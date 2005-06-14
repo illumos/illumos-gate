@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3869,6 +3869,10 @@ caddr_t data;
 	group = fp->fr_group;
 	if (!strcmp(group, "0"))
 		*group = '\0';
+
+	if (FR_ISACCOUNT(fp->fr_flags))
+		unit = IPL_LOGCOUNT;
+
 	if ((req != (int)SIOCZRLST) && (*group != '\0')) {
 		fg = fr_findgroup(group, unit, set, NULL);
 		if (fg == NULL)
@@ -3891,12 +3895,12 @@ caddr_t data;
 	else if (v == 4) {
 		if (FR_ISACCOUNT(fp->fr_flags))
 			fprev = &ipacct[in][set];
-		if ((fp->fr_flags & (FR_OUTQUE|FR_INQUE)) != 0)
+		else if ((fp->fr_flags & (FR_OUTQUE|FR_INQUE)) != 0)
 			fprev = &ipfilter[in][set];
 	} else if (v == 6) {
 		if (FR_ISACCOUNT(fp->fr_flags))
 			fprev = &ipacct6[in][set];
-		if ((fp->fr_flags & (FR_OUTQUE|FR_INQUE)) != 0)
+		else if ((fp->fr_flags & (FR_OUTQUE|FR_INQUE)) != 0)
 			fprev = &ipfilter6[in][set];
 	}
 	if (fprev == NULL)
