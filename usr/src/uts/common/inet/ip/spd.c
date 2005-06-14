@@ -1958,7 +1958,7 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp,
 			break;
 		}
 	} else {
-		check_proto = IPPROTO_ICMPV6;
+		check_proto = IPPROTO_ICMP;
 		sel->ips_isv4 = B_TRUE;
 		sel->ips_local_addr_v4 = ipha->ipha_dst;
 		sel->ips_remote_addr_v4 = ipha->ipha_src;
