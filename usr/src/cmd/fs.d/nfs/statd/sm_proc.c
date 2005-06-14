@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -779,13 +779,14 @@ statd_call_lockd(monp, state)
 		(void) printf("statd_call_lockd: %s state = %d\n",
 			stat.mon_name, stat.state);
 
+	tottimeout.tv_sec = SM_RPC_TIMEOUT;
+	tottimeout.tv_usec = 0;
+
 	if ((clnt = create_client(my_idp->my_name, my_idp->my_prog,
-		my_idp->my_vers)) == (CLIENT *) NULL) {
+		my_idp->my_vers, &tottimeout)) == (CLIENT *) NULL) {
 			return (-1);
 	}
 
-	tottimeout.tv_sec = SM_RPC_TIMEOUT;
-	tottimeout.tv_usec = 0;
 	clnt_stat = clnt_call(clnt, my_idp->my_proc, xdr_status, (char *)&stat,
 				xdr_void, NULL, tottimeout);
 	if (debug) {
@@ -808,18 +809,19 @@ statd_call_lockd(monp, state)
  * Client handle created.
  */
 CLIENT *
-create_client(host, prognum, versnum)
+create_client(host, prognum, versnum, utimeout)
 	char	*host;
 	int	prognum;
 	int	versnum;
+	struct timeval	*utimeout;
 {
 	int		fd;
 	struct timeval	timeout;
 	CLIENT		*client;
 	struct t_info	tinfo;
 
-	if ((client = clnt_create(host, prognum, versnum,
-			"netpath")) == NULL) {
+	if ((client = clnt_create_timed(host, prognum, versnum,
+			"netpath", utimeout)) == NULL) {
 		return (NULL);
 	}
 	(void) CLNT_CONTROL(client, CLGET_FD, (caddr_t)&fd);

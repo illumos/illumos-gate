@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,7 @@ extern "C" {
 #define	SM_ADDR_IPV6	"ipv6"
 
 /* Supported for readdir_r() */
-#define MAXDIRENT	(sizeof (struct dirent) +  _POSIX_PATH_MAX + 1)
+#define	MAXDIRENT	(sizeof (struct dirent) +  _POSIX_PATH_MAX + 1)
 
 /* Structure entry for monitor table (mon_table) */
 struct mon_entry {
@@ -185,7 +185,7 @@ extern void	sm_crash(void);
 extern void	sm_notify(stat_chge *ntfp);
 extern void	statd_init();
 extern void	merge_hosts(void);
-extern CLIENT	*create_client(char *host, int prognum, int versnum);
+extern CLIENT	*create_client(char *, int, int, struct timeval *);
 extern char	*xmalloc(unsigned);
 extern void	sm_status(sm_name *namep, sm_stat_res *resp);
 extern void	sm_mon(mon *monp, sm_stat_res *resp);

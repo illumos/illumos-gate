@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -594,13 +594,13 @@ statd_call_statd(name)
 				name_or_addr);
 	}
 
-	if ((clnt = create_client(name_or_addr, SM_PROG, SM_VERS)) ==
-		(CLIENT *) NULL) {
-			return (-1);
-	}
-
 	tottimeout.tv_sec = SM_RPC_TIMEOUT;
 	tottimeout.tv_usec = 0;
+
+	if ((clnt = create_client(name_or_addr, SM_PROG, SM_VERS,
+	    &tottimeout)) == (CLIENT *) NULL) {
+		return (-1);
+	}
 
 	/* Perform notification to client */
 	rc = 0;
