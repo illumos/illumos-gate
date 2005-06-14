@@ -1,0 +1,390 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+PATH=/bin:/usr/bin:/usr/sbin export PATH
+
+TEXTDOMAIN="SUNW_OST_OSCMD"
+export TEXTDOMAIN
+
+LPSET=/usr/bin/lpset
+LPGET=/usr/bin/lpget
+
+HOST=`/bin/uname -n`
+PID=$$
+
+cmd_name=lpadmin
+exit_code=0
+
+usage() {
+	gettext "Usage:\n" 1>&2
+	gettext "	lpadmin -p (printer) (options)\n" 1>&2
+	gettext "	lpadmin -x (dest)\n" 1>&2
+	gettext "	lpadmin -d (dest)\n" 1>&2
+	gettext "	lpadmin -S print-wheel -A alert-type [ -W minutes ]\n" 1>&2
+	gettext "		[ -Q requests ]\n" 1>&2
+	gettext "	lpadmin -M -f form-name [ -a [ -o filebreak ]\n" 1>&2
+	gettext "		[ -t tray-number ]]\n" 1>&2
+	exit 1
+}
+
+# 
+# Delete entries in /etc/printers.conf for local printers/classes that no longer
+# exist in the /etc/lp database
+#
+
+delete_local() {
+
+# Get printer names for each local printer
+# grep /etc/printers.conf for each bsdaddr for this server
+# get printer name from that line
+
+for LINE in `grep bsdaddr=${HOST}, /etc/printers.conf`
+do
+        PRINTER=`echo ${LINE} | sed -e 's/^:bsdaddr='$HOST',//' -e 's/[,:].*//'`
+
+# If there is not an entry for this printer in
+#       /etc/lp/printers or /etc/lp/classes
+# Then delete the entry for this printer in /etc/printers.conf
+
+        if [ ! -d /etc/lp/printers/${PRINTER} -a ! -f /etc/lp/classes/${PRINTER} ] ;
+        then
+                logger -p lpr.debug -t "lpadmin[${PID}]" \
+                         "Removing $PRINTER entry from /etc/printers.conf"
+                ${LPSET} -x ${PRINTER}
+                status=$?
+
+                if [ ${status} -ne 0 ] ; then
+                        gettext "Warning: error removing ${PRINTER} " 1>&2
+			gettext "entry from /etc/printers.conf\n" 1>&2
+                        logger -p lpr.debug -t "lpadmin[${PID}]" \
+				"Call to lpset -x $PRINTER exits with ${status}"
+			exit_code=1
+                fi
+        fi
+done
+
+#
+# shutdown scheduler if there are no local printers
+#
+CONFIGS=/etc/lp/printers/*/configuration
+
+printers_configured=`echo $CONFIGS`
+if [ "$printers_configured" = "$CONFIGS" ]; then
+	svcprop -q svc:/application/print/server:default &&
+		svcadm disable svc:/application/print/server:default
+fi
+}
+
+delete_entries() {
+if [ ! -f /etc/printers.conf ] ; then
+        logger -p lpr.debug -t "lpadmin[${PID}]" \
+		"System error: Cannot access /etc/printers.conf"
+        gettext "lpadmin: System error; Cannot access /etc/printers.conf\n" 1>&2
+        exit 1
+fi
+
+# remove _default 
+
+DEFAULTP=`${LPGET} _default | grep use | sed -e 's/[    ]*use=//'`
+${LPGET} -k bsdaddr ${DEFAULTP} >/dev/null 2>&1
+status=$?
+
+if [ ${status} -eq 0 ] ; then
+	${LPSET} -x _default
+	status=$?
+	if [ ${status} -ne 0 ] ; then
+		gettext "Warning: error removing _default entry from /etc/printers.conf\n" 1>&2
+		logger -p lpr.debug -t "lpadmin[${PID}]" \
+			"Call to lpset -x _default exits with ${status}"
+		exit_code=1
+	fi
+fi
+
+# delete entries in /etc/printers.conf for printers/classes that have
+# been deleted
+
+delete_local
+
+# Delete all the remote printers using bsdaddr
+
+for LINE in `grep bsdaddr /etc/printers.conf | grep -v ${HOST}`
+do
+        PRINTER=`echo $LINE | sed -e 's/^:bsdaddr=[^,]*,//' -e 's/[,:].*//'`
+        ${LPSET} -x $PRINTER
+	status=$?
+
+	if [ ${status} -ne 0 ] ; then
+		gettext "Warning: error removing ${PRINTER} entry from /etc/printers.conf\n" 1>&2
+		logger -p lpr.debug -t "lpadmin[${PID}]" \
+			"Call to lpset -x $PRINTER exits with ${status}"
+		exit_code=1
+	fi
+done
+}
+
+if [ $# -lt 1 ] ; then
+	usage
+	exit 1
+fi
+
+# Deal with the -d option independently since getopts does not handle
+# options that may or may not have arguments
+#
+first=$1
+second=$2
+third=$3
+
+if [ ${first} = "-d" ] ; then
+	# check that there are no extra arguments
+	if [ -n "${third}" ] ; then
+		usage
+		exit 1
+	fi
+
+
+	# be sure we have lpset and lpget
+	if [ ! -f ${LPSET} -o ! -f ${LPGET} ] ; then
+		gettext "lpadmin: System error; cannot set default printer\n" 1>&2
+		exit 2
+	fi
+
+	if [ ! -n "${second}" ] ; then
+		${LPGET} -n system _default >/dev/null 2>&1
+		exit_code=$?
+		if [ ${exit_code} -eq 0 ] ; then
+			# delete _default entry in /etc/printers.conf
+			${LPSET} -n system -x _default
+			exit_code=$?
+			if [ ${exit_code} -ne 0 ] ; then
+				gettext "lpadmin: System error while trying to delete default printer\n" 1>&2
+			fi
+		else
+			# there was no _default, the work is done
+			exit_code=0
+		fi
+	else
+		# add/change  _default entry in /etc/printers.conf
+		${LPGET} -k bsdaddr ${second} >/dev/null 2>&1
+		exit_code=$?
+		if [ $exit_code -eq 0 ] ; then
+			${LPSET} -n system -a use=${second} _default
+			exit_code=$?
+		else
+			echo "${second}: " 1>&2
+			gettext "undefined printer\n" 1>&2
+		fi
+
+	fi
+	exit ${exit_code}
+fi
+
+#		Strip off legal options
+while getopts "A:ac:D:e:f:F:H:hi:I:lm:Mn:o:p:Q:r:S:s:T:u:U:v:W:x:t:P:" arg
+do
+	case $arg in
+	D)
+		description="${OPTARG}"
+	;;
+	p)
+		if [ -n "${delete}" ] ; then
+			usage
+		fi
+		printer=${OPTARG}
+	;;
+	s)
+		server=${OPTARG}
+	;;
+	v|U)
+		device=${OPTARG}
+		server=`uname -n`
+	;;
+	x)
+		if [ -n "${printer}" -o -n "${server}" -o \
+		     -n "${device}" -o -n "${description}" ] ; then
+			usage
+		fi
+		delete=${OPTARG}
+		printer=${OPTARG}
+		if [ ${printer} = "all" ] ; then
+			local="true"
+		fi
+	;;
+	S|M|A)
+		local="true"
+	;;
+	c)
+		class=${OPTARG}
+		local="true"
+		if [ ! -f ${LPGET} ] ; then
+			gettext "lpadmin: System error; cannot set class\n " 1>&2
+			exit 2
+		fi
+
+		${LPGET} "${class}" > /dev/null 2>&1
+		lpget_class=$?
+		if [ ${lpget_class} -eq 0 -a ! -r /etc/lp/classes/"${class}" ] ; then
+			gettext "lpadmin: ERROR: Can't create class ${class}.\n" 1>&2
+			gettext "           TO FIX: This is an existing printer name;\n" 1>&2
+			gettext "                   choose another name.\n" 1>&2
+			exit 1
+		fi
+	;;
+	r)
+		pconflocalclean="true"
+		local="true"
+	;;
+	esac
+done
+
+#
+# We don't have anything to do; let user know and bail
+#
+if [ ! -n "${printer}" -a ! -n "${delete}" -a ! -n "${local}" ] ; then
+	gettext "lpadmin: ERROR: Nothing to do.\n" 1>&2
+	gettext "        TO FIX: You must give one of these options:\n" 1>&2
+	gettext "		      -p, -d, -x -S\n" 1>&2
+	exit 1
+fi
+
+#
+#       Printer does not exist
+#       To be consistent with 2.5, assume adding local printer
+#
+if [ ! -n "${device}" -a ! -n "${server}" -a ! -n "${delete}" \
+					 -a ! -n "${local}" ] ; then
+	${LPGET} "${printer}" > /dev/null 2>&1
+	lpget_stat=$?
+	if [ ${lpget_stat} -ne 0 ] ; then
+		gettext "lpadmin: ERROR: Missing -U or -v option.\n" 1>&2
+		gettext "           TO FIX: Local printers must have\n" 1>&2
+		gettext "                   a port defined (-v option) or\n" 1>&2
+		gettext "                   have dial-out instructions (-U option).\n" 1>&2
+		exit 1
+	fi
+fi
+
+#
+#	Do the LP configuration for a local printer served by lpsched
+#
+if [ -f /usr/lib/lp/local/$cmd_name ] ; then
+	if [ -f /etc/lp/printers/${printer}/configuration -o -n "${device}" -o \
+	     -f /etc/lp/classes/${printer} -o -n "${local}" ] ; then
+		# to deal with multi-word arguments
+		CMD="/usr/lib/lp/local/$cmd_name"
+		while [ -n "$*" ] ; do
+			CMD="$CMD \"$1\""
+			shift
+		done
+		case "$CMD" in
+			*\"-D\")
+				CMD="$CMD \"\""
+			;;
+		esac
+		# if adding a printer, make sure scheduler is running
+		if [ -n "${printer}" -a ! -n "${delete}" -a \
+		    ! -p /var/spool/lp/fifos/FIFO ]; then
+			svcadm enable svc:/application/print/server:default
+		fi
+		eval $CMD
+		exit_code=$?
+	fi
+fi
+
+if [ $exit_code != 0 ] ; then
+	exit $exit_code
+fi
+
+
+#	split the "server" into printer and server
+if [ -n "${server}" ] ; then
+	if [ `echo ${server} | grep -c !` = 1 ] ; then
+		rem_printer=`echo ${server} | cut -d! -f2`
+	fi
+	server=`echo ${server} | cut -d! -f1`
+fi
+
+if [ -z "${rem_printer}" ] ; then
+	rem_printer=${printer}
+fi
+
+
+
+#
+#	Do the Solstice Print Configuration in /etc
+#
+if [ ! -f ${LPSET} -o ! -f ${LPGET} ] ; then
+	exit_code=2
+else
+	if [ -n "${delete}" ] ; then
+		if [ "${delete}" = "all" ] ; then
+			delete_entries
+   		else
+   			${LPSET} -n system -x ${delete}
+   			exit_code=$?
+			delete_local
+   		fi
+	fi
+
+	if [ -n "${printer}" -a -n "${server}" ] ; then
+		${LPSET} -n system \
+			-a "bsdaddr=${server},${rem_printer},Solaris" \
+			${printer}
+		exit_code=$?
+	fi
+	if [ -n "${printer}" -a -n "${description}" ] ; then
+		${LPSET} -n system -a "description=${description}" ${printer}
+		exit_code=$?
+	fi
+
+#	Add class for local printers only
+
+	if [ -n "${class}" -a -n "${printer}" \
+		-a -f /etc/lp/printers/${printer}/configuration ] ; then
+
+		${LPGET} "${class}" > /dev/null 2>&1
+		lpget_class=$?
+
+#		If the class doesn't already exist in printers.conf, add it.
+
+		if [ ${lpget_class} -ne 0 ] ; then
+			this_server=`uname -n`
+			${LPSET} -n system \
+				-a "bsdaddr=${this_server},${class},Solaris" ${class}
+			exit_code=$?
+		fi
+	fi
+fi
+
+# /usr/lib/lp/local/lpadmin has changed the database. This cleans up cruft in the 
+# /etc/printers.conf file that refers to deleted objects.
+
+	if [ -n "${pconflocalclean}" ] ; then
+		delete_local
+	fi
+
+exit $exit_code

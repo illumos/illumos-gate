@@ -1,0 +1,71 @@
+#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:Grades 1.1 */
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#	Grades provides a orderly means of partitioning queued jobs into
+#	workloads that compete amongst its own type. Workloads can be partioned 
+#	according to size of the jobs, on a priority basis or a combination
+#	of both. Along with each grades is a list of users or groups that can
+#	use the grade, so that only select users can use the job grade.
+#	Partitioning of workloads is to be set by the uucp or system administrator.
+#
+#	Format:
+#
+#	user_job_grade			an ascii string that defines a
+#					grade for a workload partition.
+#	system_job_grade		an ascii character, A-Z, a-z,
+#					with A having the higest priority
+#					and z with the lowest priority.
+#	job_size			a number which is the maximum limit
+#					of bytes that a job can have to
+#					be placed in the queue. There are
+#					shorthand expressions that can be used
+#					to code the job_size field. K, M, and
+#					Any can used and have the meaning kilo-
+#					byte, megabyte, and no maximum,
+#					respectively. K and M must have an
+#					integer prefix.
+#	permit_type			a keyword that denotes how to interpret
+#					the id_list is contained in this field.
+#					User, non-user, group, non-group are
+#					the only valid arguments of this field.
+#	id_list				a list of login names or group names
+#					that are permitted or denied to queue
+#					jobs to this job grade. The list is to
+#					be seperated by whitespace and terminated
+#					by a newline character. The reserved word
+#					Any is used permit anyone to queue to
+#					a job grade if User is the permit_type.
+#
+#	Since the user job grade may be bound to more than one system job grade,
+#	it is important to note that the Grades file will be searched 
+#	sequentially for occurences of a user job grade. Since the names of
+#	user job grades may not be the same from system to system, we have
+#	reserved the names of three job grades so that the user may see some
+#	similiarity across different systems.
+#
+#	If the Grades file does not exist or it is unreadable, then user defined
+#	grades will not be allowed on the system.
+#	
+high	F	Any	User	Any
+medium	S	Any	User	Any
+low	n	Any	User	Any

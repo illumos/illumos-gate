@@ -1,0 +1,153 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+include ../../Makefile.cmd
+
+OWNER = root
+GROUP = sys
+FILEMODE = 0444
+
+BUILTXML= \
+	console-login.xml
+
+FSSVCS= \
+	boot-archive.xml \
+	local-fs.xml \
+	minimal-fs.xml \
+	root-fs.xml \
+	usr-fs.xml
+
+FSMANIFESTS= $(FSSVCS:%=$(ROOTSVCSYSTEMFILESYSTEM)/%)
+
+NETSVCS= \
+	datalink.xml \
+	datalink-init.xml \
+	aggregation.xml \
+	network-initial.xml \
+	network-loopback.xml \
+	network-physical.xml \
+	network-service.xml
+
+NETMANIFESTS= $(NETSVCS:%=$(ROOTSVCNETWORK)/%)
+
+MAINMILESTONES= \
+	multi-user-server.xml \
+	multi-user.xml \
+	name-services.xml \
+	network.xml \
+	single-user.xml \
+	sysconfig.xml
+
+MAINMANIFESTS= $(MAINMILESTONES:%=$(ROOTSVCMILESTONE)/%)
+
+SYSDEVSVCS= \
+	devices-local.xml
+
+SYSDEVMANIFESTS= $(SYSDEVSVCS:%=$(ROOTSVCSYSTEMDEVICE)/%)
+
+SYSTEMSVCS= \
+	console-login.xml \
+	identity.xml \
+	manifest-import.xml \
+	rmtmpfiles.xml
+
+SYSTEMMANIFESTS = $(SYSTEMSVCS:%=$(ROOTSVCSYSTEM)/%)
+
+SYSTEMSVCSVCS= \
+	restarter.xml
+
+SYSTEMSVCMANIFESTS= $(SYSTEMSVCSVCS:%=$(ROOTSVCSYSTEM)/svc/%)
+
+MISCFILES= \
+	README.share
+
+SYSTEMMISCFILES = $(MISCFILES:%.share=$(ROOT)/lib/svc/share/%)
+
+#
+# MANIFEST is used solely in the construction of the check target.
+#
+MANIFEST= $(FSSVCS) $(NETSVCS) $(MAINMILESTONES) $(SYSTEMSVCS) \
+	$(SYSDEVSVCS) $(SYSTEMSVCSVCS)
+
+SVCMETHOD=\
+	aggregation \
+	boot-archive \
+	console-login \
+	datalink \
+	datalink-init \
+	devices-local \
+	fs-local \
+	fs-minimal \
+	fs-root \
+	fs-usr \
+	identity-domain \
+	identity-node \
+	manifest-import \
+	net-loopback \
+	net-init \
+	net-physical \
+	net-svc \
+	rmtmpfiles
+
+$(ROOTSVCMETHOD) := FILEMODE = 0555
+
+all: $(BUILTXML)
+
+install: $(FSMANIFESTS) $(MAINMANIFESTS) $(NETMANIFESTS) $(SYSTEMMANIFESTS) \
+	$(ROOTSVCMETHOD) $(SYSDEVMANIFESTS) $(SYSTEMSVCMANIFESTS) \
+	$(SYSTEMMISCFILES)
+
+check:	$(CHKMANIFEST)
+
+console-login.xml: make-console-login-xml
+	$(SH) ./make-console-login-xml
+
+clobber: clean
+	-$(RM) $(BUILTXML)
+
+$(ROOTSVCMILESTONE)/%: %
+	$(INS.file)
+
+$(ROOTSVCNETWORK)/%: %
+	$(INS.file)
+
+$(ROOTSVCSYSTEM)/%: %
+	$(INS.file)
+
+$(ROOTSVCSYSTEMDEVICE)/%: %
+	$(INS.file)
+
+$(ROOTSVCSYSTEMFILESYSTEM)/%: %
+	$(INS.file)
+
+$(ROOTSVCSYSTEM)/svc/%: %
+	$(INS.file)
+
+$(ROOT)/lib/svc/share/%: %.share
+	$(INS.rename)
+
+clean lint _msg:

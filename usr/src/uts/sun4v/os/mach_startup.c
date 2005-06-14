@@ -1,0 +1,303 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/machsystm.h>
+#include <sys/archsystm.h>
+#include <sys/prom_plat.h>
+#include <sys/promif.h>
+#include <sys/vm.h>
+#include <sys/cpu.h>
+#include <sys/atomic.h>
+#include <sys/cpupart.h>
+#include <sys/disp.h>
+#include <sys/hypervisor_api.h>
+#ifdef TRAPTRACE
+#include <sys/traptrace.h>
+#include <sys/hypervisor_api.h>
+#endif /* TRAPTRACE */
+
+caddr_t	mmu_fault_status_area;
+
+extern void sfmmu_set_tsbs(void);
+/*
+ * CPU IDLE optimization variables/routines
+ */
+static int enable_halt_idle_cpus = 1;
+
+void
+setup_trap_table(void)
+{
+	caddr_t mmfsa_va;
+	extern	 caddr_t mmu_fault_status_area;
+	mmfsa_va =
+	    mmu_fault_status_area + (MMFSA_SIZE * CPU->cpu_id);
+
+	intr_init(CPU);			/* init interrupt request free list */
+	setwstate(WSTATE_KERN);
+	set_mmfsa_scratchpad(mmfsa_va);
+	prom_set_mmfsa_traptable(&trap_table, va_to_pa(mmfsa_va));
+	sfmmu_set_tsbs();
+}
+
+void
+phys_install_has_changed(void)
+{
+
+}
+
+/*
+ * Halt the present CPU until awoken via an interrupt
+ */
+static void
+cpu_halt(void)
+{
+	cpu_t *cpup = CPU;
+	processorid_t cpun = cpup->cpu_id;
+	cpupart_t *cp;
+	int hset_update = 1;
+	int s;
+
+	/*
+	 * If this CPU is online, and there's multiple CPUs
+	 * in the system, then we should notate our halting
+	 * by adding ourselves to the partition's halted CPU
+	 * bitmap. This allows other CPUs to find/awaken us when
+	 * work becomes available.
+	 */
+	if (CPU->cpu_flags & CPU_OFFLINE || ncpus == 1)
+		hset_update = 0;
+	/*
+	 * We're on our way to being halted.
+	 * Raise PIL now, so that we'll awaken immediately
+	 * after halting if someone tries to poke us between now and
+	 * the time we actually halt.
+	 */
+	s = spl7();
+
+	/*
+	 * Add ourselves to the partition's halted CPUs bitmask
+	 * if necessary.
+	 */
+	if (hset_update) {
+		cp = cpup->cpu_part;
+		CPUSET_ATOMIC_ADD(cp->cp_haltset, cpun);
+	}
+
+	/*
+	 * Check to make sure there's really nothing to do.
+	 * If work becomes available *after* we do this check
+	 * and it's determined that the work should be ours,
+	 * we won't miss it since we'll be notified with a "poke"
+	 * ...which will pop us right back out of the halted state.
+	 */
+	if (disp_anywork()) {
+		if (hset_update)
+			CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+		(void) splx(s);
+		return;
+	}
+
+	/*
+	 * Halt the strand
+	 */
+	(void) hv_cpu_yield();
+
+	/*
+	 * We're no longer halted
+	 */
+	(void) splx(s);
+	if (hset_update)
+		CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+}
+
+/*
+ * If "cpu" is halted, then wake it up clearing its halted bit in advance.
+ * Otherwise, see if other CPUs in the cpu partition are halted and need to
+ * be woken up so that they can steal the thread we placed on this CPU.
+ * This function is only used on MP systems.
+ */
+static void
+cpu_wakeup(cpu_t *cpu, int bound)
+{
+	uint_t		cpu_found;
+	int		result;
+	cpupart_t	*cp;
+
+	cp = cpu->cpu_part;
+	if (CPU_IN_SET(cp->cp_haltset, cpu->cpu_id)) {
+		/*
+		 * Clear the halted bit for that CPU since it will be
+		 * poked in a moment.
+		 */
+		CPUSET_ATOMIC_DEL(cp->cp_haltset, cpu->cpu_id);
+		/*
+		 * We may find the current CPU present in the halted cpuset
+		 * if we're in the context of an interrupt that occurred
+		 * before we had a chance to clear our bit in cpu_halt().
+		 * Poking ourself is obviously unnecessary, since if
+		 * we're here, we're not halted.
+		 */
+		if (cpu != CPU)
+			poke_cpu(cpu->cpu_id);
+		return;
+	} else {
+		/*
+		 * This cpu isn't halted, but it's idle or undergoing a
+		 * context switch. No need to awaken anyone else.
+		 */
+		if (cpu->cpu_thread == cpu->cpu_idle_thread ||
+		    cpu->cpu_disp_flags & CPU_DISP_DONTSTEAL)
+			return;
+	}
+
+	/*
+	 * No need to wake up other CPUs if the thread we just enqueued
+	 * is bound.
+	 */
+	if (bound)
+		return;
+
+	/*
+	 * See if there's any other halted CPUs. If there are, then
+	 * select one, and awaken it.
+	 * It's possible that after we find a CPU, somebody else
+	 * will awaken it before we get the chance.
+	 * In that case, look again.
+	 */
+	do {
+		CPUSET_FIND(cp->cp_haltset, cpu_found);
+		if (cpu_found == CPUSET_NOTINSET)
+			return;
+
+		ASSERT(cpu_found >= 0 && cpu_found < NCPU);
+		CPUSET_ATOMIC_XDEL(cp->cp_haltset, cpu_found, result);
+	} while (result < 0);
+
+	if (cpu_found != CPU->cpu_id)
+		poke_cpu(cpu_found);
+}
+
+void
+mach_cpu_halt_idle()
+{
+	if (enable_halt_idle_cpus) {
+		idle_cpu = cpu_halt;
+		disp_enq_thread = cpu_wakeup;
+	}
+}
+
+int
+ndata_alloc_mmfsa(struct memlist *ndata)
+{
+	size_t	size;
+
+	size = MMFSA_SIZE * max_ncpus;
+	mmu_fault_status_area = ndata_alloc(ndata, size, ecache_alignsize);
+	if (mmu_fault_status_area == NULL)
+		return (-1);
+	return (0);
+}
+
+void
+mach_memscrub(void)
+{
+	/* no memscrub support for sun4v for now */
+}
+
+void
+mach_fpras()
+{
+	/* no fpras support for sun4v for now */
+}
+
+void
+mach_hw_copy_limit(void)
+{
+	/* HW copy limits set by individual CPU module */
+}
+
+#ifdef TRAPTRACE
+/*
+ * This function sets up hypervisor traptrace buffer
+ */
+void
+htrap_trace_setup(caddr_t buf, int cpuid)
+{
+	TRAP_TRACE_CTL	*ctlp;
+
+	ctlp = &trap_trace_ctl[cpuid];
+	ctlp->d.hvaddr_base = buf;
+	ctlp->d.hlimit = HTRAP_TSIZE;
+	ctlp->d.hpaddr_base = va_to_pa(buf);
+}
+
+/*
+ * This function configures and enables the hypervisor traptrace buffer
+ */
+void
+htrap_trace_register(int cpuid)
+{
+	uint64_t ret;
+	uint64_t prev_buf, prev_bufsize;
+	uint64_t prev_enable;
+	uint64_t size;
+	TRAP_TRACE_CTL	*ctlp;
+
+	ret = hv_ttrace_buf_info(&prev_buf, &prev_bufsize);
+	if ((ret == H_EOK) && (prev_bufsize != 0)) {
+		cmn_err(CE_CONT,
+		    "!cpu%d: previous HV traptrace buffer of size 0x%lx "
+		    "at address 0x%lx", cpuid, prev_bufsize, prev_buf);
+	}
+
+	ctlp = &trap_trace_ctl[cpuid];
+	ret = hv_ttrace_buf_conf(ctlp->d.hpaddr_base, HTRAP_TSIZE /
+		(sizeof (struct htrap_trace_record)), &size);
+	if (ret == H_EOK) {
+		ret = hv_ttrace_enable((uint64_t)TRAP_TENABLE_ALL,
+			&prev_enable);
+		if (ret != H_EOK) {
+			cmn_err(CE_WARN,
+			    "!cpu%d: HV traptracing not enabled, "
+			    "ta: 0x%x returned error: %d",
+			    cpuid, TTRACE_ENABLE, ret);
+		}
+	} else {
+		cmn_err(CE_WARN,
+		    "!cpu%d: HV traptrace buffer not configured, "
+		    "ta: 0x%x returned error: %d",
+		    cpuid, TTRACE_BUF_CONF, ret);
+	}
+	/* set hvaddr_base to NULL when traptrace buffer registration fails */
+	if (ret != H_EOK) {
+		ctlp->d.hvaddr_base = NULL;
+		ctlp->d.hlimit = 0;
+		ctlp->d.hpaddr_base = NULL;
+	}
+}
+#endif /* TRAPTRACE */

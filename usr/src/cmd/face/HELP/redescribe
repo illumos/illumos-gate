@@ -1,0 +1,29 @@
+
+The redescribe command enables you to redefine an object's description.
+The object description provided by the system is the standard object
+type, e.g., standard file.  You can replace the standard description
+with a description of your own. Details of file types are available
+by striking CONTENTS and selecting Filecabinet, file folders, and
+files for the Overview of FACE Contents Menu.
+
+Use one of the methods below to redescribe an object.  The current
+object is assumed if the object name is not specified with the
+redescribe command.
+
+     Command Menu:  Select redescribe and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on redescribe and an -->
+     (alternative)  will appear on the command line followed by the
+                    redescribe. Type arguments and press ENTER to
+                    execute the command.
+
+     Command Line:  Type redescribe [object] and press ENTER.
+
+   1.  The following message appears:
+
+           Enter the new description:
+
+   2.  Type in the new description for the object. Your input is
+       limited to 23 characters and will be truncated if you type
+       a longer description.
+

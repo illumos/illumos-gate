@@ -1,0 +1,228 @@
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+# 2001 September 15
+#
+# The author disclaims copyright to this source code.  In place of
+# a legal notice, here is a blessing:
+#
+#    May you do good and not evil.
+#    May you find forgiveness for yourself and forgive others.
+#    May you share freely, never taking more than you give.
+#
+#***********************************************************************
+# This file attempts to check the library in an out-of-memory situation.
+# When compiled with -DMEMORY_DEBUG=1, the SQLite library accepts a special
+# command (sqlite_malloc_fail N) which causes the N-th malloc to fail.  This
+# special feature is used to see what happens in the library if a malloc
+# were to really fail due to an out-of-memory situation.
+#
+# $Id: malloc.test,v 1.6 2004/02/14 01:39:50 drh Exp $
+
+set testdir [file dirname $argv0]
+source $testdir/tester.tcl
+
+# Only run these tests if memory debugging is turned on.
+#
+if {[info command sqlite_malloc_stat]==""} {
+   puts "Skipping malloc tests: not compiled with -DMEMORY_DEBUG..."
+   finish_test
+   return
+}
+
+for {set go 1; set i 1} {$go} {incr i} {
+  do_test malloc-1.$i {
+     sqlite_malloc_fail 0
+     catch {db close}
+     catch {file delete -force test.db}
+     catch {file delete -force test.db-journal}
+     sqlite_malloc_fail $i
+     set v [catch {sqlite db test.db} msg]
+     if {$v} {
+       set msg ""
+     } else {
+       set v [catch {execsql {
+          CREATE TABLE t1(
+             a int, b float, c double, d text, e varchar(20),
+             primary key(a,b,c)
+          );
+          CREATE INDEX i1 ON t1(a,b);
+          INSERT INTO t1 VALUES(1,2.3,4.5,'hi','there');
+          INSERT INTO t1 VALUES(6,7.0,0.8,'hello','out yonder');
+          SELECT * FROM t1;
+          SELECT avg(b) FROM t1 GROUP BY a HAVING b>20.0;
+          DELETE FROM t1 WHERE a IN (SELECT min(a) FROM t1);
+          SELECT count(*) FROM t1;
+       }} msg]
+     }
+     set leftover [lindex [sqlite_malloc_stat] 2]
+     if {$leftover>0} {
+       if {$leftover>1} {puts "\nLeftover: $leftover\nReturn=$v  Message=$msg"}
+       set ::go 0
+       set v {1 1}
+     } else {
+       set v2 [expr {$msg=="" || $msg=="out of memory"}]
+       if {!$v2} {puts "\nError message returned: $msg"}
+       lappend v $v2
+     }
+  } {1 1}
+}
+
+set fd [open ./data.tmp w]
+for {set i 1} {$i<=20} {incr i} {
+  puts $fd "$i\t[expr {$i*$i}]\t[expr {100-$i}] abcdefghijklmnopqrstuvwxyz"
+}
+close $fd
+
+for {set go 1; set i 1} {$go} {incr i} {
+  do_test malloc-2.$i {
+     sqlite_malloc_fail 0
+     catch {db close}
+     catch {file delete -force test.db}
+     catch {file delete -force test.db-journal}
+     sqlite_malloc_fail $i
+     set v [catch {sqlite db test.db} msg]
+     if {$v} {
+       set msg ""
+     } else {
+       set v [catch {execsql {
+         CREATE TABLE t1(a int, b int, c int);
+         CREATE INDEX i1 ON t1(a,b);
+         COPY t1 FROM 'data.tmp';
+         SELECT 'stuff', count(*) as 'other stuff', max(a+10) FROM t1;
+         UPDATE t1 SET b=b||b||b||b;
+         UPDATE t1 SET b=a WHERE a in (10,12,22);
+         INSERT INTO t1(c,b,a) VALUES(20,10,5);
+         INSERT INTO t1 SELECT * FROM t1
+             WHERE a IN (SELECT a FROM t1 WHERE a<10);
+         DELETE FROM t1 WHERE a>=10;
+         DROP INDEX i1;
+         DELETE FROM t1;
+       }} msg]
+     }
+     set leftover [lindex [sqlite_malloc_stat] 2]
+     if {$leftover>0} {
+       if {$leftover>1} {puts "\nLeftover: $leftover\nReturn=$v  Message=$msg"}
+       set ::go 0
+       set v {1 1}
+     } else {
+       set v2 [expr {$msg=="" || $msg=="out of memory"}]
+       if {!$v2} {puts "\nError message returned: $msg"}
+       lappend v $v2
+     }
+  } {1 1}
+}
+
+set fd [open ./data.tmp w]
+for {set i 1} {$i<=10} {incr i} {
+  puts $fd "$i\t[expr {$i*$i}]\t[expr {100-$i}]"
+}
+close $fd
+
+for {set go 1; set i 1} {$go} {incr i} {
+  do_test malloc-3.$i {
+     sqlite_malloc_fail 0
+     catch {db close}
+     catch {file delete -force test.db}
+     catch {file delete -force test.db-journal}
+     sqlite_malloc_fail $i
+     set v [catch {sqlite db test.db} msg]
+     if {$v} {
+       set msg ""
+     } else {
+       set v [catch {execsql {
+         BEGIN TRANSACTION;
+         CREATE TABLE t1(a int, b int, c int);
+         CREATE INDEX i1 ON t1(a,b);
+         COPY t1 FROM 'data.tmp';
+         INSERT INTO t1(c,b,a) VALUES(20,10,5);
+         DELETE FROM t1 WHERE a>=10;
+         DROP INDEX i1;
+         DELETE FROM t1;
+         ROLLBACK;
+       }} msg]
+     }
+     set leftover [lindex [sqlite_malloc_stat] 2]
+     if {$leftover>0} {
+       if {$leftover>1} {puts "\nLeftover: $leftover\nReturn=$v  Message=$msg"}
+       set ::go 0
+       set v {1 1}
+     } else {
+       set v2 [expr {$msg=="" || $msg=="out of memory"}]
+       if {!$v2} {puts "\nError message returned: $msg"}
+       lappend v $v2
+     }
+  } {1 1}
+}
+for {set go 1; set i 1} {$go} {incr i} {
+  do_test malloc-4.$i {
+     sqlite_malloc_fail 0
+     catch {db close}
+     catch {file delete -force test.db}
+     catch {file delete -force test.db-journal}
+     sqlite_malloc_fail $i
+     set v [catch {sqlite db test.db} msg]
+     if {$v} {
+       set msg ""
+     } else {
+       set v [catch {execsql {
+         BEGIN TRANSACTION;
+         CREATE TABLE t1(a int, b int, c int);
+         CREATE INDEX i1 ON t1(a,b);
+         COPY t1 FROM 'data.tmp';
+         UPDATE t1 SET b=a WHERE a in (10,12,22);
+         INSERT INTO t1 SELECT * FROM t1
+             WHERE a IN (SELECT a FROM t1 WHERE a<10);
+         DROP INDEX i1;
+         DELETE FROM t1;
+         COMMIT;
+       }} msg]
+     }
+     set leftover [lindex [sqlite_malloc_stat] 2]
+     if {$leftover>0} {
+       if {$leftover>1} {puts "\nLeftover: $leftover\nReturn=$v  Message=$msg"}
+       set ::go 0
+       set v {1 1}
+     } else {
+       set v2 [expr {$msg=="" || $msg=="out of memory"}]
+       if {!$v2} {puts "\nError message returned: $msg"}
+       lappend v $v2
+     }
+  } {1 1}
+}
+for {set go 1; set i 1} {$go} {incr i} {
+  do_test malloc-5.$i {
+     sqlite_malloc_fail 0
+     catch {db close}
+     catch {file delete -force test.db}
+     catch {file delete -force test.db-journal}
+     sqlite_malloc_fail $i
+     set v [catch {sqlite db test.db} msg]
+     if {$v} {
+       set msg ""
+     } else {
+       set v [catch {execsql {
+         BEGIN TRANSACTION;
+         CREATE TABLE t1(a,b);
+         CREATE TABLE t2(x,y);
+         CREATE TRIGGER r1 AFTER INSERT ON t1 BEGIN
+           INSERT INTO t2(x,y) VALUES(new.rowid,1);
+         END;
+         INSERT INTO t1(a,b) VALUES(2,3);
+         COMMIT;
+       }} msg]
+     }
+     set leftover [lindex [sqlite_malloc_stat] 2]
+     if {$leftover>0} {
+       if {$leftover>1} {puts "\nLeftover: $leftover\nReturn=$v  Message=$msg"}
+       set ::go 0
+       set v {1 1}
+     } else {
+       set v2 [expr {$msg=="" || $msg=="out of memory"}]
+       if {!$v2} {puts "\nError message returned: $msg"}
+       lappend v $v2
+     }
+  } {1 1}
+}
+sqlite_malloc_fail 0
+finish_test

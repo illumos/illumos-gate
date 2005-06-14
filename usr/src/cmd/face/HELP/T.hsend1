@@ -1,0 +1,22 @@
+
+Press CHOICES or type the login of a user on this system.
+
+To send mail to a user on a different system the user login 
+would be of the form of  <system name!user login>. For example, 
+
+       merc!thd 
+
+would send the mail to the user with the login thd on the 
+system named merc. The system name must be a name of a system 
+that your system recognizes.
+
+The mail may be sent to more than one destination by specifying
+multiple logins in this field.
+
+After you press SAVE, the screen will clear and mailx will 
+prompt you for the subject of the mail.
+
+Type "~." to end your message and return to FACE.
+
+You can get help in mailx by typing "~?".
+

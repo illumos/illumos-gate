@@ -1,0 +1,12 @@
+e awk.h
+g/#ident	"%Z%%M%	%I%	%E% SMI"/p
+1,$s/# *define *//
+1,$s/^/"/
+1,$s/ /", /
+1,$s/$/,/
+w temp
+e token.c
+/= *{$/+1,/^};$/-1d
+-r temp
+w tmptoken.c
+q

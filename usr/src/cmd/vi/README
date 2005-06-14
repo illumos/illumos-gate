@@ -1,0 +1,60 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
+  This directory and its subdirectories contain the files necessary
+for making ex/vi in the AT&T UNIX environment: 
+
+	This is a list of all the important directories and what's
+	hidden under each.
+
+	misc - contains files used in the "make" of ex/vi
+	      { mkstr.c, xstr.c ...}
+	
+	port - ex/vi source directory.
+
+	local - contains "uparm.h" which must be edited to
+		reflect your system setup!
+		EXAMPLE:
+		--------
+		#define libpath(file) "/usr/lib/file"
+		#define loclibpath(file) "/usr/lib/file"
+		#define binpath(file) "/usr/lbin/file"
+		#define usrpath(file) "/usr/file"
+		** libpath is where ex/vi expects the strings file
+		(exstrings...this file is made as the ex/vi source 
+		is compiled), and ex/vi 's recover & preserve commands
+		(exrecover and expreserve).
+		** usrpath is where the preserved files are held after
+		a hangup or fail..."preserve" is tacked onto
+		the end of the usrpath string .
+
+	PATHs to look at (and possibly change) include: 
+
+	  port/makefile.usg   ---|
+	  preserve and recover commands all are installed in
+	  ${LIBDIR}....make sure this is where you
+	  want them to go.  This path must be the same as
+	  the path defined in local/uparm.h ...c variable
+	  name is usrpath.
+
+	     In the event of a hangup, the editor will place a
+	  copy of the temporary file in /usr/preserve.

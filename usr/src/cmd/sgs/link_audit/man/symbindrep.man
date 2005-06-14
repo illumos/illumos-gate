@@ -1,0 +1,102 @@
+.\" ident	"%Z%%M%	%I%	%E% SMI"
+.\" Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License, Version 1.0 only
+.\" (the "License").  You may not use this file except in compliance
+.\" with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.if n .tr \--
+.TH symbindrep 1 "18 Nov 1996"
+.SH NAME
+symbindrep \- report on all symbol bindings required to load this object
+.SH SYNOPSIS
+.B symbindrep
+[
+.B -f
+.I bindfromlist
+] [
+.B -t
+.I bindtolist
+] [
+.B -l
+.I symbindreplib
+] 
+.I funcname
+executable
+.SH AVAILABILITY
+.LP
+SUNWosdem
+.SH DESCRIPTION
+.B symbindrep
+is a simple example of a
+.I Link-Auditing
+library which reports on the symbol bindings performed by
+the run-time linker (ld.so.1) when loading an object.
+.B symbindrep
+will display all of the symbol bindings that occur
+between the executable and all of it's dependencies.  After all symbol
+bindings have been performed
+.B symbindrep 
+will terminate.  No code from the executable is ever executed.
+.SH OPTIONS
+.TP 10
+.BI \-f " bindfromlist"
+A colon seperated list of libraries that are to be traced.  Only symbol
+bindings from these libraries will be traced.  The default is
+to report on all symbol bindings.
+.BI \-t " bindtolib"
+A colon seperated list of libraries that are to be traced.  Only symbol
+bindings to these libraries will be reported.  The default is to trace
+all libraries.
+.BI \-l " symbindrep"
+specify an alternate symbindrep.so 
+.I Link-Auditing
+library to use.
+.SH EXAMPLES
+This example reports on only the symbol bindings between nm and
+libelf.so.1.
+.LP
+.nf
+.ft 3
+% symbindrep -t /usr/lib/libelf.so.1 -f nm nm
+                    Symbol Bindings
+
+Referencing          Defining
+Object               Object               Symbol
+------------------------------------------------------------------
+nm                   /usr/lib/libelf.so.1 elf_version
+nm                   /usr/lib/libelf.so.1 elf_begin
+nm                   /usr/lib/libelf.so.1 elf_errmsg
+nm                   /usr/lib/libelf.so.1 elf_kind
+nm                   /usr/lib/libelf.so.1 elf_end
+nm                   /usr/lib/libelf.so.1 elf32_getehdr
+nm                   /usr/lib/libelf.so.1 elf_getscn
+nm                   /usr/lib/libelf.so.1 elf32_getshdr
+nm                   /usr/lib/libelf.so.1 elf_getdata
+nm                   /usr/lib/libelf.so.1 elf_nextscn
+nm                   /usr/lib/libelf.so.1 elf_getarhdr
+nm                   /usr/lib/libelf.so.1 elf_next
+nm                   /usr/lib/libelf.so.1 elf_strptr
+.ft
+.fi
+.SH SEE ALSO
+.BR ld.so.1 (1)
+.br
+.TZ LLM

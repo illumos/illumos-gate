@@ -1,0 +1,129 @@
+#!/usr/perl5/5.8.4/bin/perl
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This script takes a file mapping CSV file as input (see flist_s10_5-8-4.csv
+# for an example), a perl build directory and an ON workspace and outputs a ksh
+# script containing the SCCS and Teamware commands necessary to copy the
+# required files from the perl build directory into the ON workspace.  Note that
+# the 'sleep 1' commands are because Teamware can't cope with rapid check-ins of
+# large numbers of files.
+#
+
+use strict;
+use warnings;
+use POSIX qw(uname);
+
+# SCCS comment, perl versions.
+our $Comment =
+    qq('5040539 Perl 5.8.4 should be integrated into S10');
+our $Ver     = '5.8.4';
+our $PrevVer = '5.8.3';
+
+# Cache of already-created directories.
+our %DirsMade;
+
+#
+# Make a directory if it hasn't already been made.
+#
+sub make_dir
+{
+	my ($dir) = @_;
+
+	if (! exists($DirsMade{$dir})) {
+		print("mkdir -p $dir\n");
+		$DirsMade{$dir}++;
+	}
+}
+
+#
+# Main.
+#
+
+# Basic sanity checks.
+@ARGV == 3 || die("Usage is $0 <mapping file> <perl build dir> <workspace>\n");
+my ($mapfile, $bld, $ws) = @ARGV;
+die("$bld is not a perl build dir\n") if (! -f "$bld/config.sh");
+die("$ws is not a workspace\n") if (! -d "$ws/Codemgr_wsdata");
+
+# Work out directory locations.
+my $ver_dst = "$ws/usr/src/cmd/perl/$Ver";
+my $prev_ver_dst = "$ws/usr/src/cmd/perl/$PrevVer";
+my $arch = ((uname())[4] eq 'i86pc') ? 'i386' : 'sparc';
+
+# Read in the mapping file.
+my ($fh, $line, %file);
+open($fh, '<', $mapfile) || die("Can't open $mapfile: $!\n");
+while (defined($line = <$fh>) && $line !~ m{^"Path",}) {
+	;
+}
+while (defined($line = <$fh>)) {
+	chomp($line);
+	my @field;
+	push(@field, $+) while $line =~
+	    m{["']([^"'\\]*(?:\\.[^"'\\]*)*)["'],?|([^,]+),?|,}g;
+	push(@field, undef) if (substr($line, -1, 1) eq ',');
+	my $p = shift(@field);
+	my $f = shift(@field);
+	# We just want the s10 column.
+	$file{$p}{$f} = defined($field[3]) ? $field[3] : '';
+}
+close($fh);
+
+# Process the mappings.
+print("#!/bin/ksh\n\nunalias rm\ntypeset -r comment=$Comment\n",
+    "set -ex\nexport CODEMGR_WS=$ws\n\n");
+foreach my $p (sort(keys(%file))) {
+	foreach my $f (sort(keys(%{$file{$p}}))) {
+		my $d = $file{$p}{$f};
+		my $pf = ($p ne '' ? "$p/" : $p) . $f;
+		my $cpf = ($p ne '' ? "$p/" : $p) . ",$f";
+
+		# If it is to go into the distrib directory.
+		if ($d eq 'distrib') {
+			make_dir("$ver_dst/distrib/$p");
+			print("cp $bld/$pf $ver_dst/distrib/$pf\n");
+			print("( cd $ver_dst/distrib/$p && ",
+			    "sccs create $f -y\"\$comment\" )\n");
+			print("rm -f $ver_dst/distrib/$cpf\n");
+			print("sleep 1\n");
+
+		# If it is to go into the arch directory.
+		} elsif ($d eq 'arch') {
+			make_dir("$ver_dst/$arch");
+			print("cp $bld/$pf $ver_dst/$arch/$f\n");
+			print("( cd $ver_dst/$arch/$p && ",
+			    "sccs create $f -y\"\$comment\" )\n");
+			print("rm -f $ver_dst/$arch/$cpf\n");
+			print("sleep 1\n");
+
+		# If it is to be copied forwards from the last version.
+		} elsif ($d eq 'fwd') {
+			make_dir("$ver_dst/distrib/$p");
+			print("( cd $prev_ver_dst/distrib/$p && ",
+			    "sccs edit $f && cp $f $ver_dst/distrib/$pf && ",
+			    "sccs unedit $f )\n");
+			print("( cd $ver_dst/distrib/$p && ",
+			    "sccs create $f -y\"\$comment\" )\n");
+			print("rm -f $ver_dst/distrib/$cpf\n");
+			print("sleep 1\n");
+		}
+	}
+}
+
+# Write a fake MANIFEST file, for 'make test'.
+print("cat > $ver_dst/distrib/MANIFEST <<EOF\n");
+foreach my $p (sort(keys(%file))) {
+	foreach my $f (sort(keys(%{$file{$p}}))) {
+		print(($p ne '' ? "$p/" : $p) . $f . "\n")
+		    if ($file{$p}{$f} eq 'distrib');
+	}
+}
+print("EOF\n");
+print("( cd $ver_dst/distrib && sccs create MANIFEST -y\"\$comment\" )\n");
+print("rm -f $ver_dst/distrib/,MANIFEST\n");
+
+print("echo SUCCESS\n");

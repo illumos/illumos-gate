@@ -1,0 +1,10 @@
+
+Press CHOICES to toggle between Yes and No or simply type "Yes" or
+"No" to specify if the owner will be permitted to view the file.
+
+If you respond "No", you will not be able to view the file.
+
+If this object is a file folder, you also need run/search permission
+to view the contents of the file folder and the contents of the 
+items listed in the file folder.
+

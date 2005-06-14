@@ -1,0 +1,10 @@
+.div
+.mul
+.rem
+.stret1
+.stret2
+.stret4
+.stret8
+.udiv
+.umul
+.urem

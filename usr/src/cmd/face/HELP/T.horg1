@@ -1,0 +1,26 @@
+
+Press CHOICES to toggle between the following to select your
+preference:
+
+         - name and description (default value):  For each file and
+           file folder type, its name and description are displayed.
+
+         - name and marks:  For each file and file folder, its name
+           is displayed with an * after the name if the object is an
+           executable file or a / after the name if the object is a
+           file folder.
+
+         - name only:  For each file and file folder, only the name
+           is displayed.
+
+         - long form:  For each file and file folder, its name,
+           description (if specified), type, and the date and time
+           it was created/changed are displayed.
+
+         - wastebasket:  This choice is only displayed if the object
+           that is being organized is your WASTEBASKET.  It changes
+           the display to be the same as name and description above
+           along with the name of the file folder that the object
+           was deleted from.  If the object being displayed does not
+           have this information available, unknown is displayed.
+

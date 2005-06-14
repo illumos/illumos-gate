@@ -1,0 +1,122 @@
+#!/usr/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:Install 2.3 */
+
+# This shell simulates the action of the install command that
+# is available on system V systems.
+#  It only does the part required for my makefile!
+#
+USAGE="usage: Install -f Directory [-o] [-m mode] [-u owner] [-g group] File"
+#
+# It will copy file to Directory changes the mode, owner and
+# group if specified.  If -o is used, an existing file is moved
+# to OLDfile.
+
+OLD=
+MODE=
+OWNER=
+GROUP=
+FILE=
+
+while [ $# -gt 0 ]
+do
+	case $1 in
+	-o)	OLD="OLD"
+		shift
+		;;
+
+	-f)	shift
+		DIR=$1
+		shift
+		;;
+
+	-f*)	DIR=`echo $1|sed "s/..//"`
+		shift
+		;;
+
+	-m)	shift
+		MODE=$1
+		shift
+		;;
+
+	-m*)	MODE=`echo $1|sed "s/..//"`
+		shift
+		;;
+
+	-u)	shift
+		OWNER=$1
+		shift
+		;;
+
+	-u*)	OWNER=`echo $1|sed "s/..//"`
+		shift
+		;;
+
+	-g)	shift
+		GROUP=$1
+		shift
+		;;
+
+	-g*)	GROUP=`echo $1|sed "s/..//"`
+		shift
+		;;
+
+	*)	FILE=$1
+		break
+		;;
+
+	esac
+done
+
+
+if [ -z "$FILE" -o -z "$DIR" ]; then
+	echo $USAGE
+	exit 1
+fi
+
+if [ -n "$OLD" ]; then
+	echo mv $DIR/$FILE $DIR/OLD$FILE
+	mv $DIR/$FILE $DIR/OLD$FILE
+fi
+
+rm -f $DIR/$FILE
+echo cp $FILE $DIR/$FILE
+cp $FILE $DIR/$FILE
+
+if [ -n "$GROUP" ]; then
+	echo chgrp $GROUP $DIR/$FILE
+	chgrp $GROUP $DIR/$FILE
+fi
+
+if [ -n "$MODE" ]; then
+	echo chmod $MODE $DIR/$FILE
+	chmod $MODE $DIR/$FILE
+fi
+
+
+if [ -n "$OWNER" ]; then
+	echo chown $OWNER $DIR/$FILE
+	chown $OWNER $DIR/$FILE
+fi
+
+ls -l $DIR/$FILE

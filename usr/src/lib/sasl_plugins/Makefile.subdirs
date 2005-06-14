@@ -1,0 +1,27 @@
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+include		$(SRC)/lib/Makefile.lib
+
+SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
+
+all :=		TARGET= all
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+install :=	TARGET= install
+lint :=		TARGET= lint
+.KEEP_STATE:
+
+all clean clobber install: spec .WAIT $(SUBDIRS)
+
+lint: $(SUBDIRS)
+
+$(SUBDIRS) spec: FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

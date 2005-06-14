@@ -1,0 +1,167 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+while read src dest
+do
+	if [ ! -f $dest ] ; then
+		cp $src $dest
+	else
+		#
+		# Strip off any leading "/a"
+		#
+		dest_file=`echo $dest | sed "s=^/a/=/="`
+
+		#
+		# Add the sysadmin group (gid 14) to support admintool
+		#
+		grep '^sysadmin:.*:14:.*' $dest 2>&1 >/dev/null
+		if [ $? = 0 ] ; then
+			/usr/bin/true
+		elif grep '^sysadmin:' $dest 2>&1 >/dev/null; then
+			cur_name="sysadmin"
+			echo "SYSADMIN_NOT_14 $dest_file none" >> /tmp/CLEANUP
+			echo "sysadmin::14:" >> $dest
+
+		elif grep ':14:' $dest 2>&1 >/dev/null; then
+			cur_name=`grep ':14:' $dest | awk -F: '{print $1}'`
+			echo "GROUP14_IN_USE $dest_file none" >> /tmp/CLEANUP
+			echo "sysadmin::14:" >> $dest
+
+		else		# add the group
+			echo "sysadmin::14:" >> $dest
+		fi
+
+		#
+		# Add the 'nogroup' group from 4.x so that people don't
+		# assign it to a regular user and confuse themselves
+		#
+		NOGROUP_LINE="nogroup::65534:"
+		if grep "$NOGROUP_LINE" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^noaccess::60002:\na\n%s\n.\nw\nq\n' \
+				"$NOGROUP_LINE" | ed -s $dest > /dev/null
+		fi
+
+		# Remove redundant /etc/group entries that overlap with
+		# primary groups from /etc/passwd
+		sed  '
+			/^root:/s/\([:,]\)root,/\1/;
+			/^root:/s/,root$//;
+			/^root:/s/:root$/:/;
+			/^bin:/s/\([:,]\)bin,/\1/;
+			/^bin:/s/,bin$//;
+			/^bin:/s/:bin$/:/;
+			/^sys:/s/\([:,]\)sys,/\1/;
+			/^sys:/s/,sys$//;
+			/^sys:/s/:sys$/:/;
+			/^adm:/s/\([:,]\)adm,/\1/;
+			/^adm:/s/,adm$//;
+			/^adm:/s/:adm$/:/;
+			/^tty:/s/\([:,]\)tty,/\1/;
+			/^tty:/s/,tty$//;
+			/^tty:/s/:tty$/:/;
+			/^uucp:/s/\([:,]\)uucp,/\1/;
+			/^uucp:/s/,uucp$//;
+			/^uucp:/s/:uucp$/:/;
+			/^nuucp:/s/\([:,]\)nuucp,/\1/;
+			/^nuucp:/s/,nuucp$//;
+			/^nuucp:/s/:nuucp$/:/;
+			/^daemon:/s/\([:,]\)daemon,/\1/;
+			/^daemon:/s/,daemon$//;
+			/^daemon:/s/:daemon$/:/;
+			/^smmsp:/s/\([:,]\)smmsp,/\1/;
+			/^smmsp:/s/,smmsp$//;
+			/^smmsp:/s/:smmsp$/:/;
+			/^lp:/s/\([:,]\)lp,/\1/;
+			/^lp:/s/,lp$//;
+			/^lp:/s/:lp$/:/' $dest > /tmp/g.$$ && 
+		cp /tmp/g.$$ $dest
+		rm -f /tmp/g.$$
+
+		#add 'root' to user-list of group1
+		# line 1,2: skip any line with root in the user field
+		# line 3:   users already in list, add "root,"
+		# line 4:   no users in list, add "root"
+
+		sed '
+			/[:,]root,/b
+			/[:,]root$/b
+			s/:1:\([^:][^:]*\)$/:1:root,\1/;
+			s/:1:$/:1:root/;
+		' $dest > /tmp/g.$$ &&
+
+		cp /tmp/g.$$ $dest
+		rm -f /tmp/g.$$
+
+		#
+		# Add the 'smmsp' group for sendmail 8.12
+		#
+		SMMSPGROUP_LINE="smmsp::25:"
+		if grep "$SMMSPGROUP_LINE" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^nogroup::65534:\na\n%s\n.\nw\nq\n' \
+				"$SMMSPGROUP_LINE" | ed -s $dest > /dev/null
+		fi
+		#
+		# Add the 'gdm' group if it doesn't already exist.
+		#
+		GDMGROUP_LINE="gdm::50:"
+		cur_name=`awk -F: '$3 == 50 {print $1}' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "gdm" ]; then
+			echo "ERROR: Reserved GID 50 already assigned" \
+				"to '$cur_name'" >> /tmp/CLEANUP
+		elif grep "$GDMGROUP_LINE" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^smmsp::25:\na\n%s\n.\nw\nq\n' \
+				"$GDMGROUP_LINE" | ed -s $dest > /dev/null
+		fi
+		#
+		# Add the 'webservd' group if it doesn't already exist.
+		#
+		WEBSERVDGROUP_LINE="webservd::80:"
+		cur_name=`awk -F: '$3 == 80 {print $1}' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "webservd" ]; then
+			echo "ERROR: Reserved GID 80 already assigned" \
+				"to '$cur_name'" >> /tmp/CLEANUP
+		elif grep "$WEBSERVDGROUP_LINE" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^gdm::50:\na\n%s\n.\nw\nq\n' \
+				"$WEBSERVDGROUP_LINE" | ed -s $dest > /dev/null
+		fi
+	fi
+done
+
+exit 0

@@ -1,0 +1,13 @@
+
+Type a print command that you wish to use when printing a file.
+
+The default value is "lp" which you may change to a different print
+facility or customized print command.
+
+You may also specify appropriate options depending on the print
+facility to be invoked. See the person responsible for your system
+for proper options.
+
+The print commands specified in these fields are saved. When you
+select print, they are displayed for you to select from.
+

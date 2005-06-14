@@ -1,0 +1,130 @@
+#include "EXTERN.h"
+#include "perl.h"
+#include "XSUB.h"
+#include <ndbm.h>
+
+typedef struct {
+	DBM * 	dbp ;
+	SV *    filter_fetch_key ;
+	SV *    filter_store_key ;
+	SV *    filter_fetch_value ;
+	SV *    filter_store_value ;
+	int     filtering ;
+	} NDBM_File_type;
+
+typedef NDBM_File_type * NDBM_File ;
+typedef datum datum_key ;
+typedef datum datum_value ;
+
+MODULE = NDBM_File	PACKAGE = NDBM_File	PREFIX = ndbm_
+
+NDBM_File
+ndbm_TIEHASH(dbtype, filename, flags, mode)
+	char *		dbtype
+	char *		filename
+	int		flags
+	int		mode
+	CODE:
+	{
+	    DBM * 	dbp ;
+
+	    RETVAL = NULL ;
+	    if ((dbp =  dbm_open(filename, flags, mode))) {
+	        RETVAL = (NDBM_File)safemalloc(sizeof(NDBM_File_type)) ;
+    	        Zero(RETVAL, 1, NDBM_File_type) ;
+		RETVAL->dbp = dbp ;
+	    }
+	    
+	}
+	OUTPUT:
+	  RETVAL
+
+void
+ndbm_DESTROY(db)
+	NDBM_File	db
+	CODE:
+	dbm_close(db->dbp);
+	safefree(db);
+
+#define ndbm_FETCH(db,key)			dbm_fetch(db->dbp,key)
+datum_value
+ndbm_FETCH(db, key)
+	NDBM_File	db
+	datum_key	key
+
+#define ndbm_STORE(db,key,value,flags)		dbm_store(db->dbp,key,value,flags)
+int
+ndbm_STORE(db, key, value, flags = DBM_REPLACE)
+	NDBM_File	db
+	datum_key	key
+	datum_value	value
+	int		flags
+    CLEANUP:
+	if (RETVAL) {
+	    if (RETVAL < 0 && errno == EPERM)
+		croak("No write permission to ndbm file");
+	    croak("ndbm store returned %d, errno %d, key \"%s\"",
+			RETVAL,errno,key.dptr);
+	    dbm_clearerr(db->dbp);
+	}
+
+#define ndbm_DELETE(db,key)			dbm_delete(db->dbp,key)
+int
+ndbm_DELETE(db, key)
+	NDBM_File	db
+	datum_key	key
+
+#define ndbm_FIRSTKEY(db)			dbm_firstkey(db->dbp)
+datum_key
+ndbm_FIRSTKEY(db)
+	NDBM_File	db
+
+#define ndbm_NEXTKEY(db,key)			dbm_nextkey(db->dbp)
+datum_key
+ndbm_NEXTKEY(db, key)
+	NDBM_File	db
+	datum_key	key = NO_INIT
+
+#define ndbm_error(db)				dbm_error(db->dbp)
+int
+ndbm_error(db)
+	NDBM_File	db
+
+#define ndbm_clearerr(db)			dbm_clearerr(db->dbp)
+void
+ndbm_clearerr(db)
+	NDBM_File	db
+
+
+SV *
+filter_fetch_key(db, code)
+	NDBM_File	db
+	SV *		code
+	SV *		RETVAL = &PL_sv_undef ;
+	CODE:
+	    DBM_setFilter(db->filter_fetch_key, code) ;
+
+SV *
+filter_store_key(db, code)
+	NDBM_File	db
+	SV *		code
+	SV *		RETVAL =  &PL_sv_undef ;
+	CODE:
+	    DBM_setFilter(db->filter_store_key, code) ;
+
+SV *
+filter_fetch_value(db, code)
+	NDBM_File	db
+	SV *		code
+	SV *		RETVAL =  &PL_sv_undef ;
+	CODE:
+	    DBM_setFilter(db->filter_fetch_value, code) ;
+
+SV *
+filter_store_value(db, code)
+	NDBM_File	db
+	SV *		code
+	SV *		RETVAL =  &PL_sv_undef ;
+	CODE:
+	    DBM_setFilter(db->filter_store_value, code) ;
+

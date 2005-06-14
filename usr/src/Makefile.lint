@@ -1,0 +1,373 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# include global definitions
+include Makefile.master
+
+#
+# As pieces are made lint-clean, add them here so the nightly build
+# can be used to keep them that way.
+#
+COMMON_SUBDIRS = \
+	cmd/acctadm \
+	cmd/asa \
+	cmd/amt \
+	cmd/audit \
+	cmd/auditconfig \
+	cmd/auditd \
+	cmd/auditreduce \
+	cmd/auditstat \
+	cmd/auths \
+	cmd/autopush \
+	cmd/banner \
+	cmd/bart \
+	cmd/basename \
+	cmd/bdiff \
+	cmd/bfs \
+	cmd/busstat \
+	cmd/boot \
+	cmd/cal \
+	cmd/captoinfo \
+	cmd/cat \
+	cmd/cdrw \
+	cmd/cfgadm \
+	cmd/checkeq \
+	cmd/checknr \
+	cmd/chgrp \
+	cmd/chmod \
+	cmd/chown \
+	cmd/chroot \
+	cmd/cksum \
+	cmd/clinfo \
+	cmd/cmd-crypto \
+	cmd/cmd-inet/sbin \
+	cmd/cmd-inet/usr.bin \
+	cmd/cmd-inet/usr.lib/dsvclockd \
+	cmd/cmd-inet/usr.lib/in.dhcpd \
+	cmd/cmd-inet/usr.lib/in.iked \
+	cmd/cmd-inet/usr.lib/in.mpathd \
+	cmd/cmd-inet/usr.lib/inetd \
+	cmd/cmd-inet/usr.lib/mipagent \
+	cmd/cmd-inet/usr.lib/pppoe \
+	cmd/cmd-inet/usr.lib/slpd \
+	cmd/cmd-inet/usr.lib/wanboot \
+	cmd/cmd-inet/usr.sadm \
+	cmd/cmd-inet/usr.sbin \
+	cmd/cmp \
+	cmd/col \
+	cmd/comm \
+	cmd/compress \
+	cmd/consadm \
+	cmd/coreadm \
+	cmd/cpc \
+	cmd/crypt \
+	cmd/csplit \
+	cmd/ctrun \
+	cmd/ctstat \
+	cmd/ctwatch \
+	cmd/cut \
+	cmd/date \
+	cmd/dd \
+	cmd/deroff \
+	cmd/devctl \
+	cmd/devfsadm \
+	cmd/devinfo \
+	cmd/devmgmt \
+	cmd/dfs.cmds \
+	cmd/diff3 \
+	cmd/diskscan \
+	cmd/dispadmin \
+	cmd/dladm \
+	cmd/dtrace \
+	cmd/du \
+	cmd/dumpadm \
+	cmd/dumpcs \
+	cmd/echo \
+	cmd/env \
+	cmd/expand \
+	cmd/fdformat \
+	cmd/fgrep \
+	cmd/file \
+	cmd/find \
+	cmd/fmthard \
+	cmd/fmtmsg \
+	cmd/fold \
+	cmd/fm \
+	cmd/format \
+	cmd/fs.d/fd \
+	cmd/fs.d/lofs/mount \
+	cmd/fs.d/mntfs \
+	cmd/fs.d/pcfs/mount \
+	cmd/fs.d/proc \
+	cmd/fs.d/tmpfs \
+	cmd/fs.d/udfs/mount \
+	cmd/fs.d/ufs/mount \
+	cmd/fuser \
+	cmd/gcore \
+	cmd/getconf \
+	cmd/getdevpolicy \
+	cmd/getfacl \
+	cmd/getopt \
+	cmd/gettext \
+	cmd/grep \
+	cmd/grep_xpg4 \
+	cmd/groups \
+	cmd/halt \
+	cmd/head \
+	cmd/init \
+	cmd/intrstat \
+	cmd/ipcrm \
+	cmd/ipcs \
+	cmd/isaexec \
+	cmd/isalist \
+	cmd/join \
+	cmd/kbd \
+	cmd/killall \
+	cmd/last \
+	cmd/lastcomm \
+	cmd/ldapcachemgr \
+	cmd/line \
+	cmd/link \
+	cmd/locator \
+	cmd/lockstat \
+	cmd/lofiadm \
+	cmd/logadm \
+	cmd/logger \
+	cmd/login \
+	cmd/logname \
+	cmd/ls \
+	cmd/lvm \
+	cmd/machid \
+	cmd/makekey \
+	cmd/mdb \
+	cmd/mesg \
+	cmd/mkdir \
+	cmd/mkfifo \
+	cmd/mkfile \
+	cmd/mkmsgs \
+	cmd/mknod \
+	cmd/msgfmt \
+	cmd/msgid \
+	cmd/mt \
+	cmd/mv \
+	cmd/newtask \
+	cmd/nice \
+	cmd/nispasswd \
+	cmd/nl \
+	cmd/nohup \
+	cmd/pagesize \
+	cmd/passwd \
+	cmd/pathchk \
+	cmd/pax \
+	cmd/pbind \
+	cmd/pfexec \
+	cmd/pgrep \
+	cmd/picl/picld \
+	cmd/picl/prtpicl \
+	cmd/plockstat \
+	cmd/pools \
+	cmd/ppgsz \
+	cmd/praudit \
+	cmd/prctl \
+	cmd/priocntl \
+	cmd/profiles \
+	cmd/prstat \
+	cmd/prtconf \
+	cmd/prtdiag \
+	cmd/prtvtoc \
+	cmd/ps \
+	cmd/psradm \
+	cmd/psrinfo \
+	cmd/psrset \
+	cmd/ptools \
+	cmd/pwck \
+	cmd/ramdiskadm \
+	cmd/rcap \
+	cmd/rcm_daemon \
+	cmd/rctladm \
+	cmd/renice \
+	cmd/rm \
+	cmd/rmdir \
+	cmd/rmformat \
+	cmd/rmt \
+	cmd/roles \
+	cmd/rpcsvc/rpc.bootparamd \
+	cmd/runat \
+	cmd/sed_xpg4 \
+	cmd/smartcard \
+	cmd/smserverd \
+	cmd/sort \
+	cmd/split \
+	cmd/ssh \
+	cmd/stat \
+	cmd/strings \
+	cmd/su \
+	cmd/sulogin \
+	cmd/sum \
+	cmd/svc \
+	cmd/swap \
+	cmd/sync \
+	cmd/syseventadm \
+	cmd/syseventd \
+	cmd/tail \
+	cmd/tee \
+	cmd/th_tools \
+	cmd/touch \
+	cmd/tr \
+	cmd/truss \
+	cmd/tty \
+	cmd/uadmin \
+	cmd/valtools \
+	cmd/wall \
+	cmd/wbem \
+	cmd/wc \
+	cmd/who \
+	cmd/whodo \
+	cmd/wracct \
+	cmd/xargs \
+	cmd/yes \
+	cmd/yppasswd \
+	cmd/zdump \
+	cmd/zlogin \
+	cmd/zoneadm \
+	cmd/zoneadmd \
+	cmd/zonecfg \
+	cmd/zonename \
+	lib/abi \
+	lib/auditd_plugins \
+	lib/crypt_modules \
+	lib/libadt_jni \
+	lib/libaio \
+	lib/libavl \
+	lib/libbsm \
+	lib/libc \
+	lib/libc_db \
+	lib/libcfgadm \
+	lib/libcmdutils \
+	lib/libcontract \
+	lib/libcryptoutil \
+	lib/libctf \
+	lib/libdevice \
+	lib/libdevid \
+	lib/libdevinfo \
+	lib/libdhcpagent \
+	lib/libdhcpdu \
+	lib/libdhcpsvc \
+	lib/libdhcputil \
+	lib/libdiskmgt \
+	lib/libdladm \
+	lib/libdlpi \
+	lib/libdoor \
+	lib/libdtrace \
+	lib/libefi \
+	lib/libelfsign \
+	lib/libexacct \
+	lib/libgen \
+	lib/libgss \
+	lib/libinetcfg \
+	lib/libinetutil \
+	lib/libipmp \
+	lib/libipp \
+	lib/libipsecutil \
+	lib/libkstat \
+	lib/liblaadm \
+	lib/liblgrp \
+	lib/liblm \
+	lib/libmacadm \
+	lib/libmalloc \
+	lib/libmd5 \
+	lib/libmp \
+	lib/libnvpair \
+	lib/libpam \
+	lib/libpctx \
+	lib/libpicl \
+	lib/libpicltree \
+	lib/libplot \
+	lib/libpool \
+	lib/libproc \
+	lib/libpthread \
+	lib/librcm \
+	lib/librestart \
+	lib/librt \
+	lib/libscf \
+	lib/libsec \
+	lib/libsecdb \
+	lib/libsendfile \
+	lib/libsldap \
+	lib/libslp \
+	lib/libsmedia \
+	lib/libthread \
+	lib/libumem \
+	lib/libuutil \
+	lib/libwanboot \
+	lib/libwanbootutil \
+	lib/libxnet \
+	lib/libzonecfg \
+	lib/libzoneinfo \
+	lib/lvm \
+	lib/madv \
+	lib/mpss \
+	lib/nametoaddr \
+	lib/ncad_addr \
+	lib/pam_modules \
+	lib/passwdutil \
+	lib/pkcs11 \
+	lib/smartcard \
+	lib/fm \
+	lib/udapl
+
+i386_SUBDIRS= \
+	cmd/biosdev \
+	cmd/rtc \
+	cmd/fs.d/xmemfs
+
+sparc_SUBDIRS= \
+	cmd/datadm \
+	cmd/dcs \
+	cmd/fruadm \
+	cmd/mtst \
+	cmd/prtfru \
+	cmd/raidctl \
+	cmd/sckmd \
+	cmd/wrsmconf \
+	cmd/wrsmstat \
+	lib/libwrsmconf \
+	lib/wrsm
+
+LINTSUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
+
+.PARALLEL:	$(LINTSUBDIRS)
+
+lint:		uts .WAIT subdirs
+
+subdirs:	$(LINTSUBDIRS)
+
+uts $(LINTSUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) lint
+
+FRC:

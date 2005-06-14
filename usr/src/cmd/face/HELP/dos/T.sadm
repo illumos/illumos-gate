@@ -1,0 +1,20 @@
+
+The MS-DOS Programs Administration Menu allows you to maintain the
+MS-DOS applications provided by you in the Programs menu in the
+FACE main menu.
+
+The items on the MS-DOS Programs Administration Menu are:
+
+      Add MS-DOS Programs:  Allows you to add MS-DOS applications to 
+      your Programs Menu.
+
+      List MS-DOS Programs:  Lists the MS-DOS applications that you 
+      added to your Programs Menu and allows you to execute an MS-DOS
+      application from the list.
+
+      Modify MS-DOS Programs:  Allows you to modify those MS-DOS
+      applications that you have added to your Programs Menu.
+
+      Remove MS-DOS Programs:  Allows you to delete MS-DOS applications 
+      that you added to your Programs Menu.
+

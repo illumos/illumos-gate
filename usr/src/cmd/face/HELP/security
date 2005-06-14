@@ -1,0 +1,32 @@
+ 
+The security command enables you to modify the ownership and
+permissions of an existing file or file folder. You indicate who may
+read, write, and run/search each object.  Search permission refers to
+file folders.  Run permission refers to executable objects. You can
+set permissions for any object that you own from the Preferences Menu.
+
+Use one of the methods below for the security command.  The current
+object is assumed if the object name is not specified with the
+security command.
+
+     Function Key:  Press the CHG-KEYS function key, then SECURITY.
+
+     Command Menu:  Select security and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on security and an -->
+     (alternative)  will appear on the command line followed by the
+                    security. Type arguments and press ENTER to
+                    execute the command.
+
+     Command Line:  Type security [object] and press ENTER.
+
+   1.  After initiating the security command, a
+       "Security on <object> for <login>" form will be displayed.
+       Edit the form to show the permissions you want.
+
+   2.  When you have made all changes to the form, press SAVE.
+
+If you would like to specify permissions for all newly created
+files and file folders, use "File Permission" on the "Preferences"
+menu which can be found in "Office of <your login>."
+

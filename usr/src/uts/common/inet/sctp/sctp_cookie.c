@@ -1,0 +1,1284 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/types.h>
+#include <sys/systm.h>
+#include <sys/stream.h>
+#include <sys/cmn_err.h>
+#include <sys/md5.h>
+#include <sys/kmem.h>
+#include <sys/strsubr.h>
+#include <sys/random.h>
+
+#include <netinet/in.h>
+#include <netinet/ip6.h>
+
+#include <inet/common.h>
+#include <inet/ip.h>
+#include <inet/ip6.h>
+#include <inet/sctp_ip.h>
+#include <inet/ipclassifier.h>
+#include "sctp_impl.h"
+
+/*
+ * From RFC 2104. This should probably go into libmd5 (and while
+ * we're at it, maybe we should make a libdigest so we can later
+ * add SHA1 and others, esp. since some weaknesses have been found
+ * with MD5).
+ *
+ * text		IN			pointer to data stream
+ * text_len	IN			length of data stream
+ * key		IN			pointer to authentication key
+ * key_len	IN			length of authentication key
+ * digest	OUT			caller digest to be filled in
+ */
+static void
+hmac_md5(uchar_t *text, size_t text_len, uchar_t *key, size_t key_len,
+    uchar_t *digest)
+{
+	MD5_CTX context;
+	uchar_t k_ipad[65];	/* inner padding - key XORd with ipad */
+	uchar_t k_opad[65];	/* outer padding - key XORd with opad */
+	uchar_t tk[16];
+	int i;
+
+	/* if key is longer than 64 bytes reset it to key=MD5(key) */
+	if (key_len > 64) {
+		MD5_CTX tctx;
+
+		MD5Init(&tctx);
+		MD5Update(&tctx, key, key_len);
+		MD5Final(tk, &tctx);
+
+		key = tk;
+		key_len = 16;
+	}
+
+	/*
+	 * the HMAC_MD5 transform looks like:
+	 *
+	 * MD5(K XOR opad, MD5(K XOR ipad, text))
+	 *
+	 * where K is an n byte key
+	 * ipad is the byte 0x36 repeated 64 times
+	 * opad is the byte 0x5c repeated 64 times
+	 * and text is the data being protected
+	 */
+
+	/* start out by storing key in pads */
+	bzero(k_ipad, sizeof (k_ipad));
+	bzero(k_opad, sizeof (k_opad));
+	bcopy(key, k_ipad, key_len);
+	bcopy(key, k_opad, key_len);
+
+	/* XOR key with ipad and opad values */
+	for (i = 0; i < 64; i++) {
+		k_ipad[i] ^= 0x36;
+		k_opad[i] ^= 0x5c;
+	}
+	/*
+	 * perform inner MD5
+	 */
+	MD5Init(&context);			/* init context for 1st */
+						/* pass */
+	MD5Update(&context, k_ipad, 64);	/* start with inner pad */
+	MD5Update(&context, text, text_len);	/* then text of datagram */
+	MD5Final(digest, &context);		/* finish up 1st pass */
+	/*
+	 * perform outer MD5
+	 */
+	MD5Init(&context);			/* init context for 2nd */
+						/* pass */
+	MD5Update(&context, k_opad, 64);	/* start with outer pad */
+	MD5Update(&context, digest, 16);	/* then results of 1st */
+						/* hash */
+	MD5Final(digest, &context);		/* finish up 2nd pass */
+}
+
+/*
+ * If inmp is non-NULL, and we need to abort, it will use the IP/SCTP
+ * info in initmp to send the abort. Otherwise, no abort will be sent.
+ * If errmp is non-NULL, a chain of unrecognized parameters will
+ * be created and returned via *errmp.
+ *
+ * Returns 1 if the parameters are OK (or there are no parameters), or
+ * 0 if not.
+ */
+static int
+validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
+    sctp_init_chunk_t *init, mblk_t *inmp, sctp_parm_hdr_t **want_cookie,
+    mblk_t **errmp, int *supp_af, uint_t *sctp_options)
+{
+	sctp_parm_hdr_t		*cph;
+	sctp_init_chunk_t	*ic;
+	ssize_t			remaining;
+	uint16_t		serror = 0;
+	char			*details = NULL;
+	size_t			errlen = 0;
+	boolean_t		got_cookie = B_FALSE;
+	uint16_t		ptype;
+
+	*supp_af = 0;
+
+	if (sctp_options != NULL)
+		*sctp_options = 0;
+
+	/* First validate stream parameters */
+	if (init->sic_instr == 0 || init->sic_outstr == 0) {
+		serror = SCTP_ERR_BAD_MANDPARM;
+		dprint(1,
+		    ("validate_init_params: bad sid, is=%d os=%d\n",
+			htons(init->sic_instr), htons(init->sic_outstr)));
+		goto abort;
+	}
+	if (ntohl(init->sic_inittag) == 0) {
+		serror = SCTP_ERR_BAD_MANDPARM;
+		dprint(1, ("validate_init_params: inittag = 0\n"));
+		goto abort;
+	}
+
+	remaining = ntohs(ch->sch_len) - sizeof (*ch);
+	ic = (sctp_init_chunk_t *)(ch + 1);
+	remaining -= sizeof (*ic);
+	if (remaining < sizeof (*cph)) {
+		/* Nothing to validate */
+		if (want_cookie != NULL)
+			goto cookie_abort;
+		return (1);
+	}
+
+	cph = (sctp_parm_hdr_t *)(ic + 1);
+
+	while (cph != NULL) {
+		ptype = ntohs(cph->sph_type);
+		switch (ptype) {
+		case PARM_HBINFO:
+		case PARM_UNRECOGNIZED:
+		case PARM_ECN:
+			/* just ignore them */
+			break;
+		case PARM_FORWARD_TSN:
+			if (sctp_options != NULL)
+				*sctp_options |= SCTP_PRSCTP_OPTION;
+			break;
+		case PARM_COOKIE:
+			got_cookie = B_TRUE;
+			if (want_cookie != NULL) {
+				*want_cookie = cph;
+			}
+			break;
+		case PARM_ADDR4:
+		case PARM_ADDR6:
+		case PARM_COOKIE_PRESERVE:
+		case PARM_ADAPT_LAYER_IND:
+			/* These are OK */
+			break;
+		case PARM_ADDR_HOST_NAME:
+			/* Don't support this; abort the association */
+			serror = SCTP_ERR_BAD_ADDR;
+			details = (char *)cph;
+			errlen = ntohs(cph->sph_len);
+			dprint(1, ("sctp:validate_init_params: host addr\n"));
+			goto abort;
+		case PARM_SUPP_ADDRS: {
+			/* Make sure we have a supported addr intersection */
+			uint16_t *p, addrtype;
+			int plen;
+
+			plen = ntohs(cph->sph_len);
+			p = (uint16_t *)(cph + 1);
+			while (plen > 0) {
+				addrtype = ntohs(*p);
+				switch (addrtype) {
+				case PARM_ADDR6:
+					*supp_af |= PARM_SUPP_V6;
+					break;
+				case PARM_ADDR4:
+					*supp_af |= PARM_SUPP_V4;
+					break;
+				default:
+					/*
+					 * Do nothing, silently ignore hostname
+					 * address.
+					 */
+					break;
+				}
+				p++;
+				plen -= sizeof (*p);
+			}
+			/*
+			 * Some sanity checks.  The following should not
+			 * fail unless the other side is broken.
+			 *
+			 * 1. If there is no supported address type yet the
+			 * supported address parameter is present, abort.
+			 * 2. If this is a V4 endpoint but V4 address is not
+			 * supported, abort.
+			 * 3. If this is a V6 only endpoint but V6 address is
+			 * not supported, abort.  This assumes that a V6
+			 * endpoint can use both V4 and V6 addresses.
+			 */
+			if (*supp_af == 0 ||
+			    (sctp->sctp_family == AF_INET &&
+			    !(*supp_af & PARM_SUPP_V4)) ||
+			    (sctp->sctp_family == AF_INET6 &&
+			    !(*supp_af & PARM_SUPP_V6) &&
+			    sctp->sctp_connp->conn_ipv6_v6only)) {
+				dprint(1,
+				("sctp:validate_init_params: no supp addr\n"));
+				serror = SCTP_ERR_BAD_ADDR;
+				goto abort;
+			}
+			break;
+		}
+		default:
+			/* Unrecognized param; check the high order bits */
+			if ((ptype & 0xc000) == 0xc000) {
+				/*
+				 * report unrecognized param, and
+				 * keep processing
+				 */
+				if (errmp != NULL) {
+					if (want_cookie != NULL) {
+						*errmp = sctp_make_err(sctp,
+						    PARM_UNRECOGNIZED,
+						    (void *)cph,
+						    ntohs(cph->sph_len));
+					} else {
+						sctp_add_unrec_parm(cph, errmp);
+					}
+				}
+				break;
+			}
+			if (ptype & 0x4000) {
+				/*
+				 * Stop processing and drop; report
+				 * unrecognized param
+				 */
+				serror = SCTP_ERR_UNREC_PARM;
+				details = (char *)cph;
+				errlen = ntohs(cph->sph_len);
+				goto abort;
+			}
+			if (ptype & 0x8000) {
+				/* skip and continue processing */
+				break;
+			}
+
+			/*
+			 * 2 high bits are clear; stop processing and
+			 * drop packet
+			 */
+			return (0);
+		}
+
+		cph = sctp_next_parm(cph, &remaining);
+	}
+
+	if (want_cookie != NULL && !got_cookie) {
+cookie_abort:
+		dprint(1, ("validate_init_params: cookie absent\n"));
+		sctp_send_abort(sctp, sctp_init2vtag(ch), SCTP_ERR_MISSING_PARM,
+		    details, errlen, inmp, 0, B_FALSE);
+		return (0);
+	}
+
+	/* OK */
+	return (1);
+
+abort:
+	if (want_cookie != NULL)
+		return (0);
+
+	sctp_send_abort(sctp, sctp_init2vtag(ch), serror, details,
+	    errlen, inmp, 0, B_FALSE);
+	return (0);
+}
+
+/*
+ * Initialize params from the INIT and INIT-ACK when the assoc. is
+ * established.
+ */
+boolean_t
+sctp_initialize_params(sctp_t *sctp, sctp_init_chunk_t *init,
+    sctp_init_chunk_t *iack)
+{
+	/* Get initial TSN */
+	sctp->sctp_ftsn = ntohl(init->sic_inittsn);
+	sctp->sctp_lastacked = sctp->sctp_ftsn - 1;
+
+	/* Serial number is initialized to the same value as the TSN */
+	sctp->sctp_fcsn = sctp->sctp_lastacked;
+
+	/*
+	 * Get verification tags; no byteordering is necessary, since
+	 * verfication tags are never processed except for byte-by-byte
+	 * comparisons.
+	 */
+	sctp->sctp_fvtag = init->sic_inittag;
+	sctp->sctp_sctph->sh_verf = init->sic_inittag;
+	sctp->sctp_sctph6->sh_verf = init->sic_inittag;
+	sctp->sctp_lvtag = iack->sic_inittag;
+
+	/* Get the peer's rwnd */
+	sctp->sctp_frwnd = ntohl(init->sic_a_rwnd);
+
+	/* Allocate the in/out-stream counters */
+	sctp->sctp_num_ostr = iack->sic_outstr;
+	sctp->sctp_ostrcntrs = kmem_zalloc(sizeof (uint16_t) *
+	    sctp->sctp_num_ostr, KM_NOSLEEP);
+	if (sctp->sctp_ostrcntrs == NULL)
+		return (B_FALSE);
+
+	sctp->sctp_num_istr = iack->sic_instr;
+	sctp->sctp_instr = kmem_zalloc(sizeof (*sctp->sctp_instr) *
+	    sctp->sctp_num_istr, KM_NOSLEEP);
+	if (sctp->sctp_instr == NULL) {
+		kmem_free(sctp->sctp_ostrcntrs, sizeof (uint16_t) *
+		    sctp->sctp_num_ostr);
+		sctp->sctp_ostrcntrs = NULL;
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+#define	SCTP_CALC_COOKIE_LEN(initcp) \
+	sizeof (int64_t) +		/* timestamp */			\
+	sizeof (uint32_t) +		/* cookie lifetime */		\
+	sizeof (sctp_init_chunk_t) +	/* INIT ACK */			\
+	sizeof (in6_addr_t) +		/* peer's original source */ 	\
+	ntohs((initcp)->sch_len) +	/* peer's INIT */		\
+	sizeof (uint32_t) +		/* local tie-tag */		\
+	sizeof (uint32_t) +		/* peer tie-tag */		\
+	sizeof (sctp_parm_hdr_t) +	/* param header */		\
+	16				/* MD5 hash */
+
+void
+sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
+{
+	ipha_t			*initiph;
+	ip6_t			*initip6h;
+	ipha_t			*iackiph;
+	ip6_t			*iackip6h;
+	sctp_chunk_hdr_t	*iack_ch;
+	sctp_init_chunk_t	*iack;
+	sctp_init_chunk_t	*init;
+	sctp_hdr_t		*iacksh;
+	sctp_hdr_t		*initsh;
+	size_t			cookielen;
+	size_t			iacklen;
+	size_t			ipsctplen;
+	size_t			errlen = 0;
+	sctp_parm_hdr_t		*cookieph;
+	mblk_t			*iackmp;
+	uint32_t		itag;
+	uint32_t		itsn;
+	int64_t			*now;
+	int64_t			nowt;
+	uint32_t		*lifetime;
+	char			*p;
+	boolean_t		 isv4;
+	int			supp_af;
+	uint_t			sctp_options;
+	uint32_t		*ttag;
+	int			pad;
+	mblk_t			*errmp = NULL;
+	boolean_t		initcollision = B_FALSE;
+
+	BUMP_LOCAL(sctp->sctp_ibchunks);
+	isv4 = (IPH_HDR_VERSION(initmp->b_rptr) == IPV4_VERSION);
+
+	/* Extract the INIT chunk */
+	if (isv4) {
+		initiph = (ipha_t *)initmp->b_rptr;
+		initsh = (sctp_hdr_t *)((char *)initiph +
+		    IPH_HDR_LENGTH(initmp->b_rptr));
+		ipsctplen = sctp->sctp_ip_hdr_len;
+	} else {
+		initip6h = (ip6_t *)initmp->b_rptr;
+		initsh = (sctp_hdr_t *)(initip6h + 1);
+		ipsctplen = sctp->sctp_ip_hdr6_len;
+	}
+	ASSERT(OK_32PTR(initsh));
+	init = (sctp_init_chunk_t *)((char *)(initsh + 1) + sizeof (*iack_ch));
+
+	/* Make sure we like the peer's parameters */
+	if (validate_init_params(sctp, ch, init, initmp, NULL, &errmp,
+		&supp_af, &sctp_options) == 0) {
+		return;
+	}
+	if (errmp != NULL)
+		errlen = msgdsize(errmp);
+	if (sctp->sctp_family == AF_INET) {
+		/*
+		 * Irregardless of the supported address in the INIT, v4
+		 * must be supported.
+		 */
+		supp_af = PARM_SUPP_V4;
+	} else {
+		/*
+		 * No supported addresses parameter in INIT.  Assume
+		 * both v4 and v6 are supported.
+		 */
+		if (supp_af == 0) {
+			supp_af = PARM_SUPP_V6 | PARM_SUPP_V4;
+		}
+	}
+	if (sctp->sctp_state <= SCTPS_LISTEN) {
+		/* normal, expected INIT: generate new vtag and itsn */
+		(void) random_get_pseudo_bytes((uint8_t *)&itag, sizeof (itag));
+		if (itag == 0)
+			itag = (uint32_t)gethrtime();
+		itsn = itag + 1;
+		itag = htonl(itag);
+	} else if (sctp->sctp_state == SCTPS_COOKIE_WAIT ||
+	    sctp->sctp_state == SCTPS_COOKIE_ECHOED) {
+		/* init collision; copy vtag and itsn from sctp */
+		itag = sctp->sctp_lvtag;
+		itsn = sctp->sctp_ltsn;
+		/*
+		 * In addition we need to send all the params that was sent
+		 * in our INIT chunk. Essentially, it is only the supported
+		 * address params that we need to add.
+		 */
+		initcollision = B_TRUE;
+	} else {
+		/* peer restart; generate new vtag but keep everything else */
+		(void) random_get_pseudo_bytes((uint8_t *)&itag, sizeof (itag));
+		if (itag == 0)
+			itag = (uint32_t)gethrtime();
+		itag = htonl(itag);
+		itsn = sctp->sctp_ltsn;
+	}
+
+	/*
+	 * Allocate a mblk for the INIT ACK, consisting of the link layer
+	 * header, the IP header, the SCTP common header, and INIT ACK chunk,
+	 * and finally the COOKIE parameter.
+	 */
+	cookielen = SCTP_CALC_COOKIE_LEN(ch);
+	iacklen = sizeof (*iack_ch) + sizeof (*iack) + cookielen;
+	if (sctp->sctp_send_adaption)
+		iacklen += (sizeof (sctp_parm_hdr_t) + sizeof (uint32_t));
+	if (((sctp_options & SCTP_PRSCTP_OPTION) || initcollision) &&
+	    sctp->sctp_prsctp_aware && sctp_prsctp_enabled) {
+		iacklen += sctp_options_param_len(sctp, SCTP_PRSCTP_OPTION);
+	}
+	if (initcollision)
+		iacklen += sctp_supaddr_param_len(sctp);
+	iacklen += sctp_addr_params_len(sctp, supp_af);
+	ipsctplen += sizeof (*iacksh) + iacklen;
+	iacklen += errlen;
+	if ((pad = ipsctplen % 4) != 0) {
+		pad = 4 - pad;
+		ipsctplen += pad;
+	}
+	iackmp = allocb(ipsctplen + sctp_wroff_xtra, BPRI_MED);
+	if (iackmp == NULL) {
+		sctp_send_abort(sctp, sctp_init2vtag(ch),
+		    SCTP_ERR_NO_RESOURCES, NULL, 0, initmp, 0, B_FALSE);
+		return;
+	}
+
+	/* Copy in the [imcomplete] IP/SCTP composite header */
+	p = (char *)(iackmp->b_rptr + sctp_wroff_xtra);
+	iackmp->b_rptr = (uchar_t *)p;
+	if (isv4) {
+		bcopy(sctp->sctp_iphc, p, sctp->sctp_hdr_len);
+		iackiph = (ipha_t *)p;
+
+		/* Copy the peer's IP addr */
+		iackiph->ipha_dst = initiph->ipha_src;
+		iackiph->ipha_src = initiph->ipha_dst;
+		iackiph->ipha_length = htons(ipsctplen + errlen);
+		iacksh = (sctp_hdr_t *)(p + sctp->sctp_ip_hdr_len);
+	} else {
+		bcopy(sctp->sctp_iphc6, p, sctp->sctp_hdr6_len);
+		iackip6h = (ip6_t *)p;
+
+		/* Copy the peer's IP addr */
+		iackip6h->ip6_dst = initip6h->ip6_src;
+		iackip6h->ip6_src = initip6h->ip6_dst;
+		iackip6h->ip6_plen = htons(ipsctplen - sizeof (*iackip6h) +
+		    errlen);
+		iacksh = (sctp_hdr_t *)(p + sctp->sctp_ip_hdr6_len);
+	}
+	ASSERT(OK_32PTR(iacksh));
+
+	/* Fill in the holes in the SCTP common header */
+	iacksh->sh_sport = initsh->sh_dport;
+	iacksh->sh_dport = initsh->sh_sport;
+	iacksh->sh_verf = init->sic_inittag;
+
+	/* INIT ACK chunk header */
+	iack_ch = (sctp_chunk_hdr_t *)(iacksh + 1);
+	iack_ch->sch_id = CHUNK_INIT_ACK;
+	iack_ch->sch_flags = 0;
+	iack_ch->sch_len = htons(iacklen);
+
+	/* The INIT ACK itself */
+	iack = (sctp_init_chunk_t *)(iack_ch + 1);
+	iack->sic_inittag = itag;	/* already in network byteorder */
+	iack->sic_inittsn = htonl(itsn);
+
+	iack->sic_a_rwnd = htonl(sctp->sctp_rwnd);
+	/* Advertise what we would want to have as stream #'s */
+	iack->sic_outstr = htons(MIN(sctp->sctp_num_ostr,
+	    ntohs(init->sic_instr)));
+	iack->sic_instr = htons(sctp->sctp_num_istr);
+
+	p = (char *)(iack + 1);
+	p += sctp_adaption_code_param(sctp, (uchar_t *)p);
+	if (initcollision)
+		p += sctp_supaddr_param(sctp, (uchar_t *)p);
+	p += sctp_addr_params(sctp, supp_af, (uchar_t *)p);
+	if (((sctp_options & SCTP_PRSCTP_OPTION) || initcollision) &&
+	    sctp->sctp_prsctp_aware && sctp_prsctp_enabled) {
+		p += sctp_options_param(sctp, p, SCTP_PRSCTP_OPTION);
+	}
+	/*
+	 * Generate and lay in the COOKIE parameter.
+	 *
+	 * The cookie consists of:
+	 * 1. The relative timestamp for the cookie (lbolt64)
+	 * 2. The cookie lifetime (uint32_t) in tick
+	 * 3. The local tie-tag
+	 * 4. The peer tie-tag
+	 * 5. Peer's original src, used to confirm the validity of address.
+	 * 6. Our INIT ACK chunk, less any parameters
+	 * 7. The INIT chunk (may contain parameters)
+	 * 8. 128-bit MD5 signature.
+	 *
+	 * Since the timestamp values will only be evaluated locally, we
+	 * don't need to worry about byte-ordering them.
+	 */
+	cookieph = (sctp_parm_hdr_t *)p;
+	cookieph->sph_type = htons(PARM_COOKIE);
+	cookieph->sph_len = htons(cookielen);
+
+	/* timestamp */
+	now = (int64_t *)(cookieph + 1);
+	nowt = lbolt64;
+	bcopy(&nowt, now, sizeof (*now));
+
+	/* cookie lifetime -- need configuration */
+	lifetime = (uint32_t *)(now + 1);
+	*lifetime = sctp->sctp_cookie_lifetime;
+
+	/* Set the tie-tags */
+	ttag = (uint32_t *)(lifetime + 1);
+	if (sctp->sctp_state <= SCTPS_COOKIE_WAIT) {
+		*ttag = 0;
+		ttag++;
+		*ttag = 0;
+		ttag++;
+	} else {
+		/* local tie-tag (network byte-order) */
+		*ttag = sctp->sctp_lvtag;
+		ttag++;
+		/* peer tie-tag (network byte-order) */
+		*ttag = sctp->sctp_fvtag;
+		ttag++;
+	}
+	/*
+	 * Copy in peer's original source address so that we can confirm
+	 * the reachability later.
+	 */
+	p = (char *)ttag;
+	if (isv4) {
+		in6_addr_t peer_addr;
+
+		IN6_IPADDR_TO_V4MAPPED(iackiph->ipha_dst, &peer_addr);
+		bcopy(&peer_addr, p, sizeof (in6_addr_t));
+	} else {
+		bcopy(&iackip6h->ip6_dst, p, sizeof (in6_addr_t));
+	}
+	p += sizeof (in6_addr_t);
+	/* Copy in our INIT ACK chunk */
+	bcopy(iack, p, sizeof (*iack));
+	iack = (sctp_init_chunk_t *)p;
+	/* Set the # of streams we'll end up using */
+	iack->sic_outstr = MIN(sctp->sctp_num_ostr, ntohs(init->sic_instr));
+	iack->sic_instr = MIN(sctp->sctp_num_istr, ntohs(init->sic_outstr));
+	p += sizeof (*iack);
+
+	/* Copy in the peer's INIT chunk */
+	bcopy(ch, p, ntohs(ch->sch_len));
+	p += ntohs(ch->sch_len);
+
+	/*
+	 * Calculate the HMAC ICV into the digest slot in buf.
+	 * First, generate a new secret if the current secret is
+	 * older than the new secret lifetime parameter permits,
+	 * copying the current secret to sctp_old_secret.
+	 */
+	if (sctp_new_secret_interval > 0 &&
+	    (sctp->sctp_last_secret_update +
+	    MSEC_TO_TICK(sctp_new_secret_interval)) <= nowt) {
+		bcopy(sctp->sctp_secret, sctp->sctp_old_secret,
+		    SCTP_SECRET_LEN);
+		(void) random_get_pseudo_bytes(sctp->sctp_secret,
+		    SCTP_SECRET_LEN);
+		sctp->sctp_last_secret_update = nowt;
+	}
+
+	hmac_md5((uchar_t *)now, cookielen - sizeof (*cookieph) - 16,
+	    (uchar_t *)sctp->sctp_secret, SCTP_SECRET_LEN, (uchar_t *)p);
+
+	iackmp->b_wptr = iackmp->b_rptr + ipsctplen;
+	iackmp->b_cont = errmp;		/*  OK if NULL */
+
+	/*
+	 * Stash the conn ptr info. for IP only as e don't have any
+	 * cached IRE.
+	 */
+	SCTP_STASH_IPINFO(iackmp, (ire_t *)NULL);
+
+	/* XXX sctp == sctp_g_q, so using its obchunks is valid */
+	BUMP_LOCAL(sctp->sctp_opkts);
+	BUMP_LOCAL(sctp->sctp_obchunks);
+
+	/* OK to call IP_PUT() here instead of sctp_add_sendq(). */
+	CONN_INC_REF(sctp->sctp_connp);
+	iackmp->b_flag |= MSGHASREF;
+	IP_PUT(iackmp, sctp->sctp_connp, isv4);
+}
+
+void
+sctp_send_cookie_ack(sctp_t *sctp)
+{
+	sctp_chunk_hdr_t *cach;
+	mblk_t *camp;
+
+	camp = sctp_make_mp(sctp, NULL, sizeof (*cach));
+	if (camp == NULL) {
+		/* XXX should abort, but don't have the inmp anymore */
+		return;
+	}
+
+	cach = (sctp_chunk_hdr_t *)camp->b_wptr;
+	camp->b_wptr = (uchar_t *)(cach + 1);
+	cach->sch_id = CHUNK_COOKIE_ACK;
+	cach->sch_flags = 0;
+	cach->sch_len = htons(sizeof (*cach));
+
+	sctp_set_iplen(sctp, camp);
+
+	BUMP_LOCAL(sctp->sctp_obchunks);
+
+	sctp_add_sendq(sctp, camp);
+}
+
+static int
+sctp_find_al_ind(sctp_parm_hdr_t *sph, ssize_t len, uint32_t *adaption_code)
+{
+
+	if (len < sizeof (*sph))
+		return (-1);
+	while (sph != NULL) {
+		if (sph->sph_type == htons(PARM_ADAPT_LAYER_IND) &&
+		    ntohs(sph->sph_len) >= (sizeof (*sph) +
+			sizeof (uint32_t))) {
+			*adaption_code = *(uint32_t *)(sph + 1);
+			return (0);
+		}
+		sph = sctp_next_parm(sph, &len);
+	}
+	return (-1);
+}
+
+void
+sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
+{
+	mblk_t			*cemp;
+	mblk_t			*mp = NULL;
+	mblk_t			*head;
+	mblk_t			*meta;
+	sctp_faddr_t		*fp;
+	sctp_chunk_hdr_t	*cech;
+	sctp_init_chunk_t	 *iack;
+	int32_t			cansend;
+	int32_t			seglen;
+	size_t			ceclen;
+	sctp_parm_hdr_t		*cph;
+	sctp_data_hdr_t		*sdc;
+	sctp_tf_t		*tf;
+	int			pad;
+	int			hdrlen;
+	mblk_t			*errmp = NULL;
+	uint_t			sctp_options;
+	int			error;
+	uint16_t		old_num_str;
+
+	iack = (sctp_init_chunk_t *)(iackch + 1);
+
+	cph = NULL;
+	if (validate_init_params(sctp, iackch, iack, iackmp, &cph, &errmp,
+	    &pad, &sctp_options) == 0) { /* result in 'pad' ignored */
+		BUMP_MIB(&sctp_mib, sctpAborted);
+		sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0, NULL);
+		sctp_clean_death(sctp, ECONNABORTED);
+		return;
+	}
+	ASSERT(cph != NULL);
+
+	ASSERT(sctp->sctp_cookie_mp == NULL);
+
+	/* Got a cookie to echo back; allocate an mblk */
+	ceclen = sizeof (*cech) + ntohs(cph->sph_len) - sizeof (*cph);
+	if ((pad = ceclen & (SCTP_ALIGN - 1)) != 0)
+		pad = SCTP_ALIGN - pad;
+
+	if (IPH_HDR_VERSION(iackmp->b_rptr) == IPV4_VERSION)
+		hdrlen = sctp->sctp_hdr_len;
+	else
+		hdrlen = sctp->sctp_hdr6_len;
+
+	cemp = allocb(sctp_wroff_xtra + hdrlen + ceclen + pad, BPRI_MED);
+	if (cemp == NULL) {
+		SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
+		    sctp->sctp_current->rto);
+		if (errmp != NULL)
+			freeb(errmp);
+		return;
+	}
+	cemp->b_rptr += (sctp_wroff_xtra + hdrlen);
+
+	/* Process the INIT ACK */
+	sctp->sctp_sctph->sh_verf = iack->sic_inittag;
+	sctp->sctp_sctph6->sh_verf = iack->sic_inittag;
+	sctp->sctp_fvtag = iack->sic_inittag;
+	sctp->sctp_ftsn = ntohl(iack->sic_inittsn);
+	sctp->sctp_lastacked = sctp->sctp_ftsn - 1;
+	sctp->sctp_fcsn = sctp->sctp_lastacked;
+	sctp->sctp_frwnd = ntohl(iack->sic_a_rwnd);
+
+	/*
+	 * Populate sctp with addresses given in the INIT ACK or IP header.
+	 * Need to set the df bit in the current fp as it has been cleared
+	 * in sctp_connect().
+	 */
+	sctp->sctp_current->df = B_TRUE;
+	/*
+	 * Since IP uses this info during the fanout process, we need to hold
+	 * the lock for this hash line while performing this operation.
+	 */
+	/* XXX sctp_conn_fanout + SCTP_CONN_HASH(sctp->sctp_ports); */
+	ASSERT(sctp->sctp_conn_tfp != NULL);
+	tf = sctp->sctp_conn_tfp;
+	/* sctp isn't a listener so only need to hold conn fanout lock */
+	mutex_enter(&tf->tf_lock);
+	if (sctp_get_addrparams(sctp, NULL, iackmp, iackch, NULL) != 0) {
+		mutex_exit(&tf->tf_lock);
+		freeb(cemp);
+		SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
+		    sctp->sctp_current->rto);
+		if (errmp != NULL)
+			freeb(errmp);
+		return;
+	}
+	mutex_exit(&tf->tf_lock);
+
+	fp = sctp->sctp_current;
+
+	/*
+	 * There could be a case when we get an INIT-ACK again, if the INIT
+	 * is re-transmitted, for e.g., which means we would have already
+	 * allocated this resource earlier (also for sctp_instr). In this
+	 * case we check and re-allocate, if necessary.
+	 */
+	old_num_str = sctp->sctp_num_ostr;
+	if (ntohs(iack->sic_instr) < sctp->sctp_num_ostr)
+		sctp->sctp_num_ostr = ntohs(iack->sic_instr);
+	if (sctp->sctp_ostrcntrs == NULL) {
+		sctp->sctp_ostrcntrs = kmem_zalloc(sizeof (uint16_t) *
+		    sctp->sctp_num_ostr, KM_NOSLEEP);
+	} else {
+		ASSERT(old_num_str > 0);
+		if (old_num_str != sctp->sctp_num_ostr) {
+			kmem_free(sctp->sctp_ostrcntrs, sizeof (uint16_t) *
+			    old_num_str);
+			sctp->sctp_ostrcntrs = kmem_zalloc(sizeof (uint16_t) *
+			    sctp->sctp_num_ostr, KM_NOSLEEP);
+		}
+	}
+	if (sctp->sctp_ostrcntrs == NULL) {
+		freeb(cemp);
+		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		if (errmp != NULL)
+			freeb(errmp);
+		return;
+	}
+
+	/*
+	 * Allocate the in stream tracking array. Comments for sctp_ostrcntrs
+	 * hold here too.
+	 */
+	old_num_str = sctp->sctp_num_istr;
+	if (ntohs(iack->sic_outstr) < sctp->sctp_num_istr)
+		sctp->sctp_num_istr = ntohs(iack->sic_outstr);
+	if (sctp->sctp_instr == NULL) {
+		sctp->sctp_instr = kmem_zalloc(sizeof (*sctp->sctp_instr) *
+		    sctp->sctp_num_istr, KM_NOSLEEP);
+	} else {
+		ASSERT(old_num_str > 0);
+		if (old_num_str != sctp->sctp_num_istr) {
+			kmem_free(sctp->sctp_instr,
+			    sizeof (*sctp->sctp_instr) * old_num_str);
+			sctp->sctp_instr = kmem_zalloc(
+			    sizeof (*sctp->sctp_instr) * sctp->sctp_num_istr,
+			    KM_NOSLEEP);
+		}
+	}
+	if (sctp->sctp_instr == NULL) {
+		kmem_free(sctp->sctp_ostrcntrs,
+		    sizeof (uint16_t) * sctp->sctp_num_ostr);
+		freeb(cemp);
+		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		if (errmp != NULL)
+			freeb(errmp);
+		return;
+	}
+
+	if (!(sctp_options & SCTP_PRSCTP_OPTION) && sctp->sctp_prsctp_aware)
+		sctp->sctp_prsctp_aware = B_FALSE;
+
+	if (sctp_find_al_ind((sctp_parm_hdr_t *)(iack + 1),
+		ntohs(iackch->sch_len) - (sizeof (*iackch) + sizeof (*iack)),
+		&sctp->sctp_rx_adaption_code) == 0) {
+		sctp->sctp_recv_adaption = 1;
+	}
+
+	cech = (sctp_chunk_hdr_t *)cemp->b_rptr;
+	ASSERT(OK_32PTR(cech));
+	cech->sch_id = CHUNK_COOKIE;
+	cech->sch_flags = 0;
+	cech->sch_len = htons(ceclen);
+
+	/* Copy the cookie (less the parm hdr) to the chunk */
+	bcopy(cph + 1, cech + 1, ceclen - sizeof (*cph));
+
+	cemp->b_wptr = cemp->b_rptr + ceclen;
+
+	if (sctp->sctp_unsent != NULL) {
+		sctp_msg_hdr_t	*smh;
+		mblk_t		*prev = NULL;
+		uint32_t	unsent = 0;
+
+		mp = sctp->sctp_xmit_unsent;
+		do {
+			smh = (sctp_msg_hdr_t *)mp->b_rptr;
+			if (smh->smh_sid >= sctp->sctp_num_ostr) {
+				unsent += smh->smh_msglen;
+				if (prev != NULL)
+					prev->b_next = mp->b_next;
+				else
+					sctp->sctp_xmit_unsent = mp->b_next;
+				mp->b_next = NULL;
+				sctp_sendfail_event(sctp, mp, SCTP_ERR_BAD_SID,
+				    B_FALSE);
+				if (prev != NULL)
+					mp = prev->b_next;
+				else
+					mp = sctp->sctp_xmit_unsent;
+			} else {
+				prev = mp;
+				mp = mp->b_next;
+			}
+		} while (mp != NULL);
+		if (unsent > 0) {
+			ASSERT(sctp->sctp_unsent >= unsent);
+			sctp->sctp_unsent -= unsent;
+			/*
+			 * Update ULP the amount of queued data, which is
+			 * sent-unack'ed + unsent.
+			 * This is not necessary, but doesn't harm, we
+			 * just use unsent instead of sent-unack'ed +
+			 * unsent, since there won't be any sent-unack'ed
+			 * here.
+			 */
+			if (!SCTP_IS_DETACHED(sctp)) {
+				sctp->sctp_ulp_xmitted(sctp->sctp_ulpd,
+				    sctp->sctp_unsent);
+			}
+		}
+		if (sctp->sctp_xmit_unsent == NULL)
+			sctp->sctp_xmit_unsent_tail = NULL;
+	}
+	ceclen += pad;
+	cansend = MIN(sctp->sctp_unsent, sctp->sctp_frwnd);
+	meta = sctp_get_msg_to_send(sctp, &mp, NULL, &error, ceclen,
+	    cansend,  NULL);
+	/*
+	 * The error cannot be anything else since we could have an non-zero
+	 * error only if sctp_get_msg_to_send() tries to send a Forward
+	 * TSN which will not happen here.
+	 */
+	ASSERT(error == 0);
+	if (meta == NULL)
+		goto sendcookie;
+	sctp->sctp_xmit_tail = meta;
+	sdc = (sctp_data_hdr_t *)mp->b_rptr;
+	seglen = ntohs(sdc->sdh_len);
+	if ((ceclen + seglen) > fp->sfa_pmss ||
+	    (seglen - sizeof (*sdc)) > cansend) {
+		goto sendcookie;
+	}
+	/* OK, if this fails */
+	cemp->b_cont = dupmsg(mp);
+sendcookie:
+	head = sctp_add_proto_hdr(sctp, fp, cemp, 0);
+	ASSERT(head != NULL);
+	/*
+	 * Even if cookie-echo exceeds MTU for one of the hops, it'll
+	 * have a chance of getting there.
+	 */
+	if (fp->isv4) {
+		ipha_t *iph = (ipha_t *)head->b_rptr;
+		iph->ipha_fragment_offset_and_flags = 0;
+	}
+	BUMP_LOCAL(sctp->sctp_obchunks);
+
+	sctp->sctp_cookie_mp = dupmsg(head);
+	/* Don't bundle, we will just resend init if this cookie is lost. */
+	if (sctp->sctp_cookie_mp == NULL) {
+		if (cemp->b_cont != NULL) {
+			freemsg(cemp->b_cont);
+			cemp->b_cont = NULL;
+		}
+	} else if (cemp->b_cont != NULL) {
+		ASSERT(mp != NULL && mp == meta->b_cont);
+		SCTP_CHUNK_CLEAR_FLAGS(cemp->b_cont);
+		cemp->b_wptr += pad;
+		seglen -= sizeof (*sdc);
+		SCTP_CHUNK_SENT(sctp, mp, sdc, fp, seglen, meta);
+	}
+	if (errmp != NULL)
+		linkb(head, errmp);
+	sctp->sctp_state = SCTPS_COOKIE_ECHOED;
+	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+
+	sctp_set_iplen(sctp, head);
+	sctp_add_sendq(sctp, head);
+}
+
+int
+sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
+    sctp_init_chunk_t **iackpp, sctp_hdr_t *insctph, int *recv_adaption,
+    in6_addr_t *peer_addr)
+{
+	int32_t			clen;
+	size_t			initplen;
+	uchar_t			*p;
+	uchar_t			*given_hash;
+	uchar_t			needed_hash[16];
+	int64_t			ts;
+	int64_t			diff;
+	uint32_t		*lt;
+	sctp_init_chunk_t	*iack;
+	sctp_chunk_hdr_t	*initch;
+	sctp_init_chunk_t	*init;
+	uint32_t		*lttag;
+	uint32_t		*fttag;
+	uint32_t		ports;
+
+	BUMP_LOCAL(sctp->sctp_ibchunks);
+	/* Verify the ICV */
+	clen = ntohs(ch->sch_len) - sizeof (*ch) - 16;
+	if (clen < 0) {
+		dprint(1, ("invalid cookie chunk length %d\n",
+		    ntohs(ch->sch_len)));
+
+		return (-1);
+	}
+	p = (uchar_t *)(ch + 1);
+
+	hmac_md5(p, clen, (uchar_t *)sctp->sctp_secret, SCTP_SECRET_LEN,
+	    needed_hash);
+
+	/* The given hash follows the cookie data */
+	given_hash = p + clen;
+
+	if (bcmp(given_hash, needed_hash, 16) != 0) {
+		/* The secret may have changed; try the old secret */
+		hmac_md5(p, clen, (uchar_t *)sctp->sctp_old_secret,
+		    SCTP_SECRET_LEN, needed_hash);
+		if (bcmp(given_hash, needed_hash, 16) != 0) {
+			return (-1);
+		}
+	}
+
+	/* Timestamp is int64_t, and we only guarantee 32-bit alignment */
+	bcopy(p, &ts, sizeof (ts));
+	/* Cookie life time, int32_t */
+	lt = (uint32_t *)(p + sizeof (ts));
+
+	/*
+	 * To quote PRC, "this is our baby", so let's continue.
+	 * We need to pull out the encapsulated INIT ACK and
+	 * INIT chunks. Note that we don't process these until
+	 * we have verified the timestamp, but we need them before
+	 * processing the timestamp since if the time check fails,
+	 * we need to get the verification tag from the INIT in order
+	 * to send a stale cookie error.
+	 */
+	lttag = (uint32_t *)(lt + 1);
+	fttag = lttag + 1;
+	if (peer_addr != NULL)
+		bcopy(fttag + 1, peer_addr, sizeof (in6_addr_t));
+	iack = (sctp_init_chunk_t *)((char *)(fttag + 1) + sizeof (in6_addr_t));
+	initch = (sctp_chunk_hdr_t *)(iack + 1);
+	init = (sctp_init_chunk_t *)(initch + 1);
+	initplen = ntohs(initch->sch_len) - (sizeof (*init) + sizeof (*initch));
+	*iackpp = iack;
+	*recv_adaption = 0;
+
+	/* Check the timestamp */
+	diff = lbolt64 - ts;
+	if (diff > *lt && (init->sic_inittag != sctp->sctp_fvtag ||
+	    iack->sic_inittag != sctp->sctp_lvtag)) {
+
+		uint32_t staleness;
+
+		staleness = TICK_TO_USEC(diff);
+		staleness = htonl(staleness);
+		sctp_send_abort(sctp, init->sic_inittag, SCTP_ERR_STALE_COOKIE,
+		    (char *)&staleness, sizeof (staleness), cmp, 1, B_FALSE);
+
+		dprint(1, ("stale cookie %d\n", staleness));
+
+		return (-1);
+	}
+
+	/* Check for attack by adding addresses to a restart */
+	bcopy(insctph, &ports, sizeof (ports));
+	if (sctp_secure_restart_check(cmp, initch, ports, KM_NOSLEEP) != 1) {
+		return (-1);
+	}
+
+	/* Look for adaptation code if there any parms in the INIT chunk */
+	if ((initplen >= sizeof (sctp_parm_hdr_t)) &&
+	    (sctp_find_al_ind((sctp_parm_hdr_t *)(init + 1), initplen,
+	    &sctp->sctp_rx_adaption_code) == 0)) {
+		*recv_adaption = 1;
+	}
+
+	/* Examine tie-tags */
+
+	if (sctp->sctp_state >= SCTPS_COOKIE_WAIT) {
+		if (sctp->sctp_state == SCTPS_ESTABLISHED &&
+		    init->sic_inittag == sctp->sctp_fvtag &&
+		    iack->sic_inittag == sctp->sctp_lvtag &&
+		    *fttag == 0 && *lttag == 0) {
+
+			dprint(1, ("duplicate cookie from %x:%x:%x:%x (%d)\n",
+			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
+			    (int)(sctp->sctp_fport)));
+			return (-1);
+		}
+
+		if (init->sic_inittag != sctp->sctp_fvtag &&
+		    iack->sic_inittag != sctp->sctp_lvtag &&
+		    *fttag == sctp->sctp_fvtag &&
+		    *lttag == sctp->sctp_lvtag) {
+			int i;
+
+			/* Section 5.2.4 case A: restart */
+			sctp->sctp_fvtag = init->sic_inittag;
+			sctp->sctp_lvtag = iack->sic_inittag;
+
+			sctp->sctp_sctph->sh_verf = init->sic_inittag;
+			sctp->sctp_sctph6->sh_verf = init->sic_inittag;
+
+			sctp->sctp_ftsn = ntohl(init->sic_inittsn);
+			sctp->sctp_lastacked = sctp->sctp_ftsn - 1;
+			sctp->sctp_frwnd = ntohl(init->sic_a_rwnd);
+			sctp->sctp_fcsn = sctp->sctp_lastacked;
+
+			if (sctp->sctp_state < SCTPS_ESTABLISHED) {
+				sctp->sctp_state = SCTPS_ESTABLISHED;
+				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
+			}
+
+			dprint(1, ("sctp peer %x:%x:%x:%x (%d) restarted\n",
+			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
+			    (int)(sctp->sctp_fport)));
+			/* reset parameters */
+			sctp_congest_reset(sctp);
+
+			/* reset stream bookkeeping */
+			sctp_instream_cleanup(sctp, B_FALSE);
+
+			sctp->sctp_istr_nmsgs = 0;
+			sctp->sctp_rxqueued = 0;
+			for (i = 0; i < sctp->sctp_num_ostr; i++) {
+				sctp->sctp_ostrcntrs[i] = 0;
+			}
+			/* XXX flush xmit_list? */
+
+			return (0);
+		} else if (init->sic_inittag != sctp->sctp_fvtag &&
+		    iack->sic_inittag == sctp->sctp_lvtag) {
+
+			/* Section 5.2.4 case B: INIT collision */
+			if (sctp->sctp_state < SCTPS_ESTABLISHED) {
+				if (!sctp_initialize_params(sctp, init, iack))
+					return (-1);	/* Drop? */
+				sctp->sctp_state = SCTPS_ESTABLISHED;
+				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
+			}
+
+			dprint(1, ("init collision with %x:%x:%x:%x (%d)\n",
+			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
+			    (int)(sctp->sctp_fport)));
+
+			return (0);
+		} else if (iack->sic_inittag != sctp->sctp_lvtag &&
+		    init->sic_inittag == sctp->sctp_fvtag &&
+		    *fttag == 0 && *lttag == 0) {
+
+			/* Section 5.2.4 case C: late COOKIE */
+			dprint(1, ("late cookie from %x:%x:%x:%x (%d)\n",
+			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
+			    (int)(sctp->sctp_fport)));
+			return (-1);
+		} else if (init->sic_inittag == sctp->sctp_fvtag &&
+		    iack->sic_inittag == sctp->sctp_lvtag) {
+
+			/*
+			 * Section 5.2.4 case D: COOKIE ECHO retransmit
+			 * Don't check cookie lifetime
+			 */
+			dprint(1, ("cookie tags match from %x:%x:%x:%x (%d)\n",
+			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
+			    (int)(sctp->sctp_fport)));
+			if (sctp->sctp_state < SCTPS_ESTABLISHED) {
+				if (!sctp_initialize_params(sctp, init, iack))
+					return (-1);	/* Drop? */
+				sctp->sctp_state = SCTPS_ESTABLISHED;
+				sctp->sctp_assoc_start_time = (uint32_t)lbolt;
+			}
+			return (0);
+		} else {
+			/* unrecognized case -- silently drop it */
+			return (-1);
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * Similar to ip_fanout_sctp, except that the src addr(s) are drawn
+ * from address parameters in an INIT ACK's address list. This
+ * function is used when an INIT ACK is received but IP's fanout
+ * function could not find a sctp via the normal lookup routine.
+ * This can happen when a host sends an INIT ACK from a different
+ * address than the INIT was sent to.
+ *
+ * Returns the sctp_t if found, or NULL if not found.
+ */
+sctp_t *
+sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
+    uint_t ipif_seqid, zoneid_t zoneid)
+{
+	int isv4;
+	ipha_t *iph;
+	ip6_t *ip6h;
+	in6_addr_t dst;
+	in6_addr_t src;
+	sctp_parm_hdr_t *ph;
+	ssize_t remaining;
+	sctp_init_chunk_t *iack;
+	uint32_t ports;
+	sctp_t *sctp = NULL;
+
+	ASSERT(ich->sch_id == CHUNK_INIT_ACK);
+
+	isv4 = (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION);
+	if (isv4) {
+		iph = (ipha_t *)mp->b_rptr;
+		IN6_IPADDR_TO_V4MAPPED(iph->ipha_dst, &dst);
+	} else {
+		ip6h = (ip6_t *)mp->b_rptr;
+		dst = ip6h->ip6_dst;
+	}
+
+	ports = *(uint32_t *)sctph;
+
+	dprint(1, ("sctp_addrlist2sctp: ports=%u, dst = %x:%x:%x:%x\n",
+	    ports, SCTP_PRINTADDR(dst)));
+
+	/* pull out any address parameters */
+	remaining = ntohs(ich->sch_len) - sizeof (*ich) - sizeof (*iack);
+	if (remaining < sizeof (*ph)) {
+		return (NULL);
+	}
+
+	iack = (sctp_init_chunk_t *)(ich + 1);
+	ph = (sctp_parm_hdr_t *)(iack + 1);
+
+	while (ph != NULL) {
+		/*
+		 * params have been put in host byteorder by
+		 * sctp_check_input()
+		 */
+		if (ph->sph_type == PARM_ADDR4) {
+			IN6_INADDR_TO_V4MAPPED((struct in_addr *)(ph + 1),
+			    &src);
+
+			sctp = sctp_conn_match(&src, &dst, ports, ipif_seqid,
+			    zoneid);
+
+			dprint(1,
+			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",
+			    SCTP_PRINTADDR(src), sctp));
+
+
+			if (sctp != NULL) {
+				return (sctp);
+			}
+		} else if (ph->sph_type == PARM_ADDR6) {
+			src = *(in6_addr_t *)(ph + 1);
+			sctp = sctp_conn_match(&src, &dst, ports, ipif_seqid,
+			    zoneid);
+
+			dprint(1,
+			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",
+			    SCTP_PRINTADDR(src), sctp));
+
+			if (sctp != NULL) {
+				return (sctp);
+			}
+		}
+
+		ph = sctp_next_parm(ph, &remaining);
+	}
+
+	return (NULL);
+}

@@ -1,0 +1,839 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/types.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <sys/dkio.h>
+#include <unistd.h>
+#include <errno.h>
+#include <libintl.h>
+#include <sys/time.h>
+
+#include "mmc.h"
+#include "util.h"
+#include "misc_scsi.h"
+#include "transport.h"
+#include "main.h"
+#include "toshiba.h"
+#include "msgs.h"
+
+uint32_t
+read_scsi32(void *addr)
+{
+	uchar_t *ad = (uchar_t *)addr;
+	uint32_t ret;
+
+	ret = ((((uint32_t)ad[0]) << 24) | (((uint32_t)ad[1]) << 16) |
+	    (((uint32_t)ad[2]) << 8) | ad[3]);
+	return (ret);
+}
+
+uint16_t
+read_scsi16(void *addr)
+{
+	uchar_t *ad = (uchar_t *)addr;
+	uint16_t ret;
+
+	ret = ((((uint16_t)ad[0]) << 8) | ad[1]);
+	return (ret);
+}
+
+void
+load_scsi32(void *addr, uint32_t v)
+{
+	uchar_t *ad = (uchar_t *)addr;
+
+	ad[0] = (uchar_t)(v >> 24);
+	ad[1] = (uchar_t)(v >> 16);
+	ad[2] = (uchar_t)(v >> 8);
+	ad[3] = (uchar_t)v;
+}
+
+void
+load_scsi16(void *addr, uint16_t v)
+{
+	uchar_t *ad = (uchar_t *)addr;
+	ad[0] = (uchar_t)(v >> 8);
+	ad[1] = (uchar_t)v;
+}
+/*
+ * will get the mode page only i.e. will strip off the header.
+ */
+int
+get_mode_page(int fd, int page_no, int pc, int buf_len, uchar_t *buffer)
+{
+	int ret;
+	uchar_t byte2, *buf;
+	uint_t header_len, page_len, copy_cnt;
+
+	byte2 = (uchar_t)(((pc << 6) & 0xC0) | (page_no & 0x3f));
+	buf = (uchar_t *)my_zalloc(256);
+
+	/* Ask 254 bytes only to make our IDE driver happy */
+	ret = mode_sense(fd, byte2, 1, 254, buf);
+	if (ret == 0) {
+		free(buf);
+		return (0);
+	}
+
+	header_len = 8 + read_scsi16(&buf[6]);
+	page_len = buf[header_len + 1] + 2;
+
+	copy_cnt = (page_len > buf_len) ? buf_len : page_len;
+	(void) memcpy(buffer, &buf[header_len], copy_cnt);
+	free(buf);
+
+	return (1);
+}
+
+/*
+ * will take care of adding mode header and any extra bytes at the end.
+ */
+int
+set_mode_page(int fd, uchar_t *buffer)
+{
+	int ret;
+	uchar_t *buf;
+	uint_t total, p_len;
+
+	p_len = buffer[1] + 2;
+	total = p_len + 8;
+	buf = (uchar_t *)my_zalloc(total);
+
+	(void) memcpy(&buf[8], buffer, p_len);
+	if (debug) {
+		int i;
+
+		(void) printf("MODE: [");
+		for (i = 0; i < p_len; i++) {
+			(void) printf("0x%02x ", (uchar_t)buffer[i]);
+		}
+
+		(void) printf("]\n");
+	}
+	ret = mode_select(fd, total, buf);
+	free(buf);
+
+	return (ret);
+}
+
+/*
+ * Builds track information database for track trackno. If trackno is
+ * -1, builds the database for next blank track.
+ */
+int
+build_track_info(cd_device *dev, int trackno, struct track_info *t_info)
+{
+	uchar_t *ti;
+	uchar_t toc[20];		/* 2 entries + 4 byte header */
+	int ret;
+
+	(void) memset(t_info, 0, sizeof (*t_info));
+	/* 1st try READ TRACK INFORMATION */
+	ti = (uchar_t *)my_zalloc(TRACK_INFO_SIZE);
+	t_info->ti_track_no = trackno;
+
+	/* Gererate faked information for writing to DVD */
+	if (device_type != CD_RW) {
+		uint_t bsize;
+
+		t_info->ti_flags = 0x3000;
+		t_info->ti_track_no = 1;
+		t_info->ti_session_no = 1;
+		t_info->ti_track_mode = 0x4;
+		t_info->ti_data_mode = 1;
+		t_info->ti_start_address = 0;
+
+		/* only 1 track on DVD make it max size */
+		t_info->ti_track_size = read_format_capacity(target->d_fd,
+		    &bsize);
+		if (t_info->ti_track_size < MAX_CD_BLKS) {
+			t_info->ti_track_size = MAX_DVD_BLKS;
+		}
+
+		t_info->ti_nwa = 0;
+		t_info->ti_lra = 0;
+		t_info->ti_packet_size = 0x10;
+		t_info->ti_free_blocks = 0;
+	}
+
+	if (read_track_info(dev->d_fd, trackno, ti)) {
+
+		if (debug)
+			(void) printf("using read_track_info for TOC \n");
+
+		t_info->ti_track_no = ti[2];
+		t_info->ti_session_no = ti[3];
+		t_info->ti_flags = (ti[6] >> 4) & 0xf;
+		t_info->ti_flags |= (uint32_t)(ti[5] & 0xf0);
+		t_info->ti_flags |= (uint32_t)(ti[7]) << 8;
+		t_info->ti_flags |= TI_SESSION_NO_VALID | TI_FREE_BLOCKS_VALID;
+		t_info->ti_track_mode = ti[5] & 0xf;
+		if ((ti[6] & 0xf) == 0xf)
+			t_info->ti_data_mode = 0xff;
+		else
+			t_info->ti_data_mode = ti[6] & 0xf;
+		t_info->ti_start_address = read_scsi32(&ti[8]);
+		t_info->ti_nwa = read_scsi32(&ti[12]);
+		t_info->ti_free_blocks = read_scsi32(&ti[16]);
+		t_info->ti_packet_size = read_scsi32(&ti[20]);
+		t_info->ti_track_size = read_scsi32(&ti[24]);
+		t_info->ti_lra = read_scsi32(&ti[28]);
+		free(ti);
+		return (1);
+	}
+	/* READ TRACK INFORMATION not supported, try other options */
+	free(ti);
+	/*
+	 * We can get info for next blank track if READ TRACK INFO is not
+	 * supported.
+	 */
+	if (trackno == -1)
+		return (0);
+
+	if (debug)
+		(void) printf("using READ_TOC for TOC\n");
+
+	/* Try Read TOC */
+	if (!read_toc(dev->d_fd, 0, trackno, 20, toc)) {
+		return (0);
+	}
+	t_info->ti_start_address = read_scsi32(&toc[8]);
+	t_info->ti_track_mode = toc[5] & 0xf;
+	t_info->ti_track_size = read_scsi32(&toc[16]) - read_scsi32(&toc[8]);
+	t_info->ti_data_mode = get_data_mode(dev->d_fd, read_scsi32(&toc[8]));
+
+	/* Numbers for audio tracks are always in 2K chunks */
+	if ((dev->d_blksize == 512) && ((t_info->ti_track_mode & 4) == 0)) {
+		t_info->ti_start_address /= 4;
+		t_info->ti_track_size /= 4;
+	}
+
+	/* Now find out the session thing */
+	ret = read_toc(dev->d_fd, 1, trackno, 12, toc);
+
+	/*
+	 * Make sure that the call succeeds and returns the requested
+	 * TOC size correctly.
+	 */
+
+	if ((ret == 0) || (toc[1] != 0x0a)) {
+
+		/* For ATAPI drives or old Toshiba drives */
+		ret = read_toc_as_per_8020(dev->d_fd, 1, trackno, 12, toc);
+	}
+	/* If this goes through well TOC length will always be 0x0a */
+	if (ret && (toc[1] == 0x0a)) {
+		if (trackno >= toc[6]) {
+			t_info->ti_session_no = toc[3];
+			t_info->ti_flags |= TI_SESSION_NO_VALID;
+		}
+		/*
+		 * This might be the last track of this session. If so,
+		 * exclude the leadout and next lead in.
+		 */
+		if (trackno == (toc[6] - 1)) {
+			/*
+			 * 1.5 Min leadout + 1 min. leadin + 2 sec. pre-gap.
+			 * For 2nd+ leadout it will be 0.5 min. But currently
+			 * there is no direct way. And it will not happen
+			 * for any normal case.
+			 *
+			 * 75 frames/sec, 60 sec/min, so leadin gap is
+			 * ((1.5 +1)*60 + 2)*75 = 11400 frames (blocks)
+			 */
+			t_info->ti_track_size -= 11400;
+		}
+	}
+	return (1);
+}
+
+uchar_t
+get_data_mode(int fd, uint32_t lba)
+{
+	int ret;
+	uchar_t *buf;
+	uchar_t mode;
+
+	buf = (uchar_t *)my_zalloc(8);
+	ret = read_header(fd, lba, buf);
+	if (ret == 0)
+		mode = 0xff;
+	else
+		mode = buf[0];
+	free(buf);
+	return (mode);
+}
+
+/*
+ * Set page code 5 for TAO mode.
+ */
+int
+prepare_for_write(cd_device *dev, int track_mode, int test_write,
+    int keep_disc_open)
+{
+	uchar_t *buf;
+	int no_err;
+	int reset_device;
+
+	if ((write_mode == DAO_MODE) && keep_disc_open) {
+		(void) printf(gettext(
+		    "Multi-session is not supported on DVD media\n"));
+		exit(1);
+	}
+
+	if ((write_mode == DAO_MODE) && debug) {
+		(void) printf("Preparing to write in DAO\n");
+	}
+
+	(void) start_stop(dev->d_fd, 1);
+	/* Some drives do not support this command but still do it */
+	(void) rezero_unit(dev->d_fd);
+
+	buf = (uchar_t *)my_zalloc(64);
+
+	no_err = get_mode_page(dev->d_fd, 5, 0, 64, buf);
+	if (no_err)
+		no_err = ((buf[1] + 2) > 64) ? 0 : 1;
+	/*
+	 * If the device is already in simulation mode and again a
+	 * simulation is requested, then set the device in non-simulation
+	 * 1st and then take it to simulation mode. This will flush any
+	 * previous fake state in the drive.
+	 */
+	if (no_err && test_write && (buf[2] & 0x10)) {
+		reset_device = 1;
+	} else {
+		reset_device = 0;
+	}
+	if (no_err != 0) {
+		buf[0] &= 0x3f;
+
+		/* set TAO or DAO writing mode */
+		buf[2] = (write_mode == TAO_MODE)?1:2;
+
+		/* set simulation flag */
+		if (test_write && (!reset_device)) {
+			buf[2] |= 0x10;
+		} else {
+			buf[2] &= ~0x10;
+		}
+
+		/* Turn on HW buffer underrun protection (BUFE) */
+		if (!test_write) {
+			buf[2] |= 0x40;
+		}
+
+		/* set track mode type */
+		if (device_type == CD_RW) {
+			buf[3] = track_mode & 0x0f;	/* ctrl nibble */
+		} else {
+			buf[3] = 5;	/* always 5 for DVD */
+		}
+
+		if (keep_disc_open) {
+			buf[3] |= 0xc0;		/* Allow more sessions */
+		}
+
+		/* Select track type (audio or data) */
+		if (track_mode == TRACK_MODE_DATA) {
+			buf[4] = 8;		/* 2048 byte sector */
+		} else {
+			buf[4] = 0;		/* 2352 byte sector */
+		}
+		buf[7] = buf[8] = 0;
+
+		/* Need to clear these fields for setting into DAO */
+		if (write_mode == DAO_MODE)
+			buf[5] = buf[15] = 0;
+
+		/* print out mode for detailed log */
+		if (debug && verbose) {
+			int i;
+
+			(void) printf("setting = [ ");
+			for (i = 0; i < 15; i++)
+				(void) printf("0x%x ", buf[i]);
+			(void) printf("]\n");
+		}
+
+		no_err = set_mode_page(dev->d_fd, buf);
+
+		if (no_err && reset_device) {
+			/* Turn the test write bit back on */
+			buf[2] |= 0x10;
+			no_err = set_mode_page(dev->d_fd, buf);
+		}
+
+		/*
+		 * Since BUFE is the only optional flag we are
+		 * setting we will try to turn it off if the command
+		 * fails.
+		 */
+		if (!no_err) {
+			/*
+			 * Some old drives may not support HW
+			 * buffer underrun protection, try again
+			 * after turning it off.
+			 */
+			if (debug)
+				(void) printf("Turning off BUFE\n");
+			buf[2] &= ~0x40;
+			no_err = set_mode_page(dev->d_fd, buf);
+		}
+	}
+
+	free(buf);
+	return (no_err);
+}
+
+/*
+ * Close session. This will write TOC.
+ */
+int
+finalize(cd_device *dev)
+{
+	uchar_t *di;
+	int count, ret, err;
+	int immediate;
+	int finalize_max;
+
+	/*
+	 * For ATAPI devices we will use the immediate mode and will
+	 * poll the command for completion so that this command may
+	 * not hog the channel. But for SCSI, we will use the treditional
+	 * way of issuing the command with a large enough timeout. This
+	 * is done because immediate mode was designed for ATAPI and some
+	 * SCSI RW drives might not be even tested with it.
+	 */
+	if ((dev->d_inq[2] & 7) != 0) {
+		/* SCSI device */
+		immediate = 0;
+	} else {
+		/* non-SCSI (e.g ATAPI) device */
+		immediate = 1;
+	}
+
+	/* We need to close track before close session */
+	if (device_type == DVD_PLUS) {
+		if (!close_track(dev->d_fd, 0, 0, immediate))
+			return (0);
+	}
+
+	if (!close_track(dev->d_fd, 0, 1, immediate)) {
+		/*
+		 * For DVD-RW close track is not well defined
+		 * some drives dont like it, others want us
+		 * to close track before closing the session.
+		 * NOTE that for MMC specification it is not mandatory
+		 * to support close track.
+		 */
+		if (device_type == DVD_MINUS) {
+			if (!close_track(dev->d_fd, 1, 0, immediate)) {
+				return (0);
+			} else {
+				/* command is already done */
+				if (!immediate)
+					return (1);
+			}
+		} else {
+			return (0);
+		}
+	} else {
+		if (!immediate)
+			return (1);
+	}
+	if (immediate) {
+		(void) sleep(10);
+
+		di = (uchar_t *)my_zalloc(DISC_INFO_BLOCK_SIZE);
+		err = 0;
+
+		if (device_type == CD_RW) {
+			/* Finalization should not take more than 6 minutes */
+			finalize_max = FINALIZE_TIMEOUT;
+		} else {
+			/* some DVD-RW drives take longer than 6 minutes */
+			finalize_max = FINALIZE_TIMEOUT*2;
+		}
+
+		for (count = 0; count < finalize_max; count++) {
+			ret = read_disc_info(dev->d_fd, di);
+			if (ret != 0)
+				break;
+			if (uscsi_status != 2)
+				err = 1;
+			if (SENSE_KEY(rqbuf) == 2) {
+				/* not ready but not becoming ready */
+				if (ASC(rqbuf) != 4)
+					err = 1;
+			} else if (SENSE_KEY(rqbuf) == 5) {
+				/* illegal mode for this track */
+				if (ASC(rqbuf) != 0x64)
+					err = 1;
+			} else {
+				err = 1;
+			}
+			if (err == 1) {
+				if (debug) {
+					(void) printf("Finalization failed\n");
+					(void) printf("%x %x %x %x\n",
+					    uscsi_status, SENSE_KEY(rqbuf),
+					    ASC(rqbuf), ASCQ(rqbuf));
+				}
+				free(di);
+				return (0);
+			}
+			if (uscsi_status == 2) {
+				int i;
+				/* illegal field in command packet */
+				if (ASC(rqbuf) == 0x24) {
+					/* print it out! */
+					(void) printf("\n");
+					for (i = 0; i < 18; i++)
+						(void) printf("%x ",
+						    (unsigned)(rqbuf[i]));
+					(void) printf("\n");
+				}
+			}
+			(void) sleep(5);
+		}
+		free(di);
+	}
+	return (ret);
+}
+
+/*
+ * Find out media capacity.
+ */
+int
+get_last_possible_lba(cd_device *dev)
+{
+	uchar_t *di;
+	int cap;
+
+	di = (uchar_t *)my_zalloc(DISC_INFO_BLOCK_SIZE);
+	if (!read_disc_info(dev->d_fd, di)) {
+		free(di);
+		return (0);
+	}
+	if ((di[21] != 0) && (di[21] != 0xff)) {
+		cap = ((di[21] * 60) + di[22]) * 75;
+	} else {
+		cap = 0;
+	}
+
+	free(di);
+	return (cap);
+}
+
+int
+read_audio_through_read_cd(cd_device *dev, uint_t start_lba, uint_t nblks,
+    uchar_t *buf)
+{
+	int retry;
+	int ret;
+
+	for (retry = 0; retry < 3; retry++) {
+		ret = read_cd(dev->d_fd, (uint32_t)start_lba, (uint16_t)nblks,
+		    1, buf, (uint32_t)(nblks * 2352));
+		if (ret)
+			break;
+	}
+	return (ret);
+}
+
+int
+eject_media(cd_device *dev)
+{
+	if (vol_running) {
+		/* If there is a media, try using DKIOCEJECT 1st */
+		if (check_device(dev, CHECK_NO_MEDIA) == 0) {
+			if (ioctl(dev->d_fd, DKIOCEJECT, 0) == 0) {
+				return (1);
+			}
+		}
+	}
+	if (load_unload(dev->d_fd, 0) == 0) {
+		/* if eject fails */
+		if ((uscsi_status == 2) && (ASC(rqbuf) == 0x53)) {
+			/*
+			 * check that eject is not blocked on the device
+			 */
+			if (!prevent_allow_mr(dev->d_fd, 1))
+				return (0);
+			return (load_unload(dev->d_fd, 0));
+		}
+		return (0);
+	}
+	return (1);
+}
+
+/*
+ * Get CD speed from Page code 2A. since GET PERFORMANCE is not supported
+ * (which is already checked before) this mode page *will* have the speed.
+ */
+static uint16_t
+i_cd_speed_read(cd_device *dev, int cmd)
+{
+	uchar_t *mp2a;
+	uint16_t rate;
+
+	mp2a = (uchar_t *)my_zalloc(PAGE_CODE_2A_SIZE);
+	if (get_mode_page(dev->d_fd, 0x2A, 0, PAGE_CODE_2A_SIZE,
+	    mp2a) == 0) {
+		rate = 0;
+	} else {
+		if (cmd == GET_READ_SPEED) {
+			rate = ((uint16_t)mp2a[14] << 8) | mp2a[15];
+		} else {
+			rate = ((uint16_t)mp2a[20] << 8) | mp2a[21];
+		}
+	}
+	free(mp2a);
+	return (rate);
+}
+
+/*
+ * CD speed related functions (ioctl style) for drives which do not support
+ * real time streaming.
+ */
+int
+cd_speed_ctrl(cd_device *dev, int cmd, int speed)
+{
+	uint16_t rate;
+
+	if ((cmd == GET_READ_SPEED) || (cmd == GET_WRITE_SPEED))
+		return (XFER_RATE_TO_SPEED(i_cd_speed_read(dev, cmd)));
+	if (cmd == SET_READ_SPEED) {
+		rate = i_cd_speed_read(dev, GET_WRITE_SPEED);
+		return (set_cd_speed(dev->d_fd, SPEED_TO_XFER_RATE(speed),
+		    rate));
+	}
+	if (cmd == SET_WRITE_SPEED) {
+		rate = i_cd_speed_read(dev, GET_READ_SPEED);
+		return (set_cd_speed(dev->d_fd, rate,
+		    SPEED_TO_XFER_RATE(speed)));
+	}
+	return (0);
+}
+
+/*
+ * cd speed related functions for drives which support RT-streaming
+ */
+int
+rt_streaming_ctrl(cd_device *dev, int cmd, int speed)
+{
+	uchar_t *perf, *str;
+	int write_perf;
+	int ret;
+	uint16_t perf_got;
+
+	write_perf = 0;
+	if ((cmd == GET_WRITE_SPEED) || (cmd == SET_READ_SPEED))
+		write_perf = 1;
+	perf = (uchar_t *)my_zalloc(GET_PERF_DATA_LEN);
+	if (!get_performance(dev->d_fd, write_perf, perf)) {
+		ret = 0;
+		goto end_rsc;
+	}
+	perf_got = (uint16_t)read_scsi32(&perf[20]);
+	if ((cmd == GET_READ_SPEED) || (cmd == GET_WRITE_SPEED)) {
+		ret = XFER_RATE_TO_SPEED(perf_got);
+		goto end_rsc;
+	}
+	str = (uchar_t *)my_zalloc(SET_STREAM_DATA_LEN);
+	(void) memcpy(&str[8], &perf[16], 4);
+	load_scsi32(&str[16], 1000);
+	load_scsi32(&str[24], 1000);
+	if (cmd == SET_WRITE_SPEED) {
+		load_scsi32(&str[12], (uint32_t)perf_got);
+		load_scsi32(&str[20], (uint32_t)SPEED_TO_XFER_RATE(speed));
+	} else {
+		load_scsi32(&str[20], (uint32_t)perf_got);
+		load_scsi32(&str[12], (uint32_t)SPEED_TO_XFER_RATE(speed));
+	}
+	ret = set_streaming(dev->d_fd, str);
+	free(str);
+
+	/* If rt_speed_ctrl fails for any reason use cd_speed_ctrl */
+	if (ret == 0) {
+		if (debug)
+			(void) printf(" real time speed control"
+			    " failed, using CD speed control\n");
+
+		dev->d_speed_ctrl = cd_speed_ctrl;
+		ret = dev->d_speed_ctrl(dev, cmd, speed);
+	}
+
+end_rsc:
+	free(perf);
+	return (ret);
+}
+
+/*
+ * Initialize device for track-at-once mode of writing. All of the data will
+ * need to be written to the track without interruption.
+ * This initialized TAO by setting page code 5 and speed.
+ */
+void
+write_init(int mode)
+{
+	(void) printf(gettext("Initializing device"));
+	if (simulation)
+		(void) printf(gettext("(Simulation mode)"));
+	print_n_flush("...");
+
+	get_media_type(target->d_fd);
+
+	/* DVD- requires DAO mode */
+	if (device_type == DVD_MINUS) {
+		write_mode = DAO_MODE;
+	}
+
+	/* For debug, print out device config information */
+	if (debug) {
+		int i;
+		uchar_t cap[80];
+
+		if (get_configuration(target->d_fd, 0, 80, cap))
+			(void) printf("Drive profile = ");
+			for (i = 10; i < 70; i += 8)
+				(void) printf(" 0x%x", cap[i]);
+			(void) printf("\n");
+	}
+
+	/* DVD+ and DVD- have no support for AUDIO, bail out */
+	if ((mode == TRACK_MODE_AUDIO) && (device_type != CD_RW)) {
+		err_msg(gettext("Audio mode is only supported for CD media\n"));
+		exit(1);
+	}
+
+	if (!prepare_for_write(target, mode, simulation, keep_disc_open)) {
+		/* l10n_NOTE : 'failed' as in Initializing device...failed  */
+		(void) printf(gettext("failed.\n"));
+		err_msg(gettext("Cannot initialize device for write\n"));
+		exit(1);
+	}
+	/* l10n_NOTE : 'done' as in "Initializing device...done"  */
+	(void) printf(gettext("done.\n"));
+
+	/* if speed change option was used (-p) then try to set the speed */
+	if (requested_speed != 0) {
+		if (verbose)
+			(void) printf(gettext("Trying to set speed to %dX.\n"),
+			    requested_speed);
+		if (target->d_speed_ctrl(target, SET_WRITE_SPEED,
+		    requested_speed) == 0) {
+			err_msg(gettext("Unable to set speed.\n"));
+			exit(1);
+		}
+		if (verbose) {
+			int speed;
+			speed = target->d_speed_ctrl(target,
+			    GET_WRITE_SPEED, 0);
+			if (speed == requested_speed) {
+				(void) printf(gettext("Speed set to %dX.\n"),
+				    speed);
+			} else {
+				(void) printf(
+				gettext("Speed set to closest approximation "
+				    "of %dX allowed by device (%dX).\n"),
+				    requested_speed, speed);
+			}
+		}
+	}
+}
+
+void
+write_fini(void)
+{
+	print_n_flush(gettext("Finalizing (Can take several minutes)..."));
+	/* Some drives don't like this while in test write mode */
+	if (!simulation) {
+		if (!finalize(target)) {
+			/*
+			 * It is possible that the drive is busy writing the
+			 * buffered portion. So do not get upset yet.
+			 */
+			(void) sleep(10);
+			if (!finalize(target)) {
+				if (debug) {
+					(void) printf("status %x, %x/%x/%x\n",
+					    uscsi_status, SENSE_KEY(rqbuf),
+					    ASC(rqbuf), ASCQ(rqbuf));
+				}
+
+				if ((device_type == DVD_MINUS) &&
+				    (SENSE_KEY(rqbuf) == 5)) {
+
+					if (verbose) {
+						(void) printf(
+						    "skipping finalizing\n");
+					}
+				} else {
+
+			/* l10n_NOTE : 'failed' as in finishing up...failed  */
+					(void) printf(gettext("failed.\n"));
+
+					err_msg(gettext(
+					    "Could not finalize the disc.\n"));
+					exit(1);
+				}
+
+
+			}
+		}
+		if (vol_running) {
+			(void) eject_media(target);
+		}
+	} else if (check_device(target, CHECK_MEDIA_IS_NOT_BLANK)) {
+		/*
+		 * Some drives such as the pioneer A04 will retain a
+		 * ghost TOC after a simulation write is done. The
+		 * media will actually be blank, but the drive will
+		 * report a TOC. There is currently no other way to
+		 * re-initialize the media other than ejecting or
+		 * to ask the drive to clear the leadout. The laser
+		 * is currently off so nothing is written to the
+		 * media (on a good behaving drive).
+		 * NOTE that a device reset does not work to make
+		 * the drive re-initialize the media.
+		 */
+
+		if (!vol_running) {
+			blanking_type = "clear";
+			blank();
+		}
+
+	}
+	/* l10n_NOTE : 'done' as in "Finishing up...done"  */
+	(void) printf(gettext("done.\n"));
+}

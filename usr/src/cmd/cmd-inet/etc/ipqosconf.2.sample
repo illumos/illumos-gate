@@ -1,0 +1,137 @@
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+# Mandatory file format version identifier.
+fmt_version 1.0
+
+# Meter traffic from application (identified by source port myport) to
+# somehost.somedomain, where somehost.somedomain is a valid hostname/IP address.
+# Mark a packet with AF11 if it does not exceed the committed burst, AF12 if it
+# exceeds committed burst, but not excess burst and AF13 if it exceeds the
+# excess burst.
+# For information on AF PHBs refer to the IPQoS Administration Guide or the
+# RFC 2597.
+#
+# Before this example configuration file can be applied the sport and daddr
+# parameter values in the ipgpc filter myfilter need to be given actual values.
+
+action {
+        module ipgpc
+	# Name must be ipgpc.classify for ipgpc action.
+	name ipgpc.classify
+        
+        filter {
+               name myfilter
+               class meter_myapp
+               sport myport
+	       daddr somehost.somedomain
+        }
+        class {
+                name meter_myapp
+                next_action meter5mbps
+                enable_stats true
+        }
+        params {
+                global_stats true
+        }
+}
+
+# meter5mbps invokes action af11 for a packet that does not exceed the
+# committed burst, af12 if it exceeds committed burst, but not excess burst
+# and af13 if it exceeds excess burst.
+action {
+    module tokenmt
+    name meter5mbps
+    params {
+       # Committed rate of 5 Mbps.
+       committed_rate 5000000
+       # Committed burst of 5 Mb.
+       committed_burst 5000000
+       # Excess Burst of 10 Mb.
+       peak_burst 10000000
+       # Action global stats enabled.
+       global_stats true
+       # RED action, mark DSCP with AF13.
+       red_action_name af13
+       # YELLOW action, mark DSCP with AF12.
+       yellow_action_name af12
+       # GREEN action, mark DSCP with AF13.
+       green_action_name af11
+       # Not color aware.
+       color_aware false
+    }
+}
+
+# Mark the DSCP with code point AF13, 001110 = 14.
+action {
+   module dscpmk
+   name af13
+   params {
+      # Enable global stats for action.
+      global_stats true
+      next_action acct_classaf1
+      # Set all 64 entries of dscp_map to 14 decimal.
+      dscp_map {0-63:14}
+   }
+}
+
+# Mark the DSCP with code point AF12, 001100 = 12.
+action {
+   module dscpmk
+   name af12
+   params {
+      global_stats true
+      next_action acct_classaf1
+      dscp_map {0-63:12}
+   }
+}
+
+# Mark the DSCP with code point AF11, 001010 = 10.
+action {
+   module dscpmk
+   name af11
+   params {
+      global_stats true
+      next_action acct_classaf1
+      dscp_map {0-63:10}
+   }
+}
+
+# Account packets for class AF1* (AF11, AF12 and AF13).
+action {
+   module flowacct
+   name acct_classaf1
+   params {
+      global_stats true
+      next_action continue
+      # Timeout flows if packets not seen for at least 60 secs.
+      timeout 60000
+      # Scan the flow table every 15 secs for removing timed out flows.
+      timer   15000
+      # Limit number of flow records in the table to 2K.
+      max_limit 2048
+   }
+}

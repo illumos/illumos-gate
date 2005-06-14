@@ -1,0 +1,36 @@
+
+The AT&T FACE Menu is your entry point into FACE. When you log in, the
+AT&T FACE Menu is your active frame.  It serves as a starting point
+for accessing all parts of FACE. It is always present on the screen.
+
+If this is your first time using AT&T FACE, you should get help on
+the mechanics of using it by striking F8, CONTENTS, before continuing.
+
+The items on the AT&T FACE Menu are:
+
+      Office of <your login>:  Enables you to create, organize, and 
+      access your Filecabinet, access the Filecabinets of other 
+      users, and customize certain aspects of AT&T FACE.
+
+      Printer Operations: Presents you with a menu that allows you
+      to get printer status information and printer queue information
+      for all of the printers defined on your machine.
+
+      Programs:  Gives you access to special applications which
+      have either been installed by your system administrator or
+      added to the programs menu by you.  Examples of special
+      applications may include spreadsheets, editors, word
+      processors or other popular software packages.
+
+      System Administration:  Presents you with menus and forms for
+      doing System Administration tasks.  This menu item only appears
+      if you were given permission for this operation by your System
+      Administrator.
+
+      UNIX System:  Places you directly at the UNIX System prompt.
+      This menu items only appears if you were given permission 
+      for this operation by your System Administrator.
+
+      Exit FACE:  Exits from AT&T FACE and, if AT&T FACE was invoked
+      for you automatically when you logged in, it logs you off.
+

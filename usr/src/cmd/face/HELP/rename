@@ -1,0 +1,26 @@
+
+The rename command enables you to change the name of a file or file
+folder.
+
+Use one of the methods below to rename an object. The current object
+will be assumed if the object is not specified with the rename command.
+
+     Function Key:  Press the CHG-KEYS function key, then RENAME.
+
+     Command Menu:  Select rename and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on rename and an -->
+     (alternative)  will appear on the command line followed by the
+                    rename. Type arguments and press ENTER to
+                    execute the command.
+
+     Command Line:  Type rename [old object] [new object] and press
+                    ENTER.
+
+  1.  The following prompt appears if a new name was not specified
+      on the command line:
+
+          Enter the new object name:
+
+  2.  Type in the new name and press ENTER.
+

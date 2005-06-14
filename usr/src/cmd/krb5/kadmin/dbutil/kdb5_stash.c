@@ -1,0 +1,208 @@
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
+ *
+ *	Openvision retains the copyright to derivative works of
+ *	this source code.  Do *NOT* create a derivative of this
+ *	source code before consulting with your legal department.
+ *	Do *NOT* integrate *ANY* of this source code into another
+ *	product before consulting with your legal department.
+ *
+ *	For further information, read the top-level Openvision
+ *	copyright which is contained in the top-level MIT Kerberos
+ *	copyright.
+ *
+ * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING
+ *
+ */
+
+
+/*
+ * admin/stash/kdb5_stash.c
+ *
+ * Copyright 1990 by the Massachusetts Institute of Technology.
+ * All Rights Reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ * 
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ * 
+ *
+ * Store the master database key in a file.
+ */
+
+#define KDB5_DISPATCH
+#define KRB5_KDB5_DBM__
+#include <k5-int.h>
+/* #define these to avoid an indirection function; for future implementations,
+   these may be redirected from a dispatch table/routine */
+#define krb5_dbm_db_set_name krb5_db_set_name
+#define krb5_dbm_db_set_nonblocking krb5_db_set_nonblocking
+#define krb5_dbm_db_init krb5_db_init
+#define krb5_dbm_db_get_age krb5_db_get_age
+#define krb5_dbm_db_create krb5_db_create
+#define krb5_dbm_db_rename krb5_db_rename
+#define krb5_dbm_db_get_principal krb5_db_get_principal
+#define krb5_dbm_db_free_principal krb5_db_free_principal
+#define krb5_dbm_db_put_principal krb5_db_put_principal
+#define krb5_dbm_db_delete_principal krb5_db_delete_principal
+#define krb5_dbm_db_lock krb5_db_lock
+#define krb5_dbm_db_unlock krb5_db_unlock
+#define krb5_dbm_db_set_lockmode krb5_db_set_lockmode
+#define krb5_dbm_db_close_database krb5_db_close_database
+#define krb5_dbm_db_open_database krb5_db_open_database
+
+#include <kadm5/admin.h>
+#include "com_err.h"
+#include <kadm5/admin.h>
+#include <stdio.h>
+#include <libintl.h>
+
+extern int errno;
+
+extern krb5_principal master_princ;
+extern kadm5_config_params global_params;
+
+extern int exit_status;
+extern int close_policy_db;
+
+void
+kdb5_stash(argc, argv)
+int argc;
+char *argv[];
+{
+    extern char *optarg;
+    extern int optind;
+    int optchar;
+    krb5_error_code retval;
+    char *dbname = (char *) NULL;
+    char *realm = 0;
+    char *mkey_name = 0;
+    char *mkey_fullname;
+    char *keyfile = 0;
+    krb5_context context;
+    krb5_keyblock mkey;
+
+    int enctypedone = 0;
+
+    if (strrchr(argv[0], '/'))
+	argv[0] = strrchr(argv[0], '/')+1;
+
+    /* Tell upwards to close the policy db cause we don't */
+    close_policy_db = 1; 
+
+    krb5_init_context(&context);
+
+    dbname = global_params.dbname;
+    realm = global_params.realm;
+    mkey_name = global_params.mkey_name;
+    keyfile = global_params.stash_file;
+
+    optind = 1;
+    while ((optchar = getopt(argc, argv, "f:")) != -1) {
+	switch(optchar) {
+	case 'f':
+	    keyfile = optarg;
+	    break;
+	case '?':
+	default:
+	    usage();
+	    return;
+	}
+    }
+
+    if (!valid_enctype(global_params.enctype)) {
+	char tmp[32];
+
+	if (krb5_enctype_to_string(global_params.enctype,
+					    tmp, sizeof (tmp)))
+	    com_err(argv[0], KRB5_PROG_KEYTYPE_NOSUPP,
+		gettext("while setting up enctype %d"),
+		global_params.enctype);
+	else
+	    com_err(argv[0], KRB5_PROG_KEYTYPE_NOSUPP, tmp);
+	exit_status++;
+	return;
+    }
+
+    if (retval = krb5_db_set_name(context, dbname)) {
+	com_err(argv[0], retval,
+	    gettext("while setting active database to '%s'"),
+	dbname);
+	exit_status++;
+	return;
+    }
+
+    /* assemble & parse the master key name */
+    if (retval = krb5_db_setup_mkey_name(context, mkey_name, realm, 
+					 &mkey_fullname, &master_princ)) {
+	com_err(argv[0], retval,
+		gettext("while setting up master key name"));
+	exit_status++;
+	return;
+    }
+    if (retval = krb5_db_init(context)) {
+	com_err(argv[0], retval,
+		gettext("while initializing the database '%s'"),
+	dbname);
+	exit_status++;
+	return;
+    }
+
+    /* TRUE here means read the keyboard, but only once */
+    if (retval = krb5_db_fetch_mkey(context, master_princ,
+				    global_params.enctype,
+				    TRUE, FALSE, (char *) NULL,
+				    0, &mkey)) {
+	com_err(argv[0], retval, gettext("while reading master key"));
+	(void) krb5_db_fini(context);
+	exit_status++;
+	return;
+    }
+    if (retval = krb5_db_verify_master_key(context, master_princ, &mkey)) {
+	com_err(argv[0], retval, gettext("while verifying master key"));
+	krb5_free_keyblock_contents(context, &mkey);
+	(void) krb5_db_fini(context);
+	exit_status++;
+	return;
+    }	
+    if (retval = krb5_db_store_mkey(context, keyfile, master_princ, 
+				    &mkey)) {
+	com_err(argv[0], errno, gettext("while storing key"));
+	krb5_free_keyblock_contents(context, &mkey);
+	(void) krb5_db_fini(context);
+	exit_status++;
+	return;
+    }
+    krb5_free_keyblock_contents(context, &mkey);
+    if (retval = krb5_db_fini(context)) {
+	com_err(argv[0], retval,
+		gettext("closing database '%s'"), dbname);
+	exit_status++;
+	return;
+    }
+
+    krb5_free_context(context);
+    exit_status = 0;
+}

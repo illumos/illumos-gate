@@ -1,0 +1,1703 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# The list is built of owner-group combinations.  ROOT.SYS occurs twice
+# because some directories owned by root and in group sys are subdirectories
+# of directories having other owner-group attributes.
+#
+# It is easier to think in terms of directory names without the ROOT macro
+# prefix.  ROOTDIRS is TARGETDIRS with ROOT prefixes.  It is necessary
+# to work with ROOT prefixes when controlling conditional assignments.
+#
+# The macro SYM.ROOT.SYS means symlinks with owner root and group sys.
+
+SYMLINKS=	$(SYM.ROOT.SYS) $(SYM.ROOT.BIN) $(SYM.OTHERS)
+
+TARGETDIRS=	$(ROOT.SYS) $(ROOT.BIN) $(ROOT.SYS2) \
+		$(UUCP.UUCP) $(OTHERS) $(SYM.USRCCSLIB) $(SYM.USRLIB) \
+		$(ROOT.SFW)
+
+$(BUILD64)	TARGETDIRS += $(ROOT.SYS64.2) $(ROOT.BIN64) \
+		$(SYM.USRCCSLIB64) $(SYM.USRLIB64) $(ROOT.SFW64)
+
+$(BUILD64)	SYMLINKS += $(SYM.ROOT.BIN64) $(SYM.ROOT.SFW64)
+
+TARGETDIRS	+= $(SYMLINKS)
+
+i386_ROOT.SYS= \
+	/boot \
+	/boot/acpi \
+	/boot/acpi/tables \
+	/boot/grub \
+	/boot/grub/bin \
+	/boot/solaris \
+	/boot/solaris/bin
+
+sparc_ROOT.SYS=
+
+ROOT.SYS= \
+	$($(MACH)_ROOT.SYS) \
+	/dev \
+	/dev/dsk \
+	/dev/fd \
+	/dev/rdsk \
+	/dev/rmt \
+	/dev/pts \
+	/dev/sad \
+	/dev/swap \
+	/devices \
+	/devices/pseudo \
+	/etc \
+	/etc/certs	\
+	/etc/cron.d \
+	/etc/crypto \
+	/etc/crypto/certs \
+	/etc/crypto/crls \
+	/etc/default \
+	/etc/devices  \
+	/etc/dfs  \
+	/etc/fs  \
+	/etc/fs/nfs  \
+	/etc/ftpd  \
+	/etc/rpcsec	\
+	/etc/security	\
+	/etc/gss	\
+	/etc/init.d  \
+	/etc/lib  \
+	/etc/opt  \
+	/etc/rc0.d  \
+	/etc/rc1.d  \
+	/etc/rc2.d  \
+	/etc/rc3.d  \
+	/etc/rcS.d  \
+	/etc/sasl	\
+	/etc/sfw \
+	/etc/svc \
+	/etc/svc/volatile \
+	/etc/tm  \
+	/etc/usb   \
+	/etc/zones  \
+	/export  \
+	/home  \
+	/kernel  \
+	/mnt  \
+	/opt  \
+	/platform  \
+	/proc  \
+	/sbin  \
+	/system \
+	/system/contract \
+	/system/object \
+	/usr  \
+	/usr/kernel  \
+	/usr/platform  \
+	/usr/share  \
+	/var  \
+	/var/adm  \
+	/var/adm/pool \
+	/var/adm/sm.bin \
+	/var/adm/streams \
+	/var/cron \
+	/var/krb5 \
+	/var/krb5/rcache  \
+	/var/krb5/rcache/root  \
+	/var/log \
+	/var/log/pool \
+	/var/sadm \
+	/var/opt \
+	/var/run \
+	/var/svc \
+	/var/svc/log \
+	/var/svc/manifest \
+	/var/svc/manifest/milestone \
+	/var/svc/manifest/device \
+	/var/svc/manifest/system \
+	/var/svc/manifest/system/device \
+	/var/svc/manifest/system/filesystem \
+	/var/svc/manifest/system/security \
+	/var/svc/manifest/system/svc \
+	/var/svc/manifest/network \
+	/var/svc/manifest/network/dns \
+	/var/svc/manifest/network/ldap \
+	/var/svc/manifest/network/nfs \
+	/var/svc/manifest/network/nis \
+	/var/svc/manifest/network/rpc \
+	/var/svc/manifest/network/security \
+	/var/svc/manifest/application \
+	/var/svc/manifest/application/management \
+	/var/svc/manifest/application/security \
+	/var/svc/manifest/application/print \
+	/var/svc/manifest/platform \
+	/var/svc/manifest/platform/i86pc \
+	/var/svc/manifest/platform/sun4u \
+	/var/svc/manifest/site \
+	/var/svc/profile
+
+# EXPORT DELETE START
+XROOT.BIN= \
+	/etc/sfw/openssl \
+	/etc/sfw/openssl/certs \
+	/etc/sfw/openssl/private \
+	/usr/lib/inet/wanboot
+# EXPORT DELETE END
+
+ROOT.BIN= \
+	/etc/saf \
+	/lib \
+	/lib/secure \
+	/lib/svc \
+	/lib/svc/bin \
+	/lib/svc/capture \
+	/lib/svc/method \
+	/lib/svc/monitor \
+	/lib/svc/seed \
+	/lib/svc/share \
+	/usr/4lib \
+	/usr/bin \
+	/usr/bin/$(MACH32) \
+	/usr/ccs \
+	/usr/ccs/bin \
+	/usr/ccs/lib \
+	/usr/demo \
+	/usr/demo/SOUND \
+	/usr/games \
+	/usr/include \
+	/usr/kvm \
+	/usr/include/sys/crypto \
+	/usr/include/fm \
+	/usr/include/gssapi \
+	/usr/include/kerberosv5 \
+	/usr/include/libmilter \
+	/usr/include/sasl \
+	/usr/lib \
+	/usr/lib/abi \
+	/usr/lib/class \
+	/usr/lib/class/FSS \
+	/usr/lib/class/FX \
+	/usr/lib/class/IA \
+	/usr/lib/class/RT \
+	/usr/lib/class/TS \
+	/usr/lib/crypto \
+	/usr/lib/drv \
+	/usr/lib/font \
+	/usr/lib/fp \
+	/usr/lib/fp/libp \
+	/usr/lib/inet \
+	/usr/lib/inet/dhcp \
+	/usr/lib/inet/dhcp/nsu \
+	/usr/lib/inet/dhcp/svc \
+	/usr/lib/inet/dhcp/svcadm \
+	$(XROOT.BIN) \
+	/usr/lib/fm    \
+	/usr/lib/gss    \
+	/usr/lib/krb5 \
+	/usr/lib/link_audit \
+	/usr/lib/libp \
+	/usr/lib/localedef \
+	/usr/lib/localedef/extensions \
+	/usr/lib/localedef/src \
+	/usr/lib/lwp \
+	/usr/lib/pool \
+	/usr/lib/rcap \
+	/usr/lib/rcap/$(MACH32) \
+	/usr/lib/saf \
+	/usr/lib/sasl \
+	/usr/lib/secure \
+	/usr/lib/security \
+	/usr/lib/term \
+	/usr/lib/zones \
+	/usr/old \
+	/usr/openwin \
+	/usr/proc \
+	/usr/proc/bin \
+	/usr/sadm \
+	/usr/sadm/install \
+	/usr/sadm/install/scripts \
+	/usr/sadm/sysadm \
+	/usr/sadm/sysadm/add-ons \
+	/usr/snadm \
+	/usr/snadm/lib \
+	/usr/sbin \
+	/usr/sbin/$(MACH32) \
+	/usr/share/audio \
+	/usr/share/audio/samples \
+	/usr/share/audio/samples/au \
+	/usr/share/man \
+	/usr/share/man/man1m \
+	/usr/ucb \
+	/usr/ucb/$(MACH32) \
+	/usr/ucblib \
+	/usr/xpg4 \
+	/usr/xpg4/bin \
+	/usr/xpg4/include \
+	/usr/xpg4/lib \
+	/usr/xpg6 \
+	/usr/xpg6/bin \
+	/var/ld \
+	/var/news \
+	/var/preserve \
+	/var/saf \
+	/var/spool
+
+sparcv9_ROOT.BIN64= \
+	/platform/sun4u/sbin \
+	/platform/sun4u/lib \
+	/platform/sun4u/lib/$(MACH64) \
+	/usr/platform/sun4u/sbin \
+	/usr/platform/sun4u/lib \
+	/usr/platform/sun4u/lib/$(MACH64) \
+	/platform/sun4v/lib \
+	/platform/sun4v/lib/$(MACH64) \
+	/usr/platform/sun4v/sbin \
+	/usr/platform/sun4v/lib \
+	/usr/platform/sun4u-us3/lib
+
+amd64_ROOT.BIN64=
+
+ROOT.BIN64= \
+	$($(MACH64)_ROOT.BIN64) \
+	/lib/$(MACH64) \
+	/lib/secure/$(MACH64) \
+	/usr/bin/$(MACH64) \
+	/usr/ccs/bin/$(MACH64)  \
+	/usr/ccs/lib/$(MACH64) \
+	/usr/lib/$(MACH64) \
+        /usr/lib/$(MACH64)/gss \
+	/usr/lib/fm/$(MACH64) \
+	/usr/lib/fp/libp/$(MACH64) \
+	/usr/lib/krb5/$(MACH64) \
+	/usr/lib/libp/$(MACH64) \
+	/usr/lib/link_audit/$(MACH64) \
+	/usr/lib/lwp/$(MACH64) \
+	/usr/lib/rcap/$(MACH64) \
+	/usr/lib/sasl/$(MACH64) \
+	/usr/lib/secure/$(MACH64) \
+	/usr/lib/security/$(MACH64) \
+	/usr/lib/abi/$(MACH64) \
+	/usr/sbin/$(MACH64) \
+	/usr/ucb/$(MACH64) \
+	/usr/ucblib/$(MACH64) \
+	/usr/xpg4/lib/$(MACH64) \
+	/var/ld/$(MACH64)
+
+ROOT.SYS2= \
+	/usr/lib/fs \
+	/usr/lib/fs/nfs \
+	/usr/lib/fs/proc \
+	/usr/lib/mdb \
+	/usr/lib/mdb/kvm \
+	/usr/lib/mdb/proc \
+	/usr/lib/mdb/disasm \
+	/usr/lib/nfs \
+	/usr/net \
+	/usr/net/servers \
+	/usr/share/lib \
+	/usr/share/lib/xml \
+	/usr/share/lib/xml/dtd \
+	/usr/share/src \
+	/var/spool/cron \
+	/var/spool/cron/atjobs \
+	/var/spool/cron/crontabs
+
+sparcv9_ROOT.SYS64.2 = \
+	/platform/sun4u \
+	/usr/platform/sun4u
+
+amd64_ROOT.SYS64.2 =
+
+ROOT.SYS64.2 = \
+	$($(MACH64)_ROOT.SYS64.2) \
+	/usr/lib/mdb/kvm/$(MACH64) \
+	/usr/lib/mdb/proc/$(MACH64)
+
+UUCP.UUCP= \
+	/var/spool/uucp \
+	/var/spool/uucppublic \
+	/var/uucp
+
+ROOT.SFW= \
+	/usr/sfw/bin \
+	/usr/sfw/sbin \
+	/usr/sfw/include \
+	/usr/sfw/lib \
+	/usr/sfw/share
+
+ROOT.SFW64= \
+	/usr/sfw/lib/$(MACH64)
+
+# EXPORT DELETE START
+ROOT.SFW64+= \
+	/usr/sfw/bin/$(MACH64)
+# EXPORT DELETE END
+
+OTHERS=  \
+	/dev/term  \
+	/tmp  \
+	/etc/mail  \
+	/etc/mail/cf  \
+	/etc/mail/cf/cf  \
+	/etc/mail/cf/domain  \
+	/etc/mail/cf/feature  \
+	/etc/mail/cf/m4  \
+	/etc/mail/cf/mailer  \
+	/etc/mail/cf/ostype  \
+	/etc/mail/cf/sh  \
+	/usr/lib/sa  \
+	/usr/share/lib/tmac  \
+	/var/adm/exacct \
+	/var/adm/log \
+	/var/adm/sa \
+	/var/mail \
+	/var/spool/lp \
+	/var/tmp
+
+# /var/mail/:saved is built directly by the rootdirs target in
+# /usr/src/Makefile because of the colon in its name.
+
+# macros for symbolic links
+
+SYM.ROOT.SYS= \
+	/dev/stdin \
+	/dev/stdout \
+	/dev/stderr \
+	/usr/adm \
+	/usr/lib/cron \
+	/usr/man \
+	/usr/pub
+
+SYM.ROOT.BIN= \
+	/bin \
+	/lib/32 \
+	/lib/secure/32 \
+	/etc/lib/ld.so.1 \
+	/etc/lib/libdl.so.1 \
+	/etc/lib/nss_files.so.1 \
+	/usr/spool \
+	/usr/lib/tmac \
+	/usr/ccs/lib/fp \
+	/usr/ccs/lib/link_audit \
+	/usr/news \
+	/usr/preserve \
+	/usr/src \
+	/usr/lib/32 \
+	/usr/lib/libp/32 \
+	/usr/lib/lwp/32 \
+	/usr/lib/link_audit/32 \
+	/usr/lib/secure/32 \
+	/var/ld/32
+
+SYM.ROOT.BIN64= \
+	/lib/64 \
+	/lib/secure/64 \
+	/usr/lib/64 \
+	/usr/lib/libp/64 \
+	/usr/lib/link_audit/64 \
+	/usr/lib/lwp/64 \
+	/usr/lib/secure/64 \
+	/usr/lib/security/64 \
+	/usr/xpg4/lib/64 \
+	/var/ld/64
+
+SYM.ROOT.SFW64= \
+	/usr/sfw/lib/64
+
+SYM.OTHERS=  \
+	/etc/log  \
+	/usr/mail  \
+	/usr/tmp
+
+# prepend the ROOT prefix
+
+ROOTDIRS=	$(TARGETDIRS:%=$(ROOT)%)
+
+# conditional assignments
+#
+# Target directories with non-default values for owner and group must
+# be referenced here, using their fully-prefixed names, and the non-
+# default values assigned.  If a directory is mentioned above and not
+# mentioned below, it has default values for attributes.
+#
+# The default values for OWNER, GROUP, and DIRMODE are specified in
+# /usr/src/Makefile.master.
+#
+
+$(ROOT)/tmp \
+$(ROOT)/usr/tmp \
+$(ROOT)/var/tmp \
+$(ROOT)/var/adm/sa \
+$(ROOT.SYS:%=$(ROOT)%) \
+$(ROOT.SYS2:%=$(ROOT)%) \
+$(ROOT.SYS64.2:%=$(ROOT)%) \
+$(SYM.ROOT.SYS:%=$(ROOT)%):=	GROUP= sys
+
+$(ROOT)/var/adm \
+$(ROOT)/var/adm/sa :=		DIRMODE= 775
+
+$(ROOT)/dev/term:=		GROUP= root
+
+$(UUCP.UUCP:%=$(ROOT)%):=	OWNER= uucp
+$(UUCP.UUCP:%=$(ROOT)%):=	GROUP= uucp
+
+$(ROOT)/etc/log \
+$(ROOT)/usr/lib/sa \
+$(ROOT)/var/adm/exacct \
+$(ROOT)/var/adm/log \
+$(ROOT)/var/adm/sa:=		OWNER= adm
+
+$(ROOT)/etc/log \
+$(ROOT)/var/adm/exacct \
+$(ROOT)/var/adm/log:=	GROUP= adm
+
+$(ROOT)/etc/mail \
+$(ROOT)/etc/mail/cf \
+$(ROOT)/etc/mail/cf/cf \
+$(ROOT)/etc/mail/cf/domain \
+$(ROOT)/etc/mail/cf/feature \
+$(ROOT)/etc/mail/cf/m4 \
+$(ROOT)/etc/mail/cf/mailer \
+$(ROOT)/etc/mail/cf/ostype \
+$(ROOT)/etc/mail/cf/sh \
+$(ROOT)/usr/mail \
+$(ROOT)/var/mail  :=	GROUP= mail
+
+$(ROOT)/var/spool/lp:=		OWNER= lp
+$(ROOT)/var/spool/lp:=		GROUP= lp
+$(ROOT)/var/spool/lp:=		DIRMODE= 775
+
+# file mode
+#
+$(ROOT)/tmp \
+$(ROOT)/var/krb5/rcache \
+$(ROOT)/var/preserve \
+$(ROOT)/var/spool/pkg \
+$(ROOT)/var/spool/uucppublic \
+$(ROOT)/var/tmp:=	DIRMODE= 1777
+
+$(ROOT)/var/krb5/rcache/root:=	DIRMODE= 700
+
+$(ROOT)/etc/sfw/openssl/private:=	DIRMODE= 700
+
+#
+# These permissions must match the ones set
+# internally by fdfs and autofs.
+#
+$(ROOT)/dev/fd \
+$(ROOT)/home:=		DIRMODE= 555
+
+$(ROOT)/dev/fd \
+$(ROOT)/home:=		GROUP= root
+
+$(ROOT)/var/mail:=	DIRMODE=1777
+
+$(ROOT)/proc:=		GROUP= root
+$(ROOT)/proc:=		DIRMODE= 555
+
+$(ROOT)/system/contract:=	DIRMODE= 555
+$(ROOT)/system/object:=		DIRMODE= 555
+
+# symlink assignments, LINKDEST is the value of the symlink
+#
+$(ROOT)/usr/lib/cron:=			LINKDEST=../../etc/cron.d
+$(ROOT)/bin:=				LINKDEST=usr/bin
+$(ROOT)/lib/32:=			LINKDEST=.
+$(ROOT)/lib/secure/32:=			LINKDEST=.
+$(ROOT)/dev/stdin:=			LINKDEST=fd/0
+$(ROOT)/dev/stdout:=			LINKDEST=fd/1
+$(ROOT)/dev/stderr:=			LINKDEST=fd/2
+$(ROOT)/usr/pub:=			LINKDEST=share/lib/pub
+$(ROOT)/usr/man:=			LINKDEST=share/man
+$(ROOT)/usr/src:=			LINKDEST=share/src
+$(ROOT)/usr/adm:=			LINKDEST=../var/adm
+$(ROOT)/etc/lib/ld.so.1:=		LINKDEST=../../lib/ld.so.1
+$(ROOT)/etc/lib/libdl.so.1:=		LINKDEST=../../lib/libdl.so.1
+$(ROOT)/etc/lib/nss_files.so.1:=	LINKDEST=../../lib/nss_files.so.1
+$(ROOT)/etc/log:=			LINKDEST=../var/adm/log
+$(ROOT)/usr/mail:=			LINKDEST=../var/mail
+$(ROOT)/usr/news:=			LINKDEST=../var/news
+$(ROOT)/usr/preserve:=			LINKDEST=../var/preserve
+$(ROOT)/usr/spool:=			LINKDEST=../var/spool
+$(ROOT)/usr/tmp:=			LINKDEST=../var/tmp
+$(ROOT)/usr/lib/tmac:=			LINKDEST=../share/lib/tmac
+$(ROOT)/usr/lib/32:=			LINKDEST=.
+$(ROOT)/usr/lib/libp/32:=		LINKDEST=.
+$(ROOT)/usr/lib/lwp/32:=		LINKDEST=.
+$(ROOT)/usr/lib/link_audit/32:=		LINKDEST=.
+$(ROOT)/usr/lib/secure/32:=		LINKDEST=.
+$(ROOT)/usr/ccs/lib/fp:=		LINKDEST=../../lib/fp
+$(ROOT)/usr/ccs/lib/link_audit:=	LINKDEST=../../lib/link_audit
+$(ROOT)/var/ld/32:=			LINKDEST=.
+
+
+$(BUILD64) $(ROOT)/lib/64:=		LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/lib/secure/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/libp/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/lwp/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/link_audit/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/secure/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/security/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/xpg4/lib/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/var/ld/64:=		LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/sfw/lib/64:=	LINKDEST=$(MACH64)
+
+# Installing a directory symlink calls for overriding INS.dir to install
+# a symlink.
+#
+$(SYMLINKS:%=$(ROOT)%):= \
+   INS.dir= -$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@; \
+	     $(CHOWN) $(OWNER) $@; $(CHGRP) $(GROUP) $@
+
+
+# Special symlinks to populate usr/ccs/lib, whose objects
+# have actually been moved to usr/lib
+# Rather than adding another set of rules, we add usr/lib/lwp files here
+$(ROOT)/usr/ccs/lib/libcurses.so:= 	REALPATH=../../../lib/libcurses.so.1
+$(ROOT)/usr/ccs/lib/llib-lcurses:= 	REALPATH=../../../lib/llib-lcurses
+$(ROOT)/usr/ccs/lib/llib-lcurses.ln:= 	REALPATH=../../../lib/llib-lcurses.ln
+$(ROOT)/usr/ccs/lib/libform.so:=	REALPATH=../../lib/libform.so.1
+$(ROOT)/usr/ccs/lib/llib-lform:= 	REALPATH=../../lib/llib-lform
+$(ROOT)/usr/ccs/lib/llib-lform.ln:= 	REALPATH=../../lib/llib-lform.ln
+$(ROOT)/usr/ccs/lib/libgen.so:=		REALPATH=../../../lib/libgen.so.1
+$(ROOT)/usr/ccs/lib/llib-lgen:= 	REALPATH=../../../lib/llib-lgen
+$(ROOT)/usr/ccs/lib/llib-lgen.ln:= 	REALPATH=../../../lib/llib-lgen.ln
+$(ROOT)/usr/ccs/lib/libmalloc.so:=	REALPATH=../../lib/libmalloc.so.1
+$(ROOT)/usr/ccs/lib/libmenu.so:=	REALPATH=../../lib/libmenu.so.1
+$(ROOT)/usr/ccs/lib/llib-lmenu:= 	REALPATH=../../lib/llib-lmenu
+$(ROOT)/usr/ccs/lib/llib-lmenu.ln:= 	REALPATH=../../lib/llib-lmenu.ln
+$(ROOT)/usr/ccs/lib/libpanel.so:=	REALPATH=../../lib/libpanel.so.1
+$(ROOT)/usr/ccs/lib/llib-lpanel:= 	REALPATH=../../lib/llib-lpanel
+$(ROOT)/usr/ccs/lib/llib-lpanel.ln:= 	REALPATH=../../lib/llib-lpanel.ln
+$(ROOT)/usr/ccs/lib/libtermlib.so:=	REALPATH=../../../lib/libcurses.so.1
+$(ROOT)/usr/ccs/lib/llib-ltermlib:= 	REALPATH=../../../lib/llib-lcurses
+$(ROOT)/usr/ccs/lib/llib-ltermlib.ln:= 	REALPATH=../../../lib/llib-lcurses.ln
+$(ROOT)/usr/ccs/lib/libtermcap.so:=	REALPATH=../../../lib/libcurses.so.1
+$(ROOT)/usr/ccs/lib/llib-ltermcap:= 	REALPATH=../../../lib/llib-lcurses
+$(ROOT)/usr/ccs/lib/llib-ltermcap.ln:= 	REALPATH=../../../lib/llib-lcurses.ln
+$(ROOT)/usr/ccs/lib/values-Xa.o:=	REALPATH=../../lib/values-Xa.o
+$(ROOT)/usr/ccs/lib/values-Xc.o:=	REALPATH=../../lib/values-Xc.o
+$(ROOT)/usr/ccs/lib/values-Xs.o:=	REALPATH=../../lib/values-Xs.o
+$(ROOT)/usr/ccs/lib/values-Xt.o:=	REALPATH=../../lib/values-Xt.o
+$(ROOT)/usr/ccs/lib/values-xpg4.o:=	REALPATH=../../lib/values-xpg4.o
+$(ROOT)/usr/ccs/lib/values-xpg6.o:=	REALPATH=../../lib/values-xpg6.o
+$(ROOT)/usr/ccs/lib/libl.so:=		REALPATH=../../lib/libl.so.1
+$(ROOT)/usr/ccs/lib/llib-ll.ln:= 	REALPATH=../../lib/llib-ll.ln
+$(ROOT)/usr/ccs/lib/liby.so:=		REALPATH=../../lib/liby.so.1
+$(ROOT)/usr/ccs/lib/llib-ly.ln:= 	REALPATH=../../lib/llib-ly.ln
+$(ROOT)/usr/ccs/lib/libld.so.2:=	REALPATH=../../../lib/libld.so.2
+$(ROOT)/usr/ccs/lib/libld.so.3:=	REALPATH=../../../lib/libld.so.3
+$(ROOT)/usr/lib/libp/libc.so.1:=	REALPATH=../../../lib/libc.so.1
+$(ROOT)/usr/lib/lwp/libthread.so.1:=	REALPATH=../libthread.so.1
+$(ROOT)/usr/lib/lwp/libthread_db.so.1:=	REALPATH=../libthread_db.so.1
+
+# symlinks to populate usr/ccs/lib/$(MACH64)
+$(ROOT)/usr/ccs/lib/$(MACH64)/libcurses.so:= \
+	REALPATH=../../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/llib-lcurses.ln:= \
+	REALPATH=../../../../lib/$(MACH64)/llib-lcurses.ln
+$(ROOT)/usr/ccs/lib/$(MACH64)/libform.so:= \
+	REALPATH=../../../lib/$(MACH64)/libform.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/llib-lform.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lform.ln
+$(ROOT)/usr/ccs/lib/$(MACH64)/libgen.so:= \
+	REALPATH=../../../../lib/$(MACH64)/libgen.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/llib-lgen.ln:= \
+	REALPATH=../../../../lib/$(MACH64)/llib-lgen.ln
+$(ROOT)/usr/ccs/lib/$(MACH64)/libmalloc.so:= \
+	REALPATH=../../../lib/$(MACH64)/libmalloc.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/libmenu.so:= \
+	REALPATH=../../../lib/$(MACH64)/libmenu.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/llib-lmenu.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lmenu.ln
+$(ROOT)/usr/ccs/lib/$(MACH64)/libpanel.so:= \
+	REALPATH=../../../lib/$(MACH64)/libpanel.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/llib-lpanel.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lpanel.ln
+$(ROOT)/usr/ccs/lib/$(MACH64)/libtermlib.so:= \
+	REALPATH=../../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/llib-ltermlib.ln:= \
+	REALPATH=../../../../lib/$(MACH64)/llib-lcurses.ln
+$(ROOT)/usr/ccs/lib/$(MACH64)/libtermcap.so:= \
+	REALPATH=../../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/llib-ltermcap.ln:= \
+	REALPATH=../../../../lib/$(MACH64)/llib-lcurses.ln
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-Xa.o:= \
+	REALPATH=../../../lib/$(MACH64)/values-Xa.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-Xc.o:= \
+	REALPATH=../../../lib/$(MACH64)/values-Xc.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-Xs.o:= \
+	REALPATH=../../../lib/$(MACH64)/values-Xs.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-Xt.o:= \
+	REALPATH=../../../lib/$(MACH64)/values-Xt.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-xpg4.o:= \
+	REALPATH=../../../lib/$(MACH64)/values-xpg4.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-xpg6.o:= \
+	REALPATH=../../../lib/$(MACH64)/values-xpg6.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/libl.so:= \
+	REALPATH=../../../lib/$(MACH64)/libl.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/llib-ll.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ll.ln
+$(ROOT)/usr/ccs/lib/$(MACH64)/liby.so:= \
+	REALPATH=../../../lib/$(MACH64)/liby.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/llib-ly.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ly.ln
+$(ROOT)/usr/ccs/lib/$(MACH64)/libld.so.2:= \
+	REALPATH=../../../../lib/$(MACH64)/libld.so.2
+$(ROOT)/usr/ccs/lib/$(MACH64)/libld.so.3:= \
+	REALPATH=../../../../lib/$(MACH64)/libld.so.3
+$(ROOT)/usr/lib/libp/$(MACH64)/libc.so.1:= \
+	REALPATH=../../../../lib/$(MACH64)/libc.so.1
+$(ROOT)/usr/lib/lwp/$(MACH64)/libthread.so.1:= \
+	REALPATH=../../$(MACH64)/libthread.so.1
+$(ROOT)/usr/lib/lwp/$(MACH64)/libthread_db.so.1:= \
+	REALPATH=../../$(MACH64)/libthread_db.so.1
+
+SYM.USRCCSLIB= \
+	/usr/ccs/lib/libcurses.so \
+	/usr/ccs/lib/llib-lcurses \
+	/usr/ccs/lib/llib-lcurses.ln \
+	/usr/ccs/lib/libform.so \
+	/usr/ccs/lib/llib-lform \
+	/usr/ccs/lib/llib-lform.ln \
+	/usr/ccs/lib/libgen.so \
+	/usr/ccs/lib/llib-lgen \
+	/usr/ccs/lib/llib-lgen.ln \
+	/usr/ccs/lib/libmalloc.so \
+	/usr/ccs/lib/libmenu.so \
+	/usr/ccs/lib/llib-lmenu \
+	/usr/ccs/lib/llib-lmenu.ln \
+	/usr/ccs/lib/libpanel.so \
+	/usr/ccs/lib/llib-lpanel \
+	/usr/ccs/lib/llib-lpanel.ln \
+	/usr/ccs/lib/libtermlib.so \
+	/usr/ccs/lib/llib-ltermlib \
+	/usr/ccs/lib/llib-ltermlib.ln \
+	/usr/ccs/lib/libtermcap.so \
+	/usr/ccs/lib/llib-ltermcap \
+	/usr/ccs/lib/llib-ltermcap.ln \
+	/usr/ccs/lib/values-Xa.o \
+	/usr/ccs/lib/values-Xc.o \
+	/usr/ccs/lib/values-Xs.o \
+	/usr/ccs/lib/values-Xt.o \
+	/usr/ccs/lib/values-xpg4.o \
+	/usr/ccs/lib/values-xpg6.o \
+	/usr/ccs/lib/libl.so \
+	/usr/ccs/lib/llib-ll.ln \
+	/usr/ccs/lib/liby.so \
+	/usr/ccs/lib/llib-ly.ln \
+	/usr/ccs/lib/libld.so.2 \
+	/usr/lib/libp/libc.so.1 \
+	/usr/lib/lwp/libthread.so.1 \
+	/usr/lib/lwp/libthread_db.so.1
+
+SYM.USRCCSLIB64= \
+	/usr/ccs/lib/libld.so.3 \
+	/usr/ccs/lib/$(MACH64)/libcurses.so \
+	/usr/ccs/lib/$(MACH64)/llib-lcurses.ln \
+	/usr/ccs/lib/$(MACH64)/libform.so \
+	/usr/ccs/lib/$(MACH64)/llib-lform.ln \
+	/usr/ccs/lib/$(MACH64)/libgen.so \
+	/usr/ccs/lib/$(MACH64)/llib-lgen.ln \
+	/usr/ccs/lib/$(MACH64)/libmalloc.so \
+	/usr/ccs/lib/$(MACH64)/libmenu.so \
+	/usr/ccs/lib/$(MACH64)/llib-lmenu.ln \
+	/usr/ccs/lib/$(MACH64)/libpanel.so \
+	/usr/ccs/lib/$(MACH64)/llib-lpanel.ln \
+	/usr/ccs/lib/$(MACH64)/libtermlib.so \
+	/usr/ccs/lib/$(MACH64)/llib-ltermlib.ln \
+	/usr/ccs/lib/$(MACH64)/libtermcap.so \
+	/usr/ccs/lib/$(MACH64)/llib-ltermcap.ln \
+	/usr/ccs/lib/$(MACH64)/values-Xa.o \
+	/usr/ccs/lib/$(MACH64)/values-Xc.o \
+	/usr/ccs/lib/$(MACH64)/values-Xs.o \
+	/usr/ccs/lib/$(MACH64)/values-Xt.o \
+	/usr/ccs/lib/$(MACH64)/values-xpg4.o \
+	/usr/ccs/lib/$(MACH64)/values-xpg6.o \
+	/usr/ccs/lib/$(MACH64)/libl.so \
+	/usr/ccs/lib/$(MACH64)/llib-ll.ln \
+	/usr/ccs/lib/$(MACH64)/liby.so \
+	/usr/ccs/lib/$(MACH64)/llib-ly.ln \
+	/usr/ccs/lib/$(MACH64)/libld.so.2 \
+	/usr/ccs/lib/$(MACH64)/libld.so.3 \
+	/usr/lib/libp/$(MACH64)/libc.so.1 \
+	/usr/lib/lwp/$(MACH64)/libthread.so.1 \
+	/usr/lib/lwp/$(MACH64)/libthread_db.so.1
+
+
+$(SYM.USRCCSLIB:%=$(ROOT)%):= \
+    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@; \
+	       $(CHOWN) $(OWNER) $@; $(CHGRP) $(GROUP) $@
+
+$(SYM.USRCCSLIB64:%=$(ROOT)%):= \
+    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@; \
+	       $(CHOWN) $(OWNER) $@; $(CHGRP) $(GROUP) $@
+
+# Special symlinks to direct libraries that have been moved
+# from /usr/lib to /lib in order to live in the root filesystem.
+$(ROOT)/lib/libthread_db.so.1:=		REALPATH=libc_db.so.1
+$(ROOT)/lib/libthread_db.so:=		REALPATH=libc_db.so.1
+$(ROOT)/usr/lib/ld.so.1:=		REALPATH=../../lib/ld.so.1
+$(ROOT)/usr/lib/libadm.so.1:=		REALPATH=../../lib/libadm.so.1
+$(ROOT)/usr/lib/libadm.so:=		REALPATH=../../lib/libadm.so.1
+$(ROOT)/usr/lib/libaio.so.1:=		REALPATH=../../lib/libaio.so.1
+$(ROOT)/usr/lib/libaio.so:=		REALPATH=../../lib/libaio.so.1
+$(ROOT)/usr/lib/libavl.so.1:=		REALPATH=../../lib/libavl.so.1
+$(ROOT)/usr/lib/libavl.so:=		REALPATH=../../lib/libavl.so.1
+$(ROOT)/usr/lib/libbsm.so.1:=		REALPATH=../../lib/libbsm.so.1
+$(ROOT)/usr/lib/libbsm.so:=		REALPATH=../../lib/libbsm.so.1
+$(ROOT)/usr/lib/libc.so.1:=		REALPATH=../../lib/libc.so.1
+$(ROOT)/usr/lib/libc.so:=		REALPATH=../../lib/libc.so.1
+$(ROOT)/usr/lib/libc_db.so.1:=		REALPATH=../../lib/libc_db.so.1
+$(ROOT)/usr/lib/libc_db.so:=		REALPATH=../../lib/libc_db.so.1
+$(ROOT)/usr/lib/libcmd.so.1:=		REALPATH=../../lib/libcmd.so.1
+$(ROOT)/usr/lib/libcmd.so:=		REALPATH=../../lib/libcmd.so.1
+$(ROOT)/usr/lib/libcmdutils.so.1:=	REALPATH=../../lib/libcmdutils.so.1
+$(ROOT)/usr/lib/libcmdutils.so:=	REALPATH=../../lib/libcmdutils.so.1
+$(ROOT)/usr/lib/libcontract.so.1:=	REALPATH=../../lib/libcontract.so.1
+$(ROOT)/usr/lib/libcontract.so:=	REALPATH=../../lib/libcontract.so.1
+$(ROOT)/usr/lib/libctf.so.1:=		REALPATH=../../lib/libctf.so.1
+$(ROOT)/usr/lib/libctf.so:=		REALPATH=../../lib/libctf.so.1
+$(ROOT)/usr/lib/libcurses.so.1:=	REALPATH=../../lib/libcurses.so.1
+$(ROOT)/usr/lib/libcurses.so:=		REALPATH=../../lib/libcurses.so.1
+$(ROOT)/usr/lib/libdevice.so.1:=	REALPATH=../../lib/libdevice.so.1
+$(ROOT)/usr/lib/libdevice.so:=		REALPATH=../../lib/libdevice.so.1
+$(ROOT)/usr/lib/libdevid.so.1:=		REALPATH=../../lib/libdevid.so.1
+$(ROOT)/usr/lib/libdevid.so:=		REALPATH=../../lib/libdevid.so.1
+$(ROOT)/usr/lib/libdevinfo.so.1:=	REALPATH=../../lib/libdevinfo.so.1
+$(ROOT)/usr/lib/libdevinfo.so:=		REALPATH=../../lib/libdevinfo.so.1
+$(ROOT)/usr/lib/libdhcpagent.so.1:=	REALPATH=../../lib/libdhcpagent.so.1
+$(ROOT)/usr/lib/libdhcpagent.so:=	REALPATH=../../lib/libdhcpagent.so.1
+$(ROOT)/usr/lib/libdhcputil.so.1:=	REALPATH=../../lib/libdhcputil.so.1
+$(ROOT)/usr/lib/libdhcputil.so:=	REALPATH=../../lib/libdhcputil.so.1
+$(ROOT)/usr/lib/libdl.so.1:=		REALPATH=../../lib/libdl.so.1
+$(ROOT)/usr/lib/libdl.so:=		REALPATH=../../lib/libdl.so.1
+$(ROOT)/usr/lib/libdoor.so.1:=		REALPATH=../../lib/libdoor.so.1
+$(ROOT)/usr/lib/libdoor.so:=		REALPATH=../../lib/libdoor.so.1
+$(ROOT)/usr/lib/libefi.so.1:=		REALPATH=../../lib/libefi.so.1
+$(ROOT)/usr/lib/libefi.so:=		REALPATH=../../lib/libefi.so.1
+$(ROOT)/usr/lib/libelf.so.1:=		REALPATH=../../lib/libelf.so.1
+$(ROOT)/usr/lib/libelf.so:=		REALPATH=../../lib/libelf.so.1
+$(ROOT)/usr/lib/libgen.so.1:=		REALPATH=../../lib/libgen.so.1
+$(ROOT)/usr/lib/libgen.so:=		REALPATH=../../lib/libgen.so.1
+$(ROOT)/usr/lib/libinetcfg.so.1:=	REALPATH=../../lib/libinetcfg.so.1
+$(ROOT)/usr/lib/libinetcfg.so:=		REALPATH=../../lib/libinetcfg.so.1
+$(ROOT)/usr/lib/libinetutil.so.1:=	REALPATH=../../lib/libinetutil.so.1
+$(ROOT)/usr/lib/libinetutil.so:=	REALPATH=../../lib/libinetutil.so.1
+$(ROOT)/usr/lib/libintl.so.1:=		REALPATH=../../lib/libintl.so.1
+$(ROOT)/usr/lib/libintl.so:=		REALPATH=../../lib/libintl.so.1
+$(ROOT)/usr/lib/libkstat.so.1:=		REALPATH=../../lib/libkstat.so.1
+$(ROOT)/usr/lib/libkstat.so:=		REALPATH=../../lib/libkstat.so.1
+$(ROOT)/usr/lib/libld.so.2:=		REALPATH=../../lib/libld.so.2
+$(ROOT)/usr/lib/libld.so.3:=		REALPATH=../../lib/libld.so.3
+$(ROOT)/usr/lib/liblddbg.so.4:=		REALPATH=../../lib/liblddbg.so.4
+$(ROOT)/usr/lib/libmd5.so.1:=		REALPATH=../../lib/libmd5.so.1
+$(ROOT)/usr/lib/libmd5.so:=		REALPATH=../../lib/libmd5.so.1
+$(ROOT)/usr/lib/libmeta.so.1:=		REALPATH=../../lib/libmeta.so.1
+$(ROOT)/usr/lib/libmeta.so:=		REALPATH=../../lib/libmeta.so.1
+$(ROOT)/usr/lib/libmp.so.1:=		REALPATH=../../lib/libmp.so.1
+$(ROOT)/usr/lib/libmp.so.2:=		REALPATH=../../lib/libmp.so.2
+$(ROOT)/usr/lib/libmp.so:=		REALPATH=../../lib/libmp.so.2
+$(ROOT)/usr/lib/libnsl.so.1:=		REALPATH=../../lib/libnsl.so.1
+$(ROOT)/usr/lib/libnsl.so:=		REALPATH=../../lib/libnsl.so.1
+$(ROOT)/usr/lib/libnvpair.so.1:=	REALPATH=../../lib/libnvpair.so.1
+$(ROOT)/usr/lib/libnvpair.so:=		REALPATH=../../lib/libnvpair.so.1
+$(ROOT)/usr/lib/libpam.so.1:=		REALPATH=../../lib/libpam.so.1
+$(ROOT)/usr/lib/libpam.so:=		REALPATH=../../lib/libpam.so.1
+$(ROOT)/usr/lib/libposix4.so.1:=	REALPATH=../../lib/librt.so.1
+$(ROOT)/usr/lib/libposix4.so:=		REALPATH=../../lib/librt.so.1
+$(ROOT)/usr/lib/libproc.so.1:=		REALPATH=../../lib/libproc.so.1
+$(ROOT)/usr/lib/libproc.so:=		REALPATH=../../lib/libproc.so.1
+$(ROOT)/usr/lib/libpthread.so.1:=	REALPATH=../../lib/libpthread.so.1
+$(ROOT)/usr/lib/libresolv.so.1:=	REALPATH=../../lib/libresolv.so.1
+$(ROOT)/usr/lib/libresolv.so.2:=	REALPATH=../../lib/libresolv.so.2
+$(ROOT)/usr/lib/libresolv.so:=		REALPATH=../../lib/libresolv.so.2
+$(ROOT)/usr/lib/libpthread.so:=		REALPATH=../../lib/libpthread.so.1
+$(ROOT)/usr/lib/librestart.so.1:=	REALPATH=../../lib/librestart.so.1
+$(ROOT)/usr/lib/librestart.so:=		REALPATH=../../lib/librestart.so.1
+$(ROOT)/usr/lib/librpcsvc.so.1:=	REALPATH=../../lib/librpcsvc.so.1
+$(ROOT)/usr/lib/librpcsvc.so:=		REALPATH=../../lib/librpcsvc.so.1
+$(ROOT)/usr/lib/librt.so.1:=		REALPATH=../../lib/librt.so.1
+$(ROOT)/usr/lib/librt.so:=		REALPATH=../../lib/librt.so.1
+$(ROOT)/usr/lib/librtld.so.1:=		REALPATH=../../lib/librtld.so.1
+$(ROOT)/usr/lib/librtld_db.so.1:=	REALPATH=../../lib/librtld_db.so.1
+$(ROOT)/usr/lib/librtld_db.so:=		REALPATH=../../lib/librtld_db.so.1
+$(ROOT)/usr/lib/libscf.so.1:=		REALPATH=../../lib/libscf.so.1
+$(ROOT)/usr/lib/libscf.so:=		REALPATH=../../lib/libscf.so.1
+$(ROOT)/usr/lib/libsec.so.1:=		REALPATH=../../lib/libsec.so.1
+$(ROOT)/usr/lib/libsec.so:=		REALPATH=../../lib/libsec.so.1
+$(ROOT)/usr/lib/libsecdb.so.1:=		REALPATH=../../lib/libsecdb.so.1
+$(ROOT)/usr/lib/libsecdb.so:=		REALPATH=../../lib/libsecdb.so.1
+$(ROOT)/usr/lib/libsendfile.so.1:=	REALPATH=../../lib/libsendfile.so.1
+$(ROOT)/usr/lib/libsendfile.so:=	REALPATH=../../lib/libsendfile.so.1
+$(ROOT)/usr/lib/libsocket.so.1:=	REALPATH=../../lib/libsocket.so.1
+$(ROOT)/usr/lib/libsocket.so:=		REALPATH=../../lib/libsocket.so.1
+$(ROOT)/usr/lib/libsysevent.so.1:=	REALPATH=../../lib/libsysevent.so.1
+$(ROOT)/usr/lib/libsysevent.so:=	REALPATH=../../lib/libsysevent.so.1
+$(ROOT)/usr/lib/libtermcap.so.1:=	REALPATH=../../lib/libcurses.so.1
+$(ROOT)/usr/lib/libtermcap.so:=		REALPATH=../../lib/libcurses.so.1
+$(ROOT)/usr/lib/libtermlib.so.1:=	REALPATH=../../lib/libcurses.so.1
+$(ROOT)/usr/lib/libtermlib.so:=		REALPATH=../../lib/libcurses.so.1
+$(ROOT)/usr/lib/libthread.so.1:=	REALPATH=../../lib/libthread.so.1
+$(ROOT)/usr/lib/libthread.so:=		REALPATH=../../lib/libthread.so.1
+$(ROOT)/usr/lib/libthread_db.so.1:=	REALPATH=../../lib/libc_db.so.1
+$(ROOT)/usr/lib/libthread_db.so:=	REALPATH=../../lib/libc_db.so.1
+$(ROOT)/usr/lib/libumem.so.1:=		REALPATH=../../lib/libumem.so.1
+$(ROOT)/usr/lib/libumem.so:=		REALPATH=../../lib/libumem.so.1
+$(ROOT)/usr/lib/libuuid.so.1:=		REALPATH=../../lib/libuuid.so.1
+$(ROOT)/usr/lib/libuuid.so:=		REALPATH=../../lib/libuuid.so.1
+$(ROOT)/usr/lib/libuutil.so.1:=		REALPATH=../../lib/libuutil.so.1
+$(ROOT)/usr/lib/libuutil.so:=		REALPATH=../../lib/libuutil.so.1
+$(ROOT)/usr/lib/libw.so.1:=		REALPATH=../../lib/libw.so.1
+$(ROOT)/usr/lib/libw.so:=		REALPATH=../../lib/libw.so.1
+$(ROOT)/usr/lib/libxnet.so.1:=		REALPATH=../../lib/libxnet.so.1
+$(ROOT)/usr/lib/libxnet.so:=		REALPATH=../../lib/libxnet.so.1
+$(ROOT)/usr/lib/llib-ladm.ln:=		REALPATH=../../lib/llib-ladm.ln
+$(ROOT)/usr/lib/llib-ladm:=		REALPATH=../../lib/llib-ladm
+$(ROOT)/usr/lib/llib-laio.ln:=		REALPATH=../../lib/llib-laio.ln
+$(ROOT)/usr/lib/llib-laio:=		REALPATH=../../lib/llib-laio
+$(ROOT)/usr/lib/llib-lavl.ln:=		REALPATH=../../lib/llib-lavl.ln
+$(ROOT)/usr/lib/llib-lavl:=		REALPATH=../../lib/llib-lavl
+$(ROOT)/usr/lib/llib-lbsm.ln:=		REALPATH=../../lib/llib-lbsm.ln
+$(ROOT)/usr/lib/llib-lbsm:=		REALPATH=../../lib/llib-lbsm
+$(ROOT)/usr/lib/llib-lc.ln:=		REALPATH=../../lib/llib-lc.ln
+$(ROOT)/usr/lib/llib-lc:=		REALPATH=../../lib/llib-lc
+$(ROOT)/usr/lib/llib-lcmd.ln:=		REALPATH=../../lib/llib-lcmd.ln
+$(ROOT)/usr/lib/llib-lcmd:=		REALPATH=../../lib/llib-lcmd
+$(ROOT)/usr/lib/llib-lcmdutils.ln:=	REALPATH=../../lib/llib-lcmdutils.ln
+$(ROOT)/usr/lib/llib-lcmdutils:=	REALPATH=../../lib/llib-lcmdutils
+$(ROOT)/usr/lib/llib-lcontract.ln:=	REALPATH=../../lib/llib-lcontract.ln
+$(ROOT)/usr/lib/llib-lcontract:=	REALPATH=../../lib/llib-lcontract
+$(ROOT)/usr/lib/llib-lctf.ln:=		REALPATH=../../lib/llib-lctf.ln
+$(ROOT)/usr/lib/llib-lctf:=		REALPATH=../../lib/llib-lctf
+$(ROOT)/usr/lib/llib-lcurses.ln:=	REALPATH=../../lib/llib-lcurses.ln
+$(ROOT)/usr/lib/llib-lcurses:=		REALPATH=../../lib/llib-lcurses
+$(ROOT)/usr/lib/llib-ldevice.ln:=	REALPATH=../../lib/llib-ldevice.ln
+$(ROOT)/usr/lib/llib-ldevice:=		REALPATH=../../lib/llib-ldevice
+$(ROOT)/usr/lib/llib-ldevid.ln:=	REALPATH=../../lib/llib-ldevid.ln
+$(ROOT)/usr/lib/llib-ldevid:=		REALPATH=../../lib/llib-ldevid
+$(ROOT)/usr/lib/llib-ldevinfo.ln:=	REALPATH=../../lib/llib-ldevinfo.ln
+$(ROOT)/usr/lib/llib-ldevinfo:=		REALPATH=../../lib/llib-ldevinfo
+$(ROOT)/usr/lib/llib-ldhcpagent.ln:=	REALPATH=../../lib/llib-ldhcpagent.ln
+$(ROOT)/usr/lib/llib-ldhcpagent:=	REALPATH=../../lib/llib-ldhcpagent
+$(ROOT)/usr/lib/llib-ldhcputil.ln:=	REALPATH=../../lib/llib-ldhcputil.ln
+$(ROOT)/usr/lib/llib-ldhcputil:=	REALPATH=../../lib/llib-ldhcputil
+$(ROOT)/usr/lib/llib-ldl.ln:=		REALPATH=../../lib/llib-ldl.ln
+$(ROOT)/usr/lib/llib-ldl:=		REALPATH=../../lib/llib-ldl
+$(ROOT)/usr/lib/llib-ldoor.ln:=		REALPATH=../../lib/llib-ldoor.ln
+$(ROOT)/usr/lib/llib-ldoor:=		REALPATH=../../lib/llib-ldoor
+$(ROOT)/usr/lib/llib-lefi.ln:=		REALPATH=../../lib/llib-lefi.ln
+$(ROOT)/usr/lib/llib-lefi:=		REALPATH=../../lib/llib-lefi
+$(ROOT)/usr/lib/llib-lelf.ln:=		REALPATH=../../lib/llib-lelf.ln
+$(ROOT)/usr/lib/llib-lelf:=		REALPATH=../../lib/llib-lelf
+$(ROOT)/usr/lib/llib-lgen.ln:=		REALPATH=../../lib/llib-lgen.ln
+$(ROOT)/usr/lib/llib-lgen:=		REALPATH=../../lib/llib-lgen
+$(ROOT)/usr/lib/llib-linetcfg.ln:=	REALPATH=../../lib/llib-linetcfg.ln
+$(ROOT)/usr/lib/llib-linetcfg:=		REALPATH=../../lib/llib-linetcfg
+$(ROOT)/usr/lib/llib-linetutil.ln:=	REALPATH=../../lib/llib-linetutil.ln
+$(ROOT)/usr/lib/llib-linetutil:=	REALPATH=../../lib/llib-linetutil
+$(ROOT)/usr/lib/llib-lintl.ln:=		REALPATH=../../lib/llib-lintl.ln
+$(ROOT)/usr/lib/llib-lintl:=		REALPATH=../../lib/llib-lintl
+$(ROOT)/usr/lib/llib-lkstat.ln:=	REALPATH=../../lib/llib-lkstat.ln
+$(ROOT)/usr/lib/llib-lkstat:=		REALPATH=../../lib/llib-lkstat
+$(ROOT)/usr/lib/llib-lmd5.ln:=		REALPATH=../../lib/llib-lmd5.ln
+$(ROOT)/usr/lib/llib-lmd5:=		REALPATH=../../lib/llib-lmd5
+$(ROOT)/usr/lib/llib-lmeta.ln:=		REALPATH=../../lib/llib-lmeta.ln
+$(ROOT)/usr/lib/llib-lmeta:=		REALPATH=../../lib/llib-lmeta
+$(ROOT)/usr/lib/llib-lnsl.ln:=		REALPATH=../../lib/llib-lnsl.ln
+$(ROOT)/usr/lib/llib-lnsl:=		REALPATH=../../lib/llib-lnsl
+$(ROOT)/usr/lib/llib-lnvpair.ln:=	REALPATH=../../lib/llib-lnvpair.ln
+$(ROOT)/usr/lib/llib-lnvpair:=		REALPATH=../../lib/llib-lnvpair
+$(ROOT)/usr/lib/llib-lpam.ln:=		REALPATH=../../lib/llib-lpam.ln
+$(ROOT)/usr/lib/llib-lpam:=		REALPATH=../../lib/llib-lpam
+$(ROOT)/usr/lib/llib-lposix4.ln:=	REALPATH=../../lib/llib-lrt.ln
+$(ROOT)/usr/lib/llib-lposix4:=		REALPATH=../../lib/llib-lrt
+$(ROOT)/usr/lib/llib-lpthread.ln:=	REALPATH=../../lib/llib-lpthread.ln
+$(ROOT)/usr/lib/llib-lpthread:=		REALPATH=../../lib/llib-lpthread
+$(ROOT)/usr/lib/llib-lresolv.ln:=	REALPATH=../../lib/llib-lresolv.ln
+$(ROOT)/usr/lib/llib-lresolv:=		REALPATH=../../lib/llib-lresolv
+$(ROOT)/usr/lib/llib-lrt.ln:=		REALPATH=../../lib/llib-lrt.ln
+$(ROOT)/usr/lib/llib-lrt:=		REALPATH=../../lib/llib-lrt
+$(ROOT)/usr/lib/llib-lrtld_db.ln:=	REALPATH=../../lib/llib-lrtld_db.ln
+$(ROOT)/usr/lib/llib-lrtld_db:=		REALPATH=../../lib/llib-lrtld_db
+$(ROOT)/usr/lib/llib-lscf.ln:=		REALPATH=../../lib/llib-lscf.ln
+$(ROOT)/usr/lib/llib-lscf:=		REALPATH=../../lib/llib-lscf
+$(ROOT)/usr/lib/llib-lsec.ln:=		REALPATH=../../lib/llib-lsec.ln
+$(ROOT)/usr/lib/llib-lsec:=		REALPATH=../../lib/llib-lsec
+$(ROOT)/usr/lib/llib-lsecdb.ln:=	REALPATH=../../lib/llib-lsecdb.ln
+$(ROOT)/usr/lib/llib-lsecdb:=		REALPATH=../../lib/llib-lsecdb
+$(ROOT)/usr/lib/llib-lsendfile.ln:=	REALPATH=../../lib/llib-lsendfile.ln
+$(ROOT)/usr/lib/llib-lsendfile:=	REALPATH=../../lib/llib-lsendfile
+$(ROOT)/usr/lib/llib-lsocket.ln:=	REALPATH=../../lib/llib-lsocket.ln
+$(ROOT)/usr/lib/llib-lsocket:=		REALPATH=../../lib/llib-lsocket
+$(ROOT)/usr/lib/llib-lsysevent.ln:=	REALPATH=../../lib/llib-lsysevent.ln
+$(ROOT)/usr/lib/llib-lsysevent:=	REALPATH=../../lib/llib-lsysevent
+$(ROOT)/usr/lib/llib-ltermcap.ln:=	REALPATH=../../lib/llib-lcurses.ln
+$(ROOT)/usr/lib/llib-ltermcap:=		REALPATH=../../lib/llib-lcurses
+$(ROOT)/usr/lib/llib-ltermlib.ln:=	REALPATH=../../lib/llib-lcurses.ln
+$(ROOT)/usr/lib/llib-ltermlib:=		REALPATH=../../lib/llib-lcurses
+$(ROOT)/usr/lib/llib-lthread.ln:=	REALPATH=../../lib/llib-lthread.ln
+$(ROOT)/usr/lib/llib-lthread:=		REALPATH=../../lib/llib-lthread
+$(ROOT)/usr/lib/llib-lthread_db.ln:=	REALPATH=../../lib/llib-lc_db.ln
+$(ROOT)/usr/lib/llib-lthread_db:=	REALPATH=../../lib/llib-lc_db
+$(ROOT)/usr/lib/llib-lumem.ln:=		REALPATH=../../lib/llib-lumem.ln
+$(ROOT)/usr/lib/llib-lumem:=		REALPATH=../../lib/llib-lumem
+$(ROOT)/usr/lib/llib-luuid.ln:=		REALPATH=../../lib/llib-luuid.ln
+$(ROOT)/usr/lib/llib-luuid:=		REALPATH=../../lib/llib-luuid
+$(ROOT)/usr/lib/llib-lxnet.ln:=		REALPATH=../../lib/llib-lxnet.ln
+$(ROOT)/usr/lib/llib-lxnet:=		REALPATH=../../lib/llib-lxnet
+$(ROOT)/usr/lib/nss_compat.so.1:=	REALPATH=../../lib/nss_compat.so.1
+$(ROOT)/usr/lib/nss_dns.so.1:=		REALPATH=../../lib/nss_dns.so.1
+$(ROOT)/usr/lib/nss_files.so.1:=	REALPATH=../../lib/nss_files.so.1
+$(ROOT)/usr/lib/nss_nis.so.1:=		REALPATH=../../lib/nss_nis.so.1
+$(ROOT)/usr/lib/nss_nisplus.so.1:=	REALPATH=../../lib/nss_nisplus.so.1
+$(ROOT)/usr/lib/nss_user.so.1:=		REALPATH=../../lib/nss_user.so.1
+
+$(ROOT)/lib/$(MACH64)/libthread_db.so.1:= \
+	REALPATH=libc_db.so.1
+$(ROOT)/lib/$(MACH64)/libthread_db.so:= \
+	REALPATH=libc_db.so.1
+$(ROOT)/usr/lib/$(MACH64)/ld.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/ld.so.1
+$(ROOT)/usr/lib/$(MACH64)/libadm.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libadm.so.1
+$(ROOT)/usr/lib/$(MACH64)/libadm.so:= \
+	REALPATH=../../../lib/$(MACH64)/libadm.so.1
+$(ROOT)/usr/lib/$(MACH64)/libaio.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libaio.so.1
+$(ROOT)/usr/lib/$(MACH64)/libaio.so:= \
+	REALPATH=../../../lib/$(MACH64)/libaio.so.1
+$(ROOT)/usr/lib/$(MACH64)/libavl.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libavl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libavl.so:= \
+	REALPATH=../../../lib/$(MACH64)/libavl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libbsm.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libbsm.so.1
+$(ROOT)/usr/lib/$(MACH64)/libbsm.so:= \
+	REALPATH=../../../lib/$(MACH64)/libbsm.so.1
+$(ROOT)/usr/lib/$(MACH64)/libc.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libc.so.1
+$(ROOT)/usr/lib/$(MACH64)/libc.so:= \
+	REALPATH=../../../lib/$(MACH64)/libc.so.1
+$(ROOT)/usr/lib/$(MACH64)/libc_db.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libc_db.so.1
+$(ROOT)/usr/lib/$(MACH64)/libc_db.so:= \
+	REALPATH=../../../lib/$(MACH64)/libc_db.so.1
+$(ROOT)/usr/lib/$(MACH64)/libcmd.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libcmd.so.1
+$(ROOT)/usr/lib/$(MACH64)/libcmd.so:= \
+	REALPATH=../../../lib/$(MACH64)/libcmd.so.1
+$(ROOT)/usr/lib/$(MACH64)/libcmdutils.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libcmdutils.so.1
+$(ROOT)/usr/lib/$(MACH64)/libcmdutils.so:= \
+	REALPATH=../../../lib/$(MACH64)/libcmdutils.so.1
+$(ROOT)/usr/lib/$(MACH64)/libcontract.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libcontract.so.1
+$(ROOT)/usr/lib/$(MACH64)/libcontract.so:= \
+	REALPATH=../../../lib/$(MACH64)/libcontract.so.1
+$(ROOT)/usr/lib/$(MACH64)/libctf.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libctf.so.1
+$(ROOT)/usr/lib/$(MACH64)/libctf.so:= \
+	REALPATH=../../../lib/$(MACH64)/libctf.so.1
+$(ROOT)/usr/lib/$(MACH64)/libcurses.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/lib/$(MACH64)/libcurses.so:= \
+	REALPATH=../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdevice.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libdevice.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdevice.so:= \
+	REALPATH=../../../lib/$(MACH64)/libdevice.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdevid.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libdevid.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdevid.so:= \
+	REALPATH=../../../lib/$(MACH64)/libdevid.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdevinfo.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libdevinfo.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdevinfo.so:= \
+	REALPATH=../../../lib/$(MACH64)/libdevinfo.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdl.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libdl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdl.so:= \
+	REALPATH=../../../lib/$(MACH64)/libdl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdoor.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libdoor.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdoor.so:= \
+	REALPATH=../../../lib/$(MACH64)/libdoor.so.1
+$(ROOT)/usr/lib/$(MACH64)/libefi.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libefi.so.1
+$(ROOT)/usr/lib/$(MACH64)/libefi.so:= \
+	REALPATH=../../../lib/$(MACH64)/libefi.so.1
+$(ROOT)/usr/lib/$(MACH64)/libelf.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libelf.so.1
+$(ROOT)/usr/lib/$(MACH64)/libelf.so:= \
+	REALPATH=../../../lib/$(MACH64)/libelf.so.1
+$(ROOT)/usr/lib/$(MACH64)/libgen.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libgen.so.1
+$(ROOT)/usr/lib/$(MACH64)/libgen.so:= \
+	REALPATH=../../../lib/$(MACH64)/libgen.so.1
+$(ROOT)/usr/lib/$(MACH64)/libinetutil.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libinetutil.so.1
+$(ROOT)/usr/lib/$(MACH64)/libinetutil.so:= \
+	REALPATH=../../../lib/$(MACH64)/libinetutil.so.1
+$(ROOT)/usr/lib/$(MACH64)/libintl.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libintl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libintl.so:= \
+	REALPATH=../../../lib/$(MACH64)/libintl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libkstat.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libkstat.so.1
+$(ROOT)/usr/lib/$(MACH64)/libkstat.so:= \
+	REALPATH=../../../lib/$(MACH64)/libkstat.so.1
+$(ROOT)/usr/lib/$(MACH64)/libld.so.2:= \
+	REALPATH=../../../lib/$(MACH64)/libld.so.2
+$(ROOT)/usr/lib/$(MACH64)/libld.so.3:= \
+	REALPATH=../../../lib/$(MACH64)/libld.so.3
+$(ROOT)/usr/lib/$(MACH64)/liblddbg.so.4:= \
+	REALPATH=../../../lib/$(MACH64)/liblddbg.so.4
+$(ROOT)/usr/lib/$(MACH64)/libmd5.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libmd5.so.1
+$(ROOT)/usr/lib/$(MACH64)/libmd5.so:= \
+	REALPATH=../../../lib/$(MACH64)/libmd5.so.1
+$(ROOT)/usr/lib/$(MACH64)/libmp.so.2:= \
+	REALPATH=../../../lib/$(MACH64)/libmp.so.2
+$(ROOT)/usr/lib/$(MACH64)/libmp.so:= \
+	REALPATH=../../../lib/$(MACH64)/libmp.so.2
+$(ROOT)/usr/lib/$(MACH64)/libnsl.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libnsl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libnsl.so:= \
+	REALPATH=../../../lib/$(MACH64)/libnsl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libnvpair.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libnvpair.so.1
+$(ROOT)/usr/lib/$(MACH64)/libnvpair.so:= \
+	REALPATH=../../../lib/$(MACH64)/libnvpair.so.1
+$(ROOT)/usr/lib/$(MACH64)/libpam.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libpam.so.1
+$(ROOT)/usr/lib/$(MACH64)/libpam.so:= \
+	REALPATH=../../../lib/$(MACH64)/libpam.so.1
+$(ROOT)/usr/lib/$(MACH64)/libposix4.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/librt.so.1
+$(ROOT)/usr/lib/$(MACH64)/libposix4.so:= \
+	REALPATH=../../../lib/$(MACH64)/librt.so.1
+$(ROOT)/usr/lib/$(MACH64)/libproc.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libproc.so.1
+$(ROOT)/usr/lib/$(MACH64)/libproc.so:= \
+	REALPATH=../../../lib/$(MACH64)/libproc.so.1
+$(ROOT)/usr/lib/$(MACH64)/libpthread.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libpthread.so.1
+$(ROOT)/usr/lib/$(MACH64)/libpthread.so:= \
+	REALPATH=../../../lib/$(MACH64)/libpthread.so.1
+$(ROOT)/usr/lib/$(MACH64)/libresolv.so.2:= \
+	REALPATH=../../../lib/$(MACH64)/libresolv.so.2
+$(ROOT)/usr/lib/$(MACH64)/libresolv.so:= \
+	REALPATH=../../../lib/$(MACH64)/libresolv.so.2
+$(ROOT)/usr/lib/$(MACH64)/librestart.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/librestart.so.1
+$(ROOT)/usr/lib/$(MACH64)/librestart.so:= \
+	REALPATH=../../../lib/$(MACH64)/librestart.so.1
+$(ROOT)/usr/lib/$(MACH64)/librpcsvc.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/librpcsvc.so.1
+$(ROOT)/usr/lib/$(MACH64)/librpcsvc.so:= \
+	REALPATH=../../../lib/$(MACH64)/librpcsvc.so.1
+$(ROOT)/usr/lib/$(MACH64)/librt.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/librt.so.1
+$(ROOT)/usr/lib/$(MACH64)/librt.so:= \
+	REALPATH=../../../lib/$(MACH64)/librt.so.1
+$(ROOT)/usr/lib/$(MACH64)/librtld.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/librtld.so.1
+$(ROOT)/usr/lib/$(MACH64)/librtld_db.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/librtld_db.so.1
+$(ROOT)/usr/lib/$(MACH64)/librtld_db.so:= \
+	REALPATH=../../../lib/$(MACH64)/librtld_db.so.1
+$(ROOT)/usr/lib/$(MACH64)/libscf.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libscf.so.1
+$(ROOT)/usr/lib/$(MACH64)/libscf.so:= \
+	REALPATH=../../../lib/$(MACH64)/libscf.so.1
+$(ROOT)/usr/lib/$(MACH64)/libsec.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libsec.so.1
+$(ROOT)/usr/lib/$(MACH64)/libsec.so:= \
+	REALPATH=../../../lib/$(MACH64)/libsec.so.1
+$(ROOT)/usr/lib/$(MACH64)/libsecdb.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libsecdb.so.1
+$(ROOT)/usr/lib/$(MACH64)/libsecdb.so:= \
+	REALPATH=../../../lib/$(MACH64)/libsecdb.so.1
+$(ROOT)/usr/lib/$(MACH64)/libsendfile.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libsendfile.so.1
+$(ROOT)/usr/lib/$(MACH64)/libsendfile.so:= \
+	REALPATH=../../../lib/$(MACH64)/libsendfile.so.1
+$(ROOT)/usr/lib/$(MACH64)/libsocket.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libsocket.so.1
+$(ROOT)/usr/lib/$(MACH64)/libsocket.so:= \
+	REALPATH=../../../lib/$(MACH64)/libsocket.so.1
+$(ROOT)/usr/lib/$(MACH64)/libsysevent.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libsysevent.so.1
+$(ROOT)/usr/lib/$(MACH64)/libsysevent.so:= \
+	REALPATH=../../../lib/$(MACH64)/libsysevent.so.1
+$(ROOT)/usr/lib/$(MACH64)/libtermcap.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/lib/$(MACH64)/libtermcap.so:= \
+	REALPATH=../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/lib/$(MACH64)/libtermlib.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/lib/$(MACH64)/libtermlib.so:= \
+	REALPATH=../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/lib/$(MACH64)/libthread.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libthread.so.1
+$(ROOT)/usr/lib/$(MACH64)/libthread.so:= \
+	REALPATH=../../../lib/$(MACH64)/libthread.so.1
+$(ROOT)/usr/lib/$(MACH64)/libthread_db.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libc_db.so.1
+$(ROOT)/usr/lib/$(MACH64)/libthread_db.so:= \
+	REALPATH=../../../lib/$(MACH64)/libc_db.so.1
+$(ROOT)/usr/lib/$(MACH64)/libumem.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libumem.so.1
+$(ROOT)/usr/lib/$(MACH64)/libumem.so:= \
+	REALPATH=../../../lib/$(MACH64)/libumem.so.1
+$(ROOT)/usr/lib/$(MACH64)/libuuid.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libuuid.so.1
+$(ROOT)/usr/lib/$(MACH64)/libuuid.so:= \
+	REALPATH=../../../lib/$(MACH64)/libuuid.so.1
+$(ROOT)/usr/lib/$(MACH64)/libuutil.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libuutil.so.1
+$(ROOT)/usr/lib/$(MACH64)/libuutil.so:= \
+	REALPATH=../../../lib/$(MACH64)/libuutil.so.1
+$(ROOT)/usr/lib/$(MACH64)/libw.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libw.so.1
+$(ROOT)/usr/lib/$(MACH64)/libw.so:= \
+	REALPATH=../../../lib/$(MACH64)/libw.so.1
+$(ROOT)/usr/lib/$(MACH64)/libxnet.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libxnet.so.1
+$(ROOT)/usr/lib/$(MACH64)/libxnet.so:= \
+	REALPATH=../../../lib/$(MACH64)/libxnet.so.1
+$(ROOT)/usr/lib/$(MACH64)/llib-ladm.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ladm.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-laio.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-laio.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lavl.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lavl.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lbsm.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lbsm.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lc.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lc.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lcmd.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lcmd.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lcmdutils.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lcmdutils.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lcontract.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lcontract.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lctf.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lctf.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lcurses.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lcurses.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lcurses:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lcurses
+$(ROOT)/usr/lib/$(MACH64)/llib-ldevice.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ldevice.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-ldevid.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ldevid.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-ldevinfo.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ldevinfo.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-ldl.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ldl.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-ldoor.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-ldoor.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lefi.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lefi.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lelf.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lelf.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lgen.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lgen.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-linetutil.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-linetutil.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lintl.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lintl.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lkstat.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lkstat.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lmd5.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lmd5.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lnsl.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lnsl.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lnvpair.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lnvpair.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lpam.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lpam.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lposix4.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lrt.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lpthread.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lpthread.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lresolv.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lresolv.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lrt.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lrt.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lrtld_db.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lrtld_db.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lscf.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lscf.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lsec.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lsec.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lsecdb.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lsecdb.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lsendfile.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lsendfile.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lsocket.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lsocket.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lsysevent.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lsysevent.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-ltermcap.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lcurses.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-ltermcap:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lcurses
+$(ROOT)/usr/lib/$(MACH64)/llib-ltermlib.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lcurses.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-ltermlib:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lcurses
+$(ROOT)/usr/lib/$(MACH64)/llib-lthread.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lthread.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lthread_db.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lc_db.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lumem.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lumem.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-luuid.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-luuid.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lxnet.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lxnet.ln
+$(ROOT)/usr/lib/$(MACH64)/nss_compat.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/nss_compat.so.1
+$(ROOT)/usr/lib/$(MACH64)/nss_dns.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/nss_dns.so.1
+$(ROOT)/usr/lib/$(MACH64)/nss_files.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/nss_files.so.1
+$(ROOT)/usr/lib/$(MACH64)/nss_nis.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/nss_nis.so.1
+$(ROOT)/usr/lib/$(MACH64)/nss_nisplus.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/nss_nisplus.so.1
+$(ROOT)/usr/lib/$(MACH64)/nss_user.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/nss_user.so.1
+$(ROOT)/usr/platform/sun4u/lib/$(MACH64)/libwrsmconf.so.1:= \
+	REALPATH=../../../../../platform/sun4u/lib/$(MACH64)/libwrsmconf.so.1
+$(ROOT)/usr/platform/sun4u/lib/$(MACH64)/libwrsmconf.so:= \
+	REALPATH=../../../../../platform/sun4u/lib/$(MACH64)/libwrsmconf.so.1
+$(ROOT)/usr/platform/sun4u/lib/libwrsmconf.so.1:= \
+	REALPATH=../../../../platform/sun4u/lib/libwrsmconf.so.1
+$(ROOT)/usr/platform/sun4u/lib/libwrsmconf.so:= \
+	REALPATH=../../../../platform/sun4u/lib/libwrsmconf.so.1
+$(ROOT)/usr/platform/sun4u/sbin/wrsmconf:= \
+	REALPATH=../../../../platform/sun4u/sbin/wrsmconf
+
+SYM.USRLIB= \
+	/lib/libthread_db.so \
+	/lib/libthread_db.so.1 \
+	/usr/lib/ld.so.1 \
+	/usr/lib/libadm.so \
+	/usr/lib/libadm.so.1 \
+	/usr/lib/libaio.so \
+	/usr/lib/libaio.so.1 \
+	/usr/lib/libavl.so \
+	/usr/lib/libavl.so.1 \
+	/usr/lib/libbsm.so \
+	/usr/lib/libbsm.so.1 \
+	/usr/lib/libc.so \
+	/usr/lib/libc.so.1 \
+	/usr/lib/libc_db.so \
+	/usr/lib/libc_db.so.1 \
+	/usr/lib/libcmd.so \
+	/usr/lib/libcmd.so.1 \
+	/usr/lib/libcmdutils.so \
+	/usr/lib/libcmdutils.so.1 \
+	/usr/lib/libcontract.so \
+	/usr/lib/libcontract.so.1 \
+	/usr/lib/libctf.so \
+	/usr/lib/libctf.so.1 \
+	/usr/lib/libcurses.so \
+	/usr/lib/libcurses.so.1 \
+	/usr/lib/libdevice.so \
+	/usr/lib/libdevice.so.1 \
+	/usr/lib/libdevid.so \
+	/usr/lib/libdevid.so.1 \
+	/usr/lib/libdevinfo.so \
+	/usr/lib/libdevinfo.so.1 \
+	/usr/lib/libdhcpagent.so \
+	/usr/lib/libdhcpagent.so.1 \
+	/usr/lib/libdhcputil.so \
+	/usr/lib/libdhcputil.so.1 \
+	/usr/lib/libdl.so \
+	/usr/lib/libdl.so.1 \
+	/usr/lib/libdoor.so \
+	/usr/lib/libdoor.so.1 \
+	/usr/lib/libefi.so \
+	/usr/lib/libefi.so.1 \
+	/usr/lib/libelf.so \
+	/usr/lib/libelf.so.1 \
+	/usr/lib/libgen.so \
+	/usr/lib/libgen.so.1 \
+	/usr/lib/libinetcfg.so \
+	/usr/lib/libinetcfg.so.1 \
+	/usr/lib/libinetutil.so \
+	/usr/lib/libinetutil.so.1 \
+	/usr/lib/libintl.so \
+	/usr/lib/libintl.so.1 \
+	/usr/lib/libkstat.so \
+	/usr/lib/libkstat.so.1 \
+	/usr/lib/libld.so.2 \
+	/usr/lib/liblddbg.so.4 \
+	/usr/lib/libmd5.so \
+	/usr/lib/libmd5.so.1 \
+	/usr/lib/libmeta.so \
+	/usr/lib/libmeta.so.1 \
+	/usr/lib/libmp.so \
+	/usr/lib/libmp.so.1 \
+	/usr/lib/libmp.so.2 \
+	/usr/lib/libnsl.so \
+	/usr/lib/libnsl.so.1 \
+	/usr/lib/libnvpair.so \
+	/usr/lib/libnvpair.so.1 \
+	/usr/lib/libpam.so \
+	/usr/lib/libpam.so.1 \
+	/usr/lib/libposix4.so \
+	/usr/lib/libposix4.so.1 \
+	/usr/lib/libproc.so \
+	/usr/lib/libproc.so.1 \
+	/usr/lib/libpthread.so \
+	/usr/lib/libpthread.so.1 \
+	/usr/lib/libresolv.so \
+	/usr/lib/libresolv.so.1 \
+	/usr/lib/libresolv.so.2 \
+	/usr/lib/librestart.so \
+	/usr/lib/librestart.so.1 \
+	/usr/lib/librpcsvc.so \
+	/usr/lib/librpcsvc.so.1 \
+	/usr/lib/librt.so \
+	/usr/lib/librt.so.1 \
+	/usr/lib/librtld.so.1 \
+	/usr/lib/librtld_db.so \
+	/usr/lib/librtld_db.so.1 \
+	/usr/lib/libscf.so \
+	/usr/lib/libscf.so.1 \
+	/usr/lib/libsec.so \
+	/usr/lib/libsec.so.1 \
+	/usr/lib/libsecdb.so \
+	/usr/lib/libsecdb.so.1 \
+	/usr/lib/libsendfile.so \
+	/usr/lib/libsendfile.so.1 \
+	/usr/lib/libsocket.so \
+	/usr/lib/libsocket.so.1 \
+	/usr/lib/libtermcap.so \
+	/usr/lib/libtermcap.so.1 \
+	/usr/lib/libtermlib.so \
+	/usr/lib/libtermlib.so.1 \
+	/usr/lib/libthread.so \
+	/usr/lib/libthread.so.1 \
+	/usr/lib/libthread_db.so \
+	/usr/lib/libthread_db.so.1 \
+	/usr/lib/libsysevent.so \
+	/usr/lib/libsysevent.so.1 \
+	/usr/lib/libumem.so \
+	/usr/lib/libumem.so.1 \
+	/usr/lib/libuuid.so \
+	/usr/lib/libuuid.so.1 \
+	/usr/lib/libuutil.so \
+	/usr/lib/libuutil.so.1 \
+	/usr/lib/libw.so \
+	/usr/lib/libw.so.1 \
+	/usr/lib/libxnet.so \
+	/usr/lib/libxnet.so.1 \
+	/usr/lib/llib-ladm \
+	/usr/lib/llib-ladm.ln \
+	/usr/lib/llib-laio \
+	/usr/lib/llib-laio.ln \
+	/usr/lib/llib-lavl \
+	/usr/lib/llib-lavl.ln \
+	/usr/lib/llib-lbsm \
+	/usr/lib/llib-lbsm.ln \
+	/usr/lib/llib-lc \
+	/usr/lib/llib-lc.ln \
+	/usr/lib/llib-lcmd \
+	/usr/lib/llib-lcmd.ln \
+	/usr/lib/llib-lcmdutils \
+	/usr/lib/llib-lcmdutils.ln \
+	/usr/lib/llib-lcontract \
+	/usr/lib/llib-lcontract.ln \
+	/usr/lib/llib-lctf \
+	/usr/lib/llib-lctf.ln \
+	/usr/lib/llib-lcurses \
+	/usr/lib/llib-lcurses.ln \
+	/usr/lib/llib-ldevice \
+	/usr/lib/llib-ldevice.ln \
+	/usr/lib/llib-ldevid \
+	/usr/lib/llib-ldevid.ln \
+	/usr/lib/llib-ldevinfo \
+	/usr/lib/llib-ldevinfo.ln \
+	/usr/lib/llib-ldhcpagent \
+	/usr/lib/llib-ldhcpagent.ln \
+	/usr/lib/llib-ldhcputil \
+	/usr/lib/llib-ldhcputil.ln \
+	/usr/lib/llib-ldl \
+	/usr/lib/llib-ldl.ln \
+	/usr/lib/llib-ldoor \
+	/usr/lib/llib-ldoor.ln \
+	/usr/lib/llib-lefi \
+	/usr/lib/llib-lefi.ln \
+	/usr/lib/llib-lelf \
+	/usr/lib/llib-lelf.ln \
+	/usr/lib/llib-lgen \
+	/usr/lib/llib-lgen.ln \
+	/usr/lib/llib-linetcfg \
+	/usr/lib/llib-linetcfg.ln \
+	/usr/lib/llib-linetutil \
+	/usr/lib/llib-linetutil.ln \
+	/usr/lib/llib-lintl \
+	/usr/lib/llib-lintl.ln \
+	/usr/lib/llib-lkstat \
+	/usr/lib/llib-lkstat.ln \
+	/usr/lib/llib-lmd5 \
+	/usr/lib/llib-lmd5.ln \
+	/usr/lib/llib-lmeta \
+	/usr/lib/llib-lmeta.ln \
+	/usr/lib/llib-lnsl \
+	/usr/lib/llib-lnsl.ln \
+	/usr/lib/llib-lnvpair \
+	/usr/lib/llib-lnvpair.ln \
+	/usr/lib/llib-lpam \
+	/usr/lib/llib-lpam.ln \
+	/usr/lib/llib-lposix4 \
+	/usr/lib/llib-lposix4.ln \
+	/usr/lib/llib-lpthread \
+	/usr/lib/llib-lpthread.ln \
+	/usr/lib/llib-lresolv \
+	/usr/lib/llib-lresolv.ln \
+	/usr/lib/llib-lrt \
+	/usr/lib/llib-lrt.ln \
+	/usr/lib/llib-lrtld_db \
+	/usr/lib/llib-lrtld_db.ln \
+	/usr/lib/llib-lscf \
+	/usr/lib/llib-lscf.ln \
+	/usr/lib/llib-lsec \
+	/usr/lib/llib-lsec.ln \
+	/usr/lib/llib-lsecdb \
+	/usr/lib/llib-lsecdb.ln \
+	/usr/lib/llib-lsendfile \
+	/usr/lib/llib-lsendfile.ln \
+	/usr/lib/llib-lsocket \
+	/usr/lib/llib-lsocket.ln \
+	/usr/lib/llib-lsysevent \
+	/usr/lib/llib-lsysevent.ln \
+	/usr/lib/llib-ltermcap \
+	/usr/lib/llib-ltermcap.ln \
+	/usr/lib/llib-ltermlib \
+	/usr/lib/llib-ltermlib.ln \
+	/usr/lib/llib-lthread \
+	/usr/lib/llib-lthread.ln \
+	/usr/lib/llib-lthread_db \
+	/usr/lib/llib-lthread_db.ln \
+	/usr/lib/llib-lumem \
+	/usr/lib/llib-lumem.ln \
+	/usr/lib/llib-luuid \
+	/usr/lib/llib-luuid.ln \
+	/usr/lib/llib-lxnet \
+	/usr/lib/llib-lxnet.ln \
+	/usr/lib/nss_compat.so.1 \
+	/usr/lib/nss_dns.so.1 \
+	/usr/lib/nss_files.so.1 \
+	/usr/lib/nss_nis.so.1 \
+	/usr/lib/nss_nisplus.so.1 \
+	/usr/lib/nss_user.so.1
+
+sparcv9_SYM.USRLIB64= \
+	/usr/platform/sun4u/lib/$(MACH64)/libwrsmconf.so	\
+	/usr/platform/sun4u/lib/$(MACH64)/libwrsmconf.so.1	\
+	/usr/platform/sun4u/lib/libwrsmconf.so			\
+	/usr/platform/sun4u/lib/libwrsmconf.so.1		\
+	/usr/platform/sun4u/sbin/wrsmconf
+
+amd64_SYM.USRLIB64=
+
+SYM.USRLIB64= \
+	$($(MACH64)_SYM.USRLIB64)		\
+	/lib/$(MACH64)/libthread_db.so \
+	/lib/$(MACH64)/libthread_db.so.1 \
+	/usr/lib/$(MACH64)/ld.so.1 \
+	/usr/lib/$(MACH64)/libadm.so \
+	/usr/lib/$(MACH64)/libadm.so.1 \
+	/usr/lib/$(MACH64)/libaio.so \
+	/usr/lib/$(MACH64)/libaio.so.1 \
+	/usr/lib/$(MACH64)/libavl.so \
+	/usr/lib/$(MACH64)/libavl.so.1 \
+	/usr/lib/$(MACH64)/libbsm.so \
+	/usr/lib/$(MACH64)/libbsm.so.1 \
+	/usr/lib/$(MACH64)/libc.so \
+	/usr/lib/$(MACH64)/libc.so.1 \
+	/usr/lib/$(MACH64)/libc_db.so \
+	/usr/lib/$(MACH64)/libc_db.so.1 \
+	/usr/lib/$(MACH64)/libcmd.so \
+	/usr/lib/$(MACH64)/libcmd.so.1 \
+	/usr/lib/$(MACH64)/libcmdutils.so \
+	/usr/lib/$(MACH64)/libcmdutils.so.1 \
+	/usr/lib/$(MACH64)/libcontract.so \
+	/usr/lib/$(MACH64)/libcontract.so.1 \
+	/usr/lib/$(MACH64)/libctf.so \
+	/usr/lib/$(MACH64)/libctf.so.1 \
+	/usr/lib/$(MACH64)/libcurses.so \
+	/usr/lib/$(MACH64)/libcurses.so.1 \
+	/usr/lib/$(MACH64)/libdevice.so \
+	/usr/lib/$(MACH64)/libdevice.so.1 \
+	/usr/lib/$(MACH64)/libdevid.so \
+	/usr/lib/$(MACH64)/libdevid.so.1 \
+	/usr/lib/$(MACH64)/libdevinfo.so \
+	/usr/lib/$(MACH64)/libdevinfo.so.1 \
+	/usr/lib/$(MACH64)/libdl.so \
+	/usr/lib/$(MACH64)/libdl.so.1 \
+	/usr/lib/$(MACH64)/libdoor.so \
+	/usr/lib/$(MACH64)/libdoor.so.1 \
+	/usr/lib/$(MACH64)/libefi.so \
+	/usr/lib/$(MACH64)/libefi.so.1 \
+	/usr/lib/$(MACH64)/libelf.so \
+	/usr/lib/$(MACH64)/libelf.so.1 \
+	/usr/lib/$(MACH64)/libgen.so \
+	/usr/lib/$(MACH64)/libgen.so.1 \
+	/usr/lib/$(MACH64)/libinetutil.so \
+	/usr/lib/$(MACH64)/libinetutil.so.1 \
+	/usr/lib/$(MACH64)/libintl.so \
+	/usr/lib/$(MACH64)/libintl.so.1 \
+	/usr/lib/$(MACH64)/libkstat.so \
+	/usr/lib/$(MACH64)/libkstat.so.1 \
+	/usr/lib/$(MACH64)/libld.so.2 \
+	/usr/lib/$(MACH64)/libld.so.3 \
+	/usr/lib/$(MACH64)/liblddbg.so.4 \
+	/usr/lib/$(MACH64)/libmd5.so \
+	/usr/lib/$(MACH64)/libmd5.so.1 \
+	/usr/lib/$(MACH64)/libmp.so \
+	/usr/lib/$(MACH64)/libmp.so.2 \
+	/usr/lib/$(MACH64)/libnsl.so \
+	/usr/lib/$(MACH64)/libnsl.so.1 \
+	/usr/lib/$(MACH64)/libnvpair.so \
+	/usr/lib/$(MACH64)/libnvpair.so.1 \
+	/usr/lib/$(MACH64)/libpam.so \
+	/usr/lib/$(MACH64)/libpam.so.1 \
+	/usr/lib/$(MACH64)/libposix4.so \
+	/usr/lib/$(MACH64)/libposix4.so.1 \
+	/usr/lib/$(MACH64)/libproc.so \
+	/usr/lib/$(MACH64)/libproc.so.1 \
+	/usr/lib/$(MACH64)/libpthread.so \
+	/usr/lib/$(MACH64)/libpthread.so.1 \
+	/usr/lib/$(MACH64)/libresolv.so \
+	/usr/lib/$(MACH64)/libresolv.so.2 \
+	/usr/lib/$(MACH64)/librestart.so \
+	/usr/lib/$(MACH64)/librestart.so.1 \
+	/usr/lib/$(MACH64)/librpcsvc.so \
+	/usr/lib/$(MACH64)/librpcsvc.so.1 \
+	/usr/lib/$(MACH64)/librt.so \
+	/usr/lib/$(MACH64)/librt.so.1 \
+	/usr/lib/$(MACH64)/librtld.so.1 \
+	/usr/lib/$(MACH64)/librtld_db.so \
+	/usr/lib/$(MACH64)/librtld_db.so.1 \
+	/usr/lib/$(MACH64)/libscf.so \
+	/usr/lib/$(MACH64)/libscf.so.1 \
+	/usr/lib/$(MACH64)/libsec.so \
+	/usr/lib/$(MACH64)/libsec.so.1 \
+	/usr/lib/$(MACH64)/libsecdb.so \
+	/usr/lib/$(MACH64)/libsecdb.so.1 \
+	/usr/lib/$(MACH64)/libsendfile.so \
+	/usr/lib/$(MACH64)/libsendfile.so.1 \
+	/usr/lib/$(MACH64)/libsocket.so \
+	/usr/lib/$(MACH64)/libsocket.so.1 \
+	/usr/lib/$(MACH64)/libsysevent.so \
+	/usr/lib/$(MACH64)/libsysevent.so.1 \
+	/usr/lib/$(MACH64)/libtermcap.so \
+	/usr/lib/$(MACH64)/libtermcap.so.1 \
+	/usr/lib/$(MACH64)/libtermlib.so \
+	/usr/lib/$(MACH64)/libtermlib.so.1 \
+	/usr/lib/$(MACH64)/libthread.so \
+	/usr/lib/$(MACH64)/libthread.so.1 \
+	/usr/lib/$(MACH64)/libthread_db.so \
+	/usr/lib/$(MACH64)/libthread_db.so.1 \
+	/usr/lib/$(MACH64)/libumem.so \
+	/usr/lib/$(MACH64)/libumem.so.1 \
+	/usr/lib/$(MACH64)/libuuid.so \
+	/usr/lib/$(MACH64)/libuuid.so.1 \
+	/usr/lib/$(MACH64)/libuutil.so \
+	/usr/lib/$(MACH64)/libuutil.so.1 \
+	/usr/lib/$(MACH64)/libw.so \
+	/usr/lib/$(MACH64)/libw.so.1 \
+	/usr/lib/$(MACH64)/libxnet.so \
+	/usr/lib/$(MACH64)/libxnet.so.1 \
+	/usr/lib/$(MACH64)/llib-ladm.ln \
+	/usr/lib/$(MACH64)/llib-laio.ln \
+	/usr/lib/$(MACH64)/llib-lavl.ln \
+	/usr/lib/$(MACH64)/llib-lbsm.ln \
+	/usr/lib/$(MACH64)/llib-lc.ln \
+	/usr/lib/$(MACH64)/llib-lcmd.ln \
+	/usr/lib/$(MACH64)/llib-lcmdutils.ln \
+	/usr/lib/$(MACH64)/llib-lcontract.ln \
+	/usr/lib/$(MACH64)/llib-lctf.ln \
+	/usr/lib/$(MACH64)/llib-lcurses \
+	/usr/lib/$(MACH64)/llib-lcurses.ln \
+	/usr/lib/$(MACH64)/llib-ldevice.ln \
+	/usr/lib/$(MACH64)/llib-ldevid.ln \
+	/usr/lib/$(MACH64)/llib-ldevinfo.ln \
+	/usr/lib/$(MACH64)/llib-ldl.ln \
+	/usr/lib/$(MACH64)/llib-ldoor.ln \
+	/usr/lib/$(MACH64)/llib-lefi.ln \
+	/usr/lib/$(MACH64)/llib-lelf.ln \
+	/usr/lib/$(MACH64)/llib-lgen.ln \
+	/usr/lib/$(MACH64)/llib-linetutil.ln \
+	/usr/lib/$(MACH64)/llib-lintl.ln \
+	/usr/lib/$(MACH64)/llib-lkstat.ln \
+	/usr/lib/$(MACH64)/llib-lmd5.ln \
+	/usr/lib/$(MACH64)/llib-lnsl.ln \
+	/usr/lib/$(MACH64)/llib-lnvpair.ln \
+	/usr/lib/$(MACH64)/llib-lpam.ln \
+	/usr/lib/$(MACH64)/llib-lposix4.ln \
+	/usr/lib/$(MACH64)/llib-lpthread.ln \
+	/usr/lib/$(MACH64)/llib-lresolv.ln \
+	/usr/lib/$(MACH64)/llib-lrt.ln \
+	/usr/lib/$(MACH64)/llib-lrtld_db.ln \
+	/usr/lib/$(MACH64)/llib-lscf.ln \
+	/usr/lib/$(MACH64)/llib-lsec.ln \
+	/usr/lib/$(MACH64)/llib-lsecdb.ln \
+	/usr/lib/$(MACH64)/llib-lsendfile.ln \
+	/usr/lib/$(MACH64)/llib-lsocket.ln \
+	/usr/lib/$(MACH64)/llib-lsysevent.ln \
+	/usr/lib/$(MACH64)/llib-ltermcap \
+	/usr/lib/$(MACH64)/llib-ltermcap.ln \
+	/usr/lib/$(MACH64)/llib-ltermlib \
+	/usr/lib/$(MACH64)/llib-ltermlib.ln \
+	/usr/lib/$(MACH64)/llib-lthread.ln \
+	/usr/lib/$(MACH64)/llib-lthread_db.ln \
+	/usr/lib/$(MACH64)/llib-lumem.ln \
+	/usr/lib/$(MACH64)/llib-luuid.ln \
+	/usr/lib/$(MACH64)/llib-lxnet.ln \
+	/usr/lib/$(MACH64)/nss_compat.so.1 \
+	/usr/lib/$(MACH64)/nss_dns.so.1 \
+	/usr/lib/$(MACH64)/nss_files.so.1 \
+	/usr/lib/$(MACH64)/nss_nis.so.1 \
+	/usr/lib/$(MACH64)/nss_nisplus.so.1 \
+	/usr/lib/$(MACH64)/nss_user.so.1 \
+	/usr/lib/libld.so.3
+
+$(SYM.USRLIB:%=$(ROOT)%):= \
+    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@; \
+	       $(CHOWN) $(OWNER) $@; $(CHGRP) $(GROUP) $@
+
+$(SYM.USRLIB64:%=$(ROOT)%):= \
+    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@; \
+	       $(CHOWN) $(OWNER) $@; $(CHGRP) $(GROUP) $@
+

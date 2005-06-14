@@ -1,0 +1,130 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+PATH=/usr/bin:/usr/sbin:$PATH; export PATH
+
+#
+# obsolete_sparc - Filter function to remove obsolete SPARC driver aliases.
+# Use sed to delete lines matching driver aliases we want to remove.
+#
+obsolete_sparc()
+{
+	sed -e '/^cpu modi4v0m[ 	]*$/d' \
+	    -e '/^PFUaga PFU,aga[ 	]*$/d' \
+	    -e '/^dbri SUNW,DBRIs3[ 	]*$/d' \
+	    -e '/^leo SUNW,leo104[ 	]*$/d' \
+	    -e '/^atapicd  "ide-cdrom"[ 	]*$/d' \
+	    -e '/^cpu TI,TMS390Z50[ 	]*$/d' \
+	    -e '/^obio bootbus[ 	]*$/d' \
+	    -e '/^sw drum[ 	]*$/d' \
+	    -e '/^ie sie[ 	]*$/d' \
+	    -e '/^sbus sbi[ 	]*$/d' \
+	    -e '/^pn SUNW,pn[ 	]*$/d' \
+	    -e '/^glm SUNW,glm[ 	]*$/d' \
+	    -e '/^gpio_87317 "gpio"[ 	]*$/d' \
+	    -e '/^pci SUNW,pci[ 	]*$/d' \
+	    -e '/^pci "pci108e,8000"[ 	]*$/d' \
+	    -e '/^pci "pci108e,a000"[ 	]*$/d' \
+	    -e '/^pci "pciclass,060000"[ 	]*$/d' \
+	    -e '/^sx SUNW,sx[ 	]*$/d' \
+	    -e '/^sx "SUNW,sx"[ 	]*$/d' \
+	    -e '/^xbox SUNW,xbox[ 	]*$/d' \
+	    -e '/^xbox "SUNW,xbox"[ 	]*$/d' \
+	    -e '/^stc SUNW,spif[ 	]*$/d' \
+	    -e '/^fjulsa "pci13e9,30"[ 	]*$/d' \
+	    -e '/^fjulsa "pci1000,30"[ 	]*$/d' \
+	    -e '/^cpu TI,TMS390Z55[ 	]*$/d' \
+	    -e '/^mic SUNW,mic[ 	]*$/d' \
+	    -e '/^pln SUNW,pln[ 	]*$/d' \
+	    -e '/^soc SUNW,soc[ 	]*$/d' \
+	    -e '/^sc_nct "nct-ds80ch11-smc"[ 	]*$/d' \
+	    -e '/^tomtppm jbus-ppm[ 	]*$/d'
+}
+
+#
+# obsolete_i386 - Filter function to remove obsolete i386 driver aliases.
+#
+obsolete_i386() {
+	sed -e '/^elx[^l].*10b7,9000.*$/d' \
+	    -e '/^elx[^l].*10b7,9050.*$/d' \
+	    -e '/^dpt[ 	]*"pci1044,a400"[       ]*$/d' \
+	    -e '/^audiocs[ 	]*"SUNW,CS4231"[ 	]*$/d' \
+	    -e '/^blogic[ 	]*"pci104b,1040"[ 	]*$/d' \
+	    -e '/^mega[ 	]*"pci101e,9010"[ 	]*$/d' \
+	    -e '/^mlx[ 	]*"pci1069,1"[ 	]*$/d' \
+	    -e '/^mlx[ 	]*"pci1069,2"[ 	]*$/d' \
+	    -e '/^mlx[ 	]*"pci1069,10"[ 	]*$/d' \
+	    -e '/^mlx[ 	]*"pci1069,11"[ 	]*$/d' \
+	    -e '/^p9000[ 	]*"pci100e,9001"[ 	]*$/d' \
+	    -e '/^p9100[ 	]*"pci100e,9100"[ 	]*$/d' \
+	    -e '/^spwr[ 	]*"pci10b8,0005"[ 	]*$/d' \
+	    -e '/^cpqncr[ 	]*"pcie11,7004"[ 	]*$/d' \
+	    -e '/^smartii[ 	]*"pcie11,4030"[ 	]*$/d' \
+	    -e '/^smartii[ 	]*"pcie11,4031"[ 	]*$/d'
+}
+
+#
+# Generate /etc/driver_aliases file.  Each entry present in $src (the copy
+# of driver_aliases being delivered by the package) is automatically added
+# to $dest (the driver_aliases file on the target system) if not already
+# present; thus it is NOT necessary to add any code below to cause a new
+# alias which has been added to the driver_aliases source to be added to
+# the target system on upgrade.
+#
+while read src dest; do
+	if [ -f $dest ]; then
+		#
+		# Strip obsolete entries from the existing driver_aliases
+		#
+		if [ $ARCH = sparc ]; then
+			obsolete_sparc < $dest > /tmp/oda.$$.tmp
+			cp /tmp/oda.$$.tmp $dest
+			rm -f /tmp/oda.$$.tmp
+		elif [ $ARCH = i386 ]; then
+			obsolete_i386 < $dest > /tmp/oda.$$.tmp
+			cp /tmp/oda.$$.tmp $dest
+			rm -f /tmp/oda.$$.tmp
+		fi
+
+		#
+		# If the alias is not present in the driver_aliases
+		# file, then append it:
+		#
+		while read alias driver; do
+			grep "^$alias[ 	][ 	]*$driver[ 	]*" $dest \
+			    >/dev/null 2>&1 || echo "$alias $driver" >>$dest
+		done < $src
+	else
+		#
+		# If no driver_aliases is present on the target system,
+		# just copy over the one from the package.
+		#
+		cp -p $src $dest
+	fi
+done
+exit 0

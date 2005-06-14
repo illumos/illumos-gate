@@ -1,0 +1,94 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# uts/common/inet/Makefile
+#
+# include global definitions
+include ../../../Makefile.master
+
+HDRS=	arp.h common.h ipclassifier.h ip.h ip6.h ipdrop.h ipsecah.h ipsecesp.h \
+	ipsec_info.h ip6_asp.h ip_if.h ip_ire.h ip_multi.h ip_ndp.h ip_rts.h \
+	ipsec_impl.h keysock.h led.h mi.h mib2.h nd.h optcom.h sadb.h \
+	sctp_itf.h snmpcom.h tcp.h tcp_sack.h tun.h udp_impl.h arp_impl.h \
+	rawip_impl.h ipp_common.h
+
+ROOTDIRS= $(ROOT)/usr/include/inet
+
+ROOTHDRS= $(HDRS:%=$(ROOT)/usr/include/inet/%)
+
+CHECKHDRS= $(HDRS:%.h=%.check)
+
+$(ROOTDIRS)/%: %
+	$(INS.file)
+
+.KEEP_STATE:
+
+.PARALLEL: $(CHECKHDRS)
+
+install_h: $(ROOTDIRS) $(ROOTHDRS)
+
+$(ROOTDIRS):
+	$(INS.dir)
+
+check:	$(CHECKHDRS)
+
+# EXPORT DELETE START
+# Special target to clean up the source tree for export distribution
+# Warning: This target changes the source tree
+EXPORT_SRC:
+	$(RM) Makefile+ ipsec_info.h+ ipsecesp.h+ 
+
+	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
+		< ipsec_info.h > ipsec_info.h+
+	$(MV) ipsec_info.h+ ipsec_info.h
+	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
+		< ipsecesp.h > ipsecesp.h+
+	$(MV) ipsecesp.h+ ipsecesp.h
+	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
+		< Makefile > Makefile+
+	$(MV) Makefile+ Makefile
+	$(CHMOD) 444 Makefile ipsec_info.h ipsecesp.h
+
+# CRYPT DELETE START
+# Special target to clean up the source tree for domestic distribution
+# Warning: This target changes the source tree
+
+CRYPT_SRC:
+	$(RM) Makefile+ ipsec_info.h+ ipsecesp.h+
+	sed -e "/CRYPT DELETE START/,/CRYPT DELETE END/d" \
+		< ipsec_info.h > ipsec_info.h+
+	$(MV) ipsec_info.h+ ipsec_info.h
+	sed -e "/CRYPT DELETE START/,/CRYPT DELETE END/d" \
+		< ipsecesp.h > ipsecesp.h+
+	$(MV) ipsecesp.h+ ipsecesp.h
+	sed -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d" \
+		< Makefile > Makefile+
+	$(MV) Makefile+ Makefile
+	$(CHMOD) 444 Makefile ipsec_info.h ipsecesp.h
+
+# CRYPT DELETE END
+# EXPORT DELETE END

@@ -1,0 +1,113 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
+
+#!search <pathname pathname ...>	# where to find pkg objects
+#!include/openssl <filename>			# include/openssl another 'prototype' file
+#!default <mode> <owner> <group>	# default used if not specified on entry
+#!<param>=<value>			# puts parameter in pkg environment
+
+# packaging files
+i pkginfo
+i copyright=../../common/openssl/LICENSE
+i depend
+d none usr 755 root sys 644 root bin
+d none usr/sfw 755 root bin 644 root bin
+d none usr/sfw/include 755 root bin 644 root bin
+d none usr/sfw/include/openssl 755 root bin 644 root bin
+f none usr/sfw/include/openssl/aes.h 644 root bin
+f none usr/sfw/include/openssl/asn1.h 644 root bin
+f none usr/sfw/include/openssl/asn1_mac.h 644 root bin
+f none usr/sfw/include/openssl/asn1t.h 644 root bin
+f none usr/sfw/include/openssl/bio.h 644 root bin
+f none usr/sfw/include/openssl/blowfish.h 644 root bin
+f none usr/sfw/include/openssl/bn.h 644 root bin
+f none usr/sfw/include/openssl/buffer.h 644 root bin
+f none usr/sfw/include/openssl/cast.h 644 root bin
+f none usr/sfw/include/openssl/comp.h 644 root bin
+f none usr/sfw/include/openssl/conf.h 644 root bin
+f none usr/sfw/include/openssl/conf_api.h 644 root bin
+f none usr/sfw/include/openssl/crypto.h 644 root bin
+f none usr/sfw/include/openssl/des.h 644 root bin
+f none usr/sfw/include/openssl/des_old.h 644 root bin
+f none usr/sfw/include/openssl/dh.h 644 root bin
+f none usr/sfw/include/openssl/dsa.h 644 root bin
+f none usr/sfw/include/openssl/dso.h 644 root bin
+f none usr/sfw/include/openssl/e_os2.h 644 root bin
+f none usr/sfw/include/openssl/ebcdic.h 644 root bin
+f none usr/sfw/include/openssl/ec.h 644 root bin
+f none usr/sfw/include/openssl/engine.h 644 root bin
+f none usr/sfw/include/openssl/err.h 644 root bin
+f none usr/sfw/include/openssl/evp.h 644 root bin
+f none usr/sfw/include/openssl/hmac.h 644 root bin
+f none usr/sfw/include/openssl/idea.h 644 root bin
+f none usr/sfw/include/openssl/krb5_asn.h 644 root bin
+f none usr/sfw/include/openssl/kssl.h 644 root bin
+f none usr/sfw/include/openssl/lhash.h 644 root bin
+f none usr/sfw/include/openssl/md2.h 644 root bin
+f none usr/sfw/include/openssl/mdc2.h 644 root bin
+f none usr/sfw/include/openssl/md4.h 644 root bin
+f none usr/sfw/include/openssl/md5.h 644 root bin
+f none usr/sfw/include/openssl/obj_mac.h 644 root bin
+f none usr/sfw/include/openssl/objects.h 644 root bin
+f none usr/sfw/include/openssl/ocsp.h 644 root bin
+f none usr/sfw/include/openssl/opensslconf.h 644 root bin
+f none usr/sfw/include/openssl/opensslv.h 644 root bin
+f none usr/sfw/include/openssl/ossl_typ.h 644 root bin
+f none usr/sfw/include/openssl/pem.h 644 root bin
+f none usr/sfw/include/openssl/pem2.h 644 root bin
+f none usr/sfw/include/openssl/pkcs12.h 644 root bin
+f none usr/sfw/include/openssl/pkcs7.h 644 root bin
+f none usr/sfw/include/openssl/rand.h 644 root bin
+f none usr/sfw/include/openssl/rc2.h 644 root bin
+f none usr/sfw/include/openssl/rc4.h 644 root bin
+f none usr/sfw/include/openssl/rc5.h 644 root bin
+f none usr/sfw/include/openssl/ripemd.h 644 root bin
+f none usr/sfw/include/openssl/rsa.h 644 root bin
+f none usr/sfw/include/openssl/safestack.h 644 root bin
+f none usr/sfw/include/openssl/sha.h 644 root bin
+f none usr/sfw/include/openssl/ssl.h 644 root bin
+f none usr/sfw/include/openssl/ssl2.h 644 root bin
+f none usr/sfw/include/openssl/ssl23.h 644 root bin
+f none usr/sfw/include/openssl/ssl3.h 644 root bin
+f none usr/sfw/include/openssl/stack.h 644 root bin
+f none usr/sfw/include/openssl/symhacks.h 644 root bin
+f none usr/sfw/include/openssl/tls1.h 644 root bin
+f none usr/sfw/include/openssl/tmdiff.h 644 root bin
+f none usr/sfw/include/openssl/txt_db.h 644 root bin
+f none usr/sfw/include/openssl/ui.h 644 root bin
+f none usr/sfw/include/openssl/ui_compat.h 644 root bin
+f none usr/sfw/include/openssl/x509.h 644 root bin
+f none usr/sfw/include/openssl/x509_vfy.h 644 root bin
+d none usr/lib 755 root bin
+d none usr/lib/pkgconfig 755 root other
+f none usr/lib/pkgconfig/openssl.pc 644 root other
+f none usr/sfw/include/openssl/x509v3.h 644 root bin

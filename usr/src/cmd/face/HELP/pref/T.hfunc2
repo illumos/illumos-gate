@@ -1,0 +1,11 @@
+
+Press CHOICES to toggle between Yes and No to specify whether you
+wish a prompt to appear when you login to notify you that objects in
+the WASTEBASKET are ready for deletion.
+
+If you set this option to "No", the prompt will not appear and files
+and file folders will be deleted as scheduled in "Delete objects after
+# of days" field, without an opportunity for you to retrieve them.
+
+The default choice is "yes".
+

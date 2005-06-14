@@ -1,0 +1,107 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the 
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 1996 Sun Microsystems, Inc.  All Rights Reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+#	A configuration file template for the SNMP Relay
+#	
+
+# IMPORTANT:
+# ----------
+#	So that the SNMP Relay will take into account
+#	your configuration file, you must:
+#	- rename this file with the ".snmprelay" extension
+#	  (for example: myagent.snmprelay)
+#	- check that this file is located in the configuration directory
+#	  for the SNMP Relay (by default: /opt/SUNWconn/snmprelay)
+
+
+##########
+# macros # 
+##########
+
+# The following 3 macros are predefined:
+#
+#	mib-2 =		1.3.6.1.2.1
+#	enterprise =	1.3.6.1.4.1
+#	sun =		1.3.6.1.4.1.42
+#
+# Your can define your own macros, so that you can
+# manipulate strings instead of OIDs in defining the agent.
+# See the "agent" section below.
+
+macros = {
+	application =		mib-2.27
+	mta =			mib-2.28
+	dsa =			mib-2.28
+
+	my-enterprise =	enterprise.n
+
+	my-subtree1 =		my-enterprise.1
+	my-subtree2 =		my-enterprise.2
+}
+
+# in enterprise.n, n is the number assigned to your company
+# by the Internet Assigned Numbers Authority.
+
+
+##########
+# agent #
+##########
+
+# You must fill in at least the following fields:
+#
+#	- name:		the name of your agent (for example, the executable
+#			file name of your agent)
+#
+#	- subtrees:	the list of OIDs / subtrees of OIDs your agent
+#			supports. The listed items must be separated by
+#			a coma.
+#
+#	- port:		the UDP port number on which you will start
+#			your agent
+#
+# You can also change the following fields:
+#
+#	- timeout:	the number of micro-seconds the SNMP Relay will
+#			wait for a reponse from your agent
+
+agents =
+{
+	{
+		name = "myagent"
+		subtrees = { my-subtree1, my-subtree2 }
+		timeout = 4000000
+		port = p
+	}
+}
+
+# In port = p, replace p by any unused port number above 1024.
+# You can use the command get_free_udp_port (default location
+# /opt/SUNWconn/mhs/bin) to find out the first unused udp port
+# number above 1024.
+
+

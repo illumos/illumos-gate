@@ -1,0 +1,27 @@
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 2000 by Sun Microsystems, Inc.
+# All rights reserved.
+
+PLUGINS=	minconn passprompt
+TARGETS=	$(PLUGINS:%=%.so)
+OBJS=		$(PLUGINS:%=%.o)
+PLUGINDIR=	/usr/lib/inet/ppp/
+INSTALLED=	$(TARGETS:%=$(PLUGINDIR)/%)
+CFLAGS=		-DPPP_DEFS_IN_NET
+
+all:	$(TARGETS)
+
+clean:
+	$(RM) -f $(TARGETS) $(OBJS)
+
+%.so:	%.o
+	$(LD) -s -G -h $@ -o $@ $^
+
+install:	$(TARGETS)
+	@test -d $(PLUGINDIR) || mkdir -m 755 -p $(PLUGINDIR)
+	@cp $(TARGETS) $(PLUGINDIR) && strip $(INSTALLED)
+
+clobber:	clean
+	$(RM) -f $(INSTALLED)

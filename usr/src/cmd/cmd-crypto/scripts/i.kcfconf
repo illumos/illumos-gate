@@ -1,0 +1,152 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Class action script for "kcfconf" class files.
+#
+# This script appends the input file from the package to the 
+# /etc/crypto/kcf.conf file.
+#
+# The syntax of the input file for a kernel software provider package is
+# <provider_name>:supportedlist=<mechlist> 
+#   where
+#     <provider_name> ::= the kernel software module base name
+#     <mechlist> ::= <mechanism>{,<mechanism>}*
+#     <mechanism> ::= a mechanism name as specified by the RSA PKCS#11 spec.
+#
+# The syntax of the input file for a cryptographic provider device driver(s)
+# package is 
+# driver_names=<driver_name_list>
+#   where
+#     <driver_name_list> ::= <name>{,<name>}*
+#     <name> ::= a device driver name
+#
+pkg_start="# Start $PKGINST"
+pkg_end="# End $PKGINST"
+tmpfile=/tmp/$$kcfconf
+error=no
+ 
+while read src dest
+do
+	[ "$src" = /dev/null ] && continue
+
+	if [ -f "$dest" ]
+	then
+		# For multiple input files; exit if error occurred in previous
+		# input file.
+		if [ "$error" = yes ]
+		then
+			echo "$0: failed to update $lastdest for $PKGINST."
+			exit 2
+		fi
+		lastdest=$dest
+
+		#
+		# If the package has been already installed, remove old entries
+		#
+		start=0;
+		end=0;
+		egrep -s "$pkg_start" $dest && start=1
+		egrep -s "$pkg_end" $dest && end=1
+
+		if [ $start -ne $end ]
+		then
+			echo "$0: missing Start or End delimiters for \
+			    $PKGINST in $dest."
+			echo "$0: $dest may be corrupted and was not updated."
+			error=yes
+			continue
+		fi
+
+		if [ $start -eq 1 ]
+		then
+			sed -e "/$pkg_start/,/$pkg_end/d" $dest > $tmpfile \
+			|| error=yes
+		else
+			cp $dest $tmpfile || error=yes
+		fi
+
+		#
+		# Check the input file syntax and append the input entries 
+		# with the package delimiters.
+		#
+		line_count=`wc -l $src | awk '{ print $1}'`
+
+		grep "driver_names" $src > /dev/null
+		if [ $? -eq 0 ]
+		then
+			#
+			# This is a device driver package.
+			# - $src should contain only one line.
+			# - If syntax of $src is correct, append the package
+			#   start delimiter with the driver_names string.
+			#
+			if [ $line_count -ne 1 ]; then
+				echo "$0: Syntax Error - $src for $PKGINST."
+				error=yes
+				continue
+			else 
+				echo "$pkg_start `cat $src`" >> $tmpfile \
+				|| error=yes
+			fi
+		else 
+			#
+			# This is a kernel software provider package.
+			# - Each line in $src should contain "supportedlist".
+			# - If syntax of $src is correct, append the package
+			#   start delimiter and the $src file.
+			#
+			supported_count=`grep supportedlist $src |wc -l`
+			if [ $line_count -ne $supported_count ]
+			then
+				echo "$0: Syntax Error - $src for $PKGINST."
+				error=yes
+				continue
+			else
+				echo "$pkg_start" >> $tmpfile || error=yes
+				cat $src >> $tmpfile || error=yes
+			fi
+		fi
+		echo "$pkg_end" >> $tmpfile || error=yes
+    
+		# Install the updated config file and clean up the tmp file
+                if [ "$error" = no ]
+                then 
+			mv $tmpfile $dest || error=yes
+		fi
+		rm -f $tmpfile   
+	else
+		echo "$0: ERROR - $dest doesn't exist for $PKGINST."
+		exit 2
+	fi
+done
+
+if [ "$error" = yes ]
+then
+	echo "$0: ERROR - failed to update $lastdest for $PKGINST."
+	exit 2
+fi
+
+exit 0

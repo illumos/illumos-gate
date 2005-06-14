@@ -1,0 +1,47 @@
+#!/sbin/sh
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Service Method Support Program (Script) for the NTP service
+#
+
+. /lib/svc/share/smf_include.sh
+
+[ -f /etc/inet/ntp.conf ] || exit $SMF_EXIT_ERR_CONFIG
+
+ARGS=`/usr/bin/nawk '
+	BEGIN {
+	    first = 1
+	}
+	/^[ \t]*#/ {
+	    next
+	}
+	/^multicastclient[ \t]+/ {
+	    if (first) {
+		first = 0
+		printf("-s -m")
+	    }
+	    if (NF == 1)
+		printf(" 224.0.1.1")
+	    else
+		printf(" %s", $2)
+	    next
+	}
+	/^server 127.127/ {
+	    next
+	}
+	/^server[ \t]+|^peer[ \t]+/ {
+	    if (first) {
+		first = 0
+		printf("-s")
+	    }
+	    printf(" %s", $2)
+	    next
+	}
+	' /etc/inet/ntp.conf`
+# Run ntpdate to sync system to peer before starting xntpd
+[ -n "$ARGS" ] && /usr/sbin/ntpdate $ARGS
+/usr/lib/inet/xntpd

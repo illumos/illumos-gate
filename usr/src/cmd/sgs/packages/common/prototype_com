@@ -1,0 +1,125 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
+
+# packaging files
+i pkginfo
+i copyright
+i depend
+i checkinstall
+i postinstall
+i preremove
+#
+# source locations relative to the prototype file
+#
+# SUNWonld
+#
+d none var 755 root sys
+d none var/ld 755 root bin
+d none $SGSBACKUPDIR 755 root bin
+d none opt 755 root sys
+d none opt/SUNWonld 755 root sys
+d none $SGSDIR/ 755 root sys
+d none $SGSDIR/lib 755 root sys
+d none $SGSDIR/usr 755 root sys
+f none $SGSDIR/lib/ld.so.1=lib/ld.so.1 755 root bin
+f none $SGSDIR/lib/libdl.so.1=lib/libdl.so.1 755 root bin
+s none $SGSDIR/lib/libdl.so=./libdl.so.1
+f none $SGSDIR/lib/libelf.so.1=lib/libelf.so.1 755 root bin
+s none $SGSDIR/lib/libelf.so=./libelf.so.1
+f none $SGSDIR/lib/libld.so.2=lib/libld.so.2 755 root bin
+f none $SGSDIR/lib/libld.so.3=lib/libld.so.3 755 root bin
+f none $SGSDIR/lib/liblddbg.so.4=lib/liblddbg.so.4 755 root bin
+f none $SGSDIR/lib/librtld.so.1=lib/librtld.so.1 755 root bin
+s none $SGSDIR/lib/librtld_db.so=librtld_db.so.1
+f none $SGSDIR/lib/librtld_db.so.1=lib/librtld_db.so.1 755 root bin
+d none $SGSDIR/usr/bin 755 root bin
+f none $SGSDIR/usr/bin/crle=usr/bin/crle 555 root bin
+f none $SGSDIR/usr/bin/ldd=usr/bin/ldd 555 root bin
+f none $SGSDIR/usr/bin/moe=usr/bin/moe 555 root bin
+f none $SGSDIR/usr/bin/pvs=usr/bin/pvs 555 root bin
+f none $SGSDIR/usr/bin/sotruss=usr/bin/sotruss 755 root bin
+f none $SGSDIR/usr/bin/whocalls=usr/bin/whocalls 755 root bin
+d none $SGSDIR/usr/ccs 755 root bin
+d none $SGSDIR/usr/ccs/bin 755 root bin
+f none $SGSDIR/usr/ccs/bin/elfdump=usr/ccs/bin/elfdump 0555 root bin
+f none $SGSDIR/usr/ccs/bin/lari=usr/ccs/bin/lari 0555 root bin
+f none $SGSDIR/usr/ccs/bin/ld=usr/ccs/bin/ld 755 root bin
+f none $SGSDIR/usr/ccs/bin/mcs=usr/ccs/bin/mcs 0555 root bin
+l none $SGSDIR/usr/ccs/bin/strip=../../../usr/ccs/bin/mcs
+d none $SGSDIR/usr/include 755 root bin
+f none $SGSDIR/usr/include/dlfcn.h=usr/include/dlfcn.h 644 root bin
+f none $SGSDIR/usr/include/libelf.h=usr/include/libelf.h 644 root bin
+f none $SGSDIR/usr/include/link.h=usr/include/link.h 644 root bin
+f none $SGSDIR/usr/include/gelf.h=usr/include/gelf.h 644 root bin
+f none $SGSDIR/usr/include/proc_service.h=usr/include/proc_service.h 644 root bin
+f none $SGSDIR/usr/include/rtld_db.h=usr/include/rtld_db.h 644 root bin
+d none $SGSDIR/usr/include/sys 755 root bin
+f none $SGSDIR/usr/include/sys/elf.h=usr/include/sys/elf.h 644 root bin
+f none $SGSDIR/usr/include/sys/elf_386.h=usr/include/sys/elf_386.h 644 root bin
+f none $SGSDIR/usr/include/sys/elf_SPARC.h=usr/include/sys/elf_SPARC.h 644 root bin
+f none $SGSDIR/usr/include/sys/elftypes.h=usr/include/sys/elftypes.h 644 root bin
+f none $SGSDIR/usr/include/sys/machelf.h=usr/include/sys/machelf.h 644 root bin
+f none $SGSDIR/usr/include/sys/link.h=usr/include/sys/link.h 644 root bin
+d none $SGSDIR/usr/lib 755 root bin
+s none $SGSDIR/usr/lib/32=.
+f none $SGSDIR/usr/lib/0@0.so.1=usr/lib/0@0.so.1 755 root bin
+f none $SGSDIR/usr/lib/lddstub=usr/lib/lddstub 555 root bin
+f none $SGSDIR/usr/lib/libcrle.so.1=usr/lib/libcrle.so.1 755 root bin
+f none $SGSDIR/usr/lib/libldstab.so.1=usr/lib/libldstab.so.1 755 root bin
+d none $SGSDIR/usr/lib/link_audit 755 root bin
+s none $SGSDIR/usr/lib/link_audit/32=.
+f none $SGSDIR/usr/lib/link_audit/ldprof.so.1=usr/lib/link_audit/ldprof.so.1 755 root bin
+f none $SGSDIR/usr/lib/link_audit/truss.so.1=usr/lib/link_audit/truss.so.1 755 root bin
+f none $SGSDIR/usr/lib/link_audit/who.so.1=usr/lib/link_audit/who.so.1 755 root bin
+d none $SGSDIR/usr/lib/mdb/ 755 root sys
+d none $SGSDIR/usr/lib/mdb/proc 755 root sys
+f none $SGSDIR/usr/lib/mdb/proc/ld.so=/usr/lib/mdb/proc/ld.so 555 root sys
+d none $SGSDIR/usr/lib/locale 755 root bin
+d none $SGSDIR/usr/lib/locale/piglatin 755 root bin
+d none $SGSDIR/usr/lib/locale/piglatin/LC_MESSAGES 755 root bin
+f none $SGSDIR/usr/lib/locale/piglatin/LC_MESSAGES/SUNW_OST_SGS.mo=/usr/lib/locale/piglatin/LC_MESSAGES/SUNW_OST_SGS.mo 444 root bin
+d none $SGSDIR/usr/lib/secure 755 root bin
+s none $SGSDIR/usr/lib/secure/32=.
+f none opt/SUNWonld/SUNWonld-README 444 root bin
+d none opt/SUNWonld/bin 755 root bin
+f none opt/SUNWonld/bin/rdb 755 root bin
+f none opt/SUNWonld/bin/perfcnt 755 root bin
+d none opt/SUNWonld/lib 755 root bin
+s none opt/SUNWonld/lib/32=.
+f none opt/SUNWonld/lib/libldmake.so.1 755 root bin
+f none opt/SUNWonld/lib/bindings.so.1 755 root bin
+f none opt/SUNWonld/lib/symbindrep.so.1 755 root bin
+f none opt/SUNWonld/lib/perfcnt.so.1 755 root bin
+d none opt/SUNWonld/man 755 root bin
+d none opt/SUNWonld/man/man1l 755 root bin
+f none opt/SUNWonld/man/man1l/chkmsg.1l 444 root bin
+f none opt/SUNWonld/man/man1l/sgsmsg.1l 444 root bin

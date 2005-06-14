@@ -1,0 +1,9 @@
+
+The refresh command will redraw the screen.  This function is useful
+if strange characters appear on your screen causing the interface to
+be garbled.
+
+     Command Menu:  Select refresh and press ENTER.
+
+     Command Line:  Type refresh and press ENTER.
+

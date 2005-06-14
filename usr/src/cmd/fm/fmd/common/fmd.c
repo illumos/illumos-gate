@@ -1,0 +1,786 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/param.h>
+#include <sys/systeminfo.h>
+#include <sys/fm/util.h>
+
+#include <limits.h>
+#include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#include <fmd_conf.h>
+#include <fmd_dispq.h>
+#include <fmd_timerq.h>
+#include <fmd_subr.h>
+#include <fmd_error.h>
+#include <fmd_module.h>
+#include <fmd_thread.h>
+#include <fmd_alloc.h>
+#include <fmd_string.h>
+#include <fmd_transport.h>
+#include <fmd_builtin.h>
+#include <fmd_ustat.h>
+#include <fmd_protocol.h>
+#include <fmd_scheme.h>
+#include <fmd_asru.h>
+#include <fmd_case.h>
+#include <fmd_log.h>
+#include <fmd_rpc.h>
+#include <fmd_dr.h>
+
+#include <fmd.h>
+
+extern const nv_alloc_ops_t fmd_nv_alloc_ops;	/* see fmd_nv.c */
+
+const char _fmd_version[] = "1.0";		/* daemon version string */
+static char _fmd_plat[MAXNAMELEN];		/* native platform string */
+static char _fmd_isa[MAXNAMELEN];		/* native instruction set */
+static struct utsname _fmd_uts;			/* native uname(2) info */
+
+/*
+ * Note: the configuration file path is ordered from most common to most host-
+ * specific because new conf files are merged/override previous ones.  The
+ * module paths are in the opposite order, from most specific to most common,
+ * because once a module is loaded fmd will not try to load over the same name.
+ */
+
+static const char _fmd_conf_path[] =
+	"%r/usr/lib/fm/fmd:"
+	"%r/usr/platform/%m/lib/fm/fmd:"
+	"%r/usr/platform/%i/lib/fm/fmd:"
+	"%r/etc/fm/fmd";
+
+static const char _fmd_agent_path[] =
+	"%r/usr/platform/%i/lib/fm/fmd/agents:"
+	"%r/usr/platform/%m/lib/fm/fmd/agents:"
+	"%r/usr/lib/fm/fmd/agents";
+
+static const char _fmd_plugin_path[] =
+	"%r/usr/platform/%i/lib/fm/fmd/plugins:"
+	"%r/usr/platform/%m/lib/fm/fmd/plugins:"
+	"%r/usr/lib/fm/fmd/plugins";
+
+static const char _fmd_scheme_path[] =
+	"usr/lib/fm/fmd/schemes";
+
+static const fmd_conf_mode_t _fmd_cerror_modes[] = {
+	{ "unload", "unload offending client module", FMD_CERROR_UNLOAD },
+	{ "stop", "stop daemon for debugger attach", FMD_CERROR_STOP },
+	{ "abort", "abort daemon and force core dump", FMD_CERROR_ABORT },
+	{ NULL, NULL, 0 }
+};
+
+static const fmd_conf_mode_t _fmd_dbout_modes[] = {
+	{ "stderr", "send debug messages to stderr", FMD_DBOUT_STDERR },
+	{ "syslog", "send debug messages to syslog", FMD_DBOUT_SYSLOG },
+	{ NULL, NULL, 0 }
+};
+
+static const fmd_conf_mode_t _fmd_debug_modes[] = {
+	{ "help", "display debugging modes and exit", FMD_DBG_HELP },
+	{ "mod", "debug module load/unload/locking", FMD_DBG_MOD },
+	{ "disp", "debug dispatch queue processing", FMD_DBG_DISP },
+	{ "xprt", "debug transport-specific routines", FMD_DBG_XPRT },
+	{ "evt", "debug event subsystem routines", FMD_DBG_EVT },
+	{ "log", "debug log subsystem routines", FMD_DBG_LOG },
+	{ "tmr", "debug timer subsystem routines", FMD_DBG_TMR },
+	{ "fmri", "debug fmri subsystem routines", FMD_DBG_FMRI },
+	{ "asru", "debug asru subsystem routines", FMD_DBG_ASRU },
+	{ "case", "debug case subsystem routines", FMD_DBG_CASE },
+	{ "ckpt", "debug checkpoint routines", FMD_DBG_CKPT },
+	{ "rpc", "debug rpc service routines", FMD_DBG_RPC },
+	{ "all", "enable all available debug modes", FMD_DBG_ALL },
+	{ NULL, NULL, 0 }
+};
+
+static int
+fmd_cerror_set(fmd_conf_param_t *pp, const char *value)
+{
+	return (fmd_conf_mode_set(_fmd_cerror_modes, pp, value));
+}
+
+static int
+fmd_dbout_set(fmd_conf_param_t *pp, const char *value)
+{
+	return (fmd_conf_mode_set(_fmd_dbout_modes, pp, value));
+}
+
+static int
+fmd_debug_set(fmd_conf_param_t *pp, const char *value)
+{
+	int err = fmd_conf_mode_set(_fmd_debug_modes, pp, value);
+
+	if (err == 0)
+		fmd.d_fmd_debug = pp->cp_value.cpv_num;
+
+	return (err);
+}
+
+static int
+fmd_trmode_set(fmd_conf_param_t *pp, const char *value)
+{
+	fmd_tracebuf_f *func;
+
+	if (strcasecmp(value, "none") == 0)
+		func = fmd_trace_none;
+	else if (strcasecmp(value, "lite") == 0)
+		func = fmd_trace_lite;
+	else if (strcasecmp(value, "full") == 0)
+		func = fmd_trace_full;
+	else
+		return (fmd_set_errno(EFMD_CONF_INVAL));
+
+	fmd.d_thr_trace = (void (*)())func;
+	pp->cp_value.cpv_ptr = (void *)func;
+	return (0);
+}
+
+static void
+fmd_trmode_get(const fmd_conf_param_t *pp, void *ptr)
+{
+	*((void **)ptr) = pp->cp_value.cpv_ptr;
+}
+
+static int
+fmd_clkmode_set(fmd_conf_param_t *pp, const char *value)
+{
+	const fmd_timeops_t *ops;
+
+	if (strcasecmp(value, "native") == 0)
+		ops = &fmd_timeops_native;
+	else if (strcasecmp(value, "simulated") == 0)
+		ops = &fmd_timeops_simulated;
+	else
+		return (fmd_set_errno(EFMD_CONF_INVAL));
+
+	fmd.d_clockops = ops;
+	pp->cp_value.cpv_ptr = (void *)ops;
+	return (0);
+}
+
+static void
+fmd_clkmode_get(const fmd_conf_param_t *pp, void *ptr)
+{
+	*((void **)ptr) = pp->cp_value.cpv_ptr;
+}
+
+static const fmd_conf_ops_t fmd_cerror_ops = {
+	fmd_cerror_set, fmd_conf_mode_get, fmd_conf_notsup, fmd_conf_nop
+};
+
+static const fmd_conf_ops_t fmd_dbout_ops = {
+	fmd_dbout_set, fmd_conf_mode_get, fmd_conf_notsup, fmd_conf_nop
+};
+
+static const fmd_conf_ops_t fmd_debug_ops = {
+	fmd_debug_set, fmd_conf_mode_get, fmd_conf_notsup, fmd_conf_nop
+};
+
+static const fmd_conf_ops_t fmd_trmode_ops = {
+	fmd_trmode_set, fmd_trmode_get, fmd_conf_notsup, fmd_conf_nop
+};
+
+static const fmd_conf_ops_t fmd_clkmode_ops = {
+	fmd_clkmode_set, fmd_clkmode_get, fmd_conf_notsup, fmd_conf_nop
+};
+
+static const fmd_conf_formal_t _fmd_conf[] = {
+{ "agent.path", &fmd_conf_path, _fmd_agent_path }, /* path for agents */
+{ "alloc_msecs", &fmd_conf_uint32, "10" },	/* msecs before alloc retry */
+{ "alloc_tries", &fmd_conf_uint32, "3" },	/* max # of alloc retries */
+{ "chassis", &fmd_conf_string, NULL },		/* chassis serial number */
+{ "ckpt.dir", &fmd_conf_string, "var/fm/fmd/ckpt" }, /* ckpt directory path */
+{ "ckpt.dirmode", &fmd_conf_int32, "0700" },	/* ckpt directory perm mode */
+{ "ckpt.mode", &fmd_conf_int32, "0400" },	/* ckpt file perm mode */
+{ "ckpt.restore", &fmd_conf_bool, "true" },	/* restore checkpoints? */
+{ "ckpt.save", &fmd_conf_bool, "true" },	/* save checkpoints? */
+{ "ckpt.zero", &fmd_conf_bool, "false" },	/* zero checkpoints on start? */
+{ "client.buflim", &fmd_conf_size, "10m" },	/* client buffer space limit */
+{ "client.dbout", &fmd_dbout_ops, NULL },	/* client debug output sinks */
+{ "client.debug", &fmd_conf_bool, NULL },	/* client debug enable */
+{ "client.error", &fmd_cerror_ops, "unload" },	/* client error policy */
+{ "client.memlim", &fmd_conf_size, "10m" },	/* client allocation limit */
+{ "client.evqlim", &fmd_conf_uint32, "256" },	/* client event queue limit */
+{ "client.thrlim", &fmd_conf_uint32, "8" },	/* client aux thread limit */
+{ "client.thrsig", &fmd_conf_signal, "SIGUSR1" }, /* fmd_thr_signal() value */
+{ "client.tmrlim", &fmd_conf_uint32, "1024" },	/* client pending timer limit */
+{ "clock", &fmd_clkmode_ops, "native" },	/* clock operation mode */
+{ "conf_path", &fmd_conf_path, _fmd_conf_path }, /* root config file path */
+{ "conf_file", &fmd_conf_string, "fmd.conf" },	/* root config file name */
+{ "core", &fmd_conf_bool, "false" },		/* force core dump on quit */
+{ "dbout", &fmd_dbout_ops, NULL },		/* daemon debug output sinks */
+{ "debug", &fmd_debug_ops, NULL },		/* daemon debugging flags */
+{ "dictdir", &fmd_conf_string, "usr/lib/fm/dict" }, /* default diagcode dir */
+{ "domain", &fmd_conf_string, NULL },		/* domain id for de auth */
+{ "errchan", &fmd_conf_string, FM_ERROR_CHAN }, /* error event channel name */
+{ "fg", &fmd_conf_bool, "false" },		/* run daemon in foreground */
+{ "gc_interval", &fmd_conf_time, "1d" },	/* garbage collection intvl */
+{ "ids.avg", &fmd_conf_uint32, "4" },		/* desired idspace chain len */
+{ "ids.max", &fmd_conf_uint32, "1024" },	/* maximum idspace buckets */
+{ "isaname", &fmd_conf_string, _fmd_isa },	/* instruction set (uname -p) */
+{ "log.rsrc", &fmd_conf_string, "var/fm/fmd/rsrc" }, /* asru log dir path */
+{ "log.creator", &fmd_conf_string, "fmd" },	/* exacct log creator string */
+{ "log.error", &fmd_conf_string, "var/fm/fmd/errlog" }, /* error log path */
+{ "log.fault", &fmd_conf_string, "var/fm/fmd/fltlog" }, /* fault log path */
+{ "log.minfree", &fmd_conf_size, "2m" },	/* min log fsys free space */
+{ "log.tryrotate", &fmd_conf_uint32, "10" },	/* max log rotation attempts */
+{ "log.waitrotate", &fmd_conf_time, "200ms" },	/* log rotation retry delay */
+{ "machine", &fmd_conf_string, _fmd_uts.machine }, /* machine name (uname -m) */
+{ "nodiagcode", &fmd_conf_string, "-" },	/* diagcode to use if error */
+{ "osrelease", &fmd_conf_string, _fmd_uts.release }, /* release (uname -r) */
+{ "osversion", &fmd_conf_string, _fmd_uts.version }, /* version (uname -v) */
+{ "platform", &fmd_conf_string, _fmd_plat },	/* platform string (uname -i) */
+{ "plugin.close", &fmd_conf_bool, "true" },	/* dlclose plugins on fini */
+{ "plugin.path", &fmd_conf_path, _fmd_plugin_path }, /* path for plugin mods */
+{ "rootdir", &fmd_conf_string, "" },		/* root directory for paths */
+{ "rpc.adm.path", &fmd_conf_string, NULL },	/* FMD_ADM rendezvous file */
+{ "rpc.adm.prog", &fmd_conf_uint32, "100169" },	/* FMD_ADM rpc program num */
+{ "rpc.api.path", &fmd_conf_string, NULL },	/* FMD_API rendezvous file */
+{ "rpc.api.prog", &fmd_conf_uint32, "100170" },	/* FMD_API rpc program num */
+{ "rpc.rcvsize", &fmd_conf_size, "128k" },	/* rpc receive buffer size */
+{ "rpc.sndsize", &fmd_conf_size, "128k" },	/* rpc send buffer size */
+{ "rsrc.age", &fmd_conf_time, "30d" },		/* max age of old rsrc log */
+{ "rsrc.zero", &fmd_conf_bool, "false" },	/* zero rsrc cache on start? */
+{ "schemedir", &fmd_conf_string, _fmd_scheme_path }, /* path for scheme mods */
+{ "self.name", &fmd_conf_string, "fmd-self-diagnosis" }, /* self-diag module */
+{ "self.dict", &fmd_conf_list, "FMD.dict" },	/* self-diag dictionary list */
+{ "server", &fmd_conf_string, _fmd_uts.nodename }, /* server id for de auth */
+{ "strbuckets", &fmd_conf_uint32, "211" },	/* size of string hashes */
+#ifdef DEBUG
+{ "trace.mode", &fmd_trmode_ops, "full" },	/* trace mode: none/lite/full */
+#else
+{ "trace.mode", &fmd_trmode_ops, "lite" },	/* trace mode: none/lite/full */
+#endif
+{ "trace.recs", &fmd_conf_uint32, "128" },	/* trace records per thread */
+{ "trace.frames", &fmd_conf_uint32, "16" },	/* max trace rec stack frames */
+{ "uuidlen", &fmd_conf_uint32, "36" },		/* UUID ASCII string length */
+{ "xprt.class", &fmd_conf_string, NULL },	/* transport event class */
+{ "xprt.device", &fmd_conf_string, NULL },	/* transport replay device */
+{ "xprt.sid", &fmd_conf_string, "fmd" },	/* transport subscriber id */
+};
+
+/*
+ * Statistics maintained by fmd itself on behalf of various global subsystems.
+ * NOTE: FMD_TYPE_STRING statistics should not be used here.  If they are
+ * required in the future, the FMD_ADM_MODGSTAT service routine must change.
+ */
+static fmd_statistics_t _fmd_stats = {
+{ "transport.received", FMD_TYPE_UINT64, "events received by transport" },
+{ "transport.discarded", FMD_TYPE_UINT64, "bad events discarded by transport" },
+{ "transport.retried", FMD_TYPE_UINT64, "retries requested of transport" },
+{ "transport.replayed", FMD_TYPE_UINT64, "events replayed by transport" },
+{ "transport.lost", FMD_TYPE_UINT64, "events lost by transport" },
+{ "errlog.replayed", FMD_TYPE_UINT64, "total events replayed from errlog" },
+{ "errlog.partials", FMD_TYPE_UINT64, "events partially committed in errlog" },
+{ "errlog.enospc", FMD_TYPE_UINT64, "events not appended to errlog (ENOSPC)" },
+{ "fltlog.enospc", FMD_TYPE_UINT64, "events not appended to fltlog (ENOSPC)" },
+{ "log.enospc", FMD_TYPE_UINT64, "events not appended to other logs (ENOSPC)" },
+{ "dr.gen", FMD_TYPE_UINT64, "dynamic reconfiguration generation" },
+};
+
+void
+fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
+{
+	fmd_conf_path_t *pap;
+	char file[PATH_MAX];
+	const char *name;
+	fmd_stat_t *sp;
+	int i;
+
+	(void) sysinfo(SI_PLATFORM, _fmd_plat, sizeof (_fmd_plat));
+	(void) sysinfo(SI_ARCHITECTURE, _fmd_isa, sizeof (_fmd_isa));
+	(void) uname(&_fmd_uts);
+
+	bzero(dp, sizeof (fmd_t));
+
+	dp->d_version = _fmd_version;
+	dp->d_pname = fmd_strbasename(arg0);
+	dp->d_pid = getpid();
+
+	if (pthread_key_create(&dp->d_key, NULL) != 0)
+		fmd_error(EFMD_EXIT, "failed to create pthread key");
+
+	(void) pthread_mutex_init(&dp->d_xprt_lock, NULL);
+	(void) pthread_cond_init(&dp->d_xprt_cv, NULL);
+	dp->d_xprt_wait++; /* pause transport threads */
+
+	(void) pthread_mutex_init(&dp->d_err_lock, NULL);
+	(void) pthread_mutex_init(&dp->d_thr_lock, NULL);
+	(void) pthread_mutex_init(&dp->d_mod_lock, NULL);
+	(void) pthread_mutex_init(&dp->d_stats_lock, NULL);
+	(void) pthread_rwlock_init(&dp->d_log_lock, NULL);
+
+	/*
+	 * A small number of properties must be set manually before we open
+	 * the root configuration file.  These include any settings for our
+	 * memory allocator and path expansion token values, because these
+	 * values are needed by the routines in fmd_conf.c itself.  After
+	 * the root configuration file is processed, we reset these properties
+	 * based upon the latest values from the configuration file.
+	 */
+	dp->d_alloc_msecs = 10;
+	dp->d_alloc_tries = 3;
+	dp->d_str_buckets = 211;
+
+	dp->d_rootdir = root ? root : "";
+	dp->d_platform = _fmd_plat;
+	dp->d_machine = _fmd_uts.machine;
+	dp->d_isaname = _fmd_isa;
+
+	dp->d_conf = fmd_conf_open(conf,
+	    sizeof (_fmd_conf) / sizeof (_fmd_conf[0]), _fmd_conf);
+
+	if (dp->d_conf == NULL) {
+		fmd_error(EFMD_EXIT,
+		    "failed to load required configuration properties\n");
+	}
+
+	(void) fmd_conf_getprop(dp->d_conf, "alloc.msecs", &dp->d_alloc_msecs);
+	(void) fmd_conf_getprop(dp->d_conf, "alloc.tries", &dp->d_alloc_tries);
+	(void) fmd_conf_getprop(dp->d_conf, "strbuckets", &dp->d_str_buckets);
+
+	(void) fmd_conf_getprop(dp->d_conf, "platform", &dp->d_platform);
+	(void) fmd_conf_getprop(dp->d_conf, "machine", &dp->d_machine);
+	(void) fmd_conf_getprop(dp->d_conf, "isaname", &dp->d_isaname);
+
+	/*
+	 * Manually specified rootdirs override config files, so only update
+	 * d_rootdir based on the config files we parsed if no 'root' was set.
+	 */
+	if (root == NULL)
+		(void) fmd_conf_getprop(dp->d_conf, "rootdir", &dp->d_rootdir);
+	else
+		(void) fmd_conf_setprop(dp->d_conf, "rootdir", dp->d_rootdir);
+
+	/*
+	 * Once the base conf file properties are loaded, lookup the values
+	 * of $conf_path and $conf_file and merge in any other conf files.
+	 */
+	(void) fmd_conf_getprop(dp->d_conf, "conf_path", &pap);
+	(void) fmd_conf_getprop(dp->d_conf, "conf_file", &name);
+
+	for (i = 0; i < pap->cpa_argc; i++) {
+		(void) snprintf(file, sizeof (file),
+		    "%s/%s", pap->cpa_argv[i], name);
+		if (access(file, F_OK) == 0)
+			fmd_conf_merge(dp->d_conf, file);
+	}
+
+	/*
+	 * Update the value of fmd.d_fg based on "fg".  We cache this property
+	 * because it must be accessed deep within fmd at fmd_verror() time.
+	 */
+	(void) fmd_conf_getprop(fmd.d_conf, "fg", &fmd.d_fg);
+
+	/*
+	 * Initialize our custom libnvpair allocator and create an nvlist for
+	 * authority elements corresponding to this instance of the daemon.
+	 */
+	(void) nv_alloc_init(&dp->d_nva, &fmd_nv_alloc_ops);
+	dp->d_auth = fmd_protocol_authority();
+
+	/*
+	 * The fmd_module_t for the root module must be created manually.  Most
+	 * of it remains unused and zero, except for the few things we fill in.
+	 */
+	dp->d_rmod = fmd_zalloc(sizeof (fmd_module_t), FMD_SLEEP);
+	dp->d_rmod->mod_name = fmd_strdup(dp->d_pname, FMD_SLEEP);
+	fmd_list_append(&dp->d_mod_list, dp->d_rmod);
+
+	(void) pthread_mutex_init(&dp->d_rmod->mod_lock, NULL);
+	(void) pthread_cond_init(&dp->d_rmod->mod_cv, NULL);
+
+	dp->d_rmod->mod_thread = fmd_thread_xcreate(dp->d_rmod, pthread_self());
+	dp->d_rmod->mod_ustat = fmd_ustat_create();
+
+	if (pthread_setspecific(dp->d_key, dp->d_rmod->mod_thread) != 0)
+		fmd_error(EFMD_EXIT, "failed to attach main thread key");
+
+	if ((dp->d_stats = (fmd_statistics_t *)fmd_ustat_insert(
+	    dp->d_rmod->mod_ustat, FMD_USTAT_NOALLOC, sizeof (_fmd_stats) /
+	    sizeof (fmd_stat_t), (fmd_stat_t *)&_fmd_stats, NULL)) == NULL)
+		fmd_error(EFMD_EXIT, "failed to initialize statistics");
+
+	/*
+	 * In addition to inserting the _fmd_stats collection of program-wide
+	 * statistics, we also insert a statistic named after each of our
+	 * errors and update these counts in fmd_verror() (see fmd_subr.c).
+	 */
+	dp->d_errstats = sp = fmd_zalloc(sizeof (fmd_stat_t) *
+	    (EFMD_END - EFMD_UNKNOWN), FMD_SLEEP);
+
+	for (i = 0; i < EFMD_END - EFMD_UNKNOWN; i++, sp++) {
+		(void) snprintf(sp->fmds_name, sizeof (sp->fmds_name), "err.%s",
+		    strrchr(fmd_errclass(EFMD_UNKNOWN + i), '.') + 1);
+		sp->fmds_type = FMD_TYPE_UINT64;
+	}
+
+	(void) fmd_ustat_insert(dp->d_rmod->mod_ustat, FMD_USTAT_NOALLOC,
+	    EFMD_END - EFMD_UNKNOWN, dp->d_errstats, NULL);
+}
+
+void
+fmd_destroy(fmd_t *dp)
+{
+	fmd_module_t *mp;
+	int core;
+
+	(void) fmd_conf_getprop(fmd.d_conf, "core", &core);
+
+	fmd_rpc_fini();
+	fmd_transport_fini();
+	fmd_dr_fini();
+
+	/*
+	 * Unload the self-diagnosis module first.  This ensures that it does
+	 * not get confused as we start unloading other modules, etc.  We must
+	 * hold the dispq lock as a writer while doing so since it uses d_self.
+	 */
+	if (dp->d_self != NULL) {
+		(void) pthread_rwlock_wrlock(&dp->d_disp->dq_lock);
+		fmd_module_unload(dp->d_self);
+		fmd_module_rele(dp->d_self);
+		dp->d_self = NULL;
+		(void) pthread_rwlock_unlock(&dp->d_disp->dq_lock);
+	}
+
+	/*
+	 * Unload modules in reverse order *except* for the root module, which
+	 * is first in the list.  This allows it to keep its thread and trace.
+	 */
+	for (mp = fmd_list_prev(&dp->d_mod_list); mp != dp->d_rmod; ) {
+		fmd_module_unload(mp);
+		mp = fmd_list_prev(mp);
+	}
+
+	if (dp->d_mod_hash != NULL) {
+		fmd_modhash_destroy(dp->d_mod_hash);
+		dp->d_mod_hash = NULL;
+	}
+
+	/*
+	 * Close both log files now that modules are no longer active.  We must
+	 * set these pointers to NULL in case any subsequent errors occur.
+	 */
+	if (dp->d_errlog != NULL) {
+		fmd_log_rele(dp->d_errlog);
+		dp->d_errlog = NULL;
+	}
+
+	if (dp->d_fltlog != NULL) {
+		fmd_log_rele(dp->d_fltlog);
+		dp->d_fltlog = NULL;
+	}
+
+	/*
+	 * Now that all data structures that refer to modules are torn down,
+	 * no modules should be remaining on the module list except for d_rmod.
+	 * If we trip one of these assertions, we're missing a rele somewhere.
+	 */
+	ASSERT(fmd_list_prev(&dp->d_mod_list) == dp->d_rmod);
+	ASSERT(fmd_list_next(&dp->d_mod_list) == dp->d_rmod);
+
+	/*
+	 * Now destroy the root module.  We clear its thread key first so any
+	 * calls to fmd_trace() inside of the module code will be ignored.
+	 */
+	(void) pthread_setspecific(dp->d_key, NULL);
+	(void) pthread_mutex_lock(&dp->d_rmod->mod_lock);
+	fmd_module_destroy(dp->d_rmod);
+
+	if (dp->d_timers != NULL)
+		fmd_timerq_destroy(dp->d_timers);
+	if (dp->d_disp != NULL)
+		fmd_dispq_destroy(dp->d_disp);
+	if (dp->d_asrus != NULL)
+		fmd_asru_hash_destroy(dp->d_asrus);
+	if (dp->d_schemes != NULL)
+		fmd_scheme_hash_destroy(dp->d_schemes);
+	if (dp->d_cases != NULL)
+		fmd_case_hash_destroy(dp->d_cases);
+
+	if (dp->d_errstats != NULL) {
+		fmd_free(dp->d_errstats,
+		    sizeof (fmd_stat_t) * (EFMD_END - EFMD_UNKNOWN));
+	}
+
+	if (dp->d_conf != NULL)
+		fmd_conf_close(dp->d_conf);
+
+	nvlist_free(dp->d_auth);
+	(void) nv_alloc_fini(&dp->d_nva);
+	dp->d_clockops->fto_fini(dp->d_clockptr);
+
+	(void) pthread_key_delete(dp->d_key);
+	bzero(dp, sizeof (fmd_t));
+
+	if (core)
+		fmd_panic("forcing core dump at user request\n");
+}
+
+/*ARGSUSED*/
+static void
+fmd_gc(fmd_t *dp, id_t id, hrtime_t hrt)
+{
+	hrtime_t delta;
+
+	if (id != 0) {
+		TRACE((FMD_DBG_MOD, "garbage collect start"));
+		fmd_modhash_apply(dp->d_mod_hash, fmd_module_gc);
+		TRACE((FMD_DBG_MOD, "garbage collect end"));
+
+		(void) pthread_rwlock_rdlock(&dp->d_log_lock);
+		fmd_log_update(dp->d_errlog);
+		(void) pthread_rwlock_unlock(&dp->d_log_lock);
+	}
+
+	(void) fmd_conf_getprop(dp->d_conf, "gc_interval", &delta);
+	(void) fmd_timerq_install(dp->d_timers, dp->d_rmod->mod_timerids,
+	    (fmd_timer_f *)fmd_gc, dp, NULL, delta);
+}
+
+/*
+ * Events are committed to the errlog after cases are checkpointed.  If fmd
+ * crashes before an event is ever associated with a module, this function will
+ * be called to replay it to all subscribers.  If fmd crashes in between the
+ * subscriber checkpointing and committing the event in the error log, the
+ * module will have seen the event and we don't want to replay it.  So we look
+ * for the event in all modules and transition it to the proper state.  If
+ * it is found, we commit it to the error log and do not replay it.  The in-
+ * memory case search used by fmd_module_contains() et al isn't particularly
+ * efficient, but it is faster than doing read i/o's on every case event to
+ * check their status or write i/o's on every event to replay to update states.
+ * We can improve the efficiency of this lookup algorithm later if necessary.
+ */
+/*ARGSUSED*/
+static void
+fmd_err_replay(fmd_log_t *lp, fmd_event_t *ep, fmd_t *dp)
+{
+	fmd_module_t *mp;
+	fmd_stat_t *sp;
+
+	(void) pthread_mutex_lock(&dp->d_mod_lock);
+
+	for (mp = fmd_list_next(&dp->d_mod_list);
+	    mp != NULL; mp = fmd_list_next(mp)) {
+		if (fmd_module_contains(mp, ep)) {
+			fmd_module_hold(mp);
+			break;
+		}
+	}
+
+	(void) pthread_mutex_unlock(&dp->d_mod_lock);
+
+	if (mp != NULL) {
+		fmd_event_commit(ep);
+		fmd_module_rele(mp);
+		sp = &dp->d_stats->ds_log_partials;
+	} else {
+		fmd_dispq_dispatch(dp->d_disp, ep,
+		    ((fmd_event_impl_t *)ep)->ev_data);
+		sp = &dp->d_stats->ds_log_replayed;
+	}
+
+	(void) pthread_mutex_lock(&dp->d_stats_lock);
+	sp->fmds_value.ui64++;
+	(void) pthread_mutex_unlock(&dp->d_stats_lock);
+}
+
+/*
+ * This signal handler is installed for the client.thrsig signal to be used to
+ * force an auxiliary thread to wake up from a system call and return EINTR in
+ * response to a module's use of fmd_thr_signal().  We also trace the event.
+ */
+static void
+fmd_signal(int sig)
+{
+	TRACE((FMD_DBG_MOD, "module thread received sig #%d", sig));
+}
+
+void
+fmd_run(fmd_t *dp, int pfd)
+{
+	char *nodc_key[] = { FMD_FLT_NODC, NULL };
+	char nodc_str[128];
+	struct sigaction act;
+
+	int status = FMD_EXIT_SUCCESS;
+	const char *name;
+	fmd_conf_path_t *pap;
+	int dbout;
+
+	/*
+	 * Cache all the current debug property settings in d_fmd_debug,
+	 * d_fmd_dbout, d_hdl_debug, and d_hdl_dbout.  If a given debug mask
+	 * is non-zero and the corresponding dbout mask is zero, set dbout
+	 * to a sensible default value based on whether we have daemonized.
+	 */
+	(void) fmd_conf_getprop(dp->d_conf, "dbout", &dbout);
+
+	if (dp->d_fmd_debug != 0 && dbout == 0)
+		dp->d_fmd_dbout = dp->d_fg? FMD_DBOUT_STDERR : FMD_DBOUT_SYSLOG;
+	else
+		dp->d_fmd_dbout = dbout;
+
+	(void) fmd_conf_getprop(dp->d_conf, "client.debug", &dp->d_hdl_debug);
+	(void) fmd_conf_getprop(dp->d_conf, "client.dbout", &dbout);
+
+	if (dp->d_hdl_debug != 0 && dbout == 0)
+		dp->d_hdl_dbout = dp->d_fg? FMD_DBOUT_STDERR : FMD_DBOUT_SYSLOG;
+	else
+		dp->d_hdl_dbout = dbout;
+
+	/*
+	 * Initialize remaining major program data structures such as the event
+	 * transport, dispatch queues, log files, module hash collections, etc.
+	 * This work is done here rather than in fmd_create() to permit the -o
+	 * command-line option to modify properties after fmd_create() is done.
+	 * Note that our event transport will remain blocked until we broadcast
+	 * to threads blocked on d_xprt_cv at the end of this function.
+	 */
+	dp->d_clockptr = dp->d_clockops->fto_init();
+	fmd_transport_init();
+	fmd_rpc_init();
+	fmd_dr_init();
+
+	dp->d_rmod->mod_timerids = fmd_idspace_create(dp->d_pname, 1, 16);
+	dp->d_timers = fmd_timerq_create();
+	dp->d_disp = fmd_dispq_create();
+	dp->d_cases = fmd_case_hash_create();
+
+	/*
+	 * Once our subsystems that use signals have been set up, install the
+	 * signal handler for the fmd_thr_signal() API.  Verify that the signal
+	 * being used for this purpose doesn't conflict with something else.
+	 */
+	(void) fmd_conf_getprop(dp->d_conf, "client.thrsig", &dp->d_thr_sig);
+
+	if (sigaction(dp->d_thr_sig, NULL, &act) != 0) {
+		fmd_error(EFMD_EXIT, "invalid signal selected for "
+		    "client.thrsig property: %d\n", dp->d_thr_sig);
+	}
+
+	if (act.sa_handler != SIG_IGN && act.sa_handler != SIG_DFL) {
+		fmd_error(EFMD_EXIT, "signal selected for client.thrsig "
+		    "property is already in use: %d\n", dp->d_thr_sig);
+	}
+
+	act.sa_handler = fmd_signal;
+	act.sa_flags = 0;
+
+	(void) sigemptyset(&act.sa_mask);
+	(void) sigaction(dp->d_thr_sig, &act, NULL);
+
+	(void) fmd_conf_getprop(dp->d_conf, "schemedir", &name);
+	dp->d_schemes = fmd_scheme_hash_create(dp->d_rootdir, name);
+
+	(void) fmd_conf_getprop(dp->d_conf, "log.rsrc", &name);
+	dp->d_asrus = fmd_asru_hash_create(dp->d_rootdir, name);
+
+	(void) fmd_conf_getprop(dp->d_conf, "log.error", &name);
+	dp->d_errlog = fmd_log_open(dp->d_rootdir, name, FMD_LOG_ERROR);
+
+	(void) fmd_conf_getprop(dp->d_conf, "log.fault", &name);
+	dp->d_fltlog = fmd_log_open(dp->d_rootdir, name, FMD_LOG_FAULT);
+
+	if (dp->d_asrus == NULL || dp->d_errlog == NULL || dp->d_fltlog == NULL)
+		fmd_error(EFMD_EXIT, "failed to initialize log files\n");
+
+	dp->d_mod_hash = fmd_modhash_create();
+	dp->d_running = 1; /* we are now officially an active fmd */
+
+	/*
+	 * Now that we're running, if a pipe fd was specified, write an exit
+	 * status to it to indicate that our parent process can safely detach.
+	 */
+	if (pfd >= 0)
+		(void) write(pfd, &status, sizeof (status));
+
+	/*
+	 * Once all data structures are initialized, we load all of our modules
+	 * in order according to class in order to load up any subscriptions.
+	 */
+	fmd_builtin_loadall(dp->d_mod_hash);
+	(void) fmd_conf_getprop(dp->d_conf, "self.name", &name);
+	dp->d_self = fmd_modhash_lookup(dp->d_mod_hash, name);
+
+	if (fmd_module_dc_key2code(dp->d_self,
+	    nodc_key, nodc_str, sizeof (nodc_str)) == 0)
+		(void) fmd_conf_setprop(dp->d_conf, "nodiagcode", nodc_str);
+
+	(void) fmd_conf_getprop(dp->d_conf, "plugin.path", &pap);
+	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_rtld_ops);
+
+	(void) fmd_conf_getprop(dp->d_conf, "agent.path", &pap);
+	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_proc_ops);
+
+	/*
+	 * Before activating the inbound event transport, we first replay any
+	 * fault events from the ASRU cache, any case events from the case hash
+	 * associated with restored case checkpoints, and any error events from
+	 * the errlog that did not finish processing the last time we ran. Then
+	 * we replay any pending events from the event transport itself.
+	 */
+	fmd_asru_hash_refresh(dp->d_asrus);
+	fmd_case_hash_refresh(dp->d_cases);
+
+	(void) pthread_rwlock_rdlock(&dp->d_log_lock);
+	fmd_log_replay(dp->d_errlog, (fmd_log_f *)fmd_err_replay, dp);
+	fmd_log_update(dp->d_errlog);
+	(void) pthread_rwlock_unlock(&dp->d_log_lock);
+
+	fmd_transport_replay();
+
+	/*
+	 * Finally, awaken any threads associated with receiving events from
+	 * our main ereport event transport that are sleeping on d_xprt_wait.
+	 */
+	(void) pthread_mutex_lock(&dp->d_xprt_lock);
+	ASSERT(dp->d_xprt_wait != 0);
+	dp->d_xprt_wait--;
+	(void) pthread_mutex_unlock(&dp->d_xprt_lock);
+	(void) pthread_cond_broadcast(&dp->d_xprt_cv);
+
+	fmd_gc(dp, 0, 0);
+}
+
+void
+fmd_help(fmd_t *dp)
+{
+	const fmd_conf_mode_t *cmp;
+
+	(void) printf("Usage: %s -o debug=mode[,mode]\n", dp->d_pname);
+
+	for (cmp = _fmd_debug_modes; cmp->cm_name != NULL; cmp++)
+		(void) printf("\t%s\t%s\n", cmp->cm_name, cmp->cm_desc);
+}

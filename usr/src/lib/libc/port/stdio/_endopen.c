@@ -1,0 +1,142 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+
+/*
+ *	This routine is a special case, in that it is aware of
+ *	both small and large file interfaces. It must be built
+ *	in the small compilation environment.
+ */
+
+#include <sys/feature_tests.h>
+
+#define	close		_close
+#define	lseek		_lseek
+#define	open		_open
+#if !defined(_LP64)
+#define	lseek64		_lseek64
+#define	open64		_open64
+#endif
+
+#include "lint.h"
+#include "file64.h"
+#include <mtlib.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <limits.h>
+#include <thread.h>
+#include <synch.h>
+#include "stdiom.h"
+#include <errno.h>
+
+/*
+ * open UNIX file name, associate with iop
+ */
+
+FILE *
+_endopen(const char *name, const char *type, FILE *iop, int largefile)
+{
+	int oflag, fd;
+	char plus;
+	rmutex_t *lk;
+
+	if (iop == NULL)
+		return (NULL);
+	switch (type[0]) {
+	default:
+		errno = EINVAL;
+		return (NULL);
+	case 'r':
+		oflag = O_RDONLY;
+		break;
+	case 'w':
+		oflag = O_WRONLY | O_TRUNC | O_CREAT;
+		break;
+	case 'a':
+		oflag = O_WRONLY | O_APPEND | O_CREAT;
+		break;
+	}
+	/* UNIX ignores 'b' and treats text and binary the same */
+	if ((plus = type[1]) == 'b')
+		plus = type[2];
+	if (plus == '+')
+		oflag = (oflag & ~(O_RDONLY | O_WRONLY)) | O_RDWR;
+
+	/* select small or large file open based on flag */
+	if (largefile) {
+		fd = open64(name, oflag, 0666);
+	} else {
+		fd = open(name, oflag, 0666);
+	}
+	if (fd < 0)
+		return (NULL);
+
+#ifdef	_LP64
+	iop->_file = fd;
+#else
+	if (fd > UCHAR_MAX) {
+		(void) close(fd);
+		errno = EMFILE;
+		return (NULL);
+	}
+	iop->_file = (unsigned char)fd; /* assume fits in unsigned char */
+#endif	/*	_LP64	*/
+
+	FLOCKFILE(lk, iop);		/* this lock may be unnecessary */
+
+#ifdef	_LP64
+	iop->_flag &= ~0377;	/* clear lower 8-bits */
+	if (plus == '+')
+		iop->_flag |= _IORW;
+	else if (type[0] == 'r')
+		iop->_flag |= _IOREAD;
+	else
+		iop->_flag |= _IOWRT;
+#else
+	if (plus == '+')
+		iop->_flag = _IORW;
+	else if (type[0] == 'r')
+		iop->_flag = _IOREAD;
+	else
+		iop->_flag = _IOWRT;
+#endif	/*	_LP64	*/
+	FUNLOCKFILE(lk);
+	if (oflag == (O_WRONLY | O_APPEND | O_CREAT)) {	/* type == "a" */
+		if (lseek64(fd, (off64_t)0, SEEK_END) < (off64_t)0) {
+			(void) close(fd);
+			return (NULL);
+		}
+	}
+
+	return (iop);
+}

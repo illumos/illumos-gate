@@ -1,0 +1,13 @@
+
+The unix-system command executes a new shell.  Your screen will be
+cleared and the "UNIX:" prompt  will be displayed.
+
+Use one of the methods below to invoke unix-system:
+
+     Command Menu:  Select unix-system and press ENTER.
+
+     Command Line:  Type unix-system and press ENTER.
+
+To return to FACE from the shell, hold down the control key (CTRL) and
+press d, or type "exit" and press ENTER.
+

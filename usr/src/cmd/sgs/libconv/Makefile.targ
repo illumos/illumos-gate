@@ -1,0 +1,85 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+pics/%.o:	../common/%.c
+		$(COMPILE.c) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%.o:	%.s
+		$(COMPILE.s) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/elfcap.o:	$(ELFCAP)/elfcap.c
+		$(COMPILE.c) -DCAP_UPPERCASE -o $@ $(ELFCAP)/elfcap.c
+		$(POST_PROCESS_O)
+
+../common/%.c:	%_msg.h
+
+%_msg.h:	$(SGSMSG) ../common/%.msg
+		$(SGSMSG) $(SGSMSGFLAGS) -l -h $@ -d $@ $<
+
+$(SGSMSG):	FRC
+		@ cd $(SGSTOOLS)/$(MACH); pwd; $(MAKE) catalog
+		@ pwd
+
+vernote.s:	bld_vernote $(ONLDREADME)
+		./bld_vernote $(VERNOTE_DEBUG) -R $(ONLDREADME) \
+			-r "$(RELEASE)" -o $@
+
+bld_vernote:	../common/bld_vernote.ksh
+		$(RM) -f $@
+		cp ../common/bld_vernote.ksh $@
+		chmod a+x $@
+
+$(LIBRARY):	pics $$(PICS)
+		@ $(RM) $(LIBRARY)
+		$(AR) $(ARFLAGS) $@ $(PICS)
+		$(POST_PROCESS_A)
+
+chkmsg:		$(LINTSRCS)
+		sh $(CHKMSG) $(CHKMSGFLAGS) $(LINTSRCS)
+
+lint:		$(LINTLIB) $(LINTOUT32) $(SGSLINTOUT)
+
+$(LINTLIB): $$(SRCS)
+		$(LINT.c) -o $(LIBNAME) $(SRCS) > $(LINTOUT) 2>&1
+
+catalog:
+
+pics:
+		-@mkdir -p $@
+
+clobber:	clean
+		-$(RM) $(LIBRARY) $(CLOBBERFILES)
+
+clean:
+		-$(RM) $(PICS) $(CLEANFILES)
+
+delete:
+
+include		$(SRC)/cmd/sgs/Makefile.targ

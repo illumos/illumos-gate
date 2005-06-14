@@ -1,0 +1,66 @@
+#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:Sysfiles 1.3 */
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#	Sysfiles provides a means of specifying different Systems,
+#	Devices and Dialers files for uucico and cu.  This is useful
+#	for certain networks where, for example, requests for login
+#	service might be accepted on a different address than requests
+#	for uucico service (hence different Systems files), or where
+#	there are different chat scripts to request each service 
+#	(hence different Dialers files).
+#
+#	Another use of Sysfiles is to split large Systems files into
+#	smaller, more manageable files (e.g., local and global Systems 
+#	files).
+#
+#	FORMAT:
+#
+#	service=<service name>	systems=<systems file list> \
+#				devices=<devices file list> \
+#				dialers=<dialers file list>
+#
+#	Where service name is "uucico" or "cu".  Each file list is a list
+#	of colon-separated file names.  File names are relative to 
+#	/etc/uucp unless a full path name is given.  Files are searched
+#	in the order that they appear in the file list.
+#
+#	The defaults are the usual uucp files: /etc/uucp/Systems,
+#	/etc/uucp/Devices and /etc/uucp/Dialers.
+#
+#	EXAMPLE 1:  
+#	This example uses different systems and dialers files to separate
+#	the uucico- and cu-specific info, with information that they
+#	use in common still in the "usual" Systems and Dialers files.
+#
+#	service=uucico	systems=Systems.cico:Systems \
+#			dialers=Dialers.cico:Dialers
+#	service=cu	systems=Systems.cu:Systems \
+#			dialers=Dialers.cu:Dialers
+#
+#	EXAMPLE 2:  
+#	This example uses the same systems files for uucico and cu,
+#	but has split the Systems file into local, company-wide,
+#	and global files.
+#
+#	service=uucico	systems=Systems.local:Systems.company:Systems
+#	service=cu	systems=Systems.local:Systems.company:Systems

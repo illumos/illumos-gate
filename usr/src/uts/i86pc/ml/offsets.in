@@ -1,0 +1,377 @@
+\
+\ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
+\ CDDL HEADER START
+\
+\ The contents of this file are subject to the terms of the
+\ Common Development and Distribution License, Version 1.0 only
+\ (the "License").  You may not use this file except in compliance
+\ with the License.
+\
+\ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+\ or http://www.opensolaris.org/os/licensing.
+\ See the License for the specific language governing permissions
+\ and limitations under the License.
+\
+\ When distributing Covered Code, include this CDDL HEADER in each
+\ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+\ If applicable, add the following below this CDDL HEADER, with the
+\ fields enclosed by brackets "[]" replaced with your own identifying
+\ information: Portions Copyright [yyyy] [name of copyright owner]
+\
+\ CDDL HEADER END
+\
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+\
+\ offsets.in: input file to produce assym.h using the ctfstabs program
+\
+
+#ifndef	_GENASSYM
+#define	_GENASSYM
+#endif
+
+#define	SIZES	1
+
+#include <sys/types.h>
+#include <sys/bootsvcs.h>
+#include <sys/systm.h>
+#include <sys/sysinfo.h>
+#include <sys/user.h>
+#include <sys/thread.h>
+#include <sys/proc.h>
+#include <sys/cpuvar.h>
+#include <sys/tss.h>
+#include <sys/privregs.h>
+#include <sys/segments.h>
+#include <sys/devops.h>
+#include <sys/ddi_impldefs.h>
+#include <vm/as.h>
+#include <sys/avintr.h>
+#include <sys/pic.h>
+#include <sys/rm_platter.h>
+#include <sys/stream.h>
+#include <sys/strsubr.h>
+#include <sys/sunddi.h>
+#include <sys/modctl.h>
+#include <sys/traptrace.h>
+#include <sys/ontrap.h>
+#include <sys/lgrp.h>
+#include <sys/dtrace.h>
+
+proc		PROCSIZE
+	p_link
+	p_next
+	p_child
+	p_sibling
+	p_sig
+	p_flag
+	p_tlist
+	p_as
+	p_lockp
+	p_user
+	p_ldt
+	p_ldt_desc
+	p_model
+	p_agenttp
+
+_kthread	THREAD_SIZE
+	t_pcb			T_LABEL
+	t_lock
+	t_lockstat
+	t_lockp
+	t_lock_flush
+	t_kpri_req
+	t_oldspl
+	t_pri
+	t_pil
+	t_lwp
+	t_procp
+	t_link
+	t_state
+	t_mstate
+	t_preempt_lk
+	t_stk			T_STACK
+	t_swap
+	t_lwpchan.lc_wchan	T_WCHAN
+	t_flag			T_FLAGS
+	t_ctx
+	t_lofault
+	t_onfault
+	t_ontrap
+	t_cpu
+	t_lpl
+	t_bound_cpu
+	t_intr
+	t_forw
+	t_back
+	t_sig
+	t_tid
+	t_pre_sys
+	t_preempt
+	t_proc_flag
+	t_startpc
+	t_sysnum
+	t_intr_start
+	_tu._ts._t_astflag	T_ASTFLAG
+	_tu._ts._t_post_sys	T_POST_SYS
+	_tu._t_post_sys_ast	T_POST_SYS_AST
+	t_copyops
+
+ctxop
+	save_op			CTXOP_SAVE
+
+as
+	a_hat
+
+user	USIZEBYTES
+	u_comm
+	u_signal
+
+_label_t
+	val	LABEL_VAL
+
+\#define	LABEL_PC	LABEL_VAL
+\#define	LABEL_SP	_CONST(LABEL_VAL + LABEL_VAL_INCR)
+\#define	T_PC		_CONST(T_LABEL + LABEL_PC)
+\#define	T_SP		_CONST(T_LABEL + LABEL_SP)
+
+_klwp
+	lwp_thread
+	lwp_procp
+	lwp_eosys
+	lwp_regs
+	lwp_arg
+	lwp_ap
+	lwp_cursig
+	lwp_state
+	lwp_mstate.ms_acct	LWP_MS_ACCT
+	lwp_mstate.ms_prev	LWP_MS_PREV
+	lwp_mstate.ms_start	LWP_MS_START
+	lwp_mstate.ms_state_start LWP_MS_STATE_START
+	lwp_pcb
+	lwp_ru.sysc		LWP_RU_SYSC
+
+\#define	LWP_ACCT_USER	_CONST(LWP_MS_ACCT + _MUL(LMS_USER, LWP_MS_ACCT_INCR))
+\#define	LWP_ACCT_SYSTEM	_CONST(LWP_MS_ACCT + _MUL(LMS_SYSTEM, LWP_MS_ACCT_INCR))
+
+fpu_ctx
+	fpu_regs		FPU_CTX_FPU_REGS
+	fpu_flags		FPU_CTX_FPU_FLAGS
+
+fxsave_state	FXSAVE_STATE_SIZE
+	fx_mxcsr_mask		FXSAVE_STATE_MXCSR_MASK
+
+
+autovec		AUTOVECSIZE
+	av_vector
+	av_intarg1
+	av_intarg2
+	av_link
+	av_prilevel
+	av_dip
+
+av_head
+	avh_link
+	avh_hi_pri
+	avh_lo_pri
+
+cpu
+	cpu_id
+	cpu_flags
+	cpu_self
+	cpu_thread
+	cpu_thread_lock
+	cpu_kprunrun
+	cpu_lwp
+	cpu_fpowner
+	cpu_idle_thread
+	cpu_intr_thread
+	cpu_intr_actv
+	cpu_base_spl
+	cpu_intr_stack
+	cpu_stats.sys.cpumigrate	CPU_STATS_SYS_CPUMIGRATE
+	cpu_stats.sys.intr		CPU_STATS_SYS_INTR
+	cpu_stats.sys.intrblk		CPU_STATS_SYS_INTRBLK
+	cpu_stats.sys.syscall		CPU_STATS_SYS_SYSCALL
+	cpu_profile_pc
+	cpu_profile_upc
+	cpu_profile_pil
+	cpu_ftrace.ftd_state		CPU_FTRACE_STATE
+
+\#define	CPU_INTR_ACTV_REF	_CONST(CPU_INTR_ACTV + 2)
+
+cpu
+	cpu_m.pil_high_start	CPU_PIL_HIGH_START
+	cpu_m.intrstat		CPU_INTRSTAT
+	cpu_m.mcpu_current_hat	CPU_CURRENT_HAT
+	cpu_m.mcpu_gdt		CPU_GDT
+	cpu_m.mcpu_idt		CPU_IDT
+	cpu_m.mcpu_tss		CPU_TSS
+	cpu_m.mcpu_softinfo	CPU_SOFTINFO
+	cpu_m.mcpu_pri		CPU_PRI
+	cpu_m.mcpu_pri_data	CPU_PRI_DATA
+
+machcpu
+	mcpu_pri_data	MCPU_PRI_DATA
+
+standard_pic
+	c_curmask
+	c_iplmask
+
+ddi_dma_impl
+	dmai_rflags
+	dmai_rdip
+
+dev_info
+	devi_ops		DEVI_DEV_OPS
+	devi_bus_ctl
+	devi_bus_dma_map
+	devi_bus_dma_ctl
+	devi_bus_dma_allochdl
+	devi_bus_dma_freehdl
+	devi_bus_dma_bindhdl
+	devi_bus_dma_unbindhdl
+	devi_bus_dma_flush
+	devi_bus_dma_win
+
+dev_ops
+	devo_bus_ops		DEVI_BUS_OPS
+
+bus_ops
+	bus_ctl			OPS_CTL
+	bus_dma_map		OPS_MAP
+	bus_dma_ctl		OPS_MCTL
+	bus_dma_allochdl	OPS_ALLOCHDL
+	bus_dma_freehdl		OPS_FREEHDL
+	bus_dma_bindhdl		OPS_BINDHDL
+	bus_dma_unbindhdl	OPS_UNBINDHDL
+	bus_dma_flush		OPS_FLUSH
+	bus_dma_win		OPS_WIN
+
+sysent	SYSENT_SIZE	SYSENT_SIZE_SHIFT
+	sy_callc
+	sy_flags
+	sy_narg
+
+stdata
+	sd_lock
+
+queue
+	q_flag
+	q_next
+	q_stream
+	q_syncq
+	q_qinfo
+
+qinit
+	qi_putp
+
+syncq
+	sq_flags
+	sq_count
+	sq_lock
+	sq_wait
+
+rm_platter
+	rm_idt_lim		IDTROFF
+	rm_gdt_lim		GDTROFF
+	rm_pdbr			CR3OFF
+	rm_cpu			CPUNOFF
+	rm_cr4			CR4OFF
+	rm_x86feature		X86FEATURE
+
+cpu_tables
+	ct_stack
+	ct_gdt
+
+\#define	DEFAULTSTKSZ	_CONST(CT_GDT - CT_STACK)
+
+ddi_acc_impl
+	ahi_acc_attr	ACC_ATTR
+	ahi_get8	ACC_GETB
+	ahi_get16	ACC_GETW
+	ahi_get32	ACC_GETL
+	ahi_get64	ACC_GETLL
+	ahi_put8	ACC_PUTB
+	ahi_put16	ACC_PUTW
+	ahi_put32	ACC_PUTL
+	ahi_put64	ACC_PUTLL
+	ahi_rep_get8	ACC_REP_GETB
+	ahi_rep_get16	ACC_REP_GETW
+	ahi_rep_get32	ACC_REP_GETL
+	ahi_rep_get64	ACC_REP_GETLL
+	ahi_rep_put8	ACC_REP_PUTB
+	ahi_rep_put16	ACC_REP_PUTW
+	ahi_rep_put32	ACC_REP_PUTL
+	ahi_rep_put64	ACC_REP_PUTLL
+
+on_trap_data
+	ot_prot
+	ot_trap
+	ot_trampoline
+	ot_jmpbuf
+	ot_prev
+	ot_handle
+	ot_pad1
+
+trap_trace_ctl_t	__TRAPTR_SIZE TRAPTR_SIZE_SHIFT
+	ttc_next	TRAPTR_NEXT
+	ttc_first	TRAPTR_FIRST
+	ttc_limit	TRAPTR_LIMIT
+
+trap_trace_rec_t	TRAP_ENT_SIZE
+	ttr_cr2
+	ttr_info.idt_entry.vector	TTR_VECTOR
+	ttr_info.idt_entry.ipl		TTR_IPL
+	ttr_info.idt_entry.spl		TTR_SPL
+	ttr_info.idt_entry.pri		TTR_PRI
+	ttr_info.gate_entry.sysnum	TTR_SYSNUM
+	ttr_marker
+	ttr_stamp
+	ttr_curthread
+	ttr_sdepth
+	ttr_stack
+
+lgrp_ld
+	lpl_lgrpid
+
+dtrace_id_t	DTRACE_IDSIZE
+
+cpu_core	CPU_CORE_SIZE	CPU_CORE_SHIFT
+	cpuc_dtrace_flags
+	cpuc_dtrace_illval
+
+timespec	TIMESPEC_SIZE
+
+gate_desc	GATE_DESC_SIZE
+
+desctbr_t	DESCTBR_SIZE
+	dtr_limit
+	dtr_base
+
+mod_stub_info	MODS_SIZE
+	mods_func_adr	MODS_INSTFCN
+	mods_errfcn	MODS_RETFCN
+	mods_flag
+
+\#define	TRAP_TSIZE		_MUL(TRAP_ENT_SIZE, TRAPTR_NENT)
+
+copyops
+	cp_copyin
+	cp_xcopyin
+	cp_copyout
+	cp_xcopyout
+	cp_copyinstr
+	cp_copyoutstr
+	cp_fuword8
+	cp_fuword16
+	cp_fuword32
+	cp_fuword64
+	cp_suword8
+	cp_suword16
+	cp_suword32
+	cp_suword64
+	cp_physio

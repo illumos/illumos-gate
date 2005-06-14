@@ -1,0 +1,172 @@
+<!--
+  -- ident	"%Z%%M%	%I%	%E% SMI"
+  --
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License, Version 1.0 only
+    (the "License").  You may not use this file except in compliance
+    with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+
+  -- Copyright (c) 2000-2001 by Sun Microsystems, Inc.
+  -- All rights reserved.
+  -->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+
+<head>
+<title>DHCP Manager Help: Data Store Conversion</title>
+<meta NAME="AUTHOR" CONTENT="smorgan">
+<meta NAME="KEYWORDS" CONTENT="DHCP">
+
+</head>
+
+<body bgcolor="#ffffff">
+
+<a name="top"></a>
+
+<table border=0 cellspacing=0 cellpadding=0 width=625>
+
+
+<!-- Start navigation banner -->
+
+<tr><td colspan=4  WIDTH="615" align="left" valign="top"><IMG SRC="art/bannersmc.gif" WIDTH=615 BORDER=0 ALT="DHCP Manager Help">
+
+	</td>
+	</tr>
+
+<!-- End navigation banner -->
+
+
+<tr>
+
+<!-- Start contents block -->
+
+	<td colspan=1 valign="top" WIDTH="105">
+	<P>&nbsp;</P>
+	<STRONG><A HREF="dhcp_main_top.html">Overview</A></STRONG><P>
+	<STRONG><A HREF="dhcp_relay_ref.html">Servers and Relays</A></STRONG><BR>
+		&nbsp;&nbsp;<A HREF="dhcp_config_wiz.html">DHCP 
+Config</a><BR> 
+        &nbsp;&nbsp;<A HREF="dhcp_relay_config.html">BOOTP Relay Config</A><BR>
+        &nbsp;&nbsp;<A HREF="dhcp_net_wiz.html">Network Config</A><BR>
+        &nbsp;&nbsp;<A HREF="dhcp_server_serv.html">Modify DHCP Service</A><BR>
+        &nbsp;&nbsp;<A HREF="dhcp_relay_serv.html">Modify BOOTP Service</A><br>
+    
+       &nbsp;&nbsp;<A HREF="dhcp_export_wiz.html">Export Config Data</A><br>      
+ &nbsp;&nbsp;<A HREF="dhcp_import_wiz.html">Import Config Data</A> <BR>
+   <IMG SRC="art/tip2.gif" WIDTH=12 HEIGHT=10 BORDER=0 ALT=""><A HREF="dhcp_convert_wiz.html">Convert Data Store</A><br><P><A HREF="dhcp_addr_ref.html"><STRONG>Addresses</STRONG></A><P>
+	<A HREF="dhcp_macro_ref.html"><STRONG>Macros</STRONG></A><P>
+	<A HREF="dhcp_option_ref.html"><STRONG>Options</STRONG></A><P>		
+	<A HREF="dhcp_main_how.html"><STRONG>How To...</STRONG></A><P>
+	<A HREF="dhcp_main_menus.html"><STRONG>Menus</STRONG></A><P>
+<A HREF="dhcp_main_idx.html"><STRONG>Index</STRONG></A>
+	
+		</td>
+	
+<!-- End contents block -->
+
+<!-- Start column rule -->
+
+	<td colspan=1 width=5 bgcolor="#CCCCCC">&nbsp;</td>
+
+<!-- End column spacer -->
+
+<!-- Start column spacer -->
+
+	<td colspan=1 width=10 bgcolor="#FFFFFF">&nbsp;</td>
+
+<!-- End column spacer -->
+
+
+
+<!-- Start topic block -->
+
+<td colspan=1 valign="top" bgcolor="#ffffff" width="495">
+<P>&nbsp;</P>
+
+
+<H1>Data Store Conversion</H1>
+
+The Data Store Conversion wizard enables you to convert the Solaris DHCP data store from one format to another.   Choose Convert Data Store from the Services menu to start the wizard.
+<P>
+The Data Store Conversion wizard asks you to supply the following information.
+<P><HR NOSHADE><P>
+
+<table border=0 cellspacing=4 cellpadding=3 width=490>
+	<tr>
+	<td width=125 valign="top"><A NAME="store"><STRONG>Data storage type</STRONG></A><br>
+	</td>
+	<td valign="top">Select the new data store type you want to use. 
+	<P>
+	Text files are recommended if you are serving a small number of
+	DHCP clients, less than 10,000. 
+	
+	<P>Binary files are recommended in sites having a very large number
+	of clients and no sharing is required among DHCP servers.
+	
+	<P>NIS+ is recommended if you are already using NIS+ for name service,
+	and if you have an environment with multiple DHCP servers, so that the
+	information can be shared by all the DHCP servers in the NIS+ domain. 
+	<P>
+<STRONG>Note:</STRONG> If the server is not already configured as a NIS+ client, you cannot select the NIS+ option.  To use NIS+ for the data store, cancel the wizard, configure the server as a NIS+ client, and run DHCP Manager again.
+
+	</td> 		
+	</tr>
+	<tr>
+	<td width=125 valign="top"><A NAME="path"><STRONG>Configure data store</STRONG></A><br>
+	</td>
+	<td valign="top">The information requested here varies according to the data store chosen.
+	If you selected text files or binary files, enter the path to the 
+	data (<tt>/var/dhcp</tt> is the default). If you use NIS+, enter the domain 
+	of the NIS+ server (this server's domain is the default). <p> 
+	
+	</td> 
+	</tr>
+	
+	<tr>
+	<td width=125 valign="top"><A NAME="save"><STRONG>Save old tables</STRONG></A></td>
+	<td valign="top">By default, the DHCP tables that the server had been using before the
+conversion are deleted after it is determined that the conversion was successful.  If you 
+do not want the tables to be deleted, select Save old tables.  Note that if a problem occurs during the conversion,
+the tables will not be deleted even if you did not elect to save the tables.<p>
+	
+	</td> 	
+
+	</tr>
+	<TR><TD COLSPAN="2">&nbsp;&nbsp;&nbsp;<A HREF="#top"><small>return to top</small></A></TD></TR>
+
+	</table>
+
+
+</table>
+
+
+
+<!-- Don't go past this line! -->
+
+	</td>
+
+<!-- End topic block -->
+
+</tr>
+
+</table>
+
+<!-- End topic table -->
+
+</body>
+</html>

@@ -1,0 +1,281 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lib/libbsm/Makefile
+#
+
+include ../../Makefile.master
+include ../Makefile.lib
+
+SUBDIRS=	spec .WAIT $(MACH) $(BUILD64) $(MACH64)
+
+XGETFLAGS_ADT += -a
+
+all :=		TARGET= all
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+delete :=	TARGET= delete
+install :=	TARGET= install
+lint :=		TARGET= lint
+package :=	TARGET= package
+
+.KEEP_STATE:
+
+all clean clobber delete install lint package: $(SUBDIRS)
+
+OBJECTS=	adr.o \
+		adrf.o \
+		adrm.o \
+		adt.o \
+		adt_token.o \
+		adt_xlate.o \
+		au_open.o \
+		au_preselect.o \
+		au_to.o \
+		au_usermask.o \
+		audit_allocate.o \
+		audit_class.o \
+		audit_cron.o \
+		audit_crontab.o \
+		audit_at.o \
+		audit_event.o \
+		audit_ftpd.o \
+		audit_halt.o \
+		audit_inetd.o \
+		audit_kadmind.o \
+		audit_krb5kdc.o \
+		audit_login.o \
+		audit_mountd.o \
+		audit_mgrs.o \
+		audit_newgrp.o \
+		audit_plugin.o \
+		audit_reboot.o \
+		audit_rexd.o \
+		audit_rexecd.o \
+		audit_rshd.o \
+		audit_settid.o \
+		audit_shutdown.o \
+		audit_su.o \
+		audit_uadmin.o \
+		audit_user.o \
+		bsm.o \
+		generic.o \
+		getacinfo.o \
+		getacval.o \
+		getauditflags.o \
+		getdaent.o \
+		getdment.o \
+		getfaudflgs.o
+
+COMMONDIR = common
+
+#
+# Macros for libbsm header files. These define user-level only interfaces.
+#
+GENHDRS = audit_uevents.h
+HDRS = libbsm.h devices.h adt.h adt_event.h audit_private.h
+COMMONHDRS =	$(HDRS:%=$(COMMONDIR)/%)
+ROOTHDRDIR = 	$(ROOT)/usr/include/bsm
+ROOTCHDRS = 	$(HDRS:%=$(ROOTHDRDIR)/%)
+ROOTHDRS = 	$(GENHDRS:%=$(ROOTHDRDIR)/%)
+
+CHECKCHDRS =	$(COMMONHDRS:%.h=%.check)
+CHECKHDRS =	$(GENHDRS:%.h=%.check)
+
+$(ROOTHDRS) := 	FILEMODE = 0644
+$(ROOTCHDRS) :=	FILEMODE = 0644
+
+#
+# Macros for libbsm database files. These should probably be installed
+# from somewhere else. Until we find that better place, install them
+# from here.
+#
+
+ROOTETCSECURITY = 	$(ROOT)/etc/security
+$(ROOTETCSECURITY) := 	DIRMODE = 0755
+$(ROOTETCSECURITY) := 	OWNER = root
+$(ROOTETCSECURITY) := 	GROUP = sys
+
+ESFILES =		audit_class audit_event
+ESSRC =			$(ESFILES:%=%.txt)
+ETCSECURITYFILES =	$(ESFILES:%=$(ROOTETCSECURITY)/%)
+$(ETCSECURITYFILES) :=	FILEMODE = 0644
+$(ETCSECURITYFILES) :=	OWNER = root
+$(ETCSECURITYFILES) :=	GROUP = sys
+
+EESFILES =		audit_startup
+EESSRC =		$(EESFILES:%=%.txt)
+EETCSECURITYFILES =	$(EESFILES:%=$(ROOTETCSECURITY)/%)
+$(EETCSECURITYFILES) :=	FILEMODE = 0744
+$(EETCSECURITYFILES) :=	OWNER = root
+$(EETCSECURITYFILES) :=	GROUP = sys
+
+RESFILES = 		audit_control audit_user
+RESSRC =		$(RESFILES:%=%.txt)
+ROOTETCSECURITYFILES =	$(RESFILES:%=$(ROOTETCSECURITY)/%)
+$(ROOTETCSECURITYFILES) := FILEMODE = 0640
+$(ROOTETCSECURITYFILES) := OWNER = root
+$(ROOTETCSECURITYFILES) := GROUP = sys
+
+#
+# /etc/security/audit/localhost/files is a symbolic link to /var/audit.
+# This is provided so that auditreduce will work in the default configuration.
+#
+RESA=$(ROOTETCSECURITY)/audit
+RESAL=$(RESA)/localhost
+VARAUDIT=$(ROOT)/var/audit
+AUDITDIRS=$(RESA) $(RESAL) $(VARAUDIT)
+$(AUDITDIRS) := FILEMODE = 0750
+$(AUDITDIRS) := OWNER = root
+$(AUDITDIRS) := GROUP = sys
+
+ARSYMLNK=$(RESAL)/files
+
+#
+# message catalogue file
+#
+TEXT_DOMAIN= SUNW_OST_OSLIB
+POFILE= libbsm.po
+CATALOG=libbsm.po
+POFILES= $(OBJECTS:%.o=%.po)
+
+#
+# Definitions for XML (DTD AND XSL)
+#
+DTD =		adt_record.dtd.1
+XSL =		adt_record.xsl.1
+ROOTXMLDIR =	$(ROOT)/usr/share/lib/xml
+ROOTDTDDIR=	$(ROOTXMLDIR)/dtd
+ROOTXSLDIR=	$(ROOTXMLDIR)/style
+ROOTDTD=	$(DTD:%=$(ROOTDTDDIR)/%)
+ROOTXSL=	$(XSL:%=$(ROOTXSLDIR)/%)
+ROOTXMLDIRS =	$(ROOTXMLDIR) $(ROOTDTDDIR) $(ROOTXSLDIR)
+ROOTXMLFILES =	$(ROOTDTD) $(ROOTXSL)
+
+$(ROOTXMLDIRS) :=  FILEMODE = 755
+$(ROOTXMLDIRS) :=  OWNER = root
+$(ROOTXMLDIRS) :=  GROUP = sys
+
+$(ROOTXMLFILES) :=  FILEMODE = 444
+$(ROOTXMLFILES) :=  OWNER = root
+$(ROOTXMLFILES) :=  GROUP = bin
+
+
+CPPFLAGS += -I$(COMMONDIR)
+CPPFLAGS += -D_REENTRANT
+
+.KEEP_STATE:
+
+install: install_dirs install_data
+
+#		$(ROOTUSRLIB) $(ROOTLIBS) $(ROOTLINKS)
+
+install_h: $(ROOTHDRDIR) $(ROOTHDRS) $(ROOTCHDRS)
+
+check:	$(CHECKHDRS) $(CHECKCHDRS)
+
+install_data: $(ESSRC) $(RESSRC) $(ROOTETCSECURITY) $(ETCSECURITYFILES) \
+	$(EETCSECURITYFILES) $(ROOTETCSECURITYFILES) $(ROOTXMLFILES)
+
+install_dirs: $(AUDITDIRS) $(ARSYMLNK) $(ROOTXMLDIRS)
+
+audit_uevents.h: mkhdr.sh audit_event.txt
+	sh mkhdr.sh
+
+$(ETCSECURITYFILES) $(EETCSECURITYFILES) $(ROOTETCSECURITYFILES) $(RESA): \
+	$(ETCSECURITY) \
+	$(ROOTETCSECURITY)
+
+$(RESAL): $(RESA)
+
+$(ARSYMLNK): $(RESAL)
+
+$(ROOTHDRDIR):
+	$(INS.dir)
+
+$(ROOTHDRDIR)/%:%
+	$(INS.file)
+
+$(ROOTHDRDIR)/%:$(COMMONDIR)/%
+	$(INS.file)
+
+$(ROOTXMLDIRS):
+	$(INS.dir)
+
+$(ROOTDTDDIR)/% $(ROOTXSLDIR)/%: %
+	$(INS.file)
+
+$(AUDITDIRS):
+	$(INS.dir)
+
+$(ARSYMLNK): 
+	$(RM) $@
+	$(SYMLINK) ../../../../var/audit $@
+
+$(ETCSECURITY)/%: %.txt
+	$(INS.rename)
+
+$(ROOTETCSECURITY):
+	$(INS.dir)
+
+$(ROOTETCSECURITY)/%: %.txt
+	$(INS.rename)
+
+%.po: $(COMMONDIR)/%.c
+	$(COMPILE.cpp) $<  > $<.i
+	$(BUILD.po)
+
+_msg: $(MSGDOMAIN) $(POFILE)
+	$(RM) $(MSGDOMAIN)/$(CATALOG)
+	$(CP) $(POFILE) $(MSGDOMAIN)
+
+catalog: _msg
+
+po_clean:
+	$(RM) $(POFILES) $(POFILE)
+
+clobber: po_clean
+
+$(POFILE): .WAIT $(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
+
+# has strings but doesn't use gettext
+adt_xlate.po: $(COMMONDIR)/adt_xlate.c
+	$(RM) adt_xlate.po
+	$(XGETTEXT) $(XGETFLAGS_ADT) $(COMMONDIR)/adt_xlate.c
+	$(SED) "/^domain/d" < messages.po > adt_xlate.po
+	$(RM) messages.po
+
+$(MSGDOMAIN):
+	$(INS.dir)
+
+
+spec $(MACH) $(MACH64) :	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

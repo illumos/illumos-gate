@@ -1,0 +1,35 @@
+
+The Preferences Menu enables you to customize certain aspects of FACE
+and the Office. 
+
+The items on the Preferences Menu are:
+
+      Change Password:  Allows you to change the password for your 
+      login on this machine.  If you select this item and then do
+      not wish to change your password, press DELETE or BREAK on
+      your keyboard to abort the password change operation.
+
+      Color Attributes:  Changes the color of screen attributes for
+      color terminals.  This menu item only appears if your are using
+      AT&T FACE on a terminal that is capable of displaying colors.
+
+      Display Frames:  Enables you to specify up to four frames to be
+      automatically displayed when you log in to FACE.
+
+      File Permissions:  Sets new file permissions for all new file
+      folders and files created in your Filecabinet and WASTEBASKET.
+
+         NOTE: If you change the value (Yes or No) in this field,
+         only files and file folders that you create after you save
+         this form will be affected. Read permission for files and
+         file folders currently in your Filecabinet and WASTEBASKET
+         are not changed.  To change permissions on files and file
+         folders that currently exist, use the security command.
+
+      Office Functions:  Customize features of the Office such as the
+      amount of time objects remain in the WASTEBASKET before they are
+      removed, specifying a default editor, the format in which your
+      folders are displayed, whether or not a confirmation frame is
+      posted when you exit FACE and whether or not FACE is invoked 
+      automatically when you login to this computer.
+

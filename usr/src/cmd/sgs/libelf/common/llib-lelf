@@ -1,0 +1,186 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/* LINTLIBRARY */
+/* PROTOLIB1 */
+
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved. 
+ * Use is subject to license terms.
+ */ 
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Generic interface definition for usr/src/lib/libelf.
+ */
+
+#include <libelf.h>
+#include <gelf.h>
+#include <nlist.h>
+
+
+/*
+ * Elf32 Symbols
+ */
+size_t		elf32_fsize(Elf_Type, size_t, uint_t);
+size_t		_elf32_fsize(Elf_Type, size_t, uint_t);
+Elf32_Ehdr *	elf32_getehdr(Elf *);
+Elf32_Ehdr *	_elf32_getehdr(Elf *);
+Elf32_Phdr *	elf32_getphdr(Elf *);
+Elf32_Phdr *	_elf32_getphdr(Elf *);
+Elf32_Shdr *	elf32_getshdr(Elf_Scn *);
+Elf32_Shdr *	_elf32_getshdr(Elf_Scn *);
+Elf32_Ehdr *	elf32_newehdr(Elf *);
+Elf32_Ehdr *	_elf32_newehdr(Elf *);
+Elf32_Phdr *	elf32_newphdr(Elf *, size_t);
+Elf32_Phdr *	_elf32_newphdr(Elf *, size_t);
+Elf_Data *	elf32_xlatetof(Elf_Data *, const Elf_Data *, uint_t);
+Elf_Data *	_elf32_xlatetof(Elf_Data *, const Elf_Data *, uint_t);
+Elf_Data *	elf32_xlatetom(Elf_Data *, const Elf_Data *, uint_t);
+Elf_Data *	_elf32_xlatetom(Elf_Data *, const Elf_Data *, uint_t);
+
+
+/*
+ * Elf64 Symbols
+ */
+size_t		elf64_fsize(Elf_Type, size_t, uint_t);
+Elf64_Ehdr *	elf64_getehdr(Elf *);
+Elf64_Phdr *	elf64_getphdr(Elf *);
+Elf64_Shdr *	elf64_getshdr(Elf_Scn *);
+Elf64_Ehdr *	elf64_newehdr(Elf *);
+Elf64_Phdr *	elf64_newphdr(Elf *, size_t);
+Elf_Data *	elf64_xlatetof(Elf_Data *, const Elf_Data *, uint_t);
+Elf_Data *	elf64_xlatetom(Elf_Data *, const Elf_Data *, uint_t);
+
+
+/*
+ * GElf Symbols
+ */
+size_t		gelf_fsize(Elf *, Elf_Type, size_t, uint_t);
+int		gelf_getclass(Elf *);
+GElf_Ehdr *	gelf_getehdr(Elf *, GElf_Ehdr *);
+int		gelf_update_ehdr(Elf *, GElf_Ehdr *);
+ulong_t		gelf_newehdr(Elf *, int);
+GElf_Phdr *	gelf_getphdr(Elf *, int, GElf_Phdr *);
+int		gelf_update_phdr(Elf *, int, GElf_Phdr *);
+ulong_t		gelf_newphdr(Elf *, size_t);
+GElf_Shdr *	gelf_getshdr(Elf_Scn *,  GElf_Shdr *);
+int		gelf_update_shdr(Elf_Scn *, GElf_Shdr *);
+Elf_Data *	gelf_xlatetof(Elf *, Elf_Data *, const Elf_Data *, uint_t);
+Elf_Data *	gelf_xlatetom(Elf *, Elf_Data *, const Elf_Data *, uint_t);
+GElf_Sym *	gelf_getsym(Elf_Data *, int, GElf_Sym *);
+int		gelf_update_sym(Elf_Data *, int, GElf_Sym *);
+GElf_Syminfo *	gelf_getsyminfo(Elf_Data *, int, GElf_Syminfo *);
+int		gelf_update_syminfo(Elf_Data *, int, GElf_Syminfo *);
+GElf_Sym *	gelf_getsymshndx(Elf_Data *, Elf_Data *, int, GElf_Sym *,
+		    Elf32_Word *);
+int		gelf_update_symshndx(Elf_Data *, Elf_Data *, int, GElf_Sym *,
+		    Elf32_Word);
+GElf_Move *	gelf_getmove(Elf_Data *, int, GElf_Move *);
+int		gelf_update_move(Elf_Data *, int, GElf_Move *);
+GElf_Dyn *	gelf_getdyn(Elf_Data *, int, GElf_Dyn *);
+int		gelf_update_dyn(Elf_Data *, int, GElf_Dyn *);
+GElf_Rela *	gelf_getrela(Elf_Data *, int, GElf_Rela *);
+int		gelf_update_rela(Elf_Data *, int, GElf_Rela *);
+GElf_Rel *	gelf_getrel(Elf_Data *, int, GElf_Rel *);
+int		gelf_update_rel(Elf_Data *, int, GElf_Rel *);
+GElf_Cap *	gelf_getcap(Elf_Data *, int, GElf_Cap *);
+int		gelf_update_cap(Elf_Data *, int, GElf_Cap *);
+
+
+/*
+ * Class-Independent Elf Symbols
+ */
+Elf *		elf_begin(int, Elf_Cmd, Elf *);
+Elf *		_elf_begin(int, Elf_Cmd, Elf *);
+int		elf_cntl(Elf *, Elf_Cmd);
+int		_elf_cntl(Elf *, Elf_Cmd);
+int		elf_end(Elf *);
+int		_elf_end(Elf *);
+const char *	elf_errmsg(int);
+const char *	_elf_errmsg(int);
+int		elf_errno(void);
+int		_elf_errno(void);
+void		elf_fill(int);
+void		_elf_fill(int);
+uint_t		elf_flagdata(Elf_Data *, Elf_Cmd, uint_t);
+uint_t		_elf_flagdata(Elf_Data *, Elf_Cmd, uint_t);
+uint_t		elf_flagehdr(Elf *, Elf_Cmd,  uint_t);
+uint_t		_elf_flagehdr(Elf *, Elf_Cmd,  uint_t);
+uint_t		elf_flagelf(Elf *, Elf_Cmd,  uint_t);
+uint_t		_elf_flagelf(Elf *, Elf_Cmd,  uint_t);
+uint_t		elf_flagphdr(Elf *, Elf_Cmd,  uint_t);
+uint_t		_elf_flagphdr(Elf *, Elf_Cmd,  uint_t);
+uint_t		elf_flagscn(Elf_Scn *, Elf_Cmd, uint_t);
+uint_t		_elf_flagscn(Elf_Scn *, Elf_Cmd, uint_t);
+uint_t		elf_flagshdr(Elf_Scn *, Elf_Cmd, uint_t);
+uint_t		_elf_flagshdr(Elf_Scn *, Elf_Cmd, uint_t);
+Elf_Arhdr *	elf_getarhdr(Elf *);
+Elf_Arhdr *	_elf_getarhdr(Elf *);
+Elf_Arsym *	elf_getarsym(Elf *, size_t *);
+Elf_Arsym *	_elf_getarsym(Elf *, size_t *);
+off_t		elf_getbase(Elf *);
+off_t		_elf_getbase(Elf *);
+Elf_Data *	elf_getdata(Elf_Scn *, Elf_Data *);
+Elf_Data *	_elf_getdata(Elf_Scn *, Elf_Data *);
+char *		elf_getident(Elf *, size_t *);
+char *		_elf_getident(Elf *, size_t *);
+int		elf_getshnum(Elf *, size_t *);
+int		elf_getshstrndx(Elf *, size_t *);
+Elf_Scn *	elf_getscn(Elf *elf, size_t);
+Elf_Scn *	_elf_getscn(Elf *elf, size_t);
+ulong_t		elf_hash(const char *);
+ulong_t		_elf_hash(const char *);
+Elf_Kind	elf_kind(Elf *);
+Elf_Kind	_elf_kind(Elf *);
+Elf *		elf_memory(char *, size_t);
+Elf *		_elf_memory(char *, size_t);
+size_t		elf_ndxscn(Elf_Scn *);
+size_t		_elf_ndxscn(Elf_Scn *);
+Elf_Data *	elf_newdata(Elf_Scn *);
+Elf_Data *	_elf_newdata(Elf_Scn *);
+Elf_Scn *	elf_newscn(Elf *);
+Elf_Scn *	_elf_newscn(Elf *);
+Elf_Cmd		elf_next(Elf *);
+Elf_Cmd		_elf_next(Elf *);
+Elf_Scn *	elf_nextscn(Elf *, Elf_Scn *);
+Elf_Scn *	_elf_nextscn(Elf *, Elf_Scn *);
+size_t		_elf_outsync(int, char *, size_t, uint_t);
+size_t		elf_rand(Elf *, size_t);
+size_t		_elf_rand(Elf *, size_t);
+Elf_Data *	elf_rawdata(Elf_Scn *, Elf_Data *);
+Elf_Data *	_elf_rawdata(Elf_Scn *, Elf_Data *);
+char *		elf_rawfile(Elf *, size_t *);
+char *		_elf_rawfile(Elf *, size_t *);
+char *		elf_strptr(Elf *, size_t, size_t);
+char *		_elf_strptr(Elf *, size_t, size_t);
+off_t		elf_update(Elf *, Elf_Cmd);
+off_t		_elf_update(Elf *, Elf_Cmd);
+uint_t		elf_version(uint_t);
+uint_t		_elf_version(uint_t);
+int		nlist(const char *, struct nlist *);
+
+
+/*
+ * Private Symbols
+ */
+Elf64_Off	_elf_getxoff(Elf_Data *);

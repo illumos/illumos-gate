@@ -1,0 +1,97 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# General-purpose messages
+#
+msgid "syslog-msgs-message-template"
+msgstr "SUNW-MSG-ID: %s, TYPE: %s, VER: 1, SEVERITY: %s\nEVENT-TIME: %s\nPLATFORM: %s, CSN: %s, HOSTNAME: %s\nSOURCE: %s, REV: %s\nEVENT-ID: %s\nDESC: %s\nAUTO-RESPONSE: %s\nIMPACT: %s\nREC-ACTION: %s\n"
+#
+# Fault-related messages
+#
+#
+# code: FMD-8000-0W
+# keys: defect.sunos.fmd.nosub
+#
+msgid "FMD-8000-0W.type"
+msgstr "Defect"
+msgid "FMD-8000-0W.severity"
+msgstr "Minor"
+msgid "FMD-8000-0W.description"
+msgstr "The Solaris Fault Manager received an event from a component to which no automated diagnosis software is currently subscribed. Refer to %s for more information."
+msgid "FMD-8000-0W.response"
+msgstr "Error reports from the component will be logged for examination by Sun."
+msgid "FMD-8000-0W.impact"
+msgstr "Automated diagnosis and response for these events will not occur."
+msgid "FMD-8000-0W.action"
+msgstr "Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly.  Contact Sun for support."
+#
+# code: FMD-8000-11
+# keys: defect.sunos.fmd.nodiagcode
+#
+msgid "FMD-8000-11.type"
+msgstr "Defect"
+msgid "FMD-8000-11.severity"
+msgstr "Minor"
+msgid "FMD-8000-11.description"
+msgstr "A Solaris Fault Manager component generated a diagnosis for which no message summary exists. Refer to %s for more information."
+msgid "FMD-8000-11.response"
+msgstr "The diagnosis has been saved in the fault log for examination by Sun."
+msgid "FMD-8000-11.impact"
+msgstr "The fault log will need to be manually examined using fmdump(1M) in order to determine if any human response is required."
+msgid "FMD-8000-11.action"
+msgstr "Use fmdump -v -u <EVENT-ID> to view the diagnosis result.  Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly."
+#
+# code: FMD-8000-2K
+# keys: defect.sunos.fmd.module
+#
+msgid "FMD-8000-2K.type"
+msgstr "Defect"
+msgid "FMD-8000-2K.severity"
+msgstr "Minor"
+msgid "FMD-8000-2K.description"
+msgstr "A Solaris Fault Manager component has experienced an error that required the module to be disabled.  Refer to %s for more information."
+msgid "FMD-8000-2K.response"
+msgstr "The module has been disabled.  Events destined for the module will be saved for manual diagnosis."
+msgid "FMD-8000-2K.impact"
+msgstr "Automated diagnosis and response for subsequent events associated with this module will not occur."
+msgid "FMD-8000-2K.action"
+msgstr "Use fmdump -v -u <EVENT-ID> to locate the module.  Use fmadm reset <module> to reset the module."
+#
+# code: FMD-8000-3F
+# keys: defect.sunos.fmd.config
+#
+msgid "FMD-8000-3F.type"
+msgstr "Defect"
+msgid "FMD-8000-3F.severity"
+msgstr "Minor"
+msgid "FMD-8000-3F.description"
+msgstr "A Solaris Fault Manager component could not load because of an error in its configuration file.  Refer to %s for more information."
+msgid "FMD-8000-3F.response"
+msgstr "The module has been disabled.  Events destined for the module will be saved for manual diagnosis."
+msgid "FMD-8000-3F.impact"
+msgstr "Automated diagnosis and response for subsequent events associated with this module will not occur."
+msgid "FMD-8000-3F.action"
+msgstr "Use fmdump -v -u <EVENT-ID> to locate the module.  Use fmadm load <module> to load the module after repairing its configuration."

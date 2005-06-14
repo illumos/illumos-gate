@@ -1,0 +1,119 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+NETYPPROG =	rpc.yppasswdd # pwconv passmgmt
+DFLTSRC =	yppasswdd.dfl
+PROG =		$(NETYPPROG)
+
+MANIFEST = passwd.xml
+
+include ../../Makefile.cmd
+
+ROOTMANIFESTDIR = $(ROOTSVCNETWORKNIS)
+
+#installed directories
+RPCSVC=		$(ROOT)/usr/include/rpcsvc
+NETSVC =	$(ROOTLIB)/netsvc
+NETYP =		$(NETSVC)/yp
+DFLTDIR = 	$(ROOTETC)/default
+ROOTDIRS =	$(NETSVC) $(NETYP) $(ROOTETC) $(DFLTDIR)
+
+# include library definitions
+#LDLIBS +=	-lrpcsvc -lnsl -lcrypt -lintl -lgen
+LDLIBS +=	-lnsl -lcmd -lc -lnisdb
+
+# Pick up includes from library
+CPPFLAGS += -I$(SRC)/lib/libnisdb/yptol
+
+# This file is now in the $(SRC)/head/rpcsvc directory.
+#HDRFILE= yppasswd.h
+#IHDRFILE= $(HDRFILE:%=$(RPCSVC)/%)
+
+INETYPPROG=		$(NETYPPROG:%=$(NETYP)/%)
+ETCDFLTFILE=		$(NETYPPROG:rpc.%=$(DFLTDIR)/%)
+
+COMMONOBJ =		yppasswdxdr.o yplckpwdf.o
+RPCYPPASSWDDOBJ =	yppasswdd.o changepasswd.o
+#YPPWCONVOBJ = 		pwconv.o
+#YPPASSMGMTOBJ =		passmgmt.o
+
+#
+# Objects shared between all the major components
+#
+SHAREDOBJ= ../shared/utils.o ../shared/lockmap.o ../shared/ancil.o
+
+OBJS = 			$(RPCYPPASSWDDOBJ) \
+			$(COMMONOBJ)
+			# $(YPPWCONVOBJ) $(YPPASSMGMTOBJ)
+
+SRCS =			$(OBJS:%.o=%.c)
+
+#conditional assignments
+$(INETSVC)   := GROUP=bin
+$(INETSVC)   := FILEMODE=555
+
+$(ETCDFLTFILE) := GROUP=sys
+$(ETCDFLTFILE) := FILEMODE=0444
+
+$(ROOTMANIFEST) := FILEMODE = 0444
+
+#install rules
+
+.KEEP_STATE:
+
+all: $(PROG)
+
+rpc.yppasswdd: $(RPCYPPASSWDDOBJ) $(COMMONOBJ) 
+	$(LINK.cc) -o $@ $(RPCYPPASSWDDOBJ) \
+	$(SHAREDOBJ) $(COMMONOBJ) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTDIRS) $(IBINPROG) $(INETYPPROG) $(ETCDFLTFILE) \
+	$(ROOTMANIFEST)
+
+$(ROOTDIRS):
+	$(INS.dir)
+
+$(NETYP)/%: %
+	$(INS.file)
+
+$(DFLTDIR)/% : %.dfl
+	$(INS.rename)
+
+clean:
+	$(RM) $(OBJS)
+
+lint:	lint_SRCS
+
+check: $(CHKMANIFEST)
+
+cstyle:
+	${CSTYLE} ${SRCS}
+
+# include library targets
+include ../../Makefile.targ

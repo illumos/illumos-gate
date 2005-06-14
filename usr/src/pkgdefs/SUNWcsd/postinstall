@@ -1,0 +1,352 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+PATH="/usr/bin:/usr/sbin:$PATH"; export PATH
+
+#
+# SUNWcsd postinstall configuration
+#
+# To address various limitations of the packaging system with respect to
+# driver files, we provide a somewhat improved system within this script.
+# Driver file entries which must be created on the target system because
+# they are needed BEFORE drvconfig runs on the subsequent re-configuration
+# boot are added to the $prototype_* variable definitions below.  This script
+# processes these maps, creating driver nodes and symbolic links, and
+# updating the software database as necessary.
+#
+# DO NOT add entries for drivers which are not needed before drvconfig runs
+# DO NOT copy any of this code to any other package script, OS/Net or otherwise
+# DO NOT hardcode minor numbers for clone drivers (use the driver name instead)
+#
+# The prototype_com, prototype_sparc, and prototype_i386 variables defined
+# below each consist of five whitespace-delimited columns, defined as follows:
+#
+# 1. Device Type - The single character 'b' (for block device) or 'c' (for
+# character device).  Used as an argument to installf(1M) and mknod(1M).
+#
+# 2. Device Path - Relative (should NOT begin with /) path to the device file
+# to be created.  This base is interpreted relative to $BASEDIR (typically /a).
+#
+# 3. Driver Name - The name of the driver which should be used to determine
+# the major number for the device file.  This name should match the name of
+# a driver previously added to $BASEDIR/etc/name_to_major via add_drv.
+#
+# 4. Minor Number - The minor number for the device file.  If the minor number
+# is a sequence of digits, this literal minor number is used as the argument
+# to mknod(1M).  If it contains any non-digit characters, it is presumed to
+# be the name of a driver, and the corresponding major number from the
+# name_to_major file is substituted instead.  This is useful for clone entries.
+#
+# 5. Symbolic Link - The symlink to the device path which should be created.
+# This field may be left blank if no symlink is needed; if multiple links to
+# the same device are required, entries may be repeated with different links.
+# The link should be a relative path to which $BASEDIR can be prepended.
+#
+# Following its creation, the driver entry is assigned permissions and
+# ownership according to the first matching entry in $BASEDIR/etc/minor_perm.
+# This script uses the same algorithm as drvconfig(1M) to match minor_perm
+# entries.  If no matching minor_perm entry is found, mode 0600, owner "root",
+# and group "sys" is assigned.
+#
+
+#
+# Common driver entries:
+#
+prototype_com='
+c devices/pseudo/arp@0:arp              arp             0       dev/arp
+c devices/pseudo/clone@0:ibd            clone           ibd     dev/ibd
+c devices/pseudo/icmp@0:icmp            icmp            0       dev/icmp
+c devices/pseudo/icmp@0:icmp            icmp            0       dev/rawip
+c devices/pseudo/icmp6@0:icmp6          icmp6           1       dev/icmp6
+c devices/pseudo/icmp6@0:icmp6          icmp6           1       dev/rawip6
+c devices/pseudo/ip@0:ip                ip              0       dev/ip
+c devices/pseudo/ip6@0:ip6              ip6             1       dev/ip6
+c devices/pseudo/rts@0:rts              rts             0       dev/rts
+c devices/pseudo/tcp@0:tcp              tcp             2       dev/tcp
+c devices/pseudo/tcp6@0:tcp6            tcp6            3       dev/tcp6
+c devices/pseudo/udp@0:udp              udp             0       dev/udp
+c devices/pseudo/udp6@0:udp6            udp6            1       dev/udp6
+c devices/pseudo/ipsecah@0:ipsecah      ipsecah         1       dev/ipsecah
+c devices/pseudo/ipsecesp@0:ipsecesp    ipsecesp        1       dev/ipsecesp
+c devices/pseudo/keysock@0:keysock      keysock         0       dev/keysock
+c devices/pseudo/cn@0:console           cn              0       dev/console
+c devices/pseudo/cn@0:syscon            cn              0       dev/syscon
+c devices/pseudo/cn@0:systty            cn              0       dev/systty
+c devices/pseudo/devinfo@0:devinfo      devinfo         0
+c devices/pseudo/ksyms@0:ksyms          ksyms           0       dev/ksyms
+c devices/pseudo/log@0:conslog          log             0       dev/conslog
+c devices/pseudo/log@0:log              log             5       dev/log
+c devices/pseudo/mm@0:mem               mm              0       dev/mem
+c devices/pseudo/mm@0:kmem              mm              1       dev/kmem
+c devices/pseudo/mm@0:null              mm              2       dev/null
+c devices/pseudo/mm@0:allkmem           mm              3       dev/allkmem
+c devices/pseudo/mm@0:zero              mm              12      dev/zero
+c devices/pseudo/openeepr@0:openprom    openeepr        0       dev/openprom
+c devices/pseudo/sad@0:admin            sad             1       dev/sad/admin
+c devices/pseudo/sad@0:user             sad             0       dev/sad/user
+c devices/pseudo/sy@0:tty               sy              0       dev/tty
+c devices/pseudo/sysevent@0:sysevent	sysevent	0       dev/sysevent
+c devices/pseudo/sysmsg@0:msglog        sysmsg          1       dev/msglog
+c devices/pseudo/sysmsg@0:sysmsg        sysmsg          0       dev/sysmsg
+c devices/pseudo/tl@0:ticots            tl              0       dev/ticots
+c devices/pseudo/tl@0:ticotsord         tl              1       dev/ticotsord
+c devices/pseudo/tl@0:ticlts            tl              2       dev/ticlts
+c devices/pseudo/wc@0:wscons            wc              0       dev/wscons
+'
+
+#
+# SPARC-specific driver entries:
+#
+prototype_sparc='
+c devices/pseudo/clone@0:eri            clone           eri     dev/eri
+c devices/pseudo/clone@0:hme            clone           hme     dev/hme
+c devices/pseudo/cvc@0:cvc              cvc             0
+c devices/pseudo/cvcredir@0:cvcredir    cvcredir        0
+'
+
+#
+# Intel-specific driver entries:
+#
+prototype_i386='
+c devices/pseudo/conskbd@0:kbd          conskbd         0       dev/kbd
+'
+
+#
+# SUNWcsd postinstall implementation
+#
+# Below this point is the code to process the above $prototype_* maps.
+# You should not need to modify any code below this point to configure
+# new drivers.  You should also not need to add code here to remove
+# nodes and links created by a previous version of this package; the
+# pkghistory mechanism can be used to pkgrm SUNWcsd prior to its re-
+# installation, which will remove everything created by this script.
+#
+
+#
+# warn - Print an error message to stderr and also to our error log file
+#
+warn()
+{
+	echo "$PKG: $*" >& 2
+	echo "$PKG: $*" >> $errlog
+}
+
+#
+# name_to_major - Echo the major number of the given device driver to stdout.
+#
+name_to_major()
+{
+	awk '$1 == NAME { print $2; exit }' NAME=$1 $BASEDIR/etc/name_to_major
+}
+
+#
+# drv_alias - Return 0 (true) if $1 is a driver alias for $2
+#
+drv_alias()
+{
+	grep "^$1[	 ][	 ]*$2[	 ]" $BASEDIR/etc/driver_aliases \
+	    >/dev/null 2>&1
+}
+
+#
+# Determine an appropriate place for our private error log file.  If $PKGSAV
+# is available, use that; otherwise use /tmp or /dev/null.  We keep a private
+# error log primarily as a debugging facility.
+#
+errlog=/dev/null
+for file in $PKGSAV/SUNWcsd.err /tmp/SUNWcsd.err; do
+	rm -f $file
+	if touch $file >/dev/null 2>&1; then
+		errlog=$file
+		break
+	fi
+done
+
+#
+# If name_to_major or minor_perm is missing, then we're in big trouble (SUNWcsr
+# isn't installed yet, or the file has been subsequently deleted).
+#
+for file in name_to_major minor_perm; do
+	if [ ! -s $BASEDIR/etc/$file ]; then
+		warn "$BASEDIR/etc/$file is missing or zero-length"
+		warn "cannot proceed with device installation"
+		exit 1
+	fi
+done
+
+eval echo "\"\$prototype_com\"" "\"\$prototype_${ARCH}\"" | \
+while read type path driver minor symlink; do
+
+	[ -z "$type" ] && continue	# Skip blank lines
+
+	#
+	# Convert the driver name to the corresponding major number
+	# by looking it up in /etc/name_to_major.
+	#
+	major=`name_to_major $driver`
+	if [ -z "$major" ]; then
+		warn "major number for '$driver' not found"
+		warn "$path will not be created"
+		continue
+	fi
+
+	#
+	# If the minor number does not consist solely of digits, we assume
+	# it too is the name of a driver (this is typically done for clone
+	# entries), and so we convert it to the driver's major number.
+	#
+	if [ -z "`expr $minor : '^\([0-9][0-9]*\)$'`" ]; then
+		minor_num=`name_to_major $minor`
+		if [ -z "$minor_num" ]; then
+			warn "major number for '$minor' not found"
+			warn "$path will not be created"
+			continue
+		else
+			minor=$minor_num
+		fi
+	fi
+
+	#
+	# Convert the driver path to two tokens used for matching entries in
+	# /etc/minor_perm: we strip the '@' address, and then obtain the
+	# drv_name (string prior to ':') and min_name (everything else).
+	#
+	mp_ifs="$IFS"		# Save IFS (token separator list)
+	IFS=":$IFS"		# Add ':' as a separator for set and read below
+
+	shift $#; set -- `basename "$path" | sed 's/@[^:]*//'`
+	drv_name="$1"; shift
+	min_name="$*"
+
+	exec 3>&0 <$BASEDIR/etc/minor_perm	# Save stdin; open minor_perm
+	mp_match=no		# We have not yet seen a matching entry
+
+	while read mp_drvname mp_minname mode owner group; do
+
+		#
+		# The logic here is a bit confusing, but matches the equally
+		# confusing logic used to parse minor_perm entries in the
+		# drvconfig change_perm() function.
+		#
+		if [ $driver = $mp_drvname ] || [ $drv_name = clone -a \
+		   \( $mp_drvname = clone -o $mp_drvname = $min_name \) ] || \
+		   ( [ $drv_name = $mp_drvname ] && \
+		   drv_alias $driver $drv_name ); then
+
+			#
+			# If we have a driver name match, see if globbing the
+			# minor_perm pattern matches min_name.
+			#
+			case "$min_name" in
+			$mp_minname)
+				mp_match=yes
+				break
+				;;
+			esac
+		fi
+	done
+
+	IFS="$mp_ifs"		# Restore IFS
+	exec 0<&3 3>&-		# Restore stdin to the $prototype_* pipeline
+
+	if [ $mp_match = no ]; then
+		mode=0600	# Default values should be secure
+		owner=root
+		group=sys
+
+		warn "no minor_perm entry matched $path"
+		warn "defaulting to $mode $owner $group"
+	fi
+	
+	echo "add $type $path ($major, $minor) $mode $owner $group"
+	rm -f $BASEDIR/$path
+
+	if mknod $BASEDIR/$path $type $major $minor; then
+
+		installf -c none $PKGINST $BASEDIR/$path $type \
+		    $major $minor $mode $owner $group || \
+			warn "failed to add $path to pkg database"
+
+		chown $owner $BASEDIR/$path
+		chgrp $group $BASEDIR/$path
+		chmod $mode $BASEDIR/$path
+	else
+		warn "failed to mknod $path"
+		continue
+	fi
+
+	if [ -n "$symlink" ]; then
+		#
+		# The link destination must be specified as an absolute path
+		# to installf.  The source we modify to be relative to the
+		# destination (each "/" becomes a "../" prefix); thus
+		# linkdst "dev/foo/bar" yields prefix "../../".
+		#
+                lprefix=`echo "$symlink" | sed 's:[^/]*::g;s:/:../:g'`
+		linksrc="$lprefix$path"
+                linkdst="/$symlink"
+
+                echo "add link $linkdst=$linksrc"
+
+		#
+		# We don't actually need to create the symlink at this time
+		# because the installf -f at the end will create all symlinks.
+		# We pipe the link description to installf instead of putting
+		# it on the command-line to work around installf broken-ness.
+		#
+		echo "$linkdst=$linksrc s" | installf -c none $PKGINST - || \
+		    warn "failed to add $linkdst to pkg database"
+	fi
+done
+
+cat << EOF > ${BASEDIR}/devices/README
+
+Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+ This installation of Solaris uses devfs to provide /devices.
+
+Warning: Do not change the content of this directory or its
+         subdirectories.
+
+ The directory containing this README file is typically hidden
+underneath the /devices devfs(7FS) mount point.  All content at or
+below this directory is an implementation artifact and subject to
+incompatible change or removal without notification.
+
+ Please reference devfs(7FS) for more information.
+
+EOF
+
+if [ -f ${BASEDIR}/devices/README ]; then
+	chown root:sys ${BASEDIR}/devices/README
+	chmod 444 ${BASEDIR}/devices/README
+fi
+
+installf -f $PKGINST || warn "failed to update pkg database"
+[ -s $errlog ] && exit 2 || exit 0

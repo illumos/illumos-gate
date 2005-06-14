@@ -1,0 +1,9 @@
+
+Enter the terminal type to be used when the application is invoked.
+If the application doesn't recognize your default terminal type,
+enter the appropriate value for the application.  You must check
+the manual pages of the application or see your System Administrator
+to determine the correct terminal type.
+
+The default terminal type is your current terminal type.
+

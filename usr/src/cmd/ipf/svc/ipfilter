@@ -1,0 +1,176 @@
+#!/sbin/sh
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+. /lib/svc/share/smf_include.sh
+
+PATH=${PATH}:/usr/sbin:/usr/lib/ipf
+PIDFILE=/etc/ipf/ipmon.pid
+IPFILCONF=/etc/ipf/ipf.conf
+IP6FILCONF=/etc/ipf/ipf6.conf
+IPNATCONF=/etc/ipf/ipnat.conf
+IPPOOLCONF=/etc/ipf/ippool.conf
+PFILCHECKED=no
+
+id=`/usr/sbin/modinfo 2>&1 | awk '/ipf/ { print $1 } ' - 2>/dev/null`
+if [ -f $PIDFILE ] ; then
+	pid=`cat $PIDFILE 2>/dev/null`
+else
+	pid=`pgrep ipmon`
+fi
+pfildpid=`pgrep pfild`
+
+logmsg()
+{
+	logger -p daemon.warning -t ipfilter "$1"
+	echo "$1" >&2
+}
+
+checkpfil()
+{
+	if [ $PFILCHECKED = yes ] ; then
+		return
+	fi
+	/usr/sbin/ndd /dev/pfil \? 2>&1 > /dev/null
+	if [ $? -ne 0 ] ; then
+		logmsg "pfil not available to support ipfilter"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+	realnic=`/sbin/ifconfig -a modlist 2>/dev/null | grep -c pfil`
+	if [ $realnic -eq 0 ] ; then
+		logmsg "pfil not configured for firewall/NAT operation"
+	fi
+	PFILCHECKED=yes
+}
+
+
+load_ipf() {
+	bad=0
+	if [ -r ${IPFILCONF} ]; then
+		checkpfil
+		ipf -IFa -f ${IPFILCONF} >/dev/null
+		if [ $? != 0 ]; then
+			echo "$0: load of ${IPFILCONF} into alternate set failed"
+			bad=1
+		fi
+	fi
+	if [ -r ${IP6FILCONF} ]; then
+		checkpfil
+		ipf -6IFa -f ${IP6FILCONF} >/dev/null
+		if [ $? != 0 ]; then
+			echo "$0: load of ${IPFILCONF} into alternate set failed"
+			bad=1
+		fi
+	fi
+	if [ $bad -eq 0 ] ; then
+		ipf -s -y >/dev/null
+		return 0
+	else
+		echo "Not switching config due to load error."
+		return 1
+	fi
+}
+
+
+load_ipnat() {
+	if [ -r ${IPNATCONF} ]; then
+		checkpfil
+		ipnat -CF -f ${IPNATCONF} >/dev/null
+		if [ $? != 0 ]; then
+			echo "$0: load of ${IPNATCONF} failed"
+			return 1
+		else
+			ipf -y >/dev/null
+			return 0
+		fi
+	else
+		return 0
+	fi
+}
+
+
+load_ippool() {
+	if [ -r ${IPPOOLCONF} ]; then
+		checkpfil
+		ippool -F >/dev/null
+		ippool -f ${IPPOOLCONF} >/dev/null
+		if [ $? != 0 ]; then
+			echo "$0: load of ${IPPOOLCONF} failed"
+			return 1
+		else
+			return 0
+		fi
+	else
+		return 0	
+	fi
+}
+
+
+case "$1" in
+	start)
+		[ ! -f ${IPFILCONF} ] && exit 0
+		[ -n "$pfildpid" ] && kill -TERM $pfildpid 2>/dev/null
+		[ -n "$pid" ] && kill -TERM $pid 2>/dev/null
+		/usr/sbin/pfild >/dev/null
+		if load_ippool && load_ipf && load_ipnat ; then
+			ipmon -Ds
+		else
+			exit $SMF_EXIT_ERR_CONFIG
+		fi
+		;;
+
+	stop)
+		[ -n "$pfildpid" ] && kill -TERM $pfildpid
+		[ -n "$pid" ] && kill -TERM $pid
+		;;
+
+	pause)
+		ipfs -l
+		ipfs -NS -w
+		ipf -D
+		if [ -f $PIDFILE ] ; then
+			if kill -0 $pid; then
+				kill -TERM $pid
+			else    
+				cp /dev/null $PIDFILE
+			fi
+		fi      
+		;;
+
+	resume)
+		ipf -E
+		ipfs -R
+		load_ippool
+		load_ipf
+		load_ipnat
+		if [ -f $PIDFILE -a -n "$pid" ] ; then
+			ipmon -Ds
+		fi
+		;;
+
+	reload)
+		load_ippool
+		load_ipf
+		load_ipnat
+		;;
+
+	reipf)
+		load_ipf
+		;;
+
+	reipnat)
+		load_ipnat
+		;;
+
+	*)
+		echo "Usage: $0 \c" >&2
+		echo "(start|stop|reload|reipf|reipnat|pause|resume)" >&2
+		exit 1
+		;;
+
+esac
+exit $SMF_EXIT_OK

@@ -1,0 +1,18 @@
+
+The show-path command enables you to display the entire pathname of any
+object currently displayed in a file folder.  It is possible that an
+object will occur in a file folder whose name is too long to display
+completely on your terminal.  To find out the full name of this object,
+use the show-path command.
+
+Use one of the methods below to use show-path on an object. The object
+must be the currently active object on your display since the show-path
+command takes no arguments.
+
+     Command Menu:  Select show-path and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on show-path and an -->
+     (alternative)  will appear on the command line followed by the
+                    show-path. Press ENTER to execute the command.
+
+     Command Line:  Type show-path and press ENTER.

@@ -1,0 +1,95 @@
+#! /bin/sh
+# Generate a terminfo command from a terminfo name.
+#
+# Copyright (C) 2002  Free Software Foundation, Inc.
+#
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+VERSION=@VERSION@
+
+usage () {
+    cat <<EOF
+Usage: grub-terminfo TERMNAME
+Generate a terminfo command from a terminfo name.
+
+  -h, --help              print this message and exit
+  -v, --version           print the version information and exit
+
+Report bugs to <bug-grub@gnu.org>.
+EOF
+}
+
+error () {
+    echo "grub-terminfo: error: $1" 1>&2
+}
+
+termname=
+
+for option in "$@"; do
+    case "$option" in
+    -h | --help)
+        usage
+	exit 0 ;;
+    -v | --version)
+	echo "grub-terminfo (GNU GRUB ${VERSION})"
+	exit 0 ;;
+    -*)
+	error "Unrecognized option \`$option'"
+	usage
+	exit 1 ;;
+    *)
+	if test "x$termname" != x; then
+	    error "More than one terminfo names?"
+	    usage
+	    exit 1
+	fi
+	termname="$option" ;;
+    esac
+done
+
+if test "x$termname" = x; then
+    error "termname not specified"
+    usage
+    exit 1
+fi
+
+get_seq () {
+    infocmp -L -1 -g $termname | sed -n -e "/$1/s/^[^=]*=\\(.*\\),\$/\\1/p"
+}
+
+cursor_address="`get_seq cursor_address`"
+if test "x$cursor_address" = x; then
+    error "cursor_address not found"
+    exit 1
+fi
+cursor_address="--cursor-address=$cursor_address"
+
+clear_screen="`get_seq clear_screen`"
+if test "x$clear_screen" != x; then
+    clear_screen="--clear-screen=$clear_screen"
+fi
+
+enter_standout_mode="`get_seq enter_standout_mode`"
+if test "x$enter_standout_mode" != x; then
+    enter_standout_mode="--enter-standout-mode=$enter_standout_mode"
+fi
+
+exit_standout_mode="`get_seq exit_standout_mode`"
+if test "x$exit_standout_mode" != x; then
+    exit_standout_mode="--exit-standout-mode=$exit_standout_mode"
+fi
+
+echo "terminfo --name=$termname" $cursor_address $clear_screen \
+    $enter_standout_mode $exit_standout_mode

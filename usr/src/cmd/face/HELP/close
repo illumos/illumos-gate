@@ -1,0 +1,11 @@
+
+   The CLOSE command allows you to close specific frames displayed on
+   the screen.  The Office Frame cannot be closed.
+
+   To CLOSE a frame use one of the options below.  If either a frame
+   number  or  name  is  not  specified the currently active frame is
+   assumed.
+
+      - Command Menu - Select CLOSE + ENTER
+
+      - Typed Command - Type close [frame_# or frame_name] + ENTER

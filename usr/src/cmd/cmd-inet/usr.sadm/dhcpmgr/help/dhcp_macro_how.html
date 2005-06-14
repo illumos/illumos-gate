@@ -1,0 +1,235 @@
+<!--
+  -- ident	"%W%	%E% SMI"
+  --
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License, Version 1.0 only
+    (the "License").  You may not use this file except in compliance
+    with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+
+ -- Copyright (c) 2000-2001 by Sun Microsystems, Inc.
+  -- All rights reserved.
+  -->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+
+<head>
+<title>DHCP Manager Help: How To... Macros</title>
+<meta NAME="AUTHOR" CONTENT="smorgan">
+<meta NAME="KEYWORDS" CONTENT="DHCP">
+
+</head>
+
+<body bgcolor="#FFFFFF">
+
+<a name="top"></a>
+
+<table border=0 cellspacing=0 cellpadding=0 width=615>
+
+<!-- Start navigation banner -->
+
+<tr><td colspan=4  WIDTH="615" align="center" valign="top"><IMG SRC="art/bannersmc.gif" WIDTH=615 BORDER=0 ALT="DHCP Manager Help">
+
+	</td>
+	</tr>
+
+<!-- End navigation banner -->
+
+
+<tr>
+
+<!-- Start contents block -->
+
+	<td colspan=1 valign="top" width=105>
+	<P>&nbsp;</P>
+	<A HREF="dhcp_main_top.html"><STRONG>Overview</STRONG></A><P>
+	<A HREF="dhcp_relay_ref.html"><STRONG>Servers and Relay Agents</STRONG></A><P>
+	<A HREF="dhcp_addr_ref.html"><STRONG>IP Addresses</STRONG></A><P>
+	<A HREF="dhcp_macro_ref.html"><STRONG>Macros</STRONG></A><P>
+	<A HREF="dhcp_option_ref.html"><STRONG>Options</STRONG></A><P>
+		
+	<A HREF="dhcp_main_how.html"><STRONG>How To..</STRONG></A><BR>
+&nbsp;&nbsp;<A HREF="dhcp_relay_how.html">Servers/Relays</A><BR>
+&nbsp;&nbsp;<A HREF="dhcp_addr_how.html">Addresses</A><BR>
+<IMG SRC="art/tip2.gif" WIDTH=12 HEIGHT=10 BORDER=0 ALT="">Macros<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#viewmacro"><EM>View</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#newmacro"><EM>Create</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#dupmacro"><EM>Duplicate</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#modmacro"><EM>Modify</EM></a><BR>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#delmacro"><EM>Delete</EM></a><BR>
+
+&nbsp;&nbsp;<A HREF="dhcp_option_how.html">Options</A><P>
+<A HREF="dhcp_main_menus.html"><STRONG>Menus</STRONG></A><P>
+<A HREF="dhcp_main_idx.html"><STRONG>Index</STRONG></A>
+	
+		</td>
+	
+<!-- End contents block -->
+
+<!-- Start column rule -->
+
+	<td colspan=1 width=5 bgcolor="#CCCCCC">&nbsp;</td>
+
+<!-- End column spacer -->
+
+<!-- Start column spacer -->
+
+	<td colspan=1 width=10 bgcolor="#FFFFFF">&nbsp;</td>
+
+<!-- End column spacer -->
+
+
+
+<!-- Start topic block -->
+
+<td colspan=1 valign="top" bgcolor="#ffffff">
+<P>&nbsp;</P>
+<H1>How To: Macros</H1>
+
+<strong><big><A NAME="viewmacro">View Macros</A></big></strong><p>
+
+<strong>Choose the <A HREF="dhcp_macro_ref.html">Macros</A> tab in the main window.</strong><BR>
+DHCP Manager displays a list of macros that have been configured
+for this network. You can view the relationship between macros.  Click on a macro to view its associated options. Click Properties from
+the Edit menu to view a list of options and their values. <P>
+
+<p>
+<hr noshade>
+<strong><big><A NAME="newmacro">Create a New Macro</A></big></strong><p>
+
+	<ol type=1>
+
+	<LI><strong>Choose the <A HREF="dhcp_macro_ref.html">Macros</A> tab in the main window.</strong><BR>
+	The DHCP Manager displays a list of macros that have been configured
+	for this network.</LI><P>
+	<LI><STRONG>Choose Create from the Edit menu.</STRONG><BR>
+	The <A HREF="dhcp_macro_create.html">Create Macro</A> dialog box opens.</LI><P>
+	<LI><strong>Enter a unique name for the new macro.</strong><BR>
+        The name must be unique within the server's DHCP table (<tt>dhcptab</TT>).<br>
+		(See the note about macro names at the end of this procedure.)
+</LI><P>
+	<LI><strong>Enter the definition of the macro.</strong><BR>
+	This can be built by including other macros, or by defining values for 
+	options to be included in the macro. The <A HREF="dhcp_option_tags.html">standard options</A> are described in the <tt>dhcp_inittab</tt>(4) man page</LI><P>
+
+	<li><strong>Click OK to accept your settings.</strong><BR>
+
+	The new macro definition is stored in the <tt>dhcptab</tt>.<p></li>
+
+	</ol><P>
+
+<center>
+	<table border=1 cellspacing=3 cellpadding=5 WIDTH="380">
+
+	<tr>
+	<td valign="middle" align="left" BGCOLOR="#EBEBEB"><a name="name">The</a> 
+	important thing to remember when naming your macro is to give it the 
+	same name as the resource or device in the category you want to control. 
+	For example, to create a Client Class macro for configuring Ultra-5s<small><sup>TM</sup></small> 
+	(which have the client class name <tt>SUNW,Ultra5_10</tt>), name your 
+	macro <tt>SUNW.Ultra5_10</tt>. See <a 
+	href="dhcp_macros_about.html#using">Using Macros and Options</a> for more 
+	information.</td>
+	</tr>
+
+	</table>
+
+</center>
+<P><HR NOSHADE><P>
+<strong><big><A NAME="dupmacro">Duplicate a Macro</A></big></strong>
+<P>
+The Duplicate command provides a simple way to create a
+new macro with some or all of the properties of an
+existing macro.<P>
+
+	<ol type=1>
+
+	<LI><strong>Choose the <A HREF="dhcp_macro_ref.html">Macros</A> tab in the main window.</strong><BR>
+
+	DHCP Manager displays a list of macros that have been configured for this network.<p></li>
+
+	<li><strong>Select the macro you want to copy, and then choose <A HREF="dhcp_macro_dup.html">Duplicate</A> from the 
+	Edit window.</strong><BR>
+	The Duplicate Macro dialog box opens.</li><P>
+
+	<li><strong>Enter a name for the new macro.</strong><br>
+		(See the <a href="#name">note</a> about macro names at the end of the
+previous procedure.)<P></LI>
+	<LI><strong>Modify the macro settings as desired.</strong></LI>
+<P>
+<LI><STRONG>Click OK to accept your
+settings.</strong><BR>
+The new macro definition is stored in the <tt>dhcptab</tt>.</li>
+
+	</ol>
+	
+<p><hr noshade><P> 
+<strong><big><A NAME="modmacro">Modify a Macro</A></big></strong><p>
+
+	<ol type=1>
+
+	<LI><strong>Choose the <A HREF="dhcp_macro_ref.html">Macros</A> tab in the main window.</strong><BR>
+
+	DHCP Manager displays a list of macros that have been configured for this network.<p></li>
+
+	<li><strong>Select the macro you want to edit, and then choose <A HREF="dhcp_macro_mod.html">Properties</A> from the
+	Edit window.</strong><BR>
+	The Macro Properties dialog box opens.<P></li>
+
+	<li><strong>Modify the macro settings as desired and click OK.</strong></LI>
+	</ol>
+
+
+<p><HR noshade><P>
+<strong><big><A NAME="delmacro">Delete a Macro</A></big></strong><p>
+
+	<ol type=1>
+
+	<LI><strong>Choose the <A HREF="dhcp_macro_ref.html">Macros</A> tab in the main window.</strong><BR>
+	DHCP Manager displays a list of macros that have been configured
+	for this network.</LI><P>
+	
+	<li><strong>Select the macro to delete, and then choose <A HREF="dhcp_macro_del.html">Delete</A> from the
+	Edit window.</strong><BR>
+	The Delete Macro dialog box opens.<P></li>
+
+	<LI><strong>Click OK.</strong><BR>
+	The macro definition is deleted from the <tt>dhcptab</tt> 
+	database.<p></li>
+	
+	</ol>
+
+
+
+&nbsp;&nbsp;&nbsp;<A HREF="#top"><small>return to top</small></A>
+<p>&nbsp;</p>
+
+
+<!-- Don't go past this line! -->
+
+	</td>
+
+<!-- End topic block -->
+
+</tr>
+
+</table>
+
+<!-- End topic table -->
+
+</body>
+</html>

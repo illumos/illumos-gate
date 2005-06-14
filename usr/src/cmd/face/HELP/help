@@ -1,0 +1,44 @@
+
+Striking the HELP function key (f1) (or typing CTRL-j help or
+CTRL-f 1) will display a frame of help text for an entire menu, a
+single field on a form, or a command.
+
+HELP for a menu describes the menu, each menu item, and the associated
+tasks and sub-menus. It will inform you of tasks that should have been
+completed prior to invoking the menu and will describe error
+conditions that could occur.  
+
+HELP for forms provides details for the field your cursor is resting
+on.  It describes the input for the field and what the information is 
+used for.
+
+In addition HELP on menus and form fields, you can receive help on
+each FACE command on the Commands Menu. You can either press the HELP
+function key with the cursor resting on a command in the Commands Menu
+or you can type help [command name] on the command line. Help for a
+command describes the function, syntax, and use of the command.  Also,
+you are instructed on how to complete any prompts that are part of
+the command procedure.
+
+When the active frame is a HELP frame, function key (f8) changes to
+CONTENTS.  When you press CONTENTS, a menu for the Overview of AT&T
+FACE Contents  will be displayed.  Striking ENTER on any item in the
+menu will provide tutorial-type information on the AT&T FACE interface.
+
+To close a HELP frame, press the CANCEL function key.
+
+Use one of the methods below to use help:
+
+      Command Menu:  Select help and press ENTER. An --> will
+                     appear on the command line to prompt you for an
+                     object.
+
+      Function Key:  Press HELP and you will see help for the item
+                     the cursor is resting on or for the menu the
+                     cursor rests in.
+
+When a help frame is longer than one screen, use the function keys
+labeled PREVPAGE and NEXTPAGE as arrow keys.
+
+To exit the Help facility, press the CANCEL function key.
+

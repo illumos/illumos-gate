@@ -1,0 +1,200 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# cmd/sgs/Makefile.targ
+
+
+################################################################################
+#
+# Linting the Linker Libraries
+#
+#  Several of the linker's libraries are, in whole or in part,
+#  are built in two passes, once as Elf32 and once as Elf64,
+#  i.e. with -D_ELF64 defined.  Lint needs to be able to do
+#  both passes, but combining the two is problematic for the
+#  2nd pass of lint, as it sees many interfaces as being defined
+#  both ways and considers them to be incompatible.  The targets
+#  defined here allow for both passes to live independently.
+#  This means that both the lint.out, and the lint library itself
+#  get generated separately, to different output files.  The
+#  lint.out's get combined into a single lint.out report, and
+#  the lint libraries get generated with a 32/64 suffix.  The
+#  dependents on these lint libraries, then, choose which version
+#  the need to use.  Substitutions can be made automatically if
+#  the macro's defined in ./Makefile.com are used to specify
+#  the dependency, for those libs that need them.
+#
+# Don't
+#
+#  Don't use the /*LINTLIBRARY*/ directive in linker libraries,
+#  this disables some important checks, including the ability
+#  to test format strings from the msg.h files.
+#
+#  Don't use the `-x' option to lint when linting linker libraries.
+#  This masks all the dead wood in our own header files.  Instead,
+#  there has been added to the relevant common directories a file
+#  called `lintsup.c' which is used to mask out the headers that
+#  we aren't interested in.  This method is used for libraries, like
+#  libld, which have their own header files, but is irrelevant to
+#  libraries like libldstab which exports no interface of it's own.
+#
+#  The `lintsup.c' file can also be used, in some cases, to mask
+#  out other issues that lint won't otherwise shut up about.
+#
+# Other Lint Options
+#
+#  `-m' has been added to the LINTFLAGS.  Warnings about globals
+#  that could be static are irrelevant because we use mapfiles to
+#  scope down unnecessary globals.
+#
+#  `-u' is used in the LINTFLAGS for libraries, otherwise lint
+#  tends to be very noisy.
+#
+#  `-x' is avoided for libraries, but is used for executables
+#  because all we care about is that what we use is defined,
+#  not about declarations in public headers that we don't use.
+#
+# Relevant variables:
+#
+# */Makefile.com
+#	SRCS=		../common/llib-l<libname>
+#	LINTSRCS=	<source files>
+#	LDLIBS=		... [$(LDDBG_LIB) $(LD_LIB)]
+#	LINTFLAGS=	...
+#	LINTFLAGS64=	...
+#	CLEANFILES +=	... $(LINTOUTS)
+#	CLOBBERFILES +=	... $(LINTLIBS)
+#
+# Relevant targets:
+#
+# */Makefile.targ
+#	# this file for SGS lint targets.
+#	include		$(SRC)/cmd/sgs/Makefile.targ
+#
+#	lint:		<choose the desired functionality> $(SGSLINTOUT)
+#
+#		$(LINTLIB32),
+#		$(LINTLIB64)	Create an Elf32 or Elf64 lint library from
+#				a proto file indicated by the $(SRCS) variable.
+#
+#		$(LINTOUT32),
+#		$(LINTOUT64)	Run lint on the sources indicated by the
+#				$(LINTSRCS) variable with respect to Elf32
+#				or Elf64.  Dependencies are gathered from
+#				the $(LDLIBS) variable.
+#
+#		$(SGSLINTOUT)	Create a `lint.out' file as the concatination
+#				of the lint output from the previous targets.
+#				This should be specified *last* in the list.
+#
+################################################################################
+
+#
+# Override the OS's $(LINTOUT) target to avoid confusion.
+#
+LINTOUT =	$(LINTOUT1)
+
+#
+# If LD_LIB or LDDBG_LIB is added to LDLIBS, then the
+# right lint library should be picked up automatically.
+#
+$(LINTOUT32) :=	LD_LIB=$(LD_LIB32)
+$(LINTOUT32) :=	LDDBG_LIB=$(LDDBG_LIB32)
+$(LINTOUT64) :=	LD_LIB=$(LD_LIB64)
+$(LINTOUT64) :=	LDDBG_LIB=$(LDDBG_LIB64)
+
+#
+# Force $(LINTLIB) in order to help the $(SGSLINTOUT)
+# target produce the same output on successive runs.
+#
+$(LINTLIB):	FRC
+
+$(LINTLIB32):	$(SRCS)
+	$(LINT.c) -o $(LIBNAME32) $(SRCS)
+
+$(LINTLIB64):	$(SRCS)
+	$(LINT.c) -D_ELF64 -o $(LIBNAME64) $(SRCS)
+
+$(LINTOUT32):	$(LINTSRCS) $(LINTSRCS32)
+	$(LINT.c) $(LINTSRCS) $(LINTSRCS32) $(LDLIBS) > $(LINTOUT32) 2>&1
+
+$(LINTOUT64):	$(LINTSRCS) $(LINTSRCS64)
+	$(LINT.c) -D_ELF64 $(LINTSRCS) $(LINTSRCS64) \
+	    $(LDLIBS) > $(LINTOUT64) 2>&1
+
+$(SGSLINTOUT): FRC
+	@ rm -f $(SGSLINTOUT)
+	@ if [ -r $(LINTOUT1) ]; then			\
+		echo "\n"$(LINTLIB) >> $(SGSLINTOUT);	\
+		echo $(DASHES) >> $(SGSLINTOUT);	\
+		cat $(LINTOUT1) >> $(SGSLINTOUT);	\
+	fi
+	@ if [ -r $(LINTOUT32) ]; then			\
+		if [ -n "$(DYNLIB)" ] ; then		\
+			echo "\nElf32 - $(DYNLIB)" >> $(SGSLINTOUT);	\
+		elif [ -n "$(RTLD)" ] ; then		\
+			echo "\nElf32 - $(RTLD)" >> $(SGSLINTOUT);	\
+		else echo "\nElf32 - $(PROG)" >> $(SGSLINTOUT);	\
+		fi; \
+		echo $(DASHES) >> $(SGSLINTOUT);	\
+		cat $(LINTOUT32) >> $(SGSLINTOUT);	\
+	fi
+	@ if [ -r $(LINTOUT64) ]; then			\
+		if [ -n "$(DYNLIB)" ] ; then		\
+			if [ $(DYNLIB) = "libld.so.2" ] ; then \
+				echo "\nElf64 - libld.so.3" >> $(SGSLINTOUT);	\
+			else \
+				echo "\nElf64 - $(DYNLIB)" >> $(SGSLINTOUT);	\
+			fi; \
+		elif [ -n "$(RTLD)" ] ; then		\
+			echo "\nElf64 - $(RTLD)" >> $(SGSLINTOUT);	\
+		else echo "\nElf64 - $(PROG)" >> $(SGSLINTOUT);	\
+		fi; \
+		echo $(DASHES) >> $(SGSLINTOUT);	\
+		cat $(LINTOUT64) >> $(SGSLINTOUT);	\
+	fi
+	@ rm -f $(LINTOUT1) $(LINTOUT32) $(LINTOUT64)
+
+#
+# For those that install the lint library source file.
+#
+$(ROOTLIBDIR)/$(LINTLIBSRC): ../common/$(LINTLIBSRC)
+	$(INS.file) ../common/$(LINTLIBSRC)
+
+$(VAR_POUND_1)$(ROOTFS_LIBDIR)/$(LIBLINKS): $(ROOTFS_LIBDIR)/$(LIBLINKS)$(VERS)
+$(VAR_POUND_1)	$(INS.liblink)
+
+$(VAR_POUND_1)$(ROOTFS_LIBDIR64)/$(LIBLINKS): $(ROOTFS_LIBDIR64)/$(LIBLINKS)$(VERS)
+$(VAR_POUND_1)	$(INS.liblink64)
+
+$(VAR_POUND_1)$(ROOTFS_LIBDIR)/$(LIBLINKSCCC): $(ROOTFS_LIBDIR)/$(LIBLINKSCCC)$(VERS)
+$(VAR_POUND_1)	$(INS.liblinkccc)
+
+$(VAR_POUND_1)$(ROOTFS_LIBDIR64)/$(LIBLINKSCCC): $(ROOTFS_LIBDIR64)/$(LIBLINKSCCC)$(VERS)
+$(VAR_POUND_1)	$(INS.liblinkccc64)
+
+FRC:

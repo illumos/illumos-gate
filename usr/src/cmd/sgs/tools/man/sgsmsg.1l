@@ -1,0 +1,433 @@
+.\" ident	"%Z%%M%	%I%	%E% SMI"
+.\" Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License, Version 1.0 only
+.\" (the "License").  You may not use this file except in compliance
+.\" with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.if n .tr \--
+.TH sgsmsg 1l "2 Jun 1999"
+.SH NAME
+sgsmsg \- generate message strings for SGS subsystem.
+.SH SYNOPSIS
+.B sgsmsg
+[
+.B \-cl
+] [
+.BI \-d\0 "data"
+] [
+.BI \-h\0 "defs"
+] [
+.BI \-i\0 "ident"
+]
+.if n .ti +5n
+[
+.BI \-m\0 "messages"
+] [
+.BI \-n\0 "name"
+]
+.I file \.\.\.
+.SH AVAILABILITY
+SUNWonld
+.SH DESCRIPTION
+\f3sgsmsg\f1 generates several message files from an input string definition
+\f2file\f1.  \f3sgsmsg\f1 provides a flexible, centralized, mechanism
+of collecting character strings within a code group such as an executable or
+shared object.  All character strings are captured into a single data array
+within the \f2data\f1 file.
+The data array is similar to that produced by
+.BR xstr (1)),
+and helps reduce the relocation overhead incurred by string pointers.
+.LP
+Indexes into the data array are generated as
+definitions within the \f2defs\f1 file. The code group can reference each
+character string via predefined macros.
+.LP
+The character strings may also be translated into an internationalized
+format and captured in the
+\f2messages\f1 file.  By default these message strings are suitable for
+.BR gettext (3I)
+manipulation.  The \f3\-c\f1 option provides for these message strings to be
+translated into a form suitable for
+.BR catgets (3C)
+manipulation.
+.SH OPERANDS
+.LP
+One of more input \f2file\f1s contains a definition for each character
+string used by a particular code group.  The interpretation of a
+definition is determined by the first character of each line within
+the input \f2file\f1:
+.LP
+.PD 0
+.RS +4
+.IP \(bu 3
+Entries that begin with a \f3#\fI, \f3$\f1 or a newline are treated as
+comments and are copied (as is) to the \f2messages\f1 file.
+.IP \(bu 3
+Entries that begin with a \f3@\f1 are translated and will be written to
+one or more of the output files. Two translations are possible dependent upon
+whether one or more tokens follow the \f3@\f1 character.
+.RE
+.PD
+.sp
+.LP
+An \f4@\f1 character followed by a single token is interpreted as one of
+two reserved message output
+\f2indicators\f1, or a message \f2identifier\f1.  The reserved output
+indicator \f4_START_\f1 enables output to the \f2messages\f1 file (note that
+the occurrence of any \f4@\f1 token will also enable message output).
+The reserved output indicator \f4_END_\f1 disables output to the
+\f2messages\f1 file.  These two indicators provides a means of isolating
+only those character strings that require translation into the \f2messages\f1
+file.
+.LP
+Besides the reserved output indicators, an \f4@\f1 character followed by a
+single token is taken to be a
+message \f2identifier\f1. This identifier will be translated into a
+\f2domain\f1 name for
+.BR gettext (3I)
+output, or a \f2setid\f1 for
+.BR catgets (3C)
+output.  This translated value is determine by substituting the message
+\f2identifier\f1 token
+for the associated definition from in the \f2ident\f1 file. Note that
+a message \f2identifier\f1 is required for
+.BR catgets (3C)
+use but is optional for
+.BR gettext (3I).
+.LP
+An \f4@\f1 character followed by multiple tokens is taken to be a
+string \f2definition\f1 followed by a quoted character string. Character
+strings can be continued over multiple lines by ending the preceding
+line with a backslash - all initial whitespace on the continuation line will
+is ignored. Character strings can contain the escape sequences
+.B \en
+for newline,
+.B \et
+for tab,
+.B \ev
+for vertical tab,
+.B \eb
+for backspace,
+.B \er
+for carriage return,
+.B \ef
+for formfeed,
+.B \e\e
+for backslash, and
+\e"
+for double quote.
+.LP
+The character string is copied to the \f2data\f1 array
+and an index into this array is generated as the \f2definition\f1 within
+the string
+\f2defs\f1 file. The character string is also translated to the appropriate
+message format and written to the \f2messages\f1 file.
+.SH OPTIONS
+.TP 12
+.B \-c
+By default, strings generated in the \f2messages\f1 file are suitable for
+.BR msgfmt (1)
+processing, which provides for message extraction via
+.BR gettext (3I).
+This option causes the formatting of the message strings to be suitable for
+.BR gencat (1)
+processing, which provides for message extraction via
+.BR catgets (3C).
+.TP
+.BI \-d\0 data
+Specify a \f2data\f1 file is to be created.
+This file contains a single data array, by default named (\f2__name\f1[]),
+containing all the strings
+defined in the string definition \f2file\f1.
+.TP
+.BI \-h\0 defs
+Specify a \f2defs\f1 file is to be created.
+This file contains definitions for each character string contained in
+the data array within the \f2data\f1 file.  These definitions represent
+offsets in the data array for each string.  Reference to individual strings
+should use one of the two defined macros \f4MSG_INTL\f1 (which specifies
+a user defined message extraction function), or \f4MSG_ORIG\f1
+(which specifies a direct access to the \f2__name\f1[] array).
+.TP
+.BI \-i\0 ident
+Specify an \f2ident\f1 file from which to interpret a message identifier
+token.
+.TP
+.B \-l
+Indicate that the \f2data\f1 array be defined local (\f2static\f1).  This
+is useful for establishing individual string arrays on a per-object basis.
+.TP
+.BI \-m\0 messages
+Specify a \f2messages\f1 file is to be created. This
+contain message strings suitable for delivery to a localization group.
+.TP
+.BI \-n\0 name
+Specify an alternative interface \f2name\f1. This name is used to label
+the message data array (\f2__name\f1[]) and the user defined message
+extraction function (const char * \f2_name\f1(int)) which will interface
+with this array.
+.SH EXAMPLES
+The following examples provide a simplified guide to using the \f3sgsmsg\fP
+command, including sample input files and generated output files.
+.LP
+The following \f2ident\f1 file provides message \f2identifiers\f1 for
+the link-editor utilities
+.BR ld (1),
+.BR libld.so.2 ,
+and
+.BR liblddbg.so.3 .
+These identifiers are referenced from the input string definition files
+of the respective code groups:
+.if n .ta 1.8i 2.2i
+.if t .ta 1.6i 2.2i
+.RS
+.nf
+.ft 3
+
+% cat sgs.ident
+.ft 1
+.if t .sp 0.35
+.if n .sp
+# mesgid	setid	domain
+.if t .sp 0.35
+.if n .sp
+MSG_ID_LD	1	SUNW_OST_SGS
+MSG_ID_LIBLD	2	SUNW_OST_SGS
+MSG_ID_LIBLDDBG	3	SUNW_OST_SGS
+
+.fi
+.RE
+.if t .bp
+.LP
+The following string definition \f2file\f1 defines a small number of
+strings used by
+.BR libld.so.2 :
+.ta 2.2i
+.RS
+.nf
+.ft 3
+
+% cat libld.msg
+.ft 1
+.if t .sp 0.35
+.if n .sp
+# ident "%Z%%M% %I%    %E% SMI"
+.if t .sp 0.35
+.if n .sp
+@ _START_
+.if t .sp 0.35
+.if n .sp
+# Message file for cmd/sgs/libld.
+.if t .sp 0.35
+.if n .sp
+@ MSG_ID_LIBLD
+
+# System call messages
+.if t .sp 0.35
+.if n .sp
+@ MSG_SYS_OPEN	"file %s: cannot open file: %s"
+@ MSG_SYS_MMAP	"file %s: cannot mmap file: %s"
+
+# Symbol processing errors
+.if t .sp 0.35
+.if n .sp
+@ MSG_SYM_DIFFTYPE	"symbol `%s' has differing types:"
+@ MSG_SYM_DIFFATTR	"symbol `%s' has differing %s:\\n\\
+		\ \\t(file %s value=0x%x; file %s value=0x%x);"
+.if t .sp 0.35
+.if n .sp
+@ _END_
+
+# The following strings represent reserved names.  Reference to
+# these strings is via the MSG_ORIG() macro, and thus no
+# translations are required.
+.if t .sp 0.35
+.if n .sp
+@ MSG_STR_EMPTY	""
+@ MSG_PTH_DEVZERO	"/dev/zero"
+@ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
+
+.fi
+.RE
+.LP
+Using the above input files, the following string and message data files can be
+generated:
+.if t .ta 0.5i 2.2i
+.if n .ta 0.5i 0.8i 3.0i
+.RS
+.nf
+.ft 3
+
+% sgsmsg\ \ \-i sgs.ident\ \ \-m\ messages\ \ \-d\ msg.c\ \ \-h\ msg.h \\
+\ \ \ \ \-n\ libld_msg\ \ libld.msg
+% cat msg.c
+.ft 1
+.if t .sp 0.35
+.if n .sp
+const char __libld_msg[] = { 0x00,
+	0x66,  0x69,  0x6c,  0x65,  0x20,  0x25,  0x73,  0x3a,  \.\.\.\.
+	0x61,  0x6e,  0x6e,  0x6f,  0x74,  0x20,  0x6f,  0x70,  \.\.\.\.
+	\.\.\.\.
+	0x00
+};
+
+.if t .bp
+.ft 3
+% cat msg.h
+.ft 1
+.if t .sp 0.35
+.if n .sp
+extern	const char	__libld_msg[];
+.if t .sp 0.35
+.if n .sp
+#define	MSG_ORIG(x)	&__libld_msg[x]
+.if t .sp 0.35
+.if n .sp
+extern	const char *	_libld_msg(int);
+.if t .sp 0.35
+.if n .sp
+#define	MSG_INTL(x)	_libld_msg(x)
+.if t .sp 0.35
+.if n .sp
+#define	MSG_SYS_OPEN	1
+#define	MSG_SYS_MMAP	31
+#define	MSG_SYM_DIFFTYPE	61
+#define	MSG_SYM_DIFFATTR	94
+#define	MSG_STR_EMPTY	167
+#define	MSG_PTH_DEVZERO	168
+#define	MSG_SUNW_OST_SGS	178
+
+.ft 3
+% cat messages
+.ft 1
+.if t .sp 0.35
+.if n .sp
+# Message file for cmd/sgs/libld.
+.if t .sp 0.35
+.if n .sp
+domain  "SUNW_OST_SGS"
+.if t .sp 0.35
+.if n .sp
+# System call messages
+.if t .sp 0.35
+.if n .sp
+msgid	"file %s: cannot open file: %s"
+msgstr	""
+msgid	"file %s: cannot mmap file: %s"
+msgstr	""
+.if t .sp 0.35
+.if n .sp
+# Symbol processing errors
+.if t .sp 0.35
+.if n .sp
+msgid	"symbol `%s' has differing types:"
+msgstr	""
+msgid	"symbol `%s' has differing %s:\\n\\t(file %s value=0x%x; file %s value=0x%x);"
+msgstr  ""
+
+.fi
+.RE
+.LP
+References to the string data from the code group
+should use one of the two defined macros
+depending upon whether an original or localized string is required.
+For example, the simple
+.BR open (2)
+of a file would use the original string, however its associated
+error message should be localized:
+.if n .ta 0.75i
+.if t .ta 0.5i 2.2i
+.RS
+.nf
+.ft 3
+
+const char * file = MSG_ORIG(MSG_PTH_DEVZERO);
+.if t .sp 0.35
+.if n .sp
+if ((fd = open(file, O_RDWR, 0)) == -1) {
+	int err = errno;
+	(void) fprintf(stderr, MSG_INTL(MSG_SYS_OPEN), file,
+	    strerror(err));
+	return (1);
+}
+
+.fi
+.RE
+.if t .bp
+.LP
+The \f3MSG_INTL\f1 definition provides for a user defined message
+extraction function
+that allows the greatest flexibility in providing an objects localization.
+Normally this interface is quite simple.  For a code group that resides
+in a shared object the following interface can be provided by the user:
+.RS
+.nf
+.ft 3
+
+extern char * _dgettext(const char *, const char *);
+.if t .sp 0.35
+.if n .sp
+const char *
+_libld_msg(int mid)
+{
+	return (_dgettext(MSG_ORIG(MSG_SUNW_OST_SGS),
+	    MSG_ORIG(mid)));
+}
+
+.fi
+.RE
+.LP
+For a code group that resides in an executable the following interface,
+and initialization can be provided by the user:
+.RS
+.nf
+.ft 3
+
+#include <locale.h>
+
+int
+main(int argc, char ** argv)
+{
+	\&\.\.\.\.\.\.
+	(void) setlocale(LC_MESSAGES, MSG_ORIG(MSG_STR_EMPTY));
+	(void) textdomain(MSG_ORIG(MSG_SUNW_OST_SGS));
+	\&\.\.\.\.\.\.
+}
+
+const char *
+_ld_msg(int mid)
+{
+	return (gettext(MSG_ORIG(mid)));
+}
+.sp
+.SH "EXIT STATUS"
+A non-zero error return indicates a processing error.
+.RE
+.PD
+.SH "SEE ALSO"
+.BR gencat (1),
+.BR ld (1),
+.BR msgfmt (1),
+.BR catgets (3C),
+.BR gettext (3I).
+.br
+.TZ LLM
+.if n .tr \-\-

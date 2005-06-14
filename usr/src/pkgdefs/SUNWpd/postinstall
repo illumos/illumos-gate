@@ -1,0 +1,244 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# SUNWpd postinstall script
+# Copyright (c) 1995-2000 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+EXIT=0
+status=0
+
+NAMEMAJOR="$BASEDIR/etc/name_to_major"
+MINORPERM="$BASEDIR/etc/minor_perm"
+DEVLINKTB="$BASEDIR/etc/devlink.tab"
+DRIVERALS="$BASEDIR/etc/driver_aliases"
+IUAP="$BASEDIR/etc/iu.ap"
+
+if test ! -f ${NAMEMAJOR} -o ! -w ${NAMEMAJOR}; then
+	echo "add_major: data file ${NAMEMAJOR} is missing/inaccessible." >&2
+	exit 1
+fi
+
+if test ! -f ${MINORPERM} -o ! -w ${MINORPERM}; then
+	echo "add_minor: data file ${MINORPERM} is missing/inaccessible." >&2
+	exit 1
+fi
+
+if test ! -f ${DEVLINKTB} -o ! -w ${DEVLINKTB}; then
+	echo "add_devlink: data file ${DEVLINKTB} is missing/inaccessible." >&2
+	exit 1
+fi
+
+if test ! -f ${DRIVERALS} -o ! -w ${DRIVERALS}; then
+	echo "add_drv_alias: data file ${DRIVERALS} is missing/inaccessible." >&2
+	exit 1
+fi
+
+trap "rm -f /tmp/$$.*;exit 1" 1 2 3 13 15
+TMP=/tmp/$$
+
+# adds new major numbers to system for device drivers
+# Usage:
+#	add_major name1 name2 name3 name4 ....
+
+add_major()
+{
+sort +1 -2n ${NAMEMAJOR} | nawk '#
+BEGIN	{oldmajor = -1}
+NR == 1	{n=split(namelist,x)
+	 if (n < 1)
+	    exit(1)
+	 for (i=1; i<=n; i++)
+	    chklist[x[i]]++
+	}
+	{for (name in chklist)
+	 {
+	    if ($1 == name)
+		delete chklist[name]
+	 }
+	 if (($2 - oldmajor) > 1)
+	 {
+	    gap++
+	    gaplist[gap] = oldmajor " " $2;
+	 }
+	 oldmajor = $2;
+	}
+END	{addsize=1
+	 for (name in chklist)
+	    addlist[addsize++] = name
+	
+	 addidx = 1
+	 for (i=1; i<=gap && addidx < addsize; i++)
+	 {
+	    split(gaplist[i],x)
+	    begmajor = x[1]
+	    endmajor = x[2]
+	    for (begmajor++;begmajor < endmajor && addidx < addsize;)
+	    {
+		printf "%s %d\n",addlist[addidx],begmajor
+		addidx++
+		begmajor++
+	    }
+	 }
+	 for (; addidx < addsize; addidx++)
+	 {
+	    oldmajor++
+	    printf "%s %d\n",addlist[addidx],oldmajor
+	 }
+	}
+' namelist="$*" - > $TMP.new
+
+if [ -s $TMP.new ]
+then
+#    echo "Adding following devices to ${NAMEMAJOR}"
+#    cat $TMP.new
+    sort +1 -2n ${NAMEMAJOR} $TMP.new -o ${NAMEMAJOR}
+fi
+}
+
+
+# adds new minor permissions to system for device drivers
+# Usage:
+#	add_minor perm1 perm2 perm3 perm4 ....
+#    i.e.
+#	add_minor 'sd:* 0666 bin bin' 'sd:a 0644 root sys'
+
+add_minor()
+{
+for p in "$@"
+do echo "$p"
+done | nawk '#
+FILENAME != "-"	{permtab[$1] = $0;next}
+FILENAME == "-"	{
+		 if ($4 == "") {
+			 printf("Missing token: (%s), skipping.\n", $0)
+			 next
+		 }
+		 if ($5 != "") {
+			 printf("Too many arguments: (%s), skipping.\n", $0)
+			 next
+		 }
+		 if ($1 !~ /:/) {
+			 printf("Bad name:minor pair: %s, skipping.\n", $1)
+			 next
+		 }
+		 if ($2 < "0000" || $2 > "4777") {
+			 printf("Bad mode: %s, skipping %s.\n", $2, $1)
+			 next
+		 }
+		 if (!($1 in permtab))
+		     print >> permtmp
+		 next
+		}
+' permtmp=$TMP.perm ${MINORPERM} - >&2
+
+if [ -s $TMP.perm ]
+then
+#	echo "Adding following permissions to ${MINORPERM}"
+#	cat $TMP.perm
+	sort +0 -1 ${MINORPERM} $TMP.perm -o ${MINORPERM}
+fi
+}
+
+
+add_devlink()
+{
+while test $# -ge 2
+do
+echo "$1	$2"
+shift 2
+done | nawk '-F ' '#
+FILENAME == "-"		{devlinktab[$1] = $0;next}
+FILENAME != "-"		{if ($1 in devlinktab)
+delete devlinktab[$1]
+}
+END			{for (d in devlinktab)
+			    print devlinktab[d] >> devlinktmp
+			}
+' devlinktmp=$TMP.devlink - ${DEVLINKTB} >&2
+
+if [ -s $TMP.devlink ]
+then
+#       echo "Adding following entries to ${DEVLINKTB}"
+#       cat $TMP.devlink
+	cat $TMP.devlink >> ${DEVLINKTB}
+fi
+}
+
+
+# adds new entries to driver_aliases file
+# Usage:
+#	add_drv_alias spec1 spec2 spec3
+#
+#	where spec is:
+#		<driver> <alias>
+#
+
+add_drv_alias()
+{
+while test $# -ge 2
+do
+	echo "$1 $2"
+	shift 2
+done | nawk '#
+FILENAME == "-"		{newaliases[$2] = $1;next}
+FILENAME != "-"		{if ($2 in newaliases) {
+			     if ($1 == newaliases[$2])
+				 delete newaliases[$2]
+			 }
+			}
+END			{for (d in newaliases)
+			    print newaliases[d],d > drvalias
+			}
+' drvalias=$TMP.drvalias - ${DRIVERALS} >&2
+ 
+if [ -s $TMP.drvalias ]
+then
+#   echo "Adding following entries to ${DRIVERALS}"
+#   cat $TMP.drvalias
+    cat $TMP.drvalias >> ${DRIVERALS}
+fi
+}
+
+# modunload the driver if installing on running system
+if [ "${BASEDIR}" = "/" ]; then
+        modnum=`set -- \`modinfo | grep ecpp\`; echo $1`
+        if [ "$modnum" ]; then
+                modunload -i $modnum
+        fi
+fi
+
+# add_drv ecpp driver if not already installed
+modnum=`grep -c ecpp ${NAMEMAJOR}`
+if [ "$modnum" = "0" ]; then
+	# add new entries to name_to_major, minor_perm,  driver_classes files
+	/usr/sbin/add_drv -b ${BASEDIR} -i '"pnpALI,1533,3" "ns87317-ecpp"' -m '* 0666 root sys' -n ecpp || status=1
+fi
+
+rm -f /tmp/$$.*
+
+exit $status

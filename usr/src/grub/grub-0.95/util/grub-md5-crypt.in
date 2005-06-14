@@ -1,0 +1,99 @@
+#! /bin/sh
+
+# Encrypt a password in MD5 format
+#   Copyright (C) 2000,2002 Free Software Foundation, Inc.
+#
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+# Replaced by the configure script.
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+sbindir=@sbindir@
+
+# Initialize some variables.
+grub_shell=${sbindir}/grub
+progname="grub-md5-crypt"
+
+# Check the arguments.
+for option in "$@"; do
+    case "$option" in
+    -h | --help)
+	cat <<EOF
+Usage: $progname [OPTION]
+Encrypt a password in MD5 format.
+
+  -h, --help              print this message and exit
+  -v, --version           print the version information and exit
+  --grub-shell=FILE       use FILE as the grub shell
+
+Report bugs to <bug-grub@gnu.org>.
+EOF
+	exit 0
+	;;
+
+    -v | --version)
+	echo "$progname (GNU GRUB ${VERSION})"
+	exit 0
+	;;
+
+    --grub-shell=*)
+	grub_shell=`echo "$option" | sed 's/--grub-shell=//'`
+	;;
+
+    *)
+	echo "$progname: unrecognized option \`$option'"
+	echo "Usage: $progname [OPTION]"
+	echo "Try \`$progname --help' for more information."
+	exit 1
+	;;
+    esac
+done
+
+# Suppress echo backs. I don't know if this is really portable. -okuji
+stty -echo
+
+# Prompt to enter a password.
+echo -n "Password: "
+read -r password
+echo
+
+# One more time.
+echo -n "Retype password: "
+read -r password2
+echo
+
+# Resume echo backs.
+stty echo
+
+if test "x$password" = x; then
+    echo "Empty password is not permitted."
+    exit 1
+fi
+
+if test "x$password" != "x$password2"; then
+    echo "Sorry, passwords do not match."
+    exit 1
+fi
+
+# Run the grub shell.
+$grub_shell --batch --device-map=/dev/null <<EOF \
+    | grep "^Encrypted: " | sed 's/^Encrypted: //'
+md5crypt
+$password
+quit
+EOF
+
+# Bye.
+exit 0

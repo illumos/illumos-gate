@@ -1,0 +1,249 @@
+.\" "
+.\" " Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+.\" " Use is subject to license terms.
+.\" "
+.\" " CDDL HEADER START
+.\" "
+.\" " The contents of this file are subject to the terms of the
+.\" " Common Development and Distribution License, Version 1.0 only
+.\" " (the "License").  You may not use this file except in compliance
+.\" " with the License.
+.\" "
+.\" " You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" " or http://www.opensolaris.org/os/licensing.
+.\" " See the License for the specific language governing permissions
+.\" " and limitations under the License.
+.\" "
+.\" " When distributing Covered Code, include this CDDL HEADER in each
+.\" " file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" " If applicable, add the following below this CDDL HEADER, with the
+.\" " fields enclosed by brackets "[]" replaced with your own identifying
+.\" " information: Portions Copyright [yyyy] [name of copyright owner]
+.\" "
+.\" " CDDL HEADER END
+.\" "
+.\" ident	"%Z%%M%	%I%	%E% SMI"
+.TH webrev 1 "1 January 2005"
+.SH NAME
+webrev \- Generate HTML codereview materials
+.SH SYNOPSIS
+webrev <file.list> | [-] | [-w [<wx file>]] | [-l [-f flp]] 
+
+.SH DESCRIPTION
+webrev takes a file list and a workspace
+and builds a set of HTML files suitable for doing
+a code review of source changes via a web page.
+
+Basic usage is:
+
+	$ webrev file.list
+
+where 'file.list' is a file containing the pathnames of all the files
+you wish to include in the review.  webrev creates a "webrev" directory
+in the workspace directory that contains all the generated HTML files.
+It also stashes a copy of the file list in that directory.
+
+1) If you use the -l option, "webrev -l", webrev extracts the file list
+from the output of "putback -n" that will include any files updated,
+created, or currently checked out.  This is the easiest way to use
+webrev.  If you use the "-l" option to generate the file list then skip
+to step (4).  Note: if the workspace is large (e.g. all of Solaris
+usr/src then this might take a while. You can run "webrev -l -f flp" to
+have webrev extract a file list from the output of "putback -n -f
+flp".  The file list created by "webrev -l" is stashed in the
+webrev directory as "file.list".
+
+If you would like more control over the file list then
+create a file containing a list of all the files to
+be included in your review with paths relative to your
+workspace directory, e.g.
+
+.IP
+usr/src/uts/common/fs/nfs/nfs_subr.c
+usr/src/uts/common/fs/nfs/nfs_export.c
+usr/src/cmd/fs.d/nfs/mountd/mountd.c
+.br
+:
+
+.PP
+Include the paths of any files added, deleted, or modified.
+You can keep this list of files in the webrev directory
+that webrev creates in your workspace directory
+(CODEMGR_WS).
+
+2) webrev needs to be able locate your workspace and
+its parent.  If you have already activated your workspace
+with the "ws" command then webrev will use the
+CODEMGR_WS environment variable.  If you are not working
+within a workspace activation, then you need to set
+the environment variable within the file list, e.g.
+
+.IP
+CODEMGR_WS=/home/brent/myws
+
+usr/src/uts/common/fs/nfs/nfs_subr.c
+usr/src/uts/common/fs/nfs/nfs_export.c
+usr/src/cmd/fs.d/nfs/mountd/mountd.c
+.br
+:
+
+.PP
+If you would like to compare against some other workspace
+that is not the parent, then you can set the CODEMGR_PARENT
+environment variable in the file list, e.g.
+
+.IP
+CODEMGR_WS=/home/brent/myws
+.br
+CODEMGR_PARENT=/ws/onnv-gate
+
+usr/src/uts/common/fs/nfs/nfs_subr.c
+usr/src/uts/common/fs/nfs/nfs_export.c
+usr/src/cmd/fs.d/nfs/mountd/mountd.c
+.br
+:
+
+.PP
+3) Run webrev with the name of the file containing
+the file list as an argument, e.g.
+
+.IP
+$ webrev file.list
+
+.PP
+If you supply "-" as the name of the file, then stdin
+will be used.
+
+If you use the "-w" flag, i.e. "webrev  -w  file.list"
+then webrev will assume the file list is in the format
+expected by the "wx" package: pathname lines alternating
+with SCCS comment lines separated by blank lines, e.g.
+
+.IP
+usr/src/uts/common/fs/nfs/nfs_subr.c
+
+1206578 Fix spelling error in comment
+
+usr/src/uts/common/fs/nfs/nfs_export.c
+
+4039272 cstyle fixes
+
+usr/src/cmd/fs.d/nfs/mountd/mountd.c
+
+1927634 mountd daemon doesn't handle expletives
+
+.PP
+Embedded bug ids and ARC cases will be converted to a URL (see
+below).
+
+4) For each file in the list, webrev will compare it
+with the version in the parent workspace (CODEMGR_PARENT)
+and generate context and side-by-side diffs (sdiffs) as
+HTML files as well as HTML renderings of the old and new
+files with prepended line numbers for easy cross-checking
+with diffs.
+
+The HTML files will have additional formatting to
+color code the source lines:
+
+.IP
+     unchanged : black
+       removed : brown
+       changed : blue
+           new : bold blue
+
+ 
+.PP
+5) Webrev will create a directory $CODEMGR_WS/webrev
+and create the HTML files in a hierarchy beneath
+this directory. Links to these HTML files will be
+built into an index.html file in the "webrev" directory.
+If you would like the "webrev" directory to appear
+somewhere other than $CODEMGR_WS, then set the WDIR
+environment variable, e.g.
+
+.IP
+       WDIR=/tmp webrev -l
+
+.PP
+Each file will be listed on a line with a link to its Cdiffs, Udiffs,
+Wdiffs, Sdiffs, Frames, Old, and New versions.  A blank line will be
+inserted between filenames that do not exist within the same directory
+as a grouping aid.  SCCS comments for each delta will be included
+automatically. Bug numbers (any sequence of 5 or more digits) and ARC
+cases (ARC name followed by year/number, e.g. PSARC/2003/436) in the
+comment will become a URL into the associated web interface.
+
+.PP
+As a review aid, you can add value to the index
+file by including text that explains the changes in front
+of the links for each file.  You might also add links
+to the one-pager, project plan, or other documents
+helpful to the reviewer.
+
+6) View the index.html file with your web browser to 
+verify that its what you want your reviewers to see.
+The browser must support HTML tables and colored fonts. 
+The Frames view requires HTML frames and JavaScript, as does Wdiff
+which also requires Dynamic HTML support.
+
+7) Then send an Email invitation to your reviewers including
+the URL to the index.html file in your workspace.  If you
+use an "http:" URL then you can omit the "index.html"
+filename, e.g.
+
+.IP
+To: bob, jane, wendy
+.br
+Subject: Please review fix for bug 1234576
+
+I'd be grateful if you would review my bugfix.
+All the relevant information can be obtained
+with the following URL:
+
+http://jurassic.eng/home/brent/myws/webrev
+
+Thanks
+.br
+Brent
+
+.SH ENVIRONMENT VARIABLES
+The following environment variables allow for easy customization of
+webrev.
+
+.IP
+CDIFFCMD and UDIFFCMD are used when generating Cdiffs and Udiffs
+respectively; their default values are "diff -b -C 5" and "diff -b -U
+5".  To generate diffs with more (or less) than 5 lines of context or
+with more (or less) strict whitespace handling, set one or both of
+these variables in your environment accordingly.
+
+WEBREV_FRAMES allows you to disable the creation of framed webrevs
+which are enabled by default.  Framed webrevs provide complete
+side-by-side comparisons utilizing HTML frames with JavaScript to aid
+in moving through the differences similar to filemerge.  To disable
+this feature set WEBREV_FRAMES=no in your environment.
+
+WEBREV_BUGURL may be set to an alternate bug to HTML interface
+(providing the BUG number can be appended to the URL).  The default
+URL is "http://monaco.sfbay.sun.com/detail.jsp?cr=".
+
+WDIFF specifies the command used to generate Wdiffs. Wdiff generates a
+full unified context listing with line numbers where unchanged
+sections of code may be expanded and collapsed.  It also provides a
+"split" feature that shows the same file in two HTML frames one above the
+other.  The default path for this script is
+/ws/onnv-gate/public/bin/wdiff but WDIFF may be set to customize this
+to use a more convenient location.
+
+.SH ACKNOWLEDGEMENTS
+Acknowledgements to Rob Thurlow, Mike Eisler, Lin Ling,
+Rod Evans, Mike Kupfer, Greg Onufer, Glenn Skinner,
+Oleg Larin, David Robinson, Matthew Cross, David L. Paktor,
+Neal Gafter, John Beck, Darren Moffat, Norm Shulman, Bill Watson,
+Pedro Rubio and Bill Shannon for valuable feedback and insight in
+building webrev.
+
+Have fun!
+		Brent Callaghan  11/28/96
+

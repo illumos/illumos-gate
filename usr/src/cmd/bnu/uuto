@@ -1,0 +1,131 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+uuto () {
+f=""
+d=""
+error="0"
+#	get file names
+#	files must be readable,
+#	directories must be readable/searchable
+#	otherwise increment error count and skip it.
+while test $#  -ge 1
+do
+	if test -d "$1" -a {"$1" = "." -o "$1" = ".."}
+		then shift; continue
+	elif test -r "$1" -a -f "$1"
+		then f="$f $1"
+	elif test -r "$1" -a -x "$1" -a -d "$1"
+		then d="$d $1"
+	else error=`expr 0$error + 1`
+		if test -f "$1"; then
+			printf "`gettext 'uuto: %s%s: file not readable'`\n" $UUP $1 >&2
+		elif test -d "$1"; then
+			printf "`gettext 'uuto: %s%s: directory not readable/searchable'`\n" $UUP $1 >&2
+		else
+			printf "`gettext 'uuto: %s%s: file/directory not found'`\n" $UUP $1 >&2
+		fi
+	fi
+	shift
+done
+if test -n "$d" -a -n "$user"
+then
+	for i in $d
+	do
+		( cd $i; UUP="$UUP$i/"
+		uuto * $1)
+		error=`expr 0$error + 0$?`
+	done
+fi
+
+if test -n "$f" -a -n "$user"
+then
+	uucp $a $f $remote!~/receive/$user/$mysys/$UUP
+	error=`expr 0$error + 0$?`
+fi
+
+return $error
+}
+
+# main uuto shell
+
+export IFS PATH
+IFS=" 	
+"
+PATH="/usr/bin"
+
+a=""
+temp=""
+mysys=`uuname -l`
+mesg="Usage: uuto [-mp] files remote!user\n"
+
+trap "trap '' 0; exit $?" 1 2 3 13 15
+copy=0
+#	get options
+while getopts mp FLAG; do
+	case $FLAG in
+	m)	a="$a -m"
+		;;
+	p)	a="$a -C"
+		copy=1 ;;
+	?)	gettext "$mesg" >&2
+		exit 1
+		;;
+	esac
+done
+shift `expr $OPTIND - 1`
+
+#	be sure have both files and destination
+if test $# -lt 2
+then
+	gettext "$mesg" >&2
+	exit 1
+fi
+#	skip file names to get to destination
+while test $#  -gt 1
+do
+	temp="$temp $1"
+	shift
+done
+#	the recipient arg: remote!user
+#	remote may be omitted (default is this machine)
+#	must have at least !user
+remote=`expr $1 : '\(.*\)!'`
+user=`expr $1 : '.*!\(.*\)'`
+if test -z "$user"
+then
+	gettext "uuto: incomplete destination -- must specify user\n" >&2
+	gettext "$mesg" >&2
+	exit 1
+fi
+a="$a -d -n $user"
+
+UUP=""
+uuto $temp
+
+exit $error

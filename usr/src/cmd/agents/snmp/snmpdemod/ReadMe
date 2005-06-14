@@ -1,0 +1,68 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the 
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+steps to create the sample agent using the agent toolkit.
+
+Step 1 : Create your MIB
+Step 2 : Copy the files in the sample directory to your own directory
+	 where you want to create your sub agent.
+Step 3 : Copy your MIB file in this directory.
+Step 4 : Modify the Makefile. Look for AGENT and assign the name of
+	 your sub agent.
+Step 5 : Modify the MIBS entry in the Makefile. You can replace mib_demo.txt
+	 with your mib file name(e.g mymib.txt).
+Step 6 : Type "make parse" to invoke the mibcodegen executable with
+	 the required mib files. This will create multiple 'c' code files.
+Step 7 : Modify the SOURCES entry in the Makefile. Add the 'c' files
+	 which are created in the previous step.
+Step 8 : Type "make", the sample agent executable will be created
+Step 9 : Modify the various generated 'c' files to add the functionality that
+	 the sub agent need to provide.
+
+Remark:
+Usage: snmpdemod  /* the generated subagent executable */
+	[-h] /* help message */
+
+	[-k (don't read config file)] /* run the subagent as standalone, in
+				other words, it doesn't register with master
+				agent */
+
+	[-p port ] /* port for listening SNMP requests */
+
+	[-c config-file (default /etc/opt/SUNWconn/SSA/snmp/conf/snmpdemo.reg)]
+		/* file for oid(subtrees) registration with master agent.
+		   with -k option, this file won't be read */
+
+	[-a sec-config-file (default /etc/opt/SUNWconn/SSA/snmp/conf/snmpdemo.acl)]
+		/* access control file for the subagent */
+
+	[-i poll-interval (default 30 seconds)]
+		/* maximum interval for subagent to wait for requests */
+
+	[-d trace-level (range 0..4, default 0)]
+		/* debugging purpose */
+

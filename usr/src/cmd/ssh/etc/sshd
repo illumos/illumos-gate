@@ -1,0 +1,68 @@
+#!/sbin/sh
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+SSHDIR=/etc/ssh
+KEYGEN="/usr/bin/ssh-keygen -q"
+PIDFILE=/var/run/sshd.pid
+
+# Checks to see if RSA, and DSA host keys are available
+# if any of these keys are not present, the respective keys are created.
+create_key()
+{
+	keypath=$1
+	keytype=$2
+
+	if [ ! -f $keypath ]; then
+		grep "^HostKey $keypath" $SSHDIR/sshd_config > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo Creating new $keytype public/private host key pair
+			$KEYGEN -f $keypath -t $keytype -N ''
+			return $?
+		fi
+	fi
+
+	return 0
+}
+
+# This script is being used for two purposes: as part of an SMF
+# start/stop/refresh method, and as a sysidconfig(1M)/sys-unconfig(1M)
+# application.
+#
+# Both, the SMF methods and sysidconfig/sys-unconfig use different
+# arguments..
+
+case $1 in 
+	# sysidconfig/sys-unconfig arguments (-c and -u)
+'-c')
+	create_key $SSHDIR/ssh_host_rsa_key rsa
+	create_key $SSHDIR/ssh_host_dsa_key dsa
+	;;
+
+'-u')
+	# sys-unconfig(1M) knows how to remove ssh host keys, so there's
+	# nothing to do here.
+	:
+	;;
+
+	# SMF arguments (start and restart [really "refresh"])
+'start')
+	/usr/lib/ssh/sshd
+	;;
+
+'restart')
+	if [ -f "$PIDFILE" ]; then
+		/usr/bin/kill -HUP `/usr/bin/cat $PIDFILE`
+	fi
+	;;
+
+*)
+	echo "Usage: $0 { start | restart }"
+	exit 1
+	;;
+esac	
+
+exit $?

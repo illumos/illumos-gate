@@ -1,0 +1,232 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+This is an internal library for use only by:
+	usr/src/cmd/cmd-crypto
+	usr/src/lib/pkcs11
+
+The library and the header file are installed into the proto area but
+are not included in any pacakges.
+
+
+			libcryptoutil Design
+
+1. Introduction
+
+There are a number of common code components and general utility functions
+needed that are shared by various userland parts of the crypto framework.
+
+The originally approved ARC materials (PSARC/2001/488 & PSARC/2001/553)
+didn't have a library that was included by all user land libraries,
+plugins and commands.
+
+The solution to this is to follow what other project teams have done in the
+past and create a project private util library.
+
+2. Contents
+
+Any code that is generic enough to be shared by multiple parts of the
+user crypto framework is eligible.
+
+The current contents are:
+
+2.1 Error & Debug Functions
+
+	cryptodebug_init(),
+	cryptodebug()
+	cryptoerror()
+
+These functions log debug or error information to stderr and/or
+syslog or a file.  Debug is off by default but the code is always
+compiled in.
+
+The cryptodebug_init() routine allows the caller to set a message
+prefix for error and debug output.
+
+The environment variable SUNW_CRYPTO_DEBUG determines wither or not
+debug output is generated at run time, valid values are "syslog" or "stderr"
+
+For example elfsign(1) could do:
+
+	cryptodebug_init("elfsign");
+
+and later:
+	cryptoerror(LOG_STDERR, gettext("invalid number of arguments"));
+
+This would cause an error message on stderr thus:
+
+	"elfsign: invalid number of arguments"
+
+The first argument to cryptoerror is either LOG_STDERR or a syslog(3c)
+priority.  All messages include the PID and are logged at LOG_USER.
+
+for debug output:
+
+	cryptodebug("scmd=request opts=%s", opts);
+
+This would go to the location defined by $SUNW_CRYPTO_DEBUG, ie
+syslog, stderr or not be generated at all.
+
+2.2 PKCS#11 Mechanism Type to and from Strings
+
+	pkcs11_mech2str() and pkcs11_str2mech()
+
+These functions use a table built at compile time from the contents of
+the pkcs11t.h file to map mechanism numbers to the corresponding string
+value.
+
+pkcs11_mech2str() returns a pointer to a string that should be free(3c)'d
+by the caller.
+
+Consumers:  
+
+	digest(1), mac(1), encrypt(1), decrypt(1) for translating
+	command line args to mech numbers.  They will need to
+	add the "CKM_" prefix before calling pkc11_str2mech()
+
+	cryptoadm(1m) for output to user, and for storing in pkcs11.conf
+	file.
+
+	Debug code.
+
+2.3 The "pkcs11.conf" configuration file Parsing code.
+
+The "pkcs11.conf" configuration file parsing code and data structures are
+shared between:
+	cryptoadm(1m), libpkcs11(3crypto).
+
+2.3.1 Data Structures:
+
+	#define MECH_ID_HEX_LEN 11 /* length of mechanism id in hex form */
+
+	typedef char libname_t[MAXPATHLEN];
+	typedef char midstr_t[MECH_ID_HEX_LEN];
+
+	/* The policy list for an entry in the config file  */
+	typedef struct umechlist {
+        	midstr_t                name;
+	        struct umechlist        *next;
+	} umechlist_t;
+
+	/* An entry in the pkcs11.conf file */
+	typedef struct uentry {
+        	libname_t       name;
+	        boolean_t       flag_enabledlist; /* TRUE if an enabledlist */
+        	umechlist_t     *policylist; /* disabledlist or enabledlist */
+	        int             count;
+	} uentry_t;
+
+	/* The entry list for the entire pkcs11.conf file */
+	typedef struct uentrylist {
+        	uentry_t               *pent;
+	        struct uentrylist      *next;
+	} uentrylist_t;
+
+
+2.3.2 Functions:
+
+extern int get_pkcs11conf_info(uentrylist_t **ppliblist);
+$
+    Retrieve the user-level provider info from the pkcs11.conf file.
+    If successful, the result is returned from the ppliblist argument.
+    This function returns SUCCESS if successfully done; otherwise it returns
+    FAILURE.  The caller should use free_uentrylist() to free the space
+    allocated for "ppliblist".
+
+extern umechlist_t *create_umech(char *mechname);
+
+    Create one item of type umechlist_t with the mechanism name in hex form. 
+    A NULL is returned when the input name is NULL or the heap memory is
+    insufficient.  The Caller should use free_umechlist() to free the space
+    allocated for the returning data.
+
+extern void free_uentrylist(uentrylist_t *ptr);
+
+    Free space allocated for an pointer to the struct "uentrylist_t".
+
+extern void free_uentry(uentry_t *ptr);
+
+    Free space allocated for an pointer to the struct "uentry_t".
+	
+extern void free_umechlist(umechlist_t *ptr);
+
+    Free space allocated for an pointer to the struct "umechlist_t".
+
+2.4 PKCS#11 Mechanism Type to key type
+
+	pkcs11_mech2keytype()
+
+This function is used to get the key type for a mechanism.
+
+Consumers:  
+
+	encrypt(1), decrypt(1), and libpkcs11(3crypto) for getting
+	the key type when creating an object for use with a
+	specific mechanism.
+
+2.5 PKCS#11 return code to string
+
+	pkcs11_strerror()
+
+This function returnes a string representation of any given PKCS11 return
+code.
+
+Consumer:
+
+	encrypt(1) and decrypt(1) uses this function for reporting errors.
+	
+3. Non-Contents
+	
+Code for cryptographic algorithms does not belong in here.  That
+comes from usr/src/common/<algorithm> since it is shared between user and
+kernel.
+
+PKCS#11 header files although they are common to various parts of the
+user land framework come from usr/src/pkcs11/include
+
+4. Interface Taxonomy
+
+Everything in this library is Project Private or Internal.  The
+exported symbols will all be marked as SUNWprivate_1.0 in the library
+spec file.
+
+5. Static vs Dynamic
+
+The initial design was to only use a static archive library to avoid
+exposing a new interface (even though it is all private).  However while
+this is fine for initial delivery it creates difficulties later with
+patching.  As such a Dynamic version will be build.
+
+Libraries for lint and header files will not be shipped in any Sun packages
+since this is all Project Private.  Similarly the abi_ file will not be
+shipped even though a spec file will be used in the source gate.
+
+6. Library location
+
+At present all of the consumers of the library are in /usr/ so the
+library is /usr/lib/{sparcv9}/libcryptoutil.so.1.  If kcfd ever moves
+to /lib/crypto/kcf as a result of PSARC/2002/117 allowing it, then
+libcryptoutil needs to move as well.

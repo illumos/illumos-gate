@@ -1,0 +1,10 @@
+
+Press CHOICES or type the name of a file that you wish to run
+the spell command on.
+
+After you press SAVE, a text frame will appear on the screen 
+that contains the results of the spell command.
+
+If the spell command found no errors in your file, a message
+to that effect will appear in the text frame.
+

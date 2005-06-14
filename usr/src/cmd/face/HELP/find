@@ -1,0 +1,34 @@
+
+The find command enables you to search for objects in your system
+based on any or all of the following criteria: Name of the file or
+file folder; Object type; Owner; Age.
+
+Find will search down through all file folders from the point you are 
+at in the Filecabinet.  If you issue the find from the Filecabinet,
+the Filecabinet is searched.  You can also specify via the "command
+line" method the name of a file folder to be searched.
+
+Use one of the methods below for the find command:
+
+     Command Menu:  Select find and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on find and an -->
+     (alternative)  will appear on the command line followed by the
+                    find. Type arguments and press ENTER to execute
+                    the command.
+
+     Command Line:  Type find [object] [file folder name] and press
+                    ENTER.
+
+   1.  If you specified an object name, FACE will begin the search
+       for matches.
+
+   2.  If you did not specify an object, a form titled
+       "Find <user login>" will appear requesting that you specify the
+       search criteria.
+
+     3.  When the find is complete, an "Objects Found" menu frame will
+         be  displayed listing  all matches found.  Each object in the
+         menu is specified in its "path name" format so you will know
+         what file folder actually contains the object.
+

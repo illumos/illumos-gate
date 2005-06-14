@@ -1,0 +1,79 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/fs_include.sh
+
+#
+# no boot-archive on sparc...yet
+#
+if [  `uname -p` = "sparc" ]; then
+	exit $SMF_EXIT_OK
+fi
+
+#
+# Check the boot archive content against root filesystem.
+# Return failure if they differ.
+#
+if [ "${_INIT_ZONENAME:=`/sbin/zonename`}" != "global" ]; then
+	exit $SMF_EXIT_OK
+fi
+
+#
+# Make sure we return failure only once. If user choose to ignore
+# error, we return success to permit boot to continue. The boot
+# archive will be updated on the subsequent shutdown.
+#
+ERRORFILE=/etc/svc/volatile/boot_archive_error
+if [ -f "${ERRORFILE}" ]; then
+	rm ${ERRORFILE}
+	exit $SMF_EXIT_OK
+fi
+
+#
+# Now check the archive.
+#
+/sbin/bootadm -a update -vn 2> /dev/null
+if [ $? = 0 ]; then
+	exit $SMF_EXIT_OK
+fi
+
+touch ${ERRORFILE}
+cecho ""
+cecho "WARNING - The following files in / differ from the boot archive:"
+
+/sbin/bootadm -a update -vn > /dev/msglog 2> /dev/null
+
+cecho "The recommended action is to reboot and select \"Solaris failsafe\""
+cecho "option from the boot menu. Then follow prompts to update the"
+cecho "boot archive."
+cecho "To continue booting at your own risk, clear the service:"
+cecho "  # svcadm clear system/boot-archive"
+cecho ""
+
+exit $SMF_EXIT_ERR_FATAL

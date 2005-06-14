@@ -1,0 +1,56 @@
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+# 2001 September 15
+#
+# The author disclaims copyright to this source code.  In place of
+# a legal notice, here is a blessing:
+#
+#    May you do good and not evil.
+#    May you find forgiveness for yourself and forgive others.
+#    May you share freely, never taking more than you give.
+#
+#***********************************************************************
+# This file runs all tests.
+#
+# $Id: quick.test,v 1.6 2004/02/11 02:18:07 drh Exp $
+
+set testdir [file dirname $argv0]
+source $testdir/tester.tcl
+rename finish_test really_finish_test
+proc finish_test {} {}
+set ISQUICK 1
+
+set EXCLUDE {
+  all.test
+  quick.test
+  btree2.test
+  malloc.test
+  memleak.test
+  misuse.test
+}
+
+if {[sqlite -has-codec]} {
+  lappend EXCLUDE \
+    attach.test \
+    attach2.test \
+    auth.test \
+    format3.test \
+    version.test
+}
+
+foreach testfile [lsort -dictionary [glob $testdir/*.test]] {
+  set tail [file tail $testfile]
+  if {[lsearch -exact $EXCLUDE $tail]>=0} continue
+  source $testfile
+  catch {db close}
+  if {$sqlite_open_file_count>0} {
+    puts "$tail did not close all files: $sqlite_open_file_count"
+    incr nErr
+    lappend ::failList $tail
+  }
+}
+source $testdir/misuse.test
+
+set sqlite_open_file_count 0
+really_finish_test

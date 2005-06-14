@@ -1,0 +1,56 @@
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+add scsi_watch_request::swr_callback targets \
+	st.c:st_media_watch_cb
+
+add scsi_pkt::pkt_comp targets \
+        st.c:st_media_watch_cb \
+	scsi_watch.c:scsi_watch_request_intr \
+	st.c:st_intr \
+	glm.c:glm_scsi_destroy_pkt \
+	glm.c:glm_scsi_init_pkt \
+	glm.c:glm_scsi_start \
+	glm.c:glm_scsi_abort \
+	glm.c:glm_scsi_reset \
+	glm.c:glm_scsi_setcap \
+	glm.c:glm_scsi_getcap \
+	glm.c:glm_scsi_dmafree \
+	glm.c:glm_scsi_reset_notify \
+	glm.c:glm_scsi_tgt_init \
+	glm.c:glm_scsi_tgt_free \
+	glm.c:glm_scsi_sync_pkt
+
+add notify_entry::callback target warlock_dummy
+
+one scsi_device
+one glm
+
+root glm_kmem_cache_destructor glm_kmem_cache_constructor
+assert order scsi_device::sd_mutex  glm::g_mutex
+
+add     scsi_hba_tran::tran_bus_config targets warlock_dummy
+add     scsi_hba_tran::tran_bus_unconfig targets warlock_dummy
+

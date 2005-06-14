@@ -1,0 +1,1989 @@
+#!/usr/bin/perl -w
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#
+# tester - run logadm tests
+#
+# requires a <bindir> argument to say where the various logadm
+# binaries live (conftest, globtest, kwtest, luttest, optstest, and
+# logadm itself).
+#
+# to run all the tests:
+# 	tester [-f] <bindir>
+#
+# to run just a few tests, given their names:
+# 	tester [-f] <bindir> globtest1 luttest1
+#
+# to setup a test and stop so you can run it by hand:
+# 	tester [-f] -s globtest1 <bindir>
+#
+# 	tester will tell you what tmp directory it created for
+# 	the test.  to run it, cd there and run:
+# 		sh runtest
+# 	to check the results, run:
+# 		sh checktest
+#
+# -f means "fast" -- without it, watchmalloc(3MALLOC) is setup for
+# each test and they run a zillion times slower and produce core
+# dumps when malloc/free problems are detected.
+#
+$watchmalloc=1;		# default is to use watchmalloc
+${ENV} = "/bin";
+umask 002;
+
+# list of tests we run by default
+@tests = (
+	"conftest1",
+	"conftest2",
+	"globtest1",
+	"globtest2",
+	"kwtest1",
+	"kwtest2",
+	"luttest1",
+	"optstest1",
+	"optstest2",
+	"logadmV1",
+	"logadmV2",
+	"logadmr",
+	"logadmw",
+	"logadm1",
+	"logadm1c",
+	"logadm2",
+	"logadm3",
+	"logadm4",
+	"logadm5",
+	"logadm6",
+	"logadm7",
+	"logadm8",
+	"logadm9",
+	"logadm9d",
+	"logadm10",
+	"logadm11",
+	"logadm12",
+	"logadm13",
+	"logadm14",
+	"logadm15",
+	"logadm16",
+	"logadm17",
+	"logadm18",
+);
+
+use Getopt::Std;
+use File::Find;
+
+$usage_summary = '[-s test-name] [-d dir] bindir [test-name...]';
+$usage_getopts = 'fd:s:';
+%usage = (
+	d=>'use dir for tests rather than creating one in /tmp',
+	s=>'setup only, do not run test');
+
+# spew usage message, plus any given message, and exit
+sub usage {
+	my $msg = shift;
+
+	if ($msg) {
+		chomp $msg;
+		warn "$0: $msg\n" if $msg;
+	}
+	warn "Usage: $0 $usage_summary\n";
+	foreach (sort keys %usage) {
+		warn "       -$_ $usage{$_}\n";
+	}
+	exit 1;
+}
+
+#
+# basic argument processing
+#
+$myname = $0;
+$myname =~ s/.*\///;	# just show last component in error mesages
+getopts($usage_getopts) or usage;
+$bindir = shift or usage;
+usage("$bindir does not exist") unless -d $bindir;
+usage("cannot list more than one test with -s option") if $opt_s && @ARGV;
+@tests = @ARGV if @ARGV;
+print "Fast mode\n" if $opt_f;
+$watchmalloc = 0 if $opt_f;
+
+$mydir=`pwd`;
+chomp $mydir;
+
+$dir = $opt_d;
+$dir = "/tmp/logadmtest$$" unless $dir = $opt_d;
+
+if (!-d $dir) {
+	mkdir $dir, 0777 or die "$myname: mkdir $dir: $!\n";
+	$needrmdir = 1;
+}
+
+chdir $dir or die "$myname: $dir: $!\n";
+
+# common commands in runtest by tests
+if ($watchmalloc) {
+	$envsetup =
+		"HOME=$dir export HOME; " .
+		"LD_PRELOAD=watchmalloc.so.1 export LD_PRELOAD; " .
+		"MALLOC_DEBUG=RW export MALLOC_DEBUG";
+} else {
+	$envsetup = "HOME=$dir export HOME; ";
+}
+
+$| = 1;		# a.k.a. setbuf(stdout, NULL)
+
+if ($opt_s) {
+	#
+	# just setup the test, explain how to use it, and exit
+	#
+	$testname = $opt_s;
+	eval "&$opt_s";
+	die "$myname: ERROR: $@" if $@;
+	print "$myname: $testname setup complete, to run, cd to:\n";
+	print "    $dir\n";
+	print "and run the command:\n";
+	print "    sh runtest\n";
+	print "to check the results, run the command:\n";
+	print "    sh checktest\n";
+	exit 0;
+} else {
+	#
+	# run all the tests
+	#
+	foreach (@tests) {
+		$testname = $_;
+		print "Running $testname...";
+		eval "&$_";
+		if ($@) {
+			print " SETUP FAILURE\n";
+			print STDERR "$myname: ERROR: $@";
+			exit 1;
+		}
+		eval "runner('runtest')";
+		if ($@) {
+			print " RUNTEST FAILURE\n";
+			print STDERR "$myname: ERROR: $@";
+			print STDERR "results captured in directory $dir\n";
+			print STDERR "  or use: $myname -s $testname $bindir\n";
+			print STDERR "  to do a fresh setup of this test.\n";
+			exit 1;
+		}
+		eval "runner('checktest')";
+		if ($@) {
+			print " CHECKTEST FAILURE\n";
+			print STDERR "$myname: ERROR: $@";
+			print STDERR "results captured in directory $dir\n";
+			print STDERR "  or use: $myname -s $testname $bindir\n";
+			print STDERR "  to do a fresh setup of this test.\n";
+			exit 1;
+		}
+		print "pass\n";
+		# sanity...
+		die "unexpected dir $dir" unless $dir =~ m,/.+/,;
+		system("/bin/rm -rf $dir/*");
+	}
+}
+
+# if we were the ones who created $dir, remove it
+if ($needrmdir) {
+	chdir $mydir;
+	rmdir $dir || die "$myname: rmdir $dir: $!\n";
+}
+
+exit 0;
+
+#
+# run a shell script and check for failure
+#
+# the shell scripts generated by this program always "exec" the binary
+# under test so checking here are for exit code, signals, and core dump
+# is actually checking the program under test and not /bin/sh
+#
+sub runner {
+	my $cmd = shift;
+	my $fullcmd = "/bin/sh $cmd";
+	my $rc = 0xffff & system("$fullcmd");
+
+	if ($rc == 0) {
+		return;		# cmd completed normally
+	} elsif ($rc == 0xff00) {
+		die "command \"$cmd\" failed: $!\n";
+	} elsif (($rc & 0xff) == 0) {
+		$rc >>= 8;
+		die "command \"$cmd\" exit $rc\n";
+	} else {
+		my $coremsg;
+		$coremsg = " (core dumped)" if ($rc & 0x80);
+		$rc &= ~0x80;
+		die "command \"$cmd\" signal $rc$coremsg\n" ;
+	}
+}
+
+#
+# set_file(filename [, contents]) -- create a file, optionally with contents
+#
+sub set_file {
+	my $file = shift;
+	my $contents = shift;
+
+	open SF, ">$file" or die "create \"$file\": $!\n";
+	print SF $contents if defined($contents);
+	close SF;
+}
+
+#############
+#############
+#############    THE TESTS START AFTER HERE...
+#############
+#############
+
+# common setup step -- create a testfile.conf
+sub set_testconffile {
+	my $fname = shift;
+	$fname = 'testfile.conf' unless defined($fname);
+
+	set_file($fname, <<'EOF');
+#
+# logadm.conf
+#
+# Default settings for system log file management.
+# The -w option to logadm(1M) is the preferred way to write to this file,
+# but if you do edit it by hand, use "logadm -V" to check it for errors.
+# 
+# The format of lines in this file is:
+#       <logname> <options>
+# For each logname listed here, the default options to logadm
+# are given.  Options given on the logadm command line override
+# the defaults contained in this file.
+#
+# logadm typically runs early every morning via an entry in
+# root's crontab (see crontab(1)).
+#
+/var/adm/messages -C 4 -P 'Thu Nov  1 16:56:42 2001' -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/cron/log -s 512k -t /var/cron/olog
+/var/lp/logs/lpsched -C 2 -N -t '$file.$N'
+#
+# The entry below is used by turnacct(1M)
+#
+/var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+apache -C 24 -a '/usr/apache/bin/apachectl graceful' -p 1m -t '/var/apache/old-logs/$basename.%Y-%m' '/var/apache/logs/*{access,error}_log'
+/var/log/syslog -C 8 -P 'Thu Nov  1 09:16:38 2001' -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/apache/logs/access_log -P 'Thu Nov  1 08:27:56 2001'
+/var/apache/logs/error_log -P 'Thu Nov  1 08:27:56 2001'
+/var/apache/logs/suexec_log -P 'Thu Nov  1 08:27:56 2001'
+/var/apache/logs/mod_jserv.log -P 'Thu Nov  1 08:27:56 2001'
+/var/apache/logs/jserv.log -P 'Thu Nov  1 08:27:56 2001'
+EOF
+}
+
+
+###########################################################################
+#
+#	conftest1 -- minimal basic test of the conf.c code
+#
+###########################################################################
+sub conftest1 {
+	set_testconffile;
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+/bin/sed '/^conffile <testfile.conf>:$/d' <std.out >sed.out
+exec /bin/diff sed.out testfile.conf
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "conftest1"
+$envsetup
+exec $bindir/conftest testfile.conf >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	conftest2 -- error path through conf.c
+#
+###########################################################################
+sub conftest2 {
+	set_file('testfile.conf', 'line fragment');
+
+	set_file('std.err.expect', <<'EOF');
+conftest: Warning: config file doesn't end with newline, last line ignored.
+EOF
+
+	set_file('checktest', <<'EOF');
+exec /bin/diff std.err std.err.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "conftest2"
+$envsetup
+$bindir/conftest testfile.conf >std.out 2>std.err || exit 0
+exit 1
+EOF
+}
+
+###########################################################################
+#
+#	globtest1 -- minimal basic test of the glob.c code
+#
+###########################################################################
+sub globtest1 {
+	set_file('fileBname12');
+	sleep 2;	# ensure above name is odler than below name
+	set_file('fileAname12');
+	set_file('fileAname1');
+	set_file('fileAname3');
+	set_file('fileAname5');
+	set_file('fileAname7');
+	set_file('fileAname9');
+	set_file('fileAname11');
+	set_file('fileBname0');
+	set_file('fileBname2');
+	set_file('fileBname4');
+	set_file('fileBname6');
+	set_file('fileBname8');
+	set_file('fileBname10');
+	mkdir 'dir1', 0777 or die "mkdir dir1: $!\n";
+	mkdir 'dir2', 0777 or die "mkdir dir2: $!\n";
+	mkdir 'dir3', 0777 or die "mkdir dir3: $!\n";
+	mkdir 'dir1/dirA', 0777 or die "mkdir dir1/dirA: $!\n";
+	mkdir 'dir1/dirB', 0777 or die "mkdir dir1/dirB: $!\n";
+	mkdir 'dir1/dirC', 0777 or die "mkdir dir1/dirC: $!\n";
+	mkdir 'dir2/dirA', 0777 or die "mkdir dir2/dirA: $!\n";
+	mkdir 'dir2/dirB', 0777 or die "mkdir dir2/dirB: $!\n";
+	mkdir 'dir2/dirC', 0777 or die "mkdir dir2/dirC: $!\n";
+	set_file('dir1/fileAname1');
+	set_file('dir1/fileAname2');
+	set_file('dir1/fileAname3');
+	set_file('dir1/fileAname4');
+	set_file('dir1/fileAname5');
+	set_file('dir1/fileBname1');
+	set_file('dir1/fileBname2');
+	set_file('dir1/fileBname3');
+	set_file('dir1/fileBname4');
+	set_file('dir1/fileBname5');
+	# supply some varying sizes to produce different total size values
+	set_file('dir1/dirA/fileAname4', '4444');
+	sleep 2;	# ensure above file is oldest in dirA
+	set_file('dir1/dirA/fileAname1', '1');
+	set_file('dir1/dirA/fileAname2', '22');
+	set_file('dir1/dirA/fileAname3', '333');
+	set_file('dir1/dirA/fileAname5', '55555');
+	set_file('dir1/dirA/fileBname1', '1');
+	set_file('dir1/dirA/fileBname2', '22');
+	set_file('dir1/dirA/fileBname3', '333');
+	set_file('dir1/dirA/fileBname4', '4444');
+	set_file('dir1/dirA/fileBname5', '55555');
+	set_file('dir1/dirB/fileAname1', '1');
+	set_file('dir1/dirB/fileAname2', '22');
+	set_file('dir1/dirB/fileAname3', '333');
+	set_file('dir1/dirB/fileAname4', '4444');
+	set_file('dir1/dirB/fileAname5', '55555');
+	set_file('dir1/dirB/fileBname1', '1');
+	set_file('dir1/dirB/fileBname2', '22');
+	set_file('dir1/dirB/fileBname3', '333');
+	set_file('dir1/dirB/fileBname4', '4444');
+	set_file('dir1/dirB/fileBname5', '55555');
+	set_file('dir1/dirC/fileAname10', '12345678901');
+	set_file('dir1/dirC/fileAname20', '123456789022');
+	set_file('dir1/dirC/fileAname30', '1234567890333');
+	set_file('dir1/dirC/fileAname40', '12345678904444');
+	set_file('dir1/dirC/fileAname50', '123456789055555');
+	set_file('dir1/dirC/fileBname10', '12345678901');
+	set_file('dir1/dirC/fileBname20', '123456789022');
+	set_file('dir1/dirC/fileBname30', '1234567890333');
+	set_file('dir1/dirC/fileBname40', '12345678904444');
+	set_file('dir1/dirC/fileBname50', '123456789055555');
+
+	set_file('std.out.expect', <<'EOF');
+<file{A,B,C}name*>:
+    <./fileAname12>
+    <./fileAname1>
+    <./fileAname3>
+    <./fileAname5>
+    <./fileAname7>
+    <./fileAname9>
+    <./fileAname11>
+    <./fileBname12>
+    <./fileBname0>
+    <./fileBname2>
+    <./fileBname4>
+    <./fileBname6>
+    <./fileBname8>
+    <./fileBname10>
+total size: 0
+    oldest <./fileBname12>
+    oldest <./fileBname8>
+    oldest <./fileBname6>
+    oldest <./fileBname4>
+    oldest <./fileBname2>
+    oldest <./fileBname10>
+    oldest <./fileBname0>
+    oldest <./fileAname9>
+    oldest <./fileAname7>
+    oldest <./fileAname5>
+    oldest <./fileAname3>
+    oldest <./fileAname12>
+    oldest <./fileAname11>
+    oldest <./fileAname1>
+<file{A,B,C}name>:
+    <fileAname>
+    <fileBname>
+    <fileCname>
+total size: 0
+    oldest <fileCname>
+    oldest <fileBname>
+    oldest <fileAname>
+<dir1/dirA/file*>:
+    <./dir1/dirA/fileAname4>
+    <./dir1/dirA/fileAname1>
+    <./dir1/dirA/fileAname2>
+    <./dir1/dirA/fileAname3>
+    <./dir1/dirA/fileAname5>
+    <./dir1/dirA/fileBname1>
+    <./dir1/dirA/fileBname2>
+    <./dir1/dirA/fileBname3>
+    <./dir1/dirA/fileBname4>
+    <./dir1/dirA/fileBname5>
+total size: 30
+    oldest <./dir1/dirA/fileAname4>
+    oldest <./dir1/dirA/fileBname5>
+    oldest <./dir1/dirA/fileBname4>
+    oldest <./dir1/dirA/fileBname3>
+    oldest <./dir1/dirA/fileBname2>
+    oldest <./dir1/dirA/fileBname1>
+    oldest <./dir1/dirA/fileAname5>
+    oldest <./dir1/dirA/fileAname3>
+    oldest <./dir1/dirA/fileAname2>
+    oldest <./dir1/dirA/fileAname1>
+<dir[13]/[e-z]*>:
+    <./dir1/fileAname1>
+    <./dir1/fileAname2>
+    <./dir1/fileAname3>
+    <./dir1/fileAname4>
+    <./dir1/fileAname5>
+    <./dir1/fileBname1>
+    <./dir1/fileBname2>
+    <./dir1/fileBname3>
+    <./dir1/fileBname4>
+    <./dir1/fileBname5>
+total size: 0
+    oldest <./dir1/fileBname5>
+    oldest <./dir1/fileBname4>
+    oldest <./dir1/fileBname3>
+    oldest <./dir1/fileBname2>
+    oldest <./dir1/fileBname1>
+    oldest <./dir1/fileAname5>
+    oldest <./dir1/fileAname4>
+    oldest <./dir1/fileAname3>
+    oldest <./dir1/fileAname2>
+    oldest <./dir1/fileAname1>
+<dir?/dir[AC]/fileBname[2-9]>:
+    <./dir1/dirA/fileBname2>
+    <./dir1/dirA/fileBname3>
+    <./dir1/dirA/fileBname4>
+    <./dir1/dirA/fileBname5>
+total size: 14
+    oldest <./dir1/dirA/fileBname5>
+    oldest <./dir1/dirA/fileBname4>
+    oldest <./dir1/dirA/fileBname3>
+    oldest <./dir1/dirA/fileBname2>
+<file[A-Z]n.*e([0-9]+)$0>:
+    <./fileBname12>
+    <./fileAname12>
+    <./fileAname1>
+    <./fileAname3>
+    <./fileAname5>
+    <./fileAname7>
+    <./fileAname9>
+    <./fileAname11>
+    <./fileBname0>
+    <./fileBname2>
+    <./fileBname4>
+    <./fileBname6>
+    <./fileBname8>
+    <./fileBname10>
+total size: 0
+    oldest <./fileBname12>
+    oldest <./fileAname12>
+    oldest <./fileAname11>
+    oldest <./fileBname10>
+    oldest <./fileAname9>
+    oldest <./fileBname8>
+    oldest <./fileAname7>
+    oldest <./fileBname6>
+    oldest <./fileAname5>
+    oldest <./fileBname4>
+    oldest <./fileAname3>
+    oldest <./fileBname2>
+    oldest <./fileAname1>
+    oldest <./fileBname0>
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+exec /bin/diff std.out std.out.expect
+EOF
+
+	$testglobs='\'file{A,B,C}name*\' \'file{A,B,C}name\' \'dir1/dirA/file*\' \'dir[13]/[e-z]*\' \'dir?/dir[AC]/fileBname[2-9]\' -r \'file[A-Z]n.*e([0-9]+)$0\'';
+
+	set_file('runtest', <<"EOF");
+# test "globtest1"
+$envsetup
+exec $bindir/globtest $testglobs >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	globtest2 -- error path through glob.c
+#
+###########################################################################
+sub globtest2 {
+	set_file('std.err.expect', <<'EOF');
+globtest: Error: Missing }
+EOF
+
+	set_file('checktest', <<'EOF');
+exec /bin/diff std.err std.err.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "globtest2"
+$envsetup
+$bindir/globtest 'hello{there' >std.out 2>std.err || exit 0
+exit 1
+EOF
+}
+
+###########################################################################
+#
+#	kwtest1 -- minimal basic test of the kw.c code
+#
+###########################################################################
+sub kwtest1 {
+	$domainname = `/bin/domainname`; chomp $domainname;
+	$isa = `/bin/uname -p`; chomp $isa;
+	$platform = `/bin/uname -i`; chomp $platform;
+	$nodename = `/bin/uname -n`; chomp $nodename;
+	$machine = `/bin/uname -m`; chomp $machine;
+	$release = `/bin/uname -r`; chomp $release;
+$secondblob=<<'EOF';
+expand<$file.$n> n -1 hasn 1 result </var/log/syslog\.([0-9]+)$0>
+expand<$file.$n> n 0 hasn 1 result </var/log/syslog.0>
+expand<$file.$n> n 1 hasn 1 result </var/log/syslog.1>
+expand<moose%d.$n> n -1 hasn 1 result <moose[0-9]+\.([0-9]+)$0>
+expand<moose%d.$n> n 0 hasn 1 result <moose%d.0>
+expand<moose%d.$n> n 1 hasn 1 result <moose%d.1>
+expand</var/logs-%Y/moose-$isa$#porklips%d.$n> n -1 hasn 1 result </var/logs-[0-9]+/moose-ISAporklips[0-9]+\.([0-9]+)$0>
+expand</var/logs-%Y/moose-$isa$#porklips%d.$n> n 0 hasn 1 result </var/logs-%Y/moose-ISAporklips%d.0>
+expand</var/logs-%Y/moose-$isa$#porklips%d.$n> n 1 hasn 1 result </var/logs-%Y/moose-ISAporklips%d.1>
+EOF
+	$percentd = `/bin/env TZ=UTC /bin/date +%d`; chomp $percentd;
+	$percentY = `/bin/env TZ=UTC /bin/date +%Y`; chomp $percentY;
+	$secondblob =~ s/%d/$percentd/mg;
+	$secondblob =~ s/%Y/$percentY/mg;
+	$secondblob =~ s/ISA/$isa/mg;
+	chomp $secondblob;
+	set_file('sed.out.expect', <<"EOF");
+            basename syslog
+             dirname /var/log
+              domain $domainname
+                file /var/log/syslog
+                home $dir
+                 isa $isa
+             logname $ENV{LOGNAME}
+             machine $machine
+               nfile 
+            nodename $nodename
+            platform $platform
+             release $release
+                user $ENV{USER}
+$secondblob
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+/bin/sed -e '/^ *secs [0-9][0-9]*$/d'\
+	-e "s/%d/`/bin/env TZ=UTC /bin/date +%d`/g"\
+	-e "s/%Y/`/bin/env TZ=UTC /bin/date +%Y`/g"\
+	<std.out >sed.out
+exec /bin/diff sed.out sed.out.expect
+EOF
+
+	$kwtest='kwtest /var/log/syslog \'$file.$n\' \'moose%d.$n\' \'/var/logs-%Y/moose-$isa$#porklips%d.$n\'';
+	set_file('runtest', <<"EOF");
+# test "kwtest1"
+$envsetup
+exec $bindir/$kwtest >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	kwtest2 -- NULL environment variables test of the kw.c code
+#
+###########################################################################
+sub kwtest2 {
+	$domainname = `/bin/domainname`; chomp $domainname;
+	$isa = `/bin/uname -p`; chomp $isa;
+	$platform = `/bin/uname -i`; chomp $platform;
+	$nodename = `/bin/uname -n`; chomp $nodename;
+	$machine = `/bin/uname -m`; chomp $machine;
+	$release = `/bin/uname -r`; chomp $release;
+$secondblob=<<'EOF';
+expand<$file.$n> n -1 hasn 1 result </var/log/syslog\.([0-9]+)$0>
+expand<$file.$n> n 0 hasn 1 result </var/log/syslog.0>
+expand<$file.$n> n 1 hasn 1 result </var/log/syslog.1>
+expand<moose%d.$n> n -1 hasn 1 result <moose[0-9]+\.([0-9]+)$0>
+expand<moose%d.$n> n 0 hasn 1 result <moose%d.0>
+expand<moose%d.$n> n 1 hasn 1 result <moose%d.1>
+expand</var/logs-%Y/moose-$isa$#porklips%d.$n> n -1 hasn 1 result </var/logs-[0-9]+/moose-ISAporklips[0-9]+\.([0-9]+)$0>
+expand</var/logs-%Y/moose-$isa$#porklips%d.$n> n 0 hasn 1 result </var/logs-%Y/moose-ISAporklips%d.0>
+expand</var/logs-%Y/moose-$isa$#porklips%d.$n> n 1 hasn 1 result </var/logs-%Y/moose-ISAporklips%d.1>
+EOF
+	$percentd = `/bin/env TZ=UTC /bin/date +%d`; chomp $percentd;
+	$percentY = `/bin/env TZ=UTC /bin/date +%Y`; chomp $percentY;
+	$secondblob =~ s/%d/$percentd/mg;
+	$secondblob =~ s/%Y/$percentY/mg;
+	$secondblob =~ s/ISA/$isa/mg;
+	chomp $secondblob;
+	set_file('sed.out.expect', <<"EOF");
+            basename syslog
+             dirname /var/log
+              domain $domainname
+                file /var/log/syslog
+                home 
+                 isa $isa
+             logname 
+             machine $machine
+               nfile 
+            nodename $nodename
+            platform $platform
+             release $release
+                user 
+$secondblob
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+/bin/sed -e '/^ *secs [0-9][0-9]*$/d'\
+	-e "s/%d/`/bin/env TZ=UTC /bin/date +%d`/g"\
+	-e "s/%Y/`/bin/env TZ=UTC /bin/date +%Y`/g"\
+	<std.out >sed.out
+exec /bin/diff sed.out sed.out.expect
+EOF
+
+	$kwtest='kwtest /var/log/syslog \'$file.$n\' \'moose%d.$n\' \'/var/logs-%Y/moose-$isa$#porklips%d.$n\'';
+	set_file('runtest', <<"EOF");
+# test "kwtest2"
+$envsetup
+LOGNAME=
+export LOGNAME
+HOME=
+export HOME
+USER=
+export USER
+exec $bindir/$kwtest >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	luttest1 -- minimal basic test of the lut.c code
+#
+###########################################################################
+sub luttest1 {
+	set_file('std.out.expect', <<'EOF');
+lut contains:
+<fix> <NULL> (<NULL>)
+<one> <two> (<two>)
+<seven> <eight> (<eight>)
+<six> <NULL> (<NULL>)
+<three> <four> (<four>)
+dup lut contains:
+<fix> <NULL> (<NULL>)
+<one> <two> (<two>)
+<seven> <eight> (<eight>)
+<six> <NULL> (<NULL>)
+<three> <four> (<four>)
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+exec /bin/diff std.out std.out.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "luttest1"
+$envsetup
+exec $bindir/luttest one=two three=four fix six seven=eight >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	optstest1 -- minimal basic test of the opts.c code
+#
+###########################################################################
+sub optstest1 {
+	$options="-a -b moose -c 1h -d 'Fri Nov  2 13:19:55 2001' -e 1k -f 2 one two three";
+	set_file('std.out.expect', <<"EOF");
+options: $options
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+exec /bin/diff std.out std.out.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "optstest1"
+$envsetup
+exec $bindir/optstest $options >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	optstest2 -- error path through opts.c code
+#
+###########################################################################
+sub optstest2 {
+	$options="-a -b -c 1h -d 'Fri Nov  2 13:19:55 2001' -e 1k -f 2 one two three";
+	set_file('std.err.expect', <<'EOF');
+optstest: Error: Option 'b' requires an argument
+optstest: Error: opts parsing failed
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.out ] && exit 1
+exec /bin/diff std.err std.err.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "optstest2"
+$envsetup
+$bindir/optstest $options >std.out 2>std.err || exit 0
+exit 1
+EOF
+}
+
+###########################################################################
+#
+#	logadmV1 -- test of "logadm -V"
+#
+###########################################################################
+sub logadmV1 {
+	set_testconffile;
+
+	set_file('std.out.expect', <<'EOF');
+/var/adm/messages -C 4 -P 'Thu Nov  1 16:56:42 2001' -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/cron/log -s 512k -t /var/cron/olog
+/var/lp/logs/lpsched -C 2 -N -t '$file.$N'
+/var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+apache -C 24 -a '/usr/apache/bin/apachectl graceful' -p 1m -t '/var/apache/old-logs/$basename.%Y-%m' '/var/apache/logs/*{access,error}_log'
+/var/log/syslog -C 8 -P 'Thu Nov  1 09:16:38 2001' -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/apache/logs/access_log -P 'Thu Nov  1 08:27:56 2001'
+/var/apache/logs/error_log -P 'Thu Nov  1 08:27:56 2001'
+/var/apache/logs/suexec_log -P 'Thu Nov  1 08:27:56 2001'
+/var/apache/logs/mod_jserv.log -P 'Thu Nov  1 08:27:56 2001'
+/var/apache/logs/jserv.log -P 'Thu Nov  1 08:27:56 2001'
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+exec /bin/diff std.out std.out.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadmV1"
+$envsetup
+exec $bindir/logadm -f testfile.conf -V >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadmV2 -- test of "logadm -V <entry>"
+#
+###########################################################################
+sub logadmV2 {
+	set_testconffile;
+
+	set_file('std.out.expect', <<'EOF');
+/var/cron/log -s 512k -t /var/cron/olog
+/var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+exec /bin/diff std.out std.out.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadmV2"
+$envsetup
+exec $bindir/logadm -f testfile.conf -V /var/cron/log /var/adm/pacct >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadmr -- test of "logadm -r <entry>"
+#
+###########################################################################
+sub logadmr {
+	set_testconffile;
+	set_testconffile('testfile.conf.orig');
+
+	set_file('diff.out.expect', <<'EOF');
+17a18
+> /var/cron/log -s 512k -t /var/cron/olog
+21a23
+> /var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+/bin/diff testfile.conf testfile.conf.orig > diff.out
+exec /bin/diff diff.out diff.out.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadmr"
+$envsetup
+exec $bindir/logadm -f testfile.conf -r /var/cron/log /var/adm/pacct >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadmw -- test of "logadm -w <entry>"
+#
+###########################################################################
+sub logadmw {
+	set_testconffile;
+	set_testconffile('testfile.conf.orig');
+
+	set_file('diff.out.expect', <<'EOF');
+31d30
+< moose -C 20 -a moose_after_cmd -g pig -m 664 -o cow -p never /moose/file
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+/bin/diff testfile.conf testfile.conf.orig > diff.out
+exec /bin/diff diff.out diff.out.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadmw"
+$envsetup
+exec $bindir/logadm -f testfile.conf -w moose -C 20 -a moose_after_cmd -g pig -m 664 -o cow -p never /moose/file >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm1 -- minimal basic test of logadm rotation
+#
+###########################################################################
+sub logadm1 {
+	set_file('logfile', 'initially logfile');
+	set_file('logfile.0', 'initially logfile.0');
+	my ($stdev, $stino, $stmode, $stnlink, $stuid, $stgid, $strdev,
+		$stsize, $statime, $stmtime, $stctime, $stblksize, $stblocks) =
+		lstat 'logfile' or die "lstat logfile: $!\n";
+
+	set_file('checktest', <<"EOF");
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -s logfile ] && exit 1
+[ -f logfile.0 ] || exit 1
+[ "xinitially logfile" = "x`/bin/cat logfile.0`" ] || exit 1
+[ "`/bin/ls -i logfile.0 | /bin/awk '{ print \$1; }'`" = "$stino" ] || exit 1
+[ -f logfile.1 ] || exit 1
+[ "xinitially logfile.0" = "x`/bin/cat logfile.1`" ] || exit 1
+exit 0
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm1"
+$envsetup
+exec $bindir/logadm -f /dev/null -p now logfile >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm1c -- same as logadm1 but with -c option
+#
+###########################################################################
+sub logadm1c {
+	set_file('logfile', 'initially logfile');
+	set_file('logfile.0', 'initially logfile.0');
+	my ($stdev, $stino, $stmode, $stnlink, $stuid, $stgid, $strdev,
+		$stsize, $statime, $stmtime, $stctime, $stblksize, $stblocks) =
+		lstat 'logfile' or die "lstat logfile: $!\n";
+
+	set_file('checktest', <<"EOF");
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -s logfile ] && exit 1
+[ -f logfile.0 ] || exit 1
+[ "xinitially logfile" = "x`/bin/cat logfile.0`" ] || exit 1
+[ "`/bin/ls -i logfile.0 | /bin/awk '{ print \$1; }'`" = "$stino" ] && exit 1
+[ -f logfile.1 ] || exit 1
+[ "xinitially logfile.0" = "x`/bin/cat logfile.1`" ] || exit 1
+exit 0
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm1c"
+$envsetup
+exec $bindir/logadm -f /dev/null -p now -c logfile >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm2 -- minimal basic test of logadm expiration
+#
+###########################################################################
+sub logadm2 {
+	set_file('logfile', 'initially logfile');
+	set_file('logfile.0', 'initially logfile.0');
+	set_file('logfile.1', 'initially logfile.1');
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -s logfile ] && exit 1
+[ -f logfile.0 ] || exit 1
+[ "xinitially logfile" = "x`/bin/cat logfile.0`" ] || exit 1
+[ -f logfile.1 ] || exit 1
+[ "xinitially logfile.0" = "x`/bin/cat logfile.1`" ] || exit 1
+[ -f logfile.2 ] && exit 1
+exit 0
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm2"
+$envsetup
+exec $bindir/logadm -f /dev/null -p now logfile -C2 >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm3 -- minimal basic test of logadm pre/post-commands
+#
+###########################################################################
+sub logadm3 {
+	set_file('logfile', 'initially logfile');
+	set_file('logfile.0', 'initially logfile.0');
+	set_file('logfile.1', 'initially logfile.1');
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -s logfile ] && exit 1
+[ -f logfile.0 ] || exit 1
+[ "xinitially logfile" = "x`/bin/cat logfile.0`" ] || exit 1
+[ -f logfile.1 ] || exit 1
+[ "xinitially logfile.0" = "x`/bin/cat logfile.1`" ] || exit 1
+[ -f logfile.2 ] && exit 1
+[ -f pre.out ] || exit 1
+[ "xpre-command-stuff" = "x`/bin/cat pre.out`" ] || exit 1
+[ -f post.out ] || exit 1
+[ "xpost-command-stuff" = "x`/bin/cat post.out`" ] || exit 1
+exit 0
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm3"
+$envsetup
+exec $bindir/logadm -f /dev/null -p now logfile -C2 -b 'echo pre-command-stuff > pre.out' -a 'echo post-command-stuff > post.out' >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm4 -- test of -t template
+#
+###########################################################################
+sub logadm4 {
+	set_file('logfile', 'initially logfile');
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -s logfile ] && exit 1
+TZ=UTC export TZ
+d=`/bin/date +%d`
+[ -f logfile.$d ] || exit 1
+[ "xinitially logfile" = "x`/bin/cat logfile.$d`" ] || exit 1
+exit 0
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm4"
+$envsetup
+exec $bindir/logadm -f /dev/null -p now logfile -t '\$file.\%d' >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm5 -- test of -R cmd and -E cmd
+#
+###########################################################################
+sub logadm5 {
+	set_file('logfile', 'initially logfile');
+	set_file('logfile.0', 'initially logfile.0');
+
+	set_file('cmd.out.expect', <<'EOF');
+just rotated: initially logfile
+just expired: initially logfile.0
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -s logfile ] && exit 1
+[ -f logfile.0 ] || exit 1
+[ "xinitially logfile" = "x`/bin/cat logfile.0`" ] || exit 1
+[ -f logfile.1 ] || exit 1
+[ "xinitially logfile.0" = "x`/bin/cat logfile.1`" ] || exit 1
+exec /bin/diff cmd.out cmd.out.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm5"
+$envsetup
+exec $bindir/logadm -f /dev/null -p now logfile -C1 -R 'echo just rotated: `/bin/cat \$file` >>cmd.out' -E 'echo just expired: `/bin/cat \$file` >>cmd.out' >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm6 -- test of -m, -o, -g
+#
+###########################################################################
+sub logadm6 {
+        set_file('logfile', 'initially logfile');
+
+        set_file('std.err.expect', <<'EOF');
+logadm: Warning: command failed: /bin/chown _nonexistentuser_:_nonexistentgroup_ logfile
+chown: unknown group id _nonexistentgroup_
+EOF
+
+        set_file('checktest', <<'EOF');
+[ -s std.err ] || exit 1
+[ -s std.out ] && exit 1
+[ -s logfile ] && exit 1
+[ -f logfile.0 ] || exit 1
+[ "xinitially logfile" = "x`/bin/cat logfile.0`" ] || exit 1
+[ "`/bin/ls -l logfile | /bin/awk '{ print $1; }'`" = "-r----x--x" ] || exit 1
+exec /bin/diff std.err std.err.expect
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm6"
+$envsetup
+exec $bindir/logadm -f /dev/null -p now logfile -m 411 -o _nonexistentuser_ -g _nonexistentgroup_ >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#       logadm7 -- test running through a conffile
+#
+###########################################################################
+sub logadm7 {
+	mkdir 'dir1', 0777 or die "mkdir dir1: $!\n";
+	set_file('dir1/syslog', 'initially dir1/syslog');
+	set_file('dir1/syslog.0', 'initially dir1/syslog.0');
+	set_file('dir1/syslog.1', 'initially dir1/syslog.1');
+	set_file('dir1/syslog.2', 'initially dir1/syslog.2');
+	set_file('dir1/syslog.3', 'initially dir1/syslog.3');
+	set_file('dir1/syslog.4', 'initially dir1/syslog.4');
+	set_file('dir1/syslog.5', 'initially dir1/syslog.5');
+	set_file('dir1/syslog.6', 'initially dir1/syslog.6');
+	set_file('dir1/syslog.7', 'initially dir1/syslog.7');
+	mkdir 'dir2', 0777 or die "mkdir dir2: $!\n";
+	set_file('dir2/messages', 'initially dir2/messages');
+	set_file('dir2/messages.0', 'initially dir2/messages.0');
+	set_file('dir2/messages.1', 'initially dir2/messages.1');
+	set_file('dir2/messages.2', 'initially dir2/messages.2');
+	set_file('dir2/messages.3', 'initially dir2/messages.3');
+
+	set_file('logadm.conf', <<'EOF');
+#
+# logadm.conf
+#
+#	this comment # has at least another #-sign in it #...
+#
+# Default settings for system log file management.
+# The -w option to logadm(1M) is the preferred way to write to this file,
+# but if you do edit it by hand, use "logadm -V" to check it for errors.
+# but if you do edit it by hand, use "logadm -V" to check it for errors.
+#
+# The format of lines in this file is:
+#       <logname> <options>
+# For each logname listed here, the default options to logadm
+# are given.  Options given on the logadm command line override
+# the defaults contained in this file.
+#
+# logadm typically runs early every morning via an entry in
+# root's crontab (see crontab(1)).
+#
+dir1/syslog -C 8 -a 'echo kill -HUP `cat /etc/syslog.pid` >> cmd.out'
+dir2/messages -C 4 -a 'echo kill -HUP `cat /etc/syslog.pid` >> cmd.out'
+#
+# The entry below is used by turnacct(1M)
+#
+/var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+EOF
+
+	system("/bin/cp logadm.conf logadm.conf.orig");
+
+	$pid=`cat /etc/syslog.pid`;
+	chomp $pid;
+	set_file('cmd.out.expect', <<"EOF");
+kill -HUP $pid
+second kill -HUP $pid
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -s std.err2 ] && exit 1
+[ -s std.out2 ] && exit 1
+[ -s std.err3 ] && exit 1
+[ -s std.out3 ] && exit 1
+[ -s std.err4 ] && exit 1
+[ -s std.out4 ] && exit 1
+[ -f dir1/syslog ] || exit 1
+[ "xsomething" = "x`/bin/cat dir1/syslog`" ] || exit 1
+[ -f dir1/syslog.0 ] || exit 1
+[ "xinitially dir1/syslog" = "x`/bin/cat dir1/syslog.0`" ] || exit 1
+[ -f dir1/syslog.1 ] || exit 1
+[ "xinitially dir1/syslog.0" = "x`/bin/cat dir1/syslog.1`" ] || exit 1
+[ -f dir1/syslog.2 ] || exit 1
+[ "xinitially dir1/syslog.1" = "x`/bin/cat dir1/syslog.2`" ] || exit 1
+[ -f dir1/syslog.3 ] || exit 1
+[ "xinitially dir1/syslog.2" = "x`/bin/cat dir1/syslog.3`" ] || exit 1
+[ -f dir1/syslog.4 ] || exit 1
+[ "xinitially dir1/syslog.3" = "x`/bin/cat dir1/syslog.4`" ] || exit 1
+[ -f dir1/syslog.5 ] || exit 1
+[ "xinitially dir1/syslog.4" = "x`/bin/cat dir1/syslog.5`" ] || exit 1
+[ -f dir1/syslog.6 ] || exit 1
+[ "xinitially dir1/syslog.5" = "x`/bin/cat dir1/syslog.6`" ] || exit 1
+[ -f dir1/syslog.7 ] || exit 1
+[ "xinitially dir1/syslog.6" = "x`/bin/cat dir1/syslog.7`" ] || exit 1
+[ -f dir1/syslog.8 ] && exit 1
+
+[ -s dir2/messages ] && exit 1
+[ -f dir2/messages.0 ] || exit 1
+[ "xsomething" = "x`/bin/cat dir2/messages.0`" ] || exit 1
+[ -f dir2/messages.1 ] || exit 1
+[ "xinitially dir2/messages" = "x`/bin/cat dir2/messages.1`" ] || exit 1
+[ -f dir2/messages.2 ] || exit 1
+[ "xinitially dir2/messages.0" = "x`/bin/cat dir2/messages.2`" ] || exit 1
+[ -f dir2/messages.3 ] || exit 1
+[ "xinitially dir2/messages.1" = "x`/bin/cat dir2/messages.3`" ] || exit 1
+[ -f dir2/messages.4 ] && exit 1
+/bin/sed "s/-P '[^']*' *//" < logadm.conf > sed.out
+exec /bin/diff sed.out logadm.conf.orig
+EOF
+
+        # first logadm call will rotate both syslog and messages
+        # second one won't because size is zero
+        # third one won't because of -P timestamps stored in conffile
+        # fourth one will do messages because of -p now on command line
+        set_file('runtest', <<"EOF");
+# test "logadm7"
+$envsetup
+$bindir/logadm -f logadm.conf >std.out 2>std.err || exit 1
+$bindir/logadm -f logadm.conf dir1/syslog dir2/messages >std.out2 2>std.err2 || exit 1
+echo something > dir1/syslog
+echo something > dir2/messages
+$bindir/logadm -f logadm.conf >std.out3 2>std.err3 || exit 1
+exec $bindir/logadm -f logadm.conf dir2/messages -p now -a 'echo second kill -HUP `cat /etc/syslog.pid` >> cmd.out' >std.out4 2>std.err4
+EOF
+}
+
+###########################################################################
+#
+#       logadm8 -- test of -z
+#
+###########################################################################
+sub logadm8 {
+	mkdir 'dir1', 0777 or die "mkdir dir1: $!\n";
+	set_file('dir1/syslog', 'initially dir1/syslog');
+	set_file('dir1/syslog.0', 'initially dir1/syslog.0');
+	set_file('dir1/syslog.1', 'initially dir1/syslog.1');
+	set_file('dir1/syslog.2', 'initially dir1/syslog.2');
+	system("/bin/gzip dir1/syslog.2");
+	die "gzip dir1/syslog.2 didn't work\n" unless -f 'dir1/syslog.2.gz';
+	set_file('dir1/syslog.3', 'initially dir1/syslog.3');
+	system("/bin/gzip dir1/syslog.3");
+	die "gzip dir1/syslog.3 didn't work\n" unless -f 'dir1/syslog.3.gz';
+	set_file('dir1/syslog.4', 'initially dir1/syslog.4');
+	system("/bin/gzip dir1/syslog.4");
+	die "gzip dir1/syslog.4 didn't work\n" unless -f 'dir1/syslog.4.gz';
+	set_file('dir1/syslog.5', 'initially dir1/syslog.5');
+	system("/bin/gzip dir1/syslog.5");
+	die "gzip dir1/syslog.5 didn't work\n" unless -f 'dir1/syslog.5.gz';
+	set_file('dir1/syslog.6', 'initially dir1/syslog.6');
+	system("/bin/gzip dir1/syslog.6");
+	die "gzip dir1/syslog.6 didn't work\n" unless -f 'dir1/syslog.6.gz';
+	set_file('dir1/syslog.7', 'initially dir1/syslog.7');
+	system("/bin/gzip dir1/syslog.7");
+	die "gzip dir1/syslog.7 didn't work\n" unless -f 'dir1/syslog.7.gz';
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -f dir1/syslog ] || exit 1
+[ -s dir1/syslog ] && exit 1
+[ -f dir1/syslog.0 ] || exit 1
+[ "xinitially dir1/syslog" = "x`/bin/cat dir1/syslog.0`" ] || exit 1
+[ -f dir1/syslog.1 ] || exit 1
+[ "xinitially dir1/syslog.0" = "x`/bin/cat dir1/syslog.1`" ] || exit 1
+[ -f dir1/syslog.2.gz ] || exit 1
+[ "xinitially dir1/syslog.1" = "x`/bin/gzcat dir1/syslog.2.gz`" ] || exit 1
+[ -f dir1/syslog.3.gz ] || exit 1
+[ "xinitially dir1/syslog.2" = "x`/bin/gzcat dir1/syslog.3.gz`" ] || exit 1
+[ -f dir1/syslog.4.gz ] || exit 1
+[ "xinitially dir1/syslog.3" = "x`/bin/gzcat dir1/syslog.4.gz`" ] || exit 1
+[ -f dir1/syslog.5.gz ] || exit 1
+[ "xinitially dir1/syslog.4" = "x`/bin/gzcat dir1/syslog.5.gz`" ] || exit 1
+[ -f dir1/syslog.6.gz ] || exit 1
+[ "xinitially dir1/syslog.5" = "x`/bin/gzcat dir1/syslog.6.gz`" ] || exit 1
+[ -f dir1/syslog.7.gz ] || exit 1
+[ "xinitially dir1/syslog.6" = "x`/bin/gzcat dir1/syslog.7.gz`" ] || exit 1
+[ -f dir1/syslog.8 ] && exit 1
+[ -f dir1/syslog.8.gz ] && exit 1
+exit 0
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm8"
+$envsetup
+exec $bindir/logadm -f /dev/null dir1/syslog -z 2 -C 8 >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#       logadm9 -- test of age check
+#
+###########################################################################
+sub logadm9 {
+	mkdir 'dir1', 0777 or die "mkdir dir1: $!\n";
+	set_file('dir1/syslog', 'initially dir1/syslog');
+	set_file('dir1/syslog.0', 'initially dir1/syslog.0');
+	set_file('dir1/syslog.1', 'initially dir1/syslog.1');
+	set_file('dir1/syslog.2', 'initially dir1/syslog.2');
+	set_file('dir1/syslog.3', 'initially dir1/syslog.3');
+	set_file('dir1/syslog.4', 'initially dir1/syslog.4');
+	set_file('dir1/syslog.5', 'initially dir1/syslog.5');
+	set_file('dir1/syslog.6', 'initially dir1/syslog.6');
+	set_file('dir1/syslog.7', 'initially dir1/syslog.7');
+	mkdir 'dir2', 0777 or die "mkdir dir2: $!\n";
+	set_file('dir2/messages', 'initially dir2/messages');
+	set_file('dir2/messages.0', 'initially dir2/messages.0');
+	set_file('dir2/messages.1', 'initially dir2/messages.1');
+	set_file('dir2/messages.2', 'initially dir2/messages.2');
+	set_file('dir2/messages.3', 'initially dir2/messages.3');
+
+	$now = time;
+	$nowstr = gmtime($now);
+	# a week minus 30 seconds ago...
+	# technically not a full week, but the heuristic used by logadm
+	# should think this is "close enough" to a full week
+	$closetoweeksecs = $now - (60 * 60 * 24 * 7 - 30);
+	$closetoweek = gmtime($closetoweeksecs);
+	# a week minus six hours ago...
+	$lessthanweeksecs = $now - (60 * 60 * 24 * 7 - 60 * 60 * 6);
+	$lessthanweek = gmtime($lessthanweeksecs);
+
+	set_file('logadm.conf', <<"EOF");
+# now: $nowstr is $now
+# $closetoweek is $closetoweeksecs
+dir1/syslog -C 8 -P '$closetoweek'
+# $lessthanweek is $lessthanweeksecs
+dir2/messages -C 4 -P '$lessthanweek'
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -f dir1/syslog ] || exit 1
+[ -s dir1/syslog ] && exit 1
+[ -f dir1/syslog.0 ] || exit 1
+[ "xinitially dir1/syslog" = "x`/bin/cat dir1/syslog.0`" ] || exit 1
+[ -f dir1/syslog.1 ] || exit 1
+[ "xinitially dir1/syslog.0" = "x`/bin/cat dir1/syslog.1`" ] || exit 1
+[ -f dir1/syslog.2 ] || exit 1
+[ "xinitially dir1/syslog.1" = "x`/bin/cat dir1/syslog.2`" ] || exit 1
+[ -f dir1/syslog.3 ] || exit 1
+[ "xinitially dir1/syslog.2" = "x`/bin/cat dir1/syslog.3`" ] || exit 1
+[ -f dir1/syslog.4 ] || exit 1
+[ "xinitially dir1/syslog.3" = "x`/bin/cat dir1/syslog.4`" ] || exit 1
+[ -f dir1/syslog.5 ] || exit 1
+[ "xinitially dir1/syslog.4" = "x`/bin/cat dir1/syslog.5`" ] || exit 1
+[ -f dir1/syslog.6 ] || exit 1
+[ "xinitially dir1/syslog.5" = "x`/bin/cat dir1/syslog.6`" ] || exit 1
+[ -f dir1/syslog.7 ] || exit 1
+[ "xinitially dir1/syslog.6" = "x`/bin/cat dir1/syslog.7`" ] || exit 1
+[ -f dir1/syslog.8 ] && exit 1
+
+[ -f dir2/messages ] || exit 1
+[ "xinitially dir2/messages" = "x`/bin/cat dir2/messages`" ] || exit 1
+[ -f dir2/messages.0 ] || exit 1
+[ "xinitially dir2/messages.0" = "x`/bin/cat dir2/messages.0`" ] || exit 1
+[ -f dir2/messages.1 ] || exit 1
+[ "xinitially dir2/messages.1" = "x`/bin/cat dir2/messages.1`" ] || exit 1
+[ -f dir2/messages.2 ] || exit 1
+[ "xinitially dir2/messages.2" = "x`/bin/cat dir2/messages.2`" ] || exit 1
+[ -f dir2/messages.3 ] || exit 1
+[ "xinitially dir2/messages.3" = "x`/bin/cat dir2/messages.3`" ] || exit 1
+[ -f dir2/messages.4 ] && exit 1
+exit 0
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm9"
+$envsetup
+exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#       logadm9d -- test of age check like logadm9, but age is a couple days
+#
+###########################################################################
+sub logadm9d {
+	mkdir 'dir1', 0777 or die "mkdir dir1: $!\n";
+	set_file('dir1/syslog', 'initially dir1/syslog');
+	set_file('dir1/syslog.0', 'initially dir1/syslog.0');
+	set_file('dir1/syslog.1', 'initially dir1/syslog.1');
+	set_file('dir1/syslog.2', 'initially dir1/syslog.2');
+	set_file('dir1/syslog.3', 'initially dir1/syslog.3');
+	set_file('dir1/syslog.4', 'initially dir1/syslog.4');
+	set_file('dir1/syslog.5', 'initially dir1/syslog.5');
+	set_file('dir1/syslog.6', 'initially dir1/syslog.6');
+	set_file('dir1/syslog.7', 'initially dir1/syslog.7');
+	mkdir 'dir2', 0777 or die "mkdir dir2: $!\n";
+	set_file('dir2/messages', 'initially dir2/messages');
+	set_file('dir2/messages.0', 'initially dir2/messages.0');
+	set_file('dir2/messages.1', 'initially dir2/messages.1');
+	set_file('dir2/messages.2', 'initially dir2/messages.2');
+	set_file('dir2/messages.3', 'initially dir2/messages.3');
+
+	$now = time;
+	$nowstr = gmtime($now);
+	# a day minus 30 seconds ago...
+	$closetodaysecs = $now - (60 * 60 * 24 - 30);
+	$closetoday = gmtime($closetodaysecs);
+	# a day minus six hours ago...
+	$lessthandaysecs = $now - (60 * 60 * 24 - 60 * 60 * 6);
+	$lessthanday = gmtime($lessthandaysecs);
+
+	set_file('logadm.conf', <<"EOF");
+# now: $nowstr is $now
+# $closetoday is $closetodaysecs
+dir1/syslog -p 1d -C 8 -P '$closetoday'
+# $lessthanday is $lessthandaysecs
+dir2/messages -p 1d -C 4 -P '$lessthanday'
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -f dir1/syslog ] || exit 1
+[ -s dir1/syslog ] && exit 1
+[ -f dir1/syslog.0 ] || exit 1
+[ "xinitially dir1/syslog" = "x`/bin/cat dir1/syslog.0`" ] || exit 1
+[ -f dir1/syslog.1 ] || exit 1
+[ "xinitially dir1/syslog.0" = "x`/bin/cat dir1/syslog.1`" ] || exit 1
+[ -f dir1/syslog.2 ] || exit 1
+[ "xinitially dir1/syslog.1" = "x`/bin/cat dir1/syslog.2`" ] || exit 1
+[ -f dir1/syslog.3 ] || exit 1
+[ "xinitially dir1/syslog.2" = "x`/bin/cat dir1/syslog.3`" ] || exit 1
+[ -f dir1/syslog.4 ] || exit 1
+[ "xinitially dir1/syslog.3" = "x`/bin/cat dir1/syslog.4`" ] || exit 1
+[ -f dir1/syslog.5 ] || exit 1
+[ "xinitially dir1/syslog.4" = "x`/bin/cat dir1/syslog.5`" ] || exit 1
+[ -f dir1/syslog.6 ] || exit 1
+[ "xinitially dir1/syslog.5" = "x`/bin/cat dir1/syslog.6`" ] || exit 1
+[ -f dir1/syslog.7 ] || exit 1
+[ "xinitially dir1/syslog.6" = "x`/bin/cat dir1/syslog.7`" ] || exit 1
+[ -f dir1/syslog.8 ] && exit 1
+
+[ -f dir2/messages ] || exit 1
+[ "xinitially dir2/messages" = "x`/bin/cat dir2/messages`" ] || exit 1
+[ -f dir2/messages.0 ] || exit 1
+[ "xinitially dir2/messages.0" = "x`/bin/cat dir2/messages.0`" ] || exit 1
+[ -f dir2/messages.1 ] || exit 1
+[ "xinitially dir2/messages.1" = "x`/bin/cat dir2/messages.1`" ] || exit 1
+[ -f dir2/messages.2 ] || exit 1
+[ "xinitially dir2/messages.2" = "x`/bin/cat dir2/messages.2`" ] || exit 1
+[ -f dir2/messages.3 ] || exit 1
+[ "xinitially dir2/messages.3" = "x`/bin/cat dir2/messages.3`" ] || exit 1
+[ -f dir2/messages.4 ] && exit 1
+exit 0
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm9d"
+$envsetup
+exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#       logadm10 -- test of size-based rotation check
+#
+###########################################################################
+sub logadm10 {
+	mkdir 'dir1', 0777 or die "mkdir dir1: $!\n";
+	set_file('dir1/syslog', 'initially dir1/syslogXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+	set_file('dir1/syslog.0', 'initially dir1/syslog.0');
+	set_file('dir1/syslog.1', 'initially dir1/syslog.1');
+	set_file('dir1/syslog.2', 'initially dir1/syslog.2');
+	set_file('dir1/syslog.3', 'initially dir1/syslog.3');
+	set_file('dir1/syslog.4', 'initially dir1/syslog.4');
+	set_file('dir1/syslog.5', 'initially dir1/syslog.5');
+	set_file('dir1/syslog.6', 'initially dir1/syslog.6');
+	set_file('dir1/syslog.7', 'initially dir1/syslog.7');
+	mkdir 'dir2', 0777 or die "mkdir dir2: $!\n";
+	set_file('dir2/messages', 'initially dir2/messages');
+	set_file('dir2/messages.0', 'initially dir2/messages.0');
+	set_file('dir2/messages.1', 'initially dir2/messages.1');
+	set_file('dir2/messages.2', 'initially dir2/messages.2');
+	set_file('dir2/messages.3', 'initially dir2/messages.3');
+
+	set_file('logadm.conf', <<"EOF");
+dir1/syslog -C 8 -s 30b
+dir2/messages -C 4 -s 30b
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -f dir1/syslog ] || exit 1
+[ -s dir1/syslog ] && exit 1
+[ -f dir1/syslog.0 ] || exit 1
+[ "xinitially dir1/syslogXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" = "x`/bin/cat dir1/syslog.0`" ] || exit 1
+[ -f dir1/syslog.1 ] || exit 1
+[ "xinitially dir1/syslog.0" = "x`/bin/cat dir1/syslog.1`" ] || exit 1
+[ -f dir1/syslog.2 ] || exit 1
+[ "xinitially dir1/syslog.1" = "x`/bin/cat dir1/syslog.2`" ] || exit 1
+[ -f dir1/syslog.3 ] || exit 1
+[ "xinitially dir1/syslog.2" = "x`/bin/cat dir1/syslog.3`" ] || exit 1
+[ -f dir1/syslog.4 ] || exit 1
+[ "xinitially dir1/syslog.3" = "x`/bin/cat dir1/syslog.4`" ] || exit 1
+[ -f dir1/syslog.5 ] || exit 1
+[ "xinitially dir1/syslog.4" = "x`/bin/cat dir1/syslog.5`" ] || exit 1
+[ -f dir1/syslog.6 ] || exit 1
+[ "xinitially dir1/syslog.5" = "x`/bin/cat dir1/syslog.6`" ] || exit 1
+[ -f dir1/syslog.7 ] || exit 1
+[ "xinitially dir1/syslog.6" = "x`/bin/cat dir1/syslog.7`" ] || exit 1
+[ -f dir1/syslog.8 ] && exit 1
+
+[ -f dir2/messages ] || exit 1
+[ "xinitially dir2/messages" = "x`/bin/cat dir2/messages`" ] || exit 1
+[ -f dir2/messages.0 ] || exit 1
+[ "xinitially dir2/messages.0" = "x`/bin/cat dir2/messages.0`" ] || exit 1
+[ -f dir2/messages.1 ] || exit 1
+[ "xinitially dir2/messages.1" = "x`/bin/cat dir2/messages.1`" ] || exit 1
+[ -f dir2/messages.2 ] || exit 1
+[ "xinitially dir2/messages.2" = "x`/bin/cat dir2/messages.2`" ] || exit 1
+[ -f dir2/messages.3 ] || exit 1
+[ "xinitially dir2/messages.3" = "x`/bin/cat dir2/messages.3`" ] || exit 1
+[ -f dir2/messages.4 ] && exit 1
+exit 0
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm10"
+$envsetup
+exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#       logadm11 -- test of size-based expiration check
+#
+###########################################################################
+sub logadm11 {
+	mkdir 'dir1', 0777 or die "mkdir dir1: $!\n";
+	set_file('dir1/syslog', 'initially dir1/syslog');
+	set_file('dir1/syslog.0', 'initially dir1/syslog.0');
+	set_file('dir1/syslog.1', 'initially dir1/syslog.1');
+	set_file('dir1/syslog.2', 'initially dir1/syslog.2');
+	set_file('dir1/syslog.3', 'initially dir1/syslog.3');
+	set_file('dir1/syslog.4', 'initially dir1/syslog.4');
+	set_file('dir1/syslog.5', 'initially dir1/syslog.5');
+	set_file('dir1/syslog.6', 'initially dir1/syslog.6');
+	set_file('dir1/syslog.7', 'initially dir1/syslog.7');
+	mkdir 'dir2', 0777 or die "mkdir dir2: $!\n";
+	set_file('dir2/messages', 'initially dir2/messages');
+	set_file('dir2/messages.0', 'initially dir2/messages.0');
+	set_file('dir2/messages.1', 'initially dir2/messages.1');
+	set_file('dir2/messages.2', 'initially dir2/messages.2');
+	set_file('dir2/messages.3', 'initially dir2/messages.3');
+
+	set_file('logadm.conf', <<"EOF");
+dir1/syslog -C 8 -s 30b -S 75b
+dir2/messages -C 4 -s 30b -S 75b
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -f dir1/syslog ] || exit 1
+[ "xinitially dir1/syslog" = "x`/bin/cat dir1/syslog`" ] || exit 1
+[ -f dir1/syslog.0 ] || exit 1
+[ "xinitially dir1/syslog.0" = "x`/bin/cat dir1/syslog.0`" ] || exit 1
+[ -f dir1/syslog.1 ] || exit 1
+[ "xinitially dir1/syslog.1" = "x`/bin/cat dir1/syslog.1`" ] || exit 1
+[ -f dir1/syslog.2 ] || exit 1
+[ "xinitially dir1/syslog.2" = "x`/bin/cat dir1/syslog.2`" ] || exit 1
+[ -f dir1/syslog.3 ] && exit 1
+[ -f dir1/syslog.4 ] && exit 1
+[ -f dir1/syslog.5 ] && exit 1
+[ -f dir1/syslog.6 ] && exit 1
+[ -f dir1/syslog.7 ] && exit 1
+[ -f dir1/syslog.8 ] && exit 1
+
+[ -f dir2/messages ] || exit 1
+[ "xinitially dir2/messages" = "x`/bin/cat dir2/messages`" ] || exit 1
+[ -f dir2/messages.0 ] || exit 1
+[ "xinitially dir2/messages.0" = "x`/bin/cat dir2/messages.0`" ] || exit 1
+[ -f dir2/messages.1 ] || exit 1
+[ "xinitially dir2/messages.1" = "x`/bin/cat dir2/messages.1`" ] || exit 1
+[ -f dir2/messages.2 ] || exit 1
+[ "xinitially dir2/messages.2" = "x`/bin/cat dir2/messages.2`" ] || exit 1
+[ -f dir2/messages.3 ] && exit 1
+[ -f dir2/messages.4 ] && exit 1
+exit 0
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm11"
+$envsetup
+exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm12 -- ENOENT error path
+#
+###########################################################################
+sub logadm12 {
+	set_file('std.err.expect', <<'EOF');
+logadm: Warning: logfile: No such file or directory
+EOF
+
+	set_file('checktest', <<"EOF");
+[ -s std.out ] && exit 1
+exec /bin/diff std.err std.err.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm12"
+$envsetup
+exec $bindir/logadm -f /dev/null logfile >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm13 -- ENOENT error path with -N flag
+#
+###########################################################################
+sub logadm13 {
+	set_file('checktest', <<"EOF");
+[ -s std.out ] && exit 1
+[ -s std.err ] && exit 1
+exit 0
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm13"
+$envsetup
+exec $bindir/logadm -N -f /dev/null logfile >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#       logadm14 -- test of -n and -v flags
+#
+###########################################################################
+sub logadm14 {
+	mkdir 'dir1', 0777 or die "mkdir dir1: $!\n";
+	set_file('dir1/syslog', 'initially dir1/syslog');
+	set_file('dir1/syslog.0', 'initially dir1/syslog.0');
+	set_file('dir1/syslog.1', 'initially dir1/syslog.1');
+	set_file('dir1/syslog.2', 'initially dir1/syslog.2');
+	set_file('dir1/syslog.3', 'initially dir1/syslog.3');
+	set_file('dir1/syslog.4', 'initially dir1/syslog.4');
+	set_file('dir1/syslog.5', 'initially dir1/syslog.5');
+	set_file('dir1/syslog.6', 'initially dir1/syslog.6');
+	set_file('dir1/syslog.7', 'initially dir1/syslog.7');
+	mkdir 'dir2', 0777 or die "mkdir dir2: $!\n";
+	set_file('dir2/messages', 'initially dir2/messages');
+	set_file('dir2/messages.0', 'initially dir2/messages.0');
+	set_file('dir2/messages.1', 'initially dir2/messages.1');
+	set_file('dir2/messages.2', 'initially dir2/messages.2');
+	set_file('dir2/messages.3', 'initially dir2/messages.3');
+
+	set_file('logadm.conf', <<'EOF');
+#
+# logadm.conf
+#
+# Default settings for system log file management.
+# The -w option to logadm(1M) is the preferred way to write to this file,
+# but if you do edit it by hand, use "logadm -V" to check it for errors.
+# but if you do edit it by hand, use "logadm -V" to check it for errors.
+#
+# The format of lines in this file is:
+#       <logname> <options>
+# For each logname listed here, the default options to logadm
+# are given.  Options given on the logadm command line override
+# the defaults contained in this file.
+#
+# logadm typically runs early every morning via an entry in
+# root's crontab (see crontab(1)).
+#
+dir1/syslog -C 8 -a 'echo kill -HUP `cat /etc/syslog.pid` >> cmd.out'
+dir2/messages -C 4 -a 'echo kill -HUP `cat /etc/syslog.pid` >> cmd.out'
+#
+# The entry below is used by turnacct(1M)
+#
+/var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+EOF
+
+	$gid = $);
+	$gid =~ s/ .*//;
+	set_file('grep.out.expect', <<'EOF'.<<"EOF".<<'EOF'.<<"EOF".<<'EOF');
+# loading logadm.conf
+# processing logname: dir1/syslog
+#     using default rotate rules: -s1b -p1w
+#     using default template: $file.$n
+mkdir -p dir1 # verify directory exists
+mv -f dir1/syslog.7 dir1/syslog.8 # rotate log file
+mkdir -p dir1 # verify directory exists
+mv -f dir1/syslog.6 dir1/syslog.7 # rotate log file
+mkdir -p dir1 # verify directory exists
+mv -f dir1/syslog.5 dir1/syslog.6 # rotate log file
+mkdir -p dir1 # verify directory exists
+mv -f dir1/syslog.4 dir1/syslog.5 # rotate log file
+mkdir -p dir1 # verify directory exists
+mv -f dir1/syslog.3 dir1/syslog.4 # rotate log file
+mkdir -p dir1 # verify directory exists
+mv -f dir1/syslog.2 dir1/syslog.3 # rotate log file
+mkdir -p dir1 # verify directory exists
+mv -f dir1/syslog.1 dir1/syslog.2 # rotate log file
+mkdir -p dir1 # verify directory exists
+mv -f dir1/syslog.0 dir1/syslog.1 # rotate log file
+mkdir -p dir1 # verify directory exists
+mv -f dir1/syslog dir1/syslog.0 # rotate log file
+touch dir1/syslog
+EOF
+chown $>:$gid dir1/syslog
+EOF
+chmod 664 dir1/syslog
+# processing logname: dir2/messages
+#     using default rotate rules: -s1b -p1w
+#     using default template: $file.$n
+mkdir -p dir2 # verify directory exists
+mv -f dir2/messages.3 dir2/messages.4 # rotate log file
+mkdir -p dir2 # verify directory exists
+mv -f dir2/messages.2 dir2/messages.3 # rotate log file
+mkdir -p dir2 # verify directory exists
+mv -f dir2/messages.1 dir2/messages.2 # rotate log file
+mkdir -p dir2 # verify directory exists
+mv -f dir2/messages.0 dir2/messages.1 # rotate log file
+mkdir -p dir2 # verify directory exists
+mv -f dir2/messages dir2/messages.0 # rotate log file
+touch dir2/messages
+EOF
+chown $>:$gid dir2/messages
+EOF
+chmod 664 dir2/messages
+# processing logname: /var/adm/pacct
+#     using default template: $file.$n
+sh -c echo kill -HUP `cat /etc/syslog.pid` >> cmd.out # -a cmd
+# logadm.conf unchanged
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -f std.out ] || exit 1
+[ -f dir1/syslog ] || exit 1
+[ "xinitially dir1/syslog" = "x`/bin/cat dir1/syslog`" ] || exit 1
+[ -f dir1/syslog.0 ] || exit 1
+[ "xinitially dir1/syslog.0" = "x`/bin/cat dir1/syslog.0`" ] || exit 1
+[ -f dir1/syslog.1 ] || exit 1
+[ "xinitially dir1/syslog.1" = "x`/bin/cat dir1/syslog.1`" ] || exit 1
+[ -f dir1/syslog.2 ] || exit 1
+[ "xinitially dir1/syslog.2" = "x`/bin/cat dir1/syslog.2`" ] || exit 1
+[ -f dir1/syslog.3 ] || exit 1
+[ "xinitially dir1/syslog.3" = "x`/bin/cat dir1/syslog.3`" ] || exit 1
+[ -f dir1/syslog.4 ] || exit 1
+[ "xinitially dir1/syslog.4" = "x`/bin/cat dir1/syslog.4`" ] || exit 1
+[ -f dir1/syslog.5 ] || exit 1
+[ "xinitially dir1/syslog.5" = "x`/bin/cat dir1/syslog.5`" ] || exit 1
+[ -f dir1/syslog.6 ] || exit 1
+[ "xinitially dir1/syslog.6" = "x`/bin/cat dir1/syslog.6`" ] || exit 1
+[ -f dir1/syslog.7 ] || exit 1
+[ "xinitially dir1/syslog.7" = "x`/bin/cat dir1/syslog.7`" ] || exit 1
+[ -f dir1/syslog.8 ] && exit 1
+
+[ -f dir2/messages ] || exit 1
+[ "xinitially dir2/messages" = "x`/bin/cat dir2/messages`" ] || exit 1
+[ -f dir2/messages.0 ] || exit 1
+[ "xinitially dir2/messages.0" = "x`/bin/cat dir2/messages.0`" ] || exit 1
+[ -f dir2/messages.1 ] || exit 1
+[ "xinitially dir2/messages.1" = "x`/bin/cat dir2/messages.1`" ] || exit 1
+[ -f dir2/messages.2 ] || exit 1
+[ "xinitially dir2/messages.2" = "x`/bin/cat dir2/messages.2`" ] || exit 1
+[ -f dir2/messages.3 ] || exit 1
+[ "xinitially dir2/messages.3" = "x`/bin/cat dir2/messages.3`" ] || exit 1
+[ -f dir2/messages.4 ] && exit 1
+/bin/grep -v 'recording rotation date' std.out > grep.out
+exec /bin/diff grep.out grep.out.expect
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm14"
+$envsetup
+exec $bindir/logadm -nv -f logadm.conf >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm15 -- test of -T
+#
+###########################################################################
+sub logadm15 {
+	set_file('logfile', '');
+	set_file('logfile.0', 'initially logfile.0');
+	set_file('logfile.1', 'initially logfile.1');
+	set_file('logfile.2', 'initially logfile.2');
+	set_file('logfile.3', 'initially logfile.3');
+	set_file('logfile.4', 'initially logfile.4');
+	set_file('logfile.5', 'initially logfile.5');
+	set_file('logfile.6', 'initially logfile.6');
+	set_file('logfile.7', 'initially logfile.7');
+	set_file('logfile.8', 'initially logfile.8');
+	set_file('logfile.9', 'initially logfile.9');
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -f logfile ] || exit 1
+[ "x" = "x`/bin/cat logfile`" ] || exit 1
+[ -f logfile.0 ] || exit 1
+[ "xinitially logfile.0" = "x`/bin/cat logfile.0`" ] || exit 1
+[ -f logfile.1 ] || exit 1
+[ "xinitially logfile.1" = "x`/bin/cat logfile.1`" ] || exit 1
+[ -f logfile.2 ] || exit 1
+[ "xinitially logfile.2" = "x`/bin/cat logfile.2`" ] || exit 1
+[ -f logfile.3 ] && exit 1
+[ -f logfile.4 ] || exit 1
+[ "xinitially logfile.4" = "x`/bin/cat logfile.4`" ] || exit 1
+[ -f logfile.5 ] && exit 1
+[ -f logfile.6 ] || exit 1
+[ "xinitially logfile.6" = "x`/bin/cat logfile.6`" ] || exit 1
+[ -f logfile.7 ] && exit 1
+[ -f logfile.8 ] || exit 1
+[ "xinitially logfile.8" = "x`/bin/cat logfile.8`" ] || exit 1
+[ -f logfile.9 ] && exit 1
+[ -f logfile.10 ] && exit 1
+exit 0
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm15"
+$envsetup
+exec $bindir/logadm -f /dev/null logfile -C1 -T '*.[13579]'>std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#	logadm16 -- test of -h
+#
+###########################################################################
+sub logadm16 {
+	set_file('std.err.expect', <<'EOF');
+Usage: logadm [options]
+       (processes all entries in /etc/logadm.conf or conffile given by -f)
+   or: logadm [options] logname...
+       (processes the given lognames)
+
+General options:
+        -e mailaddr     mail errors to given address
+        -f conffile     use conffile instead of /etc/logadm.conf
+        -h              display help
+        -N              not an error if log file nonexistent
+        -n              show actions, don't perform them
+        -r              remove logname entry from conffile
+        -V              ensure conffile entries exist, correct
+        -v              print info about actions happening
+        -w entryname    write entry to config file
+
+Options which control when a logfile is rotated:
+(default is: -s1b -p1w if no -s or -p)
+        -p period       only rotate if period passed since last rotate
+        -P timestamp    used to store rotation date in conffile
+        -s size         only rotate if given size or greater
+
+Options which control how a logfile is rotated:
+(default is: -t '$file.$n', owner/group/mode taken from log file)
+        -a cmd          execute cmd after taking actions
+        -b cmd          execute cmd before taking actions
+        -c              copy & truncate logfile, don't rename
+        -g group        new empty log file group
+        -m mode         new empty log file mode
+        -M cmd          execute cmd to rotate the log file
+        -o owner        new empty log file owner
+        -R cmd          run cmd on file after rotate
+        -t template     template for naming old logs
+        -z count        gzip old logs except most recent count
+
+Options which control the expiration of old logfiles:
+(default is: -C10 if no -A, -C, or -S)
+        -A age          expire logs older than age
+        -C count        expire old logs until count remain
+        -E cmd          run cmd on file to expire
+        -S size         expire until space used is below size 
+        -T pattern      pattern for finding old logs
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.out ] && exit 1
+exec /bin/diff std.err std.err.expect
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm16"
+$envsetup
+exec $bindir/logadm -h >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#       logadm17 -- test that mkdir -p happens as necessary
+#
+###########################################################################
+sub logadm17 {
+	set_file('logfile', 'initially logfile');
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -f dir1/dir2/logfile ] || exit 1
+[ -f logfile ] || exit 1
+[ "xinitially logfile" = "x`/bin/cat dir1/dir2/logfile`" ] || exit 1
+exit 0
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm17"
+$envsetup
+exec $bindir/logadm -f /dev/null -t 'dir1/dir2/\$basename' logfile -p now >std.out 2>std.err
+EOF
+}
+
+###########################################################################
+#
+#       logadm18 -- test of -M option
+#
+###########################################################################
+sub logadm18 {
+	mkdir 'dir1', 0777 or die "mkdir dir1: $!\n";
+	set_file('dir1/syslog', 'initially dir1/syslog');
+	set_file('dir1/syslog.0', 'initially dir1/syslog.0');
+	set_file('dir1/syslog.1', 'initially dir1/syslog.1');
+	set_file('dir1/syslog.2', 'initially dir1/syslog.2');
+	set_file('dir1/syslog.3', 'initially dir1/syslog.3');
+	set_file('dir1/syslog.4', 'initially dir1/syslog.4');
+	set_file('dir1/syslog.5', 'initially dir1/syslog.5');
+	set_file('dir1/syslog.6', 'initially dir1/syslog.6');
+	set_file('dir1/syslog.7', 'initially dir1/syslog.7');
+
+	set_file('logadm.conf', <<"EOF");
+dir1/syslog -C 8 -s 1b -M '/bin/tr [a-z] [A-Z] < \$file > \$nfile; /bin/rm -f \$file'
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -f dir1/syslog ] || exit 1
+[ -s dir1/syslog ] && exit 1
+[ -f dir1/syslog.0 ] || exit 1
+[ "xINITIALLY DIR1/SYSLOG" = "x`/bin/cat dir1/syslog.0`" ] || exit 1
+[ -f dir1/syslog.1 ] || exit 1
+[ "xinitially dir1/syslog.0" = "x`/bin/cat dir1/syslog.1`" ] || exit 1
+[ -f dir1/syslog.2 ] || exit 1
+[ "xinitially dir1/syslog.1" = "x`/bin/cat dir1/syslog.2`" ] || exit 1
+[ -f dir1/syslog.3 ] || exit 1
+[ "xinitially dir1/syslog.2" = "x`/bin/cat dir1/syslog.3`" ] || exit 1
+[ -f dir1/syslog.4 ] || exit 1
+[ "xinitially dir1/syslog.3" = "x`/bin/cat dir1/syslog.4`" ] || exit 1
+[ -f dir1/syslog.5 ] || exit 1
+[ "xinitially dir1/syslog.4" = "x`/bin/cat dir1/syslog.5`" ] || exit 1
+[ -f dir1/syslog.6 ] || exit 1
+[ "xinitially dir1/syslog.5" = "x`/bin/cat dir1/syslog.6`" ] || exit 1
+[ -f dir1/syslog.7 ] || exit 1
+[ "xinitially dir1/syslog.6" = "x`/bin/cat dir1/syslog.7`" ] || exit 1
+[ -f dir1/syslog.8 ] && exit 1
+
+exit 0
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm18"
+$envsetup
+exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+EOF
+}

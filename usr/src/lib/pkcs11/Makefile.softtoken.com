@@ -1,0 +1,193 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lib/pkcs11/Makefile.softtoken.com
+#
+
+LCL_OBJECTS = \
+	softGeneral.o 		\
+	softSlotToken.o 	\
+	softSession.o 		\
+	softObject.o 		\
+	softDigest.o	 	\
+	softSign.o 		\
+	softVerify.o 		\
+	softDualCrypt.o 	\
+	softKeys.o 		\
+	softRand.o		\
+	softSessionUtil.o	\
+	softDigestUtil.o	\
+	softAttributeUtil.o	\
+	softObjectUtil.o	\
+	softDESCrypt.o		\
+	softEncrypt.o		\
+	softDecrypt.o		\
+	softEncryptUtil.o	\
+	softDecryptUtil.o	\
+	softSignUtil.o		\
+	softVerifyUtil.o	\
+	softMAC.o		\
+	softRSA.o		\
+	softRandUtil.o		\
+	softKeysUtil.o		\
+	softARCFourCrypt.o	\
+	softDSA.o		\
+	softDH.o		\
+	softAESCrypt.o		\
+	softCrypt.o		\
+	softKeystore.o		\
+	softKeystoreUtil.o	\
+	softSSL.o		\
+	softASN1.o
+
+ASFLAGS = $(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS)
+
+AES_COBJECTS = aes_cbc_crypt.o  aes_impl.o
+ARCFOUR_COBJECTS = arcfour_crypt.o
+DES_COBJECTS = des_cbc_crypt.o des_impl.o des_ks.o
+RSA_COBJECTS = rsa_impl.o
+SHA1_COBJECTS = sha1.o
+BIGNUM_COBJECTS = bignumimpl.o
+
+AES_OBJECTS = $(AES_COBJECTS) $(AES_PSR_OBJECTS)
+ARCFOUR_OBJECTS = $(ARCFOUR_COBJECTS) $(ARCFOUR_PSR_OBJECTS)
+DES_OBJECTS = $(DES_COBJECTS) $(DES_PSR_OBJECTS)
+RSA_OBJECTS = $(RSA_COBJECTS) $(RSA_PSR_OBJECTS)
+SHA1_OBJECTS = $(SHA1_COBJECTS) $(SHA1_PSR_OBJECTS)
+BIGNUM_OBJECTS = $(BIGNUM_COBJECTS) $(BIGNUM_PSR_OBJECTS)
+
+BER_OBJECTS = bprint.o decode.o encode.o io.o
+
+# Sparc userland uses a floating-point implementation of
+# Montgomery multiply.  So, USE_FLOATING_POINT is defined here
+# for Sparc targets.
+#
+# x86 does not use floating-point for the kernel or userland.
+#
+# Sparc has only one integer implementation of big_mul_add_vec()
+# and friends, so these functions are called directly.
+# So, HWCAP (HardWare CAPabilities) is not defined for Sparc.
+#
+# x86 has multiple integer implementations to choose from.
+# Hardware features are tested at run time, just once,
+# on first use.  So, big_mul_add_vec() and friends must be
+# called through a function pointer.
+#
+# AMD64 has a 64x64->128 bit multiply instruction, which makes
+# things even faster than i386 SSE2 instructions.  Since there
+# is no run-time testing of features, as there is for SSE2,
+# there is no need to call big_mul_add_vec() and friends through
+# functions pointers, and so HWCAP is not defined.
+#
+# For now i386 and amd64 use the C code version of mont_mulf
+
+OBJECTS = \
+	$(LCL_OBJECTS)		\
+	$(AES_OBJECTS)		\
+	$(ARCFOUR_OBJECTS)	\
+	$(DES_OBJECTS)		\
+	$(RSA_OBJECTS)		\
+	$(SHA1_OBJECTS)		\
+	$(BIGNUM_OBJECTS)	\
+	$(BER_OBJECTS)
+
+AESDIR=		$(SRC)/common/crypto/aes
+ARCFOURDIR=	$(SRC)/common/crypto/arcfour
+DESDIR=		$(SRC)/common/crypto/des
+RSADIR=		$(SRC)/common/crypto/rsa
+SHA1DIR=	$(SRC)/common/crypto/sha1
+BIGNUMDIR=	$(SRC)/common/bignum
+BERDIR=		../../../libldap5/sources/ldap/ber
+
+include $(SRC)/lib/Makefile.lib
+
+#	set signing mode
+POST_PROCESS_SO +=	; $(ELFSIGN_CRYPTO)
+
+SRCDIR= $(SRC)/lib/pkcs11/pkcs11_softtoken/common
+
+SRCS =	\
+	$(LCL_OBJECTS:%.o=$(SRCDIR)/%.c) \
+	$(AES_COBJECTS:%.o=$(AESDIR)/%.c) \
+	$(ARCFOUR_COBJECTS:%.o=$(ARCFOURDIR)/%.c) \
+	$(DES_COBJECTS:%.o=$(DESDIR)/%.c) \
+	$(RSA_COBJECTS:%.o=$(RSADIR)/%.c) \
+	$(SHA1_COBJECTS:%.o=$(SHA1DIR)/%.c) \
+	$(BIGNUM_COBJECTS:%.o=$(BIGNUMDIR)/%.c) \
+	$(BIGNUM_PSR_SRCS)
+
+LIBS    =       $(DYNLIB)
+LDLIBS  +=      -lc -lmd5
+
+MAPDIR  = ../spec/$(TRANSMACH)
+SPECMAPFILE = $(MAPDIR)/mapfile
+
+CFLAGS 	+=      $(CCVERBOSE)
+CPPFLAGS += -I$(AESDIR) -I$(ARCFOURDIR) -I$(DESDIR) -I$(RSADIR) \
+	    -I$(SRCDIR) -I$(BIGNUMDIR) -D_POSIX_PTHREAD_SEMANTICS
+
+LINTFLAGS64 += -errchk=longptr64
+
+ROOTLIBDIR=     $(ROOT)/usr/lib/security
+ROOTLIBDIR64=   $(ROOT)/usr/lib/security/$(MACH64)
+
+.KEEP_STATE:
+
+all:	$(LIBS)
+
+lint: 	lintcheck
+
+pics/%.o:	$(AESDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(ARCFOURDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(DESDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(RSADIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(SHA1DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(BIGNUMDIR)/%.c
+	$(COMPILE.c) -o $@ $(BIGNUM_CFG) $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(BERDIR)/%.c
+	$(COMPILE.c) -o $@ $< -D_SOLARIS_SDK -I$(BERDIR) \
+		-I../../../libldap5/include/ldap
+	$(POST_PROCESS_O)
+
+include $(SRC)/lib/Makefile.targ

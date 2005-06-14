@@ -1,0 +1,68 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#
+
+TYPEMAP
+	Sun::Solaris::Privilege::Privset *	T_PTROBJ
+	Sun::Solaris::Ucred::Ucred *		T_PTROBJ
+	const char *				T_PV
+	const char **				T_PV
+	priv_op_t				T_IV
+	uint_t					T_IV
+	boolean_t				T_IV
+	uid_t					T_ID_T
+	gid_t					T_ID_T
+	pid_t					T_ID_T
+	zoneid_t				T_ID_T
+	projid_t				T_ID_T
+	sysret					T_SYSRET
+
+INPUT
+
+T_ID_T
+	 $var = (int)SvIV($arg)
+
+OUTPUT
+T_SYSRET
+	{
+		if ($var != -1) {
+			if ($var == 0)
+				sv_setpvn($arg, "0 but true", 10);
+			else
+				sv_setiv($arg, (IV)$var);
+		}
+	}
+
+T_ID_T
+	{
+		if ($var != -1) {
+			if ($var == 0)
+				sv_setpvn($arg, "0 but true", 10);
+			else
+				sv_setiv($arg, (IV)$var);
+		}
+	}

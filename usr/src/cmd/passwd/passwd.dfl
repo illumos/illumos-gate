@@ -1,0 +1,71 @@
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+MAXWEEKS=
+MINWEEKS=
+PASSLENGTH=6
+
+# NAMECHECK enables/disables login name checking.
+# The default is to do login name checking.
+# Specifying a value of "NO" will disable login name checking.
+#
+#NAMECHECK=NO
+
+# HISTORY sets the number of prior password changes to keep and
+# check for a user when changing passwords.  Setting the HISTORY
+# value to zero (0), or removing/commenting out the flag will
+# cause all users' prior password history to be discarded at the
+# next password change by any user.  No password history will
+# be checked if the flag is not present or has zero value.
+# The maximum value of HISTORY is 26.
+#
+# This flag is only enforced for user accounts defined in the
+# local passwd(4)/shadow(4) files.
+#
+#HISTORY=0
+#
+# Password complexity tunables.  The values listed are the defaults
+# which are compatible with previous releases of passwd.
+# See passwd(1) and pam_authtok_check(5) for use warnings and
+# discussion of the use of these options.
+#
+#MINDIFF=3
+#MINALPHA=2
+#MINNONALPHA=1
+#MINUPPER=0
+#MINLOWER=0
+#MAXREPEATS=0
+#MINSPECIAL=0
+#MINDIGIT=0
+#WHITESPACE=YES
+#
+# 
+# passwd performs dictionary lookups if DICTIONLIST or DICTIONDBDIR
+# is defined. If the password database does not yet exist, it is
+# created by passwd. See passwd(1), pam_authtok_check(5) and
+# mkpwdict(1M) for more information.
+#
+#DICTIONLIST=
+#DICTIONDBDIR=/var/passwd

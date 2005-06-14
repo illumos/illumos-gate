@@ -1,0 +1,14 @@
+ 
+The prev-frm command enables you to move to the previous frame that
+the current frame was opened from. If the current frame was the first
+frame, striking PREV-FRM would make the last frame opened the active
+frame.
+
+Use one of the methods below to use prev-frm:
+
+     Function Key:  Press the PREV-FRM function key.
+
+     Command Menu:  Select prev-frm and press ENTER.
+
+     Command Line:  Type prev-frm and press ENTER.
+

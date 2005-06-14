@@ -1,0 +1,44 @@
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# default menu entry to boot
+default 0
+#
+# menu timeout in second before default OS is booted
+# set to -1 to wait for user input
+timeout 10
+#
+# To enable grub serial console to ttya uncomment the following lines
+# and comment out the splashimage line below
+# WARNING: don't enable grub serial console when BIOS console serial
+#	redirection is active!!!
+#   serial --unit=0 --speed=9600
+#   terminal serial
+#
+# Uncomment the following line to enable GRUB splashimage on console
+#   splashimage /boot/grub/splash.xpm.gz
+#
+# To chainload another OS
+#
+# title Another OS
+#	root (hd<disk no>,<partition no>)
+#	chainloader +1
+#
+# To chainload a Solaris release not based on grub
+#
+# title Solaris 9
+#	root (hd<disk no>,<partition no>)
+#	chainloader +1
+#	makeactive
+#
+# To load a Solaris instance based on grub
+#
+# title Solaris <version>
+#	root (hd<disk no>,<partition no>,x)	--x = Solaris root slice
+#	kernel /platform/i86pc/multiboot
+#	module /platform/i86pc/boot_archive
+#
+# To override Solaris boot args (see kernel(1M)), console device and
+# properties set via eeprom(1M) edit the "kernel" line to:
+#
+#   kernel /platform/i86pc/multiboot <boot-args> -B prop1=val1,prop2=val2,...
+#

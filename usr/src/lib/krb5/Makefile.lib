@@ -1,0 +1,28 @@
+#
+# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#
+# lib/krb5/Makefile.lib
+#
+# Definitions common to krb5 libraries.
+
+include		$(SRC)/lib/Makefile.lib
+
+ROOTLIBDIR=	$(ROOT)/usr/lib/krb5
+ROOTLIBDIR64=	$(ROOT)/usr/lib/krb5/$(MACH64)
+ROOTLINTDIR=	$(ROOT)/usr/lib/krb5
+
+# definitions for lint
+LINTFLAGS=	-u -I..
+LINTFLAGS64=	-u -I..
+LINTSRC=	$(LINTLIB:%.ln=%)
+ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
+
+MAPFILE=	$(MAPDIR)/mapfile
+DYNFLAGS +=	-M $(MAPFILE)
+
+CLEANFILES +=	$(LINTOUT) $(LINTLIB)
+CLEANFILES +=	$(MAPFILE)

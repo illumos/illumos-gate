@@ -1,0 +1,401 @@
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Generic interface definition for usr/src/cmd/sgs/liblddbg.
+#
+# For information regarding the establishment of versioned definitions see:
+#	The Linker and Libraries Manual (version 2.5 or greater)
+# This is part of the Developers Guide in the Answerbook.  Specifically refer
+# to Chapter 2 under section "Defining Additional Symbols" through section
+# "Reducing Symbol Scope", and Chapter 5 "Versioning".
+#
+# For specific OSNET rules for the modification (evolution) of these version
+# definitions see:
+#	Policy for Shared Library Version Names and Interface Definitions
+
+
+SUNWprivate_4.44 {
+	global:
+		Dbg_args_files;
+		Dbg_args_flags;
+		Dbg_audit_interface;
+		Dbg_audit_lib;
+		Dbg_audit_object;
+		Dbg_audit_symval;
+		Dbg_audit_version;
+		Dbg_bind_global;
+		Dbg_bind_profile;
+		Dbg_bind_weak;
+		Dbg_bind_plt_summary;
+		Dbg_cap_hw_candidate;
+		Dbg_cap_hw_filter;
+		Dbg_cap_hw_1;
+		Dbg_cap_hw_164;
+		Dbg_cap_mapfile;
+		Dbg_cap_mapfile64;
+		Dbg_cap_sec_entry;
+		Dbg_cap_sec_entry64;
+		Dbg_cap_sec_title;
+		Dbg_ent_print;
+		Dbg_file_analyze;
+		Dbg_file_aout;
+		Dbg_file_archive;
+		Dbg_file_ar_rescan;
+		Dbg_file_bind_entry;
+		Dbg_file_cntl;
+		Dbg_file_config_dis;
+		Dbg_file_config_obj;
+		Dbg_file_delete;
+		Dbg_file_dlclose;
+		Dbg_file_dldump;
+		Dbg_file_dlopen;
+		Dbg_file_elf;
+		Dbg_file_filtee;
+		Dbg_file_filter;
+		Dbg_file_fixname;
+		Dbg_file_generic;
+		Dbg_file_hdl_action;
+		Dbg_file_hdl_collect;
+		Dbg_file_hdl_title;
+		Dbg_file_lazyload;
+		Dbg_file_ldso;
+		Dbg_file_mode_promote;
+		Dbg_file_needed;
+		Dbg_file_nl;
+		Dbg_file_output;
+		Dbg_file_preload;
+		Dbg_file_prot;
+		Dbg_file_rejected;
+		Dbg_file_del_rescan;
+		Dbg_file_reuse;
+		Dbg_file_skip;
+		Dbg_got_display;
+		Dbg_libs_audit;
+		Dbg_libs_ignore;
+		Dbg_libs_init;
+		Dbg_libs_l;
+		Dbg_libs_path;
+		Dbg_libs_req;
+		Dbg_libs_update;
+		Dbg_libs_yp;
+		Dbg_libs_ylu;
+		Dbg_libs_find;
+		Dbg_libs_found;
+		Dbg_map_atsign;
+		Dbg_map_dash;
+		Dbg_map_ent;
+		Dbg_map_equal;
+		Dbg_map_parse;
+		Dbg_map_pipe;
+		Dbg_map_seg;
+		Dbg_map_size_new;
+		Dbg_map_size_old;
+		Dbg_map_sort_fini;
+		Dbg_map_sort_orig;
+		Dbg_map_symbol;
+		Dbg_map_version;
+		Dbg_move_adjexpandreloc;
+		Dbg_move_adjmovereloc;
+		Dbg_move_data;
+		Dbg_move_expanding;
+		Dbg_move_input1;
+		Dbg_move_outsctadj;
+		Dbg_move_outsctadj64;
+		Dbg_move_outmove;
+		Dbg_move_mventry;
+		Dbg_move_mventry64;
+		Dbg_move_mventry2;
+		Dbg_move_mventry264;
+		Dbg_move_parexpn;
+		Dbg_reloc_apply;
+		Dbg_reloc_ars_entry;
+		Dbg_reloc_copy;
+		Dbg_reloc_discard;
+		Dbg_reloc_doact;
+		Dbg_reloc_doactiverel;
+		Dbg_reloc_dooutrel;
+		Dbg_reloc_error;
+		Dbg_reloc_generate;
+		Dbg_reloc_in;
+		Dbg_reloc_ors_entry;
+		Dbg_reloc_out;
+		Dbg_reloc_proc;
+		Dbg_reloc_reg_apply;
+		Dbg_reloc_run;
+		Dbg_reloc_transition;
+		Dbg_sec_added;
+		Dbg_sec_created;
+		Dbg_sec_discarded;
+		Dbg_sec_group;
+		Dbg_sec_group_discarded;
+		Dbg_sec_in;
+		Dbg_sec_order_list;
+		Dbg_sec_order_error;
+		Dbg_sec_strtab;
+		Dbg_seg_entry;
+		Dbg_seg_list;
+		Dbg_seg_os;
+		Dbg_seg_title;
+		Dbg_setup;
+		Dbg_statistics_ar;
+		Dbg_statistics_ld;
+		Dbg_syms_ar_checking;
+		Dbg_syms_ar_entry;
+		Dbg_syms_ar_resolve;
+		Dbg_syms_ar_title;
+		Dbg_syms_created;
+		Dbg_syms_discarded;
+		Dbg_syms_entered;
+		Dbg_syms_entry;
+		Dbg_syms_global;
+		Dbg_syms_ignore;
+		Dbg_syms_lazy_rescan;
+		Dbg_syms_new;
+		Dbg_syms_nl;
+		Dbg_syms_old;
+		Dbg_syms_process;
+		Dbg_syms_reduce;
+		Dbg_syms_reloc;
+		Dbg_syms_resolved;
+		Dbg_syms_resolving1;
+		Dbg_syms_resolving2;
+		Dbg_syms_sec_entry;
+		Dbg_syms_sec_title;
+		Dbg_syms_spec_title;
+		Dbg_syms_up_title;
+		Dbg_syms_updated;
+		Dbg_syms_dlsym;
+		Dbg_syms_lookup_aout;
+		Dbg_syms_lookup;
+		Dbg_syminfo_entry;
+		Dbg_syminfo_title;
+		Dbg_support_action;
+		Dbg_support_load;
+		Dbg_support_req;
+		Dbg_scc_title;
+		Dbg_scc_entry;
+		Dbg_tls_modactivity;
+		Dbg_tls_static_block;
+		Dbg_unused_file;
+		Dbg_unused_rtldinfo;
+		Dbg_unused_sec;
+		Dbg_unused_unref;
+		Dbg_util_broadcast;
+		Dbg_util_call_array;
+		Dbg_util_call_fini;
+		Dbg_util_call_init;
+		Dbg_util_call_main;
+		Dbg_util_dbnotify;
+		Dbg_util_intoolate;
+		Dbg_util_nl;
+		Dbg_util_no_init;
+		Dbg_util_str;
+		Dbg_util_wait;
+		Dbg_ver_avail_entry;
+		Dbg_ver_avail_entry64;
+		Dbg_ver_avail_title;
+		Dbg_ver_def_title;
+		Dbg_ver_desc_entry;
+		Dbg_ver_desc_entry64;
+		Dbg_ver_need_title;
+		Dbg_ver_need_entry;
+		Dbg_ver_nointerface;
+		Dbg_ver_symbol;
+		Dbg_audit_interface64;
+		Dbg_audit_lib64;
+		Dbg_audit_object64;
+		Dbg_audit_symval64;
+		Dbg_audit_version64;
+		Dbg_file_analyze64;
+		Dbg_file_aout64;
+		Dbg_file_archive64;
+		Dbg_file_bind_entry64;
+		Dbg_file_config_dis64;
+		Dbg_file_config_obj64;
+		Dbg_file_delete64;
+		Dbg_file_dlclose64;
+		Dbg_file_dldump64;
+		Dbg_file_dlopen64;
+		Dbg_file_elf64;
+		Dbg_file_filtee64;
+		Dbg_file_filter64;
+		Dbg_file_fixname64;
+		Dbg_file_generic64;
+		Dbg_file_hdl_action64;
+		Dbg_file_hdl_collect64;
+		Dbg_file_hdl_title64;
+		Dbg_file_lazyload64;
+		Dbg_file_ldso64;
+		Dbg_file_needed64;
+		Dbg_file_nl64;
+		Dbg_file_output64;
+		Dbg_file_preload64;
+		Dbg_file_prot64;
+		Dbg_file_reuse64;
+		Dbg_file_skip64;
+		Dbg_got_display64;
+		Dbg_map_atsign64;
+		Dbg_map_dash64;
+		Dbg_map_ent64;
+		Dbg_map_equal64;
+		Dbg_map_parse64;
+		Dbg_map_pipe64;
+		Dbg_map_seg64;
+		Dbg_map_size_new64;
+		Dbg_map_size_old64;
+		Dbg_map_sort_fini64;
+		Dbg_map_sort_orig64;
+		Dbg_map_symbol64;
+		Dbg_map_version64;
+		Dbg_pltpad_bindto64;
+		Dbg_pltpad_boundto64;
+		Dbg_reloc_ars_entry64;
+		Dbg_reloc_discard64;
+		Dbg_reloc_doact64;
+		Dbg_reloc_dooutrel64;
+		Dbg_reloc_error64;
+		Dbg_reloc_generate64;
+		Dbg_reloc_in64;
+		Dbg_reloc_ors_entry64;
+		Dbg_reloc_out64;
+		Dbg_reloc_proc64;
+		Dbg_reloc_reg_apply64;
+		Dbg_reloc_transition64;
+		Dbg_sec_added64;
+		Dbg_sec_created64;
+		Dbg_sec_discarded64;
+		Dbg_sec_group64;
+		Dbg_sec_group_discarded64;
+		Dbg_sec_in64;
+		Dbg_sec_order_list64;
+		Dbg_sec_order_error64;
+		Dbg_sec_strtab64;
+		Dbg_seg_entry64;
+		Dbg_seg_list64;
+		Dbg_seg_os64;
+		Dbg_seg_title64;
+		Dbg_statistics_ar64;
+		Dbg_statistics_ld64;
+		Dbg_syminfo_entry64;
+		Dbg_syminfo_title64;
+		Dbg_syms_ar_entry64;
+		Dbg_syms_ar_resolve64;
+		Dbg_syms_ar_checking64;
+		Dbg_syms_created64;
+		Dbg_syms_discarded64;
+		Dbg_syms_entered64;
+		Dbg_syms_entry64;
+		Dbg_syms_global64;
+		Dbg_syms_ignore64;
+		Dbg_syms_new64;
+		Dbg_syms_nl64;
+		Dbg_syms_old64;
+		Dbg_syms_process64;
+		Dbg_syms_reduce64;
+		Dbg_syms_reloc64;
+		Dbg_syms_resolved64;
+		Dbg_syms_resolving164;
+		Dbg_syms_resolving264;
+		Dbg_syms_sec_entry64;
+		Dbg_syms_sec_title64;
+		Dbg_syms_spec_title64;
+		Dbg_syms_up_title64;
+		Dbg_syms_updated64;
+		Dbg_syms_dlsym64;
+		Dbg_syms_lookup_aout64;
+		Dbg_syms_lookup64;
+		Dbg_tls_modactivity64;
+		Dbg_tls_static_block64;
+		Dbg_unused_sec64;
+} SUNWprivate_3.10;
+
+
+# The following interfaces are used by various parts of the link-editors and
+# the elfdump(1).  The link-editors are always packaged together but there
+# seems to be a variety of old elfdump's lying around.  elfdump only uses
+# this interface, and thus by separating in from the ever changing Dbg_*
+# interfaces we can provide a stable verioning environment for this utility.
+
+SUNWprivate_3.10 {
+	global:
+		Dbg_set;
+		Gelf_cap_print;
+		Gelf_cap_title;
+		Gelf_dyn_print;
+		Gelf_dyn_title;
+		Gelf_elf_data_title;
+		Gelf_elf_header;
+		Gelf_got_entry;
+		Gelf_got_title;
+		Gelf_phdr_entry;
+		Gelf_reloc_entry;
+		Gelf_shdr_entry;
+		Gelf_sym_dem;
+		Gelf_sym_table_entry;
+		Gelf_syminfo_entry;
+		Gelf_syminfo_title;
+		Gelf_sym_table_title;
+		Gelf_ver_def_title;
+		Gelf_ver_need_title;
+		Gelf_ver_line_1;
+		Gelf_ver_line_2;
+		Gelf_ver_line_3;
+
+	local:
+		*;
+};
+
+# The following functions must be provided by our caller, or one of the callers
+# dependencies.  When used with ld.so.1 all functions are provided from ld.so.1,
+# but when used with ld, many of the functions fall back to libc.  Presently we
+# don't build liblddbg with a libc dependency simply to avoid having to load it
+# with ld.so.1 which already offers the required interfaces (from libc_pic.a).
+# Distinguishing between `parent' and `extern' symbols offers a small
+# performance advantage with direct bindings, but this is mainly a test of what
+# we're capable of doing, rather than an admission that its really worth it :-).
+
+{
+		dbg_print =	FUNCTION parent;
+		free =		FUNCTION parent;
+		malloc =	FUNCTION parent;
+
+		_dgettext =	FUNCTION extern;
+		_close =	FUNCTION extern;
+		_open =		FUNCTION extern;
+		_write =	FUNCTION extern;
+		dlopen =	FUNCTION extern;
+		dlsym =		FUNCTION extern;
+		memcpy =	FUNCTION extern;
+		qsort =		FUNCTION extern;
+		snprintf =	FUNCTION extern;
+		sprintf =	FUNCTION extern;
+		strcat =	FUNCTION extern;
+		strcmp =	FUNCTION extern;
+		strcpy =	FUNCTION extern;
+		strlen =	FUNCTION extern;
+		strrchr =	FUNCTION extern;
+		strtok_r =	FUNCTION extern;
+};

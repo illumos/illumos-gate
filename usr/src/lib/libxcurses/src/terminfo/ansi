@@ -1,0 +1,106 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	ansi		<< TERMINFO Database >>
+#
+#	Vanilla ANSI terminal.  This definition basically describes 
+#	every thing possible on an ANSI terminal.  It assumes padding
+#	is zero and xon/xoff enabled.  Also numeric keypad mode is
+#	selected.
+#
+#	To commemt out individual selections, prefix the capability with
+#	a period (.), eg smam=\Ex is enabled while  .smam=\Ex is disabled. 
+#
+ansi|vanilla ansi terminal,
+#  Auto margins, auto left margin, Xon/xoff enabled,  safe move in standout 
+	am, xon, msgr, xenl,
+#  Screen size, standard characters
+	lines#24, cols#80, bel=^G, ht=^I, cr=^M,
+#  Reset, attrs off, normal cursor mode, keypad numeric mode, line wrap on
+	is2=\E[0m\E[?1l\E>\E[?7h, 
+#  Reset, attrs off
+	rs2=\Ec\E[0m,
+#  Turn on/off automatic margins
+	smam=\E[?7h, rmam=\E[?7l,
+#  Turn on/off "keypad-transmit" mode (application mode)
+	.smkx=\E[?1h\E=, .rmkx=\E[?1l>\E>, 
+#  Normal numeric kepad mode
+	kbs=^H, kcuu1=\E[A, kcud1=\E[B, kcuf1=\E[C, kcub1=\E[D, khome=\E[H, 
+#  Clear screen, erase to end of display
+	clear=\E[H\E[2J, ed=\E[J,
+#  Clear to beginning of line, clear to end of line
+	el1=\E[1K, el=\E[K,  
+#  Cursor absolute addressing, home cursor
+	cup=\E[%i%p1%d;%p2%dH, home=\E[H, 
+#  Cursor relative down, back, forward, and up by one
+	cud1=\E[B, cub1=\E[D, cuf1=\E[C, cuu1=\E[A,
+#  Scroll text up one, up n lines; scroll down one, down n lines
+	ind=\ED, indn=\E[%p1%dS, ri=\EM, rin=\E[%p1%dT,
+#  Save and restore cursor
+	sc=\E7,  rc=\E8,
+#  Delete one, delete n characters
+	dch1=\E[P, dch=\E[%p1%dP,
+#  Insert one, insert n lines; delete one, delete n lines
+	il1=\E[L, il=\E[%p1%dL, dl1=\E[M, dl=\E[%p1%dM,
+#  Start and finish insert mode
+	smir=\E[4h, rmir=\E[4l,
+#  Change scroll region
+	.csr=\E[%i%p1%d;%p2%dr,
+#  Set tab in current column, clear all tabs
+	hts=\EH, tbc=\E[3g,
+#  Turn on/off standout
+	smso=\E[7m, rmso=\E[m,
+#  Turn on/off underline
+	smul=\E[4m, rmul=\E[m, 
+#  Turn on blink, bold, reverse
+	blink=\E[5m, bold=\E[1m, rev=\E[7m, 
+#  Set attribute combinations
+	sgr=\E[0%?%p1%p3%|%t;7%;%?%p2%t;4%;%?%p4%t;5%;%?%p6%t;1%;m,
+#  Turn off all attributes
+	sgr0=\E[0m, 
+#  Flash by flipping background to white then black
+	flash=\E[?5h\E[?5l,
+
+ansi-tiny|Minimum ANSI terminal definition,
+#
+# The following is the minimum required by MKS Curses for use
+# with MKS Vi and MKS More.
+#
+	am,
+	lines#24,
+	cols#80,
+	el=\E[K,  
+	cup=\E[%i%p1%d;%p2%dH,
+	il1=\E[L, 
+	dl1=\E[M,
+#
+# The following is also required for traditional Vi.
+#
+	cr=\r,
+	home=\E[H, 
+	clear=\E[H\E[2J$<50>, 
+	ind=\ED, 
+	ri=\EM,

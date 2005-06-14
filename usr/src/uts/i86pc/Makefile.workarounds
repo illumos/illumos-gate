@@ -1,0 +1,83 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# uts/i86pc/Makefile.workarounds
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This makefile contains workaround defines to be shared
+# by Makefile.i86pc and the genunix Makefile.
+#
+
+#
+# SWAPGS May Fail To Read Correct GS Base
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_88
+
+#
+# Software Prefetches May Report A Page Fault
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_91
+
+#
+# RSM Auto-Halt Restart Returns To Incorrect RIP
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_93
+
+#
+# RET Instruction May Return To Incorrect EIP
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_95
+
+#
+# Compatibility Mode Branches Transfer to Illegal Address
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_100
+
+#
+# CPUID Instruction May Return Incorrect Model Number in Some Processors
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_108
+
+#
+# Certain Reverse REP MOVS May Produce Unpredictable Behaviour
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_109
+
+#
+# Sequential Execution Across Non_Canonical Boundary Caused Processor Hang
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_121
+
+#
+# TLB Flush Filter May Cause Cohenrency Problem in Multiprocessor Systems
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_122
+
+#
+# Bypassed Reads May Cause Data Corruption of System Hang in Dual Core
+# Processors
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_123

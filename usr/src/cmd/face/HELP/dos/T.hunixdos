@@ -1,0 +1,34 @@
+
+The unix-to-dos command enables you to convert a UNIX system text file
+to the MS-DOS format. 
+
+Because MS-DOS and the UNIX System treat their text files differently,
+you have to convert one file to another.  If you are working in MS-DOS
+with a file created under the UNIX System, your file needs extra
+carriage returns at the end of each line. You can use either MS-DOS or
+the UNIX System path separator for this conversion.
+
+Use one of the methods below for the unix-to-dos command:
+
+     Command Menu:  Select unix-to-dos and strike ENTER.
+
+     Command Line:  Type unix-to-dos and strike ENTER.
+
+   1.  The UNIX-to-DOS Copy form appears.
+
+   2.  Enter the name of the UNIX System text file you want to
+       convert and strike ENTER.
+
+   3.  Enter the new name of the file you want the MS-DOS file
+       to be and strike SAVE.
+
+Even though you can convert files between UNIX System and MS-DOS
+format, some MS-DOS programs cannot exchange files with other
+programs, either MS-DOS or UNIX system programs. A text file also
+called an ASCII file, is a file that contains only text. Many MS-DOS
+programs, even word processors, do not use this type of file. Instead,
+they put special codes in their files that other programs cannot
+understand. Often, however, programs allow you to read in or save
+files in ASCII format. Consult your program's instructions to see
+if this is possible.
+

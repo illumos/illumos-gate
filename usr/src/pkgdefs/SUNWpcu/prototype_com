@@ -1,0 +1,80 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
+
+#!search <pathname pathname ...>	# where to find pkg objects
+#!include <filename>			# include another 'prototype' file
+#!default <mode> <owner> <group>	# default used if not specified on entry
+#!<param>=<value>			# puts parameter in pkg environment
+
+# packaging files
+i pkginfo
+i copyright
+i depend
+i preremove
+#
+# SUNWpcu - Solaris Print /usr files
+#
+d none usr 0755 root sys
+d none usr/bin 0755 root bin
+f none usr/bin/cancel 4511 root lp
+s none usr/bin/disable=../sbin/accept
+s none usr/bin/enable=../sbin/accept
+f none usr/bin/lp 4511 root lp
+f none usr/bin/lpget 0511 root lp
+f none usr/bin/lpset 4511 root lp
+f none usr/bin/lpstat 4511 root lp
+d none usr/lib 0755 root bin
+s none usr/lib/accept=../sbin/accept
+f none usr/lib/libprint.so.2 0755 root bin
+s none usr/lib/libprint.so=./libprint.so.2
+s none usr/lib/lpadmin=../sbin/lpadmin
+s none usr/lib/lpmove=../sbin/lpmove
+s none usr/lib/lpsystem=../sbin/lpsystem
+d none usr/lib/print 0755 root lp
+d none usr/lib/print/bsd-adaptor 0755 root lp
+f none usr/lib/print/bsd-adaptor/bsd_cascade.so.1 0755 root lp
+s none usr/lib/print/bsd-adaptor/bsd_cascade.so=./bsd_cascade.so.1
+f none usr/lib/print/bsd-adaptor/bsd_test.so.1 0755 root lp
+s none usr/lib/print/bsd-adaptor/bsd_test.so=./bsd_test.so.1
+f none usr/lib/print/Makefile.yp 0444 root lp
+f none usr/lib/print/in.lpd 0555 root bin
+f none usr/lib/print/conv_fix 0555 root lp
+f none usr/lib/print/conv_lp 0555 root lp
+f none usr/lib/print/conv_lpd 0555 root lp
+s none usr/lib/print/printd=../../bin/lp
+s none usr/lib/reject=../sbin/accept
+d none usr/sbin 0755 root bin
+f none usr/sbin/accept 0555 root lp
+f none usr/sbin/lpadmin 0555 root lp
+f none usr/sbin/lpmove 4511 root lp
+f none usr/sbin/lpsystem 0555 root lp
+s none usr/sbin/reject=../sbin/accept

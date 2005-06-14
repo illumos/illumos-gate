@@ -1,0 +1,10 @@
+banner_text=cyan
+active_border=red
+inactive_border=blue
+active_title_bar=red
+inactive_title_bar=blue
+highlight_bar=blue
+slk_bar=white
+window_text=cyan
+active_title_text=cyan
+inactive_title_text=cyan

@@ -1,0 +1,77 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+msgid ""
+msgid " %-12.12s %-4.4s "
+msgid " [extent #%d of %d]"
+msgid " \t"
+msgid " linked to %s"
+msgid "%011lo"
+msgid "%07o"
+msgid "%10lo"
+msgid "%12lo"
+msgid "%2s"
+msgid "%3d/%-3d"
+msgid "%7lu"
+msgid "%8lo"
+msgid "%c "
+msgid "%lo"
+msgid "%luK\n"
+msgid "%s"
+msgid "%s %lo"
+msgid "%s %s\n"
+msgid "%s/"
+msgid "%s/%s"
+msgid "%s: "
+msgid "+++ a %s %luK [extent #%d of %d]\n"
+msgid "+++ x %s [extent #%d], %lu bytes, %luK\n"
+msgid "-"
+msgid "-C"
+msgid "-I"
+msgid "."
+msgid ".."
+msgid "/\n"
+msgid "/bin/pwd"
+msgid "/etc/default/tar"
+msgid "/tmp/tarXXXXXX"
+msgid "/usr/bin/pwd"
+msgid "0 tape blocks\n"
+msgid "00"
+msgid "0K\n"
+msgid "TAPE"
+msgid "\0"
+msgid "\n"
+msgid "\n [extent #%d of %d] %lu bytes total"
+msgid "a %s "
+msgid "a %s %luK (in %d extents)\n"
+msgid "a %s/ "
+msgid "archive0="
+msgid "input"
+msgid "output"
+msgid "pwd"
+msgid "r"
+msgid "seek = %luK\t"
+msgid "sort +0 -1 +1nr %s -o %s; awk '$1 != prev {print; prev=$1}' %s >%sX;mv %sX %s"
+msgid "ustar"
+msgid "w"
+msgid "x %s (in %d extents), %lu bytes, %luK\n"
+msgid "x %s, %lu bytes, "
+msgid "x %s, 0 bytes, "

@@ -1,0 +1,417 @@
+#!/bin/sh
+# MaKe a Bootable IMAGE --- 1.44, 2.88 and El Torito no-emulation mode
+# C) 2001,2002,2003 Thierry Laronde <tlaronde@polynum.org>
+# C) 2001,2002,2003 Robert Millan <robertmh@gnu.org>
+
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, you can either send email to this
+# program's maintainer or write to: The Free Software Foundation,
+# Inc.; 59 Temple Place, Suite 330; Boston, MA 02111-1307, USA.
+
+# $Id: mkbimage,v 1.19 2004/07/21 14:43:04 robertmh Exp $
+
+# Global variables
+tarfile=
+dir=
+fs= #file system type
+decompress=
+image_type=
+uname=`uname -s`
+PATH=/sbin:$PATH
+
+# You can set GRUB_PATH  if you need to use a specially located GRUB.
+# This MUST end by a '/'!
+
+
+#----------------------------DON'T CHANGE: INTERNALS
+
+block_size=512
+cylinders=
+heads=
+sectors=
+cyl_size=
+type_option=
+geo_option=
+image=
+bk_120=$((2 * 15 * 80))
+bk_144=$((2 * 18 * 80))
+bk_288=$((2 * 36 * 80))
+bk_160=$((2 * 20 * 80))
+bk_168=$((2 * 21 * 80))
+bk_174=$((2 * 21 * 83))
+lo_options=
+device_map=
+mkfs_options=
+debug=
+stage2_os_name=
+
+# Name by which this script was invoked.
+program=`echo "$0" | sed -e 's/[^\/]*\///g'`
+version_number='$Revision: 1.19 $'
+
+usage="
+Usage: $program [-hVF] [-t TYPE] [-d DIRECTORY] [-s FS_TYPE] -f TAR_FILE
+Make a Bootable IMAGE using GRUB as a bootloader
+
+Options:
+ Actions:
+ -d DIRECTORY [default CWD]
+	    Directory where the boot.image and the partition subdirectories
+	    are/will be created
+ -f TAR_FILE
+	    Name of the tar file containing the filesystem to install. Can
+	    be a pure tar file [.tar] or a compressed tar file
+	    [.tar.gz|.tar.bz2]
+ -s FS_TYPE
+	    Type of the file system to create on the virtual disk. Choices 
+	    are:
+		ext2 on GNU [default is ext2]
+		ext2, minix or msdos on GNU/Linux [default is ext2]
+
+ -t TYPE
+	    Type of the image to create. Choices are '1.20', '1.44', '1.60',
+	    '1.68', '1.74', '2.88' or 'hd' [default is hd]
+ -F
+	    Force to set the set_dpt flag (unnecessary 99% of the time! Be
+	    careful! 
+ Informations:
+ -D     
+	    turn Debugging on [xtrace]
+ -h|--help	
+	    display this Help and exit
+ -V|--version	
+	    display Version information and exit
+
+Copyright (c) 2001,2002,2003 Thierry Laronde <tlaronde@polynum.org>. 
+Copyright (c) 2001,2002 Robert Millan <zeratul2@wanadoo.es>.
+GPLed."
+
+version="mkbimage $version_number
+
+Written by Thierry Laronde and Robert Millan.
+
+Copyright (c) 2001,2002,2003 Thierry Laronde <tlaronde@polynum.org>.
+Copyright (c) 2001,2002,2003 Robert Millan <zeratul2@wanadoo.es>.
+
+This is free software under the GPL version 2 or later; see the source for 
+copying conditions.  There is NO warranty, not even for MERCHANTABILITY or 
+FITNESS FOR A PARTICULAR PURPOSE."
+
+# Functions
+
+error ()
+{
+	case $1 in
+	bug) echo "This is a bug!";
+		echo "$usage";;
+	option) echo "Unknow option"; echo "$usage";;
+	missing_argument) echo "You must give an argument to the option!";
+		echo "$usage";;
+	missing_option) echo "You must indicate at least one option!";
+		echo "$usage";;
+	must_be_root) echo "You must be root! (or install e2tools/mtools)";;
+	unknown_fs)	if [ $uname = Linux ];
+				then echo "The GNU/Linux supported fs are: ext2, minix or msdos!";
+			elif [ $uname = GNU ];
+				then echo "The GNU supported fs is ext2!";
+			fi;;
+	unknown_format) echo "The tar file must be .tar|.tar.gz|.tar.bz2!";;
+	wont_fit) echo "The files won't fit on the selected type of media!";;
+	wrong_directory) echo "Directory inexistant or not given!";
+		echo "$usage";;
+	wrong_file) echo "File inexistant or empty!";
+		echo "$usage";;
+	wrong_type) echo "The type specified is not a valid one!";
+		echo "$usage";;
+	esac	
+	exit 1
+}
+
+# create a filesystem of type $fs in $image with offset $offset
+mkbimage_mkfs ()
+{
+  case $offset in
+    0)  lo_options="";;
+    *) lo_options="-o $offset";;
+  esac
+
+  if [ "$offset" = "0" ] ; then
+    mkfs.$fs -F $image
+  elif [ `id -u` = "0" ] ; then
+    losetup $lo_options /dev/loop1 $image
+    mkfs.$fs /dev/loop1
+    losetup -d /dev/loop1
+  else
+    error must_be_root
+  fi
+}
+
+# copy ${image}1/* to ${image}:/, assuming ${image} contains a filesystem
+# of type $fs in offset $offset
+mkbimage_cp ()
+{
+  case $offset in
+    0)  lo_options="";;
+    *)  lo_options="-o $offset";;
+  esac
+  case $fs in
+    ext2)
+      cp="e2cp";
+      mkdir="e2mkdir";;
+    vfat)
+      cp="mcopy";
+      mkdir="mmd";;
+    *)
+      cp="";
+      mkdir="";;
+  esac
+
+  if [ "$offset" = 0 ] && which $cp > /dev/null ; then
+    for dir in $(cd ${image}1 && find -type d) ; do
+	$mkdir ${image}:$dir
+    done
+    for file in $(cd ${image}1 && find -type f) ; do
+	$cp ${image}1/$file ${image}:$file
+    done
+  elif [ "`id -u`" = "0" ] ; then
+    losetup $lo_options /dev/loop1 $image
+    mkdir ${image}.mnt
+    mount -t $fs /dev/loop1 ${image}.mnt
+    cp -a ${image}1/* ${image}.mnt/ && sync
+    umount ${image}.mnt
+    rmdir ${image}.mnt
+    losetup -d /dev/loop1
+  else
+    error must_be_root
+  fi
+}
+
+#**********************************************************************
+#                          MAIN PROGRAM                               *
+#**********************************************************************
+
+#---------------------- Getting the options
+
+[ $# -eq 0 ] && error missing_option;
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-d) shift;
+			dir="$1";
+			[ ! -d "$1" ] && error wrong_directory;;
+		-f) shift;
+			tarfile="$1";
+			[ -z "$tarfile" ] && error missing_argument;;
+		-s) shift;
+			fs="$1";;
+		-t) shift;
+			image_type="$1";;
+		-F) geo_option="-F";;
+		-D) debug="-v";
+		    set -x;;
+		-h|--help) echo "$usage"; exit 0;;
+		-V|--version) echo "$version"; exit 0;;
+	 	*) error option ;;
+	esac
+shift	
+done
+#---------------------- Sanity checks
+[ ! "$tarfile" ] && error missing_argument;
+[ ! -s "$tarfile" ] && error wrong_file;
+
+if [ ! "$image_type" ]; then
+	image_type=hd;
+elif [ "$image_type" != "1.20" ] && [ "$image_type" != "1.44" ] \
+  && [ "$image_type" != "1.60" ] && [ "$image_type" != "1.68" ] \
+  && [ "$image_type" != "2.88" ] && [ "$image_type" != "1.74" ] \
+  && [ "$image_type" != "hd" ] && [ "$image_type" != "1.60" ] ; then
+  error wrong_type ;
+fi
+
+[ ! "$fs" ] && fs=ext2
+
+# Carlo Contavalli reported that I [TL] have forgotten to specify the
+# partition ID for sfdisk to correctly fill the partition table (ext2 is the
+# default on Linux, so this worked in this case...). This is fixed below.
+case "$fs" in
+	ext2) mkfs_options="-m 0";
+		  part_id="83";; # This is the default
+#	ufs)	if [ $uname = Linux ];
+#		then error unknown_fs;
+#		fi;;
+	minix)	if [ $uname = GNU ];
+		then error unknown_fs;
+		else 
+			mkfs_options="-v"; # Minix version 2
+			part_id="81";
+		fi;;
+	msdos)	if [ $uname = GNU ];
+		then error unknown_fs;
+		else 
+			mkfs_options="-f 1 -F 12"; # the smallest...
+			part_id="1"; 
+		fi;;
+	*) error unknown_fs;;
+esac
+
+# What type of tar file has been given ?
+
+suffix=`echo "$tarfile" | sed -n 's/^.*\.\([targbz2]\{2,3\}\)$/\1/p'`
+case "$suffix" in
+	tar) decompress="cat";;
+	gz) decompress="gunzip -c";;
+	bz2) decompress="bunzip2 -c";;
+	*) error unknown_format;;
+esac
+#---------------------- Initializations
+
+[ ! "$dir" ] && dir=`pwd`
+
+image=$dir/$image_type.image
+device_map=$dir/device.map
+
+# First, find the size of the tar file in block_size.
+file_size=`$decompress $tarfile | wc -c | tr -d ' '`
+file_size=$(($file_size / $block_size + 1))
+
+# Increase in order to be sure that with a fs there will be enough
+# room (trying 110%)
+file_size=$(($file_size + $file_size / 10))
+
+case "$image_type" in
+  hd) heads=16;
+    sectors=63;
+    cyl_size=$((16 * 63));
+    # Create the minimum number of cylinders. At the moment, we leave
+    # some space by rounding everything up by adding 1 cylinder, plus
+    # another one for MBR + reserved track.
+    cylinders=$(($file_size / $cyl_size + 2));; 
+  1.20) [ $file_size -ge $bk_120 ] && error wont_fit; 
+    heads=2;
+    sectors=15;
+    cyl_size=$((2 * 15));
+    cylinders=80;;
+  1.44) [ $file_size -ge $bk_144 ] && error wont_fit; 
+    heads=2;
+    sectors=18;
+    cyl_size=$((2 * 18));
+    cylinders=80;;
+  1.60) [ $file_size -ge $bk_160 ] && error wont_fit; 
+    heads=2;
+    sectors=20;
+    cyl_size=$((2 * 20));
+    cylinders=80;
+    geo_option="-F";;
+  1.68) [ $file_size -ge $bk_168 ] && error wont_fit; 
+    heads=2;
+    sectors=21;
+    cyl_size=$((2 * 21));
+    cylinders=80;;
+  1.74) [ $file_size -ge $bk_174 ] && error wont_fit; 
+    heads=2;
+    sectors=21;
+    cyl_size=$((2 * 21));
+    cylinders=83;;
+  2.88) [ $file_size -ge $bk_288 ] && error wont_fit;
+    heads=2;
+    sectors=36;
+    cyl_size=$((2 * 36));
+    cylinders=80;;
+  *) error bug;;
+esac
+
+type_option="-t $image_type"
+
+# We start by creating a virtual disk which size is the number of
+# cylinders of $cyl_size mandatory to put the files stocked in the $tarfile
+# Create the empty virtual disk
+dd if=/dev/zero of=$image bs=$block_size count=$(($cyl_size * $cylinders))
+
+# We then format the virtual disk
+# NOTE: the El Torito specification wants only one partition. So we
+# create the first, and the remaining 3 entries are empty.
+
+if [ "$image_type" = "hd" ]; then
+  sfdisk -C $cylinders -H $heads -S $sectors -D $image<<EOT
+,,$part_id,*,0,1,1
+
+
+EOT
+  offset="$(($sectors * $block_size))" 
+  type_option=
+else
+  offset="0"
+fi
+
+# It's time now to create the filesystem on the first partition.
+mkbimage_mkfs
+
+# then untar the files
+[ ! -e ${image}1 ] || { echo "${image}1 exists, please remove it first"; exit 1;}
+mkdir -p ${image}1
+$decompress $tarfile | tar -C ${image}1 $debug -xf -
+
+# copy the untarred files into the filesystem image
+mkbimage_cp
+
+#We verify that the stage2 exists and we search the name
+stage2_os_name=`find ${image}1 -name stage2 -type f`
+
+[ -r "$stage2_os_name" ] || { echo "I can't find stage2!"; exit 1;}
+
+#------------------------- GRUB stuff
+if [ "$image_type" = "hd" ]; then
+	device='(hd0)'
+	root='(hd0,0)'
+else
+	device='(fd0)'
+	root='(fd0)'
+fi
+
+cat<<EOT >$device_map
+$device	${image}
+EOT
+
+${GRUB_PATH}grub --device-map=$device_map --batch<<EOT
+geometry $device $cylinders $heads $sectors
+root $root
+setup $device
+geometry $geo_option -w $type_option $device $cylinders $heads $sectors
+EOT
+
+echo "-------------------WHAT'S NEXT?-------------------------------------"
+echo
+
+cat <<EOF
+If you have created an image aimed to a floppy, then something like:
+
+dd if=<type>.image of=/dev/fd0[u<size>] bs=512
+
+will be more than enough... if you have formated the floppy correctly
+using \`superformat' to be found in \`fdutils' package.
+
+For El Torito floppy emulation :
+
+mkisofs -b <image> -c boot.catalog -o raw.iso <dir>
+
+And for El Torito Hard Disk emulation:
+
+mkisofs -b <image> -hard-disk-boot -c boot.catalog -o raw.iso <dir> 
+
+Enjoy!
+EOF
+
+rm -rf ${image}1
+
+exit 0

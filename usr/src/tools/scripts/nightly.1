@@ -1,0 +1,563 @@
+.\" ident	"%Z%%M%	%I%	%E% SMI"
+.\" " CDDL HEADER START
+.\" "
+.\" " The contents of this file are subject to the terms of the
+.\" " Common Development and Distribution License, Version 1.0 only
+.\" " (the "License").  You may not use this file except in compliance
+.\" " with the License.
+.\" "
+.\" " You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" " or http://www.opensolaris.org/os/licensing.
+.\" " See the License for the specific language governing permissions
+.\" " and limitations under the License.
+.\" "
+.\" " When distributing Covered Code, include this CDDL HEADER in each
+.\" " file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" " If applicable, add the following below this CDDL HEADER, with the
+.\" " fields enclosed by brackets "[]" replaced with your own identifying
+.\" " information: Portions Copyright [yyyy] [name of copyright owner]
+.\" "
+.\" " CDDL HEADER END
+.\" "
+.\" "Copyright 2005 Sun Microsystems, Inc.  All rights reserved."
+.\" "Use is subject to license terms."
+.TH nightly 1 "1 January 2005"
+.SH NAME
+.I nightly
+\- build an OS-Net consolidation overnight
+.SH SYNOPSIS
+\fBnightly [-in] [-V VERS] <env_file>\fP
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "nightly" "" "\fBnightly\fP"
+.LP
+.I nightly,
+the mother of all build scripts,
+can bringover, build, archive, package, error check, and
+generally do everything it takes to
+turn OS/Net consolidation source code into useful stuff.
+It is customizable to permit you to run anything from a
+simple build to all of the cross-checking a gatekeeper
+needs.  The advantage to using
+.I nightly
+is that you build things correctly, consistently and
+automatically, with the best practices; building with
+.I nightly
+can mean never having to say you're sorry to your
+gatekeeper.
+.LP
+More
+specifically,
+.I nightly
+performs the following tasks, in order, if
+all these things are desired:
+.LP
+.RS
+.TP
+perform a "make clobber" to clean up old binaries
+.TP
+bringover from the identified parent gate/clone
+.TP
+perform non-debug and debug builds
+.TP
+list proto area files and compare with previous list
+.TP
+copy updated proto area to parent
+.TP
+list shared lib interface and compare with previous list
+.TP
+perform builds with profiling and tracing support
+.TP
+perform a "make lint" of the kernel and report errors
+.TP
+perform a "make check" to report hdrchk/cstyle errors
+.TP
+report the presence of any core files
+.TP
+check the ELF runtime attributes of all dynamic objects
+.TP
+check for unreferenced files
+.TP
+report the total build time
+.TP
+save a detailed log file for reference
+.TP
+mail the user a summary of the completed build
+.RE
+.LP
+The actions of the script are almost completely determined by
+the environment variables in the
+.I env
+file, the only necessary argument.  Ths only thing you really
+need to use 
+.I nightly
+is an
+.I env
+file that does what you want.
+.LP
+
+.LP
+.SH NIGHTLY_OPTIONS
+The environment variable NIGHTLY_OPTIONS controls the actions
+.I nightly
+will take as it proceeds.
+The -i, -n and -V options may also be used from the command line to
+control the actions without editing your environment file.  The
+-i and -n each make the build complete more quickly by bypassing
+some actions.  If NIGHTLY_OPTIONS is not set, "-aBm" is used.
+
+.B Basic action options
+.TP 10
+.B \-D
+Do a build with DEBUG on (non-DEBUG is built by default)
+.TP
+.B \-F
+Do _not_ do a non-DEBUG build (use with -D to get just a DEBUG build)
+.TP
+.B \-M
+Do not run pmodes (safe file permission checker)
+.TP
+.B \-P
+Do a build with GPROF on (not built by default)
+.TP
+.B \-T
+Do a build with TRACE on (not built by default).  Note: the TRACE option should
+not be used with Solaris 10 or later following the integration of DTrace as it
+is no longer applicable to the Solaris kernel source base.
+.TP
+.B \-i
+Do an incremental build, suppressing the "make clobber"
+that by default removes all existing binaries and derived files.
+From the command line, -i also suppresses profiled and trace
+builds, the lint pass and the cstyle/hdrchk pass
+.TP
+.B \-n
+Suppress the bringover so that the build will start immediately with
+current source code
+.TP
+.B \-o
+Do an "old style" (pre-S10) build using root privileges to set OWNER
+and GROUP from the Makefiles.
+.TP
+.B \-a
+Create BFU archives
+.TP
+.B \-z
+Compress cpio archives with gzip
+.TP
+.B \-p
+Create packages for regular install
+.TP
+.B \-U
+Update proto area in the parent workspace
+.TP
+.B \-u
+Copy proto_list_${MACH} and friends to usr/src in the parent
+workspace.  When used with -f, also build a usr/src/unrefmaster.out in
+the parent by merging all the usr/src/unref-${MACH}.out files in the
+parent.
+.TP
+.B \-m
+Send mail to $MAILTO at end of build
+.TP
+.B \-t
+Build and use the tools in $SRC/tools.
+
+.LP
+.B Code checking options
+.TP 10
+.B \-A
+Check for ABI discrepancies in .so files.
+It is only required for shared object developers when there is an
+addition, deletion or change of interface in the .so files.
+.TP
+.B \-C
+Check for cstyle/hdrchk errors
+.TP
+.B \-f
+Check for unreferenced files.  Since the full workspace must be built
+in order to accurately identify unreferenced files, -f is ignored for
+incremental (-i) builds, or builds that do not include -l and -p.
+.TP
+.B \-r
+Check the ELF runtime attributes of all dynamic objects
+.TP
+.B \-l
+Do "make lint" in $LINTDIRS (default: $SRC n)
+.TP
+.B \-N
+Do not run protocmp or checkpaths (note: this option is not
+recommended, especially in conjunction with the \-p option)
+.TP
+.B \-W
+Do not report warnings (for freeware gate ONLY)
+
+.LP
+.B Groups of options
+.TP 10
+.B \-G
+Gate keeper default group of options (-au)
+.TP
+.B \-I
+Integration engineer default group of options (-ampu)
+.TP
+.B \-R
+Default group of options for building a release (-mp)
+
+.LP
+.B Miscellaneous options
+.TP 10
+.B \-V VERS
+set the build version string to VERS, overriding VERSION
+.TP
+.B \-d
+use Distributed Make (default uses Parallel Make)
+.TP
+.B \-X
+do IA32 realmode builds (requires access to a
+properly-configured NT build machine and root permissions)
+.TP
+.B \-S E | D | H
+Build the Export, Domestic, or Hybrid source product. Only Export and
+Domestic are truly buildable at this time.
+
+.LP
+.SH ENVIRONMENT VARIABLES
+.LP
+Here is a list of prominent environment variables that 
+.I nightly
+references and the meaning of each variable.
+.LP
+.RE
+.B CODEMGR_WS
+.RS 5
+The root of your Teamware workspace, which is the directory
+containing Codemgr_wsdata. This is the source to be built
+.LP
+.RE
+.B PARENT_WS
+.RS 5
+The root of the Teamware workspace which is the parent of the
+one being built;
+.I nightly
+uses this for the bringover if $CLONE_WS is not defined
+.LP
+.RE
+.B CLONE_WS
+.RS 5
+The clone of the parent Teamware workspace;
+.I nightly
+uses this for the bringover if it is defined, to avoid locking out
+updates to the parent for the duration of the bringover
+.LP
+.RE
+.B SRC
+.RS 5
+Root of OS-Net source code, referenced by the Makefiles.  It is
+the starting point of build activity.  It should be expressed
+in terms of $CODEMGR_WS
+.LP
+.RE
+.B ROOT
+.RS 5
+Root of the proto area for the build.  The makefiles direct
+the installation of header files and libraries to this area and
+direct references to these files by builds of commands and other
+targets.  It should be expressed in terms of $CODEMGR_WS
+.LP
+.RE
+.B MACH
+.RS 5
+The instruction set architecture of the build machine as given
+by \fIuname -p\fP, e.g. sparc, i386
+.LP
+.RE
+.B LOCKNAME
+.RS 5
+The name of the file used to lock out multiple runs of
+.I nightly.
+This should generally be left to the default setting
+.LP
+.RE
+.B ATLOG
+.RS 5
+The location of the log directory maintained by
+.I nightly
+This should generally be left to the default setting
+.LP
+.RE
+.B LOGFILE
+.RS 5
+The name of the log file in the $ATLOG directory maintained by
+.I nightly
+This should generally be left to the default setting
+.LP
+.RE
+.B STAFFER
+.RS 5
+The non-root user identity to use for the bringover from the
+clone or parent workspace
+.LP
+.RE
+.B MAILTO
+.RS 5
+The address to be used to send completion e-mail at the end of
+the build (for the -m option)
+.LP
+.RE
+.B REF_PROTO_LIST
+.RS 5
+Name of file used with protocmp to compare proto area contents
+.LP
+.RE
+.B CPIODIR
+.RS 5
+The destination for cpio archives.  This may be relative to
+$CODEMGR_WS for private archives or relative to $PARENT_WS
+if you have different workspaces for different architectures
+but want one hierarchy of BFU archives
+.LP
+.RE
+.B PARENT_ROOT
+.RS 5
+The parent root, which is the destination for updated headers and
+libraries when using the -U option
+.LP
+.RE
+.B RELEASE
+.RS 5
+The release version number to be used; e.g., 5.10.1 (Note: this is set
+in Makefile.master and should not normally be overridden)
+.LP
+.RE
+.B VERSION
+.RS 5
+The version text string to be used; e.g., "onnv:`date '+%Y-%m-%d'`"
+.LP
+.RE
+.B RELEASE_DATE
+.RS 5
+The release date text to be used; e.g., October 2007
+.LP
+.RE
+.B INTERNAL_RELEASE_BUILD
+.RS 5
+See Makefile.master - but it mostly controls id strings. Generally,
+let
+.I nightly
+set this for you.
+.LP
+.RE
+.B RELEASE_BUILD
+.RS 5
+Define this to build a release with a non-debug kernel. 
+Generally, let
+.I nightly
+set this for you based on its options.
+.LP
+.RE
+.B PKGDEFS
+.RS 5
+Points to "$SRC/pkgdefs."  Not used these days.
+.LP
+.RE
+.B PKGARCHIVE
+.RS 5
+The destination for packages.  This may be relative to
+$CODEMGR_WS for private archives or relative to $PARENT_WS
+if you have different workspaces for different architectures
+but want one hierarchy of BFU archives
+.LP
+.RE
+.B MAKEFLAGS
+.RS 5
+Set default flags to make; e.g., -k to build all targets regardless of errors.
+.LP
+.RE
+.B UT_NO_USAGE_TRACKING
+.RS 5
+Disables usage reporting by listed Devpro tools. Otherwise it sends mail
+to some Devpro machine every time the tools are used.
+.LP
+.RE
+.B LINTDIRS
+.RS 5
+Directories to lint with the -l option
+.LP
+.RE
+.B BUILD_TOOLS
+.RS 5
+BUILD_TOOLS is the root of all tools including the compilers; e.g.,
+/ws/onnv-tools.  It is used by the makefile system, but not nightly.
+.LP
+.RE
+.B ONBLD_TOOLS
+.RS 5
+ONBLD_TOOLS is the root of all the tools that are part of SUNWonbld; e.g.,
+/ws/onnv-tools/onbld.  By default, it is derived from
+.BR BUILD_TOOLS .
+It is used by the makefile system, but not nightly.
+.LP
+.RE
+.B SPRO_ROOT
+.RS 5
+The gate-defined default location for the Sun compilers, e.g.
+/ws/onnv-tools/SUNWspro.  By default, it is derived from
+.BR BUILD_TOOLS .
+It is used by the makefile system, but not nightly.
+.LP
+.RE
+.B JAVA_ROOT
+.RS 5
+The location for the java compilers for the build, generally /usr/java.
+.LP
+.RE
+.B OPTHOME
+.RS 5
+The gate-defined default location of things formerly in /opt; e.g.,
+/ws/onnv-tools.  This is used by nightly, but not the makefiles.
+.LP
+.RE
+.B TEAMWARE
+.RS 5
+The gate-defined default location for the Teamware tools; e.g.,
+/ws/onnv-tools/SUNWspro.  By default, it is derived from
+.BR OPTHOME .
+This is used by nightly, but not the makefiles.
+.LP
+.RE
+.B EXPORT_SRC
+.RS 5
+The source product has no SCCS history, and is modified to remove source
+that cannot be shipped. EXPORT_SRC is where the clear files are copied, then
+modified with 'make EXPORT_SRC'
+.LP
+.RE
+.B CRYPT_SRC
+.RS 5
+CRYPT_SRC is similar to EXPORT_SRC, but after 'make CRYPT_SRC' the files in
+xmod/cry_files are saved. They are dropped on the exportable source to create
+the domestic build
+.RE
+.LP
+.B CHECK_PATHS
+.RS 5
+Normally, nightly runs the 'checkpaths' script to check for
+discrepancies among the files that list paths to other files, such as
+exception lists and req.flg.  Set this flag to 'n' to disable this
+check, which appears in the nightly output as "Check lists of files."
+.RE
+.LP
+.B CHECK_DMAKE
+.RS 5
+Nightly validates that, if dmake is in use, the version of dmake
+encountered is known to be safe to use.  Set this flag to 'n' to
+disable this test, allowing any version of dmake to be used.
+.RE
+.LP
+.SH REALMODE ENVIRONMENT VARIABLES
+.LP
+The following environment variables referenced by
+.I nightly
+are only required on IA32 realmode builds, enabled with option -X.
+.LP
+.B NTSERVER
+.RS 5
+The host name of the NT server to be used for realmode builds.
+It is unlikely there will be any public NT machines available,
+so you'll most likely need to set one of these up for your project's
+use if you need to build realmode.
+.LP
+.RE
+.B IA32_IHV_WS
+.RS 5
+Reference to the IHV workspace containing IHV driver binaries.
+The IHV workspace must be fully built before starting the ON realmode build.
+.LP
+.RE
+.B IA32_IHV_ROOT
+.RS 5
+Reference to the IHV workspace proto area.
+The IHV workspace must be fully built before starting the ON realmode build.
+.LP
+.RE
+.B IA32_IHV_PKGS
+.RS 5
+Reference to the IHV workspace packages.
+The IHV workspace must be fully built before starting the ON realmode build.
+.LP
+.RE
+.B IA32_IHV_BINARY_PKGS
+.RS 5
+Reference to binary-only IHV packages.  These packages must
+be available before starting the ON realmode build.
+.LP
+.RE
+.B DCB_ROOT
+.RS 5
+The DCB proto area containing all the individual realmode
+drivers used to construct the boot floppy.
+.LP
+.RE
+.B BOOTFLOPPY_ROOT
+.RS 5
+Boot floppy proto area containing the actual boot floppy image
+resulting from the build.
+.LP
+.RE
+.B SPARC_RM_PKGARCHIVE
+.RS 5
+Destination for sparc realmode package SUNWrmodu.
+Yes, this sparc package really is built on x86.
+.LP
+.RE
+.B REF_PROTO_LIST_DCB
+.RS 5
+This is the reference DCB proto area to compare against
+the results of your build.  This makes it easy to see
+the changes introduced from one build to the next.
+.LP
+.RE
+.B REF_PROTO_LIST_BOOTFLOPPY
+.RS 5
+This is the reference BootFloppy proto area to compare against
+the results of your build.  This makes it easy to see
+the changes introduced from one build to the next.
+.SH REALMODE BUILDS
+.LP
+Since realmode builds are always non-DEBUG, there's no difference
+between the DEBUG & non-DEBUG versions of the realmode packages.
+All the realmode and IHV packages are installed by
+.I nightly
+in both the nightly and nightly-nd
+packages so both sets of packages are complete.
+This means both the IHV and ON builds must include non-DEBUG.
+.SH BUILDING THE IHV WORKSPACE
+.LP
+The IHV workspace can be built with
+.I nightly.
+The recommended options are:
+.LP
+.RS 5
+NIGHTLY_OPTIONS="-pmWN"
+.RE
+.LP
+The NTSERVER variable must be set to provide the NT server
+to be used for the realmode part of the IHV build.  None
+of the other realmode environment variables needed for
+ON realmode builds are required to build the IHV
+workspace.
+.SH EXAMPLES
+.LP
+Start with the example file in usr/src/tools/env/developer.sh
+(or gatekeeper.sh), copy to myenv and make your changes.
+.LP
+.PD 0
+# grep NIGHTLY_OPTIONS myenv
+.LP
+NIGHTLY_OPTIONS="-ACrlapDm"
+.LP
+export NIGHTLY_OPTIONS
+.LP
+# /opt/onbld/bin/nightly -i myenv
+.LP

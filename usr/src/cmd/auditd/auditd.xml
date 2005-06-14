@@ -1,0 +1,152 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License, Version 1.0 only
+ (the "License").  You may not use this file except in compliance
+ with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+    ident	"%Z%%M%	%I%	%E% SMI"
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:auditd'>
+
+<service
+	name='system/auditd'
+	type='service'
+	version='1'>
+
+	<single_instance />
+
+	<dependency
+		name='usr'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<dependency
+		name='ns'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/name-services' />
+	</dependency>
+
+	<dependency
+		name='syslog'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/system-log' />
+	</dependency>
+
+	<dependent
+		name='auditd_multi-user'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/multi-user'/>
+	</dependent>
+
+	<dependent
+		name='console-login'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/console-login'/>
+	</dependent>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/svc-auditd'
+		timeout_seconds='15'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec=':kill -HUP'
+		timeout_seconds='30'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<!--
+		auditd waits for c2audit to quiet down after catching a
+		-TERM before exiting; auditd's timeout is 20 seconds
+	-->
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill -TERM'
+		timeout_seconds='30'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<!-- SIGs HUP, TERM, and USR1 are all expected by auditd -->
+
+	<property_group name='startd' type='framework'>
+		<propval name='ignore_error' type='astring'
+		value='core,signal' />
+	</property_group>
+
+	<property_group name='general' type='framework'>
+		<!-- to start stop auditd -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.audit.config' />
+	</property_group>
+
+	<instance name='default' enabled='false' />
+
+	<stability value='Evolving' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				Solaris audit daemon
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='auditd'
+				section='1M'
+				manpath='/usr/share/man'/>
+			<manpage title='audit'
+				section='1M'
+				manpath='/usr/share/man'/>
+	         </documentation>
+	</template>
+
+</service>
+
+</service_bundle>

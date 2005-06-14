@@ -1,0 +1,161 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
+# # --------------------------------
+#
+# hazeltine: HAZELTINE
+#
+# Manufacturer:	HAZELTINE
+# Class:	II
+# 
+# Info:
+#	Since cuf1 is blank, when you want to erase something you
+#	are out of luck. You will have to do ^L's a lot to
+#	redraw the screen. h1000 is untested. It doesn't work in
+#	vi - (The code is there but it isn't debugged for this case.)
+#
+h1000|hazeltine 1000,
+	cub1=^H, home=^K, clear=^L, cuf1= ,
+	cols#80, lines#12, cr=^M, cud1=^J, ind=^J, bel=^G,
+h1420|hazeltine 1420,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, am, lines#24, cols#80,
+	il1=\E^Z, dl1=\E^S, ed=\E^X, clear=\E\034, cuu1=\E^L, cuf1=^P,
+	el=\E^O, ht=^N, cup=\E^Q%p2%c%p1%' '%+%c, smso=\E\037, rmso=\E^Y,
+h1500|hazeltine 1500,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=~^Z$<40>, hz, am,
+	cub1=^H, ed=~^X$<10>,
+	el=~^O, clear=~^\, cup=~^Q%p2%c%p1%c, cols#80, dl1=~^S$<40>,
+	cud1=~^K, lines#24, cuf1=^P, smso=~^_, rmso=~^Y, cuu1=~^L,
+# Info:
+#	This is a Fluke special to work around the comm gear 
+#	intercepting ^S
+#
+s1500|hazeltine 1500 thru comm system that see's ^S ,
+	cr=^M, ind=^J, cud1=^J, bel=^G,
+	il1=~^Z$<40>, am, cub1=^H, ed=~^X$<10>, el=~^O,
+	clear=~^\, cup=~^Q%p2%c%p1%c, cols#80,
+	cud1=~^K, hz, lines#24, cuf1=^P, cuu1=~^L, 
+# Info:
+#	h1510 assumed to be in escape mode. Else use h1510t.
+#
+h1510|hazeltine 1510 using escape escapes,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	il1=\E^Z, am, cub1=^H, ed=\E^X, el=\E^O, clear=\E^\,
+	cup=\E^Q%p2%c%p1%c, cols#80, dl1=\E^S, cud1=\E^K,
+	lines#24, cuf1=^P, .rmso=\E^_, .smso=\E^Y, cuu1=\E^L,
+h1510t|Hazeltine 1510 with tilde escapes,
+	am,
+	home=~^R,
+	khome=~^R,
+	cuu1=~^L,
+	kcuu1=~^L,
+	cud1=~^K,
+	kcud1=~^K,
+	cub1=\b,
+	bel=^G,
+	cbt=~,
+	clear=~,
+	cols#80,
+	cr=,
+	cuf1=^P,
+	cup=~^Q%p2%c%p1%c,
+	dl1=~^S$<40>,
+	ed=~^X$<10>,
+	el=~^O,
+	hz,
+	il1=~^Z$<40>, 
+	ind=^J,
+	kbs=,
+	kcbt=~,
+	kclr=~,
+	kcub1=\b,
+	kcuf1=^P,
+	kf0=~0\r,
+	kf1=~1\r,
+	kf2=~2\r,
+	kf3=~3\r,
+	kf4=~4\r,
+	kf5=~5\r,
+	kf6=~6\r,
+	kf7=~7\r,
+	kf8=~8\r,
+	kf9=~9\r,
+	ktbc=~.\r,
+	lines#24,
+	rmso=~^Y,
+	sc=~^E,
+	smso=~^_,
+
+
+h1520|hazeltine 1520,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=~^Z, am, cub1=^H,
+	ed=~^X, el=~^O, clear=~\034, cup=~^Q%p2%c%p1%c$<1>, cols#80,
+	dl1=~^S, cud1=~^K, hz, lines#24, cuf1=^P,
+	rmso=~^Y, smso=~\037, cuu1=~^L, home=~^R,
+# Info:
+#	The h1552 has tildes and backprimes and everything!
+#	Be sure the auto lf/cr switch is set to cr.
+#
+h1552|hazeltine 1552,
+	cols#80, it#8, lines#24,
+	bel=^G, clear=\EH\EJ, cr=\r, cub1=\b, cud1=\n,
+	cuf1=\EC, cup=\EY%p1%'\s'%+%c%p2%'\s'%+%c, cuu1=\EA,
+	dl1=\EO, ed=\EJ, el=\EK, ht=\t, il1=\EE, ind=\n,
+	kbs=\b, kcub1=\ED, kcud1=\EB, kcuf1=\EC, kcuu1=\EA,
+	kf1=\EP, kf2=\EQ, kf3=\ER, lf1=blue, lf2=red,
+	lf3=green, ri=\EI,
+h1552-rv|hazeltine 1552 reverse video,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	smso=\ES, rmso=\ET, use=h1552,
+# Info:
+#	h2000 won't work well because of a clash between upper case 
+#	and ~'s.
+#
+h2000|hazeltine 2000,
+	cud1=^J, ind=^J, bel=^G,
+	il1=~^z$<6>, am, cub1=^H, clear=~^\$<6>, cup=~^q%p2%c%p1%c, cols#74,
+	dl1=~^s$<6>, home=~^r, lines#27, pad=\177,
+# Info:
+#	Date: Fri Jul 23 10:27:53 1982
+#	I tested this termcap entry for the Hazeltine Esprit with vi. It
+#	seems to work ok. There is one problem though if one types a 
+#	lot of garbage characters very fast vi seems not able to keep 
+#	up and hangs while trying to insert. That's in insert mode 
+#	while trying to insert in the middle of a line. It might be 
+#	because the Esprit doesn't have insert char and delete char as 
+#	a built in function. Vi has to delete to end of line and then 
+#	redraw the rest of the line.
+#
+esprit|Hazeltine Esprit I,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\E^Z, am, cub1=^H,
+	cbt=\E^T, bw, ed=\E^W, el=\E^O, clear=\E\034, cup=\E^Q%p2%c%p1%c,
+	cols#80, dl1=\E^S, cud1=\E^K, home=\E^R, is2=\E\077,
+	kf0=^B\060\n, kf1=^B\061\n, kf2=^B\062\n, kf3=^B\063\n,
+	kf4=^B\064\n, kf5=^B\065\n, kf6=^B\066\n, kf7=^B\067\n,
+	kf8=^B\070\n, kf9=^B\071\n, kbs=^H, kcud1=\E^K, rmkx=\E\076,
+	khome=\E^R, kcub1=^H, kcuf1=^P, smkx=\E\074, kcuu1=\E^L, lf0=0,
+	lf1=1, lf2=2, lf3=3, lf4=4, lf5=5, lf6=6, lf7=7, lf8=8, lf9=9,
+	lines#24, cuf1=^P, rmso=\E^Y, smso=\E^_, cuu1=\E^L,

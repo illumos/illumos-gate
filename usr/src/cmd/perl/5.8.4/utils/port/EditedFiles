@@ -1,0 +1,161 @@
+#!/usr/perl5/5.8.4/bin/perl
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This script takes a file mapping CSV file as input (see flist_5.8.4_on10.csv
+# for an example), a perl build directory and a ON workspace and reports files
+# that are different in the build and ON directories.  This show up any manual
+# edits that have been made during the integration process, useful for
+# identifying files that need to be preserved during future reintegrations.
+# Run with the '-d' option to produce a diff file suitable for applying with
+# gpatch.
+
+use strict;
+use warnings;
+use POSIX qw(uname);
+use Getopt::Std;
+
+#
+# Compare two files, return 0 for different, 1 for the same.
+#
+sub file_cmp
+{
+	my ($f1, $f2) = @_;
+
+	# Quick check - they must exist and be the same size.
+	return (0) unless (-e $f1 && -e $f2 && -s $f1 == -s $f2);
+
+	# Open the files.
+	my ($fh1, $fh2);
+	open($fh1, '<', $f1) || return (0);
+	open($fh2, '<', $f2) || return (0);
+
+	# Compare.
+	my ($len1, $len2);
+	while (1) {
+		my ($buf1, $buf2);
+		$len1 = sysread($fh1, $buf1, 4096);
+		$len2 = sysread($fh2, $buf2, 4096);
+		last if ($len1 == 0 && $len2 == 0);
+		if ($len1 != $len2 || $buf1 ne $buf2) {
+			$len1 = -1;
+			$len2 = -2;
+			last;
+		}
+	}
+	close($fh1) || return (0);
+	close($fh2) || return (0);
+	return ($len1 == $len2 ? 1 : 0);
+}
+
+#
+# Main.
+#
+
+# Basic sanity checks.
+our $opt_d;
+getopts('d') && @ARGV == 3 ||
+   die("Usage is $0 [ -d ] <mapping file> <perl build dir> <workspace>\n");
+my ($mapfile, $bld, $ws) = @ARGV;
+die("$bld is not a perl build dir\n") if (! -f "$bld/config.sh");
+die("$ws is not a workspace\n") if (! -d "$ws/Codemgr_wsdata");
+my ($fh, $line);
+
+# Work out perl version.
+open($fh, '<', "$bld/patchlevel.h") || die("$bld is not a perl build dir\n");
+my ($r, $v, $s);
+while (defined($line = <$fh>)) {
+	($line =~ /#define\s+PERL_REVISION\s+(\S+)/) && ($r = $1);
+	($line =~ /#define\s+PERL_VERSION\s+(\S+)/) && ($v = $1);
+	($line =~ /#define\s+PERL_SUBVERSION\s+(\S+)/) && ($s = $1);
+	last if (defined($r) && defined($v) && defined ($s));
+}
+close($fh);
+die("Can't find perl version\n") 
+    unless (defined($r) && defined($v) && defined($s));
+my $ver = "$r.$v.$s";
+undef($r);
+undef($v);
+undef($s);
+
+# Work out directory locations.
+our $ver_dst = "$ws/usr/src/cmd/perl/$ver";
+my $arch = ((uname())[4] eq 'i86pc') ? 'i386' : 'sparc';
+
+# Read in the mapping file.
+my %file;
+open($fh, '<', $mapfile) || die("Can't open $mapfile: $!\n");
+while (defined($line = <$fh>) && $line !~ m{^"Path",}) {
+	;
+}
+while (defined($line = <$fh>)) {
+	chomp($line);
+	my @field;
+	push(@field, $+) while $line =~
+	    m{["']([^"'\\]*(?:\\.[^"'\\]*)*)["'],?|([^,]+),?|,}g;
+	push(@field, undef) if (substr($line, -1, 1) eq ',');
+	my $p = shift(@field);
+	my $f = shift(@field);
+	# We just want the s10 column.
+	$file{$p}{$f} = defined($field[3]) ? $field[3] : '';
+}
+close($fh);
+
+# Process the mappings.
+foreach my $p (sort(keys(%file))) {
+	foreach my $f (sort(keys(%{$file{$p}}))) {
+		my $d = $file{$p}{$f};
+		my $pf = ($p ne '' ? "$p/" : $p) . $f;
+		my $cpf = ($p ne '' ? "$p/" : $p) . ",$f";
+		my ($src, $dst);
+
+		# If it has gone into the distrib directory.
+		if ($d eq 'distrib') {
+			$src = "$bld/$pf";
+			$dst = "$ver_dst/distrib/$pf";
+
+		# If it has gone into the arch directory.
+		} elsif ($d eq 'arch') {
+			$src = "$bld/$pf";
+			$dst = "$ver_dst/$arch/$f";
+
+		# If it is to be copied forwards from the last version.
+		} elsif ($d eq 'fwd') {
+			$dst = "$ver_dst/distrib/$pf";
+		}
+
+
+		# Short forms of the filenames.
+		my ($ssrc, $sdst);
+		if ($src) {
+			$ssrc = $src;
+			$ssrc =~ s{^$bld/}{}o;
+			$ssrc =~ s{[^/]+/\.\./}{}g;
+		}
+		if ($dst) {
+			$sdst = $dst;
+			$sdst =~ s{^$ver_dst/}{}o;
+			$sdst =~ s{[^/]+/\.\./}{}g;
+		}
+
+		# New files.
+		if (! $src && $dst) {
+			if (! $opt_d) {
+				print("New:    $sdst\n");
+			}
+
+		# Modified files.
+		} elsif ($src && $dst && ! file_cmp($src, $dst)) {
+			if ($opt_d) {
+				system("diff -u $src $dst | " .
+				    "sed -e 's!$src!$ssrc!g' " .
+				    "-e 's!$dst!$sdst!g'");
+			} else {
+				print("Edited: $sdst\n");
+			}
+		}
+	}
+}

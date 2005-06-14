@@ -1,0 +1,168 @@
+You can use the netboot support to download OS images from a network.
+Nearly all the device drivers are coming from the network-based boot
+loader, Etherboot. Please visit its web page. They have rich
+documentations so you will be able to get useful information from there.
+The URL is <http://etherboot.sourceforge.net/>.
+
+These below are common options for configure. Perhaps you may not need
+to specify them.
+
+--disable-packet-retransmission
+  Turns off packet retransmission. Use it on an empty network, where
+  no packet collision can happen.
+
+--enable-pci-direct
+  Define this for PCI BIOSes that do not implement BIOS32 or not
+  correctly.
+
+--enable-diskless
+  Enable the diskless support. If specified, you will get two optional
+  images, called "nbgrub" and "pxegrub". The former is the ``Net Boot
+  Image Proposal'' format, which is used by Etherboot and Netboot, while
+  the latter is the ``Preboot Execution Environment" format, which is
+  used by a PXE ROM. You may buy a PXE ROM from some companies.
+
+Here is the information about the device drivers. They are all disabled
+by default, so you must specify configure options to enable drivers you
+want to use. Some drivers have extra per-driver options, so the extra
+options are also described below.
+
+Caution: You should enable them as you need. Don't enable any
+unnecessary driver, because GRUB might crash if you include too many
+drivers at the same time.
+
+3Com509, ISA/EISA
+  --enable-3c509
+
+3Com529 == MCA 3c509
+  --enable-3c529
+
+3Com59x and 3Com900
+  --enable-3c595
+
+3Com90x
+  --enable-3c90x
+
+Crystal Semiconductor CS89x0
+  --enable-cs89x0
+  --enable-cs-scan=LIST
+    Probe for CS89x0 base address using LIST of comma separated hex
+    addresses; increasing the address by one (0x300 -> 0x301) will force
+    a more aggressive probing algorithm. This might be neccessary after
+    a soft-reset of the NIC.
+
+Davicom DM9102 and 9009
+  --enable-davicom
+
+Digital DE100 and DE200
+  --enable-depca
+
+Intel Etherexpress Pro/10 (ISA card)
+  --enable-eepro
+
+Intel Etherexpress Pro/100
+  --enable-eepro100
+
+SMC 83c170 EPIC/100
+  --enable-epic100
+
+3Com507
+  --enable-3c507
+
+EXOS205
+  --enable-exos205
+
+Racal-Interlan NI5210
+  --enable-ni5210
+
+Lance PCI PCNet/32
+AMD HomePNA
+  --enable-lance
+
+Novell NE2100 and NE1500
+  --enable-ne2100
+
+Racal-Interlan NI6510
+  --enable-ni6510
+
+National Semiconductor DP8381x (Netgear FA311 and FA312)
+  --enable-natsemi
+
+Racal-Interlan NI5010
+  --enable-ni5010
+
+3Com503, aka Etherlink II, also /16 model
+  --enable-3c503
+  --enable-3c503-shmem
+    Use 3c503 shared memory mode.
+  --enable-3c503-aui
+    Use AUI by default on 3c503 cards.
+
+NE1000/2000 and clones (ISA)
+  --enable-ne
+  --enable-ne-scan=LIST (0x280,0x300,0x320,0x340)
+    Probe for NE base address using LIST of comma separated hex
+    addresses.
+
+NE2000 PCI clone (RTL8029)
+Winbond 86C940
+Compex RL2000
+KTI ET32P2
+NetVin 5000SC
+Holtek 80232
+  --enable-ns8390
+  --enable-compex-rl2000-fix
+    If you have a Compex RL2000 PCI 32-bit (11F6:1401), and the probe
+    hangs in "Probing...[NE*000/PCI]", try enabling this fix... it
+    worked for me :).
+
+WD8003/8013, SMC8216/8416
+  --enable-wd
+  --enable-wd-default-mem=MEM (0xCC000)
+    Default memory location for WD/SMC cards.
+
+Old base driver for Tulip clones
+  --enable-otulip
+
+Realtek 8139
+SMC 1211
+D-Link DFE530TX+ and DFE538TX
+  --enable-rtl8139
+
+SIS 900 and SIS 7016
+  --enable-sis900
+
+Schneider and Koch G16
+  --enable-sk-g16
+
+SMC9000
+  --enable-smc9000
+  --enable-smc9000-scan=LIST
+    List of I/O addresses to probe.
+
+Tiara, Fujitsu Lancard
+  --enable-tiara
+
+Linksys LNE100TX and other NICs using this Tulip clone chip
+Netgear FA310TX and other NICs using this Tulip clone chip
+Tulip clones based on the ADMtek Centaur-P
+Tulip clones based on the Macronix 987x5
+Tulip-Fast
+Tulip+
+Tulip 21142
+ASIX AX88140
+Intel Tulip
+Compex RL100-TX
+  --enable-tulip
+
+Rhine-I, e.g. D-Link DFE-530TX
+Rhine-II
+  --enable-via-rhine
+
+Winbond W89c840
+Compex RL100-ATX
+  --enable-w89c840
+
+
+The description about how to use the support can be found in the GRUB
+manual. Run "info grub" in the shell prompt.

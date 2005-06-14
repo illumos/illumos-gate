@@ -1,0 +1,88 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	@(#)tektronix	1.5	5/20/82
+#
+# tektronix: TEKTRONIX
+#
+tek|tek4012|4012|tektronix 4012,
+	cr=^M, cud1=^J, bel=^G, ff=^L$<1000>,
+	is2=\E^O, cub1=^H, clear=\E^L$<1000>, cols#75, lines#35, os,
+tek4013|4013|tektronix 4013,
+	rmacs=\E^N, smacs=\E^O, use=4012,
+tek4014|4014|tektronix 4014,
+	is2=\E^O\E9, cols#81, lines#38, use=tek4012,
+tek4015|4015|tektronix 4015,
+	rmacs=\E^N, smacs=\E^O, use=4014,
+tek4014-sm|4014-sm|tektronix 4014 in small font,
+	is2=\E^O\E\072, cols#121, lines#58, use=tek4014,
+tek4015-sm|4015-sm|tektronix 4015 in small font,
+	rmacs=\E^N, smacs=\E^O, use=4014-sm,
+tek4023|4023|tex|tektronix 4023,
+	cr=^M, cud1=^J, ind=^J, bel=^G, smso=^_P, rmso=^_@,
+	cup=\034%p2%' '%+%c%p1%' '%+%c, cuf1=\t, cub1=^H,
+	clear=\E^L$<4>, cols#80, lines#24, am, vt#4,
+# Can't use cursor motion because it's memory relative, and because
+# it only works in the workspace, not the monitor.  Same for home.
+# Likewise, standout only works in the workspace.
+# el was commented out since vi and rogue seem to work better simulating
+# it with lots of spaces!
+4025|4027|4024|tek4025|tek4027|tek4024|4025cu|4027cu|tektronix 4024/4025/4027,
+	cr=^M, ind=^F^J, cud1=^F^J, bel=^G, am, da, db, ht=^I, 
+	cub1=^H, lm#0, lines#34, cols#80, clear=^_era\r\n\n,
+	is2=\41com 31\r\n^_sto 9 17 25 33 41 49 57 65 73\r,
+	smkx=^_lea p4 /h/\r^_lea p8 /k/\r^_lea p6 / /\r^_lea p2 /j/\r^_lea f5 /H/\r,
+	rmkx=^_lea p2\r^_lea p4\r^_lea p6\r^_lea p8\r^_lea f5\r,
+	cuu1=^K, cuf1=^_rig\r, il1=^_up\r^_ili\r$<145>, dl1=^_dli\r^F,
+	dch1=^_dch\r, smir=^_ich\r, rmir=^F^_dow\r^K,
+	.el=^_dch 80\r, ed=^_dli 50\r, cmdch=^_,
+	il=^_up\r^_ili %p1%d\r$<145>, dl1=^_dli %p1%d\r^F,
+	cuu=^_up %p1%d\r, cud=^_dow %p1%d\r, cub=^_lef %p1%d\r, cuf=^_rig %p1%d\r,
+4025-17|4027-17|tek 4025 17 line window,
+	lines#17, use=4025,
+4025-17ws|4027-17ws|tek 4025 17 line window in workspace,
+	is2=\41com 31\r\n^_sto 9 17 25 33 41 49 57 65 73\r^_wor 17\r^_mon 17\r,
+	smcup=^_wor h\r, rmcup=^_mon h\r, smso=^_att e\r, rmso=^_att s\r, use=4025-17,
+4025ex|4027ex|tek 4025 w/!,
+	smcup=\41com 31\r, rmcup=^_com 33\r,
+	is2=^_com 33\r\n\41sto 9 17 25 33 41 49 57 65 73\r, use=4025,
+# The 4110 series may be a wonderful graphics series, but they make the 4025
+# look good for screen editing.  In the dialog area, you can't move the cursor
+# off the bottom line.  Out of the dialog area, ^K moves it up, but there
+# is no way to scroll.  Note that there is a floppy for free from Tek that
+# makes the 4112 emulate the vt52 (use the vt52 termcap).  There is also
+# an expected enhancement that will use ANSI standard sequences.
+4112|4113|4114|tek4112|tektronix 4110 series,
+	cub1=^H, cr=^M, cud1=^J, bel=^G, am,
+	clear=\ELZ, lines#34, cols#80,
+# 4112 in non-dialog area pretending to scroll.  It really wraps but vi is
+# said to work (more or less) in this mode.
+4112-fs,
+	ind=^J, ri=^K,
+4112-nd|4112 not in dialog area,
+	cuu1=^K, use=4112,
+4112-5|4112 in 5 line dialog area,
+	lines#5, use=4112,

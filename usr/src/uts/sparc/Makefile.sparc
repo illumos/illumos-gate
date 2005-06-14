@@ -1,0 +1,389 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	This makefile contains the common definitions for all sparc
+#	implementation architecture independent modules.
+#
+
+
+#
+#	Define supported builds
+#
+DEF_BUILDS	= $(DEF_BUILDS64)
+ALL_BUILDS	= $(ALL_BUILDS64)
+
+#
+#	Everybody needs to know how to build modstubs.o and to locate unix.o.
+#	Note that unix.o must currently be selected from among the possible
+#	"implementation architectures". Note further, that unix.o is only
+#	used as an optional error check for undefines so (theoretically)
+#	any "implementation architectures" could be used. We choose sun4u
+#	because it is the reference port.
+#
+UNIX_DIR	 = $(UTSBASE)/sun4u/unix
+GENLIB_DIR	 = $(UTSBASE)/sun4u/genunix
+IPDRV_DIR	 = $(UTSBASE)/sparc/ip
+MODSTUBS_DIR	 = $(UNIX_DIR)
+DSF_DIR		 = $(UNIX_DIR)
+LINTS_DIR	 = $(OBJS_DIR)
+LINT_LIB_DIR	 = $(UTSBASE)/sparc/lint-libs/$(OBJS_DIR)
+
+UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
+MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
+GENLIB		 = $(UTSBASE)/sun4u/lint-libs/$(OBJS_DIR)/libgenunix.so
+
+LINT_LIB_32	 = $(UTSBASE)/sun4u/lint-libs/$(OBJS_DIR)/llib-lunix.ln
+GEN_LINT_LIB_32	 = $(UTSBASE)/sun4u/lint-libs/$(OBJS_DIR)/llib-lgenunix.ln
+
+LINT_LIB_64	 = $(UTSBASE)/sun4u/lint-libs/$(OBJS_DIR)/llib-lunix.ln
+GEN_LINT_LIB_64	 = $(UTSBASE)/sun4u/lint-libs/$(OBJS_DIR)/llib-lgenunix.ln
+
+LINT_LIB	 = $(LINT_LIB_$(CLASS))
+GEN_LINT_LIB	 = $(GEN_LINT_LIB_$(CLASS))
+
+LINT32_DIRS	 = $(LINT32_BUILDS:%=$(UTSBASE)/sparc/lint-libs/%)
+LINT32_FILES	 = $(LINT32_DIRS:%=%/llib-l$(MODULE).ln)
+
+LINT64_DIRS	 = $(LINT64_BUILDS:%=$(UTSBASE)/sparc/lint-libs/%)
+LINT64_FILES	 = $(LINT64_DIRS:%=%/llib-l$(MODULE).ln)
+
+#
+#	Include the makefiles which define build rule templates, the
+#	collection of files per module, and a few specific flags. Note
+#	that order is significant, just as with an include path. The
+#	first build rule template which matches the files name will be
+#	used. By including these in order from most machine dependent
+#	to most machine independent, we allow a machine dependent file
+#	to be used in preference over a machine independent version
+#	(Such as a machine specific optimization, which preserves the
+#	interfaces.)
+#
+include $(UTSBASE)/sparc/Makefile.files
+include $(UTSBASE)/sparc/v9/Makefile.files
+include $(UTSBASE)/sun/Makefile.files
+include $(UTSBASE)/common/Makefile.files
+
+#
+#	Include machine independent rules. Note that this does not imply
+#	that the resulting module from rules in Makefile.uts is	machine
+#	independent. Only that the build rules are machine independent.
+#
+include $(UTSBASE)/Makefile.uts
+
+#
+#	machine specific optimization, override default in Makefile.master
+#
+XARCH_32	= -xarch=v8
+XARCH_64	= -xarch=v9
+XARCH		= $(XARCH_$(CLASS))
+
+COPTIMIZE_32	= -xO3
+COPTIMIZE_64	= -xO3
+COPTIMIZE	= $(COPTIMIZE_$(CLASS))
+
+CCMODE		= -Xa
+
+CFLAGS_32	= -xcg92
+CFLAGS_64	= -xchip=ultra $(CCABS32) $(CCREGSYM)
+CFLAGS		= $(CFLAGS_$(CLASS))
+
+CFLAGS		+= $(XARCH)
+CFLAGS		+= $(COPTIMIZE)
+CFLAGS		+= $(EXTRA_CFLAGS)
+CFLAGS		+= $(XAOPT)
+CFLAGS		+= $(INLINES)
+CFLAGS		+= $(CCMODE)
+CFLAGS		+= $(SPACEFLAG)
+CFLAGS		+= $(CERRWARN)
+CFLAGS		+= $(CTF_FLAGS)
+CFLAGS		+= $(C99MODE)
+CFLAGS		+= $(CCUNBOUND)
+CFLAGS		+= -xregs=no%float
+
+ASFLAGS		+= $(XARCH)
+
+LINT_DEFS_32	=
+LINT_DEFS_64	= -Xarch=v9
+LINT_DEFS	+= $(LINT_DEFS_$(CLASS))
+
+#
+#	The following must be defined for all implementations:
+#
+#	MODSTUBS:	Module stubs source file.
+#
+MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.s
+
+#
+#	Define the actual specific platforms - obviously none.
+#
+MACHINE_DEFS	 =
+
+#
+#	Debugging level
+#
+#	Special knowledge of which special debugging options effect which
+#	file is used to optimize the build if these flags are changed.
+#
+#	XXX: The above could possibly be done for more flags and files, but
+#	     is left as an experiment to the interested reader. Be forewarned,
+#	     that excessive use could lead to maintenance difficulties.
+#
+DEBUG_DEFS_OBJ32	=
+DEBUG_DEFS_DBG32	= -DDEBUG
+DEBUG_DEFS_OBJ64	=
+DEBUG_DEFS_DBG64	= -DDEBUG
+DEBUG_DEFS		= $(DEBUG_DEFS_$(BUILD_TYPE))
+
+DEBUG_COND_OBJ32	:sh = echo \\043
+DEBUG_COND_DBG32	=
+DEBUG_COND_OBJ64	:sh = echo \\043
+DEBUG_COND_DBG64	=
+IF_DEBUG_OBJ		= $(DEBUG_COND_$(BUILD_TYPE))$(OBJS_DIR)/
+
+$(IF_DEBUG_OBJ)syscall.o	:=	DEBUG_DEFS	+= -DSYSCALLTRACE
+$(IF_DEBUG_OBJ)clock.o		:=	DEBUG_DEFS	+= -DKSLICE=1
+
+# Comment these out if you don't want dispatcher lock statistics.
+
+# $(IF_DEBUG_OBJ)disp_lock.o	:= DEBUG_DEFS	+= -DDISP_LOCK_STATS
+
+#
+# This rather strange collection of definitions ensures that lint sees
+# 'struct cpu' containing a fully declared embedded 'struct machcpu'
+#
+# There's something deeply dissatisfying about this.
+#
+LINTMACHFLAGS = -D_MACHDEP -I../../sun4 -I../../$(PLATFORM) -I../../sfmmu
+$(LINTS_DIR)/kcpc.ln	:=	LINTFLAGS += $(LINTMACHFLAGS)
+$(LINTS_DIR)/kdi.ln	:=	LINTFLAGS += $(LINTMACHFLAGS)
+$(LINTS_DIR)/msacct.ln	:=	LINTFLAGS += $(LINTMACHFLAGS)
+$(LINTS_DIR)/thread.ln	:=	LINTFLAGS += $(LINTMACHFLAGS)
+
+#
+#	Build `options'. These are mostly historical and the need for these
+#	is largely removed by the module technology. However, the static
+#	build will continue to require these.
+#
+OPTION_DEFS	 = -DC2_AUDIT
+
+#
+#	Collect the preprocessor definitions to be associated with *all*
+#	files.
+#
+ALL_DEFS	 = $(MACHINE_DEFS) $(DEBUG_DEFS) $(OPTION_DEFS)
+#
+# ----- TRANSITIONAL SECTION --------------------------------------------------
+#
+
+#
+#	Not everything which *should* be a module is a module yet. The
+#	following is a list of such objects which are currently part of
+#	the base kernel but should soon become kmods.
+#
+NOT_YET_KMODS	 = $(OLDPTY_OBJS) $(PTY_OBJS) $(MOD_OBJS)
+
+#
+# ----- END OF TRANSITIONAL SECTION -------------------------------------------
+
+#
+#	The kernels modules which are "implementation architecture"
+#	specific for this machine are enumerated below. Note that most
+#	of these modules must exist (in one form or another) for each
+#	architecture.
+#
+#	Common Drivers (usually pseudo drivers) (/kernel/drv):
+#
+DRV_KMODS	+= aggr arp bl bofi clone cn conskbd consms cpuid
+DRV_KMODS	+= crypto cryptoadm devinfo dump
+DRV_KMODS	+= dtrace fasttrap fbt lockstat profile sdt systrace
+DRV_KMODS	+= fssnap glm icmp icmp6 ip ip6 ipsecah
+DRV_KMODS	+= ipsecesp isp iwscn keysock kmdb kstat ksyms llc1 llc2
+DRV_KMODS	+= lofi
+DRV_KMODS	+= log logindmux mm mpt nca pm poll pool
+DRV_KMODS	+= pseudo ptc ptm pts ptsl ramdisk random rsm rts sad se 
+DRV_KMODS	+= spdsock sppp sppptun sy sysevent sysmsg 
+DRV_KMODS	+= tcp tcp6 tl tnf ttymux udp udp6 vol wc winlock zcons
+DRV_KMODS	+= ippctl sctp sctp6
+DRV_KMODS	+= dld
+DRV_KMODS	+= ipf pfil
+DRV_KMODS	+= rpcib
+DRV_KMODS	+= vni
+
+#
+#       Hardware Drivers in common space
+#
+DRV_KMODS       += ixgb
+
+#
+#	Machine Specific Driver Modules (/kernel/drv):
+#
+DRV_KMODS	+= audiovia823x audio810 audiocs audioens audiots dbri
+DRV_KMODS	+= bge bpp eri esp fas hme
+DRV_KMODS	+= openeepr options sd ses sgen st
+DRV_KMODS	+= ssd socal
+DRV_KMODS	+= ecpp
+DRV_KMODS	+= uata dad ifp
+DRV_KMODS	+= hid hubd ehci ohci uhci usb_mid scsa2usb usbprn ugen
+DRV_KMODS	+= usbser usbser_edge
+DRV_KMODS	+= usb_as usb_ac
+DRV_KMODS	+= usbskel
+DRV_KMODS	+= hci1394 av1394 scsa1394
+DRV_KMODS	+= sbp2
+DRV_KMODS	+= scsi_vhci
+DRV_KMODS	+= ib ibd
+DRV_KMODS	+= xge
+DRV_KMODS	+= chxge
+DRV_KMODS	+= pci_pci px_pci
+
+#
+#	I/O framework test drivers
+#
+DRV_KMODS	+= pshot
+DRV_KMODS	+= gen_drv
+DRV_KMODS	+= tvhci tphci tclient
+
+#
+# PCMCIA specific module(s)
+#
+DRV_KMODS	+= pem stp4020 pcs pcic
+MISC_KMODS	+= busra dada pcmcia
+DRV_KMODS	+= pcata pcelx pcmem pcram pcser
+
+# Add lvm
+#
+DRV_KMODS       += md
+MISC_KMODS      += md_mirror md_stripe md_hotspares md_raid md_trans md_notify
+MISC_KMODS      += md_sp
+
+#
+#	Exec Class Modules (/kernel/exec):
+#
+EXEC_KMODS	+= aoutexec elfexec intpexec javaexec
+
+#
+#	Scheduling Class Modules (/kernel/sched):
+#
+SCHED_KMODS	+= RT TS RT_DPTBL TS_DPTBL IA FSS FX FX_DPTBL
+
+#
+#	File System Modules (/kernel/fs):
+#
+FS_KMODS	+= devfs fdfs fifofs hsfs lofs namefs nfs pcfs tmpfs
+FS_KMODS	+= specfs udfs ufs autofs cachefs procfs sockfs mntfs
+FS_KMODS	+= ctfs objfs
+
+#
+#	Streams Modules (/kernel/strmod):
+#
+STRMOD_KMODS	+= 6to4tun atun bufmod connld dedump ldterm ms pckt pfmod
+STRMOD_KMODS	+= pipemod ptem redirmod rpcmod rlmod telmod timod
+STRMOD_KMODS	+= spppasyn spppcomp
+STRMOD_KMODS	+= tirdwr ttcompat tun
+STRMOD_KMODS	+= usbkbm usbms usb_ah
+STRMOD_KMODS	+= drcompat
+STRMOD_KMODS	+= nattymod
+STRMOD_KMODS	+= cryptmod
+
+#
+#	'System' Modules (/kernel/sys):
+#
+SYS_KMODS	+= c2audit
+SYS_KMODS	+= exacctsys
+SYS_KMODS	+= inst_sync kaio msgsys semsys shmsys sysacct pipe
+SYS_KMODS	+= doorfs pset acctctl portfs
+
+#
+#	'User' Modules (/kernel/misc):
+#
+MISC_KMODS	+= amsrc1 amsrc2 audiosup diaudio mixer
+MISC_KMODS	+= consconfig gld ipc nfs_dlboot nfssrv scsi
+MISC_KMODS	+= strplumb swapgeneric klmmod klmops tlimod
+MISC_KMODS	+= krtld
+MISC_KMODS	+= rpcsec rpcsec_gss kgssapi kmech_dummy
+MISC_KMODS	+= kmech_krb5
+MISC_KMODS	+= fssnap_if
+MISC_KMODS	+= hidparser kbtrans usba usba10
+MISC_KMODS	+= s1394
+MISC_KMODS	+= hpcsvc pcicfg pcihp
+MISC_KMODS	+= rsmops
+MISC_KMODS	+= phx
+MISC_KMODS	+= kcf
+MISC_KMODS	+= ibcm
+MISC_KMODS	+= ibdm
+MISC_KMODS	+= ibmf
+MISC_KMODS	+= ibtl
+MISC_KMODS	+= ctf 
+MISC_KMODS	+= zmod
+MISC_KMODS	+= mac dls ght
+
+#
+#	Software Cryptographic Providers (/kernel/crypto):
+#
+CRYPTO_KMODS	+= aes
+CRYPTO_KMODS	+= arcfour
+CRYPTO_KMODS	+= blowfish
+CRYPTO_KMODS	+= des
+CRYPTO_KMODS	+= md5
+CRYPTO_KMODS	+= rsa
+CRYPTO_KMODS	+= sha1
+CRYPTO_KMODS	+= sha2
+CRYPTO_KMODS	+= swrand
+
+#
+# IP Policy Modules (/kernel/ipp):
+#
+IPP_KMODS	+= dlcosmk
+IPP_KMODS	+= flowacct
+IPP_KMODS	+= ipgpc
+IPP_KMODS	+= dscpmk
+IPP_KMODS	+= tokenmt
+IPP_KMODS	+= tswtclmt
+
+#
+# 'Dacf' modules (/kernel/dacf)
+DACF_KMODS	+= consconfig_dacf
+
+#
+#	SVVS Testing Modules (/kernel/strmod):
+#
+#	These are streams and driver modules which are not to be
+#	delivered with a released system. However, during development
+#	it is convenient to build and install the SVVS kernel modules.
+#
+SVVS_KMODS	+= lmodb lmode lmodr lmodt lo tidg tivc tmux
+
+SVVS		+= svvs
+
+#
+#	Modules eXcluded from the product:
+#
+XMODS		+= wsdrv tavor daplt
+
+#
+#	'Dacf' Modules (/kernel/dacf):
+#
+DACF_KMODS	+= usb_ac_dacf

@@ -1,0 +1,134 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lib/libbsm/Makefile
+#
+
+LIBRARY =	libbsm.a
+VERS = 		.1
+OBJECTS=	adr.o \
+		adrf.o \
+		adrm.o \
+		adt.o \
+		adt_token.o \
+		adt_xlate.o \
+		au_open.o \
+		au_preselect.o \
+		au_to.o \
+		au_usermask.o \
+		audit_allocate.o \
+		audit_class.o \
+		audit_cron.o \
+		audit_crontab.o \
+		audit_at.o \
+		audit_event.o \
+		audit_ftpd.o \
+		audit_halt.o \
+		audit_inetd.o \
+		audit_kadmind.o \
+		audit_krb5kdc.o \
+		audit_login.o \
+		audit_mountd.o \
+		audit_mgrs.o \
+		audit_newgrp.o \
+		audit_plugin.o \
+		audit_reboot.o \
+		audit_rexd.o \
+		audit_rexecd.o \
+		audit_rshd.o \
+		audit_settid.o \
+		audit_shutdown.o \
+		audit_su.o \
+		audit_uadmin.o \
+		audit_user.o \
+		bsm.o \
+		generic.o \
+		getacinfo.o \
+		getacval.o \
+		getauditflags.o \
+		getdaent.o \
+		getdment.o \
+		getfaudflgs.o
+
+#
+# Include common library definitions.
+#
+include ../../Makefile.lib
+
+# install this library in the root filesystem
+include ../../Makefile.rootfs
+
+MAPFILE=	$(MAPDIR)/mapfile
+
+SRCS=		$(OBJECTS:%.o=../common/%.c)
+
+LIBS =	 	$(DYNLIB) $(LINTLIB)
+
+LINTSRC= $(LINTLIB:%.ln=%)
+$(LINTLIB) :=	SRCS = ../common/$(LINTSRC)
+ROOTLINTDIR=	$(ROOTLIBDIR)
+ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
+
+CLEANFILES +=	$(LINTOUT) $(LINTLIB)
+CLOBBERFILES +=	$(MAPFILE)
+
+CFLAGS	+=	$(CCVERBOSE)
+DYNFLAGS +=	-M$(MAPFILE)
+LDLIBS +=	-lsocket -lnsl -lmd5 -lc -lsecdb
+
+COMDIR=		../common
+
+CPPFLAGS += -I$(COMDIR)
+CPPFLAGS += -D_REENTRANT
+
+#
+# message catalogue file
+#
+TEXT_DOMAIN= SUNW_OST_OSLIB
+
+.KEEP_STATE:
+
+all: $(LIBS)
+
+lint: lintcheck
+
+$(DYNLIB) $(DYNLIB64): 	$(MAPFILE)
+
+$(MAPFILE):
+	@cd $(MAPDIR); pwd; $(MAKE) mapfile
+
+# Include library targets
+#
+include ../../Makefile.targ
+
+pics/%.o: ../common/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+# install rule for lint library target
+$(ROOTLINTDIR)/%: ../common/%
+	$(INS.file)

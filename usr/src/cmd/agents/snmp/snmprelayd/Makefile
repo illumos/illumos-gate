@@ -1,0 +1,227 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the 
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# snmp/snmprelayd/Makefile
+#
+
+include ../../Makefile.vars
+
+# OPTIONAL_INCLUDE_FILE:sh = /bin/sh ../../misc.sh ../../../cmd/Makefile.cmd
+# include $(OPTIONAL_INCLUDE_FILE)
+
+include $(SRC)/cmd/Makefile.cmd
+
+#
+# In order to conform with the Solaris 2.6 way of packaging things,
+# we now need to put any deliverable that is specified in the
+# prototype file into a common "proto" area, so that their
+# packaging scheme knows where to obtain the input binaries.
+#
+
+AGENT = snmpdx
+BINPROG = $(AGENT)
+PROG=$(BINPROG)
+
+OPTBIN = $(ROOT)/usr/lib/snmp
+OPTPROG = $(PROG:%=$(OPTBIN)/%)
+
+$(OPTPROG):=	FILEMODE = 0755
+
+$(OPTBIN)/%: $(OPTBIN) %
+	$(INS.file)
+
+MYCONF = $(CONFIG_FILES)
+CONFLOC = $(ROOT)/etc/snmp/conf
+CONFRULE = $(MYCONF:%=$(CONFLOC)/%)
+
+$(CONFLOC)/%: $(CONFLOC) %
+	$(INS.file)
+
+$(OPTBIN) $(CONFLOC):
+	$(INS.dir)
+
+STUB.c = mib_handler.c $(AGENT)_tree.c $(AGENT)_appl.c $(AGENT)_trap.c
+STUB.h = $(AGENT)_stub.h
+
+SOURCES.c=\
+	agent.c\
+	subtree.c\
+	session.c\
+	dispatcher.c\
+	res.c\
+	sh_table.c\
+	$(STUB.c)
+
+SOURCES.h=\
+	../snmplib/impl.h\
+	../snmplib/error.h\
+	../snmplib/trace.h\
+	../snmplib/asn1.h\
+	../snmplib/signals.h\
+	../snmplib/snmp.h\
+	../snmplib/pdu.h\
+	../snmplib/request.h\
+	snmprelay_msg.h\
+	agent.h\
+	subtree.h\
+	session.h\
+	config.h\
+	dispatcher.h\
+	res.h\
+	$(STUB.h)\
+	../snmplib/trap.h\
+	../agent/access.h\
+	../agent/agent_msg.h\
+	sh_table.h\
+	name.h
+
+#
+# We need the config files to build the sacom directory,
+# so pull them out of SCCS.
+#
+
+CONFIG_FILES =\
+	mibiisa.rsrc-\
+	snmpdx.acl\
+	snmpdx.reg\
+	snmpdx.rsrc\
+	enterprises.oid
+
+OBJECTS= $(SOURCES.c:%.c=$(BIN)/%.o)
+
+EXT = 1
+MYLIBS=	../agent/$(MACH)/libssagent.so.$(EXT) ../snmplib/$(MACH)/libssasnmp.so.$(EXT)
+MYLINKLIBS += -L../agent/$(MACH) -lssagent -L../snmplib -lssasnmp
+
+LIBS=	-lsocket -lnsl -ll
+
+CPPFLAGS += -I. -I../agent -I../snmplib -I../../include/netmgt -I${BIN}
+
+CFLAGS += -c -D$(TARG_SYS)
+
+LDFLAGS += $(LDLIBS)
+
+LINT=lint
+
+SNMP_ROOT= ..
+PARSER_HOME= $(SNMP_ROOT)/parser
+MIB_HOME= $(SNMP_ROOT)/mib
+PURIFY_HOME= /usr/soft/purify3.0
+
+
+MIBS= $(MIB_HOME)/mib_core.txt $(MIB_HOME)/snmpdx.mib
+PARSER= $(PARSER_HOME)/$(BIN)/mibcodegen
+
+.KEEP_STATE:
+
+#######################################################
+
+#
+# all
+#
+
+FILEMODE = 0644
+$(CONFLOC)/snmpdx.acl := FILEMODE = 0600
+GROUP = sys
+
+CLOBBERFILES= y.tab.c
+
+all: $(SOURCES.h) $(BINPROG) $(CONFIG_FILES)
+
+install: all $(OPTPROG) $(CONFRULE)
+
+
+$(BINPROG): $(BIN) $(OBJECTS) $(BIN)/config.o $(MYLIBS)
+	$(CC) -o $(BINPROG) $(LDFLAGS) $(OBJECTS) $(BIN)/config.o \
+	    $(MYLINKLIBS) $(LIBS)
+	$(POST_PROCESS)
+
+$(BIN)/%.o: %.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINES) $*.c -o $@
+
+${BIN}/config.c: config.y
+	$(YACC.y) config.y
+	$(CAT) name.h y.tab.c > ${BIN}/config.c
+
+${BIN}/config.lex.c: config.l
+	$(LEX.l) config.l > ${BIN}/config.lex.c
+
+$(BIN)/config.o: ${BIN}/config.c ${BIN}/config.lex.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(DEFINES) ${BIN}/config.c -o $(BIN)/config.o
+
+
+#
+# parse
+#
+parse:	$(MIBS)
+	$(PARSER) -b $(AGENT) -f $(MIBS)
+
+#
+# lint
+#
+
+lint:
+	$(LINT) $(LDFLAGS) $(CPPFLAGS) $(DEFINES) $(SOURCES.c) $(MYLINKLIBS) $(LIBS)
+
+
+#
+# purify
+#
+
+purify:
+	$(PURIFY) $(CC) -o $(BINPROG) $(LDFLAGS) $(OBJECTS) $(MYLINKLIBS) $(LIBS)
+
+
+#
+# directories
+#
+
+$(BIN):
+	@$(TEST) -d $@ || mkdir $@
+
+
+#
+# clean
+#
+gen:	
+	$(RM) $(AGENT)_stub.h
+	$(RM) $(AGENT)_stub.c
+	$(RM) $(AGENT)_appl.c
+	$(RM) $(AGENT)_tree.c
+	$(RM) $(AGENT)_trap.c
+
+
+clean:
+	$(RM) $(OBJECTS) $(BINPROG)
+	$(RM) $(BIN)/config.lex.c $(BIN)/config.c
+
+realclobber: clean
+	sccs clean
+
+# OPTIONAL_INCLUDE_FILE:sh = /bin/sh ../../misc.sh ../../../cmd/Makefile.targ
+# include $(OPTIONAL_INCLUDE_FILE)
+
+include $(SRC)/cmd/Makefile.targ

@@ -1,0 +1,18 @@
+
+This is the fourth of up to four frames that you can specify to be
+automatically displayed when you login to FACE.
+
+Only menus or file folders should be specified.  Forms should not
+be specified because most require input that will not be available
+if forms are opened out of sequence.
+
+Press CHOICES to select the frame or enter the pathname including
+the file folder to specify a frame that is not on the menu.  If
+you enter an invalid pathname, you will be warned.
+
+If you specify a frame that has already been specified as the
+first, second or third frame, you will be warned.
+
+If no frames are specified on the Display Frames Form, the system
+will automatically display only the AT&T FACE Menu at invocation.
+

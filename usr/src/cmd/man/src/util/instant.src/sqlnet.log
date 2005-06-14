@@ -1,0 +1,46 @@
+
+
+***********************************************************************
+Fatal OSN connect error 12203, connecting to:
+ (DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=ipc)(KEY=PUBSPRO)))(CONNECT_DATA=(SID=PUBSPRO)(CID=(PROGRAM=)(HOST=arthur)(USER=djenner))))
+
+  VERSION INFORMATION:
+	TNS for SunOS: Version 2.0.15.0.0 - Production
+	Unix Domain Socket IPC NT Protocol Adaptor for SunOS: Version 2.0.15.0.0 - Production
+	Oracle Bequeath NT Protocol Adapter for SunOS: Version 2.0.15.0.0 - Production
+	TCP/IP NT Protocol Adapter for SunOS: Version 2.0.15.0.0 - Production
+  Time: 02-OCT-97 15:32:14
+  Tracing not turned on.
+  Tns error struct:
+    nr err code: 12203
+    TNS-12203: TNS:unable to connect to destination
+    ns main err code: 12541
+    TNS-12541: TNS:no listener
+    ns secondary err code: 12560
+    nt main err code: 511
+    TNS-00511: No listener
+    nt secondary err code: 2
+    nt OS err code: 0
+
+
+***********************************************************************
+Fatal OSN connect error 12203, connecting to:
+ (DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=ipc)(KEY=PUBSPRO)))(CONNECT_DATA=(SID=PUBSPRO)(CID=(PROGRAM=)(HOST=arthur)(USER=djenner))))
+
+  VERSION INFORMATION:
+	TNS for SunOS: Version 2.0.15.0.0 - Production
+	Unix Domain Socket IPC NT Protocol Adaptor for SunOS: Version 2.0.15.0.0 - Production
+	Oracle Bequeath NT Protocol Adapter for SunOS: Version 2.0.15.0.0 - Production
+	TCP/IP NT Protocol Adapter for SunOS: Version 2.0.15.0.0 - Production
+  Time: 02-OCT-97 15:32:54
+  Tracing not turned on.
+  Tns error struct:
+    nr err code: 12203
+    TNS-12203: TNS:unable to connect to destination
+    ns main err code: 12541
+    TNS-12541: TNS:no listener
+    ns secondary err code: 12560
+    nt main err code: 511
+    TNS-00511: No listener
+    nt secondary err code: 2
+    nt OS err code: 0

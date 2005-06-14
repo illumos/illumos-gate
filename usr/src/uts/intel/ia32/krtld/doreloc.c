@@ -1,0 +1,180 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#if	defined(_KERNEL)
+#include	<sys/types.h>
+#include	"reloc.h"
+#else
+#include	<stdio.h>
+#include	"sgs.h"
+#include	"machdep.h"
+#include	"libld.h"
+#include	"reloc.h"
+#include	"conv.h"
+#include	"msg.h"
+#endif
+
+/*
+ * This table represents the current relocations that do_reloc()
+ * is able to process.  The relocations below that are marked
+ * 'SPECIAL' in the comments are relocations that take special
+ * processing and shouldn't actually ever be passed to do_reloc().
+ */
+const Rel_entry	reloc_table[R_386_NUM] = {
+/* R_386_NONE */	{0, 0},
+/* R_386_32 */		{FLG_RE_NOTREL, 4},
+/* R_386_PC32 */	{FLG_RE_PCREL, 4},
+/* R_386_GOT32 */	{FLG_RE_GOTADD, 4},
+/* R_386_PLT32 */	{FLG_RE_PLTREL | FLG_RE_PCREL, 4},
+/* R_386_COPY */	{0, 0},					/* SPECIAL */
+/* R_386_GLOB_DAT */	{FLG_RE_NOTREL, 4},
+/* R_386_JMP_SLOT */	{FLG_RE_NOTREL, 4},
+/* R_386_RELATIVE */	{FLG_RE_NOTREL, 4},
+/* R_386_GOTOFF */	{FLG_RE_GOTREL, 4},
+/* R_386_GOTPC */	{FLG_RE_PCREL | FLG_RE_GOTPC | FLG_RE_LOCLBND, 4},
+/* R_386_32PLT */	{FLG_RE_PLTREL, 4},
+/* R_386_TLS_GD_PLT */	{FLG_RE_TLSINS | FLG_RE_PLTREL |
+				FLG_RE_PCREL | FLG_RE_TLSGD, 4},
+/* R_386_TLS_LDM_PLT */	{FLG_RE_TLSINS | FLG_RE_PLTREL |
+				FLG_RE_PCREL | FLG_RE_TLSLD, 4},
+/* R_386_TLS_TPOFF */	{FLG_RE_NOTREL, 4},
+/* R_386_TLS_IE */	{FLG_RE_GOTADD | FLG_RE_TLSINS | FLG_RE_TLSIE, 4},
+/* R_386_TLS_GOTIE */	{FLG_RE_GOTADD | FLG_RE_TLSINS | FLG_RE_TLSIE, 4},
+/* R_386_TLS_LE */	{FLG_RE_TLSINS | FLG_RE_NOTREL | FLG_RE_TLSLE, 4},
+/* R_386_TLS_GD */	{FLG_RE_GOTADD | FLG_RE_TLSINS | FLG_RE_TLSGD, 4},
+/* R_386_TLS_LDM */	{FLG_RE_GOTADD | FLG_RE_TLSLD | FLG_RE_TLSINS, 4},
+/* R_386_16 */		{FLG_RE_NOTSUP, 0},
+/* R_386_PC16 */	{FLG_RE_NOTSUP, 0},
+/* R_386_8 */		{FLG_RE_NOTSUP, 0},
+/* R_386_PC8 */		{FLG_RE_NOTSUP, 0},
+/* R_386_UNKNOWN24 */	{FLG_RE_NOTSUP, 0},
+/* R_386_UNKNOWN25 */	{FLG_RE_NOTSUP, 0},
+/* R_386_UNKNOWN26 */	{FLG_RE_NOTSUP, 0},
+/* R_386_UNKNOWN27 */	{FLG_RE_NOTSUP, 0},
+/* R_386_UNKNOWN28 */	{FLG_RE_NOTSUP, 0},
+/* R_386_UNKNOWN29 */	{FLG_RE_NOTSUP, 0},
+/* R_386_UNKNOWN30 */	{FLG_RE_NOTSUP, 0},
+/* R_386_UNKNOWN31 */	{FLG_RE_NOTSUP, 0},
+/* R_386_TLS_LDO_32 */	{FLG_RE_TLSINS | FLG_RE_TLSLD | FLG_RE_NOTREL, 4},
+/* R_386_UNKNOWN33 */	{FLG_RE_NOTSUP, 0},
+/* R_386_UNKNOWN34 */	{FLG_RE_NOTSUP, 0},
+/* R_386_TLS_DTPMOD32 */ {FLG_RE_NOTREL, 4},
+/* R_386_TLS_DTPOFF32 */ {FLG_RE_NOTREL, 4},
+/* R_386_UNKONWN37 */	{FLG_RE_NOTSUP, 0}
+};
+
+
+/*
+ * Write a single relocated value to its reference location.
+ * We assume we wish to add the relocatoin amount, value, to the
+ * value of the address already present at the offset.
+ *
+ * NAME			VALUE	FIELD		CALCULATION
+ *
+ * R_386_NONE		 0	none		none
+ * R_386_32		 1	word32		S + A
+ * R_386_PC32		 2	word32		S + A - P
+ * R_386_GOT32		 3	word32		G + A - P
+ * R_386_PLT32		 4	word32		L + A - P
+ * R_386_COPY		 5	none		none
+ * R_386_GLOB_DAT	 6	word32		S
+ * R_386_JMP_SLOT	 7	word32		S
+ * R_386_RELATIVE	 8	word32		B + A
+ * R_386_GOTOFF		 9	word32		S + A - GOT
+ * R_386_GOTPC		10	word32		GOT + A - P
+ * R_386_32PLT		11	word32		L + A
+ * R_386_TLS_GD_PLT	12	word32		@tlsgdplt
+ * R_386_TLS_LDM_PLT	13	word32		@tlsldmplt
+ * R_386_TLS_TPOFF	14	word32		@ntpoff(S)
+ * R_386_TLS_IE		15	word32		@indntpoff(S)
+ * R_386_TLS_GD		18	word32		@tlsgd(S)
+ * R_386_TLS_LDM	19	word32		@tlsldm(S)
+ * R_386_TLS_LDO_32	32	word32		@dtpoff(S)
+ * R_386_TLS_DTPMOD32	35	word32		@dtpmod(S)
+ * R_386_TLS_DTPOFF32	36	word32		@dtpoff(S)
+ *
+ * Relocatoins 0-10 are from Figure 4-4: Relocations Types from the
+ * intel ABI.  Relocation 11 (R_386_32PLT) is from the C++ intel abi
+ * and is in the process of being registered with intel ABI (1/13/94).
+ *
+ * Relocations R_386_TLS_* are added to support Thread-Local storage
+ *	as recorded in PSARC/2001/509
+ *
+ * Relocation calculations:
+ *
+ * CALCULATION uses the following notation:
+ *	A	the addend used
+ *	B	the base address of the shared object in memory
+ *	G	the offset into the global offset table
+ *	GOT	the address of teh global offset table
+ *	L	the procedure linkage entry
+ *	P	the place of the storage unit being relocated
+ *	S	the value of the symbol
+ *
+ *	@dtlndx(x): Allocate two contiguous entries in the GOT table to hold
+ *	   a Tls_index structure (for passing to __tls_get_addr()). The
+ *	   instructions referencing this entry will be bound to the first
+ *	   of the two GOT entries.
+ *
+ *	@tmndx(x): Allocate two contiguous entries in the GOT table to hold
+ *	   a Tls_index structure (for passing to __tls_get_addr()). The
+ *	   ti_offset field of the Tls_index will be set to 0 (zero) and the
+ *	   ti_module will be filled in at run-time. The call to
+ *	   __tls_get_addr() will return the starting offset of the dynamic
+ *	   TLS block.
+ *
+ *	@dtpoff(x): calculate the tlsoffset relative to the TLS block.
+ *
+ *	@tpoff(x): calculate the tlsoffset relative to the TLS block.
+ *
+ *	@dtpmod(x): calculate the module id of the object containing symbol x.
+ *
+ * The calculations in the CALCULATION column are assumed to have
+ * been performed before calling this function except for the addition of
+ * the addresses in the instructions.
+ */
+int
+do_reloc(unsigned char rtype, unsigned char *off, Xword *value,
+	const char *sym, const char *file)
+{
+	const Rel_entry *rep;
+
+	rep = &reloc_table[rtype];
+	/*
+	 * Currenty 386 *only* relocates against full words
+	 */
+	if (rep->re_fsize != 4) {
+		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSZ),
+		    conv_reloc_386_type_str(rtype), file,
+		    (sym ? sym : MSG_INTL(MSG_STR_UNKNOWN)),
+		    EC_WORD(rep->re_fsize));
+		return (0);
+	}
+	/* LINTED */
+	*((Xword *)off) += *value;
+	return (1);
+}

@@ -1,0 +1,30 @@
+
+Mail Services enables you read mail that other users sent you.
+It also enables you to send mail to other users.
+
+The items on the Mail Services menu are:
+
+      New Mail:  Lists the messages that other users sent 
+      you.  The screen clears and your mail messages are 
+      listed in chronological order by the mailx command. 
+      Type the number of the mail message you want to read.  
+      Type "q" to quit and return to the interface. Type "?"
+      to get help.
+
+      Send Mail: Enables you to send mail to users on this
+      system and other systems.  You will be prompted for 
+      the user login(s) and, after you press SAVE, the
+      screen will clear, and then you can type your message.
+      Type "~." to end the message and return to FACE. 
+      Type "~?" for help.
+
+      The login(s) that you enter as mail destinations are
+      only validated after you complete your mail message.
+      If you have specified any invalid mail destinations,
+      a frame will open on the display that contains all of
+      the invalid destinations.  At this point, your mail
+      message has only been sent to those destinations that
+      were valid.  You must re-enter the correct version of
+      any invalid destinations and re-enter your mail message
+      to send mail to these destinations.
+

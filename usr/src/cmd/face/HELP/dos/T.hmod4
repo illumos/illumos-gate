@@ -1,0 +1,12 @@
+
+
+Enter the pathname of the file folder that will be the
+current folder when this program is invoked.  For some
+applications, you may want all of the files that the
+program creates to be in the same file folder.  If you
+don't specify a value for this field, the default when
+the program is executed is the current open file folder.
+
+The default is the working directory for the program 
+you are modifying.
+

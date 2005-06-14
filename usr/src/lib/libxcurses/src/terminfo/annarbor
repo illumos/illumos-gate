@@ -1,0 +1,148 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# annarbor: ANN ARBOR
+#
+aa|annarbor|4080|ann arbor 4080,
+	cr=^M, cud1=^J, ind=^J, bel=^G, tbc=^\^P^P, hts=^]^P1,
+	cup=^O%p2%{10}%/%{16}%*%p2%{10}%m%+%c%p1%?%p1%{19}%>%t%{12}%+%;%'@'%+%c,
+	cols#80, lines#40, cub1=^H, clear=^L$<2>, cuu1=^N, cuf1=^_,
+	home=^K, am, kbs=^^, kcud1=^J, kcuu1=^N, kcub1=^H, kcuf1=^_, khome=^K,
+# From cbosg!chico!randvax!day Aug 1981
+# alias aaa 'setenv TERM aaa-\!^; tset -e^H -Q; alias clr echo "^[\[2J^[\[H"'
+# Be sure to change ^[ to escape in above alias.  Needs function keys added.
+# The ann arbor ambassador entries are merged from Mike O'Brien@Rand
+# and Howard Katseff at Bell Labs, and are not thoroughly tested.
+# Highly modified 6/22 by Mike O'Brien.
+# split out into several for the various screen sizes by dave-yost@rand
+# Many changes by Mark Horton 3/82
+aaa-unk|ann arbor ambassador (internal - don't use this directly),
+	am, km, mir, xon, cols#80, it#8,
+	cr=^M, ht=^I, cbt=\E[Z, bel=^G, ind=^J, ri=\EM,
+	cuu1=\E[A, cuf1=\E[C, cud1=^J, cub1=^H,
+	cuu=\E[%p1%dA, cuf=\E[%p1%dC, cud=\E[%p1%dB, cub=\E[%p1%dD,
+	ed=\E[J, el=\E[K$<5>, clear=\E[H\E[J$<156>,
+	home=\E[H, cup=\E[%i%p1%d;%p2%dH,
+	hpa=\E[%p1%{1}%+%d`, vpa=\E[%p1%{1}%+%dd,
+	dl=\E[%p1%dM,  dl1=\E[M,  il=\E[%p1%dL$<3*>,  il1=\E[L$<3>,
+	dch=\E[%p1%dP, dch1=\E[P, .ich=\E[%p1%d@$<4*>, .ich1=\E[@$<4>,
+	smir=\E[>4h, rmir=\E[>4l,
+	smul=\E[4m, rmul=\E[m, smso=\E[1m, rmso=\E[m,
+	bold=\E[1m, rev=\E[7m, blink=\E[5m, invis=\E[8m, sgr0=\E[0m,
+	sgr=\E[%?%p1%t1;%;%?%p2%t4;%;%?%p3%t7;%;%?%p4%t5;%;%?%p6%t1;%;%?%p7%t8;%;m,
+	kcuu1=\E[A, kcud1=\E[B, kcub1=\E[D, kcuf1=\E[C, khome=\E[H, kbs=^H,
+	kich1=\E[@, krmir=\E6,  kil1=\E[L,  kclr=\E[J,  kdch1=\E[P, kdl1=\E[M,
+	kf1=\EOA, kf2=\EOB, kf3=\EOC, kf4=\EOD, kf5=\EOE,
+	kf6=\EOF, kf7=\EOG, kf8=\EOH, kf9=\EOI, kf10=\EOJ,
+	rep=%p1%c\E[%p2%{1}%-%db,  sc=\E7, rc=\E8,
+	flash=\E7\E[H\E[4m\E9$<20>\E[m\E9\E8,
+	is1=\E[m\E7\E[H\E9\E8, is3=\E[1Q\E[>20;30l,
+	smm=\E[>52h, rmm=\E[>52l,
+	.mc0=\E[0i, .mc5=\E[v, .mc4=^C,
+aaa-unk-stat|Ann Arbor Ambassadors with status lines,
+	tsl=\E[>51h\E[1;%p1%dH\E[2K, fsl=\E[>51l, hs, eslok,
+	.dsl=\E7\E[60;0;0;30p\E[60;1H\E[K\E[H\E8,
+aaa-unk-rv|Ann Arbor Ambassadors in reverse-video mode,
+	bold=\E[1;7m, rev=\E[m, blink=\E[5;7m, invis=\E[7;8m, sgr0=\E[7m,
+	rmul=\E[7m, smul=\E[4;7m, rmso=\E[7m, smso=\E[m, rs1=\E[H\E[7m\E[J,
+	sgr=\E[%?%p1%!%t7;%;%?%p2%t4;%;%?%p3%t7;%;%?%p4%t5;%;%?%p6%t1;%;%?%p7%t8;%;m,
+	flash=\E7\E[H\E[7;4m\E9$<20>\E[7m\E9\E8,
+	is1=\E[7m\E7\E[H\E9\E8,
+aaa-18|ann arbor ambassador/18 lines,
+	smcup=\E[18;0;0;18p, rmcup=\E[60;0;0;18p\E[60;1H\E[K,
+	is2=\E7\E[60;0;0;18p\E8, lines#18, use=aaa-unk,
+aaa-18-rv|ann arbor ambassador/18 lines+reverse video,
+	 use=aaa-unk-rv, use=aaa-18,
+aaa-20|ann arbor ambassador/20 lines,
+	smcup=\E[20;0;0;20p, rmcup=\E[60;0;0;20p\E[60;1H\E[K,
+	is2=\E7\E[60;0;0;20p\E8, lines#20, use=aaa-unk,
+aaa-20-rv|ann arbor ambassador/20 lines+reverse video,
+	use=aaa-unk-rv, use=aaa-20,
+aaa-22|ann arbor ambassador/22 lines,
+	smcup=\E[22;0;0;22p, rmcup=\E[60;0;0;22p\E[60;1H\E[K,
+	is2=\E7\E[60;0;0;22p\E8, lines#22, use=aaa-unk,
+aaa-22-rv|ann arbor ambassador/22 lines+reverse video,
+	use=aaa-unk-rv, use=aaa-22,
+aaa-24|ann arbor ambassador/24 lines,
+	smcup=\E[24;0;0;24p, rmcup=\E[60;0;0;24p\E[60;1H\E[K,
+	is2=\E7\E[60;0;0;24p\E8, lines#24, use=aaa-unk,
+aaa-24-rv|ann arbor ambassador/24 lines+reverse video,
+	use=aaa-unk-rv, use=aaa-24,
+aaa-26|ann arbor ambassador/26 lines,
+	smcup=\E[26;0;0;26p, rmcup=\E[60;0;0;26p\E[60;1H\E[K,
+	is2=\E7\E[60;0;0;26p\E8, lines#26, use=aaa-unk,
+aaa-26-rv|ann arbor ambassador/26 lines+reverse video,
+	use=aaa-unk-rv, use=aaa-26,
+aaa-28|ann arbor ambassador/28 lines,
+	smcup=\E[28;0;0;28p, rmcup=\E[60;0;0;28p\E[60;1H\E[K,
+	is2=\E7\E[60;0;0;28p\E8, lines#28, use=aaa-unk,
+aaa-28-rv|ann arbor ambassador/28 lines+reverse video,
+	use=aaa-unk-rv, use=aaa-28,
+aaa-29|ann arbor ambassador/29 lines plus status line,
+	smcup=\E[30;1;0;30p,
+	rmcup=\E[60;1;0;30p\E[60;1H\E[K,
+	is2=\E7\E[H\E[K\E[60;1;0;30p\E8\E[>51h\E[H\E[>51l, lines#29,
+	use=aaa-unk-stat, use=aaa-unk,
+aaa-29-rv|ann arbor ambassador/29 lines+status line+reverse video,
+	use=aaa-unk-rv, use=aaa-29,
+aaa-30|ambassador|ann arbor ambassador/30 lines,
+	smcup=\E[30;0;0;30p, rmcup=\E[60;0;0;30p\E[60;1H\E[K,
+	is2=\E7\E[60;0;0;30p\E8, lines#30, use=aaa-unk,
+aaa-30-rv|ann arbor ambassador/30 lines in reverse video,
+	use=aaa-unk-rv, use=aaa-30,
+aaa-36|ann arbor ambassador/36 lines,
+	smcup=\E[36;0;0;36p, rmcup=\E[60;0;0;36p\E[60;1H\E[K,
+	is2=\E7\E[60;0;0;36p\E8, lines#36, use=aaa-unk,
+aaa-36-rv|ann arbor ambassador/36 lines+reverse video,
+	use=aaa-unk-rv, use=aaa-36,
+aaa-40|ann arbor ambassador/40 lines,
+	smcup=\E[40;0;0;40p, rmcup=\E[60;0;0;40p\E[60;1H\E[K,
+	is2=\E7\E[60;0;0;40p\E8, lines#40, use=aaa-unk,
+aaa-40-rv|ann arbor ambassador/40 lines+reverse video,
+	use=aaa-unk-rv, use=aaa-40,
+aaa-47|ann arbor ambassador/48 lines+status line,
+	smcup=\E[48;1;0;48p,
+	rmcup=\E[60;1;0;48p\E[60;1H\E[K,
+	is2=\E7\E[H\E[K\E[60;1;0;48p\E8\E[>51h\E[H\E[>51l, lines#47,
+	use=aaa-unk-stat, use=aaa-unk,
+aaa-47-rv|ann arbor ambassador/48 lines+status line+reverse video,
+	use=aaa-unk-rv, use=aaa-47,
+aaa|ambas|aaa-48|ann arbor ambassador/48 lines,
+	smcup=\E[48;0;0;48p, rmcup=\E[60;0;0;48p\E[60;1H\E[K,
+	is2=\E7\E[60;0;0;48p\E8, lines#48, use=aaa-unk,
+aaa-rv|aaa-48-rv|ann arbor ambassador/48 lines+reverse video,
+	use=aaa-unk-rv, use=aaa-48,
+aaa-59|ann arbor ambassador/59 lines plus status line,
+	is2=\E7\E[H\E[K\E[60;1;0;60p\E8\E[>51h\E[H\E[>51l, lines#59,
+	use=aaa-unk-stat, use=aaa-unk,
+aaa-59-rv|ann arbor ambassador/59 lines+status line+reverse video,
+	use=aaa-unk-rv, use=aaa-59,
+aaa-60|ann arbor ambassador/60 lines,
+	is2=\E7\E[60;0;0;60p\E[1Q\E[m\E[>20;30l\E8, lines#60, use=aaa-unk,
+aaa-60-rv|ann arbor ambassador/60 lines+reverse video,
+	use=aaa-unk-rv, use=aaa-60,
+aaa-db|aaa-30-db|ann arbor ambassador 30 lines/destructive backspace,
+	cub1=\E[D, is3=\E[1Q\E[m\E[>20l\E[>30h, use=aaa-30,

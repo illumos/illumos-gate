@@ -1,0 +1,137 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+include ../../../Makefile.master
+
+# NOTE: hrtcntl.h and hrtsys.h are present in this directory so that the
+#	hrtsys system call can be built to facilitate transportability of
+#	stock SVr4 programs.  Every effort is to be made to prevent objects
+#	from being built, so these headers are not exported (installed).
+
+HDRS	=			\
+	archsystm.h		\
+	asm_linkage.h		\
+	bootconf.h		\
+	bootregs.h		\
+	bootsvcs.h		\
+	controlregs.h		\
+	cpu.h			\
+	ddi_isa.h		\
+	debugreg.h		\
+	dnet.h			\
+	fasttrap_isa.h		\
+	fp.h			\
+	frame.h			\
+	immu.h			\
+	inline.h		\
+	kd.h			\
+	kdi_machimpl.h		\
+	machelf.h		\
+	machlock.h		\
+	machsig.h		\
+	machtypes.h		\
+	mii.h			\
+	miipriv.h		\
+	mmu.h			\
+	mouse.h			\
+	mutex_impl.h		\
+	obpdefs.h		\
+	old_procfs.h		\
+	pcb.h			\
+	privregs.h		\
+	procfs_isa.h		\
+	prom_emul.h		\
+	prom_isa.h		\
+	prom_plat.h		\
+	promif.h		\
+	promimpl.h		\
+	psw.h			\
+	pte.h			\
+	reg.h			\
+	regset.h		\
+	sbpro.h			\
+	segment.h		\
+	segments.h		\
+	spl.h			\
+	stack.h			\
+	stat_impl.h		\
+	synch32.h		\
+	sysconfig_impl.h	\
+	sysi86.h		\
+	trap.h			\
+	traptrace.h		\
+	tss.h			\
+	ucontext.h		\
+	utrap.h			\
+	vmparam.h		\
+	x86_archext.h
+
+SUBHDRS	=			\
+	dktp/cdtypes.h		\
+	dktp/mscsi.h		\
+	dktp/scdk.h		\
+	dktp/scdkwatch.h	\
+	dktp/sctarget.h		\
+	dktp/tgcd.h		\
+	dktp/tgpassthru.h
+
+FSHDRS =			\
+	seg_xmem.h		\
+	xmem.h		
+
+ROOTDIR=	$(ROOT)/usr/include/sys
+SCSIDIR=	$(ROOTDIR)/scsi
+SCSIDIRS=	$(SCSIDIR) $(SCSIDIR)/conf $(SCSIDIR)/generic \
+		$(SCSIDIR)/impl $(SCSIDIR)/targets
+DKTPDIR=	$(ROOTDIR)/dktp
+DKTPDIRS=	$(DKTPDIR)
+ROOTFSDIR=	$(ROOTDIR)/fs
+ROOTDIRS=	$(ROOTDIR) $(ROOTFSDIR)
+
+ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%) $(SUBHDRS:%=$(ROOTDIR)/%)
+ROOTFSHDRS= $(FSHDRS:%=$(ROOTDIR)/fs/%)
+
+CHECKHDRS= 			\
+	$(HDRS:%.h=%.check)	\
+	$(SUBHDRS:%.h=%.check)	\
+	$(FSHDRS:%.h=fs/%.check)
+
+# install rules
+$(ROOTDIR)/%: %
+	$(INS.file)
+
+.KEEP_STATE:
+
+.PARALLEL: $(CHECKHDRS) $(ROOTHDRS) $(ROOTFSHDRS)
+
+install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS) $(ROOTFSHDRS)
+
+$(ROOTDIRS):
+	$(INS.dir)
+
+check:	$(CHECKHDRS)

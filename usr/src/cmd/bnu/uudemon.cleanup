@@ -1,0 +1,340 @@
+#!/usr/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	This demon cleans up uucp directories.
+#	It is started by /var/spool/cron/crontabs/uucp;
+#	it can be run daily, weekly, whatever depending on the system
+#	  uucp load.
+#
+
+# return a list of systems defined in /etc/uucp/Systems
+getsystems() {
+if [ ! -f /etc/uucp/Systems ]; then
+  return
+else
+  awk '$1 !~ /^#/ {print $1}' /etc/uucp/Systems
+fi
+}
+
+# return a list of systems defined in /etc/asppp.cf
+getpppsystems() {
+if [ ! -f /etc/asppp.cf ]; then
+  return
+else
+  X=`sed -e 's/#.*$//' /etc/asppp.cf`
+  set -- $X
+  while [ $# -ne 0 ];
+  do
+      if [ "$1" = "peer_system_name" ]; then
+          PPPSYSTEMS="$PPPSYSTEMS $2"
+      fi
+      shift
+  done
+  echo "$PPPSYSTEMS"
+fi
+}
+
+nouucp() {
+# run through the systems list, deleting ppp systems
+outstr=""
+for i in `getsystems`
+do
+    del=0
+    for j in `getpppsystems`
+    do
+        if [ "$j" = "$i" ]; then
+            del=1
+        fi
+    done
+    if [ $del -ne 1 ]; then
+        outstr="$outstr $i"
+    fi
+done
+
+# if any names are in $outstr, assume uucp is configured
+
+if [ -n "$outstr" ]; then
+	return 1
+else
+	return 0
+fi
+}
+
+# Start of actual processing. For energystar compatibility,
+# we attempt to do as little I/O as possible, so first check
+# to see if uucp is configured before doing all this work.
+
+if nouucp; then
+	exit 0
+fi
+
+MAILTO=uucp
+MAILDIR=/var/mail
+export PATH
+PATH=/usr/bin:/usr/lib/uucp
+TMP=/tmp/uu$$
+
+#	Running as uucp, take care to protect things
+
+umask 0022
+
+#
+#	These are taken from the Makefile.  If changed in Makefile
+#	they must be changed here also.
+#
+PUBDIR=/var/spool/uucppublic
+SPOOL=/var/spool/uucp
+VAR=/var/uucp
+LOCKS=/var/spool/locks	# needs a comment in parms.h on USRSPOOLOCKS
+XQTDIR=$VAR/.Xqtdir
+CORRUPT=$SPOOL/.Corrupt
+LOGDIR=$VAR/.Log
+SEQDIR=$VAR/.Sequence
+STATDIR=$VAR/.Status
+WORKDIR=$SPOOL/.Workspace
+ADMIN=$VAR/.Admin
+
+#	OLD is the directory for archiving old admin/log files
+OLD=$VAR/.Old
+O_LOGS=$OLD/Old-Log
+ACCT_LOGS=$OLD/Old-acct
+SEC_LOGS=$OLD/Old-sec
+
+[ -f $ADMIN/xferstats ] && mv $ADMIN/xferstats $OLD/xferstats
+[ -f $ADMIN/audit ] && mv $ADMIN/audit $OLD/audit
+[ -f $ADMIN/command ] &&mv $ADMIN/command $OLD/command
+[ -f $ADMIN/errors ] && mv $ADMIN/errors $OLD/errors
+[ -f $ADMIN/Foreign ] && mv $ADMIN/Foreign $OLD/Foreign
+
+> $ADMIN/xferstats
+> $ADMIN/audit
+> $ADMIN/command
+> $ADMIN/errors
+> $ADMIN/Foreign
+
+#
+#	If performance log exists, save it and create a new one
+#
+if [ -f $ADMIN/perflog ]
+then
+	mv $ADMIN/perflog $OLD/perflog
+	> $ADMIN/perflog
+fi
+
+#
+#	The list in the for controls how many old Log and security logs
+#	are retained: 2 -> 3, 1 -> 2, current -> 1.
+#
+for i in  2 1
+do
+	j=`expr $i + 1`
+	[ -f ${O_LOGS}-$i ] && mv ${O_LOGS}-$i ${O_LOGS}-$j
+	[ -f ${SEC_LOGS}-$i ] && mv ${SEC_LOGS}-$i ${SEC_LOGS}-$j
+done
+
+[ -f $ADMIN/security ] && mv $ADMIN/security ${SEC_LOGS}-1
+> $ADMIN/security
+
+#
+#	Combine all log files into O_LOGS-1.
+#	Add a name separator between each system.
+#
+> ${O_LOGS}-1
+for i in uucico uucp uux uuxqt
+do
+	if [ ! -d $LOGDIR/$i ]
+	then
+	      (echo "uudemon.cleanup: $LOGDIR/$i directory does not exist, remove if file"
+	       echo "uudemon.cleanup: making a directory $LOGDIR/$i"
+	      ) | mail $MAILTO
+		rm -f $LOGDIR/$i
+		mkdir $LOGDIR/$i
+		continue
+	fi
+	cd $LOGDIR/$i
+
+#	can't compare exactly because of symlinks
+	case `pwd` in
+	*`basename $LOGDIR`/$i)
+		;;
+	*)
+	 	 (echo "uudemon.cleanup: unable to chdir to $LOGDIR/$i") | mail $MAILTO
+		continue
+		;;
+	esac
+	for j in *
+	do
+		if [ "$j" = "*" ]
+		then
+			break
+		fi
+		echo "********** $j ********** ($i)" >> ${O_LOGS}-1
+		cat $j >> ${O_LOGS}-1
+		rm -f $j
+	done
+done
+
+#
+#	If the accounting log exists, save it and create a new one.
+#	The list in the for controls how many old accounting logs
+#	are retained: 2 -> 3, 1 -> 2, current -> 1.
+#
+if [ -f $ADMIN/account ]
+then
+	for i in  2 1
+	do
+		j=`expr $i + 1`
+		[ -f ${ACCT_LOGS}-$i ] && mv ${ACCT_LOGS}-$i ${ACCT_LOGS}-$j
+	done
+	[ -f $ADMIN/account ] && mv $ADMIN/account ${ACCT_LOGS}-1
+	> $ADMIN/account
+fi
+
+#	Execute the system directory cleanup program
+#	See uucleanup.1m for details.
+uucleanup -D7 -C7 -X2 -o2 -W1
+
+#	Use the grep instead of the mv to ignore warnings to uucp
+# grep -v 'warning message sent to uucp' $ADMIN/uucleanup > $OLD/uucleanup
+[ -f $ADMIN/uucleanup ] && mv $ADMIN/uucleanup $OLD/uucleanup
+if [ -s $OLD/uucleanup ]
+then
+	(echo "Subject: cleanup"; echo; cat $OLD/uucleanup) | mail $MAILTO
+fi
+>$ADMIN/uucleanup
+
+#  cleanup funny directories that may have been created in the spool areas
+for d in $SPOOL/[0-9A-Za-z]*
+do
+	if [ -f $d ]
+	then
+		# skip any regular files, like lockfiles
+		# and mail.log and so forth
+		continue
+	fi
+	if [ -z "`ls $d`" ]
+	then
+		# empty directory
+		continue
+	fi
+	cd $d
+	# we'd check that we were in the correct directory
+	if [ "`basename \`pwd\``" != "`basename $d`" ]
+	then
+		(echo "uudemon.cleanup: unable to chdir to $d") | mail $MAILTO
+		continue
+	fi
+	for s in */*
+	do
+		if [ "$s" = "*/*" ]
+		then
+			break
+		fi
+		if [ -d $s ]
+		then
+			# Remove subdirs of subdirs
+			rm -fr $s
+		fi
+	done
+
+	# if it is now empty, remove it.
+	cd ..
+	rmdir $d/* $d
+done >/dev/null 2>&1
+
+#
+#	Find old cores
+#
+find $SPOOL -name core -print > $TMP
+if [ -s $TMP ]
+then
+	(echo "Subject: cores"; echo; cat $TMP) | mail $MAILTO
+fi
+
+#
+#	Remove old files and directories
+#
+#find $PUBDIR -type f -mtime +30 -exec rm -f {} \;
+find $PUBDIR/* -depth -type d -exec rmdir {} \; >/dev/null 2>&1
+find $SPOOL/* -depth -type d -exec rmdir {} \; >/dev/null 2>&1
+find $SEQDIR -type f -mtime +30 -exec rm -f {} \;
+find $WORKDIR -type f -mtime +1 -exec rm -f {} \;
+find $STATDIR -type f -mtime +2 -exec rm -f {} \;
+find $CORRUPT -type f -mtime +10 -exec rm -f {} \;
+
+rm -f $LOCKS/LTMP*
+rmdir $SPOOL/[0-9A-Za-z]* >/dev/null 2>&1
+
+#
+#	Mail a daily summary of status
+#
+grep passwd ${O_LOGS}-1 > $TMP
+grep "REQUEST.*/" ${O_LOGS}-1 >> $TMP
+if [ -s $TMP ]
+then
+	(echo "Subject: uucp requests"; echo; cat $TMP) | mail $MAILTO
+fi
+
+
+awk '/(DENIED)/	{print prev}
+		{prev = $0}' ${O_LOGS}-1 > $TMP
+if [ -s $TMP ]
+then
+	(echo "Subject: uucp DENIED"; echo; cat $TMP) | mail $MAILTO
+fi
+
+uustat -q > $TMP
+if [ -s $TMP ]
+then
+	(echo "Subject: uu-status"; echo; cat $TMP) | mail $MAILTO
+fi
+
+ls $CORRUPT > $TMP
+if [ -s $TMP ]
+then
+	(echo "Subject: $CORRUPT"; echo; cat $TMP) | mail $MAILTO
+fi
+
+if [ -s $OLD/errors -o -s $OLD/Foreign ]
+then
+	(echo "Subject: uucp Admin"; \
+	echo; echo tail errors; tail $OLD/errors; \
+	echo; echo tail Foreign; tail $OLD/Foreign; \
+	) | mail $MAILTO
+fi
+# don't run if no system directories exist
+if [ "`echo $SPOOL/*`" != "$SPOOL/*" ]
+then
+	(echo "Subject: uucleanup ran; $SPOOL du"; echo; du $SPOOL) | \
+		mail $MAILTO
+fi
+
+#
+#	Dispose of mail to nuucp
+#
+rm -f $MAILDIR/nuucp $TMP

@@ -1,0 +1,257 @@
+#!/usr/perl5/5.8.4/bin/perl -T
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This script builds and installs perl into the same location as when shipped
+# with ON.
+# This script should be run from within a perl source directory,
+# and needs to be setuid-root.
+#
+
+use strict;
+use warnings;
+use POSIX qw(uname setuid);
+use Cwd qw(abs_path);
+use File::Find;
+
+# Global config variables.
+our ($PerlPfx, $PerlArch, $PerlRel, $SolRel, $SolVer, $SolArch);
+
+# Globals for File::Find callbacks below.
+our ($Start, $Fh);
+
+#
+# File::Find callback for finding files touched after Start
+# and saving them in Fh.  Uses globals $Start and $Fh.
+#
+sub touched
+{
+	my ($p, $f) = ($File::Find::dir, $_);
+
+	# Ignore directories and object files.
+	return if (-d $f || $f =~ m{\.(?:a|o|so)$});
+
+	$p =~ s{^\./?}{};
+	my $pf = $p eq '' ? $f : "$p/$f";
+
+	# atime, mtime, ctime.
+	my ($a, $m, $c) = (lstat($f))[8, 9, 10];
+	$a = $m if ($m > $a);
+	$a = $c if ($c > $a);
+	print $Fh ("$pf\n") if ($a >= $Start);
+}
+
+#
+# File::Find callback for finding all .packlist files and saving their
+# contents in $Fh.  Uses global $Fh.
+#
+sub cat_packlists
+{
+	my ($p, $f) = ($File::Find::dir, $_);
+	# Ignore everything except .packlist files.
+	return unless ($f eq '.packlist');
+
+	$p =~ s{^\./?}{};
+	my $pf = $p eq '' ? $f : "$p/$f";
+
+	# Open .packlist, save into $Fh.
+	my $fh;
+	open($fh, '<', $f) || die("Can't open $pf: $!\n");
+	while (defined(my $line = <$fh>)) {
+		# Files only.
+		next unless ($line =~ s/\s+type=file.*$//);
+		$line =~ s{$PerlPfx/$PerlRel/}{};
+		print $Fh ($line)
+	}
+	close($fh);
+}
+
+#
+# Main.
+#
+
+my $config_only = @ARGV && $ARGV[0] eq '-c' ? 1 : 0;
+my $fh;
+
+# This is all rather dangerous...
+my ($ruid, $euid, $rgid, $egid) = ($<, $>, $(, $));
+$ENV{PATH} =~ s{:/usr/dist[^:]*}{}g;
+($ENV{PATH}) = $ENV{PATH} =~ /^(.*)$/;
+delete($ENV{ENV});
+if (! $config_only) {
+	$) = $rgid;
+	$> = $ruid;
+}
+
+# Basic environment check.
+die("Not a perl build directory\n")
+    unless (-f 'Configure' && -f 'MANIFEST' && -f 'perl.c');
+die("Needs to be run as root or setuid root\n")
+    unless ($config_only || $euid == 0);
+
+# Prefix for perl installation.
+$PerlPfx = '/usr/perl5';
+
+# Perl architecture.
+$PerlArch=qx{arch};
+($PerlArch) = $PerlArch =~ /^(.*)\n$/;
+$PerlArch="${PerlArch}-solaris-64int";
+
+# Perl release.
+my ($r, $v, $s);
+open($fh, '<', 'patchlevel.h') || die("Can't open patchlevel.h: $!\n");
+while (defined(my $line = <$fh>)) {
+	($line =~ /\bPERL_REVISION\s+(\d+)/) && ($r = $1);
+	($line =~ /\bPERL_VERSION\s+(\d+)/) && ($v = $1);
+	($line =~ /\bPERL_SUBVERSION\s+(\d+)/) && ($s = $1);
+	last if (defined($r) && defined($v) && defined($s));
+}
+$PerlRel = "$r.$v.$s";
+undef($r);
+undef($v);
+undef($s);
+
+# Solaris config.
+$SolRel = (uname())[2];			# Solaris Release.
+$SolVer = '2.' . substr($SolRel, 2);	# Solaris Version.
+$SolArch = qx{uname -p};		# Solaris architecture.
+chomp($SolArch);
+
+# Compiler and flags.
+my $compiler1 = qx{exec ksh -e whence cc};
+chomp($compiler1);
+$compiler1 =~ s{/bin/cc}{};
+my $compiler2 = abs_path($compiler1);
+$compiler1 = ' *' . $compiler1 . '[^ ]* *';
+$compiler2 = ' *' . $compiler2 . '[^ ]* *';
+my $optimize='-xO3 -xspace -xildoff';
+my ($ccextraflags, $myuname);
+if ($SolArch eq 'sparc') {
+	$ccextraflags='-xarch=v8';
+	$myuname="sunos localhost $SolRel sun4u sparc SUNW,Ultra-2";
+} else {
+	$ccextraflags='';
+	$myuname="sunos localhost $SolRel i86pc i386 i86pc";
+}
+$ccextraflags .= " -D_TS_ERRNO";
+$ccextraflags =~ s/\s\s+/ /g;
+$ccextraflags =~ s/^\s+//;
+$ccextraflags =~ s/\s+$//;
+
+# Dmake parallelism.
+my $DmakeJobs = 4;
+
+# Clean up, delete any old configuration files.
+system('make realclean') if (-f 'Makefile');
+unlink('config.sh') if (-f 'config.sh');
+unlink('Policy.sh') if (-f 'Policy.sh');
+
+# Create the config.over file to override some common settings.
+open($fh, '>', 'config.over') || die("Can't open config.over: $!\n");
+print $fh <<"EOF";
+ccflags=`echo \$ccflags | sed -e 's! *-I/usr/local/include *! !'`
+ccflags="\$ccflags $ccextraflags"
+ccversion='Sun WorkShop'
+cf_by='perl-bugs'
+cf_email='perl-bugs\@sun.com'
+cf_time=''
+cppflags=''
+inc_version_list=''
+inc_version_list_init='0'
+installusrbinperl='undef'
+lddlflags='-G'
+ldflags=''
+libpth='/lib /usr/lib /usr/ccs/lib'
+libsdirs=`echo \$libsdirs | sed -e 's!$compiler1! !' -e 's!$compiler2! !'`
+libsfound=`echo \$libsfound | sed -e 's!$compiler1! !' -e 's!$compiler2! !'`
+libspath='/lib /usr/lib /usr/ccs/lib'
+locincpth="/usr/sfw/include /opt/sfw/include \$locincpth"
+loclibpth=`echo \$loclibpth | sed -e 's!$compiler1! !' -e 's!$compiler2! !'`
+loclibpth="/usr/sfw/lib /opt/sfw/lib \$loclibpth"
+make_set_make='#'
+mydomain='.sun.com'
+myhostname='localhost'
+myuname='$myuname'
+osvers='$SolVer'
+pager='/usr/bin/more'
+perl5='/bin/perl'
+perladmin='perl-bugs\@sun.com'
+EOF
+close($fh);
+
+#
+# Run Configure with the correct flags to give the required config files,
+# then remove the record of the Configure command-line and extra whitespace.
+# Finally, expand config.sh into the generated files used during the build.
+# Note: due to the fact that '-D' options confuse Configure, ccflags are
+# handled in config.over, above.
+#
+system <<"EOF";
+./Configure -dsOE \\
+    -Duseshrplib -Uusemymalloc -Duse64bitint -Doptimize="$optimize" \\
+    -Dcc=cc \\
+    -Dprefix=$PerlPfx/$PerlRel \\
+    -Dprivlib=$PerlPfx/$PerlRel/lib \\
+    -Darchlib=$PerlPfx/$PerlRel/lib/$PerlArch \\
+    -Dsiteprefix=$PerlPfx/$PerlRel \\
+    -Dsitelib=$PerlPfx/site_perl/$PerlRel \\
+    -Dsitearch=$PerlPfx/site_perl/$PerlRel/$PerlArch \\
+    -Dvendorprefix=$PerlPfx/$PerlRel \\
+    -Dvendorlib=$PerlPfx/vendor_perl/$PerlRel \\
+    -Dvendorarch=$PerlPfx/vendor_perl/$PerlRel/$PerlArch \\
+    -Dman1dir=$PerlPfx/$PerlRel/man/man1 \\
+    -Dman3dir=$PerlPfx/$PerlRel/man/man3 \\
+    | 2>&1 tee configure.log 
+sed -e "s/^config_args=.*/config_args=''/" \\
+    -e "s/^config_argc=.*/config_argc=0/" \\
+    -e "/^config_arg[1-9][0-9]*=/d" \\
+    -e "s/ threads threads\\/shared//" \\
+    -e "s/'  */'/g" \\
+    -e "s/  *'/'/g" \\
+    config.sh > config.new
+mv config.new config.sh
+EOF
+
+# Get the start time of the build.
+$Start = time();
+
+# Expand the configure-generated files.
+system <<"EOF" || die("Build failed\n");
+./Configure -S | 2>&1 tee -a configure.log
+EOF
+
+# Stop here if just configuring.
+exit(0) if ($config_only);
+
+# Make and test perl.
+system <<"EOF" || die("Build failed\n");
+dmake -j $DmakeJobs | 2>&1 tee make.log
+/usr/ccs/bin/make test | 2>&1 tee test.log
+EOF
+
+# Find all files touched by the build & save in build.touched
+open($Fh, '>', 'build.touched') || die("Can't open build.touched: $!\n");
+find({ wanted => \&touched, untaint => 1 }, '.');
+close($Fh);
+
+# Install perl (needs to be root!)
+$( = $) = $egid; $< = $> = $euid;
+system <<"EOF";
+/bin/rm -rf $PerlPfx/$PerlRel
+/usr/ccs/bin/make install
+EOF
+$) = $rgid; $> = $ruid;
+
+#
+# Find all the .packlist files, cat them together
+# and save them in install.packlist
+#
+open($Fh, '>', 'install.packlist') || die("Can't open install.packlist: $!\n");
+print $Fh ("PREFIX: $PerlPfx/$PerlRel\n");
+find({ wanted => \&cat_packlists, untaint => 1 }, "$PerlPfx/$PerlRel");
+close($Fh);
+
+exit(0);

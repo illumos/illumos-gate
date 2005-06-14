@@ -1,0 +1,3 @@
+EDITOR=vi
+PS1=UNIX: 
+sendwait=

@@ -1,0 +1,108 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+i pkginfo
+i copyright
+i depend
+#
+# SUNWfmd
+#
+d none usr 755 root sys
+d none usr/include 755 root bin
+d none usr/include/fm 755 root bin
+f none usr/include/fm/diagcode.h 644 root bin
+f none usr/include/fm/fmd_adm.h 644 root bin
+f none usr/include/fm/fmd_api.h 644 root bin
+f none usr/include/fm/fmd_fmri.h 644 root bin
+f none usr/include/fm/fmd_log.h 644 root bin
+f none usr/include/fm/libtopo.h 644 root bin
+f none usr/include/fm/libtopo_enum.h 644 root bin
+d none usr/lib 755 root bin
+d none usr/lib/fm 755 root bin
+d none usr/lib/fm/dict 755 root bin
+f none usr/lib/fm/dict/FMD.dict 444 root bin
+f none usr/lib/fm/dict/SMF.dict 444 root bin
+f none usr/lib/fm/dict/SUNOS.dict 444 root bin
+f none usr/lib/fm/dict/PCI.dict 444 root bin
+d none usr/lib/fm/eft 755 root bin
+f none usr/lib/fm/eft/pci.eft 444 root bin
+d none usr/lib/fm/fmd 755 root bin
+f none usr/lib/fm/fmd/fmd 555 root bin
+f none usr/lib/fm/fmd/fminject 555 root bin
+f none usr/lib/fm/fmd/fmsim 555 root bin
+d none usr/lib/fm/fmd/plugins 755 root bin
+f none usr/lib/fm/fmd/plugins/cpumem-retire.conf 644 root bin
+f none usr/lib/fm/fmd/plugins/cpumem-retire.so 555 root bin
+f none usr/lib/fm/fmd/plugins/eft.conf 644 root bin
+f none usr/lib/fm/fmd/plugins/eft.so 555 root bin
+f none usr/lib/fm/fmd/plugins/io-retire.conf 644 root bin
+f none usr/lib/fm/fmd/plugins/io-retire.so 555 root bin
+f none usr/lib/fm/fmd/plugins/syslog-msgs.conf 644 root bin
+f none usr/lib/fm/fmd/plugins/syslog-msgs.so 555 root bin
+d none usr/lib/fm/fmd/schemes 755 root bin
+f none usr/lib/fm/fmd/schemes/cpu.so 555 root bin
+f none usr/lib/fm/fmd/schemes/dev.so 555 root bin
+f none usr/lib/fm/fmd/schemes/fmd.so 555 root bin
+f none usr/lib/fm/fmd/schemes/hc.so 555 root bin
+f none usr/lib/fm/fmd/schemes/legacy-hc.so 555 root bin
+f none usr/lib/fm/fmd/schemes/mod.so 555 root bin
+f none usr/lib/fm/fmd/schemes/pkg.so 555 root bin
+f none usr/lib/fm/libdiagcode.so.1 755 root bin
+s none usr/lib/fm/libdiagcode.so=libdiagcode.so.1
+f none usr/lib/fm/llib-ldiagcode 644 root bin
+f none usr/lib/fm/llib-ldiagcode.ln 644 root bin
+f none usr/lib/fm/libfmd_adm.so.1 755 root bin
+s none usr/lib/fm/libfmd_adm.so=libfmd_adm.so.1
+f none usr/lib/fm/llib-lfmd_adm 644 root bin
+f none usr/lib/fm/llib-lfmd_adm.ln 644 root bin
+f none usr/lib/fm/libfmd_log.so.1 755 root bin
+s none usr/lib/fm/libfmd_log.so=libfmd_log.so.1
+f none usr/lib/fm/llib-lfmd_log 644 root bin
+f none usr/lib/fm/llib-lfmd_log.ln 644 root bin
+f none usr/lib/fm/libtopo.so.1 755 root bin
+s none usr/lib/fm/libtopo.so=libtopo.so.1
+f none usr/lib/fm/llib-ltopo 644 root bin
+f none usr/lib/fm/llib-ltopo.ln 644 root bin
+d none usr/lib/fm/topo 755 root bin
+f none usr/lib/fm/topo/cpu.so 555 root sys
+f none usr/lib/fm/topo/cpu.topo 444 root bin
+f none usr/lib/fm/topo/pcibus.so 555 root sys
+f none usr/lib/fm/topo/pcibus.topo 444 root bin
+d none usr/lib/locale 755 root bin
+d none usr/lib/locale/C 755 root bin
+d none usr/lib/locale/C/LC_MESSAGES 755 root bin
+f none usr/lib/locale/C/LC_MESSAGES/FMD.mo 444 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SMF.mo 444 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SUNOS.mo 444 root bin
+f none usr/lib/locale/C/LC_MESSAGES/PCI.mo 444 root bin
+d none usr/lib/mdb 755 root sys
+d none usr/lib/mdb/proc 755 root sys
+f none usr/lib/mdb/proc/fmd.so 555 root sys
+d none usr/sbin 755 root bin
+f none usr/sbin/fmadm 555 root bin
+f none usr/sbin/fmdump 555 root bin
+f none usr/sbin/fmstat 555 root bin

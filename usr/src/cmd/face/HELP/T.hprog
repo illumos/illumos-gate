@@ -1,0 +1,19 @@
+
+The Programs Menu displays all UNIX System applications installed 
+on your system that have been made available to FACE either by the
+system administrator or by you. To run a program, highlight the
+entry and press ENTER.
+
+If the program requires a filename as a command line argument, you
+will be prompted for one before the program runs.
+
+At the option of the administrator of your system, "Mail Services"
+is available to allow you to read or send mail and "Spell Checker"
+is available to allow you to check the spelling of your files.
+
+You can install additional programs through the Programs 
+Administration menu item in your office menu.
+
+Your system administrator can install additional programs using
+the System Administration entry in the FACE menu.
+

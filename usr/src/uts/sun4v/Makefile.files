@@ -1,0 +1,156 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	This Makefile defines all file modules for the directory uts/sun4v
+#	and it's children. These are the source files which are sun4u
+#	"implementation architecture" dependent.
+#
+
+#
+#	object lists
+#
+CORE_OBJS +=	bootops.o
+CORE_OBJS +=	cmp.o
+CORE_OBJS +=	cpc_hwreg.o
+CORE_OBJS +=	cpc_subr.o
+CORE_OBJS +=	error.o
+CORE_OBJS +=	fillsysinfo.o
+CORE_OBJS +=	forthdebug.o
+CORE_OBJS +=	hardclk.o
+CORE_OBJS +=	hat_sfmmu.o
+CORE_OBJS +=	hat_kdi.o
+CORE_OBJS +=	mach_cpu_states.o
+CORE_OBJS +=	mach_ddi_impl.o
+CORE_OBJS +=    mach_descrip.o
+CORE_OBJS +=	mach_float.o
+CORE_OBJS +=	mach_mp_startup.o
+CORE_OBJS +=	mach_mp_states.o
+CORE_OBJS +=	mach_sfmmu.o
+CORE_OBJS +=	mach_startup.o
+CORE_OBJS +=	mach_subr_asm.o
+CORE_OBJS +=	mach_trap.o
+CORE_OBJS +=	mach_vm_dep.o
+CORE_OBJS +=	mach_xc.o
+CORE_OBJS +=	mem_cage.o
+CORE_OBJS +=	mem_config.o
+CORE_OBJS +=	memlist_new.o
+CORE_OBJS +=	ppage.o
+CORE_OBJS +=	sfmmu_kdi.o
+CORE_OBJS +=	swtch.o
+CORE_OBJS +=	xhat_sfmmu.o
+
+CORE_OBJS +=	mdesc_findname.o
+CORE_OBJS +=	mdesc_findnodeprop.o
+CORE_OBJS +=	mdesc_fini.o
+CORE_OBJS +=	mdesc_getpropdata.o
+CORE_OBJS +=	mdesc_getpropstr.o
+CORE_OBJS +=	mdesc_getpropval.o
+CORE_OBJS +=	mdesc_init_intern.o
+CORE_OBJS +=	mdesc_nodecount.o
+CORE_OBJS +=	mdesc_rootnode.o
+CORE_OBJS +=	mdesc_scandag.o
+
+#
+#	Some objects must be linked at the front of the image (or
+#	near other objects at the front of the image).
+#
+SPECIAL_OBJS +=	trap_table.o
+SPECIAL_OBJS +=	locore.o
+SPECIAL_OBJS +=	mach_locore.o
+SPECIAL_OBJS +=	sfmmu_asm.o
+SPECIAL_OBJS +=	mach_sfmmu_asm.o
+SPECIAL_OBJS +=	interrupt.o
+SPECIAL_OBJS +=	mach_interrupt.o
+SPECIAL_OBJS +=	wbuf.o
+SPECIAL_OBJS += hcall.o
+SPECIAL_OBJS += intrq.o
+
+#
+#			driver modules
+#
+ROOTNEX_OBJS	+= mach_rootnex.o
+#
+#	Temporary fix - Needed for Niagara+Fire bringup (non-virtualization)
+#
+PX_OBJS		+= px_lib4v.o
+TRAPSTAT_OBJS	+= trapstat.o
+
+#
+#			sun4v virtual devices
+#
+QCN_OBJS	= qcn.o
+VNEX_OBJS	= vnex.o
+GLVC_OBJS	= glvc.o
+MDESC_OBJS	= mdesc.o
+NCP_OBJS	= ncp.o ncp_kcf.o ncp_debug.o ncp_kstat.o ncp_rsa.o \
+		  ncp_dsa.o bignumimpl.o
+
+#
+#			Misc modules
+#
+OBPSYM_OBJS	+= obpsym.o obpsym_1275.o
+BOOTDEV_OBJS	+= bootdev.o
+
+#
+#			Performance Counter BackEnd (PCBE) Modules
+#
+NI_PCBE_OBJS	= niagara_pcbe.o
+
+#
+#			cpu modules
+# XXXQ Make generic4vcpu
+#
+CPU_OBJ		+= $(OBJS_DIR)/mach_cpu_module.o
+GENERIC_OBJS = generic.o generic_copy.o common_asm.o
+NIAGARACPU_OBJS = niagara.o niagara_copy.o common_asm.o niagara_perfctr.o
+NIAGARACPU_OBJS += niagara_asm.o
+
+#
+#			platform module
+#
+PLATMOD_OBJS	= platmod.o
+
+#	Section 3:	Misc.
+#
+ALL_DEFS	+= -Dsun4u -Dsun4v
+INC_PATH	+= -I$(UTSBASE)/sun4v
+
+#
+# Since assym.h is a derived file, the dependency must be explicit for
+# all files including this file. (This is only actually required in the
+# instance when the .make.state file does not exist.) It may seem that
+# the lint targets should also have a similar dependency, but they don't
+# since only C headers are included when #defined(lint) is true.
+#
+ASSYM_DEPS	+= mach_locore.o
+ASSYM_DEPS	+= module_sfmmu_asm.o
+ASSYM_DEPS	+= generic_asm.o generic_copy.o
+ASSYM_DEPS	+= niagara_copy.o niagara_asm.o
+ASSYM_DEPS	+= mach_subr_asm.o swtch.o
+ASSYM_DEPS	+= mach_interrupt.o mach_xc.o
+ASSYM_DEPS	+= trap_table.o wbuf.o
+ASSYM_DEPS	+= mach_sfmmu_asm.o sfmmu_asm.o

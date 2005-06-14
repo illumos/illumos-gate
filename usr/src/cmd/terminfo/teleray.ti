@@ -1,0 +1,71 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8	*/
+# # --------------------------------
+#
+# teleray: TELERAY
+#
+# Manufacturer:	TELERAY
+# Class:	III
+# Info:
+#	A dumb teleray with the cursor stuck on the bottom and no 
+#	obvious model number is probably a 3700.
+#
+t3700|teleray3700|dumb teleray 3700,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, clear=^L, cols#80, lines#24,
+t3800|teleray 3800 series,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, ed=\EJ, el=\EK, clear=^L,
+	cup=\EY%p1%' '%+%c%p2%' '%+%c, cols#80,  
+	cud1=\n, home=\EH, lines#24, ll=\EY7 , cuf1=\EC, ht=^I, cuu1=^K,
+t1061|t10|teleray|teleray 1061,
+	tbc=\EG, hts=\EF, cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EL$<2*>,
+	am, cub1=^H, ed=\EJ$<1>, el=\EK, clear=^L$<1>,
+	cup=\EY%p1%' '%+%c%p2%' '%+%c, cols#80,
+	dch1=\EQ, dl1=\EM$<2*>, home=\EH, ich1=\EP, ip=$<0.4*>,
+	kf1=^Z1, kf2=^Z2, kf3=^Z3, kf4=^Z4, kf5=^Z5, kf6=^Z6, kf7=^Z7, kf8=^Z8,
+	lines#24, cuf1=\EC, ht=^I, rmso=\ER@, smso= \ERD, km,
+	is2=\Ee\EU01^Z1\EV\EU02^Z2\EV\EU03^Z3\EV\EU04^Z4\EV\EU05^Z5\EV\EU06^Z6\EV\EU07^Z7\EV\EU08^Z8\EV\Ef,
+	cuu1=\EA, smul=\ERH, rmul=\ER@, xhp, xt, xmc#1,
+t1061f|teleray 1061 with fast PROMs,
+	il1=\EL, ip@, dl1=\EM, use=t1061,
+# Info:
+#	teleray 16 - map the arrow keys for vi/rogue, shifted to 
+#	up/down page, and back/forth words. Put the function keys 
+#	(f1-f10) where they can be found, and turn off the other magic 
+#	keys along the top row, except for line/local. Do the magic 
+#	appropriate to make the page shifts work.
+#	Also toggle ^S/^Q for those of us who use Emacs.
+#
+ya|t16|teleray 16,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cr=^M, cud1=^J, ind=^J, bel=^G,
+	il1=\E[L, am, cub1=^H, ed=\E[0J,
+	el=\E[0K, clear=\E[H\E[2J, cup=%i\E[%p1%d;%p2%df, cols#80, kf1=^Z1,
+	kf2=^Z2, kf3=^Z3, kf4=^Z4, kf5=^Z5, kf6=^Z6, kf7=^Z7, kf8=^Z8,
+	kf9=^Z9, kf10=^Z0, dch1=\E[P, dl1=\E[M, home=\E[H,
+	smcup=\E[U\E[?38l, rmcup=\E[V\E[24;1f\E[?38h, smir=\E[4h,
+	rmir=\E[4l, lines#24, cuf1=\E[C, ht=^I, rmso=\E[m, smso=\E[7m,
+	dch1=\E[P, cud1=\E[B, cuu1=\E[A, smul=\E[4m,
+	rmul=\E[m, xhp, xt, ri=\E[T, da, db, mir,

@@ -1,0 +1,62 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+FSTYPE=		nfs
+TYPEPROG=	mountd
+ATTMK=		$(TYPEPROG)
+
+include		../../Makefile.fstype
+
+COMMON=		$(FSLIB) nfs_sec.o sharetab.o
+LOCAL=		mountd.o netgroup.o rmtab.o nfsauth.o \
+		nfsauth_xdr.o svc_local.o exportlist.o hashset.o
+OBJS= 		$(LOCAL) $(COMMON)
+SRCS=		$(LOCAL:%.o=%.c) \
+		$(FSLIBSRC) ../lib/nfs_sec.c ../lib/sharetab.c
+LDLIBS +=	-lrpcsvc -lnsl -lbsm -lsocket -lcmd
+CFLAGS +=	-o $@
+CPPFLAGS +=	-D_REENTRANT
+
+$(TYPEPROG):	$(OBJS)
+		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+		$(POST_PROCESS)
+
+nfsauth_xdr.c:	$(ROOT)/usr/include/rpcsvc/nfsauth_prot.x
+	$(RPCGEN) -C -c -o $@ $(ROOT)/usr/include/rpcsvc/nfsauth_prot.x
+
+nfs_sec.o:	../lib/nfs_sec.c
+		$(COMPILE.c) ../lib/nfs_sec.c
+
+sharetab.o:	../lib/sharetab.c
+		$(COMPILE.c) ../lib/sharetab.c
+
+lint:
+	$(LINT.c) $(SRCS) $(LDLIBS)
+
+clean:     
+	$(RM) $(OBJS) nfsauth_xdr.c

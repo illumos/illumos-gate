@@ -1,0 +1,53 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Message file for cmd/sgs/libconv/common/phdr.c
+
+@ MSG_PT_NULL		"[ PT_NULL ]"
+@ MSG_PT_LOAD		"[ PT_LOAD ]"
+@ MSG_PT_DYNAMIC	"[ PT_DYNAMIC ]"
+@ MSG_PT_INTERP		"[ PT_INTERP ]"
+@ MSG_PT_NOTE		"[ PT_NOTE ]"
+@ MSG_PT_SHLIB		"[ PT_SHLIB ]"
+@ MSG_PT_PHDR		"[ PT_PHDR ]"
+@ MSG_PT_TLS		"[ PT_TLS ]"
+
+@ MSG_PT_SUNWBSS	"[ PT_SUNWBSS ]"
+@ MSG_PT_SUNWSTACK	"[ PT_SUNWSTACK ]"
+@ MSG_PT_SUNWBSS	"[ PT_SUNWBSS ]"
+@ MSG_PT_SUNWDTRACE	"[ PT_SUNWDTRACE ]"
+@ MSG_PT_SUNWCAP	"[ PT_SUNWCAP ]"
+
+@ MSG_PT_SUNW_UNWIND	"[ PT_SUNW_UNWIND ]"
+
+@ MSG_PF_X		 " PF_X "
+@ MSG_PF_W		 " PF_W "
+@ MSG_PF_R		 " PF_R "
+@ MSG_PF_SUNW_FAILURE	 " PF_SUNW_FAILURE "
+
+@ MSG_GBL_ZERO		"0"
+@ MSG_GBL_OSQBRKT	"["
+@ MSG_GBL_CSQBRKT	"]"

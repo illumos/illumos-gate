@@ -1,0 +1,93 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
+# # --------------------------------
+#
+# homebrew: HOME MADE TERMINALS
+#
+# Manufacturer:	HOME MADE TERMINALS
+# Class:	III
+# 
+bc|bill croft homebrew,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H,
+	cup=\E=%p1%' '%+%c%p2%' '%+%c, clear=^Z, cols#96, home=^^, lines#72,
+	cuf1=^L, cuu1=^K,
+nucterm|rayterm|nuc|nuc homebrew,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H, clear=^L$<1>,
+	lines#24, cols#80, cuf1=^C, cuu1=^N, home=^B, ll=^K, el=^A, ed=^E,
+carlock|klc|,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=^E, am, el=^U, clear=^Z$<100>,
+	cup=\E=%p1%' '%+%c%p2%' '%+%c, cols#80, dch1=\177, dl1=^D,
+	rmir=^T, home=^^, smir=^T, lines#24, cuf1=^L, rmso=^V, smso=^V,
+	cuu1=^K, flash=\EV\EV,
+# Info:
+#	EXIDY
+#
+ex3000,
+	cr=^M, cud1=^J, ind=^J, bel=^G, lines#24, cols#80, home=^Q,
+exidy|exidy2500|exidy sorcerer as dm2500,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=^P^J^X, am, cub1=^H,
+	el=^W, clear=^^, cup=^L%p2%'`'%^%c%p1%'`'%^%c, cols#64,
+	dch1=\b, dl1=^P^Z^X, smdc=^P, ed=^X, rmir=^X, home=^B, ich1=^\,
+	smir=^P, lines#30, cuf1=^\, ht=^I, smso=^N, rmso=^X, cuu1=^Z,
+sexidy|exidy smart,
+	cr=^M, cud1=^J, ind=^J, bel=^G, lines#24, cols#64, clear=^L, home=^Q,
+	cuf1=^S, cuu1=^W, cub1=^H, cub1=^A, kcud1=^S,
+# Info:
+#	netx and xitex are almost identical, except for the padding
+#	on clear screen.  Hmm.
+#
+xitex|xitex sct-100,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, ed=^F^E$<2000>, el=^E$<1600>,
+	clear=^L$<400>, cup=\E=%p1%'@'%+%c%p2%'@'%+%c, cols#64, home=^D,
+	lines#16, cuf1=\E+@A, ri=\E=@@^K, cuu1=^K,
+# NETRONICS
+netx|netronics|,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, ed=^F^E$<2000>, el=^E$<1600>,
+	clear=^L$<466>, cup=\E=%p1%'@'%+%c%p2%'@'%+%c, cols#64, home=^D,
+	lines#16, cuf1=\E+@A, ri=\E=@@^K, cuu1=^K,
+smartvid|Netronics Smartvid 80,
+	cr=^M, cud1=^J, ind=^J, bel=^G, smacs=\EG@, am, rmacs=\EGB,
+	cub1=^H, cbt=\EI, bw, ed=\EY, el=\ET, clear=^L,
+	cup=\E=%p1%' '%+%c%p2%' '%+%c,
+	cols#80, dch1=\EW, dl1=\ER, cud1=^J, rmir=\ED, eo, home=^Z,
+	ich1=\EQ, smir=\EC, lines#24, ll=^Z^K, msgr, cuf1=^A,
+	rmso=\EG@, xmc#1, smso=\EGC, ri=^K, ht=\Ei, rmcup=^Z^K,
+	rmul=\EG@, cuu1=^K, smul=\EGA, cnorm=^Z^K, xhp,
+smarterm|smarterm-s|netronics smarterm 80x24 naked terminal,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EE, am, cub1=^H, cbt=\EI,
+	ed=\EY, el=\ET, clear=^L, cup=\E=%p1%' '%+%c%p2%' '%+%c$<6>,
+	cols#80, lines#24,
+	dch1=\EW, dl1=\ER, cud1=^J, rmir=\ED, home=^Z, ich1=\EQ,
+	smir=\EC, cuf1=^A, ht=^I, rmul=\EG@, xmc#1, ul,
+	smul=\EGA,
+ubell|ubellchar|,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H, ht=^I, el=\Ed,
+	clear=^Z, cup=\E=%p1%' '%+%c%p2%' '%+%c, cols#80, lines#24, cuf1=^L,
+	cuu1=^K, home=^^,
+ttywilliams,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cols#80, lines#12,
+	cub1=^Y, cud1=^K, cuu1=^Z, clear=^^, el=^_, am, home=^], cuf1=^X,

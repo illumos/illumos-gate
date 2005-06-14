@@ -1,0 +1,54 @@
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Privileged system-wide pppd options may be placed here.  Typically, the
+# following options are used in this file:
+#
+#	lock		-- enable UUCP-style device locking
+#	name <name>	-- set local system name for authentication
+#	domain <name>	-- append domain name to local name
+#	nodefaultroute	-- prevent users from installing a default route
+#	noproxyarp	-- prevent users from using proxy ARP
+#
+# Device-specific options, such as asyncmap, should go in the per-device
+# option files named /etc/ppp/options.<tty>, where <tty> is the name of
+# the device.  For example, if /dev/ttya is used, then /etc/ppp/options.ttya
+# will be read (if it exists).  When IP addresses are allocated per-port
+# for dial-in nodes ("dynamic IP addressing"), then the remote address
+# should be placed in that file as well.
+#
+# Peer-specific options, such as connect scripts, IP addresses, and other
+# protocol options, should be placed in /etc/ppp/peers/<name>, where <name>
+# is the name of the peer.  This file is then read by using the pppd "call"
+# option; usually from the command line.
+#
+# Options in this file, /etc/ppp/options.<tty>, /etc/ppp/peers/<name>,
+# /etc/ppp/pap-secrets, and /etc/ppp/chap-secrets are all considered
+# privileged.  Those from ~/.ppprc and the command line are privileged
+# if the invoker is root, and unprivileged otherwise.
+#
+lock
+nodefaultroute
+noproxyarp

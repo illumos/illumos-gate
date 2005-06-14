@@ -1,0 +1,69 @@
+/*
+ * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * lib/krb5/ccache/ccdefops.c
+ *
+ * Copyright 1990 by the Massachusetts Institute of Technology.
+ * All Rights Reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ *
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ *
+ *
+ * Default credentials cache determination.  This is a separate file
+ * so that the user can more easily override it.
+ */
+
+#include <k5-int.h>
+
+#if defined(macintosh)
+
+/*
+ * Macs use the shared, memory based credentials cache
+ * Windows may also use the ccapi cache, but only if the Krbcc32.dll
+ * can be found; otherwise it falls back to using the old
+ * file-based ccache.
+ */
+#include "stdcc.h" /* from ccapi subdir */
+
+krb5_cc_ops *krb5_cc_dfl_ops = &krb5_cc_stdcc_ops;
+
+#else
+
+#ifdef HAVE_SYS_TYPES_H
+/* Systems that have <sys/types.h> probably have Unix-like files (off_t,
+   for example, which is needed by fcc.h).  */
+
+#include "fcc.h"		/* From file subdir */
+krb5_cc_ops *krb5_cc_dfl_ops = &krb5_cc_file_ops;
+
+#else
+/* Systems that don't have <sys/types.h> probably have stdio anyway.  */
+
+#include "scc.h"		/* From stdio subdir */
+krb5_cc_ops *krb5_cc_dfl_ops = &krb5_scc_ops;
+
+#endif
+
+#endif

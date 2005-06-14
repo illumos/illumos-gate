@@ -1,0 +1,680 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * poold - dynamically adjust pool configuration according to load.
+ */
+#include <errno.h>
+#include <jni.h>
+#include <libintl.h>
+#include <limits.h>
+#include <link.h>
+#include <locale.h>
+#include <poll.h>
+#include <pool.h>
+#include <priv.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <syslog.h>
+#include <unistd.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/ucontext.h>
+#include "utils.h"
+
+#define	POOLD_DEF_CLASSPATH	"/usr/lib/pool/JPool.jar"
+#define	POOLD_DEF_LIBPATH	"/usr/lib/pool"
+
+#if defined(sparc)
+#define	PLAT	"sparc"
+#else
+#if defined(i386)
+#define	PLAT	"i386"
+#else
+#error Unrecognized platform.
+#endif
+#endif
+
+#define	PID_PROPERTY_NAME	"system.poold.pid"
+
+#define	CLASS_FIELD_DESC(class_desc)	"L" class_desc ";"
+
+#define	LEVEL_CLASS_DESC	"java/util/logging/Level"
+#define	POOLD_CLASS_DESC	"com/sun/solaris/domain/pools/Poold"
+#define	SEVERITY_CLASS_DESC	"com/sun/solaris/service/logging/Severity"
+#define	STRING_CLASS_DESC	"java/lang/String"
+#define	SYSTEM_CLASS_DESC	"java/lang/System"
+#define	LOGGER_CLASS_DESC	"java/util/logging/Logger"
+
+extern char *optarg;
+
+static const char *pname;
+
+static enum {
+	LD_TERMINAL = 1,
+	LD_SYSLOG,
+	LD_JAVA
+} log_dest = LD_SYSLOG;
+
+typedef enum {
+	PGAS_GET_ONLY = 1,
+	PGAS_GET_AND_SET
+} pgas_mode_t;
+
+static const char PNAME_FMT[] = "%s: ";
+static const char ERRNO_FMT[] = ": %s";
+
+static JavaVM *jvm;
+static int lflag;
+
+static jmethodID log_mid;
+static jobject severity_err;
+static jobject severity_notice;
+static jobject base_log;
+static jclass poold_class;
+static jobject poold_instance;
+static int instance_running;
+static pthread_mutex_t instance_running_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static sigset_t hdl_set;
+
+static void
+usage(void)
+{
+	(void) fprintf(stderr, gettext("Usage:\t%s [-l <level>]\n"), pname);
+
+	exit(E_USAGE);
+}
+
+static void
+pu_output(int severity, const char *fmt, va_list alist)
+{
+	int err = errno;
+	char line[255] = "";
+	jobject jseverity;
+	jobject jline;
+	JNIEnv *env;
+	int detach_required = 0;
+	if (pname != NULL && log_dest == LD_TERMINAL)
+		(void) snprintf(line, sizeof (line), gettext(PNAME_FMT), pname);
+
+	(void) vsnprintf(line + strlen(line), sizeof (line) - strlen(line),
+	    fmt, alist);
+
+	if (line[strlen(line) - 1] != '\n')
+		(void) snprintf(line + strlen(line), sizeof (line) -
+		    strlen(line), gettext(ERRNO_FMT), strerror(err));
+	else
+		line[strlen(line) - 1] = 0;
+
+	switch (log_dest) {
+	case LD_TERMINAL:
+		(void) fprintf(stderr, "%s\n", line);
+		(void) fflush(stderr);
+		break;
+	case LD_SYSLOG:
+		syslog(LOG_ERR, "%s", line);
+		break;
+	case LD_JAVA:
+		if (severity == LOG_ERR)
+			jseverity = severity_err;
+		else
+			jseverity = severity_notice;
+
+		if (jvm) {
+			(*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_2);
+			if (env == NULL) {
+				detach_required = 1;
+				(*jvm)->AttachCurrentThread(jvm,
+				    (void **)&env, NULL);
+			}
+			if ((jline = (*env)->NewStringUTF(env, line)) != NULL)
+				(*env)->CallVoidMethod(env, base_log, log_mid,
+				    jseverity, jline);
+			if (detach_required)
+				(*jvm)->DetachCurrentThread(jvm);
+		}
+	}
+}
+
+/*PRINTFLIKE1*/
+static void
+pu_notice(const char *fmt, ...)
+{
+	va_list alist;
+	va_start(alist, fmt);
+	pu_output(LOG_NOTICE, fmt, alist);
+	va_end(alist);
+}
+
+/*PRINTFLIKE1*/
+static void
+pu_die(const char *fmt, ...)
+{
+	va_list alist;
+	va_start(alist, fmt);
+	pu_output(LOG_ERR, fmt, alist);
+	va_end(alist);
+	exit(E_ERROR);
+}
+
+/*
+ * Update the "system.poold.pid" to reflect this instance of poold only
+ * if the property hasn't been set already to reflect an existing
+ * process, and mode is not set to PGAS_GET_ONLY.  Returns the
+ * property's pre-existing value, or -1 otherwise.
+ */
+static pid_t
+poold_get_and_set_pid(pgas_mode_t mode)
+{
+	pool_conf_t *conf;
+	pool_elem_t *pe;
+	pool_value_t *val;
+	int64_t ival;
+
+	if (!(conf = pool_conf_alloc()))
+		return ((pid_t)-1);
+
+	if (pool_conf_open(conf, pool_dynamic_location(), PO_RDWR) != 0) {
+		(void) pool_conf_free(conf);
+		return ((pid_t)-1);
+	}
+
+	pe = pool_conf_to_elem(conf);
+	if (!(val = pool_value_alloc())) {
+		(void) pool_conf_close(conf);
+		return ((pid_t)-1);
+	}
+
+	if (pool_get_property(conf, pe, PID_PROPERTY_NAME, val) == POC_INT) {
+		if (pool_value_get_int64(val, &ival) != 0) {
+			(void) pool_value_free(val);
+			(void) pool_conf_close(conf);
+			return ((pid_t)-1);
+		}
+	} else {
+		ival = (pid_t)-1;
+	}
+
+	if (mode == PGAS_GET_AND_SET) {
+		ival = getpid();
+		pool_value_set_int64(val, ival);
+		(void) pool_put_property(conf, pe, PID_PROPERTY_NAME, val);
+		(void) pool_conf_commit(conf, 0);
+	}
+
+	(void) pool_value_free(val);
+	(void) pool_conf_close(conf);
+	pool_conf_free(conf);
+
+	return ((pid_t)ival);
+}
+
+/*
+ * Reconfigure the JVM by simply updating a dummy property on the
+ * system element to force pool_conf_update() to detect a change.
+ */
+static void
+reconfigure()
+{
+	JNIEnv *env;
+	pool_conf_t *conf;
+	pool_elem_t *pe;
+	pool_value_t *val;
+	const char *err_desc;
+	int detach_required = 0;
+
+	if ((conf = pool_conf_alloc()) == NULL) {
+		err_desc = pool_strerror(pool_error());
+		goto destroy;
+	}
+	if (pool_conf_open(conf, pool_dynamic_location(), PO_RDWR) != 0) {
+		err_desc = pool_strerror(pool_error());
+		pool_conf_free(conf);
+		goto destroy;
+	}
+
+	if ((val = pool_value_alloc()) == NULL) {
+		err_desc = pool_strerror(pool_error());
+		(void) pool_conf_close(conf);
+		pool_conf_free(conf);
+		goto destroy;
+	}
+	pe = pool_conf_to_elem(conf);
+	pool_value_set_bool(val, 1);
+	if (pool_put_property(conf, pe, "system.poold.sighup", val) !=
+	    PO_SUCCESS) {
+		err_desc = pool_strerror(pool_error());
+		pool_value_free(val);
+		(void) pool_conf_close(conf);
+		pool_conf_free(conf);
+		goto destroy;
+	}
+	pool_value_free(val);
+	(void) pool_rm_property(conf, pe, "system.poold.sighup");
+	if (pool_conf_commit(conf, 0) != PO_SUCCESS) {
+		err_desc = pool_strerror(pool_error());
+		(void) pool_conf_close(conf);
+		pool_conf_free(conf);
+		goto destroy;
+	}
+	(void) pool_conf_close(conf);
+	pool_conf_free(conf);
+	return;
+destroy:
+	if (jvm) {
+		(*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_2);
+		if (env == NULL) {
+			detach_required = 1;
+			(*jvm)->AttachCurrentThread(jvm, (void **)&env, NULL);
+		}
+		if (lflag && (*env)->ExceptionOccurred(env))
+			(*env)->ExceptionDescribe(env);
+		if (detach_required)
+			(*jvm)->DetachCurrentThread(jvm);
+		(*jvm)->DestroyJavaVM(jvm);
+	}
+	pu_die(err_desc);
+}
+
+/*
+ * If SIGHUP is invoked, we should just re-initialize poold. Since
+ * there is no easy way to determine when it's safe to re-initialzie
+ * poold, simply update a dummy property on the system element to
+ * force pool_conf_update() to detect a change.
+ *
+ * Both SIGTERM and SIGINT are interpreted as instructions to
+ * shutdown.
+ */
+/*ARGSUSED*/
+static void *
+handle_sig(void *arg)
+{
+	for (;;) {
+		JNIEnv *env;
+		jmethodID poold_shutdown_mid;
+		int sig;
+		char buf[SIG2STR_MAX];
+		int detach_required = 0;
+
+		if ((sig = sigwait(&hdl_set)) < 0)
+			pu_die("unexpected error: %d\n", errno);
+		(void) sig2str(sig, buf);
+		switch (sig) {
+		case SIGHUP:
+			reconfigure();
+			break;
+		case SIGINT:
+		case SIGTERM:
+			(void) pthread_mutex_lock(&instance_running_lock);
+			if (instance_running) {
+				(void) pthread_mutex_unlock(
+				    &instance_running_lock);
+				(*jvm)->GetEnv(jvm, (void **)&env,
+				    JNI_VERSION_1_2);
+				if (env == NULL) {
+					detach_required = 1;
+					(*jvm)->AttachCurrentThread(jvm,
+					    (void **)&env, NULL);
+				}
+				pu_notice("terminating due to signal: SIG%s\n",
+				    buf);
+				if ((poold_shutdown_mid = (*env)->GetMethodID(
+				    env, poold_class, "shutdown", "()V")) !=
+				    NULL) {
+					(*env)->CallVoidMethod(env,
+					    poold_instance,
+					    poold_shutdown_mid);
+				} else {
+					(*env)->ExceptionDescribe(env);
+					pu_die("could not invoke"
+					    " proper shutdown\n");
+				}
+				if (detach_required)
+					(*jvm)->DetachCurrentThread(jvm);
+			} else {
+				(void) pthread_mutex_unlock(
+				    &instance_running_lock);
+				pu_die("terminated with signal: SIG%s\n", buf);
+				/*NOTREACHED*/
+			}
+			break;
+		default:
+			pu_die("unexpected signal: SIG%s\n", buf);
+		}
+	}
+	/*NOTREACHED*/
+	return (NULL);
+}
+
+static const char *
+pu_getpname(const char *arg0)
+{
+	char *p;
+
+	/*
+	 * Guard against '/' at end of command invocation.
+	 */
+	for (;;) {
+		p = strrchr(arg0, '/');
+		if (p == NULL) {
+			pname = arg0;
+			break;
+		} else {
+			if (*(p + 1) == '\0') {
+				*p = '\0';
+				continue;
+			}
+
+			pname = p + 1;
+			break;
+		}
+	}
+
+	return (pname);
+}
+
+int
+main(int argc, char *argv[])
+{
+	char c;
+	char log_severity[16] = "";
+	pid_t pid;
+	JavaVMInitArgs vm_args;
+	JavaVMOption vm_opts[5];
+	int nopts = 0;
+	const char *classpath;
+	const char *libpath;
+	size_t len;
+	const char *err_desc;
+	JNIEnv *env;
+	jmethodID poold_getinstancewcl_mid;
+	jmethodID poold_run_mid;
+	jobject log_severity_string = NULL;
+	jobject log_severity_obj = NULL;
+	jclass severity_class;
+	jmethodID severity_cons_mid;
+	jfieldID base_log_fid;
+	int explain_ex = 1;
+	JavaVM *jvm_tmp;
+	pthread_t hdl_thread;
+
+	pname = pu_getpname(argv[0]);
+	openlog(pname, 0, LOG_DAEMON);
+	(void) chdir("/");
+
+	(void) setlocale(LC_ALL, "");
+#if !defined(TEXT_DOMAIN)		/* Should be defined with cc -D. */
+#define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it wasn't. */
+#endif
+	(void) textdomain(TEXT_DOMAIN);
+
+	opterr = 0;
+	while ((c = getopt(argc, argv, "l:P")) != EOF) {
+		switch (c) {
+		case 'l':	/* -l option */
+			lflag++;
+			(void) strlcpy(log_severity, optarg,
+			    sizeof (log_severity));
+			log_dest = LD_TERMINAL;
+			break;
+		default:
+			usage();
+			/*NOTREACHED*/
+		}
+	}
+
+	/*
+	 * Verify no other poold is running.  This condition is checked
+	 * again later, but should be checked now since it is more
+	 * serious (i.e.  should be reported before) than a lack of
+	 * privileges.
+	 */
+	if (((pid = poold_get_and_set_pid(PGAS_GET_ONLY)) != (pid_t)-1) &&
+	    pid != getpid() && kill(pid, 0) == 0)
+		pu_die(gettext("poold is already active (process %ld)\n"), pid);
+
+	/*
+	 * Check permission
+	 */
+	if (!priv_ineffect(PRIV_SYS_RES_CONFIG))
+		pu_die(gettext(ERR_PRIVILEGE), PRIV_SYS_RES_CONFIG);
+
+	/*
+	 * Establish the classpath and LD_LIBRARY_PATH for native
+	 * methods, and get the interpreter going.
+	 */
+	if ((classpath = getenv("POOLD_CLASSPATH")) == NULL) {
+		classpath = POOLD_DEF_CLASSPATH;
+	} else {
+		const char *cur = classpath;
+
+		/*
+		 * Check the components to make sure they're absolute
+		 * paths.
+		 */
+		while (cur != NULL && *cur) {
+			if (*cur != '/')
+				pu_die(gettext(
+				    "POOLD_CLASSPATH must contain absolute "
+				    "components\n"));
+			cur = strchr(cur + 1, ':');
+		}
+	}
+	vm_opts[nopts].optionString = malloc(len = strlen(classpath) +
+	    strlen("-Djava.class.path=") + 1);
+	(void) strlcpy(vm_opts[nopts].optionString, "-Djava.class.path=", len);
+	(void) strlcat(vm_opts[nopts++].optionString, classpath, len);
+
+	if ((libpath = getenv("POOLD_LD_LIBRARY_PATH")) == NULL)
+		libpath = POOLD_DEF_LIBPATH;
+	vm_opts[nopts].optionString = malloc(len = strlen(libpath) +
+	    strlen("-Djava.library.path=") + 1);
+	(void) strlcpy(vm_opts[nopts].optionString, "-Djava.library.path=",
+	    len);
+	(void) strlcat(vm_opts[nopts++].optionString, libpath, len);
+
+	vm_opts[nopts++].optionString = "-Xrs";
+	vm_opts[nopts++].optionString = "-enableassertions";
+
+	vm_args.options = vm_opts;
+	vm_args.nOptions = nopts;
+	vm_args.ignoreUnrecognized = JNI_FALSE;
+	vm_args.version = 0x00010002;
+
+	/*
+	 * XXX - Forking after the VM is created is desirable to
+	 * guarantee reporting of errors, but cannot be done (see
+	 * 4919246).
+	 *
+	 * If invoked by libpool(3LIB), it's set the system.poold.pid
+	 * property and forked already.  If invoked directly and -l is
+	 * specified, forking is not desired.
+	 */
+	if (!lflag && pid != getpid())
+		switch (fork()) {
+		case 0:
+			(void) setsid();
+			(void) fclose(stdin);
+			(void) fclose(stdout);
+			(void) fclose(stderr);
+			break;
+		case -1:
+			pu_die(gettext("cannot fork"));
+			/*NOTREACHED*/
+		default:
+			return (E_PO_SUCCESS);
+		}
+
+	/*
+	 * In order to avoid problems with arbitrary thread selection
+	 * when handling asynchronous signals, dedicate a thread to
+	 * look after these signals.
+	 */
+	if (sigemptyset(&hdl_set) < 0 ||
+	    sigaddset(&hdl_set, SIGHUP) < 0 ||
+	    sigaddset(&hdl_set, SIGTERM) < 0 ||
+	    sigaddset(&hdl_set, SIGINT) < 0 ||
+	    pthread_sigmask(SIG_BLOCK, &hdl_set, NULL) ||
+	    pthread_create(&hdl_thread, NULL, handle_sig, NULL))
+		pu_die(gettext("can't install signal handler"));
+
+	/*
+	 * Use jvm_tmp when creating the jvm to prevent race
+	 * conditions with signal handlers. As soon as the call
+	 * returns, assign the global jvm to jvm_tmp.
+	 */
+	if (JNI_CreateJavaVM(&jvm_tmp, (void **)&env, &vm_args) < 0)
+		pu_die(gettext("can't create Java VM"));
+	jvm = jvm_tmp;
+
+	/*
+	 * Locate the Poold class and construct an instance.  A side
+	 * effect of this is that the poold instance's logHelper will be
+	 * initialized, establishing loggers for logging errors from
+	 * this point on.  (Note, in the event of an unanticipated
+	 * exception, poold will invoke die() itself.)
+	 */
+	err_desc = gettext("JVM-related error initializing poold\n");
+	if ((poold_class = (*env)->FindClass(env, POOLD_CLASS_DESC)) == NULL)
+		goto destroy;
+	if ((poold_getinstancewcl_mid = (*env)->GetStaticMethodID(env,
+	    poold_class, "getInstanceWithConsoleLogging", "("
+	    CLASS_FIELD_DESC(SEVERITY_CLASS_DESC) ")"
+	    CLASS_FIELD_DESC(POOLD_CLASS_DESC))) == NULL)
+		goto destroy;
+	if ((poold_run_mid = (*env)->GetMethodID(env, poold_class, "run",
+	    "()V")) == NULL)
+		goto destroy;
+	if ((severity_class = (*env)->FindClass(env, SEVERITY_CLASS_DESC))
+	    == NULL)
+		goto destroy;
+	if ((severity_cons_mid = (*env)->GetStaticMethodID(env, severity_class,
+	    "getSeverityWithName", "(" CLASS_FIELD_DESC(STRING_CLASS_DESC) ")"
+	    CLASS_FIELD_DESC(SEVERITY_CLASS_DESC))) == NULL)
+		goto destroy;
+
+	/*
+	 * -l <level> was specified, indicating that messages are to be
+	 * logged to the console only.
+	 */
+	if (strlen(log_severity) > 0) {
+		if ((log_severity_string = (*env)->NewStringUTF(env,
+		    log_severity)) == NULL)
+			goto destroy;
+		if ((log_severity_obj = (*env)->CallStaticObjectMethod(env,
+		    severity_class, severity_cons_mid, log_severity_string)) ==
+		    NULL) {
+			err_desc = gettext("invalid level specified\n");
+			explain_ex = 0;
+			goto destroy;
+		}
+	} else
+		log_severity_obj = NULL;
+
+	if ((poold_instance = (*env)->CallStaticObjectMethod(env, poold_class,
+	    poold_getinstancewcl_mid, log_severity_obj)) == NULL)
+		goto destroy;
+
+	/*
+	 * Grab a global reference to poold for use in our signal
+	 * handlers.
+	 */
+	poold_instance = (*env)->NewGlobalRef(env, poold_instance);
+
+	/*
+	 * Ready LD_JAVA logging.
+	 */
+	err_desc = gettext("cannot initialize logging\n");
+	if ((log_severity_string = (*env)->NewStringUTF(env, "err")) == NULL)
+		goto destroy;
+	if (!(severity_err = (*env)->CallStaticObjectMethod(env, severity_class,
+	    severity_cons_mid, log_severity_string)))
+		goto destroy;
+	if (!(severity_err = (*env)->NewGlobalRef(env, severity_err)))
+		goto destroy;
+
+	if ((log_severity_string = (*env)->NewStringUTF(env, "notice")) == NULL)
+		goto destroy;
+	if (!(severity_notice = (*env)->CallStaticObjectMethod(env,
+	    severity_class, severity_cons_mid, log_severity_string)))
+		goto destroy;
+	if (!(severity_notice = (*env)->NewGlobalRef(env, severity_notice)))
+		goto destroy;
+
+	if (!(base_log_fid = (*env)->GetStaticFieldID(env, poold_class,
+	    "BASE_LOG", CLASS_FIELD_DESC(LOGGER_CLASS_DESC))))
+		goto destroy;
+	if (!(base_log = (*env)->GetStaticObjectField(env, poold_class,
+	    base_log_fid)))
+		goto destroy;
+	if (!(base_log = (*env)->NewGlobalRef(env, base_log)))
+		goto destroy;
+	if (!(log_mid = (*env)->GetMethodID(env, (*env)->GetObjectClass(env,
+	    base_log), "log", "(" CLASS_FIELD_DESC(LEVEL_CLASS_DESC)
+	    CLASS_FIELD_DESC(STRING_CLASS_DESC) ")V")))
+		goto destroy;
+	log_dest = LD_JAVA;
+
+	/*
+	 * Now we're ready to start poold.  Store our pid in the pools
+	 * configuration to mark that an instance of poold is active,
+	 * then invoke Poold.run(), which does not normally return.
+	 *
+	 * Note that the ignoreUpdates variable in Poold is used to
+	 * allow Poold to ignore the pools configuration update that
+	 * this change triggers. If this code is ever modified to
+	 * remove or modify this logic, then the Poold class must also
+	 * be modified to keep the actions synchronized.
+	 */
+
+	if (((pid = poold_get_and_set_pid(PGAS_GET_AND_SET)) != (pid_t)-1) &&
+	    pid != getpid() && kill(pid, 0) == 0)
+		pu_die(gettext("poold is already active (process %ld)\n"), pid);
+
+	(void) pthread_mutex_lock(&instance_running_lock);
+	instance_running = 1;
+	(void) pthread_mutex_unlock(&instance_running_lock);
+	(*env)->CallVoidMethod(env, poold_instance, poold_run_mid);
+
+	if ((*env)->ExceptionOccurred(env))
+		goto destroy;
+
+	(*jvm)->DestroyJavaVM(jvm);
+	return (E_PO_SUCCESS);
+
+destroy:
+	if (lflag && explain_ex && (*env)->ExceptionOccurred(env))
+		(*env)->ExceptionDescribe(env);
+	(*jvm)->DestroyJavaVM(jvm);
+	pu_die(err_desc);
+}

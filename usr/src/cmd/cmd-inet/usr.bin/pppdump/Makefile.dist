@@ -1,0 +1,28 @@
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 2000 by Sun Microsystems, Inc.
+# All rights reserved.
+
+TARGET=	pppdump
+OBJS=	bsd-comp.o deflate.o pppdump.o zlib.o
+BINDIR=	/usr/bin
+MANDIR=	/usr/share/man/man1m
+MANFILES=	pppdump.1m
+CFLAGS=	-DPPP_DEFS_IN_NET
+
+all:	$(TARGET)
+
+clean:
+	$(RM) -f $(TARGET) $(OBJS)
+
+$(TARGET):	$(OBJS)
+	$(CC) -o $@ $(OBJS)
+
+install:	$(TARGET)
+	@cp $(TARGET) $(BINDIR) && strip $(BINDIR)/$(TARGET)
+	@test -d $(MANDIR) || mkdir -m 755 -p $(MANDIR)
+	@cp $(MANFILES) $(MANDIR)
+
+clobber:	clean
+	$(RM) -f $(BINDIR)/$(TARGET) $(MANDIR)/$(MANFILES)

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+#
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Perl builds a private shared object, libperl.so, which we build as if it were
+# a standard Solaris library.
+#
+
+echo_file usr/src/lib/Makefile.lib
+echo_file usr/src/lib/Makefile.targ
+find_files "s.*" usr/src/lib/common

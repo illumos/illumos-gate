@@ -1,0 +1,279 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
+
+# packaging files
+i pkginfo
+i copyright
+#
+# source locations relative to the prototype file
+#
+# SUNW0on
+#
+d none usr              755 root sys
+d none usr/lib          755 root bin
+d none usr/lib/locale               755 root bin
+d none usr/lib/locale/C             755 root bin
+d none usr/lib/locale/C/LC_MESSAGES 755 root bin
+d none usr/lib/locale/C/LC_TIME     755 root bin
+f none usr/lib/locale/C/LC_MESSAGES/FMD.po               644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SMF.po               644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SUN4U.po             644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SUNOS.po             644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/PCI.po               644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_ADMIN.po    644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_NETRPC.po   644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_OSCMD.po    644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_OSLIB.po    644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_UCBCMD.po   644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_SGS.po      644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_SYSOSPAM.po 644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_LINFO       644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_ZONEINFO.po 644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/priv_names	644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/magic	644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/mailx.help           644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/more.help            644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/uxlibc.src           644 root sys
+f none usr/lib/locale/C/LC_TIME/SUNW_OST_OSCMD.po        644 root sys
+f none usr/lib/locale/C/LC_TIME/SUNW_OST_OSLIB.po        644 root sys
+#
+# Java locale directories
+#
+d none usr/share				755 root sys
+d none usr/share/lib				755 root sys
+d none usr/share/lib/locale			755 root bin
+d none usr/share/lib/locale/com			755 root bin
+d none usr/share/lib/locale/com/sun		755 root bin
+d none usr/share/lib/locale/com/sun/admin	755 root bin
+#
+# Solaris print manager
+#
+d none usr/share/lib/locale/com/sun/admin/pm 755 root bin
+d none usr/share/lib/locale/com/sun/admin/pm/client 755 root bin
+f none usr/share/lib/locale/com/sun/admin/pm/client/pmResources.java 644 root lp
+f none usr/share/lib/locale/com/sun/admin/pm/client/pmHelpResources.java 644 root lp
+#
+# Service Location Protocol
+#
+d none usr/share/lib/locale/com/sun/slp	755 root bin
+f none usr/share/lib/locale/com/sun/slp/ClientLib_en.properties	644 root sys
+f none usr/share/lib/locale/com/sun/slp/Server_en.properties	644 root sys
+#
+# DHCP Manager
+#
+d none usr/share/lib/locale/com/sun/dhcpmgr 755 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/client 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/ResourceBundle.properties 644 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/OptionDescriptions.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/client/help 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_create.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_del.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_dup.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_how.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_mod.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_multi.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_ref.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_rel.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_view.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_addr_wiz.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_config_wiz.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_convert_wiz.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_export_wiz.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_import_wiz.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_create.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_del.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_dup.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_how.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_mod.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_ref.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macro_view.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_macros_about.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_hlp.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_how.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_idx.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_menus.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_main_top.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_net_del.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_net_ref.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_net_wiz.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_create.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_del.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_dup.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_how.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_mod.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_ref.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_tags.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_option_view.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_choose.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_config.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_dis.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_enable.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_how.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_ref.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_serv.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_relay_unconfig.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_server_serv.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_server_unconfig.html 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/dhcp_solaris_about.html 444 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/client/help/art 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/bannersmc.gif 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/dot1.gif 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/dot2.gif 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/folder.gif 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/macro2.gif 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/macroflow.gif 444 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/help/art/tip2.gif 444 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWfiles 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWfiles/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWbinfiles 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWbinfiles/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWnisplus 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/client/SUNWnisplus/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/data 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/data/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/ui 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/ui/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/common 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/common/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/server 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/server/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/bridge 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/bridge/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/cli 755 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/cli/common 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/cli/common/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/cli/dhtadm 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/cli/dhtadm/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpconfig 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpconfig/ResourceBundle.properties 644 root bin
+d none usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpbatch 755 root bin
+f none usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpbatch/ResourceBundle.properties 644 root bin
+#
+# RBAC html help files for authorizations and profiles
+#
+d none usr/lib/help 755 root bin
+d none usr/lib/help/auths 755 root bin
+d none usr/lib/help/auths/locale 755 root bin
+f none usr/lib/help/auths/locale/AuditConfig.html 444 root bin
+f none usr/lib/help/auths/locale/AuditHeader.html 444 root bin
+f none usr/lib/help/auths/locale/AuditRead.html 444 root bin
+f none usr/lib/help/auths/locale/DevAllocHeader.html 444 root bin
+f none usr/lib/help/auths/locale/DevAllocate.html 444 root bin
+f none usr/lib/help/auths/locale/DevConfig.html 444 root bin
+f none usr/lib/help/auths/locale/DevGrant.html 444 root bin
+f none usr/lib/help/auths/locale/DevRevoke.html 444 root bin
+f none usr/lib/help/auths/locale/JobHeader.html 444 root bin
+f none usr/lib/help/auths/locale/AuthJobsAdmin.html 444 root bin
+f none usr/lib/help/auths/locale/JobsGrant.html 444 root bin
+f none usr/lib/help/auths/locale/AuthJobsUser.html 444 root bin
+f none usr/lib/help/auths/locale/LoginEnable.html 444 root bin
+f none usr/lib/help/auths/locale/LoginHeader.html 444 root bin
+f none usr/lib/help/auths/locale/LoginRemote.html 444 root bin
+f none usr/lib/help/auths/locale/PriAdmin.html 444 root bin
+f none usr/lib/help/auths/locale/AuthProfmgrAssign.html 444 root bin
+f none usr/lib/help/auths/locale/AuthProfmgrDelegate.html 444 root bin
+f none usr/lib/help/auths/locale/AuthProfmgrExecattrWrite.html 444 root bin
+f none usr/lib/help/auths/locale/AuthProfmgrRead.html 444 root bin
+f none usr/lib/help/auths/locale/ProfmgrHeader.html 444 root bin
+f none usr/lib/help/auths/locale/AuthProfmgrWrite.html 444 root bin
+f none usr/lib/help/auths/locale/AuthRoleAssign.html 444 root bin
+f none usr/lib/help/auths/locale/AuthRoleDelegate.html 444 root bin
+f none usr/lib/help/auths/locale/RoleHeader.html 444 root bin
+f none usr/lib/help/auths/locale/AuthRoleWrite.html 444 root bin
+f none usr/lib/help/auths/locale/SysDate.html 444 root bin
+f none usr/lib/help/auths/locale/SysHeader.html 444 root bin
+f none usr/lib/help/auths/locale/SysShutdown.html 444 root bin
+f none usr/lib/help/auths/locale/AllSolAuthsHeader.html 444 root bin
+f none usr/lib/help/auths/locale/DhcpmgrHeader.html 444 root bin
+f none usr/lib/help/auths/locale/DhcpmgrWrite.html 444 root bin
+f none usr/lib/help/auths/locale/BindStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfAutofsStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfCronStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfHeader.html 444 root bin
+f none usr/lib/help/auths/locale/SmfManageHeader.html 444 root bin
+f none usr/lib/help/auths/locale/SmfModifyAppl.html 444 root bin
+f none usr/lib/help/auths/locale/SmfModifyDepend.html 444 root bin
+f none usr/lib/help/auths/locale/SmfModifyFramework.html 444 root bin
+f none usr/lib/help/auths/locale/SmfModifyHeader.html 444 root bin
+f none usr/lib/help/auths/locale/SmfModifyMethod.html 444 root bin
+f none usr/lib/help/auths/locale/SmfNscdStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfPowerStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfSendmailStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfSshStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfSyslogStates.html 444 root bin
+d none usr/lib/help/profiles 755 root bin
+d none usr/lib/help/profiles/locale 755 root bin
+f none usr/lib/help/profiles/locale/RtAll.html 444 root bin
+f none usr/lib/help/profiles/locale/RtAuditCtrl.html 444 root bin
+f none usr/lib/help/profiles/locale/RtAuditReview.html 444 root bin
+f none usr/lib/help/profiles/locale/RtDeviceMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtPrntAdmin.html 444 root bin
+f none usr/lib/help/profiles/locale/RtContractObserver.html 444 root bin
+f none usr/lib/help/profiles/locale/RtCronMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtCryptoMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtLogMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtDeviceSecurity.html 444 root bin
+f none usr/lib/help/profiles/locale/RtFileSysMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtFTPMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtKerberosClntMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtKerberosSrvrMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtMailMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtMaintAndRepair.html 444 root bin
+f none usr/lib/help/profiles/locale/RtMediaBkup.html 444 root bin
+f none usr/lib/help/profiles/locale/RtMediaRestore.html 444 root bin
+f none usr/lib/help/profiles/locale/RtNameServiceAdmin.html 444 root bin
+f none usr/lib/help/profiles/locale/RtNameServiceSecure.html 444 root bin
+f none usr/lib/help/profiles/locale/RtNetMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtNetSecure.html 444 root bin
+f none usr/lib/help/profiles/locale/RtObAccessMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtProcManagement.html 444 root bin
+f none usr/lib/help/profiles/locale/RtRightsDelegate.html 444 root bin
+f none usr/lib/help/profiles/locale/RtSoftwareInstall.html 444 root bin
+f none usr/lib/help/profiles/locale/RtSysEvMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtUserMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtUserSecurity.html 444 root bin
+f none usr/lib/help/profiles/locale/RtDefault.html 444 root bin
+f none usr/lib/help/profiles/locale/RtFileSysSecurity.html 444 root bin
+f none usr/lib/help/profiles/locale/RtDHCPMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtIPFilterMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtDatAdmin.html 444 root bin
+f none usr/lib/help/profiles/locale/RtZoneMngmnt.html 444 root bin
+#
+#
+# OCF Messages
+#
+f none usr/lib/locale/C/LC_MESSAGES/libsmartcard.msg 644 root sys
+d none usr/share/lib/locale/com/sun/opencard 755 root bin
+d none usr/share/lib/locale/com/sun/opencard/cmd 755 root bin
+f none usr/share/lib/locale/com/sun/opencard/cmd/OCFMessages.properties 644 root sys

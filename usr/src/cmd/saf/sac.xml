@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License, Version 1.0 only
+ (the "License").  You may not use this file except in compliance
+ with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+    ident	"%Z%%M%	%I%	%E% SMI"
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
+-->
+
+<service_bundle type='manifest' name='SUNWcsr:sac'>
+
+<service
+	name='system/sac'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<dependency
+		name='filesystems'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<!--
+	  sac(1M) has historically started as prior to run level 2.  Its
+	  components have no dependents of their own.
+	-->
+	<dependency
+		name='sysconfig'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/sysconfig' />
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/usr/lib/saf/sac -t %{sanity_interval}'
+		timeout_seconds='60'>
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='60'>
+	</exec_method>
+
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring' value='child' />
+		<!-- sub-process core dumps shouldn't restart session -->
+		<propval name='ignore_error' type='astring'
+		    value='core,signal' />
+	</property_group>
+
+	<property_group name='application' type='application'>
+		<propval name='sanity_interval' type='count' value='300'
+			/>
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			SAF service access controller
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='sac' section='1M' manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

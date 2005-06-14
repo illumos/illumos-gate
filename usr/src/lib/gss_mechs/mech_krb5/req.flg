@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+echo_file usr/src/uts/common/gssapi/Makefile
+echo_file usr/src/uts/common/gssapi/gssd.x

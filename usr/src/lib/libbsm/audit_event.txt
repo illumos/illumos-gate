@@ -1,0 +1,410 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Audit Event Database
+#
+# File Format:
+#
+# event number:event name:event description:event classes (comma separated)
+#
+# Used to map audit events to audit classes for preselection and post-selection.
+# Used by TCB programs that write audit records to preselect audit events
+#     based on event to class mappings.
+#
+# NOTE: several events are obsolete but must continue to be defined here for
+# compatibility reasons. Obsolete events are defined in the "no" (invalid)
+# class to indicate they will not be generated.  Other events in the "no"
+# class which are not obsolete (but are in this class for other reasons),
+# are individually noted with a comment for explanation.
+#
+# System Adminstrators: Do NOT modify or add events with an event number less
+#   than 32768. These are reserved by the system.
+#
+#     0		Reserved as an invalid event number.
+#     1 - 2047	Reserved for the Solaris Kernel events.
+#  2048 - 32767	Reserved for the Solaris TCB programs.
+# 32768 - 65535	Available for third party TCB applications.
+#
+# 6144 - 32767  SunOS 5.X user level audit events
+#
+#
+# kernel audit events
+#
+0:AUE_NULL:indir system call:no
+1:AUE_EXIT:exit(2):ps
+2:AUE_FORK:fork(2):ps
+# AUE_OPEN is a placeholder and will not be generated
+3:AUE_OPEN:open(2) - place holder:no
+4:AUE_CREAT:creat(2):fc
+5:AUE_LINK:link(2):fc
+6:AUE_UNLINK:unlink(2):fd
+7:AUE_EXEC:exec(2):ps,ex
+8:AUE_CHDIR:chdir(2):pm
+9:AUE_MKNOD:mknod(2):fc
+10:AUE_CHMOD:chmod(2):fm
+11:AUE_CHOWN:chown(2):fm
+12:AUE_UMOUNT:umount(2) - old version:as
+13:AUE_JUNK:junk:no
+14:AUE_ACCESS:access(2):fa
+15:AUE_KILL:kill(2):pm
+16:AUE_STAT:stat(2):fa
+17:AUE_LSTAT:lstat(2):fa
+18:AUE_ACCT:acct(2):as
+19:AUE_MCTL:mctl(2):no
+20:AUE_REBOOT:reboot(2):no
+21:AUE_SYMLINK:symlink(2):fc
+22:AUE_READLINK:readlink(2):fr
+23:AUE_EXECVE:execve(2):ps,ex
+24:AUE_CHROOT:chroot(2):pm
+25:AUE_VFORK:vfork(2):ps
+26:AUE_SETGROUPS:setgroups(2):pm
+27:AUE_SETPGRP:setpgrp(2):pm
+28:AUE_SWAPON:swapon(2):no
+29:AUE_SETHOSTNAME:sethostname(2):no
+30:AUE_FCNTL:fcntl(2):fm
+31:AUE_SETPRIORITY:setpriority(2):no
+32:AUE_CONNECT:connect(2):nt
+33:AUE_ACCEPT:accept(2):nt
+34:AUE_BIND:bind(2):nt
+35:AUE_SETSOCKOPT:setsockopt(2):nt
+36:AUE_VTRACE:vtrace(2):pm
+37:AUE_SETTIMEOFDAY:settimeofday(2):no
+38:AUE_FCHOWN:fchown(2):fm
+39:AUE_FCHMOD:fchmod(2):fm
+40:AUE_SETREUID:setreuid(2):pm
+41:AUE_SETREGID:setregid(2):pm
+42:AUE_RENAME:rename(2):fc,fd
+43:AUE_TRUNCATE:truncate(2):no
+44:AUE_FTRUNCATE:ftruncate(2):no
+45:AUE_FLOCK:flock(2):no
+46:AUE_SHUTDOWN:shutdown(2):nt
+47:AUE_MKDIR:mkdir(2):fc
+48:AUE_RMDIR:rmdir(2):fd
+49:AUE_UTIMES:utimes(2):fm
+50:AUE_ADJTIME:adjtime(2):as
+51:AUE_SETRLIMIT:setrlimit(2):ua
+52:AUE_KILLPG:killpg(2):no
+53:AUE_NFS_SVC:nfs_svc(2):no
+54:AUE_STATFS:statfs(2):fa
+55:AUE_FSTATFS:fstatfs(2):fa
+56:AUE_UNMOUNT:unmount(2):no
+57:AUE_ASYNC_DAEMON:async_daemon(2):no
+58:AUE_NFS_GETFH:nfs_getfh(2):no
+59:AUE_SETDOMAINNAME:setdomainname(2):no
+60:AUE_QUOTACTL:quotactl(2):no
+61:AUE_EXPORTFS:exportfs(2):no
+62:AUE_MOUNT:mount(2):as
+# AUE_SEMSYS is a placeholder and will not be generated
+63:AUE_SEMSYS:semsys(2) - place holder:no
+# AUE_MSGSYS is a placeholder and will not be generated
+64:AUE_MSGSYS:msgsys(2) - place holder:no
+# AUE_SHMSYS is a placeholder and will not be generated
+65:AUE_SHMSYS:shmsys(2) - place holder:no
+66:AUE_BSMSYS:bsmsys(2) - place holder:no
+67:AUE_RFSSYS:rfssys(2) - place holder:no
+68:AUE_FCHDIR:fchdir(2):pm
+69:AUE_FCHROOT:fchroot(2):pm
+70:AUE_VPIXSYS:vpixsys(2) - place holder:no
+71:AUE_PATHCONF:pathconf(2):fa
+72:AUE_OPEN_R:open(2) - read:fr
+73:AUE_OPEN_RC:open(2) - read,creat:fc,fr
+74:AUE_OPEN_RT:open(2) - read,trunc:fd,fr
+75:AUE_OPEN_RTC:open(2) - read,creat,trunc:fc,fd,fr
+76:AUE_OPEN_W:open(2) - write:fw
+77:AUE_OPEN_WC:open(2) - write,creat:fc,fw
+78:AUE_OPEN_WT:open(2) - write,trunc:fd,fw
+79:AUE_OPEN_WTC:open(2) - write,creat,trunc:fc,fd,fw
+80:AUE_OPEN_RW:open(2) - read,write:fr,fw
+81:AUE_OPEN_RWC:open(2) - read,write,creat:fc,fw,fr
+82:AUE_OPEN_RWT:open(2) - read,write,trunc:fd,fr,fw
+83:AUE_OPEN_RWTC:open(2) - read,write,creat,trunc:fc,fd,fw,fr
+84:AUE_MSGCTL:msgctl(2) - illegal command:ip
+85:AUE_MSGCTL_RMID:msgctl(2) - IPC_RMID command:ip
+86:AUE_MSGCTL_SET:msgctl(2) - IPC_SET command:ip
+87:AUE_MSGCTL_STAT:msgctl(2) - IPC_STAT command:ip
+88:AUE_MSGGET:msgget(2):ip
+89:AUE_MSGRCV:msgrcv(2):ip
+90:AUE_MSGSND:msgsnd(2):ip
+91:AUE_SHMCTL:shmctl(2) - illegal command:ip
+92:AUE_SHMCTL_RMID:shmctl(2) - IPC_RMID command:ip
+93:AUE_SHMCTL_SET:shmctl(2) - IPC_SET command:ip
+94:AUE_SHMCTL_STAT:shmctl(2) - IPC_STAT command:ip
+95:AUE_SHMGET:shmget(2):ip
+96:AUE_SHMAT:shmat(2):ip
+97:AUE_SHMDT:shmdt(2):ip
+98:AUE_SEMCTL:semctl(2) - illegal command:ip
+99:AUE_SEMCTL_RMID:semctl(2) - IPC_RMID command:ip
+100:AUE_SEMCTL_SET:semctl(2) - IPC_SET command:ip
+101:AUE_SEMCTL_STAT:semctl(2) - IPC_STAT command:ip
+102:AUE_SEMCTL_GETNCNT:semctl(2) - GETNCNT command:ip
+103:AUE_SEMCTL_GETPID:semctl(2) - GETPID command:ip
+104:AUE_SEMCTL_GETVAL:semctl(2) - GETVAL command:ip
+105:AUE_SEMCTL_GETALL:semctl(2) - GETALL command:ip
+106:AUE_SEMCTL_GETZCNT:semctl(2) - GETZCNT command:ip
+107:AUE_SEMCTL_SETVAL:semctl(2) - SETVAL command:ip
+108:AUE_SEMCTL_SETALL:semctl(2) - SETALL command:ip
+109:AUE_SEMGET:semget(2):ip
+110:AUE_SEMOP:semop(2):ip
+111:AUE_CORE:process dumped core:fc
+112:AUE_CLOSE:close(2):cl
+113:AUE_SYSTEMBOOT:system booted:na
+114:AUE_ASYNC_DAEMON_EXIT:async_daemon(2) exited:no
+115:AUE_NFSSVC_EXIT:nfssvc(2) exited:no
+128:AUE_WRITEL:writel(2):no
+129:AUE_WRITEVL:writevl(2):no
+130:AUE_GETAUID:getauid(2):aa
+131:AUE_SETAUID:setauid(2):aa
+132:AUE_GETAUDIT:getaudit(2):aa
+133:AUE_SETAUDIT:setaudit(2):aa
+134:AUE_GETUSERAUDIT:getuseraudit(2):no
+135:AUE_SETUSERAUDIT:setuseraudit(2):no
+136:AUE_AUDITSVC:auditsvc(2):as
+# AUE_AUDITON is a placeholder and will not be generated
+138:AUE_AUDITON:auditon(2) - place holder:no
+139:AUE_AUDITON_GTERMID:auditon(2) - GETTERMID command:no
+140:AUE_AUDITON_STERMID:auditon(2) - SETTERMID command:no
+141:AUE_AUDITON_GPOLICY:auditon(2) - get audit policy flags:aa
+142:AUE_AUDITON_SPOLICY:auditon(2) - set audit policy flags:as
+143:AUE_AUDITON_GESTATE:auditon(2) - GESTATE command:no
+144:AUE_AUDITON_SESTATE:auditon(2) - SESTATE command:no
+145:AUE_AUDITON_GQCTRL:auditon(2) - get queue control parameters:as
+146:AUE_AUDITON_SQCTRL:auditon(2) - set queue control parameters:as
+147:AUE_GETKERNSTATE:getkernstate(2):no
+148:AUE_SETKERNSTATE:setkernstate(2):no
+149:AUE_GETPORTAUDIT:getportaudit(2):no
+150:AUE_AUDITSTAT:auditstat(2):no
+153:AUE_ENTERPROM:enter prom:na
+154:AUE_EXITPROM:exit prom:na
+158:AUE_IOCTL:ioctl(2):io
+173:AUE_ONESIDE:one-sided session record:no
+174:AUE_MSGGETL:msggetl(2):no
+175:AUE_MSGRCVL:msgrcvl(2):no
+176:AUE_MSGSNDL:msgsndl(2):no
+177:AUE_SEMGETL:semgetl(2):no
+178:AUE_SHMGETL:shmgetl(2):no
+183:AUE_SOCKET:socket(2):nt
+184:AUE_SENDTO:sendto(2):nt
+# AUE_PIPE is a potentially very high-volume event, use with caution
+185:AUE_PIPE:pipe(2):no
+186:AUE_SOCKETPAIR:socketpair(2):no
+187:AUE_SEND:send(2):no
+188:AUE_SENDMSG:sendmsg(2):nt
+189:AUE_RECV:recv(2):no
+190:AUE_RECVMSG:recvmsg(2):nt
+191:AUE_RECVFROM:recvfrom(2):nt
+# AUE_READ is a potentially very high-volume event, use with caution
+192:AUE_READ:read(2):no
+193:AUE_GETDENTS:getdents(2):no
+194:AUE_LSEEK:lseek(2):no
+# AUE_WRITE is a potentially very high-volume event, use with caution
+195:AUE_WRITE:write(2):no
+196:AUE_WRITEV:writev(2):no
+197:AUE_NFS:nfs server:no
+198:AUE_READV:readv(2):no
+199:AUE_OSTAT:old stat(2):no
+200:AUE_SETUID:old setuid(2):pm
+201:AUE_STIME:old stime(2):as
+202:AUE_UTIME:old utime(2):fm
+203:AUE_NICE:old nice(2):pm
+204:AUE_OSETPGRP:old setpgrp(2):no
+205:AUE_SETGID:old setgid(2):pm
+206:AUE_READL:readl(2):no
+207:AUE_READVL:readvl(2):no
+208:AUE_FSTAT:fstat(2):no
+209:AUE_DUP2:dup2(2):no
+# AUE_MMAP is a potentially very high-volume event, use with caution
+210:AUE_MMAP:mmap(2):no
+# AUE_AUDIT is a potentially very high-volume event, use with caution
+211:AUE_AUDIT:audit(2):no
+212:AUE_PRIOCNTLSYS:priocntlsys(2):pm
+213:AUE_MUNMAP:munmap(2):cl
+214:AUE_SETEGID:setegid(2):pm
+215:AUE_SETEUID:seteuid(2):pm
+216:AUE_PUTMSG:putmsg(2):nt
+217:AUE_GETMSG:getmsg(2):nt
+218:AUE_PUTPMSG:putpmsg(2):nt
+219:AUE_GETPMSG:getpmsg(2):nt
+# AUE_AUDITSYS is a placeholder and will not be generated
+220:AUE_AUDITSYS:audit system calls place holder:no
+221:AUE_AUDITON_GETKMASK:auditon(2) - get kernel mask:aa
+222:AUE_AUDITON_SETKMASK:auditon(2) - set kernel mask:as
+223:AUE_AUDITON_GETCWD:auditon(2) - get current working directory:aa,as
+224:AUE_AUDITON_GETCAR:auditon(2) - get current active root:aa,as
+225:AUE_AUDITON_GETSTAT:auditon(2) - get audit statistics:as
+226:AUE_AUDITON_SETSTAT:auditon(2) - reset audit statistics:as
+227:AUE_AUDITON_SETUMASK:auditon(2) - set mask per audit uid:as
+228:AUE_AUDITON_SETSMASK:auditon(2) - set mask per session ID:as
+229:AUE_AUDITON_GETCOND:auditon(2) - get audit state:aa
+230:AUE_AUDITON_SETCOND:auditon(2) - set audit state:as
+231:AUE_AUDITON_GETCLASS:auditon(2) - get event class:aa,as
+232:AUE_AUDITON_SETCLASS:auditon(2) - set event class:as
+233:AUE_FUSERS:utssys(2) - fusers:fa
+234:AUE_STATVFS:statvfs(2):fa
+235:AUE_XSTAT:xstat(2):no
+236:AUE_LXSTAT:lxstat(2):no
+237:AUE_LCHOWN:lchown(2):fm
+238:AUE_MEMCNTL:memcntl(2):ot
+239:AUE_SYSINFO:sysinfo(2):as
+240:AUE_XMKNOD:xmknod(2):no
+241:AUE_FORK1:fork1(2):ps
+# AUE_MODCTL is a placeholder and will not be generated
+242:AUE_MODCTL:modctl(2) system call place holder:no
+243:AUE_MODLOAD:modctl(2) - load module:as
+244:AUE_MODUNLOAD:modctl(2) - unload module:as
+# AUE_MODCONFIG is a place holder and will not be generated
+245:AUE_MODCONFIG:modctl(2) - no longer generated:no
+246:AUE_MODADDMAJ:modctl(2) - bind module:as
+247:AUE_SOCKACCEPT:getmsg-accept:nt
+248:AUE_SOCKCONNECT:putmsg-connect:nt
+249:AUE_SOCKSEND:putmsg-send:nt
+250:AUE_SOCKRECEIVE:getmsg-receive:nt
+251:AUE_ACLSET:acl(2) - SETACL command:fm
+252:AUE_FACLSET:facl(2) - SETACL command:fm
+# AUE_DOORFS is a placeholder and will not be generated
+253:AUE_DOORFS:doorfs(2) - system call place holder:no
+254:AUE_DOORFS_DOOR_CALL:doorfs(2) - DOOR_CALL:ip
+255:AUE_DOORFS_DOOR_RETURN:doorfs(2) - DOOR_RETURN:ip
+256:AUE_DOORFS_DOOR_CREATE:doorfs(2) - DOOR_CREATE:ip
+257:AUE_DOORFS_DOOR_REVOKE:doorfs(2) - DOOR_REVOKE:ip
+258:AUE_DOORFS_DOOR_INFO:doorfs(2) - DOOR_INFO:ip
+259:AUE_DOORFS_DOOR_CRED:doorfs(2) - DOOR_CRED:ip
+260:AUE_DOORFS_DOOR_BIND:doorfs(2) - DOOR_BIND:ip
+261:AUE_DOORFS_DOOR_UNBIND:doorfs(2) - DOOR_UNBIND:ip
+262:AUE_P_ONLINE:p_online(2):as
+263:AUE_PROCESSOR_BIND:processor_bind(2):as
+264:AUE_INST_SYNC:inst_sync(2):as
+265:AUE_SOCKCONFIG:configure socket:nt
+266:AUE_SETAUDIT_ADDR:setaudit_addr(2):aa
+267:AUE_GETAUDIT_ADDR:getaudit_addr(2):aa
+268:AUE_UMOUNT2:umount2(2):as
+# AUE_FSAT is a placeholder and will not be generated
+269:AUE_FSAT:fsat(2) - place holder:no
+270:AUE_OPENAT_R:openat(2) - read:fr
+271:AUE_OPENAT_RC:openat(2) - read,creat:fc,fr
+272:AUE_OPENAT_RT:openat(2) - read,trunc:fd,fr
+273:AUE_OPENAT_RTC:openat(2) - read,creat,trunc:fc,fd,fr
+274:AUE_OPENAT_W:openat(2) - write:fw
+275:AUE_OPENAT_WC:openat(2) - write,creat:fc,fw
+276:AUE_OPENAT_WT:openat(2) - write,trunc:fd,fw
+277:AUE_OPENAT_WTC:openat(2) - write,creat,trunc:fc,fd,fw
+278:AUE_OPENAT_RW:openat(2) - read,write:fr,fw
+279:AUE_OPENAT_RWC:openat(2) - read,write,creat:fc,fw,fr
+280:AUE_OPENAT_RWT:openat(2) - read,write,trunc:fd,fr,fw
+281:AUE_OPENAT_RWTC:openat(2) - read,write,creat,trunc:fc,fd,fw,fr
+282:AUE_RENAMEAT:renameat(2):fc,fd
+# AUE_FSTATAT is a potentially very high-volume event, use with caution
+283:AUE_FSTATAT:fstatat(2):no
+284:AUE_FCHOWNAT:fchownat(2):fm
+285:AUE_FUTIMESAT:futimesat(2):fm
+286:AUE_UNLINKAT:unlinkat(2):fd
+287:AUE_CLOCK_SETTIME:clock_settime(3RT):as
+288:AUE_NTP_ADJTIME:ntp_adjtime(2):as
+289:AUE_SETPPRIV:setppriv(2):pm
+290:AUE_MODDEVPLCY:modctl(2) - configure device policy:as
+291:AUE_MODADDPRIV:modctl(2) - configure additional privilege:as
+292:AUE_CRYPTOADM:kernel cryptographic framework:as
+#
+# user level audit events
+#
+# 2048 - 6143	Reserved
+#
+6144:AUE_at_create:at-create atjob:ua
+6145:AUE_at_delete:at-delete atjob (at or atrm):ua
+6146:AUE_at_perm:at-permission:no
+6147:AUE_cron_invoke:cron-invoke:ua
+6148:AUE_crontab_create:crontab-crontab created:ua
+6149:AUE_crontab_delete:crontab-crontab deleted:ua
+6150:AUE_crontab_perm:crontab-persmisson:no
+6151:AUE_inetd_connect:inetd connect:na
+6152:AUE_login:login - local:lo
+6153:AUE_logout:logout:lo
+6154:AUE_telnet:login - telnet:lo
+6155:AUE_rlogin:login - rlogin:lo
+6156:AUE_mountd_mount:mount:na
+6157:AUE_mountd_umount:unmount:na
+6158:AUE_rshd:rsh access:lo
+6159:AUE_su:su:lo
+6160:AUE_halt_solaris:halt(1m):ss
+6161:AUE_reboot_solaris:reboot(1m):ss
+6162:AUE_rexecd:rexecd:lo
+6163:AUE_passwd:passwd:lo
+6164:AUE_rexd:rexd:lo
+6165:AUE_ftpd:ftp access:lo
+6166:AUE_init_solaris:init(1m):ss
+6167:AUE_uadmin_solaris:uadmin(1m):ss
+6168:AUE_shutdown_solaris:shutdown(1b):ss
+6169:AUE_poweroff_solaris:poweroff(1m):ss
+6170:AUE_crontab_mod:crontab-modify:ua
+6171:AUE_ftpd_logout:ftp logout:lo
+6172:AUE_ssh:login - ssh:lo
+6173:AUE_role_login:role login:lo
+6180:AUE_prof_cmd:profile command:ua,as
+6181:AUE_filesystem_add:add filesystem:as
+6182:AUE_filesystem_delete:delete filesystem:as
+6183:AUE_filesystem_modify:modify filesystem:as
+6184:AUE_network_add:add network attributes:as
+6185:AUE_network_delete:delete network attributes:as
+6186:AUE_network_modify:modify network attributes:as
+6187:AUE_printer_add:add printer:as
+6188:AUE_printer_delete:delete printer:as
+6189:AUE_printer_modify:modify printer:as
+6190:AUE_scheduledjob_add:add scheduled job:ua
+6191:AUE_scheduledjob_delete:delete scheduled job:ua
+6192:AUE_scheduledjob_modify:modify scheduled job:ua
+6193:AUE_serialport_add:add serial port:as
+6194:AUE_serialport_delete:delete serial port:as
+6195:AUE_serialport_modify:modify serial port:as
+6196:AUE_usermgr_add:add user/user attributes:ua
+6197:AUE_usermgr_delete:delete user/user attributes:ua
+6198:AUE_usermgr_modify:modify user/user attributes:ua
+6199:AUE_uauth:authorization used:ua,as
+6200:AUE_allocate_succ:allocate-device success:ot
+6201:AUE_allocate_fail:allocate-device failure:ot
+6202:AUE_deallocate_succ:deallocate-device success:ot
+6203:AUE_deallocate_fail:deallocate-device failure:ot
+6205:AUE_listdevice_succ:allocate-list devices success:ot
+6206:AUE_listdevice_fail:allocate-list devices failure:ot
+6207:AUE_create_user:create user:ua
+6208:AUE_modify_user:modify user:ua
+6209:AUE_delete_user:delete user:ua
+6210:AUE_disable_user:disable user:ua
+6211:AUE_enable_user:enable user:ua
+6212:AUE_newgrp_login:newgrp login:lo
+6213:AUE_admin_authenticate:admin login:lo
+6214:AUE_kadmind_auth:authenticated kadmind request:ua
+6215:AUE_kadmind_unauth:unauthenticated kadmind req:ua
+6216:AUE_krb5kdc_as_req:kdc authentication svc request:ap
+6217:AUE_krb5kdc_tgs_req:kdc tkt-grant svc request:ap
+6218:AUE_krb5kdc_tgs_req_2ndtktmm:kdc tgs 2ndtkt mismtch:ap
+6219:AUE_krb5kdc_tgs_req_alt_tgt:kdc tgs issue alt tgt:ap
+6220:AUE_smserverd:smserverd:ot
+6221:AUE_screenlock:screenlock - lock:lo
+6222:AUE_screenunlock:screenlock - unlock:lo
+6223:AUE_zone_state:zoneadmd:ss
+6224:AUE_inetd_copylimit:inetd copylimit:na
+6225:AUE_inetd_failrate:inetd failrate:na
+6226:AUE_inetd_ratelimit:inetd ratelimit:na
+6227:AUE_zlogin:login - zlogin:lo

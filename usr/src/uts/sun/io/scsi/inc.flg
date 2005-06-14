@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# This file brings down all that is needed to build just 
+# SCSI Subsystem.
+#
+
+find_files "s.*"	\
+	usr/src/uts/common/io/warlock \
+	usr/src/uts/common/io/scsi \
+	usr/src/uts/common/sys \
+	usr/src/uts/sparc/dad	\
+	usr/src/uts/sparc/dada	\
+	usr/src/uts/sparc/esp	\
+	usr/src/uts/sparc/fas	\
+	usr/src/uts/sparc/glm	\
+	usr/src/uts/sparc/ifp	\
+	usr/src/uts/sparc/isp	\
+	usr/src/uts/sparc/scsi	\
+	usr/src/uts/sparc/sd	\
+	usr/src/uts/sparc/ses	\
+	usr/src/uts/sparc/sgen	\
+	usr/src/uts/sparc/socal	\
+	usr/src/uts/sparc/ssd	\
+	usr/src/uts/sparc/st	\
+	usr/src/uts/sparc/uata	\
+	usr/src/uts/sparc/warlock \
+	usr/src/uts/sun/io/dada \
+	usr/src/uts/sun/sys/dada \
+	usr/src/uts/sun/sys/scsi
+
+find_files "s.*.h"	\
+	usr/src/uts/sparc/sys \
+	usr/src/uts/sparc/v7 \
+	usr/src/uts/sparc/v9
+
+echo_file usr/src/uts/sparc/os/driver_classes
+echo_file usr/src/uts/sparc/os/driver_aliases
+echo_file usr/src/uts/sparc/os/name_to_major
+
+echo_file  usr/src/Makefile.master
+echo_file  usr/src/Makefile.master.64
+echo_file  usr/src/req.flg
+echo_file  usr/src/Makefile.psm
+echo_file  usr/src/Makefile.psm.targ
+echo_file  usr/src/uts/Makefile
+echo_file  usr/src/uts/Makefile.targ
+echo_file  usr/src/uts/Makefile.uts
+echo_file  usr/src/uts/common/Makefile.files
+echo_file  usr/src/uts/common/Makefile.rules
+echo_file  usr/src/uts/common/vm/as.h
+echo_file  usr/src/uts/common/vm/faultcode.h
+echo_file  usr/src/uts/common/vm/hat.h
+echo_file  usr/src/uts/common/vm/page.h
+echo_file  usr/src/uts/common/vm/seg.h
+echo_file  usr/src/uts/common/vm/seg_enum.h
+echo_file  usr/src/uts/req.flg
+echo_file  usr/src/uts/sparc/Makefile
+echo_file  usr/src/uts/sparc/Makefile.files
+echo_file  usr/src/uts/sparc/Makefile.rules
+echo_file  usr/src/uts/sparc/Makefile.sparc
+echo_file  usr/src/uts/sparc/Makefile.targ
+echo_file  usr/src/uts/sparc/ml/sparc.il
+echo_file  usr/src/uts/sparc/req.flg
+echo_file  usr/src/uts/sun/Makefile.files
+echo_file  usr/src/uts/sun/Makefile.rules
+echo_file  usr/src/uts/sun/io/socal.c
+echo_file  usr/src/uts/sun/io/socal_ucode.c
+echo_file  usr/src/uts/sun/sys/dmaga.h
+echo_file  usr/src/uts/sun/sys/obpdefs.h
+echo_file  usr/src/uts/sun/sys/promif.h
+echo_file  usr/src/uts/sun/sys/socal_cq_defs.h
+echo_file  usr/src/uts/sun/sys/socalmap.h
+echo_file  usr/src/uts/sun/sys/socalreg.h
+echo_file  usr/src/uts/sun/sys/socalvar.h
+echo_file  usr/src/uts/sun/sys/socalio.h

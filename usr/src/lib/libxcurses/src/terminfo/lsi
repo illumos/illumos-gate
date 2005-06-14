@@ -1,0 +1,70 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996, by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lsi: LEAR SIEGLER (ADM)
+#
+# If the adm31 gives you trouble with standout mode, check the DIP switch
+# in position 6, bank @c11, 25% from back end of pad.  Should be OFF.
+# If there is no such switch, you have an old adm31 and must use oadm31
+adm31|31|lsi adm31,
+	is2=\Eu\E0, cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EE, am, cub1=^H,
+	el=\ET, cup=\E=%p1%' '%+%c%p2%' '%+%c, clear=\E*, ed=\EY, cols#80,
+	dch1=\EW, dl1=\ER, rmir=\Er, home=^^, smir=\Eq,
+	kf0=^A0\r, kf1=^A1\r, kf2=^A2\r, kf3=^A3\r, kf4=^A4\r,
+	kf5=^A5\r, kf6=^A6\r, kf7=^A7\r, kf8=^A8\r, kf9=^A9\r,
+	kcud1=^J, kcub1=^H, kcuf1=^L, kcuu1=^K,
+	lines#24, mir, cuf1=^L,
+	rmso=\EG0, smso=\EG1, cuu1=^K, smul=\EG1, rmul=\EG0,
+adm2|lsi adm2,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EE, am, cub1=^H, ed=\EY, el=\ET,
+	clear=\E;, cup=\E=%p1%' '%+%c%p2%' '%+%c, cols#80, dch1=\EW, dl1=\ER,
+	home=^^, ich1=\EQ, kcud1=^J, khome=^^, kcub1=^H, kcuf1=^L, kcuu1=^K,
+	lines#24, cuf1=^L, cuu1=^K,
+adm3|lsi adm3,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	am, cub1=^H, clear=^Z, lines#24, cols#80,
+adm42|42|lsi adm42,
+	cvvis=\EC\E3 \E3(, cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EE$<270>,
+	am, cub1=^H, ed=\EY, el=\ET, clear=\E;, cup=\E=%p1%' '%+%c%p2%' '%+%c,
+	cols#80, dch1=\EW, dl1=\ER, rmir=\Er, smir=\Eq, ip=$<6*>, lines#24,
+	cbt=\EI, cuf1=^L, rmso=\EG0, smso=\EG4, ht=\t, cuu1=^k,
+	pad=\177,
+adm5|lsi adm5,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	ed=\EY, el=\ET, cud1=^J, kbs=^H, khome=^^,
+	rmso=\EG, xmc#1, smso=\EG, use=adm3aplus,
+adm3a|3a|lsi adm3a,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H,
+	cup=\E=%p1%' '%+%c%p2%' '%+%c, clear=^Z$<1>,
+	cols#80, home=^^, lines#24, cuf1=^L, cuu1=^K,
+#
+#  MPE/IX has trouble with files that have '+' in the name.
+# adm3a+|3a+|adm3aplus|lsi adm3a+,
+#
+adm3aplus|lsi adm3a+,
+	kcub1=^H, kcud1=^J, kcuu1=^K, kcuf1=^L, use=adm3a,
+oadm31|o31|old adm31,
+	smso=\EG4, smul@, rmul@, use=adm31,

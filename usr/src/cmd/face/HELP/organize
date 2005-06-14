@@ -1,0 +1,28 @@
+
+The organize command enables you to change the presentation of objects
+in a file folder. This pertains to an individual file or file folder.
+On the "Office Functions" frame, you can specify a presentation style
+for all your files and file folders.  If you use the organize command
+to organize a file folder, then globally define folder presentation
+through "Office Functions", the presentation specified with organize
+will take precedence.
+
+Use one of the methods below to use organize. The currently active
+frame number is assumed if the frame number is not specified with the
+organize command.
+
+     Command Menu:  Select organize and press ENTER
+
+     Command Menu:  Press CTRL-j with cursor on organize and an -->
+     (alternative)  will appear on the command line followed by the
+                    organize. Type arguments and press ENTER to
+                    execute the command.
+
+     Command Line:  Type organize [frame #] and press ENTER.
+
+   1.  Fill in the "Organize <login name>" form by entering your
+       preferences, then press SAVE.
+
+   2.  If the folder you are reorganizing is displayed on the screen,
+       you will see the changes immediately.
+

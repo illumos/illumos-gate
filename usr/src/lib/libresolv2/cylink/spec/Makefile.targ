@@ -1,0 +1,12 @@
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 1999 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+# lib/libresolv2/cylink/spec/Makefile.targ
+
+LIBRARY	=	cylink.a
+VERS	=	.1
+
+OBJECTS	=	cylink.o
+

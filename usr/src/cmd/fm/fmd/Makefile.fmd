@@ -1,0 +1,243 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+.KEEP_STATE:
+
+SRCS += fmd.c \
+	fmd_api.c \
+	fmd_alloc.c \
+	fmd_asru.c \
+	fmd_buf.c \
+	fmd_builtin.c \
+	fmd_case.c \
+	fmd_ckpt.c \
+	fmd_conf.c \
+	fmd_ctl.c \
+	fmd_dispq.c \
+	fmd_dr.c \
+	fmd_error.c \
+	fmd_event.c \
+	fmd_eventq.c \
+	fmd_fmri.c \
+	fmd_idspace.c \
+	fmd_list.c \
+	fmd_log.c \
+	fmd_main.c \
+	fmd_module.c \
+	fmd_nv.c \
+	fmd_proc.c \
+	fmd_protocol.c \
+	fmd_rpc.c \
+	fmd_rpc_adm.c \
+	fmd_rpc_api.c \
+	fmd_rtld.c \
+	fmd_scheme.c \
+	fmd_self.c \
+	fmd_serd.c \
+	fmd_string.c \
+	fmd_subr.c \
+	fmd_svc_adm.c \
+	fmd_svc_api.c \
+	fmd_thread.c \
+	fmd_time.c \
+	fmd_timerq.c \
+	fmd_trace.c \
+	fmd_transport.c \
+	fmd_ustat.c \
+	fmd_xdr_adm.c \
+	fmd_xdr_api.c
+
+PROG = fmd
+MANIFEST = ../common/$(PROG).xml
+
+ROOTPDIR = $(ROOT)/usr/lib/fm/$(PROG)
+ROOTVDIR = $(ROOT)/var/fm/$(PROG)
+ROOTVSUB = $(ROOTVDIR)/ckpt $(ROOTVDIR)/rsrc
+ROOTPROG = $(ROOTPDIR)/$(PROG)
+
+ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
+ROOTMANIFEST = $(ROOTMANIFESTDIR)/$(PROG).xml
+
+OBJS = $(SRCS:%.c=%.o)
+LINTFILES = $(SRCS:%.c=%.ln)
+
+CLEANFILES += ../common/fmd_rpc_api.h ../common/fmd_rpc_adm.h
+CLEANFILES += fmd_svc_adm.c fmd_svc_api.c fmd_xdr_adm.c fmd_xdr_api.c
+CLEANFILES += ../common/fmd_error.c
+
+DMOD = fmd.so
+ROOTDMOD = $(ROOT)/usr/lib/mdb/proc/$(DMOD)
+DMOD_SRCS = fmd_mdb.c
+DMOD_OBJS = $(DMOD_SRCS:%.c=%.o)
+DMOD_LINT = $(DMOD_SRCS:%.c=%.ln)
+
+HDRS = fmd_api.h fmd_fmri.h
+ROOTCDIR = $(ROOT)/etc/fm/$(PROG)
+ROOTHDIR = $(ROOT)/usr/include/fm
+ROOTHDRS = $(HDRS:%=$(ROOTHDIR)/%)
+
+$(ROOTHDRS) := FILEMODE = 0644
+$(ROOTVSUB) := DIRMODE = 0700
+$(ROOTMANIFEST) := FILEMODE = 0444
+
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+CPPFLAGS += -I. -I../common
+CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
+CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
+LINTFLAGS += -mu
+LDFLAGS += -R/usr/lib/fm
+LDLIBS += -L$(ROOTLIB)/fm -ldiagcode -lsysevent -luuid -lnvpair
+LDLIBS += -lexacct -lnsl -lrt -lumem
+
+$(DMOD) := CFLAGS += $(CC_PICFLAGS) -G $(XREGSFLAG)
+$(DMOD) := LDFLAGS += $(ZTEXT) -z combreloc
+
+#
+# rpcgen(1) produces code that wants to be in the foreground if we're compiled
+# DEBUG, which isn't appropriate for our daemon.  Forcibly undefine this code.
+# It also produces various lint warnings; turn these off for these files only.
+# Unfortunately we also have to turn off IGNOR2 for pass2 lint as well.
+#
+fmd_svc_adm.o fmd_svc_api.o := CPPFLAGS += -UDEBUG -URPC_SVC_FG
+fmd_xdr_adm.o fmd_xdr_api.o := CPPFLAGS += -UDEBUG -URPC_SVC_FG
+
+fmd_svc_adm.ln fmd_svc_api.ln fmd_xdr_adm.ln fmd_xdr_api.ln := LINTFLAGS += \
+  -xerroff=E_FUNC_ARG_UNUSED -xerroff=E_FUNC_VAR_UNUSED -xerroff=E_STATIC_UNUSED
+
+lint_prog := LINTFLAGS += -xerroff=E_FUNC_RET_ALWAYS_IGNOR2
+
+#
+# Reset STRIPFLAG to the empty string.  FMD is intentionally installed with
+# a symbol table in order to help agent and diagnosis engine developers.
+#
+STRIPFLAG =
+
+.NO_PARALLEL:
+.PARALLEL: $(OBJS) $(LINTFILES)
+
+all: $(PROG) $(DMOD) install_h
+
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
+	$(POST_PROCESS)
+
+$(DMOD): $(DMOD_OBJS)
+	$(LINK.c) $(DMOD_OBJS) -o $@
+	$(POST_PROCESS)
+
+%.o: ../common/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: %.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+../common/fmd_error.c: ../common/mkerror.sh ../common/fmd_error.h
+	sh ../common/mkerror.sh < ../common/fmd_error.h > $@
+
+../common/fmd_rpc_%.c: ../common/fmd_rpc_%.h
+
+../common/fmd_rpc.c: ../common/fmd_rpc_adm.h ../common/fmd_rpc_api.h
+
+../common/fmd_rpc_%.h: ../common/fmd_rpc_%.x
+	$(RPCGEN) -CMN -h -o $@ $<
+
+fmd_svc_%.c: ../common/fmd_rpc_%.h
+	$(RPCGEN) -CMN -m -o $@ `echo $< | sed 's/h$$/x/'`
+
+fmd_xdr_%.c: ../common/fmd_rpc_%.h
+	$(RPCGEN) -CMN -c -o $@ `echo $< | sed 's/h$$/x/'`
+
+clean:
+	$(RM) $(OBJS) $(DMOD_OBJS) $(LINTFILES) $(DMOD_LINT)
+	$(RM) $(CLEANFILES)
+
+clobber: clean
+	$(RM) $(PROG) $(DMOD)
+
+%.ln: ../common/%.c
+	$(LINT.c) -c $<
+
+%.ln: %.c
+	$(LINT.c) -c $<
+
+lint_prog: $(LINTFILES)
+	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
+
+lint_dmod: $(DMOD_LINT)
+	$(LINT) $(LINTFLAGS) $(DMOD_LINT) $(LDLIBS)
+
+lint: lint_prog lint_dmod
+
+$(ROOT)/etc/fm:
+	$(INS.dir)
+
+$(ROOTCDIR): $(ROOT)/etc/fm
+	$(INS.dir)
+
+$(ROOTHDIR):
+	$(INS.dir)
+
+$(ROOTHDIR)/%.h: ../common/%.h
+	$(INS.file)
+
+$(ROOTMANIFESTDIR)/%.xml: ../common/%.xml
+	$(INS.file)
+
+$(ROOT)/var/%:
+	$(INS.dir)
+
+$(ROOTVDIR): $(ROOT)/var/fm
+	$(INS.dir)
+
+$(ROOTVSUB): $(ROOTVDIR)
+	$(INS.dir)
+
+$(ROOT)/usr/lib/%:
+	$(INS.dir)
+
+$(ROOTPDIR): $(ROOT)/usr/lib/fm
+	$(INS.dir)
+
+$(ROOTPROG): $(ROOTPDIR) $(PROG)
+	$(RM) $@; $(INS) -s -m 0555 -f $(@D) $(PROG)
+
+$(ROOT)/usr/lib/mdb/proc: $(ROOT)/usr/lib/mdb
+	$(INS.dir)
+
+$(ROOTDMOD): $(ROOT)/usr/lib/mdb/proc $(DMOD)
+	$(RM) $@; $(INS) -s -m 0555 -f $(@D) $(DMOD)
+
+install_h: $(ROOTHDIR) $(ROOTHDRS)
+
+install: all install_h $(ROOTPROG) $(ROOTDMOD) \
+	$(ROOTCDIR) $(ROOTVDIR) $(ROOTVSUB) $(ROOTMANIFEST)
+
+check: $(CHKMANIFEST)

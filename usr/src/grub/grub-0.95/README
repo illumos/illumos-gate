@@ -1,0 +1,23 @@
+This is GNU GRUB, the GRand Unified Bootloader.  GRUB is intended to
+provide important bootloader features that are missing from typical
+personal computer BIOSes:
+
+  - provides fully-featured command line and graphical interfaces
+  - recognizes fdisk partitions and BSD disklabels
+  - can dynamically read Linux ext2fs, ReiserFS, JFS and XFS, BSD ufs,
+    MS-DOS FAT16 and FAT32, Minix fs, and VSTa fs filesystems, plus
+    hardcoded blocklists
+  - can boot Multiboot-compliant kernels (such as GNU Mach), as well
+    as standard Linux and *BSD kernels
+
+See the file NEWS for a description of recent changes to GRUB.
+
+If you are interested in the network support, see the file
+README.netboot under the directory netboot.
+
+See the file INSTALL for instructions on how to build and install the
+GRUB data and program files. See the GRUB manual for details about
+using GRUB as your boot loader. Type "info grub" in the shell prompt.
+
+Please visit the official web page of GNU GRUB, for more information.
+The URL is <http://www.gnu.org/software/grub/grub.html>.

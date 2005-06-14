@@ -1,0 +1,101 @@
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# This file contains tunable parameters for dhcpagent(1M).
+#
+
+# All parameters can be tuned for a specific interface by prepending
+# the interface name to the parameter name.  For example, to make
+# RELEASE_ON_SIGTERM happen on all interfaces except hme0, specify:
+#
+# hme0.RELEASE_ON_SIGTERM=no
+# RELEASE_ON_SIGTERM=yes
+
+# By default, when the DHCP agent is sent a SIGTERM, all managed
+# interfaces are dropped.  By uncommenting the following
+# parameter-value pair, all managed interfaces are released instead.
+#
+# RELEASE_ON_SIGTERM=yes
+
+# When the DHCP agent gets an ACK from the server, it sends an ARP
+# request to verify that a given IP address is not already in use.  If
+# an ARP reply is received, the DHCP agent declines the server's
+# offer.  However, if the DHCP agent is unable to send the ARP request
+# packet for whatever reason, it assumes the address is available.  To
+# be more cautious, uncomment the following parameter-value pair.
+#
+# IGNORE_FAILED_ARP=no
+
+# By default, the DHCP agent waits 3 seconds to collect OFFER
+# responses to a DISCOVER.  If it receives no OFFERs in this time, it
+# then waits for another 3 seconds, and so forth.  To change this
+# behavior, set and uncomment the following parameter-value pair.
+# Note: this does not control the retransmission strategy for
+# DISCOVERs, which is formally specified in RFC 2131.  This parameter
+# is specified in seconds.
+#
+# OFFER_WAIT=
+
+# By default, the DHCP agent waits 1000 milliseconds to collect ARP
+# replies to an ARP request when verifying that an IP address is not
+# in use.  To change this behavior, set and uncomment the following
+# parameter-value pair.  This parameter is specified in milliseconds.
+#
+# ARP_WAIT=
+
+# By default, the DHCP agent does not send out a client identifier
+# (and hence, the chaddr field is used by the DHCP server as the
+# client identifier.)  To make the DHCP agent send a client
+# identifier, set and uncomment the following parameter-value pair.
+# Note that by default this is treated as an NVT ASCII string.  To
+# specify a binary value, prepend "0x" to a sequence of hexadecimal
+# digits (for example, the value 0xAABBCC11 would set the client
+# identifier to the 4-byte binary sequence 0xAA 0xBB 0xCC 0x11).
+#
+# CLIENT_ID=
+
+# By default, the DHCP agent will try to request the hostname currently
+# associated with the interface performing DHCP.  If this option is
+# enabled, the agent will attempt to find a host name in /etc/hostname.<if>,
+# which must contain a line of the form
+#
+#	inet name
+#
+# where "name" is a single RFC 1101-compliant token.  If found, the token
+# will be used to request that host name from the DHCP server.  To prevent
+# this, uncomment the following line.
+#
+# REQUEST_HOSTNAME=no
+
+# By default, a parameter request list requesting a subnet mask (1),
+# router (3), DNS server (6), hostname (12), DNS domain (15), broadcast
+# address (28), and encapsulated vendor options (43), is sent to the DHCP
+# server when the DHCP agent sends requests.  However, if desired, this
+# can be changed by altering the following parameter-value pair.  The
+# numbers correspond to the values defined in RFC 2132.
+#
+PARAM_REQUEST_LIST=1,3,6,12,15,28,43

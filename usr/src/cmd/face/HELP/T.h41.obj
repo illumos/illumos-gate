@@ -1,0 +1,70 @@
+
+The Filecabinet, file folders, and files are objects that store data
+in your AT&T FACE Office.  These objects are accessible through the
+Office item on the AT&T FACE menu.  
+
+When you select Filecabinet from Office menu, a frame opens that lists
+the contents of your $HOME directory.  The frame will be labeled with
+the name of your home directory.  The contents are file folders or
+files.  
+
+File folder objects are the containers for your files. FACE uses  file
+folders and files just as a regular office would.  Titles for file
+folders are the names of the UNIX System directories they represent.
+File folders can be created, deleted, redescribed, or renamed, by
+using keyboard keys or commands.  Deleting a folder will also delete
+any files or file folders contained within it.
+
+File objects are the containers for your work. Files contain
+information much like pieces of paper do.  Excluding the exceptions
+noted above, a file object can be created, copied, deleted, moved,
+opened, redescribed, renamed, and have its security (i.e., permissions)
+changed.
+
+There are many varieties of files and the way you use them differs
+according to the type of information you store in them.  The different
+types of files will be discussed later.
+
+When you move the cursor to a file or file folder in the Filecabinet,
+or any other file folder, a new frame will open filled with the contents
+of the object.  A frame for a file folder will contain a list of file
+and file folders.  The action on a file depends on the type of file:
+
+
+     Standard File:  Contains an ascii text document.  When you
+     open a Standard File your default editor will be invoked.
+
+     Foreign File:  This type file can be copied, renamed, moved,
+     etc. but cannot be viewed or edited.  It is usually a file
+     from another computer system that is incompatible with the UNIX
+     operating system.  Typically, a user would want to store this
+     type of object only temporarily before transferring it to the 
+     appropriate computer system.
+
+     Data File:  This type of file's contents are in binary format,
+     which can not be viewed, printed or edited.  It can be copied,
+     moved, deleted, etc.
+
+     Executable:  This type of file will contain a computer program.
+     Opening this type of object will execute or "run" the program.
+     The screen clears and the output of the program is displayed
+     and you must press ENTER to continue FACE.
+
+
+You can change the way objects in a folder are displayed (order of
+presentation and amount of information) by using the organize
+command for an individual file folder, or by using preferences/folder
+options for your entire Filecabinet and Wastebasket.
+
+When assigning an object name to a Filecabinet or file folder object
+you are creating or renaming, it must be one word with a maximum of
+12 characters. The following special characters are not allowed when
+naming objects:  ! @ # $ ^ & * [ ] ( ) { } < > ? / | " ' ` ;.  The
+following characters may be used in object names, but not as the
+first character:  . + -.
+
+By using the security SLK command (permissions) you may control
+who has access to your files and file folders. This allows you to
+determine who has Read, Write, and Run/Search permissions for
+yourself, your group and anyone with access to the system.
+

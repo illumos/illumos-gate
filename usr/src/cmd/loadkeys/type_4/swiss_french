@@ -1,0 +1,71 @@
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Swiss French key layout
+#
+key 88	 base < shift { caps < ctrl < altg nop
+key 15	 base > shift } caps > ctrl > altg nop
+key 30	 base 1 shift + caps 1 ctrl 1 altg !
+key 31	 base 2 shift '"' caps 2 ctrl ^@ altg @
+key 32	 base 3 shift * caps 3 ctrl 3 altg #
+key 33	 base 4 shift ç caps 4 ctrl 4 altg ¢
+key 34	 base 5 shift % caps 5 ctrl 5 altg ~
+key 35	 base 6 shift & caps 6 ctrl 6 altg §
+key 36	 base 7 shift / caps 7 ctrl 7 altg |
+key 37	 base 8 shift ( caps 8 ctrl 8 altg °
+key 38	 base 9 shift ) caps 9 ctrl ^\ altg '\\'
+key 39	 base 0 shift = caps 0 ctrl ^^ altg ^
+key 40	 base '\'' shift ? caps '\'' ctrl '\'' altg `
+key 41	 base fa_cflex shift fa_grave caps fa_cflex ctrl fa_cflex altg nop
+key 54	 base q shift Q caps Q ctrl ^Q altg nop
+key 55	 base w shift W caps W ctrl ^W altg nop
+key 59	 base z shift Z caps Z ctrl ^Z altg nop
+key 62	 base o shift O caps O ctrl ^O altg nop
+key 63	 base p shift P caps P ctrl ^P altg nop
+key 64	 base è shift ü caps E ctrl è altg nop
+key 65	 base fa_umlaut shift fa_acute caps fa_umlaut ctrl fa_umlaut altg nop
+key 76	 all shiftkeys+capslock
+key 77	 base a shift A caps A ctrl ^A altg nop
+key 78	 base s shift S caps S ctrl ^S altg nop
+key 86	 base é shift ö caps E ctrl é altg nop
+key 87	 base à shift ä caps A ctrl à altg nop
+key 42	 base $ shift fa_tilde caps $ ctrl $ altg £
+key 124	 base ] shift [ caps ] ctrl ^] altg '\\' numl nonl
+key 100	 base y shift Y caps Y ctrl ^Y altg nop
+key 101  base x shift X caps X ctrl ^X altg nop
+key 102	 base c shift C caps C ctrl ^C altg nop
+key 103  base v shift V caps V ctrl ^V altg nop
+key 104  base b shift B caps B ctrl ^B altg nop
+key 105	 base n shift N caps N ctrl ^N altg nop
+key 106	 base m shift M caps M ctrl '\r' altg µ
+key 107	 base , shift ; caps , ctrl , altg nop
+key 108	 base . shift : caps . ctrl . altg nop
+key 109	 base - shift _ caps - ctrl ^_ altg nop
+key 119	 all shiftkeys+leftctrl up shiftkeys+leftctrl
+key 19	 all shiftkeys+alt up shiftkeys+alt
+key 67	 all shiftkeys+altgraph up shiftkeys+altgraph
+key 13	 all compose

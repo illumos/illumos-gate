@@ -1,0 +1,121 @@
+.\" ident	"%Z%%M%	%I%	%E% SMI"
+.\" Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License, Version 1.0 only
+.\" (the "License").  You may not use this file except in compliance
+.\" with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.if n .tr \--
+.TH chkmsg 1l "5 Apr 1997"
+.SH NAME
+chkmsg \- cross check messages 
+.SH SYNOPSIS
+.B chkmsg
+.BI [ -64 ]
+.BI file
+.BI source_files ...
+.SH AVAILABILITY
+Internal to the linker group
+.SH DESCRIPTION
+chkmsg  checks the message identifiers defined in the input file
+and the message identifyer used in the input source_files. The input
+file is the input file which is used by the sgsmsg command.
+.P
+The chkmsg command reads the input file and 
+generates two sets of message identifiers.
+The first set is
+the identifiers defined in between the _START_ and _END_ key words.
+These identifiers are intended to be referenced by MSG_INTL().
+This set is named as MSG_INTL_FROM_INPUT.
+.P
+The other set is
+the identifiers defined after the _END_ key words.
+These identifiers are intended to be referenced by MSG_ORIG().
+This set is named as MSG_ORIG_FROM_INPUT.
+.P
+The chkmsg command reads the specified input source_files and
+generates two sets of message identifiers. The first set is
+the message identifiers referenced by MSG_INTL() macro.
+This set is named as MSG_INTL_FROM_SRC.
+.P
+The other set is the message identifiers referenced by the
+MSG_ORIG() macro.
+This set is named as MSG_ORIG_FROM_SRC.
+.P
+The chkmsg command compares MSG_INTL_FROM_SRC and MSG_INTL_FROM_INPUT.
+If these two sets are different, the command gives the warning
+message and print the identifiers which are different.
+.P
+The chkmsg command compares MSG_ORIG_FROM_SRC and MSG_ORIG_FROM_INPUT.
+If these two sets are different, the command gives the warning
+message and print the identifiers which are different.
+.P
+The identifiers in MSG_INTL_FROM_SRC and MSG_ORIG_FROM_SRC are
+extracted from the source files only if they are
+directly passed to MSG_INTL() or MSG_ORIG(). Therefore, for example:
+.RS
+.nf
+.ft 3
+	char *msg;
+		|
+	msg = MSG_ERROR_01;
+		|
+	printf(MSG_INTL(msg));
+		|
+.fi
+.RE
+the identifyer MSG_ERROR_01 will not be included in MSG_INTL_FROM_SRC set.
+.P
+There are two key words which can be used in the input file 
+to control whether the identifier will be extracted into 
+MSG_{INTL,ORIG}_FROM_ORIG or not. If the identifyer are
+surrounded by _CHKMSG_SKIP_BEGIN_ {sparc,i386}
+and _CHKMSG_SKIP_END_ {sparc,i386}, then
+the identifiers will not be included in the output set.
+The architecture being checked should be specified after
+the key works.
+These key words should be specified in the comment lines.
+For example, the input file could contain:
+.RS
+.nf
+.ft 3
+	# _CHKMSG_SKIP_BEGIN_ sparc
+	@ MSG_ERROR_01	"This identifier is not defined."
+	# _CHKMSG_SKIP_END_ sparc
+.fi
+.RE
+.P
+It is assumed that the message identifier names are composed
+of only upper letters.
+.SH OPTIONS
+.TP 12
+.B \-64
+Use a 64-bit version of the machine type (i.e. sparc => sparcv9).
+Note that this option must be specified first on the command line.
+.SH "SEE ALSO"
+.BR gencat (1),
+.BR ld (1),
+.BR msgfmt (1),
+.BR catgets (3C),
+.BR gettext (3I).
+.BR sgsmsg (1l).
+.br
+.TZ LLM
+.if n .tr \-\-

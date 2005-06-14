@@ -1,0 +1,91 @@
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#	make options --should be run when adding/deleting options
+#			This script should be run to create a new
+#			ex_vars.h (based on information in ex_data.c
+#			Ex_data.c should be writeable.
+#
+	cp ex_data.c $$.c
+#
+#	write all lines which are not includes to $$.c
+#
+	set -x
+	ex - $$.c << 'STOP'
+g/^#include/d
+w
+q
+STOP
+cc -E $* $$.c > foo.c
+#
+#	use EX to clean up preprocessor output
+#
+	ex - foo.c << 'STOP'
+!echo STEP1
+$-1,$d
+1,/option options/d
+!echo STEP2
+g/^# /d
+!echo STEP3
+g/^[	]*$/d
+!echo STEP4
+%s/	\"//
+!echo STEP5
+%s/\".*//
+!echo STEP6
+1m$
+!echo STEP7
+w! tmpfile1
+!pr -t -n tmpfile1 > tmpfile2
+!echo STEP8
+q
+STOP
+#
+	ex -s tmpfile2 << 'STOP'
+$t0
+!echo STEP9
+1s/....../    0	/
+!echo STEP10
+w len4
+%s/\(......\)\(.*\)/vi_\U\2\L		\1/
+!echo STEP11
+%s/	$//
+!echo STEP12
+%s/[ ][ ]*/	/
+!echo STEP13
+$s/.*	/vi_NOPTS		/
+!echo STEP14
+%s/\([A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]*\)\(	\)/\1/
+!echo STEP15
+%s/.*/#define	&/
+!echo STEP16
+$i
+
+.
+0a
+#ident	"%Z%%M%	%I%	%E% SMI"
+.
+w! ex_vars.h
+q
+STOP
+echo finished....

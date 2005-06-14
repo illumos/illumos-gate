@@ -1,0 +1,132 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+MACH:sh=	uname -p
+
+sparc_XARCH=	-xarch=v8
+sparc64_XARCH=	-xarch=v9
+i386_XARCH=	
+i38664_XARCH=	-xarch=generic64
+C_PICFLAGS=	-Kpic
+C_PICFLAGS64=	-Kpic
+
+PROGS=		dumpbind
+LIBS=		truss.so.1 symbindrep.so.1 perfcnt.so.1 who.so.1 bindings.so.1
+KSHSRC=		sotruss.ksh symbindrep.ksh perfcnt.ksh whocalls.ksh
+SCRIPTS=	$(KSHSRC:%.ksh=%)
+
+DIRS=		obj32 obj64 lib32 lib64
+
+sparc_LIBS32=	$(LIBS:%=lib32/%)
+sparc_LIBS64=	$(LIBS:%=lib64/%)
+i386_LIBS32=	$(LIBS:%=lib32/%)
+i386_LIBS64=	$(LIBS:%=lib64/%)
+
+LIBS64=		$($(MACH)_LIBS64)
+LIBS32=		$($(MACH)_LIBS32)
+
+ALLIBS=		$(LIBS32) $(LIBS64)
+
+$(LIBS32):=	CFLAGS += $($(MACH)_XARCH) $(C_PICFLAGS)
+$(LIBS32):=	LDLIBS += -lmapmalloc -ldl -lc
+$(LIBS64):=	CFLAGS += $($(MACH)64_XARCH) $(C_PICFLAGS64)
+$(LIBS64):=	LDLIBS += -lmapmalloc -ldl -lc
+
+CPPFLAGS +=	-Isrc -D__EXTENSIONS__
+LDFLAGS =	$(ZDEFS) $(ZTEXT) $(ZIGNORE)
+
+
+.KEEP_STATE:
+
+all:	$(DIRS) .WAIT $(ALLIBS) $(SCRIPTS) $(PROGS)
+
+%:	src/%.ksh
+	$(RM) $@
+	cat $< | sed -e s,/opt/SUNWonld/lib/,`pwd`/lib, | \
+		sed -e s,/usr/lib/link_audit/,`pwd`/lib, > $@
+	chmod a+x $@
+
+obj32/%.o \
+obj64/%.o: src/%.c
+	$(COMPILE.c) $< -o $@
+
+dumpbind: \
+	obj32/dumpbind.o
+	$(LINK.c) obj32/dumpbind.o -o $@
+
+lib32/bindings.so.1: \
+	obj32/bindings.o obj32/env.o
+	$(LINK.c) -G obj32/bindings.o obj32/env.o -o $@ $(LDLIBS)
+
+lib64/bindings.so.1: \
+	obj64/bindings.o obj64/env.o
+	$(LINK.c) -G obj64/bindings.o obj64/env.o -o $@ $(LDLIBS)
+
+lib32/perfcnt.so.1: \
+	obj32/perfcnt.o obj32/hash.o obj32/env.o
+	$(LINK.c) -G obj32/perfcnt.o obj32/hash.o obj32/env.o -o $@ $(LDLIBS)
+
+lib64/perfcnt.so.1: \
+	obj64/perfcnt.o obj64/hash.o obj64/env.o
+	$(LINK.c) -G obj64/perfcnt.o obj64/hash.o obj64/env.o -o $@ $(LDLIBS)
+
+lib32/symbindrep.so.1: \
+	obj32/symbindrep.o obj32/env.o
+	$(LINK.c) -G obj32/symbindrep.o obj32/env.o -o $@ $(LDLIBS)
+
+lib64/symbindrep.so.1: \
+	obj64/symbindrep.o obj64/env.o
+	$(LINK.c) -G obj64/symbindrep.o obj64/env.o -o $@ $(LDLIBS)
+
+lib32/truss.so.1: \
+	obj32/truss.o obj32/env.o
+	$(LINK.c) -G obj32/truss.o obj32/env.o -o $@ $(LDLIBS)
+
+lib64/truss.so.1: \
+	obj64/truss.o obj64/env.o
+	$(LINK.c) -G obj64/truss.o obj64/env.o -o $@ $(LDLIBS)
+
+lib32/who.so.1: \
+	obj32/who.o obj32/env.o
+	$(LINK.c) -G obj32/who.o obj32/env.o -o $@ -lelf $(LDLIBS)
+
+lib64/who.so.1: \
+	obj64/who.o obj64/env.o
+	$(LINK.c) -G obj64/who.o obj64/env.o -o $@ -lelf $(LDLIBS)
+
+obj32 \
+obj64 \
+lib32 \
+lib64:
+	@mkdir $@ | cat
+
+clean \
+clobber:FRC
+	$(RM) -r $(DIRS) $(SCRIPTS) $(PROGS) core .make.state
+
+FRC:

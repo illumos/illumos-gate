@@ -1,0 +1,10 @@
+
+Press CHOICES to toggle between Yes and No to specify if you wish to
+invoke AT&T FACE automatically each time you log in to the system.
+
+The default choice is "Yes".
+
+If you select "Yes", you will invoke AT&T FACE at login.  If you
+invoke AT&T FACE at login, you will automatically be logged off the
+system when you exit AT&T FACE.
+

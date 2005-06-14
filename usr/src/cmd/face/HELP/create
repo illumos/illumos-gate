@@ -1,0 +1,42 @@
+
+The create command enables you to create new objects: files, and
+file folders.  File folders can store files or other file folders.
+"File folder name" is the pathname of the file folder where the object
+will be created. The pathname may be relative to the current folder,
+or your Filecabinet, or it may be the full UNIX System pathname.
+
+Use one of the methods below to create an object. The object will be
+placed on the currently active file folder if the destination
+file folder is not specified with the create command.
+
+     Function Key: Press the CHG-KEYS function key, then create.
+
+     Command Menu:  Select create and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on create and an -->
+     (alternative)  will appear on the command line followed by the
+                    create. Type arguments and press ENTER to
+                    execute the command.
+
+     Command Line:  Type create [object] [file folder name] and press
+                    ENTER.
+
+     1.  If an "object_name" is not specified, a prompt appears asking
+         you  to  enter an object name.  Type in a one word name up to
+         12 characters long and press ENTER.  Note that some
+         applications may require you to specify a name that is less 
+         than 12 characters. If this is the case and you have specified
+	 a name that is too long an error message will display and the 
+	 create procedure will begin again.
+
+     2.  Select the object type you are creating from the list of
+         object types titled "Create <object>" and press ENTER.
+         Striking the CANCEL function key will cancel the create
+         action.
+
+If you are creating a file folder, it will appear in the destination
+folder frame.
+
+If you are creating a standard file, your default editor will
+automatically be invoked enabling you to begin entering text.
+

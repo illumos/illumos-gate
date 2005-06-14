@@ -1,0 +1,31 @@
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This file provides defaults for ssh(1).
+# The values can be changed in per-user configuration files $HOME/.ssh/config
+# or on the command line of ssh(1).
+
+# Configuration data is parsed as follows:
+#  1. command line options
+#  2. user-specific file
+#  3. system-wide file /etc/ssh/ssh_config
+#
+# Any configuration value is only changed the first time it is set.
+# host-specific definitions should be at the beginning of the
+# configuration file, and defaults at the end.
+
+# Example (matches compiled in defaults):
+#
+# Host *
+#   ForwardAgent no
+#   ForwardX11 no
+#   PubkeyAuthentication yes
+#   PasswordAuthentication yes
+#   FallBackToRsh no
+#   UseRsh no
+#   BatchMode no
+#   CheckHostIP yes
+#   StrictHostKeyChecking ask
+#   EscapeChar ~

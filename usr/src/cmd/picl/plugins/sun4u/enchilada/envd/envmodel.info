@@ -1,0 +1,194 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * This is the environmental plug-in configuration file for
+ * Taco platform.
+ */
+
+VERSION 1.1
+
+VERBOSE 1
+
+/*
+ * Fan names
+ */
+#define	ENV_SYSTEM_OUT_FAN	outtake-fan
+#define	ENV_CPU0_FAN		cpu0-fan
+#define	ENV_SYSTEM_INTAKE_FAN	intake-fan
+#define	ENV_CPU1_FAN		cpu1-fan
+#define	ENV_DIMM_FAN		dimm-fan
+
+/*
+ * Sensor ids
+ */
+#define	SENSOR_CPU0_DIE		cpu0
+#define	SENSOR_CPU1_DIE		cpu1
+#define	SENSOR_INT_AMB_0	int-amb0
+#define	SENSOR_SYS_IN		sys-in
+#define	SENSOR_SYS_OUT		sys-out
+#define	SENSOR_INT_AMB_1	int-amb1
+
+/* 
+ * Hard disk sensor ids
+ */
+#define	ENV_DISK0		hard-disk0
+#define	ENV_DISK1		hard-disk1
+
+/*
+ * Enchilada sensor IDs as used in FRUID segment
+ */
+#define	CPU0_SENSOR_ID		0
+#define	CPU1_SENSOR_ID		1
+#define	INT_AMB0_SENSOR_ID	5
+#define	SYS_OUT_SENSOR_ID	3
+#define	INT_AMB1_SENSOR_ID	4
+#define	SYS_IN_SENSOR_ID	2
+
+/*
+ * Enchilada fan IDs used in FRUID segment
+ */
+#define	CPU0_FAN_ID		0
+#define	CPU1_FAN_ID		1
+#define	SYSTEM_OUT_FAN_ID	2
+#define	SYSTEM_INTAKE_FAN_ID	3
+
+#define	DIMM_FAN_ID		4
+
+#define	DISK0_ID		0
+#define	DISK1_ID		1
+/*
+ * Publish the labels for sensors and fans
+ */
+
+/*
+ * Hardware monitor 0 - at 0,58
+ */
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58/SENSOR_CPU0_DIE
+    PROP Label string r 0 "Die"
+    PROP ID int r 4 CPU0_SENSOR_ID
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58/SENSOR_CPU1_DIE
+    PROP Label string r 0 "Die"
+    PROP ID int r 4 CPU1_SENSOR_ID
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58/SENSOR_INT_AMB_0
+    PROP Label string r 0 "Ambient"
+    PROP ID int r 4 INT_AMB0_SENSOR_ID
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58/ENV_CPU0_FAN
+    PROP Label string r 0 "CPU0"
+    PROP ID int r 4 CPU0_FAN_ID
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58/ENV_CPU1_FAN
+    PROP Label string r 0 "CPU1"
+    PROP ID int r 4 CPU1_FAN_ID
+
+/*
+ * Hardware monitor 1 - at 0,5c
+ */
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c/SENSOR_SYS_IN
+    PROP Label string r 0 "Ambient"
+    PROP ID int r 4 SYS_IN_SENSOR_ID
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c/SENSOR_INT_AMB_1
+    PROP Label string r 0 "Ambient"
+    PROP ID int r 4 INT_AMB1_SENSOR_ID
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c/SENSOR_SYS_OUT
+    PROP Label string r 0 "Ambient"
+    PROP ID int r 4 SYS_OUT_SENSOR_ID
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c/ENV_SYSTEM_INTAKE_FAN
+    PROP Label string r 0 "Intake"
+    PROP ID int r 4 SYSTEM_INTAKE_FAN_ID
+
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c/ENV_SYSTEM_OUT_FAN
+    PROP Label string r 0 "Outtake"
+    PROP ID int r 4 SYSTEM_OUT_FAN_ID
+
+/*
+ * PIC Microcontroller at 0,52
+ */
+name:/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,52/ENV_DIMM_FAN
+    PROP Label string r 0 "dimm-fan"
+    PROP ID int r 4 DIMM_FAN_ID
+
+/*
+ * Internal hard disks
+ */
+name:/platform/pci@1d,700000/scsi@4/sd@0,0/ENV_DISK0
+    PROP Label string r 0 "hard-disk0"
+    PROP ID int r 4 DISK0_ID
+
+name:/platform/pci@1d,700000/scsi@4/sd@1,0/ENV_DISK1
+    PROP Label string r 0 "hard-disk1"
+    PROP ID int r 4 DISK1_ID
+
+/*
+ * Associate the environmental information with devices.
+ */
+
+/*
+ * CPU 0 environmental information
+ */
+_class:/jbus/cpu?ID=0
+TABLE Environment
+    ROW
+        PROP Class string r 0 "temperature-sensor"
+        REFPROP _temperature-sensor_ /platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58/SENSOR_CPU0_DIE
+    ENDROW
+    ROW
+        PROP Class string r 0 "temperature-sensor"
+        REFPROP _temperature-sensor_ /platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c/SENSOR_SYS_IN
+    ENDROW
+    ROW
+        PROP Class string r 0 "fan"
+        REFPROP _fan_ /platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58/ENV_CPU0_FAN
+    ENDROW
+ENDTABLE
+
+/*
+ * CPU 1 environmental information
+ */
+_class:/jbus/cpu?ID=1
+TABLE Environment
+    ROW
+        PROP Class string r 0 "temperature-sensor"
+        REFPROP _temperature-sensor_ /platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58/SENSOR_CPU1_DIE
+    ENDROW
+    ROW
+        PROP Class string r 0 "temperature-sensor"
+        REFPROP _temperature-sensor_ /platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c/SENSOR_SYS_IN
+    ENDROW
+    ROW
+        PROP Class string r 0 "fan"
+        REFPROP _fan_ /platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58/ENV_CPU1_FAN
+    ENDROW
+ENDTABLE
+

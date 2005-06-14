@@ -1,0 +1,147 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License, Version 1.0 only
+ (the "License").  You may not use this file except in compliance
+ with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWnfscr:nfs-client'>
+
+<service
+	name='network/nfs/client'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<dependency name='network'
+	    grouping='require_any'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/milestone/network' />
+	</dependency>
+
+	<dependency name='nlockmgr'
+	    grouping='require_all'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/network/nfs/nlockmgr' />
+	</dependency>
+
+	<dependency name='cbd'
+	    grouping='optional_all'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/network/nfs/cbd' />
+	</dependency>
+
+	<dependency name='mapid'
+	    grouping='optional_all'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/network/nfs/mapid' />
+	</dependency>
+
+	<dependency name='rpcbind'
+	    grouping='require_all'
+	    restart_on='restart'
+	    type='service'>
+		<service_fmri value='svc:/network/rpc/bind' />
+	</dependency>
+
+	<dependency name='keyserv'
+	    grouping='optional_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/network/rpc/keyserv' />
+	</dependency>
+
+	<dependency name='gss'
+	    grouping='optional_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/network/rpc/gss' />
+	</dependency>
+
+	<dependency name='name-services'
+	    grouping='require_all'
+	    restart_on='refresh'
+	    type='service'>
+		<service_fmri value='svc:/milestone/name-services' />
+	</dependency>
+
+	<dependent
+		name='nfs-client_multi-user'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/multi-user' />
+	</dependent>
+
+	<!--
+	  Err on the side of caution for the mountalls in the nfs-client
+	  startup script.  Don't timeout just because remote servers are
+	  being sluggish.
+	-->
+	<exec_method
+	    type='method'
+	    name='start'
+	    exec='/lib/svc/method/nfs-client %m'
+	    timeout_seconds='3600' />
+
+	<exec_method
+	    type='method'
+	    name='stop'
+	    exec='/lib/svc/method/nfs-client %m'
+	    timeout_seconds='60' />
+
+	<property_group
+	    name='startd'
+	    type='framework'>
+		<propval name='duration' type='astring' value='transient' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			NFS client
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='mount_nfs' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

@@ -1,0 +1,232 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ * Title       CIM version 2.7 NFS dependencies.
+ * Description CIM version 2.7 Solaris Network File System model dependencies.
+ * Date        02/18/2003
+ * Version     2.7
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma namespace("root/cimv2")
+#pragma Locale ("en_US")
+#pragma namespace("__create")
+
+// ==================================================================
+// ManagedElement
+// ==================================================================
+[Abstract, Version ("2.7.0"), Description (
+    "ManagedElement is an abstract class that provides a common "
+    "superclass (or top of the inheritance tree) for the "
+    "non-association classes in the CIM Schema.") ]
+class CIM_ManagedElement {
+
+    [MaxLen (64), Description ( 
+        "The Caption property is a short textual description (one-" 
+        "line string) of the object.") ] 
+    string Caption;
+
+    [Description ( 
+        "The Description property provides a textual description of "
+        "the object.") ] 
+    string Description; 
+
+    [Description (
+        "  A user-friendly name for the object. This property allows "
+        "each instance to define a user-friendly name IN ADDITION TO its "
+        "key properties/identity data, and description information. \n"
+        "  Note that ManagedSystemElement's Name property is also defined "
+        "as a user-friendly name. But, it is often subclassed to be a "
+        "Key. It is not reasonable that the same property can convey "
+        "both identity and a user friendly name, without inconsistencies. "
+        "Where Name exists and is not a Key (such as for instances of "
+        "LogicalDevice), the same information MAY be present in both "
+        "the Name and ElementName properties.") ]
+    string ElementName;
+};
+
+// ==================================================================
+//    SettingData
+// ===================================================================
+[Abstract, Experimental, Version ("2.7.0"), Description (
+    "  The SettingData class represents configuration-related and "
+    "operational parameters for one or more ManagedElement(s). A "
+    "ManagedElement may have multiple SettingData objects associated "
+    "with it. The current operational values for an Element's "
+    "parameters are reflected by properties in the Element itself or "
+    "by properties in its associations. These properties do not have "
+    "to be the same values present in the SettingData object. For "
+    "example, a modem may have a SettingData baud rate of 56Kb/sec "
+    "but be operating at 19.2Kb/sec. \n"
+    "  Note that the CIM_SettingData class is very similar to "
+    "CIM_Setting, yet both classes are present in the model.  This is "
+    "because many implementations have successfully used CIM_Setting. "
+    "However, issues have arisen that could not be resolved without "
+    "defining a new class.  Therefore, until a new major release "
+    "occurs, both classes will exist in the model.  Refer to the Core "
+    "White Paper for additional information.") ]
+class CIM_SettingData : CIM_ManagedElement {
+
+    [Key, Description (
+        "InstanceID opaquely identifies a unique instance of "
+        "SettingData.  The InstanceID must be unique within a "
+        "namespace. In order to ensure uniqueness, the value of "
+        "InstanceID SHOULD be constructed in the following manner: \n"
+        "<Vendor ID><ID> \n"
+        "   <Vendor ID> MUST include a copyrighted, trademarked "
+        "or otherwise unique name that is owned by the business entity "
+        "or a registered ID that is assigned to the business entity "
+        "that is defining the InstanceID. (This is similar to the "
+        "<Schema Name>_<Class Name> structure of Schema class names.) "
+        "The purpose of <Vendor ID> is to ensure that <ID> is truly "
+        "unique across multiple vendor implementations.   If such a "
+        "name is not used, the defining entity MUST assure that the "
+        "<ID> portion of the Instance ID is unique when compared with "
+        "other instance providers. For DMTF defined instances, the "
+        "<Vendor ID> is 'CIM'. \n"
+        "   <ID> MUST include a vendor specified unique "
+        "identifier.") ] 
+    string InstanceID;
+
+    [Required, Description (
+        "The user friendly name for this instance of SettingData. "
+        "In addition, the user friendly name can be used as a "
+        "index property for a search of query.  (Note:  Name "
+        "does not have to be unique within a namespace.)") ]
+    string ElementName;
+};
+
+// ===================================================================
+// Share
+// ===================================================================
+[Abstract, Experimental, Version ("2.7.0"), Description (
+    "A Share is representative of an object presented for use "
+    "(or shared) across systems.  Instances of CIM_Share are "
+    "associated with the shared object on the 'server'-side via "
+    "the CIM_SharedElement association.  Shares are mounted on the "
+    "'client'-side (usually into another namespace) via the CIM_Import"
+    "Share association.  CIM_Share is Abstract to force subclassing to "
+    "define the semantics of sharing." ) ]
+class CIM_Share : CIM_LogicalElement {
+ 
+    [Key, MaxLen (256),
+        Propagated ("CIM_System.CreationClassName"), 
+        Description ("The scoping System's CreationClassName. ") ]
+    string SystemCreationClassName;
+
+    [Key, Propagated ("CIM_System.Name"),
+        Description ("The scoping System's Name.") ] 
+    string SystemName;
+
+    [Key, MaxLen (256), Description (
+        "CreationClassName indicates the name of the class or the "
+        "subclass used in the creation of an instance.") ]
+    string CreationClassName;
+
+    [Override("Name"), Key, Description (
+        "The Name property, inherited from LogicalElement, "
+        "defines the shared name by which the shared object is "
+        "exported.") ]
+    string Name;
+};
+
+
+// ===================================================================
+// FileShare
+// ===================================================================
+[Abstract, Experimental, Version ("2.7.0"), Description (
+    "A FileShare is representative of a file or directory presented "
+    "for use (or shared) across systems.  Instances of FileShare are "
+    "associated with the shared object on the 'server'-side via "
+    "the CIM_SharedElement association.  Shares are mounted on the "
+    "'client'-side (usually into another namespace) via the CIM_Import"
+    "Share association.  FileShare is Abstract to force subclassing to "
+    "define the semantics of sharing." ) ]
+class CIM_FileShare : CIM_Share { 
+
+    [Description ("Indicates whether a directory or file is presented "
+        "for use (or shared) across systems.  A value of true "
+        "represents a directory.  A value of false represents a file") ]
+    boolean SharingDirectory;
+};
+
+// ===================================================================
+// NFSShare
+// ===================================================================
+[Experimental, Version ("2.7.0"), Description (
+    "An NFSShare represents a Directory associated "
+    "via CIM_SharedElement that is made accessible to "
+    "other systems. On the client-side, the NFSShare is "
+    "associated with its mount point via "
+    "CIM_ImportedShare.") ]
+class CIM_NFSShare : CIM_FileShare {
+
+    [Override("Name"), Description (
+        "The Name property, inherited from Share, defines the "
+        "shared name by which the shared object is exported.  "
+        "For NFS, this will typically be the pathname of the "
+        "exported directory, using forward slashes '/' to "
+        "precede directory names in the path.") ]
+    string Name;
+};
+
+// ===================================================================
+// SharedElement
+// ===================================================================
+[Association, Experimental, Version ("2.7.0"), Description (
+    "SharedElement associates the Share to a LogicalElement"
+    "that is being exported.")     ]
+class CIM_SharedElement: CIM_LogicalIdentity {
+          
+    [Override("SystemElement"), Key, Max (1), 
+        Description ("The Directory that is Shared.") ] 
+    CIM_LogicalElement REF SystemElement;
+
+    [Override("SameElement"), Key, Description (
+        "The Shared view of the Directory.") ]
+    CIM_Share ref SameElement;
+};
+
+// ==================================================================
+//    HostedShare
+// ==================================================================
+[Association, Experimental, Version ("2.7.0"), Description (
+    "CIM_HostedShare is an association between a Share and "
+    "the System on which the functionality resides.  The "
+    "cardinality of this association is 1-to-many.  A System "
+    "may host many Shares. Shares are weak with respect to "
+    "their hosting System. Heuristic:  A Share is hosted on "
+    "the System where the LogicalElement that Exports the "
+    "Share is located, (via LogicalIdentity.)") ]
+class CIM_HostedShare:CIM_Dependency {
+
+    [Override ("Antecedent"), Max (1), Min (1),
+        Description ("The hosting System.") ]
+    CIM_System REF Antecedent;
+
+    [Override ("Dependent"), Weak,
+        Description ("The Share hosted on the System.") ]
+    CIM_Share REF Dependent;
+};
+

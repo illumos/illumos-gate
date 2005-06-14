@@ -1,0 +1,607 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include	<stdlib.h>
+#include	<stdio.h>
+#include	<proc_service.h>
+#include	<link.h>
+#include	<rtld_db.h>
+#include	<rtld.h>
+#include	<_rtld_db.h>
+#include	<msg.h>
+
+
+/*
+ * 64-bit builds are going to compile this module twice, the
+ * second time with _ELF64 defined.  These defines should make
+ * all the necessary adjustments to the code.
+ */
+#ifdef _LP64
+#ifdef _ELF64
+#define	_rd_reset32		_rd_reset64
+#define	_rd_event_enable32	_rd_event_enable64
+#define	_rd_event_getmsg32	_rd_event_getmsg64
+#define	_rd_objpad_enable32	_rd_objpad_enable64
+#define	_rd_loadobj_iter32	_rd_loadobj_iter64
+#define	find_dynamic_ent32	find_dynamic_ent64
+#define	TList			List
+#define	TListnode		Listnode
+#else	/* ELF32 */
+#define	Rt_map			Rt_map32
+#define	Rtld_db_priv		Rtld_db_priv32
+#define	TList			List32
+#define	TListnode		Listnode32
+#define	Lm_list			Lm_list32
+#endif	/* _ELF64 */
+#else	/* _LP64 */
+#define	TList			List
+#define	TListnode		Listnode
+#endif	/* _LP64 */
+
+
+static rd_err_e
+validate_rdebug(struct rd_agent *rap)
+{
+	struct ps_prochandle	*php = rap->rd_psp;
+	psaddr_t		db_privp;
+	Rtld_db_priv		db_priv;
+
+	if (rap->rd_rdebug == 0)
+		return (RD_ERR);
+	/*
+	 * The rtld_db_priv structure contains both the traditional (exposed)
+	 * r_debug structure as well as private data only available to
+	 * this library.
+	 */
+	db_privp = rap->rd_rdebug;
+
+	/*
+	 * Verify that librtld_db & rtld are at the proper revision
+	 * levels.
+	 */
+	if (ps_pread(php, db_privp, (char *)&db_priv,
+	    sizeof (Rtld_db_priv)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_READPRIVFAIL_1),
+			EC_ADDR(db_privp)));
+		return (RD_DBERR);
+	}
+
+	if ((db_priv.rtd_version < R_RTLDDB_VERSION1) ||
+	    (db_priv.rtd_version > R_RTLDDB_VERSION)) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_BADPVERS),
+			db_priv.rtd_version, R_RTLDDB_VERSION));
+		return (RD_NOCAPAB);
+	}
+
+	/*
+	 * Is the image being examined from a core file or not.
+	 * If it is a core file then the following write will fail.
+	 */
+	if (ps_pwrite(php, db_privp, (char *)&db_priv,
+	    sizeof (Rtld_db_priv)) != PS_OK)
+		rap->rd_flags |= RDF_FL_COREFILE;
+
+	/*
+	 * If this *is not* a core file then rtld_db & ld.so.1 are
+	 * considered tightly coupled.  If the versions of our private
+	 * data structures don't match - fail!
+	 */
+	if (((rap->rd_flags & RDF_FL_COREFILE) == 0) &&
+	    (db_priv.rtd_version != R_RTLDDB_VERSION)) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_BADPVERS),
+			db_priv.rtd_version, R_RTLDDB_VERSION));
+		return (RD_NOCAPAB);
+	}
+
+	rap->rd_rdebugvers = db_priv.rtd_version;
+	rap->rd_rtlddbpriv = db_privp;
+
+	LOG(ps_plog(MSG_ORIG(MSG_DB_VALIDRDEBUG), EC_ADDR(rap->rd_rdebug),
+		R_RTLDDB_VERSION, rap->rd_rdebugvers,
+		rap->rd_flags & RDF_FL_COREFILE));
+	return (RD_OK);
+}
+
+
+rd_err_e
+find_dynamic_ent32(struct rd_agent *rap, psaddr_t dynaddr,
+	Xword dyntag, Dyn *dyn)
+{
+	struct ps_prochandle	*php = rap->rd_psp;
+	Dyn			d;
+
+	d.d_tag = DT_NULL;
+	do {
+		if (ps_pread(php, dynaddr, (void *)(&d), sizeof (d)) !=
+		    PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_READFAIL_4),
+				EC_ADDR(dynaddr)));
+			return (RD_DBERR);
+		}
+		dynaddr += sizeof (d);
+		if (d.d_tag == dyntag)
+			break;
+	} while (d.d_tag != DT_NULL);
+	if (d.d_tag == dyntag) {
+		*dyn = d;
+		LOG(ps_plog(MSG_ORIG(MSG_DB_FINDDYNAMIC), EC_ADDR(dyntag),
+		    EC_ADDR(d.d_un.d_val)));
+		return (RD_OK);
+	}
+	LOG(ps_plog(MSG_ORIG(MSG_DB_NODYNDEBUG), EC_ADDR(dyntag)));
+	return (RD_DBERR);
+}
+
+rd_err_e
+_rd_reset32(struct rd_agent *rap)
+{
+	psaddr_t		symaddr;
+	struct ps_prochandle	*php = rap->rd_psp;
+	const auxv_t		*auxvp = NULL;
+	rd_err_e		rc = RD_OK;
+
+	/*
+	 * librtld_db attempts three different methods to find
+	 * the r_debug structure which is required to
+	 * initialize itself.  The methods are:
+	 *	method1:
+	 *		entirely independent of any text segment
+	 *		and relies on the AT_SUN_LDDATA auxvector
+	 *		to find the ld.so.1::rdebug structure.
+	 *	method2:
+	 *		lookup symbols in ld.so.1's symbol table
+	 *		to find the r_debug symbol.
+	 *	method3:
+	 *		(old dbx method) dependent upon the
+	 *		text segment/symbol table of the
+	 *		executable and not ld.so.1.  We lookup the
+	 *		_DYNAMIC symbol in the executable and look for
+	 *		the DT_DEBUG entry in the .dynamic table.  This
+	 *		points to rdebug.
+	 *
+	 * If none of that works - we fail.
+	 */
+	LOG(ps_plog(MSG_ORIG(MSG_DB_RDRESET), rap->rd_dmodel));
+	/*
+	 * Method1
+	 *
+	 * Scan the aux vector looking for AT_BASE & AT_SUN_LDDATA
+	 */
+	if (ps_pauxv(php, &auxvp) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_NOAUXV)));
+		rc = RD_ERR;
+	}
+
+	rap->rd_rdebug = 0;
+
+	if (auxvp != NULL) {
+		rc = RD_ERR;
+		while (auxvp->a_type != AT_NULL) {
+			if (auxvp->a_type == AT_SUN_LDDATA) {
+				/* LINTED */
+				rap->rd_rdebug = (uintptr_t)auxvp->a_un.a_ptr;
+				LOG(ps_plog(MSG_ORIG(MSG_DB_FLDDATA),
+				    rap->rd_rdebug));
+				rc = validate_rdebug(rap);
+				break;
+			}
+			auxvp++;
+		}
+	}
+
+	/*
+	 * method2 - look for r_rdebug symbol in ld.so.1
+	 */
+	if (rc != RD_OK) {
+		/*
+		 * If the AT_SUN_LDDATA auxv vector is not present
+		 * fall back on doing a symlookup of
+		 * the r_debug symbol.  This is for backward
+		 * compatiblity with older OS's
+		 */
+		LOG(ps_plog(MSG_ORIG(MSG_DB_NOLDDATA)));
+		if (ps_pglobal_lookup(php, PS_OBJ_LDSO, MSG_ORIG(MSG_SYM_DEBUG),
+		    &symaddr) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_LOOKFAIL),
+				MSG_ORIG(MSG_SYM_DEBUG)));
+			rc = RD_DBERR;
+		} else {
+			rap->rd_rdebug = symaddr;
+			LOG(ps_plog(MSG_ORIG(MSG_DB_SYMRDEBUG),
+				EC_ADDR(symaddr)));
+			rc = validate_rdebug(rap);
+		}
+	}
+
+
+	/*
+	 * method3 - find DT_DEBUG in the executables .dynamic section.
+	 */
+	if (rc != RD_OK) {
+		Dyn	dyn;
+		if (ps_pglobal_lookup(php, PS_OBJ_EXEC,
+		    MSG_ORIG(MSG_SYM_DYNAMIC), &symaddr) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_NODYNAMIC)));
+			LOG(ps_plog(MSG_ORIG(MSG_DB_INITFAILED)));
+			return (rc);
+		}
+		rc = find_dynamic_ent32(rap, symaddr, DT_DEBUG, &dyn);
+		if (rc != RD_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_INITFAILED)));
+			return (rc);
+		}
+		rap->rd_rdebug = dyn.d_un.d_ptr;
+		rc = validate_rdebug(rap);
+		if (rc != RD_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_INITFAILED)));
+			return (rc);
+		}
+	}
+
+	if ((rap->rd_flags & RDF_FL_COREFILE) == 0) {
+		if (ps_pglobal_lookup(php, PS_OBJ_LDSO,
+		    MSG_ORIG(MSG_SYM_PREINIT), &symaddr) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_LOOKFAIL),
+				MSG_ORIG(MSG_SYM_PREINIT)));
+			return (RD_DBERR);
+		}
+		rap->rd_preinit = symaddr;
+
+		if (ps_pglobal_lookup(php, PS_OBJ_LDSO,
+		    MSG_ORIG(MSG_SYM_POSTINIT), &symaddr) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_LOOKFAIL),
+				MSG_ORIG(MSG_SYM_POSTINIT)));
+			return (RD_DBERR);
+		}
+		rap->rd_postinit = symaddr;
+
+		if (ps_pglobal_lookup(php, PS_OBJ_LDSO,
+		    MSG_ORIG(MSG_SYM_DLACT), &symaddr) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_LOOKFAIL),
+				MSG_ORIG(MSG_SYM_DLACT)));
+			return (RD_DBERR);
+		}
+		rap->rd_dlact = symaddr;
+		rap->rd_tbinder = 0;
+	}
+
+	return (RD_OK);
+}
+
+
+rd_err_e
+_rd_event_enable32(rd_agent_t *rap, int onoff)
+{
+	struct ps_prochandle	*php = rap->rd_psp;
+	Rtld_db_priv		rdb;
+
+	LOG(ps_plog(MSG_ORIG(MSG_DB_RDEVENTENABLE), rap->rd_dmodel, onoff));
+	/*
+	 * Tell the debugged process that debugging is occuring
+	 * This will enable the storing of event messages so that
+	 * the can be gathered by the debugger.
+	 */
+	if (ps_pread(php, rap->rd_rdebug, (char *)&rdb,
+	    sizeof (Rtld_db_priv)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_READFAIL_1),
+		    EC_ADDR((uintptr_t)&rdb)));
+		return (RD_DBERR);
+	}
+
+	if (onoff)
+		rdb.rtd_rdebug.r_flags |= RD_FL_DBG;
+	else
+		rdb.rtd_rdebug.r_flags &= ~RD_FL_DBG;
+
+	if (ps_pwrite(php, rap->rd_rdebug, (char *)&rdb,
+	    sizeof (Rtld_db_priv)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_WRITEFAIL_1),
+		    EC_ADDR((uintptr_t)&rdb)));
+		return (RD_DBERR);
+	}
+
+	return (RD_OK);
+}
+
+
+rd_err_e
+_rd_event_getmsg32(rd_agent_t *rap, rd_event_msg_t *emsg)
+{
+	Rtld_db_priv	rdb;
+
+	if (ps_pread(rap->rd_psp, rap->rd_rdebug, (char *)&rdb,
+	    sizeof (Rtld_db_priv)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_2),
+		    EC_ADDR(rap->rd_rdebug)));
+		return (RD_DBERR);
+	}
+	emsg->type = rdb.rtd_rdebug.r_rdevent;
+	if (emsg->type == RD_DLACTIVITY) {
+		switch (rdb.rtd_rdebug.r_state) {
+			case RT_CONSISTENT:
+				emsg->u.state = RD_CONSISTENT;
+				break;
+			case RT_ADD:
+				emsg->u.state = RD_ADD;
+				break;
+			case RT_DELETE:
+				emsg->u.state = RD_DELETE;
+				break;
+		}
+	} else
+		emsg->u.state = RD_NOSTATE;
+
+	LOG(ps_plog(MSG_ORIG(MSG_DB_RDEVENTGETMSG), rap->rd_dmodel,
+		emsg->type, emsg->u.state));
+
+	return (RD_OK);
+}
+
+
+rd_err_e
+_rd_objpad_enable32(struct rd_agent *rap, size_t padsize)
+{
+	Rtld_db_priv		db_priv;
+	struct ps_prochandle	*php = rap->rd_psp;
+
+	LOG(ps_plog(MSG_ORIG(MSG_DB_RDOBJPADE), EC_ADDR(padsize)));
+
+	if (ps_pread(php, rap->rd_rtlddbpriv, (char *)&db_priv,
+	    sizeof (Rtld_db_priv)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_READFAIL_3),
+		    EC_ADDR(rap->rd_rtlddbpriv)));
+		return (RD_DBERR);
+	}
+#if	defined(_LP64) && !defined(_ELF64)
+	/*LINTED*/
+	db_priv.rtd_objpad = (uint32_t)padsize;
+#else
+	db_priv.rtd_objpad = padsize;
+#endif
+	if (ps_pwrite(php, rap->rd_rtlddbpriv, (char *)&db_priv,
+	    sizeof (Rtld_db_priv)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_WRITEFAIL_2),
+		    EC_ADDR(rap->rd_rtlddbpriv)));
+		return (RD_DBERR);
+	}
+	return (RD_OK);
+}
+
+
+
+
+static rd_err_e
+iter_map(rd_agent_t *rap, unsigned long ident, psaddr_t lmaddr,
+	rl_iter_f *cb, void *client_data, uint_t *abort_iter)
+{
+	while (lmaddr) {
+		Rt_map		rmap;
+		rd_loadobj_t	lobj;
+		int		i;
+		ulong_t		off;
+		Ehdr		ehdr;
+		Phdr		phdr;
+
+		if (ps_pread(rap->rd_psp, lmaddr, (char *)&rmap,
+		    sizeof (Rt_map)) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_LKMAPFAIL)));
+			return (RD_DBERR);
+		}
+
+		/*
+		 * As of 'VERSION5' we only report objects
+		 * which have been fully relocated.  While the maps
+		 * might be in a consistent state - if a object hasn't
+		 * been relocated - it's not really ready for the debuggers
+		 * to examine.  This is mostly due to the fact that we
+		 * might still be mucking with the text-segment, if
+		 * we are - we could conflict with any break-points
+		 * the debuggers might have set.
+		 */
+		if (rap->rd_rdebugvers >= R_RTLDDB_VERSION5) {
+			if ((FLAGS(&rmap) & FLG_RT_RELOCED) == 0) {
+				lmaddr = (psaddr_t)NEXT(&rmap);
+				continue;
+			}
+		}
+
+		lobj.rl_base = (psaddr_t)ADDR(&rmap);
+		lobj.rl_lmident = ident;
+		lobj.rl_flags = 0;
+		lobj.rl_refnameaddr = (psaddr_t)REFNAME(&rmap);
+
+		/*
+		 * refnameaddr is only valid from a core file
+		 * which is VERSION3 or greater.
+		 */
+		if (rap->rd_rdebugvers < R_RTLDDB_VERSION3) {
+			lobj.rl_nameaddr = (psaddr_t)NAME(&rmap);
+			lobj.rl_bend = 0;
+			lobj.rl_padstart = 0;
+			lobj.rl_padend = 0;
+		} else {
+			lobj.rl_nameaddr = (psaddr_t)PATHNAME(&rmap);
+			lobj.rl_bend = ADDR(&rmap) + MSIZE(&rmap);
+			lobj.rl_padstart = PADSTART(&rmap);
+			lobj.rl_padend = PADSTART(&rmap) + PADIMLEN(&rmap);
+
+		}
+
+		if (rtld_db_version >= RD_VERSION2)
+			if (FLAGS(&rmap) & FLG_RT_IMGALLOC)
+				lobj.rl_flags |= RD_FLG_MEM_OBJECT;
+		if (rtld_db_version >= RD_VERSION2) {
+			lobj.rl_dynamic = (psaddr_t)DYN(&rmap);
+		}
+
+		if (rtld_db_version >= RD_VERSION4)
+			lobj.rl_tlsmodid = TLSMODID(&rmap);
+
+		/*
+		 * Look for beginning of data segment.
+		 *
+		 * NOTE: the data segment can only be found for full
+		 *	processes and not from core images.
+		 */
+		lobj.rl_data_base = 0;
+		if (rap->rd_flags & RDF_FL_COREFILE)
+			lobj.rl_data_base = 0;
+		else {
+			off = ADDR(&rmap);
+			if (ps_pread(rap->rd_psp, off, (char *)&ehdr,
+			    sizeof (Ehdr)) != PS_OK) {
+				LOG(ps_plog(MSG_ORIG(MSG_DB_LKMAPFAIL)));
+				return (RD_DBERR);
+			}
+			off += sizeof (Ehdr);
+			for (i = 0; i < ehdr.e_phnum; i++) {
+				if (ps_pread(rap->rd_psp, off, (char *)&phdr,
+				    sizeof (Phdr)) != PS_OK) {
+					LOG(ps_plog(MSG_ORIG(
+					    MSG_DB_LKMAPFAIL)));
+					return (RD_DBERR);
+				}
+				if ((phdr.p_type == PT_LOAD) &&
+				    (phdr.p_flags & PF_W)) {
+					lobj.rl_data_base = phdr.p_vaddr;
+					if (ehdr.e_type == ET_DYN)
+						lobj.rl_data_base +=
+							ADDR(&rmap);
+					break;
+				}
+				off += ehdr.e_phentsize;
+			}
+		}
+
+
+		/*
+		 * When we transfer control to the client we free the
+		 * lock and re-atain it after we've returned from the
+		 * client.  This is to avoid any deadlock situations.
+		 */
+		LOG(ps_plog(MSG_ORIG(MSG_DB_ITERMAP), cb, client_data,
+			EC_ADDR(lobj.rl_base), EC_ADDR(lobj.rl_lmident)));
+		RDAGUNLOCK(rap);
+		if ((*cb)(&lobj, client_data) == 0) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_CALLBACKR0)));
+			RDAGLOCK(rap);
+			*abort_iter = 1;
+			break;
+		}
+		RDAGLOCK(rap);
+		lmaddr = (psaddr_t)NEXT(&rmap);
+	}
+	return (RD_OK);
+}
+
+
+rd_err_e
+_rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
+{
+	Rtld_db_priv	db_priv;
+	TList		list;
+	TListnode	lnode;
+	Addr		lnp;
+	unsigned long	ident;
+	rd_err_e	rc;
+	uint_t		abort_iter = 0;
+
+	LOG(ps_plog(MSG_ORIG(MSG_DB_LOADOBJITER), rap->rd_dmodel, cb,
+		client_data));
+
+	if (ps_pread(rap->rd_psp, rap->rd_rtlddbpriv, (char *)&db_priv,
+	    sizeof (Rtld_db_priv)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_1),
+		    EC_ADDR(rap->rd_rtlddbpriv)));
+		return (RD_DBERR);
+	}
+
+	if (db_priv.rtd_dynlmlst == 0) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_LKMAPNOINIT),
+			EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
+		return (RD_NOMAPS);
+	}
+
+	if (ps_pread(rap->rd_psp, (psaddr_t)db_priv.rtd_dynlmlst, (char *)&list,
+	    sizeof (TList)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_3),
+			EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
+		return (RD_DBERR);
+	}
+
+	if (list.head == 0) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_LKMAPNOINIT_1),
+			EC_ADDR((uintptr_t)list.head)));
+		return (RD_NOMAPS);
+	}
+
+
+	if (cb == 0) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_NULLITER)));
+		return (RD_ERR);
+	}
+
+	for (lnp = (Addr)list.head; lnp; lnp = (Addr)lnode.next) {
+		Lm_list	lml;
+
+		/*
+		 * Iterate through the List of Lm_list's.
+		 */
+		if (ps_pread(rap->rd_psp, (psaddr_t)lnp, (char *)&lnode,
+		    sizeof (TListnode)) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_4),
+				EC_ADDR(lnp)));
+			return (RD_DBERR);
+		}
+
+		if (ps_pread(rap->rd_psp, (psaddr_t)lnode.data, (char *)&lml,
+		    sizeof (Lm_list)) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_5),
+				EC_ADDR((uintptr_t)lnode.data)));
+			return (RD_DBERR);
+		}
+
+		/*
+		 * Determine IDENT of current LM_LIST
+		 */
+		if (lml.lm_flags & LML_FLG_BASELM)
+			ident = LM_ID_BASE;
+		else if (lml.lm_flags & LML_FLG_RTLDLM)
+			ident = LM_ID_LDSO;
+		else
+			ident = (unsigned long)lnode.data;
+
+		if ((rc = iter_map(rap, ident, (psaddr_t)lml.lm_head,
+		    cb, client_data, &abort_iter)) != RD_OK) {
+			return (rc);
+		}
+		if (abort_iter)
+			break;
+	}
+	return (rc);
+}

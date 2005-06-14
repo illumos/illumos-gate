@@ -1,0 +1,79 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# ucblib/librpcsoc/Makefile.com
+#
+
+LIBRARY= librpcsoc.a
+VERS = .1
+
+CLOBBERFILES += lint.out
+
+
+OBJECTS= clnt_tcp.o clnt_udp.o getrpcport.o rtime.o svc_tcp.o svc_udp.o get_myaddress.o
+
+# include library definitions
+include $(SRC)/lib/Makefile.lib
+
+MAPFILE=	$(MAPDIR)/mapfile
+CLOBBERFILES += $(MAPFILE)
+SRCS=		$(OBJECTS:%.o=../%.c)
+
+objs/%.o pics/%.o: ../%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+LIBS = $(DYNLIB)
+
+LDLIBS += -lnsl -lsocket -lc
+CPPFLAGS += -DPORTMAP
+DYNFLAGS += -M $(MAPFILE)
+
+ROOTLIBDIR=	$(ROOT)/usr/ucblib
+ROOTLIBDIR64=   $(ROOT)/usr/ucblib/$(MACH64)
+
+LINTSRC= $(LINTLIB:%.ln=%)
+$(LINTLIB):= SRCS=../$(LINTSRC)
+
+CPPFLAGS = -I$(ROOT)/usr/ucbinclude -I../../../lib/libc/inc $(CPPFLAGS.master)
+
+.KEEP_STATE:
+
+$(DYNLIB):	$(MAPFILE)
+
+$(MAPFILE):
+	@cd $(MAPDIR); $(MAKE) mapfile
+
+lint: lintcheck
+
+# include library targets
+include $(SRC)/lib/Makefile.targ
+include ../../Makefile.ucbtarg
+
+# install rule for lint library target
+$(ROOTLINTDIR)/%: ../%
+	$(INS.file)

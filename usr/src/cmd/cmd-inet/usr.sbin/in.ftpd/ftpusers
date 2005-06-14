@@ -1,0 +1,19 @@
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# List of users denied access to the FTP server, see ftpusers(4).
+#
+root
+daemon
+bin
+sys
+adm
+lp
+uucp
+nuucp
+smmsp
+listen
+gdm
+webservd
+nobody
+noaccess
+nobody4

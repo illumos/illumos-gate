@@ -1,0 +1,83 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+NOTE: This directory contains legacy initialization and termination
+scripts for managing services.  The preferred method of service
+management is via the Service Management Facility; to read more about
+SMF, consult smf(5).
+
+File names in rc?.d directories are of the form [SK]nn<init.d filename>
+where 'S' means start this job, 'K' means kill this job, and 'nn' is the
+relative sequence number for killing or starting the job.  When
+executing each script in one of the /etc/rc[S0-6] directories, the
+/sbin/rc[S0-6] script passes a single argument.  It passes the argument
+'stop' for scripts prefixed with 'K' and the argument 'start' for
+scripts prefixed with 'S'.  There is no harm in applying the same
+sequence number to multiple scripts.  In this case the order of
+execution is deterministic but unspecified.  It is recommended that
+scripts be hard-linked from the same file stored in /etc/init.d/.
+
+On earlier Solaris releases, a script named with a suffix of '.sh' would
+be sourced, allowing scripts to modify the environment of other scripts
+executed later.  This behavior is no longer supported; for altering the
+environment in which services are run, refer to the SMF documentation.
+
+Legacy services are reported by the default svcs(1m) output, and (where
+appropriate) the utility's '-p' option.  This reporting assumes a
+behavior as described above, such that each 'S' script has a suitable
+matching 'K' script, and they are both hard linked to a script in
+/etc/init.d/.  If this is not the case, legacy service reporting may not
+operate accurately; under all circumstances, the scripts are always
+executed as described above.
+
+The run-levels operate as follows:
+
+s/S
+
+	Read /etc/rcS.d/README for details. This run-level corresponds to
+	the milestone svc:/milestone/single-user:default.
+
+0/5/6
+
+	All /etc/rc0.d/K* scripts are run, followed by all /etc/rc0.d/S*
+	scripts. The S* scripts should only be used for cleanup during
+	shutdown.
+
+1
+
+	If the system was in a higher run-level, all /etc/rc1.d/K* scripts
+	are run. Regardless of the previous run-level, all /etc/rc1.d/S*
+	scripts are run.
+
+2
+
+	Read /etc/rc2.d/README for details. This run-level corresponds to
+	the milestone svc:/milestone/multi-user:default.
+
+3
+
+	Read /etc/rc3.d/README for details. This run-level corresponds to
+	the milestone svc:/milestone/multi-user-server:default.
+

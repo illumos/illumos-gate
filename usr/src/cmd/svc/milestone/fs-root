@@ -1,0 +1,181 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
+# All rights reserved.
+#
+
+# Make sure that the libraries essential to this stage of booting can be found.
+LD_LIBRARY_PATH=/lib; export LD_LIBRARY_PATH
+
+libc_mount() {
+	#
+	# If there is an optimized libc available in /usr that fits this
+	# processor, mount it on top of the base libc.
+	#
+	MOE=`/usr/bin/moe -32 '/usr/lib/libc/$HWCAP'`
+	if [ -n "$MOE" ]; then
+		/usr/sbin/mount | egrep -s "^/lib/libc.so.1 on "
+		if [ $? -ne 0 ]; then
+			/usr/sbin/mount -O -F lofs $MOE /lib/libc.so.1
+		fi
+	fi
+}
+
+libc_psr_mount() {
+	LIBC_MOE_32=`/usr/bin/moe -32 '/platform/sun4v/lib/libc_psr/$HWCAP'`
+	if [ -n "$LIBC_MOE_32" ]; then
+		/usr/sbin/mount | egrep -s "^/platform/sun4v/lib/libc_psr.so.1 on "
+		if [ $? -ne 0 ]; then
+			/usr/sbin/mount -O -F lofs $LIBC_MOE_32 /platform/sun4v/lib/libc_psr.so.1
+		fi
+	fi
+
+	LIBC_MOE_64=`/usr/bin/moe -64 '/platform/sun4v/lib/sparcv9/libc_psr/$HWCAP'`
+	if [ -n "$LIBC_MOE_64" ]; then
+		/usr/sbin/mount | egrep -s "^/platform/sun4v/lib/sparcv9/libc_psr.so.1 on "
+		if [ $? -ne 0 ]; then
+			/usr/sbin/mount -O -F lofs $LIBC_MOE_64 /platform/sun4v/lib/sparcv9/libc_psr.so.1
+		fi
+	fi
+}
+
+#
+# Most of the operations in this script are only necessary in the global
+# zone but due to the way initialization scripts like this are packaged,
+# it needs to currently exist for all zones.
+#
+if [ "${_INIT_ZONENAME:=`/sbin/zonename`}" != "global" ]; then
+	libc_mount
+	exit 0
+fi
+
+. /lib/svc/share/smf_include.sh
+. /lib/svc/share/fs_include.sh
+
+#
+# Root is already mounted (by the kernel), but still needs to be
+# checked, possibly remounted and entered into mnttab. First
+# mount /usr read only if it is a separate file system. This must
+# be done first to allow utilities such as fsck and setmnt to
+# reside on /usr minimizing the space required by the root file
+# system.
+#
+readvfstab "/usr" < $vfstab
+if [ -n "$mountp" ]; then
+	if [ "$fstype" = cachefs ]; then
+		#
+		# Mount without the cache initially.  We'll enable it
+		# later at remount time.  This lets us avoid
+		# teaching the statically linked mount program about
+		# cachefs.  Here we determine the backfstype.
+		# This is not pretty, but we have no tools for parsing
+		# the option string until we get /usr mounted...
+		#
+		case "$mntopts" in
+		*backfstype=nfs*)
+			cfsbacktype=nfs
+			;;
+		*backfstype=hsfs*)
+			cfsbacktype=hsfs
+			;;
+		*)
+			msg='invalid vfstab entry for /usr'
+			echo $msg
+			echo "$SMF_FMRI:" $msg >/dev/msglog
+			cfsbacktype=nfs
+			;;
+		esac
+		mountfs - /usr $cfsbacktype ro $special ||
+		    exit $SMF_EXIT_ERR_FATAL
+	else
+		#
+		# Must use -o largefiles here to ensure the
+		# read-only mount does not fail as a result of
+		# having a large file present on /usr. This gives
+		# fsck a chance to fix up the largefiles flag
+		# before we remount /usr read-write.
+		#
+		if [ "x$mntopts" = x- ]; then
+			mntopts='ro,largefiles'
+		else
+			checkopt largefiles $mntopts
+			if [ "x$option" != xlargefiles ]; then
+				mntopts="largefiles,$mntopts"
+			fi
+
+			checkopt ro $mntopts
+			if [ "x$option" != xro ]; then
+				mntopts="ro,$mntopts"
+			fi
+
+			#
+			# Requesting logging on a read-only mount
+			# causes errors to be displayed, so remove
+			# "logging" from the list of options for now.
+			# The read-write mount performed later will
+			# specify the logging option if appropriate.
+			#
+
+			checkopt logging $mntopts
+			if [ "x$option" = xlogging ]; then
+				mntopts="$otherops"
+			fi
+		fi
+
+		mountfs -O /usr $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
+	fi
+fi
+
+#
+# Also mount /boot now so that things like keymap.sh can access
+# boot properties through eeprom.  Readonly isn't required because
+# /boot (and other pcfs filesystems) aren't fsck'ed at boot yet.
+# Also, we don't account for caching /boot as it must be on a local
+# disk.  So what's in vfstab is fine as it stands; just look to see
+# if it's there and avoid the mount if not.
+#
+readvfstab "/boot" < $vfstab
+
+if [ -n "$mountp" ]; then
+	mountfs - /boot $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
+fi
+
+#
+# Update kernel driver.conf cache with any additional driver.conf
+# files found on /usr, and device permissions from /etc/minor_perm.
+#
+/usr/sbin/devfsadm -I -P
+
+[ -f /etc/.dynamic_routing ] && /usr/bin/rm -f /etc/.dynamic_routing
+
+libc_mount
+
+libc_psr_mount
+
+exit 0

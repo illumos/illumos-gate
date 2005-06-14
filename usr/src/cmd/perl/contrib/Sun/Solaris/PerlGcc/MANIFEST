@@ -1,0 +1,9 @@
+Changes
+Makefile.PL
+MANIFEST
+perlgcc.PL
+pod/perlgcc.pod
+config/5.6.1/5.10/sparc/Config.pm
+config/5.6.1/5.10/x86/Config.pm
+config/5.8.4/5.10/sparc/Config.pm
+config/5.8.4/5.10/x86/Config.pm

@@ -1,0 +1,305 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <stdio.h>
+#include <string.h>
+#include <fm/fmd_api.h>
+#include <libnvpair.h>
+#include "out.h"
+#include "stats.h"
+#include "alloc.h"
+#include "stable.h"
+#include "literals.h"
+#include "lut.h"
+#include "esclex.h"
+#include "tree.h"
+#include "ipath.h"
+#include "itree.h"
+#include "ptree.h"
+#include "check.h"
+#include "version.h"
+#include "fme.h"
+#include "eval.h"
+#include "config.h"
+#include "platform.h"
+
+/*
+ * eversholt diagnosis engine (eft.so) main entry points
+ */
+
+fmd_hdl_t *Hdl;		/* handle in global for platform.c */
+
+int Debug = 1;	/* turn on here and let fmd_hdl_debug() decide if really on */
+char *Autoclose;	/* close cases automatically after solving */
+int Autoconvict;	/* true if autoconvict set in conf file */
+hrtime_t Hesitate;	/* hesitation time in ns */
+int Verbose;
+int Estats;
+int Warn;	/* zero -- eft.so should not issue language warnings */
+char **Efts;
+
+/* stuff exported by yacc-generated parsers */
+extern void yyparse(void);
+extern int yydebug;
+
+extern struct lut *Dicts;
+
+extern void literals_init(void);
+extern void literals_fini(void);
+
+/*ARGSUSED*/
+static void
+eft_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
+{
+	static char prefix[] = "ereport.";
+
+	if (strncmp(class, prefix, sizeof (prefix) - 1))
+		out(O_DIE,
+		    "eft_recv: event class \"%s\" does not begin with %s",
+		    class, prefix);
+
+	fme_receive_external_report(hdl, ep, nvl, class);
+}
+
+/*ARGSUSED*/
+static void
+eft_timeout(fmd_hdl_t *hdl, id_t tid, void *arg)
+{
+	out(O_ALTFP|O_STAMP,
+	    "\neft.so timer %ld fired with arg %p", tid, arg);
+
+	if (arg == NULL)
+		return;
+
+	fme_timer_fired(arg, tid);
+}
+
+/*ARGSUSED*/
+static void
+eft_close(fmd_hdl_t *hdl, fmd_case_t *fmcase)
+{
+	out(O_ALTFP, "eft_close called for case %s",
+	    fmd_case_uuid(hdl, fmcase));
+	fme_close_case(hdl, fmcase);
+}
+
+static const fmd_prop_t eft_props[] = {
+	{ "autoconvict", FMD_TYPE_BOOL, NULL },
+	{ "autoclose", FMD_TYPE_STRING, NULL },
+	{ "estats", FMD_TYPE_BOOL, "false" },
+	{ "hesitate", FMD_TYPE_INT64, "10000000000" },
+	{ "verbose", FMD_TYPE_INT32, "0" },
+	{ "warn", FMD_TYPE_BOOL, "false" },
+	{ "status", FMD_TYPE_STRING, NULL },
+	{ NULL, 0, NULL }
+};
+
+static const fmd_hdl_ops_t eft_ops = {
+	eft_recv,	/* fmdo_recv */
+	eft_timeout,	/* fmdo_timeout */
+	eft_close,	/* fmdo_close */
+	NULL,		/* fmdo_stats */
+	NULL,		/* fmdo_gc */
+};
+
+#define	xstr(s) str(s)
+#define	str(s) #s
+
+static const fmd_hdl_info_t fmd_info = {
+	"eft diagnosis engine",
+	xstr(VERSION_MAJOR) "." xstr(VERSION_MINOR),
+	&eft_ops, eft_props
+};
+
+/*
+ * ename_strdup -- like strdup but ename comes in and class string goes out
+ */
+static char *
+ename_strdup(struct node *np)
+{
+	struct node *mynp;
+	int len;
+	char *buf;
+
+	/* calculate length of buffer required */
+	len = 0;
+	for (mynp = np; mynp; mynp = mynp->u.name.next)
+		len += strlen(mynp->u.name.s) + 1;	/* +1 for dot or NULL */
+
+	buf = MALLOC(len);
+	buf[0] = '\0';
+
+	/* now build the string */
+	while (np) {
+		(void) strcat(buf, np->u.name.s);
+		np = np->u.name.next;
+		if (np)
+			(void) strcat(buf, ".");
+	}
+
+	return (buf);
+}
+
+/*ARGSUSED*/
+static void
+dosubscribe(struct node *lhs, struct node *rhs, void *arg)
+{
+	char *ename = ename_strdup(lhs);
+
+	out(O_DEBUG, "subscribe: \"%s\"", ename);
+	fmd_hdl_subscribe(Hdl, ename);
+	FREE(ename);
+}
+
+extern struct stats *Filecount;
+
+/*
+ * Call all of the _fini() routines to clean up the exiting DE
+ */
+void
+call_finis(void)
+{
+	platform_free_eft_files(Efts);
+	Efts = NULL;
+	platform_fini();
+	fme_fini();
+	itree_fini();
+	ipath_fini();
+	lex_free();
+	check_fini();
+	tree_fini();
+	lut_fini();
+	literals_fini();
+	stable_fini();
+	stats_fini();
+	out_fini();
+	alloc_fini();
+}
+
+/*ARGSUSED*/
+static void
+doopendict(const char *lhs, void *rhs, void *arg)
+{
+	out(O_DEBUG, "opendict: \"%s\"", lhs);
+	fmd_hdl_opendict(Hdl, lhs);
+}
+
+void
+_fmd_init(fmd_hdl_t *hdl)
+{
+	fmd_case_t *casep = NULL;
+	int count;
+	char *fname;
+
+	(void) fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info);
+
+	/* keep handle for routines like out() which need it */
+	Hdl = hdl;
+
+	Estats = fmd_prop_get_int32(hdl, "estats");
+
+	alloc_init();
+	out_init("eft");
+	stats_init(Estats);
+	stable_init(0);
+	literals_init();
+	platform_init();
+	lut_init();
+	tree_init();
+	ipath_init();
+	Efts = platform_get_eft_files();
+	lex_init(Efts, NULL, 0);
+	check_init();
+
+	/*
+	 *  If we read no .eft files, we can't do any
+	 *  diagnosing, so we just unload ourselves
+	 */
+	if (stats_counter_value(Filecount) == 0) {
+		(void) lex_fini();
+		call_finis();
+		fmd_hdl_debug(hdl, "no fault trees provided.");
+		fmd_hdl_unregister(hdl);
+		return;
+	}
+
+	yyparse();
+	(void) lex_fini();
+	tree_report();
+	if (count = out_errcount())
+		out(O_DIE, "%d language error%s encountered, exiting.",
+		    OUTS(count));
+
+	/* subscribe to events we expect to consume */
+	lut_walk(Ereportenames, (lut_cb)dosubscribe, NULL);
+
+	/* open dictionaries referenced by all .eft files */
+	lut_walk(Dicts, (lut_cb)doopendict, (void *)0);
+
+	Verbose = fmd_prop_get_int32(hdl, "verbose");
+	Warn = fmd_prop_get_int32(hdl, "warn");
+	Autoclose = fmd_prop_get_string(hdl, "autoclose");
+	Hesitate = fmd_prop_get_int64(hdl, "hesitate");
+	Autoconvict = fmd_prop_get_int32(hdl, "autoconvict");
+
+	if ((fname = fmd_prop_get_string(hdl, "status")) != NULL) {
+		FILE *fp;
+
+		if ((fp = fopen(fname, "a")) == NULL) {
+			fmd_prop_free_string(hdl, fname);
+			out(O_DIE|O_SYS, "status property file: %s", fname);
+		}
+
+		(void) setlinebuf(fp);
+		out_altfp(fp);
+
+		out(O_DEBUG, "appending status changes to \"%s\"", fname);
+		fmd_prop_free_string(hdl, fname);
+
+		out(O_ALTFP|O_STAMP, "\neft.so startup");
+	}
+
+	out(O_DEBUG,
+	    "initialized, verbose %d warn %d autoclose %s autoconvict %d",
+	    Verbose, Warn, Autoclose == NULL ? "(NULL)" : Autoclose,
+	    Autoconvict);
+
+	out(O_DEBUG, "reconstituting any existing fmes");
+	while ((casep = fmd_case_next(hdl, casep)) != NULL) {
+		fme_restart(hdl, casep);
+	}
+}
+
+/*ARGSUSED*/
+void
+_fmd_fini(fmd_hdl_t *hdl)
+{
+	fmd_prop_free_string(hdl, Autoclose);
+	Autoclose = NULL;
+	call_finis();
+}

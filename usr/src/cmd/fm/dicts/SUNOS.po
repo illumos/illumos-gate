@@ -1,0 +1,176 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# code: SUNOS-8000-0G
+# keys: ereport.sunos.unix.fm_panic
+#
+msgid "SUNOS-8000-0G.type"
+msgstr "Error"
+msgid "SUNOS-8000-0G.severity"
+msgstr "Major"
+msgid "SUNOS-8000-0G.description"
+msgstr "Errors have been detected that require a reboot to ensure system integrity.  Refer to %s for more information."
+msgid "SUNOS-8000-0G.response"
+msgstr "Solaris will attempt to save and diagnose the error telemetry"
+msgid "SUNOS-8000-0G.impact"
+msgstr "The system will sync files, save a crash dump if needed, and reboot"
+msgid "SUNOS-8000-0G.action"
+msgstr "Save the error summary below in case telemetry cannot be saved"
+#
+# code: SUNOS-8000-1L
+# keys: defect.sunos.eft.undiagnosable_problem
+#
+msgid "SUNOS-8000-1L.type"
+msgstr "Defect"
+msgid "SUNOS-8000-1L.severity"
+msgstr "Minor"
+msgid "SUNOS-8000-1L.description"
+msgstr "The EFT Diagnosis Engine encountered telemetry for which it is unable to produce a diagnosis.  This may indicate an incomplete EFT file provided or a defect in the diagnosis algorithm.  Refer to %s for more information."
+msgid "SUNOS-8000-1L.response"
+msgstr "Error reports from the component will be logged for examination by Sun."
+msgid "SUNOS-8000-1L.impact"
+msgstr "Automated diagnosis and response for these events will not occur."
+msgid "SUNOS-8000-1L.action"
+msgstr "Run pkgchk -n SUNWfmd to ensure that fault management software is installed properly.  Contact Sun for support."
+#
+# code: SUNOS-8000-20
+# keys: defect.io.pci.driver fault.io.pci.device fault.io.pci.bus 
+#
+msgid "SUNOS-8000-20.type"
+msgstr "Fault"
+msgid "SUNOS-8000-20.severity"
+msgstr "Critical"
+msgid "SUNOS-8000-20.description"
+msgstr "A problem was detected in the SUNOS subsystem or controlling software"
+msgid "SUNOS-8000-20.response"
+msgstr "One or more of device instances may be disabled"
+msgid "SUNOS-8000-20.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUNOS-8000-20.action"
+msgstr "Ensure latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact Sun for support."
+
+#
+# code: SUNOS-8000-3V
+# keys: fault.io.pci.bus fault.io.pci.device
+#
+msgid "SUNOS-8000-3V.type"
+msgstr "Fault"
+msgid "SUNOS-8000-3V.severity"
+msgstr "Critical"
+msgid "SUNOS-8000-3V.description"
+msgstr "A problem was detected in the PCI subsystem"
+msgid "SUNOS-8000-3V.response"
+msgstr "One or more of device instances may be disabled"
+msgid "SUNOS-8000-3V.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUNOS-8000-3V.action"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support."
+
+#
+# code: SUNOS-8000-46
+# keys: defect.io.pci.driver fault.io.pci.device
+#
+msgid "SUNOS-8000-46.type"
+msgstr "Fault"
+msgid "SUNOS-8000-46.severity"
+msgstr "Critical"
+msgid "SUNOS-8000-46.description"
+msgstr "A problem was detected in the PCI subsystem or controlling software"
+msgid "SUNOS-8000-46.response"
+msgstr "One or more of device instances may be disabled"
+msgid "SUNOS-8000-46.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUNOS-8000-46.action"
+msgstr "Ensure latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact Sun for support."
+
+#
+# code: SUNOS-8000-5T
+# keys: defect.io.pci.driver fault.io.pci.bus
+#
+msgid "SUNOS-8000-5T.type"
+msgstr "Fault"
+msgid "SUNOS-8000-5T.severity"
+msgstr "Critical"
+msgid "SUNOS-8000-5T.description"
+msgstr "A problem was detected in the PCI subsystem or controlling software"
+msgid "SUNOS-8000-5T.response"
+msgstr "One or more of device instances may be disabled"
+msgid "SUNOS-8000-5T.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUNOS-8000-5T.action"
+msgstr "Ensure latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact Sun for support."
+
+#
+# code: SUNOS-8000-69
+# keys: fault.io.pci.device
+#
+msgid "SUNOS-8000-69.type"
+msgstr "Fault"
+msgid "SUNOS-8000-69.severity"
+msgstr "Critical"
+msgid "SUNOS-8000-69.description"
+msgstr "A problem was detected for a PCI controller"
+msgid "SUNOS-8000-69.response"
+msgstr "One or more of device instances may be disabled"
+msgid "SUNOS-8000-69.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUNOS-8000-69.action"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support."
+
+#
+# code: SUNOS-8000-7N
+# keys: fault.io.pci.bus
+#
+msgid "SUNOS-8000-7N.type"
+msgstr "Fault"
+msgid "SUNOS-8000-7N.severity"
+msgstr "Critical"
+msgid "SUNOS-8000-7N.description"
+msgstr "A problem was detected for a PCI bus"
+msgid "SUNOS-8000-7N.response"
+msgstr "One or more of device instances may be disabled"
+msgid "SUNOS-8000-7N.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUNOS-8000-7N.action"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support."
+
+#
+# code: SUNOS-8000-8W
+# keys: defect.io.pci.driver
+#
+#
+msgid "SUNOS-8000-8W.type"
+msgstr "Fault"
+msgid "SUNOS-8000-8W.severity"
+msgstr "Critical"
+msgid "SUNOS-8000-8W.description"
+msgstr "A problem was detected in the PCI controller software"
+msgid "SUNOS-8000-8W.response"
+msgstr "One or more of device instances may be disabled"
+msgid "SUNOS-8000-8W.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUNOS-8000-8W.action"
+msgstr "Ensure latest drivers and patches are installed. Use fmdump -v -u <EVENT_ID> to identify the module/package, or contact Sun for support."

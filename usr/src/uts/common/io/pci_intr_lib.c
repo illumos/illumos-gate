@@ -1,0 +1,1169 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Support for MSI, MSIX and INTx
+ */
+
+#include <sys/conf.h>
+#include <sys/debug.h>
+#include <sys/pci.h>
+#include <sys/sunddi.h>
+#include <sys/bitmap.h>
+
+/*
+ * Library utility functions
+ */
+
+
+/*
+ * pci_check_pciex:
+ *
+ * check whether the device has PCI-E capability
+ */
+int
+pci_check_pciex(dev_info_t *dip)
+{
+	ddi_acc_handle_t cfg_handle;
+	ushort_t status;
+	ushort_t cap;
+	ushort_t capsp;
+	ushort_t cap_count = PCI_CAP_MAX_PTR;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_check_pciex: dip: 0x%p, driver: %s, "
+	    "binding: %s, nodename: %s\n", (void *)dip, ddi_driver_name(dip),
+	    ddi_binding_name(dip), ddi_node_name(dip)));
+
+	if (pci_config_setup(dip, &cfg_handle) != DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_check_pciex: "
+		    "pci_config_setup() failed\n"));
+		return (DDI_FAILURE);
+	}
+	status = pci_config_get16(cfg_handle, PCI_CONF_STAT);
+	if (!(status & PCI_STAT_CAP))
+		goto notpciex;
+
+	capsp = pci_config_get8(cfg_handle, PCI_CONF_CAP_PTR);
+	while (cap_count-- && capsp >= PCI_CAP_PTR_OFF) {
+		capsp &= PCI_CAP_PTR_MASK;
+		cap = pci_config_get8(cfg_handle, capsp);
+		DDI_INTR_NEXDBG((CE_CONT, "pci_check_pciex: capid=0x%x\n",
+		    cap));
+		if (cap == PCI_CAP_ID_PCI_E) {
+			DDI_INTR_NEXDBG((CE_CONT, "pci_check_pciex: "
+			    "PCI-Express capability found\n"));
+			pci_config_teardown(&cfg_handle);
+			return (DDI_SUCCESS);
+		}
+		capsp = pci_config_get8(cfg_handle, capsp + PCI_CAP_NEXT_PTR);
+	}
+notpciex:
+	pci_config_teardown(&cfg_handle);
+	return (DDI_FAILURE);
+}
+
+
+/*
+ * pci_get_msi_ctrl:
+ *
+ *	Helper function that returns with 'cfg_hdl', MSI/X ctrl pointer,
+ *	and caps_ptr for MSI/X if these are found.
+ */
+static int
+pci_get_msi_ctrl(dev_info_t *dip, int type, ushort_t *msi_ctrl,
+    ushort_t *caps_ptr, ddi_acc_handle_t *cfg_hdle)
+{
+	ushort_t	cap, cap_count;
+
+	*msi_ctrl = *caps_ptr = 0;
+
+	if (pci_config_setup(dip, cfg_hdle) != DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_get_msi_ctrl: "
+		    "%s%d can't get config handle",
+		    ddi_driver_name(dip), ddi_get_instance(dip)));
+
+		return (DDI_FAILURE);
+	}
+
+	/* Are capabilities supported? */
+	if (!(pci_config_get16(*cfg_hdle, PCI_CONF_STAT) & PCI_STAT_CAP)) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_get_msi_ctrl: "
+		    "%p doesn't support capabilities\n", (void *)dip));
+
+		pci_config_teardown(cfg_hdle);
+		return (DDI_FAILURE);
+	}
+
+	*caps_ptr = pci_config_get8(*cfg_hdle, PCI_CONF_CAP_PTR);
+	cap_count = PCI_CAP_MAX_PTR;
+
+	while ((cap_count--) && (*caps_ptr >= PCI_CAP_PTR_OFF)) {
+		*caps_ptr &= PCI_CAP_PTR_MASK;
+		cap = pci_config_get8(*cfg_hdle, *caps_ptr);
+
+		if ((cap == PCI_CAP_ID_MSI) && (type == DDI_INTR_TYPE_MSI)) {
+			*msi_ctrl = pci_config_get16(*cfg_hdle,
+			    *caps_ptr + PCI_MSI_CTRL);
+
+			DDI_INTR_NEXDBG((CE_CONT, "pci_get_msi_ctrl: MSI "
+			    "caps_ptr=%x msi_ctrl=%x\n", *caps_ptr, *msi_ctrl));
+
+			return (DDI_SUCCESS);
+		}
+
+		if ((cap == PCI_CAP_ID_MSI_X) && (type == DDI_INTR_TYPE_MSIX)) {
+			*msi_ctrl = pci_config_get16(*cfg_hdle,
+			    *caps_ptr + PCI_MSIX_CTRL);
+
+			DDI_INTR_NEXDBG((CE_CONT, "pci_get_msi_ctrl: MSI-X "
+			    "caps_ptr=%x msi_ctrl=%x\n", *caps_ptr, *msi_ctrl));
+
+			return (DDI_SUCCESS);
+		}
+
+		*caps_ptr = pci_config_get8(*cfg_hdle,
+		    *caps_ptr + PCI_CAP_NEXT_PTR);
+	}
+
+	pci_config_teardown(cfg_hdle);
+
+	return (DDI_FAILURE);
+}
+
+
+/*
+ * pci_msi_get_cap:
+ *
+ * Get the capabilities of the MSI/X interrupt
+ */
+int
+pci_msi_get_cap(dev_info_t *rdip, int type, int *flagsp)
+{
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_acc_handle_t	cfg_hdle;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_get_cap: rdip = 0x%p\n",
+	    (void *)rdip));
+
+	*flagsp = 0;
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		if (msi_ctrl &  PCI_MSI_64BIT_MASK)
+			*flagsp |= DDI_INTR_FLAG_MSI64;
+		if (msi_ctrl & PCI_MSI_PVM_MASK)
+			*flagsp |= (DDI_INTR_FLAG_MASKABLE |
+			    DDI_INTR_FLAG_PENDING);
+		else
+			*flagsp |= DDI_INTR_FLAG_BLOCK;
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		/* MSI-X supports PVM, 64bit by default */
+		*flagsp |= (DDI_INTR_FLAG_MASKABLE | DDI_INTR_FLAG_MSI64 |
+		    DDI_INTR_FLAG_PENDING);
+	}
+
+	*flagsp |= DDI_INTR_FLAG_EDGE;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_get_cap: flags = 0x%x\n", *flagsp));
+
+	pci_config_teardown(&cfg_hdle);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * pci_msi_configure:
+ *
+ * Configure address/data and number MSI/Xs fields in the MSI/X
+ * capability structure.
+ */
+/* ARGSUSED */
+int
+pci_msi_configure(dev_info_t *rdip, int type, int count, int inum,
+    uint64_t addr, uint64_t data)
+{
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_acc_handle_t	cfg_hdle;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: rdip = 0x%p\n",
+	    (void *)rdip));
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		/* Set the bits to inform how many MSIs are enabled */
+		msi_ctrl |= ((highbit(count) -1) << PCI_MSI_MME_SHIFT);
+		pci_config_put16(cfg_hdle,
+		    caps_ptr + PCI_MSI_CTRL, msi_ctrl);
+
+		/* Set the "data" and "addr" bits */
+		pci_config_put32(cfg_hdle,
+		    caps_ptr + PCI_MSI_ADDR_OFFSET, addr);
+
+		if (msi_ctrl &  PCI_MSI_64BIT_MASK) {
+			pci_config_put32(cfg_hdle,
+			    caps_ptr + PCI_MSI_ADDR_OFFSET + 4, 0);
+			pci_config_put16(cfg_hdle,
+			    caps_ptr + PCI_MSI_64BIT_DATA, data);
+		} else {
+			pci_config_put16(cfg_hdle,
+			    caps_ptr + PCI_MSI_32BIT_DATA, data);
+		}
+
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: msi_ctrl = %x\n",
+		    pci_config_get16(cfg_hdle, caps_ptr + PCI_MSI_CTRL)));
+
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uint64_t	off;
+		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into the "inum"th entry in the MSI-X table */
+		off = (uint64_t)msix_p->msix_tbl_addr +
+		    ((inum - 1) * PCI_MSIX_VECTOR_SIZE);
+
+		/* Set the "data" and "addr" bits */
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)((uchar_t *)off + PCI_MSIX_DATA_OFFSET), data);
+
+		ddi_put64(msix_p->msix_tbl_hdl, (uint64_t *)off, addr);
+	}
+
+	pci_config_teardown(&cfg_hdle);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * pci_msi_unconfigure:
+ *
+ * Unconfigure address/data and number MSI/Xs fields in the MSI/X
+ * capability structure.
+ */
+/* ARGSUSED */
+int
+pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
+{
+	ushort_t		msi_ctrl, caps_ptr;
+	ddi_acc_handle_t	cfg_hdle;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_unconfigure: rdip = 0x%p\n",
+	    (void *)rdip));
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		msi_ctrl &= (~PCI_MSI_MME_MASK);
+		pci_config_put16(cfg_hdle, caps_ptr + PCI_MSI_CTRL, msi_ctrl);
+
+		pci_config_put32(cfg_hdle,
+		    caps_ptr + PCI_MSI_ADDR_OFFSET, 0);
+		if (msi_ctrl &  PCI_MSI_64BIT_MASK) {
+			pci_config_put16(cfg_hdle,
+			    caps_ptr + PCI_MSI_64BIT_DATA, 0);
+			pci_config_put32(cfg_hdle,
+			    caps_ptr + PCI_MSI_ADDR_OFFSET + 4, 0);
+		} else {
+			pci_config_put16(cfg_hdle,
+			    caps_ptr + PCI_MSI_32BIT_DATA, 0);
+		}
+
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_unconfigure: "
+		    "msi_ctrl = %x\n",
+		    pci_config_get16(cfg_hdle, caps_ptr + PCI_MSI_CTRL)));
+
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uint64_t	off;
+		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into the "inum"th entry in the MSI-X table */
+		off = (uint64_t)msix_p->msix_tbl_addr +
+		    ((inum - 1) * PCI_MSIX_VECTOR_SIZE);
+
+		/* Reset the "data" and "addr" bits */
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)((uchar_t *)off + PCI_MSIX_DATA_OFFSET), 0);
+
+		ddi_put64(msix_p->msix_tbl_hdl, (uint64_t *)off, 0);
+	}
+
+	pci_config_teardown(&cfg_hdle);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * pci_is_msi_enabled:
+ *
+ * This function returns DDI_SUCCESS if MSI/X is already enabled, otherwise
+ * it returns DDI_FAILURE.
+ */
+int
+pci_is_msi_enabled(dev_info_t *rdip, int type)
+{
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_acc_handle_t	cfg_hdle;
+	int			ret = DDI_FAILURE;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_is_msi_enabled: rdip = 0x%p, "
+	    "type  = 0x%x\n", (void *)rdip, type));
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if ((type == DDI_INTR_TYPE_MSI) && (msi_ctrl & PCI_MSI_ENABLE_BIT))
+		ret = DDI_SUCCESS;
+
+	if ((type == DDI_INTR_TYPE_MSIX) && (msi_ctrl & PCI_MSIX_ENABLE_BIT))
+		ret = DDI_SUCCESS;
+
+	pci_config_teardown(&cfg_hdle);
+	return (ret);
+}
+
+
+/*
+ * pci_msi_enable_mode:
+ *
+ * This function sets the MSI_ENABLE bit in the capability structure
+ * (for MSI) and MSIX_ENABLE bit in the MSI-X capability structure.
+ */
+int
+pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
+{
+	ushort_t		caps_ptr, msi_ctrl;
+	uint16_t		cmd_reg;
+	ddi_acc_handle_t	cfg_hdle;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_enable_mode: rdip = 0x%p, "
+	    "inum  = 0x%x\n", (void *)rdip, inum));
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	/* Disable INTx simulation, if applicable */
+	cmd_reg = pci_config_get16(cfg_hdle, PCI_CONF_COMM);
+
+	/* This write succeeds only for devices > PCI2.3 */
+	pci_config_put16(cfg_hdle, PCI_CONF_COMM,
+	    cmd_reg | PCI_COMM_INTX_DISABLE);
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_enable_mode: "
+	    "Before CmdReg = 0x%x, After CmdReg = 0x%x\n",
+	    cmd_reg, pci_config_get16(cfg_hdle, PCI_CONF_COMM)));
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		if (msi_ctrl & PCI_MSI_ENABLE_BIT)
+			goto finished;
+
+		msi_ctrl |= PCI_MSI_ENABLE_BIT;
+		pci_config_put16(cfg_hdle,
+		    caps_ptr + PCI_MSI_CTRL, msi_ctrl);
+
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uint64_t	off;
+		uint32_t	mask_bits;
+		ddi_intr_msix_t	*msix_p;
+
+		if (msi_ctrl & PCI_MSIX_ENABLE_BIT)
+			goto finished;
+
+		msi_ctrl |= PCI_MSIX_ENABLE_BIT;
+		pci_config_put16(cfg_hdle,
+		    caps_ptr + PCI_MSIX_CTRL, msi_ctrl);
+
+		msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into the "inum"th entry in the MSI-X table */
+		off = (uint64_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
+
+		/* Clear the Mask bit */
+		mask_bits = ddi_get32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)((uchar_t *)off));
+
+		mask_bits &= ~0;
+
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)((uchar_t *)off), mask_bits);
+	}
+
+finished:
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_enable_mode: msi_ctrl = %x\n",
+	    msi_ctrl));
+
+	pci_config_teardown(&cfg_hdle);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * pci_msi_disable_mode:
+ *
+ * This function resets the MSI_ENABLE bit in the capability structure
+ * (for MSI) and MSIX_ENABLE bit in the MSI-X capability structure.
+ */
+int
+pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
+{
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_acc_handle_t	cfg_hdle;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_disable_mode: rdip = 0x%p "
+	    "inum = 0x%x\n", (void *)rdip, inum));
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	/* Reset the "enable" bit */
+	if (type == DDI_INTR_TYPE_MSI) {
+		if (!(msi_ctrl & PCI_MSI_ENABLE_BIT))
+			goto finished;
+		msi_ctrl &= ~PCI_MSI_ENABLE_BIT;
+		pci_config_put16(cfg_hdle,
+		    caps_ptr + PCI_MSI_CTRL, msi_ctrl);
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		offset_t		off;
+		ddi_intr_msix_t		*msix_p;
+
+		if (!(msi_ctrl & PCI_MSIX_ENABLE_BIT))
+			goto finished;
+
+		msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into the "inum"th entry in the MSI-X table */
+		off = (uint64_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
+
+		/* Set the Mask bit */
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)((uchar_t *)off), 0x1);
+	}
+
+finished:
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_disable_mode: msi_ctrl = %x\n",
+	    msi_ctrl));
+
+	pci_config_teardown(&cfg_hdle);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * pci_msi_set_mask:
+ *
+ * Set the mask bit in the MSI/X capability structure
+ */
+/* ARGSUSED */
+int
+pci_msi_set_mask(dev_info_t *rdip, int type, int inum)
+{
+	int			offset;
+	int			ret = DDI_FAILURE;
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_acc_handle_t	cfg_hdle;
+	uint_t			mask_bits;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_set_mask: rdip = 0x%p, "
+	    "type = 0x%x\n", (void *)rdip, type));
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		if (!(msi_ctrl &  PCI_MSI_PVM_MASK))
+			goto done;
+
+		offset = (msi_ctrl &  PCI_MSI_64BIT_MASK) ?
+		    PCI_MSI_64BIT_MASKBITS : PCI_MSI_32BIT_MASK;
+
+		mask_bits = pci_config_get32(cfg_hdle,
+		    caps_ptr + offset);
+
+		mask_bits |= (1 << inum);
+
+		pci_config_put32(cfg_hdle,
+		    caps_ptr + offset, mask_bits);
+
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uint64_t		off;
+		ddi_intr_msix_t		*msix_p;
+
+		/* Set function mask */
+		if (msi_ctrl & PCI_MSIX_FUNCTION_MASK) {
+			ret = DDI_SUCCESS;
+			goto done;
+		}
+
+		msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into the "inum"th entry in the MSI-X table */
+		off = (uint64_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
+
+		/* Set the Mask bit */
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)((uchar_t *)off), 0x1);
+	}
+
+	ret = DDI_SUCCESS;
+done:
+	pci_config_teardown(&cfg_hdle);
+	return (ret);
+}
+
+
+/*
+ * pci_msi_clr_mask:
+ *
+ * Clear the mask bit in the MSI/X capability structure
+ */
+/* ARGSUSED */
+int
+pci_msi_clr_mask(dev_info_t *rdip, int type, int inum)
+{
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_acc_handle_t	cfg_hdle;
+	int			offset;
+	int			ret = DDI_FAILURE;
+	uint_t			mask_bits;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_clr_mask: rdip = 0x%p, "
+	    "type = 0x%x\n", (void *)rdip, type));
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		if (!(msi_ctrl &  PCI_MSI_PVM_MASK))
+			goto done;
+
+		offset = (msi_ctrl &  PCI_MSI_64BIT_MASK) ?
+		    PCI_MSI_64BIT_MASKBITS : PCI_MSI_32BIT_MASK;
+		mask_bits = pci_config_get32(cfg_hdle,
+		    caps_ptr + offset);
+
+		mask_bits &= ~(1 << inum);
+
+		pci_config_put32(cfg_hdle,
+		    caps_ptr + offset, mask_bits);
+
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uint64_t		off;
+		ddi_intr_msix_t		*msix_p;
+
+		if (msi_ctrl & PCI_MSIX_FUNCTION_MASK) {
+			ret = DDI_SUCCESS;
+			goto done;
+		}
+
+		msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into the "inum"th entry in the MSI-X table */
+		off = (uint64_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
+
+		/* Clear the Mask bit */
+		mask_bits = ddi_get32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)((uchar_t *)off));
+
+		mask_bits &= ~0;
+
+		ddi_put32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)((uchar_t *)off), mask_bits);
+	}
+
+	ret = DDI_SUCCESS;
+done:
+	pci_config_teardown(&cfg_hdle);
+	return (ret);
+}
+
+
+/*
+ * pci_msi_get_pending:
+ *
+ * Get the pending bit from the MSI/X capability structure
+ */
+/* ARGSUSED */
+int
+pci_msi_get_pending(dev_info_t *rdip, int type, int inum, int *pendingp)
+{
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_acc_handle_t	cfg_hdle;
+	int			offset;
+	int			ret = DDI_FAILURE;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_get_pending: rdip = 0x%p\n",
+	    (void *)rdip));
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		uint32_t	pending_bits;
+
+		if (!(msi_ctrl &  PCI_MSI_PVM_MASK)) {
+			DDI_INTR_NEXDBG((CE_CONT, "pci_msi_get_pending: "
+			    "PVM is not supported\n"));
+			goto done;
+		}
+
+		offset = (msi_ctrl &  PCI_MSI_64BIT_MASK) ?
+		    PCI_MSI_64BIT_PENDING : PCI_MSI_32BIT_PENDING;
+
+		pending_bits = pci_config_get32(cfg_hdle,
+		    caps_ptr + offset);
+
+		*pendingp = pending_bits & ~(1 >> inum);
+
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uint64_t	off;
+		uint64_t	pending_bits;
+		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
+
+		/* Offset into the PBA array which has entry for "inum" */
+		off = (uint64_t)msix_p->msix_pba_addr + ((inum - 1) / 64);
+
+		/* Read the PBA array */
+		pending_bits = ddi_get64(msix_p->msix_pba_hdl,
+		    (uint64_t *)((uchar_t *)off));
+
+		*pendingp = pending_bits & ~(1 >> inum);
+	}
+
+	ret = DDI_SUCCESS;
+done:
+	pci_config_teardown(&cfg_hdle);
+	return (ret);
+}
+
+
+/*
+ * pci_msi_get_nintrs:
+ *
+ * For a given type (MSI/X) returns the number of interrupts supported
+ */
+int
+pci_msi_get_nintrs(dev_info_t *rdip, int type, int *nintrs)
+{
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_acc_handle_t	cfg_hdle;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_get_nintrs: rdip = 0x%p\n",
+	    (void *)rdip));
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		*nintrs = 1 << ((msi_ctrl & PCI_MSI_MMC_MASK) >>
+		    PCI_MSI_MMC_SHIFT);
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		if (msi_ctrl &  PCI_MSIX_TBL_SIZE_MASK)
+			*nintrs = (msi_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 1;
+	}
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_get_nintrs: "
+	    "nintr = 0x%x\n", *nintrs));
+
+	pci_config_teardown(&cfg_hdle);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * pci_msi_set_nintrs:
+ *
+ * For a given type (MSI/X) sets the number of interrupts supported
+ * by the system.
+ * For MSI: Return an error if this func is called for navail > 32
+ * For MSI-X: Return an error if this func is called for navail > 2048
+ */
+int
+pci_msi_set_nintrs(dev_info_t *rdip, int type, int navail)
+{
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_acc_handle_t	cfg_hdle;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_set_nintrs: rdip = 0x%p, "
+	    "navail = 0x%x\n", (void *)rdip, navail));
+
+	/* Check for valid input argument */
+	if (((type == DDI_INTR_TYPE_MSI) && (navail > PCI_MSI_MAX_INTRS)) ||
+	    ((type == DDI_INTR_TYPE_MSIX) && (navail >  PCI_MSIX_MAX_INTRS)))
+		return (DDI_EINVAL);
+
+	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (type == DDI_INTR_TYPE_MSI) {
+		msi_ctrl |= ((highbit(navail) -1) << PCI_MSI_MME_SHIFT);
+
+		pci_config_put16(cfg_hdle, caps_ptr + PCI_MSI_CTRL, msi_ctrl);
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_set_nintrs: unsupported\n"));
+	}
+
+	pci_config_teardown(&cfg_hdle);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * pci_msi_get_supported_type:
+ *
+ * Returns DDI_INTR_TYPE_MSI and/or DDI_INTR_TYPE_MSIX as supported
+ * types if device supports them. A DDI_FAILURE is returned otherwise.
+ */
+int
+pci_msi_get_supported_type(dev_info_t *rdip, int *typesp)
+{
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_acc_handle_t	cfg_hdle;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_get_supported_type: "
+	    "rdip = 0x%p\n", (void *)rdip));
+
+	*typesp = 0;
+
+	if (pci_get_msi_ctrl(rdip, DDI_INTR_TYPE_MSI, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) == DDI_SUCCESS) {
+		*typesp |= DDI_INTR_TYPE_MSI;
+		pci_config_teardown(&cfg_hdle);
+	}
+
+	if (pci_get_msi_ctrl(rdip, DDI_INTR_TYPE_MSIX, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) == DDI_SUCCESS) {
+		*typesp |= DDI_INTR_TYPE_MSIX;
+		pci_config_teardown(&cfg_hdle);
+	}
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_get_supported_type: "
+	    "rdip = 0x%p types 0x%x\n", (void *)rdip, *typesp));
+
+	return (*typesp == 0 ? DDI_FAILURE : DDI_SUCCESS);
+}
+
+
+/*
+ * pci_msix_init:
+ *	This function initializes the various handles/addrs etc.
+ *	needed for MSI-X support. It also allocates a private
+ *	structure to keep track of these.
+ */
+ddi_intr_msix_t *
+pci_msix_init(dev_info_t *rdip)
+{
+	uint_t			rnumber;
+	size_t			msix_tbl_size;
+	size_t			pba_tbl_size;
+	ushort_t		caps_ptr, msi_ctrl;
+	ddi_intr_msix_t		*msix_p;
+	ddi_acc_handle_t	cfg_hdle;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: rdip = %p\n", (void *)rdip));
+
+	if (pci_get_msi_ctrl(rdip, DDI_INTR_TYPE_MSI, &msi_ctrl,
+	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
+		return (NULL);
+
+	msix_p = kmem_zalloc(sizeof (ddi_intr_msix_t), KM_SLEEP);
+
+	/*
+	 * Initialize the devacc structure
+	 */
+	msix_p->msix_dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+	msix_p->msix_dev_attr.devacc_attr_endian_flags =
+	    DDI_STRUCTURE_LE_ACC;
+	msix_p->msix_dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+
+	/*
+	 * Map the entire MSI-X vector table
+	 */
+	msix_p->msix_tbl_offset = pci_config_get32(cfg_hdle,
+	    caps_ptr + PCI_MSIX_TBL_OFFSET);
+	rnumber = msix_p->msix_tbl_offset & PCI_MSIX_TBL_BIR_MASK;
+	msix_p->msix_tbl_offset &= ~rnumber; /* Clear BIR from the offset */
+
+	msix_tbl_size = (msi_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 1;
+
+	if (ddi_regs_map_setup(rdip,
+	    rnumber,
+	    &msix_p->msix_tbl_addr,
+	    msix_p->msix_tbl_offset,
+	    msix_tbl_size,
+	    &msix_p->msix_dev_attr,
+	    &msix_p->msix_tbl_hdl) !=
+	    DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_initialize: MSI-X Table "
+		    "ddi_regs_map_setup failed\n"));
+		kmem_free(msix_p, sizeof (ddi_intr_msix_t));
+		pci_config_teardown(&cfg_hdle);
+		return (NULL);
+	}
+
+	/*
+	 * Map in the MSI-X Pending Bit Array
+	 */
+	if (msi_ctrl &  PCI_MSIX_TBL_SIZE_MASK)
+		pba_tbl_size = ((msi_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 1)/64;
+
+	msix_p->msix_pba_offset = pci_config_get32(cfg_hdle,
+	    caps_ptr + PCI_MSIX_PBA_OFFSET);
+	rnumber = msix_p->msix_pba_offset & PCI_MSIX_PBA_BIR_MASK;
+	msix_p->msix_pba_offset &= ~rnumber; /* Clear offset from BIR */
+
+	if (ddi_regs_map_setup(rdip,
+	    rnumber,
+	    &msix_p->msix_pba_addr,
+	    msix_p->msix_pba_offset,
+	    pba_tbl_size,
+	    &msix_p->msix_dev_attr,
+	    &msix_p->msix_pba_hdl) != DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_initialize: PBA "
+		    "ddi_regs_map_setup failed\n"));
+		ddi_regs_map_free(&msix_p->msix_tbl_hdl);
+		kmem_free(msix_p, sizeof (ddi_intr_msix_t));
+		pci_config_teardown(&cfg_hdle);
+		return (NULL);
+	}
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: msix_p = 0x%p DONE!!\n",
+	    (void *)msix_p));
+
+	pci_config_teardown(&cfg_hdle);
+	return (msix_p);
+}
+
+
+/*
+ * pci_msix_fini:
+ *	This function cleans up previously allocated handles/addrs etc.
+ *	It is only called if no more MSI-X interrupts are being used.
+ */
+void
+pci_msix_fini(ddi_intr_msix_t *msix_p)
+{
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_fini: msix_p = 0x%p\n",
+	    (void *)msix_p));
+
+	ddi_regs_map_free(&msix_p->msix_pba_hdl);
+	ddi_regs_map_free(&msix_p->msix_tbl_hdl);
+	kmem_free(msix_p, sizeof (ddi_intr_msix_t));
+}
+
+
+
+/*
+ * Next set of routines are for INTx (legacy) PCI interrupt
+ * support only.
+ */
+
+/*
+ * pci_intx_get_cap:
+ *	For non-MSI devices that comply to PCI v2.3 or greater;
+ *	read the command register. Bit 10 implies interrupt disable.
+ *	Set this bit and then read the status register bit 3.
+ *	Bit 3 of status register is Interrupt state.
+ *	If it is set; then the device supports 'Masking'
+ *
+ *	Reset the device back to the original state.
+ */
+int
+pci_intx_get_cap(dev_info_t *dip, int *flagsp)
+{
+	uint16_t		cmdreg, savereg;
+	ddi_acc_handle_t	cfg_hdl;
+#ifdef	DEBUG
+	uint16_t		statreg;
+#endif /* DEBUG */
+
+	*flagsp = 0;
+	DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_cap: %s%d: called\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip)));
+
+	if (pci_config_setup(dip, &cfg_hdl) != DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_cap: can't get "
+		    "config handle\n"));
+		return (DDI_FAILURE);
+	}
+
+	savereg = pci_config_get16(cfg_hdl, PCI_CONF_COMM);
+	DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_cap: "
+	    "command register was 0x%x\n", savereg));
+
+	/* Disable the interrupts */
+	cmdreg = savereg | PCI_COMM_INTX_DISABLE;
+	pci_config_put16(cfg_hdl, PCI_CONF_COMM, cmdreg);
+
+#ifdef	DEBUG
+	statreg = pci_config_get16(cfg_hdl, PCI_CONF_STAT);
+	DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_cap: "
+	    "status register is 0x%x\n", statreg));
+#endif /* DEBUG */
+
+	/* Read the bit back */
+	cmdreg = pci_config_get16(cfg_hdl, PCI_CONF_COMM);
+	DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_cap: "
+	    "command register is now 0x%x\n", cmdreg));
+
+	if (cmdreg & PCI_COMM_INTX_DISABLE) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_cap: "
+		    "masking supported\n"));
+		*flagsp = (DDI_INTR_FLAG_MASKABLE |
+		    DDI_INTR_FLAG_PENDING | DDI_INTR_FLAG_LEVEL);
+	}
+
+	/* Restore the device back to the original state and return */
+	pci_config_put16(cfg_hdl, PCI_CONF_COMM, savereg);
+
+	pci_config_teardown(&cfg_hdl);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * pci_intx_clr_mask:
+ *	For non-MSI devices that comply to PCI v2.3 or greater;
+ *	clear the bit10 in the command register.
+ */
+int
+pci_intx_clr_mask(dev_info_t *dip)
+{
+	uint16_t		cmdreg;
+	ddi_acc_handle_t	cfg_hdl;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_intx_clr_mask: %s%d: called\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip)));
+
+	if (pci_config_setup(dip, &cfg_hdl) != DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_intx_clr_mask: can't get "
+		    "config handle\n"));
+		return (DDI_FAILURE);
+	}
+
+	cmdreg = pci_config_get16(cfg_hdl, PCI_CONF_COMM);
+	DDI_INTR_NEXDBG((CE_CONT, "pci_intx_clr_mask: "
+	    "command register was 0x%x\n", cmdreg));
+
+	/* Enable the interrupts */
+	cmdreg &= ~PCI_COMM_INTX_DISABLE;
+	pci_config_put16(cfg_hdl, PCI_CONF_COMM, cmdreg);
+	pci_config_teardown(&cfg_hdl);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * pci_intx_set_mask:
+ *	For non-MSI devices that comply to PCI v2.3 or greater;
+ *	set the bit10 in the command register.
+ */
+int
+pci_intx_set_mask(dev_info_t *dip)
+{
+	uint16_t		cmdreg;
+	ddi_acc_handle_t	cfg_hdl;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_intx_set_mask: %s%d: called\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip)));
+
+	if (pci_config_setup(dip, &cfg_hdl) != DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_intx_set_mask: can't get "
+		    "config handle\n"));
+		return (DDI_FAILURE);
+	}
+
+	cmdreg = pci_config_get16(cfg_hdl, PCI_CONF_COMM);
+	DDI_INTR_NEXDBG((CE_CONT, "pci_intx_set_mask: "
+	    "command register was 0x%x\n", cmdreg));
+
+	/* Disable the interrupts */
+	cmdreg |= PCI_COMM_INTX_DISABLE;
+	pci_config_put16(cfg_hdl, PCI_CONF_COMM, cmdreg);
+	pci_config_teardown(&cfg_hdl);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * pci_intx_get_pending:
+ *	For non-MSI devices that comply to PCI v2.3 or greater;
+ *	read the status register. Bit 3 of status register is
+ *	Interrupt state. If it is set; then the interrupt is
+ *	'Pending'.
+ */
+int
+pci_intx_get_pending(dev_info_t *dip, int *pendingp)
+{
+	uint16_t		statreg;
+	ddi_acc_handle_t	cfg_hdl;
+
+	*pendingp = 0;
+	DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_pending: %s%d: called\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip)));
+
+	if (pci_config_setup(dip, &cfg_hdl) != DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_pending: can't get "
+		    "config handle\n"));
+		return (DDI_FAILURE);
+	}
+
+	statreg = pci_config_get16(cfg_hdl, PCI_CONF_STAT);
+
+	if (statreg & PCI_STAT_INTR) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_pending: "
+		    "interrupt is pending\n"));
+		*pendingp = 1;
+	}
+
+	pci_config_teardown(&cfg_hdl);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * pci_devclass_to_ipl:
+ *	translate from device class to ipl
+ *	NOTE: This function is  added here as pci_intx_get_ispec()
+ *	calls this to figure out the priority.
+ *	It is moved over from x86 pci.c
+ */
+int
+pci_devclass_to_ipl(int class)
+{
+	int	base_cl;
+	int	ipl;
+
+	base_cl = (class & 0xff0000) >> 16;
+
+	/*
+	 * Use the class code values to construct an ipl for the device.
+	 */
+	switch (base_cl) {
+	default:
+	case PCI_CLASS_NONE:
+		ipl = 1;
+		break;
+	case PCI_CLASS_MASS:
+		ipl = 0x5;
+		break;
+	case PCI_CLASS_NET:
+		ipl = 0x6;
+		break;
+	case PCI_CLASS_DISPLAY:
+		ipl = 0x9;
+		break;
+	/*
+	 * for high priority interrupt handlers, use level 12
+	 * as the highest for device drivers
+	 */
+	case PCI_CLASS_MM:
+		ipl = 0xc;
+		break;
+	case PCI_CLASS_MEM:
+		ipl = 0xc;
+		break;
+	case PCI_CLASS_BRIDGE:
+		ipl = 0xc;
+		break;
+	}
+	return (ipl);
+}
+
+
+/*
+ * pci_intx_get_ispec:
+ *	Get intrspec for PCI devices (legacy support)
+ *	NOTE: This is moved here from x86 pci.c and is
+ *	needed here as pci-ide.c uses it as well
+ */
+/*ARGSUSED*/
+ddi_intrspec_t
+pci_intx_get_ispec(dev_info_t *dip, dev_info_t *rdip, int inum)
+{
+	int				class, *intpriorities;
+	uint_t				num_intpriorities;
+	struct intrspec			*ispec;
+	ddi_acc_handle_t		cfg_hdl;
+	struct ddi_parent_private_data	*pdptr;
+
+	if ((pdptr = ddi_get_parent_data(rdip)) == NULL)
+		return (NULL);
+
+	ispec = pdptr->par_intr;
+	ASSERT(ispec);
+
+	/* check if the intrspec_pri has been initialized */
+	if (!ispec->intrspec_pri) {
+		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, rdip,
+		    DDI_PROP_DONTPASS, "interrupt-priorities",
+		    &intpriorities, &num_intpriorities) == DDI_PROP_SUCCESS) {
+			if (inum < num_intpriorities)
+				ispec->intrspec_pri = intpriorities[inum];
+			ddi_prop_free(intpriorities);
+		}
+
+		/* If still no priority, guess based on the class code */
+		if (ispec->intrspec_pri == 0) {
+			/* get 'class' property to derive the intr priority */
+			class = ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
+			    DDI_PROP_DONTPASS, "class-code", -1);
+			ispec->intrspec_pri = (class == -1) ? 1 :
+			    pci_devclass_to_ipl(class);
+		}
+	}
+
+	/* Get interrupt line value */
+	if (!ispec->intrspec_vec) {
+		if (pci_config_setup(rdip, &cfg_hdl) != DDI_SUCCESS) {
+			DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_iline: "
+			    "can't get config handle\n"));
+			return (NULL);
+		}
+
+		ispec->intrspec_vec = pci_config_get8(cfg_hdl, PCI_CONF_ILINE);
+		pci_config_teardown(&cfg_hdl);
+	}
+
+	return ((ddi_intrspec_t)ispec);
+}

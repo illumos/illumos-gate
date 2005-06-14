@@ -1,0 +1,96 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+while read src dest
+do
+	if [ ! -f $dest ] ; then
+		cp $src $dest
+	else
+		grep '^#pragma' $src > /tmp/newident.$$ 2>/dev/null
+		sed -e '/^aha[	].*scsi/d' \
+		    -e '/^aic[	].*scsi/d' \
+		    -e '/^blogic[	].*scsi/d' \
+		    -e '/^cpqncr[ 	].*scsi/d' \
+		    -e '/^csa[	].*dada/d' \
+		    -e '/^csa[	].*scsi/d' \
+		    -e '/^dpt[ 	].*scsi/d' \
+		    -e '/^dsa[	].*dada/d' \
+		    -e '/^[ 	]*dsa[	].*scsi/d' \
+		    -e '/^esa[	].*scsi/d' \
+		    -e '/^eha[	].*scsi/d' \
+		    -e '/^iss[ 	].*scsi/d' \
+		    -e '/^mc[ 	].*sysbus/d' \
+		    -e '/^mcis[	].*scsi/d' \
+		    -e '/^mega[ 	].*scsi/d' \
+		    -e '/^mlx[ 	].*dada/d' \
+		    -e '/^smartii[ 	].*dada/d' \
+		    -e '/^trantor[	].*scsi/d' \
+		    -e '/^corvette[	].*scsi/d' \
+		$dest > /tmp/c.$$
+		if cmp -s /tmp/c.$$ $dest  > /dev/null 2>&1
+		then
+			:
+		else
+			cat /tmp/newident.$$ > /tmp/rest.$$
+			sed '/^#pragma.*/d' /tmp/c.$$ >> /tmp/rest.$$
+			cp /tmp/rest.$$ $dest
+		fi
+		rm -f /tmp/rest.$$ /tmp/newident.$$ /tmp/c.$$
+
+		grep '^pci[ 	].*pci' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			echo 'pci	pci' >> $dest
+		fi
+		grep '^pci_pci[ 	].*pci' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			echo 'pci_pci pci' >> $dest
+		fi
+		grep '^mscsi[ 	].*scsi' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			echo 'mscsi scsi' >> $dest
+		fi
+		grep '^pci_to_i2o[ 	].*i2o' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			echo 'pci_to_i2o i2o' >> $dest
+		fi
+		grep '^i2o_scsi[ 	].*scsi' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			echo 'i2o_scsi scsi' >> $dest
+		fi
+		grep '^mpt	scsi' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			echo 'mpt	scsi' >> $dest
+		fi
+	fi
+done
+
+exit 0

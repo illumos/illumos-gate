@@ -1,0 +1,20 @@
+
+The  frm-mgmt command enables you to move and reshape frames.  It also
+supports a "list" function that lists all open frames on the screen.
+
+Use one of the methods below to use the frm-mgmt command. The
+currently active frame is assumed if the frame number is not specified
+with the frm-mgmt command.
+
+     Command Menu:  Select frm-mgmt and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on frm-mgmt and an -->
+     (alternative)  will appear on the command line followed by the
+                    frm-mgmt.  Type arguments and press ENTER to
+                    execute the command.
+     Command Line:  Type frm-mgmt [operation] [frame # ] and press
+                    ENTER.
+
+If an "operation" is not specified,  a pop-up menu frame titled "Frame
+Management" will appear listing the frm-mgmt operations. 
+

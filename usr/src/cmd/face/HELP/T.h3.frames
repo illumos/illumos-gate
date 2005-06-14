@@ -1,0 +1,76 @@
+
+A frame is an area of the AT&T FACE screen that is surrounded by a
+border.  Frames are used to display work you are doing. Each frame is
+numbered as you open it.
+
+Using NEXT-FRM  and PREV-FRM,  or CTRL-j <frame number> (press the
+CTRL key and press j simultaneously then type the frame number) you
+can move from one frame to another allowing you to work with or
+display information for several tasks at the same time.  As you open
+each frame, that frame becomes the active frame.  All key strokes and
+the screen labeled keys apply to the active frame.  You can open and
+close all frames except the Office Frame.  
+
+You may change the position of all frames (except unnumbered pop-up
+frames) and the size of menu and text frames, using the frm-mgmt
+command.
+
+The contents of a frame can be a menu, form, text, a choices or mark
+menu, or a standard file. Navigation on each of these types of frames
+is described below.  The function keys that can be used vary from
+frame to frame. The screen labeled function keys that can be used
+will be marked with their function.  Those that can not be used will 
+be blank.  The AT&T FACE User's Guide provides details on the action of
+each function key.
+
+Menus: Menus contain lists of selectable items.  You navigate from
+one item to another using cursor keys (or CTRL-u to move up or CTRL-d
+to move down).  You can also navigate on menus by typing the first
+character of a menu item and striking ENTER. If multiple items have
+the same first character you can type several characters that make up
+a unique string. Once the cursor is resting on the correct item, you
+select it by striking ENTER.
+
+The function keys that are available on menus (outside of the
+Filecabinet) are HELP, PREV-FRM, NEXT-FRM, CANCEL, and CMD-MENU.
+Alternate keys for these function keys are listed in the AT&T FACE
+User's Guide.  When you are working in the file folders of the
+Filecabinet the following function keys will appear:  HELP, COPY,
+MOVE, DELETE, RENAME, CREATE, SECURITY, and CHG-KEYS.
+
+Forms: Forms look like fill-in-the-blank questionnaires. They prompt
+you for information that is required to complete a task. You
+navigate on forms using arrow keys or by striking ENTER.  When you have
+completed the form, press the SAVE function key to SAVE the values and
+continue with the task.
+
+The function keys for forms are HELP, CHOICES, SAVE, PREV-FRM, NEXT-FRM,
+CANCEL, and CMD-MENU.  The CHOICES function key will display the valid
+input for a field if there are any.  If CHOICES does not appear on the
+function key label there are no CHOICES available. 
+
+Choices Menus: Navigation on choices menus is identical to the menus
+described earlier. Choices menus differ because HELP is not available,
+the choices menus disappear when you navigate away from them, and when
+you press ENTER the item that the cursor rests on appears on the form
+field.  CANCEL is the only function key available for choices menus.
+
+Mark Menus: Mark menus are similar to choices menus, but mark menus
+enable you to select one or more items as input for a form field. By
+striking the MARK function key on the item, it is marked and placed on
+the form field when you press ENTER.  HELP is available for MARK menus
+that are not associated with forms, but generally CANCEL is the only
+function key that can be used.
+
+Text Frames:  Text frames, like the current frame, present information
+for the user. Text frames are used for HELP messages, confirmations,
+and warnings. You can not navigate on text frames. The function keys
+on text frames are PREVPAGE and NEXTPAGE (if the text is too long to
+fit into one frame) and CANCEL.
+
+Standard Files: When the cursor rests on a standard file in a file
+folder and you press ENTER, the default editor for your system is
+invoked in a new frame.  The common default editors are ed and vi.  
+No function keys are available for these types of frames.  The rules
+for navigation within the editor apply.
+

@@ -1,0 +1,157 @@
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+
+/*
+ * Copyright (c) 1985 Regents of the University of California.
+ * All rights reserved.  The Berkeley software License Agreement
+ * specifies the terms and conditions for redistribution.
+ */
+
+#include "synonyms.h"
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/stat.h>
+#include <ctype.h>
+#include <stdio.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <sys/file.h>
+#include "libc.h"
+#include <unistd.h>
+
+#define	SHELLS "/etc/shells"
+
+/*
+ * Do not add local shells here.  They should be added in /etc/shells
+ */
+const char *okshells[] = {
+	"/usr/bin/sh",
+	"/usr/bin/csh",
+	"/usr/bin/ksh",
+	"/usr/bin/jsh",
+	"/bin/sh",
+	"/bin/csh",
+	"/bin/ksh",
+	"/bin/jsh",
+	"/sbin/sh",
+	"/sbin/jsh",
+	"/usr/bin/pfsh",
+	"/usr/bin/pfcsh",
+	"/usr/bin/pfksh",
+	"/usr/bin/bash",
+	"/usr/bin/tcsh",
+	"/usr/bin/zsh",
+	"/bin/pfsh",
+	"/bin/pfcsh",
+	"/bin/pfksh",
+	"/bin/bash",
+	"/bin/tcsh",
+	"/bin/zsh",
+	"/usr/xpg4/bin/sh",
+	"/sbin/pfsh",
+	NULL
+};
+
+static char **shells, *strings;
+static char **curshell;
+static char **initshells(void);
+
+/*
+ * Get a list of shells from SHELLS, if it exists.
+ */
+char *
+getusershell(void)
+{
+	char *ret;
+
+	if (curshell == NULL)
+		curshell = initshells();
+	ret = *curshell;
+	if (ret != NULL)
+		curshell++;
+	return (ret);
+}
+
+void
+endusershell(void)
+{
+
+	if (shells != NULL)
+		(void) free((char *)shells);
+	shells = NULL;
+	if (strings != NULL)
+		(void) free(strings);
+	strings = NULL;
+	curshell = NULL;
+}
+
+void
+setusershell(void)
+{
+
+	curshell = initshells();
+}
+
+static char **
+initshells(void)
+{
+	char **sp, *cp;
+	FILE *fp;
+	struct stat statb;
+
+	if (shells != NULL)
+		(void) free((char *)shells);
+	shells = NULL;
+	if (strings != NULL)
+		(void) free(strings);
+	strings = NULL;
+	if ((fp = fopen(SHELLS, "r")) == (FILE *)0)
+		return ((char **)okshells);
+	/*
+	 * The +1 in the malloc() below is needed to handle the final
+	 * fgets() NULL terminator.  From fgets(3S):
+	 *
+	 * char *fgets(char *s, int n, FILE *stream);
+	 *
+	 * The  fgets()  function reads characters from the stream into
+	 * the array pointed to by s, until n-1 characters are read, or
+	 * a newline character is read and transferred to s, or an end-
+	 * of-file condition is encountered.  The string is then termi-
+	 * nated with a null character.
+	 */
+	if ((fstat(fileno(fp), &statb) == -1) || (statb.st_size > LONG_MAX) ||
+	    ((strings = malloc((size_t)statb.st_size + 1)) == NULL)) {
+		(void) fclose(fp);
+		return ((char **)okshells);
+	}
+	shells = calloc((size_t)statb.st_size / 3, sizeof (char *));
+	if (shells == NULL) {
+		(void) fclose(fp);
+		(void) free(strings);
+		strings = NULL;
+		return ((char **)okshells);
+	}
+	sp = shells;
+	cp = strings;
+	while (fgets(cp, MAXPATHLEN + 1, fp) != NULL) {
+		while (*cp != '#' && *cp != '/' && *cp != '\0')
+			cp++;
+		if (*cp == '#' || *cp == '\0')
+			continue;
+		*sp++ = cp;
+		while (!isspace(*cp) && *cp != '#' && *cp != '\0')
+			cp++;
+		*cp++ = '\0';
+	}
+	*sp = (char *)0;
+	(void) fclose(fp);
+	return (shells);
+}

@@ -1,0 +1,831 @@
+<?xml version="1.0" standalone="yes"?>
+<!DOCTYPE specification SYSTEM "audit.dtd">
+<!--
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License, Version 1.0 only
+ (the "License").  You may not use this file except in compliance
+ with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+  ident	"%Z%%M%	%I%	%E% SMI"
+-->
+
+<specification>
+
+<!-- comments are displayed to stderr if debug is on -->
+<debug set="off">
+
+    <!-- The order of events is arbitrary EXCEPT generic events must
+	 precede their instances -->
+       <!-- The order of entries within an event determine the order
+            data is defined in the external API -->
+	    <!-- The order of internal / external is arbitrary -->
+
+<!--
+	tags:
+			The following top level tags are defined:
+			<event> <token> <msg_list> <debug>
+
+	event		defines an audit record
+			- id is the record id from audit_uevents.h
+			- reorder="yes" or "no".  (default is "no").
+			  if "yes" then the order of the tokens to be
+			  output does not match the order of the data
+			  input.  (see order attribute of <entry>)
+			- header defines the header file to contain the external
+			  definitions for this event type.  The header file
+			  name is adt_event_N.h, where N is the value supplied
+			  header="0" is for "stable" events, > 0 for new ones.
+			  with this attribute. (header="1").
+			- idNo is the number associated with the external
+			  name of this event. (For AUE_login, ADT_login is
+			  the external name and idNo is the value for ADT_login.)
+			- omit is by default 'no' (i.e., don't omit) and can be
+			  'always' or 'JNI'.  In the latter case, C interface
+			  code is generated but neither Java nor JNI code is.
+			- included text is just a comment
+			Within an event block, the following tags are defined:
+			<entry>, <debug>, <altname>
+
+	altname		defines the internal name of an audit record; if
+			omitted, the internal name is the same as the
+			external name.
+
+
+	entry		defines the correspondence between the data
+			supplied by the caller and the token to be
+			output.
+			- id is the data name that shows up in the structures
+			  of adt_event.h  If it is a comma separated list,
+			  it is the list of names of data to be associated
+			  with one output token.  (See <external>, below)
+			Within an entry block, the following tags are defined:
+			<internal>, <external>, <debug>
+
+	internal	defines the token to be generated.
+			- token is a name that must also be defined with
+			  a <token> tag elsewhere in this file.  (order is
+			  not important).
+			- order="some number" determines the order of the
+			  tokens to be output, starting with 1.  The subject
+			  token is normally order="1".  The use is to insure
+			  that the order of fields listed in adt_event.h does
+			  not change when we arbitrarily change the order of
+			  tokens.  If the <event reorder="yes"> is not set,
+			  order is ignored.
+			- format is a printf-like string that will be used
+			  in to format the data supplied by the user.
+
+	external	defines the data to be supplied for creating the
+			token defined via <internal>
+			- opt is one of four values:  "required", "optional",
+			  "obsolete", or "none".  The first two values
+			  indicate that this token's data must or may
+			  be supplied by the user; the third value is
+			  equivalent to "optional" but shows in the
+			  comment that this field is no longer used;
+			  the forth value indicates that this token
+			  does not require any user-supplied data.  If
+			  data is required, then a token is always
+			  output, while optional data is output only
+			  if data is supplied.
+			- type describes the C data type to be associated
+			  with the <entry id="dataName">.  The following
+			  data types are representative:
+
+				char
+				char * (blank is optional)
+				char ** (blank is optional)
+				int, uid_t, gid_t
+				int *, uid_t *, gid_t *
+				msg  (not a C type, see below)
+				time_t
+				uint, uint *
+
+			  The msg type refers to an enumerated type
+			  that must be defined via a <msg> description
+			  else where in this file. The syntax is
+			  special.  Example: <external opt="optional"
+			  type="msg login_text"/> "login_text" is the
+			  id of a <msg_list> descriptor given
+			  elsewhere in this file.
+
+			If the <entry> id is a list, the type must also
+			be a comma-separated list, where the types are
+			in the same order as the id's.
+			If the type is an array, its length must be given
+			explicitly.
+
+	token		Define allowed token names.
+			- id is the name of token; this name is used
+			as an <internal> id.
+			- usage is an optional value.  At present, only
+			  "TSOL" is defined; it means that this data is
+			  to be used only in Trusted Solaris implementations.
+
+	msg_list	Define a set of text strings.
+			- id is the name to be used for this group of text
+			  strings in adt_event.h
+			- header is as defined for <event>
+			Within a msg_list block, <msg> and <debug> are defined.
+			The order of <msg> tags in a msg_list is reflected
+			directly in adt_event.h
+
+	msg		Define one string.
+			- id is the name to be used in the enum describing
+			  this set of strings.  Convention:  use upper case.
+			The content (text between <msg> and </msg>) is the
+			actual string.  Extra white space, including line
+			feeds, is ignored.  If empty, no output token
+			is generated unless the <external> opt attribute is
+			set to "required", in which case a blank text token
+			is generated.
+			Within a msg block, <debug> is defined, but has not been
+			tested and may have no effect.
+
+	debug		This turns on/off debug messages during the processing
+			of the xml data.  It affects the block within which it
+			is defined.
+			- set may have one of two values:  "on" or "off".  If
+			  set is omitted, the debug state for the current block
+			  is toggled.
+			The use of the <debug> tag does not affect the output
+			of data to the various files created, but does generate
+			potentially large amounts of output to stderr.
+
+-->
+<!--        template for an event record definition
+
+    <event id="" header="0" idNo="">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="">
+	    <internal token=""/>
+	    <external opt="" type="" />
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    Generic events must precede Instance events; within each
+    group, please keep the AUE_* event id's in alphabetic order.
+-->
+
+<!-- generic events  -->
+
+    <event id="AUE_generic_basic" type="generic" omit="always">
+	<!--
+
+	This is a template for the event types that have no tokens
+	other than the header and return. There is no allowed_type
+	list because the template is not externally visible due to the
+	omit="always".
+
+	-->
+	<entry id="subject">
+	    <internal  token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="return">
+	    <internal  token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_generic_login" type="generic" omit="always">
+	<!--
+
+	This is a template for the various login event types
+	AUE_login, AUE_ftp, etc which match this template.  There is
+	no allowed_type list because the template is not externally
+	visible due to the omit="always".
+
+	-->
+	<entry id="subject">
+	    <internal  token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="message">
+	    <internal  token="text"/>
+	    <external opt="optional" type="msg login_text" />
+	</entry>
+	<entry id="return">
+	    <internal  token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <!--
+	'omit="always"' means that this record type is not reflected
+	in the generated header and table files.
+     -->
+
+    <event id="AUE_generic_SMC_add" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="object_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="domain">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	</entry>
+	<entry id="name_service">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="optional" type="char *"/>
+	</entry>
+	<!--
+	  This should really be its own token type, not "text"
+	-->
+	<entry id="initial_values">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_generic_SMC_delete" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="object_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="domain">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	</entry>
+	<entry id="name_service">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="optional" type="char *"/>
+	</entry>
+	<entry id="delete_values">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_generic_SMC_modify" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="object_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="domain">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	</entry>
+	<entry id="name_service">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="optional" type="char *"/>
+	</entry>
+	<entry id="changed_values">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- instances -->
+
+    <event id="AUE_admin_authenticate" instance_of="AUE_generic_login"
+	header="0" idNo="3">
+    </event>
+
+    <event id="AUE_filesystem_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="4">
+    </event>
+    <event id="AUE_filesystem_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="5">
+    </event>
+    <event id="AUE_filesystem_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="6">
+    </event>
+
+    <event id="AUE_init_solaris" header="0" idNo="32" omit="JNI">
+	<entry id="subject">
+	    <internal  token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="info">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+        </entry>
+	<entry id="return">
+	    <internal  token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_inetd_connect" header="0" idNo="34" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="service_name">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *" />
+	</entry>
+	<entry id="ip_type,ip_remote_port,ip_local_port,ip_adr">
+	    <internal token="tid"/>
+	    <external opt="required" type="uint32_t,uint16_t,uint16_t,uint32_t[4]" />
+	</entry>
+	<entry id="cmd">
+	    <internal token="command_1"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="privileges">
+	    <internal token="priv_effective"/>
+	    <external opt="required" type="priv_set_t *" />
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_inetd_ratelimit" header="0" idNo="35" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="service_name">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *" />
+	</entry>
+	<entry id="limit">
+	    <internal token="text"/>
+	    <external opt="required" type="char *" />
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_inetd_copylimit" header="0" idNo="36" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="service_name">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *" />
+	</entry>
+	<entry id="limit">
+	    <internal token="text"/>
+	    <external opt="required" type="char *" />
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_inetd_failrate" header="0" idNo="37" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="service_name">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *" />
+	</entry>
+	<entry id="values">
+	    <internal token="text"/>
+	    <external opt="required" type="char *" />
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+
+    <event id="AUE_login" instance_of="AUE_generic_login"
+	header="0" idNo="25">
+    </event>
+
+    <event id="AUE_logout" header="0" idNo="1"> 
+	<entry id="subject">
+	    <internal  token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="user_name">
+	    <internal token="text" format="logout %s"/>
+	    <external opt="optional" type="char *"/>
+        </entry>
+	<entry id="return">
+	    <internal  token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_network_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="7">
+    </event>
+    <event id="AUE_network_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="8">
+    </event>
+    <event id="AUE_network_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="9">
+    </event>
+
+    <event id="AUE_passwd" header="0" idNo="27">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="username">
+	    <internal  token="text"/>
+	    <external opt="optional"  type="char *" />
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_printer_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="10">
+    </event>
+    <event id="AUE_printer_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="11">
+    </event>
+    <event id="AUE_printer_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="12">
+    </event>
+
+    <!--
+	AUE_prof_cmd is not supported for Java due to the structure of
+	the priv token.  When and if a Java program needs to generate
+	a priv token, we'll need to look at the data format in the
+	Java code and provide an appropriate java and jni implementation.
+    -->
+
+    <event id="AUE_prof_cmd" header="0" idNo="24" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="cwdpath">
+	    <internal token="path"/>
+	    <external opt="required" type="char*" />
+	</entry>
+	<entry id="cmdpath">
+	    <internal token="path"/>
+	    <external opt="required" type="char*" />
+	</entry>
+	<entry id="argc,argv,envp">
+	    <internal token="command"/>
+	    <external opt="required" type="int,char**,char**" />
+	</entry>
+	<entry id="proc_auid,proc_euid,proc_egid,proc_ruid,proc_rgid,proc_pid,proc_sid,proc_termid">
+	    <internal token="process"/>
+	    <external opt="required" type="uid_t,uid_t,gid_t,uid_t,gid_t,pid_t,au_asid_t,termid*" />
+	</entry>
+        <entry id="limit_set">
+	    <internal token="priv_limit"/>
+	    <external opt="optional" type="priv_set_t*" />
+        </entry>
+        <entry id="inherit_set">
+	    <internal token="priv_inherit"/>
+	    <external opt="optional" type="priv_set_t*" />
+        </entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_rlogin" instance_of="AUE_generic_login"
+	header="0" idNo="28">
+    </event>
+
+    <event id="AUE_role_login" instance_of="AUE_generic_login"
+	header="0" idNo="13">
+    </event>
+
+    <event id="AUE_scheduledjob_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="14">
+    </event>
+    <event id="AUE_scheduledjob_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="15">
+    </event>
+    <event id="AUE_scheduledjob_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="16">
+    </event>
+
+    <event id="AUE_screenlock" instance_of="AUE_generic_basic"
+	header="0" idNo="26">
+    </event>
+    <event id="AUE_screenunlock" instance_of="AUE_generic_basic"
+	header="0" idNo="31">
+    </event>
+
+    <event id="AUE_serialport_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="17">
+    </event>
+    <event id="AUE_serialport_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="18">
+    </event>
+    <event id="AUE_serialport_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="19">
+    </event>
+
+    <event id="AUE_ssh" instance_of="AUE_generic_login" header="0" idNo="2">
+    </event>
+
+    <event id="AUE_su" header="0" idNo="30">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="message">
+	    <internal  token="text"/>
+	    <external opt="optional"  type="char *" />
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_telnet" instance_of="AUE_generic_login"
+	header="0" idNo="29">
+    </event>
+
+    <event id="AUE_uauth" header="0" idNo="20">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *" />
+	</entry>
+	<entry id="objectname">
+	    <internal token="text"/>
+	    <external opt="required" type="char *" />
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_usermgr_add" instance_of="AUE_generic_SMC_add"
+	header="0" idNo="21">
+    </event>
+    <event id="AUE_usermgr_delete" instance_of="AUE_generic_SMC_delete"
+	header="0" idNo="22">
+    </event>
+    <event id="AUE_usermgr_modify" instance_of="AUE_generic_SMC_modify"
+	header="0" idNo="23">
+    </event>
+
+    <event id="AUE_zlogin" header="0" idNo="38" omit="JNI">
+	<entry id="subject">
+	    <internal  token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="message">
+	    <internal  token="text"/>
+	    <external opt="optional" type="char *" />
+	</entry>
+	<entry id="return">
+	    <internal  token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_zone_state" header="0" idNo="33" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="new_state">
+	    <internal token="text"/>
+	    <external opt="required" type="char *" />
+	</entry>
+	<entry id="zonename">
+	    <internal token="zonename"/>
+	    <external opt="required" type="char *" />
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!--
+     token definitions are partially implemented.  All they do for now
+     is create a list of defined token names.  In the future they may
+     become a way of describing token structure.
+-->
+
+    <token id="acl">	
+    </token>
+    <token id="arbitrary">
+    </token>
+    <token id="arg">
+    </token>
+    <token id="attr">
+    </token>
+    <token id="command">
+    </token>
+    <token id="command_1">
+    </token>
+    <token id="date">
+    </token>
+    <token id="exec_args">
+    </token>
+    <token id="exec_env">
+    </token>
+    <token id="exit">
+    </token>
+    <token id="file">
+    </token>
+    <token id="groups">
+    </token>
+    <token id="in_addr">
+    </token>
+    <token id="ipc">
+    </token>
+    <token id="ipc_perm">
+    </token>
+    <token id="newgroups">
+    </token>
+    <token id="opaque">
+    </token>
+    <token id="path">
+    </token>
+    <!-- pseudo token; path list generates 0 or more path tokens -->
+    <token id="path_list">
+    </token>
+    <token id="tid">
+    </token>
+
+    <!--
+
+	privilege token is implemented as one of the pseudo tokens
+	priv_limit, priv_effective, or priv_inherit
+
+    <token id="privilege">
+    </token>
+    -->
+    <token id="priv_effective">
+    </token>
+    <token id="priv_inherit">
+    </token>
+    <token id="priv_limit">
+    </token>
+    <token id="process">
+    </token>
+    <token id="return">
+    </token>
+    <token id="seq">
+    </token>
+    <token id="socket">
+    </token>
+    <token id="socket-inet">
+    </token>
+    <token id="subject">
+    </token>
+    <token id="text">
+    </token>
+    <token id="uauth">
+    </token>
+    <token id="zonename">
+    </token>
+<!--
+    error value list for return values with success/fail code of fail.
+    These values start at 1000 so praudit can tell the difference
+    between the libbsm/common/audit_*.c broken error values and
+    the new adt_ error value list.  It is public so that praudit
+    can find it.
+
+    praudit outputs "failure"  %s" for these strings, so there is
+    no need to use words such as  "failed" in the message.
+
+    ** Add to the end only to maintain validity across versions of
+    the audit log. **
+-->
+
+    <msg_list id="fail_value" header="0" start="1000" public="true">
+	<msg id="PW_ATTR">Attribute update</msg>
+	<msg id="PW">Password update</msg>
+	<msg id="USERNAME">bad username</msg>
+	<msg id="AUTH">bad auth.</msg>
+	<msg id="UID">bad uid</msg>
+	<msg id="UNKNOWN">unknown failure</msg>
+	<msg id="EXPIRED">password expired</msg>
+	<msg id="ACCOUNT_LOCKED">Account is locked</msg>
+	<msg id="BAD_DIALUP">Bad dial up</msg>
+	<msg id="BAD_ID">Invalid ID</msg>
+	<msg id="BAD_PW">Invalid password</msg>
+	<msg id="CONSOLE">Not on console</msg>
+	<msg id="MAX_TRIES">Too many failed attempts</msg>
+	<msg id="PROTOCOL_FAILURE">Protocol failure</msg>
+	<msg id="EXCLUDED_USER">Excluded user</msg>
+	<msg id="ANON_USER">No anonymous</msg>
+	<msg id="BAD_CMD">Invalid command</msg>
+	<msg id="BAD_TTY">Standard input not a tty line</msg>
+	<msg id="PROGRAM">Program failure</msg>
+	<msg id="CHDIR_FAILED">chdir to home directory</msg>
+	<msg id="INPUT_OVERFLOW">Input line too long.</msg>
+	<msg id="DEVICE_PERM">login device override</msg>
+	<msg id="AUTH_BYPASS">authorization bypass</msg>
+	<msg id="LOGIN_DISABLED">login disabled</msg>
+    </msg_list>
+
+<!--
+	The following empty list is used for PAM errors; the "start"
+	value is used by praudit to know to use the PAM infrastructure
+	for generating error strings
+-->
+    <msg_list id="fail_pam" header="0" start="2000" public="true">
+    </msg_list>
+
+<!--
+     Message list for the various authentication events, such
+     as AUE_login and AUE_admin_authenticate.  Add new entries
+     at the end.  The order of msg_list entries and the order
+     of msg entries both affect the names in adt.h and the value
+     of the associated enumerated types.
+
+     Each of these messages except NO_MSG is also in the failure_attribute
+     list; the difference is that the messages below use a text token
+     in the audit record, while the failure_attribute messages are
+     associated with the return value of the return token.
+
+     This list is deprecated; please don't use text tokens for error
+     messages.
+-->
+
+    <msg_list id="login_text" header="0" deprecated="true">
+	<msg id="NO_MSG"></msg>
+	<msg id="ACCOUNT_LOCKED">Account is locked</msg>
+	<msg id="BAD_DIALUP">Bad dial up</msg>
+	<msg id="BAD_ID">Invalid ID</msg>
+	<msg id="BAD_PW">Invalid password</msg>
+	<msg id="CONSOLE">Not on console</msg>
+	<msg id="MAX_TRIES">Too many failed attempts</msg>
+	<msg id="PROTOCOL_FAILURE">Protocol failure</msg>
+	<msg id="EXCLUDED_USER">Excluded user</msg>
+	<msg id="ANON_USER">No anonymous</msg>
+    </msg_list>
+
+</debug>
+</specification>

@@ -1,0 +1,11 @@
+
+Press CHOICES to select the login name or type the login name
+(user name) of the user who will "own" the object.
+
+Only the owner can change the owner of a file or file folder.
+Normally, all objects in your Filecabinet are owned by you.
+
+WARNING: If you change read, write, or run/search permissions for a
+file or file folder, then you change the owner to a user other than
+yourself, you might not have access to it.
+

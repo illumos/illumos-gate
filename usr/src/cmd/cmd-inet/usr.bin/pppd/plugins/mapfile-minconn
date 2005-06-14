@@ -1,0 +1,14 @@
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+# External declarations - used to suppress -zdefs errors.
+
+{
+	add_options	= FUNCTION extern;	# Provided by pppd.
+	idle_time_hook	= DATA extern;		#    "     "
+	idle_time_limit	= DATA extern;		#    "     "
+	info		= FUNCTION extern;	#    "     "
+};

@@ -1,0 +1,19 @@
+
+Press CHOICES to select the format that your file folders will be 
+displayed in. Valid choices are:
+
+         - long form:  For each file and file folder, its name,
+           description (if specified), type, and the date and time
+           it was created/changed are displayed.
+
+         - name and description (default value):  For each file and
+           file folder type, its name and description are displayed.
+
+         - name and marks:  For each file and file folder, its name
+           is displayed with an * after the name if the object is an
+           executable file or a / after the name if the object is a
+           file folder.
+
+         - name only:  For each file and file folder, only the name
+           is displayed.
+

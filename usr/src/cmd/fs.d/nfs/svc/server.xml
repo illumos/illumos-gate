@@ -1,0 +1,149 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License, Version 1.0 only
+ (the "License").  You may not use this file except in compliance
+ with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+
+	Note: if this service is modified to consist of anything other
+	than a single instance named 'default', you must make changes to
+	$SRC/head/rpcsvc/daemon_utils.h and libnsl:open_daemon_lock().
+-->
+
+<service_bundle type='manifest' name='SUNWnfssr:nfs-server'>
+
+<service
+	name='network/nfs/server'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<dependency name='network'
+	    grouping='require_any'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/milestone/network' />
+	</dependency>
+
+	<dependency name='nlockmgr'
+	    grouping='require_all'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/network/nfs/nlockmgr' />
+	</dependency>
+
+	<dependency name='mapid'
+	    grouping='optional_all'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/network/nfs/mapid' />
+	</dependency>
+
+	<dependency name='rpcbind'
+	    grouping='require_all'
+	    restart_on='restart'
+	    type='service'>
+		<service_fmri value='svc:/network/rpc/bind' />
+	</dependency>
+
+	<dependency name='keyserv'
+	    grouping='optional_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/network/rpc/keyserv' />
+	</dependency>
+
+	<dependency name='gss'
+	    grouping='optional_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/network/rpc/gss' />
+	</dependency>
+
+	<!-- Must have all local filesystems mounted before we share them -->
+	<dependency name='filesystem-local'
+	    grouping='require_all'
+	    restart_on='error'
+	    type='service'>
+	    	<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<dependent
+		name='nfs-server_multi-user-server'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/multi-user-server' />
+	</dependent>
+
+	<!--
+	  The shareall done as part of the nfs-server method may take a
+	  long time, as the contents of dfstab can be arbitrarily large.
+	  Set the timeout appropriately.
+	-->
+	<exec_method
+	    type='method'
+	    name='start'
+	    exec='/lib/svc/method/nfs-server %m'
+	    timeout_seconds='3600' />
+
+	<!--
+	  The stop method runs unshareall as well as up to a 10 second
+	  sleep to do graceful versus forceful shutdown of daemons.  Set
+	  the timeout appropriately.
+	-->
+	<exec_method
+	    type='method'
+	    name='stop'
+	    exec='/lib/svc/method/nfs-server %m %{restarter/contract}'
+	    timeout_seconds='3600' />
+
+	<property_group name='application' type='framework'>
+		<stability value='Evolving' />
+		<propval name='auto_enable' type='boolean' value='true' />
+	</property_group>
+
+	<stability value='Stable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				NFS server
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='nfsd' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

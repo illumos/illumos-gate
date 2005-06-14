@@ -1,0 +1,68 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# /etc/security/prof_attr
+#
+# profiles attributes. see prof_attr(4)
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+All:::Execute any command as the user or role:help=RtAll.html
+Audit Control:::Configure BSM auditing:auths=solaris.audit.config,solaris.jobs.admin;help=RtAuditCtrl.html
+Audit Review:::Review BSM auditing logs:auths=solaris.audit.read;help=RtAuditReview.html
+Contract Observer:::Reliably observe any/all contract events:help=RtContractObserver.html
+Device Management:::Control Access to Removable Media:auths=solaris.device.*;help=RtDeviceMngmnt.html
+Printer Management:::Manage printers, daemons, spooling:help=RtPrntAdmin.html
+Cron Management:::Manage at and cron jobs:auths=solaris.jobs.*,solaris.smf.manage.cron;help=RtCronMngmnt.html
+Log Management:::Manage log files:help=RtLogMngmnt.html
+Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.jobs.users,solaris.mail.mailq;profiles=All;help=RtDefault.html
+Device Security:::Manage devices and Volume Manager:auths=solaris.device.*;help=RtDeviceSecurity.html
+DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMngmnt.html
+File System Management:::Manage, mount, share file systems:auths=solaris.smf.manage.autofs;help=RtFileSysMngmnt.html
+File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
+Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;help=RtMailMngmnt.html
+Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log;help=RtMaintAndRepair.html
+Media Backup:::Backup files and file systems:help=RtMediaBkup.html
+Media Restore:::Restore files and file systems from backups:help=RtMediaRestore.html
+Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind;help=RtNetMngmnt.html
+Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh;help=RtNetSecure.html
+Name Service Management:::Non-security name service scripts/commands:help=RtNameServiceAdmin.html
+Name Service Security:::Security related name service scripts/commands:help=RtNameServiceSecure.html
+Object Access Management:::Change ownership and permission on files:help=RtObAccessMngmnt.html
+Process Management:::Manage current processes and processors:auths=solaris.smf.manage.cron,solaris.smf.manage.power;help=RtProcManagement.html
+Rights Delegation:::Delegate ability to assign rights to users and roles:auths=solaris.role.delegate,solaris.profmgr.delegate,solaris.grant;help=RtRightsDelegate.html
+Service Management:::Manage services:auths=solaris.smf.manage,solaris.smf.modify
+Service Operator:::Administer services:auths=solaris.smf.manage,solaris.smf.modify.framework
+Software Installation:::Add application software to the system:help=RtSoftwareInstall.html
+System Event Management:::Manage system events and system event channels:help=RtSysEvMngmnt.html
+User Management:::Manage users, groups, home directory:auths=solaris.profmgr.read;help=RtUserMngmnt.html
+User Security:::Manage passwords, clearances:auths=solaris.role.*,solaris.profmgr.*;help=RtUserSecurity.html
+FTP Management:::Manage the FTP server:help=RtFTPMngmnt.html
+Crypto Management:::Cryptographic Framework Administration:help=RtCryptoMngmnt.html
+Kerberos Client Management:::Maintain and Administer Kerberos excluding the servers:help=RtKerberosClntMngmnt.html
+Kerberos Server Management:::Maintain and Administer Kerberos Servers:profiles=Kerberos Client Management;help=RtKerberosSrvrMngmnt.html
+DAT Administration:::Manage the DAT configuration:help=RtDatAdmin.html
+Zone Management:::Zones Virtual Application Environment Administration:help=RtZoneMngmnt.html
+IP Filter Management:::IP Filter Administration:help=RtIPFilterMngmnt.html
+Project Management:::Add/Modify/Remove projects:help=RtProjManagement.html

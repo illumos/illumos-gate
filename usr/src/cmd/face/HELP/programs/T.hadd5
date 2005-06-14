@@ -1,0 +1,7 @@
+
+Enter yes here if you want to be prompted for parameters
+which will be passed to the command you have specified
+when it is executed.  These parameters will be supplied 
+on the command line when the command is run.
+
+The default for this field is no.

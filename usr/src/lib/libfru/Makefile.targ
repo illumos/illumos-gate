@@ -1,0 +1,60 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright (c) 2000 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# lib/libfru/Makefile.targ
+#
+
+include ../../Makefile.targ
+
+# build rules for pics.  (access sub directories)
+pics/%.o objs/%.o:	../libfru/%.cc
+	$(COMPILE.cc) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o objs/%.o:	../libfrureg/%.cc
+	$(COMPILE.cc) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o objs/%.o:	../libgenutil/%.cc
+	$(COMPILE.cc) -o $@ $<
+	$(POST_PROCESS_O)
+
+# some special rules for the yacc and lex parser.  (with sub directories)
+pics/y.tab.cc pics/y.tab.h: ../libfru/nameSyntaxYacc.y
+	$(YACC.y) -d ../libfru/nameSyntaxYacc.y
+	$(SED) -f ../libfru/yy-sed y.tab.c > pics/y.tab.cc
+	$(SED) -f ../libfru/yy-sed y.tab.h > pics/y.tab.h
+	$(RM) y.tab.c y.tab.h
+
+pics/nameSyntaxYacc.o: pics/y.tab.cc
+	$(COMPILE.cc) -I../libfru -Ipics -o $@ pics/y.tab.cc
+
+pics/nameSyntaxLex.o: ../libfru/nameSyntaxLex.l pics/y.tab.h
+	$(LEX.l) ../libfru/nameSyntaxLex.l | \
+		$(SED) -f ../libfru/yy-lsed > pics/lex.fru.cc
+	$(COMPILE.cc) -I../libfru -Ipics -o $@ pics/lex.fru.cc
+

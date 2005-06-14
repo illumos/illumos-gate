@@ -1,0 +1,640 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Title: Resource Utilization and Performance Monitoring 
+ *
+ * Description: Classes providing visibility to computing resource metrics.
+ * 
+ * Date: %G%
+ * 
+ * Version: %I%
+ *
+ * Copyright (c) 2001 by Sun Microsystems, Inc.
+ * All rights reserved.
+ * 
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ */
+
+
+#pragma Locale ("en_US")
+
+/*
+ * User and Project entities.
+ */
+
+//==================================================================
+// Solaris_ActiveUser
+//==================================================================
+[Provider("java:com.sun.wbem.solarisprovider.srm.Solaris_ActiveUser"),
+ Description(
+    "Represents a UserAccount that is actively "
+    "running on an OperatingSystem.")
+]
+class Solaris_ActiveUser: CIM_LogicalElement
+{
+        [Propagated("CIM_OperatingSystem.CSCreationClassName"),
+         Key,
+         Description ("The scoping ComputerSystem's CreationClassName."),
+         MaxLen (256)
+        ]  
+    string CSCreationClassName;
+
+        [Propagated("CIM_OperatingSystem.CSName"),
+         Key,
+         Description ("The scoping ComputerSystem's Name."),
+         MaxLen (256)
+        ]  
+    string CSName;
+
+        [Propagated("CIM_OperatingSystem.CreationClassName"),
+         Key,
+         Description ("The scoping OperatingSystem's CreationClassName."),
+         MaxLen (256)
+        ]  
+    string OSCreationClassName;
+
+        [Propagated("CIM_OperatingSystem.Name"),
+         Key,
+         Description ("The scoping OperatingSystem's Name."),
+         MaxLen (256)
+        ]  
+    string OSName;
+
+        [Key,
+         Description (
+                "CreationClassName indicates the name of the class or the "
+                "subclass used in the creation of an instance. When used "
+                "with the other key properties of this class, this property "
+                "allows all instances of this class and its subclasses to "
+                "be uniquely identified."),
+         MaxLen (256)
+        ]        
+    string CreationClassName;
+
+        [Read,
+         Description("User Name"),
+         MaxLen (256)
+        ]
+    string UserName;
+
+    	[Description(
+		"Get properties for all instances of Solaris_ActiveUser"
+		" as an array of strings.  Each string contains the values"
+		" of the UserID and UserName properties for a"
+		" single instance.")
+	]
+    sint32 getBulkData([OUT] string data[]);
+
+        [Key,
+         Read,
+         Description("User ID")
+        ]
+    sint32 UserID;
+
+};
+
+
+//==================================================================
+// Solaris_ActiveProject
+//==================================================================
+[Provider("java:com.sun.wbem.solarisprovider.srm.Solaris_ActiveProject"),
+ Description("Represents a Project that is actively"
+             "running on an OperatingSystem.")
+]
+class Solaris_ActiveProject: CIM_LogicalElement
+{
+        [Propagated("CIM_OperatingSystem.CSCreationClassName"),
+         Key,
+         Description ("The scoping ComputerSystem's CreationClassName."),
+         MaxLen (256)
+        ]  
+    string CSCreationClassName;
+
+        [Propagated("CIM_OperatingSystem.CSName"),
+         Key,
+         Description ("The scoping ComputerSystem's Name."),
+         MaxLen (256)
+        ]  
+    string CSName;
+
+        [Propagated("CIM_OperatingSystem.CreationClassName"),
+         Key,
+         Description ("The scoping OperatingSystem's CreationClassName."),
+         MaxLen (256)
+        ]  
+    string OSCreationClassName;
+
+        [Propagated("CIM_OperatingSystem.Name"),
+         Key,
+         Description ("The scoping OperatingSystem's Name."),
+         MaxLen (256)
+        ]  
+    string OSName;
+
+        [Key,
+         Description (
+                "CreationClassName indicates the name of the class or the "
+                "subclass used in the creation of an instance. When used "
+                "with the other key properties of this class, this property "
+                "allows all instances of this class and its subclasses to "
+                "be uniquely identified."),
+         MaxLen (256)
+        ]  
+    string CreationClassName;
+
+        [Key,
+         Read,
+         Description("Project Name"),
+         MaxLen (256)
+          ]
+    string ProjectName;
+
+        [Read,
+         Description("Project ID")
+        ]
+    sint32 ProjectID;
+
+    	[Description(
+		"Get properties for all instances of Solaris_ActiveProject"
+		" as an array of strings.  Each string contains the values"
+		" of the ProjectID and ProjectName properties for a"
+		" single instance.")
+	]
+    sint32 getBulkData([OUT] string data[]);
+};
+
+
+/*
+ * Statistical properties of Processes and Process Aggregates.
+ */
+
+//==================================================================
+// Solaris_ProcessStatisticalInformation
+//==================================================================
+[
+Description("Raw resource utilization measurements for a process.")
+]
+class Solaris_ProcessStatisticalInformation : CIM_SystemStatisticalInformation
+{
+
+	// CPU state times
+
+        [Read,
+         Description (
+                "The cumulative number of seconds that this process "
+		"has spent in User mode over its lifetime."),
+         Units("Seconds")
+        ]
+    real64 UserModeTime;
+
+        [Read,
+         Description (
+                "The cumulative number of seconds that this process "
+		"has spent in System mode over its lifetime."),
+         Units("Seconds")
+        ]
+    real64 SystemModeTime;
+
+        [Read,
+         Description (
+                "The cumulative number of seconds that this process "
+		"has spent in System Traps over its lifetime."),
+         Units("Seconds")
+        ]
+    real64 SystemTrapTime;
+
+        [Read,
+         Description (
+                "The cumulative number of seconds that this process "
+		"has spent sleeping in Text Page Faults over its lifetime."),
+         Units("Seconds")
+        ]
+    real64 TextPageFaultSleepTime;
+
+        [Read,
+         Description (
+                "The cumulative number of seconds that this process "
+		"has spent sleeping in Data Page Faults over its lifetime."),
+         Units("Seconds")
+        ]
+    real64 DataPageFaultSleepTime;
+
+        [Read,
+         Description (
+                "The cumulative number of seconds that this process "
+		"has spent sleeping in System Page Faults over its lifetime."),
+         Units("Seconds")
+        ]
+    real64 SystemPageFaultSleepTime;
+
+        [Read,
+         Description (
+                "The cumulative number of seconds that this process "
+                "has spent sleeping on User Lock Waits over its lifetime."),
+         Units("Seconds")
+        ]
+    real64 UserLockWaitSleepTime;
+
+        [Read,
+         Description (
+                "The cumulative number of seconds that this process "
+                "has spent sleeping in all other ways over its lifetime."),
+         Units("Seconds")
+        ]
+    real64 OtherSleepTime;
+
+        [Read,
+         Description (
+                "The cumulative number of seconds that this process "
+                "has spent Waiting for CPU over its lifetime."),
+         Units("Seconds")
+        ]
+    real64 WaitCPUTime;
+
+        [Read,
+         Description (
+                "The cumulative number of seconds that this process "
+                "has spent Stopped over its lifetime."),
+         Units("Seconds")
+        ]
+    real64 StoppedTime;
+
+
+	// Event counts
+
+	[Read,
+         Description (
+                "The cumulative number of Minor Page Faults engendered by the "
+                "process over its lifetime.")
+        ]
+    uint64 MinorPageFaults;
+
+	[Read,
+         Description (
+                "The cumulative number of Major Page Faults engendered by the "
+                "process over its lifetime.")
+        ]
+    uint64 MajorPageFaults;
+
+
+	[Read,
+         Description (
+                "The cumulative number of swap operations engendered by the "
+                "process over its lifetime.")
+        ]
+    uint64 SwapOperations;
+
+        [Read,
+         Description (
+                "The cumulative number of blocks Read by the process "
+                "over its lifetime.")
+        ]
+    uint64 BlocksRead;
+
+        [Read,
+         Description (
+                "The cumulative number of blocks Written by the process "
+                "over its lifetime.")
+        ]
+    uint64 BlocksWritten;
+
+        [Read,
+         Description (
+                "The cumulative number of Messages Received by the process "
+                "over its lifetime.")
+        ]
+    uint64 MessagesReceived;
+
+        [Read,
+         Description (
+                "The cumulative number of Messages Sent by the process "
+                "over its lifetime.")
+        ]
+    uint64 MessagesSent;
+
+        [Read,
+         Description (
+                "The cumulative number of Signals taken by the "
+                "process over its lifetime.")
+        ]
+    uint64 SignalsReceived;
+
+        [Read,
+         Description (
+                "The cumulative number of Voluntary Context Switches "
+                "made by the process over its lifetime.")
+        ]
+    uint64 VoluntaryContextSwitches;
+
+        [Read,
+         Description (
+                "The cumulative number of Involuntary Context Switches "
+                "made by the process over its lifetime.")
+        ]
+    uint64 InvoluntaryContextSwitches;
+
+        [Read,
+         Description (
+                "The cumulative number of system calls made by the "
+                "process over its lifetime.")
+        ]
+    uint64 SystemCallsMade;
+
+        [Read,
+         Description (
+                "The cumulative number of character I/O bytes "
+                "Read and Written by the process over its lifetime."),
+            Units ("Bytes")
+        ]
+    uint64 CharacterIOUsage;
+
+
+	// Memory usage statistics
+
+        [Read,
+         Description (
+                "The total number of KiloBytes of memory consumed by the "
+                "process heap at the time that it is sampled."),
+         Units ("KiloBytes")
+        ] 
+    uint64 ProcessHeapSize;
+
+        [Read,
+         Description(
+                "The size of the process virtual address space "
+                "in KiloBytes."),
+         Units ("KiloBytes")
+        ]
+    uint64 ProcessVMSize;
+
+        [Read,
+         Description("The resident set size of the process in KiloBytes "),
+         Units ("KiloBytes")
+        ]
+    uint64 ProcessResidentSetSize;
+
+
+	// Composite statistics
+
+        [Read,
+         Description("The percent CPU time used by the process.")
+        ]
+    real32 PercentCPUTime;
+
+        [Read,
+         Description(
+                "The ratio of the process resident set size to "
+                "physical memory.")
+        ]
+    real32 PercentMemorySize;
+
+        [Read,
+         Description(
+                "Time in User mode and System mode spent by the process," 
+                "in milliseconds. If this information is not available,"
+                "a value of 0 should be used."),
+         Units("MilliSeconds")
+        ]
+    real64 UserSystemModeTime;
+
+        [Read,
+         Description(
+                "The number of threads active in the current Process. ")
+	]
+    uint32 NumThreads;
+
+	[Read,
+	 Description (
+		"The system clock time at which the sample was taken.") ]
+    uint64 Timestamp;
+
+        [Override ("Name"),
+         Key,
+         Description ("Process ID of the owning process.")
+        ]
+    String Name;
+};
+
+
+//==================================================================
+// Solaris_UserProcessAggregateStatisticalInformation
+//==================================================================
+[Provider("java:com.sun.wbem.solarisprovider.srm.Solaris_UserProcessAggregateStatisticalInformation"),
+ Description(
+        "Accumulated resource utilization measurements for "
+        "an aggregation of processes sharing a common User.  "
+        "The (inherited) ProcessStatisticalInformation properties "
+        "are populated by summing the underlying process' usage. ")
+]
+class Solaris_UserProcessAggregateStatisticalInformation :
+        Solaris_ProcessStatisticalInformation
+{
+        [Description("The number of processes measured in the aggregate.") ]
+    uint32 NumProcs;
+
+    	[Description(
+		"Get properties for all instances of"
+		" Solaris_UserProcessAggregateStatisticalInformation" 
+		" as an array of strings.  Each string contains the values"
+		" of a single instance's properties.  The values are "
+		" separated by whitespace and appear in the same order "
+		" as they do in the MOF definition of the class.")
+	]
+    sint32 getBulkData([OUT] string data[]);
+    
+        [Override ("Name"),
+         Key,
+         Description (
+                "The unique User ID (in String form) of aggregate's owner.")
+        ]
+    String Name;
+};
+
+
+//==================================================================
+// Solaris_ProjectProcessAggregateStatisticalInformation
+//==================================================================
+[Provider("java:com.sun.wbem.solarisprovider.srm.Solaris_ProjectProcessAggregateStatisticalInformation"),
+ Description(
+        "Accumulated resource utilization measurements for "
+        "an aggregation of processes sharing a common Project.  "
+        "The (inherited) ProcessStatisticalInformation properties "
+        "are populated by summing the underlying process' usage. ")
+]
+class Solaris_ProjectProcessAggregateStatisticalInformation :
+        Solaris_ProcessStatisticalInformation
+{
+        [Description("The number of processes measured in the aggregate.") ]
+    uint32 NumProcs;
+
+    	[Description(
+		"Get properties for all instances of"
+		" Solaris_ProjectProcessAggregateStatisticalInformation" 
+		" as an array of strings.  Each string contains the values"
+		" of a single instance's properties.  The values are "
+		" separated by whitespace and appear in the same order "
+		" as they do in the MOF definition of the class.")
+	]
+    sint32 getBulkData([OUT] string data[]);
+
+        [Override ("Name"),
+         Key,
+         Description (
+                "The unique Project name of the aggregate's owner.")
+        ]
+    String Name;
+};
+
+
+/*
+ * Association between a Process and its statistics.
+ */
+
+//==================================================================
+// Solaris_ProcessStatistics
+//==================================================================
+[Association,
+ Provider("java:com.sun.wbem.solarisprovider.srm.Solaris_ProcessStatistics"),
+ Description("An association linking a Solaris_Process and its "
+        "Solaris_ProcessStatisticalInformation instance.")
+]
+class Solaris_ProcessStatistics : CIM_SystemStatistics
+{
+        [Override ("Element"), 
+         Key,
+         Description ("The Process whose utilization is being monitored.")
+        ]
+    Solaris_Process REF Element;
+
+        [Override ("Stats"), 
+         Key,
+         Description (
+                "The statistical information object that contains "
+                "utilization data for the associated Process.")
+        ]
+    Solaris_ProcessStatisticalInformation REF Stats;
+
+};
+
+
+/*
+ * Associations between Users/Projects and Processes/Process Aggregates.
+ */
+/*
+//==================================================================
+// Solaris_UserProcessStatistics
+//==================================================================
+[Association,
+ Aggregation,
+ Provider("java:com.sun.wbem.solarisprovider.srm.Solaris_UserProcessStatistics"),
+ Description("A link between a User active on a system and the "
+        "Statistics of all Processes running on its behalf.")
+]
+class Solaris_UserProcessStatistics: CIM_SystemStatistics
+{
+        [Override ("Element"),
+         Description ("The User active on a System")
+        ]
+    Solaris_ActiveUser REF Element;
+
+        [Override ("Stats"),
+         Description ("The Process Statistics belonging to the User.")
+        ]
+    Solaris_ProcessStatisticalInformation REF Stats;
+};
+
+
+//==================================================================
+// Solaris_ProjectProcessStatistics
+//==================================================================
+[Association,
+ Aggregation,
+ Provider("java:com.sun.wbem.solarisprovider.srm.Solaris_ProjectProcessStatistics"),
+ Description("A link between a Project active on a system and the "
+        "Statistics of all Processes running on its behalf.")
+
+]
+class Solaris_ProjectProcessStatistics: CIM_SystemStatistics
+{
+        [Override ("Element"),
+         Description ("The Project active on a System")
+        ]
+    Solaris_ActiveProject REF Element;
+
+        [Override ("Stats"),
+         Description ("The Process Statistics belonging to the Project")
+        ]
+    Solaris_ProcessStatisticalInformation REF Stats ;
+};
+
+*/
+
+//==================================================================
+// Solaris_ActiveUserProcessAggregateStatistics
+//==================================================================
+[Association,
+ Provider("java:com.sun.wbem.solarisprovider.srm.Solaris_ActiveUserProcessAggregateStatistics"),
+ Description("A link between an User active on a system and the "
+        "aggregated resource usage of its Process(es).")
+]
+class Solaris_ActiveUserProcessAggregateStatistics: CIM_SystemStatistics
+{
+        [Override ("Element"),
+         Key,
+         Description ("The User active on a System.")
+        ]
+    Solaris_ActiveUser REF Element;
+
+        [Override ("Stats"),
+         Key,
+         Description ("The Process Aggregate Statistics for the User.")
+        ]
+    Solaris_UserProcessAggregateStatisticalInformation REF Stats;
+};
+
+
+
+//==================================================================
+// Solaris_ActiveProjectProcessAggregateStatistics
+//==================================================================
+[Association,
+ Provider("java:com.sun.wbem.solarisprovider.srm.Solaris_ActiveProjectProcessAggregateStatistics"),
+ Description("A link between a Project active on a system and the "
+        "aggregated resource usage of its Process(es).")
+]
+class Solaris_ActiveProjectProcessAggregateStatistics: CIM_SystemStatistics
+{
+        [Override ("Element"),
+         Key,
+         Description ("The Project active on a System.")
+        ]
+    Solaris_ActiveProject REF Element;
+
+        [Override ("Stats"),
+         Key,
+         Description ("The Process Aggregate Statistics for the Project.")
+        ]
+    Solaris_ProjectProcessAggregateStatisticalInformation REF Stats;
+};
+
+

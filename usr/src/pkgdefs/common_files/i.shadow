@@ -1,0 +1,98 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+while read src dest
+do
+	if [ ! -f $dest ] ; then
+		cp $src $dest
+	else
+		#
+		# 2.6 & earlier versions had an smtp entry; remove it.
+		#
+		# Some accounts used to be shipped with "NP" they are now
+		# shipped as "*LK*" since they shouldn't be able to run
+		# cron jobs or login.
+		sed '	/^smtp:/d;
+			/^nobody:/s/:NP:/:*LK*:/;
+			/^nobody4:/s/:NP:/:*LK*:/;
+			/^noaccess/s/:NP:/:*LK*:/;' $dest > /tmp/d.$$
+		cp /tmp/d.$$ $dest
+		rm -f /tmp/d.$$
+
+		#
+		# Add the 'nobody' user from 4.x so that people don't
+		# assign it to a regular user and confuse themselves
+		#
+		NOBODY4_LINE="nobody4:*LK*:6445::::::"
+		if grep "^nobody4:" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^noaccess:*LK*\na\n%s\n.\nw\nq\n' \
+				"$NOBODY4_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'smmsp' user for sendmail 8.12
+		#
+		SMMSP_LINE="smmsp:NP:6445::::::"
+		if grep "$SMMSP_LINE" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^nobody4:*LK*\na\n%s\n.\nw\nq\n' \
+				"$SMMSP_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'gdm' reserved user if it doesn't exist.
+		#
+		GDM_LINE="gdm:*LK*:::::::"
+		if grep "^gdm:" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^listen:\*LK\*\na\n%s\n.\nw\nq\n' \
+				"$GDM_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'webservd' reserved user if it doesn't exist.
+		#
+		WEBSERVD_LINE="webservd:*LK*:::::::"
+		if grep "^webservd:" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^gdm:\*LK\*\na\n%s\n.\nw\nq\n' \
+				"$WEBSERVD_LINE" | ed -s $dest > /dev/null
+		fi
+	fi
+done
+
+exit 0

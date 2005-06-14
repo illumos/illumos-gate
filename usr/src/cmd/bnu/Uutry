@@ -1,0 +1,102 @@
+#!/usr/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:Uutry 2.6.1.8 */
+export IFS PATH
+IFS=" 	
+"
+PATH="/usr/bin"
+
+#	This shell will start a uucico for the system given.
+#	Options:
+#	  -xN the debugging level for uucico (-x5 default)
+#	  -r  force the removal of the status file
+#	The output is put in /tmp/Name where Name is the name
+#	of the system name.  A tail -f is performed after uucico is started.
+
+STATUS=/var/uucp/.Status
+
+UUCICO=/usr/lib/uucp/uucico
+tty -s
+if [ "`pwd`" != "/usr/lib/uucp" -a "$?" = 0 -a -x "./uucico" ]; then
+	echo "OK to execute uucico from current directory (`pwd`)? y or n? \c"
+	read ans
+	if [ "$ans" = "y" ]
+	    then
+		UUCICO=./uucico
+	fi
+fi
+
+REMOVE=""
+X="-x5"
+SYS=
+while [ $# -gt 0 ]
+do
+	case $1 in
+	-c)  shift; CLASS="-c$1"; shift;;
+	-c*) CLASS="$1"; shift;;
+	-x)  shift; X="-x$1"; shift;;
+	-x*) X=$1; shift;;
+	-r) REMOVE="-f"; shift;;
+	-?) echo "$0: unrecognized flag $1\nUSAGE: $0 [-r] [-xdebug_level] system";exit 1;;
+	*) SYS="$1"; shift;;
+	esac
+done
+
+if [ -z "$SYS" ]
+then
+	echo "$0:  system name required"
+	exit 1
+fi
+
+#  check for existence in Systems file
+#  only accept match of full name
+#  (important because some names may be prefixes of others!)
+XX=
+XX=`uuname | grep "^${SYS}$" `
+if [ -z "$XX" ]
+then
+	echo "Invalid system name \"$SYS\""
+	exit
+fi
+
+STMP=/tmp/$SYS
+rm -f $STMP
+> $STMP
+chmod 622 $STMP
+#  remove old status file (can't actually remove, since $STATUS isn't
+#  publicly writable, but zero-ing it out works fine)
+if [ -n "$REMOVE" ]; then
+    cp /dev/null $STATUS/${SYS} 2>/dev/null
+fi
+
+echo "$UUCICO -r1 -s$SYS $CLASS $REMOVE $X >$STMP 2>&1&"
+$UUCICO  -r1 -s$SYS $CLASS $REMOVE $X >$STMP 2>&1&
+
+echo "tmp=$STMP"
+#	on heavily loaded systems, may take a moment for uucico
+#	to create debug file.
+if [ ! -f $STMP ]
+then
+	sleep 5
+fi
+tail -f $STMP

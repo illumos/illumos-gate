@@ -1,0 +1,17 @@
+etc/rtc_config
+etc/system
+etc/name_to_major
+etc/driver_aliases
+etc/name_to_sysnum
+etc/dacf.conf
+etc/driver_classes
+etc/path_to_inst
+etc/mach
+etc/devices/devid_cache
+kernel
+platform/i86pc/biosint
+platform/i86pc/kernel
+boot/solaris.xpm
+boot/solaris/bootenv.rc
+boot/solaris/devicedb/master
+boot/acpi/tables

@@ -1,0 +1,24 @@
+
+The Objects Found Menu lists all the matches found for the criteria
+specified during the find command search. Each object in the menu is
+specified in its "path name" format so you will know what file folder
+actually contains the object.
+
+This menu frame operates like any other file folder frame, enabling
+you to open, copy, move, rename, etc. any of the objects listed. You
+cannot create an object and store it in this menu frame.
+
+Note that performing any action on an object in this menu is like
+operating on it in the folder that actually contains it.  For example,
+if you move an object in this menu, it will be moved from the file
+folder that actually contains it.
+
+Note that when you perform an action that alters the contents
+of the frame, e.g., move, delete, or rename, you will not see
+the object change until you issue the update command to update
+the frame contents. This is because this menu is not a file
+folder but an extension of the find command.
+
+To remove this menu frame from the screen, you must use either the
+cancel it or do a cleanup.
+

@@ -1,0 +1,86 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+msgid  "ruxf:e:d:"
+msgid  "/etc/acctadm.conf"
+msgid  ""
+msgid  "process"
+msgid  "proc"
+msgid  "task"
+msgid  "flow"
+msgid  "no"
+msgid  "none"
+msgid  "yes"
+msgid  "ACCTADM_PROC_ENABLE"
+msgid  "ACCTADM_PROC_FILE"
+msgid  "ACCTADM_PROC_TRACKED"
+msgid  "ACCTADM_PROC_UNTRACKED"
+msgid  "ACCTADM_TASK_ENABLE"
+msgid  "ACCTADM_TASK_FILE"
+msgid  "ACCTADM_TASK_TRACKED"
+msgid  "ACCTADM_TASK_UNTRACKED"
+msgid  "ACCTADM_FLOW_ENABLE"
+msgid  "ACCTADM_FLOW_FILE"
+msgid  "ACCTADM_FLOW_TRACKED"
+msgid  "ACCTADM_FLOW_UNTRACKED"
+msgid  "r+"
+msgid  "r"
+msgid  " %[^=]=%s \n%n"
+msgid  "\"%s\", line %d: "
+       "warning: invalid %s\n"
+msgid  "\"%s\", line %d: warning: "
+       "invalid token: %s\n"
+msgid  "\"%s\", line %d: syntax error\n"
+msgid  "%s="
+msgid  "active"
+msgid  "inactive"
+msgid  "%s\n"
+msgid  "pid"
+msgid  "uid"
+msgid  "gid"
+msgid  "projid"
+msgid  "taskid"
+msgid  "cpu"
+msgid  "time"
+msgid  "command"
+msgid  "tty"
+msgid  "host"
+msgid  "extended"
+msgid  "basic"
+msgid  "mstate"
+msgid  "saddr"
+msgid  "daddr"
+msgid  "sport"
+msgid  "dport"
+msgid  "proto"
+msgid  "dsfield"
+msgid  "nbytes"
+msgid  "npkts"
+msgid  "ctime"
+msgid  "lseen"
+msgid  "%-10s"
+msgid  "%s"
+msgid  ",%s"
+msgid  "\n"
+msgid  ", "
+msgid  ","
+msgid  "%s: "
+msgid  ": %s\n"

@@ -1,0 +1,138 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# code: PCI-8000-0C
+# keys: defect.io.pci.driver
+#
+msgid "PCI-8000-0C.type"
+msgstr "Fault"
+msgid "PCI-8000-0C.severity"
+msgstr "Critical"
+msgid "PCI-8000-0C.description"
+msgstr "A problem was detected in the PCI controller software"
+msgid "PCI-8000-0C.response"
+msgstr "One or more of device instances may be disabled"
+msgid "PCI-8000-0C.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "PCI-8000-0C.action"
+msgstr "Ensure latest drivers and patches are installed. Use fmdump -v -u <EVENT_ID> to identify the module/package, or contact Sun for support."
+#
+# code: PCI-8000-1Q
+# keys: fault.io.pci.bus
+#
+msgid "PCI-8000-1Q.type"
+msgstr "Fault"
+msgid "PCI-8000-1Q.severity"
+msgstr "Critical"
+msgid "PCI-8000-1Q.description"
+msgstr "A problem was detected for a PCI bus.  Refer to %s for more information."
+msgid "PCI-8000-1Q.response"
+msgstr "One or more device instances may be disabled"
+msgid "PCI-8000-1Q.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "PCI-8000-1Q.action"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support."
+#
+# code: PCI-8000-24
+# keys: defect.io.pci.driver fault.io.pci.bus
+#
+msgid "PCI-8000-24.type"
+msgstr "Fault"
+msgid "PCI-8000-24.severity"
+msgstr "Critical"
+msgid "PCI-8000-24.description"
+msgstr "A problem was detected in the PCI subsystem or controlling software.  Refer to %s for more information."
+msgid "PCI-8000-24.response"
+msgstr "One or more device instances may be disabled"
+msgid "PCI-8000-24.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "PCI-8000-24.action"
+msgstr "Ensure that the latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact Sun for support."
+#
+# code: PCI-8000-3R
+# keys: fault.io.pci.device
+#
+msgid "PCI-8000-3R.type"
+msgstr "Fault"
+msgid "PCI-8000-3R.severity"
+msgstr "Critical"
+msgid "PCI-8000-3R.description"
+msgstr "A problem was detected for a PCI controller.  Refer to %s for more information."
+msgid "PCI-8000-3R.response"
+msgstr "One or more device instances may be disabled"
+msgid "PCI-8000-3R.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "PCI-8000-3R.action"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support."
+#
+# code: PCI-8000-42
+# keys: defect.io.pci.driver fault.io.pci.device
+#
+msgid "PCI-8000-42.type"
+msgstr "Fault"
+msgid "PCI-8000-42.severity"
+msgstr "Critical"
+msgid "PCI-8000-42.description"
+msgstr "A problem was detected in the SUNOS subsystem or controlling software.  Refer to %s for more information."
+msgid "PCI-8000-42.response"
+msgstr "One or more device instances may be disabled"
+msgid "PCI-8000-42.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "PCI-8000-42.action"
+msgstr "Ensure that the latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact Sun for support."
+#
+# code: PCI-8000-5X
+# keys: fault.io.pci.bus fault.io.pci.device
+#
+msgid "PCI-8000-5X.type"
+msgstr "Fault"
+msgid "PCI-8000-5X.severity"
+msgstr "Critical"
+msgid "PCI-8000-5X.description"
+msgstr "A problem was detected in the PCI subsystem.  Refer to %s for more information."
+msgid "PCI-8000-5X.response"
+msgstr "One or more device instances may be disabled"
+msgid "PCI-8000-5X.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "PCI-8000-5X.action"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support."
+#
+# code: PCI-8000-6E
+# keys: defect.io.pci.driver fault.io.pci.bus fault.io.pci.device
+#
+msgid "PCI-8000-6E.type"
+msgstr "Fault"
+msgid "PCI-8000-6E.severity"
+msgstr "Critical"
+msgid "PCI-8000-6E.description"
+msgstr "A problem was detected in the SUNOS subsystem or controlling software. Refer to %s for more information."
+msgid "PCI-8000-6E.response"
+msgstr "One or more device instances may be disabled"
+msgid "PCI-8000-6E.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "PCI-8000-6E.action"
+msgstr "Ensure that the latest drivers and patches are installed, schedule a repair procedure to replace the affected device if necessary, or contact Sun for support."

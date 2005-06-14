@@ -1,0 +1,77 @@
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#
+
+This directory contains utilities that help port and patch a standard perl
+5.8.4 build directory into the ON tree.  It is hoped that future ports and
+patches will be able to use the same framework, so details of the process used
+for 5.8.4 are documented here.
+
+Porting
+=======
+
+Step 1.
+-------
+Build and install perl 5.8.4 for both the sparc and i386 architectures.  To do
+this, unpack perl 5.8.4 and then run the InstallPerl script from inside the
+directory.  This script needs to be setuid root, and will install perl under
+/usr/perl5, and will generate the correct config.sh file.  A series of status
+files will be generated in the perl build directory.  These files are then
+used in step 2 to automatically figure out which files need to be integrated
+into ON.  The files are build.touched, test.log and install.packlist.
+
+Step 2.
+-------
+From the perl build directory, run the MapFiles script.  This will produce
+a CSV file describing all the files that need to be integrated into ON, using
+the information captured by step 1.  The spreadsheet can be viewed in
+StarOffice.  The file flist_5.8.4_s10.csv in this directory is the output of
+the MapFiles script.
+
+Step 3.
+-------
+Run the CheckIn script, giving as parameters the CSV file, the perl build
+directory and the workspace that perl is to be checked in to.  The script
+outputs a shell script to stdout, the script contains the commands necessary
+to check the perl source into ON.
+
+Step 4.
+-------
+Verify that the resulting script looks sane, then run it to perform the
+integration.  Examine the output to make sure that the integration succeeded.
+
+Step 5.
+------
+Make sure you have a config.sh for both the sparc and x86 architectures, and
+that they are checked in.
+
+Step 6.
+-------
+Generate the makefiles and associated infrastructure to build the resulting
+perl 5.8.4 workspace.  These were based on the 5.8.3 versions.  Things that
+need to be done manually, in no particular order:
+	a) Merge in the ON-specific changes into installperl fromm the previous
+	   perl version.
+	b) Merge in the ON-specific changes into MakeMaker (under utils/lib)
+	   using the standard perl files as a starting point.
+	c) Generate Config.pm files for contrib/Sun/Solaris/PerlGcc and
+	   make any other necessary changes for the new OS and/or perl version.
+
+Files
+=====
+
+A full list of the files in this directory is given below.
+
+InstallPerl		Builds and installs perl.  setuid root.
+MapFiles		Figures out which files need to be integrated into ON.
+CheckIn			Generates a ksh script to do the integration.
+flist_5.8.4_s10.csv	Output of MapFiles.
+EditedFiles		Utility to find any differences between the perl build
+			directory and an ON workspace.
+ConfigPerlGcc		Generate a config.sh file suitable for use with gcc,
+			to be used with Sun::Solaris::PerlGcc.
+README			This file.

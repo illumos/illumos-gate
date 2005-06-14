@@ -1,0 +1,22 @@
+
+The Printer Operations Menu provides you with access to the printer
+operations available through AT&T FACE.
+
+The items contained in the Printer Operations menu are:
+
+        Print Options:  Enables you to change Print Options.
+        A "Change Print Options" form will be displayed.  The form
+        presents your default print commands. You may change any of
+        the print commands by editing the form.  The  print commands
+        specified in the "Change Print Option" form are saved, and
+        are presented to you during subsequent print operations.
+
+        Printer Queue:  Enables you to display all of the printer
+        requests currently queued on any printers attached to your 
+        machine.  Only 8 print requests are displayed at one time.  
+        Use the arrow keys or function keys to display other requests.
+
+        Printer Status:  Enables you to display the status of all
+        the printers attached to your machine.  Only 8 printers are 
+        displayed at one time.  Use the arrow keys or function keys 
+        to display other printers.

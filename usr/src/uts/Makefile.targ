@@ -1,0 +1,343 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	This Makefiles contains the common targets and definitions for
+#	all kernels. It is to be included in the Makefiles for specific
+#	implementation architectures and processor architecture dependent
+#	modules: i.e.: all driving kernel Makefiles.
+#
+
+#
+#	Default rule for building the lint library directory:
+#
+$(LINT_LIB_DIR):
+	-@mkdir -p $@ 2> /dev/null
+
+#
+#	All C objects depend on inline files. However, cc(1) doesn't generate
+#	the correct dependency info. Also, these Makefiles don't contain a
+#	separate list of C-derived object files (but it is light weight to
+#	let the assembler files think they depend upon this when they don't).
+#	Fortunately, the inline files won't change very often. So, for now,
+#	all objects depend on the inline files. Remove this when the inliner
+#	is fixed to drop correct dependency information.
+#
+$(OBJECTS): $(INLINES)
+
+#
+#	Partially link .o files to generate the kmod. The fake dependency
+#	on modstubs simplifies things...
+#	ELFSIGN_MOD is defined in the individual KCF plug-in modules Makefiles,
+#	and will sign the ELF objects using elfsign(1).
+#
+$(BINARY):		$(OBJECTS)
+	$(LD) -r $(LDFLAGS) -o $@ $(OBJECTS)
+	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
+	$(POST_PROCESS)
+	$(ELFSIGN_MOD)
+
+#
+#	This target checks each kmod for undefined entry points. It does not
+#	modify the kmod in any way.
+#
+$(MODULE).check:	FRC
+	@BUILD_TYPE=DBG32 $(MAKE) $(MODULE).check.targ
+
+$(MODULE).check.targ:	$(BINARY) $(OBJECTS) $(EXTRA_CHECK_OBJS) $(UNIX_O) $(MODSTUBS_O) $(GENLIB)
+	$(LD) -o /dev/null $(OBJECTS) $(EXTRA_CHECK_OBJS) $(UNIX_O) $(MODSTUBS_O) $(GENLIB)
+
+#
+#	Module lint library construction targets.
+#
+MOD_LINT_LIB	= $(LINT_LIB_DIR)/llib-l$(LINT_MODULE).ln
+
+$(MOD_LINT_LIB):	$(LINT_LIB_DIR) $(LINTS)
+	@-$(ECHO) "\n$(OBJS_DIR)/$(MODULE): (library construction):"
+	@$(LINT) -o $(LINT_MODULE) $(LINTFLAGS) $(LINTS)
+	@$(MV) $(@F) $@
+
+$(LINT_MODULE).lint:	$(MOD_LINT_LIB) $(LINT_LIB) $(GEN_LINT_LIB)
+	@-$(ECHO) "\n$(OBJS_DIR)/$(LINT_MODULE): global crosschecks:"
+	@$(LINT) $(LINTFLAGS) $(MOD_LINT_LIB) $(LINT_LIB) $(GEN_LINT_LIB)
+
+#
+# Since assym.h is a derived file, the dependency must be explicit for
+# all files including this file. (This is only actually required in the
+# instance when the .nse_depinfo file does not exist.) It may seem that
+# the lint targets should also have a similar dependency, but they don't
+# since only C headers are included when #defined(lint) is true. The
+# actual lists are defined in */Makefile.files.
+#
+$(ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/assym.h
+
+#
+#	Everybody need to know how to create a modstubs.o built with the
+#	appropriate flags and located in the appropriate location.
+#
+$(MODSTUBS_O):	$(MODSTUBS)
+	$(COMPILE.s) -o $@ $(MODSTUBS)
+
+$(LINTS_DIR)/modstubs.ln:	$(MODSTUBS)
+	@($(LHEAD) $(LINT.s) $(MODSTUBS) $(LTAIL))
+
+#
+# Build the source file which contains the kernel's utsname,
+# with release, version and machine set as follows:
+#
+#	release: contents of $(RELEASE) (Spaces replaced by '_')
+#	version: contents of $(PATCHID) (Spaces replaced by '_')
+#	machine: contents of $(PLATFORM)
+#
+# Build environment information is only contained in the comment section.
+#
+# The version string, normally the variable VERSION, is set to display
+# environmental information temporarily while in development because
+# it provides a little more useful information.
+#
+VERSION_STRING	= ($(ECHO) $$LOGNAME [\`basename $$CODEMGR_WS\`] \\\c; date +%D)
+$(INTERNAL_RELEASE_BUILD)VERSION_STRING = $(ECHO) $(PATCHID)
+
+$(OBJS_DIR)/vers.o: $(OBJECTS)
+	$(COMPILE.c) -DUTS_RELEASE=\"`$(ECHO) $(RELEASE) | sed -e 's/ /_/g'`\" \
+	    -DUTS_VERSION=\"`$(VERSION_STRING) | sed -e 's/ /_/g'`\" \
+	    -DUTS_PLATFORM=\"$(PLATFORM)\" -o $@ $(SRC)/uts/common/os/vers.c
+	$(CTFCONVERT_O)
+	$(POST_PROCESS_O)
+
+$(LINTS_DIR)/vers.ln: $(SRC)/uts/common/os/vers.c
+	@($(LHEAD) $(LINT.c) -DUTS_RELEASE=\"\" -DUTS_VERSION=\"\" \
+	    -DUTS_PLATFORM=\"\" $(SRC)/uts/common/os/vers.c $(LTAIL))
+
+#
+#	Installation targets and rules:
+#
+$(ROOT_MOD_DIR) $(USR_MOD_DIR):
+	-$(INS.dir.root.sys)
+
+$(ROOT_MOD_DIRS_32):	$(ROOT_MOD_DIR)
+	-$(INS.dir.root.sys)
+
+$(USR_MOD_DIRS_32):	$(USR_MOD_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_MOD_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MOD_DIR) FRC
+	$(INS.file)
+
+$(ROOT_DRV_DIR)/%:	$(OBJS_DIR)/% $(ROOT_DRV_DIR) FRC
+	$(INS.file)
+
+$(ROOT_DTRACE_DIR)/%:	$(OBJS_DIR)/% $(ROOT_DTRACE_DIR) FRC
+	$(INS.file)
+
+$(ROOT_EXEC_DIR)/%:	$(OBJS_DIR)/% $(ROOT_EXEC_DIR) FRC
+	$(INS.file)
+
+$(ROOT_FS_DIR)/%:	$(OBJS_DIR)/% $(ROOT_FS_DIR) FRC
+	$(INS.file)
+
+$(ROOT_SCHED_DIR)/%:	$(OBJS_DIR)/% $(ROOT_SCHED_DIR) FRC
+	$(INS.file)
+
+$(ROOT_STRMOD_DIR)/%:	$(OBJS_DIR)/% $(ROOT_STRMOD_DIR) FRC
+	$(INS.file)
+
+$(ROOT_IPP_DIR)/%:	$(OBJS_DIR)/% $(ROOT_IPP_DIR) FRC
+	$(INS.file)
+
+$(ROOT_SYS_DIR)/%:	$(OBJS_DIR)/% $(ROOT_SYS_DIR) FRC
+	$(INS.file)
+
+$(ROOT_MISC_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MISC_DIR) FRC
+	$(INS.file)
+
+$(ROOT_DACF_DIR)/%:	$(OBJS_DIR)/% $(ROOT_DACF_DIR) FRC
+	$(INS.file)
+
+$(ROOT_CRYPTO_DIR)/%:	$(OBJS_DIR)/% $(ROOT_CRYPTO_DIR) FRC
+	$(INS.file)
+
+$(ROOT_KGSS_DIR)/%:	$(OBJS_DIR)/% $(ROOT_KGSS_DIR) FRC
+	$(INS.file)
+
+$(ROOT_MACH_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MACH_DIR) FRC
+	$(INS.file)
+
+$(ROOT_FONT_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MOD_DIR) $(ROOT_FONT_DIR) FRC
+	$(INS.file)
+
+$(USR_DRV_DIR)/%:	$(OBJS_DIR)/% $(USR_DRV_DIR) FRC
+	$(INS.file)
+
+$(USR_EXEC_DIR)/%:	$(OBJS_DIR)/% $(USR_EXEC_DIR) FRC
+	$(INS.file)
+
+$(USR_FS_DIR)/%:	$(OBJS_DIR)/% $(USR_FS_DIR) FRC
+	$(INS.file)
+
+$(USR_SCHED_DIR)/%:	$(OBJS_DIR)/% $(USR_SCHED_DIR) FRC
+	$(INS.file)
+
+$(USR_STRMOD_DIR)/%:	$(OBJS_DIR)/% $(USR_STRMOD_DIR) FRC
+	$(INS.file)
+
+$(USR_SYS_DIR)/%:	$(OBJS_DIR)/% $(USR_SYS_DIR) FRC
+	$(INS.file)
+
+$(USR_MISC_DIR)/%:	$(OBJS_DIR)/% $(USR_MISC_DIR) FRC
+	$(INS.file)
+
+$(USR_DACF_DIR)/%:	$(OBJS_DIR)/% $(USR_DACF_DIR) FRC
+	$(INS.file)
+
+$(USR_PCBE_DIR)/%:	$(OBJS_DIR)/% $(USR_PCBE_DIR) FRC
+	$(INS.file)
+
+include $(SRC)/Makefile.psm.targ
+
+#
+#	Target for 64b modules
+#
+$(ROOT_KERN_DIR_64):
+	-$(INS.dir.root.sys)
+
+$(ROOT_KERN_DIR_64)/%:	$(OBJS_DIR)/% $(ROOT_KERN_DIR_64) FRC
+	$(INS.file)
+
+%/$(SUBDIR64):		%
+	-$(INS.dir.root.sys)
+
+#
+#	Targets for '.conf' file installation.
+#
+$(ROOT_CONFFILE):	$(SRC_CONFFILE)	$(ROOT_CONFFILE:%/$(CONFFILE)=%)
+	$(INS.conffile)
+
+#
+#	Targets for creating links between common platforms. ROOT_PLAT_LINKS
+#	are are the /platform level while ROOT_PLAT_LINKS_2 are one level
+#	down (/platform/`uname -i`/{lib|sbin|kernel}.
+#
+$(ROOT_PLAT_LINKS):
+	$(INS.slink1)
+
+$(ROOT_PLAT_LINKS_2):
+	$(INS.slink2)
+
+$(USR_PLAT_LINKS):
+	$(INS.slink1)
+
+$(USR_PLAT_LINKS_2):
+	$(INS.slink2)
+
+#
+# multiple builds support
+#
+def $(DEF_DEPS)			:= TARGET = def
+all $(ALL_DEPS)			:= TARGET = all
+clean $(CLEAN_DEPS)		:= TARGET = clean
+clobber $(CLOBBER_DEPS)		:= TARGET = clobber
+lint $(LINT_DEPS)		:= TARGET = lint
+modlintlib $(MODLINTLIB_DEPS)	:= TARGET = modlintlib
+clean.lint $(CLEAN_LINT_DEPS)	:= TARGET = clean.lint
+install $(INSTALL_DEPS)		:= TARGET = install
+symcheck $(SYM_DEPS)		:= TARGET = symcheck
+
+
+ALL_TARGS	= def all clean clobber lint modlintlib clean.lint lintlib install symcheck
+
+ALL_OBJ32	= $(ALL_TARGS:%=%.obj32)
+
+$(ALL_OBJ32):	FRC
+	@BUILD_TYPE=OBJ32 VERSION='$(VERSION)' $(MAKE) $(TARGET).targ
+
+ALL_DEBUG32	= $(ALL_TARGS:%=%.debug32)
+
+$(ALL_DEBUG32):	FRC
+	@BUILD_TYPE=DBG32 VERSION='$(VERSION)' $(MAKE) $(TARGET).targ
+
+ALL_OBJ64	= $(ALL_TARGS:%=%.obj64)
+
+$(ALL_OBJ64):	FRC
+	@BUILD_TYPE=OBJ64 VERSION='$(VERSION)' $(MAKE) $(TARGET).targ
+
+ALL_DEBUG64	= $(ALL_TARGS:%=%.debug64)
+
+$(ALL_DEBUG64):	FRC
+	@BUILD_TYPE=DBG64 VERSION='$(VERSION)' $(MAKE) $(TARGET).targ
+
+
+$(OBJS_DIR):
+	-@mkdir -p $@ 2> /dev/null
+
+def.targ:		$(OBJS_DIR) $(ALL_TARGET)
+
+all.targ:		$(OBJS_DIR) $(ALL_TARGET)
+
+lint.targ:		$(OBJS_DIR) $(LINT_TARGET)
+
+modlintlib.targ:	$(OBJS_DIR) $(MOD_LINT_LIB)
+
+install.targ:		$(OBJS_DIR) $(INSTALL_TARGET)
+
+#
+#	Cleanliness is next to ...
+#
+clean.targ:
+	-$(RM) $(CLEANFILES) Nothing_to_remove
+
+clobber.targ:
+	-$(RM) $(CLOBBERFILES) Nothing_to_remove
+
+clean.lint.targ:
+	-$(RM) $(CLEANLINTFILES) Nothing_to_remove
+
+#
+#	Create fake lintlibs in the 64b dirs so
+#	global linting works
+#
+lint64:
+	@$(ECHO) $(MODULE) fake lints
+	@for dir in $(LINT64_DIRS); do \
+		if [ ! -d $$dir ]; then mkdir $$dir; fi \
+	done
+	@for file in $(LINT64_FILES); do \
+		if [ ! -f $$file ]; then touch $$file; fi \
+	done
+
+#
+#	In some places we also need to create fake lintlibs for 32b
+#	dirs so global linting works
+#
+lint32:
+	@$(ECHO) $(MODULE) fake lints
+	@for dir in $(LINT32_DIRS); do \
+		if [ ! -d $$dir ]; then mkdir $$dir; fi \
+	done
+	@for file in $(LINT32_FILES); do \
+		if [ ! -f $$file ]; then touch $$file; fi \
+	done
+FRC:

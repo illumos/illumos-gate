@@ -1,0 +1,97 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10	*/
+# # --------------------------------
+#
+# perkinelmer: PERKIN ELMER
+#
+# Manufacturer:	PERKIN ELMER
+# Class:	II
+# 
+#	Following this message is a copy of our TERMINFO file for 
+#	Perkin-Elmer terminals. Please be aware that we are in the 
+#	process of revising it and will supply you a new version as 
+#	soon as its ready. In the mean time, though, this should get 
+#	you started.
+#	
+#	
+# perkinelmer: PERKIN ELMER
+#
+bantam|pe550|pe6100|perkin elmer 550,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, cols#80, el=\EI$<20>,
+	clear=\EK$<20>, cup=\EX%p1%' '%+%c\EY%p2%' '%+%c, home=\EH,
+	lines#24, ll=\EH\EA, cuf1=\EC, cuu1=\EA,
+fox|pe1100|perkin elmer 1100,
+	tbc=\E3, hts=\E1, cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H,
+	ed=\EJ$<5.5*>, el=\EI, clear=\EH\EJ$<132>, cols#80, home=\EH, lines#24,
+	ll=\EH\EA, cuf1=\EC, cup=\EX%p1%' '%+%c\EY%p2%' '%+%c,
+	cuu1=\EA, flash=^P^B^P^C,
+owl|pe1200|perkin elmer 1200,
+	tbc=\E3, hts=\E1, cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EL$<5.5*>,
+	am, cub1=^H, ed=\EJ$<5.5*>, el=\EI$<5.5>, clear=\EH\EJ$<132>, home=\EH,
+	ll=\EH\EA, cup=\EX%p1%' '%+%c\EY%p2%' '%+%c, cols#80, dch1=\EO$<5.5*>,
+	dl1=\EM$<5.5*>, ich1=\EN, ip=$<5.5*>, kbs=^h, in, lines#24,
+	cuf1=\EC, cuu1=\EA, rmso=\E!\200, smso=\E!^H, flash=^P^B^P^C,
+	kf1=\ERA, kf2=\ERB, kf3=\ERC, kf4=\ERD, kf5=\ERE, kf6=\ERF,
+	kf7=\ERG, kf8=\ERH, kf9=\ERI, kf0=\ERJ,
+pe1251|pe6300|pe6312|perkin elmer 1251,
+	am, cols#80, it#8, lines#24, xmc#1, pb#300, vt#8,
+	bel=^G, cr=^M, clear=\EK$<332>, el=\EI$<10*>, ed=\EJ$<20*>,
+	cud1=\EB, home=\EH, cub1=\ED, cuf1=\EC, cuu1=\EA, 
+	cup=\EX%p1%' '%+%c\EY%p2%' '%+%c, ind=^J, hts=\E1, kf0=\ERA,
+	kf1=\ERB, kf2=\ERC, kf3=\ERD, kf4=\ERE, kf5=\ERF, kf6=\ERG,
+	kf7=\ERH, kf8=\ERI, kf9=\ERJ, kf10=\ERK, tbc=\E3,
+pe7000m|perkin elmer 7000 series monochrome monitor,
+	am,	cols#80,    lines#24,
+	bel=^G, cr=^M,	clear=\EK, el=\EI,   ed=\EJ,
+	cud1=\EB,  home=\EH, cub1=\ED, cuf1=\EC, cuu1=\EA,
+	cup=\ES%p1%' '%+%c%p2%' '%+%c,ind=^J,
+	is1=\E!\0\EW  7o\Egf\ES7 ,
+	smso=\E!\010, rmso=\E!\0,
+	cbt=\E!Y,
+	kf0=\E!\0, kf1=\E!\001, kf2=\E!\002, kf3=\E!\003,
+	kf4=\E!\004, kf5=\E!\005, kf6=\E!\006, kf7=\E!\007,
+	kf8=\E!\010, kf9=\E!\011, kf10=\E!\012,
+	kbs=^H, kcud1=\E!U, khome=\E!S, kcub1=\E!V, kcuf1=\E!W,
+	kcuu1=\E!T, ll=\ES7 , ri=\ER, 
+	rmul=\E!\0, smul=\E!\040, 
+pe7000c|perkin elmer 7000 series colour monitor,
+	am,	cols#80,    lines#24,
+	bel=^G, cr=^M,	clear=\EK, el=\EI,   ed=\EJ,
+	cud1=\EB,  home=\EH, cub1=\ED, cuf1=\EC, cuu1=\EA,
+	cup=\ES%p1%' '%+%c%p2%' '%+%c,ind=^J,
+	is1=\E!\0\EW  7o\Egf\Eb0\Ec7\ES7 ,
+	smso=\Eb2, rmso=\Eb0,
+	cbt=\E!Y,
+	kf0=\E!\0, kf1=\E!\001, kf2=\E!\002, kf3=\E!\003,
+	kf4=\E!\004, kf5=\E!\005, kf6=\E!\006, kf7=\E!\007,
+	kf8=\E!\010, kf9=\E!\011, kf10=\E!\012,
+	kbs=^H, kcud1=\E!U, khome=\E!S, kcub1=\E!V, kcuf1=\E!W,
+	kcuu1=\E!T, ll=\ES7 , ri=\ER, 
+	rmul=\E!\0, smul=\E!\040, 
+
+
+

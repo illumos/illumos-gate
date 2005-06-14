@@ -1,0 +1,90 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# /etc/security/auth_attr
+#
+# authorizations. see auth_attr(4)
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+solaris.:::All Solaris Authorizations::help=AllSolAuthsHeader.html
+solaris.grant:::Grant All Solaris Authorizations::help=PriAdmin.html
+#
+solaris.audit.:::Audit Management::help=AuditHeader.html
+solaris.audit.config:::Configure Auditing::help=AuditConfig.html
+solaris.audit.read:::Read Audit Trail::help=AuditRead.html
+#
+solaris.device.:::Device Allocation::help=DevAllocHeader.html
+solaris.device.allocate:::Allocate Device::help=DevAllocate.html
+solaris.device.config:::Configure Device Attributes::help=DevConfig.html
+solaris.device.grant:::Delegate Device Administration::help=DevGrant.html
+solaris.device.revoke:::Revoke or Reclaim Device::help=DevRevoke.html
+solaris.device.cdrw:::CD-R/RW Recording Authorizations::help=DevCDRW.html
+#
+solaris.dhcpmgr.:::DHCP Service Management::help=DhcpmgrHeader.html
+solaris.dhcpmgr.write:::Modify DHCP Service Configuration::help=DhcpmgrWrite.html
+#
+solaris.jobs.:::Job Scheduler::help=JobHeader.html
+solaris.jobs.admin:::Manage All Jobs::help=AuthJobsAdmin.html
+solaris.jobs.grant:::Delegate Cron & At Administration::help=JobsGrant.html
+solaris.jobs.user:::Manage Owned Jobs::help=AuthJobsUser.html
+#
+solaris.login.:::Login Control::help=LoginHeader.html
+solaris.login.enable:::Enable Logins::help=LoginEnable.html
+solaris.login.remote:::Remote Login::help=LoginRemote.html
+#
+solaris.mail.:::Mail::help=MailHeader.html
+solaris.mail.mailq:::Mail Queue::help=MailQueue.html
+#
+solaris.profmgr.:::Rights::help=ProfmgrHeader.html
+solaris.profmgr.assign:::Assign All Rights::help=AuthProfmgrAssign.html
+solaris.profmgr.delegate:::Assign Owned Rights::help=AuthProfmgrDelegate.html
+solaris.profmgr.write:::Manage Rights::help=AuthProfmgrWrite.html
+solaris.profmgr.read:::View Rights::help=AuthProfmgrRead.html
+solaris.profmgr.execattr.write:::Manage Commands::help=AuthProfmgrExecattrWrite.html
+#
+solaris.role.:::Roles::help=RoleHeader.html
+solaris.role.assign:::Assign All Roles::help=AuthRoleAssign.html
+solaris.role.delegate:::Assign Owned Roles::help=AuthRoleDelegate.html
+solaris.role.write:::Manage Roles::help=AuthRoleWrite.html
+#
+solaris.smf.:::SMF Management::help=SmfHeader.html
+solaris.smf.modify.:::Modify All SMF Service Properties::help=SmfModifyHeader.html
+solaris.smf.modify.method:::Modify Service Methods::help=SmfModifyMethod.html
+solaris.smf.modify.dependency:::Modify Service Dependencies::help=SmfModifyDepend.html
+solaris.smf.modify.application:::Modify Application Type Properties::help=SmfModifyAppl.html
+solaris.smf.modify.framework:::Modify Framework Type Properties::help=SmfModifyFramework.html
+solaris.smf.manage.:::Manage All SMF Service States::help=SmfManageHeader.html
+solaris.smf.manage.autofs:::Manage Automount Service States::help=SmfAutofsStates.html
+solaris.smf.manage.bind:::Manage DNS Service States::help=BindStates.html
+solaris.smf.manage.cron:::Manage Cron Service States::help=SmfCronStates.html
+solaris.smf.manage.name-service-cache:::Manage Name Service Cache Daemon Service States::help=SmfNscdStates.html
+solaris.smf.manage.power:::Manage Power Management Service States::help=SmfPowerStates.html
+solaris.smf.manage.sendmail:::Manage Sendmail Service States::help=SmfSendmailStates.html
+solaris.smf.manage.ssh:::Manage Secure Shell Service States::help=SmfSshStates.html
+solaris.smf.manage.system-log:::Manage Syslog Service States::help=SmfSyslogStates.html
+#
+solaris.system.:::Machine Administration::help=SysHeader.html
+solaris.system.date:::Set Date & Time::help=SysDate.html
+solaris.system.shutdown:::Shutdown the System::help=SysShutdown.html

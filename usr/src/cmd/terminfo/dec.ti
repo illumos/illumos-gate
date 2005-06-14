@@ -1,0 +1,264 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+# # --------------------------------
+#
+# dec: DEC (DIGITAL EQUIPMENT CORPORATION)
+#
+# Manufacturer:	DEC (DIGITAL EQUIPTMENT CORP.)
+# Class:	II
+# 
+# Info:
+#	Note that xenl glitch in vt100 is not quite the same as concept,
+#	since the cursor is left in a different position while in the
+#	weird state (concept at beginning of next line, vt100 at end
+#	of this line) so all versions of vi before 3.7 don't handle
+#	xenl right on vt100. The correct way to handle xenl is when
+#	you output the char in column 80, immediately output CR LF
+#	and then assume you are in column 1 of the next line. If xenl
+#	is on, am should be on too.
+#	
+#	I assume you have smooth scroll off or are at a slow enough baud
+#	rate that it doesn't matter (1200? or less). Also this assumes
+#	that you set auto-nl to "on", if you set it off use vt100-nam 
+#	below.
+#	
+#	The padding requirements listed here are guesses. It is strongly
+#	recommended that xon/xoff be enabled, as this is assumed here.
+#	
+#	The vt100 uses rs2 and rf rather than is2/tbc/hts because the 
+#	tab settings are in non-volatile memory and don't need to be 
+#	reset upon login. Also setting the number of columns glitches 
+#	the screen annoyingly. You can type "reset" to get them set.
+#
+vt100|vt100-am|dec vt100 (w/advanced video),
+	mir, msgr, cr=^M, cud1=^J, ind=^J, bel=^G, cols#80, lines#24, it#8,
+	clear=\E[H\E[J$<50>, cub1=^H, am, cup=\E[%i%p1%d;%p2%dH$<5>,
+	cuf1=\E[C$<2>, cuu1=\E[A$<2>, el=\E[K$<3>, el1=\E[1K$<3>, ed=\E[J$<50>,
+	cud=\E[%p1%dB, cuu=\E[%p1%dA, cub=\E[%p1%dD, cuf=\E[%p1%dC, 
+	smso=\E[1;7m$<2>, rmso=\E[m$<2>, smul=\E[4m$<2>, rmul=\E[m$<2>,
+	bold=\E[1m$<2>, rev=\E[7m$<2>, blink=\E[5m$<2>, sgr0=\E[m^O$<2>,
+	sgr=\E[0%?%p1%p6%|%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;m%?%p9%t^N%e^O%;,
+	rs2=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h, smkx=\E[?1h\E=, rmkx=\E[?1l\E>,
+	enacs=\E(B\E)0, smacs=^N, rmacs=^O,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	tbc=\E[3g, hts=\EH, home=\E[H, ht=^I, ri=\EM$<5>,
+	kcuu1=\EOA, kcud1=\EOB, kcuf1=\EOC, kcub1=\EOD, kbs=^H,
+
+# Info:
+# This is how the keypad gets assigned.
+#	PF1	  PF2	    PF3	      PF4
+	kf1=\EOP, kf2=\EOQ, kf3=\EOR, kf4=\EOS,
+#	7	  8	     9	    '-' does not send anything on my terminal.
+	kf9=\EOw, kf10=\EOx, kf0=\EOy,
+#	4	  5	    6	      ,
+	kf5=\EOt, kf6=\EOu, kf7=\EOv, kf8=\EOl,
+#	1	  2	    3
+	ka1=\EOq, kb2=\EOr, ka3=\EOs,
+#	0	  .	    ENTER
+	kc1=\EOp, kc3=\EOn, kent=\EOM,
+#
+
+
+	vt#3, xenl, xon, sc=\E7, rc=\E8, csr=\E[%i%p1%d;%p2%dr,
+vt100-nam|vt100 w/no am (w/advanced video),
+	am@, xenl@, use=vt100-am,
+# Info:
+#	Ordinary vt100 in 132 column ("wide") mode.
+#
+vt100-w|vt100-w-am|dec vt100 132 cols (w/advanced video),
+	cols#132, lines#24, rs2=\E>\E[?3h\E[?4l\E[?5l\E[?8h, use=vt100-am,
+vt100-w-nam|vt100-nam-w|dec vt100 132 cols (w/advanced video),
+	cols#132, lines#14, rs2=\E>\E[?3h\E[?4l\E[?5l\E[?8h, vt@, use=vt100-nam,
+# Info:
+#	vt100's with no advanced video.
+#
+vt100-nav|vt100 without advanced video option,
+	sgr@, smso=\E[7m , rmso=\E[m , xmc#1,
+	smul@, rmul@, bold@, rev@, blink@, sgr0@, use=vt100,
+vt100-nav-w|vt100-w-nav|dec vt100 132 cols 14 lines (no advanced video option),
+	lines#14, cols#132, use=vt100-nav,
+# Info:
+#	vt100's with one of the 24 lines used as a status line.
+#	We put the status line on the top.
+#
+vt100-s|vt100-s-top|vt100-top-s|vt100 for use with sysline,
+	lines#23, is2=\E7\E[2;24r\E8, clear=\E[2;1H\E[J$<50>, home=\E[2;1H,
+	dsl=\E7\E[1;24r\E8,
+	cup=\E[%i%p1%{1}%+%d;%p2%dH$<5>, csr=\E[%i%i%p1%d;%p2%dr,
+	hs, eslok, tsl=\E7\E[1;%p1%dH\E[1K, fsl=\E8, use=vt100-am,
+# Info:
+#	Status line at bottom. 
+#	Clearing the screen will clobber status line.
+#
+vt100-s-bot|vt100-bot-s|vt100 for use with sysline,
+	lines#23, is2=\E[1;23r\E[23;1H, dsl=\E7\E[1;24r\E8,
+	hs, eslok, tsl=\E7\E[24;%p1%dH\E[1K, fsl=\E8, use=vt100-am,
+# vt 102
+vt102|vt-102|dec vt102,
+	xon,
+	cols#80, lines#24, vt#3,
+	bel=^G, blink=\E[5m$<2>, bold=\E[1m$<2>,
+	clear=\E[;H\E[2J$<50>, cnorm=\E[?7h, cr=\r,
+	csr=\E[%i%p1%d;%p2%dr, cub1=\b, cud1=\n,
+	cuf1=\E[C$<2>, cup=\E[%i%p1%d;%p2%dH$<5>,
+	cuu1=\E[A$<2>, cvvis=\E[?7l, ed=\E[J$<50>,
+	el=\E[K$<3>, home=\E[H, ht=\t, ind=\n,
+	is2=\E[1;24r\E[24;1H, kbs=\b, kcub1=\EOD, kcud1=\EOB,
+	kcuf1=\EOC, kcuu1=\EOA, kf1=\EOP, kf2=\EOQ, kf3=\EOR,
+	kf4=\EOS, rc=\E8, rev=\E[7m$<2>, ri=\EM$<5>,
+	rmkx=\E[?1l\E>, rmso=\E[m$<2>, rmul=\E[m$<2>,
+	rs2=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h, sc=\E7,
+	sgr0=\E[m$<2>, smkx=\E[?1h\E=, smso=\E[7m$<2>,
+	smul=\E[4m$<2>,
+# Info:
+#	vt132 - like vt100 but slower and has ins/del line and such.
+#	I'm told that smir/rmir are backwards in the terminal from the
+#	manual and from the ANSI standard, this describes the actual 
+#	terminal. I've never actually used a vt132 myself, so this 
+#	is untested.
+#
+#	The smir/rmir are now reveresed (corrected)
+#
+vt132|DEC vt132,
+	il1=\E[L$<99>, dl1=\E[M$<99>, ip=$<7>, dch1=\E[P$<7>, rmir=\E[4l,
+	smir=\E[4h, xenl, ind=^J$<30>, use=vt100,
+# Info:
+#	Older DEC CRT's
+#
+vt50|dec vt50,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, ed=\EJ, el=\EK, clear=\EH\EJ,
+	cols#80, lines#12, cuf1=\EC, ht=^I, cuu1=\EA,
+vt50h|dec vt50h,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, ed=\EJ, el=\EK,
+	clear=\EH\EJ, cup=\EY%p1%' '%+%c%p2%' '%+%c, cols#80, lines#12,
+	cuf1=\EC, ht=^I, ri=\EI, cuu1=\EA,
+vt52|dec vt52,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, ed=\EJ, el=\EK,
+	clear=\EH\EJ, cup=\EY%p1%' '%+%c%p2%' '%+%c, cols#80, lines#24,
+	cuf1=\EC, ht=^I, it#8, ri=\EI, cuu1=\EA,
+	kcuu1=\EA, kcud1=\EB, kcuf1=\EC, kcub1=\ED, kbs=^H,
+# Info:
+#	A VT62 can be made to think that it is a VT61 by moving 6 
+#	soldered-in jumpers on the i/o board. 
+#	The keyboard must be relabeled, also. 
+#
+vt61|vt-61|vt61.5|dec vt61,
+	cr=^M$<20>, cud1=^J, ind=^J$<20>, bel=^G, cub1=^H,
+	ed=\EJ$<120>, el=\EK$<70>, clear=\EH\EJ$<120>,
+	cup=\EY%p1%' '%+%c%p2%' '%+%c$<20>, cols#80, lines#24,
+	cuf1=\EC$<20>, ht=^I, ri=\E$<20>I, cuu1=\EA$<20>,
+	kcuu1=\EA, kcud1=\EB, kcuf1=\EC, kcub1=\ED,
+# Info:
+#	Graphics CRT's.
+#	clear screen also erases graphics
+#
+vt125|vt125 graphics terminal,
+	clear=\E[;H\E[2J\EPpS(E)\E\\$<50>, use=vt100, 
+gt40|dec gt40,
+	cr=^M, cud1=^J, bel=^G,
+	cub1=^H, cols#72, lines#30, os,
+gt42|dec gt42,
+	cr=^M, cud1=^J, bel=^G,
+	cub1=^H, cols#72, lines#40, os,
+# Info:
+#	The gigi does standout with red!
+#
+gigi|vk100|dec gigi graphics terminal,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cols#84, lines#24, am,
+	clear=\E[;H\E[2J, cub1=^H, cup=\E[%i%p1%d;%p2%dH, cuf1=\E[C,
+	cuu1=\E[A, el=\E[K, ed=\E[J, smso=\E[7;31m, rmso=\E[m,
+	smul=\E[4m, rmul=\E[m,
+	is2=\E>\E[?3l\E[?4l\E[?5l\E[?20l\E[?7h\E[?8h, smkx=\E[?1h\E=,
+	rmkx=\E[?1l\E>, kcuu1=\EOA,
+	kcud1=\EOB, kcuf1=\EOC, kcub1=\EOD, khome=\E[H, kf1=\EOP,
+	kf2=\EOQ, kf3=\EOR, kf4=\EOS, ht=^I, ri=\EM, xenl, cud=\E[%p1%dB,
+	cuu=\E[%p1%dA, cub=\E[%p2%dD, cuf=\E[%p1%dC,
+# Info:
+#	Hard copy (decwriter) dec terminals.
+#
+dw1|decwriter I,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	cub1=^H, cols#72, hc, os,
+dw2|decwriter|dw|decwriter II,
+	cr=^M, cud1=^J, ind=^J, bel=^G, kbs=^H, cub1=^H, cols#132, hc, os,
+# Info:
+#	\E(B	Use U.S. character set (otherwise # => british pound !)
+#	\E[20l	Disable "linefeed newline" mode (otherwise puts \r after \n,\f,\(vt )
+#	\E[w	10 char/in pitch
+#	\E[1;132	full width horizontal margins
+#	\E[2g	clear all tab stops
+#	\E[z	6 lines/in
+#	\E[66t	66 lines/page (for \f)
+#	\E[1;66r	full vertical page can be printed
+#	\E[4g	clear vertical tab stops
+#	\E>	disable alternate keypad mode (so it transmits numbers!)
+#	\E[%i%du	set tab stop at column %d (origin == 1)
+#		(Full syntax is \E[n;n;n;n;n;...;nu where each 'n' is 
+#		a tab stop)
+#	
+#       The dw3 does standout with wide characters.
+#
+dw3|la120|decwriter III,
+	cr=^M, cud1=^J, ind=^J, bel=^G, kbs=^h, cub1=^H, cols#132, hc,
+	os, smso=\E[6w, rmso=\E[w, ht=^I,
+	is1=\E(B\E[20l\E[w\E[0;132s\E[2g\E[z\E[66t\E[1;66r\E[4g\E>,
+	is2=\E[9;17;25;33;41;49;57;65;73;81;89;97;105;113;121;129u\r,
+dw4|decwriter IV,
+	cr=^M, cud1=^J, ind=^J, bel=^G, cub1=^H, cols#132, hc, os, am,
+	ht=^I, is2=\Ec, kf0=\EOP, kf1=\EOQ, kf2=\EOR, kf3=\EOS, kbs=^H,
+vt220|dec vt220 8 bit terminal,
+	am, mc5i, mir, msgr, xenl, xon,
+	cols#80, it#8, lines#24,
+	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+	bel=^G, blink=\E[5m, bold=\E[1m, clear=\E[H\E[J,
+	cr=\r, csr=\E[%i%p1%d;%p2%dr, cub=\E[%p1%dD, cub1=\b,
+	cud=\E[%p1%dB, cud1=\n, cuf=\E[%p1%dC, cuf1=\E[C,
+	cup=\E[%i%p1%d;%p2%dH, cuu=\E[%p1%dA, cuu1=\E[A,
+	dch=\E[%p1%dP, dch1=\E[P, dl=\E[%p1%dM, dl1=\E[M,
+	ech=\E[%p1%dX, ed=\E[J, el=\E[K, el1=\E[1K,
+	enacs=\E)0, flash=\E[?5h$<200>\E[?5l, home=\E[H,
+	ht=\t, hts=\EH, ich=\E[%p1%d@, il=\E[%p1%dL, il1=\E[L,
+	ind=\ED, is2=\E[?7h\E[>\E[?1h\E\sF\E[?4l, kbs=\b,
+	kcub1=\E[D, kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A,
+	kf1=\EOP, kf10=\E[21~, kf11=\E[23~, kf12=\E[24~,
+	kf13=\E[25~, kf14=\E[26~, kf17=\E[31~, kf18=\E[32~,
+	kf19=\E[33~, kf2=\EOQ, kf20=\E[34~, kf3=\EOR,
+	kf4=\EOS, kf6=\E[17~, kf7=\E[18~, kf8=\E[19~,
+	kf9=\E[20~, kfnd=\E[1~, khlp=\E[28~, kich1=\E[2~,
+	knp=\E[6~, kpp=\E[5~, krdo=\E[29~, kslt=\E[4~,
+	lf1=pf1, lf2=pf2, lf3=pf3, lf4=pf4, mc0=\E[i,
+	mc4=\E[4i, mc5=\E[5i, nel=\EE, rc=\E8, rev=\E[7m,
+	ri=\EM, rmacs=^O, rmam=\E[?7l, rmir=\E[4l,
+	rmso=\E[27m, rmul=\E[24m, rs1=\E[?3l, sc=\E7,
+	sgr0=\E[0m, smacs=^N, smam=\E[?7h, smir=\E[4h,
+	smso=\E[7m, smul=\E[4m, tbc=\E[3g,
+	sgr=\E[0%?%p1%p6%|%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;m%?%p9%t^N%e^O%;,
+

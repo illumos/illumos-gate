@@ -1,0 +1,18 @@
+
+Press CHOICES or type the login of the user you wish to send
+a copy of this mail to.
+
+To send a copy to a user on a different system the user login 
+would be of the form of  <system name!user login>. For example, 
+
+       merc!thd 
+
+would send the mail to the user with the login thd on the 
+system named merc. The system name must be a name of a system 
+that your system recognizes.
+
+The mail may be copied to more than one destination by specifying
+multiple logins in this field.  Multiple entries should be
+separated by spaces.
+
+This field is optional.

@@ -1,0 +1,56 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+These are sample DIAGCODE dictionary files, used only when the
+	make test
+target is built in the libdiagcode source area.  These files have
+special comments embedded in them that the test driver (tstdiagcode.c)
+uses to tell it what tests to run against each dictionary.  These
+tests can be used to regression test libdiagcode after a bug fix.
+If you add a feature to libdiagcode, you should add the appropriate
+unit tests here.
+
+Since DIAGCODE dictionaries allow comments with the '#' character,
+the test driver looks for directives in the comments.  The directive
+comments start with:
+
+	#TEST:
+
+and then have a colon-separated list of arguments.  The first argument
+is the function the test driver should call: open, close, codelen, maxkey,
+key2code, code2key, or getprop.  The second argument is the errno expected
+on return, or zero if no errno is expected.  The next two arguments specify
+input and output parameters to the function, and are in formats specific
+to each function.  For example:
+
+	#TEST:key2code:0:fault.one fault.two:SAMPLE0-8000-5V
+
+The above line tells the test driver to call fm_dc_key2code() with the key[]
+array set to "fault.one" and "fault.two" (in that order) and expect
+a non-error return, with the code SAMPLE0-8000-5V filled in.

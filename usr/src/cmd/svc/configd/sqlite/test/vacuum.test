@@ -1,0 +1,176 @@
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+# 2001 September 15
+#
+# The author disclaims copyright to this source code.  In place of
+# a legal notice, here is a blessing:
+#
+#    May you do good and not evil.
+#    May you find forgiveness for yourself and forgive others.
+#    May you share freely, never taking more than you give.
+#
+#***********************************************************************
+# This file implements regression tests for SQLite library.  The
+# focus of this file is testing the VACUUM statement.
+#
+# $Id: vacuum.test,v 1.15 2004/02/14 16:31:04 drh Exp $
+
+set testdir [file dirname $argv0]
+source $testdir/tester.tcl
+
+proc cksum {{db db}} {
+  set txt [$db eval {SELECT name, type, sql FROM sqlite_master}]\n
+  foreach tbl [$db eval {SELECT name FROM sqlite_master WHERE type='table'}] {
+    append txt [$db eval "SELECT * FROM $tbl"]\n
+  }
+  foreach prag {default_synchronous default_cache_size} {
+    append txt $prag-[$db eval "PRAGMA $prag"]\n
+  }
+  set cksum [string length $txt]-[md5 $txt]
+  # puts $cksum-[file size test.db]
+  return $cksum
+}
+do_test vacuum-1.1 {
+  execsql {
+    BEGIN;
+    CREATE TABLE t1(a INTEGER PRIMARY KEY, b, c);
+    INSERT INTO t1 VALUES(NULL,randstr(10,100),randstr(5,50));
+    INSERT INTO t1 VALUES(123456,randstr(10,100),randstr(5,50));
+    INSERT INTO t1 SELECT NULL, b||'-'||rowid, c||'-'||rowid FROM t1;
+    INSERT INTO t1 SELECT NULL, b||'-'||rowid, c||'-'||rowid FROM t1;
+    INSERT INTO t1 SELECT NULL, b||'-'||rowid, c||'-'||rowid FROM t1;
+    INSERT INTO t1 SELECT NULL, b||'-'||rowid, c||'-'||rowid FROM t1;
+    INSERT INTO t1 SELECT NULL, b||'-'||rowid, c||'-'||rowid FROM t1;
+    INSERT INTO t1 SELECT NULL, b||'-'||rowid, c||'-'||rowid FROM t1;
+    INSERT INTO t1 SELECT NULL, b||'-'||rowid, c||'-'||rowid FROM t1;
+    CREATE INDEX i1 ON t1(b,c);
+    CREATE TABLE t2 AS SELECT * FROM t1;
+    COMMIT;
+    DROP TABLE t2;
+  }
+  set ::size1 [file size test.db]
+  set ::cksum [cksum]
+  expr {$::cksum!=""}
+} {1}
+do_test vacuum-1.2 {
+  execsql {
+    VACUUM;
+  }
+  cksum
+} $cksum
+do_test vacuum-1.3 {
+  expr {[file size test.db]<$::size1}
+} {1}
+do_test vacuum-1.4 {
+  execsql {
+    BEGIN;
+    CREATE TABLE t2 AS SELECT * FROM t1;
+    CREATE TABLE t3 AS SELECT * FROM t1;
+    CREATE VIEW v1 AS SELECT b, c FROM t3;
+    CREATE TRIGGER r1 AFTER DELETE ON t2 BEGIN
+      SELECT 1;
+    END;
+    COMMIT;
+    DROP TABLE t2;
+  }
+  set ::size1 [file size test.db]
+  set ::cksum [cksum]
+  expr {$::cksum!=""}
+} {1}
+do_test vacuum-1.5 {
+  execsql {
+    VACUUM;
+  }
+  cksum
+} $cksum
+do_test vacuum-1.6 {
+  expr {[file size test.db]<$::size1}
+} {1}
+
+do_test vacuum-2.1 {
+  catchsql {
+    BEGIN;
+    VACUUM;
+    COMMIT;
+  }
+} {1 {cannot VACUUM from within a transaction}}
+catch {db eval COMMIT}
+do_test vacuum-2.2 {
+  sqlite db2 test.db
+  execsql {
+    BEGIN;
+    CREATE TABLE t4 AS SELECT * FROM t1;
+    CREATE TABLE t5 AS SELECT * FROM t1;
+    COMMIT;
+    DROP TABLE t4;
+    DROP TABLE t5;
+  } db2
+  set ::cksum [cksum db2]
+  catchsql {
+    VACUUM
+  }
+} {0 {}}
+do_test vacuum-2.3 {
+  cksum
+} $cksum
+do_test vacuum-2.4 {
+  catch {db2 eval {SELECT count(*) FROM sqlite_master}}
+  cksum db2
+} $cksum
+
+# Ticket #427.  Make sure VACUUM works when the EMPTY_RESULT_CALLBACKS
+# pragma is turned on.
+#
+do_test vacuum-3.1 {
+  db close
+  db2 close
+  file delete test.db
+  sqlite db test.db
+  execsql {
+    PRAGMA empty_result_callbacks=on;
+    VACUUM;
+  }
+} {}
+
+# Ticket #464.  Make sure VACUUM works with the sqlite_compile() API.
+#
+do_test vacuum-4.1 {
+  db close
+  set DB [sqlite db test.db]
+  set VM [sqlite_compile $DB {VACUUM} TAIL]
+  sqlite_step $VM N VALUES COLNAMES
+} {SQLITE_DONE}
+do_test vacuum-4.2 {
+  sqlite_finalize $VM
+} {}
+
+# Ticket #515.  VACUUM after deleting and recreating the table that
+# a view refers to.
+#
+do_test vacuum-5.1 {
+  db close
+  file delete -force test.db
+  sqlite db test.db
+  catchsql {
+    CREATE TABLE Test (TestID int primary key);
+    INSERT INTO Test VALUES (NULL);
+    CREATE VIEW viewTest AS SELECT * FROM Test;
+
+    BEGIN;
+    CREATE TEMP TABLE tempTest (TestID int primary key, Test2 int NULL);
+    INSERT INTO tempTest SELECT TestID, 1 FROM Test;
+    DROP TABLE Test;
+    CREATE TABLE Test(TestID int primary key, Test2 int NULL);
+    INSERT INTO Test SELECT * FROM tempTest;
+    COMMIT;
+    VACUUM;
+  }
+} {0 {}}
+do_test vacuum-5.2 {
+  catchsql {
+    VACUUM;
+  }
+} {0 {}}
+
+# finish_test

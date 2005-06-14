@@ -1,0 +1,132 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+[ ! -x /usr/sbin/zoneadm ] && exit 0	# SUNWzoneu not installed
+
+# Make sure working directory is / to prevent unmounting problems.
+cd /
+PATH=/usr/sbin:/usr/bin; export PATH
+
+case "$1" in
+'start')
+	egrep -vs '^#|^global:' /etc/zones/index || exit 0  # no local zones
+	ZONES=""
+	for zone in `zoneadm list -pi | nawk -F: '{
+			if ($3 == "installed") {
+				print $2
+			}
+		}'`; do
+		zonecfg -z $zone info autoboot | grep "true" >/dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			[ -z "$ZONES" ] && echo "Booting zones:\c"
+			ZONES=yes
+			echo " $zone\c"
+			#
+			# We don't (yet) support restart for zones, so
+			# we need to get all of the zones stuff off into
+			# a different contract.
+			#
+			ctrun -l none -i none zoneadm -z $zone boot &
+		fi
+	done
+	[ -n "$ZONES" ] && echo .
+	;;
+
+'stop')
+	egrep -vs '^#|^global:' /etc/zones/index || exit 0  # no local zones
+	[ "`zoneadm list`" = "global" ] && exit 0   # no zones running
+
+	MAXSHUT=60      # maximum time we'll wait for all zones to shutdown
+	MAXHALT=30      # maximum time we'll wait for all zones to halt
+
+	echo "Shutting down running zones:\c"
+
+	# First, try letting them run their shutdown scripts.
+
+	SHUTDOWN=0
+	for zone in `zoneadm list`; do
+		if [ "$zone" != "global" ]; then
+			echo " $zone\c"
+			zlogin -S $zone /sbin/init 0 < /dev/null >&0 2>&0 &
+			SHUTDOWN=1
+		fi
+	done
+	[ $SHUTDOWN -eq 1 ] && echo "."
+
+	# Allow time for zones to shutdown cleanly
+
+	while [ $MAXSHUT -gt 0 -a "`zoneadm list`" != "global" ]; do
+		MAXSHUT=`expr $MAXSHUT - 1`
+		sleep 1	# wait a bit longer
+	done
+
+	# Second, try halting them.
+
+	WAITPIDS=""
+	for zone in `zoneadm list`; do
+		if [ "$zone" != "global" ]; then
+			[ -z "$WAITPIDS" ] &&
+			    echo "Zones failed to shutdown; trying to halt:\c"
+			echo " $zone\c"
+			zoneadm -z $zone halt &
+			WAITPIDS="$WAITPIDS $!"
+		fi
+	done
+	[ ! -z "$WAITPIDS" ] && echo .
+
+	# Wait for the 'zoneadm halt' commands to complete.  We will let this
+	# run forever, since the restart daemon will eventually kill us off 
+	# anyway if the halts do not complete after a certain period of time.
+	wait $WAITPIDS
+
+	# If the halts complete but a zone is still not shutdown, it might
+	# be in a state like 'shutting_down' or 'down'.  So we give it some
+	# time to come all the way down.
+	while [ $MAXHALT -gt 0 -a "`zoneadm list`" != "global" ]; do
+		MAXHALT=`expr $MAXHALT - 1`
+		sleep 1	# wait a bit longer
+	done
+
+	#
+	# Report on zones which failed to shutdown.
+	#
+	for zone in `zoneadm list`; do
+		if [ "$zone" != "global" ]; then
+			echo "Zone '$zone' failed to halt."
+		fi
+	done
+	[ "`zoneadm list`" != "global" ] && exit 1   # zones still running
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+exit 0

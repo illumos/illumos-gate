@@ -1,0 +1,292 @@
+#!/usr/perl5/5.8.4/bin/perl
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This script works out which files from a stock Perl 5.8.3 distribution need
+# to be integrated into ON.  It MUST be run inside a stock perl distribution
+# directory AFTER the InstallPerl script has been run, as it uses the contents
+# of the MANIFEST, build.touched, test.log and install.packlist files to figure
+# out which files are needed in ON.  The parameter for this script is the name
+# of the output CSV file, which can be viewed in StarOffice.
+#
+
+use strict;
+use warnings;
+
+#
+# Compare two files, return 0 for different, 1 for the same.
+#
+sub file_cmp
+{
+	my ($f1, $f2) = @_;
+
+	# Quick check - they must exist and be the same size.
+	return (0) unless (-e $f1 && -e $f2 && -s $f1 == -s $f2);
+
+	# Open the files.
+	my ($fh1, $fh2);
+	open($fh1, '<', $f1) || return (0);
+	open($fh2, '<', $f2) || return (0);
+
+	# Compare.
+	my ($len1, $len2);
+	while (1) {
+		my ($buf1, $buf2);
+		$len1 = sysread($fh1, $buf1, 4096);
+		$len2 = sysread($fh2, $buf2, 4096);
+		last if ($len1 == 0 && $len2 == 0);
+		if ($len1 != $len2 || $buf1 ne $buf2) {
+			$len1 = -1;
+			$len2 = -2;
+			last;
+		}
+	}
+	close($fh1) || return (0);
+	close($fh2) || return (0);
+	return ($len1 == $len2 ? 1 : 0);
+}
+
+#
+# Main.
+#
+
+# %file is indexed by (path, filename)
+my ($infh, $outfh, $line, %file);
+
+# Check args.
+die("Args are <output.csv>\n") unless (@ARGV == 1);
+my ($outf) = @ARGV;
+
+# Check cwd is a valid perl build dir.
+die("Must be run from a perl build directory\n")
+    unless (-f 'config.over' && -f 'MANIFEST' && -f 'Configure' &&
+    -f 'libperl.so' && -f 'build.touched' && -f 'install.packlist');
+
+# Open output CSV file.
+open($outfh, '>', $outf) || die("Can't open $outf: $!\n");
+
+# Read the MANIFEST.
+open($infh, '<', 'MANIFEST') || die("Can't open MANIFEST: $!\n");
+while (defined($line = <$infh>)) {
+	chomp($line);
+	$line = (split(m{\s+}, $line, 2))[0];
+	my ($p, $f);
+	if ($line =~ m{/}) {
+		($p, $f) = $line =~ m{^(.*)/(.*)$};
+	} else {
+		$p = '';
+		$f = $line;
+	}
+	$file{$p}{$f}{mfst} = 'X';
+}
+close($infh);
+
+# Read build.touched.
+open($infh, '<', 'build.touched') || die("Can't open build.touched: $!\n");
+while (defined($line = <$infh>)) {
+	chomp($line);
+	my ($p, $f);
+	if ($line =~ m{/}) {
+		($p, $f) = $line =~ m{^(.*)/(.*)$};
+	} else {
+		$p = '';
+		$f = $line;
+	}
+	$file{$p}{$f}{bld} = 'X';
+}
+close($infh);
+
+# Read test.log.
+open($infh, '<', 'test.log') || die("Can't open test.log: $!\n");
+my %test;
+while (defined($line = <$infh>)) {
+	chomp($line);
+	if ($line =~ m{^([\w/-]+)\.{2,}} && $line !~ /\.skipping test/) {
+		my $file = $1;
+		if (-f ($_ = "$file.t")) {
+			$test{$_} = 1;
+		} elsif ($file =~ m{/test$} && -f ($_ = "$file.pl")) {
+			$test{$_} = 1;
+		}
+	}
+}
+close($infh);
+
+# Read install.packlist and build a hash indexed by (filename, path).
+my %inst;
+open($infh, '<', 'install.packlist')
+    || die("Can't open install.packlist: $!\n");
+$line = <$infh>;
+chomp($line);
+my $inst_pfx;
+die("Invalid install.packlist\n")
+    unless (($inst_pfx) = $line =~ /^PREFIX:\s+(.*)$/);
+while (defined($line = <$infh>)) {
+	# Skip manpages and bin/perlX.Y.Z
+	#next if ($line =~ m{^(?:man/man\d+/|bin/perl\d+\.\d+\.\d+)});
+	chomp($line);
+	my ($p, $f);
+	if ($line =~ m{/}) {
+		($p, $f) = $line =~ m{^(.*)/(.*)$};
+	} else {
+		$p = '';
+		$f = $line;
+	}
+	$inst{$f}{$p} = 1;
+}
+close($infh);
+
+# Go through the MANIFEST files, trying to match to installed files.
+foreach my $p (keys(%file)) {
+        foreach my $f (keys(%{$file{$p}})) {
+                my $v = $file{$p}{$f};
+		next unless (exists($v->{mfst}));
+
+		#
+		# Easy cases: Files that map directly into the install tree
+		#
+		if (exists($inst{$f}{$p})) {
+			$v->{inst} = 'X';
+			delete($inst{$f}{$p});
+
+		#
+		# Brute force: Compare the manifest file against each file with
+		# the same name in the install tree.
+		#
+		} else {
+			foreach my $ip (keys(%{$inst{$f}})) {
+				my ($mfst, $inst);
+				$mfst = "$p/" if ($p ne '');
+				$mfst .= $f;
+				$inst = $inst_pfx;
+				$inst .= "/$ip" if ($ip);
+				$inst .= "/$f";
+				if (file_cmp($mfst, $inst)) {
+					$v->{inst} = 'X';
+					delete($inst{$f}{$p});
+				}
+			}
+		}
+	}
+
+}
+undef(%inst);
+
+# Intuit where we think the 5.8.x files should go in S10.
+foreach my $p (keys(%file)) {
+        foreach my $f (keys(%{$file{$p}})) {
+                my $v = $file{$p}{$f};
+		my $pf = ($p ne '' ? "$p/" : $p) . $f;
+
+		#
+		# Some directories and files we can ignore completely,
+		# for example other architectures.
+		#
+		if ($p =~ m{^(?:Cross|NetWare|apollo|beos|cydwin|djgpp|emacs|
+		    epoc|jpl|mint|mpeix|os2|plan9|qnx|uts|vmesa|vms|vos|win32|
+		    wince|t/win32|lib/Thread|ext/threads)}x ||
+		    $f =~ m{Makefile.SH|Thread.pm}) {
+			$v->{s10} = 'skip';
+
+		#
+		# Stuff that we don't want from the top-level directory.
+		#
+		} elsif ($p eq '' &&
+		    $f =~ m{^(?:[Cc]onfigure.*|Makefile\.SH|Policy_sh.SH|
+		    cflags\.SH|makeaperl\.SH|makedepend\.SH|makedir\.SH|
+		    mv-if-diff)$}x) {
+			$v->{s10} = 'skip';
+
+		#
+		# We don't want README and other such files.
+		#
+		} elsif (($f =~ m{^(?:(?:readme|change|notes|patching).*|
+		    manifest)$}ix && $f !~ m{\.e2x$}) ||
+		    ($f =~ m{^todo}i && $p !~ m{^t/|/t/|/t$})) {
+			$v->{s10} = 'skip';
+
+		#
+		# Pod files need a little finesse.
+		# We don't want any that are links to README files in the
+		# top-level directory, unless they are the Solaris or Unicode
+		# ones.  We also exclude some others that aren't relevant,
+		# and include some that would otherwise be missed.
+		#
+		} elsif (($_) = $f =~ m{(\w+)\.pod$}) {
+			$_ =~ s{^perl}{};
+			if (exists($file{''}{"README.$_"})) {
+				if ($_ =~ m{^(?:solaris|cn|jp|ko|tw)$}) {
+					$v->{s10} = 'distrib';
+				} else {
+					$v->{s10} = 'skip';
+				}
+			} elsif (($v->{mfst} && ($v->{bld} || $v->{inst})) &&
+			    $_ !~ m{^(?:Config|fork|othrtut|thrtut|pumpkin|
+			    Win32|repository)$}x) {
+				$v->{s10} = 'distrib';
+			# perldelta.pod is a symlink, but we need to copy it.
+			} elsif ($_ eq 'delta') {
+				$v->{s10} = 'distrib';
+			} else {
+				$v->{s10} = 'skip';
+			}
+
+		#
+		# We only want test scripts that are actually run.
+		#
+		} elsif ($f =~ m{\.t$} || $f eq 'test.pl') {
+			if (exists($test{$pf}) || $pf eq 't/test.pl') {
+				$v->{s10} = 'distrib';
+			} else {
+				$v->{s10} = 'skip';
+			}
+
+		#
+		# Anything in the MANIFEST and touched during the
+		# build and install should be included.
+		#
+		} elsif ($v->{mfst} && ($v->{bld} || $v->{inst})) {
+			$v->{s10} = 'distrib';
+
+		} else {
+			$v->{s10} = 'skip';
+
+		}
+        }
+}
+
+#
+# Files that we need to treat specially.
+#
+$file{'..'}{'extract_config.sh'}{s10}  = 'fwd';
+$file{'..'}{'extract_makeext.sh'}{s10} = 'fwd';
+$file{'..'}{'get_no_keywords.sh'}{s10} = 'fwd';
+$file{'..'}{'Makefile'}{s10}           = 'fwd';
+$file{'..'}{'req.flg'}{s10}            = 'fwd';
+$file{'../contrib'}{'Makefile'}{s10}   = 'fwd';
+$file{''}{'config.sh'}{s10}            = 'arch';
+$file{''}{'installperl'}{s10}          = 'distrib';
+$file{''}{'utils.lst'}{s10}            = 'distrib';
+$file{''}{'Makefile'}{s10}             = 'fwd';
+$file{''}{'Makefile.lib'}{s10}         = 'fwd';
+$file{'pod'}{'Makefile'}{s10}          = 'fwd';
+$file{'utils'}{'Makefile'}{s10}        = 'fwd';
+$file{'x2p'}{'Makefile'}{s10}          = 'fwd';
+
+# Write CSV contents.
+print $outfh (qq{"Path","File","mfst","bld","inst","s10"\n});
+foreach my $p (sort(keys(%file))) {
+	foreach my $f (sort(keys(%{$file{$p}}))) {
+		print $outfh (qq{"$p","$f"});
+		foreach my $c (qw{mfst bld inst s10}) {
+			print $outfh (',');
+			print $outfh (qq{"$file{$p}{$f}{$c}"})
+			    if (defined($file{$p}{$f}{$c}));
+		}
+	print $outfh ("\n");
+	}
+}
+close($outfh);

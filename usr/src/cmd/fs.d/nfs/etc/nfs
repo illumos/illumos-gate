@@ -1,0 +1,103 @@
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+# Sets the maximum number of concurrent connection oriented connections.
+# Default is unlimited and is obtained by not setting NFSD_MAX_CONNECTIONS.
+# Equivalent to -c.
+#NFSD_MAX_CONNECTIONS=
+
+# Set connection queue length for the NFS over a connection-oriented 
+# transport. The default value is 32 entries.
+# Equivalent to -l.
+NFSD_LISTEN_BACKLOG=32
+
+# Start NFS daemon over the specified protocol only.
+# Equivalent to -p, ALL is equivalent to -a on the nfsd command line.
+# Mutually exclusive with NFSD_DEVICE.
+NFSD_PROTOCOL=ALL
+
+# Start NFS daemon for the transport specified by the given device only.
+# Equivalent to -t.
+# Mutually exclusive with setting NFSD_PROTOCOL.
+#NFSD_DEVICE=
+
+# Maximum number of concurrent NFS requests.
+# Equivalent to last numeric argument on nfsd command line.
+NFSD_SERVERS=16
+
+# Set connection queue length for lockd over a connection-oriented transport.
+# Default and minimum value is 32.
+LOCKD_LISTEN_BACKLOG=32
+
+# Maximum number of concurrent lockd requests.
+# Default is 20.
+LOCKD_SERVERS=20
+
+# Retransmit Timeout before lockd tries again.
+# Default is 5.
+LOCKD_RETRANSMIT_TIMEOUT=5
+
+# Grace period in seconds that all clients (both NLM & NFSv4) have to
+# reclaim locks after a server reboot. Also controls the NFSv4 lease
+# interval.
+# Overrides the deprecated setting LOCKD_GRACE_PERIOD.
+# Default is 90 seconds.
+GRACE_PERIOD=90
+
+# Deprecated.
+# As for GRACE_PERIOD, above.
+# Default is 90 seconds.
+#LOCKD_GRACE_PERIOD=90
+
+# Sets the minimum version of the NFS protocol that will be registered
+# and offered by the server.  The default is 2.
+#NFS_SERVER_VERSMIN=2
+
+# Sets the maximum version of the NFS protocol that will be registered
+# and offered by the server.  The default is 4.
+#NFS_SERVER_VERSMAX=4
+
+# Sets the minimum version of the NFS protocol that will be used by
+# the NFS client.  Can be overridden by the "vers=" NFS mount option.
+# The default is 2.
+#NFS_CLIENT_VERSMIN=2
+
+# Sets the maximum version of the NFS protocol that will be used by
+# the NFS client.  Can be overridden by the "vers=" NFS mount option.
+# If "vers=" is not specified for an NFS mount, this is the version
+# that will be attempted first.  The default is 4.
+#NFS_CLIENT_VERSMAX=4
+
+# Determines if the NFS version 4 delegation feature will be enabled
+# for the server.  If it is enabled, the server will attempt to
+# provide delegations to the NFS version 4 client. The default is on.
+#NFS_SERVER_DELEGATION=on
+
+# Specifies to nfsmapid daemon that it is to override its default
+# behavior of using the DNS domain, and that it is to use 'domain' as
+# the domain to append to outbound attribute strings, and that it is to
+# use 'domain' to compare against inbound attribute strings.
+#NFSMAPID_DOMAIN=domain

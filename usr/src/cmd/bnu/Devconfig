@@ -1,0 +1,53 @@
+#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:Devconfig 1.3 */
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#	Devconfig provides a means of configuring devices by service.
+#	Two types of configuration are available: module configuration
+#	for STREAMS devices, and timeout configuration.
+#
+#	FORMAT:
+#
+#	service=<service name>	device=<device type> \
+#				pop=<STREAMS module list> \
+#				push=<STREAMS module list> \
+#				connecttime=<time> \
+#				expecttime=<time> \
+#				msgtime=<time>
+#
+#	where service name is "uucico" or "cu", device type is the device or
+#	caller type (3rd field in Systems file, 1st field in Devices file),
+#	STREAMS module list is a colon-separated list of STREAMS modules
+#	to be pushed(popped) on(off) this stream, and connecttime, expecttime,
+#	and msgtime specify an integer number of seconds.
+#
+#	The examples below are for the STARLAN NETWORK and assume that both
+#	cu & uucico are going through login and so need full tty capabilities.
+#
+#	EXAMPLE:
+#		service=cu	device=STARLAN	push=ntty:tirdwr
+#		service=uucico	device=STARLAN	push=ntty:tirdwr
+#
+#	Note: The tirdwr module is part of the NSU package.  Other 
+#	modules needed to provide tty capabilities must be supplied by the
+#	network provider.
+#

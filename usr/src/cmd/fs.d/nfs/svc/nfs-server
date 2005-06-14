@@ -1,0 +1,120 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+# Start/stop processes required for server NFS
+
+. /lib/svc/share/smf_include.sh
+zone=${_INIT_ZONENAME:=`/sbin/zonename`}
+
+case "$1" in
+'start')
+	# The NFS server is not supported in a local zone
+	if [ $zone != "global" ] ; then
+		/usr/sbin/svcadm disable svc:/network/nfs/server
+		echo "The NFS server is not supported in a local zone"
+		sleep 5 &
+		exit $SMF_EXIT_OK
+	fi
+
+	# If /etc/dfs/dfstab exists and has non-blank or non-commented-out
+	# lines, then run shareall to export them, and then start up mountd
+	# and nfsd if anything is exported.
+
+	startnfsd=0
+	if [ -f /etc/dfs/dfstab ] && /usr/bin/egrep -v '^[	 ]*(#|$)' \
+	    /etc/dfs/dfstab >/dev/null 2>&1; then
+
+		/usr/sbin/shareall -F nfs
+	fi
+
+	if /usr/bin/grep -s nfs /etc/dfs/sharetab >/dev/null; then
+		startnfsd=1
+	fi
+
+	# When the system comes up umask is not set; so set the mode now
+
+	[ -f /etc/dfs/sharetab ] && /usr/bin/chmod 644 /etc/dfs/sharetab
+
+	# Start nfslogd if /etc/nfs/nfslogtab exists and is not empty
+	# This means that either we just shared new filesystems with
+	# logging enabled, or they were shared in the previous session
+	# and their working buffers haven't been processed yet.
+
+	if [ -s /etc/nfs/nfslogtab ]; then
+		/usr/lib/nfs/nfslogd &
+	fi
+
+	# Options for nfsd are now set in /etc/default/nfs
+	if [ $startnfsd -ne 0 ]; then
+		/usr/lib/nfs/mountd
+		/usr/lib/nfs/nfsd
+	else
+		/usr/sbin/svcadm disable svc:/network/nfs/server
+		echo "No NFS filesystems are shared"
+		sleep 5 &
+	fi
+
+	;;
+
+'stop')
+	/usr/bin/pkill -x -u 0,1 -z $zone '(nfsd|mountd)'
+
+	if /usr/bin/grep -s nfs /etc/dfs/sharetab >/dev/null; then
+		/usr/sbin/unshareall -F nfs
+	fi
+
+	#
+	# Wait up to 10 seconds for nfslogd to gracefully handle SIGHUP
+	#
+	/usr/bin/pkill -HUP -x -u 0 -z $zone nfslogd
+	wtime=10
+
+	while [ $wtime -gt 0 ]; do
+		/usr/bin/pgrep -x -u 0 -z $zone nfslogd >/dev/null || break
+		wtime=`expr $wtime - 1`
+		sleep 1
+	done
+
+	#
+	# Kill nfslogd more forcefully if it did not shutdown during
+	# the grace period
+	#
+	if [ $wtime -eq 0 ]; then
+		/usr/bin/pkill -TERM -x -u 0 -z $zone nfslogd
+	fi
+
+	# Kill any processes left in service contract
+	smf_kill_contract $2 TERM 1
+	[ $? -ne 0 ] && exit 1
+	;;
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+exit $SMF_EXIT_OK

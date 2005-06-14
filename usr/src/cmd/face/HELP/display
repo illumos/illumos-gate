@@ -1,0 +1,28 @@
+
+If the object is a file, it will be opened by invoking an editor.
+If it is a file folder, its contents are not displayable using
+this command.  To display the contents of a file folder, select
+that folder.
+
+The display command will open a frame displaying an object's contents
+if the object is viewable (ascii text).  You can page through the
+contents of an object if it does not fit in one frame.
+
+Use one of the methods below to display an object. The currently
+active object will be displayed if the object is not specified in
+the display command.
+
+     Command Menu:  Select display and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on display and an -->
+     (alternative)  will appear on the command line followed by the
+                    display. Type arguments and press ENTER to
+                    execute the command.
+
+     Command Line:  Type display [object] and press ENTER.
+
+If you attempt to display an object that cannot be displayed, you will
+receive a warning message.
+
+Striking the CANCEL function key will cancel the display.
+

@@ -1,0 +1,74 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996, by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# beehive: BEEHIVE
+#
+# Reports are that most of these Beehive entries (except superbee) have not been
+# tested and do not work right.  rmso is a trouble spot.  Be warned.
+# set tab is ^F, clear (one) tab is ^V, no way to clear all tabs.
+# Superbee - f1=escape, f2=^C.
+# Note: there are at least 3 kinds of superbees in the world.  The sb1
+# holds onto escapes and botches ^C's.  The sb2 is the best of the 3.
+# The sb3 puts garbage on the bottom of the screen when you scroll with
+# the switch in the back set to CRLF instead of AEP.  This description
+# is tested on the sb2 but should work on all with either switch setting.
+# The f1/f2 business is for the sb1 and the xsb can be taken out for
+# the other two if you want to try to hit that tiny escape key.
+# This description is tricky: being able to use cup depends on there being
+# 2048 bytes of memory and the hairy ind string.
+# Now that we have separate ind and cud1, I imagine this could be improved.
+sb1|superbee|superb|beehive super bee,
+	tbc=\E3, hts=\E1, is2=\EE, cud1=^J,
+	cr=^M$<10>, ind=\n$<3>\n$<3>\EA\EK$<3>\ET\ET, bel=^G,
+	am, cub1=^H, ed=\EJ$<3>, el=\EK$<3>,
+	clear=\EH\EJ$<3>, cols#80, cup=\EF%p2%3d%p1%3d, cr=\r$<1000>,
+	lm#25, da, db, xsb, dch1=\EP$<3>, dl1=\EM$<100>,
+	smso=\E_1, rmso=\E_0, lines#25,
+	cuf1=\EC, ht=^I, cuu1=\EA, home=\EH, cnorm=\n,
+	kf1=\Ep, kf2=\Eq, kf3=\Er, kf4=\Es, kf5=\Et, kf6=\Eu, kf7=\Ev, kf8=\Ew,
+	kcud1=\EB, khome=\EH, kcub1=\ED, kcuf1=\EC, kcuu1=\EA,
+# This loses on lines > 80 chars long, use at your own risk
+superbeeic|super bee with insert char,
+	ich1=, smir=\EQ, rmir=\ER, use=superbee,
+sb2|sb3|fixed superbee,
+	xsb@, use=superbee,
+# good grief - does this entry make xmc when it doesn't have to?
+# look at those spaces in rmso/smso.  Seems strange to me.
+# However, not having one to test changes on, I'll just leave it be...
+bh3m|beehiveIIIm,
+	if=/usr/lib/tabset/beehive,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	il1=^S$<160>, am, cub1=^H, ed=^R, el=^P, clear=^E^R,
+	cols#80, dl1=^Q$<350>, home=^E, lines#20, ll=^E^K,
+	cuf1=^L, ht=^I, rmso= ^_, smso=^] , cuu1=^K,
+microb|microbee|micro bee series,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^H,
+	ed=\EJ, el=\EK, clear=\EE, cols#80, cup=\EF%p1%' '%+%c%p2%' '%+%c,
+	kf1=\Ep, kf2=\Eq, kf3=\Er, kf4=\Es,
+	kf5=\Et, kf6=\Eu, kf7=\Ev, kf8=\Ew, kf9=\Ex,
+	kcud1=\EB, khome=\EH, kcub1=\ED, kcuf1=\EC, kcuu1=\EA,
+	lines#24, cuf1=\EC, ht=^I, cuu1=\EA,
+	rmso=\Ed@ , smso= \EdP, rmul=\Ed@, smul=\Ed`,

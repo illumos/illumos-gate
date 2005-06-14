@@ -1,0 +1,5 @@
+
+The SELECT command is only used during the "command prompt" context of the
+COPY and MOVE commands.  You will be prompted to use SELECT  to choose the 
+destination folder for the object being moved or copied.
+

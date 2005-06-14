@@ -1,0 +1,198 @@
+--
+-- CDDL HEADER START
+--
+-- The contents of this file are subject to the terms of the
+-- Common Development and Distribution License, Version 1.0 only
+-- (the "License").  You may not use this file except in compliance
+-- with the License.
+--
+-- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+-- or http://www.opensolaris.org/os/licensing.
+-- See the License for the specific language governing permissions
+-- and limitations under the License.
+--
+-- When distributing Covered Code, include this CDDL HEADER in each
+-- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+-- If applicable, add the following below this CDDL HEADER, with the 
+-- fields enclosed by brackets "[]" replaced with your own identifying
+-- information: Portions Copyright [yyyy] [name of copyright owner]
+--
+-- CDDL HEADER END
+--
+-- Copyright 1996 Sun Microsystems, Inc.  All Rights Reserved.
+-- Use is subject to license terms.
+--
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+--
+
+          CORE-MIB DEFINITIONS ::= BEGIN
+
+
+          IMPORTS ;
+
+
+--------------
+-- from SMI --
+--------------
+
+          -- the path to the root
+
+          internet       OBJECT IDENTIFIER ::= { iso(1) org(3) dod(6) 1 }
+
+          directory      OBJECT IDENTIFIER ::= { internet 1 }
+
+          mgmt           OBJECT IDENTIFIER ::= { internet 2 }
+
+          experimental   OBJECT IDENTIFIER ::= { internet 3 }
+
+          private        OBJECT IDENTIFIER ::= { internet 4 }
+          enterprises    OBJECT IDENTIFIER ::= { private 1 }
+
+          security       OBJECT IDENTIFIER ::= { internet 5 }
+
+          snmpV2         OBJECT IDENTIFIER ::= { internet 6 }
+
+          -- transport domains
+          snmpDomains    OBJECT IDENTIFIER ::= { snmpV2 1 }
+
+          -- transport proxies
+          snmpProxys     OBJECT IDENTIFIER ::= { snmpV2 2 }
+
+          -- module identities
+          snmpModules    OBJECT IDENTIFIER ::= { snmpV2 3 }
+
+
+-----------------
+-- from MIB-II --
+-----------------
+
+
+          mib-2      OBJECT IDENTIFIER ::= { mgmt 1 }
+
+          -- textual conventions
+
+          DisplayString ::=
+              OCTET STRING
+          -- This data type is used to model textual information taken
+          -- from the NVT ASCII character set.  By convention, objects
+          -- with this syntax are declared as having
+          --
+          --      SIZE (0..255)
+
+          PhysAddress ::=
+              OCTET STRING
+          -- This data type is used to model media addresses.  For many
+          -- types of media, this will be in a binary representation.
+          -- For example, an ethernet address would be represented as
+          -- a string of 6 octets.
+
+
+-------------------
+-- from RFC 1271 --
+-------------------
+
+              EntryStatus ::= INTEGER
+                         { valid(1),
+                           createRequest(2),
+                           underCreation(3),
+                           invalid(4)
+                         }
+ 
+              -- The status of a table entry.
+              --
+              -- Setting this object to the value invalid(4) has the
+              -- effect of invalidating the corresponding entry.
+              -- That is, it effectively disassociates the mapping
+              -- identified with said entry.
+              -- It is an implementation-specific matter as to whether
+              -- the agent removes an invalidated entry from the table.
+              -- Accordingly, management stations must be prepared to
+              -- receive tabular information from agents that corresponds
+              -- to entries currently not in use.  Proper
+              -- interpretation of such entries requires examination
+              -- of the relevant EntryStatus object.
+              --
+              -- An existing instance of this object cannot be set to
+              -- createRequest(2).  This object may only be set to
+              -- createRequest(2) when this instance is created.  When
+              -- this object is created, the agent may wish to create
+              -- supplemental object instances to complete a conceptual
+              -- row in this table.  Immediately after completing the
+              -- create operation, the agent must set this object to
+              -- underCreation(3).
+              --
+              -- Entries shall exist in the underCreation(3) state until
+              -- the management station is finished configuring the
+              -- entry and sets this object to valid(1) or aborts,
+              -- setting this object to invalid(4).  If the agent
+              -- determines that an entry has been in the
+              -- underCreation(3) state for an abnormally long time,
+              -- it may decide that the management station has
+              -- crashed.  If the agent makes this decision,
+              -- it may set this object to invalid(4) to reclaim the
+              -- entry.  A prudent agent will understand that the
+              -- management station may need to wait for human input
+              -- and will allow for that possibility in its
+              -- determination of this abnormally long period.
+
+
+-------------------
+-- from RFC 1316 --
+-------------------
+
+                InstancePointer   ::= OBJECT IDENTIFIER
+
+            -- The object identifier is a pointer to a specific instance
+            -- of a MIB object in this agent's implemented MIB.  By
+            -- convention, it is the first object in the conceptual row
+            -- for the instance.
+
+
+-------------------
+-- from RFC 1443 --
+-------------------
+
+
+	TimeStamp ::= TEXTUAL-CONVENTION
+		STATUS       current
+		DESCRIPTION
+			"The value of MIB-II's sysUpTime object at which a  1133
+			specific occurrence happened.  The specific
+			occurrence must be defined in the description of
+			any object defined using this type."
+		SYNTAX       TimeTicks
+
+	TimeInterval ::= TEXTUAL-CONVENTION
+		STATUS       current
+		DESCRIPTION
+			"A period of time, measured in units of 0.01
+			seconds."
+		SYNTAX       INTEGER (0..2147483647)
+
+
+------------------------
+-- from RFC 1065/1442 --
+------------------------
+
+	Gauge32 ::= Gauge
+
+	Counter32 ::= Counter
+
+
+-----------------
+-- entreprises --
+-----------------
+
+	sun		OBJECT IDENTIFIER ::= { enterprises 42 }
+	messaging	OBJECT IDENTIFIER ::= { sun products(2) 8 }
+
+	agents		OBJECT IDENTIFIER ::= { messaging 1 }
+	private-mibs	OBJECT IDENTIFIER ::= { messaging 2 }
+
+	snmpx400d	OBJECT IDENTIFIER ::= { agents 1 }
+	snmpxapiad	OBJECT IDENTIFIER ::= { agents 2 }
+	snmpx500d	OBJECT IDENTIFIER ::= { agents 3 }
+
+
+END
+

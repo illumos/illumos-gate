@@ -1,0 +1,23 @@
+
+File folder objects are the containers for your files.  Just as a
+regular office uses filecabinets, folders and files, AT&T FACE uses the
+same objects.
+
+Your Filecabinet is a file folder that is synonymous with your 
+HOME directory.
+
+A file folder is a named object that contains one or more files and
+other folders.  File folders can be created, deleted, redescribed, or
+renamed, by using keyboard keys or commands.  Deleting a folder will
+also delete any objects contained within it.
+
+You can change the way objects in a file folder are displayed 
+(order of presentation and amount of information) by using the 
+organize command for an individual file folder, or by using 
+Preferences options for your entire Filecabinet and Wastebasket.
+
+By using File Permissions under Preferences you may control who has 
+access to your files and file folders. This allows you to determine 
+who has read, write, and run/search permissions for yourself, your group
+and anyone with access to the system.
+

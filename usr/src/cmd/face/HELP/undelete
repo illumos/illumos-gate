@@ -1,0 +1,24 @@
+
+The undelete command is a WASTEBASKET command that enables you to
+"undelete" an object that is in the WASTEBASKET.  The object will
+be returned to the file folder in the Filecabinet that it was in when
+it was deleted.
+
+Use one of the methods below to undelete an object. The current object
+will be undeleted if the object name is not specified with the
+undelete command.
+
+     Command Menu:  Select undelete and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on undelete and an -->
+     (alternative)  will appear on the command line followed by the
+                    undelete. Type arguments and press ENTER to
+                    execute the command.
+
+     Command Line:  Type undelete [object] press ENTER.
+
+The object will be removed from the WASTEBASKET and reappear in the
+Filecabinet folder from which it was deleted.
+
+To use undelete, the active frame must be the WASTEBASKET. 
+

@@ -1,0 +1,32 @@
+ident	"%Z%%M%	%I%	%E% SMI"
+
+Copyright (c) 2000 by Sun Microsystems, Inc.
+All rights reserved.
+
+These are GNU utilities that can be used with the Solaris version of
+PPP.  They provide optional features and are not needed for normal
+operation.
+
+The pppdump utility reads files produced by the pppd "record" option
+and produces human-readable output.  This can be useful when debugging
+problems with the kernel data compression modules, but is otherwise
+generally not as useful as the debugging features already built into
+pppd.
+
+The minconn.so plugin sets a minimum initial connect time when the
+"idle" option is used.
+
+The passprompt.so plugin allows PAP to be used with external prompting
+programs, such as xprompt.  This allows the password to be supplied
+interactively, in much the same manner as on PCs.
+
+To build, simply type "make".  Depending on how your system is
+configured, you may need to specify the compiler to use, like this:
+
+	% make CC=/usr/local/bin/gcc
+
+To install, you will need to be root (or at least have write
+permission to the /etc/ppp/plugins, /usr/bin, and /usr/share/man/man1m
+directories).
+
+	# make install

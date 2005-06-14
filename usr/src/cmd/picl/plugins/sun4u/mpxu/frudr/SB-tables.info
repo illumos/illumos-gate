@@ -1,0 +1,379 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * #ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * This file creates the system board structure
+ */
+
+/*
+ * define a macro to force a #ident line into the output stream
+ * otherwise cpp removes it. Use #ifndef because of #included definitions.
+ */
+#ifndef id
+#define	id(s)	#ident s
+#endif
+id("%Z%%M% %I%     %E% SMI")
+
+/*
+ * add a Devices table to RMD0
+ */
+name:/frutree/chassis/RMD0/cdrom
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "cdrom"
+	REFPROP _cdrom_ name:/platform/pci@1e,600000/ide@d/sd@0,0
+	ENDROW
+	ENDTABLE
+
+/*
+ * add Devices table for the keyswitch
+ */
+name:/frutree/chassis/SYSCTRL
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "keyswitch"
+	REFPROP _keyswitch_ name:RMCLOMV/keyswitch
+	ENDROW
+	ENDTABLE
+
+/*
+ * add a Devices table to the system-board
+ */
+name:/frutree/chassis/MB/system-board
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_v_+3v3
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_v_+5v
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_v_+12v
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_v_-12v
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_v_vtt
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_v_gbe_+2v5
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_v_gbe_core
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_v_vcctm
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_v_+2v5
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_v_+1v5
+	ENDROW
+	ROW
+	PROP Class string r 0 "temperature-sensor"
+	REFPROP _temperature-sensor_ name:RMCLOMV/mb_t_enc
+	ENDROW
+	ROW
+	PROP Class string r 0 "current-indicator"
+	REFPROP _current-indicator_ name:RMCLOMV/mb_ff_scsi
+	ENDROW
+	ROW
+	PROP Class string r 0 "current-indicator"
+	REFPROP _current-indicator_ name:RMCLOMV/mb_ff_usb0
+	ENDROW
+	ROW
+	PROP Class string r 0 "current-indicator"
+	REFPROP _current-indicator_ name:RMCLOMV/mb_ff_usb1
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/mb_act
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/mb_service
+	ENDROW
+	ROW
+	PROP Class string r 0 "led"
+	REFPROP _led_ name:RMCLOMV/mb_locate
+	ENDROW
+	ROW
+	PROP Class string r 0 "keyswitch"
+	REFPROP _keyswitch_ name:RMCLOMV/keyswitch
+	ENDROW
+	ROW
+	PROP Class string r 0 "alarm_critical"
+	REFPROP _led_ name:RMCLOMV/alarm_critical
+	ENDROW
+	ROW
+	PROP Class string r 0 "alarm_major"
+	REFPROP _led_ name:RMCLOMV/alarm_major
+	ENDROW
+	ROW
+	PROP Class string r 0 "alarm_minor"
+	REFPROP _led_ name:RMCLOMV/alarm_minor
+	ENDROW
+	ROW
+	PROP Class string r 0 "alarm_user"
+	REFPROP _led_ name:RMCLOMV/alarm_user
+	ENDROW
+	ENDTABLE
+
+/*
+ * add a Devices table to the battery
+ */
+name:/frutree/chassis/MB/system-board/BAT/battery
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_bat_v_bat
+	ENDROW
+	ENDTABLE
+
+/*
+ * add a Devices table to the service-processor
+ */
+name:/frutree/chassis/MB/system-board/SC/sc
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "service-processor"
+	REFPROP _service-processor_ name:RMCLOMV
+	ENDROW
+	ENDTABLE
+
+/*
+ * fru parent for RMD0
+ */
+name:/platform/pci@1e,600000/ide@d/sd@0,0
+	REFPROP _fru_parent name:/frutree/chassis/RMD0/cdrom
+
+/*
+ * fru parents for mother-board sensors
+ */
+name:RMCLOMV/mb_v_+3v3
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_v_+5v
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_v_+12v
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_v_-12v
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_v_vtt
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_v_gbe_+2v5
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_v_gbe_core
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_v_vcctm
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_v_+2v5
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_v_+1v5
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_t_enc
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_ff_scsi
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_ff_usb0
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_ff_usb1
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_act
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_service
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/mb_locate
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+	PROP IsLocator string r 0 "true"
+	PROP LocatorName string r 0 "system"
+name:RMCLOMV/keyswitch
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+	PROP Label string r 0 "SYSCTRL"
+name:RMCLOMV/mb_bat_v_bat
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/BAT/battery
+name:RMCLOMV/alarm_critical
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/alarm_major
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/alarm_minor
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+name:RMCLOMV/alarm_user
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board
+
+/*
+ * add Devices tables for cpu-related sensors
+ */
+name:/frutree/chassis/MB/system-board/P0/cpu
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "cpu"
+	REFPROP _cpu_ name:/platform/SUNW,UltraSPARC-IIIi@0,0
+	ENDROW
+	ROW
+	PROP Class string r 0 "temperature-sensor"
+	REFPROP _temperature-sensor_ name:RMCLOMV/mb_p0_t_core
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_p0_v_core
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/mb_p0_t_core
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu
+name:RMCLOMV/mb_p0_v_core
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu
+
+name:/frutree/chassis/MB/system-board/P1/cpu
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "cpu"
+	REFPROP _cpu_ name:/platform/SUNW,UltraSPARC-IIIi@1,0
+	ENDROW
+	ROW
+	PROP Class string r 0 "temperature-sensor"
+	REFPROP _temperature-sensor_ name:RMCLOMV/mb_p1_t_core
+	ENDROW
+	ROW
+	PROP Class string r 0 "voltage-sensor"
+	REFPROP _voltage-sensor_ name:RMCLOMV/mb_p1_v_core
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/mb_p1_t_core
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu
+name:RMCLOMV/mb_p1_v_core
+	REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu
+
+name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D0/mem-module
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "memory-module"
+	REFPROP _memory-module_ name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=0
+	ENDROW
+	ENDTABLE
+name:/frutree/chassis/MB/system-board/P0/cpu/B0/bank/D1/mem-module
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "memory-module"
+	REFPROP _memory-module_ name:/platform/memory-controller@0,0/memory-module-group?ID=0/memory-module?ID=1
+	ENDROW
+	ENDTABLE
+name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D0/mem-module
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "memory-module"
+	REFPROP _memory-module_ name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=0
+	ENDROW
+	ENDTABLE
+name:/frutree/chassis/MB/system-board/P0/cpu/B1/bank/D1/mem-module
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "memory-module"
+	REFPROP _memory-module_ name:/platform/memory-controller@0,0/memory-module-group?ID=1/memory-module?ID=1
+	ENDROW
+	ENDTABLE
+name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D0/mem-module
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "memory-module"
+	REFPROP _memory-module_ name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=0
+	ENDROW
+	ENDTABLE
+name:/frutree/chassis/MB/system-board/P1/cpu/B0/bank/D1/mem-module
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "memory-module"
+	REFPROP _memory-module_ name:/platform/memory-controller@1,0/memory-module-group?ID=0/memory-module?ID=1
+	ENDROW
+	ENDTABLE
+name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D0/mem-module
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "memory-module"
+	REFPROP _memory-module_ name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=0
+	ENDROW
+	ENDTABLE
+name:/frutree/chassis/MB/system-board/P1/cpu/B1/bank/D1/mem-module
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "memory-module"
+	REFPROP _memory-module_ name:/platform/memory-controller@1,0/memory-module-group?ID=1/memory-module?ID=1
+	ENDROW
+	ENDTABLE
+
+/*
+ * add tables and fru parents for cpu fans
+ */
+name:/frutree/chassis/MB/system-board/P0/cpu/F0/fan-unit
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "fan"
+	REFPROP _fan_ name:RMCLOMV/mb_p0_f0_rs
+	ENDROW
+	ENDTABLE
+name:/frutree/chassis/MB/system-board/P0/cpu/F1/fan-unit
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "fan"
+	REFPROP _fan_ name:RMCLOMV/mb_p0_f1_rs
+	ENDROW
+	ENDTABLE
+name:/frutree/chassis/MB/system-board/P1/cpu/F0/fan-unit
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "fan"
+	REFPROP _fan_ name:RMCLOMV/mb_p1_f0_rs
+	ENDROW
+	ENDTABLE
+name:/frutree/chassis/MB/system-board/P1/cpu/F1/fan-unit
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "fan"
+	REFPROP _fan_ name:RMCLOMV/mb_p1_f1_rs
+	ENDROW
+	ENDTABLE
+
+name:RMCLOMV/mb_p0_f0_rs
+    REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu/F0/fan-unit
+name:RMCLOMV/mb_p0_f1_rs
+    REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P0/cpu/F1/fan-unit
+name:RMCLOMV/mb_p1_f0_rs
+    REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu/F0/fan-unit
+name:RMCLOMV/mb_p1_f1_rs
+    REFPROP _fru_parent name:/frutree/chassis/MB/system-board/P1/cpu/F1/fan-unit

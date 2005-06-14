@@ -1,0 +1,15 @@
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+# Linker mapfile that allows the dynamic library to reference some symbols
+# defined by the application.
+#
+{
+	global:
+		allow_severity = extern;
+		deny_severity = extern;
+		*;
+};

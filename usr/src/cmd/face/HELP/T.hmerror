@@ -1,0 +1,12 @@
+
+This frame is only displayed if some or all of the entries
+that you specified as mail destinations are invalid.
+
+At this point, your mail message has only been sent to those
+destinations that are not displayed in this frame.  You must
+re-enter the correct version of any invalid destinations and
+re-enter your mail message to send mail to these destinations.
+
+Press PREV-FRM to return to the Send Mail form and this frame
+will remain on the display so you can refer back to it.
+

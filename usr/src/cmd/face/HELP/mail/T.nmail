@@ -1,0 +1,29 @@
+
+Read New Mail enables you to read mail that other users have
+sent you and to save or reply to that mail.
+
+Each item on the Read New Mail menu represents one message.
+Moving to the message of your choice makes that message the
+'current' message.  You may then press one of the following
+keys to take some action on the 'current' message.
+
+      ENTER:  Allows you to read the message that you have
+      selected.
+
+      REPLY:  Allows you to reply to the author(s) of the
+      message that you have selected.  The same form that
+      you use to send a new message is used here.  The
+      author(s) and subject of the 'current' message are
+      automatically filled in for you.
+
+      SAVE:  Allows you to save the 'current' message in
+      a place where you can refer to it later.  It also
+      removes this message from the list of your new mail.
+
+      DELETE:  Deletes the 'current' message from your
+      mailbox permanently.  After you have selected this
+      function, the message is no longer available for your
+      use.
+
+If you do not either SAVE or DELETE a mail message, it remains 
+in your mailbox for future use.

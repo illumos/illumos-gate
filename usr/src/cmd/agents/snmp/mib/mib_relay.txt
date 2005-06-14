@@ -1,0 +1,559 @@
+--
+-- CDDL HEADER START
+--
+-- The contents of this file are subject to the terms of the
+-- Common Development and Distribution License, Version 1.0 only
+-- (the "License").  You may not use this file except in compliance
+-- with the License.
+--
+-- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+-- or http://www.opensolaris.org/os/licensing.
+-- See the License for the specific language governing permissions
+-- and limitations under the License.
+--
+-- When distributing Covered Code, include this CDDL HEADER in each
+-- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+-- If applicable, add the following below this CDDL HEADER, with the 
+-- fields enclosed by brackets "[]" replaced with your own identifying
+-- information: Portions Copyright [yyyy] [name of copyright owner]
+--
+-- CDDL HEADER END
+--
+-- Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+-- Use is subject to license terms.
+--
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+--
+
+-- --------------------------------------------------------------------------
+-- ra.mib mib file for relay agent
+--
+-- Dependence: $(MIB_HOME)/mib_core.txt has read
+--	      by the MIB compiler/generator
+-- Assumption: The oid for RelayAgent-mib is sun.500(not sure)
+-- ---------------------------------------------------------------------------
+-- History:
+-- Date		Developer		Comment
+-- 5-13-96	Jerry Yeung		create 
+-- 6-11-96	Jerry Yeung		agentTableIndex becomes read-write
+--					regTree has double index
+--					trap port
+--					no agentOperStatus
+--					agent system up time
+--					check point
+--					statical data
+--					subtree view
+--					table for subtree
+-- 6-23-96	Jerry Yeung		change some index to read ony
+-- 7-3-96	Jerry Yeung		add relayPollInterval  and
+--					relayMaxAgentTimeOut
+--					add agentWatchDogTime in entry
+-- 7-09-96	Jerry Yeung		change oid for relay agent
+-- ---------------------------------------------------------------------------
+
+RELAY-AGENT-MIB DEFINITIONS ::= BEGIN
+
+  IMPORTS
+	enterprises
+		FROM RFC1155-SMI
+	OBJECT-TYPE, DisplayString
+		FROM RFC1212;
+  sun 	OBJECT IDENTIFIER ::= { enterprises 42 }
+  relay-agent 	OBJECT IDENTIFIER ::= { sun products(2) 15 }
+
+--
+-- *********** agentTable **************
+--
+  agentTable	OBJECT-TYPE
+	SYNTAX	SEQUENCE OF AgentEntry
+	ACCESS	not-accessible
+	STATUS	mandatory
+	DESCRIPTION
+		"The sub-agent table."
+	::= { relay-agent 1 }
+
+  agentTableIndex	OBJECT-TYPE
+	SYNTAX	INTEGER (0..65535)
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The next available index in agentTable."
+	::= { relay-agent 2 }
+-- ****************************************
+
+--
+-- ********** RegTreeTable ****************
+--
+  regTreeTable        OBJECT-TYPE
+        SYNTAX SEQUENCE OF RegTreeEntry
+        ACCESS not-accessible
+        STATUS mandatory
+        DESCRIPTION
+                "Table for subtree registered by sub-agents."
+        ::= { relay-agent 3 }
+
+  regTreeTableIndex	OBJECT-TYPE
+	SYNTAX	INTEGER (0..65535)
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The next available index in regTreeTable."
+	::= { relay-agent 4 }
+
+-- ****************************************
+
+--
+-- ********** Global Relay agent Info ******
+--
+  relayProcessIDFile	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The file storing all the process id." 
+	::= { relay-agent 5 }
+
+  relayResourceFile	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The file storing all the agents info." 
+	::= { relay-agent 6 }
+
+  relayPersonalFileDir	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The directory of the personal file."
+	::= { relay-agent 7 }
+
+  relayLogFile	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The log file of the relay agent."
+	::= { relay-agent 8 }
+
+  relayOperationStatus	OBJECT-TYPE
+	SYNTAX	INTEGER { active(1), inactive(2) }
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"operation mode of the relay agent"
+	::= { relay-agent 9 }
+
+  relayTrapPort	OBJECT-TYPE
+	SYNTAX	INTEGER 
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"operation mode of the relay agent"
+	::= { relay-agent 10 }
+
+  relayCheckPoint OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"check the agent name is duplicate or not."
+	::= { relay-agent 11 }
+
+  relayNSession OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"num of total sessions received."
+	::= { relay-agent 12 }
+
+  relayNSessionDiscards OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"num of total sessions received."
+	::= { relay-agent 13 }
+
+-- ****************************************
+
+--
+-- ********** TableForRegTable ****************
+--
+  regTblTable        OBJECT-TYPE
+        SYNTAX SEQUENCE OF RegTblEntry
+        ACCESS not-accessible
+        STATUS mandatory
+        DESCRIPTION
+                "Table for table registered by sub-agents."
+        ::= { relay-agent 14 }
+
+  regTblTableIndex	OBJECT-TYPE
+	SYNTAX	INTEGER (0..65535)
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The next available index in regTblTable."
+	::= { relay-agent 15 }
+
+-- ****************************************
+
+--
+-- ************** Global Info for relay agent **********
+--
+  relayPollInterval OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"time interval for executing the watch-dog monitor"
+	::= { relay-agent 16 }
+
+  relayMaxAgentTimeOut OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"the max-allowable response time for any agent"
+	::= { relay-agent 17 }
+
+--
+-- ************** agentEntry(Table Entry) ************
+--
+  agentEntry 	OBJECT-TYPE
+	SYNTAX	AgentEntry
+	ACCESS	not-accessible
+	STATUS	mandatory
+	DESCRIPTION	
+		"An entry in the sub-agent table."
+	INDEX { agentID }
+	::= { agentTable 1}
+
+  AgentEntry ::=
+	SEQUENCE {
+		agentID
+			INTEGER,
+		agentStatus
+			INTEGER,
+		agentTimeout
+			INTEGER,
+		agentPortNumber
+			INTEGER,
+		agentPersonalFile
+			DisplayString,
+		agentConfigFile
+			DisplayString,
+		agentExecutable
+			DisplayString,
+		agentVersionNum
+			DisplayString,
+		agentProtocol
+			DisplayString,
+		agentProcessID
+			INTEGER,
+		agentName
+			DisplayString,
+  		agentSystemUpTime
+			TimeTicks,
+		agentWatchDogTime
+			INTEGER
+	}
+
+  agentID 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"An id for each connected agent"
+	::= { agentEntry 1 }
+
+  agentStatus 	OBJECT-TYPE
+	SYNTAX	INTEGER { active(1), inactive(2), init(3), load(4), destroy(5) }
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The status of the sub-agent."
+	::= { agentEntry 2 }
+
+  agentTimeOut 	OBJECT-TYPE
+	SYNTAX	INTEGER 
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The max. time for sub-agent to process the request in usec. "
+	::= { agentEntry 3 }
+
+  agentPortNumber 	OBJECT-TYPE
+	SYNTAX	INTEGER (0..65535)
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The port number of the sub-agent."
+	::= { agentEntry 4 }
+
+  agentPersonalFile 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The personal file of the sub-agent."
+	::= { agentEntry 5 }
+
+  agentConfigFile 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The configuratioin file of the sub-agent."
+	::= { agentEntry 6 }
+
+  agentExecutable 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The executable file of the sub-agent."
+	::= { agentEntry 7 }
+  
+  agentVersionNum 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The version number  of the sub-agent."
+	::= { agentEntry 8 }
+
+  agentProtocol 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The protocol of the sub-agent."
+	::= { agentEntry 9 }
+
+  agentProcessID 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The process id of the sub-agent."
+	::= { agentEntry 10 }
+
+  agentName 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The name of the sub-agent."
+	::= { agentEntry 11 }
+
+  agentSystemUpTime 	OBJECT-TYPE
+	SYNTAX	TimeTicks
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The system up time of the subagent."
+	::= { agentEntry 12 }
+
+  agentWatchDogTime 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The period for relay agent to probe the agent"
+	::= { agentEntry 13 }
+
+
+-- ****************************************************************
+
+--
+-- ************** RegTreeEntry(Table Entry) ************
+--
+  regTreeEntry        OBJECT-TYPE
+        SYNTAX RegTreeEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                "An entry for tree registration."
+        INDEX { regTreeAgentID, regTreeIndex }
+        ::= { regTreeTable 1 }
+
+  RegTreeEntry ::=
+        SEQUENCE {
+		regTreeIndex
+			INTEGER,
+		regTreeAgentID
+			INTEGER,
+		regTreeOID
+			OBJECT IDENTIFIER,
+		regTreeView
+			DisplayString,
+		regTreeStatus
+			INTEGER,
+		regTreePriority
+			INTEGER
+	}
+
+
+  regTreeIndex 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The index of the registration, currently same as agentid."
+	::= { regTreeEntry 1 }
+
+  regTreeAgentID 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"process ID of the sub-agent."
+	::= { regTreeEntry  2 }
+
+  regTreeOID 	OBJECT-TYPE
+	SYNTAX	OBJECT IDENTIFIER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The oid of the subtree."
+	::= { regTreeEntry 3 }
+
+  regTreeView 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The scope name of the mib subtree."
+	::= { regTreeEntry 4 }
+
+  regTreeStatus 	OBJECT-TYPE
+	SYNTAX	INTEGER { active(1), inactive(2) }
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"the entry is deleted or not."
+	::= { regTreeEntry 5 }
+
+  regTreePriority 	OBJECT-TYPE
+	SYNTAX	INTEGER (0..65535)
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		" 0 is the highest priority."
+	::= { regTreeEntry 6 }
+		
+
+-- ****************************************************************
+
+--
+-- ************** RegTreeEntry(Table Entry) ************
+--
+  regTblEntry        OBJECT-TYPE
+        SYNTAX RegTblEntry
+        ACCESS  not-accessible
+        STATUS  mandatory
+        DESCRIPTION
+                "An entry for table registration."
+        INDEX { regTblAgentID, regTblIndex }
+        ::= { regTblTable 1 }
+
+  RegTblEntry ::=
+        SEQUENCE {
+		regTblIndex
+			INTEGER,
+		regTblAgentID
+			INTEGER,
+		regTblOID
+			OBJECT IDENTIFIER,
+		regTblStartColumn
+			INTEGER,
+		regTblEndColumn
+			INTEGER,
+		regTblStartRow
+			INTEGER,
+		regTblEndRow
+			INTEGER,
+		regTblView
+			DisplayString,
+		regTblStatus
+			INTEGER
+	}
+
+  regTblIndex 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"The index of the table registration."
+	::= { regTblEntry 1 }
+
+  regTblAgentID 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-only
+	STATUS	mandatory
+	DESCRIPTION
+		"agent ID of the sub-agent."
+	::= { regTblEntry  2 }
+
+  regTblOID 	OBJECT-TYPE
+	SYNTAX	OBJECT IDENTIFIER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The oid of the subtree table."
+	::= { regTblEntry 3 }
+
+  regTblStartColumn 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"starting column of the subtable."
+	::= { regTblEntry  4 }
+
+  regTblEndColumn 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"ending column of the subtable."
+	::= { regTblEntry  5 }
+
+  regTblStartRow 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"starting row of the subtable"
+	::= { regTblEntry  6 }
+
+  regTblEndRow 	OBJECT-TYPE
+	SYNTAX	INTEGER
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"ending row of the subtable"
+	::= { regTblEntry  7 }
+
+  regTblView 	OBJECT-TYPE
+	SYNTAX	DisplayString
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"The scope name of the subtree table."
+	::= { regTblEntry 8 }
+
+  regTblStatus 	OBJECT-TYPE
+	SYNTAX	INTEGER { active(1), inactive(2) }
+	ACCESS	read-write
+	STATUS	mandatory
+	DESCRIPTION
+		"the entry is deleted or not."
+	::= { regTblEntry 9 }
+
+-- ****************************************************************
+
+END

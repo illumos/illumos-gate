@@ -1,0 +1,27 @@
+[seizo:09/09/92]
+To fix #1098866, the directory structure is modified.
+This directory contains machine independent source codes of csh.
+Two files are currently machine dependent. These are
+	signal.c and signal.h
+Machine dependent files are moved under $(MACH) directory.
+
+So, if you are going to port csh for other architecture,
+you have to do:
+	1) create a directory for the new architecture.
+		(Say, intel)
+
+	2) create following files. 
+	   (You can use sparc/{Makefile, signal.c, signal.h} as templates.
+		intel/Makefile
+		intel/signal.c
+			You need to modify sigvechandler()
+		intel/signal.h
+			You need to modify struct sigcontext.
+
+In future, I am planning to rewrite csh so it uses modern
+signal interface so csh will not have any machine dependent
+portion.
+
+usr/src/cmd/csh/SCCS/{s.signal.c, s.signal.h} are move under
+usr/src/cmd/csh/sparc/SCCS. So, if you wish to see sccs histories
+of signal.c and signal.h, please refer to usr/src/cmd/csh/sparc/SCCS.

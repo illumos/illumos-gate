@@ -1,0 +1,249 @@
+This is grub.info, produced by makeinfo version 4.0 from grub.texi.
+
+INFO-DIR-SECTION Kernel
+START-INFO-DIR-ENTRY
+* GRUB: (grub).                 The GRand Unified Bootloader
+* grub-install: (grub)Invoking grub-install.    Install GRUB on your drive
+* grub-md5-crypt: (grub)Invoking grub-md5-crypt.        Encrypt a password
+                                                        in MD5 format
+* grub-terminfo: (grub)Invoking grub-terminfo.  Generate a terminfo
+                                                command from a
+                                                terminfo name
+* grub-set-default: (grub)Invoking grub-set-default.    Set a default boot
+                                                        entry
+* mbchk: (grub)Invoking mbchk.  Check for the format of a Multiboot kernel
+END-INFO-DIR-ENTRY
+
+   Copyright (C) 1999,2000,2001,2002,2004 Free Software Foundation, Inc.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided also
+that the entire resulting derived work is distributed under the terms
+of a permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: grub.info,  Node: Bootstrap tricks,  Next: I/O ports detection,  Prev: Command interface,  Up: Internals
+
+The bootstrap mechanism used in GRUB
+====================================
+
+   The disk space can be used in a boot loader is very restricted
+because a MBR (*note MBR::) is only 512 bytes but it also contains a
+partition table (*note Partition table::) and a BPB. So the question is
+how to make a boot loader code enough small to be fit in a MBR.
+
+   However, GRUB is a very large program, so we break GRUB into 2 (or 3)
+distinct components, "Stage 1" and "Stage 2" (and optionally "Stage
+1.5"). *Note Memory map::, for more information.
+
+   We embed Stage 1 in a MBR or in the boot sector of a partition, and
+place Stage 2 in a filesystem. The optional Stage 1.5 can be installed
+in a filesystem, in the "boot loader" area in a FFS or a ReiserFS, and
+in the sectors right after a MBR, because Stage 1.5 is enough small and
+the sectors right after a MBR is normally an unused region. The size of
+this region is the number of sectors per head minus 1.
+
+   Thus, all Stage1 must do is just load Stage2 or Stage1.5. But even if
+Stage 1 needs not to support the user interface or the filesystem
+interface, it is impossible to make Stage 1 less than 400 bytes, because
+GRUB should support both the CHS mode and the LBA mode (*note Low-level
+disk I/O::).
+
+   The solution used by GRUB is that Stage 1 loads only the first
+sector of Stage 2 (or Stage 1.5) and Stage 2 itself loads the rest. The
+flow of Stage 1 is:
+
+  1. Initialize the system briefly.
+
+  2. Detect the geometry and the accessing mode of the "loading drive".
+
+  3. Load the first sector of Stage 2.
+
+  4. Jump to the starting address of the Stage 2.
+
+   The flow of Stage 2 (and Stage 1.5) is:
+
+  1. Load the rest of itself to the real starting address, that is, the
+     starting address plus 512 bytes. The block lists are stored in the
+     last part of the first sector.
+
+  2. Long jump to the real starting address.
+
+   Note that Stage 2 (or Stage 1.5) does not probe the geometry or the
+accessing mode of the "loading drive", since Stage 1 has already probed
+them.
+
+
+File: grub.info,  Node: I/O ports detection,  Next: Memory detection,  Prev: Bootstrap tricks,  Up: Internals
+
+How to probe I/O ports used by INT 13H
+======================================
+
+   FIXME: I will write this chapter after implementing the new
+technique.
+
+
+File: grub.info,  Node: Memory detection,  Next: Low-level disk I/O,  Prev: I/O ports detection,  Up: Internals
+
+How to detect all installed RAM
+===============================
+
+   FIXME: I doubt if Erich didn't write this chapter only himself
+wholly, so I will rewrite this chapter.
+
+
+File: grub.info,  Node: Low-level disk I/O,  Next: MBR,  Prev: Memory detection,  Up: Internals
+
+INT 13H disk I/O interrupts
+===========================
+
+   FIXME: I'm not sure where some part of the original chapter is
+derived, so I will rewrite this chapter.
+
+
+File: grub.info,  Node: MBR,  Next: Partition table,  Prev: Low-level disk I/O,  Up: Internals
+
+The structure of Master Boot Record
+===================================
+
+   FIXME: Likewise.
+
+
+File: grub.info,  Node: Partition table,  Next: Submitting patches,  Prev: MBR,  Up: Internals
+
+The format of partition tables
+==============================
+
+   FIXME: Probably the original chapter is derived from "How It Works",
+so I will rewrite this chapter.
+
+
+File: grub.info,  Node: Submitting patches,  Prev: Partition table,  Up: Internals
+
+Where and how you should send patches
+=====================================
+
+   When you write patches for GRUB, please send them to the mailing list
+<bug-grub@gnu.org>. Here is the list of items of which you should take
+care:
+
+   * Please make your patch as small as possible. Generally, it is not
+     a good thing to make one big patch which changes many things.
+     Instead, segregate features and produce many patches.
+
+   * Use as late code as possible, for the original code. The CVS
+     repository always has the current version (*note Obtaining and
+     Building GRUB::).
+
+   * Write ChangeLog entries. *Note Change Logs: (standards)Change
+     Logs, if you don't know how to write ChangeLog.
+
+   * Make patches in unified diff format. `diff -urN' is appropriate in
+     most cases.
+
+   * Don't make patches reversely. Reverse patches are difficult to
+     read and use.
+
+   * Be careful enough of the license term and the copyright. Because
+     GRUB is under GNU General Public License, you may not steal code
+     from software whose license is incompatible against GPL. And, if
+     you copy code written by others, you must not ignore their
+     copyrights. Feel free to ask GRUB maintainers, whenever you are
+     not sure what you should do.
+
+   * If your patch is too large to send in e-mail, put it at somewhere
+     we can see. Usually, you shouldn't send e-mail over 20K.
+
+
+File: grub.info,  Node: Index,  Prev: Internals,  Up: Top
+
+Index
+*****
+
+* Menu:
+
+* blocklist:                             blocklist.
+* boot:                                  boot.
+* bootp:                                 bootp.
+* cat:                                   cat.
+* chainloader:                           chainloader.
+* cmp:                                   cmp.
+* color:                                 color.
+* configfile:                            configfile.
+* current_drive:                         Filesystem interface.
+* current_partition:                     Filesystem interface.
+* current_slice:                         Filesystem interface.
+* debug:                                 debug.
+* default:                               default.
+* device:                                device.
+* devread:                               Filesystem interface.
+* dhcp:                                  dhcp.
+* disk_read_func:                        Filesystem interface.
+* displayapm:                            displayapm.
+* displaymem:                            displaymem.
+* embed:                                 embed.
+* fallback:                              fallback.
+* filemax:                               Filesystem interface.
+* filepos:                               Filesystem interface.
+* find:                                  find.
+* fstest:                                fstest.
+* FSYS_BUF:                              Filesystem interface.
+* geometry:                              geometry.
+* grub_read:                             Filesystem interface.
+* halt:                                  halt.
+* help:                                  help.
+* hiddenmenu:                            hiddenmenu.
+* hide:                                  hide.
+* ifconfig:                              ifconfig.
+* impsprobe:                             impsprobe.
+* initrd:                                initrd.
+* install:                               install.
+* ioprobe:                               ioprobe.
+* kernel:                                kernel.
+* lock:                                  lock.
+* makeactive:                            makeactive.
+* map:                                   map.
+* md5crypt:                              md5crypt.
+* module:                                module.
+* modulenounzip:                         modulenounzip.
+* pager:                                 pager.
+* part_length:                           Filesystem interface.
+* part_start:                            Filesystem interface.
+* partnew:                               partnew.
+* parttype:                              parttype.
+* password:                              password.
+* pause:                                 pause.
+* print_a_completion:                    Filesystem interface.
+* print_possibilities:                   Filesystem interface.
+* quit:                                  quit.
+* rarp:                                  rarp.
+* read:                                  read.
+* reboot:                                reboot.
+* root:                                  root.
+* rootnoverify:                          rootnoverify.
+* saved_drive:                           Filesystem interface.
+* saved_partition:                       Filesystem interface.
+* savedefault:                           savedefault.
+* serial:                                serial.
+* setkey:                                setkey.
+* setup:                                 setup.
+* terminal:                              terminal.
+* terminfo:                              terminfo.
+* testload:                              testload.
+* testvbe:                               testvbe.
+* tftpserver:                            tftpserver.
+* timeout:                               timeout.
+* title:                                 title.
+* unhide:                                unhide.
+* uppermem:                              uppermem.
+* vbeprobe:                              vbeprobe.
+
+

@@ -1,0 +1,64 @@
+
+Type the name of the object to be searched for. 
+
+Several characters have special meaning in this field.
+These characters are * ? [
+
+When these characters appear in this field, they have 
+the following behavior:
+
+   *   Matches any string of characters.
+
+   ?   Matches any single character.
+
+ [...] Matches any one of the enclosed characters. A
+       pair of characters separated by - matches any
+       character alphabetically between the pair,
+       inclusive. If the first character after the [
+       is the ! character, any character not enclosed
+       in the brackets is matched.
+
+These special characters can be combined in many ways.
+
+For example:
+
+   g    will find all objects named g.
+
+   g*   will find all objects starting with g.
+        (e.g. g1 great good.job)
+
+   *g   will find all objects ending with g.
+        (e.g. jog ming rug dg)
+
+   g?   will find all objects starting with g whose
+        names are exactly 2 characters long.
+        (e.g. g1 g2 gd gp)
+
+   ?g   will find all objects ending with g whose
+        names are exactly 2 characters long.
+        (e.g. 1g 2g dg pg)
+
+   g??  will find all objects starting with g whose
+        names are exactly 3 characters long.
+
+   r?g  will find all objects starting with r, ending
+        with g, whose names are exactly 3 characters
+        long.  (e.g. rug rag rig)
+
+ [abc]* will find all objects starting with either
+        a, b or c.  (e.g. also bag craft)
+
+ [f-k]* will find all objects starting with any of
+        the letters f, g, h, i, j or k.
+
+ [A-Z][a-z] will find all objects whose names are
+            exactly 2 characters long, where the
+            first character is a capital letter and
+            the second is in lower case.
+            (e.g. Aa Au Ri)
+
+ [!a]*  will find all objects whose names start with
+        anything EXCEPT a.
+
+ [!ab]* will find all objects whose names start with
+        anything EXCEPT a or b.

@@ -1,0 +1,284 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+msgid  ","
+msgstr
+msgid  ""
+msgstr
+msgid  "r"
+msgstr
+msgid  "stdin"
+msgstr
+msgid  "%-     "
+msgstr
+msgid  "%s"
+msgstr
+msgid  " "
+msgstr
+msgid  "%d"
+msgstr
+msgid  "s"
+msgstr
+msgid  "\n"
+msgstr
+msgid  "%s%s%d%s"
+msgstr
+msgid  "%s\n"
+msgstr
+msgid  "%d %d %s"
+msgstr
+msgid  "%d%s"
+msgstr
+msgid  ":"
+msgstr
+msgid  "%o"
+msgstr
+msgid  "0x%x"
+msgstr
+msgid  "%hd"
+msgstr
+msgid  "%"
+       "llo"
+msgstr
+msgid  "%"
+       "lld"
+msgstr
+msgid  "0x%"
+       "llx"
+msgstr
+msgid  "0x"
+msgstr
+msgid  "%02x"
+msgstr
+msgid  "%s%d"
+msgstr
+msgid  "%u"
+msgstr
+msgid  "%"
+       "llu"
+msgstr
+msgid  "%c"
+msgstr
+msgid  "0x%hx"
+msgstr
+msgid  "%ho"
+msgstr
+msgid  " %s=\""
+msgstr
+msgid  "<%s>"
+msgstr
+msgid  "<%s"
+msgstr
+msgid  "</%s>"
+msgstr
+msgid  "/>"
+msgstr
+msgstr
+msgid  "%C"
+msgstr
+msgid  "%*s"
+msgid  "<?xml version='1.0' encoding='UTF-8' ?>\n"
+msgstr
+msgid  "\n<!DOCTYPE audit PUBLIC "
+       "'-//Sun Microsystems, Inc.//DTD Audit V1//EN' "
+       "'file:///usr/share/lib/xml/dtd/adt_record.dtd.1'>\n\n"
+msgstr
+msgid  "<?xml-stylesheet type='text/xsl' "
+       "href='file:///usr/share/lib/xml/style/adt_record.xsl.1' ?>\n"
+msgstr
+msgid  "<audit>"
+msgstr
+msgid  "%s%s%s%s"
+msgstr
+msgid  "\n</audit>\n"
+msgstr
+msgid  "old_header"
+msgstr
+msgid  "record"
+msgstr
+msgid  "ip_address"
+msgstr
+msgid  "ip_port"
+msgstr
+msgid  "old_socket"
+msgstr
+msgid  "IPC_perm"
+msgstr
+msgid  "cmw_label"
+msgstr
+msgid  "information_label"
+msgstr
+msgid  "sensitivity_label"
+msgstr
+msgid  "use_of_privilege"
+msgstr
+msgid  "use_of_authorization"
+msgstr
+msgid  "X_atom"
+msgstr
+msgid  "X_object"
+msgstr
+msgid  "X_protocol"
+msgstr
+msgid  "X_selection"
+msgstr
+msgid  "X_color_map"
+msgstr
+msgid  "X_cursor"
+msgstr
+msgid  "X_font"
+msgstr
+msgid  "X_graphic_context"
+msgstr
+msgid  "X_pixmap"
+msgstr
+msgid  "X_property"
+msgstr
+msgid  "X_window"
+msgstr
+msgid  "X_client"
+msgstr
+msgid  "audit-uid"
+msgstr
+msgid  "uid"
+msgstr
+msgid  "gid"
+msgstr
+msgid  "ruid"
+msgstr
+msgid  "rgid"
+msgstr
+msgid  "pid"
+msgstr
+msgid  "sid"
+msgstr
+msgid  "tid"
+msgstr
+msgid  "event-modifier"
+msgstr
+msgid  "modifier"
+msgstr
+msgid  "event-type"
+msgstr
+msgid  "event"
+msgstr
+msgid  "token-version"
+msgstr
+msgid  "version"
+msgstr
+msgid  "time"
+msgstr
+msgid  "msec"
+msgstr
+msgid  "errval"
+msgstr
+msgid  "retval"
+msgstr
+msgid  "set-type"
+msgstr
+msgid  "xid"
+msgstr
+msgid  "xcreator-uid"
+msgstr
+msgid  "x_sel_text"
+msgstr
+msgid  "x_sel_type"
+msgstr
+msgid  "x_sel_data"
+msgstr
+msgid  "arg-num"
+msgstr
+msgid  "value"
+msgstr
+msgid  "desc"
+msgstr
+msgid  "mode"
+msgstr
+msgid  "fsid"
+msgstr
+msgid  "nodeid"
+msgstr
+msgid  "device"
+msgstr
+msgid  "seq-num"
+msgstr
+msgid  "argv"
+msgstr
+msgid  "arge"
+msgstr
+msgid  "arg"
+msgstr
+msgid  "env"
+msgstr
+msgid  "result"
+msgstr
+msgid  "creator-uid"
+msgstr
+msgid  "creator-gid"
+msgstr
+msgid  "seq"
+msgstr
+msgid  "key"
+msgstr
+msgid  "service_type"
+msgstr
+msgid  "len"
+msgstr
+msgid  "id"
+msgstr
+msgid  "offset"
+msgstr
+msgid  "time_to_live"
+msgstr
+msgid  "protocol"
+msgstr
+msgid  "cksum"
+msgstr
+msgid  "src_addr"
+msgstr
+msgid  "dest_addr"
+msgstr
+msgid  "type"
+msgstr
+msgid  "port"
+msgstr
+msgid  "addr"
+msgstr
+msgid  "sock_domain"
+msgstr
+msgid  "sock_type"
+msgstr
+msgid  "lport"
+msgstr
+msgid  "laddr"
+msgstr
+msgid  "fport"
+msgstr
+msgid  "faddr"
+msgstr
+msgid  "ipc-type"
+msgstr
+msgid  "ipc-id"
+msgstr
+msgid  "print"
+msgstr
+msgid  "count"
+msgstr

@@ -1,0 +1,133 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+# Some sample entries:
+# NOTE - all lines must have at least 5 fields 
+#    use '-' for unused fields
+# The Devices file is used in conjunction with the Dialers file.
+# Types that appear in the 5th field must be either built-in
+#  functions (801, Sytek, TCP, Unetserver, DK)
+#  or standard functions whose name appears in the first
+#  field in the Dialers file.
+# Two escape characters may appear in this file:
+# - \D which means don't translate the phone #/token
+# - \T translate the phone #/token using the Dialcodes file
+# Both refer to the phone number field in the Systems file (field 5)
+# \D should always be used with entries in the Dialers file, since the
+# Dialers file can contain a \T to expand the number if necessary.
+# \T should only be used with built-in functions that require expansion
+# NOTE: - if a phone number is expected and a \D or \T is not present
+#	a \T is used for a built-in, and \D is used for an entry
+#	referencing the Dialers file. (see examples below)
+#
+#
+# ---Standard modem line
+# ACU cua/b - 2400 hayes
+# or
+# ACU cua/b - 2400 hayes \D
+#
+# ---A direct line so 'cu -lcua/b' will work
+# Direct cua/b - 9600 direct
+#
+# ---A ventel modem on a develcon switch (vent is the token given to
+#	the develcon to reach the ventel modem)
+# ACU cua/b - 1200 develcon vent ventel
+# ACU cua/b - 1200 develcon vent ventel \D
+#
+# ---To reach a system on the local develcon switch
+# Develcon cua/b - Any develcon \D
+#
+# ---Access a direct connection to a system
+# systemx term/00 - Any direct
+#
+# where the Systems file looks like
+# systemx Any systemx 1200 unused  "" in:-\r\d-in: nuucp word: nuucp
+#	(The third field in Systems matches the first field in Devices)
+#
+# ---To connect to any system on the DATAKIT VCS network
+# DK DK 0 Any DK \D
+#
+# ---To connect to a system on a Datakit in nj/ho
+# DKho - uucp Any DK nj/ho/\D
+#
+# ---To use an ACU that is connected to Datakit that DK does not understand
+#	how to talk to directly
+# ACU - 0 Any DK vent ventel \D
+#
+# ---To use a dialer that the Datakit understands how to chat with
+#	This is a special case where the translation must be done by the
+#	Devices file processing.
+# ACU DKacu 0 Any DK py/garage/door.\T
+#
+
+TCP,et - - Any TCP -
+
+########	AT&T Transport Interface
+#
+# ---To use a STREAMS network that conforms to the AT&T Transport Interface
+#	with a direct connection to login service (i.e., without
+#	explicitly using the Network Listener Service dial script):
+#
+# networkx,eg devicex - - TLIS \D
+#
+#	The Systems file entry looks like:
+#
+# systemx Any networkx - addressx in:--in: nuucp word: nuucp
+#
+#	You must replace systemx, networkx, addressx, and devicex with system
+#	name, network name, network address and network device, respectively.
+#	For example, entries for machine "sffoo" on a STARLAN NETWORK might
+#	look like:
+#		sffoo Any STARLAN - sffoo in:--in: nuucp word: nuucp
+#	and:
+#		STARLAN,eg starlan - - TLIS \D
+#
+# ---To use a STREAMS network that conforms to the AT&T Transport Interface
+#	and that uses the Network Listener Service dial script to negotiate
+#	for a server:
+#
+# networkx,eg devicex - - TLIS \D nls
+#
+#
+# ---To use a non-STREAMS network that conforms to the AT&T Transport 
+#	Interface and that uses the Network Listener Service dial script
+#	to negotiate for a server:
+#
+# networkx,eg devicex - - TLI \D nls
+#
+########
+#
+#
+# NOTE: blank lines and lines that begin with a <space>, <tab>, or # are 
+#		ignored.
+#	protocols can be specified as a comma-subfield of the device type
+#		either in the Devices file (where device type is field 1)
+#		or in the Systems file (where it is field 3).
+#
+########
+#
+ACU cua/b - Any hayes
+Direct cua/b - Any direct

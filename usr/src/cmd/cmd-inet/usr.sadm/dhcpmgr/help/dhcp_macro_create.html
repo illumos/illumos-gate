@@ -1,0 +1,196 @@
+<!--
+  -- ident	"%W%	%E% SMI"
+  --
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License, Version 1.0 only
+    (the "License").  You may not use this file except in compliance
+    with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+
+ -- Copyright (c) 2000-2001 by Sun Microsystems, Inc.
+  -- All rights reserved.
+  -->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+
+<head>
+<title>DHCP Manager Help: Create Macro</title>
+<meta NAME="AUTHOR" CONTENT="smorgan">
+<meta NAME="KEYWORDS" CONTENT="DHCP">
+
+</head>
+
+<body bgcolor="#FFFFFF">
+
+<a name="top"></a>
+
+<table border=0 cellspacing=0 cellpadding=0 width=615>
+
+<!-- Start navigation banner -->
+
+<tr><td colspan=4  WIDTH="615" align="center" valign="top"><IMG SRC="art/bannersmc.gif" WIDTH=615 BORDER=0 ALT="DHCP Manager Help">
+
+	</td>
+	</tr>
+
+<!-- End navigation banner -->
+
+
+<tr>
+
+<!-- Start contents block -->
+
+	<td colspan=1 valign="top" width=105>
+	<P>&nbsp;</P>
+
+	<A HREF="dhcp_main_top.html"><STRONG>Overview</STRONG></A><P>
+	<A HREF="dhcp_relay_ref.html"><STRONG>Servers and Relays</STRONG></A><P>
+	<A HREF="dhcp_addr_ref.html"><STRONG>IP Addresses</STRONG></A><P>
+	
+		
+<A HREF="dhcp_macro_ref.html"><STRONG>Macros</STRONG></A><BR>
+<IMG SRC="art/tip2.gif" WIDTH=12 HEIGHT=10 BORDER=0 ALT="">Create<BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;<a href="#name"><EM>Name</EM></a><BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;<a href="#option"><EM>Option</EM></a><BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;<a href="#order"><EM>Up/Down</EM></a><BR>
+	&nbsp;&nbsp;&nbsp;&nbsp;<a href="#del"><EM>Delete</EM></A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_macro_dup.html">Duplicate</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_macro_mod.html">Modify</A><BR>
+	&nbsp;&nbsp;<A HREF="dhcp_macro_del.html">Delete</A><P>
+
+<A HREF="dhcp_option_ref.html"><STRONG>Options</STRONG></A><P>
+		
+<A HREF="dhcp_main_how.html"><STRONG>How To..</STRONG></A><P>
+<A HREF="dhcp_main_menus.html"><STRONG>Menus</STRONG></A><P>
+<A HREF="dhcp_main_idx.html"><STRONG>Index</STRONG></A>
+	
+	
+		</td>
+
+
+
+<!-- End contents block -->
+
+<!-- Start column rule -->
+
+	<td colspan=1 width=5 bgcolor="#CCCCCC">&nbsp;</td>
+
+<!-- End column spacer -->
+
+<!-- Start column spacer -->
+
+	<td colspan=1 width=10 bgcolor="#FFFFFF">&nbsp;</td>
+
+<!-- End column spacer -->
+
+
+
+<!-- Start topic block -->
+
+
+	<td colspan=1 valign="top" bgcolor="#ffffff">
+	<P>&nbsp;</P>
+
+
+<h1>Create Macro</h1>
+
+The Create Macro dialog box lets you to define a new macro in the <tt>dhcptab</tt> on the selected DHCP server. <p>
+See <a href="dhcp_macros_about.html#using">Using Macros and Options
+</a> for more information about defining DHCP macros.<P>
+
+
+The settings available in the Create Macro dialog box are described below.<p>
+<P><HR NOSHADE><P>
+
+
+	<table border=0 cellspacing=4 cellpadding=3>
+
+	<tr>
+	<td width=105 valign="top"><A NAME="name"><STRONG>Name</STRONG></A></td>
+	<td valign="top">Specify the name of the new macro. Remember, the name you choose determines the <A HREF="dhcp_macros_about.html#macrocat">macro category</a>. Macro names can be 
+	a maximum of 128 alphanumeric characters.<P>
+	
+	The important thing to remember when naming your macro is to give 
+	it the same name as the resource or device in the category you want 
+	to control. For example, to create a Client Class macro for 
+	configuring an Ultra-5<small><sup>TM</sup></small> (which has the client class name 
+	<tt>SUNW,Ultra5_10</tt>), name your macro <tt>SUNW.Ultra5_10</tt>. 
+	</td>
+	</tr>
+
+	<tr>
+	<td width=105 valign="top"><A NAME="option"><STRONG>Option</STRONG></A></td>
+	<td valign="top">Specify the names of options and/or macros to include in the macro. The options or macros must
+already exist in the <tt>dhcptab</tt>. If the option does not exist, you
+can create it using the <A HREF="dhcp_option_create.html">Create Option</A> dialog box.
+To browse a list of defined options, right-click in the
+Options column. Options are displayed by category and type.
+To view the list of standard options, see <A HREF="dhcp_option_tags.html">Standard Options</A>.<P>
+
+To include a nested macro, enter Include in the Option column
+and then enter the name of the macro in the Value column.<P>
+To specify an option, enter the name of the option in the Option
+column, and the value of the option in the Value column. <P></TD>
+	</tr>
+
+	<tr>
+	<td width=125 valign="top"><A NAME="order"><STRONG>Move Up/Move Down</STRONG></A></td>
+	<td valign="top">Click Move Up or Move Down to change the processing order of
+	options and nested macros. The processing order is significant, as options and 
+	macros processed last supersede conflicting values in those that are 
+	processed first. </td>
+	</tr>
+	
+	<tr>
+	<td width=125 valign="top"><A NAME="del"><STRONG>Delete</STRONG></A></td>
+	<td valign="top">Select an option and click Delete to remove it from the macro. </td>
+	</tr>
+
+
+	</table>
+
+
+
+<p>
+<strong>Notify DHCP Server of Change:</STRONG> Check the box if 
+you want the DHCP server to reload the <tt>dhcptab</tt> after
+the changed macro information is written. Normally, you will want 
+the server to reload the <tt>dhcptab</tt> so that clients will
+start receiving the new configuration data immediately.  
+However, in some cases, you may wish to delay this reload.
+For example, you may need to modify several macros in order for 
+configurations to be correct. <P>
+
+&nbsp;&nbsp;&nbsp;<A HREF="#top"><small>return to top</small></A>
+
+
+<p>&nbsp;</p>
+
+<!-- Don't go past this line! -->
+
+	</td>
+
+<!-- End topic block -->
+
+</tr>
+
+</table>
+
+<!-- End topic table -->
+
+</body>
+</html>

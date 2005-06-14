@@ -1,0 +1,11 @@
+!#ident	"%Z%%M%	%I%	%E% SMI"
+v/^tchar/d
+1,$s/=.*/;/
+1,$s/^tchar/extern tchar/
+1i
+/* DON'T EDIT THIS FILE.  
+ * This file was made from sh.tconst by the ed script make.sh.tconst.h.ed.
+ */
+.
+w sh.tconst.h
+q

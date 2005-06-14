@@ -1,0 +1,65 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
+# # --------------------------------
+#
+# sperry: SPERRY
+#
+# Manufacturer:	SPERRY
+# Class:	III
+# Info:
+#	This is a terminal that is (going to be) used with increasing 
+#	frequency here, internally at sperry. It is also similar, i 
+#	believe, to the terminal that comes with the sperry pcs that 
+#	have recenty made an entry into the micro market.
+#	It doesn't have everything that the uts30 has to offer, i'm 
+#	sure (read hope), but its a start.
+#	
+#	
+#	This entry is for the Sperry UTS30 terminal running the TTY 
+#	utility under control of CP/M Plus 1R1. The functionality 
+#	provided is comparable to the DEC vt100.
+#	
+#
+uts30|sperry uts30 with cp/m@1R1,
+	am, bw, hs,
+	cols#80, lines#24, wsl#40,
+	bel=^G, blink=\E[5m, bold=\E[1m, civis=\ER, clear=\f, cnorm=\ES,
+	cr=\r, csr=\EU%p1%' '%+%c%p2%' '%+%c, cub=\E[%p1%dD, cub1=\b,
+	cud=\E[%p1%dB, cud1=\EB, cuf=\E[%p1%dC, cuf1=\EC,
+	cup=\E[%i%p1%d;%p2%dH,
+	cuu=\E[%p1%dA, cuu1=\E[A, dch=\E[%p1%dP, dch1=\EM, dl=\E[%p1%dM,
+	dl1=\EL, 
+	ed=\E[J, el=\E[K, fsl=\r, home=\E[H, ht=\t, ich=\E[%p1%d@, ich1=\EO,
+	il=\E[%p1%dL, il1=\EN,
+	kbs=\b, kcub1=\EOD, kcud1=\EOB, kcuf1=\EOC, kcuu1=\EOA, khome=\E[H,
+	ind=\l, indn=\E[%p1%dB,
+	is2=\E[U 7\E[24;1H, rc=\EX, rev=\E[7m,
+	rf=/usr/share/lib/tabset/vt100, ri=\EI, rin=\E[%p1%dA,
+	rmacs=\Ed, rmso=\E[m,
+	rmul=\E[m, rs2=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h,
+	sc=\EW, sgr0=\E[m, smacs=\EF, smso=\E[7m, smul=\E[4m,
+	tsl=\E], uc=\EPB,

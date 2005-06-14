@@ -1,0 +1,189 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/types.h>
+#include <sys/reboot.h>
+#include <sys/cmn_err.h>
+#include <sys/bootconf.h>
+#include <sys/promif.h>
+#include <sys/obpdefs.h>
+#include <sys/sunddi.h>
+#include <sys/systm.h>
+#include <sys/kobj.h>
+#include <sys/kobj_impl.h>
+#include <util/getoptstr.h>
+
+char *kobj_kmdb_argv[11];	/* 10 arguments and trailing NULL */
+
+/*
+ * Parse the boot line to determine boot flags.
+ */
+void
+bootflags(struct bootops *ops)
+{
+	struct gos_params params;
+	uchar_t num_O_opt = 0;
+	char *cp;
+	int c;
+
+
+	if (BOP_GETPROP(ops, "boot-args", kern_bootargs) != 0) {
+		boothowto |= RB_ASKNAME;
+		return;
+	}
+
+	cp = kern_bootargs;
+
+#if !defined(__i386) && !defined(__amd64)
+	/*
+	 * x86: The boot scripts (i.e., /etc/bootrc) don't prepend the kernel
+	 * name to the boot arguments.  (And beware making it do so: if the
+	 * run-kernel command returns, it will loop, and you will end up with
+	 * multiple copies of the kernel name.)
+	 */
+	SKIP_WORD(cp);		/* Skip the kernel's filename. */
+#endif
+	SKIP_SPC(cp);
+
+	params.gos_opts = "abcdgGhi:km:O:rsvwx";
+	params.gos_strp = cp;
+	getoptstr_init(&params);
+	while ((c = getoptstr(&params)) != -1) {
+		switch (c) {
+		case 'a':
+			boothowto |= RB_ASKNAME;
+			break;
+		case 'b':
+			boothowto |= RB_NOBOOTRC;
+			break;
+		case 'c':
+			boothowto |= RB_CONFIG;
+			break;
+		case 'd':
+			boothowto |= RB_DEBUGENTER;
+			break;
+		case 'g':
+			boothowto |= RB_FORTHDEBUG;
+			break;
+		case 'G':
+			boothowto |= RB_FORTHDEBUGDBP;
+			break;
+		case 'h':
+			boothowto |= RB_HALT;
+			break;
+		case 'i':
+			if (params.gos_optarglen + 1 > sizeof (initname)) {
+				_kobj_printf(ops, "krtld: initname too long.  "
+				    "Ignoring.\n");
+			} else {
+				(void) strncpy(initname, params.gos_optargp,
+				    params.gos_optarglen);
+				initname[params.gos_optarglen] = '\0';
+			}
+			break;
+		case 'k':
+			boothowto |= RB_KMDB;
+			break;
+		case 'm':
+			if (2 + params.gos_optarglen + 1 > sizeof (initargs))
+				printf(
+				    "unix: -m argument too long.  Ignoring.\n");
+			else {
+				(void) strcpy(initargs, "-m");
+				(void) strncat(initargs, params.gos_optargp,
+				    params.gos_optarglen);
+				initargs[sizeof ("-m") - 1 +
+				    params.gos_optarglen] = '\0';
+			}
+			break;
+		case 'O': {
+			char **str = &kobj_kmdb_argv[num_O_opt];
+
+			if (++num_O_opt > (sizeof (kobj_kmdb_argv) /
+			    sizeof (char *)) - 1) {
+				_kobj_printf(ops, "krtld: too many kmdb "
+				    "options - ignoring option #%d.\n",
+				    num_O_opt);
+				continue;
+			}
+
+			*str = kobj_alloc(params.gos_optarglen + 1, KM_TMP);
+			(void) strncpy(*str, params.gos_optargp,
+			    params.gos_optarglen);
+			(*str)[params.gos_optarglen] = '\0';
+			break;
+		}
+		case 'r':
+			boothowto |= RB_RECONFIG;
+			break;
+		case 's':
+			boothowto |= RB_SINGLE;
+			break;
+		case 'v':
+			boothowto |= RB_VERBOSE;
+			break;
+		case 'w':
+			boothowto |= RB_WRITABLE;
+			break;
+		case 'x':
+			boothowto |= RB_NOBOOTCLUSTER;
+			break;
+		case '?':
+			switch (params.gos_last_opt) {
+			case 'i':
+				_kobj_printf(ops, "krtld: Required argument "
+				    "for -i flag missing.  Ignoring.\n");
+				break;
+			default:
+				_kobj_printf(ops, "krtld: Ignoring invalid "
+				    "kernel option -%c.\n",
+				    params.gos_last_opt);
+			}
+			break;
+		default:
+			_kobj_printf(ops, "krtld: Ignoring unimplemented "
+			    "option -%c.\n", c);
+		}
+	}
+
+	if ((boothowto & (RB_DEBUGENTER | RB_KMDB)) == RB_DEBUGENTER) {
+		_kobj_printf(ops, "krtld: -d is not valid without -k.\n");
+		boothowto &= ~RB_DEBUGENTER;
+	}
+
+	if (*params.gos_strp) {
+		/* Unused arguments. */
+		if (params.gos_strp[0] == '-' && ISSPACE(params.gos_strp[1])) {
+			/*EMPTY*/
+			/* Lousy install arguments.  Silently ignore. */
+		} else {
+			_kobj_printf(ops, "krtld: Unused kernel arguments: "
+			    "`%s'.\n", params.gos_strp);
+		}
+	}
+}

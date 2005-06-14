@@ -1,0 +1,13 @@
+
+The next-frm command enables you to navigate to the next frame that
+you opened after the current frame. If the current frame was the last
+opened, striking NEXT-FRM makes the first frame active.
+
+Use one of the methods below to use next-frm:
+
+     Function Key:  Press the NEXT-FRM function key.
+
+     Command Menu:  Select next-frm and press ENTER.
+
+     Command Line:  Type next-frm and press ENTER.
+

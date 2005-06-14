@@ -1,0 +1,18 @@
+
+The update command is used to update the contents of a frame to
+reflect changes made since the frame was originally opened.
+
+To use the update command, do one of the following options.  If a
+frame  is  not  specified,  the  current frame is assumed.  In the
+example below, "frame number" is the number in the left corner of
+the frame label.
+
+     Command Menu:  Select update and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on update and an -->
+     (alternative)  will appear on the command line followed by the
+                    update. Type arguments and press ENTER to
+                    execute the command.
+
+     Command Line:  Type update [ frame number] and press ENTER.
+

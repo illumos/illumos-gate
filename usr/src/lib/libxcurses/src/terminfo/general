@@ -1,0 +1,51 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# general: GENERAL TERMINAL (formerly INFOTON)
+#
+# Infoton is now called General Terminal Corp.
+# gt100 sounds like something DEC would come out with.  Lets hope they don't.
+i100|gt100|gt100a|General Terminal 100A (formerly Infoton 100),
+	cr=^M, cud1=^J, ind=^J, bel=^G, clear=^L, ed=\EJ, el=\EK,
+	lines#24, cols#80, il1=\EL, dl1=\EM, cuu1=\EA, cuf1=\EC,
+	home=\EH, cup=\Ef%p2%' '%+%c%p1%' '%+%c,
+	flash=\Eb\Ea, am, cub1=^H, smso=\Eb, rmso=\Ea,
+# Looks like an ANSI terminal, but what a kludge for dch1!  I bet smdc/rmdc
+# could be used even if the terminal is really that braindamaged.
+# But you would think being ANSI they would do \E[P right.  Hmm.
+i400|400|infoton 400,
+	cr=^M, cud1=^J, ind=^J, bel=^G, if=/usr/lib/tabset/infoton_tabs,
+	il1=\E[L, am, cub1=^H, el=\E[N, clear=\E[2J, cup=\E[%i%p1%3d;%p2%3dH,
+	cols#80, dl1=\E[M, lines#25, cuf1=\E[C, cuu1=\E[A,
+	smir=\E[4h\E[2Q, rmir=\E[4l\E[0Q, dch1=\E[4h\E[2Q\E[P\E[4l\E[0Q,
+addrinfo,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	lines#24, cols#80, clear=^L, home=^H, cuf1=^Y, ed=^K,
+	cuu1=^\, am, cub1=^Z, cup=\037%i%p1%{1}%-%c%p2%{1}%-%c, ll=^H^\,
+# No, I don't know what this is.  But KAS happens to be Kurt Shoens initials.
+infotonKAS,
+	cr=^M, cud1=^J, ind=^J, bel=^G, am, cub1=^Z,
+	ed=^K, clear=^L, cols#80, lines#24, cuf1=^Y, cuu1=^\, ll=^H^\,

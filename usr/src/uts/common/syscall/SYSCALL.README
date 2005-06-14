@@ -1,0 +1,306 @@
+
+CDDL HEADER START
+
+The contents of this file are subject to the terms of the
+Common Development and Distribution License, Version 1.0 only
+(the "License").  You may not use this file except in compliance
+with the License.
+
+You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+or http://www.opensolaris.org/os/licensing.
+See the License for the specific language governing permissions
+and limitations under the License.
+
+When distributing Covered Code, include this CDDL HEADER in each
+file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+If applicable, add the following below this CDDL HEADER, with the
+fields enclosed by brackets "[]" replaced with your own identifying
+information: Portions Copyright [yyyy] [name of copyright owner]
+
+CDDL HEADER END
+
+Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+ident	"%Z%%M%	%I%	%E% SMI"
+
+System Call Files
+------ ---- -----
+
+The universal dumping grounds for system calls in Solaris 2.x,
+common/os/scalls.c and common/fs/vncalls.c, have been sub-divided into
+smaller files.
+
+The old files had become quite large, and contained much completely
+unrelated code. From a software engineering standpoint, it didn't seem
+like a good idea to permit system calls or underlying routines
+to be cognizant of the internal interfaces and underlying routines
+of unrelated system calls.
+
+From a practical standpoint, recompiling all of scalls.c or vncalls.c
+after making only a small change in one system call seemed like
+cruel and unusual punishment.  Also, running "bringover" after
+changing scalls.c or vncalls.c in one's own environment had a
+high probability of encountering a conflict.
+
+In an attempt to improve maintainability, we have split these files
+and created new directories to hold the results. One hopes that this
+new organization will prove easier to maintain and change.
+
+The principles listed below guided the split-up. Please try to adhere
+to them if you add new system calls.
+
+
+1) System calls now live in directories called "syscall". Architecture
+   independant system calls live in common/syscall and architecture
+   dependant system calls live in sparc/syscall or i86/syscall.
+
+2) Most system calls have their own separate file. We try to keep
+   these files as small as possible.
+
+3) Unrelated system calls should NEVER be put in the same file. Do
+   not consider any of these files "dumping grounds" for new system
+   call work.
+
+4) Some files DO contain more than one system call. This occurs
+   under the following restricted conditions:
+
+	o System calls that are internally related, either because
+	  they alone call a set of static functions to do the dirty
+	  work, or because they access locally-defined static data.
+	  The system calls in sigqueue.c and lwpsys.c are examples
+	  of the first case; lwp_sobj.c is an example of the second.
+
+	o Fairly trivial pairs of "get-" and "set-" operation system
+	  calls. The file rlimit.c, containing getrlimit() and
+	  setrlimit() is a case in point.
+
+	o System calls that are basically "variations on a theme,"
+	  such as the the different forms of stat in stat.c.
+
+5) If a number of system calls make use of a local function, or,
+   if a function is used more widely than in a few system calls,
+   then perhaps this function needs to be moved to one of the
+   kernel-implementation files in common/os or common/fs. For
+   example, this was done with the functions namesetattr and
+   fdsetattr, which were used by several different system calls.
+   These functions were moved into common/os/fio.c, where they
+   seemed to fit better.
+
+-------------------------------------------------------------------
+System Call Reorganization
+------ ---- --------------
+
+The system calls in common/os/scalls.c, common/fs/vncalls.c
+have been broken up into smaller files. In addition, system
+calls that previously resided in <arch>/os/archdep.c have
+been removed from that file. The table below describes the
+manner in which the files have been split up.
+
+The original syscall files have not been deleted, but have been
+renamed to reflect their diminished contents. The file scalls.c
+has been renamed to ssig.c, and vncalls.c has been renamed to
+poll.c.
+
+
+Syscall Entry Point	Old File	New File
+-------------------	--- ----	--- ----
+gtime			scalls.c	common/syscall/time.c
+stime			scalls.c	common/syscall/time.c
+
+adjtime			scalls.c	common/syscall/adjtime.c
+
+times			scalls.c	common/syscall/times.c
+
+sysconfig		scalls.c	common/syscall/sysconfig.c
+
+setuid			scalls.c	common/syscall/uid.c
+getuid			scalls.c	common/syscall/uid.c
+seteuid			scalls.c	common/syscall/uid.c
+
+setgid			scalls.c	common/syscall/gid.c
+getgid			scalls.c	common/syscall/gid.c
+setegid			scalls.c	common/syscall/gid.c
+
+getpid			scalls.c	common/syscall/getpid.c
+
+setgroups		scalls.c	common/syscall/groups.c
+getgroups		scalls.c	common/syscall/groups.c
+
+setpgrp			scalls.c	common/syscall/pgrpsys.c
+
+pause			scalls.c	common/syscall/pause.c
+
+ssig			scalls.c	common/syscall/ssig.c
+
+sigtimedwait		scalls.c	common/syscall/sigtimedwait.c
+
+sigsuspend		scalls.c	common/syscall/sigsuspend.c
+
+sigaltstack		scalls.c	common/syscall/sigaltstack.c
+
+sigpending		scalls.c	common/syscall/sigpending.c
+
+sigprocmask		scalls.c	common/syscall/sigprocmask.c
+
+sigaction		scalls.c	common/syscall/sigaction.c
+
+kill			scalls.c	common/syscall/sigqueue.c
+sigqueue		scalls.c	common/syscall/sigqueue.c
+
+sigsendsys		scalls.c	common/syscall/sigsendset.c
+
+profil			scalls.c	common/syscall/profil.c
+
+alarm			scalls.c	common/syscall/alarm.c
+
+umask			scalls.c	common/syscall/umask.c
+
+ulimit			scalls.c	common/syscall/rlimit.c
+getrlimit		scalls.c	common/syscall/rlimit.c
+setrlimit		scalls.c	common/syscall/rlimit.c
+
+utssys			scalls.c	common/syscall/utssys.c
+
+uname			scalls.c	common/syscall/uname.c
+
+uadmin			scalls.c	common/syscall/uadmin.c
+
+systeminfo		scalls.c	common/syscall/systeminfo.c
+
+syslwp_create		scalls.c	common/syscall/lwp_create.c
+syslwp_exit		scalls.c	common/syscall/lwp_create.c
+
+syslwp_syspend		scalls.c	common/syscall/lwpsys.c
+syslwp_continue		scalls.c	common/syscall/lwpsys.c
+lwp_kill		scalls.c	common/syscall/lwpsys.c
+lwp_wait		scalls.c	common/syscall/lwpsys.c
+
+yield			scalls.c	common/syscall/yield.c
+
+lwp_self		scalls.c	common/syscall/lwp_self.c
+
+lwp_info		scalls.c	common/syscall/lwp_info.c
+
+lwp_mutex_lock		scalls.c	common/syscall/lwp_sobj.c
+lwp_mutex_unlock	scalls.c	common/syscall/lwp_sobj.c
+lwp_cond_wait		scalls.c	common/syscall/lwp_sobj.c
+lwp_cond_signal		scalls.c	common/syscall/lwp_sobj.c
+lwp_cond_broadcast	scalls.c	common/syscall/lwp_sobj.c
+lwp_sema_p		scalls.c	common/syscall/lwp_sobj.c
+lwp_sema_v		scalls.c	common/syscall/lwp_sobj.c
+
+open			vncalls.c	common/syscall/open.c
+creat			vncalls.c	common/syscall/open.c
+
+close			vncalls.c	common/syscall/close.c
+
+read			vncalls.c	common/syscall/rw.c
+write			vncalls.c	common/syscall/rw.c
+pread			vncalls.c	common/syscall/rw.c
+pwrite			vncalls.c	common/syscall/rw.c
+readv			vncalls.c	common/syscall/rw.c
+writev			vncalls.c	common/syscall/rw.c
+
+chdir			vncalls.c	common/syscall/chdir.c
+fchdir			vncalls.c	common/syscall/chdir.c
+chroot			vncalls.c	common/syscall/chdir.c
+fchroot			vncalls.c	common/syscall/chdir.c
+
+mknod			vncalls.c	common/syscall/mknod.c
+xmknod			vncalls.c	common/syscall/mknod.c
+
+mkdir			vncalls.c	common/syscall/mkdir.c
+
+link			vncalls.c	common/syscall/link.c
+
+rename			vncalls.c	common/syscall/rename.c
+
+symlink			vncalls.c	common/syscall/symlink.c
+
+unlink			vncalls.c	common/syscall/unlink.c
+
+rmdir			vncalls.c	common/syscall/rmdir.c
+
+getdents		vncalls.c	common/syscall/getdents.c
+
+lseek			vncalls.c	common/syscall/lseek.c
+llseek			vncalls.c	common/syscall/lseek.c
+
+access			vncalls.c	common/syscall/access.c
+
+stat			vncalls.c	common/syscall/stat.c
+lstat			vncalls.c	common/syscall/stat.c
+fstat			vncalls.c	common/syscall/stat.c
+xstat			vncalls.c	common/syscall/stat.c
+lxstat			vncalls.c	common/syscall/stat.c
+fxstat			vncalls.c	common/syscall/stat.c
+
+fpathconf		vncalls.c	common/syscall/pathconf.c
+pathconf		vncalls.c	common/syscall/pathconf.c
+
+readlink		vncalls.c	common/syscall/readlink.c
+
+chmod			vncalls.c	common/syscall/chmod.c
+fchmod			vncalls.c	common/syscall/chmod.c
+
+chown			vncalls.c	common/syscall/chown.c
+lchown			vncalls.c	common/syscall/chown.c
+fchown			vncalls.c	common/syscall/chown.c
+
+utime			vncalls.c	common/syscall/utime.c
+utimes			vncalls.c	common/syscall/utime.c
+
+fdsync			vncalls.c	common/syscall/fdsync.c
+
+fcntl			vncalls.c	common/syscall/fcntl.c
+
+dup			vncalls.c	common/syscall/dup.c
+
+ioctl			vncalls.c	common/syscall/ioctl.c
+stty			vncalls.c	common/syscall/ioctl.c
+gtty			vncalls.c	common/syscall/ioctl.c
+
+poll			vncalls.c	common/syscall/poll.c
+
+acl			vncalls.c	common/syscall/acl.c
+facl			vncalls.c	common/syscall/acl.c
+
+mount			vfs.c		common/syscall/mount.c
+
+statfs			vfs.c		common/syscall/statfs.c
+fstatfs			vfs.c		common/syscall/statfs.c
+
+statvfs			vfs.c		common/syscall/statvfs.c
+fstatvfs		vfs.c		common/syscall/statvfs.c
+
+sync			vfs.c		common/syscall/sync.c
+
+sysfs			vfs.c		common/syscall/sysfs.c
+
+umount			vfs.c		common/syscall/umount.c
+
+nice			priocntl.c	common/syscall/nice.c
+
+pipe			os/pipe.c	common/syscall/pipe.c
+
+msgsys			os/msg.c	common/syscall/msg.c
+
+semsys			os/sem.c	common/syscall/sem.c
+
+shmsys			os/shm.c	common/syscall/shm.c
+
+getcontext		sparc/archdep.c	sparc/syscall/getcontext.c
+lwp_getprivate		sparc/archdep.c	sparc/syscall/lwp_private.c
+lwp_setprivate		sparc/archdep.c	sparc/syscall/lwp_private.c
+
+getcontext		i86/archdep.c	i86/syscall/getcontext.c
+lwp_getprivate		i86/archdep.c	i86/syscall/lwp_private.c
+lwp_setprivate		i86/archdep.c	i86/syscall/lwp_private.c
+
+-----------------------------------------------------------------
+
+Most of the system calls in this directory have been converted
+to use C-style argument passing, instead of the old uap-pointer
+method. This usually makes the system calls faster and more
+"natural" in implementation.

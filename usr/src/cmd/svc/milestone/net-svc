@@ -1,0 +1,340 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# This is third phase of TCP/IP startup/configuration.  This script
+# runs after the NIS/NIS+ startup script.  We run things here that may
+# depend on NIS/NIS+ maps.
+#
+
+case "$1" in
+'start')
+	#
+	# In a zone we need this service to be up, but all of the work
+	# it tries to do is irrelevant (and will actually lead to the service
+	# failing if we try to do it), so just bail out.
+	#
+	if [ `/sbin/zonename` != "global" ]; then
+		exit 0
+	fi
+	;; # Fall through -- rest of script is the initialization code
+
+'stop')
+	exit 0
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+
+. /lib/svc/share/smf_include.sh
+
+# If boot variables are not set, set variables we use
+[ -z "$_INIT_UTS_NODENAME" ] && _INIT_UTS_NODENAME=`/usr/bin/uname -n`
+
+#
+# wait_nis
+# Wait up to 5 seconds for ypbind to obtain a binding.
+#
+wait_nis ()
+{
+	for i in 1 2 3 4 5; do
+		server=`/usr/bin/ypwhich 2>/dev/null`
+		[ $? -eq 0 -a -n "$server" ] && return 0 || sleep 1
+	done
+	return 1
+}
+
+#
+# This function takes two file names and the file mode as input. The two
+# files are compared for differences (using cmp(1)) and if different, the
+# second file is over written with the first. A chmod is done with the file
+# mode passed in. If the files are equal, the first file passed
+# in (the /tmp file) is deleted.
+#
+mv_file ()
+{
+	/usr/bin/cmp -s $1 $2
+	if [ $? -eq 1 ]; then
+		/usr/bin/mv $1 $2
+		#
+		# The umask during boot is configurable, which requires
+		# explicit setting of file permission modes when we
+		# create files.
+		#
+		/usr/bin/chmod $3 $2
+	else
+		/usr/bin/rm $1
+	fi
+}
+
+#
+# update_nss
+# This routine takes as a parameter, the name of the respective policy 
+# to change in the nsswitch.conf (hosts or ipnodes) to update with dns.
+#
+update_nss ()
+{
+	policy=$1;
+	# Add dns to the nsswitch file, if it isn't already there.
+	/usr/bin/awk ' $1 ~ /^'${policy}':/ {
+		n = split($0, a);
+		newl = a[1];
+		if ($0 !~ /dns/) {
+			printf("#%s # Commented out by DHCP\n", $0);
+			updated = 0;
+			for (i = 2; i <= n; i++) {
+				if (updated == 0 && index(a[i], "[") == 1) {
+					newl = newl" dns";
+					updated++;
+				}
+				newl = newl" "a[i];
+			}
+			if (updated == 0) {
+				newl = newl" dns";
+				updated++;
+			}
+			if (updated != 0)
+				newl = newl" # Added by DHCP";
+			else
+				newl = $0;
+			printf("%s\n", newl);
+		} else
+			printf("%s\n", $0);
+	} $1 !~ /^'${policy}':/ { printf("%s\n", $0); }' /etc/nsswitch.conf \
+	    >/tmp/nsswitch.conf.$$
+
+	mv_file /tmp/nsswitch.conf.$$ /etc/nsswitch.conf 644
+}
+
+#
+# update_files
+# This routine takes as a parameter, the name of the respective file 
+# (hosts or ipnodes) to update with the new host name and IP address.
+#
+update_files ()
+{
+	filename=$1;
+	# Delete any old lines added by dhcp.
+	/usr/bin/sed -e '/# Added by DHCP$/d' /etc/inet/${filename} \
+	    > /tmp/${filename}_clear.$$
+
+	shift $#	# Clear $0-9 first in case grep fails
+	set -- `/usr/bin/grep "^[ 	]*$ipaddr[ 	]" \
+	    /tmp/${filename}_clear.$$ 2>/dev/null`
+
+	if [ $# -gt 0 ]; then
+		#
+		# IP address is already in the file. Ensure the
+		# associated hostname is the same as the Hostname
+		# property returned by the DHCP server.
+		#
+		/usr/bin/sed -e "/^[ 	]*${ipaddr}[ 	]/d" \
+		    /tmp/${filename}_clear.$$ >/tmp/${filename}.$$
+		echo "${ipaddr}\t${hostname}\t# Added by DHCP" \
+		    >>/tmp/${filename}.$$
+	else
+		#
+		# IP address is missing from the respective file.  Now check
+		# to see if the hostname is present with a different IP.
+		#
+		shift $#	# Clear $0-9 in case grep fails
+		set -- `/usr/bin/grep -s -v '^#' /tmp/${filename}_clear.$$ | \
+		    /usr/bin/egrep "[	 ]${hostname}([	 ]|$)"`
+
+		if [ $# -gt 0 ]; then
+			#
+			# Hostname is present in the file. Rewrite this line
+			# to have the new IP address and the DHCP comment.
+			#
+			/usr/bin/sed -e "/^[ 	]*${1}[ 	]/d" \
+			    /tmp/${filename}_clear.$$ >/tmp/${filename}.$$
+
+			shift	# Shift off $1 (the old IP)
+
+			echo "$ipaddr $*\c" | /usr/bin/tr ' ' '\t' \
+			    >>/tmp/${filename}.$$
+
+			echo "\t# Added by DHCP" >>/tmp/${filename}.$$
+		else
+			#
+			# Hostname is not present in the named file.
+			# Add a new line for the host at the end of
+			# the new respective file.
+			#
+			/usr/bin/mv /tmp/${filename}_clear.$$ \
+			    /tmp/${filename}.$$
+			echo "${ipaddr}\t${hostname}\t# Added by DHCP" \
+			    >>/tmp/${filename}.$$
+		fi
+	fi
+
+	/usr/bin/rm -f /tmp/${filename}_clear.$$
+	mv_file /tmp/${filename}.$$ /etc/inet/${filename} 444
+}
+
+#
+# We now need to reset the netmask and broadcast address for our network
+# interfaces.  Since this may result in a name service lookup, we want to
+# now wait for NIS to come up if we previously started it.
+#
+domain=`/usr/bin/domainname 2>/dev/null`
+
+[ -z "$domain" ] || [ ! -d /var/yp/binding/$domain ] || wait_nis || \
+    echo "WARNING: Timed out waiting for NIS to come up" >& 2
+
+#
+# Re-set the netmask and broadcast addr for all IP interfaces.  This ifconfig
+# is run here, after waiting for name services, so that "netmask +" will find
+# the netmask if it lives in a NIS map. The 'D' in -auD tells ifconfig NOT to
+# mess with the interface if it is under DHCP control
+#
+/usr/sbin/ifconfig -auD4 netmask + broadcast +
+
+# Uncomment these lines to print complete network interface configuration
+# echo "network interface configuration:"
+# /usr/sbin/ifconfig -a
+
+smf_netstrategy
+
+if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
+	dnsservers=`/sbin/dhcpinfo DNSserv`
+else
+	dnsservers=""
+fi
+
+if [ -n "$dnsservers" ]; then
+	#
+	# Go through /etc/resolv.conf and replace any existing
+	# domain or nameserver entries with new ones derived
+	# from DHCP.  Note that it is important to preserve
+	# order of domain entries vs. search entries; the search
+	# entries are reserved for administrator customization
+	# and if placed after the domain entry will override it.
+	# See resolv.conf(4).
+	#
+	if [ ! -f /etc/resolv.conf ]; then
+		/usr/bin/touch /etc/resolv.conf
+	fi
+	dnsdomain=`/sbin/dhcpinfo DNSdmain`
+	export dnsservers dnsdomain
+	/usr/bin/nawk </etc/resolv.conf >/tmp/resolv.conf.$$ '
+		function writedomain() {
+			if (updated == 0) {
+			    	# Use only first domain, not a search list
+			    	split(ENVIRON["dnsdomain"], d)
+				if(length(d[1]) != 0)
+					printf("domain %s\n", d[1])
+			}
+			++updated
+		}
+		$1 == "domain" { writedomain(); next }
+		$1 != "nameserver" { print $0 }
+		END {
+			writedomain()
+			n = split(ENVIRON["dnsservers"], s)
+			for (i = 1; i <= n; ++i)
+				printf("nameserver %s\n", s[i])
+		}'
+	unset dnsservers dnsdomain
+	mv_file /tmp/resolv.conf.$$ /etc/resolv.conf 644
+	#
+	# Add dns to the nsswitch file, if it isn't already there.
+	#
+	update_nss hosts
+	update_nss ipnodes
+
+elif /usr/bin/grep '# Added by DHCP$' /etc/nsswitch.conf >/dev/null 2>&1; then
+
+	# If we added DNS to the hosts and ipnodes policy in the nsswitch,
+	# remove it.
+	/usr/bin/sed \
+	    -e '/# Added by DHCP$/d' \
+	    -e 's/^\(#hosts:\)\(.*[^#]\)\(#.*\)$/hosts: \2/' \
+	    -e 's/^\(#ipnodes:\)\(.*[^#]\)\(#.*\)$/ipnodes: \2/' \
+	    /etc/nsswitch.conf >/tmp/nsswitch.conf.$$
+
+	mv_file /tmp/nsswitch.conf.$$ /etc/nsswitch.conf 644
+fi
+
+if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
+
+	hostname=`/usr/bin/uname -n`
+	ipaddr=`/sbin/dhcpinfo Yiaddr`
+	update_files hosts
+	update_files ipnodes
+
+else
+	# We're not using a dhcp strategy, so host entries added by
+	# DHCP should be removed from /etc/inet/hosts and /etc/inet/ipnodes.
+
+	if /usr/bin/grep '# Added by DHCP$' /etc/inet/hosts >/dev/null 2>&1;
+	    then
+		/usr/bin/sed -e '/# Added by DHCP$/d' \
+		    /etc/inet/hosts > /tmp/hosts.$$
+		mv_file /tmp/hosts.$$ /etc/inet/hosts 444
+	fi
+
+	if /usr/bin/grep '# Added by DHCP$' /etc/inet/ipnodes >/dev/null 2>&1;
+	    then
+		/usr/bin/sed -e '/# Added by DHCP$/d' \
+		    /etc/inet/ipnodes > /tmp/ipnodes.$$
+		mv_file /tmp/ipnodes.$$ /etc/inet/ipnodes 444
+	fi
+fi
+
+#
+# Load the IPQoS configuration.
+# This is backgrounded so that any remote hostname lookups it performs
+# don't unduely delay startup. Any messages go via syslog.
+#
+
+if [ -f /usr/sbin/ipqosconf -a -f /etc/inet/ipqosinit.conf ]; then
+	/usr/sbin/ipqosconf -s -a /etc/inet/ipqosinit.conf &
+fi
+
+#
+# Add a static route for multicast packets out our default interface.
+# The default interface is the interface that corresponds to the node name.
+# Run in background subshell to avoid waiting for name service.
+#
+
+(
+if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
+	mcastif=`/sbin/dhcpinfo Yiaddr` || mcastif=$_INIT_UTS_NODENAME
+else
+	mcastif=$_INIT_UTS_NODENAME
+fi
+
+echo "Setting default IPv4 interface for multicast:" \
+    "add net 224.0/4: gateway $mcastif"
+
+/usr/sbin/route -n add -interface 224.0/4 -gateway "$mcastif" >/dev/null
+) &

@@ -1,0 +1,711 @@
+.\" ident	"%Z%%M%	%I%	%E% SMI"
+.\" " CDDL HEADER START
+.\" "
+.\" " The contents of this file are subject to the terms of the
+.\" " Common Development and Distribution License, Version 1.0 only
+.\" " (the "License").  You may not use this file except in compliance
+.\" " with the License.
+.\" "
+.\" " You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" " or http://www.opensolaris.org/os/licensing.
+.\" " See the License for the specific language governing permissions
+.\" " and limitations under the License.
+.\" "
+.\" " When distributing Covered Code, include this CDDL HEADER in each
+.\" " file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" " If applicable, add the following below this CDDL HEADER, with the
+.\" " fields enclosed by brackets "[]" replaced with your own identifying
+.\" " information: Portions Copyright [yyyy] [name of copyright owner]
+.\" "
+.\" " CDDL HEADER END
+.\" "
+.\" "Copyright 2005 Sun Microsystems, Inc.  All rights reserved"
+.\" "Use is subject to license terms."
+.TH wx 1 "1 January 2005"
+.SH NAME
+.I wx
+\- tool to track changes to a workspace, follow ON gate rules and much more
+.SH SYNOPSIS
+\fBwx [<sub-command> [-D] [sub-command options]]\fP
+.LP
+.SH DESCRIPTION
+.IX "OS-Net build tools" "wx" "" "\fBwx\fP"
+.LP
+.I wx
+is a shell script to help the developer keep track of file changes in a
+workspace, follow the ON gate rules and much more. 
+.LP
+Note, it is recommended that you use 
+.I wx 
+for all file manipulation instead of using sccs as this allows wx to
+automatically track changes in the workspace instead of having to use
+the update command.  See http://onnv.eng/wx.html for more
+information about using wx.
+
+.\" COMMANDS section
+.LP
+.SH COMMANDS
+
+.TP 10
+.B -D
+The -D flag turns on debugging for any command.  Debugging information
+is output to stderr.
+
+.TP
+.B access
+shorthand for "wx ws access_control"
+
+.TP
+.B active 
+alias for list 
+
+.TP
+.B apply <cmd>
+apply cmd to all active files; for example,
+"wx apply cat" cats every file
+
+.TP
+.B arcs [-u]
+display all ARC cases in check-in comments
+
+.TP
+.B args
+shorthand for "wx ws args"
+
+.TP
+.B backup [-i|-n|-z|-b|-t]
+make backup copies of all active and renamed files and certain
+wx state files (active, renamed, *.NOT).
+
+-i: info about backups (backup dir and contents)
+
+-n: no compression 
+
+-z: use gzip, faster than bzip2 but less compression.
+
+-b: use bzip2, slower but better compression.
+Defaults to the compression of the previous backup.
+
+-t: backup if wx files are newer than last backup.
+
+.TP
+.B bu 
+alias for backup command
+
+.TP
+.B bugs [-u]
+display all bugids in check-in comments
+
+.TP
+.B checkin
+Alias for delget command.
+
+.TP
+.B checkout
+Alias for edit command.
+
+.TP
+.B ci
+Alias for checkin command.
+
+.TP
+.B co
+Alias for checkout command.
+
+.TP
+.B codereview [codereview options]
+generate environmentally friendly codereview diffs
+for all active files.
+
+.TP
+.B comchk
+Warns if comments break ON rules.
+
+.TP
+.B comments
+display check-in comments for active files
+
+.TP
+.B copyright
+Warns if there is a problem with the copyright message in active files.
+Files listed in wx/copyright.NOT will be skipped.
+
+.TP
+.B create [-(c|C) comment_file] [-f] [-o] file [file ...]
+Creates one or more files in the workspace.
+(Updates active list)
+
+-c comment_file: see delget.
+
+-C comment_file: see delget.
+
+-f: force create regardless of warnings,
+(non-interactive).
+
+-o: also check out file for further editing.
+
+.TP
+.B cstyle
+run cstyle over all active .c and .h files.  Files listed in wx/cstyle.NOT
+will be skipped. 
+
+.TP
+.B delete [-f] [file ...]
+Delete one or more files from the workspace.
+Will delete all files in active list if no file
+args.  Note, for files brought over from parent,
+this command actually moves the file under the
+deleted_files/ subdir so it can be recovered.
+For new files this command can remove the file
+and file history completely.
+(Updates active list if file is in there.)
+
+-f : force delete regardless of warnings 
+(non-interactive)
+Warning, this will completely remove new
+files from the workspace.  The backup
+command will be automatically run before
+doing delete -f.
+
+.TP
+.B delget [-(c|C) comment_file][-s][-f] [file ...] 
+Check in all active files or files on command line (will do 'sccs
+create' for files without file histories). Check in comments will be
+those in active file.  See 'wx comments' for more info.
+
+-c comment_file: use comment(s) in specified comment file when creating
+file(s). Note, each comment should be on new line, blank lines not
+allowed.  The comments in the active list will be replaced by the
+comments in the comment_file for the files specified or all the entries
+in the active list if no files specified. 
+
+-C comment_file: Similar to -c but comments are appended to current
+active list comments.
+
+-f: force checkin, no checks, non-interactive.
+Use this if your sure the files okay to checkin
+otherwise this command will check for keyword
+problems.
+
+.TP
+.B deltachk
+Warns if there is more than one sccs delta in active files (more than 1
+breaks ON rules unless putting back more than 1 bug and then there
+should be at most 1 delta per bug if necessary).  Files listed in
+wx/deltachk.NOT will be skipped.
+
+.TP
+.B diffs [file ...]
+show sccs diffs for files (current vs previous version). 
+
+Will show diffs for all active files if no files given on command line.
+New files are not shown, use sub-command 'tdiffs' to include new
+files. 
+
+Will use WXDIFFCMD environment variable if set.  Hint, try: export
+WXDIFFCMD="diff -bw -U 5"
+
+.TP
+.B dir
+echo the wx directory path ($workspace/wx)
+
+.TP
+.B e <file>
+edit the named wx control file, e.g. "wx e active".
+The editor is $EDITOR if set, else vi.
+
+.TP
+.B ea
+shorthand for "wx e active" (edit active list).  
+Note, the format for each entry in the active
+list is:
+
+filepath
+<empty line> # no spaces allowed
+one or more comment lines # no blank lines between.
+<empty line> # no spaces allowed, ends the entry.
+
+In general, it is best to only edit the active list to update comments.
+Use the other wx commands like edit or create to update the active list
+when possible.
+
+.TP
+.B edit [-s] [file ...]	
+check out either file(s) on command line or all active files if no file
+args.  (Updates the active list.)
+
+-s: silent, less sccs diagnostic output.  This is true for the other
+commands that accept the -s flag.
+
+.TP
+.B egrep
+see wx grep
+
+.TP
+.B eval <cmd>
+like apply, but more general.  In fact,
+"wx apply cmd" is implemented internally as
+"wx eval 'cmd $file'".  When using eval,
+you can refer to $dir, $file, $filepath,
+$parent, and $workspace.  For example:
+wx eval 'echo $dir; sccs prt $file | more'
+will show the sccs history for each active file,
+preceded by its directory.
+
+.TP
+.B extract
+Alias for get command.
+
+.TP
+.B fullreview [codereview options]
+generate full codereview diffs for all active files.
+
+.TP
+.B get [-k][-r #][-p] [file ...]
+Get a copy of all active files or files on command
+line.  By default this is a read only version of
+the file.  Accepts 'sccs get' flags.  Here are some
+of the more common:
+
+-k: don't expand the sccs ID string
+
+-r #: get specified version #
+
+-p: output to stdout
+
+.TP
+.B grep <regular expression>
+search all active files for regular expression; equivalent to "wx eval
+\'echo $filepath; grep pattern $file'"
+
+.TP
+.B hdrchk
+run 'hdrchk -a' over all active .h files.  Warns if header files (.h) do not
+conform to ON style rules.  Note that this is not the same as running 'make
+check' or 'nightly -C', which apply a stricter set of rules to a subset of ON
+headers.  Skips files in wx/hdrchk.NOT.
+
+.TP
+.B help
+print usage message
+
+.TP
+.B info	[file ...]
+show all info about active files
+
+.TP 
+.B init [options] [src-root-dir]	
+initialize workspace for wx usage
+
+-f(t|q|n): non-interactive mode of update.  Use this to keep init from
+asking questions.
+
+-ft: thorough update (update both active, 
+renamed and new lists with all diffs between parent
+and current workspace).  Can be slow.
+
+-fq: quick update (update active list with files
+currently checked out in current workspace).
+
+-fn: no update (just create empty active, 
+renamed and new lists if they don't exist).
+
+-s: keep active list sorted by default.  This will keep the active list
+sorted whenever the active list is updated.  Must follow one of the
+-f(t|q|n) args.
+
+src-root-dir: optional path relative to top of workspace where wx will
+search for files. Use "." to set src-root to top of workspace.  Default
+is usr/src.
+
+.TP
+.B jstyle
+run jstyle over all active .java files.  Files listed in wx/jstyle.NOT
+will be skipped. 
+
+.TP
+.B keywords
+run keywords check over all active files.  Warns if it find problems
+with SCCS keywords. Skips files in wx/keywords.NOT.
+
+.TP
+.B list [-r|-p|-w] 
+list active files (the ones you are working on)
+
+-r: list only renamed active files.
+
+-p: output list of both active and renamed files 
+suitable for input to putback. 
+
+-w: output list of both active and renamed files
+suitable for input to webrev (see wx webrev 
+subcommand below).
+
+.TP
+.B makestyle
+run makestyle over all active Makefiles.
+
+.TP
+.B mv file newfile 	
+Rename file to newfile
+(Updates active list with new file name)
+
+.TP
+.B mv <file|dir> newdir 	
+Renames dir or file to newdir.  If newdir exists
+then dir will be subdir under newdir.  Note,
+this renames all files in dir and can take a
+while if there are a lot of files affected by
+the rename.  (Updates active list)
+
+.TP
+.B nawk
+see wx grep
+
+.TP
+.B new [-t]
+List new active files (files that exist in child only)
+Note, should be run before reedit (see reedit below).
+
+-t: thorough, does not use new cache (slower but more
+accurate if new cache isn't current).
+
+.TP
+.B nits [file ...]
+nits checking.  Run cstyle, jstyle, hdrchk, copyright, and keywords over files
+to which they are applicable (makestyle is not currently run because it
+seems to be quite broken -- more noise than data).  This is a subset of
+pbchk checks suitable for checking files during development.  Use pbchk
+before doing the final putback.  Will run checks on all active files if
+no file args.  Will skip checks for files listed in wx/nits.NOT.
+
+.TP
+.B out
+find all checked-out files in workspace
+
+.TP
+.B outchk
+Warns if there are files in the workspace that are checked out that are
+not in the active list.  These files should either be in the active list
+(see the "update -q" command) or they should not be checked out.
+
+.TP
+.B pb
+alias for putback.
+
+.TP
+.B pbchk [file ...]
+putback check.  Run cstyle, jstyle, hdrchk, copyright, keywords, rmdelchk,
+deltachk, comchk, rtichk and outchk over all files to which they are
+applicable (makestyle is not currently run because it seems to be quite
+broken -- more noise than data).  Should be run before doing a putback.
+Will run checks on all active files if no file args.
+Will skip checks for files listed in wx/pbchk.NOT.
+
+.TP
+.B pbcom [-v] [-u]
+display summarized comments suitable for putback
+Default is to display only bugs and arc cases.  Will
+display warnings about non-bug comments to stderr.
+
+-v: display all comments verbatim including non-bug/arc 
+
+-u: prevent sorting, order determined by active list
+Hint, putback will accept comments on stdin.
+
+.TP
+.B pblist 
+alias for list -p (see above).
+                        
+.TP
+.B pdiffs [file ...]
+show diffs against parent files
+
+Will show diffs for all active files if no files given on command line.
+New files are not shown, use sub-command 'tpdiffs' to include new
+files.
+
+Will use WXDIFFCMD environment variable if set. 
+
+.TP
+.B prt [-y]
+show SCCS delta history for all active files
+
+-y: only show latest delta entry
+
+.TP
+.B putback [-v][other putback flags, see below]
+putback active and renamed files.  Will use pbcom
+output as the putback comments.
+
+-v: pass comments verbatim to putback(see pbcom)
+Accepts -n, -p, -q putback flags ('man putback' for
+more info).
+
+.TP
+.B recheckin
+Alias for redelget command.
+
+.TP
+.B recheckout
+Alias for reedit command.
+
+.TP
+.B reci
+Alias for redelget command.
+
+.TP
+.B reco
+Alias for reedit command.
+
+.TP
+.B redelget [-m] [-s] [file ...]
+Similar to reedit but the file is checked in when the command is done.
+This is the command to use to collapse new files to their initial delta.
+
+.TP
+.B reedit [-m] [-s] [file ...]
+Collapse the sccs delta (file history) such that
+all changes made to the file in the current
+workspace are now in one delta.  If no files are
+given on command line then all the active files
+are processed.  The files are left in a checked
+out state so you can make further changes if
+required.  If not, run "wx delget" to check the
+files in prior to putback.  Note, newly created
+files will only have one delta entry after doing
+'wx delget'.  Run this right after a resolve to
+make all your changes look like a single delta.
+This eliminates the uninteresting leaf deltas
+that arise from resolving conflicts, so your
+putbacks do not contain a bunch of noise about
+every bringover/resolve you did in the interim.
+Accepts the same compression flags as wx backup.  
+[file ...] reedits files on command line.  This
+adds files to active list if not already there.
+                        
+NOTE: reedit is appropriate for leaf workspaces
+ONLY -- applying reedit to an interior-node
+workspace would delete all childrens comments
+and confuse Teamware tools in general.  
+                        
+Before using reedit it's a good idea to check
+the output of the new command to make sure the
+list of new files looks okay.  If files show up
+as new that are not then DO NOT use the reedit
+as it will destroy the file history.
+
+NOTE: if a file is new, reedit will leave the file checked out.  In
+order to keep the delta version at 1.1 redelget must be used for
+checkin.
+
+-m: only reedit files that have more that one delta as compared to
+parent file.  New files will be recreated with comment found in active
+list.
+
+.TP
+.B renamed [-a|-d|-p] 
+list locally renamed files. The output format is:
+"new_name previous_name". Note, deleted files are
+a special case of rename. 
+
+-a: list only renamed active files (same as list -r)
+
+-d: list only deleted files
+
+-p: show "new_name parent_name" (Note, parent_name
+may not be the same as previous_name)
+
+.TP
+.B reset [-f] [file ...]
+Resets file contents and history to that of parent file.  If the file
+was renamed locally it will be reset to that of the parent.  It does not
+work on new file (see uncreate).
+
+NOTE: use with care.  If something goes wrong, do a wx restore from the
+last backup and copy wx/tmp/nametable.orig to Codemgr_wsdata/nametable.
+
+.TP
+.B resolve [Teamware resolve args]
+resolve bringover conflicts and reedit just merged files.  See 'man
+resolve' for args.
+
+.TP
+.B restore [-f] [backup_dir]
+restore a backup in a workspace (restores both active files and performs
+file renames associated with that backup).  Also restores certain wx
+state files (active, renamed, *.NOT, etc...).  A path to the directory
+containing the backup to restore from can be optionally specified.
+
+-f: non-interactive.  Will restore from last backup.
+
+.TP
+.B rm
+Alias for delete command.
+
+.TP
+.B rmdelchk
+Warns if sccs rmdel was run on active files (This causes Teamware
+problems.) Files listed in wx/rmdelchk.NOT will be skipped.
+
+.TP
+.B rtichk
+make sure RTI is approved for bugs/rfe's listed in active list comments.
+(RTI is Request To Integrate and is filed using rtitool).  Will skip rtichk
+if wx/rtichk.NOT exists.
+
+.TP
+.B sed
+see wx grep
+
+.TP
+.B tdiffs [file ...]
+total diffs, similar to the diffs sub-command, except new files are also
+included in the output. New files are those listed by 'new' sub-command.
+
+Will use WXDIFFCMD environment variable if set. 
+
+.TP
+.B tpdiffs [file ...]
+total parent diffs, similar to the pdiffs sub-command, except new files are
+also included in the output.  tpdiffs considers a file to be new if it does
+not exist in the parent.
+
+Will use WXDIFFCMD environment variable if set. 
+
+.TP
+.B uncheckout
+Alias for unedit command.
+
+.TP
+.B unco
+Alias for uncheckout command.
+
+.TP
+.B uncreate [-f] [file ...]
+Undoes the create of a new file.  The file's active list entry, it's
+SCCS history and the entry in the workspace nametable will be removed
+but the file will stay in the workspace.  Will uncreate all new files in
+active list if no file argument is specified.
+
+.TP
+.B unedit [-s][-f] [file ...] 
+Returns file(s) to state prior to edit/checkout Note, files will be
+unlocked and any changes made when file was last checked out will be
+lost.  Unedit all active files if no files listed on command line.
+(Updates active list)
+
+-f: force unedit (non-interactive).  Will backup if wx files newer
+than last backup.
+
+.TP
+.B update [-q|-r] [-s]
+Update the active and renamed file lists by appending names of all files
+that have been checked out, changed or renamed as compared to the parent
+workspace.  This is the most accurate way of updating but it is slow.
+All files in the workspace must be under SCCS control in order for
+update to find them.  
+
+This command will also rename active list file entries if it discovers
+that the active file was renamed in the workspace (perhaps as a result
+of a bringover).
+
+Note, this command can be sped up in some cases by setting the PUTBACK
+env. variable to use "cm_env -g -o putback". (See
+http://webhome.holland.sun.com/casper/ for more info abou the turbo
+def.dir.flp tool).
+
+-q: quick update (only updates active list with files currently checked
+out in workspace).  This is faster but will not update the renamed list
+or find files that have been checked-in/delget'ed.  It will rename
+active entries if it finds they have been renamed in the workspace.
+
+-r: only update the renamed list.  Does not update the active list.
+
+-s: sort active list.
+
+.TP
+.B version
+print current version of this program
+
+.TP
+.B webrev
+Generates a webrev for active and renamed/deleted files.
+Note, uses comments in the active list.  This is the
+preferred way of reviewing code.
+Files listed in wx/webrev.NOT will be skipped.
+
+.TP
+.B ws <file>
+cat the named workspace control file, i.e.
+$workspace/Codemgr_wsdata/file
+
+.LP
+.SH ENVIRONMENT VARIABLES
+.LP
+Here is a list environment variables that 
+.I wx
+references and the meaning of each variable.
+.LP
+.RE
+.B BRINGOVER
+.RS 5
+Specifies the command wx uses to do a bringover (default is
+"bringover").  This is useful if you want to use something like Casper
+Dik's turbo-dir.flp scripts as in this example: 
+
+export BRINGOVER='cm_env -g -o bringover'
+.LP
+.RE
+.B PUTBACK
+.RS 5
+
+Specifies the command wx uses to do the putback (default is "putback").
+This is useful if you want to use something like Casper Dik's
+turbo-dir.flp scripts as in this example: 
+
+export PUTBACK='cm_env -g -o putback'
+.LP
+.RE
+.B WXDIFFCMD
+.RS 5
+Specifies the diff command and args for the 
+.I wx 
+diffs commands like diffs and pdiffs.  This is similar to the
+CDIFFCMD and UDIFFCMD environment variables that webrev uses.
+A good setting is:
+
+export WXDIFFCMD='diff -bw -U5'
+.LP
+.RE
+.B WXDIR
+.RS 5
+Specifies a non-default directory where 
+.I wx 
+will store its state files.  This is useful when running 
+.I wx 
+in a workspace where write permission isn't available or there is an
+existing wx directory which should not be modified.  For example:
+
+$ WXDIR=/tmp/my_wxdir wx init
+.LP
+.RE
+.B WXWEBREV
+.RS 5
+Specifies the webrev that 
+.I wx 
+will use when running the wx webrev subcommand.  For example:
+$ WXWEBREV=~/bin/webrev wx webrev
+
+.SH EXAMPLES
+.LP
+See wx link in http://onnv.eng for examples of how to use wx.
+
+.SH BUGS
+.LP
+The new wx is slower that the old wx.  There are probably ways to make
+it faster and hopefully this will be done one day.
+
+.SH See Also
+.LP
+teamware, workspace, putback, sccs, webrev

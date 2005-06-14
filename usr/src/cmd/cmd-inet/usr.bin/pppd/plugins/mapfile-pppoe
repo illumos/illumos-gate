@@ -1,0 +1,49 @@
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+# External declarations - used to suppress -zdefs errors.
+
+{
+	script_setenv	= FUNCTION extern;	# Provided by pppd.
+	script_getenv	= FUNCTION extern;	#    "     "
+	slprintf	= FUNCTION extern;	#    "     "
+	option_error	= FUNCTION extern;	#    "     "
+	warn		= FUNCTION extern;	#    "     "
+	fatal		= FUNCTION extern;	#    "     "
+	dbglog		= FUNCTION extern;	#    "     "
+	absmax_mtu	= DATA extern;		#    "     "
+	absmax_mru	= DATA extern;		#    "     "
+	updown_script_hook = DATA extern;	#    "     "
+	devnam_info	= DATA extern;		#    "     "
+	check_options_hook = DATA extern;	#    "     "
+	device_pipe_hook = DATA extern;		#    "     "
+	already_ppp	= DATA extern;		#    "     "
+	devnam		= DATA extern;		#    "     "
+	sys_read_packet_hook = DATA extern;	#    "     "
+	ifname		= DATA extern;		#    "     "
+	fclose		= FUNCTION extern;	#    "     "
+	ioctl		= FUNCTION extern;	#    "     "
+	fdopen		= FUNCTION extern;	#    "     "
+	close		= FUNCTION extern;	#    "     "
+	open		= FUNCTION extern;	#    "     "
+	strcmp		= FUNCTION extern;	#    "     "
+	fgets		= FUNCTION extern;	#    "     "
+	strlen		= FUNCTION extern;	#    "     "
+	seteuid		= FUNCTION extern;	#    "     "
+	ether_ntoa	= FUNCTION extern;	#    "     "
+	___errno	= FUNCTION extern;	#    "     "
+	strdup		= FUNCTION extern;	#    "     "
+	run_program	= FUNCTION extern;	#    "     "
+	malloc		= FUNCTION extern;	#    "     "
+	strrchr		= FUNCTION extern;	#    "     "
+	strchr		= FUNCTION extern;	#    "     "
+	error		= FUNCTION extern;	#    "     "
+	free		= FUNCTION extern;	#    "     "
+	strcpy		= FUNCTION extern;	#    "     "
+	memcpy		= FUNCTION extern;	#    "     "
+	script_unsetenv	= FUNCTION extern;	#    "     "
+	ntohs		= FUNCTION extern;	#    "     "
+};

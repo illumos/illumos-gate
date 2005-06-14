@@ -1,0 +1,170 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"	SVr4.0 1.6
+#	From:	SVr4.0	terminfo:README	1.6
+
+	
+1	Within the curses component, exists other conversion tools which are
+	much more robust than those described below. They are called infocmp, 
+	and captoinfo. The cvt files are provided here only for those possible 
+	cases where a user has the terminfo component without the libcurses 
+	component.
+	
+	The captoinfo and infocmp utilities cannot be included here, as they
+	require the user to have libcurses. Although we know of no instance
+	when a user would have one and not the other, we have provided the
+	cvt files (described below) for those limited cases.
+	
+
+
+2	The files in this directory with the .ti suffix are terminfo sources.
+	They should be compiled (separately or by catting them together into
+	terminfo.src) with tic, placing the results in /usr/lib/terminfo.
+	Please send any updates to AT&T Bell Laboratories UNIX support,
+	via UNIX mail to attunix!terminfo.
+	
+
+
+3	The cvt files are useful tools for converting termcap to terminfo.
+	They are not 100% accurate, but do most of the conversion for you.
+	cvt.ex is an ex script to convert a termcap description into a
+	terminfo description.  Note that it will not convert padding 
+	specifications, so they must be done by hand.  Note also that typical 
+	termcap entries do not give as much information as terminfo, so the 
+	resulting terminfo entry is often incomplete (e.g. won't tell you the 
+	terminal uses xon/xoff handshaking, or what extra function keys send).
+	You are urged to read the list of terminfo capabilities and augment your
+	terminfo descriptions accordingly.
+	
+	The cvt.h file is useful for a quick hack at converting termcap programs
+	which use uppercase 2 letter names for capabilities to use terminfo.
+	Since tget* are provided anyway, this is of questionable value unless
+	your program barely fits on a pdp-11.
+	
+	The cvt.sed script is useful for actually editing the source of the same
+	class of programs.  It requires a sed that understands \< and \>, the
+	mod is trivial to make if you look at the corresponding code in ex or
+	grep.
+	
+
+
+3	There are other incompatibilities at the user level between termcap and
+	terminfo.  A program which creates a termcap description and then
+	passes it to tgetent (e.g. vi used to do this if no TERM was set) or
+	which puts such a description in the environment for a child cannot
+	possibly work, since terminfo puts the parser into the compiler, not
+	the user program.  If you want to give a child a smaller window, set
+	up the LINES and COLUMNS environment variables or implement the JWINSIZE
+	ioctl.
+	
+
+
+4	If you want to edit your own personal terminfo descriptions (and are not
+	a super user on your system) the method is different.  Set
+	TERMINFO=$HOME/term (or wherever you put the compiled tree) in your
+	environment, then compile your source with tic.  Tic and user programs
+	will check in $TERMINFO before looking in /usr/lib/terminfo/*/*
+	
+
+
+5	Philosophy in adding new terminfo capabilities:
+	
+	Capabilities were cheap in termcap, since no code supported them
+	and they need only be documented.  In terminfo, they add size to
+	the structure and the binaries, so don't add them in mass quantities.
+	
+	Add a capability only if there is an application that wants to use it.
+	Lots of terminals have a half duplex forms editing mode, but no UNIX
+	applications use it, so we don't include it.
+	
+	Before you add a capability, try to hold off until there are at least
+	2 or 3 different terminals implementing similar features.  That way,
+	you can get a better idea of the general model that the capability
+	should have, rather than coming up with something that only works
+	on one kind of terminal.  For example, the status line capabilities
+	were added after we had seen the h19, the tvi950, and the vt100 run
+	sysline.  The original program, called h19sys, only worked on an h19
+	and addressed the cursor to line 25.  This model doesn't fit other
+	terminals with a status line.
+	
+	Note that capabilities must be added at the end of ../screen/caps.
+	Furthermore, if you add a private capability, you should check with
+	someone to make sure your capability goes into the master file, 
+	otherwise someone else will add a different capability and 
+	compatibility between two systems is destroyed.  There must be one 
+	master set of capabilities. This list is maintained at AT&T UNIX 
+	Development. Comments should be sent to attunix!terminfo.
+	
+
+
+6	Current murky areas include:
+	
+	Color - there is demand for colors but it isn't clear what to do yet.
+	Some terminals support only 2 or 4 or 8 or 16 colors, others have a
+	palette of some huge selection.  What are the standard colors?  How
+	does graphics fit into this (terminfo is alphanumeric oriented?)
+	Curses can have another 16 bits added, or some routine set to decide
+	which 9 attribute bits have meaning in any given program.  An 
+	alternative is that if you just want color alphanumerics for a simple 
+	application, e.g. highlighting certain fields, decide how you would 
+	want your application to behave on a B/W terminal (e.g. a vt100), 
+	using reverse for one thing, blinking for another, bold for another, 
+	invisible for another, etc.
+	(Invis may be useful for colored fields with no information in them.)
+	Then make a terminfo entry with blink=xxx, bold=yyy, etc, where xxx
+	and yyy are sequences to go into the colors you really want.  This way
+	your application also works on B/W terminals.
+	
+	Graphics: Giles Billingsley at Berkeley did something called MFBCAP
+	once, it was like termcap but 3 times as big and handled graphics.
+	I don't think it was ever finished.  I don't know how to do graphics
+	in curses, one might add it to terminfo at very high cost.
+	
+	Input: things that send escape sequences to your program to be decoded
+	are a hard issue.  You have to somehow deal with typeahead and with
+	terminals that can't do it.  This includes "request cursor position",
+	for which a better solution is to immediately address the cursor to
+	a known position.  (Curses also has filter mode that won't assume
+	the line but will assume the column.)  Mice also fall into this
+	category.  Scanf style strings (tparm is printf style) might be able
+	to decode these sequences, but I have no experience with them.
+	
+	Alternate character set: the vt100 set seems to be becoming a defacto
+	standard, although it doesn't do much.  I almost standardized on the
+	Teletype 5410, which was a nice superset of the vt100, but then Teletype
+	updated the 5410 to make it a vt100 duplicate, so now all I've put in
+	are the vt100 line drawing characters.  HP has a more complete set,
+	but it has some really weird things in it and the mappings are 
+	nonstandard.
+	Any extension should be able to handle both kinds of terminals, and
+	handle common programs without assuming an HP (or even a vt100).
+	
+	------------------------------------
+	
+
+7	Additional modules:
+	
+		ckout		shell script, analyzes file errs for diagnostics
+				and displays number of entries built
+	
+		Doc.sed		sed script to be run on ti files.
+				prints documentation of ti files.

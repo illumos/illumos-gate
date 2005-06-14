@@ -1,0 +1,105 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+#	  All Rights Reserved
+
+
+
+#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+
+######################################################################
+#
+# Entries for the AT&T 570 series printers
+#
+
+570eps|att570eps|AT&T 570 Epson emulation,
+
+	bufsz#10000,
+	cps#250,
+	cols#80,
+	orl#36,
+	orvi#216,
+
+	use=Gepson+basic,
+	use=Gepson+low,
+
+570ibm|att570ibm|AT&T 570 IBM ProPrinter emulation,
+
+	bufsz#10000,
+	cps#250,
+
+	use=Gibmg+basic,
+	use=Gibmg+low,
+
+571eps|att571eps|AT&T 571 Epson emulation,
+
+	cols#136,
+
+	use=570eps,
+
+571ibm|att571ibm|AT&T 571 IBM ProPrinter emulation,
+
+	cols#136,
+	use=570ibm,
+
+572|att572|AT&T 572 9-wire Matrix Printer,
+
+	bufsz#10000,
+	cps#250,
+	cols#80,
+	xhpa@,
+	xvpa@,
+
+	csnm=%?%p1%{0}%=%tusascii%e%p1%{1}%=%tbritish%e%p1%{2}%=%tfinnish%e%p1%{3}%=%tjapanese%e%p1%{4}%=%tnorwegian%e%p1%{5}%=%tswedish%e%p1%{6}%=%tgerman%e%p1%{7}%=%tfrench%e%p1%{8}%=%tfrench_canadian%e%p1%{9}%=%titalian%e%p1%{10}%=%tspanish%e%p1%{11}%=%tline_drawing%e%p1%{12}%=%tdanish%e%p1%{13}%=%tebcdic%e%p1%{14}%=%tmulti_national%;,
+	scs=%?%p1%{0}%=%t\E(B%e%p1%{1}%=%t\E(A%e%p1%{2}%=%t\E(C%e%p1%{3}%=%t\E(J%e%p1%{4}%=%t\E(E%e%p1%{5}%=%t\E(H%e%p1%{6}%=%t\E(K%e%p1%{7}%=%t\E(R%e%p1%{8}%=%t\E(Q%e%p1%{9}%=%t\E(Y%e%p1%{10}%=%t\E(Z%e%p1%{11}%=%t\E(O%e%p1%{12}%=%t\E(E%e%p1%{13}%=%t\E(3%e%p1%{14}%=%t\E(<%;,
+
+	is3=\E[0"z,
+
+	snlq=\E[2"z,
+	snrmq=\E[3"z,
+	sdrfq=\E[0"z,
+	sshm=\E[1m,
+	rshm=\E[22m,
+	smul=\E[4m,
+	rmul=\E[24m,
+
+# The following are not supported by 572/573
+
+	smgbp@,
+	smgtp@,
+	smglp@,
+	smgrp@,
+	cud@,
+	cuf@,
+	cuu1@,
+	hpa@,
+	vpa@,
+	nel@,
+
+	use=Gdec+basic,
+	use=Gdec+low,
+
+573|att573|AT&T 573 9-wire Matrix Printer,
+
+	cols#132,
+
+	use=572,

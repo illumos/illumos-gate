@@ -1,0 +1,12 @@
+
+The Remove MS-DOS Programs Menu allows you to remove MS-DOS programs 
+that you have added to the Programs Menu in your office.
+
+Each item on the menu represents a personal MS-DOS program that 
+you have installed in your office.
+
+Once you have selected an MS-DOS program from the menu, a confirmation
+window will be displayed.  If you press the CONT function key, the
+MS-DOS program will be deleted.  If you press the CANCEL function key,
+the MS-DOS program will NOT be deleted.
+

@@ -1,0 +1,70 @@
+Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+The /usr/share/lib/zoneinfo/src directory contains zoneinfo timezone source
+files.  These source files have been compiled using zic(1M) to create
+the zoneinfo data files in /usr/share/lib/zoneinfo.  The zic command can be
+used with the zoneinfo source files to create additional data files.
+
+The zoneinfo files track the Olson public source provided at
+ftp://elsie.nci.nih.gov/pub/, therefore zoneinfo files may be added and
+removed as the Solaris source is updated.  The current Solaris release of
+the zoneinfo files is based on tzdata2004g.tar.gz.
+
+The /usr/share/lib/zoneinfo/GMT[+-]* timezones listed below have been
+removed from the release.  Replace usage of the
+/usr/share/lib/zoneinfo/GMT[+-]* files with the equivalent quoted timezone
+(see environ(5)).  Note the signs of the offsets of the equivalent quoted
+timezone are reversed from the signs of the /usr/share/lib/zoneinfo/GMT[+-]*
+files.
+
+For example, replace TZ=:GMT+1, with TZ="<GMT-1>-1".  (The colon (:) is
+significant.  Without the colon, for example TZ=GMT+1, an unquoted timezone
+is used;  unquoted timezones are not affected by the removal of the zoneinfo
+timezone files listed below.)
+
+The following files have been removed from the release:
+
+/usr/share/lib/zoneinfo/GMT-12
+/usr/share/lib/zoneinfo/GMT-11
+/usr/share/lib/zoneinfo/GMT-10
+/usr/share/lib/zoneinfo/GMT-9
+/usr/share/lib/zoneinfo/GMT-8
+/usr/share/lib/zoneinfo/GMT-7
+/usr/share/lib/zoneinfo/GMT-6
+/usr/share/lib/zoneinfo/GMT-5
+/usr/share/lib/zoneinfo/GMT-4
+/usr/share/lib/zoneinfo/GMT-3
+/usr/share/lib/zoneinfo/GMT-2
+/usr/share/lib/zoneinfo/GMT-1
+/usr/share/lib/zoneinfo/GMT+1
+/usr/share/lib/zoneinfo/GMT+2
+/usr/share/lib/zoneinfo/GMT+3
+/usr/share/lib/zoneinfo/GMT+4
+/usr/share/lib/zoneinfo/GMT+5
+/usr/share/lib/zoneinfo/GMT+6
+/usr/share/lib/zoneinfo/GMT+7
+/usr/share/lib/zoneinfo/GMT+8
+/usr/share/lib/zoneinfo/GMT+9
+/usr/share/lib/zoneinfo/GMT+10
+/usr/share/lib/zoneinfo/GMT+11
+/usr/share/lib/zoneinfo/GMT+12
+/usr/share/lib/zoneinfo/GMT+13
+
+As zoneinfo timezones are updated, the savings/daylight transition rules
+and timezone name abbreviations may change.  This can affect how 
+the times are calculated in the local timezone.  Therefore the interpretation
+of a time_t value can vary amongst Solaris releases that use different
+versions of the zoneinfo timezones.
+
+The zoneinfo timezone data files do not transition past
+Tue Jan 19 03:14:07 2038 GMT.  Therefore for 64-bit applications using
+zoneinfo timezones, calculations beyond this date may not use the correct
+offset from standard time, and could return incorrect values.  This affects
+64-bit versions of interfaces such as ascftime(3C), cftime(3C), ctime(3C),
+getdate(3C), ftime(3C), mktime(3C), and localtime(3C).
+
+For more information see zic(1M), zdump(1M), environ(5), TIMEZONE(4),
+ctime(3C), and mktime(3C) man pages.

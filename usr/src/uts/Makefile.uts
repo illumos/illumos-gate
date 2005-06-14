@@ -1,0 +1,654 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	This Makefile contains the common targets and definitions for
+#	all kernels. It is to be included in the Makefiles for specific
+#	implementation architectures and processor architecture dependent
+#	modules: i.e.: all driving kernel Makefiles.
+#
+#	Include global definitions:
+#
+include $(SRC)/Makefile.master
+
+#
+#	No text domain in the kernel.
+#
+DTEXTDOM =
+
+#
+# 	Keep references to $(SRC)/common relative.
+COMMONBASE=	$(UTSBASE)/../common
+
+#
+#	Setup build-specific vars
+#	To add a build type:
+#		add name to ALL_BUILDS32 & ALL_BUILDS64
+#		set CLASS_name and OBJ_DIR_name
+#		add targets to Makefile.targ
+#
+
+#
+#	DEF_BUILDS is for def, lint and install
+#	ALL_BUILDS is for everything else (all, clean, ...)
+#
+# The NOT_RELEASE_BUILD noise is to maintain compatibility with the
+# gatekeeper's nightly build script.
+#
+DEF_BUILDS32				= obj32
+DEF_BUILDS64				= obj64
+DEF_BUILDSONLY64			= obj64
+$(NOT_RELEASE_BUILD)DEF_BUILDS32	= debug32
+$(NOT_RELEASE_BUILD)DEF_BUILDS64	= debug64
+$(NOT_RELEASE_BUILD)DEF_BUILDSONLY64	= debug64
+ALL_BUILDS32				= obj32 debug32
+ALL_BUILDS64				= obj64 debug64
+ALL_BUILDSONLY64			= obj64 debug64
+
+#
+#	For modules in 64b dirs that aren't built 64b
+#	or modules in 64b dirs that aren't built 32b we
+#	need to create empty modlintlib files so global lint works
+#
+LINT32_BUILDS	= debug32
+LINT64_BUILDS	= debug64
+
+#
+#	Build class (32b or 64b)
+#
+CLASS_OBJ32	= 32
+CLASS_DBG32	= 32
+CLASS_OBJ64	= 64
+CLASS_DBG64	= 64
+CLASS		= $(CLASS_$(BUILD_TYPE))
+
+#
+#	Build subdirectory
+#
+OBJS_DIR_OBJ32	= obj32
+OBJS_DIR_DBG32	= debug32
+OBJS_DIR_OBJ64	= obj64
+OBJS_DIR_DBG64	= debug64
+OBJS_DIR	= $(OBJS_DIR_$(BUILD_TYPE))
+
+#
+#	Create defaults so empty rules don't
+#	confuse make
+#
+CLASS_		= 32
+OBJS_DIR_	= debug32
+
+#
+#	Build tools
+#
+CC_sparc_32	= $(sparc_CC)
+CC_sparc_64	= $(sparcv9_CC)
+
+CC_i386_32	= $(i386_CC)
+CC_i386_64	= $(amd64_CC)
+CC_amd64_64	= $(amd64_CC)
+
+CC		= $(CC_$(MACH)_$(CLASS))
+
+AS_sparc_32	= $(sparc_AS)
+AS_sparc_64	= $(sparcv9_AS)
+
+AS_i386_32	= $(i386_AS)
+AS_i386_64	= $(amd64_AS)
+AS_amd64_64	= $(amd64_AS)
+
+AS		= $(AS_$(MACH)_$(CLASS))
+
+LD_sparc_32	= $(sparc_LD)
+LD_sparc_64	= $(sparcv9_LD)
+
+LD_i386_32	= $(i386_LD)
+LD_i386_64	= $(amd64_LD)
+LD_amd64_64	= $(amd64_LD)
+
+LD		= $(LD_$(MACH)_$(CLASS))
+
+LINT_sparc_32	= $(sparc_LINT)
+LINT_sparc_64	= $(sparcv9_LINT)
+
+LINT_i386_32	= $(i386_LINT)
+LINT_i386_64	= $(amd64_LINT)
+LINT_amd64_64	= $(amd64_LINT)
+
+LINT		= $(LINT_$(MACH)_$(CLASS))
+
+MODEL_32	= ilp32
+MODEL_64	= lp64
+MODEL		= $(MODEL_$(CLASS))
+
+#
+#	Build rules for linting the kernel.
+#
+LHEAD =	( $(ECHO) "\n$@";
+
+LGREP.2 =	grep -v ' _init ' | \
+		grep -v ' _fini ' | \
+		grep -v ' _info ' | \
+		grep -v ' _depends_on ' | \
+		cat
+
+LTAIL =	)
+
+LINT.c =	$(LINT) -c -dirout=$(LINTS_DIR) $(LINTFLAGS) $(LINT_DEFS) $(CPPFLAGS)
+
+LINTTAGS_32	=
+LINTTAGS_32	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS_32	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+LINTTAGS_32	+= -erroff=E_SUSPICIOUS_COMPARISON
+LINTTAGS_32	+= -erroff=E_CAST_UINT_TO_SIGNED_INT
+LINTTAGS_32	+= -erroff=E_PASS_UINT_TO_SIGNED_INT
+LINTTAGS_32	+= -erroff=E_INVALID_ANNOTATION_NAME
+LINTTAGS_32	+= -erroff=E_OLD_STYLE_DECL_OR_BAD_TYPE
+LINTTAGS_32	+= -erroff=E_NO_EXPLICIT_TYPE_GIVEN
+LINTTAGS_32	+= -erroff=E_STATIC_UNUSED
+LINTTAGS_32	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS_32	+= -erroff=E_ASSIGN_NARROW_CONV
+
+LINTTAGS_64	= $(LINTTAGS_32)
+
+# Selectively disable certain noisy lint errors
+LENIENT_LINTTAGS =
+LENIENT_LINTTAGS += -erroff=E_CAST_INT_TO_SMALL_INT
+LENIENT_LINTTAGS += -erroff=E_CAST_INT_CONST_TO_SMALL_INT
+LENIENT_LINTTAGS += -erroff=E_CAST_TO_PTR_FROM_INT
+LENIENT_LINTTAGS += -erroff=E_ASSIGN_INT_TO_SMALL_INT
+LENIENT_LINTTAGS += -erroff=E_ASSIGN_INT_FROM_BIG_CONST
+LENIENT_LINTTAGS += -erroff=E_CONST_PROMOTED_UNSIGNED_LL
+LENIENT_LINTTAGS += -erroff=E_CONST_PROMOTED_LONG_LONG
+LENIENT_LINTTAGS += -erroff=E_CONST_TRUNCATED_BY_ASSIGN
+LENIENT_LINTTAGS += -erroff=E_PASS_INT_FROM_BIG_CONST
+LENIENT_LINTTAGS += -erroff=E_COMP_INT_WITH_LARGE_INT
+LENIENT_LINTTAGS += -erroff=E_ASSIGN_UINT_TO_SIGNED_INT
+# These are still noisy but a bit more useful.
+# They shouldn't be used on new code.
+LENIENT_LINTTAGS += -erroff=E_PASS_INT_TO_SMALL_INT
+LENIENT_LINTTAGS += -erroff=E_PTR_CONV_LOSES_BITS
+
+# comment out next line to turn on pedantic 64-bit error checking
+LINTTAGS_64	+= $(LENIENT_LINTTAGS)
+
+LENIENT_i386_LINTTAGS	=
+
+LENIENT_amd64_LINTTAGS	=
+LENIENT_amd64_LINTTAGS	+= -erroff=E_BAD_PRAGMA_PACK_VALUE
+LENIENT_amd64_LINTTAGS	+= -erroff=E_SHIFT_CNT_NEG_TOO_BIG_L
+LENIENT_amd64_LINTTAGS	+= -erroff=E_CONST_PROMOTED_UNSIGNED_LL
+LENIENT_amd64_LINTTAGS	+= -erroff=E_CONST_PROMOTED_LONG_LONG
+
+LINTFLAGS_sparc_32	= $(LINTCCMODE) -nsxmuF -errtags=yes
+LINTFLAGS_sparc_64	= $(LINTFLAGS_sparc_32) -Xarch=v9
+LINTFLAGS_i386_32	= $(LINTCCMODE) -nsxmuF -errtags=yes
+LINTFLAGS_i386_64	= $(LINTFLAGS_i386_32) -Xarch=amd64
+
+LINTTAGS_sparc_32	= $(LINTTAGS_32)
+LINTTAGS_sparc_64	= $(LINTTAGS_64)
+LINTTAGS_i386_32	= $(LINTTAGS_32)
+LINTTAGS_i386_64	= $(LINTTAGS_64) $(LENIENT_amd64_LINTTAGS)
+
+LINTFLAGS	= $(LINTFLAGS_$(MACH)_$(CLASS)) $(LINTTAGS_$(MACH)_$(CLASS))
+LINTFLAGS	+= $(C99LMODE)
+
+#
+#	Override this variable to modify the name of the lint target.
+#
+LINT_MODULE=	$(MODULE)
+
+#
+#	Build the compile/assemble lines:
+#
+EXTRA_OPTIONS		= 
+AS_DEFS			= -D_ASM -D__STDC__=0
+
+ALWAYS_DEFS_32		= -D_KERNEL -D_SYSCALL32
+ALWAYS_DEFS_64		= -D_KERNEL -D_SYSCALL32 -D_SYSCALL32_IMPL -D_ELF64
+#
+# XX64	This should be defined by the compiler!
+#
+ALWAYS_DEFS_64		+= -Dsun -D__sun -D__SVR4
+ALWAYS_DEFS		= $(ALWAYS_DEFS_$(CLASS))
+
+#
+#	CPPFLAGS is deliberatly set with a "=" and not a "+=".  For the kernel
+#	the header include path should not look for header files outside of
+#	the kernel code.  This "=" removes the search path built in
+#	Makefile.master inside CPPFLAGS.  Ditto for AS_CPPFLAGS.
+#
+CPPFLAGS	= $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS) \
+		   $(INCLUDE_PATH) $(EXTRA_OPTIONS)
+ASFLAGS		+= -P
+AS_CPPFLAGS	= $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS) $(AS_DEFS) \
+		   $(AS_INC_PATH) $(EXTRA_OPTIONS)
+
+#
+#	Make it (relatively) easy to share compilation options between
+#	all kernel implementations.
+#
+
+#
+# XX64	Compiling with -xc99=%all on build 55 merge makes the
+#	kmem_alloc double map parts of the kernel data causing
+#	horrible overwriting and forces a hardware reset in
+#	segkp_create().  Until the origin of this problem can
+#	be tracked down (i.e. is it a deliberate C89 -> C99 semantic
+#	change for which the kernel needs repair, or is it just a
+#	bug in the x86 compiler?) disabling C99 for kernel compilation
+#	when using the Devpro compiler
+#
+i386_C99MODE		= $(C99_DISABLE)
+$(__GNUC)i386_C99MODE	= $(C99_ENABLE)
+sparc_C99MODE		= $(C99_DISABLE)
+C99MODE			= $($(MACH)_C99MODE)
+
+CFLAGS_uts		=
+CFLAGS_uts		+= $(STAND_FLAGS_$(CLASS))
+CFLAGS_uts		+= $(CCVERBOSE)
+CFLAGS_uts		+= $(ILDOFF)
+CFLAGS_uts		+= $(XAOPT)
+CFLAGS_uts		+= $(CTF_FLAGS)
+CFLAGS_uts		+= $(CERRWARN)
+CFLAGS_uts		+= $(C99MODE)
+CFLAGS_uts		+= $(EXTRA_CFLAGS)
+
+#
+#	Declare that $(OBJECTS) and $(LINTS) can be compiled in parallel.
+#	The DUMMY target is for those instances where OBJECTS and LINTS
+#	are empty (to avoid an unconditional .PARALLEL).
+.PARALLEL:	$(OBJECTS) $(LINTS) DUMMY
+
+#
+#	Expanded dependencies
+#
+DEF_DEPS	= $(DEF_BUILDS:%=def.%)
+ALL_DEPS	= $(ALL_BUILDS:%=all.%)
+CLEAN_DEPS	= $(ALL_BUILDS:%=clean.%)
+CLOBBER_DEPS	= $(ALL_BUILDS:%=clobber.%)
+LINT_DEPS	= $(DEF_BUILDS:%=lint.%)
+MODLINTLIB_DEPS	= $(DEF_BUILDS:%=modlintlib.%)
+CLEAN_LINT_DEPS	= $(ALL_BUILDS:%=clean.lint.%)
+INSTALL_DEPS	= $(DEF_BUILDS:%=install.%)
+SYM_DEPS	= $(SYM_BUILDS:%=symcheck.%)
+
+#
+#	Default module name
+#
+BINARY		= $(OBJS_DIR)/$(MODULE)
+
+#
+#	Default cleanup definitions
+#
+CLEANLINTFILES	= $(LINTS) $(MOD_LINT_LIB)
+CLEANFILES	= $(OBJECTS) $(CLEANLINTFILES)
+CLOBBERFILES	= $(BINARY) $(CLEANFILES)
+
+#
+#	Installation constants:
+#
+#		FILEMODE is the mode given to the kernel modules
+#		CFILEMODE is the mode given to the '.conf' files
+#
+FILEMODE	 = 755
+DIRMODE		 = 755
+OWNER		 = root
+GROUP		 = sys
+CFILEMODE	 = 644
+
+#
+#	Special Installation Macros for the installation of '.conf' files.
+#
+#	These are unique because they are not installed from the current
+#	working directory.
+#
+# Sigh.  Apparently at some time in the past there was a confusion on
+# whether the name is SRC_CONFFILE or SRC_CONFILE.  Consistency with the
+# other names would indicate SRC_CONFFILE, but the voting is >180 Makefiles
+# with SRC_CONFILE and about 11 with SRC_CONFFILE.  Software development
+# isn't a popularity contest, though, and so my inclination is to define
+# both names for now and incrementally convert to SRC_CONFFILE to be consistent
+# with the other names.
+#
+CONFFILE		= $(MODULE).conf
+SRC_CONFFILE		= $(CONF_SRCDIR)/$(CONFFILE)
+SRC_CONFILE		= $(SRC_CONFFILE)
+ROOT_CONFFILE_32	= $(ROOTMODULE).conf
+ROOT_CONFFILE_64	= $(ROOTMODULE:%/$(SUBDIR64)/$(MODULE)=%/$(MODULE)).conf
+ROOT_CONFFILE		= $(ROOT_CONFFILE_$(CLASS))
+
+
+INS.conffile= \
+	$(RM) $@; $(INS) -s -m $(CFILEMODE) -f $(@D) $(SRC_CONFFILE)
+$(CH)INS.conffile= \
+    $(INS) -s -m $(CFILEMODE) -u $(OWNER) -g $(GROUP) -f $(@D) $(SRC_CONFFILE)
+
+#
+# The CTF merge of child kernel modules is performed against one of the genunix
+# modules.  For Intel builds, all modules will be used with a single genunix:
+# the one built in intel/genunix.  For SPARC builds, a given
+# module may be
+# used with one of a number of genunix files, depending on what platform the
+# module is deployed on.  We merge against the sun4u genunix to optimize for
+# the common case.  We also merge against the ip driver since networking is
+# typically loaded and types defined therein are shared between many modules.
+#
+CTFMERGE_GUDIR_sparc	= sun4u
+CTFMERGE_GUDIR_i386	= intel
+CTFMERGE_GUDIR		= $(CTFMERGE_GUDIR_$(MACH))
+
+CTFMERGE_GENUNIX 	= \
+	$(UTSBASE)/$(CTFMERGE_GUDIR)/genunix/$(OBJS_DIR)/genunix
+
+#
+# Used to uniquify a non-genunix module against genunix.  If used in patch
+# mode (PATCH_BUILD != "#"), the patch ID corresponding to the module being
+# built will be used as the label.  If no ID is available, or if patch mode
+# is not being used, the value of $VERSION will be used.
+#
+CTFMERGE_UNIQUIFY_AGAINST_GENUNIX	= \
+	@label="-L VERSION" ; \
+	if [ -z "$(PATCH_BUILD)" ] ; then \
+		uniq="-D BASE" ; \
+		set -- `$(CTFFINDMOD) -n -r -t $(PMTMO_FILE) $@` ; \
+		if [ "X$$1" != "X-" ] ; then \
+			label="-l $$1" ; \
+			if [ "$$2" != "fcs" ] ; then \
+				uniq="-D $$2" ; \
+			fi ; \
+		fi ; \
+	fi ; \
+	mergecmd="$(CTFMERGE) $(CTFMRGFLAGS)" ; \
+	cmd="$$mergecmd $$label -d $(CTFMERGE_GENUNIX) $$uniq -o $@" ; \
+	echo $$cmd "$(OBJECTS) $(CTFEXTRAOBJS)" ; \
+	$$cmd $(OBJECTS) $(CTFEXTRAOBJS)
+
+#
+# Used to merge the genunix module.  genunix has special requirements in
+# patch mode.  In particular, it needs to be able to find the genunix used
+# in the previous version of the KU patch (or the FCS version of genunix in
+# the case of KU 1).
+#
+CTFMERGE_GENUNIX_MERGE		= \
+	@if [ -z "$(PATCH_BUILD)" ] ; then \
+		set -- `$(CTFFINDMOD) -b $(OBJS_DIR) -o patch,lastgu -n -r \
+		    -t $(PMTMO_FILE) $(GENUNIX) || true` '' ; \
+		msg= ; \
+		if [ $$$(POUND_SIGN) -eq 1 ] ; \
+		    then msg="Error in $(CTFFINDMOD)" ; \
+		elif [ "X$$1" = "X-" ] ; then msg="Did not get label" ; \
+		elif [ "X$$2" = "X-" ] ; then msg="Did not get withfile" ; \
+		fi ; \
+		if [ -n "$$msg" ] ; then \
+			echo "make ctf: $$msg - removing $(GENUNIX)" ; \
+			$(RM) $(GENUNIX) ; \
+			exit 1 ; \
+		fi ; \
+		label="-l $$1" ; \
+		with="-w $$2" ; \
+	else \
+		label="-L VERSION" ; \
+	fi ; \
+	cmd="$(CTFMERGE) $(CTFMRGFLAGS) $$label $$with -o $@" ; \
+	echo $$cmd "$(OBJECTS) $(CTFEXTRAOBJS) $(IPCTF_TARGET)"; \
+	$$cmd $(OBJECTS) $(CTFEXTRAOBJS) $(IPCTF_TARGET)
+
+#
+# Used to copy CTF data from the sun4u genunix to the sun4m genunix.  While
+# we may lose some genunix-specific sun4m-only data, there really isn't any
+# other way, since individual ctfmerges on the sun4u and sun4m genunix
+# modules will result in differing type indices for the same types, and we
+# can't uniquify a given non-genunix module against two genunix modules.
+#
+CTFMERGE_COPY_CTF_DATA		= \
+	@if [ -f $(CTFMERGE_GENUNIX) ] ; then \
+		cmd="$(CTFMERGE) $(CTFMRGFLAGS) -c $(CTFMERGE_GENUNIX) $@" ; \
+		echo $$cmd ; \
+		$$cmd ; \
+	else \
+		echo "WARNING: $(CTFMERGE_GENUNIX) not built. " \
+		    "CTF data will be incomplete" ; \
+	fi
+
+#
+# We ctfmerge the ip objects into genunix to maximize the number of common types
+# found there, thus maximizing the effectiveness of uniquification.  We don't
+# want the genunix build to have to know about the individual ip objects, so we
+# put them in an archive.  The genunix ctfmerge then includes this archive.
+#
+IPCTF			= $(IPDRV_DIR)/$(OBJS_DIR)/ipctf.a
+
+#
+#	Installation directories
+#
+
+#
+#	For now, 64b modules install into a subdirectory
+#	of their 32b brethren.
+#
+SUBDIR64_sparc		= sparcv9
+SUBDIR64_i386		= amd64
+SUBDIR64		= $(SUBDIR64_$(MACH))
+
+ROOT_MOD_DIR		= $(ROOT)/kernel
+
+ROOT_KERN_DIR_32	= $(ROOT_MOD_DIR)
+ROOT_DRV_DIR_32		= $(ROOT_MOD_DIR)/drv
+ROOT_DTRACE_DIR_32	= $(ROOT_MOD_DIR)/dtrace
+ROOT_EXEC_DIR_32	= $(ROOT_MOD_DIR)/exec
+ROOT_FS_DIR_32		= $(ROOT_MOD_DIR)/fs
+ROOT_SCHED_DIR_32	= $(ROOT_MOD_DIR)/sched
+ROOT_STRMOD_DIR_32	= $(ROOT_MOD_DIR)/strmod
+ROOT_IPP_DIR_32		= $(ROOT_MOD_DIR)/ipp
+ROOT_SYS_DIR_32		= $(ROOT_MOD_DIR)/sys
+ROOT_MISC_DIR_32	= $(ROOT_MOD_DIR)/misc
+ROOT_KGSS_DIR_32	= $(ROOT_MOD_DIR)/misc/kgss
+ROOT_NLMISC_DIR_32	= $(ROOT_MOD_DIR)/misc
+ROOT_MACH_DIR_32	= $(ROOT_MOD_DIR)/mach
+ROOT_CPU_DIR_32		= $(ROOT_MOD_DIR)/cpu
+ROOT_TOD_DIR_32		= $(ROOT_MOD_DIR)/tod
+ROOT_FONT_DIR_32	= $(ROOT_MOD_DIR)/fonts
+ROOT_DACF_DIR_32	= $(ROOT_MOD_DIR)/dacf
+ROOT_CRYPTO_DIR_32	= $(ROOT_MOD_DIR)/crypto
+
+ROOT_KERN_DIR_64	= $(ROOT_MOD_DIR)/$(SUBDIR64)
+ROOT_DRV_DIR_64		= $(ROOT_MOD_DIR)/drv/$(SUBDIR64)
+ROOT_DTRACE_DIR_64	= $(ROOT_MOD_DIR)/dtrace/$(SUBDIR64)
+ROOT_EXEC_DIR_64	= $(ROOT_MOD_DIR)/exec/$(SUBDIR64)
+ROOT_FS_DIR_64		= $(ROOT_MOD_DIR)/fs/$(SUBDIR64)
+ROOT_SCHED_DIR_64	= $(ROOT_MOD_DIR)/sched/$(SUBDIR64)
+ROOT_STRMOD_DIR_64	= $(ROOT_MOD_DIR)/strmod/$(SUBDIR64)
+ROOT_IPP_DIR_64		= $(ROOT_MOD_DIR)/ipp/$(SUBDIR64)
+ROOT_SYS_DIR_64		= $(ROOT_MOD_DIR)/sys/$(SUBDIR64)
+ROOT_MISC_DIR_64	= $(ROOT_MOD_DIR)/misc/$(SUBDIR64)
+ROOT_KGSS_DIR_64	= $(ROOT_MOD_DIR)/misc/kgss/$(SUBDIR64)
+ROOT_NLMISC_DIR_64	= $(ROOT_MOD_DIR)/misc/$(SUBDIR64)
+ROOT_MACH_DIR_64	= $(ROOT_MOD_DIR)/mach/$(SUBDIR64)
+ROOT_CPU_DIR_64		= $(ROOT_MOD_DIR)/cpu/$(SUBDIR64)
+ROOT_TOD_DIR_64		= $(ROOT_MOD_DIR)/tod/$(SUBDIR64)
+ROOT_FONT_DIR_64	= $(ROOT_MOD_DIR)/fonts/$(SUBDIR64)
+ROOT_DACF_DIR_64	= $(ROOT_MOD_DIR)/dacf/$(SUBDIR64)
+ROOT_CRYPTO_DIR_64	= $(ROOT_MOD_DIR)/crypto/$(SUBDIR64)
+
+ROOT_KERN_DIR		= $(ROOT_KERN_DIR_$(CLASS))
+ROOT_DRV_DIR		= $(ROOT_DRV_DIR_$(CLASS))
+ROOT_DTRACE_DIR		= $(ROOT_DTRACE_DIR_$(CLASS))
+ROOT_EXEC_DIR		= $(ROOT_EXEC_DIR_$(CLASS))
+ROOT_FS_DIR		= $(ROOT_FS_DIR_$(CLASS))
+ROOT_SCHED_DIR		= $(ROOT_SCHED_DIR_$(CLASS))
+ROOT_STRMOD_DIR		= $(ROOT_STRMOD_DIR_$(CLASS))
+ROOT_IPP_DIR		= $(ROOT_IPP_DIR_$(CLASS))
+ROOT_SYS_DIR		= $(ROOT_SYS_DIR_$(CLASS))
+ROOT_MISC_DIR		= $(ROOT_MISC_DIR_$(CLASS))
+ROOT_KGSS_DIR		= $(ROOT_KGSS_DIR_$(CLASS))
+ROOT_NLMISC_DIR		= $(ROOT_NLMISC_DIR_$(CLASS))
+ROOT_MACH_DIR		= $(ROOT_MACH_DIR_$(CLASS))
+ROOT_CPU_DIR		= $(ROOT_CPU_DIR_$(CLASS))
+ROOT_TOD_DIR		= $(ROOT_TOD_DIR_$(CLASS))
+ROOT_FONT_DIR		= $(ROOT_FONT_DIR_$(CLASS))
+ROOT_DACF_DIR		= $(ROOT_DACF_DIR_$(CLASS))
+ROOT_CRYPTO_DIR		= $(ROOT_CRYPTO_DIR_$(CLASS))
+
+ROOT_MOD_DIRS_32	= $(ROOT_DRV_DIR_32) $(ROOT_EXEC_DIR_32)
+ROOT_MOD_DIRS_32	+= $(ROOT_DTRACE_DIR_32)
+ROOT_MOD_DIRS_32	+= $(ROOT_FS_DIR_32) $(ROOT_SCHED_DIR_32)
+ROOT_MOD_DIRS_32	+= $(ROOT_STRMOD_DIR_32) $(ROOT_SYS_DIR_32)
+ROOT_MOD_DIRS_32	+= $(ROOT_IPP_DIR_32)
+ROOT_MOD_DIRS_32	+= $(ROOT_MISC_DIR_32) $(ROOT_MACH_DIR_32)
+ROOT_MOD_DIRS_32	+= $(ROOT_KGSS_DIR_32)
+ROOT_MOD_DIRS_32	+= $(ROOT_CPU_DIR_32) $(ROOT_FONT_DIR_32)
+ROOT_MOD_DIRS_32	+= $(ROOT_TOD_DIR_32) $(ROOT_DACF_DIR_32)
+ROOT_MOD_DIRS_32	+= $(ROOT_CRYPTO_DIR_32)
+
+USR_MOD_DIR		= $(ROOT)/usr/kernel
+
+USR_DRV_DIR_32		= $(USR_MOD_DIR)/drv
+USR_EXEC_DIR_32		= $(USR_MOD_DIR)/exec
+USR_FS_DIR_32		= $(USR_MOD_DIR)/fs
+USR_SCHED_DIR_32	= $(USR_MOD_DIR)/sched
+USR_STRMOD_DIR_32	= $(USR_MOD_DIR)/strmod
+USR_SYS_DIR_32		= $(USR_MOD_DIR)/sys
+USR_MISC_DIR_32		= $(USR_MOD_DIR)/misc
+USR_DACF_DIR_32		= $(USR_MOD_DIR)/dacf
+USR_PCBE_DIR_32		= $(USR_MOD_DIR)/pcbe
+
+USR_DRV_DIR_64		= $(USR_MOD_DIR)/drv/$(SUBDIR64)
+USR_EXEC_DIR_64		= $(USR_MOD_DIR)/exec/$(SUBDIR64)
+USR_FS_DIR_64		= $(USR_MOD_DIR)/fs/$(SUBDIR64)
+USR_SCHED_DIR_64	= $(USR_MOD_DIR)/sched/$(SUBDIR64)
+USR_STRMOD_DIR_64	= $(USR_MOD_DIR)/strmod/$(SUBDIR64)
+USR_SYS_DIR_64		= $(USR_MOD_DIR)/sys/$(SUBDIR64)
+USR_MISC_DIR_64		= $(USR_MOD_DIR)/misc/$(SUBDIR64)
+USR_DACF_DIR_64		= $(USR_MOD_DIR)/dacf/$(SUBDIR64)
+USR_PCBE_DIR_64		= $(USR_MOD_DIR)/pcbe/$(SUBDIR64)
+
+USR_DRV_DIR		= $(USR_DRV_DIR_$(CLASS))
+USR_EXEC_DIR		= $(USR_EXEC_DIR_$(CLASS))
+USR_FS_DIR		= $(USR_FS_DIR_$(CLASS))
+USR_SCHED_DIR		= $(USR_SCHED_DIR_$(CLASS))
+USR_STRMOD_DIR		= $(USR_STRMOD_DIR_$(CLASS))
+USR_SYS_DIR		= $(USR_SYS_DIR_$(CLASS))
+USR_MISC_DIR		= $(USR_MISC_DIR_$(CLASS))
+USR_DACF_DIR		= $(USR_DACF_DIR_$(CLASS))
+USR_PCBE_DIR		= $(USR_PCBE_DIR_$(CLASS))
+
+USR_MOD_DIRS_32		= $(USR_DRV_DIR_32) $(USR_EXEC_DIR_32)
+USR_MOD_DIRS_32		+= $(USR_FS_DIR_32) $(USR_SCHED_DIR_32)
+USR_MOD_DIRS_32		+= $(USR_STRMOD_DIR_32) $(USR_SYS_DIR_32)
+USR_MOD_DIRS_32		+= $(USR_MISC_DIR_32) $(USR_DACF_DIR_32)
+USR_MOD_DIRS_32		+= $(USR_PCBE_DIR_32)
+
+#
+#
+#
+include $(SRC)/Makefile.psm
+
+#
+#       Set ownership on links.
+#
+CHOWNLINK=
+$(CH)CHOWNLINK= ; $(CHOWN) $(OWNER) $@
+CHGRPLINK=
+$(CH)CHGRPLINK= ; $(CHGRP) $(GROUP) $@
+
+#
+#	The "-r" on the remove may be considered temporary, but is required
+#	while the replacement of the SUNW,SPARCstation-10,SX directory by
+#	a symbolic link is being propagated.
+#
+INS.slink1= $(RM) -r $@; $(SYMLINK) $(PLATFORM) $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink2= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/$(@F) $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink3= $(RM) -r $@; $(SYMLINK) $(IMPLEMENTED_PLATFORM) $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink4= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/include $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink5= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/sbin $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink6= $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
+
+ROOT_PLAT_LINKS		 = $(PLAT_LINKS:%=$(ROOT_PLAT_DIR)/%)
+ROOT_PLAT_LINKS_2	 = $(PLAT_LINKS_2:%=$(ROOT_PLAT_DIR)/%)
+USR_PLAT_LINKS		 = $(PLAT_LINKS:%=$(USR_PLAT_DIR)/%)
+USR_PLAT_LINKS_2	 = $(PLAT_LINKS_2:%=$(USR_PLAT_DIR)/%)
+
+#
+#	Collection of all relevant, delivered kernel modules.
+#
+KMODS	= $(DRV_KMODS) $(EXEC_KMODS) $(FS_KMODS) $(SCHED_KMODS) $(TOD_KMODS) \
+	  $(STRMOD_KMODS) $(SYS_KMODS) $(MISC_KMODS) $(NLMISC_KMODS) \
+	  $(MACH_KMODS) $(CPU_KMODS) $(GENUNIX_KMODS) \
+	  $(GSS_KMODS) $(MMU_KMODS) $(DACF_KMODS) $(EXPORT_KMODS) \
+	  $(IPP_KMODS) $(CRYPTO_KMODS) $(CRYPTO_EK_KMODS) $(PCBE_KMODS) \
+	  $(DRV_KMODS_$(CLASS)) $(MISC_KMODS_$(CLASS))
+
+LINT_KMODS = $(DRV_KMODS) $(EXEC_KMODS) $(FS_KMODS) $(SCHED_KMODS) \
+	  $(TOD_KMODS) $(STRMOD_KMODS) $(SYS_KMODS) $(MISC_KMODS) \
+	  $(MACH_KMODS) $(GSS_KMODS) $(DACF_KMODS) $(IPP_KMODS) \
+	  $(CRYPTO_KMODS) $(PCBE_KMODS) \
+	  $(DRV_KMODS_$(CLASS)) $(MISC_KMODS_$(CLASS))
+
+THIS_YEAR:sh=	/bin/date +%Y
+$(OBJS_DIR)/logsubr.o	:= CPPFLAGS += -DTHIS_YEAR=$(THIS_YEAR)
+$(OBJS_DIR)/logsubr.ln	:= CPPFLAGS += -DTHIS_YEAR=$(THIS_YEAR)
+
+#
+#	Files to be compiled with -xa, to generate basic block execution
+#	count data.
+#
+#	There are several ways to compile parts of the kernel for kcov:
+#               1)  Add targets to BB_FILES here or in other Makefiles
+#                       (they must in the form of $(OBJS_DIR)/target.o)
+#               2)  setenv BB_FILES '$(XXX_OBJS:%=$(OBJS_DIR)/%)'
+#               3)  setenv BB_FILES '$(OBJECTS)'
+#
+#       Do NOT setenv CFLAGS -xa, as that will cause infinite recursion
+#       in unix_bb.o
+#
+BB_FILES =
+$(BB_FILES)	:= XAOPT = -xa
+
+#
+#	The idea here is for unix_bb.o to be in all kernels except the
+#	kernel which actually gets shipped to customers.  In practice,
+#	$(RELEASE_BUILD) is on for a number of the late beta and fcs builds.
+#
+CODE_COVERAGE=
+$(RELEASE_BUILD)CODE_COVERAGE:sh=	echo \\043
+$(CODE_COVERAGE)$(OBJS_DIR)/unix_bb.o   := CPPFLAGS     += -DKCOV
+$(CODE_COVERAGE)$(OBJS_DIR)/unix_bb.ln  := CPPFLAGS     += -DKCOV
+
+#
+#	Do not let unix_bb.o get compiled with -xa!
+#
+$(OBJS_DIR)/unix_bb.o	:= XAOPT =
+
+#
+#	MPSAS support
+#
+MPSAS_BUILD:sh=		echo \\043
+#
+# Privilege files
+#
+PRIVS_AWK = $(SRC)/uts/common/os/privs.awk
+PRIVS_DEF = $(SRC)/uts/common/os/priv_defs

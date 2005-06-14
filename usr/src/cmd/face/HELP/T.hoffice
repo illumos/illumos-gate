@@ -1,0 +1,27 @@
+
+The  Office Menu provides you with access to the Office functions
+available through AT&T FACE.
+
+The items contained in the Office menu are:
+
+        Filecabinet:  Presents your file folders and files. Just as a
+        normal office uses filecabinets, folders and files, FACE uses
+        the same objects.
+
+        Other Users:  Enables you to access the Filecabinet,
+        file folders and files of other users if you have permission.
+
+        Preferences:  Enables you to customize your AT&T FACE
+        environment.  Through this menu item you can do things
+        such as change file permissions.
+
+        Programs Administration:  Enables you to customize your 
+        Programs menu on the AT&T FACE menu.  Through this menu item 
+        you can add, modify or delete items in your Programs menu.
+
+        Wastebasket:  Contains the file folders and files you have
+        deleted from your filecabinet. Files and file folders placed
+        in the WASTEBASKET will eventually be permanently removed
+        from your system based on WASTEBASKET parameters you have set
+        under Preferences.
+

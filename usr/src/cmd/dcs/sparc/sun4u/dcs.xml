@@ -1,0 +1,108 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+
+<!--
+ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License, Version 1.0 only
+ (the "License").  You may not use this file except in compliance
+ with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+-->
+
+<service_bundle type='manifest' name='SUNWdcsr:dcs'>
+
+<service
+	name='platform/sun4u/dcs'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<restarter>
+		<service_fmri value='svc:/network/inetd:default' />
+	</restarter>
+
+	<exec_method
+	    type='method'
+	    name='inetd_start'
+	    exec='/usr/lib/dcs'
+	    timeout_seconds='0'>
+	    <method_context>
+		<method_credential user='root' group='root' />
+	    </method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='inetd_offline'
+		exec=':kill_process'
+		timeout_seconds='0'>
+	</exec_method>
+
+	<exec_method
+	    type='method'
+	    name='inetd_disable'
+	    exec=':kill -KILL'
+	    timeout_seconds='0'>
+	</exec_method>
+
+	<!--
+	    The proto entry listing both tcp and tcp6only is required to prevent
+	    other services from inadvertently attempting to use the reserved
+	    dcs port and thereby running afoul of the IPsec policies which
+	    are applied to that port.
+	-->
+	<property_group name='inetd' type='framework'>
+		<stability value='Evolving' />
+		<propval name='name' type='astring' value='sun-dr' />
+		<propval name='endpoint_type' type='astring' value='stream' />
+		<propval name='wait' type='boolean' value='true' />
+		<propval name='isrpc' type='boolean' value='false' />
+		<property name='proto' type='astring'>
+			<astring_list>
+				<value_node value='tcp'/>
+				<value_node value='tcp6only'/>
+			</astring_list>
+		</property>
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			domain configuration server
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='dcs' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

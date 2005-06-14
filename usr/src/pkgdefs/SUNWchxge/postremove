@@ -1,0 +1,18 @@
+#!/sbin/sh
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+BD=${BASEDIR:-/}
+if grep -w chxge $BD/etc/name_to_major > /dev/null 2>&1
+then
+	rem_drv -b ${BD} chxge
+	if [ $? -ne 0 ]
+	then
+		exit 1 	
+	fi
+fi
+exit 0

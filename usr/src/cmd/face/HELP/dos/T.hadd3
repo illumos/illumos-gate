@@ -1,0 +1,16 @@
+
+Enter the full pathname and drive number of the program to execute
+when this menu item is selected from the Programs menu.  The drive
+number is mandatory.  Use slashes instead of backslashes to seperate
+the names in the path.
+
+For example:
+     d:/test/program   is valid but
+     d:\test\program   is not.
+
+WARNING: Only the format of this field is validated.  No check is
+         performed to verify that you have indeed specified the
+         name of an actual working program.
+
+There is no default for this field.
+

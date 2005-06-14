@@ -1,0 +1,814 @@
+-- #ident	"%Z%%M%	%I%	%E% SMI"
+
+
+XXX-MIB DEFINITIONS ::= BEGIN
+
+--
+--  References:
+--    HTTP/1.0	
+--	 http://www.w3.org/pub/WWW/Protocols/HTTP1.0/draft-ietf-http-spec.html
+--
+
+IMPORTS
+    applIndex 				FROM  APPLICATION-MIB
+    MODULE-IDENTITY, OBJECT-TYPE, enterprises,
+    Counter32, IpAddress		FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, DisplayString,
+    TimeStamp				FROM SNMPv2-TC
+    MODULE-COMPLIANCE, OBJECT-GROUP	FROM SNMPv2-CONF;
+
+
+xxxMIB MODULE-IDENTITY
+    LAST-UPDATED "9601220000Z"
+    ORGANIZATION "HTTP MIB Interest Group"
+    CONTACT-INFO
+            "        Carl W. Kalbfleisch
+
+	     Postal: On-Ramp Technologies
+                     1950 Stemmons Freeway
+                     Suite 3042 - INFOMART
+                     Dallas, TX 75207
+                     US
+
+                Tel: +1 214 672-RAMP
+                Fax: +1 214 672-7275
+
+             E-mail: cwk@onramp.net"
+
+    DESCRIPTION
+            "The MIB module for xxx Servers and Clients.  The xxx in the module
+             name is intended to cover a family of 'Networked Information
+             Retrieval' protocols such as http, nntp, ftp, gopher and so on.
+             Membership of this family is difficult to define exactly, but
+             all members share a similar request-response structure used to
+             retrieve information (in the form of files, documents, articles)
+             from a remote server."
+
+    REVISION "9601220000Z"
+    DESCRIPTION
+	    "This is the second draft of the xxx-MIB.  It is based
+             on the idea to augment applTable of RFC-1565, several
+             threads on the mailing list since the original draft was
+             posted, and limited implementation experience.  The following
+             changes apply:
+            
+	     1)  Moved from experimental.98765 to onramp.onrampExperiments.1
+	     2)  Update imports.  
+		 Include enterprises, applIndex and IpAddress
+		 Exclude experimental and TAddress
+	     3)  Update xxxEntityTable
+		-augment applTable of RFC-1565 using applIndex
+		-re-order xxxEntityTable
+		-remove  xxxEntityIndex, Vendor, Uptime, Version
+		-add xxxEntityName, Port
+		-change xxxEntityAddress from TAddress to IpAddress
+		-change xxxEntityProtocol from INTEGER to OBJECT IDENTIFIER
+		-update DESCRIPTION clauses
+	     4)  Update xxxSummaryTable
+		-augment applTable of RFC-1565 using applIndex
+		-remove xxxSummaryEntityIndex
+	     5)  Update xxxRequestTable
+		-augment applTable of RFC-1565 using applIndex
+		-remove xxxRequestEntityIndex
+		-add xxxRequestInBytes, xxxRequestOutBytes
+	     6)  Update xxxResponseTable
+		-augment applTable of RFC-1565 using applIndex
+		-remove xxxResponseEntityIndex
+		-add xxxResponseInBytes, xxxResponseOutBytes
+	     7)  Update xxxTimeoutTable
+		-augment applTable of RFC-1565 using applIndex
+		-remove xxxTimeoutEntityIndex
+		-change xxxTimeoutRemoteAddressIndex from TAddress to IpAddress
+	     8) Conformance information
+		-define group for each table.
+		-update based on new and removed attributes above
+	     9) SMICng include file
+		-include APPLICATION-MIB"
+
+    REVISION "9511080000Z"
+    DESCRIPTION
+	    "The original draft of this MIB was edited by Mark Gamble 
+	     <mgamble@esys.co.uk> and based on the work of the
+	     http-mib@onramp.net mailing list.  The original draft is
+	     available at <http://http-mib.onramp.net/draft_1.my>"
+
+    ::= { onrampExperiments 1 }
+
+--
+--  Defined here for convience with distribution.  These values are
+--  actually defined within onramp.my in the main OnRamp Technologies
+--  enterprise MIB module.
+--
+onramp 			OBJECT IDENTIFIER ::= {enterprises 1465}
+onrampExperiments 	OBJECT IDENTIFIER ::= {onramp 4}
+
+--
+--  Object Identifiers for the xxx-MIB
+--
+xxxMIBObjects	  OBJECT IDENTIFIER ::= { xxxMIB 1 }
+xxxMIBConformance OBJECT IDENTIFIER ::= { xxxMIB 2 }
+xxxMIBCompliances OBJECT IDENTIFIER ::= { xxxMIBConformance 1 }
+xxxMIBGroups      OBJECT IDENTIFIER ::= { xxxMIBConformance 2 }
+
+
+XxxMethod ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+            "This data type is used to descripe xxx methods. The value of
+             a variable of this type is exactly the same method token used
+             in an xxx request. The currently defined methods for http are
+             GET, HEAD and POST.  For ftp, this type would cover the access
+             control, transfer parameter, and service commands."
+    SYNTAX       DisplayString (SIZE (1..40))
+
+
+XxxStatusCode ::= TEXTUAL-CONVENTION
+    STATUS       current
+    DESCRIPTION
+            "The status code of an xxx response as defined in the RFC
+             specification. 
+
+             The StatusCode (or reply code) is structured as a three digit
+             code, the following description is derived from the File
+             Transfer Protocol RFC:
+
+             the first digit specifies whether the response reflects
+             a preliminary completion (1), a positive completion (2), a
+             positive intermediate (3), a transient negative (4), or a
+             permanent negative (5);
+
+             the second digit specifies whether the response refers to
+             syntax (0), information (1), connections (2), authentication (3),
+             or file system (5) (4 is 'unspecified as yet');
+
+             the third digit 'gives a finer gradation of meaning in each of
+             the function categories'.
+
+             Currently defined values for http are:
+ 
+             ok(200), created(201), accepted(202), noContent(204), 
+             movedPermanently(301), movedTemporarily(302), notModified(304),
+             badRequest(400), unauthorized(401), forbidden(403), notFound(404),
+             internalServerError(500), notImplemented(501), badGateway(502),
+             serviceUnavailable(503).
+
+             Examples for ftp include:
+
+             command okay (200), help message (214), user name okay, need
+             password (331), service not available (421)"
+
+    SYNTAX       INTEGER (100..999)
+
+
+
+-- The xxx System Group
+--
+-- The xxx System group contains information about the xxx protocol entity.
+
+xxxSystem	OBJECT IDENTIFIER ::= { xxxMIBObjects 1 }
+
+xxxEntityTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF XxxEntityEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "The table of xxx Servers and Clients present on the system."
+    ::= { xxxSystem 1 }
+
+xxxEntityEntry OBJECT-TYPE
+    SYNTAX      XxxEntityEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Details of a particular xxx Server or Client."
+    INDEX   { applIndex }
+    ::= { xxxEntityTable 1 }
+
+XxxEntityEntry ::= SEQUENCE {
+	xxxEntityDescription		DisplayString,
+	xxxEntityObjectID		OBJECT IDENTIFIER,
+	xxxEntityContact		DisplayString,
+	xxxEntityProtocol		OBJECT IDENTIFIER,
+	xxxEntityProtocolVersion	DisplayString,
+	xxxEntityName			DisplayString,
+	xxxEntityAddress		IpAddress,
+	xxxEntityPort			INTEGER,
+	xxxEntityType			INTEGER
+    }
+
+
+xxxEntityDescription OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Textual description of the xxx Server or Client.  This
+	    shall include at least the vendor and version number of
+	    the application. In a minimal case, this might be the
+	    Product Token for the application. For example, for a client,
+	    this might be 'CERN-LineMode/2.15 libwww/2.17b3' and for a
+	    server 'Apache/0.8.4'."
+    ::= { xxxEntityEntry 1 }
+-- Instrumentation:  Direct Access
+
+xxxEntityObjectID OBJECT-TYPE
+    SYNTAX      OBJECT IDENTIFIER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+         "The authoritative identification for entity.  This may be
+	  a value assigned within an enterprise MIB, or within a standard
+	  MIB.  A number of values are defined within this MIB for use
+	  for this value.  The version of the entity should be 
+	  encoded within the trailing sub-identifiers.
+
+	  For example, if the entity is verion 1.0.0 of a particular
+	  application, then the value might be '1.3.6.1.4.1.vendor.app.1.0.0'.
+
+	  If there is no appropriate value to return, then 0.0 is returned."
+    ::= { xxxEntityEntry 2 }
+-- Instrumentation:  Direct access
+
+xxxEntityContact OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The textual identification of the contact person
+             for this xxx Server or Client, together with information
+             on how to contact this person.  For instance this might
+	     be 'webmaster@domain.name'."
+    ::= { xxxEntityEntry 3 }
+-- Instrumentation:  Configuration file.
+
+xxxEntityProtocol OBJECT-TYPE
+    SYNTAX      OBJECT IDENTIFIER
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "An identification of the primary protocol in use by this
+	     entity.  For Internet applications, the IANA
+             maintains a registry of the OIDs which correspond to
+             well-known applications.  If the application protocol is
+             not listed in the registry, an OID value of the form
+             {applTCPProtoID port} or {applUDProtoID port} are used for
+             TCP-based and UDP-based protocols, respectively. In either
+             case 'port' corresponds to the primary port number being
+             used by the protocol."
+    ::= { xxxEntityEntry 4 }
+-- Instrumentation:  System file.
+
+xxxEntityProtocolVersion OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Textual description of the version of the protocol implemented.
+	     For HTTP, the value shall be the HTTP Version."
+    ::= { xxxEntityEntry 5 }
+-- Instrumentation:  Log file
+
+
+--
+--  See article http://http-mib.onramp.net/archive/0191.html
+--  for information on why xxxEntityName, Address and port are three
+--  separate attributes.
+--
+xxxEntityName OBJECT-TYPE
+    SYNTAX      DisplayString
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The fully qualified domain name by which this entity is
+	     known.  This may be different than applName since that
+	     value is only a textual name for the application."
+    ::= { xxxEntityEntry 6 }
+-- Instrumentation:  Config file
+
+xxxEntityAddress OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The Transport Address at which the xxx Entity listens for
+             Requests or Responses."
+    ::= { xxxEntityEntry 7 }
+-- Instrumentation:  DNS
+
+xxxEntityPort OBJECT-TYPE
+    SYNTAX      INTEGER (0..10000)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The primary port used to communicate with this entity."
+    ::= { xxxEntityEntry 8 }
+-- Instrumentation:  Config file
+
+
+xxxEntityType OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    server(1),
+                    client(2),
+                    proxy(3),
+                    cachingProxy(4)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Identification of the role of the xxx Entity."
+    ::= { xxxEntityEntry 9 }
+-- Instrumentation:  Direct access
+
+
+-- The xxx Statistics Group
+--
+-- The xxx Statistics group contains information concerning the utilisation
+-- of the xxx protocol entity.
+
+xxxStatistics	OBJECT IDENTIFIER ::= { xxxMIBObjects 2 }
+
+xxxSummaryTable	OBJECT-TYPE
+    SYNTAX	SEQUENCE OF XxxSummaryEntry
+    MAX-ACCESS	not-accessible
+    STATUS	current
+    DESCRIPTION
+            "The table providing overview statistics for the xxx protocol
+             entities on this system."
+    ::= { xxxStatistics 1 }
+
+xxxSummaryEntry	OBJECT-TYPE
+    SYNTAX      XxxSummaryEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Overview statistics for an individual xxx Server or Client."
+    INDEX	{ applIndex }
+    ::= { xxxSummaryTable 1 }
+
+
+XxxSummaryEntry ::= SEQUENCE {
+	xxxSummaryRequests		Counter32,
+	xxxSummaryRequestErrors		Counter32,
+	xxxSummaryRequestDiscards	Counter32,
+	xxxSummaryResponses		Counter32,
+	xxxSummaryResponseDiscards	Counter32,
+	xxxSummaryInUnknowns		Counter32,
+	xxxSummaryInBytes		Counter32,
+	xxxSummaryOutBytes		Counter32
+    }
+
+xxxSummaryRequests OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The total number of Requests generated or received by this entity."
+    ::= { xxxSummaryEntry 1 }
+-- Instrumentation:  Log file
+
+xxxSummaryRequestErrors OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The total number of Request errors detected by this entity
+             (server only.)"
+    ::= { xxxSummaryEntry 2 }
+-- Instrumentation:  Log file
+
+xxxSummaryRequestDiscards OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The total number of Requests discarded by this entity
+             (server only)."
+    ::= { xxxSummaryEntry 3 }
+-- Instrumentation:  Log file
+
+xxxSummaryResponses OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The total number of Responses generated or received by this
+             entity."
+    ::= { xxxSummaryEntry 4 }
+-- Instrumentation:  Log file
+
+xxxSummaryResponseDiscards OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The total number of Responses discarded by this entity
+             (client only)."
+    ::= { xxxSummaryEntry 5 }
+-- Instrumentation:  Log file
+
+xxxSummaryInUnknowns OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The total number of unknown messages detected by this entity."
+    ::= { xxxSummaryEntry 6 }
+-- Instrumentation:  Log file
+
+xxxSummaryInBytes OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The total number of bytes received by this entity."
+    ::= { xxxSummaryEntry 7 }
+-- Instrumentation:  Log file
+
+xxxSummaryOutBytes OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The total number of bytes generated by this entity."
+    ::= { xxxSummaryEntry 8 }
+-- Instrumentation:  Log file
+
+
+
+
+
+xxxRequestTable	OBJECT-TYPE
+    SYNTAX	SEQUENCE OF XxxRequestEntry
+    MAX-ACCESS	not-accessible
+    STATUS	current
+    DESCRIPTION
+            "The table providing detailed request statistics for the xxx
+             protocol entities on this system."
+    ::= { xxxStatistics 2 }
+
+xxxRequestEntry	OBJECT-TYPE
+    SYNTAX      XxxRequestEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Request statistics for an individual xxx Server or Client."
+    INDEX	{ applIndex, xxxRequestMethodIndex }
+    ::= { xxxRequestTable 1 }
+
+XxxRequestEntry ::= SEQUENCE {
+	xxxRequestMethodIndex		XxxMethod,
+	xxxRequestInCount		Counter32,
+	xxxRequestInBytes		Counter32,
+	xxxRequestInLastTime		TimeStamp,
+	xxxRequestOutCount		Counter32,
+	xxxRequestOutBytes		Counter32,
+	xxxRequestOutLastTime		TimeStamp
+    }
+
+xxxRequestMethodIndex OBJECT-TYPE
+    SYNTAX      XxxMethod
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The particular request method the statistics apply to."
+    ::= { xxxRequestEntry 1 }
+-- Instrumentation:  Log file
+
+xxxRequestInCount OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The number of requests of this type received by this entity."
+    ::= { xxxRequestEntry 2 }
+-- Instrumentation:  Log file
+
+xxxRequestInBytes OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The number of bytes this type received by this entity."
+    ::= { xxxRequestEntry 3 }
+-- Instrumentation:  Log file
+
+xxxRequestInLastTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The value of sysUpTime at the time the last request was received."
+    ::= { xxxRequestEntry 4 }
+-- Instrumentation:  Log file
+
+xxxRequestOutCount OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The number of requests of this type generated by this entity."
+    ::= { xxxRequestEntry 5 }
+-- Instrumentation:  Log file
+
+xxxRequestOutBytes OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The number of bytes of this type generated by this entity."
+    ::= { xxxRequestEntry 6 }
+-- Instrumentation:  Log file
+
+xxxRequestOutLastTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The value of sysUpTime at the time the last request was generated."
+    ::= { xxxRequestEntry 7 }
+-- Instrumentation:  Log file
+
+
+
+
+
+
+xxxResponseTable	OBJECT-TYPE
+    SYNTAX	SEQUENCE OF XxxResponseEntry
+    MAX-ACCESS	not-accessible
+    STATUS	current
+    DESCRIPTION
+            "The table providing detailed response statistics for the xxx
+             protocol entities on this system."
+    ::= { xxxStatistics 3 }
+
+xxxResponseEntry	OBJECT-TYPE
+    SYNTAX      XxxResponseEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Response statistics for an individual xxx Server or Client."
+    INDEX	{ applIndex, xxxResponseStatusIndex }
+    ::= { xxxResponseTable 1 }
+
+XxxResponseEntry ::= SEQUENCE {
+	xxxResponseStatusIndex		XxxStatusCode,
+	xxxResponseInCount		Counter32,
+	xxxResponseInBytes		Counter32,
+	xxxResponseInLastTime		TimeStamp,
+	xxxResponseOutCount		Counter32,
+	xxxResponseOutBytes		Counter32,
+	xxxResponseOutLastTime		TimeStamp
+    }
+
+xxxResponseStatusIndex OBJECT-TYPE
+    SYNTAX      XxxStatusCode
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The particular response status the statistics apply to."
+    ::= { xxxResponseEntry 1 }
+-- Instrumentation:  Log file
+
+xxxResponseInCount OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The number of responses of this type received by this entity."
+    ::= { xxxResponseEntry 2 }
+-- Instrumentation:  Log file
+
+xxxResponseInBytes OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The number of bytes of this type received by this entity."
+    ::= { xxxResponseEntry 3 }
+-- Instrumentation:  Log file
+
+xxxResponseInLastTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The value of sysUpTime at the time the last response was received."
+    ::= { xxxResponseEntry 4 }
+-- Instrumentation:  Log file
+
+xxxResponseOutCount OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The number of responses of this type generated by this entity."
+    ::= { xxxResponseEntry 5 }
+-- Instrumentation:  Log file
+
+xxxResponseOutBytes OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The number of bytes of this type generated by this entity."
+    ::= { xxxResponseEntry 6 }
+-- Instrumentation:  Log file
+
+xxxResponseOutLastTime OBJECT-TYPE
+    SYNTAX      TimeStamp
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The value of sysUpTime at the time the last response was
+             generated."
+    ::= { xxxResponseEntry 7 }
+-- Instrumentation:  Log file
+
+
+
+
+
+
+
+
+xxxTotalTimeouts OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only   
+    STATUS      current
+    DESCRIPTION
+            "The total number of timeouts for all xxx entities."
+    ::= { xxxStatistics 4 }
+--Instrumentation:  Log file
+
+xxxLastTimeoutEntityIndex OBJECT-TYPE
+    SYNTAX      INTEGER (1..2147483647)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The unique (on this machine) identifier for this entity.  This
+             Index corresponds to xxxEntityIndex in the xxx System group.
+             Note that this index can be used to retrieve details from the
+             xxxTimeoutTable."
+    ::= { xxxStatistics 5 }
+-- Instrumentation:  Log file
+
+xxxLastTimeoutRemoteAddressIndex OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The address of the remote entity.
+             Note that this index can be used to retrieve details from the
+             xxxTimeoutTable."
+    ::= { xxxStatistics 6 }
+-- Instrumentation:  Log file
+
+xxxTimeoutTable	OBJECT-TYPE
+    SYNTAX	SEQUENCE OF XxxTimeoutEntry
+    MAX-ACCESS	not-accessible
+    STATUS	current
+    DESCRIPTION
+            "The table providing detailed timeout statistics for the xxx
+             protocol entities on this system."
+    ::= { xxxStatistics 7 }
+
+xxxTimeoutEntry	OBJECT-TYPE
+    SYNTAX      XxxTimeoutEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+            "Timeout statistics for a particular xxx Server or Client."
+    INDEX	{ applIndex, xxxTimeoutRemoteAddressIndex }
+    ::= { xxxTimeoutTable 1 }
+
+XxxTimeoutEntry ::= SEQUENCE {
+	xxxTimeoutRemoteAddressIndex	IpAddress,
+	xxxTimeoutTimeouts		Counter32
+    }
+
+xxxTimeoutRemoteAddressIndex OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "The address of the remote entity."
+    ::= { xxxTimeoutEntry 2 }
+-- Instrumentation:  Log file
+
+xxxTimeoutTimeouts OBJECT-TYPE
+    SYNTAX      Counter32
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+            "Total number of timeouts which have occurred between these two
+             entities."
+    ::= { xxxTimeoutEntry 3 }
+-- Instrumentation:  Log file
+
+
+
+
+
+
+-- Conformance and compliance definitions.
+
+xxxMIBEntityGroup OBJECT-GROUP
+    OBJECTS 
+	{ 
+	xxxEntityDescription,
+	xxxEntityObjectID,
+	xxxEntityContact,
+	xxxEntityProtocol,
+	xxxEntityProtocolVersion,
+	xxxEntityName,
+	xxxEntityAddress,
+	xxxEntityPort,
+	xxxEntityType
+	}
+    STATUS  current
+    DESCRIPTION
+            ""
+    ::= { xxxMIBGroups 1 }
+
+xxxMIBSummaryGroup OBJECT-GROUP
+    OBJECTS 
+	{ 
+	xxxSummaryRequests,
+	xxxSummaryRequestErrors,
+	xxxSummaryRequestDiscards,
+	xxxSummaryResponses,
+	xxxSummaryResponseDiscards,
+	xxxSummaryInUnknowns,
+	xxxSummaryInBytes,
+	xxxSummaryOutBytes
+	}
+    STATUS  current
+    DESCRIPTION
+            ""
+    ::= { xxxMIBGroups 2 }
+
+xxxMIBRequestGroup OBJECT-GROUP
+    OBJECTS 
+	{ 
+	xxxRequestMethodIndex,
+	xxxRequestInCount,
+	xxxRequestInBytes,
+	xxxRequestInLastTime,
+	xxxRequestOutCount,
+	xxxRequestOutBytes,
+	xxxRequestOutLastTime
+	}
+    STATUS  current
+    DESCRIPTION
+            ""
+    ::= { xxxMIBGroups 3 }
+
+xxxMIBResponseGroup OBJECT-GROUP
+    OBJECTS 
+	{ 
+	xxxResponseStatusIndex,
+	xxxResponseInCount,
+	xxxResponseInBytes,
+	xxxResponseInLastTime,
+	xxxResponseOutCount,
+	xxxResponseOutBytes,
+	xxxResponseOutLastTime
+	}
+    STATUS  current
+    DESCRIPTION
+            ""
+    ::= { xxxMIBGroups 4 }
+
+xxxMIBTimeoutGroup OBJECT-GROUP
+    OBJECTS 
+	{ 
+	xxxTotalTimeouts,
+	xxxLastTimeoutEntityIndex,
+	xxxLastTimeoutRemoteAddressIndex,
+	xxxTimeoutRemoteAddressIndex,
+	xxxTimeoutTimeouts
+	}
+    STATUS  current
+    DESCRIPTION
+            ""
+    ::= { xxxMIBGroups 5 }
+
+xxxCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+            "The compliance statement for SNMP entities
+             which implement the HTTP MIB."
+    MODULE  -- this module
+        MANDATORY-GROUPS 
+		{ 
+		xxxMIBEntityGroup,
+		xxxMIBSummaryGroup,
+		xxxMIBRequestGroup,
+		xxxMIBResponseGroup,
+		xxxMIBTimeoutGroup
+		}
+    ::= { xxxMIBCompliances 4 }
+
+END
+

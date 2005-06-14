@@ -1,0 +1,362 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# This is the second phase of TCP/IP configuration.  The first part is
+# run by the /lib/svc/method/net-physical script (the svc:/network/physical 
+# service) and includes configuring the interfaces and setting the machine's
+# hostname.  This script (the svc:/network/initial service), does all
+# configuration that can be done before name services are started. This
+# includes configuring IP routing, and setting any tunable parameters.
+# The third part, run by the /lib/svc/method/net-svc script (the
+# svc:/network/service service), does all configuration that may require
+# name services.  This includes a final re-configuration of the interfaces.
+#
+
+. /lib/svc/share/smf_include.sh
+
+case "$1" in
+'start')
+	#
+	# In a zone we need this service to be up, but all of the work
+	# it tries to do is irrelevant (and will actually lead to the service
+	# failing if we try to do it), so just bail out.
+	#
+	if [ `/sbin/zonename` != "global" ]; then
+		exit 0
+	fi
+	;; # Fall through -- rest of script is the initialization code
+
+'stop')
+	if [ `/sbin/zonename` != "global" ]; then
+		exit 0
+	fi
+	#
+	# If we were routing dynamically, we will note this with
+	# the .dynamic_routing file, so that we can leave the routes
+	# in place without thinking they're static route entries
+	# when we come back into states 2 or 3.
+	#
+	if /usr/bin/pgrep -x -u 0 'in.routed|in.rdisc' >/dev/null 2>&1; then
+		/usr/bin/pkill -z `/sbin/zonename` -x -u 0 'in.routed|in.rdisc'
+		> /etc/.dynamic_routing
+	fi
+	/usr/bin/pkill -z `/sbin/zonename` -x -u 0 'in.ndpd|in.ripngd'
+	exit 0
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+
+# Configure IPv6 Default Address Selection.
+if [ -f /etc/inet/ipaddrsel.conf ]; then
+	/usr/sbin/ipaddrsel -f /etc/inet/ipaddrsel.conf
+fi
+
+/usr/sbin/ifconfig -a6u >/etc/svc/volatile/ifconfig.$$
+numv6ifs=`/usr/bin/grep -c inet6 /etc/svc/volatile/ifconfig.$$`
+if  [ $numv6ifs -gt 1 ]; then
+	#
+	# Add a static route for multicast packets out of a link-local
+	# interface, although would like to specify multicast interface using
+	# an interface name!
+	#
+	set -- `/usr/bin/awk '
+		/inet6 fe80:/ {
+			print substr($2, 1, index($2, "/") - 1)
+		}' /etc/svc/volatile/ifconfig.$$`
+
+	if [ -n "$1" ]; then
+		echo "Setting default IPv6 interface for multicast:" \
+		    "add net ff00::/8: gateway $1"
+		/usr/sbin/route -n add -interface -inet6 "ff00::/8" "$1" \
+		    >/dev/null
+	fi
+fi
+/usr/bin/rm -f /etc/svc/volatile/ifconfig.$$
+
+#
+# Now that /usr is mounted, see if in.mpathd needs to be started by firing it
+# up in "adopt" mode; if there are no interfaces it needs to manage, it will
+# automatically exit.  Note that it may already be running if we're not
+# executing as part of system boot.
+#
+/usr/bin/pgrep -x -u 0 in.mpathd >/dev/null 2>&1 || /usr/lib/inet/in.mpathd -a
+
+#
+# Pass to the kernel the list of supported IPsec protocols and algorithms.
+# This will not cause IPsec to be loaded.
+#
+/usr/sbin/ipsecalgs -s
+
+#
+# Initialize IPsec only if ipsecinit.conf exists.  Otherwise, save the
+# kernel memory that'll be consumed if IPsec is loaded.  See below for more
+# IPsec-related commands.
+#
+if [ -f /etc/inet/ipsecinit.conf ] ; then
+	/usr/sbin/ipsecconf -qa /etc/inet/ipsecinit.conf
+fi
+
+#
+# Set the RFC 1948 entropy, regardless of if I'm using it or not.  If present,
+# use the encrypted root password as a source of entropy.  Otherwise,
+# just use the pre-set (and hopefully difficult to guess) entropy that
+# tcp used when it loaded.
+#
+encr=`/usr/bin/awk -F: '/^root:/ {print $2}' /etc/shadow`
+[ -z "$encr" ] || /usr/sbin/ndd -set /dev/tcp tcp_1948_phrase $encr
+unset encr
+
+#
+# Get values for TCP_STRONG_ISS, ACCEPT6TO4RELAY and RELAY6TO4ADDR.
+#
+[ -f /etc/default/inetinit ] && . /etc/default/inetinit
+
+#
+# Set TCP ISS generation.  By default the ISS generation is
+# time + random()-delta.  This might not be strong enough for some users.
+# See /etc/default/inetinit for settings and further info on TCP_STRONG_ISS.
+# If not set, use TCP's internal default setting.
+#
+if [ $TCP_STRONG_ISS ]; then
+	/usr/sbin/ndd -set /dev/tcp tcp_strong_iss $TCP_STRONG_ISS
+fi
+
+#
+# Configure default IPv4 routers using the local "/etc/defaultrouter"
+# configuration file.  The file can contain the hostnames or IP
+# addresses of one or more default routers.  If hostnames are used,
+# each hostname must also be listed in the local "/etc/hosts" file
+# because NIS and NIS+ are not running at the time that this script is
+# run.  Each router name or address is listed on a single line by
+# itself in the file.  Anything else on that line after the router's
+# name or address is ignored.  Lines that begin with "#" are
+# considered comments and ignored.
+#
+# The default routes listed in the "/etc/defaultrouter" file will
+# replace those added by the kernel during diskless booting.  An
+# empty "/etc/defaultrouter" file will cause the default route
+# added by the kernel to be deleted.
+#
+# Note that the default router file is ignored if we received routes
+# from a DHCP server.  Our policy is to always trust DHCP over local
+# administration.
+#
+smf_netstrategy
+
+if [ "$_INIT_NET_STRATEGY" = "dhcp" ] && [ -n "`/sbin/dhcpinfo Router`" ]; then
+	defrouters=`/sbin/dhcpinfo Router`
+elif [ -f /etc/defaultrouter ]; then
+	defrouters=`/usr/bin/grep -v \^\# /etc/defaultrouter | \
+	    /usr/bin/awk '{print $1}'`
+	if [ -n "$defrouters" ]; then
+		#
+		# We want the default router(s) listed in /etc/defaultrouter
+		# to replace the one added from the BOOTPARAMS WHOAMI response
+		# but we must avoid flushing the last route between the running
+		# system and its /usr file system.
+		#
+
+		# First, remember the original route.
+		shift $#
+		set -- `/usr/bin/netstat -rn -f inet | /usr/bin/grep '^default'`
+		route_IP="$2"
+
+		#
+		# Next, add those from /etc/defaultrouter.  While doing this,
+		# if one of the routes we add is for the route previously
+		# added as a result of the BOOTPARAMS response, we will see
+		# a message of the form:
+		#	"add net default: gateway a.b.c.d: entry exists"
+		#
+		do_delete=yes
+		for router in $defrouters; do
+			set -- `/usr/sbin/route -n add default -gateway $router`
+			[ $? -ne 0 -a "x$5" = "x$route_IP:" ] && do_delete=no
+		done
+
+		#
+		# Finally, delete the original default route unless it was
+		# also listed in the defaultrouter file.
+		#
+		if [ -n "$route_IP" -a $do_delete = yes ]; then
+			/usr/sbin/route -n delete default -gateway $route_IP \
+			    >/dev/null
+		fi
+	else
+		/usr/sbin/route -fn > /dev/null
+	fi
+else
+	defrouters=
+fi
+
+#
+# Use routeadm(1M) to configure forwarding and launch routing daemons for
+# IPv4 and IPv6 based on preset values.  These settings only apply to the
+# global zone.  For IPv4 dynamic routing, the system will default to
+# disabled if a default route was previously added via BOOTP, DHCP, or
+# the /etc/defaultrouter file.  routeadm also starts in.ndpd.
+#
+if [ ! -f /etc/.dynamic_routing ] && [ -z "$defrouters" ]; then
+	#
+	# No default routes were setup by "route" command above.
+	# Check the kernel routing table for any other default
+	# routes.
+	#
+	/usr/bin/netstat -rn -f inet | \
+	    /usr/bin/grep default >/dev/null 2>&1 && defrouters=yes
+fi
+[ -f /etc/.dynamic_routing ] && /usr/bin/rm -f /etc/.dynamic_routing
+if [ -z "$defrouters" ]; then
+	routeadmstr="-e ipv4-routing"
+else
+	routeadmstr="-d ipv4-routing"
+fi
+#
+# The -b option used here tells routeadm that the ipv4-routing
+# option in $routeadmstr is the boot-time default.  The
+# boot-time default is used if the administrator has not
+# explicitly enabled or disabled ipv4-routing using the -e or
+# -d routeadm option.
+#
+/usr/sbin/routeadm -u -b $routeadmstr
+
+#
+# In spite of global policy, there may be a need for IPsec because of
+# per-socket policy or tunnelled policy.  With that in mind, check for manual
+# keys in /etc/inet/secret/ipseckeys, or check for IKE configuration in
+# /etc/inet/ike/config.  Either of these will also load and initialize IPsec,
+# thereby consuming kernel memory.
+#
+
+if [ -f /etc/inet/secret/ipseckeys ] ; then
+	/usr/sbin/ipseckey -f /etc/inet/secret/ipseckeys
+fi
+
+if [ -f /etc/inet/ike/config ] ; then
+	/usr/lib/inet/in.iked
+fi
+
+#
+# Configure tunnels which were deferred by /lib/svc/method/net-physical
+# (the svc:/network/physical service) since it depends on the tunnel endpoints
+# being reachable i.e. routing must be running.
+#
+# WARNING: you may wish to turn OFF forwarding if you haven't already, because
+# of various possible security vulnerabilities when configuring tunnels for
+# Virtual Private Network (VPN) construction.
+#
+# Also, if names are used in the /etc/hostname.ip.tun* file, those names
+# have to be in either DNS (and DNS is used) or in /etc/hosts, because this
+# file is executed before NIS or NIS+ is started.
+#
+
+#
+# IPv4 tunnels
+# The second component of the name must be either "ip" or "ip6".
+#
+interface_names="`/usr/bin/ls /etc/hostname.ip*.*[0-9] 2>/dev/null | \
+    /usr/bin/grep '/etc/hostname\.ip6\{0,1\}\.'`"
+if [ -n "$interface_names" ]; then
+	(
+		echo "configuring IPv4 tunnels:\c"
+		# Extract the part after the first '.'
+		set -- `for intr in $interface_names; do \
+		    /usr/bin/expr //$intr : '[^.]*\.\(.*\)$'; done`
+		while [ $# -ge 1 ]; do
+			# Skip empty files
+			if [ ! -s /etc/hostname\.$1 ]; then
+				shift
+				continue
+			fi
+			/usr/sbin/ifconfig $1 plumb
+			while read ifcmds; do
+				if [ -n "$ifcmds" ]; then
+					/usr/sbin/ifconfig $1 inet $ifcmds
+				fi
+			done </etc/hostname\.$1 >/dev/null
+			echo " $1\c"
+			shift
+		done
+		echo "."
+	)
+fi
+
+#
+# IPv6 Tunnels
+# The second component of the name must be either "ip" or "ip6".
+#
+interface_names="`/usr/bin/ls /etc/hostname6.ip*.*[0-9] 2>/dev/null | \
+    /usr/bin/grep '/etc/hostname6\.ip6\{0,1\}\.'`"
+if [ -n "$interface_names" ]; then
+	(
+		echo "configuring IPv6 tunnels:\c"
+		# Extract the part after the first '.'
+		set -- `for intr in $interface_names; do \
+		    /usr/bin/expr //$intr : '[^.]*\.\(.*\)$'; done`
+		while [ $# -ge 1 ]; do
+			# Skip empty files
+			if [ ! -s /etc/hostname6\.$1 ]; then
+				shift
+				continue
+			fi
+			/usr/sbin/ifconfig $1 inet6 plumb
+			while read ifcmds; do
+				if [ -n "$ifcmds" ]; then
+					/usr/sbin/ifconfig $1 inet6 $ifcmds
+				fi
+			done </etc/hostname6\.$1 > /dev/null
+			echo " $1\c"
+			shift
+		done
+		echo "."
+	)
+fi
+
+#
+# Set 6to4 Relay Router communication support policy and, if applicable,
+# the destination Relay Router IPv4 address.  See /etc/default/inetinit for
+# setting and further info on ACCEPT6TO4RELAY and RELAY6TO4ADDR.
+# If ACCEPT6TO4RELAY=NO, the default value in the kernel will
+# be used.
+#
+ACCEPT6TO4RELAY=`echo "$ACCEPT6TO4RELAY" | /usr/bin/tr '[A-Z]' '[a-z]'`
+if [ "$ACCEPT6TO4RELAY" = yes ]; then
+        if [ "$RELAY6TO4ADDR" ]; then
+                /usr/sbin/6to4relay -e -a $RELAY6TO4ADDR
+        else
+                /usr/sbin/6to4relay -e
+        fi
+fi
+
+# Clear exit status.
+exit 0

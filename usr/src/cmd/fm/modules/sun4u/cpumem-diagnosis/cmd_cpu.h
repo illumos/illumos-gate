@@ -1,0 +1,493 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _CMD_CPU_H
+#define	_CMD_CPU_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Each CPU of interest has a cmd_cpu_t structure.  CPUs become of interest when
+ * they are the focus of ereports, or when they detect UEs.  CPUs may be the
+ * target of several different kinds of ereport, each of which is tracked
+ * differently.  cpu_cases lists the types of cases that can be open against a
+ * given CPU.  The life of a CPU is complicated by the fact that xxCs and xxUs
+ * received by the DE may in fact be side-effects of earlier UEs, xxCs, or xxUs.
+ * Causes of side-effects, and actions taken to resolve them, can be found below
+ * and in cmd_memerr.h.
+ *
+ * Data structures:
+ *      ________                                   CMD_PTR_CPU_ICACHE
+ *     /        \       ,--------.                 CMD_PTR_CPU_DCACHE
+ *     |CPU     | <---- |case_ptr| (one or more of CMD_PTR_CPU_PCACHE         )
+ *     |        |       `--------'                 CMD_PTR_CPU_ITLB
+ *     |,-------|       ,-------.                  CMD_PTR_CPU_DTLB
+ *     ||asru   | ----> |fmri_t |                  CMD_PTR_CPU_L2DATA
+ *     |:-------|       :-------:                  CMD_PTR_CPU_L2DATA_UERETRY
+ *     ||fru    | ----> |fmri_t |                  CMD_PTR_CPU_L2TAG
+ *     |`-------|       `-------'                  CMD_PTR_CPU_L3DATA
+ *     |        |       ,---------.                CMD_PTR_CPU_L3DATA_UERETRY
+ *     | uec    | ----> |UE cache |                CMD_PTR_CPU_L3TAG
+ *     \________/       `---------'                CMD_PTR_CPU_FPU
+ *
+ *      ________
+ *     /        \       ,--------.
+ *     | xr     | <---- |case_ptr| (CMD_PTR_XR_WAITER)
+ *     |        |       `--------'
+ *     |,-------|       ,-------.
+ *     ||rsrc   | ----> |fmri_t |
+ *     |`-------|       `-------'
+ *     | cpu    | ----> detecting CPU
+ *     \________/
+ *
+ * Data structure	P?  Case- Notes
+ *                          Rel?
+ * ----------------	--- ----- --------------------------------------
+ * cmd_cpu_t		Yes No    Name is derived from CPU ID ("cpu_%d")
+ * cmd_case_ptr_t	Yes Yes   Name is case's UUID
+ * cpu_asru (fmri_t)	Yes No    Name is derived from CPU ID ("cpu_asru_%d")
+ * cpu_fru (fmri_t)	Yes No    Name is derived from CPU ID ("cpu_fru_%d")
+ * cpu_uec		Yes No    Name is derived from CPU ID ("cpu_uec_%d")
+ * cmd_xr_t		Yes Yes   Name is `redelivery'
+ * xr_rsrc (fmri_t)     Yes No    Name is derived from case's UUID ("%s_rsrc")
+ */
+
+#include <cmd.h>
+#include <cmd_state.h>
+#include <cmd_fmri.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct cmd_cpu cmd_cpu_t;
+
+typedef enum cmd_cpu_type {
+	CPU_ULTRASPARC_III = 1,
+	CPU_ULTRASPARC_IIIplus,
+	CPU_ULTRASPARC_IIIi,
+	CPU_ULTRASPARC_IV,
+	CPU_ULTRASPARC_IVplus,
+	CPU_ULTRASPARC_IIIiplus
+} cmd_cpu_type_t;
+
+typedef struct cmd_cpu_cases {
+	cmd_case_t cpuc_icache;		/* All I$ errors (IPE, IDSPE, etc) */
+	cmd_case_t cpuc_dcache;		/* All D$ errors (DPE, DDSPE, etc) */
+	cmd_case_t cpuc_pcache;		/* All P$ errors (PDSPE) */
+	cmd_case_t cpuc_itlb;		/* ITLB errors (ITLBPE) */
+	cmd_case_t cpuc_dtlb;		/* DTLB errors (DTLBPE) */
+	cmd_case_t cpuc_l2data;		/* All correctable L2$ data errors */
+	cmd_case_t cpuc_l2tag;		/* All correctable L2$ tag errors */
+	cmd_case_t cpuc_l3data;		/* All correctable L3$ data errors */
+	cmd_case_t cpuc_l3tag;		/* All correctable L3$ tag errors */
+	cmd_case_t cpuc_fpu;		/* FPU errors */
+} cmd_cpu_cases_t;
+
+/*
+ * The UE cache.  We actually have two UE caches - the current one and the old
+ * one.  When it's time to flush the UE cache, we move the current UE cache to
+ * the old position and flush the E$.  Then, we schedule the removal of the old
+ * UE cache.  This allows a) xxUs triggered by the flush to match against the
+ * old cache, while b) still allowing new UEs to be added to the current UE
+ * cache.  UE matches will always search in both caches (if present), but
+ * additions will only end up in the current cache.  We go to all of this
+ * effort because the cost of a missed ereport (discarding due to a false match
+ * in the cache) is much less than that of a missed match.  In the latter case,
+ * the CPU will be erroneously offlined.
+ *
+ * A special case is triggered if we see a UE with a not valid AFAR.  Without
+ * the AFAR, we aren't able to properly match subsequent xxU's.  As a result,
+ * we need to throw the cache into all-match mode, wherein all subsequent match
+ * attempts will succeed until the UE cache is flushed.
+ */
+
+#define	CPU_UEC_F_ALLMATCH	0x1	/* all-match mode active */
+
+typedef struct cmd_cpu_uec {
+	uint64_t *uec_cache;		/* The UE cache */
+	uint_t uec_nent;		/* Number of allocated slots in cache */
+	uint_t uec_flags;		/* CPU_UEC_F_* */
+	char uec_bufname[CMD_BUFNMLEN];	/* Name of buffer used for cache */
+} cmd_cpu_uec_t;
+
+extern void cmd_cpu_uec_add(fmd_hdl_t *, cmd_cpu_t *, uint64_t);
+extern int cmd_cpu_uec_match(cmd_cpu_t *, uint64_t);
+extern void cmd_cpu_uec_clear(fmd_hdl_t *, cmd_cpu_t *);
+extern void cmd_cpu_uec_set_allmatch(fmd_hdl_t *, cmd_cpu_t *);
+
+/*
+ * Certain types of xxC and xxU can trigger other types as side-effects.  These
+ * secondary ereports need to be discarded, as treating them as legitimate
+ * ereports in their own right will cause erroneous diagnosis.  As an example
+ * (see cmd_xxcu_trains for more), an L2$ UCC will usually trigger an L2$ WDC
+ * resulting from the trap handler's flushing of the L2$.  If we treat both as
+ * legitimate, we'll end up adding two ereports to the SERD engine,
+ * significantly cutting the threshold for retiring the CPU.
+ *
+ * Our saving grace is the fact that the side-effect ereports will have the same
+ * ENA as the primary.  As such, we can keep track of groups of ereports by ENA.
+ * These groups, which we'll call trains, can then be matched against a list of
+ * known trains.  The list (an array of cmd_xxcu_train_t structures) has both a
+ * description of the composition of the train and an indication as to which of
+ * the received ereports is the primary.
+ *
+ * The cmd_xxcu_trw_t is used to gather the members of the train.  When the
+ * first member comes in, we allocate a trw, recording the ENA of the ereport,
+ * as well as noting its class in trw_mask.  We then reschedule the delivery of
+ * the ereport for some configurable time in the future, trusting that all
+ * members of the train will have arrived by that time.  Subsequent ereports in
+ * the same train match the recorded ENA, and add themselves to the mask.
+ * When the first ereport is redelivered, trw_mask is used to determine whether
+ * or not a train has been seen.  An exact match is required.  If a match is
+ * made, the ereport indicated as the primary cause is used for diagnosis.
+ */
+
+#define	CMD_TRW_F_DELETING	0x1	/* reclaiming events */
+#define	CMD_TRW_F_CAUSESEEN	0x2	/* cause of train already processed */
+#define	CMD_TRW_F_GCSEEN	0x4	/* seen by GC, erased next time */
+
+typedef struct cmd_xxcu_trw {
+	uint64_t trw_ena;	/* the ENA for this group of ereports */
+	cmd_errcl_t trw_mask;	/* ereports seen thus far with this ENA */
+	uint16_t trw_cpuid;	/* CPU to which this watcher belongs */
+	uint8_t	 trw_ref;	/* number of ereports with this ENA */
+	uint8_t	 trw_flags;	/* CMD_TRW_F_* */
+	uint32_t trw_pad;
+} cmd_xxcu_trw_t;
+
+extern cmd_xxcu_trw_t *cmd_trw_lookup(uint64_t);
+extern cmd_xxcu_trw_t *cmd_trw_alloc(uint64_t);
+extern void cmd_trw_restore(fmd_hdl_t *);
+extern void cmd_trw_write(fmd_hdl_t *);
+extern void cmd_trw_ref(fmd_hdl_t *, cmd_xxcu_trw_t *, cmd_errcl_t);
+extern void cmd_trw_deref(fmd_hdl_t *, cmd_xxcu_trw_t *);
+
+extern cmd_errcl_t cmd_xxcu_train_match(cmd_errcl_t);
+
+/*
+ * We don't have access to ereport nvlists when they are redelivered via timer.
+ * As such, we have to retrieve everything we might need for diagnosis when we
+ * first receive the ereport.  The retrieved information is stored in the
+ * cmd_xr_t, which is persisted.
+ */
+
+typedef struct cmd_xr cmd_xr_t;
+
+/*
+ * xr_hdlr can't be persisted, so we use these in xr_hdlrid to indicate the
+ * handler to be used.  xr_hdlr is then updated so it can be used directly.
+ */
+#define	CMD_XR_HDLR_XXC		1
+#define	CMD_XR_HDLR_XXU		2
+
+typedef void cmd_xr_hdlr_f(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
+
+struct cmd_xr {
+	cmd_list_t xr_list;
+	id_t xr_id;		/* ID of timer used for redelivery */
+	cmd_cpu_t *xr_cpu;	/* Detecting CPU, recalc'd from cpuid */
+	uint32_t xr_cpuid;	/* ID of detecting CPU */
+	uint64_t xr_ena;	/* ENA from ereport */
+	uint64_t xr_afar;	/* AFAR from ereport nvlist */
+	uint16_t xr_synd;	/* syndrome from ereport nvlist */
+	uint8_t xr_afar_status;	/* AFAR status from ereport nvlist */
+	uint8_t xr_synd_status;	/* syndrome status from ereport nvlist */
+	cmd_fmri_t xr_rsrc;	/* resource from ereport nvlist */
+	cmd_errcl_t xr_clcode;	/* CMD_ERRCL_* for this ereport */
+	cmd_xr_hdlr_f *xr_hdlr;	/* handler, recalc'd from hdlrid on restart */
+	uint_t xr_hdlrid;	/* CMD_XR_HDLR_*, used for recalc of hdlr */
+	fmd_case_t *xr_case;	/* Throwaway case used to track redelivery */
+	uint_t xr_ref;		/* Number of references to this struct */
+};
+
+#define	xr_rsrc_nvl		xr_rsrc.fmri_nvl
+
+extern cmd_xr_t *cmd_xr_create(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    cmd_cpu_t *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_xr_reschedule(fmd_hdl_t *, cmd_xr_t *, uint_t);
+extern void cmd_xr_deref(fmd_hdl_t *, cmd_xr_t *);
+
+extern void cmd_xxc_resolve(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
+extern void cmd_xxu_resolve(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
+
+/*
+ * The master structure containing or referencing all of the state for a given
+ * CPU.
+ */
+
+/*
+ * We periodically flush the E$, thus allowing us to flush the UE cache (see
+ * above for a description of the UE cache).  In particular, we flush it
+ * whenever we see a UE with a non-valid AFAR.  To keep from overflushing the
+ * CPU, we cap the number of flushes that we'll do in response to UEs with
+ * non-valid AFARs.  The cap is the number of permitted flushes per GC/restart
+ * cycle, and was determined arbitrarily.
+ */
+#define	CPU_UEC_FLUSH_MAX	3
+
+/*
+ * The CPU structure started life without a version number.  Making things more
+ * complicated, the version number in the new struct occupies the space used for
+ * cpu_cpuid in the non-versioned struct.  We therefore have to use somewhat
+ * unorthodox version numbers to distinguish between the two types of struct
+ * (pre- and post-versioning) -- version numbers that can't be mistaken for
+ * CPUIDs.  Our version numbers, therefore, will be negative.
+ *
+ * For future expansion, the version member must always stay where it is.  At
+ * some point in the future, when more structs get versions, the version member
+ * should move into the cmd_header_t.
+ */
+#define	CPU_MKVERSION(version)	((uint_t)(0 - (version)))
+
+#define	CMD_CPU_VERSION_1	CPU_MKVERSION(1)	/* -1 */
+#define	CMD_CPU_VERSION_2	CPU_MKVERSION(2)	/* -2 */
+#define	CMD_CPU_VERSION		CMD_CPU_VERSION_2
+
+#define	CMD_CPU_VERSIONED(cpu)	((int)(cpu)->cpu_version < 0)
+
+#define	CMD_CPU_F_DELETING	0x1
+
+typedef struct cmd_cpu_0 {
+	cmd_header_t cpu0_header;	/* Nodetype must be CMD_NT_CPU */
+	uint32_t cpu0_cpuid;		/* Logical ID for this CPU */
+	cmd_cpu_type_t cpu0_type;	/* CPU model */
+	fmd_case_t *cpu0_cases[4];	/* v0 had embedded case_t w/4 cases */
+	uint8_t cpu0_faulting;		/* Set if fault has been issued */
+	cmd_fmri_t cpu0_asru;		/* ASRU for this CPU */
+	cmd_fmri_t cpu0_fru;		/* FRU for this CPU */
+	cmd_cpu_uec_t cpu0_uec;		/* UE cache */
+	cmd_cpu_uec_t cpu0_olduec;	/* To-be-flushed UE cache */
+	id_t cpu0_uec_flush;		/* Timer ID for UE cache flush */
+	uint_t cpu0_uec_nflushes;	/* # of flushes since last restart/GC */
+	cmd_list_t cpu0_xxu_retries;	/* List of pending xxU retries */
+} cmd_cpu_0_t;
+
+typedef struct cmd_cpu_1 {
+	cmd_header_t cpu1_header;	/* Nodetype must be CMD_NT_CPU */
+	uint_t cpu1_version;		/* struct version - must follow hdr */
+	uint32_t cpu1_cpuid;		/* Logical ID for this CPU */
+	cmd_cpu_type_t cpu1_type;	/* CPU model */
+	uintptr_t *cpu1_cases;		/* v1 had a pointer to a case array */
+	uint8_t cpu1_faulting;		/* Set if fault has been issued */
+	cmd_fmri_t cpu1_asru;		/* ASRU for this CPU */
+	cmd_fmri_t cpu1_fru;		/* FRU for this CPU */
+	cmd_cpu_uec_t cpu1_uec;		/* UE cache */
+	cmd_cpu_uec_t cpu1_olduec;	/* To-be-flushed UE cache */
+	id_t cpu1_uec_flush;		/* Timer ID for UE cache flush */
+	uint_t cpu1_uec_nflushes;	/* # of flushes since last restart/GC */
+	cmd_list_t cpu1_xxu_retries;	/* List of pending xxU retries */
+} cmd_cpu_1_t;
+
+/* Portion of the bank structure which must be persisted */
+typedef struct cmd_cpu_pers {
+	cmd_header_t cpup_header;	/* Nodetype must be CMD_NT_CPU */
+	uint_t cpup_version;		/* struct version - must follow hdr */
+	uint32_t cpup_cpuid;		/* Logical ID for this CPU */
+	cmd_cpu_type_t cpup_type;	/* CPU model */
+	uint8_t cpup_faulting;		/* Set if fault has been issued */
+	cmd_fmri_t cpup_asru;		/* ASRU for this CPU */
+	cmd_fmri_t cpup_fru;		/* FRU for this CPU */
+	cmd_cpu_uec_t cpup_uec;		/* UE cache */
+	cmd_cpu_uec_t cpup_olduec;	/* To-be-flushed UE cache */
+} cmd_cpu_pers_t;
+
+/* Persistent and dynamic CPU data */
+struct cmd_cpu {
+	cmd_cpu_pers_t cpu_pers;
+	cmd_cpu_cases_t cpu_cases;
+	id_t cpu_uec_flush;		/* Timer ID for UE cache flush */
+	uint_t cpu_uec_nflushes;	/* # of flushes since last restart/GC */
+	cmd_list_t cpu_xxu_retries;	/* List of pending xxU retries */
+	uint_t cpu_flags;
+};
+
+#define	CMD_CPU_MAXSIZE \
+	MAX(MAX(sizeof (cmd_cpu_0_t), sizeof (cmd_cpu_1_t)), \
+	    sizeof (cmd_cpu_pers_t))
+#define	CMD_CPU_MINSIZE \
+	MIN(MIN(sizeof (cmd_cpu_0_t), sizeof (cmd_cpu_1_t)), \
+	    sizeof (cmd_cpu_pers_t))
+
+#define	cpu_header		cpu_pers.cpup_header
+#define	cpu_nodetype		cpu_pers.cpup_header.hdr_nodetype
+#define	cpu_bufname		cpu_pers.cpup_header.hdr_bufname
+#define	cpu_version		cpu_pers.cpup_version
+#define	cpu_cpuid		cpu_pers.cpup_cpuid
+#define	cpu_type		cpu_pers.cpup_type
+#define	cpu_faulting		cpu_pers.cpup_faulting
+#define	cpu_asru		cpu_pers.cpup_asru
+#define	cpu_fru			cpu_pers.cpup_fru
+#define	cpu_uec			cpu_pers.cpup_uec
+#define	cpu_olduec		cpu_pers.cpup_olduec
+#define	cpu_icache		cpu_cases.cpuc_icache
+#define	cpu_dcache		cpu_cases.cpuc_dcache
+#define	cpu_pcache		cpu_cases.cpuc_pcache
+#define	cpu_itlb		cpu_cases.cpuc_itlb
+#define	cpu_dtlb		cpu_cases.cpuc_dtlb
+#define	cpu_l2data		cpu_cases.cpuc_l2data
+#define	cpu_l2tag		cpu_cases.cpuc_l2tag
+#define	cpu_l3data		cpu_cases.cpuc_l3data
+#define	cpu_l3tag		cpu_cases.cpuc_l3tag
+#define	cpu_fpu			cpu_cases.cpuc_fpu
+#define	cpu_asru_nvl		cpu_asru.fmri_nvl
+#define	cpu_fru_nvl		cpu_fru.fmri_nvl
+
+/*
+ * L2$ and L3$ Data errors
+ *
+ *          SERD name
+ *   Type   (if any)   Fault
+ *  ------ ----------- -------------------------------
+ *   xxC   l2cachedata fault.cpu.<cputype>.l2cachedata
+ *   xxU        -      fault.cpu.<cputype>.l2cachedata
+ *  L3_xxC l3cachedata fault.cpu.<cputype>.l3cachedata
+ *  L3_xxU      -      fault.cpu.<cputype>.l3cachedata
+ *
+ * NOTE: For the purposes of the discussion below, xxC and xxU refer to both
+ *       L2$ and L3$ data errors.
+ *
+ * These ereports will be dropped if (among other things) they are side-effects
+ * of UEs (xxUs only) or other xxCs or xxUs.  Whenever UEs are detected, they
+ * are added to a per-CPU cache.  xxUs are then compared to this cache.  If a
+ * xxU's AFAR refers to an address which recently saw a UE, the xxU is dropped,
+ * as it was most likely caused by the UE.  When multiple xxCs and xxUs are seen
+ * with the same ENA, all save one are generally side-effects.  We track these
+ * groups (referred to as trains), matching them against a premade list.  If one
+ * of the trains matches, we drop all but the primary, which is indicated in the
+ * list.
+ *
+ * The expected resolution of l2cachedata and l3cachedata faults is the
+ * disabling of the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_xxc(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_xxu(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+/*
+ * L2$ and L3$ Tag errors
+ *
+ *           SERD name
+ *   Type    (if any)   Fault
+ *  ------- ----------- -------------------------------
+ *   TxCE   l2cachetag  fault.cpu.<cputype>.l2cachetag
+ *  L3_THCE l3cachetag  fault.cpu.<cputype>.l3cachetag
+ *
+ * We'll never see the uncorrectable Tag errors - they'll cause the machine to
+ * reset, and we'll be ne'er the wiser.
+ *
+ * The expected resolution of l2cachetag and l3cachetag faults is the disabling
+ * of the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_txce(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+extern cmd_evdisp_t cmd_l3_thce(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+/*
+ * L1$ errors
+ *
+ *          SERD name
+ *   Type   (if any)   Fault
+ *  ------- --------- -------------------------------
+ *   IPE     icache   fault.cpu.<cputype>.icache
+ *   IxSPE   icache   fault.cpu.<cputype>.icache
+ *   DPE     dcache   fault.cpu.<cputype>.dcache
+ *   DxSPE   dcache   fault.cpu.<cputype>.dcache
+ *   PDSPE   pcache   fault.cpu.<cputype>.pcache
+ *
+ * The I$, D$, and P$ are clean, and thus have no uncorrectable errors.
+ *
+ * The expected resolution of icache, dcache, and pcache faults is the disabling
+ * of the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_icache(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_dcache(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_pcache(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+/*
+ * TLB errors
+ *
+ *         SERD name
+ *   Type  (if any)   Fault
+ *  ------ --------- -------------------------------
+ *  ITLBPE   itlb    fault.cpu.<cputype>.itlb
+ *  DTLBPE   dtlb    fault.cpu.<cputype>.dtlb
+ *
+ * The expected resolution of itlb and dtlb faults is the disabling of the
+ * indicated CPU.
+ */
+extern cmd_evdisp_t cmd_itlb(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_dtlb(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+extern void cmd_cpuerr_close(fmd_hdl_t *, void *);
+
+/*
+ * FPU errors
+ *
+ *         SERD name
+ *   Type  (if any)   Fault
+ *  ------ --------- -------------------------------
+ *   FPU       -     fault.cpu.<cputype>.fpu
+ *
+ * The expected resolution of FPU faults is the disabling of the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_fpu(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+/*
+ * CPUs are described by FMRIs.  This routine will retrieve the CPU state
+ * structure (creating a new one if necessary) described by the detector
+ * FMRI in the passed ereport.
+ */
+extern cmd_cpu_t *cmd_cpu_lookup_from_detector(fmd_hdl_t *, nvlist_t *,
+    const char *);
+
+extern nvlist_t *cmd_cpu_create_fault(fmd_hdl_t *, cmd_cpu_t *, const char *,
+    nvlist_t *, uint_t);
+
+extern void cmd_cpu_destroy(fmd_hdl_t *, cmd_cpu_t *);
+extern void *cmd_cpu_restore(fmd_hdl_t *, fmd_case_t *, cmd_case_ptr_t *);
+extern void cmd_cpu_validate(fmd_hdl_t *);
+extern void cmd_cpu_timeout(fmd_hdl_t *, id_t, void *);
+extern void cmd_cpu_gc(fmd_hdl_t *);
+extern void cmd_cpu_fini(fmd_hdl_t *hdl);
+extern char *cmd_cpu_serdnm_create(fmd_hdl_t *, cmd_cpu_t *, const char *);
+
+extern int cmd_cpu_check_support(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _CMD_CPU_H */

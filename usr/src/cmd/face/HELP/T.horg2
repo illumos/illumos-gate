@@ -1,0 +1,20 @@
+
+Press CHOICES to select your preference.
+
+         - alphabetical (default value): Names of files and file
+           folders beginning with numbers are displayed first, then
+           names beginning with capital letters, followed by names
+           beginning with  lower case letters.
+
+         - alphabetical by description: All files and file folders
+           with the same description are grouped together and
+           alphabetically sorted within each group.  The groups are
+           also ordered alphabetically (e.g.  File folders before
+           Standard Files).
+
+         - least recent first: Chronological order of files and file
+           folders starting with oldest file.
+
+         - most recent first: Chronological order of files and file
+           folders starting with newest file.
+

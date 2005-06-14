@@ -1,0 +1,535 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# caps
+#
+# Terminfo Capability Database
+#
+# Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
+#
+# $Header: /team/ps/sun_xcurses/archive/local_changes/xcurses/src/lib/libxcurses/src/libc/xcurses/rcs/caps 1.4 1998/06/04 19:22:52 cbates Exp $
+#
+#
+# DESCRIPTION
+#
+# This file and the companion AWK scripts are used to generate
+#
+# 	boolcode.c	boolfnam.c	boolname.c
+#	numcode.c	numfnam.c	numname.c
+#       strcode.c	strfnam.c	strname.c
+#	term.h
+#
+#
+# FORMAT
+#
+# 	full-name  terminfo-name  termcap-code  type  comment
+#
+# full-name 		Name of the variable used within C source.
+# terminfo-name		Name used by TIC or DUMP for terminfo definitions.
+# termcap-code		Old termcap code name
+# type			One of bool, number, str
+# comment		
+#
+# Each field is <blank> separated.  All blank lines and lines beginning 
+# with '#' are ignored.
+#
+#
+# NOTE
+#
+# New capabilities must be placed at the end of the appropriate list.
+# This allows previous versions of programs to still function without
+# being recompiled.
+#
+
+auto_left_margin	bw	bw	bool	cub1 wraps from column 0 to last column
+auto_right_margin	am	am	bool	Terminal has automatic margins
+no_esc_ctlc		xsb	xb	bool	Beehive (f1=escape, f2=ctrl C)
+ceol_standout_glitch	xhp	xs	bool	Standout not erased by overwriting (hp)
+eat_newline_glitch	xenl	xn	bool	newline ignored after 80 cols (Concept)
+erase_overstrike	eo	eo	bool	Can erase overstrikes with a blank
+generic_type		gn	gn	bool	Generic line type (e.g. dialup, switch).
+hard_copy		hc	hc	bool	Hardcopy terminal
+has_meta_key		km	km	bool	Has a meta key (shift, sets parity bit)
+has_status_line		hs	hs	bool	Has extra status line
+insert_null_glitch	in	in	bool	Insert mode distinguishes nulls
+memory_above		da	da	bool	Display may be retained above the screen
+memory_below		db	db	bool	Display may be retained below the screen
+move_insert_mode	mir	mi	bool	Safe to move while in insert mode
+move_standout_mode	msgr	ms	bool	Safe to move in standout modes
+over_strike		os	os	bool	Terminal overstrikes
+status_line_esc_ok	eslok	es	bool	Escape can be used on the status line
+dest_tabs_magic_smso	xt	xt	bool	Tabs destructive, magic smso char (Teleray 1061)
+tilde_glitch		hz	hz	bool	Hazeltine; can't print ~'s
+transparent_underline	ul	ul	bool	underline character overstrikes
+xon_xoff		xon	xo	bool	Terminal uses xon/xoff handshaking
+needs_xon_xoff		nxon	nx	bool	Padding won't work, xon/xoff required
+prtr_silent		mc5i	5i	bool	Printer won't echo on screen
+hard_cursor		chts	HC	bool	Cursor is hard to see
+non_rev_rmcup		nrrmc	NR	bool	smcup does not reverse rmcup
+no_pad_char		npc	NP	bool	Pad character doesn't exist
+non_dest_scroll_region	ndscr	ND	bool	Scroll region is non-destructive
+can_change		ccc	cc	bool	terminal can redefine existing color
+back_color_erase	bce	be	bool	Screen erased with background color
+hue_lightness_saturation	hls	hl	bool	Terminal uses only HLS color notation (Tektronix)
+col_addr_glitch		xhpa	YA	bool	Only positive motion for hpa/mhpa caps
+cr_cancels_micro_mode	crxm	YB	bool	Using cr turns off micro mode
+has_print_wheel		daisy	YC	bool	Printer needs operator to change character set
+row_addr_glitch		xvpa	YD	bool	Only positive motion for vpa/mvpa caps
+semi_auto_right_margin	sam	YE	bool	Printing in last column causes cr
+cpi_changes_res		cpix	YF	bool	Changing character pitch changes resolution
+lpi_changes_res		lpix	YG	bool	Changing line pitch changes resolution
+# Add new boolean capabilities before this line
+
+columns			cols	co	number	# of columns in a line
+init_tabs		it	it	number	Tabs initially every # spaces
+lines			lines	li	number	# of lines on screen or page
+lines_of_memory		lm	lm	number	Lines of memory if > lines. 0 means varies
+magic_cookie_glitch	xmc	sg	number	# of blank chars left by smso or rmso
+padding_baud_rate	pb	pb	number	Lowest baud rate where cr/nl padding needed
+virtual_terminal	vt	vt	number	Virtual terminal # (CB/Unix)
+width_status_line	wsl	ws	number	# columns in status line
+num_labels		nlab	Nl	number	# of labels on screen (start at 1)
+label_height		lh	lh	number	# rows in each label
+label_width		lw	lw	number	# cols in each label
+max_attributes		ma	ma	number	Max combined attr. terminal can display
+maximum_windows		wnum	MW	number	Max # of definable windows
+max_colors		colors	Co	number	Max # of colors on the screen
+max_pairs		pairs	pa	number	Max # of color-pairs on the screen
+no_color_video		ncv	NC	number	Video attributes that can't be used withcolors
+buffer_capacity		bufsz	Ya	number	# of bytes buffered before printing
+dot_vert_spacing	spinv	Yb	number	Spacing of pins vertically in pins per inch
+dot_horz_spacing	spinh	Yc	number	Spacing of dots horizontally in dots per inch
+max_micro_address	maddr	Yd	number	Max value in micro_..._address
+max_micro_jump		mjump	Ye	number	Max value in parm_..._micro
+micro_col_size		mcs	Yf	number	Character step size when in micro mode
+micro_line_size		mls	Yg	number	Line step size when in micro mode
+number_of_pins		npins	yH	number	Number of pins in print-head
+output_res_char		orc	Yi	number	Horz. res. in units per character
+output_res_line		orl	Yj	number	Vert. res. in units per line
+output_res_horz_inch	orhi	Yk	number	Horz. res. in units per inch
+output_res_vert_inch	orvi	Yl	number	Vert. res. in units per inch
+print_rate		cps	Ym	number	Print rate in characters per second
+wide_char_size		widcs	Yn	number	Character step size when in double wide mode
+buttons			btns	BT	number	Number of buttons on mouse
+bit_image_entwining	bitwin	Yo	number	Number of passes for each bit-map row
+bit_image_type		bitype	Yp	number	Type of bit image device
+# Add new numeric capabilities before this line
+
+back_tab		cbt	bt	str	Back tab (P)
+bell			bel	bl	str	Audible signal (bell) (P)
+carriage_return	cr	cr	str	Carriage return (P*)
+change_scroll_region	csr	cs	str	change to lines #1 through #2 (vt100) (PG)
+clear_all_tabs		tbc	ct	str	Clear all tab stops. (P)
+clear_screen		clear	cl	str	Clear screen (P*)
+clr_eol			el	ce	str	Clear to end of line (P)
+clr_eos			ed	cd	str	Clear to end of display (P*)
+column_address		hpa	ch	str	Set cursor column (PG)
+command_character	cmdch	CC	str	Term. settable cmd char in prototype
+cursor_address		cup	cm	str	Cursor motion to row #1 col #2 (PG)
+cursor_down		cud1	do	str	Down one line
+cursor_home		home	ho	str	Home cursor (if no cup)
+cursor_invisible	civis	vi	str	Make cursor invisible
+cursor_left		cub1	le	str	Move cursor left one space.
+cursor_mem_address	mrcup	CM	str	Memory relative cursor addressing.
+cursor_normal		cnorm	ve	str	Make cursor appear normal (undo vs/vi)
+cursor_right		cuf1	nd	str	Non-destructive space (cursor right)
+cursor_to_ll		ll	ll	str	Last line, first column (if no cup)
+cursor_up		cuu1	up	str	Upline (cursor up)
+cursor_visible		cvvis	vs	str	Make cursor very visible
+delete_character	dch1	dc	str	Delete character (P*)
+delete_line		dl1	dl	str	Delete line (P*)
+dis_status_line		dsl	ds	str	Disable status line
+down_half_line		hd	hd	str	Half-line down (forward 1/2 linefeed)
+enter_alt_charset_mode	smacs	as	str	Start alternate character set (P)
+enter_blink_mode	blink	mb	str	Turn on blinking
+enter_bold_mode		bold	md	str	Turn on bold (extra bright) mode
+enter_ca_mode		smcup	ti	str	String to end programs that use cup
+enter_delete_mode	smdc	dm	str	Delete mode (enter)
+enter_dim_mode		dim	mh	str	Turn on half-bright mode
+enter_insert_mode	smir	im	str	Insert mode (enter);
+enter_secure_mode	invis	mk	str	Turn on blank mode (chars invisible)
+enter_protected_mode	prot	mp	str	Turn on protected mode
+enter_reverse_mode	rev	mr	str	Turn on reverse video mode
+enter_standout_mode	smso	so	str	Begin stand out mode
+enter_underline_mode	smul	us	str	Start underscore mode
+erase_chars		ech	ec	str	Erase #1 characters (PG)
+exit_alt_charset_mode	rmacs	ae	str	End alternate character set (P)
+exit_attribute_mode	sgr0	me	str	Turn off all attributes
+exit_ca_mode		rmcup	te	str	String to begin programs that use cup
+exit_delete_mode	rmdc	ed	str	End delete mode
+exit_insert_mode	rmir	ei	str	End insert mode;
+exit_standout_mode	rmso	se	str	End stand out mode
+exit_underline_mode	rmul	ue	str	End underscore mode
+flash_screen		flash	vb	str	Visible bell (may not move cursor)
+form_feed		ff	ff	str	Hardcopy terminal page eject (P*)
+from_status_line	fsl	fs	str	Return from status line
+init_1string		is1	i1	str	Terminal initialization string
+init_2string		is2	is	str	Terminal initialization string
+init_3string		is3	i3	str	Terminal initialization string
+init_file		if	if	str	Name of file containing is
+insert_character	ich1	ic	str	Insert character (P)
+insert_line		il1	al	str	Add new blank line (P*)
+insert_padding		ip	ip	str	Insert pad after character inserted (P*)
+key_backspace		kbs	kb	str	Sent by backspace key
+key_catab		ktbc	ka	str	Sent by clear-all-tabs key.
+key_clear		kclr	kC	str	Sent by clear screen or erase key.
+key_ctab		kctab	kt	str	Sent by clear-tab key
+key_dc			kdch1	kD	str	Sent by delete character key.
+key_dl			kdl1	kL	str	Sent by delete line key.
+key_down		kcud1	kd	str	Sent by terminal down arrow key
+key_eic			krmir	kM	str	Sent by rmir or smir in insert mode.
+key_eol			kel	kE	str	Sent by clear-to-end-of-line key.
+key_eos			ked	kS	str	Sent by clear-to-end-of-screen key.
+key_f0			kf0	k0	str	Sent by function key f0.
+key_f1			kf1	k1	str	Sent by function key f1.
+key_f10			kf10	k;	str	Sent by function key f10.
+key_f2			kf2	k2	str	Sent by function key f2.
+key_f3			kf3	k3	str	Sent by function key f3.
+key_f4			kf4	k4	str	Sent by function key f4.
+key_f5			kf5	k5	str	Sent by function key f5.
+key_f6			kf6	k6	str	Sent by function key f6.
+key_f7			kf7	k7	str	Sent by function key f7.
+key_f8			kf8	k8	str	Sent by function key f8.
+key_f9			kf9	k9	str	Sent by function key f9.
+key_home		khome	kh	str	Sent by home key.
+key_ic			kich1	kI	str	Sent by ins char/enter ins mode key.
+key_il			kil1	kA	str	Sent by insert line.
+key_left		kcub1	kl	str	Sent by terminal left arrow key
+key_ll			kll	kH	str	Sent by home down key (lower left)
+key_npage		knp	kN	str	Sent by next-page key
+key_ppage		kpp	kP	str	Sent by previous-page key
+key_right		kcuf1	kr	str	Sent by terminal right arrow key
+key_sf			kind	kF	str	Sent by scroll-forward/down key
+key_sr			kri	kR	str	Sent by scroll-backward/up key
+key_stab		khts	kT	str	Sent by set-tab key
+key_up			kcuu1	ku	str	Sent by terminal up arrow key
+keypad_local		rmkx	ke	str	Out of keypad transmit mode
+keypad_xmit		smkx	ks	str	Put terminal in keypad transmit mode
+lab_f0			lf0	l0	str	Labels on function key f0 if not f0
+lab_f1			lf1	l1	str	Labels on function key f1 if not f1
+lab_f10			lf10	la	str	Labels on function key f10 if not f10
+lab_f2			lf2	l2	str	Labels on function key f2 if not f2
+lab_f3			lf3	l3	str	Labels on function key f3 if not f3
+lab_f4			lf4	l4	str	Labels on function key f4 if not f4
+lab_f5			lf5	l5	str	Labels on function key f5 if not f5
+lab_f6			lf6	l6	str	Labels on function key f6 if not f6
+lab_f7			lf7	l7	str	Labels on function key f7 if not f7
+lab_f8			lf8	l8	str	Labels on function key f8 if not f8
+lab_f9			lf9	l9	str	Labels on function key f9 if not f9
+meta_off		rmm	mo	str	Turn off meta mode
+meta_on			smm	mm	str	Turn on meta mode (8th bit)
+newline			nel	nw	str	Newline (behaves like cr followed by lf)
+pad_char		pad	pc	str	Pad character (rather than null)
+parm_dch		dch	DC	str	Delete #1 chars (PG*)
+parm_delete_line	dl	DL	str	Delete #1 lines (PG*)
+parm_down_cursor	cud	DO	str	Move cursor down #1 lines. (PG*)
+parm_ich		ich	IC	str	Insert #1 blank chars (PG*)
+parm_index		indn	SF	str	Scroll forward #1 lines (PG)
+parm_insert_line	il	AL	str	Add #1 new blank lines (PG*)
+parm_left_cursor	cub	LE	str	Move cursor left #1 spaces (PG)
+parm_right_cursor	cuf	RI	str	Move cursor right #1 spaces. (PG*)
+parm_rindex		rin	SR	str	Scroll backward #1 lines (PG)
+parm_up_cursor		cuu	UP	str	Move cursor up #1 lines. (PG*)
+pkey_key		pfkey	pk	str	Prog funct key #1 to type string #2
+pkey_local		pfloc	pl	str	Prog funct key #1 to execute string #2
+pkey_xmit		pfx	px	str	Prog funct key #1 to xmit string #2
+print_screen		mc0	ps	str	Print contents of the screen
+prtr_off		mc4	pf	str	Turn off the printer
+prtr_on			mc5	po	str	Turn on the printer
+repeat_char		rep	rp	str	Repeat char #1 #2 times.	(PG*)
+reset_1string		rs1	r1	str	Reset terminal completely to sane modes.
+reset_2string		rs2	r2	str	Reset terminal completely to sane modes.
+reset_3string		rs3	r3	str	Reset terminal completely to sane modes.
+reset_file		rf	rf	str	Name of file containing reset string.
+restore_cursor		rc	rc	str	Restore cursor to position of last sc.
+row_address		vpa	cv	str	Like hpa but sets row. (PG)
+save_cursor		sc	sc	str	Save cursor position. (P)
+scroll_forward		ind	sf	str	Scroll text up (P)
+scroll_reverse		ri	ri	str	Scroll text down (P)
+set_attributes		sgr	sa	str	Define the video attributes (PG9)
+set_tab			hts	st	str	Set a tab in all rows, current column.
+set_window		wind	wi	str	Current window is lines #1-#2 cols #3-#4
+tab			ht	ta	str	Tab to next 8 space hardware tab stop.
+to_status_line		tsl	ts	str	Go to status line
+underline_char		uc	uc	str	Underscore one char and move past it
+up_half_line		hu	hu	str	Half-line up (reverse 1/2 linefeed)
+init_prog		iprog	iP	str	Path name of program for init
+key_a1			ka1	K1	str	Upper left of keypad
+key_a3			ka3	K3	str	Upper right of keypad
+key_b2			kb2	K2	str	Center of keypad
+key_c1			kc1	K4	str	Lower left of keypad
+key_c3			kc3	K5	str	Lower right of keypad
+prtr_non		mc5p	pO	str	Turn on the printer for #1 bytes.
+char_padding		rmp	rP	str	Like ip but when in replace mode
+acs_chars		acsc	ac	str	Graphics char set pairs aAbBcC - defn=vt100
+plab_norm		pln	pn	str	Prog label #1 to show string #2
+key_btab		kcbt	kB	str	Sent by BackTab key
+enter_xon_mode		smxon	SX	str	Turn on xon/xoff handshaking
+exit_xon_mode		rmxon	RX	str	Turn off xon/xoff handshaking
+enter_am_mode		smam	SA	str	Turn on automatic margins
+exit_am_mode		rmam	RA	str	Turn off automatic margins
+xon_character		xonc	XN	str	xon character
+xoff_character		xoffc	XF	str	xoff character
+ena_acs			enacs	eA	str	Enable alternate character set
+label_on		smln	LO	str	Turn on soft labels
+label_off		rmln	LF	str	Turn off soft labels
+key_beg			kbeg	@1	str	Sent by beginning key
+key_cancel		kcan	@2	str	Sent by cancel key
+key_close		kclo	@3	str	Sent by close key
+key_command		kcmd	@4	str	Sent by command key
+key_copy		kcpy	@5	str	Sent by copy key
+key_create		kcrt	@6	str	Sent by create key
+key_end			kend	@7	str	Sent by end key
+key_enter		kent	@8	str	Sent by enter/send key
+key_exit		kext	@9	str	Sent by exit key
+key_find		kfnd	@0	str	Sent by find key
+key_help		khlp	%1	str	Sent by help key
+key_mark		kmrk	%2	str	Sent by mark key
+key_message		kmsg	%3	str	Sent by message key
+key_move		kmov	%4	str	Sent by move key
+key_next		knxt	%5	str	Sent by next-object key
+key_open		kopn	%6	str	Sent by open key
+key_options		kopt	%7	str	Sent by options key
+key_previous		kprv	%8	str	Sent by previous-object key
+key_print		kprt	%9	str	Sent by print or copy key
+key_redo		krdo	%0	str	Sent by redo key
+key_reference		kref	&1	str	Sent by reference key
+key_refresh		krfr	&2	str	Sent by refresh key
+key_replace		krpl	&3	str	Sent by replace key
+key_restart		krst	&4	str	Sent by restart key
+key_resume		kres	&5	str	Sent by resume key
+key_save		ksav	&6	str	Sent by save key
+key_suspend		kspd	&7	str	Sent by suspend key
+key_undo		kund	&8	str	Sent by undo key
+key_sbeg		kBEG	&9	str	Sent by shift-beginning key
+key_scancel		kCAN	&0	str	Sent by shift-cancel key
+key_scommand		kCMD	*1	str	Sent by shift-command key
+key_scopy		kCPY	*2	str	Sent by shift-copy key
+key_screate		kCRT	*3	str	Sent by shift-create key
+key_sdc			kDC	*4	str	Sent by shift-delete-char key
+key_sdl			kDL	*5	str	Sent by shift-delete-line key
+key_select		kslt	*6	str	Sent by select key
+key_send		kEND	*7	str	Sent by shift-end key
+key_seol		kEOL	*8	str	Sent by shift-eol key
+key_sexit		kEXT	*9	str	Sent by shift-exit key
+key_sfind		kFND	*0	str	Sent by shift-find key
+key_shelp		kHLP	#1	str	Sent by shift-help key
+key_shome		kHOM	#2	str	Sent by shift-home key
+key_sic			kIC	#3	str	Sent by shift-insert-char key
+key_sleft		kLFT	#4	str	Sent by shift-left key
+key_smessage		kMSG	%a	str	Sent by shift-message key
+key_smove		kMOV	%b	str	Sent by shift-move key
+key_snext		kNXT	%c	str	Sent by shift-next key
+key_soptions		kOPT	%d	str	Sent by shift-options key
+key_sprevious		kPRV	%e	str	Sent by shift-prev key
+key_sprint		kPRT	%f	str	Sent by shift-print key
+key_sredo		kRDO	%g	str	Sent by shift-redo key
+key_sreplace		kRPL	%h	str	Sent by shift-replace key
+key_sright		kRIT	%i	str	Sent by shift-right key
+key_srsume		kRES	%j	str	Sent by shift-resume key
+key_ssave		kSAV	!1	str	Sent by shift-save key
+key_ssuspend		kSPD	!2	str	Sent by shift-suspend key
+key_sundo		kUND	!3	str	Sent by shift-undo key
+req_for_input		rfi	RF	str	Send next input char (for ptys)
+key_f11			kf11	F1	str	Sent by function key 11
+key_f12			kf12	F2	str	Sent by function key 12
+key_f13			kf13	F3	str	Sent by function key 13
+key_f14			kf14	F4	str	Sent by function key 14
+key_f15			kf15	F5	str	Sent by function key 15
+key_f16			kf16	F6	str	Sent by function key 16
+key_f17			kf17	F7	str	Sent by function key 17
+key_f18			kf18	F8	str	Sent by function key 18
+key_f19			kf19	F9	str	Sent by function key 19
+key_f20			kf20	FA	str	Sent by function key 20
+key_f21			kf21	FB	str	Sent by function key 21
+key_f22			kf22	FC	str	Sent by function key 22
+key_f23			kf23	FD	str	Sent by function key 23
+key_f24			kf24	FE	str	Sent by function key 24
+key_f25			kf25	FF	str	Sent by function key 25
+key_f26			kf26	FG	str	Sent by function key 26
+key_f27			kf27	FH	str	Sent by function key 27
+key_f28			kf28	FI	str	Sent by function key 28
+key_f29			kf29	FJ	str	Sent by function key 29
+key_f30			kf30	FK	str	Sent by function key 30
+key_f31			kf31	FL	str	Sent by function key 31
+key_f32			kf32	FM	str	Sent by function key 32
+key_f33			kf33	FN	str	Sent by function key 33
+key_f34			kf34	FO	str	Sent by function key 34
+key_f35			kf35	FP	str	Sent by function key 35
+key_f36			kf36	FQ	str	Sent by function key 36
+key_f37			kf37	FR	str	Sent by function key 37
+key_f38			kf38	FS	str	Sent by function key 38
+key_f39			kf39	FT	str	Sent by function key 39
+key_f40			kf40	FU	str	Sent by function key 40
+key_f41			kf41	FV	str	Sent by function key 41
+key_f42			kf42	FW	str	Sent by function key 42
+key_f43			kf43	FX	str	Sent by function key 43
+key_f44			kf44	FY	str	Sent by function key 44
+key_f45			kf45	FZ	str	Sent by function key 45
+key_f46			kf46	Fa	str	Sent by function key 46
+key_f47			kf47	Fb	str	Sent by function key 47
+key_f48			kf48	Fc	str	Sent by function key 48
+key_f49			kf49	Fd	str	Sent by function key 49
+key_f50			kf50	Fe	str	Sent by function key 50
+key_f51			kf51	Ff	str	Sent by function key 51
+key_f52			kf52	Fg	str	Sent by function key 52
+key_f53			kf53	Fh	str	Sent by function key 53
+key_f54			kf54	Fi	str	Sent by function key 54
+key_f55			kf55	Fj	str	Sent by function key 55
+key_f56			kf56	Fk	str	Sent by function key 56
+key_f57			kf57	Fl	str	Sent by function key 57
+key_f58			kf58	Fm	str	Sent by function key 58
+key_f59			kf59	Fn	str	Sent by function key 59
+key_f60			kf60	Fo	str	Sent by function key 60
+key_f61			kf61	Fp	str	Sent by function key 61
+key_f62			kf62	Fq	str	Sent by function key 62
+key_f63			kf63	Fr	str	Sent by function key 63
+clr_bol			el1	cb	str	Clear to beginning of line, inclusive
+clear_margins		mgc	MC	str	Clear all margins top, bottom, and sides
+set_left_margin		smgl	ML	str	Set left margin at current column 
+set_right_margin	smgr	MR	str	Set right margin at current column
+label_format		fln	Lf	str	Label format
+set_clock		sclk	SC	str	Set clock to hours #1, minutes #2, seconds #3
+display_clock		dclk	DK	str	Display time-of-day clock
+remove_clock		rmclk	RC	str	Remove time-of-day clock
+create_window		cwin	CW	str	Define win #1 to go from #2,#3 to #4,#5
+goto_window		wingo	WG	str	Go to window #1
+hangup			hup	HU	str	hand-up phone
+dial_phone		dial	DI	str	Dial phone number #1
+quick_dial		qdial	QD	str	Dail phone number #1, without progress detection
+tone			tone	TO	str	Select touch tone dialing
+pulse			pulse	PU	str	Select pulse dialing
+flash_hook		hook	fh	str	Flash the phone switch hook
+fixed_pause		pause	PA	str	Pause for 2-3 seconds
+wait_tone		wait	WA	str	Wait for dial tone
+user0			u0	u0	str	User string 0
+user1			u1	u1	str	User string 1
+user2			u2	u2	str	User string 2
+user3			u3	u3	str	User string 3
+user4			u4	u4	str	User string 4
+user5			u5	u5	str	User string 5
+user6			u6	u6	str	User string 6
+user7			u7	u7	str	User string 7
+user8			u8	u8	str	User string 8
+user9			u9	u9	str	User string 9
+orig_pair		op	op	str	Set default color-pair to the orignal one
+orig_colors		oc	oc	str	Set all color(-pair)s to the original ones
+initialize_color	initc	Ic	str	Initialize the definition of color
+initialize_pair		initp	Ip	str	Initialize color-pair
+set_color_pair		scp	sp	str	Set current color-pair to #1
+set_foreground		setf	Sf	str	Set current foreground color #1
+set_background		setb	Sb	str	Set current background color #1
+change_char_pitch	cpi	ZA	str	Change # of characters per inch
+change_line_pitch	lpi	ZB	str	Change # of lines per inch
+change_res_horz		chr	ZC	str	Change horizontal resolution
+change_res_vert		cvr	ZD	str	Change vertical resolution
+define_char		defc	ZE	str	Define a character in a character set
+enter_doublewide_mode	swidm	ZF	str	Enable double wide printing
+enter_draft_quality	sdrfq	ZG	str	Set draft quality print
+enter_italics_mode	sitm	ZH	str	Enable italics
+enter_leftward_mode	slm	ZI	str	Enable leftward carriage motion
+enter_micro_mode	smicm	ZJ	str	Enable micro motion capabilities
+enter_near_letter_quality	snlq	ZK	str	Set near-letter quality
+enter_normal_quality	snrmq	ZL	str	Set normal quality print
+enter_shadow_mode	sshm	ZM	str	Enable shadow printing
+enter_subscript_mode	ssubm	ZN	str	Enable subscript printing
+enter_superscript_mode	ssupm	ZO	str	Enable superscript printing
+enter_upward_mode	sum	ZP	str	Enable upward carriage motion
+exit_doublewide_mode	rwidm	ZQ	str	Disable double wide printing
+exit_italics_mode	ritm	ZR	str	Disable italics
+exit_leftward_mode	rlm	ZS	str	Enable rightward (normal) carriage motion
+exit_micro_mode		rmicm	ZT	str	Disable micro motion capabilities
+exit_shadow_mode	rshm	ZU	str	Disable shadow printing
+exit_subscript_mode	rsubm	ZV	str	Disable subscript printing
+exit_superscript_mode	rsupm	ZW	str	Disable superscript printing
+exit_upward_mode	rum	ZX	str	Enable downward (normal) carriage motion
+micro_column_address	mhpa	ZY	str	Like column address for micro adjustment
+micro_down		mcud1	ZZ	str	Like cursor_down for micro adjustment
+micro_left		mcub1	Za	str	Like cursor_left for micro adjustment
+micro_right		mcuf1	Zb	str	Like cursor_right for micro adjustment
+micro_row_address	mvpa	Zc	str	Like row_address for micro adjustment
+micro_up		mcuu1	Zd	str	Like cursor_up for micro adjustment
+order_of_pins		porder	Ze	str	Matches software bits to print-head pins
+parm_down_micro		mcud	Zf	str	Like parm_down_cursor
+parm_left_micro		mcub	Zg	str	Like parm_left_cursor
+parm_right_micro	mcuf	Zh	str	Like parm_right_cursor
+parm_up_micro		mcuu	Zi	str	Like parm_up_cursor
+select_char_set		scs	Zj	str	Select character set
+set_bottom_margin	smgb	Zk	str	Set bottom margin at current line
+set_bottom_margin_parm	smgbp	Zl	str	Set bottom margin at line #1 or #2 lines from the bottom
+set_left_margin_parm	smglp	Zm	str	Set left (right) margin at column #1 (#2)
+set_right_margin_parm	smgrp	Zn	str	Set right margin at column #1
+set_top_margin		smgt	Zo	str	Set top margin at current line
+set_top_margin_parm	smgtp	Zp	str	Set top (bottom) margin at line #1 (#2)
+start_bit_image		sbim	Zq	str	Start printing bit image graphics
+start_char_set_def	scsd	Zr	str	Start definition of character set
+stop_bit_image		rbim	Zs	str	Stop printing bit image graphics
+stop_char_set_def	rcsd	Zt	str	Stop definition of character set
+subscript_characters	subcs	Zu	str	List of "subscript-able" characters
+superscript_characters	supcs	Zv	str	List of "superscript-able" characters
+these_cause_cr		docr	Zw	str	Printing any of these chars causes cr
+zero_motion		zerom	Zx	str	No motion for the subsequent character
+char_set_names		csnm	Zy	str	List of character set names
+key_mouse		kmous	Km	str	Mourse event has occured
+mouse_info		minfo	Mi	str	Mouse status information
+req_mouse_pos		reqmp	RQ	str	Request mouse position report
+get_mouse		getm	Gm	str	Curses should get button events
+set_a_foreground	setaf	AF	str	Set foreground colour #1 using ANSI escape
+set_a_background	setab	AB	str	Set background colour #1 using ANSI escape
+pkey_plab		pfxl	xl	str	Prog key #1 to xmit #2 and show string #3
+device_type		devt	dv	str	Indicate language/codeset support
+code_set_init		csin	ci	str	Init sequence for multiple codesets
+set0_des_seq		s0ds	s0	str	Shift into codeset 0 (EUC set 0, ASCII)
+set1_des_seq		s1ds	s1	str	Shift into codeset 1
+set2_des_seq		s2ds	s2	str	Shift into codeset 2
+set3_des_seq		s3ds	s3	str	Shift into codeset 3
+set_lr_margin		smglr	ML	str	Set both left & right margins
+set_tb_margin		smgtb	MT	str	Set both top & bottom margins
+bit_image_repeat	birep	Xy	str	Repeat bit-image cell #1, #2 times
+bit_image_newline	binel	Zz	str	Move start of next row
+bit_image_carriage_return	bicr	Yv	str	Move start of same row
+color_names		colornm	Yw	str	Give name for color #1
+define_bit_image_region	defbi	Yx	str	Define rectangular bit-image region
+end_bit_image_region	endbi	Yy	str	End a bit-image region
+set_color_band		setcolor	Yz	str	Change to ribbon color #1
+set_page_length		slines	YZ	str	Set page length to #1 lines
+display_pc_char		dispc	S1	str	Display PC character
+enter_pc_charset_mode	smpch	S2	str	Enter PC character display mode
+exit_pc_charset_mode	rmpch	S3	str	Exit PC character display mode
+enter_scancode_mode	smsc	S4	str	Enter PC scancode mode
+exit_scancode_mode	rmsc	S5	str	Exit PC scancode mode
+pc_term_options		pctrm	S6	str	PC terminal options
+scancode_escape		scesc	S7	str	Escape for scancode emulation
+alt_scancode_esc	scesa	S8	str	Alternate escape for scancode emulation
+enter_horizontal_hl_mode	ehhlm	??	str	Horizontal highlight mode
+enter_left_hl_mode	elhlm	??	str	Left highlight mode
+enter_low_hl_mode	elohlm	??	str	Low highlight mode
+enter_right_hl_mode	erhlm	??	str	Right highlight mode
+enter_top_hl_mode	ethlm	??	str	Top highlight mode
+enter_vertical_hl_mode	evhlm	??	str	Vertical highlight mode
+set_a_attributes	sgr1	?1	str	Define second set of attributes #1-#6
+set_pglen_inch		slength	YI	str	Set page length to #1/100 of an inch
+# Add new string capabilities before this line

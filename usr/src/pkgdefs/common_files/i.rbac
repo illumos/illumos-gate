@@ -1,0 +1,356 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# i.rbac
+#
+# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# class action script for "rbac" class files
+# installed by pkgadd
+#
+# Files in "rbac" class:
+#
+# /etc/security{prof_attr,exec_attr,auth_attr}
+# /etc/user_attr
+#
+#  Allowable exit codes
+#
+# 0 - success
+# 2 - warning or possible error condition. Installation continues. A warning
+#     message is displayed at the time of completion. 
+#
+
+tmp_dir=/tmp
+
+basename_cmd=/usr/bin/basename
+cp_cmd=/usr/bin/cp
+egrep_cmd=/usr/bin/egrep
+mv_cmd=/usr/bin/mv
+nawk_cmd=/usr/bin/nawk
+rm_cmd=/usr/bin/rm
+sed_cmd=/usr/bin/sed
+sort_cmd=/usr/bin/sort
+
+# $1 is the type
+# $2 is the "old/existing file"
+# $3 is the "new (to be merged)" file
+# $4 is the output file
+# returns 0 on success
+# returns 2 on failure if nawk fails with non-zero exit status
+#
+dbmerge() {
+#
+# If the new file has an ident string, remove the ident string from the old
+# file.
+#
+	newident=`${egrep_cmd} '^#[pragma 	]*ident' $3 \
+	    2>/dev/null`
+	if [ -n "${newident}" ]; then
+		${egrep_cmd} -v '^#[pragma 	]*ident' $2 > $4.old 2>/dev/null
+	else
+		$cp_cmd $2 $4.old
+	fi
+#
+# If the new file has a Sun copyright, remove the Sun copyright from the old
+# file.
+#
+	newcr=`${egrep_cmd} '^# Copyright.*Sun Microsystems, Inc.' $3 \
+	    2>/dev/null`
+	if [ -n "${newcr}" ]; then
+		$sed_cmd -e '/^# Copyright.*Sun Microsystems, Inc./d' \
+		    -e '/^# All rights reserved./d' \
+		    -e '/^# Use is subject to license terms./d' \
+		    $4.old > $4.$$ 2>/dev/null
+		$mv_cmd $4.$$ $4.old
+	fi
+#
+# Remove empty lines and multiple instances of these comments:
+#
+	$sed_cmd -e '/^# \/etc\/security\/exec_attr/d' -e '/^#$/d' \
+		-e '/^# execution attributes for profiles./d' \
+		-e '/^# See exec_attr(4)/d' \
+		-e '/^# \/etc\/user_attr/d' \
+		-e '/^# user attributes. see user_attr(4)/d' \
+		-e '/^# \/etc\/security\/prof_attr/d' \
+		-e '/^# profiles attributes. see prof_attr(4)/d' \
+		-e '/^# See prof_attr(4)/d' \
+		-e '/^# \/etc\/security\/auth_attr/d' \
+		-e '/^# authorizations. see auth_attr(4)/d' \
+		-e '/^# authorization attributes. see auth_attr(4)/d' \
+		    $4.old > $4.$$
+	$mv_cmd $4.$$ $4.old
+#
+# Retain old and new header comments.
+#
+	$sed_cmd -n -e '/^[^#]/,$d' -e '/^##/,$d' -e p $4.old > $4
+	$rm_cmd $4.old
+	$sed_cmd -n -e '/^[^#]/,$d' -e '/^##/,$d' -e p $3 >> $4
+#
+# Handle line continuations (trailing \)
+#
+ 	$sed_cmd \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    $2 > $4.old
+ 	$sed_cmd \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
+ 	    $3 > $4.new
+#
+#!/usr/bin/nawk -f
+#
+#       dbmerge type=[auth|prof|user|exec] old-file new-file
+#
+#       Merge two versions of an RBAC database file. The output
+#       consists of the lines from the new-file, while preserving
+#       user customizations in the old-file. Specifically, the
+#       keyword/value section of each record contains the union
+#       of the entries found in both files. The value for each
+#       keyword is the value from the new-file, except for three
+#       keywords ("auths", "profiles", "roles") where the values
+#       from the old and new files are merged.
+#
+#	The output is run through sort except for the comments
+#	which will appear first in the output.
+#
+# 
+	$nawk_cmd  '
+
+BEGIN {
+	FS=":" \
+}
+
+/^#/ {
+	continue;
+}
+
+type == "auth" {
+	key = $1 ":" $2 ":" $3 ;
+	if (NR == FNR) {
+		short_comment[key] = $4 ;
+		long_comment[key] = $5;
+		record[key] = $6;
+	}
+	else {
+		if ( $4 != "" ) {
+			short_comment[key] = $4 ;
+		}
+		if ( $5 != "" ) {
+			long_comment[key] =  $5 ;
+		}
+		print key ":" short_comment[key] ":" long_comment[key] ":" \
+		    merge_attrs(record[key], $6);
+		delete record[key];
+	}
+}
+
+type == "prof" {
+	key = $1 ":" $2 ":" $3 ;
+	if (NR == FNR) {
+		comment[key] = $4;
+		record[key] = $5;
+	}
+	else {
+		if ( $4 != "" ) {
+			comment[key] = $4 ;
+		}
+		print key ":" comment[key] ":" merge_attrs(record[key], $5);
+		delete record[key];
+	}
+}
+
+type == "exec" {
+	key = $1 ":" $2 ":" $3 ":" $4 ":" $5 ":" $6 ;
+	# Substitute new entries, do not merge.
+	record[key] = $7;
+}
+
+type == "user" {
+	key = $1 ":" $2 ":" $3 ":" $4 ;
+	if (NR == FNR)
+		record[key] = $5;
+	else {
+		print key ":" merge_attrs(record[key], $5);
+		delete record[key];
+	}
+}
+
+END {
+	for (key in record) {
+		if (type == "prof") {
+			print key ":" comment[key] ":" record[key];
+		} else
+			if (type == "auth") {
+				print key ":" short_comment[key] ":"  \
+				    long_comment[key] ":" record[key];
+			} else
+				print key ":" record[key];
+		}
+}
+
+function merge_attrs(old, new, cnt, new_cnt, i, j, list, new_list, keyword)
+{
+	cnt = split(old, list, ";");
+	new_cnt = split(new, new_list, ";");
+	for (i = 1; i <= new_cnt; i++) {
+		keyword = substr(new_list[i], 1, index(new_list[i], "=")-1);
+		for (j = 1; j <= cnt; j++) {
+			if (match(list[j], "^" keyword "=")) {
+				list[j] = merge_values(keyword, list[j],
+				    new_list[i]);
+				break;
+			}
+		}
+		if (j > cnt)
+			list[++cnt] = new_list[i];
+	}
+
+	return unsplit(list, cnt, ";"); \
+}
+
+function merge_values(keyword, old, new, cnt, new_cnt, i, j, list, new_list, d)
+{
+	if (keyword != "auths" && keyword != "profiles")
+		return new;
+
+	cnt = split(substr(old, length(keyword)+2), list, ",");
+	new_cnt = split(substr(new, length(keyword)+2), new_list, ",");
+
+	# If the existing list contains "All", remove it and add it
+	# to the new list; that way "All" will appear at the only valid
+	# location, the end of the list.
+	if (keyword == "profiles") {
+		d = 0;
+		for (i = 1; i <= cnt; i++) {
+			if (list[i] != "All")
+				list[++d] = list[i];
+		}
+		if (cnt != d) {
+			new_list[++new_cnt] = "All";
+			cnt = d;
+		}
+	}
+	for (i = 1; i <= new_cnt; i++) {
+		for (j = 1; j <= cnt; j++) {
+			if (list[j] == new_list[i])
+				break;
+		}
+		if (j > cnt)
+			list[++cnt] = new_list[i];
+	}
+
+	return keyword "=" unsplit(list, cnt, ",");
+}
+
+function unsplit(list, cnt, delim, str)
+{
+	str = list[1];
+	for (i = 2; i <= cnt; i++)
+		str = str delim list[i];
+	return str;
+}' \
+	type=$1 $4.old $4.new > $4.unsorted
+	rc=$?
+	$sort_cmd < $4.unsorted >> $4
+	return $rc
+}
+
+# $1 is the merged file
+# $2 is the target file
+#
+commit() {
+	$mv_cmd $1 $2
+	return $?
+}
+
+outfile=""
+type=""
+set_type_and_outfile() {
+	#
+	# Assumes basename $1 returns one of
+	# prof_attr, exec_attr, auth_attr, or user_attr
+	#
+	fname=`$basename_cmd $1`
+	type=`echo $fname | $sed_cmd -e s'/^\([a-z][a-z]*\)_attr$/\1/' `
+	case "$type" in
+		"prof"|"exec"|"user"|"auth") ;;
+		*) return 2 ;;
+	esac
+
+	outfile=$tmp_dir/rbac_${PKGINST}_${fname}_merge
+
+	return 0
+}
+
+cleanup() {
+	$rm_cmd -f $outfile $outfile.old $outfile.new $outfile.unsorted
+
+	return 0
+}
+
+exit_status=0
+
+# main
+
+while read newfile oldfile ; do
+	if [ ! -f $oldfile ]; then
+		cp $newfile $oldfile
+	else
+		set_type_and_outfile $newfile
+		if [ $? -ne 0 ]; then
+			echo "$0 : $newfile not one of" \
+			    " prof_attr, exec_attr, auth_attr, user_attr"
+			exit_status=2
+			continue
+		fi
+
+		dbmerge $type $oldfile $newfile $outfile
+		if [ $? -ne 0 ]; then
+			echo "$0 : failed to merge $newfile with $oldfile"
+			cleanup
+			exit_status=2
+			continue
+		fi
+
+		commit $outfile $oldfile 
+		if [ $? -ne 0 ]; then
+			echo "$0 : failed to mv $outfile to $2"
+			cleanup
+			exit_status=2
+			continue
+		fi
+
+		cleanup
+	fi
+done
+
+if [ "$1" = "ENDOFCLASS" ]; then
+	exit 0
+fi
+
+exit $exit_status

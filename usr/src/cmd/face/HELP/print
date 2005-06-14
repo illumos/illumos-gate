@@ -1,0 +1,25 @@
+
+The print command enables you to send a file object to the printer.
+
+Use one of the methods below to print an object. The current object
+will be printed if the object is not specified with the print command.
+
+     Command Menu:  Select print and press ENTER.
+
+     Command Line:  Type print [object] and press ENTER.
+
+
+  1.  To print an object, from the "Print <object>" menu:
+
+        - Select a print option and press ENTER.
+
+      A "Print <object>" menu will appear.
+
+  2.  To change Print Options, select "Change Print Options" from the
+      "Print <object>" menu. A "Change Print Options" form will then be
+      displayed.  The form presents your default print commands. You
+      may change any of the print commands by editing the form.
+
+      The  print commands specified in the "Change Print Option" form
+      are saved, and are presented during subsequent printings.
+

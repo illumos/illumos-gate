@@ -1,0 +1,98 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Build and link kmdb
+#
+all: $(PROG) kmdb_modlinktest.o
+
+%.o: ../../kmdb/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: ../../mdb/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.ln: ../../kmdb/%.c
+	$(LINT.c) -c $<
+
+%.ln: ../../mdb/%.c
+	$(LINT.c) -c $<
+
+ROOT_MISC_DIR		= $(ROOT)/kernel/misc
+ROOT_MISC_DIR_64	= $(ROOT_MISC_DIR)/$(SUBDIR64)
+
+ROOTMISC		= $(ROOT_MISC_DIR)/$(PROG)
+ROOTMISC64		= $(ROOT_MISC_DIR_64)/$(PROG)
+
+include ../../../../Makefile.cmd
+include ../../Makefile.ia32
+include ../../../Makefile.kmdb
+
+INCDIRS += $(SRC)/uts/i86pc
+
+CPPFLAGS += -DDIS_TEXT
+
+install: all $(ROOTMISC)
+
+#
+# lint rules
+#
+
+.PARALLEL: lintkmdb lintprom lintkctl
+
+lint: lintkmdb lintprom lintkctl
+	$(LINT) $(ALLLINTFLAGS) $(KMDBOBJS:%.o=%.ln) $(PROMOBJS:%.o=%.ln)
+
+lintkmdb: $(KMDBOBJS:%.o=%.ln)
+	$(LINT) $(LINTFLAGS) $(KMDBOBJS:%.o=%.ln)
+
+lintprom: $(PROMOBJS:%.o=%.ln)
+	$(LINT) $(LINTFLAGS) $(PROMOBJS:%.o=%.ln)
+
+lintkctl: $(KCTLOBJS:%.o=%.ln)
+	$(LINT) $(ALLLINTFLAGS) $(KCTLOBJS:%.o=%.ln)
+
+kaif_off.h: ../../kmdb/kaif_off.in
+	$(OFFSETS_CREATE) <../../kmdb/kaif_off.in >$@
+
+kmdb_context_off.h: ../../kmdb/kmdb_context_off.in
+	$(OFFSETS_CREATE) <../../kmdb/kmdb_context_off.in >$@
+
+#
+# Installation targets
+#
+
+$(ROOT_MISC_DIR) $(ROOT_MISC_DIR_64):
+	-$(INS.dir.root.sys)
+
+$(ROOT_MISC_DIR)/%: 	% $(ROOT_MISC_DIR)
+	$(INS.file)
+
+$(ROOT_MISC_DIR_64)/%:	% $(ROOT_MISC_DIR_64)
+	$(INS.file)

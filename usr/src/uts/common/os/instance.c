@@ -1,0 +1,1267 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Instance number assignment code
+ */
+
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/errno.h>
+#include <sys/systm.h>
+#include <sys/kobj.h>
+#include <sys/t_lock.h>
+#include <sys/kmem.h>
+#include <sys/cmn_err.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/autoconf.h>
+#include <sys/systeminfo.h>
+#include <sys/hwconf.h>
+#include <sys/reboot.h>
+#include <sys/ddi_impldefs.h>
+#include <sys/instance.h>
+#include <sys/debug.h>
+#include <sys/sysevent.h>
+#include <sys/modctl.h>
+#include <sys/console.h>
+#include <sys/cladm.h>
+
+static void in_preassign_instance(void);
+static void i_log_devfs_instance_mod(void);
+static int in_get_infile(char *);
+static void in_removenode(struct devnames *dnp, in_node_t *mp, in_node_t *ap);
+static in_node_t *in_alloc_node(char *name, char *addr);
+static int in_eqstr(char *a, char *b);
+static char *in_name_addr(char **cpp, char **addrp);
+static in_node_t *in_devwalk(dev_info_t *dip, in_node_t **ap, char *addr);
+static void in_dealloc_node(in_node_t *np);
+static in_node_t *in_make_path(char *path);
+static void in_enlist(in_node_t *ap, in_node_t *np);
+static int in_inuse(int instance, char *name);
+static void in_hashdrv(in_drv_t *dp);
+static in_drv_t *in_drvwalk(in_node_t *np, char *binding_name);
+static in_drv_t *in_alloc_drv(char *bindingname);
+static void in_endrv(in_node_t *np, in_drv_t *dp);
+static void in_dq_drv(in_drv_t *np);
+static void in_removedrv(struct devnames *dnp, in_drv_t *mp);
+static int in_pathin(char *cp, int instance, char *bname, struct bind **args);
+static int in_next_instance(major_t);
+
+/* external functions */
+extern char *i_binding_to_drv_name(char *bname);
+
+/*
+ * This plus devnames defines the entire software state of the instance world.
+ */
+typedef struct in_softstate {
+	in_node_t	*ins_root;	/* the root of our instance tree */
+	in_drv_t	*ins_no_major;	/* majorless drv entries */
+	/*
+	 * Used to serialize access to data structures
+	 */
+	void		*ins_thread;
+	kmutex_t	ins_serial;
+	kcondvar_t	ins_serial_cv;
+	int		ins_busy;
+	char		ins_dirty;	/* need flush */
+} in_softstate_t;
+
+static in_softstate_t e_ddi_inst_state;
+
+/*
+ * State transition information:
+ * e_ddi_inst_state contains, among other things, the root of a tree of
+ * device nodes used to track instance number assignments.
+ * Each device node may contain multiple driver bindings, represented
+ * by a linked list of in_drv_t nodes, each with an instance assignment
+ * (except for root node). Each in_drv node can be in one of 3 states,
+ * indicated by ind_state:
+ *
+ * IN_UNKNOWN:	Each node created in this state.  The instance number of
+ *	this node is not known.  ind_instance is set to -1.
+ * IN_PROVISIONAL:  When a node is assigned an instance number in
+ *	e_ddi_assign_instance(), its state is set to IN_PROVISIONAL.
+ *	Subsequently, the framework will always call either
+ *	e_ddi_keep_instance() which makes the node IN_PERMANENT,
+ *	or e_ddi_free_instance(), which deletes the node.
+ * IN_PERMANENT:
+ *	If e_ddi_keep_instance() is called on an IN_PROVISIONAL node,
+ *	its state is set to IN_PERMANENT.
+ */
+
+static char *instance_file = INSTANCE_FILE;
+static char *instance_file_backup = INSTANCE_FILE INSTANCE_FILE_SUFFIX;
+
+/*
+ * Return values for in_get_infile().
+ */
+#define	PTI_FOUND	0
+#define	PTI_NOT_FOUND	1
+#define	PTI_REBUILD	2
+
+/*
+ * Path to instance file magic string used for first time boot after
+ * an install.  If this is the first string in the file we will
+ * automatically rebuild the file.
+ */
+#define	PTI_MAGIC_STR		"#path_to_inst_bootstrap_1"
+#define	PTI_MAGIC_STR_LEN	(sizeof (PTI_MAGIC_STR) - 1)
+
+void
+e_ddi_instance_init(void)
+{
+	char *file;
+	int rebuild = 1;
+	struct in_drv *dp;
+
+	mutex_init(&e_ddi_inst_state.ins_serial, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&e_ddi_inst_state.ins_serial_cv, NULL, CV_DEFAULT, NULL);
+
+	/*
+	 * Only one thread is allowed to change the state of the instance
+	 * number assignments on the system at any given time.
+	 * Note that this is not really necessary, as we are single-threaded
+	 * here, but it won't hurt, and it allows us to keep ASSERTS for
+	 * our assumptions in the code.
+	 */
+	e_ddi_enter_instance();
+
+	/*
+	 * Create the root node, instance zallocs to 0.
+	 * The name and address of this node never get examined, we always
+	 * start searching with its first child.
+	 */
+	ASSERT(e_ddi_inst_state.ins_root == NULL);
+	e_ddi_inst_state.ins_root = in_alloc_node(NULL, NULL);
+	dp = in_alloc_drv("rootnex");
+	in_endrv(e_ddi_inst_state.ins_root, dp);
+
+	file = instance_file;
+	switch (in_get_infile(file)) {
+	default:
+	case PTI_NOT_FOUND:
+		/* make sure path_to_inst is recreated */
+		boothowto |= RB_RECONFIG;
+
+		/*
+		 * Something is wrong. First try the backup file.
+		 * If not found, rebuild path_to_inst. Emit a
+		 * message about the problem.
+		 */
+		cmn_err(CE_WARN, "%s empty or not found", file);
+
+		file = instance_file_backup;
+		if (in_get_infile(file) != PTI_FOUND) {
+			cmn_err(CE_NOTE, "rebuilding device instance data");
+			break;
+		}
+		cmn_err(CE_NOTE, "using backup instance data in %s", file);
+		/*FALLTHROUGH*/
+
+	case PTI_FOUND:
+		/*
+		 * We've got a readable file
+		 * parse the file into the instance tree
+		 */
+		(void) read_binding_file(file, NULL, in_pathin);
+		rebuild = 0;
+		break;
+
+	case PTI_REBUILD:
+		cmn_err(CE_CONT,
+			"?Using default device instance data\n");
+		break;
+	}
+
+	/*
+	 * The OBP device tree has been copied to the kernel and
+	 * bound to drivers at this point. We walk the per-driver
+	 * list to preassign instances. Since the bus addr is
+	 * unknown at this point, we cannot place the instance
+	 * number in the instance tree. This will be done at
+	 * a later time.
+	 */
+	if (rebuild)
+		in_preassign_instance();
+
+	e_ddi_exit_instance();
+}
+
+static void
+in_preassign_instance()
+{
+	major_t m;
+	extern major_t devcnt;
+
+	for (m = 0; m < devcnt; m++) {
+		struct devnames *dnp = &devnamesp[m];
+		dev_info_t *dip = dnp->dn_head;
+		while (dip) {
+			DEVI(dip)->devi_instance = dnp->dn_instance;
+			dnp->dn_instance++;
+			dip = ddi_get_next(dip);
+		}
+	}
+}
+
+/*
+ * Checks to see if the /etc/path_to_inst file exists and whether or not
+ * it has the magic string in it.
+ *
+ * Returns one of the following:
+ *
+ *	PTI_FOUND	- We have found the /etc/path_to_inst file
+ *	PTI_REBUILD	- We have found the /etc/path_to_inst file and the
+ *			  first line was PTI_MAGIC_STR.
+ *	PTI_NOT_FOUND	- We did not find the /etc/path_to_inst file
+ *
+ */
+static int
+in_get_infile(char *filename)
+{
+	intptr_t file;
+	int return_val;
+	char buf[PTI_MAGIC_STR_LEN];
+
+	/*
+	 * Try to open the file.
+	 */
+	if ((file = kobj_open(filename)) == -1) {
+		return (PTI_NOT_FOUND);
+	}
+	return_val = PTI_FOUND;
+
+	/*
+	 * Read the first PTI_MAGIC_STR_LEN bytes from the file to see if
+	 * it contains the magic string.  If there aren't that many bytes
+	 * in the file, then assume file is correct and no magic string
+	 * and move on.
+	 */
+	switch (kobj_read(file, buf, PTI_MAGIC_STR_LEN, 0)) {
+
+	case PTI_MAGIC_STR_LEN:
+		/*
+		 * If the first PTI_MAGIC_STR_LEN bytes are the magic string
+		 * then return PTI_REBUILD.
+		 */
+		if (strncmp(PTI_MAGIC_STR, buf, PTI_MAGIC_STR_LEN) == 0)
+			return_val = PTI_REBUILD;
+		break;
+
+	case 0:
+		/*
+		 * If the file is zero bytes in length, then consider the
+		 * file to not be found
+		 */
+		return_val = PTI_NOT_FOUND;
+
+	default: /* Do nothing we have a good file */
+		break;
+	}
+
+	kobj_close(file);
+	return (return_val);
+}
+
+int
+is_pseudo_device(dev_info_t *dip)
+{
+	dev_info_t	*pdip;
+
+	for (pdip = ddi_get_parent(dip); pdip && pdip != ddi_root_node();
+	    pdip = ddi_get_parent(pdip)) {
+		if (strcmp(ddi_get_name(pdip), DEVI_PSEUDO_NEXNAME) == 0)
+			return (1);
+	}
+	return (0);
+}
+
+
+static void
+in_set_instance(dev_info_t *dip, in_drv_t *dp, major_t major)
+{
+	/* use preassigned instance if available */
+	if (DEVI(dip)->devi_instance != -1)
+		dp->ind_instance = DEVI(dip)->devi_instance;
+	else
+		dp->ind_instance = in_next_instance(major);
+}
+
+/*
+ * Look up an instance number for a dev_info node, and assign one if it does
+ * not have one (the dev_info node has devi_name and devi_addr already set).
+ */
+uint_t
+e_ddi_assign_instance(dev_info_t *dip)
+{
+	char *name;
+	in_node_t *ap, *np;
+	in_drv_t *dp;
+	major_t major;
+	uint_t ret;
+	char *bname;
+
+	/*
+	 * Allow implementation to override
+	 */
+	if ((ret = impl_assign_instance(dip)) != (uint_t)-1)
+		return (ret);
+
+	/*
+	 * If this is a pseudo-device, use the instance number
+	 * assigned by the pseudo nexus driver. The mutex is
+	 * not needed since the instance tree is not used.
+	 */
+	if (is_pseudo_device(dip)) {
+		return (ddi_get_instance(dip));
+	}
+
+	/*
+	 * Only one thread is allowed to change the state of the instance
+	 * number assignments on the system at any given time.
+	 */
+	e_ddi_enter_instance();
+
+	/*
+	 * Look for instance node, allocate one if not found
+	 */
+	np = in_devwalk(dip, &ap, NULL);
+	if (np == NULL) {
+		name = ddi_node_name(dip);
+		np = in_alloc_node(name, ddi_get_name_addr(dip));
+		ASSERT(np != NULL);
+		in_enlist(ap, np);	/* insert into tree */
+	}
+	ASSERT(np == in_devwalk(dip, &ap, NULL));
+
+	/*
+	 * Look for driver entry, allocate one if not found
+	 */
+	bname = (char *)ddi_driver_name(dip);
+	dp = in_drvwalk(np, bname);
+	if (dp == NULL) {
+		dp = in_alloc_drv(bname);
+		ASSERT(dp != NULL);
+		major = ddi_driver_major(dip);
+		ASSERT(major != (major_t)-1);
+		in_endrv(np, dp);
+		in_set_instance(dip, dp, major);
+		dp->ind_state = IN_PROVISIONAL;
+		in_hashdrv(dp);
+	}
+
+	ret = dp->ind_instance;
+
+	e_ddi_exit_instance();
+	return (ret);
+}
+
+static int
+mkpathname(char *path, in_node_t *np, int len)
+{
+	int len_needed;
+
+	if (np == e_ddi_inst_state.ins_root)
+		return (DDI_SUCCESS);
+
+	if (mkpathname(path, np->in_parent, len) == DDI_FAILURE)
+		return (DDI_FAILURE);
+
+	len_needed = strlen(path);
+	len_needed += strlen(np->in_node_name) + 1;	/* for '/' */
+	if (np->in_unit_addr) {
+		len_needed += strlen(np->in_unit_addr) + 1;  /* for '@' */
+	}
+	len_needed += 1; /* for '\0' */
+
+	/*
+	 * XX complain
+	 */
+	if (len_needed > len)
+		return (DDI_FAILURE);
+
+	if (np->in_unit_addr[0] == '\0')
+		(void) sprintf(path+strlen(path), "/%s", np->in_node_name);
+	else
+		(void) sprintf(path+strlen(path), "/%s@%s", np->in_node_name,
+		    np->in_unit_addr);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * produce the path to the given instance of a major number.
+ * path must hold MAXPATHLEN string
+ */
+int
+e_ddi_instance_majorinstance_to_path(major_t major, uint_t inst, char *path)
+{
+	struct devnames	*dnp;
+	in_drv_t	*dp;
+	int		ret;
+
+	e_ddi_enter_instance();
+
+	/* look for the instance threaded off major */
+	dnp = &devnamesp[major];
+	for (dp = dnp->dn_inlist; dp != NULL; dp = dp->ind_next)
+		if (dp->ind_instance == inst)
+			break;
+
+	/* produce path from the node that uses the instance */
+	if (dp) {
+		*path = 0;
+		ret = mkpathname(path, dp->ind_node, MAXPATHLEN);
+	} else
+		ret = DDI_FAILURE;
+
+	e_ddi_exit_instance();
+	return (ret);
+}
+
+/*
+ * This depends on the list being sorted in ascending instance number
+ * sequence.  dn_instance contains the next available instance no.
+ * or IN_SEARCHME, indicating (a) hole(s) in the sequence.
+ */
+static int
+in_next_instance(major_t major)
+{
+	unsigned int prev;
+	struct devnames *dnp;
+	in_drv_t *dp;
+
+	dnp = &devnamesp[major];
+
+	ASSERT(major != (major_t)-1);
+	ASSERT(e_ddi_inst_state.ins_busy);
+	if (dnp->dn_instance != IN_SEARCHME)
+		return (dnp->dn_instance++);
+	dp = dnp->dn_inlist;
+
+	/* no existing entries, assign instance 0 */
+	if (dp == NULL) {
+		dnp->dn_instance = 1;
+		return (0);
+	}
+
+	prev = dp->ind_instance;
+	if (prev != 0)	/* hole at beginning of list */
+		return (0);
+	/* search the list for a hole in the sequence */
+	for (dp = dp->ind_next; dp; dp = dp->ind_next) {
+		if (dp->ind_instance != prev + 1)
+			return (prev + 1);
+		prev++;
+	}
+	/*
+	 * If we got here, then the hole has been patched
+	 */
+	dnp->dn_instance = ++prev + 1;
+
+	return (prev);
+}
+
+/*
+ * This call causes us to *forget* the instance number we've generated
+ * for a given device if it was not permanent.
+ */
+void
+e_ddi_free_instance(dev_info_t *dip, char *addr)
+{
+	char *name;
+	in_node_t *np;
+	in_node_t *ap;	/* ancestor node */
+	major_t major;
+	struct devnames *dnp;
+	in_drv_t *dp;	/* in_drv entry */
+
+	/*
+	 * Allow implementation override
+	 */
+	if (impl_free_instance(dip) == DDI_SUCCESS)
+		return;
+
+	/*
+	 * If this is a pseudo-device, no instance number
+	 * was assigned.
+	 */
+	if (is_pseudo_device(dip)) {
+		return;
+	}
+
+	name = (char *)ddi_driver_name(dip);
+	major = ddi_driver_major(dip);
+	ASSERT(major != (major_t)-1);
+	dnp = &devnamesp[major];
+	/*
+	 * Only one thread is allowed to change the state of the instance
+	 * number assignments on the system at any given time.
+	 */
+	e_ddi_enter_instance();
+	np = in_devwalk(dip, &ap, addr);
+	ASSERT(np);
+	dp = in_drvwalk(np, name);
+	ASSERT(dp);
+	if (dp->ind_state == IN_PROVISIONAL) {
+		in_removedrv(dnp, dp);
+	}
+	if (np->in_drivers == NULL) {
+		in_removenode(dnp, np, ap);
+	}
+	e_ddi_exit_instance();
+}
+
+/*
+ * This makes our memory of an instance assignment permanent
+ */
+void
+e_ddi_keep_instance(dev_info_t *dip)
+{
+	in_node_t *np, *ap;
+	in_drv_t *dp;
+
+	/*
+	 * Allow implementation override
+	 */
+	if (impl_keep_instance(dip) == DDI_SUCCESS)
+		return;
+
+	/*
+	 * Nothing to do for pseudo devices.
+	 */
+	if (is_pseudo_device(dip))
+		return;
+
+	/*
+	 * Only one thread is allowed to change the state of the instance
+	 * number assignments on the system at any given time.
+	 */
+	e_ddi_enter_instance();
+	np = in_devwalk(dip, &ap, NULL);
+	ASSERT(np);
+	dp = in_drvwalk(np, (char *)ddi_driver_name(dip));
+	ASSERT(dp);
+
+	mutex_enter(&e_ddi_inst_state.ins_serial);
+	if (dp->ind_state == IN_PROVISIONAL) {
+		dp->ind_state = IN_PERMANENT;
+		i_log_devfs_instance_mod();
+		e_ddi_inst_state.ins_dirty = 1;
+	}
+	mutex_exit(&e_ddi_inst_state.ins_serial);
+	e_ddi_exit_instance();
+}
+
+/*
+ * A new major has been added to the system.  Run through the orphan list
+ * and try to attach each one to a driver's list.
+ */
+void
+e_ddi_unorphan_instance_nos()
+{
+	in_drv_t *dp, *ndp;
+
+	/*
+	 * disconnect the orphan list, and call in_hashdrv for each item
+	 * on it
+	 */
+
+	/*
+	 * Only one thread is allowed to change the state of the instance
+	 * number assignments on the system at any given time.
+	 */
+	e_ddi_enter_instance();
+	if (e_ddi_inst_state.ins_no_major == NULL) {
+		e_ddi_exit_instance();
+		return;
+	}
+	/*
+	 * Hash instance list to devnames structure of major.
+	 * Note that if there is not a valid major number for the
+	 * node, in_hashdrv will put it back on the no_major list.
+	 */
+	dp = e_ddi_inst_state.ins_no_major;
+	e_ddi_inst_state.ins_no_major = NULL;
+	while (dp) {
+		ndp = dp->ind_next;
+		ASSERT(dp->ind_state != IN_UNKNOWN);
+		dp->ind_next = NULL;
+		in_hashdrv(dp);
+		dp = ndp;
+	}
+	e_ddi_exit_instance();
+}
+
+static void
+in_removenode(struct devnames *dnp, in_node_t *mp, in_node_t *ap)
+{
+	in_node_t *np;
+
+	ASSERT(e_ddi_inst_state.ins_busy);
+	/*
+	 * Assertion: parents are always instantiated by the framework
+	 * before their children, destroyed after them
+	 */
+	ASSERT(mp->in_child == NULL);
+	/*
+	 * Assertion: drv entries are always removed before their owning nodes
+	 */
+	ASSERT(mp->in_drivers == NULL);
+	/*
+	 * Take the node out of the tree
+	 */
+	if (ap->in_child == mp) {
+		ap->in_child = mp->in_sibling;
+		in_dealloc_node(mp);
+		return;
+	} else {
+		for (np = ap->in_child; np; np = np->in_sibling) {
+			if (np->in_sibling == mp) {
+				np->in_sibling = mp->in_sibling;
+				in_dealloc_node(mp);
+				return;
+			}
+		}
+	}
+	panic("in_removenode dnp %p mp %p", (void *)dnp, (void *)mp);
+}
+
+/*
+ * Recursive ascent
+ *
+ * This now only does half the job.  It finds the node, then the caller
+ * has to search the node for the binding name
+ */
+static in_node_t *
+in_devwalk(dev_info_t *dip, in_node_t **ap, char *addr)
+{
+	in_node_t *np;
+	char *name;
+
+	ASSERT(dip);
+	ASSERT(e_ddi_inst_state.ins_busy);
+	if (dip == ddi_root_node()) {
+		*ap = NULL;
+		return (e_ddi_inst_state.ins_root);
+	}
+	/*
+	 * call up to find parent, then look through the list of kids
+	 * for a match
+	 */
+	np = in_devwalk(ddi_get_parent(dip), ap, NULL);
+	if (np == NULL)
+		return (np);
+	*ap = np;
+	np = np->in_child;
+	name = ddi_node_name(dip);
+	if (addr == NULL)
+		addr = ddi_get_name_addr(dip);
+
+	while (np) {
+		if (in_eqstr(np->in_node_name, name) &&
+		    in_eqstr(np->in_unit_addr, addr)) {
+			return (np);
+		}
+		np = np->in_sibling;
+	}
+	return (np);
+}
+
+/*
+ * Create a node specified by cp and assign it the given instance no.
+ */
+static int
+in_pathin(char *cp, int instance, char *bname, struct bind **args)
+{
+	in_node_t *np;
+	in_drv_t *dp;
+	char *name;
+
+	ASSERT(e_ddi_inst_state.ins_busy);
+	ASSERT(args == NULL);
+
+	/*
+	 * Give a warning to the console.
+	 * return value ignored
+	 */
+	if (cp[0] != '/' || instance == -1 || bname == NULL) {
+		cmn_err(CE_WARN,
+		    "invalid instance file entry %s %d",
+		    cp, instance);
+
+		return (0);
+	}
+
+	if ((name  = i_binding_to_drv_name(bname)) != NULL)
+		bname = name;
+
+	np = in_make_path(cp);
+	ASSERT(np);
+	if (in_inuse(instance, bname)) {
+		cmn_err(CE_WARN,
+		    "instance already in use: %s %d", cp, instance);
+		return (0);
+	}
+	dp = in_drvwalk(np, bname);
+	if (dp != NULL) {
+		cmn_err(CE_WARN,
+		    "multiple instance number assignments for "
+		    "'%s' (driver %s), %d used",
+		    cp, bname, dp->ind_instance);
+		return (0);
+	}
+	dp = in_alloc_drv(bname);
+	in_endrv(np, dp);
+	dp->ind_instance = instance;
+	dp->ind_state = IN_PERMANENT;
+	in_hashdrv(dp);
+
+	return (0);
+}
+
+/*
+ * Create (or find) the node named by path by recursively descending from the
+ * root's first child (we ignore the root, which is never named)
+ */
+static in_node_t *
+in_make_path(char *path)
+{
+	in_node_t *ap;		/* ancestor pointer */
+	in_node_t *np;		/* working node pointer */
+	in_node_t *rp;		/* return node pointer */
+	char buf[MAXPATHLEN];	/* copy of string so we can change it */
+	char *cp, *name, *addr;
+
+	ASSERT(e_ddi_inst_state.ins_busy);
+	if (path == NULL || path[0] != '/')
+		return (NULL);
+	(void) snprintf(buf, sizeof (buf), "%s", path);
+	cp = buf + 1;	/* skip over initial '/' in path */
+	name = in_name_addr(&cp, &addr);
+
+	/*
+	 * In S9 and earlier releases, the path_to_inst file
+	 * SunCluster was prepended with "/node@#". This was
+	 * removed in S10. We skip the prefix if the prefix
+	 * still exists in /etc/path_to_inst. It is needed for
+	 * various forms of Solaris upgrade to work properly
+	 * in the SunCluster environment.
+	 */
+	if ((cluster_bootflags & CLUSTER_CONFIGURED) &&
+	    (strcmp(name, "node") == 0))
+		name = in_name_addr(&cp, &addr);
+
+	ap = e_ddi_inst_state.ins_root;
+	rp = np = e_ddi_inst_state.ins_root->in_child;
+	while (name) {
+		while (name && np) {
+			if (in_eqstr(name, np->in_node_name) &&
+			    in_eqstr(addr, np->in_unit_addr)) {
+				name = in_name_addr(&cp, &addr);
+				if (name == NULL)
+					return (np);
+				ap = np;
+				np = np->in_child;
+				continue;
+			} else {
+				np = np->in_sibling;
+			}
+		}
+		np = in_alloc_node(name, addr);
+		in_enlist(ap, np);	/* insert into tree */
+		rp = np;	/* value to return if we quit */
+		ap = np;	/* new parent */
+		np = NULL;	/* can have no children */
+		name = in_name_addr(&cp, &addr);
+	}
+	return (rp);
+}
+
+/*
+ * Insert node np into the tree as one of ap's children.
+ */
+static void
+in_enlist(in_node_t *ap, in_node_t *np)
+{
+	in_node_t *mp;
+	ASSERT(e_ddi_inst_state.ins_busy);
+	/*
+	 * Make this node some other node's child or child's sibling
+	 */
+	ASSERT(ap && np);
+	if (ap->in_child == NULL) {
+		ap->in_child = np;
+	} else {
+		for (mp = ap->in_child; mp; mp = mp->in_sibling)
+			if (mp->in_sibling == NULL) {
+				mp->in_sibling = np;
+				break;
+			}
+	}
+	np->in_parent = ap;
+}
+
+/*
+ * Insert drv entry dp onto a node's driver list
+ */
+static void
+in_endrv(in_node_t *np, in_drv_t *dp)
+{
+	in_drv_t *mp;
+	ASSERT(e_ddi_inst_state.ins_busy);
+	ASSERT(np && dp);
+	mp = np->in_drivers;
+	np->in_drivers = dp;
+	dp->ind_next_drv = mp;
+	dp->ind_node = np;
+}
+
+/*
+ * Parse the next name out of the path, null terminate it and update cp.
+ * caller has copied string so we can mess with it.
+ * Upon return *cpp points to the next section to be parsed, *addrp points
+ * to the current address substring (or NULL if none) and we return the
+ * current name substring (or NULL if none).  name and address substrings
+ * are null terminated in place.
+ */
+
+static char *
+in_name_addr(char **cpp, char **addrp)
+{
+	char *namep;	/* return value holder */
+	char *ap;	/* pointer to '@' in string */
+	char *sp;	/* pointer to '/' in string */
+
+	if (*cpp == NULL || **cpp == '\0') {
+		*addrp = NULL;
+		return (NULL);
+	}
+	namep = *cpp;
+	sp = strchr(*cpp, '/');
+	if (sp != NULL) {	/* more to follow */
+		*sp = '\0';
+		*cpp = sp + 1;
+	} else {		/* this is last component. */
+		*cpp = NULL;
+	}
+	ap = strchr(namep, '@');
+	if (ap == NULL) {
+		*addrp = NULL;
+	} else {
+		*ap = '\0';		/* terminate the name */
+		*addrp = ap + 1;
+	}
+	return (namep);
+}
+
+/*
+ * Allocate a node and storage for name and addr strings, and fill them in.
+ */
+static in_node_t *
+in_alloc_node(char *name, char *addr)
+{
+	in_node_t *np;
+	char *cp;
+	size_t namelen;
+
+	ASSERT(e_ddi_inst_state.ins_busy);
+	/*
+	 * Has name or will become root
+	 */
+	ASSERT(name || e_ddi_inst_state.ins_root == NULL);
+	if (addr == NULL)
+		addr = "";
+	if (name == NULL)
+		namelen = 0;
+	else
+		namelen = strlen(name) + 1;
+	cp = kmem_zalloc(sizeof (in_node_t) + namelen + strlen(addr) + 1,
+	    KM_SLEEP);
+	np = (in_node_t *)cp;
+	if (name) {
+		np->in_node_name = cp + sizeof (in_node_t);
+		(void) strcpy(np->in_node_name, name);
+	}
+	np->in_unit_addr = cp + sizeof (in_node_t) + namelen;
+	(void) strcpy(np->in_unit_addr, addr);
+	return (np);
+}
+
+/*
+ * Allocate a drv entry and storage for binding name string, and fill it in.
+ */
+static in_drv_t *
+in_alloc_drv(char *bindingname)
+{
+	in_drv_t *dp;
+	char *cp;
+	size_t namelen;
+
+	ASSERT(e_ddi_inst_state.ins_busy);
+	/*
+	 * Has name or will become root
+	 */
+	ASSERT(bindingname || e_ddi_inst_state.ins_root == NULL);
+	if (bindingname == NULL)
+		namelen = 0;
+	else
+		namelen = strlen(bindingname) + 1;
+	cp = kmem_zalloc(sizeof (in_drv_t) + namelen, KM_SLEEP);
+	dp = (in_drv_t *)cp;
+	if (bindingname) {
+		dp->ind_driver_name = cp + sizeof (in_drv_t);
+		(void) strcpy(dp->ind_driver_name, bindingname);
+	}
+	dp->ind_state = IN_UNKNOWN;
+	dp->ind_instance = -1;
+	return (dp);
+}
+
+static void
+in_dealloc_node(in_node_t *np)
+{
+	/*
+	 * The root node can never be de-allocated
+	 */
+	ASSERT(np->in_node_name && np->in_unit_addr);
+	ASSERT(e_ddi_inst_state.ins_busy);
+	kmem_free(np, sizeof (in_node_t) + strlen(np->in_node_name)
+	    + strlen(np->in_unit_addr) + 2);
+}
+
+static void
+in_dealloc_drv(in_drv_t *dp)
+{
+	ASSERT(dp->ind_driver_name);
+	ASSERT(e_ddi_inst_state.ins_busy);
+	kmem_free(dp, sizeof (in_drv_t) + strlen(dp->ind_driver_name)
+	    + 1);
+}
+
+/*
+ * Handle the various possible versions of "no address"
+ */
+static int
+in_eqstr(char *a, char *b)
+{
+	if (a == b)	/* covers case where both are nulls */
+		return (1);
+	if (a == NULL && *b == 0)
+		return (1);
+	if (b == NULL && *a == 0)
+		return (1);
+	if (a == NULL || b == NULL)
+		return (0);
+	return (strcmp(a, b) == 0);
+}
+
+/*
+ * Returns true if instance no. is already in use by named driver
+ */
+static int
+in_inuse(int instance, char *name)
+{
+	major_t major;
+	in_drv_t *dp;
+	struct devnames *dnp;
+
+	ASSERT(e_ddi_inst_state.ins_busy);
+	/*
+	 * For now, if we've never heard of this device we assume it is not
+	 * in use, since we can't tell
+	 * XXX could do the weaker search through the nomajor list checking
+	 * XXX for the same name
+	 */
+	if ((major = ddi_name_to_major(name)) == (major_t)-1)
+		return (0);
+	dnp = &devnamesp[major];
+
+	dp = dnp->dn_inlist;
+	while (dp) {
+		if (dp->ind_instance == instance)
+			return (1);
+		dp = dp->ind_next;
+	}
+	return (0);
+}
+
+static void
+in_hashdrv(in_drv_t *dp)
+{
+	struct devnames *dnp;
+	in_drv_t *mp, *pp;
+	major_t major;
+
+	/* hash to no major list */
+	if ((major = ddi_name_to_major(dp->ind_driver_name)) == (major_t)-1) {
+		dp->ind_next = e_ddi_inst_state.ins_no_major;
+		e_ddi_inst_state.ins_no_major = dp;
+		return;
+	}
+
+	/*
+	 * dnp->dn_inlist is sorted by instance number.
+	 * Adding a new instance entry may introduce holes,
+	 * set dn_instance to IN_SEARCHME so the next instance
+	 * assignment may fill in holes.
+	 */
+	dnp = &devnamesp[major];
+	pp = mp = dnp->dn_inlist;
+	if (mp == NULL || dp->ind_instance < mp->ind_instance) {
+		/* prepend as the first entry, turn on IN_SEARCHME */
+		dnp->dn_instance = IN_SEARCHME;
+		dp->ind_next = mp;
+		dnp->dn_inlist = dp;
+		return;
+	}
+
+	ASSERT(mp->ind_instance != dp->ind_instance);
+	while (mp->ind_instance < dp->ind_instance && mp->ind_next) {
+		pp = mp;
+		mp = mp->ind_next;
+		ASSERT(mp->ind_instance != dp->ind_instance);
+	}
+
+	if (mp->ind_instance < dp->ind_instance) { /* end of list */
+		dp->ind_next = NULL;
+		mp->ind_next = dp;
+	} else {
+		ASSERT(dnp->dn_instance == IN_SEARCHME);
+		dp->ind_next = pp->ind_next;
+		pp->ind_next = dp;
+	}
+}
+
+/*
+ * Remove a driver entry from the list, given a previous pointer
+ */
+static void
+in_removedrv(struct devnames *dnp, in_drv_t *mp)
+{
+	in_drv_t *dp;
+	in_drv_t *prevp;
+
+	if (dnp->dn_inlist == mp) {	/* head of list */
+		dnp->dn_inlist = mp->ind_next;
+		dnp->dn_instance = IN_SEARCHME;
+		in_dq_drv(mp);
+		in_dealloc_drv(mp);
+		return;
+	}
+	prevp = dnp->dn_inlist;
+	for (dp = prevp->ind_next; dp; dp = dp->ind_next) {
+		if (dp == mp) {		/* found it */
+			break;
+		}
+		prevp = dp;
+	}
+
+	ASSERT(dp == mp);
+	dnp->dn_instance = IN_SEARCHME;
+	prevp->ind_next = mp->ind_next;
+	in_dq_drv(mp);
+	in_dealloc_drv(mp);
+}
+
+static void
+in_dq_drv(in_drv_t *mp)
+{
+	struct in_node *node = mp->ind_node;
+	in_drv_t *ptr, *prev;
+
+	if (mp == node->in_drivers) {
+		node->in_drivers = mp->ind_next_drv;
+		return;
+	}
+	prev = node->in_drivers;
+	for (ptr = prev->ind_next_drv; ptr != (struct in_drv *)NULL;
+	    ptr = ptr->ind_next_drv) {
+		if (ptr == mp) {
+			prev->ind_next_drv = ptr->ind_next_drv;
+			return;
+		}
+	}
+	panic("in_dq_drv: in_drv not found on node driver list");
+}
+
+
+in_drv_t *
+in_drvwalk(in_node_t *np, char *binding_name)
+{
+	char *name;
+	in_drv_t *dp = np->in_drivers;
+	while (dp) {
+		if ((name = i_binding_to_drv_name(dp->ind_driver_name))
+		    == NULL) {
+			name = dp->ind_driver_name;
+		}
+		if (strcmp(binding_name, name) == 0) {
+			break;
+		}
+		dp = dp->ind_next_drv;
+	}
+	return (dp);
+}
+
+
+
+static void
+i_log_devfs_instance_mod(void)
+{
+	sysevent_t *ev;
+	sysevent_id_t eid;
+
+	/*
+	 * Prevent unnecessary event generation.  Do not need to generate
+	 * events during boot.
+	 */
+	if (!i_ddi_io_initialized())
+		return;
+
+	ev = sysevent_alloc(EC_DEVFS, ESC_DEVFS_INSTANCE_MOD, EP_DDI,
+		SE_NOSLEEP);
+	if (ev == NULL) {
+		return;
+	}
+	if (log_sysevent(ev, SE_NOSLEEP, &eid) != 0) {
+		cmn_err(CE_WARN, "i_log_devfs_instance_mod: failed to post "
+			"event");
+	}
+	sysevent_free(ev);
+}
+
+void
+e_ddi_enter_instance()
+{
+	mutex_enter(&e_ddi_inst_state.ins_serial);
+	if (e_ddi_inst_state.ins_thread == curthread)
+		e_ddi_inst_state.ins_busy++;
+	else {
+		while (e_ddi_inst_state.ins_busy)
+			cv_wait(&e_ddi_inst_state.ins_serial_cv,
+			    &e_ddi_inst_state.ins_serial);
+		e_ddi_inst_state.ins_thread = curthread;
+		e_ddi_inst_state.ins_busy = 1;
+	}
+	mutex_exit(&e_ddi_inst_state.ins_serial);
+}
+
+void
+e_ddi_exit_instance()
+{
+	mutex_enter(&e_ddi_inst_state.ins_serial);
+	e_ddi_inst_state.ins_busy--;
+	if (e_ddi_inst_state.ins_busy == 0) {
+		cv_broadcast(&e_ddi_inst_state.ins_serial_cv);
+		e_ddi_inst_state.ins_thread = NULL;
+	}
+	mutex_exit(&e_ddi_inst_state.ins_serial);
+}
+
+int
+e_ddi_instance_is_clean()
+{
+	return (e_ddi_inst_state.ins_dirty == 0);
+}
+
+void
+e_ddi_instance_set_clean()
+{
+	e_ddi_inst_state.ins_dirty = 0;
+}
+
+in_node_t *
+e_ddi_instance_root()
+{
+	return (e_ddi_inst_state.ins_root);
+}
+
+/*
+ * Visit a node in the instance tree
+ */
+static int
+in_walk_instances(in_node_t *np, char *path, char *this,
+    int (*f)(const char *, in_node_t *, in_drv_t *, void *), void *arg)
+{
+	in_drv_t *dp;
+	int rval = INST_WALK_CONTINUE;
+	char *next;
+
+	while (np != NULL) {
+
+		if (np->in_unit_addr[0] == 0)
+			(void) sprintf(this, "/%s", np->in_node_name);
+		else
+			(void) sprintf(this, "/%s@%s", np->in_node_name,
+			    np->in_unit_addr);
+		next = this + strlen(this);
+
+		for (dp = np->in_drivers; dp; dp = dp->ind_next_drv) {
+			if (dp->ind_state == IN_PERMANENT) {
+				rval = (*f)(path, np, dp, arg);
+				if (rval == INST_WALK_TERMINATE)
+					break;
+			}
+		}
+		if (np->in_child) {
+			rval = in_walk_instances(np->in_child,
+			    path, next, f, arg);
+			if (rval == INST_WALK_TERMINATE)
+				break;
+		}
+
+		np = np->in_sibling;
+	}
+
+	return (rval);
+}
+
+/*
+ * A general interface for walking the instance tree,
+ * calling a user-supplied callback for each node.
+ */
+int
+e_ddi_walk_instances(int (*f)(const char *,
+	in_node_t *, in_drv_t *, void *), void *arg)
+{
+	in_node_t *root;
+	int rval;
+	char *path;
+
+	path = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+
+	e_ddi_enter_instance();
+	root = e_ddi_instance_root();
+	rval = in_walk_instances(root->in_child, path, path, f, arg);
+	e_ddi_exit_instance();
+
+	kmem_free(path, MAXPATHLEN);
+	return (rval);
+}

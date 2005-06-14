@@ -1,0 +1,19 @@
+ 
+The cancel command enables you to close one or more frames, or cancel
+a request or activity.
+
+NOTE: You cannot close the AT&T FACE Menu.
+
+Use one of the methods below to use cancel:
+
+     Function Key:  Press the CANCEL function key.
+
+     Command Menu:  Select cancel and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on cancel and an -->
+     (alternative)  will appear on the command line followed by the
+                    cancel. Type arguments and press ENTER to execute
+                    the command.
+
+     Command Line:  Type cancel [frame#] and press ENTER.
+

@@ -1,0 +1,808 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/errno.h>
+#include <sys/types.h>
+#include <sys/kmem.h>
+#include <sys/crypto/common.h>
+#include <sys/crypto/impl.h>
+#include <sys/crypto/api.h>
+#include <sys/crypto/spi.h>
+#include <sys/crypto/sched_impl.h>
+
+/*
+ * Encryption and decryption routines.
+ */
+
+/*
+ * The following are the possible returned values common to all the routines
+ * below. The applicability of some of these return values depends on the
+ * presence of the arguments.
+ *
+ *	CRYPTO_SUCCESS:	The operation completed successfully.
+ *	CRYPTO_QUEUED:	A request was submitted successfully. The callback
+ *			routine will be called when the operation is done.
+ *	CRYPTO_INVALID_MECH_NUMBER, CRYPTO_INVALID_MECH_PARAM, or
+ *	CRYPTO_INVALID_MECH for problems with the 'mech'.
+ *	CRYPTO_INVALID_DATA for bogus 'data'
+ *	CRYPTO_HOST_MEMORY for failure to allocate memory to handle this work.
+ *	CRYPTO_INVALID_CONTEXT: Not a valid context.
+ *	CRYPTO_BUSY:	Cannot process the request now. Schedule a
+ *			crypto_bufcall(), or try later.
+ *	CRYPTO_NOT_SUPPORTED and CRYPTO_MECH_NOT_SUPPORTED: No provider is
+ *			capable of a function or a mechanism.
+ *	CRYPTO_INVALID_KEY: bogus 'key' argument.
+ *	CRYPTO_INVALID_PLAINTEXT: bogus 'plaintext' argument.
+ *	CRYPTO_INVALID_CIPHERTEXT: bogus 'ciphertext' argument.
+ */
+
+/*
+ * crypto_cipher_init_prov()
+ *
+ * Arguments:
+ *
+ *	pd:	provider descriptor
+ *	sid:	session id
+ *	mech:	crypto_mechanism_t pointer.
+ *		mech_type is a valid value previously returned by
+ *		crypto_mech2id();
+ *		When the mech's parameter is not NULL, its definition depends
+ *		on the standard definition of the mechanism.
+ *	key:	pointer to a crypto_key_t structure.
+ *	tmpl:	a crypto_ctx_template_t, opaque template of a context of an
+ *		encryption  or decryption with the 'mech' using 'key'.
+ *		'tmpl' is created by a previous call to
+ *		crypto_create_ctx_template().
+ *	ctxp:	Pointer to a crypto_context_t.
+ *	func:	CRYPTO_FG_ENCRYPT or CRYPTO_FG_DECRYPT.
+ *	cr:	crypto_call_req_t calling conditions and call back info.
+ *
+ * Description:
+ *	This is a common function invoked internally by both
+ *	crypto_encrypt_init() and crypto_decrypt_init().
+ *	Asynchronously submits a request for, or synchronously performs the
+ *	initialization of an encryption or a decryption operation.
+ *	When possible and applicable, will internally use the pre-expanded key
+ *	schedule from the context template, tmpl.
+ *	When complete and successful, 'ctxp' will contain a crypto_context_t
+ *	valid for later calls to encrypt_update() and encrypt_final(), or
+ *	decrypt_update() and decrypt_final().
+ *	The caller should hold a reference on the specified provider
+ *	descriptor before calling this function.
+ *
+ * Context:
+ *	Process or interrupt, according to the semantics dictated by the 'cr'.
+ *
+ * Returns:
+ *	See comment in the beginning of the file.
+ */
+static int
+crypto_cipher_init_prov(kcf_provider_desc_t *pd, crypto_session_id_t sid,
+    crypto_mechanism_t *mech, crypto_key_t *key,
+    crypto_spi_ctx_template_t tmpl, crypto_context_t *ctxp,
+    crypto_call_req_t *crq, crypto_func_group_t func)
+{
+	int error;
+	crypto_ctx_t *ctx;
+	kcf_req_params_t params;
+
+	ASSERT(KCF_PROV_REFHELD(pd));
+
+	/* First, allocate and initialize the canonical context */
+	if ((ctx = kcf_new_ctx(crq, pd, sid)) == NULL)
+		return (CRYPTO_HOST_MEMORY);
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(crq, pd)) {
+		crypto_mechanism_t lmech;
+
+		lmech = *mech;
+		KCF_SET_PROVIDER_MECHNUM(mech->cm_type, pd, &lmech);
+
+		if (func == CRYPTO_FG_ENCRYPT)
+			error = KCF_PROV_ENCRYPT_INIT(pd, ctx, &lmech,
+			    key, tmpl, KCF_SWFP_RHNDL(crq));
+		else {
+			ASSERT(func == CRYPTO_FG_DECRYPT);
+
+			error = KCF_PROV_DECRYPT_INIT(pd, ctx, &lmech,
+			    key, tmpl, KCF_SWFP_RHNDL(crq));
+		}
+		KCF_PROV_INCRSTATS(pd, error);
+	} else {
+		if (func == CRYPTO_FG_ENCRYPT) {
+			KCF_WRAP_ENCRYPT_OPS_PARAMS(&params, KCF_OP_INIT, sid,
+			    mech, key, NULL, NULL, tmpl);
+		} else {
+			ASSERT(func == CRYPTO_FG_DECRYPT);
+			KCF_WRAP_DECRYPT_OPS_PARAMS(&params, KCF_OP_INIT, sid,
+			    mech, key, NULL, NULL, tmpl);
+		}
+
+		error = kcf_submit_request(pd, ctx, crq, &params, B_FALSE);
+	}
+
+	if ((error == CRYPTO_SUCCESS) || (error == CRYPTO_QUEUED))
+		*ctxp = (crypto_context_t)ctx;
+	else {
+		/* Release the hold done in kcf_new_ctx(). */
+		KCF_CONTEXT_REFRELE((kcf_context_t *)ctx->cc_framework_private);
+	}
+
+	return (error);
+}
+
+/*
+ * Same as crypto_cipher_init_prov(), but relies on the scheduler to pick
+ * an appropriate provider. See crypto_cipher_init_prov() comments for more
+ * details.
+ */
+static int
+crypto_cipher_init(crypto_mechanism_t *mech, crypto_key_t *key,
+    crypto_ctx_template_t tmpl, crypto_context_t *ctxp,
+    crypto_call_req_t *crq, crypto_func_group_t func)
+{
+	int error;
+	kcf_mech_entry_t *me;
+	kcf_provider_desc_t *pd;
+	kcf_ctx_template_t *ctx_tmpl;
+	crypto_spi_ctx_template_t spi_ctx_tmpl = NULL;
+	kcf_prov_tried_t *list = NULL;
+
+retry:
+	/* pd is returned held */
+	if ((pd = kcf_get_mech_provider(mech->cm_type, &me, &error,
+	    list, func, CHECK_RESTRICT(crq), 0)) == NULL) {
+		if (list != NULL)
+			kcf_free_triedlist(list);
+		return (error);
+	}
+
+	/*
+	 * For SW providers, check the validity of the context template
+	 * It is very rare that the generation number mis-matches, so
+	 * is acceptable to fail here, and let the consumer recover by
+	 * freeing this tmpl and create a new one for the key and new SW
+	 * provider
+	 */
+	if ((pd->pd_prov_type == CRYPTO_SW_PROVIDER) &&
+	    ((ctx_tmpl = (kcf_ctx_template_t *)tmpl) != NULL)) {
+		if (ctx_tmpl->ct_generation != me->me_gen_swprov) {
+			if (list != NULL)
+				kcf_free_triedlist(list);
+			KCF_PROV_REFRELE(pd);
+			return (CRYPTO_OLD_CTX_TEMPLATE);
+		} else {
+			spi_ctx_tmpl = ctx_tmpl->ct_prov_tmpl;
+		}
+	}
+
+	error = crypto_cipher_init_prov(pd, pd->pd_sid, mech, key,
+	    spi_ctx_tmpl, ctxp, crq, func);
+	if (error != CRYPTO_SUCCESS && error != CRYPTO_QUEUED &&
+	    IS_RECOVERABLE(error)) {
+		/* Add pd to the linked list of providers tried. */
+		if (kcf_insert_triedlist(&list, pd, KCF_KMFLAG(crq)) != NULL)
+			goto retry;
+	}
+
+	if (list != NULL)
+		kcf_free_triedlist(list);
+
+	KCF_PROV_REFRELE(pd);
+	return (error);
+}
+
+/*
+ * crypto_encrypt_prov()
+ *
+ * Arguments:
+ *	pd:	provider descriptor
+ *	sid:	session id
+ *	mech:	crypto_mechanism_t pointer.
+ *		mech_type is a valid value previously returned by
+ *		crypto_mech2id();
+ *		When the mech's parameter is not NULL, its definition depends
+ *		on the standard definition of the mechanism.
+ *	key:	pointer to a crypto_key_t structure.
+ *	plaintext: The message to be encrypted
+ *	ciphertext: Storage for the encrypted message. The length needed
+ *		depends on the mechanism, and the plaintext's size.
+ *	tmpl:	a crypto_ctx_template_t, opaque template of a context of an
+ *		encryption with the 'mech' using 'key'. 'tmpl' is created by
+ *		a previous call to crypto_create_ctx_template().
+ *	cr:	crypto_call_req_t calling conditions and call back info.
+ *
+ * Description:
+ *	Asynchronously submits a request for, or synchronously performs a
+ *	single-part encryption of 'plaintext' with the mechanism 'mech', using
+ *	the key 'key'.
+ *	When complete and successful, 'ciphertext' will contain the encrypted
+ *	message.
+ *
+ * Context:
+ *	Process or interrupt, according to the semantics dictated by the 'cr'.
+ *
+ * Returns:
+ *	See comment in the beginning of the file.
+ */
+int
+crypto_encrypt_prov(crypto_mechanism_t *mech, crypto_data_t *plaintext,
+    crypto_key_t *key, crypto_ctx_template_t tmpl, crypto_data_t *ciphertext,
+    crypto_call_req_t *crq, kcf_provider_desc_t *pd, crypto_session_id_t sid)
+{
+	kcf_req_params_t params;
+
+	ASSERT(KCF_PROV_REFHELD(pd));
+	KCF_WRAP_ENCRYPT_OPS_PARAMS(&params, KCF_OP_ATOMIC, sid, mech, key,
+	    plaintext, ciphertext, tmpl);
+
+	return (kcf_submit_request(pd, NULL, crq, &params, B_FALSE));
+}
+
+/*
+ * Same as crypto_encrypt_prov(), but relies on the scheduler to pick
+ * a provider. See crypto_encrypt_prov() for more details.
+ */
+int
+crypto_encrypt(crypto_mechanism_t *mech, crypto_data_t *plaintext,
+    crypto_key_t *key, crypto_ctx_template_t tmpl, crypto_data_t *ciphertext,
+    crypto_call_req_t *crq)
+{
+	int error;
+	kcf_mech_entry_t *me;
+	kcf_req_params_t params;
+	kcf_provider_desc_t *pd;
+	kcf_ctx_template_t *ctx_tmpl;
+	crypto_spi_ctx_template_t spi_ctx_tmpl = NULL;
+	kcf_prov_tried_t *list = NULL;
+
+retry:
+	/* pd is returned held */
+	if ((pd = kcf_get_mech_provider(mech->cm_type, &me, &error,
+	    list, CRYPTO_FG_ENCRYPT_ATOMIC, CHECK_RESTRICT(crq),
+	    plaintext->cd_length)) == NULL) {
+		if (list != NULL)
+			kcf_free_triedlist(list);
+		return (error);
+	}
+
+	/*
+	 * For SW providers, check the validity of the context template
+	 * It is very rare that the generation number mis-matches, so
+	 * is acceptable to fail here, and let the consumer recover by
+	 * freeing this tmpl and create a new one for the key and new SW
+	 * provider
+	 */
+	if ((pd->pd_prov_type == CRYPTO_SW_PROVIDER) &&
+	    ((ctx_tmpl = (kcf_ctx_template_t *)tmpl) != NULL)) {
+		if (ctx_tmpl->ct_generation != me->me_gen_swprov) {
+			if (list != NULL)
+				kcf_free_triedlist(list);
+			KCF_PROV_REFRELE(pd);
+			return (CRYPTO_OLD_CTX_TEMPLATE);
+		} else {
+			spi_ctx_tmpl = ctx_tmpl->ct_prov_tmpl;
+		}
+	}
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(crq, pd)) {
+		crypto_mechanism_t lmech;
+
+		lmech = *mech;
+		KCF_SET_PROVIDER_MECHNUM(mech->cm_type, pd, &lmech);
+
+		error = KCF_PROV_ENCRYPT_ATOMIC(pd, pd->pd_sid, &lmech, key,
+		    plaintext, ciphertext, spi_ctx_tmpl, KCF_SWFP_RHNDL(crq));
+		KCF_PROV_INCRSTATS(pd, error);
+	} else {
+		KCF_WRAP_ENCRYPT_OPS_PARAMS(&params, KCF_OP_ATOMIC, pd->pd_sid,
+		    mech, key, plaintext, ciphertext, spi_ctx_tmpl);
+		error = kcf_submit_request(pd, NULL, crq, &params, B_FALSE);
+	}
+
+	if (error != CRYPTO_SUCCESS && error != CRYPTO_QUEUED &&
+	    IS_RECOVERABLE(error)) {
+		/* Add pd to the linked list of providers tried. */
+		if (kcf_insert_triedlist(&list, pd, KCF_KMFLAG(crq)) != NULL)
+			goto retry;
+	}
+
+	if (list != NULL)
+		kcf_free_triedlist(list);
+
+	KCF_PROV_REFRELE(pd);
+	return (error);
+}
+
+/*
+ * crypto_encrypt_init_prov()
+ *
+ * Calls crypto_cipher_init_prov() to initialize an encryption operation.
+ */
+int
+crypto_encrypt_init_prov(kcf_provider_desc_t *pd, crypto_session_id_t sid,
+    crypto_mechanism_t *mech, crypto_key_t *key,
+    crypto_ctx_template_t tmpl, crypto_context_t *ctxp,
+    crypto_call_req_t *crq)
+{
+	return (crypto_cipher_init_prov(pd, sid, mech, key, tmpl, ctxp, crq,
+	    CRYPTO_FG_ENCRYPT));
+}
+
+/*
+ * crypto_encrypt_init()
+ *
+ * Calls crypto_cipher_init() to initialize an encryption operation
+ */
+int
+crypto_encrypt_init(crypto_mechanism_t *mech, crypto_key_t *key,
+    crypto_ctx_template_t tmpl, crypto_context_t *ctxp,
+    crypto_call_req_t *crq)
+{
+	return (crypto_cipher_init(mech, key, tmpl, ctxp, crq,
+	    CRYPTO_FG_ENCRYPT));
+}
+
+/*
+ * crypto_encrypt_update()
+ *
+ * Arguments:
+ *	context: A crypto_context_t initialized by encrypt_init().
+ *	plaintext: The message part to be encrypted
+ *	ciphertext: Storage for the encrypted message part.
+ *	cr:	crypto_call_req_t calling conditions and call back info.
+ *
+ * Description:
+ *	Asynchronously submits a request for, or synchronously performs a
+ *	part of an encryption operation.
+ *
+ * Context:
+ *	Process or interrupt, according to the semantics dictated by the 'cr'.
+ *
+ * Returns:
+ *	See comment in the beginning of the file.
+ */
+int
+crypto_encrypt_update(crypto_context_t context, crypto_data_t *plaintext,
+    crypto_data_t *ciphertext, crypto_call_req_t *cr)
+{
+	crypto_ctx_t *ctx = (crypto_ctx_t *)context;
+	kcf_context_t *kcf_ctx;
+	kcf_provider_desc_t *pd;
+	int error;
+	kcf_req_params_t params;
+
+	if ((ctx == NULL) ||
+	    ((kcf_ctx = (kcf_context_t *)ctx->cc_framework_private) == NULL) ||
+	    ((pd = kcf_ctx->kc_prov_desc) == NULL)) {
+		return (CRYPTO_INVALID_CONTEXT);
+	}
+
+	KCF_PROV_REFHOLD(pd);
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(cr, pd)) {
+		error = KCF_PROV_ENCRYPT_UPDATE(pd, ctx, plaintext,
+		    ciphertext, NULL);
+		KCF_PROV_INCRSTATS(pd, error);
+	} else {
+		KCF_WRAP_ENCRYPT_OPS_PARAMS(&params, KCF_OP_UPDATE, pd->pd_sid,
+		    NULL, NULL, plaintext, ciphertext, NULL);
+		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+	}
+
+	KCF_PROV_REFRELE(pd);
+	return (error);
+}
+
+/*
+ * crypto_encrypt_final()
+ *
+ * Arguments:
+ *	context: A crypto_context_t initialized by encrypt_init().
+ *	ciphertext: Storage for the last part of encrypted message
+ *	cr:	crypto_call_req_t calling conditions and call back info.
+ *
+ * Description:
+ *	Asynchronously submits a request for, or synchronously performs the
+ *	final part of an encryption operation.
+ *
+ * Context:
+ *	Process or interrupt, according to the semantics dictated by the 'cr'.
+ *
+ * Returns:
+ *	See comment in the beginning of the file.
+ */
+int
+crypto_encrypt_final(crypto_context_t context, crypto_data_t *ciphertext,
+    crypto_call_req_t *cr)
+{
+	crypto_ctx_t *ctx = (crypto_ctx_t *)context;
+	kcf_context_t *kcf_ctx;
+	kcf_provider_desc_t *pd;
+	int error;
+	kcf_req_params_t params;
+
+	if ((ctx == NULL) ||
+	    ((kcf_ctx = (kcf_context_t *)ctx->cc_framework_private) == NULL) ||
+	    ((pd = kcf_ctx->kc_prov_desc) == NULL)) {
+		return (CRYPTO_INVALID_CONTEXT);
+	}
+
+	KCF_PROV_REFHOLD(pd);
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(cr, pd)) {
+		error = KCF_PROV_ENCRYPT_FINAL(pd, ctx, ciphertext, NULL);
+		KCF_PROV_INCRSTATS(pd, error);
+	} else {
+		KCF_WRAP_ENCRYPT_OPS_PARAMS(&params, KCF_OP_FINAL, pd->pd_sid,
+		    NULL, NULL, NULL, ciphertext, NULL);
+		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+	}
+
+	KCF_PROV_REFRELE(pd);
+	/* Release the hold done in kcf_new_ctx() during init step. */
+	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
+	return (error);
+}
+
+/*
+ * crypto_decrypt_prov()
+ *
+ * Arguments:
+ *	pd:	provider descriptor
+ *	sid:	session id
+ *	mech:	crypto_mechanism_t pointer.
+ *		mech_type is a valid value previously returned by
+ *		crypto_mech2id();
+ *		When the mech's parameter is not NULL, its definition depends
+ *		on the standard definition of the mechanism.
+ *	key:	pointer to a crypto_key_t structure.
+ *	ciphertext: The message to be encrypted
+ *	plaintext: Storage for the encrypted message. The length needed
+ *		depends on the mechanism, and the plaintext's size.
+ *	tmpl:	a crypto_ctx_template_t, opaque template of a context of an
+ *		encryption with the 'mech' using 'key'. 'tmpl' is created by
+ *		a previous call to crypto_create_ctx_template().
+ *	cr:	crypto_call_req_t calling conditions and call back info.
+ *
+ * Description:
+ *	Asynchronously submits a request for, or synchronously performs a
+ *	single-part decryption of 'ciphertext' with the mechanism 'mech', using
+ *	the key 'key'.
+ *	When complete and successful, 'plaintext' will contain the decrypted
+ *	message.
+ *
+ * Context:
+ *	Process or interrupt, according to the semantics dictated by the 'cr'.
+ *
+ * Returns:
+ *	See comment in the beginning of the file.
+ */
+int
+crypto_decrypt_prov(crypto_mechanism_t *mech, crypto_data_t *ciphertext,
+    crypto_key_t *key, crypto_ctx_template_t tmpl, crypto_data_t *plaintext,
+    crypto_call_req_t *crq, kcf_provider_desc_t *pd, crypto_session_id_t sid)
+{
+	kcf_req_params_t params;
+
+	ASSERT(KCF_PROV_REFHELD(pd));
+	KCF_WRAP_DECRYPT_OPS_PARAMS(&params, KCF_OP_ATOMIC, sid, mech, key,
+	    ciphertext, plaintext, tmpl);
+
+	return (kcf_submit_request(pd, NULL, crq, &params, B_FALSE));
+}
+
+/*
+ * Same as crypto_decrypt_prov(), but relies on the KCF scheduler to
+ * choose a provider. See crypto_decrypt_prov() comments for more
+ * information.
+ */
+int
+crypto_decrypt(crypto_mechanism_t *mech, crypto_data_t *ciphertext,
+    crypto_key_t *key, crypto_ctx_template_t tmpl, crypto_data_t *plaintext,
+    crypto_call_req_t *crq)
+{
+	int error;
+	kcf_mech_entry_t *me;
+	kcf_req_params_t params;
+	kcf_provider_desc_t *pd;
+	kcf_ctx_template_t *ctx_tmpl;
+	crypto_spi_ctx_template_t spi_ctx_tmpl = NULL;
+	kcf_prov_tried_t *list = NULL;
+
+retry:
+	/* pd is returned held */
+	if ((pd = kcf_get_mech_provider(mech->cm_type, &me, &error,
+	    list, CRYPTO_FG_DECRYPT_ATOMIC, CHECK_RESTRICT(crq),
+	    ciphertext->cd_length)) == NULL) {
+		if (list != NULL)
+			kcf_free_triedlist(list);
+		return (error);
+	}
+
+	/*
+	 * For SW providers, check the validity of the context template
+	 * It is very rare that the generation number mis-matches, so
+	 * is acceptable to fail here, and let the consumer recover by
+	 * freeing this tmpl and create a new one for the key and new SW
+	 * provider
+	 */
+	if ((pd->pd_prov_type == CRYPTO_SW_PROVIDER) &&
+	    ((ctx_tmpl = (kcf_ctx_template_t *)tmpl) != NULL)) {
+		if (ctx_tmpl->ct_generation != me->me_gen_swprov) {
+			if (list != NULL)
+				kcf_free_triedlist(list);
+			KCF_PROV_REFRELE(pd);
+			return (CRYPTO_OLD_CTX_TEMPLATE);
+		} else {
+			spi_ctx_tmpl = ctx_tmpl->ct_prov_tmpl;
+		}
+	}
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(crq, pd)) {
+		crypto_mechanism_t lmech;
+
+		lmech = *mech;
+		KCF_SET_PROVIDER_MECHNUM(mech->cm_type, pd, &lmech);
+
+		error = KCF_PROV_DECRYPT_ATOMIC(pd, pd->pd_sid, &lmech, key,
+		    ciphertext, plaintext, spi_ctx_tmpl, KCF_SWFP_RHNDL(crq));
+		KCF_PROV_INCRSTATS(pd, error);
+	} else {
+		KCF_WRAP_DECRYPT_OPS_PARAMS(&params, KCF_OP_ATOMIC, pd->pd_sid,
+		    mech, key, ciphertext, plaintext, spi_ctx_tmpl);
+		error = kcf_submit_request(pd, NULL, crq, &params, B_FALSE);
+	}
+
+	if (error != CRYPTO_SUCCESS && error != CRYPTO_QUEUED &&
+	    IS_RECOVERABLE(error)) {
+		/* Add pd to the linked list of providers tried. */
+		if (kcf_insert_triedlist(&list, pd, KCF_KMFLAG(crq)) != NULL)
+			goto retry;
+	}
+
+	if (list != NULL)
+		kcf_free_triedlist(list);
+
+	KCF_PROV_REFRELE(pd);
+	return (error);
+}
+
+/*
+ * crypto_decrypt_init_prov()
+ *
+ * Calls crypto_cipher_init_prov() to initialize a decryption operation
+ */
+int
+crypto_decrypt_init_prov(kcf_provider_desc_t *pd, crypto_session_id_t sid,
+    crypto_mechanism_t *mech, crypto_key_t *key,
+    crypto_ctx_template_t tmpl, crypto_context_t *ctxp,
+    crypto_call_req_t *crq)
+{
+	return (crypto_cipher_init_prov(pd, sid, mech, key, tmpl, ctxp, crq,
+	    CRYPTO_FG_DECRYPT));
+}
+
+/*
+ * crypto_decrypt_init()
+ *
+ * Calls crypto_cipher_init() to initialize a decryption operation
+ */
+int
+crypto_decrypt_init(crypto_mechanism_t *mech, crypto_key_t *key,
+    crypto_ctx_template_t tmpl, crypto_context_t *ctxp,
+    crypto_call_req_t *crq)
+{
+	return (crypto_cipher_init(mech, key, tmpl, ctxp, crq,
+	    CRYPTO_FG_DECRYPT));
+}
+
+/*
+ * crypto_decrypt_update()
+ *
+ * Arguments:
+ *	context: A crypto_context_t initialized by decrypt_init().
+ *	ciphertext: The message part to be decrypted
+ *	plaintext: Storage for the decrypted message part.
+ *	cr:	crypto_call_req_t calling conditions and call back info.
+ *
+ * Description:
+ *	Asynchronously submits a request for, or synchronously performs a
+ *	part of an decryption operation.
+ *
+ * Context:
+ *	Process or interrupt, according to the semantics dictated by the 'cr'.
+ *
+ * Returns:
+ *	See comment in the beginning of the file.
+ */
+int
+crypto_decrypt_update(crypto_context_t context, crypto_data_t *ciphertext,
+    crypto_data_t *plaintext, crypto_call_req_t *cr)
+{
+	crypto_ctx_t *ctx = (crypto_ctx_t *)context;
+	kcf_context_t *kcf_ctx;
+	kcf_provider_desc_t *pd;
+	int error;
+	kcf_req_params_t params;
+
+	if ((ctx == NULL) ||
+	    ((kcf_ctx = (kcf_context_t *)ctx->cc_framework_private) == NULL) ||
+	    ((pd = kcf_ctx->kc_prov_desc) == NULL)) {
+		return (CRYPTO_INVALID_CONTEXT);
+	}
+
+	KCF_PROV_REFHOLD(pd);
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(cr, pd)) {
+		error = KCF_PROV_DECRYPT_UPDATE(pd, ctx, ciphertext,
+		    plaintext, NULL);
+		KCF_PROV_INCRSTATS(pd, error);
+	} else {
+		KCF_WRAP_DECRYPT_OPS_PARAMS(&params, KCF_OP_UPDATE, pd->pd_sid,
+		    NULL, NULL, ciphertext, plaintext, NULL);
+		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+	}
+
+	KCF_PROV_REFRELE(pd);
+	return (error);
+}
+
+/*
+ * crypto_decrypt_final()
+ *
+ * Arguments:
+ *	context: A crypto_context_t initialized by decrypt_init().
+ *	plaintext: Storage for the last part of the decrypted message
+ *	cr:	crypto_call_req_t calling conditions and call back info.
+ *
+ * Description:
+ *	Asynchronously submits a request for, or synchronously performs the
+ *	final part of a decryption operation.
+ *
+ * Context:
+ *	Process or interrupt, according to the semantics dictated by the 'cr'.
+ *
+ * Returns:
+ *	See comment in the beginning of the file.
+ */
+int
+crypto_decrypt_final(crypto_context_t context, crypto_data_t *plaintext,
+    crypto_call_req_t *cr)
+{
+	crypto_ctx_t *ctx = (crypto_ctx_t *)context;
+	kcf_context_t *kcf_ctx;
+	kcf_provider_desc_t *pd;
+	int error;
+	kcf_req_params_t params;
+
+	if ((ctx == NULL) ||
+	    ((kcf_ctx = (kcf_context_t *)ctx->cc_framework_private) == NULL) ||
+	    ((pd = kcf_ctx->kc_prov_desc) == NULL)) {
+		return (CRYPTO_INVALID_CONTEXT);
+	}
+
+	KCF_PROV_REFHOLD(pd);
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(cr, pd)) {
+		error = KCF_PROV_DECRYPT_FINAL(pd, ctx, plaintext, NULL);
+		KCF_PROV_INCRSTATS(pd, error);
+	} else {
+		KCF_WRAP_DECRYPT_OPS_PARAMS(&params, KCF_OP_FINAL, pd->pd_sid,
+		    NULL, NULL, NULL, plaintext, NULL);
+		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+	}
+
+	KCF_PROV_REFRELE(pd);
+	/* Release the hold done in kcf_new_ctx() during init step. */
+	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
+	return (error);
+}
+
+/*
+ * See comments for crypto_encrypt_update().
+ */
+int
+crypto_encrypt_single(crypto_context_t context, crypto_data_t *plaintext,
+    crypto_data_t *ciphertext, crypto_call_req_t *cr)
+{
+	crypto_ctx_t *ctx = (crypto_ctx_t *)context;
+	kcf_context_t *kcf_ctx;
+	kcf_provider_desc_t *pd;
+	int error;
+	kcf_req_params_t params;
+
+	if ((ctx == NULL) ||
+	    ((kcf_ctx = (kcf_context_t *)ctx->cc_framework_private) == NULL) ||
+	    ((pd = kcf_ctx->kc_prov_desc) == NULL)) {
+		return (CRYPTO_INVALID_CONTEXT);
+	}
+
+	KCF_PROV_REFHOLD(pd);
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(cr, pd)) {
+		error = KCF_PROV_ENCRYPT(pd, ctx, plaintext,
+		    ciphertext, NULL);
+		KCF_PROV_INCRSTATS(pd, error);
+	} else {
+		KCF_WRAP_ENCRYPT_OPS_PARAMS(&params, KCF_OP_SINGLE, pd->pd_sid,
+		    NULL, NULL, plaintext, ciphertext, NULL);
+		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+	}
+
+	KCF_PROV_REFRELE(pd);
+	/* Release the hold done in kcf_new_ctx() during init step. */
+	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
+	return (error);
+}
+
+/*
+ * See comments for crypto_decrypt_update().
+ */
+int
+crypto_decrypt_single(crypto_context_t context, crypto_data_t *ciphertext,
+    crypto_data_t *plaintext, crypto_call_req_t *cr)
+{
+	crypto_ctx_t *ctx = (crypto_ctx_t *)context;
+	kcf_context_t *kcf_ctx;
+	kcf_provider_desc_t *pd;
+	int error;
+	kcf_req_params_t params;
+
+	if ((ctx == NULL) ||
+	    ((kcf_ctx = (kcf_context_t *)ctx->cc_framework_private) == NULL) ||
+	    ((pd = kcf_ctx->kc_prov_desc) == NULL)) {
+		return (CRYPTO_INVALID_CONTEXT);
+	}
+
+	KCF_PROV_REFHOLD(pd);
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(cr, pd)) {
+		error = KCF_PROV_DECRYPT(pd, ctx, ciphertext,
+		    plaintext, NULL);
+		KCF_PROV_INCRSTATS(pd, error);
+	} else {
+		KCF_WRAP_DECRYPT_OPS_PARAMS(&params, KCF_OP_SINGLE, pd->pd_sid,
+		    NULL, NULL, ciphertext, plaintext, NULL);
+		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+	}
+
+	KCF_PROV_REFRELE(pd);
+	/* Release the hold done in kcf_new_ctx() during init step. */
+	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
+	return (error);
+}

@@ -1,0 +1,37 @@
+The IPV6 code is enabled by uncommenting
+
+IPV6 = -DHAVE_IPV6
+
+Check your system specific make line for the entry IPV6="$(IPV6)"; it has not
+been added to most yet.
+
+The code was tested on Solaris 8 Beta.  A single tcpd binary supports
+IPV6 and IPV4 sockets as well as TLI (v4/v6).
+
+The code successfully compiles on Solaris 7 + playground.sun.com IPV6 patch,
+but I have not tested the binary.
+
+The code also compiles on AIX using "-DHAVE_IPV6 -DUSE_GETHOSTBYNAME2"
+
+The KILL_IPOPTIONS option doesn't work.  (Something to do with IPV4 addresses
+mapped inside IPV6 sockets)
+
+The code extends the hosts.{allow,deny} syntax in a minor way.  You can
+now specify IPV6 address, like this:
+
+		# Ipv6 numeric address
+		someservice: [x:x:x::x]
+		# Ipv6 network
+		otherservice: [x:x:x::x/prefix]
+
+
+Note that the "[" and "]" are part of the syntax; no whitespace is allowed
+inside the [].
+
+The datastructures have been modified such that we hope that
+libwrap binary compatibility is maintained.
+
+The original tcp_wrappers-7.6 files have been renamed and have a .org
+extension; only this file (README.ipv6) was added.
+
+Casper Dik (Casper.Dik@Holland.Sun.COM)

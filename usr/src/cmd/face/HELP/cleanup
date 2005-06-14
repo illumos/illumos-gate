@@ -1,0 +1,11 @@
+
+The cleanup command closes all frames on the screen except the AT&T
+FACE frame and those frames you have defined to open upon login via
+the "Display Frames" form accessed from the Preferences menu.
+
+Use one of the methods below to use cleanup.
+
+     Command Menu:  Select cleanup and press ENTER.
+
+     Command Line:  Type cleanup and press ENTER.
+

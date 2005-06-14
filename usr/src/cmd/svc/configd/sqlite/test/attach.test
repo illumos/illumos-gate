@@ -1,0 +1,589 @@
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+# 2003 April 4
+#
+# The author disclaims copyright to this source code.  In place of
+# a legal notice, here is a blessing:
+#
+#    May you do good and not evil.
+#    May you find forgiveness for yourself and forgive others.
+#    May you share freely, never taking more than you give.
+#
+#***********************************************************************
+# This file implements regression tests for SQLite library.  The
+# focus of this script is testing the ATTACH and DETACH commands
+# and related functionality.
+#
+# $Id: attach.test,v 1.13 2004/02/14 01:39:50 drh Exp $
+#
+
+set testdir [file dirname $argv0]
+source $testdir/tester.tcl
+
+for {set i 2} {$i<=15} {incr i} {
+  file delete -force test$i.db
+  file delete -force test$i.db-journal
+}
+
+do_test attach-1.1 {
+  execsql {
+    CREATE TABLE t1(a,b);
+    INSERT INTO t1 VALUES(1,2);
+    INSERT INTO t1 VALUES(3,4);
+    SELECT * FROM t1;
+  }
+} {1 2 3 4}
+do_test attach-1.2 {
+  sqlite db2 test2.db
+  execsql {
+    CREATE TABLE t2(x,y);
+    INSERT INTO t2 VALUES(1,'x');
+    INSERT INTO t2 VALUES(2,'y');
+    SELECT * FROM t2;
+  } db2
+} {1 x 2 y}
+do_test attach-1.3 {
+  execsql {
+    ATTACH DATABASE 'test2.db' AS two;
+    SELECT * FROM two.t2;
+  }
+} {1 x 2 y}
+do_test attach-1.4 {
+  execsql {
+    SELECT * FROM t2;
+  }
+} {1 x 2 y}
+do_test attach-1.5 {
+  execsql {
+    DETACH DATABASE two;
+    SELECT * FROM t1;
+  }
+} {1 2 3 4}
+do_test attach-1.6 {
+  catchsql {
+    SELECT * FROM t2;
+  }
+} {1 {no such table: t2}}
+do_test attach-1.7 {
+  catchsql {
+    SELECT * FROM two.t2;
+  }
+} {1 {no such table: two.t2}}
+do_test attach-1.8 {
+  catchsql {
+    ATTACH DATABASE 'test3.db' AS three;
+  }
+} {1 {cannot attach empty database: three}}
+do_test attach-1.9 {
+  catchsql {
+    SELECT * FROM three.sqlite_master;
+  }
+} {1 {no such table: three.sqlite_master}}
+do_test attach-1.10 {
+  catchsql {
+    DETACH DATABASE three;
+  }
+} {1 {no such database: three}}
+do_test attach-1.11 {
+  execsql {
+    ATTACH 'test.db' AS db2;
+    ATTACH 'test.db' AS db3;
+    ATTACH 'test.db' AS db4;
+    ATTACH 'test.db' AS db5;
+    ATTACH 'test.db' AS db6;
+    ATTACH 'test.db' AS db7;
+    ATTACH 'test.db' AS db8;
+    ATTACH 'test.db' AS db9;
+  }
+} {}
+proc db_list {db} {
+  set list {}
+  foreach {idx name file} [execsql {PRAGMA database_list} $db] {
+    lappend list $idx $name
+  }
+  return $list
+}
+do_test attach-1.11b {
+  db_list db
+} {0 main 1 temp 2 db2 3 db3 4 db4 5 db5 6 db6 7 db7 8 db8 9 db9}
+do_test attach-1.12 {
+  catchsql {
+    ATTACH 'test.db' as db2;
+  }
+} {1 {database db2 is already in use}}
+do_test attach-1.13 {
+  catchsql {
+    ATTACH 'test.db' as db5;
+  }
+} {1 {database db5 is already in use}}
+do_test attach-1.14 {
+  catchsql {
+    ATTACH 'test.db' as db9;
+  }
+} {1 {database db9 is already in use}}
+do_test attach-1.15 {
+  catchsql {
+    ATTACH 'test.db' as main;
+  }
+} {1 {database main is already in use}}
+do_test attach-1.16 {
+  catchsql {
+    ATTACH 'test.db' as temp;
+  }
+} {1 {database temp is already in use}}
+do_test attach-1.17 {
+  catchsql {
+    ATTACH 'test.db' as MAIN;
+  }
+} {1 {database MAIN is already in use}}
+do_test attach-1.18 {
+  catchsql {
+    ATTACH 'test.db' as db10;
+    ATTACH 'test.db' as db11;
+  }
+} {0 {}}
+do_test attach-1.19 {
+  catchsql {
+    ATTACH 'test.db' as db12;
+  }
+} {1 {too many attached databases - max 10}}
+do_test attach-1.20.1 {
+  execsql {
+    DETACH db5;
+  }
+  db_list db
+} {0 main 1 temp 2 db2 3 db3 4 db4 5 db11 6 db6 7 db7 8 db8 9 db9 10 db10}
+integrity_check attach-1.20.2
+do_test attach-1.21 {
+  catchsql {
+    ATTACH 'test.db' as db12;
+  }
+} {0 {}}
+do_test attach-1.22 {
+  catchsql {
+    ATTACH 'test.db' as db13;
+  }
+} {1 {too many attached databases - max 10}}
+do_test attach-1.23 {
+  catchsql {
+    DETACH db14;
+  }
+} {1 {no such database: db14}}
+do_test attach-1.24 {
+  catchsql {
+    DETACH db12;
+  }
+} {0 {}}
+do_test attach-1.25 {
+  catchsql {
+    DETACH db12;
+  }
+} {1 {no such database: db12}}
+do_test attach-1.26 {
+  catchsql {
+    DETACH main;
+  }
+} {1 {cannot detach database main}}
+do_test attach-1.27 {
+  catchsql {
+    DETACH Temp;
+  }
+} {1 {cannot detach database Temp}}
+do_test attach-1.28 {
+  catchsql {
+    DETACH db11;
+    DETACH db10;
+    DETACH db9;
+    DETACH db8;
+    DETACH db7;
+    DETACH db6;
+    DETACH db4;
+    DETACH db3;
+    DETACH db2;
+  }
+} {0 {}}
+do_test attach-1.29 {
+  db_list db
+} {0 main 1 temp}
+
+do_test attach-2.1 {
+  execsql {
+    CREATE TABLE tx(x1,x2,y1,y2);
+    CREATE TRIGGER r1 AFTER UPDATE ON t2 FOR EACH ROW BEGIN
+      INSERT INTO tx(x1,x2,y1,y2) VALUES(OLD.x,NEW.x,OLD.y,NEW.y);
+    END;
+    SELECT * FROM tx;
+  } db2;
+} {}
+do_test attach-2.2 {
+  execsql {
+    UPDATE t2 SET x=x+10;
+    SELECT * FROM tx;
+  } db2;
+} {1 11 x x 2 12 y y}
+do_test attach-2.3 {
+  execsql {
+    CREATE TABLE tx(x1,x2,y1,y2);
+    SELECT * FROM tx;
+  }
+} {}
+do_test attach-2.4 {
+  execsql {
+    ATTACH 'test2.db' AS db2;
+  }
+} {}
+do_test attach-2.5 {
+  execsql {
+    UPDATE db2.t2 SET x=x+10;
+    SELECT * FROM db2.tx;
+  }
+} {1 11 x x 2 12 y y 11 21 x x 12 22 y y}
+do_test attach-2.6 {
+  execsql {
+    SELECT * FROM main.tx;
+  }
+} {}
+do_test attach-2.7 {
+  execsql {
+    SELECT type, name, tbl_name FROM db2.sqlite_master;
+  }
+} {table t2 t2 table tx tx trigger r1 t2}
+do_test attach-2.8 {
+  db_list db
+} {0 main 1 temp 2 db2}
+do_test attach-2.9 {
+  execsql {
+    CREATE INDEX i2 ON t2(x);
+    SELECT * FROM t2 WHERE x>5;
+  } db2
+} {21 x 22 y}
+do_test attach-2.10 {
+  execsql {
+    SELECT type, name, tbl_name FROM sqlite_master;
+  } db2
+} {table t2 t2 table tx tx trigger r1 t2 index i2 t2}
+#do_test attach-2.11 {
+#  catchsql { 
+#    SELECT * FROM t2 WHERE x>5;
+#  }
+#} {1 {database schema has changed}}
+do_test attach-2.12 {
+  db_list db
+} {0 main 1 temp 2 db2}
+do_test attach-2.13 {
+  catchsql {
+    SELECT * FROM t2 WHERE x>5;
+  }
+} {0 {21 x 22 y}}
+do_test attach-2.14 {
+  execsql {
+    SELECT type, name, tbl_name FROM sqlite_master;
+  }
+} {table t1 t1 table tx tx}
+do_test attach-2.15 {
+  execsql {
+    SELECT type, name, tbl_name FROM db2.sqlite_master;
+  }
+} {table t2 t2 table tx tx trigger r1 t2 index i2 t2}
+do_test attach-2.16 {
+  db close
+  sqlite db test.db
+  execsql {
+    ATTACH 'test2.db' AS db2;
+    SELECT type, name, tbl_name FROM db2.sqlite_master;
+  }
+} {table t2 t2 table tx tx trigger r1 t2 index i2 t2}
+
+do_test attach-3.1 {
+  db close
+  db2 close
+  sqlite db test.db
+  sqlite db2 test2.db
+  execsql {
+    SELECT * FROM t1
+  }
+} {1 2 3 4}
+do_test attach-3.2 {
+  catchsql {
+    SELECT * FROM t2
+  }
+} {1 {no such table: t2}}
+do_test attach-3.3 {
+  catchsql {
+    ATTACH DATABASE 'test2.db' AS db2;
+    SELECT * FROM t2
+  }
+} {0 {21 x 22 y}}
+
+# Even though main has a transaction, test2.db should not be locked.
+do_test attach-3.4 {
+  execsql BEGIN
+  catchsql {
+    SELECT * FROM t2;
+  } db2;
+} {0 {21 x 22 y}}
+
+# Reading from db2 should not lock test2.db
+do_test attach-3.5 {
+  execsql {SELECT * FROM t2}
+  catchsql {
+    SELECT * FROM t2;
+  } db2;
+} {0 {21 x 22 y}}
+
+# Making a change to db2 causes test2.ddb to become locked.
+do_test attach-3.6 {
+  execsql {
+    UPDATE t2 SET x=x+1 WHERE x=50;
+  }
+  catchsql {
+    SELECT * FROM t2;
+  } db2;
+} {1 {database is locked}}
+
+do_test attach-3.7 {
+  execsql ROLLBACK
+  execsql {SELECT * FROM t2} db2
+} {21 x 22 y}
+do_test attach-3.8 {
+  execsql BEGIN
+  execsql BEGIN db2
+  catchsql {SELECT * FROM t2}
+} {1 {database is locked}}
+do_test attach-3.9 {
+  catchsql {SELECT * FROM t2} db2
+} {0 {21 x 22 y}}
+do_test attach-3.10 {
+  execsql {SELECT * FROM t1}
+} {1 2 3 4}
+do_test attach-3.11 {
+  catchsql {UPDATE t1 SET a=a+1}
+} {0 {}}
+do_test attach-3.12 {
+  execsql {SELECT * FROM t1}
+} {2 2 4 4}
+do_test attach-3.13 {
+  catchsql {UPDATE t2 SET x=x+1 WHERE x=50}
+} {1 {database is locked}}
+do_test attach-3.14 {
+  # Unable to reinitialize the schema tables because the aux database
+  # is still locked.
+  catchsql {SELECT * FROM t1}
+} {1 {database is locked}}
+do_test attach-3.15 {
+  execsql COMMIT db2
+  execsql {SELECT * FROM t1}
+} {1 2 3 4}
+
+# Ticket #323
+do_test attach-4.1 {
+  execsql {DETACH db2}
+  db2 close
+  sqlite db2 test2.db
+  execsql {
+    CREATE TABLE t3(x,y);
+    CREATE UNIQUE INDEX t3i1 ON t3(x);
+    INSERT INTO t3 VALUES(1,2);
+    SELECT * FROM t3;
+  } db2;
+} {1 2}
+do_test attach-4.2 {
+  execsql {
+    CREATE TABLE t3(a,b);
+    CREATE UNIQUE INDEX t3i1b ON t3(a);
+    INSERT INTO t3 VALUES(9,10);
+    SELECT * FROM t3;
+  }
+} {9 10}
+do_test attach-4.3 {
+  execsql {
+    ATTACH DATABASE 'test2.db' AS db2;
+    SELECT * FROM db2.t3;
+  }
+} {1 2}
+do_test attach-4.4 {
+  execsql {
+    SELECT * FROM main.t3;
+  }
+} {9 10}
+do_test attach-4.5 {
+  execsql {
+    INSERT INTO db2.t3 VALUES(9,10);
+    SELECT * FROM db2.t3;
+  }
+} {1 2 9 10}
+do_test attach-4.6 {
+  execsql {
+    DETACH db2;
+  }
+  execsql {
+    CREATE TABLE t4(x);
+    CREATE TRIGGER t3r3 AFTER INSERT ON t3 BEGIN
+      INSERT INTO t4 VALUES('db2.' || NEW.x);
+    END;
+    INSERT INTO t3 VALUES(6,7);
+    SELECT * FROM t4;
+  } db2
+} {db2.6}
+do_test attach-4.7 {
+  execsql {
+    CREATE TABLE t4(y);
+    CREATE TRIGGER t3r3 AFTER INSERT ON t3 BEGIN
+      INSERT INTO t4 VALUES('main.' || NEW.a);
+    END;
+    INSERT INTO main.t3 VALUES(11,12);
+    SELECT * FROM main.t4;
+  }
+} {main.11}
+do_test attach-4.8 {
+  execsql {
+    ATTACH DATABASE 'test2.db' AS db2;
+    INSERT INTO db2.t3 VALUES(13,14);
+    SELECT * FROM db2.t4 UNION ALL SELECT * FROM main.t4;
+  }
+} {db2.6 db2.13 main.11}
+do_test attach-4.9 {
+  execsql {
+    INSERT INTO main.t3 VALUES(15,16);
+    SELECT * FROM db2.t4 UNION ALL SELECT * FROM main.t4;
+  }
+} {db2.6 db2.13 main.11 main.15}
+do_test attach-4.10 {
+  execsql {
+    DETACH DATABASE db2;
+  }
+  execsql {
+    CREATE VIEW v3 AS SELECT x*100+y FROM t3;
+    SELECT * FROM v3;
+  } db2
+} {102 910 607 1314}
+do_test attach-4.11 {
+  execsql {
+    CREATE VIEW v3 AS SELECT a*100+b FROM t3;
+    SELECT * FROM v3;
+  }
+} {910 1112 1516}
+do_test attach-4.12 {
+  execsql {
+    ATTACH DATABASE 'test2.db' AS db2;
+    SELECT * FROM db2.v3;
+  }
+} {102 910 607 1314}
+do_test attach-4.13 {
+  execsql {
+    SELECT * FROM main.v3;
+  }
+} {910 1112 1516}
+
+# Tests for the sqliteFix...() routines in attach.c
+#
+do_test attach-5.1 {
+  db close
+  sqlite db test.db
+  db2 close
+  file delete -force test2.db
+  sqlite db2 test2.db
+  catchsql {
+    ATTACH DATABASE 'test.db' AS orig;
+    CREATE TRIGGER r1 AFTER INSERT ON orig.t1 BEGIN;
+      SELECT 'no-op';
+    END;
+  } db2
+} {1 {triggers may not be added to auxiliary database orig}}
+do_test attach-5.2 {
+  catchsql {
+    CREATE TABLE t5(x,y);
+    CREATE TRIGGER r5 AFTER INSERT ON t5 BEGIN
+      SELECT 'no-op';
+    END;
+  } db2
+} {0 {}}
+do_test attach-5.3 {
+  catchsql {
+    DROP TRIGGER r5;
+    CREATE TRIGGER r5 AFTER INSERT ON t5 BEGIN
+      SELECT 'no-op' FROM orig.t1;
+    END;
+  } db2
+} {1 {trigger r5 cannot reference objects in database orig}}
+do_test attach-5.4 {
+  catchsql {
+    CREATE TEMP TABLE t6(p,q,r);
+    CREATE TRIGGER r5 AFTER INSERT ON t5 BEGIN
+      SELECT 'no-op' FROM temp.t6;
+    END;
+  } db2
+} {1 {trigger r5 cannot reference objects in database temp}}
+do_test attach-5.5 {
+  catchsql {
+    CREATE TRIGGER r5 AFTER INSERT ON t5 BEGIN
+      SELECT 'no-op' || (SELECT * FROM temp.t6);
+    END;
+  } db2
+} {1 {trigger r5 cannot reference objects in database temp}}
+do_test attach-5.6 {
+  catchsql {
+    CREATE TRIGGER r5 AFTER INSERT ON t5 BEGIN
+      SELECT 'no-op' FROM t1 WHERE x<(SELECT min(x) FROM temp.t6);
+    END;
+  } db2
+} {1 {trigger r5 cannot reference objects in database temp}}
+do_test attach-5.7 {
+  catchsql {
+    CREATE TRIGGER r5 AFTER INSERT ON t5 BEGIN
+      SELECT 'no-op' FROM t1 GROUP BY 1 HAVING x<(SELECT min(x) FROM temp.t6);
+    END;
+  } db2
+} {1 {trigger r5 cannot reference objects in database temp}}
+do_test attach-5.7 {
+  catchsql {
+    CREATE TRIGGER r5 AFTER INSERT ON t5 BEGIN
+      SELECT max(1,x,(SELECT min(x) FROM temp.t6)) FROM t1;
+    END;
+  } db2
+} {1 {trigger r5 cannot reference objects in database temp}}
+do_test attach-5.8 {
+  catchsql {
+    CREATE TRIGGER r5 AFTER INSERT ON t5 BEGIN
+      INSERT INTO t1 VALUES((SELECT min(x) FROM temp.t6),5);
+    END;
+  } db2
+} {1 {trigger r5 cannot reference objects in database temp}}
+do_test attach-5.9 {
+  catchsql {
+    CREATE TRIGGER r5 AFTER INSERT ON t5 BEGIN
+      DELETE FROM t1 WHERE x<(SELECT min(x) FROM temp.t6);
+    END;
+  } db2
+} {1 {trigger r5 cannot reference objects in database temp}}
+
+# Check to make sure we get a sensible error if unable to open
+# the file that we are trying to attach.
+#
+do_test attach-6.1 {
+  catchsql {
+    ATTACH DATABASE 'no-such-file' AS nosuch;
+  }
+} {1 {cannot attach empty database: nosuch}}
+file delete -force no-such-file
+if {$tcl_platform(platform)=="unix"} {
+  do_test attach-6.2 {
+    sqlite dbx cannot-read
+    dbx eval {CREATE TABLE t1(a,b,c)}
+    dbx close
+    file attributes cannot-read -permission 0000
+    catchsql {
+      ATTACH DATABASE 'cannot-read' AS noread;
+    }
+  } {1 {unable to open database: cannot-read}}
+  file delete -force cannot-read
+}
+
+for {set i 2} {$i<=15} {incr i} {
+  catch {db$i close}
+}
+file delete -force test2.db
+
+
+finish_test

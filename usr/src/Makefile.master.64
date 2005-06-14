@@ -1,0 +1,80 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# rebind basic build macros to 64-bit versions
+
+CFLAGS=		$(CFLAGS64)
+CCFLAGS=	$(CCFLAGS64)
+COPTFLAG=	$(COPTFLAG64)
+CCOPTFLAG=	$(CCOPTFLAG64)
+COMPILE.c=	$(COMPILE64.c)
+COMPILE.cc=	$(COMPILE64.cc)
+COMPILE.s=	$(COMPILE64.s)
+COMPILE.d=	$(COMPILE64.d)
+LINK.c=		$(LINK64.c)
+LINK.cc=	$(LINK64.cc)
+LINT.c=		$(LINT64.c)
+
+OFFSETS_CREATE=	$(OFFSETS_CREATE64)
+
+#
+# Some library path hackery, to allow building of partial workspaces
+# and properly set the 64-bit library paths with 'ws'
+#
+LDLIBS1=	$(ENVLDLIBS1:%=%/$(MACH64))
+LDLIBS2=	$(ENVLDLIBS2:%=%/$(MACH64))
+LDLIBS3=	$(ENVLDLIBS3:%=%/$(MACH64))
+LDLIBS64 = 	$(LDLIBS1) $(LDLIBS2) $(LDLIBS3)
+#
+# Moved these up to the top level here, so they can be overridden
+#
+LDLIBS.cmd =	$(LDLIBS64)
+LDLIBS.lib =	$(LDLIBS64)
+
+#
+# Override Makefile.master's settings of SFWLIBDIR
+#
+SFWLIBDIR=	$(SFWLIBDIR64)
+
+#
+# Override Makefile.master's settings of CC, CCC, AS and LINT
+#
+CC=		$($(MACH64)_CC)
+CCC=		$($(MACH64)_CCC)
+CPP=		$($(MACH64)_CPP)
+AS=		$($(MACH64)_AS)
+LD=		$($(MACH64)_LD)
+LINT=		$($(MACH64)_LINT)
+
+BUILD.SO=	$(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
+		$(PICS) -L $(ROOTLIBDIR64) $(LDLIBS)
+
+CCNEEDED		= -lCrun
+# XX64  What to do about libstdc++ for g++ ???
+
+BUILDCCC.SO=    $(CCC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS) $(CCNEEDED)

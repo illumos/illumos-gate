@@ -1,0 +1,205 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	This Makefile defines all file modules in the directory uts/i86pc
+#	and it's children. These are the source files which i86pc
+#	"implementation architecture" dependent.
+#
+
+#
+#	object lists
+#
+CORE_OBJS +=			\
+	beeper.o		\
+	biosdisk.o		\
+	cbe.o			\
+	confunix.o		\
+	cpuid.o			\
+	dis_tables.o		\
+	ddi_impl.o		\
+	dtrace_subr.o		\
+	dvma.o			\
+	graphics.o		\
+	hat_i86.o		\
+	hat_kdi.o		\
+	hment.o			\
+	hrtimers.o		\
+	htable.o		\
+	instr_size.o		\
+	intr.o			\
+	lgrpplat.o		\
+	mach_i86mmu.o		\
+	mach_kdi.o		\
+	mach_sysconfig.o	\
+	machdep.o		\
+	mem_config_stubs.o	\
+	memnode.o		\
+	mlsetup.o		\
+	mp_call.o		\
+	mp_implfuncs.o		\
+	mp_machdep.o		\
+	mp_startup.o		\
+	memscrub.o		\
+	mpcore.o		\
+	notes.o			\
+	pmem.o			\
+	ppage.o			\
+	startup.o		\
+	timestamp.o		\
+	trap.o			\
+	vm_machdep.o		\
+	x_call.o
+
+#
+#	locore.o is special. It must be the first file relocated so that it
+#	it is relocated just where its name implies.
+#
+SPECIAL_OBJS_32 +=		\
+	locore.o		\
+	fast_trap_asm.o		\
+	interrupt.o		\
+	syscall_asm.o
+
+SPECIAL_OBJS_64 +=		\
+	locore.o		\
+	fast_trap_asm.o		\
+	interrupt.o		\
+	syscall_asm_amd64.o
+
+SPECIAL_OBJS += $(SPECIAL_OBJS_$(CLASS))
+
+#
+#			driver modules
+#
+ROOTNEX_OBJS += rootnex.o
+ISANEXUS_OBJS += isa.o dma_engine.o i8237A.o
+PCINEXUS_OBJS += pci.o pci_tools.o
+
+TCIC_OBJS +=	tcic.o
+
+ATA_OBJS +=	$(GHD_OBJS) ata_blacklist.o ata_common.o ata_disk.o \
+		ata_dma.o atapi.o atapi_fsm.o ata_debug.o \
+		sil3xxx.o
+
+CHS_OBJS	+= chs.o chs_busops.o chs_conf.o chs_dac.o	\
+		   chs_devops.o chs_hba.o chs_interrupt.o	\
+		   chs_intr.o chs_queue.o chs_raid.o		\
+		   chs_transport.o chs_viper.o chs_viperconf.o
+
+NCRS_OBJS	+= glm.o
+ELXL_OBJS	+= elxl.o elxl_cmn.o mii.o
+
+FD_OBJS		+= fd.o
+
+PCN_OBJS	+= mii.o
+SBPRO_OBJS	+= sbpro.o
+
+DNET_OBJS	+= dnet.o mii.o
+IPRB_OBJS	+= iprb.o mii.o
+BMC_OBJS	+= bmc_fe.o bmc_kcs.o
+LOGI_OBJS	+= logi.o
+MSCSI_OBJS	+= mscsi.o
+MSMOUSE_OBJS	+= msm.o
+PCPLUSMP_OBJS	+= apic.o psm_common.o apic_introp.o
+RTLS_OBJS	+= rtls.o
+SPWR_OBJS	+= spwr.o 9432.o lm9432.o lm9432cf.o
+AGPGART_OBJS	+=	agpgart.o \
+			agp_kstat.o
+AGPTARGET_OBJS	+=	agptarget.o
+AMD64GART_OBJS	+=	amd64_gart.o
+BSCV_OBJS	+= bscv.o
+BSCBUS_OBJS	+= bscbus.o
+
+#
+#	platform specific modules
+#
+UPPC_OBJS += uppc.o psm_common.o
+PCI_AUTOCONFIG_OBJS += \
+	pci_autoconfig.o \
+	pci_boot.o	\
+	pci_memlist.o	\
+	pci_mech1.o	\
+	pci_mech2.o	\
+	pci_neptune.o	\
+	pci_orion.o	\
+	pci_resource.o
+
+ACPICA_OBJS	+= dbcmds.o dbdisply.o \
+		   dbexec.o dbfileio.o dbhistry.o dbinput.o dbstats.o \
+		   dbutils.o dbxface.o evevent.o evgpe.o evgpeblk.o \
+		   evmisc.o evregion.o evrgnini.o evsci.o evxface.o \
+		   evxfevnt.o evxfregn.o hwacpi.o hwgpe.o hwregs.o \
+		   hwsleep.o hwtimer.o dsfield.o dsinit.o dsmethod.o \
+		   dsmthdat.o dsobject.o dsopcode.o dsutils.o dswexec.o \
+		   dswload.o dswscope.o dswstate.o exconfig.o exconvrt.o \
+		   excreate.o exdump.o exfield.o exfldio.o exmisc.o \
+		   exmutex.o exnames.o exoparg1.o exoparg2.o exoparg3.o \
+		   exoparg6.o exprep.o exregion.o exresnte.o exresolv.o \
+		   exresop.o exstore.o exstoren.o exstorob.o exsystem.o \
+		   exutils.o psargs.o psopcode.o psparse.o psscope.o \
+		   pstree.o psutils.o pswalk.o psxface.o nsaccess.o \
+		   nsalloc.o nsdump.o nsdumpdv.o nseval.o nsinit.o \
+		   nsload.o nsnames.o nsobject.o nsparse.o nssearch.o \
+		   nsutils.o nswalk.o nsxfeval.o nsxfname.o nsxfobj.o \
+		   rsaddr.o rscalc.o rscreate.o rsdump.o \
+		   rsio.o rsirq.o rslist.o rsmemory.o rsmisc.o \
+		   rsutils.o rsxface.o tbconvrt.o tbget.o tbgetall.o \
+		   tbinstal.o tbrsdt.o tbutils.o tbxface.o tbxfroot.o \
+		   utalloc.o utclib.o utcopy.o utdebug.o utdelete.o \
+		   uteval.o utglobal.o utinit.o utmath.o utmisc.o \
+		   utobject.o utxface.o acpica.o acpi_enum.o master_ops.o \
+		   osl.o osl_ml.o acpica_ec.o
+
+#
+#	Build up defines and paths.
+#
+ALL_DEFS	+= -Di86pc
+INC_PATH	+= -I$(UTSBASE)/i86pc
+
+#
+# Since assym.h is a derived file, the dependency must be explicit for
+# all files including this file. (This is only actually required in the
+# instance when the .nse_depinfo file does not exist.) It may seem that
+# the lint targets should also have a similar dependency, but they don't
+# since only C headers are included when #defined(__lint) is true.
+#
+ASSYM_DEPS      += 		\
+	copy.o			\
+	desctbls_asm.o		\
+	ddi_i86_asm.o		\
+	exception.o		\
+	fast_trap_asm.o		\
+	float.o			\
+	i86_subr.o		\
+	interrupt.o		\
+	lock_prim.o		\
+	locore.o		\
+	mpcore.o		\
+	sseblk.o		\
+	swtch.o			\
+	syscall_asm.o		\
+	syscall_asm_amd64.o

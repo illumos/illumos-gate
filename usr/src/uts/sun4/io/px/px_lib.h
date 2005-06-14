@@ -1,0 +1,186 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef	_SYS_PX_LIB_H
+#define	_SYS_PX_LIB_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+/*
+ * Include all data structures and definitions in this file that are
+ * required between the common and hardware specific code.
+ */
+
+#define	DIP_TO_HANDLE(dip)	((px_t *)DIP_TO_STATE(dip))->px_dev_hdl
+
+/*
+ * The following macros define	the mmu page size and related operations.
+ */
+#define	MMU_PAGE_SHIFT		13
+#define	MMU_PAGE_SIZE		(1 << MMU_PAGE_SHIFT)
+#define	MMU_PAGE_MASK		~(MMU_PAGE_SIZE - 1)
+#define	MMU_PAGE_OFFSET		(MMU_PAGE_SIZE - 1)
+#define	MMU_PTOB(x)		(((uint64_t)(x)) << MMU_PAGE_SHIFT)
+#define	MMU_BTOP(x)		((x) >> MMU_PAGE_SHIFT)
+#define	MMU_BTOPR(x)		MMU_BTOP((x) + MMU_PAGE_OFFSET)
+
+/* MMU map flags */
+#define	MMU_MAP_MP		0
+#define	MMU_MAP_BUF		1
+
+typedef struct px px_t;
+typedef struct px_common px_common_t;
+typedef struct px_msiq px_msiq_t;
+
+extern int px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl);
+extern int px_lib_dev_fini(dev_info_t *dip);
+extern int px_lib_map_vconfig(dev_info_t *dip, ddi_map_req_t *mp,
+    pci_config_offset_t off, pci_regspec_t *rp, caddr_t *addrp);
+extern int px_lib_intr_devino_to_sysino(dev_info_t *dip, devino_t devino,
+    sysino_t *sysino);
+extern int px_lib_intr_getvalid(dev_info_t *dip, sysino_t sysino,
+    intr_valid_state_t *intr_valid_state);
+extern int px_lib_intr_setvalid(dev_info_t *dip, sysino_t sysino,
+    intr_valid_state_t intr_valid_state);
+extern int px_lib_intr_getstate(dev_info_t *dip, sysino_t sysino,
+    intr_state_t *intr_state);
+extern int px_lib_intr_setstate(dev_info_t *dip, sysino_t sysino,
+    intr_state_t intr_state);
+extern int px_lib_intr_gettarget(dev_info_t *dip, sysino_t sysino,
+    cpuid_t *cpuid);
+extern int px_lib_intr_settarget(dev_info_t *dip, sysino_t sysino,
+    cpuid_t cpuid);
+extern int px_lib_intr_reset(dev_info_t *dip);
+
+extern int px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
+    io_attributes_t io_attributes, void *addr, size_t pfn_index, int flag);
+extern int px_lib_iommu_demap(dev_info_t *dip, tsbid_t tsbid, pages_t pages);
+extern int px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid,
+    io_attributes_t *attributes_p, r_addr_t *r_addr_p);
+extern int px_lib_dma_bypass_rngchk(ddi_dma_attr_t *attrp, uint64_t *lo_p,
+    uint64_t *hi_p);
+extern int px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra,
+    io_attributes_t io_attributes, io_addr_t *io_addr_p);
+extern int px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle, off_t off, size_t len, uint_t cache_flags);
+
+/*
+ * MSIQ Functions:
+ */
+extern int px_lib_msiq_init(dev_info_t *dip);
+extern int px_lib_msiq_fini(dev_info_t *dip);
+extern int px_lib_msiq_info(dev_info_t *dip, msiqid_t msiq_id,
+    r_addr_t *ra_p, uint_t *msiq_rec_cnt_p);
+extern int px_lib_msiq_getvalid(dev_info_t *dip, msiqid_t msiq_id,
+    pci_msiq_valid_state_t *msiq_valid_state);
+extern int px_lib_msiq_setvalid(dev_info_t *dip, msiqid_t msiq_id,
+    pci_msiq_valid_state_t msiq_valid_state);
+extern int px_lib_msiq_getstate(dev_info_t *dip, msiqid_t msiq_id,
+    pci_msiq_state_t *msiq_state);
+extern int px_lib_msiq_setstate(dev_info_t *dip, msiqid_t msiq_id,
+    pci_msiq_state_t msiq_state);
+extern int px_lib_msiq_gethead(dev_info_t *dip, msiqid_t msiq_id,
+    msiqhead_t *msiq_head);
+extern int px_lib_msiq_sethead(dev_info_t *dip, msiqid_t msiq_id,
+    msiqhead_t msiq_head);
+extern int px_lib_msiq_gettail(dev_info_t *dip, msiqid_t msiq_id,
+    msiqtail_t *msiq_tail);
+extern void px_lib_get_msiq_rec(dev_info_t *dip, px_msiq_t *msiq_p,
+    msiq_rec_t *msiq_rec_p);
+
+/*
+ * MSI Functions:
+ */
+extern int px_lib_msi_init(dev_info_t *dip);
+extern int px_lib_msi_getmsiq(dev_info_t *dip, msinum_t msi_num,
+    msiqid_t *msiq_id);
+extern int px_lib_msi_setmsiq(dev_info_t *dip, msinum_t msi_num,
+    msiqid_t msiq_id, msi_type_t msitype);
+extern int px_lib_msi_getvalid(dev_info_t *dip, msinum_t msi_num,
+    pci_msi_valid_state_t *msi_valid_state);
+extern int px_lib_msi_setvalid(dev_info_t *dip, msinum_t msi_num,
+    pci_msi_valid_state_t msi_valid_state);
+extern int px_lib_msi_getstate(dev_info_t *dip, msinum_t msi_num,
+    pci_msi_state_t *msi_state);
+extern int px_lib_msi_setstate(dev_info_t *dip, msinum_t msi_num,
+    pci_msi_state_t msi_state);
+
+/*
+ * MSG Functions:
+ */
+extern int px_lib_msg_getmsiq(dev_info_t *dip, pcie_msg_type_t msg_type,
+    msiqid_t *msiq_id);
+extern int px_lib_msg_setmsiq(dev_info_t *dip, pcie_msg_type_t msg_type,
+    msiqid_t msiq_id);
+extern int px_lib_msg_getvalid(dev_info_t *dip, pcie_msg_type_t msg_type,
+    pcie_msg_valid_state_t *msg_valid_state);
+extern int px_lib_msg_setvalid(dev_info_t *dip, pcie_msg_type_t msg_type,
+    pcie_msg_valid_state_t msg_valid_state);
+
+/*
+ * CPR Suspend/Resume Functions:
+ */
+extern int px_lib_suspend(dev_info_t *dip);
+extern void px_lib_resume(dev_info_t *dip);
+
+/*
+ * PCI tool Functions:
+ */
+extern int px_lib_tools_dev_reg_ops(dev_info_t *dip, void *arg,
+    int cmd, int mode);
+extern int px_lib_tools_bus_reg_ops(dev_info_t *dip, void *arg, int cmd,
+    int mode);
+extern int px_lib_tools_intr_admn(dev_info_t *dip, void *arg, int cmd,
+    int mode);
+
+/*
+ * PPM interface
+ */
+extern int px_lib_pmctl(int cmd, px_t *px_p);
+
+/*
+ * Misc Functions:
+ */
+extern uint64_t px_lib_get_cb(caddr_t csr);
+extern void px_lib_set_cb(caddr_t csr, uint64_t val);
+
+/*
+ * Peek and poke access ddi_ctlops helper functions
+ */
+extern int px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
+    peekpoke_ctlops_t *in_args);
+extern int px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
+    peekpoke_ctlops_t *in_args, void *result);
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _SYS_PX_LIB_H */

@@ -1,0 +1,45 @@
+#! /bin/sh
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# SUNWagp postinstall script
+
+PATH=/usr/bin:/usr/sbin:${PATH}
+export PATH
+BRALIAS='"pci8086,7124" "pci8086,7122" "pci8086,7120" "pci1022,7454" "pci8086,3580" "pci8086,3575" "pci8086,2560"'
+CPUGART='"pci1022,1103"'
+DRVPERM='* 0644 root sys'
+
+installed() {
+	driver=$1
+	grep "^${driver} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
+	return $?
+}
+
+EXIT=0
+
+installed agptarget || \
+add_drv -b "${BASEDIR}" \
+	-m "${DRVPERM}" \
+	-i "${BRALIAS}" \
+	agptarget || \
+EXIT=1
+
+# amd64_gart is only needed in AMD64 system
+installed amd64_gart || \
+add_drv -b "${BASEDIR}" \
+	-m "${DRVPERM}" \
+	-i "${CPUGART}" \
+	amd64_gart || \
+EXIT=1
+
+installed agpgart || \
+add_drv -b "${BASEDIR}" \
+	-m "${DRVPERM}" \
+	agpgart || \
+EXIT=1
+
+exit ${EXIT}

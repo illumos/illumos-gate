@@ -1,0 +1,57 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# /etc/default/kbd
+#
+# kbd default settings processed via kbd(1).
+#
+# KEYBOARD_ABORT affects the default behavior of the keyboard abort
+# sequence, see kbd(1) for details.  The default value is "enable". The
+# optional values are "disable" or "alternate". Any other value is ignored.
+# If you choose "alternate" it will affect the serial console drivers  ONLY.
+# The keyboard BREAK (sequence and plug/unplug) won't be affected by this.
+# If "alternate" is in effect any protocol (PPP, SLIP... etc) should not be
+# run over the serial console port.
+#
+# KEYCLICK affects the default keyclick behavior. Possible values are
+# 'on' and 'off'.  Any other value is ignored. The default behavior is
+# to leave the current keyclick setting unchanged.
+#
+# Uncomment the following line to disable keyboard or serial device
+# abort sequences:
+#KEYBOARD_ABORT=disable
+
+# Uncomment the following line to enable a non-BREAK alternate
+# serial input device abort sequence:
+#KEYBOARD_ABORT=alternate
+
+# Uncomment the following line to change the keyclick behavior:
+#KEYCLICK=off
+
+# Uncomment the following lines to set up autorepeat delay and rate,
+# units in milliseconds:
+#REPEAT_DELAY=500
+#REPEAT_RATE=33

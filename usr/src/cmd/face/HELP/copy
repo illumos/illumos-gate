@@ -1,0 +1,40 @@
+
+The copy command enables you to duplicate a selected object (file or
+file folder) keeping one copy in its original location and moving the
+other to a new location.  "Object" is the object to be copied and the
+"file folder name" is the file folder where the copy is to be placed.
+FACE will prompt you for any information you don't provide on the
+command line.
+
+Use one of the methods below to copy an object. The currently active
+object will be copied if the object is not specified with the copy
+command.
+
+     Function Key:  Press the CHG-KEYS function key, then COPY.
+
+     Command Menu:  Select copy and press ENTER.
+
+     Command Menu:  Press CTRL-j with cursor on copy and an -->
+     (alternative)  will appear on the command line followed by the
+                    copy. Type arguments and press ENTER to
+                    execute the command.
+
+     Command Line:  Type copy [object] [file folder name] and press
+     ENTER.
+
+   1.  The following message and prompt will appear if you did not
+       specify a destination file folder with the copy command:
+
+            Open or move to the destination folder and press SELECT.
+
+       Navigate to the destination file folder, opening it if it is
+       not currently open, and press SELECT.  If you would like to
+       copy the object to the currently active file folder, press
+       SELECT. Striking the CANCEL function key will cancel the copy.
+
+   2.  If a file with the same name already exists in the destination
+       file folder, you will be prompted for a new name for the copy.
+
+To copy an entire file folder to another file folder, specify the
+file folder name as the object to be copied.
+

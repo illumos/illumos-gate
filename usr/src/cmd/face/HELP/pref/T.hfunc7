@@ -1,0 +1,11 @@
+
+Press CHOICES to toggle between Yes and No to specify if you wish to
+receive a confirmation window when you exit AT&T FACE.  This confirmation
+window will allow you to abort the exit procedure if you invoked it
+by mistake.
+
+The default choice is "Yes".
+
+If you select "Yes", you will receive the confirmation window every
+time you exit from AT&T FACE.
+

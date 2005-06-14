@@ -1,0 +1,6587 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/note.h>
+#include <sys/t_lock.h>
+#include <sys/cmn_err.h>
+#include <sys/instance.h>
+#include <sys/conf.h>
+#include <sys/stat.h>
+#include <sys/ddi.h>
+#include <sys/hwconf.h>
+#include <sys/sunddi.h>
+#include <sys/sunndi.h>
+#include <sys/ddi_impldefs.h>
+#include <sys/ndi_impldefs.h>
+#include <sys/modctl.h>
+#include <sys/dacf.h>
+#include <sys/promif.h>
+#include <sys/cpuvar.h>
+#include <sys/pathname.h>
+#include <sys/taskq.h>
+#include <sys/sysevent.h>
+#include <sys/sunmdi.h>
+#include <sys/stream.h>
+#include <sys/strsubr.h>
+#include <sys/fs/snode.h>
+#include <sys/fs/dv_node.h>
+
+#ifdef DEBUG
+int ddidebug = DDI_AUDIT;
+#else
+int ddidebug = 0;
+#endif
+
+#define	MT_CONFIG_OP	0
+#define	MT_UNCONFIG_OP	1
+
+/* Multi-threaded configuration */
+struct mt_config_handle {
+	kmutex_t mtc_lock;
+	kcondvar_t mtc_cv;
+	int mtc_thr_count;
+	dev_info_t *mtc_pdip;	/* parent dip for mt_config_children */
+	dev_info_t **mtc_fdip;	/* "a" dip where unconfigure failed */
+	major_t mtc_parmajor;	/* parent major for mt_config_driver */
+	major_t mtc_major;
+	int mtc_flags;
+	int mtc_op;		/* config or unconfig */
+	int mtc_error;		/* operation error */
+	struct brevq_node **mtc_brevqp;	/* outstanding branch events queue */
+#ifdef DEBUG
+	int total_time;
+	timestruc_t start_time;
+#endif /* DEBUG */
+};
+
+struct devi_nodeid {
+	dnode_t nodeid;
+	dev_info_t *dip;
+	struct devi_nodeid *next;
+};
+
+struct devi_nodeid_list {
+	kmutex_t dno_lock;		/* Protects other fields */
+	struct devi_nodeid *dno_head;	/* list of devi nodeid elements */
+	struct devi_nodeid *dno_free;	/* Free list */
+	uint_t dno_list_length;		/* number of dips in list */
+};
+
+/* used to keep track of branch remove events to be generated */
+struct brevq_node {
+	char *deviname;
+	struct brevq_node *sibling;
+	struct brevq_node *child;
+};
+
+static struct devi_nodeid_list devi_nodeid_list;
+static struct devi_nodeid_list *devimap = &devi_nodeid_list;
+
+/*
+ * Well known nodes which are attached first at boot time.
+ */
+dev_info_t *top_devinfo;		/* root of device tree */
+dev_info_t *options_dip;
+dev_info_t *pseudo_dip;
+dev_info_t *clone_dip;
+dev_info_t *scsi_vhci_dip;		/* MPXIO dip */
+major_t clone_major;
+
+/* block all future dev_info state changes */
+static hrtime_t volatile devinfo_freeze = 0;
+
+/* number of dev_info attaches/detaches currently in progress */
+static ulong_t devinfo_attach_detach = 0;
+
+extern kmutex_t global_vhci_lock;
+
+/*
+ * The devinfo snapshot cache and related variables.
+ * The only field in the di_cache structure that needs initialization
+ * is the mutex (cache_lock). However, since this is an adaptive mutex
+ * (MUTEX_DEFAULT) - it is automatically initialized by being allocated
+ * in zeroed memory (static storage class). Therefore no explicit
+ * initialization of the di_cache structure is needed.
+ */
+struct di_cache	di_cache = {1};
+int		di_cache_debug = 0;
+
+/* For ddvis, which needs pseudo children under PCI */
+int pci_allow_pseudo_children = 0;
+
+/*
+ * The following switch is for service people, in case a
+ * 3rd party driver depends on identify(9e) being called.
+ */
+int identify_9e = 0;
+
+int mtc_off;					/* turn off mt config */
+
+static kmem_cache_t *ddi_node_cache;		/* devinfo node cache */
+static devinfo_log_header_t *devinfo_audit_log;	/* devinfo log */
+static int devinfo_log_size;			/* size in pages */
+
+static int lookup_compatible(dev_info_t *, uint_t);
+static char *encode_composite_string(char **, uint_t, size_t *, uint_t);
+static void link_to_driver_list(dev_info_t *);
+static void unlink_from_driver_list(dev_info_t *);
+static void add_to_dn_list(struct devnames *, dev_info_t *);
+static void remove_from_dn_list(struct devnames *, dev_info_t *);
+static dev_info_t *find_child_by_callback(dev_info_t *, char *, char *,
+    int (*)(dev_info_t *, char *, int));
+static dev_info_t *find_duplicate_child();
+static void add_global_props(dev_info_t *);
+static void remove_global_props(dev_info_t *);
+static int uninit_node(dev_info_t *);
+static void da_log_init(void);
+static void da_log_enter(dev_info_t *);
+static int walk_devs(dev_info_t *, int (*f)(dev_info_t *, void *), void *, int);
+static int reset_nexus_flags(dev_info_t *, void *);
+static void ddi_optimize_dtree(dev_info_t *);
+static int is_leaf_node(dev_info_t *);
+static struct mt_config_handle *mt_config_init(dev_info_t *, dev_info_t **,
+    int, major_t, int, struct brevq_node **);
+static void mt_config_children(struct mt_config_handle *);
+static void mt_config_driver(struct mt_config_handle *);
+static int mt_config_fini(struct mt_config_handle *);
+static int devi_unconfig_common(dev_info_t *, dev_info_t **, int, major_t,
+    struct brevq_node **);
+static int
+ndi_devi_config_obp_args(dev_info_t *parent, char *devnm,
+    dev_info_t **childp, int flags);
+
+/*
+ * dev_info cache and node management
+ */
+
+/* initialize dev_info node cache */
+void
+i_ddi_node_cache_init()
+{
+	ASSERT(ddi_node_cache == NULL);
+	ddi_node_cache = kmem_cache_create("dev_info_node_cache",
+	    sizeof (struct dev_info), 0, NULL, NULL, NULL, NULL, NULL, 0);
+
+	if (ddidebug & DDI_AUDIT)
+		da_log_init();
+}
+
+/*
+ * Allocating a dev_info node, callable from interrupt context with KM_NOSLEEP
+ * The allocated node has a reference count of 0.
+ */
+dev_info_t *
+i_ddi_alloc_node(dev_info_t *pdip, char *node_name, dnode_t nodeid,
+    int instance, ddi_prop_t *sys_prop, int flag)
+{
+	struct dev_info *devi;
+	struct devi_nodeid *elem;
+	static char failed[] = "i_ddi_alloc_node: out of memory";
+
+	ASSERT(node_name != NULL);
+
+	if ((devi = kmem_cache_alloc(ddi_node_cache, flag)) == NULL) {
+		cmn_err(CE_NOTE, failed);
+		return (NULL);
+	}
+
+	bzero(devi, sizeof (struct dev_info));
+
+	if (devinfo_audit_log) {
+		devi->devi_audit = kmem_zalloc(sizeof (devinfo_audit_t), flag);
+		if (devi->devi_audit == NULL)
+			goto fail;
+	}
+
+	if ((devi->devi_node_name = i_ddi_strdup(node_name, flag)) == NULL)
+		goto fail;
+	/* default binding name is node name */
+	devi->devi_binding_name = devi->devi_node_name;
+	devi->devi_major = (major_t)-1;	/* unbound by default */
+
+	/*
+	 * Make a copy of system property
+	 */
+	if (sys_prop &&
+	    (devi->devi_sys_prop_ptr = i_ddi_prop_list_dup(sys_prop, flag))
+	    == NULL)
+		goto fail;
+
+	/*
+	 * Assign devi_nodeid, devi_node_class, devi_node_attributes
+	 * according to the following algorithm:
+	 *
+	 * nodeid arg			node class		node attributes
+	 *
+	 * DEVI_PSEUDO_NODEID		DDI_NC_PSEUDO		A
+	 * DEVI_SID_NODEID		DDI_NC_PSEUDO		A,P
+	 * other			DDI_NC_PROM		P
+	 *
+	 * Where A = DDI_AUTO_ASSIGNED_NODEID (auto-assign a nodeid)
+	 * and	 P = DDI_PERSISTENT
+	 *
+	 * auto-assigned nodeids are also auto-freed.
+	 */
+	switch (nodeid) {
+	case DEVI_SID_NODEID:
+		devi->devi_node_attributes = DDI_PERSISTENT;
+		if ((elem = kmem_zalloc(sizeof (*elem), flag)) == NULL)
+			goto fail;
+		/*FALLTHROUGH*/
+	case DEVI_PSEUDO_NODEID:
+		devi->devi_node_attributes |= DDI_AUTO_ASSIGNED_NODEID;
+		devi->devi_node_class = DDI_NC_PSEUDO;
+		if (impl_ddi_alloc_nodeid(&devi->devi_nodeid)) {
+			panic("i_ddi_alloc_node: out of nodeids");
+			/*NOTREACHED*/
+		}
+		break;
+	default:
+		if ((elem = kmem_zalloc(sizeof (*elem), flag)) == NULL)
+			goto fail;
+		/*
+		 * the nodetype is 'prom', try to 'take' the nodeid now.
+		 * This requires memory allocation, so check for failure.
+		 */
+		if (impl_ddi_take_nodeid(nodeid, flag) != 0) {
+			kmem_free(elem, sizeof (*elem));
+			goto fail;
+		}
+
+		devi->devi_nodeid = nodeid;
+		devi->devi_node_class = DDI_NC_PROM;
+		devi->devi_node_attributes = DDI_PERSISTENT;
+
+	}
+
+	if (ndi_dev_is_persistent_node((dev_info_t *)devi)) {
+		mutex_enter(&devimap->dno_lock);
+		elem->next = devimap->dno_free;
+		devimap->dno_free = elem;
+		mutex_exit(&devimap->dno_lock);
+	}
+
+	/*
+	 * Instance is normally initialized to -1. In a few special
+	 * cases, the caller may specify an instance (e.g. CPU nodes).
+	 */
+	devi->devi_instance = instance;
+
+	/*
+	 * set parent and bus_ctl parent
+	 */
+	devi->devi_parent = DEVI(pdip);
+	devi->devi_bus_ctl = DEVI(pdip);
+
+	NDI_CONFIG_DEBUG((CE_CONT,
+	    "i_ddi_alloc_node: name=%s id=%d\n", node_name, devi->devi_nodeid));
+
+	cv_init(&(devi->devi_cv), NULL, CV_DEFAULT, NULL);
+	mutex_init(&(devi->devi_lock), NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&(devi->devi_pm_lock), NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&(devi->devi_pm_busy_lock), NULL, MUTEX_DEFAULT, NULL);
+
+	i_ddi_set_node_state((dev_info_t *)devi, DS_PROTO);
+	da_log_enter((dev_info_t *)devi);
+	return ((dev_info_t *)devi);
+
+fail:
+	if (devi->devi_sys_prop_ptr)
+		i_ddi_prop_list_delete(devi->devi_sys_prop_ptr);
+	if (devi->devi_node_name)
+		kmem_free(devi->devi_node_name, strlen(node_name) + 1);
+	if (devi->devi_audit)
+		kmem_free(devi->devi_audit, sizeof (devinfo_audit_t));
+	kmem_cache_free(ddi_node_cache, devi);
+	cmn_err(CE_NOTE, failed);
+	return (NULL);
+}
+
+/*
+ * free a dev_info structure.
+ * NB. Not callable from interrupt since impl_ddi_free_nodeid may block.
+ */
+void
+i_ddi_free_node(dev_info_t *dip)
+{
+	struct dev_info *devi = DEVI(dip);
+	struct devi_nodeid *elem;
+
+	ASSERT(devi->devi_ref == 0);
+	ASSERT(devi->devi_addr == NULL);
+	ASSERT(devi->devi_node_state == DS_PROTO);
+	ASSERT(devi->devi_child == NULL);
+
+	if (devi->devi_intr_p)
+		i_ddi_intr_devi_fini((dev_info_t *)devi);
+
+	/* free devi_addr */
+	ddi_set_name_addr(dip, NULL);
+
+	if (i_ndi_dev_is_auto_assigned_node(dip))
+		impl_ddi_free_nodeid(DEVI(dip)->devi_nodeid);
+
+	if (ndi_dev_is_persistent_node(dip)) {
+		mutex_enter(&devimap->dno_lock);
+		ASSERT(devimap->dno_free);
+		elem = devimap->dno_free;
+		devimap->dno_free = elem->next;
+		mutex_exit(&devimap->dno_lock);
+		kmem_free(elem, sizeof (*elem));
+	}
+
+	if (DEVI(dip)->devi_compat_names)
+		kmem_free(DEVI(dip)->devi_compat_names,
+		    DEVI(dip)->devi_compat_length);
+
+	ddi_prop_remove_all(dip);	/* remove driver properties */
+	if (devi->devi_sys_prop_ptr)
+		i_ddi_prop_list_delete(devi->devi_sys_prop_ptr);
+	if (devi->devi_hw_prop_ptr)
+		i_ddi_prop_list_delete(devi->devi_hw_prop_ptr);
+
+	i_ddi_set_node_state(dip, DS_INVAL);
+	da_log_enter(dip);
+	if (devi->devi_audit) {
+		kmem_free(devi->devi_audit, sizeof (devinfo_audit_t));
+	}
+	kmem_free(devi->devi_node_name, strlen(devi->devi_node_name) + 1);
+	if (devi->devi_device_class)
+		kmem_free(devi->devi_device_class,
+		    strlen(devi->devi_device_class) + 1);
+	cv_destroy(&(devi->devi_cv));
+	mutex_destroy(&(devi->devi_lock));
+	mutex_destroy(&(devi->devi_pm_lock));
+	mutex_destroy(&(devi->devi_pm_busy_lock));
+
+	kmem_cache_free(ddi_node_cache, devi);
+}
+
+
+/*
+ * Node state transitions
+ */
+
+/*
+ * Change the node name
+ */
+int
+ndi_devi_set_nodename(dev_info_t *dip, char *name, int flags)
+{
+	_NOTE(ARGUNUSED(flags))
+	char *nname, *oname;
+
+	ASSERT(dip && name);
+
+	oname = DEVI(dip)->devi_node_name;
+	if (strcmp(oname, name) == 0)
+		return (DDI_SUCCESS);
+
+	/*
+	 * pcicfg_fix_ethernet requires a name change after node
+	 * is linked into the tree. When pcicfg is fixed, we
+	 * should only allow name change in DS_PROTO state.
+	 */
+	if (i_ddi_node_state(dip) >= DS_BOUND) {
+		/*
+		 * Don't allow name change once node is bound
+		 */
+		cmn_err(CE_NOTE,
+		    "ndi_devi_set_nodename: node already bound dip = %p,"
+		    " %s -> %s", (void *)dip, ddi_node_name(dip), name);
+		return (NDI_FAILURE);
+	}
+
+	nname = i_ddi_strdup(name, KM_SLEEP);
+	DEVI(dip)->devi_node_name = nname;
+	i_ddi_set_binding_name(dip, nname);
+	kmem_free(oname, strlen(oname) + 1);
+
+	da_log_enter(dip);
+	return (NDI_SUCCESS);
+}
+
+void
+i_ddi_add_devimap(dev_info_t *dip)
+{
+	struct devi_nodeid *elem;
+
+	ASSERT(dip);
+
+	if (!ndi_dev_is_persistent_node(dip))
+		return;
+
+	ASSERT(ddi_get_parent(dip) == NULL || (DEVI_VHCI_NODE(dip)) ||
+	    DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+
+	mutex_enter(&devimap->dno_lock);
+
+	ASSERT(devimap->dno_free);
+
+	elem = devimap->dno_free;
+	devimap->dno_free = elem->next;
+
+	elem->nodeid = ddi_get_nodeid(dip);
+	elem->dip = dip;
+	elem->next = devimap->dno_head;
+	devimap->dno_head = elem;
+
+	devimap->dno_list_length++;
+
+	mutex_exit(&devimap->dno_lock);
+}
+
+static int
+i_ddi_remove_devimap(dev_info_t *dip)
+{
+	struct devi_nodeid *prev, *elem;
+	static const char *fcn = "i_ddi_remove_devimap";
+
+	ASSERT(dip);
+
+	if (!ndi_dev_is_persistent_node(dip))
+		return (DDI_SUCCESS);
+
+	mutex_enter(&devimap->dno_lock);
+
+	/*
+	 * The following check is done with dno_lock held
+	 * to prevent race between dip removal and
+	 * e_ddi_prom_node_to_dip()
+	 */
+	if (e_ddi_devi_holdcnt(dip)) {
+		mutex_exit(&devimap->dno_lock);
+		return (DDI_FAILURE);
+	}
+
+	ASSERT(devimap->dno_head);
+	ASSERT(devimap->dno_list_length > 0);
+
+	prev = NULL;
+	for (elem = devimap->dno_head; elem; elem = elem->next) {
+		if (elem->dip == dip) {
+			ASSERT(elem->nodeid == ddi_get_nodeid(dip));
+			break;
+		}
+		prev = elem;
+	}
+
+	if (elem && prev)
+		prev->next = elem->next;
+	else if (elem)
+		devimap->dno_head = elem->next;
+	else
+		panic("%s: devinfo node(%p) not found",
+		    fcn, (void *)dip);
+
+	devimap->dno_list_length--;
+
+	elem->nodeid = 0;
+	elem->dip = NULL;
+
+	elem->next = devimap->dno_free;
+	devimap->dno_free = elem;
+
+	mutex_exit(&devimap->dno_lock);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Link this node into the devinfo tree and add to orphan list
+ * Not callable from interrupt context
+ */
+static void
+link_node(dev_info_t *dip)
+{
+	struct dev_info *devi = DEVI(dip);
+	struct dev_info *parent = devi->devi_parent;
+	dev_info_t **dipp;
+
+	ASSERT(parent);	/* never called for root node */
+
+	NDI_CONFIG_DEBUG((CE_CONT, "link_node: parent = %s child = %s\n",
+	    parent->devi_node_name, devi->devi_node_name));
+
+	/*
+	 * Hold the global_vhci_lock before linking any direct
+	 * children of rootnex driver. This special lock protects
+	 * linking and unlinking for rootnext direct children.
+	 */
+	if ((dev_info_t *)parent == ddi_root_node())
+		mutex_enter(&global_vhci_lock);
+
+	/*
+	 * attach the node to end of the list unless the node is already there
+	 */
+	dipp = (dev_info_t **)(&DEVI(parent)->devi_child);
+	while (*dipp && (*dipp != dip)) {
+		dipp = (dev_info_t **)(&DEVI(*dipp)->devi_sibling);
+	}
+	ASSERT(*dipp == NULL);	/* node is not linked */
+
+	/*
+	 * Now that we are in the tree, update the devi-nodeid map.
+	 */
+	i_ddi_add_devimap(dip);
+
+	/*
+	 * This is a temporary workaround for Bug 4618861.
+	 * We keep the scsi_vhci nexus node on the left side of the devinfo
+	 * tree (under the root nexus driver), so that virtual nodes under
+	 * scsi_vhci will be SUSPENDed first and RESUMEd last.  This ensures
+	 * that the pHCI nodes are active during times when their clients
+	 * may be depending on them.  This workaround embodies the knowledge
+	 * that system PM and CPR both traverse the tree left-to-right during
+	 * SUSPEND and right-to-left during RESUME.
+	 */
+	if (strcmp(devi->devi_name, "scsi_vhci") == 0) {
+		/* Add scsi_vhci to beginning of list */
+		ASSERT((dev_info_t *)parent == top_devinfo);
+		/* scsi_vhci under rootnex */
+		devi->devi_sibling = parent->devi_child;
+		parent->devi_child = devi;
+	} else {
+		/* Add to end of list */
+		*dipp = dip;
+		DEVI(dip)->devi_sibling = NULL;
+	}
+
+	/*
+	 * Release the global_vhci_lock before linking any direct
+	 * children of rootnex driver.
+	 */
+	if ((dev_info_t *)parent == ddi_root_node())
+		mutex_exit(&global_vhci_lock);
+
+	/* persistent nodes go on orphan list */
+	if (ndi_dev_is_persistent_node(dip))
+		add_to_dn_list(&orphanlist, dip);
+}
+
+/*
+ * Unlink this node from the devinfo tree
+ */
+static int
+unlink_node(dev_info_t *dip)
+{
+	struct dev_info *devi = DEVI(dip);
+	struct dev_info *parent = devi->devi_parent;
+	dev_info_t **dipp;
+
+	ASSERT(parent != NULL);
+	ASSERT(devi->devi_node_state == DS_LINKED);
+
+	NDI_CONFIG_DEBUG((CE_CONT, "unlink_node: name = %s\n",
+	    ddi_node_name(dip)));
+
+	/* check references */
+	if (devi->devi_ref || i_ddi_remove_devimap(dip) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	/*
+	 * Hold the global_vhci_lock before linking any direct
+	 * children of rootnex driver.
+	 */
+	if ((dev_info_t *)parent == ddi_root_node())
+		mutex_enter(&global_vhci_lock);
+
+	dipp = (dev_info_t **)(&DEVI(parent)->devi_child);
+	while (*dipp && (*dipp != dip)) {
+		dipp = (dev_info_t **)(&DEVI(*dipp)->devi_sibling);
+	}
+	if (*dipp) {
+		*dipp = (dev_info_t *)(devi->devi_sibling);
+		devi->devi_sibling = NULL;
+	} else {
+		NDI_CONFIG_DEBUG((CE_NOTE, "unlink_node: %s not linked",
+		    devi->devi_node_name));
+	}
+
+	/*
+	 * Release the global_vhci_lock before linking any direct
+	 * children of rootnex driver.
+	 */
+	if ((dev_info_t *)parent == ddi_root_node())
+		mutex_exit(&global_vhci_lock);
+
+	/* Remove node from orphan list */
+	if (ndi_dev_is_persistent_node(dip)) {
+		remove_from_dn_list(&orphanlist, dip);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Bind this devinfo node to a driver. If compat is NON-NULL, try that first.
+ * Else, use the node-name.
+ *
+ * NOTE: IEEE1275 specifies that nodename should be tried before compatible.
+ *	Solaris implementation binds nodename after compatible.
+ *
+ * If we find a binding,
+ * - set the binding name to the the string,
+ * - set major number to driver major
+ *
+ * If we don't find a binding,
+ * - return failure
+ */
+static int
+bind_node(dev_info_t *dip)
+{
+	char *p = NULL;
+	major_t major = (major_t)(major_t)-1;
+	struct dev_info *devi = DEVI(dip);
+	dev_info_t *parent = ddi_get_parent(dip);
+
+	ASSERT(devi->devi_node_state == DS_LINKED);
+
+	NDI_CONFIG_DEBUG((CE_CONT, "bind_node: 0x%p(name = %s)\n",
+	    (void *)dip, ddi_node_name(dip)));
+
+	mutex_enter(&DEVI(dip)->devi_lock);
+	if (DEVI(dip)->devi_flags & DEVI_NO_BIND) {
+		mutex_exit(&DEVI(dip)->devi_lock);
+		return (DDI_FAILURE);
+	}
+	mutex_exit(&DEVI(dip)->devi_lock);
+
+	/* find the driver with most specific binding using compatible */
+	major = ddi_compatible_driver_major(dip, &p);
+	if (major == (major_t)-1)
+		return (DDI_FAILURE);
+
+	devi->devi_major = major;
+	if (p != NULL) {
+		i_ddi_set_binding_name(dip, p);
+		NDI_CONFIG_DEBUG((CE_CONT, "bind_node: %s bound to %s\n",
+		    devi->devi_node_name, p));
+	}
+
+	/* Link node to per-driver list */
+	link_to_driver_list(dip);
+
+	/*
+	 * reset parent flag so that nexus will merge .conf props
+	 */
+	if (ndi_dev_is_persistent_node(dip)) {
+		mutex_enter(&DEVI(parent)->devi_lock);
+		DEVI(parent)->devi_flags &=
+		    ~(DEVI_ATTACHED_CHILDREN|DEVI_MADE_CHILDREN);
+		mutex_exit(&DEVI(parent)->devi_lock);
+	}
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Unbind this devinfo node
+ * Called before the node is destroyed or driver is removed from system
+ */
+static int
+unbind_node(dev_info_t *dip)
+{
+	ASSERT(DEVI(dip)->devi_node_state == DS_BOUND);
+	ASSERT(DEVI(dip)->devi_major != (major_t)-1);
+
+	/* check references */
+	if (DEVI(dip)->devi_ref)
+		return (DDI_FAILURE);
+
+	NDI_CONFIG_DEBUG((CE_CONT, "unbind_node: 0x%p(name = %s)\n",
+	    (void *)dip, ddi_node_name(dip)));
+
+	unlink_from_driver_list(dip);
+	DEVI(dip)->devi_major = (major_t)-1;
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Initialize a node: calls the parent nexus' bus_ctl ops to do the operation.
+ * Must hold parent and per-driver list while calling this function.
+ * A successful init_node() returns with an active ndi_hold_devi() hold on
+ * the parent.
+ */
+static int
+init_node(dev_info_t *dip)
+{
+	int error;
+	dev_info_t *pdip = ddi_get_parent(dip);
+	int (*f)(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *, void *);
+	char *path;
+
+	ASSERT(i_ddi_node_state(dip) == DS_BOUND);
+
+	/* should be DS_READY except for pcmcia ... */
+	ASSERT(i_ddi_node_state(pdip) >= DS_PROBED);
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(dip, path);
+	NDI_CONFIG_DEBUG((CE_CONT, "init_node: entry: path %s 0x%p\n",
+	    path, (void *)dip));
+
+	/*
+	 * The parent must have a bus_ctl operation.
+	 */
+	if ((DEVI(pdip)->devi_ops->devo_bus_ops == NULL) ||
+	    (f = DEVI(pdip)->devi_ops->devo_bus_ops->bus_ctl) == NULL) {
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	add_global_props(dip);
+
+	/*
+	 * Invoke the parent's bus_ctl operation with the DDI_CTLOPS_INITCHILD
+	 * command to transform the child to canonical form 1. If there
+	 * is an error, ddi_remove_child should be called, to clean up.
+	 */
+	error = (*f)(pdip, pdip, DDI_CTLOPS_INITCHILD, dip, NULL);
+	if (error != DDI_SUCCESS) {
+		NDI_CONFIG_DEBUG((CE_CONT, "init_node: %s 0x%p failed\n",
+		    path, (void *)dip));
+		remove_global_props(dip);
+		/* in case nexus driver didn't clear this field */
+		ddi_set_name_addr(dip, NULL);
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	ndi_hold_devi(pdip);
+
+	/* check for duplicate nodes */
+	if (find_duplicate_child(pdip, dip) != NULL) {
+		/* recompute path after initchild for @addr information */
+		(void) ddi_pathname(dip, path);
+
+		/*
+		 * uninit_node() the duplicate - a successful uninit_node()
+		 * does a ndi_rele_devi
+		 */
+		if ((error = uninit_node(dip)) != DDI_SUCCESS) {
+			ndi_rele_devi(pdip);
+			cmn_err(CE_WARN, "init_node: uninit of duplicate "
+			    "node %s failed", path);
+		}
+		NDI_CONFIG_DEBUG((CE_CONT, "init_node: duplicate uninit "
+		    "%s 0x%p%s\n", path, (void *)dip,
+		    (error == DDI_SUCCESS) ? "" : " failed"));
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	/*
+	 * Apply multi-parent/deep-nexus optimization to the new node
+	 */
+	DEVI(dip)->devi_instance = e_ddi_assign_instance(dip);
+	ddi_optimize_dtree(dip);
+	error = DDI_SUCCESS;
+
+out:	kmem_free(path, MAXPATHLEN);
+	return (error);
+}
+
+/*
+ * Uninitialize node
+ * The per-driver list must be held busy during the call.
+ * A successful uninit_node() releases the init_node() hold on
+ * the parent by calling ndi_rele_devi().
+ */
+static int
+uninit_node(dev_info_t *dip)
+{
+	int node_state_entry;
+	dev_info_t *pdip;
+	struct dev_ops *ops;
+	int (*f)();
+	int error;
+	char *addr;
+
+	/*
+	 * Don't check for references here or else a ref-counted
+	 * dip cannot be downgraded by the framework.
+	 */
+	node_state_entry = i_ddi_node_state(dip);
+	ASSERT((node_state_entry == DS_BOUND) ||
+		(node_state_entry == DS_INITIALIZED));
+	pdip = ddi_get_parent(dip);
+	ASSERT(pdip);
+
+	NDI_CONFIG_DEBUG((CE_CONT, "uninit_node: 0x%p(%s%d)\n",
+	    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
+
+	if (((ops = ddi_get_driver(pdip)) == NULL) ||
+	    (ops->devo_bus_ops == NULL) ||
+	    ((f = ops->devo_bus_ops->bus_ctl) == NULL)) {
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * save the @addr prior to DDI_CTLOPS_UNINITCHILD for use in
+	 * freeing the instance if it succeeds.
+	 */
+	if (node_state_entry == DS_INITIALIZED) {
+		addr = ddi_get_name_addr(dip);
+		if (addr)
+			addr = i_ddi_strdup(addr, KM_SLEEP);
+	} else {
+		addr = NULL;
+	}
+
+	error = (*f)(pdip, pdip, DDI_CTLOPS_UNINITCHILD, dip, (void *)NULL);
+	if (error == DDI_SUCCESS) {
+		/* if uninitchild forgot to set devi_addr to NULL do it now */
+		ddi_set_name_addr(dip, NULL);
+
+		/*
+		 * Free instance number. This is a no-op if instance has
+		 * been kept by probe_node().  Avoid free when we are called
+		 * from init_node (DS_BOUND) because the instance has not yet
+		 * been assigned.
+		 */
+		if (node_state_entry == DS_INITIALIZED) {
+			e_ddi_free_instance(dip, addr);
+			DEVI(dip)->devi_instance = -1;
+		}
+
+		/* release the init_node hold */
+		ndi_rele_devi(pdip);
+
+		remove_global_props(dip);
+		e_ddi_prop_remove_all(dip);
+	} else {
+		NDI_CONFIG_DEBUG((CE_CONT, "uninit_node failed: 0x%p(%s%d)\n",
+		    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
+	}
+
+	if (addr)
+		kmem_free(addr, strlen(addr) + 1);
+	return (error);
+}
+
+/*
+ * Invoke driver's probe entry point to probe for existence of hardware.
+ * Keep instance permanent for successful probe and leaf nodes.
+ *
+ * Per-driver list must be held busy while calling this function.
+ */
+static int
+probe_node(dev_info_t *dip)
+{
+	int rv;
+
+	ASSERT(i_ddi_node_state(dip) == DS_INITIALIZED);
+
+	NDI_CONFIG_DEBUG((CE_CONT, "probe_node: 0x%p(%s%d)\n",
+	    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
+
+	/* temporarily hold the driver while we probe */
+	DEVI(dip)->devi_ops = ndi_hold_driver(dip);
+	if (DEVI(dip)->devi_ops == NULL) {
+		NDI_CONFIG_DEBUG((CE_CONT,
+		    "probe_node: 0x%p(%s%d) cannot load driver\n",
+		    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
+		return (DDI_FAILURE);
+	}
+
+	if (identify_9e != 0)
+		(void) devi_identify(dip);
+
+	rv = devi_probe(dip);
+
+	/* release the driver now that probe is complete */
+	ndi_rele_driver(dip);
+	DEVI(dip)->devi_ops = NULL;
+
+	switch (rv) {
+	case DDI_PROBE_SUCCESS:			/* found */
+	case DDI_PROBE_DONTCARE:		/* ddi_dev_is_sid */
+		e_ddi_keep_instance(dip);	/* persist instance */
+		rv = DDI_SUCCESS;
+		break;
+
+	case DDI_PROBE_PARTIAL:			/* maybe later */
+	case DDI_PROBE_FAILURE:			/* not found */
+		NDI_CONFIG_DEBUG((CE_CONT,
+		    "probe_node: 0x%p(%s%d) no hardware found%s\n",
+		    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip),
+		    (rv == DDI_PROBE_PARTIAL) ? " yet" : ""));
+		rv = DDI_FAILURE;
+		break;
+
+	default:
+#ifdef	DEBUG
+		cmn_err(CE_WARN, "probe_node: %s%d: illegal probe(9E) value",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+#endif	/* DEBUG */
+		rv = DDI_FAILURE;
+		break;
+	}
+	return (rv);
+}
+
+/*
+ * Unprobe a node. Simply reset the node state.
+ * Per-driver list must be held busy while calling this function.
+ */
+static int
+unprobe_node(dev_info_t *dip)
+{
+	ASSERT(i_ddi_node_state(dip) == DS_PROBED);
+
+	/*
+	 * Don't check for references here or else a ref-counted
+	 * dip cannot be downgraded by the framework.
+	 */
+
+	NDI_CONFIG_DEBUG((CE_CONT, "unprobe_node: 0x%p(name = %s)\n",
+	    (void *)dip, ddi_node_name(dip)));
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Attach devinfo node.
+ * Per-driver list must be held busy.
+ */
+static int
+attach_node(dev_info_t *dip)
+{
+	int rv;
+
+	ASSERT(i_ddi_node_state(dip) == DS_PROBED);
+
+	NDI_CONFIG_DEBUG((CE_CONT, "attach_node: 0x%p(%s%d)\n",
+	    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
+
+	/*
+	 * Tell mpxio framework that a node is about to online.
+	 */
+	if ((rv = mdi_devi_online(dip, 0)) != NDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	/* no recursive attachment */
+	ASSERT(DEVI(dip)->devi_ops == NULL);
+
+	/*
+	 * Hold driver the node is bound to.
+	 */
+	DEVI(dip)->devi_ops = ndi_hold_driver(dip);
+	if (DEVI(dip)->devi_ops == NULL) {
+		/*
+		 * We were able to load driver for probing, so we should
+		 * not get here unless something really bad happened.
+		 */
+		cmn_err(CE_WARN, "attach_node: no driver for major %d",
+		    DEVI(dip)->devi_major);
+		return (DDI_FAILURE);
+	}
+
+	if (NEXUS_DRV(DEVI(dip)->devi_ops))
+		DEVI(dip)->devi_taskq = ddi_taskq_create(dip,
+		    "nexus_enum_tq", 1,
+		    TASKQ_DEFAULTPRI, 0);
+
+	DEVI_SET_ATTACHING(dip);
+	DEVI_SET_NEED_RESET(dip);
+	rv = devi_attach(dip, DDI_ATTACH);
+	if (rv != DDI_SUCCESS)
+		DEVI_CLR_NEED_RESET(dip);
+	DEVI_CLR_ATTACHING(dip);
+
+	if (rv != DDI_SUCCESS) {
+		if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
+			e_devid_cache_unregister(dip);
+			DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
+		}
+		/*
+		 * Cleanup dacf reservations
+		 */
+		mutex_enter(&dacf_lock);
+		dacf_clr_rsrvs(dip, DACF_OPID_POSTATTACH);
+		dacf_clr_rsrvs(dip, DACF_OPID_PREDETACH);
+		mutex_exit(&dacf_lock);
+		if (DEVI(dip)->devi_taskq)
+			ddi_taskq_destroy(DEVI(dip)->devi_taskq);
+		ddi_remove_minor_node(dip, NULL);
+
+		/* release the driver if attach failed */
+		ndi_rele_driver(dip);
+		DEVI(dip)->devi_ops = NULL;
+		NDI_CONFIG_DEBUG((CE_CONT, "attach_node: 0x%p(%s%d) failed\n",
+		    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
+		return (DDI_FAILURE);
+	}
+
+	/* successful attach, return with driver held */
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Detach devinfo node.
+ * Per-driver list must be held busy.
+ */
+static int
+detach_node(dev_info_t *dip, uint_t flag)
+{
+	int rv;
+	ASSERT(i_ddi_node_state(dip) == DS_ATTACHED);
+
+	/* check references */
+	if (DEVI(dip)->devi_ref)
+		return (DDI_FAILURE);
+
+	NDI_CONFIG_DEBUG((CE_CONT, "detach_node: 0x%p(%s%d)\n",
+	    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
+
+	/* Offline the device node with the mpxio framework. */
+	if (mdi_devi_offline(dip, flag) != NDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	/* drain the taskq */
+	if (DEVI(dip)->devi_taskq)
+		ddi_taskq_wait(DEVI(dip)->devi_taskq);
+
+	rv = devi_detach(dip, DDI_DETACH);
+	if (rv == DDI_SUCCESS)
+		DEVI_CLR_NEED_RESET(dip);
+
+	if (rv != DDI_SUCCESS) {
+		NDI_CONFIG_DEBUG((CE_CONT,
+		    "detach_node: 0x%p(%s%d) failed\n",
+		    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
+		return (DDI_FAILURE);
+	}
+
+	/* destroy the taskq */
+	if (DEVI(dip)->devi_taskq) {
+		ddi_taskq_destroy(DEVI(dip)->devi_taskq);
+		DEVI(dip)->devi_taskq = NULL;
+	}
+
+	/* Cleanup dacf reservations */
+	mutex_enter(&dacf_lock);
+	dacf_clr_rsrvs(dip, DACF_OPID_POSTATTACH);
+	dacf_clr_rsrvs(dip, DACF_OPID_PREDETACH);
+	mutex_exit(&dacf_lock);
+
+	/* Remove properties and minor nodes in case driver forgots */
+	ddi_remove_minor_node(dip, NULL);
+	ddi_prop_remove_all(dip);
+
+	/* a detached node can't have attached or .conf children */
+	mutex_enter(&DEVI(dip)->devi_lock);
+	DEVI(dip)->devi_flags &= ~(DEVI_MADE_CHILDREN|DEVI_ATTACHED_CHILDREN);
+	if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
+		e_devid_cache_unregister(dip);
+		DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
+	}
+	mutex_exit(&DEVI(dip)->devi_lock);
+
+	/* successful detach, release the driver */
+	ndi_rele_driver(dip);
+	DEVI(dip)->devi_ops = NULL;
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Run dacf post_attach routines
+ */
+static int
+postattach_node(dev_info_t *dip)
+{
+	int rval;
+
+	/*
+	 * For hotplug busses like USB, it's possible that devices
+	 * are removed but dip is still around. We don't want to
+	 * run dacf routines as part of detach failure recovery.
+	 *
+	 * Pretend success until we figure out how to prevent
+	 * access to such devinfo nodes.
+	 */
+	if (DEVI_IS_DEVICE_REMOVED(dip))
+		return (DDI_SUCCESS);
+
+	/*
+	 * if dacf_postattach failed, report it to the framework
+	 * so that it can be retried later at the open time.
+	 */
+	mutex_enter(&dacf_lock);
+	rval = dacfc_postattach(dip);
+	mutex_exit(&dacf_lock);
+
+	/*
+	 * Plumbing during postattach may fail because of the
+	 * underlying device is not ready. This will fail ndi_devi_config()
+	 * in dv_filldir() and a warning message is issued. The message
+	 * from here will explain what happened
+	 */
+	if (rval != DACF_SUCCESS) {
+		cmn_err(CE_WARN, "Postattach failed for %s%d\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Run dacf pre-detach routines
+ */
+static int
+predetach_node(dev_info_t *dip, uint_t flag)
+{
+	int ret;
+
+	/*
+	 * Don't auto-detach if DDI_FORCEATTACH or DDI_NO_AUTODETACH
+	 * properties are set.
+	 */
+	if (flag & NDI_AUTODETACH) {
+		struct devnames *dnp;
+		int pflag = DDI_PROP_NOTPROM | DDI_PROP_DONTPASS;
+
+		if ((ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+			pflag, DDI_FORCEATTACH, 0) == 1) ||
+		    (ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+			pflag, DDI_NO_AUTODETACH, 0) == 1))
+			return (DDI_FAILURE);
+
+		/* check for driver global version of DDI_NO_AUTODETACH */
+		dnp = &devnamesp[DEVI(dip)->devi_major];
+		LOCK_DEV_OPS(&dnp->dn_lock);
+		if (dnp->dn_flags & DN_NO_AUTODETACH) {
+			UNLOCK_DEV_OPS(&dnp->dn_lock);
+			return (DDI_FAILURE);
+		}
+		UNLOCK_DEV_OPS(&dnp->dn_lock);
+	}
+
+	mutex_enter(&dacf_lock);
+	ret = dacfc_predetach(dip);
+	mutex_exit(&dacf_lock);
+
+	return (ret);
+}
+
+/*
+ * Wrapper for making multiple state transitions
+ */
+
+/*
+ * i_ndi_config_node: upgrade dev_info node into a specified state.
+ * It is a bit tricky because the locking protocol changes before and
+ * after a node is bound to a driver. All locks are held external to
+ * this function.
+ */
+int
+i_ndi_config_node(dev_info_t *dip, ddi_node_state_t state, uint_t flag)
+{
+	_NOTE(ARGUNUSED(flag))
+	int rv = DDI_SUCCESS;
+
+	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+
+	while ((i_ddi_node_state(dip) < state) && (rv == DDI_SUCCESS)) {
+
+		/* don't allow any more changes to the device tree */
+		if (devinfo_freeze) {
+			rv = DDI_FAILURE;
+			break;
+		}
+
+		switch (i_ddi_node_state(dip)) {
+		case DS_PROTO:
+			/*
+			 * only caller can reference this node, no external
+			 * locking needed.
+			 */
+			link_node(dip);
+			i_ddi_set_node_state(dip, DS_LINKED);
+			break;
+		case DS_LINKED:
+			/*
+			 * Three code path may attempt to bind a node:
+			 * - boot code
+			 * - add_drv
+			 * - hotplug thread
+			 * Boot code is single threaded, add_drv synchronize
+			 * on a userland lock, and hotplug synchronize on
+			 * hotplug_lk. There could be a race between add_drv
+			 * and hotplug thread. We'll live with this until the
+			 * conversion to top-down loading.
+			 */
+			if ((rv = bind_node(dip)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_BOUND);
+			break;
+		case DS_BOUND:
+			/*
+			 * The following transitions synchronizes on the
+			 * per-driver busy changing flag, since we already
+			 * have a driver.
+			 */
+			if ((rv = init_node(dip)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_INITIALIZED);
+			break;
+		case DS_INITIALIZED:
+			if ((rv = probe_node(dip)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_PROBED);
+			break;
+		case DS_PROBED:
+			atomic_add_long(&devinfo_attach_detach, 1);
+			if ((rv = attach_node(dip)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_ATTACHED);
+			atomic_add_long(&devinfo_attach_detach, -1);
+			break;
+		case DS_ATTACHED:
+			if ((rv = postattach_node(dip)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_READY);
+			break;
+		case DS_READY:
+			break;
+		default:
+			/* should never reach here */
+			ASSERT("unknown devinfo state");
+		}
+	}
+
+	if (ddidebug & DDI_AUDIT)
+		da_log_enter(dip);
+	return (rv);
+}
+
+/*
+ * i_ndi_unconfig_node: downgrade dev_info node into a specified state.
+ */
+int
+i_ndi_unconfig_node(dev_info_t *dip, ddi_node_state_t state, uint_t flag)
+{
+	int rv = DDI_SUCCESS;
+
+	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+
+	while ((i_ddi_node_state(dip) > state) && (rv == DDI_SUCCESS)) {
+
+		/* don't allow any more changes to the device tree */
+		if (devinfo_freeze) {
+			rv = DDI_FAILURE;
+			break;
+		}
+
+		switch (i_ddi_node_state(dip)) {
+		case DS_PROTO:
+			break;
+		case DS_LINKED:
+			/*
+			 * Persistent nodes are only removed by hotplug code
+			 * .conf nodes synchronizes on per-driver list.
+			 */
+			if ((rv = unlink_node(dip)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_PROTO);
+			break;
+		case DS_BOUND:
+			/*
+			 * The following transitions synchronizes on the
+			 * per-driver busy changing flag, since we already
+			 * have a driver.
+			 */
+			if ((rv = unbind_node(dip)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_LINKED);
+			break;
+		case DS_INITIALIZED:
+			if ((rv = uninit_node(dip)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_BOUND);
+			break;
+		case DS_PROBED:
+			if ((rv = unprobe_node(dip)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_INITIALIZED);
+			break;
+		case DS_ATTACHED:
+			atomic_add_long(&devinfo_attach_detach, 1);
+			DEVI_SET_DETACHING(dip);
+			membar_enter();	/* ensure visibility for hold_devi */
+
+			if ((rv = detach_node(dip, flag)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_PROBED);
+			DEVI_CLR_DETACHING(dip);
+			atomic_add_long(&devinfo_attach_detach, -1);
+			break;
+		case DS_READY:
+			if ((rv = predetach_node(dip, flag)) == DDI_SUCCESS)
+				i_ddi_set_node_state(dip, DS_ATTACHED);
+			break;
+		default:
+			ASSERT("unknown devinfo state");
+		}
+	}
+	da_log_enter(dip);
+	return (rv);
+}
+
+/*
+ * ddi_initchild: transform node to DS_INITIALIZED state
+ */
+int
+ddi_initchild(dev_info_t *parent, dev_info_t *proto)
+{
+	int ret, circ;
+
+	ndi_devi_enter(parent, &circ);
+	ret = i_ndi_config_node(proto, DS_INITIALIZED, 0);
+	ndi_devi_exit(parent, circ);
+
+	return (ret);
+}
+
+/*
+ * ddi_uninitchild: transform node down to DS_BOUND state
+ */
+int
+ddi_uninitchild(dev_info_t *dip)
+{
+	int ret, circ;
+	dev_info_t *parent = ddi_get_parent(dip);
+	ASSERT(parent);
+
+	ndi_devi_enter(parent, &circ);
+	ret = i_ndi_unconfig_node(dip, DS_BOUND, 0);
+	ndi_devi_exit(parent, circ);
+
+	return (ret);
+}
+
+/*
+ * i_ddi_attachchild: transform node to DS_READY state
+ */
+static int
+i_ddi_attachchild(dev_info_t *dip)
+{
+	int ret, circ;
+	dev_info_t *parent = ddi_get_parent(dip);
+	ASSERT(parent);
+
+	if ((i_ddi_node_state(dip) < DS_BOUND) || DEVI_IS_DEVICE_OFFLINE(dip))
+		return (DDI_FAILURE);
+
+	ndi_devi_enter(parent, &circ);
+	ret = i_ndi_config_node(dip, DS_READY, 0);
+	if (ret == NDI_SUCCESS) {
+		ret = DDI_SUCCESS;
+	} else {
+		/*
+		 * Take it down to DS_INITIALIZED so pm_pre_probe is run
+		 * on the next attach
+		 */
+		(void) i_ndi_unconfig_node(dip, DS_INITIALIZED, 0);
+		ret = DDI_FAILURE;
+	}
+	ndi_devi_exit(parent, circ);
+
+	return (ret);
+}
+
+/*
+ * i_ddi_detachchild: transform node down to DS_PROBED state
+ *	If it fails, put it back to DS_READY state.
+ * NOTE: A node that fails detach may be at DS_ATTACHED instead
+ * of DS_READY for a small amount of time.
+ */
+static int
+i_ddi_detachchild(dev_info_t *dip, uint_t flags)
+{
+	int ret, circ;
+	dev_info_t *parent = ddi_get_parent(dip);
+	ASSERT(parent);
+
+	ndi_devi_enter(parent, &circ);
+	ret = i_ndi_unconfig_node(dip, DS_PROBED, flags);
+	if (ret != DDI_SUCCESS)
+		(void) i_ndi_config_node(dip, DS_READY, 0);
+	else
+		/* allow pm_pre_probe to reestablish pm state */
+		(void) i_ndi_unconfig_node(dip, DS_INITIALIZED, 0);
+	ndi_devi_exit(parent, circ);
+
+	return (ret);
+}
+
+/*
+ * Add a child and bind to driver
+ */
+dev_info_t *
+ddi_add_child(dev_info_t *pdip, char *name, uint_t nodeid, uint_t unit)
+{
+	int circ;
+	dev_info_t *dip;
+
+	/* allocate a new node */
+	dip = i_ddi_alloc_node(pdip, name, nodeid, (int)unit, NULL, KM_SLEEP);
+
+	ndi_devi_enter(pdip, &circ);
+	(void) i_ndi_config_node(dip, DS_BOUND, 0);
+	ndi_devi_exit(pdip, circ);
+	return (dip);
+}
+
+/*
+ * ddi_remove_child: remove the dip. The parent must be attached and held
+ */
+int
+ddi_remove_child(dev_info_t *dip, int dummy)
+{
+	_NOTE(ARGUNUSED(dummy))
+	int circ, ret;
+	dev_info_t *parent = ddi_get_parent(dip);
+	ASSERT(parent);
+
+	ndi_devi_enter(parent, &circ);
+
+	/*
+	 * If we still have children, for example SID nodes marked
+	 * as persistent but not attached, attempt to remove them.
+	 */
+	if (DEVI(dip)->devi_child) {
+		ret = ndi_devi_unconfig(dip, NDI_DEVI_REMOVE);
+		if (ret != NDI_SUCCESS) {
+			ndi_devi_exit(parent, circ);
+			return (DDI_FAILURE);
+		}
+		ASSERT(DEVI(dip)->devi_child == NULL);
+	}
+
+	ret = i_ndi_unconfig_node(dip, DS_PROTO, 0);
+	ndi_devi_exit(parent, circ);
+
+	if (ret != DDI_SUCCESS)
+		return (ret);
+
+	ASSERT(i_ddi_node_state(dip) == DS_PROTO);
+	i_ddi_free_node(dip);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * NDI wrappers for ref counting, node allocation, and transitions
+ */
+
+/*
+ * Hold/release the devinfo node itself.
+ * Caller is assumed to prevent the devi from detaching during this call
+ */
+void
+ndi_hold_devi(dev_info_t *dip)
+{
+	mutex_enter(&DEVI(dip)->devi_lock);
+	ASSERT(DEVI(dip)->devi_ref >= 0);
+	DEVI(dip)->devi_ref++;
+	membar_enter();			/* make sure stores are flushed */
+	mutex_exit(&DEVI(dip)->devi_lock);
+}
+
+void
+ndi_rele_devi(dev_info_t *dip)
+{
+	ASSERT(DEVI(dip)->devi_ref > 0);
+
+	mutex_enter(&DEVI(dip)->devi_lock);
+	DEVI(dip)->devi_ref--;
+	membar_enter();			/* make sure stores are flushed */
+	mutex_exit(&DEVI(dip)->devi_lock);
+}
+
+int
+e_ddi_devi_holdcnt(dev_info_t *dip)
+{
+	return (DEVI(dip)->devi_ref);
+}
+
+/*
+ * Hold/release the driver the devinfo node is bound to.
+ */
+struct dev_ops *
+ndi_hold_driver(dev_info_t *dip)
+{
+	if (i_ddi_node_state(dip) < DS_BOUND)
+		return (NULL);
+
+	ASSERT(DEVI(dip)->devi_major != -1);
+	return (mod_hold_dev_by_major(DEVI(dip)->devi_major));
+}
+
+void
+ndi_rele_driver(dev_info_t *dip)
+{
+	ASSERT(i_ddi_node_state(dip) >= DS_BOUND);
+	mod_rele_dev_by_major(DEVI(dip)->devi_major);
+}
+
+/*
+ * Single thread entry into devinfo node for modifying its children.
+ * To verify in ASSERTS use DEVI_BUSY_OWNED macro.
+ */
+void
+ndi_devi_enter(dev_info_t *dip, int *circular)
+{
+	struct dev_info *devi = DEVI(dip);
+	ASSERT(dip != NULL);
+
+	mutex_enter(&devi->devi_lock);
+	if (devi->devi_busy_thread == curthread) {
+		devi->devi_circular++;
+	} else {
+		while (DEVI_BUSY_CHANGING(devi) && !panicstr)
+			cv_wait(&(devi->devi_cv), &(devi->devi_lock));
+		if (panicstr) {
+			mutex_exit(&devi->devi_lock);
+			return;
+		}
+		devi->devi_flags |= DEVI_BUSY;
+		devi->devi_busy_thread = curthread;
+	}
+	*circular = devi->devi_circular;
+	mutex_exit(&devi->devi_lock);
+}
+
+/*
+ * Release ndi_devi_enter or successful ndi_devi_tryenter.
+ */
+void
+ndi_devi_exit(dev_info_t *dip, int circular)
+{
+	struct dev_info *devi = DEVI(dip);
+	ASSERT(dip != NULL);
+
+	if (panicstr)
+		return;
+
+	mutex_enter(&(devi->devi_lock));
+	if (circular != 0) {
+		devi->devi_circular--;
+	} else {
+		devi->devi_flags &= ~DEVI_BUSY;
+		ASSERT(devi->devi_busy_thread == curthread);
+		devi->devi_busy_thread = NULL;
+		cv_broadcast(&(devi->devi_cv));
+	}
+	mutex_exit(&(devi->devi_lock));
+}
+
+/*
+ * Attempt to single thread entry into devinfo node for modifying its children.
+ */
+int
+ndi_devi_tryenter(dev_info_t *dip, int *circular)
+{
+	int rval = 1;		   /* assume we enter */
+	struct dev_info *devi = DEVI(dip);
+	ASSERT(dip != NULL);
+
+	mutex_enter(&devi->devi_lock);
+	if (devi->devi_busy_thread == (void *)curthread) {
+		devi->devi_circular++;
+	} else {
+		if (!DEVI_BUSY_CHANGING(devi)) {
+			devi->devi_flags |= DEVI_BUSY;
+			devi->devi_busy_thread = (void *)curthread;
+		} else {
+			rval = 0;	/* devi is busy */
+		}
+	}
+	*circular = devi->devi_circular;
+	mutex_exit(&devi->devi_lock);
+	return (rval);
+}
+
+/*
+ * Allocate and initialize a new dev_info structure.
+ *
+ * This routine may be called at interrupt time by a nexus in
+ * response to a hotplug event, therefore memory allocations are
+ * not allowed to sleep.
+ */
+int
+ndi_devi_alloc(dev_info_t *parent, char *node_name, dnode_t nodeid,
+    dev_info_t **ret_dip)
+{
+	ASSERT(node_name != NULL);
+	ASSERT(ret_dip != NULL);
+
+	*ret_dip = i_ddi_alloc_node(parent, node_name, nodeid, -1, NULL,
+	    KM_NOSLEEP);
+	if (*ret_dip == NULL) {
+		return (NDI_NOMEM);
+	}
+
+	return (NDI_SUCCESS);
+}
+
+/*
+ * Allocate and initialize a new dev_info structure
+ * This routine may sleep and should not be called at interrupt time
+ */
+void
+ndi_devi_alloc_sleep(dev_info_t *parent, char *node_name, dnode_t nodeid,
+    dev_info_t **ret_dip)
+{
+	ASSERT(node_name != NULL);
+	ASSERT(ret_dip != NULL);
+
+	*ret_dip = i_ddi_alloc_node(parent, node_name, nodeid, -1, NULL,
+	    KM_SLEEP);
+	ASSERT(*ret_dip);
+}
+
+/*
+ * Remove an initialized (but not yet attached) dev_info
+ * node from it's parent.
+ */
+int
+ndi_devi_free(dev_info_t *dip)
+{
+	ASSERT(dip != NULL);
+
+	if (i_ddi_node_state(dip) >= DS_INITIALIZED)
+		return (DDI_FAILURE);
+
+	NDI_CONFIG_DEBUG((CE_CONT, "ndi_devi_free: %s%d (%p)\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip));
+
+	(void) ddi_remove_child(dip, 0);
+
+	return (NDI_SUCCESS);
+}
+
+/*
+ * ndi_devi_bind_driver() binds a driver to a given device. If it fails
+ * to bind the driver, it returns an appropriate error back. Some drivers
+ * may want to know if the actually failed to bind.
+ */
+int
+ndi_devi_bind_driver(dev_info_t *dip, uint_t flags)
+{
+	int ret = NDI_FAILURE;
+	int circ;
+	dev_info_t *pdip = ddi_get_parent(dip);
+	ASSERT(pdip);
+
+	NDI_CONFIG_DEBUG((CE_CONT,
+	    "ndi_devi_bind_driver: %s%d (%p) flags: %x\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, flags));
+
+	ndi_devi_enter(pdip, &circ);
+	if (i_ndi_config_node(dip, DS_BOUND, flags) == DDI_SUCCESS)
+		ret = NDI_SUCCESS;
+	ndi_devi_exit(pdip, circ);
+
+	return (ret);
+}
+
+/*
+ * ndi_devi_unbind_driver: unbind the dip
+ */
+static int
+ndi_devi_unbind_driver(dev_info_t *dip)
+{
+	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+
+	return (i_ndi_unconfig_node(dip, DS_LINKED, 0));
+}
+
+/*
+ * Misc. help routines called by framework only
+ */
+
+/*
+ * Get the state of node
+ */
+ddi_node_state_t
+i_ddi_node_state(dev_info_t *dip)
+{
+	return (DEVI(dip)->devi_node_state);
+}
+
+/*
+ * Set the state of node
+ */
+void
+i_ddi_set_node_state(dev_info_t *dip, ddi_node_state_t state)
+{
+	DEVI(dip)->devi_node_state = state;
+	membar_enter();			/* make sure stores are flushed */
+}
+
+/*
+ * Common function for finding a node in a sibling list given name and addr.
+ *
+ * By default, name is matched with devi_node_name. The following
+ * alternative match strategies are supported:
+ *
+ *	FIND_NAME_BY_DRIVER: A match on driver name bound to node is conducted.
+ *		This support is used for support of OBP generic names and
+ *		for the conversion from driver names to generic names.  When
+ *		more consistency in the generic name environment is achieved
+ *		(and not needed for upgrade) this support can be removed.
+ *
+ * If a child is not named (dev_addr == NULL), there are three
+ * possible actions:
+ *
+ *	(1) skip it
+ *	(2) FIND_ADDR_BY_INIT: bring child to DS_INITIALIZED state
+ *	(3) FIND_ADDR_BY_CALLBACK: use a caller-supplied callback function
+ */
+#define	FIND_NAME_BY_DRIVER	0x01
+#define	FIND_ADDR_BY_INIT	0x10
+#define	FIND_ADDR_BY_CALLBACK	0x20
+
+static dev_info_t *
+find_sibling(dev_info_t *head, char *cname, char *caddr, uint_t flag,
+    int (*callback)(dev_info_t *, char *, int))
+{
+	dev_info_t	*dip;
+	char		*addr, *buf;
+	major_t		major;
+
+	/* only one way to name a node */
+	ASSERT(((flag & FIND_ADDR_BY_INIT) == 0) ||
+	    ((flag & FIND_ADDR_BY_CALLBACK) == 0));
+
+	if (flag & FIND_NAME_BY_DRIVER) {
+		major = ddi_name_to_major(cname);
+		if (major == (major_t)-1)
+			return (NULL);
+	}
+
+	/* preallocate buffer of naming node by callback */
+	if (flag & FIND_ADDR_BY_CALLBACK)
+		buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+
+	/*
+	 * Walk the child list to find a match
+	 */
+
+	for (dip = head; dip; dip = ddi_get_next_sibling(dip)) {
+		if (flag & FIND_NAME_BY_DRIVER) {
+			/* match driver major */
+			if (DEVI(dip)->devi_major != major)
+				continue;
+		} else {
+			/* match node name */
+			if (strcmp(cname, DEVI(dip)->devi_node_name) != 0)
+				continue;
+		}
+
+		if ((addr = DEVI(dip)->devi_addr) == NULL) {
+			/* name the child based on the flag */
+			if (flag & FIND_ADDR_BY_INIT) {
+				if (ddi_initchild(ddi_get_parent(dip), dip)
+				    != DDI_SUCCESS)
+					continue;
+				addr = DEVI(dip)->devi_addr;
+			} else if (flag & FIND_ADDR_BY_CALLBACK) {
+				if ((callback == NULL) || (callback(
+				    dip, buf, MAXNAMELEN) != DDI_SUCCESS))
+					continue;
+				addr = buf;
+			} else {
+				continue;	/* skip */
+			}
+		}
+
+		/* match addr */
+		ASSERT(addr != NULL);
+		if (strcmp(caddr, addr) == 0)
+			break;	/* node found */
+
+	}
+	if (flag & FIND_ADDR_BY_CALLBACK)
+		kmem_free(buf, MAXNAMELEN);
+	return (dip);
+}
+
+/*
+ * Find child of pdip with name: cname@caddr
+ * Called by init_node() to look for duplicate nodes
+ */
+static dev_info_t *
+find_duplicate_child(dev_info_t *pdip, dev_info_t *dip)
+{
+	dev_info_t *dup;
+	char *cname = DEVI(dip)->devi_node_name;
+	char *caddr = DEVI(dip)->devi_addr;
+
+	/* search nodes before dip */
+	dup = find_sibling(ddi_get_child(pdip), cname, caddr, 0, NULL);
+	if (dup != dip)
+		return (dup);
+
+	/*
+	 * search nodes after dip; normally this is not needed,
+	 */
+	return (find_sibling(ddi_get_next_sibling(dip), cname, caddr,
+	    0, NULL));
+}
+
+/*
+ * Find a child of a given name and address, using a callback to name
+ * unnamed children. cname is the binding name.
+ */
+static dev_info_t *
+find_child_by_callback(dev_info_t *pdip, char *cname, char *caddr,
+    int (*name_node)(dev_info_t *, char *, int))
+{
+	return (find_sibling(ddi_get_child(pdip), cname, caddr,
+	    FIND_NAME_BY_DRIVER|FIND_ADDR_BY_CALLBACK, name_node));
+}
+
+/*
+ * Find a child of a given name and address, invoking initchild to name
+ * unnamed children. cname is the node name.
+ */
+static dev_info_t *
+find_child_by_name(dev_info_t *pdip, char *cname, char *caddr)
+{
+	dev_info_t	*dip;
+
+	/* attempt search without changing state of preceeding siblings */
+	dip = find_sibling(ddi_get_child(pdip), cname, caddr, 0, NULL);
+	if (dip)
+		return (dip);
+
+	return (find_sibling(ddi_get_child(pdip), cname, caddr,
+	    FIND_ADDR_BY_INIT, NULL));
+}
+
+/*
+ * Find a child of a given name and address, invoking initchild to name
+ * unnamed children. cname is the node name.
+ */
+static dev_info_t *
+find_child_by_driver(dev_info_t *pdip, char *cname, char *caddr)
+{
+	dev_info_t	*dip;
+
+	/* attempt search without changing state of preceeding siblings */
+	dip = find_sibling(ddi_get_child(pdip), cname, caddr,
+	    FIND_NAME_BY_DRIVER, NULL);
+	if (dip)
+		return (dip);
+
+	return (find_sibling(ddi_get_child(pdip), cname, caddr,
+	    FIND_NAME_BY_DRIVER|FIND_ADDR_BY_INIT, NULL));
+}
+
+/*
+ * Deleting a property list. Take care, since some property structures
+ * may not be fully built.
+ */
+void
+i_ddi_prop_list_delete(ddi_prop_t *prop)
+{
+	while (prop) {
+		ddi_prop_t *next = prop->prop_next;
+		if (prop->prop_name)
+			kmem_free(prop->prop_name, strlen(prop->prop_name) + 1);
+		if ((prop->prop_len != 0) && prop->prop_val)
+			kmem_free(prop->prop_val, prop->prop_len);
+		kmem_free(prop, sizeof (struct ddi_prop));
+		prop = next;
+	}
+}
+
+/*
+ * Duplicate property list
+ */
+ddi_prop_t *
+i_ddi_prop_list_dup(ddi_prop_t *prop, uint_t flag)
+{
+	ddi_prop_t *result, *prev, *copy;
+
+	if (prop == NULL)
+		return (NULL);
+
+	result = prev = NULL;
+	for (; prop != NULL; prop = prop->prop_next) {
+		ASSERT(prop->prop_name != NULL);
+		copy = kmem_zalloc(sizeof (struct ddi_prop), flag);
+		if (copy == NULL)
+			goto fail;
+
+		copy->prop_dev = prop->prop_dev;
+		copy->prop_flags = prop->prop_flags;
+		copy->prop_name = i_ddi_strdup(prop->prop_name, flag);
+		if (copy->prop_name == NULL)
+			goto fail;
+
+		if ((copy->prop_len = prop->prop_len) != 0) {
+			copy->prop_val = kmem_zalloc(prop->prop_len, flag);
+			if (copy->prop_val == NULL)
+				goto fail;
+
+			bcopy(prop->prop_val, copy->prop_val, prop->prop_len);
+		}
+
+		if (prev == NULL)
+			result = prev = copy;
+		else
+			prev->prop_next = copy;
+		prev = copy;
+	}
+	return (result);
+
+fail:
+	i_ddi_prop_list_delete(result);
+	return (NULL);
+}
+
+/*
+ * Create a reference property list, currently used only for
+ * driver global properties. Created with ref count of 1.
+ */
+ddi_prop_list_t *
+i_ddi_prop_list_create(ddi_prop_t *props)
+{
+	ddi_prop_list_t *list = kmem_alloc(sizeof (*list), KM_SLEEP);
+	list->prop_list = props;
+	list->prop_ref = 1;
+	return (list);
+}
+
+/*
+ * Increment/decrement reference count. The reference is
+ * protected by dn_lock. The only interfaces modifying
+ * dn_global_prop_ptr is in impl_make[free]_parlist().
+ */
+void
+i_ddi_prop_list_hold(ddi_prop_list_t *prop_list, struct devnames *dnp)
+{
+	ASSERT(prop_list->prop_ref >= 0);
+	ASSERT(mutex_owned(&dnp->dn_lock));
+	prop_list->prop_ref++;
+}
+
+void
+i_ddi_prop_list_rele(ddi_prop_list_t *prop_list, struct devnames *dnp)
+{
+	ASSERT(prop_list->prop_ref > 0);
+	ASSERT(mutex_owned(&dnp->dn_lock));
+	prop_list->prop_ref--;
+
+	if (prop_list->prop_ref == 0) {
+		i_ddi_prop_list_delete(prop_list->prop_list);
+		kmem_free(prop_list, sizeof (*prop_list));
+	}
+}
+
+/*
+ * Free table of classes by drivers
+ */
+void
+i_ddi_free_exported_classes(char **classes, int n)
+{
+	if ((n == 0) || (classes == NULL))
+		return;
+
+	kmem_free(classes, n * sizeof (char *));
+}
+
+/*
+ * Get all classes exported by dip
+ */
+int
+i_ddi_get_exported_classes(dev_info_t *dip, char ***classes)
+{
+	extern void lock_hw_class_list();
+	extern void unlock_hw_class_list();
+	extern int get_class(const char *, char **);
+
+	static char *rootclass = "root";
+	int n = 0, nclass = 0;
+	char **buf;
+
+	ASSERT(i_ddi_node_state(dip) >= DS_BOUND);
+
+	if (dip == ddi_root_node())	/* rootnode exports class "root" */
+		nclass = 1;
+	lock_hw_class_list();
+	nclass += get_class(ddi_driver_name(dip), NULL);
+	if (nclass == 0) {
+		unlock_hw_class_list();
+		return (0);		/* no class exported */
+	}
+
+	*classes = buf = kmem_alloc(nclass * sizeof (char *), KM_SLEEP);
+	if (dip == ddi_root_node()) {
+		*buf++ = rootclass;
+		n = 1;
+	}
+	n += get_class(ddi_driver_name(dip), buf);
+	unlock_hw_class_list();
+
+	ASSERT(n == nclass);    /* make sure buf wasn't overrun */
+	return (nclass);
+}
+
+/*
+ * Helper functions, returns NULL if no memory.
+ */
+char *
+i_ddi_strdup(char *str, uint_t flag)
+{
+	char *copy;
+
+	if (str == NULL)
+		return (NULL);
+
+	copy = kmem_alloc(strlen(str) + 1, flag);
+	if (copy == NULL)
+		return (NULL);
+
+	(void) strcpy(copy, str);
+	return (copy);
+}
+
+/*
+ * Load driver.conf file for major. Load all if major == -1.
+ *
+ * This is called
+ * - early in boot after devnames array is initialized
+ * - from vfs code when certain file systems are mounted
+ * - from add_drv when a new driver is added
+ */
+int
+i_ddi_load_drvconf(major_t major)
+{
+	extern int modrootloaded;
+
+	major_t low, high, m;
+
+	if (major == (major_t)-1) {
+		low = 0;
+		high = devcnt - 1;
+	} else {
+		if (major >= devcnt)
+			return (EINVAL);
+		low = high = major;
+	}
+
+	for (m = low; m <= high; m++) {
+		struct devnames *dnp = &devnamesp[m];
+		LOCK_DEV_OPS(&dnp->dn_lock);
+		dnp->dn_flags &= ~DN_DRIVER_HELD;
+		(void) impl_make_parlist(m);
+		UNLOCK_DEV_OPS(&dnp->dn_lock);
+	}
+
+	if (modrootloaded) {
+		ddi_walk_devs(ddi_root_node(), reset_nexus_flags,
+		    (void *)(uintptr_t)major);
+	}
+
+	/* build dn_list from old entries in path_to_inst */
+	e_ddi_unorphan_instance_nos();
+	return (0);
+}
+
+/*
+ * Unload a specific driver.conf.
+ * Don't support unload all because it doesn't make any sense
+ */
+int
+i_ddi_unload_drvconf(major_t major)
+{
+	int error;
+	struct devnames *dnp;
+
+	if (major >= devcnt)
+		return (EINVAL);
+
+	/*
+	 * Take the per-driver lock while unloading driver.conf
+	 */
+	dnp = &devnamesp[major];
+	LOCK_DEV_OPS(&dnp->dn_lock);
+	error = impl_free_parlist(major);
+	UNLOCK_DEV_OPS(&dnp->dn_lock);
+	return (error);
+}
+
+/*
+ * Merge a .conf node. This is called by nexus drivers to augment
+ * hw node with properties specified in driver.conf file. This function
+ * takes a callback routine to name nexus children.
+ * The parent node must be held busy.
+ *
+ * It returns DDI_SUCCESS if the node is merged and DDI_FAILURE otherwise.
+ */
+int
+ndi_merge_node(dev_info_t *dip, int (*name_node)(dev_info_t *, char *, int))
+{
+	dev_info_t *hwdip;
+
+	ASSERT(ndi_dev_is_persistent_node(dip) == 0);
+	ASSERT(ddi_get_name_addr(dip) != NULL);
+
+	hwdip = find_child_by_callback(ddi_get_parent(dip),
+	    ddi_binding_name(dip), ddi_get_name_addr(dip), name_node);
+
+	/*
+	 * Look for the hardware node that is the target of the merge;
+	 * return failure if not found.
+	 */
+	if ((hwdip == NULL) || (hwdip == dip)) {
+		char *buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		NDI_CONFIG_DEBUG((CE_WARN, "No HW node to merge conf node %s",
+		    ddi_deviname(dip, buf)));
+		kmem_free(buf, MAXNAMELEN);
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Make sure the hardware node is uninitialized and has no property.
+	 * This may not be the case if new .conf files are load after some
+	 * hardware nodes have already been initialized and attached.
+	 *
+	 * N.B. We return success here because the node was *intended*
+	 * 	to be a merge node because there is a hw node with the name.
+	 */
+	mutex_enter(&DEVI(hwdip)->devi_lock);
+	if (ndi_dev_is_persistent_node(hwdip) == 0) {
+		char *buf;
+		mutex_exit(&DEVI(hwdip)->devi_lock);
+
+		buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		NDI_CONFIG_DEBUG((CE_NOTE, "Duplicate .conf node %s",
+		    ddi_deviname(dip, buf)));
+		kmem_free(buf, MAXNAMELEN);
+		return (DDI_SUCCESS);
+	}
+
+	/*
+	 * If it is possible that the hardware has already been touched
+	 * then don't merge.
+	 */
+	if (i_ddi_node_state(hwdip) >= DS_INITIALIZED ||
+	    (DEVI(hwdip)->devi_sys_prop_ptr != NULL) ||
+	    (DEVI(hwdip)->devi_drv_prop_ptr != NULL)) {
+		char *buf;
+		mutex_exit(&DEVI(hwdip)->devi_lock);
+
+		buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		NDI_CONFIG_DEBUG((CE_NOTE,
+		    "!Cannot merge .conf node %s with hw node %p "
+		    "-- not in proper state",
+		    ddi_deviname(dip, buf), (void *)hwdip));
+		kmem_free(buf, MAXNAMELEN);
+		return (DDI_SUCCESS);
+	}
+
+	mutex_enter(&DEVI(dip)->devi_lock);
+	DEVI(hwdip)->devi_sys_prop_ptr = DEVI(dip)->devi_sys_prop_ptr;
+	DEVI(hwdip)->devi_drv_prop_ptr = DEVI(dip)->devi_drv_prop_ptr;
+	DEVI(dip)->devi_sys_prop_ptr = NULL;
+	DEVI(dip)->devi_drv_prop_ptr = NULL;
+	mutex_exit(&DEVI(dip)->devi_lock);
+	mutex_exit(&DEVI(hwdip)->devi_lock);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Merge a "wildcard" .conf node. This is called by nexus drivers to
+ * augment a set of hw node with properties specified in driver.conf file.
+ * The parent node must be held busy.
+ *
+ * There is no failure mode, since the nexus may or may not have child
+ * node bound the driver specified by the wildcard node.
+ */
+void
+ndi_merge_wildcard_node(dev_info_t *dip)
+{
+	dev_info_t *hwdip;
+	dev_info_t *pdip = ddi_get_parent(dip);
+	major_t major = ddi_driver_major(dip);
+
+	/* never attempt to merge a hw node */
+	ASSERT(ndi_dev_is_persistent_node(dip) == 0);
+	/* must be bound to a driver major number */
+	ASSERT(major != (major_t)-1);
+
+	/*
+	 * Walk the child list to find all nodes bound to major
+	 * and copy properties.
+	 */
+	mutex_enter(&DEVI(dip)->devi_lock);
+	for (hwdip = ddi_get_child(pdip); hwdip;
+	    hwdip = ddi_get_next_sibling(hwdip)) {
+		/*
+		 * Skip nodes not bound to same driver
+		 */
+		if (ddi_driver_major(hwdip) != major)
+			continue;
+
+		/*
+		 * Skip .conf nodes
+		 */
+		if (ndi_dev_is_persistent_node(hwdip) == 0)
+			continue;
+
+		/*
+		 * Make sure the node is uninitialized and has no property.
+		 */
+		mutex_enter(&DEVI(hwdip)->devi_lock);
+		if (i_ddi_node_state(hwdip) >= DS_INITIALIZED ||
+		    (DEVI(hwdip)->devi_sys_prop_ptr != NULL) ||
+		    (DEVI(hwdip)->devi_drv_prop_ptr != NULL)) {
+			mutex_exit(&DEVI(hwdip)->devi_lock);
+			NDI_CONFIG_DEBUG((CE_NOTE, "HW node %p state not "
+			    "suitable for merging wildcard conf node %s",
+			    (void *)hwdip, ddi_node_name(dip)));
+			continue;
+		}
+
+		DEVI(hwdip)->devi_sys_prop_ptr =
+		    i_ddi_prop_list_dup(DEVI(dip)->devi_sys_prop_ptr, KM_SLEEP);
+		DEVI(hwdip)->devi_drv_prop_ptr =
+		    i_ddi_prop_list_dup(DEVI(dip)->devi_drv_prop_ptr, KM_SLEEP);
+		mutex_exit(&DEVI(hwdip)->devi_lock);
+	}
+	mutex_exit(&DEVI(dip)->devi_lock);
+}
+
+/*
+ * Return the major number based on the compatible property. This interface
+ * may be used in situations where we are trying to detect if a better driver
+ * now exists for a device, so it must use the 'compatible' property.  If
+ * a non-NULL formp is specified and the binding was based on compatible then
+ * return the pointer to the form used in *formp.
+ */
+major_t
+ddi_compatible_driver_major(dev_info_t *dip, char **formp)
+{
+	struct dev_info *devi = DEVI(dip);
+	void		*compat;
+	size_t		len;
+	char		*p = NULL;
+	major_t		major = (major_t)-1;
+
+	if (formp)
+		*formp = NULL;
+
+	/* look up compatible property */
+	(void) lookup_compatible(dip, KM_SLEEP);
+	compat = (void *)(devi->devi_compat_names);
+	len = devi->devi_compat_length;
+
+	/* find the highest precedence compatible form with a driver binding */
+	while ((p = prom_decode_composite_string(compat, len, p)) != NULL) {
+		major = ddi_name_to_major(p);
+		if ((major != (major_t)-1) &&
+		    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED)) {
+			if (formp)
+				*formp = p;
+			return (major);
+		}
+	}
+
+	/*
+	 * none of the compatible forms have a driver binding, see if
+	 * the node name has a driver binding.
+	 */
+	major = ddi_name_to_major(ddi_node_name(dip));
+	if ((major != (major_t)-1) &&
+	    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED))
+		return (major);
+
+	/* no driver */
+	return ((major_t)-1);
+}
+
+/*
+ * Static help functions
+ */
+
+/*
+ * lookup the "compatible" property and cache it's contents in the
+ * device node.
+ */
+static int
+lookup_compatible(dev_info_t *dip, uint_t flag)
+{
+	int rv;
+	int prop_flags;
+	uint_t ncompatstrs;
+	char **compatstrpp;
+	char *di_compat_strp;
+	size_t di_compat_strlen;
+
+	if (DEVI(dip)->devi_compat_names) {
+		return (DDI_SUCCESS);
+	}
+
+	prop_flags = DDI_PROP_TYPE_STRING | DDI_PROP_DONTPASS;
+
+	if (flag & KM_NOSLEEP) {
+		prop_flags |= DDI_PROP_DONTSLEEP;
+	}
+
+	if (ndi_dev_is_prom_node(dip) == 0) {
+		prop_flags |= DDI_PROP_NOTPROM;
+	}
+
+	rv = ddi_prop_lookup_common(DDI_DEV_T_ANY, dip, prop_flags,
+	    "compatible", &compatstrpp, &ncompatstrs,
+	    ddi_prop_fm_decode_strings);
+
+	if (rv == DDI_PROP_NOT_FOUND) {
+		return (DDI_SUCCESS);
+	}
+
+	if (rv != DDI_PROP_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * encode the compatible property data in the dev_info node
+	 */
+	rv = DDI_SUCCESS;
+	if (ncompatstrs != 0) {
+		di_compat_strp = encode_composite_string(compatstrpp,
+		    ncompatstrs, &di_compat_strlen, flag);
+		if (di_compat_strp != NULL) {
+			DEVI(dip)->devi_compat_names = di_compat_strp;
+			DEVI(dip)->devi_compat_length = di_compat_strlen;
+		} else {
+			rv = DDI_FAILURE;
+		}
+	}
+	ddi_prop_free(compatstrpp);
+	return (rv);
+}
+
+/*
+ * Create a composite string from a list of strings.
+ *
+ * A composite string consists of a single buffer containing one
+ * or more NULL terminated strings.
+ */
+static char *
+encode_composite_string(char **strings, uint_t nstrings, size_t *retsz,
+    uint_t flag)
+{
+	uint_t index;
+	char  **strpp;
+	uint_t slen;
+	size_t cbuf_sz = 0;
+	char *cbuf_p;
+	char *cbuf_ip;
+
+	if (strings == NULL || nstrings == 0 || retsz == NULL) {
+		return (NULL);
+	}
+
+	for (index = 0, strpp = strings; index < nstrings; index++)
+		cbuf_sz += strlen(*(strpp++)) + 1;
+
+	if ((cbuf_p = kmem_alloc(cbuf_sz, flag)) == NULL) {
+		cmn_err(CE_NOTE,
+		    "?failed to allocate device node compatstr");
+		return (NULL);
+	}
+
+	cbuf_ip = cbuf_p;
+	for (index = 0, strpp = strings; index < nstrings; index++) {
+		slen = strlen(*strpp);
+		bcopy(*(strpp++), cbuf_ip, slen);
+		cbuf_ip += slen;
+		*(cbuf_ip++) = '\0';
+	}
+
+	*retsz = cbuf_sz;
+	return (cbuf_p);
+}
+
+static void
+link_to_driver_list(dev_info_t *dip)
+{
+	major_t major = DEVI(dip)->devi_major;
+	struct devnames *dnp;
+
+	ASSERT(major != (major_t)-1);
+
+	/*
+	 * Remove from orphan list
+	 */
+	if (ndi_dev_is_persistent_node(dip)) {
+		dnp = &orphanlist;
+		remove_from_dn_list(dnp, dip);
+	}
+
+	/*
+	 * Add to per driver list
+	 */
+	dnp = &devnamesp[major];
+	add_to_dn_list(dnp, dip);
+}
+
+static void
+unlink_from_driver_list(dev_info_t *dip)
+{
+	major_t major = DEVI(dip)->devi_major;
+	struct devnames *dnp;
+
+	ASSERT(major != (major_t)-1);
+
+	/*
+	 * Remove from per-driver list
+	 */
+	dnp = &devnamesp[major];
+	remove_from_dn_list(dnp, dip);
+
+	/*
+	 * Add to orphan list
+	 */
+	if (ndi_dev_is_persistent_node(dip)) {
+		dnp = &orphanlist;
+		add_to_dn_list(dnp, dip);
+	}
+}
+
+/*
+ * scan the per-driver list looking for dev_info "dip"
+ */
+static dev_info_t *
+in_dn_list(struct devnames *dnp, dev_info_t *dip)
+{
+	struct dev_info *idevi;
+
+	if ((idevi = DEVI(dnp->dn_head)) == NULL)
+		return (NULL);
+
+	while (idevi) {
+		if (idevi == DEVI(dip))
+			return (dip);
+		idevi = idevi->devi_next;
+	}
+	return (NULL);
+}
+
+/*
+ * insert devinfo node 'dip' into the per-driver instance list
+ * headed by 'dnp'
+ *
+ * Nodes on the per-driver list are ordered: HW - SID - PSEUDO.  The order is
+ * required for merging of .conf file data to work properly.
+ */
+static void
+add_to_ordered_dn_list(struct devnames *dnp, dev_info_t *dip)
+{
+	dev_info_t **dipp;
+
+	ASSERT(mutex_owned(&(dnp->dn_lock)));
+
+	dipp = &dnp->dn_head;
+	if (ndi_dev_is_prom_node(dip)) {
+		/*
+		 * Find the first non-prom node or end of list
+		 */
+		while (*dipp && (ndi_dev_is_prom_node(*dipp) != 0)) {
+			dipp = (dev_info_t **)&DEVI(*dipp)->devi_next;
+		}
+	} else if (ndi_dev_is_persistent_node(dip)) {
+		/*
+		 * Find the first non-persistent node
+		 */
+		while (*dipp && (ndi_dev_is_persistent_node(*dipp) != 0)) {
+			dipp = (dev_info_t **)&DEVI(*dipp)->devi_next;
+		}
+	} else {
+		/*
+		 * Find the end of the list
+		 */
+		while (*dipp) {
+			dipp = (dev_info_t **)&DEVI(*dipp)->devi_next;
+		}
+	}
+
+	DEVI(dip)->devi_next = DEVI(*dipp);
+	*dipp = dip;
+}
+
+/*
+ * add a list of device nodes to the device node list in the
+ * devnames structure
+ */
+static void
+add_to_dn_list(struct devnames *dnp, dev_info_t *dip)
+{
+	/*
+	 * Look to see if node already exists
+	 */
+	LOCK_DEV_OPS(&(dnp->dn_lock));
+	if (in_dn_list(dnp, dip)) {
+		cmn_err(CE_NOTE, "add_to_dn_list: node %s already in list",
+		    DEVI(dip)->devi_node_name);
+	} else {
+		add_to_ordered_dn_list(dnp, dip);
+	}
+	UNLOCK_DEV_OPS(&(dnp->dn_lock));
+}
+
+static void
+remove_from_dn_list(struct devnames *dnp, dev_info_t *dip)
+{
+	dev_info_t **plist;
+
+	LOCK_DEV_OPS(&(dnp->dn_lock));
+
+	plist = (dev_info_t **)&dnp->dn_head;
+	while (*plist && (*plist != dip)) {
+		plist = (dev_info_t **)&DEVI(*plist)->devi_next;
+	}
+
+	if (*plist != NULL) {
+		ASSERT(*plist == dip);
+		*plist = (dev_info_t *)(DEVI(dip)->devi_next);
+		DEVI(dip)->devi_next = NULL;
+	} else {
+		NDI_CONFIG_DEBUG((CE_NOTE,
+		    "remove_from_dn_list: node %s not found in list",
+		    DEVI(dip)->devi_node_name));
+	}
+
+	UNLOCK_DEV_OPS(&(dnp->dn_lock));
+}
+
+/*
+ * Add and remove reference driver global property list
+ */
+static void
+add_global_props(dev_info_t *dip)
+{
+	struct devnames *dnp;
+	ddi_prop_list_t *plist;
+
+	ASSERT(DEVI(dip)->devi_global_prop_list == NULL);
+	ASSERT(DEVI(dip)->devi_major != (major_t)-1);
+
+	dnp = &devnamesp[DEVI(dip)->devi_major];
+	LOCK_DEV_OPS(&dnp->dn_lock);
+	plist = dnp->dn_global_prop_ptr;
+	if (plist == NULL) {
+		UNLOCK_DEV_OPS(&dnp->dn_lock);
+		return;
+	}
+	i_ddi_prop_list_hold(plist, dnp);
+	UNLOCK_DEV_OPS(&dnp->dn_lock);
+
+	mutex_enter(&DEVI(dip)->devi_lock);
+	DEVI(dip)->devi_global_prop_list = plist;
+	mutex_exit(&DEVI(dip)->devi_lock);
+}
+
+static void
+remove_global_props(dev_info_t *dip)
+{
+	ddi_prop_list_t *proplist;
+
+	mutex_enter(&DEVI(dip)->devi_lock);
+	proplist = DEVI(dip)->devi_global_prop_list;
+	DEVI(dip)->devi_global_prop_list = NULL;
+	mutex_exit(&DEVI(dip)->devi_lock);
+
+	if (proplist) {
+		major_t major;
+		struct devnames *dnp;
+
+		major = ddi_driver_major(dip);
+		ASSERT(major != (major_t)-1);
+		dnp = &devnamesp[major];
+		LOCK_DEV_OPS(&dnp->dn_lock);
+		i_ddi_prop_list_rele(proplist, dnp);
+		UNLOCK_DEV_OPS(&dnp->dn_lock);
+	}
+}
+
+#ifdef DEBUG
+/*
+ * Set this variable to '0' to disable the optimization,
+ * and to 2 to print debug message.
+ */
+static int optimize_dtree = 1;
+
+static void
+debug_dtree(dev_info_t *devi, struct dev_info *adevi, char *service)
+{
+	char *adeviname, *buf;
+
+	/*
+	 * Don't print unless optimize dtree is set to 2+
+	 */
+	if (optimize_dtree <= 1)
+		return;
+
+	buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	adeviname = ddi_deviname((dev_info_t *)adevi, buf);
+	if (*adeviname == '\0')
+		adeviname = "root";
+
+	cmn_err(CE_CONT, "%s %s -> %s\n",
+	    ddi_deviname(devi, buf), service, adeviname);
+
+	kmem_free(buf, MAXNAMELEN);
+}
+#else /* DEBUG */
+#define	debug_dtree(a1, a2, a3)	 /* nothing */
+#endif  /* DEBUG */
+
+static void
+ddi_optimize_dtree(dev_info_t *devi)
+{
+	struct dev_info *pdevi;
+	struct bus_ops *b;
+
+	pdevi = DEVI(devi)->devi_parent;
+	ASSERT(pdevi);
+
+	/*
+	 * Set the unoptimized values
+	 */
+	DEVI(devi)->devi_bus_map_fault = pdevi;
+	DEVI(devi)->devi_bus_dma_map = pdevi;
+	DEVI(devi)->devi_bus_dma_allochdl = pdevi;
+	DEVI(devi)->devi_bus_dma_freehdl = pdevi;
+	DEVI(devi)->devi_bus_dma_bindhdl = pdevi;
+	DEVI(devi)->devi_bus_dma_bindfunc =
+	pdevi->devi_ops->devo_bus_ops->bus_dma_bindhdl;
+	DEVI(devi)->devi_bus_dma_unbindhdl = pdevi;
+	DEVI(devi)->devi_bus_dma_unbindfunc =
+	    pdevi->devi_ops->devo_bus_ops->bus_dma_unbindhdl;
+	DEVI(devi)->devi_bus_dma_flush = pdevi;
+	DEVI(devi)->devi_bus_dma_win = pdevi;
+	DEVI(devi)->devi_bus_dma_ctl = pdevi;
+	DEVI(devi)->devi_bus_ctl = pdevi;
+
+#ifdef DEBUG
+	if (optimize_dtree == 0)
+		return;
+#endif /* DEBUG */
+
+	b = pdevi->devi_ops->devo_bus_ops;
+
+	if (i_ddi_map_fault == b->bus_map_fault) {
+		DEVI(devi)->devi_bus_map_fault = pdevi->devi_bus_map_fault;
+		debug_dtree(devi, DEVI(devi)->devi_bus_map_fault,
+		    "bus_map_fault");
+	}
+
+	if (ddi_dma_map == b->bus_dma_map) {
+		DEVI(devi)->devi_bus_dma_map = pdevi->devi_bus_dma_map;
+		debug_dtree(devi, DEVI(devi)->devi_bus_dma_map, "bus_dma_map");
+	}
+
+	if (ddi_dma_allochdl == b->bus_dma_allochdl) {
+		DEVI(devi)->devi_bus_dma_allochdl =
+		    pdevi->devi_bus_dma_allochdl;
+		debug_dtree(devi, DEVI(devi)->devi_bus_dma_allochdl,
+		    "bus_dma_allochdl");
+	}
+
+	if (ddi_dma_freehdl == b->bus_dma_freehdl) {
+		DEVI(devi)->devi_bus_dma_freehdl = pdevi->devi_bus_dma_freehdl;
+		debug_dtree(devi, DEVI(devi)->devi_bus_dma_freehdl,
+		    "bus_dma_freehdl");
+	}
+
+	if (ddi_dma_bindhdl == b->bus_dma_bindhdl) {
+		DEVI(devi)->devi_bus_dma_bindhdl = pdevi->devi_bus_dma_bindhdl;
+		DEVI(devi)->devi_bus_dma_bindfunc =
+		    pdevi->devi_bus_dma_bindhdl->devi_ops->
+		    devo_bus_ops->bus_dma_bindhdl;
+		debug_dtree(devi, DEVI(devi)->devi_bus_dma_bindhdl,
+		    "bus_dma_bindhdl");
+	}
+
+	if (ddi_dma_unbindhdl == b->bus_dma_unbindhdl) {
+		DEVI(devi)->devi_bus_dma_unbindhdl =
+		    pdevi->devi_bus_dma_unbindhdl;
+		DEVI(devi)->devi_bus_dma_unbindfunc =
+		    pdevi->devi_bus_dma_unbindhdl->devi_ops->
+		    devo_bus_ops->bus_dma_unbindhdl;
+		debug_dtree(devi, DEVI(devi)->devi_bus_dma_unbindhdl,
+		    "bus_dma_unbindhdl");
+	}
+
+	if (ddi_dma_flush == b->bus_dma_flush) {
+		DEVI(devi)->devi_bus_dma_flush = pdevi->devi_bus_dma_flush;
+		debug_dtree(devi, DEVI(devi)->devi_bus_dma_flush,
+		    "bus_dma_flush");
+	}
+
+	if (ddi_dma_win == b->bus_dma_win) {
+		DEVI(devi)->devi_bus_dma_win = pdevi->devi_bus_dma_win;
+		debug_dtree(devi, DEVI(devi)->devi_bus_dma_win,
+		    "bus_dma_win");
+	}
+
+	if (ddi_dma_mctl == b->bus_dma_ctl) {
+		DEVI(devi)->devi_bus_dma_ctl = pdevi->devi_bus_dma_ctl;
+		debug_dtree(devi, DEVI(devi)->devi_bus_dma_ctl, "bus_dma_ctl");
+	}
+
+	if (ddi_ctlops == b->bus_ctl) {
+		DEVI(devi)->devi_bus_ctl = pdevi->devi_bus_ctl;
+		debug_dtree(devi, DEVI(devi)->devi_bus_ctl, "bus_ctl");
+	}
+}
+
+#define	MIN_DEVINFO_LOG_SIZE	max_ncpus
+#define	MAX_DEVINFO_LOG_SIZE	max_ncpus * 10
+
+static void
+da_log_init()
+{
+	devinfo_log_header_t *dh;
+	int logsize = devinfo_log_size;
+
+	if (logsize == 0)
+		logsize = MIN_DEVINFO_LOG_SIZE;
+	else if (logsize > MAX_DEVINFO_LOG_SIZE)
+		logsize = MAX_DEVINFO_LOG_SIZE;
+
+	dh = kmem_alloc(logsize * PAGESIZE, KM_SLEEP);
+	mutex_init(&dh->dh_lock, NULL, MUTEX_DEFAULT, NULL);
+	dh->dh_max = ((logsize * PAGESIZE) - sizeof (*dh)) /
+	    sizeof (devinfo_audit_t) + 1;
+	dh->dh_curr = -1;
+	dh->dh_hits = 0;
+
+	devinfo_audit_log = dh;
+}
+
+/*
+ * Log the stack trace in per-devinfo audit structure and also enter
+ * it into a system wide log for recording the time history.
+ */
+static void
+da_log_enter(dev_info_t *dip)
+{
+	devinfo_audit_t *da_log, *da = DEVI(dip)->devi_audit;
+	devinfo_log_header_t *dh = devinfo_audit_log;
+
+	if (devinfo_audit_log == NULL)
+		return;
+
+	ASSERT(da != NULL);
+
+	da->da_devinfo = dip;
+	da->da_timestamp = gethrtime();
+	da->da_thread = curthread;
+	da->da_node_state = DEVI(dip)->devi_node_state;
+	da->da_device_state = DEVI(dip)->devi_state;
+	da->da_depth = getpcstack(da->da_stack, DDI_STACK_DEPTH);
+
+	/*
+	 * Copy into common log and note the location for tracing history
+	 */
+	mutex_enter(&dh->dh_lock);
+	dh->dh_hits++;
+	dh->dh_curr++;
+	if (dh->dh_curr >= dh->dh_max)
+		dh->dh_curr -= dh->dh_max;
+	da_log = &dh->dh_entry[dh->dh_curr];
+	mutex_exit(&dh->dh_lock);
+
+	bcopy(da, da_log, sizeof (devinfo_audit_t));
+	da->da_lastlog = da_log;
+}
+
+static void
+attach_drivers()
+{
+	int i;
+	for (i = 0; i < devcnt; i++) {
+		struct devnames *dnp = &devnamesp[i];
+		if ((dnp->dn_flags & DN_FORCE_ATTACH) &&
+		    (ddi_hold_installed_driver((major_t)i) != NULL))
+			ddi_rele_driver((major_t)i);
+	}
+}
+
+/*
+ * Launch a thread to force attach drivers. This avoids penalty on boot time.
+ */
+void
+i_ddi_forceattach_drivers()
+{
+	/*
+	 * On i386, the USB drivers need to load and take over from the
+	 * SMM BIOS drivers ASAP after consconfig(), so make sure they
+	 * get loaded right here rather than letting the thread do it.
+	 *
+	 * The order here is important.  EHCI must be loaded first, as
+	 * we have observed many systems on which hangs occur if the
+	 * {U,O}HCI companion controllers take over control from the BIOS
+	 * before EHCI does.  These hangs are also caused by BIOSes leaving
+	 * interrupt-on-port-change enabled in the ehci controller, so that
+	 * when uhci/ohci reset themselves, it induces a port change on
+	 * the ehci companion controller.  Since there's no interrupt handler
+	 * installed at the time, the moment that interrupt is unmasked, an
+	 * interrupt storm will occur.  All this is averted when ehci is
+	 * loaded first.  And now you know..... the REST of the story.
+	 *
+	 * Regardless of platform, ehci needs to initialize first to avoid
+	 * unnecessary connects and disconnects on the companion controller
+	 * when ehci sets up the routing.
+	 */
+	(void) ddi_hold_installed_driver(ddi_name_to_major("ehci"));
+	(void) ddi_hold_installed_driver(ddi_name_to_major("uhci"));
+	(void) ddi_hold_installed_driver(ddi_name_to_major("ohci"));
+
+	(void) thread_create(NULL, 0, (void (*)())attach_drivers, NULL, 0, &p0,
+	    TS_RUN, minclsyspri);
+}
+
+/*
+ * This is a private DDI interface for optimizing boot performance.
+ * I/O subsystem initialization is considered complete when devfsadm
+ * is executed.
+ *
+ * NOTE: The start of syseventd in S60devfsadm happen to be convenient
+ *	indicator for the completion of I/O initialization during boot.
+ *	The implementation should be replaced by something more robust.
+ */
+int
+i_ddi_io_initialized()
+{
+	extern int sysevent_daemon_init;
+	return (sysevent_daemon_init);
+}
+
+
+/*
+ * device tree walking
+ */
+
+struct walk_elem {
+	struct walk_elem *next;
+	dev_info_t *dip;
+};
+
+static void
+free_list(struct walk_elem *list)
+{
+	while (list) {
+		struct walk_elem *next = list->next;
+		kmem_free(list, sizeof (*list));
+		list = next;
+	}
+}
+
+static void
+append_node(struct walk_elem **list, dev_info_t *dip)
+{
+	struct walk_elem *tail;
+	struct walk_elem *elem = kmem_alloc(sizeof (*elem), KM_SLEEP);
+
+	elem->next = NULL;
+	elem->dip = dip;
+
+	if (*list == NULL) {
+		*list = elem;
+		return;
+	}
+
+	tail = *list;
+	while (tail->next)
+		tail = tail->next;
+
+	tail->next = elem;
+}
+
+/*
+ * The implementation of ddi_walk_devs().
+ */
+static int
+walk_devs(dev_info_t *dip, int (*f)(dev_info_t *, void *), void *arg,
+    int do_locking)
+{
+	struct walk_elem *head = NULL;
+
+	/*
+	 * Do it in two passes. First pass invoke callback on each
+	 * dip on the sibling list. Second pass invoke callback on
+	 * children of each dip.
+	 */
+	while (dip) {
+		switch ((*f)(dip, arg)) {
+		case DDI_WALK_TERMINATE:
+			free_list(head);
+			return (DDI_WALK_TERMINATE);
+
+		case DDI_WALK_PRUNESIB:
+			/* ignore sibling by setting dip to NULL */
+			append_node(&head, dip);
+			dip = NULL;
+			break;
+
+		case DDI_WALK_PRUNECHILD:
+			/* don't worry about children */
+			dip = ddi_get_next_sibling(dip);
+			break;
+
+		case DDI_WALK_CONTINUE:
+		default:
+			append_node(&head, dip);
+			dip = ddi_get_next_sibling(dip);
+			break;
+		}
+
+	}
+
+	/* second pass */
+	while (head) {
+		int circ;
+		struct walk_elem *next = head->next;
+
+		if (do_locking)
+			ndi_devi_enter(head->dip, &circ);
+		if (walk_devs(ddi_get_child(head->dip), f, arg, do_locking) ==
+		    DDI_WALK_TERMINATE) {
+			if (do_locking)
+				ndi_devi_exit(head->dip, circ);
+			free_list(head);
+			return (DDI_WALK_TERMINATE);
+		}
+		if (do_locking)
+			ndi_devi_exit(head->dip, circ);
+		kmem_free(head, sizeof (*head));
+		head = next;
+	}
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * This general-purpose routine traverses the tree of dev_info nodes,
+ * starting from the given node, and calls the given function for each
+ * node that it finds with the current node and the pointer arg (which
+ * can point to a structure of information that the function
+ * needs) as arguments.
+ *
+ * It does the walk a layer at a time, not depth-first. The given function
+ * must return one of the following values:
+ *	DDI_WALK_CONTINUE
+ *	DDI_WALK_PRUNESIB
+ *	DDI_WALK_PRUNECHILD
+ *	DDI_WALK_TERMINATE
+ *
+ * N.B. Since we walk the sibling list, the caller must ensure that
+ *	the parent of dip is held against changes, unless the parent
+ *	is rootnode.  ndi_devi_enter() on the parent is sufficient.
+ *
+ *	To avoid deadlock situations, caller must not attempt to
+ *	configure/unconfigure/remove device node in (*f)(), nor should
+ *	it attempt to recurse on other nodes in the system.
+ *
+ *	This is not callable from device autoconfiguration routines.
+ *	They include, but not limited to, _init(9e), _fini(9e), probe(9e),
+ *	attach(9e), and detach(9e).
+ */
+
+void
+ddi_walk_devs(dev_info_t *dip, int (*f)(dev_info_t *, void *), void *arg)
+{
+
+	ASSERT(dip == NULL || ddi_get_parent(dip) == NULL ||
+		DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+
+	(void) walk_devs(dip, f, arg, 1);
+}
+
+/*
+ * This is a general-purpose routine traverses the per-driver list
+ * and calls the given function for each node. must return one of
+ * the following values:
+ *	DDI_WALK_CONTINUE
+ *	DDI_WALK_TERMINATE
+ *
+ * N.B. The same restrictions from ddi_walk_devs() apply.
+ */
+
+void
+e_ddi_walk_driver(char *drv, int (*f)(dev_info_t *, void *), void *arg)
+{
+	major_t major;
+	struct devnames *dnp;
+	dev_info_t *dip;
+
+	major = ddi_name_to_major(drv);
+	if (major == (major_t)-1)
+		return;
+
+	dnp = &devnamesp[major];
+	LOCK_DEV_OPS(&dnp->dn_lock);
+	dip = dnp->dn_head;
+	while (dip) {
+		ndi_hold_devi(dip);
+		UNLOCK_DEV_OPS(&dnp->dn_lock);
+		if ((*f)(dip, arg) == DDI_WALK_TERMINATE) {
+			ndi_rele_devi(dip);
+			return;
+		}
+		LOCK_DEV_OPS(&dnp->dn_lock);
+		ndi_rele_devi(dip);
+		dip = ddi_get_next(dip);
+	}
+	UNLOCK_DEV_OPS(&dnp->dn_lock);
+}
+
+/*
+ * argument to i_find_devi, a devinfo node search callback function.
+ */
+struct match_info {
+	dev_info_t	*dip;		/* result */
+	char		*nodename;	/* if non-null, nodename must match */
+	int		instance;	/* if != -1, instance must match */
+	int		attached;	/* if != 0, state >= DS_ATTACHED */
+};
+
+static int
+i_find_devi(dev_info_t *dip, void *arg)
+{
+	struct match_info *info = (struct match_info *)arg;
+
+	if (((info->nodename == NULL) ||
+		(strcmp(ddi_node_name(dip), info->nodename) == 0)) &&
+	    ((info->instance == -1) ||
+		(ddi_get_instance(dip) == info->instance)) &&
+	    ((info->attached == 0) ||
+		(i_ddi_node_state(dip) >= DS_ATTACHED))) {
+		info->dip = dip;
+		ndi_hold_devi(dip);
+		return (DDI_WALK_TERMINATE);
+	}
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * Find dip with a known node name and instance and return with it held
+ */
+dev_info_t *
+ddi_find_devinfo(char *nodename, int instance, int attached)
+{
+	struct match_info	info;
+
+	info.nodename = nodename;
+	info.instance = instance;
+	info.attached = attached;
+	info.dip = NULL;
+
+	ddi_walk_devs(ddi_root_node(), i_find_devi, &info);
+	return (info.dip);
+}
+
+/*
+ * Parse for name, addr, and minor names. Some args may be NULL.
+ */
+void
+i_ddi_parse_name(char *name, char **nodename, char **addrname, char **minorname)
+{
+	char *cp;
+	static char nulladdrname[] = "";
+
+	/* default values */
+	if (nodename)
+		*nodename = name;
+	if (addrname)
+		*addrname = nulladdrname;
+	if (minorname)
+		*minorname = NULL;
+
+	cp = name;
+	while (*cp != '\0') {
+		if (addrname && *cp == '@') {
+			*addrname = cp + 1;
+			*cp = '\0';
+		} else if (minorname && *cp == ':') {
+			*minorname = cp + 1;
+			*cp = '\0';
+		}
+		++cp;
+	}
+}
+
+static char *
+child_path_to_driver(dev_info_t *parent, char *child_name, char *unit_address)
+{
+	char *p, *drvname = NULL;
+	major_t maj;
+
+	/*
+	 * Construct the pathname and ask the implementation
+	 * if it can do a driver = f(pathname) for us, if not
+	 * we'll just default to using the node-name that
+	 * was given to us.  We want to do this first to
+	 * allow the platform to use 'generic' names for
+	 * legacy device drivers.
+	 */
+	p = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(parent, p);
+	(void) strcat(p, "/");
+	(void) strcat(p, child_name);
+	if (unit_address && *unit_address) {
+		(void) strcat(p, "@");
+		(void) strcat(p, unit_address);
+	}
+
+	/*
+	 * Get the binding. If there is none, return the child_name
+	 * and let the caller deal with it.
+	 */
+	maj = path_to_major(p);
+
+	kmem_free(p, MAXPATHLEN);
+
+	if (maj != (major_t)-1)
+		drvname = ddi_major_to_name(maj);
+	if (drvname == NULL)
+		drvname = child_name;
+
+	return (drvname);
+}
+
+
+/*
+ * Given the pathname of a device, fill in the dev_info_t value and/or the
+ * dev_t value and/or the spectype, depending on which parameters are non-NULL.
+ * If there is an error, this function returns -1.
+ *
+ * NOTE: If this function returns the dev_info_t structure, then it
+ * does so with a hold on the devi. Caller should ensure that they get
+ * decremented via ddi_release_devi() or ndi_rele_devi();
+ *
+ * This function can be invoked in the boot case for a pathname without
+ * device argument (:xxxx), traditionally treated as a minor name.
+ * In this case, we do the following
+ * (1) search the minor node of type DDM_DEFAULT.
+ * (2) if no DDM_DEFAULT minor exists, then the first non-alias minor is chosen.
+ * (3) if neither exists, a dev_t is faked with minor number = instance.
+ * As of S9 FCS, no instance of #1 exists. #2 is used by several platforms
+ * to default the boot partition to :a possibly by other OBP definitions.
+ * #3 is used for booting off network interfaces, most SPARC network
+ * drivers support Style-2 only, so only DDM_ALIAS minor exists.
+ *
+ * It is possible for OBP to present device args at the end of the path as
+ * well as in the middle. For example, with IB the following strings are
+ * valid boot paths.
+ *	a /pci@8,700000/ib@1,2:port=1,pkey=ff,dhcp,...
+ *	b /pci@8,700000/ib@1,1:port=1/ioc@xxxxxx,yyyyyyy:dhcp
+ * Case (a), we first look for minor node "port=1,pkey...".
+ * Failing that, we will pass "port=1,pkey..." to the bus_config
+ * entry point of ib (HCA) driver.
+ * Case (b), configure ib@1,1 as usual. Then invoke ib's bus_config
+ * with argument "ioc@xxxxxxx,yyyyyyy:port=1". After configuring
+ * the ioc, look for minor node dhcp. If not found, pass ":dhcp"
+ * to ioc's bus_config entry point.
+ */
+int
+resolve_pathname(char *pathname,
+	dev_info_t **dipp, dev_t *devtp, int *spectypep)
+{
+	int error;
+	dev_info_t *parent, *child;
+	struct pathname pn;
+	char *component, *config_name;
+	char *minorname = NULL;
+	char *prev_minor = NULL;
+	dev_t devt = NODEV;
+	int spectype;
+	struct ddi_minor_data *dmn;
+
+	if (*pathname != '/')
+		return (EINVAL);
+	parent = ddi_root_node();	/* Begin at the top of the tree */
+
+	if (error = pn_get(pathname, UIO_SYSSPACE, &pn))
+		return (error);
+	pn_skipslash(&pn);
+
+	ASSERT(i_ddi_node_state(parent) >= DS_ATTACHED);
+	ndi_hold_devi(parent);
+
+	component = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	config_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+
+	while (pn_pathleft(&pn)) {
+		/* remember prev minor (:xxx) in the middle of path */
+		if (minorname)
+			prev_minor = i_ddi_strdup(minorname, KM_SLEEP);
+
+		/* Get component and chop off minorname */
+		(void) pn_getcomponent(&pn, component);
+		i_ddi_parse_name(component, NULL, NULL, &minorname);
+
+		if (prev_minor == NULL) {
+			(void) snprintf(config_name, MAXNAMELEN, "%s",
+			    component);
+		} else {
+			(void) snprintf(config_name, MAXNAMELEN, "%s:%s",
+			    component, prev_minor);
+			kmem_free(prev_minor, strlen(prev_minor) + 1);
+			prev_minor = NULL;
+		}
+
+		/*
+		 * Find and configure the child
+		 */
+		if (ndi_devi_config_one(parent, config_name, &child,
+		    NDI_PROMNAME | NDI_NO_EVENT) != NDI_SUCCESS) {
+			ndi_rele_devi(parent);
+			pn_free(&pn);
+			kmem_free(component, MAXNAMELEN);
+			kmem_free(config_name, MAXNAMELEN);
+			return (-1);
+		}
+
+		ASSERT(i_ddi_node_state(child) >= DS_ATTACHED);
+		ndi_rele_devi(parent);
+		parent = child;
+		pn_skipslash(&pn);
+	}
+
+	/*
+	 * First look for a minor node matching minorname.
+	 * Failing that, try to pass minorname to bus_config().
+	 */
+	if (minorname && i_ddi_minorname_to_devtspectype(parent,
+	    minorname, &devt, &spectype) == DDI_FAILURE) {
+		(void) snprintf(config_name, MAXNAMELEN, "%s", minorname);
+		if (ndi_devi_config_obp_args(parent,
+		    config_name, &child, 0) != NDI_SUCCESS) {
+			ndi_rele_devi(parent);
+			pn_free(&pn);
+			kmem_free(component, MAXNAMELEN);
+			kmem_free(config_name, MAXNAMELEN);
+			NDI_CONFIG_DEBUG((CE_NOTE,
+			    "%s: minor node not found\n", pathname));
+			return (-1);
+		}
+		minorname = NULL;	/* look for default minor */
+		ASSERT(i_ddi_node_state(child) >= DS_ATTACHED);
+		ndi_rele_devi(parent);
+		parent = child;
+	}
+
+	if (devtp || spectypep) {
+		if (minorname == NULL) {
+			/* search for a default entry */
+			mutex_enter(&(DEVI(parent)->devi_lock));
+			for (dmn = DEVI(parent)->devi_minor; dmn;
+			    dmn = dmn->next) {
+				if (dmn->type == DDM_DEFAULT) {
+					devt = dmn->ddm_dev;
+					spectype = dmn->ddm_spec_type;
+					break;
+				}
+			}
+
+			if (devt == NODEV) {
+				/*
+				 * No default minor node, try the first one;
+				 * else, assume 1-1 instance-minor mapping
+				 */
+				dmn = DEVI(parent)->devi_minor;
+				if (dmn && ((dmn->type == DDM_MINOR) ||
+				    (dmn->type == DDM_INTERNAL_PATH))) {
+					devt = dmn->ddm_dev;
+					spectype = dmn->ddm_spec_type;
+				} else {
+					devt = makedevice(
+					    DEVI(parent)->devi_major,
+					    ddi_get_instance(parent));
+					spectype = S_IFCHR;
+				}
+			}
+			mutex_exit(&(DEVI(parent)->devi_lock));
+		}
+		if (devtp)
+			*devtp = devt;
+		if (spectypep)
+			*spectypep = spectype;
+	}
+
+	pn_free(&pn);
+	kmem_free(component, MAXNAMELEN);
+	kmem_free(config_name, MAXNAMELEN);
+
+	/*
+	 * If there is no error, return the appropriate parameters
+	 */
+	if (dipp != NULL)
+		*dipp = parent;
+	else {
+		/*
+		 * We should really keep the ref count to keep the node from
+		 * detaching but ddi_pathname_to_dev_t() specifies a NULL dipp,
+		 * so we have no way of passing back the held dip.  Not holding
+		 * the dip allows detaches to occur - which can cause problems
+		 * for subsystems which call ddi_pathname_to_dev_t (console).
+		 *
+		 * Instead of holding the dip, we place a ddi-no-autodetach
+		 * property on the node to prevent auto detaching.
+		 *
+		 * The right fix is to remove ddi_pathname_to_dev_t and replace
+		 * it, and all references, with a call that specifies a dipp.
+		 * In addition, the callers of this new interfaces would then
+		 * need to call ndi_rele_devi when the reference is complete.
+		 */
+		(void) ddi_prop_update_int(DDI_DEV_T_NONE, parent,
+		    DDI_NO_AUTODETACH, 1);
+		ndi_rele_devi(parent);
+	}
+
+	return (0);
+}
+
+/*
+ * Given the pathname of a device, return the dev_t of the corresponding
+ * device.  Returns NODEV on failure.
+ *
+ * Note that this call sets the DDI_NO_AUTODETACH property on the devinfo node.
+ */
+dev_t
+ddi_pathname_to_dev_t(char *pathname)
+{
+	dev_t devt;
+	int error;
+
+	error = resolve_pathname(pathname, NULL, &devt, NULL);
+
+	return (error ? NODEV : devt);
+}
+
+/*
+ * Translate a prom pathname to kernel devfs pathname.
+ * Caller is assumed to allocate devfspath memory of
+ * size at least MAXPATHLEN
+ *
+ * The prom pathname may not include minor name, but
+ * devfs pathname has a minor name portion.
+ */
+int
+i_ddi_prompath_to_devfspath(char *prompath, char *devfspath)
+{
+	dev_t		devt = (dev_t)NODEV;
+	dev_info_t	*dip = NULL;
+	char		*minor_name = NULL;
+	int		spectype;
+	int		error;
+
+	error = resolve_pathname(prompath, &dip, &devt, &spectype);
+	if (error)
+		return (DDI_FAILURE);
+	ASSERT(dip && devt != NODEV);
+
+	/*
+	 * Get in-kernel devfs pathname
+	 */
+	(void) ddi_pathname(dip, devfspath);
+
+	mutex_enter(&(DEVI(dip)->devi_lock));
+	minor_name = i_ddi_devtspectype_to_minorname(dip, devt, spectype);
+	if (minor_name) {
+		(void) strcat(devfspath, ":");
+		(void) strcat(devfspath, minor_name);
+	} else {
+		/*
+		 * If minor_name is NULL, we have an alias minor node.
+		 * So manufacture a path to the corresponding clone minor.
+		 */
+		(void) snprintf(devfspath, MAXPATHLEN, "%s:%s",
+		    CLONE_PATH, ddi_driver_name(dip));
+	}
+	mutex_exit(&(DEVI(dip)->devi_lock));
+
+	/* release hold from resolve_pathname() */
+	ndi_rele_devi(dip);
+	return (0);
+}
+
+/*
+ * Reset all the pure leaf drivers on the system at halt time
+ */
+static int
+reset_leaf_device(dev_info_t *dip, void *arg)
+{
+	_NOTE(ARGUNUSED(arg))
+	struct dev_ops *ops;
+
+	/* if the device doesn't need to be reset then there's nothing to do */
+	if (!DEVI_NEED_RESET(dip))
+		return (DDI_WALK_CONTINUE);
+
+	/*
+	 * if the device isn't a char/block device or doesn't have a
+	 * reset entry point then there's nothing to do.
+	 */
+	ops = ddi_get_driver(dip);
+	if ((ops == NULL) || (ops->devo_cb_ops == NULL) ||
+	    (ops->devo_reset == nodev) || (ops->devo_reset == nulldev) ||
+	    (ops->devo_reset == NULL))
+		return (DDI_WALK_CONTINUE);
+
+	if (DEVI_IS_ATTACHING(dip) || DEVI_IS_DETACHING(dip)) {
+		static char path[MAXPATHLEN];
+
+		/*
+		 * bad news, this device has blocked in it's attach or
+		 * detach routine, which means it not safe to call it's
+		 * devo_reset() entry point.
+		 */
+		cmn_err(CE_WARN, "unable to reset device: %s",
+		    ddi_pathname(dip, path));
+		return (DDI_WALK_CONTINUE);
+	}
+
+	NDI_CONFIG_DEBUG((CE_NOTE, "resetting %s%d\n",
+		ddi_driver_name(dip), ddi_get_instance(dip)));
+
+	(void) devi_reset(dip, DDI_RESET_FORCE);
+	return (DDI_WALK_CONTINUE);
+}
+
+void
+reset_leaves(void)
+{
+	/*
+	 * if we're reached here, the device tree better not be changing.
+	 * so either devinfo_freeze better be set or we better be panicing.
+	 */
+	ASSERT(devinfo_freeze || panicstr);
+
+	(void) walk_devs(top_devinfo, reset_leaf_device, NULL, 0);
+}
+
+/*
+ * devtree_freeze() must be called before reset_leaves() during a
+ * normal system shutdown.  It attempts to ensure that there are no
+ * outstanding attach or detach operations in progress when reset_leaves()
+ * is invoked.  It must be called before the system becomes single-threaded
+ * because device attach and detach are multi-threaded operations.  (note
+ * that during system shutdown the system doesn't actually become
+ * single-thread since other threads still exist, but the shutdown thread
+ * will disable preemption for itself, raise it's pil, and stop all the
+ * other cpus in the system there by effectively making the system
+ * single-threaded.)
+ */
+void
+devtree_freeze(void)
+{
+	int delayed = 0;
+
+	/* if we're panicing then the device tree isn't going to be changing */
+	if (panicstr)
+		return;
+
+	/* stop all dev_info state changes in the device tree */
+	devinfo_freeze = gethrtime();
+
+	/*
+	 * if we're not panicing and there are on-going attach or detach
+	 * operations, wait for up to 3 seconds for them to finish.  This
+	 * is a randomly chosen interval but this should be ok because:
+	 * - 3 seconds is very small relative to the deadman timer.
+	 * - normal attach and detach operations should be very quick.
+	 * - attach and detach operations are fairly rare.
+	 */
+	while (!panicstr && atomic_add_long_nv(&devinfo_attach_detach, 0) &&
+	    (delayed < 3)) {
+		delayed += 1;
+
+		/* do a sleeping wait for one second */
+		ASSERT(!servicing_interrupt());
+		delay(drv_usectohz(MICROSEC));
+	}
+}
+
+static int
+bind_dip(dev_info_t *dip, void *arg)
+{
+	_NOTE(ARGUNUSED(arg))
+	if (i_ddi_node_state(dip) < DS_BOUND)
+		(void) ndi_devi_bind_driver(dip, 0);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+void
+i_ddi_bind_devs(void)
+{
+	ddi_walk_devs(top_devinfo, bind_dip, (void *)NULL);
+}
+
+static int
+unbind_children(dev_info_t *dip, void *arg)
+{
+	int circ;
+	dev_info_t *cdip;
+	major_t major = (major_t)(uintptr_t)arg;
+
+	ndi_devi_enter(dip, &circ);
+	cdip = ddi_get_child(dip);
+	/*
+	 * We are called either from rem_drv or update_drv.
+	 * In both cases, we unbind persistent nodes and destroy
+	 * .conf nodes. In the case of rem_drv, this will be the
+	 * final state. In the case of update_drv, i_ddi_bind_devs()
+	 * will be invoked later to reenumerate (new) driver.conf
+	 * rebind persistent nodes.
+	 */
+	while (cdip) {
+		dev_info_t *next = ddi_get_next_sibling(cdip);
+		if ((i_ddi_node_state(cdip) > DS_INITIALIZED) ||
+		    (ddi_driver_major(cdip) != major)) {
+			cdip = next;
+			continue;
+		}
+		(void) ndi_devi_unbind_driver(cdip);
+		if (ndi_dev_is_persistent_node(cdip) == 0)
+			(void) ddi_remove_child(cdip, 0);
+		cdip = next;
+	}
+	ndi_devi_exit(dip, circ);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+void
+i_ddi_unbind_devs(major_t major)
+{
+	ddi_walk_devs(top_devinfo, unbind_children, (void *)(uintptr_t)major);
+}
+
+/*
+ * I/O Hotplug control
+ */
+
+/*
+ * create and attach a dev_info node from a .conf file spec
+ */
+static void
+init_spec_child(dev_info_t *pdip, struct hwc_spec *specp, uint_t flags)
+{
+	_NOTE(ARGUNUSED(flags))
+	dev_info_t *dip;
+	char *node_name;
+
+	if (((node_name = specp->hwc_devi_name) == NULL) ||
+	    (ddi_name_to_major(node_name) == (major_t)-1)) {
+		char *tmp = node_name;
+		if (tmp == NULL)
+			tmp = "<none>";
+		cmn_err(CE_CONT,
+		    "init_spec_child: parent=%s, bad spec (%s)\n",
+		    ddi_node_name(pdip), tmp);
+		return;
+	}
+
+	dip = i_ddi_alloc_node(pdip, node_name, (dnode_t)DEVI_PSEUDO_NODEID,
+	    -1, specp->hwc_devi_sys_prop_ptr, KM_SLEEP);
+
+	if (dip == NULL)
+		return;
+
+	if (ddi_initchild(pdip, dip) != DDI_SUCCESS)
+		(void) ddi_remove_child(dip, 0);
+}
+
+/*
+ * Lookup hwc specs from hash tables and make children from the spec
+ * Because some .conf children are "merge" nodes, we also initialize
+ * .conf children to merge properties onto hardware nodes.
+ *
+ * The pdip must be held busy.
+ */
+int
+i_ndi_make_spec_children(dev_info_t *pdip, uint_t flags)
+{
+	extern struct hwc_spec *hwc_get_child_spec(dev_info_t *, major_t);
+
+	struct hwc_spec *list, *spec;
+
+	if (DEVI(pdip)->devi_flags & DEVI_MADE_CHILDREN)
+		return (DDI_SUCCESS);
+
+	list = hwc_get_child_spec(pdip, (major_t)-1);
+	for (spec = list; spec != NULL; spec = spec->hwc_next) {
+		init_spec_child(pdip, spec, flags);
+	}
+	hwc_free_spec_list(list);
+
+	mutex_enter(&DEVI(pdip)->devi_lock);
+	DEVI(pdip)->devi_flags |= DEVI_MADE_CHILDREN;
+	mutex_exit(&DEVI(pdip)->devi_lock);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Run initchild on all child nodes such that instance assignment
+ * for multiport network cards are contiguous.
+ *
+ * The pdip must be held busy.
+ */
+static void
+i_ndi_init_hw_children(dev_info_t *pdip, uint_t flags)
+{
+	dev_info_t *dip;
+
+	ASSERT(DEVI(pdip)->devi_flags & DEVI_MADE_CHILDREN);
+
+	/* contiguous instance assignment */
+	e_ddi_enter_instance();
+	dip = ddi_get_child(pdip);
+	while (dip) {
+		if (ndi_dev_is_persistent_node(dip))
+			(void) i_ndi_config_node(dip, DS_INITIALIZED, flags);
+		dip = ddi_get_next_sibling(dip);
+	}
+	e_ddi_exit_instance();
+}
+
+/*
+ * report device status
+ */
+static void
+i_ndi_devi_report_status_change(dev_info_t *dip, char *path)
+{
+	char *status;
+
+	if (!DEVI_NEED_REPORT(dip) ||
+	    (i_ddi_node_state(dip) < DS_INITIALIZED)) {
+		return;
+	}
+
+	if (DEVI_IS_DEVICE_OFFLINE(dip)) {
+		status = "offline";
+	} else if (DEVI_IS_DEVICE_DOWN(dip)) {
+		status = "down";
+	} else if (DEVI_IS_BUS_QUIESCED(dip)) {
+		status = "quiesced";
+	} else if (DEVI_IS_BUS_DOWN(dip)) {
+		status = "down";
+	} else if (i_ddi_node_state(dip) == DS_READY) {
+		status = "online";
+	} else {
+		status = "unknown";
+	}
+
+	if (path == NULL) {
+		path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		cmn_err(CE_CONT, "?%s (%s%d) %s\n",
+			ddi_pathname(dip, path), ddi_driver_name(dip),
+			ddi_get_instance(dip), status);
+		kmem_free(path, MAXPATHLEN);
+	} else {
+		cmn_err(CE_CONT, "?%s (%s%d) %s\n",
+			path, ddi_driver_name(dip),
+			ddi_get_instance(dip), status);
+	}
+
+	DEVI_REPORT_DONE(dip);
+}
+
+/*
+ * log a notification that a dev_info node has been configured.
+ */
+static int
+i_log_devfs_add_devinfo(dev_info_t *dip, uint_t flags)
+{
+	int se_err;
+	char *pathname;
+	sysevent_t *ev;
+	sysevent_id_t eid;
+	sysevent_value_t se_val;
+	sysevent_attr_list_t *ev_attr_list = NULL;
+	char *class_name;
+	int no_transport = 0;
+
+	ASSERT(dip);
+
+	/*
+	 * Invalidate the devinfo snapshot cache
+	 */
+	i_ddi_di_cache_invalidate(KM_SLEEP);
+
+	/* do not generate ESC_DEVFS_DEVI_ADD event during boot */
+	if (!i_ddi_io_initialized())
+		return (DDI_SUCCESS);
+
+	ev = sysevent_alloc(EC_DEVFS, ESC_DEVFS_DEVI_ADD, EP_DDI, SE_SLEEP);
+
+	pathname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+	(void) ddi_pathname(dip, pathname);
+	ASSERT(strlen(pathname));
+
+	se_val.value_type = SE_DATA_TYPE_STRING;
+	se_val.value.sv_string = pathname;
+	if (sysevent_add_attr(&ev_attr_list, DEVFS_PATHNAME,
+	    &se_val, SE_SLEEP) != 0) {
+		goto fail;
+	}
+
+	/* add the device class attribute */
+	if ((class_name = i_ddi_devi_class(dip)) != NULL) {
+		se_val.value_type = SE_DATA_TYPE_STRING;
+		se_val.value.sv_string = class_name;
+
+		if (sysevent_add_attr(&ev_attr_list,
+		    DEVFS_DEVI_CLASS, &se_val, SE_SLEEP) != 0) {
+			sysevent_free_attr(ev_attr_list);
+			goto fail;
+		}
+	}
+
+	/*
+	 * must log a branch event too unless NDI_BRANCH_EVENT_OP is set,
+	 * in which case the branch event will be logged by the caller
+	 * after the entire branch has been configured.
+	 */
+	if ((flags & NDI_BRANCH_EVENT_OP) == 0) {
+		/*
+		 * Instead of logging a separate branch event just add
+		 * DEVFS_BRANCH_EVENT attribute. It indicates devfsadmd to
+		 * generate a EC_DEV_BRANCH event.
+		 */
+		se_val.value_type = SE_DATA_TYPE_INT32;
+		se_val.value.sv_int32 = 1;
+		if (sysevent_add_attr(&ev_attr_list,
+		    DEVFS_BRANCH_EVENT, &se_val, SE_SLEEP) != 0) {
+			sysevent_free_attr(ev_attr_list);
+			goto fail;
+		}
+	}
+
+	if (sysevent_attach_attributes(ev, ev_attr_list) != 0) {
+		sysevent_free_attr(ev_attr_list);
+		goto fail;
+	}
+
+	if ((se_err = log_sysevent(ev, SE_SLEEP, &eid)) != 0) {
+		if (se_err == SE_NO_TRANSPORT)
+			no_transport = 1;
+		goto fail;
+	}
+
+	sysevent_free(ev);
+	kmem_free(pathname, MAXPATHLEN);
+
+	return (DDI_SUCCESS);
+
+fail:
+	cmn_err(CE_WARN, "failed to log ESC_DEVFS_DEVI_ADD event for %s%s",
+	    pathname, (no_transport) ? " (syseventd not responding)" : "");
+
+	cmn_err(CE_WARN, "/dev may not be current for driver %s. "
+	    "Run devfsadm -i %s",
+	    ddi_driver_name(dip), ddi_driver_name(dip));
+
+	sysevent_free(ev);
+	kmem_free(pathname, MAXPATHLEN);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * log a notification that a dev_info node has been unconfigured.
+ */
+static int
+i_log_devfs_remove_devinfo(char *pathname, char *class_name, char *driver_name,
+    int instance, uint_t flags)
+{
+	sysevent_t *ev;
+	sysevent_id_t eid;
+	sysevent_value_t se_val;
+	sysevent_attr_list_t *ev_attr_list = NULL;
+	int se_err;
+	int no_transport = 0;
+
+	i_ddi_di_cache_invalidate(KM_SLEEP);
+
+	if (!i_ddi_io_initialized())
+		return (DDI_SUCCESS);
+
+	ev = sysevent_alloc(EC_DEVFS, ESC_DEVFS_DEVI_REMOVE, EP_DDI, SE_SLEEP);
+
+	se_val.value_type = SE_DATA_TYPE_STRING;
+	se_val.value.sv_string = pathname;
+	if (sysevent_add_attr(&ev_attr_list, DEVFS_PATHNAME,
+	    &se_val, SE_SLEEP) != 0) {
+		goto fail;
+	}
+
+	if (class_name) {
+		/* add the device class, driver name and instance attributes */
+
+		se_val.value_type = SE_DATA_TYPE_STRING;
+		se_val.value.sv_string = class_name;
+		if (sysevent_add_attr(&ev_attr_list,
+		    DEVFS_DEVI_CLASS, &se_val, SE_SLEEP) != 0) {
+			sysevent_free_attr(ev_attr_list);
+			goto fail;
+		}
+
+		se_val.value_type = SE_DATA_TYPE_STRING;
+		se_val.value.sv_string = driver_name;
+		if (sysevent_add_attr(&ev_attr_list,
+		    DEVFS_DRIVER_NAME, &se_val, SE_SLEEP) != 0) {
+			sysevent_free_attr(ev_attr_list);
+			goto fail;
+		}
+
+		se_val.value_type = SE_DATA_TYPE_INT32;
+		se_val.value.sv_int32 = instance;
+		if (sysevent_add_attr(&ev_attr_list,
+		    DEVFS_INSTANCE, &se_val, SE_SLEEP) != 0) {
+			sysevent_free_attr(ev_attr_list);
+			goto fail;
+		}
+	}
+
+	/*
+	 * must log a branch event too unless NDI_BRANCH_EVENT_OP is set,
+	 * in which case the branch event will be logged by the caller
+	 * after the entire branch has been unconfigured.
+	 */
+	if ((flags & NDI_BRANCH_EVENT_OP) == 0) {
+		/*
+		 * Instead of logging a separate branch event just add
+		 * DEVFS_BRANCH_EVENT attribute. It indicates devfsadmd to
+		 * generate a EC_DEV_BRANCH event.
+		 */
+		se_val.value_type = SE_DATA_TYPE_INT32;
+		se_val.value.sv_int32 = 1;
+		if (sysevent_add_attr(&ev_attr_list,
+		    DEVFS_BRANCH_EVENT, &se_val, SE_SLEEP) != 0) {
+			sysevent_free_attr(ev_attr_list);
+			goto fail;
+		}
+	}
+
+	if (sysevent_attach_attributes(ev, ev_attr_list) != 0) {
+		sysevent_free_attr(ev_attr_list);
+		goto fail;
+	}
+
+	if ((se_err = log_sysevent(ev, SE_SLEEP, &eid)) != 0) {
+		if (se_err == SE_NO_TRANSPORT)
+			no_transport = 1;
+		goto fail;
+	}
+
+	sysevent_free(ev);
+	return (DDI_SUCCESS);
+
+fail:
+	sysevent_free(ev);
+	cmn_err(CE_WARN, "failed to log ESC_DEVFS_DEVI_REMOVE event for %s%s",
+	    pathname, (no_transport) ? " (syseventd not responding)" : "");
+	return (DDI_SUCCESS);
+}
+
+/*
+ * log an event that a dev_info branch has been configured or unconfigured.
+ */
+static int
+i_log_devfs_branch(char *node_path, char *subclass)
+{
+	int se_err;
+	sysevent_t *ev;
+	sysevent_id_t eid;
+	sysevent_value_t se_val;
+	sysevent_attr_list_t *ev_attr_list = NULL;
+	int no_transport = 0;
+
+	/* do not generate the event during boot */
+	if (!i_ddi_io_initialized())
+		return (DDI_SUCCESS);
+
+	ev = sysevent_alloc(EC_DEVFS, subclass, EP_DDI, SE_SLEEP);
+
+	se_val.value_type = SE_DATA_TYPE_STRING;
+	se_val.value.sv_string = node_path;
+
+	if (sysevent_add_attr(&ev_attr_list, DEVFS_PATHNAME,
+	    &se_val, SE_SLEEP) != 0) {
+		goto fail;
+	}
+
+	if (sysevent_attach_attributes(ev, ev_attr_list) != 0) {
+		sysevent_free_attr(ev_attr_list);
+		goto fail;
+	}
+
+	if ((se_err = log_sysevent(ev, SE_SLEEP, &eid)) != 0) {
+		if (se_err == SE_NO_TRANSPORT)
+			no_transport = 1;
+		goto fail;
+	}
+
+	sysevent_free(ev);
+	return (DDI_SUCCESS);
+
+fail:
+	cmn_err(CE_WARN, "failed to log %s branch event for %s%s",
+	    subclass, node_path,
+	    (no_transport) ? " (syseventd not responding)" : "");
+
+	sysevent_free(ev);
+	return (DDI_FAILURE);
+}
+
+/*
+ * log an event that a dev_info tree branch has been configured.
+ */
+static int
+i_log_devfs_branch_add(dev_info_t *dip)
+{
+	char *node_path;
+	int rv;
+
+	node_path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(dip, node_path);
+	rv = i_log_devfs_branch(node_path, ESC_DEVFS_BRANCH_ADD);
+	kmem_free(node_path, MAXPATHLEN);
+
+	return (rv);
+}
+
+/*
+ * log an event that a dev_info tree branch has been unconfigured.
+ */
+static int
+i_log_devfs_branch_remove(char *node_path)
+{
+	return (i_log_devfs_branch(node_path, ESC_DEVFS_BRANCH_REMOVE));
+}
+
+/*
+ * enqueue the dip's deviname on the branch event queue.
+ */
+static struct brevq_node *
+brevq_enqueue(struct brevq_node **brevqp, dev_info_t *dip,
+    struct brevq_node *child)
+{
+	struct brevq_node *brn;
+	char *deviname;
+
+	deviname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	(void) ddi_deviname(dip, deviname);
+
+	brn = kmem_zalloc(sizeof (*brn), KM_SLEEP);
+	brn->deviname = i_ddi_strdup(deviname, KM_SLEEP);
+	kmem_free(deviname, MAXNAMELEN);
+	brn->child = child;
+	brn->sibling = *brevqp;
+	*brevqp = brn;
+
+	return (brn);
+}
+
+/*
+ * free the memory allocated for the elements on the branch event queue.
+ */
+static void
+free_brevq(struct brevq_node *brevq)
+{
+	struct brevq_node *brn, *next_brn;
+
+	for (brn = brevq; brn != NULL; brn = next_brn) {
+		next_brn = brn->sibling;
+		ASSERT(brn->child == NULL);
+		kmem_free(brn->deviname, strlen(brn->deviname) + 1);
+		kmem_free(brn, sizeof (*brn));
+	}
+}
+
+/*
+ * log the events queued up on the branch event queue and free the
+ * associated memory.
+ *
+ * node_path must have been allocated with at least MAXPATHLEN bytes.
+ */
+static void
+log_and_free_brevq(char *node_path, struct brevq_node *brevq)
+{
+	struct brevq_node *brn;
+	char *p;
+
+	p = node_path + strlen(node_path);
+	for (brn = brevq; brn != NULL; brn = brn->sibling) {
+		(void) strcpy(p, brn->deviname);
+		(void) i_log_devfs_branch_remove(node_path);
+	}
+	*p = '\0';
+
+	free_brevq(brevq);
+}
+
+/*
+ * log the events queued up on the branch event queue and free the
+ * associated memory. Same as the previous function but operates on dip.
+ */
+static void
+log_and_free_brevq_dip(dev_info_t *dip, struct brevq_node *brevq)
+{
+	char *path;
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(dip, path);
+	log_and_free_brevq(path, brevq);
+	kmem_free(path, MAXPATHLEN);
+}
+
+/*
+ * log the outstanding branch remove events for the grand children of the dip
+ * and free the associated memory.
+ */
+static void
+log_and_free_br_events_on_grand_children(dev_info_t *dip,
+    struct brevq_node *brevq)
+{
+	struct brevq_node *brn;
+	char *path;
+	char *p;
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(dip, path);
+	p = path + strlen(path);
+	for (brn = brevq; brn != NULL; brn = brn->sibling) {
+		if (brn->child) {
+			(void) strcpy(p, brn->deviname);
+			/* now path contains the node path to the dip's child */
+			log_and_free_brevq(path, brn->child);
+			brn->child = NULL;
+		}
+	}
+	kmem_free(path, MAXPATHLEN);
+}
+
+/*
+ * log and cleanup branch remove events for the grand children of the dip.
+ */
+static void
+cleanup_br_events_on_grand_children(dev_info_t *dip, struct brevq_node **brevqp)
+{
+	dev_info_t *child;
+	struct brevq_node *brevq, *brn, *prev_brn, *next_brn;
+	char *path;
+	int circ;
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	prev_brn = NULL;
+	brevq = *brevqp;
+
+	ndi_devi_enter(dip, &circ);
+	for (brn = brevq; brn != NULL; brn = next_brn) {
+		next_brn = brn->sibling;
+		for (child = ddi_get_child(dip); child != NULL;
+		    child = ddi_get_next_sibling(child)) {
+			if (i_ddi_node_state(child) >= DS_INITIALIZED) {
+				(void) ddi_deviname(child, path);
+				if (strcmp(path, brn->deviname) == 0)
+					break;
+			}
+		}
+
+		if (child != NULL && !(DEVI_EVREMOVE(child))) {
+			/*
+			 * Event state is not REMOVE. So branch remove event
+			 * is not going be generated on brn->child.
+			 * If any branch remove events were queued up on
+			 * brn->child log them and remove the brn
+			 * from the queue.
+			 */
+			if (brn->child) {
+				(void) ddi_pathname(dip, path);
+				(void) strcat(path, brn->deviname);
+				log_and_free_brevq(path, brn->child);
+			}
+
+			if (prev_brn)
+				prev_brn->sibling = next_brn;
+			else
+				*brevqp = next_brn;
+
+			kmem_free(brn->deviname, strlen(brn->deviname) + 1);
+			kmem_free(brn, sizeof (*brn));
+		} else {
+			/*
+			 * Free up the outstanding branch remove events
+			 * queued on brn->child since brn->child
+			 * itself is eligible for branch remove event.
+			 */
+			if (brn->child) {
+				free_brevq(brn->child);
+				brn->child = NULL;
+			}
+			prev_brn = brn;
+		}
+	}
+
+	ndi_devi_exit(dip, circ);
+	kmem_free(path, MAXPATHLEN);
+}
+
+static int
+need_remove_event(dev_info_t *dip, int flags)
+{
+	if ((flags & (NDI_NO_EVENT | NDI_AUTODETACH)) == 0 &&
+	    (flags & (NDI_DEVI_OFFLINE | NDI_UNCONFIG | NDI_DEVI_REMOVE)) &&
+	    !(DEVI_EVREMOVE(dip)))
+		return (1);
+	else
+		return (0);
+}
+
+/*
+ * Unconfigure children/descendants of the dip.
+ *
+ * If the operation involves a branch event NDI_BRANCH_EVENT_OP is set
+ * through out the unconfiguration. On successful return *brevqp is set to
+ * a queue of dip's child devinames for which branch remove events need
+ * to be generated.
+ */
+static int
+devi_unconfig_branch(dev_info_t *dip, dev_info_t **dipp, int flags,
+    struct brevq_node **brevqp)
+{
+	int rval;
+
+	*brevqp = NULL;
+
+	if ((!(flags & NDI_BRANCH_EVENT_OP)) && need_remove_event(dip, flags))
+		flags |= NDI_BRANCH_EVENT_OP;
+
+	if (flags & NDI_BRANCH_EVENT_OP) {
+		rval = devi_unconfig_common(dip, dipp, flags, (major_t)-1,
+		    brevqp);
+
+		if (rval != NDI_SUCCESS && (*brevqp)) {
+			log_and_free_brevq_dip(dip, *brevqp);
+			*brevqp = NULL;
+		}
+	} else
+		rval = devi_unconfig_common(dip, dipp, flags, (major_t)-1,
+		    NULL);
+
+	return (rval);
+}
+
+/*
+ * If the dip is already bound to a driver transition to DS_INITIALIZED
+ * in order to generate an event in the case where the node was left in
+ * DS_BOUND state since boot (never got attached) and the node is now
+ * being offlined.
+ */
+static void
+init_bound_node_ev(dev_info_t *pdip, dev_info_t *dip, int flags)
+{
+	if (need_remove_event(dip, flags) &&
+	    i_ddi_node_state(dip) == DS_BOUND &&
+	    i_ddi_node_state(pdip) >= DS_ATTACHED &&
+	    !(DEVI_IS_DEVICE_OFFLINE(dip)))
+		(void) ddi_initchild(pdip, dip);
+}
+
+/*
+ * attach a node/branch with parent already held busy
+ */
+static int
+devi_attach_node(dev_info_t *dip, uint_t flags)
+{
+	if (flags & NDI_DEVI_ONLINE) {
+		DEVI_SET_DEVICE_ONLINE(dip);
+	}
+
+	if (DEVI_IS_DEVICE_OFFLINE(dip)) {
+		return (NDI_FAILURE);
+	}
+
+	if (i_ddi_attachchild(dip) != DDI_SUCCESS) {
+		DEVI_SET_EVUNINIT(dip);
+		if (ndi_dev_is_persistent_node(dip))
+			(void) ddi_uninitchild(dip);
+		else {
+			/*
+			 * Delete .conf nodes and nodes that are not
+			 * well formed.
+			 */
+			(void) ddi_remove_child(dip, 0);
+		}
+		return (NDI_FAILURE);
+	}
+
+	i_ndi_devi_report_status_change(dip, NULL);
+
+	/*
+	 * log an event, but not during devfs lookups in which case
+	 * NDI_NO_EVENT is set.
+	 */
+	if ((flags & NDI_NO_EVENT) == 0 && !(DEVI_EVADD(dip))) {
+		(void) i_log_devfs_add_devinfo(dip, flags);
+		DEVI_SET_EVADD(dip);
+	} else if (!(flags & NDI_NO_EVENT_STATE_CHNG))
+		DEVI_SET_EVADD(dip);
+
+	return (NDI_SUCCESS);
+}
+
+/*
+ * Configure all children of a nexus, assuming all spec children have
+ * been made.
+ */
+static int
+devi_attach_children(dev_info_t *pdip, uint_t flags, major_t major)
+{
+	dev_info_t *dip;
+
+	ASSERT(DEVI(pdip)->devi_flags & DEVI_MADE_CHILDREN);
+
+	dip = ddi_get_child(pdip);
+	while (dip) {
+		/*
+		 * NOTE: devi_attach_node() may remove the dip
+		 */
+		dev_info_t *next = ddi_get_next_sibling(dip);
+
+		/*
+		 * Configure all nexus nodes or leaf nodes with
+		 * matching driver major
+		 */
+		if ((major == (major_t)-1) ||
+		    (major == ddi_driver_major(dip)) ||
+		    ((flags & NDI_CONFIG) && (is_leaf_node(dip) == 0)))
+			(void) devi_attach_node(dip, flags);
+		dip = next;
+	}
+
+	return (NDI_SUCCESS);
+}
+
+/* internal function to config immediate children */
+static int
+config_immediate_children(dev_info_t *pdip, uint_t flags, major_t major)
+{
+	int circ;
+	ASSERT(i_ddi_node_state(pdip) >= DS_ATTACHED);
+
+	if (!NEXUS_DRV(ddi_get_driver(pdip)))
+		return (NDI_SUCCESS);
+
+	NDI_CONFIG_DEBUG((CE_CONT,
+	    "config_immediate_children: %s%d (%p), flags=%x\n",
+	    ddi_driver_name(pdip), ddi_get_instance(pdip),
+	    (void *)pdip, flags));
+
+	ndi_devi_enter(pdip, &circ);
+
+	if (flags & NDI_CONFIG_REPROBE) {
+		mutex_enter(&DEVI(pdip)->devi_lock);
+		DEVI(pdip)->devi_flags &= ~DEVI_MADE_CHILDREN;
+		mutex_exit(&DEVI(pdip)->devi_lock);
+	}
+	(void) i_ndi_make_spec_children(pdip, flags);
+	i_ndi_init_hw_children(pdip, flags);
+	(void) devi_attach_children(pdip, flags, major);
+
+	ndi_devi_exit(pdip, circ);
+
+	return (NDI_SUCCESS);
+}
+
+/* internal function to config grand children */
+static int
+config_grand_children(dev_info_t *pdip, uint_t flags, major_t major)
+{
+	struct mt_config_handle *hdl;
+
+	/* multi-threaded configuration of child nexus */
+	hdl = mt_config_init(pdip, NULL, flags, major, MT_CONFIG_OP, NULL);
+	mt_config_children(hdl);
+
+	return (mt_config_fini(hdl));	/* wait for threads to exit */
+}
+
+/*
+ * Common function for device tree configuration,
+ * either BUS_CONFIG_ALL or BUS_CONFIG_DRIVER.
+ * The NDI_CONFIG flag causes recursive configuration of
+ * grandchildren, devfs usage should not recurse.
+ */
+static int
+devi_config_common(dev_info_t *dip, int flags, major_t major)
+{
+	int error;
+	int (*f)();
+
+	if (i_ddi_node_state(dip) <  DS_READY)
+		return (NDI_FAILURE);
+
+	if (pm_pre_config(dip, NULL) != DDI_SUCCESS)
+		return (NDI_FAILURE);
+
+	if ((DEVI(dip)->devi_ops->devo_bus_ops == NULL) ||
+	    (DEVI(dip)->devi_ops->devo_bus_ops->busops_rev < BUSO_REV_5) ||
+	    (f = DEVI(dip)->devi_ops->devo_bus_ops->bus_config) == NULL) {
+		error = config_immediate_children(dip, flags, major);
+	} else {
+		/* call bus_config entry point */
+		ddi_bus_config_op_t bus_op = (major == (major_t)-1) ?
+		    BUS_CONFIG_ALL : BUS_CONFIG_DRIVER;
+		error = (*f)(dip,
+		    flags, bus_op, (void *)(uintptr_t)major, NULL, 0);
+	}
+
+	if (error) {
+		pm_post_config(dip, NULL);
+		return (error);
+	}
+
+	/*
+	 * Some callers, notably SCSI, need to mark the devfs cache
+	 * to be rebuilt together with the config operation.
+	 */
+	if (flags & NDI_DEVFS_CLEAN)
+		(void) devfs_clean(dip, NULL, 0);
+
+	if (flags & NDI_CONFIG)
+		(void) config_grand_children(dip, flags, major);
+
+	pm_post_config(dip, NULL);
+
+	return (NDI_SUCCESS);
+}
+
+/*
+ * Framework entry point for BUS_CONFIG_ALL
+ */
+int
+ndi_devi_config(dev_info_t *dip, int flags)
+{
+	NDI_CONFIG_DEBUG((CE_CONT,
+	    "ndi_devi_config: par = %s%d (%p), flags = 0x%x\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, flags));
+
+	return (devi_config_common(dip, flags, (major_t)-1));
+}
+
+/*
+ * Framework entry point for BUS_CONFIG_DRIVER, bound to major
+ */
+int
+ndi_devi_config_driver(dev_info_t *dip, int flags, major_t major)
+{
+	/* don't abuse this function */
+	ASSERT(major != (major_t)-1);
+
+	NDI_CONFIG_DEBUG((CE_CONT,
+	    "ndi_devi_config_driver: par = %s%d (%p), flags = 0x%x\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, flags));
+
+	return (devi_config_common(dip, flags, major));
+}
+
+/*
+ * called by nexus drivers to configure/unconfigure its children
+ */
+static int
+devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **dipp,
+    uint_t flags, clock_t timeout)
+{
+	int circ, probed, rv;
+	dev_info_t *dip = NULL;
+	char *name, *addr, *drivername = NULL;
+	clock_t end_time;	/* 60 sec */
+
+	if (!NEXUS_DRV(ddi_get_driver(pdip)))
+		return (NDI_FAILURE);
+
+	if (MDI_PHCI(pdip)) {
+		/* Call mdi_ to configure the child */
+		rv = mdi_devi_config_one(pdip, devnm, dipp, flags, timeout);
+		if (rv == MDI_SUCCESS)
+			return (NDI_SUCCESS);
+
+		/*
+		 * Normally, we should return failure here.
+		 *
+		 * Leadville implemented an unfortunate fallback mechanism.
+		 * If a target is non-standard and scsi_vhci doesn't know
+		 * how to do failover, then the node is enumerated under
+		 * phci. Leadville specifies NDI_MDI_FALLBACK flag to
+		 * maintain the old behavior.
+		 */
+		if ((flags & NDI_MDI_FALLBACK) == 0)
+			return (NDI_FAILURE);
+	}
+
+	/* split name into "name@addr" parts */
+	i_ddi_parse_name(devnm, &name, &addr, NULL);
+
+	if (flags & NDI_PROMNAME) {
+		/*
+		 * We may have a genericname on a system that creates
+		 * drivername nodes (from .conf files).  Find the drivername
+		 * by nodeid. If we can't find a node with devnm as the
+		 * node name then we search by drivername.  This allows an
+		 * implementation to supply a genericly named boot path (disk)
+		 * and locate drivename nodes (sd).
+		 */
+		drivername = child_path_to_driver(pdip, name, addr);
+	}
+
+	if (timeout > 0) {
+		end_time = ddi_get_lbolt() + timeout;
+	}
+
+	ndi_devi_enter(pdip, &circ);
+
+reprobe:
+	probed = (DEVI(pdip)->devi_flags & DEVI_MADE_CHILDREN);
+	(void) i_ndi_make_spec_children(pdip, flags);
+	for (;;) {
+		dip = find_child_by_name(pdip, name, addr);
+		/*
+		 * Search for a node bound to the drivername driver with
+		 * the specified "@addr".
+		 */
+		if (dip == NULL && drivername)
+			dip = find_child_by_driver(pdip, drivername, addr);
+
+		if (dip || timeout <= 0 || ddi_get_lbolt() >= end_time)
+			break;
+
+		/*
+		 * Wait up to end_time for asynchronous enumeration
+		 */
+		ndi_devi_exit(pdip, circ);
+		NDI_DEBUG(flags, (CE_CONT,
+		    "%s%d: waiting for child %s@%s, timeout %ld",
+		    ddi_driver_name(pdip), ddi_get_instance(pdip),
+		    name, addr, timeout));
+
+		mutex_enter(&DEVI(pdip)->devi_lock);
+		(void) cv_timedwait(&DEVI(pdip)->devi_cv,
+		    &DEVI(pdip)->devi_lock, end_time);
+		mutex_exit(&DEVI(pdip)->devi_lock);
+		ndi_devi_enter(pdip, &circ);
+		(void) i_ndi_make_spec_children(pdip, flags);
+	}
+
+	if ((dip == NULL) && probed && (flags & NDI_CONFIG_REPROBE) &&
+	    i_ddi_io_initialized()) {
+		/*
+		 * reenumerate .conf nodes and probe again
+		 */
+		mutex_enter(&DEVI(pdip)->devi_lock);
+		DEVI(pdip)->devi_flags &= ~DEVI_MADE_CHILDREN;
+		mutex_exit(&DEVI(pdip)->devi_lock);
+		goto reprobe;
+	}
+
+	if (addr[0] != '\0')
+		*(addr - 1) = '@';
+
+	if (dip == NULL || devi_attach_node(dip, flags) != NDI_SUCCESS) {
+		ndi_devi_exit(pdip, circ);
+		return (NDI_FAILURE);
+	}
+
+	*dipp = dip;
+	ndi_hold_devi(dip);
+	ndi_devi_exit(pdip, circ);
+	return (NDI_SUCCESS);
+}
+
+/*
+ * Enumerate and attach a child specified by name 'devnm'.
+ * Called by devfs lookup and DR to perform a BUS_CONFIG_ONE.
+ * Note: devfs does not make use of NDI_CONFIG to configure
+ * an entire branch.
+ */
+int
+ndi_devi_config_one(dev_info_t *dip, char *devnm, dev_info_t **dipp, int flags)
+{
+	int error;
+	int (*f)();
+	int branch_event = 0;
+
+	ASSERT(dipp);
+	ASSERT(i_ddi_node_state(dip) >= DS_ATTACHED);
+
+	NDI_CONFIG_DEBUG((CE_CONT,
+	    "ndi_devi_config_one: par = %s%d (%p), child = %s\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, devnm));
+
+	if (pm_pre_config(dip, devnm) != DDI_SUCCESS)
+		return (NDI_FAILURE);
+
+	if ((flags & (NDI_NO_EVENT | NDI_BRANCH_EVENT_OP)) == 0 &&
+	    (flags & NDI_CONFIG)) {
+		flags |= NDI_BRANCH_EVENT_OP;
+		branch_event = 1;
+	}
+
+	if ((DEVI(dip)->devi_ops->devo_bus_ops == NULL) ||
+	    (DEVI(dip)->devi_ops->devo_bus_ops->busops_rev < BUSO_REV_5) ||
+	    (f = DEVI(dip)->devi_ops->devo_bus_ops->bus_config) == NULL) {
+		error = devi_config_one(dip, devnm, dipp, flags, 0);
+	} else {
+		/* call bus_config entry point */
+		error = (*f)(dip, flags, BUS_CONFIG_ONE, (void *)devnm, dipp);
+	}
+
+	if (error || (flags & NDI_CONFIG) == 0) {
+		pm_post_config(dip, devnm);
+		return (error);
+	}
+
+	/*
+	 * DR usage ((i.e. call with NDI_CONFIG) recursively configures
+	 * grandchildren, performing a BUS_CONFIG_ALL from the node attached
+	 * by the BUS_CONFIG_ONE.
+	 */
+	ASSERT(*dipp);
+
+	error = devi_config_common(*dipp, flags, (major_t)-1);
+
+	pm_post_config(dip, devnm);
+
+	if (branch_event)
+		(void) i_log_devfs_branch_add(*dipp);
+
+	return (error);
+}
+
+
+/*
+ * Enumerate and attach a child specified by name 'devnm'.
+ * Called during configure the OBP options. This configures
+ * only one node.
+ */
+static int
+ndi_devi_config_obp_args(dev_info_t *parent, char *devnm,
+    dev_info_t **childp, int flags)
+{
+	int error;
+	int (*f)();
+
+	ASSERT(childp);
+	ASSERT(i_ddi_node_state(parent) >= DS_ATTACHED);
+
+	NDI_CONFIG_DEBUG((CE_CONT, "ndi_devi_config_obp_args: "
+	    "par = %s%d (%p), child = %s\n", ddi_driver_name(parent),
+	    ddi_get_instance(parent), (void *)parent, devnm));
+
+	if ((DEVI(parent)->devi_ops->devo_bus_ops == NULL) ||
+	    (DEVI(parent)->devi_ops->devo_bus_ops->busops_rev < BUSO_REV_5) ||
+	    (f = DEVI(parent)->devi_ops->devo_bus_ops->bus_config) == NULL) {
+		error = NDI_FAILURE;
+	} else {
+		/* call bus_config entry point */
+		error = (*f)(parent, flags,
+		    BUS_CONFIG_OBP_ARGS, (void *)devnm, childp);
+	}
+	return (error);
+}
+
+
+/*
+ * detach a node with parent already held busy
+ */
+static int
+devi_detach_node(dev_info_t *dip, uint_t flags)
+{
+	dev_info_t *pdip = ddi_get_parent(dip);
+	int ret = NDI_SUCCESS;
+	ddi_eventcookie_t cookie;
+
+	if (flags & NDI_POST_EVENT) {
+		if (pdip && i_ddi_node_state(pdip) >= DS_ATTACHED) {
+			if (ddi_get_eventcookie(dip, DDI_DEVI_REMOVE_EVENT,
+			    &cookie) == NDI_SUCCESS)
+				(void) ndi_post_event(dip, dip, cookie, NULL);
+		}
+	}
+
+	if (i_ddi_detachchild(dip, flags) != DDI_SUCCESS)
+		return (NDI_FAILURE);
+
+	if (flags & NDI_AUTODETACH)
+		return (NDI_SUCCESS);
+
+	/*
+	 * For DR, even bound nodes may need to have offline
+	 * flag set.
+	 */
+	if (flags & NDI_DEVI_OFFLINE) {
+		DEVI_SET_DEVICE_OFFLINE(dip);
+	}
+
+	if (i_ddi_node_state(dip) == DS_INITIALIZED) {
+		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		(void) ddi_pathname(dip, path);
+		if (flags & NDI_DEVI_OFFLINE)
+			i_ndi_devi_report_status_change(dip, path);
+
+		if (need_remove_event(dip, flags)) {
+			(void) i_log_devfs_remove_devinfo(path,
+			    i_ddi_devi_class(dip),
+			    (char *)ddi_driver_name(dip),
+			    ddi_get_instance(dip),
+			    flags);
+			DEVI_SET_EVREMOVE(dip);
+		}
+		kmem_free(path, MAXPATHLEN);
+	}
+
+	if (flags & (NDI_UNCONFIG | NDI_DEVI_REMOVE)) {
+		ret = ddi_uninitchild(dip);
+		if (ret == NDI_SUCCESS) {
+			/*
+			 * Remove uninitialized pseudo nodes because
+			 * system props are lost and the node cannot be
+			 * reattached.
+			 */
+			if (!ndi_dev_is_persistent_node(dip))
+				flags |= NDI_DEVI_REMOVE;
+
+			if (flags & NDI_DEVI_REMOVE)
+				ret = ddi_remove_child(dip, 0);
+		}
+	}
+
+	return (ret);
+}
+
+/*
+ * unconfigure immediate children of bus nexus device
+ */
+static int
+unconfig_immediate_children(
+	dev_info_t *dip,
+	dev_info_t **dipp,
+	int flags,
+	major_t major)
+{
+	int rv = NDI_SUCCESS, circ;
+	dev_info_t *child;
+
+	ASSERT(dipp == NULL || *dipp == NULL);
+
+	ndi_devi_enter(dip, &circ);
+	child = ddi_get_child(dip);
+	while (child) {
+		dev_info_t *next = ddi_get_next_sibling(child);
+		if ((major != (major_t)-1) &&
+		    (major != ddi_driver_major(child))) {
+			child = next;
+			continue;
+		}
+
+		/* skip nexus nodes during autodetach */
+		if ((flags & NDI_AUTODETACH) && !is_leaf_node(child)) {
+			child = next;
+			continue;
+		}
+
+		if (devi_detach_node(child, flags) != NDI_SUCCESS) {
+			if (dipp && *dipp == NULL) {
+				ndi_hold_devi(child);
+				*dipp = child;
+			}
+			rv = NDI_FAILURE;
+		}
+
+		/*
+		 * Continue upon failure--best effort algorithm
+		 */
+		child = next;
+	}
+	ndi_devi_exit(dip, circ);
+	return (rv);
+}
+
+/*
+ * unconfigure grand children of bus nexus device
+ */
+static int
+unconfig_grand_children(
+	dev_info_t *dip,
+	dev_info_t **dipp,
+	int flags,
+	major_t major,
+	struct brevq_node **brevqp)
+{
+	struct mt_config_handle *hdl;
+
+	if (brevqp)
+		*brevqp = NULL;
+
+	/* multi-threaded configuration of child nexus */
+	hdl = mt_config_init(dip, dipp, flags, major, MT_UNCONFIG_OP, brevqp);
+	mt_config_children(hdl);
+
+	return (mt_config_fini(hdl));	/* wait for threads to exit */
+}
+
+/*
+ * Unconfigure children/descendants of the dip.
+ *
+ * If brevqp is not NULL, on return *brevqp is set to a queue of dip's
+ * child devinames for which branch remove events need to be generated.
+ */
+static int
+devi_unconfig_common(
+	dev_info_t *dip,
+	dev_info_t **dipp,
+	int flags,
+	major_t major,
+	struct brevq_node **brevqp)
+{
+	int rv;
+	int pm_cookie;
+	int (*f)();
+	ddi_bus_config_op_t bus_op;
+
+	if (dipp)
+		*dipp = NULL;
+	if (brevqp)
+		*brevqp = NULL;
+
+	/*
+	 * Power up the dip if it is powered off.  If the flag bit
+	 * NDI_AUTODETACH is set and the dip is not at its full power,
+	 * skip the rest of the branch.
+	 */
+	if (pm_pre_unconfig(dip, flags, &pm_cookie, NULL) != DDI_SUCCESS)
+		return ((flags & NDI_AUTODETACH) ? NDI_SUCCESS :
+		    NDI_FAILURE);
+
+	/*
+	 * Some callers, notably SCSI, need to clear out the devfs
+	 * cache together with the unconfig to prevent stale entries.
+	 */
+	if (flags & NDI_DEVFS_CLEAN)
+		(void) devfs_clean(dip, NULL, 0);
+
+	rv = unconfig_grand_children(dip, dipp, flags, major, brevqp);
+
+	if ((rv != NDI_SUCCESS) && ((flags & NDI_AUTODETACH) == 0)) {
+		if (brevqp && *brevqp) {
+			log_and_free_br_events_on_grand_children(dip, *brevqp);
+			free_brevq(*brevqp);
+			*brevqp = NULL;
+		}
+		pm_post_unconfig(dip, pm_cookie, NULL);
+		return (rv);
+	}
+
+	if (dipp && *dipp) {
+		ndi_rele_devi(*dipp);
+		*dipp = NULL;
+	}
+
+	/*
+	 * It is possible to have a detached nexus with children
+	 * and grandchildren (for example: a branch consisting
+	 * entirely of bound nodes.) Since the nexus is detached
+	 * the bus_unconfig entry point cannot be used to remove
+	 * or unconfigure the descendants.
+	 */
+	if (i_ddi_node_state(dip) < DS_ATTACHED ||
+	    (DEVI(dip)->devi_ops->devo_bus_ops == NULL) ||
+	    (DEVI(dip)->devi_ops->devo_bus_ops->busops_rev < BUSO_REV_5) ||
+	    (f = DEVI(dip)->devi_ops->devo_bus_ops->bus_unconfig) == NULL) {
+		rv = unconfig_immediate_children(dip, dipp, flags, major);
+	} else {
+		/*
+		 * call bus_unconfig entry point
+		 * It should reset nexus flags if unconfigure succeeds.
+		 */
+		bus_op = (major == (major_t)-1) ?
+		    BUS_UNCONFIG_ALL : BUS_UNCONFIG_DRIVER;
+		rv = (*f)(dip, flags, bus_op, (void *)(uintptr_t)major);
+	}
+
+	pm_post_unconfig(dip, pm_cookie, NULL);
+
+	if (brevqp && *brevqp)
+		cleanup_br_events_on_grand_children(dip, brevqp);
+
+	return (rv);
+}
+
+/*
+ * called by devfs/framework to unconfigure children bound to major
+ * If NDI_AUTODETACH is specified, this is invoked by either the
+ * moduninstall daemon or the modunload -i 0 command.
+ */
+int
+ndi_devi_unconfig_driver(dev_info_t *dip, int flags, major_t major)
+{
+	NDI_CONFIG_DEBUG((CE_CONT,
+	    "ndi_devi_unconfig_driver: par = %s%d (%p), flags = 0x%x\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, flags));
+
+	return (devi_unconfig_common(dip, NULL, flags, major, NULL));
+}
+
+int
+ndi_devi_unconfig(dev_info_t *dip, int flags)
+{
+	NDI_CONFIG_DEBUG((CE_CONT,
+	    "ndi_devi_unconfig: par = %s%d (%p), flags = 0x%x\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, flags));
+
+	return (devi_unconfig_common(dip, NULL, flags, (major_t)-1, NULL));
+}
+
+int
+e_ddi_devi_unconfig(dev_info_t *dip, dev_info_t **dipp, int flags)
+{
+	NDI_CONFIG_DEBUG((CE_CONT,
+	    "e_ddi_devi_unconfig: par = %s%d (%p), flags = 0x%x\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, flags));
+
+	return (devi_unconfig_common(dip, dipp, flags, (major_t)-1, NULL));
+}
+
+/*
+ * Unconfigure child by name
+ */
+static int
+devi_unconfig_one(dev_info_t *pdip, char *devnm, int flags)
+{
+	int rv, circ;
+	dev_info_t *child;
+
+	ndi_devi_enter(pdip, &circ);
+	child = ndi_devi_findchild(pdip, devnm);
+	if (child == NULL) {
+		NDI_CONFIG_DEBUG((CE_CONT,
+		    "devi_unconfig_one: %s not found\n", devnm));
+		ndi_devi_exit(pdip, circ);
+		return (NDI_SUCCESS);
+	}
+	rv = devi_detach_node(child, flags);
+	ndi_devi_exit(pdip, circ);
+	return (rv);
+}
+
+int
+ndi_devi_unconfig_one(
+	dev_info_t *pdip,
+	char *devnm,
+	dev_info_t **dipp,
+	int flags)
+{
+	int (*f)();
+	int circ, rv;
+	int pm_cookie;
+	dev_info_t *child;
+	struct brevq_node *brevq = NULL;
+
+	ASSERT(i_ddi_node_state(pdip) >= DS_ATTACHED);
+
+	NDI_CONFIG_DEBUG((CE_CONT,
+	    "ndi_devi_unconfig_one: par = %s%d (%p), child = %s\n",
+	    ddi_driver_name(pdip), ddi_get_instance(pdip),
+	    (void *)pdip, devnm));
+
+	if (pm_pre_unconfig(pdip, flags, &pm_cookie, devnm) != DDI_SUCCESS)
+		return (NDI_FAILURE);
+
+	if (dipp)
+		*dipp = NULL;
+
+	ndi_devi_enter(pdip, &circ);
+	child = ndi_devi_findchild(pdip, devnm);
+	if (child == NULL) {
+		NDI_CONFIG_DEBUG((CE_CONT, "ndi_devi_unconfig_one: %s"
+		    " not found\n", devnm));
+		ndi_devi_exit(pdip, circ);
+		pm_post_unconfig(pdip, pm_cookie, devnm);
+		return (NDI_SUCCESS);
+	}
+
+	/*
+	 * Unconfigure children/descendants of named child
+	 */
+	rv = devi_unconfig_branch(child, dipp, flags | NDI_UNCONFIG, &brevq);
+	if (rv != NDI_SUCCESS)
+		goto out;
+
+	init_bound_node_ev(pdip, child, flags);
+
+	if ((DEVI(pdip)->devi_ops->devo_bus_ops == NULL) ||
+	    (DEVI(pdip)->devi_ops->devo_bus_ops->busops_rev < BUSO_REV_5) ||
+	    (f = DEVI(pdip)->devi_ops->devo_bus_ops->bus_unconfig) == NULL) {
+		rv = devi_detach_node(child, flags);
+	} else {
+		/* call bus_config entry point */
+		rv = (*f)(pdip, flags, BUS_UNCONFIG_ONE, (void *)devnm);
+	}
+
+	if (brevq) {
+		if (rv != NDI_SUCCESS)
+			log_and_free_brevq_dip(child, brevq);
+		else
+			free_brevq(brevq);
+	}
+
+	if (dipp && rv != NDI_SUCCESS) {
+		ndi_hold_devi(child);
+		ASSERT(*dipp == NULL);
+		*dipp = child;
+	}
+
+out:
+	ndi_devi_exit(pdip, circ);
+	pm_post_unconfig(pdip, pm_cookie, devnm);
+
+	return (rv);
+}
+
+struct async_arg {
+	dev_info_t *dip;
+	uint_t flags;
+};
+
+/*
+ * Common async handler for:
+ *	ndi_devi_bind_driver_async
+ *	ndi_devi_online_async
+ */
+static int
+i_ndi_devi_async_common(dev_info_t *dip, uint_t flags, void (*func)())
+{
+	int tqflag;
+	int kmflag;
+	struct async_arg *arg;
+	dev_info_t *pdip = ddi_get_parent(dip);
+
+	ASSERT(pdip);
+	ASSERT(DEVI(pdip)->devi_taskq);
+	ASSERT(ndi_dev_is_persistent_node(dip));
+
+	if (flags & NDI_NOSLEEP) {
+		kmflag = KM_NOSLEEP;
+		tqflag = TQ_NOSLEEP;
+	} else {
+		kmflag = KM_SLEEP;
+		tqflag = TQ_SLEEP;
+	}
+
+	arg = kmem_alloc(sizeof (*arg), kmflag);
+	if (arg == NULL)
+		goto fail;
+
+	arg->flags = flags;
+	arg->dip = dip;
+	if (ddi_taskq_dispatch(DEVI(pdip)->devi_taskq, func, arg, tqflag) ==
+	    DDI_SUCCESS) {
+		return (NDI_SUCCESS);
+	}
+
+fail:
+	NDI_CONFIG_DEBUG((CE_CONT, "%s%d: ddi_taskq_dispatch failed",
+	    ddi_driver_name(pdip), ddi_get_instance(pdip)));
+
+	if (arg)
+		kmem_free(arg, sizeof (*arg));
+	return (NDI_FAILURE);
+}
+
+static void
+i_ndi_devi_bind_driver_cb(struct async_arg *arg)
+{
+	(void) ndi_devi_bind_driver(arg->dip, arg->flags);
+	kmem_free(arg, sizeof (*arg));
+}
+
+int
+ndi_devi_bind_driver_async(dev_info_t *dip, uint_t flags)
+{
+	return (i_ndi_devi_async_common(dip, flags,
+	    (void (*)())i_ndi_devi_bind_driver_cb));
+}
+
+/*
+ * place the devinfo in the ONLINE state.
+ */
+int
+ndi_devi_online(dev_info_t *dip, uint_t flags)
+{
+	int circ, rv;
+	dev_info_t *pdip = ddi_get_parent(dip);
+	int branch_event = 0;
+
+	ASSERT(pdip);
+
+	NDI_CONFIG_DEBUG((CE_CONT, "ndi_devi_online: %s%d (%p)\n",
+		ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip));
+
+	ndi_devi_enter(pdip, &circ);
+	/* bind child before merging .conf nodes */
+	rv = i_ndi_config_node(dip, DS_BOUND, flags);
+	if (rv != NDI_SUCCESS) {
+		ndi_devi_exit(pdip, circ);
+		return (rv);
+	}
+
+	/* merge .conf properties */
+	(void) i_ndi_make_spec_children(pdip, flags);
+
+	flags |= (NDI_DEVI_ONLINE | NDI_CONFIG);
+
+	if (flags & NDI_NO_EVENT) {
+		/*
+		 * Caller is specifically asking for not to generate an event.
+		 * Set the following flag so that devi_attach_node() don't
+		 * change the event state.
+		 */
+		flags |= NDI_NO_EVENT_STATE_CHNG;
+	}
+
+	if ((flags & (NDI_NO_EVENT | NDI_BRANCH_EVENT_OP)) == 0 &&
+	    ((flags & NDI_CONFIG) || DEVI_NEED_NDI_CONFIG(dip))) {
+		flags |= NDI_BRANCH_EVENT_OP;
+		branch_event = 1;
+	}
+
+	/*
+	 * devi_attach_node() may remove dip on failure
+	 */
+	if ((rv = devi_attach_node(dip, flags)) == NDI_SUCCESS) {
+		if ((flags & NDI_CONFIG) || DEVI_NEED_NDI_CONFIG(dip)) {
+			(void) ndi_devi_config(dip, flags);
+		}
+
+		if (branch_event)
+			(void) i_log_devfs_branch_add(dip);
+	}
+
+	ndi_devi_exit(pdip, circ);
+
+	/*
+	 * Notify devfs that we have a new node. Devfs needs to invalidate
+	 * cached directory contents.
+	 *
+	 * For PCMCIA devices, it is possible the pdip is not fully
+	 * attached. In this case, calling back into devfs will
+	 * result in a loop or assertion error. Hence, the check
+	 * on node state.
+	 *
+	 * If we own parent lock, this is part of a branch operation.
+	 * We skip the devfs_clean() step because the cache invalidation
+	 * is done higher up in the device tree.
+	 */
+	if (rv == NDI_SUCCESS && i_ddi_node_state(pdip) == DS_READY &&
+	    !DEVI_BUSY_OWNED(pdip))
+		(void) devfs_clean(pdip, NULL, 0);
+	return (rv);
+}
+
+static void
+i_ndi_devi_online_cb(struct async_arg *arg)
+{
+	(void) ndi_devi_online(arg->dip, arg->flags);
+	kmem_free(arg, sizeof (*arg));
+}
+
+int
+ndi_devi_online_async(dev_info_t *dip, uint_t flags)
+{
+	/* mark child as need config if requested. */
+	if (flags & NDI_CONFIG)
+		DEVI_SET_NDI_CONFIG(dip);
+
+	return (i_ndi_devi_async_common(dip, flags,
+	    (void (*)())i_ndi_devi_online_cb));
+}
+
+/*
+ * Take a device node Offline
+ * To take a device Offline means to detach the device instance from
+ * the driver and prevent devfs requests from re-attaching the device
+ * instance.
+ *
+ * The flag NDI_DEVI_REMOVE causes removes the device node from
+ * the driver list and the device tree. In this case, the device
+ * is assumed to be removed from the system.
+ */
+int
+ndi_devi_offline(dev_info_t *dip, uint_t flags)
+{
+	int circ, rval = 0;
+	dev_info_t *pdip = ddi_get_parent(dip);
+	struct brevq_node *brevq = NULL;
+
+	ASSERT(pdip);
+
+	flags |= NDI_DEVI_OFFLINE;
+	ndi_devi_enter(pdip, &circ);
+	if (i_ddi_node_state(dip) == DS_READY) {
+		/*
+		 * If dip is in DS_READY state, there may be cached dv_nodes
+		 * referencing this dip, so we invoke devfs code path.
+		 * Note that we must release busy changing on pdip to
+		 * avoid deadlock against devfs.
+		 */
+		char *devname = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
+		(void) ddi_deviname(dip, devname);
+		ndi_devi_exit(pdip, circ);
+
+		/*
+		 * If we own parent lock, this is part of a branch
+		 * operation. We skip the devfs_clean() step.
+		 */
+		if (!DEVI_BUSY_OWNED(pdip))
+			rval = devfs_clean(pdip, devname + 1, DV_CLEAN_FORCE);
+		kmem_free(devname, MAXNAMELEN + 1);
+
+		if (rval == 0)
+			rval = devi_unconfig_branch(dip, NULL,
+			    flags|NDI_UNCONFIG, &brevq);
+		if (rval)
+			return (NDI_FAILURE);
+
+		ndi_devi_enter(pdip, &circ);
+	}
+
+	init_bound_node_ev(pdip, dip, flags);
+
+	rval = devi_detach_node(dip, flags);
+	if (brevq) {
+		if (rval != NDI_SUCCESS)
+			log_and_free_brevq_dip(dip, brevq);
+		else
+			free_brevq(brevq);
+	}
+
+	ndi_devi_exit(pdip, circ);
+
+	return (rval);
+}
+
+/*
+ * Find the child dev_info node of parent nexus 'p' whose name
+ * matches "cname@caddr".  Recommend use of ndi_devi_findchild() instead.
+ */
+dev_info_t *
+ndi_devi_find(dev_info_t *pdip, char *cname, char *caddr)
+{
+	dev_info_t *child;
+	int circ;
+
+	if (pdip == NULL || cname == NULL || caddr == NULL)
+		return ((dev_info_t *)NULL);
+
+	ndi_devi_enter(pdip, &circ);
+	child = find_sibling(ddi_get_child(pdip), cname, caddr, 0, NULL);
+	ndi_devi_exit(pdip, circ);
+	return (child);
+}
+
+/*
+ * Find the child dev_info node of parent nexus 'p' whose name
+ * matches devname "name@addr".  Permits caller to hold the parent.
+ */
+dev_info_t *
+ndi_devi_findchild(dev_info_t *pdip, char *devname)
+{
+	dev_info_t *child;
+	char	*cname, *caddr;
+	char	*devstr;
+
+	ASSERT(DEVI_BUSY_OWNED(pdip));
+
+	devstr = i_ddi_strdup(devname, KM_SLEEP);
+	i_ddi_parse_name(devstr, &cname, &caddr, NULL);
+
+	if (cname == NULL || caddr == NULL) {
+		kmem_free(devstr, strlen(devname)+1);
+		return ((dev_info_t *)NULL);
+	}
+
+	child = find_sibling(ddi_get_child(pdip), cname, caddr, 0, NULL);
+	kmem_free(devstr, strlen(devname)+1);
+	return (child);
+}
+
+/*
+ * Misc. routines called by framework only
+ */
+
+/*
+ * Clear the DEVI_MADE_CHILDREN/DEVI_ATTACHED_CHILDREN flags
+ * if new child spec has been added.
+ */
+static int
+reset_nexus_flags(dev_info_t *dip, void *arg)
+{
+	struct hwc_spec *list;
+
+	if (((DEVI(dip)->devi_flags & DEVI_MADE_CHILDREN) == 0) ||
+	    ((list = hwc_get_child_spec(dip, (major_t)(uintptr_t)arg)) == NULL))
+		return (DDI_WALK_CONTINUE);
+
+	hwc_free_spec_list(list);
+	mutex_enter(&DEVI(dip)->devi_lock);
+	DEVI(dip)->devi_flags &= ~(DEVI_MADE_CHILDREN | DEVI_ATTACHED_CHILDREN);
+	mutex_exit(&DEVI(dip)->devi_lock);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * Helper functions, returns NULL if no memory.
+ */
+
+/*
+ * path_to_major:
+ *
+ * Return an alternate driver name binding for the leaf device
+ * of the given pathname, if there is one. The purpose of this
+ * function is to deal with generic pathnames. The default action
+ * for platforms that can't do this (ie: x86 or any platform that
+ * does not have prom_finddevice functionality, which matches
+ * nodenames and unit-addresses without the drivers participation)
+ * is to return (major_t)-1.
+ *
+ * Used in loadrootmodules() in the swapgeneric module to
+ * associate a given pathname with a given leaf driver.
+ *
+ */
+major_t
+path_to_major(char *path)
+{
+	dev_info_t *dip;
+	char *p, *q;
+	dnode_t nodeid;
+	major_t maj;
+
+	/*
+	 * Get the nodeid of the given pathname, if such a mapping exists.
+	 */
+	dip = NULL;
+	nodeid = prom_finddevice(path);
+	if (nodeid != OBP_BADNODE) {
+		/*
+		 * Find the nodeid in our copy of the device tree and return
+		 * whatever name we used to bind this node to a driver.
+		 */
+		dip = e_ddi_nodeid_to_dip(nodeid);
+	}
+
+	if (dip == NULL) {
+		NDI_CONFIG_DEBUG((CE_WARN,
+		    "path_to_major: can't bind <%s>\n", path));
+		return ((major_t)-1);
+	}
+
+	/*
+	 * If we're bound to something other than the nodename,
+	 * note that in the message buffer and system log.
+	 */
+	p = ddi_binding_name(dip);
+	q = ddi_node_name(dip);
+	if (p && q && (strcmp(p, q) != 0))
+		NDI_CONFIG_DEBUG((CE_NOTE, "path_to_major: %s bound to %s\n",
+		    path, p));
+
+	maj = ddi_name_to_major(p);
+
+	ndi_rele_devi(dip);		/* release node held during walk */
+
+	return (maj);
+}
+
+/*
+ * Return the held dip for the specified major and instance, attempting to do
+ * an attach if specified. Return NULL if the devi can't be found or put in
+ * the proper state. The caller must release the hold via ddi_release_devi if
+ * a non-NULL value is returned.
+ *
+ * Some callers expect to be able to perform a hold_devi() while in a context
+ * where using ndi_devi_enter() to ensure the hold might cause deadlock (see
+ * open-from-attach code in consconfig_dacf.c). Such special-case callers
+ * must ensure that an ndi_devi_enter(parent)/ndi_devi_hold() from a safe
+ * context is already active. The hold_devi() implementation must accommodate
+ * these callers.
+ */
+static dev_info_t *
+hold_devi(major_t major, int instance, int flags)
+{
+	struct devnames	*dnp;
+	dev_info_t	*dip;
+	char		*path;
+
+	if ((major >= devcnt) || (instance == -1))
+		return (NULL);
+
+	/* try to find the instance in the per driver list */
+	dnp = &(devnamesp[major]);
+	LOCK_DEV_OPS(&(dnp->dn_lock));
+	for (dip = dnp->dn_head; dip;
+	    dip = (dev_info_t *)DEVI(dip)->devi_next) {
+		/* skip node if instance field is not valid */
+		if (i_ddi_node_state(dip) < DS_INITIALIZED)
+			continue;
+
+		/* look for instance match */
+		if (DEVI(dip)->devi_instance == instance) {
+			/*
+			 * To accommodate callers that can't block in
+			 * ndi_devi_enter() we do an ndi_devi_hold(), and
+			 * afterwards check that the node is in a state where
+			 * the hold prevents detach(). If we did not manage to
+			 * prevent detach then we ndi_rele_devi() and perform
+			 * the slow path below (which can result in a blocking
+			 * ndi_devi_enter() while driving attach top-down).
+			 * This code depends on the ordering of
+			 * DEVI_SET_DETACHING and the devi_ref check in the
+			 * detach_node() code path.
+			 */
+			ndi_hold_devi(dip);
+			if ((i_ddi_node_state(dip) >= DS_ATTACHED) &&
+			    !DEVI_IS_DETACHING(dip)) {
+				UNLOCK_DEV_OPS(&(dnp->dn_lock));
+				return (dip);	/* fast-path with devi held */
+			}
+			ndi_rele_devi(dip);
+
+			/* try slow-path */
+			dip = NULL;
+			break;
+		}
+	}
+	ASSERT(dip == NULL);
+	UNLOCK_DEV_OPS(&(dnp->dn_lock));
+
+	if (flags & E_DDI_HOLD_DEVI_NOATTACH)
+		return (NULL);		/* told not to drive attach */
+
+	/* slow-path may block, so it should not occur from interrupt */
+	ASSERT(!servicing_interrupt());
+	if (servicing_interrupt())
+		return (NULL);
+
+	/* reconstruct the path and drive attach by path through devfs. */
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	if (e_ddi_majorinstance_to_path(major, instance, path) == 0)
+		dip = e_ddi_hold_devi_by_path(path, flags);
+	kmem_free(path, MAXPATHLEN);
+	return (dip);			/* with devi held */
+}
+
+/*
+ * The {e_}ddi_hold_devi{_by_{instance|dev|path}} hold the devinfo node
+ * associated with the specified arguments.  This hold should be released
+ * by calling ddi_release_devi.
+ *
+ * The E_DDI_HOLD_DEVI_NOATTACH flag argument allows the caller to to specify
+ * a failure return if the node is not already attached.
+ *
+ * NOTE: by the time we make e_ddi_hold_devi public, we should be able to reuse
+ * ddi_hold_devi again.
+ */
+dev_info_t *
+ddi_hold_devi_by_instance(major_t major, int instance, int flags)
+{
+	return (hold_devi(major, instance, flags));
+}
+
+dev_info_t *
+e_ddi_hold_devi_by_dev(dev_t dev, int flags)
+{
+	major_t	major = getmajor(dev);
+	dev_info_t	*dip;
+	struct dev_ops	*ops;
+	dev_info_t	*ddip = NULL;
+
+	dip = hold_devi(major, dev_to_instance(dev), flags);
+
+	/*
+	 * The rest of this routine is legacy support for drivers that
+	 * have broken DDI_INFO_DEVT2INSTANCE implementations but may have
+	 * functional DDI_INFO_DEVT2DEVINFO implementations.  This code will
+	 * diagnose inconsistency and, for maximum compatibility with legacy
+	 * drivers, give preference to the drivers DDI_INFO_DEVT2DEVINFO
+	 * implementation over the above derived dip based the driver's
+	 * DDI_INFO_DEVT2INSTANCE implementation. This legacy support should
+	 * be removed when DDI_INFO_DEVT2DEVINFO is deprecated.
+	 *
+	 * NOTE: The following code has a race condition. DEVT2DEVINFO
+	 *	returns a dip which is not held. By the time we ref ddip,
+	 *	it could have been freed. The saving grace is that for
+	 *	most drivers, the dip returned from hold_devi() is the
+	 *	same one as the one returned by DEVT2DEVINFO, so we are
+	 *	safe for drivers with the correct getinfo(9e) impl.
+	 */
+	if (((ops = ddi_hold_driver(major)) != NULL) &&
+	    CB_DRV_INSTALLED(ops) && ops->devo_getinfo)  {
+		if ((*ops->devo_getinfo)(NULL, DDI_INFO_DEVT2DEVINFO,
+		    (void *)dev, (void **)&ddip) != DDI_SUCCESS)
+			ddip = NULL;
+	}
+
+	/* give preference to the driver returned DEVT2DEVINFO dip */
+	if (ddip && (dip != ddip)) {
+#ifdef	DEBUG
+		cmn_err(CE_WARN, "%s: inconsistent getinfo(9E) implementation",
+		    ddi_driver_name(ddip));
+#endif	/* DEBUG */
+		ndi_hold_devi(ddip);
+		if (dip)
+			ndi_rele_devi(dip);
+		dip = ddip;
+	}
+
+	if (ops)
+		ddi_rele_driver(major);
+
+	return (dip);
+}
+
+/*
+ * For compatibility only. Do not call this function!
+ */
+dev_info_t *
+e_ddi_get_dev_info(dev_t dev, vtype_t type)
+{
+	dev_info_t *dip = NULL;
+	if (getmajor(dev) >= devcnt)
+		return (NULL);
+
+	switch (type) {
+	case VCHR:
+	case VBLK:
+		dip = e_ddi_hold_devi_by_dev(dev, 0);
+	default:
+		break;
+	}
+
+	/*
+	 * For compatibility reasons, we can only return the dip with
+	 * the driver ref count held. This is not a safe thing to do.
+	 * For certain broken third-party software, we are willing
+	 * to venture into unknown territory.
+	 */
+	if (dip) {
+		(void) ndi_hold_driver(dip);
+		ndi_rele_devi(dip);
+	}
+	return (dip);
+}
+
+dev_info_t *
+e_ddi_hold_devi_by_path(char *path, int flags)
+{
+	dev_info_t	*dip;
+
+	/* can't specify NOATTACH by path */
+	ASSERT(!(flags & E_DDI_HOLD_DEVI_NOATTACH));
+
+	return (resolve_pathname(path, &dip, NULL, NULL) ? NULL : dip);
+}
+
+void
+e_ddi_hold_devi(dev_info_t *dip)
+{
+	ndi_hold_devi(dip);
+}
+
+void
+ddi_release_devi(dev_info_t *dip)
+{
+	ndi_rele_devi(dip);
+}
+
+/*
+ * Associate a streams queue with a devinfo node
+ * NOTE: This function is called by STREAM driver's put procedure.
+ *	It cannot block.
+ */
+void
+ddi_assoc_queue_with_devi(queue_t *q, dev_info_t *dip)
+{
+	queue_t *rq = _RD(q);
+	struct stdata *stp;
+	vnode_t *vp;
+
+	/* set flag indicating that ddi_assoc_queue_with_devi was called */
+	mutex_enter(QLOCK(rq));
+	rq->q_flag |= _QASSOCIATED;
+	mutex_exit(QLOCK(rq));
+
+	/* get the vnode associated with the queue */
+	stp = STREAM(rq);
+	vp = stp->sd_vnode;
+	ASSERT(vp);
+
+	/* change the hardware association of the vnode */
+	spec_assoc_vp_with_devi(vp, dip);
+}
+
+/*
+ * ddi_install_driver(name)
+ *
+ * Driver installation is currently a byproduct of driver loading.  This
+ * may change.
+ */
+int
+ddi_install_driver(char *name)
+{
+	major_t major = ddi_name_to_major(name);
+
+	if ((major == (major_t)-1) ||
+	    (ddi_hold_installed_driver(major) == NULL)) {
+		return (DDI_FAILURE);
+	}
+	ddi_rele_driver(major);
+	return (DDI_SUCCESS);
+}
+
+struct dev_ops *
+ddi_hold_driver(major_t major)
+{
+	return (mod_hold_dev_by_major(major));
+}
+
+
+void
+ddi_rele_driver(major_t major)
+{
+	mod_rele_dev_by_major(major);
+}
+
+
+/*
+ * This is called during boot to force attachment order of special dips
+ * dip must be referenced via ndi_hold_devi()
+ */
+int
+i_ddi_attach_node_hierarchy(dev_info_t *dip)
+{
+	dev_info_t *parent;
+
+	if (i_ddi_node_state(dip) == DS_READY)
+		return (DDI_SUCCESS);
+
+	/*
+	 * Attach parent dip
+	 */
+	parent = ddi_get_parent(dip);
+	if (i_ddi_attach_node_hierarchy(parent) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	/*
+	 * Expand .conf nodes under this parent
+	 */
+	(void) i_ndi_make_spec_children(parent, 0);
+	return (i_ddi_attachchild(dip));
+}
+
+/* keep this function static */
+static int
+attach_driver_nodes(major_t major)
+{
+	struct devnames *dnp;
+	dev_info_t *dip;
+	int error = DDI_FAILURE;
+
+	dnp = &devnamesp[major];
+	LOCK_DEV_OPS(&dnp->dn_lock);
+	dip = dnp->dn_head;
+	while (dip) {
+		ndi_hold_devi(dip);
+		UNLOCK_DEV_OPS(&dnp->dn_lock);
+		if (i_ddi_attach_node_hierarchy(dip) == DDI_SUCCESS)
+			error = DDI_SUCCESS;
+		LOCK_DEV_OPS(&dnp->dn_lock);
+		ndi_rele_devi(dip);
+		dip = ddi_get_next(dip);
+	}
+	if (error == DDI_SUCCESS)
+		dnp->dn_flags |= DN_NO_AUTODETACH;
+	UNLOCK_DEV_OPS(&dnp->dn_lock);
+
+
+	return (error);
+}
+
+/*
+ * i_ddi_attach_hw_nodes configures and attaches all hw nodes
+ * bound to a specific driver. This function replaces calls to
+ * ddi_hold_installed_driver() for drivers with no .conf
+ * enumerated nodes.
+ *
+ * This facility is typically called at boot time to attach
+ * platform-specific hardware nodes, such as ppm nodes on xcal
+ * and grover and keyswitch nodes on cherrystone. It does not
+ * deal with .conf enumerated node. Calling it beyond the boot
+ * process is strongly discouraged.
+ */
+int
+i_ddi_attach_hw_nodes(char *driver)
+{
+	major_t major;
+
+	major = ddi_name_to_major(driver);
+	if (major == (major_t)-1)
+		return (DDI_FAILURE);
+
+	return (attach_driver_nodes(major));
+}
+
+/*
+ * i_ddi_attach_pseudo_node configures pseudo drivers which
+ * has a single node. The .conf nodes must be enumerated
+ * before calling this interface. The dip is held attached
+ * upon returning.
+ *
+ * This facility should only be called only at boot time
+ * by the I/O framework.
+ */
+dev_info_t *
+i_ddi_attach_pseudo_node(char *driver)
+{
+	major_t major;
+	dev_info_t *dip;
+
+	major = ddi_name_to_major(driver);
+	if (major == (major_t)-1)
+		return (NULL);
+
+	if (attach_driver_nodes(major) != DDI_SUCCESS)
+		return (NULL);
+
+	dip = devnamesp[major].dn_head;
+	ASSERT(dip && ddi_get_next(dip) == NULL);
+	ndi_hold_devi(dip);
+	return (dip);
+}
+
+static void
+diplist_to_parent_major(dev_info_t *head, char parents[])
+{
+	major_t major;
+	dev_info_t *dip, *pdip;
+
+	for (dip = head; dip != NULL; dip = ddi_get_next(dip)) {
+		pdip = ddi_get_parent(dip);
+		ASSERT(pdip);	/* disallow rootnex.conf nodes */
+		major = ddi_driver_major(pdip);
+		if ((major != (major_t)-1) && parents[major] == 0)
+			parents[major] = 1;
+	}
+}
+
+/*
+ * Call ddi_hold_installed_driver() on each parent major
+ * and invoke mt_config_driver() to attach child major.
+ * This is part of the implementation of ddi_hold_installed_driver.
+ */
+static int
+attach_driver_by_parent(major_t child_major, char parents[])
+{
+	major_t par_major;
+	struct mt_config_handle *hdl;
+	int flags = NDI_DEVI_PERSIST | NDI_NO_EVENT;
+
+	hdl = mt_config_init(NULL, NULL, flags, child_major, MT_CONFIG_OP,
+	    NULL);
+	for (par_major = 0; par_major < devcnt; par_major++) {
+		/* disallow recursion on the same driver */
+		if (parents[par_major] == 0 || par_major == child_major)
+			continue;
+		if (ddi_hold_installed_driver(par_major) == NULL)
+			continue;
+		hdl->mtc_parmajor = par_major;
+		mt_config_driver(hdl);
+		ddi_rele_driver(par_major);
+	}
+	(void) mt_config_fini(hdl);
+
+	return (i_ddi_devs_attached(child_major));
+}
+
+int
+i_ddi_devs_attached(major_t major)
+{
+	dev_info_t *dip;
+	struct devnames *dnp;
+	int error = DDI_FAILURE;
+
+	/* check for attached instances */
+	dnp = &devnamesp[major];
+	LOCK_DEV_OPS(&dnp->dn_lock);
+	for (dip = dnp->dn_head; dip != NULL; dip = ddi_get_next(dip)) {
+		if (i_ddi_node_state(dip) >= DS_ATTACHED) {
+			error = DDI_SUCCESS;
+			break;
+		}
+	}
+	UNLOCK_DEV_OPS(&dnp->dn_lock);
+
+	return (error);
+}
+
+/*
+ * ddi_hold_installed_driver configures and attaches all
+ * instances of the specified driver. To accomplish this
+ * it configures and attaches all possible parents of
+ * the driver, enumerated both in h/w nodes and in the
+ * driver's .conf file.
+ *
+ * NOTE: This facility is for compatibility purposes only and will
+ *	eventually go away. Its usage is strongly discouraged.
+ */
+static void
+enter_driver(struct devnames *dnp)
+{
+	mutex_enter(&dnp->dn_lock);
+	ASSERT(dnp->dn_busy_thread != curthread);
+	while (dnp->dn_flags & DN_DRIVER_BUSY)
+		cv_wait(&dnp->dn_wait, &dnp->dn_lock);
+	dnp->dn_flags |= DN_DRIVER_BUSY;
+	dnp->dn_busy_thread = curthread;
+	mutex_exit(&dnp->dn_lock);
+}
+
+static void
+exit_driver(struct devnames *dnp)
+{
+	mutex_enter(&dnp->dn_lock);
+	ASSERT(dnp->dn_busy_thread == curthread);
+	dnp->dn_flags &= ~DN_DRIVER_BUSY;
+	dnp->dn_busy_thread = NULL;
+	cv_broadcast(&dnp->dn_wait);
+	mutex_exit(&dnp->dn_lock);
+}
+
+struct dev_ops *
+ddi_hold_installed_driver(major_t major)
+{
+	struct dev_ops *ops;
+	struct devnames *dnp;
+	char *parents;
+	int error;
+
+	ops = ddi_hold_driver(major);
+	if (ops == NULL)
+		return (NULL);
+
+	/*
+	 * Return immediately if all the attach operations associated
+	 * with a ddi_hold_installed_driver() call have already been done.
+	 */
+	dnp = &devnamesp[major];
+	enter_driver(dnp);
+	if (dnp->dn_flags & DN_DRIVER_HELD) {
+		exit_driver(dnp);
+		if (i_ddi_devs_attached(major) == DDI_SUCCESS)
+			return (ops);
+		ddi_rele_driver(major);
+		return (NULL);
+	}
+
+	LOCK_DEV_OPS(&dnp->dn_lock);
+	dnp->dn_flags |= (DN_DRIVER_HELD | DN_NO_AUTODETACH);
+	UNLOCK_DEV_OPS(&dnp->dn_lock);
+
+	DCOMPATPRINTF((CE_CONT,
+	    "ddi_hold_installed_driver: %s\n", dnp->dn_name));
+
+	/*
+	 * When the driver has no .conf children, it is sufficient
+	 * to attach existing nodes in the device tree. Nodes not
+	 * enumerated by the OBP are not attached.
+	 */
+	if (dnp->dn_pl == NULL) {
+		if (attach_driver_nodes(major) == DDI_SUCCESS) {
+			exit_driver(dnp);
+			return (ops);
+		}
+		exit_driver(dnp);
+		ddi_rele_driver(major);
+		return (NULL);
+	}
+
+	/*
+	 * Driver has .conf nodes. We find all possible parents
+	 * and recursively all ddi_hold_installed_driver on the
+	 * parent driver; then we invoke ndi_config_driver()
+	 * on all possible parent node in parallel to speed up
+	 * performance.
+	 */
+	parents = kmem_zalloc(devcnt * sizeof (char), KM_SLEEP);
+
+	LOCK_DEV_OPS(&dnp->dn_lock);
+	/* find .conf parents */
+	(void) impl_parlist_to_major(dnp->dn_pl, parents);
+	/* find hw node parents */
+	diplist_to_parent_major(dnp->dn_head, parents);
+	UNLOCK_DEV_OPS(&dnp->dn_lock);
+
+	error = attach_driver_by_parent(major, parents);
+	kmem_free(parents, devcnt * sizeof (char));
+	if (error == DDI_SUCCESS) {
+		exit_driver(dnp);
+		return (ops);
+	}
+
+	exit_driver(dnp);
+	ddi_rele_driver(major);
+	return (NULL);
+}
+
+/*
+ * Default bus_config entry point for nexus drivers
+ */
+int
+ndi_busop_bus_config(dev_info_t *pdip, uint_t flags, ddi_bus_config_op_t op,
+    void *arg, dev_info_t **child, clock_t timeout)
+{
+	major_t major;
+
+	/*
+	 * A timeout of 30 minutes or more is probably a mistake
+	 * This is intended to catch uses where timeout is in
+	 * the wrong units.  timeout must be in units of ticks.
+	 */
+	ASSERT(timeout < SEC_TO_TICK(1800));
+
+	major = (major_t)-1;
+	switch (op) {
+	case BUS_CONFIG_ONE:
+		NDI_DEBUG(flags, (CE_CONT, "%s%d: bus config %s timeout=%ld\n",
+			ddi_driver_name(pdip), ddi_get_instance(pdip),
+			(char *)arg, timeout));
+		return (devi_config_one(pdip, (char *)arg, child, flags,
+		    timeout));
+
+	case BUS_CONFIG_DRIVER:
+		major = (major_t)(uintptr_t)arg;
+		/*FALLTHROUGH*/
+	case BUS_CONFIG_ALL:
+		NDI_DEBUG(flags, (CE_CONT, "%s%d: bus config timeout=%ld\n",
+			ddi_driver_name(pdip), ddi_get_instance(pdip),
+			timeout));
+		if (timeout > 0) {
+			NDI_DEBUG(flags, (CE_CONT,
+			    "%s%d: bus config all timeout=%ld\n",
+			    ddi_driver_name(pdip), ddi_get_instance(pdip),
+			    timeout));
+			delay(timeout);
+		}
+		return (config_immediate_children(pdip, flags, major));
+
+	default:
+		return (NDI_FAILURE);
+	}
+	/*NOTREACHED*/
+}
+
+/*
+ * Default busop bus_unconfig handler for nexus drivers
+ */
+int
+ndi_busop_bus_unconfig(dev_info_t *pdip, uint_t flags, ddi_bus_config_op_t op,
+    void *arg)
+{
+	major_t major;
+
+	major = (major_t)-1;
+	switch (op) {
+	case BUS_UNCONFIG_ONE:
+		NDI_DEBUG(flags, (CE_CONT, "%s%d: bus unconfig %s\n",
+		    ddi_driver_name(pdip), ddi_get_instance(pdip),
+		    (char *)arg));
+		return (devi_unconfig_one(pdip, (char *)arg, flags));
+
+	case BUS_UNCONFIG_DRIVER:
+		major = (major_t)(uintptr_t)arg;
+		/*FALLTHROUGH*/
+	case BUS_UNCONFIG_ALL:
+		NDI_DEBUG(flags, (CE_CONT, "%s%d: bus unconfig all\n",
+		    ddi_driver_name(pdip), ddi_get_instance(pdip)));
+		return (unconfig_immediate_children(pdip, NULL, flags, major));
+
+	default:
+		return (NDI_FAILURE);
+	}
+	/*NOTREACHED*/
+}
+
+/*
+ * dummy functions to be removed
+ */
+void
+impl_rem_dev_props(dev_info_t *dip)
+{
+	_NOTE(ARGUNUSED(dip))
+	/* do nothing */
+}
+
+/*
+ * Determine if a node is a leaf node. If not sure, return false (0).
+ */
+static int
+is_leaf_node(dev_info_t *dip)
+{
+	major_t major = ddi_driver_major(dip);
+
+	if (major == (major_t)-1)
+		return (0);
+
+	return (devnamesp[major].dn_flags & DN_LEAF_DRIVER);
+}
+
+/*
+ * Multithreaded [un]configuration
+ */
+static struct mt_config_handle *
+mt_config_init(dev_info_t *pdip, dev_info_t **dipp, int flags,
+    major_t major, int op, struct brevq_node **brevqp)
+{
+	struct mt_config_handle	*hdl = kmem_alloc(sizeof (*hdl), KM_SLEEP);
+
+	mutex_init(&hdl->mtc_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&hdl->mtc_cv, NULL, CV_DEFAULT, NULL);
+	hdl->mtc_pdip = pdip;
+	hdl->mtc_fdip = dipp;
+	hdl->mtc_parmajor = (major_t)-1;
+	hdl->mtc_flags = flags;
+	hdl->mtc_major = major;
+	hdl->mtc_thr_count = 0;
+	hdl->mtc_op = op;
+	hdl->mtc_error = 0;
+	hdl->mtc_brevqp = brevqp;
+
+#ifdef DEBUG
+	gethrestime(&hdl->start_time);
+	hdl->total_time = 0;
+#endif /* DEBUG */
+
+	return (hdl);
+}
+
+#ifdef DEBUG
+static int
+time_diff_in_msec(timestruc_t start, timestruc_t end)
+{
+	int	nsec, sec;
+
+	sec = end.tv_sec - start.tv_sec;
+	nsec = end.tv_nsec - start.tv_nsec;
+	if (nsec < 0) {
+		nsec += NANOSEC;
+		sec -= 1;
+	}
+
+	return (sec * (NANOSEC >> 20) + (nsec >> 20));
+}
+
+#endif	/* DEBUG */
+
+static int
+mt_config_fini(struct mt_config_handle *hdl)
+{
+	int		rv;
+#ifdef DEBUG
+	int		real_time;
+	timestruc_t	end_time;
+#endif /* DEBUG */
+
+	mutex_enter(&hdl->mtc_lock);
+	while (hdl->mtc_thr_count > 0)
+		cv_wait(&hdl->mtc_cv, &hdl->mtc_lock);
+	rv = hdl->mtc_error;
+	mutex_exit(&hdl->mtc_lock);
+
+#ifdef DEBUG
+	gethrestime(&end_time);
+	real_time = time_diff_in_msec(hdl->start_time, end_time);
+	if ((ddidebug & DDI_MTCONFIG) && hdl->mtc_pdip)
+		cmn_err(CE_NOTE,
+		    "config %s%d: total time %d msec, real time %d msec",
+			ddi_driver_name(hdl->mtc_pdip),
+			ddi_get_instance(hdl->mtc_pdip),
+			hdl->total_time, real_time);
+#endif /* DEBUG */
+
+	cv_destroy(&hdl->mtc_cv);
+	mutex_destroy(&hdl->mtc_lock);
+	kmem_free(hdl, sizeof (*hdl));
+
+	return (rv);
+}
+
+struct mt_config_data {
+	struct mt_config_handle	*mtc_hdl;
+	dev_info_t		*mtc_dip;
+	major_t			mtc_major;
+	int			mtc_flags;
+	struct brevq_node	*mtc_brn;
+	struct mt_config_data	*mtc_next;
+};
+
+static void
+mt_config_thread(void *arg)
+{
+	struct mt_config_data	*mcd = (struct mt_config_data *)arg;
+	struct mt_config_handle	*hdl = mcd->mtc_hdl;
+	dev_info_t		*dip = mcd->mtc_dip;
+	dev_info_t		*rdip, **dipp;
+	major_t			major = mcd->mtc_major;
+	int			flags = mcd->mtc_flags;
+	int			rv = 0;
+
+#ifdef DEBUG
+	timestruc_t start_time, end_time;
+	gethrestime(&start_time);
+#endif /* DEBUG */
+
+	rdip = NULL;
+	dipp = hdl->mtc_fdip ? &rdip : NULL;
+
+	switch (hdl->mtc_op) {
+	case MT_CONFIG_OP:
+		rv = devi_config_common(dip, flags, major);
+		break;
+	case MT_UNCONFIG_OP:
+		if (mcd->mtc_brn) {
+			struct brevq_node *brevq = NULL;
+			rv = devi_unconfig_common(dip, dipp, flags, major,
+			    &brevq);
+			mcd->mtc_brn->child = brevq;
+		} else
+			rv = devi_unconfig_common(dip, dipp, flags, major,
+			    NULL);
+		break;
+	}
+
+	mutex_enter(&hdl->mtc_lock);
+#ifdef DEBUG
+	gethrestime(&end_time);
+	hdl->total_time += time_diff_in_msec(start_time, end_time);
+#endif /* DEBUG */
+	if (rv != NDI_SUCCESS)
+		hdl->mtc_error = rv;
+	if (hdl->mtc_fdip && *hdl->mtc_fdip == NULL) {
+		*hdl->mtc_fdip = rdip;
+		rdip = NULL;
+	}
+
+	if (--hdl->mtc_thr_count == 0)
+		cv_broadcast(&hdl->mtc_cv);
+	mutex_exit(&hdl->mtc_lock);
+
+	if (rdip) {
+		ASSERT(rv != NDI_SUCCESS);
+		ndi_rele_devi(rdip);
+	}
+
+	ndi_rele_devi(dip);
+	kmem_free(mcd, sizeof (*mcd));
+}
+
+/*
+ * Multi-threaded config/unconfig of child nexus
+ */
+static void
+mt_config_children(struct mt_config_handle *hdl)
+{
+	dev_info_t		*pdip = hdl->mtc_pdip;
+	major_t			major = hdl->mtc_major;
+	dev_info_t		*dip;
+	int			circ;
+	struct brevq_node	*brn = NULL;
+	struct mt_config_data	*mcd_head = NULL;
+	struct mt_config_data	*mcd_tail = NULL;
+	struct mt_config_data	*mcd;
+#ifdef DEBUG
+	timestruc_t		end_time;
+
+	/* Update total_time in handle */
+	gethrestime(&end_time);
+	hdl->total_time += time_diff_in_msec(hdl->start_time, end_time);
+#endif
+
+	ndi_devi_enter(pdip, &circ);
+	dip = ddi_get_child(pdip);
+	while (dip) {
+		if (hdl->mtc_op == MT_UNCONFIG_OP && hdl->mtc_brevqp &&
+		    !(DEVI_EVREMOVE(dip)) &&
+		    i_ddi_node_state(dip) >= DS_INITIALIZED) {
+			/*
+			 * Enqueue this dip's deviname.
+			 * No need to hold a lock while enqueuing since this
+			 * is the only thread doing the enqueue and no one
+			 * walks the queue while we are in multithreaded
+			 * unconfiguration.
+			 */
+			brn = brevq_enqueue(hdl->mtc_brevqp, dip, NULL);
+		}
+
+		/*
+		 * Hold the child that we are processing so he does not get
+		 * removed. The corrisponding ndi_rele_devi() for children
+		 * that are not being skipped is done at the end of
+		 * mt_config_thread().
+		 */
+		ndi_hold_devi(dip);
+
+		/*
+		 * skip leaf nodes and (for configure) nodes not
+		 * fully attached.
+		 */
+		if (is_leaf_node(dip) ||
+		    (hdl->mtc_op == MT_CONFIG_OP &&
+		    i_ddi_node_state(dip) < DS_READY)) {
+			ndi_rele_devi(dip);
+			dip = ddi_get_next_sibling(dip);
+			continue;
+		}
+
+		mcd = kmem_alloc(sizeof (*mcd), KM_SLEEP);
+		mcd->mtc_dip = dip;
+		mcd->mtc_hdl = hdl;
+		mcd->mtc_brn = brn;
+
+		/*
+		 * Switch a 'driver' operation to an 'all' operation below a
+		 * node bound to the driver.
+		 */
+		if ((major == (major_t)-1) || (major == ddi_driver_major(pdip)))
+			mcd->mtc_major = (major_t)-1;
+		else
+			mcd->mtc_major = major;
+
+		/*
+		 * The unconfig-driver to unconfig-all conversion above
+		 * constitutes an autodetach for NDI_DETACH_DRIVER calls,
+		 * set NDI_AUTODETACH.
+		 */
+		mcd->mtc_flags = hdl->mtc_flags;
+		if ((mcd->mtc_flags & NDI_DETACH_DRIVER) &&
+		    (hdl->mtc_op == MT_UNCONFIG_OP) &&
+		    (major == ddi_driver_major(pdip)))
+			mcd->mtc_flags |= NDI_AUTODETACH;
+
+		mutex_enter(&hdl->mtc_lock);
+		hdl->mtc_thr_count++;
+		mutex_exit(&hdl->mtc_lock);
+
+		/*
+		 * Add to end of list to process after ndi_devi_exit to avoid
+		 * locking differences depending on value of mtc_off.
+		 */
+		mcd->mtc_next = NULL;
+		if (mcd_head == NULL)
+			mcd_head = mcd;
+		else
+			mcd_tail->mtc_next = mcd;
+		mcd_tail = mcd;
+
+		dip = ddi_get_next_sibling(dip);
+	}
+	ndi_devi_exit(pdip, circ);
+
+	/* go through the list of held children */
+	for (mcd = mcd_head; mcd; mcd = mcd_head) {
+		mcd_head = mcd->mtc_next;
+		if (mtc_off)
+			mt_config_thread(mcd);
+		else
+			(void) thread_create(NULL, 0, mt_config_thread, mcd,
+			    0, &p0, TS_RUN, minclsyspri);
+	}
+}
+
+static void
+mt_config_driver(struct mt_config_handle *hdl)
+{
+	major_t			par_major = hdl->mtc_parmajor;
+	major_t			major = hdl->mtc_major;
+	struct devnames		*dnp = &devnamesp[par_major];
+	dev_info_t		*dip;
+	struct mt_config_data	*mcd_head = NULL;
+	struct mt_config_data	*mcd_tail = NULL;
+	struct mt_config_data	*mcd;
+#ifdef DEBUG
+	timestruc_t		end_time;
+
+	/* Update total_time in handle */
+	gethrestime(&end_time);
+	hdl->total_time += time_diff_in_msec(hdl->start_time, end_time);
+#endif
+	ASSERT(par_major != (major_t)-1);
+	ASSERT(major != (major_t)-1);
+
+	LOCK_DEV_OPS(&dnp->dn_lock);
+	dip = devnamesp[par_major].dn_head;
+	while (dip) {
+		/*
+		 * Hold the child that we are processing so he does not get
+		 * removed. The corrisponding ndi_rele_devi() for children
+		 * that are not being skipped is done at the end of
+		 * mt_config_thread().
+		 */
+		ndi_hold_devi(dip);
+
+		/* skip leaf nodes and nodes not fully attached */
+		if ((i_ddi_node_state(dip) < DS_READY) || is_leaf_node(dip)) {
+			ndi_rele_devi(dip);
+			dip = ddi_get_next(dip);
+			continue;
+		}
+
+		mcd = kmem_alloc(sizeof (*mcd), KM_SLEEP);
+		mcd->mtc_dip = dip;
+		mcd->mtc_hdl = hdl;
+		mcd->mtc_major = major;
+		mcd->mtc_flags = hdl->mtc_flags;
+
+		mutex_enter(&hdl->mtc_lock);
+		hdl->mtc_thr_count++;
+		mutex_exit(&hdl->mtc_lock);
+
+		/*
+		 * Add to end of list to process after UNLOCK_DEV_OPS to avoid
+		 * locking differences depending on value of mtc_off.
+		 */
+		mcd->mtc_next = NULL;
+		if (mcd_head == NULL)
+			mcd_head = mcd;
+		else
+			mcd_tail->mtc_next = mcd;
+		mcd_tail = mcd;
+
+		dip = ddi_get_next(dip);
+	}
+	UNLOCK_DEV_OPS(&dnp->dn_lock);
+
+	/* go through the list of held children */
+	for (mcd = mcd_head; mcd; mcd = mcd_head) {
+		mcd_head = mcd->mtc_next;
+		if (mtc_off)
+			mt_config_thread(mcd);
+		else
+			(void) thread_create(NULL, 0, mt_config_thread, mcd,
+			    0, &p0, TS_RUN, minclsyspri);
+	}
+}
+
+/*
+ * Given the nodeid for a persistent (PROM or SID) node, return
+ * the corresponding devinfo node
+ * NOTE: This function will return NULL for .conf nodeids.
+ */
+dev_info_t *
+e_ddi_nodeid_to_dip(dnode_t nodeid)
+{
+	dev_info_t		*dip = NULL;
+	struct devi_nodeid	*prev, *elem;
+
+	mutex_enter(&devimap->dno_lock);
+
+	prev = NULL;
+	for (elem = devimap->dno_head; elem; elem = elem->next) {
+		if (elem->nodeid == nodeid) {
+			ndi_hold_devi(elem->dip);
+			dip = elem->dip;
+			break;
+		}
+		prev = elem;
+	}
+
+	/*
+	 * Move to head for faster lookup next time
+	 */
+	if (elem && prev) {
+		prev->next = elem->next;
+		elem->next = devimap->dno_head;
+		devimap->dno_head = elem;
+	}
+
+	mutex_exit(&devimap->dno_lock);
+	return (dip);
+}
+
+static void
+free_cache_task(void *arg)
+{
+	ASSERT(arg == NULL);
+
+	mutex_enter(&di_cache.cache_lock);
+
+	/*
+	 * The cache can be invalidated without holding the lock
+	 * but it can be made valid again only while the lock is held.
+	 * So if the cache is invalid when the lock is held, it will
+	 * stay invalid until lock is released.
+	 */
+	if (!di_cache.cache_valid)
+		i_ddi_di_cache_free(&di_cache);
+
+	mutex_exit(&di_cache.cache_lock);
+
+	if (di_cache_debug)
+		cmn_err(CE_NOTE, "system_taskq: di_cache freed");
+}
+
+extern int modrootloaded;
+
+void
+i_ddi_di_cache_free(struct di_cache *cache)
+{
+	int	error;
+
+	ASSERT(mutex_owned(&cache->cache_lock));
+
+	if (cache->cache_size) {
+		ASSERT(cache->cache_size > 0);
+		ASSERT(cache->cache_data);
+
+		kmem_free(cache->cache_data, cache->cache_size);
+		cache->cache_data = NULL;
+		cache->cache_size = 0;
+
+		if (di_cache_debug)
+			cmn_err(CE_NOTE, "i_ddi_di_cache_free: freed cachemem");
+	} else {
+		ASSERT(cache->cache_data == NULL);
+		if (di_cache_debug)
+			cmn_err(CE_NOTE, "i_ddi_di_cache_free: NULL cache");
+	}
+
+	if (!modrootloaded || rootvp == NULL || vn_is_readonly(rootvp)) {
+		if (di_cache_debug) {
+			cmn_err(CE_WARN, "/ not mounted/RDONLY. Skip unlink");
+		}
+		return;
+	}
+
+	error = vn_remove(DI_CACHE_FILE, UIO_SYSSPACE, RMFILE);
+	if (di_cache_debug && error && error != ENOENT) {
+		cmn_err(CE_WARN, "%s: unlink failed: %d", DI_CACHE_FILE, error);
+	} else if (di_cache_debug && !error) {
+		cmn_err(CE_NOTE, "i_ddi_di_cache_free: unlinked cache file");
+	}
+}
+
+void
+i_ddi_di_cache_invalidate(int kmflag)
+{
+	uint_t	flag;
+
+	if (!modrootloaded || !i_ddi_io_initialized()) {
+		if (di_cache_debug)
+			cmn_err(CE_NOTE, "I/O not inited. Skipping invalidate");
+		return;
+	}
+
+	/*
+	 * Invalidate the in-core cache
+	 */
+	atomic_and_32(&di_cache.cache_valid, 0);
+
+	flag = (kmflag == KM_SLEEP) ? TQ_SLEEP : TQ_NOSLEEP;
+
+	(void) taskq_dispatch(system_taskq, free_cache_task, NULL, flag);
+
+	if (di_cache_debug) {
+		cmn_err(CE_NOTE, "invalidation with km_flag: %s",
+		    kmflag == KM_SLEEP ? "KM_SLEEP" : "KM_NOSLEEP");
+	}
+}
+
+
+static void
+i_bind_vhci_node(dev_info_t *dip)
+{
+	char	*node_name;
+
+	node_name = i_ddi_strdup(ddi_node_name(dip), KM_SLEEP);
+	i_ddi_set_binding_name(dip, node_name);
+	DEVI(dip)->devi_major = ddi_name_to_major(node_name);
+	i_ddi_set_node_state(dip, DS_BOUND);
+}
+
+
+static void
+i_free_vhci_bind_name(dev_info_t *dip)
+{
+	if (DEVI(dip)->devi_binding_name) {
+		kmem_free(DEVI(dip)->devi_binding_name,
+		    sizeof (ddi_node_name(dip)));
+	}
+}
+
+
+static char vhci_node_addr[2];
+
+static int
+i_init_vhci_node(dev_info_t *dip)
+{
+	add_global_props(dip);
+	DEVI(dip)->devi_ops = ndi_hold_driver(dip);
+	if (DEVI(dip)->devi_ops == NULL)
+		return (-1);
+
+	DEVI(dip)->devi_instance = e_ddi_assign_instance(dip);
+	e_ddi_keep_instance(dip);
+	vhci_node_addr[0]	= '\0';
+	ddi_set_name_addr(dip, vhci_node_addr);
+	i_ddi_set_node_state(dip, DS_INITIALIZED);
+	return (0);
+}
+
+static void
+i_link_vhci_node(dev_info_t *dip)
+{
+	/*
+	 * scsi_vhci should be kept left most of the device tree.
+	 */
+	mutex_enter(&global_vhci_lock);
+	if (scsi_vhci_dip) {
+		DEVI(dip)->devi_sibling = DEVI(scsi_vhci_dip)->devi_sibling;
+		DEVI(scsi_vhci_dip)->devi_sibling = DEVI(dip);
+	} else {
+		DEVI(dip)->devi_sibling = DEVI(top_devinfo)->devi_child;
+		DEVI(top_devinfo)->devi_child = DEVI(dip);
+	}
+	mutex_exit(&global_vhci_lock);
+}
+
+
+/*
+ * This a special routine to enumerate vhci node (child of rootnex
+ * node) without holding the ndi_devi_enter() lock. The device node
+ * is allocated, initialized and brought into DS_READY state before
+ * inserting into the device tree. The VHCI node is handcrafted
+ * here to bring the node to DS_READY, similar to rootnex node.
+ *
+ * The global_vhci_lock protects linking the node into the device
+ * as same lock is held before linking/unlinking any direct child
+ * of rootnex children.
+ *
+ * This routine is a workaround to handle a possible deadlock
+ * that occurs while trying to enumerate node in a different sub-tree
+ * during _init/_attach entry points.
+ */
+/*ARGSUSED*/
+dev_info_t *
+ndi_devi_config_vhci(char *drvname, int flags)
+{
+	struct devnames		*dnp;
+	dev_info_t		*dip;
+	major_t			major = ddi_name_to_major(drvname);
+
+	if (major == -1)
+		return (NULL);
+
+	/* Make sure we create the VHCI node only once */
+	dnp = &devnamesp[major];
+	LOCK_DEV_OPS(&dnp->dn_lock);
+	if (dnp->dn_head) {
+		dip = dnp->dn_head;
+		UNLOCK_DEV_OPS(&dnp->dn_lock);
+		return (dip);
+	}
+	UNLOCK_DEV_OPS(&dnp->dn_lock);
+
+	/* Allocate the VHCI node */
+	ndi_devi_alloc_sleep(top_devinfo, drvname, DEVI_SID_NODEID, &dip);
+	ndi_hold_devi(dip);
+
+	/* Mark the node as VHCI */
+	DEVI(dip)->devi_node_attributes |= DDI_VHCI_NODE;
+
+	i_ddi_add_devimap(dip);
+	i_bind_vhci_node(dip);
+	if (i_init_vhci_node(dip) == -1) {
+		i_free_vhci_bind_name(dip);
+		ndi_rele_devi(dip);
+		(void) ndi_devi_free(dip);
+		return (NULL);
+	}
+
+	DEVI_SET_ATTACHING(dip);
+	if (devi_attach(dip, DDI_ATTACH) != DDI_SUCCESS) {
+		cmn_err(CE_CONT, "Could not attach %s driver", drvname);
+		e_ddi_free_instance(dip, vhci_node_addr);
+		i_free_vhci_bind_name(dip);
+		ndi_rele_devi(dip);
+		(void) ndi_devi_free(dip);
+		return (NULL);
+	}
+	DEVI_CLR_ATTACHING(dip);
+
+	i_link_vhci_node(dip);
+	i_ddi_set_node_state(dip, DS_READY);
+
+	LOCK_DEV_OPS(&dnp->dn_lock);
+	dnp->dn_flags |= DN_DRIVER_HELD;
+	dnp->dn_head = dip;
+	UNLOCK_DEV_OPS(&dnp->dn_lock);
+
+	i_ndi_devi_report_status_change(dip, NULL);
+
+	return (dip);
+}
+
+/*
+ * ibt_hw_is_present() returns 0 when there is no IB hardware actively
+ * running.  This is primarily useful for modules like rpcmod which
+ * needs a quick check to decide whether or not it should try to use
+ * InfiniBand
+ */
+int ib_hw_status = 0;
+int
+ibt_hw_is_present()
+{
+	return (ib_hw_status);
+}

@@ -1,0 +1,183 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+# Clear sysidtool which may have gone into maintenance due to a dependency
+# cycle with milestone/single-user, when upgrading to a system that
+# introduces milestone/sysconfig.
+#
+cat >> $BASEDIR/var/svc/profile/upgrade <<\_CLRSYSID
+	/usr/sbin/svcadm clear svc:/system/sysidtool:net
+	/usr/sbin/svcadm clear svc:/system/sysidtool:system
+_CLRSYSID
+
+if [ -h $BASEDIR/var/mail.ABCsavedXYZ ] ; then
+	rmdir $BASEDIR/var/mail/:saved >/dev/null 2>&1
+	if [ $? = 0 ] ; then
+		rmdir $BASEDIR/var/mail >/dev/null 2>&1
+		if [ $? = 0 ] ; then
+			mv $BASEDIR/var/mail.ABCsavedXYZ $BASEDIR/var/mail
+		fi
+	fi
+	rm -fr $BASEDIR/var/mail.ABCsavedXYZ
+fi
+
+if [ -h $BASEDIR/var/news.ABCsavedXYZ ] ; then
+	rmdir $BASEDIR/var/news >/dev/null 2>&1
+	if [ $? = 0 ] ; then
+		mv $BASEDIR/var/news.ABCsavedXYZ $BASEDIR/var/news
+	fi
+	rm -fr $BASEDIR/var/news.ABCsavedXYZ
+fi
+
+PMTAB=$BASEDIR/etc/saf/tcp/_pmtab
+if [ -f $PMTAB ] ; then
+	sed -e 's/\\x00020ACE......../\\x00020ACE00000000/' \
+	    -e 's/\\x00020203......../\\x0002020300000000/' $PMTAB >/tmp/t.$$
+	cp /tmp/t.$$ $PMTAB
+fi
+
+AUTH_ATTR=$BASEDIR/etc/security/auth_attr
+if [ -f $AUTH_ATTR ] ; then
+	sed '/^solaris\.\*/d' $AUTH_ATTR > /tmp/a.$$
+	cp /tmp/a.$$ $AUTH_ATTR
+	rm -f /tmp/a.$$
+fi
+
+INITTAB=$BASEDIR/etc/inittab
+if [ -f $INITTAB -a -n "$SUNW_PKG_INSTALL_ZONENAME" -a \
+    "$SUNW_PKG_INSTALL_ZONENAME" != "global" ]; then
+	sed -e '/^ap:/d' -e '/^sp:/d' $INITTAB > /tmp/i.$$
+	cp /tmp/i.$$ $INITTAB
+	rm -f /tmp/i.$$
+fi
+
+VFSTAB=$BASEDIR/etc/vfstab
+if [ -f $VFSTAB -a -n "$SUNW_PKG_INSTALL_ZONENAME" -a \
+    "$SUNW_PKG_INSTALL_ZONENAME" != "global" ]; then
+	sed '/^\/devices[	 ]/d' $VFSTAB > /tmp/v.$$
+	cp /tmp/v.$$ $VFSTAB
+	rm -f /tmp/v.$$
+fi
+
+#
+# Get rid of obsolete BIND 8 server instance
+#
+cat >> $BASEDIR/var/svc/profile/upgrade <<\_DEL_BIND8
+	obs_se=/usr/sbin/in.named
+	cur_se=`svcprop -p start/exec svc:/network/dns/server 2>/dev/null`
+	if [ "$obs_se" = "$cur_se" ]; then
+		svcadm disable -s svc:/network/dns/server:default
+		svccfg delete svc:/network/dns/server:default
+		# If this was the only instance, delete the service also
+		svcs network/dns/server >/dev/null 2>&1 || \
+		    svccfg delete svc:/network/dns/server
+	fi
+_DEL_BIND8
+
+#
+# svc:/network/rpc/keyserv is expected to be off on systems that don't
+# set domainname.  On systems that do define a default domain, leave the
+# setting as previously set.
+#
+cat >> $BASEDIR/var/svc/profile/upgrade <<\_CSVC_UPGRADE_2
+	if [ ! -f /etc/defaultdomain ]; then
+		svcadm disable network/rpc/keyserv
+	fi
+_CSVC_UPGRADE_2
+
+if [ "$UPDATE" != yes ]; then
+	#
+	# On initial install, default to ns_files.xml.  The installer will
+	# customize, if appropriate.
+	#
+	ln -s ns_files.xml $BASEDIR/var/svc/profile/name_service.xml
+elif [ ! -r $BASEDIR/var/svc/profile/name_service.xml ]; then
+	#
+	# Associate name service profile, if none present.
+	#
+	grep ldap $BASEDIR/etc/nsswitch.conf >/dev/null 2>&1
+	is_ldap=$?
+	grep nisplus $BASEDIR/etc/nsswitch.conf >/dev/null 2>&1
+	is_nisplus=$?
+	grep nis $BASEDIR/etc/nsswitch.conf >/dev/null 2>&1
+	is_nis=$?
+
+	if [ $is_ldap = 0 ]; then
+		ns_profile=ns_ldap.xml
+	elif [ $is_nisplus = 0  ]; then
+		ns_profile=ns_nisplus.xml
+	elif [ $is_nis = 0 ]; then
+		ns_profile=ns_nis.xml
+	else
+		ns_profile=ns_files.xml
+	fi
+
+	ln -s $ns_profile $BASEDIR/var/svc/profile/name_service.xml
+
+	grep dns $BASEDIR/etc/nsswitch.conf >/dev/null 2>&1
+	if [ $? = 0 ]; then
+		echo "/usr/sbin/svcadm enable network/dns/client" >> \
+		    $BASEDIR/var/svc/profile/upgrade
+	fi
+fi
+
+#
+# Associate correct inetd services profile.
+#
+rm -f $BASEDIR/var/svc/profile/inetd_services.xml
+if [ "$UPDATE" = yes ]; then
+	ln -s inetd_upgrade.xml $BASEDIR/var/svc/profile/inetd_services.xml
+	# Ensure inetd-upgrade is run post-upgrade
+	echo "/usr/sbin/svcadm enable network/inetd-upgrade" >> \
+	    $BASEDIR/var/svc/profile/upgrade
+else
+	ln -s inetd_generic.xml $BASEDIR/var/svc/profile/inetd_services.xml
+fi
+
+#
+# /etc/svc/repository.db was previously packaged but it is now generated
+# from one of the seed repositories and then updated by svccfg(1M).
+# Therefore, removef(1M) is used to remove the packaging database entry
+# although the repository itself is preserved.
+#
+/usr/sbin/removef $PKGINST /etc/svc/repository.db >/dev/null 2>&1
+/usr/sbin/removef -f $PKGINST >/dev/null 2>&1
+
+# Solaris audit's internal "enable/disable" state is maintained by
+# c2audit; if c2audit accepts the auditconfig query, then auditing
+# is enabled and SMF should enable auditd.
+#
+cat >> $BASEDIR/var/svc/profile/upgrade <<\_ENABLE_AUDIT
+/usr/sbin/auditconfig -getcond 2> /dev/null
+if [ $? -eq 0 ]; then
+	/usr/sbin/svcadm enable system/auditd
+fi
+_ENABLE_AUDIT
+
+exit 0

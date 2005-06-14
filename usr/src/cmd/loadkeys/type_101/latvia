@@ -1,0 +1,91 @@
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Latvian key layout
+#
+
+# Main Pad Row 1:  digits, Backspace
+key 1 base ` shift fa_tilde caps ` ctrl ` altg -
+key 2 base 1 shift ! caps 1 ctrl 1 altg nop
+key 3 base 2 shift @ caps 2 ctrl 2 altg §
+key 4 base 3 shift # caps 3 ctrl 3 altg °
+key 5 base 4 shift $ caps 4 ctrl 4 altg nop
+key 6 base 5 shift % caps 5 ctrl 5 altg nop
+key 7 base 6 shift ^ caps 6 ctrl ^^ altg '\''
+key 8 base 7 shift & caps 7 ctrl 7 altg nop
+key 9 base 8 shift * caps 8 ctrl 8 altg nop
+key 10 base 9 shift ( caps 9 ctrl 9 altg nop
+key 11 base 0 shift ) caps 0 ctrl 0 altg nop
+key 12 base - shift _ caps - ctrl ^_ altg nop
+key 13 base = shift + caps = ctrl = altg nop
+key 14 all hole
+key 15 all '\b'
+
+# Main Pad Row 2:  Tab, QWERTY...
+key 17 base q shift Q caps Q ctrl ^Q altg nop
+key 18 base w shift W caps W ctrl ^W altg nop
+key 19 base e shift E caps E ctrl ^E altg ã
+key 20 base r shift R caps R ctrl ^R altg °
+key 22 base y shift Y caps Y ctrl ^Y altg nop
+key 25 base o shift O caps O ctrl ^O altg õ
+key 26 base p shift P caps P ctrl ^P altg nop
+key 27 base [ shift { caps [ ctrl ^[ altg nop
+key 28 base ] shift } caps ] ctrl ^] altg nop
+key 29 base ° shift | caps ° ctrl ° altg nop
+
+# Main Pad Row 3:  CapsLock, ASDFGH..., Enter
+key 31 base a shift A caps A ctrl ^A altg nop
+key 32 base s shift S caps S ctrl ^S altg nop
+key 39 base l shift L caps L ctrl ^L altg ô
+key 40 base ; shift : caps ; ctrl ; altg nop
+key 41 base ` shift '"' caps ` ctrl ` altg fa_grave
+key 42 base # shift ~ caps # ctrl # altg nop
+
+# Main Pad Row 4:  Shift, ZXCVBN..., Shift
+key 45 all hole
+key 46 base z shift Z caps Z ctrl ^Z altg nop
+key 47 base x shift X caps X ctrl ^X altg nop
+key 48 base c shift C caps C ctrl ^C altg nop
+key 52 base m shift M caps M ctrl '\r' altg nop
+key 53 base , shift < caps , ctrl , altg nop
+key 54 base . shift > caps . ctrl . altg nop
+key 55 base / shift ? caps / ctrl ^_ altg nop
+key 56 all nop
+
+# Main Pad Row 5:  Ctrl, Alt, Space, ...
+key 62 all shiftkeys+altgraph up shiftkeys+altgraph
+
+# Numeric Pad
+key 104 base '\177' shift . caps '\177' ctrl paddot altg nop numl paddot
+
+# Japanese Keys
+key 131 all hole
+key 132 all hole
+key 133 all hole
+
+# Korean Keys
+key 150 all hole
+key 151 all hole

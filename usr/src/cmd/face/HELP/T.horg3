@@ -1,0 +1,13 @@
+
+Press CHOICES to toggle between yes and no.
+
+         - no (default value): Selecting no for this field will
+           cause the selections made on this form to affect the
+           style that the current file folder is displayed in. 
+           These selections will override the selections made on
+           the Office Function Form.
+
+         - yes: Selecting yes for this field will cause the current 
+           file folder to be displayed according to the preferences
+           that you have set on the Office Function Form.
+

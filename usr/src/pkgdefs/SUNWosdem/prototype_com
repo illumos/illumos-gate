@@ -1,0 +1,134 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
+
+#!search <pathname pathname ...>	# where to find pkg objects
+#!include <filename>			# include another 'prototype' file
+#!default <mode> <owner> <group>	# default used if not specified on entry
+#!<param>=<value>			# puts parameter in pkg environment
+
+# packaging files
+i pkginfo
+i copyright
+i depend
+#
+# source locations relative to the prototype file
+#
+# SUNWosdem
+#
+d none usr 755 root sys
+d none usr/demo 755 root bin
+d none usr/demo/ELF 755 root bin
+f none usr/demo/ELF/Makefile 644 root bin
+f none usr/demo/ELF/README 644 root bin
+f none usr/demo/ELF/acom.c 644 root bin
+f none usr/demo/ELF/dispsyms.c 644 root bin
+f none usr/demo/ELF/pcom.c 644 root bin
+f none usr/demo/ELF/dcom.c 644 root bin
+f none usr/demo/ELF/tpcom.c 644 root bin
+d none usr/demo/libexacct 755 root bin
+f none usr/demo/libexacct/README 644 root bin
+f none usr/demo/libexacct/Makefile 644 root bin
+f none usr/demo/libexacct/exdump.c 644 root bin
+d none usr/demo/librtld_db 755 root bin
+f none usr/demo/librtld_db/00README 644 root bin
+f none usr/demo/librtld_db/Makefile.com 644 root bin
+f none usr/demo/librtld_db/Makefile.targ 644 root bin
+d none usr/demo/librtld_db/common 755 root bin
+f none usr/demo/librtld_db/common/bpt.c 644 root bin
+f none usr/demo/librtld_db/common/callstack.c 644 root bin
+f none usr/demo/librtld_db/common/dis.c 644 root bin
+f none usr/demo/librtld_db/common/disasm.c 644 root bin
+f none usr/demo/librtld_db/common/disasm.h 644 root bin
+f none usr/demo/librtld_db/common/globals.c 644 root bin
+f none usr/demo/librtld_db/common/gram.y 644 root bin
+f none usr/demo/librtld_db/common/help.c 644 root bin
+f none usr/demo/librtld_db/common/lex.l 644 root bin
+f none usr/demo/librtld_db/common/main.c 644 root bin
+f none usr/demo/librtld_db/common/maps.c 644 root bin
+f none usr/demo/librtld_db/common/ps.c 644 root bin
+f none usr/demo/librtld_db/common/rdb.h 644 root bin
+f none usr/demo/librtld_db/common/rdb.man 644 root bin
+f none usr/demo/librtld_db/common/syms.c 644 root bin
+f none usr/demo/librtld_db/common/utils.c 644 root bin
+d none usr/demo/librtld_db/i386 755 root bin
+f none usr/demo/librtld_db/i386/Makefile 644 root bin
+f none usr/demo/librtld_db/i386/m_utils.c 644 root bin
+f none usr/demo/librtld_db/i386/rdb_mach.h 644 root bin
+f none usr/demo/librtld_db/i386/regs.c 644 root bin
+d none usr/demo/librtld_db/amd64 755 root bin
+f none usr/demo/librtld_db/amd64/Makefile 644 root bin
+f none usr/demo/librtld_db/amd64/rdb_mach.h 644 root bin
+f none usr/demo/librtld_db/amd64/regs.c 644 root bin
+d none usr/demo/librtld_db/sparc 755 root bin
+f none usr/demo/librtld_db/sparc/Makefile 644 root bin
+f none usr/demo/librtld_db/sparc/m_utils.c 644 root bin
+f none usr/demo/librtld_db/sparc/rdb_mach.h 644 root bin
+f none usr/demo/librtld_db/sparc/regs.c 644 root bin
+d none usr/demo/librtld_db/sparcv9 755 root bin
+f none usr/demo/librtld_db/sparcv9/Makefile 644 root bin
+f none usr/demo/librtld_db/sparcv9/m_utils.c 644 root bin
+f none usr/demo/librtld_db/sparcv9/rdb_mach.h 644 root bin
+f none usr/demo/librtld_db/sparcv9/regs.c 644 root bin
+d none usr/demo/librtld_db/tests 755 root bin
+f none usr/demo/librtld_db/tests/breaks 644 root bin
+f none usr/demo/librtld_db/tests/loadmaps 644 root bin
+f none usr/demo/librtld_db/tests/object_padding_maps 644 root bin
+f none usr/demo/librtld_db/tests/plt_skip 644 root bin
+f none usr/demo/librtld_db/tests/simp.c 644 root bin
+f none usr/demo/librtld_db/tests/steps 644 root bin
+f none usr/demo/librtld_db/tests/sub.c 644 root bin
+f none usr/demo/librtld_db/tests/test-sparc-regs 644 root bin
+d none usr/demo/link_audit 755 root bin
+f none usr/demo/link_audit/00README 644 root bin
+f none usr/demo/link_audit/Makefile 644 root bin
+d none usr/demo/link_audit/man 755 root bin
+f none usr/demo/link_audit/man/dumpbind.man 644 root bin
+f none usr/demo/link_audit/man/perfcnt.man 644 root bin
+f none usr/demo/link_audit/man/symbindrep.man 644 root bin
+d none usr/demo/link_audit/src 755 root bin
+f none usr/demo/link_audit/src/dumpbind.c 644 root bin
+f none usr/demo/link_audit/src/bindings.c 644 root bin
+f none usr/demo/link_audit/src/bindings.h 644 root bin
+f none usr/demo/link_audit/src/env.c 644 root bin
+f none usr/demo/link_audit/src/env.h 644 root bin
+f none usr/demo/link_audit/src/hash.c 644 root bin
+f none usr/demo/link_audit/src/hash.h 644 root bin
+f none usr/demo/link_audit/src/sotruss.ksh 644 root bin
+f none usr/demo/link_audit/src/mach.h 644 root bin
+f none usr/demo/link_audit/src/perfcnt.c 644 root bin
+f none usr/demo/link_audit/src/perfcnt.ksh 644 root bin
+f none usr/demo/link_audit/src/symbindrep.c 644 root bin
+f none usr/demo/link_audit/src/symbindrep.ksh 644 root bin
+f none usr/demo/link_audit/src/truss.c 644 root bin
+f none usr/demo/link_audit/src/who.c 644 root bin
+f none usr/demo/link_audit/src/who.h 644 root bin
+f none usr/demo/link_audit/src/whocalls.ksh 644 root bin

@@ -1,0 +1,18 @@
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright (c) 2001 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+# External declarations - used to suppress -zdefs errors.
+
+{
+	add_options	= FUNCTION extern;	# Provided by pppd.
+	detached	= DATA extern;		#    "     "
+	error		= FUNCTION extern;	#    "     "
+	pap_passwd_hook = DATA extern;		#    "     "
+	remote_name	= DATA extern;		#    "     "
+	slprintf	= FUNCTION extern;	#    "     "
+	sys_close	= FUNCTION extern;	#    "     "
+	warn		= FUNCTION extern;	#    "     "
+};

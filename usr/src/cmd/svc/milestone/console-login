@@ -1,0 +1,68 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# For modifying parameters passed to ttymon, do not edit
+# this script. Instead use svccfg(1m) to modify the SMF
+# repository. For example:
+#
+# # svccfg
+# svc:> select system/console-login
+# svc:/system/console-login> setprop ttymon/terminal_type = "xterm"
+# svc:/system/console-login> exit
+
+FMRI=svc:/system/console-login
+
+getproparg() {
+	val=`svcprop -p $2 $FMRI`
+	[ -n "$val" ] && echo $1 $val
+}
+
+args="-g"
+
+val=`svcprop -p ttymon/device $FMRI`
+# if this isn't set, recover a little
+[ -z "$val" ] && val=/dev/console
+args="$args -d $val"
+
+args="$args `getproparg -l ttymon/label`"
+args="$args `getproparg -T ttymon/terminal_type`"
+args="$args `getproparg -m ttymon/modules`"
+
+val=`svcprop -p ttymon/nohangup $FMRI`
+[ "$val" = "true" ] && args="$args -h"
+
+val=`svcprop -p ttymon/timeout $FMRI`
+[ -n "$val" -a "$val" != "0" ] && args="$args -t $val"
+
+val=`svcprop -p ttymon/prompt $FMRI`
+if [ -n "$val" ]; then
+	prompt=`eval echo $val`
+	exec /usr/lib/saf/ttymon $args -p "`eval echo $prompt` "
+else
+	exec /usr/lib/saf/ttymon $args
+fi

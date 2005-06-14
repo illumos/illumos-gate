@@ -1,0 +1,96 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#  NOTE:  When a change is made to the source file for
+#  /etc/security/device_policy a corresponding change must be made to
+#  this class-action script.
+#
+while read src dest
+do
+	if [ ! -f $dest ] ; then
+		cp $src $dest
+		continue
+	fi
+
+	# changes
+	cp $dest $dest.$$
+	sed < $dest.$$ > $dest \
+	    -e '/md:admin/s/read_priv_set=sys_config/			/' \
+	    -e '/^[sm]d[: 	]/d'					   \
+	    -e '/^ssd[: 	]/d'					   \
+	    -e '/^fssnap:\*	/d'					   \
+	    -e '/^icmp[ 	]*read_priv_set=net_rawaccess[ 	]*write_priv_set=net_rawaccess$/d' \
+	    -e '/^icmp6[ 	]*read_priv_set=net_rawaccess[ 	]*write_priv_set=net_rawaccess$/d'
+
+	rm -f $dest.$$
+
+	# potential additions
+	additions="bge dnet ibd icmp icmp6 openeepr random vni ipf pfil"
+
+	for dev in $additions
+	do
+		# if an entry for this driver exists in the source
+		# file...
+		grep "$dev" $src > /dev/null 2>&1
+		if [ $? = 0 ] ; then
+			# ...and no entry exists in the destination
+			# file...
+			grep "$dev" $dest > /dev/null 2>&1
+			if [ $? != 0 ] ; then
+				# ...then add the entry from
+				# the source file to the
+				# destination file.
+				grep "$dev" $src >> $dest
+			fi
+		fi
+	done
+
+	# potential deletions
+	deletions="elx"
+
+	for dev in $deletions
+	do
+		# if an entry for this driver exists in the destination
+		# file...
+		grep "$dev" $dest > /dev/null 2>&1
+		if [ $? = 0 ] ; then
+			# ...and no entry exists in the source
+			# file...
+			grep "$dev" $src > /dev/null 2>&1
+			if [ $? != 0 ] ; then
+				# ...then remove the entry from
+				# the destination file.
+				cp $dest $dest.$$
+				grep -v "$dev" $dest.$$ > $dest
+				rm -f $dest.$$
+			fi
+		fi
+	done
+done
+
+exit 0

@@ -1,0 +1,36 @@
+
+The WASTEBASKET contains folders and files you have deleted from your
+Filecabinet.  Files and folders placed in the WASTEBASKET will be
+permanently removed from your system.
+
+Objects in the WASTEBASKET may be moved or copied back into your
+Filecabinet using the move or copy command.  Use the undelete command
+if you would like to simply move an object back to the folder from
+which it was originally deleted.
+
+By accessing the Office Functions Form from the Preferences Menu, you
+can do the following:
+
+   - Set an interval period (1-30 days) for automatic deletion of
+     each object in your WASTEBASKET.
+
+   - Select to be notified when you log in that objects are ready
+     to be deleted from your WASTEBASKET.
+
+If you select to be notified before your WASTEBASKET is emptied, when
+FACE is started a frame will appear listing all the WASTEBASKET object(s)
+scheduled for removal.  If you press ENTER, you will delete all the
+WASTEBASKET object(s) listed in the frame.  If you press CANCEL, you
+will retain the listed object(s) in your WASTEBASKET.  You can also
+choose to save selected file(s) from this frame by moving to the file(s)
+you wish to save and pressing MARK.  When you are done marking those
+files you wish to save, press enter and the rest of the files in the
+frame will be deleted permanently.
+
+The undelete command is a WASTEBASKET command that enables you to
+"undelete" an object that is in the WASTEBASKET.  With the cursor
+resting on the item that you want to undelete, press f7 for the
+Commands Menu. Navigate to the undelete command and press ENTER. The
+item in the WASTEBASKET will be returned to the file folder you
+deleted it from.
+

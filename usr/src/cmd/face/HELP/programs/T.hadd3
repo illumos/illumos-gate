@@ -1,0 +1,11 @@
+
+Enter the name of the program to execute when this menu item
+is selected from the Programs menu.  You may enter the name
+of a command if that command appears in your PATH, otherwise
+you may enter a full pathname for the program.  Pathnames
+relative to your working directory are not allowed.  A check
+is made to warn you if you are not allowed to execute the
+program you have named or it cannot be found.
+
+There is no default for this field.
+

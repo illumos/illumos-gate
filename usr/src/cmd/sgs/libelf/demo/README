@@ -1,0 +1,78 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+This directory contains sample programs that demonstrate how to
+use the libelf library.  Manual pages for libelf routines are
+located in section 3e: Library Functions.
+
+Each of these sample programs displays or manipulates information
+from a ELF file in some way.  Each programs also uses libelf
+differently.  To learn more about ELF files and their format you
+should refer to the "Linker & Libraries section" of the Solaris
+AnswerBook and to the "System V Application Binary Interface"
+printed by Unix Press.
+
+The following is an overview of the source files provided:
+
+pcom.c		print comment: prints the .comment section of ELF
+		files ELF members of archives. Demonstrates how to
+		examine a file opened with elf_begin(ELF_C_READ)
+
+acom.c		append comment: appends to or creates a .comment
+		section for ELF files.  Demonstrates the updating
+		of a file with elf_begin(ELF_C_RDWR)
+
+dcom.c		delete comment: deletes a .comment section from an
+		ELF file.  Demonstrates the creation of a ELF
+		file with elf_begin(ELF_C_WRITE)
+
+tpcom.c		threaded print comment:  a threaded version of pcom.c.
+		Demonstrates that libelf is MT-Hot and can be used
+		in a threaded program.
+
+dispsyms.c	print symbols:  scans a ELF file for either
+		a symbol table (either SHT_DYNSYM or SHT_SYMTAB)
+		and displays the symbol tables contents.
+
+Makefile	make file to build the above programs.
+
+
+
+Building the demos
+------------------
+
+Before attempting to build the demos be sure that you have installed a
+Solaris Developer Cluster and a C compiler (purchased separatly) onto
+your system.
+
+To build the programs, do the following:
+
+	% make all
+
+To test the programs, do the following:
+
+	% make test

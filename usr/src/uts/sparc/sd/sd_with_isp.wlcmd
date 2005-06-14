@@ -1,0 +1,35 @@
+# Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+add scsi_watch_request::swr_callback targets \
+	sd.c:sd_mhd_watch_cb \
+	sd.c:sd_media_watch_cb
+
+add scsi_pkt::pkt_comp targets \
+	sd.c:sd_mhd_watch_cb \
+	sd.c:sd_media_watch_cb \
+	sd.c:sd_mhd_watch_cb \
+	scsi_watch.c:scsi_watch_request_intr \
+	sd.c:sdintr
+
+one scsi_device
+one isp
+
+add notify_entry::callback target  sd_mhd_reset_notify_cb
+add sd.c:sd_start_cmds/funcp target sd_initpkt_for_buf sd_initpkt_for_uscsi
+
+root isp_kmem_cache_constructor isp_kmem_cache_destructor
+root isp.c:isp_scsi_dmafree isp.c:isp_scsi_sync_pkt
+root isp.c:isp_i_print_response
+
+root sd_handle_mchange sd_media_change_task sd_start_stop_unit_task
+root sd_wm_cache_constructor sd_wm_cache_destructor sd_read_modify_write_task
+root sd_xbuf_strategy 
+root sd_failfast_flushq_callback
+
+
+add     scsi_hba_tran::tran_bus_config targets warlock_dummy
+add     scsi_hba_tran::tran_bus_unconfig targets warlock_dummy
+

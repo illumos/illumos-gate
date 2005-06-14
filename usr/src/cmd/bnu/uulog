@@ -1,0 +1,108 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+export IFS PATH
+IFS=" 	
+"
+PATH="/usr/bin"
+
+#
+# usage:
+# 	uulog
+# or	uulog foo
+# or	uulog -sfoo
+# or	uulog -s foo
+# or	uulog -ffoo
+# or	uulog -f foo
+#
+#	-x means check the execute file
+#	-nnn where 'nnn' is a number will do tail -nnn
+#
+LOGDIR=/var/uucp/.Log
+type=uucico
+fflag=""
+sys=""
+n=""
+
+cd $LOGDIR
+
+while getopts :xf:s:0123456789 FLAG; do
+	case $FLAG in
+	x)	type=uuxqt
+		;;
+	f)	fflag=1
+		sys="$sys $OPTARG"
+		;;
+	s)	sys="$sys $OPTARG"
+		;;
+	:)	gettext "uulog: System name must follow -$OPTARG flag\n" 1>&2
+		exit 1
+		;;
+	[0-9])	n=$n$FLAG
+		;;
+	*)	gettext "Usage: uulog [-x] [-f system] | [[-number] [-s system...]]\n" 1>&2
+		exit 1
+		;;
+	esac
+done
+
+shift `expr $OPTIND - 1`
+
+sys="$sys $*"
+
+set - $sys
+if [ x$fflag = x ]; then
+	if [ $# = 0 ]; then
+		set - `/usr/bin/ls $type`
+	fi
+	for i in $*
+	do
+		if [ -f $type/$i ]
+		then
+			if [ x$n = x ]; then
+				cat $type/$i
+			else
+				tail -$n $type/$i
+			fi
+		else
+			printf "`gettext 'uulog: No log file available for system %s'`\n" $i  1>&2
+			exit 1
+		fi
+	done
+else
+	if [ $# != 1 ]; then
+		gettext "uulog: Only one system allowed with -f\n" 1>&2
+		exit 2
+	fi
+	if [ -f $type/$1 ]
+	then
+		exec tail -${n}f $type/$1
+	else
+		printf "`gettext 'uulog: No log file available for system %s'`\n" $1 1>&2
+		exit 1
+	fi
+fi

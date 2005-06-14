@@ -1,0 +1,10 @@
+
+The time command displays the time of the day in hours and minutes on
+the message line.
+
+Use one of the methods below to display the time:
+
+     Command Menu:  Select time and press ENTER.
+
+     Command Line:  Type time and press ENTER.
+

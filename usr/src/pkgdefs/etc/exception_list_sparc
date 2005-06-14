@@ -1,0 +1,792 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Exception List for protocmp
+#
+###########################################
+#
+# ENTRIES FILTERED OUT OF THE protolist
+#
+###########################################
+#
+# The following entries are built in the /proto area
+# but not included in any packages - this is intentional.
+#
+usr/include/auth_list.h		sparc
+usr/include/getxby_door.h	sparc
+usr/include/rpcsvc/daemon_utils.h	sparc
+usr/include/priv_utils.h	sparc
+usr/include/bsm/audit_door_infc.h	sparc
+usr/include/bsm/audit_private.h	sparc
+usr/include/security/pam_impl.h	sparc
+usr/include/passwdutil.h	sparc
+#
+# Private/Internal libraries of the Cryptographic Framework.
+#
+usr/lib/llib-lelfsign.ln	sparc
+usr/lib/llib-lelfsign	sparc
+usr/lib/llib-lcryptoutil.ln	sparc
+usr/lib/llib-lcryptoutil	sparc
+usr/lib/sparcv9/llib-lcryptoutil.ln	sparc
+usr/include/cryptoutil.h	sparc
+#
+# The following files are used by libdhcpsvc, the
+# standalone's DHCP implementation, and the kernel (nfs_dlboot).
+# They contain interfaces which are currently private.
+#
+usr/include/dhcp_svc_private.h	sparc
+usr/include/dhcp_svc_confkey.h	sparc
+usr/include/dhcp_svc_confopt.h	sparc
+usr/include/dhcp_symbol.h	sparc
+usr/include/sys/sunos_dhcp_class.h	sparc
+usr/lib/llib-ldhcpsvc		sparc
+usr/lib/llib-ldhcpsvc.ln	sparc
+usr/lib/libdhcpsvc.so		sparc
+#
+# Private MAC driver header files
+#
+usr/include/sys/aggr.h		sparc
+usr/include/sys/aggr_impl.h	sparc
+usr/include/sys/dld.h		sparc
+usr/include/sys/dld_impl.h		sparc
+usr/include/sys/dls.h		sparc
+usr/include/sys/dls_impl.h		sparc
+usr/include/sys/mac.h		sparc
+usr/include/sys/mac_impl.h		sparc
+usr/include/libdladm.h		sparc
+usr/include/libdlpi.h		sparc
+usr/include/liblaadm.h		sparc
+usr/include/libmacadm.h		sparc
+#
+# These files are installed in the proto area for
+# Solaris MAC drivers and should not be shipped
+#
+lib/libdladm.so		sparc
+lib/libdlpi.so		sparc
+lib/liblaadm.so		sparc
+lib/libmacadm.so		sparc
+lib/llib-ldladm.ln		sparc
+lib/llib-ldladm		sparc
+lib/llib-ldlpi.ln		sparc
+lib/llib-ldlpi		sparc
+lib/llib-llaadm.ln		sparc
+lib/llib-llaadm		sparc
+lib/llib-lmacadm.ln		sparc
+lib/llib-lmacadm		sparc
+#
+# IKE and IPsec support library exceptions.  The IKE support
+# library contains exclusively private interfaces, as does
+# libipsecutil.  My apologies for the glut of header files here.
+#
+usr/include/ikedoor.h		sparc
+usr/include/ipsec_util.h	sparc
+usr/include/err.h		sparc
+usr/include/ike			sparc
+usr/include/ike/certlib.h	sparc
+usr/include/ike/pkcs11-glue.h	sparc
+usr/include/ike/crypto_tests.h	sparc
+usr/include/ike/sshdistdefs.h	sparc
+usr/include/ike/sshglobals.h	sparc
+usr/include/ike/sshasmidioms.h	sparc
+usr/include/ike/sshcryptoaux.h	sparc
+usr/include/ike/pkcs1_pad.h	sparc
+usr/include/ike/ssh1encode.h	sparc
+usr/include/ike/sshpem.h	sparc
+usr/include/ike/sshprvkey.h	sparc
+usr/include/ike/sshpemi.h	sparc
+usr/include/ike/sshkeyblob1.h	sparc
+usr/include/ike/sshkeyblob2.h	sparc
+usr/include/ike/sshpubkey.h	sparc
+usr/include/ike/sshcipherlist.h	sparc
+usr/include/ike/ssh2pubkeyencode.h	sparc
+usr/include/ike/sshpsystem.h	sparc
+usr/include/ike/sshsnlist.h	sparc
+usr/include/ike/dn.h		sparc
+usr/include/ike/ocsp_internal.h	sparc
+usr/include/ike/oid.h		sparc
+usr/include/ike/sshasn1-oid.h	sparc
+usr/include/ike/sshglist.h	sparc
+usr/include/ike/sshocsp.h	sparc
+usr/include/ike/sshocspclient.h	sparc
+usr/include/ike/sshocsphttp.h	sparc
+usr/include/ike/sshocspresponder.h	sparc
+usr/include/ike/sshpswbmac.h	sparc
+usr/include/ike/sshgafpi.h	sparc
+usr/include/ike/sshgafp.h	sparc
+usr/include/ike/x509.h		sparc
+usr/include/ike/x509internal.h	sparc
+usr/include/ike/x509spkac.h	sparc
+usr/include/ike/sshhttpi.h	sparc
+usr/include/ike/sshhttp_status.h	sparc
+usr/include/ike/sshhttp.h	sparc
+usr/include/ike/isakmp.h	sparc
+usr/include/ike/isakmp_defaults.h	sparc
+usr/include/ike/isakmp_doi.h	sparc
+usr/include/ike/isakmp_notify.h	sparc
+usr/include/ike/isakmp_internal.h	sparc
+usr/include/ike/isakmp_policy.h	sparc
+usr/include/ike/isakmp_state.h	sparc
+usr/include/ike/isakmp_util.h	sparc
+usr/include/ike/isakmp_linearize.h	sparc
+usr/include/ike/sshldap.h	sparc
+usr/include/ike/ldap-internal.h	sparc
+usr/include/ike/sshmp.h		sparc
+usr/include/ike/sshmp-2adic.h	sparc
+usr/include/ike/sshmp-kernel.h	sparc
+usr/include/ike/sshmp-arithmetic.h	sparc
+usr/include/ike/sshmp-compat.h	sparc
+usr/include/ike/sshmp-convabs.h	sparc
+usr/include/ike/sshmp-intmod.h	sparc
+usr/include/ike/sshmp-integer.h	sparc
+usr/include/ike/sshmp-montgomery.h	sparc
+usr/include/ike/sshmp-powm.h	sparc
+usr/include/ike/sshsieve.h	sparc
+usr/include/ike/sshmp-types.h	sparc
+usr/include/ike/sigchld.h	sparc
+usr/include/ike/sshtty.h	sparc
+usr/include/ike/sshttymodes.h	sparc
+usr/include/ike/pty-int.h	sparc
+usr/include/ike/sshsessionincludes.h	sparc
+usr/include/ike/sshunixpipestream.h	sparc
+usr/include/ike/sshunixptystream.h	sparc
+usr/include/ike/sshuser.h	sparc
+usr/include/ike/sshadt_i.h	sparc
+usr/include/ike/sshadt_array_i.h	sparc
+usr/include/ike/sshadt.h	sparc
+usr/include/ike/sshadt_array.h	sparc
+usr/include/ike/sshadt_map_i.h	sparc
+usr/include/ike/sshadt_assoc.h	sparc
+usr/include/ike/sshadt_avltree.h	sparc
+usr/include/ike/sshadt_avltree_i.h	sparc
+usr/include/ike/sshadt_bag.h	sparc
+usr/include/ike/sshadt_bag_i.h	sparc
+usr/include/ike/sshadt_conv.h	sparc
+usr/include/ike/sshadt_impls.h	sparc
+usr/include/ike/sshadt_intmap.h	sparc
+usr/include/ike/sshadt_list.h	sparc
+usr/include/ike/sshadt_list_i.h	sparc
+usr/include/ike/sshadt_std_i.h	sparc
+usr/include/ike/sshadt_map.h	sparc
+usr/include/ike/sshadt_priority_queue.h	sparc
+usr/include/ike/sshadt_shortcuts.h	sparc
+usr/include/ike/sshadt_strmap.h	sparc
+usr/include/ike/sshadt_structs.h	sparc
+usr/include/ike/sshadt_xmap.h	sparc
+usr/include/ike/sshadt_priority_heap.h	sparc
+usr/include/ike/sshadt_priority_heap_i.h	sparc
+usr/include/ike/sshadt_ranges.h	sparc
+usr/include/ike/sshaudit.h	sparc
+usr/include/ike/sshbuffer.h	sparc
+usr/include/ike/sshgetopt.h	sparc
+usr/include/ike/sshenum.h	sparc
+usr/include/ike/sshbprintf.h	sparc
+usr/include/ike/sshdebug.h	sparc
+usr/include/ike/sshdsprintf.h	sparc
+usr/include/ike/sshrand.h	sparc
+usr/include/ike/sshgetput.h	sparc
+usr/include/ike/sshfastalloc.h	sparc
+usr/include/ike/sshmatch.h	sparc
+usr/include/ike/sshrefcnt.h	sparc
+usr/include/ike/sshmalloc.h	sparc
+usr/include/ike/sshtime.h	sparc
+usr/include/ike/sshobstack.h	sparc
+usr/include/ike/sshsnprintf.h	sparc
+usr/include/ike/sshtimemeasure.h	sparc
+usr/include/ike/sshthread.h	sparc
+usr/include/ike/ssheloop.h	sparc
+usr/include/ike/sshmutex.h	sparc
+usr/include/ike/sshoperation.h	sparc
+usr/include/ike/sshtimeouts.h	sparc
+usr/include/ike/sshtimeoutsi.h	sparc
+usr/include/ike/sshfsm.h	sparc
+usr/include/ike/sshfsm_internal.h	sparc
+usr/include/ike/sshbufaux.h	sparc
+usr/include/ike/sshdecay.h	sparc
+usr/include/ike/sshcrc32.h	sparc
+usr/include/ike/sshgenutils.h	sparc
+usr/include/ike/sshinet.h	sparc
+usr/include/ike/sshtcp.h	sparc
+usr/include/ike/sshinetencode.h	sparc
+usr/include/ike/sshlocalstream.h	sparc
+usr/include/ike/sshsocks.h	sparc
+usr/include/ike/sshudp.h	sparc
+usr/include/ike/sshurl.h	sparc
+usr/include/ike/sshnameserver.h	sparc
+usr/include/ike/sshpacketint.h	sparc
+usr/include/ike/sshpacketstream.h	sparc
+usr/include/ike/sshstream.h	sparc
+usr/include/ike/sshdatastream.h	sparc
+usr/include/ike/sshfsmstreams.h	sparc
+usr/include/ike/sshstreamconnect.h	sparc
+usr/include/ike/sshstreampair.h	sparc
+usr/include/ike/sshdlex.h	sparc
+usr/include/ike/sshbase16.h	sparc
+usr/include/ike/sshencode.h	sparc
+usr/include/ike/sshbase64.h	sparc
+usr/include/ike/sshregex.h	sparc
+usr/include/ike/sshbitvector.h	sparc
+usr/include/ike/sshfingerprint.h	sparc
+usr/include/ike/sshmiscstring.h	sparc
+usr/include/ike/sshstr.h	sparc
+usr/include/ike/sshutf8.h	sparc
+usr/include/ike/sshfilebuffer.h	sparc
+usr/include/ike/sshdirectory.h	sparc
+usr/include/ike/sshfdstream.h	sparc
+usr/include/ike/sshfileio.h	sparc
+usr/include/ike/sshsignals.h	sparc
+usr/include/ike/sshincludes.h	sparc
+usr/include/ike/sshincludes_unix.h	sparc
+usr/include/ike/sshasn1.h	sparc
+usr/include/ike/sshasn1i.h	sparc
+usr/include/ike/sshber.h	sparc
+usr/include/ike/ssh_berfile.h	sparc
+usr/include/ike/enroll-internal.h	sparc
+usr/include/ike/enroll-pkix.h	sparc
+usr/include/ike/enroll-scep.h	sparc
+usr/include/ike/x509cmp-internal.h	sparc
+usr/include/ike/x509cmp.h	sparc
+usr/include/ike/x509scep.h	sparc
+usr/include/ike/sshenroll.h	sparc
+usr/include/ike/sshcrmf.h	sparc
+usr/include/ike/scep-internal.h	sparc
+usr/include/ike/ssh_PKIDiscoverySpec.h	sparc
+usr/include/ike/cert-db.h	sparc
+usr/include/ike/cmi-internal.h	sparc
+usr/include/ike/cmi-map.h	sparc
+usr/include/ike/cmi.h		sparc
+usr/include/ike/cmi-debug.h	sparc
+usr/include/ike/cmi-edb.h	sparc
+usr/include/ike/sshpkcs5.h	sparc
+usr/include/ike/pkcs6.h		sparc
+usr/include/ike/sshpkcs1.h	sparc
+usr/include/ike/sshpkcs12.h	sparc
+usr/include/ike/sshpkcs7.h	sparc
+usr/include/ike/sshpkcs8.h	sparc
+usr/include/ike/pkcs7-internal.h	sparc
+usr/include/ike/sshpkcs12-conv.h	sparc
+usr/include/ike/des.h		sparc
+usr/include/ike/blowfish.h	sparc
+usr/include/ike/nociph.h	sparc
+usr/include/ike/rc2.h		sparc
+usr/include/ike/rijndael.h	sparc
+usr/include/ike/sshrotate.h	sparc
+usr/include/ike/sshcipher_i.h	sparc
+usr/include/ike/namelist.h	sparc
+usr/include/ike/md5.h		sparc
+usr/include/ike/sha.h		sparc
+usr/include/ike/sha256.h	sparc
+usr/include/ike/sshhash_i.h	sparc
+usr/include/ike/hmac.h		sparc
+usr/include/ike/macs.h		sparc
+usr/include/ike/sshmac_i.h	sparc
+usr/include/ike/dlfix.h		sparc
+usr/include/ike/dlglue.h	sparc
+usr/include/ike/libmonitor.h	sparc
+usr/include/ike/rsa.h		sparc
+usr/include/ike/sshgenmp.h	sparc
+usr/include/ike/dl-internal.h	sparc
+usr/include/ike/pkcs1.h		sparc
+usr/include/ike/sshpk_i.h	sparc
+usr/include/ike/sshrgf-internal.h	sparc
+usr/include/ike/sshrgf.h	sparc
+usr/include/ike/sshrandom_i.h	sparc
+usr/include/ike/sshcrypt.h	sparc
+usr/include/ike/sshcipher.h	sparc
+usr/include/ike/sshcrypt_i.h	sparc
+usr/include/ike/sshproxykey.h	sparc
+usr/include/ike/sshmac.h	sparc
+usr/include/ike/sshpk.h		sparc
+usr/include/ike/sshrandom.h	sparc
+usr/include/ike/sshhash.h	sparc
+usr/include/ike/sshconf.h	sparc
+usr/lib/libike.so		sparc
+usr/lib/llib-like.ln		sparc
+usr/lib/llib-lipsecutil		sparc
+usr/lib/libipsecutil.so		sparc
+usr/lib/llib-lipsecutil.ln	sparc
+#
+# The following files are used by the dhcpmgr.
+#
+usr/share/lib/locale/com/sun/dhcpmgr/bridge/ResourceBundle.properties	sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli/common/ResourceBundle.properties	sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpbatch/ResourceBundle.properties	sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpconfig/ResourceBundle.properties	sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli/dhtadm/ResourceBundle.properties	sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm/ResourceBundle.properties	sparc
+#
+usr/include/inet/arp_impl.h	sparc
+usr/include/inet/rawip_impl.h	sparc
+usr/include/inet/udp_impl.h	sparc
+usr/include/inet/ip_ndp.h	sparc
+usr/include/inet/ipdrop.h	sparc
+usr/include/inet/tun.h		sparc
+usr/include/protocols/ripngd.h	sparc
+usr/include/libmail.h	sparc
+usr/include/s_string.h	sparc
+usr/include/sys/vgareg.h	sparc
+usr/include/sys/logindmux_impl.h	sparc
+# Some IPsec headers can't be shipped lest we hit export controls...
+usr/include/inet/ipsec_impl.h	sparc
+usr/include/inet/ipsec_info.h	sparc
+usr/include/inet/ipsecah.h	sparc
+usr/include/inet/ipsecesp.h	sparc
+usr/include/inet/keysock.h	sparc
+usr/include/inet/sadb.h		sparc
+usr/include/sys/sha1.h		sparc
+usr/include/sys/sha1_consts.h	sparc
+usr/include/sys/sha2.h          sparc
+usr/include/sys/sha2_consts.h   sparc
+usr/include/inet/tun.h		sparc
+#
+#The following are win and graphics related also ignore and do NOT
+#replace.
+#
+usr/include/sys/cms.h	sparc
+usr/include/sys/ieeefp.h	sparc
+usr/include/sys/memvar.h	sparc
+usr/include/sys/pixrect.h	sparc
+usr/include/sys/pr_planegroups.h	sparc
+usr/include/sys/pr_impl_util.h	sparc
+usr/include/sys/winlockio.h	sparc
+#
+# these are just funky entries - they are fixed up
+# via a post install scripts.
+#
+usr/lib/libcrypt.so		sparc
+usr/lib/libcrypt.so.1		sparc
+usr/lib/sparcv9/libcrypt.so	sparc
+usr/lib/sparcv9/libcrypt.so.1	sparc
+usr/lib/font/devpost/charlib/~=	sparc
+###########################################
+#
+# ENTRIES FILTERED OUT OF THE protodirs
+#
+###########################################
+#
+# The following dhcpmgr directories are not shipped.
+#
+usr/share/lib/locale/com/sun/dhcpmgr/bridge		sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli		sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpbatch	sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpconfig	sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli/dhtadm		sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm		sparc
+usr/share/lib/locale/com/sun/dhcpmgr/cli/common		sparc
+#
+# Entries for things built during the wyoming project which will
+# be removed when it's complete.
+#
+#
+# Part of the implementation of libthread, there is no reason for synch32.h 
+# to be part of a package that the customer should ever see.  The file
+# is installed to a proto area by the uts build because various libraries
+# are dependent upon its contents, and should not have their own copies.
+#
+usr/include/sys/synch32.h		sparc
+#
+# These files are installed in the proto area by the build of libproc for
+# the benefit of the builds of cmd/truss, cmd/gcore and cmd/ptools, which
+# use libproc as their common process-control library.  These are not
+# interfaces for customer use, so the files are excluded from packaging.
+#
+usr/include/libproc.h		sparc
+lib/llib-lproc			sparc
+lib/llib-lproc.ln		sparc
+lib/sparcv9/llib-lproc.ln	sparc
+#
+# This file is used for private communication between mdb, drv/kmdb, and
+# misc/kmdb.  The interfaces described herein are not intended for customer
+# use, and are thus excluded from packaging.
+#
+usr/include/sys/kmdb.h		sparc
+#
+# These files are installed in the proto area by the build of libdhcpagent
+# and libdhcputil for the benefit of DHCP-related networking commands such
+# as dhcpagent, dhcpinfo, ifconfig, and netstat.  These are not interfaces
+# for customer use, so the files are excluded from packaging.
+#
+usr/include/dhcp_hostconf.h	sparc
+usr/include/dhcp_impl.h		sparc
+usr/include/dhcp_inittab.h	sparc
+usr/include/dhcp_symbol_common.h	sparc
+usr/include/dhcpagent_ipc.h	sparc
+usr/include/dhcpagent_util.h	sparc
+usr/include/dhcpmsg.h		sparc
+usr/lib/llib-ldhcpagent		sparc
+usr/lib/llib-ldhcpagent.ln	sparc
+usr/lib/llib-ldhcputil		sparc
+usr/lib/llib-ldhcputil.ln	sparc
+usr/lib/libdhcpagent.so		sparc
+usr/lib/libdhcputil.so		sparc
+lib/llib-ldhcpagent		sparc
+lib/llib-ldhcpagent.ln		sparc
+lib/llib-ldhcputil		sparc
+lib/llib-ldhcputil.ln		sparc
+lib/libdhcpagent.so		sparc
+lib/libdhcputil.so		sparc
+#
+# These files are installed in the proto area by the build of libinetcfg.
+# Only the shared object is shipped.
+#
+usr/include/inetcfg.h		sparc
+usr/lib/llib-linetcfg		sparc
+usr/lib/llib-linetcfg.ln	sparc
+usr/lib/libinetcfg.so		sparc
+lib/llib-linetcfg		sparc
+lib/llib-linetcfg.ln		sparc
+lib/libinetcfg.so		sparc
+#
+# Don't ship header files private to libipmp and in.mpathd
+#
+usr/include/ipmp_query_impl.h	sparc
+#
+# These files are installed in the proto area by the build of libinetsvc,
+# an inetd-specific library shared by inetd, inetadm and inetconv. Only
+# the shared object is shipped.
+#
+usr/include/inetsvc.h		sparc
+usr/lib/llib-linetsvc		sparc
+usr/lib/llib-linetsvc.ln	sparc
+usr/lib/libinetsvc.so		sparc
+#
+# These files are installed in the proto area by the build of libinetutil,
+# a general purpose library for the benefit of internet utilities. Only
+# the shared object is shipped.
+#
+usr/include/libinetutil.h	sparc
+usr/include/netinet/inetutil.h	sparc
+usr/lib/llib-linetutil		sparc
+usr/lib/llib-linetutil.ln	sparc
+usr/lib/sparcv9/llib-linetutil.ln 	sparc
+usr/lib/libinetutil.so		sparc
+usr/lib/sparcv9/libinetutil.so	sparc
+lib/llib-linetutil		sparc
+lib/llib-linetutil.ln		sparc
+lib/sparcv9/llib-linetutil.ln 	sparc
+lib/libinetutil.so		sparc
+lib/sparcv9/libinetutil.so	sparc
+#
+# Miscellaneous kernel interfaces or kernel<->user interfaces that are
+# consolidation private and we do not want to export at this time.
+#
+usr/include/sys/dumpadm.h	sparc
+usr/include/sys/ontrap.h	sparc
+usr/include/sys/sysmsg_impl.h	sparc
+usr/include/sys/cryptmod.h	sparc
+#
+# These files are installed in the proto area so lvm can use
+# them during the build process.
+#
+usr/include/sdssc.h			sparc
+usr/lib/llib-lmeta			sparc
+usr/lib/llib-lmeta.ln			sparc
+lib/llib-lmeta				sparc
+lib/llib-lmeta.ln			sparc
+#
+# non-public pci header
+#
+usr/include/sys/pci_impl.h      sparc
+#
+# Exception list for RCM project, included by librcm and rcm_daemon
+#
+usr/include/librcm_impl.h	sparc
+usr/include/librcm_event.h	sparc
+#
+# MDB deliverables that are not yet public
+#
+usr/lib/mdb/proc/mdb_test.so		sparc
+usr/lib/mdb/proc/sparcv9/mdb_test.so	sparc
+#
+# SNCA project exception list
+#
+usr/include/inet/nca			sparc
+usr/include/inet/nca/nca.h		sparc
+usr/include/inet/nca/ncadoorhdr.h	sparc
+usr/include/inet/nca/ncakmem.h		sparc
+usr/include/inet/nca/ncalogd.h		sparc
+usr/include/inet/nca/ncandd.h		sparc
+usr/include/inet/nca/ncaio.h		sparc
+#
+# other contents (packages removed in source product)
+usr/bin/des				sparc
+usr/include/des/desdata.h		sparc
+usr/lib/libcrypt_d.so			sparc
+usr/lib/libcrypt_d.so.1			sparc
+usr/lib/sparcv9/libcrypt_d.so		sparc
+usr/lib/sparcv9/libcrypt_d.so.1		sparc
+etc/krb5/kadm5.acl			sparc
+etc/krb5/kdc.conf			sparc
+etc/krb5/kpropd.acl			sparc
+usr/lib/krb5/README.db2			sparc
+usr/lib/krb5/kadmind			sparc
+usr/lib/krb5/kprop			sparc
+usr/lib/krb5/kprop_script		sparc
+usr/lib/krb5/kpropd			sparc
+usr/lib/krb5/krb5kdc			sparc
+usr/lib/krb5/libdb2.so			sparc
+usr/lib/krb5/libdb2.so.1		sparc
+usr/lib/krb5/libdyn.so			sparc
+usr/lib/krb5/libdyn.so.1		sparc
+usr/lib/krb5/libkadm5srv.so		sparc
+usr/lib/krb5/libkadm5srv.so.1		sparc
+usr/lib/krb5/libkdb.so			sparc
+usr/lib/krb5/libkdb.so.1		sparc
+usr/sbin/kadmin.local			sparc
+usr/sbin/kadmin				sparc
+usr/sbin/kclient			sparc
+usr/sbin/kdb5_util			sparc
+usr/sbin/kproplog			sparc
+var/krb5				sparc
+var/svc/manifest/network/security/kadmin.xml	sparc
+var/svc/manifest/network/security/krb5_prop.xml	sparc
+var/svc/manifest/network/security/krb5kdc.xml	sparc
+# these are "removed" from the source product build because the only
+# pacakges that currently deliver them are removed.
+# they really should't be in here.
+etc/sfw                                 sparc
+usr/sfw/bin                             sparc
+usr/sfw/lib/64                          sparc
+usr/sfw/lib/sparcv9                     sparc
+#
+# Entries for the libmech_krb5 symlink, which has been included
+# for build purposes only, not delivered to customers.
+#
+usr/lib/gss/libmech_krb5.so		sparc
+usr/lib/sparcv9/gss/libmech_krb5.so	sparc
+usr/lib/sparcv9/libmech_krb5.so		sparc
+usr/lib/libmech_krb5.so			sparc
+#
+# all of ssh is removed from the source product, including the service
+# description and methods
+#
+lib/svc/method/sshd			sparc
+var/svc/manifest/network/ssh.xml	sparc
+#
+# Entries for headers from efcode project which user does not need
+# to see
+#
+usr/platform/sun4u/include/sys/fc_plat.h	sparc
+usr/platform/sun4u/include/sys/fcode.h		sparc
+#
+# PPPoE files not delivered to customers.
+usr/include/net/pppoe.h			sparc
+usr/include/net/sppptun.h		sparc
+#
+# User<->kernel interface used by cfgadm/USB only
+#
+usr/include/sys/usb/hubd/hubd_impl.h			sparc
+#
+# Private ucred kernel header
+#
+usr/include/sys/ucred.h					sparc
+#
+# Private and/or platform-specific smf(5) files
+#
+lib/librestart.so			sparc
+lib/llib-lrestart			sparc
+lib/llib-lrestart.ln			sparc
+lib/sparcv9/librestart.so		sparc
+lib/sparcv9/llib-lrestart.ln		sparc
+usr/lib/librestart.so			sparc
+usr/lib/sparcv9/librestart.so		sparc
+usr/include/librestart.h		sparc
+usr/include/librestart_priv.h		sparc
+usr/include/libcontract_priv.h		sparc
+var/svc/manifest/platform/i86pc		sparc
+var/svc/manifest/platform/i86pc/eeprom.xml	sparc
+var/svc/profile/platform_i86pc.xml	sparc
+#
+# Private libuutil files
+#
+lib/libuutil.so				sparc
+lib/llib-luutil				sparc
+lib/llib-luutil.ln			sparc
+lib/sparcv9/libuutil.so			sparc
+lib/sparcv9/llib-luutil.ln		sparc
+usr/lib/libuutil.so			sparc
+usr/lib/sparcv9/libuutil.so		sparc
+usr/include/libuutil.h			sparc
+usr/include/libuutil_impl.h		sparc
+#
+# Private Multidata file.
+#
+usr/include/sys/multidata_impl.h	sparc
+#
+# The following files are used by wanboot.
+# They contain interfaces which are currently private.
+#
+usr/include/sys/wanboot_impl.h		sparc
+usr/lib/llib-lwanboot.ln		sparc
+usr/include/wanbootutil.h		sparc
+usr/include/wanboot			sparc
+usr/include/wanboot/key_xdr.h		sparc
+usr/include/wanboot/key_util.h		sparc
+usr/include/wanboot/wbio.h		sparc
+#
+# Even though all the objects built under usr/src/stand are later glommed
+# together into a couple of second-stage boot loaders, we dump the static
+# archives and lint libraries into $(ROOT)/stand for intermediate use
+# (e.g., for lint, linking the second-stage boot loaders, ...).  Since
+# these are merely intermediate objects, they do not need to be packaged.
+#
+stand					sparc
+stand/lib				sparc
+stand/lib/libcrypto.a			sparc
+stand/lib/libhsfs.a			sparc
+stand/lib/libinet.a			sparc
+stand/lib/libmd5.a			sparc
+stand/lib/libnfs.a			sparc
+stand/lib/libnvpair.a			sparc
+stand/lib/libsa.a			sparc
+stand/lib/libscrypt.a			sparc
+stand/lib/libsock.a			sparc
+stand/lib/libssl.a			sparc
+stand/lib/libtcp.a			sparc
+stand/lib/libtcpstubs.a			sparc
+stand/lib/libufs.a			sparc
+stand/lib/libwanboot.a			sparc
+stand/lib/libxdr.a			sparc
+stand/lib/llib-lcrypto.ln		sparc
+stand/lib/llib-lfakeboot.ln		sparc
+stand/lib/llib-lhsfs.ln			sparc
+stand/lib/llib-linet.ln			sparc
+stand/lib/llib-lmd5.ln			sparc
+stand/lib/llib-lnfs.ln			sparc
+stand/lib/llib-lnvpair.ln		sparc
+stand/lib/llib-lsa.ln			sparc
+stand/lib/llib-lscrypt.ln		sparc
+stand/lib/llib-lsock.ln			sparc
+stand/lib/llib-lssl.ln			sparc
+stand/lib/llib-ltcp.ln			sparc
+stand/lib/llib-ltcpstubs.ln		sparc
+stand/lib/llib-lufs.ln			sparc
+stand/lib/llib-lwanboot.ln		sparc
+stand/lib/llib-lxdr.ln			sparc
+#
+# Private KEF header files
+#
+usr/include/sys/crypto					sparc
+usr/include/sys/crypto/api.h				sparc
+usr/include/sys/crypto/common.h				sparc
+usr/include/sys/crypto/elfsign.h			sparc
+usr/include/sys/crypto/impl.h				sparc
+usr/include/sys/crypto/ioctl.h				sparc
+usr/include/sys/crypto/ioctladmin.h			sparc
+usr/include/sys/crypto/ops_impl.h			sparc
+usr/include/sys/crypto/sched_impl.h			sparc
+usr/include/sys/crypto/spi.h				sparc
+#
+# The following files are installed in the proto area
+# by the build of libavl (AVL Tree Interface Library).
+# libavl contains interfaces which are all private 
+# interfaces.
+#
+lib/llib-lavl					sparc
+lib/llib-lavl.ln				sparc
+lib/libavl.so					sparc
+lib/sparcv9/llib-lavl.ln			sparc
+lib/sparcv9/libavl.so				sparc
+usr/lib/llib-lavl				sparc
+usr/lib/llib-lavl.ln				sparc
+usr/lib/libavl.so				sparc
+usr/lib/sparcv9/llib-lavl.ln			sparc
+usr/lib/sparcv9/libavl.so			sparc
+#
+# The following files are installed in the proto area
+# by the build of libcmdutils (Command Utilities Library).
+# libcmdutils contains interfaces which are all private
+# interfaces.
+#
+usr/include/libcmdutils.h			sparc
+lib/llib-lcmdutils				sparc
+lib/llib-lcmdutils.ln				sparc
+lib/libcmdutils.so				sparc
+lib/sparcv9/llib-lcmdutils.ln			sparc
+lib/sparcv9/libcmdutils.so			sparc
+usr/lib/llib-lcmdutils				sparc
+usr/lib/llib-lcmdutils.ln			sparc
+usr/lib/libcmdutils.so				sparc
+usr/lib/sparcv9/llib-lcmdutils.ln		sparc
+usr/lib/sparcv9/libcmdutils.so			sparc
+#
+# User<->kernel interface used by cfgadm/IB only
+#
+usr/include/sys/ib/ibnex				sparc
+usr/include/sys/ib/ibnex/ibnex_devctl.h			sparc
+#
+# Entries for the SCM IFD Handler which are used only to build
+# the SCM IFD Handler and are not delivered to customers.
+#
+usr/include/scm_ifdh.h				sparc
+usr/include/scm_protocol.h			sparc
+#
+# USB skeleton driver stays in sync with the rest of USB but doesn't ship.
+#
+kernel/drv/sparcv9/usbskel				sparc
+kernel/drv/usbskel.conf					sparc
+#
+# Consolidation and Sun private libdevid interfaces
+# Public libdevid interfaces provided by devid.h
+#
+usr/include/sys/libdevid.h			sparc
+#
+# amd 8111 audio driver doesn't ship in sparc platform.
+#
+kernel/drv/sparcv9/audio810			sparc
+kernel/drv/audio810.conf			sparc 
+#
+# VIA VT823x audio driver doesn't ship in sparc platform.
+#
+kernel/drv/sparcv9/audiovia823x			sparc
+kernel/drv/audiovia823x.conf			sparc
+#
+# The following files are installed in the proto area by the build of
+# libprtdiag.  libprtdiag contains interfaces which are all private.
+# Only the shared object is shipped.
+#
+usr/platform/sun4u/lib/llib-lprtdiag		sparc
+usr/platform/sun4u/lib/llib-lprtdiag.ln		sparc
+usr/platform/sun4v/lib/llib-lprtdiag.ln		sparc
+#
+# The following files are installed in the proto area by the build of
+# mdesc driver in sun4v. These header files are used on in the build
+# and do not need to be shipped to customers.
+#
+usr/include/sys/mdesc.h				sparc
+usr/include/sys/mdesc_impl.h			sparc
+usr/platform/sun4v/include/sys/mach_descrip.h	sparc
+#
+# The following files are installed in the proto area by the build of
+# libc_i18n.  libc_i18n.a is used only when linking libc.so.1.
+#
+lib/libc_i18n.a					sparc
+lib/sparcv9/libc_i18n.a				sparc
+#
+# The following files are installed in the proto area by the build of
+# libpcp.  libpcp contains interfaces which are all private.
+# Only the shared object is shipped.
+#
+usr/platform/SUNW,Sun-Fire-T200/lib/llib-lpcp.ln	sparc

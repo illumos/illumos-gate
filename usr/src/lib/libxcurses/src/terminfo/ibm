@@ -1,0 +1,59 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 1996 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# ibm: IBM, INTERACTIVE SYSTEMS, and INTECOLOR
+#
+# Some of these should go in the misc category, IBM, ISC, and intecolor can't
+# all have I.  I will wait to see who comes out with more terminals.
+# These compucolors appear similar, but they at least have different
+# sized screens.  I don't know what's going on here.
+# There is further confusion since intecolor seems to call themselves isc too.
+8001|isc8001|compucolor|intecolor,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\EU, am, cub1=^Z,
+	clear=^L$<3*>, cup=^C%p2%c%p1%c, cols#80, rmdc=\EQ, smdc=\EQ, ed=\EF,
+	dch1=\177, dl1=\EV, rmir=\EF, smir=\EQ, lines#40, cuf1=^Y$<1>,
+	ht=\t$<8>, cuu1=^\, home=^H$<1>,
+compucolor2|compucolorii,
+	cr=^M, cud1=^J, ind=^J, bel=^G,
+	ht=^I, am, cup=^C%p2%c%p1%c, cub1=^Z, lines#32, cols#64,
+	clear=^L, home=^H, cuf1=^Y, cuu1=^\,
+# From cithep!eric  Wed Sep 16 08:06:44 1981
+intext|Interactive Systems Corporation modified owl 1200,
+	cr=^M, cud1=^J, ind=^J, bel=^G, il1=\020$<5.5*>, am, cub1=^_,
+	cub1=^H, cbt=^Y, ed=\026J$<5.5*>, el=^K\160^R,
+	clear=\014$<132>, cup=\017%p1%' '%+%c%p2%' '%+%c, cols#80,
+	dch1=\022$<5.5*>, dl1=\021$<5.5*>, rmir=\026\074,
+	smir=\026\073, ip=$<5.5*>, lines#24, cuf1=\036, ht=^I, 
+	cuu1=\034, rmso=^V# , xmc#1, smso=^V$\054,
+	kcub1=^_, kcud1=^J, kcuf1=^^, kcuu1=\034, kbs=^H, khome=^Z,
+	kf1=^VA\r, kf2=^VB\r, kf3=^VC\r, kf4=^VD\r, kf5=^VE\r,
+	kf6=^VF\r, kf7=^VG\r, kf8=^VH\r, kf9=^VI\r, kf0=^VJ\r,
+ibm|ibm3101|3101|i3101|IBM 3101-10,
+	.if=/usr/lib/tabset/3101,
+	cr=^M, cud1=^J, ind=^J, bel=^G, tbc=\EH, hts=\E0, am, cub1=^H,
+	clear=\EK, lines#24, cols#80, cuf1=\EC, cuu1=\EA, ed=\EJ, el=\EI,
+	kcud1=\EB, kcub1=\ED, kcuf1=\EC, kcuu1=\EA,
+	home=\EH, cup=\EY%p1%' '%+%c%p2%' '%+%c, ht=^I, 

@@ -1,0 +1,110 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:README 2.5 */
+
+		Basic Networking Utilities
+Customer Information Documents
+
+Basic Networking Utilities Product Overview - release 1 # 307-038
+Basic Networking Utilities Installation Guide and Release Notes
+   - Release 1 # 307-036
+Basic Networking Utilities - release 1 # 307-165
+
+See the following for additional information:
+Permissions:	an example of a Permissions file. (a default will be generated
+		during the installation procedure.
+uucp.1c		manual page for uucp
+uustat.1c:	uustat man page
+uulog.1c:	uulog man page
+uucleanup.1m:	man page for uucleanup
+uudemon.hour:	hourly demon
+uudemon.poll:	polling demon
+uudemon.admin:	to send messages about status to the administrator of uucp
+uudemon.cleanup:	cleanup demon
+
+Some useful shells:
+Uutry:		shell for debugging--starts uucico with debugging option
+Cvt:		shell to move C. and D. files from /usr/spool/uucp to proper
+		place for the new directory structure
+SetUp		shell that copies old system files to the
+		new places (L.sys etc)
+		NOTE - this will be
+		automatically run during installation
+
+Here are some pointers for converting to the new version:
+
+1- There are some significant changes in L.sys  (new name = Systems) format.
+    a-	For direct lines, the first device specification is changed
+	from "term/xx" to "Direct"
+    b-	On time fields where the default wait time was specified,
+	the ',' must be changed to a ';'
+	In addition, the time has a slightly different meaning.
+	The retry algorithm is now an exponential backoff with initial
+	time (RETRYTIME in parms.h) and max retrytime (MAXRETRYTIME in
+	parms.h).  If the ;time field is specified, that will always
+	be the retry time.  If it is not given, the backoff will be used.
+   (SEE Basic Networking Utilities - release 1 # 307-165 for details)
+
+2- The L-devices (new name=Devices) file must also be changed.
+    a-	All ACU lines must have "801" or the name of the modem
+	(for example, penril) added to the end of the line.
+    b-	All DIR lines must have "DIR" changed to "Direct"
+	and the work 'direct' added to the line.
+    See the comments in the Devices file delivered with the source.
+   (SEE Basic Networking Utilities - release 1 # 307-165 for details)
+
+3- The uucico program no longer searches for a system to call, it
+   must be called with a -s option.  A new program, uusched,
+   does the search for work and calls remotes in random order,
+   by invoking uucico with -sSYSTEM option.  (see uudemon.hour)
+
+Cron entries should be put into crontab for the demons. For example
+
+39,9 * * * * /usr/bin/su uucp -c "/usr/lib/uucp/uudemon.hour" > /dev/null
+10 * * * * /usr/bin/su uucp -c "/usr/lib/uucp/uudemon.poll" > /dev/null
+45 23 * * * ulimit 5000; /usr/bin/su uucp -c "/usr/lib/uucp/uudemon.cleanup" > /dev/null
+48 10,14 * * 1-5 /usr/bin/su uucp -c "/usr/lib/uucp/uudemon.admin" > /dev/null
+
+Note - It is best to run these demons from the root cron file.
+At a minimum, the uudemon.cleanup entry must be started as root since it must
+invoke a 'ulimit' command.
+
+
+
+For building the system:
+1- Carefully go through the parms.h file to set it up for your
+   environment.
+  (SEE Basic Networking Utilities - release 1 # 307-165 for details)
+
+2- During installation, a Permissions file will be created
+   if one does not already exist.
+   It will also make the needed directories, create some files in
+   /usr/lib/uucp and install the uudemons.
+
+3- The demons also send mail to someone (default uucp).  Change as
+   desired.
+
+
+Other misc:
+0- SEE Basic Networking Utilities - release 1 # 307-165 
+   to learn how to set up the Permissions file.
+   A default one will be created by make install.

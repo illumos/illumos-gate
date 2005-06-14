@@ -1,0 +1,1229 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ * Title       Solaris Network File System (NFS) MOF specification 1.3
+ * Description Solaris Network File System model.
+ * Date        03/21/2003
+ * Version     1.3
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma namespace("root/cimv2")
+#pragma Locale ("en_US")
+
+// ===================================================================
+//   Objects
+// ===================================================================
+
+#pragma namespace("__create")
+
+[Provider("jni:libWBEMnfs.so"),
+ Version("1.3.0"),
+ Description (
+     "A class that represents a local NFS shared object on the "
+     "server side that is made accessible to other systems.")
+]
+class Solaris_NFSShare : CIM_NFSShare
+{
+    [Description("If set to true: maximal  access  is  given  to all "
+    		 "clients. Valid for NFS version 2 only.  Corresponds "
+                 "to the 'aclok' share_nfs option (Solaris 9)."),
+     ModelCorrespondence{"Solaris_NFSMount.Version"}]
+    boolean AllowAccessControl = false;
+    		 
+    [Description("Sets the the effective user ID of unknown users. By "
+		 "default, unknown users are given the effective user "
+		 "ID UID_NOBODY. UID_NOBODY is usually set to 60001 but "
+		 "because an administrator can change this we don't set "
+		 "it to this by default.  Corresponds to the "
+		 "'anon=' share_nfs option (Solaris 9)."),
+     Required,
+     Units("Bytes")]
+    Uint32 EffectiveUID;
+    
+    [Description("If set to true: causes  the  server  file system to "
+                 "silently ignore any attempt to  enable the setuid or "
+                 "setgid mode bits.  Corresponds to the 'nosuid' "
+                 "share_nfs option (Solaris 9).")]
+    boolean IgnoreSetId = false;
+    
+    [Description("Enables NFS server logging for the specified file "
+                 "system. The optional tag determines the location of "
+                 "the related log files. The tag is defined in "
+                 "etc/nfs/nfslog.conf. The default value is the global "
+                 "tag.  The log file tag is only applicable when logging is "
+                 "turned on.  Corresponds to the 'log=' share_nfs option "
+                 "(Solaris 9)."),
+     MappingStrings{"SOLARIS9.SUN|/etc/nfs/nfslog.conf"}]
+    String LogFileTag;
+
+    [Description("If set to true: the share is to be persistent across "
+    		 "reboots.")]
+    boolean Persistent = false;
+    
+    [Description(
+        "A value of true prevents clients from mounting subdirectories "
+        "of shared directories.  Corresponds to the 'nosub' share_nfs "
+        "option (Solaris 9).")]
+    boolean PreventSubDirMount = false;
+    
+    [Description("If set to true: the public file handle is moved from "
+                 "root (/) to the exported directory.  Corresponds to "
+                 "the 'public' share_nfs option (Solaris 9).")]
+    boolean Public = false;
+    
+    [Description("This attribute is only used upon creation of a share.  "
+    		 "Security information should be retrieved from "
+    		 "Solaris_NFSShareSecurity and Solaris_NFSShareSecurityModes."
+    		 "This attribute stores the security options for a share.  "
+    		 "Each element of the array is a string starting with "
+    		 "sec=<mode> and including all options, such as access lists, "
+    		 "pertaining to that security mode.")]
+    String SecurityOptions[];
+    
+    [Description("A string of share options for the shared file system as found"
+    		 "in /etc/dfs/sharetab.")]
+    String ShareOptions;
+    
+    [Description("An attribute that is only used at the time of creation of "
+    		 "a Solaris_NFSShare instance.  If it is set to true, the "
+    		 "the NFS server daemons (nfsd and mountd) will be started "
+    		 "with the default settings, if and only if, nfsd and mountd "
+    		 "aren't already running on the host.  The daemons will NOT "
+    		 "be stopped and restarted.  As a side effect of starting the "
+    		 "NFS server daemons the share being created will be placed "
+    		 "as an entry in /etc/dfs/dfstab since the starting of the "
+    		 "daemon relies on entries here."),
+      MappingStrings{"SOLARIS9.SUN|/etc/init.d/nfs.server start"}]
+     boolean StartDaemons = false;
+};
+
+[Provider(
+     "jni:libWBEMnfs.so"),
+ Version("1.3.0"),
+ Description (
+     "A class used to represent the NFS share security mode and "
+     "associated options for a Solaris_NFSShare object.")
+]
+class Solaris_NFSShareSecurity : CIM_Setting
+{
+
+    [Description("Sets the maximum life time (in seconds) of the "
+                 "RPC request's credential, that the NFS server "
+                 "will allow. Valid for NFS sec mode of diffie "
+                 "helman (dh) only.  Corresponds to the 'window=' "
+                 "share_nfs option (Solaris 9)."
+                 "If the security mode is not Diffie Helman, this "
+                 "property will not be set."),
+        ModelCorrespondence{"Solaris_NFSShareSecurity.Mode"},
+        Units("seconds")]
+    uint32 MaxLife = 30000;
+    
+    [Key,
+    Description (
+        "Security mode used. Can be either sys, dh, krb5, krb5i, "
+        "krb5p.  Unknown and other default to the default security "
+        "mode of AUTH_SYS (sys).  Corresponds to the 'sec=' share_nfs "
+        "option (Solaris 9)."),
+      Required,
+      ValueMap {"Unknown", "Other", "sys", "dh", "krb5", "krb5i", "krb5p"}]
+    String Mode;
+
+    [Description (
+        "If true: Access will be read-only for all clients in this "
+        "security mode. else: access will be read-write.  Corresponds "
+        "to the 'ro' share_nfs option (Solaris 9).")]
+    boolean ReadOnly;
+
+    [Description (
+        "The list of clients whose access will be read-only. "
+        "Corresponds to the 'ro=' share_nfs option (Solaris 9).")]
+    string ReadOnlyList[];
+    
+    [Description (
+        "The list of clients whose access will be read-write. "
+        "Corresponds to the 'rw=' share_nfs option (Solaris 9).")]
+    string ReadWriteList[];
+
+    [Description (
+        "The list of hosts with root access. Only root users from the "
+        "hosts specified will have root access.  Corresponds to the "
+        "'root=' share_nfs option (Solaris 9).")]
+    string RootServers[];
+    
+    [Override("SettingId"),
+     Key,
+     Description("The path name of the share."),
+     Required]
+    String SettingId;
+};
+
+#pragma namespace("__modify")
+
+[Provider(
+     "jni:libWBEMnfs.so"),
+ Version("1.3.0"),
+ Description (
+     "The options used to mount a Solaris NFS file system.")]
+class Solaris_NFS : CIM_NFS
+{
+    [Deprecated {
+        "This is not replaced with anything.  Global doesn't apply to NFS file "
+        "system mounts."},
+     Description("If set to true: the filesystem is mounted 'globally' on all "
+                 "nodes of a cluster. "
+                 "If set to false (default): the filesystem is not mounted on "
+                 "all nodes of a cluster. "
+                 "Ignored for non-clustered systems.")]
+    boolean Global = false;
+    
+    [Deprecated {
+        "Solaris_NFSMount.GroupId"},
+     Description("If set to true: use BSD style group id semantics. "
+                 "If set to false (default): use System V style group "
+                 "id semantics.")]
+    boolean GrpId = false;
+
+//    [Override("Name"),
+//     Description("The Name property is populated with the following string:  "
+//     		 "resource:=<resource> devid:=<devid>  "
+//     		 "Upon creation of an instance of Solaris_NFS, Name must be "
+//     		 "populated with just the file system resource "
+//     		 "(ex: /dev/dsk/c0t0d0s6 or pogo:/export) since the devid/file "
+//     		 "system id is not yet known.")]
+//    string Name;
+    
+    [Deprecated {
+        "Solaris_Mount.NoMnttabEntry"},
+     Description("If set to true: the mount entry is not added to /etc/mnttab. "
+                 " If set to false (default): the mount is recorded in "
+                 "/etc/mnttab.")]
+    boolean NoMnttabEntry = false;
+
+    [Deprecated {
+        "Solaris_Mount.NoSuid"},
+     Description("If set to true: don't allow allow setuid execution. "
+                "If set to false (default): allow setuid execution.")]
+    boolean NoSuid = false;
+
+    [Deprecated {
+        "Solaris_Mount.Overlay"},
+     Description("If set to true: the file system is mounted over an existing "
+                 "mounted filesystem.  "
+                 "If set to false (default): the filesystem is not mounted over "
+                 "an existing mounted filesystem.")]
+    boolean Overlay = false;
+
+    [Deprecated {
+        "Solaris_NFSMount.Posix"},
+     Description("If set to true: use POSIX.1 semantics for filesystem. "
+                 "If set to false (default): do not use POSIX.1 semantics.")]
+    boolean Posix = false;
+
+    [Deprecated {
+        "Solaris_NFSMount.Protocol"},
+     Description("A string specifying the transport protocol used for the "
+                 "NFS mount. It is the value of the network_id field from "
+                 "/etc/netconfig.")]
+    String Proto;
+
+    [Deprecated {
+        "Solaris_NFSMount.Public"},
+     Description("If set to true: use the public file handle. "
+                 "If set to false (default): do not use the public "
+                 "file handle.")]
+    boolean Public = false;
+
+    [Deprecated {
+        "Solaris_NFSMount.EnableQuotaChecking"},
+     Description("If set to true: enable quota checking. "
+                 "If set to false (default): disable quota checking.")]
+    boolean Quota = false;
+
+    [Deprecated {
+        "The same effect can be achieved by setting Solaris_Mount.ReadOnly "
+        "to false which resets the mount option to read-write. Then remount "
+        "the filesystem."},
+     Description("If set to true: remount a read-only file system with "
+		 "read-write options. "
+		 "If set to false (default): the filsystem is mounted with "
+	         "the specified mount options.")]
+    boolean Remount = false;
+    
+    [Deprecated {
+    	"Solaris_NFSMount.SecurityMode"},
+     Description("A string describing the security mode for NFS transactions. "
+                 "Available modes is listed in /etc/nfssec.conf.")]
+    String SecurityMode;    
+
+    [Deprecated {
+        "Calculate from CIM_FileSystem.FileSystemSize and "
+        "CIM_FileSystem.AvailableSpace.  "
+        "UsedSpace = CIM_FileSystem.FileSystemSize - "
+        "CIM_FileSystem.AvailableSpace. "
+        "Note: CIM_FileSystem.AvailableSpace now contains "
+        "the correct value with respect to the space "
+        "reserved only for superuser."},
+     Description("Indicates the total amount of used space on the "
+        	 "File System in bytes. Note that this is not the "
+        	 "FileSystemSize minus AvailableSpace due to the space "
+        	 "reserved only for superuser."),
+     Units("Bytes")]
+    uint64 UsedSpace;
+    
+    [Deprecated {
+        "Solaris_NFSMount.Version"},
+     Description ("Version number of NFS protocol to use."),
+     ValueMap {"2", "3", "4", "highest"}]
+    String Version = "highest";
+
+    // Methods
+    [Deprecated {
+        "Solaris_NFSMount.getNetCfgList"},
+     Description("Method to obtain the list of network IDs from "
+                 "the /etc/netconfig file.")]
+    sint32 getNetCfgList([OUT, IN(false)]string ids[]);
+
+    [Deprecated {
+        "Solaris_NFSMount.getNfsSecList"},
+     Description("Method to obtain the list of nfs security modes from "
+                 "the /etc/nfssec.conf file.")]
+    sint32 getNfsSecList([OUT, IN(false)]string secmodes[]);
+
+    [Deprecated {
+        "Solaris_NFSMount.getDefaultNfsSecMode"},
+     Description("Method to obtain the the default nfs security mode from "
+                 "the /etc/nfssec.conf file.")]
+    sint32 getDefaultNfsSecMode([OUT, IN(false)]string secmode);
+};
+
+#pragma namespace("__create")
+
+[Provider(
+     "jni:libWBEMnfs.so"),
+ Version("1.3.0"),
+ Description (
+     "This class represents a share that is to be persistent across reboots.  "
+     "There is a possiblity depending on the persistance mechanism "
+     "(ex: /etc/dfs/dfstab) that there are multiple shares that are to be "
+     "persistent which have the same path.  If this occurs, a Key Not Unique "
+     "type of error will be set when calling intrinsic methods getInstance, "
+     "deleteInstance, addInstance and editInstance and no instance will be "
+     "returned.")]
+class Solaris_PersistentShare : CIM_SystemSetting
+{
+
+    [Description(
+         "String representing the share command entry in /etc/dfs/dfstab.")]
+    String Command;
+
+    [Override ("SettingID"),
+     Description("The path of the persistent share.")]
+    string SettingID;
+  
+    //Methods
+    [Description("Method to be used to clear up conflicts in the "
+     	"/etc/dfs/dfstab file.  Conflicts are defined as any entries that have "
+     	"the same path to be shared.  All entries with the same path as passed "
+     	"in with the <path> parameter will be deleted.  The method returns 1 "
+     	"if it succeded, 0 if a failure occurred.")]
+    sint32 deleteAllWithDuplicatePath([IN]String path);
+};
+
+[Experimental,
+ Version("1.3.0"),
+ Description("The Solaris_MountSetting object contains attributes that "
+             "are commonly used to configure a file system mount on a "
+             "Solaris system.  Attributes which have the potential of "
+             "operating at a different value than what was configured "
+             "will also be on the Solaris_Mount object.")]
+class Solaris_MountSetting : CIM_SettingData {
+
+    [Description ("The underlying file system type the mount is to be "
+                  "configured for."),
+     ValueMap {"Unknown", "Other", "ufs", "nfs", "hsfs", "cachefs", "pcfs", 
+             "procfs", "tmpfs", "VxFS", "SAMQFS", "devfs", "udfs", "sockfs",
+             "autofs", "specfs", "fifofs"},
+     ModelCorrespondence {"CIM_FileSystem.FileSystemType"},
+     MappingStrings {"SOLARIS9.SUN|mount -F <FStype>"}]
+    string FsType;      
+
+    [Description ("A string of file system mount options specified when "
+                  "mounting the file system.  This property is also present on "
+                  "the Solaris_Mount class.  The Solaris_Mount.MountOptions "
+                  "property represents the actual operational value of the "
+                  "mount options string as reported in /etc/mnttab.  "
+                  "Therefore, the properties may have different values."),
+     MappingStrings {"SOLARIS9.SUN|mount -o <mount options, comma delimited>"}]
+    string MountOptions;
+         
+    [Description("If set to true: the mount entry is added to /etc/mnttab."
+                 "If set to false (default): the mount is not recorded in "
+                 "/etc/mnttab."),
+     MappingStrings {"SOLARIS9.SUN|mount -m"}]
+    boolean NoMnttabEntry = false;
+    
+    [Description("If set to true: don't allow allow setuid execution.  "
+                 "If set to false (default): allow setuid execution."),
+     MappingStrings {"SOLARIS9.SUN|mount -o suid | nosuid"}]
+    boolean NoSuid = false;
+         
+    [Description("If set to true: the filesystem is mounted over an "
+                 "existing mounted filesystem.  If set to false (default): "
+                 " the filesystem is not mounted over an existing mounted "
+                 "filesystem."),
+     MappingStrings {"SOLARIS9.SUN|mount -O"}]
+    boolean Overlay = false;    
+  
+    [Description("If set to true: the filesystem is mounted as a read only "
+                 "filesystem.  If set to false (default): the "
+                 "filesystem is mounted as a read/write "
+                 "filesystem."),
+     MappingStrings {"SOLARIS9.SUN|mount -o rw | ro"}]
+    boolean ReadOnly = false;
+    
+    [Description("If set to true, the file system will have a corresponding "
+                 "device to mount/mount point entry in /etc/vfstab.  This "
+                 "property is also present on the Solaris_Mount class.  The "
+                 "Solaris_Mount.VfstabEntry property represents the actual "
+                 "operational value of whether or not the mount has and entry "
+                 "in /etc/vfstab.  Therefore, the properties may have "
+                 "different values."),
+     MappingStrings {"SOLARIS9.SUN|vfstab"}]
+     
+    boolean VfstabEntry;
+
+};
+
+[Experimental,
+ Version("1.3.0"),
+ Description ("The Solaris_NFSMountSetting object contains attributes "
+              "that are commonly used to configure an NFS mount "
+              "on a Solaris system.  Attributes which have the "
+              "potential of operating at a different value than what "
+              "was configured will also be on the Solaris_NFSMount object.") ]
+class Solaris_NFSMountSetting : Solaris_MountSetting
+{
+
+    [Description (
+        "If set to true, allow data and attribute caching.  If set to "
+        "false, suppress data and attribute caching.  Corresponds to "
+        "the 'noac' mount_nfs option (Solaris 9).") ]
+    boolean AttributeCaching = true;
+
+    [Description (
+        "Maximum number of seconds that cached attributes are held "
+        "after directory update.  Corresponds to the 'acdirmax=' "
+        "mount_nfs option (Solaris 9)."),
+       Units("Seconds") ]
+    uint16 AttributeCachingForDirectoriesMax = 60;
+
+    [Description (
+        "Minimum number of seconds that cached attributes are held "
+        "after directory update.  Corresponds to the 'acdirmin=' "
+        "mount_nfs option (Solaris 9)."),
+       Units("Seconds") ]
+    uint16 AttributeCachingForDirectoriesMin = 30;
+
+    [Description (
+        "Maximum number of seconds that cached attributes are held "
+        "after file modification.  Corresponds to the 'acregmax=' "
+        "mount_nfs option (Solaris 9)."),
+       Units("Seconds") ]
+    uint16 AttributeCachingForRegularFilesMax = 60;
+
+    [Description (
+        "Minimum number of seconds that cached attributes are held "
+        "after file modification.  Corresponds to the 'acregmin=' "
+        "mount_nfs option (Solaris 9)."),
+       Units("Seconds") ]
+    uint16 AttributeCachingForRegularFilesMin = 3;
+
+    [Description("If set to true: enable quota checking.  If set to "
+                 "false (default): disable quota checking. "
+                 "Corresponds to the 'quota/noquota' mount_nfs "
+                 "options (Solaris 9).")]
+    boolean EnableQuotaChecking = false;
+
+    [Description (
+        "The list of resources to be used for failover. Each "
+        "resource must be of the form host:/pathname, NFS URL or a "
+        "list of hosts, if the exported directory name is the same.")]
+    string FailoverList[];
+    
+    [Description("If true, data is transferred directly between "
+                 "client and server, with no buffering on the client. "
+                 "If false: Data is buffered on the client. "
+                 "The default is false.  Corresponds to the "
+                 "'forcedirectio/noforcedirectio' mount_nfs options "
+                 "(Solaris 9).")]
+    boolean ForceDirectIO = false;
+    
+    [Description("If set to true: use BSD style group id semantics. "
+                 "If set to false (default): use System V style group "
+                 "id semantics.  Corresponds to the 'grpid' mount_nfs "
+                 "option (Solaris 9).")]
+    boolean GroupId = false;
+    
+    [Description (
+        "If set to true, once the FileSystem is mounted, NFS requests "
+        "are retried until the hosting System responds.  "
+        "If set to false, once the FileSystem is mounted, an error "
+        "is returned if the hosting System does not respond. "
+        "Corresponds to the 'hard/soft' mount_nfs options (Solaris 9).")]
+    boolean HardMount = true;
+
+    [Description (
+        "If set to true, keyboard interrupts are permitted to kill a "
+        "process that is hung while waiting for a response on a hard- "
+        "mounted file system.  If set to false, keyboard interrupts "
+        "are ignored.  Corresponds to the 'intr/nointr' mount_nfs "
+        "options (Solaris 9).") ]
+    boolean Interrupt = true;
+
+    [Description ("Maximum number of NFS retransmissions allowed. "
+        "Corresponds to the 'retrans=' mount_nfs option (Solaris 9).") ]
+    uint16 MaxRetransmissionAttempts = 5;
+
+    [Description ("Maximum number of mount failure retries allowed.  The "
+    	"default for the mount command is 10000.  The default for the "
+    	"automounter is 0.  "
+        "Corresponds to the 'retry=' mount_nfs option (Solaris 9).  "
+        "This value is only valid upon creation of an instance of "
+	"instance of Solaris_NFSMount.  This is actually a mount _process_ "
+	"option and not a mount option.") ]
+    uint16 MountFailureRetries;
+
+    [Description("If true, do not perform the normal close-to-open "
+                 "consistency. The client will not perform the flush "
+                 "on close and the request for validation, allowing "
+                 "the possiblity of differences among copies of the "
+                 "same file as stored on multiple clients.  This can "
+                 "be used where it can be guaranteed that accesses to "
+                 "a specified file system will be made from only one "
+                 "client and only that client.  The default is false. "
+                 "Corresponds to the 'nocto' mount_nfs option (Solaris 9).")]
+    boolean NoCloseToOpenConsistency = false;
+
+    [Description("If set to true: use POSIX.1 semantics for filesystem. "
+                 "If set to false (default): do not use POSIX.1 "
+                 "semantics.  Corresponds to the 'posix' mount_nfs "
+                 "option (Solaris 9).")]
+    boolean Posix = false;
+
+    [Description("A string specifying the transport protocol used for the "
+                 "NFS mount. It is the value of the network_id field from "
+                 "/etc/netconfig.  Corresponds to the 'proto=' "
+                 "mount_nfs option (Solaris 9)."),
+     MappingStrings{"SOLARIS9.SUN|/etc/netconfig"} ]
+    String Protocol;
+
+    [Description("If set to true: use the public file handle. "
+                 "If set to false (default): do not use the public "
+                 "file handle.  Corresponds to the 'public' mount_nfs "
+                 "option (Solaris 9).")]
+    boolean Public = false;
+
+    [Description ("Read buffer size in bytes.  The default is 32768 for "
+    	"version 3 and 8192 for version 2.  Corresponds to the "
+        "'rsize=' mount_nfs option (Solaris 9)."),
+       Units("Bytes") ]
+    uint64 ReadBufferSize;
+
+    [Description ("NFS timeout in tenths of a second.  The default is 11 "
+    	"tenths of a second for connectionless transports and 600 "
+    	"tenths of a second for connection oriented transports.  "
+    	"Corresponds to the 'timeo=' mount_nfs option (Solaris 9)."),
+       Units ("Tenths of Seconds") ]
+    uint32 RetransmissionTimeout;
+
+    [Description (
+        "If set to true, if the first mount attempt fails, retries are "
+        "performed in the foreground.  If set to false, retries are "
+        "performed in the background.  Corresponds to the 'bg/fg' "
+        "mount_nfs options (Solaris 9).  "
+        "This value is only valid upon creation of an instance of "
+	"instance of Solaris_NFSMount.  This is actually a mount _process_ "
+	"option and not a mount option.") ]
+    boolean RetryInForeground = true;
+
+    [Description("A string describing the security mode for NFS transactions. "
+                 "Available modes is listed in /etc/nfssec.conf. "
+                 "Corresponds to the 'sec=' mount_nfs option (Solaris 9)."),
+     MappingStrings{"SOLARIS9.SUN|/etc/nfssec.conf"} ]
+    String SecurityMode;
+
+    [Description (
+        "The NFS Server IP port number.  Default is NFS_PORT which is defined "
+        "in /usr/include/nfs/nfs.h.  Corresponds to the 'port=' mount_nfs "
+        "option (Solaris 9).") ]
+    uint32 ServerCommunicationPort;
+
+    [Description("The name of the NFS server.")]
+    String ServerName;
+
+    [Description("The path of the NFS resource on the server.")]
+    String ServerPath;
+
+    [Description (
+        "Version number of NFS protocol to use.  Corresponds to the "
+        "'vers=' mount_nfs option (Solaris 9)."),
+     ValueMap {"2", "3", "4", "highest"} ]
+    String Version = "highest";
+
+    [Description ("Write buffer size in bytes.  The default is 32768 for "
+    	"version 3 and 8192 for version 2.  Corresponds to the "
+        "'wsize=' mount_nfs option (Solaris 9)."),
+       Units("Bytes") ]
+    uint64 WriteBufferSize;
+
+
+    [Description(
+      "Allows the creation and manipulation of extended attributes. "
+      "Corresponds to the 'xattr/noxattr' mount_nfs options (Solaris 9). ")]
+    boolean Xattr = true;
+};
+
+    [Experimental,
+     Version("1.3.0"),
+     Description("The Solaris_ShareSetting object contains attributes that "
+                 "are commonly used to configure the sharing of a resource "
+                 "on a Solaris system.")]
+class Solaris_ShareSetting : CIM_SettingData {
+};
+
+[Experimental,
+ Version("1.3.0"),
+ Description (
+     "A class that contains attributes for a local NFS shared object "
+     "on the server side that is made accessible to other systems. "
+     "Attributes which have the potential of operating at a different "
+     "value than what was configured will also be on the Solaris_Mount "
+     "object.")
+]
+class Solaris_NFSShareSetting : Solaris_ShareSetting
+{
+
+    [Description("If set to true: maximal  access  is  given  to all "
+                 "clients. Valid for NFS version 2 only.  Corresponds "
+                 "to the 'aclok' share_nfs option (Solaris 9)."),
+        ModelCorrespondence{"Solaris_NFSMount.Version"}]
+    boolean AllowAccessControl;
+    
+    [Description("Sets the the effective user ID of unknown users. By "
+                 "default, unknown users are given the effective user "
+                 "ID UID_NOBODY. UID_NOBODY is usually set to 60001 but "
+                 "because an administrator can change this we don't set "
+                 "it to this by default.  Corresponds to the "
+                 "'anon=' share_nfs option (Solaris 9)."),
+        Required,
+        Units("Bytes")]
+    Uint32 EffectiveUID;
+    
+    [Description("If set to true: causes  the  server  file system to "
+                 "silently ignore any attempt to  enable the setuid or "
+                 "setgid mode bits.  Corresponds to the 'nosuid' "
+                 "share_nfs option (Solaris 9).")]
+    boolean IgnoreSetId;    
+    
+    [Description("Enables NFS server logging for the specified file "
+                 "system. The optional tag determines the location of "
+                 "the related log files. The tag is defined in "
+                 "etc/nfs/nfslog.conf. The default value is the global "
+                 "tag.  Corresponds to the 'log=' share_nfs option (Solaris 9)."),
+        MappingStrings{"SOLARIS9.SUN|/etc/nfs/nfslog.conf"}]
+    String LogFileTag = "global";
+    
+    [Description("If set to true: the public file handle is moved from "
+                 "root (/) to the exported directory.  Corresponds to "
+                 "the 'public' share_nfs option (Solaris 9).")]
+    boolean Public;
+
+    [Description (
+        "A value of true prevents clients from mounting subdirectories "
+        "of shared directories.  Corresponds to the 'nosub' share_nfs "
+        "option (Solaris 9).")]
+    boolean PreventSubDirMount;
+    
+    [Description("An attribute that is only used at the time of creation of "
+    		 "a NFS Share instance.  If it is set to true, the "
+    		 "the NFS server daemons (nfsd and mountd) will be started "
+    		 "with the default settings, if and only if, nfsd and mountd "
+    		 "aren't already running on the host.  The daemons will NOT "
+    		 "be stopped and restarted.  As a side effect of starting the "
+    		 "NFS server daemons the share being created will be placed "
+    		 "as an entry in /etc/dfs/dfstab since the starting of the "
+    		 "daemon relies on entries here."),
+      MappingStrings{"SOLARIS9.SUN|/etc/init.d/nfs.server start"}]
+     boolean StartDaemons;
+};
+
+
+    [Provider("jni:libWBEMnfs.so"),
+     Version("1.3.0"),
+     Description("A logical element that contains the information necessary "
+     		 "to represent and manage the functionality provided by "
+     		 "shares in Solaris.")]
+     
+class Solaris_ShareService : CIM_Service {
+
+    //Methods
+    [Description("Method which shares all resources listed in the file "
+    		 "specified with the file parameter.   The specified file "
+    		 "should contain a list of share command lines.  "
+    		 "If no file is specified /etc/dfs/dfstab is used.  "
+    		 "Resources may be shared by specific file system types by "
+    		 "specifying the file system type (or types in a comma "
+    		 "delimited list) as input parameter, fstype.  The method "
+    		 "returns 1 if it succeded, 0 if a failure occurred.  "
+    		 "Corresponds to /usr/sbin/shareall (Solaris 9)")]
+    sint32 shareall([IN]String fstype, [IN]String file);
+    
+    [Description("Method which unshares all currently shared resources.  "
+    		 "If a fstype (or fstypes in a comma delimited list) is not "
+    		 "specified in the fstype parameter, all distributed file "
+    		 "system type resources will be unshared.  The method "
+    		 "returns 1 if it succeded, 0 if a failure occurred.  "
+    		 "Corresponds to /usr/sbin/unshareall (Solaris 9)")]
+    sint32 unshareall([IN]String fstype);
+};
+
+
+
+    [Provider("jni:libWBEMnfs.so"),
+     Version("1.3.0"),
+     Description("A logical element that contains the information necessary "
+     		 "to represent and manage the functionality provided by "
+     		 "file system mounts in Solaris.")]
+
+class Solaris_MountService : CIM_Service {
+
+    //Methods
+    [Description("Method which mounts file systems listed in the file system "
+    		 "table as specified with the fstable parameter."
+    		 "The specified file system table (file) must be in the vfstab "
+    		 "format.  If no file system table is specified (an empty "
+    		 "string is passed in) /etc/vfstab is used.  Only the file "
+    		 "systems having the mount at boot field set to yes in the "
+    		 "table will be mounted.  "
+    		 "The fstype parameter can be used to specify the file "
+    		 "system type of the file systems to be mounted.  The "
+    		 "onlyLocalFileSystems and onlyRemoteFileSystems parameters "
+    		 "are mutually exclusive.  If onlyLocalFileSystems is true, "
+    		 "the mountall action will be limited to local file systems.  "
+    		 "If onlyRemoteFileSystems is true, the mountall action will "
+    		 "be limited to remote file system types.  The method "
+    		 "returns 1 if it succeded, 0 if a failure occurred.  "
+    		 "Corresponds to /usr/sbin/mountall (Solaris 9)")]
+    sint32 mountall([IN]String fstype, [IN]Boolean onlyLocalFileSystems,
+    		    [IN]Boolean onlyRemoteFileSystems, [IN]String fstable);
+    
+    [Description("Method used to unmount all file systems except root, /usr, "
+    		 "/var, /var/adm, /var/run, /proc, and /dev/fd.  There is no "
+    		 "guarantee that this function will unmount busy file "
+    		 "systems.  "
+    		 "The fstype parameter can be used to specify the fstype of "
+    		 "the file systems to be unmounted.  The host parameter "
+    		 "can be used to unmount all file systems listed in "
+    		 "/etc/mnttab that are remote-mounted from the host specified."
+    		 "  If onlyLocalFileSystems is true, limit the unmounting to "
+    		 "local file systems.  If onlyRemoteFileSystems is true, the "
+    		 "mounting will be limited to remote file system types.  "
+    		 "If killProcesses is true, a SIGKILL signal is sent to each "
+    		 "process using the file and this spawns kills for those"
+    		 "processes.  If unmountInParallel is true, the umount "
+    		 "operation will be performed in parallel.  "
+    		 "The onlyLocalFileSystems and onlyRemoteFileSystems "
+    		 "parameters are mutually exclusive and cannot be used when "
+    		 "a host is defined.  The fstype and host parameters are also "
+    		 "mutually exclusive.  The method returns 1 if it succeded, 0 "
+    		 "if a failure occurred.  Corresponds to /usr/sbin/umountall "
+    		 "(Solaris 9)")]
+    sint32 unmountall([IN]String fstype,
+    		      [IN]String host, 
+    		      [IN]Boolean onlyLocalFileSystems,
+    		      [IN]Boolean onlyRemoteFileSystems, 
+    		      [IN]Boolean killProcesses, 
+    		      [IN]Boolean umountInParallel);
+};
+
+// ===================================================================
+//   Associations
+// ===================================================================
+#pragma namespace("__modify")
+
+[Association,
+ Provider(
+     "jni:libWBEMnfs.so"),
+ Version("1.3.0"),
+ Description (
+     "An association between a remote directory that can be mounted "
+     "and the NFS mounted file system.") ]
+class Solaris_NFSMount : Solaris_Mount
+{
+   [Description (
+        "If set to true, allow data and attribute caching.  If set to "
+        "false, suppress data and attribute caching.  Corresponds to "
+        "the 'noac' mount_nfs option (Solaris 9).") ]
+    boolean AttributeCaching = true;
+
+    [Description (
+        "Maximum number of seconds that cached attributes are held "
+        "after directory update.  Corresponds to the 'acdirmax=' "
+        "mount_nfs option (Solaris 9)."),
+       Units("Seconds") ]
+    uint16 AttributeCachingForDirectoriesMax = 60;
+
+    [Description (
+        "Minimum number of seconds that cached attributes are held "
+        "after directory update.  Corresponds to the 'acdirmin=' "
+        "mount_nfs option (Solaris 9)."),
+       Units("Seconds") ]
+    uint16 AttributeCachingForDirectoriesMin = 30;
+
+    [Description (
+        "Maximum number of seconds that cached attributes are held "
+        "after file modification.  Corresponds to the 'acregmax=' "
+        "mount_nfs option (Solaris 9)."),
+       Units("Seconds") ]
+    uint16 AttributeCachingForRegularFilesMax = 60;
+
+    [Description (
+        "Minimum number of seconds that cached attributes are held "
+        "after file modification.  Corresponds to the 'acregmin=' "
+        "mount_nfs option (Solaris 9)."),
+       Units("Seconds") ]
+    uint16 AttributeCachingForRegularFilesMin = 3;
+    
+    [Override ("Dependent"),
+     Description ("The file system mounted via NFS. "
+        "It is also referred to as the resource to mount.") ]
+    Solaris_NFS REF Dependent;
+
+    [Description("If set to true: enable quota checking.  If set to "
+                 "false (default): disable quota checking. "
+                 "Corresponds to the 'quota/noquota' mount_nfs "
+                 "options (Solaris 9).")]
+    boolean EnableQuotaChecking = false;
+
+    [Description("If true, data is transferred directly between "
+                 "client and server, with no buffering on the client. "
+                 "If false: Data is buffered on the client. "
+                 "The default is false.  Corresponds to the "
+                 "'forcedirectio/noforcedirectio' mount_nfs options "
+                 "(Solaris 9).")]
+    boolean ForceDirectIO = false;
+
+    [Description (
+        "The list of resources to be used for failover. Each "
+        "resource must be of the form host:/pathname, NFS URL or a "
+        "list of hosts, if the exported directory name is the same.")]
+    string FailoverList[];
+
+    [Description("If set to true: use BSD style group id semantics. "
+                 "If set to false (default): use System V style group "
+                 "id semantics.  Corresponds to the 'grpid' mount_nfs "
+                 "option (Solaris 9).")]
+    boolean GroupId = false;
+
+    [Description (
+        "If set to true, once the FileSystem is mounted, NFS requests "
+        "are retried until the hosting System responds.  "
+        "If set to false, once the FileSystem is mounted, an error "
+        "is returned if the hosting System does not respond. "
+        "Corresponds to the 'hard/soft' mount_nfs options (Solaris 9).")]
+    boolean HardMount = true;
+
+    [Description (
+        "If set to true, keyboard interrupts are permitted to kill a "
+        "process that is hung while waiting for a response on a hard- "
+        "mounted file system.  If set to false, keyboard interrupts "
+        "are ignored.  Corresponds to the 'intr/nointr' mount_nfs "
+        "options (Solaris 9).")]
+    boolean Interrupt = true;
+
+    [Description ("Maximum number of NFS retransmissions allowed. "
+        "Corresponds to the 'retrans=' mount_nfs option (Solaris 9).") ]
+    uint16 MaxRetransmissionAttempts = 5;
+
+    [Description ("Maximum number of mount failure retries allowed.  The "
+    	"default for the mount command is 10000.  The default for the "
+    	"automounter is 0.  "
+        "Corresponds to the 'retry=' mount_nfs option (Solaris 9).  "
+        "This value is only valid upon creation of an instance of "
+	"instance of Solaris_NFSMount.  This is actually a mount _process_ "
+	"option and not a mount option.") ]
+    uint16 MountFailureRetries;
+
+    [Description("If true, do not perform the normal close-to-open "
+                 "consistency. The client will not perform the flush "
+                 "on close and the request for validation, allowing "
+                 "the possiblity of differences among copies of the "
+                 "same file as stored on multiple clients.  This can "
+                 "be used where it can be guaranteed that accesses to "
+                 "a specified file system will be made from only one "
+                 "client and only that client.  The default is false. "
+                 "Corresponds to the 'nocto' mount_nfs option (Solaris 9).")]
+    boolean NoCloseToOpenConsistency = false;
+
+    [Description("If set to true: use POSIX.1 semantics for filesystem. "
+                 "If set to false (default): do not use POSIX.1 "
+                 "semantics.  Corresponds to the 'posix' mount_nfs "
+                 "option (Solaris 9).")]
+    boolean Posix = false;
+
+    [Description("A string specifying the transport protocol used for the "
+                 "NFS mount. It is the value of the network_id field from "
+                 "/etc/netconfig.  Corresponds to the 'proto=' "
+                 "mount_nfs option (Solaris 9)."),
+        MappingStrings{"SOLARIS9.SUN|/etc/netconfig"}]
+    String Protocol;
+
+    [Description("If set to true: use the public file handle. "
+                 "If set to false (default): do not use the public "
+                 "file handle.  Corresponds to the 'public' mount_nfs "
+                 "option (Solaris 9).")]
+    boolean Public = false;
+
+    [Description ("Read buffer size in bytes.  The default is 32768 for "
+    	"version 3 and 8192 for version 2.  Corresponds to the "
+        "'rsize=' mount_nfs option (Solaris 9)."),
+       Units("Bytes") ]
+    uint64 ReadBufferSize;
+
+    [Deprecated {
+        "Solaris_NFSMount.FailoverList"},
+     Description (
+        "Array of replicated resources to be used for failover. Each "
+        "resource must be of the form host:/pathname, NFS URL or a "
+        "list of hosts, if the exported directory name is the same.") ]
+    string ReplicatedResources[];
+
+    [Description ("NFS timeout in tenths of a second.  The default is 11 "
+    	"tenths of a second for connectionless transports and 600 "
+    	"tenths of a second for connection oriented transports.  "
+    	"Corresponds to the 'timeo=' mount_nfs option (Solaris 9)."),
+       Units ("Tenths of Seconds")]
+    uint32 RetransmissionTimeout;
+
+    [Description (
+        "If set to true, if the first mount attempt fails, retries are "
+        "performed in the foreground.  If set to false, retries are "
+        "performed in the background.  Corresponds to the 'bg/fg' "
+        "mount_nfs options (Solaris 9).  "
+        "This value is only valid upon creation of an instance of "
+	"instance of Solaris_NFSMount.  This is actually a mount _process_ "
+	"option and not a mount option.")]
+    boolean RetryInForeground = true;
+
+    [Description("A string describing the security mode for NFS transactions. "
+                 "Available modes are listed in /etc/nfssec.conf. "
+                 "Corresponds to the 'sec=' mount_nfs option (Solaris 9)."),
+        MappingStrings{"SOLARIS9.SUN|/etc/nfssec.conf"}]
+    String SecurityMode;
+
+    [Description (
+        "The NFS Server IP port number.  Default is NFS_PORT which is defined "
+        "defined in /usr/include/nfs/nfs.h.  Corresponds to the "
+        "'port=' mount_nfs option (Solaris 9).") ]
+    uint32 ServerCommunicationPort;
+
+    [Description("The name of the NFS server.")]
+    String ServerName;
+
+    [Description("The path of the NFS resource on the server.")]
+    String ServerPath;
+    
+    [Description (
+        "Version number of NFS protocol to use.  Corresponds to the "
+        "'vers=' mount_nfs option (Solaris 9)."),
+     ValueMap {"2", "3", "4", "highest"} ]
+    String Version = "highest";
+
+
+    [Description ("Write buffer size in bytes.  The default is 32768 for "
+    	"version 3 and 8192 for version 2.  Corresponds to the "
+        "'wsize=' mount_nfs option (Solaris 9)."),
+       Units("Bytes") ]
+    uint64 WriteBufferSize;
+
+    [Description(
+      "Allows the creation and manipulation of extended attributes. "
+      "Corresponds to the 'xattr/noxattr' mount_nfs options (Solaris 9). ")]
+    boolean Xattr = true;
+
+    // Methods
+    [Description("Method to obtain the list of network IDs from "
+                 "the /etc/netconfig file.  Returns 1 if method completed "
+                 "successfully, 0 if an error occurred.  Corresponds to the "
+                 "data stored in /etc/netconfig (Solaris 9).")]
+    sint32 getNetCfgList([OUT, IN(false)]string ids[]);
+
+    [Description("Method to obtain the list of nfs security modes from "
+                 "the /etc/nfssec.conf file.  Returns 1 if method completed "
+                 "successfully, 0 if an error occurred.  Corresponds to the "
+                 "data stored in /etc/nfssec.conf (Solaris 9).")]
+    sint32 getNfsSecList([OUT, IN(false)]string secmodes[]);
+
+    [Description("Method to obtain the the default nfs security mode from "
+                 "the /etc/nfssec.conf file.  Returns 1 if method completed "
+                 "successfully, 0 if an error occurred.  Corresponds to the "
+                 "data stored in /etc/nfssec.conf (Solaris9).")]
+    sint32 getDefaultNfsSecMode([OUT, IN(false)]string secmode);
+};
+
+#pragma namespace("__create")
+
+[Association,
+ Provider(
+     "jni:libWBEMnfs.so"),
+ Version("1.3.0"),
+ Description (
+     "This association represents the relationship between an NFS "
+     "share and its security modes.")
+]
+class Solaris_NFSShareSecurityModes : CIM_ElementSetting
+{
+       [Override ("Element"),
+        Description ("The share the mode is for.")]
+    Solaris_NFSShare REF Element;
+
+       [Override("Setting"), Description (
+        "The Setting that can be applied") ]
+    Solaris_NFSShareSecurity REF Setting;
+
+};
+
+[Association,
+ Version("1.3.0"),
+ Description ("Class represents the relationship between an NFS "
+              "Share object and its default setting. The default "
+              "setting of AUTH_SYS for the security mode will be "
+              "set in the provider.")
+]
+class Solaris_NFSShareDefSecurityMode : CIM_DefaultSetting
+{
+    [Override ("Element"),
+        Description ("The share the mode is for.")]
+    Solaris_NFSShare REF Element;
+
+    [Override("Setting"),
+        Description ("The Setting that can be applied to ") ]
+    Solaris_NFSShareSecurity REF Setting;
+
+};
+
+
+
+[Association,
+ Provider(
+     "jni:libWBEMnfs.so"),
+ Version("1.3.0"),
+ Description ("Class that represents the association between the "
+               "share and its host.")
+]
+class Solaris_HostedShare : CIM_HostedShare
+{
+    [Override ("Antecedent"),
+        Description ("The host of the NFS shared file system.")]
+    Solaris_ComputerSystem REF Antecedent;
+
+    [Override ("Dependent"),
+        Description ("The NFS shared directory.")]
+    Solaris_NFSShare REF Dependent;
+};
+
+[Association,
+ Aggregation,
+ Version("1.3.0"),
+ Description(
+     "An association that represents the aggregation of all of "
+     "the Solaris_PersistentShare objects and ties them to a "
+     "Solaris_SystemConfiguration object.")]
+class Solaris_PersistentShareConfiguration : CIM_SystemSettingContext
+{
+
+};
+
+[Association,
+ Provider(
+     "jni:libWBEMnfs.so"),
+ Version("1.3.0"),
+ Description(
+    "This class ties an individual Solaris_PersistentShare to its "
+    "owning system.")]
+class Solaris_PersistentShareForSystem : CIM_SettingForSystem
+{
+
+    [Override ("Antecedent"),
+       Description ("The Solaris Hosting System.")]
+    Solaris_ComputerSystem REF Antecedent;
+
+    [Override ("Dependent"),
+        Description ("The dfstab entry for the system.")]
+    Solaris_PersistentShare REF Dependent;
+};
+
+
+[Association,
+ Provider(
+     "jni:libWBEMnfs.so"),
+ Version("1.3.0"),
+ Description(
+     "This class ties an individual Solaris_PersistentShare to a "
+     "Solaris_NFSShare.")]
+class Solaris_NFSShareEntry : CIM_ElementSetting
+{
+    [Override ("Setting"),
+        Description ("The persistent share setting")]
+    Solaris_PersistentShare REF Setting;
+
+};
+
+[Association,
+ Version("1.3.0"),
+ Description ("associates the Share to a LogicalElement that is "
+              "being exported.") ]
+class Solaris_SharedElement : CIM_SharedElement
+{
+};
+
+#pragma namespace("__modify")
+
+[Association,
+ Provider("java:com.sun.wbem.solarisprovider.fsmgr.share.Solaris_NFSExport"),
+ Deprecated {
+    "Solaris_SharedFileSystem"},
+ Description ("Solaris_NFSExport inherited from CIM_Export")]
+class Solaris_NFSExport : CIM_Export
+{
+
+        [Description (
+                "If set to true: give maximum access to NFS v2 clients.  "
+                "If set to false (default): give minimum access to NFS v2 "
+                "clients.") ]
+        boolean AclOk = false;
+        
+        [Description (
+                "The effective UID of unknown users. The default value is "
+                "UID_NOBODY (60001).") ]
+        sint32 AnonUid;
+
+        [Description ("Share description.") ]
+        string Description;
+        
+        [Description (
+                "Index file to use when accessing a Web-NFS directory.") ]
+        string IndexFile;
+
+        [Description (
+                "If set to true: prevents clients from mounting "
+                "subdirectories of the exported directory.  "
+                "If set to false (default): allows clients to mount "
+                "subdirectories.") ]
+        boolean NoSub = false;
+
+        [Description (
+                "If set to true: don't allow allow setuid execution.  "
+                "If set to false (default): allow setuid execution.") ]
+        boolean NoSuid = false;
+
+        [Description (
+                "If set to true: use exported directory as the location of "
+                "the public file handle for Web-NFS.  "
+                "If set to false (default): exported directory is not the "
+                "location of the public file handle.") ]
+        boolean Public = false;
+
+        [Description (
+                "If set to true: grant read-only access to all clients.  "
+                "If set to false (default):do not grant read-only access "
+                "to all clients.") ]
+        boolean ReadOnly = false;
+
+        [Description (
+                "If set to true (default): grant read-write access to all "
+                "clients.  "
+                "If set to false: do not grant read-write access to all "
+                "clients.") ]
+        boolean ReadWrite = true;
+
+        [Description ("Array of clients granted read-only access.") ]
+        string ROAccessList[];
+
+        [Description (
+                "Array of hosts from which root users can gain "
+                "root access.") ]
+        string RootAccessList[];
+
+        [Description ("Array of clients granted read-write access.") ]
+        string RWAccessList[];
+        
+        [Description (
+                "If set to true: the filesystem is shared at boot.  "
+                "If set to false (default): the resource is not shared at "
+                "boot.") ]
+        boolean ShareAtBootEntry = false;
+
+        [Description (
+                "Array of security modes to be used to NFS transactions. "
+                "Available modes is listed in /etc/nfssec.conf.") ]
+        string SecurityModes[];
+
+        [Description ("Share options.") ]
+        string ShareOptions;
+
+        [Description (
+                "Maximum lifetime of a request allowed by the NFS server "
+                "(in seconds) when using Diffie-Hellman or Kerberos security.  "
+                "Default value is 30000 seconds (8.3 hours).") ]
+        uint32 Window = 30000;
+
+
+	//Methods
+        [Description("Method to delete a dfstab entry.")]
+        sint32 deleteDfstabEntry([IN]string pathName);
+
+};
+
+#pragma namespace("__create")
+
+[Association,
+ Version("1.3.0"),
+ Provider(
+     "jni:libWBEMnfs.so"),
+ Description ("Class that represents the association between the local "
+              "filesystem and the Solaris_NFSShare on the server.")
+]
+class Solaris_SharedFileSystem : Solaris_SharedElement
+{
+    [Override("SystemElement"), Key, MAX(1),
+           Description ("The Directory that is Shared.") ]
+    CIM_LogicalElement REF SystemElement;
+
+    [Override("SameElement"), Key, Description (
+           "The Shared view of the Directory.") ]
+    CIM_Share REF SameElement;
+
+};

@@ -1,0 +1,420 @@
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+# 2002 March 6
+#
+# The author disclaims copyright to this source code.  In place of
+# a legal notice, here is a blessing:
+#
+#    May you do good and not evil.
+#    May you find forgiveness for yourself and forgive others.
+#    May you share freely, never taking more than you give.
+#
+#***********************************************************************
+# This file implements regression tests for SQLite library.
+#
+# This file implements tests for the PRAGMA command.
+#
+# $Id: pragma.test,v 1.9 2004/04/23 17:04:45 drh Exp $
+
+set testdir [file dirname $argv0]
+source $testdir/tester.tcl
+
+# Delete the preexisting database to avoid the special setup
+# that the "all.test" script does.
+#
+db close
+file delete test.db
+set DB [sqlite db test.db]
+
+do_test pragma-1.1 {
+  execsql {
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {2000 2000 1 1}
+do_test pragma-1.2 {
+  execsql {
+    PRAGMA cache_size=1234;
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {1234 2000 1 1}
+do_test pragma-1.3 {
+  db close
+  sqlite db test.db
+  execsql {
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {2000 2000 1 1}
+do_test pragma-1.4 {
+  execsql {
+    PRAGMA synchronous=OFF;
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {2000 2000 0 1}
+do_test pragma-1.5 {
+  execsql {
+    PRAGMA cache_size=4321;
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {4321 2000 0 1}
+do_test pragma-1.6 {
+  execsql {
+    PRAGMA synchronous=ON;
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {4321 2000 1 1}
+do_test pragma-1.7 {
+  db close
+  sqlite db test.db
+  execsql {
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {2000 2000 1 1}
+do_test pragma-1.8 {
+  execsql {
+    PRAGMA default_synchronous=OFF;
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {2000 2000 0 0}
+do_test pragma-1.9 {
+  execsql {
+    PRAGMA default_cache_size=123;
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {123 123 0 0}
+do_test pragma-1.10 {
+  db close
+  set ::DB [sqlite db test.db]
+  execsql {
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {123 123 0 0}
+do_test pragma-1.11 {
+  execsql {
+    PRAGMA synchronous=NORMAL;
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {123 123 1 0}
+do_test pragma-1.12 {
+  execsql {
+    PRAGMA synchronous=FULL;
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {123 123 2 0}
+do_test pragma-1.13 {
+  db close
+  set ::DB [sqlite db test.db]
+  execsql {
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {123 123 0 0}
+do_test pragma-1.14 {
+  execsql {
+    PRAGMA default_synchronous=FULL;
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {123 123 2 2}
+do_test pragma-1.15 {
+  db close
+  set ::DB [sqlite db test.db]
+  execsql {
+    PRAGMA cache_size;
+    PRAGMA default_cache_size;
+    PRAGMA synchronous;
+    PRAGMA default_synchronous;
+  }
+} {123 123 2 2}
+
+do_test pragma-2.1 {
+  execsql {
+    PRAGMA show_datatypes=on;
+    PRAGMA empty_result_callbacks=off;
+  }
+  sqlite_datatypes $::DB {SELECT * FROM sqlite_master}
+} {}
+do_test pragma-2.2 {
+  execsql {
+    PRAGMA empty_result_callbacks=on;
+  }
+  sqlite_datatypes $::DB {SELECT * FROM sqlite_master}
+} {text text text integer text}
+
+# Make sure we can read the schema when empty_result_callbacks are
+# turned on. Ticket #406
+do_test pragma-2.2.1 {
+  execsql {
+    BEGIN;
+    CREATE TABLE tabx(a,b,c,d);
+    ROLLBACK;
+    SELECT count(*) FROM sqlite_master;
+  }
+} {0}
+
+do_test pragma-2.3 {
+  execsql {
+    CREATE TABLE t1(
+       a INTEGER,
+       b TEXT,
+       c WHATEVER,
+       d CLOB,
+       e BLOB,
+       f VARCHAR(123),
+       g nVaRcHaR(432)
+    );
+  }
+  sqlite_datatypes $::DB {SELECT * FROM t1}
+} {INTEGER TEXT WHATEVER CLOB BLOB VARCHAR(123) nVaRcHaR(432)}
+do_test pragma-2.4 {
+  sqlite_datatypes $::DB {
+     SELECT 1, 'hello', NULL
+  }
+} {NUMERIC TEXT TEXT}
+do_test pragma-2.5 {
+  sqlite_datatypes $::DB {
+     SELECT 1+2 AS X, 'hello' || 5 AS Y, NULL AS Z
+  }
+} {NUMERIC TEXT TEXT}
+do_test pragma-2.6 {
+  execsql {
+    CREATE VIEW v1 AS SELECT a+b, b||c, * FROM t1;
+  }
+  sqlite_datatypes $::DB {SELECT * FROM v1}
+} {NUMERIC TEXT INTEGER TEXT WHATEVER CLOB BLOB VARCHAR(123) nVaRcHaR(432)}
+do_test pragma-2.7 {
+  sqlite_datatypes $::DB {
+    SELECT d,e FROM t1 UNION SELECT a,c FROM t1
+  }
+} {INTEGER WHATEVER}
+do_test pragma-2.8 {
+  sqlite_datatypes $::DB {
+    SELECT d,e FROM t1 EXCEPT SELECT c,e FROM t1
+  }
+} {WHATEVER BLOB}
+do_test pragma-2.9 {
+  sqlite_datatypes $::DB {
+    SELECT d,e FROM t1 INTERSECT SELECT c,e FROM t1
+  }
+} {WHATEVER BLOB}
+do_test pragma-2.10 {
+  sqlite_datatypes $::DB {
+    SELECT d,e FROM t1 INTERSECT SELECT c,e FROM v1
+  }
+} {WHATEVER BLOB}
+
+# Construct a corrupted index and make sure the integrity_check
+# pragma finds it.
+#
+if {![sqlite -has-codec]} {
+do_test pragma-3.1 {
+  execsql {
+    BEGIN;
+    CREATE TABLE t2(a,b,c);
+    CREATE INDEX i2 ON t2(a);
+    INSERT INTO t2 VALUES(11,2,3);
+    INSERT INTO t2 VALUES(22,3,4);
+    COMMIT;
+    SELECT rowid, * from t2;
+  }
+} {1 11 2 3 2 22 3 4}
+do_test pragma-3.2 {
+  set rootpage [execsql {SELECT rootpage FROM sqlite_master WHERE name='i2'}]
+  set db [btree_open test.db]
+  btree_begin_transaction $db
+  set c [btree_cursor $db $rootpage 1]
+  btree_first $c
+  btree_delete $c
+  btree_commit $db
+  btree_close $db
+  execsql {PRAGMA integrity_check}
+} {{rowid 1 missing from index i2} {wrong # of entries in index i2}}
+}; # endif has-codec
+
+# Test the temp_store and default_temp_store pragmas
+#
+do_test pragma-4.2 {
+  execsql {
+    PRAGMA temp_store='default';
+    PRAGMA temp_store;
+  }
+} {0}
+do_test pragma-4.3 {
+  execsql {
+    PRAGMA temp_store='file';
+    PRAGMA temp_store;
+  }
+} {1}
+do_test pragma-4.4 {
+  execsql {
+    PRAGMA temp_store='memory';
+    PRAGMA temp_store;
+  }
+} {2}
+do_test pragma-4.5 {
+  execsql {
+    PRAGMA default_temp_store='default';
+    PRAGMA default_temp_store;
+  }
+} {0}
+do_test pragma-4.6 {
+  execsql {
+    PRAGMA temp_store;
+  }
+} {2}
+do_test pragma-4.7 {
+  db close
+  sqlite db test.db
+  execsql {
+    PRAGMA temp_store;
+  }
+} {0}
+do_test pragma-4.8 {
+  execsql {
+    PRAGMA default_temp_store;
+  }
+} {0}
+do_test pragma-4.9 {
+  execsql {
+    PRAGMA default_temp_store='file';
+    PRAGMA default_temp_store;
+  }
+} {1}
+do_test pragma-4.10 {
+  execsql {
+    PRAGMA temp_store;
+  }
+} {0}
+do_test pragma-4.11 {
+  db close
+  sqlite db test.db
+  execsql {
+    PRAGMA temp_store;
+  }
+} {1}
+do_test pragma-4.12 {
+  execsql {
+    PRAGMA default_temp_store;
+  }
+} {1}
+do_test pragma-4.13 {
+  execsql {
+    PRAGMA default_temp_store='memory';
+    PRAGMA default_temp_store;
+  }
+} {2}
+do_test pragma-4.14 {
+  execsql {
+    PRAGMA temp_store;
+  }
+} {1}
+do_test pragma-4.15 {
+  db close
+  sqlite db test.db
+  execsql {
+    PRAGMA temp_store;
+  }
+} {2}
+do_test pragma-4.16 {
+  execsql {
+    PRAGMA default_temp_store;
+  }
+} {2}
+do_test pragma-4.17 {
+  execsql {
+    PRAGMA temp_store='file';
+    PRAGMA temp_store
+  }
+} {1}
+do_test pragma-4.18 {
+  execsql {
+    PRAGMA default_temp_store
+  }
+} {2}
+do_test pragma-4.19 {
+  db close
+  sqlite db test.db
+  execsql {
+    PRAGMA temp_store
+  }
+} {2}
+
+# Changing the TEMP_STORE deletes any existing temporary tables
+#
+do_test pragma-4.20 {
+  execsql {SELECT name FROM sqlite_temp_master}
+} {}
+do_test pragma-4.21 {
+  execsql {
+    CREATE TEMP TABLE test1(a,b,c);
+    SELECT name FROM sqlite_temp_master;
+  }
+} {test1}
+do_test pragma-4.22 {
+  execsql {
+    PRAGMA temp_store='file';
+    SELECT name FROM sqlite_temp_master;
+  }
+} {}
+do_test pragma-4.23 {
+  execsql {
+    CREATE TEMP TABLE test1(a,b,c);
+    SELECT name FROM sqlite_temp_master;
+  }
+} {test1}
+do_test pragma-4.24 {
+  execsql {
+    PRAGMA temp_store='memory';
+    SELECT name FROM sqlite_temp_master;
+  }
+} {}
+do_test pragma-4.25 {
+  catchsql {
+    BEGIN;
+    PRAGMA temp_store='default';
+    COMMIT;
+  }
+} {1 {temporary storage cannot be changed from within a transaction}}
+catchsql {COMMIT}
+
+finish_test

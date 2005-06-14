@@ -1,0 +1,14 @@
+
+The exit command enables you to exit from AT&T FACE, and logs
+you off the system if AT&T FACE was invoked at login time. 
+(See the Office Functions menu under Preferences on the 
+Office of <login> menu for details.)
+
+Use one of the methods below to exit:
+
+     Command Menu:  Select exit and press ENTER.
+
+     Command Line:  Type exit and press ENTER.
+
+     AT&T FACE frame:  Select Exit FACE.
+

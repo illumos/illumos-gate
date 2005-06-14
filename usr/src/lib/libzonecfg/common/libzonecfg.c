@@ -1,0 +1,3084 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <errno.h>
+#include <fnmatch.h>
+#include <strings.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <assert.h>
+#include <libgen.h>
+#include <libintl.h>
+#include <alloca.h>
+#include <ctype.h>
+#include <sys/mntio.h>
+#include <sys/mnttab.h>
+
+#include <arpa/inet.h>
+#include <netdb.h>
+
+#include <priv.h>
+
+#include <libxml/xmlmemory.h>
+#include <libxml/parser.h>
+
+#include <libdevinfo.h>
+
+#include <libzonecfg.h>
+#include "zonecfg_impl.h"
+
+#define	_PATH_TMPFILE	"/zonecfg.XXXXXX"
+
+/* Hard-code the DTD element/attribute/entity names just once, here. */
+#define	DTD_ELEM_ATTR		(const xmlChar *) "attr"
+#define	DTD_ELEM_COMMENT	(const xmlChar *) "comment"
+#define	DTD_ELEM_DEVICE		(const xmlChar *) "device"
+#define	DTD_ELEM_FS		(const xmlChar *) "filesystem"
+#define	DTD_ELEM_FSOPTION	(const xmlChar *) "fsoption"
+#define	DTD_ELEM_IPD		(const xmlChar *) "inherited-pkg-dir"
+#define	DTD_ELEM_NET		(const xmlChar *) "network"
+#define	DTD_ELEM_RCTL		(const xmlChar *) "rctl"
+#define	DTD_ELEM_RCTLVALUE	(const xmlChar *) "rctl-value"
+#define	DTD_ELEM_ZONE		(const xmlChar *) "zone"
+
+#define	DTD_ATTR_ACTION		(const xmlChar *) "action"
+#define	DTD_ATTR_ADDRESS	(const xmlChar *) "address"
+#define	DTD_ATTR_AUTOBOOT	(const xmlChar *) "autoboot"
+#define	DTD_ATTR_DIR		(const xmlChar *) "directory"
+#define	DTD_ATTR_LIMIT		(const xmlChar *) "limit"
+#define	DTD_ATTR_MATCH		(const xmlChar *) "match"
+#define	DTD_ATTR_NAME		(const xmlChar *) "name"
+#define	DTD_ATTR_PHYSICAL	(const xmlChar *) "physical"
+#define	DTD_ATTR_POOL		(const xmlChar *) "pool"
+#define	DTD_ATTR_PRIV		(const xmlChar *) "priv"
+#define	DTD_ATTR_RAW		(const xmlChar *) "raw"
+#define	DTD_ATTR_SPECIAL	(const xmlChar *) "special"
+#define	DTD_ATTR_TYPE		(const xmlChar *) "type"
+#define	DTD_ATTR_VALUE		(const xmlChar *) "value"
+#define	DTD_ATTR_ZONEPATH	(const xmlChar *) "zonepath"
+
+#define	DTD_ENTITY_BOOLEAN	"boolean"
+#define	DTD_ENTITY_DEVPATH	"devpath"
+#define	DTD_ENTITY_DRIVER	"driver"
+#define	DTD_ENTITY_DRVMIN	"drv_min"
+#define	DTD_ENTITY_FALSE	"false"
+#define	DTD_ENTITY_INT		"int"
+#define	DTD_ENTITY_STRING	"string"
+#define	DTD_ENTITY_TRUE		"true"
+#define	DTD_ENTITY_UINT		"uint"
+
+struct zone_dochandle {
+	char		*zone_dh_rootdir;
+	xmlDocPtr	zone_dh_doc;
+	xmlNodePtr	zone_dh_cur;
+	xmlNodePtr	zone_dh_top;
+};
+
+/*
+ * For functions which return int, which is most of the functions herein,
+ * the return values should be from the Z_foo set defined in <libzonecfg.h>.
+ * In some instances, we take pains mapping some libc errno values to Z_foo
+ * values from this set.
+ */
+
+/*
+ * Callers of the _file_path() functions are expected to have the second
+ * parameter be a (char foo[MAXPATHLEN]).
+ */
+
+static void
+config_file_path(const char *zonename, char *answer)
+{
+	(void) snprintf(answer, MAXPATHLEN,
+	    "%s/%s.xml", ZONE_CONFIG_ROOT, zonename);
+}
+
+static void
+snap_file_path(char *zonename, char *answer)
+{
+	(void) snprintf(answer, MAXPATHLEN,
+	    "%s/%s.snapshot.xml", ZONE_SNAPSHOT_ROOT, zonename);
+}
+
+/*ARGSUSED*/
+static void
+zonecfg_error_func(void *ctx, const char *msg, ...)
+{
+	/*
+	 * This function does nothing by design.  Its purpose is to prevent
+	 * libxml from dumping unwanted messages to stdout/stderr.
+	 */
+}
+
+zone_dochandle_t
+zonecfg_init_handle(void)
+{
+	zone_dochandle_t handle = malloc(sizeof (struct zone_dochandle));
+	if (handle == NULL) {
+		errno = Z_NOMEM;
+		return (NULL);
+	}
+	handle->zone_dh_doc = NULL;
+	handle->zone_dh_cur = NULL;
+	handle->zone_dh_top = NULL;
+
+	/* generic libxml initialization */
+	xmlLineNumbersDefault(1);
+	xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS;
+	xmlDoValidityCheckingDefaultValue = 1;
+	(void) xmlKeepBlanksDefault(0);
+	xmlGetWarningsDefaultValue = 0;
+	xmlSetGenericErrorFunc(NULL, zonecfg_error_func);
+
+	return (handle);
+}
+
+int
+zonecfg_check_handle(zone_dochandle_t handle)
+{
+	if (handle == NULL || handle->zone_dh_doc == NULL)
+		return (Z_BAD_HANDLE);
+	return (Z_OK);
+}
+
+void
+zonecfg_fini_handle(zone_dochandle_t handle)
+{
+	if (zonecfg_check_handle(handle) == Z_OK)
+		xmlFreeDoc(handle->zone_dh_doc);
+	if (handle != NULL)
+		free(handle);
+}
+
+static int
+zonecfg_destroy_impl(char *filename)
+{
+	if (unlink(filename) == -1) {
+		if (errno == EACCES)
+			return (Z_ACCES);
+		if (errno == ENOENT)
+			return (Z_NO_ZONE);
+		return (Z_MISC_FS);
+	}
+	return (Z_OK);
+}
+
+int
+zonecfg_destroy(const char *zonename)
+{
+	char path[MAXPATHLEN];
+
+	config_file_path(zonename, path);
+	return (zonecfg_destroy_impl(path));
+}
+
+int
+zonecfg_destroy_snapshot(char *zonename)
+{
+	char path[MAXPATHLEN];
+
+	snap_file_path(zonename, path);
+	return (zonecfg_destroy_impl(path));
+}
+
+static int
+operation_prep(zone_dochandle_t handle)
+{
+	xmlNodePtr cur;
+
+	if (zonecfg_check_handle(handle) == Z_BAD_HANDLE)
+		return (Z_BAD_HANDLE);
+
+	if ((cur = xmlDocGetRootElement(handle->zone_dh_doc)) == NULL) {
+		zonecfg_fini_handle(handle);
+		return (Z_EMPTY_DOCUMENT);
+	}
+
+	if (xmlStrcmp(cur->name, DTD_ELEM_ZONE)) {
+		zonecfg_fini_handle(handle);
+		return (Z_WRONG_DOC_TYPE);
+	}
+	handle->zone_dh_cur = cur;
+	handle->zone_dh_top = cur;
+	return (Z_OK);
+}
+
+static int
+zonecfg_get_handle_impl(char *zonename, char *filename, zone_dochandle_t handle)
+{
+	xmlValidCtxtPtr cvp;
+	xmlDocPtr top;
+	xmlNodePtr child, next;
+	struct stat statbuf;
+	int valid;
+
+	if (zonename == NULL)
+		return (Z_NO_ZONE);
+	if ((handle->zone_dh_doc = xmlParseFile(filename)) == NULL) {
+		/* distinguish file not found vs. found but not parsed */
+		if (stat(filename, &statbuf) == 0)
+			return (Z_INVALID_DOCUMENT);
+		return (Z_NO_ZONE);
+	}
+	if ((cvp = xmlNewValidCtxt()) == NULL)
+		return (Z_NOMEM);
+	cvp->error = zonecfg_error_func;
+	cvp->warning = zonecfg_error_func;
+	valid = xmlValidateDocument(cvp, handle->zone_dh_doc);
+	xmlFreeValidCtxt(cvp);
+	if (valid == 0)
+		return (Z_INVALID_DOCUMENT);
+	/* delete any comments such as inherited Sun copyright / ident str */
+	top = handle->zone_dh_doc;
+	for (child = top->xmlChildrenNode; child != NULL; child = next) {
+		next = child->next;
+		if (child->name == NULL)
+			continue;
+		if (xmlStrcmp(child->name, DTD_ELEM_COMMENT) == 0) {
+			next = child->next;
+			xmlUnlinkNode(child);
+			xmlFreeNode(child);
+		}
+	}
+	return (Z_OK);
+}
+
+int
+zonecfg_get_handle(char *zonename, zone_dochandle_t handle)
+{
+	char path[MAXPATHLEN];
+
+	config_file_path(zonename, path);
+	return (zonecfg_get_handle_impl(zonename, path, handle));
+}
+
+int
+zonecfg_get_snapshot_handle(char *zonename, zone_dochandle_t handle)
+{
+	char path[MAXPATHLEN];
+
+	snap_file_path(zonename, path);
+	return (zonecfg_get_handle_impl(zonename, path, handle));
+}
+
+int
+zonecfg_get_name(zone_dochandle_t handle, char *name, size_t namesize)
+{
+	xmlNodePtr cur;
+	xmlChar *property;
+	size_t srcsize;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	cur = xmlDocGetRootElement(handle->zone_dh_doc);
+	if (cur == NULL) {
+		zonecfg_fini_handle(handle);
+		return (Z_EMPTY_DOCUMENT);
+	}
+
+	if (xmlStrcmp(cur->name, DTD_ELEM_ZONE)) {
+		zonecfg_fini_handle(handle);
+		return (Z_WRONG_DOC_TYPE);
+	}
+	if ((property = xmlGetProp(cur, DTD_ATTR_NAME)) == NULL)
+		return (Z_BAD_PROPERTY);
+	srcsize = strlcpy(name, (char *)property, namesize);
+	xmlFree(property);
+	if (srcsize >= namesize)
+		return (Z_TOO_BIG);
+	return (Z_OK);
+}
+
+static int
+zonecfg_save_impl(zone_dochandle_t handle, char *filename)
+{
+	char tmpfile[MAXPATHLEN];
+	int tmpfd;
+	xmlValidCtxt cvp = { NULL };
+	xmlNodePtr comment;
+
+	(void) strlcpy(tmpfile, filename, sizeof (tmpfile));
+	(void) dirname(tmpfile);
+	(void) strlcat(tmpfile, _PATH_TMPFILE, sizeof (tmpfile));
+
+	tmpfd = mkstemp(tmpfile);
+	if (tmpfd == -1) {
+		(void) unlink(tmpfile);
+		return (Z_TEMP_FILE);
+	}
+	(void) close(tmpfd);
+
+	cvp.error = zonecfg_error_func;
+	cvp.warning = zonecfg_error_func;
+
+	if ((comment = xmlNewComment((xmlChar *) "\n    DO NOT EDIT THIS "
+	    "FILE.  Use zonecfg(1M) instead.\n")) == NULL)
+		goto err;
+	if (xmlAddPrevSibling(handle->zone_dh_top, comment) == 0)
+		goto err;
+
+	if (xmlValidateDocument(&cvp, handle->zone_dh_doc) == 0)
+		goto err;
+
+	if (xmlSaveFormatFile(tmpfile, handle->zone_dh_doc, 1) <= 0)
+		goto err;
+	(void) chmod(tmpfile, 0644);
+
+	if (rename(tmpfile, filename) == -1) {
+		(void) unlink(tmpfile);
+		if (errno == EACCES)
+			return (Z_ACCES);
+		return (Z_MISC_FS);
+	}
+	return (Z_OK);
+
+err:
+	(void) unlink(tmpfile);
+	return (Z_SAVING_FILE);
+}
+
+int
+zonecfg_save(zone_dochandle_t handle)
+{
+	char zname[MAXPATHLEN], path[MAXPATHLEN];
+	int err;
+
+	if ((err = zonecfg_get_name(handle, zname, sizeof (zname))) != Z_OK) {
+		return (err);
+	}
+	config_file_path(zname, path);
+	return (zonecfg_save_impl(handle, path));
+}
+
+/*
+ * Special case: if access(2) fails with ENOENT, then try again using
+ * ZONE_CONFIG_ROOT instead of config_file_path(zonename).  This is how we
+ * work around the case of a config file which has not been created yet:
+ * the user will need access to the directory so use that as a heuristic.
+ */
+
+int
+zonecfg_access(const char *zonename, int amode)
+{
+	char path[MAXPATHLEN];
+
+	config_file_path(zonename, path);
+	if (access(path, amode) == 0)
+		return (Z_OK);
+	if (errno == ENOENT && access(ZONE_CONFIG_ROOT, amode) == 0)
+		return (Z_OK);
+	if (errno == EACCES)
+		return (Z_ACCES);
+	if (errno == EINVAL)
+		return (Z_INVAL);
+	return (Z_MISC_FS);
+}
+
+int
+zonecfg_create_snapshot(char *zonename)
+{
+	zone_dochandle_t handle;
+	char path[MAXPATHLEN], zonepath[MAXPATHLEN], rpath[MAXPATHLEN];
+	int error = Z_OK, res;
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		return (Z_NOMEM);
+	}
+
+	if ((error = zonecfg_get_handle(zonename, handle)) != Z_OK)
+		goto out;
+	if ((error = operation_prep(handle)) != Z_OK)
+		goto out;
+	error = zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath));
+	if (error != Z_OK)
+		goto out;
+	if ((res = resolvepath(zonepath, rpath, sizeof (rpath))) == -1) {
+		error = Z_RESOLVED_PATH;
+		goto out;
+	}
+	/*
+	 * If the resolved path is not the same as the original path, then
+	 * save the resolved path in the snapshot, thus preventing any
+	 * potential problems down the line when zoneadmd goes to unmount
+	 * file systems and depends on initial string matches with resolved
+	 * paths.
+	 */
+	rpath[res] = '\0';
+	if (strcmp(zonepath, rpath) != 0) {
+		if ((error = zonecfg_set_zonepath(handle, rpath)) != Z_OK)
+			goto out;
+	}
+	if ((mkdir(ZONE_SNAPSHOT_ROOT, S_IRWXU) == -1) && (errno != EEXIST)) {
+		error = Z_MISC_FS;
+		goto out;
+	}
+
+	snap_file_path(zonename, path);
+	error = zonecfg_save_impl(handle, path);
+
+out:
+	zonecfg_fini_handle(handle);
+	return (error);
+}
+
+int
+zonecfg_set_name(zone_dochandle_t handle, char *name)
+{
+	xmlNodePtr cur;
+
+	if (handle == NULL || name == NULL)
+		return (Z_INVAL);
+
+	cur = xmlDocGetRootElement(handle->zone_dh_doc);
+	if (cur == NULL) {
+		zonecfg_fini_handle(handle);
+		return (Z_EMPTY_DOCUMENT);
+	}
+
+	if (xmlStrcmp(cur->name, DTD_ELEM_ZONE)) {
+		zonecfg_fini_handle(handle);
+		return (Z_WRONG_DOC_TYPE);
+	}
+	if (xmlSetProp(cur, DTD_ATTR_NAME, (const xmlChar *) name) == NULL)
+		return (Z_INVAL);
+	return (Z_OK);
+}
+
+int
+zonecfg_get_zonepath(zone_dochandle_t handle, char *path, size_t pathsize)
+{
+	xmlNodePtr cur;
+	xmlChar *property;
+	size_t srcsize;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	cur = xmlDocGetRootElement(handle->zone_dh_doc);
+	if (cur == NULL) {
+		zonecfg_fini_handle(handle);
+		return (Z_EMPTY_DOCUMENT);
+	}
+
+	if (xmlStrcmp(cur->name, DTD_ELEM_ZONE)) {
+		zonecfg_fini_handle(handle);
+		return (Z_WRONG_DOC_TYPE);
+	}
+	if ((property = xmlGetProp(cur, DTD_ATTR_ZONEPATH)) == NULL)
+		return (Z_BAD_PROPERTY);
+	srcsize = strlcpy(path, (char *)property, pathsize);
+	xmlFree(property);
+	if (srcsize >= pathsize)
+		return (Z_TOO_BIG);
+	return (Z_OK);
+}
+
+int
+zonecfg_set_zonepath(zone_dochandle_t handle, char *zonepath)
+{
+	xmlNodePtr cur;
+	char name[ZONENAME_MAX];
+	struct zoneent ze;
+	int err;
+
+	if (handle == NULL || zonepath == NULL)
+		return (Z_INVAL);
+
+	cur = xmlDocGetRootElement(handle->zone_dh_doc);
+	if (cur == NULL) {
+		zonecfg_fini_handle(handle);
+		return (Z_EMPTY_DOCUMENT);
+	}
+
+	if (xmlStrcmp(cur->name, DTD_ELEM_ZONE)) {
+		zonecfg_fini_handle(handle);
+		return (Z_WRONG_DOC_TYPE);
+	}
+	if (xmlSetProp(cur, DTD_ATTR_ZONEPATH, (const xmlChar *) zonepath) ==
+	    NULL)
+		return (Z_INVAL);
+
+	/* now set the copy in the index file */
+	if ((err = zonecfg_get_name(handle, name, sizeof (name))) != Z_OK)
+		return (err);
+	(void) strlcpy(ze.zone_name, name, sizeof (ze.zone_name));
+	ze.zone_state = -1;
+	(void) strlcpy(ze.zone_path, zonepath, sizeof (ze.zone_path));
+	return (putzoneent(&ze, PZE_MODIFY));
+}
+
+int
+zonecfg_get_autoboot(zone_dochandle_t handle, boolean_t *autoboot)
+{
+	xmlNodePtr cur;
+	xmlChar *property;
+	int result = Z_OK;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	cur = xmlDocGetRootElement(handle->zone_dh_doc);
+	if (cur == NULL) {
+		zonecfg_fini_handle(handle);
+		return (Z_EMPTY_DOCUMENT);
+	}
+
+	if (xmlStrcmp(cur->name, DTD_ELEM_ZONE)) {
+		zonecfg_fini_handle(handle);
+		return (Z_WRONG_DOC_TYPE);
+	}
+	if ((property = xmlGetProp(cur, DTD_ATTR_AUTOBOOT)) == NULL)
+		return (Z_BAD_PROPERTY);
+	if (strcmp((char *)property, DTD_ENTITY_TRUE) == 0)
+		*autoboot = B_TRUE;
+	else if (strcmp((char *)property, DTD_ENTITY_FALSE) == 0)
+		*autoboot = B_FALSE;
+	else
+		result = Z_BAD_PROPERTY;
+	xmlFree(property);
+	return (result);
+}
+
+int
+zonecfg_set_autoboot(zone_dochandle_t handle, boolean_t autoboot)
+{
+	xmlNodePtr cur;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	cur = xmlDocGetRootElement(handle->zone_dh_doc);
+	if (cur == NULL) {
+		zonecfg_fini_handle(handle);
+		return (Z_EMPTY_DOCUMENT);
+	}
+
+	if (xmlStrcmp(cur->name, DTD_ELEM_ZONE)) {
+		zonecfg_fini_handle(handle);
+		return (Z_WRONG_DOC_TYPE);
+	}
+	if (xmlSetProp(cur, DTD_ATTR_AUTOBOOT, autoboot ?
+	    (const xmlChar *) DTD_ENTITY_TRUE :
+	    (const xmlChar *) DTD_ENTITY_FALSE) == NULL)
+		return (Z_INVAL);
+	return (Z_OK);
+}
+
+int
+zonecfg_get_pool(zone_dochandle_t handle, char *pool, size_t poolsize)
+{
+	xmlNodePtr cur;
+	xmlChar *property;
+	size_t srcsize;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	cur = xmlDocGetRootElement(handle->zone_dh_doc);
+	if (cur == NULL) {
+		zonecfg_fini_handle(handle);
+		return (Z_EMPTY_DOCUMENT);
+	}
+
+	if (xmlStrcmp(cur->name, DTD_ELEM_ZONE)) {
+		zonecfg_fini_handle(handle);
+		return (Z_WRONG_DOC_TYPE);
+	}
+	property = xmlGetProp(cur, DTD_ATTR_POOL);
+	/*
+	 * Because the DTD lists the pool as 'CDATA ""', we will get exactly
+	 * that even if no pool is in the configuratin: a zero length string.
+	 * So the NULL check below should (in theory) never trigger, but we
+	 * have it for consistency with other _get_X() functions.
+	 */
+	if (property == NULL)
+		return (Z_NO_ENTRY);
+	srcsize = strlcpy(pool, (char *)property, poolsize);
+	xmlFree(property);
+	if (srcsize >= poolsize)
+		return (Z_TOO_BIG);
+	return (Z_OK);
+}
+
+int
+zonecfg_set_pool(zone_dochandle_t handle, char *pool)
+{
+	xmlNodePtr cur;
+
+	if (handle == NULL || pool == NULL)
+		return (Z_INVAL);
+
+	cur = xmlDocGetRootElement(handle->zone_dh_doc);
+	if (cur == NULL) {
+		zonecfg_fini_handle(handle);
+		return (Z_EMPTY_DOCUMENT);
+	}
+
+	if (xmlStrcmp(cur->name, DTD_ELEM_ZONE)) {
+		zonecfg_fini_handle(handle);
+		return (Z_WRONG_DOC_TYPE);
+	}
+	if (xmlSetProp(cur, DTD_ATTR_POOL, (const xmlChar *) pool) == NULL)
+		return (Z_INVAL);
+	return (Z_OK);
+}
+
+static int
+newprop(zone_dochandle_t handle, xmlNodePtr node, const xmlChar *attrname,
+    char *src)
+{
+	xmlAttrPtr newattr;
+
+	newattr = xmlNewProp(node, attrname, (xmlChar *)src);
+	if (newattr == NULL) {
+		xmlUnlinkNode(node);
+		xmlFreeNode(node);
+		zonecfg_fini_handle(handle);
+		return (Z_BAD_PROPERTY);
+	}
+	return (Z_OK);
+}
+
+static int
+zonecfg_add_filesystem_core(zone_dochandle_t handle, struct zone_fstab *tabptr)
+{
+	xmlNodePtr newnode, cur = handle->zone_dh_cur, options_node;
+	zone_fsopt_t *ptr;
+	int err;
+
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_FS, NULL);
+	if ((err = newprop(handle, newnode, DTD_ATTR_SPECIAL,
+	    tabptr->zone_fs_special)) != Z_OK)
+		return (err);
+	if (tabptr->zone_fs_raw[0] != '\0' &&
+	    (err = newprop(handle, newnode, DTD_ATTR_RAW,
+	    tabptr->zone_fs_raw)) != Z_OK)
+		return (err);
+	if ((err = newprop(handle, newnode, DTD_ATTR_DIR,
+	    tabptr->zone_fs_dir)) != Z_OK)
+		return (err);
+	if ((err = newprop(handle, newnode, DTD_ATTR_TYPE,
+	    tabptr->zone_fs_type)) != Z_OK)
+		return (err);
+	if (tabptr->zone_fs_options != NULL) {
+		for (ptr = tabptr->zone_fs_options; ptr != NULL;
+		    ptr = ptr->zone_fsopt_next) {
+			options_node = xmlNewTextChild(newnode, NULL,
+			    DTD_ELEM_FSOPTION, NULL);
+			if ((err = newprop(handle, options_node, DTD_ATTR_NAME,
+			    ptr->zone_fsopt_opt)) != Z_OK)
+				return (err);
+		}
+	}
+	return (Z_OK);
+}
+
+int
+zonecfg_add_filesystem(zone_dochandle_t handle, struct zone_fstab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_filesystem_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+zonecfg_add_ipd_core(zone_dochandle_t handle, struct zone_fstab *tabptr)
+{
+	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	int err;
+
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_IPD, NULL);
+	if ((err = newprop(handle, newnode, DTD_ATTR_DIR,
+	    tabptr->zone_fs_dir)) != Z_OK)
+		return (err);
+	return (Z_OK);
+}
+
+int
+zonecfg_add_ipd(zone_dochandle_t handle, struct zone_fstab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_ipd_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_add_fs_option(struct zone_fstab *tabptr, char *option)
+{
+	zone_fsopt_t *last, *old, *new;
+
+	last = tabptr->zone_fs_options;
+	for (old = last; old != NULL; old = old->zone_fsopt_next)
+		last = old;	/* walk to the end of the list */
+	new = (zone_fsopt_t *)malloc(sizeof (zone_fsopt_t));
+	if (new == NULL)
+		return (Z_NOMEM);
+	(void) strlcpy(new->zone_fsopt_opt, option,
+	    sizeof (new->zone_fsopt_opt));
+	new->zone_fsopt_next = NULL;
+	if (last == NULL)
+		tabptr->zone_fs_options = new;
+	else
+		last->zone_fsopt_next = new;
+	return (Z_OK);
+}
+
+int
+zonecfg_remove_fs_option(struct zone_fstab *tabptr, char *option)
+{
+	zone_fsopt_t *last, *this, *next;
+
+	last = tabptr->zone_fs_options;
+	for (this = last; this != NULL; this = this->zone_fsopt_next) {
+		if (strcmp(this->zone_fsopt_opt, option) == 0) {
+			next = this->zone_fsopt_next;
+			if (this == tabptr->zone_fs_options)
+				tabptr->zone_fs_options = next;
+			else
+				last->zone_fsopt_next = next;
+			free(this);
+			return (Z_OK);
+		} else
+			last = this;
+	}
+	return (Z_NO_PROPERTY_ID);
+}
+
+void
+zonecfg_free_fs_option_list(zone_fsopt_t *list)
+{
+	zone_fsopt_t *this, *next;
+
+	for (this = list; this != NULL; this = next) {
+		next = this->zone_fsopt_next;
+		free(this);
+	}
+}
+
+void
+zonecfg_free_rctl_value_list(struct zone_rctlvaltab *valtab)
+{
+	if (valtab == NULL)
+		return;
+	zonecfg_free_rctl_value_list(valtab->zone_rctlval_next);
+	free(valtab);
+}
+
+static boolean_t
+match_prop(xmlNodePtr cur, const xmlChar *attr, char *user_prop)
+{
+	xmlChar *gotten_prop;
+	int prop_result;
+
+	gotten_prop = xmlGetProp(cur, attr);
+	if (gotten_prop == NULL)	/* shouldn't happen */
+		return (B_FALSE);
+	prop_result = xmlStrcmp(gotten_prop, (const xmlChar *) user_prop);
+	xmlFree(gotten_prop);
+	return ((prop_result == 0));
+}
+
+static int
+zonecfg_delete_filesystem_core(zone_dochandle_t handle,
+    struct zone_fstab *tabptr)
+{
+	xmlNodePtr cur = handle->zone_dh_cur;
+	boolean_t dir_match, spec_match, raw_match, type_match;
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_FS))
+			continue;
+		dir_match = match_prop(cur, DTD_ATTR_DIR, tabptr->zone_fs_dir);
+		spec_match = match_prop(cur, DTD_ATTR_SPECIAL,
+		    tabptr->zone_fs_special);
+		raw_match = match_prop(cur, DTD_ATTR_RAW,
+		    tabptr->zone_fs_raw);
+		type_match = match_prop(cur, DTD_ATTR_TYPE,
+		    tabptr->zone_fs_type);
+		if (dir_match && spec_match && raw_match && type_match) {
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+			return (Z_OK);
+		}
+	}
+	return (Z_NO_RESOURCE_ID);
+}
+
+int
+zonecfg_delete_filesystem(zone_dochandle_t handle, struct zone_fstab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_filesystem_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_modify_filesystem(
+	zone_dochandle_t handle,
+	struct zone_fstab *oldtabptr,
+	struct zone_fstab *newtabptr)
+{
+	int err;
+
+	if (oldtabptr == NULL || newtabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_filesystem_core(handle, oldtabptr)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_filesystem_core(handle, newtabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+zonecfg_delete_ipd_core(zone_dochandle_t handle, struct zone_fstab *tabptr)
+{
+	xmlNodePtr cur = handle->zone_dh_cur;
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_IPD))
+			continue;
+		if (match_prop(cur, DTD_ATTR_DIR, tabptr->zone_fs_dir)) {
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+			return (Z_OK);
+		}
+	}
+	return (Z_NO_RESOURCE_ID);
+}
+
+int
+zonecfg_delete_ipd(zone_dochandle_t handle, struct zone_fstab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_ipd_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_modify_ipd(zone_dochandle_t handle, struct zone_fstab *oldtabptr,
+    struct zone_fstab *newtabptr)
+{
+	int err;
+
+	if (oldtabptr == NULL || newtabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_ipd_core(handle, oldtabptr)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_ipd_core(handle, newtabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+fetchprop(xmlNodePtr cur, const xmlChar *propname, char *dst, size_t dstsize)
+{
+	xmlChar *property;
+	size_t srcsize;
+
+	if ((property = xmlGetProp(cur, propname)) == NULL)
+		return (Z_BAD_PROPERTY);
+	srcsize = strlcpy(dst, (char *)property, dstsize);
+	xmlFree(property);
+	if (srcsize >= dstsize)
+		return (Z_TOO_BIG);
+	return (Z_OK);
+}
+
+int
+zonecfg_lookup_filesystem(
+	zone_dochandle_t handle,
+	struct zone_fstab *tabptr)
+{
+	xmlNodePtr cur, options, firstmatch;
+	int err;
+	char dirname[MAXPATHLEN], special[MAXPATHLEN], raw[MAXPATHLEN];
+	char type[FSTYPSZ];
+	char options_str[MAX_MNTOPT_STR];
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	/*
+	 * Walk the list of children looking for matches on any properties
+	 * specified in the fstab parameter.  If more than one resource
+	 * matches, we return Z_INSUFFICIENT_SPEC; if none match, we return
+	 * Z_NO_RESOURCE_ID.
+	 */
+	cur = handle->zone_dh_cur;
+	firstmatch = NULL;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_FS))
+			continue;
+		if (strlen(tabptr->zone_fs_dir) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_DIR, dirname,
+			    sizeof (dirname)) == Z_OK) &&
+			    (strcmp(tabptr->zone_fs_dir, dirname) == 0)) {
+				if (firstmatch == NULL)
+					firstmatch = cur;
+				else
+					return (Z_INSUFFICIENT_SPEC);
+			}
+		}
+		if (strlen(tabptr->zone_fs_special) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_SPECIAL, special,
+			    sizeof (special)) == Z_OK)) {
+				if (strcmp(tabptr->zone_fs_special,
+				    special) == 0) {
+					if (firstmatch == NULL)
+						firstmatch = cur;
+					else if (firstmatch != cur)
+						return (Z_INSUFFICIENT_SPEC);
+				} else {
+					/*
+					 * If another property matched but this
+					 * one doesn't then reset firstmatch.
+					 */
+					if (firstmatch == cur)
+						firstmatch = NULL;
+				}
+			}
+		}
+		if (strlen(tabptr->zone_fs_raw) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_RAW, raw,
+			    sizeof (raw)) == Z_OK)) {
+				if (strcmp(tabptr->zone_fs_raw, raw) == 0) {
+					if (firstmatch == NULL)
+						firstmatch = cur;
+					else if (firstmatch != cur)
+						return (Z_INSUFFICIENT_SPEC);
+				} else {
+					/*
+					 * If another property matched but this
+					 * one doesn't then reset firstmatch.
+					 */
+					if (firstmatch == cur)
+						firstmatch = NULL;
+				}
+			}
+		}
+		if (strlen(tabptr->zone_fs_type) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_TYPE, type,
+			    sizeof (type)) == Z_OK)) {
+				if (strcmp(tabptr->zone_fs_type, type) == 0) {
+					if (firstmatch == NULL)
+						firstmatch = cur;
+					else if (firstmatch != cur)
+						return (Z_INSUFFICIENT_SPEC);
+				} else {
+					/*
+					 * If another property matched but this
+					 * one doesn't then reset firstmatch.
+					 */
+					if (firstmatch == cur)
+						firstmatch = NULL;
+				}
+			}
+		}
+	}
+
+	if (firstmatch == NULL)
+		return (Z_NO_RESOURCE_ID);
+
+	cur = firstmatch;
+
+	if ((err = fetchprop(cur, DTD_ATTR_DIR, tabptr->zone_fs_dir,
+	    sizeof (tabptr->zone_fs_dir))) != Z_OK)
+		return (err);
+
+	if ((err = fetchprop(cur, DTD_ATTR_SPECIAL, tabptr->zone_fs_special,
+	    sizeof (tabptr->zone_fs_special))) != Z_OK)
+		return (err);
+
+	if ((err = fetchprop(cur, DTD_ATTR_RAW, tabptr->zone_fs_raw,
+	    sizeof (tabptr->zone_fs_raw))) != Z_OK)
+		return (err);
+
+	if ((err = fetchprop(cur, DTD_ATTR_TYPE, tabptr->zone_fs_type,
+	    sizeof (tabptr->zone_fs_type))) != Z_OK)
+		return (err);
+
+	/* options are optional */
+	tabptr->zone_fs_options = NULL;
+	for (options = cur->xmlChildrenNode; options != NULL;
+	    options = options->next) {
+		if ((fetchprop(options, DTD_ATTR_NAME, options_str,
+		    sizeof (options_str)) != Z_OK))
+			break;
+		if (zonecfg_add_fs_option(tabptr, options_str) != Z_OK)
+			break;
+	}
+	return (Z_OK);
+}
+
+int
+zonecfg_lookup_ipd(zone_dochandle_t handle, struct zone_fstab *tabptr)
+{
+	xmlNodePtr cur, match;
+	int err;
+	char dirname[MAXPATHLEN];
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	/*
+	 * General algorithm:
+	 * Walk the list of children looking for matches on any properties
+	 * specified in the fstab parameter.  If more than one resource
+	 * matches, we return Z_INSUFFICIENT_SPEC; if none match, we return
+	 * Z_NO_RESOURCE_ID.
+	 */
+	cur = handle->zone_dh_cur;
+	match = NULL;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_IPD))
+			continue;
+		if (strlen(tabptr->zone_fs_dir) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_DIR, dirname,
+			    sizeof (dirname)) == Z_OK) &&
+			    (strcmp(tabptr->zone_fs_dir, dirname) == 0)) {
+				if (match == NULL)
+					match = cur;
+				else
+					return (Z_INSUFFICIENT_SPEC);
+			}
+		}
+	}
+
+	if (match == NULL)
+		return (Z_NO_RESOURCE_ID);
+
+	cur = match;
+
+	if ((err = fetchprop(cur, DTD_ATTR_DIR, tabptr->zone_fs_dir,
+	    sizeof (tabptr->zone_fs_dir))) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+/*
+ * Compare two IP addresses in string form.  Allow for the possibility that
+ * one might have "/<prefix-length>" at the end: allow a match on just the
+ * IP address (or host name) part.
+ */
+
+boolean_t
+zonecfg_same_net_address(char *a1, char *a2)
+{
+	char *slashp, *slashp1, *slashp2;
+	int result;
+
+	if (strcmp(a1, a2) == 0)
+		return (B_TRUE);
+
+	/*
+	 * If neither has a slash or both do, they need to match to be
+	 * considered the same, but they did not match above, so fail.
+	 */
+	slashp1 = strchr(a1, '/');
+	slashp2 = strchr(a2, '/');
+	if ((slashp1 == NULL && slashp2 == NULL) ||
+	    (slashp1 != NULL && slashp2 != NULL))
+		return (B_FALSE);
+
+	/*
+	 * Only one had a slash: pick that one, zero out the slash, compare
+	 * the "address only" strings, restore the slash, and return the
+	 * result of the comparison.
+	 */
+	slashp = (slashp1 == NULL) ? slashp2 : slashp1;
+	*slashp = '\0';
+	result = strcmp(a1, a2);
+	*slashp = '/';
+	return ((result == 0));
+}
+
+int
+zonecfg_valid_net_address(char *address, struct lifreq *lifr)
+{
+	struct sockaddr_in *sin4;
+	struct sockaddr_in6 *sin6;
+	struct addrinfo hints, *result;
+	char *slashp = strchr(address, '/');
+
+	bzero(lifr, sizeof (struct lifreq));
+	sin4 = (struct sockaddr_in *)&lifr->lifr_addr;
+	sin6 = (struct sockaddr_in6 *)&lifr->lifr_addr;
+	if (slashp != NULL)
+		*slashp = '\0';
+	if (inet_pton(AF_INET, address, &sin4->sin_addr) == 1) {
+		sin4->sin_family = AF_INET;
+	} else if (inet_pton(AF_INET6, address, &sin6->sin6_addr) == 1) {
+		if (slashp == NULL)
+			return (Z_IPV6_ADDR_PREFIX_LEN);
+		sin6->sin6_family = AF_INET6;
+	} else {
+		/* "address" may be a host name */
+		(void) memset(&hints, 0, sizeof (hints));
+		hints.ai_family = PF_INET;
+		if (getaddrinfo(address, NULL, &hints, &result) != 0)
+			return (Z_BOGUS_ADDRESS);
+		sin4->sin_family = result->ai_family;
+		(void) memcpy(&sin4->sin_addr,
+		    /* LINTED E_BAD_PTR_CAST_ALIGN */
+		    &((struct sockaddr_in *)result->ai_addr)->sin_addr,
+		    sizeof (struct in_addr));
+		freeaddrinfo(result);
+	}
+	return (Z_OK);
+}
+
+int
+zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
+{
+	xmlNodePtr cur, firstmatch;
+	int err;
+	char address[INET6_ADDRSTRLEN], physical[LIFNAMSIZ];
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	firstmatch = NULL;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_NET))
+			continue;
+		if (strlen(tabptr->zone_nwif_physical) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_PHYSICAL, physical,
+			    sizeof (physical)) == Z_OK) &&
+			    (strcmp(tabptr->zone_nwif_physical,
+			    physical) == 0)) {
+				if (firstmatch == NULL)
+					firstmatch = cur;
+				else
+					return (Z_INSUFFICIENT_SPEC);
+			}
+		}
+		if (strlen(tabptr->zone_nwif_address) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_ADDRESS, address,
+			    sizeof (address)) == Z_OK)) {
+				if (zonecfg_same_net_address(
+				    tabptr->zone_nwif_address, address)) {
+					if (firstmatch == NULL)
+						firstmatch = cur;
+					else if (firstmatch != cur)
+						return (Z_INSUFFICIENT_SPEC);
+				} else {
+					/*
+					 * If another property matched but this
+					 * one doesn't then reset firstmatch.
+					 */
+					if (firstmatch == cur)
+						firstmatch = NULL;
+				}
+			}
+		}
+	}
+	if (firstmatch == NULL)
+		return (Z_NO_RESOURCE_ID);
+
+	cur = firstmatch;
+
+	if ((err = fetchprop(cur, DTD_ATTR_PHYSICAL, tabptr->zone_nwif_physical,
+	    sizeof (tabptr->zone_nwif_physical))) != Z_OK)
+		return (err);
+
+	if ((err = fetchprop(cur, DTD_ATTR_ADDRESS, tabptr->zone_nwif_address,
+	    sizeof (tabptr->zone_nwif_address))) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+zonecfg_add_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
+{
+	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	int err;
+
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_NET, NULL);
+	if ((err = newprop(handle, newnode, DTD_ATTR_ADDRESS,
+	    tabptr->zone_nwif_address)) != Z_OK)
+		return (err);
+	if ((err = newprop(handle, newnode, DTD_ATTR_PHYSICAL,
+	    tabptr->zone_nwif_physical)) != Z_OK)
+		return (err);
+	return (Z_OK);
+}
+
+int
+zonecfg_add_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_nwif_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+zonecfg_delete_nwif_core(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
+{
+	xmlNodePtr cur = handle->zone_dh_cur;
+	boolean_t addr_match, phys_match;
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_NET))
+			continue;
+
+		addr_match = match_prop(cur, DTD_ATTR_ADDRESS,
+		    tabptr->zone_nwif_address);
+		phys_match = match_prop(cur, DTD_ATTR_PHYSICAL,
+		    tabptr->zone_nwif_physical);
+
+		if (addr_match && phys_match) {
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+			return (Z_OK);
+		}
+	}
+	return (Z_NO_RESOURCE_ID);
+}
+
+int
+zonecfg_delete_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_nwif_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_modify_nwif(
+	zone_dochandle_t handle,
+	struct zone_nwiftab *oldtabptr,
+	struct zone_nwiftab *newtabptr)
+{
+	int err;
+
+	if (oldtabptr == NULL || newtabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_nwif_core(handle, oldtabptr)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_nwif_core(handle, newtabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_lookup_dev(zone_dochandle_t handle, struct zone_devtab *tabptr)
+{
+	xmlNodePtr cur, firstmatch;
+	int err;
+	char match[MAXPATHLEN];
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	firstmatch = NULL;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_DEVICE))
+			continue;
+		if (strlen(tabptr->zone_dev_match) == 0)
+			continue;
+
+		if ((fetchprop(cur, DTD_ATTR_MATCH, match,
+		    sizeof (match)) == Z_OK)) {
+			if (strcmp(tabptr->zone_dev_match,
+			    match) == 0) {
+				if (firstmatch == NULL)
+					firstmatch = cur;
+				else if (firstmatch != cur)
+					return (Z_INSUFFICIENT_SPEC);
+			} else {
+				/*
+				 * If another property matched but this
+				 * one doesn't then reset firstmatch.
+				 */
+				if (firstmatch == cur)
+					firstmatch = NULL;
+			}
+		}
+	}
+	if (firstmatch == NULL)
+		return (Z_NO_RESOURCE_ID);
+
+	cur = firstmatch;
+
+	if ((err = fetchprop(cur, DTD_ATTR_MATCH, tabptr->zone_dev_match,
+	    sizeof (tabptr->zone_dev_match))) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+zonecfg_add_dev_core(zone_dochandle_t handle, struct zone_devtab *tabptr)
+{
+	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	int err;
+
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_DEVICE, NULL);
+
+	if ((err = newprop(handle, newnode, DTD_ATTR_MATCH,
+	    tabptr->zone_dev_match)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_add_dev(zone_dochandle_t handle, struct zone_devtab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_dev_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+zonecfg_delete_dev_core(zone_dochandle_t handle, struct zone_devtab *tabptr)
+{
+	xmlNodePtr cur = handle->zone_dh_cur;
+	int match_match;
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_DEVICE))
+			continue;
+
+		match_match = match_prop(cur, DTD_ATTR_MATCH,
+		    tabptr->zone_dev_match);
+
+		if (match_match) {
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+			return (Z_OK);
+		}
+	}
+	return (Z_NO_RESOURCE_ID);
+}
+
+int
+zonecfg_delete_dev(zone_dochandle_t handle, struct zone_devtab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_dev_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_modify_dev(
+	zone_dochandle_t handle,
+	struct zone_devtab *oldtabptr,
+	struct zone_devtab *newtabptr)
+{
+	int err;
+
+	if (oldtabptr == NULL || newtabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_dev_core(handle, oldtabptr)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_dev_core(handle, newtabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+/*
+ * This is the set of devices which must be present in every zone.  Users
+ * can augment this list with additional device rules in their zone
+ * configuration, but at present cannot remove any of the this set of
+ * standard devices.  All matching is done by /dev pathname (the "/dev"
+ * part is implicit.  Try to keep rules which match a large number of
+ * devices (like the pts rule) first.
+ */
+static const char *standard_devs[] = {
+	"pts/*",
+	"ptmx",
+	"random",
+	"urandom",
+	"poll",
+	"pool",
+	"kstat",
+	"zero",
+	"null",
+	"crypto",
+	"cryptoadm",
+	"ticots",
+	"ticotsord",
+	"ticlts",
+	"lo0",
+	"lo1",
+	"lo2",
+	"lo3",
+	"sad/user",
+	"tty",
+	"logindmux",
+	"log",
+	"conslog",
+	"arp",
+	"tcp",
+	"tcp6",
+	"udp",
+	"udp6",
+	"sysevent",
+#ifdef __sparc
+	"openprom",
+#endif
+	"cpu/self/cpuid",
+	"dtrace/helper",
+	NULL
+};
+
+/*
+ * This function finds everything mounted under a zone's rootpath.
+ * This returns the number of mounts under rootpath, or -1 on error.
+ * callback is called once per mount found with the first argument
+ * pointing to the  mount point.
+ *
+ * If the callback function returns non-zero zonecfg_find_mounts
+ * aborts with an error.
+ */
+
+int
+zonecfg_find_mounts(char *rootpath, int (*callback)(const char *, void *),
+    void *priv) {
+	FILE *mnttab;
+	struct mnttab m;
+	size_t l;
+	int rv = 0;
+
+	assert(rootpath != NULL);
+
+	l = strlen(rootpath);
+
+	mnttab = fopen("/etc/mnttab", "r");
+
+	if (mnttab == NULL)
+		return (-1);
+
+	if (ioctl(fileno(mnttab), MNTIOC_SHOWHIDDEN, NULL) < 0)  {
+		rv = -1;
+		goto out;
+	}
+
+	while (!getmntent(mnttab, &m)) {
+		if ((strncmp(rootpath, m.mnt_mountp, l) == 0) &&
+		    (m.mnt_mountp[l] == '/')) {
+			rv++;
+			if (callback == NULL)
+				continue;
+			if (callback(m.mnt_mountp, priv)) {
+				rv = -1;
+				goto out;
+
+			}
+		}
+	}
+
+out:
+	(void) fclose(mnttab);
+	return (rv);
+}
+
+/*
+ * This routine is used to determine if a given device should appear in the
+ * zone represented by 'handle'.  First it consults the list of "standard"
+ * zone devices.  Then it scans the user-supplied device entries.
+ */
+int
+zonecfg_match_dev(zone_dochandle_t handle, char *devpath,
+    struct zone_devtab *out_match)
+{
+	int err;
+	boolean_t found = B_FALSE;
+	char match[MAXPATHLEN];
+	const char **stdmatch;
+	xmlNodePtr cur;
+
+	if (handle == NULL || devpath == NULL)
+		return (Z_INVAL);
+
+	/*
+	 * Check the "standard" devices which we require to be present.
+	 */
+	for (stdmatch = &standard_devs[0]; *stdmatch != NULL; stdmatch++) {
+		/*
+		 * fnmatch gives us simple but powerful shell-style matching.
+		 */
+		if (fnmatch(*stdmatch, devpath, FNM_PATHNAME) == 0) {
+			if (!out_match)
+				return (Z_OK);
+			(void) snprintf(out_match->zone_dev_match,
+			    sizeof (out_match->zone_dev_match),
+			    "/dev/%s", *stdmatch);
+			return (Z_OK);
+		}
+	}
+
+	/*
+	 * We got no hits in the set of standard devices.  On to the user
+	 * supplied ones.
+	 */
+	if ((err = operation_prep(handle)) != Z_OK) {
+		handle->zone_dh_cur = NULL;
+		return (err);
+	}
+
+	cur = handle->zone_dh_cur;
+	cur = cur->xmlChildrenNode;
+	if (cur == NULL)
+		return (Z_NO_ENTRY);
+	handle->zone_dh_cur = cur;
+
+	for (; cur != NULL; cur = cur->next) {
+		char *m;
+		if (xmlStrcmp(cur->name, DTD_ELEM_DEVICE) != 0)
+			continue;
+		if ((err = fetchprop(cur, DTD_ATTR_MATCH, match,
+		    sizeof (match))) != Z_OK) {
+			handle->zone_dh_cur = handle->zone_dh_top;
+			return (err);
+		}
+		m = match;
+		/*
+		 * fnmatch gives us simple but powerful shell-style matching;
+		 * but first, we need to strip out /dev/ from the matching rule.
+		 */
+		if (strncmp(m, "/dev/", 5) == 0)
+			m += 5;
+
+		if (fnmatch(m, devpath, FNM_PATHNAME) == 0) {
+			found = B_TRUE;
+			break;
+		}
+	}
+
+	if (!found)
+		return (Z_NO_ENTRY);
+
+	if (!out_match)
+		return (Z_OK);
+
+	(void) strlcpy(out_match->zone_dev_match, match,
+	    sizeof (out_match->zone_dev_match));
+	return (Z_OK);
+}
+
+int
+zonecfg_lookup_attr(zone_dochandle_t handle, struct zone_attrtab *tabptr)
+{
+	xmlNodePtr cur, firstmatch;
+	int err;
+	char name[MAXNAMELEN], type[MAXNAMELEN], value[MAXNAMELEN];
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	firstmatch = NULL;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_ATTR))
+			continue;
+		if (strlen(tabptr->zone_attr_name) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_NAME, name,
+			    sizeof (name)) == Z_OK) &&
+			    (strcmp(tabptr->zone_attr_name, name) == 0)) {
+				if (firstmatch == NULL)
+					firstmatch = cur;
+				else
+					return (Z_INSUFFICIENT_SPEC);
+			}
+		}
+		if (strlen(tabptr->zone_attr_type) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_TYPE, type,
+			    sizeof (type)) == Z_OK)) {
+				if (strcmp(tabptr->zone_attr_type, type) == 0) {
+					if (firstmatch == NULL)
+						firstmatch = cur;
+					else if (firstmatch != cur)
+						return (Z_INSUFFICIENT_SPEC);
+				} else {
+					/*
+					 * If another property matched but this
+					 * one doesn't then reset firstmatch.
+					 */
+					if (firstmatch == cur)
+						firstmatch = NULL;
+				}
+			}
+		}
+		if (strlen(tabptr->zone_attr_value) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_VALUE, value,
+			    sizeof (value)) == Z_OK)) {
+				if (strcmp(tabptr->zone_attr_value, value) ==
+				    0) {
+					if (firstmatch == NULL)
+						firstmatch = cur;
+					else if (firstmatch != cur)
+						return (Z_INSUFFICIENT_SPEC);
+				} else {
+					/*
+					 * If another property matched but this
+					 * one doesn't then reset firstmatch.
+					 */
+					if (firstmatch == cur)
+						firstmatch = NULL;
+				}
+			}
+		}
+	}
+	if (firstmatch == NULL)
+		return (Z_NO_RESOURCE_ID);
+
+	cur = firstmatch;
+
+	if ((err = fetchprop(cur, DTD_ATTR_NAME, tabptr->zone_attr_name,
+	    sizeof (tabptr->zone_attr_name))) != Z_OK)
+		return (err);
+
+	if ((err = fetchprop(cur, DTD_ATTR_TYPE, tabptr->zone_attr_type,
+	    sizeof (tabptr->zone_attr_type))) != Z_OK)
+		return (err);
+
+	if ((err = fetchprop(cur, DTD_ATTR_VALUE, tabptr->zone_attr_value,
+	    sizeof (tabptr->zone_attr_value))) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+zonecfg_add_attr_core(zone_dochandle_t handle, struct zone_attrtab *tabptr)
+{
+	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	int err;
+
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_ATTR, NULL);
+	err = newprop(handle, newnode, DTD_ATTR_NAME, tabptr->zone_attr_name);
+	if (err != Z_OK)
+		return (err);
+	err = newprop(handle, newnode, DTD_ATTR_TYPE, tabptr->zone_attr_type);
+	if (err != Z_OK)
+		return (err);
+	err = newprop(handle, newnode, DTD_ATTR_VALUE, tabptr->zone_attr_value);
+	if (err != Z_OK)
+		return (err);
+	return (Z_OK);
+}
+
+int
+zonecfg_add_attr(zone_dochandle_t handle, struct zone_attrtab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_attr_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+zonecfg_delete_attr_core(zone_dochandle_t handle, struct zone_attrtab *tabptr)
+{
+	xmlNodePtr cur = handle->zone_dh_cur;
+	int name_match, type_match, value_match;
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_ATTR))
+			continue;
+
+		name_match = match_prop(cur, DTD_ATTR_NAME,
+		    tabptr->zone_attr_name);
+		type_match = match_prop(cur, DTD_ATTR_TYPE,
+		    tabptr->zone_attr_type);
+		value_match = match_prop(cur, DTD_ATTR_VALUE,
+		    tabptr->zone_attr_value);
+
+		if (name_match && type_match && value_match) {
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+			return (Z_OK);
+		}
+	}
+	return (Z_NO_RESOURCE_ID);
+}
+
+int
+zonecfg_delete_attr(zone_dochandle_t handle, struct zone_attrtab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_attr_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_modify_attr(
+	zone_dochandle_t handle,
+	struct zone_attrtab *oldtabptr,
+	struct zone_attrtab *newtabptr)
+{
+	int err;
+
+	if (oldtabptr == NULL || newtabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_attr_core(handle, oldtabptr)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_attr_core(handle, newtabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_get_attr_boolean(const struct zone_attrtab *attr, boolean_t *value)
+{
+	if (attr == NULL)
+		return (Z_INVAL);
+
+	if (strcmp(attr->zone_attr_type, DTD_ENTITY_BOOLEAN) != 0)
+		return (Z_INVAL);
+
+	if (strcmp(attr->zone_attr_value, DTD_ENTITY_TRUE) == 0) {
+		*value = B_TRUE;
+		return (Z_OK);
+	}
+	if (strcmp(attr->zone_attr_value, DTD_ENTITY_FALSE) == 0) {
+		*value = B_FALSE;
+		return (Z_OK);
+	}
+	return (Z_INVAL);
+}
+
+int
+zonecfg_get_attr_int(const struct zone_attrtab *attr, int64_t *value)
+{
+	long long result;
+	char *endptr;
+
+	if (attr == NULL)
+		return (Z_INVAL);
+
+	if (strcmp(attr->zone_attr_type, DTD_ENTITY_INT) != 0)
+		return (Z_INVAL);
+
+	errno = 0;
+	result = strtoll(attr->zone_attr_value, &endptr, 10);
+	if (errno != 0 || *endptr != '\0')
+		return (Z_INVAL);
+	*value = result;
+	return (Z_OK);
+}
+
+int
+zonecfg_get_attr_string(const struct zone_attrtab *attr, char *value,
+    size_t val_sz)
+{
+	if (attr == NULL)
+		return (Z_INVAL);
+
+	if (strcmp(attr->zone_attr_type, DTD_ENTITY_STRING) != 0)
+		return (Z_INVAL);
+
+	if (strlcpy(value, attr->zone_attr_value, val_sz) >= val_sz)
+		return (Z_TOO_BIG);
+	return (Z_OK);
+}
+
+int
+zonecfg_get_attr_uint(const struct zone_attrtab *attr, uint64_t *value)
+{
+	unsigned long long result;
+	long long neg_result;
+	char *endptr;
+
+	if (attr == NULL)
+		return (Z_INVAL);
+
+	if (strcmp(attr->zone_attr_type, DTD_ENTITY_UINT) != 0)
+		return (Z_INVAL);
+
+	errno = 0;
+	result = strtoull(attr->zone_attr_value, &endptr, 10);
+	if (errno != 0 || *endptr != '\0')
+		return (Z_INVAL);
+	errno = 0;
+	neg_result = strtoll(attr->zone_attr_value, &endptr, 10);
+	/*
+	 * Incredibly, strtoull("<negative number>", ...) will not fail but
+	 * return whatever (negative) number cast as a u_longlong_t, so we
+	 * need to look for this here.
+	 */
+	if (errno == 0 && neg_result < 0)
+		return (Z_INVAL);
+	*value = result;
+	return (Z_OK);
+}
+
+int
+zonecfg_lookup_rctl(zone_dochandle_t handle, struct zone_rctltab *tabptr)
+{
+	xmlNodePtr cur, val;
+	char savedname[MAXNAMELEN];
+	struct zone_rctlvaltab *valptr;
+	int err;
+
+	if (tabptr->zone_rctl_name == NULL ||
+	    strlen(tabptr->zone_rctl_name) == 0)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_RCTL))
+			continue;
+		if ((fetchprop(cur, DTD_ATTR_NAME, savedname,
+		    sizeof (savedname)) == Z_OK) &&
+		    (strcmp(savedname, tabptr->zone_rctl_name) == 0)) {
+			tabptr->zone_rctl_valptr = NULL;
+			for (val = cur->xmlChildrenNode; val != NULL;
+			    val = val->next) {
+				valptr = (struct zone_rctlvaltab *)malloc(
+				    sizeof (struct zone_rctlvaltab));
+				if (valptr == NULL)
+					return (Z_NOMEM);
+				if ((fetchprop(val, DTD_ATTR_PRIV,
+				    valptr->zone_rctlval_priv,
+				    sizeof (valptr->zone_rctlval_priv)) !=
+				    Z_OK))
+					break;
+				if ((fetchprop(val, DTD_ATTR_LIMIT,
+				    valptr->zone_rctlval_limit,
+				    sizeof (valptr->zone_rctlval_limit)) !=
+				    Z_OK))
+					break;
+				if ((fetchprop(val, DTD_ATTR_ACTION,
+				    valptr->zone_rctlval_action,
+				    sizeof (valptr->zone_rctlval_action)) !=
+				    Z_OK))
+					break;
+				if (zonecfg_add_rctl_value(tabptr, valptr) !=
+				    Z_OK)
+					break;
+			}
+			return (Z_OK);
+		}
+	}
+	return (Z_NO_RESOURCE_ID);
+}
+
+static int
+zonecfg_add_rctl_core(zone_dochandle_t handle, struct zone_rctltab *tabptr)
+{
+	xmlNodePtr newnode, cur = handle->zone_dh_cur, valnode;
+	struct zone_rctlvaltab *valptr;
+	int err;
+
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_RCTL, NULL);
+	err = newprop(handle, newnode, DTD_ATTR_NAME, tabptr->zone_rctl_name);
+	if (err != Z_OK)
+		return (err);
+	for (valptr = tabptr->zone_rctl_valptr; valptr != NULL;
+	    valptr = valptr->zone_rctlval_next) {
+		valnode = xmlNewTextChild(newnode, NULL,
+		    DTD_ELEM_RCTLVALUE, NULL);
+		err = newprop(handle, valnode, DTD_ATTR_PRIV,
+		    valptr->zone_rctlval_priv);
+		if (err != Z_OK)
+			return (err);
+		err = newprop(handle, valnode, DTD_ATTR_LIMIT,
+		    valptr->zone_rctlval_limit);
+		if (err != Z_OK)
+			return (err);
+		err = newprop(handle, valnode, DTD_ATTR_ACTION,
+		    valptr->zone_rctlval_action);
+		if (err != Z_OK)
+			return (err);
+	}
+	return (Z_OK);
+}
+
+int
+zonecfg_add_rctl(zone_dochandle_t handle, struct zone_rctltab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL || tabptr->zone_rctl_name == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_rctl_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+zonecfg_delete_rctl_core(zone_dochandle_t handle, struct zone_rctltab *tabptr)
+{
+	xmlNodePtr cur = handle->zone_dh_cur;
+	xmlChar *savedname;
+	int name_result;
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_RCTL))
+			continue;
+
+		savedname = xmlGetProp(cur, DTD_ATTR_NAME);
+		if (savedname == NULL)	/* shouldn't happen */
+			continue;
+		name_result = xmlStrcmp(savedname,
+		    (const xmlChar *) tabptr->zone_rctl_name);
+		xmlFree(savedname);
+
+		if (name_result == 0) {
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+			return (Z_OK);
+		}
+	}
+	return (Z_NO_RESOURCE_ID);
+}
+
+int
+zonecfg_delete_rctl(zone_dochandle_t handle, struct zone_rctltab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL || tabptr->zone_rctl_name == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_rctl_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_modify_rctl(
+	zone_dochandle_t handle,
+	struct zone_rctltab *oldtabptr,
+	struct zone_rctltab *newtabptr)
+{
+	int err;
+
+	if (oldtabptr == NULL || oldtabptr->zone_rctl_name == NULL ||
+	    newtabptr == NULL || newtabptr->zone_rctl_name == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_rctl_core(handle, oldtabptr)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_rctl_core(handle, newtabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_add_rctl_value(
+	struct zone_rctltab *tabptr,
+	struct zone_rctlvaltab *valtabptr)
+{
+	struct zone_rctlvaltab *last, *old, *new;
+	rctlblk_t *rctlblk = alloca(rctlblk_size());
+
+	last = tabptr->zone_rctl_valptr;
+	for (old = last; old != NULL; old = old->zone_rctlval_next)
+		last = old;	/* walk to the end of the list */
+	new = valtabptr;	/* alloc'd by caller */
+	new->zone_rctlval_next = NULL;
+	if (zonecfg_construct_rctlblk(valtabptr, rctlblk) != Z_OK)
+		return (Z_INVAL);
+	if (!zonecfg_valid_rctlblk(rctlblk))
+		return (Z_INVAL);
+	if (last == NULL)
+		tabptr->zone_rctl_valptr = new;
+	else
+		last->zone_rctlval_next = new;
+	return (Z_OK);
+}
+
+int
+zonecfg_remove_rctl_value(
+	struct zone_rctltab *tabptr,
+	struct zone_rctlvaltab *valtabptr)
+{
+	struct zone_rctlvaltab *last, *this, *next;
+
+	last = tabptr->zone_rctl_valptr;
+	for (this = last; this != NULL; this = this->zone_rctlval_next) {
+		if (strcmp(this->zone_rctlval_priv,
+		    valtabptr->zone_rctlval_priv) == 0 &&
+		    strcmp(this->zone_rctlval_limit,
+		    valtabptr->zone_rctlval_limit) == 0 &&
+		    strcmp(this->zone_rctlval_action,
+		    valtabptr->zone_rctlval_action) == 0) {
+			next = this->zone_rctlval_next;
+			if (this == tabptr->zone_rctl_valptr)
+				tabptr->zone_rctl_valptr = next;
+			else
+				last->zone_rctlval_next = next;
+			free(this);
+			return (Z_OK);
+		} else
+			last = this;
+	}
+	return (Z_NO_PROPERTY_ID);
+}
+
+char *
+zonecfg_strerror(int errnum)
+{
+	switch (errnum) {
+	case Z_OK:
+		return (dgettext(TEXT_DOMAIN, "OK"));
+	case Z_EMPTY_DOCUMENT:
+		return (dgettext(TEXT_DOMAIN, "Empty document"));
+	case Z_WRONG_DOC_TYPE:
+		return (dgettext(TEXT_DOMAIN, "Wrong document type"));
+	case Z_BAD_PROPERTY:
+		return (dgettext(TEXT_DOMAIN, "Bad document property"));
+	case Z_TEMP_FILE:
+		return (dgettext(TEXT_DOMAIN,
+		    "Problem creating temporary file"));
+	case Z_SAVING_FILE:
+		return (dgettext(TEXT_DOMAIN, "Problem saving file"));
+	case Z_NO_ENTRY:
+		return (dgettext(TEXT_DOMAIN, "No such entry"));
+	case Z_BOGUS_ZONE_NAME:
+		return (dgettext(TEXT_DOMAIN, "Bogus zone name"));
+	case Z_REQD_RESOURCE_MISSING:
+		return (dgettext(TEXT_DOMAIN, "Required resource missing"));
+	case Z_REQD_PROPERTY_MISSING:
+		return (dgettext(TEXT_DOMAIN, "Required property missing"));
+	case Z_BAD_HANDLE:
+		return (dgettext(TEXT_DOMAIN, "Bad handle"));
+	case Z_NOMEM:
+		return (dgettext(TEXT_DOMAIN, "Out of memory"));
+	case Z_INVAL:
+		return (dgettext(TEXT_DOMAIN, "Invalid argument"));
+	case Z_ACCES:
+		return (dgettext(TEXT_DOMAIN, "Permission denied"));
+	case Z_TOO_BIG:
+		return (dgettext(TEXT_DOMAIN, "Argument list too long"));
+	case Z_MISC_FS:
+		return (dgettext(TEXT_DOMAIN,
+		    "Miscellaneous file system error"));
+	case Z_NO_ZONE:
+		return (dgettext(TEXT_DOMAIN, "No such zone configured"));
+	case Z_NO_RESOURCE_TYPE:
+		return (dgettext(TEXT_DOMAIN, "No such resource type"));
+	case Z_NO_RESOURCE_ID:
+		return (dgettext(TEXT_DOMAIN, "No such resource with that id"));
+	case Z_NO_PROPERTY_TYPE:
+		return (dgettext(TEXT_DOMAIN, "No such property type"));
+	case Z_NO_PROPERTY_ID:
+		return (dgettext(TEXT_DOMAIN, "No such property with that id"));
+	case Z_RESOURCE_EXISTS:
+		return (dgettext(TEXT_DOMAIN,
+		    "Resource already exists with that id"));
+	case Z_INVALID_DOCUMENT:
+		return (dgettext(TEXT_DOMAIN, "Invalid document"));
+	case Z_ID_IN_USE:
+		return (dgettext(TEXT_DOMAIN, "Zone ID in use"));
+	case Z_NO_SUCH_ID:
+		return (dgettext(TEXT_DOMAIN, "No such zone ID"));
+	case Z_UPDATING_INDEX:
+		return (dgettext(TEXT_DOMAIN, "Problem updating index file"));
+	case Z_LOCKING_FILE:
+		return (dgettext(TEXT_DOMAIN, "Locking index file"));
+	case Z_UNLOCKING_FILE:
+		return (dgettext(TEXT_DOMAIN, "Unlocking index file"));
+	case Z_INSUFFICIENT_SPEC:
+		return (dgettext(TEXT_DOMAIN, "Insufficient specification"));
+	case Z_RESOLVED_PATH:
+		return (dgettext(TEXT_DOMAIN, "Resolved path mismatch"));
+	case Z_IPV6_ADDR_PREFIX_LEN:
+		return (dgettext(TEXT_DOMAIN,
+		    "IPv6 address missing required prefix length"));
+	case Z_BOGUS_ADDRESS:
+		return (dgettext(TEXT_DOMAIN,
+		    "Neither an IPv4 nor an IPv6 address nor a host name"));
+	default:
+		return (dgettext(TEXT_DOMAIN, "Unknown error"));
+	}
+}
+
+/*
+ * Note that the zonecfg_setXent() and zonecfg_endXent() calls are all the
+ * same, as they just turn around and call zonecfg_setent() / zonecfg_endent().
+ */
+
+static int
+zonecfg_setent(zone_dochandle_t handle)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK) {
+		handle->zone_dh_cur = NULL;
+		return (err);
+	}
+	cur = handle->zone_dh_cur;
+	cur = cur->xmlChildrenNode;
+	handle->zone_dh_cur = cur;
+	return (Z_OK);
+}
+
+static int
+zonecfg_endent(zone_dochandle_t handle)
+{
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	handle->zone_dh_cur = handle->zone_dh_top;
+	return (Z_OK);
+}
+
+int
+zonecfg_setfsent(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getfsent(zone_dochandle_t handle, struct zone_fstab *tabptr)
+{
+	xmlNodePtr cur, options;
+	char options_str[MAX_MNTOPT_STR];
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_FS))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_SPECIAL, tabptr->zone_fs_special,
+	    sizeof (tabptr->zone_fs_special))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_RAW, tabptr->zone_fs_raw,
+	    sizeof (tabptr->zone_fs_raw))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_DIR, tabptr->zone_fs_dir,
+	    sizeof (tabptr->zone_fs_dir))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_TYPE, tabptr->zone_fs_type,
+	    sizeof (tabptr->zone_fs_type))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	/* OK for options to be NULL */
+	tabptr->zone_fs_options = NULL;
+	for (options = cur->xmlChildrenNode; options != NULL;
+	    options = options->next) {
+		if (fetchprop(options, DTD_ATTR_NAME, options_str,
+		    sizeof (options_str)) != Z_OK)
+			break;
+		if (zonecfg_add_fs_option(tabptr, options_str) != Z_OK)
+			break;
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_endfsent(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
+}
+
+int
+zonecfg_setipdent(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getipdent(zone_dochandle_t handle, struct zone_fstab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_IPD))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_DIR, tabptr->zone_fs_dir,
+	    sizeof (tabptr->zone_fs_dir))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_endipdent(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
+}
+
+int
+zonecfg_setnwifent(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getnwifent(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_NET))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_ADDRESS, tabptr->zone_nwif_address,
+	    sizeof (tabptr->zone_nwif_address))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_PHYSICAL, tabptr->zone_nwif_physical,
+	    sizeof (tabptr->zone_nwif_physical))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_endnwifent(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
+}
+
+int
+zonecfg_setdevent(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getdevent(zone_dochandle_t handle, struct zone_devtab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_DEVICE))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_MATCH, tabptr->zone_dev_match,
+	    sizeof (tabptr->zone_dev_match))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_enddevent(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
+}
+
+int
+zonecfg_setrctlent(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getrctlent(zone_dochandle_t handle, struct zone_rctltab *tabptr)
+{
+	xmlNodePtr cur, val;
+	struct zone_rctlvaltab *valptr;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_RCTL))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_NAME, tabptr->zone_rctl_name,
+	    sizeof (tabptr->zone_rctl_name))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	tabptr->zone_rctl_valptr = NULL;
+	for (val = cur->xmlChildrenNode; val != NULL; val = val->next) {
+		valptr = (struct zone_rctlvaltab *)malloc(
+		    sizeof (struct zone_rctlvaltab));
+		if (valptr == NULL)
+			return (Z_NOMEM);
+		if (fetchprop(val, DTD_ATTR_PRIV, valptr->zone_rctlval_priv,
+		    sizeof (valptr->zone_rctlval_priv)) != Z_OK)
+			break;
+		if (fetchprop(val, DTD_ATTR_LIMIT, valptr->zone_rctlval_limit,
+		    sizeof (valptr->zone_rctlval_limit)) != Z_OK)
+			break;
+		if (fetchprop(val, DTD_ATTR_ACTION, valptr->zone_rctlval_action,
+		    sizeof (valptr->zone_rctlval_action)) != Z_OK)
+			break;
+		if (zonecfg_add_rctl_value(tabptr, valptr) != Z_OK)
+			break;
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_endrctlent(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
+}
+
+int
+zonecfg_setattrent(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getattrent(zone_dochandle_t handle, struct zone_attrtab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_ATTR))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_NAME, tabptr->zone_attr_name,
+	    sizeof (tabptr->zone_attr_name))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_TYPE, tabptr->zone_attr_type,
+	    sizeof (tabptr->zone_attr_type))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_VALUE, tabptr->zone_attr_value,
+	    sizeof (tabptr->zone_attr_value))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_endattrent(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
+}
+
+/* This will ultimately be configurable. */
+static const char *priv_list[] = {
+	PRIV_FILE_CHOWN,
+	PRIV_FILE_CHOWN_SELF,
+	PRIV_FILE_DAC_EXECUTE,
+	PRIV_FILE_DAC_READ,
+	PRIV_FILE_DAC_SEARCH,
+	PRIV_FILE_DAC_WRITE,
+	PRIV_FILE_OWNER,
+	PRIV_FILE_SETID,
+	PRIV_IPC_DAC_READ,
+	PRIV_IPC_DAC_WRITE,
+	PRIV_IPC_OWNER,
+	PRIV_NET_ICMPACCESS,
+	PRIV_NET_PRIVADDR,
+	PRIV_PROC_CHROOT,
+	PRIV_SYS_AUDIT,
+	PRIV_PROC_AUDIT,
+	PRIV_PROC_OWNER,
+	PRIV_PROC_SETID,
+	PRIV_PROC_TASKID,
+	PRIV_SYS_ACCT,
+	PRIV_SYS_ADMIN,
+	PRIV_SYS_MOUNT,
+	PRIV_SYS_NFS,
+	PRIV_SYS_RESOURCE,
+	PRIV_CONTRACT_EVENT,
+	PRIV_CONTRACT_OBSERVER,
+	NULL
+};
+
+int
+zonecfg_get_privset(priv_set_t *privs)
+{
+	const char **strp;
+	priv_set_t *basic = priv_str_to_set("basic", ",", NULL);
+
+	if (basic == NULL)
+		return (Z_INVAL);
+
+	priv_union(basic, privs);
+	priv_freeset(basic);
+
+	for (strp = priv_list; *strp != NULL; strp++) {
+		if (priv_addset(privs, *strp) != 0) {
+			return (Z_INVAL);
+		}
+	}
+	return (Z_OK);
+}
+
+int
+zonecfg_add_index(char *zone, char *path)
+{
+	struct zoneent ze;
+
+	(void) strlcpy(ze.zone_name, zone, sizeof (ze.zone_name));
+	ze.zone_state = ZONE_STATE_CONFIGURED;
+	(void) strlcpy(ze.zone_path, path, sizeof (ze.zone_path));
+	return (putzoneent(&ze, PZE_ADD));
+}
+
+int
+zonecfg_delete_index(char *zone)
+{
+	struct zoneent ze;
+
+	(void) strlcpy(ze.zone_name, zone, sizeof (ze.zone_name));
+	return (putzoneent(&ze, PZE_REMOVE));
+}
+
+int
+zone_get_zonepath(char *zone_name, char *zonepath, size_t rp_sz)
+{
+	zone_dochandle_t handle;
+	boolean_t found = B_FALSE;
+	struct zoneent *ze;
+	FILE *cookie;
+	int err;
+
+	if (zone_name == NULL)
+		return (Z_INVAL);
+
+	if (strcmp(zone_name, GLOBAL_ZONENAME) == 0) {
+		(void) strlcpy(zonepath, "/", rp_sz);
+		return (Z_OK);
+	}
+
+	/*
+	 * First check the index file.  Because older versions did not have
+	 * a copy of the zone path, allow for it to be zero length, in which
+	 * case we ignore this result and fall back to the XML files.
+	 */
+	(void) strlcpy(zonepath, "", rp_sz);
+	cookie = setzoneent();
+	while ((ze = getzoneent_private(cookie)) != NULL) {
+		if (strcmp(ze->zone_name, zone_name) == 0) {
+			found = B_TRUE;
+			if (strlen(ze->zone_path) > 0)
+				(void) strlcpy(zonepath, ze->zone_path, rp_sz);
+		}
+		free(ze);
+		if (found)
+			break;
+	}
+	endzoneent(cookie);
+	if (found && strlen(zonepath) > 0)
+		return (Z_OK);
+
+	/* Fall back to the XML files. */
+	if ((handle = zonecfg_init_handle()) == NULL)
+		return (Z_NOMEM);
+
+	/*
+	 * Check the snapshot first: if a zone is running, its zonepath
+	 * may have changed.
+	 */
+	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
+		if ((err = zonecfg_get_handle(zone_name, handle)) != Z_OK)
+			return (err);
+	}
+	err = zonecfg_get_zonepath(handle, zonepath, rp_sz);
+	zonecfg_fini_handle(handle);
+	return (err);
+}
+
+int
+zone_get_rootpath(char *zone_name, char *rootpath, size_t rp_sz)
+{
+	int err;
+
+	/* This function makes sense for non-global zones only. */
+	if (strcmp(zone_name, GLOBAL_ZONENAME) == 0)
+		return (Z_BOGUS_ZONE_NAME);
+	if ((err = zone_get_zonepath(zone_name, rootpath, rp_sz)) != Z_OK)
+		return (err);
+	if (strlcat(rootpath, "/root", rp_sz) >= rp_sz)
+		return (Z_TOO_BIG);
+	return (Z_OK);
+}
+
+static zone_state_t
+kernel_state_to_user_state(zone_status_t kernel_state)
+{
+	assert(kernel_state <= ZONE_MAX_STATE);
+	switch (kernel_state) {
+		case ZONE_IS_UNINITIALIZED:
+		case ZONE_IS_READY:
+			return (ZONE_STATE_READY);
+		case ZONE_IS_BOOTING:
+		case ZONE_IS_RUNNING:
+			return (ZONE_STATE_RUNNING);
+		case ZONE_IS_SHUTTING_DOWN:
+		case ZONE_IS_EMPTY:
+			return (ZONE_STATE_SHUTTING_DOWN);
+		case ZONE_IS_DOWN:
+		case ZONE_IS_DYING:
+		case ZONE_IS_DEAD:
+		default:
+			return (ZONE_STATE_DOWN);
+	}
+	/* NOTREACHED */
+}
+
+int
+zone_get_state(char *zone_name, zone_state_t *state_num)
+{
+	zone_status_t status;
+	zoneid_t zone_id;
+	struct zoneent *ze;
+	boolean_t found = B_FALSE;
+	FILE *cookie;
+
+	if (zone_name == NULL)
+		return (Z_INVAL);
+
+	/* check to see if zone is running */
+	if ((zone_id = getzoneidbyname(zone_name)) != -1 &&
+	    zone_getattr(zone_id, ZONE_ATTR_STATUS, &status,
+	    sizeof (status)) >= 0) {
+		*state_num = kernel_state_to_user_state(status);
+		return (Z_OK);
+	}
+
+	cookie = setzoneent();
+	while ((ze = getzoneent_private(cookie)) != NULL) {
+		if (strcmp(ze->zone_name, zone_name) == 0) {
+			found = B_TRUE;
+			*state_num = ze->zone_state;
+		}
+		free(ze);
+		if (found)
+			break;
+	}
+	endzoneent(cookie);
+	return ((found) ? Z_OK : Z_NO_ZONE);
+}
+
+int
+zone_set_state(char *zone, zone_state_t state)
+{
+	struct zoneent ze;
+
+	if (state != ZONE_STATE_CONFIGURED && state != ZONE_STATE_INSTALLED &&
+	    state != ZONE_STATE_INCOMPLETE)
+		return (Z_INVAL);
+
+	(void) strlcpy(ze.zone_name, zone, sizeof (ze.zone_name));
+	ze.zone_state = state;
+	(void) strlcpy(ze.zone_path, "", sizeof (ze.zone_path));
+	return (putzoneent(&ze, PZE_MODIFY));
+}
+
+/*
+ * Get id (if any) for specified zone.  There are four possible outcomes:
+ * - If the string corresponds to the numeric id of an active (booted)
+ *   zone, sets *zip to the zone id and returns 0.
+ * - If the string corresponds to the name of an active (booted) zone,
+ *   sets *zip to the zone id and returns 0.
+ * - If the string is a name in the configuration but is not booted,
+ *   sets *zip to ZONE_ID_UNDEFINED and returns 0.
+ * - Otherwise, leaves *zip unchanged and returns -1.
+ *
+ * This function acts as an auxiliary filter on the function of the same
+ * name in libc; the linker binds to this version if libzonecfg exists,
+ * and the libc version if it doesn't.  Any changes to this version of
+ * the function should probably be reflected in the libc version as well.
+ */
+int
+zone_get_id(const char *str, zoneid_t *zip)
+{
+	zone_dochandle_t hdl;
+	zoneid_t zoneid;
+	char *cp;
+	int err;
+
+	/* first try looking for active zone by id */
+	errno = 0;
+	zoneid = (zoneid_t)strtol(str, &cp, 0);
+	if (errno == 0 && cp != str && *cp == '\0' &&
+	    getzonenamebyid(zoneid, NULL, 0) != -1) {
+		*zip = zoneid;
+		return (0);
+	}
+
+	/* then look for active zone by name */
+	if ((zoneid = getzoneidbyname(str)) != -1) {
+		*zip = zoneid;
+		return (0);
+	}
+
+	/* if in global zone, try looking up name in configuration database */
+	if (getzoneid() != GLOBAL_ZONEID ||
+	    (hdl = zonecfg_init_handle()) == NULL)
+		return (-1);
+
+	if (zonecfg_get_handle((char *)str, hdl) == Z_OK) {
+		/* zone exists but isn't active */
+		*zip = ZONE_ID_UNDEFINED;
+		err = 0;
+	} else {
+		err = -1;
+	}
+
+	zonecfg_fini_handle(hdl);
+	return (err);
+}
+
+char *
+zone_state_str(zone_state_t state_num)
+{
+	switch (state_num) {
+	case ZONE_STATE_CONFIGURED:
+		return (ZONE_STATE_STR_CONFIGURED);
+	case ZONE_STATE_INCOMPLETE:
+		return (ZONE_STATE_STR_INCOMPLETE);
+	case ZONE_STATE_INSTALLED:
+		return (ZONE_STATE_STR_INSTALLED);
+	case ZONE_STATE_READY:
+		return (ZONE_STATE_STR_READY);
+	case ZONE_STATE_RUNNING:
+		return (ZONE_STATE_STR_RUNNING);
+	case ZONE_STATE_SHUTTING_DOWN:
+		return (ZONE_STATE_STR_SHUTTING_DOWN);
+	case ZONE_STATE_DOWN:
+		return (ZONE_STATE_STR_DOWN);
+	default:
+		return ("unknown");
+	}
+}
+
+/*
+ * File-system convenience functions.
+ */
+boolean_t
+zonecfg_valid_fs_type(const char *type)
+{
+	/*
+	 * We already know which FS types don't work.
+	 */
+	if (strcmp(type, "proc") == 0 ||
+	    strcmp(type, "mntfs") == 0 ||
+	    strcmp(type, "autofs") == 0 ||
+	    strncmp(type, "nfs", sizeof ("nfs") - 1) == 0 ||
+	    strcmp(type, "cachefs") == 0)
+		return (B_FALSE);
+	/*
+	 * The caller may do more detailed verification to make sure other
+	 * aspects of this filesystem type make sense.
+	 */
+	return (B_TRUE);
+}
+
+/*
+ * Generally uninteresting rctl convenience functions.
+ */
+
+int
+zonecfg_construct_rctlblk(const struct zone_rctlvaltab *rctlval,
+    rctlblk_t *rctlblk)
+{
+	unsigned long long ull;
+	char *endp;
+	rctl_priv_t priv;
+	rctl_qty_t limit;
+	uint_t action;
+
+	/* Get the privilege */
+	if (strcmp(rctlval->zone_rctlval_priv, "basic") == 0) {
+		priv = RCPRIV_BASIC;
+	} else if (strcmp(rctlval->zone_rctlval_priv, "privileged") == 0) {
+		priv = RCPRIV_PRIVILEGED;
+	} else {
+		/* Invalid privilege */
+		return (Z_INVAL);
+	}
+
+	/* deal with negative input; strtoull(3c) doesn't do what we want */
+	if (rctlval->zone_rctlval_limit[0] == '-')
+		return (Z_INVAL);
+	/* Get the limit */
+	errno = 0;
+	ull = strtoull(rctlval->zone_rctlval_limit, &endp, 0);
+	if (errno != 0 || *endp != '\0') {
+		/* parse failed */
+		return (Z_INVAL);
+	}
+	limit = (rctl_qty_t)ull;
+
+	/* Get the action */
+	if (strcmp(rctlval->zone_rctlval_action, "none") == 0) {
+		action = RCTL_LOCAL_NOACTION;
+	} else if (strcmp(rctlval->zone_rctlval_action, "signal") == 0) {
+		action = RCTL_LOCAL_SIGNAL;
+	} else if (strcmp(rctlval->zone_rctlval_action, "deny") == 0) {
+		action = RCTL_LOCAL_DENY;
+	} else {
+		/* Invalid Action */
+		return (Z_INVAL);
+	}
+	rctlblk_set_local_action(rctlblk, action, 0);
+	rctlblk_set_privilege(rctlblk, priv);
+	rctlblk_set_value(rctlblk, limit);
+	return (Z_OK);
+}
+
+static int
+rctl_check(const char *rctlname, void *arg)
+{
+	const char *attrname = arg;
+
+	/*
+	 * Returning 1 here is our signal to zonecfg_is_rctl() that it is
+	 * indeed an rctl name recognized by the system.
+	 */
+	return (strcmp(rctlname, attrname) == 0 ? 1 : 0);
+}
+
+boolean_t
+zonecfg_is_rctl(const char *name)
+{
+	return (rctl_walk(rctl_check, (void *)name) == 1);
+}
+
+boolean_t
+zonecfg_valid_rctlname(const char *name)
+{
+	const char *c;
+
+	if (strncmp(name, "zone.", sizeof ("zone.") - 1) != 0)
+		return (B_FALSE);
+	if (strlen(name) == sizeof ("zone.") - 1)
+		return (B_FALSE);
+	for (c = name + sizeof ("zone.") - 1; *c != '\0'; c++) {
+		if (!isalpha(*c) && *c != '-')
+			return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+boolean_t
+zonecfg_valid_rctlblk(const rctlblk_t *rctlblk)
+{
+	rctl_priv_t priv = rctlblk_get_privilege((rctlblk_t *)rctlblk);
+	uint_t action = rctlblk_get_local_action((rctlblk_t *)rctlblk, NULL);
+
+	if (priv != RCPRIV_PRIVILEGED)
+		return (B_FALSE);
+	if (action != RCTL_LOCAL_NOACTION && action != RCTL_LOCAL_DENY)
+		return (B_FALSE);
+	return (B_TRUE);
+}
+
+boolean_t
+zonecfg_valid_rctl(const char *name, const rctlblk_t *rctlblk)
+{
+	rctlblk_t *current, *next;
+	rctl_qty_t limit = rctlblk_get_value((rctlblk_t *)rctlblk);
+	uint_t action = rctlblk_get_local_action((rctlblk_t *)rctlblk, NULL);
+	uint_t global_flags;
+
+	if (!zonecfg_valid_rctlblk(rctlblk))
+		return (B_FALSE);
+	if (!zonecfg_valid_rctlname(name))
+		return (B_FALSE);
+
+	current = alloca(rctlblk_size());
+	if (getrctl(name, NULL, current, RCTL_FIRST) != 0)
+		return (B_TRUE);	/* not an rctl on this system */
+	/*
+	 * Make sure the proposed value isn't greater than the current system
+	 * value.
+	 */
+	next = alloca(rctlblk_size());
+	while (rctlblk_get_privilege(current) != RCPRIV_SYSTEM) {
+		rctlblk_t *tmp;
+
+		if (getrctl(name, current, next, RCTL_NEXT) != 0)
+			return (B_FALSE);	/* shouldn't happen */
+		tmp = current;
+		current = next;
+		next = tmp;
+	}
+	if (limit > rctlblk_get_value(current))
+		return (B_FALSE);
+
+	/*
+	 * Make sure the proposed action is allowed.
+	 */
+	global_flags = rctlblk_get_global_flags(current);
+	if ((global_flags & RCTL_GLOBAL_DENY_NEVER) &&
+	    action == RCTL_LOCAL_DENY)
+		return (B_FALSE);
+	if ((global_flags & RCTL_GLOBAL_DENY_ALWAYS) &&
+	    action == RCTL_LOCAL_NOACTION)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}

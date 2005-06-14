@@ -1,0 +1,16 @@
+
+Type the number of days since the object was created or last changed.
+
+For example:
+
+   Type:     3     To find objects created or changed 3 days ago.
+
+   Type:    <3     To find objects created or changed within the last
+                   2 days.
+
+   Type:    >3     To find objects created or changed more than 3 days
+                   ago.
+
+   Type:   3-10    To find objects created or changed between 3 and 10
+                   days ago.
+

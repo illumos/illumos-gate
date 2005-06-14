@@ -1,0 +1,10 @@
+
+   Use the OPEN command to access the contents of a  folder, or file. 
+   OPEN will display a new frame containing a menu of folder contents, 
+   a menu of other services or options, or in the case of  a file  
+   object, invoke the default editor (if a standard file).
+
+   To OPEN an object use one of the options below.  If an object  name
+   is not specified the current object is assumed.
+
+      - Typed Command - Type open [object_name] + ENTER

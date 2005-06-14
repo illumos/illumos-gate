@@ -1,0 +1,132 @@
+
+// Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+// Use is subject to license terms.
+//
+// CDDL HEADER START
+//
+// The contents of this file are subject to the terms of the
+// Common Development and Distribution License, Version 1.0 only
+// (the "License").  You may not use this file except in compliance
+// with the License.
+//
+// You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+// or http://www.opensolaris.org/os/licensing.
+// See the License for the specific language governing permissions
+// and limitations under the License.
+//
+// When distributing Covered Code, include this CDDL HEADER in each
+// file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+// If applicable, add the following below this CDDL HEADER, with the
+// fields enclosed by brackets "[]" replaced with your own identifying
+// information: Portions Copyright [yyyy] [name of copyright owner]
+//
+// CDDL HEADER END
+//
+// ident	"%Z%%M%	%I%	%E% SMI"
+
+//
+// eucJP to SJIS
+//
+
+
+#include <sys/errno.h>
+#define	SS2	0x008e
+#define	SS3	0x008f
+
+eucJP%SJIS {
+	operation init {
+		cs = 0;
+		offset = 0;
+	};
+
+	direction {
+
+		condition {
+			cs == 2;
+		} operation {
+			output = input[0];
+			cs = 0;
+			discard;
+		};
+
+		condition {
+			cs == 1;
+		} operation {
+			var_input = input[0] & 0x7f;
+			var_input = var_input + offset; 
+			if (var_input >= 0x7f) {
+				var_input = var_input + 0x01; 
+			}
+			output = var_input;
+			cs = 0;
+			discard;
+		};
+
+		condition { 
+			between 0x00 ... 0x7f ;
+		} operation {
+			if ( outputsize < 1 ) {
+				error E2BIG;
+			}
+			output = input[0];
+			discard;
+		};
+
+		condition {
+			between SS2 ... SS2 ;
+		} operation {
+			// Note this, in the .c file check is made
+			// against ileft > 0 ,  but it's since the
+			// ileft is already decremented.
+
+			if ( inputsize > 1 ) {
+				if ( ( input[1] >= 0xa1 ) && ( input[1] <= 0xfe )) {
+					if (outputsize < 1 ) {
+						error E2BIG;
+					}
+					cs = 2;
+				} else {
+					error EILSEQ;
+				}
+			} else {
+				error EINVAL;
+			}
+		};
+
+		condition {
+			between 0xa1 ... 0xfe;
+		} operation {
+			if ( inputsize > 1 ) {
+				if ( ( input[1]   >= 0xa1 ) && (  input[1]  <= 0xfe)) {
+					if ( outputsize < 2 ) {
+						error E2BIG;
+					}
+
+					cs = 1;
+					var_input = input[0] & 0x7f;
+					if ( var_input & 0x01) {
+						offset = 0x1f;
+					} else {
+						offset = 0x7d;
+					}
+					var_input = ((var_input - 0x21 ) >> 1) + 0x81;
+					if ( var_input > 0x9f ) {
+						var_input = var_input + 0x40;
+					}
+					output = var_input;
+					discard;
+
+				} else {
+					error EINVAL;
+				}
+			} else {
+				error EILSEQ;
+			}
+		};
+
+		true operation {
+			error EILSEQ;
+		};
+	};
+	
+}

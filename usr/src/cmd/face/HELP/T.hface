@@ -1,0 +1,54 @@
+
+AT&T FACE presents your files and file folders on the screen 
+through a system of menus and forms. The following describes 
+the different parts of the AT&T FACE display.
+
+   Title Line:  This is the top line of the display. The date
+   is always displayed in the center. On the far left is the
+   electronic mail alert, "MAIL", indicating  when new mail has
+   arrived. (You can read your mail by selecting "Programs"
+   from the "AT&T FACE" menu and selecting "Mail Services".)
+   On the far right is the "working" indicator, letting you 
+   know when the system is processing your requested action.
+
+   Work Area:  The middle section of the screen is the work area 
+   where frames are displayed.  See the Frames and Function key 
+   overview for a description of frames. The size of the work 
+   area is determined by the size of the screen of your terminal. 
+
+   AT&T FACE Menu:  This menu is the "active" frame when you invoke
+   FACE.  It serves as a starting point from which all parts of
+   FACE can be accessed.  It is always present on the screen. 
+   You can specify additional frames to be opened when FACE is 
+   invoked through Preferences on the Office menu.
+
+   Message Line:  Just below the work area there is a line called 
+   the message line.  It prompts you for an action or gives you 
+   feedback on the action you performed.  When you are 
+   completing a field in a frame, the message line prompts 
+   you for input and tells you what function keys to press.  If 
+   you make an error in your input, the message line will inform
+   you of the error.  To see the original message again, navigate 
+   from the field and then navigate back.
+
+   Command Line:  This line follows the message line.  It is
+   the place where you type commands and their arguments.  
+   This line is accessed by typing CTRL-j (holding down the 
+   CTRL key and striking j simultaneously.  An arrow (-->) will 
+   appear on the command line.  Type the command followed by 
+   arguments and press ENTER to execute it.
+
+   Function Keys:  The labels at the bottom of the screen
+   correspond to the keyboard function keys <f1> to <f8> which 
+   are supported on many terminal keyboards.  When you press a key, 
+   they action that labels the key is taken. The labels change 
+   depending the type of frame that is currently active.  See the 
+   Frames and Function Keys Overview for details.
+
+   If your terminal does not have function keys that are usable 
+   with AT&T FACE, you can use alternate keystrokes.  These are 
+   listed in the AT&T FACE  User's Guide.  Most of the labeled 
+   functions are also available through the Commands Menu or can 
+   be typed on the command line. The Commands Overview provides 
+   more detail.
+

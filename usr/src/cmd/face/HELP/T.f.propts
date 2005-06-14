@@ -1,0 +1,9 @@
+
+Print commands # 1 through 3 specify three different ways your files
+can be printed.  Press ENTER with the cursor resting on one of these 
+and the current file will be printed using the print command.
+
+When you press ENTER with the cursor resting on Change Print Options 
+you can change them from default values which is lp, by selecting 
+print options.
+

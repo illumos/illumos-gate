@@ -1,0 +1,17 @@
+
+The goto command enables you to quickly make a frame active by
+specifying the frame number.
+
+Use one of the methods below for the goto command:
+
+     Command Menu:  Select goto and press ENTER. A prompt will appear
+     on the command line to indicate that you must provide a frame
+     number.
+
+     Command Menu:  Press CTRL-j with cursor on goto and an -->
+     (alternative)  will appear on the command line followed by the
+                    goto. Type arguments and press ENTER to
+                    execute the command.
+
+     Command Line:  Type goto [frame #] and press ENTER.
+

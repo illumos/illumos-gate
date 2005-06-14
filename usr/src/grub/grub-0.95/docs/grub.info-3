@@ -1,0 +1,1366 @@
+This is grub.info, produced by makeinfo version 4.0 from grub.texi.
+
+INFO-DIR-SECTION Kernel
+START-INFO-DIR-ENTRY
+* GRUB: (grub).                 The GRand Unified Bootloader
+* grub-install: (grub)Invoking grub-install.    Install GRUB on your drive
+* grub-md5-crypt: (grub)Invoking grub-md5-crypt.        Encrypt a password
+                                                        in MD5 format
+* grub-terminfo: (grub)Invoking grub-terminfo.  Generate a terminfo
+                                                command from a
+                                                terminfo name
+* grub-set-default: (grub)Invoking grub-set-default.    Set a default boot
+                                                        entry
+* mbchk: (grub)Invoking mbchk.  Check for the format of a Multiboot kernel
+END-INFO-DIR-ENTRY
+
+   Copyright (C) 1999,2000,2001,2002,2004 Free Software Foundation, Inc.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided also
+that the entire resulting derived work is distributed under the terms
+of a permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions.
+
+
+File: grub.info,  Node: install,  Next: ioprobe,  Prev: initrd,  Up: Command-line and menu entry commands
+
+install
+-------
+
+ - Command: install [`--force-lba'] [`--stage2=os_stage2_file']
+          stage1_file [`d'] dest_dev stage2_file [addr] [`p']
+          [config_file] [real_config_file]
+     This command is fairly complex, and you should not use this command
+     unless you are familiar with GRUB. Use `setup' (*note setup::)
+     instead.
+
+     In short, it will perform a full install presuming the Stage 2 or
+     Stage 1.5(1) (*note install-Footnote-1::) is in its final install
+     location.
+
+     In slightly more detail, it will load STAGE1_FILE, validate that
+     it is a GRUB Stage 1 of the right version number, install in it a
+     blocklist for loading STAGE2_FILE as a Stage 2. If the option `d'
+     is present, the Stage 1 will always look for the actual disk
+     STAGE2_FILE was installed on, rather than using the booting drive.
+     The Stage 2 will be loaded at address ADDR, which must be `0x8000'
+     for a true Stage 2, and `0x2000' for a Stage 1.5. If ADDR is not
+     present, GRUB will determine the address automatically. It then
+     writes the completed Stage 1 to the first block of the device
+     DEST_DEV. If the options `p' or CONFIG_FILE are present, then it
+     reads the first block of stage2, modifies it with the values of
+     the partition STAGE2_FILE was found on (for `p') or places the
+     string CONFIG_FILE into the area telling the stage2 where to look
+     for a configuration file at boot time. Likewise, if
+     REAL_CONFIG_FILE is present and STAGE2_FILE is a Stage 1.5, then
+     the Stage 2 CONFIG_FILE is patched with the configuration file
+     name REAL_CONFIG_FILE. This command preserves the DOS BPB (and for
+     hard disks, the partition table) of the sector the Stage 1 is to
+     be installed into.
+
+     *Caution:* Several buggy BIOSes don't pass a booting drive
+     properly when booting from a hard disk drive. Therefore, you will
+     unfortunately have to specify the option `d', whether your Stage2
+     resides at the booting drive or not, if you have such a BIOS. We
+     know these are defective in this way:
+
+
+          Fujitsu LifeBook 400 BIOS version 31J0103A
+
+
+          HP Vectra XU 6/200 BIOS version GG.06.11
+
+     *Caution2:* A number of BIOSes don't return a correct LBA support
+     bitmap even if they do have the support. So GRUB provides a
+     solution to ignore the wrong bitmap, that is, the option
+     `--force-lba'. Don't use this option if you know that your BIOS
+     doesn't have LBA support.
+
+     *Caution3:* You must specify the option `--stage2' in the grub
+     shell, if you cannot unmount the filesystem where your stage2 file
+     resides. The argument should be the file name in your operating
+     system.
+
+
+File: grub.info,  Node: install-Footnotes,  Up: install
+
+   (1) They're loaded the same way, so we will refer to the Stage 1.5
+as a Stage 2 from now on.
+
+
+File: grub.info,  Node: ioprobe,  Next: kernel,  Prev: install,  Up: Command-line and menu entry commands
+
+ioprobe
+-------
+
+ - Command: ioprobe drive
+     Probe I/O ports used for the drive DRIVE. This command will list
+     the I/O ports on the screen. For technical information, *Note
+     Internals::.
+
+
+File: grub.info,  Node: kernel,  Next: lock,  Prev: ioprobe,  Up: Command-line and menu entry commands
+
+kernel
+------
+
+ - Command: kernel [`--type=type'] [`--no-mem-option'] file ...
+     Attempt to load the primary boot image (Multiboot a.out or ELF,
+     Linux zImage or bzImage, FreeBSD a.out, NetBSD a.out, etc.) from
+     FILE. The rest of the line is passed verbatim as the "kernel
+     command-line". Any modules must be reloaded after using this
+     command.
+
+     This command also accepts the option `--type' so that you can
+     specify the kernel type of FILE explicitly. The argument TYPE must
+     be one of these: `netbsd', `freebsd', `openbsd', `linux',
+     `biglinux', and `multiboot'. However, you need to specify it only
+     if you want to load a NetBSD ELF kernel, because GRUB can
+     automatically determine a kernel type in the other cases, quite
+     safely.
+
+     The option `--no-mem-option' is effective only for Linux. If the
+     option is specified, GRUB doesn't pass the option `mem=' to the
+     kernel.  This option is implied for Linux kernels 2.4.18 and newer.
+
+
+File: grub.info,  Node: lock,  Next: makeactive,  Prev: kernel,  Up: Command-line and menu entry commands
+
+lock
+----
+
+ - Command: lock
+     Prevent normal users from executing arbitrary menu entries. You
+     must use the command `password' if you really want this command to
+     be useful (*note password::).
+
+     This command is used in a menu, as shown in this example:
+
+          title This entry is too dangerous to be executed by normal users
+          lock
+          root (hd0,a)
+          kernel /no-security-os
+
+     See also *Note Security::.
+
+
+File: grub.info,  Node: makeactive,  Next: map,  Prev: lock,  Up: Command-line and menu entry commands
+
+makeactive
+----------
+
+ - Command: makeactive
+     Set the active partition on the root disk to GRUB's root device.
+     This command is limited to _primary_ PC partitions on a hard disk.
+
+
+File: grub.info,  Node: map,  Next: md5crypt,  Prev: makeactive,  Up: Command-line and menu entry commands
+
+map
+---
+
+ - Command: map to_drive from_drive
+     Map the drive FROM_DRIVE to the drive TO_DRIVE. This is necessary
+     when you chain-load some operating systems, such as DOS, if such
+     an OS resides at a non-first drive. Here is an example:
+
+          grub> map (hd0) (hd1)
+          grub> map (hd1) (hd0)
+
+     The example exchanges the order between the first hard disk and the
+     second hard disk. See also *Note DOS/Windows::.
+
+
+File: grub.info,  Node: md5crypt,  Next: module,  Prev: map,  Up: Command-line and menu entry commands
+
+md5crypt
+--------
+
+ - Command: md5crypt
+     Prompt to enter a password, and encrypt it in MD5 format. The
+     encrypted password can be used with the command `password' (*note
+     password::). See also *Note Security::.
+
+
+File: grub.info,  Node: module,  Next: modulenounzip,  Prev: md5crypt,  Up: Command-line and menu entry commands
+
+module
+------
+
+ - Command: module file ...
+     Load a boot module FILE for a Multiboot format boot image (no
+     interpretation of the file contents are made, so the user of this
+     command must know what the kernel in question expects). The rest
+     of the line is passed as the "module command-line", like the
+     `kernel' command. You must load a Multiboot kernel image before
+     loading any module. See also *Note modulenounzip::.
+
+
+File: grub.info,  Node: modulenounzip,  Next: pause,  Prev: module,  Up: Command-line and menu entry commands
+
+modulenounzip
+-------------
+
+ - Command: modulenounzip file ...
+     The same as `module' (*note module::), except that automatic
+     decompression is disabled.
+
+
+File: grub.info,  Node: pause,  Next: quit,  Prev: modulenounzip,  Up: Command-line and menu entry commands
+
+pause
+-----
+
+ - Command: pause message ...
+     Print the MESSAGE, then wait until a key is pressed. Note that
+     placing <^G> (ASCII code 7) in the message will cause the speaker
+     to emit the standard beep sound, which is useful when prompting
+     the user to change floppies.
+
+
+File: grub.info,  Node: quit,  Next: reboot,  Prev: pause,  Up: Command-line and menu entry commands
+
+quit
+----
+
+ - Command: quit
+     Exit from the grub shell `grub' (*note Invoking the grub shell::).
+     This command can be used only in the grub shell.
+
+
+File: grub.info,  Node: reboot,  Next: read,  Prev: quit,  Up: Command-line and menu entry commands
+
+reboot
+------
+
+ - Command: reboot
+     Reboot the computer.
+
+
+File: grub.info,  Node: read,  Next: root,  Prev: reboot,  Up: Command-line and menu entry commands
+
+read
+----
+
+ - Command: read addr
+     Read a 32-bit value from memory at address ADDR and display it in
+     hex format.
+
+
+File: grub.info,  Node: root,  Next: rootnoverify,  Prev: read,  Up: Command-line and menu entry commands
+
+root
+----
+
+ - Command: root device [hdbias]
+     Set the current "root device" to the device DEVICE, then attempt
+     to mount it to get the partition size (for passing the partition
+     descriptor in `ES:ESI', used by some chain-loaded boot loaders),
+     the BSD drive-type (for booting BSD kernels using their native
+     boot format), and correctly determine the PC partition where a BSD
+     sub-partition is located. The optional HDBIAS parameter is a
+     number to tell a BSD kernel how many BIOS drive numbers are on
+     controllers before the current one. For example, if there is an
+     IDE disk and a SCSI disk, and your FreeBSD root partition is on
+     the SCSI disk, then use a `1' for HDBIAS.
+
+     See also *Note rootnoverify::.
+
+
+File: grub.info,  Node: rootnoverify,  Next: savedefault,  Prev: root,  Up: Command-line and menu entry commands
+
+rootnoverify
+------------
+
+ - Command: rootnoverify device [hdbias]
+     Similar to `root' (*note root::), but don't attempt to mount the
+     partition. This is useful for when an OS is outside of the area of
+     the disk that GRUB can read, but setting the correct root device
+     is still desired. Note that the items mentioned in `root' above
+     which derived from attempting the mount will _not_ work correctly.
+
+
+File: grub.info,  Node: savedefault,  Next: setup,  Prev: rootnoverify,  Up: Command-line and menu entry commands
+
+savedefault
+-----------
+
+ - Command: savedefault num
+     Save the current menu entry or NUM if specified as a default
+     entry. Here is an example:
+
+          default saved
+          timeout 10
+          
+          title GNU/Linux
+          root (hd0,0)
+          kernel /boot/vmlinuz root=/dev/sda1 vga=ext
+          initrd /boot/initrd
+          savedefault
+          
+          title FreeBSD
+          root (hd0,a)
+          kernel /boot/loader
+          savedefault
+
+     With this configuration, GRUB will choose the entry booted
+     previously as the default entry.
+
+     You can specify `fallback' instead of a number. Then, next
+     fallback entry is saved. Next fallback entry is chosen from
+     fallback entries. Normally, this will be the first entry in
+     fallback ones.
+
+     See also *Note default:: and *Note Invoking grub-set-default::.
+
+
+File: grub.info,  Node: setup,  Next: testload,  Prev: savedefault,  Up: Command-line and menu entry commands
+
+setup
+-----
+
+ - Command: setup [`--force-lba'] [`--stage2=os_stage2_file']
+          [`--prefix=dir'] install_device [image_device]
+     Set up the installation of GRUB automatically. This command uses
+     the more flexible command `install' (*note install::) in the
+     backend and installs GRUB into the device INSTALL_DEVICE. If
+     IMAGE_DEVICE is specified, then find the GRUB images (*note
+     Images::) in the device IMAGE_DEVICE, otherwise use the current
+     "root device", which can be set by the command `root'. If
+     INSTALL_DEVICE is a hard disk, then embed a Stage 1.5 in the disk
+     if possible.
+
+     The option `--prefix' specifies the directory under which GRUB
+     images are put. If it is not specified, GRUB automatically
+     searches them in `/boot/grub' and `/grub'.
+
+     The options `--force-lba' and `--stage2' are just passed to
+     `install' if specified. *Note install::, for more information.
+
+
+File: grub.info,  Node: testload,  Next: testvbe,  Prev: setup,  Up: Command-line and menu entry commands
+
+testload
+--------
+
+ - Command: testload file
+     Read the entire contents of FILE in several different ways and
+     compare them, to test the filesystem code. The output is somewhat
+     cryptic, but if no errors are reported and the final `i=X,
+     filepos=Y' reading has X and Y equal, then it is definitely
+     consistent, and very likely works correctly subject to a
+     consistent offset error. If this test succeeds, then a good next
+     step is to try loading a kernel.
+
+
+File: grub.info,  Node: testvbe,  Next: uppermem,  Prev: testload,  Up: Command-line and menu entry commands
+
+testvbe
+-------
+
+ - Command: testvbe mode
+     Test the VESA BIOS EXTENSION mode MODE. This command will switch
+     your video card to the graphics mode, and show an endless
+     animation. Hit any key to return. See also *Note vbeprobe::.
+
+
+File: grub.info,  Node: uppermem,  Next: vbeprobe,  Prev: testvbe,  Up: Command-line and menu entry commands
+
+uppermem
+--------
+
+ - Command: uppermem kbytes
+     Force GRUB to assume that only KBYTES kilobytes of upper memory
+     are installed. Any system address range maps are discarded.
+
+     *Caution:* This should be used with great caution, and should only
+     be necessary on some old machines. GRUB's BIOS probe can pick up
+     all RAM on all new machines the author has ever heard of. It can
+     also be used for debugging purposes to lie to an OS.
+
+
+File: grub.info,  Node: vbeprobe,  Prev: uppermem,  Up: Command-line and menu entry commands
+
+vbeprobe
+--------
+
+ - Command: vbeprobe [mode]
+     Probe VESA BIOS EXTENSION information. If the mode MODE is
+     specified, show only the information about MODE. Otherwise, this
+     command lists up available VBE modes on the screen. See also *Note
+     testvbe::.
+
+
+File: grub.info,  Node: Troubleshooting,  Next: Invoking the grub shell,  Prev: Commands,  Up: Top
+
+Error messages reported by GRUB
+*******************************
+
+   This chapter describes error messages reported by GRUB when you
+encounter trouble. *Note Invoking the grub shell::, if your problem is
+specific to the grub shell.
+
+* Menu:
+
+* Stage1 errors::               Errors reported by the Stage 1
+* Stage1.5 errors::             Errors reported by the Stage 1.5
+* Stage2 errors::               Errors reported by the Stage 2
+
+
+File: grub.info,  Node: Stage1 errors,  Next: Stage1.5 errors,  Up: Troubleshooting
+
+Errors reported by the Stage 1
+==============================
+
+   The general way that the Stage 1 handles errors is to print an error
+string and then halt. Pressing `<CTRL>-<ALT>-<DEL>' will reboot.
+
+   The following is a comprehensive list of error messages for the
+Stage 1:
+
+Hard Disk Error
+     The stage2 or stage1.5 is being read from a hard disk, and the
+     attempt to determine the size and geometry of the hard disk failed.
+
+Floppy Error
+     The stage2 or stage1.5 is being read from a floppy disk, and the
+     attempt to determine the size and geometry of the floppy disk
+     failed. It's listed as a separate error since the probe sequence
+     is different than for hard disks.
+
+Read Error
+     A disk read error happened while trying to read the stage2 or
+     stage1.5.
+
+Geom Error
+     The location of the stage2 or stage1.5 is not in the portion of
+     the disk supported directly by the BIOS read calls.  This could
+     occur because the BIOS translated geometry has been changed by the
+     user or the disk is moved to another machine or controller after
+     installation, or GRUB was not installed using itself (if it was,
+     the Stage 2 version of this error would have been seen during that
+     process and it would not have completed the install).
+
+
+File: grub.info,  Node: Stage1.5 errors,  Next: Stage2 errors,  Prev: Stage1 errors,  Up: Troubleshooting
+
+Errors reported by the Stage 1.5
+================================
+
+   The general way that the Stage 1.5 handles errors is to print an
+error number in the form `Error NUM' and then halt. Pressing
+`<CTRL>-<ALT>-<DEL>' will reboot.
+
+   The error numbers correspond to the errors reported by Stage 2.
+*Note Stage2 errors::.
+
+
+File: grub.info,  Node: Stage2 errors,  Prev: Stage1.5 errors,  Up: Troubleshooting
+
+Errors reported by the Stage 2
+==============================
+
+   The general way that the Stage 2 handles errors is to abort the
+operation in question, print an error string, then (if possible) either
+continue based on the fact that an error occurred or wait for the user
+to deal with the error.
+
+   The following is a comprehensive list of error messages for the
+Stage 2 (error numbers for the Stage 1.5 are listed before the colon in
+each description):
+
+1 : Filename must be either an absolute filename or blocklist
+     This error is returned if a file name is requested which doesn't
+     fit the syntax/rules listed in the *Note Filesystem::.
+
+2 : Bad file or directory type
+     This error is returned if a file requested is not a regular file,
+     but something like a symbolic link, directory, or FIFO.
+
+3 : Bad or corrupt data while decompressing file
+     This error is returned if the run-length decompression code gets an
+     internal error. This is usually from a corrupt file.
+
+4 : Bad or incompatible header in compressed file
+     This error is returned if the file header for a supposedly
+     compressed file is bad.
+
+5 : Partition table invalid or corrupt
+     This error is returned if the sanity checks on the integrity of the
+     partition table fail. This is a bad sign.
+
+6 : Mismatched or corrupt version of stage1/stage2
+     This error is returned if the install command points to
+     incompatible or corrupt versions of the stage1 or stage2. It can't
+     detect corruption in general, but this is a sanity check on the
+     version numbers, which should be correct.
+
+7 : Loading below 1MB is not supported
+     This error is returned if the lowest address in a kernel is below
+     the 1MB boundary. The Linux zImage format is a special case and
+     can be handled since it has a fixed loading address and maximum
+     size.
+
+8 : Kernel must be loaded before booting
+     This error is returned if GRUB is told to execute the boot sequence
+     without having a kernel to start.
+
+9 : Unknown boot failure
+     This error is returned if the boot attempt did not succeed for
+     reasons which are unknown.
+
+10 : Unsupported Multiboot features requested
+     This error is returned when the Multiboot features word in the
+     Multiboot header requires a feature that is not recognized. The
+     point of this is that the kernel requires special handling which
+     GRUB is probably unable to provide.
+
+11 : Unrecognized device string
+     This error is returned if a device string was expected, and the
+     string encountered didn't fit the syntax/rules listed in the *Note
+     Filesystem::.
+
+12 : Invalid device requested
+     This error is returned if a device string is recognizable but does
+     not fall under the other device errors.
+
+13 : Invalid or unsupported executable format
+     This error is returned if the kernel image being loaded is not
+     recognized as Multiboot or one of the supported native formats
+     (Linux zImage or bzImage, FreeBSD, or NetBSD).
+
+14 : Filesystem compatibility error, cannot read whole file
+     Some of the filesystem reading code in GRUB has limits on the
+     length of the files it can read. This error is returned when the
+     user runs into such a limit.
+
+15 : File not found
+     This error is returned if the specified file name cannot be found,
+     but everything else (like the disk/partition info) is OK.
+
+16 : Inconsistent filesystem structure
+     This error is returned by the filesystem code to denote an internal
+     error caused by the sanity checks of the filesystem structure on
+     disk not matching what it expects. This is usually caused by a
+     corrupt filesystem or bugs in the code handling it in GRUB.
+
+17 : Cannot mount selected partition
+     This error is returned if the partition requested exists, but the
+     filesystem type cannot be recognized by GRUB.
+
+18 : Selected cylinder exceeds maximum supported by BIOS
+     This error is returned when a read is attempted at a linear block
+     address beyond the end of the BIOS translated area. This generally
+     happens if your disk is larger than the BIOS can handle (512MB for
+     (E)IDE disks on older machines or larger than 8GB in general).
+
+19 : Linux kernel must be loaded before initrd
+     This error is returned if the initrd command is used before
+     loading a Linux kernel.
+
+20 : Multiboot kernel must be loaded before modules
+     This error is returned if the module load command is used before
+     loading a Multiboot kernel. It only makes sense in this case
+     anyway, as GRUB has no idea how to communicate the presence of
+     such modules to a non-Multiboot-aware kernel.
+
+21 : Selected disk does not exist
+     This error is returned if the device part of a device- or full
+     file name refers to a disk or BIOS device that is not present or
+     not recognized by the BIOS in the system.
+
+22 : No such partition
+     This error is returned if a partition is requested in the device
+     part of a device- or full file name which isn't on the selected
+     disk.
+
+23 : Error while parsing number
+     This error is returned if GRUB was expecting to read a number and
+     encountered bad data.
+
+24 : Attempt to access block outside partition
+     This error is returned if a linear block address is outside of the
+     disk partition. This generally happens because of a corrupt
+     filesystem on the disk or a bug in the code handling it in GRUB
+     (it's a great debugging tool).
+
+25 : Disk read error
+     This error is returned if there is a disk read error when trying to
+     probe or read data from a particular disk.
+
+26 : Too many symbolic links
+     This error is returned if the link count is beyond the maximum
+     (currently 5), possibly the symbolic links are looped.
+
+27 : Unrecognized command
+     This error is returned if an unrecognized command is entered on the
+     command-line or in a boot sequence section of a configuration file
+     and that entry is selected.
+
+28 : Selected item cannot fit into memory
+     This error is returned if a kernel, module, or raw file load
+     command is either trying to load its data such that it won't fit
+     into memory or it is simply too big.
+
+29 : Disk write error
+     This error is returned if there is a disk write error when trying
+     to write to a particular disk. This would generally only occur
+     during an install of set active partition command.
+
+30 : Invalid argument
+     This error is returned if an argument specified to a command is
+     invalid.
+
+31 : File is not sector aligned
+     This error may occur only when you access a ReiserFS partition by
+     block-lists (e.g. the command `install'). In this case, you should
+     mount the partition with the `-o notail' option.
+
+32 : Must be authenticated
+     This error is returned if you try to run a locked entry. You should
+     enter a correct password before running such an entry.
+
+33 : Serial device not configured
+     This error is returned if you try to change your terminal to a
+     serial one before initializing any serial device.
+
+34 : No spare sectors on the disk
+     This error is returned if a disk doesn't have enough spare space.
+     This happens when you try to embed Stage 1.5 into the unused
+     sectors after the MBR, but the first partition starts right after
+     the MBR or they are used by EZ-BIOS.
+
+
+File: grub.info,  Node: Invoking the grub shell,  Next: Invoking grub-install,  Prev: Troubleshooting,  Up: Top
+
+Invoking the grub shell
+***********************
+
+   This chapter documents the grub shell `grub'. Note that the grub
+shell is an emulator; it doesn't run under the native environment, so it
+sometimes does something wrong. Therefore, you shouldn't trust it too
+much. If there is anything wrong with it, don't hesitate to try the
+native GRUB environment, especially when it guesses a wrong map between
+BIOS drives and OS devices.
+
+* Menu:
+
+* Basic usage::                 How to use the grub shell
+* Installation under UNIX::     How to install GRUB via `grub'
+* Device map::                  The map between BIOS drives and OS devices
+
+
+File: grub.info,  Node: Basic usage,  Next: Installation under UNIX,  Up: Invoking the grub shell
+
+Introduction into the grub shell
+================================
+
+   You can use the command `grub' for installing GRUB under your
+operating systems and for a testbed when you add a new feature into GRUB
+or when fixing a bug. `grub' is almost the same as the Stage 2, and, in
+fact, it shares the source code with the Stage 2 and you can use the
+same commands (*note Commands::) in `grub'. It is emulated by replacing
+BIOS calls with UNIX system calls and libc functions.
+
+   The command `grub' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version number of GRUB and exit.
+
+`--verbose'
+     Print some verbose messages for debugging purpose.
+
+`--device-map=FILE'
+     Use the device map file FILE. The format is described in *Note
+     Device map::.
+
+`--no-floppy'
+     Do not probe any floppy drive. This option has no effect if the
+     option `--device-map' is specified (*note Device map::).
+
+`--probe-second-floppy'
+     Probe the second floppy drive. If this option is not specified,
+     the grub shell does not probe it, as that sometimes takes a long
+     time. If you specify the device map file (*note Device map::), the
+     grub shell just ignores this option.
+
+`--config-file=FILE'
+     Read the configuration file FILE instead of `/boot/grub/menu.lst'.
+     The format is the same as the normal GRUB syntax. See *Note
+     Filesystem::, for more information.
+
+`--boot-drive=DRIVE'
+     Set the stage2 BOOT_DRIVE to DRIVE. This argument should be an
+     integer (decimal, octal or hexadecimal).
+
+`--install-partition=PAR'
+     Set the stage2 INSTALL_PARTITION to PAR. This argument should be
+     an integer (decimal, octal or hexadecimal).
+
+`--no-config-file'
+     Do not use the configuration file even if it can be read.
+
+`--no-curses'
+     Do not use the screen handling interface by the curses even if it
+     is available.
+
+`--batch'
+     This option has the same meaning as `--no-config-file --no-curses'.
+
+`--read-only'
+     Disable writing to any disk.
+
+`--hold'
+     Wait until a debugger will attach. This option is useful when you
+     want to debug the startup code.
+
+
+File: grub.info,  Node: Installation under UNIX,  Next: Device map,  Prev: Basic usage,  Up: Invoking the grub shell
+
+How to install GRUB via `grub'
+==============================
+
+   The installation procedure is the same as under the "native" Stage
+2. *Note Installation::, for more information. The command
+`grub'-specific information is described here.
+
+   What you should be careful about is "buffer cache". `grub' makes use
+of raw devices instead of filesystems that your operating systems
+serve, so there exists a potential problem that some cache
+inconsistency may corrupt your filesystems. What we recommend is:
+
+   * If you can unmount drives to which GRUB may write any amount of
+     data, unmount them before running `grub'.
+
+   * If a drive cannot be unmounted but can be mounted with the
+     read-only flag, mount it in read-only mode. That should be secure.
+
+   * If a drive must be mounted with the read-write flag, make sure
+     that no activity is being done on it while the command `grub' is
+     running.
+
+   * Reboot your operating system as soon as possible. This is probably
+     not required if you follow the rules above, but reboot is the most
+     secure way.
+
+   In addition, enter the command `quit' when you finish the
+installation. That is _very important_ because `quit' makes the buffer
+cache consistent. Do not push <C-c>.
+
+   If you want to install GRUB non-interactively, specify `--batch'
+option in the command-line. This is a simple example:
+
+     #!/bin/sh
+     
+     # Use /usr/sbin/grub if you are on an older system.
+     /sbin/grub --batch <<EOT 1>/dev/null 2>/dev/null
+     root (hd0,0)
+     setup (hd0)
+     quit
+     EOT
+
+
+File: grub.info,  Node: Device map,  Prev: Installation under UNIX,  Up: Invoking the grub shell
+
+The map between BIOS drives and OS devices
+==========================================
+
+   When you specify the option `--device-map' (*note Basic usage::),
+the grub shell creates the "device map file" automatically unless it
+already exists. The file name `/boot/grub/device.map' is preferred.
+
+   If the device map file exists, the grub shell reads it to map BIOS
+drives to OS devices. This file consists of lines like this:
+
+     DEVICE FILE
+
+   DEVICE is a drive specified in the GRUB syntax (*note Device
+syntax::), and FILE is an OS file, which is normally a device file.
+
+   The reason why the grub shell gives you the device map file is that
+it cannot guess the map between BIOS drives and OS devices correctly in
+some environments. For example, if you exchange the boot sequence
+between IDE and SCSI in your BIOS, it gets the order wrong.
+
+   Thus, edit the file if the grub shell makes a mistake. You can put
+any comments in the file if needed, as the grub shell assumes that a
+line is just a comment if the first character is `#'.
+
+
+File: grub.info,  Node: Invoking grub-install,  Next: Invoking grub-md5-crypt,  Prev: Invoking the grub shell,  Up: Top
+
+Invoking grub-install
+*********************
+
+   The program `grub-install' installs GRUB on your drive using the
+grub shell (*note Invoking the grub shell::). You must specify the
+device name on which you want to install GRUB, like this:
+
+     grub-install INSTALL_DEVICE
+
+   The device name INSTALL_DEVICE is an OS device name or a GRUB device
+name.
+
+   `grub-install' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version number of GRUB and exit.
+
+`--force-lba'
+     Force GRUB to use LBA mode even for a buggy BIOS. Use this option
+     only if your BIOS doesn't work properly in LBA mode even though it
+     supports LBA mode.
+
+`--root-directory=DIR'
+     Install GRUB images under the directory DIR instead of the root
+     directory. This option is useful when you want to install GRUB
+     into a separate partition or a removable disk. Here is an example
+     in which you have a separate "boot" partition which is mounted on
+     `/boot':
+
+          grub-install --root-directory=/boot hd0
+
+`--grub-shell=FILE'
+     Use FILE as the grub shell. You can append arbitrary options to
+     FILE after the file name, like this:
+
+          grub-install --grub-shell="grub --read-only" /dev/fd0
+
+`--recheck'
+     Recheck the device map, even if `/boot/grub/device.map' already
+     exists. You should use this option whenever you add/remove a disk
+     into/from your computer.
+
+
+File: grub.info,  Node: Invoking grub-md5-crypt,  Next: Invoking grub-terminfo,  Prev: Invoking grub-install,  Up: Top
+
+Invoking grub-md5-crypt
+***********************
+
+   The program `grub-md5-crypt' encrypts a password in MD5 format.
+This is just a frontend of the grub shell (*note Invoking the grub
+shell::). Passwords encrypted by this program can be used with the
+command `password' (*note password::).
+
+   `grub-md5-crypt' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version information and exit.
+
+`--grub-shell=FILE'
+     Use FILE as the grub shell.
+
+
+File: grub.info,  Node: Invoking grub-terminfo,  Next: Invoking grub-set-default,  Prev: Invoking grub-md5-crypt,  Up: Top
+
+Invoking grub-terminfo
+**********************
+
+   The program `grub-terminfo' generates a terminfo command from a
+terminfo name (*note terminfo::). The result can be used in the
+configuration file, to define escape sequences. Because GRUB assumes
+that your terminal is vt100-compatible by default, this would be useful
+only if your terminal is uncommon (such as vt52).
+
+   `grub-terminfo' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version information and exit.
+
+   You must specify one argument to this command. For example:
+
+     grub-terminfo vt52
+
+
+File: grub.info,  Node: Invoking grub-set-default,  Next: Invoking mbchk,  Prev: Invoking grub-terminfo,  Up: Top
+
+Invoking grub-set-default
+*************************
+
+   The program `grub-set-default' sets the default boot entry for GRUB.
+This automatically creates a file named `default' under your GRUB
+directory (i.e. `/boot/grub'), if it is not present. This file is used
+to determine the default boot entry when GRUB boots up your system when
+you use `default saved' in your configuration file (*note default::),
+and to save next default boot entry when you use `savedefault' in a
+boot entry (*note savedefault::).
+
+   `grub-set-default' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version information and exit.
+
+`--root-directory=DIR'
+     Use the directory DIR instead of the root directory (i.e. `/') to
+     define the location of the default file. This is useful when you
+     mount a disk which is used for another system.
+
+   You must specify a single argument to `grub-set-default'. This
+argument is normally the number of a default boot entry. For example,
+if you have this configuration file:
+
+     default saved
+     timeout 10
+     
+     title GNU/Hurd
+     root (hd0,0)
+     ...
+     
+     title GNU/Linux
+     root (hd0,1)
+     ...
+
+   and if you want to set the next default boot entry to GNU/Linux, you
+may execute this command:
+
+     grub-set-default 1
+
+   Because the entry for GNU/Linux is `1'. Note that entries are
+counted from zero. So, if you want to specify GNU/Hurd here, then you
+should specify `0'.
+
+   This feature is very useful if you want to test a new kernel or to
+make your system quite robust. *Note Making your system robust::, for
+more hints about how to set up a robust system.
+
+
+File: grub.info,  Node: Invoking mbchk,  Next: Obtaining and Building GRUB,  Prev: Invoking grub-set-default,  Up: Top
+
+Invoking mbchk
+**************
+
+   The program `mbchk' checks for the format of a Multiboot kernel. We
+recommend using this program before booting your own kernel by GRUB.
+
+   `mbchk' accepts the following options:
+
+`--help'
+     Print a summary of the command-line options and exit.
+
+`--version'
+     Print the version number of GRUB and exit.
+
+`--quiet'
+     Suppress all normal output.
+
+
+File: grub.info,  Node: Obtaining and Building GRUB,  Next: Reporting bugs,  Prev: Invoking mbchk,  Up: Top
+
+How to obtain and build GRUB
+****************************
+
+     *Caution:* GRUB requires binutils-2.9.1.0.23 or later because the
+     GNU assembler has been changed so that it can produce real 16bits
+     machine code between 2.9.1 and 2.9.1.0.x. See
+     `http://sources.redhat.com/binutils/', to obtain information on
+     how to get the latest version.
+
+   GRUB is available from the GNU alpha archive site
+`ftp://alpha.gnu.org/gnu/grub' or any of its mirrors. The file will be
+named grub-version.tar.gz. The current version is 0.95, so the file you
+should grab is:
+
+   `ftp://alpha.gnu.org/gnu/grub/grub-0.95.tar.gz'
+
+   To unbundle GRUB use the instruction:
+
+     zcat grub-0.95.tar.gz | tar xvf -
+
+   which will create a directory called `grub-0.95' with all the
+sources. You can look at the file `INSTALL' for detailed instructions
+on how to build and install GRUB, but you should be able to just do:
+
+     cd grub-0.95
+     ./configure
+     make install
+
+   This will install the grub shell `grub' (*note Invoking the grub
+shell::), the Multiboot checker `mbchk' (*note Invoking mbchk::), and
+the GRUB images. This will also install the GRUB manual.
+
+   Also, the latest version is available from the CVS. See
+`http://savannah.gnu.org/cvs/?group=grub' for more information.
+
+
+File: grub.info,  Node: Reporting bugs,  Next: Future,  Prev: Obtaining and Building GRUB,  Up: Top
+
+Reporting bugs
+**************
+
+   These are the guideline for how to report bugs. Take a look at this
+list below before you submit bugs:
+
+  1. Before getting unsettled, read this manual through and through.
+     Also, see the GNU GRUB FAQ
+     (http://www.gnu.org/software/grub/grub-faq.html).
+
+  2. Always mention the information on your GRUB. The version number
+     and the configuration are quite important. If you build it
+     yourself, write the options specified to the configure script and
+     your operating system, including the versions of gcc and binutils.
+
+  3. If you have trouble with the installation, inform us of how you
+     installed GRUB. Don't omit error messages, if any. Just `GRUB hangs
+     up when it boots' is not enough.
+
+     The information on your hardware is also essential. These are
+     especially important: the geometries and the partition tables of
+     your hard disk drives and your BIOS.
+
+  4. If GRUB cannot boot your operating system, write down _everything_
+     you see on the screen. Don't paraphrase them, like `The foo OS
+     crashes with GRUB, even though it can boot with the bar boot
+     loader just fine'. Mention the commands you executed, the messages
+     printed by them, and information on your operating system
+     including the version number.
+
+  5. Explain what you wanted to do. It is very useful to know your
+     purpose and your wish, and how GRUB didn't satisfy you.
+
+  6. If you can investigate the problem yourself, please do. That will
+     give you and us much more information on the problem. Attaching a
+     patch is even better.
+
+     When you attach a patch, make the patch in unified diff format, and
+     write ChangeLog entries. But, even when you make a patch, don't
+     forget to explain the problem, so that we can understand what your
+     patch is for.
+
+  7. Write down anything that you think might be related. Please
+     understand that we often need to reproduce the same problem you
+     encounterred in our environment. So your information should be
+     sufficient for us to do the same thing--Don't forget that we
+     cannot see your computer directly. If you are not sure whether to
+     state a fact or leave it out, state it!  Reporting too many things
+     is much better than omitting something important.
+
+   If you follow the guideline above, submit a report to the Bug
+Tracking System (http://savannah.gnu.org/bugs/?group=grub).
+Alternatively, you can submit a report via electronic mail to
+<bug-grub@gnu.org>, but we strongly recommend that you use the Bug
+Tracking System, because e-mail can be passed over easily.
+
+   Once we get your report, we will try to fix the bugs.
+
+
+File: grub.info,  Node: Future,  Next: Internals,  Prev: Reporting bugs,  Up: Top
+
+Where GRUB will go
+******************
+
+   We started the next generation of GRUB, GRUB 2. This will include
+internationalization, dynamic module loading, real memory management,
+multiple architecture support, a scripting language, and many other
+nice feature. If you are interested in the development of GRUB 2, take
+a look at the homepage (http://www.gnu.org/software/grub/grub.html).
+
+
+File: grub.info,  Node: Internals,  Next: Index,  Prev: Future,  Up: Top
+
+Hacking GRUB
+************
+
+   This chapter documents the user-invisible aspect of GRUB.
+
+   As a general rule of software development, it is impossible to keep
+the descriptions of the internals up-to-date, and it is quite hard to
+document everything. So refer to the source code, whenever you are not
+satisfied with this documentation.  Please assume that this gives just
+hints to you.
+
+* Menu:
+
+* Memory map::                  The memory map of various components
+* Embedded data::               Embedded variables in GRUB
+* Filesystem interface::        The generic interface for filesystems
+* Command interface::           The generic interface for built-ins
+* Bootstrap tricks::            The bootstrap mechanism used in GRUB
+* I/O ports detection::         How to probe I/O ports used by INT 13H
+* Memory detection::            How to detect all installed RAM
+* Low-level disk I/O::          INT 13H disk I/O interrupts
+* MBR::                         The structure of Master Boot Record
+* Partition table::             The format of partition tables
+* Submitting patches::          Where and how you should send patches
+
+
+File: grub.info,  Node: Memory map,  Next: Embedded data,  Up: Internals
+
+The memory map of various components
+====================================
+
+   GRUB consists of two distinct components, called "stages", which are
+loaded at different times in the boot process. Because they run
+mutual-exclusively, sometimes a memory area overlaps with another
+memory area. And, even in one stage, a single memory area can be used
+for various purposes, because their usages are mutually exclusive.
+
+   Here is the memory map of the various components:
+
+0 to 4K-1
+     BIOS and real mode interrupts
+
+0x07BE to 0x07FF
+     Partition table passed to another boot loader
+
+down from 8K-1
+     Real mode stack
+
+0x2000 to ?
+     The optional Stage 1.5 is loaded here
+
+0x2000 to 0x7FFF
+     Command-line buffer for Multiboot kernels and modules
+
+0x7C00 to 0x7DFF
+     Stage 1 is loaded here by BIOS or another boot loader
+
+0x7F00 to 0x7F42
+     LBA drive parameters
+
+0x8000 to ?
+     Stage2 is loaded here
+
+The end of Stage 2 to 416K-1
+     Heap, in particular used for the menu
+
+down from 416K-1
+     Protected mode stack
+
+416K to 448K-1
+     Filesystem buffer
+
+448K to 479.5K-1
+     Raw device buffer
+
+479.5K to 480K-1
+     512-byte scratch area
+
+480K to 512K-1
+     Buffers for various functions, such as password, command-line, cut
+     and paste, and completion.
+
+The last 1K of lower memory
+     Disk swapping code and data
+
+   See the file `stage2/shared.h', for more information.
+
+
+File: grub.info,  Node: Embedded data,  Next: Filesystem interface,  Prev: Memory map,  Up: Internals
+
+Embedded variables in GRUB
+==========================
+
+   Stage 1 and Stage 2 have embedded variables whose locations are
+well-defined, so that the installation can patch the binary file
+directly without recompilation of the stages.
+
+   In Stage 1, these are defined:
+
+`0x3E'
+     The version number (not GRUB's, but the installation mechanism's).
+
+`0x40'
+     The boot drive. If it is 0xFF, use a drive passed by BIOS.
+
+`0x41'
+     The flag for if forcing LBA.
+
+`0x42'
+     The starting address of Stage 2.
+
+`0x44'
+     The first sector of Stage 2.
+
+`0x48'
+     The starting segment of Stage 2.
+
+`0x1FE'
+     The signature (`0xAA55').
+
+   See the file `stage1/stage1.S', for more information.
+
+   In the first sector of Stage 1.5 and Stage 2, the block lists are
+recorded between `firstlist' and `lastlist'. The address of `lastlist'
+is determined when assembling the file `stage2/start.S'.
+
+   The trick here is that it is actually read backward, and the first
+8-byte block list is not read here, but after the pointer is decremented
+8 bytes, then after reading it, it decrements again, reads, and so on,
+until it is finished. The terminating condition is when the number of
+sectors to be read in the next block list is zero.
+
+   The format of a block list can be seen from the example in the code
+just before the `firstlist' label. Note that it is always from the
+beginning of the disk, but _not_ relative to the partition boundaries.
+
+   In the second sector of Stage 1.5 and Stage 2, these are defined:
+
+`0x6'
+     The version number (likewise, the installation mechanism's).
+
+`0x8'
+     The installed partition.
+
+`0xC'
+     The saved entry number.
+
+`0x10'
+     The identifier.
+
+`0x11'
+     The flag for if forcing LBA.
+
+`0x12'
+     The version string (GRUB's).
+
+`0x12' + "the length of the version string"
+     The name of a configuration file.
+
+   See the file `stage2/asm.S', for more information.
+
+
+File: grub.info,  Node: Filesystem interface,  Next: Command interface,  Prev: Embedded data,  Up: Internals
+
+The generic interface for filesystems
+=====================================
+
+   For any particular partition, it is presumed that only one of the
+"normal" filesystems such as FAT, FFS, or ext2fs can be used, so there
+is a switch table managed by the functions in `disk_io.c'. The notation
+is that you can only "mount" one at a time.
+
+   The block list filesystem has a special place in the system. In
+addition to the "normal" filesystem (or even without one mounted), you
+can access disk blocks directly (in the indicated partition) via the
+block list notation. Using the block list filesystem doesn't effect any
+other filesystem mounts.
+
+   The variables which can be read by the filesystem backend are:
+
+`current_drive'
+     The current BIOS drive number (numbered from 0, if a floppy, and
+     numbered from 0x80, if a hard disk).
+
+`current_partition'
+     The current partition number.
+
+`current_slice'
+     The current partition type.
+
+`saved_drive'
+     The "drive" part of the root device.
+
+`saved_partition'
+     The "partition" part of the root device.
+
+`part_start'
+     The current partition starting address, in sectors.
+
+`part_length'
+     The current partition length, in sectors.
+
+`print_possibilities'
+     True when the `dir' function should print the possible completions
+     of a file, and false when it should try to actually open a file of
+     that name.
+
+`FSYS_BUF'
+     Filesystem buffer which is 32K in size, to use in any way which the
+     filesystem backend desires.
+
+   The variables which need to be written by a filesystem backend are:
+
+`filepos'
+     The current position in the file, in sectors.
+
+     *Caution:* the value of FILEPOS can be changed out from under the
+     filesystem code in the current implementation. Don't depend on it
+     being the same for later calls into the backend code!
+
+`filemax'
+     The length of the file.
+
+`disk_read_func'
+     The value of DISK_READ_HOOK _only_ during reading of data for the
+     file, not any other fs data, inodes, FAT tables, whatever, then
+     set to `NULL' at all other times (it will be `NULL' by default).
+     If this isn't done correctly, then the `testload' and `install'
+     commands won't work correctly.
+
+   The functions expected to be used by the filesystem backend are:
+
+`devread'
+     Only read sectors from within a partition. Sector 0 is the first
+     sector in the partition.
+
+`grub_read'
+     If the backend uses the block list code, then `grub_read' can be
+     used, after setting BLOCK_FILE to 1.
+
+`print_a_completion'
+     If PRINT_POSSIBILITIES is true, call `print_a_completion' for each
+     possible file name. Otherwise, the file name completion won't work.
+
+   The functions expected to be defined by the filesystem backend are
+described at least moderately in the file `filesys.h'. Their usage is
+fairly evident from their use in the functions in `disk_io.c', look for
+the use of the FSYS_TABLE array.
+
+   *Caution:* The semantics are such that then `mount'ing the
+filesystem, presume the filesystem buffer `FSYS_BUF' is corrupted, and
+(re-)load all important contents. When opening and reading a file,
+presume that the data from the `mount' is available, and doesn't get
+corrupted by the open/read (i.e. multiple opens and/or reads will be
+done with only one mount if in the same filesystem).
+
+
+File: grub.info,  Node: Command interface,  Next: Bootstrap tricks,  Prev: Filesystem interface,  Up: Internals
+
+The generic interface for built-ins
+===================================
+
+   GRUB built-in commands are defined in a uniformal interface, whether
+they are menu-specific or can be used anywhere. The definition of a
+builtin command consists of two parts: the code itself and the table of
+the information.
+
+   The code must be a function which takes two arguments, a command-line
+string and flags, and returns an `int' value. The "flags" argument
+specifies how the function is called, using a bit mask. The return
+value must be zero if successful, otherwise non-zero. So it is normally
+enough to return ERRNUM.
+
+   The table of the information is represented by the structure `struct
+builtin', which contains the name of the command, a pointer to the
+function, flags, a short description of the command and a long
+description of the command. Since the descriptions are used only for
+help messages interactively, you don't have to define them, if the
+command may not be called interactively (such as `title').
+
+   The table is finally registered in the table BUILTIN_TABLE, so that
+`run_script' and `enter_cmdline' can find the command. See the files
+`cmdline.c' and `builtins.c', for more details.
+

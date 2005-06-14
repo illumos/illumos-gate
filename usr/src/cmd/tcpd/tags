@@ -1,0 +1,149 @@
+HOSTNAME_KNOWN	tcpd.h	/^#define HOSTNAME_KNOWN(s) (STR_NE((s),unknown) && /
+Menviron	environ.c	/^int     main(argc, argv)$/
+Mmiscd	miscd.c	/^main(argc, argv)$/
+Msafe_finger	safe_finger.c	/^main(argc, argv)$/
+Mtcpd	tcpd.c	/^main(argc, argv)$/
+Mtcpdchk	tcpdchk.c	/^int     main(argc, argv)$/
+Mtcpdmatch	tcpdmatch.c	/^int     main(argc, argv)$/
+Mtry-from	try-from.c	/^main(argc, argv)$/
+NOT_INADDR	tcpd.h	/^#define NOT_INADDR(s) (s[strspn(s,"0123456789abcde/
+SGADDRP	tcpd.h	/^#define SGADDRP(sag)		(((sag)->sg_family == AF_INE/
+SGADDRSZ	tcpd.h	/^#define SGADDRSZ(sag)		((sag)->sg_family == AF_INE/
+SGFAM	tcpd.h	/^#define SGFAM(sag)		((sag)->sg_family == AF_INET6 /
+SGPORT	tcpd.h	/^#define SGPORT(sag)		(*((sag)->sg_family == AF_INE/
+SGSOCKADDRSZ	tcpd.h	/^#define SGSOCKADDRSZ(sag)	((sag)->sg_family == AF_/
+SG_IS_UNSPECIFIED	tcpd.h	/^#define SG_IS_UNSPECIFIED(sag) \\$/
+STRN_CPY	tcpd.h	/^#define STRN_CPY(d,s,l)	{ strncpy((d),(s),(l)); (d/
+STRN_EQ	tcpd.h	/^#define STRN_EQ(x,y,l)	(strncasecmp((x),(y),(l)) =/
+STRN_NE	tcpd.h	/^#define STRN_NE(x,y,l)	(strncasecmp((x),(y),(l)) !/
+STR_EQ	tcpd.h	/^#define STR_EQ(x,y)	(strcasecmp((x),(y)) == 0)$/
+STR_NE	tcpd.h	/^#define STR_NE(x,y)	(strcasecmp((x),(y)) != 0)$/
+S_ISDIR	tcpdchk.c	/^#define S_ISDIR(m)	(((m) & S_IFMT) == S_IFDIR)$/
+VAEND	mystdarg.h	/^#define VAEND(ap)              va_end(ap)$/
+VARARGS	diag.c	/^void    VARARGS(tcpd_warn, char *, format)$/
+VASTART	mystdarg.h	/^#define VASTART(ap,type,name)  va_start(ap,name)$/
+__P	tli-sequent.h	/^#define __P(X) X$/
+addenv	environ.c	/^static int addenv(nameval)$/
+allow_option	options.c	/^static void allow_option(value, request)$/
+banners_option	options.c	/^static void banners_option(value, request)$/
+base_name	inetcf.c	/^static char *base_name(path)$/
+check_client_list	tcpdchk.c	/^static void check_client_list(list)$/
+check_daemon	tcpdchk.c	/^static void check_daemon(pat)$/
+check_daemon_list	tcpdchk.c	/^static void check_daemon_list(list)$/
+check_dns	scaffold.c	/^int     check_dns(host)$/
+check_host	tcpdchk.c	/^static int check_host(pat)$/
+check_path	scaffold.c	/^int     check_path(path, st)$/
+check_user	tcpdchk.c	/^static void check_user(pat)$/
+chop_string	options.c	/^static char *chop_string(string)$/
+clean_exit	clean_exit.c	/^void    clean_exit(request)$/
+cleanup	safe_finger.c	/^void    cleanup(sig)$/
+client_match	hosts_access.c	/^static int client_match(tok, request)$/
+closelog	fakelog.c	/^closelog()$/
+cmalloc	environ.c	/^static char *cmalloc(new_len, old, old_len)$/
+deny_option	options.c	/^static void deny_option(value, request)$/
+do_child	shell_cmd.c	/^static void do_child(command)$/
+dot_quad_addr	misc.c	/^unsigned long dot_quad_addr(str)$/
+dup_hostent	scaffold.c	/^static struct hostent *dup_hostent(hp)$/
+eval_client	eval.c	/^char   *eval_client(request)$/
+eval_daemon	tcpd.h	/^#define eval_daemon(r)	((r)->daemon)	\/* daemon pro/
+eval_hostaddr	eval.c	/^char   *eval_hostaddr(host)$/
+eval_hostinfo	eval.c	/^char   *eval_hostinfo(host)$/
+eval_hostname	eval.c	/^char   *eval_hostname(host)$/
+eval_pid	tcpd.h	/^#define eval_pid(r)	((r)->pid)	\/* process id *\/$/
+eval_server	eval.c	/^char   *eval_server(request)$/
+eval_user	eval.c	/^char   *eval_user(request)$/
+expand	tcpdmatch.c	/^static void expand(text, pattern, request)$/
+expand_arg	options.c	/^#define expand_arg(o)	((o)->flags & EXPAND_ARG)$/
+find_inet_addr	scaffold.c	/^struct hostent *find_inet_addr(host)$/
+findenv	environ.c	/^static char **findenv(name, len)$/
+fix_fgets	workarounds.c	/^char   *fix_fgets(buf, len, fp)$/
+fix_gethostbyname	workarounds.c	/^struct hostent *fix_gethostbyname(name)$/
+fix_getpeername	workarounds.c	/^int     fix_getpeername(sock, sa, len)$/
+fix_inet_addr	workarounds.c	/^long    fix_inet_addr(string)$/
+fix_options	fix_options.c	/^fix_options(request)$/
+fix_recvfrom	workarounds.c	/^int     fix_recvfrom(sock, buf, buflen, flags, fro/
+fix_strtok	workarounds.c	/^char   *fix_strtok(buf, sep)$/
+fromhost	fromhost.c	/^void    fromhost(request)$/
+fsocket	rfc931.c	/^static FILE *fsocket(domain, type, protocol)$/
+get_field	options.c	/^static char *get_field(string)$/
+getenv	environ.c	/^char   *getenv(name)$/
+gethostbyname_dot	socket.c	/^static struct hostent *gethostbyname_dot(name)$/
+group_option	options.c	/^static void group_option(value, request)$/
+host_match	hosts_access.c	/^static int host_match(tok, host)$/
+hosts_access	hosts_access.c	/^int     hosts_access(request)$/
+hosts_ctl	hosts_ctl.c	/^int     hosts_ctl(daemon, name, addr, user)$/
+inet_cfg	inetcf.c	/^char   *inet_cfg(conf)$/
+inet_chk	inetcf.c	/^static void inet_chk(protocol, path, arg0, arg1)$/
+inet_get	inetcf.c	/^int     inet_get(name)$/
+inet_set	inetcf.c	/^void    inet_set(name, type)$/
+ipv6_mask	hosts_access.c	/^static void ipv6_mask(in6p, maskbits)$/
+keepalive_option	options.c	/^static void keepalive_option(value, request)$/
+linger_option	options.c	/^static void linger_option(value, request)$/
+list_match	hosts_access.c	/^static int list_match(list, request, match_fn)$/
+masked_match	hosts_access.c	/^static int masked_match(net_tok, mask_tok, string)/
+memcpy	environ.c	/^#define memcpy(d,s,l) bcopy(s,d,l)$/
+my_strtok	workarounds.c	/^char   *my_strtok(buf, sep)$/
+myvsyslog	myvsyslog.c	/^myvsyslog(severity, format, ap)$/
+namelength	environ.c	/^static int namelength(name)$/
+need_arg	options.c	/^#define need_arg(o)	((o)->flags & NEED_ARG)$/
+nice_option	options.c	/^static void nice_option(value, request)$/
+numeric_addr	misc.c	/^int numeric_addr(str, addr, af, len)$/
+openlog	fakelog.c	/^openlog(name, logopt, facility)$/
+opt_arg	options.c	/^#define opt_arg(o)	((o)->flags & OPT_ARG)$/
+parse_table	tcpdchk.c	/^static void parse_table(table, request)$/
+percent_m	percent_m.c	/^char   *percent_m(obuf, ibuf)$/
+percent_x	percent_x.c	/^char   *percent_x(result, result_len, string, requ/
+permit_arg	options.c	/^#define permit_arg(o)	((o)->flags & (NEED_ARG | OP/
+perror_exit	safe_finger.c	/^void    perror_exit(text)$/
+pipe_stdin	safe_finger.c	/^int     pipe_stdin(argv)$/
+print_list	tcpdchk.c	/^static void print_list(title, list)$/
+printenv	environ.c	/^static void printenv()$/
+process_options	options.c	/^void    process_options(options, request)$/
+ptx_sink	ptx.c	/^static void ptx_sink(fd)$/
+putenv	environ.c	/^int     putenv(nameval)$/
+refuse	refuse.c	/^void    refuse(request)$/
+request_fill	update.c	/^static struct request_info *request_fill(request, /
+reserved_name	tcpdchk.c	/^static int reserved_name(pat)$/
+rfc931	rfc931.c	/^void    rfc931(rmt_sin, our_sin, dest)$/
+rfc931_option	options.c	/^static void rfc931_option(value, request)$/
+server_match	hosts_access.c	/^static int server_match(tok, request)$/
+setenv	environ.c	/^int     setenv(name, value, clobber)$/
+setenv_option	options.c	/^static void setenv_option(value, request)$/
+severity_map	options.c	/^static int severity_map(table, name)$/
+severity_option	options.c	/^static void severity_option(value, request)$/
+shell_cmd	scaffold.c	/^void    shell_cmd(command)$/
+skip_ipv6_addrs	misc.c	/^char *skip_ipv6_addrs(str)$/
+sock_host	socket.c	/^void    sock_host(request)$/
+sock_hostaddr	socket.c	/^void    sock_hostaddr(host)$/
+sock_hostname	socket.c	/^void    sock_hostname(host)$/
+sock_methods	tcpd.h	/^#define sock_methods(r) \\$/
+sock_sink	socket.c	/^static void sock_sink(fd)$/
+sockgen_simplify	socket.c	/^void sockgen_simplify(sg)$/
+spawn_option	options.c	/^static void spawn_option(value, request)$/
+split_at	misc.c	/^char   *split_at(string, delimiter)$/
+strcasecmp	strcasecmp.c	/^strcasecmp(s1, s2)$/
+string_match	hosts_access.c	/^static int string_match(tok, string)$/
+strncasecmp	strcasecmp.c	/^strncasecmp(s1, s2, n)$/
+table_match	hosts_access.c	/^static int table_match(table, request)$/
+tcpd_diag	diag.c	/^static void tcpd_diag(severity, tag, format, ap)$/
+tcpdmatch	tcpdmatch.c	/^static void tcpdmatch(request)$/
+timeout	rfc931.c	/^static void timeout(sig)$/
+tli_cleanup	tli.c	/^static void tli_cleanup(request)$/
+tli_endpoints	tli.c	/^static void tli_endpoints(request)$/
+tli_error	tli-sequent.c	/^static char *tli_error()$/
+tli_host	ptx.c	/^void    tli_host(request)$/
+tli_hostaddr	tli.c	/^static void tli_hostaddr(host)$/
+tli_hostname	tli.c	/^static void tli_hostname(host)$/
+tli_sink	tli-sequent.c	/^static void tli_sink(fd)$/
+tli_transport	tli.c	/^static struct netconfig *tli_transport(fd)$/
+twist_option	options.c	/^static void twist_option(value, request)$/
+umask_option	options.c	/^static void umask_option(value, request)$/
+unsetenv	environ.c	/^void    unsetenv(name)$/
+usage	tcpdchk.c	/^static void usage()$/
+use_last	options.c	/^#define use_last(o)	((o)->flags & USE_LAST)$/
+user_option	options.c	/^static void user_option(value, request)$/
+vfprintf	vfprintf.c	/^int     vfprintf(fp, format, ap)$/
+vprintf	vfprintf.c	/^vprintf(format, ap)$/
+vsyslog	fakelog.c	/^vsyslog(severity, fmt, ap)$/
+xgets	misc.c	/^char   *xgets(ptr, len, fp)$/
+yp_get_default_domain	workarounds.c	/^int     yp_get_default_domain(ptr)$/

@@ -1,0 +1,115 @@
+/*
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * lib/krb5/krb/copy_princ.c
+ *
+ * Copyright 1990 by the Massachusetts Institute of Technology.
+ * All Rights Reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ * 
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ * 
+ *
+ * krb5_copy_principal()
+ */
+
+#include <k5-int.h>
+/*
+ * Copy a principal structure, with fresh allocation.
+ */
+/*ARGSUSED*/
+KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
+krb5_copy_principal(context, inprinc, outprinc)
+    krb5_context context;
+    krb5_const_principal inprinc;
+    krb5_principal FAR *outprinc;
+{
+    register krb5_principal tempprinc;
+    register int i, nelems;
+
+    tempprinc = (krb5_principal)MALLOC(sizeof(krb5_principal_data));
+
+    if (tempprinc == 0)
+	return ENOMEM;
+
+#ifdef HAVE_C_STRUCTURE_ASSIGNMENT
+    *tempprinc = *inprinc;	/* Copy all of the non-allocated pieces */
+#else
+    (void) memcpy(tempprinc, inprinc, sizeof(krb5_principal_data));
+#endif
+
+    nelems = (int) krb5_princ_size(context, inprinc);
+    tempprinc->data = MALLOC(nelems * sizeof(krb5_data));
+
+    if (tempprinc->data == 0) {
+	FREE((char *)tempprinc, sizeof(krb5_principal_data));
+	return ENOMEM;
+    }
+
+    for (i = 0; i < nelems; i++) {
+	int len = krb5_princ_component(context, inprinc, i)->length;
+	krb5_princ_component(context, tempprinc, i)->length = len;
+
+        /*
+         * Allocate one extra byte for trailing zero byte so string ops
+         * can be used on the components.
+         */
+	if (len &&
+            ((krb5_princ_component(context, tempprinc, i)->data =
+	      MALLOC(len + 1)) == 0)) {
+	    while (--i >= 0)
+		FREE(krb5_princ_component(context, tempprinc, i)->data, 
+			krb5_princ_component(context, inprinc, i)->length + 1);
+	    FREE (tempprinc->data, nelems * sizeof(krb5_data));
+	    FREE (tempprinc,sizeof(krb5_principal_data));
+	    return ENOMEM;
+	}
+	if (len)
+	    (void) memcpy(krb5_princ_component(context, tempprinc, i)->data,
+		   krb5_princ_component(context, inprinc, i)->data, len);
+    }
+
+    tempprinc->realm.length = inprinc->realm.length;
+
+    /*
+     * Allocate one extra byte for the realm name string terminator.  The
+     * realm and principle component strings alway leave a null byte after
+     * 'length' bytes that needs to be malloc/freed.
+     */
+    tempprinc->realm.data = MALLOC(tempprinc->realm.length + 1);
+
+    if (!tempprinc->realm.data && tempprinc->realm.length) {
+	    for (i = 0; i < nelems; i++)
+		    FREE(krb5_princ_component(context, tempprinc, i)->data,
+			krb5_princ_component(context, inprinc, i)->length + 1);
+	    FREE (tempprinc->data, nelems * sizeof(krb5_data));
+	    FREE (tempprinc,sizeof(krb5_principal_data));
+	    return ENOMEM;
+    }
+    if (tempprinc->realm.length)
+	(void) memcpy(tempprinc->realm.data, inprinc->realm.data,
+	       inprinc->realm.length);
+    
+    *outprinc = tempprinc;
+    return 0;
+}

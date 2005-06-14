@@ -1,0 +1,15 @@
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Special mapfile to establish h_errno as a filter on libnsl.  As a filtered
+# symbol, this isn't visible to apptrace, and thus doesn't have to be defined
+# from the specfiles.  To ensure the symbol remains in .bss, with the correct
+# size, its filtering capabilities are assigned here rather than via a specfile.
+
+SUNW_2.1 {
+	global:
+		h_errno = FILTER libnsl.so.1;
+};

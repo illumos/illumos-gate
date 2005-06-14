@@ -1,0 +1,184 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _SYS_US_DRV_H
+#define	_SYS_US_DRV_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/promif.h>
+#include <sys/cpuvar.h>
+#include <sys/taskq.h>
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+#ifdef _KERNEL
+
+/*
+ * UltraSPARC CPU power management data
+ */
+/*
+ * Data related to a particular speed.
+ *
+ * All per speed data nodes for a CPU are linked together using down_spd.
+ * The link list is ordered with first node containing data for
+ * normal (maximum) speed. up_spd points to the next speed up. Currently
+ * all up_spd's point to the normal speed but this can be changed in future.
+ * quant_cnt is the number of ticks when monitoring system will be called
+ * next. There are different quant_cnt for different speeds.
+ */
+typedef struct us_pm_spd {
+	uint_t			divisor;	/* speed divisor */
+	uint_t			quant_cnt;	/* quantum count in ticks */
+	struct us_pm_spd	*down_spd;	/* ptr to next speed down */
+	struct us_pm_spd	*up_spd;	/* ptr to next speed up */
+	uint_t			idle_hwm;	/* down if idle thread >= hwm */
+	uint_t			idle_lwm;	/* up if idle thread < lwm */
+	uint_t			idle_bhwm_cnt;	/* # of iters idle is < hwm */
+	uint_t			idle_blwm_cnt;	/* # of iters idle is < lwm */
+	uint_t			user_hwm;	/* up if user thread > hwm */
+	int			user_lwm;	/* down if user thread <= lwm */
+	int			pm_level;	/* power level for framework */
+} us_pm_spd_t;
+
+/*
+ * Power management data
+ */
+typedef struct us_pm {
+	us_pm_spd_t	*head_spd;	/* ptr to head of speed */
+	us_pm_spd_t	*cur_spd;	/* ptr to current speed */
+	us_pm_spd_t	*targ_spd;	/* target speed when cur_spd */
+					/* is unknown (i.e. NULL) */
+	uint_t		num_spd;	/* number of speeds */
+	uint_t		lastquan_idle;	/* last quantum's CPU_IDLE timestamp */
+	uint_t		lastquan_user;	/* last quantum's CPU_USER timestamp */
+	clock_t		lastquan_lbolt;	/* last quantum's lbolt */
+	int		pm_busycnt;	/* pm_busy_component() count  */
+	taskq_t		*tq;		/* taskq handler for CPU monitor */
+	timeout_id_t	timeout_id;	/* us_pm_monitor()'s timeout_id */
+	int		timeout_count;	/* count dispatched timeouts */
+	kmutex_t	timeout_lock;	/* protect timeout_count */
+	kcondvar_t	timeout_cv;	/* wait on timeout_count change */
+} us_pm_t;
+
+/*
+ * Idle & user threads water marks in percentage
+ */
+#define	US_PM_IDLE_LWM		8	/* idle low water mark */
+#define	US_PM_IDLE_HWM		98	/* idle high water mark */
+#define	US_PM_USER_HWM		20	/* user high water mark */
+#define	US_PM_IDLE_BUF_ZONE	4	/* buffer zone when going down */
+
+#define	US_PM_IDLE_BLWM_CNT_MAX	2	/* # of iters idle can be < lwm */
+#define	US_PM_IDLE_BHWM_CNT_MAX	2	/* # of iters idle can be < hwm */
+
+/*
+ * Maximums for creating 'pm-components' property
+ */
+#define	US_PM_COMP_MAX_DIG	4	/* max digits in power level */
+					/* or divisor */
+#define	US_PM_COMP_MAX_VAL	9999	/* max value in above digits */
+
+/*
+ * Component number for calls to PM framework
+ */
+#define	US_PM_COMP_NUM		0	/* first component is 0 */
+
+/*
+ * Quantum counts for normal and other clock speeds in terms of ticks.
+ *
+ * In determining the quantum count, we need to balance two opposing factors:
+ *
+ *	1) Minimal delay when user start using the CPU that is in low
+ *	power mode -- requires that we monitor more frequently,
+ *
+ *	2) Extra code executed because of frequent monitoring -- requires
+ *	that we monitor less frequently.
+ *
+ * We reach a tradeoff between these two requirements by monitoring
+ * more frequently when we are in low speed mode (US_PM_QUANT_CNT_OTHR)
+ * so we can bring the CPU up without user noticing it. Moreover, at low
+ * speed we are not using CPU much so extra code execution should be fine.
+ * Since we are in no hurry to bring CPU down and at normal speed and we
+ * might really be using the CPU fully, we monitor less frequently
+ * (US_PM_QUANT_CNT_NORMAL).
+ */
+#define	US_PM_QUANT_CNT_NORMAL	(hz * 5)		/* 5 sec */
+#define	US_PM_QUANT_CNT_OTHR	(hz * 1)		/* 1 sec */
+
+/*
+ * Taskq parameters
+ */
+#define	US_PM_TASKQ_THREADS	1	/* # threads to run CPU monitor */
+#define	US_PM_TASKQ_MIN		2	/* min # of taskq entries */
+#define	US_PM_TASKQ_MAX		2	/* max # of taskq entries */
+
+
+/*
+ * Device driver state structure
+ */
+typedef struct us_devstate {
+	dev_info_t	*dip;		/* devinfo handle */
+	processorid_t	cpu_id;		/* CPU number for this node */
+	us_pm_t		us_pm;		/* power management data */
+	kmutex_t	lock;		/* protects state struct */
+} us_devstate_t;
+
+
+
+/*
+ * Debugging definitions
+ */
+#ifdef	DEBUG
+#define	D_INIT			0x00000001
+#define	D_FINI			0x00000002
+#define	D_ATTACH		0x00000004
+#define	D_DETACH		0x00000008
+#define	D_POWER			0x00000010
+#define	D_PM_INIT		0x00000020
+#define	D_PM_FREE		0x00000040
+#define	D_PM_COMP_CREATE	0x00000080
+#define	D_PM_MONITOR		0x00000100
+#define	D_PM_MONITOR_VERBOSE	0x00000200
+#define	D_PM_MONITOR_DELAY	0x00000400
+
+extern uint_t	us_drv_debug;
+
+#define	_PRINTF prom_printf
+#define	DPRINTF(flag, args)	if (us_drv_debug & flag) _PRINTF args;
+#else
+#define	DPRINTF(flag, args)
+#endif /* DEBUG */
+
+#endif /* _KERNEL */
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif /* _SYS_US_DRV_H */

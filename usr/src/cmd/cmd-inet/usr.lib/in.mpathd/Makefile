@@ -1,0 +1,87 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1992-2002 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+PROG	= in.mpathd
+PROGDFL	= mpathd
+OBJS	= mpd_tables.o mpd_main.o mpd_probe.o
+SRCS	= $(OBJS:%.o=%.c)
+
+include ../../../Makefile.cmd
+
+POFILE	= $(PROG).po
+POFILES = $(SRCS:%.c=%.po)
+
+#
+# We need access to the ancillary data features which are only available
+# via UNIX98; enable the appropriate #defines for UNIX98.
+#
+CPPFLAGS += -D_XOPEN_SOURCE=500 -D__EXTENSIONS__ -I$(SRC)/cmd/cmd-inet/common
+LDLIBS	+= -lcmd -lsocket -lnsl -lsysevent -lnvpair -lipmp -lc
+
+DFLTD  		= $(ROOTETC)/default
+ETCDFLTPROG	= $(PROGDFL:%=$(DFLTD)/%)
+$(ETCDFLTPROG)	:= FILEMODE = 0444
+$(ETCDFLTPROG)	:= OWNER = root
+$(ETCDFLTPROG)	:= GROUP = sys
+
+LINTFLAGS += -erroff=E_FUNC_DECL_VAR_ARG2 -erroff=E_INCONS_VAL_TYPE_DECL2 \
+	    -erroff=E_FUNC_USED_VAR_ARG2 -erroff=E_INCONS_ARG_DECL2 \
+	    -erroff=E_NAME_USED_NOT_DEF2 -erroff=E_INCONS_ARG_USED2 \
+	    -errtags=yes
+
+.KEEP_STATE:
+
+all:		$(PROG) $(PROGDFL).dfl 
+
+$(PROG):	$(OBJS)
+		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+		$(POST_PROCESS)
+
+include ../Makefile.lib
+
+$(ROOTSBINPROG):
+		$(RM) $@; $(SYMLINK) ../usr/lib/inet/$(PROG) $@
+
+install:	all $(ROOTLIBINETPROG) $(ROOTSBINPROG) $(DFLTD) $(ETCDFLTPROG)
+
+clean:
+		$(RM) $(OBJS)
+
+lint:		lint_SRCS
+
+$(DFLTD):
+		$(INS.dir)
+
+$(DFLTD)/%:	%.dfl
+		$(INS.rename)
+
+$(POFILE): 	$(POFILES)
+		$(RM) $@
+		$(CAT) $(POFILES) > $@
+
+include ../../../Makefile.targ

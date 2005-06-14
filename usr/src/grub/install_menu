@@ -1,0 +1,15 @@
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+default=0
+timeout=60
+splashimage=/boot/grub/splash.xpm.gz
+title Solaris 
+	kernel /boot/multiboot kernel/unix -B install_media=cdrom
+	module /boot/x86.miniroot
+title Solaris Serial Console ttya
+        kernel /boot/multiboot kernel/unix -B install_media=cdrom,console=ttya
+        module /boot/x86.miniroot
+title Solaris Serial Console ttyb (for lx50, v60x and v65x)
+        kernel /boot/multiboot kernel/unix -B install_media=cdrom,console=ttyb
+        module /boot/x86.miniroot

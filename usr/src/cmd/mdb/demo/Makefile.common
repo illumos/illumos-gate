@@ -1,0 +1,69 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+MODULES = example1.so example2.so
+
+CFLAGS += $(CCVERBOSE) -xstrconst -K pic
+CPPFLAGS += -D_KERNEL
+LDFLAGS += $(ZTEXT)
+
+OBJECTS = $(MODULES:%.so=%.o)
+LINTFILES = $(MODULES:%.so=%.ln)
+
+all: $(MODULES)
+
+.KEEP_STATE:
+
+.NO_PARALLEL:
+.PARALLEL: $(OBJECTS) $(LINTFILES)
+
+%.so: %.o
+	$(CC) $(CFLAGS) -G -o $@ $< $(LDFLAGS) $(LIBS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
+
+%.o: ../common/%.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
+
+clean:
+	rm -f $(OBJECTS)
+
+clean.lint:
+	rm -f $(LINTFILES)
+
+clobber: clean clean.lint
+	rm -f $(MODULES)
+
+%.ln: %.c
+	$(LINT) $(LINTFLAGS) $(CPPFLAGS) -c $<
+
+%.ln: ../common/%.c
+	$(LINT) $(LINTFLAGS) $(CPPFLAGS) -c $<
+
+lint: $(LINTFILES)

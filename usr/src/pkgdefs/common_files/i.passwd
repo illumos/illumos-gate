@@ -1,0 +1,116 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+while read src dest
+do
+	if [ ! -f $dest ] ; then
+		cp $src $dest
+	else
+		#
+		# 2.1 version of this file had a trailing blank
+		# in the nobody entry.  Remove it.
+		#
+		# 2.6 & earlier versions had an smtp entry; remove it.
+		#
+		# The NFS nobody users get better GECOS entries.
+		sed -e 's/^\(nobody:.*:\) $/\1/' \
+		    -e '/^smtp:/d' \
+		    -e '/^nobody:/s/:Nobody:/:NFS Anonymous Access User:/' \
+		    -e '/^nobody4:/s/:SunOS\ 4\.x\ Nobody:/:SunOS 4.x NFS Anonymous Access User:/;' \
+		    $dest > /tmp/d.$$
+		cp /tmp/d.$$ $dest
+		rm -f /tmp/d.$$
+
+		#
+		# s10 is changing root's group back to 0:
+		#
+		sed -e 's/^root:\([^:]*\):0:1:/root:\1:0:0:/' \
+			$dest > /tmp/d.$$
+		cp /tmp/d.$$ $dest
+		rm -f /tmp/d.$$
+
+		#
+		# Add the 'nobody' user from 4.x so that people don't
+		# assign it to a regular user and confuse themselves
+		#
+		NOBODY4_LINE="nobody4:x:65534:65534:SunOS 4.x NFS Anoymous Access User:/:"
+		if grep "^nobody4:" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^noaccess:x\na\n%s\n.\nw\nq\n' \
+				"$NOBODY4_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'smmsp' user for sendmail 8.12
+		#
+		SMMSP_LIN="smmsp:x:25:25:SendMail Message Submission Program:/:"
+		if grep "$SMMSP_LIN" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^nobody4:x\na\n%s\n.\nw\nq\n' \
+				"$SMMSP_LIN" | ed -s $dest > /dev/null
+		fi
+		
+		#
+		# Add the 'gdm' user if it doesn't exist.
+		#
+		GDM_LINE="gdm:x:50:50:GDM Reserved UID:/:"
+		cur_name=`awk -F: '$3 == 50 { print $1 }' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "gdm" ]; then
+			echo "ERROR: Reserved UID 50 already assigned" \
+				"to '$cur_name'" >> /tmp/CLEANUP
+		elif grep "$GDM_LINE" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^listen:x\na\n%s\n.\nw\nq\n' \
+				"$GDM_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'webservd' user if it doesn't exist.
+		#
+		WEBSERVD_LIN="webservd:x:80:80:WebServer Reserved UID:/:"
+		cur_name=`awk -F: '$3 == 80 { print $1 }' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "webservd" ]; then
+			echo "ERROR: Reserved UID 80 already assigned" \
+				"to '$cur_name'" >> /tmp/CLEANUP
+		elif grep "$WEBSERVD_LIN" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^gdm:x\na\n%s\n.\nw\nq\n' \
+				"$WEBSERVD_LIN" | ed -s $dest > /dev/null
+		fi
+	fi
+done
+
+exit 0

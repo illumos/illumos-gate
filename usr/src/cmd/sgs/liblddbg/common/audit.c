@@ -1,0 +1,93 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include	<dlfcn.h>
+#include	<stdio.h>
+#include	"_debug.h"
+#include	"msg.h"
+#include	"libld.h"
+
+
+void
+Dbg_audit_version(const char *lib, ulong_t version)
+{
+	if (DBG_NOTCLASS(DBG_AUDITING))
+		return;
+
+	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	dbg_print(MSG_INTL(MSG_AUD_VERSION), lib, (int)version);
+}
+
+void
+Dbg_audit_lib(const char *lib)
+{
+	if (DBG_NOTCLASS(DBG_AUDITING))
+		return;
+
+	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	dbg_print(MSG_INTL(MSG_AUD_INIT), lib);
+}
+
+void
+Dbg_audit_interface(const char *lib, const char *interface)
+{
+	if (DBG_NOTCLASS(DBG_AUDITING))
+		return;
+
+	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	dbg_print(MSG_INTL(MSG_AUD_INTERFACE), lib, interface);
+}
+
+void
+Dbg_audit_object(const char *lib, const char *obj)
+{
+	if (DBG_NOTCLASS(DBG_AUDITING))
+		return;
+
+	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	dbg_print(MSG_INTL(MSG_AUD_OBJECT), lib, obj);
+}
+
+void
+Dbg_audit_symval(const char *lib, const char *func, const char *sym,
+    Addr pval, Addr nval)
+{
+	char	mesg[100];
+
+	if (DBG_NOTCLASS(DBG_AUDITING))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	if (pval == nval)
+		mesg[0] = '\0';
+	else
+		(void) sprintf(mesg, MSG_INTL(MSG_AUD_SYMNEW), EC_XWORD(nval));
+
+	dbg_print(MSG_INTL(MSG_AUD_SYM), lib, func, _Dbg_sym_dem(sym),
+	    EC_XWORD(pval), mesg);
+}

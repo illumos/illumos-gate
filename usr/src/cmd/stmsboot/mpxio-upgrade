@@ -1,0 +1,233 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+. /lib/svc/share/fs_include.sh
+. /lib/svc/share/net_include.sh
+
+# Make sure that the essential libraries can be found.
+LD_LIBRARY_PATH=/lib; export LD_LIBRARY_PATH
+STMSBOOTUTIL=/lib/mpxio/stmsboot_util
+FPCONF=/kernel/drv/fp.conf
+SAVEDIR=/etc/mpxio
+RECOVERFILE=$SAVEDIR/recover_instructions
+DEVFSADM=/usr/sbin/devfsadm
+METADEVADM=/usr/sbin/metadevadm
+usrmounted=0
+
+# map $special and $fsckdev
+mpxio_mapdev()
+{
+	new_special=`$STMSBOOTUTIL -m $special`
+	if [ $? -eq 0 ]; then
+		special=$new_special
+	fi
+
+	new_fsckdev=`$STMSBOOTUTIL -m $fsckdev`
+	if [ $? -eq 0 ]; then
+		fsckdev=$new_fsckdev
+	fi
+}
+
+mpxio_error()
+{
+	cecho "\nERROR: stmsboot: $1"
+	#
+	# display recovery instructions - the first call logs to the service
+	# log and the second call displays on the console.
+	#
+	shcat $RECOVERFILE
+	shcat $RECOVERFILE >/dev/msglog 2>&1
+	cecho "These instructions were also logged to the file $RECOVERFILE\n"
+}
+
+#
+# root ("/") is already mounted read only by the kernel.
+# Remount the root read-write.
+#
+mpxio_mount_root()
+{
+	exec < $vfstab; readvfstab /
+	mpxio_mapdev
+
+	checkopt "llock" $mntopts
+	mntopts='remount'
+	[ -n "$otherops" ] && mntopts="${mntopts},${otherops}"
+	/sbin/mount -m -F $fstype -o $mntopts $special $mountp \
+>/dev/msglog 2>&1
+}
+
+#
+# mount /usr read only
+#
+mpxio_mount_usr()
+{
+	exec < $vfstab; readvfstab "/usr"
+	ret_val=0
+	if [ -n "$mountp" ]; then
+		mpxio_mapdev
+		if [ "$fstype" = cachefs ]; then
+			# Mount read-only without the cache.
+			case "$mntopts" in
+			*backfstype=nfs*)
+				cfsbacktype=nfs
+				;;
+			*backfstype=hsfs*)
+				cfsbacktype=hsfs
+				;;
+			*)
+				cecho 'stmsboot: invalid vfstab entry for /usr'
+				cfsbacktype=nfs
+				;;
+			esac
+			# see the comment below for /dev/null
+			/sbin/mount -m -F $cfsbacktype -o ro $special $mountp \
+>/dev/null 2>&1
+			ret_val=$?
+		else
+			#
+			# Must use -o largefiles here to ensure the read-only
+			# mount does not fail as a result of having a large
+			# file present on /usr.
+			#
+			if [ "x$mntopts" = x- ]; then
+				mntopts='ro,largefiles'
+			else
+				checkopt largefiles $mntopts
+				if [ "x$option" != xlargefiles ]; then
+					mntopts="largefiles,$mntopts"
+				fi
+
+				checkopt ro $mntopts
+				if [ "x$option" != xro ]; then
+					mntopts="ro,$mntopts"
+				fi
+
+				#
+				# Requesting logging on a read-only mount
+				# causes errors to be displayed, so remove
+				# "logging" from the list of options.
+				#
+
+				checkopt logging $mntopts
+				if [ "x$option" = xlogging ]; then
+					mntopts="$otherops"
+				fi
+			fi
+
+			#
+			# In case of a manual restart of the service, mount
+			# will emit messages if /usr is already mounted.
+			# So redirect the output to /dev/null.
+			#
+			/sbin/mount -m -F $fstype -o $mntopts $special /usr \
+>/dev/null 2>&1
+			ret_val=$?
+		fi
+		if [ $ret_val -eq 0 ]; then
+			usrmounted=1
+		fi
+	fi
+
+	return $ret_val
+}
+
+# update system dump configuration
+update_dumpconf()
+{
+	set -- `dumpadm -u 2>&1 | egrep 'cannot use /dev.* as dump device'`
+	if [ "x$4" != x ]; then
+		newname=`$STMSBOOTUTIL -M $4`
+		if [ $? -eq 0 ]; then
+			if dumpadm -d $newname > /dev/null; then
+				cecho "stmsboot: dump configuration has been \
+updated."
+			else
+				mpxio_error "failed to configure $newname as \
+the dump device.\nold dump device name: $4"
+				return 1
+			fi
+		fi
+	fi
+	return 0
+}
+
+#
+# do the actual work
+#
+mpxio_main()
+{
+	#
+	# NOTE: If the first attempt to run the service has failed due to an
+	# expected error, users should be able to manually rerun the service.
+	#
+	# First mount /usr read only. This must be done to run
+	# utilities such as fsck and devfsadm.
+	# In the case of a manual rerun of the service, mounting of /usr here
+	# fails if /usr already happens to be mounted. It is better that we
+	# do not mount /usr if already mounted, but there seems to be no
+	# apparent way to check whether /usr is mounted or not as we mount
+	# /usr without making an entry into /etc/mnttab. So instead of
+	# explicitly checking for mount failures, we just do a sanity check
+	# by looking for some file (in this case devfsadm) in /usr.
+	#
+	mpxio_mount_usr
+	if [ ! -s $DEVFSADM ]; then
+		mpxio_error "failed to mount the /usr filesystem."
+		return
+	fi
+
+	if mpxio_mount_root; then
+		# create /dev links
+		cecho "stmsboot: configuring devices"
+		$DEVFSADM
+
+		# update /etc/vfstab to reflect device name changes
+		if $STMSBOOTUTIL -u >/dev/msglog 2>&1; then
+			if update_dumpconf; then
+				# update svm configuration to reflect new names
+				if [ -s /kernel/drv/md.conf ] && \
+				    [ -x $METADEVADM ]; then
+					$METADEVADM -r >/dev/msglog 2>&1
+				fi
+			fi
+		else
+			mpxio_error "failed to update /etc/vfstab."
+		fi
+
+		/usr/sbin/svcadm disable platform/sun4u/mpxio-upgrade
+
+		/usr/sbin/reboot
+	else
+		mpxio_error "failed to mount the root filesystem."
+		if [ $usrmounted -eq 1 ]; then
+			/sbin/umount /usr
+		fi
+	fi
+}
+
+mpxio_main

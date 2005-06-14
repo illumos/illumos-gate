@@ -1,0 +1,130 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License, Version 1.0 only
+ (the "License").  You may not use this file except in compliance
+ with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+    ident	"%Z%%M%	%I%	%E% SMI"
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
+
+    Note: if this service is modified to consist of anything other
+    than a single instance named 'default', you must make changes to
+    $SRC/head/rpcsvc/daemon_utils.h and libnsl:open_daemon_lock().
+-->
+
+<service_bundle type='manifest' name='SUNWatfsr:autofs'>
+
+<service
+	name='system/filesystem/autofs'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<dependency
+		name='fs'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<dependency
+		name='name-service-milestone'
+		type='service'
+		grouping='require_all'
+		restart_on='restart'>
+		<service_fmri value='svc:/milestone/name-services' />
+	</dependency>
+
+	<dependency
+		name='nfs'
+		type='service'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/nfs/client' />
+	</dependency>
+
+	<dependency
+		name='rpcbind'
+		type='service'
+		grouping='require_all'
+		restart_on='restart'>
+		<service_fmri value='svc:/network/rpc/bind' />
+	</dependency>
+
+	<dependent
+		name='autofs_multi-user'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/multi-user' />
+	</dependent>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/svc-autofs %m'
+		timeout_seconds='60'>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec='/lib/svc/method/svc-autofs %m %{restarter/contract}'
+		timeout_seconds='60'>
+	</exec_method>
+
+	<property_group name='general' type='framework'>
+		<!-- to start stop autofs daemon -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.autofs' />
+	</property_group>
+
+
+	<property_group name='application' type='framework'>
+		<stability value='Evolving' />
+		<propval name='auto_enable' type='boolean' value='true' />
+	</property_group>
+
+	<stability value='Stable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			automounter
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='automount' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

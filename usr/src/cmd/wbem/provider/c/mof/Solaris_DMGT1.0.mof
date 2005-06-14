@@ -1,0 +1,789 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * ident	"%Z%%M%	%I%	%E% SMI"
+ *
+ * Title	Solaris Device Management MOF specification
+ * Description	This model incorporates Disks, Disks Partitions and other 
+ *		device management classes. 
+ * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma namespace("root/cimv2")
+#pragma Locale ("en_US")
+#pragma namespace("__modify")
+ 
+//=============================================================================
+// Title: Solaris_DiskDrive
+// Version: 1.3.0
+// Date: 2/12/02 
+// Description: Solaris_DiskDrive MOF Class definition
+//=============================================================================
+
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+      "Provides information about the logical characteristics"
+      "of a disk drive attached to a Solaris system.")]
+class Solaris_DiskDrive : CIM_DiskDrive
+{
+    [Deprecated {
+	""},
+     MaxLen (256),
+     Description (
+      "A string describing the type of disk. The use of"
+      "this is deprecated. This is a media specific attribute. ")]
+    string DiskType;
+
+    [Deprecated {
+	"Solaris_Disk.PhysicalLabels"}, 
+     MaxLen (256),
+     Description (
+      "A string containing a user defined label for the disk."
+      "This attribute has been deprecated. It is a media attribute and"
+      "is covered by the label property inherited on the media object.")]
+    string DiskLabel;
+
+    [Deprecated {
+	""},
+     Description (
+      "The number of sectors per cylinder.This attribute has"
+      "been deprecated. It is a media attribute and is not valid"
+      "because this information cannot be reliably determined."  )]
+    uint32 SectorsPerCylinder;
+
+    [Deprecated {
+	""},
+     Description (
+      "The number of heads per cylinder. This attribute has been"
+      "deprecated. See SectorsPerCylinder for details." )]
+    uint32 HeadsPerCylinder;
+
+    [Deprecated {
+	""},
+     Description (
+      "The number of sectors per track. This attribute has been"
+      "deprecated. See SectorsPerCylinder for details.")]
+    uint32 SectorsPerTrack;
+
+    [Deprecated {
+	""},
+     Description (
+      "The size of a cylinder in bytes. This attribute has been"
+      "deprecated. See SectorsPerCylinder for details.")]
+    uint32 BytesPerCylinder;
+
+    [Deprecated {
+	""},
+     Description (
+      "The number of cylinders for this disk. This attribute"
+      "has been deprecated. See SectorsPerCylinder for details.")]
+    uint32 PhysicalCylinders;
+
+    [Deprecated {
+	""},
+     Description (
+      "The number of cylinders available for partitions. This"
+      "attribute has been deprecated. See SectorsPerCylinder for details.")]
+    uint32 DataCylinders;
+
+    [Deprecated {
+	""},
+     Description (
+      "The number of reserved cylinders. This attribute has been"
+      "deprecated. See SectorsPerCylinder for details.")]
+    uint32 AlternateCylinders;
+
+    [Deprecated {
+	""},
+     Description (
+      "The number of actual cylinders. This attribute has"
+      "been deprecated. See SectorsPerCylinder for details.")]
+    uint32 ActualCylinders;
+
+    [Deprecated {
+	""},
+     Description (
+      "Does this disk require fdisk partitions?"
+      "Solaris i386 machines require a disk to"
+      "contain fdisk partitions. This attribute has been deprecated.")]
+    boolean FdiskRequired;
+
+    [Deprecated {
+	""},
+     Description (
+      "Does this disk contain fdisk partitions. This attribute"
+      "has been deprecated. This is now modeled using the" 
+      "Solaris_DiskPartBasedOnFDisk association.")]
+    boolean FdiskPresent;
+
+    [Deprecated {
+	"Solaris_Disk.labelDisk()"
+	},
+     Description (
+      "Label the disk with the given string."
+      "The string should contain a short label for the"
+      "disk of up to 8 characters. This method has been deprecated."
+      "This behavior is now modeled using the labelDisk method on" 
+      "Solaris_Disk.")]
+    boolean LabelDisk([IN] String label);
+
+    [Deprecated {
+	"Solaris_Disk.createFDiskPartitions"
+	},
+     Description (
+      "Create one Solaris fdisk partition that"
+      "uses the whole disk. This method has been deprecated. This has"
+      "been replaced with the Solaris_Disk.createFDiskPartitions method.")]
+    boolean CreateDefaultFdiskPartition();
+
+    [Deprecated {
+	"Solaris_Disk.createFDiskPartitions"
+	},
+     Description (
+      "Create fdisk partitions on this disk. This method"
+      "has been deprecated. It has been replaced with the"
+      "Solaris_Disk.createFDiskPartitions method.")]
+    boolean CreateFdiskPartitions([IN] uint32 DiskParameters[]);
+
+    [Deprecated {
+	""},
+     Description (
+      "Retrieve the current fdisk partitions for this disk."
+      "This method has been deprecated. It is now modeled using the "
+      "Solaris_DiskPartition object with the fDisk subtype" )]
+    boolean GetFdiskPartitions([OUT, IN(False)] uint32 FDiskPartitions[]);
+};
+
+//=============================================================================
+// Title: Solaris_DiskPartition
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_DiskPartition MOF Class definition
+//=============================================================================
+
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description("Provides information about the logical partitions"
+                 "on a disk drive attached to a Solaris system.")]
+class Solaris_DiskPartition : CIM_DiskPartition
+{
+
+    [Description ("The type of Solaris partition."),
+     ValueMap{"0", "1", "2", "3", "4"},
+     Values {"Unknown", "Other", "Solaris", "FDisk", "EFI"}]
+    uint16 SolarisPartitionType;
+
+    [Description ("The size in bytes of this partition"),
+     Units("Bytes")]
+    uint64 PartitionSize;
+
+    [Description ("The Starting cylinder for this partition")]
+    uint32 StartCylinder;
+
+    [Description ("The ending cylinder for this partition")]
+    uint32 EndCylinder;
+
+    [Description ("The number of cylinders for this partition")]
+    uint32 TotalCylinders;
+
+    [Deprecated {
+	""},
+     MaxLen (256),
+     Description ("A string containing the deviceID of the scoping disk." 
+       "This is now modeled on the media object and is obtained by the Name"
+	"attribute on that object. ")]
+    string DiskID;
+
+    [Deprecated {
+	""},
+     Description ("The FLAG for this partition. The Flag describes"
+         "how the partition is to be mounted."
+         "0x00 Mountable Read Write"
+         "0x01 Not Mountable"
+         "0x10 Mountable Read Only. This attribute has been deprecated."
+	 " A partition is not mounted. A Filesystem is.")]
+    uint8 Flag;
+
+   [Deprecated {
+	""},
+    Description ("The TAG for this partition. The Tag describes"
+         "the type of partition"
+         "Unassigned   0x00"
+         "Boot         0x01"
+         "Root         0x02"
+         "Swap         0x03"
+         "Usr          0x04"
+         "Backup       0x05"
+         "Stand        0x06"
+         "Var          0x07"
+         "Home         0x08"
+         "Altsctr      0x09"
+         "Cache        0x0a This attribute has been deprecated. A"
+	 "Filesystem on a partition determines its use case.")]
+    uint8 Tag;
+
+    [Deprecated {
+	""},
+     Description ("Is there an existing file system on this partition."
+	"This attribute has been deprecated. This information is obtained"
+	"by traversing the Solaris_LocalFSResidesOnExtent association.")]
+    boolean ValidFileSystem;
+
+    [Deprecated {
+	"" },
+     Description ("Create file system on this partition using the default"
+         "parameters. Returns TRUE if successful. This method has been"
+	 "deprecated. The behavior for this method is done with the "
+	 "creation of a Solaris_FileSystem object.")]
+    boolean CreateFileSystem();
+
+    [Deprecated {
+	"Solaris_Disk.createPartitions()"},
+     Description ("Create partition on this disk. Partitions are created"
+         "based on the instance of Solaris_DiskPartition that"
+         "are associated with this Solaris_DiskDrive instance. This "
+	 "method has been deprecated. It is replaced by the" 
+	 "Solaris_Disk.createPartitions() method.")]
+    boolean CreatePartitions([IN] uint32 DiskParameters[]);
+
+};
+
+//=============================================================================
+// Title: Solaris_MediaPresent
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_MediaPresent MOF Class definition
+//=============================================================================
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description ("Solaris_MediaPresent an association that represents"
+               "The relationship between a media access device and"
+               "its media if present.")]
+class Solaris_MediaPresent : CIM_MediaPresent
+{
+};
+
+#pragma namespace("__create")
+//=============================================================================
+// Title: Solaris_LogicalDisk
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_LogicalDisk MOF Class definition
+//=============================================================================
+
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description("Provides information about the logical characteristics"
+                 "of a disk.")] 
+
+class Solaris_LogicalDisk : CIM_StorageVolume 
+{
+};
+
+
+//=============================================================================
+// Title: Solaris_PhysicalMedia
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_PhysicalMedia MOF Class definition
+//=============================================================================
+
+     [Version("1.3.0"),
+      Abstract,
+      Description(
+	"The PhysicalMedia class represents any type of documentation"
+     	"or storage medium, such as tapes, CDROMs, etc. This class"
+     	"is typically used to locate and manage Removable Media"
+     	"(versus Media sealed with the MediaAccessDevice, as a single"
+     	"Package, as is the case with hard disks). However, 'sealed'"
+     	"Media can also be modeled using this class, where the Media"
+     	"would then be associated with the PhysicalPackage using the"
+     	"PackagedComponent relationship.")]
+class Solaris_PhysicalMedia : CIM_PhysicalMedia 
+{
+};
+
+//=============================================================================
+// Title: Solaris_Disk
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_Disk MOF Class definition
+//=============================================================================
+
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description("Provides information about the physical characteristics"
+                 "of a disk.")]
+class Solaris_Disk : Solaris_PhysicalMedia 
+{
+
+    [Description ("Create partitions on this disk.")]
+    boolean createPartitions([IN] uint32 diskParameters[]);
+
+    [Description ("Create fdisk partitions on this disk.")]
+    boolean createFDiskPartitions([IN] uint32 diskParameters[]);
+
+    [Description ("Change the label on this disk.")]
+    boolean labelDisk([IN] string newLabel);
+
+    [Description ("Returns the geometry information with regard to this"
+     "disk.")]
+    boolean getDiskGeometry([IN] string diskName, [OUT, IN(False)] uint32 geometry[]);
+};
+
+//=============================================================================
+// Title: Solaris_PhysicalPackage
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_PhysicalPackage MOF Class definition
+//=============================================================================
+
+    [Version("1.3.0"),
+     Description (
+      "This class represents the package that realizes the Solaris"
+      "logical devices.This class does not have a provider,rather it relies on"
+      "the user to provide instances of this class. Physical package"
+      "characteristics are not generally available via Solaris, so the"
+      "user will have to manually input the instances of these.")]
+class Solaris_PhysicalPackage : CIM_PhysicalPackage
+{
+};
+
+//=============================================================================
+// Title: Solaris_RealizesExtent
+// Version: 1.3.0
+// Date: 02/12/02
+// Description: Solaris_RealizesExtent MOF Class definition
+//=============================================================================
+
+    [Association,
+     Version("1.3.0"),
+     Provider ("jni:libWBEMdisk.so"),
+     Description("A logical disk is realized by a physical disk. This" 
+     "association models this relationship, specifically the relationship"
+     "between the Solaris_Disk and the Solaris_LogicalDisk.")]
+class Solaris_RealizesExtent : CIM_RealizesExtent 
+{
+    [Override ("Antecedent"), Key, 
+     Description(
+      "The physical disk which realizes the logical disk")]
+     Solaris_Disk REF Antecedent;
+
+    [Override ("Dependent"), Key, 
+     Description(
+      "The logical representation of the physical disk")]
+     Solaris_LogicalDisk REF Dependent; 
+};
+
+//=============================================================================
+// Title: Solaris_RealizesDiskPartition
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_RealizesDiskPartition MOF Class definition
+//=============================================================================
+
+    [Association,
+     Version("1.3.0"),
+     Provider ("jni:libWBEMdisk.so"),
+     Description("Disk partitions are directly realized on physical media."
+      "This is used to model the creation of partitions on a raw SCSI or"
+      "IDE drive, Solaris_PhysicalDisk")]
+class Solaris_RealizesDiskPartition: CIM_RealizesDiskPartition
+{
+   [Override ("Antecedent"), Key,
+    Description (
+    "The physical media on which the partition is realized."),
+    Max (1)]
+   Solaris_Disk REF Antecedent;
+
+   [Override ("Dependent"), Key,
+    Description (
+    "The disk partition that is located on the media.")]
+   Solaris_DiskPartition REF Dependent;
+};
+
+//=============================================================================
+// Title: Solaris_RealizesDiskDrive
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_RealizesDiskDrive MOF Class definition
+//=============================================================================
+
+    [Association,
+     Version("1.3.0"),
+     Provider ("jni:libWBEMdisk.so"),
+     Description("Disk drives are realized by physical packages."
+     "This is used to model the realization of a Solaris_DiskDrive by"
+     "Solaris_PhysicalPackage. If the user has not input instances"
+     "of Solaris_PhysicalPackage no values will be returned on enumeration."
+     "Additionally, no create, modify or delete operations are allowed.")]
+class Solaris_RealizesDiskDrive: CIM_Realizes
+{
+   [Override ("Antecedent"), Key,
+    Description (
+    "The physical package that implements the logical device.")]
+   Solaris_PhysicalPackage REF Antecedent;
+
+   [Override ("Dependent"), Key,
+    Description (
+    "The logical device .") ]
+   Solaris_DiskDrive REF Dependent;
+};
+
+//=============================================================================
+// Title: Solaris_DiskPartitionBasedOnDisk
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_DiskPartitionBasedOnDisk MOF Class definition
+//=============================================================================
+
+    [Association,
+     Version("1.3.0"),
+     Provider ("jni:libWBEMdisk.so"),
+     Description("A disk partition in Solaris can be based on either"
+     "a disk or an fdisk. This association models the relationship of"
+     "Solaris disk partition with its underlying disk(not fDisk)")]
+class Solaris_DiskPartitionBasedOnDisk: CIM_DiskPartitionBasedOnVolume
+{
+   [Override ("Antecedent"), Key,
+    Description (
+    "The lower level StorageExtent.") ]
+   Solaris_LogicalDisk REF Antecedent;
+
+  [Override ("Dependent"), Key, 
+   Description (
+   "The higher level StorageExtent.") ]
+   Solaris_DiskPartition REF Dependent;
+};
+
+
+//=============================================================================
+// Title: Solaris_DiskPartitionBasedOnFDisk
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_DiskPartitionBasedOnFDisk MOF Class definition
+//=============================================================================
+
+    [Association,
+     Version("1.3.0"),
+     Provider ("jni:libWBEMdisk.so"),
+     Description("A disk partition in Solaris can be based on either"
+     "a disk or an fdisk. This association models the relationship of"
+     "Solaris disk partition with its underlying fdisk")]
+class Solaris_DiskPartitionBasedOnFDisk: CIM_BasedOn
+{
+   [Override ("Antecedent"), Key, 
+    Description (
+    "The lower level StorageExtent. The Fdisk partition")]
+   Solaris_DiskPartition REF Antecedent;
+
+   [Override ("Dependent"), Key,
+    Description (
+    "The higher level StorageExtent. The Solaris disk partition")]
+   Solaris_DiskPartition REF Dependent;
+};
+
+//=============================================================================
+// Title: Solaris_SCSIController
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_SCSIController MOF Class definition
+//=============================================================================
+
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+      "Provides data with regard to the capabilities and management"
+      "of a SCSI controller under Solaris.")]
+class Solaris_SCSIController : CIM_SCSIController 
+{
+};
+
+//=============================================================================
+// Title: Solaris_IDEController
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_IDEController MOF Class definition
+//=============================================================================
+
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+      "Provides data with regard to the capabilities and management"
+      "of a SCSI controller under Solaris.")]
+class Solaris_IDEController : CIM_IDEController 
+{
+};
+
+//=============================================================================
+// Title: Solaris_MPXIOController
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_MPXIOController MOF Class definition
+//=============================================================================
+
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+      "Provides data with regard to the capabilities and management"
+      "of a MPXIO controller under Solaris.")]
+class Solaris_MPXIOController : CIM_Controller 
+{
+};
+
+//=============================================================================
+// Title: Solaris_USBSCSIController
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_USBSCSIController MOF Class definition
+//=============================================================================
+
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+      "Provides data with regard to the capabilities and management"
+      "of a USB SCSI controller under Solaris.")]
+class Solaris_USBSCSIController : Solaris_SCSIController 
+{
+};
+
+//=============================================================================
+// Title: Solaris_GenericController
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_GenericController MOF Class definition
+//=============================================================================
+
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+      "Provides data with regard to the capabilities and management"
+      "of 'unknown' controllers under Solaris.")]
+class Solaris_GenericController : CIM_Controller 
+{
+};
+
+//=============================================================================
+// Title: Solaris_SCSIInterface
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_SCSIInterface MOF Class definition
+//=============================================================================
+
+    [Association,
+     Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+      "The ControlledBy relationship indicating which devices"
+      "are accessed through a SCSIController, along with the characteristics"
+      "of this access.")]
+class Solaris_SCSIInterface : CIM_SCSIInterface 
+{
+};
+
+//=============================================================================
+// Title: Solaris_MPXIOInterface
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_MPXIOInterface MOF Class definition
+//=============================================================================
+
+    [Association,
+     Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+      "MPXIOInterface is a ControlledBy relationship indicating"
+      "which devices are accessed through the MPXIOController and the"
+      "the characteristics of this access.")]
+class Solaris_MPXIOInterface : CIM_ControlledBy 
+{
+};
+
+//=============================================================================
+// Title: Solaris_IDEInterface
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_IDEInterface MOF Class definition
+//=============================================================================
+
+    [Association,
+     Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+      "IDEInterface is a ControlledBy relationship indicating"
+      "which devices are accessed through the IDEController and the"
+      "the characteristics of this access.")]
+class Solaris_IDEInterface : CIM_ControlledBy 
+{
+};
+
+//=============================================================================
+// Title: Solaris_ExtraCapacityGroup
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_ExtraCapacityGroup MOF Class definition
+//=============================================================================
+
+    [Version("1.3.0"),
+     Abstract,
+     Description(
+	"A class that indicates that the aggregated elements have more"
+	"capacity or capability than is needed.")]
+
+class Solaris_ExtraCapacityGroup : CIM_ExtraCapacityGroup 
+{
+};
+
+//=============================================================================
+// Title: Solaris_MPXIOGroup
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_MPXIOGroup MOF Class definition
+//=============================================================================
+
+    [Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+	"A class that indicates that the aggregated elements have more"
+	"capacity or capability than is needed. Specifically, this"
+        "class addresses the controllers that make up the MPXIO "
+	"controller functionality.")]
+
+class Solaris_MPXIOGroup : Solaris_ExtraCapacityGroup 
+{
+};
+
+//=============================================================================
+// Title: Solaris_ControllerLogicalIdentity
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_ControllerLogicalIdentity MOF Class definition
+//=============================================================================
+
+    [Association,
+     Abstract,
+     Version("1.3.0"),
+     Description(
+	"This association represents the different aspects of the "
+	"the same controller.")] 
+class Solaris_ControllerLogicalIdentity : CIM_LogicalIdentity 
+{
+};
+
+//=============================================================================
+// Title: Solaris_MPXIOCtrlrLogicalIdentity
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_MPXIOCtrlrLogicalIdentity MOF Class definition
+//=============================================================================
+
+    [Association,
+     Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+	"This association represents the different aspects of the "
+	"the same MPXIO controller. Specifically, the ExtraCapacityGroup"
+	"view of the MPXIO Controller.")] 
+class Solaris_MPXIOCtrlrLogicalIdentity : Solaris_ControllerLogicalIdentity 
+{
+    [Override ("SystemElement"), Key,
+     Description(
+      "Represents the mpxio aspect of the controller.")]
+     Solaris_MPXIOController REF SystemElement;
+
+    [Override ("SameElement"), Key,
+     Description(
+      "Represents the other logical aspect of the mpxio controller.")]
+    Solaris_MPXIOGroup REF SameElement;  
+};
+
+
+
+//=============================================================================
+// Title: Solaris_ControllerComponent
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_ControllerComponent MOF Class definition
+//=============================================================================
+
+    [Association, Aggregation,
+     Abstract,
+     Version("1.3.0"),
+     Description(
+	"A redundancy group aggregates managed system elements, and"
+	"indicates that these elements provide redundancy.")]
+class Solaris_ControllerComponent : CIM_RedundancyComponent 
+{
+};
+
+
+//=============================================================================
+// Title: Solaris_MPXIOComponent
+// Version: 1.3.0
+// Date: 2/12/02
+// Description: Solaris_MPXIOComponent MOF Class definition
+//=============================================================================
+
+    [Association, Aggregation,
+     Provider ("jni:libWBEMdisk.so"),
+     Version("1.3.0"),
+     Description(
+	"A redundancy group aggregates managed system elements, and"
+	"indicates that these elements provide redundancy. Specifically"
+	"this class represents the physical controllers that are"
+	"a part of the scsi_vhci controller group.")]
+class Solaris_MPXIOComponent : Solaris_ControllerComponent 
+{
+      [Override ("GroupComponent"), Aggregate, Key,
+       Description (
+	"This grouping is an extra capacity group.")] 
+     Solaris_MPXIOGroup REF GroupComponent;
+
+      [Override ("PartComponent"), Key,
+       Description (
+	"Parts can only be a controller type.")] 
+     CIM_Controller REF PartComponent;
+};
+
+
+//=============================================================================
+// Title: Solaris_StorageLibrary
+// Version: 0.0.9
+// Date: 2/12/02
+// Description: Solaris_StorageLibrary MOF Class definition
+//=============================================================================
+
+    [Version("0.0.9"),
+     Experimental,
+     Description (
+     "A StorageLibrary is a collection of ManagedSystemElements "
+     "that operate together to provide cartridge library "
+     "capabilities. This object serves as an aggregation point to "
+     "group the following elements: MediaTransferDevices, a Label"
+     "Reader, a library Door, MediaAccessDevices, and other "
+     "Library components.") ]
+
+class Solaris_StorageLibrary : CIM_StorageLibrary
+{
+};

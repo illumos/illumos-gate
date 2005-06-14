@@ -1,0 +1,73 @@
+#!/usr/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+# This shell should be run out of crontab once an hour,
+#  a little before  uudemon.hour, since this one
+#  does not start the scheduler.
+
+PATH=/usr/bin:/usr/lib/uucp
+SPOOL=/var/spool/uucp
+
+# This is the sub directory that the C. file will be queue in
+DEFQUEUE=Z
+
+POLLFILE=/etc/uucp/Poll
+# POLLFILE is a list of "system <tab> hour1 hour2 hour3 ..." for polling
+# For example 
+#	raven	2  6  10
+# without the # at the beginning.  Lines starting with # are ignored.
+
+umask 022
+set +e
+
+HOUR="`date '+%H'`"
+# HOUR="`date | sed -e 's/:.*//' -e 's/^.*\(..\)$/\1/'"
+
+while read site poll
+do
+	case $site in
+	\#*)	continue;;
+	esac
+	for i in $poll
+	do
+		if [ $i -eq $HOUR ]
+		then
+			if [ ! -d ${SPOOL}/${site} ]
+			then
+				mkdir ${SPOOL}/${site}
+			fi
+			if [ ! -d ${SPOOL}/${site}/${DEFQUEUE} ]
+			then
+				mkdir ${SPOOL}/${site}/${DEFQUEUE}
+			fi
+			j=`expr $site : '\(.\{1,7\}\)'`
+			touch ${SPOOL}/${site}/${DEFQUEUE}/C.${j}${DEFQUEUE}0000
+			continue 2
+		fi
+	done
+done <$POLLFILE

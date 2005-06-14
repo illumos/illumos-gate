@@ -1,0 +1,1477 @@
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Note: The '#ident' on the first line is also the key to
+#	the versioning information for the SGS toolset.  It must
+#	be maintained in the 'ident' form, and on the first 10 lines
+#	of the readme.  If it is ever updated, you must also update
+#	libconv/common/bld_vernote.ksh.  See bug#4519569 for more
+#	details on SGS versioning.
+#
+--------------------------------------------------------------------------------
+SUNWonld - link-editors development package.
+--------------------------------------------------------------------------------
+
+  The SUNWonld package is an internal development package containing the
+  link-editors and some related tools.  All components live in the OSNET
+  source base, but not all components are delivered as part of the normal
+  OSNET consolidation.  The intent of this package is to provide access
+  to new features/bugfixes before they become generally available.
+
+  General link-editor information can be found:
+
+    http://linkers.eng/
+
+  Comments and Questions:
+
+    Contact Rod Evans, Mike Walker and/or Seizo Sakurai.
+
+  Warnings:
+
+    The postremove script for this package employs /usr/sbin/static/mv,
+    and thus, besides the common core dependencies, this package also
+    has a dependency on the SUNWsutl package.
+
+  Patches:
+
+    If the patch has been made official, you'll find it in:
+
+	http://sunsolve.Ebay.Sun.COM/cgi/show.pl?target=patches/os-patches
+
+    If it hasn't been released, the patch will be in:
+
+	/net/sunsoftpatch/patches/temporary
+
+    Note, any patches logged here refer to the temporary ("T") name, as we
+    never know when they're made official, and although we try to keep all
+    patch information up-to-date the real status of any patch can be
+    determined from:
+
+	http://sunsoftpatch.eng
+
+    If it has been obsoleted, the patch will be in:
+    
+        /net/on${RELEASE}-patch/on${RELEASE}/patches/${MACH}/obsolete
+
+
+  History:
+
+    Note, starting after Solaris 10, a (D) following the bug synopsis indicates
+    that a documentation change accompanies the implementation change.  See the
+    implementation bug report for details.
+
+    The following bug fixes exist in the OSNET consolidation workspace
+    from which this package is created:
+
+---
+5.5
+---
+Bugid   Risk Synopsis
+================================================================================
+1179363 segment addresses not being caclulated properly when mapfiles are used
+1179076 gprof has trouble finding the etext symbol for scoped libraries
+1179880 the symbol _end is calculated with the wrong address
+1180010 Versioning/Scoping updates.
+1181026 ld.so.1 - dbx just can't handle it.
+1181174 x86 ABI shows only 1 reserved PLT entry rather than 4
+1182089 the continuing saga of invalid relocations in ld.so.1
+1181841 run-time loader debugger doesn't work if ld.so.1 built without profiling
+1181633 pvs(1) updates.
+1181166 Unclear message output from ld w.r.t. map files
+1171726 Enhanced LD_PRELOAD (or new environment variable) for higher trust
+1184436 relocations against non-allocable sections are passed to ld.so.1
+1183916 Some copy relocations aren't necessary.
+1184330 text alignment calculation incorrect when .align padding is in effect
+1155388 Dynamic linker ignores runpaths of libraries dlopened for suid or sgid
+	apps
+XXXXXXX v8+ support (aux filter handling, PLATFORM token, ofl_e_machine, etc.)
+1168853 SPARC hardware multiply and divide support
+1178994 RTLD_GLOBAL semantics not clear
+1184454 ldd should process non-executable shared objects.
+1186050 ld is in-efficient in how it creates it's output relocations
+1185256 ld.so.1 is not threads safe durring it's run-time binding of symbols
+1194710 mapfile section identifier $REL broken in 2.5
+1187274 rtld doesn't always do the correct thing for copy relocations
+1187869 Seg fault executing 4.1.x compiled program on sol 2.4 with setgid/setuid
+1190133 Why spend time linking libdl.so?
+1193794 .bss section must be the last section of a segment
+1167049 Need additional relocation types for C++
+1198994 new filters cause dbx/rtc grief
+1199539 RFE for significant reduction of swap space need to link with large
+	archives
+1206122 ld(1) support interface makes life hard for unbundled products
+1210707 ld(1) core dumps on unknown section types
+1198970 ldd doesn't work with sbcp
+1214740 nss_*.so files should only be loaded from /usr/lib
+1214211 dlopen
+1212392 BCP's "dlsym()" lookup defective
+1216291 Gets ld: fatal: small GOT overflows error when linking Dyn Lib on
+	2.5 Beta.
+1218109 runtime linker BCP support requires additional iflush instructions
+1177496 link-editors require to provide for defining interfaces within
+	dynamic objects.
+
+
+-----
+5.5.1
+-----
+Bugid   Risk Synopsis
+================================================================================
+1229498 linker has problems detecting out-of-range offsets
+1233113 refine range checking and error checking for relocation processing
+1224970 linker should use block zero instructions for zeroing bss on ppc
+1205913 Incomplete implementation of sync_instruction_memory(); need linker
+	change
+1240680 ld does not implement all relocation types specified by PowerPC ABI
+1241843 ld.so security problem
+1242249 DPS library (libserverdps.so) compiled on x86, 2.5 (and 2.5.1)
+	is unusable
+
+
+---
+5.6
+---
+Bugid   Risk Synopsis
+================================================================================
+1056449 ld should handle an empty archive without aborting with an error
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.5_sparc:	patch 103242-03
+	Solaris/SunOS 5.5_x86:		patch 103243-03
+	Solaris/SunOS 5.4_sparc:	patch 102049-03
+	Solaris/SunOS 5.4_x86:		patch 102778-03
+	Solaris/SunOS 5.5.1_sparc	patch 103606-01
+	Solaris/SunOS 5.5.1_x86		patch 103607-01
+	Solaris/SunOS 5.5.1_ppc		patch 103608-01
+--------------------------------------------------------------------------------
+1244333 The SHF_EXCLUDE flag defined in ppc ABI should be implemented for all
+	ISA's
+1196634 Need a way to elide sections from executables
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.5.1_sparc	patch 103606-02
+	Solaris/SunOS 5.5.1_x86		patch 103607-02
+	Solaris/SunOS 5.5.1_ppc		patch 103608-02
+	Solaris/SunOS 5.5_sparc:	patch 103242-04
+	Solaris/SunOS 5.5_x86:		patch 103243-04
+	Solaris/SunOS 5.4_sparc:	patch 102049-04
+	Solaris/SunOS 5.4_x86:		patch 102778-04
+--------------------------------------------------------------------------------
+1264828 Linker patch 102049-03 breaks binary compatibility for 2.4
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.4		patch 102049-05
+--------------------------------------------------------------------------------
+1211314 libelf rewrite/MT-hot
+1209374 Debug output from linker, when LD_BINDINGS is on, is garbled
+        for MT processes
+xxxxxxx add suport for the mapfile commands $NEED, $ADDVERS, & $SPECVERS
+1068307 librtld_db.so debugger interface
+1183695 mcs command fails when swap space gets low
+1211653 mcs get arith exception when processing  profile binary built with ild
+1109538 mcs does not handle ar%archives like the man page says it does
+1236011 versioning processing within ld(1) has inconsistancies
+1239275 ld build fails for large files project
+1207279 WEAK symbols as tentative external references not just defines on
+        Solaris 2.x
+1236001 weak symbol references are not being handled consistantly.
+1231489 2.5 ld core dumps when referencing a symbol assigned to .hash section
+1136286 null lex input generates error:"lex.yy.c", line84: If-less endif
+1144937 size dumps core
+1242447 librtld_db.so: rl_refnameaddr should point into malloced memory
+1241834 libelf inefficiently uses PAGESIZE throughout code
+1242605 Cannot link C program with '-lxfn' without also using '-lC'.
+1245719 ld.so.1 dies when trying to load the same object twice if via
+	different path
+1234586 linker bug causes dynamically-linked applications to dump core when run
+1083126 strcoll (3) error not correctly messaged because libdl is not messaged
+1194771 ld(1) could do with some diagnostic cleanup
+1245467 be sympathetic to NULL character pointers
+1239423 Locus/Merge require a virtual segment reservation.
+1241127 sections should be assigned to segments based on sh_flags -
+	not section type
+xxxxxxx performance improvement to dlopen() of same object
+1248207 add suport for specifying DT_NEEDED's via ld command line for
+	relocatable object
+1247793 dlsym() can't find symbol
+1253568 ld.so.1 system errors cause segv in localized environment
+1248401 relocation error in libxfn.so.2 fini section
+1187549 modload doesn't correctly handle all relocation entry types
+1249861 rtld_db.h header file belongs in /usr/include, not /usr/include/sys
+xxxxxxx fixup data usage (paddr_t) in rdb (per tpm's request)
+1243653 C++ relocations do not output relative relocations when they are
+        performed
+xxxxxxx fix lint for doreloc.c
+1173320 problem with re-opening simularly named shared objects...
+1253656 Need a way from rtld to put holes between libraries
+1250505 Need krtld hooks for notification of module loads/unloads
+1256687 rtld_db interface gives redundant information....
+1258330 krtld bootstrap on ppc doesn't new relocation types...
+1215722 dlsym does not resolve symbols from prevous dlopen'd objects
+1258269 dlopen(, RTLD_GLOBAL) behaviour changed in build 12
+1261756 shared object relocation does not completely protect against recursion
+1261396 dlopen() of relocatable objects ignores the DT_NEEDED entries
+1263968 endhostent() SEGVs on dev_14 WOS
+1265223 infinite recursion in elf_intp_find_sym() filter symbol resolution
+1266632 core file read errors when dbx uses system rtld_db in 2.6 build 15
+1267122 proc_service.h & rtld_db.h shouldn't use 32bit centric paddr_t 
+	type for mem ptrs
+1267163 add librtld_db sample code to SUNWosdem package
+1260997 would like to be able filter more than one library
+1267524 librtld_db demo directories installed with bad permissions
+1261247 The SHF_ORDERED flag defined by ppcs and V9 ABIs should be on all
+	platforms.
+4006945 The link editor, ld, should not call free().
+4008147 Need way to "scope" linker symbol names
+1258508 dlopen family of routines require Xopen/Aspen extensions/corrections
+4009779 strip -x corrupted ELF symbol info causing ld to SEGV
+4004765 malloc() failures in libelf do not pass-on the errno diagnostic
+	information
+4007999 Need a linker feature to reduce kernel symbol tables to the minimum
+4011795 dlfcn.h contains const definition outside __STDC__
+4007697 more 64-bit cleanup in librtld_db
+4011926 krtld fails to load DT_NEEDED entries from relocatable objects 
+4008068 krtld fails to link unix if the symbol table is stripped 
+1185888 nm should have option to dump SHT_DYNSYM symbols
+4016432 Relocation loop should optimize for R_SPARC_RELATIVE case
+4016234 Facilities for runtime interposition inadequate
+4019284 filling in the link_audit holes
+1130251 The linker does not support initialization dependencies
+1265925 rtld call .init sections in bad order in MT applications
+4027554 ld.so.1 data segment rounding causes problems on i386
+4030200 cyclic dependencies cause binding to libthread before it is initialized
+4030900 LD_PROFILE causes core dumps with libc.so.1
+4033138 x86pc fgetwc fails on VSX with Signal 9 error
+4033944 pltenter() on i386 is broken in ld.so.1
+4025565 Add link-editor option to extract all archive members.
+4034878 failed dlmopens() do not clean up all link-map lists
+4034709 ld.so.1 doesn't check for string overflow in eprintf()
+4036640 ld dies with a segv when running purify 4.0.1
+4037738 checking #pragma weak symbol defenitions from executable is broken.
+4033943 PLT's should not be created for WEAK bindings to implicit dependencies.
+4041709 whocalls does not have a copyright notice
+4036167 libld: MSGs aligned with <Tab>
+4044009 Want option to removed unneeded dynamic dependencies during load.
+4045947 ld gets segmentation fault when linking object files
+4046476 Link auditing fails to handle dlsym bindings
+4044832 LD_PROFILE can cause MT sun4 apps to die on stack overflow
+4044816 When LD_BIND_NOW set, LD_PROFILE/LD_AUDIT causes SIGILL
+
+
+---------
+Solaris 7
+---------
+Bugid   Risk Synopsis
+================================================================================
+4008477 Change where executable finds its libraries without re-linking
+4050759 /usr/ccs/bin/dump -sv or -r hit SIGBUS on -dn stripped binaries
+4044285 Combining relocation sections yields performance gain
+xxxxxxx Add support for link-auditing flag LA_SYMB_ALTVALUE & increment
+	LAV_CURRENT to 2
+4058928 segment reservations made too soon
+xxxxxxx fix failure to call la_symbind32() for dl* routines (georgn)
+xxxxxxx add GOT debugging information to ld & elfdump
+4066815 GOT table on x86 has empty fields
+xxxxxxx enhance whocalls to add: static symbol table evaluation and
+	multiple symbols
+4068108 dlerror() messages printed to stderr durring link-auditing
+4064724 linking against a EM_SPARC32PLUS dynamic library results in a
+	EM_SPARC32PLUS obj
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.5.1_sparc	patch 103627-02
+	Solaris/SunOS 5.5.1_x86		patch 103628-02
+	Solaris/SunOS 5.5_sparc:	patch 103242-06
+	Solaris/SunOS 5.5_x86:		patch 103243-06
+	Solaris/SunOS 5.4_sparc:	patch 102049-06
+	Solaris/SunOS 5.4_x86:		patch 102778-04
+--------------------------------------------------------------------------------
+1182346 utilities need to use cplus_demangle from latest version of libC.so
+4074398 2.4 app takes up 8X more space under 2.5.1
+4079633 typo in new "gelf.h" wyoming header file
+4085734 ld: V9 default load address is different to V8
+4079003 Multiplication fails intermittently with libthread linked against
+	program.
+4081897 Stripping shared object makes an illegal binary that crashes ld
+4084466 elf32_newehdr() hangs in programs linked with libthread.
+4075643 -zallextract can corrupt relocation section placement
+4081897 Stripping shared object makes an illegal binary that crashes ld
+4050759 /usr/ccs/bin/dump -sv or -r hit SIGBUS on -dn stripped binaries
+4085036 Need lazy loading with Solaris
+4092335 chkmesg not able to find xlate.c durring build of
+4093064 elfdump coredumps inside of syminfo processing
+4095156 64-bit link auditing
+xxxxxxx fix badly sized SUNW_versym sections in relocatable objects
+4096079 implement HIX22 & LOX10 (HaL) relocation types per v9 ABI
+4096995 gelf needs to be made MT-safe
+xxxxxxx switch libelf demos over to using GElf
+xxxxxxx re-enable loading of .o modules by ld.so.1
+4067926 strip breaks hard link
+xxxxxxx ld.so.1 fmap page should be mapped MAP_PRIVATE (see 4098752)
+4097806 runtime linker references a unmapped address causing libthread panic
+4099713 stripping and scoping create invalid init/fini dynamic tags.
+4088306 introduce new section SHT_COMDAT
+4102797 elftypes.h uses new 2.7 inttypes data structures
+4095586 LD_PROFILE needs to work in 64-bit libraries
+4100002 /usr/ccs/bin/dump gives different results on 2.7 compared with 2.6
+4099127 dlopen failure in link auditing context can be hazardous to your health
+4104963 Either EM_NUM or EM_SPARCV9 needs to change
+4102130 dependency search continuation when ELF mismatch is found
+xxxxxxx add ELF_SPARCV9_MAXPGSZ constant
+4092511 object size silently truncated to 32 bits
+4107525 Locking in eprint is incorrect; causes hangs on MT applications on 2.6
+4108699 lazy loading can cause .init sections to fire off to soon.
+4108808 text segment re-mapped read-write when not required
+4113836 attempting to load a non-loadable file causes ld.so.1 to SEGV
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.6_sparc		patch 105490-04
+	Solaris/SunOS 5.6_x86		patch 105491-04
+	Solaris/SunOS 5.5.1_sparc	patch 103627-03  (never released)
+	Solaris/SunOS 5.5.1_x86		patch 103628-03  (never released)
+--------------------------------------------------------------------------------
+4150646 Security bug 1241843 resurfaces in 2.7 + 2.6 and 5.5.1 + patch.
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.6_sparc		patch 105490-05
+	Solaris/SunOS 5.6_x86		patch 105491-05
+	Solaris/SunOS 5.5_sparc:	patch 103242-07
+	Solaris/SunOS 5.5_x86:		patch 103243-07
+The fix for:
+    4149227 103612-41 causes ldd to throw out unresolved references in
+	    libdl.so.1
+is incorporated in the following patches:
+	Solaris/SunOS 5.5.1_sparc	patch 103627-04
+	Solaris/SunOS 5.5.1_x86		patch 103628-04   (never released)
+--------------------------------------------------------------------------------
+4107294 move /usr/ccs/lib contents to /usr/lib
+xxxxxxx librtld_db needs to recognize v9 PLT style introduced in 4087120
+4106398 size of .bss section is truncated
+4106312 ld can't create a 64-bit binary with a .bss section > 32-bits
+4111848 v9 segment alignment should be 1mb.
+4110994 patch 103627-02 breaks implicit arch dependence result from libs
+4092633 rtld_db only returns link-map lists for ld.so.1 & base
+4116970 gelf.h fails to compile under C++
+4114006 dlopen() and symbol addressing failures
+4118404 link_audit: pltglue applied on functions which don't need it.
+1046594 RFE: allow multiple initialization of a COMMON block.
+4122351 need 64-bit port of rdb_demo
+xxxxxxx dlopen() durring la_objopen() closed stdin
+4121546 rtld_db: displaying 32bit link_maps from 64bit process is broken
+4113960 dlsym() doesn't search each referenced dependent objects
+	associated w/name
+4123233 dlsym dies durring kdmconfig
+4121563 .SUNW_move section is misaligned.
+4124773 ld has 2GB file size limit
+4069849 mcs: multiple -a xxx with null .comment section is ignored
+4105877 patch 103627-02 causes sources to core dump
+4126137 EF_SPARC_SUN_US3 flag added to v9 ABI
+4164297 cleanup headers for strict ansi compilation
+4127674 dlopen() doesn't always use the correct link map
+4129745 fix WDISP30 relocaitons won't reach errors on sparcv9
+4099108 dladdr returns argv[0] in dli_fname 
+4121152 linker does not complain about type mismatches
+4128742 register symbols are not implemented for sparc
+4135749 gelf_getehdr segmentation faults
+4141174 elf utilities are not consistant printing 64-bit fields
+4143820 change to v9 ABI spec for PCPLT10 relocation
+4145987 nlist can leak fd's
+4134302 dlopen/dlclose leaks memoey
+4134367 libthread panic: alloc_chunk due to too many open files
+4128755 doreloc() is truncating relocation error messages...
+4141790 scratch register symbols should not conflict
+4153501 patch 103627-02 causes ksh to core dump
+4156854 Symbol yp_get_default_domain not found by the gethostent() function
+4160709 dlopen() fails on library (libxil) built with -lthread
+4161775 nm dumps core on ELF with no symbol table.
+4159122 UNIX98:  dlclose() to invalid handle may dump core
+4165899 ld execs 64-bit ld when linking Elf32, can break apps using procfs.
+4168556 elfdump truncates 64-bit symbol values
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.6_sparc		patch 105490-06  (never released)
+	Solaris/SunOS 5.6_x86		patch 105491-06
+	Solaris/SunOS 5.5.1_sparc	patch 103627-05  (never released)
+	Solaris/SunOS 5.5.1_x86		patch 103628-05  (never released)
+	Solaris/SunOS 5.5_sparc:	patch 103242-08
+	Solaris/SunOS 5.5_x86:		patch 103243-08
+--------------------------------------------------------------------------------
+
+-------------------------------------
+Solaris 7 399 (1st Q-update - s998u1)
+-------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4176796 The Intel version of visu crashes before main
+4176579 problem loading dynamically linked libraries with setuid root
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.7_sparc		patch 106950-01
+	Solaris/SunOS 5.7_x86		patch 106951-01
+	Solaris/SunOS 5.6_sparc		patch 105490-07
+	Solaris/SunOS 5.6_x86		patch 105491-07
+	Solaris/SunOS 5.5.1_sparc	patch 103627-06  (never released)
+	Solaris/SunOS 5.5.1_x86		patch 103628-06  (never released)
+--------------------------------------------------------------------------------
+
+-------------------------------------
+Solaris 7 599 (2nd Q-update - s998u2)
+-------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4159122 UNIX98:  dlclose() to invalid handle may dump core
+	(updated with _READ_COMMENT_BELOW_FOR_4159122_ guards).
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.7_sparc		patch 106950-02  (never released)
+	Solaris/SunOS 5.7_x86		patch 106951-02  (never released)
+	Solaris/SunOS 5.6_sparc		patch 105490-08
+	Solaris/SunOS 5.6_x86		patch 105491-08
+	Solaris/SunOS 5.5.1_sparc	patch 103627-07
+	Solaris/SunOS 5.5.1_x86		patch 103628-07  (never released)
+--------------------------------------------------------------------------------
+4173576 Segmentation Fault on register-symbol declaration building a.out
+4174468 scratch register symbol has multiple entries in .dynamic for
+	same register
+4179880 DT_RELASZ in .dynamic incorrectly calculated when .rela for reg-sym
+	present
+4188527 lorder output incorrect for v9 objects with global register ELF records
+4188843 nm -p produces key letter of 13 for global register records
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.7_x86		patch 106951-03
+	Solaris/SunOS 5.6_sparc		patch 105490-09
+	Solaris/SunOS 5.6_x86		patch 105491-09
+The fix for:
+    4205087 linker patch 103627-08 breaks viewpathing
+is incorporated in the following patches:
+	Solaris/SunOS 5.5.1_sparc	patch 103627-08
+	Solaris/SunOS 5.5.1_x86		patch 103628-08   (never released)
+The fix for:
+    4210064 R_SPARC_UA relocations miss one byte.
+is incorporated in the following patch:
+	Solaris/SunOS 5.7_sparc		patch 106950-03
+--------------------------------------------------------------------------------
+The following patches have been reved to add a dependency on the libthread
+updates provided with patch 103640-27.  This addresses:
+    4214980 2.5.1 linker patch 103627 causes a threaded app to hangs on a
+	    __lwp_sema_wait
+	Solaris/SunOS 5.5.1_sparc	patch 103627-09
+	Solaris/SunOS 5.5.1_x86		patch 103628-09
+--------------------------------------------------------------------------------
+The fix for:
+    4238973 fix for 4121152 affects linking of Ada objects
+    4158744 patch 103627-02 causes core when RPATH has blank entry and
+	    dlopen/dlclose is used
+is incorporated in the following patches:
+	Solaris/SunOS 5.5.1_sparc	patch 103627-11
+	Solaris/SunOS 5.5.1_x86		patch 103628-10
+--------------------------------------------------------------------------------
+
+-------------------------------------
+Solaris 7 899 (3rd Q-update - s998u3)
+-------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4138735 weak symbol in shared library not following consistent rule
+xxxxxxx make link_auditing examples signal safe (sigprocmask())
+xxxxxxx 64-bit elfdump to handle large files
+xxxxxxx linker package sets wrong permission for /etc directory
+4157981 dlopen(main) can be hazardous
+4174723 UNIX98:  dlclose() to invalid handle may dump core  (REVISIT)
+4165487 lazy loading updates required
+xxxxxxx install 64-bit link_audit demo libs in SUNWonld package.
+4162257 chkmsg.csh can break command line builds
+4175645 unix and krtld have .plt sections
+--------------------------------------------------------------------------------
+WARNING the above bug fix exposed 4185393 (build 9 linker changes make latent
+cpr/modload interaction fatal), thus don't take 4175645 without 4185393 if this
+version of ld(1) will be used to build the OSNet kernel.
+--------------------------------------------------------------------------------
+xxxxxxx linker package should not include ld.so for x86
+4126647 runtime linker causes coredump if LC_MESSAGE contains illegal pathname
+4177698 dump - misses relocation information on i386
+4178042 applications with Interp of /usr/lib/libc.so.1 can relocate libc twice
+4105031 cycles in a version are illegal - ld should not permit their creation
+4131855 ldd doesn't show lazily linked libraries
+4159200 Dangling link (/usr/ccs/lib/libld.so.3) on x86
+4180384 version definitions can mistakenly remain WEAK
+4182429 lazy loading symbol resolution fallback
+4183895 skipd crashed on on28; ld.so.1 appears to be the culprit
+4130082 *nm* "nm -P -tx file.." and "nm -P -td" file.." output does not 
+	comform to standard.
+4182215 update semantics of common variables binding against shared objects..
+4113668 -zredlocsym can cause building of applications with bad GOT
+4187474 ld.so.1: invalid setting of environ breaks old gcc app (enscript)
+4173393 dlclose does not remove all objects.
+4177348 dis(1) should use .dynsym when .symtab isn't available.
+4193939 dldump() doesn't understand DT_RELACOUNT flag.
+4193290 dlmopen(LM_ID_BASE, ...) does not always return a base link map handle
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following *point* patch:
+	Solaris/SunOS 5.6_sparc		patch 107253-01
+--------------------------------------------------------------------------------
+4191371 OSNet libs should be built using -zcombreloc
+4195791 ldd and lazy dependencies (4131855 fix incomplete).
+4196866 explicit dlopen() of libthread fails.
+4196548 dump -tv uses 13 instead of REGI for global register symbols
+4129858 core: need a better way to tell core/a.out mismatches
+4151085 LD_PROFILE causes core dump
+4199538 LD_PRELOAD should not trust /usr/lib
+4202613 performance updates
+4194028 cets: link error when SHF_ORDER flag is set in section header
+4210064 R_SPARC_UA type relocations aren't handled correctly.
+4198813 elf_rawdata seg faults when scn is NULL
+4200167 V9 PLT sequences can be even shorter
+4212187 no spec files for librtld_db
+4180247 elf utilities aren't large file aware
+4191427 there is no lint library for librtld_db
+4205087 linker patch 103627-08 breaks viewpathing
+4214649 cyclic dependencies within tsorted inits can fail with lazy loading
+4212473 dlopen(RTLD_NEXT) fails when caller is last object of link-map list
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.7_sparc		patch 106950-04  (never released)
+	Solaris/SunOS 5.7_x86		patch 106951-04  (never released)
+	Solaris/SunOS 5.6_sparc		patch 107733-01  (never released)
+	Solaris/SunOS 5.6_x86		patch 107734-01
+--------------------------------------------------------------------------------
+
+
+---------
+Solaris 8
+---------
+Bugid   Risk Synopsis
+================================================================================
+4225937 i386 linker emits sparc specific warning messages
+4215164 shf_order flag handling broken by fix for 4194028.
+4215587 using ld and the -r option on solaris 7 with compiler option -xarch=v9
+	causes link errors.
+4234657 103627-08 breaks purify 4.2 (plt padding should not be enabled for
+	32-bit)
+4235241 dbx no longer gets dlclose notification.
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.7_sparc		patch 106950-05  (never released)
+	Solaris/SunOS 5.7_x86		patch 106951-05  (never released)
+	Solaris/SunOS 5.6_sparc		patch 107733-02  (never released)
+	Solaris/SunOS 5.6_x86		patch 107734-02
+--------------------------------------------------------------------------------
+4248290 inetd dumps core upon bootup - failure in dlclose() logic.
+4238071 dlopen() leaks while descriptors under low memory conditions
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.7_sparc		patch 106950-06
+	Solaris/SunOS 5.7_x86		patch 106951-06
+	Solaris/SunOS 5.6_sparc		patch 107733-03  (never released)
+	Solaris/SunOS 5.6_x86		patch 107734-03
+--------------------------------------------------------------------------------
+4267980 INITFIRST flag of the shard object could be ignored.
+--------------------------------------------------------------------------------
+All the above changes plus the following:
+    4238973 fix for 4121152 affects linking of Ada objects
+    4158744 patch 103627-02 causes core when RPATH has blank entry and
+	    dlopen/dlclose is used
+are incorporated in the following patches:
+	Solaris/SunOS 5.5.1_sparc	patch 103627-12  (never released)	
+	Solaris/SunOS 5.5.1_x86		patch 103628-11
+--------------------------------------------------------------------------------
+4256518 miscalculated calloc() during dlclose/tsorting can result in segv
+4254171 DT_SPARC_REGISTER has invalid value associated with it.
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.7_sparc		patch 106950-07
+	Solaris/SunOS 5.7_x86		patch 106951-07
+	Solaris/SunOS 5.6_sparc		patch 107733-04  (never released)
+	Solaris/SunOS 5.6_x86		patch 107734-04
+--------------------------------------------------------------------------------
+4293159 ld needs to combine sections with and without SHF_ORDERED flag(comdat)
+4292238 linking a library which has a static char ptr invokes mprotect() call
+--------------------------------------------------------------------------------
+All the above changes except for:
+    4256518 miscalculated calloc() during dlclose/tsorting can result in segv
+    4254171 DT_SPARC_REGISTER has invalid value associated with it.
+plus the following:
+    4238973 fix for 4121152 affects linking of Ada objects
+    4158744 patch 103627-02 causes core when RPATH has blank entry and
+	    dlopen/dlclose is used
+are incorporated in the following patches:
+	Solaris/SunOS 5.5.1_sparc	patch 103627-13	
+	Solaris/SunOS 5.5.1_x86		patch 103628-12
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.7_sparc		patch 106950-08
+	Solaris/SunOS 5.7_x86		patch 106951-08
+	Solaris/SunOS 5.6_sparc		patch 107733-05
+	Solaris/SunOS 5.6_x86		patch 107734-05
+--------------------------------------------------------------------------------
+4295613 COMMON symbol resolution can be incorrect
+--------------------------------------------------------------------------------
+All the above changes plus the followings:
+    4238973 fix for 4121152 affects linking of Ada objects
+    4158744 patch 103627-02 causes core when RPATH has blank entry and
+	    dlopen/dlclose is used
+are incorporated in the following patches:
+	Solaris/SunOS 5.5.1_sparc	patch 103627-14
+	Solaris/SunOS 5.5.1_x86		patch 103628-13
+--------------------------------------------------------------------------------
+The fix for the following bug:
+    4351197 nfs performance problem by 103627-13
+is incorporated in the following patches:
+	Solaris/SunOS 5.5.1_sparc	patch 103627-15
+	Solaris/SunOS 5.5.1_x86		patch 103628-14
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.7_sparc		patch 106950-09
+	Solaris/SunOS 5.7_x86		patch 106951-09
+	Solaris/SunOS 5.6_sparc		patch 107733-06
+	Solaris/SunOS 5.6_x86		patch 107734-06
+--------------------------------------------------------------------------------
+4158971 increase the default segment alignment for i386 to 64k
+4064994 Add an $ISALIST token to those understood by the dynamic linker
+xxxxxxx ia64 common code putback
+4239308 LD_DEBUG busted for sparc machines
+4239008 Support MAP_ANON
+4238494 link-auditing extensions required
+4232239 R_SPARC_LOX10 truncates field
+4231722 R_SPARC_UA* relocations are busted
+4235514 R_SPARC_OLO10 relocation fails
+4244025 sgsmsg update
+4239281 need to support SECREL relocations for ia64
+4253751 ia64 linker must support PT_IA_64_UNWIND tables
+4259254 dlmopen mistakenly closes fd 0 (stdin) under certain error conditions
+4260872 libelf hangs when libthread present
+4224569 linker core dumping when profiling specified
+4270937 need mechanism to suppress ld.so.1's use of a default search path.
+1050476 ld.so to permit configuration of search path
+4273654 filtee processing using $ISALIST could be optimized
+4271860 get MERCED cruft out of elf.h
+4248991 Dynamic loader (via PLT) corrupts register G4
+4275754 cannot mmap file: Resource temporarily unavailable
+4277689 The linker can not handle relocation against MOVE tabl
+4270766 atexit processing required on dlclose().
+4279229 Add a "release" token to those understood by the dynamic linker
+4215433 ld can bus error when insufficient disc space exists for output file
+4285571 Pssst, want some free disk space?  ld's miscalculating.
+4286236 ar gives confusing "bad format" error with a null .stab section
+4286838 ld.so.1 can't handle a no-bits segment
+4287364 ld.so.1 runtime configuration cleanup
+4289573 disable linking of ia64 binaries for Solaris8
+4293966 crle(1)'s default directories should be supplied
+
+------------------------------------
+Solaris 8 600 (1st Q-update - s28u1)
+------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4309212 dlsym can't find symbol
+4311226 rejection of preloading in secure apps is inconsistent
+4312449 dlclose: invalid deletion of dependency can occur using RTLD_GLOBAL
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-01
+	Solaris/SunOS 5.8_x86		patch 109148-01
+	Solaris/SunOS 5.7_sparc		patch 106950-10
+	Solaris/SunOS 5.7_x86		patch 106951-10
+	Solaris/SunOS 5.6_sparc		patch 107733-07
+	Solaris/SunOS 5.6_x86		patch 107734-07
+--------------------------------------------------------------------------------
+
+------------------------------------
+Solaris 8 900 (2nd Q-update - s28u2)
+------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4324775 non-PIC code & -zcombreloc don't mix very well...
+4327653 run-time linker should preload tables it will process (madvise)
+4324324	shared object code can be referenced before .init has fired
+4321634 .init firing of multiple INITFIRST objects can fail
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-03
+	Solaris/SunOS 5.8_x86		patch 109148-03
+	Solaris/SunOS 5.7_sparc		patch 106950-11
+	Solaris/SunOS 5.7_x86		patch 106951-11
+	Solaris/SunOS 5.6_sparc		patch 107733-08
+	Solaris/SunOS 5.6_x86		patch 107734-08
+--------------------------------------------------------------------------------
+4338812 crle(1) omits entries in the directory cache
+4341496 RFE: provide a static version of /usr/bin/crle
+4340878 rtld should treat $ORIGIN like LD_LIBRARY_PATH in security issues
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-04
+	Solaris/SunOS 5.8_x86		patch 109148-04
+	Solaris/SunOS 5.7_sparc		patch 106950-12
+	Solaris/SunOS 5.7_x86		patch 106951-12
+--------------------------------------------------------------------------------
+4349563 auxiliary filter error handling regression introduced in 4165487
+4355795 ldd -r now gives "displacement relocated" warnings
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.7_sparc		patch 106950-13
+	Solaris/SunOS 5.7_x86		patch 106951-13
+	Solaris/SunOS 5.6_sparc		patch 107733-09
+	Solaris/SunOS 5.6_x86		patch 107734-09
+--------------------------------------------------------------------------------
+4210412 versioning a static executable causes ld to core dump
+4219652 Linker gives misleading error about not finding main (xarch=v9)
+4103449 ld command needs a command line flag to force 64-bits
+4187211 problem with RDISP32 linking in copy-relocated objects
+4287274 dladdr, dlinfo do not provide the full path name of a shared object
+4297563 dlclose still does not remove all objects.
+4250694 rtld_db needs a new auxvec entry
+4235315 new features for rtld_db (DT_CHECKSUM, dynamic linked .o files
+4303609 64bit libelf.so.1 does not properly implement elf_hash()
+4310901 su.static fails when OSNet build with lazy-loading
+4310324 elf_errno() causes Bus Error(coredump) in 64-bit multithreaded programs
+4306415 ld core dump
+4316531 BCP: possible failure with dlclose/_preexec_exit_handlers
+4313765 LD_BREADTH should be shot
+4318162 crle uses automatic strings in putenv.
+4255943 Description of -t option incomplete.
+4322528 sgs message test infrastucture needs improvement
+4239213 Want an API to obtain linker's search path
+4324134 use of extern mapfile directives can contribute unused symbols
+4322581 ELF data structures could be layed out more efficiently...
+4040628 Unnecessary section header symbols should be removed from .dynsym
+4300018 rtld: bindlock should be freed before calling call_fini()
+4336102 dlclose with non-deletable objects can mishandle dependencies
+4329785 mixing of SHT_SUNW_COMDAT & SHF_ORDERED causes ld to seg fault
+4334617 COPY relocations should be produces for references to .bss symbols
+4248250 relcoation of local ABS symbols incorrect
+4335801 For complimentary alignments eliminate ld: warning: symbol `ll'
+        has differing a
+4336980 ld.so.1 relative path processing revisited
+4243097 dlerror(3DL) is not affected by setlocale(3C).
+4344528 dump should remove -D and -l usage message
+xxxxxxx	enable LD_ALTEXEC to access alternate link-editor
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-06
+	Solaris/SunOS 5.8_x86		patch 109148-06
+--------------------------------------------------------------------------------
+
+------------------------------------
+Solaris 8 101 (3rd Q-update - s28u3)
+------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4346144 link-auditing: plt_tracing fails if LA_SYMB_NOPLTENTER given after
+        being bound
+4346001 The ld should support mapfile syntax to generate PT_SUNWSTACK segment
+4349137 rtld_db: A third fallback method for locating the linkmap
+4343417 dladdr interface information inadequate
+4343801 RFE: crle(1): provide option for updating configuration files
+4346615 ld.so.1 attempting to open a directory gives: No such device
+4352233 crle should not honor umask
+4352330 LD_PRELOAD cannot use absolute path for privileged program
+4357805 RFE: man page for ld(1) does not document all -z or -B options in
+	Solaris 8 9/00
+4358751 ld.so.1: LD_XXX environ variables and LD_FLAGS should be synchronized.
+4358862 link editors should reference "64" symlinks instead of sparcv9 (ia64).
+4356879 PLTs could use faster code sequences in some cases
+4367118 new fast baplt's fail when traversed twice in threaded application
+4366905 Need a way to determine path to a shared library
+4351197 nfs performance problem by 103627-13
+4367405 LD_LIBRARY_PATH_64 not being used
+4354500 SHF_ORDERED ordered scections does not properly sort sections
+4369068 ld(1)'s weak symbol processing is inefficient (slow and doesn't scale).
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-07
+	Solaris/SunOS 5.8_x86		patch 109148-07
+	Solaris/SunOS 5.7_sparc		patch 106950-14
+	Solaris/SunOS 5.7_x86		patch 106951-14
+--------------------------------------------------------------------------------
+
+------------------------------------
+Solaris 8 701 (5th Q-update - s28u5)
+------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4368846 ld(1) fails to version some interfaces given in a mapfile
+4077245 dump core dump on null pointer.
+4372554 elfdump should demangle symbols (like nm, dump)
+4371114 dlclose may unmap a promiscuous object while it's still in use.
+4204447 elfdump should understand SHN_AFTER/SHN_BEGIN macro
+4377941 initialization of interposers may not occur
+4381116 ldd/ld.so.1 could aid in detecting unused dependencies
+4381783 dlopen/dlclose of a libCrun+libthread can dump core
+4385402 linker & run-time linker must support gABI ELF updates
+4394698 ld.so.1 does not process DF_SYMBOLIC - not gABI conforming
+4394212 the link editor quietly ignores missing support libraries
+4390308 ld.so.1 should provide more flexibility LD_PRELOAD'ing 32-bit/64-bit
+	objects
+4401232 crle(1) could provide better flexibility for alternatives
+4401815 fix misc nits in debugging output...
+4402861 cleanup /usr/demo/link_audit & /usr/tmp/librtld_db demo source code...
+4393044 elfdump should allow raw dumping of sections
+4413168 SHF_ORDERED bit causes linker to generate a separate section
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-08
+	Solaris/SunOS 5.8_x86		patch 109148-08
+--------------------------------------------------------------------------------
+4452202 Typos in <sys/link.h>
+4452220 dump doesn't support RUNPATH
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-09
+	Solaris/SunOS 5.8_x86		patch 109148-09
+--------------------------------------------------------------------------------
+
+-------------------------------------
+Solaris 8 1001 (6th Q-update - s28u6)
+-------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4421842 fixups in SHT_GROUP processing required...
+4450433 problem with liblddbg output on -Dsection,detail when
+        processing SHF_LINK_ORDER
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-10
+	Solaris/SunOS 5.8_x86		patch 109148-10
+	Solaris/SunOS 5.7_sparc		patch 106950-15
+	Solaris/SunOS 5.7_x86		patch 106951-15
+--------------------------------------------------------------------------------
+4463473 pldd showing wrong output
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-11
+	Solaris/SunOS 5.8_x86		patch 109148-11
+--------------------------------------------------------------------------------
+
+------------------------------------
+Solaris 8 202 (7th Q-update - s28u7)
+------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4488954 ld.so.1 reuses same buffer to send ummapping range to
+	_preexec_exit_handlers()
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-12
+	Solaris/SunOS 5.8_x86		patch 109148-12
+--------------------------------------------------------------------------------
+
+
+---------
+Solaris 9
+---------
+Bugid   Risk Synopsis
+================================================================================
+4505289 incorrect handling of _START_ and _END_
+4506164 mcs does not recognize #linkbefore or #linkafter qualifiers
+4447560 strip is creating unexecutable files...
+4513842 library names not in ld.so string pool cause corefile bugs
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-13
+	Solaris/SunOS 5.8_x86		patch 109148-13
+	Solaris/SunOS 5.7_sparc		patch 106950-16
+	Solaris/SunOS 5.7_x86		patch 106951-16
+--------------------------------------------------------------------------------
+4291384 ld -M with a mapfile does not properly align Fortran REAL*8 data
+4413322 SunOS 5.9 librtld_db doesn't show dlopened ".o" files anymore?
+4429371 librtld_db busted on ia32 with SC6.x compilers...
+4418274 elfdump dumps core on invalid input
+4432224 libelf xlate routines are out of date
+4433643 Memory leak using dlopen()/dlclose() in Solaris 8
+4446564 ldd/lddstub - core dump conditions
+4446115 translating SUNW_move sections is broken
+4450225 The rdb command can fall into an infinite loop
+4448531 Linker Causes Segmentation Fault
+4453241 Regression in 4291384 can result in empty symbol table.
+4453398 invalid runpath token can cause ld to spin.
+4460230 ld (for OS 5.8 and 5.9) loses error message
+4462245 ld.so.1 core dumps when executed directly...
+4455802 need more flexibility in establishing a support library for ld
+4467068 dyn_plt_entsize not properly initialized in ld.so.1
+4468779 elf_plt_trace_write() broken on i386 (link-auditing)
+4465871 -zld32 and -zld64 does not work the way it should
+4461890 bad shared object created with -zredlocsym
+4469400 ld.so.1: is_so_loaded isn't as efficient as we thought...
+4469566 lazy loading fallback can reference un-relocated objects
+4470493 libelf incorectly translates NOTE sections accross architectures...
+4469684 rtld leaks dl_handles and permits on dlopen/dlclose
+4475174 ld.so.1 prematurly reports the failure to load a object...
+4475514 ld.so.1 can core dump in memory allocation fails (no swap)
+4481851 Setting ld.so.1 environment variables globally would be useful
+4482035 setting LD_PROFILE & LD_AUDIT causes ping command to issue warnings
+	on 5.8
+4377735 segment reservations cause sbrk() to fail
+4491434 ld.so.1 can leak file-descriptors when loading same named objects
+4289232 some of warning/error/debugging messages from libld.so can be revised
+4462748 Linker Portion of TLS Support
+4496718 run-time linkers mutex_locks not working with ld_libc interface
+4497270 The -zredlocsym option should not eliminate partially initialized local symbols
+4496963 dumping an object with crle(1) that uses $ORIGIN can loose its
+	dependencies 
+4499413 Sun linker orders of magnitude slower than gnu linker
+4461760 lazy loading libXm and libXt can fail.
+4469031 The partial initialized (local) symbols for intel platform is not
+	working.
+4492883 Add link-editor option to multi-pass archives to resolve unsatisfied
+	symbols
+4503731 linker-related commands misspell "argument"
+4503768 whocalls(1) should output messages to stderr, not stdout
+4503748 whocalls(1) usage message and manpage could be improved
+4503625 nm should be taught about TLS symbols - that they aren't allowed that is
+4300120 segment address validation is too simplistic to handle segment reservations
+4404547 krtld/reloc.h could have better error message, has typos
+4270931 R_SPARC_HIX22 relocation is not handled properly
+4485320 ld needs to support more the 32768 PLTs
+4516434 sotruss can not watch libc_psr.so.1
+4213100 sotruss could use more flexible pattern matching
+4503457 ld seg fault with comdat
+4510264 sections with SHF_TLS can come in different orders...
+4518079 link-editor support library unable to modify section header flags
+4515913 ld.so.1 can incorrectly decrement external reference counts on dlclose()
+4519569 ld -V does not return a interesting value...
+4524512 ld.so.1 should allow alternate termination signals
+4524767 elfdump dies on bogus sh_name fields...
+4524735 ld getopt processing of '-' changed
+4521931 subroutine in a shared object as LOCL instead of GLOB
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.8_sparc		patch 109147-14
+	Solaris/SunOS 5.8_x86		patch 109148-14
+	Solaris/SunOS 5.7_sparc		patch 106950-17
+	Solaris/SunOS 5.7_x86		patch 106951-17
+--------------------------------------------------------------------------------
+4532729 tentative definition of TLS variable causes linker to dump core
+4526745 fixup ld error message about duplicate dependencies/needed names
+4522999 Solaris linker one order of magnitude slower than GNU linker
+4518966 dldump undoes existing relocations with no thought of alignment or size.
+4587441 Certain libraries have race conditions when setting error codes
+4523798 linker option to align bss to large pagesize alignments.
+4524008 ld can improperly set st_size of symbols named "_init" or "_fini"
+4619282 ld cannot link a program with the option -sb
+4620846 Perl Configure probing broken by ld changes
+4621122 multiple ld '-zinitarray=' on a commandline fails
+--------------------------------------------------------------------------------
+	Solaris/SunOS 5.8_sparc		patch 109147-15
+	Solaris/SunOS 5.8_x86		patch 109148-15
+	Solaris/SunOS 5.7_sparc		patch 106950-18
+	Solaris/SunOS 5.7_x86		patch 106951-18
+	Solaris/SunOS 5.6_sparc		patch 107733-10
+	Solaris/SunOS 5.6_x86		patch 107734-10
+--------------------------------------------------------------------------------
+The fix for the following bug is incorporated in:
+	4616944 ar seg faults when order of object file is reversed.
+	Solaris/SunOS 5.8_sparc		patch 109147-16
+	Solaris/SunOS 5.8_x86		patch 109148-16
+--------------------------------------------------------------------------------
+All the above changes plus the fix for the following bug
+are incorporated in the following patches:
+	4872634 Large LD_PRELOAD values can cause SEGV of process
+	Solaris/SunOS 5.6_sparc		patch T107733-11
+	Solaris/SunOS 5.6_x86		patch T107734-11
+--------------------------------------------------------------------------------
+
+------------------------------------
+Solaris 9 1202 (2nd Q-update - s9u2)
+------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4546416 add help messages to ld.so mdbmodule
+4526752 we should build and ship ld.so's mdb module
+4624658 update 386 TLS relocation values
+4622472 LA_SYMB_DLSYM not set for la_symbind() invocations
+4638070 ldd/ld.so.1 could aid in detecting unreferenced dependencies
+	PSARC/2002/096 Detecting unreferenced dependencies with ldd(1)
+4633860 Optimization for unused static global variables
+	PSARC/2002/113 ld -zignore - section elimination
+4642829 ld.so.1 mprotect()'s text segment for weak relocations (it shouldn't)
+4621479 'make' in $SRC/cmd/sgs/tools tries to install things in the proto area
+4529912 purge ia64 source from sgs
+4651709 dlopen(RTLD_NOLOAD) can disable lazy loading
+4655066 crle: -u with nonexistent config file doesn't work
+4654406 string tables created by the link-editor could be smaller...
+	PSARC/2002/160 ld -znocompstrtab - disable string-table compression
+4651493 RTLD_NOW can result in binding to an object prior to its init being run.
+4662575 linker displacement relocation checking introduces significant
+	linker overhead
+4533195 ld interposes on malloc()/free() preventing support library from freeing
+	memory
+4630224 crle get's confused about memory layout of objects...
+4664855 crle on application failed with ld.so.1 encountering mmap() returning
+	ENOMEM err
+4669582 latest dynamic linker causes libthread _init to get skipped
+4671493 ld.so.1 inconsistantly assigns PATHNAME() on primary objects
+4668517 compile with map.bssalign doesn't copy _iob to bss
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-01
+        Solaris/SunOS 5.8_sparc         patch T109147-17
+        Solaris/SunOS 5.8_x86           patch T109148-17
+--------------------------------------------------------------------------------
+4701749 On Solaris 8 + 109147-16 ld crashes when building a dynamic library.
+4707808 The ldd command is broken in the latest 2.8 linker patch.
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-02
+        Solaris/SunOS 5.8_sparc         patch T109147-18
+        Solaris/SunOS 5.8_x86           patch T109148-18
+--------------------------------------------------------------------------------
+4696204 enable extended section indexes in relocatable objects
+	PSARC/2001/332 ELF gABI updates - round II
+	PSARC/2002/369 libelf interfaces to support ELF Extended Sections
+4706503 linkers need to cope with EF_SPARCV9_PSO/EF_SPARCV9_RMO
+4716929 updating of local register symbols in dynamic symtab busted...
+4710814 add "official" support for the "symbolic" keyword in linker map-file
+	PSARC/2002/439 linker mapfile visibility declarations
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-03
+        Solaris/SunOS 5.8_sparc         patch T109147-19
+        Solaris/SunOS 5.8_x86           patch T109148-19
+        Solaris/SunOS 5.7_sparc         patch T106950-19
+        Solaris/SunOS 5.7_x86           patch T106951-19
+--------------------------------------------------------------------------------
+
+-----------------------------------
+Solaris 9 403 (3nd Q-update - s9u3)
+-----------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4731174 strip(1) does not fixup SHT_GROUP data
+4733697 -zignore with gcc may exclude C++ exception sections
+4733317 R_SPARC_*_HIX22 calculations are wrong with 32bit LD building
+	ELF64 binaries
+4735165 fatal linker error when compiling C++ programs with -xlinkopt
+4736951 The mcs broken when the target file is an archive file
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.8_sparc         patch T109147-20
+        Solaris/SunOS 5.8_x86           patch T109148-20
+        Solaris/SunOS 5.7_sparc         patch T106950-20
+        Solaris/SunOS 5.7_x86           patch T106951-20
+--------------------------------------------------------------------------------
+4739660 Threads deadlock in schedlock and dynamic linker lock.
+4653148 ld.so.1/libc should unregister its dlclose() exit handler via a fini.
+4743413 ld.so.1 doesn't terminate argv with NULL pointer when invoked directly
+4746231 linker core-dumps when SECTION relocations are made against discarded
+	sections
+4730433 ld.so.1 wastes time repeatedly opening dependencies
+4744337 missing RD_CONSISTENT event with dlmopen(LD_ID_NEWLM, ...)
+4670835 rd_load_objiter can ignore callback's return value
+4745932 strip utility doesn't strip out Dwarf2 debug section
+4754751 "strip" command doesn't remove comdat stab sections.
+4755674 Patch 109147-18 results in coredump.
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-04
+        Solaris/SunOS 5.7_sparc         patch T106950-21
+        Solaris/SunOS 5.7_x86           patch T106951-21
+--------------------------------------------------------------------------------
+4772927 strip core dumps on an archive library
+4774727 direct-bindings can fail against copy-reloc symbols
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-05
+        Solaris/SunOS 5.9_x86           patch T113986-01
+        Solaris/SunOS 5.8_sparc         patch T109147-21
+        Solaris/SunOS 5.8_x86           patch T109148-21
+        Solaris/SunOS 5.7_sparc         patch T106950-22
+        Solaris/SunOS 5.7_x86           patch T106951-22
+--------------------------------------------------------------------------------
+
+-----------------------------------
+Solaris 9 803 (4th Q-update - s9u4)
+-----------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4730110 ld.so.1 list implementation could scale better
+4728822 restrict the objects dlsym() searches.
+	PSARC/2002/478 New dlopen(3dl) flag - RTLD_FIRST
+4714146 crle: 64-bit secure pathname is incorrect.
+4504895 dlclose() does not remove all objects
+4698800 Wrong comments in /usr/lib/ld/sparcv9/map.*
+4745129 dldump is inconsistent with .dynamic processing errors.
+4753066 LD_SIGNAL isn't very useful in a threaded environment
+	PSARC/2002/569 New dlinfo(3dl) flag - RTLD_DI_SIGNAL
+4765536 crle: symbolic links can confuse alternative object configuration info
+4766815 ld -r of object the TLS data fails
+4770484 elfdump can not handle stripped archive file
+4770494 The ld command gives improper error message handling broken archive 
+4775738 overwriting output relocation table when 'ld -zignore' is used
+4778247 elfdump -e of core files fails
+4779976 elfdump dies on bad relocation entries
+4787579 invalid SHT_GROUP entries can cause linker to seg fault
+4783869 dlclose: filter closure exhibits hang/failure - introduced with 4504895
+4778418 ld.so.1: there be nits out there
+4792461 Thread-Local Storage - x86 instruction sequence updates
+	PSARC/2002/746 Thread-Local Storage - x86 instruction sequence updates
+4461340 sgs: ugly build output while suppressing ia64 (64-bit) build on Intel
+4790194 dlopen(..., RTLD_GROUP) has an odd interaction with interposition
+4804328 auditing of threaded applications results in deadlock
+4806476 building relocatable objects with SHF_EXCLUDE loses relocation
+	information
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-06
+        Solaris/SunOS 5.9_x86           patch T113986-02
+        Solaris/SunOS 5.8_sparc         patch T109147-22
+        Solaris/SunOS 5.8_x86           patch T109148-22
+--------------------------------------------------------------------------------
+4731183 compiler creates .tlsbss section instead of .tbss as documented
+4816378 TLS: a tls test case dumps core with C and C++ compilers
+4817314 TLS_GD relocations against local symbols do not reference symbol...
+4811951 non-default symbol visibility overriden by definition in shared object
+4802194 relocation error of mozilla built by K2 compiler
+4715815 ld should allow linking with no output file (or /dev/null)
+4793721 Need a way to null all code in ISV objects enabling ld performance
+	tuning
+--------------------------------------------------------------------------------
+All the above change plus the fix for:
+	4796237 RFE: link-editor became extremely slow with patch 109147-20 and
+		static libraries
+is incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-07
+        Solaris/SunOS 5.9_x86           patch T113986-03
+        Solaris/SunOS 5.8_sparc         patch T109147-23
+        Solaris/SunOS 5.8_x86           patch T109148-23
+--------------------------------------------------------------------------------
+
+------------------------------------
+Solaris 9 1203 (5th Q-update - s9u5)
+------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4830584 mmap for the padding region doesn't get freed after dlclose
+4831650 ld.so.1 can walk off the end of it's call_init() array...
+4831544 ldd using .so modules compiled with FD7 compiler caused a core dump
+4834784 Accessing members in a TLS structure causes a core dump in Oracle
+4824026 segv when -z combreloc is used with -xlinkopt
+4825296 typo in elfdump
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-08
+        Solaris/SunOS 5.9_x86           patch T113986-04
+        Solaris/SunOS 5.8_sparc         patch T109147-24
+        Solaris/SunOS 5.8_x86           patch T109148-24
+--------------------------------------------------------------------------------
+4470917 Solaris Process Model Unification (link-editor components only)
+	PSARC/2002/117
+4744411 Bloomberg wants a faster linker.
+4811969 64-bit links can be much slower than 32-bit.
+4825065 ld(1) should ignore consecutive empty sections.
+4838226 unrelocated shared objects may be erroneously collected for init firing
+4830889 TLS: testcase coredumps with -xarch=v9 and -g
+4845764 filter removal can leave dangling filtee pointer
+4811093 apptrace -F libc date core dumps
+4826315 Link editors need to be pre- and post- Unified Process Model aware
+4868300 interposing on direct bindings can fail
+4872634 Large LD_PRELOAD values can cause SEGV of process
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-09
+        Solaris/SunOS 5.9_x86           patch T113986-05
+        Solaris/SunOS 5.8_sparc         patch T109147-25
+        Solaris/SunOS 5.8_x86           patch T109148-25
+--------------------------------------------------------------------------------
+
+------------------------------------
+Solaris 9 404 (6th Q-update - s9u6)
+------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4870260 The elfdump command should produce more warning message on invalid move
+	entries.
+4865418 empty PT_TLS program headers cause problems in TLS enabled applications
+4825151 compiler core dumped with a -mt -xF=%all test
+4845829 The runtime linker fails to dlopen() long path name.
+4900684 shared libraries with more then 32768 plt's fail for sparc ELF64
+4906062 Makefiles under usr/src/cmd/sgs needs to be updated
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-10
+        Solaris/SunOS 5.9_x86           patch T113986-06
+        Solaris/SunOS 5.8_sparc         patch T109147-26
+        Solaris/SunOS 5.8_x86           patch T109148-26
+        Solaris/SunOS 5.7_sparc         patch T106950-24
+        Solaris/SunOS 5.7_x86           patch T106951-24
+--------------------------------------------------------------------------------
+4900320 rtld library mapping could be faster
+4911775 implement GOTDATA proposal in ld
+	PSARC/2003/477 SPARC GOTDATA instruction sequences
+4904565 Functionality to ignore relocations against external symbols
+4764817 add section types SHT_DEBUG and SHT_DEBUGSTR
+	PSARC/2003/510 New ELF DEBUG and ANNOTATE sections
+4850703 enable per-symbol direct bindings
+4716275 Help required in the link analysis of runtime interfaces
+	PSARC/2003/519 Link-editors: Direct Binding Updates
+4904573 elfdump may hang when processing archive files
+4918310 direct binding from an executable can't be interposed on
+4918938 ld.so.1 has become SPARC32PLUS - breaks 4.x binary compatibility
+4911796 S1S8 C++: ld dump core when compiled and linked with xlinkopt=1.
+4889914 ld crashes with SEGV using -M mapfile under certain conditions
+4911936 exception are not catch from shared library with -zignore
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-11
+        Solaris/SunOS 5.9_x86           patch T113986-07
+        Solaris/SunOS 5.8_sparc         patch T109147-27
+        Solaris/SunOS 5.8_x86           patch T109148-27
+        Solaris/SunOS 5.7_sparc         patch T106950-25
+        Solaris/SunOS 5.7_x86           patch T106951-25
+--------------------------------------------------------------------------------
+4946992 ld crashes due to huge number of sections (>65,000)
+4951840 mcs -c goes into a loop on executable program
+4939869 Need additional relocation types for abs34 code model
+	PSARC/2003/684 abs34 ELF relocations
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-12
+        Solaris/SunOS 5.9_x86           patch T113986-08
+        Solaris/SunOS 5.8_sparc         patch T109147-28
+        Solaris/SunOS 5.8_x86           patch T109148-28
+--------------------------------------------------------------------------------
+
+------------------------------------
+Solaris 9 904 (7th Q-update - s9u7)
+------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+4912214 Having multiple of libc.so.1 in a link map causes malloc() to fail
+4526878 ld.so.1 should pass MAP_ALIGN flag to give kernel more flexibility
+4930997 sgs bld_vernote.ksh script needs to be hardend...
+4796286 ld.so.1: scenario for trouble?
+4930985 clean up cruft under usr/src/cmd/sgs/tools
+4933300 remove references to Ultra-1 in librtld_db demo
+4936305 string table compression is much too slow...
+4939626 SUNWonld internal package must be updated...
+4939565 per-symbol filtering required
+4948119 ld(1) -z loadfltr fails with per-symbol filtering
+4948427 ld.so.1 gives fatal error when multiple RTLDINFO objects are loaded
+4940894 ld core dumps using "-xldscope=symbolic
+4955373 per-symbol filtering refinements
+4878827 crle(1M) - display post-UPM search paths, and compensate for pre-UPM.
+4955802 /usr/ccs/bin/ld dumps core in process_reld()
+4964415 elfdump issues wrong relocation error message
+4966465 LD_NOAUXFLTR fails when object is both a standard and auxiliary filter
+4973865 the link-editor does not scale properly when linking objects with 
+	lots of syms
+4975598 SHT_SUNW_ANNOTATE section relocation not resolved
+4974828 nss_files nss_compat r_mt tests randomly segfaulting
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+        Solaris/SunOS 5.9_sparc         patch T112963-13
+        Solaris/SunOS 5.9_x86           patch T113986-09
+--------------------------------------------------------------------------------
+4860508 link-editors should create/promote/verify hardware capabilities
+5002160 crle: reservation for dumped objects gets confused by mmaped object
+4967869 linking stripped library causes segv in linker
+5006657 link-editor doesn't always handle nodirect binding syminfo information
+4915901 no way to see ELF information
+5021773 ld.so.1 has trouble with objects having more than 2 segments.
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.9_sparc		patch T112963-14
+	Solaris/SunOS 5.9_x86		patch T113986-10
+	Solaris/SunOS 5.8_sparc		patch T109147-29
+	Solaris/SunOS 5.8_x86		patch T109148-29
+--------------------------------------------------------------------------------
+
+----------
+Solaris 10
+----------
+Bugid   Risk Synopsis
+================================================================================
+5044797 ld.so.1: secure directory testing is being skipped during filtee
+	processing
+4963676 Remove remaining static libraries
+5021541 unnecessary PT_SUNWBSS segment may be created
+5031495 elfdump complains about bad symbol entries in core files
+5012172 Need error when creating shared object with .o compiled
+	-xarch=v9 -xcode=abs44
+4994738 rd_plt_resolution() resolves ebx-relative PLT entries incorrectly
+5023493 ld -m output with patch 109147-25 missing .o information
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.9_sparc		patch T112963-15
+	Solaris/SunOS 5.9_x86		patch T113986-11
+	Solaris/SunOS 5.8_sparc		patch T109147-30
+	Solaris/SunOS 5.8_x86		patch T109148-30
+--------------------------------------------------------------------------------
+5071614 109147-29 & -30 break the build of on28-patch on Solaris 8 2/04
+5029830	crle: provide for optional alternative dependencies.
+5034652 ld.so.1 should save, and print, more error messages
+5036561 ld.so.1 outputs non-fatal fatal message about auxiliary filter libraries
+5042713 4866170 broke ld.so's ::setenv
+5047082 ld can core dump on bad gcc objects
+5047612 ld.so.1: secure pathname verification is flawed with filter use
+5047235 elfdump can core dump printing PT_INTERP section
+4798376 nits in demo code
+5041446 gelf_update_*() functions inconsistently return NULL or 0
+5032364 M_ID_TLSBSS and M_ID_UNKNOWN have the same value
+4707030 Empty LD_PRELOAD_64 doesn't override LD_PRELOAD
+4968618 symbolic linkage causes core dump
+5062313 dladdr() can cause deadlock in MT apps.
+5056867 $ISALIST/$HWCAP expansion should be more flexible.
+4918303 0@0.so.1 should not use compiler-supplied crt*.o files
+5058415 whocalls cannot take more than 10 arguments
+5067518 The fix for 4918303 breaks the build if a new work space is used.
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.9_sparc		patch T112963-16
+	Solaris/SunOS 5.9_x86		patch T113986-12
+	Solaris/SunOS 5.8_sparc		patch T109147-31
+	Solaris/SunOS 5.8_x86		patch T109148-31
+--------------------------------------------------------------------------------
+5013759 *file* should report hardware/software capabilities (link-editor
+	components only)
+5063580 libldstab: file /tmp/posto..: .stab[.index|.sbfocus] found with no
+	matching stri
+5076838 elfdump(1) is built with a CTF section (the wrong one)
+5080344 Hardware capabilities are not enforced for a.out
+5079061 RTLD_DEFAULT can be expensive
+5064973 allow normal relocs against TLS symbols for some sections
+5085792 LD_XXXX_64 should override LD_XXXX
+5096272 every executable or library has a .SUNW_dof section
+5094135 Bloomberg wants a faster ldd.
+5086352 libld.so.3 should be built with a .SUNW_ctf ELF section, ready for CR
+5098205 elfdump gives wrong section name for the global offset table
+5092414 Linker patch 109147-29 makes Broadvison One-To-One server v4.1
+	installation fail
+5080256 dump(1) doesn't list ELF hardware capabilities
+5097347 recursive read lock in gelf_getsym()
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.9_sparc		patch T112963-17
+	Solaris/SunOS 5.9_x86		patch T113986-13
+	Solaris/SunOS 5.8_sparc		patch T109147-32
+	Solaris/SunOS 5.8_x86		patch T109148-32
+--------------------------------------------------------------------------------
+5106206 ld.so.1 fail to run a Solaris9 program that has libc linked with
+	-z lazyload
+5102601 ON should deliver a 64-bit operating system for Opteron systems
+	(link-editor components only)
+6173852 enable link_auditing technology for amd64
+6174599 linker does not create .eh_frame_hdr sections for eh_frame sections
+	with SHF_LINK_ORDER
+6175609 amd64 run-time linker has a corrupted note section
+6175843 amd64 rdb_demo files not installed
+6182293 ld.so.1 can repeatedly relocate object .plts (RTLD_NOW).
+6183645 ld core dumps when automounter fails
+6178667 ldd list unexpected (file not found) in x86 environment.
+6181928 Need new reloc types R_AMD64_GOTOFF64 and R_AMD64_GOTPC32
+6182884 AMD64: ld coredumps when building a shared library
+6173559 The ld may set incorrect value for sh_addralign under some conditions.
+5105601 ld.so.1 gets a little too enthusiastic with interposition
+6189384 ld.so.1 should accommodate a files dev/inode change (libc loopback mnt)
+6177838 AMD64: linker cannot resolve PLT for 32-bit a.out(s) on amd64-S2 kernel
+6190863 sparc disassembly code should be removed from rdb_demo
+6191488 unwind eh_frame_hdr needs corrected encoding value
+6192490 moe(1) returns /lib/libc.so.1 for optimal expansion of libc HWCAP
+	libraries
+6192164 AMD64: introduce dlamd64getunwind interface
+	PSARC/2004/747 libc::dlamd64getunwind()
+6195030 libdl has bad version name
+6195521 64-bit moe(1) missed the train
+6198358 AMD64: bad eh_frame_hdr data when C and C++ mixed in a.out
+6204123 ld.so.1: symbol lookup fails even after lazy loading fallback
+6207495 UNIX98/UNIX03 vsx namespace violation DYNL.hdr/misc/dlfcn/T.dlfcn 
+	14 Failed
+6217285 ctfmerge crashed during full onnv build
+--------------------------------------------------------------------------------
+
+--------------
+Solaris Nevada
+--------------
+Bugid   Risk Synopsis
+================================================================================
+6209350 Do not include signature section from dynamic dependency library into
+	relocatable object
+6212797 The binary compiled on SunOS4.x doesn't run on Solaris8 with Patch
+	109147-31
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.9_sparc	patch T112963-18
+    Solaris/SunOS 5.9_x86	patch T113986-14
+    Solaris/SunOS 5.8_sparc	patch T109147-33
+    Solaris/SunOS 5.8_x86	patch T109148-33
+--------------------------------------------------------------------------------
+6219538 112963-17: linker patch causes binary to dump core
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T117462-01
+    Solaris/SunOS 5.10_x86	patch T118345-01
+    Solaris/SunOS 5.9_sparc	patch T112963-19
+    Solaris/SunOS 5.9_x86	patch T113986-15
+    Solaris/SunOS 5.8_sparc	patch T109147-34
+    Solaris/SunOS 5.8_x86	patch T109148-34
+--------------------------------------------------------------------------------
+6257177 incremental builds of usr/src/cmd/sgs can fail...
+6219651 AMD64: Linker does not issue error for out of range R_AMD64_PC32
+--------------------------------------------------------------------------------
+All the above change is incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T117462-02
+    Solaris/SunOS 5.10_x86	patch T118345-02
+    Solaris/SunOS 5.9_sparc	patch T112963-20
+    Solaris/SunOS 5.9_x86	patch T113986-16
+    Solaris/SunOS 5.8_sparc	patch T109147-35
+    Solaris/SunOS 5.8_x86	patch T109148-35
+NOTE: The fix for 6219651 is only applicable for 5.10_x86 platform.
+--------------------------------------------------------------------------------
+5080443 lazy loading failure doesn't clean up after itself (D)
+6226206 ld.so.1 failure when processing single segment hwcap filtee
+6228472 ld.so.1: link-map control list stacking can loose objects
+6235000 random packages not getting installed in snv_09 and snv_10 -
+	rtld/common/malloc.c Assertion
+6219317 Large page support is needed for mapping executables, libraries and
+	files (link-editor components only)
+6244897 ld.so.1 can't run apps from commandline
+6251798 moe(1) returns an internal assertion failure message in some
+	circumstances
+6251722 ld fails silently with exit 1 status when -z ignore passed
+6254364 ld won't build libgenunix.so with absolute relocations
+6215444 ld.so.1 caches "not there" lazy libraries, foils svc.startd(1M)'s logic
+6222525 dlsym(3C) trusts caller(), which may return wrong results with tail call
+	optimization
+6241995 warnings in sgs should be fixed (link-editor components only)
+6258834 direct binding availability should be verified at runtime
+6260361 lari shouldn't count a.out non-zero undefined entries as interesting
+6260780 ldd doesn't recognize LD_NOAUXFLTR
+6266261 Add ld(1) -Bnodirect support (D)
+6261990 invalid e_flags error could be a little more friendly
+6261803 lari(1) should find more events uninteresting (D)
+6267352 libld_malloc provides inadequate alignment
+6268693 SHN_SUNW_IGNORE symbols should be allowed to be mulitiply defined
+6262789 Infosys wants a faster linker
+--------------------------------------------------------------------------------
+All the above change is incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T117462-03
+    Solaris/SunOS 5.10_x86	patch T118345-03
+    Solaris/SunOS 5.9_sparc	patch T112963-21
+    Solaris/SunOS 5.9_x86	patch T113986-17
+    Solaris/SunOS 5.8_sparc	patch T109147-36
+    Solaris/SunOS 5.8_x86	patch T109148-36
+--------------------------------------------------------------------------------
+6283601 The usr/src/cmd/sgs/packages/common/copyright contains old information
+	legally problematic

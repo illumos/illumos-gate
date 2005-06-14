@@ -1,0 +1,1515 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/types.h>
+#include <sys/stream.h>
+#include <sys/mdb_modapi.h>
+#include <sys/socket.h>
+#include <sys/list.h>
+#include <sys/strsun.h>
+
+#include <mdb/mdb_stdlib.h>
+
+#include <netinet/in.h>
+#include <netinet/ip6.h>
+#include <netinet/sctp.h>
+
+#include <inet/common.h>
+#include <inet/ip.h>
+#include <inet/ip6.h>
+#include <inet/ipclassifier.h>
+
+#include <sctp/sctp_impl.h>
+#include <sctp/sctp_addr.h>
+
+#define	MDB_SCTP_SHOW_FLAGS	0x1
+#define	MDB_SCTP_DUMP_ADDRS	0x2
+#define	MDB_SCTP_SHOW_HASH	0x4
+#define	MDB_SCTP_SHOW_OUT	0x8
+#define	MDB_SCTP_SHOW_IN	0x10
+#define	MDB_SCTP_SHOW_MISC	0x20
+#define	MDB_SCTP_SHOW_RTT	0x40
+#define	MDB_SCTP_SHOW_STATS	0x80
+#define	MDB_SCTP_SHOW_FLOW	0x100
+#define	MDB_SCTP_SHOW_HDR	0x200
+#define	MDB_SCTP_SHOW_PMTUD	0x400
+#define	MDB_SCTP_SHOW_RXT	0x800
+#define	MDB_SCTP_SHOW_CONN	0x1000
+#define	MDB_SCTP_SHOW_CLOSE	0x2000
+#define	MDB_SCTP_SHOW_EXT	0x4000
+
+#define	MDB_SCTP_SHOW_ALL	0xffffffff
+
+uint_t sctp_conn_hash_size;
+static GElf_Sym sctp_list_sym;
+static list_t sctp_list;
+
+/*
+ * Both the ill and ipif global arrays are small, so we just read
+ * in the whole arrays.
+ */
+static sctp_ill_hash_t local_g_ills[SCTP_ILL_HASH];
+static sctp_ipif_hash_t local_g_ipifs[SCTP_IPIF_HASH];
+
+/*
+ * Copy from usr/src/uts/common/os/list.c.  Should we have a generic
+ * mdb list walker?
+ */
+#define	list_object(a, node) ((void *)(((char *)node) - (a)->list_offset))
+
+/* ARGSUSED */
+static int
+sctp_faddr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	sctp_faddr_t fa[1];
+	char *statestr;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_vread(fa, sizeof (*fa), addr) == -1) {
+		mdb_warn("cannot read fadder at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	switch (fa->state) {
+	case SCTP_FADDRS_UNREACH:
+		statestr = "SCTP_FADDRS_UNREACH";
+		break;
+	case SCTP_FADDRS_DOWN:
+		statestr = "SCTP_FADDRS_DOWN";
+		break;
+	case SCTP_FADDRS_ALIVE:
+		statestr = "SCTP_FADDRS_ALIVE";
+		break;
+	case SCTP_FADDRS_UNCONFIRMED:
+		statestr = "SCTP_FADDRS_UNCONFIRMED";
+		break;
+	default:
+		statestr = "UNKNOWN STATE";
+		break;
+	}
+
+	mdb_printf("%<u>%p\t%<b>%N%</b>\t%s%</u>\n", addr, &fa->faddr,
+	    statestr);
+	mdb_printf("next\t\t%?p\tsaddr\t%N\n", fa->next, &fa->saddr);
+	mdb_printf("rto\t\t%?d\tsrtt\t\t%?d\n", fa->rto, fa->srtt);
+	mdb_printf("rttvar\t\t%?d\trtt_updates\t%?u\n", fa->rttvar,
+	    fa->rtt_updates);
+	mdb_printf("strikes\t\t%?d\tmax_retr\t%?d\n", fa->strikes,
+	    fa->max_retr);
+	mdb_printf("hb_expiry\t%?ld\thb_interval\t%?u\n", fa->hb_expiry,
+	    fa->hb_interval);
+	mdb_printf("pmss\t\t%?u\tcwnd\t\t%?u\n", fa->sfa_pmss, fa->cwnd);
+	mdb_printf("ssthresh\t%?u\tsuna\t\t%?u\n", fa->ssthresh, fa->suna);
+	mdb_printf("pba\t\t%?u\tacked\t\t%?u\n", fa->pba, fa->acked);
+	mdb_printf("lastactive\t%?ld\thb_secret\t%?#lx\n", fa->lastactive,
+	    fa->hb_secret);
+	mdb_printf("timer_mp\t%?p\tire\t\t%?p\n", fa->timer_mp, fa->ire);
+	mdb_printf("hb_pending\t%?d\ttimer_running\t%?d\n"
+	    "df\t\t%?d\tpmtu_discovered\t%?d\n"
+	    "isv4\t\t%?d\tretransmissions\t%?u\n",
+	    fa->hb_pending, fa->timer_running, fa->df, fa->pmtu_discovered,
+	    fa->isv4, fa->T3expire);
+
+	return (DCMD_OK);
+}
+
+static void
+print_set(sctp_set_t *sp)
+{
+	mdb_printf("\tbegin\t%<b>%?x%</b>\t\tend\t%<b>%?x%</b>\n",
+	    sp->begin, sp->end);
+	mdb_printf("\tnext\t%?p\tprev\t%?p\n", sp->next, sp->prev);
+}
+
+/* ARGSUSED */
+static int
+sctp_set(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	sctp_set_t sp[1];
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_vread(sp, sizeof (*sp), addr) == -1)
+		return (DCMD_ERR);
+
+	print_set(sp);
+
+	return (DCMD_OK);
+}
+
+static void
+dump_sack_info(uintptr_t addr)
+{
+	sctp_set_t sp[1];
+
+	while (addr != 0) {
+		if (mdb_vread(sp, sizeof (*sp), addr) == -1) {
+			mdb_warn("failed to read sctp_set at %p", addr);
+			return;
+		}
+
+		addr = (uintptr_t)sp->next;
+		print_set(sp);
+	}
+}
+
+static int
+dump_msghdr(mblk_t *meta)
+{
+	sctp_msg_hdr_t smh;
+
+	if (mdb_vread(&smh, sizeof (smh), (uintptr_t)meta->b_rptr) == -1)
+		return (-1);
+
+	mdb_printf("%<u>msg_hdr_t at \t%?p\tsentto\t%?p%</u>\n",
+	    meta->b_rptr, SCTP_CHUNK_DEST(meta));
+	mdb_printf("\tttl\t%?ld\ttob\t%?ld\n", smh.smh_ttl, smh.smh_tob);
+	mdb_printf("\tsid\t%?u\tssn\t%?u\n", smh.smh_sid, smh.smh_ssn);
+	mdb_printf("\tppid\t%?u\tflags\t%?s\n", smh.smh_ppid,
+	    smh.smh_flags & MSG_UNORDERED ? "unordered" : " ");
+	mdb_printf("\tcontext\t%?u\tmsglen\t%?d\n", smh.smh_context,
+	    smh.smh_msglen);
+
+	return (0);
+}
+
+static int
+dump_datahdr(mblk_t *mp)
+{
+	sctp_data_hdr_t	sdc;
+	uint16_t		sdh_int16;
+	uint32_t		sdh_int32;
+
+	if (mdb_vread(&sdc, sizeof (sdc), (uintptr_t)mp->b_rptr) == -1)
+		return (-1);
+
+	mdb_printf("%<u>data_chunk_t \t%?p\tsentto\t%?p%</u>\n",
+	    mp->b_rptr, SCTP_CHUNK_DEST(mp));
+	mdb_printf("\tsent\t%?d\t", SCTP_CHUNK_ISSENT(mp)?1:0);
+	mdb_printf("retrans\t%?d\n", SCTP_CHUNK_WANT_REXMIT(mp)?1:0);
+	mdb_printf("\tacked\t%?d\t", SCTP_CHUNK_ISACKED(mp)?1:0);
+	mdb_printf("sackcnt\t%?u\n", SCTP_CHUNK_SACKCNT(mp));
+
+	mdb_nhconvert(&sdh_int16, &sdc.sdh_len, sizeof (sdc.sdh_len));
+	mdb_printf("\tlen\t%?d\t", sdh_int16);
+	mdb_printf("BBIT=%d", SCTP_DATA_GET_BBIT(&sdc) == 0 ? 0 : 1);
+	mdb_printf("EBIT=%d", SCTP_DATA_GET_EBIT(&sdc) == 0 ? 0 : 1);
+
+	mdb_nhconvert(&sdh_int32, &sdc.sdh_tsn, sizeof (sdc.sdh_tsn));
+	mdb_nhconvert(&sdh_int16, &sdc.sdh_sid, sizeof (sdc.sdh_sid));
+	mdb_printf("\ttsn\t%?x\tsid\t%?hu\n", sdh_int32, sdh_int16);
+
+	mdb_nhconvert(&sdh_int16, &sdc.sdh_ssn, sizeof (sdc.sdh_ssn));
+	mdb_nhconvert(&sdh_int32, &sdc.sdh_payload_id,
+	    sizeof (sdc.sdh_payload_id));
+	mdb_printf("\tssn\t%?hu\tppid\t%?d\n", sdh_int16, sdh_int32);
+
+	return (0);
+}
+
+static int
+sctp_sent_list(mblk_t *addr)
+{
+	mblk_t meta, mp;
+
+	if (!addr)
+		return (0);
+
+	if (mdb_vread(&meta, sizeof (meta), (uintptr_t)addr) == -1)
+		return (-1);
+
+	for (;;) {
+		dump_msghdr(&meta);
+
+		if (meta.b_cont == NULL) {
+			mdb_printf("No data chunks with message header!\n");
+			return (-1);
+		}
+		if (mdb_vread(&mp, sizeof (mp),
+			(uintptr_t)meta.b_cont) == -1) {
+			return (-1);
+		}
+		for (;;) {
+			dump_datahdr(&mp);
+			if (!mp.b_next)
+				break;
+
+			if (mdb_vread(&mp, sizeof (mp),
+			    (uintptr_t)(mp.b_next)) == -1)
+				return (-1);
+		}
+		if (meta.b_next == NULL)
+			break;
+		if (mdb_vread(&meta, sizeof (meta),
+		    (uintptr_t)meta.b_next) == -1)
+			return (-1);
+	}
+
+	return (0);
+}
+
+static int
+sctp_unsent_list(mblk_t *addr)
+{
+	mblk_t meta;
+
+	if (!addr)
+		return (0);
+
+	if (mdb_vread(&meta, sizeof (meta), (uintptr_t)addr) == -1)
+		return (-1);
+
+	for (;;) {
+		dump_msghdr(&meta);
+
+		if (meta.b_next == NULL)
+			break;
+
+		if (mdb_vread(&meta, sizeof (meta),
+		    (uintptr_t)meta.b_next) == -1)
+			return (-1);
+	}
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+sctp_xmit_list(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
+{
+	sctp_t sctp;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&sctp, sizeof (sctp), addr) == -1)
+		return (DCMD_ERR);
+
+	mdb_printf("%<b>Chunkified TX list%</b>\n");
+	if (sctp_sent_list(sctp.sctp_xmit_head) < 0)
+		return (DCMD_ERR);
+
+	mdb_printf("%<b>Unchunkified TX list%</b>\n");
+	if (sctp_unsent_list(sctp.sctp_xmit_unsent) < 0)
+		return (DCMD_ERR);
+
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+sctp_mdata_chunk(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
+{
+	sctp_data_hdr_t dc;
+	mblk_t mp;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&mp, sizeof (mp), addr) == -1)
+		return (DCMD_ERR);
+
+	if (mdb_vread(&dc, sizeof (dc), (uintptr_t)mp.b_rptr) == -1)
+		return (DCMD_ERR);
+
+	mdb_printf("%<b>%-?p%</b>tsn\t%?x\tsid\t%?hu\n", addr,
+	    dc.sdh_tsn, dc.sdh_sid);
+	mdb_printf("%-?sssn\t%?hu\tppid\t%?x\n", "", dc.sdh_ssn,
+	    dc.sdh_payload_id);
+
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+sctp_istr_msgs(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
+{
+	mblk_t			istrmp;
+	mblk_t			dmp;
+	sctp_data_hdr_t 	dp;
+	uintptr_t		daddr;
+	uintptr_t		chaddr;
+	boolean_t		bbit;
+	boolean_t		ebit;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	do {
+		if (mdb_vread(&istrmp, sizeof (istrmp), addr) == -1)
+			return (DCMD_ERR);
+
+		mdb_printf("\tistr mblk at %p: next: %?p\n"
+		    "\t\tprev: %?p\tcont: %?p\n", addr, istrmp.b_next,
+		    istrmp.b_prev, istrmp.b_cont);
+		daddr = (uintptr_t)&istrmp;
+		do {
+			if (mdb_vread(&dmp, sizeof (dmp), daddr) == -1)
+				break;
+			chaddr = (uintptr_t)dmp.b_rptr;
+			if (mdb_vread(&dp, sizeof (dp), chaddr) == -1)
+				break;
+
+			bbit = (SCTP_DATA_GET_BBIT(&dp) != 0);
+			ebit = (SCTP_DATA_GET_EBIT(&dp) != 0);
+
+			mdb_printf("\t\t\ttsn: %x  bbit: %d  ebit: %d\n",
+			    dp.sdh_tsn, bbit, ebit);
+
+
+			daddr = (uintptr_t)dmp.b_cont;
+		} while (daddr != NULL);
+
+		addr = (uintptr_t)istrmp.b_next;
+	} while (addr != NULL);
+
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+sctp_reass_list(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
+{
+	sctp_reass_t srp;
+	mblk_t srpmp;
+	sctp_data_hdr_t dp;
+	mblk_t dmp;
+	uintptr_t daddr;
+	uintptr_t chaddr;
+	boolean_t bbit, ebit;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	do {
+		if (mdb_vread(&srpmp, sizeof (srpmp), addr) == -1)
+			return (DCMD_ERR);
+
+		if (mdb_vread(&srp, sizeof (srp),
+		    (uintptr_t)srpmp.b_datap->db_base) == -1)
+			return (DCMD_ERR);
+
+		mdb_printf("\treassembly mblk at %p: next: %?p\n"
+		    "\t\tprev: %?p\tcont: %?p\n", addr, srpmp.b_next,
+		    srpmp.b_prev, srpmp.b_cont);
+		mdb_printf("\t\tssn: %hu\tneeded: %hu\tgot: %hu\ttail: %?p\n"
+		    "\t\tpartial_delivered: %s\n", srp.ssn, srp.needed,
+		    srp.got, srp.tail, srp.partial_delivered ? "TRUE" :
+		    "FALSE");
+
+		/* display the contents of this ssn's reassemby list */
+		daddr = DB_TYPE(&srpmp) == M_CTL ? (uintptr_t)srpmp.b_cont :
+		    (uintptr_t)&srpmp;
+		do {
+			if (mdb_vread(&dmp, sizeof (dmp), daddr) == -1)
+				break;
+			chaddr = (uintptr_t)dmp.b_rptr;
+			if (mdb_vread(&dp, sizeof (dp), chaddr) == -1)
+				break;
+
+			bbit = (SCTP_DATA_GET_BBIT(&dp) != 0);
+			ebit = (SCTP_DATA_GET_EBIT(&dp) != 0);
+
+			mdb_printf("\t\t\ttsn: %x  bbit: %d  ebit: %d\n",
+			    dp.sdh_tsn, bbit, ebit);
+
+			daddr = (uintptr_t)dmp.b_cont;
+		} while (daddr != NULL);
+
+		addr = (uintptr_t)srpmp.b_next;
+	} while (addr != NULL);
+
+	return (DCMD_OK);
+}
+
+/* ARGSUSED */
+static int
+sctp_uo_reass_list(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
+{
+	sctp_data_hdr_t	dp;
+	mblk_t		dmp;
+	uintptr_t	chaddr;
+	boolean_t	bbit;
+	boolean_t	ebit;
+	boolean_t	ubit;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	do {
+		if (mdb_vread(&dmp, sizeof (dmp), addr) == -1)
+			return (DCMD_ERR);
+
+		mdb_printf("\treassembly mblk at %p: next: %?p\n"
+		    "\t\tprev: %?p\n", addr, dmp.b_next, dmp.b_prev);
+
+		chaddr = (uintptr_t)dmp.b_rptr;
+		if (mdb_vread(&dp, sizeof (dp), chaddr) == -1)
+			break;
+
+		bbit = (SCTP_DATA_GET_BBIT(&dp) != 0);
+		ebit = (SCTP_DATA_GET_EBIT(&dp) != 0);
+		ubit = (SCTP_DATA_GET_UBIT(&dp) != 0);
+
+		mdb_printf("\t\t\tsid: %hu ssn: %hu tsn: %x "
+		    "flags: %x (U=%d B=%d E=%d)\n", dp.sdh_sid, dp.sdh_ssn,
+		    dp.sdh_tsn, dp.sdh_flags, ubit, bbit, ebit);
+
+		addr = (uintptr_t)dmp.b_next;
+	} while (addr != NULL);
+
+	return (DCMD_OK);
+}
+
+static int
+sctp_instr(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
+{
+	sctp_instr_t sip;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&sip, sizeof (sip), addr) == -1)
+		return (DCMD_ERR);
+
+	mdb_printf("%<b>%-?p%</b>\n\tmsglist\t%?p\tnmsgs\t%?d\n"
+	    "\tnextseq\t%?d\treass\t%?p\n", addr, sip.istr_msgs,
+	    sip.istr_nmsgs, sip.nextseq, sip.istr_reass);
+	mdb_set_dot(addr + sizeof (sip));
+
+	return (sctp_reass_list((uintptr_t)sip.istr_reass, flags, ac, av));
+}
+
+static const char *
+state2str(sctp_t *sctp)
+{
+	switch (sctp->sctp_state) {
+	case SCTPS_IDLE:		return ("SCTPS_IDLE");
+	case SCTPS_BOUND:		return ("SCTPS_BOUND");
+	case SCTPS_LISTEN:		return ("SCTPS_LISTEN");
+	case SCTPS_COOKIE_WAIT:		return ("SCTPS_COOKIE_WAIT");
+	case SCTPS_COOKIE_ECHOED:	return ("SCTPS_COOKIE_ECHOED");
+	case SCTPS_ESTABLISHED:		return ("SCTPS_ESTABLISHED");
+	case SCTPS_SHUTDOWN_PENDING:	return ("SCTPS_SHUTDOWN_PENDING");
+	case SCTPS_SHUTDOWN_SENT:	return ("SCTPS_SHUTDOWN_SENT");
+	case SCTPS_SHUTDOWN_RECEIVED:	return ("SCTPS_SHUTDOWN_RECEIVED");
+	case SCTPS_SHUTDOWN_ACK_SENT:	return ("SCTPS_SHUTDOWN_ACK_SENT");
+	default:			return ("UNKNOWN STATE");
+	}
+}
+
+static void
+show_sctp_flags(sctp_t *sctp)
+{
+	mdb_printf("\tunderstands_asconf\t%d\n",
+	    sctp->sctp_understands_asconf);
+	mdb_printf("\tdebug\t\t\t%d\n", sctp->sctp_debug);
+	mdb_printf("\tdontroute\t\t%d\n", sctp->sctp_dontroute);
+	mdb_printf("\tbroadcast\t\t%d\n", sctp->sctp_broadcast);
+
+	mdb_printf("\tuseloopback\t\t%d\n", sctp->sctp_useloopback);
+	mdb_printf("\tcchunk_pend\t\t%d\n", sctp->sctp_cchunk_pend);
+	mdb_printf("\tdgram_errind\t\t%d\n", sctp->sctp_dgram_errind);
+	mdb_printf("\treuseaddr\t\t%d\n", sctp->sctp_reuseaddr);
+
+	mdb_printf("\tlinger\t\t\t%d\n", sctp->sctp_linger);
+	if (sctp->sctp_lingering)
+		return;
+	mdb_printf("\tlingering\t\t%d\n", sctp->sctp_lingering);
+	mdb_printf("\tloopback\t\t%d\n", sctp->sctp_loopback);
+	mdb_printf("\tforce_sack\t\t%d\n", sctp->sctp_force_sack);
+
+	mdb_printf("\tack_timer_runing\t%d\n", sctp->sctp_ack_timer_running);
+	mdb_printf("\trecvdstaddr\t\t%d\n", sctp->sctp_recvdstaddr);
+	mdb_printf("\thwcksum\t\t\t%d\n", sctp->sctp_hwcksum);
+	mdb_printf("\tunderstands_addip\t%d\n", sctp->sctp_understands_addip);
+
+	mdb_printf("\tbound_to_all\t\t%d\n", sctp->sctp_bound_to_all);
+	mdb_printf("\tcansleep\t\t%d\n", sctp->sctp_cansleep);
+	mdb_printf("\tdetached\t\t%d\n", sctp->sctp_detached);
+	mdb_printf("\tsend_adaption\t\t%d\n", sctp->sctp_send_adaption);
+
+	mdb_printf("\trecv_adaption\t\t%d\n", sctp->sctp_recv_adaption);
+	mdb_printf("\tndelay\t\t\t%d\n", sctp->sctp_ndelay);
+	mdb_printf("\tcondemned\t\t%d\n", sctp->sctp_condemned);
+	mdb_printf("\tchk_fast_rexmit\t\t%d\n", sctp->sctp_chk_fast_rexmit);
+	mdb_printf("\tprsctp_aware\t\t%d\n", sctp->sctp_prsctp_aware);
+
+	mdb_printf("\trecvsndrcvinfo\t\t%d\n", sctp->sctp_recvsndrcvinfo);
+	mdb_printf("\trecvassocevnt\t\t%d\n", sctp->sctp_recvassocevnt);
+	mdb_printf("\trecvpathevnt\t\t%d\n", sctp->sctp_recvpathevnt);
+	mdb_printf("\trecvsendfailevnt\t%d\n", sctp->sctp_recvsendfailevnt);
+
+	mdb_printf("\trecvpeerevnt\t\t%d\n", sctp->sctp_recvpeererr);
+	mdb_printf("\trecvchutdownevnt\t%d\n", sctp->sctp_recvshutdownevnt);
+	mdb_printf("\trecvcpdnevnt\t\t%d\n", sctp->sctp_recvpdevnt);
+	mdb_printf("\trecvcalevnt\t\t%d\n\n", sctp->sctp_recvalevnt);
+}
+
+/*
+ * Given a sctp_saddr_ipif_t, print out its address.  This assumes
+ * that addr contains the sctp_addr_ipif_t structure already and this
+ * function does not need to read it in.
+ */
+/* ARGSUSED */
+static int
+print_saddr(uintptr_t ptr, const void *addr, void *cbdata)
+{
+	sctp_saddr_ipif_t *saddr = (sctp_saddr_ipif_t *)addr;
+	sctp_ipif_t ipif;
+	char *statestr;
+
+	/* Read in the sctp_ipif object */
+	if (mdb_vread(&ipif, sizeof (ipif), (uintptr_t)saddr->saddr_ipifp) ==
+	    -1) {
+		mdb_warn("cannot read ipif at %p", saddr->saddr_ipifp);
+		return (WALK_ERR);
+	}
+
+	switch (ipif.sctp_ipif_state) {
+	case SCTP_IPIFS_CONDEMNED:
+		statestr = "SCTP_IPIFS_CONDEMNED";
+		break;
+	case SCTP_IPIFS_INVALID:
+		statestr = "SCTP_IPIFS_INVALID";
+		break;
+	case SCTP_IPIFS_DOWN:
+		statestr = "SCTP_IPIFS_DOWN";
+		break;
+	case SCTP_IPIFS_UP:
+		statestr = "SCTP_IPIFS_UP";
+		break;
+	default:
+		statestr = "Unknown state";
+		break;
+	}
+	mdb_printf("\t%N\tmtu %d id %d %d %s\n", &ipif.sctp_ipif_saddr,
+	    ipif.sctp_ipif_mtu, ipif.sctp_ipif_id,
+	    ipif.sctp_ipif_zoneid, statestr);
+
+	return (WALK_NEXT);
+}
+
+/*
+ * Given a sctp_faddr_t, print out its address.  This assumes that
+ * addr contains the sctp_faddr_t structure already and this function
+ * does not need to read it in.
+ */
+static int
+print_faddr(uintptr_t ptr, const void *addr, void *cbdata)
+{
+	sctp_faddr_t *faddr = (sctp_faddr_t *)addr;
+	int *i = cbdata;
+
+	mdb_printf("\t%d:\t%N\t%?p\n", (*i)++, &faddr->faddr, ptr);
+	return (WALK_NEXT);
+}
+
+int
+sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	sctp_t sctp;
+	conn_t connp;
+	int i;
+	uint_t opts = 0;
+	uint_t paddr = 0;
+	in_port_t lport, fport;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&sctp, sizeof (sctp), addr) == -1) {
+		mdb_warn("failed to read sctp_t at: %p\n", addr);
+		return (DCMD_ERR);
+	}
+	if (mdb_vread(&connp, sizeof (connp),
+	    (uintptr_t)sctp.sctp_connp) == -1) {
+		mdb_warn("failed to read conn_t at: %p\n", sctp.sctp_connp);
+		return (DCMD_ERR);
+	}
+
+	if (mdb_getopts(argc, argv,
+		'a', MDB_OPT_SETBITS, MDB_SCTP_SHOW_ALL, &opts,
+		'f', MDB_OPT_SETBITS, MDB_SCTP_SHOW_FLAGS, &opts,
+		'h', MDB_OPT_SETBITS, MDB_SCTP_SHOW_HASH, &opts,
+		'o', MDB_OPT_SETBITS, MDB_SCTP_SHOW_OUT, &opts,
+		'i', MDB_OPT_SETBITS, MDB_SCTP_SHOW_IN, &opts,
+		'm', MDB_OPT_SETBITS, MDB_SCTP_SHOW_MISC, &opts,
+		'r', MDB_OPT_SETBITS, MDB_SCTP_SHOW_RTT, &opts,
+		'S', MDB_OPT_SETBITS, MDB_SCTP_SHOW_STATS, &opts,
+		'F', MDB_OPT_SETBITS, MDB_SCTP_SHOW_FLOW, &opts,
+		'H', MDB_OPT_SETBITS, MDB_SCTP_SHOW_HDR, &opts,
+		'p', MDB_OPT_SETBITS, MDB_SCTP_SHOW_PMTUD, &opts,
+		'R', MDB_OPT_SETBITS, MDB_SCTP_SHOW_RXT, &opts,
+		'C', MDB_OPT_SETBITS, MDB_SCTP_SHOW_CONN, &opts,
+		'c', MDB_OPT_SETBITS, MDB_SCTP_SHOW_CLOSE, &opts,
+		'e', MDB_OPT_SETBITS, MDB_SCTP_SHOW_EXT, &opts,
+		'P', MDB_OPT_SETBITS, 1, &paddr,
+		'd', MDB_OPT_SETBITS, MDB_SCTP_DUMP_ADDRS, &opts) != argc) {
+		return (DCMD_USAGE);
+	}
+
+	/* non-verbose faddrs, suitable for pipelines to sctp_faddr */
+	if (paddr != 0) {
+		sctp_faddr_t faddr, *fp;
+		for (fp = sctp.sctp_faddrs; fp != NULL; fp = faddr.next) {
+			if (mdb_vread(&faddr, sizeof (faddr), (uintptr_t)fp)
+			    == -1) {
+				mdb_warn("failed to read faddr at %p",
+				    fp);
+				return (DCMD_ERR);
+			}
+			mdb_printf("%p\n", fp);
+		}
+		return (DCMD_OK);
+	}
+
+	mdb_nhconvert(&lport, &sctp.sctp_lport, sizeof (lport));
+	mdb_nhconvert(&fport, &sctp.sctp_fport, sizeof (fport));
+	mdb_printf("%<u>%p% %22s S=%-6hu D=%-6hu% ZONE=%d%</u>", addr,
+	    state2str(&sctp), lport, fport, connp.conn_zoneid);
+
+	if (sctp.sctp_faddrs) {
+		sctp_faddr_t faddr;
+		if (mdb_vread(&faddr, sizeof (faddr),
+		    (uintptr_t)sctp.sctp_faddrs) != -1)
+			mdb_printf("%<u> %N%</u>", &faddr.faddr);
+	}
+	mdb_printf("\n");
+
+	if (opts & MDB_SCTP_DUMP_ADDRS) {
+		mdb_printf("%<b>Local and Peer Addresses%</b>\n");
+
+		/* Display source addresses */
+		mdb_printf("nsaddrs\t\t%?d\n", sctp.sctp_nsaddrs);
+		(void) mdb_pwalk("sctp_walk_saddr", print_saddr, NULL, addr);
+
+		/* Display peer addresses */
+		mdb_printf("faddrs\t\t%?p\n", sctp.sctp_faddrs);
+		i = 1;
+		(void) mdb_pwalk("sctp_walk_faddr", print_faddr, &i, addr);
+
+		mdb_printf("lastfaddr\t%?p\tprimary\t\t%?p\n",
+		    sctp.sctp_lastfaddr, sctp.sctp_primary);
+		mdb_printf("current\t\t%?p\tlastdata\t%?p\n",
+		    sctp.sctp_current, sctp.sctp_lastdata);
+	}
+
+	if (opts & MDB_SCTP_SHOW_OUT) {
+		mdb_printf("%<b>Outbound Data%</b>\n");
+		mdb_printf("xmit_head\t%?p\txmit_tail\t%?p\n",
+		    sctp.sctp_xmit_head, sctp.sctp_xmit_tail);
+		mdb_printf("xmit_unsent\t%?p\txmit_unsent_tail%?p\n",
+		    sctp.sctp_xmit_unsent, sctp.sctp_xmit_unsent_tail);
+		mdb_printf("xmit_unacked\t%?p\n", sctp.sctp_xmit_unacked);
+		mdb_printf("unacked\t\t%?u\tunsent\t\t%?ld\n",
+		    sctp.sctp_unacked, sctp.sctp_unsent);
+		mdb_printf("ltsn\t\t%?x\tlastack_rxd\t%?x\n",
+		    sctp.sctp_ltsn, sctp.sctp_lastack_rxd);
+		mdb_printf("recovery_tsn\t%?x\tadv_pap\t\t%?x\n",
+		    sctp.sctp_recovery_tsn, sctp.sctp_adv_pap);
+		mdb_printf("num_ostr\t%?hu\tostrcntrs\t%?p\n",
+		    sctp.sctp_num_ostr, sctp.sctp_ostrcntrs);
+
+		mdb_printf("%<b>Default Send Parameters%</b>\n");
+		mdb_printf("def_stream\t%?u\tdef_flags\t%?x\n",
+		    sctp.sctp_def_stream, sctp.sctp_def_flags);
+		mdb_printf("def_ppid\t%?x\tdef_context\t%?x\n",
+		    sctp.sctp_def_ppid, sctp.sctp_def_context);
+		mdb_printf("def_timetolive\t%?u\n",
+		    sctp.sctp_def_timetolive);
+	}
+
+	if (opts & MDB_SCTP_SHOW_IN) {
+		mdb_printf("%<b>Inbound Data%</b>\n");
+		mdb_printf("sack_info\t%?p\tsack_gaps\t%?d\n",
+		    sctp.sctp_sack_info, sctp.sctp_sack_gaps);
+		dump_sack_info((uintptr_t)sctp.sctp_sack_info);
+		mdb_printf("ftsn\t\t%?x\tlastacked\t%?x\n",
+		    sctp.sctp_ftsn, sctp.sctp_lastacked);
+		mdb_printf("istr_nmsgs\t%?d\tsack_toggle\t%?d\n",
+		    sctp.sctp_istr_nmsgs, sctp.sctp_sack_toggle);
+		mdb_printf("ack_mp\t\t%?p\n", sctp.sctp_ack_mp);
+		mdb_printf("num_istr\t%?hu\tinstr\t\t%?p\n",
+		    sctp.sctp_num_istr, sctp.sctp_instr);
+		mdb_printf("unord_reass\t%?p\n", sctp.sctp_uo_frags);
+	}
+
+	if (opts & MDB_SCTP_SHOW_RTT) {
+		mdb_printf("%<b>RTT Tracking%</b>\n");
+		mdb_printf("rtt_tsn\t\t%?x\tout_time\t%?ld\n",
+		    sctp.sctp_rtt_tsn, sctp.sctp_out_time);
+	}
+
+	if (opts & MDB_SCTP_SHOW_FLOW) {
+		mdb_printf("%<b>Flow Control%</b>\n");
+		mdb_printf("txmit_hiwater\t%?d\n"
+		    "xmit_lowater\t%?d\tfrwnd\t\t%?u\n"
+		    "rwnd\t\t%?u\trxqueued\t%?u\n"
+		    "cwnd_max\t%?u\n", sctp.sctp_xmit_hiwater,
+		    sctp.sctp_xmit_lowater, sctp.sctp_frwnd,
+		    sctp.sctp_rwnd, sctp.sctp_rxqueued, sctp.sctp_cwnd_max);
+	}
+
+	if (opts & MDB_SCTP_SHOW_HDR) {
+		mdb_printf("%<b>Composite Headers%</b>\n");
+		mdb_printf("iphc\t\t%?p\tiphc6\t\t%?p\n"
+		    "iphc_len\t%?d\tiphc6_len\t%?d\n"
+		    "hdr_len\t\t%?d\thdr6_len\t%?d\n"
+		    "ipha\t\t%?p\tip6h\t\t%?p\n"
+		    "ip_hdr_len\t%?d\tip_hdr6_len\t%?d\n"
+		    "sctph\t\t%?p\tsctph6\t\t%?p\n"
+		    "lvtag\t\t%?x\tfvtag\t\t%?x\n", sctp.sctp_iphc,
+		    sctp.sctp_iphc6, sctp.sctp_iphc_len,
+		    sctp.sctp_iphc6_len, sctp.sctp_hdr_len,
+		    sctp.sctp_hdr6_len, sctp.sctp_ipha, sctp.sctp_ip6h,
+		    sctp.sctp_ip_hdr_len, sctp.sctp_ip_hdr6_len,
+		    sctp.sctp_sctph, sctp.sctp_sctph6, sctp.sctp_lvtag,
+		    sctp.sctp_fvtag);
+	}
+
+	if (opts & MDB_SCTP_SHOW_PMTUD) {
+		mdb_printf("%<b>PMTUd%</b>\n");
+		mdb_printf("last_mtu_probe\t%?ld\tmtu_probe_intvl\t%?ld\n"
+		    "mss\t\t%?u\n",
+		    sctp.sctp_last_mtu_probe, sctp.sctp_mtu_probe_intvl,
+		    sctp.sctp_mss);
+	}
+
+	if (opts & MDB_SCTP_SHOW_RXT) {
+		mdb_printf("%<b>Retransmit Info%</b>\n");
+		mdb_printf("cookie_mp\t%?p\tstrikes\t\t%?d\n"
+		    "max_init_rxt\t%?d\tpa_max_rxt\t%?d\n"
+		    "pp_max_rxt\t%?d\trto_max\t\t%?u\n"
+		    "rto_min\t\t%?u\trto_initial\t%?u\n"
+		    "init_rto_max\t%?u\n", sctp.sctp_cookie_mp,
+		    sctp.sctp_strikes, sctp.sctp_max_init_rxt,
+		    sctp.sctp_pa_max_rxt, sctp.sctp_pp_max_rxt,
+		    sctp.sctp_rto_max, sctp.sctp_rto_min,
+		    sctp.sctp_rto_initial, sctp.sctp_init_rto_max);
+	}
+
+	if (opts & MDB_SCTP_SHOW_CONN) {
+		mdb_printf("%<b>Connection State%</b>\n");
+		mdb_printf("last_secret_update%?ld\n",
+		    sctp.sctp_last_secret_update);
+
+		mdb_printf("secret\t\t");
+		for (i = 0; i < SCTP_SECRET_LEN; i++) {
+			if (i % 2 == 0)
+				mdb_printf("0x%02x", sctp.sctp_secret[i]);
+			else
+				mdb_printf("%02x ", sctp.sctp_secret[i]);
+		}
+		mdb_printf("\n");
+		mdb_printf("old_secret\t");
+		for (i = 0; i < SCTP_SECRET_LEN; i++) {
+			if (i % 2 == 0)
+				mdb_printf("0x%02x", sctp.sctp_old_secret[i]);
+			else
+				mdb_printf("%02x ", sctp.sctp_old_secret[i]);
+		}
+		mdb_printf("\n");
+	}
+
+	if (opts & MDB_SCTP_SHOW_STATS) {
+		mdb_printf("%<b>Stats Counters%</b>\n");
+		mdb_printf("opkts\t\t%?llu\tobchunks\t%?llu\n"
+		    "odchunks\t%?llu\toudchunks\t%?llu\n"
+		    "rxtchunks\t%?llu\tT1expire\t%?lu\n"
+		    "T2expire\t%?lu\tT3expire\t%?lu\n"
+		    "msgcount\t%?llu\tprsctpdrop\t%?llu\n"
+		    "AssocStartTime\t%?lu\n",
+		    sctp.sctp_opkts, sctp.sctp_obchunks,
+		    sctp.sctp_odchunks, sctp.sctp_oudchunks,
+		    sctp.sctp_rxtchunks, sctp.sctp_T1expire,
+		    sctp.sctp_T2expire, sctp.sctp_T3expire,
+		    sctp.sctp_msgcount, sctp.sctp_prsctpdrop,
+		    sctp.sctp_assoc_start_time);
+		mdb_printf("ipkts\t\t%?llu\tibchunks\t%?llu\n"
+		    "idchunks\t%?llu\tiudchunks\t%?llu\n"
+		    "fragdmsgs\t%?llu\treassmsgs\t%?llu\n",
+		    sctp.sctp_ipkts, sctp.sctp_ibchunks,
+		    sctp.sctp_idchunks, sctp.sctp_iudchunks,
+		    sctp.sctp_fragdmsgs, sctp.sctp_reassmsgs);
+	}
+
+	if (opts & MDB_SCTP_SHOW_HASH) {
+		mdb_printf("%<b>Hash Tables%</b>\n");
+		mdb_printf("conn_hash_next\t%?p\t", sctp.sctp_conn_hash_next);
+		mdb_printf("conn_hash_prev\t%?p\n", sctp.sctp_conn_hash_prev);
+		mdb_printf("[ conn_hash bucket\t%?d ]\n",
+		    SCTP_CONN_HASH(sctp.sctp_ports));
+
+		mdb_printf("listen_hash_next%?p\t",
+		    sctp.sctp_listen_hash_next);
+		mdb_printf("listen_hash_prev%?p\n",
+		    sctp.sctp_listen_hash_prev);
+		mdb_nhconvert(&lport, &sctp.sctp_lport, sizeof (lport));
+		mdb_printf("[ listen_hash bucket\t%?d ]\n",
+		    SCTP_LISTEN_HASH(lport));
+
+		mdb_printf("conn_tfp\t%?p\t", sctp.sctp_conn_tfp);
+		mdb_printf("listen_tfp\t%?p\n", sctp.sctp_listen_tfp);
+
+		mdb_printf("bind_hash\t%?p\tptpbhn\t\t%?p\n",
+		    sctp.sctp_bind_hash, sctp.sctp_ptpbhn);
+		mdb_printf("bind_lockp\t%?p\n",
+		    sctp.sctp_bind_lockp);
+		mdb_printf("[ bind_hash bucket\t%?d ]\n",
+		    SCTP_BIND_HASH(lport));
+	}
+
+	if (opts & MDB_SCTP_SHOW_CLOSE) {
+		mdb_printf("%<b>Cleanup / Close%</b>\n");
+		mdb_printf("shutdown_faddr\t%?p\tclient_errno\t%?d\n"
+		    "lingertime\t%?d\trefcnt\t\t%?hu\n",
+		    sctp.sctp_shutdown_faddr, sctp.sctp_client_errno,
+		    sctp.sctp_lingertime, sctp.sctp_refcnt);
+	}
+
+	if (opts & MDB_SCTP_SHOW_MISC) {
+		mdb_printf("%<b>Miscellaneous%</b>\n");
+		mdb_printf("bound_if\t%?u\theartbeat_mp\t%?p\n"
+		    "family\t\t%?u\tipversion\t%?hu\n"
+		    "hb_interval\t%?u\tautoclose\t%?d\n"
+		    "active\t\t%?ld\ttx_adaption_code%?x\n"
+		    "rx_adaption_code%?x\ttimer_mp\t%?p\n",
+		    sctp.sctp_bound_if, sctp.sctp_heartbeat_mp,
+		    sctp.sctp_family, sctp.sctp_ipversion,
+		    sctp.sctp_hb_interval, sctp.sctp_autoclose,
+		    sctp.sctp_active, sctp.sctp_tx_adaption_code,
+		    sctp.sctp_rx_adaption_code, sctp.sctp_timer_mp);
+	}
+
+	if (opts & MDB_SCTP_SHOW_EXT) {
+		mdb_printf("%<b>Extensions and Reliable Ctl Chunks%</b>\n");
+		mdb_printf("cxmit_list\t%?p\tlcsn\t\t%?x\n"
+		    "fcsn\t\t%?x\n", sctp.sctp_cxmit_list, sctp.sctp_lcsn,
+		    sctp.sctp_fcsn);
+	}
+
+	if (opts & MDB_SCTP_SHOW_FLAGS) {
+		mdb_printf("%<b>Flags%</b>\n");
+		show_sctp_flags(&sctp);
+	}
+
+	return (DCMD_OK);
+}
+
+typedef struct fanout_walk_data {
+	int index;
+	int size;
+	uintptr_t sctp;
+	sctp_tf_t *fanout;
+	uintptr_t (*getnext)(sctp_t *);
+} fanout_walk_data_t;
+
+typedef struct fanout_init {
+	const char *symname;
+	int (*getsize)();
+	uintptr_t (*getnext)(sctp_t *);
+} fanout_init_t;
+
+static uintptr_t
+listen_next(sctp_t *sctp)
+{
+	return ((uintptr_t)sctp->sctp_listen_hash_next);
+}
+
+static int
+listen_size(void)
+{
+	return (SCTP_LISTEN_FANOUT_SIZE);
+}
+
+static uintptr_t
+conn_next(sctp_t *sctp)
+{
+	return ((uintptr_t)sctp->sctp_conn_hash_next);
+}
+
+static int
+conn_size(void)
+{
+	GElf_Sym sym;
+	int size;
+
+	if (mdb_lookup_by_name("sctp_conn_hash_size", &sym) == -1) {
+		mdb_warn("can't read 'sctp_conn_hash_size'");
+		return (1);
+	}
+	if (mdb_vread(&size, sizeof (size), sym.st_value) == -1) {
+		mdb_warn("can't dereference 'sctp_conn_hash_size'");
+		return (1);
+	}
+	return (size);
+}
+
+static uintptr_t
+bind_next(sctp_t *sctp)
+{
+	return ((uintptr_t)sctp->sctp_bind_hash);
+}
+
+static int
+bind_size(void)
+{
+	return (SCTP_BIND_FANOUT_SIZE);
+}
+
+static intptr_t
+find_next_hash_item(fanout_walk_data_t *fw)
+{
+	sctp_tf_t tf;
+	sctp_t sctp;
+
+	/* first try to continue down the hash chain */
+	if (fw->sctp != NULL) {
+		/* try to get next in hash chain */
+		if (mdb_vread(&sctp, sizeof (sctp), fw->sctp) == -1) {
+			mdb_warn("failed to read sctp at %p", fw->sctp);
+			return (NULL);
+		}
+		fw->sctp = fw->getnext(&sctp);
+		if (fw->sctp != NULL)
+			return (fw->sctp);
+		else
+			/* end of chain; go to next bucket */
+			fw->index++;
+	}
+
+	/* find a new hash chain, traversing the buckets */
+	for (; fw->index < fw->size; fw->index++) {
+		/* read the current hash line for an sctp */
+		if (mdb_vread(&tf, sizeof (tf),
+			(uintptr_t)(fw->fanout + fw->index)) == -1) {
+			mdb_warn("failed to read tf at %p",
+			    fw->fanout + fw->index);
+			return (NULL);
+		}
+		if (tf.tf_sctp != NULL) {
+			/* start of a new chain */
+			fw->sctp = (uintptr_t)tf.tf_sctp;
+			return (fw->sctp);
+		}
+	}
+	return (NULL);
+}
+
+static int
+fanout_walk_init(mdb_walk_state_t *wsp)
+{
+	GElf_Sym sym;
+	fanout_walk_data_t *lw;
+	fanout_init_t *fi = wsp->walk_arg;
+
+	if (mdb_lookup_by_name(fi->symname, &sym) == -1) {
+		mdb_warn("failed to read '%s'", fi->symname);
+		return (WALK_ERR);
+	}
+
+	lw = mdb_alloc(sizeof (*lw), UM_SLEEP);
+	lw->index = 0;
+	lw->size = fi->getsize();
+	lw->sctp = NULL;
+	lw->fanout = (sctp_tf_t *)sym.st_value;
+	lw->getnext = fi->getnext;
+
+	if ((wsp->walk_addr = find_next_hash_item(lw)) == NULL) {
+		return (WALK_DONE);
+	}
+	wsp->walk_data = lw;
+	return (WALK_NEXT);
+}
+
+static int
+fanout_walk_step(mdb_walk_state_t *wsp)
+{
+	fanout_walk_data_t *fw = wsp->walk_data;
+	uintptr_t addr = wsp->walk_addr;
+	sctp_t sctp;
+	int status;
+
+	if (mdb_vread(&sctp, sizeof (sctp), addr) == -1) {
+		mdb_warn("failed to read sctp at %p", addr);
+		return (WALK_DONE);
+	}
+
+	status = wsp->walk_callback(addr, &sctp, wsp->walk_cbdata);
+	if (status != WALK_NEXT)
+		return (status);
+
+	if ((wsp->walk_addr = find_next_hash_item(fw)) == NULL)
+		return (WALK_DONE);
+
+	return (WALK_NEXT);
+}
+
+static void
+fanout_walk_fini(mdb_walk_state_t *wsp)
+{
+	fanout_walk_data_t *fw = wsp->walk_data;
+
+	mdb_free(fw, sizeof (*fw));
+}
+
+static int
+sctp_walk_init(mdb_walk_state_t *wsp)
+{
+	wsp->walk_addr = (uintptr_t)list_object(&sctp_list,
+	    sctp_list.list_head.list_next);
+	return (WALK_NEXT);
+}
+
+static int
+sctp_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t psctp = wsp->walk_addr;
+	sctp_t sctp;
+	int status;
+
+	if (mdb_vread(&sctp, sizeof (sctp), psctp) == -1) {
+		mdb_warn("failed to read sctp at %p", psctp);
+		return (WALK_ERR);
+	}
+	status = wsp->walk_callback(psctp, &sctp, wsp->walk_cbdata);
+	if (status != WALK_NEXT)
+		return (status);
+
+	if ((psctp = (uintptr_t)sctp.sctp_list.list_next) ==
+	    sctp_list_sym.st_value + OFFSETOF(list_t, list_head)) {
+		return (WALK_DONE);
+	} else {
+		wsp->walk_addr = (uintptr_t)list_object(&sctp_list, psctp);
+		return (WALK_NEXT);
+	}
+}
+
+static int
+sctp_walk_faddr_init(mdb_walk_state_t *wsp)
+{
+	sctp_t sctp;
+
+	if (wsp->walk_addr == NULL)
+		return (WALK_ERR);
+
+	if (mdb_vread(&sctp, sizeof (sctp), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read sctp at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	if ((wsp->walk_addr = (uintptr_t)sctp.sctp_faddrs) != NULL)
+		return (WALK_NEXT);
+	else
+		return (WALK_DONE);
+}
+
+static int
+sctp_walk_faddr_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t faddr_ptr = wsp->walk_addr;
+	sctp_faddr_t sctp_faddr;
+	int status;
+
+	if (mdb_vread(&sctp_faddr, sizeof (sctp_faddr_t), faddr_ptr) == -1) {
+		mdb_warn("failed to read sctp_faddr_t at %p", faddr_ptr);
+		return (WALK_ERR);
+	}
+	status = wsp->walk_callback(faddr_ptr, &sctp_faddr, wsp->walk_cbdata);
+	if (status != WALK_NEXT)
+		return (status);
+	if ((faddr_ptr = (uintptr_t)sctp_faddr.next) == NULL) {
+		return (WALK_DONE);
+	} else {
+		wsp->walk_addr = faddr_ptr;
+		return (WALK_NEXT);
+	}
+}
+
+/*
+ * Helper structure for sctp_walk_saddr.  It stores the sctp_t being walked,
+ * the current index to the sctp_saddrs[], and the current count of the
+ * sctp_saddr_ipif_t list.
+ */
+typedef struct {
+	sctp_t	sctp;
+	int	hash_index;
+	int	cur_cnt;
+} saddr_walk_t;
+
+static int
+sctp_walk_saddr_init(mdb_walk_state_t *wsp)
+{
+	sctp_t *sctp;
+	int i;
+	saddr_walk_t *swalker;
+
+	if (wsp->walk_addr == NULL)
+		return (WALK_ERR);
+
+	swalker = mdb_alloc(sizeof (saddr_walk_t), UM_SLEEP);
+	sctp = &swalker->sctp;
+	if (mdb_vread(sctp, sizeof (sctp_t), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read sctp at %p", wsp->walk_addr);
+		mdb_free(swalker, sizeof (saddr_walk_t));
+		return (WALK_ERR);
+	}
+
+	/* Find the first source address. */
+	for (i = 0; i < SCTP_IPIF_HASH; i++) {
+		if (sctp->sctp_saddrs[i].ipif_count > 0) {
+			list_t *addr_list;
+
+			addr_list = &sctp->sctp_saddrs[i].sctp_ipif_list;
+			wsp->walk_addr = (uintptr_t)list_object(addr_list,
+			    addr_list->list_head.list_next);
+
+			/* Recode the current info */
+			swalker->hash_index = i;
+			swalker->cur_cnt = 1;
+			wsp->walk_data = swalker;
+
+			return (WALK_NEXT);
+		}
+	}
+	return (WALK_DONE);
+}
+
+static int
+sctp_walk_saddr_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t saddr_ptr = wsp->walk_addr;
+	sctp_saddr_ipif_t saddr;
+	saddr_walk_t *swalker;
+	sctp_t *sctp;
+	int status;
+	int i, j;
+
+	if (mdb_vread(&saddr, sizeof (sctp_saddr_ipif_t), saddr_ptr) == -1) {
+		mdb_warn("failed to read sctp_saddr_ipif_t at %p", saddr_ptr);
+		return (WALK_ERR);
+	}
+	status = wsp->walk_callback(saddr_ptr, &saddr, wsp->walk_cbdata);
+	if (status != WALK_NEXT)
+		return (status);
+
+	swalker = (saddr_walk_t *)wsp->walk_data;
+	sctp = &swalker->sctp;
+	i = swalker->hash_index;
+	j = swalker->cur_cnt;
+
+	/*
+	 * If there is still a source address in the current list, return it.
+	 * Otherwise, go to the next list in the sctp_saddrs[].
+	 */
+	if (j++ < sctp->sctp_saddrs[i].ipif_count) {
+		wsp->walk_addr = (uintptr_t)saddr.saddr_ipif.list_next;
+		swalker->cur_cnt = j;
+		return (WALK_NEXT);
+	} else {
+		list_t *lst;
+
+		for (i = i + 1; i < SCTP_IPIF_HASH; i++) {
+			if (sctp->sctp_saddrs[i].ipif_count > 0) {
+				lst = &sctp->sctp_saddrs[i].sctp_ipif_list;
+				wsp->walk_addr = (uintptr_t)list_object(
+				    lst, lst->list_head.list_next);
+				swalker->hash_index = i;
+				swalker->cur_cnt = 1;
+				return (WALK_NEXT);
+			}
+		}
+	}
+	return (WALK_DONE);
+}
+
+static void
+sctp_walk_saddr_fini(mdb_walk_state_t *wsp)
+{
+	saddr_walk_t *swalker = (saddr_walk_t *)wsp->walk_data;
+
+	mdb_free(swalker, sizeof (saddr_walk_t));
+}
+
+static int
+sctp_walk_ill_init(mdb_walk_state_t *wsp)
+{
+	intptr_t i;
+
+	/* Find the first ill. */
+	for (i = 0; i < SCTP_ILL_HASH; i++) {
+		if (local_g_ills[i].ill_count > 0) {
+			wsp->walk_addr = (uintptr_t)list_object(
+			    &local_g_ills[i].sctp_ill_list,
+			    local_g_ills[i].sctp_ill_list.list_head.list_next);
+			wsp->walk_data = (void *)i;
+			wsp->walk_arg = (void *)1;
+			return (WALK_NEXT);
+		}
+	}
+	return (WALK_DONE);
+}
+
+static int
+sctp_walk_ill_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t ill_ptr = wsp->walk_addr;
+	sctp_ill_t ill;
+	int status;
+	intptr_t i, j;
+
+	if (mdb_vread(&ill, sizeof (sctp_ill_t), ill_ptr) == -1) {
+		mdb_warn("failed to read sctp_ill_t at %p", ill_ptr);
+		return (WALK_ERR);
+	}
+	status = wsp->walk_callback(ill_ptr, &ill, wsp->walk_cbdata);
+	if (status != WALK_NEXT)
+		return (status);
+
+	i = (intptr_t)wsp->walk_data;
+	j = (intptr_t)wsp->walk_arg;
+
+	/*
+	 * If there is still an ill in the current list, return it.
+	 * Otherwise, go to the next list and find another one.
+	 */
+	if (j++ < local_g_ills[i].ill_count) {
+		wsp->walk_addr = (uintptr_t)ill.sctp_ills.list_next;
+		wsp->walk_data = (void *)i;
+		wsp->walk_arg = (void *)j;
+		return (WALK_NEXT);
+	} else {
+		list_t *ill_list;
+
+		for (i = i + 1; i < SCTP_ILL_HASH; i++) {
+			if (local_g_ills[i].ill_count > 0) {
+				ill_list = &local_g_ills[i].sctp_ill_list;
+				wsp->walk_addr = (uintptr_t)list_object(
+				    ill_list, ill_list->list_head.list_next);
+
+				/* Record the current position. */
+				wsp->walk_data = (void *)i;
+				wsp->walk_arg = (void *)1;
+				return (WALK_NEXT);
+			}
+		}
+	}
+	return (WALK_DONE);
+}
+
+static int
+sctp_walk_ipif_init(mdb_walk_state_t *wsp)
+{
+	intptr_t i;
+	list_t *ipif_list;
+
+	for (i = 0; i < SCTP_IPIF_HASH; i++) {
+		if (local_g_ipifs[i].ipif_count > 0) {
+			ipif_list = &local_g_ipifs[i].sctp_ipif_list;
+
+			wsp->walk_addr = (uintptr_t)list_object(ipif_list,
+			    ipif_list->list_head.list_next);
+			wsp->walk_data = (void *)i;
+			wsp->walk_arg = (void *)1;
+			return (WALK_NEXT);
+		}
+	}
+	return (WALK_DONE);
+}
+
+static int
+sctp_walk_ipif_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t ipif_ptr = wsp->walk_addr;
+	sctp_ipif_t ipif;
+	int status;
+	intptr_t i, j;
+
+	if (mdb_vread(&ipif, sizeof (sctp_ipif_t), ipif_ptr) == -1) {
+		mdb_warn("failed to read sctp_ipif_t at %p", ipif_ptr);
+		return (WALK_ERR);
+	}
+	status = wsp->walk_callback(ipif_ptr, &ipif, wsp->walk_cbdata);
+	if (status != WALK_NEXT)
+		return (status);
+
+	i = (intptr_t)wsp->walk_data;
+	j = (intptr_t)wsp->walk_arg;
+
+	/*
+	 * If there is still an ipif in the current list, return it.
+	 * Otherwise, go to the next list and find another one.
+	 */
+	if (j++ < local_g_ipifs[i].ipif_count) {
+		wsp->walk_addr = (uintptr_t)ipif.sctp_ipifs.list_next;
+		wsp->walk_data = (void *)i;
+		wsp->walk_arg = (void *)j;
+		return (WALK_NEXT);
+	} else {
+		list_t *ipif_list;
+
+		for (i = i + 1; i < SCTP_IPIF_HASH; i++) {
+			if (local_g_ipifs[i].ipif_count > 0) {
+				ipif_list = &local_g_ipifs[i].sctp_ipif_list;
+				wsp->walk_addr = (uintptr_t)list_object(
+				    ipif_list, ipif_list->list_head.list_next);
+
+				/* Record the current position */
+				wsp->walk_data = (void *)i;
+				wsp->walk_arg = (void *)1;
+				return (WALK_NEXT);
+			}
+		}
+	}
+	return (WALK_DONE);
+}
+
+static void
+sctp_help(void)
+{
+	mdb_printf("Print information for a given SCTP sctp_t\n\n");
+	mdb_printf("Options:\n");
+	mdb_printf("\t-a\t All the information\n");
+	mdb_printf("\t-f\t Flags\n");
+	mdb_printf("\t-h\t Hash Tables\n");
+	mdb_printf("\t-o\t Outbound Data\n");
+	mdb_printf("\t-i\t Inbound Data\n");
+	mdb_printf("\t-m\t Miscellaneous Information\n");
+	mdb_printf("\t-r\t RTT Tracking\n");
+	mdb_printf("\t-S\t Stats Counters\n");
+	mdb_printf("\t-F\t Flow Control\n");
+	mdb_printf("\t-H\t Composite Headers\n");
+	mdb_printf("\t-p\t PMTUD\n");
+	mdb_printf("\t-R\t Retransmit Information\n");
+	mdb_printf("\t-C\t Connection State\n");
+	mdb_printf("\t-c\t Cleanup / Close\n");
+	mdb_printf("\t-e\t Extensions and Reliable Control Chunks\n");
+	mdb_printf("\t-d\t Local and Peer addresses\n");
+	mdb_printf("\t-P\t Peer addresses\n");
+}
+static const mdb_dcmd_t dcmds[] = {
+	{ "sctp", ":[-afhoimrSFHpRCcedP]",
+	    "display sctp control structure", sctp, sctp_help },
+	{ "sctp_set", ":", "display a SCTP set", sctp_set },
+	{ "sctp_faddr", ":", "display a faddr", sctp_faddr },
+	{ "sctp_istr_msgs", ":", "display msg list on an instream",
+	    sctp_istr_msgs },
+	{ "sctp_mdata_chunk", ":", "display a data chunk in an mblk",
+	    sctp_mdata_chunk },
+	{ "sctp_xmit_list", ":", "display sctp xmit lists", sctp_xmit_list },
+	{ "sctp_instr", ":", "display instr", sctp_instr },
+	{ "sctp_reass_list", ":", "display reass list", sctp_reass_list },
+	{ "sctp_uo_reass_list", ":", "display un-ordered reass list",
+	    sctp_uo_reass_list },
+	{ NULL }
+};
+
+static const fanout_init_t listen_fanout_init = {
+	"sctp_listen_fanout", listen_size, listen_next
+};
+
+static const fanout_init_t conn_fanout_init = {
+	"sctp_conn_fanout", conn_size, conn_next
+};
+
+static const fanout_init_t bind_fanout_init = {
+	"sctp_bind_fanout", bind_size, bind_next
+};
+
+static const mdb_walker_t walkers[] = {
+	{ "sctps", "walk the full chain of sctps",
+	    sctp_walk_init, sctp_walk_step, NULL },
+	{ "sctp_listen_fanout", "walk the sctp listen fanout",
+	    fanout_walk_init, fanout_walk_step, fanout_walk_fini,
+	    (void *)&listen_fanout_init },
+	{ "sctp_conn_fanout", "walk the sctp conn fanout",
+	    fanout_walk_init, fanout_walk_step, fanout_walk_fini,
+	    (void *)&conn_fanout_init },
+	{ "sctp_bind_fanout", "walk the sctp bind fanout",
+	    fanout_walk_init, fanout_walk_step, fanout_walk_fini,
+	    (void *)&bind_fanout_init },
+	{ "sctp_walk_faddr", "walk the peer address list of a given sctp_t",
+	    sctp_walk_faddr_init, sctp_walk_faddr_step, NULL },
+	{ "sctp_walk_saddr", "walk the local address list of a given sctp_t",
+	    sctp_walk_saddr_init, sctp_walk_saddr_step, sctp_walk_saddr_fini },
+	{ "sctp_walk_ill", "walk the sctp_g_ills list",
+	    sctp_walk_ill_init, sctp_walk_ill_step, NULL },
+	{ "sctp_walk_ipif", "walk the sctp_g_ipif list",
+	    sctp_walk_ipif_init, sctp_walk_ipif_step, NULL },
+	{ NULL }
+};
+
+static const mdb_modinfo_t modinfo = { MDB_API_VERSION, dcmds, walkers };
+
+const mdb_modinfo_t *
+_mdb_init(void)
+{
+	GElf_Sym sym;
+	GElf_Sym ills_sym;
+	GElf_Sym ipifs_sym;
+
+	if (mdb_lookup_by_name("sctp_g_list", &sctp_list_sym) == -1) {
+		mdb_warn("failed to find 'sctp_g_list'");
+		return (NULL);
+	}
+	if (mdb_vread(&sctp_list, sizeof (list_t),
+	    (uintptr_t)sctp_list_sym.st_value) == -1) {
+		mdb_warn("failed to read 'sctp_g_list'");
+		return (NULL);
+	}
+	if (mdb_lookup_by_name("sctp_conn_hash_size", &sym) != -1) {
+		if (mdb_vread(&sctp_conn_hash_size,
+		    sizeof (sctp_conn_hash_size), sym.st_value) == -1) {
+			mdb_warn("failed to read 'sctp_conn_hash_size'");
+			return (NULL);
+		}
+	}
+	if (mdb_lookup_by_name("sctp_g_ills", &ills_sym) == -1) {
+		mdb_warn("failed to find 'sctp_g_ills'");
+		return (NULL);
+	}
+	if (mdb_vread(&local_g_ills, sizeof (local_g_ills),
+	    (uintptr_t)ills_sym.st_value) == -1) {
+		mdb_warn("failed to read 'sctp_g_ills'");
+		return (NULL);
+	}
+	if (mdb_lookup_by_name("sctp_g_ipifs", &ipifs_sym) == -1) {
+		mdb_warn("failed to find 'sctp_g_ipifs'");
+		return (NULL);
+	}
+	if (mdb_vread(&local_g_ipifs, sizeof (local_g_ipifs),
+	    (uintptr_t)ipifs_sym.st_value) == -1) {
+		mdb_warn("failed to read 'sctp_g_ipifs'");
+		return (NULL);
+	}
+
+	return (&modinfo);
+}

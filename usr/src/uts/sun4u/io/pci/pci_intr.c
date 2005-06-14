@@ -1,0 +1,745 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * PCI nexus interrupt handling:
+ *	PCI device interrupt handler wrapper
+ *	pil lookup routine
+ *	PCI device interrupt related initchild code
+ */
+
+#include <sys/types.h>
+#include <sys/kmem.h>
+#include <sys/async.h>
+#include <sys/spl.h>
+#include <sys/sunddi.h>
+#include <sys/machsystm.h>	/* e_ddi_nodeid_to_dip() */
+#include <sys/ddi_impldefs.h>
+#include <sys/pci/pci_obj.h>
+#include <sys/sdt.h>
+
+#ifdef _STARFIRE
+#include <sys/starfire.h>
+#endif /* _STARFIRE */
+
+/*
+ * interrupt jabber:
+ *
+ * When an interrupt line is jabbering, every time the state machine for the
+ * associated ino is idled, a new mondo will be sent and the ino will go into
+ * the pending state again. The mondo will cause a new call to
+ * pci_intr_wrapper() which normally idles the ino's state machine which would
+ * precipitate another trip round the loop.
+ * The loop can be broken by preventing the ino's state machine from being
+ * idled when an interrupt line is jabbering. See the comment at the
+ * beginning of pci_intr_wrapper() explaining how the 'interrupt jabber
+ * protection' code does this.
+ */
+
+/*LINTLIBRARY*/
+
+#ifdef NOT_DEFINED
+/*
+ * This array is used to determine the sparc PIL at the which the
+ * handler for a given INO will execute.  This table is for onboard
+ * devices only.  A different scheme will be used for plug-in cards.
+ */
+
+uint_t ino_to_pil[] = {
+
+	/* pil */		/* ino */
+
+	0, 0, 0, 0,  		/* 0x00 - 0x03: bus A slot 0 int#A, B, C, D */
+	0, 0, 0, 0,		/* 0x04 - 0x07: bus A slot 1 int#A, B, C, D */
+	0, 0, 0, 0,  		/* 0x08 - 0x0B: unused */
+	0, 0, 0, 0,		/* 0x0C - 0x0F: unused */
+
+	0, 0, 0, 0,  		/* 0x10 - 0x13: bus B slot 0 int#A, B, C, D */
+	0, 0, 0, 0,		/* 0x14 - 0x17: bus B slot 1 int#A, B, C, D */
+	0, 0, 0, 0,  		/* 0x18 - 0x1B: bus B slot 2 int#A, B, C, D */
+	4, 0, 0, 0,		/* 0x1C - 0x1F: bus B slot 3 int#A, B, C, D */
+
+	4,			/* 0x20: SCSI */
+	6,			/* 0x21: ethernet */
+	3,			/* 0x22: parallel port */
+	9,			/* 0x23: audio record */
+	9,			/* 0x24: audio playback */
+	14,			/* 0x25: power fail */
+	4,			/* 0x26: 2nd SCSI */
+	8,			/* 0x27: floppy */
+	14,			/* 0x28: thermal warning */
+	12,			/* 0x29: keyboard */
+	12,			/* 0x2A: mouse */
+	12,			/* 0x2B: serial */
+	0,			/* 0x2C: timer/counter 0 */
+	0,			/* 0x2D: timer/counter 1 */
+	14,			/* 0x2E: uncorrectable ECC errors */
+	14,			/* 0x2F: correctable ECC errors */
+	14,			/* 0x30: PCI bus A error */
+	14,			/* 0x31: PCI bus B error */
+	14,			/* 0x32: power management wakeup */
+	14,			/* 0x33 */
+	14,			/* 0x34 */
+	14,			/* 0x35 */
+	14,			/* 0x36 */
+	14,			/* 0x37 */
+	14,			/* 0x38 */
+	14,			/* 0x39 */
+	14,			/* 0x3a */
+	14,			/* 0x3b */
+	14,			/* 0x3c */
+	14,			/* 0x3d */
+	14,			/* 0x3e */
+	14,			/* 0x3f */
+	14			/* 0x40 */
+};
+#endif /* NOT_DEFINED */
+
+
+#define	PCI_SIMBA_VENID		0x108e	/* vendor id for simba */
+#define	PCI_SIMBA_DEVID		0x5000	/* device id for simba */
+
+/*
+ * map_pcidev_cfg_reg - create mapping to pci device configuration registers
+ *			if we have a simba AND a pci to pci bridge along the
+ *			device path.
+ *			Called with corresponding mutexes held!!
+ *
+ * XXX	  XXX	XXX	The purpose of this routine is to overcome a hardware
+ *			defect in Sabre CPU and Simba bridge configuration
+ *			which does not drain DMA write data stalled in
+ *			PCI to PCI bridges (such as the DEC bridge) beyond
+ *			Simba. This routine will setup the data structures
+ *			to allow the pci_intr_wrapper to perform a manual
+ *			drain data operation before passing the control to
+ *			interrupt handlers of device drivers.
+ * return value:
+ * DDI_SUCCESS
+ * DDI_FAILURE		if unable to create mapping
+ */
+static int
+map_pcidev_cfg_reg(dev_info_t *dip, dev_info_t *rdip, ddi_acc_handle_t *hdl_p)
+{
+	dev_info_t *cdip;
+	dev_info_t *pci_dip = NULL;
+	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
+	int simba_found = 0, pci_bridge_found = 0;
+
+	for (cdip = rdip; cdip && cdip != dip; cdip = ddi_get_parent(cdip)) {
+		ddi_acc_handle_t config_handle;
+		uint32_t vendor_id = ddi_getprop(DDI_DEV_T_ANY, cdip,
+			DDI_PROP_DONTPASS, "vendor-id", 0xffff);
+
+		DEBUG4(DBG_A_INTX, pci_p->pci_dip,
+			"map dev cfg reg for %s%d: @%s%d\n",
+			ddi_driver_name(rdip), ddi_get_instance(rdip),
+			ddi_driver_name(cdip), ddi_get_instance(cdip));
+
+		if (ddi_prop_exists(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
+				"no-dma-interrupt-sync"))
+			continue;
+
+		/* continue to search up-stream if not a PCI device */
+		if (vendor_id == 0xffff)
+			continue;
+
+		/* record the deepest pci device */
+		if (!pci_dip)
+			pci_dip = cdip;
+
+		/* look for simba */
+		if (vendor_id == PCI_SIMBA_VENID) {
+			uint32_t device_id = ddi_getprop(DDI_DEV_T_ANY,
+			    cdip, DDI_PROP_DONTPASS, "device-id", -1);
+			if (device_id == PCI_SIMBA_DEVID) {
+				simba_found = 1;
+				DEBUG0(DBG_A_INTX, pci_p->pci_dip,
+					"\tFound simba\n");
+				continue; /* do not check bridge if simba */
+			}
+		}
+
+		/* look for pci to pci bridge */
+		if (pci_config_setup(cdip, &config_handle) != DDI_SUCCESS) {
+			cmn_err(CE_WARN,
+			    "%s%d: can't get brdg cfg space for %s%d\n",
+				ddi_driver_name(dip), ddi_get_instance(dip),
+				ddi_driver_name(cdip), ddi_get_instance(cdip));
+			return (DDI_FAILURE);
+		}
+		if (pci_config_get8(config_handle, PCI_CONF_BASCLASS)
+		    == PCI_CLASS_BRIDGE) {
+			DEBUG0(DBG_A_INTX, pci_p->pci_dip,
+				"\tFound PCI to xBus bridge\n");
+			pci_bridge_found = 1;
+		}
+		pci_config_teardown(&config_handle);
+	}
+
+	if (!pci_bridge_found)
+		return (DDI_SUCCESS);
+	if (!simba_found && (CHIP_TYPE(pci_p) < PCI_CHIP_SCHIZO))
+		return (DDI_SUCCESS);
+	if (pci_config_setup(pci_dip, hdl_p) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s%d: can not get config space for %s%d\n",
+			ddi_driver_name(dip), ddi_get_instance(dip),
+			ddi_driver_name(cdip), ddi_get_instance(cdip));
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
+
+/*
+ * If the unclaimed interrupt count has reached the limit set by
+ * pci_unclaimed_intr_max within the time limit, then all interrupts
+ * on this ino is blocked by not idling the interrupt state machine.
+ */
+static int
+pci_spurintr(ib_ino_info_t *ino_p) {
+	int i;
+	ih_t *ih_p = ino_p->ino_ih_start;
+	pci_t *pci_p = ino_p->ino_ib_p->ib_pci_p;
+	char *err_fmt_str;
+
+	if (ino_p->ino_unclaimed > pci_unclaimed_intr_max)
+		return (DDI_INTR_CLAIMED);
+
+	if (!ino_p->ino_unclaimed)
+		ino_p->ino_spurintr_begin = ddi_get_lbolt();
+
+	ino_p->ino_unclaimed++;
+
+	if (ino_p->ino_unclaimed <= pci_unclaimed_intr_max)
+		goto clear;
+
+	if (drv_hztousec(ddi_get_lbolt() - ino_p->ino_spurintr_begin)
+	    > pci_spurintr_duration) {
+		ino_p->ino_unclaimed = 0;
+		goto clear;
+	}
+	err_fmt_str = "%s%d: ino 0x%x blocked";
+	goto warn;
+clear:
+	IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);  /* clear the pending state */
+	if (!pci_spurintr_msgs) /* tomatillo errata #71 spurious mondo */
+		return (DDI_INTR_CLAIMED);
+
+	err_fmt_str = "!%s%d: spurious interrupt from ino 0x%x";
+warn:
+	cmn_err(CE_WARN, err_fmt_str, NAMEINST(pci_p->pci_dip), ino_p->ino_ino);
+	for (i = 0; i < ino_p->ino_ih_size; i++, ih_p = ih_p->ih_next)
+		cmn_err(CE_CONT, "!%s-%d#%x ", NAMEINST(ih_p->ih_dip),
+		    ih_p->ih_inum);
+	cmn_err(CE_CONT, "!\n");
+	return (DDI_INTR_CLAIMED);
+}
+
+/*
+ * pci_intr_wrapper
+ *
+ * This routine is used as wrapper around interrupt handlers installed by child
+ * device drivers.  This routine invokes the driver interrupt handlers and
+ * examines the return codes.
+ * There is a count of unclaimed interrupts kept on a per-ino basis. If at
+ * least one handler claims the interrupt then the counter is halved and the
+ * interrupt state machine is idled. If no handler claims the interrupt then
+ * the counter is incremented by one and the state machine is idled.
+ * If the count ever reaches the limit value set by pci_unclaimed_intr_max
+ * then the interrupt state machine is not idled thus preventing any further
+ * interrupts on that ino. The state machine will only be idled again if a
+ * handler is subsequently added or removed.
+ *
+ * return value: DDI_INTR_CLAIMED if any handlers claimed the interrupt,
+ * DDI_INTR_UNCLAIMED otherwise.
+ */
+
+extern uint64_t intr_get_time(void);
+
+uint_t
+pci_intr_wrapper(caddr_t arg)
+{
+	ib_ino_info_t *ino_p = (ib_ino_info_t *)arg;
+	uint_t result = 0, r;
+	pci_t *pci_p = ino_p->ino_ib_p->ib_pci_p;
+	pbm_t *pbm_p = pci_p->pci_pbm_p;
+	ih_t *ih_p = ino_p->ino_ih_start;
+	int i;
+
+	for (i = 0; i < ino_p->ino_ih_size; i++, ih_p = ih_p->ih_next) {
+		dev_info_t *dip = ih_p->ih_dip;
+		uint_t (*handler)() = ih_p->ih_handler;
+		caddr_t arg1 = ih_p->ih_handler_arg1;
+		caddr_t arg2 = ih_p->ih_handler_arg2;
+		ddi_acc_handle_t cfg_hdl = ih_p->ih_config_handle;
+
+		if (pci_intr_dma_sync && cfg_hdl && pbm_p->pbm_sync_reg_pa) {
+			(void) pci_config_get16(cfg_hdl, PCI_CONF_VENID);
+			pci_pbm_dma_sync(pbm_p, ino_p->ino_ino);
+		}
+
+		if (ih_p->ih_intr_state == PCI_INTR_STATE_DISABLE) {
+			DEBUG3(DBG_INTR, pci_p->pci_dip,
+			    "pci_intr_wrapper: %s%d interrupt %d is disabled\n",
+			    ddi_driver_name(dip), ddi_get_instance(dip),
+			    ino_p->ino_ino);
+
+			continue;
+		}
+
+		DTRACE_PROBE4(interrupt__start, dev_info_t, dip,
+		    void *, handler, caddr_t, arg1, caddr_t, arg2);
+
+		r = (*handler)(arg1, arg2);
+
+		/*
+		 * Account for time used by this interrupt. Protect against
+		 * conflicting writes to ih_ticks from ib_intr_dist_all() by
+		 * using atomic ops.
+		 */
+
+		if (ino_p->ino_pil <= LOCK_LEVEL)
+			atomic_add_64(&ih_p->ih_ticks, intr_get_time());
+
+		DTRACE_PROBE4(interrupt__complete, dev_info_t, dip,
+		    void *, handler, caddr_t, arg1, int, r);
+
+		result += r;
+
+		if (pci_check_all_handlers)
+			continue;
+		if (result)
+			break;
+	}
+
+	if (!result)
+		return (pci_spurintr(ino_p));
+
+	ino_p->ino_unclaimed = 0;
+	IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);  /* clear the pending state */
+
+	return (DDI_INTR_CLAIMED);
+}
+
+dev_info_t *
+get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip)
+{
+	dev_info_t *cdip = rdip;
+
+	for (; ddi_get_parent(cdip) != dip; cdip = ddi_get_parent(cdip))
+		;
+
+	return (cdip);
+}
+
+/* default class to pil value mapping */
+pci_class_val_t pci_default_pil [] = {
+	{0x000000, 0xff0000, 0x1},	/* Class code for pre-2.0 devices */
+	{0x010000, 0xff0000, 0x4},	/* Mass Storage Controller */
+	{0x020000, 0xff0000, 0x6},	/* Network Controller */
+	{0x030000, 0xff0000, 0x9},	/* Display Controller */
+	{0x040000, 0xff0000, 0x9},	/* Multimedia Controller */
+	{0x050000, 0xff0000, 0xb},	/* Memory Controller */
+	{0x060000, 0xff0000, 0xb},	/* Bridge Controller */
+	{0x0c0000, 0xffff00, 0x9},	/* Serial Bus, FireWire (IEEE 1394) */
+	{0x0c0100, 0xffff00, 0x4},	/* Serial Bus, ACCESS.bus */
+	{0x0c0200, 0xffff00, 0x4},	/* Serial Bus, SSA */
+	{0x0c0300, 0xffff00, 0x9},	/* Serial Bus Universal Serial Bus */
+	{0x0c0400, 0xffff00, 0x6},	/* Serial Bus, Fibre Channel */
+	{0x0c0600, 0xffff00, 0x6}	/* Serial Bus, Infiniband */
+};
+
+/*
+ * Default class to intr_weight value mapping (% of CPU).  A driver.conf
+ * entry on or above the pci node like
+ *
+ *	pci-class-intr-weights= 0x020000, 0xff0000, 30;
+ *
+ * can be used to augment or override entries in the default table below.
+ *
+ * NB: The values below give NICs preference on redistribution, and provide
+ * NICs some isolation from other interrupt sources. We need better interfaces
+ * that allow the NIC driver to identify a specific NIC instance as high
+ * bandwidth, and thus deserving of separation from other low bandwidth
+ * NICs additional isolation from other interrupt sources.
+ *
+ * NB: We treat Infiniband like a NIC.
+ */
+pci_class_val_t pci_default_intr_weight [] = {
+	{0x020000, 0xff0000, 35},	/* Network Controller */
+	{0x010000, 0xff0000, 10},	/* Mass Storage Controller */
+	{0x0c0400, 0xffff00, 10},	/* Serial Bus, Fibre Channel */
+	{0x0c0600, 0xffff00, 50}	/* Serial Bus, Infiniband */
+};
+
+static uint32_t
+pci_match_class_val(uint32_t key, pci_class_val_t *rec_p, int nrec,
+    uint32_t default_val)
+{
+	int i;
+
+	for (i = 0; i < nrec; rec_p++, i++) {
+		if ((rec_p->class_code & rec_p->class_mask) ==
+		    (key & rec_p->class_mask))
+			return (rec_p->class_val);
+	}
+
+	return (default_val);
+}
+
+/*
+ * Return the configuration value, based on class code and sub class code,
+ * from the specified property based or default pci_class_val_t table.
+ */
+uint32_t
+pci_class_to_val(dev_info_t *rdip, char *property_name, pci_class_val_t *rec_p,
+    int nrec, uint32_t default_val)
+{
+	int property_len;
+	uint32_t class_code;
+	pci_class_val_t *conf;
+	uint32_t val = default_val;
+
+	/*
+	 * Use the "class-code" property to get the base and sub class
+	 * codes for the requesting device.
+	 */
+	class_code = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
+	    DDI_PROP_DONTPASS, "class-code", -1);
+
+	if (class_code == -1)
+		return (val);
+
+	/* look up the val from the default table */
+	val = pci_match_class_val(class_code, rec_p, nrec, val);
+
+
+	/* see if there is a more specific property specified value */
+	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_NOTPROM,
+	    property_name, (caddr_t)&conf, &property_len))
+			return (val);
+
+	if ((property_len % sizeof (pci_class_val_t)) == 0)
+		val = pci_match_class_val(class_code, conf,
+		    property_len / sizeof (pci_class_val_t), val);
+	kmem_free(conf, property_len);
+	return (val);
+}
+
+/* pci_class_to_pil: return the pil for a given PCI device. */
+uint32_t
+pci_class_to_pil(dev_info_t *rdip)
+{
+	uint32_t pil;
+
+	/* default pil is 0 (uninitialized) */
+	pil = pci_class_to_val(rdip,
+	    "pci-class-priorities", pci_default_pil,
+	    sizeof (pci_default_pil) / sizeof (pci_class_val_t), 0);
+
+	/* range check the result */
+	if (pil >= 0xf)
+		pil = 0;
+
+	return (pil);
+}
+
+/* pci_class_to_intr_weight: return the intr_weight for a given PCI device. */
+int32_t
+pci_class_to_intr_weight(dev_info_t *rdip)
+{
+	int32_t intr_weight;
+
+	/* default weight is 0% */
+	intr_weight = pci_class_to_val(rdip,
+	    "pci-class-intr-weights", pci_default_intr_weight,
+	    sizeof (pci_default_intr_weight) / sizeof (pci_class_val_t), 0);
+
+	/* range check the result */
+	if (intr_weight < 0)
+		intr_weight = 0;
+	if (intr_weight > 1000)
+		intr_weight = 1000;
+
+	return (intr_weight);
+}
+
+int
+pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
+{
+	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
+	ib_t *ib_p = pci_p->pci_ib_p;
+	cb_t *cb_p = pci_p->pci_cb_p;
+	ih_t *ih_p;
+	ib_ino_t ino;
+	ib_ino_info_t *ino_p;		/* pulse interrupts have no ino */
+	ib_mondo_t mondo;
+	uint32_t cpu_id;
+	int ret;
+	int32_t weight;
+
+	ino = IB_MONDO_TO_INO(hdlp->ih_vector);
+
+	DEBUG3(DBG_A_INTX, dip, "pci_add_intr: rdip=%s%d ino=%x\n",
+	    ddi_driver_name(rdip), ddi_get_instance(rdip), ino);
+
+	if (ino > ib_p->ib_max_ino) {
+		DEBUG1(DBG_A_INTX, dip, "ino %x is invalid\n", ino);
+		return (DDI_INTR_NOTFOUND);
+	}
+
+	if (hdlp->ih_vector & PCI_PULSE_INO) {
+		volatile uint64_t *map_reg_addr;
+		map_reg_addr = ib_intr_map_reg_addr(ib_p, ino);
+
+		mondo = pci_xlate_intr(dip, rdip, ib_p, ino);
+		if (mondo == 0)
+			goto fail1;
+
+		hdlp->ih_vector = CB_MONDO_TO_XMONDO(cb_p, mondo);
+
+		if (i_ddi_add_ivintr(hdlp) != DDI_SUCCESS)
+			goto fail1;
+
+		/*
+		 * Select cpu and program.
+		 *
+		 * Since there is no good way to always derive cpuid in
+		 * pci_remove_intr for PCI_PULSE_INO (esp. for STARFIRE), we
+		 * don't add (or remove) device weight for pulsed interrupt
+		 * sources.
+		 */
+		mutex_enter(&ib_p->ib_intr_lock);
+		cpu_id = intr_dist_cpuid();
+		*map_reg_addr = ib_get_map_reg(mondo, cpu_id);
+		mutex_exit(&ib_p->ib_intr_lock);
+		*map_reg_addr;	/* flush previous write */
+		goto done;
+	}
+
+	if ((mondo = pci_xlate_intr(dip, rdip, pci_p->pci_ib_p, ino)) == 0)
+		goto fail1;
+
+	ino = IB_MONDO_TO_INO(mondo);
+
+	mutex_enter(&ib_p->ib_ino_lst_mutex);
+	ih_p = ib_alloc_ih(rdip, hdlp->ih_inum,
+	    hdlp->ih_cb_func, hdlp->ih_cb_arg1, hdlp->ih_cb_arg2);
+	if (map_pcidev_cfg_reg(dip, rdip, &ih_p->ih_config_handle))
+		goto fail2;
+
+	if (ino_p = ib_locate_ino(ib_p, ino)) {		/* sharing ino */
+		uint32_t intr_index = hdlp->ih_inum;
+		if (ib_ino_locate_intr(ino_p, rdip, intr_index)) {
+			DEBUG1(DBG_A_INTX, dip, "dup intr #%d\n", intr_index);
+			goto fail3;
+		}
+
+		/* add weight to the cpu that we are already targeting */
+		cpu_id = ino_p->ino_cpuid;
+		weight = pci_class_to_intr_weight(rdip);
+		intr_dist_cpuid_add_device_weight(cpu_id, rdip, weight);
+
+		ib_ino_add_intr(pci_p, ino_p, ih_p);
+		goto ino_done;
+	}
+
+	ino_p = ib_new_ino(ib_p, ino, ih_p);
+
+	if (hdlp->ih_pri == 0)
+		hdlp->ih_pri = pci_class_to_pil(rdip);
+
+	hdlp->ih_vector = CB_MONDO_TO_XMONDO(cb_p, mondo);
+
+	DEBUG2(DBG_A_INTX, dip, "pci_add_intr:  pil=0x%x mondo=0x%x\n",
+	    hdlp->ih_pri, hdlp->ih_vector);
+
+	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp,
+	    (ddi_intr_handler_t *)pci_intr_wrapper, (caddr_t)ino_p, NULL);
+
+	ret = i_ddi_add_ivintr(hdlp);
+
+	/*
+	 * Restore original interrupt handler
+	 * and arguments in interrupt handle.
+	 */
+	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, ih_p->ih_handler,
+	    ih_p->ih_handler_arg1, ih_p->ih_handler_arg2);
+
+	if (ret != DDI_SUCCESS)
+		goto fail4;
+
+	/* Save the pil for this ino */
+	ino_p->ino_pil = hdlp->ih_pri;
+
+	/* clear and enable interrupt */
+	IB_INO_INTR_CLEAR(ino_p->ino_clr_reg);
+
+	/* select cpu and compute weight, saving both for sharing and removal */
+	cpu_id = pci_intr_dist_cpuid(ib_p, ino_p);
+	ino_p->ino_cpuid = cpu_id;
+	ino_p->ino_established = 1;
+	weight = pci_class_to_intr_weight(rdip);
+	intr_dist_cpuid_add_device_weight(cpu_id, rdip, weight);
+
+#ifdef _STARFIRE
+	cpu_id = pc_translate_tgtid(cb_p->cb_ittrans_cookie, cpu_id,
+		IB_GET_MAPREG_INO(ino));
+#endif /* _STARFIRE */
+	*ino_p->ino_map_reg = ib_get_map_reg(mondo, cpu_id);
+	*ino_p->ino_map_reg;
+ino_done:
+	ih_p->ih_ino_p = ino_p;
+	if (ih_p->ih_ksp)
+		kstat_install(ih_p->ih_ksp);
+	ib_ino_map_reg_share(ib_p, ino, ino_p);
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
+done:
+	DEBUG2(DBG_A_INTX, dip, "done! Interrupt 0x%x pil=%x\n",
+		hdlp->ih_vector, hdlp->ih_pri);
+	return (DDI_SUCCESS);
+fail4:
+	ib_delete_ino(ib_p, ino_p);
+fail3:
+	if (ih_p->ih_config_handle)
+		pci_config_teardown(&ih_p->ih_config_handle);
+fail2:
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
+	kmem_free(ih_p, sizeof (ih_t));
+fail1:
+	DEBUG2(DBG_A_INTX, dip, "Failed! Interrupt 0x%x pil=%x\n",
+		hdlp->ih_vector, hdlp->ih_pri);
+	return (DDI_FAILURE);
+}
+
+int
+pci_remove_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
+{
+	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
+	ib_t *ib_p = pci_p->pci_ib_p;
+	cb_t *cb_p = pci_p->pci_cb_p;
+	ib_ino_t ino;
+	ib_mondo_t mondo;
+	ib_ino_info_t *ino_p;	/* non-pulse only */
+	ih_t *ih_p;		/* non-pulse only */
+
+	ino = IB_MONDO_TO_INO(hdlp->ih_vector);
+
+	DEBUG3(DBG_R_INTX, dip, "pci_rem_intr: rdip=%s%d ino=%x\n",
+	    ddi_driver_name(rdip), ddi_get_instance(rdip), ino);
+
+	if (hdlp->ih_vector & PCI_PULSE_INO) { /* pulse interrupt */
+		volatile uint64_t *map_reg_addr;
+
+		/*
+		 * No weight was added by pci_add_intr for PCI_PULSE_INO
+		 * because it is difficult to determine cpuid here.
+		 */
+		map_reg_addr = ib_intr_map_reg_addr(ib_p, ino);
+		IB_INO_INTR_RESET(map_reg_addr);	/* disable intr */
+		*map_reg_addr;
+
+		mondo = pci_xlate_intr(dip, rdip, ib_p, ino);
+		if (mondo == 0) {
+			DEBUG1(DBG_R_INTX, dip,
+				"can't get mondo for ino %x\n", ino);
+			return (DDI_FAILURE);
+		}
+
+		if (hdlp->ih_pri == 0)
+			hdlp->ih_pri = pci_class_to_pil(rdip);
+
+		hdlp->ih_vector = CB_MONDO_TO_XMONDO(cb_p, mondo);
+
+		DEBUG2(DBG_R_INTX, dip, "pci_rem_intr: pil=0x%x mondo=0x%x\n",
+		    hdlp->ih_pri, hdlp->ih_vector);
+
+		i_ddi_rem_ivintr(hdlp);
+
+		DEBUG2(DBG_R_INTX, dip, "pulse success mondo=%x reg=%p\n",
+			mondo, map_reg_addr);
+		return (DDI_SUCCESS);
+	}
+
+	/* Translate the interrupt property */
+	mondo = pci_xlate_intr(dip, rdip, pci_p->pci_ib_p, ino);
+	if (mondo == 0) {
+		DEBUG1(DBG_R_INTX, dip, "can't get mondo for ino %x\n", ino);
+		return (DDI_FAILURE);
+	}
+	ino = IB_MONDO_TO_INO(mondo);
+
+	mutex_enter(&ib_p->ib_ino_lst_mutex);
+	ino_p = ib_locate_ino(ib_p, ino);
+	if (!ino_p) {
+		int r = cb_remove_xintr(pci_p, dip, rdip, ino, mondo);
+		if (r != DDI_SUCCESS)
+			cmn_err(CE_WARN, "%s%d-xintr: ino %x is invalid",
+			    ddi_driver_name(dip), ddi_get_instance(dip), ino);
+		mutex_exit(&ib_p->ib_ino_lst_mutex);
+		return (r);
+	}
+
+	ih_p = ib_ino_locate_intr(ino_p, rdip, hdlp->ih_inum);
+	ib_ino_rem_intr(pci_p, ino_p, ih_p);
+	intr_dist_cpuid_rem_device_weight(ino_p->ino_cpuid, rdip);
+	if (ino_p->ino_ih_size == 0) {
+		IB_INO_INTR_PEND(ib_clear_intr_reg_addr(ib_p, ino));
+		hdlp->ih_vector = CB_MONDO_TO_XMONDO(cb_p, mondo);
+		if (hdlp->ih_pri == 0)
+			hdlp->ih_pri = pci_class_to_pil(rdip);
+
+		i_ddi_rem_ivintr(hdlp);
+		ib_delete_ino(ib_p, ino_p);
+	}
+
+	/* re-enable interrupt only if mapping register still shared */
+	if (ib_ino_map_reg_unshare(ib_p, ino, ino_p)) {
+		IB_INO_INTR_ON(ino_p->ino_map_reg);
+		*ino_p->ino_map_reg;
+	}
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
+
+	if (ino_p->ino_ih_size == 0)
+		kmem_free(ino_p, sizeof (ib_ino_info_t));
+
+	DEBUG1(DBG_R_INTX, dip, "success! mondo=%x\n", mondo);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * free the pci_inos array allocated during pci_intr_setup. the actual
+ * interrupts are torn down by their respective block destroy routines:
+ * cb_destroy, pbm_destroy, and ib_destroy.
+ */
+void
+pci_intr_teardown(pci_t *pci_p)
+{
+	kmem_free(pci_p->pci_inos, pci_p->pci_inos_len);
+	pci_p->pci_inos = NULL;
+	pci_p->pci_inos_len = 0;
+}

@@ -1,0 +1,23 @@
+
+This frame displays the text of the mail message that you
+have selected.  You must press one of the following keys to
+leave this frame.
+
+      REPLY:  Allows you to reply to the author(s) of the
+      message that you have selected.  The same form that
+      you use to send a new message is used here.  The
+      author(s) and subject of the 'current' message are
+      automatically filled in for you.
+
+      SAVE:  Allows you to save the displayed message in
+      a place where you can refer to it later.  This function
+      is only available if you are reading new mail.
+
+      DELETE:  Deletes the displayed message from your
+      mailbox permanently.  After you have selected this
+      function, the message is no longer available for your
+      use.
+
+      CANCEL:  Removes this frame from the display and
+      returns you to the list of your mail messages.  The
+      'current' message is not disturbed.
