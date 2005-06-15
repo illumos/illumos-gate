@@ -945,6 +945,9 @@ check_for_user_address:
 	 */
 	ENTRY_NP(mcetrap)
 	TRAP_NOERR(T_MCE)	/* $18 */
+#if defined(__amd64)
+	SET_CPU_GSBASE
+#endif
 	jmp	cmninttrap
 	SET_SIZE(mcetrap)
 
