@@ -52,6 +52,7 @@ extern char *heap_lp_base;	/* start of kernel large page heap arena */
 extern char *heap_lp_end;	/* end of kernel large page heap arena */
 extern struct seg kvseg;	/* primary kernel heap segment */
 extern struct seg kvseg_core;	/* "core" kernel heap segment */
+extern vmem_t *heap_lp_arena;	/* kernel large page heap arena */
 extern vmem_t *heap_arena;	/* primary kernel heap arena */
 extern vmem_t *hat_memload_arena; /* HAT translation arena */
 extern struct seg kvseg32;	/* 32-bit kernel heap segment */

@@ -140,7 +140,7 @@ static  uint_t	segkmem_lpshift = PAGESHIFT;
 
 size_t  segkmem_kmemlp_quantum = 0x400000;	/* 4MB */
 size_t  segkmem_heaplp_quantum;
-static	vmem_t *heap_lp_arena;
+vmem_t *heap_lp_arena;
 static  vmem_t *kmem_lp_arena;
 static  vmem_t *segkmem_ppa_arena;
 static	segkmem_lpcb_t segkmem_lpcb;

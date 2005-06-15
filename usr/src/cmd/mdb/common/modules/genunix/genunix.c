@@ -1324,6 +1324,8 @@ typedef struct kgrep_walk_data {
 	uintptr_t kg_kvseg32;
 	uintptr_t kg_kvseg_core;
 	uintptr_t kg_segkpm;
+	uintptr_t kg_heap_lp_base;
+	uintptr_t kg_heap_lp_end;
 } kgrep_walk_data_t;
 
 static int
@@ -1345,19 +1347,39 @@ kgrep_walk_seg(uintptr_t addr, const struct seg *seg, kgrep_walk_data_t *kg)
 static int
 kgrep_walk_vseg(uintptr_t addr, const vmem_seg_t *seg, kgrep_walk_data_t *kg)
 {
+	/*
+	 * skip large page heap address range - it is scanned by walking
+	 * allocated vmem_segs in the heap_lp_arena
+	 */
+	if (seg->vs_start == kg->kg_heap_lp_base &&
+	    seg->vs_end == kg->kg_heap_lp_end)
+		return (WALK_NEXT);
+
+	return (kg->kg_cb(seg->vs_start, seg->vs_end, kg->kg_cbdata));
+}
+
+/*ARGSUSED*/
+static int
+kgrep_xwalk_vseg(uintptr_t addr, const vmem_seg_t *seg, kgrep_walk_data_t *kg)
+{
 	return (kg->kg_cb(seg->vs_start, seg->vs_end, kg->kg_cbdata));
 }
 
 static int
 kgrep_walk_vmem(uintptr_t addr, const vmem_t *vmem, kgrep_walk_data_t *kg)
 {
+	mdb_walk_cb_t walk_vseg = (mdb_walk_cb_t)kgrep_walk_vseg;
+
 	if (strcmp(vmem->vm_name, "heap") != 0 &&
 	    strcmp(vmem->vm_name, "heap32") != 0 &&
-	    strcmp(vmem->vm_name, "heap_core") != 0)
+	    strcmp(vmem->vm_name, "heap_core") != 0 &&
+	    strcmp(vmem->vm_name, "heap_lp") != 0)
 		return (WALK_NEXT);
 
-	if (mdb_pwalk("vmem_alloc",
-	    (mdb_walk_cb_t)kgrep_walk_vseg, kg, addr) == -1) {
+	if (strcmp(vmem->vm_name, "heap_lp") == 0)
+		walk_vseg = (mdb_walk_cb_t)kgrep_xwalk_vseg;
+
+	if (mdb_pwalk("vmem_alloc", walk_vseg, kg, addr) == -1) {
 		mdb_warn("couldn't walk vmem_alloc for vmem %p", addr);
 		return (WALK_ERR);
 	}
@@ -1399,6 +1421,16 @@ kgrep_subr(kgrep_cb_func *cb, void *cbdata)
 
 	if (mdb_lookup_by_name("segkpm_ops", &segkpm) == -1) {
 		mdb_warn("failed to locate 'segkpm_ops' symbol\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&kg.kg_heap_lp_base, "heap_lp_base") == -1) {
+		mdb_warn("failed to read 'heap_lp_base'\n");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&kg.kg_heap_lp_end, "heap_lp_end") == -1) {
+		mdb_warn("failed to read 'heap_lp_end'\n");
 		return (DCMD_ERR);
 	}
 

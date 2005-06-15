@@ -486,11 +486,11 @@ cpr_dump(vnode_t *vp)
 
 
 /*
- * cpr_walk() is called many 100x with a range within kvseg;
+ * cpr_xwalk() is called many 100x with a range within kvseg or kvseg_reloc;
  * a page-count from each range is accumulated at arg->pages.
  */
 static void
-cpr_walk(void *arg, void *base, size_t size)
+cpr_xwalk(void *arg, void *base, size_t size)
 {
 	struct cpr_walkinfo *cwip = arg;
 
@@ -498,6 +498,30 @@ cpr_walk(void *arg, void *base, size_t size)
 	    cwip->mapflag, cwip->bitfunc, DBG_DONTSHOWRANGE);
 	cwip->size += size;
 	cwip->ranges++;
+}
+
+/*
+ * cpr_walk() is called many 100x with a range within kvseg or kvseg_reloc;
+ * a page-count from each range is accumulated at arg->pages.
+ */
+static void
+cpr_walk(void *arg, void *base, size_t size)
+{
+	caddr_t addr = base;
+	caddr_t addr_end = addr + size;
+
+	/*
+	 * If we are about to start walking the range of addresses we
+	 * carved out of the kernel heap for the large page heap walk
+	 * heap_lp_arena to find what segments are actually populated
+	 */
+	if (SEGKMEM_USE_LARGEPAGES &&
+	    addr == heap_lp_base && addr_end == heap_lp_end &&
+	    vmem_size(heap_lp_arena, VMEM_ALLOC) < size) {
+		vmem_walk(heap_lp_arena, VMEM_ALLOC, cpr_xwalk, arg);
+	} else {
+		cpr_xwalk(arg, base, size);
+	}
 }
 
 

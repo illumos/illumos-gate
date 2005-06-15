@@ -63,6 +63,7 @@
 #include <sys/memlist.h>
 #include <sys/bootconf.h>
 #include <sys/thread.h>
+#include <vm/vm_dep.h>
 
 extern	void cpr_clear_bitmaps(void);
 extern	void dtlb_wr_entry(uint_t, tte_t *, uint64_t *);
@@ -222,6 +223,15 @@ i_cpr_mp_setup(void)
 	char *str;
 	cpu_t *cp;
 
+	uint64_t kctx = kcontextreg;
+
+	/*
+	 * Do not allow setting page size codes in MMU primary context
+	 * register while using cif wrapper. This is needed to work
+	 * arround OBP incorrect handling of this MMU register.
+	 */
+	kcontextreg = 0;
+
 	/*
 	 * reset cpu_ready_set so x_calls work properly
 	 */
@@ -286,6 +296,9 @@ i_cpr_mp_setup(void)
 	i_cpr_cif_setup(CIF_UNLINK);
 
 	(void) i_cpr_prom_pages(CPR_PROM_RESTORE);
+
+	/* allow setting page size codes in MMU primary context register */
+	kcontextreg = kctx;
 }
 
 
@@ -587,7 +600,7 @@ i_cpr_write_machdep(vnode_t *vp)
 	 * TLB miss handling.
 	 */
 	m_info.mmu_ctx_sec = INVALID_CONTEXT;
-	m_info.mmu_ctx_pri = sfmmu_getctx_pri();
+	m_info.mmu_ctx_pri = KCONTEXT;
 
 	tinfo = (uintptr_t)curthread;
 	m_info.thrp = (cpr_ptr)tinfo;
