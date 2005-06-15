@@ -490,9 +490,13 @@ struct regs {
 #ifndef _ASM
 #define	TSTATE_ICC	((long long)CCR_ICC << TSTATE_CCR_SHIFT)
 #define	TSTATE_IC	((long long)CCR_IC << TSTATE_CCR_SHIFT)
+#define	TSTATE_IV	((long long)CCR_IV << TSTATE_CCR_SHIFT)
+#define	TSTATE_XV	((long long)CCR_XV << TSTATE_CCR_SHIFT)
 #else
 #define	TSTATE_ICC	(CCR_ICC << TSTATE_CCR_SHIFT)
 #define	TSTATE_IC	(CCR_IC << TSTATE_CCR_SHIFT)
+#define	TSTATE_IV	(CCR_IV << TSTATE_CCR_SHIFT)
+#define	TSTATE_XV	(CCR_XV << TSTATE_CCR_SHIFT)
 #endif
 #define	TSTATE_V8_UBITS (TSTATE_ICC | TSTATE_PEF)
 

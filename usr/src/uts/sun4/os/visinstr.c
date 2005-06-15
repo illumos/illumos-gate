@@ -381,7 +381,6 @@ vis_edge(
 	uint64_t ah61l, ah61r;		/* Higher 61 bits of address */
 	int al3l, al3r;			/* Lower 3 bits of address */
 	int am32;			/* Whether PSTATE.AM == 1 */
-	uint_t ccr;
 
 	nrs1 = inst.rs1;
 	nrs2 = inst.rs2;
@@ -395,10 +394,10 @@ vis_edge(
 		return (ftt);
 
 	/* Get PSTATE.AM to determine 32-bit vs 64-bit addressing */
-	am32 =  get_pstate() & 0x8;
+	am32 =  pregs->r_tstate & TSTATE_AM;
 	if (am32 == 1) {
-		ah61l = addrl & ~0x7 & 0xffffffff;
-		ah61r = addrr & ~0x7 & 0xffffffff;
+		ah61l = addrl & 0xffffffff8;
+		ah61r = addrr & 0xffffffff8;
 	} else {
 		ah61l = addrl & ~0x7;
 		ah61r = addrr & ~0x7;
@@ -419,61 +418,10 @@ vis_edge(
 			} else {
 				VISINFO_KSTAT(vis_edge8n);
 			}
-			switch (al3l) {
-			case 0:
-				mask = 0xff;
-				break;
-			case 1:
-				mask = 0x7f;
-				break;
-			case 2:
-				mask = 0x3f;
-				break;
-			case 3:
-				mask = 0x1f;
-				break;
-			case 4:
-				mask = 0x0f;
-				break;
-			case 5:
-				mask = 0x07;
-				break;
-			case 6:
-				mask = 0x03;
-				break;
-			case 7:
-				mask = 0x01;
-				break;
-			}
+			mask = 0xff >> al3l;
 			if (ah61l == ah61r) {
 				al3r = addrr & 0x7;
-				switch (al3r) {
-
-				case 0:
-					mask &= 0x80;
-					break;
-				case 1:
-					mask &= 0xc0;
-					break;
-				case 2:
-					mask &= 0xe0;
-					break;
-				case 3:
-					mask &= 0xf0;
-					break;
-				case 4:
-					mask &= 0xf8;
-					break;
-				case 5:
-					mask &= 0xfc;
-					break;
-				case 6:
-					mask &= 0xfe;
-					break;
-				case 7:
-					mask &= 0xff;
-					break;
-				}
+				mask &= (0xff << (0x7 - al3r)) & 0xff;
 			}
 			break;
 		case edge8l:
@@ -483,61 +431,10 @@ vis_edge(
 			} else {
 				VISINFO_KSTAT(vis_edge8ln);
 			}
-
-			switch (al3l) {
-			case 0:
-				mask = 0xff;
-				break;
-			case 1:
-				mask = 0xfe;
-				break;
-			case 2:
-				mask = 0xfc;
-				break;
-			case 3:
-				mask = 0xf8;
-				break;
-			case 4:
-				mask = 0xf0;
-				break;
-			case 5:
-				mask = 0xe0;
-				break;
-			case 6:
-				mask = 0xc0;
-				break;
-			case 7:
-				mask = 0x80;
-				break;
-			}
+			mask = (0xff << al3l) & 0xff;
 			if (ah61l == ah61r) {
 				al3r = addrr & 0x7;
-				switch (al3r) {
-				case 0:
-					mask &= 0x01;
-					break;
-				case 1:
-					mask &= 0x03;
-					break;
-				case 2:
-					mask &= 0x07;
-					break;
-				case 3:
-					mask &= 0x0f;
-					break;
-				case 4:
-					mask &= 0x1f;
-					break;
-				case 5:
-					mask &= 0x3f;
-					break;
-				case 6:
-					mask &= 0x7f;
-					break;
-				case 7:
-					mask &= 0xff;
-					break;
-				}
+				mask &= 0xff >> (0x7 - al3r);
 			}
 			break;
 		}
@@ -547,6 +444,7 @@ vis_edge(
 	case edge16n:
 	case edge16ln:
 		al3l = addrl & 0x6;
+		al3l >>= 0x1;
 		switch (inst.opf) {
 		case edge16:
 		case edge16n:
@@ -556,35 +454,11 @@ vis_edge(
 			} else {
 				VISINFO_KSTAT(vis_edge16n);
 			}
-			switch (al3l) {
-			case 0:
-				mask = 0xf;
-				break;
-			case 2:
-				mask = 0x7;
-				break;
-			case 4:
-				mask = 0x3;
-				break;
-			case 6:
-				mask = 0x1;
-				break;
-			}
+			mask = 0xf >> al3l;
 			if (ah61l == ah61r) {
 				al3r = addrr & 0x6;
-				switch (al3r) {
-				case 0:
-					mask &= 0x8;
-					break;
-				case 2:
-					mask &= 0xc;
-					break;
-				case 4:
-					mask &= 0xe;
-					break;
-				case 6:
-					mask &= 0xf;
-				}
+				al3r >>= 0x1;
+				mask &= (0xf << (0x3 - al3r)) & 0xf;
 			}
 			break;
 		case edge16l:
@@ -595,36 +469,12 @@ vis_edge(
 			} else {
 				VISINFO_KSTAT(vis_edge16ln);
 			}
-			switch (al3l) {
-			case 0:
-				mask = 0xf;
-				break;
-			case 2:
-				mask = 0xe;
-				break;
-			case 4:
-				mask = 0xc;
-				break;
-			case 6:
-				mask = 0x8;
-				break;
-			}
+
+			mask = (0xf << al3l) & 0xf;
 			if (ah61l == ah61r) {
 				al3r = addrr & 0x6;
-				switch (al3r) {
-				case 0:
-					mask &= 0x1;
-					break;
-				case 2:
-					mask &= 0x3;
-					break;
-				case 4:
-					mask &= 0x7;
-					break;
-				case 6:
-					mask &= 0xf;
-					break;
-				}
+				al3r >>= 0x1;
+				mask &= 0xf >> (0x3 - al3r);
 			}
 			break;
 		}
@@ -634,6 +484,8 @@ vis_edge(
 	case edge32n:
 	case edge32ln:
 		al3l = addrl & 0x4;
+		al3l >>= 0x2;
+
 		switch (inst.opf) {
 		case edge32:
 		case edge32n:
@@ -643,24 +495,11 @@ vis_edge(
 			} else {
 				VISINFO_KSTAT(vis_edge32n);
 			}
-			switch (al3l) {
-			case 0:
-				mask = 0x3;
-				break;
-			case 4:
-				mask = 0x1;
-				break;
-			}
+			mask = 0x3 >> al3l;
 			if (ah61l == ah61r) {
 				al3r = addrr & 0x4;
-				switch (al3r) {
-				case 0:
-					mask &= 0x2;
-					break;
-				case 4:
-					mask &= 0x3;
-					break;
-				}
+				al3r >>= 0x2;
+				mask &= (0x3 << (0x1 - al3r)) & 0x3;
 			}
 			break;
 		case edge32l:
@@ -671,29 +510,17 @@ vis_edge(
 			} else {
 				VISINFO_KSTAT(vis_edge32ln);
 			}
-			switch (al3l) {
-			case 0:
-				mask = 0x3;
-				break;
-			case 4:
-				mask = 0x2;
-				break;
-			}
+			mask = (0x3 << al3l) & 0x3;
 			if (ah61l == ah61r) {
 				al3r = addrr & 0x4;
-				switch (al3r) {
-				case 0:
-					mask &= 0x1;
-					break;
-				case 4:
-					mask &= 0x3;
-					break;
+				al3r >>= 0x2;
+				mask &= 0x3 >> (0x1 - al3r);
 			}
 			break;
 		}
 		break;
-		}
 	}
+
 	ftt = write_iureg(pfpsd, nrd, pregs, prw, &mask);
 
 	switch (inst.opf) {
@@ -707,20 +534,17 @@ vis_edge(
 		/* We need to set the CCR if we have a carry overflow */
 		/* If this is a 64 bit app, we need to CCR.xcc.v */
 		/* This is the same as the SUBcc instruction */
-		ccr = get_ccr();
 		if (addrl > addrr) {
 			if (am32 == 1) {
-				ccr |= 0x2;
-				set_ccr(ccr);
+				pregs->r_tstate |= TSTATE_IV;
 			} else {
-			    ccr |= 0x20;
-				set_ccr(ccr);
+				pregs->r_tstate |= TSTATE_XV;
 			}
 		}
 		break;
 	}
 	return (ftt);
-}
+	}
 /*
  * Simulator for three dimentional array addressing instructions.
  */
@@ -817,7 +641,7 @@ vis_alignaddr(
 	ftt = write_iureg(pfpsd, nrd, pregs, prw, &r);
 
 
-	g = pfpsd->get_gsr(fp);
+	g = pfpsd->fp_current_read_gsr(fp);
 	g &= ~(GSR_ALIGN_MASK);		/* zero the align offset */
 	r = ea & 0x7;
 	if (inst.opf == alignaddrl) {
@@ -828,7 +652,7 @@ vis_alignaddr(
 			r = (uint64_t)(s & 0x7);
 	}
 	g |= (r << GSR_ALIGN_SHIFT) & GSR_ALIGN_MASK;
-	pfpsd->set_gsr(g, fp);
+	pfpsd->fp_current_write_gsr(g, fp);
 
 	return (ftt);
 }
@@ -862,12 +686,12 @@ vis_bmask(
 	ea += tea;
 	ftt = write_iureg(pfpsd, nrd, pregs, prw, &ea);
 
-	g = pfpsd->get_gsr(fp);
+	g = pfpsd->fp_current_read_gsr(fp);
 	g &= ~(GSR_MASK_MASK);		/* zero the mask offset */
 
 	/* Put the least significant 32 bits of ea in GSR.mask */
 	g |= (ea << GSR_MASK_SHIFT) & GSR_MASK_MASK;
-	pfpsd->set_gsr(g, fp);
+	pfpsd->fp_current_write_gsr(g, fp);
 	return (ftt);
 }
 
@@ -1268,7 +1092,7 @@ vis_fpixel(
 		if ((nrs2 & 1) == 1) 	/* fix register encoding */
 			nrs2 = (nrs2 & 0x1e) | 0x20;
 		_fp_unpack_extword(pfpsd, &lrs2.ll, nrs2);
-		r = pfpsd->get_gsr(fp);
+		r = pfpsd->fp_current_read_gsr(fp);
 		/* fpack16 ignores GSR.scale msb */
 		sf = (int)(GSR_SCALE(r) & 0xf);
 		for (i = 0; i <= 3; i++) {
@@ -1295,7 +1119,7 @@ vis_fpixel(
 			nrs2 = (nrs2 & 0x1e) | 0x20;
 		_fp_unpack_extword(pfpsd, &lrs2.ll, nrs2);
 
-		r = pfpsd->get_gsr(fp);
+		r = pfpsd->fp_current_read_gsr(fp);
 		sf = (int)GSR_SCALE(r);
 		lrd.ll = lrs1.ll << 8;
 		for (i = 0, k = 3; i <= 1; i++, k += 4) {
@@ -1319,7 +1143,7 @@ vis_fpixel(
 			nrs2 = (nrs2 & 0x1e) | 0x20;
 		_fp_unpack_extword(pfpsd, &lrs2.ll, nrs2);
 
-		r = pfpsd->get_gsr(fp);
+		r = pfpsd->fp_current_read_gsr(fp);
 		sf = (int)GSR_SCALE(r);
 		for (i = 0; i <= 1; i++) {
 			j = (int)lrs2.i[i];	/* preserve the sign */
@@ -1431,7 +1255,7 @@ vis_faligndata(
 	_fp_unpack_extword(pfpsd, &lrs1.ll, nrs1);
 	_fp_unpack_extword(pfpsd, &lrs2.ll, nrs2);
 
-	r = pfpsd->get_gsr(fp);
+	r = pfpsd->fp_current_read_gsr(fp);
 	ao = (int)GSR_ALIGN(r);
 
 	for (i = 0, j = ao, k = 0; i <= 7; i++)
@@ -1476,8 +1300,7 @@ vis_bshuffle(
 	_fp_unpack_extword(pfpsd, &lrs1.ll, nrs1);
 	_fp_unpack_extword(pfpsd, &lrs2.ll, nrs2);
 
-	/* r = get_gsr(fp); */
-	r = pfpsd->get_gsr(fp);
+	r = pfpsd->fp_current_read_gsr(fp);
 	ao = (int)GSR_MASK(r);
 
 	/*
@@ -1521,11 +1344,11 @@ vis_siam(
 	uint64_t g, r;
 	nrs2 = inst.rs2;
 
-	g = pfpsd->get_gsr(fp);
+	g = pfpsd->fp_current_read_gsr(fp);
 	g &= ~(GSR_IM_IRND_MASK);	/* zero the IM and IRND fields */
 	r = nrs2 & 0x7;			/* get mode(3 bit) */
 	g |= (r << GSR_IRND_SHIFT);
-	pfpsd->set_gsr(g, fp);
+	pfpsd->fp_current_write_gsr(g, fp);
 	return (ftt_none);
 }
 
@@ -1997,7 +1820,7 @@ vis_rdgsr(
 
 	nrd = pinst.rd;
 
-	r = pfpsd->get_gsr(fp);
+	r = pfpsd->fp_current_read_gsr(fp);
 	ftt = write_iureg(pfpsd, nrd, pregs, prw, &r);
 	pregs->r_pc = pregs->r_npc;	/* Do not retry emulated instruction. */
 	pregs->r_npc += 4;
@@ -2040,7 +1863,7 @@ vis_wrgsr(
 		r2 = (fp.i << 19) >> 19;
 	}
 	r = r1 ^ r2;
-	pfpsd->set_gsr(r, fp);
+	pfpsd->fp_current_write_gsr(r, fp);
 	pregs->r_pc = pregs->r_npc;	/* Do not retry emulated instruction. */
 	pregs->r_npc += 4;
 	return (ftt);

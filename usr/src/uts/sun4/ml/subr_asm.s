@@ -343,7 +343,7 @@ restore_gsr(kfpu_t *fp)
 
 /*
  * uint64_t
- * get_phys_gsr()
+ * _fp_read_pgsr()
  * Get the graphics status register info from fp and return it
  */
 
@@ -351,15 +351,15 @@ restore_gsr(kfpu_t *fp)
 
 /* ARGSUSED */
 uint64_t
-get_phys_gsr(kfpu_t *fp)
+_fp_read_pgsr(kfpu_t *fp)
 { return 0; }
 
 #else	/* lint */
 
-	ENTRY_NP(get_phys_gsr)
+	ENTRY_NP(_fp_read_pgsr)
 	retl
 	rd	%gsr, %o0
-	SET_SIZE(get_phys_gsr)
+	SET_SIZE(_fp_read_pgsr)
 
 #endif	/* lint */
 
@@ -387,7 +387,7 @@ get_gsr(kfpu_t *fp)
 #endif
 
 /*
- * set_phys_gsr(uint64_t *buf, kfpu_t *fp)
+ * _fp_write_pgsr(uint64_t *buf, kfpu_t *fp)
  * Set the graphics status register info to fp from buf
  */
 
@@ -395,15 +395,15 @@ get_gsr(kfpu_t *fp)
 
 /* ARGSUSED */
 void
-set_phys_gsr(uint64_t buf, kfpu_t *fp)
+_fp_write_pgsr(uint64_t buf, kfpu_t *fp)
 {}
 
 #else	/* lint */
 
-	ENTRY_NP(set_phys_gsr)
+	ENTRY_NP(_fp_write_pgsr)
 	retl
 	mov	%o0, %gsr
-	SET_SIZE(set_phys_gsr)
+	SET_SIZE(_fp_write_pgsr)
 
 #endif	/* lint */
 
@@ -425,67 +425,6 @@ set_gsr(uint64_t buf, kfpu_t *fp)
 	retl
 	stx	%o0, [%o1 + FPU_GSR]
 	SET_SIZE(set_gsr)
-
-#endif	/* lint */
-/*
- * Routine to get the pstate reg - used by vis emulation code
- * to test whether the AM bit for 32 bit instructions
- * has been set.
- */
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-uint_t
-get_pstate(void)
-{ return 0; }
-#else	/* lint */
-
-	ENTRY_NP(get_pstate)
-	retl
-	rdpr	%pstate, %o0
-	SET_SIZE(get_pstate)
-
-#endif	/* lint */
-/*
- * Routine to get the ccr bits - used by vis emulation code
- * to get the ccr bits before an edge instruction is performed
- *
- */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-
-uint_t
-get_ccr()
-{ return 0; }
-#else	/* lint */
-
-	ENTRY_NP(get_ccr)
-	retl
-	rd	%ccr, %o0
-	SET_SIZE(get_ccr)
-
-#endif
-
-/*
- * Routine to set the ccr bits - used by vis emulation code
- * to set the ccr bits after an edge instruction is performed
- *
- */
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-		
-void
-set_ccr(uint_t buf)
-{}
-#else	/* lint */
-
-	ENTRY_NP(set_ccr)
-	retl
-	mov	%o0, %ccr
-	SET_SIZE(set_ccr)
 
 #endif	/* lint */
 

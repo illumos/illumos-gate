@@ -241,11 +241,8 @@ typedef			/* FPU data used by simulator. */
 	void			(*fp_current_write_freg) ();
 	void			(*fp_current_read_dreg) ();
 	void			(*fp_current_write_dreg) ();
-	uint64_t		(*get_gsr) (kfpu_t *);
-	uint_t			(*get_ccr) ();
-	uint_t			(*get_pstate) ();
-	void			(*set_gsr) (uint64_t, kfpu_t *);
-	void			(*set_ccr) (uint_t);
+	uint64_t		(*fp_current_read_gsr) (kfpu_t *);
+	void			(*fp_current_write_gsr) (uint64_t, kfpu_t *);
 	int			fp_trapcode;
 	char			*fp_trapaddr;
 	struct	regs		*fp_traprp;

@@ -79,11 +79,8 @@ extern void save_gsr(kfpu_t *);
 extern void restore_gsr(kfpu_t *);
 extern uint64_t get_gsr(kfpu_t *);
 extern void set_gsr(uint64_t, kfpu_t *);
-extern uint64_t get_phys_gsr(kfpu_t *);
-extern void set_phys_gsr(uint64_t, kfpu_t *);
-extern uint_t get_pstate();
-extern uint_t get_ccr();
-extern void set_ccr(uint_t);
+extern uint64_t _fp_read_pgsr(kfpu_t *);
+extern void _fp_write_pgsr(uint64_t, kfpu_t *);
 extern void _fp_read_pdreg(uint64_t *, uint_t);
 extern void _fp_write_pdreg(uint64_t *, uint_t);
 

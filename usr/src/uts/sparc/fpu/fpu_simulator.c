@@ -41,7 +41,6 @@
 #include <sys/privregs.h>
 #include <sys/vis_simulator.h>
 
-
 #define	FPUINFO_KSTAT(opcode)	{					\
 	extern void __dtrace_probe___fpuinfo_##opcode(uint64_t *);	\
 	uint64_t *stataddr = &fpuinfo.opcode.value.ui64;		\
@@ -479,25 +478,16 @@ fpu_vis_sim(
 		pfpsd->fp_current_write_freg = _fp_write_pfreg;
 		pfpsd->fp_current_read_dreg = _fp_read_pdreg;
 		pfpsd->fp_current_write_dreg = _fp_write_pdreg;
-		pfpsd->get_gsr = get_phys_gsr;
-		pfpsd->set_gsr = set_phys_gsr;
-		pfpsd->get_ccr = get_ccr;
-		pfpsd->set_ccr = set_ccr;
-		pfpsd->get_pstate = get_pstate;
+		pfpsd->fp_current_read_gsr = _fp_read_pgsr;
+		pfpsd->fp_current_write_gsr = _fp_write_pgsr;
 	} else {
 		pfpsd->fp_current_pfregs = pfp;
 		pfpsd->fp_current_read_freg = _fp_read_vfreg;
 		pfpsd->fp_current_write_freg = _fp_write_vfreg;
 		pfpsd->fp_current_read_dreg = _fp_read_vdreg;
 		pfpsd->fp_current_write_dreg = _fp_write_vdreg;
-		pfpsd->get_gsr = get_gsr;
-		pfpsd->set_gsr = set_gsr;
-
-		/* There are no virtual routines */
-		/* for getting/setting ccr and pstate */
-		pfpsd->get_ccr = get_ccr;
-		pfpsd->set_ccr = set_ccr;
-		pfpsd->get_pstate = get_pstate;
+		pfpsd->fp_current_read_gsr = get_gsr;
+		pfpsd->fp_current_write_gsr = set_gsr;
 	}
 
 	if ((fp.inst.hibits == 2) && (fp.inst.op3 == 0x36)) {
@@ -542,11 +532,8 @@ fpu_simulator(
 	pfpsd->fp_current_write_freg = _fp_write_pfreg;
 	pfpsd->fp_current_read_dreg = _fp_read_pdreg;
 	pfpsd->fp_current_write_dreg = _fp_write_pdreg;
-	pfpsd->get_gsr = get_phys_gsr;
-	pfpsd->set_gsr = set_phys_gsr;
-	pfpsd->get_ccr = get_ccr;
-	pfpsd->set_ccr = set_ccr;
-	pfpsd->get_pstate = get_pstate;
+	pfpsd->fp_current_read_gsr = _fp_read_pgsr;
+	pfpsd->fp_current_write_gsr = _fp_write_pgsr;
 	return (_fp_fpu_simulator(pfpsd, fp.inst, pfsr, gsr));
 }
 
@@ -578,14 +565,8 @@ fp_emulator(
 	pfpsd->fp_current_write_freg = _fp_write_vfreg;
 	pfpsd->fp_current_read_dreg = _fp_read_vdreg;
 	pfpsd->fp_current_write_dreg = _fp_write_vdreg;
-	pfpsd->get_gsr = get_gsr;
-	pfpsd->set_gsr = set_gsr;
-
-	/* There are no virtual routines */
-	/* for getting/setting ccr and pstate */
-	pfpsd->get_ccr = get_ccr;
-	pfpsd->set_ccr = set_ccr;
-	pfpsd->get_pstate = get_pstate;
+	pfpsd->fp_current_read_gsr = get_gsr;
+	pfpsd->fp_current_write_gsr = set_gsr;
 	pfpsd->fp_trapaddr = (caddr_t)pinst; /* bad inst addr in case we trap */
 	ftt = _fp_read_inst((uint32_t *)pinst, &(fp.i), pfpsd);
 	if (ftt != ftt_none)
