@@ -254,6 +254,7 @@ typedef	struct {
 	Audit_list	*lm_alp;	/* audit list descripter */
 	avl_tree_t	*lm_fpavl;	/* avl tree of objects loaded */
 	Alist		*lm_lists;	/* active and pending link-map lists */
+	char		***lm_environ;	/* pointer to environment array */
 	Word		lm_tflags;	/* transferable flags */
 	int		lm_obj;		/* total number of objs on link-map */
 	int		lm_init;	/* new obj since last init processing */
@@ -278,6 +279,7 @@ typedef struct {
 	Elf32_Addr	lm_alp;
 	Elf32_Addr	lm_fpavl;
 	Elf32_Addr	lm_lists;
+	Elf32_Addr	lm_environ;
 	Elf32_Word	lm_tflags;
 	int		lm_obj;
 	int		lm_init;

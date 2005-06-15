@@ -410,11 +410,11 @@ extern char		**environ;	/* environ pointer */
 
 extern int		dyn_plt_ent_size; /* Size of dynamic plt's */
 extern ulong_t		at_flags;	/* machine specific file flags */
-extern const char	*pr_name;	/* file name of executing process */
+extern const char	*procname;	/* file name of executing process */
 extern Rtld_db_priv	r_debug;	/* debugging information */
 extern char		*lasterr;	/* string describing last error */
 extern Interp		*interp;	/* ELF executable interpreter info */
-extern const char	*rt_name;	/* name of the dynamic linker */
+extern const char	*rtldname;	/* name of the dynamic linker */
 extern List		hdl_list[];	/* dlopen() handle list */
 extern size_t		syspagsz;	/* system page size */
 extern char		*platform; 	/* platform name */
@@ -477,6 +477,9 @@ extern const Msg	ldd_reject[];
 extern const char	*profile_name;	/* object being profiled */
 extern const char	*profile_out;	/* profile output file */
 extern const char	*profile_lib;	/* audit library to perform profile */
+
+extern Dl_argsinfo	argsinfo;	/* process argument, environment and */
+					/*	auxv information */
 
 extern const char	*err_strs[];	/* diagnostic error string headers */
 extern const char	*nosym_str;	/* MSG_GEN_NOSYM message cache */
@@ -613,10 +616,11 @@ extern void		rtld_db_dlactivity(void);
 extern void		rtld_db_preinit(void);
 extern void		rtld_db_postinit(void);
 extern void		rtldexit(Lm_list *, int);
-extern int		rtld_getopt(char **, Word *, Word *, int);
+extern int		rtld_getopt(char **, char ***, auxv_t **, Word *,
+			    Word *, int);
 extern void		security(uid_t, uid_t, gid_t, gid_t, int);
 extern void		set_environ(Lm_list *);
-extern Rt_map		*setup(ulong_t, ulong_t, Word, char *, int, char *,
+extern Rt_map		*setup(char **, auxv_t *, Word, char *, int, char *,
 			    Dyn *, ulong_t, ulong_t, int fd, Phdr *, char *,
 			    char **, int, uid_t, uid_t, gid_t, gid_t, void *,
 			    int, uint_t);

@@ -32,7 +32,7 @@
 
 # Usage error
 @ MSG_USG_BADOPT	"usage: ld.so.1 [-e option,...] \
-			 <dynamic object> [exec args ...]"
+			 dynamic-object [object args,...]"
 
 # Message formatting error.
 @ MSG_EMG_BUFOVRFLW	"ld.so.1: internal: message buffer overflow"

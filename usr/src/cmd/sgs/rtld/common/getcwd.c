@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -224,6 +224,13 @@ getcwd(char *path, size_t pathsz)
 /*
  * Take the given link-map file/pathname and prepend the current working
  * directory.
+ *
+ * When $ORIGIN was first introduced, the expansion of a relative pathname was
+ * deferred until it was required.  However now we insure a full pathname is
+ * always created - things like the analyzer wish to rely on librtld_db
+ * returning a full path.  The overhead of this is perceived to be low,
+ * providing the associated libc version of getcwd is available (see 4336878).
+ * This getcwd() was ported back to Solaris 8.1.
  */
 size_t
 fullpath(Rt_map *lmp, const char *rpath)

@@ -504,18 +504,9 @@ aout_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	caddr_t		addr;		/* mmap result temporary */
 	struct link_dynamic *ld;	/* dynamic pointer of object mapped */
 	size_t		size;		/* size of object */
-	const char	*name;		/* actual name stored for pathname */
 	Rt_map		*lmp;		/* link map created */
 	int		err;
 	struct nlist	*nl;
-
-	/*
-	 * Is object the executable?
-	 */
-	if (pname == (char *)0)
-		name = pr_name;
-	else
-		name = pname;
 
 	/*
 	 * Map text and allocate enough address space to fit the whole
@@ -529,7 +520,7 @@ aout_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	if ((addr = mmap(0, size, (PROT_READ | PROT_EXEC), MAP_PRIVATE,
 	    fd, 0)) == MAP_FAILED) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), name,
+		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), pname,
 		    strerror(err));
 		return (0);
 	}
@@ -558,7 +549,7 @@ aout_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	    (int)exec->a_data, (PROT_READ | PROT_WRITE | PROT_EXEC),
 	    (MAP_FIXED | MAP_PRIVATE), fd, (off_t)exec->a_text) == MAP_FAILED) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), name,
+		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), pname,
 		    strerror(err));
 		return (0);
 	}
@@ -601,8 +592,8 @@ aout_new_lm(Lm_list *lml, const char *pname, const char *oname,
 	Rt_map	*lmp;
 	caddr_t offset;
 
-	DBG_CALL(Dbg_file_aout((pname ? pname : pr_name), (ulong_t)ld,
-	    (ulong_t)addr, (ulong_t)size));
+	DBG_CALL(Dbg_file_aout(pname, (ulong_t)ld, (ulong_t)addr,
+	    (ulong_t)size));
 
 	/*
 	 * Allocate space for the link-map and private a.out information.  Once
@@ -637,7 +628,7 @@ aout_new_lm(Lm_list *lml, const char *pname, const char *oname,
 	/*
 	 * Specific settings for a.out format.
 	 */
-	if (pname == 0) {
+	if (lml->lm_head == 0) {
 		offset = (caddr_t)MAIN_BASE;
 		FLAGS(lmp) |= FLG_RT_FIXED;
 	} else

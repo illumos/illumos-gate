@@ -27,6 +27,7 @@
 
 #include	"_synonyms.h"
 
+#include	<sys/auxv.h>
 #include	<string.h>
 #include	<unistd.h>
 #include	<fcntl.h>
@@ -130,8 +131,8 @@ Dbg_file_elf(const char *name, ulong_t dynamic, ulong_t base,
 }
 
 void
-Dbg_file_ldso(const char *name, ulong_t dynamic, ulong_t base, ulong_t envp,
-    ulong_t auxv)
+Dbg_file_ldso(const char *name, ulong_t dynamic, ulong_t base, char **envp,
+    auxv_t *auxv)
 {
 	if (DBG_NOTCLASS(DBG_FILES))
 		return;

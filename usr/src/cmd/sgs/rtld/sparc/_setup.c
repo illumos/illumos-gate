@@ -232,9 +232,9 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 	/*
 	 * Continue with generic startup processing.
 	 */
-	if ((lmp = setup((unsigned long)_envp, (unsigned long)_auxv, _flags,
-	    _platform, _syspagsz, _rt_name, dyn_ptr, ld_base, interp_base,
-	    fd, phdr, _execname, _argv, dz_fd, uid, euid, gid, egid,
+	if ((lmp = setup((char **)_envp, (auxv_t *)_auxv, _flags, _platform,
+	    _syspagsz, _rt_name, dyn_ptr, ld_base, interp_base, fd, phdr,
+	    _execname, _argv, dz_fd, uid, euid, gid, egid,
 #ifdef	A_OUT
 	    aoutdyn, auxflags, hwcap_1)) == (Rt_map *)0) {
 #else

@@ -164,29 +164,109 @@ preload(const char *str, Rt_map *lmp)
 }
 
 Rt_map *
-setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
-    char *_rt_name, Dyn *dyn_ptr, ulong_t ld_base, ulong_t interp_base, int fd,
-    Phdr *phdr, char *_execname, char **_argv, int dz_fd, uid_t uid, uid_t euid,
-    gid_t gid, gid_t egid, void *aoutdyn, int auxflags, uint_t hwcap_1)
+setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
+    char *_rtldname, Dyn *dyn_ptr, ulong_t ld_base, ulong_t interp_base, int fd,
+    Phdr *phdr, char *execname, char **argv, int dz_fd, uid_t uid,
+    uid_t euid, gid_t gid, gid_t egid, void *aoutdyn, int auxflags,
+    uint_t hwcap_1)
 {
 	Rt_map		*rlmp, *mlmp, **tobj = 0;
-	ulong_t		etext;
 	Ehdr		*ehdr;
 	struct stat	status;
-	int		features = 0, _name, i, ldsoexec = 0;
+	int		features = 0, ldsoexec = 0;
 	size_t		eaddr, esize;
-	char		*c;
+	char		*str, *argvname;
 	Mmap		*mmaps;
 
 	/*
-	 * Now that ld.so has relocated itself, initialize any global variables.
-	 * Initialize our own 'environ' so as to establish an address suitable
-	 * for libc's hardware mul/div magic (libc/sparc/crt/hwmuldiv.o).
+	 * Now that ld.so has relocated itself, initialize our own 'environ' so
+	 * as to establish an address suitable for libc's hardware mul/div
+	 * magic (libc/sparc/crt/hwmuldiv.o).
 	 */
-	_environ = (char **)((ulong_t)_auxv - sizeof (char *));
+	_environ = (char **)((ulong_t)auxv - sizeof (char *));
 	_init();
-	_environ = (char **)envp;
+	_environ = envp;
 
+	/*
+	 * Far the most common application execution revolves around appending
+	 * the application name to the users PATH definition, thus a full name
+	 * is passed to exec() which will in turn be returned via
+	 * AT_SUN_EXECNAME.  Applications may also be invoked from the current
+	 * working directory, or via a relative name.
+	 *
+	 * Determine whether the kernel has supplied a AT_SUN_EXECNAME aux
+	 * vector.  This vector points to the full pathname, on the stack, of
+	 * the object that started the process.  If this is null, then
+	 * AT_SUN_EXECNAME isn't supported (if the pathname exceeded the system
+	 * limit (PATH_MAX) the exec would have failed).  This flag is used to
+	 * determine whether we can call resolvepath().
+	 */
+	if (execname)
+		rtld_flags |= RT_FL_EXECNAME;
+
+	/*
+	 * Determine how ld.so.1 has been executed.
+	 */
+	if ((fd == -1) && (phdr == 0)) {
+		/*
+		 * If we received neither the AT_EXECFD nor the AT_PHDR aux
+		 * vector, ld.so.1 must have been invoked directly from the
+		 * command line.
+		 */
+		ldsoexec = 1;
+
+		/*
+		 * AT_SUN_EXECNAME provides the most precise name, if it is
+		 * available, otherwise fall back to argv[0].  At this time,
+		 * there is no process name.
+		 */
+		if (execname)
+			rtldname = execname;
+		else if (argv[0])
+			rtldname = argv[0];
+		else
+			rtldname = (char *)MSG_INTL(MSG_STR_UNKNOWN);
+	} else {
+		/*
+		 * Otherwise, we have a standard process.  AT_SUN_EXECNAME
+		 * provides the most precise name, if it is available,
+		 * otherwise fall back to argv[0].  Provided the application
+		 * is already mapped, the process is the application, so
+		 * simplify the application name for use in any diagnostics.
+		 */
+		if (execname)
+			argvname = execname;
+		else if (argv[0])
+			argvname = execname = argv[0];
+		else
+			argvname = execname = (char *)MSG_INTL(MSG_STR_UNKNOWN);
+
+		if (fd == -1) {
+			if ((str = strrchr(argvname, '/')) != 0)
+				procname = ++str;
+			else
+				procname = argvname;
+		}
+
+		/*
+		 * At this point, we don't know the runtime linkers full path
+		 * name.  The _rtldname passed to us is the SONAME of the
+		 * runtime linker, which is typically /lib/ld.so.1 no matter
+		 * what the full path is.   Use this for now, we'll reset the
+		 * runtime linkers name once the application is analyzed.
+		 */
+		if (_rtldname) {
+			if ((str = strrchr(_rtldname, '/')) != 0)
+				rtldname = ++str;
+			else
+				rtldname = _rtldname;
+		} else
+			rtldname = (char *)MSG_INTL(MSG_STR_UNKNOWN);
+	}
+
+	/*
+	 * Initialize any global variables.
+	 */
 	at_flags = _flags;
 	if (dz_fd != FD_UNAVAIL)
 		dz_init(dz_fd);
@@ -243,7 +323,6 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 		hwcap = (ulong_t)hwcap_1;
 	}
 #endif
-
 	/*
 	 * Look for environment strings (allows things like LD_NOAUDIT to be
 	 * established, although debugging isn't enabled until later).
@@ -268,82 +347,55 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 	mmaps[1].m_perm = (PROT_READ | PROT_WRITE | PROT_EXEC);
 
 	/*
-	 * Create a link map structure for ld.so.  We assign the NAME() after
-	 * link-map creation to avoid fullpath() processing within elf_new_lm().
-	 * This is carried out later when the true interpretor path (as defined
-	 * within the application) is known.
+	 * Create a link map structure for ld.so.1.
 	 */
-	if ((rlmp = elf_new_lm(&lml_rtld, 0, 0, dyn_ptr, ld_base,
+	if ((rlmp = elf_new_lm(&lml_rtld, _rtldname, rtldname, dyn_ptr, ld_base,
 	    (ulong_t)&_etext, ALO_DATA, (ulong_t)(eaddr - ld_base), 0, ld_base,
 	    (ulong_t)(eaddr - ld_base), mmaps, 2)) == 0) {
 		return (0);
 	}
-	NAME(rlmp) = _rt_name;
+
 	MODE(rlmp) |= (RTLD_LAZY | RTLD_NODELETE | RTLD_GLOBAL | RTLD_WORLD);
 	FLAGS(rlmp) |= (FLG_RT_ANALYZED | FLG_RT_RELOCED | FLG_RT_INITDONE |
 		FLG_RT_INITCLCT | FLG_RT_FINICLCT | FLG_RT_MODESET);
+
+	/*
+	 * Initialize the runtime linkers information.
+	 */
+	interp = &_interp;
+	interp->i_name = NAME(rlmp);
+	interp->i_faddr = (caddr_t)ADDR(rlmp);
 	ldso_plt_init(rlmp);
 
 	/*
-	 * If we received neither the AT_EXECFD nor the AT_PHDR aux vector,
-	 * ld.so.1 must have been invoked directly from the command line.  In
-	 * this case examine argv to determine what file to execute.
+	 * If ld.so.1 has been invoked directly, process its arguments.
 	 */
-	if ((fd == -1) && (!phdr)) {
+	if (ldsoexec) {
 		/*
-		 * Set pr_name now to print error messages if required. It will
-		 * be reset below if an executable is found.
+		 * Process any arguments that are specific to ld.so.1, and
+		 * reorganize the process stack to effectively remove ld.so.1
+		 * from it.  Reinitialize the environment pointer, as this may
+		 * have been shifted after skipping ld.so.1's arguments.
 		 */
-		rt_name = pr_name = _argv[0];
-		if (rtld_getopt(_argv, &(lml_main.lm_flags),
-		    &(lml_main.lm_tflags), (aoutdyn != 0)) == 1)
+		if (rtld_getopt(argv, &envp, &auxv, &(lml_main.lm_flags),
+		    &(lml_main.lm_tflags), (aoutdyn != 0)) == 1) {
+			eprintf(ERR_NONE, MSG_INTL(MSG_USG_BADOPT));
 			return (0);
-		if ((fd = open(_argv[0], O_RDONLY)) == -1) {
+		}
+		_environ = envp;
+
+		/*
+		 * Open the object that ld.so.1 is to execute.
+		 */
+		argvname = execname = argv[0];
+
+		if ((fd = open(argvname, O_RDONLY)) == -1) {
 			int	err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), _argv[0],
+			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), argvname,
 			    strerror(err));
 			return (0);
 		}
-		NAME(rlmp) = _execname;
-		interp = &_interp;
-		interp->i_name = NAME(rlmp);
-		interp->i_faddr = (caddr_t)ADDR(rlmp);
-		ldsoexec = 1;
 	}
-
-	/*
-	 * Duplicate the runtime linkers name so that it is available in a core
-	 * file.
-	 */
-	if ((NAME(rlmp) = strdup(NAME(rlmp))) == 0)
-		return (0);
-
-	/*
-	 * Get the filename of the rtld for use in any diagnostics (but
-	 * save the full name in the link map for future comparisons)
-	 */
-	rt_name = c = NAME(rlmp);
-	while (*c) {
-		if (*c++ == '/')
-			rt_name = c;
-	}
-
-	/*
-	 * Establish the applications name.  Note, if ld.so.1 was executed with
-	 * the application as its argument, argv[0] will now reflect the
-	 * application name.
-	 */
-	if (_argv[0]) {
-		/*
-		 * Some troublesome programs will change the value of argv[0].
-		 * Dupping this string protects ourselves from such programs.
-		 */
-		if ((pr_name = (const char *)strdup(_argv[0])) == 0)
-			return (0);
-	} else
-		pr_name = (const char *)MSG_INTL(MSG_STR_UNKNOWN);
-
-	_name = 0;
 
 	/*
 	 * Map in the file, if exec has not already done so.  If it has,
@@ -357,18 +409,26 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 		 * Find out what type of object we have.
 		 */
 		(void) fstat(fd, &status);
-		if ((ftp = are_u_this(&rej, fd, &status, pr_name)) == 0) {
+		if ((ftp = are_u_this(&rej, fd, &status, argvname)) == 0) {
 			eprintf(ERR_FATAL, MSG_INTL(err_reject[rej.rej_type]),
-			    pr_name, conv_reject_str(&rej));
+			    argvname, conv_reject_str(&rej));
 			return (0);
 		}
 
 		/*
 		 * Map in object.
 		 */
-		mlmp = (ftp->fct_map_so)(&lml_main, ALO_DATA, 0, pr_name, fd);
-		if (mlmp == 0)
+		if ((mlmp = (ftp->fct_map_so)(&lml_main, ALO_DATA, execname,
+		    argvname, fd)) == 0)
 			return (0);
+
+		/*
+		 * We now have a process name for error diagnostics.
+		 */
+		if ((str = strrchr(argvname, '/')) != 0)
+			procname = ++str;
+		else
+			procname = argvname;
 
 		if (ldsoexec) {
 			Addr	brkbase = 0;
@@ -384,6 +444,7 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 
 			if ((FCT(mlmp) == &elf_fct) &&
 			    (ehdr->e_type == ET_EXEC)) {
+				int	i;
 				Phdr *	_phdr = (Phdr *)((uintptr_t)ADDR(mlmp) +
 					ehdr->e_phoff);
 
@@ -405,13 +466,13 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 			if (_brk_unlocked((void *)brkbase) == -1) {
 				int	err = errno;
 				eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_BRK),
-				    pr_name, strerror(err));
+				    argvname, strerror(err));
 			}
 		}
 
 		/*
-		 * Object has now been mmaped in, we no longer
-		 * need the file descriptor.
+		 * The object has now been mmaped, we no longer need the file
+		 * descriptor.
 		 */
 		(void) close(fd);
 
@@ -424,10 +485,9 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 		 */
 		if (aoutdyn) {
 #ifdef A_OUT
-			if ((mlmp = aout_new_lm(&lml_main, 0, 0, aoutdyn, 0, 0,
-			    ALO_DATA)) == 0) {
+			if ((mlmp = aout_new_lm(&lml_main, execname, argvname,
+			    aoutdyn, 0, 0, ALO_DATA)) == 0)
 				return (0);
-			}
 
 			/*
 			 * Set the memory size.  Note, we only know the end of
@@ -453,23 +513,21 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 			 * Make sure no-direct bindings are in effect.
 			 */
 			lml_main.lm_tflags |= LML_TFLG_NODIRECT;
-
 #else
 			eprintf(ERR_FATAL, MSG_INTL(MSG_ERR_REJ_UNKFILE),
-			    pr_name);
+			    argvname);
 			return (0);
 #endif
 		} else if (phdr) {
 			Phdr		*pptr, *firstptr = 0, *lastptr;
-			Phdr		*tlsphdr = 0;
-			Phdr		*unwindphdr = 0;
+			Phdr		*tlsphdr = 0, *unwindphdr = 0;
 			Dyn		*dyn = 0;
 			Cap		*cap = 0;
-			Off		i_offset;
+			Off		i_offset = 0;
 			Addr		base = 0;
-			char		*name = 0;
-			ulong_t		memsize, phsize, entry;
+			ulong_t		memsize, phsize, entry, etext;
 			uint_t		mmapcnt = 0;
+			int		i;
 
 			/*
 			 * Using the executables phdr address determine the base
@@ -488,11 +546,8 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 			 */
 			ehdr = (Ehdr *)((Addr)phdr - phdr->p_offset);
 			phsize = ehdr->e_phentsize;
-			if (ehdr->e_type == ET_DYN) {
+			if (ehdr->e_type == ET_DYN)
 				base = (Addr)ehdr;
-				name = (char *)pr_name;
-				_name = 1;
-			}
 
 			/*
 			 * Allocate a mapping array to retain mapped segment
@@ -507,7 +562,6 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 			 */
 			for (i = 0, pptr = phdr; i < ehdr->e_phnum; i++) {
 				if (pptr->p_type == PT_INTERP) {
-					interp = &_interp;
 					i_offset = pptr->p_offset;
 					interp->i_faddr =
 					    (caddr_t)interp_base;
@@ -520,13 +574,14 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 					if (!firstptr)
 						firstptr = pptr;
 					lastptr = pptr;
-					if (!interp->i_name && pptr->p_filesz &&
+					if (i_offset && pptr->p_filesz &&
 					    (i_offset >= pptr->p_offset) &&
 					    (i_offset <=
 					    (pptr->p_memsz + pptr->p_offset))) {
 						interp->i_name = (char *)
 						    pptr->p_vaddr + i_offset -
 						    pptr->p_offset + base;
+						i_offset = 0;
 					}
 					if ((pptr->p_flags &
 					    (PF_R | PF_W)) == PF_R)
@@ -571,8 +626,8 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 			if (ehdr->e_type == ET_DYN)
 				entry += (ulong_t)ehdr;
 
-			if ((mlmp = elf_new_lm(&lml_main, name, 0, dyn,
-			    (Addr)ehdr, etext, ALO_DATA, memsize, entry,
+			if ((mlmp = elf_new_lm(&lml_main, execname, argvname,
+			    dyn, (Addr)ehdr, etext, ALO_DATA, memsize, entry,
 			    (ulong_t)ehdr, memsize, mmaps, mmapcnt)) == 0) {
 				return (0);
 			}
@@ -588,53 +643,47 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 	}
 
 	/*
-	 * Determine whether the kernel has supplied a AT_SUN_EXECNAME aux
-	 * vector.  This vector points to the full pathname, on the stack, of
-	 * the object that started the process.  If this is null, then
-	 * AT_SUN_EXECNAME isn't supported (if the pathname exceeded the system
-	 * limit (PATH_MAX) the exec would have failed).
+	 * Establish the interpretors name as that defined within the initial
+	 * object (executable).  This provides for ORIGIN processing of ld.so.1
+	 * dependencies.
 	 */
-	if (_execname)
-		rtld_flags |= RT_FL_EXECNAME;
-
-	/*
-	 * Having mapped the executable in and created its link map, initialize
-	 * the name and flags entries as necessary.
-	 *
-	 * Note that any object that starts the process is identified as `main',
-	 * even shared objects.  This assumes that the starting object will call
-	 * .init and .fini from its own crt use (this is a pretty valid
-	 * assumption as the crts also provide the necessary entry point).
-	 * However, newer objects may contain .initarray or .finiarray which
-	 * the runtime linker must execute, and which require bindings to be
-	 * established to main for proper initarray/finiarray ordering.
-	 */
-	if (_name == 0) {
-		/*
-		 * If the argv[0] name is a full path, and an AT_SUN_EXECNAME
-		 * exists, and we haven't executed ld.so.1 directly, then use
-		 * this name for diagnostics.  Various commands use isaexec(3C)
-		 * to execute their 64-bit counterparts, however, the 64-bit
-		 * application simply obtains its argv[] from the parent, and
-		 * thus will contain the 32-bit application name.
-		 */
-		if ((*pr_name == '/') && _execname && (ldsoexec == 0))
-			pr_name = _execname;
-		NAME(mlmp) = (char *)pr_name;
+	if (ldsoexec == 0) {
+		size_t	len = strlen(interp->i_name);
+		(void) expand(&interp->i_name, &len, 0, 0,
+		    (PN_TKN_ISALIST | PN_TKN_HWCAP), rlmp);
 	}
+	PATHNAME(rlmp) = interp->i_name;
+
+	if (FLAGS1(rlmp) & FL1_RT_RELATIVE)
+		(void) fullpath(rlmp, 0);
+	else
+		ORIGNAME(rlmp) = PATHNAME(rlmp) = NAME(rlmp);
 
 	/*
-	 * Setup the PATHNAME()/ORIGNAME() for the main primary object and
-	 * for ld.so.1.  If we didn't receive a AT_SUN_EXECNAME or it
-	 * was ld.so.1 itself that was executed, then PATHNAME() will be
-	 * based off of argv[0].  Otherwise - the PATHNAME is AT_SUN_EXECNAME.
+	 * Having established the true runtime linkers name, simplify the name
+	 * for error diagnostics.
 	 */
-	if ((ldsoexec) || (_execname == 0))
-		PATHNAME(mlmp) = NAME(mlmp);
+	if ((str = strrchr(PATHNAME(rlmp), '/')) != 0)
+		rtldname = ++str;
 	else
-		PATHNAME(mlmp) = _execname;
+		rtldname = PATHNAME(rlmp);
 
-	ORIGNAME(mlmp) = PATHNAME(mlmp);
+	/*
+	 * Expand the fullpath name of the application.  This typically occurs
+	 * as a part of loading an object, but as the kernel probably mapped
+	 * it in, complete this processing now.
+	 */
+	if (FLAGS1(mlmp) & FL1_RT_RELATIVE)
+		(void) fullpath(mlmp, 0);
+
+	/*
+	 * Some troublesome programs will change the value of argv[0].  Dupping
+	 * the process string protects us, and insures the string is left in
+	 * any core files.
+	 */
+	if ((str = (char *)strdup(procname)) == 0)
+		return (0);
+	procname = str;
 
 	/*
 	 * If the kernel has provided hardware capabilities information, and
@@ -663,47 +712,18 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 		FLAGS1(mlmp) |= FL1_RT_NOINIFIN;
 
 	/*
-	 * Establish the interpretors name as that defined within the initial
-	 * object (executable).  This provides for ORIGIN processing of ld.so.1
-	 * dependencies.
-	 */
-	if (interp) {
-		size_t	len;
-		ORIGNAME(rlmp) = interp->i_name;
-		len = strlen(interp->i_name);
-		(void) expand(&interp->i_name, &len, 0, 0,
-		    (PN_TKN_ISALIST | PN_TKN_HWCAP), mlmp);
-		PATHNAME(rlmp) = interp->i_name;
-	} else {
-		ORIGNAME(rlmp) = PATHNAME(rlmp) = NAME(rlmp);
-	}
-
-	/*
-	 * Far the most common application execution revolves around appending
-	 * the application name to the users PATH definition, thus a full name
-	 * is passed to exec() which will in turn be returned via
-	 * AT_SUN_EXECNAME.  Applications may also be invoked from the current
-	 * working directory, or via a relative name.
-	 *
-	 * When $ORIGIN was first introduced, the expansion of a relative
-	 * pathname was deferred until it was required.  However now we insure
-	 * a full pathname is always created - things like the analyzer wish to
-	 * rely on librtld_db returning a full path.  The overhead of this is
-	 * perceived to be low, providing the associated libc version of getcwd
-	 * is available (see 4336878), plus it only affects execing relative
-	 * paths.  Here we expand the application and ld.so.1 - see
-	 * elf_new_lm() for the expansion of all other dependencies.
-	 */
-	if (FLAGS1(mlmp) & FL1_RT_RELATIVE)
-		(void) fullpath(mlmp, 0);
-	if (FLAGS1(rlmp) & FL1_RT_RELATIVE)
-		(void) fullpath(rlmp, 0);
-
-	/*
 	 * Identify lddstub if necessary.
 	 */
 	if (lml_main.lm_flags & LML_FLG_TRC_LDDSTUB)
 		FLAGS1(mlmp) |= FL1_RT_LDDSTUB;
+
+	/*
+	 * Retain our argument information for use in dlinfo.
+	 */
+	argsinfo.dla_argv = argv--;
+	argsinfo.dla_argc = (long)*argv;
+	argsinfo.dla_envp = envp;
+	argsinfo.dla_auxv = auxv;
 
 	(void) enter();
 
@@ -776,15 +796,18 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 	/*
 	 * Establish the modes of the initial object.  These modes are
 	 * propagated to any preloaded objects and explicit shared library
-	 * dependencies.
+	 * dependencies.  Note, RTLD_NOW may have been established during
+	 * analysis of the application had it been built -z now.
 	 */
 	MODE(mlmp) |= (RTLD_NODELETE | RTLD_GLOBAL | RTLD_WORLD);
 	if (rtld_flags & RT_FL_CONFGEN)
 		MODE(mlmp) |= RTLD_CONFGEN;
-	if (rtld_flags2 & RT_FL2_BINDNOW)
-		MODE(mlmp) |= RTLD_NOW;
-	else
-		MODE(mlmp) |= RTLD_LAZY;
+	if ((MODE(mlmp) & RTLD_NOW) == 0) {
+		if (rtld_flags2 & RT_FL2_BINDNOW)
+			MODE(mlmp) |= RTLD_NOW;
+		else
+			MODE(mlmp) |= RTLD_LAZY;
+	}
 
 	/*
 	 * If debugging was requested initialize things now that any cache has
@@ -805,8 +828,8 @@ setup(ulong_t envp, ulong_t _auxv, Word _flags, char *_platform, int _syspagsz,
 		DBG_CALL(Dbg_file_config_dis(config->c_name, features));
 
 	if (dbg_mask) {
-		DBG_CALL(Dbg_file_ldso(rt_name, (ulong_t)DYN(rlmp),
-		    ADDR(rlmp), envp, _auxv));
+		DBG_CALL(Dbg_file_ldso(PATHNAME(rlmp), (ulong_t)DYN(rlmp),
+		    ADDR(rlmp), envp, auxv));
 
 		if (FCT(mlmp) == &elf_fct) {
 			DBG_CALL(Dbg_file_elf(PATHNAME(mlmp),

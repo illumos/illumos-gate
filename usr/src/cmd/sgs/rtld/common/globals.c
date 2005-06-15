@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -99,8 +99,9 @@ uint_t		rtld_flags2 = 0;
 /*
  * Various other global data.
  */
-const char	*pr_name;
-const char	*rt_name;		/* the run time linkers name */
+const char	*procname = (const char *)0;
+const char	*rtldname = MSG_ORIG(MSG_FIL_RTLD);
+
 char		*lasterr = (char *)0;	/* string describing last error */
 					/*	cleared by each dlerror() */
 Interp		*interp = 0;		/* ELF interpreter info */
@@ -153,6 +154,9 @@ unsigned char	search_rules[] = {	/* dependency search rules */
 		DEFAULT,		/*	default library path */
 		0
 };
+
+Dl_argsinfo	argsinfo = { 0 };	/* process argument, environment and */
+					/*	auxv information. */
 
 /*
  * Frequently used messages are cached here to reduce _dgettext() overhead and

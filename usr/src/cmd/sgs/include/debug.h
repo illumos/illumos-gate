@@ -318,8 +318,8 @@ extern	void		Dbg_file_hdl_collect(Grp_hdl *, const char *);
 extern	void		Dbg_file_hdl_title(int);
 extern	void		Dbg_file_lazyload(const char *, const char *,
 			    const char *);
-extern	void		Dbg_file_ldso(const char *, ulong_t, ulong_t, ulong_t,
-			    ulong_t);
+extern	void		Dbg_file_ldso(const char *, ulong_t, ulong_t, char **,
+			    auxv_t *);
 extern	void		Dbg_file_mode_promote(const char *, int);
 extern	void		Dbg_file_needed(const char *, const char *);
 extern	void		Dbg_file_nl(void);

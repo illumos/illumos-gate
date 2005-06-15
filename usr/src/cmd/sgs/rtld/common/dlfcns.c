@@ -1509,9 +1509,8 @@ get_linkmap_id(Lm_list *lml)
 	return ((Lmid_t)lml);
 }
 
-
 /*
- * Extract information for a dlopen() handle.  The valid request are:
+ * Extract information for a dlopen() handle.
  */
 static int
 dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
@@ -1601,6 +1600,22 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 			return (-1);
 		}
 		lmp = ghp->gh_owner;
+	}
+
+	/*
+	 * Obtain the process arguments, environment and auxv.  Note, as the
+	 * environment can be modified by the user (putenv(3c)), reinitialize
+	 * the environment pointer on each request.
+	 */
+	if (request == RTLD_DI_ARGSINFO) {
+		Dl_argsinfo	*aip = (Dl_argsinfo *)p;
+		Lm_list		*lml = LIST(lmp);
+
+		*aip = argsinfo;
+		if (lml->lm_flags & LML_FLG_ENVIRON)
+			aip->dla_envp = *(lml->lm_environ);
+
+		return (0);
 	}
 
 	/*
@@ -1708,17 +1723,13 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 	 * Basically return the dirname(1) of the objects fullpath.
 	 */
 	if (request == RTLD_DI_ORIGIN) {
-		char	*str;
+		char	*str = (char *)p;
 
-		if ((str = strrchr(PATHNAME(lmp), '/')) != 0) {
-			size_t	len = str - PATHNAME(lmp);
+		if (DIRSZ(lmp) == 0)
+			(void) fullpath(lmp, 0);
 
-			(void) strncpy((char *)p, PATHNAME(lmp), len);
-			str = (char *)p + len;
-		} else {
-			str = (char *)p;
-			*str++ = '.';
-		}
+		(void) strncpy(str, ORIGNAME(lmp), DIRSZ(lmp));
+		str += DIRSZ(lmp);
 		*str = '\0';
 
 		return (0);

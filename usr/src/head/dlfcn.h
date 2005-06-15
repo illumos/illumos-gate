@@ -35,13 +35,14 @@
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
+#include <sys/auxv.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 /*
- * Information structure for libpath dlinfo() and dlamd64getunwind() request.
+ * Information structures for various dlinfo() requests.
  */
 #if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
 #ifdef __STDC__
@@ -59,13 +60,7 @@ typedef struct	dl_info {
 	void		*dli_saddr;
 } Dl_info;
 #endif /* __STDC__ */
-#endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
 
-
-/*
- * Information structure for libpath dlinfo() request.
- */
-#if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
 typedef struct	dl_serpath {
 	char		*dls_name;	/* library search path name */
 	uint_t		dls_flags;	/* path information */
@@ -88,6 +83,13 @@ typedef struct {
 	void	    *dlui_segend;	/* end of segment described */
 					/*  by unwind block */
 } Dl_amd64_unwindinfo;
+
+typedef struct	dl_argsinfo {
+	long		dla_argc;	/* process argument count */
+	char		**dla_argv;	/* process arguments */
+	char		**dla_envp;	/* process environment variables */
+	auxv_t		*dla_auxv;	/* process auxv vectors */
+} Dl_argsinfo;
 #endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
 
 
@@ -208,7 +210,9 @@ extern Dl_amd64_unwindinfo  *dlamd64getunwind();
 						/*	internal use only */
 #define	RTLD_DI_GETSIGNAL	9		/* get termination signal */
 #define	RTLD_DI_SETSIGNAL	10		/* set termination signal */
-#define	RTLD_DI_MAX		10
+#define	RTLD_DI_ARGSINFO	11		/* get process arguments */
+						/*	environment and auxv */
+#define	RTLD_DI_MAX		11
 
 #if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
 /*

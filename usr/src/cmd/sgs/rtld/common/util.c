@@ -208,7 +208,7 @@ rd_event(Lm_list *lml, rd_event_e event, r_state_e state)
  * accordingly.
  *
  * While the stack layout is platform specific - it just so happens that x86,
- * sparc, & sparcv9 all share the following initial stack layout.
+ * sparc, sparcv9, and amd64 all share the following initial stack layout.
  *
  *	!_______________________!  high addresses
  *	!			!
@@ -243,44 +243,52 @@ rd_event(Lm_list *lml, rd_event_e event, r_state_e state)
  *
  */
 static void
-stack_cleanup(char **argv, int rmcnt)
+stack_cleanup(char **argv, char ***envp, auxv_t **auxv, int rmcnt)
 {
-	int		i;
+	int		ndx;
 	long		*argc;
-	char		**_argv, **envp, **_envp;
-	auxv_t		*auxv, *_auxv;
+	char		**oargv, **nargv;
+	char		**oenvp, **nenvp;
+	auxv_t		*oauxv, *nauxv;
 
 	/*
-	 * Slide ARGV[] and update argc.
+	 * Slide ARGV[] and update argc.  The argv pointer remains the same,
+	 * however slide the applications arguments over the arguments to
+	 * ld.so.1.
 	 */
-	_argv = argv;
-	argv = &argv[rmcnt];
-	for (i = 0; argv[i]; i++) {
-		_argv[i] = argv[i];
-	}
-	_argv[i] = argv[i];
-	argc = (long *)((uintptr_t)_argv - sizeof (long *));
+	nargv = &argv[0];
+	oargv = &argv[rmcnt];
+
+	for (ndx = 0; oargv[ndx]; ndx++)
+		nargv[ndx] = oargv[ndx];
+	nargv[ndx] = oargv[ndx];
+
+	argc = (long *)((uintptr_t)argv - sizeof (long *));
 	*argc -= rmcnt;
 
 	/*
-	 * Slide ENVP[].
+	 * Slide ENVP[], and update the environment array pointer.
 	 */
-	envp = &argv[i + 1];
-	_envp = &_argv[i + 1];
-	for (i = 0; envp[i]; i++) {
-		_envp[i] = envp[i];
-	}
-	_envp[i] = envp[i];
+	ndx++;
+	nenvp = &nargv[ndx];
+	oenvp = &oargv[ndx];
+	*envp = nenvp;
+
+	for (ndx = 0; oenvp[ndx]; ndx++)
+		nenvp[ndx] = oenvp[ndx];
+	nenvp[ndx] = oenvp[ndx];
 
 	/*
-	 * Slide AUXV[].
+	 * Slide AUXV[], and update the aux vector pointer.
 	 */
-	auxv = (auxv_t *)&envp[i + 1];
-	_auxv = (auxv_t *)&_envp[i + 1];
-	for (i = 0; auxv[i].a_type != AT_NULL; i++) {
-		_auxv[i] = auxv[i];
-	}
-	_auxv[i] = auxv[i];
+	ndx++;
+	nauxv = (auxv_t *)&nenvp[ndx];
+	oauxv = (auxv_t *)&oenvp[ndx];
+	*auxv = nauxv;
+
+	for (ndx = 0; (oauxv[ndx].a_type != AT_NULL); ndx++)
+		nauxv[ndx] = oauxv[ndx];
+	nauxv[ndx] = oauxv[ndx];
 }
 #else
 /*
@@ -290,56 +298,60 @@ stack_cleanup(char **argv, int rmcnt)
 #endif
 
 /*
- * The only command line argument recognized is -e, followed by an rtld
- * environment variable.
+ * The only command line argument recognized is -e, followed by a runtime
+ * linker environment variable.
  */
 int
-rtld_getopt(char **argv, Word *lmflags, Word *lmtflags, int aout)
+rtld_getopt(char **argv, char ***envp, auxv_t **auxv, Word *lmflags,
+    Word *lmtflags, int aout)
 {
-	int	i, errflg = 0;
+	int	ndx;
 
-	for (i = 1; argv[i]; i++) {
+	for (ndx = 1; argv[ndx]; ndx++) {
 		char	*str;
 
-		if (argv[i][0] != '-')
+		if (argv[ndx][0] != '-')
 			break;
 
-		if (argv[i][1] == '\0') {
-			i++;
-			break;
-		}
-
-		if (argv[i][1] != 'e') {
-			errflg++;
+		if (argv[ndx][1] == '\0') {
+			ndx++;
 			break;
 		}
 
-		if (argv[i][2] == '\0') {
-			i++;
-			if (argv[i] == NULL) {
-				errflg++;
-				break;
-			}
-			str = argv[i];
+		if (argv[ndx][1] != 'e')
+			return (1);
+
+		if (argv[ndx][2] == '\0') {
+			ndx++;
+			if (argv[ndx] == NULL)
+				return (1);
+			str = argv[ndx];
 		} else
-			str = &argv[i][2];
+			str = &argv[ndx][2];
 
+		/*
+		 * If the environment variable starts with LD_, strip the LD_.
+		 * Otherwise, take things as is.
+		 */
+		if ((str[0] == 'L') && (str[1] == 'D') && (str[2] == '_') &&
+		    (str[3] != '\0'))
+			str += 3;
 		if (ld_flags_env(str, lmflags, lmtflags, 0, aout) == 1)
 			return (1);
 	}
 
-	if (errflg || (argv[i] == 0)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_USG_BADOPT));
+	/*
+	 * Make sure an object file has been specified.
+	 */
+	if (argv[ndx] == 0)
 		return (1);
-	}
 
 	/*
 	 * Having gotten the arguments, clean ourselves off of the stack.
 	 */
-	stack_cleanup(argv, i);
+	stack_cleanup(argv, envp, auxv, ndx);
 	return (0);
 }
-
 
 /*
  * Compare function for FullpathNode AVL tree.
@@ -2707,10 +2719,16 @@ eprintf(Error error, const char *format, ...)
 			if (err_strs[ERR_ELF] == 0)
 			    err_strs[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
 		}
-		if (bufprint(&prf, MSG_ORIG(MSG_STR_EMSGFOR1),
-		    rt_name, pr_name, err_strs[error]) == 0) {
-			overflow = 1;
+		if (procname) {
+			if (bufprint(&prf, MSG_ORIG(MSG_STR_EMSGFOR1),
+			    rtldname, procname, err_strs[error]) == 0)
+				overflow = 1;
 		} else {
+			if (bufprint(&prf, MSG_ORIG(MSG_STR_EMSGFOR2),
+			    rtldname, err_strs[error]) == 0)
+				overflow = 1;
+		}
+		if (overflow == 0) {
 			/*
 			 * Remove the terminating '\0'.
 			 */
@@ -3302,8 +3320,8 @@ callable(Rt_map * clmp, Rt_map * dlmp, Grp_hdl * ghp)
  *  o	after loading a new shared object.  We can add shared objects to various
  *	link-maps, and any link-map dependencies requiring getopt() require
  *	their own environ.  In addition, lazy loading might bring in the
- *	supplier of environ (libc) after the link-map has been established and
- *	other objects are present.
+ *	supplier of environ (libc used to be a lazy loading candidate) after
+ *	the link-map has been established and other objects are present.
  *
  * This routine handles all these scenarios, without adding unnecessary overhead
  * to ld.so.1.
@@ -3324,12 +3342,13 @@ set_environ(Lm_list *lml)
 	sl.sl_flags = LKUP_WEAK;
 
 	if (sym = LM_LOOKUP_SYM(lml->lm_head)(&sl, &dlmp, &binfo)) {
-		char **	addr = (char **)sym->st_value;
+		lml->lm_environ = (char ***)sym->st_value;
 
 		if (!(FLAGS(dlmp) & FLG_RT_FIXED))
-			addr = (char **)((uintptr_t)addr +
-				(uintptr_t)ADDR(dlmp));
-		*addr = (char *)environ;
+			lml->lm_environ =
+			    (char ***)((uintptr_t)lml->lm_environ +
+			    (uintptr_t)ADDR(dlmp));
+		*(lml->lm_environ) = (char **)environ;
 		lml->lm_flags |= LML_FLG_ENVIRON;
 	}
 }

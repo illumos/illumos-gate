@@ -1043,7 +1043,7 @@ elf_copy_gen(Rt_map *lmp)
 	    r_debug.rtd_rdebug.r_ldbase) &&
 	    !(strcmp(interp->i_name, MSG_ORIG(MSG_PTH_LIBC)))) {
 
-		DBG_CALL(Dbg_reloc_run(pr_name, M_REL_SHT_TYPE, 0,
+		DBG_CALL(Dbg_reloc_run(NAME(lmp), M_REL_SHT_TYPE, 0,
 		    DBG_REL_START));
 
 		if (_elf_copy_reloc(MSG_ORIG(MSG_SYM_CTYPE), lmp,

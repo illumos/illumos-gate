@@ -740,8 +740,7 @@ elf_map_check(const char *name, caddr_t vaddr, Off size)
 
 	if (ioctl(pfd, PIOCNMAP, (void *)&num) == -1) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_PROC), pr_name,
-		    strerror(err));
+		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_PROC), name, strerror(err));
 		return (1);
 	}
 
@@ -750,8 +749,7 @@ elf_map_check(const char *name, caddr_t vaddr, Off size)
 
 	if (ioctl(pfd, PIOCMAP, (void *)maps) == -1) {
 		err = errno;
-		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_PROC), pr_name,
-		    strerror(err));
+		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_PROC), name, strerror(err));
 		free(maps);
 		return (1);
 	}
@@ -2416,7 +2414,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				remove_so(0, lmp);
 				return (0);
 			}
-			if (NAME(lmp)) {
+			if (lml_main.lm_head) {
 				if (audit_setup(lmp, AUDITORS(lmp)) == 0) {
 					remove_so(0, lmp);
 					return (0);
@@ -2491,20 +2489,11 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	Rt_map		*lmp;		/* link map created */
 	caddr_t		paddr;		/* start of padded image */
 	Off		plen;		/* size of image including padding */
-	const char	*name;
 	Half		etype;
 	int		fixed;
 	Mmap		*mmaps;
 	uint_t		mmapcnt = 0;
 	Xword		align = 0;
-
-	/*
-	 * Establish the objects name.
-	 */
-	if (pname == (char *)0)
-		name = pr_name;
-	else
-		name = pname;
 
 	/* LINTED */
 	ehdr = (Ehdr *)fmap->fm_maddr;
@@ -2513,7 +2502,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 * If this a relocatable object then special processing is required.
 	 */
 	if ((etype = ehdr->e_type) == ET_REL)
-		return (elf_obj_file(lml, lmco, name, fd));
+		return (elf_obj_file(lml, lmco, pname, fd));
 
 	/*
 	 * If this isn't a dynamic executable or shared object we can't process
@@ -2524,7 +2513,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	else if (etype == ET_DYN)
 		fixed = 0;
 	else {
-		eprintf(ERR_ELF, MSG_INTL(MSG_GEN_BADTYPE), name,
+		eprintf(ERR_ELF, MSG_INTL(MSG_GEN_BADTYPE), pname,
 		    conv_etype_str(etype));
 		return (0);
 	}
@@ -2536,7 +2525,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	size = (size_t)((char *)ehdr->e_phoff +
 		(ehdr->e_phnum * ehdr->e_phentsize));
 	if (size > fmap->fm_fsize) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), name);
+		eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), pname);
 		return (0);
 	}
 	if (size > fmap->fm_msize) {
@@ -2544,7 +2533,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 		if ((fmap->fm_maddr = mmap(fmap->fm_maddr, size, PROT_READ,
 		    fmap->fm_mflags, fd, 0)) == MAP_FAILED) {
 			int	err = errno;
-			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), name,
+			eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), pname,
 			    strerror(err));
 			return (0);
 		}
@@ -2573,7 +2562,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 			/* LINTED argument lph is initialized in first pass */
 			} else if (pptr->p_vaddr <= lph->p_vaddr) {
 				eprintf(ERR_ELF, MSG_INTL(MSG_GEN_INVPRGHDR),
-				    name);
+				    pname);
 				return (0);
 			}
 
@@ -2611,7 +2600,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 * specified file and memory size.
 	 */
 	if ((fph == 0) || (lmph == 0) || (lfph == 0)) {
-		eprintf(ERR_ELF, MSG_INTL(MSG_GEN_NOLOADSEG), name);
+		eprintf(ERR_ELF, MSG_INTL(MSG_GEN_NOLOADSEG), pname);
 		return (0);
 	}
 
@@ -2621,7 +2610,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 * bus errors if we're given a truncated file).
 	 */
 	if (fmap->fm_fsize < ((size_t)lfph->p_offset + lfph->p_filesz)) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), name);
+		eprintf(ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), pname);
 		return (0);
 	}
 
@@ -2636,7 +2625,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 * Determine if an existing mapping is acceptable.
 	 */
 	if (interp && (lml->lm_flags & LML_FLG_BASELM) &&
-	    (strcmp(name, interp->i_name) == 0)) {
+	    (strcmp(pname, interp->i_name) == 0)) {
 		/*
 		 * If this is the interpreter then it has already been mapped
 		 * and we have the address so don't map it again.  Note that
@@ -2707,7 +2696,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 		/*
 		 * Map the file.
 		 */
-		if (!(faddr = elf_map_it(name, memsize, ehdr, fph, lph,
+		if (!(faddr = elf_map_it(pname, memsize, ehdr, fph, lph,
 		    &phdr, &paddr, &plen, fixed, fd, align, mmaps, &mmapcnt)))
 			return (0);
 	}
