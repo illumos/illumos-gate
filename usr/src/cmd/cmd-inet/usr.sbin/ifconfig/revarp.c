@@ -505,7 +505,8 @@ dlpi_print_address(char *ifname)
 	if (dlpi_info(fd, -1, &dl_info, NULL, NULL, NULL, NULL, NULL,
 	    NULL) < 0) {
 		(void) fprintf(stderr, "ifconfig: info req failed\n");
-		goto failed;
+		(void) dlpi_close(fd);
+		return;
 	}
 
 	len = dl_info.dl_addr_length - abs(dl_info.dl_sap_length);
@@ -531,7 +532,6 @@ dlpi_print_address(char *ifname)
 		}
 		free(str);
 	}
-	free(laddr);
 
 failed:
 	free(laddr);
