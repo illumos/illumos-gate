@@ -53,6 +53,13 @@
 		<service_fmri value='svc:/system/filesystem/usr' />
 	</dependency>
 
+	<dependent
+		name='keymap_single-user'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/single-user' />
+	</dependent>
+
 	<exec_method
 		type='method'
 		name='start'
