@@ -317,7 +317,7 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 		hdlp->ih_dip = dip;
 		hdlp->ih_inum = inum + i;
 		if (type & DDI_INTR_TYPE_FIXED)
-			i_ddi_set_intr_handle(dip, i, &h_array[i]);
+			i_ddi_set_intr_handle(dip, hdlp->ih_inum, &h_array[i]);
 
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: hdlp = 0x%p\n",
 		    (void *)h_array[i]));
