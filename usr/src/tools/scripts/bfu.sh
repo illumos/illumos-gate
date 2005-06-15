@@ -3985,7 +3985,7 @@ build_boot_archive()
 	# to silence complaints about new files
 	# svccfg -s system/boot-archive setprop start/exec = true
 
-	mkdir -p /bfu.conflicts/lib/svc/method
+	mkdir -p $rootprefix/bfu.conflicts/lib/svc/method
 	cp $rootprefix/lib/svc/method/boot-archive \
 	    $rootprefix/bfu.conflicts/lib/svc/method/boot-archive
 	cat >$rootprefix/lib/svc/method/boot-archive <<"EOF"
