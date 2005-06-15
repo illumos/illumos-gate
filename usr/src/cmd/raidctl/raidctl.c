@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,6 +182,10 @@ static void
 raidctl_error(char *str)
 {
 	switch (errno) {
+	case EINVAL:
+		(void) fprintf(stderr, gettext("Error: "
+			"invalid argument would be returned\n"));
+		break;
 	case EIO:
 	case EFAULT:
 		(void) fprintf(stderr,
