@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 /*
  * An application should not include this header directly.  Instead it
@@ -332,9 +331,8 @@ extern int	_flsbuf();
 
 #if !defined(__lint)
 
-#ifndef	_REENTRANT
+#if	!defined(_REENTRANT) && !defined(_LP64) && !defined(_STRICT_STDC)
 
-#ifndef	_LP64
 #ifdef	__STDC__
 #if __cplusplus >= 199711L
 namespace std {
@@ -354,7 +352,10 @@ inline int putc(int _x, FILE *_p) {
 #define	putc(x, p)	(--(p)->_cnt < 0 ? _flsbuf((x), (p)) : \
 				(int)(*(p)->_ptr++ = (unsigned char) (x)))
 #endif	/* __STDC__ */
-#endif	/* _LP64 */
+
+#endif /* !defined(_REENTRANT) && !defined(_LP64) && !defined(_STRICT_STDC) */
+
+#ifndef	_REENTRANT
 
 #if __cplusplus >= 199711L
 namespace std {
