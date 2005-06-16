@@ -50,6 +50,13 @@ _start:
 	movl	%ecx, call_ecx
 	movl	%edx, call_edx
 	movl	%edi, call_edi
+	/
+	/ We need to save cr0 here and restore it after we return
+	/ from BIOS call to avoid unexpectedly modification to cr0
+	/ by the buggy firmware of some storage HBAs
+	/
+	movl	%cr0, %eax
+	movl	%eax, call_cr0
 
 	/ switch stack to 0x5000
 	movl    $0x5000, %eax
@@ -148,11 +155,15 @@ newintcode:
 	/ Interrupt descriptor table
 	lidt    kernIDTptr
 
+	/ Returned from BIOS call, restore cr0 here
+	movl	call_cr0, %edx
+	movl	%edx, %cr0
 	movl    call_edx, %edx
 	movl    call_ecx, %ecx
 	movl    call_ebx, %ebx
 	movl    call_edi, %edi
 	movl    call_esi, %esi
+
 	/ switch back to caller's stack
 	movl    call_esp, %esp
 	popl	%ebp
@@ -308,6 +319,9 @@ call_gs:
 .globl call_ss
 call_ss:
 	.value	0
+.globl call_cr0
+call_cr0:
+	.long	0
 .globl call_esp
 call_esp:
 	.long	0
