@@ -214,7 +214,12 @@ i_ddi_get_intr_handle(dev_info_t *dip, int inum)
 	if (intr_p == NULL)
 		return (NULL);
 
-	ASSERT((inum >= 0) && (inum < intr_p->devi_intr_sup_nintrs));
+	/*
+	 * Changed this to a check and return NULL if an invalid inum
+	 * is passed to retrieve a handle
+	 */
+	if ((inum < 0) || (inum >= intr_p->devi_intr_sup_nintrs))
+		return (NULL);
 
 	return ((intr_p->devi_intr_handle_p) ?
 	    intr_p->devi_intr_handle_p[inum] : NULL);
@@ -229,7 +234,12 @@ i_ddi_set_intr_handle(dev_info_t *dip, int inum,
 	if (intr_p == NULL)
 		return;
 
-	ASSERT((inum >= 0) && (inum < intr_p->devi_intr_sup_nintrs));
+	/*
+	 * Changed this to a check and return if an invalid inum
+	 * is passed to set a handle
+	 */
+	if ((inum < 0) || (inum >= intr_p->devi_intr_sup_nintrs))
+		return;
 
 	if (intr_p->devi_intr_handle_p == NULL) {
 		/* nintrs could be zero; so check for it first */
