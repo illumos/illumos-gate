@@ -418,7 +418,8 @@ extern "C" {
 1:									\
 	set	ASI_CORE_RUNNING_RW, scr1;				\
 	stxa	scr2, [scr1]ASI_CMP_SHARED;	/* ... and park it. */	\
-	membar	#Sync;				/* spin until the... */	\
+	membar	#Sync;							\
+	set	ASI_CORE_RUNNING_STATUS, scr1;	/* spin until... */	\
 	ldxa	[scr1]ASI_CMP_SHARED, scr1;	/* ... the other...  */	\
 	cmp	scr1, scr2;	/* ...core is parked according to... */	\
 	bne,a	%xcc, 1b;	/* ...the core running status reg.  */	\
