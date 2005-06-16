@@ -460,6 +460,13 @@ void	sticksync_master(void);
 #define	HVDUMP_SIZE_MAX		0x10000
 #define	HVDUMP_SIZE_DEFAULT	0x8000
 
+/*
+ * HV TOD service retry in usecs
+ */
+
+#define	HV_TOD_RETRY_THRESH	100
+#define	HV_TOD_WAIT_USEC	5
+
 #endif /* _KERNEL */
 
 #ifdef __cplusplus

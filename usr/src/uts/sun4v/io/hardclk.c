@@ -129,15 +129,65 @@ setcpudelay(void)
 	}
 }
 
+/*
+ * Hypervisor can return one of two error conditions
+ * for the TOD_GET API call. 1) H_ENOTSUPPORTED 2) H_EWOULDBLOCK
+ *
+ * To handle the H_ENOTSUPPORTED we return 0 seconds and let clkset
+ * set tod_broken.
+ * To handle the H_EWOULDBLOCK we retry for about 500usec and
+ * return hrestime if we can't successfully get a value.
+ */
 timestruc_t
 tod_get(void)
 {
 	timestruc_t ts;
 	uint64_t seconds;
+	int i;
+	unsigned int spl_old;
+	uint64_t ret;
+	/*
+	 * Make sure we don't get preempted
+	 * while getting the tod value.
+	 * getting preempted could mean we always
+	 * hit the hypervisor during an update
+	 * and always get EWOULDBLOCK.
+	 */
 
-	(void) hv_tod_get(&seconds);
-	ts.tv_sec = seconds;
+	spl_old = ddi_enter_critical();
+	for (i = 0; i <= HV_TOD_RETRY_THRESH; i++) {
+		ret = hv_tod_get(&seconds);
+
+		if (ret != H_EWOULDBLOCK)
+			break;
+		drv_usecwait(HV_TOD_WAIT_USEC);
+	}
+	ddi_exit_critical(spl_old);
+
 	ts.tv_nsec = 0;
+	if (ret != H_EOK) {
+
+		switch (ret) {
+		default:
+			cmn_err(CE_WARN,
+			    "tod_get: unknown error from hv_tod_get, %lx\n",
+			    ret);
+			/*FALLTHRU*/
+		case H_EWOULDBLOCK:
+			/*
+			 * We timed out
+			 */
+			tod_fault_reset();
+			ts.tv_sec = tod_validate(hrestime.tv_sec);
+			break;
+
+		case H_ENOTSUPPORTED:
+			ts.tv_sec = 0;
+			break;
+		};
+	} else {
+		ts.tv_sec = tod_validate(seconds);
+	}
 
 	return (ts);
 }
@@ -146,9 +196,20 @@ tod_get(void)
 void
 tod_set(timestruc_t ts)
 {
-	(void) hv_tod_set(ts.tv_sec);
-}
+	int i;
+	uint64_t ret;
 
+	tod_fault_reset();
+	for (i = 0; i <= HV_TOD_RETRY_THRESH; i++) {
+		ret = hv_tod_set(ts.tv_sec);
+		if (ret != H_EWOULDBLOCK)
+			break;
+		drv_usecwait(HV_TOD_WAIT_USEC);
+	}
+	if (ret != H_EOK && ret != H_ENOTSUPPORTED && ret != H_EWOULDBLOCK)
+		cmn_err(CE_WARN,
+		    "tod_set: Unknown error from hv_tod_set, err %lx", ret);
+}
 
 /*
  * The following wrappers have been added so that locking
