@@ -54,6 +54,7 @@ static int used_mem_count = 0;
 #define	ACPI_ISA_LIMIT	16
 static int interrupt[ACPI_ISA_LIMIT], dma[ACPI_ISA_LIMIT];
 #define	ACPI_ELEMENT_PACKAGE_LIMIT	32
+#define	EISA_ID_SIZE	7
 
 /*
  * insert used io/mem in increasing order
@@ -639,7 +640,7 @@ process_cids(ACPI_OBJECT *rv, char **cidstr, int *cidstr_size)
 		ACPI_OBJECT obj = rv->Package.Elements[i];
 		switch (obj.Type) {
 		case ACPI_TYPE_INTEGER:
-			*cidstr_size += 9; /* one more for NULL separator */
+			*cidstr_size += EISA_ID_SIZE + 1;
 			break;
 		case ACPI_TYPE_STRING:
 			*cidstr_size += obj.String.Length + 1;
@@ -648,7 +649,7 @@ process_cids(ACPI_OBJECT *rv, char **cidstr, int *cidstr_size)
 			break;
 		}
 	}
-	*cidstr = kmem_alloc(*cidstr_size, KM_SLEEP);
+	*cidstr = kmem_zalloc(*cidstr_size, KM_SLEEP);
 	tmp_cidstr = *cidstr;
 	for (i = 0; i < rv->Package.Count; i++) {
 		/* get the actual acpi_object */
@@ -659,7 +660,7 @@ process_cids(ACPI_OBJECT *rv, char **cidstr, int *cidstr_size)
 			if (acpi_enum_debug & PROCESS_CIDS) {
 				cmn_err(CE_NOTE, "integer CID: %s", tmp_cidstr);
 			}
-			tmp_cidstr += 9;
+			tmp_cidstr += EISA_ID_SIZE + 1;
 			break;
 		case ACPI_TYPE_STRING:
 			(void) strcpy(tmp_cidstr, obj.String.Pointer);
@@ -669,6 +670,10 @@ process_cids(ACPI_OBJECT *rv, char **cidstr, int *cidstr_size)
 			tmp_cidstr += strlen(obj.String.Pointer) + 1;
 			break;
 		default:
+			if (acpi_enum_debug & PROCESS_CIDS) {
+				cmn_err(CE_NOTE, "unexpected CID type: %d",
+				    obj.Type);
+			}
 			break;
 		}
 	}
