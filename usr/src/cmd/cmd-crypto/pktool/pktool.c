@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,9 @@
 
 /*
  * This file comprises the main driver for this tool.
+ * Upon parsing the command verbs from user input, it
+ * branches to the appropriate modules to perform the
+ * requested task.
  */
 
 #include <stdio.h>
@@ -48,16 +51,33 @@
 typedef struct verbcmd_s {
 	char	*verb;
 	int	(*action)(int, char *[]);
-	int	mode;			/* reserved */
-	char	*synopsis;		/* reserved */
+	int	mode;
+	char	*synopsis;
 } verbcmd;
 
 /* External declarations for supported verb actions. */
 extern int	pk_setpin(int argc, char *argv[]);
+extern int	pk_list(int argc, char *argv[]);
+extern int	pk_delete(int argc, char *argv[]);
+extern int	pk_import(int argc, char *argv[]);
+extern int	pk_export(int argc, char *argv[]);
+extern int	pk_tokens(int argc, char *argv[]);
+
+/* Forward declarations for "built-in" verb actions. */
+static int	pk_help(int argc, char *argv[]);
 
 /* Command structure for verbs and their actions.  Do NOT i18n/l10n. */
 static verbcmd	cmds[] = {
-	{ "setpin",	pk_setpin,	0,	"" },
+	{ "tokens",	pk_tokens,	0,	"tokens" },
+	{ "setpin",	pk_setpin,	0,	"setpin" },
+	{ "list",	pk_list,	0,	"list [-p] [-P] [-l <label>]"
+	    "\n\t\tor list [--public] [--private] [--label[=]<label>]" },
+	{ "delete",	pk_delete,	0,
+	    "delete { [-p] [-P] [-l <label>] }"
+	    "\n\t\tor delete { [--public] [--private] [--label[=]<label>] }" },
+	{ "import",	pk_import,	0,	"import <file>" },
+	{ "export",	pk_export,	0,	"export <file>" },
+	{ "-?",		pk_help,	0,	"--help\t(help and usage)" },
 };
 static int	num_cmds = sizeof (cmds) / sizeof (verbcmd);
 
@@ -71,8 +91,34 @@ static void	usage(void);
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("Usage:\n"));
-	(void) fprintf(stderr, gettext("\t%s setpin\n"), prog);
+	int	i;
+
+	cryptodebug("inside usage");
+
+	/* Display this block only in command-line mode. */
+	(void) fprintf(stdout, gettext("Usage:\n"));
+	(void) fprintf(stdout, gettext("\t%s -?\t(help and usage)\n"), prog);
+	(void) fprintf(stdout, gettext("\t%s subcommand [options...]\n"), prog);
+	(void) fprintf(stdout, gettext("where subcommands may be:\n"));
+
+	/* Display only those verbs that match the current tool mode. */
+	for (i = 0; i < num_cmds; i++) {
+		/* Do NOT i18n/l10n. */
+		(void) fprintf(stdout, "\t%s\n", cmds[i].synopsis);
+	}
+}
+
+/*
+ * Provide help, in the form of displaying the usage.
+ */
+static int
+pk_help(int argc, char *argv[])
+/* ARGSUSED */
+{
+	cryptodebug("inside pk_help");
+
+	usage();
+	return (0);
 }
 
 /*
@@ -86,6 +132,7 @@ main(int argc, char *argv[], char *envp[])
 	int	rv;
 	int	pk_argc = 0;
 	char	**pk_argv = NULL;
+	int	save_errno = 0;
 
 	/* Set up for i18n/l10n. */
 	(void) setlocale(LC_ALL, "");
@@ -101,122 +148,88 @@ main(int argc, char *argv[], char *envp[])
 	/* Set up for debug and error output. */
 	cryptodebug_init(prog);
 
-	/* There must be one remaining arg at this point */
 	if (argc == 0) {
 		usage();
 		return (1);
 	}
 
-	/*
-	 * By default, metaslot is enabled, and pkcs11_softtoken is
-	 * the keystore, so, pkcs11_softtoken is hidden.
-	 * Always turns off Metaslot so that we can see pkcs11_softtoken.
-	 */
+	/* Check for help options.  For CLIP-compliance. */
+	if (argc == 1 && argv[0][0] == '-') {
+		switch (argv[0][1]) {
+		case '?':
+			return (pk_help(argc, argv));
+		default:
+			usage();
+			return (1);
+		}
+	}
+
+	/* Always turns off Metaslot so that we can see softtoken. */
+	cryptodebug("disabling Metaslot");
 	if (setenv("METASLOT_ENABLED", "false", 1) < 0) {
-		pk11_errno = errno;
+		save_errno = errno;
 		cryptoerror(LOG_STDERR,
-		    gettext("Disabling metaslot failed: %s"),
-		    strerror(pk11_errno));
+		    gettext("Disabling Metaslot failed (%s)."),
+		    strerror(save_errno));
 		return (1);
 	}
 
 	/* Begin parsing command line. */
+	cryptodebug("begin parsing command line");
 	pk_argc = argc;
 	pk_argv = argv;
 
-	/* Check for valid verb */
+	/* Check for valid verb (or an abbreviation of it). */
 	found = -1;
 	for (i = 0; i < num_cmds; i++) {
 		if (strcmp(cmds[i].verb, pk_argv[0]) == 0) {
 			if (found < 0) {
+				cryptodebug("found cmd %s", cmds[i].verb);
 				found = i;
 				break;
+			} else {
+				cryptodebug("also found cmd %s, skipping",
+				    cmds[i].verb);
 			}
 		}
 	}
-
 	/* Stop here if no valid verb found. */
 	if (found < 0) {
-		cryptoerror(LOG_STDERR,
-			gettext("Invalid verb: %s"), pk_argv[0]);
+		cryptoerror(LOG_STDERR, gettext("Invalid verb: %s"),
+		    pk_argv[0]);
 		return (1);
 	}
 
 	/* Get to work! */
+	cryptodebug("begin executing cmd action");
 	rv = (*cmds[found].action)(pk_argc, pk_argv);
+	cryptodebug("end executing cmd action");
 	switch (rv) {
 	case PK_ERR_NONE:
+		cryptodebug("subcommand succeeded");
 		break;		/* Command succeeded, do nothing. */
 	case PK_ERR_USAGE:
+		cryptodebug("usage error detected");
 		usage();
 		break;
 	case PK_ERR_QUIT:
+		cryptodebug("quit command received");
 		exit(0);
 		/* NOTREACHED */
-	case PK_ERR_PK11INIT:
-		cryptoerror(LOG_STDERR, "%s (%s)",
-		    gettext("Unable to initialize PKCS#11"),
-		    pkcs11_strerror(pk11_errno));
-		cryptodebug("C_Initialize failed (%s)",
-		    pkcs11_strerror(pk11_errno));
-		break;
-	case PK_ERR_PK11SLOTS:
-		cryptoerror(LOG_STDERR, "%s (%s)",
-		    gettext("Failed to find PKCS#11 slots"),
-		    pkcs11_strerror(pk11_errno));
-		cryptodebug("C_GetSlotList failed (%s)",
-		    pkcs11_strerror(pk11_errno));
-		break;
-	case PK_ERR_PK11SESSION:
-		cryptoerror(LOG_STDERR, "%s (%s)",
-		    gettext("Unable to open PKCS#11 session"),
-		    pkcs11_strerror(pk11_errno));
-		cryptodebug("C_OpenSession failed (%s)",
-		    pkcs11_strerror(pk11_errno));
-		break;
-	case PK_ERR_PK11LOGIN:
-		if (pk11_errno == CKR_PIN_INCORRECT)
-			cryptoerror(LOG_STDERR, "%s", gettext("Incorrect PIN"));
-		else {
-			cryptoerror(LOG_STDERR, "%s (%s)",
-			    gettext("PKCS#11 authentication failed"),
-			    pkcs11_strerror(pk11_errno));
-			cryptodebug("C_Login failed (%s)",
-			    pkcs11_strerror(pk11_errno));
-		}
-		break;
-	case PK_ERR_PK11SETPIN:
-		cryptoerror(LOG_STDERR, "%s (%s)",
-		    gettext("Set PIN failed"), pkcs11_strerror(pk11_errno));
-		break;
-	case PK_ERR_NOSLOTS:
-		cryptoerror(LOG_STDERR, "%s", gettext("No slots were found"));
-		break;
-	case PK_ERR_NOMEMORY:
-		cryptoerror(LOG_STDERR, "%s", gettext("Out of memory"));
-		break;
-	case PK_ERR_NOTFOUND:
-		cryptoerror(LOG_STDERR, "%s", gettext("Token name not found"));
-		break;
-	case PK_ERR_PASSPHRASE:
+	case PK_ERR_PK11:
 		cryptoerror(LOG_STDERR, "%s",
-		    gettext("Unable to get token PIN"));
+		    gettext("Command failed due to PKCS#11 error."));
 		break;
-	case PK_ERR_NEWPIN:
-		cryptoerror(LOG_STDERR, "%s", gettext("Failed to get new PIN"));
-		break;
-	case PK_ERR_PINCONFIRM:
+	case PK_ERR_SYSTEM:
 		cryptoerror(LOG_STDERR, "%s",
-		    gettext("Failed to confirm new PIN"));
+		    gettext("Command failed due to system error."));
 		break;
-	case PK_ERR_PINMATCH:
-		cryptoerror(LOG_STDERR, "%s", gettext("PINs do not match"));
-		break;
-	case PK_ERR_CHANGEPIN:
-		cryptoerror(LOG_STDERR, "%s", gettext("PIN must be changed"));
+	case PK_ERR_OPENSSL:
+		cryptoerror(LOG_STDERR, "%s",
+		    gettext("Command failed due to OpenSSL error."));
 		break;
 	default:
-		cryptoerror(LOG_STDERR, "%s (%d)",
+		cryptoerror(LOG_STDERR, "%s (%d).",
 		    gettext("Unknown error value"), rv);
 		break;
 	}

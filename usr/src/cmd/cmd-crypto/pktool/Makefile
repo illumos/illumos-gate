@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,24 +30,38 @@ PROG =	pktool
 
 OBJS =	pktool.o \
 	common.o \
-	setpin.o
+	derparse.o \
+	osslcommon.o \
+	p12common.o \
+	setpin.o \
+	list.o \
+	delete.o \
+	import.o \
+	export.o \
+	tokens.o
 
 include ../../Makefile.cmd
+include $(SRC)/lib/openssl/Makefile.openssl
 
 SRCS =	$(OBJS:%.o=%.c)
 POFILES = $(OBJS:%.o=%.po)
 POFILE = $(PROG)_msg.po
 
+CPPFLAGS += -I. $(OPENSSL_CPPFLAGS)
 CFLAGS += $(CCVERBOSE)
 
-LDLIBS += -lpkcs11 -lcryptoutil
+DYNFLAGS += $(OPENSSL_DYNFLAGS)
+LDFLAGS += $(OPENSSL_LDFLAGS)
+LDLIBS += -lpkcs11 -lcryptoutil -lcrypto -lldap
+
+LINTFLAGS += $(OPENSSL_LDFLAGS)
 
 .KEEP_STATE:
 
 all : $(PROG)
 
 $(PROG) : $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(LINK.c) -o $@ $(OBJS) $(DYNFLAGS) $(LDLIBS)
 	$(POST_PROCESS)
 
 $(POFILE) : $(POFILES)

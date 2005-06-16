@@ -2,9 +2,10 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <openssl/asn1.h>
@@ -23,6 +24,7 @@
 #include <openssl/dso.h>
 #include <openssl/e_os2.h>
 #include <openssl/ebcdic.h>
+#include <openssl/engine.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
