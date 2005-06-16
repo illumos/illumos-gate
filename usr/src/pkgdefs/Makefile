@@ -173,6 +173,8 @@ COMMON_SUBDIRS= \
 	SUNWftduu \
 	SUNWftpr  \
 	SUNWftpu  \
+	SUNWfwdc  \
+	SUNWfwdcu  \
 	SUNWgssdh  \
 	SUNWgssc  \
 	SUNWgss	\

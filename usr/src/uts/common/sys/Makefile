@@ -585,6 +585,9 @@ CRYPTOHDRS=			\
 	ops_impl.h		\
 	sched_impl.h
 
+DCAMHDRS=			\
+	dcam1394_io.h
+
 IBHDRS=			\
 	ib_types.h	\
 	ib_pkt_hdrs.h
@@ -916,6 +919,9 @@ audio/%.check:	audio/%.h
 av/%.check:	av/%.h
 	$(DOT_H_CHECK)
 
+dcam/%.check:	dcam/%.h
+	$(DOT_H_CHECK)
+
 fm/%.check:     fm/%.h
 	$(DOT_H_CHECK)
 
@@ -1015,6 +1021,7 @@ CHECKHDRS=						\
 	$(BSCHDRS:%.h=%.check)				\
 	$(CHKHDRS:%.h=%.check)				\
 	$(CRYPTOHDRS:%.h=crypto/%.check)		\
+	$(DCAMHDRS:%.h=dcam/%.check)			\
 	$(IBHDRS:%.h=ib/%.check)			\
 	$(IBDHDRS:%.h=ib/clients/ibd/%.check)		\
 	$(IBTLHDRS:%.h=ib/ibtl/%.check)			\
@@ -1067,6 +1074,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/hotplug	\
 	$(ROOTDIR)/hotplug/pci	\
 	$(ROOTDIR)/crypto	\
+	$(ROOTDIR)/dcam		\
 	$(ROOTDIR)/iso		\
 	$(ROOTDIR)/fm		\
 	$(ROOTDIR)/fm/cpu	\
@@ -1111,6 +1119,8 @@ ROOTAUDHDRS= $(AUDIOHDRS:%=$(ROOTDIR)/audio/%)
 ROOTAVHDRS= $(AVHDRS:%=$(ROOTDIR)/av/%)
 
 ROOTCRYPTOHDRS= $(CRYPTOHDRS:%=$(ROOTDIR)/crypto/%)
+
+ROOTDCAMHDRS= $(DCAMHDRS:%=$(ROOTDIR)/dcam/%)
 
 ROOTIBHDRS= $(IBHDRS:%=$(ROOTDIR)/ib/%)
 ROOTIBDHDRS= $(IBDHDRS:%=$(ROOTDIR)/ib/clients/ibd/%)
@@ -1280,6 +1290,7 @@ $(ROOTDIR)/rsm/%:	rsm/%
 	$(ROOTHDRS)		\
 	$(ROOTAUDHDRS)		\
 	$(ROOTCRYPTOHDRS)	\
+	$(ROOTDCAMHDRS)		\
 	$(ROOTISOHDRS)		\
 	$(ROOTFMHDRS)		\
 	$(ROOTFMCPUHDRS)	\
@@ -1324,6 +1335,7 @@ install_h:			\
 	$(ROOTHDRS)		\
 	$(ROOTAUDHDRS)		\
 	$(ROOTCRYPTOHDRS)	\
+	$(ROOTDCAMHDRS)		\
 	$(ROOTISOHDRS)		\
 	$(ROOTFMHDRS)		\
 	$(ROOTFMCPUHDRS)	\

@@ -365,6 +365,7 @@ DRV_KMODS	+= usbskel
 MISC_KMODS	+= s1394 sbp2
 DRV_KMODS	+= hci1394 scsa1394
 DRV_KMODS	+= av1394
+DRV_KMODS	+= dcam1394
 
 #
 #	InfiniBand pseudo drivers

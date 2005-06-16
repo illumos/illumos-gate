@@ -616,6 +616,9 @@ AV1394_OBJS +=	av1394.o av1394_as.o av1394_async.o av1394_cfgrom.o \
 		av1394_isoch_recv.o av1394_isoch_xmit.o av1394_list.o \
 		av1394_queue.o
 
+DCAM1394_OBJS += dcam.o dcam_frame.o dcam_param.o dcam_reg.o \
+		dcam_ring_buff.o
+
 SCSA1394_OBJS += hba.o sbp2_driver.o sbp2_bus.o
 
 SBP2_OBJS += cfgrom.o sbp2.o

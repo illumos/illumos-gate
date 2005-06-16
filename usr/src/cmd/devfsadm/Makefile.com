@@ -49,6 +49,7 @@ CLOBBERFILES = $(MODS) $(DEVLINKTAB) $(DEVFSCOMPATLINKS) $(DEVFSADM_DAEMON)
 LINK_SRCS =			\
 	$(COMMON)/disk_link.c	\
 	$(COMMON)/ieee1394_link.c	\
+	$(COMMON)/dcam1394_link.c	\
 	$(COMMON)/tape_link.c	\
 	$(COMMON)/usb_link.c	\
 	$(COMMON)/port_link.c	\
@@ -68,6 +69,7 @@ LINT_MODULES = $(LINK_SRCS:.c=.ln)
 LINK_OBJS =			\
 	disk_link.o		\
 	ieee1394_link.o		\
+	dcam1394_link.o		\
 	tape_link.o		\
 	usb_link.o		\
 	port_link.o		\
@@ -85,6 +87,7 @@ LINK_OBJS =			\
 LINK_MODS =			\
 	SUNW_disk_link.so	\
 	SUNW_ieee1394_link.so	\
+	SUNW_dcam1394_link.so	\
 	SUNW_tape_link.so	\
 	SUNW_usb_link.so	\
 	SUNW_port_link.so	\
