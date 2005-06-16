@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -440,8 +440,7 @@ gettext("Usage: %s -eiIUdFntBNHvV~ -T FILE -u USER -h hops -r address\n"),
 		quit(0);
 		Verhogen();
 	}
-	exit(rpterr);
-	/* NOTREACHED */
+	return (rpterr);
 }
 
 /*

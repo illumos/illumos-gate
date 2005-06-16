@@ -185,7 +185,7 @@ int
 any(int ch, char *str)
 {
 	register char *f;
-	register c;
+	int c;
 
 	f = str;
 	c = ch;

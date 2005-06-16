@@ -134,7 +134,7 @@ netmap(char name[], char from[])
 		optim(nbuf, ret);
 #else
 	nstrcpy(ret, sizeof (ret), nbuf);
-#endif	OPTIM
+#endif	/* OPTIM */
 	if (debug) fprintf(stderr, "after  optim, nbuf '%s', ret '%s'\n", nbuf, ret);
 	cp = ret;
 	if (debug) fprintf(stderr, "wind up with '%s'\n", name);
@@ -667,7 +667,7 @@ optim1(char netstr[], char name[])
 	optiboth(name);
 	prefer(name);
 }
-#endif	OPTIM
+#endif	/* OPTIM */
 
 /*
  * Return the network of the separator --
@@ -847,7 +847,7 @@ best(int src, int dest)
 		np++;
 	return(np->no_char);
 }
-#endif	OPTIM
+#endif	/* OPTIM */
 
 #ifdef notdef
 /*

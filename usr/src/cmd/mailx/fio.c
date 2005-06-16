@@ -19,15 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-/*
- *	Copyright (c) 1999 by Sun Microsystems, Inc.
- *	All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.13.2.2 */
+#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "rcv.h"
 #include <locale.h>
@@ -391,6 +392,7 @@ getln(char *line, int max, FILE *f)
  * include the newline at the end.
  */
 
+int
 readline(FILE *ibuf, char *linebuf)
 {
 	register char *cp;
@@ -785,6 +787,7 @@ safeexpand(char name[])
 /*
  * Determine the current folder directory name.
  */
+int
 getfold(char *name)
 {
 	char *folder;

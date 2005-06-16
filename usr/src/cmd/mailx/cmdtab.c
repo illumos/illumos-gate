@@ -22,7 +22,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -54,7 +53,7 @@
  */
 #define	C	(int (*)(void *))
 
-extern const struct cmd cmdtab[] = {
+const struct cmd cmdtab[] = {
 	"next",		C next,		NDMLIST,	0,	MMNDEL,
 	"alias",	C group,	M|RAWLIST,	0,	1000,
 	"print",	C type,		MSGLIST,	0,	MMNDEL,

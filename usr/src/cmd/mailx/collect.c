@@ -134,7 +134,7 @@ collect(struct header *hp)
 		sigset(SIGINT, ignintr ? intack : collrub), sigblock(sigmask(SIGINT));
 	if ((savehup = sigset(SIGHUP, SIG_IGN)) != SIG_IGN)
 		sigset(SIGHUP, collrub), sigblock(sigmask(SIGHUP));
-# else VMUNIX
+# else /* VMUNIX */
 # ifdef OLD_BSD_SIGS
 	if ((savesig = sigset(SIGINT, SIG_IGN)) != SIG_IGN)
 		sigset(SIGINT, ignintr ? intack : collrub);
@@ -158,7 +158,7 @@ collect(struct header *hp)
 		sigprocmask(SIG_BLOCK, &mask, NULL);
 	}
 # endif
-# endif VMUNIX
+# endif /* VMUNIX */
 #ifdef SIGCONT
 	savecont = sigset(SIGCONT, collcont);
 #endif
@@ -228,14 +228,14 @@ collect(struct header *hp)
 		setjmp(coljmp);
 # ifdef VMUNIX
 		sigsetmask(omask);
-# else VMUNIX
+# else /* VMUNIX */
 # ifdef OLD_BSD_SIGS
 		sigrelse(SIGINT);
 		sigrelse(SIGHUP);
 # else
 		sigprocmask(SIG_SETMASK, &omask, NULL);
 # endif
-# endif VMUNIX
+# endif /* VMUNIX */
 		if (intty && !tflag && outtty && iprompt)
 			fputs(iprompt, stdout);
 		flush();

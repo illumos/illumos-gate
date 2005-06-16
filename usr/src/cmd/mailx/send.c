@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -652,6 +652,7 @@ infix(struct header *hp, FILE *fi)
  * passed file buffer.
  */
 
+int
 puthead(struct header *hp, FILE *fo, int w, long clen)
 {
 	register int gotcha;

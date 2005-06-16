@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-/*
- * Copyright (c) 1985-2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -421,7 +420,7 @@ Type(int *msgvec)
 static int
 type1(int *msgvec, int doign, int page)
 {
-	register *ip;
+	int *ip;
 	register struct message *mp;
 	register int mesg;
 	register char *cp;

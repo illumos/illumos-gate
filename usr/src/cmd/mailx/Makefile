@@ -92,7 +92,7 @@ $(VEROBJ): $(VERSRC)
 
 # want to recreate version.c whenever (and only when) mailx needs to be rebuilt
 $(VERSRC): $(OBJS) $(LIBMAIL)
-	$(ECHO) "extern const char *const version=\"mailx version $(MAILXVERSION) `date`\";" > $@
+	$(ECHO) "const char *const version=\"mailx version $(MAILXVERSION) `date`\";" > $@
 
 install: all $(ROOTMAILXD) $(ROOTPROG) $(ROOTMAILXHELP) \
 	$(ROOTMAILXRC) $(ROOTUCBMAIL) $(ROOTUCBCAPMAIL) $(ROOTUCBMAILRC)

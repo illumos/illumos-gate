@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright (c) 1985-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -617,7 +617,7 @@ unpack(struct name *np)
 		extra++;
 	if (hflag)
 		extra += 2;
-#endif SENDMAIL
+#endif /* SENDMAIL */
 	top = (char **) salloc((t + extra) * sizeof (char *));
 	ap = top;
 	*ap++ = "mail";
@@ -636,7 +636,7 @@ unpack(struct name *np)
 		snprintf(hbuf, sizeof (hbuf), "%d", hflag);
 		*ap++ = savestr(hbuf);
 	}
-#endif SENDMAIL
+#endif /* SENDMAIL */
 	while (n != NIL) {
 		if (n->n_type & GDEL) {
 			n = n->n_flink;

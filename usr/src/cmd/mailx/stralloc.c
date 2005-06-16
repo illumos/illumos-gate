@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -34,11 +40,6 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * Copyright (c) 1993-1997, by Sun Microsystems, Inc.
- * All rights reserved.
- */
 
 /*
  * mailx -- a modified version of a University of California at Berkeley
@@ -135,7 +136,7 @@ srealloc(void *optr, unsigned size)
 		s &= ~01;
 #else
 #error Unknown architecture!
-#endif defined(u3b) || defined(sparc)
+#endif /* defined(u3b) || defined(sparc) */
 		delta = s - (sp->s_nextFree - (char *)optr);
 		if (delta <= sp->s_nleft) {
 			sp->s_nextFree += delta;

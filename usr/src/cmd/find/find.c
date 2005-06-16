@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -38,6 +36,8 @@
 /*
  * Copyright 1985, 1990 by Mortice Kern Systems Inc.  All rights reserved.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <errno.h>
@@ -185,7 +185,7 @@ static int		execute();
 static int		doexec();
 static struct Args	*lookup();
 static int		ok();
-static void		usage();
+static void		usage(void)	__NORETURN;
 static struct Arglist	*varargs();
 static int		list();
 static char		*getgroup();
@@ -697,7 +697,7 @@ err:
  */
 
 static void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr,
 	    gettext("%s: [-H | -L] path-list predicate-list\n"), cmdname);
