@@ -641,10 +641,9 @@ ufs_fio_holey(vnode_t *vp, int cmd, offset_t *off)
 	int error;
 	boolean_t hole;
 
-	ASSERT(*off >= 0);
 	rw_enter(&ip->i_contents, RW_READER);
-	isz = (offset_t)ip->i_size;
-	if (*off >= isz)  {
+	isz = ip->i_size;
+	if (noff >= isz)  {
 		rw_exit(&ip->i_contents);
 		return (ENXIO);
 	}
