@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_PX_OBJ_H
-#define	_SYS_PX_OBJ_H
+#ifndef	_SYS_PX_ERR_H
+#define	_SYS_PX_ERR_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,30 +33,27 @@
 extern "C" {
 #endif
 
-#include <sys/pcie.h>
-#include <sys/pcie_impl.h>
-#include <sys/fm/io/sun4_fire.h>
-#include <sys/pci_intr_lib.h>
-#include "px_nexus.h"
-#include "px_ioapi.h"
-#include "px_lib.h"
-#include "px_fm.h"
-#include "px_mmu.h"
-#include "px_space.h"
-#include "px_dma.h"	/* Macros use perf counters in px_space.h */
-#include "px_fdvma.h"
-#include "px_msiq.h"
-#include "px_msi.h"
-#include "px_ib.h"
-#include "px_cb.h"
-#include "px_pec.h"
-#include "px_intr.h"	/* needs px_ib.h */
-#include "px_var.h"
-#include "px_util.h"
-#include "px_debug.h"
+typedef enum {
+	PX_ERR_JBC,
+	PX_ERR_MMU,
+	PX_ERR_IMU,
+	PX_ERR_TLU_UE,
+	PX_ERR_TLU_CE,
+	PX_ERR_TLU_OE,
+	PX_ERR_ILU,
+	PX_ERR_LPU_LINK,
+	PX_ERR_LPU_PHY,
+	PX_ERR_LPU_RX,
+	PX_ERR_LPU_TX,
+	PX_ERR_LPU_LTSSM,
+	PX_ERR_LPU_GIGABLZ
+} px_err_id_t;
+
+void px_err_reg_enable(px_t *px_p, px_err_id_t id);
+void px_err_reg_disable(px_t *px_p, px_err_id_t id);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SYS_PX_OBJ_H */
+#endif	/* _SYS_PX_ERR_H */

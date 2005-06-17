@@ -34,46 +34,16 @@ extern "C" {
 #endif
 
 /*
- * Register base definitions.
- *
- * The specific numeric values for CSR, XBUS, Configuration,
- * Interrupt blocks and other register bases.
- */
-typedef enum {
-	PX_REG_BANK0 = 0,
-	PX_REG_BANK1,
-	PX_REG_BANK2,
-	PX_REG_BANK3,
-	PX_REG_BANK4
-} px_reg_bank_t;
-
-#ifdef	sun4v
-#define	PX_REG_CSR	PX_REG_BANK1
-#define	PX_REG_XBC	PX_REG_BANK2
-#define	PX_REG_CFG	PX_REG_BANK3
-#define	PX_REG_IC	PX_REG_BANK4
-#else
-#define	PX_REG_CSR	PX_REG_BANK0
-#define	PX_REG_XBC	PX_REG_BANK1
-#define	PX_REG_CFG	PX_REG_BANK2
-#define	PX_REG_IC	PX_REG_BANK3
-#endif	/* sun4v */
-
-enum px_nintr_index {
-	PX_INTR_XBC = 0,	/* all		not shared */
-	PX_INTR_PEC = 1		/* all		not shared */
-};
-
-/*
  * offsets of PCI address spaces from base address:
  */
-#define	PX_CONFIG			0x001000000ull
+#define	PX_CONFIG		0x001000000ull
 #define	PX_A_IO			0x002000000ull
 #define	PX_B_IO			0x002010000ull
-#define	PX_A_MEMORY			0x100000000ull
-#define	PX_B_MEMORY			0x180000000ull
-#define	PX_IO_SIZE			0x000010000ull
-#define	PX_MEM_SIZE			0x080000000ull
+#define	PX_A_MEMORY		0x100000000ull
+#define	PX_B_MEMORY		0x180000000ull
+#define	PX_IO_SIZE		0x000010000ull
+#define	PX_MEM_SIZE		0x080000000ull
+
 /*
  * The following typedef is used to represent a
  * 1275 "bus-range" property of a PCI Bus node.
@@ -82,15 +52,6 @@ typedef struct px_bus_range {
 	uint32_t lo;
 	uint32_t hi;
 } px_bus_range_t;
-
-/*
- * The following typedef is used to represent a
- * 1275 "reg" property of a PCI nexus.
- */
-typedef struct px_nexus_regspec {
-	uint64_t phys_addr;
-	uint64_t size;
-} px_nexus_regspec_t;
 
 /*
  * The following typedef is used to represent an entry in the "ranges"
@@ -106,14 +67,20 @@ typedef struct px_ranges {
 	uint32_t size_low;
 } px_ranges_t;
 
+/*
+ * The following typedef is used to represent a
+ * 1275 "reg" property of a PCI nexus.
+ */
+typedef struct px_nexus_regspec {
+	uint64_t phys_addr;
+	uint64_t size;
+} px_nexus_regspec_t;
+
 typedef enum { PX_NEW, PX_ATTACHED, PX_DETACHED, PX_SUSPENDED } px_state_t;
-typedef enum { PX_OBJ_INTR_ADD, PX_OBJ_INTR_REMOVE } px_obj_op_t;
-typedef enum { PX_PEC_OBJ, PX_CB_OBJ } px_obj_t;
+enum { PX_INTR_XBC, PX_INTR_PEC };
 
 #define	PX_ATTACH_RETCODE(obj, op, err) \
 	((err) ? (obj) << 8 | (op) << 4 | (err) & 0xf : DDI_SUCCESS)
-
-#define	PX_OTHER_SIDE(side) ((side) ^ 1)
 
 /*
  * px soft state structure:
@@ -150,15 +117,6 @@ struct px {
 	int pci_numproxy;		/* upa interrupt proxies */
 	int px_thermal_interrupt;	/* node has thermal interrupt */
 
-	/*
-	 * register mapping:
-	 * XXX - Remove the following fields and move them
-	 * to SUN4U library code, after complete virtualization
-	 * (after porting MSI and Error handling code).
-	 */
-	caddr_t px_address[4];
-	ddi_acc_handle_t px_ac[4];
-
 	/* Interrupt support */
 	int intr_map_size;
 	struct intr_map *intr_map;
@@ -174,7 +132,6 @@ struct px {
 
 	/* Platform specific information */
 	void	*px_plat_p;
-
 };
 
 /* px soft state flag */

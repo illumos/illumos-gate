@@ -46,6 +46,23 @@ extern "C" {
 					/* no translation exists */
 
 /*
+ * Register base definitions.
+ *
+ * The specific numeric values for CSR, XBUS, Configuration,
+ * Interrupt blocks and other register bases.
+ */
+typedef enum {
+	PX_REG_CSR = 0,
+	PX_REG_XBC,
+	PX_REG_CFG,
+	PX_REG_IC,
+	PX_REG_MAX
+} px_reg_bank_t;
+
+/*
+ * Registers/state/variables that need to be saved and restored during
+ * suspend/resume.
+ *
  * SUN4U px specific data structure.
  */
 typedef struct pxu {
@@ -63,6 +80,10 @@ typedef struct pxu {
 	uint64_t	*ib_config_state;
 	uint64_t	*xcb_config_state;
 	uint64_t	*msiq_config_state;
+
+	/* sun4u specific vars */
+	caddr_t			px_address[4];
+	ddi_acc_handle_t	px_ac[4];
 } pxu_t;
 
 /*
@@ -201,10 +222,6 @@ typedef	struct eq_rec {
 #define	LPU_LTSSM_CONFIG1_LTSSM_20_TO_DEFAULT		0x5
 #define	LPU_LTSSM_CONFIG2_LTSSM_12_TO_DEFAULT		0x2DC6C0
 #define	LPU_LTSSM_CONFIG3_LTSSM_2_TO_DEFAULT		0x7A120
-/*
- * XXX fix LPU_LTSSM_CONFIG4_DATA_RATE_DEFAULT &
- * LPU_LTSSM_CONFIG4_N_FTS_DEFAULT in px_pec.h
- */
 #define	LPU_LTSSM_CONFIG4_DATA_RATE_DEFAULT		0x2
 #define	LPU_LTSSM_CONFIG4_N_FTS_DEFAULT			0x8c
 
@@ -237,13 +254,6 @@ extern void hvio_cb_init(caddr_t xbc_csr_base, pxu_t *pxu_p);
 extern void hvio_ib_init(caddr_t csr_base, pxu_t *pxu_p);
 extern void hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p);
 extern void hvio_pec_init(caddr_t csr_base, pxu_t *pxu_p);
-
-#ifdef	VPCI_CONFIG_ACCESS
-extern uint64_t hvio_config_get(devhandle_t dev_hdl, pci_device_t bdf,
-    pci_config_offset_t off, pci_config_size_t size, pci_cfg_data_t *data_p);
-extern uint64_t hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf,
-    pci_config_offset_t off, pci_config_size_t size, pci_cfg_data_t data);
-#endif	/* VPCI_CONFIG_ACCESS */
 
 extern uint64_t hvio_intr_devino_to_sysino(devhandle_t dev_hdl, pxu_t *pxu_p,
     devino_t devino, sysino_t *sysino);

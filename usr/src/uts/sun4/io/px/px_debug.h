@@ -85,7 +85,7 @@ typedef enum {	/* same sequence as px_debug_sym[] */
 	/* 36 */ DBG_ILU,
 	/* 37 */ DBG_TLU,
 	/* 38 */ DBG_LPU,
-	/* 39 */ DBG_RSV3,
+	/* 39 */ DBG_MMU,
 
 	/* 40 */ DBG_OPEN,
 	/* 41 */ DBG_CLOSE,

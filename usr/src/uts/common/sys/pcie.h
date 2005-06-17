@@ -1,0 +1,548 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef	_SYS_PCIE_H
+#define	_SYS_PCIE_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+#include <sys/pci.h>
+
+/*
+ * PCI-Express Capability Registers Offsets
+ */
+#define	PCIE_CAP_ID			PCI_CAP_ID
+#define	PCIE_CAP_NEXT_PTR		PCI_CAP_NEXT_PTR
+#define	PCIE_PCIECAP			0x02	/* PCI-e Capability Reg */
+#define	PCIE_DEVCAP			0x04	/* Device Capability */
+#define	PCIE_DEVCTL			0x08	/* Device Control */
+#define	PCIE_DEVSTS			0x0A	/* Device Status */
+#define	PCIE_LINKCAP			0x04	/* Link Capability */
+#define	PCIE_LINKCTL			0x0C	/* Link Control */
+#define	PCIE_LINKSTS			0x10	/* Link Status */
+#define	PCIE_SLOTCAP			0x14	/* Slot Capability */
+#define	PCIE_SLOTCTL			0x18	/* Slot Control */
+#define	PCIE_SLOTSTS			0x1A	/* Slot Status */
+#define	PCIE_ROOTCTL			0x1C	/* Root Control */
+#define	PCIE_ROOTSTS			0x20	/* Root Status */
+
+/*
+ * PCI-Express Capabilities Register
+ */
+#define	PCIE_PCIECAP_VER_1_0		0x1	/* PCI-E spec 1.0 */
+#define	PCIE_PCIECAP_VER_MASK		0xF	/* Version Mask */
+#define	PCIE_PCIECAP_DEV_TYPE_PCIE_DEV	0x00	/* PCI-E Endpont Device */
+#define	PCIE_PCIECAP_DEV_TYPE_PCI_DEV	0x10	/* Leg PCI Endpont Device */
+#define	PCIE_PCIECAP_DEV_TYPE_ROOT	0x40	/* Root Port of Root Complex */
+#define	PCIE_PCIECAP_DEV_TYPE_UP	0x50	/* Upstream Port of Switch */
+#define	PCIE_PCIECAP_DEV_TYPE_DOWN	0x60	/* Downstream Port of Switch */
+#define	PCIE_PCIECAP_DEV_TYPE_PCIE2PCI	0x70	/* PCI-E to PCI Bridge */
+#define	PCIE_PCIECAP_DEV_TYPE_PCI2PCIE	0x80	/* PCI to PCI-E Bridge */
+#define	PCIE_PCIECAP_DEV_TYPE_MASK	0xF0	/* Device/Port Type Mask */
+#define	PCIE_PCIECAP_SLOT_IMPL		0x100	/* Slot Impl vs Integrated */
+#define	PCIE_PCIECAP_INT_MSG_NUM	0x3700	/* Interrupt Message Number */
+
+/*
+ * Device Capabilities Register
+ */
+#define	PCIE_DEVCAP_MAX_PAYLOAD_128	0x0
+#define	PCIE_DEVCAP_MAX_PAYLOAD_256	0x1
+#define	PCIE_DEVCAP_MAX_PAYLOAD_512	0x2
+#define	PCIE_DEVCAP_MAX_PAYLOAD_1024	0x3
+#define	PCIE_DEVCAP_MAX_PAYLOAD_2048	0x4
+#define	PCIE_DEVCAP_MAX_PAYLOAD_4096	0x5
+#define	PCIE_DEVCAP_MAX_PAYLOAD_MASK	0x7	/* Max Payload Size Supported */
+
+#define	PCIE_DEVCAP_PHTM_FUNC_NONE	0x00	/* No Function # bits used */
+#define	PCIE_DEVCAP_PHTM_FUNC_ONE	0x08	/* First most sig. bit used */
+#define	PCIE_DEVCAP_PHTM_FUNC_TWO	0x10	/* First 2 most sig bit used */
+#define	PCIE_DEVCAP_PHTM_FUNC_THREE	0x18	/* All 3 bits used */
+#define	PCIE_DEVCAP_PHTM_FUNC_MASK	0x18	/* Phantom Func Supported */
+
+#define	PCIE_DEVCAP_EXT_TAG_5BIT	0x00	/* 5-Bit Tag Field Supported */
+#define	PCIE_DEVCAP_EXT_TAG_8BIT	0x20	/* 8-Bit Tag Field Supported */
+#define	PCIE_DEVCAP_EXT_TAG_MASK	0x20	/* Ext. Tag Field Supported */
+
+#define	PCIE_DEVCAP_EP_L0S_LAT_MIN	0x000	/* < 64 ns */
+#define	PCIE_DEVCAP_EP_L0S_LAT_64ns	0x040	/* 64 ns - 128 ns */
+#define	PCIE_DEVCAP_EP_L0S_LAT_128ns	0x080	/* 128 ns - 256 ns */
+#define	PCIE_DEVCAP_EP_L0S_LAT_256ns	0x0C0	/* 256 ns - 512 ns */
+#define	PCIE_DEVCAP_EP_L0S_LAT_512ns	0x100	/* 512 ns - 1 us */
+#define	PCIE_DEVCAP_EP_L0S_LAT_1us	0x140	/* 1 us - 2 us */
+#define	PCIE_DEVCAP_EP_L0S_LAT_2us	0x180	/* 2 us - 4 us */
+#define	PCIE_DEVCAP_EP_L0S_LAT_MAX	0x1C0	/* > 4 us */
+#define	PCIE_DEVCAP_EP_L0S_LAT_MASK	0x1C0	/* EP L0s Accetable Latency */
+
+#define	PCIE_DEVCAP_EP_L1_LAT_MIN	0x000	/* < 1 us */
+#define	PCIE_DEVCAP_EP_L1_LAT_1us	0x140	/* 1 us - 2 us */
+#define	PCIE_DEVCAP_EP_L1_LAT_2us	0x180	/* 2 us - 4 us */
+#define	PCIE_DEVCAP_EP_L1_LAT_4us	0x140	/* 4 us - 8 us */
+#define	PCIE_DEVCAP_EP_L1_LAT_8us	0x180	/* 8 us - 16 us */
+#define	PCIE_DEVCAP_EP_L1_LAT_16us	0x140	/* 16 us - 32 us */
+#define	PCIE_DEVCAP_EP_L1_LAT_32us	0x180	/* 32 us - 64 us */
+#define	PCIE_DEVCAP_EP_L1_LAT_MAX	0x1C0	/* > 64 us */
+#define	PCIE_DEVCAP_EP_L1_LAT_MASK	0x700	/* EP L1 Accetable Latency */
+
+#define	PCIE_DEVCAP_ATTN_BUTTON		0x1000	/* Attention Button Present */
+#define	PCIE_DEVCAP_ATTN_INDICATOR	0x2000	/* Attn Indicator Present */
+#define	PCIE_DEVCAP_PWR_INDICATOR	0x4000	/* Power Indicator Present */
+
+#define	PCIE_DEVCAP_PLMT_VAL_SHIFT	18	/* Power Limit Value Shift */
+#define	PCIE_DEVCAP_PLMT_VAL_MASK	0xFF	/* Power Limit Value Mask */
+
+#define	PCIE_DEVCAP_PLMT_SCL_1_BY_1	0x0000000	/* 1x Scale */
+#define	PCIE_DEVCAP_PLMT_SCL_1_BY_10	0x4000000	/* 0.1x Scale */
+#define	PCIE_DEVCAP_PLMT_SCL_1_BY_100	0x8000000	/* 0.01x Scale */
+#define	PCIE_DEVCAP_PLMT_SCL_1_BY_1000	0xC000000	/* 0.001x Scale */
+#define	PCIE_DEVCAP_PLMT_SCL_MASK	0xC000000	/* Power Limit Scale */
+
+/*
+ * Device Control Register
+ */
+#define	PCIE_DEVCTL_CE_REPORTING_EN	0x1	/* Correctable Error Enable */
+#define	PCIE_DEVCTL_NFE_REPORTING_EN	0x2	/* Non-Fatal Error Enable */
+#define	PCIE_DEVCTL_FE_REPORTING_EN	0x4	/* Fatal Error Enable */
+#define	PCIE_DEVCTL_UR_REPORTING_EN	0x8	/* Unsupported Request Enable */
+#define	PCIE_DEVCTL_RO_EN		0x10	/* Enable Relaxed Ordering */
+
+#define	PCIE_DEVCTL_MAX_PAYLOAD_128	0x00
+#define	PCIE_DEVCTL_MAX_PAYLOAD_256	0x20
+#define	PCIE_DEVCTL_MAX_PAYLOAD_512	0x40
+#define	PCIE_DEVCTL_MAX_PAYLOAD_1024	0x60
+#define	PCIE_DEVCTL_MAX_PAYLOAD_2048	0x80
+#define	PCIE_DEVCTL_MAX_PAYLOAD_4096	0xA0
+#define	PCIE_DEVCTL_MAX_PAYLOAD_MASK	0xE0	/* Max_Payload_Size */
+
+#define	PCIE_DEVCTL_EXT_TAG_FIELD_EN	0x100	/* Extended Tag Field Enable */
+#define	PCIE_DEVCTL_PHTM_FUNC_EN	0x200	/* Phantom Functions Enable */
+#define	PCIE_DEVCTL_AUX_POWER_PM_EN	0x400	/* Auxiliary Power PM Enable */
+#define	PCIE_DEVCTL_ENABLE_NO_SNOOP	0x800	/* Enable No Snoop */
+
+#define	PCIE_DEVCTL_MAX_READ_REQ_128	0x00
+#define	PCIE_DEVCTL_MAX_READ_REQ_256	0x10
+#define	PCIE_DEVCTL_MAX_READ_REQ_512	0x20
+#define	PCIE_DEVCTL_MAX_READ_REQ_1024	0x30
+#define	PCIE_DEVCTL_MAX_READ_REQ_2048	0x40
+#define	PCIE_DEVCTL_MAX_READ_REQ_4096	0x50
+#define	PCIE_DEVCTL_MAX_READ_REQ_MASK	0x7000	/* Max_Read_Request_Size */
+
+/*
+ * Device Status Register
+ */
+#define	PCIE_DEVSTS_CE_DETECTED		0x1	/* Correctable Error Detected */
+#define	PCIE_DEVSTS_NFE_DETECTED	0x2	/* Non Fatal Error Detected */
+#define	PCIE_DEVSTS_FE_DETECTED		0x4	/* Fatal Error Detected */
+#define	PCIE_DEVSTS_UR_DETECTED		0x8	/* Unsupported Req Detected */
+#define	PCIE_DEVSTS_AUX_POWER		0x10	/* AUX Power Detected */
+#define	PCIE_DEVSTS_TRANS_PENDING	0x20	/* Transactions Pending */
+
+/*
+ * Link Capability Register
+ */
+#define	PCIE_LINKCAP_MAX_SPEED_2_5	0x1	/* 2.5 Gb/s Speed */
+#define	PCIE_LINKCAP_MAX_SPEED_MASK	0xF	/* Maximum Link Speed */
+#define	PCIE_LINKCAP_MAX_WIDTH_X1	0x010
+#define	PCIE_LINKCAP_MAX_WIDTH_X2	0x020
+#define	PCIE_LINKCAP_MAX_WIDTH_X4	0x040
+#define	PCIE_LINKCAP_MAX_WIDTH_X8	0x080
+#define	PCIE_LINKCAP_MAX_WIDTH_X12	0x0C0
+#define	PCIE_LINKCAP_MAX_WIDTH_X16	0x100
+#define	PCIE_LINKCAP_MAX_WIDTH_X32	0x200
+#define	PCIE_LINKCAP_MAX_WIDTH_MASK	0x3f0	/* Maximum Link Width */
+
+#define	PCIE_LINKCAP_ASPM_SUP_L0S	0x400	/* L0s Entry Supported */
+#define	PCIE_LINKCAP_ASPM_SUP_L0S_L1	0xC00	/* L0s abd L1 Supported */
+#define	PCIE_LINKCAP_ASPM_SUP_MASK	0xC00	/* ASPM Support */
+
+#define	PCIE_LINKCAP_L0S_EXIT_LAT_MIN	0x0000	/* < 64 ns */
+#define	PCIE_LINKCAP_L0S_EXIT_LAT_64ns	0x1000	/* 64 ns - 128 ns */
+#define	PCIE_LINKCAP_L0S_EXIT_LAT_128ns	0x2000	/* 128 ns - 256 ns */
+#define	PCIE_LINKCAP_L0S_EXIT_LAT_256ns	0x3000	/* 256 ns - 512 ns */
+#define	PCIE_LINKCAP_L0S_EXIT_LAT_512ns	0x4000	/* 512 ns - 1 us */
+#define	PCIE_LINKCAP_L0S_EXIT_LAT_1us	0x5000	/* 1 us - 2 us */
+#define	PCIE_LINKCAP_L0S_EXIT_LAT_2us	0x6000	/* 2 us - 4 us */
+#define	PCIE_LINKCAP_L0S_EXIT_LAT_MAX	0x7000	/* > 4 us */
+#define	PCIE_LINKCAP_L0S_EXIT_LAT_MASK	0x7000	/* L0s Exit Latency */
+
+#define	PCIE_LINKCAP_L1_EXIT_LAT_MIN	0x00000	/* < 1 us */
+#define	PCIE_LINKCAP_L1_EXIT_LAT_1us	0x08000	/* 1 us - 2 us */
+#define	PCIE_LINKCAP_L1_EXIT_LAT_2us	0x10000	/* 2 us - 4 us */
+#define	PCIE_LINKCAP_L1_EXIT_LAT_4us	0x18000	/* 4 us - 8 us */
+#define	PCIE_LINKCAP_L1_EXIT_LAT_8us	0x20000	/* 8 us - 16 us */
+#define	PCIE_LINKCAP_L1_EXIT_LAT_16us	0x28000	/* 16 us - 32 us */
+#define	PCIE_LINKCAP_L1_EXIT_LAT_32us	0x30000	/* 32 us - 64 us */
+#define	PCIE_LINKCAP_L1_EXIT_LAT_MAX	0x38000	/* > 64 us */
+#define	PCIE_LINKCAP_L1_EXIT_LAT_MASK	0x38000	/* L1 Exit Latency */
+
+#define	PCIE_LINKCAP_PORT_NUMBER	0xF0000000	/* Port Number */
+
+/*
+ * Link Control Register
+ */
+#define	PCIE_LINKCTL_ASPM_CTL_DIS	0x0	/* ASPM Disable */
+#define	PCIE_LINKCTL_ASPM_CTL_L0S	0x1	/* ASPM L0s only */
+#define	PCIE_LINKCTL_ASPM_CTL_L1	0x2	/* ASPM L1 only */
+#define	PCIE_LINKCTL_ASPM_CTL_L0S_L1	0x3	/* ASPM L0s and L1 only */
+#define	PCIE_LINKCTL_ASPM_CTL_MASK	0x3	/* ASPM Control */
+
+#define	PCIE_LINKCTL_RCB_64_BYTE	0x0	/* 64 Byte */
+#define	PCIE_LINKCTL_RCB_128_BYTE	0x8	/* 128 Byte */
+#define	PCIE_LINKCTL_RCB_MASK		0x8	/* Read Completion Boundary */
+
+#define	PCIE_LINKCTL_LINK_DISABLE	0x10	/* Link Disable */
+#define	PCIE_LINKCTL_RETRAIN_LINK	0x20	/* Retrain Link */
+#define	PCIE_LINKCTL_COMMON_CLK_CFG	0x40	/* Common Clock Configuration */
+#define	PCIE_LINKCTL_EXT_SYNCH		0x80	/* Extended Synch */
+
+/*
+ * Link Status Register
+ */
+#define	PCIE_LINKSTS_SPEED_2_5		0x1	/* Link Speed */
+#define	PCIE_LINKSTS_SPEED_MASK		0xF	/* Link Speed */
+
+#define	PCIE_LINKSTS_NEG_WIDTH_X1	0x010
+#define	PCIE_LINKSTS_NEG_WIDTH_X2	0x020
+#define	PCIE_LINKSTS_NEG_WIDTH_X4	0x040
+#define	PCIE_LINKSTS_NEG_WIDTH_X8	0x080
+#define	PCIE_LINKSTS_NEG_WIDTH_X12	0x0C0
+#define	PCIE_LINKSTS_NEG_WIDTH_X16	0x100
+#define	PCIE_LINKSTS_NEG_WIDTH_X32	0x200
+#define	PCIE_LINKSTS_NEG_WIDTH_MASK	0x3F0	/* Negotiated Link Width */
+
+#define	PCIE_LINKSTS_TRAINING_ERROR	0x400	/* Training Error */
+#define	PCIE_LINKSTS_LINK_TRAINING	0x800	/* Link Training */
+#define	PCIE_LINKSTS_SLOT_CLK_CFG	0x1000	/* Slot Clock Configuration */
+
+/*
+ * Slot Capability Register
+ */
+#define	PCIE_SLOTCAP_ATTN_BUTTON	0x1	/* Attention Button Present */
+#define	PCIE_SLOTCAP_POWER_CONTROLLER	0x2	/* Power Controller Present */
+#define	PCIE_SLOTCAP_MRL_SENSOR		0x4	/* MRL Sensor Present */
+#define	PCIE_SLOTCAP_ATTN_INDICATOR	0x8	/* Attn Indicator Present */
+#define	PCIE_SLOTCAP_PWR_INDICATOR	0x10	/* Power Indicator Present */
+#define	PCIE_SLOTCAP_HP_SURPRISE	0x20	/* Hot-Plug Surprise */
+#define	PCIE_SLOTCAP_HP_CAPABLE		0x40	/* Hot-Plug Capable */
+
+#define	PCIE_SLOTCAP_PLMT_VAL_SHIFT	7	/* Slot Pwr Limit Value Shift */
+#define	PCIE_SLOTCAP_PLMT_VAL_MASK	0xFF	/* Slot Pwr Limit Value */
+
+#define	PCIE_SLOTCAP_PLMT_SCL_1_BY_1	0x00000	/* 1x Scale */
+#define	PCIE_SLOTCAP_PLMT_SCL_1_BY_10	0x08000	/* 0.1x Scale */
+#define	PCIE_SLOTCAP_PLMT_SCL_1_BY_100	0x10000	/* 0.01x Scale */
+#define	PCIE_SLOTCAP_PLMT_SCL_1_BY_1000	0x18000	/* 0.001x Scale */
+#define	PCIE_SLOTCAP_PLMT_SCL_MASK	0x18000	/* Slot Power Limit Scale */
+
+#define	PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT	19	/* Physical Slot Num Shift */
+#define	PCIE_SLOTCAP_PHY_SLOT_NUM_MASK	0x1FFF	/* Physical Slot Num Mask */
+
+/*
+ * Slot Control Register
+ */
+#define	PCIE_SLOTCTL_ATTN_BTN_EN	0x1	/* Attn Button Pressed Enable */
+#define	PCIE_SLOTCTL_PWR_FAULT_EN	0x2	/* Pwr Fault Detected Enable */
+#define	PCIE_SLOTCTL_MRL_SENSOR_EN	0x4	/* MRL Sensor Changed Enable */
+#define	PCIE_SLOTCTL_PRESENCE_CHANGE_EN	0x8	/* Presence Detect Changed En */
+#define	PCIE_SLOTCTL_CMD_INTR_EN	0x10	/* CMD Completed Interrupt En */
+#define	PCIE_SLOTCTL_HP_INTR_EN		0x20	/* Hot-Plug Interrupt Enable */
+
+#define	PCIE_SLOTCTL_ATTN_CTL_ON	0x40	/* On  */
+#define	PCIE_SLOTCTL_ATTN_CTL_BLINK	0x80	/* Blink */
+#define	PCIE_SLOTCTL_ATTN_CTL_OFF	0xC0	/* Off */
+#define	PCIE_SLOTCTL_ATTN_CTL_MASK	0xC0	/* Attn Indicator Control */
+
+#define	PCIE_SLOTCTL_PWR_CTL_ON		0x100	/* On  */
+#define	PCIE_SLOTCTL_PWR_CTL_BLINK	0x200	/* Blink */
+#define	PCIE_SLOTCTL_PWR_CTL_OFF	0x300	/* Off */
+#define	PCIE_SLOTCTL_PWR_CTL_MASK	0x300	/* Power Indicator Control */
+
+#define	PCIE_SLOTCTL_PWR_CONTROLLER_CTL	0x400	/* Power Controller Control */
+
+/*
+ * Slot Status Register
+ */
+#define	PCIE_SLOTSTS_ATTN_BTN_PRESSED	0x1	/* Attention Button Pressed */
+#define	PCIE_SLOTSTS_PWR_FAULT_DETECTED	0x2	/* Power Fault Detected */
+#define	PCIE_SLOTSTS_MRL_SENSOR_CHANGED	0x4	/* MRL Sensor Changed */
+#define	PCIE_SLOTSTS_PRESENCE_CHANGED	0x8	/* Presence Detect Changed */
+#define	PCIE_SLOTSTS_COMMAND_COMPLETED	0x10	/* Command Completed */
+#define	PCIE_SLOTSTS_MRL_SENSOR_OPEN	0x20	/* MRL Open */
+#define	PCIE_SLOTSTS_PRESENCE_DETECTED	0x40	/* Card Present in slot */
+
+/*
+ * Root Control Register
+ */
+#define	PCIE_ROOTCTL_SYS_ERR_ON_CE_EN	0x1	/* Sys Err on Cor Err Enable */
+#define	PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN	0x2	/* Sys Err on NF Err Enable */
+#define	PCIE_ROOTCTL_SYS_ERR_ON_FE_EN	0x3	/* Sys Err on Fatal Err En */
+#define	PCIE_ROOTCTL_PME_INTERRUPT_EN	0x4	/* PME Interrupt Enable */
+
+/*
+ * Root Status Register
+ */
+#define	PCIE_ROOTSTS_PME_REQ_ID_SHIFT	0	/* PME Requestor ID */
+#define	PCIE_ROOTSTS_PME_REQ_ID_MASK	0xFFFF	/* PME Requestor ID */
+
+#define	PCIE_ROOTSTS_PME_STATUS		0x10000	/* PME Status */
+#define	PCIE_ROOTSTS_PME_PENDING	0x20000	/* PME Pending */
+
+
+/*
+ * PCI-Express Enhanced Capabilities Link Entry Bit Offsets
+ */
+#define	PCIE_EXT_CAP			0x100	/* Base Address of Ext Cap */
+
+#define	PCIE_EXT_CAP_ID_SHIFT		0	/* PCI-e Ext Cap ID */
+#define	PCIE_EXT_CAP_ID_MASK		0xFFFF
+#define	PCIE_EXT_CAP_VER_SHIFT		16	/* PCI-e Ext Cap Ver */
+#define	PCIE_EXT_CAP_VER_MASK		0xF
+#define	PCIE_EXT_CAP_NEXT_PTR_SHIFT	20	/* PCI-e Ext Cap Next Ptr */
+#define	PCIE_EXT_CAP_NEXT_PTR_MASK	0xFFF
+
+#define	PCIE_EXT_CAP_NEXT_PTR_NULL	0x0
+
+/*
+ * PCI-Express Enhanced Capability Identifier Values
+ */
+#define	PCIE_EXT_CAP_ID_AER		0x1	/* Advanced Error Handling */
+#define	PCIE_EXT_CAP_ID_VC		0x2	/* Virtual Channel */
+#define	PCIE_EXT_CAP_ID_SER		0x3	/* Serial Number */
+#define	PCIE_EXT_CAP_ID_PWR_BUDGET	0x4	/* Power Budgeting */
+
+/*
+ * PCI-Express Advanced Error Reporting Extended Capability Offsets
+ */
+#define	PCIE_AER_CAP			0x0	/* Enhanced Capability Header */
+#define	PCIE_AER_UCE_STS		0x4	/* Uncorrectable Error Status */
+#define	PCIE_AER_UCE_MASK		0x8	/* Uncorrectable Error Mask */
+#define	PCIE_AER_UCE_SERV		0xc	/* Uncor Error Severity */
+#define	PCIE_AER_CE_STS			0x10	/* Correctable Error Status */
+#define	PCIE_AER_CE_MASK		0x14	/* Correctable Error Mask */
+#define	PCIE_AER_CTL			0x18	/* AER Capability & Control */
+#define	PCIE_AER_HDR_LOG		0x1c	/* Header Log */
+
+/* Root Ports Only */
+#define	PCIE_AER_RE_CMD			0x2c	/* Root Error Command */
+#define	PCIE_AER_RE_STS			0x30	/* Root Error Status */
+#define	PCIE_AER_CE_SRC_ID		0x34	/* Error Source ID */
+#define	PCIE_AER_ERR_SRC_ID		0x36	/* Error Source ID */
+
+/* Bridges Only */
+#define	PCIE_AER_SUCE_STS		0x2c	/* Secondary UCE Status */
+#define	PCIE_AER_SUCE_MASK		0x30	/* Secondary UCE Mask */
+#define	PCIE_AER_SUCE_SERV		0x34	/* Secondary UCE Severity */
+#define	PCIE_AER_SCTL			0x38	/* Secondary Cap & Ctl */
+#define	PCIE_AER_SHDR_LOG		0x3c	/* Secondary Header Log */
+
+/*
+ * AER Uncorrectable Error Status/Mask/Severity Register
+ */
+#define	PCIE_AER_UCE_TRAINING		0x0	/* Training Error Status */
+#define	PCIE_AER_UCE_DLP		0x10	/* Data Link Protocol Error */
+#define	PCIE_AER_UCE_PTLP		0x1000	/* Poisoned TLP Status */
+#define	PCIE_AER_UCE_FCP		0x2000	/* Flow Control Protocol Sts */
+#define	PCIE_AER_UCE_TO			0x4000	/* Completion Timeout Status */
+#define	PCIE_AER_UCE_CA			0x8000	/* Completer Abort Status */
+#define	PCIE_AER_UCE_UC			0x10000	/* Unexpected Completion Sts */
+#define	PCIE_AER_UCE_RO			0x20000	/* Receiver Overflow Status */
+#define	PCIE_AER_UCE_MTLP		0x40000	/* Malformed TLP Status */
+#define	PCIE_AER_UCE_ECRC		0x80000	/* ECRC Error Status */
+#define	PCIE_AER_UCE_UR		0x100000	/* Unsupported Req */
+#define	PCIE_AER_UCE_BITS		(PCIE_AER_UCE_TRAINING | \
+    PCIE_AER_UCE_DLP | PCIE_AER_UCE_PTLP | PCIE_AER_UCE_FCP | \
+    PCIE_AER_UCE_TO | PCIE_AER_UCE_CA | PCIE_AER_UCE_UC | PCIE_AER_UCE_RO | \
+    PCIE_AER_UCE_MTLP | PCIE_AER_UCE_ECRC | PCIE_AER_UCE_UR)
+
+/*
+ * AER Correctable Error Status/Mask Register
+ */
+#define	PCIE_AER_CE_RECEIVER_ERR	0x1	/* Receiver Error Status */
+#define	PCIE_AER_CE_BAD_TLP		0x40	/* Bad TLP Status */
+#define	PCIE_AER_CE_BAD_DLLP		0x80	/* Bad DLLP Status */
+#define	PCIE_AER_CE_REPLAY_ROLLOVER	0x100	/* REPLAY_NUM Rollover Status */
+#define	PCIE_AER_CE_REPLAY_TO		0x1000	/* Replay Timer Timeout Sts */
+#define	PCIE_AER_CE_BITS		(PCIE_AER_CE_RECEIVER_ERR | \
+    PCIE_AER_CE_BAD_TLP | PCIE_AER_CE_BAD_DLLP | PCIE_AER_CE_REPLAY_ROLLOVER | \
+    PCIE_AER_CE_REPLAY_TO)
+
+/*
+ * AER Capability & Control
+ */
+#define	PCIE_AER_CTL_FST_ERR_PTR_MASK	0x1F	/* First Error Pointer */
+#define	PCIE_AER_CTL_ECRC_GEN_CAP	0x20	/* ECRC Generation Capable */
+#define	PCIE_AER_CTL_ECRC_GEN_ENA	0x40	/* ECRC Generation Enable */
+#define	PCIE_AER_CTL_ECRC_CHECK_CAP	0x80	/* ECRC Check Capable */
+#define	PCIE_AER_CTL_ECRC_CHECK_ENA	0x100	/* ECRC Check Enable */
+
+/*
+ * AER Root Command Register
+ */
+#define	PCIE_AER_RE_CMD_CE_REP_EN	0x1	/* Correctable Error Enable */
+#define	PCIE_AER_RE_CMD_NFE_REP_EN	0x2	/* Non-Fatal Error Enable */
+#define	PCIE_AER_RE_CMD_FE_REP_EN	0x4	/* Fatal Error Enable */
+
+/*
+ * AER Root Error Status Register
+ */
+#define	PCIE_AER_RE_STS_CE_RCVD		0x1	/* ERR_COR Received */
+#define	PCIE_AER_RE_STS_MUL_CE_RCVD	0x2	/* Multiple ERR_COR Received */
+#define	PCIE_AER_RE_STS_FE_NFE_RCVD	0x4	/* FATAL/NON-FATAL Received */
+#define	PCIE_AER_RE_STS_MUL_FE_NFE_RCVD	0x8	/* Multiple ERR_F/NF Received */
+#define	PCIE_AER_RE_STS_FIRST_UC_FATAL	0x10	/* First Uncorrectable Fatal */
+#define	PCIE_AER_RE_STS_NFE_MSGS_RCVD	0x20	/* Non-Fatal Error Msgs Rcvd */
+#define	PCIE_AER_RE_STS_FE_MSGS_RCVD	0x40	/* Fatal Error Messages Rcvd */
+
+#define	PCIE_AER_RE_STS_MSG_NUM_SHIFT	27	/* Offset of Intr Msg Number */
+#define	PCIE_AER_RE_STS_MSG_NUM_MASK	0x1F	/* Intr Msg Number Mask */
+
+/*
+ * AER Error Source Identification Register
+ */
+#define	PCIE_AER_ERR_SRC_ID_CE_SHIFT	0	/* ERR_COR Source ID */
+#define	PCIE_AER_ERR_SRC_ID_CE_MASK	0xFFFF
+#define	PCIE_AER_ERR_SRC_ID_UE_SHIFT	16	/* ERR_FATAL/NONFATAL Src ID */
+#define	PCIE_AER_ERR_SRC_ID_UE_MASK	0xFFF
+
+/*
+ * AER Secondary Uncorrectable Error Register
+ */
+#define	PCIE_AER_SUCE_TA_ON_SC		0x1	/* Target Abort on Split Comp */
+#define	PCIE_AER_SUCE_MA_ON_SC 		0x2	/* Master Abort on Split Comp */
+#define	PCIE_AER_SUCE_RCVD_TA		0x4	/* Received Target Abort */
+#define	PCIE_AER_SUCE_RCVD_MA 		0x8	/* Received Master Abort */
+#define	PCIE_AER_SUCE_USC_ERR 		0x20	/* Unexpected Split Comp Err */
+#define	PCIE_AER_SUCE_USC_MSG_DATA_ERR	0x40	/* USC Message Data Error */
+#define	PCIE_AER_SUCE_UC_DATA_ERR	0x80	/* Uncorrectable Data Error */
+#define	PCIE_AER_SUCE_UC_ATTR_ERR	0x100	/* UC Attribute Err */
+#define	PCIE_AER_SUCE_UC_ADDR_ERR	0x200	/* Uncorrectable Address Err */
+#define	PCIE_AER_SUCE_TIMER_EXPIRED	0x400	/* Delayed xtion discard */
+#define	PCIE_AER_SUCE_PERR_ASSERT	0x800	/* PERR Assertion Detected */
+#define	PCIE_AER_SUCE_SERR_ASSERT	0x1000	/* SERR Assertion Detected */
+#define	PCIE_AER_SUCE_INTERNAL_ERR	0x2000	/* Internal Bridge Err Detect */
+#define	PCIE_AER_SUCE_BITS		(PCIE_AER_SUCE_TA_ON_SC | \
+    PCIE_AER_SUCE_MA_ON_SC | PCIE_AER_SUCE_RCVD_TA | PCIE_AER_SUCE_RCVD_MA | \
+    PCIE_AER_SUCE_USC_ERR | PCIE_AER_SUCE_USC_MSG_DATA_ERR | \
+    PCIE_AER_SUCE_UC_DATA_ERR | PCIE_AER_SUCE_UC_ATTR_ERR | \
+    PCIE_AER_SUCE_UC_ADDR_ERR |	PCIE_AER_SUCE_TIMER_EXPIRED | \
+    PCIE_AER_SUCE_PERR_ASSERT |	PCIE_AER_SUCE_SERR_ASSERT | \
+    PCIE_AER_SUCE_INTERNAL_ERR)
+
+/*
+ * AER Secondary Capability & Control
+ */
+#define	PCIE_AER_SCTL_FST_ERR_PTR_MASK	0x1F	/* First Error Pointer */
+
+/*
+ * AER Secondary Headers
+ * The Secondary Header Logs is 4 DW long.
+ * The first 2 DW are split into 3 sections
+ * o Transaction Attribute
+ * o Transaction Command Lower
+ * o Transaction Command Higher
+ * The last 2 DW is the Transaction Address
+ */
+#define	PCIE_AER_SHDR_LOG_ATTR_MASK	0xFFFFFFFFF
+#define	PCIE_AER_SHDR_LOG_CMD_LOW_MASK	0xF000000000
+#define	PCIE_AER_SHDR_LOG_CMD_HIGH_MASK	0xF0000000000
+#define	PCIE_AER_SHDR_LOG_ADDR_MASK	0xFFFFFFFFFFFFFFFF
+
+/*
+ * PCI-E Common TLP Header Fields
+ */
+#define	PCIE_TLP_FMT_3DW 	0x00
+#define	PCIE_TLP_FMT_4DW	0x20
+#define	PCIE_TLP_FMT_3DW_DATA	0x40
+#define	PCIE_TLP_FMT_4DW_DATA	0x60
+
+#define	PCIE_TLP_TYPE_MEM	0x0
+#define	PCIE_TLP_TYPE_MEMLK	0x1
+#define	PCIE_TLP_TYPE_IO 	0x2
+#define	PCIE_TLP_TYPE_CFG0	0x4
+#define	PCIE_TLP_TYPE_CFG1	0x5
+#define	PCIE_TLP_TYPE_MSG 	0x10
+#define	PCIE_TLP_TYPE_CPL	0xA
+#define	PCIE_TLP_TYPE_CPLLK	0xB
+#define	PCIE_TLP_TYPE_MSI	0x18
+
+#define	PCIE_TLP_MRD3		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_MEM)
+#define	PCIE_TLP_MRD4		(PCIE_TLP_FMT_4DW | PCIE_TLP_TYPE_MEM)
+#define	PCIE_TLP_MRDLK3		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_MEMLK)
+#define	PCIE_TLP_MRDLK4		(PCIE_TLP_FMT_4DW | PCIE_TLP_TYPE_MEMLK)
+#define	PCIE_TLP_MRDWR3		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_MEM)
+#define	PCIE_TLP_MRDWR4		(PCIE_TLP_FMT_4DW_DATA | PCIE_TLP_TYPE_MEM)
+#define	PCIE_TLP_IORD 		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_IO)
+#define	PCIE_TLP_IOWR 		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_IO)
+#define	PCIE_TLP_CFGRD0		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_CFG0)
+#define	PCIE_TLP_CFGWR0		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_CFG0)
+#define	PCIE_TLP_CFGRD1		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_CFG1)
+#define	PCIE_TLP_CFGWR1		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_CFG1)
+#define	PCIE_TLP_MSG 		(PCIE_TLP_FMT_4DW | PCIE_TLP_TYPE_MSG)
+#define	PCIE_TLP_MSGD 		(PCIE_TLP_FMT_4DW_DATA | PCIE_TLP_TYPE_MSG)
+#define	PCIE_TLP_CPL		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_CPL)
+#define	PCIE_TLP_CPLD		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_CPL)
+#define	PCIE_TLP_CPLLK		(PCIE_TLP_FMT_3DW | PCIE_TLP_TYPE_CPLLK)
+#define	PCIE_TLP_CPLDLK		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_CPLLK)
+#define	PCIE_TLP_MSI32		(PCIE_TLP_FMT_3DW_DATA | PCIE_TLP_TYPE_MSI)
+#define	PCIE_TLP_MSI64		(PCIE_TLP_FMT_4DW_DATA | PCIE_TLP_TYPE_MSI)
+
+typedef uint16_t pcie_req_id_t;
+
+#define	PCIE_REQ_ID_BUS_SHIFT	8
+#define	PCIE_REQ_ID_BUS_MASK	0xFF00
+#define	PCIE_REQ_ID_DEV_SHIFT	3
+#define	PCIE_REQ_ID_DEV_MASK	0x00F1
+#define	PCIE_REQ_ID_FUNC_SHIFT	0
+#define	PCIE_REQ_ID_FUNC_MASK	0x0007
+
+/*
+ * PCI-Express Message Request Header
+ */
+typedef struct pcie_msg {
+	uint32_t	rsvd1	:16,	/* DW0 */
+			td	:1,
+			ep	:1,
+			attr	:2,
+			rsvd2	:2,
+			len	:10;
+	uint32_t	rid	:16,	/* DW1 */
+			tag	:8,
+			msg_code:8;
+	uint32_t	unused[2];	/* DW 2 & 3 */
+} pcie_msg_t;
+
+#define	PCIE_MSG_CODE_ERR_COR		0x30
+#define	PCIE_MSG_CODE_ERR_NONFATAL	0x31
+#define	PCIE_MSG_CODE_ERR_FATAL		0x33
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _SYS_PCIE_H */

@@ -63,11 +63,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Include SUN4 specific headers files
-#	
-#	XXX - Remove sun4u path after adding VPCI error handling
 #
 INC_PATH	+= -I$(UTSBASE)/sun4/io/px
-INC_PATH	+= -I$(UTSBASE)/sun4v/io/px
 
 #
 # lint pass one enforcement
@@ -81,7 +78,7 @@ CFLAGS += -dalign
 
 #	Dependency
 #
-LDFLAGS += -dy -Nmisc/busra
+LDFLAGS += -dy -Nmisc/busra -Nmisc/pcie
 
 #	Default build targets.
 #

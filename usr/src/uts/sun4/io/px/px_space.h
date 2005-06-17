@@ -115,6 +115,9 @@ extern uint64_t px_imu_intr_mask;
 extern uint64_t px_imu_log_mask;
 extern uint64_t px_imu_count_mask;
 
+#define	LPU_INTR_ENABLE 0ull
+#define	LPU_INTR_DISABLE -1ull
+
 extern uint64_t px_ilu_intr_mask;
 extern uint64_t px_ilu_log_mask;
 extern uint64_t px_ilu_count_mask;

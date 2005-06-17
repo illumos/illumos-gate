@@ -257,7 +257,7 @@ DRV_KMODS	+= scsi_vhci
 DRV_KMODS	+= ib ibd
 DRV_KMODS	+= xge
 DRV_KMODS	+= chxge
-DRV_KMODS	+= pci_pci px_pci
+DRV_KMODS	+= pci_pci px_pci pcie
 
 #
 #	I/O framework test drivers

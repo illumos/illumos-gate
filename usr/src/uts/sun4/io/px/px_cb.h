@@ -36,11 +36,13 @@ extern "C" {
 /*
  * Control block soft state structure:
  */
+#define	PX_CB_MAX_LEAF 2
 typedef struct px_cb px_cb_t;
 struct px_cb {
-	px_t	 *xbc_px_p;		/* link back to px soft state */
-	kmutex_t xbc_intr_lock;		/* guards add/rem intr and intr dist */
+	px_t	*xbc_px_p;		/* link back to px soft state */
 	int	 xbc_attachcnt;
+	kmutex_t xbc_fm_mutex;
+	px_t	*xbc_px_list[PX_CB_MAX_LEAF];	/* list of px_p for FMA */
 };
 
 extern int px_cb_attach(px_t *px_p);

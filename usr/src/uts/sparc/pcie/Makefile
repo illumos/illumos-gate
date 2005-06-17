@@ -20,16 +20,15 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/px/Makefile
-#
+# uts/sparc/pcie/Makefile
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the pci driver kernel module
+#	This makefile drives the production of the PCIE driver kernel module.
 #
-#	sun4u implementation architecture dependent
+#	sparc architecture dependent
 #
 
 #
@@ -40,15 +39,15 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= px
-OBJECTS		= $(PX_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PX_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+MODULE		= pcie
+OBJECTS		= $(PCIE_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCIE_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sun4u/Makefile.sun4u
+include $(UTSBASE)/sparc/Makefile.sparc
 
 #
 #	Define targets
@@ -58,25 +57,16 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	Include SUN4 and SUN4U specific headers files
-#
-INC_PATH	+= -I$(UTSBASE)/sun4/io/px
-INC_PATH	+= -I$(UTSBASE)/sun4u/io/px
-
-#
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
 
 #
-# Turn on doubleword alignment for 64 bit registers
+# Overrides
 #
-CFLAGS += -dalign
-
-#
-#	Dependency
-#
-LDFLAGS += -dy -Nmisc/busra -Nmisc/pcie
+MODSTUBS_DIR	= $(OBJS_DIR)
+$(MODSTUBS_O)	:= AS_CPPFLAGS += -DPCIE_MODULE
+CLEANFILES	+= $(MODSTUBS_O)
 
 #
 #	Default build targets.
@@ -99,7 +89,6 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-#
 #	Include common targets.
 #
-include $(UTSBASE)/sun4u/Makefile.targ
+include $(UTSBASE)/sparc/Makefile.targ

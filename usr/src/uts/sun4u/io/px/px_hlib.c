@@ -60,6 +60,13 @@ static uint64_t	pec_config_state_regs[] = {
 	TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE,
 	TLU_CORRECTABLE_ERROR_LOG_ENABLE,
 	TLU_CORRECTABLE_ERROR_INTERRUPT_ENABLE,
+	LPU_LINK_LAYER_INTERRUPT_MASK,
+	LPU_PHY_INTERRUPT_MASK,
+	LPU_RECEIVE_PHY_INTERRUPT_MASK,
+	LPU_TRANSMIT_PHY_INTERRUPT_MASK,
+	LPU_GIGABLAZE_GLUE_INTERRUPT_MASK,
+	LPU_LTSSM_INTERRUPT_MASK,
+	LPU_RESET,
 	LPU_DEBUG_CONFIG,
 	LPU_INTERRUPT_MASK,
 	LPU_LINK_LAYER_CONFIG,
@@ -68,15 +75,10 @@ static uint64_t	pec_config_state_regs[] = {
 	LPU_TXLINK_REPLAY_TIMER_THRESHOLD,
 	LPU_REPLAY_BUFFER_MAX_ADDRESS,
 	LPU_TXLINK_RETRY_FIFO_POINTER,
-	LPU_PHY_INTERRUPT_MASK,
-	LPU_RECEIVE_PHY_INTERRUPT_MASK,
-	LPU_TRANSMIT_PHY_INTERRUPT_MASK,
 	LPU_LTSSM_CONFIG2,
 	LPU_LTSSM_CONFIG3,
 	LPU_LTSSM_CONFIG4,
 	LPU_LTSSM_CONFIG5,
-	LPU_LTSSM_INTERRUPT_MASK,
-	LPU_GIGABLAZE_GLUE_INTERRUPT_MASK,
 	DMC_CORE_AND_BLOCK_INTERRUPT_ENABLE,
 	DMC_DEBUG_SELECT_FOR_PORT_A,
 	DMC_DEBUG_SELECT_FOR_PORT_B
@@ -91,6 +93,7 @@ static uint64_t	pec_config_state_regs[] = {
 static uint64_t mmu_config_state_regs[] = {
 	MMU_TSB_CONTROL,
 	MMU_CONTROL_AND_STATUS,
+	MMU_ERROR_LOG_ENABLE,
 	MMU_INTERRUPT_ENABLE
 };
 #define	MMU_SIZE (sizeof (mmu_config_state_regs))
@@ -139,6 +142,9 @@ static uint64_t	msiq_config_other_regs[] = {
 static uint64_t msiq_suspend(devhandle_t dev_hdl, pxu_t *pxu_p);
 static void msiq_resume(devhandle_t dev_hdl, pxu_t *pxu_p);
 
+/*
+ * Initialize the module, but do not enable interrupts.
+ */
 /* ARGSUSED */
 void
 hvio_cb_init(caddr_t xbc_csr_base, pxu_t *pxu_p)
@@ -149,16 +155,16 @@ hvio_cb_init(caddr_t xbc_csr_base, pxu_t *pxu_p)
 	val = (1ULL << JBUS_PARITY_CONTROL_P_EN);
 	CSR_XS(xbc_csr_base, JBUS_PARITY_CONTROL, val);
 	DBG(DBG_CB, NULL, "hvio_cb_init, JBUS_PARITY_CONTROL: 0x%llx\n",
-		CSR_XR(xbc_csr_base, JBUS_PARITY_CONTROL));
+	    CSR_XR(xbc_csr_base, JBUS_PARITY_CONTROL));
 
-	val = (1 << JBC_FATAL_RESET_ENABLE_SPARE_P_INT_EN)|
-		(1 << JBC_FATAL_RESET_ENABLE_MB_PEA_P_INT_EN) |
-		(1 << JBC_FATAL_RESET_ENABLE_CPE_P_INT_EN)	|
-		(1 << JBC_FATAL_RESET_ENABLE_APE_P_INT_EN)	|
-		(1 << JBC_FATAL_RESET_ENABLE_PIO_CPE_INT_EN)	|
-		(1 << JBC_FATAL_RESET_ENABLE_JTCEEW_P_INT_EN) |
-		(1 << JBC_FATAL_RESET_ENABLE_JTCEEI_P_INT_EN) |
-		(1 << JBC_FATAL_RESET_ENABLE_JTCEER_P_INT_EN);
+	val = (1 << JBC_FATAL_RESET_ENABLE_SPARE_P_INT_EN) |
+	    (1 << JBC_FATAL_RESET_ENABLE_MB_PEA_P_INT_EN) |
+	    (1 << JBC_FATAL_RESET_ENABLE_CPE_P_INT_EN) |
+	    (1 << JBC_FATAL_RESET_ENABLE_APE_P_INT_EN) |
+	    (1 << JBC_FATAL_RESET_ENABLE_PIO_CPE_INT_EN) |
+	    (1 << JBC_FATAL_RESET_ENABLE_JTCEEW_P_INT_EN) |
+	    (1 << JBC_FATAL_RESET_ENABLE_JTCEEI_P_INT_EN) |
+	    (1 << JBC_FATAL_RESET_ENABLE_JTCEER_P_INT_EN);
 	CSR_XS(xbc_csr_base, JBC_FATAL_RESET_ENABLE, val);
 	DBG(DBG_CB, NULL, "hvio_cb_init, JBC_FATAL_RESET_ENABLE: 0x%llx\n",
 		CSR_XR(xbc_csr_base, JBC_FATAL_RESET_ENABLE));
@@ -168,110 +174,74 @@ hvio_cb_init(caddr_t xbc_csr_base, pxu_t *pxu_p)
 	 */
 	CSR_XS(xbc_csr_base, JBC_CORE_AND_BLOCK_INTERRUPT_ENABLE, -1ull);
 	DBG(DBG_CB, NULL,
-		"hvio_cb_init, JBC_CORE_AND_BLOCK_INTERRUPT_ENABLE: 0x%llx\n",
-		CSR_XR(xbc_csr_base, JBC_CORE_AND_BLOCK_INTERRUPT_ENABLE));
+	    "hvio_cb_init, JBC_CORE_AND_BLOCK_INTERRUPT_ENABLE: 0x%llx\n",
+	    CSR_XR(xbc_csr_base, JBC_CORE_AND_BLOCK_INTERRUPT_ENABLE));
 
 	/*
-	 * Enable all error log bits.
+	 * CSR_V CB's interrupt regs (log, enable, status, clear)
 	 */
-	CSR_XS(xbc_csr_base, JBC_ERROR_LOG_ENABLE, -1ull);
 	DBG(DBG_CB, NULL, "hvio_cb_init, JBC_ERROR_LOG_ENABLE: 0x%llx\n",
-		CSR_XR(xbc_csr_base, JBC_ERROR_LOG_ENABLE));
+	    CSR_XR(xbc_csr_base, JBC_ERROR_LOG_ENABLE));
 
-	/*
-	 * Enable all interrupts.
-	 */
-	CSR_XS(xbc_csr_base, JBC_INTERRUPT_ENABLE, -1ull);
 	DBG(DBG_CB, NULL, "hvio_cb_init, JBC_INTERRUPT_ENABLE: 0x%llx\n",
-		CSR_XR(xbc_csr_base, JBC_INTERRUPT_ENABLE));
+	    CSR_XR(xbc_csr_base, JBC_INTERRUPT_ENABLE));
 
-	/*
-	 * Emit warning for pending errors and flush the logged error
-	 * status register.
-	 */
-	val = CSR_XR(xbc_csr_base, JBC_ERROR_STATUS_CLEAR);
+	DBG(DBG_CB, NULL, "hvio_cb_init, JBC_INTERRUPT_STATUS: 0x%llx\n",
+	    CSR_XR(xbc_csr_base, JBC_INTERRUPT_STATUS));
 
-	CSR_XS(xbc_csr_base, JBC_ERROR_STATUS_CLEAR, -1ull);
 	DBG(DBG_CB, NULL, "hvio_cb_init, JBC_ERROR_STATUS_CLEAR: 0x%llx\n",
-		CSR_XR(xbc_csr_base, JBC_ERROR_STATUS_CLEAR));
+	    CSR_XR(xbc_csr_base, JBC_ERROR_STATUS_CLEAR));
 }
 
+/*
+ * Initialize the module, but do not enable interrupts.
+ */
 /* ARGSUSED */
 void
 hvio_ib_init(caddr_t csr_base, pxu_t *pxu_p)
 {
-	uint64_t val;
-
 	/*
-	 * CSR_V IMU_ERROR_LOG_ENABLE Expect Kernel 0x3FF
+	 * CSR_V IB's interrupt regs (log, enable, status, clear)
 	 */
-	val = -1ull;
-	CSR_XS(csr_base, IMU_ERROR_LOG_ENABLE, val);
 	DBG(DBG_IB, NULL, "hvio_ib_init - IMU_ERROR_LOG_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, IMU_ERROR_LOG_ENABLE));
+	    CSR_XR(csr_base, IMU_ERROR_LOG_ENABLE));
 
-	/*
-	 * CSR_V IMU_INTERRUPT_ENABLE Expect Kernel 0x3FF000003FF
-	 */
-	val = -1ull;
-	CSR_XS(csr_base, IMU_INTERRUPT_ENABLE, val);
 	DBG(DBG_IB, NULL, "hvio_ib_init - IMU_INTERRUPT_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, IMU_INTERRUPT_ENABLE));
+	    CSR_XR(csr_base, IMU_INTERRUPT_ENABLE));
 
-	/*
-	 * CSR_V IMU_INTERRUPT_STATUS Expect HW 0x0
-	 */
 	DBG(DBG_IB, NULL, "hvio_ib_init - IMU_INTERRUPT_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, IMU_INTERRUPT_STATUS));
+	    CSR_XR(csr_base, IMU_INTERRUPT_STATUS));
 
-	/*
-	 * CSR_V IMU_ERROR_STATUS_CLEAR Expect HW 0x0
-	 */
 	DBG(DBG_IB, NULL, "hvio_ib_init - IMU_ERROR_STATUS_CLEAR: 0x%llx\n",
-		CSR_XR(csr_base, IMU_ERROR_STATUS_CLEAR));
+	    CSR_XR(csr_base, IMU_ERROR_STATUS_CLEAR));
 }
 
+/*
+ * Initialize the module, but do not enable interrupts.
+ */
 /* ARGSUSED */
 static void
 ilu_init(caddr_t csr_base, pxu_t *pxu_p)
 {
-	uint64_t val;
-
 	/*
-	 * CSR_V ILU_ERROR_LOG_ENABLE Expect OBP 0x10
+	 * CSR_V ILU's interrupt regs (log, enable, status, clear)
 	 */
-
-	val = 0ull;
-	val = (1ull << ILU_ERROR_LOG_ENABLE_IHB_PE);
-
-	CSR_XS(csr_base, ILU_ERROR_LOG_ENABLE, val);
 	DBG(DBG_ILU, NULL, "ilu_init - ILU_ERROR_LOG_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, ILU_ERROR_LOG_ENABLE));
+	    CSR_XR(csr_base, ILU_ERROR_LOG_ENABLE));
 
-	/*
-	 * CSR_V ILU_INTERRUPT_ENABLE Expect OBP 0x1000000010
-	 */
-
-	val = (1ull << ILU_INTERRUPT_ENABLE_IHB_PE_S) |
-		(1ull << ILU_INTERRUPT_ENABLE_IHB_PE_P);
-
-	CSR_XS(csr_base, ILU_INTERRUPT_ENABLE, val);
 	DBG(DBG_ILU, NULL, "ilu_init - ILU_INTERRUPT_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, ILU_INTERRUPT_ENABLE));
+	    CSR_XR(csr_base, ILU_INTERRUPT_ENABLE));
 
-	/*
-	 * CSR_V ILU_INTERRUPT_STATUS Expect HW 0x1000000010
-	 */
 	DBG(DBG_ILU, NULL, "ilu_init - ILU_INTERRUPT_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, ILU_INTERRUPT_STATUS));
+	    CSR_XR(csr_base, ILU_INTERRUPT_STATUS));
 
-	/*
-	 * CSR_V ILU_ERROR_STATUS_CLEAR Expect HW 0x0
-	 */
 	DBG(DBG_ILU, NULL, "ilu_init - ILU_ERROR_STATUS_CLEAR: 0x%llx\n",
-		CSR_XR(csr_base, ILU_ERROR_STATUS_CLEAR));
+	    CSR_XR(csr_base, ILU_ERROR_STATUS_CLEAR));
 }
 
+/*
+ * Initialize the module, but do not enable interrupts.
+ */
 static void
 tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 {
@@ -322,13 +292,13 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * All other bits are reserved.
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, TLU_STATUS));
+	    CSR_XR(csr_base, TLU_STATUS));
 
 	/*
 	 * CSR_V TLU_PME_TURN_OFF_GENERATE Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_PME_TURN_OFF_GENERATE: 0x%llx\n",
-		CSR_XR(csr_base, TLU_PME_TURN_OFF_GENERATE));
+	    CSR_XR(csr_base, TLU_PME_TURN_OFF_GENERATE));
 
 	/*
 	 * CSR_V TLU_INGRESS_CREDITS_INITIAL Expect HW 0x10000200C0
@@ -341,7 +311,7 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * HW.
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_INGRESS_CREDITS_INITIAL: 0x%llx\n",
-		CSR_XR(csr_base, TLU_INGRESS_CREDITS_INITIAL));
+	    CSR_XR(csr_base, TLU_INGRESS_CREDITS_INITIAL));
 
 	/*
 	 * CSR_V TLU_DIAGNOSTIC Expect HW 0x0
@@ -351,159 +321,131 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Diagnostic register - always zero unless we are debugging.
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_DIAGNOSTIC: 0x%llx\n",
-		CSR_XR(csr_base, TLU_DIAGNOSTIC));
+	    CSR_XR(csr_base, TLU_DIAGNOSTIC));
 
 	/*
 	 * CSR_V TLU_EGRESS_CREDITS_CONSUMED Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_EGRESS_CREDITS_CONSUMED: 0x%llx\n",
-		CSR_XR(csr_base, TLU_EGRESS_CREDITS_CONSUMED));
+	    CSR_XR(csr_base, TLU_EGRESS_CREDITS_CONSUMED));
 
 	/*
 	 * CSR_V TLU_EGRESS_CREDIT_LIMIT Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_EGRESS_CREDIT_LIMIT: 0x%llx\n",
-		CSR_XR(csr_base, TLU_EGRESS_CREDIT_LIMIT));
+	    CSR_XR(csr_base, TLU_EGRESS_CREDIT_LIMIT));
 
 	/*
 	 * CSR_V TLU_EGRESS_RETRY_BUFFER Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_EGRESS_RETRY_BUFFER: 0x%llx\n",
-		CSR_XR(csr_base, TLU_EGRESS_RETRY_BUFFER));
+	    CSR_XR(csr_base, TLU_EGRESS_RETRY_BUFFER));
 
 	/*
 	 * CSR_V TLU_INGRESS_CREDITS_ALLOCATED Expected HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_INGRESS_CREDITS_ALLOCATED: 0x%llx\n",
-		CSR_XR(csr_base, TLU_INGRESS_CREDITS_ALLOCATED));
+	    "tlu_init - TLU_INGRESS_CREDITS_ALLOCATED: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_INGRESS_CREDITS_ALLOCATED));
 
 	/*
 	 * CSR_V TLU_INGRESS_CREDITS_RECEIVED Expected HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_INGRESS_CREDITS_RECEIVED: 0x%llx\n",
-		CSR_XR(csr_base, TLU_INGRESS_CREDITS_RECEIVED));
+	    "tlu_init - TLU_INGRESS_CREDITS_RECEIVED: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_INGRESS_CREDITS_RECEIVED));
 
 	/*
-	 * CSR_V TLU_OTHER_EVENT_LOG_ENABLE Expected HW 0x7FF0F
-	 */
-
-	/*
-	 * First of a 'guilty five'.  Problem now is that the orde
-	 * seems to different - some are log enable first then
-	 * interrupt enable, others are have them reversed.  For
-	 * now I'll do them independently before creating a common
-	 * framework for them all.
-	 */
-
-	val = -1ull;
-	CSR_XS(csr_base, TLU_OTHER_EVENT_LOG_ENABLE, val);
-	DBG(DBG_TLU, NULL, "tlu_init - TLU_OTHER_EVENT_LOG_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, TLU_OTHER_EVENT_LOG_ENABLE));
-
-	/*
-	 * CSR_V TLU_OTHER_EVENT_INTERRUPT_ENABLE OBP 0x7FF0F0007FF0F
-	 */
-
-	/*
-	 * Second of five.  Bits [55-32] enable secondary other event
-	 * interrupt enables, bit [23:0] enable primatry other event
-	 * interrupt enables.
-	 */
-
-	val = -1ull;
-	CSR_XS(csr_base, TLU_OTHER_EVENT_INTERRUPT_ENABLE, val);
-	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_OTHER_EVENT_INTERRUPT_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, TLU_OTHER_EVENT_INTERRUPT_ENABLE));
-
-	/*
-	 * CSR_V TLU_OTHER_EVENT_INTERRUPT_STATUS Expect HW 0x0
+	 * CSR_V TLU's interrupt regs (log, enable, status, clear)
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_OTHER_EVENT_INTERRUPT_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, TLU_OTHER_EVENT_INTERRUPT_STATUS));
+	    "tlu_init - TLU_OTHER_EVENT_LOG_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_OTHER_EVENT_LOG_ENABLE));
 
-	/*
-	 * CSR_V TLU_OTHER_EVENT_STATUS_CLEAR Expect HW 0x0
-	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_OTHER_EVENT_STATUS_CLEAR: 0x%llx\n",
-		CSR_XR(csr_base, TLU_OTHER_EVENT_STATUS_CLEAR));
+	    "tlu_init - TLU_OTHER_EVENT_INTERRUPT_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_OTHER_EVENT_INTERRUPT_ENABLE));
+
+	DBG(DBG_TLU, NULL,
+	    "tlu_init - TLU_OTHER_EVENT_INTERRUPT_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_OTHER_EVENT_INTERRUPT_STATUS));
+
+	DBG(DBG_TLU, NULL,
+	    "tlu_init - TLU_OTHER_EVENT_STATUS_CLEAR: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_OTHER_EVENT_STATUS_CLEAR));
 
 	/*
 	 * CSR_V TLU_RECEIVE_OTHER_EVENT_HEADER1_LOG Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_RECEIVE_OTHER_EVENT_HEADER1_LOG: 0x%llx\n",
-		CSR_XR(csr_base, TLU_RECEIVE_OTHER_EVENT_HEADER1_LOG));
+	    "tlu_init - TLU_RECEIVE_OTHER_EVENT_HEADER1_LOG: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_RECEIVE_OTHER_EVENT_HEADER1_LOG));
 
 	/*
 	 * CSR_V TLU_RECEIVE_OTHER_EVENT_HEADER2_LOG Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_RECEIVE_OTHER_EVENT_HEADER2_LOG: 0x%llx\n",
-		CSR_XR(csr_base, TLU_RECEIVE_OTHER_EVENT_HEADER2_LOG));
+	    "tlu_init - TLU_RECEIVE_OTHER_EVENT_HEADER2_LOG: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_RECEIVE_OTHER_EVENT_HEADER2_LOG));
 
 	/*
 	 * CSR_V TLU_TRANSMIT_OTHER_EVENT_HEADER1_LOG Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_TRANSMIT_OTHER_EVENT_HEADER1_LOG: 0x%llx\n",
-		CSR_XR(csr_base, TLU_TRANSMIT_OTHER_EVENT_HEADER1_LOG));
+	    "tlu_init - TLU_TRANSMIT_OTHER_EVENT_HEADER1_LOG: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_TRANSMIT_OTHER_EVENT_HEADER1_LOG));
 
 	/*
 	 * CSR_V TLU_TRANSMIT_OTHER_EVENT_HEADER2_LOG Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_TRANSMIT_OTHER_EVENT_HEADER2_LOG: 0x%llx\n",
-		CSR_XR(csr_base, TLU_TRANSMIT_OTHER_EVENT_HEADER2_LOG));
+	    "tlu_init - TLU_TRANSMIT_OTHER_EVENT_HEADER2_LOG: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_TRANSMIT_OTHER_EVENT_HEADER2_LOG));
 
 	/*
 	 * CSR_V TLU_PERFORMANCE_COUNTER_SELECT Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_PERFORMANCE_COUNTER_SELECT: 0x%llx\n",
-		CSR_XR(csr_base, TLU_PERFORMANCE_COUNTER_SELECT));
+	    "tlu_init - TLU_PERFORMANCE_COUNTER_SELECT: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_PERFORMANCE_COUNTER_SELECT));
 
 	/*
 	 * CSR_V TLU_PERFORMANCE_COUNTER_ZERO Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_PERFORMANCE_COUNTER_ZERO: 0x%llx\n",
-		CSR_XR(csr_base, TLU_PERFORMANCE_COUNTER_ZERO));
+	    "tlu_init - TLU_PERFORMANCE_COUNTER_ZERO: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_PERFORMANCE_COUNTER_ZERO));
 
 	/*
 	 * CSR_V TLU_PERFORMANCE_COUNTER_ONE Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_PERFORMANCE_COUNTER_ONE: 0x%llx\n",
-		CSR_XR(csr_base, TLU_PERFORMANCE_COUNTER_ONE));
+	    CSR_XR(csr_base, TLU_PERFORMANCE_COUNTER_ONE));
 
 	/*
 	 * CSR_V TLU_PERFORMANCE_COUNTER_TWO Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_PERFORMANCE_COUNTER_TWO: 0x%llx\n",
-		CSR_XR(csr_base, TLU_PERFORMANCE_COUNTER_TWO));
+	    CSR_XR(csr_base, TLU_PERFORMANCE_COUNTER_TWO));
 
 	/*
 	 * CSR_V TLU_DEBUG_SELECT_A Expect HW 0x0
 	 */
 
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_DEBUG_SELECT_A: 0x%llx\n",
-		CSR_XR(csr_base, TLU_DEBUG_SELECT_A));
+	    CSR_XR(csr_base, TLU_DEBUG_SELECT_A));
 
 	/*
 	 * CSR_V TLU_DEBUG_SELECT_B Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_DEBUG_SELECT_B: 0x%llx\n",
-		CSR_XR(csr_base, TLU_DEBUG_SELECT_B));
+	    CSR_XR(csr_base, TLU_DEBUG_SELECT_B));
 
 	/*
 	 * CSR_V TLU_DEVICE_CAPABILITIES Expect HW 0xFC2
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_DEVICE_CAPABILITIES: 0x%llx\n",
-		CSR_XR(csr_base, TLU_DEVICE_CAPABILITIES));
+	    CSR_XR(csr_base, TLU_DEVICE_CAPABILITIES));
 
 	/*
 	 * CSR_V TLU_DEVICE_CONTROL Expect HW 0x0
@@ -518,19 +460,19 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	val = 0x0ull;
 	CSR_XS(csr_base, TLU_DEVICE_CONTROL, val);
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_DEVICE_CONTROL: 0x%llx\n",
-		CSR_XR(csr_base, TLU_DEVICE_CONTROL));
+	    CSR_XR(csr_base, TLU_DEVICE_CONTROL));
 
 	/*
 	 * CSR_V TLU_DEVICE_STATUS Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_DEVICE_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, TLU_DEVICE_STATUS));
+	    CSR_XR(csr_base, TLU_DEVICE_STATUS));
 
 	/*
 	 * CSR_V TLU_LINK_CAPABILITIES Expect HW 0x15C81
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_LINK_CAPABILITIES: 0x%llx\n",
-		CSR_XR(csr_base, TLU_LINK_CAPABILITIES));
+	    CSR_XR(csr_base, TLU_LINK_CAPABILITIES));
 
 	/*
 	 * CSR_V TLU_LINK_CONTROL Expect OBP 0x40
@@ -549,7 +491,7 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 
 	CSR_XS(csr_base, TLU_LINK_CONTROL, val);
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_LINK_CONTROL: 0x%llx\n",
-		CSR_XR(csr_base, TLU_LINK_CONTROL));
+	    CSR_XR(csr_base, TLU_LINK_CONTROL));
 
 	/*
 	 * CSR_V TLU_LINK_STATUS Expect OBP 0x1011
@@ -565,7 +507,7 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * the only speed as yet supported by the PCI-E spec.
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_LINK_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, TLU_LINK_STATUS));
+	    CSR_XR(csr_base, TLU_LINK_STATUS));
 
 	/*
 	 * CSR_V TLU_SLOT_CAPABILITIES Expect OBP ???
@@ -582,49 +524,36 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * by the power limit scale to get the actual power limit.
 	 */
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_SLOT_CAPABILITIES: 0x%llx\n",
-		CSR_XR(csr_base, TLU_SLOT_CAPABILITIES));
+	    CSR_XR(csr_base, TLU_SLOT_CAPABILITIES));
 
 	/*
 	 * CSR_V TLU_UNCORRECTABLE_ERROR_LOG_ENABLE Expect Kernel 0x17F011
 	 */
-
-	/*
-	 * First of a 'guilty five'.  See note for Other Event Log.
-	 */
-	val = -1ull;
-	CSR_XS(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE, val);
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_UNCORRECTABLE_ERROR_LOG_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE));
+	    "tlu_init - TLU_UNCORRECTABLE_ERROR_LOG_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE));
 
 	/*
-	 * CSR_V TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE
-	 * Expect Kernel 0x17F0110017F011
+	 * CSR_V TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE Expect
+	 * Kernel 0x17F0110017F011
 	 */
-
-	/*
-	 * Second of a 'guilty five'.  Needs the value in both bits [52:32]
-	 * and bits [20:0] for primary and secondary error interrupts.
-	 */
-	val = -1ull;
-	CSR_XS(csr_base, TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE, val);
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE));
+	    "tlu_init - TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE));
 
 	/*
 	 * CSR_V TLU_UNCORRECTABLE_ERROR_INTERRUPT_STATUS Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_UNCORRECTABLE_ERROR_INTERRUPT_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_INTERRUPT_STATUS));
+	    "tlu_init - TLU_UNCORRECTABLE_ERROR_INTERRUPT_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_INTERRUPT_STATUS));
 
 	/*
 	 * CSR_V TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR: 0x%llx\n",
-		CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR));
+	    "tlu_init - TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR));
 
 	/*
 	 * CSR_V TLU_RECEIVE_UNCORRECTABLE_ERROR_HEADER1_LOG HW 0x0
@@ -654,46 +583,39 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	    "tlu_init - TLU_TRANSMIT_UNCORRECTABLE_ERROR_HEADER2_LOG: 0x%llx\n",
 	    CSR_XR(csr_base, TLU_TRANSMIT_UNCORRECTABLE_ERROR_HEADER2_LOG));
 
+
+	/*
+	 * CSR_V TLU's CE interrupt regs (log, enable, status, clear)
+	 * Plus header logs
+	 */
+
 	/*
 	 * CSR_V TLU_CORRECTABLE_ERROR_LOG_ENABLE Expect Kernel 0x11C1
 	 */
-
-	/*
-	 * Another set of 'guilty five'.
-	 */
-
-	val = -1ull;
-	CSR_XS(csr_base, TLU_CORRECTABLE_ERROR_LOG_ENABLE, val);
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_CORRECTABLE_ERROR_LOG_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_LOG_ENABLE));
+	    "tlu_init - TLU_CORRECTABLE_ERROR_LOG_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_LOG_ENABLE));
 
 	/*
 	 * CSR_V TLU_CORRECTABLE_ERROR_INTERRUPT_ENABLE Kernel 0x11C1000011C1
 	 */
-
-	/*
-	 * Bits [44:32] for secondary error, bits [12:0] for primary errors.
-	 */
-	val = -1ull;
-	CSR_XS(csr_base, TLU_CORRECTABLE_ERROR_INTERRUPT_ENABLE, val);
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_CORRECTABLE_ERROR_INTERRUPT_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_INTERRUPT_ENABLE));
+	    "tlu_init - TLU_CORRECTABLE_ERROR_INTERRUPT_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_INTERRUPT_ENABLE));
 
 	/*
 	 * CSR_V TLU_CORRECTABLE_ERROR_INTERRUPT_STATUS Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_CORRECTABLE_ERROR_INTERRUPT_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_INTERRUPT_STATUS));
+	    "tlu_init - TLU_CORRECTABLE_ERROR_INTERRUPT_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_INTERRUPT_STATUS));
 
 	/*
 	 * CSR_V TLU_CORRECTABLE_ERROR_STATUS_CLEAR Expect HW 0x0
 	 */
 	DBG(DBG_TLU, NULL,
-		"tlu_init - TLU_CORRECTABLE_ERROR_STATUS_CLEAR: 0x%llx\n",
-		CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_STATUS_CLEAR));
+	    "tlu_init - TLU_CORRECTABLE_ERROR_STATUS_CLEAR: 0x%llx\n",
+	    CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_STATUS_CLEAR));
 }
 
 static void
@@ -814,7 +736,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Should be set by HW.
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_ID: 0x%llx\n",
-		CSR_XR(csr_base, LPU_ID));
+	    CSR_XR(csr_base, LPU_ID));
 
 	/*
 	 * CSR_V LPU_RESET Expect Kernel 0x0
@@ -827,7 +749,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	val = 0ull;
 	CSR_XS(csr_base, LPU_RESET, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_RESET: 0x%llx\n",
-		CSR_XR(csr_base, LPU_RESET));
+	    CSR_XR(csr_base, LPU_RESET));
 
 	/*
 	 * CSR_V LPU_DEBUG_STATUS Expect HW 0x0
@@ -839,19 +761,19 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * how do they get set if they are read only?
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_DEBUG_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_DEBUG_STATUS));
+	    CSR_XR(csr_base, LPU_DEBUG_STATUS));
 
 	/*
 	 * CSR_V LPU_DEBUG_CONFIG Expect Kernel 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_DEBUG_CONFIG: 0x%llx\n",
-		CSR_XR(csr_base, LPU_DEBUG_CONFIG));
+	    CSR_XR(csr_base, LPU_DEBUG_CONFIG));
 
 	/*
 	 * CSR_V LPU_LTSSM_CONTROL Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_CONTROL: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_CONTROL));
+	    CSR_XR(csr_base, LPU_LTSSM_CONTROL));
 
 	/*
 	 * CSR_V LPU_LINK_STATUS Expect HW 0x101
@@ -864,63 +786,61 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * link status register.
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LINK_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_STATUS));
+	    CSR_XR(csr_base, LPU_LINK_STATUS));
 
 	/*
 	 * CSR_V LPU_INTERRUPT_STATUS Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_INTERRUPT_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_INTERRUPT_STATUS));
+	    CSR_XR(csr_base, LPU_INTERRUPT_STATUS));
 
 	/*
 	 * CSR_V LPU_INTERRUPT_MASK Expect HW 0x0
 	 */
-	val = 0ull;
-	CSR_XS(csr_base, LPU_INTERRUPT_MASK, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_INTERRUPT_MASK: 0x%llx\n",
-		CSR_XR(csr_base, LPU_INTERRUPT_MASK));
+	    CSR_XR(csr_base, LPU_INTERRUPT_MASK));
 
 	/*
 	 * CSR_V LPU_LINK_PERFORMANCE_COUNTER_SELECT Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LINK_PERFORMANCE_COUNTER_SELECT: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER_SELECT));
+	    "lpu_init - LPU_LINK_PERFORMANCE_COUNTER_SELECT: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER_SELECT));
 
 	/*
 	 * CSR_V LPU_LINK_PERFORMANCE_COUNTER_CONTROL Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LINK_PERFORMANCE_COUNTER_CONTROL: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER_CONTROL));
+	    "lpu_init - LPU_LINK_PERFORMANCE_COUNTER_CONTROL: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER_CONTROL));
 
 	/*
 	 * CSR_V LPU_LINK_PERFORMANCE_COUNTER1 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LINK_PERFORMANCE_COUNTER1: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER1));
+	    "lpu_init - LPU_LINK_PERFORMANCE_COUNTER1: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER1));
 
 	/*
 	 * CSR_V LPU_LINK_PERFORMANCE_COUNTER1_TEST Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LINK_PERFORMANCE_COUNTER1_TEST: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER1_TEST));
+	    "lpu_init - LPU_LINK_PERFORMANCE_COUNTER1_TEST: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER1_TEST));
 
 	/*
 	 * CSR_V LPU_LINK_PERFORMANCE_COUNTER2 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LINK_PERFORMANCE_COUNTER2: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER2));
+	    "lpu_init - LPU_LINK_PERFORMANCE_COUNTER2: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER2));
 
 	/*
 	 * CSR_V LPU_LINK_PERFORMANCE_COUNTER2_TEST Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LINK_PERFORMANCE_COUNTER2_TEST: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER2_TEST));
+	    "lpu_init - LPU_LINK_PERFORMANCE_COUNTER2_TEST: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LINK_PERFORMANCE_COUNTER2_TEST));
 
 	/*
 	 * CSR_V LPU_LINK_LAYER_CONFIG Expect HW 0x100
@@ -935,7 +855,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	val = (1ull << LPU_LINK_LAYER_CONFIG_VC0_EN);
 	CSR_XS(csr_base, LPU_LINK_LAYER_CONFIG, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LINK_LAYER_CONFIG: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_LAYER_CONFIG));
+	    CSR_XR(csr_base, LPU_LINK_LAYER_CONFIG));
 
 	/*
 	 * CSR_V LPU_LINK_LAYER_STATUS Expect OBP 0x5
@@ -955,28 +875,25 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 */
 
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LINK_LAYER_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_LAYER_STATUS));
-
-	/*
-	 * CSR_V LPU_LINK_LAYER_INTERRUPT_AND_STATUS Expect HW 0x0
-	 */
-	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LINK_LAYER_INTERRUPT_AND_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_LAYER_INTERRUPT_AND_STATUS));
+	    CSR_XR(csr_base, LPU_LINK_LAYER_STATUS));
 
 	/*
 	 * CSR_V LPU_LINK_LAYER_INTERRUPT_AND_STATUS_TEST Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LINK_LAYER_INTERRUPT_AND_STATUS_TEST: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_LAYER_INTERRUPT_AND_STATUS_TEST));
+	    "lpu_init - LPU_LINK_LAYER_INTERRUPT_AND_STATUS_TEST: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LINK_LAYER_INTERRUPT_AND_STATUS_TEST));
 
 	/*
-	 * CSR_V LPU_LINK_LAYER_INTERRUPT_MASK Expect OBP 0x0
+	 * CSR_V LPU Link Layer interrupt regs (mask, status)
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LINK_LAYER_INTERRUPT_MASK: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LINK_LAYER_INTERRUPT_MASK));
+	    "lpu_init - LPU_LINK_LAYER_INTERRUPT_MASK: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LINK_LAYER_INTERRUPT_MASK));
+
+	DBG(DBG_LPU, NULL,
+	    "lpu_init - LPU_LINK_LAYER_INTERRUPT_AND_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LINK_LAYER_INTERRUPT_AND_STATUS));
 
 	/*
 	 * CSR_V LPU_FLOW_CONTROL_UPDATE_CONTROL Expect OBP 0x7
@@ -989,11 +906,11 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * updates.
 	 */
 	val = (1ull << LPU_FLOW_CONTROL_UPDATE_CONTROL_FC0_U_NP_EN) |
-		(1ull << LPU_FLOW_CONTROL_UPDATE_CONTROL_FC0_U_P_EN);
+	    (1ull << LPU_FLOW_CONTROL_UPDATE_CONTROL_FC0_U_P_EN);
 	CSR_XS(csr_base, LPU_FLOW_CONTROL_UPDATE_CONTROL, val);
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_FLOW_CONTROL_UPDATE_CONTROL: 0x%llx\n",
-		CSR_XR(csr_base, LPU_FLOW_CONTROL_UPDATE_CONTROL));
+	    "lpu_init - LPU_FLOW_CONTROL_UPDATE_CONTROL: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_FLOW_CONTROL_UPDATE_CONTROL));
 
 	/*
 	 * CSR_V LPU_LINK_LAYER_FLOW_CONTROL_UPDATE_TIMEOUT_VALUE
@@ -1003,11 +920,10 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	/*
 	 * This should be set by OBP.  We'll check to make sure.
 	 */
-	DBG(DBG_LPU, NULL,
-		"lpu_init - "
-		"LPU_LINK_LAYER_FLOW_CONTROL_UPDATE_TIMEOUT_VALUE: 0x%llx\n",
-		CSR_XR(csr_base,
-		LPU_LINK_LAYER_FLOW_CONTROL_UPDATE_TIMEOUT_VALUE));
+	DBG(DBG_LPU, NULL, "lpu_init - "
+	    "LPU_LINK_LAYER_FLOW_CONTROL_UPDATE_TIMEOUT_VALUE: 0x%llx\n",
+	    CSR_XR(csr_base,
+	    LPU_LINK_LAYER_FLOW_CONTROL_UPDATE_TIMEOUT_VALUE));
 
 	/*
 	 * CSR_V LPU_LINK_LAYER_VC0_FLOW_CONTROL_UPDATE_TIMER0 Expect OBP ???
@@ -1019,11 +935,10 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * [14:0], respectively.  These are read-only to SW so
 	 * either HW or OBP needs to set them.
 	 */
-	DBG(DBG_LPU, NULL,
-		"lpu_init - "
-		"LPU_LINK_LAYER_VC0_FLOW_CONTROL_UPDATE_TIMER0: 0x%llx\n",
-		CSR_XR(csr_base,
-		LPU_LINK_LAYER_VC0_FLOW_CONTROL_UPDATE_TIMER0));
+	DBG(DBG_LPU, NULL, "lpu_init - "
+	    "LPU_LINK_LAYER_VC0_FLOW_CONTROL_UPDATE_TIMER0: 0x%llx\n",
+	    CSR_XR(csr_base,
+	    LPU_LINK_LAYER_VC0_FLOW_CONTROL_UPDATE_TIMER0));
 
 	/*
 	 * CSR_V LPU_LINK_LAYER_VC0_FLOW_CONTROL_UPDATE_TIMER1 Expect OBP ???
@@ -1034,11 +949,10 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * have the timer values for completetions.  Read-only to
 	 * SW; OBP or HW need to set it.
 	 */
-	DBG(DBG_LPU, NULL,
-		"lpu_init - "
-		"LPU_LINK_LAYER_VC0_FLOW_CONTROL_UPDATE_TIMER1: 0x%llx\n",
-		CSR_XR(csr_base,
-		LPU_LINK_LAYER_VC0_FLOW_CONTROL_UPDATE_TIMER1));
+	DBG(DBG_LPU, NULL, "lpu_init - "
+	    "LPU_LINK_LAYER_VC0_FLOW_CONTROL_UPDATE_TIMER1: 0x%llx\n",
+	    CSR_XR(csr_base,
+	    LPU_LINK_LAYER_VC0_FLOW_CONTROL_UPDATE_TIMER1));
 
 	/*
 	 * CSR_V LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD
@@ -1061,8 +975,8 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * CSR_V LPU_TXLINK_ACKNAK_LATENCY_TIMER Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_ACKNAK_LATENCY_TIMER: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_ACKNAK_LATENCY_TIMER));
+	    "lpu_init - LPU_TXLINK_ACKNAK_LATENCY_TIMER: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_ACKNAK_LATENCY_TIMER));
 
 	/*
 	 * CSR_V LPU_TXLINK_REPLAY_TIMER_THRESHOLD
@@ -1084,14 +998,14 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * CSR_V LPU_TXLINK_REPLAY_TIMER Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_TXLINK_REPLAY_TIMER: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_REPLAY_TIMER));
+	    CSR_XR(csr_base, LPU_TXLINK_REPLAY_TIMER));
 
 	/*
 	 * CSR_V LPU_TXLINK_REPLAY_NUMBER_STATUS Expect OBP 0x3
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_REPLAY_NUMBER_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_REPLAY_NUMBER_STATUS));
+	    "lpu_init - LPU_TXLINK_REPLAY_NUMBER_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_REPLAY_NUMBER_STATUS));
 
 	/*
 	 * CSR_V LPU_REPLAY_BUFFER_MAX_ADDRESS Expect OBP 0xB3F
@@ -1104,14 +1018,14 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * CSR_V LPU_TXLINK_RETRY_FIFO_POINTER Expect OBP 0xFFFF0000
 	 */
 	val = ((LPU_TXLINK_RETRY_FIFO_POINTER_RTRY_FIFO_TLPTR_DEFAULT <<
-		LPU_TXLINK_RETRY_FIFO_POINTER_RTRY_FIFO_TLPTR) |
-		(LPU_TXLINK_RETRY_FIFO_POINTER_RTRY_FIFO_HDPTR_DEFAULT <<
-		LPU_TXLINK_RETRY_FIFO_POINTER_RTRY_FIFO_HDPTR));
+	    LPU_TXLINK_RETRY_FIFO_POINTER_RTRY_FIFO_TLPTR) |
+	    (LPU_TXLINK_RETRY_FIFO_POINTER_RTRY_FIFO_HDPTR_DEFAULT <<
+	    LPU_TXLINK_RETRY_FIFO_POINTER_RTRY_FIFO_HDPTR));
 
 	CSR_XS(csr_base, LPU_TXLINK_RETRY_FIFO_POINTER, val);
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_RETRY_FIFO_POINTER: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_RETRY_FIFO_POINTER));
+	    "lpu_init - LPU_TXLINK_RETRY_FIFO_POINTER: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_RETRY_FIFO_POINTER));
 
 	/*
 	 * CSR_V LPU_TXLINK_RETRY_FIFO_R_W_POINTER Expect OBP 0x0
@@ -1124,21 +1038,21 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * CSR_V LPU_TXLINK_RETRY_FIFO_CREDIT Expect HW 0x1580
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_RETRY_FIFO_CREDIT: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_RETRY_FIFO_CREDIT));
+	    "lpu_init - LPU_TXLINK_RETRY_FIFO_CREDIT: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_RETRY_FIFO_CREDIT));
 
 	/*
 	 * CSR_V LPU_TXLINK_SEQUENCE_COUNTER Expect OBP 0xFFF0000
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_TXLINK_SEQUENCE_COUNTER: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_COUNTER));
+	    CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_COUNTER));
 
 	/*
 	 * CSR_V LPU_TXLINK_ACK_SENT_SEQUENCE_NUMBER Expect HW 0xFFF
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_ACK_SENT_SEQUENCE_NUMBER: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_ACK_SENT_SEQUENCE_NUMBER));
+	    "lpu_init - LPU_TXLINK_ACK_SENT_SEQUENCE_NUMBER: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_ACK_SENT_SEQUENCE_NUMBER));
 
 	/*
 	 * CSR_V LPU_TXLINK_SEQUENCE_COUNT_FIFO_MAX_ADDR Expect OBP 0x157
@@ -1148,8 +1062,8 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Test only register.  Will not be programmed.
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_SEQUENCE_COUNT_FIFO_MAX_ADDR: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_COUNT_FIFO_MAX_ADDR));
+	    "lpu_init - LPU_TXLINK_SEQUENCE_COUNT_FIFO_MAX_ADDR: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_COUNT_FIFO_MAX_ADDR));
 
 	/*
 	 * CSR_V LPU_TXLINK_SEQUENCE_COUNT_FIFO_POINTERS Expect HW 0xFFF0000
@@ -1159,21 +1073,21 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Test only register.  Will not be programmed.
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_SEQUENCE_COUNT_FIFO_POINTERS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_COUNT_FIFO_POINTERS));
+	    "lpu_init - LPU_TXLINK_SEQUENCE_COUNT_FIFO_POINTERS: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_COUNT_FIFO_POINTERS));
 
 	/*
 	 * CSR_V LPU_TXLINK_SEQUENCE_COUNT_R_W_POINTERS Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_SEQUENCE_COUNT_R_W_POINTERS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_COUNT_R_W_POINTERS));
+	    "lpu_init - LPU_TXLINK_SEQUENCE_COUNT_R_W_POINTERS: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_COUNT_R_W_POINTERS));
 
 	/*
 	 * CSR_V LPU_TXLINK_TEST_CONTROL Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_TXLINK_TEST_CONTROL: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_TEST_CONTROL));
+	    CSR_XR(csr_base, LPU_TXLINK_TEST_CONTROL));
 
 	/*
 	 * CSR_V LPU_TXLINK_MEMORY_ADDRESS_CONTROL Expect HW 0x0
@@ -1190,36 +1104,36 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * CSR_V LPU_TXLINK_MEMORY_DATA_LOAD0 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_MEMORY_DATA_LOAD0: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_MEMORY_DATA_LOAD0));
+	    "lpu_init - LPU_TXLINK_MEMORY_DATA_LOAD0: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_MEMORY_DATA_LOAD0));
 
 	/*
 	 * CSR_V LPU_TXLINK_MEMORY_DATA_LOAD1 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_MEMORY_DATA_LOAD1: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_MEMORY_DATA_LOAD1));
+	    "lpu_init - LPU_TXLINK_MEMORY_DATA_LOAD1: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_MEMORY_DATA_LOAD1));
 
 	/*
 	 * CSR_V LPU_TXLINK_MEMORY_DATA_LOAD2 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_MEMORY_DATA_LOAD2: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_MEMORY_DATA_LOAD2));
+	    "lpu_init - LPU_TXLINK_MEMORY_DATA_LOAD2: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_MEMORY_DATA_LOAD2));
 
 	/*
 	 * CSR_V LPU_TXLINK_MEMORY_DATA_LOAD3 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_MEMORY_DATA_LOAD3: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_MEMORY_DATA_LOAD3));
+	    "lpu_init - LPU_TXLINK_MEMORY_DATA_LOAD3: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_MEMORY_DATA_LOAD3));
 
 	/*
 	 * CSR_V LPU_TXLINK_MEMORY_DATA_LOAD4 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_MEMORY_DATA_LOAD4: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_MEMORY_DATA_LOAD4));
+	    "lpu_init - LPU_TXLINK_MEMORY_DATA_LOAD4: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_MEMORY_DATA_LOAD4));
 
 	/*
 	 * CSR_V LPU_TXLINK_RETRY_DATA_COUNT Expect HW 0x0
@@ -1229,7 +1143,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Test only register.  Will not be programmed.
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_TXLINK_RETRY_DATA_COUNT: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_RETRY_DATA_COUNT));
+	    CSR_XR(csr_base, LPU_TXLINK_RETRY_DATA_COUNT));
 
 	/*
 	 * CSR_V LPU_TXLINK_SEQUENCE_BUFFER_COUNT Expect HW 0x0
@@ -1239,8 +1153,8 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Test only register.  Will not be programmed.
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_SEQUENCE_BUFFER_COUNT: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_BUFFER_COUNT));
+	    "lpu_init - LPU_TXLINK_SEQUENCE_BUFFER_COUNT: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_BUFFER_COUNT));
 
 	/*
 	 * CSR_V LPU_TXLINK_SEQUENCE_BUFFER_BOTTOM_DATA Expect HW 0x0
@@ -1250,15 +1164,15 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Test only register.
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TXLINK_SEQUENCE_BUFFER_BOTTOM_DATA: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_BUFFER_BOTTOM_DATA));
+	    "lpu_init - LPU_TXLINK_SEQUENCE_BUFFER_BOTTOM_DATA: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TXLINK_SEQUENCE_BUFFER_BOTTOM_DATA));
 
 	/*
 	 * CSR_V LPU_RXLINK_NEXT_RECEIVE_SEQUENCE_1_COUNTER Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - "
-		"LPU_RXLINK_NEXT_RECEIVE_SEQUENCE_1_COUNTER: 0x%llx\n",
-		CSR_XR(csr_base, LPU_RXLINK_NEXT_RECEIVE_SEQUENCE_1_COUNTER));
+	    "LPU_RXLINK_NEXT_RECEIVE_SEQUENCE_1_COUNTER: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_RXLINK_NEXT_RECEIVE_SEQUENCE_1_COUNTER));
 
 	/*
 	 * CSR_V LPU_RXLINK_UNSUPPORTED_DLLP_RECEIVED Expect HW 0x0
@@ -1268,8 +1182,8 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * test only register.
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_RXLINK_UNSUPPORTED_DLLP_RECEIVED: 0x%llx\n",
-		CSR_XR(csr_base, LPU_RXLINK_UNSUPPORTED_DLLP_RECEIVED));
+	    "lpu_init - LPU_RXLINK_UNSUPPORTED_DLLP_RECEIVED: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_RXLINK_UNSUPPORTED_DLLP_RECEIVED));
 
 	/*
 	 * CSR_V LPU_RXLINK_TEST_CONTROL Expect HW 0x0
@@ -1279,27 +1193,20 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * test only register.
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_RXLINK_TEST_CONTROL: 0x%llx\n",
-		CSR_XR(csr_base, LPU_RXLINK_TEST_CONTROL));
+	    CSR_XR(csr_base, LPU_RXLINK_TEST_CONTROL));
 
 	/*
 	 * CSR_V LPU_PHYSICAL_LAYER_CONFIGURATION Expect HW 0x10
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_PHYSICAL_LAYER_CONFIGURATION: 0x%llx\n",
-		CSR_XR(csr_base, LPU_PHYSICAL_LAYER_CONFIGURATION));
+	    "lpu_init - LPU_PHYSICAL_LAYER_CONFIGURATION: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_PHYSICAL_LAYER_CONFIGURATION));
 
 	/*
 	 * CSR_V LPU_PHY_LAYER_STATUS Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_PHY_LAYER_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_PHY_LAYER_STATUS));
-
-	/*
-	 * CSR_V LPU_PHY_LAYER_INTERRUPT_AND_STATUS Expect HW 0x0
-	 */
-	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_PHY_LAYER_INTERRUPT_AND_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_PHY_LAYER_INTERRUPT_AND_STATUS));
+	    CSR_XR(csr_base, LPU_PHY_LAYER_STATUS));
 
 	/*
 	 * CSR_V LPU_PHY_INTERRUPT_AND_STATUS_TEST Expect HW 0x0
@@ -1309,13 +1216,14 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	    CSR_XR(csr_base, LPU_PHY_INTERRUPT_AND_STATUS_TEST));
 
 	/*
-	 * CSR_V LPU_PHY_INTERRUPT_MASK Expect HW 0x0
+	 * CSR_V LPU PHY LAYER interrupt regs (mask, status)
 	 */
-
-	val = 0ull;
-	CSR_XS(csr_base, LPU_PHY_INTERRUPT_MASK, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_PHY_INTERRUPT_MASK: 0x%llx\n",
-		CSR_XR(csr_base, LPU_PHY_INTERRUPT_MASK));
+	    CSR_XR(csr_base, LPU_PHY_INTERRUPT_MASK));
+
+	DBG(DBG_LPU, NULL,
+	    "lpu_init - LPU_PHY_LAYER_INTERRUPT_AND_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_PHY_LAYER_INTERRUPT_AND_STATUS));
 
 	/*
 	 * CSR_V LPU_RECEIVE_PHY_CONFIG Expect HW 0x0
@@ -1328,32 +1236,25 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * bits.
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_RECEIVE_PHY_CONFIG: 0x%llx\n",
-		CSR_XR(csr_base, LPU_RECEIVE_PHY_CONFIG));
+	    CSR_XR(csr_base, LPU_RECEIVE_PHY_CONFIG));
 
 	/*
 	 * CSR_V LPU_RECEIVE_PHY_STATUS1 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_RECEIVE_PHY_STATUS1: 0x%llx\n",
-		CSR_XR(csr_base, LPU_RECEIVE_PHY_STATUS1));
+	    CSR_XR(csr_base, LPU_RECEIVE_PHY_STATUS1));
 
 	/*
 	 * CSR_V LPU_RECEIVE_PHY_STATUS2 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_RECEIVE_PHY_STATUS2: 0x%llx\n",
-		CSR_XR(csr_base, LPU_RECEIVE_PHY_STATUS2));
+	    CSR_XR(csr_base, LPU_RECEIVE_PHY_STATUS2));
 
 	/*
 	 * CSR_V LPU_RECEIVE_PHY_STATUS3 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_RECEIVE_PHY_STATUS3: 0x%llx\n",
-		CSR_XR(csr_base, LPU_RECEIVE_PHY_STATUS3));
-
-	/*
-	 * CSR_V LPU_RECEIVE_PHY_INTERRUPT_AND_STATUS Expect HW 0x0
-	 */
-	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_RECEIVE_PHY_INTERRUPT_AND_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_RECEIVE_PHY_INTERRUPT_AND_STATUS));
+	    CSR_XR(csr_base, LPU_RECEIVE_PHY_STATUS3));
 
 	/*
 	 * CSR_V LPU_RECEIVE_PHY_INTERRUPT_AND_STATUS_TEST Expect HW 0x0
@@ -1363,32 +1264,27 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	    CSR_XR(csr_base, LPU_RECEIVE_PHY_INTERRUPT_AND_STATUS_TEST));
 
 	/*
-	 * CSR_V LPU_RECEIVE_PHY_INTERRUPT_MASK Expect OBP 0x0
+	 * CSR_V LPU RX LAYER interrupt regs (mask, status)
 	 */
-	val = 0ull;
-	CSR_XS(csr_base, LPU_RECEIVE_PHY_INTERRUPT_MASK, val);
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_RECEIVE_PHY_INTERRUPT_MASK: 0x%llx\n",
-		CSR_XR(csr_base, LPU_RECEIVE_PHY_INTERRUPT_MASK));
+	    "lpu_init - LPU_RECEIVE_PHY_INTERRUPT_MASK: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_RECEIVE_PHY_INTERRUPT_MASK));
+
+	DBG(DBG_LPU, NULL,
+	    "lpu_init - LPU_RECEIVE_PHY_INTERRUPT_AND_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_RECEIVE_PHY_INTERRUPT_AND_STATUS));
 
 	/*
 	 * CSR_V LPU_TRANSMIT_PHY_CONFIG Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_TRANSMIT_PHY_CONFIG: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TRANSMIT_PHY_CONFIG));
+	    CSR_XR(csr_base, LPU_TRANSMIT_PHY_CONFIG));
 
 	/*
 	 * CSR_V LPU_TRANSMIT_PHY_STATUS Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_TRANSMIT_PHY_STATUS: 0x%llx\n",
 		CSR_XR(csr_base, LPU_TRANSMIT_PHY_STATUS));
-
-	/*
-	 * CSR_V LPU_TRANSMIT_PHY_INTERRUPT_AND_STATUS Expect HW 0x0
-	 */
-	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TRANSMIT_PHY_INTERRUPT_AND_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TRANSMIT_PHY_INTERRUPT_AND_STATUS));
 
 	/*
 	 * CSR_V LPU_TRANSMIT_PHY_INTERRUPT_AND_STATUS_TEST Expect HW 0x0
@@ -1399,19 +1295,21 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	    LPU_TRANSMIT_PHY_INTERRUPT_AND_STATUS_TEST));
 
 	/*
-	 * CSR_V LPU_TRANSMIT_PHY_INTERRUPT_MASK Expect HW 0x0
+	 * CSR_V LPU TX LAYER interrupt regs (mask, status)
 	 */
-	val = 0ull;
-	CSR_XS(csr_base, LPU_TRANSMIT_PHY_INTERRUPT_MASK, val);
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_TRANSMIT_PHY_INTERRUPT_MASK: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TRANSMIT_PHY_INTERRUPT_MASK));
+	    "lpu_init - LPU_TRANSMIT_PHY_INTERRUPT_MASK: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TRANSMIT_PHY_INTERRUPT_MASK));
+
+	DBG(DBG_LPU, NULL,
+	    "lpu_init - LPU_TRANSMIT_PHY_INTERRUPT_AND_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_TRANSMIT_PHY_INTERRUPT_AND_STATUS));
 
 	/*
 	 * CSR_V LPU_TRANSMIT_PHY_STATUS_2 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_TRANSMIT_PHY_STATUS_2: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TRANSMIT_PHY_STATUS_2));
+	    CSR_XR(csr_base, LPU_TRANSMIT_PHY_STATUS_2));
 
 	/*
 	 * CSR_V LPU_LTSSM_CONFIG1 Expect OBP 0x205
@@ -1425,7 +1323,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * As such we will use the reset value.
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_CONFIG1: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_CONFIG1));
+	    CSR_XR(csr_base, LPU_LTSSM_CONFIG1));
 
 	/*
 	 * CSR_V LPU_LTSSM_CONFIG2 Expect OBP 0x2DC6C0
@@ -1435,33 +1333,30 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Again, what does '12 ms timeout value mean'?
 	 */
 	val = (LPU_LTSSM_CONFIG2_LTSSM_12_TO_DEFAULT <<
-		LPU_LTSSM_CONFIG2_LTSSM_12_TO);
+	    LPU_LTSSM_CONFIG2_LTSSM_12_TO);
 	CSR_XS(csr_base, LPU_LTSSM_CONFIG2, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_CONFIG2: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_CONFIG2));
+	    CSR_XR(csr_base, LPU_LTSSM_CONFIG2));
 
 	/*
 	 * CSR_V LPU_LTSSM_CONFIG3 Expect OBP 0x7A120
 	 */
 	val = (LPU_LTSSM_CONFIG3_LTSSM_2_TO_DEFAULT <<
-		LPU_LTSSM_CONFIG3_LTSSM_2_TO);
+	    LPU_LTSSM_CONFIG3_LTSSM_2_TO);
 	CSR_XS(csr_base, LPU_LTSSM_CONFIG3, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_CONFIG3: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_CONFIG3));
+	    CSR_XR(csr_base, LPU_LTSSM_CONFIG3));
 
 	/*
 	 * CSR_V LPU_LTSSM_CONFIG4 Expect OBP 0x21300
-	 *
-	 * XXX fix LPU_LTSSM_CONFIG4_DATA_RATE_DEFAULT &
-	 * LPU_LTSSM_CONFIG4_N_FTS_DEFAULT in px_pec.h
 	 */
 	val = ((LPU_LTSSM_CONFIG4_DATA_RATE_DEFAULT <<
-		LPU_LTSSM_CONFIG4_DATA_RATE) |
+	    LPU_LTSSM_CONFIG4_DATA_RATE) |
 		(LPU_LTSSM_CONFIG4_N_FTS_DEFAULT <<
 		LPU_LTSSM_CONFIG4_N_FTS));
 	CSR_XS(csr_base, LPU_LTSSM_CONFIG4, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_CONFIG4: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_CONFIG4));
+	    CSR_XR(csr_base, LPU_LTSSM_CONFIG4));
 
 	/*
 	 * CSR_V LPU_LTSSM_CONFIG5 Expect OBP 0x0
@@ -1469,7 +1364,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	val = 0ull;
 	CSR_XS(csr_base, LPU_LTSSM_CONFIG5, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_CONFIG5: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_CONFIG5));
+	    CSR_XR(csr_base, LPU_LTSSM_CONFIG5));
 
 	/*
 	 * CSR_V LPU_LTSSM_STATUS1 Expect OBP 0x0
@@ -1479,122 +1374,106 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * LTSSM Status registers are test only.
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_STATUS1: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_STATUS1));
+	    CSR_XR(csr_base, LPU_LTSSM_STATUS1));
 
 	/*
 	 * CSR_V LPU_LTSSM_STATUS2 Expect OBP 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_STATUS2: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_STATUS2));
-
-	/*
-	 * CSR_V LPU_LTSSM_INTERRUPT_AND_STATUS Expect HW 0x0
-	 */
-	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LTSSM_INTERRUPT_AND_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_INTERRUPT_AND_STATUS));
+	    CSR_XR(csr_base, LPU_LTSSM_STATUS2));
 
 	/*
 	 * CSR_V LPU_LTSSM_INTERRUPT_AND_STATUS_TEST Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LTSSM_INTERRUPT_AND_STATUS_TEST: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_INTERRUPT_AND_STATUS_TEST));
+	    "lpu_init - LPU_LTSSM_INTERRUPT_AND_STATUS_TEST: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LTSSM_INTERRUPT_AND_STATUS_TEST));
 
 	/*
-	 * CSR_V LPU_LTSSM_INTERRUPT_MASK Expect HW 0x0
+	 * CSR_V LPU LTSSM  LAYER interrupt regs (mask, status)
 	 */
-	val = 0ull;
-	CSR_XS(csr_base, LPU_LTSSM_INTERRUPT_MASK, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_INTERRUPT_MASK: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_INTERRUPT_MASK));
+	    CSR_XR(csr_base, LPU_LTSSM_INTERRUPT_MASK));
+
+	DBG(DBG_LPU, NULL,
+	    "lpu_init - LPU_LTSSM_INTERRUPT_AND_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LTSSM_INTERRUPT_AND_STATUS));
 
 	/*
 	 * CSR_V LPU_LTSSM_STATUS_WRITE_ENABLE Expect OBP 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_LTSSM_STATUS_WRITE_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, LPU_LTSSM_STATUS_WRITE_ENABLE));
+	    "lpu_init - LPU_LTSSM_STATUS_WRITE_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_LTSSM_STATUS_WRITE_ENABLE));
 
 	/*
 	 * CSR_V LPU_GIGABLAZE_GLUE_CONFIG1 Expect OBP 0x88407
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_GIGABLAZE_GLUE_CONFIG1: 0x%llx\n",
-		CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_CONFIG1));
+	    CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_CONFIG1));
 
 	/*
 	 * CSR_V LPU_GIGABLAZE_GLUE_CONFIG2 Expect OBP 0x35
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_GIGABLAZE_GLUE_CONFIG2: 0x%llx\n",
-		CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_CONFIG2));
+	    CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_CONFIG2));
 
 	/*
 	 * CSR_V LPU_GIGABLAZE_GLUE_CONFIG3 Expect OBP 0x4400FA
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_GIGABLAZE_GLUE_CONFIG3: 0x%llx\n",
-		CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_CONFIG3));
+	    CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_CONFIG3));
 
 	/*
 	 * CSR_V LPU_GIGABLAZE_GLUE_CONFIG4 Expect OBP 0x1E848
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_GIGABLAZE_GLUE_CONFIG4: 0x%llx\n",
-		CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_CONFIG4));
+	    CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_CONFIG4));
 
 	/*
 	 * CSR_V LPU_GIGABLAZE_GLUE_STATUS Expect OBP 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_GIGABLAZE_GLUE_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_STATUS));
-
-	/*
-	 * CSR_V LPU_GIGABLAZE_GLUE_INTERRUPT_AND_STATUS Expect OBP 0x0
-	 */
-	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_GIGABLAZE_GLUE_INTERRUPT_AND_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_INTERRUPT_AND_STATUS));
+	    CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_STATUS));
 
 	/*
 	 * CSR_V LPU_GIGABLAZE_GLUE_INTERRUPT_AND_STATUS_TEST Expect OBP 0x0
 	 */
-	DBG(DBG_LPU, NULL,
-		"lpu_init - "
-		"LPU_GIGABLAZE_GLUE_INTERRUPT_AND_STATUS_TEST: 0x%llx\n",
-		CSR_XR(csr_base,
-		LPU_GIGABLAZE_GLUE_INTERRUPT_AND_STATUS_TEST));
+	DBG(DBG_LPU, NULL, "lpu_init - "
+	    "LPU_GIGABLAZE_GLUE_INTERRUPT_AND_STATUS_TEST: 0x%llx\n",
+	    CSR_XR(csr_base,
+	    LPU_GIGABLAZE_GLUE_INTERRUPT_AND_STATUS_TEST));
 
 	/*
-	 * CSR_V LPU_GIGABLAZE_GLUE_INTERRUPT_MASK Expect OBP 0x0
+	 * CSR_V LPU GIGABLASE LAYER interrupt regs (mask, status)
 	 */
-
-	/*
-	 * Reset value masks all interrupts.  This will be changed
-	 * to enable all interrupts.
-	 */
-	val = 0x0ull;
-	CSR_XS(csr_base, LPU_GIGABLAZE_GLUE_INTERRUPT_MASK, val);
 	DBG(DBG_LPU, NULL,
 	    "lpu_init - LPU_GIGABLAZE_GLUE_INTERRUPT_MASK: 0x%llx\n",
 	    CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_INTERRUPT_MASK));
+
+	DBG(DBG_LPU, NULL,
+	    "lpu_init - LPU_GIGABLAZE_GLUE_INTERRUPT_AND_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_INTERRUPT_AND_STATUS));
 
 	/*
 	 * CSR_V LPU_GIGABLAZE_GLUE_POWER_DOWN1 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_GIGABLAZE_GLUE_POWER_DOWN1: 0x%llx\n",
-		CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_POWER_DOWN1));
+	    "lpu_init - LPU_GIGABLAZE_GLUE_POWER_DOWN1: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_POWER_DOWN1));
 
 	/*
 	 * CSR_V LPU_GIGABLAZE_GLUE_POWER_DOWN2 Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL,
-		"lpu_init - LPU_GIGABLAZE_GLUE_POWER_DOWN2: 0x%llx\n",
-		CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_POWER_DOWN2));
+	    "lpu_init - LPU_GIGABLAZE_GLUE_POWER_DOWN2: 0x%llx\n",
+	    CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_POWER_DOWN2));
 
 	/*
 	 * CSR_V LPU_GIGABLAZE_GLUE_CONFIG5 Expect OBP 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_GIGABLAZE_GLUE_CONFIG5: 0x%llx\n",
-		CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_CONFIG5));
+	    CSR_XR(csr_base, LPU_GIGABLAZE_GLUE_CONFIG5));
 }
 
 /* ARGSUSED */
@@ -1610,15 +1489,15 @@ dmc_init(caddr_t csr_base, pxu_t *pxu_p)
 	val = -1ull;
 	CSR_XS(csr_base, DMC_CORE_AND_BLOCK_INTERRUPT_ENABLE, val);
 	DBG(DBG_DMC, NULL,
-		"dmc_init - DMC_CORE_AND_BLOCK_INTERRUPT_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, DMC_CORE_AND_BLOCK_INTERRUPT_ENABLE));
+	    "dmc_init - DMC_CORE_AND_BLOCK_INTERRUPT_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, DMC_CORE_AND_BLOCK_INTERRUPT_ENABLE));
 
 	/*
 	 * CSR_V DMC_CORE_AND_BLOCK_ERROR_STATUS Expect HW 0x0
 	 */
 	DBG(DBG_DMC, NULL,
-		"dmc_init - DMC_CORE_AND_BLOCK_ERROR_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, DMC_CORE_AND_BLOCK_ERROR_STATUS));
+	    "dmc_init - DMC_CORE_AND_BLOCK_ERROR_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, DMC_CORE_AND_BLOCK_ERROR_STATUS));
 
 	/*
 	 * CSR_V DMC_DEBUG_SELECT_FOR_PORT_A Expect HW 0x0
@@ -1626,7 +1505,7 @@ dmc_init(caddr_t csr_base, pxu_t *pxu_p)
 	val = 0x0ull;
 	CSR_XS(csr_base, DMC_DEBUG_SELECT_FOR_PORT_A, val);
 	DBG(DBG_DMC, NULL, "dmc_init - DMC_DEBUG_SELECT_FOR_PORT_A: 0x%llx\n",
-		CSR_XR(csr_base, DMC_DEBUG_SELECT_FOR_PORT_A));
+	    CSR_XR(csr_base, DMC_DEBUG_SELECT_FOR_PORT_A));
 
 	/*
 	 * CSR_V DMC_DEBUG_SELECT_FOR_PORT_B Expect HW 0x0
@@ -1634,7 +1513,7 @@ dmc_init(caddr_t csr_base, pxu_t *pxu_p)
 	val = 0x0ull;
 	CSR_XS(csr_base, DMC_DEBUG_SELECT_FOR_PORT_B, val);
 	DBG(DBG_DMC, NULL, "dmc_init - DMC_DEBUG_SELECT_FOR_PORT_B: 0x%llx\n",
-		CSR_XR(csr_base, DMC_DEBUG_SELECT_FOR_PORT_B));
+	    CSR_XR(csr_base, DMC_DEBUG_SELECT_FOR_PORT_B));
 }
 
 void
@@ -1654,17 +1533,20 @@ hvio_pec_init(caddr_t csr_base, pxu_t *pxu_p)
 	val = -1ull;
 	CSR_XS(csr_base, PEC_CORE_AND_BLOCK_INTERRUPT_ENABLE, val);
 	DBG(DBG_PEC, NULL,
-		"hvio_pec_init - PEC_CORE_AND_BLOCK_INTERRUPT_ENABLE: 0x%llx\n",
-		CSR_XR(csr_base, PEC_CORE_AND_BLOCK_INTERRUPT_ENABLE));
+	    "hvio_pec_init - PEC_CORE_AND_BLOCK_INTERRUPT_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, PEC_CORE_AND_BLOCK_INTERRUPT_ENABLE));
 
 	/*
 	 * CSR_V PEC_CORE_AND_BLOCK_INTERRUPT_STATUS Expect HW 0x0
 	 */
 	DBG(DBG_PEC, NULL,
-		"hvio_pec_init - PEC_CORE_AND_BLOCK_INTERRUPT_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, PEC_CORE_AND_BLOCK_INTERRUPT_STATUS));
+	    "hvio_pec_init - PEC_CORE_AND_BLOCK_INTERRUPT_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, PEC_CORE_AND_BLOCK_INTERRUPT_STATUS));
 }
 
+/*
+ * Initialize the module, but do not enable interrupts.
+ */
 void
 hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 {
@@ -1724,9 +1606,9 @@ hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 */
 	val = CSR_XR(csr_base, MMU_CONTROL_AND_STATUS);
 	val |= ((1ull << MMU_CONTROL_AND_STATUS_SE)
-		| (MMU_CONTROL_AND_STATUS_CM_MASK << MMU_CONTROL_AND_STATUS_CM)
-		| (1ull << MMU_CONTROL_AND_STATUS_BE)
-		| (1ull << MMU_CONTROL_AND_STATUS_TE));
+	    | (MMU_CONTROL_AND_STATUS_CM_MASK << MMU_CONTROL_AND_STATUS_CM)
+	    | (1ull << MMU_CONTROL_AND_STATUS_BE)
+	    | (1ull << MMU_CONTROL_AND_STATUS_TE));
 
 	CSR_XS(csr_base, MMU_CONTROL_AND_STATUS, val);
 
@@ -1740,10 +1622,20 @@ hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 	(void) CSR_XR(csr_base, MMU_CONTROL_AND_STATUS);
 
 	/*
-	 * Enable all primary and secondary interrupts.
+	 * CSR_V TLU's UE interrupt regs (log, enable, status, clear)
+	 * Plus header logs
 	 */
-	val = -1ull;
-	CSR_XS(csr_base, MMU_INTERRUPT_ENABLE, val);
+	DBG(DBG_MMU, NULL, "mmu_init - MMU_ERROR_LOG_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, MMU_ERROR_LOG_ENABLE));
+
+	DBG(DBG_MMU, NULL, "mmu_init - MMU_INTERRUPT_ENABLE: 0x%llx\n",
+	    CSR_XR(csr_base, MMU_INTERRUPT_ENABLE));
+
+	DBG(DBG_MMU, NULL, "mmu_init - MMU_INTERRUPT_STATUS: 0x%llx\n",
+	    CSR_XR(csr_base, MMU_INTERRUPT_STATUS));
+
+	DBG(DBG_MMU, NULL, "mmu_init - MMU_ERROR_STATUS_CLEAR: 0x%llx\n",
+	    CSR_XR(csr_base, MMU_ERROR_STATUS_CLEAR));
 }
 
 /*
@@ -1833,7 +1725,7 @@ hvio_iommu_getbypass(devhandle_t dev_hdl, r_addr_t ra,
 	uint64_t	pfn = MMU_BTOP(ra);
 
 	*io_addr_p = MMU_BYPASS_BASE | ra |
-			(pf_is_memory(pfn) ? 0 : MMU_BYPASS_NONCACHE);
+	    (pf_is_memory(pfn) ? 0 : MMU_BYPASS_NONCACHE);
 
 	return (H_EOK);
 }
@@ -2698,6 +2590,7 @@ px_send_pme_turnoff(caddr_t csr_base)
 	if (reg & (1ull << TLU_PME_TURN_OFF_GENERATE_PTO)) {
 		return (DDI_FAILURE);
 	}
+
 	/* write to PME_Turn_off reg to boradcast */
 	reg |= (1ull << TLU_PME_TURN_OFF_GENERATE_PTO);
 	CSR_XS(csr_base,  TLU_PME_TURN_OFF_GENERATE, reg);

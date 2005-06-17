@@ -38,11 +38,15 @@
 #include <sys/async.h>
 #include <sys/spl.h>
 #include <sys/sunddi.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
 #include <sys/machsystm.h>	/* e_ddi_nodeid_to_dip() */
 #include <sys/ddi_impldefs.h>
 #include <sys/sdt.h>
 #include <sys/atomic.h>
 #include "px_obj.h"
+#include <sys/ontrap.h>
+#include <sys/membar.h>
 
 /*
  * interrupt jabber:
@@ -60,7 +64,6 @@
  */
 
 /*LINTLIBRARY*/
-
 
 /*
  * If the unclaimed interrupt count has reached the limit set by
@@ -108,7 +111,6 @@ warn:
 	cmn_err(CE_CONT, "!\n");
 	return (DDI_INTR_CLAIMED);
 }
-
 
 extern uint64_t intr_get_time(void);
 
@@ -316,10 +318,19 @@ px_msiq_intr(caddr_t arg)
 			DTRACE_PROBE4(interrupt__start, dev_info_t, dip,
 			    void *, handler, caddr_t, arg1, caddr_t, arg2);
 
-			if (msiq_rec_p->msiq_rec_type == MSG_REC)
-				px_p->px_pec_p->pec_msiq_rec_p = msiq_rec_p;
-
-			ret = (*handler)(arg1, arg2);
+			/*
+			 * Special case for PCIE Error Messages.
+			 * The current frame work doesn't fit PCIE Err Msgs
+			 * This should be fixed when PCIE MESSAGES as a whole
+			 * is architected correctly.
+			 */
+			if ((msg_code == PCIE_MSG_CODE_ERR_COR) ||
+			    (msg_code == PCIE_MSG_CODE_ERR_NONFATAL) ||
+			    (msg_code == PCIE_MSG_CODE_ERR_FATAL)) {
+				ret = px_err_fabric_intr(px_p, msg_code,
+				    msiq_rec_p->msiq_rec_rid);
+			} else
+				ret = (*handler)(arg1, arg2);
 
 			/*
 			 * Account for time used by this interrupt. Protect
@@ -475,7 +486,6 @@ px_class_to_val(dev_info_t *rdip, char *property_name, px_class_val_t *rec_p,
 	return (val);
 }
 
-
 /* px_class_to_pil: return the pil for a given device. */
 uint32_t
 px_class_to_pil(dev_info_t *rdip)
@@ -493,7 +503,6 @@ px_class_to_pil(dev_info_t *rdip)
 
 	return (pil);
 }
-
 
 /* px_class_to_intr_weight: return the intr_weight for a given device. */
 static int32_t
@@ -514,7 +523,6 @@ px_class_to_intr_weight(dev_info_t *rdip)
 
 	return (intr_weight);
 }
-
 
 /* ARGSUSED */
 int
@@ -1112,7 +1120,7 @@ px_rem_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	} else {
 		/* Re-enable interrupt only if mapping regsiter still shared */
 		if ((ret = px_lib_intr_settarget(px_p->px_dip,
-			    ino_p->ino_sysino, curr_cpu)) != DDI_SUCCESS)
+		    ino_p->ino_sysino, curr_cpu)) != DDI_SUCCESS)
 			goto fail;
 
 		ret = px_lib_intr_setvalid(px_p->px_dip, ino_p->ino_sysino,

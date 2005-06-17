@@ -131,9 +131,6 @@ px_mmu_attach(px_t *px_p)
 		}
 	}
 
-	px_err_add_fh(&px_p->px_fault, PX_ERR_MMU,
-	    (caddr_t)px_p->px_address[PX_REG_CSR]);
-
 	return (DDI_SUCCESS);
 }
 
@@ -162,18 +159,6 @@ px_mmu_detach(px_t *px_p)
 	px_p->px_mmu_p = NULL;
 }
 
-int
-px_mmu_intr(dev_info_t *dip, px_fh_t *fh_p)
-{
-	uint32_t offset = px_fhd_tbl[fh_p->fh_err_id].fhd_st;
-	uint64_t stat = fh_p->fh_stat;
-
-	if (stat)
-		LOG(DBG_ERR_INTR, dip, "[%x]=%16llx mmu stat\n", offset, stat);
-	return (stat ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
-}
-
-int
 px_mmu_map_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
     size_t npages, size_t pfn_index)
 {

@@ -38,7 +38,8 @@
 #include <sys/autoconf.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_subrdefs.h>
-#include <sys/pci.h>
+#include <sys/pcie.h>
+#include <sys/pcie_impl.h>
 #include <sys/ddi.h>
 #include <sys/sunndi.h>
 #include <sys/hotplug/pci/pcihp.h>
@@ -47,19 +48,7 @@
 #include <sys/file.h>
 #include "pcie_pwr.h"
 #include "px_pci.h"
-#include "px_pci_fm.h"
 #include "px_debug.h"
-
-/*
- * The variable controls the default setting of the command register
- * for pci devices.  See pxb_initchild() for details.
- */
-static uint16_t pxb_command_default = PCI_COMM_SERR_ENABLE |
-					PCI_COMM_WAIT_CYC_ENAB |
-					PCI_COMM_PARITY_DETECT |
-					PCI_COMM_ME |
-					PCI_COMM_MAE |
-					PCI_COMM_IO;
 
 static int pxb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 	off_t, off_t, caddr_t *);
@@ -67,6 +56,16 @@ static int pxb_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
 	void *, void *);
 static int pxb_intr_ops(dev_info_t *dip, dev_info_t *rdip,
 	ddi_intr_op_t intr_op, ddi_intr_handle_impl_t *hdlp, void *result);
+
+/*
+ * FMA functions
+ */
+static int pxb_fm_init(pxb_devstate_t *pxb_p);
+static void pxb_fm_fini(pxb_devstate_t *pxb_p);
+static int pxb_fm_init_child(dev_info_t *dip, dev_info_t *cdip, int cap,
+    ddi_iblock_cookie_t *ibc_p);
+static int pxb_fm_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
+    const void *impl_data);
 
 struct bus_ops pxb_bus_ops = {
 	BUSO_REV,
@@ -85,19 +84,19 @@ struct bus_ops pxb_bus_ops = {
 	ddi_dma_mctl,
 	pxb_ctlops,
 	ddi_bus_prop_op,
-	ndi_busop_get_eventcookie,	/* (*bus_get_eventcookie)();    */
+	ndi_busop_get_eventcookie,	/* (*bus_get_eventcookie)();	*/
 	ndi_busop_add_eventcall,	/* (*bus_add_eventcall)();	*/
-	ndi_busop_remove_eventcall,	/* (*bus_remove_eventcall)();   */
+	ndi_busop_remove_eventcall,	/* (*bus_remove_eventcall)();	*/
 	ndi_post_event,			/* (*bus_post_event)();		*/
 	NULL,				/* (*bus_intr_ctl)(); */
 	NULL,				/* (*bus_config)(); */
 	NULL,				/* (*bus_unconfig)(); */
-	px_pci_fm_init_child,		/* (*bus_fm_init)(); */
+	pxb_fm_init_child,		/* (*bus_fm_init)(); */
 	NULL,				/* (*bus_fm_fini)(); */
 	i_ndi_busop_access_enter,	/* (*bus_fm_access_enter)(); */
 	i_ndi_busop_access_exit,	/* (*bus_fm_access_fini)(); */
 	pcie_bus_power,			/* (*bus_power)(); */
-	pxb_intr_ops			/* (*bus_intr_op)(); 		*/
+	pxb_intr_ops			/* (*bus_intr_op)();		*/
 };
 
 static int pxb_open(dev_t *devp, int flags, int otyp, cred_t *credp);
@@ -157,8 +156,8 @@ struct dev_ops pxb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"Standard PCI to PCI bridge nexus driver %I%",
-	&pxb_ops,	/* driver ops */
+	"Standard PCI to PCI bridge nexus driver 1.5",
+	&pxb_ops,   /* driver ops */
 };
 
 static struct modlinkage modlinkage = {
@@ -171,14 +170,6 @@ static struct modlinkage modlinkage = {
  * soft state pointer and structure template:
  */
 void *pxb_state;
-
-static struct pxb_cfg_state {
-	dev_info_t *dip;
-	uint16_t command;
-	uint8_t header_type;
-	uint8_t sec_latency_timer;
-	uint16_t bridge_control;
-};
 
 /*
  * forward function declarations:
@@ -320,7 +311,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	if ((px_pci_fm_attach(pxb)) != DDI_SUCCESS) {
+	if ((pxb_fm_init(pxb)) != DDI_SUCCESS) {
 		DBG(DBG_ATTACH, devi, "Failed in px_pci_fm_attach\n");
 		goto fail;
 	}
@@ -441,7 +432,7 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		pxb_intr_fini(pxb);
 
 		if (pxb->pxb_init_flags & PXB_INIT_FM)
-			px_pci_fm_detach(pxb);
+			pxb_fm_fini(pxb);
 
 		if (pxb->pxb_init_flags & PXB_INIT_CONFIG_HANDLE)
 			pci_config_teardown(&pxb->pxb_config_handle);
@@ -713,10 +704,6 @@ static int
 pxb_initchild(dev_info_t *child)
 {
 	char name[MAXNAMELEN];
-	ddi_acc_handle_t config_handle;
-	uint16_t command_preserve, command;
-	uint16_t bcr;
-	uint8_t header_type;
 	pxb_devstate_t *pxb;
 
 	/*
@@ -797,41 +784,8 @@ pxb_initchild(dev_info_t *child)
 	    "INITCHILD: config regs setup for %s@%s\n",
 	    ddi_node_name(child), ddi_get_name_addr(child));
 
-	if (pci_config_setup(child, &config_handle) != DDI_SUCCESS) {
-		pcie_pm_release(pxb->pxb_dip);
-		return (DDI_FAILURE);
-	}
+	pcie_initchild(child);
 
-	/*
-	 * Determine the configuration header type.
-	 */
-	header_type = pci_config_get8(config_handle, PCI_CONF_HEADER);
-
-	/*
-	 * Support for the "command-preserve" property.
-	 */
-	command_preserve = ddi_prop_get_int(DDI_DEV_T_ANY, child,
-		DDI_PROP_DONTPASS, "command-preserve", 0);
-	command = pci_config_get16(config_handle, PCI_CONF_COMM);
-	command &= (command_preserve | PCI_COMM_BACK2BACK_ENAB);
-	command |= (pxb_command_default & ~command_preserve);
-	pci_config_put16(config_handle, PCI_CONF_COMM, command);
-
-	/*
-	 * If the device has a bus control register then program it
-	 * based on the settings in the command register.
-	 */
-	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
-		bcr = pci_config_get8(config_handle, PCI_BCNF_BCNTRL);
-		if (pxb_command_default & PCI_COMM_PARITY_DETECT)
-			bcr |= PCI_BCNF_BCNTRL_PARITY_ENABLE;
-		if (pxb_command_default & PCI_COMM_SERR_ENABLE)
-			bcr |= PCI_BCNF_BCNTRL_SERR_ENABLE;
-		bcr |= PCI_BCNF_BCNTRL_MAST_AB_MODE;
-		pci_config_put8(config_handle, PCI_BCNF_BCNTRL, bcr);
-	}
-
-	pci_config_teardown(&config_handle);
 	pcie_pm_release(pxb->pxb_dip);
 
 	return (DDI_SUCCESS);
@@ -859,7 +813,7 @@ pxb_intr_init(pxb_devstate_t *pxb, int intr_type) {
 	    (intr_type == DDI_INTR_TYPE_MSI) ? "MSI" : "INTx");
 
 	/*
-	 * Get number of requested interrupts.  If none requested or DDI_FAILURE
+	 * Get number of requested interrupts.	If none requested or DDI_FAILURE
 	 * just return DDI_SUCCESS.
 	 *
 	 * Several Bridges/Switches will not have this property set, resulting
@@ -1040,12 +994,12 @@ pxb_intr(caddr_t arg1, caddr_t arg2) {
 static
 int pxb_get_port_type(dev_info_t *dip, ddi_acc_handle_t config_handle) {
 	ushort_t	caps_ptr, cap;
-	int 		port_type = PX_CAP_REG_DEV_TYPE_PCIE_DEV;
+	int		port_type = PX_CAP_REG_DEV_TYPE_PCIE_DEV;
 
 	/*
 	 * Check if capabilities list is supported.  If not then it is a PCI
 	 * device.  If so, check to see if it contains PCI Express Capability
-	 * Register.  XXX - Eventually move this code to PCI-EX Framework
+	 * Register. Eventually move this code to PCI-EX Framework.
 	 */
 	if (pci_config_get16(config_handle, PCI_CONF_STAT)
 				& PCI_STAT_CAP)
@@ -1086,6 +1040,8 @@ pxb_removechild(dev_info_t *dip)
 	ddi_remove_minor_node(dip, NULL);
 
 	impl_rem_dev_props(dip);
+
+	pcie_uninitchild(dip);
 }
 
 /*
@@ -1490,6 +1446,88 @@ pxb_pwr_init_and_raise(dev_info_t *dip, pcie_pwr_t *pwr_p)
 	if (ret == DDI_SUCCESS)
 		pwr_p->pwr_func_lvl = PM_LEVEL_D0;
 	return (ret);
+}
+
+static int
+pxb_fm_init(pxb_devstate_t *pxb_p)
+{
+	ddi_fm_error_t	derr;
+	dev_info_t	*dip = pxb_p->pxb_dip;
+
+	pxb_p->pxb_fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
+		DDI_FM_ACCCHK_CAPABLE;
+
+	/*
+	 * Request our capability level and get our parents capability
+	 * and ibc.
+	 */
+	ddi_fm_init(dip, &pxb_p->pxb_fm_cap, &pxb_p->pxb_fm_ibc);
+
+	pci_ereport_setup(dip);
+
+	/*
+	 * clear any outstanding error bits
+	 */
+	bzero(&derr, sizeof (ddi_fm_error_t));
+	derr.fme_version = DDI_FME_VERSION;
+	derr.fme_flag = DDI_FM_ERR_EXPECTED;
+	pci_ereport_post(dip, &derr, NULL);
+
+	/*
+	 * Register error callback with our parent.
+	 */
+	ddi_fm_handler_register(pxb_p->pxb_dip, pxb_fm_err_callback, NULL);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Breakdown our FMA resources
+ */
+static void
+pxb_fm_fini(pxb_devstate_t *pxb_p)
+{
+	dev_info_t *dip = pxb_p->pxb_dip;
+	/*
+	 * Clean up allocated fm structures
+	 */
+	ddi_fm_handler_unregister(dip);
+	pci_ereport_teardown(dip);
+	ddi_fm_fini(dip);
+}
+
+/*
+ * Function used to initialize FMA for our children nodes. Called
+ * through pci busops when child node calls ddi_fm_init.
+ */
+/*ARGSUSED*/
+int
+pxb_fm_init_child(dev_info_t *dip, dev_info_t *cdip, int cap,
+    ddi_iblock_cookie_t *ibc_p)
+{
+	pxb_devstate_t *pxb_p = (pxb_devstate_t *)
+	    ddi_get_soft_state(pxb_state, ddi_get_instance(dip));
+	*ibc_p = pxb_p->pxb_fm_ibc;
+	return (pxb_p->pxb_fm_cap | DDI_FM_DMACHK_CAPABLE);
+}
+
+/*
+ * Error callback handler.
+ */
+/*ARGSUSED*/
+static int
+pxb_fm_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
+    const void *impl_data)
+{
+	/* Need to revisit when pcie fm is supported */
+#ifdef	FMA
+	uint16_t pci_cfg_stat, pci_cfg_sec_stat;
+
+	pci_ereport_post(dip, derr, &pci_cfg_stat);
+	pci_bdg_ereport_post(dip, derr, &pci_cfg_sec_stat);
+	return (pci_bdg_check_status(dip, derr, pci_cfg_stat,
+	    pci_cfg_sec_stat));
+#endif	/* FMA */
+	return (DDI_FM_OK);
 }
 
 /*

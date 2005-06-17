@@ -59,13 +59,6 @@ extern uint_t px_get_nreg_set(dev_info_t *child);
 extern uint_t px_get_nintr(dev_info_t *child);
 extern uint64_t px_get_cfg_pabase(px_t *px_p);
 
-/*
- * XXX - remove the following functions once we port error handling
- *        and other misc functionalities based on new VPCI interfaces.
- */
-extern uint64_t px_get_err_reg(caddr_t, uint32_t);
-extern void px_set_err_reg(caddr_t, uint32_t, uint64_t);
-
 #ifdef	__cplusplus
 }
 #endif

@@ -42,20 +42,6 @@ uint32_t px_spurintr_duration = 60000000; /* One minute */
 uint64_t px_spurintr_msgs = PX_SPURINTR_MSG_DEFAULT;
 
 /*
- * The variable controls the default setting of the command register
- * for pci devices.  See init_child() for details.
- *
- * This flags also controls the setting of bits in the bridge control
- * register pci to pci bridges.  See init_child() for details.
- */
-ushort_t px_command_default = PCI_COMM_SERR_ENABLE |
-				PCI_COMM_WAIT_CYC_ENAB |
-				PCI_COMM_PARITY_DETECT |
-				PCI_COMM_ME |
-				PCI_COMM_MAE |
-				PCI_COMM_IO;
-
-/*
  * The following variable enables a workaround for the following obp bug:
  *
  *	1234181 - obp should set latency timer registers in pci
@@ -170,7 +156,10 @@ uint64_t px_tlu_ce_intr_mask	= PX_ERR_MASK_NONE;
 uint64_t px_tlu_ce_log_mask	= PX_ERR_MASK_NONE;
 uint64_t px_tlu_ce_count_mask	= PX_ERR_MASK_NONE;
 
-uint64_t px_tlu_oe_intr_mask	= PX_ERR_EN_ALL & ~0x800;
+/*
+ * Do not enable Link Interrupts
+ */
+uint64_t px_tlu_oe_intr_mask	= PX_ERR_EN_ALL & ~0x80000000800;
 uint64_t px_tlu_oe_log_mask	= PX_ERR_EN_ALL;
 uint64_t px_tlu_oe_count_mask	= PX_ERR_EN_ALL;
 
@@ -182,35 +171,46 @@ uint64_t px_imu_intr_mask	= PX_ERR_EN_ALL;
 uint64_t px_imu_log_mask	= PX_ERR_EN_ALL;
 uint64_t px_imu_count_mask	= PX_ERR_EN_ALL;
 
-uint64_t px_ilu_intr_mask	= PX_ERR_EN_ALL;
-uint64_t px_ilu_log_mask	= PX_ERR_EN_ALL;
+/*
+ * (1ull << ILU_INTERRUPT_ENABLE_IHB_PE_S) |
+ * (1ull << ILU_INTERRUPT_ENABLE_IHB_PE_P);
+ */
+uint64_t px_ilu_intr_mask	= (((uint64_t)0x10 << 32) | 0x10);
+uint64_t px_ilu_log_mask	= 0x10; /* ILU_ERROR_LOG_ENABLE_IHB_PE */
 uint64_t px_ilu_count_mask	= PX_ERR_EN_ALL;
 
 uint64_t px_cb_intr_mask	= PX_ERR_EN_ALL;
 uint64_t px_cb_log_mask		= PX_ERR_EN_ALL;
 uint64_t px_cb_count_mask	= PX_ERR_EN_ALL;
 
-uint64_t px_lpul_intr_mask	= PX_ERR_MASK_NONE;
+/*
+ * LPU Intr Registers are reverse encoding from the registers above.
+ * 1 = disable
+ * 0 = enable
+ *
+ * Log and Count are however still the same.
+ */
+uint64_t px_lpul_intr_mask	= LPU_INTR_DISABLE;
 uint64_t px_lpul_log_mask	= PX_ERR_EN_ALL;
 uint64_t px_lpul_count_mask	= PX_ERR_EN_ALL;
 
-uint64_t px_lpup_intr_mask	= PX_ERR_MASK_NONE;
+uint64_t px_lpup_intr_mask	= LPU_INTR_DISABLE;
 uint64_t px_lpup_log_mask	= PX_ERR_EN_ALL;
 uint64_t px_lpup_count_mask	= PX_ERR_EN_ALL;
 
-uint64_t px_lpur_intr_mask	= PX_ERR_MASK_NONE;
+uint64_t px_lpur_intr_mask	= LPU_INTR_DISABLE;
 uint64_t px_lpur_log_mask	= PX_ERR_EN_ALL;
 uint64_t px_lpur_count_mask	= PX_ERR_EN_ALL;
 
-uint64_t px_lpux_intr_mask	= 0x50;			/* mask all ? */
+uint64_t px_lpux_intr_mask	= LPU_INTR_DISABLE;
 uint64_t px_lpux_log_mask	= PX_ERR_EN_ALL;
 uint64_t px_lpux_count_mask	= PX_ERR_EN_ALL;
 
-uint64_t px_lpus_intr_mask	= PX_ERR_MASK_NONE;	/* mask all ? */
+uint64_t px_lpus_intr_mask	= LPU_INTR_DISABLE;
 uint64_t px_lpus_log_mask	= PX_ERR_EN_ALL;
 uint64_t px_lpus_count_mask	= PX_ERR_EN_ALL;
 
-uint64_t px_lpug_intr_mask	= PX_ERR_MASK_NONE;
+uint64_t px_lpug_intr_mask	= LPU_INTR_DISABLE;
 uint64_t px_lpug_log_mask	= PX_ERR_EN_ALL;
 uint64_t px_lpug_count_mask	= PX_ERR_EN_ALL;
 

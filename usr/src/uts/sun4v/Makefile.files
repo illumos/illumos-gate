@@ -93,10 +93,7 @@ SPECIAL_OBJS += intrq.o
 #			driver modules
 #
 ROOTNEX_OBJS	+= mach_rootnex.o
-#
-#	Temporary fix - Needed for Niagara+Fire bringup (non-virtualization)
-#
-PX_OBJS		+= px_lib4v.o
+PX_OBJS		+= px_lib4v.o px_err.o
 TRAPSTAT_OBJS	+= trapstat.o
 
 #

@@ -59,7 +59,7 @@ px_ib_attach(px_t *px_p)
 	DBG(DBG_IB, dip, "px_ib_attach\n");
 
 	if (px_lib_intr_devino_to_sysino(px_p->px_dip,
-	    px_p->px_inos[PX_FAULT_PEC], &sysino) != DDI_SUCCESS)
+	    px_p->px_inos[PX_INTR_PEC], &sysino) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	/*
@@ -83,12 +83,8 @@ px_ib_attach(px_t *px_p)
 	 */
 	fault_p->px_fh_dip = dip;
 	fault_p->px_fh_sysino = sysino;
-	fault_p->px_fh_lst = NULL;
-	mutex_init(&fault_p->px_fh_lock, NULL, MUTEX_DRIVER, NULL);
-
-	/* Register IMU error */
-	px_err_add_fh(fault_p, PX_ERR_IMU,
-	    (caddr_t)px_p->px_address[PX_REG_CSR]);
+	fault_p->px_err_func = px_err_dmc_pec_intr;
+	fault_p->px_intr_ino = px_p->px_inos[PX_INTR_PEC];
 
 	return (DDI_SUCCESS);
 }
@@ -100,8 +96,6 @@ px_ib_detach(px_t *px_p)
 	dev_info_t	*dip = px_p->px_dip;
 
 	DBG(DBG_IB, dip, "px_ib_detach\n");
-
-	px_err_rem(&px_p->px_fault, PX_FAULT_PEC);
 
 	bus_func_unregister(BF_TYPE_RESINTR, px_ib_intr_reset, ib_p);
 	intr_dist_rem_weighted(px_ib_intr_redist, ib_p);
@@ -239,7 +233,7 @@ px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
 	intr_valid_state_t	enabled = 0;
 	hrtime_t	start_time;
 	intr_state_t	intr_state;
-	int		e;
+	int		e = DDI_SUCCESS;
 
 	DBG(DBG_IB, dip, "px_ib_intr_dist_en: ino=0x%x\n", ino);
 
@@ -321,6 +315,7 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 	/* Redistribute internal interrupts */
 	if (weight == 0) {
 		devino_t	ino_pec = px_p->px_inos[PX_INTR_PEC];
+
 		mutex_enter(&ib_p->ib_intr_lock);
 		px_ib_intr_dist_en(dip, intr_dist_cpuid(), ino_pec, B_FALSE);
 		mutex_exit(&ib_p->ib_intr_lock);
@@ -805,14 +800,4 @@ px_ib_update_intr_state(px_t *px_p, dev_info_t *rdip,
 
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
 	return (ret);
-}
-
-int
-px_imu_intr(dev_info_t *dip, px_fh_t *fh_p)
-{
-	uint32_t offset = px_fhd_tbl[fh_p->fh_err_id].fhd_st;
-	uint64_t stat = fh_p->fh_stat;
-	if (stat)
-		LOG(DBG_ERR_INTR, dip, "[%x]=%16llx imu stat\n", offset, stat);
-	return (stat ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
 }

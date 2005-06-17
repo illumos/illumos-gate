@@ -33,9 +33,14 @@
 #include <sys/ddifm.h>
 #include <sys/fm/protocol.h>
 #include <sys/vmem.h>
+#include <sys/intr.h>
+#include <sys/ivintr.h>
+#include <sys/errno.h>
 #include <sys/hypervisor_api.h>
 #include <px_obj.h>
+#include <sys/machsystm.h>
 #include "px_lib4v.h"
+#include "px_err.h"
 
 /* mask for the ranges property in calculating the real PFN range */
 uint_t px_ranges_phi_mask = ((1 << 28) -1);
@@ -414,8 +419,8 @@ px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	    dip, rdip, handle, off, len, cache_flags);
 
 	if (!(mp->dmai_flags & DMAI_FLAGS_INUSE)) {
-		cmn_err(CE_WARN, "Unbound dma handle %p from %s%d", (void *)mp,
-		    ddi_driver_name(rdip), ddi_get_instance(rdip));
+		cmn_err(CE_WARN, "%s%d: Unbound dma handle %p.",
+		    ddi_driver_name(rdip), ddi_get_instance(rdip), (void *)mp);
 		return (DDI_FAILURE);
 	}
 
@@ -430,7 +435,8 @@ px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	pg_off += mp->dmai_size;			/* end max */
 	pg_off = MIN(off + len, pg_off);		/* hi */
 	if (dvma_addr >= pg_off) {			/* lo >= hi ? */
-		cmn_err(CE_WARN, "%lx + %lx out of window [%lx,%lx]",
+		cmn_err(CE_WARN, "%s%d: %lx + %lx out of window [%lx,%lx]",
+		    ddi_driver_name(rdip), ddi_get_instance(rdip),
 		    off, len, mp->dmai_offset,
 		    mp->dmai_offset + mp->dmai_size);
 		return (DDI_FAILURE);
@@ -1002,14 +1008,14 @@ px_lib_tools_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode)
  */
 /*ARGSUSED*/
 uint64_t
-px_lib_get_cb(caddr_t csr)
+px_lib_get_cb(dev_info_t *dip)
 {
 	return (DDI_SUCCESS);
 }
 
 /*ARGSUSED*/
 void
-px_lib_set_cb(caddr_t csr, uint64_t val)
+px_lib_set_cb(dev_info_t *dip, uint64_t val)
 {
 	/* Noop */
 }
@@ -1368,11 +1374,16 @@ px_lib_map_vconfig(dev_info_t *dip,
 	return (DDI_SUCCESS);
 }
 
+/*
+ * px_lib_log_safeacc_err:
+ * Imitate a cpu/mem trap call when a peek/poke fails.
+ * This will initiate something similar to px_fm_callback.
+ */
 static void
-px_lib_log_safeacc_err(px_t *px_p, dev_info_t *rdip,
-    ddi_acc_handle_t handle, int fme_flag)
+px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag)
 {
 	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)handle;
+	px_cb_t	*cb_p = px_p->px_cb_p;
 	ddi_fm_error_t derr;
 
 	derr.fme_status = DDI_FM_NONFATAL;
@@ -1383,7 +1394,11 @@ px_lib_log_safeacc_err(px_t *px_p, dev_info_t *rdip,
 	if (hp)
 		hp->ahi_err->err_expected = DDI_FM_ERR_EXPECTED;
 
-	(void) px_fm_err_handler(rdip, &derr, (const void *)px_p);
+	mutex_enter(&cb_p->xbc_fm_mutex);
+
+	(void) ndi_fm_handler_dispatch(px_p->px_dip, NULL, &derr);
+
+	mutex_exit(&cb_p->xbc_fm_mutex);
 }
 
 
@@ -1443,6 +1458,7 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 {
 	px_t *px_p = DIP_TO_STATE(dip);
 	px_pec_t *pec_p = px_p->px_pec_p;
+	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)in_args->handle;
 
 	size_t repcount = in_args->repcount;
 	size_t size = in_args->size;
@@ -1456,6 +1472,14 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 
 	r_addr_t ra;
 	uint64_t pokeval;
+
+	/*
+	 * Used only to notify error handling peek/poke is occuring
+	 * One scenario is when a fabric err as a result of peek/poke.
+	 * However there is no way to guarantee that the fabric error
+	 * handler will occur in the window where otd is set.
+	 */
+	on_trap_data_t otd;
 
 	if (px_lib_bdf_from_dip(rdip, &bdf) != DDI_SUCCESS) {
 		DBG(DBG_LIB_DMA, px_p->px_dip,
@@ -1487,21 +1511,25 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 			goto done;
 		}
 
-		/* Hypervisor does not guarantee poke serialization. */
-		mutex_enter(&pec_p->pec_pokefault_mutex);
-
 		/*
-		 * XXX Fabric errors can come in via error interrupts, and
-		 * this code lacks the handshaking needed to process them.
-		 *
-		 * XXX what to do for ddi_poke since there is no handle?
-		 *
-		 * XXX Holes to be filled in by FMA putback.
+		 * Grab pokefault mutex since hypervisor does not guarantee
+		 * poke serialization.
 		 */
+		if (hp) {
+			i_ndi_busop_access_enter(hp->ahi_common.ah_dip,
+			    (ddi_acc_handle_t)hp);
+			pec_p->pec_safeacc_type = DDI_FM_ERR_EXPECTED;
+		} else {
+			mutex_enter(&pec_p->pec_pokefault_mutex);
+			pec_p->pec_safeacc_type = DDI_FM_ERR_POKE;
+		}
+		pec_p->pec_ontrap_data = &otd;
+
 		hvio_poke_status = hvio_poke(px_p->px_dev_hdl, ra, size,
 			    pokeval, bdf, &wrt_stat);
 
-		mutex_exit(&pec_p->pec_pokefault_mutex);
+		if (otd.ot_trap & OT_DATA_ACCESS)
+			err = DDI_FAILURE;
 
 		if ((hvio_poke_status != H_EOK) || (wrt_stat != H_EOK)) {
 			err = DDI_FAILURE;
@@ -1510,14 +1538,30 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 #endif
 			/*
 			 * For CAUTIOUS and POKE access, notify FMA to
-			 * cleanup.  Distinguish between them, as FMA
-			 * may need to take different actions for each.
+			 * cleanup.  Imitate a cpu/mem trap call like in sun4u.
 			 */
-			px_lib_log_safeacc_err(px_p, rdip, in_args->handle,
-			    (in_args->handle ? DDI_FM_ERR_EXPECTED :
+			px_lib_log_safeacc_err(px_p, (ddi_acc_handle_t)hp,
+			    (hp ? DDI_FM_ERR_EXPECTED :
 			    DDI_FM_ERR_POKE));
 
+			pec_p->pec_ontrap_data = NULL;
+			pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
+			if (hp) {
+				i_ndi_busop_access_exit(hp->ahi_common.ah_dip,
+				    (ddi_acc_handle_t)hp);
+			} else {
+				mutex_exit(&pec_p->pec_pokefault_mutex);
+			}
 			goto done;
+		}
+
+		pec_p->pec_ontrap_data = NULL;
+		pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
+		if (hp) {
+			i_ndi_busop_access_exit(hp->ahi_common.ah_dip,
+			    (ddi_acc_handle_t)hp);
+		} else {
+			mutex_exit(&pec_p->pec_pokefault_mutex);
 		}
 
 		host_addr += size;
@@ -1540,6 +1584,7 @@ px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
 {
 	px_t *px_p = DIP_TO_STATE(dip);
 	px_pec_t *pec_p = px_p->px_pec_p;
+	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)in_args->handle;
 
 	size_t repcount = in_args->repcount;
 	uintptr_t dev_addr = in_args->dev_addr;
@@ -1549,8 +1594,15 @@ px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
 	uint32_t read_status;
 	uint64_t hvio_peek_status;
 	uint64_t peekval;
-
 	int err = DDI_SUCCESS;
+
+	/*
+	 * Used only to notify error handling peek/poke is occuring
+	 * One scenario is when a fabric err as a result of peek/poke.
+	 * However there is no way to guarantee that the fabric error
+	 * handler will occur in the window where otd is set.
+	 */
+	on_trap_data_t otd;
 
 	result = (void *)in_args->host_addr;
 
@@ -1558,27 +1610,32 @@ px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
 	for (; repcount; repcount--) {
 
 		/* Lock pokefault mutex so read doesn't mask a poke fault. */
-		mutex_enter(&pec_p->pec_pokefault_mutex);
+		if (hp) {
+			i_ndi_busop_access_enter(hp->ahi_common.ah_dip,
+			    (ddi_acc_handle_t)hp);
+			pec_p->pec_safeacc_type = DDI_FM_ERR_EXPECTED;
+		} else {
+			mutex_enter(&pec_p->pec_pokefault_mutex);
+			pec_p->pec_safeacc_type = DDI_FM_ERR_PEEK;
+		}
+		pec_p->pec_ontrap_data = &otd;
 
 		hvio_peek_status = hvio_peek(px_p->px_dev_hdl, ra,
 		    in_args->size, &read_status, &peekval);
-
-		mutex_exit(&pec_p->pec_pokefault_mutex);
 
 		if ((hvio_peek_status != H_EOK) || (read_status != H_EOK)) {
 			err = DDI_FAILURE;
 
 			/*
 			 * For CAUTIOUS and PEEK access, notify FMA to
-			 * cleanup.  Distinguish between them, as FMA
-			 * may need to take different actions for each.
+			 * cleanup.  Imitate a cpu/mem trap call like in sun4u.
 			 */
-			px_lib_log_safeacc_err(px_p, rdip, in_args->handle,
-			    (in_args->handle ? DDI_FM_ERR_EXPECTED :
+			px_lib_log_safeacc_err(px_p, (ddi_acc_handle_t)hp,
+			    (hp ? DDI_FM_ERR_EXPECTED :
 			    DDI_FM_ERR_PEEK));
 
 			/* Stuff FFs in host addr if peek. */
-			if (in_args->handle == NULL) {
+			if (hp == NULL) {
 				int i;
 				uint8_t *ff_addr = (uint8_t *)host_addr;
 				for (i = 0; i < in_args->size; i++)
@@ -1587,30 +1644,45 @@ px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
 #ifdef  DEBUG
 			px_peekfault_cnt++;
 #endif
+			pec_p->pec_ontrap_data = NULL;
+			pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
+			if (hp) {
+				i_ndi_busop_access_exit(hp->ahi_common.ah_dip,
+				    (ddi_acc_handle_t)hp);
+			} else {
+				mutex_exit(&pec_p->pec_pokefault_mutex);
+			}
 			goto done;
 
+		}
+		pec_p->pec_ontrap_data = NULL;
+		pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
+		if (hp) {
+			i_ndi_busop_access_exit(hp->ahi_common.ah_dip,
+			    (ddi_acc_handle_t)hp);
 		} else {
+			mutex_exit(&pec_p->pec_pokefault_mutex);
+		}
 
-			switch (in_args->size) {
-			case sizeof (uint8_t):
-				*(uint8_t *)host_addr = (uint8_t)peekval;
-				break;
-			case sizeof (uint16_t):
-				*(uint16_t *)host_addr = (uint16_t)peekval;
-				break;
-			case sizeof (uint32_t):
-				*(uint32_t *)host_addr = (uint32_t)peekval;
-				break;
-			case sizeof (uint64_t):
-				*(uint64_t *)host_addr = (uint64_t)peekval;
-				break;
-			default:
-				DBG(DBG_MAP, px_p->px_dip,
-				    "peek: invalid size %d passed\n",
-				    in_args->size);
-				err = DDI_FAILURE;
-				goto done;
-			}
+		switch (in_args->size) {
+		case sizeof (uint8_t):
+			*(uint8_t *)host_addr = (uint8_t)peekval;
+			break;
+		case sizeof (uint16_t):
+			*(uint16_t *)host_addr = (uint16_t)peekval;
+			break;
+		case sizeof (uint32_t):
+			*(uint32_t *)host_addr = (uint32_t)peekval;
+			break;
+		case sizeof (uint64_t):
+			*(uint64_t *)host_addr = (uint64_t)peekval;
+			break;
+		default:
+			DBG(DBG_MAP, px_p->px_dip,
+			    "peek: invalid size %d passed\n",
+			    in_args->size);
+			err = DDI_FAILURE;
+			goto done;
 		}
 
 		host_addr += in_args->size;
@@ -1623,6 +1695,101 @@ px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
 done:
 	return (err);
 }
+
+
+/* add interrupt vector */
+int
+px_err_add_intr(px_fault_t *px_fault_p)
+{
+	int	ret;
+	px_t	*px_p = DIP_TO_STATE(px_fault_p->px_fh_dip);
+
+	DBG(DBG_LIB_INT, px_p->px_dip,
+	    "px_err_add_intr: calling add_ivintr");
+	ret = add_ivintr(px_fault_p->px_fh_sysino, PX_ERR_PIL,
+	    px_fault_p->px_err_func, (caddr_t)px_fault_p,
+	    (caddr_t)&px_fault_p->px_intr_payload[0]);
+
+	if (ret != DDI_SUCCESS) {
+		DBG(DBG_LIB_INT, px_p->px_dip,
+		"add_ivintr returns %d, faultp: %p", ret, px_fault_p);
+
+		return (ret);
+	}
+	DBG(DBG_LIB_INT, px_p->px_dip,
+	    "px_err_add_intr: ib_intr_enable ");
+
+	px_ib_intr_enable(px_p, intr_dist_cpuid(), px_fault_p->px_intr_ino);
+
+	return (ret);
+}
+
+
+/* remove interrupt vector */
+void
+px_err_rem_intr(px_fault_t *px_fault_p)
+{
+	px_t	*px_p = DIP_TO_STATE(px_fault_p->px_fh_dip);
+
+	rem_ivintr(px_fault_p->px_fh_sysino, NULL);
+
+	px_ib_intr_disable(px_p->px_ib_p, px_fault_p->px_intr_ino,
+	    IB_INTR_WAIT);
+}
+
+
+#ifdef FMA
+void
+px_fill_rc_status(px_fault_t *px_fault_p, pciex_rc_error_regs_t *rc_status)
+{
+	px_pec_err_t	*err_pkt;
+
+	err_pkt = (px_pec_err_t *)px_fault_p->px_intr_payload;
+
+	/* initialise all the structure members */
+	rc_status->status_valid = 0;
+
+	if (err_pkt->pec_descr.P) {
+		/* PCI Status Register */
+		rc_status->pci_err_status = err_pkt->pci_err_status;
+		rc_status->status_valid |= PCI_ERR_STATUS_VALID;
+	}
+
+	if (err_pkt->pec_descr.E) {
+		/* PCIe Status Register */
+		rc_status->pcie_err_status = err_pkt->pcie_err_status;
+		rc_status->status_valid |= PCIE_ERR_STATUS_VALID;
+	}
+
+	if (err_pkt->pec_descr.U) {
+		rc_status->ue_status = err_pkt->ue_reg_status;
+		rc_status->status_valid |= UE_STATUS_VALID;
+	}
+
+	if (err_pkt->pec_descr.H) {
+		rc_status->ue_hdr1 = err_pkt->hdr[0];
+		rc_status->status_valid |= UE_HDR1_VALID;
+	}
+
+	if (err_pkt->pec_descr.I) {
+		rc_status->ue_hdr2 = err_pkt->hdr[1];
+		rc_status->status_valid |= UE_HDR2_VALID;
+	}
+
+	/* ue_fst_err_ptr - not available for sun4v?? */
+
+
+	if (err_pkt->pec_descr.S) {
+		rc_status->source_id = err_pkt->err_src_reg;
+		rc_status->status_valid |= SOURCE_ID_VALID;
+	}
+
+	if (err_pkt->pec_descr.R) {
+		rc_status->root_err_status = err_pkt->root_err_status;
+		rc_status->status_valid |= CE_STATUS_VALID;
+	}
+}
+#endif
 
 /*ARGSUSED*/
 int

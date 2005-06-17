@@ -37,6 +37,7 @@
 #include <sys/machsystm.h>
 #include "px_obj.h"
 
+
 /*LINTLIBRARY*/
 
 int
@@ -44,56 +45,69 @@ px_cb_attach(px_t *px_p)
 {
 	sysino_t sysino;
 	px_fault_t *fault_p = &px_p->px_cb_fault;
-	caddr_t	csr = (caddr_t)px_p->px_address[PX_REG_XBC];
+	dev_info_t *dip = px_p->px_dip;
 	px_cb_t *cb_p;
+	int i;
 
 	/* if fail to get sysino, no need to proceed */
-	if (px_lib_intr_devino_to_sysino(px_p->px_dip,
-	    px_p->px_inos[PX_FAULT_XBC], &sysino) != DDI_SUCCESS)
+	if (px_lib_intr_devino_to_sysino(dip,
+	    px_p->px_inos[PX_INTR_XBC], &sysino) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	/*
 	 * allocating JBC common block
 	 */
-	if ((cb_p = (px_cb_t *)px_lib_get_cb(csr)) == NULL) {
+	if ((cb_p = (px_cb_t *)px_lib_get_cb(dip)) == NULL) {
 		cb_p = kmem_zalloc(sizeof (px_cb_t), KM_SLEEP);
 		cb_p->xbc_px_p = px_p;
-		mutex_init(&cb_p->xbc_intr_lock, NULL, MUTEX_DRIVER, NULL);
+		mutex_init(&cb_p->xbc_fm_mutex, NULL, MUTEX_DRIVER,
+		    (void *)px_p->px_fm_ibc);
+		cb_p->xbc_px_list[0] = px_p;
 		cb_p->xbc_attachcnt++;
 		px_p->px_cb_p = cb_p;
-		px_lib_set_cb(csr, (uint64_t)cb_p);
+		px_lib_set_cb(dip, (uint64_t)cb_p);
 	} else {
+		/* Find the next empty slot */
+		for (i = 0; i < PX_CB_MAX_LEAF; i++) {
+			if (cb_p->xbc_px_list[i] == NULL) {
+				cb_p->xbc_px_list[i] = px_p;
+				break;
+			}
+		}
+		/* Make sure we were able to find a empty bucket */
+		ASSERT(i < PX_CB_MAX_LEAF);
+
 		cb_p->xbc_attachcnt++;
 		px_p->px_cb_p = cb_p;
+
 		return (DDI_SUCCESS);
 	}
+
 
 	/*
 	 * initialize XBC fault data structure
 	 * this happens on first attaching instance on sun4u,
 	 * and every instance on sun4v.
 	 */
-	fault_p->px_fh_dip = px_p->px_dip;	/* ??? */
+	fault_p->px_fh_dip = dip;	/* used in sun4u */
 	fault_p->px_fh_sysino = sysino;
-	fault_p->px_fh_lst = NULL;
-	mutex_init(&fault_p->px_fh_lock, NULL, MUTEX_DRIVER, NULL);
-
-	/*
-	 * Register JBC Error interrupt.
-	 */
-	px_err_add_fh(fault_p, PX_ERR_JBC,
-		(caddr_t)px_p->px_address[PX_REG_XBC]);
+	fault_p->px_err_func = px_err_cb_intr;
+	fault_p->px_intr_ino = px_p->px_inos[PX_INTR_XBC];
 
 	/* activate JBC fault interrupt if not yet activated */
-	return (px_err_add_intr(px_p,
-	    &px_p->px_cb_fault, PX_FAULT_XBC));
+	return (px_err_add_intr(&px_p->px_cb_fault));
 }
 
 void
 px_cb_detach(px_t *px_p)
 {
 	px_cb_t *cb_p = px_p->px_cb_p;
-	caddr_t	csr = (caddr_t)px_p->px_address[PX_REG_XBC];
+	int i;
+
+	for (i = 0; i < PX_CB_MAX_LEAF; i++) {
+		if (cb_p->xbc_px_list[i] == px_p)
+			cb_p->xbc_px_list[i] = NULL;
+	}
 
 	cb_p->xbc_attachcnt--;
 	if (cb_p->xbc_attachcnt > 0) {
@@ -101,20 +115,9 @@ px_cb_detach(px_t *px_p)
 		return;
 	}
 
-	px_err_rem_intr(px_p, PX_FAULT_XBC);
-	px_err_rem(&px_p->px_cb_fault, PX_FAULT_XBC);
-	mutex_destroy(&cb_p->xbc_intr_lock);
-	px_lib_set_cb(csr, 0ull);
+	px_err_rem_intr(&px_p->px_cb_fault);
+	mutex_destroy(&cb_p->xbc_fm_mutex);
+	px_lib_set_cb(px_p->px_dip, 0ull);
 	px_p->px_cb_p = NULL;
 	kmem_free(cb_p, sizeof (px_cb_t));
-}
-
-int
-px_cb_intr(dev_info_t *dip, px_fh_t *fh_p)
-{
-	uint32_t offset = px_fhd_tbl[fh_p->fh_err_id].fhd_st;
-	uint64_t stat = fh_p->fh_stat;
-	if (stat)
-		LOG(DBG_ERR_INTR, dip, "[%x]=%16llx cb stat\n", offset, stat);
-	return (stat ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
 }

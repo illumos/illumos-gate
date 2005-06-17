@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_PX_OBJ_H
-#define	_SYS_PX_OBJ_H
+#ifndef	_SYS_PCIE_IMPL_H
+#define	_SYS_PCIE_IMPL_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,30 +33,14 @@
 extern "C" {
 #endif
 
-#include <sys/pcie.h>
-#include <sys/pcie_impl.h>
-#include <sys/fm/io/sun4_fire.h>
-#include <sys/pci_intr_lib.h>
-#include "px_nexus.h"
-#include "px_ioapi.h"
-#include "px_lib.h"
-#include "px_fm.h"
-#include "px_mmu.h"
-#include "px_space.h"
-#include "px_dma.h"	/* Macros use perf counters in px_space.h */
-#include "px_fdvma.h"
-#include "px_msiq.h"
-#include "px_msi.h"
-#include "px_ib.h"
-#include "px_cb.h"
-#include "px_pec.h"
-#include "px_intr.h"	/* needs px_ib.h */
-#include "px_var.h"
-#include "px_util.h"
-#include "px_debug.h"
+/*
+ * PCI-Express Friendly Functions
+ */
+extern int pcie_initchild(dev_info_t *dip);
+extern void pcie_uninitchild(dev_info_t *dip);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SYS_PX_OBJ_H */
+#endif	/* _SYS_PCIE_IMPL_H */

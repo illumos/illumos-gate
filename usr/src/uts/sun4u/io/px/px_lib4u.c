@@ -31,6 +31,8 @@
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
 #include <sys/modctl.h>
 #include <sys/disp.h>
 #include <sys/stat.h>
@@ -38,12 +40,15 @@
 #include <sys/vmem.h>
 #include <sys/iommutsb.h>
 #include <sys/cpuvar.h>
+#include <sys/ivintr.h>
 #include <px_obj.h>
 #include <pcie_pwr.h>
 #include "px_tools_var.h"
 #include <px_regs.h>
 #include <px_csr.h>
+#include <sys/machsystm.h>
 #include "px_lib4u.h"
+#include "px_err.h"
 
 #pragma weak jbus_stst_order
 
@@ -54,13 +59,96 @@ uint_t px_ranges_phi_mask = 0xfffffffful;
 
 static int px_goto_l23ready(px_t *px_p);
 static uint32_t px_identity_chip(px_t *px_p);
+static void px_lib_clr_errs(px_t *px_p, px_pec_t *pec_p);
+
+/*
+ * px_lib_map_registers
+ *
+ * This function is called from the attach routine to map the registers
+ * accessed by this driver.
+ *
+ * used by: px_attach()
+ *
+ * return value: DDI_FAILURE on failure
+ */
+int
+px_lib_map_regs(pxu_t *pxu_p, dev_info_t *dip)
+{
+	ddi_device_acc_attr_t	attr;
+	px_reg_bank_t		reg_bank = PX_REG_CSR;
+
+	DBG(DBG_ATTACH, dip, "px_lib_map_regs: pxu_p:0x%p, dip 0x%p\n",
+		pxu_p, dip);
+
+	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+	attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
+
+	/*
+	 * PCI CSR Base
+	 */
+	if (ddi_regs_map_setup(dip, reg_bank, &pxu_p->px_address[reg_bank],
+	    0, 0, &attr, &pxu_p->px_ac[reg_bank]) != DDI_SUCCESS) {
+		goto fail;
+	}
+
+	reg_bank++;
+
+	/*
+	 * XBUS CSR Base
+	 */
+	if (ddi_regs_map_setup(dip, reg_bank, &pxu_p->px_address[reg_bank],
+	    0, 0, &attr, &pxu_p->px_ac[reg_bank]) != DDI_SUCCESS) {
+		goto fail;
+	}
+
+	pxu_p->px_address[reg_bank] -= FIRE_CONTROL_STATUS;
+
+done:
+	for (; reg_bank >= PX_REG_CSR; reg_bank--) {
+		DBG(DBG_ATTACH, dip, "reg_bank 0x%x address 0x%p\n",
+		    reg_bank, pxu_p->px_address[reg_bank]);
+	}
+
+	return (DDI_SUCCESS);
+
+fail:
+	cmn_err(CE_WARN, "%s%d: unable to map reg entry %d\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), reg_bank);
+
+	for (reg_bank--; reg_bank >= PX_REG_CSR; reg_bank--) {
+		pxu_p->px_address[reg_bank] = NULL;
+		ddi_regs_map_free(&pxu_p->px_ac[reg_bank]);
+	}
+
+	return (DDI_FAILURE);
+}
+
+/*
+ * px_lib_unmap_regs:
+ *
+ * This routine unmaps the registers mapped by map_px_registers.
+ *
+ * used by: px_detach(), and error conditions in px_attach()
+ *
+ * return value: none
+ */
+void
+px_lib_unmap_regs(pxu_t *pxu_p)
+{
+	int i;
+
+	for (i = 0; i < PX_REG_MAX; i++) {
+		if (pxu_p->px_ac[i])
+			ddi_regs_map_free(&pxu_p->px_ac[i]);
+	}
+}
 
 int
 px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 {
 	px_t		*px_p = DIP_TO_STATE(dip);
-	caddr_t		xbc_csr_base = (caddr_t)px_p->px_address[PX_REG_XBC];
-	caddr_t		csr_base = (caddr_t)px_p->px_address[PX_REG_CSR];
+	caddr_t		xbc_csr_base, csr_base;
 	px_dvma_range_prop_t	px_dvma_range;
 	uint32_t	chip_id;
 	pxu_t		*pxu_p;
@@ -78,7 +166,7 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 		DBG(DBG_ATTACH, dip, "FIRE Hardware Version 2.0\n");
 		break;
 	default:
-		cmn_err(CE_WARN, "%s(%d): FIRE Hardware Version Unknown\n",
+		cmn_err(CE_WARN, "%s%d: FIRE Hardware Version Unknown\n",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
 		return (DDI_FAILURE);
 	}
@@ -88,15 +176,20 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	 * the px state structure.
 	 */
 	pxu_p = kmem_zalloc(sizeof (pxu_t), KM_SLEEP);
-
 	pxu_p->chip_id = chip_id;
 	pxu_p->portid  = ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "portid", -1);
 
-	/*
-	 * XXX - Move all ddi_regs_map_setup() from px_util.c
-	 * to to this file before complete virtualization.
-	 */
+	/* Map in the registers */
+	if (px_lib_map_regs(pxu_p, dip) == DDI_FAILURE) {
+		kmem_free(pxu_p, sizeof (pxu_t));
+
+		return (DDI_FAILURE);
+	}
+
+	xbc_csr_base = (caddr_t)pxu_p->px_address[PX_REG_XBC];
+	csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
+
 	pxu_p->tsb_cookie = iommu_tsb_alloc(pxu_p->portid);
 	pxu_p->tsb_size = iommu_tsb_cookie_to_size(pxu_p->tsb_cookie);
 	pxu_p->tsb_vaddr = iommu_tsb_cookie_to_va(pxu_p->tsb_cookie);
@@ -123,6 +216,23 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 
 	px_p->px_plat_p = (void *)pxu_p;
 
+	/*
+	 * Initialize all the interrupt handlers
+	 */
+	px_err_reg_enable(px_p, PX_ERR_JBC);
+	px_err_reg_enable(px_p, PX_ERR_MMU);
+	px_err_reg_enable(px_p, PX_ERR_IMU);
+	px_err_reg_enable(px_p, PX_ERR_TLU_UE);
+	px_err_reg_enable(px_p, PX_ERR_TLU_CE);
+	px_err_reg_enable(px_p, PX_ERR_TLU_OE);
+	px_err_reg_enable(px_p, PX_ERR_ILU);
+	px_err_reg_enable(px_p, PX_ERR_LPU_LINK);
+	px_err_reg_enable(px_p, PX_ERR_LPU_PHY);
+	px_err_reg_enable(px_p, PX_ERR_LPU_RX);
+	px_err_reg_enable(px_p, PX_ERR_LPU_TX);
+	px_err_reg_enable(px_p, PX_ERR_LPU_LTSSM);
+	px_err_reg_enable(px_p, PX_ERR_LPU_GIGABLZ);
+
 	/* Initilize device handle */
 	*dev_hdl = (devhandle_t)csr_base;
 
@@ -139,10 +249,28 @@ px_lib_dev_fini(dev_info_t *dip)
 
 	DBG(DBG_DETACH, dip, "px_lib_dev_fini: dip 0x%p\n", dip);
 
+	/*
+	 * Deinitialize all the interrupt handlers
+	 */
+	px_err_reg_disable(px_p, PX_ERR_JBC);
+	px_err_reg_disable(px_p, PX_ERR_MMU);
+	px_err_reg_disable(px_p, PX_ERR_IMU);
+	px_err_reg_disable(px_p, PX_ERR_TLU_UE);
+	px_err_reg_disable(px_p, PX_ERR_TLU_CE);
+	px_err_reg_disable(px_p, PX_ERR_TLU_OE);
+	px_err_reg_disable(px_p, PX_ERR_ILU);
+	px_err_reg_disable(px_p, PX_ERR_LPU_LINK);
+	px_err_reg_disable(px_p, PX_ERR_LPU_PHY);
+	px_err_reg_disable(px_p, PX_ERR_LPU_RX);
+	px_err_reg_disable(px_p, PX_ERR_LPU_TX);
+	px_err_reg_disable(px_p, PX_ERR_LPU_LTSSM);
+	px_err_reg_disable(px_p, PX_ERR_LPU_GIGABLZ);
+
 	iommu_tsb_free(pxu_p->tsb_cookie);
 
+	px_lib_unmap_regs((pxu_t *)px_p->px_plat_p);
+	kmem_free(px_p->px_plat_p, sizeof (pxu_t));
 	px_p->px_plat_p = NULL;
-	kmem_free(pxu_p, sizeof (pxu_t));
 
 	return (DDI_SUCCESS);
 }
@@ -455,8 +583,9 @@ px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 		return (DDI_SUCCESS);
 
 	if (!(mp->dmai_flags & DMAI_FLAGS_INUSE)) {
-		cmn_err(CE_WARN, "Unbound dma handle %p from %s%d", (void *)mp,
-		    ddi_driver_name(rdip), ddi_get_instance(rdip));
+		cmn_err(CE_WARN, "%s%d: Unbound dma handle %p.",
+		    ddi_driver_name(rdip), ddi_get_instance(rdip), (void *)mp);
+
 		return (DDI_FAILURE);
 	}
 
@@ -1091,8 +1220,8 @@ px_lib_suspend(dev_info_t *dip)
 
 	DBG(DBG_DETACH, dip, "px_lib_suspend: dip 0x%p\n", dip);
 
-	dev_hdl = (devhandle_t)px_p->px_address[PX_REG_CSR];
-	xbus_dev_hdl = (devhandle_t)px_p->px_address[PX_REG_XBC];
+	dev_hdl = (devhandle_t)pxu_p->px_address[PX_REG_CSR];
+	xbus_dev_hdl = (devhandle_t)pxu_p->px_address[PX_REG_XBC];
 
 	if ((ret = hvio_suspend(dev_hdl, pxu_p)) == H_EOK) {
 		px_p->px_cb_p->xbc_attachcnt--;
@@ -1116,8 +1245,8 @@ px_lib_resume(dev_info_t *dip)
 
 	DBG(DBG_ATTACH, dip, "px_lib_resume: dip 0x%p\n", dip);
 
-	dev_hdl = (devhandle_t)px_p->px_address[PX_REG_CSR];
-	xbus_dev_hdl = (devhandle_t)px_p->px_address[PX_REG_XBC];
+	dev_hdl = (devhandle_t)pxu_p->px_address[PX_REG_CSR];
+	xbus_dev_hdl = (devhandle_t)pxu_p->px_address[PX_REG_XBC];
 
 	px_p->px_cb_p->xbc_attachcnt++;
 	if (px_p->px_cb_p->xbc_attachcnt == 1)
@@ -1168,15 +1297,21 @@ px_lib_tools_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode)
  * Currently unsupported by hypervisor
  */
 uint64_t
-px_lib_get_cb(caddr_t csr)
+px_lib_get_cb(dev_info_t *dip)
 {
-	return (CSR_XR(csr, JBUS_SCRATCH_1));
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	return (CSR_XR((caddr_t)pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1));
 }
 
 void
-px_lib_set_cb(caddr_t csr, uint64_t val)
+px_lib_set_cb(dev_info_t *dip, uint64_t val)
 {
-	CSR_XS(csr, JBUS_SCRATCH_1, val);
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	CSR_XS((caddr_t)pxu_p->px_address[PX_REG_XBC], JBUS_SCRATCH_1, val);
 }
 
 /*ARGSUSED*/
@@ -1189,6 +1324,44 @@ px_lib_map_vconfig(dev_info_t *dip,
 	 * No special config space access services in this layer.
 	 */
 	return (DDI_FAILURE);
+}
+
+static void
+px_lib_clr_errs(px_t *px_p, px_pec_t *pec_p)
+{
+	dev_info_t	*rpdip = px_p->px_dip;
+	px_cb_t		*cb_p = px_p->px_cb_p;
+	int		err = PX_OK, ret;
+	int		acctype = pec_p->pec_safeacc_type;
+	ddi_fm_error_t	derr;
+
+	/* Create the derr */
+	bzero(&derr, sizeof (ddi_fm_error_t));
+	derr.fme_version = DDI_FME_VERSION;
+	derr.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
+	derr.fme_flag = acctype;
+
+	if (acctype == DDI_FM_ERR_EXPECTED) {
+		derr.fme_status = DDI_FM_NONFATAL;
+		ndi_fm_acc_err_set(pec_p->pec_acc_hdl, &derr);
+	}
+
+	mutex_enter(&cb_p->xbc_fm_mutex);
+
+	/* send ereport/handle/clear fire registers */
+	err = px_err_handle(px_p, &derr, PX_LIB_CALL, B_TRUE);
+
+	/* Check all child devices for errors */
+	ret = ndi_fm_handler_dispatch(rpdip, NULL, &derr);
+
+	mutex_exit(&cb_p->xbc_fm_mutex);
+
+	/*
+	 * PX_FATAL_HW indicates a condition recovered from Fatal-Reset,
+	 * therefore it does not cause panic.
+	 */
+	if ((err & (PX_FATAL_GOS | PX_FATAL_SW)) || (ret == DDI_FM_FATAL))
+		fm_panic("Fatal System Port Error has occurred\n");
 }
 
 #ifdef  DEBUG
@@ -1208,6 +1381,7 @@ px_lib_do_poke(dev_info_t *dip, dev_info_t *rdip,
 
 	mutex_enter(&pec_p->pec_pokefault_mutex);
 	pec_p->pec_ontrap_data = &otd;
+	pec_p->pec_safeacc_type = DDI_FM_ERR_POKE;
 
 	/* Set up protected environment. */
 	if (!on_trap(&otd, OT_DATA_ACCESS)) {
@@ -1220,12 +1394,8 @@ px_lib_do_poke(dev_info_t *dip, dev_info_t *rdip,
 	} else
 		err = DDI_FAILURE;
 
-	/*
-	 * Read the async fault register for the PEC to see it sees
-	 * a master-abort.
-	 *
-	 * XXX check if we need to clear errors at this point.
-	 */
+	px_lib_clr_errs(px_p, pec_p);
+
 	if (otd.ot_trap & OT_DATA_ACCESS)
 		err = DDI_FAILURE;
 
@@ -1233,6 +1403,7 @@ px_lib_do_poke(dev_info_t *dip, dev_info_t *rdip,
 	no_trap();
 
 	pec_p->pec_ontrap_data = NULL;
+	pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
 	mutex_exit(&pec_p->pec_pokefault_mutex);
 
 #ifdef  DEBUG
@@ -1258,13 +1429,15 @@ px_lib_do_caut_put(dev_info_t *dip, dev_info_t *rdip,
 	px_pec_t *pec_p = px_p->px_pec_p;
 	int err = DDI_SUCCESS;
 
-	/* Use ontrap data in handle set up by FMA */
-	pec_p->pec_ontrap_data = (on_trap_data_t *)hp->ahi_err->err_ontrap;
-
-	hp->ahi_err->err_expected = DDI_FM_ERR_EXPECTED;
+	/*
+	 * Note that i_ndi_busop_access_enter ends up grabbing the pokefault
+	 * mutex.
+	 */
 	i_ndi_busop_access_enter(hp->ahi_common.ah_dip, (ddi_acc_handle_t)hp);
 
-	mutex_enter(&pec_p->pec_pokefault_mutex);
+	pec_p->pec_ontrap_data = (on_trap_data_t *)hp->ahi_err->err_ontrap;
+	pec_p->pec_safeacc_type = DDI_FM_ERR_EXPECTED;
+	hp->ahi_err->err_expected = DDI_FM_ERR_EXPECTED;
 
 	if (!i_ddi_ontrap((ddi_acc_handle_t)hp)) {
 		for (; repcount; repcount--) {
@@ -1296,12 +1469,8 @@ px_lib_do_caut_put(dev_info_t *dip, dev_info_t *rdip,
 			if (flags == DDI_DEV_AUTOINCR)
 				dev_addr += size;
 
-			/*
-			 * Read the async fault register for the PEC to see it
-			 * sees a master-abort.
-			 *
-			 * XXX check if we need to clear errors at this point.
-			 */
+			px_lib_clr_errs(px_p, pec_p);
+
 			if (pec_p->pec_ontrap_data->ot_trap & OT_DATA_ACCESS) {
 				err = DDI_FAILURE;
 #ifdef  DEBUG
@@ -1314,7 +1483,7 @@ px_lib_do_caut_put(dev_info_t *dip, dev_info_t *rdip,
 
 	i_ddi_notrap((ddi_acc_handle_t)hp);
 	pec_p->pec_ontrap_data = NULL;
-	mutex_exit(&pec_p->pec_pokefault_mutex);
+	pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
 	i_ndi_busop_access_exit(hp->ahi_common.ah_dip, (ddi_acc_handle_t)hp);
 	hp->ahi_err->err_expected = DDI_FM_ERR_UNEXPECTED;
 
@@ -1335,8 +1504,13 @@ px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
 static int
 px_lib_do_peek(dev_info_t *dip, peekpoke_ctlops_t *in_args)
 {
+	px_t *px_p = DIP_TO_STATE(dip);
+	px_pec_t *pec_p = px_p->px_pec_p;
 	int err = DDI_SUCCESS;
 	on_trap_data_t otd;
+
+	mutex_enter(&pec_p->pec_pokefault_mutex);
+	pec_p->pec_safeacc_type = DDI_FM_ERR_PEEK;
 
 	if (!on_trap(&otd, OT_DATA_ACCESS)) {
 		uintptr_t tramp = otd.ot_trampoline;
@@ -1349,6 +1523,8 @@ px_lib_do_peek(dev_info_t *dip, peekpoke_ctlops_t *in_args)
 		err = DDI_FAILURE;
 
 	no_trap();
+	pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
+	mutex_exit(&pec_p->pec_pokefault_mutex);
 
 #ifdef  DEBUG
 	if (err == DDI_FAILURE)
@@ -1372,8 +1548,15 @@ px_lib_do_caut_get(dev_info_t *dip, peekpoke_ctlops_t *cautacc_ctlops_arg)
 	px_pec_t *pec_p = px_p->px_pec_p;
 	int err = DDI_SUCCESS;
 
-	hp->ahi_err->err_expected = DDI_FM_ERR_EXPECTED;
+	/*
+	 * Note that i_ndi_busop_access_enter ends up grabbing the pokefault
+	 * mutex.
+	 */
 	i_ndi_busop_access_enter(hp->ahi_common.ah_dip, (ddi_acc_handle_t)hp);
+
+	pec_p->pec_ontrap_data = (on_trap_data_t *)hp->ahi_err->err_ontrap;
+	pec_p->pec_safeacc_type = DDI_FM_ERR_EXPECTED;
+	hp->ahi_err->err_expected = DDI_FM_ERR_EXPECTED;
 
 	if (repcount == 1) {
 		if (!i_ddi_ontrap((ddi_acc_handle_t)hp)) {
@@ -1411,6 +1594,7 @@ px_lib_do_caut_get(dev_info_t *dip, peekpoke_ctlops_t *cautacc_ctlops_arg)
 
 	i_ddi_notrap((ddi_acc_handle_t)hp);
 	pec_p->pec_ontrap_data = NULL;
+	pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
 	i_ndi_busop_access_exit(hp->ahi_common.ah_dip, (ddi_acc_handle_t)hp);
 	hp->ahi_err->err_expected = DDI_FM_ERR_UNEXPECTED;
 
@@ -1469,7 +1653,8 @@ static int
 px_goto_l23ready(px_t *px_p)
 {
 	pcie_pwr_t	*pwr_p;
-	caddr_t	csr_base = (caddr_t)px_p->px_address[PX_REG_CSR];
+	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
+	caddr_t	csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
 	int		ret = DDI_SUCCESS;
 	clock_t		end, timeleft;
 
@@ -1564,3 +1749,37 @@ px_identity_chip(px_t *px_p)
 
 	return (PX_CHIP_UNIDENTIFIED);
 }
+
+int
+px_err_add_intr(px_fault_t *px_fault_p)
+{
+	dev_info_t	*dip = px_fault_p->px_fh_dip;
+	px_t		*px_p = DIP_TO_STATE(dip);
+
+	VERIFY(add_ivintr(px_fault_p->px_fh_sysino, PX_ERR_PIL,
+		px_fault_p->px_err_func, (caddr_t)px_fault_p, NULL) == 0);
+
+	px_ib_intr_enable(px_p, intr_dist_cpuid(), px_fault_p->px_intr_ino);
+
+	return (DDI_SUCCESS);
+}
+
+void
+px_err_rem_intr(px_fault_t *px_fault_p)
+{
+	dev_info_t	*dip = px_fault_p->px_fh_dip;
+	px_t		*px_p = DIP_TO_STATE(dip);
+
+	rem_ivintr(px_fault_p->px_fh_sysino, NULL);
+
+	px_ib_intr_disable(px_p->px_ib_p, px_fault_p->px_intr_ino,
+		IB_INTR_WAIT);
+}
+
+#ifdef FMA
+void
+px_fill_rc_status(px_fault_t *px_fault_p, pciex_rc_error_regs_t *rc_status)
+{
+	/* populate the rc_status by reading the registers - TBD */
+}
+#endif /* FMA */

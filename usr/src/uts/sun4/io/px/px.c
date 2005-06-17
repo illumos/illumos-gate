@@ -42,7 +42,6 @@
 #include <sys/ddi_subrdefs.h>
 #include <sys/epm.h>
 #include <sys/iommutsb.h>
-#include <px_regs.h>
 #include "px_obj.h"
 #include "pcie_pwr.h"
 
@@ -87,8 +86,8 @@ static struct bus_ops px_bus_ops = {
 	NULL,			/* (*bus_unconfig)(); */
 	px_fm_init_child,	/* (*bus_fm_init)(); */
 	NULL,			/* (*bus_fm_fini)(); */
-	NULL,			/* (*bus_fm_access_enter)(); */
-	NULL,			/* (*bus_fm_access_fini)(); */
+	px_bus_enter,		/* (*bus_fm_access_enter)(); */
+	px_bus_exit,		/* (*bus_fm_access_fini)(); */
 	pcie_bus_power,		/* (*bus_power)(); */
 	px_intr_ops		/* (*bus_intr_op)(); */
 };
@@ -245,16 +244,6 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (px_get_props(px_p, dip) == DDI_FAILURE)
 			goto err_bad_px_prop;
 
-		/*
-		 * Map in the registers.
-		 *
-		 * Remove px_map_regs() from here and move them to SUN4U
-		 * library code, after complete virtualization
-		 * (after porting MSI and Error handling code).
-		 */
-		if (px_map_regs(px_p, dip) == DDI_FAILURE)
-			goto err_bad_reg_prop;
-
 		if ((px_fm_attach(px_p)) != DDI_SUCCESS)
 			goto err_bad_fm;
 
@@ -299,16 +288,13 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * All of the error handlers have been registered
 		 * by now so it's time to activate the interrupt.
 		 */
-		if ((ret = px_err_add_intr(px_p, &px_p->px_fault,
-		    PX_FAULT_PEC)) != DDI_SUCCESS)
+		if ((ret = px_err_add_intr(&px_p->px_fault)) != DDI_SUCCESS)
 			goto err_bad_pec_add_intr;
 
 		/*
 		 * Create the "devctl" node for hotplug and pcitool support.
 		 * For non-hotplug bus, we still need ":devctl" to
 		 * support DEVCTL_DEVICE_* and DEVCTL_BUS_* ioctls.
-		 *
-		 * Hot Plug will be done at a later time...
 		 */
 		if (ddi_create_minor_node(dip, "devctl", S_IFCHR,
 		    PCIHP_AP_MINOR_NUM(instance, PCIHP_DEVCTL_MINOR),
@@ -334,7 +320,7 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		break;
 
 err_bad_devctl_node:
-		px_err_rem_intr(px_p, PX_FAULT_PEC);
+		px_err_rem_intr(&px_p->px_fault);
 err_bad_pec_add_intr:
 		px_pec_detach(px_p);
 err_bad_pec:
@@ -352,8 +338,6 @@ err_bad_ib:
 err_bad_dev_init:
 		px_fm_detach(px_p);
 err_bad_fm:
-		px_unmap_regs(px_p);
-err_bad_reg_prop:
 		px_free_props(px_p);
 err_bad_px_prop:
 		mutex_destroy(&px_p->px_mutex);
@@ -438,7 +422,7 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		px_p->px_state = PX_DETACHED;
 
 		ddi_remove_minor_node(dip, "devctl");
-		px_err_rem_intr(px_p, PX_FAULT_PEC);
+		px_err_rem_intr(&px_p->px_fault);
 		px_pec_detach(px_p);
 		px_msi_detach(px_p);
 		px_msiq_detach(px_p);
@@ -452,7 +436,6 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 * Free the px soft state structure and the rest of the
 		 * resources it's using.
 		 */
-		px_unmap_regs(px_p);
 		px_free_props(px_p);
 		px_pwr_teardown(dip);
 		pwr_common_teardown(dip);
@@ -536,7 +519,6 @@ px_pwr_setup(dev_info_t *dip)
 	hdl.ih_cb_func = (ddi_intr_handler_t *)pcie_pwr_intr;
 	hdl.ih_cb_arg1 = pwr_p;
 	hdl.ih_cb_arg2 = NULL;
-
 	if (px_add_msiq_intr(dip, dip, &hdl, MSG_REC,
 	    (msgcode_t)PCIE_PME_ACK_MSG, &pwr_p->pwr_msiq_id) != DDI_SUCCESS) {
 		DBG(DBG_PWR, dip, "px_pwr_setup: couldn't add intr\n");
@@ -560,8 +542,8 @@ px_pwrsetup_err:
 static void
 px_pwr_teardown(dev_info_t *dip)
 {
-	pcie_pwr_t *pwr_p;
-	ddi_intr_handle_impl_t	hdl;
+	pcie_pwr_t	*pwr_p;
+	ddi_intr_handle_impl_t hdl;
 
 	if (!PCIE_PMINFO(dip) || !(pwr_p = PCIE_NEXUS_PMINFO(dip)))
 		return;
@@ -889,6 +871,11 @@ mapped:
 	DBG(DBG_DMA_BINDH, dip, "cookie %llx+%x\n", cookiep->dmac_address,
 		cookiep->dmac_size);
 	px_dump_dma_handle(DBG_DMA_MAP, dip, mp);
+
+	/* insert dma handle into FMA cache */
+	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR)
+		(void) ndi_fmc_insert(rdip, DMA_HANDLE, mp, NULL);
+
 	return (mp->dmai_nwin == 1 ? DDI_DMA_MAPPED : DDI_DMA_PARTIAL_MAP);
 map_err:
 	px_dma_freepfn(mp);
@@ -914,6 +901,14 @@ px_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 	if ((mp->dmai_flags & DMAI_FLAGS_INUSE) == 0) {
 		DBG(DBG_DMA_UNBINDH, dip, "handle not inuse\n");
 		return (DDI_FAILURE);
+	}
+
+	/* remove dma handle from FMA cache */
+	if (mp->dmai_attr.dma_attr_flags & DDI_DMA_FLAGERR) {
+		if (DEVI(rdip)->devi_fmhdl != NULL &&
+		    DDI_FM_DMA_ERR_CAP(DEVI(rdip)->devi_fmhdl->fh_cap)) {
+			(void) ndi_fmc_remove(rdip, DMA_HANDLE, mp);
+		}
 	}
 
 	/*
@@ -944,6 +939,7 @@ px_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 		ddi_run_callback(&px_kmem_clid);
 	}
 	mp->dmai_flags &= DMAI_FLAGS_PRESERVE;
+
 	return (DDI_SUCCESS);
 }
 
@@ -1177,7 +1173,7 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	case DDI_CTLOPS_REGSIZE:
 		*((off_t *)result) = px_get_reg_set_size(rdip, *((int *)arg));
-		return (*((off_t *)result) == -1 ? DDI_FAILURE : DDI_SUCCESS);
+		return (*((off_t *)result) == 0 ? DDI_FAILURE : DDI_SUCCESS);
 
 	case DDI_CTLOPS_NREGS:
 		*((uint_t *)result) = px_get_nreg_set(rdip);

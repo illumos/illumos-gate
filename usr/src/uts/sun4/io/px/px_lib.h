@@ -56,7 +56,6 @@ extern "C" {
 #define	MMU_MAP_BUF		1
 
 typedef struct px px_t;
-typedef struct px_common px_common_t;
 typedef struct px_msiq px_msiq_t;
 
 extern int px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl);
@@ -78,6 +77,11 @@ extern int px_lib_intr_gettarget(dev_info_t *dip, sysino_t sysino,
 extern int px_lib_intr_settarget(dev_info_t *dip, sysino_t sysino,
     cpuid_t cpuid);
 extern int px_lib_intr_reset(dev_info_t *dip);
+
+#ifdef FMA
+extern void px_fill_rc_status(px_fault_t *px_fault_p,
+    pciex_rc_error_regs_t *rc_status);
+#endif
 
 extern int px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
     io_attributes_t io_attributes, void *addr, size_t pfn_index, int flag);
@@ -168,8 +172,8 @@ extern int px_lib_pmctl(int cmd, px_t *px_p);
 /*
  * Misc Functions:
  */
-extern uint64_t px_lib_get_cb(caddr_t csr);
-extern void px_lib_set_cb(caddr_t csr, uint64_t val);
+extern uint64_t px_lib_get_cb(dev_info_t *dip);
+extern void px_lib_set_cb(dev_info_t *dip, uint64_t val);
 
 /*
  * Peek and poke access ddi_ctlops helper functions
@@ -178,6 +182,21 @@ extern int px_lib_ctlops_poke(dev_info_t *dip, dev_info_t *rdip,
     peekpoke_ctlops_t *in_args);
 extern int px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
     peekpoke_ctlops_t *in_args, void *result);
+
+/*
+ * Error handling functions
+ */
+#define	PX_INTR_PAYLOAD_SIZE	8	/* 64 bit words */
+typedef struct px_fault {
+	dev_info_t	*px_fh_dip;
+	sysino_t	px_fh_sysino;
+	uint_t		(*px_err_func)(caddr_t px_fault);
+	devino_t	px_intr_ino;
+	uint64_t	px_intr_payload[PX_INTR_PAYLOAD_SIZE];
+} px_fault_t;
+
+extern int px_err_add_intr(px_fault_t *px_fault_p);
+extern void px_err_rem_intr(px_fault_t *px_fault_p);
 
 #ifdef	__cplusplus
 }

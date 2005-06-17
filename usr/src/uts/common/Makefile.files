@@ -1213,6 +1213,8 @@ INCLUDE_PATH    += $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
 #
 XGE_OBJS = xge.o xgell.o
 
+PCIE_OBJS += pcie.o
+
 XGE_HAL_OBJS =  xgehal-channel.o xgehal-fifo.o xgehal-ring.o  xgehal-config.o \
 		xgehal-driver.o  xgehal-mm.o xgehal-stats.o  xgehal-device.o \
 		xge-queue.o  xgehal-mgmt.o xgehal-mgmtaux.o

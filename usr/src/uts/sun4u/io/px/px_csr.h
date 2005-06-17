@@ -89,22 +89,25 @@ extern "C" {
 #define	CSR_BS(base, off, bit) \
 	((*(volatile uint64_t *)((base) + ((off)))) = \
 	((*(volatile uint64_t *)((base) + ((off)))) | \
-	(1ULL<<(off ## _ ## bit))))
+	(1ull<<(off ## _ ## bit))))
 
 #define	CSRA_BS(base, off, index, bit) \
 	((*(volatile uint64_t *)((base) + ((off) + ((index) * 8)))) = \
 	((*(volatile uint64_t *)((base) + ((off) + ((index) * 8)))) | \
-	(1ULL<<(off ## _ ## bit))))
+	(1ull<<(off ## _ ## bit))))
 
 #define	CSR_BC(base, off, bit) \
 	((*(volatile uint64_t *)((base) + ((off)))) = \
 	((*(volatile uint64_t *)((base) + ((off)))) & \
-	~(1ULL<<(off ## _ ## bit))))
+	~(1ull<<(off ## _ ## bit))))
 
 #define	CSRA_BC(base, off, index, bit) \
 	((*(volatile uint64_t *)((base) + ((off) + ((index) * 8)))) = \
 	((*(volatile uint64_t *)((base) + ((off) + ((index) * 8)))) & \
-	~(1ULL<<(off ## _ ## bit))))
+	~(1ull<<(off ## _ ## bit))))
+
+#define	BIT_TST(reg, bitno)	(reg & (1ull << bitno))
+#define	BITMASK(bitno)		(1ull << bitno)
 
 #ifdef	__cplusplus
 }

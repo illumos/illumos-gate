@@ -164,6 +164,7 @@ f none kernel/misc/sparcv9/krtld 755 root sys
 f none kernel/misc/sparcv9/mac 755 root sys
 l none kernel/misc/sparcv9/md5=../../../kernel/crypto/sparcv9/md5
 f none kernel/misc/sparcv9/pcicfg 755 root sys
+f none kernel/misc/sparcv9/pcie 755 root sys
 f none kernel/misc/sparcv9/pcihp 755 root sys
 f none kernel/misc/sparcv9/pcmcia 755 root sys
 f none kernel/misc/sparcv9/rpcsec 755 root sys

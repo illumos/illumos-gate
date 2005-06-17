@@ -73,9 +73,9 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS += -dalign
 
 #
-# Build for fire PRM 0.9 and above.
+#	Dependency
 #
-#CFLAGS += -DFIRE_PRM_09
+LDFLAGS += -dy -Nmisc/pcie
 
 #
 #	Default build targets.

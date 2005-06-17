@@ -74,12 +74,6 @@ typedef struct px_pec {
 	px_t		*pec_px_p;	/* link back to px soft state */
 
 	/*
-	 * PCI configuration header block for the PBM:
-	 * config_header_t *pec_config_header;
-	 * ddi_acc_handle_t pec_config_ac;
-	 */
-
-	/*
 	 * Memory address range on this PBM used to determine DMA on this pec
 	 */
 	px_iopfn_t		pec_base32_pfn;
@@ -91,7 +85,13 @@ typedef struct px_pec {
 	 * support for ddi_poke:
 	 */
 	on_trap_data_t	*pec_ontrap_data;
+	int		pec_safeacc_type;
 	kmutex_t	pec_pokefault_mutex;
+
+	/*
+	 * support for cautious
+	 */
+	ddi_acc_handle_t pec_acc_hdl;
 
 #define	PBM_NAMESTR_BUFLEN 	64
 	/* driver name & instance */
@@ -104,7 +104,6 @@ typedef struct px_pec {
 	msiqid_t	pec_corr_msg_msiq_id;
 	msiqid_t	pec_non_fatal_msg_msiq_id;
 	msiqid_t	pec_fatal_msg_msiq_id;
-	msiq_rec_t	*pec_msiq_rec_p;
 } px_pec_t;
 
 /*
@@ -113,10 +112,6 @@ typedef struct px_pec {
 
 extern int px_pec_attach(px_t *px_p);
 extern void px_pec_detach(px_t *px_p);
-
-extern uint_t px_pec_corr_msg_intr(caddr_t arg);
-extern uint_t px_pec_non_fatal_msg_intr(caddr_t arg);
-extern uint_t px_pec_fatal_msg_intr(caddr_t arg);
 
 #ifdef	__cplusplus
 }

@@ -43,8 +43,6 @@
 #include <sys/ddi_impldefs.h>
 #include "px_obj.h"
 #include "pcie_pwr.h"
-#include <px_regs.h>
-#include <px_csr.h>
 
 /*LINTLIBRARY*/
 
@@ -261,89 +259,6 @@ px_xlate_reg(px_t *px_p, pci_regspec_t *px_rp, struct regspec *new_rp)
 }
 
 /*
- * px_map_registers
- *
- * This function is called from the attach routine to map the registers
- * accessed by this driver.
- *
- * used by: px_attach()
- *
- * return value: DDI_FAILURE on failure
- *
- * Remove px_map_regs() from here and move them to SUN4U library code,
- * after complete virtualization (after porting MSI and Error handling code).
- */
-int
-px_map_regs(px_t *px_p, dev_info_t *dip)
-{
-	ddi_device_acc_attr_t	attr;
-	px_reg_bank_t		reg_bank = PX_REG_CSR;
-
-	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
-	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
-	attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
-
-	/*
-	 * PCI CSR Base
-	 */
-	if (ddi_regs_map_setup(dip, reg_bank, &px_p->px_address[reg_bank],
-	    0, 0, &attr, &px_p->px_ac[reg_bank]) != DDI_SUCCESS) {
-		goto fail;
-	}
-
-	reg_bank++;
-
-	/*
-	 * XBUS CSR Base
-	 */
-	if (ddi_regs_map_setup(dip, reg_bank, &px_p->px_address[reg_bank],
-	    0, 0, &attr, &px_p->px_ac[reg_bank]) != DDI_SUCCESS) {
-		goto fail;
-	}
-
-	px_p->px_address[reg_bank] -= FIRE_CONTROL_STATUS;
-
-done:
-	for (; reg_bank >= PX_REG_CSR; reg_bank--) {
-		DBG(DBG_ATTACH, dip, "reg_bank 0x%x address 0x%p\n",
-		    reg_bank, px_p->px_address[reg_bank]);
-	}
-
-	return (DDI_SUCCESS);
-
-fail:
-	cmn_err(CE_WARN, "%s%d: unable to map reg entry %d\n",
-	    ddi_driver_name(dip), ddi_get_instance(dip), reg_bank);
-
-	for (reg_bank--; reg_bank >= PX_REG_CSR; reg_bank--) {
-		px_p->px_address[reg_bank] = NULL;
-		ddi_regs_map_free(&px_p->px_ac[reg_bank]);
-	}
-
-	return (DDI_FAILURE);
-}
-
-/*
- * px_unmap_regs:
- *
- * This routine unmap the registers mapped by map_px_registers.
- *
- * used by: px_detach(), and error conditions in px_attach()
- *
- * return value: none
- */
-void
-px_unmap_regs(px_t *px_p)
-{
-	int i;
-
-	for (i = 0; i < 4; i++) {
-		if (px_p->px_ac[i])
-			ddi_regs_map_free(&px_p->px_ac[i]);
-	}
-}
-
-/*
  * px_report_dev
  *
  * This function is called from our control ops routine on a
@@ -459,14 +374,12 @@ px_uninit_child(px_t *px_p, dev_info_t *child)
 	ddi_set_name_addr(child, NULL);
 	ddi_remove_minor_node(child, NULL);
 	impl_rem_dev_props(child);
-	return (DDI_SUCCESS);
-}
 
-/*ARGSUSED*/
-void
-px_post_init_child(px_t *px_p, dev_info_t *child)
-{
-	/* Add px specific PEC code */
+	DBG(DBG_PWR, ddi_get_parent(child), "\n\n");
+
+	pcie_uninitchild(child);
+
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -483,15 +396,10 @@ px_post_init_child(px_t *px_p, dev_info_t *child)
 int
 px_init_child(px_t *px_p, dev_info_t *child)
 {
-	pci_regspec_t *pci_rp;
-	char name[10];
-	ddi_acc_handle_t config_handle;
-	uint16_t command_preserve, command;
-	uint8_t bcr;
-	uint8_t header_type, min_gnt;
-	uint16_t latency_timer;
-	uint_t n;
-	int i, no_config;
+	dev_info_t	*parent_dip = px_p->px_dip;
+	pci_regspec_t	*pci_rp;
+	char		name[10];
+	int		i, no_config;
 
 	/*
 	 * The following is a special case for pcimem nodes.
@@ -575,8 +483,8 @@ px_init_child(px_t *px_p, dev_info_t *child)
 		return (DDI_SUCCESS);
 	}
 
-	if (pcie_pm_hold(px_p->px_dip) != DDI_SUCCESS) {
-		DBG(DBG_PWR, px_p->px_dip,
+	if (pcie_pm_hold(parent_dip) != DDI_SUCCESS) {
+		DBG(DBG_PWR, parent_dip,
 		    "INITCHILD: px_pm_hold failed\n");
 		return (DDI_FAILURE);
 	}
@@ -596,107 +504,16 @@ px_init_child(px_t *px_p, dev_info_t *child)
 		return (DDI_SUCCESS);
 	}
 
-	DBG(DBG_PWR, ddi_get_parent(child),
+	DBG(DBG_PWR, parent_dip,
 	    "INITCHILD: config regs setup for %s@%s\n",
 	    ddi_node_name(child), ddi_get_name_addr(child));
 
-	/*
-	 * Map the child configuration space to for initialization.
-	 * We assume the obp will do the following in the devices
-	 * config space:
-	 *
-	 *	Set the latency-timer register to values appropriate
-	 *	for the devices on the bus (based on other devices
-	 *	MIN_GNT and MAX_LAT registers.
-	 *
-	 *	Set the fast back-to-back enable bit in the command
-	 *	register if it's supported and all devices on the bus
-	 *	have the capability.
-	 *
-	 */
-	if (pci_config_setup(child, &config_handle) != DDI_SUCCESS) {
-		ddi_set_name_addr(child, NULL);
-		pcie_pm_release(px_p->px_dip);
-		return (DDI_FAILURE);
-	}
-
-	/*
-	 * Determine the configuration header type.
-	 */
-	header_type = pci_config_get8(config_handle, PCI_CONF_HEADER);
-	DBG(DBG_INIT_CLD, px_p->px_dip, "%s: header_type=%x\n",
-	    ddi_driver_name(child), header_type);
-
-	/*
-	 * Support for "command-preserve" property.  Note that we
-	 * add PCI_COMM_BACK2BACK_ENAB to the bits to be preserved
-	 * since the obp will set this if the device supports and
-	 * all targets on the same bus support it.  Since psycho
-	 * doesn't support PCI_COMM_BACK2BACK_ENAB, it will never
-	 * be set.  This is just here in case future revs do support
-	 * PCI_COMM_BACK2BACK_ENAB.
-	 */
-	command_preserve =
-	    ddi_prop_get_int(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-		"command-preserve", 0);
-	DBG(DBG_INIT_CLD, px_p->px_dip, "%s: command-preserve=%x\n",
-	    ddi_driver_name(child), command_preserve);
-	command = pci_config_get16(config_handle, PCI_CONF_COMM);
-	command &= (command_preserve | PCI_COMM_BACK2BACK_ENAB);
-	command |= (px_command_default & ~command_preserve);
-	pci_config_put16(config_handle, PCI_CONF_COMM, command);
-	command = pci_config_get16(config_handle, PCI_CONF_COMM);
-	DBG(DBG_INIT_CLD, px_p->px_dip, "%s: command=%x\n",
-	    ddi_driver_name(child),
-	    pci_config_get16(config_handle, PCI_CONF_COMM));
-
-	/*
-	 * If the device has a bus control register then program it
-	 * based on the settings in the command register.
-	 */
-	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
-		bcr = pci_config_get8(config_handle, PCI_BCNF_BCNTRL);
-		if (px_command_default & PCI_COMM_PARITY_DETECT)
-			bcr |= PCI_BCNF_BCNTRL_PARITY_ENABLE;
-		if (px_command_default & PCI_COMM_SERR_ENABLE)
-			bcr |= PCI_BCNF_BCNTRL_SERR_ENABLE;
-		bcr |= PCI_BCNF_BCNTRL_MAST_AB_MODE;
-		pci_config_put8(config_handle, PCI_BCNF_BCNTRL, bcr);
-	}
-
-	/*
-	 * Initialize latency timer registers if needed.
-	 */
-	if (px_set_latency_timer_register &&
-	    ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-		"latency-timer", 0) == 0) {
-
-		latency_timer = px_latency_timer;
-		if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
-			pci_config_put8(config_handle, PCI_BCNF_LATENCY_TIMER,
-			    latency_timer);
-		} else {
-			min_gnt = pci_config_get8(config_handle,
-			    PCI_CONF_MIN_G);
-			DBG(DBG_INIT_CLD, px_p->px_dip, "%s: min_gnt=%x\n",
-			    ddi_driver_name(child), min_gnt);
-		}
-		latency_timer = MIN(latency_timer, 0xff);
-		pci_config_put8(config_handle, PCI_CONF_LATENCY_TIMER,
-		    latency_timer);
-		n = pci_config_get8(config_handle, PCI_CONF_LATENCY_TIMER);
-		if (n != 0)
-			(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-			    "latency-timer", n);
-	}
-
-	pci_config_teardown(&config_handle);
+	pcie_initchild(child);
 
 	/*
 	 * Handle chip specific init-child tasks.
 	 */
-	px_post_init_child(px_p, child);
-	pcie_pm_release(px_p->px_dip);
+	pcie_pm_release(parent_dip);
 
 	return (DDI_SUCCESS);
 }
@@ -709,24 +526,24 @@ px_init_child(px_t *px_p, dev_info_t *child)
  *
  * used by: pci_ctlops() - DDI_CTLOPS_REGSIZE
  *
- * return value: size of reg set on success, -1 on error
+ * return value: size of reg set on success, 0 on error
  */
 off_t
 px_get_reg_set_size(dev_info_t *child, int rnumber)
 {
 	pci_regspec_t *pci_rp;
-	off_t size = -1;
+	off_t size = 0;
 	int i;
 
 	if (rnumber < 0)
-		return (-1);
+		return (0);
 
 	/*
 	 * Get the reg property for the device.
 	 */
 	if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS, "reg",
 	    (caddr_t)&pci_rp, &i) != DDI_SUCCESS)
-		return (-1);
+		return (0);
 
 	if (rnumber >= (i / (int)sizeof (pci_regspec_t)))
 		goto done;
@@ -840,20 +657,4 @@ px_log_cfg_err(dev_info_t *dip, ushort_t status_reg, char *err_msg)
 	    (uint32_t)status_reg, PX_STATUS_BITS);
 
 	return (nerr);
-}
-
-/*
- * remove the following functions once we port error handling and other
- * misc functionalities based on new VPCI interfaces.
- */
-uint64_t
-px_get_err_reg(caddr_t csr, uint32_t off)
-{
-	return (CSR_XR(csr, off));
-}
-
-void
-px_set_err_reg(caddr_t csr, uint32_t off, uint64_t val)
-{
-	CSR_XS(csr, off, val);
 }

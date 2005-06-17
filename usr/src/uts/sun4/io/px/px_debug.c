@@ -111,6 +111,16 @@ static char *px_debug_sym [] = {	/* same sequence as px_debug_bit */
 	/* LAST */ "unknown"
 };
 
+/*
+ * There are side effects of printing debug messages while servicing
+ * interrupts at PIL 14. This tunable keeps printing debug messages
+ * disabled by default.
+ *
+ * For debugging purposes set px_dbg_print != 0 to see printf messages
+ * during interrupt.
+ */
+int px_dbg_print = 0;
+
 void
 px_dbg(px_debug_bit_t bit, dev_info_t *dip, char *fmt, ...)
 {
@@ -126,15 +136,21 @@ px_dbg(px_debug_bit_t bit, dev_info_t *dip, char *fmt, ...)
 		goto body;
 	if (dip) {
 		if (servicing_interrupt()) {
-			cmn_err(CE_NOTE, "%s(%d): %s: ", ddi_driver_name(dip),
-			    ddi_get_instance(dip), px_debug_sym[bit]);
+			if (px_dbg_print) {
+				prom_printf("%s(%d): %s: ",
+				    ddi_driver_name(dip),
+				    ddi_get_instance(dip),
+				    px_debug_sym[bit]);
+			}
 		} else {
 			prom_printf("%s(%d): %s: ", ddi_driver_name(dip),
 			    ddi_get_instance(dip), px_debug_sym[bit]);
 		}
 	} else {
 		if (servicing_interrupt()) {
-			cmn_err(CE_NOTE, "px: %s: ", px_debug_sym[bit]);
+			if (px_dbg_print) {
+				prom_printf("px: %s: ", px_debug_sym[bit]);
+			}
 		} else {
 			prom_printf("px: %s: ", px_debug_sym[bit]);
 		}
@@ -142,7 +158,9 @@ px_dbg(px_debug_bit_t bit, dev_info_t *dip, char *fmt, ...)
 body:
 	va_start(ap, fmt);
 	if (servicing_interrupt()) {
-		vcmn_err(CE_NOTE, fmt, ap);
+		if (px_dbg_print) {
+			prom_vprintf(fmt, ap);
+		}
 	} else {
 		prom_vprintf(fmt, ap);
 	}
@@ -156,6 +174,10 @@ void
 px_log2ce(px_debug_bit_t bit, dev_info_t *dip, char *fmt, ...)
 {
 	va_list ap;
+
+	if (servicing_interrupt())
+		return;
+
 	if (dip)
 		cmn_err(CE_WARN, "%s(%d): ",
 			ddi_driver_name(dip), ddi_get_instance(dip));

@@ -48,103 +48,9 @@
 
 extern uint_t px_ranges_phi_mask;
 
+static uint_t px_pec_error_intr(caddr_t a);
 static int    px_pec_msg_add_intr(px_t *px_p);
 static void   px_pec_msg_rem_intr(px_t *px_p);
-
-static void
-px_ilu_attach(px_pec_t *pec_p)
-{
-	/*
-	 * Register ilu error interrupt.  This will
-	 * also program the correct values into the
-	 * log enable and interrupt enable registers.
-	 */
-	px_err_add_fh(&pec_p->pec_px_p->px_fault, PX_ERR_ILU,
-	    (caddr_t)pec_p->pec_px_p->px_address[PX_REG_CSR]);
-}
-
-int
-px_ilu_intr(dev_info_t *dip, px_fh_t *fh_p)
-{
-	uint32_t offset = px_fhd_tbl[fh_p->fh_err_id].fhd_st;
-	uint64_t stat = fh_p->fh_stat;
-
-	if (stat)
-		LOG(DBG_ERR_INTR, dip, "[%x]=%16llx ilu stat\n", offset, stat);
-	return (stat ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
-}
-
-static void
-px_tlu_attach(px_pec_t *pec_p)
-{
-	caddr_t	csr_base = (caddr_t)pec_p->pec_px_p->px_address[PX_REG_CSR];
-	px_fault_t *px_fault_p = &pec_p->pec_px_p->px_fault;
-
-	px_err_add_fh(px_fault_p, PX_ERR_TLU_UE, csr_base);
-	px_err_add_fh(px_fault_p, PX_ERR_TLU_CE, csr_base);
-	px_err_add_fh(px_fault_p, PX_ERR_TLU_OE, csr_base);
-}
-
-static void
-px_lpu_attach(px_pec_t *pec_p)
-{
-	caddr_t csr_base = (caddr_t)pec_p->pec_px_p->px_address[PX_REG_CSR];
-	px_fault_t *px_fault_p = &pec_p->pec_px_p->px_fault;
-
-	px_err_add_fh(px_fault_p, PX_ERR_LPU_LINK, csr_base);
-	px_err_add_fh(px_fault_p, PX_ERR_LPU_PHY, csr_base);
-	px_err_add_fh(px_fault_p, PX_ERR_LPU_REC_PHY, csr_base);
-	px_err_add_fh(px_fault_p, PX_ERR_LPU_TRNS_PHY, csr_base);
-	px_err_add_fh(px_fault_p, PX_ERR_LPU_LTSSM, csr_base);
-	px_err_add_fh(px_fault_p, PX_ERR_LPU_GIGABLZ, csr_base);
-}
-
-int
-px_tlu_ue_intr(dev_info_t *dip, px_fh_t *fh_p)
-{
-	uint32_t offset = px_fhd_tbl[fh_p->fh_err_id].fhd_st;
-	uint64_t stat = fh_p->fh_stat;
-
-	if (stat)
-		LOG(DBG_ERR_INTR, dip, "[%x]=%16llx tlu ue stat\n", offset,
-			stat);
-	return (stat ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
-}
-
-int
-px_tlu_ce_intr(dev_info_t *dip, px_fh_t *fh_p)
-{
-	uint32_t offset = px_fhd_tbl[fh_p->fh_err_id].fhd_st;
-	uint64_t stat = fh_p->fh_stat;
-
-	if (stat)
-		LOG(DBG_ERR_INTR, dip, "[%x]=%16llx tlu ce stat\n", offset,
-			stat);
-	return (stat ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
-}
-
-int
-px_tlu_oe_intr(dev_info_t *dip, px_fh_t *fh_p)
-{
-	uint32_t offset = px_fhd_tbl[fh_p->fh_err_id].fhd_st;
-	uint64_t stat = fh_p->fh_stat;
-
-	if (stat)
-		LOG(DBG_ERR_INTR, dip, "[%x]=%16llx tlu other stat\n", offset,
-			stat);
-	return (stat ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
-}
-
-int
-px_lpu_intr(dev_info_t *dip, px_fh_t *fh_p)
-{
-	uint32_t offset = px_fhd_tbl[fh_p->fh_err_id].fhd_st;
-	uint64_t stat = fh_p->fh_stat;
-
-	if (stat)
-		LOG(DBG_ERR_INTR, dip, "[%x]=%16llx lpu stat\n", offset, stat);
-	return (stat ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
-}
 
 int
 px_pec_attach(px_t *px_p)
@@ -216,27 +122,13 @@ px_pec_attach(px_t *px_p)
 	}
 
 	/*
-	 * configure ILU.
-	 */
-	px_ilu_attach(pec_p);
-
-	/*
-	 * configure TLU.
-	 */
-	px_tlu_attach(pec_p);
-
-	/*
-	 * configure LPU
-	 */
-	px_lpu_attach(pec_p);
-
-	/*
 	 * Register a function to disable pec error interrupts during a panic.
 	 * do in px_attach. bus_func_register(BF_TYPE_ERRDIS,
 	 * (busfunc_t)pec_disable_pci_errors, pec_p);
 	 */
 
-	mutex_init(&pec_p->pec_pokefault_mutex, NULL, MUTEX_DRIVER, 0);
+	mutex_init(&pec_p->pec_pokefault_mutex, NULL, MUTEX_DRIVER,
+	    (void *)px_p->px_fm_ibc);
 
 	return (DDI_SUCCESS);
 }
@@ -310,16 +202,16 @@ px_pec_msg_add_intr(px_t *px_p)
 	DBG(DBG_MSG, px_p->px_dip, "px_pec_msg_add_intr\n");
 
 	/* Initilize handle */
+	hdl.ih_cb_func = (ddi_intr_handler_t *)px_err_fabric_intr;
+	hdl.ih_cb_arg1 = NULL;
+	hdl.ih_cb_arg2 = NULL;
 	hdl.ih_ver = DDI_INTR_VERSION;
 	hdl.ih_state = DDI_IHDL_STATE_ALLOC;
 	hdl.ih_dip = dip;
 	hdl.ih_inum = 0;
-	hdl.ih_pri = PX_ERR_PIL;
 
 	/* Add correctable error message handler */
-	hdl.ih_cb_func = (ddi_intr_handler_t *)px_pec_corr_msg_intr;
-	hdl.ih_cb_arg1 = px_p;
-	hdl.ih_cb_arg2 = NULL;
+	hdl.ih_pri = PX_ERR_LOW_PIL;
 
 	if ((ret = px_add_msiq_intr(dip, dip, &hdl,
 	    MSG_REC, (msgcode_t)PCIE_CORR_MSG,
@@ -333,9 +225,7 @@ px_pec_msg_add_intr(px_t *px_p)
 	px_lib_msg_setvalid(dip, PCIE_CORR_MSG, PCIE_MSG_VALID);
 
 	/* Add non-fatal error message handler */
-	hdl.ih_cb_func = (ddi_intr_handler_t *)px_pec_non_fatal_msg_intr;
-	hdl.ih_cb_arg1 = px_p;
-	hdl.ih_cb_arg2 = NULL;
+	hdl.ih_pri = PX_ERR_PIL;
 
 	if ((ret = px_add_msiq_intr(dip, dip, &hdl,
 	    MSG_REC, (msgcode_t)PCIE_NONFATAL_MSG,
@@ -350,9 +240,7 @@ px_pec_msg_add_intr(px_t *px_p)
 	px_lib_msg_setvalid(dip, PCIE_NONFATAL_MSG, PCIE_MSG_VALID);
 
 	/* Add fatal error message handler */
-	hdl.ih_cb_func = (ddi_intr_handler_t *)px_pec_fatal_msg_intr;
-	hdl.ih_cb_arg1 = px_p;
-	hdl.ih_cb_arg2 = NULL;
+	hdl.ih_pri = PX_ERR_PIL;
 
 	if ((ret = px_add_msiq_intr(dip, dip, &hdl,
 	    MSG_REC, (msgcode_t)PCIE_FATAL_MSG,
@@ -416,49 +304,4 @@ px_pec_msg_rem_intr(px_t *px_p)
 
 		pec_p->pec_fatal_msg_msiq_id = -1;
 	}
-}
-
-/*ARGSUSED*/
-uint_t
-px_pec_corr_msg_intr(caddr_t arg)
-{
-	px_t		*px_p = (px_t *)arg;
-	uint64_t	rid = px_p->px_pec_p->pec_msiq_rec_p->msiq_rec_rid;
-
-	DBG(DBG_MSG_INTR, px_p->px_dip,
-	    "px_pec_corr_msg_intr: requester id 0x%x\n", rid);
-
-	px_p->px_pec_p->pec_msiq_rec_p = NULL;
-
-	return (DDI_INTR_CLAIMED);
-}
-
-/*ARGSUSED*/
-uint_t
-px_pec_non_fatal_msg_intr(caddr_t arg)
-{
-	px_t		*px_p = (px_t *)arg;
-	uint64_t	rid = px_p->px_pec_p->pec_msiq_rec_p->msiq_rec_rid;
-
-	DBG(DBG_MSG_INTR, px_p->px_dip,
-	    "px_pec_non_fatal_msg_intr: requester id 0x%x\n", rid);
-
-	px_p->px_pec_p->pec_msiq_rec_p = NULL;
-
-	return (DDI_INTR_CLAIMED);
-}
-
-/*ARGSUSED*/
-uint_t
-px_pec_fatal_msg_intr(caddr_t arg)
-{
-	px_t		*px_p = (px_t *)arg;
-	uint64_t	rid = px_p->px_pec_p->pec_msiq_rec_p->msiq_rec_rid;
-
-	DBG(DBG_MSG_INTR, px_p->px_dip,
-	    "px_pec_fatal_msg_intr: requester id 0x%x\n", rid);
-
-	px_p->px_pec_p->pec_msiq_rec_p = NULL;
-
-	return (DDI_INTR_CLAIMED);
 }

@@ -34,7 +34,7 @@
 #include <sys/ddi_implfuncs.h>
 #include <sys/pci/pci_regs.h>
 #include <px_csr.h>
-#include <px_regs.h>		/* XXX - remove it later */
+#include <px_regs.h>
 #include <px_obj.h>
 #include <px_lib4u.h>
 #include <px_asm.h>
@@ -316,7 +316,8 @@ px_get_intr(dev_info_t *dip, void *arg, int mode, px_t *px_p)
 	pci_intr_get_t *iget = &partial_iget;
 	size_t	iget_kmem_alloc_size = 0;
 	px_ib_t *ib_p = px_p->px_ib_p;
-	uint64_t csrbase = (uint64_t)px_p->px_address[PX_REG_CSR];
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+	uint64_t csrbase = (uint64_t)pxu_p->px_address[PX_REG_CSR];
 	uint64_t imregval;
 	uint32_t ino;
 	uint8_t num_devs_ret;
@@ -424,7 +425,8 @@ px_set_intr(dev_info_t *dip, void *arg, int mode, px_t *px_p)
 	pci_intr_set_t iset;
 	uint32_t old_cpu_id;
 	hrtime_t start_time;
-	uint64_t csrbase = (uint64_t)px_p->px_address[PX_REG_CSR];
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+	uint64_t csrbase = (uint64_t)pxu_p->px_address[PX_REG_CSR];
 	px_ib_t *ib_p = px_p->px_ib_p;
 	uint64_t imregval;
 	uint64_t new_imregval;
