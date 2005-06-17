@@ -45,9 +45,6 @@ include ../Makefile.com
 # install rules
 #
 
-$(PLATLIBS):
-	$(INS.dir)
-
 $(PLATLIBS)/libpcp.so:
 	$(RM) -r $@; $(SYMLINK) libpcp.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
 
@@ -55,7 +52,7 @@ $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 	$(INS.file)
 
 $(USR_PSM_LIB_DIR):
-	cd $(UTSBASE)/sun4v; pwd; $(MAKE) $(USR_PSM_LIB_DIR)
+	$(INS.dir.root.sys)
 
 $(LINKED_DIRS):   $(USR_PLAT_DIR)
 	-$(INS.dir.root.sys)
@@ -72,7 +69,7 @@ $(LINKED_LIBPCP1_DIR): $(USR_PLAT_DIR)
 $(LINKED_LLIBLPCP_DIR): $(USR_PLAT_DIR)
 	-$(INS.slink8)
 
-install: all $(PLATLIBS) $(USR_PSM_LIBS) $(PLATLIBS)/libpcp.so \
+install: all $(USR_PSM_LIBS) $(PLATLIBS)/libpcp.so \
 	$(LINKED_DIRS) $(LINKED_LIB_DIRS) \
 	$(LINKED_LIBPCP_DIR) $(LINKED_LIBPCP1_DIR) \
 	$(LINKED_LLIBLPCP_DIR)

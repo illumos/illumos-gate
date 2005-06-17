@@ -72,6 +72,9 @@ $(USR_ONTARIO_ISYS_DIR):	$(USR_ONTARIO_INC_DIR)
 $(USR_ONTARIO_SBIN_DIR):	$(USR_ONTARIO_DIR)
 	-$(INS.slink5)
 
+$(USR_ONTARIO_LIB_DIR):	$(USR_ONTARIO_DIR)
+	-$(INS.dir.root.bin)
+
 #
 #	Include common targets.
 #
