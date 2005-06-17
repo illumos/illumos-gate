@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,6 +96,21 @@ main(int argc, char *argv[])
 		return (sbrr);
 	}
 
+	if ((sblock.fs_magic != FS_MAGIC) &&
+	    (sblock.fs_magic != MTB_UFS_MAGIC)) {
+		(void) printf("bad super block magic number\n");
+		return (35);
+	}
+
+	if (sblock.fs_magic == MTB_UFS_MAGIC &&
+	    (sblock.fs_version > MTB_UFS_VERSION_1 ||
+	    sblock.fs_version < MTB_UFS_VERSION_MIN)) {
+		(void) printf(
+		    "unrecognized version of UFS on-disk format: %d\n",
+		    sblock.fs_version);
+		return (35);
+	}
+
 	/* If fs is logged, roll the log. */
 	if (sblock.fs_logbno) {
 		switch (rl_roll_log(argv[1])) {
@@ -119,21 +134,6 @@ main(int argc, char *argv[])
 				argv[1]);
 			break;
 		}
-	}
-
-	if ((sblock.fs_magic != FS_MAGIC) &&
-	    (sblock.fs_magic != MTB_UFS_MAGIC)) {
-		(void) printf("bad super block magic number\n");
-		return (35);
-	}
-
-	if (sblock.fs_magic == MTB_UFS_MAGIC &&
-	    (sblock.fs_version > MTB_UFS_VERSION_1 ||
-	    sblock.fs_version < MTB_UFS_VERSION_MIN)) {
-		(void) printf(
-		    "unrecognized version of UFS on-disk format: %d\n",
-		    sblock.fs_version);
-		return (35);
 	}
 
 	for (i = 2; i < argc; i++) {
