@@ -69,6 +69,7 @@ grub_log2 (unsigned long word)
 static int
 iso9660_devread (int sector, int byte_offset, int byte_len, char *buf)
 {
+  static int read_count = 0, threshold = 2;
   unsigned short sector_size_lg2 = log2(buf_geom.sector_size);
 
   /*
@@ -94,6 +95,11 @@ iso9660_devread (int sector, int byte_offset, int byte_len, char *buf)
     printf ("<%d, %d, %d>", sector, byte_offset, byte_len);
 #endif /* !STAGE1_5 */
 
+  read_count += (byte_len >> 9);
+  if ((read_count >> 11) > threshold) {
+	printf(".");
+	threshold += 2;	/* one dot every 2 MB */
+  }
   return rawread(current_drive, part_start + sector, byte_offset, byte_len, buf);
 }
 

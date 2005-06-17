@@ -1375,15 +1375,18 @@ vgatext_init_graphics(struct vgatext_softc *softc)
 }
 #endif
 
+static char vga_fontslot = 0;
+
 static void
 vgatext_setfont(struct vgatext_softc *softc)
 {
+	static uchar_t fsreg[8] = {0x0, 0x30, 0x5, 0x35, 0xa, 0x3a, 0xf, 0x3f};
+
 	extern unsigned char *ENCODINGS[];
-	unsigned char *from;
-	unsigned char *to;
-	int	i;
-	int	j;
-	int	bpc;
+	uchar_t *from;
+	uchar_t volatile *to;
+	int	i, j, s;
+	int	bpc, f_offset;
 
 	/* Sync-reset the sequencer registers */
 	vga_set_seq(&softc->regs, 0x00, 0x01);
@@ -1418,15 +1421,13 @@ vgatext_setfont(struct vgatext_softc *softc)
 	/*
 	 * This assumes 8x16 characters, which yield the traditional 80x25
 	 * screen.  It really should support other character heights.
-	 *
-	 * plane2 may contain 8 font sets, we shouldn't touch font set 0,
-	 * which is default font and kept in slot 0. we will load our own
-	 * font in slot 2, which is 4*8K offset to slot 0;
 	 */
 	bpc = 16;
+	s = vga_fontslot;
+	f_offset = s * 8 * 1024;
 	for (i = 0; i < 256; i++) {
 		from = ENCODINGS[i];
-		to = (unsigned char *)softc->fb.addr + 32768 + i * 0x20;
+		to = (unsigned char *)softc->fb.addr + f_offset + i * 0x20;
 		for (j = 0; j < bpc; j++)
 			*to++ = *from++;
 	}
@@ -1441,10 +1442,9 @@ vgatext_setfont(struct vgatext_softc *softc)
 	 */
 	vga_set_seq(&softc->regs, 0x04, 0x03);
 	/*
-	 * select font map that resides in slot 2
-	 * 010b -- font residing at 8000h - 9FFFh
+	 * select font map
 	 */
-	vga_set_seq(&softc->regs, 0x03, 0x0a);
+	vga_set_seq(&softc->regs, 0x03, fsreg[s]);
 	/* Sync-reset ended, and allow the sequencer to operate */
 	vga_set_seq(&softc->regs, 0x00, 0x03);
 

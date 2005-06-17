@@ -204,12 +204,17 @@ serial_adjust_prop(void)
 	    'a' + console - CONS_TTYA);
 	plen = bgetproplen(NULL, propname);
 	if (plen > 0 && plen <= sizeof (propval)) {
+		bgetprop(NULL, propname, propval);
+	} else {
+		strcpy(propval, "9600,8,n,1,-");
+	}
+
+	{
 		char *p;
 		ulong_t baud;
 		uchar_t lcr = 0;
 
 		/* property is of the form: "9600,8,n,1,-" */
-		bgetprop(NULL, propname, propval);
 		p = strtok(propval, ",");
 		if (strcmp(p, "110") == 0)
 			baud = ASY110;
@@ -296,9 +301,14 @@ serial_adjust_prop(void)
 	    "tty%c-rts-dtr-off", 'a' + console - CONS_TTYA);
 	plen = bgetproplen(NULL, propname);
 	if (plen > 0 && plen <= sizeof (propval)) {
+		bgetprop(NULL, propname, propval);
+	} else {
+		strcpy(propval, "false");
+	}
+
+	{
 		char *p;
 		uchar_t mcr = DTR | RTS;
-		bgetprop(NULL, propname, propval);
 		if (propval[0] != 'f' && propval[0] != 'F')
 			mcr = 0;
 		/* set modem control bits */
@@ -314,8 +324,14 @@ console_init(char *bootstr)
 	console = CONS_INVALID;
 
 	cons = strstr(bootstr, "console=");
-	if (cons) {
+	if (cons)
 		cons += strlen("console=");
+	else {
+		cons = strstr(bootstr, "output-device=");
+		if (cons)
+			cons += strlen("output-device=");
+	}
+	if (cons) {
 		if (strncmp(cons, "ttya", 4) == 0)
 			console = CONS_TTYA;
 		else if (strncmp(cons, "ttyb", 4) == 0)

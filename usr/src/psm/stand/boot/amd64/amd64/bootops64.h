@@ -41,7 +41,10 @@ extern "C" {
 struct bsys_mem64 {
 	caddr64_t	physinstalled;	/* struct memlist64 pointer */
 	caddr64_t	physavail;	/* struct memlist64 pointer */
+	caddr64_t	virtavail;	/* struct memlist64 pointer */
 	caddr64_t	pcimem;		/* struct memlist64 pointer */
+	uint32_t	extent;		/* unused */
+	uint32_t	__bsys_pad0;
 };
 
 /*

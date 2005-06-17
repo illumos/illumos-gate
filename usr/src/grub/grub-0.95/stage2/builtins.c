@@ -934,8 +934,8 @@ static void solaris_config_file (void)
 	if (grub_strcmp(config_file, "/boot/grub/menu.lst") != 0)
 		return;
 
-	/* default solaris configfile name /menu.lst.01<ether_addr> */
-	grub_strcpy(c, "/menu.lst.01");
+	/* default solaris configfile name menu.lst.01<ether_addr> */
+	grub_strcpy(c, "menu.lst.01");
 	c += grub_strlen(c);
 	for (i = 0; i < ETH_ALEN; i++) {
 		unsigned char b = arptable[ARP_CLIENT].node[i];
@@ -950,6 +950,12 @@ static void solaris_config_file (void)
 	if (grub_open(menufile)) {
 		grub_strcpy(config_file, menufile);
 		grub_close();
+	} else {
+		char *cp = config_file;
+		/* skip leading slashes for tftp */
+		while (*cp++ == '/')
+			;
+	  	grub_memmove (config_file, cp, strlen(cp) + 1);
 	}
 }
 

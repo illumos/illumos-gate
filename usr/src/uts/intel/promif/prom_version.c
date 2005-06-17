@@ -57,7 +57,7 @@ prom_is_openprom(void)
 int
 prom_version_name(char *buf, int len)
 {
-	static char *prom_versionstr = "DevConf 2.0";
+	static char prom_versionstr[] = "DevConf 2.0";
 	extern size_t strlcpy(char *, const char *, size_t);
 
 	(void) strlcpy(buf, prom_versionstr, len - 1);

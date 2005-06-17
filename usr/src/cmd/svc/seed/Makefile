@@ -29,6 +29,7 @@ include ../../Makefile.cmd
 
 ETCSVC = $(ROOTETC)/svc
 LIBSVCSEED = $(ROOT)/lib/svc/seed
+INSTALLSEED = $(ROOT)/usr/sadm/install
 
 #
 # Because seed repository construction requires a functioning repository, a
@@ -37,26 +38,29 @@ LIBSVCSEED = $(ROOT)/lib/svc/seed
 #
 
 #
-# GLOBAL_ZONE_DESCRIPTIONS and NONGLOBAL_ZONE_DESCRIPTIONS contain the
-# services used to define a 'seed repository' for a standalone Solaris
-# instance or for a zone, respectively.  A service needed for either one of
-# these seeds must be added to the appropriate macro.  The definition of a seed
-# repository is a self-consistent set of services that can boot.
+# We build and deliver 3 seed repositories:
+#	global.db	-- for a standalone Solaris (global zone)
+#	nonglobal.db	-- for a Solaris Zone
+#	miniroot.db	-- for the install miniroot
+# COMMON_DESCRIPTIONS contains manifests needed by all 3 repositories.
+# GLOBAL_ZONE_DESCRIPTIONS/NONGLOBAL_ZONE_DESCRIPTIONS/MINIROOT_DESCRIPTIONS
+# contain additional manifests needed.
 #
-GLOBAL_ZONE_DESCRIPTIONS = \
+
+#
+# Manifests needed by all seed repositories. If you change this, you
+# must test Solaris standalone, Solaris zone, and Install miniroot.
+#
+COMMON_DESCRIPTIONS = \
 	../milestone/boot-archive.xml \
-	../milestone/console-login.xml \
 	../milestone/datalink.xml \
-	../milestone/datalink-init.xml \
 	../milestone/devices-local.xml \
 	../milestone/identity.xml \
 	../milestone/local-fs.xml \
 	../milestone/manifest-import.xml \
 	../milestone/minimal-fs.xml \
-	../milestone/multi-user-server.xml \
 	../milestone/multi-user.xml \
 	../milestone/name-services.xml \
-	../milestone/aggregation.xml \
 	../milestone/network-initial.xml \
 	../milestone/network-loopback.xml \
 	../milestone/network-physical.xml \
@@ -65,33 +69,48 @@ GLOBAL_ZONE_DESCRIPTIONS = \
 	../milestone/single-user.xml \
 	../milestone/usr-fs.xml \
 	../../rpcbind/bind.xml \
+
+#
+# Additional manifests for standalone Solaris
+#
+GLOBAL_ZONE_DESCRIPTIONS = \
+	../milestone/console-login.xml \
+	../milestone/datalink-init.xml \
+	../milestone/multi-user-server.xml \
+	../milestone/aggregation.xml \
 	../../cmd-inet/usr.lib/inetd/inetd-upgrade.xml \
 	../../utmpd/utmp.xml \
 	../../lvm/util/metainit.xml \
 	../../ipf/svc/pfil.xml
 
+#
+# Additional manifests for a Solaris zone
+#
 NONGLOBAL_ZONE_DESCRIPTIONS = \
-	../milestone/boot-archive.xml \
 	../milestone/console-login.xml \
-	../milestone/datalink.xml \
-	../milestone/devices-local.xml \
-	../milestone/identity.xml \
-	../milestone/local-fs.xml \
-	../milestone/manifest-import.xml \
-	../milestone/minimal-fs.xml \
 	../milestone/multi-user-server.xml \
-	../milestone/multi-user.xml \
-	../milestone/name-services.xml \
 	../milestone/aggregation.xml \
-	../milestone/network-initial.xml \
-	../milestone/network-loopback.xml \
-	../milestone/network-physical.xml \
-	../milestone/restarter.xml \
-	../milestone/root-fs.xml \
-	../milestone/single-user.xml \
-	../milestone/usr-fs.xml \
-	../../rpcbind/bind.xml \
 	../../utmpd/utmp.xml
+
+#
+# Additional manifests for the install miniroot.
+#
+MINIROOT_DESCRIPTIONS= \
+	../milestone/datalink-init.xml \
+	../milestone/sysconfig.xml \
+	../../cmd-inet/usr.lib/inetd/inetd.xml \
+	../../cmd-inet/usr.sbin/login.xml \
+	../milestone/network-service.xml \
+	../../cmd-inet/usr.sbin/telnet.xml \
+	../../../lib/libresolv2/client.xml \
+	../../ldapcachemgr/client.xml \
+	../../ypcmd/client.xml \
+	../../ypcmd/server.xml \
+	../../keyserv/keyserv.xml \
+	../../rpcsvc/nisplus.xml \
+	../../cmd-crypto/scripts/cryptosvc.xml \
+	../../nscd/name-service-cache.xml \
+	../../syslogd/system-log.xml
 
 OWNER = root
 GROUP = sys
@@ -104,7 +123,7 @@ SVCCFG = ../svccfg/svccfg-native
 
 .KEEP_STATE:
 
-all: global.db nonglobal.db
+all: global.db nonglobal.db miniroot.db
 
 $(CONFIGD): FRC
 	@cd ../configd; pwd; $(MAKE) $(MFLAGS) native
@@ -115,8 +134,19 @@ $(SVCCFG): FRC
 ../milestone/console-login.xml:
 	@cd ../milestone; pwd; $(MAKE) $(MFLAGS) console-login.xml
 
-global.db: $(GLOBAL_ZONE_DESCRIPTIONS) $(CONFIGD) $(SVCCFG)
+common.db: $(COMMON_DESCRIPTIONS) $(CONFIGD) $(SVCCFG)
+	$(RM) -f common.db common.db-journal
+	for m in $(COMMON_DESCRIPTIONS); do \
+		echo $$m; \
+		SVCCFG_DTD=../dtd/service_bundle.dtd.1 \
+		SVCCFG_REPOSITORY=$(SRC)/cmd/svc/seed/common.db \
+		SVCCFG_CONFIGD_PATH=$(CONFIGD) \
+		$(SVCCFG) import $$m; \
+	done
+
+global.db: common.db $(GLOBAL_ZONE_DESCRIPTIONS) $(CONFIGD) $(SVCCFG)
 	$(RM) -f global.db global.db-journal
+	$(CP) common.db global.db
 	for m in $(GLOBAL_ZONE_DESCRIPTIONS); do \
 		echo $$m; \
 		SVCCFG_DTD=../dtd/service_bundle.dtd.1 \
@@ -125,8 +155,9 @@ global.db: $(GLOBAL_ZONE_DESCRIPTIONS) $(CONFIGD) $(SVCCFG)
 		$(SVCCFG) import $$m; \
 	done
 
-nonglobal.db: $(NONGLOBAL_ZONE_DESCRIPTIONS) $(CONFIGD) $(SVCCFG)
-	$(RM) -f nonglobal.db global.db-journal
+nonglobal.db: common.db $(NONGLOBAL_ZONE_DESCRIPTIONS) $(CONFIGD) $(SVCCFG)
+	$(RM) -f nonglobal.db nonglobal.db-journal
+	$(CP) common.db nonglobal.db
 	for m in $(NONGLOBAL_ZONE_DESCRIPTIONS); do \
 		echo $$m; \
 		SVCCFG_DTD=../dtd/service_bundle.dtd.1 \
@@ -135,7 +166,18 @@ nonglobal.db: $(NONGLOBAL_ZONE_DESCRIPTIONS) $(CONFIGD) $(SVCCFG)
 		$(SVCCFG) import $$m; \
 	done
 
-install: install_global install_nonglobal
+miniroot.db: common.db $(MINIROOT_DESCRIPTIONS) $(CONFIGD) $(SVCCFG)
+	$(RM) -f miniroot.db miniroot.db-journal
+	$(CP) common.db miniroot.db
+	for m in $(MINIROOT_DESCRIPTIONS); do \
+		echo $$m; \
+		SVCCFG_DTD=../dtd/service_bundle.dtd.1 \
+		SVCCFG_REPOSITORY=$(SRC)/cmd/svc/seed/miniroot.db \
+		SVCCFG_CONFIGD_PATH=$(CONFIGD) \
+		$(SVCCFG) import $$m; \
+	done
+
+install: install_global install_nonglobal install_miniroot
 
 install_global: global.db
 	$(RM) $(LIBSVCSEED)/global.db
@@ -145,9 +187,17 @@ install_nonglobal: nonglobal.db
 	$(RM) $(LIBSVCSEED)/nonglobal.db
 	$(INS) -f $(LIBSVCSEED) -m $(SEEDFILEMODE) -s nonglobal.db
 
+install_miniroot: $(INSTALLSEED) miniroot.db
+	$(RM) $(INSTALLSEED)/miniroot.db
+	$(INS) -f $(INSTALLSEED) -m $(SEEDFILEMODE) -s miniroot.db
+
+$(INSTALLSEED):
+	$(INS.dir)
+
 clean lint:
+	$(RM) common.db
 
 clobber:
-	$(RM) global.db nonglobal.db
+	$(RM) common.db global.db nonglobal.db miniroot.db
 
 FRC:

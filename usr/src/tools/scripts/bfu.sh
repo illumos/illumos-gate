@@ -982,6 +982,7 @@ smf_obsolete_manifests="
 # smf services whose manifests have been renamed
 smf_renamed_manifests="
 	var/svc/manifest/milestone/name-service.xml
+	var/svc/manifest/system/filesystem/boot-archive.xml
 "
 
 # Obsolete smf methods

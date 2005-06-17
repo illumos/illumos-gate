@@ -65,8 +65,8 @@ diskread(fileid_t *filep)
 	/* add in offset of root slice */
 	blocknum = filep->fi_blocknum;
 
-	diskloc = (caddr_t)rd_start + blocknum * DEV_BSIZE;
-	if (diskloc + filep->fi_count > (caddr_t)rd_end) {
+	diskloc = (caddr_t)(uintptr_t)rd_start + blocknum * DEV_BSIZE;
+	if (diskloc + filep->fi_count > (caddr_t)(uintptr_t)rd_end) {
 		_kobj_printf(ops, "diskread: start = 0x%p, size = 0x%x\n",
 		    diskloc, filep->fi_count);
 		_kobj_printf(ops, "reading beyond end of ramdisk\n");
@@ -132,8 +132,8 @@ bkmem_alloc(size_t size)
 
 	addr = BOP_ALLOC(ops, 0, size, 0);
 #ifdef	DEBUG
-	if (scratch_max < (uint64_t)addr + size)
-		scratch_max = (uint64_t)addr + size;
+	if (scratch_max < (uintptr_t)addr + size)
+		scratch_max = (uintptr_t)addr + size;
 #endif
 	return (addr);
 }

@@ -651,6 +651,7 @@ l none usr/sadm/bin/valtime=../../../usr/bin/cktime
 l none usr/sadm/bin/valuid=../../../usr/bin/ckuid
 l none usr/sadm/bin/valyorn=../../../usr/bin/ckyorn
 d none usr/sadm/install 755 root bin
+f none usr/sadm/install/miniroot.db 444 root sys
 d none usr/sadm/install/scripts 755 root bin
 f none usr/sadm/install/scripts/i.ipsecalgs 555 root sys
 f none usr/sadm/install/scripts/r.ipsecalgs 555 root sys

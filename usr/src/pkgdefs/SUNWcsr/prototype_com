@@ -482,10 +482,10 @@ f manifest var/svc/manifest/network/ldap/client.xml 0444 root sys
 d none var/svc/manifest/platform 755 root sys
 d none var/svc/manifest/site 755 root sys
 d none var/svc/manifest/system 755 root sys
+f manifest var/svc/manifest/system/boot-archive.xml 0444 root sys
 d none var/svc/manifest/system/device 755 root sys
 f manifest var/svc/manifest/system/device/devices-local.xml 0444 root sys
 d none var/svc/manifest/system/filesystem 0755 root sys
-f manifest var/svc/manifest/system/filesystem/boot-archive.xml 0444 root sys
 f manifest var/svc/manifest/system/filesystem/local-fs.xml 0444 root sys
 f manifest var/svc/manifest/system/filesystem/minimal-fs.xml 0444 root sys
 f manifest var/svc/manifest/system/filesystem/root-fs.xml 0444 root sys

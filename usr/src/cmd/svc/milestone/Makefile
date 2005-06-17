@@ -35,7 +35,6 @@ BUILTXML= \
 	console-login.xml
 
 FSSVCS= \
-	boot-archive.xml \
 	local-fs.xml \
 	minimal-fs.xml \
 	root-fs.xml \
@@ -70,6 +69,7 @@ SYSDEVSVCS= \
 SYSDEVMANIFESTS= $(SYSDEVSVCS:%=$(ROOTSVCSYSTEMDEVICE)/%)
 
 SYSTEMSVCS= \
+	boot-archive.xml \
 	console-login.xml \
 	identity.xml \
 	manifest-import.xml \

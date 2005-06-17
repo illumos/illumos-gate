@@ -1017,12 +1017,6 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func)
 	 */
 	/* io range */
 	val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
-	/* if 32-bit supported, make sure upper bits are not set */
-	if ((val & 0xf) == 1 &&
-	    pci_getw(bus, dev, func, PCI_BCNF_IO_BASE_HI)) {
-		cmn_err(CE_NOTE, "unsupported 32-bit IO address on"
-		    " pci-pci bridge [%d/%d/%d]", bus, dev, func);
-	}
 	io_range[0] = ((val & 0xf0) << 8);
 	val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
 	io_range[1]  = ((val & 0xf0) << 8) | 0xFFF;
@@ -1037,6 +1031,12 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func)
 		}
 		dcmn_err(CE_NOTE, "bus %d io-range: 0x%x-%x",
 		    secbus, io_range[0], io_range[1]);
+		/* if 32-bit supported, make sure upper bits are not set */
+		if ((val & 0xf) == 1 &&
+		    pci_getw(bus, dev, func, PCI_BCNF_IO_BASE_HI)) {
+			cmn_err(CE_NOTE, "unsupported 32-bit IO address on"
+			    " pci-pci bridge [%d/%d/%d]", bus, dev, func);
+		}
 	}
 
 	/* mem range */
@@ -1060,12 +1060,6 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func)
 
 	/* prefetchable memory range */
 	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_PF_BASE_LOW);
-	/* if 64-bit supported, make sure upper bits are not set */
-	if ((val & 0xf) == 1 &&
-	    pci_getl(bus, dev, func, PCI_BCNF_PF_BASE_HIGH)) {
-		cmn_err(CE_NOTE, "unsupported 64-bit prefetch memory on"
-		    " pci-pci bridge [%d/%d/%d]", bus, dev, func);
-	}
 	pmem_range[0] = ((val & 0xFFF0) << 16);
 	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_PF_LIMIT_LOW);
 	pmem_range[1] = ((val & 0xFFF0) << 16) | 0xFFFFF;
@@ -1080,6 +1074,12 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func)
 		}
 		dcmn_err(CE_NOTE, "bus %d pmem-range: 0x%x-%x",
 		    secbus, pmem_range[0], pmem_range[1]);
+		/* if 64-bit supported, make sure upper bits are not set */
+		if ((val & 0xf) == 1 &&
+		    pci_getl(bus, dev, func, PCI_BCNF_PF_BASE_HIGH)) {
+			cmn_err(CE_NOTE, "unsupported 64-bit prefetch memory on"
+			    " pci-pci bridge [%d/%d/%d]", bus, dev, func);
+		}
 	}
 
 	add_bus_range_prop(secbus);

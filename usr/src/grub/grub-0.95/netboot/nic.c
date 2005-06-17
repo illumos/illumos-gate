@@ -460,6 +460,7 @@ static int await_rarp(int ival, void *ptr, unsigned short ptype,
 		memcpy(arptable[ARP_SERVER].node, arpreply->shwaddr, ETH_ALEN);
 		memcpy(&arptable[ARP_SERVER].ipaddr, arpreply->sipaddr, sizeof(in_addr));
 		memcpy(&arptable[ARP_CLIENT].ipaddr, arpreply->tipaddr, sizeof(in_addr));
+		memset(&arptable[ARP_GATEWAY].ipaddr, 0, sizeof(in_addr));
 		return 1;
 	}
 	return 0;
@@ -671,7 +672,7 @@ int dhcp(void)
 
 	network_ready = 0;
 
-	memset(&ip, 0, sizeof(struct dhcpip_t));
+	memset(&ip, 0, sizeof(ip));
 	ip.bp.bp_op = BOOTP_REQUEST;
 	ip.bp.bp_htype = 1;
 	ip.bp.bp_hlen = ETH_ALEN;
@@ -690,7 +691,7 @@ int dhcp(void)
 		rx_qdrain();
 
 		udp_transmit(IP_BROADCAST, BOOTP_CLIENT, BOOTP_SERVER,
-			     sizeof(struct bootpip_t), &ip);
+			     sizeof(ip), &ip);
 		timeout = rfc2131_sleep_interval(TIMEOUT, retry++);
 		if (await_reply(await_dhcp, 0, NULL, timeout)) {
 			/* If not a DHCPOFFER then must be just a
@@ -710,7 +711,7 @@ int dhcp(void)
 			memcpy(&ip.bp.bp_vend[15], &dhcp_addr, sizeof(in_addr));
 			for (reqretry = 0; reqretry < MAX_BOOTP_RETRIES; ) {
 				udp_transmit(IP_BROADCAST, BOOTP_CLIENT, BOOTP_SERVER,
-					     sizeof(struct bootpip_t), &ip);
+					     sizeof(ip), &ip);
 				dhcp_reply=0;
 				timeout = rfc2131_sleep_interval(TIMEOUT, reqretry++);
 				if (await_reply(await_dhcp, 0, NULL, timeout))
