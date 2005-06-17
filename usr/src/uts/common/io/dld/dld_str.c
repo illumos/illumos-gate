@@ -207,9 +207,11 @@ dld_str_destroy(dld_str_t *dsp)
 	dsp->ds_rq = dsp->ds_wq = NULL;
 
 	/*
-	 * Clear down notifications.
+	 * Reinitialize all the flags.
 	 */
 	dsp->ds_notifications = 0;
+	dsp->ds_passivestate = DLD_UNINITIALIZED;
+	dsp->ds_mode = DLD_UNITDATA;
 
 	/*
 	 * Free the object back to the cache.
@@ -678,9 +680,10 @@ dld_str_detach(dld_str_t *dsp)
 	dld_str_tx_drop(dsp);
 
 	/*
-	 * Clear the polling flag.
+	 * Clear the polling and promisc flags.
 	 */
 	dsp->ds_polling = B_FALSE;
+	dsp->ds_promisc = 0;
 
 	/*
 	 * Close the channel.

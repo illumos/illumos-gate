@@ -478,7 +478,14 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	/*
 	 * Set the receive callback.
 	 */
-	dls_rx_set(dsp->ds_dc, dld_str_rx_unitdata, (void *)dsp);
+	dls_rx_set(dsp->ds_dc, (dsp->ds_mode == DLD_RAW) ?
+	    dld_str_rx_raw : dld_str_rx_unitdata, dsp);
+
+	/*
+	 * Set the M_DATA handler.
+	 */
+	if (dsp->ds_mode == DLD_RAW)
+		dld_str_tx_raw(dsp);
 
 	/*
 	 * Bind the channel such that it can receive packets.

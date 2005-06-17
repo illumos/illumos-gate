@@ -181,15 +181,17 @@ ioc_raw(dld_str_t *dsp, mblk_t *mp)
 		return;
 	}
 
-	/*
-	 * Set the receive callback.
-	 */
-	dls_rx_set(dsp->ds_dc, dld_str_rx_raw, (void *)dsp);
+	if (dsp->ds_dlstate == DL_IDLE) {
+		/*
+		 * Set the receive callback.
+		 */
+		dls_rx_set(dsp->ds_dc, dld_str_rx_raw, dsp);
 
-	/*
-	 * Set the M_DATA handler.
-	 */
-	dld_str_tx_raw(dsp);
+		/*
+		 * Set the M_DATA handler.
+		 */
+		dld_str_tx_raw(dsp);
+	}
 
 	/*
 	 * Note that raw mode is enabled.
