@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,7 @@ extern offset_t llseek();
  */
 #define	PC_NSEC(a)	((unsigned short)((a[20]<<8)+a[19]))
 #define	PC_BIGNSEC(a)	((unsigned)((a[35]<<24)+(a[34]<<16)+(a[33]<<8)+a[32]))
-#define	PC_SPF(a)	((unsigned short)(a[23]<<8)+a[22])
+#define	PC_SPF(a)	((unsigned short)((a[23]<<8)+a[22]))
 #define	PC_BIGSPF(a)	((unsigned)((a[39]<<24)+(a[38]<<16)+(a[37]<<8)+a[36]))
 
 /*
@@ -144,7 +144,7 @@ usage()
 dumpfs(name)
 	char *name;
 {
-	char	buf[DEV_BSIZE];
+	unsigned char	buf[DEV_BSIZE];
 	char	label[LABEL_SIZE+1];
 	unsigned char	media;
 
@@ -242,7 +242,7 @@ unsigned char media_type;
 	}
 }
 
-well_formed(char bs[])
+well_formed(unsigned char bs[])
 {
 	int fatmatch;
 
