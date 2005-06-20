@@ -18,20 +18,15 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+
+/*
  * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  
-	/* from UCB 4.1 10/01/80 */
-#include <stdio.h>
-#include <locale.h>
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	ungetchar(c)	ungetc(c, stdin)
-
-long	ftell();
-char	*calloc();
 /*
  * mkstr - create a string error message file by massaging C source
  *
@@ -58,15 +53,27 @@ char	*calloc();
  * existing error message file for recompilation of single routines.
  */
 
+#include <stdio.h>
+#include <locale.h>
+
+#define	ungetchar(c)	ungetc(c, stdin)
+
+long	ftell();
+char	*calloc();
 
 FILE	*mesgread, *mesgwrite;
 char	*progname;
 char	usagestr[] =	"usage: %s [ - ] mesgfile prefix file ...\n";
 char	name[100], *np;
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int hashit(char *str, char really, unsigned int fakept);
+void process(void);
+void inithash(void);
+int octdigit(char c);
+void copystr(void);
+
+int
+main(int argc, char *argv[])
 {
 	char addon = 0;
 
@@ -102,14 +109,14 @@ main(argc, argv)
 		process();
 		argc--, argv++;
 	} while (argc > 0);
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
-process()
+void
+process(void)
 {
-	register char *cp;
-	register c;
+	char *cp;
+	int c;
 
 	for (;;) {
 		c = getchar();
@@ -130,11 +137,11 @@ process()
 	}
 }
 
-match(ocp)
-	char *ocp;
+int
+match(char *ocp)
 {
-	register char *cp;
-	register c;
+	char *cp;
+	int c;
 
 	for (cp = ocp + 1; *cp; cp++) {
 		c = getchar();
@@ -148,11 +155,12 @@ match(ocp)
 	return (1);
 }
 
-copystr()
+void
+copystr(void)
 {
-	register c, ch;
+	int c, ch;
 	char buf[512];
-	register char *cp = buf;
+	char *cp = buf;
 
 	for (;;) {
 		c = getchar();
@@ -211,14 +219,15 @@ out:
 	printf("%d", hashit(buf, 1, NULL));
 }
 
-octdigit(c)
-	char c;
+int
+octdigit(char c)
 {
 
 	return (c >= '0' && c <= '7');
 }
 
-inithash()
+void
+inithash(void)
 {
 	char buf[512];
 	int mesgpt = 0;
@@ -234,20 +243,18 @@ inithash()
 
 struct	hash {
 	long	hval;
-	unsigned hpt;
+	unsigned int hpt;
 	struct	hash *hnext;
 } *bucket[NBUCKETS];
 
-hashit(str, really, fakept)
-	char *str;
-	char really;
-	unsigned fakept;
+int
+hashit(char *str, char really, unsigned int fakept)
 {
 	int i;
-	register struct hash *hp;
+	struct hash *hp;
 	char buf[512];
 	long hashval = 0;
-	register char *cp;
+	char *cp;
 
 	if (really)
 		fflush(mesgwrite);
@@ -287,13 +294,11 @@ hashit(str, really, fakept)
 #include <sys/types.h>
 #include <sys/stat.h>
 
-fgetNUL(obuf, rmdr, file)
-	char *obuf;
-	register int rmdr;
-	FILE *file;
+int
+fgetNUL(char *obuf, int rmdr, FILE *file)
 {
-	register c;
-	register char *buf = obuf;
+	int c;
+	char *buf = obuf;
 
 	while (--rmdr > 0 && (c = getc(file)) != 0 && c != EOF)
 		*buf++ = c;

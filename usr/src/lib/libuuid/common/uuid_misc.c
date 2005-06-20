@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2000,2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,5 +183,5 @@ get_system_time(uuid_time_t *uuid_time)
 	 */
 	*uuid_time = (uint64_t)tp.tv_sec * 10000000;
 	*uuid_time += tp.tv_usec * 10;
-	*uuid_time += 0x01B21DD213814000;
+	*uuid_time += 0x01B21DD213814000ULL;
 }

@@ -20,12 +20,14 @@
 #
 # CDDL HEADER END
 #
+
 #
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
 #ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1995 by Sun Microsystems, Inc.
-# All rights reserved.
-#
+
 # Stub library for programmer's interface to libsys.  Used to satisfy ld(1)
 # processing, and serves as a precedence place-holder at execution-time.
 
@@ -38,7 +40,7 @@ awk '
 		flag = "";
 	if ($1 == "f") {
 		printf("void *\n%s%s()\n{\n", flag, $3);
-		printf("\t/*NOTREACHED*/\n}\n\n");
+		printf("\t/*NOTREACHED*/\n\treturn (0);\n}\n\n");
 	} else {
 		if ($4 == "1")
 			printf("%s %s%s %s %s\n\n", $5, flag, $3, $6, $7);

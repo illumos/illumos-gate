@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1996-1997, 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.30	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Memory management: malloc(), realloc(), free(), memalign().
@@ -85,8 +85,8 @@ static	void	unprotect(TREE *);
  * 0xfeedbeef and 0xfeedface are invalid pointer values in all programs.
  */
 static	uint64_t	patterns[2] = {
-	0xdeadbeefdeadbeef,	/* pattern in a freed block */
-	0xbaddcafebaddcafe	/* pattern in an allocated block */
+	0xdeadbeefdeadbeefULL,	/* pattern in a freed block */
+	0xbaddcafebaddcafeULL	/* pattern in an allocated block */
 };
 
 static void

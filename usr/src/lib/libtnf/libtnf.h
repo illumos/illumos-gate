@@ -19,8 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1994, by Sun Microsytems, Inc.
+ * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _LIBTNF_H
@@ -238,7 +240,7 @@ caddr_t	_tnf_datum_val(tnf_datum_t);
 #else  /* _DATUM_MACROS */
 
 /* Some degree of type safety: */
-#define	DATUM(x, y)	_DATUM(&(x)->INFO_MEMBER_0, y)
+#define	DATUM(x, y)	_DATUM((uintptr_t)&(x)->INFO_MEMBER_0, y)
 #define	DATUM_INFO(d)	((struct taginfo *)_DATUM_HI(d))
 #define	DATUM_VAL(d)	((caddr_t)_DATUM_LO(d))
 

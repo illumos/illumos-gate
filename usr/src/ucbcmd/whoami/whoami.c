@@ -1,6 +1,10 @@
+/*
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,12 +12,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <unistd.h>
@@ -27,12 +26,11 @@
 /*
  * whoami
  */
-struct	passwd *getpwuid();
 
-void
-main()
+int
+main(int argc, char *argv[])
 {
-	register struct passwd *pp;
+	struct passwd *pp;
 	uid_t	euid;
 
 	/* Set locale environment variables local definitions */
@@ -49,6 +47,5 @@ main()
 		exit(1);
 	}
 	printf("%s\n", pp->pw_name);
-	exit(0);
-	/*NOTREACHED*/
+	return (0);
 }
