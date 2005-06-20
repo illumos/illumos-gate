@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -424,7 +424,7 @@ all_stat_load(void)
 	 */
 	compute_cpu_stat_adj();
 	for (i = 0; i < CPU_STATES; i++)
-		d.csi.cpu[i] = cpu_tick[i] + cpu_stat_adj[i];
+		d.csi.cpu[i] = (cpu_tick[i] + cpu_stat_adj[i]) / ncpus;
 
 	return (0);
 }
