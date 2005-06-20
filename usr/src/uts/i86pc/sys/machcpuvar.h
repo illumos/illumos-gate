@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,11 +56,11 @@ struct cpuid_info;			/* (deliberately not visible here) */
 
 struct	machcpu {
 	/* define all the x_call stuff */
-	int	xc_pend[X_CALL_LEVELS];
-	int	xc_wait[X_CALL_LEVELS];
-	int	xc_ack[X_CALL_LEVELS];
-	int	xc_state[X_CALL_LEVELS];
-	int	xc_retval[X_CALL_LEVELS];
+	volatile int	xc_pend[X_CALL_LEVELS];
+	volatile int	xc_wait[X_CALL_LEVELS];
+	volatile int	xc_ack[X_CALL_LEVELS];
+	volatile int	xc_state[X_CALL_LEVELS];
+	volatile int	xc_retval[X_CALL_LEVELS];
 
 	int		mcpu_nodeid;		/* node-id */
 	int		mcpu_pri;		/* CPU priority */
