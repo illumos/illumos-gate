@@ -13300,7 +13300,6 @@ nfs4frlock_recovery(int needrecov, nfs4_error_t *ep,
 	nfs4_open_owner_t	*oop = *oopp;
 	nfs4_open_stream_t	*osp = *ospp;
 	nfs4_lock_owner_t	*lop = *lopp;
-	nfs_argop4		*argop;
 
 	bool_t abort, retry;
 
@@ -13368,15 +13367,19 @@ nfs4frlock_recovery(int needrecov, nfs4_error_t *ep,
 		*did_start_fop = FALSE;
 	}
 
-	argop = (*argspp)->array;
-	ASSERT((*argspp)->array_len == 2);
-	if (argop[1].argop == OP_LOCK)
-		nfs4args_lock_free(&argop[1]);
-	else if (argop[1].argop == OP_LOCKT)
-		nfs4args_lockt_free(&argop[1]);
-	kmem_free(argop, 2 * sizeof (nfs_argop4));
-	if (!ep->error && retry == TRUE) {
-		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)*respp);
+	if (retry == TRUE) {
+		nfs_argop4	*argop;
+
+		argop = (*argspp)->array;
+		ASSERT((*argspp)->array_len == 2);
+
+		if (argop[1].argop == OP_LOCK)
+			nfs4args_lock_free(&argop[1]);
+		else if (argop[1].argop == OP_LOCKT)
+			nfs4args_lockt_free(&argop[1]);
+		kmem_free(argop, 2 * sizeof (nfs_argop4));
+		if (!ep->error)
+			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)*respp);
 		*respp = NULL;
 		*argspp = NULL;
 	}
