@@ -118,6 +118,7 @@ ONBLD_TOOLS=		$(BUILD_TOOLS)/onbld
 JAVA_ROOT=	/usr/java
 
 SFW_ROOT=	/usr/sfw
+SFWINCDIR=	$(SFW_ROOT)/include
 SFWLIBDIR=	$(SFW_ROOT)/lib
 SFWLIBDIR64=	$(SFW_ROOT)/lib/$(MACH64)
 
