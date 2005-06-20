@@ -2278,6 +2278,9 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 	for (i = 0; i < ms_rpt->no_of_usages; i++) {
 		rptcnt = ms_rpt->usage_descr[i].rptcnt;
 		rptsz = ms_rpt->usage_descr[i].rptsz;
+		if (rptcnt == 0) {
+			continue;
+		}
 		button_page = 0;
 		for (j = 0; j < rptcnt; j++) {
 			if (ms_rpt->usage_descr[j + i].usage_id == HID_GD_X) {
@@ -2321,6 +2324,8 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 		}
 
 		i += j;
+
+		/* enter the next valid usage */
 		if (button_page == 0) {
 			i --;
 		}
@@ -2329,14 +2334,8 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 
 	kmem_free(ms_rpt, sizeof (hidparser_rpt_t));
 
-	if (limit % 8) {
-		/* This is not correct. Fail the open */
-
-		return (USB_FAILURE);
-	} else {
-
-		idf->tlen = limit / 8;
-	}
+	/* get the length of sending data */
+	idf->tlen = limit / 8;
 
 	/* Check whether X and Y are relative or absolute */
 	rval = hidparser_get_main_item_data_descr(
@@ -2357,6 +2356,14 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 
 	/* get the logical_maximum for X and Y respectively */
 	if (!(idf->xattr & HID_MAIN_ITEM_RELATIVE)) {
+
+		/* the data format can't be parsed correctly */
+		if (limit % 8) {
+			USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
+			    "Wrong data packet include %d bits", limit);
+
+			return (USB_FAILURE);
+		}
 		if (hidparser_get_usage_attribute(
 			    usbmsp->usbms_report_descr_handle,
 			    usbmsp->usbms_rptid,
@@ -2389,7 +2396,7 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 		if (usbmsp->usbms_logical_Xmax == 0) {
 			USB_DPRINTF_L3(PRINT_MASK_ALL,
 			    usbms_log_handle,
-			    "get error X logical max value");
+			    "X logical max value is zero");
 
 			return (USB_FAILURE);
 		}
@@ -2397,7 +2404,7 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 		if (usbmsp->usbms_logical_Ymax == 0) {
 			USB_DPRINTF_L3(PRINT_MASK_ALL,
 			    usbms_log_handle,
-			    "get error Y logical max value");
+			    "Y logical max value is zero");
 
 			return (USB_FAILURE);
 		}
@@ -2425,6 +2432,19 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 			fep->value = NULL;
 			mb->b_wptr += sizeof (Firm_event);
 			putnext(q, mb);
+		}
+	} else {
+		/* general data format of relative mouse */
+		idf->xlen = idf->ylen = idf->zlen = 1;
+		idf->xpos = 1;
+		idf->ypos = 2;
+		idf->zpos = 3;
+
+		/* three-byte packet for general mouse */
+		if (limit % 8) {
+			USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
+			    "Data per packet include %d bits", limit);
+			idf->tlen = 3;
 		}
 	}
 
