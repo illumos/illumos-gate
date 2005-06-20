@@ -1,9 +1,3 @@
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* XPM */
 static char * grub_splash_xpm[] = {
 "640 480 15 1",
