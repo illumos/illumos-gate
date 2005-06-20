@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,10 +104,13 @@ typedef	ulong_t		u_off_t;
  *	These limits reflect the maximum size regular file that
  *	can be archived, depending on the archive type. For archives
  *	with character-format headers (odc, tar, ustar) we use
- *	CHAR_OFFSET_MAX. Otherwise, we are limited to the size
- *	that will fit in a signed long value.
+ *	CHAR_OFFSET_MAX.  For archives with SVR4 ASCII headers (-c, -H crc)
+ *	we store filesize in an 8-char hexadecimal string and use
+ *	ASC_OFFSET_MAX.  Otherwise, we are limited to the size that will
+ *	fit in a signed long value.
  */
-#define	CHAR_OFFSET_MAX	077777777777	/* 11 octal digits */
+#define	CHAR_OFFSET_MAX	077777777777ULL	/* 11 octal digits */
+#define	ASC_OFFSET_MAX	0XFFFFFFFF	/* 8 hexadecimal digits */
 #define	BIN_OFFSET_MAX	LONG_MAX	/* signed long max value */
 
 static char	aclchar = ' ';
@@ -642,6 +645,7 @@ static void *e_zalloc(int flag, size_t size);
  * and then select either copy in (-i), copy out (-o), or pass (-p) action.
  */
 
+int
 main(int argc, char **argv)
 {
 	int i;
@@ -5283,6 +5287,7 @@ setup(int largc, char **largv)
 			case CRC:
 				Hdrsz = ASCSZ;
 				Pad_val = FULLWD;
+				Max_offset = (off_t)(ASC_OFFSET_MAX);
 				break;
 			case TAR:
 			/* FALLTHROUGH */
@@ -5881,7 +5886,7 @@ write_hdr(int secflag, off_t len)
 		    "%.6lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%."
 		    "8lx%.8lx%.8lx%.8lx%s",
 			G_p->g_magic, G_p->g_ino, mode, G_p->g_uid,
-			G_p->g_gid, G_p->g_nlink, G_p->g_mtime, (long)len,
+			G_p->g_gid, G_p->g_nlink, G_p->g_mtime, (ulong_t)len,
 			major(G_p->g_dev), minor(G_p->g_dev),
 			major(G_p->g_rdev), minor(G_p->g_rdev),
 			G_p->g_namesz, G_p->g_cksum, G_p->g_nam_p);
