@@ -200,6 +200,8 @@ void Dbg_sec_added(Os_desc *, Sg_desc *);
 void Dbg_sec_added64(Os_desc *, Sg_desc *);
 void Dbg_sec_created(Os_desc *, Sg_desc *);
 void Dbg_sec_created64(Os_desc *, Sg_desc *);
+void Dbg_sec_group(Is_desc *, Group_desc *);
+void Dbg_sec_group64(Is_desc *, Group_desc *);
 void Dbg_sec_in(Is_desc *);
 void Dbg_sec_in64(Is_desc *);
 void Dbg_sec_order_list(Ofl_desc *, int);

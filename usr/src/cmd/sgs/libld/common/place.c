@@ -24,8 +24,8 @@
  *	  All Rights Reserved
  *
  *
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -53,10 +53,9 @@ set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 }
 
 /*
- * This function is used to determine if section ordering is turned
- * on and if so it will return the appropriate os_txtndx.
- * This information is derived from the Sg_desc->sg_segorder
- * List that was built up from the Mapfile.
+ * Determine if section ordering is turned on.  If so, return the appropriate
+ * os_txtndx.  This information is derived from the Sg_desc->sg_segorder
+ * list that was built up from the Mapfile.
  */
 int
 set_os_txtndx(Is_desc *isp, Sg_desc * sgp)
@@ -68,12 +67,10 @@ set_os_txtndx(Is_desc *isp, Sg_desc * sgp)
 		if (strcmp(scop->sco_secname, isp->is_name) == 0) {
 			scop->sco_flags |= FLG_SGO_USED;
 			return ((int)scop->sco_index);
-		} /* if */
-	} /* for */
+		}
+	}
 	return (0);
-} /* set_os_txtndx() */
-
-
+}
 
 /*
  * Place a section into the appropriate segment.
@@ -85,49 +82,48 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	Ent_desc *	enp;
 	Sg_desc	*	sgp;
 	Os_desc	*	osp;
+	int		os_ndx;
 	Shdr *		shdr = isp->is_shdr;
-	int		os_ndx = 0;
-	Group_desc *	gdesc;
 	Xword		shflagmask, shflags = shdr->sh_flags;
 	Ifl_desc *	ifl = isp->is_file;
 
 	DBG_CALL(Dbg_sec_in(isp));
 
 	if ((shflags & SHF_GROUP) || (shdr->sh_type == SHT_GROUP)) {
-		if ((gdesc = get_group_desc(ofl, isp)) ==
-		    (Group_desc *)S_ERROR)
-			return ((Os_desc *)S_ERROR);
-		if (gdesc)
-			DBG_CALL(Dbg_sec_group(isp));
+		Group_desc *	gdesc;
 
-		/*
-		 * If this 'group' is marked for DISCARD - then discard
-		 * the section.
-		 */
-		if (gdesc && (gdesc->gd_flags & GRP_FLG_DISCARD)) {
-			isp->is_flags |= FLG_IS_DISCARD;
-			DBG_CALL(Dbg_sec_group_discarded(isp));
-			return ((Os_desc *)0);
+		if ((gdesc = get_group(ofl, isp)) == (Group_desc *)S_ERROR)
+			return ((Os_desc *)S_ERROR);
+
+		if (gdesc) {
+			DBG_CALL(Dbg_sec_group(isp, gdesc));
+
+			/*
+			 * If this group is marked as discarded, then this
+			 * section needs to be discarded.
+			 */
+			if (gdesc->gd_flags & GRP_FLG_DISCARD) {
+				isp->is_flags |= FLG_IS_DISCARD;
+				return ((Os_desc *)0);
+			}
 		}
 
 		/*
-		 * SHT_GROUP sections are only included into reloatable
+		 * SHT_GROUP sections can only be included into relocatable
 		 * objects.
 		 */
-		if ((shdr->sh_type == SHT_GROUP) &&
-		    ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)) {
-			isp->is_flags |= FLG_IS_DISCARD;
-			return ((Os_desc *)0);
-		}
-		if (shdr->sh_type == SHT_GROUP)
+		if (shdr->sh_type == SHT_GROUP) {
+			if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
+				isp->is_flags |= FLG_IS_DISCARD;
+				return ((Os_desc *)0);
+			}
 			ofl->ofl_flags1 |= FLG_OF1_GRPSECT;
+		}
 	}
 
 	/*
-	 * We always have SHF_TLS sections assigned to the
-	 * DATA segment (and then the PT_TLS embedded inside
-	 * of there).  So - we set any SHF_WRITE permissions for
-	 * the segment assignment.
+	 * Always assign SHF_TLS sections to the DATA segment (and then the
+	 * PT_TLS embedded inside of there).
 	 */
 	if (shflags & SHF_TLS)
 		shflags |= SHF_WRITE;

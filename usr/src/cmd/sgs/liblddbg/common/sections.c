@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -151,25 +151,20 @@ Dbg_sec_discarded(Is_desc *isp, Is_desc *disp)
 }
 
 void
-Dbg_sec_group(Is_desc *isp)
+Dbg_sec_group(Is_desc *isp, Group_desc *gdp)
 {
-	Group_desc	*gdesc = isp->is_group;
-	if (DBG_NOTCLASS(DBG_SECTIONS))
-		return;
-	dbg_print(MSG_INTL(MSG_SEC_GRP), isp->is_name,
-		isp->is_file->ifl_name, gdesc->gd_gsectname,
-		gdesc->gd_symname);
-}
+	const char	*fmt;
 
-void
-Dbg_sec_group_discarded(Is_desc *isp)
-{
-	Group_desc	*gdesc = isp->is_group;
 	if (DBG_NOTCLASS(DBG_SECTIONS))
 		return;
-	dbg_print(MSG_INTL(MSG_SEC_GRP_DISCARDED), isp->is_name,
-		isp->is_file->ifl_name, gdesc->gd_gsectname,
-		gdesc->gd_symname);
+
+	if (gdp->gd_flags & GRP_FLG_DISCARD)
+		fmt = MSG_INTL(MSG_SEC_GRP_DISCARDED);
+	else
+		fmt = MSG_INTL(MSG_SEC_GRP_INPUT);
+
+	dbg_print(fmt, isp->is_name, isp->is_file->ifl_name,
+	    gdp->gd_gsectname, gdp->gd_symname);
 }
 
 void

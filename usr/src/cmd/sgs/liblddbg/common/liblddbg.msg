@@ -454,10 +454,10 @@
 @ MSG_SEC_CREATED	"section=%s; added to segment=%s (created)"
 @ MSG_SEC_DISCARDED	"section=%s; input from file=%s; \
 			 discarded in favor of section=%s from file=%s"
-@ MSG_SEC_GRP		"section=%s; input from file=%s; \
-			 section member of group: %s:%s"
+@ MSG_SEC_GRP_INPUT	"section=%s; input from file=%s; \
+			 member of group: %s:%s"
 @ MSG_SEC_GRP_DISCARDED	"section=%s; input from file=%s; \
-			 discarded because it is a member of group: %s:%s"
+			 discarded: member of existing group: %s:%s"
 
 @ MSG_SEC_STRTAB_STND	"strtab=%s; full size: %d; uncompressed"
 @ MSG_SEC_STRTAB_COMP	"strtab=%s; full size: %d -> compressed down to: %d"

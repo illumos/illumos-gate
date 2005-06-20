@@ -224,7 +224,6 @@ extern	void		dbg_print(const char *, ...);
 #define	Dbg_sec_created		Dbg_sec_created64
 #define	Dbg_sec_discarded	Dbg_sec_discarded64
 #define	Dbg_sec_group		Dbg_sec_group64
-#define	Dbg_sec_group_discarded	Dbg_sec_group_discarded64
 #define	Dbg_sec_in		Dbg_sec_in64
 #define	Dbg_sec_order_list	Dbg_sec_order_list64
 #define	Dbg_sec_order_error	Dbg_sec_order_error64
@@ -395,8 +394,7 @@ extern	void		Dbg_reloc_transition(Half, Word, Word, Xword,
 extern	void		Dbg_sec_added(Os_desc *, Sg_desc *);
 extern	void		Dbg_sec_created(Os_desc *, Sg_desc *);
 extern	void		Dbg_sec_discarded(Is_desc *, Is_desc *);
-extern	void		Dbg_sec_group(Is_desc *);
-extern	void		Dbg_sec_group_discarded(Is_desc *);
+extern	void		Dbg_sec_group(Is_desc *, Group_desc *);
 extern	void		Dbg_sec_in(Is_desc *);
 extern	void		Dbg_sec_order_list(Ofl_desc *, int);
 extern	void		Dbg_sec_order_error(Ifl_desc *, Word, int);

@@ -37,7 +37,7 @@
 #	Policy for Shared Library Version Names and Interface Definitions
 
 
-SUNWprivate_4.44 {
+SUNWprivate_4.45 {
 	global:
 		Dbg_args_files;
 		Dbg_args_flags;
@@ -150,7 +150,6 @@ SUNWprivate_4.44 {
 		Dbg_sec_created;
 		Dbg_sec_discarded;
 		Dbg_sec_group;
-		Dbg_sec_group_discarded;
 		Dbg_sec_in;
 		Dbg_sec_order_list;
 		Dbg_sec_order_error;
@@ -288,7 +287,6 @@ SUNWprivate_4.44 {
 		Dbg_sec_created64;
 		Dbg_sec_discarded64;
 		Dbg_sec_group64;
-		Dbg_sec_group_discarded64;
 		Dbg_sec_in64;
 		Dbg_sec_order_list64;
 		Dbg_sec_order_error64;

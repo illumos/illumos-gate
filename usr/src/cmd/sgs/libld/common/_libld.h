@@ -128,6 +128,7 @@ typedef struct {
 } Dfltr_desc;
 
 #define	AL_CNT_DFLTR	4
+#define	AL_CNT_GROUP	20
 
 /*
  * Per-symbol filtee descriptor.  This associates symbol definitions with
@@ -209,7 +210,7 @@ extern uintptr_t	fillin_gotplt1(Ofl_desc *);
 extern Addr		fillin_gotplt2(Ofl_desc *);
 extern Gotndx *		find_gotndx(List *, Gotref, Ofl_desc *, Rel_desc *);
 extern uintptr_t	find_library(const char *, Ofl_desc *);
-extern Group_desc *	get_group_desc(Ofl_desc *, Is_desc *);
+extern Group_desc *	get_group(Ofl_desc *, Is_desc *);
 extern Word		hashbkts(Word);
 extern Xword		lcm(Xword, Xword);
 extern int		ldexit(void);

@@ -142,7 +142,7 @@ struct ofl_desc {
 	List		ofl_parsym; 	/* list of Parsym_info */
 	List		ofl_extrarels;	/* relocation sections which have */
 					/*    a NULL sh_info */
-	List		ofl_groups;	/* list of interesting SHT_GROUPs */
+	avl_tree_t	*ofl_groups;	/* pointer to head of Groups AVL tree */
 	List		ofl_initarray;	/* list of init array func names */
 	List		ofl_finiarray;	/* list of fini array func names */
 	List		ofl_preiarray;	/* list of preinit array func names */
@@ -434,7 +434,7 @@ struct ifl_desc {			/* input file descriptor */
 	Ver_index	*ifl_verndx;	/* verndx[ver ndx] = Ver_index */
 	List		ifl_verdesc;	/* version descriptor list */
 	List		ifl_relsect;	/* relocation section list */
-	List		ifl_groups;	/* SHT_GROUP sectin list */
+	Alist		*ifl_groups;	/* SHT_GROUP section list */
 	Half		ifl_neededndx;	/* index to NEEDED in .dyn section */
 	Half		ifl_flags;	/* Explicit/implicit reference */
 };
@@ -477,8 +477,6 @@ struct is_desc {			/* input section descriptor */
 	Os_desc		*is_osdesc;	/* new output section for this */
 					/*	input section */
 	Elf_Data	*is_indata;	/* input sections raw data */
-	Group_desc	*is_group;	/* SHT_GROUP info associated with */
-					/*	section */
 	Is_desc		*is_symshndx;	/* related SHT_SYM_SHNDX section */
 	Word		is_scnndx;	/* original section index in file */
 	Word		is_txtndx;	/* Index for section.  Used to decide */
@@ -908,10 +906,9 @@ struct	uts_desc {
 struct group_desc {
 	const char	*gd_gsectname;	/* group section name */
 	const char	*gd_symname;	/* symbol name */
-	Sym *		gd_sym;		/* pointer to signature symbol */
-	Elf_Scn *	gd_scn;
-	Word *		gd_groupdata;	/* Data for group section */
-	size_t		gd_gdcnt;	/* number of entries in groupdata */
+	Word		*gd_data;	/* data for group section */
+	size_t		gd_scnndx;	/* group section index */
+	size_t		gd_cnt;		/* number of entries in group data */
 	Word		gd_flags;
 };
 
