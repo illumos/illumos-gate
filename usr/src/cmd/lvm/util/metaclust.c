@@ -934,10 +934,10 @@ main(int argc, char **argv)
 
 			/*
 			 * Set start step flag for set. This is set to indicate
-			 * that the reconfig cycle entered through the start
-			 * step and is used in reconfig step 4 to determine
-			 * whether the node had entered through the start
-			 * step or the return step.
+			 * that this node entered the reconfig cycle through
+			 * the start step.  This is used during the reconfig
+			 * cycle to determine whether the node had entered
+			 * through the start step or the return step.
 			 */
 			(void) memset(&sf, 0, sizeof (sf));
 			sf.sf_setno = sp->setno;

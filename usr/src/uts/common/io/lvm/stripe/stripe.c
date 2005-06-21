@@ -946,6 +946,19 @@ stripe_open(dev_t *dev, int flag, int otyp, cred_t *cred_p, int md_oflags)
 	mdi_unit_t	*ui = MDI_UNIT(mnum);
 	ms_unit_t	*un;
 	int		err = 0;
+	set_t		setno;
+
+	/*
+	 * When doing an open of a multi owner metadevice, check to see if this
+	 * node is a starting node and if a reconfig cycle is underway.
+	 * If so, the system isn't sufficiently set up enough to handle the
+	 * open (which involves I/O during sp_validate), so fail with ENXIO.
+	 */
+	setno = MD_MIN2SET(mnum);
+	if ((md_set[setno].s_status & (MD_SET_MNSET | MD_SET_MN_START_RC)) ==
+	    (MD_SET_MNSET | MD_SET_MN_START_RC)) {
+			return (ENXIO);
+	}
 
 	/* single thread */
 	un = (ms_unit_t *)md_unit_openclose_enter(ui);
