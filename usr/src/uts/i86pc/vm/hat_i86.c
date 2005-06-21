@@ -2005,10 +2005,26 @@ hat_pte_unmap(
 			pp = NULL;
 		} else {
 			pp = page_numtopp_nolock(pfn);
-			ASSERT(pp != NULL);
+			if (pp == NULL) {
+				panic("no page_t, not NOCONSIST: old_pte="
+				    FMT_PTE " ht=%lx entry=0x%x pte_ptr=%lx",
+				    old_pte, (uintptr_t)ht, entry,
+				    (uintptr_t)pte_ptr);
+			}
 			x86_hm_enter(pp);
 		}
-		old_pte = x86pte_invalidate_pfn(ht, entry, pfn, pte_ptr);
+
+		/*
+		 * If freeing the address space, check that the PTE
+		 * hasn't changed, as the mappings are no longer in use by
+		 * any thread, invalidation is unnecessary.
+		 * If not freeing, do a full invalidate.
+		 */
+		if (hat->hat_flags & HAT_FREEING)
+			old_pte = x86pte_get(ht, entry);
+		else
+			old_pte =
+			    x86pte_invalidate_pfn(ht, entry, pfn, pte_ptr);
 
 		/*
 		 * If the page hadn't changed we've unmapped it and can proceed
@@ -2078,7 +2094,7 @@ hat_kmap_unload(caddr_t addr, size_t len, uint_t flags)
 		pg_off = mmu_btop(va - mmu.kmap_addr);
 		if (mmu.pae_hat) {
 			pte_ptr = mmu.kmap_ptes + pg_off;
-			old_pte = *(x86pte_t *)pte_ptr;
+			ATOMIC_LOAD64((x86pte_t *)pte_ptr, old_pte);
 		} else {
 			pte_ptr = (x86pte32_t *)mmu.kmap_ptes + pg_off;
 			old_pte = *(x86pte32_t *)pte_ptr;
@@ -2167,7 +2183,7 @@ hat_unload_callback(
 	uintptr_t	eaddr = vaddr + len;
 	htable_t	*ht = NULL;
 	uint_t		entry;
-	uintptr_t	last_va = (uintptr_t)-1L;
+	uintptr_t	contig_va = (uintptr_t)-1L;
 	range_info_t	r[MAX_UNLOAD_CNT];
 	uint_t		r_cnt = 0;
 	x86pte_t	old_pte;
@@ -2190,7 +2206,7 @@ hat_unload_callback(
 		/*
 		 * We'll do the call backs for contiguous ranges
 		 */
-		if (vaddr != last_va ||
+		if (vaddr != contig_va ||
 		    (r_cnt > 0 && r[r_cnt - 1].rng_level != ht->ht_level)) {
 			if (r_cnt == MAX_UNLOAD_CNT) {
 				handle_ranges(cb, r_cnt, r);
@@ -2209,8 +2225,8 @@ hat_unload_callback(
 		hat_pte_unmap(ht, entry, flags, old_pte, NULL);
 
 		ASSERT(ht->ht_level <= mmu.max_page_level);
-		last_va = vaddr;
 		vaddr += LEVEL_SIZE(ht->ht_level);
+		contig_va = vaddr;
 		++r[r_cnt - 1].rng_cnt;
 	}
 	if (ht)
@@ -2543,15 +2559,7 @@ hat_getpfnum(hat_t *hat, caddr_t addr)
 
 		pg_off = mmu_btop(vaddr - mmu.kmap_addr);
 		if (mmu.pae_hat) {
-#ifdef __i386
-			volatile x86pte_t *p = mmu.kmap_ptes + pg_off;
-
-			do {
-				pte = *p;
-			} while (pte != *p);
-#else
-			pte = mmu.kmap_ptes[pg_off];
-#endif
+			ATOMIC_LOAD64(mmu.kmap_ptes + pg_off, pte);
 		} else {
 			pte = ((x86pte32_t *)mmu.kmap_ptes)[pg_off];
 		}
@@ -3069,7 +3077,11 @@ hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry)
 	 * Invalidate the PTE and remove the hment.
 	 */
 	old_pte = x86pte_invalidate_pfn(ht, entry, pfn, NULL);
-	ASSERT(PTE2PFN(old_pte, ht->ht_level) == pfn);
+	if (PTE2PFN(old_pte, ht->ht_level) != pfn) {
+		panic("x86pte_invalidate_pfn() failure found PTE = " FMT_PTE
+		    " pfn being unmapped is %lx ht=0x%lx entry=0x%x",
+		    old_pte, pfn, (uintptr_t)ht, entry);
+	}
 
 	/*
 	 * Clean up all the htable information for this mapping

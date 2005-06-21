@@ -525,8 +525,11 @@ hment_remove(page_t *pp, htable_t *ht, uint_t entry)
 		prev = hm;
 		hm = hm->hm_hashnext;
 	}
-	if (hm == NULL)
-		panic("hment_remove() mapping not found in hash table");
+	if (hm == NULL) {
+		panic("hment_remove() missing in hash table pp=%lx, ht=%lx,"
+		    "entry=0x%x hash index=0x%x", (uintptr_t)pp, (uintptr_t)ht,
+		    entry, idx);
+	}
 
 	if (prev)
 		prev->hm_hashnext = hm->hm_hashnext;

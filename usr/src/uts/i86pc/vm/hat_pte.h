@@ -245,6 +245,8 @@ struct hat_mmu_info {
 /*
  * The concept of a VA hole exists in AMD64. This might need to be made
  * model specific eventually.
+ *
+ * In the 64 bit kernel PTE loads are atomic, but need cas64 on 32 bit kernel.
  */
 #if defined(__amd64)
 
@@ -255,6 +257,7 @@ struct hat_mmu_info {
 #endif
 
 #define	FMT_PTE "%lx"
+#define	ATOMIC_LOAD64(ptr, pte) ((pte) = *(ptr))
 
 #elif defined(__i386)
 
@@ -265,8 +268,10 @@ struct hat_mmu_info {
 #endif
 
 #define	FMT_PTE "%llx"
+#define	ATOMIC_LOAD64(ptr, pte) (((pte) = *(ptr)),			\
+	((pte) = cas64(ptr, pte, pte)))
 
-#endif
+#endif	/* __i386 */
 
 
 extern struct hat_mmu_info mmu;

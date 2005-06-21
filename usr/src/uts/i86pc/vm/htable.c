@@ -1304,14 +1304,7 @@ htable_scan(htable_t *ht, uintptr_t *vap, uintptr_t eaddr)
 	 */
 	if (va < eaddr && pte_ptr != end_pte_ptr) {
 		if (mmu.pae_hat) {
-			found_pte = *(x86pte_t *)pte_ptr;
-#if defined(__i386)
-			/*
-			 * 64 bit reads on 32 bit x86 are not atomic
-			 */
-			while (found_pte != *(volatile x86pte_t *)pte_ptr)
-				found_pte = *(volatile x86pte_t *)pte_ptr;
-#endif
+			ATOMIC_LOAD64((x86pte_t *)pte_ptr, found_pte);
 		} else {
 			found_pte = *(x86pte32_t *)pte_ptr;
 		}
@@ -1724,19 +1717,14 @@ x86pte_get(htable_t *ht, uint_t entry)
 {
 	x86pte_t	pte;
 	x86pte32_t	*pte32p;
-	volatile x86pte_t	*ptep;
+	x86pte_t	*ptep;
 
 	/*
-	 * 32 bit (non-pae) is always atomic.
-	 * 64 bit is only atomic on 64 bit mode.
+	 * Be careful that loading PAE entries in 32 bit kernel is atomic.
 	 */
 	ptep = x86pte_access_pagetable(ht);
 	if (mmu.pae_hat) {
-		pte = ptep[entry];
-#if defined(__i386)
-		while (pte != ptep[entry])
-			pte = ptep[entry];
-#endif /* __i386 */
+		ATOMIC_LOAD64(ptep + entry, pte);
 	} else {
 		pte32p = (x86pte32_t *)ptep;
 		pte = pte32p[entry];
