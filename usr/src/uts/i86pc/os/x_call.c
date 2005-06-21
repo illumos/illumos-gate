@@ -128,6 +128,7 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 				(cpup->cpu_m.xc_pend[X_CALL_MEDPRI]))
 				break;
 			ht_pause();
+			return_instr();
 		}
 		return (DDI_INTR_CLAIMED);
 	}
@@ -169,11 +170,15 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 	 * Wait for the initiator of the x-call to indicate
 	 * that all CPUs involved can proceed.
 	 */
-	while (cpup->cpu_m.xc_wait[pri])
+	while (cpup->cpu_m.xc_wait[pri]) {
 		ht_pause();
+		return_instr();
+	}
 
-	while (cpup->cpu_m.xc_state[pri] != XC_DONE)
+	while (cpup->cpu_m.xc_state[pri] != XC_DONE) {
 		ht_pause();
+		return_instr();
+	}
 
 	/*
 	 * Flush the TLB, if that's what is requested.
@@ -373,8 +378,10 @@ xc_capture_cpus(cpuset_t set)
 	for (cix = 0; cix < NCPU; cix++) {
 		if (lcx != cix && CPU_IN_SET(set, cix)) {
 			cpup = cpu[cix];
-			while (cpup->cpu_m.xc_ack[X_CALL_MEDPRI] == 0)
+			while (cpup->cpu_m.xc_ack[X_CALL_MEDPRI] == 0) {
 				ht_pause();
+				return_instr();
+			}
 			cpup->cpu_m.xc_ack[X_CALL_MEDPRI] = 0;
 		}
 		i++;
@@ -497,8 +504,10 @@ xc_common(
 	for (cix = 0; cix < NCPU; cix++) {
 		if (lcx != cix && CPU_IN_SET(set, cix)) {
 			cpup = cpu[cix];
-			while (cpup->cpu_m.xc_ack[pri] == 0)
+			while (cpup->cpu_m.xc_ack[pri] == 0) {
 				ht_pause();
+				return_instr();
+			}
 			cpup->cpu_m.xc_ack[pri] = 0;
 		}
 	}
@@ -537,8 +546,10 @@ xc_common(
 		if (lcx != cix && CPU_IN_SET(set, cix)) {
 			cpup = cpu[cix];
 			if (cpup != NULL && (cpup->cpu_flags & CPU_READY)) {
-				while (cpup->cpu_m.xc_ack[pri] == 0)
+				while (cpup->cpu_m.xc_ack[pri] == 0) {
 					ht_pause();
+					return_instr();
+				}
 				cpup->cpu_m.xc_ack[pri] = 0;
 			}
 		}
