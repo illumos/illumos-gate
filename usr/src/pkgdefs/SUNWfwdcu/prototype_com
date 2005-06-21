@@ -51,5 +51,5 @@ f none usr/lib/devfsadm/linkmod/SUNW_dcam1394_link.so 0755 root sys
 d none usr/include 0755 root bin
 d none usr/include/sys 0755 root bin
 d none usr/include/sys/dcam 0755 root bin
-f none usr/include/sys/dcam/dcam1394_io.h 0755 root bin
+f none usr/include/sys/dcam/dcam1394_io.h 0644 root bin
 
