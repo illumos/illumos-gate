@@ -575,7 +575,7 @@ ecc_err_drain(void *not_used, ecc_errstate_t *ecc_err, errorq_elem_t *eqep)
 			page_settoxic(pp, PAGE_IS_FAULTY);
 			(void) page_retire(pp, PAGE_IS_TOXIC);
 		}
-		ecc_err->ecc_err_type = CE_DISP_UNKNOWN;
+		ecc_err->ecc_err_type = flt_to_error_type(ecc);
 		break;
 
 	case CBNINTR_CE:
