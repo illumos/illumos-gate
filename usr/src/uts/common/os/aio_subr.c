@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1281,8 +1281,9 @@ aio_close_port(void *arg, int port, pid_t pid, int lastclose)
 		return;
 	}
 	aiop->aio_portpendcnt += counter;
+	mutex_exit(&aiop->aio_mutex);
 	while (aiop->aio_portpendcnt)
-		cv_wait(&aiop->aio_portcv, &aiop->aio_mutex);
+		cv_wait(&aiop->aio_portcv, &aiop->aio_portq_mutex);
 
 	/*
 	 * all pending AIOs are completed.
@@ -1290,7 +1291,6 @@ aio_close_port(void *arg, int port, pid_t pid, int lastclose)
 	 */
 
 	reqp = aiop->aio_portq;
-	mutex_exit(&aiop->aio_mutex);
 	headp = NULL;
 	for (; reqp != NULL; reqp = next) {
 		next = reqp->aio_req_next;

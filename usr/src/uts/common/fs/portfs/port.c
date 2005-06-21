@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1523,9 +1523,11 @@ portnowait:
 			pgt->pgt_rqtp = rqtp;
 		} else {
 			/* timeout already checked -> remember values */
-			pgt->pgt_timecheck = timecheck;
-			pgt->pgt_rqtime = *rqtp;
 			pgt->pgt_rqtp = rqtp;
+			if (rqtp != NULL) {
+				pgt->pgt_timecheck = timecheck;
+				pgt->pgt_rqtime = *rqtp;
+			}
 		}
 		if (blocking)
 			/* timeout remaining */
