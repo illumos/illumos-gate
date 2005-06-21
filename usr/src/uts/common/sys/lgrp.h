@@ -593,7 +593,6 @@ pgcnt_t	lgrp_plat_mem_size(lgrp_handle_t, lgrp_mem_query_t);
 int	lgrp_plat_latency(lgrp_handle_t, lgrp_handle_t);
 lgrp_handle_t	lgrp_plat_root_hand(void);
 void	lgrp_plat_probe(void);
-void	lgrp_plat_build_topo(void);
 
 #endif	/* _KERNEL && _KMEMUSER */
 

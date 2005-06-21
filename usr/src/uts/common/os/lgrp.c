@@ -650,6 +650,11 @@ lgrp_cpu_init(struct cpu *cp)
 		klgrpset_clear(changed);
 		count += lgrp_leaf_add(my_lgrp, lgrp_table, lgrp_alloc_max + 1,
 		    &changed);
+		/*
+		 * May have added new intermediate lgroups, so need to add
+		 * resources other than CPUs which are added below
+		 */
+		(void) lgrp_mnode_update(changed, NULL);
 	} else if (my_lgrp->lgrp_latency == 0 && lgrp_plat_latency(hand, hand)
 	    > 0) {
 		/*
@@ -1275,9 +1280,9 @@ lgrp_mem_init(int mnode, lgrp_handle_t hand, boolean_t is_copy_rename)
 			start_cpus();
 	} else if (!klgrpset_ismember(my_lgrp->lgrp_set[LGRP_RSRC_MEM],
 	    my_lgrp->lgrp_id)) {
-		klgrpset_add(changed, lgrpid);
-		count = 1;
-
+		/*
+		 * Add new lgroup memory resource to existing lgroup
+		 */
 		lgrpid = my_lgrp->lgrp_id;
 		klgrpset_add(my_lgrp->lgrp_set[LGRP_RSRC_MEM], lgrpid);
 		klgrpset_add(changed, lgrpid);

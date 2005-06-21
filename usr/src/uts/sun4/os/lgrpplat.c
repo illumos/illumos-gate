@@ -350,14 +350,6 @@ lgrp_plat_alloc(lgrp_id_t lgrpid)
 }
 
 /*
- * Do any platform specific preparation and/or building of full lgroup topology
- */
-void
-lgrp_plat_build_topo(void)
-{
-}
-
-/*
  * Probe memory in each node from current CPU to determine latency topology
  */
 void

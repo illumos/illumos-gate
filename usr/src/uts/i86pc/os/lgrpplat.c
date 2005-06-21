@@ -834,10 +834,11 @@ lgrp_plat_latency_verify(void)
 	u_longlong_t			t2;
 
 	/*
-	 * Nothing to do when this is an UMA machine
+	 * Nothing to do when this is an UMA machine, lgroup topology is
+	 * limited to 2 levels, or there aren't any probe times yet
 	 */
 	if (max_mem_nodes == 1 || lgrp_topo_levels < 2 ||
-	    lgrp_plat_probe_times[0][0] == 0)
+	    (lgrp_plat_probe_time_max == 0 && lgrp_plat_probe_time_min == -1))
 		return (0);
 
 	/*
@@ -864,6 +865,11 @@ lgrp_plat_latency_verify(void)
 		if (t2 == 0)
 			continue;
 
+		if (t1 == 0) {
+			t1 = t2;
+			continue;
+		}
+
 		if (t1 != t2)
 			return (-2);
 	}
@@ -871,16 +877,17 @@ lgrp_plat_latency_verify(void)
 	/*
 	 * Local latencies should be less than remote
 	 */
-	t1 = lgrp_plat_probe_times[0][0];
-	for (i = 0; i < lgrp_plat_node_cnt; i++)
-		for (j = 0; j < lgrp_plat_node_cnt; j++) {
-			if (i == j || t2 == 0)
-				continue;
+	if (t1) {
+		for (i = 0; i < lgrp_plat_node_cnt; i++)
+			for (j = 0; j < lgrp_plat_node_cnt; j++) {
+				t2 = lgrp_plat_probe_times[i][j];
+				if (i == j || t2 == 0)
+					continue;
 
-			t2 = lgrp_plat_probe_times[i][j];
-			if (t1 >= t2)
-				return (-3);
-		}
+				if (t1 >= t2)
+					return (-3);
+			}
+	}
 
 	/*
 	 * Rest of checks are not very useful for machines with less than

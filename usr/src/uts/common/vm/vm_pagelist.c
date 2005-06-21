@@ -3440,7 +3440,7 @@ int	pgrppgcp;
  * PAGESIZE pages.
  */
 page_t *
-page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp,
+page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp_target,
     uint_t pgrflags)
 {
 	page_t		*like_pp;
@@ -3454,7 +3454,7 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp,
 	int		mtype;
 	int		flags = 0;
 	lgrp_mnode_cookie_t	lgrp_cookie;
-
+	lgrp_t		*lgrp;
 
 	REPL_STAT_INCR(ngets);
 	like_pp = orig_like_pp;
@@ -3502,8 +3502,19 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp,
 			/*
 			 * If an lgroup was specified, try to get the
 			 * page from that lgroup.
+			 * NOTE: Must be careful with code below because
+			 *	 lgroup may disappear and reappear since there
+			 *	 is no locking for lgroup here.
 			 */
-			if (LGRP_EXISTS(lgrp)) {
+			if (LGRP_EXISTS(lgrp_target)) {
+				/*
+				 * Keep local variable for lgroup separate
+				 * from lgroup argument since this code should
+				 * only be exercised when lgroup argument
+				 * exists....
+				 */
+				lgrp = lgrp_target;
+
 				/* Try the lgroup's freelists first */
 				LGRP_MNODE_COOKIE_INIT(lgrp_cookie, lgrp,
 				    LGRP_SRCH_LOCAL);
@@ -3544,10 +3555,10 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp,
 				break;
 			}
 
-			ASSERT(!LGRP_EXISTS(lgrp));
 			/*
-			 * No lgroup was specified, so just try to get the
-			 * page as close to like_pp's mnode as possible.
+			 * No lgroup was specified (or lgroup was removed by
+			 * DR, so just try to get the page as close to
+			 * like_pp's mnode as possible.
 			 * First try the local freelist...
 			 */
 			mnode = PP_2_MEM_NODE(like_pp);
