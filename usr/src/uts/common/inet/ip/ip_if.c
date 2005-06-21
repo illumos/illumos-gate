@@ -19331,7 +19331,7 @@ illgrp_scheduler(ill_t *ill)
 	 * is currently being inserted we may end up just returning this
 	 * ill itself. That is ok.
 	 */
-	if ((illgrp = ill->ill_group) == NULL) {
+	if (ill->ill_group == NULL) {
 		ill_refhold(ill);
 		return (ill);
 	}
@@ -19344,6 +19344,7 @@ illgrp_scheduler(ill_t *ill)
 	rw_enter(&ill_g_lock, RW_READER);
 	if ((illgrp = ill->ill_group) == NULL) {
 		rw_exit(&ill_g_lock);
+		ill_refhold(ill);
 		return (ill);
 	}
 
@@ -19374,7 +19375,6 @@ illgrp_scheduler(ill_t *ill)
 			retill = illgrp->illgrp_ill;
 	}
 	mutex_exit(&illgrp->illgrp_lock);
-
 	rw_exit(&ill_g_lock);
 
 	return (i == illcnt ? NULL : retill);
