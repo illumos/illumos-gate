@@ -1207,7 +1207,7 @@ ddi_get_iblock_cookie(dev_info_t *dip, uint_t inumber,
 		return (DDI_FAILURE);
 	}
 
-	*iblock_cookiep = (ddi_iblock_cookie_t)(uint64_t)pri;
+	*iblock_cookiep = (ddi_iblock_cookie_t)(uintptr_t)pri;
 	/* Free the handle allocated here only if no existing handle exists */
 	if (existing_hdlp == NULL)
 		(void) ddi_intr_free(hdl);
@@ -1267,7 +1267,7 @@ ddi_add_intr(dev_info_t *dip, uint_t inumber,
 	}
 
 	if (iblock_cookiep)
-		*iblock_cookiep = (ddi_iblock_cookie_t)(uint64_t)pri;
+		*iblock_cookiep = (ddi_iblock_cookie_t)(uintptr_t)pri;
 
 	if (idevice_cookiep) {
 		idevice_cookiep->idev_vector = 0;
@@ -1349,7 +1349,7 @@ ddi_get_soft_iblock_cookie(dev_info_t *dip, int preference,
 	if (preference == DDI_SOFTINT_FIXED)
 		return (DDI_FAILURE);
 
-	*iblock_cookiep = (ddi_iblock_cookie_t)((uint64_t)
+	*iblock_cookiep = (ddi_iblock_cookie_t)((uintptr_t)
 	    ((preference > DDI_SOFTINT_MED) ? DDI_SOFT_INTR_PRI_H :
 	    DDI_SOFT_INTR_PRI_M));
 
@@ -1377,7 +1377,7 @@ ddi_add_softintr(dev_info_t *dip, int preference, ddi_softintr_t *idp,
 
 	/* Translate the priority preference */
 	if (preference == DDI_SOFTINT_FIXED) {
-		softpri = (uint64_t)*iblock_cookiep;
+		softpri = *((uint64_t *)iblock_cookiep);
 		softpri = MIN(softpri, DDI_SOFT_INTR_PRI_H);
 	} else {
 		softpri = (uint64_t)((preference > DDI_SOFTINT_MED) ?
@@ -1399,7 +1399,7 @@ ddi_add_softintr(dev_info_t *dip, int preference, ddi_softintr_t *idp,
 	}
 
 	if (iblock_cookiep)
-		*iblock_cookiep = (ddi_iblock_cookie_t)softpri;
+		*iblock_cookiep = *((ddi_iblock_cookie_t *)(&softpri));
 
 	if (idevice_cookiep) {
 		idevice_cookiep->idev_vector = 0;

@@ -5189,7 +5189,7 @@ pcmcia_intr_enable_isr(dev_info_t *dip, dev_info_t *rdip,
 		mutex_exit(&sockp->ls_ilock);
 		hdlp->ih_vector = ispecp->intrspec_vec = sockp->ls_intr_vec;
 		hdlp->ih_pri = sockp->ls_intr_pri;
-		sockp->ls_iblk = (ddi_iblock_cookie_t)(uint64_t)
+		sockp->ls_iblk = (ddi_iblock_cookie_t)(uintptr_t)
 		    sockp->ls_intr_pri;
 		sockp->ls_idev.idev_vector = (ushort_t)hdlp->ih_vector;
 		sockp->ls_idev.idev_priority = (ushort_t)sockp->ls_intr_pri;
@@ -5209,7 +5209,7 @@ pcmcia_intr_enable_isr(dev_info_t *dip, dev_info_t *rdip,
 		ret = (*(DEVI(parent)->devi_ops->devo_bus_ops->bus_intr_op))(
 		    parent, rdip, DDI_INTROP_ENABLE, hdlp, NULL);
 
-		sockp->ls_iblk = (ddi_iblock_cookie_t)(uint64_t)
+		sockp->ls_iblk = (ddi_iblock_cookie_t)(uintptr_t)
 		    sockp->ls_intr_pri;
 		sockp->ls_idev.idev_vector = (ushort_t)sockp->ls_intr_vec;
 		sockp->ls_idev.idev_priority = (ushort_t)sockp->ls_intr_pri;

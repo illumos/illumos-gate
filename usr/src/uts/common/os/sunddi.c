@@ -316,7 +316,7 @@ i_ddi_peekpoke(dev_info_t *devi, ddi_ctl_enum_t cmd, size_t size,
 
 	/* Note: size is assumed to be correct;  it is not checked. */
 	peekpoke_args.size = size;
-	peekpoke_args.dev_addr = (uint64_t)addr;
+	peekpoke_args.dev_addr = (uintptr_t)addr;
 	peekpoke_args.handle = NULL;
 	peekpoke_args.repcount = 1;
 	peekpoke_args.flags = 0;
@@ -338,7 +338,7 @@ i_ddi_peekpoke(dev_info_t *devi, ddi_ctl_enum_t cmd, size_t size,
 		}
 	}
 
-	peekpoke_args.host_addr = (uint64_t)&peekpoke_value.u64;
+	peekpoke_args.host_addr = (uintptr_t)&peekpoke_value.u64;
 
 	if (devi != NULL)
 		rval = ddi_ctlops(devi, devi, cmd, &peekpoke_args,

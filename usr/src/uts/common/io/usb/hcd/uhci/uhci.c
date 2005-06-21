@@ -381,7 +381,7 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	hcdi_args.usba_hcdi_register_ops = uhcip->uhci_hcdi_ops;
 	hcdi_args.usba_hcdi_register_dma_attr = &uhcip->uhci_dma_attr;
 	hcdi_args.usba_hcdi_register_iblock_cookie =
-	    (ddi_iblock_cookie_t)(uint64_t)intr_pri;
+	    (ddi_iblock_cookie_t)(uintptr_t)intr_pri;
 
 	if (usba_hcdi_register(&hcdi_args, 0) != USB_SUCCESS) {
 

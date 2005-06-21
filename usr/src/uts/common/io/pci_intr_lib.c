@@ -244,11 +244,11 @@ pci_msi_configure(dev_info_t *rdip, int type, int count, int inum,
 		    pci_config_get16(cfg_hdle, caps_ptr + PCI_MSI_CTRL)));
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
-		uint64_t	off;
+		uintptr_t	off;
 		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uint64_t)msix_p->msix_tbl_addr +
+		off = (uintptr_t)msix_p->msix_tbl_addr +
 		    ((inum - 1) * PCI_MSIX_VECTOR_SIZE);
 
 		/* Set the "data" and "addr" bits */
@@ -304,11 +304,11 @@ pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 		    pci_config_get16(cfg_hdle, caps_ptr + PCI_MSI_CTRL)));
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
-		uint64_t	off;
+		uintptr_t	off;
 		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uint64_t)msix_p->msix_tbl_addr +
+		off = (uintptr_t)msix_p->msix_tbl_addr +
 		    ((inum - 1) * PCI_MSIX_VECTOR_SIZE);
 
 		/* Reset the "data" and "addr" bits */
@@ -394,7 +394,7 @@ pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 		    caps_ptr + PCI_MSI_CTRL, msi_ctrl);
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
-		uint64_t	off;
+		uintptr_t	off;
 		uint32_t	mask_bits;
 		ddi_intr_msix_t	*msix_p;
 
@@ -408,7 +408,7 @@ pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 		msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uint64_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		off = (uintptr_t)msix_p->msix_tbl_addr + ((inum - 1) *
 		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
 
 		/* Clear the Mask bit */
@@ -457,7 +457,7 @@ pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
 		pci_config_put16(cfg_hdle,
 		    caps_ptr + PCI_MSI_CTRL, msi_ctrl);
 	} else if (type == DDI_INTR_TYPE_MSIX) {
-		offset_t		off;
+		uintptr_t		off;
 		ddi_intr_msix_t		*msix_p;
 
 		if (!(msi_ctrl & PCI_MSIX_ENABLE_BIT))
@@ -466,7 +466,7 @@ pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
 		msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uint64_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		off = (uintptr_t)msix_p->msix_tbl_addr + ((inum - 1) *
 		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
 
 		/* Set the Mask bit */
@@ -521,7 +521,7 @@ pci_msi_set_mask(dev_info_t *rdip, int type, int inum)
 		    caps_ptr + offset, mask_bits);
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
-		uint64_t		off;
+		uintptr_t		off;
 		ddi_intr_msix_t		*msix_p;
 
 		/* Set function mask */
@@ -533,7 +533,7 @@ pci_msi_set_mask(dev_info_t *rdip, int type, int inum)
 		msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uint64_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		off = (uintptr_t)msix_p->msix_tbl_addr + ((inum - 1) *
 		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
 
 		/* Set the Mask bit */
@@ -585,7 +585,7 @@ pci_msi_clr_mask(dev_info_t *rdip, int type, int inum)
 		    caps_ptr + offset, mask_bits);
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
-		uint64_t		off;
+		uintptr_t		off;
 		ddi_intr_msix_t		*msix_p;
 
 		if (msi_ctrl & PCI_MSIX_FUNCTION_MASK) {
@@ -596,7 +596,7 @@ pci_msi_clr_mask(dev_info_t *rdip, int type, int inum)
 		msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uint64_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		off = (uintptr_t)msix_p->msix_tbl_addr + ((inum - 1) *
 		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
 
 		/* Clear the Mask bit */
@@ -655,12 +655,12 @@ pci_msi_get_pending(dev_info_t *rdip, int type, int inum, int *pendingp)
 		*pendingp = pending_bits & ~(1 >> inum);
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
-		uint64_t	off;
+		uintptr_t	off;
 		uint64_t	pending_bits;
 		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the PBA array which has entry for "inum" */
-		off = (uint64_t)msix_p->msix_pba_addr + ((inum - 1) / 64);
+		off = (uintptr_t)msix_p->msix_pba_addr + ((inum - 1) / 64);
 
 		/* Read the PBA array */
 		pending_bits = ddi_get64(msix_p->msix_pba_hdl,

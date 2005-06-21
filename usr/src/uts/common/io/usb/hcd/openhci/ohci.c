@@ -686,7 +686,7 @@ ohci_attach(dev_info_t		*dip,
 	 * could just go)
 	 */
 	hcdi_args.usba_hcdi_register_iblock_cookie =
-	    (ddi_iblock_cookie_t)(uint64_t)ohcip->ohci_intr_pri;
+	    (ddi_iblock_cookie_t)(uintptr_t)ohcip->ohci_intr_pri;
 
 	if (usba_hcdi_register(&hcdi_args, 0) != DDI_SUCCESS) {
 		(void) ohci_cleanup(ohcip);

@@ -167,7 +167,7 @@ usba_hcdi_register(usba_hcdi_register_args_t *args, uint_t flags)
 	 * could just go)
 	 */
 	hcdi->hcdi_soft_iblock_cookie =
-	    (ddi_iblock_cookie_t)(uint64_t)soft_prip;
+	    (ddi_iblock_cookie_t)(uintptr_t)soft_prip;
 
 	usba_init_list(&hcdi->hcdi_cb_queue, NULL, NULL);
 
