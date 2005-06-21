@@ -747,6 +747,9 @@ process_indent($)
 		return		if (/{$/);
 		return		if (/}[,;]?$/);
 
+		# Allow macros on their own lines
+		return		if (/^\s*[A-Z_][A-Z_0-9]*$/);
+
 		# cases we don't deal with, generally non-kosher
 		if (/{/) {
 			err("stuff after {");
