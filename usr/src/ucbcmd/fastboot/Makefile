@@ -25,26 +25,18 @@
 # Use is subject to license terms.
 #
 
-SHFILES= fastboot
-CLOBBERFILES= $(SHFILES)
-
-SHSRCS= $(SHFILES:%=%.sh)
+PROG= fastboot
 
 include ../Makefile.ucbcmd
 
 .KEEP_STATE:
 
-all: $(SHFILES) 
+all: $(PROG)
 
-%: %.sh
-	$(RM) $@
-	$(CP) $< $@
-
-install: all $(ROOTBIN) $(ROOTSHFILES)
+install: all $(ROOTBIN) $(ROOTPROG)
 
 clean:
 
 lint:
 
 include ../Makefile.ucbtarg
-

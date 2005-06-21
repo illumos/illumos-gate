@@ -25,22 +25,15 @@
 # Use is subject to license terms.
 #
 
-SHFILES= file
-CLOBBERFILES= $(SHFILES)
-
-SHSRCS= $(SHFILES:%=%.sh)
+PROG= file
 
 include ../Makefile.ucbcmd
 
 .KEEP_STATE:
 
-all: $(SHFILES)
+all: $(PROG)
 
-%: %.sh
-	$(RM) $@
-	$(CP) $< $@
-
-install: all $(ROOTBIN) $(ROOTSHFILES)
+install: all $(ROOTBIN) $(ROOTPROG)
 
 clean:
 

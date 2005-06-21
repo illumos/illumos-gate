@@ -21,34 +21,25 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989 by Sun Microsystems, Inc.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
-SHFILES= lintcmd
-
-SHFILES2= lint
-
-CLOBBERFILES= $(SHFILES) $(SHFILES2)
-
-SHSRCS= $(SHFILES2:%=%.sh)
+PROG= lintcmd
+REALPROG= lint
 
 include ../Makefile.ucbcmd
 
 .KEEP_STATE:
 
-all: $(SHFILES) 
+all: $(PROG)
 
-$(SHFILES):	$(SHSRCS)
-	$(RM) $@
-	$(CP) $(SHSRCS) $@
-
-install: all $(ROOTBIN) $(ROOTSHFILES)
-	rm -f $(ROOTBIN)/$(SHFILES2)
-	mv $(ROOTBIN)/$(SHFILES) $(ROOTBIN)/$(SHFILES2)
+install: all $(ROOTBIN) $(ROOTPROG)
+	$(RM) $(ROOTBIN)/$(REALPROG)
+	$(MV) $(ROOTBIN)/$(PROG) $(ROOTBIN)/$(REALPROG)
 
 clean:
 
 lint:
 
 include ../Makefile.ucbtarg
-

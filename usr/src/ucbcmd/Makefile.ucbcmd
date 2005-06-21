@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,7 +53,6 @@ ROOTBIN32=	$(ROOTBIN)/$(MACH32)
 ROOTBIN64=	$(ROOTBIN)/$(MACH64)
 
 ROOTPROG=	$(PROG:%=$(ROOTBIN)/%)
-ROOTSHFILES=	$(SHFILES:%=$(ROOTBIN)/%)
 ROOTLIBPROG=	$(PROG:%=$(ROOTLIB)/%)
 ROOT4LIBPROG=	$(PROG:%=$(ROOT4LIB)/%)
 ROOTETCPROG=	$(PROG:%=$(ROOTETC)/%)

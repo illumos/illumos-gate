@@ -21,29 +21,22 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989 by Sun Microsystems, Inc.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
-SHFILES= ld
-CLOBBERFILES= $(SHFILES)
-
-SHSRCS= $(SHFILES:%=%.sh)
+PROG= ld
 
 include ../Makefile.ucbcmd
 
 .KEEP_STATE:
 
-all: $(SHFILES) 
+all: $(PROG)
 
-%: %.sh
-	$(RM) $@
-	$(CP) $< $@
-
-install: all $(ROOTBIN) $(ROOTSHFILES)
+install: all $(ROOTBIN) $(ROOTPROG)
 
 clean:
 
 lint:
 
 include ../Makefile.ucbtarg
-
