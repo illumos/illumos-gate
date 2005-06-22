@@ -20,9 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -36,8 +38,6 @@
 /*
  * Copyright 1985, 1990 by Mortice Kern Systems Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <errno.h>
@@ -62,6 +62,7 @@
 
 
 #define	A_DAY		(long)(60*60*24)	/* a day full of seconds */
+#define	A_MIN		(long)(60)
 #define	BLKSIZ		512
 #define	round(x, s)	(((x)+(s)-1)&~((s)-1))
 #ifndef FTW_SLN
@@ -82,7 +83,7 @@ enum Command
 	PRINT, DEPTH, LOCAL, MOUNT, ATIME, MTIME, CTIME, NEWER,
 	NAME, F_USER, F_GROUP, INUM, SIZE, LINKS, PERM, EXEC, OK, CPIO, NCPIO,
 	TYPE, AND, OR, NOT, LPAREN, RPAREN, CSIZE, VARARGS, FOLLOW,
-	PRUNE, NOUSER, NOGRP, FSTYPE, LS, XATTR, ACL
+	PRUNE, NOUSER, NOGRP, FSTYPE, LS, XATTR, ACL, MMIN, AMIN, CMIN
 };
 
 enum Type
@@ -106,8 +107,10 @@ static struct Args commands[] =
 	"(",		LPAREN,	Unary,
 	")",		RPAREN,	Unary,
 	"-a",		AND,	Op,
+	"-amin",	AMIN,	Num,
 	"-atime",	ATIME,	Num,
 	"-cpio",	CPIO,	Cpio,
+	"-cmin",	CMIN,	Num,
 	"-ctime",	CTIME,	Num,
 	"-depth",	DEPTH,	Unary,
 	"-exec",	EXEC,	Exec,
@@ -117,6 +120,7 @@ static struct Args commands[] =
 	"-links",	LINKS,	Num,
 	"-local",	LOCAL,	Unary,
 	"-mount",	MOUNT,	Unary,
+	"-mmin",	MMIN,	Num,
 	"-mtime",	MTIME,	Num,
 	"-name",	NAME,	Str,
 	"-ncpio",	NCPIO,  Cpio,
@@ -504,8 +508,11 @@ int *actionp;
 			np->first.ll = atoll(b);
 			break;
 
+		case CMIN:
 		case CTIME:
+		case MMIN:
 		case MTIME:
+		case AMIN:
 		case ATIME:
 		case LINKS:
 			np->first.l = atol(b);
@@ -822,6 +829,18 @@ struct FTW *state;
 			t = statb->st_mtime;
 		days:
 			l = (now-t)/A_DAY;
+			goto num;
+		case MMIN:
+			t = statb->st_mtime;
+			goto mins;
+		case AMIN:
+			t = statb->st_atime;
+			goto mins;
+		case CMIN:
+			t = statb->st_ctime;
+			goto mins;
+		mins:
+			l = (now-t)/A_MIN;
 			goto num;
 		case CSIZE:
 			ll = (long long)statb->st_size;
