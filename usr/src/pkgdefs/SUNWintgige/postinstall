@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"	
@@ -128,5 +128,47 @@ check_add_drv()
 }
 
 	check_add_drv -b "${BASEDIR}" -i \
-			'"pci8086,1000" "pci8086,1001" "pci8086,1004" "pci8086,1008" "pci8086,1009" "pci8086,100d" "pci8086,100e" "pci8086,100f" "pci8086,1010" "pci8086,1011" "pci8086,1012" "pci8086,1013" "pci8086,1014" "pci8086,1015" "pci8086,1016" "pci8086,1017" "pci8086,1018" "pci8086,1019" "pci8086,101a" "pci8086,101d" "pci8086,101e" "pci8086,1026" "pci8086,1027" "pci8086,1028" "pci8086,1075" "pci8086,1076" "pci8086,1077" "pci8086,1079" "pci8086,107a" "pci8086,107b"' \
+	'"pci8086,1000"
+	"pci8086,1001"
+	"pci8086,1004"
+	"pci8086,1008"
+	"pci8086,1009"
+	"pci8086,100d"
+	"pci8086,100e"
+	"pci8086,100f"
+	"pci8086,1010"
+	"pci8086,1011"
+	"pci8086,1012"
+	"pci8086,1013"
+	"pci8086,1014"
+	"pci8086,1015"
+	"pci8086,1016"
+	"pci8086,1017"
+	"pci8086,1018"
+	"pci8086,1019"
+	"pci8086,101a"
+	"pci8086,101d"
+	"pci8086,101e"
+	"pci8086,1026"
+	"pci8086,1027"
+	"pci8086,1028"
+	"pci8086,105a"
+	"pci8086,105b"
+	"pci8086,105c"
+	"pci8086,105e"
+	"pci8086,105f"
+	"pci8086,1060"
+	"pci8086,1061"
+	"pci8086,1062"
+	"pci8086,1063"
+	"pci8086,1075"
+	"pci8086,1076"
+	"pci8086,1077"
+	"pci8086,1079"
+	"pci8086,107a"
+	"pci8086,107b"
+	"pci8086,107c"
+	"pci8086,107d"
+	"pci8086,107e"
+	"pci8086,108a"' \
 	-m '* 0666 root root' e1000g
