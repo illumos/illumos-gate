@@ -115,6 +115,9 @@ struct mac_impl_s {
 
 	kmutex_t		mi_activelink_lock;
 	boolean_t		mi_activelink;
+
+	mac_txinfo_t		mi_txinfo;
+	mac_txinfo_t		mi_txloopinfo;
 };
 
 extern void	mac_init(void);

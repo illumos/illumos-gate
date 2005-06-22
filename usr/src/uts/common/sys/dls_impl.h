@@ -62,6 +62,7 @@ struct dls_link_s {
 	uint_t			dl_macref;
 	ght_t			dl_impl_hash;
 	mac_txloop_t		dl_loopback;
+	kmutex_t		dl_promisc_lock;
 	uint_t			dl_npromisc;
 	uint_t			dl_nactive;
 	uint32_t		dl_unknowns;
@@ -97,8 +98,7 @@ struct dls_impl_s {
 	dls_multicst_addr_t		*di_dmap;
 	dls_rx_t			di_rx;
 	void				*di_rx_arg;
-	dls_tx_t			di_tx;
-	void				*di_tx_arg;
+	const mac_txinfo_t		*di_txinfo;
 	boolean_t			di_bound;
 	boolean_t			di_removing;
 	boolean_t			di_active;

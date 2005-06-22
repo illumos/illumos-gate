@@ -215,6 +215,7 @@ aggr_m_tx(void *arg, mblk_t *mp)
 	aggr_grp_t *grp = arg;
 	aggr_port_t *port;
 	mblk_t *nextp;
+	const mac_txinfo_t *mtp;
 
 	rw_enter(&grp->lg_lock, RW_READER);
 
@@ -238,7 +239,12 @@ aggr_m_tx(void *arg, mblk_t *mp)
 
 		rw_exit(&grp->lg_lock);
 
-		if ((mp = port->lp_tx(port->lp_tx_arg, mp)) != NULL) {
+		/*
+		 * We store the transmit info pointer locally in case it
+		 * changes between loading mt_fn and mt_arg.
+		 */
+		mtp = port->lp_txinfo;
+		if ((mp = mtp->mt_fn(mtp->mt_arg, mp)) != NULL) {
 			mp->b_next = nextp;
 			goto done;
 		}

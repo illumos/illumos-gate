@@ -455,6 +455,7 @@ lacp_xmit_sm(aggr_port_t *portp)
 	size_t	len;
 	mblk_t  *mp;
 	hrtime_t now, elapsed;
+	const mac_txinfo_t *mtp;
 
 	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
 
@@ -505,7 +506,12 @@ lacp_xmit_sm(aggr_port_t *portp)
 	fill_lacp_pdu(portp,
 	    (lacp_t *)(mp->b_rptr + sizeof (struct ether_header)));
 
-	portp->lp_tx(portp->lp_tx_arg, mp);
+	/*
+	 * Store the transmit info pointer locally in case it changes between
+	 * loading mt_fn and mt_arg.
+	 */
+	mtp = portp->lp_txinfo;
+	mtp->mt_fn(mtp->mt_arg, mp);
 
 	pl->NTT = B_FALSE;
 	portp->lp_lacp_stats.LACPDUsTx++;
@@ -748,7 +754,8 @@ lacp_mux_sm(aggr_port_t *portp)
 static void
 receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 {
-	marker_pdu_t	*markerp = (marker_pdu_t *)mp->b_rptr;
+	marker_pdu_t		*markerp = (marker_pdu_t *)mp->b_rptr;
+	const mac_txinfo_t	*mtp;
 
 	AGGR_LACP_LOCK(portp->lp_grp);
 
@@ -822,7 +829,12 @@ receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 	fill_lacp_ether(portp, (struct ether_header *)mp->b_rptr);
 	AGGR_LACP_UNLOCK(portp->lp_grp);
 
-	portp->lp_tx(portp->lp_tx_arg, mp);
+	/*
+	 * Store the transmit info pointer locally in case it changes between
+	 * loading mt_fn and mt_arg.
+	 */
+	mtp = portp->lp_txinfo;
+	mtp->mt_fn(mtp->mt_arg, mp);
 	return;
 
 bail:

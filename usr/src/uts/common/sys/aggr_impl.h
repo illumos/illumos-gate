@@ -84,8 +84,7 @@ typedef struct aggr_port_s {
 	uint64_t	lp_stat[MAC_NSTAT];
 	aggr_lacp_port_t lp_lacp;		/* LACP state */
 	lacp_stats_t	lp_lacp_stats;
-	mac_tx_t	lp_tx;
-	void		*lp_tx_arg;
+	const mac_txinfo_t *lp_txinfo;
 } aggr_port_t;
 
 /*

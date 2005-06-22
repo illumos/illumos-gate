@@ -111,8 +111,6 @@ typedef	void	(*dls_rx_t)(void *, mac_resource_handle_t, mblk_t *, size_t);
 
 extern void	dls_rx_set(dls_channel_t, dls_rx_t, void *);
 
-typedef	mac_tx_t	dls_tx_t;
-
 extern mblk_t		*dls_tx(dls_channel_t, mblk_t *);
 
 extern boolean_t	dls_active_set(dls_channel_t);

@@ -3337,6 +3337,7 @@ gld_cmds(queue_t *q, mblk_t *mp)
 	case DL_TEST_REQ:
 	case DL_TEST_RES:
 	case DL_CONTROL_REQ:
+	case DL_PASSIVE_REQ:
 		result = DL_NOTSUPPORTED;
 		break;
 

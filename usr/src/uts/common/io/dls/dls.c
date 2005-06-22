@@ -75,7 +75,7 @@ i_dls_destructor(void *buf, void *arg)
 	ASSERT(dip->di_dmap == NULL);
 	ASSERT(!dip->di_bound);
 	ASSERT(dip->di_rx == NULL);
-	ASSERT(dip->di_tx == NULL);
+	ASSERT(dip->di_txinfo == NULL);
 
 	rw_destroy(&(dip->di_lock));
 }
@@ -93,20 +93,9 @@ i_dls_notify(void *arg, mac_notify_type_t type)
 	case MAC_NOTE_PROMISC:
 		/*
 		 * Every time the MAC interface changes promiscuity we
-		 * need to reset the transmit function:
-		 *
-		 * - In non-promiscuous mode we simply copy the function
-		 *   pointer from the MAC module.
-		 *
-		 * - In promiscuous mode we use mac_txloop(), which will
-		 *   handle the loopback case.
+		 * need to reset our transmit information.
 		 */
-		if (mac_promisc_get(dip->di_mh, MAC_PROMISC)) {
-			dip->di_tx = mac_txloop;
-			dip->di_tx_arg = dip->di_mh;
-		} else {
-			mac_tx_get(dip->di_mh, &dip->di_tx, &dip->di_tx_arg);
-		}
+		dip->di_txinfo = mac_tx_get(dip->di_mh);
 		break;
 	}
 }
@@ -348,13 +337,9 @@ dls_open(const char *name, dls_channel_t *dcp)
 	mac_unicst_get(dip->di_mh, dip->di_unicst_addr);
 
 	/*
-	 * Set the MAC transmit function.
-	 *
-	 * NOTE: We know that the MAC is not in promiscuous mode so we
-	 *	 simply copy the values from the MAC.
-	 *	 (See comment in i_dls_notify() for further explanation).
+	 * Set the MAC transmit information.
 	 */
-	mac_tx_get(dip->di_mh, &dip->di_tx, &dip->di_tx_arg);
+	dip->di_txinfo = mac_tx_get(dip->di_mh);
 
 	/*
 	 * Set up packet header constructor and parser functions. (We currently
@@ -437,8 +422,7 @@ dls_close(dls_channel_t dc)
 	 * Free the dls_impl_t back to the cache.
 	 */
 	dip->di_dvp = NULL;
-	dip->di_tx = NULL;
-	dip->di_tx_arg = NULL;
+	dip->di_txinfo = NULL;
 	kmem_cache_free(i_dls_impl_cachep, dip);
 
 	/*
@@ -576,7 +560,11 @@ multi:
 	/*
 	 * It's easiest to add the txloop handler up-front; if promiscuous
 	 * mode cannot be enabled, then we'll remove it before returning.
+	 * Use dl_promisc_lock to prevent racing with another thread also
+	 * manipulating the promiscuous state on another dls_impl_t associated
+	 * with the same dls_link_t.
 	 */
+	mutex_enter(&dlp->dl_promisc_lock);
 	if (dlp->dl_npromisc == 0 &&
 	    (flags & (DLS_PROMISC_MULTI|DLS_PROMISC_PHYS))) {
 		ASSERT(dlp->dl_mth == NULL);
@@ -584,54 +572,45 @@ multi:
 	}
 
 	/*
-	 * Check if we need to turn on 'all multicast' mode.
+	 * Turn on or off 'all multicast' mode, if necessary.
 	 */
-	if ((flags & DLS_PROMISC_MULTI) &&
-	    !(dip->di_promisc & DLS_PROMISC_MULTI)) {
-		err = mac_promisc_set(dip->di_mh, B_TRUE, MAC_PROMISC);
-		if (err != 0)
-			goto done;
-		dip->di_promisc |= DLS_PROMISC_MULTI;
-		dlp->dl_npromisc++;
-		goto phys;
+	if (flags & DLS_PROMISC_MULTI) {
+		if (!(dip->di_promisc & DLS_PROMISC_MULTI)) {
+			err = mac_promisc_set(dip->di_mh, B_TRUE, MAC_PROMISC);
+			if (err != 0)
+				goto done;
+			dip->di_promisc |= DLS_PROMISC_MULTI;
+			dlp->dl_npromisc++;
+		}
+	} else {
+		if (dip->di_promisc & DLS_PROMISC_MULTI) {
+			err = mac_promisc_set(dip->di_mh, B_FALSE, MAC_PROMISC);
+			if (err != 0)
+				goto done;
+			dip->di_promisc &= ~DLS_PROMISC_MULTI;
+			dlp->dl_npromisc--;
+		}
 	}
 
 	/*
-	 * Check if we need to turn off 'all multicast' mode.
+	 * Turn on or off 'all physical' mode, if necessary.
 	 */
-	if (!(flags & DLS_PROMISC_MULTI) &&
-	    (dip->di_promisc & DLS_PROMISC_MULTI)) {
-		err = mac_promisc_set(dip->di_mh, B_FALSE, MAC_PROMISC);
-		if (err != 0)
-			goto done;
-		dip->di_promisc &= ~DLS_PROMISC_MULTI;
-		dlp->dl_npromisc--;
-	}
-
-phys:
-	/*
-	 * Check if we need to turn on 'all physical' mode.
-	 */
-	if ((flags & DLS_PROMISC_PHYS) &&
-	    !(dip->di_promisc & DLS_PROMISC_PHYS)) {
-		err = mac_promisc_set(dip->di_mh, B_TRUE, MAC_PROMISC);
-		if (err != 0)
-			goto done;
-		dip->di_promisc |= DLS_PROMISC_PHYS;
-		dlp->dl_npromisc++;
-		goto done;
-	}
-
-	/*
-	 * Check if we need to turn off 'all physical' mode.
-	 */
-	if (!(flags & DLS_PROMISC_PHYS) &&
-	    (dip->di_promisc & DLS_PROMISC_PHYS)) {
-		err = mac_promisc_set(dip->di_mh, B_FALSE, MAC_PROMISC);
-		if (err != 0)
-			goto done;
-		dip->di_promisc &= ~DLS_PROMISC_PHYS;
-		dlp->dl_npromisc--;
+	if (flags & DLS_PROMISC_PHYS) {
+		if (!(dip->di_promisc & DLS_PROMISC_PHYS)) {
+			err = mac_promisc_set(dip->di_mh, B_TRUE, MAC_PROMISC);
+			if (err != 0)
+				goto done;
+			dip->di_promisc |= DLS_PROMISC_PHYS;
+			dlp->dl_npromisc++;
+		}
+	} else {
+		if (dip->di_promisc & DLS_PROMISC_PHYS) {
+			err = mac_promisc_set(dip->di_mh, B_FALSE, MAC_PROMISC);
+			if (err != 0)
+				goto done;
+			dip->di_promisc &= ~DLS_PROMISC_PHYS;
+			dlp->dl_npromisc--;
+		}
 	}
 
 done:
@@ -641,6 +620,7 @@ done:
 	}
 
 	ASSERT(dlp->dl_npromisc == 0 || dlp->dl_mth != NULL);
+	mutex_exit(&dlp->dl_promisc_lock);
 
 	rw_exit(&(dip->di_lock));
 	return (err);
@@ -775,9 +755,9 @@ dls_rx_set(dls_channel_t dc, dls_rx_t rx, void *arg)
 mblk_t *
 dls_tx(dls_channel_t dc, mblk_t *mp)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
+	const mac_txinfo_t *mtp = ((dls_impl_t *)dc)->di_txinfo;
 
-	return (dip->di_tx(dip->di_tx_arg, mp));
+	return (mtp->mt_fn(mtp->mt_arg, mp));
 }
 
 /*

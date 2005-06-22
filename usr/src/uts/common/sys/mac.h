@@ -356,6 +356,11 @@ typedef struct mac_rx_fifo_s {
 	uint_t			mrf_normal_pkt_count;
 } mac_rx_fifo_t;
 
+typedef struct mac_txinfo_s {
+	mac_tx_t		mt_fn;
+	void			*mt_arg;
+} mac_txinfo_t;
+
 typedef union mac_resource_u {
 	mac_resource_type_t	mr_type;
 	mac_rx_fifo_t		mr_fifo;
@@ -383,7 +388,7 @@ extern int			mac_unicst_set(mac_handle_t, const uint8_t *);
 extern void			mac_unicst_get(mac_handle_t, uint8_t *);
 extern void			mac_resources(mac_handle_t);
 extern void			mac_ioctl(mac_handle_t, queue_t *, mblk_t *);
-extern void			mac_tx_get(mac_handle_t, mac_tx_t *, void **);
+extern const mac_txinfo_t	*mac_tx_get(mac_handle_t);
 extern link_state_t		mac_link_get(mac_handle_t);
 extern mac_notify_handle_t	mac_notify_add(mac_handle_t, mac_notify_t,
     void *);

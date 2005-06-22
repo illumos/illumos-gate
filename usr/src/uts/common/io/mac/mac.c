@@ -197,6 +197,14 @@ i_mac_create(mac_t *mp)
 	mip->mi_multicst_verify = i_mac_ether_multicst_verify;
 
 	/*
+	 * Set up the two possible transmit routines.
+	 */
+	mip->mi_txinfo.mt_fn = mp->m_tx;
+	mip->mi_txinfo.mt_arg = mp->m_driver;
+	mip->mi_txloopinfo.mt_fn = mac_txloop;
+	mip->mi_txloopinfo.mt_arg = mip;
+
+	/*
 	 * Initialize the kstats for this device.
 	 */
 	mac_stat_create(mip);
@@ -778,16 +786,35 @@ mac_ioctl(mac_handle_t mh, queue_t *wq, mblk_t *bp)
 	mp->m_ioctl(mp->m_driver, wq, bp);
 }
 
-void
-mac_tx_get(mac_handle_t mh, mac_tx_t *txp, void **argp)
+const mac_txinfo_t *
+mac_tx_get(mac_handle_t mh)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	mac_t		*mp = mip->mi_mp;
+	mac_txinfo_t	*mtp;
 
-	ASSERT(mp->m_tx != NULL);
+	/*
+	 * Grab the lock to prevent us from racing with MAC_PROMISC being
+	 * changed.  This is sufficient since MAC clients are careful to always
+	 * call mac_txloop_add() prior to enabling MAC_PROMISC, and to disable
+	 * MAC_PROMISC prior to calling mac_txloop_remove().
+	 */
+	rw_enter(&mip->mi_txloop_lock, RW_READER);
 
-	*txp = mp->m_tx;
-	*argp = mp->m_driver;
+	if (mac_promisc_get(mh, MAC_PROMISC)) {
+		ASSERT(mip->mi_mtfp != NULL);
+		mtp = &mip->mi_txloopinfo;
+	} else {
+		/*
+		 * Note that we cannot ASSERT() that mip->mi_mtfp is NULL,
+		 * because to satisfy the above ASSERT(), we have to disable
+		 * MAC_PROMISC prior to calling mac_txloop_remove().
+		 */
+		mtp = &mip->mi_txinfo;
+
+	}
+
+	rw_exit(&mip->mi_txloop_lock);
+	return (mtp);
 }
 
 link_state_t
@@ -1146,21 +1173,28 @@ mac_txloop(void *arg, mblk_t *bp)
 		}
 
 		rw_enter(&mip->mi_txloop_lock, RW_READER);
-
 		mtfp = mip->mi_mtfp;
-		for (; mtfp != NULL; mtfp = mtfp->mtf_nextp) {
+		while (mtfp != NULL && loop_bp != NULL) {
 			bp = loop_bp;
-			if (mtfp->mtf_nextp != NULL) {
+
+			/* XXX counter bump if copymsg() fails? */
+			if (mtfp->mtf_nextp != NULL)
 				loop_bp = copymsg(bp);
-				/* XXX counter bump if copymsg() fails? */
-			}
+			else
+				loop_bp = NULL;
 
 			mtfp->mtf_fn(mtfp->mtf_arg, bp);
-			if (loop_bp == NULL)
-				break;
+			mtfp = mtfp->mtf_nextp;
 		}
-
 		rw_exit(&mip->mi_txloop_lock);
+
+		/*
+		 * It's possible we've raced with the disabling of promiscuous
+		 * mode, in which case we can discard our copy.
+		 */
+		if (loop_bp != NULL)
+			freemsg(loop_bp);
+
 		bp = next_bp;
 	}
 

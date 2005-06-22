@@ -143,17 +143,8 @@ aggr_port_create(const char *name, uint_t portnum, aggr_port_t **pp)
 	/* set port's receive callback */
 	port->lp_mrh = mac_rx_add(mh, aggr_recv_cb, (void *)port);
 
-	/*
-	 * If the underlying port is already in promiscuous mode, then
-	 * use mac_txloop() so that whatever is monitoring the port sees
-	 * all the packets we send to it.
-	 */
-	if (mac_promisc_get(port->lp_mh, MAC_PROMISC)) {
-		port->lp_tx = mac_txloop;
-		port->lp_tx_arg = port->lp_mh;
-	} else {
-		mac_tx_get(port->lp_mh, &port->lp_tx, &port->lp_tx_arg);
-	}
+	/* set port's transmit information */
+	port->lp_txinfo = mac_tx_get(port->lp_mh);
 
 	/* set port's ring add and ring remove callbacks */
 	mac_resource_set(mh, aggr_port_resource_add, (void *)port);
@@ -347,12 +338,7 @@ aggr_port_notify_cb(void *arg, mac_notify_type_t type)
 			mac_unicst_update(&grp->lg_mac, grp->lg_addr);
 		break;
 	case MAC_NOTE_PROMISC:
-		if (mac_promisc_get(port->lp_mh, MAC_PROMISC)) {
-			port->lp_tx = mac_txloop;
-			port->lp_tx_arg = port->lp_mh;
-		} else {
-			mac_tx_get(port->lp_mh, &port->lp_tx, &port->lp_tx_arg);
-		}
+		port->lp_txinfo = mac_tx_get(port->lp_mh);
 		break;
 	default:
 		break;

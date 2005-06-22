@@ -85,6 +85,7 @@ i_dls_link_constructor(void *buf, void *arg, int kmflag)
 	ASSERT(err == 0);
 
 	mutex_init(&dlp->dl_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&dlp->dl_promisc_lock, NULL, MUTEX_DEFAULT, NULL);
 	return (0);
 }
 
@@ -104,6 +105,7 @@ i_dls_link_destructor(void *buf, void *arg)
 	ASSERT(err == 0);
 
 	mutex_destroy(&dlp->dl_lock);
+	mutex_destroy(&dlp->dl_promisc_lock);
 }
 
 #define	ETHER_MATCH(_pkt_a, _pkt_b)					\
