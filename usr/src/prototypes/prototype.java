@@ -18,11 +18,17 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+
+/*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  * ident	"%Z%%M%	%I%	%E% SMI"
- *
+ */
+
+/*
  * Comment that describes the contents of this file.
  */
