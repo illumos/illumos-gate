@@ -330,6 +330,7 @@ DRV_KMODS	+= bge
 DRV_KMODS      += mdesc
 DRV_KMODS	+= ncp
 DRV_KMODS	+= ebus
+DRV_KMODS       += su
 #
 #	Exec Class Modules (/kernel/exec):
 #

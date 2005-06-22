@@ -62,6 +62,7 @@ f none platform/sun4v/kernel/drv/sparcv9/dma 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/px 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/qcn 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/rootnex 755 root sys
+f none platform/sun4v/kernel/drv/sparcv9/su 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/trapstat 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/vnex 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/glvc 755 root sys

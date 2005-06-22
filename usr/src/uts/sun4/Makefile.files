@@ -82,6 +82,7 @@ FCODE_OBJS	+= fcode.o
 FCODEM_OBJS	+= fc_ddi.o fc_physio.o fc_ops.o fc_subr.o
 FCPCI_OBJS	+= fcpci.o
 EBUS_OBJS	+= ebus.o
+SU_OBJS		+= su_driver.o
 
 #
 #			Misc modules
