@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1131,9 +1131,45 @@ qunbufcall(queue_t *q, bufcall_id_t id)
 }
 
 /*
- * Associate stream with an instance of the bottom driver.
- * This interface may be called from STREAM driver's put
- * procedure, so it cannot block.
+ * Associate the stream with an instance of the bottom driver.  This
+ * function is called by APIs that establish or modify the hardware
+ * association (ppa) of an open stream.  Two examples of such
+ * post-open(9E) APIs are the dlpi(7p) DL_ATTACH_REQ message, and the
+ * ndd(1M) "instance=" ioctl(2).  This interface may be called from a
+ * stream driver's wput procedure and from within syncq perimeters,
+ * so it can't block.
+ *
+ * The qassociate() "model" is that it should drive attach(9E), yet it
+ * can't really do that because driving attach(9E) is a blocking
+ * operation.  Instead, the qassociate() implementation has complex
+ * dependencies on the implementation behavior of other parts of the
+ * kernel to ensure all appropriate instances (ones that have not been
+ * made inaccessible by DR) are attached at stream open() time, and
+ * that they will not autodetach.  The code relies on the fact that an
+ * open() of a stream that ends up using qassociate() always occurs on
+ * a minor node created with CLONE_DEV.  The open() comes through
+ * clnopen() and since clnopen() calls ddi_hold_installed_driver() we
+ * attach all instances and mark them DN_NO_AUTODETACH (given
+ * DN_DRIVER_HELD is maintained correctly).
+ *
+ * Since qassociate() can't really drive attach(9E), there are corner
+ * cases where the compromise described above leads to qassociate()
+ * returning failure.  This can happen when administrative functions
+ * that cause detach(9E), such as "update_drv" or "modunload -i", are
+ * performed on the driver between the time the stream was opened and
+ * the time its hardware association was established.  Although this can
+ * theoretically be an arbitrary amount of time, in practice the window
+ * is usually quite small, since applications almost always issue their
+ * hardware association request immediately after opening the stream,
+ * and do not typically switch association while open.  When these
+ * corner cases occur, and qassociate() finds the requested instance
+ * detached, it will return failure.  This failure should be propagated
+ * to the requesting administrative application using the appropriate
+ * post-open(9E) API error mechanism.
+ *
+ * All qassociate() callers are expected to check for and gracefully handle
+ * failure return, propagating errors back to the requesting administrative
+ * application.
  */
 int
 qassociate(queue_t *q, int instance)

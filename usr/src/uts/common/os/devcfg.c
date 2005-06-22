@@ -1049,7 +1049,9 @@ attach_node(dev_info_t *dip)
 static int
 detach_node(dev_info_t *dip, uint_t flag)
 {
-	int rv;
+	struct devnames	*dnp;
+	int		rv;
+
 	ASSERT(i_ddi_node_state(dip) == DS_ATTACHED);
 
 	/* check references */
@@ -1103,6 +1105,18 @@ detach_node(dev_info_t *dip, uint_t flag)
 		DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
 	}
 	mutex_exit(&DEVI(dip)->devi_lock);
+
+	/*
+	 * If the instance has successfully detached in detach_driver() context,
+	 * clear DN_DRIVER_HELD for correct ddi_hold_installed_driver()
+	 * behavior. Consumers like qassociate() depend on this (via clnopen()).
+	 */
+	if (flag & NDI_DETACH_DRIVER) {
+		dnp = &(devnamesp[DEVI(dip)->devi_major]);
+		LOCK_DEV_OPS(&dnp->dn_lock);
+		dnp->dn_flags &= ~DN_DRIVER_HELD;
+		UNLOCK_DEV_OPS(&dnp->dn_lock);
+	}
 
 	/* successful detach, release the driver */
 	ndi_rele_driver(dip);
