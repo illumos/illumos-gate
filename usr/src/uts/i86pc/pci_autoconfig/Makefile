@@ -21,7 +21,7 @@
 #
 #
 # uts/i86pc/pci_autoconfig/Makefile
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,8 +41,10 @@ UTSBASE	= ../..
 #	Define the module and object file sets.
 #
 MODULE		= pci_autoconfig
-OBJECTS		= $(PCI_AUTOCONFIG_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCI_AUTOCONFIG_OBJS:%.o=$(LINTS_DIR)/%.ln)
+OBJECTS		= $(PCI_AUTOCONFIG_OBJS:%=$(OBJS_DIR)/%) \
+		  $(PCI_STRING_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCI_AUTOCONFIG_OBJS:%.o=$(LINTS_DIR)/%.ln) \
+		  $(PCI_STRING_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #

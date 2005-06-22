@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,7 +30,7 @@
 
 LIBRARY= pci.a
 VERS= .1
-OBJECTS= cfga.o
+OBJECTS= cfga.o pci_strings.o
 
 # include library definitions
 include ../../../Makefile.lib
@@ -50,7 +50,7 @@ ROOTLIBDIR64= $(USR_LIB_DIR_CFGADM_64)
 MAPFILE=	$(MAPDIR)/mapfile
 CLOBBERFILES += $(MAPFILE)
 
-SRCS=		$(OBJECTS:%.o=../common/%.c)
+SRCS=		../common/cfga.c $(SRC)/common/pci/pci_strings.c
 
 LIBS = $(DYNLIB)
 
@@ -89,6 +89,10 @@ $(USR_LIB_DIR_CFGADM_64)/%: % $(USR_LIB_DIR_CFGADM_64)
 # include library targets
 include ../../../Makefile.targ
 
-pics/%.o: ../common/%.c
-	$(COMPILE.c) -o $@ $<
+pics/cfga.o: ../common/cfga.c
+	$(COMPILE.c) -o $@ ../common/cfga.c
+	$(POST_PROCESS_O)
+
+pics/pci_strings.o: $(SRC)/common/pci/pci_strings.c
+	$(COMPILE.c) -o $@ $(SRC)/common/pci/pci_strings.c
 	$(POST_PROCESS_O)

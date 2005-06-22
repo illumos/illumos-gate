@@ -1227,3 +1227,8 @@ CH_OBJS = ch.o sge.o pe.o glue.o
 CH_COM_OBJS =	ch_subr.o tp.o ch_mac.o ulp.o vsc7321.o mc3.o xpak.o pm3393.o \
 		ixf1010.o espi.o idt75.o mc4.o mv88e1xxx.o cspi.o mv88x201x.o \
 		my3126.o cynse70xxx.o
+
+#
+#	PCI strings file 
+#
+PCI_STRING_OBJS = pci_strings.o

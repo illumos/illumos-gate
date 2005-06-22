@@ -35,6 +35,7 @@
 #include <sys/memlist.h>
 #include <sys/bootconf.h>
 #include "mps_table.h"
+#include "../../../../common/pci/pci_strings.h"
 
 #define	pci_getb	(*pci_getb_func)
 #define	pci_getw	(*pci_getw_func)
@@ -47,6 +48,7 @@
 #define	CONFIG_INFO	0
 #define	CONFIG_UPDATE	1
 #define	CONFIG_NEW	2
+#define	COMPAT_BUFSIZE	256
 
 extern int pci_bios_nbus;
 static uchar_t max_dev_pci = 32;	/* PCI standard */
@@ -1086,169 +1088,8 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func)
 	add_ppb_ranges_prop(secbus);
 }
 
-static const struct {
-	uchar_t base_class;
-	uchar_t sub_class;
-	uchar_t prog_class;
-	char *desc;
-} class_pci[] = {
-	0, 0, 0,	"Unspecified class",
-	0, 1, 0,	"VGA compatible controller",
-
-	1, 0, 0,	"SCSI bus controller",
-	1, 1, 0x80,	"IDE controller", /* Special case - see below */
-	1, 2, 0,	"Floppy controller",
-	1, 3, 0,	"IPI bus controller",
-	1, 4, 0,	"RAID controller",
-	1, 5, 0x20,	"ATA controller with single DMA",
-	1, 5, 0x30,	"ATA controller with chained DMA",
-	1, 6, 0,	"Serial ATA Direct Port Access (DPA)",
-	1, 0x80, 0,	"Mass storage controller",
-	1, 0x80, 1,	"Mass storage controller",
-
-	2, 0, 0,	"Ethernet controller",
-	2, 1, 0,	"Token ring controller",
-	2, 2, 0,	"FDDI controller",
-	2, 3, 0,	"ATM controller",
-	2, 4, 0,	"ISDN controller",
-	2, 5, 0,	"WorldFip controller",
-	2, 6, 0,	"PICMG 2.14 Multi computing controller",
-	2, 0x80, 0,	"Network controller",
-
-	3, 0, 0,	"VGA compatible controller",
-	3, 0, 1,	"8514-compatible display controller",
-	3, 1, 0,	"XGA video controller",
-	3, 2, 0,	"3D controller",
-	3, 0x80, 0,	"Video controller",
-
-	4, 0, 0,	"Video device",
-	4, 1, 0,	"Audio device",
-	4, 2, 0,	"Computer Telephony device",
-	4, 0x80, 0,	"Multimedia device",
-
-	5, 0, 0,	"Ram",
-	5, 1, 0,	"Flash memory",
-	5, 0x80, 0,	"Memory controller",
-
-	6, 0, 0,	"Host bridge",
-	6, 1, 0,	"ISA bridge",
-	6, 2, 0,	"EISA bridge",
-	6, 3, 0,	"MCA bridge",
-	6, 4, 0,	"PCI-PCI bridge",
-	6, 4, 1,	"Subtractive Decode PCI-PCI bridge",
-	6, 5, 0,	"PCMCIA bridge",
-	6, 6, 0,	"NuBus bridge",
-	6, 7, 0,	"CardBus bridge",
-	6, 8, 0,	"RACE-way bridge transport mode",
-	6, 8, 1,	"RACE-way bridge endpoint mode",
-	6, 9, 0x40,	"Semi-transparent PCI-PCI primary bridge",
-	6, 9, 0x80,	"Semi-transparent PCI-PCI secondary bridge",
-	6, 0xA, 0,	"Infiniband-PCI bridge",
-	6, 0x80, 0,	"Bridge device",
-
-	7, 0, 0,	"Serial controller",
-	7, 0, 1,	"16450-compatible serial controller",
-	7, 0, 2,	"16550-compatible serial controller",
-	7, 0, 3,	"16650-compatible serial controller",
-	7, 0, 4,	"16750-compatible serial controller",
-	7, 0, 5,	"16850-compatible serial controller",
-	7, 0, 6,	"16950-compatible serial controller",
-	7, 1, 0,	"Parallel port",
-	7, 1, 1,	"Bidirectional parallel port",
-	7, 1, 2,	"ECP 1.X parallel port",
-	7, 1, 3,	"IEEE 1284 parallel port",
-	7, 1, 0xFE,	"IEEE 1284 target device",
-	7, 2, 0,	"Multiport serial controller",
-	7, 3, 0,	"Modem controller",
-	7, 3, 1,	"Hayes 16450-compatible modem",
-	7, 3, 2,	"Hayes 16550-compatible modem",
-	7, 3, 3,	"Hayes 16650-compatible modem",
-	7, 3, 4,	"Hayes 16750-compatible modem",
-	7, 4, 0,	"GPIB controller",
-	7, 5, 0,	"Smartcard controller",
-	7, 0x80, 0,	"Communication device",
-
-	8, 0, 0,	"8259 PIC",
-	8, 0, 1,	"ISA PIC",
-	8, 0, 2,	"EISA PIC",
-	8, 0, 0x10,	"I/O APIC",
-	8, 0, 0x20,	"I/O(x) APIC",
-	8, 1, 0,	"8237 DMA controller",
-	8, 1, 1,	"ISA DMA controller",
-	8, 1, 2,	"EISA DMA controller",
-	8, 2, 0,	"8254 system timer",
-	8, 2, 1,	"ISA system timer",
-	8, 2, 2,	"EISA system timers",
-	8, 3, 0,	"Real time clock",
-	8, 3, 1,	"ISA real time clock",
-	8, 4, 0,	"PCI Hot-Plug controller",
-	8, 0x80, 0,	"System peripheral",
-
-	9, 0, 0,	"Keyboard controller",
-	9, 1, 0,	"Digitizer (pen)",
-	9, 2, 0,	"Mouse controller",
-	9, 3, 0,	"Scanner controller",
-	9, 4, 0,	"Gameport controller",
-	9, 4, 1,	"Gameport Legacy controller",
-	9, 0x80, 0,	"Input controller",
-
-	10, 0, 0,	"Generic Docking station",
-	10, 0x80, 0,	"Docking station",
-
-	11, 0, 0,	"386",
-	11, 1, 0,	"486",
-	11, 2, 0,	"Pentium",
-	11, 0x10, 0,	"Alpha",
-	11, 0x20, 0,	"Power-PC",
-	11, 0x30, 0,	"MIPS",
-	11, 0x40, 0,	"Co-processor",
-
-	12, 0, 0,	"FireWire (IEEE 1394)",
-	12, 0, 0x10,	"FireWire (IEEE 1394) OpenHCI compliant",
-	12, 1, 0,	"ACCESS.bus",
-	12, 2, 0,	"SSA",
-	12, 3, 0,	"Universal Serial Bus UHCI compliant",
-	12, 3, 0x10,	"Universal Serial Bus OHCI compliant",
-	12, 3, 0x20,	"Universal Serial Bus EHCI compliant",
-	12, 3, 0x80,	"Universal Serial Bus generic HCD",
-	12, 3, 0xFE,	"Universal Serial Bus device",
-	12, 4, 0,	"Fibre Channel",
-	12, 5, 0,	"SMBus (System Management Bus)",
-	12, 6, 0,	"InfiniBand",
-	12, 7, 0,	"IPMI SMIC Interface",
-	12, 7, 1,	"IPMI Keyboard Controller Style Interface",
-	12, 7, 2,	"IPMI Block Transfer Interface",
-	12, 8, 0,	"SERCOS Interface Standard",
-	12, 9, 0,	"CANbus",
-
-	13, 0, 0,	"IRDA Wireless controller",
-	13, 1, 0,	"Consumer IR Wireless controller",
-	13, 0x10, 0,	"RF Wireless controller",
-	13, 0x11, 0,	"Bluetooth Wireless controller",
-	13, 0x12, 0,	"Broadband Wireless controller",
-	13, 0x20, 0,	"802.11a Wireless controller",
-	13, 0x21, 0,	"802.11b Wireless controller",
-	13, 0x80, 0,	"Wireless controller",
-
-	14, 0, 0,	"I20 controller",
-
-	15, 1, 0,	"TV Satellite controller",
-	15, 2, 0,	"Audio Satellite controller",
-	15, 3, 0,	"Voice Satellite controller",
-	15, 4, 0,	"Data Satellite controller",
-
-	16, 0, 0,	"Network and computing en/decryption",
-	16, 1, 0,	"Entertainment en/decryption",
-	16, 0x80, 0,	"En/decryption controller",
-
-	17, 0, 0,	"DPIO modules",
-	17, 1, 0,	"Performance counters",
-	17, 0x10, 0,	"Comm Synch time and freq test/measurement",
-	17, 0x20, 0,	"Management card",
-	17, 0x80, 0,	"DSP/DAP controllers",
-};
-
-static int class_pci_items = sizeof (class_pci) / sizeof (class_pci[0]);
+extern const struct pci_class_strings_s class_pci[];
+extern int class_pci_items;
 
 static void
 add_model_prop(dev_info_t *dip, uint_t classcode)
@@ -1266,13 +1107,12 @@ add_model_prop(dev_info_t *dip, uint_t classcode)
 			if ((baseclass == class_pci[i].base_class) &&
 			    (subclass == class_pci[i].sub_class) &&
 			    (progclass == class_pci[i].prog_class)) {
-				desc = class_pci[i].desc;
+				desc = class_pci[i].actual_desc;
 				break;
 			}
 		}
-		if (i == class_pci_items) {
+		if (i == class_pci_items)
 			desc = "Unknown class of pci/pnpbios device";
-		}
 	}
 
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip, "model",

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +66,10 @@
 #include <limits.h>
 #include <sys/mkdev.h>
 #include <librcm.h>
+#include "../../../../common/pci/pci_strings.h"
+
+extern const struct pci_class_strings_s class_pci[];
+extern int class_pci_items;
 
 /*
  * Set the version number
@@ -179,274 +184,12 @@ NULL
 
 #define	MAX_FORMAT 80
 
-/*
- * PCI CLASS CODE/SUBCLASS CODE
- */
-
-
-/*
- * when adding subclasses, update this to the max number of strings
- * and pad the rest of them out to that length with "unknown"
- * this type string may not exceed 7 characters since it, the / delimiter
- * and the board capabilities must all fit into CFGA_TYPE_LEN
- */
-
-#define	PCISO_MAX_SUBCLASS 9
-
-static char *
-pci_masstrg []  = {
-	/* n */ "scsi",
-	/* n */ "ide",
-	/* n */ "flpydis",
-	/* n */ "ipi",
-	/* n */ "raid",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */  NULL
-};
-
-static char *
-pci_network [] = {
-	/* n */ "etherne",
-	/* n */ "tokenrg",
-	/* n */ "fddi",
-	/* n */ "atm",
-	/* n */ "isdn",
-	/* n */ "unknown",
-	/* n */ "mcd",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_display [] = {
-	/* n */ "vgs8514",
-	/* n */ "xga",
-	/* n */ "3d",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */  NULL
-};
-
-static char *
-pci_multimd [] = {
-	/* n */ "video",
-	/* n */ "audio",
-	/* n */ "teleph",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_memory [] = {
-	/* n */ "ram",
-	/* n */ "flash",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_bridge [] = {
-	/* n */ "hostpci",
-	/* n */ "pci-isa",
-	/* n */ "pcieisa",
-	/* n */ "pci-mca",
-	/* n */ "pci-pci",
-	/* n */ "pcipcmc",
-	/* n */ "pcinubu",
-	/* n */ "pcicard",
-	/* n */ "pcirace",
-	/* n */ "stpci",
-	/* n */ NULL
-};
-
-static char *
-pci_comm [] = {
-	/* n */ "serial",
-	/* n */ "paralle",
-	/* n */ "multise",
-	/* n */ "modem",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_periph [] = {
-	/* n */ "pic",
-	/* n */ "dma",
-	/* n */ "timer",
-	/* n */ "rtc",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_input [] = {
-	/* n */ "keyboar",
-	/* n */ "tablet",
-	/* n */ "mouse",
-	/* n */ "scanner",
-	/* n */ "gamepor",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_dock [] = {
-	/* n */ "docking",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_processor [] = {
-	/* n */ "386",
-	/* n */ "486",
-	/* n */ "pentium",
-	/* n */ "alpha",
-	/* n */ "powerpc",
-	/* n */ "mips",
-	/* n */ "coproc",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_serial [] = {
-	/* n */ "1394",
-	/* n */ "access",
-	/* n */ "ssa",
-	/* n */ "usb",
-	/* n */ "fibre",
-	/* n */ "smbus",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_wireless [] = {
-	/* n */ "irda",
-	/* n */ "ir",
-	/* n */ "rf",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_intio [] = {
-	/* n */ "i2o",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_satellite [] = {
-	/* n */ "tv",
-	/* n */ "audio",
-	/* n */ "voice",
-	/* n */ "data",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_crypt [] = {
-	/* n */ "netcryp",
-	/* n */ "entcryp",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-static char *
-pci_signal [] = {
-	/* n */ "dpio",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
+#define	ENABLE_SLOT	0
+#define	DISABLE_SLOT	1
+#define	ENABLE_AUTOCNF	2
+#define	DISABLE_AUTOCNF	3
+#define	LED		4
+#define	MODE		5
 
 /*
  * Board Type
@@ -467,7 +210,7 @@ board_strs[] = {
  */
 static char *
 func_strs[] = {
-	/* n */	"enable_slot",
+	/* n */ "enable_slot",
 	/* n */ "disable_slot",
 	/* n */ "enable_autoconfig",
 	/* n */ "disable_autoconfig",
@@ -475,35 +218,6 @@ func_strs[] = {
 	/* n */ "mode",
 	/* n */ NULL
 };
-
-#define	PCISO_SUBCLASS_OTHER 0x80 /* generic subclass */
-
-/*
- * other subclass types
- */
-
-static char *
-other_strs[] = {
-	/* n */	"none",
-	/* n */	"storage",
-	/* n */	"network",
-	/* n */	"display",
-	/* n */	"mmedia",
-	/* n */	"memory",
-	/* n */	"bridge",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ "unknown",
-	/* n */ NULL
-};
-
-
-#define	ENABLE_SLOT	0
-#define	DISABLE_SLOT	1
-#define	ENABLE_AUTOCNF	2
-#define	DISABLE_AUTOCNF	3
-#define	LED		4
-#define	MODE		5
 
 /*
  * LED strings
@@ -1589,6 +1303,7 @@ find_physical_slot_names(const char *devcomp, struct searcharg *slotarg)
 static void
 get_type(hpc_board_type_t boardtype, hpc_card_info_t cardinfo, char *buf)
 {
+	int i;
 
 	DBG(1, ("class: %i\n", cardinfo.base_class));
 	DBG(1, ("subclass: %i\n", cardinfo.sub_class));
@@ -1598,77 +1313,17 @@ get_type(hpc_board_type_t boardtype, hpc_card_info_t cardinfo, char *buf)
 		return;
 	}
 
-	if (cardinfo.sub_class == PCISO_SUBCLASS_OTHER) {
-		if (cardinfo.base_class < PCISO_MAX_SUBCLASS)
-			TPCT(other_strs[cardinfo.base_class]);
-		else
-			TPCT("unknown");
-	} else {
-		if (cardinfo.sub_class > PCISO_MAX_SUBCLASS) {
-			TPCT("unknown");
-		} else {
-			if (cardinfo.header_type != PCI_HEADER_MULTI) {
-				switch (cardinfo.base_class) {
-				case PCI_CLASS_MASS:
-					TPCT(pci_masstrg[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_NET:
-					TPCT(pci_network[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_DISPLAY:
-					TPCT(pci_display[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_MM:
-					TPCT(pci_multimd[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_MEM:
-					TPCT(pci_memory[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_BRIDGE:
-					TPCT(pci_bridge[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_COMM:
-					TPCT(pci_comm[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_PERIPH:
-					TPCT(pci_periph[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_INPUT:
-					TPCT(pci_input[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_DOCK:
-					TPCT(pci_dock[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_PROCESSOR:
-					TPCT(pci_processor[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_SERIALBUS:
-					TPCT(pci_serial[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_WIRELESS:
-					TPCT(pci_wireless[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_INTIO:
-					TPCT(pci_intio[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_SATELLITE:
-					TPCT(pci_satellite[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_CRYPT:
-					TPCT(pci_crypt[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_SIGNAL:
-					TPCT(pci_signal[cardinfo.sub_class]);
-					break;
-				case PCI_CLASS_NONE:
-				default:
-					TPCT("unknown");
-					return;
-				}
-			} else
-				TPCT("mult");
+	for (i = 0; i < class_pci_items; i++) {
+		if ((cardinfo.base_class == class_pci[i].base_class) &&
+		    (cardinfo.sub_class == class_pci[i].sub_class) &&
+		    (cardinfo.prog_class == class_pci[i].prog_class)) {
+			TPCT(class_pci[i].short_desc);
+			break;
 		}
 	}
+
+	if (i == class_pci_items)
+		TPCT("unknown");
 
 	TPCT("/");
 	switch (boardtype) {

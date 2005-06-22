@@ -38,6 +38,7 @@ find_files "s.*" usr/src/common/ctf
 find_files "s.*" usr/src/common/exacct
 find_files "s.*" usr/src/common/nvpair
 find_files "s.*" usr/src/common/devid
+find_files "s.*" usr/src/common/pci
 find_files "s.*" usr/src/common/util
 find_files "s.*" usr/src/common/net/wanboot/crypt
 find_files "s.*" usr/src/common/crypto
