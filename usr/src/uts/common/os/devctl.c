@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1299,14 +1299,13 @@ int
 e_devid_cache_to_devt_list(ddi_devid_t devid, char *minor_name,
 	int *retndevts, dev_t **retdevts)
 {
-	char *path, **paths;
-	int i, j, n, x;
-	dev_t *devts, *udevts;
-	int ndevts, ndevts_alloced;
-	dev_info_t *devi, **devis;
-	int ndevis, npaths, nalloced;
-	ddi_devid_t match_devid;
-	int undevts;
+	char		*path, **paths;
+	int		i, j, n;
+	dev_t		*devts, *udevts;
+	int		ndevts, undevts, ndevts_alloced;
+	dev_info_t	*devi, **devis;
+	int		ndevis, npaths, nalloced;
+	ddi_devid_t	match_devid;
 
 	DEVID_LOG_FIND(("find", devid, NULL));
 
@@ -1420,42 +1419,37 @@ restart:
 	}
 
 	/*
-	 * Build the final list of dev_t's with duplicate collapsed
-	 * Also build the final list in sorted order so we hand
-	 * off a consistent list of dev_t's to avoid SVM complaints
-	 * about volumes moving around.
+	 * Build the final list of sorted dev_t's with duplicates collapsed so
+	 * returned results are consistent. This prevents implementation
+	 * artifacts from causing unnecessary changes in SVM namespace.
 	 */
-	undevts = 1;
-	for (i = 1; i < ndevts; i++) {
-		for (j = 0; j < i; j++) {
-			if (devts[i] == devts[j])
-				break;
-		}
-		if (j == i)
-			undevts++;
-	}
-
-	udevts = kmem_alloc(undevts * sizeof (dev_t), KM_SLEEP);
-
-	n = 1;
-	udevts[0] = devts[0];
-	for (i = 1; i < ndevts; i++) {
-		for (j = 0; j < n; j++) {
-			if (udevts[j] == devts[i])
-				break;
-			if (udevts[j] > devts[i]) {
-				for (x = n; x > j; x--)
-					udevts[x] = udevts[x-1];
-				udevts[j] = devts[i];
-				n++;
-				break;
+	/* bubble sort */
+	for (i = 0; i < (ndevts - 1); i++) {
+		for (j = 0; j < ((ndevts - 1) - i); j++) {
+			if (devts[j + 1] < devts[j]) {
+				n = devts[j];
+				devts[j] = devts[j + 1];
+				devts[j + 1] = n;
 			}
 		}
-		if (j == i) {
-			udevts[n++] = devts[i];
-		}
 	}
-	ASSERT(n == undevts);
+
+	/* determine number of unique values */
+	for (undevts = ndevts, i = 1; i < ndevts; i++) {
+		if (devts[i - 1] == devts[i])
+			undevts--;
+	}
+
+	/* allocate unique */
+	udevts = kmem_alloc(undevts * sizeof (dev_t), KM_SLEEP);
+
+	/* copy unique */
+	udevts[0] = devts[0];
+	for (i = 1, j = 1; i < ndevts; i++) {
+		if (devts[i - 1] != devts[i])
+			udevts[j++] = devts[i];
+	}
+	ASSERT(j == undevts);
 
 	kmem_free(devts, ndevts_alloced * sizeof (dev_t));
 
