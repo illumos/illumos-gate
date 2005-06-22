@@ -1625,6 +1625,87 @@ build_did_list(
 	*did_listp = head;
 	return (1);
 }
+/*
+ * check_nm_disks
+ *	Checks the disks listed in the shared did namespace to see if they
+ *	are accessable on the system. If not, return ENOTSUP error to
+ *	indicate we have a partial diskset.
+ * Returns:
+ *	< 0 		for failure
+ *	  0		success
+ *	  ENOTSUP	partial diskset, not all disks in a diskset on the
+ *			system where import is being executed
+ */
+static int
+check_nm_disks(
+	md_error_t		*ep,
+	struct devid_min_rec	*did_nmp,
+	struct devid_shr_rec	*did_shrnmp
+)
+{
+	char 		*search_path = "/dev";
+	char		*minor_name = NULL;
+	uint_t		used_size, min_used_size;
+	ddi_devid_t	did;
+	devid_nmlist_t	*nm;
+	void		*did_min_namep;
+	void		*did_shr_namep;
+	size_t		did_nsize, did_shr_nsize;
+
+	used_size = did_shrnmp->did_rec_hdr.r_used_size -
+	    sizeof (struct nm_rec_hdr);
+	min_used_size = did_nmp->min_rec_hdr.r_used_size -
+	    sizeof (struct nm_rec_hdr);
+	did_shr_namep = (void *)(&did_shrnmp->device_id[0]);
+	while (used_size > (int)sizeof (struct did_shr_name)) {
+		did_min_namep = (void *)(&did_nmp->minor_name[0]);
+		/* grab device id and minor name from the shared spaces */
+		did = (ddi_devid_t)(((struct did_shr_name *)
+		    did_shr_namep)->did_devid);
+		if (devid_valid(did) == 0) {
+			return (-1);
+		}
+
+		/*
+		 * We need to check that the DID_NM and DID_SHR_NM are in
+		 * sync. It is possible that we took a panic between writing
+		 * the two areas to disk. This would be cleaned up on the
+		 * next snarf but we don't know for sure that snarf has even
+		 * happened since we're reading from disk.
+		 */
+		while (((struct did_shr_name *)did_shr_namep)->did_key !=
+		    ((struct did_min_name *)did_min_namep)->min_devid_key) {
+			did_nsize = DID_NAMSIZ((struct did_min_name *)
+			    did_min_namep);
+			did_min_namep = ((void *)((char *)did_min_namep +
+			    did_nsize));
+			min_used_size -= did_nsize;
+			if (min_used_size < (int)sizeof (struct did_min_name))
+				continue;
+		}
+		minor_name = ((struct did_min_name *)did_min_namep)->min_name;
+
+		/*
+		 * Try to find disk in the system. If we can't find the
+		 * disk, we have a partial diskset.
+		 */
+		if ((meta_deviceid_to_nmlist(search_path,
+		    did, minor_name, &nm)) != 0) {
+			(void) mddserror(ep, MDE_DS_PARTIALSET, MD_SET_BAD,
+			    mynode(), NULL, NULL);
+			return (ENOTSUP);
+		}
+		devid_free_nmlist(nm);
+		used_size -= DID_SHR_NAMSIZ((struct did_shr_name *)
+		    did_shr_namep);
+		/* increment to next item in the shared spaces */
+		did_shr_nsize = DID_SHR_NAMSIZ((struct did_shr_name *)
+		    did_shr_namep);
+		did_shr_namep = ((void *)((char *)did_shr_namep +
+		    did_shr_nsize));
+	}
+	return (0);
+}
 
 /*
  * meta_get_set_info
@@ -1832,7 +1913,8 @@ meta_get_set_info(
 		goto append;
 
 	/*LINTED*/
-	did_nmp = (struct devid_min_rec *)(did_nm + sizeof (mddb_rb_t));
+	did_nmp = (struct devid_min_rec *)(did_nm + sizeof (mddb_rb_t) -
+	    sizeof (int));
 	if (did_nmp->min_rec_hdr.r_next_recid != (mddb_recid_t)0) {
 		extended_namespace = 1;
 		rval = 0;
@@ -1846,12 +1928,22 @@ meta_get_set_info(
 		goto append;
 
 	/*LINTED*/
-	did_shrnmp = (struct devid_shr_rec *)(did_shrnm + sizeof (mddb_rb_t));
+	did_shrnmp = (struct devid_shr_rec *)(did_shrnm + sizeof (mddb_rb_t) -
+	    sizeof (int));
 	if (did_shrnmp->did_rec_hdr.r_next_recid != (mddb_recid_t)0) {
 		extended_namespace = 1;
 		rval = 0;
 		goto out;
 	}
+
+	/*
+	 * We need to check if all of the disks listed in the namespace
+	 * are actually available. If they aren't we'll return with
+	 * an ENOTSUP error which indicates a partial diskset.
+	 */
+	rval = check_nm_disks(ep, did_nmp, did_shrnmp);
+	if ((rval < 0) || (rval == ENOTSUP))
+		goto out;
 
 append:
 	/* Finally, we've got what we need to process this replica. */

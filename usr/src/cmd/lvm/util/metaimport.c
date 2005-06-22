@@ -719,7 +719,14 @@ skipdisk:
 	 * Hopefully this is friendlier than just not printing anything at all.
 	 */
 	if (rscount == 0) {
-		md_eprintf("%s\n", gettext("no unconfigured sets detected"));
+		/*
+		 * If we've found partial disksets but no complete disksets,
+		 * we don't want this to print.
+		 */
+		if (!partial) {
+			md_eprintf("%s\n", gettext("no unconfigured sets "
+			    "detected"));
+		}
 		md_exit(sp, 0);
 	}
 
