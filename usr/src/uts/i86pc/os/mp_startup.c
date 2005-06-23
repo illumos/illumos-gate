@@ -241,7 +241,6 @@ extern void *long_mode_64(void);
 	extern void init_intr_threads(struct cpu *);
 
 	struct cpu_tables *tablesp;
-	extern chip_t cpu0_chip;
 	rm_platter_t *real_mode_platter = (rm_platter_t *)rm_platter_va;
 
 #ifdef TRAPTRACE
@@ -302,11 +301,6 @@ extern void *long_mode_64(void);
 	cp->cpu_dispatch_pri = DISP_PRIO(tp);
 
 	/*
-	 * Bootstrap cpu_chip in case mp_startup blocks
-	 */
-	cp->cpu_chip = &cpu0_chip;
-
-	/*
 	 * Now, initialize per-CPU idle thread for this CPU.
 	 */
 	tp = thread_create(NULL, PAGESIZE, idle, NULL, 0, procp, TS_ONPROC, -1);
@@ -318,6 +312,13 @@ extern void *long_mode_64(void);
 	tp->t_affinitycnt = 1;
 	tp->t_cpu = cp;
 	tp->t_disp_queue = cp->cpu_disp;
+
+	/*
+	 * Bootstrap the CPU for CMT aware scheduling
+	 * The rest of the initialization will happen from
+	 * mp_startup()
+	 */
+	chip_bootstrap_cpu(cp);
 
 	/*
 	 * Perform CPC intialization on the new CPU.

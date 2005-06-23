@@ -1633,14 +1633,9 @@ cpu_list_init(cpu_t *cp)
 	cp->cpu_cache_offset = KMEM_CACHE_SIZE(cp->cpu_seqid);
 	cp_default.cp_cpulist = cp;
 	cp_default.cp_ncpus = 1;
-	cp->cpu_next_lpl = cp;
-	cp->cpu_prev_lpl = cp;
-	cp->cpu_next_lgrp = cp;
-	cp->cpu_prev_lgrp = cp;
 	cp->cpu_next_part = cp;
 	cp->cpu_prev_part = cp;
 	cp->cpu_part = &cp_default;
-	cp->cpu_lpl = lpl_bootstrap;
 
 	CPUSET_ADD(cpu_available, cp->cpu_id);
 }
@@ -1711,12 +1706,6 @@ cpu_add_unit(cpu_t *cp)
 	cpu_info_kstat_create(cp);
 	cp->cpu_next_part = cp;
 	cp->cpu_prev_part = cp;
-
-	cp->cpu_next_lgrp = cp;
-	cp->cpu_prev_lgrp = cp;
-	cp->cpu_next_lpl = cp;
-	cp->cpu_prev_lpl = cp;
-	cp->cpu_lpl = lpl_bootstrap;
 
 	init_cpu_mstate(cp, CMS_SYSTEM);
 

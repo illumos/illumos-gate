@@ -80,6 +80,15 @@
 
 chip_t			cpu0_chip;	/* chip structure for first CPU */
 
+/*
+ * chip_bootstrap is used on platforms where it is possible to enter the
+ * dispatcher before a new CPU's chip initialization has happened.
+ */
+static chip_t		chip_bootstrap;
+
+#define	CPU_HAS_NO_CHIP(cp)	\
+	((cp)->cpu_chip == NULL || (cp)->cpu_chip == &chip_bootstrap)
+
 static chip_t		*chip_list;	/* protected by CPU lock */
 static chip_set_t	chip_set;	/* bitmap of chips in existence */
 					/* indexed by chip_seqid */
@@ -295,10 +304,16 @@ chip_cpu_fini(cpu_t *cp)
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
+	/*
+	 * This can happen if the CPU failed to power on
+	 */
+	if (CPU_HAS_NO_CHIP(cp))
+		return;
+
 	chp = cp->cpu_chip;
 	cp->cpu_chip = NULL;
 
-	if (chp != NULL && --chp->chip_ref == 0) {
+	if (--chp->chip_ref == 0) {
 		/*
 		 * make sure the chip is really empty
 		 */
@@ -476,6 +491,15 @@ chip_cpu_startup(cpu_t *cp)
 	 * (slave startup)
 	 */
 	CHIP_NRUNNING(cp->cpu_chip, 1);
+}
+
+/*
+ * Provide the specified CPU a bootstrap chip
+ */
+void
+chip_bootstrap_cpu(cpu_t *cp)
+{
+	cp->cpu_chip = &chip_bootstrap;
 }
 
 /*

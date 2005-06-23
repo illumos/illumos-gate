@@ -150,10 +150,22 @@ lgrp_t		*lgrp_root = NULL;
  * The lpl_bootstrap_list is maintained by the code in lgrp.c. Every other
  * consumer who needs default lpl should use lpl_bootstrap which is a pointer to
  * the first element of lpl_bootstrap_list.
+ *
+ * CPUs that are added to the system, but have not yet been assigned to an
+ * lgrp will use lpl_bootstrap as a default lpl. This is necessary because
+ * on some architectures (x86) it's possible for the slave CPU startup thread
+ * to enter the dispatcher or allocate memory before calling lgrp_cpu_init().
  */
 #define	LPL_BOOTSTRAP_SIZE 2
 static lpl_t	lpl_bootstrap_list[LPL_BOOTSTRAP_SIZE];
 lpl_t		*lpl_bootstrap;
+
+/*
+ * If cp still references the bootstrap lpl, it has not yet been added to
+ * an lgrp. lgrp_mem_choose() uses this macro to detect the case where
+ * a thread is trying to allocate memory close to a CPU that has no lgrp.
+ */
+#define	LGRP_CPU_HAS_NO_LGRP(cp)	((cp)->cpu_lpl == lpl_bootstrap)
 
 static lgrp_t	lroot;
 
@@ -314,8 +326,8 @@ lgrp_root_init(void)
 	/*
 	 * Setup initial lpl list for CPU0 and initial t0 home.
 	 * The only lpl space we have so far is lpl_bootstrap. It is used for
-	 * all topology operations untill cp_default until cp_default is
-	 * initialized at which point t0.t_lpl will be updated.
+	 * all topology operations until cp_default is initialized at which
+	 * point t0.t_lpl will be updated.
 	 */
 	lpl_bootstrap = lpl_bootstrap_list;
 	t0.t_lpl = lpl_bootstrap;
@@ -480,6 +492,19 @@ lgrp_config(lgrp_config_flag_t event, uintptr_t resource, uintptr_t where)
 	 * platform of the reconfiguration event.
 	 */
 	case LGRP_CONFIG_CPU_ADD:
+		cp = (cpu_t *)resource;
+
+		/*
+		 * Initialize the new CPU's lgrp related next/prev
+		 * links, and give it a bootstrap lpl so that it can
+		 * survive should it need to enter the dispatcher.
+		 */
+		cp->cpu_next_lpl = cp;
+		cp->cpu_prev_lpl = cp;
+		cp->cpu_next_lgrp = cp;
+		cp->cpu_prev_lgrp = cp;
+		cp->cpu_lpl = lpl_bootstrap;
+
 		lgrp_plat_config(event, resource);
 		atomic_add_32(&lgrp_gen, 1);
 
@@ -1587,6 +1612,10 @@ lgrp_phys_to_lgrp(u_longlong_t physaddr)
 
 /*
  * Return the leaf lgroup containing the given CPU
+ *
+ * The caller needs to take precautions necessary to prevent
+ * "cpu" from going away across a call to this function.
+ * hint: kpreempt_disable()/kpreempt_enable()
  */
 static lgrp_t *
 lgrp_cpu_to_lgrp(cpu_t *cpu)
@@ -3617,8 +3646,19 @@ lgrp_mem_choose(struct seg *seg, caddr_t vaddr, size_t pgsz)
 
 		/*
 		 * Return lgroup of current CPU which faulted on memory
+		 * If the CPU isn't currently in an lgrp, then opt to
+		 * allocate from the root.
+		 *
+		 * Kernel preemption needs to be disabled here to prevent
+		 * the current CPU from going away before lgrp is found.
 		 */
-		lgrp = lgrp_cpu_to_lgrp(CPU);
+		if (LGRP_CPU_HAS_NO_LGRP(CPU)) {
+			lgrp = lgrp_root;
+		} else {
+			kpreempt_disable();
+			lgrp = lgrp_cpu_to_lgrp(CPU);
+			kpreempt_enable();
+		}
 		break;
 
 	case LGRP_MEM_POLICY_NEXT:
