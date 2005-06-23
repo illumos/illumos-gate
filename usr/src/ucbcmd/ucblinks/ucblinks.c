@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998, 2000, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,7 @@ struct devices_ent {
 	int			minor;		/* minor number */
 	int			israw;		/* character device? */
 	int			iscd;		/* cdrom? */
+	int			issd;		/* simple sd use? */
 	int			csum;		/* checksum of name */
 	struct symlink		*linksto;	/* symlinks to this name */
 	struct drvinfo		*drp;		/* driver for this name */
@@ -613,6 +614,7 @@ devices_entry(const char *name, const struct stat *sp,
 	dep->minor = minor(sp->st_rdev);
 	dep->israw = (type == S_IFCHR);
 	dep->iscd = 0;
+	dep->issd = 0;
 	dep->linksto = NULL;
 	dep->drp = drp;
 
@@ -1193,7 +1195,6 @@ rule_mt(struct devices_ent *dep)
 	}
 }
 
-
 static int
 find_cd_nodes(di_node_t node, di_minor_t minor, void *arg)
 {
@@ -1219,15 +1220,40 @@ find_cd_nodes(di_node_t node, di_minor_t minor, void *arg)
 	return (DI_WALK_CONTINUE);
 }
 
+static int
+find_sd_nodes(di_node_t node, di_minor_t minor, void *arg)
+{
+	char	*path;
+	char	devpath[MAXPATHLEN];
+	struct devices_ent *dep;
+
+	path = di_devfs_path(node);
+
+	if (*path == '/') {
+		(void) strcpy(devpath, path+1);
+		(void) strcat(devpath, ":");
+		(void) strcat(devpath, di_minor_name(minor));
+
+		dep = lookup_devices_sym(devpath);
+		if (dep != NULL) {
+			dep->issd = 1;
+		}
+	}
+
+	di_devfs_path_free(path);
+
+	return (DI_WALK_CONTINUE);
+}
 
 /*
  * The rule for scsi disks uses this to determine if the /devices
  * entry corresponds to a cdrom drive.  Use libdevinfo to walk
- * the device tree, calling find_cd_nodes() for each minor
- * node of type DDI_NT_CD.
+ * the device tree:
+ *	 calling find_cd_nodes() for each minor node of type DDI_NT_CD.
+ *	 calling find_sd_nodes() for each minor node of type DDI_NT_BLOCK_CHAN.
  */
 static void
-find_cds(void)
+find_cdsd(void)
 {
 	di_node_t	root_node;
 
@@ -1236,9 +1262,9 @@ find_cds(void)
 		return;
 	}
 	di_walk_minor(root_node, DDI_NT_CD, 0, NULL, find_cd_nodes);
+	di_walk_minor(root_node, DDI_NT_BLOCK_CHAN, 0, NULL, find_sd_nodes);
 	di_fini(root_node);
 }
-
 
 
 /*
@@ -1264,7 +1290,7 @@ rule_sd(struct devices_ent *dep)
 	char *link_pfx;
 
 	if (first) {
-		find_cds();
+		find_cdsd();
 		first = 0;
 	}
 
@@ -1284,6 +1310,9 @@ rule_sd(struct devices_ent *dep)
 		}
 		return;
 	}
+
+	if (!dep->issd)
+		return;
 
 	if (dep->israw) {
 		link_pfx = "r";
