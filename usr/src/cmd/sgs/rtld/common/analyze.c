@@ -1350,7 +1350,7 @@ _find_file(Lm_list *lml, const char *oname, const char *nname, Rt_map *clmp,
 	return (file_open(0, lml, oname, nname, clmp, flags, fdesc, rej));
 }
 
-int
+static int
 find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
     Fdesc * fdesc, Rej_desc *rej, Pnode * dir, Word * strhash, size_t olen)
 {
@@ -1459,7 +1459,7 @@ find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
  * process the various names by which it can be referenced.
  */
 static Rt_map *
-load_file(Lm_list *lml, Aliste lmco, Rt_map *clmp, Fdesc * fdesc)
+load_file(Lm_list *lml, Aliste lmco, Fdesc * fdesc)
 {
 	const char	*oname = fdesc->fd_oname;
 	const char	*nname = fdesc->fd_nname;
@@ -1566,18 +1566,9 @@ load_file(Lm_list *lml, Aliste lmco, Rt_map *clmp, Fdesc * fdesc)
 	}
 
 	/*
-	 * If we're being audited tell the audit library of the file we've
-	 * just opened.  Note, if the new link-map requires local auditing of
-	 * its dependencies we also register its opening.
+	 * Identify this as a new object.
 	 */
-	if (((lml->lm_tflags | FLAGS1(clmp) | FLAGS1(nlmp)) &
-	    LML_TFLG_AUD_MASK) && (((lml->lm_flags | LIST(clmp)->lm_flags) &
-	    LML_FLG_NOAUDIT) == 0)) {
-		if (audit_objopen(clmp, nlmp) == 0) {
-			remove_so(lml, nlmp);
-			return (0);
-		}
-	}
+	FLAGS(nlmp) |= FLG_RT_NEWLOAD;
 
 	/*
 	 * Report module loads to TLS module activity.
@@ -1781,7 +1772,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 	 * this mapping needs to be reset to insure it doesn't mistakenly get
 	 * unmapped as part of HWCAP cleanup.
 	 */
-	nlmp = load_file(lml, lmco, clmp, &fdesc);
+	nlmp = load_file(lml, lmco, &fdesc);
 
 	if (flags & FLG_RT_HWCAP) {
 		fdp->fd_fmap.fm_maddr = fmap->fm_maddr;
@@ -1842,7 +1833,7 @@ load_trace(Lm_list *lml, const char *name, Rt_map *clmp)
  * updating the objects mode, creating a handle if necessary, and adding this
  * object to existing handles if required.
  */
-int
+static int
 load_finish(Lm_list *lml, const char *name, Rt_map * clmp, int nmode,
     uint_t flags, Grp_hdl ** hdl, Rt_map * nlmp)
 {
@@ -2131,17 +2122,38 @@ load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 	/*
 	 * Finish processing this loaded object.
 	 */
-	if (load_finish(lml, name, clmp, nmode, flags, hdl, nlmp) != 0)
-		return (nlmp);
+	if (load_finish(lml, name, clmp, nmode, flags, hdl, nlmp) == 0) {
+		FLAGS(nlmp) &= ~FLG_RT_NEWLOAD;
+
+		/*
+		 * If this object has already been analyzed, then it is in use,
+		 * so even though this operation has failed, it should not be
+		 * torn down.
+		 */
+		if ((FLAGS(nlmp) & FLG_RT_ANALYZED) == 0)
+			remove_so(lml, nlmp);
+		return (0);
+	}
 
 	/*
-	 * If this object has already been analyzed, then it is in use, so even
-	 * though this operation has failed, it should not be torn down.
+	 * If this object is new, and we're being audited, tell the audit
+	 * library of the file we've just opened.  Note, if the new link-map
+	 * requires local auditing of its dependencies we also register its
+	 * opening.
 	 */
-	if ((FLAGS(nlmp) & FLG_RT_ANALYZED) == 0)
-		remove_so(lml, nlmp);
+	if (FLAGS(nlmp) & FLG_RT_NEWLOAD) {
+		FLAGS(nlmp) &= ~FLG_RT_NEWLOAD;
 
-	return (0);
+		if (((lml->lm_tflags | FLAGS1(clmp) | FLAGS1(nlmp)) &
+		    LML_TFLG_AUD_MASK) && (((lml->lm_flags |
+		    LIST(clmp)->lm_flags) & LML_FLG_NOAUDIT) == 0)) {
+			if (audit_objopen(clmp, nlmp) == 0) {
+				remove_so(lml, nlmp);
+				return (0);
+			}
+		}
+	}
+	return (nlmp);
 }
 
 /*

@@ -1478,3 +1478,4 @@ All the above change is incorporated in the following patches:
 6276905 dlinfo gives inconsistent results (relative vs absolute linkname) (D)
 	PSARC/2005/357 dlinfo(3c) RTLD_DI_ARGSINFO
 6284941 excessive link times with many groups/sections
+6280467 dlclose() unmaps shared library before library's _fini() has finished

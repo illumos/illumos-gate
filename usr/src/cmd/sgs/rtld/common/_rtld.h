@@ -576,8 +576,6 @@ extern void		lm_move(Lm_list *, Aliste, Aliste, Lm_cntl *,
 			    Lm_cntl *);
 extern int		lm_salvage(Lm_list *, int, Aliste);
 extern void		load_completion(Rt_map *, Rt_map *);
-extern int		load_finish(Lm_list *, const char *, Rt_map *, int,
-			    uint_t, Grp_hdl **, Rt_map *);
 extern Rt_map 		*load_hwcap(Lm_list *, Aliste, const char *, Rt_map *,
 			    uint_t, uint_t, Grp_hdl **, Rej_desc *);
 extern Rt_map		*load_path(Lm_list *, Aliste, const char *, Rt_map *,

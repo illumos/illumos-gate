@@ -608,7 +608,7 @@ typedef struct rt_map32 {
 #define	FLG_RT_SETGROUP	0x00000008	/* group establishment required */
 #define	FLG_RT_HWCAP	0x00000010	/* process $HWCAP expansion */
 #define	FLG_RT_OBJECT	0x00000020	/* object processing (ie. .o's) */
-
+#define	FLG_RT_NEWLOAD	0x00000040	/* object is newly loaded */
 #define	FLG_RT_NODUMP	0x00000080	/* object can't be dldump(3x)'ed */
 #define	FLG_RT_DELETE	0x00000100	/* object can be deleted */
 #define	FLG_RT_ANALYZED	0x00000200	/* object has been analyzed */
