@@ -853,7 +853,7 @@ validate_device_array(
 		    desc = hba;
 		}
 
-		if ((item = dlist_new_item((void *)desc)) == NULL) {
+		if ((item = dlist_new_item((void *)(uintptr_t)desc)) == NULL) {
 		    error = ENOMEM;
 		} else {
 		    *list = dlist_append(item, *list, AT_HEAD);

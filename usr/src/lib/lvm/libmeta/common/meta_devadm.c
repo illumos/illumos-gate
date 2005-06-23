@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -465,7 +465,7 @@ fix_replicanames(
 
 		mda_debug("replica update: reloading %s %p\n",
 		    disklist[i].devname,
-		    (void *) meta_expldev(disklist[i].dev));
+		    (void *)(uintptr_t)meta_expldev(disklist[i].dev));
 
 		if (firsttime) {
 			mda_print(dgettext(TEXT_DOMAIN,
@@ -620,12 +620,12 @@ pathname_reload(
 		}
 
 		mda_debug("pathname_reload: examining %s\n",
-		    (char *)nm.devname);
+		    (char *)(uintptr_t)nm.devname);
 
 		if ((devidp = has_devid(setno, sideno, nm.key, ep)) == NULL) {
 			/* metadevices do not have devid's in them */
 			mda_debug("pathname_reload: no devid for %s\n",
-			    (char *)nm.devname);
+			    (char *)(uintptr_t)nm.devname);
 			continue;
 		}
 
@@ -636,7 +636,8 @@ pathname_reload(
 			 * devidp is non-null then the minor_name has
 			 * already been looked up.
 			 */
-			mda_debug("No minor name for %s\n", (char *)nm.devname);
+			mda_debug("No minor name for %s\n",
+			    (char *)(uintptr_t)nm.devname);
 			free(devidp);
 			continue;
 		}
@@ -657,7 +658,7 @@ pathname_reload(
 		 * optimization to try and prevent a search for the complete
 		 * /dev namespace.
 		 */
-		search_number = mda_findpath((char *)nm.devname);
+		search_number = mda_findpath((char *)(uintptr_t)nm.devname);
 		if (search_number == -1) {
 			search_path = "/dev";
 		} else {
@@ -679,7 +680,7 @@ pathname_reload(
 
 		small_dev = meta_cmpldev(dev);
 		mda_debug("Old device lookup: %s (%p)\n",
-				(char *)nm.devname, (void *)small_dev);
+			(char *)(uintptr_t)nm.devname, (void *)small_dev);
 
 		/*
 		 * Check to see if the returned disk matches the stored one
@@ -694,11 +695,13 @@ pathname_reload(
 				match_type |= DEV_MATCH;
 			}
 
-			if (strncmp((char *)nm.devname, disklist[i].devname,
-			    strlen((char *)nm.devname)) == 0) {
+			if (strncmp((char *)(uintptr_t)nm.devname,
+			    disklist[i].devname,
+			    strlen((char *)(uintptr_t)nm.devname)) == 0) {
 				mda_debug("Name match: %s and %s (%d)\n",
-				    disklist[i].devname, (char *)nm.devname,
-				    strlen((char *)nm.devname));
+				    disklist[i].devname,
+				    (char *)(uintptr_t)nm.devname,
+				    strlen((char *)(uintptr_t)nm.devname));
 				match_type |= NAME_MATCH;
 			}
 
@@ -729,7 +732,7 @@ pathname_reload(
 			mda_print(dgettext(TEXT_DOMAIN,
 			    "%s changed to %s from device relocation "
 			    "information %s\n"),
-			    (char *)nm.devname, disklist[i].devname,
+			    (char *)(uintptr_t)nm.devname, disklist[i].devname,
 			    devidstr);
 		}
 		devid_str_free(devidstr);
@@ -760,7 +763,8 @@ pathname_reload(
 		ctds_name += sizeof (char);
 
 		mda_debug("Reloading disk %s %s %p\n",
-		    ctds_name, path, (void *) meta_expldev(disklist[i].dev));
+		    ctds_name, path,
+		    (void *)(uintptr_t)meta_expldev(disklist[i].dev));
 
 		if (!(dev_options & DEV_NOACTION)) {
 			/* Something has changed so update the namespace */
@@ -820,7 +824,7 @@ pathname_reload(
 		    "detected in Solaris Volume Manager\n"));
 		mda_print(dgettext(TEXT_DOMAIN,
 		    "Please check the status of the following disk(s):\n"));
-		ctdp = (char *)ds.ctdp;
+		ctdp = (char *)(uintptr_t)ds.ctdp;
 		while (*ctdp != NULL) {
 			mda_print("\t%s\n", ctdp);
 			ctdp += ds.maxsz;
@@ -1140,14 +1144,14 @@ devid_update(
 			goto out;
 		}
 
-		diskname = getdiskname((char *)nm.devname);
+		diskname = getdiskname((char *)(uintptr_t)nm.devname);
 
 		mda_debug("Checking %s with %s\n", diskname, dnp->cname);
 		if (strcmp(diskname, dnp->cname) != 0)
 			continue;
 
 		mda_debug("Updating device %s in namespace\n",
-		    (char *)nm.devname);
+		    (char *)(uintptr_t)nm.devname);
 
 		/*
 		 * found disk, does it have a devid within the namespace ?
@@ -1156,11 +1160,12 @@ devid_update(
 		 */
 		if ((devidp = has_devid(setno, side, nm.key, ep)) == NULL) {
 			mda_debug("%s has no devid in the namespace",
-			    (char *)nm.devname);
+			    (char *)(uintptr_t)nm.devname);
 			if (dev_options & DEV_VERBOSE) {
 				mda_print(dgettext(TEXT_DOMAIN,
 				"SVM has no device id for "
-				"%s, cannot update.\n"), (char *)nm.devname);
+				"%s, cannot update.\n"),
+				(char *)(uintptr_t)nm.devname);
 			}
 			continue; /* no devid. go on to next */
 		}
@@ -1195,7 +1200,7 @@ devid_update(
 					    "SVM failed to update the device "
 					    "id for %s probably due to both "
 					    "devt and device id changing.\n"),
-					    (char *)nm.devname);
+					    (char *)(uintptr_t)nm.devname);
 				}
 				(void) mdstealerror(ep, &nm.mde);
 				mde_perror(ep, "");
@@ -1432,7 +1437,7 @@ meta_upd_ctdnames(
 
 	small_dev = meta_cmpldev(dev);
 	mda_debug("Old device lookup: %s (%p)\n",
-			(char *)nm.devname, (void *)small_dev);
+			(char *)(uintptr_t)nm.devname, (void *)small_dev);
 	/*
 	 * Check to see if the returned disk matches the stored one
 	 */
@@ -1445,8 +1450,8 @@ meta_upd_ctdnames(
 			match_type |= DEV_MATCH;
 		}
 
-		if (strncmp((char *)nm.devname, disklist[i].devname,
-		    strlen((char *)nm.devname)) == 0) {
+		if (strncmp((char *)(uintptr_t)nm.devname, disklist[i].devname,
+		    strlen((char *)(uintptr_t)nm.devname)) == 0) {
 			match_type |= NAME_MATCH;
 		}
 
@@ -1476,7 +1481,7 @@ meta_upd_ctdnames(
 
 	if (!(match_type & NAME_MATCH)) {
 		mda_debug("Did not match on name: %s (%p)\n",
-		    (char *)nm.devname, (void *) disklist[i].dev);
+		    (char *)(uintptr_t)nm.devname, (void *) disklist[i].dev);
 	}
 
 	/*

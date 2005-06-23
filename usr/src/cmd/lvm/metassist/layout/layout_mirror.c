@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2211,7 +2211,7 @@ remove_used_disks(
 	    error = volume_shares_disk(diskp, volume, &shares);
 	    if ((error == 0) && (shares != B_TRUE)) {
 		/* disk is unused */
-		if ((item = dlist_new_item((void*)diskp)) == NULL) {
+		if ((item = dlist_new_item((void*)(uintptr_t)diskp)) == NULL) {
 		    error = ENOMEM;
 		} else {
 		    list = dlist_append(item, list, AT_TAIL);
@@ -2278,7 +2278,7 @@ volume_shares_disk(
 
 		if (error == 0) {
 		    if (compare_descriptor_names(
-			(void*)disk, (void*)odisk) == 0) {
+			(void*)(uintptr_t)disk, (void*)(uintptr_t)odisk) == 0) {
 			/* otherslice is on same disk, stop */
 			*shares = B_TRUE;
 		    }
@@ -2319,7 +2319,7 @@ select_mpxio_hbas(
 	    boolean_t ismpxio = B_FALSE;
 	    if ((error = hba_is_multiplex(hba, &ismpxio)) == 0) {
 		if (ismpxio == B_TRUE) {
-		    dlist_t *item = dlist_new_item((void *)hba);
+		    dlist_t *item = dlist_new_item((void *)(uintptr_t)hba);
 		    if (item != NULL) {
 			*mpxio_hbas =
 			    dlist_append(item, *mpxio_hbas, AT_TAIL);

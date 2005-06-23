@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,11 +160,11 @@ meta_getdidbykey(
 	}
 	if (metaioctl(MD_IOCGET_DID, &nm, &nm.mde, NULL) != 0) {
 		(void) mdstealerror(ep, &nm.mde);
-		(void) free((void *)nm.devid);
+		(void) free((void *)(uintptr_t)nm.devid);
 		return (NULL);
 	}
 
-	return ((void *)nm.devid);
+	return ((void *)(uintptr_t)nm.devid);
 }
 
 /*

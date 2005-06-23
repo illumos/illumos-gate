@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,7 @@ usage(char *myname)
 	myname, myname, myname);
 }
 
-void
+int
 main(int argc, char **argv)
 {
 	char		c;
@@ -238,4 +238,5 @@ main(int argc, char **argv)
 	closelog();
 	(void) meta_unlock(sp, ep);
 	md_exit(local_sp, ret);
+	return (0);
 }

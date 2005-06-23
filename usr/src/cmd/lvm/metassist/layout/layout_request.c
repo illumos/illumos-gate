@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -992,7 +992,8 @@ get_disks_for_target(
 		if (error == 0) {
 		    if (spec_includes_device(targetid, diskid) == B_TRUE) {
 			/* add disk */
-			if ((item = dlist_new_item((void *)disk)) == NULL) {
+			if ((item = dlist_new_item((void *)(uintptr_t)disk)) ==
+			    NULL) {
 			    error = ENOMEM;
 			} else {
 			    *disks = dlist_append(item, *disks, AT_HEAD);
@@ -1013,7 +1014,7 @@ get_disks_for_target(
 					targetid, aliasid) == B_TRUE) {
 
 				/* alias matched, add disk */
-				item = dlist_new_item((void *)disk);
+				item = dlist_new_item((void *)(uintptr_t)disk);
 				if (item == NULL) {
 				    error = ENOMEM;
 				} else {
@@ -1114,11 +1115,11 @@ select_hbas_with_n_disks(
 		dm_descriptor_t disk = (uintptr_t)iter2->obj;
 
 		/* unique disk? has it been seen thru some other HBA? */
-		if (dlist_contains(*seldisks, (void *)disk,
+		if (dlist_contains(*seldisks, (void *)(uintptr_t)disk,
 		    compare_descriptor_names) != B_TRUE) {
 
 		    /* distinct, add to list of all_distinct */
-		    dlist_t *item = dlist_new_item((void *)disk);
+		    dlist_t *item = dlist_new_item((void *)(uintptr_t)disk);
 		    if (item == NULL) {
 			error = ENOMEM;
 		    } else {
@@ -1135,7 +1136,7 @@ select_hbas_with_n_disks(
 	    if (ndistinct >= mindisks) {
 
 		/* this HBA has minimum # of disks, add to output list */
-		dlist_t	*item = dlist_new_item((void *)hba);
+		dlist_t	*item = dlist_new_item((void *)(uintptr_t)hba);
 		if (item == NULL) {
 		    error = ENOMEM;
 		} else {
@@ -1221,7 +1222,7 @@ hba_get_avail_disks_and_space(
 		continue;
 	    }
 
-	    if (dlist_contains(hbas, (void *)hba,
+	    if (dlist_contains(hbas, (void *)(uintptr_t)hba,
 			compare_descriptor_names) == B_TRUE) {
 
 		/* is disk available? */
@@ -1233,7 +1234,7 @@ hba_get_avail_disks_and_space(
 		    error = disk_get_avail_space(request, disk, &disk_space);
 		    if ((error == 0) && (disk_space > 0)) {
 
-			dlist_t *item = dlist_new_item((void *)disk);
+			dlist_t *item = dlist_new_item((void *)(uintptr_t)disk);
 			if (item == NULL) {
 			    error = ENOMEM;
 			} else {
@@ -1302,8 +1303,8 @@ disk_get_avail_space(
 
 	    /* is slice on disk in question? */
 	    if (((error = slice_get_disk(slice, &slice_disk)) != 0) ||
-		(compare_descriptor_names((void *)slice_disk,
-			(void *)disk) != 0)) {
+		(compare_descriptor_names((void *)(uintptr_t)slice_disk,
+			(void *)(uintptr_t)disk) != 0)) {
 		continue;
 	    }
 
@@ -1380,7 +1381,7 @@ disks_get_avail_slices(
 
 	    /* is slice on a disk in the input list? */
 	    if (((error = slice_get_disk(slice, &disk)) != 0) ||
-		(dlist_contains(disks, (void *)disk,
+		(dlist_contains(disks, (void *)(uintptr_t)disk,
 			compare_descriptor_names) != B_TRUE)) {
 		continue;
 	    }
@@ -1405,7 +1406,7 @@ disks_get_avail_slices(
 		uint64_t size = 0;
 		error = slice_get_size(slice, &size);
 		if ((error == 0) && (size > 0)) {
-		    dlist_t *item = dlist_new_item((void *)slice);
+		    dlist_t *item = dlist_new_item((void *)(uintptr_t)slice);
 		    if (item == NULL) {
 			error = ENOMEM;
 		    } else {
@@ -1505,7 +1506,7 @@ get_hbas_and_disks_used_by_volume(
 		((error = devconfig_get_name(dev, &name)) != 0) ||
 		(error = get_disk_for_named_slice(name, &disk));
 		if (error == 0) {
-		    dlist_t *item = dlist_new_item((void *)disk);
+		    dlist_t *item = dlist_new_item((void *)(uintptr_t)disk);
 		    if (item == NULL) {
 			error = ENOMEM;
 		    } else {

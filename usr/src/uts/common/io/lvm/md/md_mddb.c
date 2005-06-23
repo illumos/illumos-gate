@@ -2936,8 +2936,8 @@ ridev(
 				sz = clp->l_old_devid_sz;
 				r->ri_old_devid = (ddi_devid_t)kmem_zalloc(sz,
 				    KM_SLEEP);
-				bcopy((char *)clp->l_old_devid, (char *)r->
-				    ri_old_devid, sz);
+				bcopy((char *)(uintptr_t)clp->l_old_devid,
+				    (char *)r->ri_old_devid, sz);
 			} else {
 				r->ri_old_devid = 0;
 			}
@@ -5269,7 +5269,7 @@ get_mbs_n_lbs(
 				    did_icp);
 
 				if (cl->l_devid_flags & MDDB_DEVID_SZ) {
-					if ((cl->l_devid = (uint64_t)kmem_alloc
+					if ((cl->l_devid = (uintptr_t)kmem_alloc
 					    (cl->l_devid_sz, KM_SLEEP))
 					    == NULL) {
 						continue;
@@ -7936,9 +7936,10 @@ delnewside(
 		if (lbp->lb_flags & MDDB_MNSET) {
 			if ((index = checklocator(lbp, li,
 			    cp->c_sideno)) == -1) {
-				if (use_devid)
-					ddi_devid_free(
-						(ddi_devid_t)clp->l_devid);
+				if (use_devid) {
+					ddi_devid_free((ddi_devid_t)
+					    (uintptr_t)clp->l_devid);
+				}
 				single_thread_end(s);
 				mddb_setexit(s);
 				return (mdmddberror(ep, MDE_DB_TOOSMALL,
@@ -8256,7 +8257,8 @@ newdev(
 		lbp->lb_flags |= MDDB_MNSET;
 		if ((index = checklocator(lbp, li, s->s_sideno)) == -1) {
 			if (use_devid)
-				ddi_devid_free((ddi_devid_t)clp->l_devid);
+				ddi_devid_free((ddi_devid_t)(uintptr_t)clp->
+				    l_devid);
 			lp->l_flags = old_flags;
 			lbp->lb_loccnt--;
 			mddb_devclose(md_expldev(clp->l_dev));

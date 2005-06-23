@@ -792,7 +792,8 @@ md_probe_ioctl(mdsetname_t *sp, mdnamelist_t *nlp, int ndevs, char *drvname)
 
 	for (p = nlp, i = 0; p; p = p->next, i++) {
 		np = p->namep;
-		((minor_t *)iocp->mnum_list)[i] = meta_getminor(np->dev);
+		((minor_t *)(uintptr_t)iocp->mnum_list)[i] =
+		    meta_getminor(np->dev);
 	}
 
 
@@ -915,7 +916,7 @@ create_nlp(mdsetname_t *sp)
 		mde_perror(&e, "create_nlp: malloc failed\n");
 		md_exit(sp, 1);
 	}
-	/* LINTED */
+	return (0);
 }
 
 /*

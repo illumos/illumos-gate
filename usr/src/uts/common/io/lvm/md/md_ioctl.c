@@ -1191,8 +1191,9 @@ mddb_config_from_user(
 		}
 		d1->c_locator.l_devid = (uint64_t)(uintptr_t)d2;
 
-		if ((caddr_t)d1->c_locator.l_old_devid) {
-			*c_old_devid_addr = (caddr_t)d1->c_locator.l_old_devid;
+		if ((caddr_t)(uintptr_t)d1->c_locator.l_old_devid) {
+			*c_old_devid_addr = (caddr_t)(uintptr_t)
+			    d1->c_locator.l_old_devid;
 
 			sz3 = d1->c_locator.l_old_devid_sz;
 			if (d1->c_locator.l_old_devid_sz <= 0 ||
@@ -1202,14 +1203,15 @@ mddb_config_from_user(
 				return (EINVAL);
 			}
 			d3 = kmem_zalloc(sz3, KM_SLEEP);
-			if (ddi_copyin((caddr_t)d1->c_locator.l_old_devid,
+			if (ddi_copyin(
+			    (caddr_t)(uintptr_t)d1->c_locator.l_old_devid,
 			    d3, sz3, mode) != 0) {
 				kmem_free((void *)d1, sz1);
 				kmem_free(d2, sz2);
 				kmem_free(d3, sz3);
 				return (EFAULT);
 			}
-			d1->c_locator.l_old_devid = (uint64_t)d3;
+			d1->c_locator.l_old_devid = (uintptr_t)d3;
 		}
 	} else {
 		d1->c_locator.l_devid = (uint64_t)0;
@@ -1256,7 +1258,7 @@ mddb_config_to_user(
 
 	if (d1->c_locator.l_old_devid) {
 		sz3 = d1->c_locator.l_old_devid_sz;
-		d3 = (caddr_t)d1->c_locator.l_old_devid;
+		d3 = (caddr_t)(uintptr_t)d1->c_locator.l_old_devid;
 		if (ddi_copyout(d3, (caddr_t)c_old_devid_addr,
 		    sz3, mode) != 0) {
 			kmem_free(d1, sz1);
@@ -1264,7 +1266,7 @@ mddb_config_to_user(
 			kmem_free(d3, sz3);
 		}
 	}
-	d1->c_locator.l_old_devid = (uint64_t)c_old_devid_addr;
+	d1->c_locator.l_old_devid = (uintptr_t)c_old_devid_addr;
 
 	if (ddi_copyout(d1, data, sz1, mode) != 0) {
 		kmem_free(d1, sz1);
@@ -2928,7 +2930,7 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		}
 
 		msg = (char *)kmem_zalloc(cmp->size + 1, KM_SLEEP);
-		if (ddi_copyin((caddr_t)cmp->md_message, msg,
+		if (ddi_copyin((caddr_t)(uintptr_t)cmp->md_message, msg,
 			cmp->size, mode) != 0) {
 			kmem_free(msg, cmp->size + 1);
 			err = EFAULT;

@@ -2097,18 +2097,19 @@ metareplicaname(
 		return (NULL);
 	}
 
-	rp->r_blkno = MD_DISKADDR_ERROR;
-	rp->r_nblk = MD_DISKADDR_ERROR;
+	rp->r_blkno = (daddr_t)MD_DISKADDR_ERROR;
+	rp->r_nblk = (daddr_t)MD_DISKADDR_ERROR;
 	rp->r_flags = c->c_locator.l_flags | MDDB_F_NODEVID;
 	if (c->c_locator.l_devid_flags & MDDB_DEVID_VALID) {
-		sz = devid_sizeof((ddi_devid_t)(c->c_locator.l_devid));
+		sz = devid_sizeof((ddi_devid_t)(uintptr_t)
+		    (c->c_locator.l_devid));
 		if ((rp->r_devid = (ddi_devid_t)malloc(sz)) ==
 		    (ddi_devid_t)NULL) {
 			Free(rp);
 			return (NULL);
 		}
 		(void) memcpy((void *)rp->r_devid,
-		    (void *)c->c_locator.l_devid, sz);
+		    (void *)(uintptr_t)c->c_locator.l_devid, sz);
 		(void) strcpy(rp->r_minor_name, c->c_locator.l_minor_name);
 		rp->r_flags &= ~MDDB_F_NODEVID;
 		/* Overwrite dev derived from name with dev from devid */
@@ -2364,7 +2365,7 @@ meta_setup_db_locations(
 			return (mdsyserror(ep, ENOMEM, META_DBCONF));
 		}
 
-		(void) memcpy((void *)c.c_locator.l_devid,
+		(void) memcpy((void *)(uintptr_t)c.c_locator.l_devid,
 		    (void *)devid_decode, sz);
 
 		devid_free(devid_decode);
@@ -2372,7 +2373,7 @@ meta_setup_db_locations(
 		if (strlen(minor_name) > MDDB_MINOR_NAME_MAX) {
 			free(minor_name);
 			free(devidp);
-			free((void *)c.c_locator.l_devid);
+			free((void *)(uintptr_t)c.c_locator.l_devid);
 			return (mdsyserror(ep, ENOMEM, META_DBCONF));
 		}
 		(void) strcpy(c.c_locator.l_minor_name, minor_name);
@@ -2397,19 +2398,19 @@ meta_setup_db_locations(
 		if (checksum != 42) {
 			/* overwritten later for more serious problems */
 			rval = mderror(ep, MDE_MDDB_CKSUM, META_DBCONF);
-			free((void *)c.c_locator.l_devid);
+			free((void *)(uintptr_t)c.c_locator.l_devid);
 			continue;
 		}
 		c.c_locator.l_flags = 0;
 
 		/* use db location */
 		if (metaioctl(MD_DB_USEDEV, &c, &c.c_mde, NULL) != 0) {
-			free((void *)c.c_locator.l_devid);
+			free((void *)(uintptr_t)c.c_locator.l_devid);
 			return (mdstealerror(ep, &c.c_mde));
 		}
 
 		/* free up devid if in use */
-		free((void *)c.c_locator.l_devid);
+		free((void *)(uintptr_t)c.c_locator.l_devid);
 		c.c_locator.l_devid = (uint64_t)0;
 		c.c_locator.l_devid_flags = 0;
 	}

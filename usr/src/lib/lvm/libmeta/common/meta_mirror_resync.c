@@ -504,6 +504,7 @@ meta_mn_mirror_resync_all(void *arg)
 	(void) meta_unlock(sp, &mde);
 	md_exit(sp, 0);
 	/*NOTREACHED*/
+	return (NULL);
 }
 
 /*

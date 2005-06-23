@@ -19,7 +19,6 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1440,7 +1439,7 @@ mdmn_do_meta_md_addside(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 			return;
 		}
 
-		nm.devname = (uint64_t)meta_getnmbykey(msg->msg_setno,
+		nm.devname = (uintptr_t)meta_getnmbykey(msg->msg_setno,
 			d->msg_otherside, nm.key, &ep);
 		if (nm.devname == NULL) {
 			(void) mdstealerror(&(resp->mmr_ep), &ep);
@@ -1448,14 +1447,15 @@ mdmn_do_meta_md_addside(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 			return;
 		}
 		nm.side = d->msg_sideno;
-		if ((done = meta_getside_devinfo(sp, (char *)nm.devname,
+		if ((done = meta_getside_devinfo(sp,
+		    (char *)(uintptr_t)nm.devname,
 		    d->msg_sideno, &cname, &dname, &mnum, &ep)) == -1) {
 			(void) mdstealerror(&(resp->mmr_ep), &ep);
-			Free((void *)nm.devname);
+			Free((void *)(uintptr_t)nm.devname);
 			resp->mmr_exitval = -1;
 			return;
 		}
-		Free((void *)nm.devname);
+		Free((void *)(uintptr_t)nm.devname);
 		if (done != 1) {
 			Free(cname);
 			Free(dname);
@@ -1689,7 +1689,7 @@ mdmn_do_iocset(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 		return;
 	}
 
-	d->iocset_params.mdp = (uint64_t)&d->unit; /* set pointer to unit */
+	d->iocset_params.mdp = (uintptr_t)&d->unit; /* set pointer to unit */
 	ret = metaioctl(MD_IOCSET, &(d->iocset_params), &mde, np->cname);
 	resp->mmr_exitval = ret;
 }

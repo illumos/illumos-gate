@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -560,9 +560,9 @@ generate_known_disks(
 
 	    if (bad_disk) {
 		/* remember bad disks and continue */
-		if (dlist_contains(*bad,
-			    (void *)disk, compare_descriptor_names) != B_TRUE) {
-		    dlist_t *item = dlist_new_item((void *)disk);
+		if (dlist_contains(*bad, (void *)(uintptr_t)disk,
+		    compare_descriptor_names) != B_TRUE) {
+		    dlist_t *item = dlist_new_item((void *)(uintptr_t)disk);
 		    if (item == NULL) {
 			error = ENOMEM;
 		    } else {
@@ -619,7 +619,7 @@ generate_known_disks(
 	    }
 
 	    if (error == 0) {
-		dlist_t *item = dlist_new_item((void *)disk);
+		dlist_t *item = dlist_new_item((void *)(uintptr_t)disk);
 		if (item == NULL) {
 		    error = ENOMEM;
 		} else {
@@ -694,7 +694,8 @@ generate_known_slices(
 
 		    if (error == ENODEV) {
 			/* bad slice, remember it and continue */
-			dlist_t *item = dlist_new_item((void *)slice);
+			dlist_t *item =
+			    dlist_new_item((void *)(uintptr_t)slice);
 			if (item == NULL) {
 			    error = ENOMEM;
 			} else {
@@ -784,7 +785,7 @@ generate_known_slices(
 		}
 
 		if (error == 0) {
-		    dlist_t *item = dlist_new_item((void *)slice);
+		    dlist_t *item = dlist_new_item((void *)(uintptr_t)slice);
 		    if (item == NULL) {
 			error = ENOMEM;
 		    } else {
@@ -867,8 +868,8 @@ generate_known_hbas(
 		    dlist_t		*item = NULL;
 
 		    /* scan list of known HBAs and see if known */
-		    if (dlist_contains(*known,
-			(void*)hba, compare_descriptor_names) == B_TRUE) {
+		    if (dlist_contains(*known, (void*)(uintptr_t)hba,
+			compare_descriptor_names) == B_TRUE) {
 			/* known HBA */
 			continue;
 		    }
@@ -882,7 +883,8 @@ generate_known_hbas(
 		    error = generate_known_hba_name(hba, alias, disk);
 		    if (error == 0) {
 			/* add to known HBA list */
-			if ((item = dlist_new_item((void *)hba)) == NULL) {
+			if ((item = dlist_new_item((void *)(uintptr_t)hba)) ==
+			    NULL) {
 			    error = ENOMEM;
 			} else {
 			    *known =
@@ -1123,7 +1125,7 @@ generate_usable_disks_and_slices_in_local_set(
 		/* Is the disk available? */
 		if (error == 0 && bad_disk == B_FALSE && avail == B_TRUE) {
 		    error = dlist_append_object(
-			(void *)disk, usable_disks, AT_TAIL);
+			(void *)(uintptr_t)disk, usable_disks, AT_TAIL);
 		}
 
 		dlist_free_items(slices, NULL);
@@ -1293,7 +1295,8 @@ generate_usable_disks_and_slices_in_named_set(
 			bad_disk = B_TRUE;
 		    } else {
 
-			dlist_t *item = dlist_new_item((void *)slice);
+			dlist_t *item =
+			    dlist_new_item((void *)(uintptr_t)slice);
 			if (item == NULL) {
 			    error = ENOMEM;
 			} else {
@@ -1334,8 +1337,8 @@ generate_usable_disks_and_slices_in_named_set(
 		    error = create_usable_slices(disk, used_slices_on_this_disk,
 			unused_slices_on_this_disk, usable_slices);
 		    if (error == 0) {
-			error = dlist_append_object(
-			    (void *)disk, usable_disks, AT_TAIL);
+			error = dlist_append_object((void *)(uintptr_t)disk,
+			    usable_disks, AT_TAIL);
 		    }
 		}
 	    }
@@ -1584,7 +1587,7 @@ add_new_usable(
 		    nblks, nblks * disk_blksz);
 		if (error == 0) {
 		    error = dlist_append_object(
-			(void *)new_usable, usable, AT_TAIL);
+			(void *)(uintptr_t)new_usable, usable, AT_TAIL);
 		}
 	    }
 	}
@@ -1682,14 +1685,15 @@ generate_usable_hbas(
 		    dlist_t		*item = NULL;
 
 		    /* scan list of usable HBAs and see if known */
-		    if (dlist_contains(*usable,
-			(void*)hba, compare_descriptor_names) == B_TRUE) {
+		    if (dlist_contains(*usable, (void*)(uintptr_t)hba,
+			compare_descriptor_names) == B_TRUE) {
 			/* known HBA, continue to next HBA/alias */
 			continue;
 		    }
 
 		    /* add this HBA to the usable list */
-		    if ((item = dlist_new_item((void *)hba)) == NULL) {
+		    if ((item = dlist_new_item((void *)(uintptr_t)hba)) ==
+			NULL) {
 			error = ENOMEM;
 		    } else {
 			*usable =
@@ -1772,7 +1776,7 @@ check_slice_usage(
 
 	if (error != 0) {
 	    if (error == ENODEV) {
-		dlist_t *item = dlist_new_item((void *)slice);
+		dlist_t *item = dlist_new_item((void *)(uintptr_t)slice);
 		oprintf(OUTPUT_TERSE,
 			gettext("Warning: unable to get slice information "
 				"for %s, it will not be used.\n"), name);

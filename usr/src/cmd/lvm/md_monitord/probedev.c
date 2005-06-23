@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,10 +137,11 @@ md_probe_ioctl(mdnamelist_t *nlp, int ndevs, char *drvname, boolean_e verbose)
 
 	for (p = nlp, i = 0; p; p = p->next, i++) {
 		np = p->namep;
-		((minor_t *)iocp->mnum_list)[i] = meta_getminor(np->dev);
+		((minor_t *)(uintptr_t)iocp->mnum_list)[i] =
+		    meta_getminor(np->dev);
 		if (verbose == True)
 			monitord_print(6, "...%s 0x%lx\n", np->cname,
-			    ((minor_t *)iocp->mnum_list)[i]);
+			    ((minor_t *)(uintptr_t)iocp->mnum_list)[i]);
 	}
 
 
@@ -271,7 +272,7 @@ create_nlp()
 		    "create_nlp: malloc failed\n"));
 		monitord_exit(errno);
 	}
-	/* LINTED */
+	return (0);
 }
 
 /*

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -708,7 +708,8 @@ remove_undersized_slices(
 
 		    /* this slice is large enough */
 		    dlist_t *item = NULL;
-		    if ((item = dlist_new_item((void *)aslice)) == NULL) {
+		    if ((item = dlist_new_item((void *)(uintptr_t)aslice)) ==
+			NULL) {
 			error = ENOMEM;
 		    } else {
 			filtered = dlist_insert_ordered(item, filtered,
@@ -796,8 +797,9 @@ find_spare_for_component(
 
 		/* see if spare's disk is independent of the volume */
 		error = get_disk_for_named_slice(spname, &disk);
-		if ((error == 0) && (dlist_contains(disks, (void *)disk,
-		    compare_descriptor_names) == B_FALSE)) {
+		if ((error == 0) && (dlist_contains(disks,
+		    (void *)(uintptr_t)disk, compare_descriptor_names) ==
+		    B_FALSE)) {
 		    *found = B_TRUE;
 		}
 	    }

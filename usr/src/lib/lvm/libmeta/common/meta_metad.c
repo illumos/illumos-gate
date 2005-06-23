@@ -1893,6 +1893,7 @@ clnt_getset(
 /*
  * return the multi-node diskset record, drive records and node records.
  */
+int
 clnt_mngetset(
 	char			*hostname,
 	char			*setname,
@@ -1969,6 +1970,7 @@ clnt_mngetset(
 /*
  * Set master nodeid and nodename in multi-node set record.
  */
+int
 clnt_mnsetmaster(
 	char			*hostname,
 	mdsetname_t		*sp,

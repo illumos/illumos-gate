@@ -19,9 +19,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -253,7 +252,8 @@ exit_commd()
 	(void) metaioctl(MD_MN_SET_COMMD_RUNNING, 0, &ep, "rpc.mdcommd");
 }
 
-void
+/* ARGSUSED */
+int
 main()
 {
 	pid_t pid;
@@ -354,6 +354,5 @@ main()
 
 	svc_run();
 	_msgout(gettext("svc_run returned"));
-	exit(1);
-	/* NOTREACHED */
+	return (1);
 }

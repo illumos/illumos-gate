@@ -2170,15 +2170,16 @@ meta_imp_set(
 		c.c_locator.l_dev = meta_cmpldev(np->dev);
 		c.c_locator.l_mnum = meta_getminor(np->dev);
 		c.c_locator.l_devid = (uintptr_t)Malloc(midp->mid_devid_sz);
-		(void) memcpy((void *)c.c_locator.l_devid, midp->mid_devid,
-		    midp->mid_devid_sz);
+		(void) memcpy((void *)(uintptr_t)c.c_locator.l_devid,
+		    midp->mid_devid, midp->mid_devid_sz);
 		c.c_locator.l_devid_sz = midp->mid_devid_sz;
 		c.c_locator.l_devid_flags =
 		    MDDB_DEVID_VALID | MDDB_DEVID_SPACE | MDDB_DEVID_SZ;
 		if (midp->mid_o_devid) {
 			c.c_locator.l_old_devid =
-			    (uint64_t)Malloc(midp->mid_o_devid_sz);
-			(void) memcpy((void *)c.c_locator.l_old_devid,
+			    (uint64_t)(uintptr_t)Malloc(midp->mid_o_devid_sz);
+			(void) memcpy((void *)(uintptr_t)
+			    c.c_locator.l_old_devid,
 			    midp->mid_o_devid, midp->mid_o_devid_sz);
 			c.c_locator.l_old_devid_sz = midp->mid_o_devid_sz;
 		}
@@ -2208,9 +2209,10 @@ meta_imp_set(
 			}
 
 			if (metaioctl(MD_DB_USEDEV, &c, &c.c_mde, NULL) != 0) {
-				Free((void *)c.c_locator.l_devid);
+				Free((void *)(uintptr_t)c.c_locator.l_devid);
 				if (c.c_locator.l_old_devid)
-					Free((void *)c.c_locator.l_old_devid);
+					Free((void *)(uintptr_t)
+					    c.c_locator.l_old_devid);
 				return (mdstealerror(ep, &c.c_mde));
 			}
 		} while (mirp != NULL);
@@ -2223,9 +2225,9 @@ meta_imp_set(
 	if (dry_run == 1) {
 		md_eprintf("%s\n", dgettext(TEXT_DOMAIN,
 		    "import should be successful"));
-		Free((void *)c.c_locator.l_devid);
+		Free((void *)(uintptr_t)c.c_locator.l_devid);
 		if (c.c_locator.l_old_devid)
-			Free((void *)c.c_locator.l_old_devid);
+			Free((void *)(uintptr_t)c.c_locator.l_old_devid);
 		return (0);
 	}
 
@@ -2235,9 +2237,9 @@ meta_imp_set(
 	 * Tell kernel to load them up and import the set
 	 */
 	if (metaioctl(MD_IOCIMP_LOAD, &c.c_setno, &c.c_mde, NULL) != 0) {
-		Free((void *)c.c_locator.l_devid);
+		Free((void *)(uintptr_t)c.c_locator.l_devid);
 		if (c.c_locator.l_old_devid)
-			Free((void *)c.c_locator.l_old_devid);
+			Free((void *)(uintptr_t)c.c_locator.l_old_devid);
 		return (mdstealerror(ep, &c.c_mde));
 	}
 
@@ -2264,8 +2266,8 @@ meta_imp_set(
 		md_eprintf("%s\n", dgettext(TEXT_DOMAIN, "Please stop and "
 		    "restart rpc.metad"));
 
-	Free((void *)c.c_locator.l_devid);
+	Free((void *)(uintptr_t)c.c_locator.l_devid);
 	if (c.c_locator.l_old_devid)
-		Free((void *)c.c_locator.l_old_devid);
+		Free((void *)(uintptr_t)c.c_locator.l_old_devid);
 	return (0);
 }

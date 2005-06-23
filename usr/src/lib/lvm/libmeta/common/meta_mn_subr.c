@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -286,8 +286,8 @@ meta_mn_send_command(
 			    "Command not attempted: Unable to log message "
 			    "in set %s\n"), sp->setname);
 			if (c.c_flags & MDDB_C_STALE) {
-			    (void) mdmddberror(ep, MDE_DB_STALE, NODEV64,
-			    sp->setno, 0, NULL);
+			    (void) mdmddberror(ep, MDE_DB_STALE,
+			    (minor_t)NODEV64, sp->setno, 0, NULL);
 			    mde_perror(ep, "");
 			}
 		} else {

@@ -749,7 +749,8 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 			sz = devid_sizeof(devidp);
 			c.c_locator.l_devid = (uintptr_t)malloc(sz);
 			c.c_locator.l_devid_sz = sz;
-			(void) memcpy((void *)c.c_locator.l_devid, devidp, sz);
+			(void) memcpy((void *)(uintptr_t)c.c_locator.l_devid,
+			    devidp, sz);
 			if (minor_name == NULL) {
 				/* ERROR fix up */
 				Free(devid_str);
@@ -811,8 +812,8 @@ snarf_set(mdsetname_t *sp, bool_t stale_bool, md_error_t *ep)
 		return (mdstealerror(ep, &c.c_mde));
 
 	if (c.c_flags & MDDB_C_STALE)
-		return (mdmddberror(ep, MDE_DB_STALE, NODEV64, sp->setno,
-		    0, NULL));
+		return (mdmddberror(ep, MDE_DB_STALE, (minor_t)NODEV64,
+		    sp->setno, 0, NULL));
 
 	return (0);
 }

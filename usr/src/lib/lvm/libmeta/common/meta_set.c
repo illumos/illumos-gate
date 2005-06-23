@@ -2456,7 +2456,7 @@ meta_set_join(
 			stale_set = 1;
 		} else if (mdisok(ep)) {
 			/* If snarf failed, but no error was set - set it */
-			(void) mdmddberror(ep, MDE_DB_NOTNOW, NODEV64,
+			(void) mdmddberror(ep, MDE_DB_NOTNOW, (minor_t)NODEV64,
 			    sp->setno, 0, NULL);
 				rval = -1;
 				goto out;
@@ -2474,7 +2474,7 @@ meta_set_join(
 	if (own_set(sp, NULL, TRUE, ep) == MD_SETOWNER_NO) {
 		if (mdisok(ep)) {
 			/* If snarf failed, but no error was set - set it */
-			(void) mdmddberror(ep, MDE_DB_NOTNOW, NODEV64,
+			(void) mdmddberror(ep, MDE_DB_NOTNOW, (minor_t)NODEV64,
 				sp->setno, 0, NULL);
 		}
 		mde_perror(ep, dgettext(TEXT_DOMAIN,

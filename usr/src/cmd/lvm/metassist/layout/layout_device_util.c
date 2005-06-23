@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -605,7 +605,8 @@ disk_get_slices(
 		    print_get_assoc_desc_error(disk, gettext("slice"), error);
 		} else {
 		    for (i = 0; (slices[i] != NULL) && (error == 0); i++) {
-			dlist_t *item = dlist_new_item((void *)slices[i]);
+			dlist_t *item =
+			    dlist_new_item((void *)(uintptr_t)slices[i]);
 			if (item == NULL) {
 			    error = ENOMEM;
 			} else {
@@ -1007,7 +1008,7 @@ add_virtual_slice(
 	    dlist_free_items(aliases, free);
 	}
 
-	if ((item = dlist_new_item((void *)sp)) == NULL) {
+	if ((item = dlist_new_item((void *)(uintptr_t)sp)) == NULL) {
 	    return (ENOMEM);
 	}
 
@@ -1195,7 +1196,7 @@ disk_get_virtual_slices(
 	for (i = 0; i < nelem && slices[i] != -1; i++) {
 	    dlist_t *item = NULL;
 
-	    if ((item = dlist_new_item((void*)slices[i])) == NULL) {
+	    if ((item = dlist_new_item((void*)(uintptr_t)slices[i])) == NULL) {
 		error = ENOMEM;
 		break;
 	    }
@@ -1227,7 +1228,7 @@ is_virtual_slice(
 	dm_descriptor_t desc)
 {
         return (dlist_contains(_virtual_slices,
-			(void*)desc, compare_descriptors));
+			(void*)(uintptr_t)desc, compare_descriptors));
 }
 
 /*
@@ -1858,7 +1859,7 @@ group_similar_hbas(
 	    char	*type = NULL;
 
 	    /* if item doesn't go into a list it must be freed */
-	    if ((item = dlist_new_item((void *)hba)) == NULL) {
+	    if ((item = dlist_new_item((void *)(uintptr_t)hba)) == NULL) {
 		error = ENOMEM;
 		continue;
 	    }
@@ -2742,7 +2743,7 @@ disk_get_associated_desc(
 	    for (i = 0;
 		(assoc != NULL) && (assoc[i] != NULL) && (error == 0);
 		i++) {
-		dlist_t *item = dlist_new_item((void *)assoc[i]);
+		dlist_t *item = dlist_new_item((void *)(uintptr_t)assoc[i]);
 		if (item == NULL) {
 		    error = ENOMEM;
 		} else {

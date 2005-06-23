@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -406,7 +406,7 @@ choose_slice(
 		 * NB: lists of slices larger than necessary are kept in
 		 * ascending order (results in best fit, not worst fit)
 		 */
-	    if ((item = dlist_new_item((void*)slice)) == NULL) {
+	    if ((item = dlist_new_item((void*)(uintptr_t)slice)) == NULL) {
 		error = ENOMEM;
 	    } else {
 		list[i][j][k][l][m] =
@@ -1331,7 +1331,7 @@ pick_from_best_hba_and_disk(
 	    }
 
 	    /* add slice to list in descending size order */
-	    if ((item = dlist_new_item((void*)slice)) == NULL) {
+	    if ((item = dlist_new_item((void*)(uintptr_t)slice)) == NULL) {
 		error = ENOMEM;
 	    } else {
 		prefhbas[n] =
@@ -1372,14 +1372,14 @@ pick_from_best_hba_and_disk(
 		 */
 		for (iter1 = _used_slices; iter1 != NULL; iter1 = iter1->next) {
 		    usedslice_t *used = (usedslice_t *)iter1->obj;
-		    if (compare_descriptors(
-				(void *)disk, (void *)used->disk) == 0) {
+		    if (compare_descriptors((void *)(uintptr_t)disk,
+			(void *)(uintptr_t)used->disk) == 0) {
 			n++;
 		    }
 		}
 
 		/* add slice to list in descending size order */
-		if ((item = dlist_new_item((void *)slice)) == NULL) {
+		if ((item = dlist_new_item((void *)(uintptr_t)slice)) == NULL) {
 		    error = ENOMEM;
 		} else {
 		    prefdisks[n] =
@@ -1566,8 +1566,8 @@ slice_on_unique_disk(
 		(error = get_disk_for_named_slice(oname, &odisk));
 
 		if ((error == 0) &&
-			(compare_descriptor_names(
-				(void*)disk, (void*)odisk) == 0)) {
+			(compare_descriptor_names((void*)(uintptr_t)disk,
+			    (void*)(uintptr_t)odisk) == 0)) {
 		    /* origslice is on same disk, stop */
 		    *unique = B_FALSE;
 		}
@@ -1576,7 +1576,7 @@ slice_on_unique_disk(
 
 	/* check disk against the used disks */
 	if ((error == 0) && (*unique == B_TRUE) &&
-		dlist_contains(used_disks, (void *)disk,
+		dlist_contains(used_disks, (void *)(uintptr_t)disk,
 			compare_descriptor_names) == B_TRUE) {
 		*unique = B_FALSE;
 	}
@@ -2135,7 +2135,8 @@ disk_has_used_slice(
 	    usedslice_t *used = (usedslice_t *)iter->obj;
 
 	    /* compare used slice's disk to disk */
-	    if (compare_descriptors((void *)disk, (void *)used->disk) == 0) {
+	    if (compare_descriptors((void *)(uintptr_t)disk,
+		(void *)(uintptr_t)used->disk) == 0) {
 		*hasused = B_TRUE;
 	    }
 	}
@@ -2179,7 +2180,7 @@ add_reserved_slice(
 {
 	dlist_t	*item = NULL;
 
-	if ((item = dlist_new_item((void *)slice)) == NULL) {
+	if ((item = dlist_new_item((void *)(uintptr_t)slice)) == NULL) {
 	    return (ENOMEM);
 	}
 
@@ -2209,8 +2210,8 @@ is_reserved_slice(
 	dm_descriptor_t	slice,
 	boolean_t	*is_reserved)
 {
-	*is_reserved = dlist_contains(
-		_rsvd_slices, (void *)slice, compare_descriptor_names);
+	*is_reserved = dlist_contains(_rsvd_slices,
+	    (void *)(uintptr_t)slice, compare_descriptor_names);
 
 	return (0);
 }

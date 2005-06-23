@@ -185,14 +185,14 @@ add_md_sidenms(mdsetname_t *sp, side_t sideno, side_t otherside, md_error_t *ep)
 			}
 
 			if ((done = meta_getnextside_devinfo(sp,
-			    (char *)nm.devname, &tmp_sideno,
+			    (char *)(uintptr_t)nm.devname, &tmp_sideno,
 			    &cname, &dname, &mnum, ep)) == -1) {
-				Free((void *)nm.devname);
+				Free((void *)(uintptr_t)nm.devname);
 				return (-1);
 			}
 
 			assert(done == 1);
-			Free((void *)nm.devname);
+			Free((void *)(uintptr_t)nm.devname);
 
 			/*
 			 * The device reference count can be greater than 1 if

@@ -6649,4 +6649,5 @@ meta_mn_sp_update_abr(void *arg)
 
 	md_exit(sp, 0);
 	/*NOTREACHED*/
+	return (NULL);
 }

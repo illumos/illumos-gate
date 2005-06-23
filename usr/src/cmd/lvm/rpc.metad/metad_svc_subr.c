@@ -2890,8 +2890,8 @@ joinset(
 		if (setup_db_bydd(local_sp, mydd, 0, ep) == -1) {
 			/* If ep isn't set for some reason, set it */
 			if (! mdisok(ep)) {
-				(void) mdmddberror(ep, MDE_DB_NOTNOW, NODEV64,
-					sp->setno, 0, NULL);
+				(void) mdmddberror(ep, MDE_DB_NOTNOW,
+				    (minor_t)NODEV64, sp->setno, 0, NULL);
 			}
 			return;
 		}
@@ -2915,8 +2915,8 @@ joinset(
 				return;
 			} else if (mdisok(ep)) {
 				/* If snarf failed, but no error set - set it */
-				(void) mdmddberror(ep, MDE_DB_NOTNOW, NODEV64,
-					sp->setno, 0, NULL);
+				(void) mdmddberror(ep, MDE_DB_NOTNOW,
+				    (minor_t)NODEV64, sp->setno, 0, NULL);
 				return;
 			}
 		}
@@ -4775,6 +4775,7 @@ mdrpc_mn_is_stale_2_svc(
  * This is only used during a reconfig cycle.
  */
 /* ARGSUSED */
+int
 mdrpc_clr_mnsetlock_2_svc(
 	mdrpc_null_args		*args,
 	mdrpc_generic_res	*res,

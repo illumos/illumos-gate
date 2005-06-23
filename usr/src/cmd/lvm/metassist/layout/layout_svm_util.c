@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -791,7 +791,7 @@ get_disks_in_diskset(
 		/* If this disk is in the given set... */
 		error = is_disk_in_diskset(disk, dsname, &in_diskset);
 		if (error == 0 && in_diskset == B_TRUE) {
-		    dlist_t *item = dlist_new_item((void *)disk);
+		    dlist_t *item = dlist_new_item((void *)(uintptr_t)disk);
 		    *disks = dlist_append(item, *disks, AT_TAIL);
 		}
 	    }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -483,7 +483,7 @@ mdmn_commitlog(md_set_desc *sd, md_error_t *ep)
 		copy_changelog(lr, &clodrec, MD_MN_COPY_TO_ONDISK);
 		METAD_SETUP_LR(MD_DB_SETDATA, setno, lr->lr_selfid);
 		req.ur_size  = MDMN_LOGRECSIZE_OD;
-		req.ur_data = (uint64_t)&clodrec;
+		req.ur_data = (uintptr_t)&clodrec;
 		if ((retval = metaioctl(MD_MN_DB_USERREQ, &req, &req.ur_mde,
 							    NULL)) != 0) {
 			(void) mdstealerror(ep, &req.ur_mde);
@@ -503,7 +503,7 @@ mdmn_commitlog(md_set_desc *sd, md_error_t *ep)
 		METAD_SETUP_LR(MD_DB_COMMIT_MANY, setno,
 					mdmn_changelog[setno][0].lr_selfid);
 		req.ur_size = size;
-		req.ur_data = (uint64_t)recs;
+		req.ur_data = (uintptr_t)recs;
 		if ((retval = metaioctl(MD_MN_DB_USERREQ, &req,
 						&req.ur_mde, NULL)) != 0) {
 			(void) mdstealerror(ep, &req.ur_mde);
@@ -543,7 +543,7 @@ mdmn_log_it(set_t set, md_error_t *ep, mdmn_changelog_record_t *lr)
 	copy_changelog(lr, &clodrec, MD_MN_COPY_TO_ONDISK);
 	METAD_SETUP_LR(MD_DB_SETDATA, set, lr->lr_selfid);
 	req.ur_size = MDMN_LOGRECSIZE_OD;
-	req.ur_data = (uint64_t)&clodrec;
+	req.ur_data = (uintptr_t)&clodrec;
 	if (metaioctl(MD_MN_DB_USERREQ, &req, &req.ur_mde, NULL) != 0) {
 		(void) mdstealerror(ep, &req.ur_mde);
 #ifdef DEBUG
@@ -561,7 +561,7 @@ mdmn_log_it(set_t set, md_error_t *ep, mdmn_changelog_record_t *lr)
 	/* Commit to mddb  on disk */
 	METAD_SETUP_LR(MD_DB_COMMIT_ONE, set, lr->lr_selfid);
 	req.ur_size = size;
-	req.ur_data = (uint64_t)recs;
+	req.ur_data = (uintptr_t)recs;
 	if (metaioctl(MD_MN_DB_USERREQ, &req, &req.ur_mde, NULL) != 0) {
 		(void) mdstealerror(ep, &req.ur_mde);
 #ifdef DEBUG

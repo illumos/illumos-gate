@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,7 +230,7 @@ panic_system(int nid, md_mn_msgtype_t type, int master_err, int master_exitval,
 			nid, type, master_exitval, slave_result->mmr_exitval);
 	}
 	commd_err.size = strlen(msg_buf);
-	commd_err.md_message = (uint64_t)&msg_buf[0];
+	commd_err.md_message = (uint64_t)(uintptr_t)&msg_buf[0];
 
 	metaioctl(MD_MN_COMMD_ERR, &commd_err, &mne, "rpc.mdcommd");
 	(void) uadmin(A_DUMP, AD_BOOT, NULL);

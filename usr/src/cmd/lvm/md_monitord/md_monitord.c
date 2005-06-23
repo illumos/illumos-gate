@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -374,7 +374,7 @@ wait_for_event(md_error_t *statusp)
 	return (event.ev);
 }
 
-void
+int
 main(int argc, char **argv)
 {
 	boolean_e	startup = True;
@@ -525,4 +525,5 @@ main(int argc, char **argv)
 		probe_all_devs(startup, &status, verbose);
 		startup = False; /* since we have gone through once */
 	} while (wait_for_event(&status));
+	return (0);
 }

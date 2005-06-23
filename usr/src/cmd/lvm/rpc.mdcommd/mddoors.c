@@ -171,7 +171,8 @@ door2rpc(void *cookie,		/* required by the doors infrastructure */
 }
 
 
-void
+/* ARGSUSED */
+int
 main(void)
 {
 
@@ -272,5 +273,5 @@ main(void)
 	(void) pause();
 	syslog(LOG_DAEMON | LOG_ERR, gettext(
 			"Unexpected exit from pause()"));
-	exit(1);
+	return (1);
 }

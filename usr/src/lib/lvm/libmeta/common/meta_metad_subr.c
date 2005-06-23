@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,10 +119,11 @@ ckncvt_set_record(mddb_userreq_t *reqp, md_error_t *ep)
 		if (reqp->ur_size >= sizeof (*sr))
 			return (0);
 
-		reqp->ur_data = (uintptr_t)Realloc((void *)reqp->ur_data,
-		    sizeof (*sr));
-		(void) memset(((char *)reqp->ur_data) + reqp->ur_size, '\0',
-		    sizeof (*sr) - reqp->ur_size);
+		reqp->ur_data = (uintptr_t)Realloc((void *)(uintptr_t)
+		    reqp->ur_data, sizeof (*sr));
+		(void) memset(
+		    ((char *)(uintptr_t)reqp->ur_data) + reqp->ur_size,
+		    '\0', sizeof (*sr) - reqp->ur_size);
 		reqp->ur_size = sizeof (*sr);
 		return (0);
 	}
@@ -134,7 +135,7 @@ ckncvt_set_record(mddb_userreq_t *reqp, md_error_t *ep)
 
 	/* shorthand */
 	req = *reqp;			/* structure assignment */
-	sr = (md_set_record *)req.ur_data;
+	sr = (md_set_record *)(uintptr_t)req.ur_data;
 
 	if (sr->sr_flags & MD_SR_CVT)
 		return (0);
@@ -163,7 +164,7 @@ ckncvt_set_record(mddb_userreq_t *reqp, md_error_t *ep)
 	sr = Zalloc(sizeof (*sr));
 
 	/* copy all the data from the record being converted */
-	(void) memmove(sr, (void *)reqp->ur_data, reqp->ur_size);
+	(void) memmove(sr, (void *)(uintptr_t)reqp->ur_data, reqp->ur_size);
 	sr->sr_flags &= ~MD_SR_CVT;
 
 	/* adjust the selfid to point to the new record */
@@ -179,7 +180,7 @@ ckncvt_set_record(mddb_userreq_t *reqp, md_error_t *ep)
 	}
 
 	/* Commit the old and the new */
-	recs[0] = ((md_set_record *)reqp->ur_data)->sr_selfid;
+	recs[0] = ((md_set_record *)(uintptr_t)reqp->ur_data)->sr_selfid;
 	recs[1] = sr->sr_selfid;
 	recs[2] = 0;
 
@@ -193,10 +194,11 @@ ckncvt_set_record(mddb_userreq_t *reqp, md_error_t *ep)
 	}
 
 	/* Add the the old record to the list of records to delete */
-	url_addl(&url_tode, ((md_set_record *)reqp->ur_data)->sr_selfid);
+	url_addl(&url_tode,
+	    ((md_set_record *)(uintptr_t)reqp->ur_data)->sr_selfid);
 
 	/* Free the old records space */
-	Free((void *)reqp->ur_data);
+	Free((void *)(uintptr_t)reqp->ur_data);
 
 	/* Adjust the reqp structure to point to the new record and size */
 	reqp->ur_recid = sr->sr_selfid;
@@ -257,7 +259,7 @@ get_db_rec(
 	reqp->ur_data = (uintptr_t)Zalloc(reqp->ur_size);
 	if (metaioctl(MD_DB_USERREQ, reqp, &reqp->ur_mde, NULL) != 0) {
 		(void) mdstealerror(ep, &reqp->ur_mde);
-		Free((void *)reqp->ur_data);
+		Free((void *)(uintptr_t)reqp->ur_data);
 		Free(reqp);
 		*idp = 0;
 		return (NULL);
@@ -268,7 +270,7 @@ get_db_rec(
 		    switch (reqp->ur_type2) {
 			case MDDB_UR_SR:
 				if (ckncvt_set_record(reqp, ep)) {
-					Free((void *)reqp->ur_data);
+					Free((void *)(uintptr_t)reqp->ur_data);
 					Free(reqp);
 					return (NULL);
 				}
@@ -298,7 +300,7 @@ get_ur_rec(
 	if (reqp == NULL)
 		return (NULL);
 
-	ret_val = (void *)reqp->ur_data;
+	ret_val = (void *)(uintptr_t)reqp->ur_data;
 	Free(reqp);
 	return (ret_val);
 }
@@ -1092,13 +1094,13 @@ set_snarf(md_error_t *ep)
 		    MDDB_USER, 0, &id, ep)) != NULL) {
 			if (reqp->ur_type2 != MDDB_UR_SR &&
 			    reqp->ur_type2 != MDDB_UR_DR) {
-				Free((void *)reqp->ur_data);
+				Free((void *)(uintptr_t)reqp->ur_data);
 				Free(reqp);
 				continue;
 			}
 			if (! url_findl(url_used, reqp->ur_recid))
 				url_addl(&url_tode, reqp->ur_recid);
-			Free((void *)reqp->ur_data);
+			Free((void *)(uintptr_t)reqp->ur_data);
 			Free(reqp);
 		}
 		if (! mdisok(ep)) {
@@ -1482,7 +1484,7 @@ commitset(md_set_record *sr, int inc_genid, md_error_t *ep)
 				nr->nr_genid++;
 			METAD_SETUP_NR(MD_DB_SETDATA, nr->nr_selfid)
 			req.ur_size = sizeof (*nr);
-			req.ur_data = (uint64_t)nr;
+			req.ur_data = (uint64_t)(uintptr_t)nr;
 			if (metaioctl(MD_DB_USERREQ, &req, &req.ur_mde, NULL)
 			    != 0) {
 				(void) mdstealerror(ep, &req.ur_mde);

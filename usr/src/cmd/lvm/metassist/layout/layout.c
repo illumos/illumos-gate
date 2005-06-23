@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -593,7 +593,8 @@ add_modified_disk(
 	for (iter = _modified_disks; iter != NULL; iter = iter->next) {
 	    moddisk = (moddisk_t *)iter->obj;
 	    if (compare_descriptor_names(
-		(void *)moddisk->disk, (void *)disk) == 0) {
+		(void *)(uintptr_t)moddisk->disk,
+		(void *)(uintptr_t)disk) == 0) {
 		/* already in list */
 		return (0);
 	    }
@@ -853,7 +854,7 @@ get_removed_slices_for_disks(
 
 	    (void) get_disk_for_named_slice(rmvd->slice_name, &disk);
 
-	    if ((item = dlist_find(mod_disks, (void *)disk,
+	    if ((item = dlist_find(mod_disks, (void *)(uintptr_t)disk,
 		compare_disk_to_moddisk_disk)) == NULL) {
 		/* slice on disk that we don't care about */
 		continue;
@@ -939,7 +940,7 @@ get_modified_slices_for_disks(
 	    (void) devconfig_get_name(slice, &sname);
 	    (void) get_disk_for_named_slice(sname, &disk);
 
-	    if ((item = dlist_find(mod_disks, (void *)disk,
+	    if ((item = dlist_find(mod_disks, (void *)(uintptr_t)disk,
 		compare_disk_to_moddisk_disk)) == NULL) {
 		/* slice on disk that we don't care about */
 		continue;
@@ -1000,7 +1001,7 @@ compare_disk_to_moddisk_disk(
 	assert(moddisk != NULL);
 
 	return (compare_descriptor_names((void *)disk,
-			(void *)((moddisk_t *)moddisk)->disk));
+			(void *)(uintptr_t)((moddisk_t *)moddisk)->disk));
 }
 
 /*

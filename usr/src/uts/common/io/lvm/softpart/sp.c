@@ -1159,9 +1159,9 @@ sp_directed_read(minor_t mnum, vol_directed_rd_t *vdr, int mode)
 		cvdr.vdr_nbytes = child_buf->b_bcount;
 		cvdr.vdr_offset = ldbtob(child_buf->b_lblkno);
 		/* Work out where we are in the allocated buffer */
-		useroff = (offset_t)kbuffer;
+		useroff = (offset_t)(uintptr_t)kbuffer;
 		useroff = useroff + (offset_t)current_offset;
-		cvdr.vdr_data = (void *)useroff;
+		cvdr.vdr_data = (void *)(uintptr_t)useroff;
 		child_buf = md_bioclone(parent_buf, current_offset,
 					child_buf->b_bcount, child_buf->b_edev,
 					child_buf->b_blkno, NULL,
