@@ -265,6 +265,9 @@ int noexec_user_stack_log = 1;
 int segvn_lpg_disable = 0;
 uint_t segvn_maxpgszc = 0;
 
+ulong_t segvn_vmpss_clrszc_cnt;
+ulong_t segvn_vmpss_clrszc_err;
+ulong_t segvn_fltvnpages_clrszc_cnt;
 ulong_t segvn_fltvnpages_clrszc_err;
 ulong_t segvn_setpgsz_align_err;
 ulong_t segvn_setpgsz_getattr_err;
@@ -2296,8 +2299,8 @@ segvn_faultpage(
 	/*
 	 * Steal the original page if the following conditions are true:
 	 *
-	 * We are low on memory, the page is not private, page is not
-	 * shared, not modified, not `locked' or if we have it `locked'
+	 * We are low on memory, the page is not private, page is not large,
+	 * not shared, not modified, not `locked' or if we have it `locked'
 	 * (i.e., p_cowcnt == 1 and p_lckcnt == 0, which also implies
 	 * that the page is not shared) and if it doesn't have any
 	 * translations. page_struct_lock isn't needed to look at p_cowcnt
@@ -2305,7 +2308,7 @@ segvn_faultpage(
 	 */
 	(void) hat_pagesync(opp, HAT_SYNC_DONTZERO | HAT_SYNC_STOPON_MOD);
 
-	if (stealcow && freemem < minfree && steal &&
+	if (stealcow && freemem < minfree && steal && opp->p_szc == 0 &&
 	    page_tryupgrade(opp) && !hat_ismod(opp) &&
 	    ((opp->p_lckcnt == 0 && opp->p_cowcnt == 0) ||
 	    (opp->p_lckcnt == 0 && opp->p_cowcnt == 1 &&
@@ -3156,6 +3159,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	ASSERT(amp == NULL || IS_P2ALIGNED(aindx, maxpages));
 	ASSERT(SEGVN_LOCK_HELD(seg->s_as, &svd->lock));
 	ASSERT(seg->s_szc < NBBY * sizeof (int));
+	ASSERT(type != F_SOFTLOCK || lpgeaddr - a == maxpgsz);
 
 	VM_STAT_COND_ADD(type == F_SOFTLOCK, segvnvmstats.fltvnpages[0]);
 	VM_STAT_COND_ADD(type != F_SOFTLOCK, segvnvmstats.fltvnpages[1]);
@@ -3297,24 +3301,23 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				segtype == MAP_PRIVATE ? ppa : NULL)) {
 				SEGVN_VMSTAT_FLTVNPAGES(9);
 				if (page_alloc_pages(seg, a, &pplist, NULL,
-				    szc, 0)) {
-					SEGVN_RESTORE_SOFTLOCK(type, pages);
+				    szc, 0) && type != F_SOFTLOCK) {
 					SEGVN_VMSTAT_FLTVNPAGES(10);
 					pszc = 0;
 					ierr = -1;
 					alloc_failed |= (1 << szc);
 					break;
 				}
-				if (vp->v_mpssdata == SEGVN_PAGEIO) {
+				if (pplist != NULL &&
+				    vp->v_mpssdata == SEGVN_PAGEIO) {
 					int downsize;
 					SEGVN_VMSTAT_FLTVNPAGES(11);
 					physcontig = segvn_fill_vp_pages(svd,
 					    vp, off, szc, ppa, &pplist,
 					    &pszc, &downsize);
 					ASSERT(!physcontig || pplist == NULL);
-					if (!physcontig && downsize) {
-						SEGVN_RESTORE_SOFTLOCK(type,
-						    pages);
+					if (!physcontig && downsize &&
+					    type != F_SOFTLOCK) {
 						ASSERT(pplist == NULL);
 						SEGVN_VMSTAT_FLTVNPAGES(12);
 						ierr = -1;
@@ -3525,7 +3528,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 					ASSERT(ppa[i]->p_offset ==
 					    off + (i << PAGESHIFT));
 				}
-#endif
+#endif /* DEBUG */
 				/*
 				 * All pages are of szc we need and they are
 				 * all locked so they can't change szc. load
@@ -3584,22 +3587,11 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				ppages = btop(ppgsz);
 				aphase = btop(P2PHASE((uintptr_t)a, ppgsz));
 
+				ASSERT(type != F_SOFTLOCK);
+
 				SEGVN_VMSTAT_FLTVNPAGES(31);
 				if (aphase != P2PHASE(pfn, ppages)) {
 					segvn_faultvnmpss_align_err4++;
-				} else if (type == F_SOFTLOCK &&
-				    a != lpgaddr &&
-				    !IS_P2ALIGNED(pfn,
-					page_get_pagecnt(ppa[0]->p_szc))) {
-					/*
-					 * if we locked previous offsets for
-					 * smaller szc page larger page can't
-					 * be here since one needs excl locks
-					 * to promote page size.
-					 */
-					panic("segvn_fault_vnodepages: "
-					    "unexpected larger than szc page"
-					    " found after SOFTLOCK");
 				} else {
 					SEGVN_VMSTAT_FLTVNPAGES(32);
 					if (pplist != NULL) {
@@ -3614,7 +3606,6 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 						anon_array_exit(&an_cookie);
 						ANON_LOCK_EXIT(&amp->a_rwlock);
 					}
-					SEGVN_RESTORE_SOFTLOCK(type, pages);
 					pszc = pszc1;
 					ierr = -2;
 					break;
@@ -3632,7 +3623,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			    !segvn_full_szcpages(ppa, szc, &upgrdfail,
 				&pszc))) {
 
-				if (upgrdfail) {
+				if (upgrdfail && type != F_SOFTLOCK) {
 					/*
 					 * segvn_full_szcpages failed to lock
 					 * all pages EXCL. Size down.
@@ -3654,7 +3645,6 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 						anon_array_exit(&an_cookie);
 						ANON_LOCK_EXIT(&amp->a_rwlock);
 					}
-					SEGVN_RESTORE_SOFTLOCK(type, pages);
 					ierr = -1;
 					break;
 				}
@@ -3748,7 +3738,8 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			 * allocate now.
 			 */
 			if (pplist == NULL &&
-			    page_alloc_pages(seg, a, &pplist, NULL, szc, 0)) {
+			    page_alloc_pages(seg, a, &pplist, NULL, szc, 0) &&
+			    type != F_SOFTLOCK) {
 				SEGVN_VMSTAT_FLTVNPAGES(38);
 				for (i = 0; i < pages; i++) {
 					page_unlock(ppa[i]);
@@ -3757,7 +3748,6 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 					anon_array_exit(&an_cookie);
 					ANON_LOCK_EXIT(&amp->a_rwlock);
 				}
-				SEGVN_RESTORE_SOFTLOCK(type, pages);
 				ierr = -1;
 				alloc_failed |= (1 << szc);
 				break;
@@ -3765,11 +3755,29 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 
 			SEGVN_VMSTAT_FLTVNPAGES(39);
 
-			segvn_relocate_pages(ppa, pplist);
+			if (pplist != NULL) {
+				segvn_relocate_pages(ppa, pplist);
+#ifdef DEBUG
+			} else {
+				ASSERT(type == F_SOFTLOCK);
+				SEGVN_VMSTAT_FLTVNPAGES(40);
+#endif /* DEBUG */
+			}
 
 			SEGVN_UPDATE_MODBITS(ppa, pages, rw, prot, vpprot);
-			hat_memload_array(hat, a, pgsz, ppa, prot & vpprot,
-			    hat_flag);
+
+			if (pplist == NULL && segvn_anypgsz_vnode == 0) {
+				ASSERT(type == F_SOFTLOCK);
+				for (i = 0; i < pages; i++) {
+					ASSERT(ppa[i]->p_szc < szc);
+					hat_memload(hat, a + (i << PAGESHIFT),
+					    ppa[i], prot & vpprot, hat_flag);
+				}
+			} else {
+				ASSERT(pplist != NULL || type == F_SOFTLOCK);
+				hat_memload_array(hat, a, pgsz, ppa,
+				    prot & vpprot, hat_flag);
+			}
 			if (!(hat_flag & HAT_LOAD_LOCK)) {
 				for (i = 0; i < pages; i++) {
 					ASSERT(PAGE_SHARED(ppa[i]));
@@ -3790,6 +3798,9 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 		if (a == lpgeaddr)
 			break;
 		ASSERT(a < lpgeaddr);
+
+		ASSERT(!brkcow && type != F_SOFTLOCK);
+
 		/*
 		 * ierr == -1 means we failed to map with a large page.
 		 * (either due to allocation/relocation failures or
@@ -3803,14 +3814,14 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 		ASSERT(ierr == -2 || szc != 0);
 		ASSERT(ierr == -1 || szc < seg->s_szc);
 		if (ierr == -2) {
-			SEGVN_VMSTAT_FLTVNPAGES(40);
+			SEGVN_VMSTAT_FLTVNPAGES(41);
 			ASSERT(pszc > szc && pszc <= seg->s_szc);
 			szc = pszc;
 		} else if (segvn_anypgsz_vnode) {
-			SEGVN_VMSTAT_FLTVNPAGES(41);
+			SEGVN_VMSTAT_FLTVNPAGES(42);
 			szc--;
 		} else {
-			SEGVN_VMSTAT_FLTVNPAGES(42);
+			SEGVN_VMSTAT_FLTVNPAGES(43);
 			ASSERT(pszc < szc);
 			/*
 			 * other process created pszc large page.
@@ -3821,20 +3832,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 
 		pgsz = page_get_pagesize(szc);
 		pages = btop(pgsz);
-		ASSERT(type != F_SOFTLOCK || ierr == -1 ||
-		    (IS_P2ALIGNED(a, pgsz) && IS_P2ALIGNED(lpgeaddr, pgsz)));
-		if (type == F_SOFTLOCK) {
-			/*
-			 * For softlocks we cannot reduce the fault area
-			 * (calculated based on the largest page size for this
-			 * segment) for size down and a is already next
-			 * page size aligned as assertted above for size
-			 * ups. Therefore just continue in case of softlock.
-			 */
-			SEGVN_VMSTAT_FLTVNPAGES(43);
-			continue; /* keep lint happy */
-		} else if (ierr == -2) {
-
+		if (ierr == -2) {
 			/*
 			 * Size up case. Note lpgaddr may only be needed for
 			 * softlock case so we don't adjust it here.
@@ -3902,6 +3900,8 @@ out:
 	SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
 	err = 0;
 	if (seg->s_szc != 0) {
+		segvn_fltvnpages_clrszc_cnt++;
+		ASSERT(svd->softlockcnt == 0);
 		err = segvn_clrszc(seg);
 		if (err != 0) {
 			segvn_fltvnpages_clrszc_err++;
@@ -4214,30 +4214,16 @@ segvn_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 	anon_sync_obj_t cookie;
 	int brkcow = BREAK_COW_SHARE(rw, type, svd->type);
 
-	/*
-	 * S_READ_NOCOW is like read
-	 * except caller advises no need
-	 * to copy-on-write for softlock
-	 * because it holds address space
-	 * locked as writer and thus prevents
-	 * any copy on writes of a softlocked
-	 * page by another thread.
-	 * S_READ_NOCOW vs S_READ distinction was
-	 * only needed for BREAK_COW_SHARE(). After
-	 * that we treat S_READ_NOW as just S_READ.
-	 */
-	if (rw == S_READ_NOCOW) {
-		rw = S_READ;
-		ASSERT(type == F_SOFTLOCK &&
-		    AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
-	}
-
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
 
 	/*
 	 * First handle the easy stuff
 	 */
 	if (type == F_SOFTUNLOCK) {
+		if (rw == S_READ_NOCOW) {
+			rw = S_READ;
+			ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+		}
 		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_READER);
 		pgsz = (seg->s_szc == 0) ? PAGESIZE :
 		    page_get_pagesize(seg->s_szc);
@@ -4261,6 +4247,7 @@ top:
 
 		switch (rw) {
 		case S_READ:
+		case S_READ_NOCOW:
 			protchk = PROT_READ;
 			break;
 		case S_WRITE:
@@ -4279,6 +4266,80 @@ top:
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 			return (FC_PROT);	/* illegal access type */
 		}
+	}
+
+	/*
+	 * We can't allow the long term use of softlocks for vmpss segments,
+	 * because in some file truncation cases we should be able to demote
+	 * the segment, which requires that there are no softlocks.  The
+	 * only case where it's ok to allow a SOFTLOCK fault against a vmpss
+	 * segment is S_READ_NOCOW, where the caller holds the address space
+	 * locked as writer and calls softunlock before dropping the as lock.
+	 * S_READ_NOCOW is used by /proc to read memory from another user.
+	 *
+	 * Another deadlock between SOFTLOCK and file truncation can happen
+	 * because segvn_fault_vnodepages() calls the FS one pagesize at
+	 * a time. A second VOP_GETPAGE() call by segvn_fault_vnodepages()
+	 * can cause a deadlock because the first set of page_t's remain
+	 * locked SE_SHARED.  To avoid this, we demote segments on a first
+	 * SOFTLOCK if they have a length greater than the segment's
+	 * page size.
+	 *
+	 * So for now, we only avoid demoting a segment on a SOFTLOCK when
+	 * the access type is S_READ_NOCOW and the fault length is less than
+	 * or equal to the segment's page size. While this is quite restrictive,
+	 * it should be the most common case of SOFTLOCK against a vmpss
+	 * segment.
+	 *
+	 * For S_READ_NOCOW, it's safe not to do a copy on write because the
+	 * caller makes sure no COW will be caused by another thread for a
+	 * softlocked page.
+	 */
+	if (type == F_SOFTLOCK && svd->vp != NULL && seg->s_szc != 0) {
+		int demote = 0;
+
+		if (rw != S_READ_NOCOW) {
+			demote = 1;
+		}
+		if (!demote && len > PAGESIZE) {
+			pgsz = page_get_pagesize(seg->s_szc);
+			CALC_LPG_REGION(pgsz, seg, addr, len, lpgaddr,
+			    lpgeaddr);
+			if (lpgeaddr - lpgaddr > pgsz) {
+				demote = 1;
+			}
+		}
+
+		ASSERT(demote || AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+
+		if (demote) {
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
+			if (seg->s_szc != 0) {
+				segvn_vmpss_clrszc_cnt++;
+				ASSERT(svd->softlockcnt == 0);
+				err = segvn_clrszc(seg);
+				if (err) {
+					segvn_vmpss_clrszc_err++;
+					SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+					return (FC_MAKE_ERR(err));
+				}
+			}
+			ASSERT(seg->s_szc == 0);
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			goto top;
+		}
+	}
+
+	/*
+	 * S_READ_NOCOW vs S_READ distinction was
+	 * only needed for the code above. After
+	 * that we treat it as S_READ.
+	 */
+	if (rw == S_READ_NOCOW) {
+		ASSERT(type == F_SOFTLOCK);
+		ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+		rw = S_READ;
 	}
 
 	/*
@@ -4331,14 +4392,14 @@ top:
 			if (err == IE_RETRY) {
 				ASSERT(seg->s_szc == 0);
 				ASSERT(SEGVN_READ_HELD(seg->s_as, &svd->lock));
-				goto cont;
+				SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+				goto top;
 			}
 		}
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		return (err);
 	}
 
-cont:
 	page = seg_page(seg, addr);
 	if (amp != NULL) {
 		anon_index = svd->anon_index + page;

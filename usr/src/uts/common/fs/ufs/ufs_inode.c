@@ -1298,8 +1298,6 @@ ufs_itrunc(struct inode *oip, u_offset_t length, int flags, cred_t *cr)
 	if (boff == 0) {
 		(void) pvn_vplist_dirty(ITOV(oip), length, ufs_putapage,
 		    B_INVAL | B_TRUNC, CRED());
-		if (length == 0)
-			ASSERT(!vn_has_cached_data(ITOV(oip)));
 	} else {
 		/*
 		 * Make sure that the last block is properly allocated.

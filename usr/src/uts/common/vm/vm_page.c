@@ -3566,6 +3566,22 @@ page_rename(page_t *opp, vnode_t *vp, u_offset_t off)
 	TRACE_3(TR_FAC_VM, TR_PAGE_RENAME,
 		"page rename:pp %p vp %p off %llx", opp, vp, off);
 
+	/*
+	 * CacheFS may call page_rename for a large NFS page
+	 * when both CacheFS and NFS mount points are used
+	 * by applications. Demote this large page before
+	 * renaming it, to ensure that there are no "partial"
+	 * large pages left lying around.
+	 */
+	if (opp->p_szc != 0) {
+		vnode_t *ovp = opp->p_vnode;
+		ASSERT(ovp != NULL);
+		ASSERT(!IS_SWAPFSVP(ovp));
+		ASSERT(ovp != &kvp);
+		page_demote_vp_pages(opp);
+		ASSERT(opp->p_szc == 0);
+	}
+
 	page_hashout(opp, NULL);
 	PP_CLRAGED(opp);
 
@@ -3610,6 +3626,12 @@ top:
 			goto top;
 		}
 
+		/*
+		 * If an existing page is a large page, then demote
+		 * it to ensure that no "partial" large pages are
+		 * "created" after page_rename. An existing page
+		 * can be a CacheFS page, and can't belong to swapfs.
+		 */
 		if (hat_page_is_mapped(pp)) {
 			/*
 			 * Unload translations.  Since we hold the
@@ -3620,6 +3642,19 @@ top:
 			 */
 			mutex_exit(phm);
 			(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
+			if (pp->p_szc != 0) {
+				ASSERT(!IS_SWAPFSVP(vp));
+				ASSERT(vp != &kvp);
+				page_demote_vp_pages(pp);
+				ASSERT(pp->p_szc == 0);
+			}
+			mutex_enter(phm);
+		} else if (pp->p_szc != 0) {
+			ASSERT(!IS_SWAPFSVP(vp));
+			ASSERT(vp != &kvp);
+			mutex_exit(phm);
+			page_demote_vp_pages(pp);
+			ASSERT(pp->p_szc == 0);
 			mutex_enter(phm);
 		}
 		page_hashout(pp, phm);

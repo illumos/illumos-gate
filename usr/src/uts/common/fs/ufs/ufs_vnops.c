@@ -5472,6 +5472,16 @@ ufs_pageio(struct vnode *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 		}
 	}
 
+	/*
+	 * Return an error to segvn because the pagefault request is beyond
+	 * PAGESIZE rounded EOF.
+	 */
+	if (vmpss && btopr(io_off + io_len) > btopr(ip->i_size)) {
+		if (dolock)
+			rw_exit(&ip->i_contents);
+		return (EFAULT);
+	}
+
 	if (pp == NULL) {
 		if (bmap_has_holes(ip)) {
 			err = ENOSYS;
