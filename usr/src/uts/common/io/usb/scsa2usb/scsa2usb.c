@@ -4603,9 +4603,6 @@ scsa2usb_handle_data_start(scsa2usb_state_t *scsa2usbp,
 		SCSA2USB_FREE_MSG(req->bulk_data);
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
-
-		ASSERT(cmd->cmd_bp->b_bcount >= req->bulk_len);
-
 		req->bulk_data = esballoc_wait(
 				(uchar_t *)cmd->cmd_bp->b_un.b_addr +
 				cmd->cmd_offset,

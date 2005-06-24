@@ -142,6 +142,7 @@ static void	ugen_minor_node_table_destroy(ugen_state_t *);
 static void	ugen_minor_node_table_shrink(ugen_state_t *);
 static int	ugen_cr2lcstat(int);
 static void	ugen_check_mask(uint_t, uint_t *, uint_t *);
+static int	ugen_is_valid_minor_node(ugen_state_t *, dev_t);
 
 static kmutex_t	ugen_devt_list_mutex;
 static ugen_devt_list_entry_t ugen_devt_list;
@@ -756,6 +757,12 @@ usb_ugen_open(usb_ugen_hdl_t usb_ugen_hdl, dev_t *devp, int flag, int sflag,
 	}
 
 	ugenp = usb_ugen_hdl_impl->hdl_ugenp;
+
+	if (ugen_is_valid_minor_node(ugenp, *devp) != USB_SUCCESS) {
+
+		return (EINVAL);
+	}
+
 	minor_node_type = UGEN_MINOR_TYPE(ugenp, *devp);
 
 	USB_DPRINTF_L4(UGEN_PRINT_CBOPS, ugenp->ug_log_hdl,
@@ -886,6 +893,11 @@ usb_ugen_close(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, int flag, int otype,
 	}
 
 	ugenp = usb_ugen_hdl_impl->hdl_ugenp;
+	if (ugen_is_valid_minor_node(ugenp, dev) != USB_SUCCESS) {
+
+		return (EINVAL);
+	}
+
 	minor_node_type = UGEN_MINOR_TYPE(ugenp, dev);
 
 	USB_DPRINTF_L4(UGEN_PRINT_CBOPS, ugenp->ug_log_hdl,
@@ -962,6 +974,21 @@ int
 usb_ugen_read(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, struct uio *uiop,
     cred_t *credp)
 {
+	ugen_state_t		*ugenp;
+	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
+				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+
+	if (usb_ugen_hdl == NULL) {
+
+		return (EINVAL);
+	}
+	ugenp = usb_ugen_hdl_impl->hdl_ugenp;
+
+	if (ugen_is_valid_minor_node(ugenp, dev) != USB_SUCCESS) {
+
+		return (EINVAL);
+	}
+
 	return (physio(ugen_strategy,
 	    (struct buf *)0, dev, B_READ, ugen_minphys, uiop));
 }
@@ -972,6 +999,21 @@ int
 usb_ugen_write(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, struct uio *uiop,
     cred_t *credp)
 {
+	ugen_state_t		*ugenp;
+	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
+				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+
+	if (usb_ugen_hdl == NULL) {
+
+		return (EINVAL);
+	}
+	ugenp = usb_ugen_hdl_impl->hdl_ugenp;
+
+	if (ugen_is_valid_minor_node(ugenp, dev) != USB_SUCCESS) {
+
+		return (EINVAL);
+	}
+
 	return (physio(ugen_strategy,
 	    (struct buf *)0, dev, B_WRITE, ugen_minphys, uiop));
 }
@@ -997,6 +1039,10 @@ usb_ugen_poll(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, short events,
 	}
 
 	ugenp = usb_ugen_hdl_impl->hdl_ugenp;
+	if (ugen_is_valid_minor_node(ugenp, dev) != USB_SUCCESS) {
+
+		return (EINVAL);
+	}
 
 	minor_node_type = UGEN_MINOR_TYPE(ugenp, dev);
 	ep_index	= UGEN_MINOR_EPIDX(ugenp, dev);
@@ -1089,6 +1135,11 @@ ugen_strategy(struct buf *bp)
 
 	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
 	    "ugen_strategy: bp=0x%p minor=0x%x", bp, getminor(dev));
+
+	if (ugen_is_valid_minor_node(ugenp, dev) != USB_SUCCESS) {
+
+		return (EINVAL);
+	}
 
 	mutex_enter(&ugenp->ug_mutex);
 	ugenp->ug_pending_cmds++;
@@ -3325,7 +3376,7 @@ static ugen_minor_t
 ugen_devt2minor(ugen_state_t *ugenp, dev_t dev)
 {
 	USB_DPRINTF_L4(UGEN_PRINT_CBOPS, ugenp->ug_log_hdl,
-	    "ugen_devt2minor: minorcode=%d, minor=0x%" PRIx64,
+	    "ugen_devt2minor: minorindex=%d, minor=0x%" PRIx64,
 	    UGEN_MINOR_GET_IDX(ugenp, dev),
 	    ugenp->ug_minor_node_table[UGEN_MINOR_GET_IDX(ugenp, dev)]);
 
@@ -3333,6 +3384,23 @@ ugen_devt2minor(ugen_state_t *ugenp, dev_t dev)
 			ugenp->ug_minor_node_table_index);
 
 	return (ugenp->ug_minor_node_table[UGEN_MINOR_GET_IDX(ugenp, dev)]);
+}
+
+
+static int
+ugen_is_valid_minor_node(ugen_state_t *ugenp, dev_t dev)
+{
+	int idx = UGEN_MINOR_GET_IDX(ugenp, dev);
+
+	if ((idx < ugenp->ug_minor_node_table_index) &&
+	    (idx > 0)) {
+
+		return (USB_SUCCESS);
+	}
+	USB_DPRINTF_L2(UGEN_PRINT_CBOPS, ugenp->ug_log_hdl,
+	    "ugen_is_valid_minor_node: invalid minorindex=%d", idx);
+
+	return (USB_FAILURE);
 }
 
 
