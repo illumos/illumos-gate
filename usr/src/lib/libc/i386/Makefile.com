@@ -967,7 +967,6 @@ BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 # C99 mode.  This has been enabled to support the complex arithmetic
 # added to libc.
 C99MODE=	$(C99_ENABLE)
-C99LMODE=	-Xc99=%all
 
 # libc method of building an archive
 BUILD.AR= $(RM) $@ ; \

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,7 +41,6 @@ MAPOPTS=	$(MAPFILES:%=-M%)
 SRCDIR=		../common
 LIBS=		$(DYNLIB) $(LINTLIB)
 
-C99LMODE =	-Xc99=%none
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
