@@ -191,7 +191,7 @@ uint_t	ppm_do_vcore = 0;
 static boolean_t	ppm_cpr_callb(void *, int);
 static int		ppm_fetset(ppm_domain_t *, uint8_t);
 static int		ppm_fetget(ppm_domain_t *, uint8_t *);
-static int		ppm_gpioset(ppm_domain_t *, uint8_t, int);
+static int		ppm_gpioset(ppm_domain_t *, int);
 static int		ppm_manage_cpus(dev_info_t *, power_req_t *, int *);
 static int		ppm_change_cpu_power(ppm_dev_t *, int);
 static int		ppm_revert_cpu_power(ppm_dev_t *, int);
@@ -479,6 +479,7 @@ ppm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 
 		case PPMD_PCI:	/* report pci slot clock ON or OFF */
 		case PPMD_PCI_PROP:
+		case PPMD_PCIE:
 			level = (domp->status == PPMD_ON) ?
 			    PPMIO_POWER_ON : PPMIO_POWER_OFF;
 			break;
@@ -1834,7 +1835,7 @@ ppm_fetset(ppm_domain_t *domp, uint8_t value)
 			break;
 	if (!dc || !dc->lh) {
 		PPMD(D_FET, ("%s: %s domain: NULL ppm_dc handle\n",
-		    str, domp->name));
+		    str, domp->name))
 		return (DDI_FAILURE);
 	}
 
@@ -1864,7 +1865,7 @@ ppm_fetset(ppm_domain_t *domp, uint8_t value)
 				 */
 				PPMD(D_FET, ("%s : waiting %lu micro seconds "
 					"before on\n", domp->name,
-					delay - temp));
+					delay - temp))
 				drv_usecwait(delay - temp);
 			}
 		}
@@ -1912,7 +1913,7 @@ ppm_fetset(ppm_domain_t *domp, uint8_t value)
 			else if (dc->method == PPMDC_KIO)
 				delay = dc->m_un.kio.post_delay;
 			PPMD(D_FET, ("%s : waiting %lu micro seconds "
-			    "after on\n", domp->name, delay));
+			    "after on\n", domp->name, delay))
 			if (delay > 0)
 				drv_usecwait(delay);
 		}
@@ -2365,7 +2366,7 @@ ppm_manage_pcie(dev_info_t *dip, power_req_t *reqp, int *result)
  * specific purposes.
  */
 static int
-ppm_gpioset(ppm_domain_t *domp, uint8_t value, int key)
+ppm_gpioset(ppm_domain_t *domp, int key)
 {
 #ifdef DEBUG
 	char	*str = "ppm_gpioset";
@@ -2380,7 +2381,7 @@ ppm_gpioset(ppm_domain_t *domp, uint8_t value, int key)
 			break;
 	if (!dc || !dc->lh) {
 		PPMD(D_GPIO, ("%s: %s domain: NULL ppm_dc handle\n",
-		    str, domp->name));
+		    str, domp->name))
 		return (DDI_FAILURE);
 	}
 
@@ -2400,12 +2401,28 @@ ppm_gpioset(ppm_domain_t *domp, uint8_t value, int key)
 		i2c_req.reg_val = dc->m_un.i2c.val;
 		ret = ldi_ioctl(dc->lh, dc->m_un.i2c.iowr,
 		    (intptr_t)&i2c_req, FWRITE | FKIOCTL, kcred, NULL);
+
+		PPMD(D_GPIO, ("%s: %s domain(%s) from %s by writing %x "
+		    "to gpio\n",
+		    str, (ret == 0) ? "turned" : "FAILed to turn",
+		    domp->name,
+		    (domp->status == PPMD_ON) ? "ON" : "OFF",
+		    dc->m_un.i2c.val))
+
 		break;
 
 	case PPMDC_KIO:
 		ret = ldi_ioctl(dc->lh, dc->m_un.kio.iowr,
 		    (intptr_t)&(dc->m_un.kio.val), FWRITE | FKIOCTL, kcred,
 		    NULL);
+
+		PPMD(D_GPIO, ("%s: %s domain(%s) from %s by writing %x "
+		    "to gpio\n",
+		    str, (ret == 0) ? "turned" : "FAILed to turn",
+		    domp->name,
+		    (domp->status == PPMD_ON) ? "ON" : "OFF",
+		    dc->m_un.kio.val))
+
 		break;
 
 	default:
@@ -2414,25 +2431,15 @@ ppm_gpioset(ppm_domain_t *domp, uint8_t value, int key)
 		return (DDI_FAILURE);
 	}
 
-	PPMD(D_GPIO, ("%s: %s domain(%s) gpio from %s to %s\n", str,
-	    (ret == 0) ? "turned" : "failed to turn",
-	    domp->name,
-	    (domp->status == PPMD_ON) ? "ON" : "OFF",
-	    (value == PPMD_ON) ? "ON" : "OFF"))
-
-	if (ret == DDI_SUCCESS) {
-		domp->status = value;
-
-		/* implement any post op delay. */
-		if (dc->method == PPMDC_I2CKIO)
-			delay = dc->m_un.i2c.post_delay;
-		else if (dc->method == PPMDC_KIO)
-			delay = dc->m_un.kio.post_delay;
-		if (delay > 0) {
-			PPMD(D_GPIO, ("%s : waiting %lu micro seconds "
-			    "after change\n", domp->name, delay))
-			drv_usecwait(delay);
-		}
+	/* implement any post op delay. */
+	if (dc->method == PPMDC_I2CKIO)
+		delay = dc->m_un.i2c.post_delay;
+	else if (dc->method == PPMDC_KIO)
+		delay = dc->m_un.kio.post_delay;
+	if (delay > 0) {
+		PPMD(D_GPIO, ("%s : waiting %lu micro seconds "
+		    "after change\n", domp->name, delay))
+		drv_usecwait(delay);
 	}
 
 	return (ret);
@@ -2475,63 +2482,61 @@ ppm_pcie_pwr(ppm_domain_t *domp, int onoff)
 				    "after change\n", domp->name, delay))
 				drv_usecwait(delay);
 			}
-		} else
+		} else {
+			PPMD(D_PCI, ("%s: ldi_ioctl FAILED for domain(%s)\n",
+			    str, domp->name))
 			return (ret);
+		}
 	}
 
 	switch (onoff) {
 	case PPMD_OFF:
 		/* Turn off the clock for this slot. */
-		if ((ret = ppm_gpioset(domp,
-			    PPMD_OFF, PPMDC_CLK_OFF)) != DDI_SUCCESS) {
+		if ((ret = ppm_gpioset(domp, PPMDC_CLK_OFF)) != DDI_SUCCESS) {
 			PPMD(D_GPIO,
 			    ("%s: failed to turn off domain(%s) clock\n",
-			    str, domp->name));
+			    str, domp->name))
 			return (ret);
 		}
 
 		/* Turn off the power to this slot */
-		if ((ret = ppm_gpioset(domp,
-			PPMD_OFF, PPMDC_PWR_OFF)) != DDI_SUCCESS) {
-			    PPMD(D_GPIO,
-				("%s: failed to turn off domain(%s) power\n",
-				str, domp->name));
+		if ((ret = ppm_gpioset(domp, PPMDC_PWR_OFF)) != DDI_SUCCESS) {
+			PPMD(D_GPIO,
+			    ("%s: failed to turn off domain(%s) power\n",
+			    str, domp->name))
+			return (ret);
 		}
 		break;
 	case PPMD_ON:
 		/* Assert RESET for this slot. */
-		if ((ret = ppm_gpioset(domp,
-		    PPMD_OFF, PPMDC_RESET_ON)) != DDI_SUCCESS) {
+		if ((ret = ppm_gpioset(domp, PPMDC_RESET_ON)) != DDI_SUCCESS) {
 			PPMD(D_GPIO,
 			    ("%s: failed to assert reset for domain(%s)\n",
-			    str, domp->name));
+			    str, domp->name))
 			return (ret);
 		}
 
 		/* Turn on the power to this slot */
-		if ((ret = ppm_gpioset(domp,
-		    PPMD_OFF, PPMDC_PWR_ON)) != DDI_SUCCESS) {
+		if ((ret = ppm_gpioset(domp, PPMDC_PWR_ON)) != DDI_SUCCESS) {
 			PPMD(D_GPIO,
-			    ("%s: failed to turn on domain(%s) clock\n",
-			    str, domp->name));
+			    ("%s: failed to turn on domain(%s) power\n",
+			    str, domp->name))
 			return (ret);
 		}
 
 		/* Turn on the clock for this slot */
-		if ((ret = ppm_gpioset(domp,
-		    PPMD_OFF, PPMDC_CLK_ON)) != DDI_SUCCESS) {
+		if ((ret = ppm_gpioset(domp, PPMDC_CLK_ON)) != DDI_SUCCESS) {
 			PPMD(D_GPIO,
-			    ("%s: failed to turn on domain(%s) power\n",
-			    str, domp->name));
+			    ("%s: failed to turn on domain(%s) clock\n",
+			    str, domp->name))
 			return (ret);
 		}
 
 		/* De-assert RESET for this slot. */
-		if ((ret = ppm_gpioset(domp,
-		    PPMD_OFF, PPMDC_RESET_OFF)) != DDI_SUCCESS) {
+		if ((ret = ppm_gpioset(domp, PPMDC_RESET_OFF)) != DDI_SUCCESS) {
 			PPMD(D_GPIO,
 			    ("%s: failed to de-assert reset for domain(%s)\n",
-			    str, domp->name));
+			    str, domp->name))
 			return (ret);
 		}
 
@@ -2551,14 +2556,19 @@ ppm_pcie_pwr(ppm_domain_t *domp, int onoff)
 			ret = ldi_ioctl(dc->lh, dc->m_un.kio.iowr,
 			    (intptr_t)&(dc->m_un.kio.val),
 			    FWRITE | FKIOCTL, kcred, NULL);
-			if (ret == DDI_SUCCESS) {
-				delay = dc->m_un.kio.post_delay;
-				if (delay > 0) {
-					PPMD(D_GPIO, ("%s: waiting %lu micro "
-					    "seconds after change\n",
-					    domp->name, delay))
-					drv_usecwait(delay);
-				}
+
+			if (ret != DDI_SUCCESS) {
+				PPMD(D_PCI, ("%s: layered ioctl to PCIe"
+				    "root complex nexus FAILed\n", str))
+				return (ret);
+			}
+
+			delay = dc->m_un.kio.post_delay;
+			if (delay > 0) {
+				PPMD(D_GPIO, ("%s: waiting %lu micro "
+				    "seconds after change\n",
+				    domp->name, delay))
+				    drv_usecwait(delay);
 			}
 		}
 		break;
@@ -2566,6 +2576,11 @@ ppm_pcie_pwr(ppm_domain_t *domp, int onoff)
 		ASSERT(0);
 	}
 
+	PPMD(D_PCI, ("%s: turned domain(%s) PCIe slot power from %s to %s\n",
+	    str, domp->name, (domp->status == PPMD_ON) ? "ON" : "OFF",
+	    onoff == PPMD_ON ? "ON" : "OFF"))
+
+	domp->status = onoff;
 	return (ret);
 }
 
@@ -2660,8 +2675,17 @@ ppm_manage_led(int action)
 static void
 ppm_set_led(ppm_domain_t *domp, int val)
 {
-	(void) ppm_gpioset(domp,
-	    val, (val == PPMD_ON) ? PPMDC_LED_ON : PPMDC_LED_OFF);
+	int ret;
+
+	ret = ppm_gpioset(domp,
+	    (val == PPMD_ON) ? PPMDC_LED_ON : PPMDC_LED_OFF);
+
+	PPMD(D_LED, ("ppm_set_led:  %s LED from %s\n",
+	    (ret == 0) ? "turned" : "FAILed to turn",
+	    (domp->status == PPMD_ON) ? "ON to OFF" : "OFF to ON"))
+
+	if (ret == DDI_SUCCESS)
+		domp->status = val;
 }
 
 
