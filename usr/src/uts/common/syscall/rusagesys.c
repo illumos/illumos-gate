@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,15 +45,7 @@ getrusage(void *user_rusage)
 	hrtime_t snsecs, unsecs;
 	klwp_t *lwp;
 
-	r.ru_maxrss =	0;	/* always 0 */
-	r.ru_ixrss =	0;	/* always 0 */
-	r.ru_idrss =	0;	/* always 0 */
-	r.ru_isrss =	0;	/* always 0 */
-
-	r.ru_utime.tv_sec = 0;
-	r.ru_utime.tv_usec = 0;
-	r.ru_stime.tv_sec = 0;
-	r.ru_stime.tv_usec = 0;
+	bzero(&r, sizeof (struct rusage));
 
 	mutex_enter(&p->p_lock);
 
@@ -101,10 +93,7 @@ getrusage(void *user_rusage)
 	if (get_udatamodel() == DATAMODEL_ILP32) {
 		struct rusage32 r32;
 
-		r32.ru_maxrss =	0;	/* always 0 */
-		r32.ru_ixrss =	0;	/* always 0 */
-		r32.ru_idrss =	0;	/* always 0 */
-		r32.ru_isrss =	0;	/* always 0 */
+		bzero(&r32, sizeof (struct rusage32));
 
 		r32.ru_utime.tv_sec  = r.ru_utime.tv_sec;
 		r32.ru_utime.tv_usec = r.ru_utime.tv_usec;
@@ -138,22 +127,14 @@ getrusage_chld(void *user_rusage)
 	struct rusage r;
 	kthread_t *t = curthread;
 	proc_t *p = ttoproc(t);
-
 	hrtime_t snsecs, unsecs;
 
-	r.ru_maxrss =	0;	/* always 0 */
-	r.ru_ixrss =	0;	/* always 0 */
-	r.ru_idrss =	0;	/* always 0 */
-	r.ru_isrss =	0;	/* always 0 */
+	bzero(&r, sizeof (struct rusage));
 
 	mutex_enter(&p->p_lock);
 
 	unsecs = p->p_cacct[LMS_USER];
 	snsecs = p->p_cacct[LMS_SYSTEM] + p->p_cacct[LMS_TRAP];
-	r.ru_utime.tv_sec = 0;
-	r.ru_utime.tv_usec = 0;
-	r.ru_stime.tv_sec = 0;
-	r.ru_stime.tv_usec = 0;
 
 	r.ru_majflt	= p->p_cru.majflt;
 	r.ru_minflt	= p->p_cru.minflt;
@@ -174,10 +155,7 @@ getrusage_chld(void *user_rusage)
 	if (get_udatamodel() == DATAMODEL_ILP32) {
 		struct rusage32 r32;
 
-		r32.ru_maxrss =	0;	/* always 0 */
-		r32.ru_ixrss =	0;	/* always 0 */
-		r32.ru_idrss =	0;	/* always 0 */
-		r32.ru_isrss =	0;	/* always 0 */
+		bzero(&r32, sizeof (struct rusage32));
 
 		r32.ru_utime.tv_sec  = r.ru_utime.tv_sec;
 		r32.ru_utime.tv_usec = r.ru_utime.tv_usec;
@@ -214,14 +192,7 @@ getrusage_lwp(void *user_rusage)
 	hrtime_t snsecs, unsecs;
 	struct mstate *ms;
 
-	r.ru_maxrss =	0;	/* always 0 */
-	r.ru_ixrss =	0;	/* always 0 */
-	r.ru_idrss =	0;	/* always 0 */
-	r.ru_isrss =	0;	/* always 0 */
-	r.ru_utime.tv_sec = 0;
-	r.ru_utime.tv_usec = 0;
-	r.ru_stime.tv_sec = 0;
-	r.ru_stime.tv_usec = 0;
+	bzero(&r, sizeof (struct rusage));
 
 	lwp = ttolwp(t);
 	ms = &lwp->lwp_mstate;
@@ -246,10 +217,7 @@ getrusage_lwp(void *user_rusage)
 	if (get_udatamodel() == DATAMODEL_ILP32) {
 		struct rusage32 r32;
 
-		r32.ru_maxrss =	0;	/* always 0 */
-		r32.ru_ixrss =	0;	/* always 0 */
-		r32.ru_idrss =	0;	/* always 0 */
-		r32.ru_isrss =	0;	/* always 0 */
+		bzero(&r32, sizeof (struct rusage32));
 
 		r32.ru_utime.tv_sec  = r.ru_utime.tv_sec;
 		r32.ru_utime.tv_usec = r.ru_utime.tv_usec;
