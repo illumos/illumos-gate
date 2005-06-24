@@ -6627,6 +6627,10 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 		return;
 	}
 
+	if (ip_loopback_src_or_dst(ipha, NULL)) {
+		goto icmp_err_ret;
+	}
+
 	if (mctl_present && io->ipsec_out_attach_if) {
 		/* ip_grab_attach_ill returns a held ill */
 		attach_ill = ip_grab_attach_ill(NULL, first_mp,
@@ -25892,9 +25896,15 @@ ip_loopback_src_or_dst(ipha_t *ipha, ill_t *ill)
 	if (((ntohl(ipha->ipha_src) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET) ||
 	    ((ntohl(ipha->ipha_dst) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET)) {
 		if (ip_debug > 2) {
-			printf("ip_loopback_src_or_dst: "
-			    "dropping packet received on %s\n",
-			    ill->ill_name);
+			if (ill != NULL) {
+				printf("ip_loopback_src_or_dst: "
+				    "dropping packet received on %s\n",
+				    ill->ill_name);
+			} else {
+				printf("ip_loopback_src_or_dst: "
+				    "dropping packet\n");
+			}
+
 			pr_addr_dbg(
 			    "ip_loopback_src_or_dst: from src %s\n",
 			    AF_INET, &ipha->ipha_src);

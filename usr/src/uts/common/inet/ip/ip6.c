@@ -4202,7 +4202,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 {
 	in6_addr_t	v6gw;
 	in6_addr_t	dst;
-	ire_t		*ire;
+	ire_t		*ire = NULL;
 	ipif_t		*src_ipif = NULL;
 	ill_t		*dst_ill = NULL;
 	ire_t		*sire = NULL;
@@ -4267,6 +4267,15 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				ire_marks = IRE_MARK_HIDDEN;
 		}
 	}
+
+	if (IN6_IS_ADDR_LOOPBACK(v6dstp)) {
+		ip1dbg(("ip_newroute_v6: dst with loopback addr\n"));
+		goto icmp_err_ret;
+	} else if (IN6_IS_ADDR_LOOPBACK(v6srcp)) {
+		ip1dbg(("ip_newroute_v6: src with loopback addr\n"));
+		goto icmp_err_ret;
+	}
+
 	/*
 	 * If this IRE is created for forwarding or it is not for
 	 * TCP traffic, mark it as temporary.
@@ -6590,6 +6599,19 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 			freemsg(first_mp);
 			return;
 		}
+
+		if (IN6_IS_ADDR_LOOPBACK(&ip6h->ip6_src)) {
+			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
+			ip1dbg(("ip_rput_v6: pkt with loopback src"));
+			freemsg(first_mp);
+			return;
+		} else if (IN6_IS_ADDR_LOOPBACK(&ip6h->ip6_dst)) {
+			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
+			ip1dbg(("ip_rput_v6: pkt with loopback dst"));
+			freemsg(first_mp);
+			return;
+		}
+
 		flags |= (ll_multicast ? IP6_IN_LLMCAST : 0);
 		ip_rput_data_v6(q, ill, mp, ip6h, flags, hada_mp);
 	} else {
@@ -7221,7 +7243,7 @@ forward:
 		boolean_t check_multi = B_TRUE;
 		ill_group_t *ill_group = NULL;
 		ill_group_t *ire_group = NULL;
-		ill_t	*ire_ill;
+		ill_t	*ire_ill = NULL;
 		uint_t	ill_ifindex = ill->ill_usesrc_ifindex;
 
 		/*
@@ -7236,9 +7258,10 @@ forward:
 		    ire->ire_ipif->ipif_ill->ill_flags & ILLF_ROUTER) == 0);
 
 		ill_group = ill->ill_group;
-		if (rq != NULL)
-			ire_group = ((ill_t *)(rq)->q_ptr)->ill_group;
-		ire_ill = (ill_t *)(ire->ire_rfq)->q_ptr;
+		if (rq != NULL) {
+			ire_ill = (ill_t *)(rq->q_ptr);
+			ire_group = ire_ill->ill_group;
+		}
 
 		/*
 		 * If it's part of the same IPMP group, or if it's a legal
@@ -7247,7 +7270,7 @@ forward:
 		 */
 		if (ill_group != NULL && ill_group == ire_group) {
 			check_multi = B_FALSE;
-		} else if (ill_ifindex != 0 &&
+		} else if (ill_ifindex != 0 && ire_ill != NULL &&
 		    ill_ifindex == ire_ill->ill_phyint->phyint_ifindex) {
 			check_multi = B_FALSE;
 		}
