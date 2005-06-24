@@ -142,63 +142,6 @@ ib_configure(ib_t *ib_p)
 	*ib_p->ib_intr_retry_timer_reg = pci_intr_retry_intv;
 }
 
-static struct {
-	kstat_named_t ihks_name;
-	kstat_named_t ihks_type;
-	kstat_named_t ihks_cpu;
-	kstat_named_t ihks_pil;
-	kstat_named_t ihks_time;
-	kstat_named_t ihks_ino;
-	kstat_named_t ihks_cookie;
-	kstat_named_t ihks_devpath;
-	kstat_named_t ihks_buspath;
-} ih_ks_template = {
-	{ "name",	KSTAT_DATA_CHAR },
-	{ "type",	KSTAT_DATA_CHAR },
-	{ "cpu",	KSTAT_DATA_UINT64 },
-	{ "pil",	KSTAT_DATA_UINT64 },
-	{ "time",	KSTAT_DATA_UINT64 },
-	{ "ino",	KSTAT_DATA_UINT64 },
-	{ "cookie",	KSTAT_DATA_UINT64 },
-	{ "devpath",	KSTAT_DATA_STRING },
-	{ "buspath",	KSTAT_DATA_STRING },
-};
-static uint32_t ih_instance;
-
-static kmutex_t ih_ks_template_lock;
-
-int
-ih_ks_update(kstat_t *ksp, int rw)
-{
-	ih_t *ih_p = ksp->ks_private;
-	int maxlen = sizeof (ih_ks_template.ihks_name.value.c);
-	ib_t *ib_p = ih_p->ih_ino_p->ino_ib_p;
-	pci_t *pci_p = ib_p->ib_pci_p;
-	ib_ino_t ino;
-	char ih_devpath[MAXPATHLEN];
-	char ih_buspath[MAXPATHLEN];
-
-	ino = ih_p->ih_ino_p->ino_ino;
-
-	(void) snprintf(ih_ks_template.ihks_name.value.c, maxlen, "%s%d",
-	    ddi_driver_name(ih_p->ih_dip),
-	    ddi_get_instance(ih_p->ih_dip));
-	(void) strcpy(ih_ks_template.ihks_type.value.c, "fixed");
-	ih_ks_template.ihks_cpu.value.ui64 = ih_p->ih_ino_p->ino_cpuid;
-	ih_ks_template.ihks_pil.value.ui64 = ih_p->ih_ino_p->ino_pil;
-	ih_ks_template.ihks_time.value.ui64 = ih_p->ih_nsec + (uint64_t)
-	    tick2ns((hrtime_t)ih_p->ih_ticks, ih_p->ih_ino_p->ino_cpuid);
-	ih_ks_template.ihks_ino.value.ui64 = ino;
-	ih_ks_template.ihks_cookie.value.ui64 = IB_INO_TO_MONDO(ib_p, ino);
-
-	(void) ddi_pathname(ih_p->ih_dip, ih_devpath);
-	(void) ddi_pathname(pci_p->pci_dip, ih_buspath);
-	kstat_named_setstr(&ih_ks_template.ihks_devpath, ih_devpath);
-	kstat_named_setstr(&ih_ks_template.ihks_buspath, ih_buspath);
-
-	return (0);
-}
-
 /*
  * can only used for psycho internal interrupts thermal, power,
  * ue, ce, pbm
@@ -364,6 +307,7 @@ ib_intr_dist(ib_t *ib_p, ib_ino_info_t *ino_p)
 void
 ib_intr_dist_all(void *arg, int32_t weight_max, int32_t weight)
 {
+	extern kmutex_t pciintr_ks_template_lock;
 	ib_t *ib_p = (ib_t *)arg;
 	pci_t *pci_p = ib_p->ib_pci_p;
 	ib_ino_info_t *ino_p;
@@ -461,8 +405,8 @@ ib_intr_dist_all(void *arg, int32_t weight_max, int32_t weight)
 				 * which might have been in effect.
 				 *
 				 * because we are updating two fields in
-				 * ih_t we must lock ih_ks_template_lock to
-				 * prevent someone from reading the kstats
+				 * ih_t we must lock pciintr_ks_template_lock
+				 * to prevent someone from reading the kstats
 				 * after we set ih_ticks to 0 and before we
 				 * increment ih_nsec to compensate.
 				 *
@@ -472,11 +416,11 @@ ib_intr_dist_all(void *arg, int32_t weight_max, int32_t weight)
 				 * to 0. To do this we use atomic_swap.
 				 */
 
-				mutex_enter(&ih_ks_template_lock);
+				mutex_enter(&pciintr_ks_template_lock);
 				ticks = atomic_swap_64(&ih_lst->ih_ticks, 0);
 				ih_lst->ih_nsec += (uint64_t)
 				    tick2ns(ticks, orig_cpuid);
-				mutex_exit(&ih_ks_template_lock);
+				mutex_exit(&pciintr_ks_template_lock);
 			}
 
 			/* program the hardware */
@@ -807,17 +751,7 @@ ib_alloc_ih(dev_info_t *rdip, uint32_t inum,
 	ih_p->ih_config_handle = NULL;
 	ih_p->ih_nsec = 0;
 	ih_p->ih_ticks = 0;
-	ih_p->ih_ksp = kstat_create("pci_intrs",
-	    atomic_inc_32_nv(&ih_instance), "config", "interrupts",
-	    KSTAT_TYPE_NAMED, sizeof (ih_ks_template) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL);
-	if (ih_p->ih_ksp != NULL) {
-		ih_p->ih_ksp->ks_data_size += MAXPATHLEN * 2;
-		ih_p->ih_ksp->ks_lock = &ih_ks_template_lock;
-		ih_p->ih_ksp->ks_data = &ih_ks_template;
-		ih_p->ih_ksp->ks_private = ih_p;
-		ih_p->ih_ksp->ks_update = ih_ks_update;
-	}
+	ih_p->ih_ksp = NULL;
 
 	return (ih_p);
 }

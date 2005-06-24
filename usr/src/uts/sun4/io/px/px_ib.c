@@ -109,67 +109,6 @@ px_ib_detach(px_t *px_p)
 	kmem_free(ib_p, sizeof (px_ib_t));
 }
 
-static struct {
-	kstat_named_t ihks_name;
-	kstat_named_t ihks_type;
-	kstat_named_t ihks_cpu;
-	kstat_named_t ihks_pil;
-	kstat_named_t ihks_time;
-	kstat_named_t ihks_ino;
-	kstat_named_t ihks_cookie;
-	kstat_named_t ihks_devpath;
-	kstat_named_t ihks_buspath;
-} px_ih_ks_template = {
-	{ "name",	KSTAT_DATA_CHAR },
-	{ "type",	KSTAT_DATA_CHAR },
-	{ "cpu",	KSTAT_DATA_UINT64 },
-	{ "pil",	KSTAT_DATA_UINT64 },
-	{ "time",	KSTAT_DATA_UINT64 },
-	{ "ino",	KSTAT_DATA_UINT64 },
-	{ "cookie",	KSTAT_DATA_UINT64 },
-	{ "devpath",	KSTAT_DATA_STRING },
-	{ "buspath",	KSTAT_DATA_STRING },
-};
-
-static uint32_t ih_instance;
-static kmutex_t ih_ks_template_lock;
-
-int
-ih_ks_update(kstat_t *ksp, int rw)
-{
-	px_ih_t *ih_p = ksp->ks_private;
-	int maxlen = sizeof (px_ih_ks_template.ihks_name.value.c);
-	px_ib_t *ib_p = ih_p->ih_ino_p->ino_ib_p;
-	px_t *px_p = ib_p->ib_px_p;
-	devino_t ino;
-	sysino_t sysino;
-	char ih_devpath[MAXPATHLEN];
-	char ih_buspath[MAXPATHLEN];
-
-	ino = ih_p->ih_ino_p->ino_ino;
-	(void) px_lib_intr_devino_to_sysino(px_p->px_dip, ino, &sysino);
-
-	(void) snprintf(px_ih_ks_template.ihks_name.value.c, maxlen, "%s%d",
-	    ddi_driver_name(ih_p->ih_dip),
-	    ddi_get_instance(ih_p->ih_dip));
-
-	(void) strcpy(px_ih_ks_template.ihks_type.value.c,
-	    (ih_p->ih_rec_type == 0) ? "fixed" : "msi");
-	px_ih_ks_template.ihks_cpu.value.ui64 = ih_p->ih_ino_p->ino_cpuid;
-	px_ih_ks_template.ihks_pil.value.ui64 = ih_p->ih_ino_p->ino_pil;
-	px_ih_ks_template.ihks_time.value.ui64 = ih_p->ih_nsec + (uint64_t)
-	    tick2ns((hrtime_t)ih_p->ih_ticks, ih_p->ih_ino_p->ino_cpuid);
-	px_ih_ks_template.ihks_ino.value.ui64 = ino;
-	px_ih_ks_template.ihks_cookie.value.ui64 = sysino;
-
-	(void) ddi_pathname(ih_p->ih_dip, ih_devpath);
-	(void) ddi_pathname(px_p->px_dip, ih_buspath);
-	kstat_named_setstr(&px_ih_ks_template.ihks_devpath, ih_devpath);
-	kstat_named_setstr(&px_ih_ks_template.ihks_buspath, ih_buspath);
-
-	return (0);
-}
-
 void
 px_ib_intr_enable(px_t *px_p, cpuid_t cpu_id, devino_t ino)
 {
@@ -304,6 +243,7 @@ done:
 static void
 px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 {
+	extern kmutex_t pxintr_ks_template_lock;
 	px_ib_t		*ib_p = (px_ib_t *)arg;
 	px_t		*px_p = ib_p->ib_px_p;
 	dev_info_t	*dip = px_p->px_dip;
@@ -388,8 +328,8 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 				 * which might have been in effect.
 				 *
 				 * because we are updating two fields in
-				 * ih_t we must lock ih_ks_template_lock to
-				 * prevent someone from reading the kstats
+				 * ih_t we must lock pxintr_ks_template_lock
+				 * to prevent someone from reading the kstats
 				 * after we set ih_ticks to 0 and before we
 				 * increment ih_nsec to compensate.
 				 *
@@ -399,11 +339,11 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 				 * to 0. To do this we use atomic_swap.
 				 */
 
-				mutex_enter(&ih_ks_template_lock);
+				mutex_enter(&pxintr_ks_template_lock);
 				ticks = atomic_swap_64(&ih_lst->ih_ticks, 0);
 				ih_lst->ih_nsec += (uint64_t)
 				    tick2ns(ticks, orig_cpuid);
-				mutex_exit(&ih_ks_template_lock);
+				mutex_exit(&pxintr_ks_template_lock);
 			}
 
 			/* enable interrupt on new targeted cpu */
@@ -749,26 +689,7 @@ px_ib_alloc_ih(dev_info_t *rdip, uint32_t inum,
 	ih_p->ih_msg_code = msg_code;
 	ih_p->ih_nsec = 0;
 	ih_p->ih_ticks = 0;
-
-	/*
-	 * Create pci_intrs::: kstats for all ih types except messages,
-	 * which represent unusual conditions and don't need to be tracked.
-	 */
 	ih_p->ih_ksp = NULL;
-	if (rec_type == 0 || rec_type == MSI32_REC || rec_type == MSI64_REC) {
-		ih_p->ih_ksp = kstat_create("pci_intrs",
-		    atomic_inc_32_nv(&ih_instance), "config", "interrupts",
-		    KSTAT_TYPE_NAMED,
-		    sizeof (px_ih_ks_template) / sizeof (kstat_named_t),
-		    KSTAT_FLAG_VIRTUAL);
-	}
-	if (ih_p->ih_ksp != NULL) {
-		ih_p->ih_ksp->ks_data_size += MAXPATHLEN * 2;
-		ih_p->ih_ksp->ks_lock = &ih_ks_template_lock;
-		ih_p->ih_ksp->ks_data = &px_ih_ks_template;
-		ih_p->ih_ksp->ks_private = ih_p;
-		ih_p->ih_ksp->ks_update = ih_ks_update;
-	}
 
 	return (ih_p);
 }

@@ -42,6 +42,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/pci/pci_obj.h>
 #include <sys/sdt.h>
+#include <sys/clock.h>
 
 #ifdef _STARFIRE
 #include <sys/starfire.h>
@@ -488,6 +489,67 @@ pci_class_to_intr_weight(dev_info_t *rdip)
 	return (intr_weight);
 }
 
+static struct {
+	kstat_named_t pciintr_ks_name;
+	kstat_named_t pciintr_ks_type;
+	kstat_named_t pciintr_ks_cpu;
+	kstat_named_t pciintr_ks_pil;
+	kstat_named_t pciintr_ks_time;
+	kstat_named_t pciintr_ks_ino;
+	kstat_named_t pciintr_ks_cookie;
+	kstat_named_t pciintr_ks_devpath;
+	kstat_named_t pciintr_ks_buspath;
+} pciintr_ks_template = {
+	{ "name",	KSTAT_DATA_CHAR },
+	{ "type",	KSTAT_DATA_CHAR },
+	{ "cpu",	KSTAT_DATA_UINT64 },
+	{ "pil",	KSTAT_DATA_UINT64 },
+	{ "time",	KSTAT_DATA_UINT64 },
+	{ "ino",	KSTAT_DATA_UINT64 },
+	{ "cookie",	KSTAT_DATA_UINT64 },
+	{ "devpath",	KSTAT_DATA_STRING },
+	{ "buspath",	KSTAT_DATA_STRING },
+};
+static uint32_t pciintr_ks_instance;
+
+kmutex_t pciintr_ks_template_lock;
+
+int
+pci_ks_update(kstat_t *ksp, int rw)
+{
+	ih_t *ih_p = ksp->ks_private;
+	int maxlen = sizeof (pciintr_ks_template.pciintr_ks_name.value.c);
+	ib_t *ib_p = ih_p->ih_ino_p->ino_ib_p;
+	pci_t *pci_p = ib_p->ib_pci_p;
+	ib_ino_t ino;
+	char ih_devpath[MAXPATHLEN];
+	char ih_buspath[MAXPATHLEN];
+
+	ino = ih_p->ih_ino_p->ino_ino;
+
+	(void) snprintf(pciintr_ks_template.pciintr_ks_name.value.c, maxlen,
+	    "%s%d", ddi_driver_name(ih_p->ih_dip),
+	    ddi_get_instance(ih_p->ih_dip));
+	(void) strcpy(pciintr_ks_template.pciintr_ks_type.value.c, "fixed");
+	pciintr_ks_template.pciintr_ks_cpu.value.ui64 =
+	    ih_p->ih_ino_p->ino_cpuid;
+	pciintr_ks_template.pciintr_ks_pil.value.ui64 =
+	    ih_p->ih_ino_p->ino_pil;
+	pciintr_ks_template.pciintr_ks_time.value.ui64 =
+	    ih_p->ih_nsec + (uint64_t)
+	    tick2ns((hrtime_t)ih_p->ih_ticks, ih_p->ih_ino_p->ino_cpuid);
+	pciintr_ks_template.pciintr_ks_ino.value.ui64 = ino;
+	pciintr_ks_template.pciintr_ks_cookie.value.ui64 =
+		IB_INO_TO_MONDO(ib_p, ino);
+
+	(void) ddi_pathname(ih_p->ih_dip, ih_devpath);
+	(void) ddi_pathname(pci_p->pci_dip, ih_buspath);
+	kstat_named_setstr(&pciintr_ks_template.pciintr_ks_devpath, ih_devpath);
+	kstat_named_setstr(&pciintr_ks_template.pciintr_ks_buspath, ih_buspath);
+
+	return (0);
+}
+
 int
 pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 {
@@ -614,8 +676,19 @@ pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 	*ino_p->ino_map_reg;
 ino_done:
 	ih_p->ih_ino_p = ino_p;
-	if (ih_p->ih_ksp)
+	ih_p->ih_ksp = kstat_create("pci_intrs",
+	    atomic_inc_32_nv(&pciintr_ks_instance), "config", "interrupts",
+	    KSTAT_TYPE_NAMED,
+	    sizeof (pciintr_ks_template) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
+	if (ih_p->ih_ksp != NULL) {
+		ih_p->ih_ksp->ks_data_size += MAXPATHLEN * 2;
+		ih_p->ih_ksp->ks_lock = &pciintr_ks_template_lock;
+		ih_p->ih_ksp->ks_data = &pciintr_ks_template;
+		ih_p->ih_ksp->ks_private = ih_p;
+		ih_p->ih_ksp->ks_update = pci_ks_update;
 		kstat_install(ih_p->ih_ksp);
+	}
 	ib_ino_map_reg_share(ib_p, ino, ino_p);
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
 done:

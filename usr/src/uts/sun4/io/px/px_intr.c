@@ -47,6 +47,7 @@
 #include "px_obj.h"
 #include <sys/ontrap.h>
 #include <sys/membar.h>
+#include <sys/clock.h>
 
 /*
  * interrupt jabber:
@@ -791,6 +792,95 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	return (ret);
 }
 
+static struct {
+	kstat_named_t pxintr_ks_name;
+	kstat_named_t pxintr_ks_type;
+	kstat_named_t pxintr_ks_cpu;
+	kstat_named_t pxintr_ks_pil;
+	kstat_named_t pxintr_ks_time;
+	kstat_named_t pxintr_ks_ino;
+	kstat_named_t pxintr_ks_cookie;
+	kstat_named_t pxintr_ks_devpath;
+	kstat_named_t pxintr_ks_buspath;
+} pxintr_ks_template = {
+	{ "name",	KSTAT_DATA_CHAR },
+	{ "type",	KSTAT_DATA_CHAR },
+	{ "cpu",	KSTAT_DATA_UINT64 },
+	{ "pil",	KSTAT_DATA_UINT64 },
+	{ "time",	KSTAT_DATA_UINT64 },
+	{ "ino",	KSTAT_DATA_UINT64 },
+	{ "cookie",	KSTAT_DATA_UINT64 },
+	{ "devpath",	KSTAT_DATA_STRING },
+	{ "buspath",	KSTAT_DATA_STRING },
+};
+
+static uint32_t pxintr_ks_instance;
+kmutex_t pxintr_ks_template_lock;
+
+int
+px_ks_update(kstat_t *ksp, int rw)
+{
+	px_ih_t *ih_p = ksp->ks_private;
+	int maxlen = sizeof (pxintr_ks_template.pxintr_ks_name.value.c);
+	px_ib_t *ib_p = ih_p->ih_ino_p->ino_ib_p;
+	px_t *px_p = ib_p->ib_px_p;
+	devino_t ino;
+	sysino_t sysino;
+	char ih_devpath[MAXPATHLEN];
+	char ih_buspath[MAXPATHLEN];
+
+	ino = ih_p->ih_ino_p->ino_ino;
+	(void) px_lib_intr_devino_to_sysino(px_p->px_dip, ino, &sysino);
+
+	(void) snprintf(pxintr_ks_template.pxintr_ks_name.value.c, maxlen,
+	    "%s%d", ddi_driver_name(ih_p->ih_dip),
+	    ddi_get_instance(ih_p->ih_dip));
+
+	(void) strcpy(pxintr_ks_template.pxintr_ks_type.value.c,
+	    (ih_p->ih_rec_type == 0) ? "fixed" : "msi");
+	pxintr_ks_template.pxintr_ks_cpu.value.ui64 = ih_p->ih_ino_p->ino_cpuid;
+	pxintr_ks_template.pxintr_ks_pil.value.ui64 = ih_p->ih_ino_p->ino_pil;
+	pxintr_ks_template.pxintr_ks_time.value.ui64 =
+	    ih_p->ih_nsec + (uint64_t)
+	    tick2ns((hrtime_t)ih_p->ih_ticks, ih_p->ih_ino_p->ino_cpuid);
+	pxintr_ks_template.pxintr_ks_ino.value.ui64 = ino;
+	pxintr_ks_template.pxintr_ks_cookie.value.ui64 = sysino;
+
+	(void) ddi_pathname(ih_p->ih_dip, ih_devpath);
+	(void) ddi_pathname(px_p->px_dip, ih_buspath);
+	kstat_named_setstr(&pxintr_ks_template.pxintr_ks_devpath, ih_devpath);
+	kstat_named_setstr(&pxintr_ks_template.pxintr_ks_buspath, ih_buspath);
+
+	return (0);
+}
+
+void
+px_create_intr_kstats(px_ih_t *ih_p)
+{
+	msiq_rec_type_t rec_type = ih_p->ih_rec_type;
+
+	ASSERT(ih_p->ih_ksp == NULL);
+
+	/*
+	 * Create pci_intrs::: kstats for all ih types except messages,
+	 * which represent unusual conditions and don't need to be tracked.
+	 */
+	if (rec_type == 0 || rec_type == MSI32_REC || rec_type == MSI64_REC) {
+		ih_p->ih_ksp = kstat_create("pci_intrs",
+		    atomic_inc_32_nv(&pxintr_ks_instance), "config",
+		    "interrupts", KSTAT_TYPE_NAMED,
+		    sizeof (pxintr_ks_template) / sizeof (kstat_named_t),
+		    KSTAT_FLAG_VIRTUAL);
+	}
+	if (ih_p->ih_ksp != NULL) {
+		ih_p->ih_ksp->ks_data_size += MAXPATHLEN * 2;
+		ih_p->ih_ksp->ks_lock = &pxintr_ks_template_lock;
+		ih_p->ih_ksp->ks_data = &pxintr_ks_template;
+		ih_p->ih_ksp->ks_private = ih_p;
+		ih_p->ih_ksp->ks_update = px_ks_update;
+	}
+}
+
 int
 px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
@@ -873,6 +963,7 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 	intr_dist_cpuid_add_device_weight(ino_p->ino_cpuid, rdip, weight);
 
 	ih_p->ih_ino_p = ino_p;
+	px_create_intr_kstats(ih_p);
 	if (ih_p->ih_ksp)
 		kstat_install(ih_p->ih_ksp);
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
@@ -1047,6 +1138,7 @@ px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	intr_dist_cpuid_add_device_weight(ino_p->ino_cpuid, rdip, weight);
 
 	ih_p->ih_ino_p = ino_p;
+	px_create_intr_kstats(ih_p);
 	if (ih_p->ih_ksp)
 		kstat_install(ih_p->ih_ksp);
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
