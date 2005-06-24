@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1696,9 +1697,8 @@ analyze_args(obj_list * c,
  */
 /* ======================================================================= */
 
-void
-main(int argc,
-    char **argv)
+int
+main(int argc, char *argv[])
 {
 	obj_list	*main_obj;
 	dt_list		*q;
@@ -1749,5 +1749,5 @@ main(int argc,
 	if (oflag)
 		(void) fclose(OUTPUT_FD);
 
-	exit(0);
+	return (0);
 }

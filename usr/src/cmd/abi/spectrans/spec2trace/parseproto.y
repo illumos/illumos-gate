@@ -19,10 +19,13 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+
+/*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "parseproto.h"
@@ -2169,7 +2172,7 @@ char *
 decl_ToFormal(decl_t *dp)
 {
 	char tmp[BUFSIZ];
-	char bufp[BUFSIZ];
+	static char bufp[BUFSIZ];
 	char *bend;
 	type_t	*tp = dp->d_type;
 

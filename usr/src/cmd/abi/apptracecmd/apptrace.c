@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -267,6 +268,7 @@ main(int argc, char **argv)
 		/* Normal return from main() */
 		return (WEXITSTATUS(stat_loc));
 	}
+	return (0);
 	/* NOTREACHED */
 }
 
