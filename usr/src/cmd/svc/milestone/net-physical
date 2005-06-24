@@ -286,8 +286,13 @@ if [ "$interface_names" != '/etc/dhcp.*[0-9]' ]; then
 	[ -n "$i4d_fail" ] && warn_failed_ifs "configure IPv4 DHCP" $i4d_fail
 fi
 
-# Configure the rest of the IPv4 interfaces automatically, quietly.
-/sbin/ifconfig -adD4 auto-revarp netmask + broadcast + up
+# In order to avoid bringing up the interfaces that have
+# intentionally been left down, perform RARP only if the system
+# has no configured hostname in /etc/nodename
+hostname="`shcat /etc/nodename 2>/dev/null`"
+if [ "$_INIT_NET_STRATEGY" = "rarp" -o -z "$hostname" ]; then
+	/sbin/ifconfig -adD4 auto-revarp netmask + broadcast + up
+fi
 
 #
 # Process IPv4 and IPv6 interfaces that failed to plumb.  Find an
