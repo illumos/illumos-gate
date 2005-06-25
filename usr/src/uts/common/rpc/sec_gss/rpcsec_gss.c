@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -802,7 +802,8 @@ next_token:
 		goto done;
 	} else if (*gssstat != GSS_S_COMPLETE) {
 		(void) rpc_gss_display_status(*gssstat, *minor_stat,
-			*actual_mech_type, crgetuid(cr),
+			isrefresh ? GSS_C_NULL_OID : *actual_mech_type,
+					crgetuid(cr),
 			"rpcsec_gss_secreate_pvt:gss_export_sec_context");
 		(void) kgss_delete_sec_context(minor_stat,
 					&ap->context, NULL);
