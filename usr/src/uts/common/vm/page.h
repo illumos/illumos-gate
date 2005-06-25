@@ -829,7 +829,7 @@ size_t	page_get_user_pagesize(uint_t n);
 pgcnt_t	page_get_pagecnt(uint_t);
 uint_t	page_get_shift(uint_t);
 int	page_szc(size_t);
-int	page_user_szc(size_t);
+int	page_szc_user_filtered(size_t);
 
 
 /* page_get_replacement page flags */

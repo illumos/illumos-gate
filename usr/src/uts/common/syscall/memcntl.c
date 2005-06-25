@@ -386,9 +386,9 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 
 /*
  * Return page size code for page size passed in. If
- * matching page size not found return -1.
+ * matching page size not found or supported, return -1.
  */
 static uint_t
 mem_getpgszc(size_t pgsz) {
-	return ((uint_t)page_user_szc(pgsz));
+	return ((uint_t)page_szc_user_filtered(pgsz));
 }

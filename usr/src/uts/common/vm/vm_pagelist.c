@@ -334,14 +334,16 @@ page_szc(size_t pagesize)
 }
 
 /*
- * page size to page size code for user supported page sizes
+ * page size to page size code with the restriction that it be a supported
+ * user page size.  If it's not a supported user page size, -1 will be returned.
  */
 int
-page_user_szc(size_t pagesize)
+page_szc_user_filtered(size_t pagesize)
 {
 	int szc = page_szc(pagesize);
-	if (szc != -1)
-		return (SZC_2_USERSZC(szc));
+	if ((szc != -1) && (SZC_2_USERSZC(szc) != -1)) {
+		return (szc);
+	}
 	return (-1);
 }
 
