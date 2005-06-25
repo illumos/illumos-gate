@@ -81,6 +81,8 @@
 #include <nfs/nfs_acl.h>
 #include <nfs/nfs_log.h>
 #include <nfs/lm.h>
+#include <nfs/nfs_dispatch.h>
+#include <nfs/nfs4_drc.h>
 
 #include <rpcsvc/nfsauth_prot.h>
 
@@ -142,36 +144,6 @@ _info(struct modinfo *modinfop)
 }
 
 /*
- * RPC dispatch table
- * Indexed by version, proc
- */
-
-struct rpcdisp {
-	void	  (*dis_proc)();	/* proc to call */
-	xdrproc_t dis_xdrargs;		/* xdr routine to get args */
-	xdrproc_t dis_fastxdrargs;	/* `fast' xdr routine to get args */
-	int	  dis_argsz;		/* sizeof args */
-	xdrproc_t dis_xdrres;		/* xdr routine to put results */
-	xdrproc_t dis_fastxdrres;	/* `fast' xdr routine to put results */
-	int	  dis_ressz;		/* size of results */
-	void	  (*dis_resfree)();	/* frees space allocated by proc */
-	int	  dis_flags;		/* flags, see below */
-	fhandle_t *(*dis_getfh)();	/* returns the fhandle for the req */
-	void	  (*dis_flagproc)();	/* calculate dis_flags (nfsv4 only) */
-};
-
-#define	RPC_IDEMPOTENT	0x1	/* idempotent or not */
-/*
- * Be very careful about which NFS procedures get the RPC_ALLOWANON bit.
- * Right now, it this bit is on, we ignore the results of per NFS request
- * access control.
- */
-#define	RPC_ALLOWANON	0x2	/* allow anonymous access */
-#define	RPC_MAPRESP	0x4	/* use mapped response buffer */
-#define	RPC_AVOIDWORK	0x8	/* do work avoidance for dups */
-#define	RPC_PUBLICFH_OK	0x10	/* allow use of public filehandle */
-
-/*
  * PUBLICFH_CHECK() checks if the dispatch routine supports
  * RPC_PUBLICFH_OK, if the filesystem is exported public, and if the
  * incoming request is using the public filehandle. The check duplicates
@@ -187,17 +159,8 @@ struct rpcdisp {
 		(exi == exi_public && exportmatch(exi_root, \
 		&fh->fh_fsid, (fid_t *)&fh->fh_xlen))))
 
-struct rpc_disptable {
-	int dis_nprocs;
-	char **dis_procnames;
-	kstat_named_t **dis_proccntp;
-	struct rpcdisp *dis_table;
-};
-
 static void	nfs_srv_shutdown_all(int);
 static void	rfs4_server_start(int);
-static void	rpc_null(caddr_t *, caddr_t *);
-static void	rfs_error(caddr_t *, caddr_t *);
 static void	nullfree(void);
 static void	rfs_dispatch(struct svc_req *, SVCXPRT *);
 static void	acl_dispatch(struct svc_req *, SVCXPRT *);
@@ -279,6 +242,8 @@ static nfs_server_running_t nfs_server_upordown;
 static kmutex_t nfs_server_upordown_lock;
 static	kcondvar_t nfs_server_upordown_cv;
 
+int rfs4_dispatch(struct rpcdisp *, struct svc_req *, SVCXPRT *, char *);
+
 /*
  * RDMA wait variables.
  */
@@ -342,6 +307,7 @@ nfs_srv_shutdown_all(int quiesce) {
 			nfs_server_upordown = NFS_SERVER_STOPPING;
 			mutex_exit(&nfs_server_upordown_lock);
 			rfs4_state_fini();
+			rfs4_fini_drc(nfs4_drc);
 			mutex_enter(&nfs_server_upordown_lock);
 			nfs_server_upordown = NFS_SERVER_STOPPED;
 			cv_signal(&nfs_server_upordown_cv);
@@ -547,6 +513,9 @@ rfs4_server_start(int nfs4_srv_delegation)
 				}
 			} else {
 				rfs4_state_init();
+				nfs4_drc = rfs4_init_drc(nfs4_drc_max,
+							nfs4_drc_hash,
+							nfs4_drc_lifetime);
 			}
 
 			/*
@@ -615,7 +584,7 @@ rdma_start(struct rdma_svc_args *rsa)
 }
 
 /* ARGSUSED */
-static void
+void
 rpc_null(caddr_t *argp, caddr_t *resp)
 {
 }
@@ -663,70 +632,70 @@ static struct rpcdisp rfsdisptab_v2[] = {
 	    xdr_void, NULL_xdrproc_t, 0,
 	    xdr_void, NULL_xdrproc_t, 0,
 	    nullfree, RPC_IDEMPOTENT,
-	    0, 0},
+	    0},
 
 	/* RFS_GETATTR = 1 */
 	{rfs_getattr,
 	    xdr_fhandle, xdr_fastfhandle, sizeof (fhandle_t),
 	    xdr_attrstat, xdr_fastattrstat, sizeof (struct nfsattrstat),
 	    nullfree, RPC_IDEMPOTENT|RPC_ALLOWANON|RPC_MAPRESP,
-	    rfs_getattr_getfh, 0},
+	    rfs_getattr_getfh},
 
 	/* RFS_SETATTR = 2 */
 	{rfs_setattr,
 	    xdr_saargs, NULL_xdrproc_t, sizeof (struct nfssaargs),
 	    xdr_attrstat, xdr_fastattrstat, sizeof (struct nfsattrstat),
 	    nullfree, RPC_MAPRESP,
-	    rfs_setattr_getfh, 0},
+	    rfs_setattr_getfh},
 
 	/* RFS_ROOT = 3 *** NO LONGER SUPPORTED *** */
 	{rfs_error,
 	    xdr_void, NULL_xdrproc_t, 0,
 	    xdr_void, NULL_xdrproc_t, 0,
 	    nullfree, RPC_IDEMPOTENT,
-	    0, 0},
+	    0},
 
 	/* RFS_LOOKUP = 4 */
 	{rfs_lookup,
 	    xdr_diropargs, NULL_xdrproc_t, sizeof (struct nfsdiropargs),
 	    xdr_diropres, xdr_fastdiropres, sizeof (struct nfsdiropres),
 	    nullfree, RPC_IDEMPOTENT|RPC_MAPRESP|RPC_PUBLICFH_OK,
-	    rfs_lookup_getfh, 0},
+	    rfs_lookup_getfh},
 
 	/* RFS_READLINK = 5 */
 	{rfs_readlink,
 	    xdr_fhandle, xdr_fastfhandle, sizeof (fhandle_t),
 	    xdr_rdlnres, NULL_xdrproc_t, sizeof (struct nfsrdlnres),
 	    rfs_rlfree, RPC_IDEMPOTENT,
-	    rfs_readlink_getfh, 0},
+	    rfs_readlink_getfh},
 
 	/* RFS_READ = 6 */
 	{rfs_read,
 	    xdr_readargs, NULL_xdrproc_t, sizeof (struct nfsreadargs),
 	    xdr_rdresult, NULL_xdrproc_t, sizeof (struct nfsrdresult),
 	    rfs_rdfree, RPC_IDEMPOTENT,
-	    rfs_read_getfh, 0},
+	    rfs_read_getfh},
 
 	/* RFS_WRITECACHE = 7 *** NO LONGER SUPPORTED *** */
 	{rfs_error,
 	    xdr_void, NULL_xdrproc_t, 0,
 	    xdr_void, NULL_xdrproc_t, 0,
 	    nullfree, RPC_IDEMPOTENT,
-	    0, 0},
+	    0},
 
 	/* RFS_WRITE = 8 */
 	{rfs_write,
 	    xdr_writeargs, NULL_xdrproc_t, sizeof (struct nfswriteargs),
 	    xdr_attrstat, xdr_fastattrstat, sizeof (struct nfsattrstat),
 	    nullfree, RPC_MAPRESP,
-	    rfs_write_getfh, 0},
+	    rfs_write_getfh},
 
 	/* RFS_CREATE = 9 */
 	{rfs_create,
 	    xdr_creatargs, NULL_xdrproc_t, sizeof (struct nfscreatargs),
 	    xdr_diropres, xdr_fastdiropres, sizeof (struct nfsdiropres),
 	    nullfree, RPC_MAPRESP,
-	    rfs_create_getfh, 0},
+	    rfs_create_getfh},
 
 	/* RFS_REMOVE = 10 */
 	{rfs_remove,
@@ -737,7 +706,7 @@ static struct rpcdisp rfsdisptab_v2[] = {
 	    xdr_enum, NULL_xdrproc_t, sizeof (enum nfsstat),
 #endif
 	    nullfree, RPC_MAPRESP,
-	    rfs_remove_getfh, 0},
+	    rfs_remove_getfh},
 
 	/* RFS_RENAME = 11 */
 	{rfs_rename,
@@ -748,7 +717,7 @@ static struct rpcdisp rfsdisptab_v2[] = {
 	    xdr_enum, NULL_xdrproc_t, sizeof (enum nfsstat),
 #endif
 	    nullfree, RPC_MAPRESP,
-	    rfs_rename_getfh, 0},
+	    rfs_rename_getfh},
 
 	/* RFS_LINK = 12 */
 	{rfs_link,
@@ -759,7 +728,7 @@ static struct rpcdisp rfsdisptab_v2[] = {
 	    xdr_enum, NULL_xdrproc_t, sizeof (enum nfsstat),
 #endif
 	    nullfree, RPC_MAPRESP,
-	    rfs_link_getfh, 0},
+	    rfs_link_getfh},
 
 	/* RFS_SYMLINK = 13 */
 	{rfs_symlink,
@@ -770,14 +739,14 @@ static struct rpcdisp rfsdisptab_v2[] = {
 	    xdr_enum, NULL_xdrproc_t, sizeof (enum nfsstat),
 #endif
 	    nullfree, RPC_MAPRESP,
-	    rfs_symlink_getfh, 0},
+	    rfs_symlink_getfh},
 
 	/* RFS_MKDIR = 14 */
 	{rfs_mkdir,
 	    xdr_creatargs, NULL_xdrproc_t, sizeof (struct nfscreatargs),
 	    xdr_diropres, xdr_fastdiropres, sizeof (struct nfsdiropres),
 	    nullfree, RPC_MAPRESP,
-	    rfs_mkdir_getfh, 0},
+	    rfs_mkdir_getfh},
 
 	/* RFS_RMDIR = 15 */
 	{rfs_rmdir,
@@ -788,21 +757,21 @@ static struct rpcdisp rfsdisptab_v2[] = {
 	    xdr_enum, NULL_xdrproc_t, sizeof (enum nfsstat),
 #endif
 	    nullfree, RPC_MAPRESP,
-	    rfs_rmdir_getfh, 0},
+	    rfs_rmdir_getfh},
 
 	/* RFS_READDIR = 16 */
 	{rfs_readdir,
 	    xdr_rddirargs, NULL_xdrproc_t, sizeof (struct nfsrddirargs),
 	    xdr_putrddirres, NULL_xdrproc_t, sizeof (struct nfsrddirres),
 	    rfs_rddirfree, RPC_IDEMPOTENT,
-	    rfs_readdir_getfh, 0},
+	    rfs_readdir_getfh},
 
 	/* RFS_STATFS = 17 */
 	{rfs_statfs,
 	    xdr_fhandle, xdr_fastfhandle, sizeof (fhandle_t),
 	    xdr_statfs, xdr_faststatfs, sizeof (struct nfsstatfs),
 	    nullfree, RPC_IDEMPOTENT|RPC_ALLOWANON|RPC_MAPRESP,
-	    rfs_statfs_getfh, 0},
+	    rfs_statfs_getfh},
 };
 
 static char *rfscallnames_v3[] = {
@@ -840,154 +809,154 @@ static struct rpcdisp rfsdisptab_v3[] = {
 	    xdr_void, NULL_xdrproc_t, 0,
 	    xdr_void, NULL_xdrproc_t, 0,
 	    nullfree, RPC_IDEMPOTENT,
-	    0, 0},
+	    0},
 
 	/* RFS3_GETATTR = 1 */
 	{rfs3_getattr,
 	    xdr_nfs_fh3, xdr_fastnfs_fh3, sizeof (GETATTR3args),
 	    xdr_GETATTR3res, NULL_xdrproc_t, sizeof (GETATTR3res),
 	    nullfree, (RPC_IDEMPOTENT | RPC_ALLOWANON),
-	    rfs3_getattr_getfh, 0},
+	    rfs3_getattr_getfh},
 
 	/* RFS3_SETATTR = 2 */
 	{rfs3_setattr,
 	    xdr_SETATTR3args, NULL_xdrproc_t, sizeof (SETATTR3args),
 	    xdr_SETATTR3res, NULL_xdrproc_t, sizeof (SETATTR3res),
 	    nullfree, 0,
-	    rfs3_setattr_getfh, 0},
+	    rfs3_setattr_getfh},
 
 	/* RFS3_LOOKUP = 3 */
 	{rfs3_lookup,
 	    xdr_diropargs3, NULL_xdrproc_t, sizeof (LOOKUP3args),
 	    xdr_LOOKUP3res, NULL_xdrproc_t, sizeof (LOOKUP3res),
 	    nullfree, (RPC_IDEMPOTENT | RPC_PUBLICFH_OK),
-	    rfs3_lookup_getfh, 0},
+	    rfs3_lookup_getfh},
 
 	/* RFS3_ACCESS = 4 */
 	{rfs3_access,
 	    xdr_ACCESS3args, NULL_xdrproc_t, sizeof (ACCESS3args),
 	    xdr_ACCESS3res, NULL_xdrproc_t, sizeof (ACCESS3res),
 	    nullfree, RPC_IDEMPOTENT,
-	    rfs3_access_getfh, 0},
+	    rfs3_access_getfh},
 
 	/* RFS3_READLINK = 5 */
 	{rfs3_readlink,
 	    xdr_nfs_fh3, xdr_fastnfs_fh3, sizeof (READLINK3args),
 	    xdr_READLINK3res, NULL_xdrproc_t, sizeof (READLINK3res),
 	    rfs3_readlink_free, RPC_IDEMPOTENT,
-	    rfs3_readlink_getfh, 0},
+	    rfs3_readlink_getfh},
 
 	/* RFS3_READ = 6 */
 	{rfs3_read,
 	    xdr_READ3args, NULL_xdrproc_t, sizeof (READ3args),
 	    xdr_READ3res, NULL_xdrproc_t, sizeof (READ3res),
 	    rfs3_read_free, RPC_IDEMPOTENT,
-	    rfs3_read_getfh, 0},
+	    rfs3_read_getfh},
 
 	/* RFS3_WRITE = 7 */
 	{rfs3_write,
 	    xdr_WRITE3args, NULL_xdrproc_t, sizeof (WRITE3args),
 	    xdr_WRITE3res, NULL_xdrproc_t, sizeof (WRITE3res),
 	    nullfree, 0,
-	    rfs3_write_getfh, 0},
+	    rfs3_write_getfh},
 
 	/* RFS3_CREATE = 8 */
 	{rfs3_create,
 	    xdr_CREATE3args, NULL_xdrproc_t, sizeof (CREATE3args),
 	    xdr_CREATE3res, NULL_xdrproc_t, sizeof (CREATE3res),
 	    nullfree, 0,
-	    rfs3_create_getfh, 0},
+	    rfs3_create_getfh},
 
 	/* RFS3_MKDIR = 9 */
 	{rfs3_mkdir,
 	    xdr_MKDIR3args, NULL_xdrproc_t, sizeof (MKDIR3args),
 	    xdr_MKDIR3res, NULL_xdrproc_t, sizeof (MKDIR3res),
 	    nullfree, 0,
-	    rfs3_mkdir_getfh, 0},
+	    rfs3_mkdir_getfh},
 
 	/* RFS3_SYMLINK = 10 */
 	{rfs3_symlink,
 	    xdr_SYMLINK3args, NULL_xdrproc_t, sizeof (SYMLINK3args),
 	    xdr_SYMLINK3res, NULL_xdrproc_t, sizeof (SYMLINK3res),
 	    nullfree, 0,
-	    rfs3_symlink_getfh, 0},
+	    rfs3_symlink_getfh},
 
 	/* RFS3_MKNOD = 11 */
 	{rfs3_mknod,
 	    xdr_MKNOD3args, NULL_xdrproc_t, sizeof (MKNOD3args),
 	    xdr_MKNOD3res, NULL_xdrproc_t, sizeof (MKNOD3res),
 	    nullfree, 0,
-	    rfs3_mknod_getfh, 0},
+	    rfs3_mknod_getfh},
 
 	/* RFS3_REMOVE = 12 */
 	{rfs3_remove,
 	    xdr_diropargs3, NULL_xdrproc_t, sizeof (REMOVE3args),
 	    xdr_REMOVE3res, NULL_xdrproc_t, sizeof (REMOVE3res),
 	    nullfree, 0,
-	    rfs3_remove_getfh, 0},
+	    rfs3_remove_getfh},
 
 	/* RFS3_RMDIR = 13 */
 	{rfs3_rmdir,
 	    xdr_diropargs3, NULL_xdrproc_t, sizeof (RMDIR3args),
 	    xdr_RMDIR3res, NULL_xdrproc_t, sizeof (RMDIR3res),
 	    nullfree, 0,
-	    rfs3_rmdir_getfh, 0},
+	    rfs3_rmdir_getfh},
 
 	/* RFS3_RENAME = 14 */
 	{rfs3_rename,
 	    xdr_RENAME3args, NULL_xdrproc_t, sizeof (RENAME3args),
 	    xdr_RENAME3res, NULL_xdrproc_t, sizeof (RENAME3res),
 	    nullfree, 0,
-	    rfs3_rename_getfh, 0},
+	    rfs3_rename_getfh},
 
 	/* RFS3_LINK = 15 */
 	{rfs3_link,
 	    xdr_LINK3args, NULL_xdrproc_t, sizeof (LINK3args),
 	    xdr_LINK3res, NULL_xdrproc_t, sizeof (LINK3res),
 	    nullfree, 0,
-	    rfs3_link_getfh, 0},
+	    rfs3_link_getfh},
 
 	/* RFS3_READDIR = 16 */
 	{rfs3_readdir,
 	    xdr_READDIR3args, NULL_xdrproc_t, sizeof (READDIR3args),
 	    xdr_READDIR3res, NULL_xdrproc_t, sizeof (READDIR3res),
 	    rfs3_readdir_free, RPC_IDEMPOTENT,
-	    rfs3_readdir_getfh, 0},
+	    rfs3_readdir_getfh},
 
 	/* RFS3_READDIRPLUS = 17 */
 	{rfs3_readdirplus,
 	    xdr_READDIRPLUS3args, NULL_xdrproc_t, sizeof (READDIRPLUS3args),
 	    xdr_READDIRPLUS3res, NULL_xdrproc_t, sizeof (READDIRPLUS3res),
 	    rfs3_readdirplus_free, RPC_AVOIDWORK,
-	    rfs3_readdirplus_getfh, 0},
+	    rfs3_readdirplus_getfh},
 
 	/* RFS3_FSSTAT = 18 */
 	{rfs3_fsstat,
 	    xdr_nfs_fh3, xdr_fastnfs_fh3, sizeof (FSSTAT3args),
 	    xdr_FSSTAT3res, NULL_xdrproc_t, sizeof (FSSTAT3res),
 	    nullfree, RPC_IDEMPOTENT,
-	    rfs3_fsstat_getfh, 0},
+	    rfs3_fsstat_getfh},
 
 	/* RFS3_FSINFO = 19 */
 	{rfs3_fsinfo,
 	    xdr_nfs_fh3, xdr_fastnfs_fh3, sizeof (FSINFO3args),
 	    xdr_FSINFO3res, NULL_xdrproc_t, sizeof (FSINFO3res),
 	    nullfree, RPC_IDEMPOTENT|RPC_ALLOWANON,
-	    rfs3_fsinfo_getfh, 0},
+	    rfs3_fsinfo_getfh},
 
 	/* RFS3_PATHCONF = 20 */
 	{rfs3_pathconf,
 	    xdr_nfs_fh3, xdr_fastnfs_fh3, sizeof (PATHCONF3args),
 	    xdr_PATHCONF3res, NULL_xdrproc_t, sizeof (PATHCONF3res),
 	    nullfree, RPC_IDEMPOTENT,
-	    rfs3_pathconf_getfh, 0},
+	    rfs3_pathconf_getfh},
 
 	/* RFS3_COMMIT = 21 */
 	{rfs3_commit,
 	    xdr_COMMIT3args, NULL_xdrproc_t, sizeof (COMMIT3args),
 	    xdr_COMMIT3res, NULL_xdrproc_t, sizeof (COMMIT3res),
 	    nullfree, RPC_IDEMPOTENT,
-	    rfs3_commit_getfh, 0},
+	    rfs3_commit_getfh},
 };
 
 static char *rfscallnames_v4[] = {
@@ -1011,14 +980,13 @@ static struct rpcdisp rfsdisptab_v4[] = {
 	{rpc_null,
 	    xdr_void, NULL_xdrproc_t, 0,
 	    xdr_void, NULL_xdrproc_t, 0,
-	    nullfree, RPC_IDEMPOTENT, 0, 0},
+	    nullfree, RPC_IDEMPOTENT, 0},
 
 	/* RFS4_compound = 1 */
 	{rfs4_compound,
 	    xdr_COMPOUND4args, NULL_xdrproc_t, sizeof (COMPOUND4args),
 	    xdr_COMPOUND4res, NULL_xdrproc_t, sizeof (COMPOUND4res),
-	    rfs4_compound_free, 0 /* XXX? RPC_IDEMPOTENT */,
-	    0, rfs4_compound_flagproc},
+	    rfs4_compound_free, 0, 0},
 };
 
 union rfs_args {
@@ -1424,6 +1392,7 @@ auth_tooweak(struct svc_req *req, char *res)
 	return (FALSE);
 }
 
+
 static void
 common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 		rpcvers_t max_vers, char *pgmname,
@@ -1461,9 +1430,6 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	vers = req->rq_vers;
 
 	if (vers < min_vers || vers > max_vers) {
-		TRACE_3(TR_FAC_NFS, TR_CMN_DISPATCH_START,
-			"common_dispatch_start:(%S) proc_num %d xid %x",
-			"bad version", (int)vers, 0);
 		svcerr_progvers(req->rq_xprt, min_vers, max_vers);
 		error++;
 		cmn_err(CE_NOTE, "%s: bad version number %u", pgmname, vers);
@@ -1473,16 +1439,12 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 
 	which = req->rq_proc;
 	if (which < 0 || which >= disptable[(int)vers].dis_nprocs) {
-		TRACE_3(TR_FAC_NFS, TR_CMN_DISPATCH_START,
-			"common_dispatch_start:(%S) proc_num %d xid %x",
-			"bad proc", which, 0);
 		svcerr_noproc(req->rq_xprt);
 		error++;
 		goto done;
 	}
 
 	(*(disptable[(int)vers].dis_proccntp))[which].value.ui64++;
-	DTRACE_PROBE2(nfs__dispatch, struct svc_req *, req, SVCXPRT *, xprt);
 
 	disp = &disptable[(int)vers].dis_table[which];
 
@@ -1492,8 +1454,7 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	 */
 
 	args = (char *)&args_buf;
-	TRACE_0(TR_FAC_NFS, TR_SVC_GETARGS_START,
-		"svc_getargs_start:");
+
 #ifdef DEBUG
 	if (rfs_no_fast_xdrargs || (auth_flavor == RPCSEC_GSS) ||
 	    disp->dis_fastxdrargs == NULL_xdrproc_t ||
@@ -1505,8 +1466,6 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 #endif
 		bzero(args, disp->dis_argsz);
 		if (!SVC_GETARGS(xprt, disp->dis_xdrargs, args)) {
-			TRACE_1(TR_FAC_NFS, TR_SVC_GETARGS_END,
-				"svc_getargs_end:(%S)", "bad");
 			svcerr_decode(xprt);
 			error++;
 			cmn_err(CE_NOTE, "%s: bad getargs for %u/%d",
@@ -1514,22 +1473,20 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 			goto done;
 		}
 	}
-	TRACE_1(TR_FAC_NFS, TR_SVC_GETARGS_END,
-		"svc_getargs_end:(%S)", "good");
 
 	/*
-	 * Calculate flags (only relevant for nfsv4 compounds)
+	 * If Version 4 use that specific dispatch function.
 	 */
-	if (disp->dis_flagproc)
-		(*disp->dis_flagproc)(args, &dis_flags);
+	if (req->rq_vers == 4) {
+		error += rfs4_dispatch(disp, req, xprt, args);
+		goto done;
+	}
 
-	else
-		dis_flags = disp->dis_flags;
+	dis_flags = disp->dis_flags;
 
 	/*
 	 * Find export information and check authentication,
 	 * setting the credential if everything is ok.
-	 * *** NFSv4 Does not do this.
 	 */
 	if (disp->dis_getfh != NULL) {
 		fhandle_t *fh;
@@ -1580,11 +1537,8 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 		}
 #endif
 
-		TRACE_0(TR_FAC_NFS, TR_CHECKEXPORT_START,
-			"checkexport_start:");
 		exi = checkexport(&fh->fh_fsid, (fid_t *)&fh->fh_xlen);
-		TRACE_0(TR_FAC_NFS, TR_CHECKEXPORT_END,
-			"checkexport_end:");
+
 		if (exi != NULL) {
 			publicfh_ok = PUBLICFH_CHECK(disp, exi, fh);
 
@@ -1641,12 +1595,9 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 		case DUP_NEW:
 		case DUP_DROP:
 			curthread->t_flag |= T_DONTPEND;
-			TRACE_4(TR_FAC_NFS, TR_CMN_PROC_START,
-				"cmn_proc_start:%p vers %d proc_num %d req %x",
-				disptable, vers, which, req);
+
 			(*disp->dis_proc)(args, res, exi, req, cr);
-			TRACE_0(TR_FAC_NFS, TR_CMN_PROC_END,
-				"cmn_proc_end:");
+
 			curthread->t_flag &= ~T_DONTPEND;
 			if (curthread->t_flag & T_WOULDBLOCK) {
 				curthread->t_flag &= ~T_WOULDBLOCK;
@@ -1674,12 +1625,9 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 
 	} else {
 		curthread->t_flag |= T_DONTPEND;
-		TRACE_4(TR_FAC_NFS, TR_CMN_PROC_START,
-			"cmn_proc_start:%p vers %d proc_num %d req %x",
-			disptable, vers, which, req);
+
 		(*disp->dis_proc)(args, res, exi, req, cr);
-		TRACE_0(TR_FAC_NFS, TR_CMN_PROC_END,
-			"cmn_proc_end:");
+
 		curthread->t_flag &= ~T_DONTPEND;
 		if (curthread->t_flag & T_WOULDBLOCK) {
 			curthread->t_flag &= ~T_WOULDBLOCK;
@@ -1731,8 +1679,6 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	/*
 	 * Serialize and send results struct
 	 */
-	TRACE_0(TR_FAC_NFS, TR_SVC_SENDREPLY_START,
-		"svc_sendreply_start:");
 #ifdef DEBUG
 	if (rfs_no_fast_xdrres == 0 && res != (char *)&res_buf) {
 #else
@@ -1748,8 +1694,6 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 			error++;
 		}
 	}
-	TRACE_0(TR_FAC_NFS, TR_SVC_SENDREPLY_END,
-		"svc_sendreply_end:");
 
 	/*
 	 * Log if needed
@@ -1766,19 +1710,13 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	 * have non-idempotent procedures with functions.
 	 */
 	if (disp->dis_resfree != nullfree && dupcached == FALSE) {
-		TRACE_0(TR_FAC_NFS, TR_SVC_FREERES_START,
-			"svc_freeres_start:");
 		(*disp->dis_resfree)(res);
-		TRACE_0(TR_FAC_NFS, TR_SVC_FREERES_END,
-			"svc_freeres_end:");
 	}
 
 done:
 	/*
 	 * Free arguments struct
 	 */
-	TRACE_0(TR_FAC_NFS, TR_SVC_FREEARGS_START,
-		"svc_freeargs_start:");
 	if (disp) {
 		if (!SVC_FREEARGS(xprt, disp->dis_xdrargs, args)) {
 			cmn_err(CE_NOTE, "%s: bad freeargs", pgmname);
@@ -1791,20 +1729,12 @@ done:
 		}
 	}
 
-	TRACE_0(TR_FAC_NFS, TR_SVC_FREEARGS_END,
-		"svc_freeargs_end:");
-
 	if (exi != NULL)
 		exi_rele(exi);
 
 	global_svstat_ptr[req->rq_vers][NFS_BADCALLS].value.ui64 += error;
 
 	global_svstat_ptr[req->rq_vers][NFS_CALLS].value.ui64++;
-
-
-	TRACE_1(TR_FAC_NFS, TR_CMN_DISPATCH_END,
-		"common_dispatch_end:proc_num %d",
-		which);
 }
 
 static void
