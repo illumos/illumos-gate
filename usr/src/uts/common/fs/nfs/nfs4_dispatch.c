@@ -27,7 +27,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
+#include <sys/systm.h>
+#include <sys/sdt.h>
 #include <rpc/types.h>
 #include <rpc/auth.h>
 #include <rpc/auth_unix.h>
