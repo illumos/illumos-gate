@@ -1082,8 +1082,16 @@ set_args(int *mntflags, struct nfs_args *args, char *fshost, struct mnttab *mnt)
 			nfsvers = (rpcvers_t)atoi(val);
 			break;
 		case OPT_PROTO:
+			if (val == NULL)
+				goto badopt;
+
 			nfs_proto = (char *)malloc(strlen(val)+1);
-			(void) strcpy(nfs_proto, val);
+			if (!nfs_proto) {
+				pr_err(gettext("no memory"));
+				return (RET_ERR);
+			}
+
+			(void) strncpy(nfs_proto, val, strlen(val)+1);
 			break;
 		case OPT_NOPRINT:
 			args->flags |= NFSMNT_NOPRINT;
@@ -1358,7 +1366,7 @@ get_the_addr(char *hostname, ulong_t prog, ulong_t vers,
 		if (vers == NFS_V4 &&
 		    strncasecmp(nconf->nc_proto, NC_UDP,
 				strlen(NC_UDP)) == 0) {
-			SET_ERR_RET(error, ERR_RPCERROR, 0);
+			SET_ERR_RET(error, ERR_PROTO_UNSUPP, 0);
 			goto done;
 		}
 
@@ -1405,7 +1413,19 @@ get_the_addr(char *hostname, ulong_t prog, ulong_t vers,
 
 	cl = clnt_tli_create(fd, nconf, &tbind->addr, prog, vers, 0, 0);
 	if (cl == NULL) {
-		SET_ERR_RET(error, ERR_RPCERROR, rpc_createerr.cf_stat);
+		/*
+		 * clnt_tli_create() returns either RPC_SYSTEMERROR,
+		 * RPC_UNKNOWNPROTO or RPC_TLIERROR. The RPC_TLIERROR translates
+		 * to "Misc. TLI error". This is not too helpful. Most likely
+		 * the connection to the remote server timed out, so this
+		 * error is at least less perplexing.
+		 * See: usr/src/cmd/rpcinfo/rpcinfo.c
+		 */
+		if (rpc_createerr.cf_stat == RPC_TLIERROR) {
+			SET_ERR_RET(error, ERR_RPCERROR, RPC_PMAPFAILURE);
+		} else {
+			SET_ERR_RET(error, ERR_RPCERROR, rpc_createerr.cf_stat);
+		}
 		goto done;
 	}
 
@@ -1817,19 +1837,19 @@ done:
 		endnetpath(nc);
 
 	if (nb == NULL) {
-		if (error) {
-			/*
-			 * Check the saved errors. The RPC error has *
-			 * precedence over the no host error.
-			 */
-			if (errsave_nohost.error_type != ERR_PROTO_NONE)
-				SET_ERR_RET(error, errsave_nohost.error_type,
+		/*
+		 * Check the saved errors. The RPC error has *
+		 * precedence over the no host error.
+		 */
+		if (errsave_nohost.error_type != ERR_PROTO_NONE)
+			SET_ERR_RET(error, errsave_nohost.error_type,
 					errsave_nohost.error_value);
-			if (errsave_rpcerr.error_type != ERR_PROTO_NONE)
-				SET_ERR_RET(error, errsave_rpcerr.error_type,
+
+		if (errsave_rpcerr.error_type != ERR_PROTO_NONE)
+			SET_ERR_RET(error, errsave_rpcerr.error_type,
 					errsave_rpcerr.error_value);
-		}
 	}
+
 	return (nb);
 }
 
@@ -2338,7 +2358,7 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 					nfs_proto);
 				break;
 			case ERR_NOHOST:
-				pr_err("%s: %s\n", fshost, netdir_sperror());
+				pr_err("%s: %s\n", fshost, "Unknown host");
 				break;
 			default:
 				/* case ERR_PROTO_NONE falls through */
