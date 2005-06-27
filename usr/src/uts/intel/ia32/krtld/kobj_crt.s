@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,7 @@ exitto(caddr_t entrypoint)
 
 #else	/* lint */
 
+	.data
 save_esp2:
         .long   0
 
