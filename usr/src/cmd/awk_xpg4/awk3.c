@@ -38,7 +38,7 @@
 static int	dohash(wchar_t *name);
 static NODE	*arithmetic(NODE *np);
 static NODE	*comparison(NODE *np);
-static int	typeof(NODE *np);
+static int	type_of(NODE *np);
 static NODE	*lfield(INT fieldno, NODE *value);
 static NODE	*rfield(INT fieldno);
 static NODE	*userfunc(NODE *np);
@@ -143,7 +143,7 @@ strassign(NODE *np, STRING string, int flags, size_t length)
 	np->n_flags &= FSAVE;
 	if (flags & FSENSE) {
 		flags &= ~FSENSE;
-		flags |= typeof(np);
+		flags |= type_of(np);
 	} else
 		flags |= FSTRING;
 	np->n_flags |= flags;
@@ -340,7 +340,7 @@ stringnode(STRING s, int how, size_t length)
 		}
 	}
 	if (how & FSENSE) {
-		np->n_flags = typeof(np);
+		np->n_flags = type_of(np);
 		how &= ~FSENSE;
 	} else
 		np->n_flags = FSTRING;
@@ -1241,7 +1241,7 @@ arithmetic(NODE *np)
 
 	left = exprreduce(np->n_left);
 	if (isreal(left->n_flags)
-	|| (isstring(left->n_flags) && (typeof(left)&FVREAL))) {
+	|| (isstring(left->n_flags) && (type_of(left)&FVREAL))) {
 		type = FREAL;
 		r1 = exprreal(left);
 		r2 = exprreal(np->n_right);
@@ -1249,7 +1249,7 @@ arithmetic(NODE *np)
 		i1 = exprint(left);
 		right = exprreduce(np->n_right);
 		if (isreal(right->n_flags)
-		 || (isstring(right->n_flags) && (typeof(right)&FVREAL))) {
+		 || (isstring(right->n_flags) && (type_of(right)&FVREAL))) {
 
 			type = FREAL;
 			r1 = i1;
@@ -1390,9 +1390,9 @@ do_strcmp:
 		    (wchar_t *)exprstring(right));
 	} else {
 		if (isstring(tl))
-			tl = typeof(left);
+			tl = type_of(left);
 		if (isstring(tr))
-			tr = typeof(right);
+			tr = type_of(right);
 		if (!isnumber(tl) || !isnumber(tr))
 			goto do_strcmp;
 		if (isreal(tl) || isreal(tr)) {
@@ -1447,7 +1447,7 @@ do_strcmp:
  * will possibly have FVINT or FVREAL or'ed in.
  */
 static int
-typeof(NODE *np)
+type_of(NODE *np)
 {
 	wchar_t *cp;
 	int somedigits = 0;
