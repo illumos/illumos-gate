@@ -3548,21 +3548,10 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 char *
 mdi_pi_get_addr(mdi_pathinfo_t *pip)
 {
-	char *addr;
-
 	if (pip == NULL)
 		return (NULL);
 
-	addr = MDI_PI(pip)->pi_addr;
-
-	/*
-	 * XXX To be removed when libg_fc is updated to
-	 * skip leading 'w' in NWS consolidation.
-	 */
-	if (*addr == 'w')
-		addr += 1;
-
-	return (addr);
+	return (MDI_PI(pip)->pi_addr);
 }
 
 /*

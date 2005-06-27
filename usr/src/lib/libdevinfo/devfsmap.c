@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1303,7 +1303,7 @@ add_to_phci_list(char **phci_list, sv_path_info_t *pi, int npaths, int state,
 
 	while (npaths--) {
 		if (state == pi->ret_state) {
-			(void) snprintf(name, MAXPATHLEN, "%s/%s@w%s",
+			(void) snprintf(name, MAXPATHLEN, "%s/%s@%s",
 			    pi->device.ret_phci, node_name, pi->ret_addr);
 			if ((*phci_list = strdup(name)) == NULL)
 				return (-1);
