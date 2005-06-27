@@ -1358,33 +1358,66 @@ spdsock_encode_rule(mblk_t *req, const ipsec_policy_t *rule,
 }
 
 static ipsec_policy_t *
+spdsock_dump_next_in_chain(spdsock_t *ss, ipsec_policy_head_t *iph,
+    ipsec_policy_t *cur)
+{
+	ASSERT(RW_READ_HELD(&iph->iph_lock));
+
+	ss->spdsock_dump_count++;
+	ss->spdsock_dump_cur_rule = cur->ipsp_hash.hash_next;
+	return (cur);
+}
+
+static ipsec_policy_t *
 spdsock_dump_next_rule(spdsock_t *ss, ipsec_policy_head_t *iph)
 {
 	ipsec_policy_t *cur;
+	ipsec_policy_root_t *ipr;
+	int chain, nchains, type, af;
 
 	ASSERT(RW_READ_HELD(&iph->iph_lock));
 
 	cur = ss->spdsock_dump_cur_rule;
 
-	if (cur == NULL) {
-		int af = ss->spdsock_dump_cur_af;
-		int type = ss->spdsock_dump_cur_type;
-		do {
-			af++;
-			if (af >= IPSEC_NAF) {
-				af = IPSEC_AF_V4;
-				type++;
-				if (type >= IPSEC_NTYPES)
-					return (NULL);
-			}
-			cur = iph->iph_root[type].ipr[af];
-		} while (cur == NULL);
-		ss->spdsock_dump_cur_af = af;
-		ss->spdsock_dump_cur_type = type;
+	if (cur != NULL)
+		return (spdsock_dump_next_in_chain(ss, iph, cur));
+
+	type = ss->spdsock_dump_cur_type;
+
+next:
+	chain = ss->spdsock_dump_cur_chain;
+	ipr = &iph->iph_root[type];
+	nchains = ipr->ipr_nchains;
+
+	while (chain < nchains) {
+		cur = ipr->ipr_hash[chain].hash_head;
+		chain++;
+		if (cur != NULL) {
+			ss->spdsock_dump_cur_chain = chain;
+			return (spdsock_dump_next_in_chain(ss, iph, cur));
+		}
 	}
-	ss->spdsock_dump_count++;
-	ss->spdsock_dump_cur_rule = cur->ipsp_links.itl_next;
-	return (cur);
+	ss->spdsock_dump_cur_chain = nchains;
+
+	af = ss->spdsock_dump_cur_af;
+	while (af < IPSEC_NAF) {
+		cur = ipr->ipr_nonhash[af];
+		af++;
+		if (cur != NULL) {
+			ss->spdsock_dump_cur_af = af;
+			return (spdsock_dump_next_in_chain(ss, iph, cur));
+		}
+	}
+
+	type++;
+	if (type >= IPSEC_NTYPES)
+		return (NULL);
+
+	ss->spdsock_dump_cur_chain = 0;
+	ss->spdsock_dump_cur_type = type;
+	ss->spdsock_dump_cur_af = IPSEC_AF_V4;
+	goto next;
+
 }
 
 static mblk_t *
@@ -1476,9 +1509,9 @@ spdsock_dump(queue_t *q, ipsec_policy_head_t *iph,
 	ss->spdsock_dump_gen = iph->iph_gen;
 	ss->spdsock_dump_cur_type = 0;
 	ss->spdsock_dump_cur_af = IPSEC_AF_V4;
-	ss->spdsock_dump_cur_rule = iph->iph_root[0].ipr[IPSEC_AF_V4];
+	ss->spdsock_dump_cur_rule = iph->iph_root[0].ipr_nonhash[IPSEC_AF_V4];
 	ss->spdsock_dump_count = 0;
-
+	ss->spdsock_dump_cur_chain = 0;
 	rw_exit(&iph->iph_lock);
 
 	qreply(q, mr);

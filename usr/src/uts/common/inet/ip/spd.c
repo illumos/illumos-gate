@@ -94,8 +94,8 @@ static boolean_t ipsec_check_ipsecin_action(struct ipsec_in_s *, mblk_t *,
     kstat_named_t **);
 static int32_t ipsec_act_ovhd(const ipsec_act_t *act);
 static void ipsec_unregister_prov_update(void);
-static boolean_t ipsec_compare_action(ipsec_policy_t *p1,
-    ipsec_policy_t *p2);
+static boolean_t ipsec_compare_action(ipsec_policy_t *, ipsec_policy_t *);
+static uint32_t selector_hash(ipsec_selector_t *);
 
 /*
  * Policy rule index generator.  We assume this won't wrap in the
@@ -117,15 +117,25 @@ static ipsec_policy_head_t inactive_policy;
 static ipdropper_t spd_dropper;
 
 /*
- * For now, use a trivially sized hash table.
+ * For now, use a trivially sized hash table for actions.
  * In the future we can add the structure canonicalization necessary
  * to get the hash function to behave correctly..
  */
 #define	IPSEC_ACTION_HASH_SIZE 1
-#define	IPSEC_SEL_HASH_SIZE 1
+
+/*
+ * Selector hash table is statically sized at module load time.
+ * we default to 251 buckets, which is the largest prime number under 255
+ */
+
+#define	IPSEC_SPDHASH_DEFAULT 251
+uint32_t ipsec_spd_hashsize = 0;
+
+#define	IPSEC_SEL_NOHASH ((uint32_t)(~0))
 
 static HASH_HEAD(ipsec_action_s) ipsec_action_hash[IPSEC_ACTION_HASH_SIZE];
-static HASH_HEAD(ipsec_sel) ipsec_sel_hash[IPSEC_SEL_HASH_SIZE];
+static HASH_HEAD(ipsec_sel) *ipsec_sel_hash;
+
 static kmem_cache_t *ipsec_action_cache;
 static kmem_cache_t *ipsec_sel_cache;
 static kmem_cache_t *ipsec_pol_cache;
@@ -159,6 +169,12 @@ static crypto_notify_handle_t prov_update_handle = NULL;
 	(((sa1) == NULL) || ((sa2) == NULL) ||				\
 	(((sa1)->ipsa_src_cid == (sa2)->ipsa_src_cid) &&		\
 	    (((sa1)->ipsa_dst_cid == (sa2)->ipsa_dst_cid))))
+
+#define	IPPOL_UNCHAIN(php, ip) 						\
+	HASHLIST_UNCHAIN((ip), ipsp_hash);				\
+	avl_remove(&(php)->iph_rulebyid, (ip));				\
+	IPPOL_REFRELE(ip);
+
 /*
  * Policy failure messages.
  */
@@ -213,6 +229,98 @@ hrtime_t ipsec_policy_failure_last = 0;
  *	entries..
  */
 
+
+/*
+ * AVL tree comparison function.
+ * the in-kernel avl assumes unique keys for all objects.
+ * Since sometimes policy will duplicate rules, we may insert
+ * multiple rules with the same rule id, so we need a tie-breaker.
+ */
+static int
+ipsec_policy_cmpbyid(const void *a, const void *b)
+{
+	const ipsec_policy_t *ipa, *ipb;
+	uint64_t idxa, idxb;
+
+	ipa = (const ipsec_policy_t *)a;
+	ipb = (const ipsec_policy_t *)b;
+	idxa = ipa->ipsp_index;
+	idxb = ipb->ipsp_index;
+
+	if (idxa < idxb)
+		return (-1);
+	if (idxa > idxb)
+		return (1);
+	/*
+	 * Tie-breaker #1: All installed policy rules have a non-NULL
+	 * ipsl_sel (selector set), so an entry with a NULL ipsp_sel is not
+	 * actually in-tree but rather a template node being used in
+	 * an avl_find query; see ipsec_policy_delete().  This gives us
+	 * a placeholder in the ordering just before the the first entry with
+	 * a key >= the one we're looking for, so we can walk forward from
+	 * that point to get the remaining entries with the same id.
+	 */
+	if ((ipa->ipsp_sel == NULL) && (ipb->ipsp_sel != NULL))
+		return (-1);
+	if ((ipb->ipsp_sel == NULL) && (ipa->ipsp_sel != NULL))
+		return (1);
+	/*
+	 * At most one of the arguments to the comparison should have a
+	 * NULL selector pointer; if not, the tree is broken.
+	 */
+	ASSERT(ipa->ipsp_sel != NULL);
+	ASSERT(ipb->ipsp_sel != NULL);
+	/*
+	 * Tie-breaker #2: use the virtual address of the policy node
+	 * to arbitrarily break ties.  Since we use the new tree node in
+	 * the avl_find() in ipsec_insert_always, the new node will be
+	 * inserted into the tree in the right place in the sequence.
+	 */
+	if (ipa < ipb)
+		return (-1);
+	if (ipa > ipb)
+		return (1);
+	return (0);
+}
+
+static void
+ipsec_polhead_free_table(ipsec_policy_head_t *iph)
+{
+	int dir, nchains;
+
+	nchains = ipsec_spd_hashsize;
+
+	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
+		ipsec_policy_root_t *ipr = &iph->iph_root[dir];
+
+		if (ipr->ipr_hash == NULL)
+			continue;
+
+		kmem_free(ipr->ipr_hash, nchains *
+		    sizeof (ipsec_policy_hash_t));
+	}
+}
+
+static void
+ipsec_polhead_destroy(ipsec_policy_head_t *iph)
+{
+	int dir;
+
+	avl_destroy(&iph->iph_rulebyid);
+	rw_destroy(&iph->iph_lock);
+
+	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
+		ipsec_policy_root_t *ipr = &iph->iph_root[dir];
+		int nchains = ipr->ipr_nchains;
+		int chain;
+
+		for (chain = 0; chain < nchains; chain++)
+			mutex_destroy(&(ipr->ipr_hash[chain].hash_lock));
+
+	}
+	ipsec_polhead_free_table(iph);
+}
+
 /*
  * Module unload hook.
  */
@@ -224,13 +332,13 @@ ipsec_policy_destroy(void)
 	ip_drop_unregister(&spd_dropper);
 	ip_drop_destroy();
 
-	rw_destroy(&system_policy.iph_lock);
-	rw_destroy(&inactive_policy.iph_lock);
+	ipsec_polhead_destroy(&system_policy);
+	ipsec_polhead_destroy(&inactive_policy);
 
 	for (i = 0; i < IPSEC_ACTION_HASH_SIZE; i++)
 		mutex_destroy(&(ipsec_action_hash[i].hash_lock));
 
-	for (i = 0; i < IPSEC_SEL_HASH_SIZE; i++)
+	for (i = 0; i < ipsec_spd_hashsize; i++)
 		mutex_destroy(&(ipsec_sel_hash[i].hash_lock));
 
 	ipsec_unregister_prov_update();
@@ -245,6 +353,97 @@ ipsec_policy_destroy(void)
 	ipsid_fini();
 }
 
+
+/*
+ * Called when table allocation fails to free the table.
+ */
+static int
+ipsec_alloc_tables_failed()
+{
+	if (ipsec_sel_hash != NULL) {
+		kmem_free(ipsec_sel_hash, ipsec_spd_hashsize *
+		    sizeof (*ipsec_sel_hash));
+		ipsec_sel_hash = NULL;
+	}
+	ipsec_polhead_free_table(&system_policy);
+	ipsec_polhead_free_table(&inactive_policy);
+
+	return (ENOMEM);
+}
+
+/*
+ * Attempt to allocate the tables in a single policy head.
+ * Return nonzero on failure after cleaning up any work in progress.
+ */
+static int
+ipsec_alloc_table(ipsec_policy_head_t *iph, int kmflag)
+{
+	int dir, nchains;
+
+	nchains = ipsec_spd_hashsize;
+
+	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
+		ipsec_policy_root_t *ipr = &iph->iph_root[dir];
+
+		ipr->ipr_hash = kmem_zalloc(nchains *
+		    sizeof (ipsec_policy_hash_t), kmflag);
+		if (ipr->ipr_hash == NULL)
+			return (ipsec_alloc_tables_failed());
+	}
+	return (0);
+}
+
+/*
+ * Attempt to allocate the various tables.  Return nonzero on failure
+ * after cleaning up any work in progress.
+ */
+static int
+ipsec_alloc_tables(int kmflag)
+{
+	int error;
+
+	error = ipsec_alloc_table(&system_policy, kmflag);
+	if (error != 0)
+		return (error);
+
+	error = ipsec_alloc_table(&inactive_policy, kmflag);
+	if (error != 0)
+		return (error);
+
+	ipsec_sel_hash = kmem_zalloc(ipsec_spd_hashsize *
+	    sizeof (*ipsec_sel_hash), kmflag);
+
+	if (ipsec_sel_hash == NULL)
+		return (ipsec_alloc_tables_failed());
+
+	return (0);
+}
+
+/*
+ * After table allocation, initialize a policy head.
+ */
+static void
+ipsec_polhead_init(ipsec_policy_head_t *iph)
+{
+	int dir, chain, nchains;
+
+	nchains = ipsec_spd_hashsize;
+
+	rw_init(&iph->iph_lock, NULL, RW_DEFAULT, NULL);
+	avl_create(&iph->iph_rulebyid, ipsec_policy_cmpbyid,
+	    sizeof (ipsec_policy_t), offsetof(ipsec_policy_t, ipsp_byid));
+
+	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
+		ipsec_policy_root_t *ipr = &iph->iph_root[dir];
+		ipr->ipr_nchains = nchains;
+
+		for (chain = 0; chain < nchains; chain++) {
+			mutex_init(&(ipr->ipr_hash[chain].hash_lock),
+			    NULL, MUTEX_DEFAULT, NULL);
+		}
+	}
+}
+
 /*
  * Module load hook.
  */
@@ -252,16 +451,34 @@ void
 ipsec_policy_init()
 {
 	int i;
-	ipsid_init();
 
-	rw_init(&system_policy.iph_lock, NULL, RW_DEFAULT, NULL);
-	rw_init(&inactive_policy.iph_lock, NULL, RW_DEFAULT, NULL);
+	/*
+	 * Make two attempts to allocate policy hash tables; try it at
+	 * the "preferred" size (may be set in /etc/system) first,
+	 * then fall back to the default size.
+	 */
+	if (ipsec_spd_hashsize == 0)
+		ipsec_spd_hashsize = IPSEC_SPDHASH_DEFAULT;
+
+	if (ipsec_alloc_tables(KM_NOSLEEP) != 0) {
+		cmn_err(CE_WARN,
+		    "Unable to allocate %d entry IPsec policy hash table",
+		    ipsec_spd_hashsize);
+		ipsec_spd_hashsize = IPSEC_SPDHASH_DEFAULT;
+		cmn_err(CE_WARN, "Falling back to %d entries",
+		    ipsec_spd_hashsize);
+		(void) ipsec_alloc_tables(KM_SLEEP);
+	}
+
+	ipsid_init();
+	ipsec_polhead_init(&system_policy);
+	ipsec_polhead_init(&inactive_policy);
 
 	for (i = 0; i < IPSEC_ACTION_HASH_SIZE; i++)
 		mutex_init(&(ipsec_action_hash[i].hash_lock),
 		    NULL, MUTEX_DEFAULT, NULL);
 
-	for (i = 0; i < IPSEC_SEL_HASH_SIZE; i++)
+	for (i = 0; i < ipsec_spd_hashsize; i++)
 		mutex_init(&(ipsec_sel_hash[i].hash_lock),
 		    NULL, MUTEX_DEFAULT, NULL);
 
@@ -417,16 +634,42 @@ void
 ipsec_swap_policy(void)
 {
 	int af, dir;
-	ipsec_policy_t *t1, *t2;
+	avl_tree_t r1, r2;
 
 	rw_enter(&inactive_policy.iph_lock, RW_WRITER);
 	rw_enter(&system_policy.iph_lock, RW_WRITER);
+
+	r1 = system_policy.iph_rulebyid;
+	r2 = inactive_policy.iph_rulebyid;
+	system_policy.iph_rulebyid = r2;
+	inactive_policy.iph_rulebyid = r1;
+
 	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
+		ipsec_policy_hash_t *h1, *h2;
+
+		h1 = system_policy.iph_root[dir].ipr_hash;
+		h2 = inactive_policy.iph_root[dir].ipr_hash;
+		system_policy.iph_root[dir].ipr_hash = h2;
+		inactive_policy.iph_root[dir].ipr_hash = h1;
+
 		for (af = 0; af < IPSEC_NAF; af++) {
-			t1 = system_policy.iph_root[dir].ipr[af];
-			t2 = inactive_policy.iph_root[dir].ipr[af];
-			system_policy.iph_root[dir].ipr[af] = t2;
-			inactive_policy.iph_root[dir].ipr[af] = t1;
+			ipsec_policy_t *t1, *t2;
+
+			t1 = system_policy.iph_root[dir].ipr_nonhash[af];
+			t2 = inactive_policy.iph_root[dir].ipr_nonhash[af];
+			system_policy.iph_root[dir].ipr_nonhash[af] = t2;
+			inactive_policy.iph_root[dir].ipr_nonhash[af] = t1;
+			if (t1 != NULL) {
+				t1->ipsp_hash.hash_pp =
+				    &(inactive_policy.iph_root[dir].
+				    ipr_nonhash[af]);
+			}
+			if (t2 != NULL) {
+				t2->ipsp_hash.hash_pp =
+				    &(system_policy.iph_root[dir].
+				    ipr_nonhash[af]);
+			}
+
 		}
 	}
 	system_policy.iph_gen++;
@@ -453,7 +696,7 @@ ipsec_copy_policy(const ipsec_policy_t *src)
 	IPACT_REFHOLD(src->ipsp_act);
 	src->ipsp_sel->ipsl_refs++;
 
-	dst->ipsp_links.itl_next = NULL;
+	HASH_NULL(dst, ipsp_hash);
 	dst->ipsp_refs = 1;
 	dst->ipsp_sel = src->ipsp_sel;
 	dst->ipsp_act = src->ipsp_act;
@@ -462,6 +705,35 @@ ipsec_copy_policy(const ipsec_policy_t *src)
 
 	return (dst);
 }
+
+void
+ipsec_insert_always(avl_tree_t *tree, void *new_node)
+{
+	void *node;
+	avl_index_t where;
+
+	node = avl_find(tree, new_node, &where);
+	ASSERT(node == NULL);
+	avl_insert(tree, new_node, where);
+}
+
+
+static int
+ipsec_copy_chain(ipsec_policy_head_t *dph, ipsec_policy_t *src,
+    ipsec_policy_t **dstp)
+{
+	for (; src != NULL; src = src->ipsp_hash.hash_next) {
+		ipsec_policy_t *dst = ipsec_copy_policy(src);
+		if (dst == NULL)
+			return (ENOMEM);
+
+		HASHLIST_INSERT(dst, ipsp_hash, *dstp);
+		ipsec_insert_always(&dph->iph_rulebyid, dst);
+	}
+	return (0);
+}
+
+
 
 /*
  * Make one policy head look exactly like another.
@@ -473,8 +745,7 @@ ipsec_copy_policy(const ipsec_policy_t *src)
 static int
 ipsec_copy_polhead(ipsec_policy_head_t *sph, ipsec_policy_head_t *dph)
 {
-	int af, dir;
-	ipsec_policy_t *src, *dst, **dstp;
+	int af, dir, chain, nchains;
 
 	rw_enter(&dph->iph_lock, RW_WRITER);
 
@@ -483,19 +754,23 @@ ipsec_copy_polhead(ipsec_policy_head_t *sph, ipsec_policy_head_t *dph)
 	rw_enter(&sph->iph_lock, RW_READER);
 
 	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
+		ipsec_policy_root_t *dpr = &dph->iph_root[dir];
+		ipsec_policy_root_t *spr = &sph->iph_root[dir];
+		nchains = dpr->ipr_nchains;
+
+		ASSERT(dpr->ipr_nchains == spr->ipr_nchains);
+
 		for (af = 0; af < IPSEC_NAF; af++) {
-			dstp = &dph->iph_root[dir].ipr[af];
-			for (src = sph->iph_root[dir].ipr[af];
-			    src != NULL; src = src->ipsp_links.itl_next) {
-				dst = ipsec_copy_policy(src);
-				if (dst == NULL) {
-					rw_exit(&sph->iph_lock);
-					rw_exit(&dph->iph_lock);
-					return (ENOMEM);
-				}
-				*dstp = dst;
-				dstp = &dst->ipsp_links.itl_next;
-			}
+			if (ipsec_copy_chain(dph, spr->ipr_nonhash[af],
+			    &dpr->ipr_nonhash[af]))
+				goto abort_copy;
+		}
+
+		for (chain = 0; chain < nchains; chain++) {
+			if (ipsec_copy_chain(dph,
+			    spr->ipr_hash[chain].hash_head,
+			    &dpr->ipr_hash[chain].hash_head))
+				goto abort_copy;
 		}
 	}
 
@@ -504,6 +779,12 @@ ipsec_copy_polhead(ipsec_policy_head_t *sph, ipsec_policy_head_t *dph)
 	rw_exit(&sph->iph_lock);
 	rw_exit(&dph->iph_lock);
 	return (0);
+
+abort_copy:
+	ipsec_polhead_flush(dph);
+	rw_exit(&sph->iph_lock);
+	rw_exit(&dph->iph_lock);
+	return (ENOMEM);
 }
 
 /*
@@ -896,9 +1177,12 @@ ipsec_req_from_head(ipsec_policy_head_t *ph, ipsec_req_t *req, int af)
 {
 	ipsec_policy_t *p;
 
-	for (p = ph->iph_root[IPSEC_INBOUND].ipr[af];
+	/*
+	 * FULL-PERSOCK: consult hash table, too?
+	 */
+	for (p = ph->iph_root[IPSEC_INBOUND].ipr_nonhash[af];
 	    p != NULL;
-	    p = p->ipsp_links.itl_next) {
+	    p = p->ipsp_hash.hash_next) {
 		if ((p->ipsp_sel->ipsl_key.ipsl_valid&IPSL_WILDCARD) == 0)
 			return (ipsec_req_from_act(p->ipsp_act, req));
 	}
@@ -1316,48 +1600,17 @@ ip_addr_match(uint8_t *addr1, int pfxlen, in6_addr_t *addr2p)
 		    (0xff<<(8-bitsleft))) == 0)));
 }
 
-/*
- * Try to find and return the best policy entry under a given policy
- * root for a given set of selectors; the first parameter "best" is
- * the current best policy so far.  If "best" is non-null, we have a
- * reference to it.  We return a reference to a policy; if that policy
- * is not the original "best", we need to release that reference
- * before returning.
- */
 static ipsec_policy_t *
-ipsec_find_policy_head(ipsec_policy_t *best,
-    ipsec_policy_head_t *head, int direction, ipsec_selector_t *sel)
+ipsec_find_policy_chain(ipsec_policy_t *best, ipsec_policy_t *chain,
+    ipsec_selector_t *sel, boolean_t is_icmp_inv_acq)
 {
-	ipsec_policy_t *p, *curbest;
 	ipsec_selkey_t *isel;
-	uint32_t valid;
-	ipsec_policy_root_t *root;
-	uint8_t is_icmp_inv_acq = sel->ips_is_icmp_inv_acq;
+	ipsec_policy_t *p;
 	int bpri = best ? best->ipsp_prio : 0;
-	int af = sel->ips_isv4 ? IPSEC_AF_V4 : IPSEC_AF_V6;
 
-	curbest = best;
-	root = &head->iph_root[direction];
+	for (p = chain; p != NULL; p = p->ipsp_hash.hash_next) {
+		uint32_t valid;
 
-#ifdef DEBUG
-	if (is_icmp_inv_acq) {
-		if (sel->ips_isv4) {
-			if (sel->ips_protocol != IPPROTO_ICMP) {
-			    cmn_err(CE_WARN, "ipsec_find_policy_head:"
-			    " expecting icmp, got %d", sel->ips_protocol);
-			}
-		} else {
-			if (sel->ips_protocol != IPPROTO_ICMP) {
-				cmn_err(CE_WARN, "ipsec_find_policy_head:"
-				" expecting icmpv6, got %d", sel->ips_protocol);
-			}
-		}
-	}
-#endif
-
-	rw_enter(&head->iph_lock, RW_READER);
-
-	for (p = root->ipr[af]; p != NULL; p = p->ipsp_links.itl_next) {
 		if (p->ipsp_prio <= bpri)
 			continue;
 		isel = &p->ipsp_sel->ipsl_key;
@@ -1410,17 +1663,66 @@ ipsec_find_policy_head(ipsec_policy_t *best,
 		}
 
 		/* we matched all the packet-port-field selectors! */
-		curbest = p;
+		best = p;
 		bpri = p->ipsp_prio;
 	}
 
+	return (best);
+}
+
+/*
+ * Try to find and return the best policy entry under a given policy
+ * root for a given set of selectors; the first parameter "best" is
+ * the current best policy so far.  If "best" is non-null, we have a
+ * reference to it.  We return a reference to a policy; if that policy
+ * is not the original "best", we need to release that reference
+ * before returning.
+ */
+static ipsec_policy_t *
+ipsec_find_policy_head(ipsec_policy_t *best,
+    ipsec_policy_head_t *head, int direction, ipsec_selector_t *sel,
+    int selhash)
+{
+	ipsec_policy_t *curbest;
+	ipsec_policy_root_t *root;
+	uint8_t is_icmp_inv_acq = sel->ips_is_icmp_inv_acq;
+	int af = sel->ips_isv4 ? IPSEC_AF_V4 : IPSEC_AF_V6;
+
+	curbest = best;
+	root = &head->iph_root[direction];
+
+#ifdef DEBUG
+	if (is_icmp_inv_acq) {
+		if (sel->ips_isv4) {
+			if (sel->ips_protocol != IPPROTO_ICMP) {
+			    cmn_err(CE_WARN, "ipsec_find_policy_head:"
+			    " expecting icmp, got %d", sel->ips_protocol);
+			}
+		} else {
+			if (sel->ips_protocol != IPPROTO_ICMPV6) {
+				cmn_err(CE_WARN, "ipsec_find_policy_head:"
+				" expecting icmpv6, got %d", sel->ips_protocol);
+			}
+		}
+	}
+#endif
+
+	rw_enter(&head->iph_lock, RW_READER);
+
+	if (root->ipr_nchains > 0) {
+		curbest = ipsec_find_policy_chain(curbest,
+		    root->ipr_hash[selhash].hash_head, sel, is_icmp_inv_acq);
+	}
+	curbest = ipsec_find_policy_chain(curbest, root->ipr_nonhash[af], sel,
+	    is_icmp_inv_acq);
+
 	/*
-	 * Adjust reference counts if we found anything.
+	 * Adjust reference counts if we found anything new.
 	 */
 	if (curbest != best) {
-		if (curbest != NULL) {
-			IPPOL_REFHOLD(curbest);
-		}
+		ASSERT(curbest != NULL);
+		IPPOL_REFHOLD(curbest);
+
 		if (best != NULL) {
 			IPPOL_REFRELE(best);
 		}
@@ -1444,14 +1746,16 @@ ipsec_find_policy(int direction, conn_t *connp, ipsec_out_t *io,
     ipsec_selector_t *sel)
 {
 	ipsec_policy_t *p;
+	int selhash = selector_hash(sel);
 
-	p = ipsec_find_policy_head(NULL, &system_policy, direction, sel);
+	p = ipsec_find_policy_head(NULL, &system_policy, direction, sel,
+	    selhash);
 	if ((connp != NULL) && (connp->conn_policy != NULL)) {
 		p = ipsec_find_policy_head(p, connp->conn_policy,
-		    direction, sel);
+		    direction, sel, selhash);
 	} else if ((io != NULL) && (io->ipsec_out_polhead != NULL)) {
 		p = ipsec_find_policy_head(p, io->ipsec_out_polhead,
-		    direction, sel);
+		    direction, sel, selhash);
 	}
 
 	return (p);
@@ -2120,8 +2424,7 @@ ipsec_in_to_out_action(ipsec_in_t *ii)
 		return (NULL);
 
 	bzero(ap, sizeof (*ap));
-	ap->ipa_hash.hash_next = NULL;
-	ap->ipa_hash.hash_pp = NULL;
+	HASH_NULL(ap, ipa_hash);
 	ap->ipa_next = NULL;
 	ap->ipa_refs = 1;
 
@@ -2236,6 +2539,51 @@ static uint32_t
 policy_hash(int size, const void *start, const void *end)
 {
 	return (0);
+}
+
+
+/*
+ * Hash function macros for each address type.
+ *
+ * The IPV6 hash function assumes that the low order 32-bits of the
+ * address (typically containing the low order 24 bits of the mac
+ * address) are reasonably well-distributed.  Revisit this if we run
+ * into trouble from lots of collisions on ::1 addresses and the like
+ * (seems unlikely).
+ */
+#define	IPSEC_IPV4_HASH(a) ((a) % ipsec_spd_hashsize)
+#define	IPSEC_IPV6_HASH(a) ((a.s6_addr32[3]) % ipsec_spd_hashsize)
+
+/*
+ * These two hash functions should produce coordinated values
+ * but have slightly different roles.
+ */
+static uint32_t
+selkey_hash(const ipsec_selkey_t *selkey)
+{
+	uint32_t valid = selkey->ipsl_valid;
+
+	if (!(valid & IPSL_REMOTE_ADDR))
+		return (IPSEC_SEL_NOHASH);
+
+	if (valid & IPSL_IPV4) {
+		if (selkey->ipsl_remote_pfxlen == 32)
+			return (IPSEC_IPV4_HASH(selkey->ipsl_remote.ipsad_v4));
+	}
+	if (valid & IPSL_IPV6) {
+		if (selkey->ipsl_remote_pfxlen == 128)
+			return (IPSEC_IPV6_HASH(selkey->ipsl_remote.ipsad_v6));
+	}
+	return (IPSEC_SEL_NOHASH);
+}
+
+static uint32_t
+selector_hash(ipsec_selector_t *sel)
+{
+	if (sel->ips_isv4) {
+		return (IPSEC_IPV4_HASH(sel->ips_remote_addr_v4));
+	}
+	return (IPSEC_IPV6_HASH(sel->ips_remote_addr_v6));
 }
 
 /*
@@ -2392,11 +2740,11 @@ ipsec_action_reclaim(void *dummy)
  * Intern a selector set into the selector set hash table.
  * This is simpler than the actions case..
  */
-ipsec_sel_t *
-ipsec_find_sel(const ipsec_selkey_t *selkey)
+static ipsec_sel_t *
+ipsec_find_sel(ipsec_selkey_t *selkey)
 {
 	ipsec_sel_t *sp;
-	uint32_t hval;
+	uint32_t hval, bucket;
 
 	/*
 	 * Exactly one AF bit should be set in selkey.
@@ -2404,37 +2752,36 @@ ipsec_find_sel(const ipsec_selkey_t *selkey)
 	ASSERT(!(selkey->ipsl_valid & IPSL_IPV4) ^
 	    !(selkey->ipsl_valid & IPSL_IPV6));
 
-	/*
-	 * TODO: should canonicalize selkey (i.e., zeroize any padding)
-	 * so we can use a non-trivial policy_hash function.
-	 */
-	hval = policy_hash(IPSEC_SEL_HASH_SIZE, selkey, selkey+1);
+	hval = selkey_hash(selkey);
+	selkey->ipsl_hval = hval;
 
-	ASSERT(!HASH_LOCKED(ipsec_sel_hash, hval));
-	HASH_LOCK(ipsec_sel_hash, hval);
+	bucket = (hval == IPSEC_SEL_NOHASH) ? 0 : hval;
 
-	for (HASH_ITERATE(sp, ipsl_hash, ipsec_sel_hash, hval)) {
+	ASSERT(!HASH_LOCKED(ipsec_sel_hash, bucket));
+	HASH_LOCK(ipsec_sel_hash, bucket);
+
+	for (HASH_ITERATE(sp, ipsl_hash, ipsec_sel_hash, bucket)) {
 		if (bcmp(&sp->ipsl_key, selkey, sizeof (*selkey)) == 0)
 			break;
 	}
 	if (sp != NULL) {
 		sp->ipsl_refs++;
 
-		HASH_UNLOCK(ipsec_sel_hash, hval);
+		HASH_UNLOCK(ipsec_sel_hash, bucket);
 		return (sp);
 	}
+
 	sp = kmem_cache_alloc(ipsec_sel_cache, KM_NOSLEEP);
 	if (sp == NULL) {
-		HASH_UNLOCK(ipsec_sel_hash, hval);
+		HASH_UNLOCK(ipsec_sel_hash, bucket);
 		return (NULL);
 	}
 
-	HASH_INSERT(sp, ipsl_hash, ipsec_sel_hash, hval);
+	HASH_INSERT(sp, ipsl_hash, ipsec_sel_hash, bucket);
 	sp->ipsl_refs = 2;	/* one for hash table, one for caller */
 	sp->ipsl_key = *selkey;
-	sp->ipsl_key.ipsl_hval = (uint8_t)hval;
 
-	HASH_UNLOCK(ipsec_sel_hash, hval);
+	HASH_UNLOCK(ipsec_sel_hash, bucket);
 
 	return (sp);
 }
@@ -2445,6 +2792,9 @@ ipsec_sel_rel(ipsec_sel_t **spp)
 	ipsec_sel_t *sp = *spp;
 	int hval = sp->ipsl_key.ipsl_hval;
 	*spp = NULL;
+
+	if (hval == IPSEC_SEL_NOHASH)
+		hval = 0;
 
 	ASSERT(!HASH_LOCKED(ipsec_sel_hash, hval));
 	HASH_LOCK(ipsec_sel_hash, hval);
@@ -2480,8 +2830,8 @@ ipsec_policy_free(ipsec_policy_t *ipp)
  * the appropriate tables.
  */
 ipsec_policy_t *
-ipsec_policy_create(const ipsec_selkey_t *keys,
-    const ipsec_act_t *a, int nacts, int prio)
+ipsec_policy_create(ipsec_selkey_t *keys, const ipsec_act_t *a,
+    int nacts, int prio)
 {
 	ipsec_action_t *ap;
 	ipsec_sel_t *sp;
@@ -2502,7 +2852,7 @@ ipsec_policy_create(const ipsec_selkey_t *keys,
 		return (NULL);
 	}
 
-	ipp->ipsp_links.itl_next = NULL;
+	HASH_NULL(ipp, ipsp_hash);
 
 	ipp->ipsp_refs = 1;	/* caller's reference */
 	ipp->ipsp_sel = sp;
@@ -2516,24 +2866,37 @@ ipsec_policy_create(const ipsec_selkey_t *keys,
 static void
 ipsec_update_present_flags()
 {
+	boolean_t hashpol = (avl_numnodes(&system_policy.iph_rulebyid) > 0);
+
+	if (hashpol) {
+		ipsec_outbound_v4_policy_present = B_TRUE;
+		ipsec_outbound_v6_policy_present = B_TRUE;
+		ipsec_inbound_v4_policy_present = B_TRUE;
+		ipsec_inbound_v6_policy_present = B_TRUE;
+		return;
+	}
+
 	ipsec_outbound_v4_policy_present = (NULL !=
-	    system_policy.iph_root[IPSEC_TYPE_OUTBOUND].ipr[IPSEC_AF_V4]);
+	    system_policy.iph_root[IPSEC_TYPE_OUTBOUND].
+	    ipr_nonhash[IPSEC_AF_V4]);
 	ipsec_outbound_v6_policy_present = (NULL !=
-	    system_policy.iph_root[IPSEC_TYPE_OUTBOUND].ipr[IPSEC_AF_V6]);
+	    system_policy.iph_root[IPSEC_TYPE_OUTBOUND].
+	    ipr_nonhash[IPSEC_AF_V6]);
 	ipsec_inbound_v4_policy_present = (NULL !=
-	    system_policy.iph_root[IPSEC_TYPE_INBOUND].ipr[IPSEC_AF_V4]);
+	    system_policy.iph_root[IPSEC_TYPE_INBOUND].
+	    ipr_nonhash[IPSEC_AF_V4]);
 	ipsec_inbound_v6_policy_present = (NULL !=
-	    system_policy.iph_root[IPSEC_TYPE_INBOUND].ipr[IPSEC_AF_V6]);
+	    system_policy.iph_root[IPSEC_TYPE_INBOUND].
+	    ipr_nonhash[IPSEC_AF_V6]);
 }
 
 boolean_t
-ipsec_policy_delete(ipsec_policy_head_t *php,
-    const ipsec_selkey_t *keys, int dir)
+ipsec_policy_delete(ipsec_policy_head_t *php, ipsec_selkey_t *keys, int dir)
 {
 	ipsec_sel_t *sp;
-	ipsec_policy_t **pptr;
-	ipsec_policy_t *ip;
+	ipsec_policy_t *ip, *nip, *head;
 	int af;
+	ipsec_policy_root_t *pr = &php->iph_root[dir];
 
 	sp = ipsec_find_sel(keys);
 
@@ -2544,20 +2907,30 @@ ipsec_policy_delete(ipsec_policy_head_t *php,
 
 	rw_enter(&php->iph_lock, RW_WRITER);
 
-	for (pptr = &php->iph_root[dir].ipr[af], ip = *pptr;
-	    ip != NULL; ip = *pptr) {
+	if (keys->ipsl_hval == IPSEC_SEL_NOHASH) {
+		head = pr->ipr_nonhash[af];
+	} else {
+		head = pr->ipr_hash[keys->ipsl_hval].hash_head;
+	}
+
+	for (ip = head; ip != NULL; ip = nip) {
+		nip = ip->ipsp_hash.hash_next;
 		if (ip->ipsp_sel != sp) {
-			pptr = &ip->ipsp_links.itl_next;
 			continue;
 		}
-		*pptr = ip->ipsp_links.itl_next;
-		rw_exit(&php->iph_lock);
-		IPPOL_REFRELE(ip);
-		ipsec_sel_rel(&sp);
+
+		IPPOL_UNCHAIN(php, ip);
+
 		php->iph_gen++;
+		ipsec_update_present_flags();
+
+		rw_exit(&php->iph_lock);
+
+		ipsec_sel_rel(&sp);
+
 		return (B_TRUE);
 	}
-	ipsec_update_present_flags();
+
 	rw_exit(&php->iph_lock);
 	ipsec_sel_rel(&sp);
 	return (B_FALSE);
@@ -2566,33 +2939,47 @@ ipsec_policy_delete(ipsec_policy_head_t *php,
 int
 ipsec_policy_delete_index(ipsec_policy_head_t *php, uint64_t policy_index)
 {
-	int dir;
-	boolean_t found;
+	boolean_t found = B_FALSE;
+	ipsec_policy_t ipkey;
+	ipsec_policy_t *ip;
+	avl_index_t where;
 
-	found = B_FALSE;
+	(void) memset(&ipkey, 0, sizeof (ipkey));
+	ipkey.ipsp_index = policy_index;
 
 	rw_enter(&php->iph_lock, RW_WRITER);
-	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
-		ipsec_policy_t **pptr;
-		ipsec_policy_t *ip;
-		int af;
 
-		for (af = 0; af < IPSEC_NAF; af++) {
-			for (pptr = &php->iph_root[dir].ipr[af], ip = *pptr;
-			    ip != NULL; ip = *pptr) {
-				if (ip->ipsp_index != policy_index) {
-					pptr = &ip->ipsp_links.itl_next;
-					continue;
-				}
-				*pptr = ip->ipsp_links.itl_next;
-				php->iph_gen++;
-				IPPOL_REFRELE(ip);
-				found = B_TRUE;
-			}
+	/*
+	 * We could be cleverer here about the walk.
+	 * but well, (k+1)*log(N) will do for now (k==number of matches,
+	 * N==number of table entries
+	 */
+	for (;;) {
+		ip = (ipsec_policy_t *)avl_find(&php->iph_rulebyid,
+		    (void *)&ipkey, &where);
+		ASSERT(ip == NULL);
+
+		ip = avl_nearest(&php->iph_rulebyid, where, AVL_AFTER);
+
+		if (ip == NULL)
+			break;
+
+		if (ip->ipsp_index != policy_index) {
+			ASSERT(ip->ipsp_index > policy_index);
+			break;
 		}
+
+		IPPOL_UNCHAIN(php, ip);
+		found = B_TRUE;
 	}
-	ipsec_update_present_flags();
+
+	if (found) {
+		php->iph_gen++;
+		ipsec_update_present_flags();
+	}
+
 	rw_exit(&php->iph_lock);
+
 	return (found ? 0 : ENOENT);
 }
 
@@ -2609,28 +2996,35 @@ ipsec_check_policy(ipsec_policy_head_t *php, ipsec_policy_t *ipp, int direction)
 {
 	ipsec_policy_root_t *pr = &php->iph_root[direction];
 	int af = -1;
-	ipsec_policy_t *p2;
+	ipsec_policy_t *p2, *head;
 	uint8_t check_proto;
+	ipsec_selkey_t *selkey = &ipp->ipsp_sel->ipsl_key;
+	uint32_t	valid = selkey->ipsl_valid;
 
-	ASSERT(RW_WRITE_HELD(&php->iph_lock));
-
-	if (ipp->ipsp_sel->ipsl_key.ipsl_valid & IPSL_IPV6) {
-		ASSERT(!(ipp->ipsp_sel->ipsl_key.ipsl_valid & IPSL_IPV4));
+	if (valid & IPSL_IPV6) {
+		ASSERT(!(valid & IPSL_IPV4));
 		af = IPSEC_AF_V6;
 		check_proto = IPPROTO_ICMPV6;
 	} else {
-		ASSERT(ipp->ipsp_sel->ipsl_key.ipsl_valid & IPSL_IPV4);
+		ASSERT(valid & IPSL_IPV4);
 		af = IPSEC_AF_V4;
 		check_proto = IPPROTO_ICMP;
 	}
+
+	ASSERT(RW_WRITE_HELD(&php->iph_lock));
 
 	/*
 	 * Double-check that we don't have any duplicate selectors here.
 	 * Because selectors are interned below, we need only compare pointers
 	 * for equality.
 	 */
+	if (selkey->ipsl_hval == IPSEC_SEL_NOHASH) {
+		head = pr->ipr_nonhash[af];
+	} else {
+		head = pr->ipr_hash[selkey->ipsl_hval].hash_head;
+	}
 
-	for (p2 = pr->ipr[af]; p2 != NULL; p2 = p2->ipsp_links.itl_next) {
+	for (p2 = head; p2 != NULL; p2 = p2->ipsp_hash.hash_next) {
 		if (p2->ipsp_sel == ipp->ipsp_sel)
 			return (B_FALSE);
 	}
@@ -2642,11 +3036,12 @@ ipsec_check_policy(ipsec_policy_head_t *php, ipsec_policy_t *ipp, int direction)
 	 * discard and bypass will override all other actions
 	 */
 
-	if (ipp->ipsp_sel->ipsl_key.ipsl_valid & IPSL_PROTOCOL &&
-	    ipp->ipsp_sel->ipsl_key.ipsl_proto == check_proto &&
+	if (valid & IPSL_PROTOCOL &&
+	    selkey->ipsl_proto == check_proto &&
 	    (ipp->ipsp_act->ipa_act.ipa_type == IPSEC_ACT_APPLY)) {
-		for (p2 = pr->ipr[af]; p2 != NULL;
-		    p2 = p2->ipsp_links.itl_next) {
+
+		for (p2 = head; p2 != NULL; p2 = p2->ipsp_hash.hash_next) {
+
 			if (p2->ipsp_sel->ipsl_key.ipsl_valid & IPSL_PROTOCOL &&
 			    p2->ipsp_sel->ipsl_key.ipsl_proto == check_proto &&
 			    (p2->ipsp_act->ipa_act.ipa_type ==
@@ -2767,43 +3162,73 @@ void
 ipsec_enter_policy(ipsec_policy_head_t *php, ipsec_policy_t *ipp, int direction)
 {
 	ipsec_policy_root_t *pr = &php->iph_root[direction];
+	ipsec_selkey_t *selkey = &ipp->ipsp_sel->ipsl_key;
+	uint32_t valid = selkey->ipsl_valid;
+	uint32_t hval = selkey->ipsl_hval;
 	int af = -1;
 
 	ASSERT(RW_WRITE_HELD(&php->iph_lock));
 
-	if (ipp->ipsp_sel->ipsl_key.ipsl_valid & IPSL_IPV6) {
-		ASSERT(!(ipp->ipsp_sel->ipsl_key.ipsl_valid & IPSL_IPV4));
+	if (valid & IPSL_IPV6) {
+		ASSERT(!(valid & IPSL_IPV4));
 		af = IPSEC_AF_V6;
 	} else {
-		ASSERT(ipp->ipsp_sel->ipsl_key.ipsl_valid & IPSL_IPV4);
+		ASSERT(valid & IPSL_IPV4);
 		af = IPSEC_AF_V4;
 	}
 
 	php->iph_gen++;
 
-	ipp->ipsp_links.itl_next = pr->ipr[af];
-	pr->ipr[af] = ipp;
+	if (hval == IPSEC_SEL_NOHASH) {
+		HASHLIST_INSERT(ipp, ipsp_hash, pr->ipr_nonhash[af]);
+	} else {
+		HASH_LOCK(pr->ipr_hash, hval);
+		HASH_INSERT(ipp, ipsp_hash, pr->ipr_hash, hval);
+		HASH_UNLOCK(pr->ipr_hash, hval);
+	}
+
+	ipsec_insert_always(&php->iph_rulebyid, ipp);
+
 	ipsec_update_present_flags();
 }
+
+static void
+ipsec_ipr_flush(ipsec_policy_head_t *php, ipsec_policy_root_t *ipr)
+{
+	ipsec_policy_t *ip, *nip;
+
+	int af, chain, nchain;
+
+	for (af = 0; af < IPSEC_NAF; af++) {
+		for (ip = ipr->ipr_nonhash[af]; ip != NULL; ip = nip) {
+			nip = ip->ipsp_hash.hash_next;
+			IPPOL_UNCHAIN(php, ip);
+		}
+		ipr->ipr_nonhash[af] = NULL;
+	}
+	nchain = ipr->ipr_nchains;
+
+	for (chain = 0; chain < nchain; chain++) {
+		for (ip = ipr->ipr_hash[chain].hash_head; ip != NULL;
+		    ip = nip) {
+			nip = ip->ipsp_hash.hash_next;
+			IPPOL_UNCHAIN(php, ip);
+		}
+		ipr->ipr_hash[chain].hash_head = NULL;
+	}
+}
+
 
 void
 ipsec_polhead_flush(ipsec_policy_head_t *php)
 {
-	ipsec_policy_t *ip, *nip;
-	int dir, af;
+	int dir;
 
 	ASSERT(RW_WRITE_HELD(&php->iph_lock));
 
-	for (dir = 0; dir < IPSEC_NTYPES; dir++) {
-		for (af = 0; af < IPSEC_NAF; af++) {
-			for (ip = php->iph_root[dir].ipr[af];
-			    ip != NULL; ip = nip) {
-				nip = ip->ipsp_links.itl_next;
-				IPPOL_REFRELE(ip);
-			}
-			php->iph_root[dir].ipr[af] = NULL;
-		}
-	}
+	for (dir = 0; dir < IPSEC_NTYPES; dir++)
+		ipsec_ipr_flush(php, &php->iph_root[dir]);
+
 	ipsec_update_present_flags();
 }
 
@@ -2818,21 +3243,38 @@ ipsec_polhead_free(ipsec_policy_head_t *php)
 	kmem_free(php, sizeof (*php));
 }
 
+static void
+ipsec_ipr_init(ipsec_policy_root_t *ipr)
+{
+	int af;
+
+	ipr->ipr_nchains = 0;
+	ipr->ipr_hash = NULL;
+
+	for (af = 0; af < IPSEC_NAF; af++) {
+		ipr->ipr_nonhash[af] = NULL;
+	}
+}
+
 extern ipsec_policy_head_t *
 ipsec_polhead_create(void)
 {
 	ipsec_policy_head_t *php;
-	int af;
 
 	php = kmem_alloc(sizeof (*php), KM_NOSLEEP);
-	if (php != NULL) {
-		rw_init(&php->iph_lock, NULL, RW_DEFAULT, NULL);
-		for (af = 0; af < IPSEC_NAF; af++) {
-			php->iph_root[IPSEC_TYPE_INBOUND].ipr[af] = NULL;
-			php->iph_root[IPSEC_TYPE_OUTBOUND].ipr[af] = NULL;
-		}
-		php->iph_refs = 1;
-	}
+	if (php == NULL)
+		return (php);
+
+	rw_init(&php->iph_lock, NULL, RW_DEFAULT, NULL);
+	php->iph_refs = 1;
+	php->iph_gen = 0;
+
+	ipsec_ipr_init(&php->iph_root[IPSEC_TYPE_INBOUND]);
+	ipsec_ipr_init(&php->iph_root[IPSEC_TYPE_OUTBOUND]);
+
+	avl_create(&php->iph_rulebyid, ipsec_policy_cmpbyid,
+	    sizeof (ipsec_policy_t), offsetof(ipsec_policy_t, ipsp_byid));
+
 	return (php);
 }
 
@@ -2841,7 +3283,6 @@ ipsec_polhead_create(void)
  * old one and return the only reference to the new one.
  * If the old one had a refcount of 1, just return it.
  */
-
 extern ipsec_policy_head_t *
 ipsec_polhead_split(ipsec_policy_head_t *php)
 {

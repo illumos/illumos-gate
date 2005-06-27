@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,7 @@ typedef struct spdsock_s
 	int			spdsock_dump_cur_type;
 	int			spdsock_dump_cur_af;
 	ipsec_policy_t 		*spdsock_dump_cur_rule;
+	uint32_t		spdsock_dump_cur_chain;
 	uint32_t		spdsock_dump_count;
 } spdsock_t;
 

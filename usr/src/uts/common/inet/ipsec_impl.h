@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +81,7 @@ extern "C" {
 #include <inet/ipsecesp.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/api.h>
+#include <sys/avl.h>
 
 /*
  * Maximum number of authentication algorithms (can be indexed by one byte
@@ -147,15 +148,37 @@ extern uint32_t keysock_next_seq(void);
 			&((var)->field.hash_next); 		\
 }
 
-#define	HASH_UNCHAIN(var, field, table, hash)		\
-{							\
-	ASSERT(MUTEX_HELD(&(table)[hash].hash_lock));	\
-	*var->field.hash_pp = var->field.hash_next;	\
-	if (var->field.hash_next)			\
-		var->field.hash_next->field.hash_pp = 	\
-			var->field.hash_pp;		\
-	var->field.hash_next = NULL;			\
-	var->field.hash_pp = NULL;			\
+
+#define	HASH_UNCHAIN(var, field, table, hash)			\
+{								\
+	ASSERT(MUTEX_HELD(&(table)[hash].hash_lock));		\
+	HASHLIST_UNCHAIN(var, field);				\
+}
+
+#define	HASHLIST_INSERT(var, field, head)			\
+{								\
+	(var)->field.hash_next = head;				\
+	(var)->field.hash_pp = &(head);				\
+	head = var;						\
+	if ((var)->field.hash_next != NULL)			\
+		(var)->field.hash_next->field.hash_pp = 	\
+			&((var)->field.hash_next); 		\
+}
+
+#define	HASHLIST_UNCHAIN(var, field) 				\
+{								\
+	*var->field.hash_pp = var->field.hash_next;		\
+	if (var->field.hash_next)				\
+		var->field.hash_next->field.hash_pp = 		\
+			var->field.hash_pp;			\
+	HASH_NULL(var, field);					\
+}
+
+
+#define	HASH_NULL(var, field) 					\
+{								\
+	var->field.hash_next = NULL;				\
+	var->field.hash_pp = NULL;				\
 }
 
 #define	HASH_LINK(fieldname, type)				\
@@ -172,6 +195,8 @@ extern uint32_t keysock_next_seq(void);
 	}
 
 typedef struct ipsec_policy_s ipsec_policy_t;
+
+typedef HASH_HEAD(ipsec_policy_s) ipsec_policy_hash_t;
 
 /*
  * When adding new fields to ipsec_prot_t, make sure to update
@@ -207,7 +232,7 @@ typedef struct ipsec_prot
 /*
  * An individual policy action, possibly a member of a chain.
  *
- * Rule chains may be shared between multiple policy rules.
+ * Action chains may be shared between multiple policy rules.
  *
  * With one exception (IPSEC_POLICY_LOG), a chain consists of an
  * ordered list of alternative ways to handle a packet.
@@ -333,13 +358,14 @@ typedef struct ipsec_selkey
 	uint8_t		ipsl_icmp_type_end;
 	uint8_t		ipsl_icmp_code;
 	uint8_t		ipsl_icmp_code_end;
+
 	uint8_t		ipsl_proto;		/* ip payload type */
 	uint8_t		ipsl_local_pfxlen;	/* #bits of prefix */
 	uint8_t		ipsl_remote_pfxlen;	/* #bits of prefix */
 	uint8_t		ipsl_mbz;
-} ipsec_selkey_t;
 
-#define	ipsl_hval	ipsl_mbz		/* space-conservation */
+	uint32_t	ipsl_hval;
+} ipsec_selkey_t;
 
 typedef struct ipsec_sel
 {
@@ -349,21 +375,18 @@ typedef struct ipsec_sel
 } ipsec_sel_t;
 
 /*
- * "Tree" linkage.
+ * One policy rule.  This will be linked into a single hash chain bucket in
+ * the parent rule structure.  If the selector is simple enough to
+ * allow hashing, it gets filed under ipsec_policy_root_t->ipr_hash.
+ * Otherwise it goes onto a linked list in ipsec_policy_root_t->ipr_nonhash[af]
  *
- * XXX use singly-linked list for now, until we have a classifier..
- */
-typedef struct ipsec_tree_link
-{
-	ipsec_policy_t	*itl_next;		/* next one in list.. */
-} ipsec_tree_link_t;
-
-/*
- * One policy rule.
+ * In addition, we file the rule into an avl tree keyed by the rule index.
+ * (Duplicate rules are permitted; the comparison function breaks ties).
  */
 struct ipsec_policy_s
 {
-	ipsec_tree_link_t	ipsp_links;	/* protected by iph_lock */
+	HASH_LINK(ipsp_hash, struct ipsec_policy_s);
+	avl_node_t		ipsp_byid;
 	uint64_t		ipsp_index;	/* unique id */
 	uint32_t		ipsp_prio; 	/* rule priority */
 	uint32_t		ipsp_refs;
@@ -393,7 +416,9 @@ struct ipsec_policy_s
 
 typedef struct ipsec_policy_root_s
 {
-	ipsec_policy_t	*ipr[IPSEC_NAF];
+	ipsec_policy_t		*ipr_nonhash[IPSEC_NAF];
+	int			ipr_nchains;
+	ipsec_policy_hash_t 	*ipr_hash;
 } ipsec_policy_root_t;
 
 /*
@@ -408,6 +433,7 @@ typedef struct ipsec_policy_head_s
 	krwlock_t	iph_lock;
 	uint64_t	iph_gen; /* generation number */
 	ipsec_policy_root_t iph_root[IPSEC_NTYPES];
+	avl_tree_t	iph_rulebyid;
 } ipsec_policy_head_t;
 
 #define	IPPH_REFHOLD(iph) {			\
@@ -553,10 +579,10 @@ extern ipsec_policy_head_t *ipsec_inactive_policy(void);
 extern void ipsec_swap_policy(void);
 
 extern int ipsec_clone_system_policy(void);
-extern ipsec_policy_t *ipsec_policy_create(const ipsec_selkey_t *,
+extern ipsec_policy_t *ipsec_policy_create(ipsec_selkey_t *,
     const ipsec_act_t *, int, int);
 extern boolean_t ipsec_policy_delete(ipsec_policy_head_t *,
-    const ipsec_selkey_t *, int);
+    ipsec_selkey_t *, int);
 extern int ipsec_policy_delete_index(ipsec_policy_head_t *, uint64_t);
 extern void ipsec_polhead_flush(ipsec_policy_head_t *);
 extern void ipsec_actvec_from_req(ipsec_req_t *, ipsec_act_t **, uint_t *);
@@ -590,6 +616,8 @@ extern mblk_t *ip_copymsg(mblk_t *mp);
 extern void iplatch_free(ipsec_latch_t *);
 extern ipsec_latch_t *iplatch_create(void);
 extern int ipsec_set_req(cred_t *, conn_t *, ipsec_req_t *);
+
+extern void ipsec_insert_always(avl_tree_t *tree, void *new_node);
 
 /*
  * IPsec AH/ESP functions called from IP.

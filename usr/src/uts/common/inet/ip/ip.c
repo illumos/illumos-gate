@@ -8887,11 +8887,11 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 		 */
 		fam = IPSEC_AF_V6;
 		pr = &ph->iph_root[IPSEC_TYPE_INBOUND];
-		pin6->ipsp_links.itl_next = pr->ipr[fam];
-		pr->ipr[fam] = pin6;
+		HASHLIST_INSERT(pin6, ipsp_hash, pr->ipr_nonhash[fam]);
+		ipsec_insert_always(&ph->iph_rulebyid, pin6);
 		pr = &ph->iph_root[IPSEC_TYPE_OUTBOUND];
-		pout6->ipsp_links.itl_next = pr->ipr[fam];
-		pr->ipr[fam] = pout6;
+		HASHLIST_INSERT(pout6, ipsp_hash, pr->ipr_nonhash[fam]);
+		ipsec_insert_always(&ph->iph_rulebyid, pout6);
 	}
 
 	ipsec_actvec_free(actp, nact);
@@ -8901,11 +8901,12 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 	 */
 	fam = IPSEC_AF_V4;
 	pr = &ph->iph_root[IPSEC_TYPE_INBOUND];
-	pin4->ipsp_links.itl_next = pr->ipr[fam];
-	pr->ipr[fam] = pin4;
+	HASHLIST_INSERT(pin4, ipsp_hash, pr->ipr_nonhash[fam]);
+	ipsec_insert_always(&ph->iph_rulebyid, pin4);
+
 	pr = &ph->iph_root[IPSEC_TYPE_OUTBOUND];
-	pout4->ipsp_links.itl_next = pr->ipr[fam];
-	pr->ipr[fam] = pout4;
+	HASHLIST_INSERT(pout4, ipsp_hash, pr->ipr_nonhash[fam]);
+	ipsec_insert_always(&ph->iph_rulebyid, pout4);
 
 	/*
 	 * If the requests need security, set enforce_policy.
