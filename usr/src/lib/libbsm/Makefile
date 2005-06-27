@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -79,7 +79,6 @@ OBJECTS=	adr.o \
 		audit_rshd.o \
 		audit_settid.o \
 		audit_shutdown.o \
-		audit_su.o \
 		audit_uadmin.o \
 		audit_user.o \
 		bsm.o \

@@ -67,9 +67,10 @@
 #include <errno.h>
 #include <stdarg.h>
 
-#ifdef DYNAMIC_SU
+#include <bsm/adt.h>
+#include <bsm/adt_event.h>
+
 #include <security/pam_appl.h>
-#endif
 
 #define	PATH	"/usr/bin:"		/* path for users other than root */
 #define	SUPATH	"/usr/sbin:/usr/bin"	/* path for root */
@@ -78,7 +79,12 @@
 #define	ROOT 0
 #ifdef	DYNAMIC_SU
 #define	EMBEDDED_NAME	"embedded_su"
+#define	DEF_ATTEMPTS	3		/* attempts to change password */
 #endif	/* DYNAMIC_SU */
+
+#define	PW_FALSE	1		/* no password change */
+#define	PW_TRUE		2		/* successful password change */
+#define	PW_FAILED	3		/* failed password change */
 
 /*
  * Intervals to sleep after failed su
@@ -105,39 +111,34 @@ static char *initenv[] = {
 static char mail[30] = { "MAIL=/var/mail/" };
 
 static void envalt(void);
-static void log(char *where, char *towho, int how);
-static void to(int sig);
+static void log(char *, char *, int);
+static void to(int);
 
 enum messagemode { USAGE, ERR, WARN };
-static void message(enum messagemode mode, char *fmt, ...);
+static void message(enum messagemode, char *, ...);
 
-static char *alloc_vsprintf(const char *fmt, va_list ap1);
-static char *tail(char *a);
+static char *alloc_vsprintf(const char *, va_list);
+static char *tail(char *);
 
-/*
- * Obsolescent Audit hooks for su command
- */
-extern void audit_su_bad_authentication(void);
-extern void audit_su_bad_username(void);
-extern void audit_su_init_info(char *, char *);
-extern void audit_su_reset_ai(void);
-extern void audit_su_success(void);
-extern void audit_su_unknown_failure(void);
+static void audit_success(int, struct passwd *);
+static void audit_failure(int, struct passwd *, int);
 
 #ifdef DYNAMIC_SU
-static void validate(char *usernam);
-static int legalenvvar(char *s);
+static void validate(char *, int *);
+static int legalenvvar(char *);
 static int su_conv(int, struct pam_message **, struct pam_response **, void *);
 static int emb_su_conv(int, struct pam_message **, struct pam_response **,
     void *);
-static void freeresponse(int num_msg, struct pam_response **response);
+static void freeresponse(int, struct pam_response **response);
 static struct pam_conv pam_conv = {su_conv, NULL};
 static struct pam_conv emb_pam_conv = {emb_su_conv, NULL};
-static pam_handle_t	*pamh;		/* Authentication handle */
-static void quotemsg(char *fmt, ...);
+static void quotemsg(char *, ...);
 static void readinitblock(void);
+#else	/* !DYNAMIC_SU */
+static void update_audit(struct passwd *pwd);
 #endif	/* DYNAMIC_SU */
 
+static pam_handle_t	*pamh = NULL;	/* Authentication handle */
 struct	passwd pwd;
 char	pwdbuf[1024];			/* buffer for getpwnam_r() */
 char	shell[] = "/usr/bin/sh";	/* default shell */
@@ -161,6 +162,7 @@ char *username;					/* the invoker */
 static	int	dosyslog = 0;			/* use syslog? */
 char	*myname;
 #ifdef	DYNAMIC_SU
+int passreq = 0;
 boolean_t embedded = B_FALSE;
 #endif	/* DYNAMIC_SU */
 
@@ -171,7 +173,7 @@ main(int argc, char **argv)
 	struct spwd sp;
 	char  spbuf[1024];		/* buffer for getspnam_r() */
 	char *password;
-#endif
+#endif	/* !DYNAMIC_SU */
 	char *nptr;
 	char *pshell;
 	int eflag = 0;
@@ -188,6 +190,7 @@ main(int argc, char **argv)
 	int retcode;
 	int idx = 0;
 #endif	/* DYNAMIC_SU */
+	int pw_change = PW_FALSE;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -197,14 +200,14 @@ main(int argc, char **argv)
 
 	myname = tail(argv[0]);
 
-#if	defined(DYNAMIC_SU)
+#ifdef	DYNAMIC_SU
 	if (strcmp(myname, EMBEDDED_NAME) == 0) {
 		embedded = B_TRUE;
 		setbuf(stdin, NULL);
 		setbuf(stdout, NULL);
 		readinitblock();
 	}
-#endif	/* defined(DYNAMIC_SU) */
+#endif	/* DYNAMIC_SU */
 
 	if (argc > 1 && *argv[1] == '-') {
 		/* Explicitly check for just `-' (no trailing chars) */
@@ -282,19 +285,29 @@ main(int argc, char **argv)
 		exit(1);
 #endif	/* DYNAMIC_SU */
 
-	/*
-	 * Save away the following for writing user-level audit records:
-	 *	username desired
-	 *	current tty
-	 *	whether or not username desired is expired
-	 *	auditinfo structure of current process
-	 *	uid's and gid's of current process
-	 */
-	audit_su_init_info(nptr, ttyn);
 	openlog("su", LOG_CONS, LOG_AUTH);
 
 #ifdef DYNAMIC_SU
 
+	/*
+	 * Use the same value of sleeptime and password required that
+	 * login(1) uses.
+	 * This is obtained by reading the file /etc/default/login
+	 * using the def*() functions
+	 */
+	if (defopen(DEFAULT_LOGIN) == 0) {
+		if ((ptr = defread("SLEEPTIME=")) != NULL) {
+			sleeptime = atoi(ptr);
+			if (sleeptime < 0 || sleeptime > 5)
+				sleeptime = SLEEPTIME;
+		}
+
+		if ((ptr = defread("PASSREQ=")) != NULL &&
+		    strcasecmp("YES", ptr) == 0)
+			passreq = 1;
+
+		(void) defopen((char *)NULL);
+	}
 	/*
 	 * Ignore SIGQUIT and SIGINT
 	 */
@@ -311,27 +324,13 @@ main(int argc, char **argv)
 
 	if (retcode != PAM_SUCCESS) {
 		/*
-		 * Use the same value of sleeptime that login(1) uses.
-		 * This is obtained by reading the file /etc/default/login
-		 * using the def*() functions
-		 */
-		if (defopen(DEFAULT_LOGIN) == 0) {
-			if ((ptr = defread("SLEEPTIME=")) != NULL)
-				sleeptime = atoi(ptr);
-			(void) defopen((char *)NULL);
-
-			if (sleeptime < 0 || sleeptime > 5)
-				sleeptime = SLEEPTIME;
-		}
-
-		/*
-		 * 1st step: log the error.
+		 * 1st step: audit and log the error.
 		 * 2nd step: sleep.
 		 * 3rd step: print out message to user.
 		 */
+		audit_failure(PW_FALSE, NULL, retcode);
 		switch (retcode) {
 		case PAM_USER_UNKNOWN:
-			audit_su_bad_username();
 			closelog();
 			(void) sleep(sleeptime);
 			message(ERR, gettext("Unknown id: %s"), nptr);
@@ -340,7 +339,6 @@ main(int argc, char **argv)
 		case PAM_AUTH_ERR:
 			if (Sulog != NULL)
 				log(Sulog, nptr, 0);	/* log entry */
-			audit_su_bad_authentication();
 			if (dosyslog)
 				syslog(LOG_CRIT, "'su %s' failed for %s on %s",
 				    pwd.pw_name, username, ttyn);
@@ -351,7 +349,6 @@ main(int argc, char **argv)
 
 		case PAM_CONV_ERR:
 		default:
-			audit_su_unknown_failure();
 			if (dosyslog)
 				syslog(LOG_CRIT, "'su %s' failed for %s on %s",
 				    pwd.pw_name, username, ttyn);
@@ -366,12 +363,11 @@ main(int argc, char **argv)
 		exit(1);
 	}
 	if (flags)
-		validate(username);
+		validate(username, &pw_change);
 	if (pam_setcred(pamh, PAM_REINITIALIZE_CRED) != PAM_SUCCESS) {
 		message(ERR, gettext("unable to set credentials"));
 		exit(2);
 	}
-	audit_su_success();
 	if (dosyslog)
 		syslog(getuid() == 0 ? LOG_INFO : LOG_NOTICE,
 		    "'su %s' succeeded for %s on %s",
@@ -379,11 +375,11 @@ main(int argc, char **argv)
 	closelog();
 	(void) signal(SIGQUIT, SIG_DFL);
 	(void) signal(SIGINT, SIG_DFL);
-#else	/* STATIC !PAM */
+#else	/* !DYNAMIC_SU */
 	if ((getpwnam_r(nptr, &pwd, pwdbuf, sizeof (pwdbuf)) == NULL) ||
 	    (getspnam_r(nptr, &sp, spbuf, sizeof (spbuf)) == NULL)) {
 		message(ERR, gettext("Unknown id: %s"), nptr);
-		audit_su_bad_username();
+		audit_failure(PW_FALSE, NULL, PAM_USER_UNKNOWN);
 		closelog();
 		exit(1);
 	}
@@ -402,7 +398,7 @@ main(int argc, char **argv)
 		if (Sulog != NULL)
 			log(Sulog, nptr, 0);    /* log entry */
 		message(ERR, gettext("Sorry"));
-		audit_su_bad_authentication();
+		audit_failure(PW_FALSE, NULL, PAM_AUTH_ERR);
 		if (dosyslog)
 			syslog(LOG_CRIT, "'su %s' failed for %s on %s",
 			    pwd.pw_name, username, ttyn);
@@ -412,14 +408,15 @@ main(int argc, char **argv)
 	/* clear password file entry */
 	(void) memset((void *)spbuf, 0, sizeof (spbuf));
 ok:
-	audit_su_reset_ai();
-	audit_su_success();
+	/* update audit session in a non-pam environment */
+	update_audit(&pwd);
 	if (dosyslog)
 		syslog(getuid() == 0 ? LOG_INFO : LOG_NOTICE,
 		    "'su %s' succeeded for %s on %s",
 		    pwd.pw_name, username, ttyn);
-#endif	/* STATIC !PAM */
+#endif	/* DYNAMIC_SU */
 
+	audit_success(pw_change, &pwd);
 	uid = pwd.pw_uid;
 	gid = pwd.pw_gid;
 	dir = strdup(pwd.pw_dir);
@@ -578,7 +575,7 @@ ok:
 				idx++;
 			}
 		}
-#endif
+#endif	/* DYNAMIC_SU */
 		envinit[++envidx] = NULL;
 		environ = envinit;
 	} else {
@@ -598,7 +595,7 @@ ok:
 #ifdef DYNAMIC_SU
 	if (pamh)
 		(void) pam_end(pamh, PAM_SUCCESS);
-#endif
+#endif	/* DYNAMIC_SU */
 
 	/*
 	 * if new user is root:
@@ -765,6 +762,111 @@ log(char *where, char *towho, int how)
 static void
 to(int sig)
 {}
+
+/*
+ * audit_success - audit successful su
+ *
+ *	Entry	process audit context established -- i.e., pam_setcred()
+ *			or equivalent called.
+ *		pw_change = PW_TRUE, if successful password change audit
+ *				required.
+ *		pwd = passwd entry for new user.
+ */
+
+static void
+audit_success(int pw_change, struct passwd *pwd)
+{
+	adt_session_data_t	*ah = NULL;
+	adt_event_data_t	*event;
+
+	if (adt_start_session(&ah, NULL, ADT_USE_PROC_DATA) != 0) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "adt_start_session(ADT_su): %m");
+		return;
+	}
+	/* since proc uid/gid not yet updated */
+	if (adt_set_user(ah, pwd->pw_uid, pwd->pw_gid, pwd->pw_uid,
+	    pwd->pw_gid, NULL, ADT_USER) != 0) {
+		syslog(LOG_AUTH | LOG_ERR,
+		    "adt_set_user(ADT_su, ADT_FAILURE): %m");
+	}
+	if ((event = adt_alloc_event(ah, ADT_su)) == NULL) {
+		syslog(LOG_AUTH | LOG_ALERT, "adt_alloc_event(ADT_su): %m");
+	} else if (adt_put_event(event, ADT_SUCCESS, ADT_SUCCESS) != 0) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "adt_put_event(ADT_su, ADT_SUCCESS): %m");
+	}
+
+	if (pw_change == PW_TRUE) {
+		/* Also audit password change */
+		adt_free_event(event);
+		if ((event = adt_alloc_event(ah, ADT_passwd)) == NULL) {
+			syslog(LOG_AUTH | LOG_ALERT,
+			    "adt_alloc_event(ADT_passwd): %m");
+		} else if (adt_put_event(event, ADT_SUCCESS,
+		    ADT_SUCCESS) != 0) {
+			syslog(LOG_AUTH | LOG_ALERT,
+			    "adt_put_event(ADT_passwd, ADT_SUCCESS): %m");
+		}
+	}
+	adt_free_event(event);
+}
+
+
+/*
+ * audit_failure - audit failed su
+ *
+ *	Entry	New audit context not set.
+ *		pw_change == PW_FALSE, if no password change requested.
+ *			     PW_FAILED, if failed password change audit
+ *				      required.
+ *		pwent = NULL, or password entry to use.
+ *		pamerr = PAM error code; reason for failure.
+ */
+
+static void
+audit_failure(int pw_change, struct passwd *pwd, int pamerr)
+{
+	adt_session_data_t	*ah;	/* audit session handle */
+	adt_event_data_t	*event;	/* event to generate */
+
+	if (adt_start_session(&ah, NULL, ADT_USE_PROC_DATA) != 0) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "adt_start_session(ADT_su, ADT_FAILURE): %m");
+		return;
+	}
+	if (pwd != NULL) {
+		/* target user authenticated, merge audit state */
+		if (adt_set_user(ah, pwd->pw_uid, pwd->pw_gid, pwd->pw_uid,
+		    pwd->pw_gid, NULL, ADT_UPDATE) != 0) {
+			syslog(LOG_AUTH | LOG_ERR,
+			    "adt_set_user(ADT_su, ADT_FAILURE): %m");
+		}
+	}
+	if ((event = adt_alloc_event(ah, ADT_su)) == NULL) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "adt_alloc_event(ADT_su, ADT_FAILURE): %m");
+		return;
+	} else if (adt_put_event(event, ADT_FAILURE,
+	    ADT_FAIL_PAM + pamerr) != 0) {
+		syslog(LOG_AUTH | LOG_ALERT,
+		    "adt_put_event(ADT_su(ADT_FAIL, %s): %m",
+		    pam_strerror(pamh, pamerr));
+	}
+	if (pw_change != PW_FALSE) {
+		/* Also audit password change failed */
+		adt_free_event(event);
+		if ((event = adt_alloc_event(ah, ADT_passwd)) == NULL) {
+			syslog(LOG_AUTH | LOG_ALERT,
+			    "adt_alloc_event(ADT_passwd): %m");
+		} else if (adt_put_event(event, ADT_FAILURE,
+		    ADT_FAIL_PAM + pamerr) != 0) {
+			syslog(LOG_AUTH | LOG_ALERT,
+			    "adt_put_event(ADT_passwd, ADT_FAILURE): %m");
+		}
+	}
+	adt_free_event(event);
+}
 
 #ifdef DYNAMIC_SU
 /*
@@ -1010,34 +1112,45 @@ quotemsg(char *fmt, ...)
 
 /*
  * validate - Check that the account is valid for switching to.
- *
- * If the password has expired, we must refuse the 'su' attempt
- * regardless of whether the password is null or not.
- *
- * If the password is NULL but has NOT expired then we allow the
- * su attempt to succeed.
  */
 static void
-validate(char *usernam)
+validate(char *usernam, int *pw_change)
 {
-	int error = 0;
+	int error;
+	int flag = 0;
+	int tries;
 
-	if ((error = pam_acct_mgmt(pamh, 0)) != 0) {
+	if (passreq)
+		flag = PAM_DISALLOW_NULL_AUTHTOK;
+
+	if ((error = pam_acct_mgmt(pamh, flag)) != PAM_SUCCESS) {
 		if (Sulog != NULL)
 			log(Sulog, pwd.pw_name, 0);    /* log entry */
 		if (error == PAM_NEW_AUTHTOK_REQD) {
+			tries = 0;
 			message(ERR, gettext("Password for user "
-			    "'%s' has expired - use passwd(1) to update it"),
-			    pwd.pw_name);
-			    audit_su_bad_authentication();
-			    if (dosyslog)
-				syslog(LOG_CRIT, "'su %s' failed for %s on %s",
-				    pwd.pw_name, usernam, ttyn);
-			closelog();
-			exit(1);
+			    "'%s' has expired"), pwd.pw_name);
+			while ((error = pam_chauthtok(pamh, 0)) !=
+			    PAM_SUCCESS) {
+				if ((error == PAM_AUTHTOK_ERR ||
+				    error == PAM_TRY_AGAIN) &&
+				    (tries++ < DEF_ATTEMPTS)) {
+					continue;
+				}
+				message(ERR, gettext("Sorry"));
+				audit_failure(PW_FAILED, &pwd, error);
+				if (dosyslog)
+					syslog(LOG_CRIT,
+					    "'su %s' failed for %s on %s",
+					    pwd.pw_name, usernam, ttyn);
+				closelog();
+				exit(1);
+			}
+			*pw_change = PW_TRUE;
+			return;
 		} else {
 			message(ERR, gettext("Sorry"));
-			audit_su_bad_authentication();
+			audit_failure(PW_FALSE, &pwd, error);
 			if (dosyslog)
 			    syslog(LOG_CRIT, "'su %s' failed for %s on %s",
 				pwd.pw_name, usernam, ttyn);
@@ -1111,6 +1224,31 @@ readinitblock(void)
 		if (bol && strcmp(buf, ".\n") == 0)
 			return;
 		bol = (strchr(buf, '\n') != NULL);
+	}
+}
+#else	/* !DYNAMIC_SU */
+static void
+update_audit(struct passwd *pwd)
+{
+	adt_session_data_t	*ah;	/* audit session handle */
+
+	if (adt_start_session(&ah, NULL, ADT_USE_PROC_DATA) != 0) {
+		message(ERR, gettext("Sorry"));
+		if (dosyslog)
+			syslog(LOG_CRIT, "'su %s' failed for %s "
+			    "cannot start audit session %m",
+			    pwd->pw_name, username);
+		closelog();
+		exit(2);
+	}
+	if (adt_set_user(ah, pwd->pw_uid, pwd->pw_gid, pwd->pw_uid,
+	    pwd->pw_gid, NULL, ADT_UPDATE) != 0) {
+		if (dosyslog)
+			syslog(LOG_CRIT, "'su %s' failed for %s "
+			    "cannot update audit session %m",
+			    pwd->pw_name, username);
+		closelog();
+		exit(2);
 	}
 }
 #endif	/* DYNAMIC_SU */

@@ -549,48 +549,6 @@ declaration	int audit_shutdown_success(void)
 version		SUNWprivate_1.1
 end		
 
-function	audit_su_bad_authentication
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void audit_su_bad_authentication(void)
-version		SUNWprivate_1.1
-end		
-
-function	audit_su_bad_uid
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void audit_su_bad_uid(uid_t)
-version		SUNWprivate_1.1
-end		
-
-function	audit_su_bad_username
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void audit_su_bad_username(void)
-version		SUNWprivate_1.1
-end		
-
-function	audit_su_init_info
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void audit_su_init_info(char *username, char *ttyn)
-version		SUNWprivate_1.1
-end		
-
-function	audit_su_reset_ai
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void audit_su_reset_ai(void)
-version		SUNWprivate_1.1
-end		
-
-function	audit_su_success
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void audit_su_success(void)
-version		SUNWprivate_1.1
-end		
-
-function	audit_su_unknown_failure
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	void audit_su_unknown_failure(void)
-version		SUNWprivate_1.1
-end		
-
 function	aug_audit
 include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
 declaration	int aug_audit(void)
