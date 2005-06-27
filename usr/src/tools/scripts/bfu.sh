@@ -5074,6 +5074,7 @@ mondo_loop() {
 	rm -f $root/platform/sun4u/kernel/misc/sparcv9/pcmcia
 	rm -f $usr/include/v9/sys/traptrace.h
 	rm -f $usr/platform/sun4u/include/sys/spitasi.h
+	rm -f $usr/kernel/pcbe/sparcv9/pcbe.SUNW,UltraSPARC-T1
 
 	#
         # Remove the IPsec encryption and authentication modules.

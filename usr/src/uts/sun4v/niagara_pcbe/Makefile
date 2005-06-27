@@ -25,7 +25,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# This Makefile builds the UltraSPARC-H20 Performance Counter BackEnd (PCBE).
+# This Makefile builds the UltraSPARC-T1 Performance Counter BackEnd (PCBE).
 #
 
 UTSBASE = ../..
@@ -36,7 +36,7 @@ UTSBASE = ../..
 MODULE		= pcbe.SUNW,UltraSPARC-T1
 OBJECTS		= $(NI_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(NI_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
 
 #
 #	Include common rules.

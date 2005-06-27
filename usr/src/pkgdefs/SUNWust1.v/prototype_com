@@ -53,6 +53,9 @@ d none platform/sun4v/kernel 755 root sys
 d none platform/sun4v/kernel/cpu 755 root sys
 d none platform/sun4v/kernel/cpu/sparcv9 755 root sys
 f none platform/sun4v/kernel/cpu/sparcv9/SUNW,UltraSPARC-T1 755 root sys
+d none platform/sun4v/kernel/pcbe 755 root sys
+d none platform/sun4v/kernel/pcbe/sparcv9 755 root sys
+f none platform/sun4v/kernel/pcbe/sparcv9/pcbe.SUNW,UltraSPARC-T1 755 root sys
 
 d none platform/sun4v/lib 755 root bin
 d none platform/sun4v/lib/libc_psr 755 root bin

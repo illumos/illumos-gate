@@ -137,7 +137,6 @@ enum tod_fault_type {
 extern time_t tod_validate(time_t);
 extern void tod_fault_reset(void);
 extern void plat_tod_fault(enum tod_fault_type);
-#pragma	weak	plat_tod_fault
 
 #ifndef _LP64
 #ifndef min

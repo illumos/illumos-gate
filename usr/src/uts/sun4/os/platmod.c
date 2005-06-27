@@ -26,6 +26,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/systm.h>
+
 /*
  * All platmod functions are weak and are only present when required.
  * The function calls have been converted to use methods
@@ -39,3 +41,9 @@
 char *platform_module_list[] = {
 	(char *)0
 };
+
+/*ARGSUSED*/
+void
+plat_tod_fault(enum tod_fault_type tod_bad)
+{
+}

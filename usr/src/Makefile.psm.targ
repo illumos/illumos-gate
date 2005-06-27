@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -104,6 +104,9 @@ $(ROOT_PSM_DACF_DIR)/%:		$(OBJS_DIR)/% $(ROOT_PSM_DACF_DIR) FRC
 	$(INS.file)
 
 $(ROOT_PSM_CRYPTO_DIR)/%:	$(OBJS_DIR)/% $(ROOT_PSM_CRYPTO_DIR) FRC
+	$(INS.file)
+
+$(ROOT_PSM_PCBE_DIR)/%:		$(OBJS_DIR)/% $(ROOT_PSM_PCBE_DIR) FRC
 	$(INS.file)
 
 #

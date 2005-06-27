@@ -1964,8 +1964,7 @@ tod_fault(enum tod_fault_type ftype, int off)
 	if (tod_faulted != ftype) {
 		switch (ftype) {
 		case TOD_NOFAULT:
-			if (&plat_tod_fault)
-				plat_tod_fault(TOD_NOFAULT);
+			plat_tod_fault(TOD_NOFAULT);
 			cmn_err(CE_NOTE, "Restarted tracking "
 					"Time of Day clock.");
 			tod_faulted = ftype;
@@ -1973,8 +1972,7 @@ tod_fault(enum tod_fault_type ftype, int off)
 		case TOD_REVERSED:
 		case TOD_JUMPED:
 			if (tod_faulted == TOD_NOFAULT) {
-				if (&plat_tod_fault)
-					plat_tod_fault(ftype);
+				plat_tod_fault(ftype);
 				cmn_err(CE_WARN, "Time of Day clock error: "
 				    "reason [%s by 0x%x]. -- "
 				    " Stopped tracking Time Of Day clock.",
@@ -1985,8 +1983,7 @@ tod_fault(enum tod_fault_type ftype, int off)
 		case TOD_STALLED:
 		case TOD_RATECHANGED:
 			if (tod_faulted == TOD_NOFAULT) {
-				if (&plat_tod_fault)
-					plat_tod_fault(ftype);
+				plat_tod_fault(ftype);
 				cmn_err(CE_WARN, "Time of Day clock error: "
 				    "reason [%s]. -- "
 				    " Stopped tracking Time Of Day clock.",
