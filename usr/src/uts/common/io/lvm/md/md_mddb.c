@@ -66,6 +66,7 @@ mhd_mhiargs_t	defmhiargs = {
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/svm.h>
 
+extern char svm_bootpath[];
 
 int			md_maxbootlist = MAXBOOTLIST;
 static ulong_t		mddb_maxblocks = 0;	/* tune for small records */
@@ -2839,6 +2840,45 @@ checkcopy
 err:
 	return (retval);
 }
+
+/*
+ * Determine if the location information for two mddbs is the same.
+ * The device slice and block offset should match.  If both have devids then
+ * use that for the comparison, otherwise we compare the dev_ts.
+ * Comparing with the devid allows us to handle the case where a mddb was
+ * relocated to a dead mddbs dev_t.  The live mddb will have the dev_t of
+ * the dead mddb but the devid comparison will catch this and not match.
+ *
+ * Return 1 if the location of the two mddbs match, 0 if not.
+ */
+static int
+match_mddb(mddb_ri_t *rip, ddi_devid_t devid, char *minor, md_dev64_t dev,
+	daddr32_t blkno)
+{
+	if (rip->ri_flags & MDDB_F_EMASTER) {
+		/*
+		 * If this element is errored then we don't try to match on it.
+		 * If we try to match we could erroneously match on the dev_t
+		 * of a relocated disk.
+		 */
+		return (0);
+	}
+
+	if (rip->ri_devid && devid && minor) {
+		if (ddi_devid_compare(rip->ri_devid, devid) != 0 ||
+		    strcmp(rip->ri_minor_name, minor) != 0)
+			return (0);
+	} else {
+		if (rip->ri_dev != dev)
+			return (0);
+	}
+
+	if (rip->ri_blkno != blkno)
+		return (0);
+
+	return (1);
+}
+
 static int
 ridev(
 	mddb_ri_t	**rip,
@@ -2890,18 +2930,12 @@ ridev(
 		*dev_2b_fixed = clp->l_dev;
 	r = *rip;
 
-	/*
-	 * Can just use ri_dev for comparison since it would have also been
-	 * generated from a device id and minor name, if a valid
-	 * device id existed.
-	 */
 	while (r) {
-		if ((r->ri_dev == ldev) && (r->ri_blkno == clp->l_blkno)) {
+		if (match_mddb(r, (ddi_devid_t)(uintptr_t)clp->l_devid,
+		    clp->l_minor_name, ldev, clp->l_blkno)) {
 			if ((clp->l_devid != 0) &&
 			    !(clp->l_devid_flags & MDDB_DEVID_VALID)) {
 				r->ri_flags |= MDDB_F_EMASTER;
-				r->ri_devid = 0;
-				r->ri_old_devid = (ddi_devid_t)NULL;
 			} else {
 				r->ri_flags |= flag;
 			}
@@ -2926,25 +2960,23 @@ ridev(
 	}
 	r->ri_flags |= flag;
 	if (clp->l_devid != 0) {
-		if (clp->l_devid_flags & MDDB_DEVID_VALID) {
-			sz = clp->l_devid_sz;
-			r->ri_devid = (ddi_devid_t)kmem_zalloc(sz, KM_SLEEP);
-			bcopy((void *)(uintptr_t)clp->l_devid,
-			    (char *)r->ri_devid, sz);
+		sz = clp->l_devid_sz;
+		r->ri_devid = (ddi_devid_t)kmem_zalloc(sz, KM_SLEEP);
+		bcopy((void *)(uintptr_t)clp->l_devid, (char *)r->ri_devid, sz);
 
-			if (clp->l_old_devid != NULL) {
-				sz = clp->l_old_devid_sz;
-				r->ri_old_devid = (ddi_devid_t)kmem_zalloc(sz,
-				    KM_SLEEP);
-				bcopy((char *)(uintptr_t)clp->l_old_devid,
-				    (char *)r->ri_old_devid, sz);
-			} else {
-				r->ri_old_devid = 0;
-			}
-			if (strlen(clp->l_minor_name) < MDDB_MINOR_NAME_MAX)
-				(void) strcpy(r->ri_minor_name,
-				    clp->l_minor_name);
+		if (clp->l_old_devid != NULL) {
+			sz = clp->l_old_devid_sz;
+			r->ri_old_devid = (ddi_devid_t)kmem_zalloc(sz,
+			    KM_SLEEP);
+			bcopy((char *)(uintptr_t)clp->l_old_devid,
+			    (char *)r->ri_old_devid, sz);
 		} else {
+			r->ri_old_devid = 0;
+		}
+		if (strlen(clp->l_minor_name) < MDDB_MINOR_NAME_MAX)
+			(void) strcpy(r->ri_minor_name, clp->l_minor_name);
+
+		if (!(clp->l_devid_flags & MDDB_DEVID_VALID)) {
 			/*
 			 * Devid is present, but not valid.  This could
 			 * happen if device has been powered off or if
@@ -2955,8 +2987,6 @@ ridev(
 			 * the dev_t accesses.
 			 */
 			r->ri_flags |= MDDB_F_EMASTER;
-			r->ri_devid = 0;
-			r->ri_old_devid = 0;
 		}
 	} else {
 		r->ri_devid = 0;
@@ -4093,11 +4123,6 @@ selectlocator(
 			mddb_devid_icp_free(&r->ri_did_icp, r->ri_lbp);
 			if (!(md_get_setstatus(setno) &
 			    MD_SET_REPLICATED_IMPORT)) {
-				if (r->ri_devid != (ddi_devid_t)NULL) {
-					sz = ddi_devid_sizeof(r->ri_devid);
-					kmem_free((caddr_t)r->ri_devid, sz);
-					r->ri_devid = (ddi_devid_t)NULL;
-				}
 				if (r->ri_old_devid != (ddi_devid_t)NULL) {
 					sz = ddi_devid_sizeof(r->ri_old_devid);
 					kmem_free((caddr_t)r->ri_old_devid, sz);
@@ -4190,11 +4215,6 @@ selectlocator(
 			mddb_devid_icp_free(&r->ri_did_icp, r->ri_lbp);
 			if (!(md_get_setstatus(setno) &
 			    MD_SET_REPLICATED_IMPORT)) {
-				if (r->ri_devid != (ddi_devid_t)NULL) {
-					sz = ddi_devid_sizeof(r->ri_devid);
-					kmem_free((caddr_t)r->ri_devid, sz);
-					r->ri_devid = (ddi_devid_t)NULL;
-				}
 				if (r->ri_old_devid != (ddi_devid_t)NULL) {
 					sz = ddi_devid_sizeof(r->ri_old_devid);
 					kmem_free((caddr_t)r->ri_old_devid, sz);
@@ -4250,11 +4270,6 @@ selectlocator(
 
 		mddb_devid_icp_free(&r->ri_did_icp, r->ri_lbp);
 		if (!(md_get_setstatus(setno) & MD_SET_REPLICATED_IMPORT)) {
-			if (r->ri_devid != (ddi_devid_t)NULL) {
-				sz = ddi_devid_sizeof(r->ri_devid);
-				kmem_free((caddr_t)r->ri_devid, sz);
-				r->ri_devid = (ddi_devid_t)NULL;
-			}
 			if (r->ri_old_devid != (ddi_devid_t)NULL) {
 				sz = ddi_devid_sizeof(r->ri_old_devid);
 				kmem_free((caddr_t)r->ri_old_devid, sz);
@@ -4304,11 +4319,6 @@ out:
 		/* Get rid of extra locator devid block info */
 		mddb_devid_icp_free(&r->ri_did_icp, r->ri_lbp);
 		if (!(md_get_setstatus(setno) & MD_SET_REPLICATED_IMPORT)) {
-			if (r->ri_devid != (ddi_devid_t)NULL) {
-				sz = ddi_devid_sizeof(r->ri_devid);
-				kmem_free((caddr_t)r->ri_devid, sz);
-				r->ri_devid = (ddi_devid_t)NULL;
-			}
 			if (r->ri_old_devid != (ddi_devid_t)NULL) {
 				sz = ddi_devid_sizeof(r->ri_old_devid);
 				kmem_free((caddr_t)r->ri_old_devid, sz);
@@ -5515,6 +5525,8 @@ load_old_replicas(
 	alc = 0;
 	lc = 0;
 	for (li = 0; li < lbp->lb_loccnt; li++) {
+		ddi_devid_t	li_devid;
+
 		lp = &lbp->lb_locators[li];
 
 		if (lp->l_flags & MDDB_F_DELETED)
@@ -5523,9 +5535,20 @@ load_old_replicas(
 		/* Count non-deleted replicas */
 		lc++;
 
+		/*
+		 * Use the devid of this locator to compare with the rip
+		 * list.  The scenario to watch out for here is that this
+		 * locator could be on a disk that is dead and there could
+		 * be a valid entry in the rip list for a different disk
+		 * that has been moved to the dead disks dev_t.  We don't
+		 * want to match with the moved disk.
+		 */
+		li_devid = NULL;
+		(void) mddb_devid_get(s, li, &li_devid, &minor_name);
+
 		for (rip = s->s_rip; rip != NULL; rip = rip->ri_next) {
-			if ((rip->ri_dev == md_expldev(lp->l_dev)) &&
-			    (rip->ri_blkno == lp->l_blkno)) {
+			if (match_mddb(rip, li_devid, minor_name,
+			    md_expldev(lp->l_dev), lp->l_blkno)) {
 				break;
 			}
 		}
@@ -5572,23 +5595,18 @@ load_old_replicas(
 				md_clr_setstatus(setno, MD_SET_STALE);
 			}
 		}
-		/*
-		 * Rootdev is 0 only when booting. So, if
-		 * we have come this far and rootdev is 0,
-		 * we can conclude:
-		 * 1. We are being called on bootup.
-		 * 2. We have mirrored root.
-		 *
-		 * To handle the quorum issue for a 2 disk case,
-		 * we add another vote for rootdev. We are not
-		 * removing the requirement for majority quorum
-		 * but rather delegating the vote to user level
-		 * daemons. Since the daemon has checked the valid
-		 * bootpath, rootdev is given an additional vote.
-		 */
 
-		if (mirrored_root_flag == 1 &&
-			((rootdev == 0) && (alc + 1 > tlc))) {
+		/*
+		 * The mirrored_root_flag allows the sysadmin to decide to
+		 * start the local set in a read/write (non-stale) mode
+		 * when there are only 50% available mddbs on the system and
+		 * when the root file system is on a mirror.  This is useful
+		 * in a 2 disk system where 1 disk failure would cause an mddb
+		 * quorum failure and subsequent boot failures since the root
+		 * filesystem would be in a read-only state.
+		 */
+		if (mirrored_root_flag == 1 && setno == 0 &&
+		    svm_bootpath[0] != 0) {
 			md_clr_setstatus(setno, MD_SET_STALE);
 		} else {
 			if (md_get_setstatus(setno) & MD_SET_STALE) {
@@ -5656,8 +5674,8 @@ load_old_replicas(
 
 		/* Find rip entry for this locator if one exists */
 		for (rip = s->s_rip; rip != NULL; rip = rip->ri_next) {
-			if (rip->ri_dev == md_expldev(lp->l_dev) &&
-			    rip->ri_blkno == lp->l_blkno)
+			if (match_mddb(rip, NULL, NULL, md_expldev(lp->l_dev),
+			    lp->l_blkno))
 				break;
 		}
 
@@ -5704,8 +5722,8 @@ load_old_replicas(
 
 		/* Find rip entry for this locator if one exists */
 		for (rip = s->s_rip; rip != NULL; rip = rip->ri_next) {
-			if (rip->ri_dev == md_expldev(lp->l_dev) &&
-			    rip->ri_blkno == lp->l_blkno)
+			if (match_mddb(rip, NULL, NULL, md_expldev(lp->l_dev),
+			    lp->l_blkno))
 				break;
 		}
 
@@ -6024,13 +6042,13 @@ errout:
 	/* Free extraneous rip components. */
 	for (rip = s->s_rip; rip != NULL; rip = rip->ri_next) {
 		/* Get rid of lbp's and dtp's */
-		if (rip->ri_lbp != lbp && rip->ri_lbp != (mddb_lb_t *)NULL) {
+
+		if (rip->ri_lbp != lbp) {
 			if (rip->ri_dtp != (mddb_dt_t *)NULL) {
 				kmem_free((caddr_t)rip->ri_dtp, MDDB_DT_BYTES);
 				rip->ri_dtp = (mddb_dt_t *)NULL;
 			}
 
-			mddb_devid_icp_free(&rip->ri_did_icp, rip->ri_lbp);
 			if (rip->ri_devid != (ddi_devid_t)NULL) {
 				sz = (int)ddi_devid_sizeof(rip->ri_devid);
 				kmem_free((caddr_t)rip->ri_devid, sz);
@@ -6042,9 +6060,14 @@ errout:
 				rip->ri_old_devid = (ddi_devid_t)NULL;
 			}
 
-			kmem_free((caddr_t)rip->ri_lbp,
-			    dbtob(rip->ri_lbp->lb_blkcnt));
-			rip->ri_lbp = (mddb_lb_t *)NULL;
+			if (rip->ri_lbp != (mddb_lb_t *)NULL) {
+				mddb_devid_icp_free(&rip->ri_did_icp,
+				    rip->ri_lbp);
+
+				kmem_free((caddr_t)rip->ri_lbp,
+				    dbtob(rip->ri_lbp->lb_blkcnt));
+				rip->ri_lbp = (mddb_lb_t *)NULL;
+			}
 		}
 
 		if (lbp != NULL) {
