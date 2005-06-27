@@ -138,6 +138,7 @@ COMMON_SUBDIRS=		\
 	ed		\
 	eeprom		\
 	egrep		\
+	emul64ioctl	\
 	enhance		\
 	env		\
 	eqn		\

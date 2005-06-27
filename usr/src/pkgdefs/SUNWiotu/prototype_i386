@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,9 +52,11 @@ f none usr/kernel/drv/gen_drv 755 root sys
 f none usr/kernel/drv/tvhci 755 root sys
 f none usr/kernel/drv/tphci 755 root sys
 f none usr/kernel/drv/tclient 755 root sys
+f none usr/kernel/drv/emul64 755 root sys
 d none usr/kernel/drv/amd64 755 root sys
 f none usr/kernel/drv/amd64/pshot 755 root sys
 f none usr/kernel/drv/amd64/gen_drv 755 root sys
 f none usr/kernel/drv/amd64/tvhci 755 root sys
 f none usr/kernel/drv/amd64/tphci 755 root sys
 f none usr/kernel/drv/amd64/tclient 755 root sys
+f none usr/kernel/drv/amd64/emul64 755 root sys

@@ -108,6 +108,7 @@ COMMON_SUBDIRS = \
 	cmd/dumpadm \
 	cmd/dumpcs \
 	cmd/echo \
+	cmd/emul64ioctl \
 	cmd/env \
 	cmd/expand \
 	cmd/fdformat \

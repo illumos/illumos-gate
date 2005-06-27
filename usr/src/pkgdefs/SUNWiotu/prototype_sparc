@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,3 +52,4 @@ f none usr/kernel/drv/sparcv9/gen_drv 755 root sys
 f none usr/kernel/drv/sparcv9/tvhci 755 root sys
 f none usr/kernel/drv/sparcv9/tphci 755 root sys
 f none usr/kernel/drv/sparcv9/tclient 755 root sys
+f none usr/kernel/drv/sparcv9/emul64 755 root sys

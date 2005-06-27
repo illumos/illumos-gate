@@ -701,6 +701,8 @@ TPHCI_OBJS += tphci.o
 
 TVHCI_OBJS += tvhci.o
 
+EMUL64_OBJS += emul64.o emul64_bsd.o
+
 ZCONS_OBJS += zcons.o
 
 #

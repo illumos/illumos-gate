@@ -265,6 +265,7 @@ DRV_KMODS	+= pci_pci px_pci pcie
 DRV_KMODS	+= pshot
 DRV_KMODS	+= gen_drv
 DRV_KMODS	+= tvhci tphci tclient
+DRV_KMODS	+= emul64
 
 #
 # PCMCIA specific module(s)

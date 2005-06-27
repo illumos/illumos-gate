@@ -307,14 +307,14 @@ static struct bus_ops pshot_bus_ops = {
 	NULL,				/* bus_add_interspec */
 	NULL,				/* bus_remove_interspec */
 	i_ddi_map_fault,		/* bus_map_fault */
-	ddi_no_dma_map,			/* bus_dma_map */
-	ddi_no_dma_allochdl,		/* bus_dma_allochdl */
-	NULL,				/* bus_dma_freehdl */
-	NULL,				/* bus_dma_bindhdl */
-	NULL,				/* bus_dma_unbindhdl */
-	NULL,				/* bus_dma_flush */
-	NULL,				/* bus_dma_win */
-	NULL,				/* bus_dma_ctl */
+	ddi_dma_map,			/* bus_dma_map */
+	ddi_dma_allochdl,		/* bus_dma_allochdl */
+	ddi_dma_freehdl,		/* bus_dma_freehdl */
+	ddi_dma_bindhdl,		/* bus_dma_bindhdl */
+	ddi_dma_unbindhdl,		/* bus_dma_unbindhdl */
+	ddi_dma_flush,			/* bus_dma_flush */
+	ddi_dma_win,			/* bus_dma_win */
+	ddi_dma_mctl,			/* bus_dma_ctl */
 	pshot_ctl,			/* bus_ctl */
 	ddi_bus_prop_op,		/* bus_prop_op */
 	pshot_get_eventcookie,		/* bus_get_eventcookie */
@@ -2737,7 +2737,7 @@ pshot_nexus_properties(dev_info_t *parent, dev_info_t *child, char *cname,
 	char *extension;
 
 	/*
-	 * extract the address extention
+	 * extract the address extension
 	 */
 	extension = strstr(caddr, ",");
 	if (extension != NULL) {
@@ -2811,7 +2811,7 @@ pshot_leaf_properties(dev_info_t *parent, dev_info_t *child, char *cname,
 	char *extension;
 
 	/*
-	 * extract the address extention
+	 * extract the address extension
 	 */
 	extension = strstr(caddr, ",");
 	if (extension != NULL) {
@@ -3360,9 +3360,7 @@ pshot_probe_family(dev_info_t *self, ddi_probe_method_t probe_how,
 	}
 	return (DDI_SUCCESS);
 }
-#endif
 
-#ifdef NOTNEEDED
 static int
 strtoi(char *str)
 {
@@ -3375,7 +3373,6 @@ strtoi(char *str)
 	}
 	return (val);
 }
-#endif
 
 struct m_to_reg {
 	char	*mc;
@@ -3391,7 +3388,7 @@ struct m_to_reg m_regspecs[] = {
 	{"i86pc", 3, {0xf, 0x6000000, 0x20}},
 	{NULL, 0, {0, 0, 0}},
 };
-
+#endif
 
 static void
 pshot_setup_autoattach(dev_info_t *devi)

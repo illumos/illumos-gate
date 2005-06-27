@@ -196,6 +196,9 @@ CHKHDRS=			\
 	elf_notes.h		\
 	elf_amd64.h		\
 	elftypes.h		\
+	emul64.h		\
+	emul64cmd.h		\
+	emul64var.h		\
 	epm.h			\
 	errno.h			\
 	errorq.h		\
