@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -707,7 +707,7 @@ fr_info_t *fin;
 		ip->ip_id = fr_nextipid(fin);
 		ip->ip_hl = sizeof(*ip) >> 2;
 		ip->ip_p = IPPROTO_TCP;
-		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
+		ip->ip_len = sizeof(*ip) + sizeof(*tcp);
 		ip->ip_tos = fin->fin_ip->ip_tos;
 		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2);
 	}
@@ -715,6 +715,25 @@ fr_info_t *fin;
 }
 
 
+/*
+ * Function:	fr_send_ip
+ * Returns:	 0: success
+ *		-1: failed
+ * Parameters:
+ *	fin: packet information
+ *	m: the message block where ip head starts
+ *
+ * Send a new packet through the IP stack. 
+ *
+ * For IPv4 packets, ip_len must be in host byte order, and ip_v,
+ * ip_ttl, ip_off, and ip_sum are ignored (filled in by this
+ * function).
+ *
+ * For IPv6 packets, ip6_flow, ip6_vfc, and ip6_hlim are filled
+ * in by this function.
+ *
+ * All other portions of the packet must be in on-the-wire format.
+ */
 static int fr_send_ip(fin, m)
 fr_info_t *fin;
 mblk_t *m;
@@ -739,10 +758,11 @@ mblk_t *m;
 
 #if SOLARIS2 >= 10
 		ip->ip_ttl = 255;
-		ip->ip_off = htons(IP_DF);
+
+		ip->ip_off = IP_DF;
 #else
 		ip->ip_ttl = (u_char)(*ip_ttl_ptr);
-		ip->ip_off = htons(*ip_mtudisc ? IP_DF : 0);
+		ip->ip_off = *ip_mtudisc ? IP_DF : 0;
 #endif
 
 		ip->ip_sum = ipf_cksum((u_short *)ip, sizeof(*ip));
@@ -882,7 +902,7 @@ int dst;
 		ip->ip_p = IPPROTO_ICMP;
 		ip->ip_id = fin->fin_ip->ip_id;
 		ip->ip_tos = fin->fin_ip->ip_tos;
-		ip->ip_len = htons((u_short)sz);
+		ip->ip_len = (u_short)sz;
 		if (dst == 0) {
 			if (fr_ifpaddr(4, FRI_NORMAL, qif->qf_ill,
 				       &dst4, NULL) == -1) {
