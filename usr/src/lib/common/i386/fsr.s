@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,14 @@
 	.file	"fsr.s"
 
 	.section	.data
+	.align 4
 
 	.weak	__fsr_init_value
+
+__fsr_init_value_ptr:
+	.4byte	__fsr_init_value
+	.type   __fsr_init_value_ptr,@object
+	.size   __fsr_init_value_ptr,4
 
 /*
  * The following table maps trap enable bits in __fsr_init_value
@@ -100,7 +106,8 @@ __fsr:
 	pushl	%ecx
 	subl	$4,%esp
 
-	movl	$__fsr_init_value,%ecx	/* get the value set by CG */
+	lea	__fsr_init_value_ptr, %ecx
+	movl	(%ecx),%ecx		/* get the value set by CG */
 	shrl	$1,%ecx			/* get rid of fns bit */
 	cmpl	$0,%ecx			/* if remaining bits are zero */
 	je	3f			/*   there's nothing to do */
