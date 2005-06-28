@@ -2154,6 +2154,55 @@ drmach_board_connect(drmachid_t id, drmach_opts_t *opts)
 sbd_error_t *
 drmach_board_disconnect(drmachid_t id, drmach_opts_t *opts)
 {
+	drmach_board_t		*bp;
+	int			rv;
+	int			d_idx;	/* device index */
+	drmachid_t		d_id;	/* device ID */
+	sbd_error_t		*err;
+
+	if (!DRMACH_IS_BOARD_ID(id))
+		return (drerr_new(0, ESTF_INAPPROP, NULL));
+
+	bp = id;
+
+	/*
+	 * We need to make sure all of the board's device nodes
+	 * have been removed from the Solaris device tree before
+	 * continuing with the disconnect. Otherwise, we could
+	 * disconnect the board and remove the OBP device tree
+	 * nodes with Solaris device tree nodes remaining.
+	 *
+	 * On Starfire, Solaris device tree nodes are deleted
+	 * during unconfigure by drmach_unconfigure(). It's
+	 * necessary to do this here because drmach_unconfigure()
+	 * failures are not handled during unconfigure.
+	 */
+	if (bp->devices) {
+		rv = drmach_array_first(bp->devices, &d_idx, &d_id);
+		while (rv == 0) {
+			err = drmach_unconfigure(d_id, DRMACH_DEVI_REMOVE);
+			if (err)
+				return (err);
+
+			rv = drmach_array_next(bp->devices, &d_idx, &d_id);
+		}
+	}
+
+	/*
+	 * Starfire board Solaris device tree counter nodes,
+	 * which are only present on start-of-day boards, are
+	 * removed in the dr_post_op() code flow after the
+	 * board is unconfigured. We call the counter node
+	 * removal function here because unconfigure errors
+	 * can cause the dr_post_op() function to be skipped
+	 * after an unconfigure operation even though all of
+	 * the board's devices have been transitioned to the
+	 * unconfigured state.
+	 */
+	err = drmach_remove_counter_nodes(id);
+	if (err)
+		return (err);
+
 	return (NULL);
 }
 
