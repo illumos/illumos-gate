@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +86,8 @@ static struct dev_ops seeprom_ops = {
 	seeprom_detach,
 	nodev,
 	&seeprom_cbops,
-	NULL
+	NULL,
+	nulldev
 };
 
 static struct modldrv seeprom_modldrv = {
@@ -112,10 +113,13 @@ _init(void)
 {
 	int error;
 
-	error = mod_install(&seeprom_modlinkage);
-	if (error == 0) {
-		(void) ddi_soft_state_init(&seepromsoft_statep,
-			sizeof (struct seepromunit), 1);
+	if ((error = ddi_soft_state_init(&seepromsoft_statep,
+	    sizeof (struct seepromunit), 1)) != 0)
+		return (error);
+
+	if ((error = mod_install(&seeprom_modlinkage)) != 0) {
+		ddi_soft_state_fini(&seepromsoft_statep);
+		return (error);
 	}
 
 	return (error);
@@ -235,7 +239,7 @@ seeprom_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		    getminor((dev_t)arg));
 		if (unitp == NULL) {
 
-			return (ENXIO);
+			return (DDI_FAILURE);
 		}
 		*result = (void *)unitp->seeprom_dip;
 
