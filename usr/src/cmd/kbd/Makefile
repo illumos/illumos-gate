@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,6 +28,7 @@
 
 MANIFEST = keymap.xml
 SVCMETHOD = keymap
+DEFAULTFILES = kbd.dfl
 
 include ../Makefile.cmd
 
@@ -39,29 +40,13 @@ PROG	= kbd
 CFLAGS	+= $(CCVERBOSE)
 LDLIBS	+= -lcmd
 
-DFLTD	= $(ROOTETC)/default
-DDIRS	= $(DFLTD)
-
-ETCDFLTPROG = $(PROG:%=$(DFLTD)/%)
-$(ETCDFLTPROG) := FILEMODE = 0444
-$(ETCDFLTPROG) := OWNER = root
-$(ETCDFLTPROG) := GROUP = sys
-
 $(ROOTMANIFEST) := FILEMODE = 0444
 
-all: $(PROG) $(PROG).dfl
+all: $(PROG)
 
-install: all $(DDIRS) $(ETCDFLTPROG) $(ROOTPROG) $(ROOTMANIFEST) \
-	$(ROOTSVCMETHOD)
-
-$(DDIRS):
-	$(INS.dir)
-
-$(DFLTD)/% : %.dfl
-	$(INS.rename)
+install: all $(ROOTETCDEFAULTFILES) $(ROOTPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 clean:
-	$(RM) $(PROG)
 
 lint:	lint_PROG
 

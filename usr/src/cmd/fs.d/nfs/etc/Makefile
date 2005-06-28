@@ -22,24 +22,22 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
+DEFAULTFILES = nfs.dfl
 
 include ../../../Makefile.cmd
 
 ETCNFS= $(ROOTETC)/nfs
 VARNFS= $(ROOT)/var/nfs
-DEFNFS= $(ROOT)/default
 TXTS= nfssec.conf
 NFSTXTS= nfslog.conf
-DEFTXTS= nfs
 V4SSDIR= $(VARNFS)/v4_state $(VARNFS)/v4_oldstate
 
 IETCFILES=			$(TXTS:%=$(ROOTETC)/%)
 INFSETCFILES=			$(NFSTXTS:%=$(ROOTETC)/nfs/%)
-IDEFFILES=			$(DEFTXTS:%=$(ROOTETC)/default/%)
 
 $(VARNFS) := GROUP = bin
 FILEMODE= 0644
@@ -49,9 +47,10 @@ GROUP= sys
 $(V4SSDIR) := GROUP = daemon 
 $(V4SSDIR) := OWNER = daemon 
 
-all: $(TXTS) $(NFSTXTS) $(DEFTXTS)
+all: $(TXTS) $(NFSTXTS)
 
-install: all $(IETCFILES) $(ETCNFS) $(INFSETCFILES) $(VARNFS) $(V4SSDIR) $(IDEFFILES)
+install: all $(IETCFILES) $(ETCNFS) $(INFSETCFILES) $(VARNFS) $(V4SSDIR) \
+	 $(IDEFFILES) $(ROOTETCDEFAULTFILES)
 
 $(ROOTETC)/%: %
 	$(INS.file)
@@ -68,11 +67,6 @@ $(VARNFS):
 $(V4SSDIR):
 	$(INS.dir)
 
-$(ROOTETC)/default/%: %
-	$(INS.file)
-
 .KEEP_STATE:
-
-FRC:
 
 clean clobber lint:

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -180,10 +180,10 @@ $(ROOTMAN3FILES) := OWNER= root
 $(ROOTMAN3FILES) := GROUP= bin
 
 ROOTETCDEFAULT=	$(ROOTETC)/default
-ROOTETCDEFAULTFILES=	$(DEFAULTFILES:%=$(ROOTETCDEFAULT)/%)
+ROOTETCDEFAULTFILES=	$(DEFAULTFILES:%.dfl=$(ROOTETCDEFAULT)/%)
 $(ROOTETCDEFAULTFILES) :=	OWNER = root
 $(ROOTETCDEFAULTFILES) :=	GROUP = sys
-$(ROOTETCDEFAULTFILES) :=	FILEMODE = 0444
+$(ROOTETCDEFAULTFILES) :=	FILEMODE = 0644
 
 #
 # Directories for smf(5) service manifests and profiles.
@@ -287,6 +287,9 @@ $(ROOTUSRSBIN64)/%: %
 
 $(ROOTETC)/%: %
 	$(INS.file)
+
+$(ROOTETCDEFAULT)/%:	%.dfl
+	$(INS.rename)
 
 $(ROOTCCSBIN)/%: %
 	$(INS.file)

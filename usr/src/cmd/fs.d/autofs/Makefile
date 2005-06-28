@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,13 +42,13 @@ LINKVALUE=	../lib/fs/$(FSTYPE)/$(AUTO)
 MAPS=		auto_master auto_home
 MAPINSTALL=	$(MAPS:%=$(ROOTETC)/%)
 AUTOFS=		autofs
-AUTOFSINSTALL=	$(AUTOFS:%=$(ROOTETC)/default/%)
+DEFAULTFILES=	autofs.dfl
 SMFMANIFEST=	autofs.xml
 SMFMETHOD=	svc-autofs
 MFSTINSTALL=	$(SMFMANIFEST:%=$(ROOTSVCSYSTEM)/filesystem/%)
 METHODINSTALL=	$(SMFMETHOD:%=$(ROOTLIBSVCMETHOD)/%)
 
-OTHERINSTALL=	$(MAPINSTALL) $(LINKINSTALL) $(AUTOFSINSTALL) \
+OTHERINSTALL=	$(MAPINSTALL) $(LINKINSTALL) $(ROOTETCDEFAULTFILES) \
 		$(MFSTINSTALL) $(METHODINSTALL)
 
 UNCHECKED_HDRS=	webnfs.h
@@ -60,10 +60,6 @@ include		../Makefile.fstype
 
 $(MAPINSTALL)	:= OWNER= root
 $(MAPINSTALL)	:= FILEMODE= 0644
-
-$(AUTOFSINSTALL) := OWNER= root
-$(AUTOFSINSTALL) := FILEMODE= 0444
-$(AUTOFSINSTALL) := GROUP= sys
 
 $(MFSTINSTALL)	:= FILEMODE = 0444
 
@@ -133,9 +129,6 @@ $(SHARE):	$(SHAREOBJS)
 $(UNSHARE):	$(UNSHAREOBJS)
 		$(LINK.c) -o $@ $(UNSHAREOBJS)
 		$(POST_PROCESS)
-
-$(ROOTETC)/default/%:%
-		$(INS.file)
 
 $(ROOTSVCSYSTEM)/filesystem/%: %
 		$(INS.file)

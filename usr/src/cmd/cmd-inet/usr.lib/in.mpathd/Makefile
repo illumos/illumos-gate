@@ -20,16 +20,17 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1992-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG	= in.mpathd
-PROGDFL	= mpathd
 OBJS	= mpd_tables.o mpd_main.o mpd_probe.o
 SRCS	= $(OBJS:%.o=%.c)
+
+DEFAULTFILES = mpathd.dfl
 
 include ../../../Makefile.cmd
 
@@ -43,12 +44,6 @@ POFILES = $(SRCS:%.c=%.po)
 CPPFLAGS += -D_XOPEN_SOURCE=500 -D__EXTENSIONS__ -I$(SRC)/cmd/cmd-inet/common
 LDLIBS	+= -lcmd -lsocket -lnsl -lsysevent -lnvpair -lipmp -lc
 
-DFLTD  		= $(ROOTETC)/default
-ETCDFLTPROG	= $(PROGDFL:%=$(DFLTD)/%)
-$(ETCDFLTPROG)	:= FILEMODE = 0444
-$(ETCDFLTPROG)	:= OWNER = root
-$(ETCDFLTPROG)	:= GROUP = sys
-
 LINTFLAGS += -erroff=E_FUNC_DECL_VAR_ARG2 -erroff=E_INCONS_VAL_TYPE_DECL2 \
 	    -erroff=E_FUNC_USED_VAR_ARG2 -erroff=E_INCONS_ARG_DECL2 \
 	    -erroff=E_NAME_USED_NOT_DEF2 -erroff=E_INCONS_ARG_USED2 \
@@ -56,7 +51,7 @@ LINTFLAGS += -erroff=E_FUNC_DECL_VAR_ARG2 -erroff=E_INCONS_VAL_TYPE_DECL2 \
 
 .KEEP_STATE:
 
-all:		$(PROG) $(PROGDFL).dfl 
+all:		$(PROG)
 
 $(PROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
@@ -67,18 +62,12 @@ include ../Makefile.lib
 $(ROOTSBINPROG):
 		$(RM) $@; $(SYMLINK) ../usr/lib/inet/$(PROG) $@
 
-install:	all $(ROOTLIBINETPROG) $(ROOTSBINPROG) $(DFLTD) $(ETCDFLTPROG)
+install:	all $(ROOTLIBINETPROG) $(ROOTSBINPROG) $(ROOTETCDEFAULTFILES)
 
 clean:
 		$(RM) $(OBJS)
 
 lint:		lint_SRCS
-
-$(DFLTD):
-		$(INS.dir)
-
-$(DFLTD)/%:	%.dfl
-		$(INS.rename)
 
 $(POFILE): 	$(POFILES)
 		$(RM) $@

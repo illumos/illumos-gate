@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -85,15 +85,6 @@ $(ROOTXMLSTYLEFILES) :=	GROUP = sys
 $(ROOTXMLSTYLEFILES) :=	FILEMODE = 0444
 
 $(ROOTXMLSTYLE)/%: %
-	$(INS.file)
-
-# Rule/definitions for /etc/default
-ROOTETCDEFAULTFILES=	$(DEFAULTFILES:%=$(ROOTETCDEFAULT)/%)
-$(ROOTETCDEFAULTFILES) :=	OWNER = root
-$(ROOTETCDEFAULTFILES) :=	GROUP = sys
-$(ROOTETCDEFAULTFILES) :=	FILEMODE = 0644
-
-$(ROOTETCDEFAULT)/%: %
 	$(INS.file)
 
 # Install recursively

@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/fs.d/nfs/nfslog/Makefile
@@ -30,6 +30,7 @@
 FSTYPE=		nfs
 TYPEPROG=	nfslogd
 ATTMK=		$(TYPEPROG)
+DEFAULTFILES=	nfslogd.dfl
 
 include		../../Makefile.fstype
 
@@ -57,20 +58,11 @@ $(POFILE):      $(SRCS)
 	sed "/^domain/d"        messages.po     > $@
 	$(RM) messages.po $(POFILE).i
 
-
-DFLTD=		$(ROOTETC)/default
-ETCDFLTPROG=	$(TYPEPROG:%=$(DFLTD)/%)
-
-$(ETCDFLTPROG) := FILEMODE = $(LIBFILEMODE)
-
 $(TYPEPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
-$(DFLTD)/% : %.dfl
-	$(INS.rename)
-
-install:	all $(ETCDFLTPROG)
+install:	all $(ROOTETCDEFAULTFILES)
 
 nfslog_config.o:	../lib/nfslog_config.c
 		$(COMPILE.c) ../lib/nfslog_config.c

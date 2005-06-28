@@ -20,26 +20,20 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= utmpd
+DEFAULTFILES= utmpd.dfl
 
 include ../Makefile.cmd
-
-DFLTD= $(ROOTETC)/default
-DIRS= $(DFLTD)
 
 MANIFEST = utmp.xml
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 SVCMETHOD = svc-utmpd
-
-ETCDFLTPROG = $(PROG:%=$(DFLTD)/%)
-$(ETCDFLTPROG) := FILEMODE = $(LIBFILEMODE)
-$(ETCDFLTPROG) := GROUP = sys
 
 FILEMODE = 555
 OWNER = root
@@ -53,15 +47,8 @@ $(ROOTMANIFEST) := GROUP = sys
 
 all: $(PROG)
 
-install: all $(DIRS) $(ROOTLIBPROG) $(PROG).dfl $(ETCDFLTPROG) $(ROOTMANIFEST) \
+install: all $(DIRS) $(ROOTLIBPROG) $(ROOTETCDEFAULTFILES) $(ROOTMANIFEST) \
 	$(ROOTSVCMETHOD)
-
-$(DFLTD)/% : %
-	$(MV) $(PROG) $(PROG).save
-	$(LN) $(PROG).dfl $(PROG)
-	$(INS.file)
-	$(RM) $(PROG)
-	$(MV) $(PROG).save $(PROG)
 
 check:	$(CHKMANIFEST)
 

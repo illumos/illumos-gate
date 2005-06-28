@@ -33,6 +33,7 @@
 #
 # Ignore text files.
 #
+./OPENSOLARIS.LICENSE
 *.txt
 */*[Rr][Ee][Aa][Dd][Mm][Ee]*
 */ChangeLog
@@ -42,11 +43,24 @@
 */LICENSE
 
 #
-# Ignore everything under trees that are maintained externally.
+# Ignore oddly-named text files scattered about -- someday these should be
+# suffixed with .txt so we don't have to list them.
+#
+./cmd/oawk/EXPLAIN
+./cmd/rpcsvc/nis/rpc.nisd/resolv_server/DNS_FWD
+./cmd/vi/port/ex.news
+./uts/common/io/dktp/controller/ata/capacity.notes
+./cmd/ssh/doc/*
+
+#
+# Ignore everything under trees that may be resynched from outside ON.
 #
 ./cmd/perl
+./cmd/svc/configd/sqlite
 ./cmd/tcpd
 ./common/openssl
+./grub
+./uts/intel/sys/acpi
 
 #
 # Ignore any files built as part of the nightly program itself.
@@ -118,15 +132,6 @@
 ./cmd/sgs/*/*/*chk.msg
 
 #
-# Ignore oddly-named text files scattered about -- someday these should be
-# suffixed with .txt so we don't have to list them.
-#
-./cmd/oawk/EXPLAIN
-./cmd/rpcsvc/nis/rpc.nisd/resolv_server/DNS_FWD
-./cmd/vi/port/ex.news
-./uts/common/io/dktp/controller/ata/capacity.notes
-
-#
 # Ignore files that get used during a EXPORT_SRC or CRYPT_SRC build only.
 #
 ./common/crypto/aes/Makefile
@@ -134,6 +139,12 @@
 ./common/crypto/blowfish/Makefile
 ./common/crypto/des/Makefile
 ./common/crypto/rsa/Makefile
+./lib/gss_mechs/mech_dh/backend/mapfile-vers
+./lib/gss_mechs/mech_dh/dh1024/mapfile-vers
+./lib/gss_mechs/mech_dh/dh192/mapfile-vers
+./lib/gss_mechs/mech_dh/dh640/mapfile-vers
+./lib/gss_mechs/mech_krb5/spec/krb5_clean.spec
+./lib/gss_mechs/mech_spnego/spec/clean.spec
 ./lib/pkcs11/pkcs11_softtoken/common/Makefile
 ./uts/common/Makefile
 ./uts/common/crypto/io/Makefile
@@ -141,8 +152,8 @@
 ./uts/common/gssapi/mechs/dummy/Makefile
 ./uts/common/gssapi/mechs/krb5/Makefile
 ./uts/common/inet/ip/Makefile
-./xmod
 ./uts/sun4v/io/ncp/Makefile
+./xmod
 
 #
 # Ignore Makefiles which are used by developers but not used by nightly
@@ -182,6 +193,11 @@
 ./lib/libbsm/common/adt_ucred.h
 
 #
+# Ignore files provided by Adaptec as part of their software drop.
+#
+./uts/intel/io/adpu320/chim/hwm/seqse320.h
+
+#
 # Ignore files originally supplied by ISC (Internet Software Consortium) 
 # as part of a BIND release.
 #
@@ -204,11 +220,6 @@
 ./lib/libresolv2/common/inet/inet_addr.c
 
 #
-# Ignore OpenSSH documentation
-#
-./cmd/ssh/doc/*
-
-#
 # Ignore ufs unix version of the boot block, useful for testing.
 #
 ./psm/stand/bootblks/ufs/common/iob.h
@@ -216,49 +227,7 @@
 ./psm/stand/bootblks/obp-c/common/cbootblk.h
 
 #
-# Ignore all ON-internal packages.
-#
-./pkgdefs/SUNWon*
-
-#
-# Ignore this adpu320 file: 
-#   seqse320.h is legitimate file being wrongly picked up by findunref.
-#
-./uts/intel/io/adpu320/chim/hwm/seqse320.h
-
-#
-# Ignore unused files in the sqlite distribution
-#
-./cmd/svc/configd/sqlite/*
-
-#
 # Ignore mont_mulf.c. It is used as a starting point for some hand optimized
 # assembly files. We keep it around for future reference.
 #
 ./common/bignum/mont_mulf.c
-
-#
-# Ignore files needed only for export source builds, or only for non-export
-# builds.
-#
-./lib/gss_mechs/mech_dh/backend/mapfile-vers
-./lib/gss_mechs/mech_dh/dh1024/mapfile-vers
-./lib/gss_mechs/mech_dh/dh192/mapfile-vers
-./lib/gss_mechs/mech_dh/dh640/mapfile-vers
-./lib/gss_mechs/mech_krb5/spec/krb5_clean.spec
-./lib/gss_mechs/mech_spnego/spec/clean.spec
-
-#
-# Ignore extra files included with the grub source distribution
-#
-./grub
-
-#
-# Ignore any extra files provided with intel's apci implementation
-#
-./uts/intel/sys/acpi
-
-#
-# Ignore the CDDL notice
-#
-./OPENSOLARIS.LICENSE

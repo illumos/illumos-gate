@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,12 +28,12 @@
 
 METASSIST_TOPLEVEL = ..
 
+# Files to be copied to /etc/default
+DEFAULTFILES = \
+	metassist.xml.dfl
+
 include $(METASSIST_TOPLEVEL)/../../Makefile.cmd
 include $(METASSIST_TOPLEVEL)/Makefile.env
-
-# Files to be copied to /etc/defaults
-DEFAULTFILES = \
-	metassist.xml
 
 # Files to be copied to /usr/share/lib/xml/dtd
 DTDFILES = \

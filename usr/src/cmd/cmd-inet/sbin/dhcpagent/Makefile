@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,21 +28,15 @@
 
 PROG    = dhcpagent
 ROOTFS_PROG = $(PROG)
-LOCOBJS = adopt.o agent.o arp_check.o async.o bound.o class_id.o defaults.o \
-	  dlpi_io.o dlprims.o inform.o init_reboot.o \
-	  interface.o ipc_action.o packet.o release.o renew.o request.o \
-	  script_handler.o select.o util.o
+DEFAULTFILES = dhcpagent.dfl
+
+LOCOBJS = adopt.o agent.o arp_check.o async.o bound.o class_id.o defaults.o   \
+	  dlpi_io.o dlprims.o inform.o init_reboot.o interface.o ipc_action.o \
+	  packet.o release.o renew.o request.o script_handler.o select.o util.o
 COMDIR  = $(SRC)/common/net/dhcp
 COMOBJS = ipv4_sum.o udp_sum.o
-INETDIR = $(SRC)/cmd/cmd-inet/common
 
 include ../../../Makefile.cmd
-
-DFLTD   = $(ROOTETC)/default
-ETCDFLTPROG = $(PROG:%=$(DFLTD)/%)
-$(ETCDFLTPROG) := FILEMODE = 0444
-$(ETCDFLTPROG) := OWNER = root
-$(ETCDFLTPROG) := GROUP = sys
 
 OBJS    = $(COMOBJS) $(LOCOBJS)
 SRCS    = $(COMOBJS:%.o=$(COMDIR)/%.c) $(LOCOBJS:%.o=%.c)
@@ -54,14 +48,14 @@ XGETFLAGS += -a -x dhcpagent.xcl
 # to compile a debug version, do a `make COPTFLAG="-g -XO0"'
 #
 
-CPPFLAGS  += -I$(COMDIR) -I$(INETDIR)
+CPPFLAGS  += -I$(COMDIR)
 LDLIBS    += -lsocket -lnvpair -lnsl -ldhcpagent -ldhcputil -linetutil -ldevinfo
 
 .KEEP_STATE:
 
-all:		$(ROOTFS_PROG) $(PROG).dfl
+all:		$(ROOTFS_PROG)
 
-install:	all $(ROOTSBINPROG) $(ETCDFLTPROG)
+install:	all $(ROOTSBINPROG) $(ROOTETCDEFAULTFILES)
 
 $(PROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
@@ -70,13 +64,6 @@ $(PROG):	$(OBJS)
 %.o:		$(COMDIR)/%.c
 		$(COMPILE.c) $(OUTPUT_OPTION) $<
 		$(POST_PROCESS_O)
-
-%.o:		$(INETDIR)/%.c
-		$(COMPILE.c) $(OUTPUT_OPTION) $<
-		$(POST_PROCESS_O)
-
-$(DFLTD)/%:	%.dfl
-		$(INS.rename)
 
 $(POFILE):	$(POFILES)
 		$(RM) $@; $(CAT) $(POFILES) > $@; $(RM) $(POFILES)

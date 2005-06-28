@@ -20,20 +20,20 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-PROG= ftp
-PROGDFL=	ftp
-OBJS=	cmds.o cmdtab.o ftp.o getpass.o glob.o main.o pclose.o \
-	ruserpass.o domacro.o
+PROG =		ftp
+DEFAULTFILES =	ftp.dfl
 
+OBJS =		cmds.o cmdtab.o ftp.o getpass.o glob.o main.o pclose.o \
+		ruserpass.o domacro.o
 AUTH_OBJS =	auth.o cmds_gss.o secure.o
 OBJS +=		$(AUTH_OBJS)
-SRCS= $(OBJS:%.o=%.c)
+SRCS =		$(OBJS:%.o=%.c)
 
 include ../../../Makefile.cmd
 
@@ -45,31 +45,19 @@ CPPFLAGS +=	-D_FILE_OFFSET_BITS=64 \
 LDLIBS +=	-lsocket -lnsl -lcmd -lgss
 LDFLAGS +=	$(ZLAZYLOAD)
 
-DFLTD		= $(ROOTETC)/default
-ETCDFLTPROG	= $(PROGDFL:%=$(DFLTD)/%)
-$(ETCDFLTPROG)	:= FILEMODE = 0644
-$(ETCDFLTPROG)	:= OWNER = root
-$(ETCDFLTPROG)	:= GROUP = sys
-
 .KEEP_STATE:
 
-all:		$(PROG) $(PROGDFL).dfl
+all:		$(PROG)
 
 $(PROG):	$(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
 
-install:	all $(ROOTPROG) $(DFLTD) $(ETCDFLTPROG)
+install:	all $(ROOTPROG) $(ROOTETCDEFAULTFILES)
 
 clean:
-	$(RM) $(OBJS)
+		$(RM) $(OBJS)
 
-lint:	lint_SRCS
-
-$(DFLTD):
-		$(INS.dir)
-
-$(DFLTD)/%:	%.dfl
-		$(INS.rename)
+lint:		lint_SRCS
 
 include ../../../Makefile.targ

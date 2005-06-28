@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,7 +53,7 @@ d none etc 755 root sys
 e preserve etc/auto_home 644 root bin
 e automaster etc/auto_master 644 root bin
 d none etc/default 755 root sys
-e preserve etc/default/autofs 444 root sys
+e preserve etc/default/autofs 644 root sys
 d none lib 755 root bin
 d none lib/svc 755 root bin
 d none lib/svc/method 755 root bin

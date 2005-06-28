@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,7 +50,7 @@ i r.manifest
 #
 d none etc 755 root sys
 d none etc/default 755 root sys
-e preserve etc/default/telnetd 444 root sys
+e preserve etc/default/telnetd 644 root sys
 d none var 0755 root sys
 d none var/svc 0755 root sys
 d none var/svc/manifest 0755 root sys

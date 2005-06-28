@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,15 +28,12 @@
 # cmd/tar/Makefile
 
 PROG= tar
+DEFAULTFILES= tar.dfl
 
 include ../Makefile.cmd
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I../../lib/libcmd/inc
-SED= sed
 DCFILE= $(PROG).dc
-
-DFLTD= $(ROOTETC)/default
-DIRS= $(DFLTD)
 
 LDLIBS += -lcmd -lsec
 
@@ -49,33 +46,18 @@ CPPFLAGS += -DEUC
 
 ROOTSYMLINK=	$(ROOTPROG)
 
-ETCDFLTPROG = $(PROG:%=$(DFLTD)/%)
-$(ETCDFLTPROG) := FILEMODE = $(LIBFILEMODE)
-$(ETCDFLTPROG) := OWNER = root
-$(ETCDFLTPROG) := GROUP = sys
-
 XGETFLAGS += -a -x tar.xcl
 
 .KEEP_STATE:
 
-all: $(PROG) $(PROG).dfl
+all: $(PROG)
 
-install: all $(DIRS) $(ROOTUSRSBINPROG) $(ETCDFLTPROG) $(ROOTSYMLINK)
+install: all $(ROOTUSRSBINPROG) $(ROOTETCDEFAULTFILES) $(ROOTSYMLINK)
 	-$(RM) -r $(ROOTETCPROG)
 	-$(SYMLINK) ../usr/sbin/$(PROG) $(ROOTETCPROG)
 
 $(ROOTSYMLINK):
 	$(RM) $@; $(SYMLINK) ../sbin/$(PROG) $@
-
-$(DIRS):
-	$(INS.dir)
-
-$(DFLTD)/% : %
-	$(MV) $(PROG) $(PROG).save
-	$(LN) $(PROG).dfl $(PROG)
-	$(INS.file)
-	$(RM) $(PROG)
-	$(MV) $(PROG).save $(PROG)
 
 clean:
 

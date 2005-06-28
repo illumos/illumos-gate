@@ -58,7 +58,7 @@ NSLPROG=	6to4relay arp gettable hostconfig ikeadm in.comsat in.rarpd \
 CMDPROG=	in.telnetd
 IPSECUTILPROG=	ikeadm ipsecalgs ipsecconf ipseckey
 K5PROGS=	in.telnetd in.rlogind in.rshd
-DEFAULTFILES=	telnetd
+DEFAULTFILES=	telnetd.dfl
 
 PROGSRCS=	$(PROG:%=%.c)
 TFTPDOBJS=	in.tftpd.o tftpsubs.o
@@ -189,9 +189,6 @@ tftpsubs.o: $(OTHERSRC)
 
 $(ROOTUSRSBINLINKS):
 	-$(RM) $@; $(SYMLINK) ../../sbin/$(@F) $@
-
-$(ROOTETCDEFAULT)/%: %.dfl
-	 $(INS.rename)
 
 install: $(PROG) $(ROOTFS_PROG) $(SUBDIRS) .WAIT $(ROOTUSRSBINPROG) \
 	$(ROOTSBINPROG) $(ROOTUSRSBINLINKS) $(ROOTETCDEFAULTFILES) \

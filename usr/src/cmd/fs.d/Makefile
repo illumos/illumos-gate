@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,7 +41,7 @@ ROOTFS_PROG=	mount umount
 XPG4PROG=	df
 SPPROG=		clri
 MNTTAB=		mnttab
-FSTYPE=		fs
+DEFAULTFILES=	fs.dfl
 
 include ../Makefile.cmd
 
@@ -79,7 +79,6 @@ ROOTUSRSBINF=		$(USRSBINF:%=$(ROOTUSRSBIN)/%)
 ROOTUSRSBINCLRI=	$(USRSBINCLRI:%=$(ROOTUSRSBIN)/%)
 ROOTUSRSBINFF=		$(USRSBINFF:%=$(ROOTUSRSBIN)/%)
 ROOTETCMNTTAB=		$(MNTTAB:%=$(ROOTETC)/%)
-ROOTFSTYPE=		$(ROOTETC)/default/$(FSTYPE)
 SYMETC2SBIN	=	$(ETC2SBIN:%=$(ROOTETC)/%)
 SYMETC2USRSBIN	=	$(ETC2USRSBIN:%=$(ROOTETC)/%)
 SYMUSRBIN2USRSBIN=	$(USRBIN2USRSBIN:%=$(ROOTBIN)/%)
@@ -96,7 +95,6 @@ $(SPPROG) :=	LDLIBS += -lcmd -lkstat
 $(ROOTETCMNTTAB) := FILEMODE = 444
 $(ROOTETCMNTTAB) := OWNER = root
 $(ROOTETCMNTTAB) := GROUP = root
-$(ROOTFSTYPE)	 := FILEMODE = 444
 
 # for messaging catalog
 #
@@ -131,7 +129,8 @@ _msg: $(I18NDIRS) $(POFILES1) $(POFILES_XPG4)
 	$(RM) $(MSGDOMAIN)/$(POFILE)
 	cp $(POFILE) $(MSGDOMAIN)
 
-all_local:	$(PROG) $(ROOTFS_PROG) $(XPG4PROG) $(SPPROG) $(MNTTAB) $(FSTYPE)
+all_local:	$(PROG) $(ROOTFS_PROG) $(XPG4PROG) $(SPPROG) $(MNTTAB) \
+		$(DEFAULTFILES)
 
 ff volcopy: deffs.o $$(@F).o
 		$(LINK.c) -o $@ $@.o deffs.o $(LDLIBS)
@@ -160,12 +159,9 @@ $(SPPROG):	switchout.o deffs.o fssnapsup.o
 install: $(FSLIB) .WAIT $(SUBDIRS) .WAIT install_local
 
 install_local:	all_local $(ROOTSBINPROG) $(ROOTUSRSBINF) $(ROOTUSRSBINCLRI) \
-		$(ROOTUSRSBINFF) $(ROOTETCMNTTAB) $(ROOTFSTYPE) \
+		$(ROOTUSRSBINFF) $(ROOTETCMNTTAB) $(ROOTETCDEFAULTFILES) \
 		$(ROOTXPG4PROG) $(SYMETC2SBIN) $(SYMETC2USRSBIN) \
 		$(SYMUSRBIN2USRSBIN) $(SYMDEVNM) $(ROOTUSRSBINLINKS)
-
-$(ROOTETC)/default/%:%
-		$(INS.file)
 
 # Links from /etc to /sbin such as /etc/mount -> ../sbin/mount
 $(SYMETC2SBIN):
@@ -194,8 +190,8 @@ $(ROOTUSRSBINCLRI):	$(ROOTUSRSBIN)/clri
 $(MNTTAB):
 	touch $(MNTTAB)
 
-$(FSTYPE):
-	@$(RM) $@; $(ECHO) "LOCAL=ufs" >$@
+fs.dfl:
+	$(RM) $@; $(ECHO) "LOCAL=ufs" >$@
 
 # Multiple names for ff (ncheck)
 $(ROOTUSRSBINFF):	$(ROOTUSRSBIN)/ff
@@ -208,7 +204,8 @@ clean_local:
 clobber: $(ALL_SUBDIRS) .WAIT clobber_local
 
 clobber_local:	clean_local
-	$(RM) $(PROG) $(ROOTFS_PROG) $(SPPROG) $(MNTTAB) $(FSTYPE) $(CLOBBERFILES)
+	$(RM) $(PROG) $(ROOTFS_PROG) $(SPPROG) $(MNTTAB) $(DEFAULTFILES) \
+	$(CLOBBERFILES)
 
 lint:
 

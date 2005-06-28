@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,6 +42,7 @@ SYSIDPM = 	sysidpm
 PROG =		$(DAEMON) $(PMCFG) $(SYSIDPM)
 ETCFILES =	power.conf
 POWERPERM =	power
+DEFAULTFILES =	power.dfl
 
 include ../Makefile.cmd
 
@@ -79,12 +80,8 @@ $(ROOTLIBPOWER) := FILEMODE= 755
 $(ROOTLIBPOWERDAEMON) := GROUP= bin
 $(ROOTLIBPOWERDAEMON) := FILEMODE= 555
 
-ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%)
-$(ROOTETCFILES) := FILEMODE= 644
-
-DFLTD= $(ROOTETC)/default
-ROOTDFLFILES= $(POWERPERM:%=$(DFLTD)/%)
-$(ROOTDFLFILES) := FILEMODE= 444
+ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%) 
+$(ROOTETCFILES) := FILEMODE= 644 
 
 ROOTUSRSBINSYSIDPM= $(SYSIDPM:%=$(ROOTUSRSBIN)/%)
 $(ROOTUSRSBINSYSIDPM) := FILEMODE= 755
@@ -124,11 +121,8 @@ $(ROOTLIBSVCMETHOD)/svc-power := GROUP = bin
 $(ROOTLIBSVCMETHOD)/svc-power := FILEMODE = 0555
 
 install: all $(ROOTUSRSBINPMCFG) $(ROOTLIBPOWERDAEMON) \
-	$(ROOTETCFILES) $(ROOTUSRSBINSYSIDPM) $(ROOTDFLFILES) \
+	$(ROOTETCFILES) $(ROOTUSRSBINSYSIDPM) $(ROOTETCDEFAULTFILES) \
 	$(ROOTMANIFEST) $(ROOTMETHOD)
-
-$(DFLTD)/%:	%.dfl
-	$(INS.rename)
 
 $(ROOTLIBPOWER):
 	$(INS.dir)

@@ -26,6 +26,8 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+DEFAULTFILES =	cron.dfl
+
 include		../Makefile.cmd
 
 MANIFEST =	cron.xml
@@ -39,7 +41,6 @@ ROOTVAR =	$(ROOT)/var
 
 ROOTSPCRON =	$(ROOTVAR)/spool/cron
 ROOTCROND =	$(ROOTETC)/cron.d
-ROOTDEFAULT =	$(ROOTETC)/default
 ROOTCRONTABS =	$(ROOTSPCRON)/crontabs
 ROOTATJOBS =	$(ROOTSPCRON)/atjobs
 ROOTLIBCRON =	$(ROOTLIB)/cron
@@ -52,21 +53,17 @@ PROG =		$(PROG1) $(PROG2)
 SCRIPT =	batch
 XPG4SCRIPT =	batch.xpg4
 
-FILES =		cron.dfl
-
 POFILE=		$(PROG1)_cmd.po
 POFILES=	at.po crontab.po funcs.po batch.po
 XGETFLAGS=	-a -x $(PROG1).xcl
 
-ROOTDIRS =	$(ROOTSPCRON) $(ROOTCROND) $(ROOTDEFAULT)	\
+ROOTDIRS =	$(ROOTSPCRON) $(ROOTCROND) \
 		$(ROOTCRONTABS) $(ROOTATJOBS)
 
 ROOTPROG =	$(PROG1:%=$(ROOTUSRSBIN)/%) $(PROG2:%=$(ROOTBIN)/%)	\
-		$(SCRIPT:%=$(ROOTBIN)/%) $(FILES:%=$(ROOTDEFAULT)/%)	\
+		$(SCRIPT:%=$(ROOTBIN)/%) \
 		$(XPG4PROG:%=$(ROOTXPG4BIN)/%) \
 		$(XPG4SCRIPT:%.xpg4=$(ROOTXPG4BIN)/%)
-
-ROOTSETUP =	$(ROOTDEFAULT)/cron
 
 ROOTSYMLINK =	$(ROOTLIBCRON) $(ROOTETC)/cron
 
@@ -149,7 +146,7 @@ $(ROOTLIBSVCMETHOD)/svc-cron := FILEMODE = 0555
 
 all :		$(PROG) $(XPG4) $(SCRIPT) $(XPG4SCRIPT) $(FILES)
 
-install :	all $(ROOTPROG) $(ROOTSETUP) $(ROOTSYMLINK) \
+install :	all $(ROOTPROG) $(ROOTETCDEFAULTFILES) $(ROOTSYMLINK) \
 		$(ROOTMANIFEST) $(ROOTMETHOD)
 
 $(PROG) :	$$(POBJS)
@@ -183,14 +180,8 @@ att2.c :	att2.l att2.ed att1.c
 #$(ROOTDIRS):
 #		$(INS.dir)
 
-$(ROOTCROND)/% $(ROOTDEFAULT)/% : %
-		$(INS.file)
-
 $(ROOTSYMLINK) :
 		$(RM) $@; $(SYMLINK) $(SYMLNKDEST) $@
-
-$(ROOTSETUP) :	$(ROOTDEFAULT)/cron.dfl
-		$(RM) $@; $(MV) $(ROOTDEFAULT)/cron.dfl $@
 
 check:		$(CHKMANIFEST)
 

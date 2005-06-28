@@ -21,8 +21,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1997, 2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #
 # cmd/syslogd/sparc/Makefile
@@ -31,5 +31,4 @@ include ../Makefile.com
 
 all: $(PROG) $(VARSYSLOG) $(VARAUTHLOG)
 
-install: all $(ROOTUSRSBINPROG) $(ROOTETCDFLT) $(ROOTETCCONFIG) \
-	$(ROOTLIBROTATE) logfiles
+install: all $(ROOTUSRSBINPROG) $(ROOTETCCONFIG) $(ROOTLIBROTATE) logfiles

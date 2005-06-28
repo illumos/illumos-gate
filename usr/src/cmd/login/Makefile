@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -31,17 +31,14 @@ OBJS= login.o login_audit.o
 SRCS= $(OBJS:%.o=%.c)
 ONC_SRCS=$(SRCS:%.c=%.c_onc_plus)
 
+DEFAULTFILES= login.dfl
+
 include ../Makefile.cmd
 
-DFLTD= $(ROOTETC)/default
-DIRS= $(DFLTD)
 LOGINDEVPERM= logindevperm
 LOGINDEVPERMSRC= $(LOGINDEVPERM).sh
 ROOTLOGINDEVPERM= $(LOGINDEVPERM:%=$(ROOTETC)/%)
 
-ETCDFLTPROG = $(PROG:%=$(DFLTD)/%)
-$(ETCDFLTPROG) := FILEMODE = $(LIBFILEMODE)
-$(ETCDFLTPROG) := GROUP = sys
 $(ROOTLOGINDEVPERM) := FILEMODE = 644
 $(ROOTLOGINDEVPERM) := GROUP = sys
 FILEMODE= 4555
@@ -58,7 +55,7 @@ CFLAGS += $(CCVERBOSE)
 .KEEP_STATE:
 
 
-all: $(PROG) $(PROG).dfl $(ROOTLOGINDEVPERM)
+all: $(PROG) $(ROOTLOGINDEVPERM)
 
 $(LOGINDEVPERM): $(LOGINDEVPERMSRC)
 	$(RM) $(LOGINDEVPERM)
@@ -68,17 +65,7 @@ $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(DIRS) $(ROOTPROG) $(PROG).dfl $(ETCDFLTPROG) $(ROOTLOGINDEVPERM)
-
-$(DIRS):
-	$(INS.dir)
-
-$(DFLTD)/% : %
-	$(MV) $(PROG) $(PROG).save
-	$(LN) $(PROG).dfl $(PROG)
-	$(INS.file)
-	$(RM) $(PROG)
-	$(MV) $(PROG).save $(PROG)
+install: all $(DIRS) $(ROOTPROG) $(ROOTETCDEFAULTFILES) $(ROOTLOGINDEVPERM)
 
 clean:
 	$(RM) $(OBJS)

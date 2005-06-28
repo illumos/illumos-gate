@@ -20,14 +20,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 NETYPPROG =	rpc.yppasswdd # pwconv passmgmt
-DFLTSRC =	yppasswdd.dfl
+DEFAULTFILES =	yppasswdd.dfl
 PROG =		$(NETYPPROG)
 
 MANIFEST = passwd.xml
@@ -40,8 +40,7 @@ ROOTMANIFESTDIR = $(ROOTSVCNETWORKNIS)
 RPCSVC=		$(ROOT)/usr/include/rpcsvc
 NETSVC =	$(ROOTLIB)/netsvc
 NETYP =		$(NETSVC)/yp
-DFLTDIR = 	$(ROOTETC)/default
-ROOTDIRS =	$(NETSVC) $(NETYP) $(ROOTETC) $(DFLTDIR)
+ROOTDIRS =	$(NETSVC) $(NETYP)
 
 # include library definitions
 #LDLIBS +=	-lrpcsvc -lnsl -lcrypt -lintl -lgen
@@ -55,7 +54,6 @@ CPPFLAGS += -I$(SRC)/lib/libnisdb/yptol
 #IHDRFILE= $(HDRFILE:%=$(RPCSVC)/%)
 
 INETYPPROG=		$(NETYPPROG:%=$(NETYP)/%)
-ETCDFLTFILE=		$(NETYPPROG:rpc.%=$(DFLTDIR)/%)
 
 COMMONOBJ =		yppasswdxdr.o yplckpwdf.o
 RPCYPPASSWDDOBJ =	yppasswdd.o changepasswd.o
@@ -93,7 +91,7 @@ rpc.yppasswdd: $(RPCYPPASSWDDOBJ) $(COMMONOBJ)
 	$(SHAREDOBJ) $(COMMONOBJ) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTDIRS) $(IBINPROG) $(INETYPPROG) $(ETCDFLTFILE) \
+install: all $(ROOTDIRS) $(IBINPROG) $(INETYPPROG) $(ROOTETCDEFAULTFILES) \
 	$(ROOTMANIFEST)
 
 $(ROOTDIRS):
@@ -101,9 +99,6 @@ $(ROOTDIRS):
 
 $(NETYP)/%: %
 	$(INS.file)
-
-$(DFLTDIR)/% : %.dfl
-	$(INS.rename)
 
 clean:
 	$(RM) $(OBJS)

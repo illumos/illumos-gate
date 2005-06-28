@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,10 +29,7 @@
 PROG= init 
 ROOTFS_PROG= $(PROG)
 
-DFLTD= $(ROOTETC)/default
-
-ROOTDFLTPROG = $(PROG:%=$(DFLTD)/%)
-$(ROOTDFLTPROG) := FILEMODE = $(LIBFILEMODE)
+DEFAULTFILES= init.dfl
 
 include ../Makefile.cmd
 
@@ -48,9 +45,9 @@ CLOBBERFILES= $(STATIC)
 
 .KEEP_STATE:
 
-all: $(ROOTFS_PROG) $(PROG).dfl 
+all: $(ROOTFS_PROG)
 
-install: all $(PROG).dfl $(ROOTDFLTPROG) $(ROOTSBINPROG)
+install: all $(ROOTETCDEFAULTFILES) $(ROOTSBINPROG)
 	$(RM) $(ROOTETCPROG)
 	$(RM) $(ROOTUSRSBINPROG)
 	$(RM) $(ROOTETC)/telinit
@@ -59,9 +56,6 @@ install: all $(PROG).dfl $(ROOTDFLTPROG) $(ROOTSBINPROG)
 	$(SYMLINK) ../sbin/$(PROG) $(ROOTETC)/telinit
 	$(RM) $(ROOTETC)/TIMEZONE
 	cd $(ROOTETC); $(SYMLINK) default/init TIMEZONE
-
-$(DFLTD)/% : %.dfl
-	$(INS.rename)
 
 test:
 	rtest $(PROG)

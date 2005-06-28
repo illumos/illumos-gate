@@ -20,36 +20,20 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/cmd-inet/etc/default/Makefile
 
-DFLTF=	inetinit ipsec
+DEFAULTFILES=	inetinit.dfl ipsec.dfl
 
 include ../../../Makefile.cmd
 
-DFLTD= $(ROOTETC)/default
-ETCDFLTPROG = $(DFLTF:%=$(DFLTD)/%)
-$(ETCDFLTPROG) := FILEMODE = $(LIBFILEMODE)
-$(ETCDFLTPROG) := GROUP = sys
-DIRS=$(DFLTD)
+all clean lint:
 
-all:
-
-install: all $(DIRS) $(ETCDFLTPROG)
-
-$(DFLTD)/% : % $(DFLTD)
-	$(INS.file)
-
-$(DIRS):
-	$(INS.dir)
-
-clean:
-
-lint:
+install: all $(ROOTETCDEFAULTFILES)
 
 include ../../../Makefile.targ
 

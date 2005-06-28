@@ -35,8 +35,7 @@ PROG= $(SBINPROG) $(BINPROG)
 
 HDRS= key_prot.h
 
-DFLTD = $(ROOTETC)/default
-ROOTKEYSERVDFLT = $(DFLTD)/keyserv
+DEFAULTFILES = keyserv.dfl
 
 KEYSERVOBJS = keyserv.o
 KEYLOGOUTOBJS = keylogout.o
@@ -103,9 +102,6 @@ keylogin: $(KEYLOGINOBJS)
 	$(LINK.c) $(KEYLOGINOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(DFLTD)/%: %.dfl
-	$(INS.rename)
-
 chkey: $(CHKEYOBJS) $(CHANGE_OBJS)
 	$(LINK.c) $(CHANGE_OBJS) $(CHKEYOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
@@ -126,7 +122,7 @@ domainname: $(DOMAINNAMEOBJS)
 selfcheck.o: ../fs.d/nfs/lib/selfcheck.c
 	$(COMPILE.c) ../fs.d/nfs/lib/selfcheck.c
 
-install: all $(DIRS) $(IBINPROG) $(ISBINPROG) $(ROOTKEYSERVDFLT) \
+install: all $(DIRS) $(IBINPROG) $(ISBINPROG) $(ROOTETCDEFAULTFILES) \
 	$(ROOTMANIFEST)
 
 clean:

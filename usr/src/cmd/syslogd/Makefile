@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,6 +31,7 @@
 PROG= 		syslogd
 MANIFEST=	system-log.xml
 SVCMETHOD=	system-log
+DEFAULTFILES=	syslogd.dfl
 
 include ../Makefile.cmd
 
@@ -48,11 +49,9 @@ $(ROOTMANIFEST) := FILEMODE = 0444
 
 .KEEP_STATE:
 
-all:	$(SUBDIRS)
+all clean clobber lint:	$(SUBDIRS)
 
-clean clobber lint:	$(SUBDIRS)
-
-install:	$(ROOTMANIFEST) $(ROOTSVCMETHOD) $(SUBDIRS)
+install: $(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTETCDEFAULTFILES) $(SUBDIRS)
 
 check:	$(CHKMANIFEST)
 

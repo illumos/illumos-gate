@@ -22,16 +22,20 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1998 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/devfsadm/Makefile
 #
 
+DEFAULTFILES = devfsadm.dfl
+
+include ../Makefile.cmd
+
 #
 # One for each ISA.
 #
-SUBDIRS=	$(MACH)
+SUBDIRS =	$(MACH)
 
 all	:=	TARGET= all
 install	:=	TARGET= install
@@ -42,10 +46,11 @@ lint	:=	TARGET= lint
 
 .KEEP_STATE:
 
-all install clean clobber lint _msg:	$(SUBDIRS)
+all clean clobber lint _msg:	$(SUBDIRS)
+
+install: $(SUBDIRS) $(ROOTETCDEFAULTFILES)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-

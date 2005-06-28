@@ -22,18 +22,18 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1991-2000 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 TXTS= nsswitch.conf netconfig hosts services
+DEFAULTFILES= nss.dfl
 
 include ../Makefile.cmd
 
 FILES= hosts services
 ETCFILES= netconfig nsswitch.conf nsswitch.files nsswitch.nis nsswitch.nisplus \
 		nsswitch.dns nsswitch.ldap 
-ETCDEFAULTFILES= nss
 
 ROOTNET=    $(ROOTETC)/net
 TICLTS=     $(ROOTNET)/ticlts
@@ -49,14 +49,13 @@ ROOTDIRS= \
 ITICLTSFILES=		$(FILES:%=$(TICLTS)/%)
 ITICOTSFILES=		$(FILES:%=$(TICOTS)/%)
 ITICOTSORDFILES=	$(FILES:%=$(TICOTSORD)/%)
-IETCFILES=			$(ETCFILES:%=$(ROOTETC)/%)
-IETCDEFAULTFILES=	$(ETCDEFAULTFILES:%=$(ROOTETC)/default/%)
+IETCFILES=		$(ETCFILES:%=$(ROOTETC)/%)
 
 FILEMODE= 0644
 OWNER= root
 GROUP= sys
 
-$(TICLTS)/% $(TICOTS)/% $(TICOTSORD)/% $(ROOTETC)/% $(ROOTETC)/default/%: %
+$(TICLTS)/% $(TICOTS)/% $(TICOTSORD)/% $(ROOTETC)/%: %
 	$(INS.file)
 
 .KEEP_STATE:
@@ -64,7 +63,7 @@ $(TICLTS)/% $(TICOTS)/% $(TICOTSORD)/% $(ROOTETC)/% $(ROOTETC)/default/%: %
 all: $(TXTS)
 
 install: all $(ROOTDIRS) $(ITICLTSFILES) $(ITICOTSFILES) $(ITICOTSORDFILES) \
-			$(IETCFILES) $(IETCDEFAULTFILES)
+			$(IETCFILES) $(ROOTETCDEFAULTFILES)
 
 $(ROOTDIRS):
 	$(INS.dir)

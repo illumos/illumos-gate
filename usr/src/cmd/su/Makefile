@@ -30,6 +30,7 @@
 
 PROG =		su
 ROOTFS_PROG =	su.static
+DEFAULTFILES =	su.dfl
 
 include		../Makefile.cmd
 
@@ -38,16 +39,12 @@ ROOTEMB_PROG =	$(ROOTLIB)/$(EMB_PROG)
 
 PROG_STATIC = $(ROOTSBIN)/$(ROOTFS_PROG)
 
-DFLTD =		$(ROOTETC)/default
-ETCDFLTPROG =	$(PROG:%=$(DFLTD)/%)
-
 # set /usr/bin/su to 4555; set /sbin/su.static to 0555
 FILEMODE =	04555
 
 GROUP =		sys
 
 $(PROG_STATIC) := FILEMODE = 0555
-$(ETCDFLTPROG) := FILEMODE = $(LIBFILEMODE)
 
 # A reduced su.static is created, with just enough functionality
 # to satisfy the needs of a single-user login with /usr not mounted.
@@ -66,11 +63,7 @@ lint :=		LDLIBS += -lcmd -lbsm -lpam
 
 .KEEP_STATE:
 
-all:		$(PROG) $(ROOTFS_PROG) $(EMB_PROG) $(PROG).dfl 
-
-# install rule for the default file
-$(DFLTD)/%:	%.dfl
-		$(INS.rename)
+all:		$(PROG) $(ROOTFS_PROG) $(EMB_PROG)
 
 # install rule for non-setuid /sbin/su.static
 # (exec'd by /sbin/sulogin when booting single user)
@@ -78,8 +71,8 @@ $(ROOTFS_PROG):	$(PROG).c
 		$(LINK.c) $(PROG).c -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-install:	all $(PROG_STATIC) $(ROOTPROG) $(ROOTSBINPROG) $(ETCDFLTPROG) \
-		$(ROOTEMB_PROG)
+install:	all $(PROG_STATIC) $(ROOTPROG) $(ROOTSBINPROG) \
+		$(ROOTETCDEFAULTFILES) $(ROOTEMB_PROG)
 
 $(ROOTSBINPROG): $(ROOTPROG)
 		$(RM) $(ROOTSBINPROG); \

@@ -20,21 +20,17 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= passwd
+DEFAULTFILES= passwd.dfl
 
 include ../Makefile.cmd
 
-DFLTD= $(ROOTETC)/default
-DIRS= $(DFLTD)
-
-ETCDFLTPROG = $(PROG:%=$(DFLTD)/%)
-$(ETCDFLTPROG) := FILEMODE = $(LIBFILEMODE)
 passwd := LDLIBS += $(ROOT)/usr/lib/passwdutil.so.1 
 lint := LDLIBS += -lpasswdutil
 LDLIBS += -lbsm -lpam -lnsl
@@ -48,17 +44,7 @@ XGETFLAGS += -a -x $(PROG).xcl
 
 all: $(PROG)
 
-install: all $(DIRS) $(ROOTPROG) $(PROG).dfl $(ETCDFLTPROG)
-
-$(DIRS):
-	$(INS.dir)
-
-$(DFLTD)/% : %
-	$(MV) $(PROG) $(PROG).save
-	$(LN) $(PROG).dfl $(PROG)
-	$(INS.file)
-	$(RM) $(PROG)
-	$(MV) $(PROG).save $(PROG)
+install: all $(ROOTPROG) $(ROOTETCDEFAULTFILES)
 
 clean:
 
