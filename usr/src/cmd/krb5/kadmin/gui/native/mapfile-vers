@@ -1,4 +1,6 @@
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -29,6 +31,7 @@ SUNWprivate_1.1 {
 		Java_Kadmin_sessionInit;
 		Java_Kadmin_sessionExit;
 		Java_Kadmin_getPrivs;
+		Java_Kadmin_getEncList;
 		Java_Kadmin_getPrincipalList;
 		Java_Kadmin_getPrincipalList2;
 		Java_Kadmin_loadPrincipal;

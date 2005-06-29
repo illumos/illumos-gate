@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,9 +155,18 @@ krb5_data *result_data;
 		ap_rep.data = ptr;
 		ptr += ap_rep.length;
 
-		if (ret = krb5_rd_rep(context, auth_context, &ap_rep,
-				    &ap_rep_enc))
+		/*
+		 * Save send_subkey to later smash recv_subkey.
+		 */
+		ret = krb5_auth_con_getsendsubkey(context, auth_context, &tmp);
+		if (ret)
 			return (ret);
+
+		if (ret = krb5_rd_rep(context, auth_context, &ap_rep,
+				    &ap_rep_enc)) {
+			krb5_free_keyblock(context, tmp);
+			return (ret);
+		}
 
 		krb5_free_ap_rep_enc_part(context, ap_rep_enc);
 
@@ -166,17 +175,15 @@ krb5_data *result_data;
 		cipherresult.length = (packet->data + packet->length) - ptr;
 
 		/*
-		 * XXX there's no api to do this right. The problem is that
-		 * if there's a remote subkey, it will be used.  This is
-		 * not what the spec requires
+		 * Smash recv_subkey to be send_subkey, per spec.
 		 */
-		tmp = auth_context->recv_subkey;
-		auth_context->recv_subkey = NULL;
+		ret = krb5_auth_con_setrecvsubkey(context, auth_context, tmp);
+		krb5_free_keyblock(context, tmp);
+		if (ret)
+			return (ret);
 
 		ret = krb5_rd_priv(context, auth_context, &cipherresult,
 				&clearresult, &replay);
-
-		auth_context->recv_subkey = tmp;
 
 		if (ret)
 			return (ret);

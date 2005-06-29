@@ -19,12 +19,10 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libkadmin.a
 VERS=		.1
@@ -44,6 +42,7 @@ ROOTLIBDIR=	$(ROOT)/usr/lib/krb5
 LIBS =		$(DYNLIB)
 
 CPPFLAGS += -I../ -I$(SRC)/lib/krb5 \
+	-I$(SRC)/lib/krb5/kadm5 \
 	-I$(SRC)/lib/gss_mechs/mech_krb5/include \
 	-I$(SRC)/lib/gss_mechs/mech_krb5/krb5/error_tables \
 	-I$(SRC)/uts/common/gssapi/mechs/krb5/include \

@@ -19,12 +19,10 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright (c) 1999-2000 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../../../../../Makefile.master
 include ../../../../Makefile.cmd
@@ -33,7 +31,8 @@ JAVAFLAGS= -nowarn -O
 
 GUIDIR=$(SRC)/cmd/krb5/kadmin/gui
 
-CLASSES=DCPanel DCListener DCTextField DCCircularTextField DateTimeDialog DurationHelper LineSeparator
+CLASSES=DCPanel DCListener DCTextField DCCircularTextField DateTimeDialog \
+	DurationHelper LineSeparator EncListDialog
 
 JFILES=$(CLASSES:%=%.java)
 

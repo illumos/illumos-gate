@@ -22,9 +22,8 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
- *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 import java.util.ListResourceBundle;
@@ -291,6 +290,18 @@ public class HelpData extends ListResourceBundle {
 	 "The name of the principal who last modified the account for this"
 	 +" principal."},
         
+        {"EncList",
+	 "The encryption types that the principal's keys will be created with."
+	 +" Use a white space to separate encryption types."
+	 +" Leave blank if the default set of encryption types is desired."
+	 +" Refer to krb5.conf for the available encryption types supported."
+	 +" The default set of dialog choices can be over-ridden by defining"
+	 +" supported_enctypes with the desired list of encryption types in"
+	 +" the realm's section of krb5.conf."
+	 +" \n"
+	 +"Changing encryption types is only applicable when creating a"
+	 +" principal or when changing a password.  So a password must be"
+	 +" accompanied with any encryption type changes."},
         
         {"PrExpiry",
 	 "The date and time on which the principal's account expires. When the"
@@ -918,10 +929,29 @@ public class HelpData extends ListResourceBundle {
 	 "Opens the Date and Time Helper window to help you create"
 	 +" a formatted date and time entry for the associated field."},
         
-        
         {"DurationHelperButton",
 	 "Opens the Time Duration Helper window to help you create a time"
 	 +" duration in seconds for the associated field."},
+
+        {"EncListHelperButton",
+	 "Opens the Encryption Types Helper window to help you create"
+	 +" the principal's keys from the default set."},
+
+	//
+	// EncryptionTypeDialogHelp
+	//
+
+	{"EncryptionTypeDialogHelp",
+	 "You can select/deselect encryption types for this principal as"
+	 +" needed.  Certain encryption types are similar therefore when"
+	 +" one of these encryption types is selected the other type(s)"
+	 +" will be deselected.  If no encryption types are selected the"
+	 +" default set of types will be used, see krb5.conf(4) for these.\n"
+	 +" \n"
+	 +"Click OK to copy the encryption list that you've selected to the"
+	 +" corresponding field.\n"
+	 +" \n"
+	 +"Click Clear to unselect all encryption types listed."},
         
         //
         // DateTimeDialog
@@ -1039,7 +1069,13 @@ public class HelpData extends ListResourceBundle {
 	 +" After you specify the time"
 	 +" and click OK, the time duration is copied into the corresponding"
 	 +" field."},
-        
+
+	{"EncList...",
+	 "Opens the SEAM Encryption Type List Helper window, which enables you"
+	 +" to specify custom encryption types for the principal. "
+	 +" After you select the encryption types and click OK, the encryption"
+	 +" type list is copied into the corresponding field."},
+
         {"Print...",
 	 "Opens the SEAM Print Dialog window, which enables you to specify a"
 	 +" printer"

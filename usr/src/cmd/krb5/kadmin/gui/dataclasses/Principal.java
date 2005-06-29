@@ -22,8 +22,8 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 import java.util.Date;
@@ -72,6 +72,7 @@ class Principal {
     boolean isNew;		// newly created principal?
     boolean dummy;		// use dummy data?
     boolean newComments;	// are comments new or changed?
+    String EncTypes;		// enc type list to be used for key gen
   
     /**
      * Initialize new principal to defaults - this one is for new creations
@@ -100,6 +101,7 @@ class Principal {
         Kvno = new Integer(0);
         Mkvno = new Integer(0);
         flags = new Flags();
+	EncTypes = new String("");
     }
 
     /*
@@ -166,6 +168,7 @@ class Principal {
 	curr.PrPasswd = new String("");	    /* override */
 	curr.PrExpireTime = new Date(old.PrExpireTime.getTime());
 	curr.Policy = new String(old.Policy);
+	curr.EncTypes = new String(old.EncTypes);
 	curr.LastPwChange = new Date(0);    /* override: never */
 	if (old.PwExpireTime == null)
 	    curr.PwExpireTime = null;
@@ -238,6 +241,13 @@ class Principal {
 	PrPasswd = pw;
 	return true;
     }
+
+    public boolean setEncType(String enctype) {
+	EncTypes = enctype;
+	// Don't have to check enc type list provided given that list was
+	// populated from the checkbox list
+	return true;
+    }
      
     /**
      * @param exp Contains a date formatted by the default locale,
@@ -298,6 +308,10 @@ class Principal {
             return neverString;
         else 
             return df.format(ModTime);
+    }
+
+    public String getEncType() {
+            return EncTypes;
     }
 
     public String getExpiry() {
@@ -429,6 +443,7 @@ class Principal {
         sb.append(getString("Account Expires:") + "  "
               + getExpiry()).append('\n');
         sb.append(getString("Policy:") + "  " + Policy).append('\n');
+        sb.append(getString("Enc Types:") + "  " + EncTypes).append('\n');
         sb.append(getString("Comments:") + "  " + Comments).append('\n');
         sb.append(getString("Key Version:") + "	" + Kvno).append('\t');
         sb.append(getString("Password Expires:") + "  "

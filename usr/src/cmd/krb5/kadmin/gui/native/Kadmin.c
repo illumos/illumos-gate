@@ -20,9 +20,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <jni.h>
@@ -32,9 +33,12 @@
 #include <netdb.h>
 #include <iconv.h>
 #include <langinfo.h>
+#include <clnt/client_internal.h>
+#include <etypes.h>
 
 static int Principal_to_kadmin(JNIEnv *, jobject, int, krb5_principal *,
-	kadm5_principal_ent_rec *, long *, char **, char **);
+	kadm5_principal_ent_rec *, long *, char **, char **,
+	kadm5_config_params *);
 static int kadmin_to_Principal(kadm5_principal_ent_rec *, JNIEnv *, jobject,
 	const char *, char *);
 static int Policy_to_kadmin(JNIEnv *, jobject, int, kadm5_policy_ent_rec *,
@@ -43,7 +47,7 @@ static int kadmin_to_Policy(kadm5_policy_ent_rec *, JNIEnv *, jobject);
 static int edit_comments(kadm5_principal_ent_rec *, krb5_principal, char *);
 static int format_comments(kadm5_principal_ent_rec *, long *, char *);
 static int extract_comments(kadm5_principal_ent_rec *, char **);
-static int set_password(krb5_principal, char *);
+static int set_password(krb5_principal, char *, kadm5_config_params *);
 static void handle_error(JNIEnv *, int);
 static char *qualify(char *name);
 
@@ -240,6 +244,107 @@ charcmp(const void *a, const void *b)
 
 /*
  * Class:     Kadmin
+ * Method:    getEncList
+ * Signature: ()[Ljava/lang/String;
+ */
+
+/*ARGSUSED*/
+JNIEXPORT jobjectArray JNICALL
+Java_Kadmin_getEncList(JNIEnv *env,
+	jobject obj)
+{
+	jclass stringclass;
+	jobjectArray elist;
+	jstring s;
+	kadm5_ret_t ret;
+	int i, j, k, *grp = NULL;
+	krb5_int32 num_keysalts;
+	krb5_key_salt_tuple *keysalts;
+	krb5_enctype e_type;
+	kadm5_server_handle_t handle;
+	char *e_str, e_buf[BUFSIZ];
+	krb5_error_code kret;
+	krb5_boolean similar;
+	krb5_context context;
+
+	if (kret = krb5_init_context(&context)) {
+		handle_error(env, kret);
+		return (NULL);
+	}
+
+	/*
+	 * Create and populate a Java String array
+	 */
+	stringclass = (*env)->FindClass(env, "java/lang/String");
+	if (!stringclass) {
+		handle_error(env, KADM_JNI_CLASS);
+		return (NULL);
+	}
+
+	handle = server_handle;
+	num_keysalts = handle->params.num_keysalts;
+	keysalts = handle->params.keysalts;
+	elist = (*env)->NewObjectArray(env, num_keysalts, stringclass, NULL);
+	if (!elist) {
+		handle_error(env, KADM_JNI_ARRAY);
+		return (NULL);
+	}
+
+	/*
+	 * Populate groupings for encryption types that are similar.
+	 */
+	grp = malloc(sizeof (int) * num_keysalts);
+	if (grp == NULL) {
+		handle_error(env, errno);
+		return (NULL);
+	}
+	for (i = 0; i < num_keysalts; grp[i] = i++);
+	for (i = 0; i < num_keysalts; i++) {
+		if (grp[i] != i)
+			continue;
+		for (j = i + 1; j < num_keysalts; j++) {
+			if (kret = krb5_c_enctype_compare(context,
+			    keysalts[i].ks_enctype, keysalts[j].ks_enctype,
+			    &similar)) {
+				free(grp);
+				handle_error(env, kret);
+				return (NULL);
+			}
+			if (similar)
+				grp[j] = grp[i];
+		}
+	}
+
+	/*
+	 * Populate from params' supported enc type list from the initial kadmin
+	 * session, this is documented default that the client can handle.
+	 */
+	for (i = 0; i < num_keysalts; i++) {
+		e_type = keysalts[i].ks_enctype;
+
+		for (j = 0; j < krb5_enctypes_length; j++) {
+			if (e_type == krb5_enctypes_list[j].etype) {
+				e_str = krb5_enctypes_list[j].in_string;
+				(void) snprintf(e_buf, sizeof (e_buf),
+				    "%d %s:normal", grp[i], e_str);
+				s = (*env)->NewStringUTF(env, e_buf);
+				if (!s) {
+					free(grp);
+					handle_error(env, KADM_JNI_NEWSTRING);
+					return (NULL);
+				}
+				(*env)->SetObjectArrayElement(env, elist, i, s);
+				break;
+			}
+		}
+	}
+
+	free(grp);
+	return (elist);
+}
+
+/*
+ * Class:     Kadmin
  * Method:    getPrincipalList
  * Signature: ()[Ljava/lang/String;
  */
@@ -289,7 +394,6 @@ Java_Kadmin_getPrincipalList(JNIEnv *env,
 	kadm5_free_name_list(server_handle, princs, count);
 	return (plist);
 }
-
 
 /*
  * Class:     Kadmin
@@ -360,7 +464,8 @@ Java_Kadmin_loadPrincipal(JNIEnv *env, jobject obj, jstring name, jobject prin)
 	char *comments = NULL;
 	kadm5_principal_ent_rec pr_rec;
 	kadm5_ret_t ret;
-	long mask = KADM5_PRINCIPAL_NORMAL_MASK | KADM5_TL_DATA;
+	long mask = KADM5_PRINCIPAL_NORMAL_MASK | KADM5_TL_DATA |
+	    KADM5_KEY_DATA;
 	krb5_principal kprin = NULL;
 	krb5_context context;
 
@@ -436,13 +541,15 @@ Java_Kadmin_savePrincipal(JNIEnv *env, jobject obj, jobject prin)
 	char *comments = NULL;
 	kadm5_ret_t ret;
 	krb5_principal kprin = NULL;
+	kadm5_config_params params;
 
 	/*
 	 * Convert principal object to the kadmin API structure
 	 */
 	memset((char *)&pr_rec, 0, sizeof (pr_rec));
+	memset((char *)&params, 0, sizeof (params));
 	ret = Principal_to_kadmin(env, prin, 0, &kprin, &pr_rec, &mask,
-					&pw, &comments);
+					&pw, &comments, &params);
 	if (ret) {
 		handle_error(env, ret);
 		return (JNI_FALSE);
@@ -471,7 +578,9 @@ Java_Kadmin_savePrincipal(JNIEnv *env, jobject obj, jobject prin)
 	/*
 	 * Set the password if changed
 	 */
-	ret = set_password(kprin, pw);
+	ret = set_password(kprin, pw, &params);
+	if (params.keysalts != NULL)
+		free(params.keysalts);
 	if (ret) {
 		handle_error(env, ret);
 		ret = JNI_FALSE;
@@ -499,13 +608,15 @@ Java_Kadmin_createPrincipal(JNIEnv *env, jobject obj, jobject prin)
 	char *comments = NULL;
 	kadm5_ret_t ret;
 	krb5_principal kprin = NULL;
+	kadm5_config_params params;
 
 	/*
 	 * Convert principal object to the kadmin API structure
 	 */
 	memset((char *)&pr_rec, 0, sizeof (pr_rec));
+	memset((char *)&params, 0, sizeof (params));
 	ret = Principal_to_kadmin(env, prin, 1, &kprin, &pr_rec, &mask,
-					&pw, &comments);
+					&pw, &comments, &params);
 	if (ret) {
 		handle_error(env, ret);
 		return (JNI_FALSE);
@@ -514,7 +625,13 @@ Java_Kadmin_createPrincipal(JNIEnv *env, jobject obj, jobject prin)
 	/*
 	 * Create the new principal
 	 */
-	ret = kadm5_create_principal(server_handle, &pr_rec, mask, pw);
+	if (params.mask & KADM5_CONFIG_ENCTYPES) {
+		ret = kadm5_create_principal_3(server_handle, &pr_rec, mask,
+			params.num_keysalts, params.keysalts, pw);
+		if (params.keysalts != NULL)
+			free(params.keysalts);
+	} else
+		ret = kadm5_create_principal(server_handle, &pr_rec, mask, pw);
 	if (ret) {
 		handle_error(env, ret);
 		ret = JNI_FALSE;
@@ -793,7 +910,8 @@ Java_Kadmin_saveDefaults(JNIEnv *env, jobject obj, jobject config)
 
 static int
 Principal_to_kadmin(JNIEnv *env, jobject prin, int new, krb5_principal *kprin,
-	kadm5_principal_ent_rec *p, long *mask, char **pw, char **comments)
+	kadm5_principal_ent_rec *p, long *mask, char **pw, char **comments,
+	kadm5_config_params *pparams)
 {
 	jstring s;
 	jclass prcl, dateclass, intclass;
@@ -859,6 +977,27 @@ Principal_to_kadmin(JNIEnv *env, jobject prin, int new, krb5_principal *kprin,
 	l = (*env)->CallLongMethod(env, obj, mid);
 	p->princ_expire_time = (long)(l / 1000LL);
 	*mask |= KADM5_PRINC_EXPIRE_TIME;
+
+	f = (*env)->GetFieldID(env, prcl, "EncTypes", "Ljava/lang/String;");
+	if (!f)
+		return (KADM_JNI_FIELD);
+	obj = (*env)->GetObjectField(env, prin, f);
+	if (!obj)
+		return (KADM_JNI_OFIELD);
+	s = (jstring)obj;
+	str = (*env)->GetStringUTFChars(env, s, NULL);
+	if (!str)
+		return (KADM_JNI_STRING);
+	if (strlen(str)) {
+		ret = krb5_string_to_keysalts((char *)str, ", \t", ":.-", 0,
+		    &(pparams->keysalts), &(pparams->num_keysalts));
+		if (ret) {
+			(*env)->ReleaseStringUTFChars(env, s, str);
+			return (ret);
+		}
+		pparams->mask |= KADM5_CONFIG_ENCTYPES;
+	}
+	(*env)->ReleaseStringUTFChars(env, s, str);
 
 	f = (*env)->GetFieldID(env, prcl, "Policy", "Ljava/lang/String;");
 	if (!f)
@@ -1021,10 +1160,10 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 	jfieldID f;
 	jmethodID mid;
 	jobject obj;
-	int i;
+	int i, j, n, used = 0, size = 0;
 	kadm5_ret_t ret;
 	krb5_context context;
-	char *ptr;
+	char *ptr, *enclist = NULL, *e_str = NULL, *i_str;
 	char *cstr;
 
 	jfieldID flagsID;
@@ -1060,6 +1199,55 @@ kadmin_to_Principal(kadm5_principal_ent_rec *p, JNIEnv *env, jobject prin,
 		return (KADM_JNI_OFIELD);
 	(*env)->CallVoidMethod(env, obj, mid,
 			(jlong) (p->princ_expire_time * 1000LL));
+
+	f = (*env)->GetFieldID(env, prcl, "EncTypes", "Ljava/lang/String;");
+	if (!f)
+		return (KADM_JNI_FIELD);
+	used = 0;
+	enclist = malloc(size += 2048);
+	if (enclist == NULL)
+		return (errno);
+	for (i = 0; i < p->n_key_data; i++) {
+		krb5_key_data *key_data = &p->key_data[i];
+		for (j = 0; j < krb5_enctypes_length; j++) {
+			if (key_data->key_data_type[0] ==
+			    krb5_enctypes_list[j].etype) {
+				i_str = krb5_enctypes_list[j].in_string;
+				n = strlen(i_str) + strlen(":normal");
+				e_str = malloc(n);
+				if (e_str == NULL) {
+					free(enclist);
+					return (errno);
+				}
+				(void) snprintf(e_str, n + 1, "%s:normal",
+				    i_str);
+				/*
+				 * We reallocate if existing + what we need +
+				 * 2 (the null byte and a space for the list).
+				 */
+				if (used + n + 2 > size) {
+					enclist = realloc(enclist,
+					    size += 2048);
+					if (enclist == NULL) {
+						free(e_str);
+						return (errno);
+					}
+				}
+				(void) strncpy(&enclist[used], e_str, n);
+				free(e_str);
+				e_str = NULL;
+				used += n + 1;
+				enclist[used-1] = ' ';
+				enclist[used] = '\0';
+				break;
+			}
+		}
+	}
+	s = (*env)->NewStringUTF(env, enclist);
+	free(enclist);
+	if (!s)
+		return (KADM_JNI_NEWSTRING);
+	(*env)->SetObjectField(env, prin, f, s);
 
 	f = (*env)->GetFieldID(env, prcl, "Policy", "Ljava/lang/String;");
 	if (!f)
@@ -1558,13 +1746,20 @@ extract_comments(kadm5_principal_ent_rec *p, char **comments)
  * Set password for the modified principal
  */
 static int
-set_password(krb5_principal kprin, char *pw)
+set_password(krb5_principal kprin, char *pw, kadm5_config_params *pparams)
 {
 	kadm5_ret_t ret;
+	int keepold = 0;
 
 	if (!pw || !strlen(pw))
 		return (0);
-	ret = kadm5_chpass_principal(server_handle, kprin, pw);
+
+	if (pparams->mask & KADM5_CONFIG_ENCTYPES)
+		ret = kadm5_chpass_principal_3(server_handle, kprin, keepold,
+		    pparams->num_keysalts, pparams->keysalts, pw);
+	else
+		ret = kadm5_chpass_principal(server_handle, kprin, pw);
+
 	if (ret)
 		return (ret);
 	return (0);

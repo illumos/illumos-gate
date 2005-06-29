@@ -22,7 +22,7 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,6 +111,9 @@ public class KdcGui extends Group {
     // For date & time helper dialogs
     private DateTimeDialog dateTimeDialog = null;
     private DurationHelper durationHelper = null;
+
+    // For the encryption list helper dialog
+    private EncListDialog encListDialog = null;
     
     // Important defaults and current settings
     private String DefName = null;
@@ -614,6 +617,8 @@ public class KdcGui extends Group {
         gui.PrPasswordLabel.set("text" /* NOI18N */, getString("Password:"));
         gui.PrBasicRandomPw.set("text" /* NOI18N */,
 				getString("Generate Random Password"));
+        gui.EncListLabel.set("text" /* NOI18N */,
+			getString("Encryption Key Types:"));
         gui.LabelBarPrincipal.set("text" /* NOI18N */,
 				  getString("Admin History"));
         gui.PrLastChangedTimeLabel.set("text" /* NOI18N */,
@@ -1003,7 +1008,7 @@ public class KdcGui extends Group {
     public boolean prUpdateFromGui(boolean nullPasswdOK) {
         return (setPrName1() && setPrPassword(nullPasswdOK) && setPrExpiry() &&
 		setPrComments() && setPrPwExpiry() && setPrKvno() &&
-		setPrMaxlife() && setPrMaxrenew());
+		setPrMaxlife() && setPrMaxrenew() && setEncType());
     }
     
     /**
@@ -1381,6 +1386,7 @@ public class KdcGui extends Group {
         Boolean b = new Boolean((privs & PRIV_CHANGEPW) != 0);
         gui.PrPassword.set("enabled" /* NOI18N */, b);
         gui.PrBasicRandomPw.set("enabled" /* NOI18N */, b);
+        gui.EncList.set("enabled" /* NOI18N */, b);
         try {
             prin = new Principal(Kadmin, CurPrincipal);
         } catch (Exception e) {
@@ -1416,6 +1422,7 @@ public class KdcGui extends Group {
         enablePrAttributes(b);
         gui.PrPassword.set("enabled" /* NOI18N */, b);
         gui.PrBasicRandomPw.set("enabled" /* NOI18N */, b);
+        gui.EncList.set("enabled" /* NOI18N */, b);
         try {
             prin = new Principal(Kadmin, defaults);
         } catch (Exception e) {
@@ -1457,6 +1464,7 @@ public class KdcGui extends Group {
         Boolean b = new Boolean(true);
         enablePrAttributes(b);
         gui.PrPassword.set("enabled" /* NOI18N */, b);
+        gui.PrBasicRandomPw.set("enabled" /* NOI18N */, b);
         gui.PrBasicRandomPw.set("enabled" /* NOI18N */, b);
         try {
             prin = new Principal(Kadmin, prin);
@@ -1642,6 +1650,16 @@ public class KdcGui extends Group {
         return true;
     }
     
+    public boolean setEncType() {
+        if (prin.setEncType((String)gui.EncList.get("text" /* NOI18N */))) {
+            // visually delete any extraneous data that was ignored in the
+            // parsing by resetting the gui data
+            gui.EncList.set("text" /* NOI18N */,  prin.getEncType());
+            return true;
+        } else
+            return false;
+    }
+
     public boolean setPrExpiry() {
         if (prin.setExpiry((String)gui.PrExpiry.get("text" /* NOI18N */))) {
             // visually delete any extraneous data that was ignored in the
@@ -1779,6 +1797,7 @@ public class KdcGui extends Group {
         gui.PrLastChangedTime.set("text" /* NOI18N */, p.getModTime());
         gui.PrLastChangedBy.set("text" /* NOI18N */,   p.ModName);
         gui.PrExpiry.set("text" /* NOI18N */,          p.getExpiry());
+        gui.EncList.set("text" /* NOI18N */,           p.getEncType());
         gui.PrLastSuccess.set("text" /* NOI18N */,     p.getLastSuccess());
         gui.PrLastFailure.set("text" /* NOI18N */,     p.getLastFailure());
         gui.PrFailCount.set("text" /* NOI18N */, nf.format(p.NumFailures));
@@ -2755,8 +2774,9 @@ public class KdcGui extends Group {
         text[0] = getString("Sun Enterprise Authentication"
 			    +" Mechanism Administration Tool");
         text[1] = System.getProperty("SEAM_VERS" /* NOI18N */);
-        text[2] = getString("Copyright 1999-2002 Sun Microsystems, Inc.");
-        text[3] = getString("All Rights Reserved.");
+        text[2] = getString("Copyright 2005 Sun Microsystems, Inc.  "
+				+"All rights reserved.");
+        text[3] = getString("Use is subject to license terms.");
         text[4] = System.getProperty("os.name" /* NOI18N */);
         text[5] = System.getProperty("os.arch" /* NOI18N */);
         text[6] = System.getProperty("os.version" /* NOI18N */);
@@ -2797,7 +2817,7 @@ public class KdcGui extends Group {
 				     "setFromDateTimeDialog" /* NOI18N */));
         }
     }
-    
+
     private void getDurationFromDialogBox(TextField tf, Frame frame) {
         tf.select(0, 0);
         durationHelper = new DurationHelper(frame, tf.getBackground(),
@@ -2810,6 +2830,38 @@ public class KdcGui extends Group {
             tf.dispatchEvent(new ActionEvent(tf, ActionEvent.ACTION_PERFORMED,
 				     "setFromDurationHelper" /* NOI18N */));
         }
+    }
+
+    private void getEncListFromDialogBox(TextField tf, Frame frame) {
+	tf.select(0, 0);
+	encListDialog = new EncListDialog(frame, tf.getBackground(),
+	    tf.getForeground(), Kadmin);
+
+	encListDialog.setEncTypes(tf.getText());
+	encListDialog.setVisible(true);
+
+	// Modal dialog box so this is after dialog box disappers
+	if (encListDialog.isSaved()) {
+		String e = encListDialog.toString();
+
+		if (e.compareTo("") != 0) {
+	    	    String p = (String)gui.PrPassword.get("text" /* NOI18N */);
+
+		    // In order to change the key encryption type(s) the admin
+		    // will have to supply a password.
+	    	    if (p.compareTo("") == 0) {
+			showWarning(getString(
+			"If changing the key encryption types then specify a" +
+			" new password for the principal whose keys are" +
+			" being changed"));
+			((TextField)gui.PrPassword.getBody()).requestFocus();
+	    	    }
+		}  
+		tf.setText(e);
+		tf.dispatchEvent(new ActionEvent(tf,
+		    ActionEvent.ACTION_PERFORMED,
+		    "setFromEncListDialog" /* NOI18N */));
+	}
     }
     
     /**
@@ -3019,6 +3071,7 @@ public class KdcGui extends Group {
             ItemListener il;
             DateTimeListener dtl;
             DurationListener dl;
+            EncListListener ell;
             KeyListener kl1 = new KeystrokeDetector(PRINCIPAL_EDITING);
             KeyListener kl2 = new KeystrokeDetector(POLICY_EDITING);
             KeyListener kl3 = new KeystrokeDetector(PRINCIPAL_LIST);
@@ -3108,7 +3161,19 @@ public class KdcGui extends Group {
             o = gui.PrBasicRandomPw.getBody();
             a = new Association(o, al, BUTTON_ACTION);
             MainNormal.addElement(a);
+
+            al = new EncListAction();
+            o = gui.EncList.getBody();
+            a = new Association(o, al, TEXTFIELD_ACTION);
+            MainNormal.addElement(a);
+            a = new Association(o, kl1, TEXTFIELD_KEY);
+            MainNormal.addElement(a);
             
+            ell = new EncListListener((TextField)gui.EncList.getBody(), fr);
+            o = gui.EncListMoreButton.getBody();
+            a = new Association(o, ell, BUTTON_ACTION);
+            MainNormal.addElement(a);
+
             al = new PrExpiryAction();
             o = gui.PrExpiry.getBody();
             a = new Association(o, al, TEXTFIELD_ACTION);
@@ -3471,7 +3536,22 @@ public class KdcGui extends Group {
             a = new Association(o, ml, BUTTON_MOUSE);
             MainHelp.addElement(a);
             ((Button)o).setName("PrBasicRandomPw" /* NOI18N */);
+
+            o = gui.EncList.getBody();
+            a = new Association(o, ml, TEXTFIELD_MOUSE);
+            MainHelp.addElement(a);
+            ((TextField)o).setName("EncList" /* NOI18N */);
             
+            o = gui.EncListLabel.getBody();
+            a = new Association(o, ml, LABEL_MOUSE);
+            MainHelp.addElement(a);
+            ((Label)o).setName("EncList" /* NOI18N */);
+            
+            o = gui.EncListMoreButton.getBody();
+            a = new Association(o, ml, BUTTON_MOUSE);
+            MainHelp.addElement(a);
+            ((Button)o).setName("EncListHelperButton" /* NOI18N */);
+
             o = gui.PrExpiry.getBody();
             a = new Association(o, ml, TEXTFIELD_MOUSE);
             MainHelp.addElement(a);
@@ -3949,6 +4029,11 @@ public class KdcGui extends Group {
         MainFixers.addElement(a);
         
         o = gui.PrExpiry.getBody();
+        tf = new TextFixer((TextField)o);
+        a = new Association(o, tf, TEXTFIELD_KEY);
+        MainFixers.addElement(a);
+
+        o = gui.EncList.getBody();
         tf = new TextFixer((TextField)o);
         a = new Association(o, tf, TEXTFIELD_KEY);
         MainFixers.addElement(a);
@@ -4669,6 +4754,13 @@ public class KdcGui extends Group {
             prSetNeedSave();
         }
     }
+
+    private class EncListAction implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            setEncType();
+            prSetNeedSave();
+        }
+    }
     
     private class PrExpiryAction implements ActionListener {
         public void actionPerformed(ActionEvent e) {
@@ -5204,6 +5296,7 @@ public class KdcGui extends Group {
             // System.out.println("Disabling password components");
             gui.PrPassword.set("enabled" /* NOI18N */, off);
             gui.PrBasicRandomPw.set("enabled" /* NOI18N */, off);
+            gui.EncList.set("enabled" /* NOI18N */, off);
         }
         
         /*
@@ -5289,6 +5382,7 @@ public class KdcGui extends Group {
         // Basics
         gui.PrPolicy.set("enabled" /* NOI18N */, sense);
         gui.PrExpiry.set("enabled" /* NOI18N */, sense);
+        gui.EncList.set("enabled" /* NOI18N */, sense);
         gui.PrComments.set("enabled" /* NOI18N */, sense);
         // Details
         gui.PrPwExpiry.set("enabled" /* NOI18N */, sense);
@@ -5391,6 +5485,32 @@ public class KdcGui extends Group {
 		    getDateTimeFromDialogBox(tf, frame);
         } // actionPerformed
     } // class DateTimeListener
+
+    /**
+     * This class launches the EncListDialog box when the user presses
+     * the "..." button. An instance of this is shared by all the
+     * buttons that are meant to do this.
+     */
+    private class EncListListener implements ActionListener {
+        
+        private TextField tf;
+        private Frame frame;
+        
+        EncListListener(TextField tf, Frame frame) {
+            this.tf = tf;
+            this.frame = frame;
+        }
+        
+        public void actionPerformed(ActionEvent e) {
+            if (mainHelpMode && frame == realMainFrame)
+                showHelp("EncList...");
+            else
+                if (defaultsHelpMode && frame == defaultsEditingFrame)
+		    showHelp("EncList...");
+		else
+		    getEncListFromDialogBox(tf, frame);
+        } // actionPerformed
+    } // class EncListListener
     
     /**
      * This class launches the durrationHelper dialog box when the user presses

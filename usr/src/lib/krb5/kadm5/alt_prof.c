@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,7 @@ krb5_error_code kadm5_free_config_params();
 	"aes128-cts-hmac-sha1-96:normal " \
 	"des3-cbc-hmac-sha1-kd:normal " \
 	"arcfour-hmac-md5:normal " \
+	"arcfour-hmac-md5-exp:normal " \
 	"des-cbc-md5:normal " \
 	"des-cbc-crc:normal"
 

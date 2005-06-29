@@ -22,7 +22,7 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@ public class GuiResource extends ListResourceBundle {
         {"Duplicate ", "Duplicate "},
         {"- *CHANGES*", "- *CHANGES*"},
         {"OK", "OK"},
+        {"Clear", "Clear"},
         {"New", "New"},
         {"Please save or cancel first", "Please save or cancel first"},
         {"Cannot find default realm; check /etc/krb5/krb5.conf",
@@ -69,12 +70,15 @@ public class GuiResource extends ListResourceBundle {
 	 "Please enter a principal name or cancel"},
         {"Please enter a password or cancel",
 	 "Please enter a password or cancel"},
+	{"If changing the key encryption types then specify a new password"
+	 +" for the principal whose keys are being changed",
+	 "If changing the key encryption types then specify a new password"
+	 +" for the principal whose keys are being changed"},
         {"Please enter a policy name or cancel",
 	 "Please enter a policy name or cancel"},
         {"Context-Sensitive Help", "Context-Sensitive Help"},
-        {"Click on GUI items to get help.\n\nClick on button below",
-	 "to dismiss, Click on GUI items to get help.\n\nClick on",
-	 "button below to dismiss"},
+        {"Click on GUI items to get help.\n\nClick on button below to dismiss",
+	 "Click on GUI items to get help.\n\nClick on button below to dismiss"},
         {"Principal Name:", "Principal Name:"},
         {"Principal", "Principal"},
         {"Password:", "Password:"},
@@ -100,6 +104,7 @@ public class GuiResource extends ListResourceBundle {
         {"Last Principal Change:", "Last Principal Change:"},
         {"Last Changed By:", "Last Changed By:"},
         {"Account Expires:", "Account Expires:"},
+        {"Encryption Key Types:", "Encryption Key Types:"},
         {"Save", "Save"},
         {"Previous", "Previous"},
         {"Next", "Next"},
@@ -164,6 +169,10 @@ public class GuiResource extends ListResourceBundle {
         {"Midnight", "Midnight"},
         {"Help", "Help"},
         {"Help for Date and Time Dialog", "Help for Date and Time Dialog"},
+
+	{"SEAM Encryption Type List Helper",
+	 "SEAM Encryption Type List Helper"},
+	{"Help for Encryption Type Dialog", "Help for Encryption Type Dialog"},
         
         {"SEAM Duration Helper", "SEAM Duration Helper"},
         {"Weeks", "Weeks"},
@@ -219,20 +228,18 @@ public class GuiResource extends ListResourceBundle {
 	 "You are about to lose changes."},
         {"Click OK to proceed or Cancel to continue editing.",
 	 "Click OK to proceed or Cancel to continue editing."},
-        {"Click Save to commit changes, Discard to discard changes",
-	 "or Cancel to continue editing.",
-	 "Click Save to commit changes",
-	 "Discard to discard changes, or Cancel",
-	 "to continue editing."},
+        {"Click Save to commit changes, Discard to discard changes,"
+	 +" or Cancel to continue editing.",
+	 "Click Save to commit changes, Discard to discard changes,"
+	 +" or Cancel to continue editing."},
         {"Unable to access lists; please use the Name field.",
 	 "Unable to access lists; please use the Name field."},
         {"About SEAM Adminstration Tool", "About SEAM Adminstration Tool"},
         {"Sun Enterprise Authentication Mechanism Administration Tool",
-	 "Sun Enterprise Authentication Mechanism Administration",
-	 "Tool"},
-        {"Copyright 1999-2002 Sun Microsystems, Inc.",
-	 "Copyright 1999-2002 Sun Microsystems, Inc."},
-        {"All Rights Reserved.", "All Rights Reserved."},
+	 "Sun Enterprise Authentication Mechanism Administration Tool"},
+        {"Copyright 2005 Sun Microsystems, Inc.  All rights reserved.",
+	 "Copyright 2005 Sun Microsystems, Inc.  All rights reserved."},
+	{"Use is subject to license terms.", "Use is subject to license terms"},
         {"Example: ", "Example: "},
         {"or", "or"},
         {"Properties", "Properties"},

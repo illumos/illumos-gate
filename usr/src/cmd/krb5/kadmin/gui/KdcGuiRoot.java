@@ -24,7 +24,6 @@
  *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
  */
 
 /**
@@ -132,6 +131,9 @@ public class KdcGuiRoot extends Root {
     public ButtonShadow PrBasicNext;
     public ButtonShadow PrBasicPrevious;
     public ButtonShadow PrBasicRandomPw;
+    public LabelShadow EncListLabel;
+    public TextFieldShadow EncList;
+    public ButtonShadow EncListMoreButton;
     public ButtonShadow PrBasicSave;
     public TextFieldShadow PrComments;
     public LabelShadow PrCommentsLabel;
@@ -292,9 +294,7 @@ public class KdcGuiRoot extends Root {
         {
             double _tmp[] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 			     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-			     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-			     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-			     0.0};
+			     0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
             gbpanel44.set("columnWeights", _tmp);
         }
         gbpanel44.set("layoutLocation", new java.awt.Point(602, 10));
@@ -345,6 +345,7 @@ public class KdcGuiRoot extends Root {
         LoginStartOver.set("GBConstraints", new GBConstraints
 			   ("x=15;y=15;width=4;height=2"));
         LoginStartOver.set("text", "Start Over");
+        
         LoginRealmLabel = new LabelShadow();
         LoginRealmLabel.set("name", "LoginRealmLabel");
         gbpanel44.add(LoginRealmLabel);
@@ -887,11 +888,33 @@ public class KdcGuiRoot extends Root {
 			    new sunsoft.jws.visual.rt.type.AnchorEnum
 			    ("west"));
         
+	EncListLabel = new LabelShadow();
+	EncListLabel.set("name", "EncListLabel");
+        gbpanel67.add(EncListLabel);
+	EncListLabel.set("GBConstraints", new GBConstraints("x=0;y=10"));
+	EncListLabel.set("text", "Encryption Key Types:");
+	EncListLabel.set("anchor",
+			new sunsoft.jws.visual.rt.type.AnchorEnum("east"));
+
+        EncList = new TextFieldShadow();
+        EncList.set("name", "EncList");
+        gbpanel67.add(EncList);
+        EncList.set("GBConstraints", new GBConstraints
+		     ("x=1;y=10;fill=horizontal"));
+
+        EncListMoreButton = new ButtonShadow();
+        EncListMoreButton.set("name", "EncListMoreButton");
+        gbpanel67.add(EncListMoreButton);
+        EncListMoreButton.set("GBConstraints", new GBConstraints
+			       ("x=2;y=10"));
+        EncListMoreButton.set("standard", Boolean.FALSE);
+        EncListMoreButton.set("text", "...");
+	
         PrPolicyLabel = new LabelShadow();
         PrPolicyLabel.set("name", "PrPolicyLabel");
         gbpanel67.add(PrPolicyLabel);
         PrPolicyLabel.set("GBConstraints", new GBConstraints
-			  ("x=0;y=10"));
+			  ("x=0;y=12"));
         PrPolicyLabel.set("text", "Policy:");
         PrPolicyLabel.set("anchor",
 			  new sunsoft.jws.visual.rt.type.AnchorEnum
@@ -902,7 +925,7 @@ public class KdcGuiRoot extends Root {
         gbpanel67.add(PrPolicy);
         PrPolicy.set("items", convert("[Ljava.lang.String;",
 				      "(no policy)"));
-        PrPolicy.set("GBConstraints", new GBConstraints("x=1;y=10"));
+        PrPolicy.set("GBConstraints", new GBConstraints("x=1;y=12"));
         PrPolicy.set("anchor", new sunsoft.jws.visual.rt.type.AnchorEnum
 		     ("west"));
         PrPolicy.set("selectedItem", "(no policy)");
@@ -911,7 +934,7 @@ public class KdcGuiRoot extends Root {
         PrExpiryLabel.set("name", "PrExpiryLabel");
         gbpanel67.add(PrExpiryLabel);
         PrExpiryLabel.set("GBConstraints", new GBConstraints
-			  ("x=0;y=12"));
+			  ("x=0;y=14"));
         PrExpiryLabel.set("text", "Account Expires:");
         PrExpiryLabel.set("anchor",
 			  new sunsoft.jws.visual.rt.type.AnchorEnum
@@ -921,13 +944,13 @@ public class KdcGuiRoot extends Root {
         PrExpiry.set("name", "PrExpiry");
         gbpanel67.add(PrExpiry);
         PrExpiry.set("GBConstraints", new GBConstraints
-		     ("x=1;y=12;fill=horizontal"));
+		     ("x=1;y=14;fill=horizontal"));
         
         PrExpiryMoreButton = new ButtonShadow();
         PrExpiryMoreButton.set("name", "PrExpiryMoreButton");
         gbpanel67.add(PrExpiryMoreButton);
         PrExpiryMoreButton.set("GBConstraints", new GBConstraints
-			       ("x=2;y=12"));
+			       ("x=2;y=14"));
         PrExpiryMoreButton.set("standard", Boolean.FALSE);
         PrExpiryMoreButton.set("text", "...");
         
@@ -935,7 +958,7 @@ public class KdcGuiRoot extends Root {
         LabelBarPrincipal.set("name", "LabelBarPrincipal");
         gbpanel67.add(LabelBarPrincipal);
         LabelBarPrincipal.set("GBConstraints", new GBConstraints
-			      ("x=0;y=14;width=3;fill=horizontal"));
+			      ("x=0;y=16;width=3;fill=horizontal"));
         LabelBarPrincipal.set("text", "Admin History");
         LabelBarPrincipal.set("font", convert
 			      ("java.awt.Font",
@@ -945,7 +968,7 @@ public class KdcGuiRoot extends Root {
         PrLastChangedTimeLabel.set("name", "PrLastChangedTimeLabel");
         gbpanel67.add(PrLastChangedTimeLabel);
         PrLastChangedTimeLabel.set("GBConstraints",
-				   new GBConstraints("x=0;y=16"));
+				   new GBConstraints("x=0;y=18"));
         PrLastChangedTimeLabel.set("text", "Last Principal Change:");
         PrLastChangedTimeLabel.set
 	    ("anchor",
@@ -955,7 +978,7 @@ public class KdcGuiRoot extends Root {
         PrLastChangedTime.set("name", "PrLastChangedTime");
         gbpanel67.add(PrLastChangedTime);
         PrLastChangedTime.set("GBConstraints", new GBConstraints
-			      ("x=1;y=16"));
+			      ("x=1;y=18"));
         PrLastChangedTime.set("text", "");
         PrLastChangedTime.set("alignment",
 			      new sunsoft.jws.visual.rt.type.AlignmentEnum
@@ -968,7 +991,7 @@ public class KdcGuiRoot extends Root {
         PrLastChangedByLabel.set("name", "PrLastChangedByLabel");
         gbpanel67.add(PrLastChangedByLabel);
         PrLastChangedByLabel.set("GBConstraints",
-				 new GBConstraints("x=0;y=18"));
+				 new GBConstraints("x=0;y=20"));
         PrLastChangedByLabel.set("text", "Last Changed By:");
         PrLastChangedByLabel.set
 	    ("anchor",
@@ -978,7 +1001,7 @@ public class KdcGuiRoot extends Root {
         PrLastChangedBy.set("name", "PrLastChangedBy");
         gbpanel67.add(PrLastChangedBy);
         PrLastChangedBy.set("GBConstraints", new GBConstraints
-			    ("x=1;y=18"));
+			    ("x=1;y=20"));
         PrLastChangedBy.set("text", "");
         PrLastChangedBy.set
 	    ("alignment",
@@ -991,7 +1014,7 @@ public class KdcGuiRoot extends Root {
         PrCommentsLabel.set("name", "PrCommentsLabel");
         gbpanel67.add(PrCommentsLabel);
         PrCommentsLabel.set("GBConstraints", new GBConstraints
-			    ("x=0;y=20"));
+			    ("x=0;y=22"));
         PrCommentsLabel.set("text", "Comments:");
         PrCommentsLabel.set("anchor",
 			    new sunsoft.jws.visual.rt.type.AnchorEnum
@@ -1001,13 +1024,13 @@ public class KdcGuiRoot extends Root {
         PrComments.set("name", "PrComments");
         gbpanel67.add(PrComments);
         PrComments.set("GBConstraints", new GBConstraints
-		       ("x=1;y=20;fill=horizontal"));
+		       ("x=1;y=22;fill=horizontal"));
         
         labelbar20 = new LabelBarShadow();
         labelbar20.set("name", "labelbar20");
         gbpanel67.add(labelbar20);
         labelbar20.set("GBConstraints", new GBConstraints
-		       ("x=0;y=22;width=3;fill=horizontal"));
+		       ("x=0;y=24;width=3;fill=horizontal"));
         
         gbpanel11 = new GBPanelShadow();
         gbpanel11.set("name", "gbpanel11");
@@ -1017,7 +1040,7 @@ public class KdcGuiRoot extends Root {
             gbpanel11.set("rowHeights", _tmp);
         }
         gbpanel11.set("GBConstraints", new GBConstraints
-		      ("x=0;y=24;width=3;fill=both"));
+		      ("x=0;y=26;width=3;fill=both"));
         {
             int _tmp[] = {14, 14, 14, 14, 14, 14, 14};
             gbpanel11.set("columnWidths", _tmp);

@@ -22,12 +22,9 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-//import Principal;
-//import Policy;
 
 public class Kadmin {
 
@@ -51,6 +48,11 @@ public class Kadmin {
 	 * Get the ACL setting for the logged in principal
 	 */
 	public native int getPrivs();
+
+	/**
+	 * Get the complete enc type list
+	 */
+	public native String[] getEncList();
 
 	/**
 	 * Get the complete principal list

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
-	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
 	ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,7 +62,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='kadmind' section='1M'
+			<manpage title='krb5kdc' section='1M'
 			    manpath='/usr/share/man' />
 		</documentation>
 	</template>

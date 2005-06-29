@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,7 +182,7 @@ void PRS(argc, argv)
 					debug++;
 					break;
 				case 'P':
-			port = htons(atoi(optarg));
+			port = atoi(optarg);
 					if (!port)
 						usage();
 					break;
@@ -379,7 +379,7 @@ open_connection(host, fd, Errmsg, ErrmsgSz)
 	hints.ai_socktype = SOCK_STREAM;
 
 	if (port != 0)
-		(void) snprintf(serv_or_port, sizeof(serv_or_port), ("%d"), 
+		(void) snprintf(serv_or_port, sizeof(serv_or_port), ("%hu"), 
 				port);
 	else 
 		strncpy(serv_or_port, KPROP_SERVICE, sizeof(serv_or_port));

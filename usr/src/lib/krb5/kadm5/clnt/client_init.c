@@ -593,6 +593,7 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 	krb5_int32 starttime;
 	char *server = NULL;
 	krb5_principal serverp = NULL, clientp = NULL;
+	bool_t cpw = FALSE;
 
 	ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
 		"entering kadm5_init_any\n"));
@@ -719,8 +720,13 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 	}
 	clientp = creds.client;
 
+	if (strncmp(service_name, KADM5_CHANGEPW_HOST_SERVICE,
+	    strlen(KADM5_CHANGEPW_HOST_SERVICE)) == 0)
+		cpw = TRUE;	
+
 	if (init_type == INIT_PASS &&
-	    handle->params.kpasswd_protocol == KRB5_CHGPWD_CHANGEPW_V2) {
+	    handle->params.kpasswd_protocol == KRB5_CHGPWD_CHANGEPW_V2 &&
+	    cpw == TRUE) {
 		/*
 		 * The 'service_name' is constructed by the caller
 		 * but its done before the parameter which determines
@@ -881,7 +887,8 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 #endif
 
 	if (init_type != INIT_PASS ||
-	    handle->params.kpasswd_protocol == KRB5_CHGPWD_RPCSEC) {
+	    handle->params.kpasswd_protocol == KRB5_CHGPWD_RPCSEC ||
+	    cpw == FALSE) {
 		code = _kadm5_initialize_rpcsec_gss_handle(handle,
 					client_name, service_name);
 		if (code != 0)
