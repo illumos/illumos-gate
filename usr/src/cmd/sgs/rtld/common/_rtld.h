@@ -521,7 +521,7 @@ extern Sym		*dlsym_handle(Grp_hdl *, Slookup *, Rt_map **,
 			    uint_t *);
 extern void		*dlsym_intn(void *, const char *, Rt_map *, Rt_map **);
 extern Grp_hdl		*dlmopen_intn(Lm_list *, const char *, int, Rt_map *,
-			    uint_t, int *);
+			    uint_t, uint_t, int *);
 extern size_t		doprf(const char *, va_list, Prfbuf *);
 extern int		dowrite(Prfbuf *);
 extern void		dz_init(int);

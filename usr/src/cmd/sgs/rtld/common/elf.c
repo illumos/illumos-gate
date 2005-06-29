@@ -2415,7 +2415,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				return (0);
 			}
 			if (lml_main.lm_head) {
-				if (audit_setup(lmp, AUDITORS(lmp)) == 0) {
+				if (audit_setup(lmp, AUDITORS(lmp), 0) == 0) {
 					remove_so(0, lmp);
 					return (0);
 				}

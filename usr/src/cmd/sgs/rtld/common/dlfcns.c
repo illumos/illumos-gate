@@ -585,7 +585,7 @@ _dlclose(void *handle)
  */
 static Grp_hdl *
 dlmopen_core(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
-    uint_t flags)
+    uint_t flags, uint_t orig)
 {
 	Rt_map	*nlmp;
 	Grp_hdl	*ghp;
@@ -685,11 +685,14 @@ dlmopen_core(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 	 * provides flexibility should we be able to support dlopening more
 	 * than one object in the future.
 	 */
-	if ((pnp = LM_FIX_NAME(clmp)(path, clmp, PN_SER_DLOPEN)) == 0)
+	if ((pnp = LM_FIX_NAME(clmp)(path, clmp, orig)) == 0) {
+		remove_lml(lml);
 		return (0);
+	}
 	if (((pnp->p_orig & (PN_TKN_ISALIST | PN_TKN_HWCAP)) || pnp->p_next) &&
 	    ((mode & RTLD_FIRST) == 0)) {
 		remove_pnode(pnp);
+		remove_lml(lml);
 		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_5));
 		return (0);
 	}
@@ -701,6 +704,7 @@ dlmopen_core(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 	if ((lmc = alist_append(&(lml->lm_lists), 0, sizeof (Lm_cntl),
 	    AL_CNT_LMLISTS)) == 0) {
 		remove_pnode(pnp);
+		remove_lml(lml);
 		return (0);
 	}
 	olmco = nlmco = (Aliste)((char *)lmc - (char *)lml->lm_lists);
@@ -765,7 +769,7 @@ dlmopen_core(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
  */
 Grp_hdl *
 dlmopen_intn(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
-    uint_t flags, int *loaded)
+    uint_t flags, uint_t orig, int *loaded)
 {
 	Rt_map *	dlmp = 0;
 	Grp_hdl *	ghp;
@@ -773,7 +777,8 @@ dlmopen_intn(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 	/*
 	 * Determine the link-map that has just been loaded.
 	 */
-	if ((ghp = dlmopen_core(lml, path, mode, clmp, flags)) != 0) {
+	if ((ghp = dlmopen_core(lml, path, mode, clmp, flags,
+	    (orig | PN_SER_DLOPEN))) != 0) {
 		/*
 		 * Establish the new link-map from which .init processing will
 		 * begin.  Ignore .init firing when constructing a configuration
@@ -833,7 +838,7 @@ dlmopen_check(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 	if (((mode & (RTLD_GROUP | RTLD_WORLD)) == 0) && !(mode & RTLD_NOLOAD))
 		mode |= (RTLD_GROUP | RTLD_WORLD);
 
-	return (dlmopen_intn(lml, path, mode, clmp, 0, loaded));
+	return (dlmopen_intn(lml, path, mode, clmp, 0, 0, loaded));
 }
 
 #pragma weak dlopen = _dlopen

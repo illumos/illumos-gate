@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,7 @@ struct audit_list {
 /*
  * Link-Edit audit functions
  */
-extern int		audit_setup(Rt_map *, Audit_desc *);
+extern int		audit_setup(Rt_map *, Audit_desc *, uint_t);
 
 extern void		audit_desc_cleanup(Audit_desc *, Rt_map *);
 extern void		audit_info_cleanup(Audit_info *);

@@ -1479,3 +1479,4 @@ All the above change is incorporated in the following patches:
 	PSARC/2005/357 dlinfo(3c) RTLD_DI_ARGSINFO
 6284941 excessive link times with many groups/sections
 6280467 dlclose() unmaps shared library before library's _fini() has finished
+6291547 ld.so mishandles LD_AUDIT causing security problems.

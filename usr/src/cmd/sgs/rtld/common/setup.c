@@ -865,7 +865,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 				if ((auditors->ad_name = strdup(aud[ndx])) == 0)
 					return (0);
 				rtld_flags2 |= RT_FL2_FTL2WARN;
-				(void) audit_setup(mlmp, auditors);
+				(void) audit_setup(mlmp, auditors,
+				    PN_SER_EXTLOAD);
 				rtld_flags2 &= ~RT_FL2_FTL2WARN;
 			}
 		}
@@ -876,7 +877,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 * Any object required auditing (set with a DT_DEPAUDIT dynamic
 		 * entry) that can't be established is fatal.
 		 */
-		if (audit_setup(mlmp, AUDITORS(mlmp)) == 0)
+		if (audit_setup(mlmp, AUDITORS(mlmp), 0) == 0)
 			return (0);
 
 		FLAGS1(mlmp) |= AUDITORS(mlmp)->ad_flags;

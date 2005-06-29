@@ -889,7 +889,7 @@ audit_disable(char *name, Rt_map *clmp, Grp_hdl *ghp, Audit_list *alp)
  * a descriptor representing the entry points it provides.
  */
 int
-audit_setup(Rt_map *clmp, Audit_desc *adp)
+audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig)
 {
 	char	*ptr, *next;
 	int	error = 1;
@@ -905,8 +905,8 @@ audit_setup(Rt_map *clmp, Audit_desc *adp)
 	 * The audit definitions may be a list (which will already have been
 	 * dupped) so split it into individual tokens.
 	 */
-	ptr = strtok_r(adp->ad_name, MSG_ORIG(MSG_STR_DELIMIT), &next);
-	do {
+	for (ptr = strtok_r(adp->ad_name, MSG_ORIG(MSG_STR_DELIMIT), &next);
+	    ptr; ptr = strtok_r(NULL,  MSG_ORIG(MSG_STR_DELIMIT), &next)) {
 		Grp_hdl		*ghp;
 		Rt_map		*lmp;
 		Rt_map		**tobj;
@@ -917,7 +917,7 @@ audit_setup(Rt_map *clmp, Audit_desc *adp)
 		 */
 		if ((ghp = dlmopen_intn((Lm_list *)LM_ID_NEWLM, ptr,
 		    (RTLD_FIRST | RTLD_GLOBAL | RTLD_WORLD), clmp,
-		    FLG_RT_AUDIT, 0)) == 0) {
+		    FLG_RT_AUDIT, orig, 0)) == 0) {
 			error = audit_disable(ptr, clmp, 0, 0);
 			continue;
 		}
@@ -1027,9 +1027,7 @@ audit_setup(Rt_map *clmp, Audit_desc *adp)
 		 */
 		adp->ad_flags |= alp->al_flags;
 		LIST(lmp)->lm_alp = alp;
-
-	} while ((ptr = strtok_r(NULL,
-	    MSG_ORIG(MSG_STR_DELIMIT), &next)) != NULL);
+	}
 
 	/*
 	 * Free the original audit string, as this descriptor may be used again
