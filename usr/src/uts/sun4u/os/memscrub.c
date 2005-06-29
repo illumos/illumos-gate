@@ -1082,12 +1082,12 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 
 		if (!on_trap(&otd, OT_DATA_EC)) {
 			memscrub_read(va, bpp);
-			no_trap();
 			/*
 			 * Check if CEs require logging
 			 */
 			cpu_check_ce(SCRUBBER_CEEN_CHECK,
 			    (uint64_t)pa, va, psz);
+			no_trap();
 			thread_affinity_clear(curthread);
 		} else {
 			no_trap();
@@ -1107,16 +1107,15 @@ memscrub_scan(uint_t blks, ms_paddr_t src)
 			    int tmp = 0;
 			    for (; tmp < bpp; tmp += MEMSCRUB_BPP) {
 				thread_affinity_set(curthread, CPU_CURRENT);
-				if (!on_trap(&otd, OT_DATA_EC))
+				if (!on_trap(&otd, OT_DATA_EC)) {
 				    memscrub_read(vaddr, MEMSCRUB_BPP);
-				else
+				    cpu_check_ce(SCRUBBER_CEEN_CHECK,
+					(uint64_t)paddr, vaddr, MMU_PAGESIZE);
+				    no_trap();
+				} else {
+				    no_trap();
 				    memscrub_counts.errors_found.value.ui32++;
-				no_trap();
-				/*
-				 * Check if CEs require logging
-				 */
-				cpu_check_ce(SCRUBBER_CEEN_CHECK,
-				    (uint64_t)paddr, vaddr, MMU_PAGESIZE);
+				}
 				thread_affinity_clear(curthread);
 				vaddr += MMU_PAGESIZE;
 				paddr += MMU_PAGESIZE;
