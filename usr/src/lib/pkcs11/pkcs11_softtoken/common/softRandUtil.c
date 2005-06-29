@@ -87,7 +87,7 @@ soft_random_generator(CK_BYTE *ran_out, CK_ULONG ran_len, boolean_t token)
 					    &soft_giant_mutex);
 					return (CKR_DEVICE_ERROR);
 				}
-				(void) fcntl(soft_random_fd, F_SETFD,
+				(void) fcntl(soft_urandom_fd, F_SETFD,
 				    FD_CLOEXEC);
 			}
 			(void) pthread_mutex_unlock(&soft_giant_mutex);
