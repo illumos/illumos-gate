@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1993,2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,7 @@
 # cmd/sgs/yacc/i386/Makefile
 
 PROG=		yacc
-DEFLIST=	-DNOLIBW -DELF
+DEFLIST=	-DELF
 
 include 	../../../Makefile.cmd
 include		../Makefile.com

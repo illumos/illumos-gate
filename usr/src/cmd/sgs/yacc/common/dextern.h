@@ -20,59 +20,34 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /* Copyright (c) 1988 AT&T */
 /* All Rights Reserved */
 
+#ifndef _DEXTERN_H
+#define	_DEXTERN_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <ctype.h>
 #include <memory.h>
 #include <string.h>
 #include <malloc.h>
 #include <values.h>
-#ifdef __STDC__
+#include <widec.h>
+#include <unistd.h>
 #include <stdlib.h>
-#else
-extern char *malloc();
-extern char *calloc();
-extern char *realloc();
-extern void exit();
-#include <sys/types.h>		/* for size_t */
-#ifndef _SIZE_T
-#define	_SIZE_T
-#if defined(_LP64) || defined(_I32LPx)
-typedef	unsigned long	size_t;		/* size of something in bytes */
-#else
-typedef	unsigned int	size_t;		/* (historical version) */
-#endif
-#endif
-#endif
-#ifdef NOLIBW
-/*
- * no wide char classification macro or I/O.
- * mimic these with whatever we have.
- * "%ws", L'c' and L"ssss" in the source files are
- * replaced by sed in makefile.
- */
-#define	iswascii(c)	isascii((char)(c))
-#define	iswspace(c)	isspace((char)(c))
-#define	iswalpha(c)	isalpha((char)(c))
-#define	iswdigit(c)	isdigit((char)(c))
-#define	iswxdigit(c)	isxdigit((char)(c))
-#define	iswupper(c)	isupper((char)(c))
-#define	iswlower(c)	islower((char)(c))
-#define	towlower(c)	((wchar_t) tolower((char)(c)))
-#define	getwc(f)	getc(f)
-#define	ungetwc(c, f)	ungetc((char)(c), f)
-#define	putwc(c, f)	putc((char)(c), (f))
-#else /* !NOLIBW */ /* This is probably a SysV with MNLS extension. */
 #include <wctype.h>
-#endif /* !NOLIBW */
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
 	/*  MANIFEST CONSTANT DEFINITIONS */
 #if u3b || u3b15 || u3b2 || vax || uts || sparc
 #define	WORD32
@@ -181,13 +156,13 @@ typedef	unsigned int	size_t;		/* (historical version) */
 
 	/* I/O descriptors */
 
-extern FILE * finput;		/* input file */
-extern FILE * faction;		/* file for saving actions */
-extern FILE * fdefine;		/* file for #defines */
-extern FILE * ftable;		/* y.tab.c file */
-extern FILE * ftemp;		/* tempfile to pass 2 */
-extern FILE * fdebug;		/* tempfile for two debugging info arrays */
-extern FILE * foutput;		/* y.output file */
+extern FILE *finput;		/* input file */
+extern FILE *faction;		/* file for saving actions */
+extern FILE *fdefine;		/* file for #defines */
+extern FILE *ftable;		/* y.tab.c file */
+extern FILE *ftemp;		/* tempfile to pass 2 */
+extern FILE *fdebug;		/* tempfile for two debugging info arrays */
+extern FILE *foutput;		/* y.output file */
 
 	/* structure declarations */
 
@@ -298,7 +273,7 @@ extern int zzsrconf;
 
 	/* define external functions */
 
-extern void setup(int, char * []);
+extern void setup(int, char *[]);
 extern void closure(int);
 extern void output(void);
 extern void aryfil(int *, int, int);
@@ -313,7 +288,7 @@ extern wchar_t *symnam(int);
 extern wchar_t *writem(int *);
 extern void exp_mem(int);
 extern void exp_act(int **);
-extern apack(int *, int);
+extern int apack(int *, int);
 extern int state(int);
 extern void fprintf3(FILE *, const char *, const wchar_t *, const char *, ...);
 extern void error3(const char *, const wchar_t *, const char *, ...);
@@ -352,3 +327,9 @@ extern char *parser;
 #ifndef PARSER
 #define	PARSER "/usr/ccs/lib/yaccpar"
 #endif
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif /* _DEXTERN_H */

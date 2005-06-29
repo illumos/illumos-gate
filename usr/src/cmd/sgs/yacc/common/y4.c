@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "dextern"
+#include "dextern.h"
 #define	NOMORE -1000
 
 static void gin(int);
@@ -55,7 +55,7 @@ static int adb = 0;
 void
 callopt()
 {
-	register i, *p, j, k, *q;
+	int i, *p, j, k, *q;
 
 	ggreed = (int *) malloc(sizeof (int) * size);
 	pgo = (int *) malloc(sizeof (int) * size);
@@ -184,7 +184,7 @@ callopt()
 
 	if (adb > 2) { /* print a array */
 		for (p = amem; p <= maxa; p += 10) {
-			(void) fprintf(ftable, "%4d  ", p-amem);
+			(void) fprintf(ftable, "%4" PRIdPTR "  ", p-amem);
 			for (i = 0; i < 10; ++i)
 				(void) fprintf(ftable, "%4d  ", p[i]);
 			(void) fprintf(ftable, "\n");
@@ -197,9 +197,9 @@ callopt()
 }
 
 static void
-gin(i)
+gin(int i)
 {
-	register *r, *s, *q1, *q2;
+	int *r, *s, *q1, *q2;
 	int *p;
 
 	/* enter gotos on nonterminal i into array amem */
@@ -271,9 +271,9 @@ gin(i)
 }
 
 static void
-stin(i)
+stin(int i)
 {
-	register *r, n, nn, flag, j, *q1, *q2;
+	int *r, n, nn, flag, j, *q1, *q2;
 	int *s;
 
 	tystate[i] = 0;
@@ -290,7 +290,7 @@ stin(i)
 		flag = 0;
 		for (r = q1; r < q2; r += 2) {
 			s = *r + n + amem;
-			if ((int) s < (int) amem)
+			if (s < amem)
 				goto nextn;
 			/*
 			 * Check if action table needs to
@@ -368,10 +368,11 @@ stin(i)
 	/* NOTREACHED */
 }
 
-static nxti()
+static int
+nxti()
 {
 	/* finds the next i */
-	register i, max, maxi;
+	int i, max, maxi;
 	max = 0;
 
 	for (i = 1; i <= nnonter; ++i)
@@ -397,7 +398,7 @@ static void
 osummary()
 {
 	/* write summary */
-	register i, *p;
+	int i, *p;
 
 	if (foutput == NULL)
 		return;
@@ -408,10 +409,11 @@ osummary()
 	}
 
 	(void) fprintf(foutput,
-		"Optimizer space used: input %d/%d, output %d/%d\n",
+		"Optimizer space used: input %" PRIdPTR
+		"/%d, output %" PRIdPTR "/%d\n",
 		optimmem-tracemem + 1, new_memsize, maxa-amem + 1, new_actsize);
 	(void) fprintf(foutput,
-		"%d table entries, %d zero\n", (maxa-amem) + 1, i);
+		"%" PRIdPTR " table entries, %d zero\n", (maxa-amem) + 1, i);
 	(void) fprintf(foutput,
 		"maximum spread: %d, maximum offset: %d\n", maxspr, maxoff);
 
@@ -423,7 +425,7 @@ aoutput()
 	/* this version is for C */
 	/* write out the optimized parser */
 
-	(void) fprintf(ftable, "# define YYLAST %d\n", maxa-amem + 1);
+	(void) fprintf(ftable, "# define YYLAST %" PRIdPTR "\n", maxa-amem + 1);
 	arout(L"yyact", amem, (maxa - amem) + 1);
 	arout(L"yypact", indgo, nstate);
 	arout(L"yypgo", pgo, nnonter + 1);
@@ -434,7 +436,7 @@ arout(s, v, n)
 wchar_t *s;
 int *v, n;
 {
-	register i;
+	int i;
 
 	(void) fprintf(ftable, "static YYCONST yytabelem %ws[]={\n", s);
 	for (i = 0; i < n; ) {
@@ -448,9 +450,10 @@ int *v, n;
 	}
 }
 
-static gtnm()
+static int
+gtnm()
 {
-	register s, val, c;
+	int s, val, c;
 
 	/* read and convert an integer from the standard input */
 	/* return the terminating character */

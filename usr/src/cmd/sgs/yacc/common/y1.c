@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "dextern"
+#include "dextern.h"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <unistd.h>
@@ -40,7 +40,7 @@ static void mktbls(void);
 static void others(void);
 static void summary(void);
 static wchar_t *chcopy(wchar_t *, wchar_t *);
-static setunion(int *, int *);
+static int setunion(int *, int *);
 static void prlook(LOOKSETS *);
 static void cpres(void);
 static void cpfir(void);
@@ -113,9 +113,8 @@ char run_directory[MAXPATHLEN];
 char current_work_directory[MAXPATHLEN];
 extern int find_run_directory(char *, char *, char *, char **, char *);
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
 	setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -140,8 +139,7 @@ char *argv[];
 	summary();
 	callopt();
 	others();
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
 
@@ -250,8 +248,7 @@ static void
 others()
 {
 	extern int gen_lines;
-	extern int act_lines;
-	register c, i, j;
+	int c, i, j;
 	int tmpline;
 
 	/* This  routine has been "stolen" from the driver */
@@ -396,7 +393,7 @@ int *pp;
 		for (i = 0; i < isize; ++i)
 			sarr[i] = L' ';
 	}
-	for (p = pp; *p > 0; ++p) /* EMPTY */;
+	for (p = pp; *p > 0; ++p) /* NULL */;
 	p = prdptr[-*p];
 	q = chcopy(sarr, nontrst[*p-NTBASE].name);
 	q = chcopy(q, L" : ");
@@ -440,7 +437,7 @@ int *pp;
 
 /* return a pointer to the name of symbol i */
 wchar_t *
-symnam(i)
+symnam(int i)
 {
 	wchar_t *cp;
 
@@ -476,8 +473,10 @@ summary()
 		(void) fprintf(foutput,
 			"%d/%d working sets used\n", zzcwp, wsetsz);
 		(void) fprintf(foutput,
-			"memory: states,etc. %d/%d, parser %d/%d\n",
-			mem-tracemem, new_memsize, memp-amem, new_actsize);
+			"memory: states,etc. %" PRIdPTR
+			"/%d, parser %" PRIdPTR "/%d\n",
+			mem-tracemem, new_memsize,
+			memp-amem, new_actsize);
 		(void) fprintf(foutput,
 			"%d/%d distinct lookahead sets\n", nlset, lsetsize);
 		(void) fprintf(foutput,
@@ -600,11 +599,11 @@ int *v, n, c;
 
 /* set a to the union of a and b */
 /* return 1 if b is not a subset of a, 0 otherwise */
-static
+static int
 setunion(a, b)
-register *a, *b;
+int *a, *b;
 {
-	register i, x, sub;
+	int i, x, sub;
 
 	sub = 0;
 	SETLOOP(i) {
@@ -619,7 +618,7 @@ static void
 prlook(p)
 LOOKSETS *p;
 {
-	register j, *pp;
+	int j, *pp;
 	pp = p->lset;
 	if (pp == 0)
 		(void) fprintf(foutput, "\tNULL");
@@ -642,9 +641,9 @@ LOOKSETS *p;
 static void
 cpres()
 {
-	register **ptrpy;
+	int **ptrpy;
 	int **pyield;
-	register c, j, i;
+	int c, j, i;
 
 	/*
 	 * 2/29/88 -
@@ -717,7 +716,7 @@ static int indebug = 0;
 static void
 cpfir()
 {
-	register *p, **s, i, **t, ch, changes;
+	int *p, **s, i, **t, ch, changes;
 
 	zzcwp = nnonter;
 	NTLOOP(i) {
@@ -772,7 +771,7 @@ int
 state(int c)
 {
 	int size1, size2;
-	register i;
+	int i;
 	ITEM *p1, *p2, *k, *l, *q1, *q2;
 	p1 = pstate[nstate];
 	p2 = pstate[nstate+1];
@@ -887,7 +886,7 @@ cempty()
 #define	EMPTY 1
 #define	WHOKNOWS 0
 #define	OK 1
-	register i, *p;
+	int i, *p;
 
 	/*
 	 * first, use the array pempty to detect productions
@@ -976,7 +975,7 @@ static void
 stagen()
 {
 	int i, j;
-	register c;
+	int c;
 	register WSET *p, *q;
 
 	/* initialize */
@@ -1042,8 +1041,9 @@ stagen()
 
 /* generate the closure of state i */
 static int cldebug = 0; /* debugging flag for closure */
+
 void
-closure(i)
+closure(int i)
 {
 	int c, ch, work, k;
 	register WSET *u, *v;
@@ -1177,7 +1177,7 @@ LOOKSETS *p;
 	/* return pointer to a perminent location for the set */
 
 	int j, *w;
-	register *u, *v;
+	int *u, *v;
 	register LOOKSETS *q;
 
 	for (q = &lkst[nlset]; q-- > lkst; ) {

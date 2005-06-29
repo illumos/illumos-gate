@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -35,8 +35,9 @@
 #pragma weak yyparse
 extern int yyparse(void);
 
+/* ARGSUSED */
 int
-main()
+main(int argc, char **argv)
 {
 	setlocale(LC_ALL, "");
 	yyparse();

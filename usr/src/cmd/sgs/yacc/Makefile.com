@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -67,6 +67,10 @@ BUILD.AR=	$(AR) $(ARFLAGS) $@ `$(LORDER) $(OBJS) | $(TSORT)`
 LINTFLAGS=	-ax
 LINTPOUT=	lintp.out
 
+C99MODE= $(C99_ENABLE)
+CFLAGS += $(CCVERBOSE)
+CFLAGS64 += $(CCVERBOSE)
+
 $(LINTLIB):=	LINTFLAGS = -nvx
 $(ROOTCCSBINPROG):= FILEMODE = 0555
 
@@ -77,9 +81,6 @@ ROOTLINT=	$(LINTSRCS:../common/%=$(ROOTLINTDIR)/%)
 DYNLINKLIBDIR=	$(ROOTLIBDIR)
 DYNLINKLIB=	$(LIBLINKS:%=$(DYNLINKLIBDIR)/%)
 
-# Need to make sure lib-make's are warning free
-$(DYNLIB) :=	CFLAGS += $(CCVERBOSE)
-$(DYNLIB) :=	CFLAGS64 += $(CCVERBOSE)
 $(DYNLIB) :=	LDLIBS += -lc
 
 DYNFLAGS += -M$(MAPFILE)

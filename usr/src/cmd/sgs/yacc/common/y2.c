@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "dextern"
+#include "dextern.h"
 #include "sgs.h"
+#include <stdio.h>
+
 #define	IDENTIFIER 257
 
 #define	MARK 258
@@ -162,11 +164,9 @@ static int gen_testing = 0;
 /* flag for version stamping--default turned off */
 static char *v_stmp = "n";
 
-#ifndef NOLIBW	/* No wchar_t, no multibyte char handling! */
 int nmbchars = 0;	/* number of mb literals in mbchars */
 MBCLIT *mbchars = (MBCLIT *) 0; /* array of mb literals */
 int nmbcharsz = 0; /* allocated space for mbchars */
-#endif /* !NOLIBW */
 
 void
 setup(argc, argv)
@@ -183,10 +183,6 @@ char *argv[];
 	char *sym_prefix = "";
 #define	F_NAME_LENGTH	128
 	char	fname[F_NAME_LENGTH+1];
-
-	extern char	*optarg;
-	extern int	optind;
-	extern 		getopt();
 
 	foutput = NULL;
 	fdefine = NULL;
@@ -801,7 +797,7 @@ char *argv[];
 		if (ntypes && !(levprd[nprod] & ACTFLAG) &&
 				nontrst[*prdptr[nprod]-NTBASE].tvalue) {
 			/* no explicit action, LHS has value */
-			register tempty;
+			int tempty;
 			tempty = prdptr[nprod][1];
 			if (tempty < 0)
 /*
@@ -896,12 +892,11 @@ register wchar_t *s;
 }
 
 static int
-defin(t, s)
-register wchar_t *s;
+defin(int t, wchar_t *s)
 {
 	/* define s to be a terminal if t=0 or a nonterminal if t=1 */
 
-	register val;
+	int val;
 
 	if (t) {
 		if (++nnonter >= nnontersz)
@@ -1099,12 +1094,12 @@ defout()
 	ndefout = ntokens+1;
 }
 
-static
+static int
 gettok()
 {
-	register i, base;
+	int i, base;
 	static int peekline; /* number of '\n' seen in lookahead */
-	register c, match, reserve;
+	int c, match, reserve;
 begin:
 	reserve = 0;
 	lineno += peekline;
@@ -1273,11 +1268,11 @@ begin:
 	return (IDENTIFIER);
 }
 
-static
-fdtype(t)
+static int
+fdtype(int t)
 {
 	/* determine the type of a symbol */
-	register v;
+	int v;
 	if (t >= NTBASE)
 		v = nontrst[t-NTBASE].tvalue;
 	else
@@ -1290,9 +1285,8 @@ fdtype(t)
 	return (v);
 }
 
-static
-chfind(t, s)
-register wchar_t *s;
+static int
+chfind(int t, wchar_t *s)
 {
 	int i;
 
@@ -1410,11 +1404,11 @@ cpycode()
 	"eof before %%}"));
 }
 
-static
+static int
 skipcom()
 {
 	/* skip over comments */
-	register c, i = 0;  /* i is the number of lines skipped */
+	int c, i = 0;  /* i is the number of lines skipped */
 
 	/* skipcom is called after reading a / */
 
@@ -1439,10 +1433,11 @@ skipcom()
 	error(gettext(
 	"EOF inside comment"));
 	/* NOTREACHED */
+	return (0);
 }
 
 static void
-cpyact(offset)
+cpyact(int offset)
 {
 	/* copy C action to the next ; or closing } */
 	int brac, c, match, i, t, j, s, tok, argument, m;
@@ -1472,7 +1467,7 @@ swt:
 		s = 1;
 		tok = -1;
 		argument = 1;
-		while ((c = getwc(finput)) == L' ' || c == L'\t') /* EMPTY */;
+		while ((c = getwc(finput)) == L' ' || c == L'\t') /* NULL */;
 		if (c == L'<') { /* type description */
 			(void) ungetwc(c, finput);
 			if (gettok() != TYPENAME)
@@ -1521,10 +1516,10 @@ swt:
 			else
 				id_sw = 0;
 			while ((c = getwc(finput)) == L' ' ||
-				c == L'\t') /* EMPTY */;
+				c == L'\t') /* NULL */;
 			if (c == L'#') {
 				while ((c = getwc(finput)) == L' ' ||
-					c == L'\t') /* EMPTY */;
+					c == L'\t') /* NULL */;
 				if (iswdigit(c)) {
 					m = 0;
 					while (iswdigit(c)) {
@@ -1697,7 +1692,7 @@ lcopy:
 		/*
 		 * Error. Silently ignore.
 		 */
-		;
+		/* EMPTY */;
 	}
 	/*
 	 * If c has a possibility to be a
@@ -2045,9 +2040,6 @@ int chlit;
  */
 {
 	int	i;
-#ifdef	NOLIBW
-	return (chlit); /* assume always singlebyte char */
-#else /* !NOLIBW */
 
 	if (chlit < 0xff)
 		return (chlit); /* single-byte char */
@@ -2068,7 +2060,6 @@ int chlit;
 	mbchars[nmbchars-1].character = chlit;
 	return (mbchars[nmbchars-1].tvalue = extval++);
 	/* Return the newly assigned token. */
-#endif /* !NOLIBW */
 }
 
 /*

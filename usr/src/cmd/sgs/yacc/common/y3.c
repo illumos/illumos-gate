@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,16 +29,14 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "dextern"
+#include "dextern.h"
 
 static void go2gen(int);
 static void precftn(int, int, int);
 static void wract(int);
 static void wrstate(int);
 static void wdef(wchar_t *, int);
-#ifndef	NOLIBW
 static void wrmbchars(void);
-#endif /* !NOLIBW */
 	/* important local variables */
 static int lastred; /* number of the last reduction of a state */
 int *defact;
@@ -116,21 +114,21 @@ output()
 
 	(void) fprintf(ftable, "\t};\n");
 	wdef(L"YYNPROD", nprod);
-#ifndef	NOLIBW
 	if (nmbchars > 0) {
 		wrmbchars();
 	}
-#endif /* !NOLIBW */
 }
 
 static int pkdebug = 0;
+int
 apack(p, n)
 int *p;
+int n;
 {
 	/* pack state i from temp1 into amem */
 	int off;
-	register *pp, *qq;
-	int *q, *r, *rr;
+	int *pp, *qq;
+	int *q, *rr;
 	int diff;
 
 	/*
@@ -142,7 +140,7 @@ int *p;
 
 	q = p + n;
 	for (pp = p, off = 0; *pp == 0 && pp <= q; ++pp, --off)
-		/* EMPTY */;
+		/* NULL */;
 	if (pp > q)
 		return (0);  /* no actions */
 	p = pp;
@@ -170,7 +168,7 @@ int *p;
 
 		if (pkdebug && foutput != NULL)
 			(void) fprintf(foutput,
-				"off = %d, k = %d\n", off, rr-amem);
+				"off = %d, k = %" PRIdPTR "\n", off, rr-amem);
 
 		qq = rr;
 		for (pp = p; pp <= q; ++pp, ++qq) {
@@ -248,7 +246,7 @@ go2out()
 }
 
 static int g2debug = 0;
-static void go2gen(c)
+static void go2gen(int c)
 {
 	/* output the gotos for nonterminal c */
 	int i, work, cc;
@@ -306,7 +304,7 @@ static void go2gen(c)
 
 /* decide a shift/reduce conflict by precedence.  */
 static void
-precftn(r, t, s)
+precftn(int r, int t, int s)
 {
 
 	/*
@@ -347,7 +345,7 @@ precftn(r, t, s)
 }
 
 static void
-wract(i)
+wract(int i)
 {
 	/* output state i */
 	/* temp1 has the actions, lastred the default */
@@ -427,10 +425,10 @@ wract(i)
 }
 
 static void
-wrstate(i)
+wrstate(int i)
 {
 	/* writes state i */
-	register j0, j1;
+	int j0, j1;
 	register ITEM *pp, *qq;
 	register WSET *u;
 
@@ -481,8 +479,7 @@ wrstate(i)
 }
 
 static void
-wdef(s, n)
-wchar_t *s;
+wdef(wchar_t *s, int n)
 {
 	/* output a definition of s to the value n */
 	(void) fprintf(ftable, "# define %ws %d\n", s, n);
@@ -493,7 +490,7 @@ warray(s, v, n)
 wchar_t *s;
 int *v, n;
 {
-	register i;
+	int i;
 	(void) fprintf(ftable, "static YYCONST yytabelem %ws[]={\n", s);
 	for (i = 0; i < n; ) {
 		if (i % 10 == 0)
@@ -516,7 +513,7 @@ hideprod()
 	 * derived by productions in levprd.
 	 */
 
-	register i, j;
+	int i, j;
 
 	j = 0;
 	levprd[0] = 0;
@@ -542,7 +539,6 @@ hideprod()
 }
 
 
-#ifndef	NOLIBW
 static int
 cmpmbchars(p, q)
 MBCLIT *p, *q;
@@ -563,7 +559,7 @@ wrmbchars()
 		"\n\tint tvalue;\n}yymbchars[YYNMBCHARS]={\n");
 	for (i = 0; i < nmbchars; ++i) {
 		(void) fprintf(ftable, "\t{%#x,%d}",
-			mbchars[i].character, mbchars[i].tvalue);
+			(int)mbchars[i].character, mbchars[i].tvalue);
 		if (i < nmbchars - 1) {
 			/* Not the last. */
 			(void) fprintf(ftable, ",\n");
@@ -571,4 +567,3 @@ wrmbchars()
 	}
 	(void) fprintf(ftable, "\n};\n");
 }
-#endif /* !NOLIBW */
