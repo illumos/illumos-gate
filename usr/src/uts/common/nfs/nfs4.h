@@ -901,23 +901,6 @@ extern	void		rfs4_unshare(rfs4_state_t *);
 extern	void		rfs4_set_deleg_policy(srv_deleg_policy_t);
 #ifdef DEBUG
 #define	NFS4_DEBUG(var, args) if (var) cmn_err args
-#include <sys/systm.h>
-#include <sys/kobj.h>
-#define	NFS4_DEBUG_STACK(var, args) \
-if (var) { \
-int i, depth; \
-pc_t stack[25]; \
-char *sym; \
-ulong_t off; \
-\
-cmn_err args; \
-depth = getpcstack(stack, 25); \
-for (i = 0; i < depth; i++) { \
-	sym = kobj_getsymname(stack[i], &off); \
-	cmn_err(CE_CONT, \
-	    "\t%s+%lx", sym ? sym : "?", off); \
-} \
-}
 
 extern int rfs4_debug;
 extern int nfs4_client_attr_debug;
@@ -952,7 +935,6 @@ void nfs4_debug_mutex_exit(kmutex_t *, char *, int);
 
 #else  /* ! DEBUG */
 #define	NFS4_DEBUG(var, args)
-#define	NFS4_DEBUG_STACK(var, args)
 #endif /* DEBUG */
 
 /*
