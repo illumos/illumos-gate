@@ -1101,7 +1101,13 @@ MOD_OBJS +=	modctl.o modsubr.o modsysfile.o modconf.o modhash.o
 
 MPT_OBJS +=	mpt.o mpt_fw.o mpt_impl.o mpt_init.o mpt_raid.o
 
-SCSI_VHCI_OBJS += scsi_vhci.o sun_asymmetric_fops.o symmetric_fops.o lsi_asymmetric_fops.o std_asymmetric_fops.o emc_asymmetric_fops.o
+SCSI_VHCI_OBJS +=	scsi_vhci.o		\
+			sun_asymmetric_fops.o	\
+			symmetric_fops.o	\
+			lsi_asymmetric_fops.o	\
+			std_asymmetric_fops.o	\
+			emc_asymmetric_fops.o	\
+			proprietary_vhci_util.o
 
 STRPLUMB_OBJS += strplumb.o
 
