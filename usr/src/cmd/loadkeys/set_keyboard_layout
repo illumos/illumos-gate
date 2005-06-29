@@ -23,8 +23,8 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms. 
 #
 
 KBD_TYPE=`/usr/bin/kbd -t`
@@ -37,9 +37,11 @@ case "$KBD_TYPE" in
 "USB keyboard")
 	case "$KBD_LAYOUT_NAME" in
 	"")			LAYOUT= ;;
+	"Belgian" )             LAYOUT=2 ;;
 	"Czech" )		LAYOUT= ;;
 	"Danish" )		LAYOUT=6 ;;
 	"Dutch" )		LAYOUT=18 ;;
+	"Finnish" )             LAYOUT=7 ;;
 	"French" )		LAYOUT=8 ;;
 	"French-Canadian" ) 	LAYOUT= ;;
 	"German" )		LAYOUT=9 ;;
@@ -54,7 +56,7 @@ case "$KBD_TYPE" in
 	"Korean" )		LAYOUT=16 ;;
 	"Norwegian" )		LAYOUT=19 ;;
 	"Portuguese" )		LAYOUT=22 ;;
-	"Russian" )		LAYOUT= ;;
+        "Russian" )             LAYOUT=23 ;;	
 	"Spanish" )		LAYOUT=25 ;;
 	"Swedish" )		LAYOUT=26 ;;
 	"Swiss-French" ) 	LAYOUT=27 ;;
@@ -71,9 +73,11 @@ case "$KBD_TYPE" in
 "PC")
 	case "$KBD_LAYOUT_NAME" in
 	"")			LAYOUT= ;;
+	"Belgian" )             LAYOUT=2 ;;
 	"Czech" )		LAYOUT=53 ;;
 	"Danish" )		LAYOUT=36 ;;
 	"Dutch" )		LAYOUT=39 ;;
+	"Finnish" )             LAYOUT=7 ;;
 	"French" )		LAYOUT=35 ;;
 	"French-Canadian" ) 	LAYOUT=50 ;;
 	"German" )		LAYOUT=37 ;;
