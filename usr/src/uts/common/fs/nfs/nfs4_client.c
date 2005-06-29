@@ -3371,6 +3371,7 @@ recov_retry:
 		after_time.tv_sec, after_time.tv_nsec));
 
 	if (e.error == 0 && res.status == NFS4ERR_CB_PATH_DOWN) {
+		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 		nfs4_delegreturn_all(sp);
 		nfs4_end_op(mi, NULL, NULL, &recov_state, needrecov);
 		VFS_RELE(mi->mi_vfsp);
@@ -3420,7 +3421,6 @@ recov_retry:
 		e.error = geterrno4(res.status);
 	}
 
-out:
 	if (!rpc_error)
 		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 
