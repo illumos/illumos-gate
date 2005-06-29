@@ -141,7 +141,7 @@ static void	cmdin(void);
 static void	cpp(char *, FILE *, FILE *);
 static void	edit(char *);
 
-void
+int
 main(int argc, char **argv)
 {
 	int	com;
@@ -201,7 +201,7 @@ main(int argc, char **argv)
 	if (argc != 2) {
 		(void) fprintf(stderr, gettext(
 		"Usage: sdiff [-l] [-s] [-o output] [-w #] file1 file2\n"));
-		exit(2);
+		return (2);
 	}
 
 	file1 = *argv++;
@@ -361,7 +361,7 @@ main(int argc, char **argv)
 	if (odes)
 		(void) fclose(odes);
 	sremove();
-	exit(rcode);
+	return (rcode);
 }
 
 static int
