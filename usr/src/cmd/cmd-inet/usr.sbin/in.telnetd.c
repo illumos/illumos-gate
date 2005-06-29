@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1489,6 +1489,7 @@ encrypt_end(int direction)
 
 	cki.keylen = 0;
 	cki.iveclen = 0;
+	cki.ivec_usage = IVEC_ONETIME;
 
 	crioc.ic_cmd = CRYPTIOCSETUP;
 	crioc.ic_timout = -1;
@@ -2549,6 +2550,8 @@ getencrtype(void)
 			if (!sent_do_encrypt) {
 				send_do(TELOPT_ENCRYPT);
 				sent_do_encrypt = B_TRUE;
+				remopts[TELOPT_ENCRYPT] =
+				    OPT_YES_BUT_ALWAYS_LOOK;
 			}
 			if (enc_debug)
 				(void) fprintf(stderr, "SENT DO ENCRYPT\n");
