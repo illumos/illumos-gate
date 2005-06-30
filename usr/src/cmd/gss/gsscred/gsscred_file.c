@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,9 +42,16 @@
 #define	MAX_ENTRY_LEN 1024
 static const char credFile[] = "/etc/gss/gsscred_db";
 static const char credFileTmp[] = "/etc/gss/gsscred_db.tmp";
+static const int expNameTokIdLen = 2;
+static const int mechOidLenLen = 2;
+static const int mechOidTagLen = 1;
 
 static int matchEntry(const char *entry, const gss_buffer_t name,
 		const char *uid, uid_t *uidOut);
+
+/* From g_glue.c */
+extern int
+get_der_length(unsigned char **, unsigned int, unsigned int *);
 
 /*
  * file_addGssCredEntry
@@ -246,8 +253,15 @@ static int matchEntry(const char *entry, const gss_buffer_t name,
 		const char *uid, uid_t *uidOut)
 {
 	char fullEntry[MAX_ENTRY_LEN+1], *item;
+	unsigned char *buf;
 	char dilims[] = "\t \n";
-
+	int length;
+	unsigned int dummy;
+	OM_uint32 minor, result;
+	gss_buffer_desc mechOidDesc = GSS_C_EMPTY_BUFFER;
+	gss_name_t intName;
+	gss_buffer_desc expName;
+	char *krb5_oid = "\052\206\110\206\367\022\001\002\002";
 
 	if (entry == NULL || isspace(*entry))
 		return (0);
@@ -264,9 +278,71 @@ static int matchEntry(const char *entry, const gss_buffer_t name,
 		if (strlen(item) < name->length)
 			return (0);
 
-		/* check if the prefix of the name matches */
-		if (memcmp(item, name->value, name->length) != 0)
-			return (0);
+		if (memcmp(item, name->value, name->length) != 0) {
+
+			buf = (unsigned char *)name->value;
+			buf += expNameTokIdLen;
+
+			/* skip oid length - get to der */
+			buf += 2;
+
+			/* skip oid tag */
+			buf++;
+
+			/* get oid length */
+			length = get_der_length(&buf,
+				(name->length - expNameTokIdLen
+				- mechOidLenLen - mechOidTagLen), &dummy);
+
+			if (length == -1)
+				return (0);
+
+			mechOidDesc.length = length;
+
+			/*
+			 * check whether exported name length is within the
+			 * boundary.
+			 */
+			if (name->length <
+				(expNameTokIdLen + mechOidLenLen + length
+					+ dummy + mechOidTagLen))
+				return (0);
+
+			mechOidDesc.value = buf;
+
+			buf += dummy + mechOidDesc.length;
+
+			/*
+			 * If the mechoid is that of Kerberos and if the
+			 * "display" part of the exported file name starts and
+			 * ends with a zero-valued byte, then we are dealing
+			 * with old styled gsscred entries. We will then match
+			 * them in the following manner:
+			 *	- gss_import_name() the name from the file
+			 *	- gss_export_name() the result
+			 *	- mem_cmp() the result with the name we are
+			 *		trying to match.
+			 */
+			if (mechOidDesc.length == 9 &&
+				(memcmp(buf, krb5_oid,
+						mechOidDesc.length) == 0) &&
+				(*buf == '\0' && buf[length] == '\0')) {
+				if (gss_import_name(&minor, name,
+						GSS_C_NT_EXPORT_NAME,
+						&intName) != GSS_S_COMPLETE)
+					return (0);
+				result = gss_export_name(&minor, intName,
+								&expName);
+				(void) gss_release_name(&minor, &intName);
+				if (result != GSS_S_COMPLETE)
+					return (0);
+				result = memcmp(item, expName.value,
+							expName.length);
+				(void) gss_release_buffer(&minor, &expName);
+				if (result != 0)
+					return (0);
+			}
+		}
 
 		/* do we need to check the uid - if not then we found it */
 		if (uid == NULL) {
