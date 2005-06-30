@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -594,6 +594,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	uint_t evtype;
 	restarter_inst_t *inst = *instp;
 	int id = inst->ri_id;
+	int forkerr;
 
 	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
 	assert(instance_in_transition(inst));
@@ -764,15 +765,20 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		}
 	}
 
-	pid = startd_fork1(NULL);
+	pid = startd_fork1(&forkerr);
 	if (pid == 0)
 		exec_method(inst, type, method, mcp, need_session);
 
 	if (pid == -1) {
+		if (forkerr == EAGAIN)
+			result = EAGAIN;
+		else
+			result = EFAULT;
+
 		log_error(LOG_WARNING,
-		    "%s: Couldn't fork to execute method %s\n",
-		    inst->ri_i.i_fmri, method);
-		result = EFAULT;
+		    "%s: Couldn't fork to execute method %s: %s\n",
+		    inst->ri_i.i_fmri, method, strerror(forkerr));
+
 		goto out;
 	}
 
