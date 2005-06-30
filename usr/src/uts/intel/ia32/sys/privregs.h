@@ -119,11 +119,11 @@ struct regs {
  * check in cmnint valid.
  */
 #define	__SEGREGS_LOAD_KERNEL	\
-	movw	$KDS_SEL, %ax;	\
+	movw	$KDS_SEL, %cx;	\
+	movw	%cx, %ds;	\
+	movw	%cx, %es;	\
 	movw	$KFS_SEL, %cx;	\
 	movw	$KGS_SEL, %dx;	\
-	movw	%ax, %ds;	\
-	movw	%ax, %es;	\
 	movw	%cx, %fs;	\
 	movw	%dx, %gs;
 
@@ -197,18 +197,20 @@ struct regs {
 #define	SYSCALL_PUSH			\
 	pusha;				\
 	__SEGREGS_PUSH			\
-	__FRAME_PUSH			\
+	subl	$8, %esp;		\
 	pushfl;				\
 	popl	%ecx;			\
 	orl	$PS_IE, %ecx;		\
 	movl	%ecx, REGOFF_EFL(%esp);	\
+	movl	$0, REGOFF_SAVPC(%esp);	\
 	movl	$0, REGOFF_SAVFP(%esp);	\
 	__SEGREGS_LOAD_KERNEL
 
 #define	SYSENTER_PUSH			\
 	pusha;				\
 	__SEGREGS_PUSH			\
-	__FRAME_PUSH			\
+	subl	$8, %esp;		\
+	movl	$0, REGOFF_SAVPC(%esp);	\
 	movl	$0, REGOFF_SAVFP(%esp);	\
 	__SEGREGS_LOAD_KERNEL
 
