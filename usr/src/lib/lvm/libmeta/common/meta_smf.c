@@ -323,7 +323,7 @@ online(char *svc_names[], char **names)
 				p = Malloc(sz);
 				(void) snprintf(p, sz, "%s\n\t%s", *names,
 				    svc_names[i]);
-				Free(names);
+				Free(*names);
 			}
 
 			*names = p;

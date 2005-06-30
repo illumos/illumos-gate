@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # SVM Flash cleanup
@@ -54,20 +54,66 @@ if [ "${FLASH_TYPE}" = "FULL" ]; then
 	' ${IN_SYS} > ${TMP_SYS}
 	cp ${TMP_SYS} ${IN_SYS}
 
-	# Remove SVM mddb entries from /kernel/drv/md.conf.
-	nawk '
-	BEGIN {delmddb=0}
-	/^# Begin MDD database info \(do not edit\)$/ {delmddb=1}
-	/^# End MDD database info \(do not edit\)$/ {delmddb=0; next}
-	{if (delmddb == 0) print $0}
-	' ${IN_CONF} > ${TMP_CONF}
-	cp ${TMP_CONF} ${IN_CONF}
+	# Check if we are on the mini-root.  If we are, we need to clean up the
+	# mddb configuration since this implies we are doing a full flash onto
+	# a fresh system.
+	#
+	# If we are not on the mini-root that must mean we are installing
+	# the full flash via live-upgrade.  In that case we share the
+	# SVM configuration with the currently running system so we
+	# need to copy the md.conf file from the current root onto the
+	# newly installed root.  Note that the flash archive might not have
+	# been created from the currently running system.
+	if [ -h /kernel/drv/md.conf ]; then
+		# Remove SVM mddb entries from /kernel/drv/md.conf.
+		nawk '
+		BEGIN {delmddb=0}
+		/^# Begin MDD database info \(do not edit\)$/ {delmddb=1}
+		/^# End MDD database info \(do not edit\)$/ {delmddb=0; next}
+		{if (delmddb == 0) print $0}
+		' ${IN_CONF} > ${TMP_CONF}
+		cp ${TMP_CONF} ${IN_CONF}
 
-	# Remove SVM mddb entries from /etc/lvm/mddb.cf.
-	nawk '
-	/^#/ {print $0}
-	' ${IN_CF} > ${TMP_CF}
-	cp ${TMP_CF} ${IN_CF}
+		# Remove SVM mddb entries from /etc/lvm/mddb.cf.
+		nawk '
+		/^#/ {print $0}
+		' ${IN_CF} > ${TMP_CF}
+		cp ${TMP_CF} ${IN_CF}
+
+	else
+		# copy SVM config from current root to new root
+		cp /kernel/drv/md.conf ${IN_CONF}
+		cp /etc/lvm/mddb.cf ${IN_CF}
+	fi
+
+	# We may need to enable the SVM services in SMF.  This could happen
+	# if we used jumpstart or live-upgrade to create SVM volumes as
+	# part of the flash install.
+	#
+	# It doesn't matter if we are doing a flash install via a jumpstart
+	# on the mini-root or via a live-upgrade.  In both cases we check
+	# the md.conf on the currently running root to see if SVM is
+	# configured.  For the jumpstart case it will have setup the
+	# volumes already so the mini-root md.conf has the mddb info.  For
+	# the live-upgade case both roots will be sharing the same md.conf
+	# and have the same view of the SVM configuration.
+	#
+	# Check if there are mddb entries in md.conf to determine if SVM is
+	# configured.
+	sed -e 's/#.*$//' /kernel/drv/md.conf | \
+	    egrep '^[    ]*mddb_bootlist' >/dev/null 2>&1
+	MDDB_STATUS=$?
+
+	if [ $MDDB_STATUS -eq 0 ]; then
+		echo "/usr/sbin/svcadm enable system/metainit:default" >> \
+		    ${FLASH_ROOT}/var/svc/profile/upgrade
+
+		echo "/usr/sbin/svcadm enable system/mdmonitor:default" >> \
+		    ${FLASH_ROOT}/var/svc/profile/upgrade
+
+		echo "/usr/sbin/svcadm enable network/rpc/meta:default" >> \
+		    ${FLASH_ROOT}/var/svc/profile/upgrade
+	fi
 
 else
 	# Differential flash install, restore clone SVM configuration.
