@@ -1611,8 +1611,7 @@ ck_p_sz(struct passwd *pwp)
 		sprintf(ctp, "%d", pwp->pw_gid) +
 		(int)strlen(pwp->pw_comment) +
 		(int)strlen(pwp->pw_dir)	+
-		(int)strlen(pwp->pw_shell) + 6) > (ENTRY_LENGTH-1))
-	{
+		(int)strlen(pwp->pw_shell) + 6) > (ENTRY_LENGTH-1)) {
 		rid_tmpf();
 		bad_arg("New password entry too long");
 	}
@@ -1634,8 +1633,7 @@ ck_s_sz(struct spwd *ssp)
 		sprintf(ctp, "%d", ssp->sp_max) +
 		sprintf(ctp, "%d", ssp->sp_warn) +
 		sprintf(ctp, "%d", ssp->sp_inact) +
-		sprintf(ctp, "%d", ssp->sp_expire) + 7) > (ENTRY_LENGTH - 1))
-	{
+		sprintf(ctp, "%d", ssp->sp_expire) + 7) > (ENTRY_LENGTH - 1)) {
 		rid_tmpf();
 		bad_arg("New password entry too long");
 	}

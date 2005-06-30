@@ -227,17 +227,14 @@ main(int argc, char *argv[])
 
 		/*	Check number of fields	*/
 
-		for (i = 0; buf[i] != NULL; i++)
-		{
-			if (buf[i] == ':')
-			{
+		for (i = 0; buf[i] != NULL; i++) {
+			if (buf[i] == ':') {
 				delim[colons] = i;
 				if (++colons > NUM_COLONS)
 					break;
 			}
 		}
-		if (colons != NUM_COLONS)
-		{
+		if (colons != NUM_COLONS) {
 			error(BADLINE);
 			free(tmpbuf);
 			continue;
@@ -248,10 +245,8 @@ main(int argc, char *argv[])
 
 		if (buf[0] == ':')
 			error(NONAME);
-		else
-		{
-			for (i = 0; buf[i] != ':'; i++)
-			{
+		else {
+			for (i = 0; buf[i] != ':'; i++) {
 				if (i >= LOGNAME_MAX)
 					longnam++;
 				if (!(islower(buf[i]) || isdigit(buf[i])))
@@ -270,8 +265,7 @@ main(int argc, char *argv[])
 		if (len > 10 || len < 1)
 			error(BADGID);
 		else {
-			for (i = (delim[1]+1); i < delim[2]; i++)
-			{
+			for (i = (delim[1]+1); i < delim[2]; i++) {
 				if (! (isdigit(buf[i])))
 					baddigit++;
 				else if (baddigit == 0)
@@ -291,11 +285,9 @@ main(int argc, char *argv[])
 
 		listlen = strlen(nptr) - 1;
 
-		while ((cptr = strchr(nptr, ',')) != NULL)
-		{
+		while ((cptr = strchr(nptr, ',')) != NULL) {
 			*cptr = NULL;
-			if (*nptr == NULL)
-			{
+			if (*nptr == NULL) {
 				if (listlen)
 					error(NULLNAME);
 				nptr++;
@@ -396,34 +388,28 @@ void
 error(char *msg)
 {
 	code = 1;
-	if (eflag == 0)
-	{
+	if (eflag == 0) {
 		fprintf(stderr, "\n\n%s", buf);
 		eflag = 1;
 	}
-	if (longnam != 0)
-	{
+	if (longnam != 0) {
 		fprintf(stderr, "\t%s\n", gettext(msg));
 		longnam = 0;
 		return;
 	}
-	if (badchar != 0)
-	{
+	if (badchar != 0) {
 		fprintf(stderr, "\t%d %s\n", badchar, gettext(msg));
 		badchar = 0;
 		return;
-	} else if (baddigit != 0)
-	{
+	} else if (baddigit != 0) {
 		fprintf(stderr, "\t%s\n", gettext(msg));
 		baddigit = 0;
 		return;
-	} else if (badlognam != 0)
-	{
+	} else if (badlognam != 0) {
 		fprintf(stderr, "\t%s - %s\n", nptr, gettext(msg));
 		badlognam = 0;
 		return;
-	} else
-	{
+	} else {
 		fprintf(stderr, "\t%s\n", gettext(msg));
 		return;
 	}
