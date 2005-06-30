@@ -42,6 +42,10 @@ extern "C" {
 #define	PCITOOL_USER_VERSION	1
 #define	PCITOOL_DRVR_VERSION	1
 
+/* File suffixes for nexus pcitool nodes. */
+#define	PCI_MINOR_REG	"reg"
+#define	PCI_MINOR_INTR	"intr"
+
 /*
  * Ioctls for PCI tools.
  */

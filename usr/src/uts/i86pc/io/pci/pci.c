@@ -52,7 +52,6 @@
 #include <sys/pci_tools_var.h>
 #include "pci_var.h"
 
-
 /* Save minimal state. */
 void *pci_statep;
 
@@ -119,7 +118,7 @@ static int pci_prop_op(dev_t dev, dev_info_t *devi, ddi_prop_op_t prop_op,
  * One goal here is to leverage off of the pcihp.c source without making
  * changes to it.  Call into it's cb_ops directly if needed, piggybacking
  * anything else needed by the pci_tools.c module.  Only pci_tools and pcihp
- * will be using the PCI devctl node.
+ * will be opening PCI nexus driver file descriptors.
  */
 
 struct cb_ops pci_cb_ops = {
@@ -171,7 +170,7 @@ static int pci_removechild(dev_info_t *child);
 static int pci_initchild(dev_info_t *child);
 
 /*
- * Miscellaneous internal function
+ * Miscellaneous internal functions
  */
 static int pci_get_reg_prop(dev_info_t *dip, pci_regspec_t *pci_rp);
 
@@ -273,7 +272,7 @@ pci_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * Use the minor number as constructed by pcihp, as the index value to
 	 * ddi_soft_state_zalloc.
 	 */
-	int minor = DIP_TO_MINOR(devi);
+	int instance = ddi_get_instance(devi);
 	pci_state_t *pcip = NULL;
 
 	if (ddi_prop_update_string(DDI_DEV_T_NONE, devi, "device_type", "pci")
@@ -281,12 +280,12 @@ pci_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		cmn_err(CE_WARN, "pci:  'device_type' prop create failed");
 	}
 
-	if (ddi_soft_state_zalloc(pci_statep, minor) == DDI_SUCCESS) {
-		pcip = ddi_get_soft_state(pci_statep, minor);
+	if (ddi_soft_state_zalloc(pci_statep, instance) == DDI_SUCCESS) {
+		pcip = ddi_get_soft_state(pci_statep, instance);
 	}
 
 	if (pcip == NULL) {
-		return (DDI_FAILURE);
+		goto bad_soft_state;
 	}
 
 	pcip->pci_dip = devi;
@@ -299,23 +298,35 @@ pci_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 */
 	if (pcihp_init(devi) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "pci: Failed to setup hotplug framework");
-		ddi_soft_state_free(pci_statep, minor);
-		return (DDI_FAILURE);
+		goto bad_pcihp_init;
+	}
+
+	if (pcitool_init(devi) != DDI_SUCCESS) {
+		goto bad_pcitool_init;
 	}
 
 	ddi_report_dev(devi);
 
 	return (DDI_SUCCESS);
+
+bad_pcitool_init:
+	(void) pcihp_uninit(devi);
+bad_pcihp_init:
+	ddi_soft_state_free(pci_statep, instance);
+bad_soft_state:
+	return (DDI_FAILURE);
 }
 
 /*ARGSUSED*/
 static int
 pci_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
-	/*
-	 * Uninitialize hotplug support on this bus.
-	 */
+	/* Uninitialize pcitool support. */
+	pcitool_uninit(devi);
+
+	/* Uninitialize hotplug support on this bus. */
 	(void) pcihp_uninit(devi);
+
 	ddi_soft_state_free(pci_statep, DIP_TO_MINOR(devi));
 
 	return (DDI_SUCCESS);
@@ -658,7 +669,7 @@ pci_get_nintrs(dev_info_t *dip, int type, int *nintrs)
 /* ARGSUSED */
 static int
 pci_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
-    ddi_intr_handle_impl_t *hdlp, void *result)
+	ddi_intr_handle_impl_t *hdlp, void *result)
 {
 	int			priority = 0;
 	int			psm_status = 0;
@@ -1012,7 +1023,7 @@ pci_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 static int
 pci_enable_intr(dev_info_t *pdip, dev_info_t *rdip,
-    ddi_intr_handle_impl_t *hdlp, uint32_t inum)
+	ddi_intr_handle_impl_t *hdlp, uint32_t inum)
 {
 	int		vector;
 	struct intrspec	*ispec;
@@ -1043,7 +1054,7 @@ pci_enable_intr(dev_info_t *pdip, dev_info_t *rdip,
 
 static void
 pci_disable_intr(dev_info_t *pdip, dev_info_t *rdip,
-    ddi_intr_handle_impl_t *hdlp, uint32_t inum)
+	ddi_intr_handle_impl_t *hdlp, uint32_t inum)
 {
 	int		vector;
 	struct intrspec	*ispec;
@@ -1619,16 +1630,17 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 {
 	int rv = ENOTTY;
 
-	if (IS_DEVCTL(cmd)) {
-		return ((pcihp_cb_ops.cb_ioctl)(dev, cmd, arg, mode,
-		    credp, rvalp));
-	}
+	minor_t minor = getminor(dev);
 
-	/*
-	 * PCI tools.
-	 */
+	switch (PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
+	case PCIHP_DEVCTL_MINOR:
+		if (IS_DEVCTL(cmd))
+			rv = (pcihp_cb_ops.cb_ioctl)(dev, cmd, arg, mode,
+			    credp, rvalp);
+		break;
 
-	if ((cmd & ~IOCPARM_MASK) == PCITOOL_IOC) {
+	case PCI_TOOL_REG_MINOR_NUM:
+
 		switch (cmd) {
 		case PCITOOL_DEVICE_SET_REG:
 		case PCITOOL_DEVICE_GET_REG:
@@ -1651,10 +1663,15 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				rv = pcitool_bus_reg_ops(
 				    dev, (void *)arg, cmd, mode);
 			break;
+		}
+		break;
 
+	case PCI_TOOL_INTR_MINOR_NUM:
+
+		switch (cmd) {
 		case PCITOOL_DEVICE_SET_INTR:
 
-			/* Require PRIV_SYS_RES_CONFIG */
+			/* Require PRIV_SYS_RES_CONFIG, same as psradm */
 			if (secpolicy_ponline(credp)) {
 				rv = EPERM;
 				break;
@@ -1666,11 +1683,11 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		case PCITOOL_DEVICE_NUM_INTR:
 			rv = pcitool_intr_admn(dev, (void *)arg, cmd, mode);
 			break;
-
-		default:
-			rv = ENOTTY;
-			break;
 		}
+		break;
+
+	default:
+		break;
 	}
 
 	return (rv);
@@ -1678,7 +1695,7 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 static int
 pci_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
-    int flags, char *name, caddr_t valuep, int *lengthp)
+	int flags, char *name, caddr_t valuep, int *lengthp)
 {
 	return ((pcihp_cb_ops.cb_prop_op)(dev, dip, prop_op, flags,
 	    name, valuep, lengthp));

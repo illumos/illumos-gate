@@ -26,18 +26,21 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/stat.h>
+#include <sys/sunddi.h>
+#include <sys/param.h>
+
 #include <sys/sysmacros.h>
 #include <sys/machsystm.h>
 #include <sys/promif.h>
 #include <sys/cpuvar.h>
 
-#include <sys/pci/pci_regs.h>
 #include <sys/pci/pci_obj.h>
 #include <sys/hotplug/pci/pcihp.h>
 
-#include <sys/pci/pci_tools_impl.h>
 #include <sys/pci_tools.h>
 #include <sys/pci_tools_var.h>
+#include <sys/pci/pci_tools_impl.h>
 
 /*
  * Extract 64 bit parent or size values from 32 bit cells of
@@ -52,6 +55,8 @@
 #define	PCI_GET_RANGE_PROP_SIZE(ranges, bank) \
 	((((uint64_t)(ranges[bank].size_high)) << 32) | \
 	ranges[bank].size_low)
+
+#define	PCI_BAR_OFFSET(x)	(pci_bars[x.barnum])
 
 /* Big and little endian as boolean values. */
 #define	BE B_TRUE
@@ -84,16 +89,23 @@ static uint8_t pci_bars[] = {
 
 /*LINTLIBRARY*/
 
-static int pci_safe_phys_peek(pci_t *, boolean_t, size_t, uint64_t, uint64_t *);
-static int pci_safe_phys_poke(pci_t *, boolean_t, size_t, uint64_t, uint64_t);
-static int pci_validate_cpuid(uint32_t);
-static uint8_t ib_get_ino_devs(ib_t *ib_p, uint32_t ino, uint8_t *devs_ret,
-    pcitool_intr_dev_t *devs);
-static int pci_access(pci_t *, uint64_t, uint64_t, uint64_t *,
-    uint8_t, boolean_t, boolean_t, uint32_t *);
-static int pcitool_intr_get_max_ino(uint32_t *, int);
-static int pcitool_get_intr(dev_info_t *, void *, int, pci_t *);
-static int pcitool_set_intr(dev_info_t *, void *, int, pci_t *);
+static int pcitool_phys_peek(pci_t *pci_p, boolean_t type, size_t size,
+    uint64_t paddr, uint64_t *value_p);
+static int pcitool_phys_poke(pci_t *pci_p, boolean_t type, size_t size,
+    uint64_t paddr, uint64_t value);
+static boolean_t pcitool_validate_cpuid(uint32_t cpu_id);
+static int pcitool_access(pci_t *pci_p, uint64_t phys_addr, uint64_t max_addr,
+    uint64_t *data, uint8_t size, boolean_t write, boolean_t endian,
+    uint32_t *pcitool_status);
+static int pcitool_validate_barnum_bdf(pcitool_reg_t *prg);
+static int pcitool_get_bar(pci_t *pci_p, pcitool_reg_t *prg,
+    uint64_t config_base_addr, uint64_t config_max_addr, uint64_t *bar,
+    boolean_t *is_io_space);
+static int pcitool_config_request(pci_t *pci_p, pcitool_reg_t *prg,
+    uint64_t base_addr, uint64_t max_addr, uint8_t size, boolean_t write_flag);
+static int pcitool_intr_get_max_ino(uint32_t *arg, int mode);
+static int pcitool_get_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p);
+static int pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p);
 
 extern int pci_do_phys_peek(size_t, uint64_t, uint64_t *, int);
 extern int pci_do_phys_poke(size_t, uint64_t, uint64_t *, int);
@@ -107,12 +119,12 @@ extern int pci_do_phys_poke(size_t, uint64_t, uint64_t *, int);
  * value_p is where the value is returned.
  */
 static int
-pci_safe_phys_peek(pci_t *pci_p, boolean_t type, size_t size, uint64_t paddr,
-    uint64_t *value_p)
+pcitool_phys_peek(pci_t *pci_p, boolean_t type, size_t size,
+	uint64_t paddr, uint64_t *value_p)
 {
 	on_trap_data_t otd;
 	int err = DDI_SUCCESS;
-	peek_poke_value_t peek_value;	/* XXX Take glbl data structure type. */
+	peek_poke_value_t peek_value;
 
 	pbm_t *pbm_p = pci_p->pci_pbm_p;
 
@@ -169,8 +181,8 @@ pci_safe_phys_peek(pci_t *pci_p, boolean_t type, size_t size, uint64_t paddr,
  * value contains the value to be written.
  */
 static int
-pci_safe_phys_poke(pci_t *pci_p, boolean_t type, size_t size, uint64_t paddr,
-    uint64_t value)
+pcitool_phys_poke(pci_t *pci_p, boolean_t type, size_t size,
+	uint64_t paddr, uint64_t value)
 {
 	on_trap_data_t otd;
 	int err = DDI_SUCCESS;
@@ -230,66 +242,17 @@ pci_safe_phys_poke(pci_t *pci_p, boolean_t type, size_t size, uint64_t paddr,
 
 /*
  * Validate the cpu_id passed in.
- * A value of 1 will be returned for success and zero for failure.
+ * A value of B_TRUE will be returned for success.
  */
-static int
-pci_validate_cpuid(uint32_t cpu_id)
+static boolean_t
+pcitool_validate_cpuid(uint32_t cpuid)
 {
-	extern cpu_t	*cpu[NCPU];
-	int rval = 1;
+	extern const int _ncpu;
+	extern cpu_t	*cpu[];
 
 	ASSERT(mutex_owned(&cpu_lock));
 
-	if (cpu_id >= NCPU) {
-		rval = 0;
-
-	} else if (cpu[cpu_id] == NULL) {
-		rval = 0;
-
-	} else if (!(cpu_is_online(cpu[cpu_id]))) {
-		rval = 0;
-	}
-
-	return (rval);
-}
-
-
-/*
- * Return the dips or number of dips associated with a given interrupt block.
- * Size of dips array arg is passed in as dips_ret arg.
- * Number of dips returned is returned in dips_ret arg.
- * Array of dips gets returned in the dips argument.
- * Function returns number of dips existing for the given interrupt block.
- *
- */
-uint8_t
-ib_get_ino_devs(
-    ib_t *ib_p, uint32_t ino, uint8_t *devs_ret, pcitool_intr_dev_t *devs)
-{
-	ib_ino_info_t *ino_p;
-	ih_t *ih_p;
-	uint32_t num_devs = 0;
-	int i;
-
-	mutex_enter(&ib_p->ib_ino_lst_mutex);
-	ino_p = ib_locate_ino(ib_p, ino);
-	if (ino_p != NULL) {
-		num_devs = ino_p->ino_ih_size;
-		for (i = 0, ih_p = ino_p->ino_ih_head;
-		    ((i < ino_p->ino_ih_size) && (i < *devs_ret));
-		    i++, ih_p = ih_p->ih_next) {
-		    (void) strncpy(devs[i].driver_name,
-			    ddi_driver_name(ih_p->ih_dip), MAXMODCONFNAME-1);
-			devs[i].driver_name[MAXMODCONFNAME] = '\0';
-			(void) ddi_pathname(ih_p->ih_dip, devs[i].path);
-			devs[i].dev_inst = ddi_get_instance(ih_p->ih_dip);
-		}
-		*devs_ret = i;
-	}
-
-	mutex_exit(&ib_p->ib_ino_lst_mutex);
-
-	return (num_devs);
+	return ((cpuid < _ncpu) && (cpu[cpuid] && cpu_is_online(cpu[cpuid])));
 }
 
 
@@ -402,9 +365,7 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 			 * extracted from the bridge.
 			 */
 			iget->ctlr = 0;
-			iget->cpu_id =
-			    (imregval & COMMON_INTR_MAP_REG_TID) >>
-			    COMMON_INTR_MAP_REG_TID_SHIFT;
+			iget->cpu_id = ib_map_reg_get_cpu(imregval);
 		}
 	}
 done_get_intr:
@@ -423,7 +384,6 @@ done_get_intr:
 	return (rval);
 }
 
-
 /*
  * Associate a new CPU with a given ino.
  *
@@ -432,32 +392,25 @@ done_get_intr:
 static int
 pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 {
+	ib_t *ib_p = pci_p->pci_ib_p;
+	int rval = SUCCESS;
+
 	uint8_t zero = 0;
 	pcitool_intr_set_t iset;
 	uint32_t old_cpu_id;
 	hrtime_t start_time;
-	ib_t *ib_p = pci_p->pci_ib_p;
 	uint64_t imregval;
 	uint64_t new_imregval;
 	volatile uint64_t *imregp;
 	volatile uint64_t *idregp;
-	int rval = SUCCESS;
 
 	if (ddi_copyin(arg, &iset, sizeof (pcitool_intr_set_t), mode) !=
-	    DDI_SUCCESS) {
-
+	    DDI_SUCCESS)
 		return (EFAULT);
-	}
 
-	/* Validate input argument. */
-	if (iset.ino > PCI_MAX_INO) {
-		iset.status = PCITOOL_INVALID_INO;
-		rval = EINVAL;
-		goto done_set_intr;
-	}
-
-	/* Validate that ino given belongs to a device. */
-	if (ib_get_ino_devs(ib_p, iset.ino, &zero, NULL) == 0) {
+	/* Validate input argument and that ino given belongs to a device. */
+	if ((iset.ino > PCI_MAX_INO) ||
+	    (ib_get_ino_devs(ib_p, iset.ino, &zero, NULL) == 0)) {
 		iset.status = PCITOOL_INVALID_INO;
 		rval = EINVAL;
 		goto done_set_intr;
@@ -472,13 +425,10 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 
 	/* Save original mapreg value. */
 	imregval = *imregp;
-
 	DEBUG1(DBG_TOOLS, dip, "orig mapreg value: 0x%llx\n", imregval);
 
 	/* Is this request a noop? */
-	old_cpu_id = (imregval & COMMON_INTR_MAP_REG_TID) >>
-		COMMON_INTR_MAP_REG_TID_SHIFT;
-	if (old_cpu_id == iset.cpu_id) {
+	if ((old_cpu_id = ib_map_reg_get_cpu(imregval)) == iset.cpu_id) {
 		iset.status = PCITOOL_SUCCESS;
 		goto done_set_intr;
 	}
@@ -497,18 +447,15 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 	/* Wait until there are no more pending interrupts. */
 	start_time = gethrtime();
 
-	DEBUG0(DBG_TOOLS, dip,
-	    "About to check for pending interrupts...\n");
+	DEBUG0(DBG_TOOLS, dip, "About to check for pending interrupts...\n");
 
 	while (IB_INO_INTR_PENDING(idregp, iset.ino)) {
 
 		DEBUG0(DBG_TOOLS, dip, "Waiting for pending ints to clear\n");
-
-		if ((gethrtime() - start_time) < pci_intrpend_timeout) {
+		if ((gethrtime() - start_time) < pci_intrpend_timeout)
 			continue;
 
-		/* Timed out waiting. */
-		} else {
+		else {	/* Timed out waiting. */
 			iset.status = PCITOOL_PENDING_INTRTIMEOUT;
 			rval = ETIME;
 			goto done_set_intr;
@@ -520,28 +467,31 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 	DEBUG1(DBG_TOOLS, dip,
 	    "after disabling intr, mapreg value: 0x%llx\n", new_imregval);
 
-	/* Prepare new mapreg value with interrupts enabled and new cpu_id. */
-	new_imregval = (new_imregval | COMMON_INTR_MAP_REG_VALID) &
-	    ~COMMON_INTR_MAP_REG_TID;
-	new_imregval |= (iset.cpu_id << COMMON_INTR_MAP_REG_TID_SHIFT);
-
 	/*
 	 * Get lock, validate cpu and write new mapreg value.
 	 * Return original cpu value to caller via iset.cpu_id.
 	 */
 	mutex_enter(&cpu_lock);
-	if (pci_validate_cpuid(iset.cpu_id)) {
+	if (pcitool_validate_cpuid(iset.cpu_id)) {
+
+		/* Prepare new mapreg value with intr enabled and new cpu_id. */
+		new_imregval &=
+		    COMMON_INTR_MAP_REG_IGN | COMMON_INTR_MAP_REG_INO;
+		new_imregval = ib_get_map_reg(new_imregval, iset.cpu_id);
 
 		DEBUG1(DBG_TOOLS, dip, "Writing new mapreg value:0x%llx\n",
 		    new_imregval);
 
 		*imregp = new_imregval;
+
+		ib_log_new_cpu(ib_p, old_cpu_id, iset.cpu_id, iset.ino);
+
 		mutex_exit(&cpu_lock);
+
 		iset.cpu_id = old_cpu_id;
 		iset.status = PCITOOL_SUCCESS;
 
-	/* Invalid cpu.  Restore original register image. */
-	} else {
+	} else {	/* Invalid cpu.  Restore original register image. */
 
 		DEBUG0(DBG_TOOLS, dip,
 		    "Invalid cpuid: writing orig mapreg value\n");
@@ -554,9 +504,8 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 done_set_intr:
 	iset.drvr_version = PCITOOL_DRVR_VERSION;
 	if (ddi_copyout(&iset, arg, sizeof (pcitool_intr_set_t), mode) !=
-	    DDI_SUCCESS) {
+	    DDI_SUCCESS)
 		rval = EFAULT;
-	}
 
 	return (rval);
 }
@@ -596,9 +545,9 @@ pcitool_intr_admn(dev_t dev, void *arg, int cmd, int mode)
 
 
 /*
- * Wrapper around pci_safe_phys_peek/poke.
+ * Wrapper around pcitool_phys_peek/poke.
  *
- * Validates arguments and calls pci_safe_phys_peek/poke appropriately.
+ * Validates arguments and calls pcitool_phys_peek/poke appropriately.
  *
  * Dip is of the nexus,
  * phys_addr is the address to write in physical space,
@@ -608,9 +557,9 @@ pcitool_intr_admn(dev_t dev, void *arg, int cmd, int mode)
  * other args are self-explanatory.
  */
 static int
-pci_access(pci_t *pci_p, uint64_t phys_addr, uint64_t max_addr,
-    uint64_t *data, uint8_t size, boolean_t write, boolean_t endian,
-    uint32_t *pcitool_status)
+pcitool_access(pci_t *pci_p, uint64_t phys_addr, uint64_t max_addr,
+	uint64_t *data, uint8_t size, boolean_t write, boolean_t endian,
+	uint32_t *pcitool_status)
 {
 
 	int rval = SUCCESS;
@@ -636,13 +585,13 @@ pci_access(pci_t *pci_p, uint64_t phys_addr, uint64_t max_addr,
 	} else if (write) {
 
 		DEBUG3(DBG_PHYS_ACC, dip,
-		    "%d byte %s pci_safe_phys_poke at addr 0x%llx\n",
+		    "%d byte %s pcitool_phys_poke at addr 0x%llx\n",
 		    size, (endian ? "BE" : "LE"), phys_addr);
 
-		if (pci_safe_phys_poke(pci_p, endian, size, phys_addr, *data) !=
-		    DDI_SUCCESS) {
+		if (pcitool_phys_poke(pci_p, endian, size, phys_addr,
+		    *data) != DDI_SUCCESS) {
 			DEBUG3(DBG_PHYS_ACC, dip,
-			    "%d byte %s pci_safe_phys_poke at addr "
+			    "%d byte %s pcitool_phys_poke at addr "
 			    "0x%llx failed\n",
 			    size, (endian ? "BE" : "LE"), phys_addr);
 			*pcitool_status = PCITOOL_INVALID_ADDRESS;
@@ -650,17 +599,16 @@ pci_access(pci_t *pci_p, uint64_t phys_addr, uint64_t max_addr,
 			rval = EFAULT;
 		}
 
-	/* Read */
-	} else {
+	} else {	/* Read */
 
 		DEBUG3(DBG_PHYS_ACC, dip,
-		    "%d byte %s pci_safe_phys_peek at addr 0x%llx\n",
+		    "%d byte %s pcitool_phys_peek at addr 0x%llx\n",
 		    size, (endian ? "BE" : "LE"), phys_addr);
 
-		if (pci_safe_phys_peek(pci_p, endian, size, phys_addr, data) !=
-		    DDI_SUCCESS) {
+		if (pcitool_phys_peek(pci_p, endian, size, phys_addr,
+		    data) != DDI_SUCCESS) {
 			DEBUG3(DBG_PHYS_ACC, dip,
-			    "%d byte %s pci_safe_phys_peek at addr "
+			    "%d byte %s pcitool_phys_peek at addr "
 			    "0x%llx failed\n",
 			    size, (endian ? "BE" : "LE"), phys_addr);
 			*pcitool_status = PCITOOL_INVALID_ADDRESS;
@@ -680,82 +628,67 @@ pcitool_bus_reg_ops(dev_t dev, void *arg, int cmd, int mode)
 
 	pci_t			*pci_p = DEV_TO_SOFTSTATE(dev);
 	dev_info_t		*dip = pci_p->pci_dip;
-	pci_nexus_regspec_t	*pci_rp;
+	pci_nexus_regspec_t	*pci_rp = NULL;
+	boolean_t		write_flag = B_FALSE;
 	pcitool_reg_t		prg;
 	uint64_t		base_addr;
 	uint64_t		max_addr;
 	uint32_t		reglen;
-	uint32_t		numbanks = 0;
 	uint8_t			size;
 	uint32_t		rval = 0;
-	boolean_t		write_flag = B_FALSE;
 
-	switch (cmd) {
-	case PCITOOL_NEXUS_SET_REG:
+	if (cmd == PCITOOL_NEXUS_SET_REG)
 		write_flag = B_TRUE;
 
-	/*FALLTHRU*/
-	case PCITOOL_NEXUS_GET_REG:
-		DEBUG0(DBG_TOOLS, dip,
-		    "pcitool_bus_reg_ops nexus set/get reg\n");
+	DEBUG0(DBG_TOOLS, dip, "pcitool_bus_reg_ops nexus set/get reg\n");
 
-		/* Read data from userland. */
-		if (ddi_copyin(arg, &prg, sizeof (pcitool_reg_t), mode) !=
-		    DDI_SUCCESS) {
-			DEBUG0(DBG_TOOLS, dip, "Error reading arguments\n");
-			return (EFAULT);
-		}
-
-		/*
-		 * Read reg property which contains starting addr
-		 * and size of banks.
-		 */
-		if (ddi_prop_lookup_int_array(
-		    DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		    "reg", (int **)&pci_rp, &reglen) == DDI_SUCCESS) {
-			if (((reglen * sizeof (int)) %
-			    sizeof (pci_nexus_regspec_t)) != 0) {
-				DEBUG0(DBG_TOOLS, dip,
-				    "reg prop not well-formed");
-				prg.status = PCITOOL_REGPROP_NOTWELLFORMED;
-				rval = EIO;
-				goto done;
-			}
-		}
-
-		numbanks =
-		    (reglen * sizeof (int)) / sizeof (pci_nexus_regspec_t);
-
-		/* Bounds check the bank number. */
-		if (prg.barnum >= numbanks) {
-			prg.status = PCITOOL_OUT_OF_RANGE;
-			rval = EINVAL;
-			goto done;
-		}
-
-		size = PCITOOL_ACC_ATTR_SIZE(prg.acc_attr);
-		base_addr = pci_rp[prg.barnum].phys_addr;
-		max_addr = base_addr + pci_rp[prg.barnum].size;
-		prg.phys_addr = base_addr + prg.offset;
-
-		DEBUG4(DBG_TOOLS, dip,
-		    "pcitool_bus_reg_ops: nexus: base:0x%llx, offset:0x%llx, "
-		    "addr:0x%llx, max_addr:0x%llx\n",
-		    base_addr, prg.offset, prg.phys_addr, max_addr);
-
-		/* Access device.  prg.status is modified. */
-		rval = pci_access(pci_p,
-		    prg.phys_addr, max_addr, &prg.data, size, write_flag,
-		    PCITOOL_ACC_IS_BIG_ENDIAN(prg.acc_attr),	/* BE/LE */
-		    &prg.status);
-
-		break;
-
-	default:
-		return (ENOTTY);
+	/* Read data from userland. */
+	if (ddi_copyin(arg, &prg, sizeof (pcitool_reg_t), mode) !=
+	    DDI_SUCCESS) {
+		DEBUG0(DBG_TOOLS, dip, "Error reading arguments\n");
+		return (EFAULT);
 	}
 
+	/* Read reg property which contains starting addr and size of banks. */
+	if (ddi_prop_lookup_int_array(
+	    DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "reg", (int **)&pci_rp, &reglen) == DDI_SUCCESS) {
+		if (((reglen * sizeof (int)) %
+		    sizeof (pci_nexus_regspec_t)) != 0) {
+			DEBUG0(DBG_TOOLS, dip, "reg prop not well-formed");
+			prg.status = PCITOOL_REGPROP_NOTWELLFORMED;
+			rval = EIO;
+			goto done;
+		}
+	}
+
+	/* Bounds check the bank number. */
+	if (prg.barnum >=
+	    (reglen * sizeof (int)) / sizeof (pci_nexus_regspec_t)) {
+		prg.status = PCITOOL_OUT_OF_RANGE;
+		rval = EINVAL;
+		goto done;
+	}
+
+	size = PCITOOL_ACC_ATTR_SIZE(prg.acc_attr);
+	base_addr = pci_rp[prg.barnum].phys_addr;
+	max_addr = base_addr + pci_rp[prg.barnum].size;
+	prg.phys_addr = base_addr + prg.offset;
+
+	DEBUG4(DBG_TOOLS, dip,
+	    "pcitool_bus_reg_ops: nexus: base:0x%llx, offset:0x%llx, "
+	    "addr:0x%llx, max_addr:0x%llx\n",
+	    base_addr, prg.offset, prg.phys_addr, max_addr);
+
+	/* Access device.  prg.status is modified. */
+	rval = pcitool_access(pci_p,
+	    prg.phys_addr, max_addr, &prg.data, size, write_flag,
+	    PCITOOL_ACC_IS_BIG_ENDIAN(prg.acc_attr), &prg.status);
+
 done:
+	if (pci_rp != NULL)
+		ddi_prop_free(pci_rp);
+
 	prg.drvr_version = PCITOOL_DRVR_VERSION;
 	if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t), mode) !=
 	    DDI_SUCCESS) {
@@ -766,6 +699,139 @@ done:
 	return (rval);
 }
 
+
+static int
+pcitool_validate_barnum_bdf(pcitool_reg_t *prg)
+{
+	int rval = SUCCESS;
+
+	if (prg->barnum >= (sizeof (pci_bars) / sizeof (pci_bars[0]))) {
+		prg->status = PCITOOL_OUT_OF_RANGE;
+		rval = EINVAL;
+
+	/* Validate address arguments of bus / dev / func */
+	} else if (((prg->bus_no &
+	    (PCI_REG_BUS_M >> PCI_REG_BUS_SHIFT)) != prg->bus_no) ||
+	    ((prg->dev_no &
+	    (PCI_REG_DEV_M >> PCI_REG_DEV_SHIFT)) != prg->dev_no) ||
+	    ((prg->func_no &
+	    (PCI_REG_FUNC_M >> PCI_REG_FUNC_SHIFT)) != prg->func_no)) {
+		prg->status = PCITOOL_INVALID_ADDRESS;
+		rval = EINVAL;
+	}
+
+	return (rval);
+}
+
+static int
+pcitool_get_bar(pci_t *pci_p, pcitool_reg_t *prg, uint64_t config_base_addr,
+	uint64_t config_max_addr, uint64_t *bar, boolean_t *is_io_space)
+{
+
+	uint8_t bar_offset;
+	int rval;
+	dev_info_t *dip = pci_p->pci_dip;
+
+	*bar = 0;
+	*is_io_space = B_FALSE;
+
+	/*
+	 * Translate BAR number into offset of the BAR in
+	 * the device's config space.
+	 */
+	bar_offset = PCI_BAR_OFFSET((*prg));
+
+	DEBUG2(DBG_TOOLS, dip, "barnum:%d, bar_offset:0x%x\n",
+	    prg->barnum, bar_offset);
+
+	/*
+	 * Get Bus Address Register (BAR) from config space.
+	 * bar_offset is the offset into config space of the BAR desired.
+	 * prg->status is modified on error.
+	 */
+	rval = pcitool_access(pci_p, config_base_addr + bar_offset,
+	    config_max_addr, bar,
+	    4,		/* 4 bytes. */
+	    B_FALSE,	/* Read */
+	    B_FALSE, 	/* Little endian. */
+	    &prg->status);
+	if (rval != SUCCESS)
+		return (rval);
+
+	DEBUG1(DBG_TOOLS, dip, "bar returned is 0x%llx\n", *bar);
+	if (!(*bar)) {
+		prg->status = PCITOOL_INVALID_ADDRESS;
+		return (EINVAL);
+	}
+
+	/*
+	 * BAR has bits saying this space is IO space, unless
+	 * this is the ROM address register.
+	 */
+	if (((PCI_BASE_SPACE_M & *bar) == PCI_BASE_SPACE_IO) &&
+	    (bar_offset != PCI_CONF_ROM)) {
+		*is_io_space = B_TRUE;
+		*bar &= PCI_BASE_IO_ADDR_M;
+
+	/*
+	 * BAR has bits saying this space is 64 bit memory
+	 * space, unless this is the ROM address register.
+	 *
+	 * The 64 bit address stored in two BAR cells is not necessarily
+	 * aligned on an 8-byte boundary.  Need to keep the first 4
+	 * bytes read, and do a separate read of the high 4 bytes.
+	 */
+
+	} else if ((PCI_BASE_TYPE_ALL & *bar) && (bar_offset != PCI_CONF_ROM)) {
+
+		uint32_t low_bytes = (uint32_t)(*bar & ~PCI_BASE_TYPE_ALL);
+
+		/* Don't try to read past the end of BARs. */
+		if (bar_offset >= PCI_CONF_BASE5) {
+			prg->status = PCITOOL_OUT_OF_RANGE;
+			return (EIO);
+		}
+
+		/* Access device.  prg->status is modified on error. */
+		rval = pcitool_access(pci_p,
+		    config_base_addr + bar_offset + 4, config_max_addr, bar,
+		    4,		/* 4 bytes. */
+		    B_FALSE,	/* Read */
+		    B_FALSE, 	/* Little endian. */
+		    &prg->status);
+		if (rval != SUCCESS)
+			return (rval);
+
+		*bar = (*bar << 32) + low_bytes;
+	}
+
+	return (SUCCESS);
+}
+
+
+static int
+pcitool_config_request(pci_t *pci_p, pcitool_reg_t *prg, uint64_t base_addr,
+	uint64_t max_addr, uint8_t size, boolean_t write_flag)
+{
+	int rval;
+	dev_info_t *dip = pci_p->pci_dip;
+
+	/* Access config space and we're done. */
+	prg->phys_addr = base_addr + prg->offset;
+
+	DEBUG4(DBG_TOOLS, dip, "config access: base:0x%llx, "
+	    "offset:0x%llx, phys_addr:0x%llx, end:%s\n",
+	    base_addr, prg->offset, prg->phys_addr,
+	    (PCITOOL_ACC_IS_BIG_ENDIAN(prg->acc_attr)? "big" : "ltl"));
+
+	/* Access device.  pr.status is modified. */
+	rval = pcitool_access(pci_p, prg->phys_addr, max_addr, &prg->data, size,
+	    write_flag, PCITOOL_ACC_IS_BIG_ENDIAN(prg->acc_attr), &prg->status);
+
+	DEBUG1(DBG_TOOLS, dip, "config access: data:0x%llx\n", prg->data);
+
+	return (rval);
+}
 
 /* Perform register accesses on PCI leaf devices. */
 int
@@ -782,274 +848,167 @@ pcitool_dev_reg_ops(dev_t dev, void *arg, int cmd, int mode)
 	uint64_t	bar = 0;
 	int		rval = 0;
 	boolean_t	write_flag = B_FALSE;
+	boolean_t	is_io_space = B_FALSE;
 	uint8_t		size;
-	uint8_t		bar_offset;
 
-	switch (cmd) {
-	case (PCITOOL_DEVICE_SET_REG):
+	if (cmd == PCITOOL_DEVICE_SET_REG)
 		write_flag = B_TRUE;
 
-	/*FALLTHRU*/
-	case (PCITOOL_DEVICE_GET_REG):
-		DEBUG0(DBG_TOOLS, dip, "pcitool_dev_reg_ops set/get reg\n");
-		if (ddi_copyin(arg, &prg, sizeof (pcitool_reg_t), mode) !=
-		    DDI_SUCCESS) {
-			DEBUG0(DBG_TOOLS, dip,
-			    "Error reading arguments\n");
-			return (EFAULT);
-		}
+	DEBUG0(DBG_TOOLS, dip, "pcitool_dev_reg_ops set/get reg\n");
+	if (ddi_copyin(arg, &prg, sizeof (pcitool_reg_t), mode) !=
+	    DDI_SUCCESS) {
+		DEBUG0(DBG_TOOLS, dip, "Error reading arguments\n");
+		return (EFAULT);
+	}
 
-		if (prg.barnum >= (sizeof (pci_bars) / sizeof (pci_bars[0]))) {
-			prg.status = PCITOOL_OUT_OF_RANGE;
-			rval = EINVAL;
+	DEBUG3(DBG_TOOLS, dip, "raw bus:0x%x, dev:0x%x, func:0x%x\n",
+	    prg.bus_no, prg.dev_no, prg.func_no);
+
+	if ((rval = pcitool_validate_barnum_bdf(&prg)) != SUCCESS)
+		goto done_reg;
+
+	size = PCITOOL_ACC_ATTR_SIZE(prg.acc_attr);
+
+	/* Get config space first. */
+	range_prop = PCI_GET_RANGE_PROP(rp, PCI_CONFIG_RANGE_BANK);
+	range_prop_size = PCI_GET_RANGE_PROP_SIZE(rp, PCI_CONFIG_RANGE_BANK);
+	max_addr = range_prop + range_prop_size;
+
+	/*
+	 * Build device address based on base addr from range prop, and bus,
+	 * dev and func values passed in.  This address is where config space
+	 * begins.
+	 */
+	base_addr = range_prop +
+	    (prg.bus_no << PCI_REG_BUS_SHIFT) +
+	    (prg.dev_no << PCI_REG_DEV_SHIFT) +
+	    (prg.func_no << PCI_REG_FUNC_SHIFT);
+
+	if ((base_addr < range_prop) || (base_addr >= max_addr)) {
+		prg.status = PCITOOL_OUT_OF_RANGE;
+		rval = EINVAL;
+		goto done_reg;
+	}
+
+	DEBUG5(DBG_TOOLS, dip, "range_prop:0x%llx, shifted: bus:0x%x, dev:0x%x "
+	    "func:0x%x, addr:0x%x\n", range_prop,
+	    prg.bus_no << PCI_REG_BUS_SHIFT, prg.dev_no << PCI_REG_DEV_SHIFT,
+	    prg.func_no << PCI_REG_FUNC_SHIFT, base_addr);
+
+	/* Proper config space desired. */
+	if (prg.barnum == 0) {
+
+		rval = pcitool_config_request(pci_p, &prg, base_addr, max_addr,
+		    size, write_flag);
+
+	} else {	/* IO / MEM / MEM64 space. */
+
+		if (pcitool_get_bar(pci_p, &prg, base_addr, max_addr, &bar,
+		    &is_io_space) != SUCCESS)
 			goto done_reg;
-		}
 
-		DEBUG3(DBG_TOOLS, dip, "raw bus:0x%x, dev:0x%x, func:0x%x\n",
-		    prg.bus_no, prg.dev_no, prg.func_no);
+		/* IO space. */
+		if (is_io_space) {
 
-		/* Validate address arguments of bus / dev / func */
-		if (((prg.bus_no &
-		    (PCI_REG_BUS_M >> PCI_REG_BUS_SHIFT)) !=
-		    prg.bus_no) ||
-		    ((prg.dev_no &
-		    (PCI_REG_DEV_M >> PCI_REG_DEV_SHIFT)) !=
-		    prg.dev_no) ||
-		    ((prg.func_no &
-		    (PCI_REG_FUNC_M >> PCI_REG_FUNC_SHIFT)) !=
-		    prg.func_no)) {
-			prg.status = PCITOOL_INVALID_ADDRESS;
-			rval = EINVAL;
-			goto done_reg;
-		}
+			DEBUG0(DBG_TOOLS, dip, "IO space\n");
 
-		size = PCITOOL_ACC_ATTR_SIZE(prg.acc_attr);
+			/* Reposition to focus on IO space. */
+			range_prop = PCI_GET_RANGE_PROP(rp, PCI_IO_RANGE_BANK);
+			range_prop_size = PCI_GET_RANGE_PROP_SIZE(rp,
+			    PCI_IO_RANGE_BANK);
 
-		/* Get config space first. */
-		range_prop = PCI_GET_RANGE_PROP(rp, PCI_CONFIG_RANGE_BANK);
-		range_prop_size =
-		    PCI_GET_RANGE_PROP_SIZE(rp, PCI_CONFIG_RANGE_BANK);
-		max_addr = range_prop + range_prop_size;
+		/* 64 bit memory space. */
+		} else if ((bar >> 32) != 0) {
 
-		/*
-		 * Build device address based on base addr from range prop, and
-		 * bus, dev and func values passed in.  This address is where
-		 * config space begins.
-		 */
-		base_addr = range_prop +
-		    (prg.bus_no << PCI_REG_BUS_SHIFT) +
-		    (prg.dev_no << PCI_REG_DEV_SHIFT) +
-		    (prg.func_no << PCI_REG_FUNC_SHIFT);
+			DEBUG1(DBG_TOOLS, dip,
+			    "64 bit mem space.  64-bit bar is 0x%llx\n", bar);
 
-		if ((base_addr < range_prop) || (base_addr >= max_addr)) {
-			prg.status = PCITOOL_OUT_OF_RANGE;
-			rval = EINVAL;
-			goto done_reg;
-		}
+			/* Reposition to MEM64 range space. */
+			range_prop = PCI_GET_RANGE_PROP(rp,
+			    PCI_MEM64_RANGE_BANK);
+			range_prop_size = PCI_GET_RANGE_PROP_SIZE(rp,
+			    PCI_MEM64_RANGE_BANK);
 
-		DEBUG5(DBG_TOOLS, dip,
-		    "range_prop:0x%llx, shifted: bus:0x%x, dev:0x%x "
-		    "func:0x%x, addr:0x%x",
-		    range_prop,
-		    prg.bus_no << PCI_REG_BUS_SHIFT,
-		    prg.dev_no << PCI_REG_DEV_SHIFT,
-		    prg.func_no << PCI_REG_FUNC_SHIFT,
-		    base_addr);
+		} else {	/* Mem32 space, including ROM */
 
-		/* Proper config space desired. */
-		if (prg.barnum == 0) {
+			DEBUG0(DBG_TOOLS, dip, "32 bit mem space\n");
 
-			/* Access config space and we're done. */
-			prg.phys_addr = base_addr + prg.offset;
+			if (PCI_BAR_OFFSET(prg) == PCI_CONF_ROM) {
 
-			DEBUG4(DBG_TOOLS, dip,
-			    "config access: base:0x%llx, offset:0x%llx, "
-			    "phys_addr:0x%llx, end:%s\n",
-			    base_addr, prg.offset, prg.phys_addr,
-			    (PCITOOL_ACC_IS_BIG_ENDIAN(prg.acc_attr)?
-				"big" : "ltl"));
+				DEBUG0(DBG_TOOLS, dip,
+				    "Additional ROM checking\n");
 
-			/* Access device.  pr.status is modified. */
-			rval = pci_access(pci_p,
-			    prg.phys_addr, max_addr,
-			    &prg.data, size, write_flag,
-			    PCITOOL_ACC_IS_BIG_ENDIAN(prg.acc_attr), /* BE/LE */
-			    &prg.status);
+				/* Can't write to ROM */
+				if (write_flag) {
+					prg.status = PCITOOL_ROM_WRITE;
+					rval = EIO;
+					goto done_reg;
 
-			DEBUG1(DBG_TOOLS, dip, "config access: data:0x%llx\n",
-			    prg.data);
-
-		/* IO/ MEM/ MEM64 space. */
-		} else {
-
-			/*
-			 * Translate BAR number into offset of the BAR in
-			 * the device's config space.
-			 */
-			bar_offset = pci_bars[prg.barnum];
-
-			DEBUG2(DBG_TOOLS, dip, "barnum:%d, bar_offset:0x%x\n",
-			    prg.barnum, bar_offset);
-
-			/*
-			 * Get Bus Address Register (BAR) from config space.
-			 * bar_offset is the offset into config space of the
-			 * BAR desired.  prg.status is modified on error.
-			 */
-			rval = pci_access(pci_p,
-			    base_addr + bar_offset,
-			    max_addr, &bar,
-			    4,		/* 4 bytes. */
-			    B_FALSE,	/* Read */
-			    B_FALSE, 	/* Little endian. */
-			    &prg.status);
-			if (rval != SUCCESS) {
-				goto done_reg;
-			}
-
-			/*
-			 * Reference proper PCI space based on the BAR.
-			 * If 64 bit MEM space, need to load other half of the
-			 * BAR first.
-			 */
-
-			DEBUG1(DBG_TOOLS, dip, "bar returned is 0x%llx\n", bar);
-			if (!bar) {
-				rval = EINVAL;
-				prg.status = PCITOOL_INVALID_ADDRESS;
-				goto done_reg;
-			}
-
-			/*
-			 * BAR has bits saying this space is IO space, unless
-			 * this is the ROM address register.
-			 */
-			if (((PCI_BASE_SPACE_M & bar) == PCI_BASE_SPACE_IO) &&
-			    (bar_offset != PCI_CONF_ROM)) {
-				DEBUG0(DBG_TOOLS, dip, "IO space\n");
-
-				/* Reposition to focus on IO space. */
-				range_prop = PCI_GET_RANGE_PROP(rp,
-				    PCI_IO_RANGE_BANK);
-				range_prop_size = PCI_GET_RANGE_PROP_SIZE(rp,
-				    PCI_IO_RANGE_BANK);
-
-				bar &= PCI_BASE_IO_ADDR_M;
-
-			/*
-			 * BAR has bits saying this space is 64 bit memory
-			 * space, unless this is the ROM address register.
-			 *
-			 * The 64 bit address stored in two BAR cells is not
-			 * necessarily aligned on an 8-byte boundary.
-			 * Need to keep the first 4 bytes read,
-			 * and do a separate read of the high 4 bytes.
-			 */
-
-			} else if ((PCI_BASE_TYPE_ALL & bar) &&
-			    (bar_offset != PCI_CONF_ROM)) {
-
-				uint32_t low_bytes =
-				    (uint32_t)(bar & ~PCI_BASE_TYPE_ALL);
-
-				/*
-				 * Don't try to read the next 4 bytes
-				 * past the end of BARs.
-				 */
-				if (bar_offset >= PCI_CONF_BASE5) {
-					prg.status = PCITOOL_OUT_OF_RANGE;
+				/* ROM disabled for reading */
+				} else if (!(bar & 0x00000001)) {
+					prg.status = PCITOOL_ROM_DISABLED;
 					rval = EIO;
 					goto done_reg;
 				}
-
-				/*
-				 * Access device.
-				 * prg.status is modified on error.
-				 */
-				rval = pci_access(pci_p,
-				    base_addr + bar_offset + 4,
-				    max_addr, &bar,
-				    4,		/* 4 bytes. */
-				    B_FALSE,	/* Read */
-				    B_FALSE, 	/* Little endian. */
-				    &prg.status);
-				if (rval != SUCCESS) {
-					goto done_reg;
-				}
-
-				bar = (bar << 32) + low_bytes;
-
-				DEBUG1(DBG_TOOLS, dip,
-				    "64 bit mem space.  64-bit bar is 0x%llx\n",
-				    bar);
-
-				/* Reposition to MEM64 range space. */
-				range_prop = PCI_GET_RANGE_PROP(rp,
-				    PCI_MEM64_RANGE_BANK);
-				range_prop_size = PCI_GET_RANGE_PROP_SIZE(rp,
-				    PCI_MEM64_RANGE_BANK);
-
-			/* Mem32 space, including ROM */
-			} else {
-
-				if (bar_offset == PCI_CONF_ROM) {
-
-					DEBUG0(DBG_TOOLS, dip,
-					    "Additional ROM checking\n");
-
-					/* Can't write to ROM */
-					if (write_flag) {
-						prg.status = PCITOOL_ROM_WRITE;
-						rval = EIO;
-						goto done_reg;
-
-					/* ROM disabled for reading */
-					} else if (!(bar & 0x00000001)) {
-						prg.status =
-						    PCITOOL_ROM_DISABLED;
-						rval = EIO;
-						goto done_reg;
-					}
-				}
-
-				DEBUG0(DBG_TOOLS, dip, "32 bit mem space\n");
-				range_prop = PCI_GET_RANGE_PROP(rp,
-				    PCI_MEM_RANGE_BANK);
-				range_prop_size = PCI_GET_RANGE_PROP_SIZE(rp,
-				    PCI_MEM_RANGE_BANK);
 			}
 
-			/* Common code for all IO/MEM range spaces. */
-			max_addr = range_prop + range_prop_size;
-			base_addr = range_prop + bar;
-
-			DEBUG3(DBG_TOOLS, dip,
-			    "addr portion of bar is 0x%llx, base=0x%llx, "
-			    "offset:0x%lx\n", bar, base_addr, prg.offset);
-
-			/*
-			 * Use offset provided by caller to index into
-			 * desired space, then access.
-			 * Note that prg.status is modified on error.
-			 */
-			prg.phys_addr = base_addr + prg.offset;
-			rval = pci_access(pci_p,
-			    prg.phys_addr,
-			    max_addr, &prg.data, size, write_flag,
-			    PCITOOL_ACC_IS_BIG_ENDIAN(prg.acc_attr), /* BE/LE */
-			    &prg.status);
+			range_prop = PCI_GET_RANGE_PROP(rp, PCI_MEM_RANGE_BANK);
+			range_prop_size = PCI_GET_RANGE_PROP_SIZE(rp,
+			    PCI_MEM_RANGE_BANK);
 		}
+
+		/* Common code for all IO/MEM range spaces. */
+		max_addr = range_prop + range_prop_size;
+		base_addr = range_prop + bar;
+
+		DEBUG3(DBG_TOOLS, dip,
+		    "addr portion of bar is 0x%llx, base=0x%llx, "
+		    "offset:0x%lx\n", bar, base_addr, prg.offset);
+
+		/*
+		 * Use offset provided by caller to index into
+		 * desired space, then access.
+		 * Note that prg.status is modified on error.
+		 */
+		prg.phys_addr = base_addr + prg.offset;
+		rval = pcitool_access(pci_p, prg.phys_addr,
+		    max_addr, &prg.data, size, write_flag,
+		    PCITOOL_ACC_IS_BIG_ENDIAN(prg.acc_attr), &prg.status);
+	}
+
 done_reg:
-		prg.drvr_version = PCITOOL_DRVR_VERSION;
-		if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t), mode) !=
-		    DDI_SUCCESS) {
-			DEBUG0(DBG_TOOLS, dip, "Error returning arguments.\n");
-			rval = EFAULT;
-		}
-		break;
-	default:
-		rval = ENOTTY;
-		break;
+	prg.drvr_version = PCITOOL_DRVR_VERSION;
+	if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t), mode) !=
+	    DDI_SUCCESS) {
+		DEBUG0(DBG_TOOLS, dip, "Error returning arguments.\n");
+		rval = EFAULT;
 	}
 	return (rval);
+}
+
+int
+pcitool_init(dev_info_t *dip)
+{
+	int instance = ddi_get_instance(dip);
+
+	if (ddi_create_minor_node(dip, PCI_MINOR_REG, S_IFCHR,
+	    PCIHP_AP_MINOR_NUM(instance, PCI_TOOL_REG_MINOR_NUM),
+	    DDI_NT_REGACC, 0) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (ddi_create_minor_node(dip, PCI_MINOR_INTR, S_IFCHR,
+	    PCIHP_AP_MINOR_NUM(instance, PCI_TOOL_INTR_MINOR_NUM),
+	    DDI_NT_INTRCTL, 0) != DDI_SUCCESS) {
+		ddi_remove_minor_node(dip, PCI_MINOR_REG);
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+void
+pcitool_uninit(dev_info_t *dip)
+{
+	ddi_remove_minor_node(dip, PCI_MINOR_REG);
+	ddi_remove_minor_node(dip, PCI_MINOR_INTR);
 }

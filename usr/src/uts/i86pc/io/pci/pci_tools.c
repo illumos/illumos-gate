@@ -28,6 +28,7 @@
 
 #include <sys/types.h>
 #include <sys/mkdev.h>
+#include <sys/stat.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <vm/seg_kmem.h>
@@ -69,6 +70,37 @@ static int pcitool_mem_access(dev_info_t *dip, pcitool_reg_t *prg,
     uint64_t virt_addr, boolean_t write_flag);
 static uint64_t pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages);
 static void pcitool_unmap(uint64_t virt_addr, size_t num_pages);
+
+int
+pcitool_init(dev_info_t *dip)
+{
+	int instance = ddi_get_instance(dip);
+
+	/* Create pcitool nodes for register access and interrupt routing. */
+
+	if (ddi_create_minor_node(dip, PCI_MINOR_REG, S_IFCHR,
+	    PCIHP_AP_MINOR_NUM(instance, PCI_TOOL_REG_MINOR_NUM),
+	    DDI_NT_REGACC, 0) != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	if (ddi_create_minor_node(dip, PCI_MINOR_INTR, S_IFCHR,
+	    PCIHP_AP_MINOR_NUM(instance, PCI_TOOL_INTR_MINOR_NUM),
+	    DDI_NT_INTRCTL, 0) != DDI_SUCCESS) {
+		ddi_remove_minor_node(dip, PCI_MINOR_REG);
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+void
+pcitool_uninit(dev_info_t *dip)
+{
+	ddi_remove_minor_node(dip, PCI_MINOR_INTR);
+	ddi_remove_minor_node(dip, PCI_MINOR_REG);
+}
+
 
 /*
  * A note about ontrap handling:
@@ -296,7 +328,7 @@ pcitool_io_access(dev_info_t *dip, pcitool_reg_t *prg, boolean_t write_flag)
 /*ARGSUSED*/
 static int
 pcitool_mem_access(dev_info_t *dip, pcitool_reg_t *prg, uint64_t virt_addr,
-    boolean_t write_flag)
+	boolean_t write_flag)
 {
 	size_t size = PCITOOL_ACC_ATTR_SIZE(prg->acc_attr);
 	boolean_t big_endian = PCITOOL_ACC_IS_BIG_ENDIAN(prg->acc_attr);
@@ -407,8 +439,8 @@ pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages)
 	if ((offset + size) > (MMU_PAGESIZE * 2)) {
 		if (pcitool_debug)
 			prom_printf("boundary violation: "
-			    "offset:0x%" PRIx64 ", size:%ld, pagesize:0x%x\n",
-			    offset, size, MMU_PAGESIZE);
+			    "offset:0x%" PRIx64 ", size:%" PRId64 ", "
+			    "pagesize:0x%x\n", offset, size, MMU_PAGESIZE);
 		return (NULL);
 
 	} else if ((offset + size) > MMU_PAGESIZE) {
@@ -456,8 +488,11 @@ pcitool_unmap(uint64_t virt_addr, size_t num_pages)
 int
 pcitool_dev_reg_ops(dev_t dev, void *arg, int cmd, int mode)
 {
-	pci_state_t	*pci_p = PCI_DEV_TO_STATE(dev);
+	minor_t		minor = getminor(dev);
+	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
+	pci_state_t	*pci_p = ddi_get_soft_state(pci_statep, instance);
 	dev_info_t	*dip = pci_p->pci_dip;
+
 	boolean_t	write_flag = B_FALSE;
 	int		rval = 0;
 	pcitool_reg_t	prg;

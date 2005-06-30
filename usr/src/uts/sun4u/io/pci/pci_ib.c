@@ -248,6 +248,35 @@ ib_intr_dist_nintr(ib_t *ib_p, ib_ino_t ino, volatile uint64_t *imr_p)
 	imr = *imr_p;	/* flush previous write */
 }
 
+/*
+ * Converts into nsec, ticks logged with a given CPU.  Adds nsec to ih.
+ */
+/*ARGSUSED*/
+void
+ib_cpu_ticks_to_ih_nsec(ib_t *ib_p, ih_t *ih_p, uint32_t cpu_id)
+{
+	extern kmutex_t pciintr_ks_template_lock;
+	hrtime_t ticks;
+
+	/*
+	 * Because we are updating two fields in ih_t we must lock
+	 * pciintr_ks_template_lock to prevent someone from reading the
+	 * kstats after we set ih_ticks to 0 and before we increment
+	 * ih_nsec to compensate.
+	 *
+	 * We must also protect against the interrupt arriving and incrementing
+	 * ih_ticks between the time we read it and when we reset it to 0.
+	 * To do this we use atomic_swap.
+	 */
+
+	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
+
+	mutex_enter(&pciintr_ks_template_lock);
+	ticks = atomic_swap_64(&ih_p->ih_ticks, 0);
+	ih_p->ih_nsec += (uint64_t)tick2ns(ticks, cpu_id);
+	mutex_exit(&pciintr_ks_template_lock);
+}
+
 static void
 ib_intr_dist(ib_t *ib_p, ib_ino_info_t *ino_p)
 {
@@ -307,7 +336,6 @@ ib_intr_dist(ib_t *ib_p, ib_ino_info_t *ino_p)
 void
 ib_intr_dist_all(void *arg, int32_t weight_max, int32_t weight)
 {
-	extern kmutex_t pciintr_ks_template_lock;
 	ib_t *ib_p = (ib_t *)arg;
 	pci_t *pci_p = ib_p->ib_pci_p;
 	ib_ino_info_t *ino_p;
@@ -382,7 +410,6 @@ ib_intr_dist_all(void *arg, int32_t weight_max, int32_t weight)
 			for (i = 0, ih_lst = ino_p->ino_ih_head;
 			    i < ino_p->ino_ih_size;
 			    i++, ih_lst = ih_lst->ih_next) {
-				hrtime_t ticks;
 
 				dweight = i_ddi_get_intr_weight(ih_lst->ih_dip);
 				intr_dist_cpuid_add_device_weight(
@@ -403,24 +430,10 @@ ib_intr_dist_all(void *arg, int32_t weight_max, int32_t weight)
 				 * Note that the value in ih_ticks has already
 				 * been corrected for any power savings mode
 				 * which might have been in effect.
-				 *
-				 * because we are updating two fields in
-				 * ih_t we must lock pciintr_ks_template_lock
-				 * to prevent someone from reading the kstats
-				 * after we set ih_ticks to 0 and before we
-				 * increment ih_nsec to compensate.
-				 *
-				 * we must also protect against the interrupt
-				 * arriving and incrementing ih_ticks between
-				 * the time we read it and when we reset it
-				 * to 0. To do this we use atomic_swap.
 				 */
 
-				mutex_enter(&pciintr_ks_template_lock);
-				ticks = atomic_swap_64(&ih_lst->ih_ticks, 0);
-				ih_lst->ih_nsec += (uint64_t)
-				    tick2ns(ticks, orig_cpuid);
-				mutex_exit(&pciintr_ks_template_lock);
+				ib_cpu_ticks_to_ih_nsec(ib_p, ih_lst,
+				    orig_cpuid);
 			}
 
 			/* program the hardware */
@@ -735,9 +748,10 @@ ib_ino_locate_intr(ib_ino_info_t *ino_p, dev_info_t *rdip, uint32_t inum)
 
 ih_t *
 ib_alloc_ih(dev_info_t *rdip, uint32_t inum,
-    uint_t (*int_handler)(caddr_t int_handler_arg1, caddr_t int_handler_arg2),
-    caddr_t int_handler_arg1,
-    caddr_t int_handler_arg2)
+	uint_t (*int_handler)(caddr_t int_handler_arg1,
+	caddr_t int_handler_arg2),
+	caddr_t int_handler_arg1,
+	caddr_t int_handler_arg2)
 {
 	ih_t *ih_p;
 
@@ -758,7 +772,7 @@ ib_alloc_ih(dev_info_t *rdip, uint32_t inum,
 
 int
 ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
-    ddi_intr_handle_impl_t *hdlp, uint_t new_intr_state)
+	ddi_intr_handle_impl_t *hdlp, uint_t new_intr_state)
 {
 	ib_t		*ib_p = pci_p->pci_ib_p;
 	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
@@ -784,4 +798,63 @@ ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
 
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
 	return (ret);
+}
+
+/*
+ * Return the dips or number of dips associated with a given interrupt block.
+ * Size of dips array arg is passed in as dips_ret arg.
+ * Number of dips returned is returned in dips_ret arg.
+ * Array of dips gets returned in the dips argument.
+ * Function returns number of dips existing for the given interrupt block.
+ *
+ */
+uint8_t
+ib_get_ino_devs(
+	ib_t *ib_p, uint32_t ino, uint8_t *devs_ret, pcitool_intr_dev_t *devs)
+{
+	ib_ino_info_t *ino_p;
+	ih_t *ih_p;
+	uint32_t num_devs = 0;
+	int i;
+
+	mutex_enter(&ib_p->ib_ino_lst_mutex);
+	ino_p = ib_locate_ino(ib_p, ino);
+	if (ino_p != NULL) {
+		num_devs = ino_p->ino_ih_size;
+		for (i = 0, ih_p = ino_p->ino_ih_head;
+		    ((i < ino_p->ino_ih_size) && (i < *devs_ret));
+		    i++, ih_p = ih_p->ih_next) {
+			(void) strncpy(devs[i].driver_name,
+			    ddi_driver_name(ih_p->ih_dip), MAXMODCONFNAME-1);
+			devs[i].driver_name[MAXMODCONFNAME] = '\0';
+			(void) ddi_pathname(ih_p->ih_dip, devs[i].path);
+			devs[i].dev_inst = ddi_get_instance(ih_p->ih_dip);
+		}
+		*devs_ret = i;
+	}
+
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
+
+	return (num_devs);
+}
+
+void ib_log_new_cpu(ib_t *ib_p, uint32_t old_cpu_id, uint32_t new_cpu_id,
+	uint32_t ino)
+{
+	ib_ino_info_t *ino_p;
+
+	mutex_enter(&ib_p->ib_ino_lst_mutex);
+
+	/* Log in OS data structures the new CPU. */
+	ino_p = ib_locate_ino(ib_p, ino);
+	if (ino_p != NULL) {
+
+		/* Log in OS data structures the new CPU. */
+		ino_p->ino_cpuid = new_cpu_id;
+
+		/* Account for any residual time to be logged for old cpu. */
+		ib_cpu_ticks_to_ih_nsec(ib_p, ino_p->ino_ih_head, old_cpu_id);
+	}
+
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
 }

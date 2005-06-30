@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <sys/ddi_subrdefs.h>
+#include <sys/pci_tools.h>
 
 typedef uint8_t ib_ino_t;
 typedef uint16_t ib_mondo_t;
@@ -212,6 +213,11 @@ extern void ib_unregister_intr(ib_mondo_t mondo);
 extern void ib_intr_dist_nintr(ib_t *ib_p, ib_ino_t ino,
 	volatile uint64_t *imr_p);
 extern void ib_intr_dist_all(void *arg, int32_t max_weight, int32_t weight);
+extern void ib_cpu_ticks_to_ih_nsec(ib_t *ib_p, ih_t *ih_p, uint32_t cpu_id);
+extern uint8_t ib_get_ino_devs(ib_t *ib_p, uint32_t ino, uint8_t *devs_ret,
+	pcitool_intr_dev_t *devs);
+extern void ib_log_new_cpu(ib_t *ib_p, uint32_t old_cpu_id, uint32_t new_cpu_id,
+	uint32_t ino);
 
 extern int pci_pil[];
 

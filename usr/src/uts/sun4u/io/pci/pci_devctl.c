@@ -50,6 +50,8 @@
 
 static int pci_open(dev_t *devp, int flags, int otyp, cred_t *credp);
 static int pci_close(dev_t dev, int flags, int otyp, cred_t *credp);
+static int pci_devctl_ioctl(dev_info_t *dip, int cmd, intptr_t arg, int mode,
+						cred_t *credp, int *rvalp);
 static int pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 						cred_t *credp, int *rvalp);
 static int pci_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
@@ -144,77 +146,12 @@ pci_close(dev_t dev, int flags, int otyp, cred_t *credp)
 
 /* ARGSUSED */
 static int
-pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
+pci_devctl_ioctl(dev_info_t *dip, int cmd, intptr_t arg, int mode,
+    cred_t *credp, int *rvalp)
 {
-	pci_t *pci_p;
-	dev_info_t *dip;
+	int rv = 0;
 	struct devctl_iocdata *dcp;
 	uint_t bus_state;
-	int rv = 0;
-
-	pci_p = DEV_TO_SOFTSTATE(dev);
-	if (pci_p == NULL)
-		return (ENXIO);
-
-	dip = pci_p->pci_dip;
-	DEBUG2(DBG_IOCTL, dip, "dev=%x: cmd=%x\n", dev, cmd);
-#ifdef PCI_DMA_TEST
-	if (IS_DMATEST(cmd)) {
-		*rvalp = pci_dma_test(cmd, dip, pci_p, arg);
-		return (0);
-	}
-#endif
-
-	/*
-	 * PCI tools.
-	 */
-
-	if ((cmd & ~IOCPARM_MASK) == PCITOOL_IOC) {
-		switch (cmd) {
-		case PCITOOL_DEVICE_SET_REG:
-		case PCITOOL_DEVICE_GET_REG:
-
-			/* Require full privileges. */
-			if (secpolicy_kmdb(credp))
-				rv = EPERM;
-			else
-				rv = pcitool_dev_reg_ops(
-				    dev, (void *)arg, cmd, mode);
-			break;
-
-		case PCITOOL_NEXUS_SET_REG:
-		case PCITOOL_NEXUS_GET_REG:
-
-			/* Require full privileges. */
-			if (secpolicy_kmdb(credp))
-				rv = EPERM;
-			else
-				rv = pcitool_bus_reg_ops(
-				    dev, (void *)arg, cmd, mode);
-			break;
-
-		case PCITOOL_DEVICE_SET_INTR:
-
-			/* Require PRIV_SYS_RES_CONFIG, same as psradm */
-			if (secpolicy_ponline(credp)) {
-				rv = EPERM;
-				break;
-			}
-
-		/*FALLTHRU*/
-		/* These require no special privileges. */
-		case PCITOOL_DEVICE_GET_INTR:
-		case PCITOOL_DEVICE_NUM_INTR:
-			rv = pcitool_intr_admn(dev, (void *)arg, cmd, mode);
-			break;
-
-		default:
-			rv = ENOTTY;
-			break;
-		}
-
-		return (rv);
-	}
 
 	/*
 	 * We can use the generic implementation for these ioctls
@@ -272,6 +209,90 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	}
 
 	ndi_dc_freehdl(dcp);
+	return (rv);
+}
+
+
+static int
+pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
+{
+	pci_t *pci_p;
+	dev_info_t *dip;
+	minor_t minor = getminor(dev);
+	int rv = ENOTTY;
+
+	pci_p = DEV_TO_SOFTSTATE(dev);
+	if (pci_p == NULL)
+		return (ENXIO);
+
+	dip = pci_p->pci_dip;
+	DEBUG2(DBG_IOCTL, dip, "dev=%x: cmd=%x\n", dev, cmd);
+
+#ifdef PCI_DMA_TEST
+	if (IS_DMATEST(cmd)) {
+		*rvalp = pci_dma_test(cmd, dip, pci_p, arg);
+		return (0);
+	}
+#endif
+
+	switch (PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
+	case PCI_TOOL_REG_MINOR_NUM:
+
+		switch (cmd) {
+		case PCITOOL_DEVICE_SET_REG:
+		case PCITOOL_DEVICE_GET_REG:
+
+			/* Require full privileges. */
+			if (secpolicy_kmdb(credp))
+				rv = EPERM;
+			else
+				rv = pcitool_dev_reg_ops(
+				    dev, (void *)arg, cmd, mode);
+			break;
+
+		case PCITOOL_NEXUS_SET_REG:
+		case PCITOOL_NEXUS_GET_REG:
+
+			/* Require full privileges. */
+			if (secpolicy_kmdb(credp))
+				rv = EPERM;
+			else
+				rv = pcitool_bus_reg_ops(
+				    dev, (void *)arg, cmd, mode);
+			break;
+		}
+
+		break;
+
+	case PCI_TOOL_INTR_MINOR_NUM:
+
+		switch (cmd) {
+		case PCITOOL_DEVICE_SET_INTR:
+
+			/* Require PRIV_SYS_RES_CONFIG, same as psradm */
+			if (secpolicy_ponline(credp)) {
+				rv = EPERM;
+				break;
+			}
+
+		/*FALLTHRU*/
+		/* These require no special privileges. */
+		case PCITOOL_DEVICE_GET_INTR:
+		case PCITOOL_DEVICE_NUM_INTR:
+			rv = pcitool_intr_admn(dev, (void *)arg, cmd, mode);
+			break;
+		}
+
+		break;
+
+	case PCIHP_DEVCTL_MINOR:
+		rv = pci_devctl_ioctl(dip, cmd, arg, mode, credp, rvalp);
+		break;
+
+	default:
+		break;
+	}
+
 	return (rv);
 }
 

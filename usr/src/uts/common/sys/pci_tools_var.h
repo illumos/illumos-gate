@@ -33,12 +33,23 @@
 extern "C" {
 #endif
 
+/* This file contains pcitool defs exported to other modules of a PCI driver. */
+
+/*
+ * Minor numbers for dedicated pcitool nodes.
+ * Note that FF and FE minor numbers are used for other minor nodes.
+ */
+#define	PCI_TOOL_REG_MINOR_NUM	0xFD
+#define	PCI_TOOL_INTR_MINOR_NUM	0xFC
+
 /*
  * Functions exported from the pci_tools.c module.
  */
 extern int pcitool_dev_reg_ops(dev_t dev, void *arg, int cmd, int mode);
 extern int pcitool_bus_reg_ops(dev_t dev, void *arg, int cmd, int mode);
 extern int pcitool_intr_admn(dev_t dev, void *arg, int cmd, int mode);
+extern int pcitool_init(dev_info_t *dip);
+extern void pcitool_uninit(dev_info_t *dip);
 
 #ifdef	__cplusplus
 }

@@ -215,6 +215,9 @@ extern "C" {
 #define	DDI_NT_AGP_TARGET	"ddi_agp:target" /* agp target device */
 #define	DDI_NT_AGP_CPUGART	"ddi_agp:cpugart" /* amd64 on-cpu gart device */
 
+#define	DDI_NT_REGACC		"ddi_tool_reg"	/* tool register access */
+#define	DDI_NT_INTRCTL		"ddi_tool_intr"	/* tool intr access */
+
 /*
  * DDI event definitions
  */

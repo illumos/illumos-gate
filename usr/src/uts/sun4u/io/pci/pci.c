@@ -43,6 +43,7 @@
 #include <sys/ddi_subrdefs.h>
 #include <sys/epm.h>
 #include <sys/hotplug/pci/pcihp.h>
+#include <sys/pci_tools_var.h>
 #include <sys/spl.h>
 #include <sys/pci/pci_obj.h>
 
@@ -333,6 +334,14 @@ pci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		/*
+		 * Create pcitool nodes for register access and interrupt
+		 * routing.
+		 */
+		if (pcitool_init(dip) != DDI_SUCCESS) {
+			goto err_bad_pcitool_nodes;
+		}
+
+		/*
 		 * Due to unresolved hardware issues, disable PCIPM until
 		 * the problem is fully understood.
 		 *
@@ -345,9 +354,14 @@ pci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		DEBUG0(DBG_ATTACH, dip, "attach success\n");
 		break;
 
-err_bad_objs:
-		ddi_remove_minor_node(dip, "devctl");
+err_bad_pcitool_nodes:
+		if (pci_p->hotplug_capable == B_FALSE)
+			ddi_remove_minor_node(dip, "devctl");
+		else
+			(void) pcihp_uninit(dip);
 err_bad_devctl_node:
+		pci_obj_destroy(pci_p);
+err_bad_objs:
 		unmap_pci_registers(pci_p);
 err_bad_reg_prop:
 		free_pci_properties(pci_p);
@@ -419,6 +433,8 @@ pci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 				mutex_exit(&pci_p->pci_mutex);
 				return (DDI_FAILURE);
 			}
+
+		pcitool_uninit(dip);
 
 		pci_obj_destroy(pci_p);
 
