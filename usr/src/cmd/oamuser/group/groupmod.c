@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -57,9 +57,8 @@ extern void errmsg();
 
 char *cmdname = "groupmod";
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int ch;				/* return from getopt */
 	gid_t gid;			/* group id */

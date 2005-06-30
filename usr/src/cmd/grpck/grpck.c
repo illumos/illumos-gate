@@ -23,6 +23,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -66,7 +67,7 @@ char *nptr;
 char *cptr;
 FILE *fptr;
 gid_t gid;
-int error();
+void error(char *msg);
 
 struct group {
 	struct group *nxt;
@@ -82,7 +83,7 @@ struct node {
 };
 
 void *
-emalloc(size)
+emalloc(size_t size)
 {
 	void *vp;
 	vp = malloc(size);
@@ -93,9 +94,8 @@ emalloc(size)
 	return (vp);
 }
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
 	struct passwd *pwp;
 	struct node *root = NULL;
@@ -387,14 +387,13 @@ getnext:
 			}
 		}
 	}
-	exit(code);
+	return (code);
 }
 
 /*	Error printing routine	*/
 
-error(msg)
-
-char *msg;
+void
+error(char *msg)
 {
 	code = 1;
 	if (eflag == 0)

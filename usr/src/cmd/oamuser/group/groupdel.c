@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -48,12 +48,11 @@ char *cmdname = "groupdel";
 extern void errmsg(), exit();
 extern int del_group();
 
-main(argc, argv)
-int argc;
-char **argv;
+int
+main(int argc, char **argv)
 {
-	register char *group;		/* group name from command line */
-	register retval = 0;
+	char *group;		/* group name from command line */
+	int retval = 0;
 
 	if (argc != 2) {
 		errmsg(M_DUSAGE);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,15 +42,13 @@ extern void exit();
 extern char *strtok();
 
 static gid_t grplist[ NGROUPS_UMAX + 1 ];
-static ngroups_max = 0;
+static int ngroups_max = 0;
 
 /* Validate a list of groups */
 int	**
-valid_lgroup( list, gid )
-char *list;
-gid_t gid;
+valid_lgroup(char *list, gid_t gid)
 {
-	register n_invalid = 0, i = 0, j;
+	int n_invalid = 0, i = 0, j;
 	char *ptr;
 	struct group *g_ptr;
 	int warning;

@@ -179,7 +179,8 @@ static int		pam_retval = PAM_SUCCESS;
 static uid_t		uid;
 static char		*prognamep;
 static long		maxdate;	/* password aging information */
-static int		passwd_conv();
+static int		passwd_conv(int, struct pam_message **,
+			    struct pam_response **, void *);
 static struct pam_conv	pam_conv = {passwd_conv, NULL};
 static pam_handle_t	*pamh;		/* Authentication handle */
 static char		*usrname;	/* user whose attribute we update */
@@ -199,7 +200,7 @@ extern	void		setusershell(void);
 extern	char		*getusershell(void);
 extern	void		endusershell(void);
 
-static	void		passwd_exit(int retcode);
+static	void		passwd_exit(int retcode) __NORETURN;
 static	void		rusage(void);
 static	int		ckuid(void);
 static	int		ckarg(int argc, char **argv, attrlist **attributes);
@@ -225,10 +226,8 @@ static	char		*getresponse(char *);
  * 	password attributes which corresponds to their login name.
  */
 
-void
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 
 	int	flag;
@@ -502,6 +501,8 @@ main(argc, argv)
 		}
 		(void) passwd_exit(retval);
 	}
+	/* NOTREACHED */
+	return (0);
 }
 
 /*
@@ -1224,7 +1225,7 @@ ckarg(int argc, char **argv, attrlist **attributes)
  */
 
 static int
-ckuid()
+ckuid(void)
 {
 	if (uid != 0) {
 		return (retval = NOPERM);
@@ -1347,9 +1348,7 @@ free_attr(attrlist *attributes)
  *
  */
 int
-get_namelist_files(namelist_p, num_user)
-	char ***namelist_p;
-	int *num_user;
+get_namelist_files(char ***namelist_p, int *num_user)
 {
 	FILE		*pwfp;
 	struct passwd	*pwd;
@@ -1416,8 +1415,7 @@ static DEFINE_NSS_DB_ROOT(db_root);
 static DEFINE_NSS_GETENT(context);
 
 static void
-_np_nss_initf_shadow(p)
-	nss_db_params_t	*p;
+_np_nss_initf_shadow(nss_db_params_t *p)
 {
 	p->name	= NSS_DBNAM_SHADOW;
 	p->config_name    = NSS_DBNAM_PASSWD;	/* Use config for "passwd" */
@@ -1426,23 +1424,20 @@ _np_nss_initf_shadow(p)
 }
 
 static void
-_np_setspent()
+_np_setspent(void)
 {
 	nss_setent(&db_root, _np_nss_initf_shadow, &context);
 }
 
 static void
-_np_endspent()
+_np_endspent(void)
 {
 	nss_endent(&db_root, _np_nss_initf_shadow, &context);
 	nss_delete(&db_root);
 }
 
 static struct spwd *
-_np_getspent_r(result, buffer, buflen)
-	struct spwd	*result;
-	char		*buffer;
-	int		buflen;
+_np_getspent_r(struct spwd *result, char *buffer, int buflen)
 {
 	nss_XbyY_args_t arg;
 	char		*nam;
@@ -1464,7 +1459,7 @@ _np_getspent_r(result, buffer, buflen)
 static nss_XbyY_buf_t *buffer;
 
 static struct spwd *
-_np_getspent()
+_np_getspent(void)
 {
 	nss_XbyY_buf_t	*b;
 
@@ -1531,8 +1526,7 @@ get_namelist(pwu_repository_t repository, char ***namelist, int *num_user)
  */
 
 void
-passwd_exit(retcode)
-	int	retcode;
+passwd_exit(int retcode)
 {
 
 	if (pamh)
@@ -1598,11 +1592,8 @@ passwd_exit(retcode)
 
 /*ARGSUSED*/
 static int
-passwd_conv(num_msg, msg, response, appdata_ptr)
-	int num_msg;
-	struct pam_message **msg;
-	struct pam_response **response;
-	void *appdata_ptr;
+passwd_conv(int num_msg, struct pam_message **msg,
+	    struct pam_response **response, void *appdata_ptr)
 {
 	struct pam_message	*m;
 	struct pam_response	*r;
@@ -1779,7 +1770,7 @@ attrlist_reorder(attrlist **l)
 }
 
 void
-rusage()
+rusage(void)
 {
 
 #define	MSG(a) (void) fprintf(stderr, gettext((a)));

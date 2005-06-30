@@ -19,17 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* SVr4.0 1.4 */
-
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -221,13 +221,10 @@ dup_to_nl(char *from)
 }
 
 void
-dispusrdef(fptr, flags, usertype)
-FILE *fptr;
-unsigned flags;
-char *usertype;
+dispusrdef(FILE *fptr, unsigned flags, char *usertype)
 {
 	struct userdefs *deflts = getusrdef(usertype);
-	register outcount = 0;
+	int outcount = 0;
 
 	/* Print out values */
 

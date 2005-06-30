@@ -110,17 +110,26 @@ char	*msg;			/* pointer to error message	*/
 #define	OUSERATTR_FILENAME	"/etc/ouser_attr"
 #define	USERATTR_TEMP		"/etc/uatmp"
 
+struct uid_blk {
+	struct uid_blk *link;
+	uid_t low;		/* low bound for this uid block */
+	uid_t high;		/* high bound for this uid block */
+};
+
 extern userattr_t *fgetuserattr(FILE *);
+
 
 /*
  * Declare all functions that do not return integers.  This is here
  * to get rid of some lint messages
  */
 
-void	uid_bcom(), add_ublk(), bad_perm(), bad_usage(), bad_arg(),
-	bad_uid(), bad_pasf(), file_error(), bad_news(), no_lock(),
-	add_uid(), rid_tmpf(), ck_p_sz(), ck_s_sz(), bad_name(),
-	bad_uattr();
+void	uid_bcom(struct uid_blk *), add_ublk(uid_t, struct uid_blk *),
+	bad_perm(void),
+	bad_usage(char *), bad_arg(char *), bad_uid(void), bad_pasf(void),
+	file_error(void), bad_news(void), no_lock(void), add_uid(uid_t),
+	rid_tmpf(void), ck_p_sz(struct passwd *), ck_s_sz(struct spwd *),
+	bad_name(char *), bad_uattr(void);
 
 void file_copy(FILE *spf, long NIS_pos);
 
@@ -133,19 +142,13 @@ static int fd_ptemp, fd_stemp, fd_uatemp;
  * used on the system.
  */
 
-struct uid_blk {
-	struct uid_blk *link;
-	uid_t low;		/* low bound for this uid block */
-	uid_t high;		/* high bound for this uid block */
-};
 
 #ifndef att
 /*
  * getspnan routine that ONLY looks at the local shadow file
  */
 struct spwd *
-local_getspnam(name)
-char *name;
+local_getspnam(char *name)
 {
 	FILE *shadf;
 	struct spwd *sp;
@@ -278,9 +281,8 @@ extern int errno;
 int optn_mask = 0, info_mask = 0;
 extern int getdate_err;
 
-main(argc, argv)
-int	argc;
-char  **argv;
+int
+main(int argc, char **argv)
 {
 	int c, i;
 	char *lognamp, *char_p;
@@ -1374,14 +1376,14 @@ char  **argv;
 	/*
 	 * Return 0 status, indicating success
 	 */
-	exit(0);
+	return (0);
 
 }  /* end of main */
 
 /* Try to recover the old password file */
 
 int
-rec_pwd()
+rec_pwd(void)
 {
 	if (unlink(PASSWD) || link(OPASSWD, PASSWD))
 		return (-1);
@@ -1392,8 +1394,7 @@ rec_pwd()
 /* combine two uid_blk's */
 
 void
-uid_bcom(uid_p)
-struct uid_blk *uid_p;
+uid_bcom(struct uid_blk *uid_p)
 {
 	struct uid_blk *uid_tp;
 
@@ -1407,9 +1408,7 @@ struct uid_blk *uid_p;
 /* add a new uid_blk */
 
 void
-add_ublk(num, uid_p)
-uid_t num;
-struct uid_blk *uid_p;
+add_ublk(uid_t num, struct uid_blk *uid_p)
 {
 	struct uid_blk *uid_tp;
 
@@ -1441,8 +1440,7 @@ struct uid_blk *uid_p;
  */
 /* add_uid() adds uid to the link list of used uids */
 void
-add_uid(uid)
-uid_t uid;
+add_uid(uid_t uid)
 {
 	struct uid_blk *uid_p;
 	/* Only keep track of the ones above UID_MIN */
@@ -1501,15 +1499,14 @@ uid_t uid;
 }
 
 void
-bad_perm()
+bad_perm(void)
 {
 	(void) fprintf(stderr, gettext("%s: Permission denied\n"), prognamp);
 	exit(1);
 }
 
 void
-bad_usage(sp)
-char *sp;
+bad_usage(char *sp)
 {
 	if (strlen(sp) != 0)
 		(void) fprintf(stderr, "%s: %s\n", prognamp, gettext(sp));
@@ -1525,8 +1522,7 @@ char *sp;
 }
 
 void
-bad_arg(s)
-char *s;
+bad_arg(char *s)
 {
 	(void) fprintf(stderr, "%s: %s\n", prognamp, gettext(s));
 
@@ -1536,8 +1532,7 @@ char *s;
 }
 
 void
-bad_name(s)
-char *s;
+bad_name(char *s)
 {
 	(void) fprintf(stderr, "%s: %s\n", prognamp, gettext(s));
 	ulckpwdf();
@@ -1545,7 +1540,7 @@ char *s;
 }
 
 void
-bad_uid()
+bad_uid(void)
 {
 	(void) fprintf(stderr, gettext("%s: UID in use\n"), prognamp);
 
@@ -1554,7 +1549,7 @@ bad_uid()
 }
 
 void
-bad_pasf()
+bad_pasf(void)
 {
 	msg = "%s: Inconsistent password files\n";
 	(void) fprintf(stderr, gettext(msg), prognamp);
@@ -1564,7 +1559,7 @@ bad_pasf()
 }
 
 void
-bad_uattr()
+bad_uattr(void)
 {
 	msg = "%s: Bad user_attr database\n";
 	(void) fprintf(stderr, gettext(msg), prognamp);
@@ -1574,7 +1569,7 @@ bad_uattr()
 }
 
 void
-file_error()
+file_error(void)
 {
 	msg = "%s: Unexpected failure.	Password files unchanged\n";
 	(void) fprintf(stderr, gettext(msg), prognamp);
@@ -1584,7 +1579,7 @@ file_error()
 }
 
 void
-bad_news()
+bad_news(void)
 {
 	msg = "%s: Unexpected failure.	Password file(s) missing\n";
 	(void) fprintf(stderr, gettext(msg), prognamp);
@@ -1594,7 +1589,7 @@ bad_news()
 }
 
 void
-no_lock()
+no_lock(void)
 {
 	msg = "%s: Password file(s) busy.  Try again later\n";
 	(void) fprintf(stderr, gettext(msg), prognamp);
@@ -1604,8 +1599,7 @@ no_lock()
 
 /* Check for the size of the whole passwd entry */
 void
-ck_p_sz(pwp)
-struct passwd *pwp;
+ck_p_sz(struct passwd *pwp)
 {
 	char ctp[128];
 
@@ -1626,8 +1620,7 @@ struct passwd *pwp;
 
 /* Check for the size of the whole passwd entry */
 void
-ck_s_sz(ssp)
-struct spwd *ssp;
+ck_s_sz(struct spwd *ssp)
 {
 	char ctp[128];
 
@@ -1650,7 +1643,7 @@ struct spwd *ssp;
 
 /* Get rid of the temp files */
 void
-rid_tmpf()
+rid_tmpf(void)
 {
 	(void) fclose(fp_ptemp);
 

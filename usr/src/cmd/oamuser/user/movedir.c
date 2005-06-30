@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -48,13 +49,13 @@ static char cmdbuf[SBUFSZ];	/* buffer for system call */
  *	Move directory contents from one place to another
  */
 int
-move_dir(from, to, login)
-char *from;			/* directory to move files from */
-char *to;			/* dirctory to move files to */
-char *login;			/* login id of owner */
+move_dir(char *from, char *to, char *login)
+		/* directory to move files from */
+		/* dirctory to move files to */
+		/* login id of owner */
 {
 	size_t len = 0;
-	register rc = EX_SUCCESS;
+	int rc = EX_SUCCESS;
 	struct stat statbuf;
 	struct utimbuf times;
 	/*

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,13 +58,11 @@ static void showgroups();
 
 static int ngroups_max;
 
-void
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
-	register int xval = 0;
-	register struct passwd *pw;
+	int xval = 0;
+	struct passwd *pw;
 
 	ngroups_max = sysconf(_SC_NGROUPS_MAX);
 
@@ -98,15 +96,14 @@ main(argc, argv)
 		}
 	}
 
-	exit(xval);
+	return (xval);
 
 }
 
 static void
-showgroups(pw)
-	register struct passwd *pw;
+showgroups(struct passwd *pw)
 {
-	register struct group *gr;
+	struct group *gr;
 	static gid_t *groups = NULL;
 	int ngroups;
 	int i;

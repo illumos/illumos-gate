@@ -38,7 +38,7 @@
 
 
 static projid_t projlist[NPROJECTS_MAX + 1];
-static nproj_max = NPROJECTS_MAX;
+static int nproj_max = NPROJECTS_MAX;
 
 /* Validate a list of projects */
 int **

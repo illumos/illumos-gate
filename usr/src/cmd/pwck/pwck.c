@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,7 @@ static int lc;
 static char buf[512];
 static void error(char *);
 
+int
 main(int argc, char **argv)
 {
 	int delim[512];

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,14 +63,13 @@
 
 char pwdflr[]	= "x";				/* password filler */
 char *prognamp;
-void f_err(), f_miss(), f_bdshw();
+void f_err(void), f_miss(void), f_bdshw(void);
 
 /*
  * getspnan routine that ONLY looks at the local shadow file
  */
 struct spwd *
-local_getspnam(name)
-char *name;
+local_getspnam(char *name)
 {
 	FILE *shadf;
 	struct spwd * sp;
@@ -89,17 +88,16 @@ char *name;
 	return (sp);
 }
 
-main(argc, argv)
-int argc;
-char **argv;
+int
+main(int argc, char **argv)
 {
 	extern	int	errno;
-	void  no_recover(), no_convert();
+	void  no_recover(void), no_convert(void);
 	struct  passwd  *pwdp;
 	struct	spwd	*sp, sp_pwd;		/* default entry */
 	struct stat buf;
 	FILE	*tp_fp, *tsp_fp;
-	register time_t	when, minweeks, maxweeks;
+	time_t	when, minweeks, maxweeks;
 	int file_exist = 1;
 	int end_of_file = 0;
 	mode_t mode;
@@ -461,11 +459,11 @@ char **argv;
 		(void) unlink(OPASSWD);
 
 	(void) ulckpwdf();
-	exit(0);
+	return (0);
 }
 
 void
-no_recover()
+no_recover(void)
 {
 	DELPTMP();
 	DELSHWTMP();
@@ -473,7 +471,7 @@ no_recover()
 }
 
 void
-no_convert()
+no_convert(void)
 {
 	DELPTMP();
 	DELSHWTMP();
@@ -481,7 +479,7 @@ no_convert()
 }
 
 void
-f_err()
+f_err(void)
 {
 	fprintf(stderr,
 		gettext("%s: Unexpected failure. Conversion not done.\n"),
@@ -490,7 +488,7 @@ f_err()
 }
 
 void
-f_miss()
+f_miss(void)
 {
 	fprintf(stderr,
 		gettext("%s: Unexpected failure. Password file(s) missing.\n"),
@@ -499,7 +497,7 @@ f_miss()
 }
 
 void
-f_bdshw()
+f_bdshw(void)
 {
 	fprintf(stderr,
 		gettext("%s: Bad entry in /etc/shadow. Conversion not done.\n"),

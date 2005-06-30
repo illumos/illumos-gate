@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -48,11 +49,11 @@ static char cmdbuf[ SBUFSZ ];	/* buffer for system call */
 	directory.
 */
 int
-create_home( homedir, skeldir, uid, gid)
-char *homedir;			/* home directory to create */
-char *skeldir;			/* skel directory to copy if indicated */
-uid_t uid;			/* uid of new user */
-gid_t gid;			/* group id of new user */
+create_home(char *homedir, char *skeldir, uid_t uid, gid_t gid)
+		/* home directory to create */
+		/* skel directory to copy if indicated */
+		/* uid of new user */
+		/* group id of new user */
 {
 	if( mkdir(homedir, 0775) != 0 ) {
 		errmsg( M_OOPS, "create the home directory", prerrno( errno ) );
@@ -102,8 +103,8 @@ gid_t gid;			/* group id of new user */
 }
 
 /* Remove a home directory structure */
-rm_homedir( dir )
-char *dir;
+int
+rm_homedir(char *dir)
 {
 	(void) sprintf( cmdbuf, "rm -rf %s", dir );
 		
