@@ -150,11 +150,16 @@ extern uint64_t px_lpug_intr_mask;
 extern uint64_t px_lpug_log_mask;
 extern uint64_t px_lpug_count_mask;
 
+/* timeout length in nano second */
 #define	PX_PME_TO_ACK_TIMEOUT	1000000
+#define	PX_LINKUP_TIMEOUT	100000
 #define	PX_PWR_PIL		1
+#define	PX_MAX_L1_TRIES		5
 
 extern uint64_t px_pme_to_ack_timeout;
+extern uint64_t px_linkup_timeout;
 extern uint32_t	px_pwr_pil;
+extern uint32_t px_max_l1_tries;
 
 #ifdef	__cplusplus
 }

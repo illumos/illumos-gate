@@ -1797,3 +1797,17 @@ px_lib_pmctl(int cmd, px_t *px_p)
 {
 	return (DDI_FAILURE);
 }
+
+/*ARGSUSED*/
+uint_t
+px_lup_softintr(caddr_t arg)
+{
+	return (DDI_INTR_CLAIMED);
+}
+
+/*ARGSUSED*/
+uint_t
+px_pmeq_intr(caddr_t arg)
+{
+	return (DDI_INTR_CLAIMED);
+}

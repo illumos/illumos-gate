@@ -177,6 +177,9 @@ PX_ERPT_SEND_DEC(jbc_csr);
 int px_err_imu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
+int px_err_imu_pme_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr);
 int px_err_imu_eq_ovfl_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr);
@@ -205,6 +208,10 @@ PX_ERPT_SEND_DEC(mmu);
  */
 
 #define	PX_ERR_PEC_CLASS(n)	PCIEX_FIRE "." FIRE_PEC_ ## n
+
+int px_err_tlu_lup_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr);
 
 /* Fire Ereport Handling Forward Declarations */
 PX_ERPT_SEND_DEC(pec_ilu);

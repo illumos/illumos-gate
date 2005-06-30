@@ -943,28 +943,6 @@ pcie_pwr_suspend(dev_info_t *dip)
 	return (DDI_SUCCESS);
 }
 
-/*
- * Handles PME_To_ACK message
- */
-uint_t
-pcie_pwr_intr(caddr_t arg)
-{
-	pcie_pwr_t	*pwr_p = (pcie_pwr_t *)arg;
-
-	DBG(DBG_PWR, NULL, "PME_TO_ACK received\n");
-	mutex_enter(&pwr_p->pwr_intr_lock);
-	cv_broadcast(&pwr_p->pwr_cv);
-	if (pwr_p->pwr_flags & PCIE_PME_TURNOFF_PENDING) {
-		pwr_p->pwr_flags |= PCIE_PMETOACK_RECVD;
-	} else {
-		/* Nobody waiting for this! */
-		DBG(DBG_PWR, NULL, "PME_TO_ACK received after timeout\n");
-		pwr_p->pwr_pmetoack_ignored++;
-	}
-	mutex_exit(&pwr_p->pwr_intr_lock);
-	return (DDI_INTR_CLAIMED);
-}
-
 #ifdef DEBUG
 /*
  * Description of bus_power_op.

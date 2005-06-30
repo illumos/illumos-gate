@@ -225,6 +225,13 @@ typedef	struct eq_rec {
 #define	LPU_LTSSM_CONFIG4_DATA_RATE_DEFAULT		0x2
 #define	LPU_LTSSM_CONFIG4_N_FTS_DEFAULT			0x8c
 
+/* LPU LTSSM states */
+#define	LPU_LTSSM_L0			0x0
+#define	LPU_LTSSM_L1_IDLE		0x15
+
+/* TLU Control register bits */
+#define	TLU_REMAIN_DETECT_QUIET		8
+
 /*
  * The sequence of the chip_type appearance is significant.
  * There are code depending on it: PX_CHIP_TYPE(pxu_p) < PX_CHIP_FIRE.
@@ -339,6 +346,9 @@ extern uint64_t hvio_cb_suspend(devhandle_t dev_hdl, pxu_t *pxu_p);
 extern void hvio_cb_resume(devhandle_t pci_dev_hdl, devhandle_t xbus_dev_hdl,
     devino_t devino, pxu_t *pxu_p);
 extern int px_send_pme_turnoff(caddr_t csr_base);
+extern int px_link_wait4l1idle(caddr_t csr_base);
+extern int px_link_retrain(caddr_t csr_base);
+extern void px_enable_detect_quiet(caddr_t csr_base);
 
 #ifdef	__cplusplus
 }

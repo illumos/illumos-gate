@@ -277,6 +277,15 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 		    (1ull << TLU_CONTROL_NPWR_EN) | TLU_CONTROL_CONFIG_DEFAULT;
 	}
 
+	/*
+	 * Set Detect.Quiet. This will disable automatic link
+	 * re-training, if the link goes down e.g. power management
+	 * turns off power to the downstream device. This will enable
+	 * Fire to go to Drain state, after link down. The drain state
+	 * forces a reset to the FC state machine, which is required for
+	 * proper link re-training.
+	 */
+	val |= (1ull << TLU_REMAIN_DETECT_QUIET);
 	CSR_XS(csr_base, TLU_CONTROL, val);
 	DBG(DBG_TLU, NULL, "tlu_init - TLU_CONTROL: 0x%llx\n",
 	    CSR_XR(csr_base, TLU_CONTROL));
@@ -2583,16 +2592,77 @@ px_send_pme_turnoff(caddr_t csr_base)
 {
 	volatile uint64_t reg;
 
-	/* TBD: Wait for link to be in L1 state (link status reg) */
-
 	reg = CSR_XR(csr_base, TLU_PME_TURN_OFF_GENERATE);
 	/* If already pending, return failure */
 	if (reg & (1ull << TLU_PME_TURN_OFF_GENERATE_PTO)) {
+		DBG(DBG_PWR, NULL, "send_pme_turnoff: pending PTO bit "
+		    "tlu_pme_turn_off_generate = %x\n", reg);
 		return (DDI_FAILURE);
 	}
 
 	/* write to PME_Turn_off reg to boradcast */
 	reg |= (1ull << TLU_PME_TURN_OFF_GENERATE_PTO);
 	CSR_XS(csr_base,  TLU_PME_TURN_OFF_GENERATE, reg);
+
 	return (DDI_SUCCESS);
+}
+
+/*
+ * Checks for link being in L1idle state.
+ * Returns
+ * DDI_SUCCESS - if the link is in L1idle
+ * DDI_FAILURE - if the link is not in L1idle
+ */
+int
+px_link_wait4l1idle(caddr_t csr_base)
+{
+	uint8_t ltssm_state;
+	int ntries = px_max_l1_tries;
+
+	while (ntries > 0) {
+		ltssm_state = CSR_FR(csr_base, LPU_LTSSM_STATUS1, LTSSM_STATE);
+		if (ltssm_state == LPU_LTSSM_L1_IDLE || (--ntries <= 0))
+			break;
+		delay(1);
+	}
+	DBG(DBG_PWR, NULL, "check_for_l1idle: ltssm_state %x\n", ltssm_state);
+	return ((ltssm_state == LPU_LTSSM_L1_IDLE) ? DDI_SUCCESS : DDI_FAILURE);
+}
+
+/*
+ * Tranisition the link to L0, after it is down.
+ */
+int
+px_link_retrain(caddr_t csr_base)
+{
+	volatile uint64_t reg;
+
+	reg = CSR_XR(csr_base, TLU_CONTROL);
+	if (!(reg & (1ull << TLU_REMAIN_DETECT_QUIET))) {
+		DBG(DBG_PWR, NULL, "retrain_link: detect.quiet bit not set\n");
+		return (DDI_FAILURE);
+	}
+
+	/* Clear link down bit in TLU Other Event Clear Status Register. */
+	CSR_BS(csr_base, TLU_OTHER_EVENT_STATUS_CLEAR, LDN_P);
+
+	/* Clear Drain bit in TLU Status Register */
+	CSR_BS(csr_base, TLU_STATUS, DRAIN);
+
+	/* Clear Remain in Detect.Quiet bit in TLU Control Register */
+	reg = CSR_XR(csr_base, TLU_CONTROL);
+	reg &= ~(1ull << TLU_REMAIN_DETECT_QUIET);
+	CSR_XS(csr_base, TLU_CONTROL, reg);
+
+	return (DDI_SUCCESS);
+}
+
+void
+px_enable_detect_quiet(caddr_t csr_base)
+{
+	volatile uint64_t tlu_ctrl;
+
+	tlu_ctrl = CSR_XR(csr_base, TLU_CONTROL);
+	tlu_ctrl |= (1ull << TLU_REMAIN_DETECT_QUIET);
+	CSR_XS(csr_base, TLU_CONTROL, tlu_ctrl);
 }

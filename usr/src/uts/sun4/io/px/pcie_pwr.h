@@ -35,14 +35,6 @@ extern "C" {
 
 #include "px_ioapi.h"	/* for msiq */
 
-/*
- * device port types coarsely defined for PM purpose
- */
-typedef enum pcie_devport {
-	_PCIE_END, _PCIE_ROOTCMPLX, _SWITCH_UP,
-	_SWITCH_DOWN, _BRIDGE_UP, _BRIDGE_DOWN, _PCI_PCI
-} pcie_devport_t;
-
 /* index of counters for each level */
 #define	PCIE_D3_INDEX		PM_LEVEL_D3
 #define	PCIE_D2_INDEX 		PM_LEVEL_D2
@@ -60,12 +52,9 @@ typedef struct pcie_pwr {
 	 */
 	kmutex_t	pwr_lock;	/* to protect the counters and  */
 					/* power level change		*/
-
-	/* capability, dev type */
 	int		pwr_pmcaps;	/* pm capability */
 	ddi_acc_handle_t pwr_conf_hdl;	/* for config access */
 	uint8_t		pwr_pmcsr_offset; /* PMCSR offset */
-	pcie_devport_t	pwr_devport;	/* def. extended to include pci */
 	int		pwr_link_lvl;	/* link level. Currently not used */
 	int		pwr_func_lvl;	/* function power level */
 	int		pwr_flags;	/* flags */
@@ -76,11 +65,6 @@ typedef struct pcie_pwr {
 	 */
 	int		pwr_counters[PCIE_MAX_PWR_LEVELS];
 
-	/* fields used by pcie driver */
-	kmutex_t	pwr_intr_lock;	/* used in the interrupt */
-	kcondvar_t	pwr_cv;		/* used in interrupt and timeout */
-	msiqid_t	pwr_msiq_id;	/* EQ id for PME ack messages	*/
-	uint32_t	pwr_pmetoack_ignored; /* count of PME_To_ACKs ignored */
 } pcie_pwr_t;
 
 typedef struct pcie_pwr_child {
@@ -143,9 +127,7 @@ typedef struct pcie_pm {
  */
 #define	PCIE_ASPM_ENABLED		0x01
 #define	PCIE_SLOT_LOADED		0x02
-#define	PCIE_PMETOACK_RECVD		0x04
-#define	PCIE_PME_TURNOFF_PENDING	0x08
-#define	PCIE_PM_BUSY			0x10
+#define	PCIE_PM_BUSY			0x04
 
 #define	PM_LEVEL_L3	0
 #define	PM_LEVEL_L2	1
@@ -177,8 +159,6 @@ extern int pcie_pwr_suspend(dev_info_t *dip);
 extern int pcie_pwr_resume(dev_info_t *dip);
 extern int pcie_pm_hold(dev_info_t *dip);
 extern void pcie_pm_release(dev_info_t *dip);
-extern void pcie_pmetoack_timeout(void *arg);
-extern uint_t pcie_pwr_intr(caddr_t arg);
 
 #ifdef	__cplusplus
 }

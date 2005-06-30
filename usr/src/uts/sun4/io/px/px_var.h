@@ -132,6 +132,23 @@ struct px {
 
 	/* Platform specific information */
 	void	*px_plat_p;
+
+	/* Power Management fields */
+	kmutex_t	px_l23ready_lock; /* used in PME_To_ACK interrupt */
+	kcondvar_t	px_l23ready_cv;	/* used in PME_TO_ACK timeout */
+
+	/* Fields below deal with link up interrupt */
+	kmutex_t	px_lup_lock;
+	kcondvar_t	px_lup_cv;	/* used in LUP event timeout */
+	kmutex_t	px_lupsoft_lock;
+	ddi_softintr_t	px_lupsoft_id;
+	int		px_lupsoft_pending;
+	int		px_pm_flags;
+	msiqid_t	px_pm_msiq_id;	/* EQ id for PCIE_PME_ACK_MSG Message */
+	uint32_t	px_pmetoack_ignored; /* count of PME_To_ACKs ignored */
+	uint32_t	px_pme_ignored; /* count of PME ignored */
+	uint32_t	px_lup_ignored; /* count of link up events ignored */
+
 };
 
 /* px soft state flag */
@@ -139,6 +156,12 @@ struct px {
 #define	PX_SOFT_STATE_OPEN_EXCL		0x02
 #define	PX_SOFT_STATE_CLOSED		0x04
 #define	PX_BYPASS_DMA_ALLOWED		0x10
+
+/* px_pm_flags definitions */
+#define	PX_PMETOACK_RECVD		0x1
+#define	PX_PME_TURNOFF_PENDING		0x2
+#define	PX_LINKUP_RECVD			0x4
+#define	PX_LINKUP_PENDING		0x8
 
 #define	DIP_TO_INST(dip)	ddi_get_instance(dip)
 #define	INST_TO_STATE(inst)	ddi_get_soft_state(px_state_p, inst)

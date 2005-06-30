@@ -58,6 +58,8 @@ ulong_t px_mmu_dvma_end = 0xfffffffful;
 uint_t px_ranges_phi_mask = 0xfffffffful;
 
 static int px_goto_l23ready(px_t *px_p);
+static int px_goto_l0(px_t *px_p);
+static int px_pre_pwron_check(px_t *px_p);
 static uint32_t px_identity_chip(px_t *px_p);
 static void px_lib_clr_errs(px_t *px_p, px_pec_t *pec_p);
 
@@ -1610,6 +1612,7 @@ px_lib_ctlops_peek(dev_info_t *dip, dev_info_t *rdip,
 	return (in_args->handle ? px_lib_do_caut_get(dip, in_args) :
 	    px_lib_do_peek(dip, in_args));
 }
+
 /*
  * implements PPM interface
  */
@@ -1630,9 +1633,12 @@ px_lib_pmctl(int cmd, px_t *px_p)
 		return (px_goto_l23ready(px_p));
 
 	case PPMREQ_PRE_PWR_ON:
+		DBG(DBG_PWR, px_p->px_dip, "ioctl: PRE_PWR_ON request\n");
+		return (px_pre_pwron_check(px_p));
+
 	case PPMREQ_POST_PWR_ON:
-		/* code to be written for Fire 2.0. return failure for now */
-		return (DDI_FAILURE);
+		DBG(DBG_PWR, px_p->px_dip, "ioctl: POST_PWR_ON request\n");
+		return (px_goto_l0(px_p));
 
 	default:
 		return (DDI_FAILURE);
@@ -1657,6 +1663,7 @@ px_goto_l23ready(px_t *px_p)
 	caddr_t	csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
 	int		ret = DDI_SUCCESS;
 	clock_t		end, timeleft;
+	int		mutex_held = 1;
 
 	/* If no PM info, return failure */
 	if (!PCIE_PMINFO(px_p->px_dip) ||
@@ -1664,19 +1671,19 @@ px_goto_l23ready(px_t *px_p)
 		return (DDI_FAILURE);
 
 	mutex_enter(&pwr_p->pwr_lock);
-	mutex_enter(&pwr_p->pwr_intr_lock);
+	mutex_enter(&px_p->px_l23ready_lock);
 	/* Clear the PME_To_ACK receieved flag */
-	pwr_p->pwr_flags &= ~PCIE_PMETOACK_RECVD;
+	px_p->px_pm_flags &= ~PX_PMETOACK_RECVD;
 	if (px_send_pme_turnoff(csr_base) != DDI_SUCCESS) {
 		ret = DDI_FAILURE;
 		goto l23ready_done;
 	}
-	pwr_p->pwr_flags |= PCIE_PME_TURNOFF_PENDING;
+	px_p->px_pm_flags |= PX_PME_TURNOFF_PENDING;
 
 	end = ddi_get_lbolt() + drv_usectohz(px_pme_to_ack_timeout);
-	while (!(pwr_p->pwr_flags & PCIE_PMETOACK_RECVD)) {
-		timeleft = cv_timedwait(&pwr_p->pwr_cv,
-		    &pwr_p->pwr_intr_lock, end);
+	while (!(px_p->px_pm_flags & PX_PMETOACK_RECVD)) {
+		timeleft = cv_timedwait(&px_p->px_l23ready_cv,
+		    &px_p->px_l23ready_lock, end);
 		/*
 		 * if cv_timedwait returns -1, it is either
 		 * 1) timed out or
@@ -1689,7 +1696,7 @@ px_goto_l23ready(px_t *px_p)
 		if (timeleft == -1)
 			break;
 	}
-	if (!(pwr_p->pwr_flags & PCIE_PMETOACK_RECVD)) {
+	if (!(px_p->px_pm_flags & PX_PMETOACK_RECVD)) {
 		/*
 		 * Either timedout or interrupt didn't get a
 		 * chance to grab the mutex and set the flag.
@@ -1698,26 +1705,175 @@ px_goto_l23ready(px_t *px_p)
 		 * set the flag 2) creates a delay between two
 		 * consequetive requests.
 		 */
-		mutex_exit(&pwr_p->pwr_intr_lock);
+		mutex_exit(&px_p->px_l23ready_lock);
 		delay(5);
-		mutex_enter(&pwr_p->pwr_intr_lock);
-		if (!(pwr_p->pwr_flags & PCIE_PMETOACK_RECVD)) {
+		mutex_held = 0;
+		if (!(px_p->px_pm_flags & PX_PMETOACK_RECVD)) {
 			ret = DDI_FAILURE;
 			DBG(DBG_PWR, px_p->px_dip, " Timed out while waiting"
 			    " for PME_TO_ACK\n");
 		}
 	}
-	/* PME_To_ACK receieved */
-	pwr_p->pwr_flags &= ~(PCIE_PME_TURNOFF_PENDING | PCIE_PMETOACK_RECVD);
-
-	/* TBD: wait till link is in L2/L3 ready (link status reg) */
+	px_p->px_pm_flags &= ~(PX_PME_TURNOFF_PENDING | PX_PMETOACK_RECVD);
 
 l23ready_done:
-	mutex_exit(&pwr_p->pwr_intr_lock);
+	if (mutex_held)
+		mutex_exit(&px_p->px_l23ready_lock);
+	/*
+	 * Wait till link is in L1 idle, if sending PME_Turn_Off
+	 * was succesful.
+	 */
+	if (ret == DDI_SUCCESS) {
+		if (px_link_wait4l1idle(csr_base) != DDI_SUCCESS) {
+			DBG(DBG_PWR, px_p->px_dip, " Link is not at L1"
+			    "even though we received PME_To_ACK.\n");
+			ret = DDI_FAILURE;
+		} else
+			pwr_p->pwr_link_lvl = PM_LEVEL_L3;
+
+	}
 	mutex_exit(&pwr_p->pwr_lock);
 	return (ret);
 }
 
+/*
+ * Message interrupt handler intended to be shared for both
+ * PME and PME_TO_ACK msg handling, currently only handles
+ * PME_To_ACK message.
+ */
+uint_t
+px_pmeq_intr(caddr_t arg)
+{
+	px_t	*px_p = (px_t *)arg;
+
+	mutex_enter(&px_p->px_l23ready_lock);
+	cv_broadcast(&px_p->px_l23ready_cv);
+	if (px_p->px_pm_flags & PX_PME_TURNOFF_PENDING) {
+		px_p->px_pm_flags |= PX_PMETOACK_RECVD;
+	} else {
+		/*
+		 * This maybe the second ack received. If so then,
+		 * we should be receiving it during wait4L1 stage.
+		 */
+		px_p->px_pmetoack_ignored++;
+	}
+	mutex_exit(&px_p->px_l23ready_lock);
+	return (DDI_INTR_CLAIMED);
+}
+
+static int
+px_pre_pwron_check(px_t *px_p)
+{
+	pcie_pwr_t	*pwr_p;
+
+	/* If no PM info, return failure */
+	if (!PCIE_PMINFO(px_p->px_dip) ||
+	    !(pwr_p = PCIE_NEXUS_PMINFO(px_p->px_dip)))
+		return (DDI_FAILURE);
+
+	return (pwr_p->pwr_link_lvl == PM_LEVEL_L3 ? DDI_SUCCESS : DDI_FAILURE);
+}
+
+static int
+px_goto_l0(px_t *px_p)
+{
+	pcie_pwr_t	*pwr_p;
+	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
+	caddr_t csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
+	int		ret = DDI_SUCCESS;
+	clock_t		end, timeleft;
+	int		mutex_held = 1;
+
+	/* If no PM info, return failure */
+	if (!PCIE_PMINFO(px_p->px_dip) ||
+	    !(pwr_p = PCIE_NEXUS_PMINFO(px_p->px_dip)))
+		return (DDI_FAILURE);
+
+	mutex_enter(&pwr_p->pwr_lock);
+	mutex_enter(&px_p->px_lupsoft_lock);
+	/* Clear the LINKUP_RECVD receieved flag */
+	px_p->px_pm_flags &= ~PX_LINKUP_RECVD;
+	if (px_link_retrain(csr_base) != DDI_SUCCESS) {
+		ret = DDI_FAILURE;
+		goto l0_done;
+	}
+	px_p->px_pm_flags |= PX_LINKUP_PENDING;
+
+	end = ddi_get_lbolt() + drv_usectohz(px_linkup_timeout);
+	while (!(px_p->px_pm_flags & PX_LINKUP_RECVD)) {
+		timeleft = cv_timedwait(&px_p->px_lup_cv,
+		    &px_p->px_lupsoft_lock, end);
+		/*
+		 * if cv_timedwait returns -1, it is either
+		 * 1) timed out or
+		 * 2) there was a pre-mature wakeup but by the time
+		 * cv_timedwait is called again end < lbolt i.e.
+		 * end is in the past.
+		 * 3) By the time we make first cv_timedwait call,
+		 * end < lbolt is true.
+		 */
+		if (timeleft == -1)
+			break;
+	}
+	if (!(px_p->px_pm_flags & PX_LINKUP_RECVD)) {
+		/*
+		 * Either timedout or interrupt didn't get a
+		 * chance to grab the mutex and set the flag.
+		 * release the mutex and delay for sometime.
+		 * This will 1) give a chance for interrupt to
+		 * set the flag 2) creates a delay between two
+		 * consequetive requests.
+		 */
+		mutex_exit(&px_p->px_lupsoft_lock);
+		mutex_held = 0;
+		delay(5);
+		if (!(px_p->px_pm_flags & PX_LINKUP_RECVD)) {
+			ret = DDI_FAILURE;
+			DBG(DBG_PWR, px_p->px_dip, " Timed out while waiting"
+			    " for link up\n");
+		}
+	}
+	px_p->px_pm_flags &= ~(PX_LINKUP_PENDING | PX_LINKUP_RECVD);
+
+l0_done:
+	if (mutex_held)
+		mutex_exit(&px_p->px_lupsoft_lock);
+	if (ret == DDI_SUCCESS)
+		px_enable_detect_quiet(csr_base);
+	mutex_exit(&pwr_p->pwr_lock);
+	return (ret);
+}
+
+uint_t
+px_lup_softintr(caddr_t arg)
+{
+	px_t *px_p = (px_t *)arg;
+
+	mutex_enter(&px_p->px_lup_lock);
+	if (!(px_p->px_lupsoft_pending > 0)) {
+		/* Spurious */
+		mutex_exit(&px_p->px_lup_lock);
+		return (DDI_INTR_UNCLAIMED);
+	}
+	px_p->px_lupsoft_pending--;
+	if (px_p->px_lupsoft_pending > 0) {
+		/* More than one lup soft intr posted - unlikely */
+		mutex_exit(&px_p->px_lup_lock);
+		return (DDI_INTR_UNCLAIMED);
+	}
+	mutex_exit(&px_p->px_lup_lock);
+
+	mutex_enter(&px_p->px_lupsoft_lock);
+	cv_broadcast(&px_p->px_lup_cv);
+	if (px_p->px_pm_flags & PX_LINKUP_PENDING) {
+		px_p->px_pm_flags |= PX_LINKUP_RECVD;
+	} else {
+		/* Nobody waiting for this! */
+		px_p->px_lup_ignored++;
+	}
+	mutex_exit(&px_p->px_lupsoft_lock);
+	return (DDI_INTR_CLAIMED);
+}
 
 /*
  * Extract the drivers binding name to identify which chip we're binding to.

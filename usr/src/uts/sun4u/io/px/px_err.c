@@ -41,6 +41,7 @@
 #include <px_regs.h>
 #include <px_csr.h>
 #include <sys/membar.h>
+#include "pcie_pwr.h"
 #include "px_lib4u.h"
 #include "px_err.h"
 #include "px_err_impl.h"
@@ -117,7 +118,7 @@ px_err_bit_desc_t px_err_imu_tbl[] = {
 	{ IMU_BIT_DESC(MSI_MAL_ERR,		non_fatal,	imu_rds) },
 	{ IMU_BIT_DESC(MSI_PAR_ERR,		fatal_stuck,	imu_rds) },
 	{ IMU_BIT_DESC(PMEACK_MES_NOT_EN,	imu_rbne,	imu_rds) },
-	{ IMU_BIT_DESC(PMPME_MES_NOT_EN,	imu_rbne,	imu_rds) },
+	{ IMU_BIT_DESC(PMPME_MES_NOT_EN,	imu_pme,	imu_rds) },
 	{ IMU_BIT_DESC(FATAL_MES_NOT_EN,	imu_rbne,	imu_rds) },
 	{ IMU_BIT_DESC(NONFATAL_MES_NOT_EN,	imu_rbne,	imu_rds) },
 	{ IMU_BIT_DESC(COR_MES_NOT_EN,		imu_rbne,	imu_rds) },
@@ -254,7 +255,7 @@ px_err_bit_desc_t px_err_tlu_oe_tbl[] = {
 	{ TLU_OE_BIT_DESC(LIN,		non_fatal,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(LRS,		non_fatal,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(LDN,		non_fatal,	pciex_oe) },
-	{ TLU_OE_BIT_DESC(LUP,		non_fatal,	pciex_oe) },
+	{ TLU_OE_BIT_DESC(LUP,		tlu_lup,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(ERU,		fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(ERO,		fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(EMP,		fatal_gos,	pciex_oe) },
@@ -458,7 +459,8 @@ px_err_cb_intr(caddr_t arg)
 	dev_info_t	*leafdip;
 	px_t		*px_p = DIP_TO_STATE(rpdip);
 	px_cb_t		*cb_p = px_p->px_cb_p;
-	int		err = PX_OK, ret;
+	int		err = PX_OK;
+	int		ret = DDI_FM_OK;
 	int		fatal = 0;
 	int		nonfatal = 0;
 	int		unknown = 0;
@@ -537,7 +539,8 @@ px_err_dmc_pec_intr(caddr_t arg)
 	dev_info_t	*rpdip = px_fault_p->px_fh_dip;
 	px_t		*px_p = DIP_TO_STATE(rpdip);
 	px_cb_t		*cb_p = px_p->px_cb_p;
-	int		err = PX_OK, ret;
+	int		err = PX_OK;
+	int		ret = DDI_FM_OK;
 	ddi_fm_error_t	derr;
 
 	/* Create the derr */
@@ -680,7 +683,7 @@ px_err_handle(px_t *px_p, ddi_fm_error_t *derr, int caller,
 {
 	px_cb_t			*cb_p = px_p->px_cb_p; /* for fm_mutex */
 	px_err_ss_t		ss;
-	int			err;
+	int			err = PX_OK;
 
 	ASSERT(MUTEX_HELD(&cb_p->xbc_fm_mutex));
 
@@ -701,9 +704,8 @@ px_err_handle(px_t *px_p, ddi_fm_error_t *derr, int caller,
 		px_pec_t	*pec_p = px_p->px_pec_p;
 		on_trap_data_t	*otd = pec_p->pec_ontrap_data;
 
-		if ((otd != NULL) && (otd->ot_prot & OT_DATA_ACCESS)) {
+		if ((otd != NULL) && (otd->ot_prot & OT_DATA_ACCESS))
 			otd->ot_trap |= OT_DATA_ACCESS;
-		}
 	}
 
 	return (err);
@@ -864,7 +866,10 @@ px_err_check_severity(px_t *px_p, ddi_fm_error_t *derr, int err, int caller)
 {
 	px_pec_t 	*pec_p = px_p->px_pec_p;
 	boolean_t	is_safeacc = B_FALSE;
-	int		ret = err;
+
+	/* nothing to do if called with no error */
+	if (err == PX_OK)
+		return (err);
 
 	/* Cautious access error handling  */
 	switch (derr->fme_flag) {
@@ -903,18 +908,9 @@ px_err_check_severity(px_t *px_p, ddi_fm_error_t *derr, int err, int caller)
 	 * Fire register, re-adjust error status from safe access.
 	 */
 	if (is_safeacc && !(err & PX_FATAL_GOS))
-		ret = PX_NONFATAL;
+		return (PX_NONFATAL);
 
-	if (err & PX_FATAL_GOS)
-		ret = PX_FATAL_GOS;
-	else if (err & (PX_STUCK_FATAL | PX_FATAL_SW))
-		err &= (PX_STUCK_FATAL | PX_FATAL_SW);
-	else if (err & (PX_NONFATAL | PX_FATAL_HW))
-		ret = PX_NONFATAL;
-	else
-		ret = PX_OK;
-
-	return (ret);
+	return (err);
 }
 
 /* predefined convenience functions */
@@ -1311,6 +1307,22 @@ px_err_imu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 	return (err);
 }
 
+/*
+ * No platforms uses PME. Any PME received is simply logged
+ * for analysis.
+ */
+/* ARGSUSED */
+int
+px_err_imu_pme_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr)
+{
+	px_t		*px_p = DIP_TO_STATE(rpdip);
+
+	px_p->px_pme_ignored++;
+	return (PX_NONFATAL);
+}
+
 /* handle EQ overflow */
 /* ARGSUSED */
 int
@@ -1499,6 +1511,36 @@ px_err_mmu_tblwlk_handle(dev_info_t *rpdip, caddr_t csr_base,
 		rpdip, DMA_HANDLE, derr->fme_ena, (void *)mmu_tfa);
 
 	return ((ret == DDI_FM_FATAL) ? PX_FATAL_GOS : PX_NONFATAL);
+}
+
+/*
+ * TLU LUP event - power management code is interested in this event.
+ */
+/* ARGSUSED */
+int
+px_err_tlu_lup_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr)
+{
+	px_t	*px_p = DIP_TO_STATE(rpdip);
+
+	/*
+	 * Existense of pm info indicates the power management
+	 * is interested in this event.
+	 */
+	if (!PCIE_PMINFO(rpdip) || !PCIE_NEXUS_PMINFO(rpdip))
+		return (PX_OK);
+
+	mutex_enter(&px_p->px_lup_lock);
+	px_p->px_lupsoft_pending++;
+	mutex_exit(&px_p->px_lup_lock);
+
+	/*
+	 * Post a soft interrupt to wake up threads waiting for this.
+	 */
+	ddi_trigger_softintr(px_p->px_lupsoft_id);
+
+	return (PX_OK);
 }
 
 /* PEC ILU none - see io erpt doc, section 3.1 */
