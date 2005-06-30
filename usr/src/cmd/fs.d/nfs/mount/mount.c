@@ -2353,9 +2353,18 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 					nfs_proto);
 				break;
 			case ERR_PROTO_UNSUPP:
-				pr_err(gettext("%s: NFS service does not"
-					" support protocol: %s.\n"), fshost,
-					nfs_proto);
+				if (nfsvers_to_use == NFS_VERSMIN) {
+					/*
+					 * Print this message after we have
+					 * tried all versions of NFS and none
+					 * support the asked transport.
+					 * Otherwise we depricate the version
+					 * and retry below.
+					 */
+					pr_err(gettext("%s: NFS service does"
+						" not support protocol: %s.\n"),
+						fshost, nfs_proto);
+				}
 				break;
 			case ERR_NOHOST:
 				pr_err("%s: %s\n", fshost, "Unknown host");
@@ -2375,8 +2384,15 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 		else if (addr_error.error_type == ERR_RPCERROR &&
 			! IS_UNRECOVERABLE_RPC(addr_error.error_value)) {
 			return (RET_RETRY);
-		}
-		else
+		} else if (nfsvers == 0 && addr_error.error_type ==
+			ERR_PROTO_UNSUPP && nfsvers_to_use != NFS_VERSMIN) {
+			/*
+			 * If no version is specified, and the error is due
+			 * to an unsupported transport, then depricate the
+			 * version and retry.
+			 */
+			return (RET_RETRY);
+		} else
 			return (RET_ERR);
 	}
 	nconf = *nconfp;
