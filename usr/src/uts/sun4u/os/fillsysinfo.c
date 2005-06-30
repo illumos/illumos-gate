@@ -914,10 +914,14 @@ check_cpus_set(void)
 
 	/*
 	 * Change from mmu_page_sizes from 4 to 6 for totally-Panther domains,
-	 * where npanther == ncpunode.
+	 * where npanther == ncpunode. Also, set ecache_alignsize (and a few
+	 * other globals) to the correct value for totally-Panther domains.
 	 */
 	if (&mmu_init_mmu_page_sizes) {
 		(void) mmu_init_mmu_page_sizes(npanther);
+	}
+	if ((npanther == ncpunode) && (&cpu_fix_allpanther)) {
+		cpu_fix_allpanther();
 	}
 
 	/*

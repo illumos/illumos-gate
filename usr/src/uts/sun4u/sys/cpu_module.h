@@ -59,11 +59,15 @@ void	cpu_kdi_init(struct kdi *);
 /*
  * set CPU implementation details
  *
+ * set Panther CPU implementation details
+ *
  * mmu_init_mmu_page_sizes changes the mmu_page_sizes variable from
  *	The default 4 page sizes to 6 page sizes for Panther-only domains,
  *	and is called from fillsysinfo.c:check_cpus_set at early bootup time.
  */
 void	cpu_fiximp(dnode_t dnode);
+#pragma weak cpu_fix_allpanther
+void	cpu_fix_allpanther(void);
 #pragma weak mmu_init_mmu_page_sizes
 int	mmu_init_mmu_page_sizes(int cinfo);
 

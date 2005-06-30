@@ -141,6 +141,24 @@ cpu_fiximp(dnode_t dnode)
 	vac = 1;
 }
 
+/*
+ * Use Panther values for Panther-only domains.
+ * See Panther PRM, 1.5.4 Cache Hierarchy
+ */
+void
+cpu_fix_allpanther(void)
+{
+	/* dcache same as Ch+ */
+	icache_size = PN_ICACHE_SIZE;
+	icache_linesize = PN_ICACHE_LSIZE;
+	ecache_size = PN_L3_SIZE;
+	ecache_alignsize = PN_L3_LINESIZE;
+	ecache_associativity = PN_L3_NWAYS;
+	ecache_setsize = PN_L3_SET_SIZE;
+	ASSERT(ecache_setsize >= (ecache_size / ecache_associativity));
+	/* vac same as Ch+ */
+}
+
 void
 send_mondo_set(cpuset_t set)
 {
