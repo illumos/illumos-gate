@@ -507,7 +507,7 @@ meta_set_take(
 	int			rb_level = 0;
 	md_error_t		xep = mdnullerror;
 	mdsetname_t		*local_sp = NULL;
-	side_t			side = MD_KEYWILD;
+	side_t			side;
 	int			ret = 0;
 	char			*newname = NULL;
 	mdkey_t			side_names_key;
@@ -574,27 +574,28 @@ meta_set_take(
 		rval = -1;
 		goto out;
 	}
+
 	/*
-	 * Get the current side number - do not use getmyside()
-	 * as this code is essentially getnodeside() and this saves
-	 * some instructions.
+	 * Find the "side" value so that it can be used to deal with
+	 * the devids.
 	 */
-	for (i = 0; i < MD_MAXSIDES; i++) {
-		if (sd->sd_nodes[i][0] == '\0')
-			continue;
-		if (strcmp(sd->sd_nodes[i], mynode()) == 0) {
-			/*
-			 * SKEW is required for the local set
-			 * as side 0 in this set is the node
-			 * associated with it (this node).
-			 */
-			side = i + SKEW;
-			break;
-		}
+	side = getnodeside(mynode(), sd);
+
+	if (side == MD_SIDEWILD) {
+	    (void) mddserror(ep, MDE_DS_HOSTNOSIDE, sp->setno, mynode(),
+		NULL, mynode());
+	    rval = -1;
+	    goto out;
 	}
-	if (side == MD_KEYWILD)
-		return (mddserror(ep, MDE_DS_HOSTNOSIDE, sp->setno, mynode(),
-		    NULL, mynode()));
+
+	/*
+	 * A local sets' side 0 references records associated with
+	 * that node's local set. As this is a non-local set, "side"
+	 * must be modified (by adding a SKEW) before we reference
+	 * records in the local set [setno = 0] for the non-local set
+	 * [setno = 1..n].
+	 */
+	side += SKEW;
 
 	/*
 	 * Check the local devid namespace to see if the disks
