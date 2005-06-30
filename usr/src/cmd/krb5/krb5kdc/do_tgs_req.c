@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -740,7 +740,11 @@ krb5_data **response;
 
     retval = krb5_mk_error(kdc_context, &errpkt, scratch);
     free(errpkt.text.data);
+    if (retval)
+    free(scratch); 
+    else
     *response = scratch;
+    
     return retval;
 }
 

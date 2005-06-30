@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,7 +98,9 @@ krb5_unparse_name_ext(context, principal, name, size)
 				totalsize++;
 		totalsize++;	/* This is for the separator */
 	}
-
+	if (nelem == 0 )
+		totalsize++;
+	
 	/*
 	 * Allocate space for the ascii string; if space has been
 	 * provided, use it, realloc'ing it if necessary.
