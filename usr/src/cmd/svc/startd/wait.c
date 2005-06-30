@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,6 +103,10 @@ wait_remove(wait_info_t *wi, int direct)
 	}
 
 	MUTEX_LOCK(&wait_info_lock);
+	if (wi->wi_fd != -1) {
+		startd_close(wi->wi_fd);
+		wi->wi_fd = -1;
+	}
 	uu_list_remove(wait_info_list, wi);
 	MUTEX_UNLOCK(&wait_info_lock);
 
@@ -218,20 +222,22 @@ wait_thread(void *args)
 		port_event_t pe;
 		int fd;
 		wait_info_t *wi;
-		struct timespec ts;
 
-		ts.tv_sec = 1;
-		ts.tv_nsec = 0;
-
-		if (port_get(port_fd, &pe, &ts) == -1)
-			if (errno == EINTR || errno == ETIME)
+		if (port_get(port_fd, &pe, NULL) != 0) {
+			if (errno == EINTR)
 				continue;
-			else
+			else {
 				log_error(LOG_WARNING,
-				    "port_get returned %s\n", strerror(errno));
+				    "port_get() failed with %s\n",
+				    strerror(errno));
+				bad_error("port_get", errno);
+			}
+		}
 
 		fd = pe.portev_object;
 		wi = pe.portev_user;
+		assert(wi != NULL);
+		assert(fd == wi->wi_fd);
 
 		if ((pe.portev_events & POLLHUP) == POLLHUP) {
 			psinfo_t psi;
@@ -271,9 +277,6 @@ wait_thread(void *args)
 		}
 
 err_remove:
-		startd_close(fd);
-		wi->wi_fd = -1;
-
 		wait_remove(wi, 0);
 	}
 
