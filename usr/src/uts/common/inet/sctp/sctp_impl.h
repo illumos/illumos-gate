@@ -1075,7 +1075,6 @@ extern int	sctp_shutdown_received(sctp_t *, sctp_chunk_hdr_t *, int, int);
 extern void	sctp_shutdown_complete(sctp_t *);
 extern void	sctp_set_if_mtu(sctp_t *);
 extern void	sctp_set_iplen(sctp_t *, mblk_t *);
-extern void	sctp_set_rto(sctp_t *, clock_t);
 extern void	sctp_set_ulp_prop(sctp_t *);
 extern size_t	sctp_supaddr_param_len(sctp_t *);
 extern size_t	sctp_supaddr_param(sctp_t *, uchar_t *);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,8 +182,9 @@ sctp_ire2faddr(sctp_t *sctp, sctp_faddr_t *fp)
 	 * have any yet.
 	 */
 	if (fp->srtt == -1 && ire->ire_uinfo.iulp_rtt != 0) {
-		fp->srtt = ire->ire_uinfo.iulp_rtt;
-		fp->rttvar = ire->ire_uinfo.iulp_rtt_sd;
+		/* The cached value is in ms. */
+		fp->srtt = MSEC_TO_TICK(ire->ire_uinfo.iulp_rtt);
+		fp->rttvar = MSEC_TO_TICK(ire->ire_uinfo.iulp_rtt_sd);
 		fp->rto = 3 * fp->srtt;
 
 		/* Bound the RTO by configured min and max values */
@@ -255,26 +256,27 @@ sctp_faddr2ire(sctp_t *sctp, sctp_faddr_t *fp)
 		}
 	}
 
-	if (fp->rtt_updates >= sctp_rtt_updates) {
+	if (sctp_rtt_updates != 0 && fp->rtt_updates >= sctp_rtt_updates) {
 		/*
 		 * If there is no old cached values, initialize them
 		 * conservatively.  Set them to be (1.5 * new value).
-		 * This code copied from ip_ire_advise().
+		 * This code copied from ip_ire_advise().  The cached
+		 * value is in ms.
 		 */
 		if (ire->ire_uinfo.iulp_rtt != 0) {
 			ire->ire_uinfo.iulp_rtt = (ire->ire_uinfo.iulp_rtt +
-			    fp->srtt) >> 1;
+			    TICK_TO_MSEC(fp->srtt)) >> 1;
 		} else {
-			ire->ire_uinfo.iulp_rtt = fp->srtt +
-			    (fp->srtt >> 1);
+			ire->ire_uinfo.iulp_rtt = TICK_TO_MSEC(fp->srtt +
+			    (fp->srtt >> 1));
 		}
 		if (ire->ire_uinfo.iulp_rtt_sd != 0) {
 			ire->ire_uinfo.iulp_rtt_sd =
 			    (ire->ire_uinfo.iulp_rtt_sd +
-			    fp->rttvar) >> 1;
+			    TICK_TO_MSEC(fp->rttvar)) >> 1;
 		} else {
-			ire->ire_uinfo.iulp_rtt_sd = fp->rttvar +
-			    (fp->rttvar >> 1);
+			ire->ire_uinfo.iulp_rtt_sd = TICK_TO_MSEC(fp->rttvar +
+			    (fp->rttvar >> 1));
 		}
 		fp->rtt_updates = 0;
 	}
