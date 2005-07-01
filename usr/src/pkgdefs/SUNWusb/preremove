@@ -81,7 +81,18 @@ fi
 
 if installed ehci
 then
-	rem_drv -b ${BASEDIR} ehci || EXIT=1
+	#
+	# Only rem_drv ehci if there are no user-defined aliases
+	# Be careful about the egrep [ ] regexp - it should be
+	# [<SAPCE><TAB>]
+	# 
+
+	egrep "^ehci[ 	]" $BASEDIR/etc/driver_aliases | \
+	    grep -v "pciclass,0c0320" > /dev/null 2>&1
+
+	if [ $? -eq 1 ]; then
+		rem_drv -b ${BASEDIR} ehci || EXIT=1
+	fi
 fi
 
 if installed uhci

@@ -1011,7 +1011,14 @@ typedef struct setup_pkt {
  * workaround for ALI chips
  */
 #define	PCI_VENDOR_ALI		0x10b9		/* PCI Vendor-id Acer */
+
+/*
+ * VIA chips have some problems, the workaround can ensure those chips
+ * work reliably. Revisions >= 0x80 are part of a southbridge and appear
+ * to be reliable.
+ */
 #define	PCI_VENDOR_VIA		0x1106		/* PCI Vendor-id VIA */
+#define	PCI_VIA_REVISION_6212	0x80		/* VIA 6212 revision ID */
 
 #define	EHCI_VIA_LOST_INTERRUPTS	0x01
 #define	EHCI_VIA_ASYNC_SCHEDULE		0x02

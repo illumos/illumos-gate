@@ -959,14 +959,24 @@ ehci_init_ctlr(ehci_state_t	*ehcip)
 
 	/*
 	 * VIA chips have some issues and may not work reliably.
-	 * If we were bound using class pciclass,0c0320,
-	 * complain, else proceed. This will allow the user
-	 * to bind ehci specifically to this chip and not
-	 * have the warnings
+	 * Revisions >= 0x80 are part of a southbridge and appear
+	 * to be reliable with the workaround.
+	 * For revisions < 0x80, if we  were bound using class
+	 * complain, else proceed. This will allow the user to
+	 * bind ehci specifically to this chip and not have the
+	 * warnings
 	 */
-	if ((ehcip->ehci_vendor_id == PCI_VENDOR_VIA) &&
-	    (strcmp(DEVI(ehcip->ehci_dip)->devi_binding_name,
-	    "pciclass,0c0320") == 0)) {
+	if (ehcip->ehci_vendor_id == PCI_VENDOR_VIA) {
+
+	    if (ehcip->ehci_rev_id >= PCI_VIA_REVISION_6212) {
+
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+		    "ehci_init_ctlr: Applying VIA workarounds for "
+		    "the 6212 chip.");
+
+	    } else if (strcmp(DEVI(ehcip->ehci_dip)->devi_binding_name,
+		"pciclass,0c0320") == 0) {
+
 		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 		    "Due to recently discovered incompatibilities");
 		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
@@ -989,10 +999,12 @@ ehci_init_ctlr(ehci_state_t	*ehcip)
 		    "compatible USB products.");
 
 		return (DDI_FAILURE);
-	} else if ((ehcip->ehci_vendor_id == PCI_VENDOR_VIA) &&
-	    ehci_vt62x2_workaround) {
+
+	    } else if (ehci_vt62x2_workaround) {
+
 		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 		    "Applying VIA workarounds");
+	    }
 	}
 
 	/*
