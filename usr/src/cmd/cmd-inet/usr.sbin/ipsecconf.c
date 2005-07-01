@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,7 @@ static char spdsock_diag_buf[SPDSOCK_DIAG_BUF_LEN];
 #define	CURL_BEGIN		'{'
 #define	CURL_END		'}'
 #define	MAXARGS			20
+#define	NOERROR			0
 
 /*
  * IPSEC_CONF_ADD should start with 1, so that when multiple commands
@@ -1170,13 +1171,13 @@ send_pf_pol_message(int ipsec_cmd, ips_conf_t *conf)
 	int fd = get_pf_pol_socket();
 
 	if (fd < 0)
-		return (1);
+		return (EBADF);
 
 	retval = ips_conf_to_pfpol_msg(ipsec_cmd, conf, 1, &polmsg);
 
 	if (retval) {
 		(void) close(fd);
-		return (1);
+		return (ENOMEM);
 	}
 
 	total_len = polmsg.iov_len;
@@ -1202,8 +1203,12 @@ send_pf_pol_message(int ipsec_cmd, ips_conf_t *conf)
 
 			if (cnt > 8 && return_buf->spd_msg_errno) {
 				int diag = return_buf->spd_msg_diagnostic;
-				warnx("%s: %s", gettext("spd_msg return"),
-				    strerror(return_buf->spd_msg_errno));
+				if (!ipsecconf_qflag) {
+					warnx("%s: %s",
+					    gettext("spd_msg return"),
+					    strerror(
+					    return_buf->spd_msg_errno));
+				}
 				if (diag != 0)
 					(void) printf("%s\n",
 					    spdsock_diag(diag));
@@ -1213,10 +1218,11 @@ send_pf_pol_message(int ipsec_cmd, ips_conf_t *conf)
 				pfpol_msg_dump(return_buf,
 				    "send_pf_pol_message");
 #endif
+				retval = return_buf->spd_msg_errno;
 				free(return_buf);
 				free(polmsg.iov_base);
 				(void) close(fd);
-				return (1);
+				return (retval);
 			}
 
 			retval = spdsock_get_ext(exts, return_buf,
@@ -1232,7 +1238,7 @@ send_pf_pol_message(int ipsec_cmd, ips_conf_t *conf)
 					free(return_buf);
 					free(polmsg.iov_base);
 					(void) close(fd);
-					return (1);
+					return (ENOMEM);
 				}
 			}
 
@@ -1440,20 +1446,7 @@ lock()
 		/*
 		 * open() returned an EEXIST error. We don't fail yet
 		 * as it could be a residual from a previous
-		 * execution. However, we need to clear errno here.
-		 * If we don't and print_cmd_buf() is later invoked
-		 * as the result of a parsing error, it
-		 * will assume that the current error is EEXIST and
-		 * that a corresponding error message has already been
-		 * printed, which results in an incomplete error
-		 * message. If errno is zero, print_cmd_buf() will
-		 * assume that it is called as a result of a
-		 * parsing error and will print the appropriate
-		 * error message.
-		 */
-		errno = 0;
-
-		/*
+		 * execution.
 		 * File exists. make sure it is OK. We need to lstat()
 		 * as fstat() stats the file pointed to by the symbolic
 		 * link.
@@ -3020,15 +3013,14 @@ do_port_adds(ips_conf_t *cptr)
 #endif
 
 	ret = send_pf_pol_message(SPD_ADDRULE, cptr);
-	if (ret != 0) {
+	if (ret != 0 && !ipsecconf_qflag) {
 		warnx(
 		    gettext("Could not add IPv4 policy for sport %d, dport %d"),
 		    cptr->ips_src_port_min, cptr->ips_dst_port_min);
 
-		return (errno);
 	}
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -3194,21 +3186,22 @@ do_address_adds(ips_conf_t *cptr)
 
 			ret = send_pf_pol_message(SPD_ADDRULE, cptr);
 
-			if (ret != 0) {
+			if (ret == 0) {
+				add_count++;
+			} else {
 				/* For now, allow duplicate/overlap policies. */
-				if (errno != EEXIST) {
+				if (ret != EEXIST) {
 					/*
 					 * We have an error where we added
 					 * some, but had errors with others.
 					 * Undo the previous adds, and
 					 * bail.
 					 */
-					rc = errno;
+					rc = ret;
 					goto bail;
 				}
 			}
 
-			add_count++;
 			bzero(&cptr->ips_dst_mask_v6,
 			    sizeof (struct in6_addr));
 		}
@@ -3235,7 +3228,7 @@ bail:
 		 * to avoid a corresponding entry from being added
 		 * to ipsecpolicy.conf.
 		 */
-		if ((ret == -1) && (errno == EEXIST)) {
+		if ((ret == EEXIST)) {
 			/* All adds failed with EEXIST */
 			rc = EEXIST;
 		} else {
@@ -4810,15 +4803,20 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 }
 
 static int
-print_cmd_buf(FILE *fp)
+print_cmd_buf(FILE *fp, int error)
 {
 	*(cbuf + cbuf_offset) = '\0';
 
 	if (fp == stderr) {
-		if (errno == EEXIST) {
-			warnx(gettext("Command:\n%s"), cbuf);
+		if (ipsecconf_qflag) {
+			return (0);
+		}
+		if (error == EEXIST) {
+			warnx(gettext("Duplicate policy entry (ignored):\n%s"),
+			    cbuf);
 		} else {
-			warnx(gettext("Malformed command:\n%s"), cbuf);
+			warnx(gettext("Malformed command (fatal):\n%s"),
+			    cbuf);
 		}
 
 	} else {
@@ -4916,7 +4914,7 @@ ipsec_conf_add(void)
 		"\tthat are not subjected to policy constraints, may be\n"
 		"\tsubjected to policy constraints because of the new\n"
 		"\tpolicy. This can disrupt the communication of the\n"
-		"\texisting connections.\n");
+		"\texisting connections.\n\n");
 
 	if (act_props == NULL) {
 		warn(gettext("memory"));
@@ -4984,7 +4982,7 @@ ipsec_conf_add(void)
 				break;
 			case EEXIST:
 				/* duplicate entries, continue adds */
-				(void) print_cmd_buf(stderr);
+				(void) print_cmd_buf(stderr, EEXIST);
 				goto next;
 			default:
 				/* other error, bail */
@@ -4998,7 +4996,7 @@ ipsec_conf_add(void)
 				/* no error. */
 				break;
 			case EEXIST:
-				(void) print_cmd_buf(stderr);
+				(void) print_cmd_buf(stderr, EEXIST);
 				goto next;
 			case EBUSY:
 				warnx(gettext(
@@ -5030,6 +5028,7 @@ ipsec_conf_add(void)
 		}
 
 		/*
+		 * Go ahead and add policy entries to config file.
 		 * The # should help re-using the ipsecpolicy.conf
 		 * for input again as # will be treated as comment.
 		 */
@@ -5042,7 +5041,7 @@ ipsec_conf_add(void)
 			ret = -1;
 			break;
 		}
-		if (print_cmd_buf(policy_fp) == -1) {
+		if (print_cmd_buf(policy_fp, NOERROR) == -1) {
 			warnx(gettext("Addition incomplete. Please "
 			    "flush all the entries and re-configure :"));
 			reconfigure();
@@ -5092,7 +5091,7 @@ next:
 	}
 bail:
 	if (ret == -1) {
-		(void) print_cmd_buf(stderr);
+		(void) print_cmd_buf(stderr, EINVAL);
 		for (i = 0; act_props->pattern[i] != NULL; i++)
 			free(act_props->pattern[i]);
 		for (j = 0; act_props->ap[j].act != NULL; j++) {
