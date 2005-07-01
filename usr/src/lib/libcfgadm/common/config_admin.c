@@ -19,8 +19,11 @@
  *
  * CDDL HEADER END
  */
+
+/* Portions Copyright 2005 Cyril Plisko */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -277,8 +280,10 @@ static void destroy_cache();
  */
 #define	LIB_PATH_BASE1	"/usr/platform/"
 #define	LIB_PATH_BASE2	"/usr"
-#ifdef __sparcv9
+#if defined(__sparcv9)
 #define	LIB_PATH_MIDDLE	"/lib/cfgadm/sparcv9/"
+#elif defined(__amd64)
+#define	LIB_PATH_MIDDLE "/lib/cfgadm/amd64/"
 #else
 #define	LIB_PATH_MIDDLE	"/lib/cfgadm/"
 #endif
