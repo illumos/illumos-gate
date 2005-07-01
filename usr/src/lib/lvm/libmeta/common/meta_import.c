@@ -636,86 +636,83 @@ get_nonreplica_disks(
 		    &min->min_name[0], &nmlist) == 0) {
 
 			assert(nmlist->devname != NULL);
-			/* Don't bother with metadevices, but track disks */
-			if (!is_metaname(nmlist->devname)) {
-				dnp = metadrivename(&sp,
-				    metadiskname(nmlist->devname), ep);
+			dnp = metadrivename(&sp,
+			    metadiskname(nmlist->devname), ep);
 
-				assert(dnp != NULL);
-				/* Is it already on the list? */
-				for (midp = misp->mis_drives; midp != NULL;
-				    midp = midp->mid_next) {
-					if (midp->mid_dnp == dnp) {
-						on_list = 1;
-						break;
-					}
-				}
-
-				devid_sz = devid_sizeof(
-				    (ddi_devid_t)valid_did);
-
-				if (!on_list) {
-					mddb_mb_t	*mbp;
-					uint_t		sliceno;
-					mdname_t	*rsp;
-					int		fd = -1;
-
-					mbp = Malloc(DEV_BSIZE);
-
-					/* determine the replica slice */
-					if (meta_replicaslice(dnp, &sliceno,
-					    ep) != 0) {
-						Free(mbp);
-						continue;
-					}
-
-					/*
-					 * if the replica slice size is zero,
-					 * don't bother opening
-					 */
-					if (dnp->vtoc.parts[sliceno].size
-					    == 0) {
-						Free(mbp);
-						continue;
-					}
-
-					if ((rsp = metaslicename(dnp, sliceno,
-					    ep)) == NULL) {
-						Free(mbp);
-						continue;
-					}
-
-					if ((fd = open(rsp->rname,
-					    O_RDONLY| O_NDELAY)) < 0) {
-						Free(mbp);
-						continue;
-					}
-
-					/*
-					 * a drive may not have a master block
-					 */
-					if (read_master_block(ep, fd, mbp,
-					    DEV_BSIZE) <= 0) {
-						mdclrerror(ep);
-						Free(mbp);
-						(void) close(fd);
-						continue;
-					}
-
-					(void) close(fd);
-					/*
-					 * If it is replicated diskset,
-					 * r_did will be non-NULL and
-					 * devid_sz will be its size
-					 */
-					midpp = drive_append_wrapper(midpp,
-					    dnp, &did->did_devid, r_did,
-					    devid_sz, &min->min_name[0],
-					    mbp->mb_setcreatetime, NULL);
-					Free(mbp);
+			assert(dnp != NULL);
+			/* Is it already on the list? */
+			for (midp = misp->mis_drives; midp != NULL;
+			    midp = midp->mid_next) {
+				if (midp->mid_dnp == dnp) {
+					on_list = 1;
+					break;
 				}
 			}
-			devid_free_nmlist(nmlist);
+
+			devid_sz = devid_sizeof(
+			    (ddi_devid_t)valid_did);
+
+			if (!on_list) {
+				mddb_mb_t	*mbp;
+				uint_t		sliceno;
+				mdname_t	*rsp;
+				int		fd = -1;
+
+				mbp = Malloc(DEV_BSIZE);
+
+				/* determine the replica slice */
+				if (meta_replicaslice(dnp, &sliceno,
+				    ep) != 0) {
+					Free(mbp);
+					continue;
+				}
+
+				/*
+				 * if the replica slice size is zero,
+				 * don't bother opening
+				 */
+				if (dnp->vtoc.parts[sliceno].size
+				    == 0) {
+					Free(mbp);
+					continue;
+				}
+
+				if ((rsp = metaslicename(dnp, sliceno,
+				    ep)) == NULL) {
+					Free(mbp);
+					continue;
+				}
+
+				if ((fd = open(rsp->rname,
+				    O_RDONLY| O_NDELAY)) < 0) {
+					Free(mbp);
+					continue;
+				}
+
+				/*
+				 * a drive may not have a master block
+				 */
+				if (read_master_block(ep, fd, mbp,
+				    DEV_BSIZE) <= 0) {
+					mdclrerror(ep);
+					Free(mbp);
+						(void) close(fd);
+						continue;
+				}
+
+				(void) close(fd);
+				/*
+				 * If it is replicated diskset,
+				 * r_did will be non-NULL and
+				 * devid_sz will be its size
+				 */
+				midpp = drive_append_wrapper(midpp,
+				    dnp, &did->did_devid, r_did,
+				    devid_sz, &min->min_name[0],
+				    mbp->mb_setcreatetime, NULL);
+				Free(mbp);
+			}
+		devid_free_nmlist(nmlist);
 		}
 	}
 }

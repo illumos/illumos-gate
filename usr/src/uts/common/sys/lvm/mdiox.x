@@ -1460,7 +1460,8 @@ struct md_overlap_error_t {
 enum md_use_errno_t {
 	MDE_IS_MOUNTED = 1,
 	MDE_ALREADY,
-	MDE_OVERLAP
+	MDE_OVERLAP,
+	MDE_SAME_DEVID
 };
 
 %

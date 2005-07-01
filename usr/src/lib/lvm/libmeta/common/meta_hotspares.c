@@ -1049,13 +1049,6 @@ meta_hs_replace(
 		return (-1);
 	}
 
-	/* In dryrun mode (DOIT not set) we must not alter the mddb */
-	if (options & MDCMD_DOIT) {
-		/* store name in namespace */
-		if (add_key_name(sp, newnp, NULL, ep) != 0)
-			return (-1);
-	}
-
 	/*
 	 * Copy back the saved devid.
 	 */

@@ -1147,6 +1147,22 @@ use_to_str(
 			    MDB_STR));
 		}
 		break;
+	case MDE_SAME_DEVID:
+		/*
+		 * when the object of the error (existing device in the
+		 * metaconfiguration that has the same devid)
+		 * is the metadb then it is necessary
+		 * to explicitly specify the string in the error message so
+		 * that it can be successfully localized for the Asian locales.
+		 */
+		if (strcmp(ip->where, MDB_STR) != 0) {
+			(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
+			    "identical devid detected on %s"), ip->where);
+		} else {
+			(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
+			    "identical devid detected in " MDB_STR));
+		}
+		break;
 	default:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
 		    "unknown dev error code %d"), ip->errnum);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,12 @@
 #include "meta_lib_prv.h"
 #include <devid.h>
 #include <sys/dumpadm.h>
+
+/* possible returns from meta_check_samedrive */
+#define	CANT_TELL		-1
+#define	NOT_SAMEDRIVE		0
+#define	IDENTICAL_NAME_DEVT	1
+#define	IDENTICAL_DEVIDS	2
 
 /*
  * static list(s)
@@ -476,6 +482,11 @@ add_to_devname_list(
 
 /*
  * check for same drive
+ *
+ * Differentiate between matching on name/dev_t and devid.  In the latter
+ * case it is correct to fail but misleading to give the same error msg as
+ * for an overlapping slice.
+ *
  */
 int
 meta_check_samedrive(
@@ -493,7 +504,7 @@ meta_check_samedrive(
 	char		*name1 = NULL;
 	char		*name2 = NULL;
 
-	int		retval = -1;
+	int		retval = CANT_TELL;
 	int		fd1 = -1;
 	int		fd2 = -1;
 	int		rc1 = -2, rc2 = -2;
@@ -543,26 +554,26 @@ meta_check_samedrive(
 	 */
 
 	if ((np1 == NULL) || (np2 == NULL))
-		return (0);
+		return (NOT_SAMEDRIVE);
 
 	/* if the name structs are the same then the drives must be */
 	if (np1 == np2)
-		return (1);
+		return (IDENTICAL_NAME_DEVT);
 
 	name1 = np1->bname;
 	name2 = np2->bname;
 
 	if ((name1 == NULL) || ((strl1 = strlen(name1)) == 0) ||
 	    (name2 == NULL) || ((strl2 = strlen(name2)) == 0))
-		return (0);
+		return (NOT_SAMEDRIVE);
 
 	if ((strl1 == strl2) && (strcmp(name1, name2) == 0)) {
 		/* names are identical */
-		return (1);
+		return (IDENTICAL_NAME_DEVT);
 	}
 
 	if (is_metaname(name1) || is_metaname(name2))
-		return (0);
+		return (NOT_SAMEDRIVE);
 
 	/*
 	 * Check to see if the devicename is in the static list.  If so,
@@ -611,7 +622,7 @@ meta_check_samedrive(
 	 */
 	if (!devid1_found) {
 		if ((fd1 = open(name1, O_RDONLY | O_NDELAY)) < 0) {
-			return (0);
+			return (NOT_SAMEDRIVE);
 		}
 		rc1 = devid_get(fd1, &devid1);
 		(void) close(fd1);
@@ -622,7 +633,7 @@ meta_check_samedrive(
 
 	if (!devid2_found) {
 		if ((fd2 = open(name2, O_RDONLY | O_NDELAY)) < 0) {
-			return (0);
+			return (NOT_SAMEDRIVE);
 		}
 		rc2 = devid_get(fd2, &devid2);
 		(void) close(fd2);
@@ -634,9 +645,9 @@ meta_check_samedrive(
 
 	if ((rc1 == 0) && (rc2 == 0)) {
 		if (devid_compare(devid1, devid2) == 0)
-			retval = 1; /* same drive */
+			retval = IDENTICAL_DEVIDS; /* same devid */
 		else
-			retval = 0; /* different drives */
+			retval = NOT_SAMEDRIVE; /* different drives */
 
 	}
 
@@ -664,11 +675,14 @@ meta_check_samedrive(
 	    l == strlen(np2->bname))) &&
 	    ((type1 == MDT_COMP) || (type1 == MDT_META)) &&
 	    ((type2 == MDT_COMP) || (type2 == MDT_META)))
-		return (np1->drivenamep == np2->drivenamep);
+		if (np1->drivenamep == np2->drivenamep)
+			return (IDENTICAL_NAME_DEVT);
+		else
+			return (NOT_SAMEDRIVE);
 
 	/* check for same drive */
 	if (meta_getmajor(np1->dev) != meta_getmajor(np2->dev))
-		return (0);		/* not same drive */
+		return (NOT_SAMEDRIVE);		/* not same drive */
 
 	if (((cinfop1 = metagetcinfo(np1, ep)) == NULL) ||
 	    ((cinfop2 = metagetcinfo(np2, ep)) == NULL)) {
@@ -677,19 +691,19 @@ meta_check_samedrive(
 		    (strcmp(np1->drivenamep->rname,
 		    np2->drivenamep->rname) != 0)) {
 			mdclrerror(ep);
-			return (0);	/* not same drive */
+			return (NOT_SAMEDRIVE);	/* not same drive */
 		} else {
-			return (-1);	/* can't tell */
+			return (CANT_TELL);	/* can't tell */
 		}
 	} else if ((strncmp(cinfop1->cname, cinfop2->cname,
 	    sizeof (cinfop1->cname)) != 0) ||
 	    (cinfop1->cnum != cinfop2->cnum) ||
 	    (cinfop1->unit != cinfop2->unit)) {
-		return (0);		/* not same drive */
+		return (NOT_SAMEDRIVE);		/* not same drive */
 	}
 
 	/* same drive */
-	return (1);
+	return (IDENTICAL_NAME_DEVT);
 }
 
 /*
@@ -711,7 +725,7 @@ meta_check_overlap(
 	mdvtoc_t	*vtocp1, *vtocp2;
 	uint_t		partno1, partno2;
 	mdpart_t	*partp1, *partp2;
-	int		err;
+	int		ret;
 
 	/* verify args */
 	if (slblk1 == MD_DISKADDR_ERROR) {
@@ -724,9 +738,9 @@ meta_check_overlap(
 	}
 
 	/* check for same drive */
-	if ((err = meta_check_samedrive(np1, np2, ep)) == 0) {
+	if ((ret = meta_check_samedrive(np1, np2, ep)) == 0) {
 		return (0);			/* not same drive */
-	} else if (err < 0) {
+	} else if (ret < 0) {
 		return (-1);			/* can't tell */
 	}
 
@@ -749,8 +763,12 @@ meta_check_overlap(
 			return (mduseerror(ep, MDE_ALREADY, np1->dev,
 			    uname, np1->cname));
 		}
-		return (mduseerror(ep,		/* slice overlaps */
-		    MDE_OVERLAP, np1->dev, uname, np1->cname));
+		if (ret == IDENTICAL_NAME_DEVT)
+		    return (mduseerror(ep,		/* slice overlaps */
+			MDE_OVERLAP, np1->dev, uname, np1->cname));
+		else
+		    return (mduseerror(ep, 		/* same devid */
+			MDE_SAME_DEVID, np1->dev, uname, np2->cname));
 	}
 
 	/* return success */
