@@ -78,7 +78,6 @@ extern struct scsi_key_strings scsi_cmds[];
  * Local Static Data
  */
 static void *st_state;
-static int st_last_scanned_instance;	/* used in st_runout */
 static char *st_label = "st";
 
 /*
@@ -322,7 +321,7 @@ static int st_check_density_or_wfm(dev_t dev, int wfm, int mode, int stepflag);
 static int st_ioctl_cmd(dev_t dev, struct uscsi_cmd *,
 	enum uio_seg, enum uio_seg, enum uio_seg);
 static int st_mtioctop(struct scsi_tape *un, intptr_t arg, int flag);
-static void st_start(struct scsi_tape *un, int flag);
+static void st_start(struct scsi_tape *un);
 static int st_handle_start_busy(struct scsi_tape *un, struct buf *bp,
     clock_t timeout_interval);
 static int st_handle_intr_busy(struct scsi_tape *un, struct buf *bp,
@@ -331,13 +330,13 @@ static int st_handle_intr_retry_lcmd(struct scsi_tape *un, struct buf *bp);
 static void st_done_and_mutex_exit(struct scsi_tape *un, struct buf *bp);
 static void st_init(struct scsi_tape *un);
 static void st_make_cmd(struct scsi_tape *un, struct buf *bp,
-	int (*func)());
+    int (*func)(caddr_t));
 static void st_make_uscsi_cmd(struct scsi_tape *, struct uscsi_cmd *,
-	struct buf *, int (*)());
+    struct buf *bp, int (*func)(caddr_t));
 static void st_intr(struct scsi_pkt *pkt);
 static void st_set_state(struct scsi_tape *un);
 static void st_test_append(struct buf *bp);
-static int st_runout();
+static int st_runout(caddr_t);
 static int st_cmd(dev_t dev, int com, int count, int wait);
 static int st_set_compression(struct scsi_tape *un);
 static int st_write_fm(dev_t dev, int wfm);
@@ -660,7 +659,7 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 			/* now we are ready to start up any queued I/Os */
 			if (un->un_ncmds || un->un_quef) {
-				st_start(un, ST_USER_CONTEXT);
+				st_start(un);
 			}
 
 			cv_broadcast(&un->un_suspend_cv);
@@ -847,7 +846,6 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
 	int 	instance;
 	int 	dev_instance;
-	int	err = 0;
 	struct scsi_device *devp;
 	struct scsi_tape *un;
 	clock_t wait_cmds_complete;
@@ -894,39 +892,54 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		 * the test unit ready fails;
 		 * also un_state may be set to non-closed, so reset it
 		 */
-		if (!DEVI_IS_DEVICE_REMOVED(devi)) {
-			if (un->un_dev) {
-				mutex_enter(ST_MUTEX);
-				err = st_cmd(un->un_dev, SCMD_TEST_UNIT_READY,
-				    0, SYNC_CMD);
-				mutex_exit(ST_MUTEX);
-			}
+		if ((un->un_dev) &&		/* Been opened since attach */
+		    ((un->un_fileno > 0) ||	/* Known position not rewound */
+		    (un->un_blkno != 0))) {	/* Or within first file */
+			mutex_enter(ST_MUTEX);
+			/*
+			 * Send Test Unit Ready in the hopes that if
+			 * the drive is not in the state we think it is.
+			 * And the state will be changed so it can be detached.
+			 * If the command fails to reach the device and
+			 * the drive was not rewound or unloaded we want
+			 * to fail the detach till a user command fails
+			 * where after the detach will succead.
+			 */
+			(void) st_cmd(un->un_dev, SCMD_TEST_UNIT_READY,
+			    0, SYNC_CMD);
+			/*
+			 * After TUR un_state may be set to non-closed,
+			 * so reset it back.
+			 */
 			un->un_state = ST_STATE_CLOSED;
+			mutex_exit(ST_MUTEX);
+		}
+		ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "un_status=%x, fileno=%x, blkno=%lx\n",
+		    un->un_status, un->un_fileno, un->un_blkno);
+
+		/*
+		 * check again:
+		 * if we are not at BOT then it is not safe to unload
+		 */
+		if ((un->un_dev) &&		/* Been opened since attach */
+		    ((un->un_fileno > 0) ||	/* Known position not rewound */
+		    (un->un_blkno != 0))) {	/* Or within first file */
 			ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "err=%x, un_status=%x, fileno=%x, blkno=%lx\n",
-			    err, un->un_status, un->un_fileno, un->un_blkno);
+			    "cannot detach: fileno=%x, blkno=%lx\n",
+			    un->un_fileno, un->un_blkno);
+			return (DDI_FAILURE);
+		}
 
-			/*
-			 * check again:
-			 * if we are not at BOT then it is not safe to unload
-			 */
-			if ((un->un_fileno > 0) || (un->un_blkno != 0)) {
-				ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
-				    "cannot detach: fileno=%x, blkno=%lx\n",
-				    un->un_fileno, un->un_blkno);
-				return (DDI_FAILURE);
-			}
-
-			/*
-			 * Just To make sure that we have released the
-			 * tape unit .
-			 */
-			if (un->un_dev && (un->un_rsvd_status & ST_RESERVE)) {
-				mutex_enter(ST_MUTEX);
-				(void) st_cmd(un->un_dev, SCMD_RELEASE, 0,
-				    SYNC_CMD);
-				mutex_exit(ST_MUTEX);
-			}
+		/*
+		 * Just To make sure that we have released the
+		 * tape unit .
+		 */
+		if (un->un_dev && (un->un_rsvd_status & ST_RESERVE) &&
+		    !DEVI_IS_DEVICE_REMOVED(devi)) {
+			mutex_enter(ST_MUTEX);
+			(void) st_cmd(un->un_dev, SCMD_RELEASE, 0, SYNC_CMD);
+			mutex_exit(ST_MUTEX);
 		}
 
 		/*
@@ -3230,7 +3243,7 @@ st_strategy(struct buf *bp)
 
 	ST_DO_KSTATS(bp, kstat_waitq_enter);
 
-	st_start(un, ST_USER_CONTEXT);
+	st_start(un);
 
 done:
 	mutex_exit(ST_MUTEX);
@@ -5550,6 +5563,7 @@ st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd,
 
 	un->un_srqbufp = krqbuf;
 	bp = un->un_sbufp;
+	bzero(bp, sizeof (buf_t));
 
 	/*
 	 * Force asynchronous mode, if necessary.
@@ -5767,17 +5781,31 @@ start_dump(struct scsi_tape *un, struct buf *bp)
 /*
  * Command start && done functions
  */
+
+/*
+ * st_start()
+ *
+ * Called from:
+ *  st_strategy() to start a command.
+ *  st_runout() to retry when scsi_pkt allocation fails on previous attempt(s).
+ *  st_attach() when resuming from power down state.
+ *  st_start_restart() to retry transport when device was previously busy.
+ *  st_done_and_mutex_exit() to start the next command when previous is done.
+ *
+ * On entry:
+ *  scsi_pkt may or may not be allocated.
+ *
+ */
 static void
-st_start(struct scsi_tape *un, int flag)
+st_start(struct scsi_tape *un)
 {
 	struct buf *bp;
 	int status;
 
-retry:
 	ASSERT(mutex_owned(ST_MUTEX));
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_start(): dev = 0x%lx, flag = %d\n", un->un_dev, flag);
+	    "st_start(): dev = 0x%lx\n", un->un_dev);
 
 	if ((bp = un->un_quef) == NULL) {
 		return;
@@ -5786,50 +5814,77 @@ retry:
 	ASSERT((bp->b_flags & B_DONE) == 0);
 
 	/*
-	 * we want to allocated everything to have it in the kernel ready to
-	 * go
-	 */
-	if (!BP_PKT(bp)) {
-		ASSERT((bp->b_flags & B_DONE) == 0);
-		st_make_cmd(un, bp, st_runout);
-		ASSERT((bp->b_flags & B_DONE) == 0);
-		if (!BP_PKT(bp) && !(bp->b_flags & B_ERROR)) {
-			un->un_state = ST_STATE_RESOURCE_WAIT;
-			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "no resources for pkt\n");
-			return;
-		} else if (bp->b_flags & B_ERROR) {
-			scsi_log(ST_DEVINFO, st_label, CE_WARN,
-			    "errors after pkt alloc "
-			    "(b_flags=0x%x, b_error=0x%x)\n",
-			    bp->b_flags, geterror(bp));
-			ASSERT((bp->b_flags & B_DONE) == 0);
-
-			un->un_quef = bp->b_actf;
-			if (un->un_quel == bp) {
-				/*
-				 *  For the case of queue having one
-				 *  element, set the tail pointer to
-				 *  point to the element.
-				 */
-				un->un_quel = bp->b_actf;
-			}
-			bp->b_actf = NULL;
-
-			ASSERT((bp->b_flags & B_DONE) == 0);
-			bp->b_resid = bp->b_bcount;
-			mutex_exit(ST_MUTEX);
-			biodone(bp);
-			mutex_enter(ST_MUTEX);
-			goto retry;
-		}
-	}
-
-	/*
 	 * Don't send more than un_throttle commands to the HBA
 	 */
 	if ((un->un_throttle <= 0) || (un->un_ncmds >= un->un_throttle)) {
 		return;
+	}
+
+	/*
+	 * If the buf has no scsi_pkt call st_make_cmd() to get one and
+	 * build the command.
+	 */
+	if (BP_PKT(bp) == NULL) {
+		ASSERT((bp->b_flags & B_DONE) == 0);
+		st_make_cmd(un, bp, st_runout);
+		ASSERT((bp->b_flags & B_DONE) == 0);
+		status = geterror(bp);
+
+		/*
+		 * Some HBA's don't call bioerror() to set an error.
+		 * And geterror() returns zero if B_ERROR is not set.
+		 * So if we get zero we must check b_error.
+		 */
+		if (status == 0 && bp->b_error != 0) {
+			status = bp->b_error;
+			bioerror(bp, status);
+		}
+
+		/*
+		 * Some HBA's convert DDI_DMA_NORESOURCES into ENOMEM.
+		 * In tape ENOMEM has special meaning so we'll change it.
+		 */
+		if (status == ENOMEM) {
+			status = 0;
+			bioerror(bp, status);
+		}
+
+		/*
+		 * Did it fail and is it retryable?
+		 * If so return and wait for the callback through st_runout.
+		 * Also looks like scsi_init_pkt() will setup a callback even
+		 * if it isn't retryable.
+		 */
+		if (BP_PKT(bp) == NULL) {
+			if (status == 0) {
+				/*
+				 * If first attempt save state.
+				 */
+				if (un->un_state != ST_STATE_RESOURCE_WAIT) {
+					un->un_laststate = un->un_state;
+					un->un_state = ST_STATE_RESOURCE_WAIT;
+				}
+				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+				    "temp no resources for pkt\n");
+			} else {
+				/*
+				 * Unlikely that it would be retryable then not.
+				 */
+				if (un->un_state == ST_STATE_RESOURCE_WAIT) {
+					un->un_state = un->un_laststate;
+				}
+				scsi_log(ST_DEVINFO, st_label, SCSI_DEBUG,
+				    "perm no resources for pkt errno = 0x%x\n",
+				    status);
+			}
+			return;
+		}
+		/*
+		 * Worked this time set the state back.
+		 */
+		if (un->un_state == ST_STATE_RESOURCE_WAIT) {
+			un->un_state = un->un_laststate;
+		}
 	}
 
 	/*
@@ -6003,35 +6058,66 @@ exit:
 static int
 st_runout(caddr_t arg)
 {
-	int serviced;
-	int instance;
-	struct scsi_tape *un;
+	struct scsi_tape *un = (struct scsi_tape *)arg;
+	struct buf *bp;
 
-	serviced = 1;
-
-	un = (struct scsi_tape *)arg;
 	ASSERT(un != NULL);
 
 	mutex_enter(ST_MUTEX);
 
-	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_runout()\n");
+	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG, "st_runout()\n");
 
-	instance = st_last_scanned_instance;
-	st_last_scanned_instance = 0;
+	bp = un->un_quef;
 
-	if (un->un_state == ST_STATE_RESOURCE_WAIT) {
-		st_start(un, 0);
-		if (un->un_state ==  ST_STATE_RESOURCE_WAIT) {
-			serviced = 0;
-			if (!st_last_scanned_instance) {
-				st_last_scanned_instance = instance;
-			}
+	/*
+	 * failed scsi_init_pkt(). If errno is zero its retryable.
+	 */
+	if ((bp != NULL) && (geterror(bp) != 0)) {
+
+		scsi_log(ST_DEVINFO, st_label, CE_WARN,
+		    "errors after pkt alloc (b_flags=0x%x, b_error=0x%x)\n",
+		    bp->b_flags, geterror(bp));
+		ASSERT((bp->b_flags & B_DONE) == 0);
+
+		un->un_quef = bp->b_actf;
+		if (un->un_quel == bp) {
+			/*
+			 *  For the case of queue having one
+			 *  element, set the tail pointer to
+			 *  point to the element.
+			 */
+			un->un_quel = bp->b_actf;
 		}
+		bp->b_actf = NULL;
+
+		ASSERT((bp->b_flags & B_DONE) == 0);
+
+		/*
+		 * Set resid, Error already set, then unblock calling thread.
+		 */
+		bp->b_resid = bp->b_bcount;
+		biodone(bp);
+	} else {
+		/*
+		 * Try Again
+		 */
+		st_start(un);
 	}
+
 	mutex_exit(ST_MUTEX);
 
-	return (serviced);
+	/*
+	 * Comments courtesy of sd.c
+	 * The scsi_init_pkt routine allows for the callback function to
+	 * return a 0 indicating the callback should be rescheduled or a 1
+	 * indicating not to reschedule. This routine always returns 1
+	 * because the driver always provides a callback function to
+	 * scsi_init_pkt. This results in a callback always being scheduled
+	 * (via the scsi_init_pkt callback implementation) if a resource
+	 * failure occurs.
+	 */
+
+	return (1);
 }
 
 /*
@@ -6110,7 +6196,7 @@ st_done_and_mutex_exit(struct scsi_tape *un, struct buf *bp)
 	if (un->un_pwr_mgmt == ST_PWR_SUSPENDED) {
 		cv_broadcast(&un->un_tape_busy_cv);
 	} else if (un->un_quef && un->un_throttle && !pe_flagged) {
-		st_start(un, 0);
+		st_start(un);
 	}
 
 	if (bp == un->un_sbufp && (bp->b_flags & B_ASYNC)) {
@@ -6829,6 +6915,7 @@ st_cmd(dev_t dev, int com, int count, int wait)
 	un->un_sbuf_busy = 1;
 
 	bp = un->un_sbufp;
+	bzero(bp, sizeof (buf_t));
 
 	bp->b_flags = (wait) ? B_BUSY : B_BUSY|B_ASYNC;
 
@@ -6923,6 +7010,9 @@ st_cmd(dev_t dev, int com, int count, int wait)
 		bp->b_bcount = 0;
 		count = 0;
 		break;
+	default:
+		ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
+		    "Unhandled scsi command 0x%x in st_cmd()\n", com);
 	}
 
 	mutex_exit(ST_MUTEX);
@@ -7411,6 +7501,7 @@ st_gen_mode_sense(struct scsi_tape *un, int page, struct seq_mode *page_data,
 	com->uscsi_cdblen = CDB_GROUP0;
 	com->uscsi_bufaddr = (caddr_t)page_data;
 	com->uscsi_buflen = page_size;
+	com->uscsi_timeout = un->un_dp->non_motion_timeout;
 	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT |
 			    USCSI_READ | USCSI_RQENABLE;
 
@@ -7461,6 +7552,7 @@ st_gen_mode_select(struct scsi_tape *un, struct seq_mode *page_data,
 	com->uscsi_cdblen = CDB_GROUP0;
 	com->uscsi_bufaddr = (caddr_t)page_data;
 	com->uscsi_buflen = page_size;
+	com->uscsi_timeout = un->un_dp->non_motion_timeout;
 	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT
 		| USCSI_WRITE | USCSI_RQENABLE;
 
@@ -7565,11 +7657,11 @@ st_init(struct scsi_tape *un)
 
 
 static void
-st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
+st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)(caddr_t))
 {
 	struct scsi_pkt *pkt;
 	struct uscsi_cmd *ucmd;
-	int count, tval;
+	int count, tval = 0;
 	int flags = 0;
 	uchar_t com;
 	char fixbit;
@@ -7579,10 +7671,6 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_make_cmd(): dev = 0x%lx\n", un->un_dev);
 
-	/*
-	 * Use I/O timeout as default.
-	 */
-	tval = un->un_dp->io_timeout;
 
 	/*
 	 * fixbit is for setting the Fixed Mode and Suppress Incorrect
@@ -7597,7 +7685,7 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			sizeof (struct scsi_arq_status) : 1);
 		pkt = scsi_init_pkt(ROUTE, NULL, bp,
 		    CDB_GROUP0, stat_size, 0, 0, func, (caddr_t)un);
-		if (pkt == (struct scsi_pkt *)0) {
+		if (pkt == NULL) {
 			goto exit;
 		}
 		SET_BP_PKT(bp, pkt);
@@ -7620,6 +7708,8 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			un->un_lastop = ST_OP_WRITE;
 		}
 
+		tval = un->un_dp->io_timeout;
+
 		/*
 		 * For really large xfers, increase timeout
 		 */
@@ -7638,12 +7728,10 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 		goto exit;
 
 	} else {				/* special I/O */
-		char saved_lastop = un->un_lastop;
 		struct buf *allocbp = NULL;
 		int stat_size = (un->un_arq_enabled ?
 			sizeof (struct scsi_arq_status) : 1);
 
-		un->un_lastop = ST_OP_CTL;	/* usual */
 
 		com = (uchar_t)(uintptr_t)bp->b_forw;
 		count = bp->b_bcount;
@@ -7660,6 +7748,7 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			}
 			allocbp = bp;
 			un->un_lastop = ST_OP_READ;
+			tval = un->un_dp->io_timeout;
 			break;
 
 		case SCMD_WRITE:
@@ -7673,6 +7762,7 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			}
 			allocbp = bp;
 			un->un_lastop = ST_OP_WRITE;
+			tval = un->un_dp->io_timeout;
 			break;
 
 		case SCMD_WRITE_FILE_MARK:
@@ -7680,11 +7770,13 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			    "write %d file marks\n", count);
 			un->un_lastop = ST_OP_WEOF;
 			fixbit = 0;
+			tval = un->un_dp->io_timeout;
 			break;
 
 		case SCMD_REWIND:
 			fixbit = 0;
 			count = 0;
+			un->un_lastop = ST_OP_CTL;
 			tval = un->un_dp->rewind_timeout;
 			ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "rewind\n");
@@ -7697,6 +7789,7 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			    "space %d %s from file %d blk %ld\n",
 			    count, (fixbit) ? "filemarks" : "records",
 			    un->un_fileno, un->un_blkno);
+			un->un_lastop = ST_OP_CTL;
 			tval = un->un_dp->space_timeout;
 			break;
 
@@ -7715,6 +7808,7 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			if (count & 2) {
 				tval += un->un_dp->rewind_timeout;
 			}
+			un->un_lastop = ST_OP_CTL;
 			break;
 
 		case SCMD_ERASE:
@@ -7726,6 +7820,7 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			 */
 			fixbit = 1;
 			tval = un->un_dp->erase_timeout;
+			un->un_lastop = ST_OP_CTL;
 			break;
 
 		case SCMD_MODE_SENSE:
@@ -7733,7 +7828,6 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			    "mode sense\n");
 			allocbp = bp;
 			fixbit = 0;
-			un->un_lastop = saved_lastop;
 			tval = un->un_dp->non_motion_timeout;
 			break;
 
@@ -7742,7 +7836,6 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			    "mode select\n");
 			allocbp = bp;
 			fixbit = 0;
-			un->un_lastop = saved_lastop;
 			tval = un->un_dp->non_motion_timeout;
 			break;
 
@@ -7750,7 +7843,6 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "reserve\n");
 			fixbit = 0;
-			un->un_lastop = saved_lastop;
 			tval = un->un_dp->non_motion_timeout;
 			break;
 
@@ -7758,7 +7850,6 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "release\n");
 			fixbit = 0;
-			un->un_lastop = saved_lastop;
 			tval = un->un_dp->non_motion_timeout;
 			break;
 
@@ -7767,7 +7858,6 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			    "read block limits\n");
 			allocbp = bp;
 			fixbit = count = 0;
-			un->un_lastop = saved_lastop;
 			tval = un->un_dp->non_motion_timeout;
 			break;
 
@@ -7775,13 +7865,16 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "test unit ready\n");
 			fixbit = 0;
-			un->un_lastop = saved_lastop;
 			tval = un->un_dp->non_motion_timeout;
 			break;
+		default:
+			ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
+			    "Unhandled scsi command 0x%x in st_make_cmd()\n",
+			    com);
 		}
 		pkt = scsi_init_pkt(ROUTE, NULL, allocbp,
 			CDB_GROUP0, stat_size, 0, 0, func, (caddr_t)un);
-		if (pkt == (struct scsi_pkt *)0) {
+		if (pkt == NULL) {
 			goto exit;
 		}
 		if (allocbp)
@@ -7823,6 +7916,7 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)())
 			break;
 		}
 	}
+	ASSERT(tval);
 	pkt->pkt_time = tval;
 	pkt->pkt_comp = st_intr;
 	pkt->pkt_private = (opaque_t)bp;
@@ -7838,7 +7932,7 @@ exit:
  */
 static void
 st_make_uscsi_cmd(struct scsi_tape *un, struct uscsi_cmd *ucmd,
-    struct buf *bp, int (*func)())
+    struct buf *bp, int (*func)(caddr_t))
 {
 	struct scsi_pkt *pkt;
 	caddr_t cdb;
@@ -7868,7 +7962,7 @@ st_make_uscsi_cmd(struct scsi_tape *un, struct uscsi_cmd *ucmd,
 	pkt = scsi_init_pkt(ROUTE, NULL,
 		(bp->b_bcount > 0) ? bp : NULL,
 		cdblen, stat_size, 0, 0, func, (caddr_t)un);
-	if (pkt == (struct scsi_pkt *)NULL) {
+	if (pkt == NULL) {
 		goto exit;
 	}
 
@@ -8349,7 +8443,7 @@ st_start_restart(void *arg)
 		"st_tran_restart()\n");
 
 	if (un->un_quef) {
-		st_start(un, 0);
+		st_start(un);
 	}
 
 	mutex_exit(ST_MUTEX);
@@ -10520,7 +10614,7 @@ st_reserve_release(dev_t dev, int cmd)
 		cdb[0] = SCMD_RESERVE;
 	}
 	bzero(com, sizeof (struct uscsi_cmd));
-	com->uscsi_flags = USCSI_SILENT | USCSI_WRITE | USCSI_RQENABLE;
+	com->uscsi_flags = USCSI_WRITE;
 	com->uscsi_cdb = cdb;
 	com->uscsi_cdblen = CDB_GROUP0;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;

@@ -932,12 +932,6 @@ _NOTE(SCHEME_PROTECTS_DATA("save sharing",
 		return (ENXIO);
 
 /*
- * flag for st_start(), which allows making a copy of the bp
- * (copyin only works in user context)
- */
-#define	ST_USER_CONTEXT 1
-
-/*
  * Debugging turned on via conditional compilation switch -DSTDEBUG
  */
 #ifdef DEBUG
