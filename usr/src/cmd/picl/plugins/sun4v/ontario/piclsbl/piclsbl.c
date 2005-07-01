@@ -141,6 +141,7 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	pcp_sbl_resp_t	*resp_ptr = NULL;
 	int		status = -1;
 	disk_lookup_t	lookup;
+	int		channel_fd;
 
 	/*
 	 * setup the request data to attach to the libpcp msg
@@ -218,13 +219,13 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	 * one event comes in, we'll retry to initialize this connection
 	 * up to 3 times
 	 */
-	if ((*pcp_init_ptr)(LED_CHANNEL) < 0) {
+	if ((channel_fd = (*pcp_init_ptr)(LED_CHANNEL)) < 0) {
 		/* failed to init; wait and retry up to 3 times */
 		int s = PCPINIT_TIMEOUT;
 		int retries = 0;
 		while (retries++) {
 			(void) sleep(s);
-			if ((*pcp_init_ptr)(LED_CHANNEL) == 0)
+			if ((channel_fd = (*pcp_init_ptr)(LED_CHANNEL)) >= 0)
 				break;
 			else if (retries == 3) {
 				syslog(LOG_ERR, "piclsbl: ",
@@ -246,11 +247,12 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	/*
 	 * send the request, receive the response
 	 */
-	if ((*pcp_send_recv_ptr)(&send_msg, &recv_msg, PCPCOMM_TIMEOUT) < 0) {
+	if ((*pcp_send_recv_ptr)(channel_fd, &send_msg, &recv_msg,
+		PCPCOMM_TIMEOUT) < 0) {
 		/* we either timed out or erred; either way try again */
 		int s = PCPCOMM_TIMEOUT;
 		(void) sleep(s);
-		if ((*pcp_send_recv_ptr)(&send_msg, &recv_msg,
+		if ((*pcp_send_recv_ptr)(channel_fd, &send_msg, &recv_msg,
 				PCPCOMM_TIMEOUT) < 0) {
 			syslog(LOG_ERR, "piclsbl: communication failure");
 			goto sbl_return;
@@ -289,7 +291,7 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 		syslog(LOG_ERR, "piclsbl: OK2RM LED set to unknown state");
 
 sbl_return:
-	(*pcp_close_ptr)();
+	(*pcp_close_ptr)(channel_fd);
 	if (req_ptr != NULL)
 		umem_free(req_ptr, sizeof (pcp_sbl_req_t));
 	if (resp_ptr != NULL)

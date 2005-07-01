@@ -55,9 +55,10 @@
 /*
  * Following libpcp interfaces are exposed to user applications.
  *
- * int pcp_init(char *channel_dev_path);
- * int pcp_send_recv(pcp_msg_t *req_msg, pcp_msg_t *resp_msg, uint32_t timeout);
- * int pcp_close(void);
+ * int pcp_init(char *channel_name);
+ * int pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
+ * 			uint32_t timeout);
+ * int pcp_close(int channel_fd);
  *
  */
 
@@ -68,7 +69,7 @@ static int pcp_send_req_msg_hdr(pcp_req_msg_hdr_t *req_hdr);
 static int pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr);
 static int pcp_io_op(void *buf, int byte_cnt, int io_op);
 static int pcp_get_xid(void);
-static int pcp_get_prop(int prop, unsigned int *val);
+static int pcp_get_prop(int channel_fd, int prop, unsigned int *val);
 static int pcp_read(uint8_t *buf, int buf_len);
 static int pcp_write(uint8_t *buf, int buf_len);
 static int pcp_peek(uint8_t *buf, int buf_len);
@@ -77,10 +78,10 @@ static int pcp_frame_error_handle(void);
 static int check_magic_byte_presence(int byte_cnt, uint8_t *byte_val,
 					int *ispresent);
 static uint16_t checksum(uint16_t *addr, int32_t count);
-static int pcp_cleanup(void);
+static int pcp_cleanup(int channel_fd);
 
 /*
- * glvc driver file descriptor
+ * local channel (glvc) file descriptor set by pcp_send_recv()
  */
 static int chnl_fd = -1;
 
@@ -169,16 +170,17 @@ glvc_timeout_handler(void)
  */
 
 int
-pcp_init(char *channel_dev_path)
+pcp_init(char *channel_name)
 {
 	sigset_t oldset;
+	int channel_fd;
 
-	if (channel_dev_path == NULL)
+	if (channel_name == NULL)
 		return (PCPL_INVALID_ARGS);
 	/*
-	 * Open virtual channel device node.
+	 * Open virtual channel name.
 	 */
-	if ((chnl_fd = open(channel_dev_path, O_RDWR|O_EXCL)) < 0) {
+	if ((channel_fd = open(channel_name, O_RDWR|O_EXCL)) < 0) {
 		return (PCPL_GLVC_ERROR);
 	}
 
@@ -191,9 +193,8 @@ pcp_init(char *channel_dev_path)
 	 * Get the Channel MTU size
 	 */
 
-	if (pcp_get_prop(GLVC_XPORT_OPT_MTU_SZ, &mtu_size) != 0) {
-		(void) close(chnl_fd);
-		chnl_fd = -1;
+	if (pcp_get_prop(channel_fd, GLVC_XPORT_OPT_MTU_SZ, &mtu_size) != 0) {
+		(void) close(channel_fd);
 		return (PCPL_GLVC_ERROR);
 	}
 
@@ -217,28 +218,29 @@ pcp_init(char *channel_dev_path)
 	glvc_act.sa_flags = SA_NODEFER;
 
 	if (sigaction(SIGALRM, &glvc_act, &old_act) < 0) {
-		(void) close(chnl_fd);
-		chnl_fd = -1;
+		(void) close(channel_fd);
 		return (PCPL_ERROR);
 	}
 
-	return (PCPL_OK);
+	return (channel_fd);
 }
 
 /*
  * Function: Close platform channel.
- * Arguments: None
+ * Arguments:
+ *	int channel_fd - channel file descriptor.
  * Returns:
  *	always returns PCPL_OK for now.
  */
 int
-pcp_close(void)
+pcp_close(int channel_fd)
 {
 
-	if (chnl_fd >= 0) {
-		(void) pcp_cleanup();
-		(void) close(chnl_fd);
-		chnl_fd = -1;
+	if (channel_fd >= 0) {
+		(void) pcp_cleanup(channel_fd);
+		(void) close(channel_fd);
+	} else {
+		return (-1);
 	}
 
 	/*
@@ -282,6 +284,7 @@ pcp_close(void)
 /*
  * Function: Send and Receive messages on platform channel.
  * Arguments:
+ *	int channel_fd      - channel file descriptor.
  *	pcp_msg_t *req_msg  - Request Message to send to other end of channel.
  *	pcp_msg_t *resp_msg - Response Message to be received.
  *	uint32_t timeout    - timeout field when waiting for data from channel.
@@ -296,7 +299,8 @@ pcp_close(void)
  *			PCPL_CKSUM_ERROR - checksum error.
  */
 int
-pcp_send_recv(pcp_msg_t *req_msg, pcp_msg_t *resp_msg, uint32_t timeout)
+pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
+		uint32_t timeout)
 {
 	void *datap;
 	void *resp_msg_data = NULL;
@@ -307,9 +311,12 @@ pcp_send_recv(pcp_msg_t *req_msg, pcp_msg_t *resp_msg, uint32_t timeout)
 #ifdef PCP_CKSUM_ENABLE
 	uint16_t bkup_resp_hdr_cksum;
 #endif
-	if (chnl_fd < 0) {
+	if (channel_fd < 0) {
 		return (PCPL_ERROR);
 	}
+
+	/* copy channel_fd to local fd (chnl_fd) for other functions use */
+	chnl_fd = channel_fd;
 
 	if (req_msg == NULL) {
 		return (PCPL_INVALID_ARGS);
@@ -331,8 +338,10 @@ pcp_send_recv(pcp_msg_t *req_msg, pcp_msg_t *resp_msg, uint32_t timeout)
 			return (PCPL_MALLOC_FAIL);
 	}
 
-	/* calculate request msg_cksum */
-	cksum = checksum((uint16_t *)datap, req_msg->msg_len);
+	if (req_msg->msg_len != 0) {
+		/* calculate request msg_cksum */
+		cksum = checksum((uint16_t *)datap, req_msg->msg_len);
+	}
 
 	/*
 	 * Fill in the message header for the request packet
@@ -370,10 +379,13 @@ pcp_send_recv(pcp_msg_t *req_msg, pcp_msg_t *resp_msg, uint32_t timeout)
 	/*
 	 * send request message
 	 */
-	if ((ret = pcp_io_op(datap, req_msg->msg_len,
+	if (req_msg->msg_len != 0) {
+		if ((ret = pcp_io_op(datap, req_msg->msg_len,
 					PCPL_IO_OP_WRITE))) {
-		return (ret);
+			return (ret);
+		}
 	}
+
 	if (timeout == (uint32_t)PCP_TO_NO_RESPONSE)
 		return (PCPL_OK);
 
@@ -430,30 +442,32 @@ pcp_send_recv(pcp_msg_t *req_msg, pcp_msg_t *resp_msg, uint32_t timeout)
 		return (PCPL_XPORT_ERROR);
 	}
 
+	if (resp_msg_hdr->msg_len != 0) {
 
-	/* libpcp users should free this memory */
-	if ((resp_msg_data = (uint8_t *)malloc(resp_msg_hdr->msg_len)) == NULL)
-		return (PCPL_MALLOC_FAIL);
-	bzero(resp_msg_data, resp_msg_hdr->msg_len);
-	/*
-	 * Receive response message.
-	 */
-	if ((ret = pcp_io_op(resp_msg_data, resp_msg_hdr->msg_len,
+		/* libpcp users should free this memory */
+		if ((resp_msg_data = (uint8_t *)malloc(resp_msg_hdr->msg_len))
+			== NULL)
+			return (PCPL_MALLOC_FAIL);
+		bzero(resp_msg_data, resp_msg_hdr->msg_len);
+		/*
+		 * Receive response message.
+		 */
+		if ((ret = pcp_io_op(resp_msg_data, resp_msg_hdr->msg_len,
 						PCPL_IO_OP_READ))) {
-		free(resp_msg_data);
-		return (ret);
-	}
+			free(resp_msg_data);
+			return (ret);
+		}
 
 #ifdef PCP_CKSUM_ENABLE
-	/* verify response message data checksum */
-	cksum = checksum((uint16_t *)resp_msg_data,
-				resp_msg_hdr->msg_len);
-	if (cksum != resp_msg_hdr->msg_cksum) {
-		free(resp_msg_data);
-		return (PCPL_CKSUM_ERROR);
-	}
+		/* verify response message data checksum */
+		cksum = checksum((uint16_t *)resp_msg_data,
+					resp_msg_hdr->msg_len);
+		if (cksum != resp_msg_hdr->msg_cksum) {
+			free(resp_msg_data);
+			return (PCPL_CKSUM_ERROR);
+		}
 #endif
-
+	}
 	/* Everything is okay put the received data into user */
 	/* application's resp_msg struct */
 	resp_msg->msg_len = resp_msg_hdr->msg_len;
@@ -468,6 +482,7 @@ pcp_send_recv(pcp_msg_t *req_msg, pcp_msg_t *resp_msg, uint32_t timeout)
 /*
  * Function: Get channel property values.
  * Arguments:
+ *	int channel_fd - channel file descriptor.
  *	int prop - property id.
  *	unsigned int *val - property value tobe copied.
  * Returns:
@@ -477,7 +492,7 @@ pcp_send_recv(pcp_msg_t *req_msg, pcp_msg_t *resp_msg, uint32_t timeout)
  */
 
 static int
-pcp_get_prop(int prop, unsigned int *val)
+pcp_get_prop(int channel_fd, int prop, unsigned int *val)
 {
 	glvc_xport_opt_op_t	channel_op;
 	int			ret;
@@ -488,7 +503,9 @@ pcp_get_prop(int prop, unsigned int *val)
 
 	(void) alarm(glvc_timeout);
 
-	if ((ret = ioctl(chnl_fd, GLVC_XPORT_IOCTL_OPT_OP, &channel_op)) < 0) {
+	if ((ret = ioctl(channel_fd, GLVC_XPORT_IOCTL_OPT_OP,
+		&channel_op)) < 0) {
+
 		(void) alarm(0);
 		return (ret);
 	}
@@ -1094,7 +1111,7 @@ checksum(uint16_t *addr, int32_t count)
  * channel buffers.
  */
 static int
-pcp_cleanup(void)
+pcp_cleanup(int channel_fd)
 {
 	int			ret;
 	glvc_xport_msg_peek_t	peek_ctrl;
@@ -1124,7 +1141,7 @@ pcp_cleanup(void)
 	while (!done) {
 
 		(void) alarm(PCP_CLEANUP_TIMEOUT);
-		if ((ret = ioctl(chnl_fd, GLVC_XPORT_IOCTL_DATA_PEEK,
+		if ((ret = ioctl(channel_fd, GLVC_XPORT_IOCTL_DATA_PEEK,
 							&peek_ctrl)) < 0) {
 			(void) alarm(0);
 			done = 1;
@@ -1144,7 +1161,7 @@ pcp_cleanup(void)
 
 		/* remove data from channel */
 		(void) alarm(PCP_CLEANUP_TIMEOUT);
-		if ((ret = read(chnl_fd, buf, n)) < 0) {
+		if ((ret = read(channel_fd, buf, n)) < 0) {
 			(void) alarm(0);
 			done = 1;
 			continue;

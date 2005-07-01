@@ -85,13 +85,15 @@ extern "C" {
 typedef struct pcp_msg {
 	uint8_t	msg_type;
 	uint8_t	sub_type;
+	uint16_t rsvd_pad;
 	uint32_t msg_len;
 	void *msg_data;
 } pcp_msg_t;
 
-int pcp_init(char *channel_dev_path);
-int pcp_send_recv(pcp_msg_t *req_msg, pcp_msg_t *resp_msg, uint32_t timeout);
-int pcp_close(void);
+int pcp_init(char *channel_name);
+int pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
+			uint32_t timeout);
+int pcp_close(int channel_fd);
 
 #ifdef	__cplusplus
 }

@@ -97,7 +97,7 @@ typedef struct pcp_resp_msg_hdr {
 #define	PCP_XPORT_ERROR		(4)	/* message in complete error */
 
 /* defines for 'timeout' */
-#define	PCP_TO_NO_RESPONSE	(-1)	/* no response required */
+#define	PCP_TO_NO_RESPONSE	(0xFFFFFFFF)	/* no response required */
 #define	PCP_TO_WAIT_FOREVER	(0)	/* wait forever..(in reality, */
 					/* it waits until glvc driver */
 					/* call returns; curently glvc */
