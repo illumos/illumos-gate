@@ -759,7 +759,7 @@ strplumb_get_netdev_path(void)
 		(void) bcopy(bootp + 28, boot_macaddr, boot_maclen);
 
 		/* encode to ascii string to match what sparc OBP exports */
-		dhcack = kmem_alloc(bootp_len * 2 + IFNAMSIZ + 2, KM_SLEEP);
+		dhcack = kmem_zalloc(bootp_len * 2 + IFNAMSIZ + 2, KM_SLEEP);
 		(void) octet_to_hexascii(bootp, bootp_len, dhcack + IFNAMSIZ,
 		    &len);
 		ASSERT(len < bootp_len * 2 + 2);
