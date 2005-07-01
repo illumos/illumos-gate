@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -55,7 +56,6 @@
 #include "rpc_mt.h"
 #include <assert.h>
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <sys/byteorder.h>
 #include <sys/mkdev.h>
@@ -72,29 +72,25 @@
 #define	MIN(a, b)	(((a) < (b)) ? (a) : (b))
 #endif
 
-extern int __rpc_timeval_to_msec();
+extern int __rpc_timeval_to_msec(struct timeval *);
 extern int __rpc_compress_pollfd(int, pollfd_t *, pollfd_t *);
-extern bool_t xdr_opaque_auth();
-extern bool_t __rpc_gss_wrap();
-extern bool_t __rpc_gss_unwrap();
-
-CLIENT *_clnt_vc_create_timed(int, struct netbuf *, rpcprog_t,
+extern bool_t xdr_opaque_auth(XDR *, struct opaque_auth *);
+extern bool_t __rpc_gss_wrap(AUTH *, char *, uint_t, XDR *, bool_t (*)(),
+								caddr_t);
+extern bool_t __rpc_gss_unwrap(AUTH *, XDR *, bool_t (*)(), caddr_t);
+extern CLIENT *_clnt_vc_create_timed(int, struct netbuf *, rpcprog_t,
 		rpcvers_t, uint_t, uint_t, const struct timeval *);
 
-static struct clnt_ops	*clnt_vc_ops();
-#ifdef __STDC__
+static struct clnt_ops	*clnt_vc_ops(void);
 static int		read_vc(void *, caddr_t, int);
 static int		write_vc(void *, caddr_t, int);
-#else
-static int		read_vc();
-static int		write_vc();
-#endif
-static int		t_rcvall();
-static bool_t		time_not_ok();
-static bool_t		set_up_connection();
+static int		t_rcvall(int, char *, int);
+static bool_t		time_not_ok(struct timeval *);
 
 struct ct_data;
-static bool_t		set_io_mode(struct ct_data *ct, int ioMode);
+static bool_t		set_up_connection(int, struct netbuf *,
+				struct ct_data *, const struct timeval *);
+static bool_t		set_io_mode(struct ct_data *, int);
 
 /*
  * Lock table handle used by various MT sync. routines
@@ -161,19 +157,13 @@ static mutex_t nb_list_mutex = DEFAULTMUTEX;
 /* Default size of the IO buffer used in non blocking mode */
 #define	DEFAULT_PENDING_ZONE_MAX_SIZE (16*1024)
 
-static int nb_send(struct ct_data *ct, void *buff,
-    unsigned  int  nbytes);
+static int nb_send(struct ct_data *, void *, unsigned int);
+static int do_flush(struct ct_data *, uint_t);
+static bool_t set_flush_mode(struct ct_data *, int);
+static bool_t set_blocking_connection(struct ct_data *, bool_t);
 
-static int do_flush(struct ct_data *ct, uint_t flush_mode);
-
-static bool_t set_flush_mode(struct ct_data *ct,
-    int P_mode);
-
-static bool_t set_blocking_connection(struct ct_data *ct,
-    bool_t blocking);
-
-static int register_nb(struct ct_data *ct);
-static int unregister_nb(struct ct_data *ct);
+static int register_nb(struct ct_data *);
+static int unregister_nb(struct ct_data *);
 
 
 /*
@@ -219,13 +209,8 @@ set_blocking_connection(struct ct_data *ct, bool_t blocking)
  * fd should be open and bound.
  */
 CLIENT *
-clnt_vc_create(fd, svcaddr, prog, vers, sendsz, recvsz)
-	int fd;				/* open file descriptor */
-	struct netbuf *svcaddr;		/* servers address */
-	rpcprog_t prog;			/* program number */
-	rpcvers_t vers;			/* version number */
-	uint_t sendsz;			/* buffer recv size */
-	uint_t recvsz;			/* buffer send size */
+clnt_vc_create(const int fd, struct netbuf *svcaddr, const rpcprog_t prog,
+	const rpcvers_t vers, const uint_t sendsz, const uint_t recvsz)
 {
 	return (_clnt_vc_create_timed(fd, svcaddr, prog, vers, sendsz,
 			recvsz, NULL));
@@ -243,14 +228,8 @@ clnt_vc_create(fd, svcaddr, prog, vers, sendsz, recvsz)
  * If tp is NULL, use default timeout to set up the connection.
  */
 CLIENT *
-_clnt_vc_create_timed(fd, svcaddr, prog, vers, sendsz, recvsz, tp)
-	int fd;				/* open file descriptor */
-	struct netbuf *svcaddr;		/* servers address */
-	rpcprog_t prog;			/* program number */
-	rpcvers_t vers;			/* version number */
-	uint_t sendsz;			/* buffer recv size */
-	uint_t recvsz;			/* buffer send size */
-	const struct timeval *tp;	/* connection timeout */
+_clnt_vc_create_timed(int fd, struct netbuf *svcaddr, rpcprog_t prog,
+	rpcvers_t vers, uint_t sendsz, uint_t recvsz, const struct timeval *tp)
 {
 	CLIENT *cl;			/* client handle */
 	struct ct_data *ct;		/* private data */
@@ -259,11 +238,9 @@ _clnt_vc_create_timed(fd, svcaddr, prog, vers, sendsz, recvsz, tp)
 	struct t_info tinfo;
 	int flag;
 
-	trace5(TR_clnt_vc_create, 0, prog, vers, sendsz, recvsz);
-
-	cl = (CLIENT *)mem_alloc(sizeof (*cl));
-	ct = (struct ct_data *)mem_alloc(sizeof (*ct));
-	if ((cl == (CLIENT *)NULL) || (ct == (struct ct_data *)NULL)) {
+	cl = malloc(sizeof (*cl));
+	ct = malloc(sizeof (*ct));
+	if ((cl == NULL) || (ct == NULL)) {
 		(void) syslog(LOG_ERR, clnt_vc_errstr,
 				clnt_vc_str, __no_mem_str);
 		rpc_createerr.cf_stat = RPC_SYSTEMERROR;
@@ -302,7 +279,7 @@ _clnt_vc_create_timed(fd, svcaddr, prog, vers, sendsz, recvsz, tp)
 		sig_mutex_unlock(&vctbl_lock);
 		goto err;
 	}
-	ct->ct_is_blocking = flag&O_NONBLOCK? FALSE:TRUE;
+	ct->ct_is_blocking = flag & O_NONBLOCK ? FALSE : TRUE;
 
 	if (set_up_connection(fd, svcaddr, ct, tp) == FALSE) {
 		sig_mutex_unlock(&vctbl_lock);
@@ -338,7 +315,7 @@ _clnt_vc_create_timed(fd, svcaddr, prog, vers, sendsz, recvsz, tp)
 	 * pre-serialize the static part of the call msg and stash it away
 	 */
 	xdrmem_create(&(ct->ct_xdrs), ct->ct_mcall, MCALL_MSG_SIZE, XDR_ENCODE);
-	if (! xdr_callhdr(&(ct->ct_xdrs), &call_msg)) {
+	if (!xdr_callhdr(&(ct->ct_xdrs), &call_msg)) {
 		goto err;
 	}
 	ct->ct_mpos = XDR_GETPOS(&(ct->ct_xdrs));
@@ -378,22 +355,20 @@ _clnt_vc_create_timed(fd, svcaddr, prog, vers, sendsz, recvsz, tp)
 	cl->cl_ops = clnt_vc_ops();
 	cl->cl_private = (caddr_t)ct;
 	cl->cl_auth = authnone_create();
-	cl->cl_tp = (char *)NULL;
-	cl->cl_netid = (char *)NULL;
-	trace3(TR_clnt_vc_create, 1, prog, vers);
+	cl->cl_tp = NULL;
+	cl->cl_netid = NULL;
 	return (cl);
 
 err:
 	if (cl) {
 		if (ct) {
 			if (ct->ct_addr.len)
-				mem_free(ct->ct_addr.buf, ct->ct_addr.len);
-			mem_free((caddr_t)ct, sizeof (struct ct_data));
+				free(ct->ct_addr.buf);
+			free(ct);
 		}
-		mem_free((caddr_t)cl, sizeof (CLIENT));
+		free(cl);
 	}
-	trace3(TR_clnt_vc_create, 1, prog, vers);
-	return ((CLIENT *)NULL);
+	return (NULL);
 }
 
 #define	TCPOPT_BUFSIZE 128
@@ -410,6 +385,7 @@ _set_tcp_conntime(int fd, int optval)
 	int *ip;
 	char buf[TCPOPT_BUFSIZE];
 
+	/* LINTED pointer cast */
 	opt = (struct opthdr *)buf;
 	opt->level =  IPPROTO_TCP;
 	opt->name = TCP_CONN_ABORT_THRESHOLD;
@@ -418,6 +394,7 @@ _set_tcp_conntime(int fd, int optval)
 	req.flags = T_NEGOTIATE;
 	req.opt.len = sizeof (struct opthdr) + opt->len;
 	req.opt.buf = (char *)opt;
+	/* LINTED pointer cast */
 	ip = (int *)((char *)buf + sizeof (struct opthdr));
 	*ip = optval;
 
@@ -442,6 +419,7 @@ _get_tcp_conntime(int fd)
 	int *ip, retval;
 	char buf[TCPOPT_BUFSIZE];
 
+	/* LINTED pointer cast */
 	opt = (struct opthdr *)buf;
 	opt->level =  IPPROTO_TCP;
 	opt->name = TCP_CONN_ABORT_THRESHOLD;
@@ -450,6 +428,7 @@ _get_tcp_conntime(int fd)
 	req.flags = T_CURRENT;
 	req.opt.len = sizeof (struct opthdr) + opt->len;
 	req.opt.buf = (char *)opt;
+	/* LINTED pointer cast */
 	ip = (int *)((char *)buf + sizeof (struct opthdr));
 	*ip = 0;
 
@@ -460,17 +439,15 @@ _get_tcp_conntime(int fd)
 		return (-1);
 	}
 
+	/* LINTED pointer cast */
 	ip = (int *)((char *)buf + sizeof (struct opthdr));
 	retval = *ip;
 	return (retval);
 }
 
 static bool_t
-set_up_connection(fd, svcaddr, ct, tp)
-	int fd;
-	struct netbuf *svcaddr;		/* servers address */
-	struct ct_data *ct;
-	struct timeval *tp;
+set_up_connection(int fd, struct netbuf *svcaddr, struct ct_data *ct,
+						const struct timeval *tp)
 {
 	int state;
 	struct t_call sndcallstr, *rcvcall;
@@ -492,7 +469,7 @@ set_up_connection(fd, svcaddr, ct, tp)
 #endif
 	switch (state) {
 	case T_IDLE:
-		if (svcaddr == (struct netbuf *)NULL) {
+		if (svcaddr == NULL) {
 			rpc_createerr.cf_stat = RPC_UNKNOWNADDR;
 			return (FALSE);
 		}
@@ -532,6 +509,7 @@ set_up_connection(fd, svcaddr, ct, tp)
 		    ms = tp->tv_sec * SECS_TO_MS + tp->tv_usec * USECS_TO_MS;
 		    if (((curr_time = _get_tcp_conntime(fd)) != -1) &&
 			(_set_tcp_conntime(fd, ms) == 0)) {
+			/* EMPTY */
 #ifdef DEBUG
 			fprintf(stderr, "set_up_connection: set tcp ");
 			fprintf(stderr, "connection timeout to %d ms\n", ms);
@@ -568,7 +546,7 @@ set_up_connection(fd, svcaddr, ct, tp)
 		 * Set the connection timeout back to its old value.
 		 */
 		if (curr_time) {
-			_set_tcp_conntime(fd, curr_time);
+			(void) _set_tcp_conntime(fd, curr_time);
 		}
 
 		if (!connected) {
@@ -593,7 +571,7 @@ set_up_connection(fd, svcaddr, ct, tp)
 		break;
 	case T_DATAXFER:
 	case T_OUTCON:
-		if (svcaddr == (struct netbuf *)NULL) {
+		if (svcaddr == NULL) {
 			/*
 			 * svcaddr could also be NULL in cases where the
 			 * client is already bound and connected.
@@ -601,7 +579,7 @@ set_up_connection(fd, svcaddr, ct, tp)
 			ct->ct_addr.len = 0;
 		} else {
 			ct->ct_addr.buf = malloc(svcaddr->len);
-			if (ct->ct_addr.buf == (char *)NULL) {
+			if (ct->ct_addr.buf == NULL) {
 				(void) syslog(LOG_ERR, clnt_vc_errstr,
 					clnt_vc_str, __no_mem_str);
 				rpc_createerr.cf_stat = RPC_SYSTEMERROR;
@@ -610,7 +588,7 @@ set_up_connection(fd, svcaddr, ct, tp)
 				return (FALSE);
 			}
 			(void) memcpy(ct->ct_addr.buf, svcaddr->buf,
-					(int)svcaddr->len);
+					(size_t)svcaddr->len);
 			ct->ct_addr.len = ct->ct_addr.maxlen = svcaddr->len;
 		}
 		break;
@@ -622,14 +600,8 @@ set_up_connection(fd, svcaddr, ct, tp)
 }
 
 static enum clnt_stat
-clnt_vc_call(cl, proc, xdr_args, args_ptr, xdr_results, results_ptr, timeout)
-	CLIENT *cl;
-	rpcproc_t proc;
-	xdrproc_t xdr_args;
-	caddr_t args_ptr;
-	xdrproc_t xdr_results;
-	caddr_t results_ptr;
-	struct timeval timeout;
+clnt_vc_call(CLIENT *cl, rpcproc_t proc, xdrproc_t xdr_args, caddr_t args_ptr,
+	xdrproc_t xdr_results, caddr_t results_ptr, struct timeval timeout)
 {
 /* LINTED pointer alignment */
 	struct ct_data *ct = (struct ct_data *)cl->cl_private;
@@ -640,8 +612,6 @@ clnt_vc_call(cl, proc, xdr_args, args_ptr, xdr_results, results_ptr, timeout)
 	uint32_t *msg_x_id = (uint32_t *)(ct->ct_mcall);	/* yuk */
 	bool_t shipnow;
 	int refreshes = 2;
-
-	trace3(TR_clnt_vc_call, 0, cl, proc);
 
 	if (rpc_fd_lock(vctbl, ct->ct_fd)) {
 		rpc_callerr.re_status = RPC_FAILED;
@@ -680,15 +650,14 @@ call_again:
 	*msg_x_id = htonl(x_id);
 
 	if (cl->cl_auth->ah_cred.oa_flavor != RPCSEC_GSS) {
-		if ((! XDR_PUTBYTES(xdrs, ct->ct_mcall, ct->ct_mpos)) ||
-		    (! XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
-		    (! AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
-		    (! xdr_args(xdrs, args_ptr))) {
+		if ((!XDR_PUTBYTES(xdrs, ct->ct_mcall, ct->ct_mpos)) ||
+		    (!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
+		    (!AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
+		    (!xdr_args(xdrs, args_ptr))) {
 			if (rpc_callerr.re_status == RPC_SUCCESS)
 				rpc_callerr.re_status = RPC_CANTENCODEARGS;
 			(void) xdrrec_endofrecord(xdrs, TRUE);
 			rpc_fd_unlock(vctbl, ct->ct_fd);
-			trace3(TR_clnt_vc_call, 1, cl, proc);
 			return (rpc_callerr.re_status);
 		}
 	} else {
@@ -701,18 +670,15 @@ call_again:
 				rpc_callerr.re_status = RPC_CANTENCODEARGS;
 			(void) xdrrec_endofrecord(xdrs, TRUE);
 			rpc_fd_unlock(vctbl, ct->ct_fd);
-			trace3(TR_clnt_vc_call, 1, cl, proc);
 			return (rpc_callerr.re_status);
 		}
 	}
-	if (! xdrrec_endofrecord(xdrs, shipnow)) {
+	if (!xdrrec_endofrecord(xdrs, shipnow)) {
 		rpc_fd_unlock(vctbl, ct->ct_fd);
-		trace3(TR_clnt_vc_call, 1, cl, proc);
 		return (rpc_callerr.re_status = RPC_CANTSEND);
 	}
-	if (! shipnow) {
+	if (!shipnow) {
 		rpc_fd_unlock(vctbl, ct->ct_fd);
-		trace3(TR_clnt_vc_call, 1, cl, proc);
 		return (RPC_SUCCESS);
 	}
 	/*
@@ -720,7 +686,6 @@ call_again:
 	 */
 	if (timeout.tv_sec == 0 && timeout.tv_usec == 0) {
 		rpc_fd_unlock(vctbl, ct->ct_fd);
-		trace3(TR_clnt_vc_call, 1, cl, proc);
 		return (rpc_callerr.re_status = RPC_TIMEDOUT);
 	}
 
@@ -729,22 +694,19 @@ call_again:
 	 * Keep receiving until we get a valid transaction id
 	 */
 	xdrs->x_op = XDR_DECODE;
-	/*CONSTANTCONDITION*/
-	while (TRUE) {
+	for (;;) {
 		reply_msg.acpted_rply.ar_verf = _null_auth;
 		reply_msg.acpted_rply.ar_results.where = NULL;
 		reply_msg.acpted_rply.ar_results.proc = (xdrproc_t)xdr_void;
-		if (! xdrrec_skiprecord(xdrs)) {
+		if (!xdrrec_skiprecord(xdrs)) {
 			rpc_fd_unlock(vctbl, ct->ct_fd);
-			trace3(TR_clnt_vc_call, 1, cl, proc);
 			return (rpc_callerr.re_status);
 		}
 		/* now decode and validate the response header */
-		if (! xdr_replymsg(xdrs, &reply_msg)) {
+		if (!xdr_replymsg(xdrs, &reply_msg)) {
 			if (rpc_callerr.re_status == RPC_SUCCESS)
 				continue;
 			rpc_fd_unlock(vctbl, ct->ct_fd);
-			trace3(TR_clnt_vc_call, 1, cl, proc);
 			return (rpc_callerr.re_status);
 		}
 		if (reply_msg.rm_xid == x_id)
@@ -761,7 +723,7 @@ call_again:
 		__seterr_reply(&reply_msg, &(rpc_callerr));
 
 	if (rpc_callerr.re_status == RPC_SUCCESS) {
-		if (! AUTH_VALIDATE(cl->cl_auth,
+		if (!AUTH_VALIDATE(cl->cl_auth,
 				&reply_msg.acpted_rply.ar_verf)) {
 			rpc_callerr.re_status = RPC_AUTHERROR;
 			rpc_callerr.re_why = AUTH_INVALIDRESP;
@@ -800,16 +762,11 @@ call_again:
 		(void) xdr_opaque_auth(xdrs, &(reply_msg.acpted_rply.ar_verf));
 	}
 	rpc_fd_unlock(vctbl, ct->ct_fd);
-	trace3(TR_clnt_vc_call, 1, cl, proc);
 	return (rpc_callerr.re_status);
 }
 
 static enum clnt_stat
-clnt_vc_send(cl, proc, xdr_args, args_ptr)
-	CLIENT *cl;
-	rpcproc_t proc;
-	xdrproc_t xdr_args;
-	caddr_t args_ptr;
+clnt_vc_send(CLIENT *cl, rpcproc_t proc, xdrproc_t xdr_args, caddr_t args_ptr)
 {
 /* LINTED pointer alignment */
 	struct ct_data *ct = (struct ct_data *)cl->cl_private;
@@ -817,8 +774,6 @@ clnt_vc_send(cl, proc, xdr_args, args_ptr)
 	uint32_t x_id;
 /* LINTED pointer alignment */
 	uint32_t *msg_x_id = (uint32_t *)(ct->ct_mcall);	/* yuk */
-
-	trace3(TR_clnt_vc_send, 0, cl, proc);
 
 	if (rpc_fd_lock(vctbl, ct->ct_fd)) {
 		rpc_callerr.re_status = RPC_FAILED;
@@ -839,15 +794,14 @@ clnt_vc_send(cl, proc, xdr_args, args_ptr)
 	*msg_x_id = htonl(x_id);
 
 	if (cl->cl_auth->ah_cred.oa_flavor != RPCSEC_GSS) {
-		if ((! XDR_PUTBYTES(xdrs, ct->ct_mcall, ct->ct_mpos)) ||
-		    (! XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
-		    (! AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
-		    (! xdr_args(xdrs, args_ptr))) {
+		if ((!XDR_PUTBYTES(xdrs, ct->ct_mcall, ct->ct_mpos)) ||
+		    (!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
+		    (!AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
+		    (!xdr_args(xdrs, args_ptr))) {
 			if (rpc_callerr.re_status == RPC_SUCCESS)
 				rpc_callerr.re_status = RPC_CANTENCODEARGS;
 			(void) xdrrec_endofrecord(xdrs, TRUE);
 			rpc_fd_unlock(vctbl, ct->ct_fd);
-			trace3(TR_clnt_vc_send, 1, cl, proc);
 			return (rpc_callerr.re_status);
 		}
 	} else {
@@ -860,7 +814,6 @@ clnt_vc_send(cl, proc, xdr_args, args_ptr)
 				rpc_callerr.re_status = RPC_CANTENCODEARGS;
 			(void) xdrrec_endofrecord(xdrs, TRUE);
 			rpc_fd_unlock(vctbl, ct->ct_fd);
-			trace3(TR_clnt_vc_send, 1, cl, proc);
 			return (rpc_callerr.re_status);
 		}
 	}
@@ -871,62 +824,46 @@ clnt_vc_send(cl, proc, xdr_args, args_ptr)
 	 * An error, if any occurs, is reported through
 	 * rpc_callerr.re_status.
 	 */
-	xdrrec_endofrecord(xdrs, TRUE);
+	(void) xdrrec_endofrecord(xdrs, TRUE);
 
 	rpc_fd_unlock(vctbl, ct->ct_fd);
-	trace3(TR_clnt_vc_call, 1, cl, proc);
 	return (rpc_callerr.re_status);
 }
 
+/* ARGSUSED */
 static void
-clnt_vc_geterr(cl, errp)
-	CLIENT *cl;
-	struct rpc_err *errp;
+clnt_vc_geterr(CLIENT *cl, struct rpc_err *errp)
 {
-	trace2(TR_clnt_vc_geterr, 0, cl);
 	*errp = rpc_callerr;
-	trace2(TR_clnt_vc_geterr, 1, cl);
 }
 
 static bool_t
-clnt_vc_freeres(cl, xdr_res, res_ptr)
-	CLIENT *cl;
-	xdrproc_t xdr_res;
-	caddr_t res_ptr;
+clnt_vc_freeres(CLIENT *cl, xdrproc_t xdr_res, caddr_t res_ptr)
 {
 /* LINTED pointer alignment */
 	struct ct_data *ct = (struct ct_data *)cl->cl_private;
 	XDR *xdrs = &(ct->ct_xdrs);
-	bool_t dummy;
+	bool_t stat;
 
-	trace2(TR_clnt_vc_freeres, 0, cl);
-	rpc_fd_lock(vctbl, ct->ct_fd);
+	(void) rpc_fd_lock(vctbl, ct->ct_fd);
 	xdrs->x_op = XDR_FREE;
-	dummy = (*xdr_res)(xdrs, res_ptr);
+	stat = (*xdr_res)(xdrs, res_ptr);
 	rpc_fd_unlock(vctbl, ct->ct_fd);
-	trace2(TR_clnt_vc_freeres, 1, cl);
-	return (dummy);
+	return (stat);
 }
 
 static void
 clnt_vc_abort(void)
 {
-	trace1(TR_clnt_vc_abort, 0);
-	trace1(TR_clnt_vc_abort, 1);
 }
 
 /*ARGSUSED*/
 static bool_t
-clnt_vc_control(cl, request, info)
-	CLIENT *cl;
-	int request;
-	char *info;
+clnt_vc_control(CLIENT *cl, int request, char *info)
 {
 	bool_t ret;
 /* LINTED pointer alignment */
 	struct ct_data *ct = (struct ct_data *)cl->cl_private;
-
-	trace3(TR_clnt_vc_control, 0, cl, request);
 
 	if (rpc_fd_lock(vctbl, ct->ct_fd)) {
 		rpc_fd_unlock(vctbl, ct->ct_fd);
@@ -937,18 +874,18 @@ clnt_vc_control(cl, request, info)
 	case CLSET_FD_CLOSE:
 		ct->ct_closeit = TRUE;
 		rpc_fd_unlock(vctbl, ct->ct_fd);
-		trace3(TR_clnt_vc_control, 1, cl, request);
 		return (TRUE);
 	case CLSET_FD_NCLOSE:
 		ct->ct_closeit = FALSE;
 		rpc_fd_unlock(vctbl, ct->ct_fd);
-		trace3(TR_clnt_vc_control, 1, cl, request);
 		return (TRUE);
 	case CLFLUSH:
 		if (ct->ct_io_mode == RPC_CL_NONBLOCKING) {
 			int res;
 			res = do_flush(ct, (info == NULL ||
+			    /* LINTED pointer cast */
 			    *(int *)info == RPC_CL_DEFAULT_FLUSH)?
+			    /* LINTED pointer cast */
 			    ct->ct_blocking_mode: *(int *)info);
 			ret = (0 == res);
 		}
@@ -959,7 +896,6 @@ clnt_vc_control(cl, request, info)
 	/* for other requests which use info */
 	if (info == NULL) {
 		rpc_fd_unlock(vctbl, ct->ct_fd);
-		trace3(TR_clnt_vc_control, 1, cl, request);
 		return (FALSE);
 	}
 	switch (request) {
@@ -967,7 +903,6 @@ clnt_vc_control(cl, request, info)
 /* LINTED pointer alignment */
 		if (time_not_ok((struct timeval *)info)) {
 			rpc_fd_unlock(vctbl, ct->ct_fd);
-			trace3(TR_clnt_vc_control, 1, cl, request);
 			return (FALSE);
 		}
 /* LINTED pointer alignment */
@@ -982,7 +917,7 @@ clnt_vc_control(cl, request, info)
 			(ct->ct_wait % 1000) * 1000;
 		break;
 	case CLGET_SERVER_ADDR:	/* For compatibility only */
-		(void) memcpy(info, ct->ct_addr.buf, (int)ct->ct_addr.len);
+		(void) memcpy(info, ct->ct_addr.buf, (size_t)ct->ct_addr.len);
 		break;
 	case CLGET_FD:
 /* LINTED pointer alignment */
@@ -1005,17 +940,14 @@ clnt_vc_control(cl, request, info)
 			rpc_createerr.cf_error.re_terrno = t_errno;
 			rpc_createerr.cf_error.re_errno = errno;
 			rpc_fd_unlock(vctbl, ct->ct_fd);
-			trace3(TR_clnt_vc_control, 1, cl, request);
 			return (FALSE);
 		}
 		ret = set_up_connection(ct->ct_fd, (struct netbuf *)info,
 			ct, NULL));
 		rpc_fd_unlock(vctbl, ct->ct_fd);
-		trace3(TR_clnt_vc_control, 1, cl, request);
 		return (ret);
 #else
 		rpc_fd_unlock(vctbl, ct->ct_fd);
-		trace3(TR_clnt_vc_control, 1, cl, request);
 		return (FALSE);
 #endif
 	case CLGET_XID:
@@ -1072,6 +1004,7 @@ clnt_vc_control(cl, request, info)
 		break;
 
 	case CLSET_IO_MODE:
+		/* LINTED pointer cast */
 		if (!set_io_mode(ct, *(int *)info)) {
 		    rpc_fd_unlock(vctbl, ct->ct_fd);
 		    return (FALSE);
@@ -1079,16 +1012,19 @@ clnt_vc_control(cl, request, info)
 		break;
 	case CLSET_FLUSH_MODE:
 		/* Set a specific FLUSH_MODE */
+		/* LINTED pointer cast */
 		if (!set_flush_mode(ct, *(int *)info)) {
 		    rpc_fd_unlock(vctbl, ct->ct_fd);
 		    return (FALSE);
 		}
 		break;
 	case CLGET_FLUSH_MODE:
+		/* LINTED pointer cast */
 		*(rpcflushmode_t *)info = ct->ct_blocking_mode;
 		break;
 
 	case CLGET_IO_MODE:
+		/* LINTED pointer cast */
 		*(rpciomode_t *)info = ct->ct_io_mode;
 		break;
 
@@ -1097,6 +1033,7 @@ clnt_vc_control(cl, request, info)
 		 * Returns the current amount of memory allocated
 		 * to pending requests
 		 */
+		/* LINTED pointer cast */
 		*(int *)info = ct->ct_bufferPendingSize;
 		break;
 
@@ -1110,9 +1047,11 @@ clnt_vc_control(cl, request, info)
 		 * If the new size is equal to the current size,
 		 * there is nothing to do.
 		 */
+		/* LINTED pointer cast */
 		if (ct->ct_bufferSize == *(uint_t *)info)
 			break;
 
+		/* LINTED pointer cast */
 		ct->ct_bufferSize = *(uint_t *)info;
 		if (ct->ct_buffer) {
 			free(ct->ct_buffer);
@@ -1126,48 +1065,44 @@ clnt_vc_control(cl, request, info)
 		 * Returns the size of buffer allocated
 		 * to pending requests
 		 */
+		/* LINTED pointer cast */
 		*(uint_t *)info = ct->ct_bufferSize;
 		break;
 
 	default:
 		rpc_fd_unlock(vctbl, ct->ct_fd);
-		trace3(TR_clnt_vc_control, 1, cl, request);
 		return (FALSE);
 	}
 	rpc_fd_unlock(vctbl, ct->ct_fd);
-	trace3(TR_clnt_vc_control, 1, cl, request);
 	return (TRUE);
 }
 
 static void
-clnt_vc_destroy(cl)
-	CLIENT *cl;
+clnt_vc_destroy(CLIENT *cl)
 {
 /* LINTED pointer alignment */
 	struct ct_data *ct = (struct ct_data *)cl->cl_private;
 	int ct_fd = ct->ct_fd;
 
-	trace2(TR_clnt_vc_destroy, 0, cl);
-	rpc_fd_lock(vctbl, ct_fd);
+	(void) rpc_fd_lock(vctbl, ct_fd);
 
 	if (ct->ct_io_mode == RPC_CL_NONBLOCKING) {
-	    do_flush(ct, RPC_CL_BLOCKING_FLUSH);
-	    unregister_nb(ct);
+		(void) do_flush(ct, RPC_CL_BLOCKING_FLUSH);
+		(void) unregister_nb(ct);
 	}
 
 	if (ct->ct_closeit)
 		(void) t_close(ct_fd);
 	XDR_DESTROY(&(ct->ct_xdrs));
 	if (ct->ct_addr.buf)
-		(void) free(ct->ct_addr.buf);
-	mem_free((caddr_t)ct, sizeof (struct ct_data));
+		free(ct->ct_addr.buf);
+	free(ct);
 	if (cl->cl_netid && cl->cl_netid[0])
-		mem_free(cl->cl_netid, strlen(cl->cl_netid) +1);
+		free(cl->cl_netid);
 	if (cl->cl_tp && cl->cl_tp[0])
-		mem_free(cl->cl_tp, strlen(cl->cl_tp) +1);
-	mem_free((caddr_t)cl, sizeof (CLIENT));
+		free(cl->cl_tp);
+	free(cl);
 	rpc_fd_unlock(vctbl, ct_fd);
-	trace2(TR_clnt_vc_destroy, 1, cl);
 }
 
 /*
@@ -1184,17 +1119,11 @@ read_vc(void *ct_tmp, caddr_t buf, int len)
 	struct ct_data *ct = ct_tmp;
 	struct timeval starttime;
 	struct timeval curtime;
-	struct timeval time_waited;
-	struct timeval timeout;
 	int poll_time;
 	int delta;
 
-	trace2(TR_read_vc, 0, len);
-
-	if (len == 0) {
-		trace2(TR_read_vc, 1, len);
+	if (len == 0)
 		return (0);
-	}
 
 	/*
 	 * Allocate just one the first time.  thr_get_storage() may
@@ -1209,7 +1138,6 @@ read_vc(void *ct_tmp, caddr_t buf, int len)
 		rpc_callerr.re_status = RPC_SYSTEMERROR;
 		rpc_callerr.re_errno = errno;
 		rpc_callerr.re_terrno = 0;
-		trace2(TR_read_vc, 1, len);
 		return (-1);
 	}
 
@@ -1222,7 +1150,7 @@ read_vc(void *ct_tmp, caddr_t buf, int len)
 	pfdp[0].events = MASKVAL;
 	pfdp[0].revents = 0;
 	poll_time = ct->ct_wait;
-	if (gettimeofday(&starttime, (struct timezone *)NULL) == -1) {
+	if (gettimeofday(&starttime, NULL) == -1) {
 		syslog(LOG_ERR, "Unable to get time of day: %m");
 		return (-1);
 	}
@@ -1250,13 +1178,12 @@ read_vc(void *ct_tmp, caddr_t buf, int len)
 					rpc_callerr.re_status = RPC_SYSTEMERROR;
 					rpc_callerr.re_errno = errno;
 					rpc_callerr.re_terrno = 0;
-					trace2(TR_read_vc, 1, len);
 					return (-1);
 				}
 
 				pfdp = tmp_pfdp;
 				npfd = svc_max_pollfd + 1;
-				pthread_setspecific(pfdp_key, pfdp);
+				(void) pthread_setspecific(pfdp_key, pfdp);
 			}
 			if (npfd > 1)
 				(void) memcpy(&pfdp[1], svc_pollfd,
@@ -1270,7 +1197,6 @@ read_vc(void *ct_tmp, caddr_t buf, int len)
 		switch (fds = poll(pfdp, npfd, poll_time)) {
 		case 0:
 			rpc_callerr.re_status = RPC_TIMEDOUT;
-			trace2(TR_read_vc, 1, len);
 			return (-1);
 
 		case -1:
@@ -1282,8 +1208,7 @@ read_vc(void *ct_tmp, caddr_t buf, int len)
 				 * update time_waited
 				 */
 
-				if (gettimeofday(&curtime,
-				(struct timezone *)NULL) == -1) {
+				if (gettimeofday(&curtime, NULL) == -1) {
 					syslog(LOG_ERR,
 					    "Unable to get time of day:  %m");
 					errno = 0;
@@ -1298,7 +1223,6 @@ read_vc(void *ct_tmp, caddr_t buf, int len)
 					rpc_callerr.re_status =
 						RPC_TIMEDOUT;
 					errno = 0;
-					trace2(TR_read_vc, 1, len);
 					return (-1);
 				} else {
 					errno = 0; /* reset it */
@@ -1323,14 +1247,12 @@ read_vc(void *ct_tmp, caddr_t buf, int len)
 			 *	instead.
 			 */
 			rpc_callerr.re_errno = errno = EBADF;
-			trace2(TR_read_vc, 1, len);
 			return (-1);
 		}
 
 		if (pfdp[0].revents & (POLLERR | POLLHUP)) {
 			rpc_callerr.re_status = RPC_CANTRECV;
 			rpc_callerr.re_errno = errno = EPIPE;
-			trace2(TR_read_vc, 1, len);
 			return (-1);
 		}
 		break;
@@ -1351,22 +1273,16 @@ read_vc(void *ct_tmp, caddr_t buf, int len)
 		rpc_callerr.re_status = RPC_CANTRECV;
 		break;
 	}
-	trace2(TR_read_vc, 1, len);
 	return (len);
 }
 
 static int
-write_vc(ct_tmp, buf, len)
-	void *ct_tmp;
-	caddr_t buf;
-	int len;
+write_vc(void *ct_tmp, caddr_t buf, int len)
 {
 	int i, cnt;
 	struct ct_data *ct = ct_tmp;
 	int flag;
 	int maxsz;
-
-	trace2(TR_write_vc, 0, len);
 
 	maxsz = ct->ct_tsdu;
 
@@ -1395,7 +1311,6 @@ write_vc(ct_tmp, buf, len)
 			rpc_callerr.re_errno = 0;
 			rpc_callerr.re_status = RPC_CANTSTORE;
 		}
-		trace2(TR_write_vc, 1, len);
 		return (len);
 	}
 
@@ -1411,7 +1326,6 @@ write_vc(ct_tmp, buf, len)
 			rpc_callerr.re_errno = 0;
 			rpc_callerr.re_status = RPC_CANTSEND;
 		}
-		trace2(TR_write_vc, 1, len);
 		return (len);
 	}
 
@@ -1425,11 +1339,9 @@ write_vc(ct_tmp, buf, len)
 			rpc_callerr.re_terrno = t_errno;
 			rpc_callerr.re_errno = 0;
 			rpc_callerr.re_status = RPC_CANTSEND;
-			trace2(TR_write_vc, 1, len);
 			return (-1);
 		}
 	}
-	trace2(TR_write_vc, 1, len);
 	return (len);
 }
 
@@ -1437,16 +1349,12 @@ write_vc(ct_tmp, buf, len)
  * Receive the required bytes of data, even if it is fragmented.
  */
 static int
-t_rcvall(fd, buf, len)
-	int fd;
-	char *buf;
-	int len;
+t_rcvall(int fd, char *buf, int len)
 {
 	int moreflag;
 	int final = 0;
 	int res;
 
-	trace3(TR_t_rcvall, 0, fd, len);
 	do {
 		moreflag = 0;
 		res = t_rcv(fd, buf, (unsigned)len, &moreflag);
@@ -1454,30 +1362,25 @@ t_rcvall(fd, buf, len)
 			if (t_errno == TLOOK)
 				switch (t_look(fd)) {
 				case T_DISCONNECT:
-					t_rcvdis(fd, NULL);
-					t_snddis(fd, NULL);
-					trace3(TR_t_rcvall, 1, fd, len);
+					(void) t_rcvdis(fd, NULL);
+					(void) t_snddis(fd, NULL);
 					return (-1);
 				case T_ORDREL:
 				/* Received orderly release indication */
-					t_rcvrel(fd);
+					(void) t_rcvrel(fd);
 				/* Send orderly release indicator */
 					(void) t_sndrel(fd);
-					trace3(TR_t_rcvall, 1, fd, len);
 					return (-1);
 				default:
-					trace3(TR_t_rcvall, 1, fd, len);
 					return (-1);
 				}
 		} else if (res == 0) {
-			trace3(TR_t_rcvall, 1, fd, len);
 			return (0);
 		}
 		final += res;
 		buf += res;
 		len -= res;
 	} while ((len > 0) && (moreflag & T_MORE));
-	trace3(TR_t_rcvall, 1, fd, len);
 	return (final);
 }
 
@@ -1489,7 +1392,6 @@ clnt_vc_ops(void)
 
 	/* VARIABLES PROTECTED BY ops_lock: ops */
 
-	trace1(TR_clnt_vc_ops, 0);
 	sig_mutex_lock(&ops_lock);
 	if (ops.cl_call == NULL) {
 		ops.cl_call = clnt_vc_call;
@@ -1501,7 +1403,6 @@ clnt_vc_ops(void)
 		ops.cl_control = clnt_vc_control;
 	}
 	sig_mutex_unlock(&ops_lock);
-	trace1(TR_clnt_vc_ops, 1);
 	return (&ops);
 }
 
@@ -1510,11 +1411,8 @@ clnt_vc_ops(void)
  * Note this is different from time_not_ok in clnt_dg.c
  */
 static bool_t
-time_not_ok(t)
-	struct timeval *t;
+time_not_ok(struct timeval *t)
 {
-	trace1(TR_time_not_ok, 0);
-	trace1(TR_time_not_ok, 1);
 	return (t->tv_sec <= -1 || t->tv_sec > 100000000 ||
 		t->tv_usec <= -1 || t->tv_usec > 1000000);
 }
@@ -1530,12 +1428,12 @@ addInBuffer(struct ct_data *ct, char *dataToAdd, unsigned int nBytes)
 		/* Buffer not allocated yet. */
 		char *buffer;
 
-		buffer = (char *)malloc(ct->ct_bufferSize);
+		buffer = malloc(ct->ct_bufferSize);
 		if (NULL == buffer) {
 			errno = ENOMEM;
 			return (-1);
 		}
-		memcpy(buffer, dataToAdd, nBytes);
+		(void) memcpy(buffer, dataToAdd, nBytes);
 
 		ct->ct_buffer = buffer;
 		ct->ct_bufferReadPtr = buffer;
@@ -1553,7 +1451,7 @@ addInBuffer(struct ct_data *ct, char *dataToAdd, unsigned int nBytes)
 
 		ct->ct_bufferPendingSize += nBytes;
 
-		memcpy(ct->ct_bufferWritePtr, dataToAdd, len);
+		(void) memcpy(ct->ct_bufferWritePtr, dataToAdd, len);
 		ct->ct_bufferWritePtr += len;
 		nBytes -= len;
 		if (0 == nBytes) {
@@ -1575,19 +1473,11 @@ addInBuffer(struct ct_data *ct, char *dataToAdd, unsigned int nBytes)
 			 * Copy the remaining data to the beginning of the
 			 * buffer
 			 */
-			memcpy(ct->ct_buffer, dataToAdd, nBytes);
+			(void) memcpy(ct->ct_buffer, dataToAdd, nBytes);
 			ct->ct_bufferWritePtr = ct->ct_buffer + nBytes;
 		}
 	}
 	return (0);
-}
-
-static void
-getFromBuffer(struct ct_data *ct, char **data, unsigned int *nBytes)
-{
-	int len = MIN(ct->ct_bufferPendingSize, REMAIN_BYTES(bufferReadPtr));
-	*data = ct->ct_bufferReadPtr;
-	*nBytes = len;
 }
 
 static void
@@ -1662,11 +1552,11 @@ set_io_mode(struct ct_data *ct, int ioMode)
 				 * If a buffer was allocated for this
 				 * connection, flush it now, and free it.
 				 */
-				do_flush(ct, RPC_CL_BLOCKING_FLUSH);
+				(void) do_flush(ct, RPC_CL_BLOCKING_FLUSH);
 				free(ct->ct_buffer);
 				ct->ct_buffer = NULL;
 			}
-			unregister_nb(ct);
+			(void) unregister_nb(ct);
 			ct->ct_io_mode = ioMode;
 		}
 		break;
@@ -1701,7 +1591,7 @@ do_flush(struct ct_data *ct, uint_t flush_mode)
 			if (REMAIN_BYTES(bufferReadPtr) <
 			    ct->ct_bufferPendingSize) {
 				struct iovec iov[2];
-				iovFromBuffer(ct, iov);
+				(void) iovFromBuffer(ct, iov);
 				result = writev(ct->ct_fd, iov, 2);
 			} else {
 				result = t_snd(ct->ct_fd, ct->ct_bufferReadPtr,
@@ -1716,10 +1606,10 @@ do_flush(struct ct_data *ct, uint_t flush_mode)
 		break;
 
 	case RPC_CL_BESTEFFORT_FLUSH:
-		set_blocking_connection(ct, FALSE);
+		(void) set_blocking_connection(ct, FALSE);
 		if (REMAIN_BYTES(bufferReadPtr) < ct->ct_bufferPendingSize) {
 			struct iovec iov[2];
-			iovFromBuffer(ct, iov);
+			(void) iovFromBuffer(ct, iov);
 			result = writev(ct->ct_fd, iov, 2);
 		} else {
 			result = t_snd(ct->ct_fd, ct->ct_bufferReadPtr,
@@ -1759,14 +1649,14 @@ nb_send(struct ct_data *ct, void *buff, unsigned int nBytes)
 	 */
 	if (nBytes > (ct->ct_bufferSize - ct->ct_bufferPendingSize)) {
 		/* Try to flush  (to free some space). */
-		do_flush(ct, RPC_CL_BESTEFFORT_FLUSH);
+		(void) do_flush(ct, RPC_CL_BESTEFFORT_FLUSH);
 
 		/* Can we store the message now ? */
 		if (nBytes > (ct->ct_bufferSize - ct->ct_bufferPendingSize))
 			return (-2);
 	}
 
-	set_blocking_connection(ct, FALSE);
+	(void) set_blocking_connection(ct, FALSE);
 
 	/*
 	 * If there is no data pending, we can simply try
@@ -1849,7 +1739,7 @@ nb_send(struct ct_data *ct, void *buff, unsigned int nBytes)
 }
 
 static void
-flush_registered_clients()
+flush_registered_clients(void)
 {
 	struct nb_reg_node *node;
 
@@ -1858,15 +1748,15 @@ flush_registered_clients()
 	}
 
 	LIST_FOR_EACH(nb_first, node) {
-		do_flush(node->ct, RPC_CL_BLOCKING_FLUSH);
+		(void) do_flush(node->ct, RPC_CL_BLOCKING_FLUSH);
 	}
 }
 
 static int
-allocate_chunk()
+allocate_chunk(void)
 {
 #define	CHUNK_SIZE 16
-	struct nb_reg_node *chk = (struct nb_reg_node *)
+	struct nb_reg_node *chk =
 	    malloc(sizeof (struct nb_reg_node) * CHUNK_SIZE);
 	struct nb_reg_node *n;
 	int i;
@@ -1889,16 +1779,16 @@ register_nb(struct ct_data *ct)
 {
 	struct nb_reg_node *node;
 
-	mutex_lock(&nb_list_mutex);
+	(void) mutex_lock(&nb_list_mutex);
 
 	if (LIST_ISEMPTY(nb_free) && (allocate_chunk() == -1)) {
-		mutex_unlock(&nb_list_mutex);
+		(void) mutex_unlock(&nb_list_mutex);
 		errno = ENOMEM;
 		return (-1);
 	}
 
 	if (!exit_handler_set) {
-		atexit(flush_registered_clients);
+		(void) atexit(flush_registered_clients);
 		exit_handler_set = TRUE;
 	}
 	/* Get the first free node */
@@ -1907,7 +1797,7 @@ register_nb(struct ct_data *ct)
 	node->ct = ct;
 
 	LIST_ADD(nb_first, node);
-	mutex_unlock(&nb_list_mutex);
+	(void) mutex_unlock(&nb_list_mutex);
 
 	return (0);
 }
@@ -1917,8 +1807,8 @@ unregister_nb(struct ct_data *ct)
 {
 	struct nb_reg_node *node;
 
-	mutex_lock(&nb_list_mutex);
-	assert(! LIST_ISEMPTY(nb_first));
+	(void) mutex_lock(&nb_list_mutex);
+	assert(!LIST_ISEMPTY(nb_first));
 
 	node = nb_first;
 	LIST_FOR_EACH(nb_first, node) {
@@ -1932,6 +1822,6 @@ unregister_nb(struct ct_data *ct)
 			break;
 		}
 	}
-	mutex_unlock(&nb_list_mutex);
+	(void) mutex_unlock(&nb_list_mutex);
 	return (0);
 }

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -46,7 +47,6 @@
 #include <errno.h>
 #include <sys/poll.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <syslog.h>
 #include <thread.h>
 #include <assert.h>
@@ -224,7 +224,7 @@ static bool_t svc_exit_done = TRUE;
 
 
 void
-svc_run()
+svc_run(void)
 {
 	/* NO OTHER THREADS ARE RUNNING */
 
@@ -243,10 +243,10 @@ svc_run()
 			continue;
 		}
 
-		mutex_lock(&svc_door_mutex);
+		(void) mutex_lock(&svc_door_mutex);
 		if (svc_ndoorfds > 0)
-			cond_wait(&svc_door_waitcv, &svc_door_mutex);
-		mutex_unlock(&svc_door_mutex);
+			(void) cond_wait(&svc_door_waitcv, &svc_door_mutex);
+		(void) mutex_unlock(&svc_door_mutex);
 	}
 }
 
@@ -256,7 +256,7 @@ svc_run()
  *	service handles.
  */
 void
-svc_exit()
+svc_exit(void)
 {
 	SVCXPRT	*xprt;
 	int fd;
@@ -264,11 +264,9 @@ svc_exit()
 
 	/* NO LOCKS HELD */
 
-	trace1(TR_svc_exit, 0);
-	mutex_lock(&svc_exit_mutex);
+	(void) mutex_lock(&svc_exit_mutex);
 	if (svc_exit_done) {
-		mutex_unlock(&svc_exit_mutex);
-		trace1(TR_svc_exit, 1);
+		(void) mutex_unlock(&svc_exit_mutex);
 		return;
 	}
 	svc_exit_done = TRUE;
@@ -280,24 +278,22 @@ svc_exit()
 	}
 	__svc_free_xprtlist();
 	__svc_cleanup_door_xprts();
-	mutex_unlock(&svc_exit_mutex);
+	(void) mutex_unlock(&svc_exit_mutex);
 
 	if (svc_mt_mode != RPC_SVC_MT_NONE) {
-		mutex_lock(&svc_mutex);
-		cond_broadcast(&svc_thr_fdwait);
-		mutex_unlock(&svc_mutex);
+		(void) mutex_lock(&svc_mutex);
+		(void) cond_broadcast(&svc_thr_fdwait);
+		(void) mutex_unlock(&svc_mutex);
 
 		(void) write(svc_pipe[1], &dummy, sizeof (dummy));
 	}
 
-	mutex_lock(&svc_door_mutex);
-	cond_signal(&svc_door_waitcv);	/* wake up door dispatching */
-	mutex_unlock(&svc_door_mutex);
+	(void) mutex_lock(&svc_door_mutex);
+	(void) cond_signal(&svc_door_waitcv);	/* wake up door dispatching */
+	(void) mutex_unlock(&svc_door_mutex);
 
 	/* destroy reactor information if any */
 	__destroy_userfd();
-
-	trace1(TR_svc_exit, 1);
 }
 
 
@@ -329,7 +325,7 @@ extern int _sigaddset(sigset_t *, int);
 extern int _sigprocmask(int, const sigset_t *, sigset_t *);
 
 static void
-_svc_run()
+_svc_run(void)
 {
 	sigset_t set, oldset;
 	int npollfds;
@@ -344,18 +340,17 @@ _svc_run()
 	(void) _sigemptyset(&set);
 	(void) _sigaddset(&set, SIGALRM);
 	(void) _sigprocmask(SIG_BLOCK, &set, &oldset);
-	trace1(TR_svc_run, 0);
 	while (!svc_exit_done) {
 		/*
 		 * Check whether there is any server fd on which we may want
 		 * to wait.
 		 */
-		rw_rdlock(&svc_fd_lock);
+		(void) rw_rdlock(&svc_fd_lock);
 		if (alloc_pollset(svc_npollfds) == -1)
 			break;
 		npollfds = __rpc_compress_pollfd(svc_max_pollfd,
 			svc_pollfd, svc_pollset);
-		rw_unlock(&svc_fd_lock);
+		(void) rw_unlock(&svc_fd_lock);
 		if (npollfds == 0)
 			break;	/* None waiting, hence return */
 
@@ -375,7 +370,6 @@ _svc_run()
 			svc_getreq_poll(svc_pollset, i);
 		}
 	}
-	trace1(TR_svc_run, 1);
 	(void) _sigprocmask(SIG_SETMASK, &oldset, NULL);
 }
 
@@ -391,7 +385,7 @@ enum {
 };
 
 static void
-_svc_run_mt()
+_svc_run_mt(void)
 {
 	int npollfds;
 	int n_polled, dispatch;
@@ -436,8 +430,8 @@ _svc_run_mt()
 		 * locks.  This prevents more than one thread from
 		 * trying to poll at the same time.
 		 */
-		mutex_lock(&svc_thr_mutex);
-		mutex_lock(&svc_mutex);
+		(void) mutex_lock(&svc_thr_mutex);
+		(void) mutex_lock(&svc_mutex);
 continue_with_locks:
 		myfd = -1;
 		mypollfd = INVALID_POLLFD;
@@ -465,14 +459,14 @@ continue_with_locks:
 			/*
 			 * if there are no file descriptors, return
 			 */
-			rw_rdlock(&svc_fd_lock);
+			(void) rw_rdlock(&svc_fd_lock);
 			if (svc_npollfds == 0 ||
 					alloc_pollset(svc_npollfds + 1) == -1) {
-				rw_unlock(&svc_fd_lock);
+				(void) rw_unlock(&svc_fd_lock);
 				svc_polling = FALSE;
 				svc_thr_total--;
-				mutex_unlock(&svc_mutex);
-				mutex_unlock(&svc_thr_mutex);
+				(void) mutex_unlock(&svc_mutex);
+				(void) mutex_unlock(&svc_thr_mutex);
 				if (!main_thread) {
 					thr_exit(NULL);
 					/* NOTREACHED */
@@ -482,7 +476,7 @@ continue_with_locks:
 
 			npollfds = __rpc_compress_pollfd(svc_max_pollfd,
 					svc_pollfd, svc_pollset);
-			rw_unlock(&svc_fd_lock);
+			(void) rw_unlock(&svc_fd_lock);
 
 			if (npollfds == 0) {
 				/*
@@ -492,10 +486,10 @@ continue_with_locks:
 				 * wait on condition variable, otherwise exit.
 				 */
 				svc_polling = FALSE;
-				mutex_unlock(&svc_thr_mutex);
+				(void) mutex_unlock(&svc_thr_mutex);
 				if ((!main_thread) && svc_waiters > 0) {
 					svc_thr_total--;
-					mutex_unlock(&svc_mutex);
+					(void) mutex_unlock(&svc_mutex);
 					thr_exit(NULL);
 					/* NOTREACHED */
 				}
@@ -505,7 +499,8 @@ continue_with_locks:
 					svc_total_pending == 0 &&
 							!svc_exit_done) {
 					svc_waiters++;
-					cond_wait(&svc_thr_fdwait, &svc_mutex);
+					(void) cond_wait(&svc_thr_fdwait,
+								&svc_mutex);
 					svc_waiters--;
 				}
 
@@ -515,13 +510,13 @@ continue_with_locks:
 				 */
 				if (svc_exit_done) {
 					svc_thr_total--;
-					mutex_unlock(&svc_mutex);
+					(void) mutex_unlock(&svc_mutex);
 					if (!main_thread)
 						thr_exit(NULL);
 					break;
 				}
 
-				mutex_unlock(&svc_mutex);
+				(void) mutex_unlock(&svc_mutex);
 				continue;
 			}
 
@@ -539,9 +534,9 @@ continue_with_locks:
 			do {
 				int i, j;
 
-				mutex_unlock(&svc_mutex);
+				(void) mutex_unlock(&svc_mutex);
 				n_polled = poll(svc_pollset, npollfds + 1, -1);
-				mutex_lock(&svc_mutex);
+				(void) mutex_lock(&svc_mutex);
 				if (n_polled <= 0)
 					continue;
 
@@ -583,8 +578,8 @@ continue_with_locks:
 			 */
 			if (svc_exit_done) {
 				svc_thr_total--;
-				mutex_unlock(&svc_mutex);
-				mutex_unlock(&svc_thr_mutex);
+				(void) mutex_unlock(&svc_mutex);
+				(void) mutex_unlock(&svc_thr_mutex);
 				if (!main_thread) {
 					thr_exit(NULL);
 					/* NOTREACHED */
@@ -665,8 +660,8 @@ continue_with_locks:
 		/*
 		 * Release mutexes so other threads can get going.
 		 */
-		mutex_unlock(&svc_mutex);
-		mutex_unlock(&svc_thr_mutex);
+		(void) mutex_unlock(&svc_mutex);
+		(void) mutex_unlock(&svc_thr_mutex);
 
 		/*
 		 * Process request.
@@ -713,7 +708,7 @@ continue_with_locks:
 /* LINTED pointer alignment */
 				if (svc_flags(xprt) & SVC_ARGS_CHECK)
 					svc_args_done(xprt);
-				mutex_lock(&svc_mutex);
+				(void) mutex_lock(&svc_mutex);
 				_svc_done_private(xprt);
 				if (svc_mt_mode == RPC_SVC_MT_AUTO) {
 					/*
@@ -733,15 +728,15 @@ continue_with_locks:
 						svc_thr_total--;
 						if (svc_thr_total ==
 						    svc_waiters) {
-							cond_broadcast(
+							(void) cond_broadcast(
 							    &svc_thr_fdwait);
 						}
-						mutex_unlock(&svc_mutex);
+						(void) mutex_unlock(&svc_mutex);
 						thr_exit(NULL);
 						/* NOTREACHED */
 					}
 				}
-				mutex_unlock(&svc_mutex);
+				(void) mutex_unlock(&svc_mutex);
 			}
 		}
 
@@ -753,8 +748,7 @@ continue_with_locks:
  * start_threads() - Start specified number of threads.
  */
 static void
-start_threads(num_threads)
-	int		num_threads;
+start_threads(int num_threads)
 {
 	int		i;
 
@@ -776,7 +770,7 @@ start_threads(num_threads)
  * create_pipe() - create pipe for breaking out of poll.
  */
 static void
-create_pipe()
+create_pipe(void)
 {
 	if (pipe(svc_pipe) == -1) {
 		syslog(LOG_ERR, dgettext(__nsl_dom,
@@ -800,7 +794,7 @@ create_pipe()
  * clear_pipe() - Empty data in pipe.
  */
 static void
-clear_pipe()
+clear_pipe(void)
 {
 	char	buf[16];
 	int	i;
@@ -850,8 +844,7 @@ select_next_pollfd(int *fd, int *pollfdIndex)
  * Clear fd bit in svc_fdset.
  */
 static SVCXPRT *
-make_xprt_copy(parent)
-	SVCXPRT	*parent;
+make_xprt_copy(SVCXPRT *parent)
 {
 /* LINTED pointer alignment */
 	SVCXPRT_LIST	*xlist = SVCEXT(parent)->my_xlist;
@@ -874,9 +867,9 @@ make_xprt_copy(parent)
 	if (xprt) {
 /* LINTED pointer alignment */
 		SVCEXT(parent)->refcnt++;
-		rw_wrlock(&svc_fd_lock);
+		(void) rw_wrlock(&svc_fd_lock);
 		clear_pollfd(fd);
-		rw_unlock(&svc_fd_lock);
+		(void) rw_unlock(&svc_fd_lock);
 	}
 	return (xprt);
 }
@@ -885,8 +878,7 @@ make_xprt_copy(parent)
  * _svc_done_private() - return copies to library.
  */
 static void
-_svc_done_private(xprt)
-	SVCXPRT		*xprt;
+_svc_done_private(SVCXPRT *xprt)
 {
 	SVCXPRT		*parent;
 	SVCXPRT_LIST	*xhead, *xlist;
@@ -946,9 +938,9 @@ svc_done(SVCXPRT *xprt)
 	if (svc_flags(xprt) & SVC_ARGS_CHECK)
 		svc_args_done(xprt);
 
-	mutex_lock(&svc_mutex);
+	(void) mutex_lock(&svc_mutex);
 	_svc_done_private(xprt);
-	mutex_unlock(&svc_mutex);
+	(void) mutex_unlock(&svc_mutex);
 }
 
 
@@ -956,8 +948,7 @@ svc_done(SVCXPRT *xprt)
  * Mark argument completion.  Release file descriptor.
  */
 void
-svc_args_done(xprt)
-	SVCXPRT	*xprt;
+svc_args_done(SVCXPRT *xprt)
 {
 	char	dummy;
 /* LINTED pointer alignment */
@@ -977,12 +968,12 @@ svc_args_done(xprt)
 	if (svc_type(xprt) == SVC_CONNECTION &&
 				(stat = SVC_STAT(xprt)) != XPRT_IDLE) {
 		if (stat == XPRT_MOREREQS) {
-			mutex_lock(&svc_mutex);
+			(void) mutex_lock(&svc_mutex);
 			svc_pending_fds[svc_last_pending++] = xprt->xp_fd;
 			if (svc_last_pending > CIRCULAR_BUFSIZE)
 				svc_last_pending = 0;
 			svc_total_pending++;
-			mutex_unlock(&svc_mutex);
+			(void) mutex_unlock(&svc_mutex);
 			wake_up_poller = FALSE;
 		} else {
 			/*
@@ -991,9 +982,9 @@ svc_args_done(xprt)
 			return;
 		}
 	} else {
-		rw_wrlock(&svc_fd_lock);
+		(void) rw_wrlock(&svc_fd_lock);
 		set_pollfd(xprt->xp_fd, MASKVAL);
-		rw_unlock(&svc_fd_lock);
+		(void) rw_unlock(&svc_fd_lock);
 		wake_up_poller = TRUE;
 	}
 
@@ -1001,13 +992,13 @@ svc_args_done(xprt)
 		/*
 		 * Wake up any waiting threads.
 		 */
-		mutex_lock(&svc_mutex);
+		(void) mutex_lock(&svc_mutex);
 		if (svc_waiters > 0) {
-			cond_broadcast(&svc_thr_fdwait);
-			mutex_unlock(&svc_mutex);
+			(void) cond_broadcast(&svc_thr_fdwait);
+			(void) mutex_unlock(&svc_mutex);
 			return;
 		}
-		mutex_unlock(&svc_mutex);
+		(void) mutex_unlock(&svc_mutex);
 	}
 
 	/*
@@ -1044,9 +1035,7 @@ __rpc_legal_connmaxrec(int suggested) {
 
 
 bool_t
-rpc_control(op, info)
-	int		op;
-	void		*info;
+rpc_control(int op, void *info)
 {
 	int		tmp;
 	extern int	__rpc_minfd;
@@ -1067,9 +1056,9 @@ rpc_control(op, info)
 	case RPC_SVC_THRMAX_SET:
 		if ((tmp = *((int *)info)) < 1)
 			return (FALSE);
-		mutex_lock(&svc_mutex);
+		(void) mutex_lock(&svc_mutex);
 		svc_thr_max = tmp;
-		mutex_unlock(&svc_mutex);
+		(void) mutex_unlock(&svc_mutex);
 		return (TRUE);
 	case RPC_SVC_THRMAX_GET:
 		*((int *)info) = svc_thr_max;

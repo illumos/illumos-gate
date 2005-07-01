@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -39,19 +41,14 @@
  * "pointers".  See xdr.h for more info on the interface to xdr.
  */
 #include <sys/types.h>
-#include <rpc/trace.h>
-#ifdef KERNEL
-#include <sys/param.h>
-#else
 #include <syslog.h>
 #include <stdio.h>
 #include <stdlib.h>
-#endif
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 #include <memory.h>
 
-#define	LASTUNSIGNED	((u_int)0-1)
+#define	LASTUNSIGNED	((uint_t)0-1)
 char mem_err_msg_ref[] = "xdr_reference: out of memory";
 
 /*
@@ -64,46 +61,35 @@ char mem_err_msg_ref[] = "xdr_reference: out of memory";
  * proc is the routine to handle the referenced structure.
  */
 bool_t
-xdr_reference(XDR *xdrs, caddr_t *pp, u_int size, xdrproc_t proc)
+xdr_reference(XDR *xdrs, caddr_t *pp, uint_t size, const xdrproc_t proc)
 {
-	register caddr_t loc = *pp;
-	register bool_t stat;
+	caddr_t loc = *pp;
+	bool_t stat;
 
-	trace2(TR_xdr_reference, 0, size);
 	if (loc == NULL)
 		switch (xdrs->x_op) {
 		case XDR_FREE:
-			trace1(TR_xdr_reference, 1);
 			return (TRUE);
-
 		case XDR_DECODE:
-			*pp = loc = (caddr_t) mem_alloc(size);
-#ifndef KERNEL
+			*pp = loc = malloc(size);
 			if (loc == NULL) {
 				(void) syslog(LOG_ERR, mem_err_msg_ref);
-
-				trace1(TR_xdr_reference, 1);
 				return (FALSE);
 			}
 			(void) memset(loc, 0, (int)size);
-#else
-			(void) memset(loc, 0, size);
-#endif
 			break;
 	}
 
 	stat = (*proc)(xdrs, loc, LASTUNSIGNED);
 
 	if (xdrs->x_op == XDR_FREE) {
-		mem_free(loc, size);
+		free(loc);
 		*pp = NULL;
 	}
-	trace1(TR_xdr_reference, 1);
 	return (stat);
 }
 
 
-#ifndef KERNEL
 /*
  * xdr_pointer():
  *
@@ -124,24 +110,16 @@ xdr_reference(XDR *xdrs, caddr_t *pp, u_int size, xdrproc_t proc)
  *
  */
 bool_t
-xdr_pointer(XDR *xdrs, char **objpp, u_int obj_size, xdrproc_t xdr_obj)
+xdr_pointer(XDR *xdrs, char **objpp, uint_t obj_size, const xdrproc_t xdr_obj)
 {
 	bool_t more_data;
-	bool_t dummy;
 
-	trace2(TR_xdr_pointer, 0, obj_size);
 	more_data = (*objpp != NULL);
-	if (! xdr_bool(xdrs, &more_data)) {
-		trace1(TR_xdr_pointer, 1);
+	if (!xdr_bool(xdrs, &more_data))
 		return (FALSE);
-	}
-	if (! more_data) {
+	if (!more_data) {
 		*objpp = NULL;
-		trace1(TR_xdr_pointer, 1);
 		return (TRUE);
 	}
-	dummy = xdr_reference(xdrs, objpp, obj_size, xdr_obj);
-	trace1(TR_xdr_pointer, 1);
-	return (dummy);
+	return (xdr_reference(xdrs, objpp, obj_size, xdr_obj));
 }
-#endif /* ! KERNEL */

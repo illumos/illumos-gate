@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +33,6 @@
  * are applicable to the other file.
  */
 #include "mt.h"
-#include <rpc/trace.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <stropts.h>
@@ -59,34 +59,26 @@ _tx_sndvudata(int fd, const struct t_unitdata *unitdata, struct t_iovec *tiov,
 	char *dataptr;
 	unsigned int nbytes;
 
-	trace2(TR_t_sndvudata, 0, fd);
 	assert(api_semantics == TX_XTI_XNS5_API);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_sndvudata, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype != T_CLTS) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndvudata, 1, fd);
 		return (-1);
 	}
 
 	if (tiovcount == 0 || tiovcount > T_IOV_MAX) {
 		t_errno = TBADDATA;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndvudata, 1, fd);
 		return (-1);
 	}
 
 	if (tiptr->ti_state != T_IDLE) {
 		t_errno = TOUTSTATE;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndvudata, 1, fd);
 		return (-1);
 	}
 
@@ -96,7 +88,6 @@ _tx_sndvudata(int fd, const struct t_unitdata *unitdata, struct t_iovec *tiov,
 	    !(tiptr->ti_prov_flag & (SENDZERO|OLD_SENDZERO))) {
 		t_errno = TBADDATA;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndvudata, 1, fd);
 		return (-1);
 	}
 
@@ -104,7 +95,6 @@ _tx_sndvudata(int fd, const struct t_unitdata *unitdata, struct t_iovec *tiov,
 		t_errno = TBADDATA;
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndvudata, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -116,11 +106,11 @@ _tx_sndvudata(int fd, const struct t_unitdata *unitdata, struct t_iovec *tiov,
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndvudata, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
 
+	/* LINTED pointer cast */
 	udreq = (struct T_unitdata_req *)ctlbuf.buf;
 
 	udreq->PRIM_type = T_UNITDATA_REQ;
@@ -205,7 +195,6 @@ _tx_sndvudata(int fd, const struct t_unitdata *unitdata, struct t_iovec *tiov,
 	if (dataptr != NULL)
 		free(dataptr);
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_sndvudata, 0, fd);
 	return (0);
 err_out:
 	sv_errno = errno;
@@ -216,7 +205,6 @@ err_out:
 	if (dataptr != NULL)
 		free(dataptr);
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_sndvudata, 1, fd);
 	errno = sv_errno;
 	return (-1);
 }

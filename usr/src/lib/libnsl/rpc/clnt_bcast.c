@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -41,8 +43,8 @@
  */
 
 #include <string.h>
+#include <strings.h>
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <rpc/nettype.h>
 #include <sys/poll.h>
 #include <netdir.h>
@@ -58,6 +60,10 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define	MAXBCAST 20	/* Max no of broadcasting transports */
 #define	INITTIME 4000	/* Time to wait initially */
@@ -67,9 +73,6 @@ int lowvers = 1;	/* by default, broadcast only version 2 over UDP */
 #ifndef NETIDLEN
 #define	NETIDLEN 32
 #endif
-
-extern int inet_pton();
-extern int bzero(caddr_t dst, int len);
 
 /*
  * If nettype is NULL, it broadcasts on all the available
@@ -96,34 +99,25 @@ extern int bzero(caddr_t dst, int len);
 
 
 enum clnt_stat
-rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
-	eachresult, inittime, waittime, netclass)
-	rpcprog_t	prog;		/* program number */
-	rpcvers_t	vers;		/* version number */
-	rpcproc_t	proc;		/* procedure number */
-	xdrproc_t	xargs;		/* xdr routine for args */
-	caddr_t		argsp;		/* pointer to args */
-	xdrproc_t	xresults;	/* xdr routine for results */
-	caddr_t		resultsp;	/* pointer to results */
-	resultproc_t	eachresult;	/* call with each result obtained */
-	int 		inittime;	/* how long to wait initially */
-	int 		waittime;	/* maximum time to wait */
-	const char	*netclass;	/* transport type */
+rpc_broadcast_exp(const rpcprog_t prog, const rpcvers_t vers,
+    const rpcproc_t proc, const xdrproc_t xargs, caddr_t argsp,
+    const xdrproc_t xresults, caddr_t resultsp, const resultproc_t eachresult,
+    const int inittime, const int waittime, const char *netclass)
 {
 	enum clnt_stat	stat = RPC_SUCCESS; /* Return status */
-	XDR 		xdr_stream; /* XDR stream */
-	register XDR 	*xdrs = &xdr_stream;
+	XDR		xdr_stream; /* XDR stream */
+	XDR		*xdrs = &xdr_stream;
 	struct rpc_msg	msg;	/* RPC message */
 	struct timeval	t;
-	char 		*outbuf = NULL;	/* Broadcast msg buffer */
+	char		*outbuf = NULL;	/* Broadcast msg buffer */
 	char		*inbuf = NULL; /* Reply buf */
 	uint_t		maxbufsize = 0;
-	AUTH 		*sys_auth = authsys_create_default();
-	register int	i, j;
+	AUTH		*sys_auth = authsys_create_default();
+	int		i, j;
 	void		*handle;
 	char		uaddress[1024];	/* A self imposed limit */
 	char		*uaddrp = uaddress;
-	int 		pmap_reply_flag; /* reply recvd from PORTMAP */
+	int		pmap_reply_flag; /* reply recvd from PORTMAP */
 	/* An array of all the suitable broadcast transports */
 	struct {
 		int fd;		/* File descriptor */
@@ -135,7 +129,7 @@ rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
 		struct nd_addrlist *nal; /* Broadcast addrs */
 	} fdlist[MAXBCAST];
 	struct pollfd pfd[MAXBCAST];
-	register int 	fdlistno = 0;
+	int		fdlistno = 0;
 	struct r_rpcb_rmtcallargs barg;	/* Remote arguments */
 	struct r_rpcb_rmtcallres bres; /* Remote results */
 	struct t_unitdata t_udata, t_rdata;
@@ -157,11 +151,8 @@ rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
 	int udpbufsz = 0;
 #endif				/* PORTMAP */
 
-	trace4(TR_rpc_broadcast, 0, prog, vers, proc);
-	if (sys_auth == (AUTH *)NULL) {
-		trace4(TR_rpc_broadcast, 1, prog, vers, proc);
+	if (sys_auth == NULL)
 		return (RPC_SYSTEMERROR);
-	}
 	/*
 	 * initialization: create a fd, a broadcast address, and send the
 	 * request on the broadcast transport.
@@ -173,19 +164,15 @@ rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
 		nettype = NULL;
 	else {
 		size_t len = strlen(netclass);
-		if (len >= sizeof (nettype_array)) {
-			trace4(TR_rpc_broadcast, 1, prog, vers, proc);
+		if (len >= sizeof (nettype_array))
 			return (RPC_UNKNOWNPROTO);
-		}
-		strcpy(nettype, netclass);
+		(void) strcpy(nettype, netclass);
 	}
 
 	if (nettype == NULL)
 		nettype = "datagram_n";
-	if ((handle = __rpc_setconf((char *)nettype)) == NULL) {
-		trace4(TR_rpc_broadcast, 1, prog, vers, proc);
+	if ((handle = __rpc_setconf((char *)nettype)) == NULL)
 		return (RPC_UNKNOWNPROTO);
-	}
 	while (nconf = __rpc_getconf(handle)) {
 		struct t_info tinfo;
 		int fd;
@@ -199,8 +186,7 @@ rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
 			stat = RPC_CANTSEND;
 			continue;
 		}
-		if (t_bind(fd, (struct t_bind *)NULL,
-			(struct t_bind *)NULL) == -1) {
+		if (t_bind(fd, NULL, NULL) == -1) {
 			(void) t_close(fd);
 			stat = RPC_CANTSEND;
 			continue;
@@ -216,7 +202,7 @@ rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
 		fdlist[fdlistno].udp_flag = FALSE;
 		if (((addrlen = __rpc_get_a_size(tinfo.addr)) == 0) ||
 		    ((fdlist[fdlistno].raddr.buf = malloc(addrlen)) == NULL)) {
-			t_close(fd);
+			(void) t_close(fd);
 			stat = RPC_SYSTEMERROR;
 			goto done_broad;
 		}
@@ -229,7 +215,7 @@ rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
 
 		if ((fdlist[fdlistno].dsize = __rpc_get_t_size(0,
 				tinfo.tsdu)) == 0) {
-			t_close(fd);
+			(void) t_close(fd);
 			free(fdlist[fdlistno].raddr.buf);
 			stat = RPC_SYSTEMERROR; /* XXX */
 			goto done_broad;
@@ -242,7 +228,7 @@ rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
 		    strcmp(nconf->nc_proto, NC_UDP) == 0) {
 			udpbufsz = fdlist[fdlistno].dsize;
 			if ((outbuf_pmap = malloc(udpbufsz)) == NULL) {
-				t_close(fd);
+				(void) t_close(fd);
 				free(fdlist[fdlistno].raddr.buf);
 				stat = RPC_SYSTEMERROR;
 				goto done_broad;
@@ -290,8 +276,8 @@ rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
 	msg.rm_call.cb_cred = sys_auth->ah_cred;
 	msg.rm_call.cb_verf = sys_auth->ah_verf;
 	xdrmem_create(xdrs, outbuf, maxbufsize, XDR_ENCODE);
-	if ((! xdr_callmsg(xdrs, &msg)) ||
-	    (! xdr_rpcb_rmtcallargs(xdrs, &barg))) {
+	if ((!xdr_callmsg(xdrs, &msg)) ||
+	    (!xdr_rpcb_rmtcallargs(xdrs, &barg))) {
 		stat = RPC_CANTENCODEARGS;
 		goto done_broad;
 	}
@@ -319,8 +305,8 @@ rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
 		bres_pmap.xdr_res = xresults;
 		bres_pmap.res.res_val = resultsp;
 		xdrmem_create(xdrs, outbuf_pmap, udpbufsz, XDR_ENCODE);
-		if ((! xdr_callmsg(xdrs, &msg)) ||
-		    (! xdr_rmtcallargs(xdrs, &barg_pmap))) {
+		if ((!xdr_callmsg(xdrs, &msg)) ||
+		    (!xdr_rmtcallargs(xdrs, &barg_pmap))) {
 			stat = RPC_CANTENCODEARGS;
 			goto done_broad;
 		}
@@ -370,7 +356,7 @@ rpc_broadcast_exp(prog, vers, proc, xargs, argsp, xresults, resultsp,
 					(void) syslog(LOG_ERR,
 					"Cannot send broadcast\
 packet: %m");
-#ifdef 	RPC_DEBUG
+#ifdef	RPC_DEBUG
 				t_error("rpc_broadcast: t_sndudata");
 #endif
 					stat = RPC_CANTSEND;
@@ -392,8 +378,10 @@ packet: %m");
 				}
 
 				for (j = 0; j < addrlist->n_cnt; j++) {
+#ifdef	RPC_DEBUG
 					struct netconfig *nconf =
 						fdlist[i].nconf;
+#endif
 
 					t_udata.addr = addrlist->n_addrs[j];
 
@@ -408,13 +396,13 @@ packet: %m");
 						(void) syslog(LOG_ERR,
 						"Cannot send broadcast\
 packet: %m");
-#ifdef 	RPC_DEBUG
+#ifdef	RPC_DEBUG
 					t_error("rpc_broadcast: t_sndudata");
 #endif
 							stat = RPC_CANTSEND;
 							continue;
 						};
-#ifdef 	RPC_DEBUG
+#ifdef	RPC_DEBUG
 					if (!lowvers || !fdlist[i].udp_flag)
 						fprintf(stderr, "Broadcast\
 packet sent for %s\n", nconf->nc_netid);
@@ -537,6 +525,7 @@ sent for %s\n", nconf->nc_netid);
 			 * If so, decode the results. If return id is xid + 1
 			 * it was a PORTMAP reply
 			 */
+			/* LINTED pointer cast */
 			if (*((uint32_t *)(inbuf)) == *((uint32_t *)(outbuf))) {
 				pmap_reply_flag = 0;
 				msg.acpted_rply.ar_verf = _null_auth;
@@ -546,8 +535,10 @@ sent for %s\n", nconf->nc_netid);
 					(xdrproc_t)xdr_rpcb_rmtcallres;
 #ifdef PORTMAP
 			} else if (pmap_flag &&
+				/* LINTED pointer cast */
 				*((uint32_t *)(inbuf)) ==
-				*((uint32_t *)(outbuf_pmap))) {
+					/* LINTED pointer cast */
+					*((uint32_t *)(outbuf_pmap))) {
 				pmap_reply_flag = 1;
 				msg.acpted_rply.ar_verf = _null_auth;
 				msg.acpted_rply.ar_results.where =
@@ -566,6 +557,7 @@ sent for %s\n", nconf->nc_netid);
 #ifdef PORTMAP
 					if (pmap_flag && pmap_reply_flag) {
 						/* convert port to taddr */
+						/* LINTED pointer cast */
 						((struct sockaddr_in *)
 						t_rdata.addr.buf)->sin_port =
 						htons((ushort_t)*port);
@@ -615,44 +607,29 @@ sent for %s\n", nconf->nc_netid);
 
 done_broad:
 	if (inbuf)
-		(void) free(inbuf);
+		free(inbuf);
 	if (outbuf)
-		(void) free(outbuf);
+		free(outbuf);
 #ifdef PORTMAP
 	if (outbuf_pmap)
-		(void) free(outbuf_pmap);
+		free(outbuf_pmap);
 #endif
 	for (i = 0; i < fdlistno; i++) {
 		(void) t_close(fdlist[i].fd);
-		(void) free(fdlist[i].raddr.buf);
+		free(fdlist[i].raddr.buf);
 	}
 	AUTH_DESTROY(sys_auth);
 	(void) __rpc_endconf(handle);
 
-	trace4(TR_rpc_broadcast, 1, prog, vers, proc);
 	return (stat);
 }
 
-
 enum clnt_stat
-rpc_broadcast(prog, vers, proc, xargs, argsp, xresults, resultsp,
-			eachresult, nettype)
-	rpcprog_t	prog;		/* program number */
-	rpcvers_t	vers;		/* version number */
-	rpcproc_t	proc;		/* procedure number */
-	xdrproc_t	xargs;		/* xdr routine for args */
-	caddr_t		argsp;		/* pointer to args */
-	xdrproc_t	xresults;	/* xdr routine for results */
-	caddr_t		resultsp;	/* pointer to results */
-	resultproc_t	eachresult;	/* call with each result obtained */
-	const char	*nettype;	/* transport type */
+rpc_broadcast(const rpcprog_t prog, const rpcvers_t vers, const rpcproc_t proc,
+	const xdrproc_t xargs, caddr_t argsp, xdrproc_t const xresults,
+	caddr_t resultsp, const resultproc_t eachresult, const char *nettype)
 {
-	enum clnt_stat	dummy;
-
-	trace4(TR_rpc_broadcast, 0, prog, vers, proc);
-	dummy = rpc_broadcast_exp(prog, vers, proc, xargs, argsp,
+	return (rpc_broadcast_exp(prog, vers, proc, xargs, argsp,
 		xresults, resultsp, eachresult,
-		INITTIME, WAITTIME, nettype);
-	trace1(TR_rpc_broadcast, 1);
-	return (dummy);
+		INITTIME, WAITTIME, nettype));
 }

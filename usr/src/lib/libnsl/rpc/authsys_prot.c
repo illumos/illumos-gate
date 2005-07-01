@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,17 +37,15 @@
 /*
  * authsys_prot.c
  * XDR for UNIX style authentication parameters for RPC
- *
  */
 
 #include <rpc/types.h>
-#include <rpc/trace.h>
 #include <rpc/xdr.h>
 #include <rpc/auth.h>
 #include <rpc/auth_sys.h>
 
-bool_t xdr_uid_t();
-bool_t xdr_gid_t();
+extern bool_t xdr_uid_t(XDR *, uid_t *);
+extern bool_t xdr_gid_t(XDR *, gid_t *);
 
 /*
  * XDR for unix authentication parameters.
@@ -53,18 +53,14 @@ bool_t xdr_gid_t();
 bool_t
 xdr_authsys_parms(XDR *xdrs, struct authsys_parms *p)
 {
-	trace1(TR_xdr_authsys_parms, 0);
 	if (xdr_u_int(xdrs, &(p->aup_time)) &&
 	    xdr_string(xdrs, &(p->aup_machname), MAX_MACHINE_NAME) &&
 	    xdr_uid_t(xdrs, (uid_t *)&(p->aup_uid)) &&
 	    xdr_gid_t(xdrs, (gid_t *)&(p->aup_gid)) &&
 	    xdr_array(xdrs, (caddr_t *)&(p->aup_gids),
-	    &(p->aup_len), NGRPS, (u_int)sizeof (gid_t),
-	    (xdrproc_t) xdr_gid_t)) {
-		trace1(TR_xdr_authsys_parms, 1);
+	    &(p->aup_len), NGRPS, (uint_t)sizeof (gid_t),
+	    (xdrproc_t)xdr_gid_t))
 		return (TRUE);
-	}
-	trace1(TR_xdr_authsys_parms, 1);
 	return (FALSE);
 }
 
@@ -74,18 +70,14 @@ xdr_authsys_parms(XDR *xdrs, struct authsys_parms *p)
 bool_t
 xdr_authloopback_parms(XDR *xdrs, struct authsys_parms *p)
 {
-	/* trace1(TR_xdr_authsys_parms, 0); */
 	if (xdr_u_int(xdrs, &(p->aup_time)) &&
 	    xdr_string(xdrs, &(p->aup_machname), MAX_MACHINE_NAME) &&
 	    xdr_uid_t(xdrs, (uid_t *)&(p->aup_uid)) &&
 	    xdr_gid_t(xdrs, (gid_t *)&(p->aup_gid)) &&
 	    xdr_array(xdrs, (caddr_t *)&(p->aup_gids),
-	    &(p->aup_len), NGRPS_LOOPBACK, sizeof (gid_t),
-	    (xdrproc_t) xdr_gid_t)) {
-		/* trace1(TR_xdr_authsys_parms, 1); */
+	    &(p->aup_len), NGRPS_LOOPBACK, (uint_t)sizeof (gid_t),
+	    (xdrproc_t)xdr_gid_t))
 		return (TRUE);
-	}
-	/* trace1(TR_xdr_authsys_parms, 1); */
 	return (FALSE);
 }
 
@@ -95,25 +87,10 @@ xdr_authloopback_parms(XDR *xdrs, struct authsys_parms *p)
 bool_t
 xdr_uid_t(XDR *xdrs, uid_t *ip)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_uid_t, 0);
-#ifdef lint
-	(void) (xdr_short(xdrs, (short *)ip));
-	dummy = xdr_int(xdrs, (int *)ip);
-	trace1(TR_xdr_uid_t, 1);
-	return (dummy);
-#else
-	if (sizeof (uid_t) == sizeof (int)) {
-		dummy = xdr_int(xdrs, (int *)ip);
-		trace1(TR_xdr_uid_t, 1);
-		return (dummy);
-	} else {
-		dummy = xdr_short(xdrs, (short *)ip);
-		trace1(TR_xdr_uid_t, 1);
-		return (dummy);
-	}
-#endif
+	/* CONSTCOND */
+	if (sizeof (uid_t) != sizeof (int))
+		return (xdr_short(xdrs, (short *)ip));
+	return (xdr_int(xdrs, (int *)ip));
 }
 
 /*
@@ -122,23 +99,8 @@ xdr_uid_t(XDR *xdrs, uid_t *ip)
 bool_t
 xdr_gid_t(XDR *xdrs, gid_t *ip)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_gid_t, 0);
-#ifdef lint
-	(void) (xdr_short(xdrs, (short *)ip));
-	dummy = xdr_int(xdrs, (int *)ip);
-	trace1(TR_xdr_gid_t, 1);
-	return (dummy);
-#else
-	if (sizeof (gid_t) == sizeof (int)) {
-		dummy = xdr_int(xdrs, (int *)ip);
-		trace1(TR_xdr_gid_t, 1);
-		return (dummy);
-	} else {
-		dummy = xdr_short(xdrs, (short *)ip);
-		trace1(TR_xdr_gid_t, 1);
-		return (dummy);
-	}
-#endif
+	/* CONSTCOND */
+	if (sizeof (gid_t) != sizeof (int))
+		return (xdr_short(xdrs, (short *)ip));
+	return (xdr_int(xdrs, (int *)ip));
 }

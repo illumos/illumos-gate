@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -52,17 +54,12 @@
 #include <rpc/des_crypt.h>
 #include <rpc/rpc.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <strings.h>
 
-#ifdef KERNEL
-#include <sys/kernel.h>
-#define	gettimeofday(tvp, tzp)	(*(tvp) = time)
-#else
 #include <syslog.h>
-#endif
 
 extern int key_decryptsession_pk(const char *, netobj *, des_block *);
 
@@ -127,7 +124,6 @@ struct {
 enum auth_stat
 __svcauth_des(struct svc_req *rqst, struct rpc_msg *msg)
 {
-
 	int32_t		*ixdr;
 	des_block	cryptbuf[2];
 	struct authdes_cred	*cred;
@@ -148,39 +144,35 @@ __svcauth_des(struct svc_req *rqst, struct rpc_msg *msg)
 	int	fullname_rcvd = 0;
 	int from_cache = 0;
 
-	trace1(TR___svcauth_des, 0);
-	mutex_lock(&authdes_lock);
+	(void) mutex_lock(&authdes_lock);
 	if (_rpc_authdes_cache == NULL) {
 		int ret = cache_init();
 		if (ret == -1) {
-			mutex_unlock(&authdes_lock);
-			trace1(TR___svcauth_des, 1);
+			(void) mutex_unlock(&authdes_lock);
 			return (AUTH_FAILED);
 		}
 	}
-	mutex_unlock(&authdes_lock);
+	(void) mutex_unlock(&authdes_lock);
 
+	/* LINTED pointer cast */
 	area = (struct area *)rqst->rq_clntcred;
 	cred = (struct authdes_cred *)&area->area_cred;
 
-	if ((uint_t)msg->rm_call.cb_cred.oa_length == 0) {
-		trace1(TR___svcauth_des, 1);
+	if ((uint_t)msg->rm_call.cb_cred.oa_length == 0)
 		return (AUTH_BADCRED);
-	}
 	/*
 	 * Get the credential
 	 */
+	/* LINTED pointer cast */
 	ixdr = (int32_t *)msg->rm_call.cb_cred.oa_base;
 	cred->adc_namekind = IXDR_GET_ENUM(ixdr, enum authdes_namekind);
 	switch (cred->adc_namekind) {
 	case ADN_FULLNAME:
 		namelen = IXDR_GET_U_INT32(ixdr);
-		if (namelen > MAXNETNAMELEN) {
-			trace1(TR___svcauth_des, 1);
+		if (namelen > MAXNETNAMELEN)
 			return (AUTH_BADCRED);
-		}
 		cred->adc_fullname.name = area->area_netname;
-		memcpy(cred->adc_fullname.name, (char *)ixdr, (uint_t)namelen);
+		(void) memcpy(cred->adc_fullname.name, ixdr, (uint_t)namelen);
 		cred->adc_fullname.name[namelen] = 0;
 		ixdr += (RNDUP(namelen) / BYTES_PER_XDR_UNIT);
 		cred->adc_fullname.key.key.high = (uint32_t)*ixdr++;
@@ -192,23 +184,21 @@ __svcauth_des(struct svc_req *rqst, struct rpc_msg *msg)
 		cred->adc_nickname = (uint32_t)*ixdr++;
 		break;
 	default:
-		trace1(TR___svcauth_des, 1);
 		return (AUTH_BADCRED);
 	}
 
-	if ((uint_t)msg->rm_call.cb_verf.oa_length == 0) {
-		trace1(TR___svcauth_des, 1);
+	if ((uint_t)msg->rm_call.cb_verf.oa_length == 0)
 		return (AUTH_BADVERF);
-	}
 	/*
 	 * Get the verifier
 	 */
+	/* LINTED pointer cast */
 	ixdr = (int32_t *)msg->rm_call.cb_verf.oa_base;
 	verf.adv_xtimestamp.key.high = (uint32_t)*ixdr++;
 	verf.adv_xtimestamp.key.low = (uint32_t)*ixdr++;
 	verf.adv_int_u = (uint32_t)*ixdr++;
 
-	mutex_lock(&authdes_lock);
+	(void) mutex_lock(&authdes_lock);
 
 	/*
 	 * Get the conversation key
@@ -221,9 +211,8 @@ again:
 		init_sessionkey = cred->adc_fullname.key;
 		sessionkey = &init_sessionkey;
 
-		if (! __getpublickey_cached(cred->adc_fullname.name,
+		if (!__getpublickey_cached(cred->adc_fullname.name,
 				pkey_data, &from_cache)) {
-
 			/*
 			 * if the user has no public key, treat him as the
 			 * unauthenticated identity - nobody. If this
@@ -231,26 +220,22 @@ again:
 			 * user's keys and used nobody's secret key
 			 * as a backup.
 			 */
-
-			if (! __getpublickey_cached("nobody",
+			if (!__getpublickey_cached("nobody",
 						pkey_data, &from_cache)) {
 				__msgout(LOG_INFO,
 				"_svcauth_des: no public key for nobody or ",
 				cred->adc_fullname.name);
-				mutex_unlock(&authdes_lock);
-				trace1(TR___svcauth_des, 1);
+				(void) mutex_unlock(&authdes_lock);
 				return (AUTH_BADCRED); /* no key */
-			} else {
-
-				/*
-				 * found a public key for nobody. change
-				 * the fullname id to nobody, so the caller
-				 * thinks the client specified nobody
-				 * as the user identity.
-				 */
-
-				strcpy(cred->adc_fullname.name, "nobody");
 			}
+
+			/*
+			 * found a public key for nobody. change
+			 * the fullname id to nobody, so the caller
+			 * thinks the client specified nobody
+			 * as the user identity.
+			 */
+			(void) strcpy(cred->adc_fullname.name, "nobody");
 		}
 		pkey.n_bytes = pkey_data;
 		pkey.n_len = strlen(pkey_data) + 1;
@@ -260,26 +245,23 @@ again:
 				__getpublickey_flush(cred->adc_fullname.name);
 				goto again;
 			}
-		__msgout(LOG_INFO,
-			"_svcauth_des: key_decryptsessionkey failed for",
-			cred->adc_fullname.name);
-			mutex_unlock(&authdes_lock);
-			trace1(TR___svcauth_des, 1);
+			__msgout(LOG_INFO,
+			    "_svcauth_des: key_decryptsessionkey failed for",
+			    cred->adc_fullname.name);
+			(void) mutex_unlock(&authdes_lock);
 			return (AUTH_BADCRED);	/* key not found */
 		}
 	} else { /* ADN_NICKNAME */
 		sid = cred->adc_nickname;
 		if (sid >= authdes_cachesz) {
 			__msgout(LOG_INFO, "_svcauth_des:", "bad nickname");
-			mutex_unlock(&authdes_lock);
-			trace1(TR___svcauth_des, 1);
+			(void) mutex_unlock(&authdes_lock);
 			return (AUTH_BADCRED);	/* garbled credential */
 		}
 		/* actually check that the entry is not null */
 		entry = &_rpc_authdes_cache[sid];
 		if (entry->rname == NULL) {
-			mutex_unlock(&authdes_lock);
-			trace1(TR___svcauth_des, 1);
+			(void) mutex_unlock(&authdes_lock);
 			return (AUTH_BADCRED);	/* cached out */
 		}
 		sessionkey = &_rpc_authdes_cache[sid].key;
@@ -308,8 +290,7 @@ again:
 		__msgout(LOG_ERR, "_svcauth_des: DES decryption failure for",
 			fullname_rcvd ? cred->adc_fullname.name :
 			_rpc_authdes_cache[sid].rname);
-		mutex_unlock(&authdes_lock);
-		trace1(TR___svcauth_des, 1);
+		(void) mutex_unlock(&authdes_lock);
 		return (AUTH_FAILED);	/* system error */
 	}
 
@@ -343,8 +324,7 @@ again:
 				__msgout(LOG_INFO,
 					"_svcauth_des: corrupted window from",
 					cred->adc_fullname.name);
-				mutex_unlock(&authdes_lock);
-				trace1(TR___svcauth_des, 1);
+				(void) mutex_unlock(&authdes_lock);
 				/* garbled credential or invalid secret key */
 				return (AUTH_BADCRED);
 			}
@@ -356,8 +336,7 @@ again:
 			__msgout(LOG_INFO,
 				"_svcauth_des: replayed credential from",
 				cred->adc_fullname.name);
-				mutex_unlock(&authdes_lock);
-				trace1(TR___svcauth_des, 1);
+				(void) mutex_unlock(&authdes_lock);
 				return (AUTH_REJECTEDCRED);	/* replay */
 			} else sid = cache_spot_id;
 			nick = 0;
@@ -376,8 +355,7 @@ again:
 			fullname_rcvd ? cred->adc_fullname.name :
 				_rpc_authdes_cache[sid].rname);
 			/* cached out (bad key), or garbled verifier */
-			mutex_unlock(&authdes_lock);
-			trace1(TR___svcauth_des, 1);
+			(void) mutex_unlock(&authdes_lock);
 			return (nick ? AUTH_REJECTEDVERF : AUTH_BADVERF);
 		}
 		if (nick && BEFORE(&timestamp,
@@ -390,11 +368,10 @@ again:
 	"_svcauth_des: timestamp is earlier than the one previously seen from",
 			fullname_rcvd ? cred->adc_fullname.name :
 				_rpc_authdes_cache[sid].rname);
-			mutex_unlock(&authdes_lock);
-			trace1(TR___svcauth_des, 1);
+			(void) mutex_unlock(&authdes_lock);
 			return (AUTH_REJECTEDVERF);	/* replay */
 		}
-		(void) gettimeofday(&current, (struct timezone *)NULL);
+		(void) gettimeofday(&current, NULL);
 		current.tv_sec -= window;	/* allow for expiration */
 		if (!BEFORE(&current, &timestamp)) {
 			if (fullname_rcvd && from_cache) {
@@ -406,8 +383,7 @@ again:
 				fullname_rcvd ? cred->adc_fullname.name :
 					_rpc_authdes_cache[sid].rname);
 			/* replay, or garbled credential */
-			mutex_unlock(&authdes_lock);
-			trace1(TR___svcauth_des, 1);
+			(void) mutex_unlock(&authdes_lock);
 			return (nick ? AUTH_REJECTEDVERF : AUTH_BADCRED);
 		}
 	}
@@ -433,8 +409,7 @@ again:
 		__msgout(LOG_ERR, "_svcauth_des: DES encryption failure for",
 			fullname_rcvd ? cred->adc_fullname.name :
 			_rpc_authdes_cache[sid].rname);
-		mutex_unlock(&authdes_lock);
-		trace1(TR___svcauth_des, 1);
+		(void) mutex_unlock(&authdes_lock);
 		return (AUTH_FAILED);	/* system error */
 	}
 	verf.adv_xtimestamp = cryptbuf[0];
@@ -442,6 +417,7 @@ again:
 	/*
 	 * Serialize the reply verifier, and update rqst
 	 */
+	/* LINTED pointer cast */
 	ixdr = (int32_t *)msg->rm_call.cb_verf.oa_base;
 	*ixdr++ = (int32_t)verf.adv_xtimestamp.key.high;
 	*ixdr++ = (int32_t)verf.adv_xtimestamp.key.low;
@@ -456,8 +432,7 @@ again:
 			"_svcauth_des: Authenticator length error",
 			fullname_rcvd ? cred->adc_fullname.name :
 			_rpc_authdes_cache[sid].rname);
-		mutex_unlock(&authdes_lock);
-		trace1(TR___svcauth_des, 1);
+		(void) mutex_unlock(&authdes_lock);
 		return (AUTH_REJECTEDVERF);
 	}
 
@@ -471,17 +446,14 @@ again:
 	if (cred->adc_namekind == ADN_FULLNAME) {
 		cred->adc_fullname.window = window;
 		cred->adc_nickname = sid;	/* save nickname */
-		if (entry->rname != NULL) {
-			mem_free(entry->rname, strlen(entry->rname) + 1);
-		}
-		entry->rname =
-		    (char *)mem_alloc((uint_t)strlen(cred->adc_fullname.name)
-					+ 1);
+		if (entry->rname != NULL)
+			free(entry->rname);
+		entry->rname = malloc(strlen(cred->adc_fullname.name) + 1);
 		if (entry->rname != NULL) {
 			(void) strcpy(entry->rname, cred->adc_fullname.name);
 		} else {
 			__msgout(LOG_CRIT, "_svcauth_des:", "out of memory");
-			mutex_unlock(&authdes_lock);
+			(void) mutex_unlock(&authdes_lock);
 			return (AUTH_FAILED);
 		}
 		entry->key = *sessionkey;
@@ -497,8 +469,7 @@ again:
 		cred->adc_fullname.key = entry->key;
 		cred->adc_fullname.window = entry->window;
 	}
-	mutex_unlock(&authdes_lock);
-	trace1(TR___svcauth_des, 1);
+	(void) mutex_unlock(&authdes_lock);
 	return (AUTH_OK);	/* we made it! */
 }
 
@@ -507,21 +478,20 @@ again:
  * Initialize the cache
  */
 static int
-cache_init()
+cache_init(void)
 {
 	int i;
 
 /* LOCK HELD ON ENTRY: authdes_lock */
 
-	trace1(TR_cache_init, 0);
 	assert(MUTEX_HELD(&authdes_lock));
-	_rpc_authdes_cache = (struct cache_entry *)
-		mem_alloc(sizeof (struct cache_entry) * authdes_cachesz);
+	_rpc_authdes_cache =
+		malloc(sizeof (struct cache_entry) * authdes_cachesz);
 	if (_rpc_authdes_cache == NULL) {
 		__msgout(LOG_CRIT, "cache_init:", "out of memory");
 		return (-1);
 	}
-	memset((char *)_rpc_authdes_cache, 0,
+	(void) memset(_rpc_authdes_cache, 0,
 		sizeof (struct cache_entry) * authdes_cachesz);
 
 	/*
@@ -544,7 +514,6 @@ cache_init()
 	cache_head->prev = cache_tail;
 	cache_tail->next = cache_head;
 	cache_tail->prev = &_rpc_authdes_cache[authdes_cachesz - 2];
-	trace1(TR_cache_init, 1);
 	return (0);
 }
 
@@ -553,14 +522,11 @@ cache_init()
  * Find the lru victim
  */
 static uint32_t
-cache_victim()
+cache_victim(void)
 {
-
 /* LOCK HELD ON ENTRY: authdes_lock */
 
-	trace1(TR_cache_victim, 0);
 	assert(MUTEX_HELD(&authdes_lock));
-	trace1(TR_cache_victim, 1);
 	return (cache_head->index);			/* list in lru order */
 }
 
@@ -570,13 +536,11 @@ cache_victim()
 static void
 cache_ref(uint32_t sid)
 {
-	int i;
 	struct cache_entry *curr = &_rpc_authdes_cache[sid];
 
 
 /* LOCK HELD ON ENTRY: authdes_lock */
 
-	trace1(TR_cache_ref, 0);
 	assert(MUTEX_HELD(&authdes_lock));
 
 	/*
@@ -598,8 +562,6 @@ cache_ref(uint32_t sid)
 		cache_tail->next = curr;		/* fix the tail  */
 		cache_tail = curr;			/* move the tail */
 	}
-
-	trace1(TR_cache_ref, 1);
 }
 
 /*
@@ -613,11 +575,9 @@ cache_spot(des_block *key, char *name, struct timeval *timestamp)
 	struct cache_entry *cp;
 	int i;
 	uint32_t hi;
-	static uint32_t dummy;
 
 /* LOCK HELD ON ENTRY: authdes_lock */
 
-	trace1(TR_cache_spot, 0);
 	assert(MUTEX_HELD(&authdes_lock));
 	hi = key->key.high;
 	for (cp = _rpc_authdes_cache, i = 0; i < authdes_cachesz; i++, cp++) {
@@ -627,19 +587,15 @@ cache_spot(des_block *key, char *name, struct timeval *timestamp)
 		    memcmp(cp->rname, name, strlen(name) + 1) == 0) {
 			if (BEFORE(timestamp, &cp->laststamp)) {
 				svcauthdes_stats.ncachereplays++;
-				trace1(TR_cache_spot, 1);
 				return (-1);	/* replay */
 			}
 			svcauthdes_stats.ncachehits++;
-			trace1(TR_cache_spot, 1);
 			return (i);
 			/* refresh */
 		}
 	}
 	svcauthdes_stats.ncachemisses++;
-	dummy = cache_victim();
-	trace1(TR_cache_spot, 1);
-	return (dummy);	/* new credential */
+	return (cache_victim());
 }
 
 
@@ -661,16 +617,11 @@ struct bsdcred {
 static void
 invalidate(char *cred)
 {
-	trace1(TR_invalidate, 0);
-	if (cred == NULL) {
-		trace1(TR_invalidate, 1);
+	if (cred == NULL)
 		return;
-	}
+	/* LINTED pointer cast */
 	((struct bsdcred *)cred)->grouplen = INVALID;
-	trace1(TR_invalidate, 1);
 }
-
-
 
 /*
  * Map a des credential into a unix cred.
@@ -689,21 +640,19 @@ authdes_getucred(const struct authdes_cred *adc, uid_t *uid, gid_t *gid,
 	int i_grouplen;
 	struct bsdcred *cred;
 
-	trace1(TR_authdes_getucred, 0);
 	sid = adc->adc_nickname;
 	if (sid >= authdes_cachesz) {
 		__msgout2(__getucredstr, "invalid nickname");
-		trace1(TR_authdes_getucred, 1);
 		return (0);
 	}
-	mutex_lock(&authdes_lock);
+	(void) mutex_lock(&authdes_lock);
+	/* LINTED pointer cast */
 	cred = (struct bsdcred *)_rpc_authdes_cache[sid].localcred;
 	if (cred == NULL) {
-		cred = (struct bsdcred *)mem_alloc(sizeof (struct bsdcred));
+		cred = malloc(sizeof (struct bsdcred));
 		if (cred == NULL) {
 			__msgout2(__getucredstr, "out of memory");
-			mutex_unlock(&authdes_lock);
-			trace1(TR_authdes_getucred, 1);
+			(void) mutex_unlock(&authdes_lock);
 			return (0);
 		}
 		_rpc_authdes_cache[sid].localcred = (char *)cred;
@@ -718,8 +667,7 @@ authdes_getucred(const struct authdes_cred *adc, uid_t *uid, gid_t *gid,
 			__msgout2(__getucredstr, "unknown netname");
 			/* mark as lookup up, but not found */
 			cred->grouplen = UNKNOWN;
-			mutex_unlock(&authdes_lock);
-			trace1(TR_authdes_getucred, 1);
+			(void) mutex_unlock(&authdes_lock);
 			return (0);
 		}
 		__msgout2(__getucredstr, "missed ucred cache");
@@ -729,15 +677,14 @@ authdes_getucred(const struct authdes_cred *adc, uid_t *uid, gid_t *gid,
 		for (i = i_grouplen - 1; i >= 0; i--) {
 			cred->groups[i] = groups[i];	/* int to short */
 		}
-		mutex_unlock(&authdes_lock);
-		trace1(TR_authdes_getucred, 1);
+		(void) mutex_unlock(&authdes_lock);
 		return (1);
-	} else if (cred->grouplen == UNKNOWN) {
+	}
+	if (cred->grouplen == UNKNOWN) {
 		/*
 		 * Already lookup up, but no match found
 		 */
-		mutex_unlock(&authdes_lock);
-		trace1(TR_authdes_getucred, 1);
+		(void) mutex_unlock(&authdes_lock);
 		return (0);
 	}
 
@@ -750,8 +697,7 @@ authdes_getucred(const struct authdes_cred *adc, uid_t *uid, gid_t *gid,
 	for (i = cred->grouplen - 1; i >= 0; i--) {
 		groups[i] = cred->groups[i];	/* short to int */
 	}
-	mutex_unlock(&authdes_lock);
-	trace1(TR_authdes_getucred, 1);
+	(void) mutex_unlock(&authdes_lock);
 	return (1);
 }
 
@@ -759,24 +705,12 @@ authdes_getucred(const struct authdes_cred *adc, uid_t *uid, gid_t *gid,
 static void
 __msgout(int level, const char *str, const char *strarg)
 {
-	trace1(TR___msgout, 0);
-#ifdef	KERNEL
-		printf("%s %s\n", str, strarg);
-#else
-		(void) syslog(level, "%s %s", str, strarg);
-#endif
-	trace1(TR___msgout, 1);
+	(void) syslog(level, "%s %s", str, strarg);
 }
 
 
 static void
 __msgout2(const char *str, const char *str2)
 {
-	trace1(TR___msgout, 0);
-#ifdef	KERNEL
-		printf("%s %s", str, str2);
-#else
-		(void) syslog(LOG_DEBUG, "%s %s", str, str2);
-#endif
-	trace1(TR___msgout, 1);
+	(void) syslog(LOG_DEBUG, "%s %s", str, str2);
 }

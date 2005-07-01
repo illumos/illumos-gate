@@ -19,23 +19,20 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-		/* SVr4.0 1.1.1.1 */
 
 #include <stdlib.h>
 #include "mt.h"
 #include <errno.h>
-#include <rpc/trace.h>
 #include <unistd.h>
 #include <string.h>
 #include <stropts.h>
@@ -60,20 +57,14 @@ _tx_getname(int fd, struct netbuf *name, int type, int api_semantics)
 	struct _ti_user *tiptr;
 	int retval, sv_errno;
 
-	trace3(TR_t_getname, 0, fd, type);
 	assert(_T_IS_TLI(api_semantics)); /* TLI only interface */
 	if (!name || ((type != LOCALNAME) && (type != REMOTENAME))) {
-		trace3(TR_t_getname, 1, fd, type);
 		errno = EINVAL;
 		return (-1);
 	}
 
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == 0) {
-		sv_errno = errno;
-		trace3(TR_t_getname, 1, fd, type);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == 0)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	retval = __tx_getname_locked(fd, name, type);
@@ -81,14 +72,12 @@ _tx_getname(int fd, struct netbuf *name, int type, int api_semantics)
 	if (retval < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace3(TR_t_getname, 1, fd, type);
 		errno = sv_errno;
 		return (-1);
 	}
 
 	sig_mutex_unlock(&tiptr->ti_lock);
 
-	trace3(TR_t_getname, 1, fd, type);
 	return (0);
 }
 
@@ -127,14 +116,8 @@ _tx_getprotaddr(
 	struct strbuf ctlbuf;
 	int retlen;
 
-	trace2(TR_t_getprotaddr, 0, fd);
-
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == 0) {
-		sv_errno = errno;
-		trace2(TR_t_getprotaddr, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == 0)
 		return (-1);
-	}
 
 	sig_mutex_lock(&tiptr->ti_lock);
 
@@ -159,11 +142,11 @@ _tx_getprotaddr(
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_bind, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
 
+	/* LINTED pointer cast */
 	addreqp = (struct T_addr_req *)ctlbuf.buf;
 	addreqp->PRIM_type = T_ADDR_REQ;
 
@@ -176,7 +159,6 @@ _tx_getprotaddr(
 	if (retval < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_getprotaddr, 1, fd);
 		errno = sv_errno;
 		goto err_out;
 	}
@@ -184,12 +166,12 @@ _tx_getprotaddr(
 
 	if (retlen < (int)sizeof (struct T_addr_ack)) {
 		t_errno = TSYSERR;
-		trace2(TR_t_getprotaddr, 1, fd);
 		errno = EIO;
 		retval = -1;
 		goto err_out;
 	}
 
+	/* LINTED pointer cast */
 	addrackp = (struct T_addr_ack *)ctlbuf.buf;
 
 	/*
@@ -199,12 +181,11 @@ _tx_getprotaddr(
 		if (TLEN_GT_NLEN(addrackp->LOCADDR_length,
 		    boundaddr->addr.maxlen)) {
 			t_errno = TBUFOVFLW;
-			trace2(TR_t_getprotaddr, 1, fd);
 			retval = -1;
 			goto err_out;
 		}
 		boundaddr->addr.len = addrackp->LOCADDR_length;
-		memcpy(boundaddr->addr.buf,
+		(void) memcpy(boundaddr->addr.buf,
 		    ctlbuf.buf + addrackp->LOCADDR_offset,
 		    (size_t)addrackp->LOCADDR_length);
 	}
@@ -225,17 +206,14 @@ _tx_getprotaddr(
 		if (TLEN_GT_NLEN(addrackp->REMADDR_length,
 		    peeraddr->addr.maxlen)) {
 			t_errno = TBUFOVFLW;
-			trace2(TR_t_getprotaddr, 1, fd);
 			retval = -1;
 			goto err_out;
 		}
 		peeraddr->addr.len = addrackp->REMADDR_length;
-		memcpy(peeraddr->addr.buf,
+		(void) memcpy(peeraddr->addr.buf,
 		    ctlbuf.buf + addrackp->REMADDR_offset,
 		    (size_t)addrackp->REMADDR_length);
 	}
-
-	trace2(TR_t_getprotaddr, 1, fd);
 
 err_out:
 	if (didalloc)

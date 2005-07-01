@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,22 +42,12 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <rpc/des_crypt.h>
 /* EXPORT DELETE START */
 #ifdef sun
 #include <sys/ioctl.h>
 #include <sys/des.h>
-#ifdef _KERNEL
-#include <sys/conf.h>
-#define	getdesfd() (cdevsw[11].d_open(0, 0) ? -1 : 0)
-#define	ioctl(a, b, c) (cdevsw[11].d_ioctl(0, b, c, 0) ? -1 : 0)
-#ifndef CRYPT
-#define	_des_crypt(a, b, c) 0
-#endif
-#else
 #define	getdesfd()	(open("/dev/des", 0, 0))
-#endif
 #else
 #include <des/des.h>
 #endif
@@ -64,9 +55,9 @@
 #include <rpc/rpc.h>
 /* EXPORT DELETE START */
 
-extern int __des_crypt();
+extern int __des_crypt(char *, unsigned, struct desparams *);
 
-static int common_crypt();
+static int common_crypt(char *, char *, unsigned, unsigned, struct desparams *);
 
 /*
  * To see if chip is installed
@@ -79,8 +70,8 @@ static int g_desfd = UNOPENED;
  * Copy 8 bytes
  */
 #define	COPY8(src, dst) { \
-	register char *a = (char *) dst; \
-	register char *b = (char *) src; \
+	char *a = (char *)dst; \
+	char *b = (char *)src; \
 	*a++ = *b++; *a++ = *b++; *a++ = *b++; *a++ = *b++; \
 	*a++ = *b++; *a++ = *b++; *a++ = *b++; *a++ = *b++; \
 }
@@ -89,10 +80,10 @@ static int g_desfd = UNOPENED;
  * Copy multiple of 8 bytes
  */
 #define	DESCOPY(src, dst, len) { \
-	register char *a = (char *) dst; \
-	register char *b = (char *) src; \
-	register int i; \
-	for (i = (int) len; i > 0; i -= 8) { \
+	char *a = (char *)dst; \
+	char *b = (char *)src; \
+	int i; \
+	for (i = (int)len; i > 0; i -= 8) { \
 		*a++ = *b++; *a++ = *b++; *a++ = *b++; *a++ = *b++; \
 		*a++ = *b++; *a++ = *b++; *a++ = *b++; *a++ = *b++; \
 	} \
@@ -109,12 +100,10 @@ cbc_crypt(char *key, char *buf, size_t len, unsigned int mode, char *ivec)
 	int err;
 	struct desparams dp;
 
-	trace3(TR_cbc_crypt, 0, len, mode);
 	dp.des_mode = CBC;
 	COPY8(ivec, dp.des_ivec);
 	err = common_crypt(key, buf, len, mode, &dp);
 	COPY8(dp.des_ivec, ivec);
-	trace3(TR_cbc_crypt, 1, len, mode);
 	return (err);
 #if 0
 /* EXPORT DELETE END */
@@ -133,13 +122,9 @@ ecb_crypt(char *key, char *buf, size_t len, unsigned int mode)
 {
 /* EXPORT DELETE START */
 	struct desparams dp;
-	int dummy;
 
-	trace3(TR_ecb_crypt, 0, len, mode);
 	dp.des_mode = ECB;
-	dummy = common_crypt(key, buf, len, mode, &dp);
-	trace3(TR_ecb_crypt, 1, len, mode);
-	return (dummy);
+	return (common_crypt(key, buf, len, mode, &dp));
 #if 0
 /* EXPORT DELETE END */
 	return (DESERR_HWERROR);
@@ -155,21 +140,14 @@ ecb_crypt(char *key, char *buf, size_t len, unsigned int mode)
  * Common code to cbc_crypt() & ecb_crypt()
  */
 static int
-common_crypt(key, buf, len, mode, desp)
-	char *key;
-	char *buf;
-	register unsigned len;
-	unsigned mode;
-	register struct desparams *desp;
+common_crypt(char *key, char *buf, unsigned len, unsigned mode,
+							struct desparams *desp)
 {
-	register int desdev;
-	register int res;
+	int desdev;
+	int res;
 
-	trace3(TR_common_crypt, 0, len, mode);
-	if ((len % 8) != 0 || len > DES_MAXDATA) {
-		trace3(TR_common_crypt, 1, len, mode);
+	if ((len % 8) != 0 || len > DES_MAXDATA)
 		return (DESERR_BADPARAM);
-	}
 	desp->des_dir =
 		((mode & DES_DIRMASK) == DES_ENCRYPT) ? ENCRYPT : DECRYPT;
 
@@ -189,13 +167,12 @@ common_crypt(key, buf, len, mode, desp)
 		desp->des_len = len;
 		if (len <= DES_QUICKLEN) {
 			DESCOPY(buf, desp->des_data, len);
-			res = ioctl(g_desfd, DESIOCQUICK, (char *) desp);
+			res = ioctl(g_desfd, DESIOCQUICK, (char *)desp);
 			DESCOPY(desp->des_data, buf, len);
 		} else {
-			desp->des_buf = (u_char *) buf;
-			res = ioctl(g_desfd, DESIOCBLOCK, (char *) desp);
+			desp->des_buf = (uchar_t *)buf;
+			res = ioctl(g_desfd, DESIOCBLOCK, (char *)desp);
 		}
-		trace3(TR_common_crypt, 1, len, mode);
 		return (res == 0 ? DESERR_NONE : DESERR_HWERROR);
 	}
 software:
@@ -203,11 +180,8 @@ software:
 	/*
 	 * software
 	 */
-	if (!__des_crypt(buf, len, desp)) {
-		trace3(TR_common_crypt, 1, len, mode);
+	if (!__des_crypt(buf, len, desp))
 		return (DESERR_HWERROR);
-	}
-	trace3(TR_common_crypt, 1, len, mode);
 	return (desdev == DES_SW ? DESERR_NONE : DESERR_NOHWDEVICE);
 }
 /* EXPORT DELETE END */
@@ -253,11 +227,10 @@ desN_crypt(des_block keys[], int keynum, char *buf, unsigned int len,
 
 
 int
-__cbc_triple_crypt(des_block keys[], char *buf,  u_int len,
-			u_int mode, char *ivec)
+__cbc_triple_crypt(des_block keys[], char *buf,  uint_t len,
+			uint_t mode, char *ivec)
 {
 /* EXPORT DELETE START */
-	trace3(T___cbc_triple_crypt, 0, len, mode);
 	return (desN_crypt(keys, 3, buf, len, mode, ivec));
 #if 0
 /* EXPORT DELETE END */

@@ -19,6 +19,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -58,7 +59,10 @@ t_rcv.o         t_rcvconnect.o	t_rcvdis.o      t_rcvrel.o      t_rcvudata.o \
 t_rcvuderr.o    t_snd.o		t_snddis.o      t_sndrel.o      t_sndudata.o \
 t_sndv.o	t_sndreldata.o  t_rcvv.o 	t_rcvreldata.o  t_sysconf.o \
 t_sndvudata.o	t_rcvvudata.o   t_sync.o        t_unbind.o	t_strerror.o \
-tli_wrappers.o  xti_wrappers.o
+xti_wrappers.o
+
+WRAPPERS= \
+tli_wrappers.o
 
 RPC= \
 auth_des.o	auth_none.o	auth_sys.o	auth_time.o	authdes_prot.o \
@@ -69,7 +73,7 @@ inet_ntoa.o	key_call.o	key_prot.o	mt_misc.o \
 netname.o	netnamer.o	openchild.o	pmap_clnt.o	pmap_prot.o \
 rpc_callmsg.o	rpc_comdata.o	rpc_comdata1.o	rpc_generic.o	rpc_prot.o \
 rpc_sel2poll.o \
-rpc_soc.o	rpc_td.o	rpc_trace.o	rpcb_clnt.o	rpcb_prot.o \
+rpc_soc.o	rpc_td.o	rpcb_clnt.o	rpcb_prot.o \
 rpcb_st_xdr.o	rpcdname.o	rpcsec_gss_if.o	rtime_tli.o	svc.o \
 svc_auth.o	svc_auth_loopb.o	svc_auth_sys.o	svc_dg.o \
 svc_door.o	svc_generic.o	svc_raw.o	svc_run.o	svc_simple.o \
@@ -101,7 +105,7 @@ NIS= $(NIS_GEN) $(NIS_CACHE)
 KEY= publickey.o xcrypt.o gen_dhkeys.o
 
 OBJECTS= $(COMMON) $(DES) $(DIAL) $(IPSEC) $(NETDIR) $(NSS) $(NETSELECT) \
-	 $(NSL) $(RPC) $(SAF) $(YP) $(NIS) $(KEY)
+	 $(NSL) $(WRAPPERS) $(RPC) $(SAF) $(YP) $(NIS) $(KEY)
 
 # libnsl build rules
 pics/%.o: ../common/%.c
@@ -198,9 +202,12 @@ CCFLAGS += $(NOEXCEPTIONS)
 CCFLAGS64 += $(NOEXCEPTIONS)
 
 CPPFLAGS +=	-I$(SRC)/lib/common/inc -I$(SRC)/lib/libnsl/include -D_REENTRANT
+CPPFLAGS +=	-I$(SRC)/lib/libnsl/dial
+
+CFLAGS +=	-v
 
 LAZYLIBS = $(ZLAZYLOAD) -lmp -lmd5 -lscf $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -lmp -lmd5
+lint := LAZYLIBS = -lmd5
 LDLIBS +=	$(LAZYLIBS) -lc
 DYNFLAGS +=	$(MAPOPTS)
 
@@ -213,6 +220,7 @@ LINTFLAGS64 +=	-m -DPORTMAP
 
 $(DYNLIB):	$(MAPFILES)
 
+# Don't lint WRAPPERS as they are explicitly unclean
 SRCS=	$(DES:%.o=../des/%.c)			\
 	$(DIAL:%.o=../dial/%.c)			\
 	$(IPSEC:%.o=../ipsec/%.c)		\

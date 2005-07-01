@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -37,12 +38,10 @@
  * Implements a connectionless client side RPC.
  */
 
-
 #include "mt.h"
 #include "rpc_mt.h"
 #include <assert.h>
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <sys/poll.h>
 #include <syslog.h>
@@ -56,12 +55,15 @@
 #include <strings.h>
 
 
-extern int __rpc_timeval_to_msec();
-extern bool_t xdr_opaque_auth();
-extern bool_t __rpc_gss_unwrap();
+extern int __rpc_timeval_to_msec(struct timeval *);
+extern bool_t xdr_opaque_auth(XDR *, struct opaque_auth *);
+extern bool_t __rpc_gss_wrap(AUTH *, char *, uint_t, XDR *, bool_t (*)(),
+								caddr_t);
+extern bool_t __rpc_gss_unwrap(AUTH *, XDR *, bool_t (*)(), caddr_t);
 
-static struct clnt_ops *clnt_dg_ops();
-static bool_t time_not_ok();
+
+static struct clnt_ops *clnt_dg_ops(void);
+static bool_t time_not_ok(struct timeval *);
 
 /*
  *	This machinery implements per-fd locks for MT-safety.  It is not
@@ -124,13 +126,8 @@ static int _rcv_unitdata_err(struct cu_data *cu);
  * If svcaddr is NULL, returns NULL.
  */
 CLIENT *
-clnt_dg_create(fd, svcaddr, program, version, sendsz, recvsz)
-	int fd;				/* open file descriptor */
-	struct netbuf *svcaddr;		/* servers address */
-	rpcprog_t program;		/* program number */
-	rpcvers_t version;		/* version number */
-	uint_t sendsz;			/* buffer recv size */
-	uint_t recvsz;			/* buffer send size */
+clnt_dg_create(const int fd, struct netbuf *svcaddr, const rpcprog_t program,
+	const rpcvers_t version, const uint_t sendsz, const uint_t recvsz)
 {
 	CLIENT *cl = NULL;		/* client handle */
 	struct cu_data *cu = NULL;	/* private data */
@@ -138,8 +135,8 @@ clnt_dg_create(fd, svcaddr, program, version, sendsz, recvsz)
 	struct t_info tinfo;
 	struct timeval now;
 	struct rpc_msg call_msg;
-
-	trace5(TR_clnt_dg_create, 0, program, version, sendsz, recvsz);
+	uint_t ssz;
+	uint_t rsz;
 
 	sig_mutex_lock(&dgtbl_lock);
 	if ((dgtbl == NULL) && ((dgtbl = rpc_fd_init()) == NULL)) {
@@ -148,17 +145,15 @@ clnt_dg_create(fd, svcaddr, program, version, sendsz, recvsz)
 	}
 	sig_mutex_unlock(&dgtbl_lock);
 
-	if (svcaddr == (struct netbuf *)NULL) {
+	if (svcaddr == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNADDR;
-		trace3(TR_clnt_dg_create, 1, program, version);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 	if (t_getinfo(fd, &tinfo) == -1) {
 		rpc_createerr.cf_stat = RPC_TLIERROR;
 		rpc_createerr.cf_error.re_errno = 0;
 		rpc_createerr.cf_error.re_terrno = t_errno;
-		trace3(TR_clnt_dg_create, 1, program, version);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 	/*
 	 * Setup to rcv datagram error, we ignore any errors returned from
@@ -172,44 +167,43 @@ clnt_dg_create(fd, svcaddr, program, version, sendsz, recvsz)
 	/*
 	 * Find the receive and the send size
 	 */
-	sendsz = __rpc_get_t_size((int)sendsz, tinfo.tsdu);
-	recvsz = __rpc_get_t_size((int)recvsz, tinfo.tsdu);
-	if ((sendsz == 0) || (recvsz == 0)) {
+	ssz = __rpc_get_t_size((int)sendsz, tinfo.tsdu);
+	rsz = __rpc_get_t_size((int)recvsz, tinfo.tsdu);
+	if ((ssz == 0) || (rsz == 0)) {
 		rpc_createerr.cf_stat = RPC_TLIERROR; /* XXX */
 		rpc_createerr.cf_error.re_errno = 0;
 		rpc_createerr.cf_error.re_terrno = 0;
-		trace3(TR_clnt_dg_create, 1, program, version);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 
-	if ((cl = (CLIENT *)mem_alloc(sizeof (CLIENT))) == (CLIENT *)NULL)
+	if ((cl = malloc(sizeof (CLIENT))) == NULL)
 		goto err1;
 	/*
 	 * Should be multiple of 4 for XDR.
 	 */
-	sendsz = ((sendsz + 3) / 4) * 4;
-	recvsz = ((recvsz + 3) / 4) * 4;
-	cu = (struct cu_data *)mem_alloc(sizeof (*cu) + sendsz + recvsz);
-	if (cu == (struct cu_data *)NULL)
+	ssz = ((ssz + 3) / 4) * 4;
+	rsz = ((rsz + 3) / 4) * 4;
+	cu = malloc(sizeof (*cu) + ssz + rsz);
+	if (cu == NULL)
 		goto err1;
-	if ((cu->cu_raddr.buf = mem_alloc(svcaddr->len)) == NULL)
+	if ((cu->cu_raddr.buf = malloc(svcaddr->len)) == NULL)
 		goto err1;
-	(void) memcpy(cu->cu_raddr.buf, svcaddr->buf, (int)svcaddr->len);
+	(void) memcpy(cu->cu_raddr.buf, svcaddr->buf, (size_t)svcaddr->len);
 	cu->cu_raddr.len = cu->cu_raddr.maxlen = svcaddr->len;
-	cu->cu_outbuf_start = &cu->cu_inbuf[recvsz];
+	cu->cu_outbuf_start = &cu->cu_inbuf[rsz];
 	/* Other values can also be set through clnt_control() */
 	cu->cu_wait.tv_sec = 15;	/* heuristically chosen */
 	cu->cu_wait.tv_usec = 0;
 	cu->cu_total.tv_sec = -1;
 	cu->cu_total.tv_usec = -1;
-	cu->cu_sendsz = sendsz;
-	cu->cu_recvsz = recvsz;
-	(void) gettimeofday(&now, (struct timezone *)NULL);
+	cu->cu_sendsz = ssz;
+	cu->cu_recvsz = rsz;
+	(void) gettimeofday(&now, NULL);
 	call_msg.rm_xid = getpid() ^ now.tv_sec ^ now.tv_usec;
 	call_msg.rm_call.cb_prog = program;
 	call_msg.rm_call.cb_vers = version;
-	xdrmem_create(&(cu->cu_outxdrs), cu->cu_outbuf, sendsz, XDR_ENCODE);
-	if (! xdr_callhdr(&(cu->cu_outxdrs), &call_msg)) {
+	xdrmem_create(&(cu->cu_outxdrs), cu->cu_outbuf, ssz, XDR_ENCODE);
+	if (!xdr_callhdr(&(cu->cu_outxdrs), &call_msg)) {
 		rpc_createerr.cf_stat = RPC_CANTENCODEARGS;  /* XXX */
 		rpc_createerr.cf_error.re_errno = 0;
 		rpc_createerr.cf_error.re_terrno = 0;
@@ -217,12 +211,12 @@ clnt_dg_create(fd, svcaddr, program, version, sendsz, recvsz)
 	}
 	cu->cu_xdrpos = XDR_GETPOS(&(cu->cu_outxdrs));
 	XDR_DESTROY(&(cu->cu_outxdrs));
-	xdrmem_create(&(cu->cu_outxdrs), cu->cu_outbuf_start, sendsz,
+	xdrmem_create(&(cu->cu_outxdrs), cu->cu_outbuf_start, ssz,
 								XDR_ENCODE);
 /* LINTED pointer alignment */
 	tr_data = (struct t_unitdata *)t_alloc(fd,
 				T_UNITDATA, T_ADDR | T_OPT);
-	if (tr_data == (struct t_unitdata *)NULL) {
+	if (tr_data == NULL) {
 		goto err1;
 	}
 	tr_data->udata.maxlen = cu->cu_recvsz;
@@ -239,11 +233,10 @@ clnt_dg_create(fd, svcaddr, program, version, sendsz, recvsz)
 	cl->cl_ops = clnt_dg_ops();
 	cl->cl_private = (caddr_t)cu;
 	cl->cl_auth = authnone_create();
-	cl->cl_tp = (char *)NULL;
-	cl->cl_netid = (char *)NULL;
+	cl->cl_tp = NULL;
+	cl->cl_netid = NULL;
 	cu->pfdp.fd = cu->cu_fd;
 	cu->pfdp.events = MASKVAL;
-	trace3(TR_clnt_dg_create, 1, program, version);
 	return (cl);
 err1:
 	(void) syslog(LOG_ERR, mem_err_clnt_dg);
@@ -252,25 +245,18 @@ err1:
 	rpc_createerr.cf_error.re_terrno = 0;
 err2:
 	if (cl) {
-		mem_free((caddr_t)cl, sizeof (CLIENT));
+		free(cl);
 		if (cu) {
-			mem_free(cu->cu_raddr.buf, cu->cu_raddr.len);
-			mem_free((caddr_t)cu, sizeof (*cu) + sendsz + recvsz);
+			free(cu->cu_raddr.buf);
+			free(cu);
 		}
 	}
-	trace3(TR_clnt_dg_create, 1, program, version);
-	return ((CLIENT *)NULL);
+	return (NULL);
 }
 
 static enum clnt_stat
-clnt_dg_call(cl, proc, xargs, argsp, xresults, resultsp, utimeout)
-	CLIENT	*cl;			/* client handle */
-	rpcproc_t	proc;		/* procedure number */
-	xdrproc_t	xargs;		/* xdr routine for args */
-	caddr_t		argsp;		/* pointer to args */
-	xdrproc_t	xresults;	/* xdr routine for results */
-	caddr_t		resultsp;	/* pointer to results */
-	struct timeval	utimeout;	/* seconds to wait before giving up */
+clnt_dg_call(CLIENT *cl, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp,
+	xdrproc_t xresults, caddr_t resultsp, struct timeval utimeout)
 {
 /* LINTED pointer alignment */
 	struct cu_data *cu = (struct cu_data *)cl->cl_private;
@@ -288,8 +274,6 @@ clnt_dg_call(cl, proc, xargs, argsp, xresults, resultsp, utimeout)
 	struct t_unitdata tu_data;
 	int res;			/* result of operations */
 	uint32_t x_id;
-
-	trace3(TR_clnt_dg_call, 0, cl, proc);
 
 	if (rpc_fd_lock(dgtbl, cu->cu_fd)) {
 		rpc_callerr.re_status = RPC_FAILED;
@@ -314,21 +298,21 @@ call_again:
 	xdrs = &(cu->cu_outxdrs);
 	xdrs->x_op = XDR_ENCODE;
 	XDR_SETPOS(xdrs, 0);
-/* LINTED pointer alignment */
 	/*
 	 * Due to little endian byte order, it is necessary to convert to host
 	 * format before incrementing xid.
 	 */
+	/* LINTED pointer cast */
 	x_id = ntohl(*(uint32_t *)(cu->cu_outbuf)) + 1;		/* set XID */
+	/* LINTED pointer cast */
 	*(uint32_t *)cu->cu_outbuf = htonl(x_id);
 
 	if (cl->cl_auth->ah_cred.oa_flavor != RPCSEC_GSS) {
-		if ((! XDR_PUTBYTES(xdrs, cu->cu_outbuf, cu->cu_xdrpos)) ||
-				(! XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
-				(! AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
-				(! xargs(xdrs, argsp))) {
+		if ((!XDR_PUTBYTES(xdrs, cu->cu_outbuf, cu->cu_xdrpos)) ||
+				(!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
+				(!AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
+				(!xargs(xdrs, argsp))) {
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
-			trace2(TR_clnt_dg_call, 1, cl);
 			return (rpc_callerr.re_status = RPC_CANTENCODEARGS);
 		}
 	} else {
@@ -338,7 +322,6 @@ call_again:
 		if (!__rpc_gss_wrap(cl->cl_auth, cu->cu_outbuf,
 		    ((char *)u) - cu->cu_outbuf, xdrs, xargs, argsp)) {
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
-			trace2(TR_clnt_dg_call, 1, cl);
 			return (rpc_callerr.re_status = RPC_CANTENCODEARGS);
 		}
 	}
@@ -352,7 +335,6 @@ send_again:
 		rpc_callerr.re_terrno = t_errno;
 		rpc_callerr.re_errno = errno;
 		rpc_fd_unlock(dgtbl, cu->cu_fd);
-		trace2(TR_clnt_dg_call, 1, cl);
 		return (rpc_callerr.re_status = RPC_CANTSEND);
 	}
 
@@ -361,7 +343,6 @@ send_again:
 	 */
 	if (timeout.tv_sec == 0 && timeout.tv_usec == 0) {
 		rpc_fd_unlock(dgtbl, cu->cu_fd);
-		trace2(TR_clnt_dg_call, 1, cl);
 		return (rpc_callerr.re_status = RPC_TIMEDOUT);
 	}
 	/*
@@ -391,7 +372,6 @@ send_again:
 		 * this could happen if time_waited >= timeout
 		 */
 		rpc_fd_unlock(dgtbl, cu->cu_fd);
-		trace2(TR_clnt_dg_call, 1, cl);
 		return (rpc_callerr.re_status = RPC_TIMEDOUT);
 	}
 
@@ -412,7 +392,6 @@ send_again:
 				rpc_callerr.re_errno = errno;
 				rpc_callerr.re_terrno = 0;
 				rpc_fd_unlock(dgtbl, cu->cu_fd);
-				trace2(TR_clnt_dg_call, 1, cl);
 				return (rpc_callerr.re_status = RPC_CANTRECV);
 			}
 			/*FALLTHROUGH*/
@@ -489,7 +468,6 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 					goto send_again;
 			}
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
-			trace2(TR_clnt_dg_call, 1, cl);
 			return (rpc_callerr.re_status = RPC_TIMEDOUT);
 
 		default:
@@ -507,7 +485,6 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 			 */
 			rpc_callerr.re_errno = errno = EBADF;
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
-			trace2(TR_clnt_dg_call, 1, cl);
 			return (-1);
 		}
 
@@ -553,14 +530,14 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 			if (errnoflag == FALSE)
 				rpc_callerr.re_errno = errno;
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
-			trace2(TR_clnt_dg_call, 1, cl);
 			return (rpc_callerr.re_status = RPC_CANTRECV);
 		}
 		if (cu->cu_tr_data->udata.len < (uint_t)sizeof (uint32_t))
 			continue;
 		/* see if reply transaction id matches sent id */
-/* LINTED pointer alignment */
+		/* LINTED pointer alignment */
 		if (*((uint32_t *)(cu->cu_inbuf)) !=
+				/* LINTED pointer alignment */
 				*((uint32_t *)(cu->cu_outbuf)))
 			goto timeout;
 		/* we now assume we have the proper reply */
@@ -583,7 +560,7 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 			__seterr_reply(&reply_msg, &(rpc_callerr));
 
 		if (rpc_callerr.re_status == RPC_SUCCESS) {
-			if (! AUTH_VALIDATE(cl->cl_auth,
+			if (!AUTH_VALIDATE(cl->cl_auth,
 					    &reply_msg.acpted_rply.ar_verf)) {
 				rpc_callerr.re_status = RPC_AUTHERROR;
 				rpc_callerr.re_why = AUTH_INVALIDRESP;
@@ -633,16 +610,11 @@ timeout:			(void) gettimeofday(&curtime, NULL);
 
 	}
 	rpc_fd_unlock(dgtbl, cu->cu_fd);
-	trace2(TR_clnt_dg_call, 1, cl);
 	return (rpc_callerr.re_status);
 }
 
 static enum clnt_stat
-clnt_dg_send(cl, proc, xargs, argsp)
-	CLIENT		*cl;		/* client handle */
-	rpcproc_t	proc;		/* procedure number */
-	xdrproc_t	xargs;		/* xdr routine for args */
-	caddr_t		argsp;		/* pointer to args */
+clnt_dg_send(CLIENT *cl, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp)
 {
 /* LINTED pointer alignment */
 	struct cu_data *cu = (struct cu_data *)cl->cl_private;
@@ -650,8 +622,6 @@ clnt_dg_send(cl, proc, xargs, argsp)
 	int outlen;
 	struct t_unitdata tu_data;
 	uint32_t x_id;
-
-	trace3(TR_clnt_dg_send, 0, cl, proc);
 
 	if (rpc_fd_lock(dgtbl, cu->cu_fd)) {
 		rpc_callerr.re_status = RPC_FAILED;
@@ -665,21 +635,21 @@ clnt_dg_send(cl, proc, xargs, argsp)
 	xdrs = &(cu->cu_outxdrs);
 	xdrs->x_op = XDR_ENCODE;
 	XDR_SETPOS(xdrs, 0);
-/* LINTED pointer alignment */
 	/*
 	 * Due to little endian byte order, it is necessary to convert to host
 	 * format before incrementing xid.
 	 */
+/* LINTED pointer alignment */
 	x_id = ntohl(*(uint32_t *)(cu->cu_outbuf)) + 1;		/* set XID */
+	/* LINTED pointer cast */
 	*(uint32_t *)cu->cu_outbuf = htonl(x_id);
 
 	if (cl->cl_auth->ah_cred.oa_flavor != RPCSEC_GSS) {
-		if ((! XDR_PUTBYTES(xdrs, cu->cu_outbuf, cu->cu_xdrpos)) ||
-				(! XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
-				(! AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
-				(! xargs(xdrs, argsp))) {
+		if ((!XDR_PUTBYTES(xdrs, cu->cu_outbuf, cu->cu_xdrpos)) ||
+				(!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
+				(!AUTH_MARSHALL(cl->cl_auth, xdrs)) ||
+				(!xargs(xdrs, argsp))) {
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
-			trace2(TR_clnt_dg_send, 1, cl);
 			return (rpc_callerr.re_status = RPC_CANTENCODEARGS);
 		}
 	} else {
@@ -689,7 +659,6 @@ clnt_dg_send(cl, proc, xargs, argsp)
 		if (!__rpc_gss_wrap(cl->cl_auth, cu->cu_outbuf,
 		    ((char *)u) - cu->cu_outbuf, xdrs, xargs, argsp)) {
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
-			trace2(TR_clnt_dg_send, 1, cl);
 			return (rpc_callerr.re_status = RPC_CANTENCODEARGS);
 		}
 	}
@@ -702,7 +671,6 @@ clnt_dg_send(cl, proc, xargs, argsp)
 		rpc_callerr.re_terrno = t_errno;
 		rpc_callerr.re_errno = errno;
 		rpc_fd_unlock(dgtbl, cu->cu_fd);
-		trace2(TR_clnt_dg_send, 1, cl);
 		return (rpc_callerr.re_status = RPC_CANTSEND);
 	}
 
@@ -716,9 +684,7 @@ clnt_dg_geterr(CLIENT *cl, struct rpc_err *errp)
 /* LINTED pointer alignment */
 	struct cu_data *cu = (struct cu_data *)cl->cl_private;
 
-	trace2(TR_clnt_dg_geterr, 0, cl);
 	*errp = rpc_callerr;
-	trace2(TR_clnt_dg_geterr, 1, cl);
 }
 
 static bool_t
@@ -727,23 +693,19 @@ clnt_dg_freeres(CLIENT *cl, xdrproc_t xdr_res, caddr_t res_ptr)
 /* LINTED pointer alignment */
 	struct cu_data *cu = (struct cu_data *)cl->cl_private;
 	XDR *xdrs = &(cu->cu_outxdrs);
-	bool_t dummy;
+	bool_t stat;
 
-	trace2(TR_clnt_dg_freeres, 0, cl);
-	rpc_fd_lock(dgtbl, cu->cu_fd);
+	(void) rpc_fd_lock(dgtbl, cu->cu_fd);
 	xdrs->x_op = XDR_FREE;
-	dummy = (*xdr_res)(xdrs, res_ptr);
+	stat = (*xdr_res)(xdrs, res_ptr);
 	rpc_fd_unlock(dgtbl, cu->cu_fd);
-	trace2(TR_clnt_dg_freeres, 1, cl);
-	return (dummy);
+	return (stat);
 }
 
+/* ARGSUSED */
 static void
-clnt_dg_abort(/* h */)
-	/* CLIENT *h; */
+clnt_dg_abort(CLIENT *h)
 {
-	trace1(TR_clnt_dg_abort, 0);
-	trace1(TR_clnt_dg_abort, 1);
 }
 
 static bool_t
@@ -752,8 +714,6 @@ clnt_dg_control(CLIENT *cl, int request, char *info)
 /* LINTED pointer alignment */
 	struct cu_data *cu = (struct cu_data *)cl->cl_private;
 	struct netbuf *addr;
-	trace3(TR_clnt_dg_control, 0, cl, request);
-
 	if (rpc_fd_lock(dgtbl, cu->cu_fd)) {
 		rpc_fd_unlock(dgtbl, cu->cu_fd);
 		return (RPC_FAILED);
@@ -763,19 +723,16 @@ clnt_dg_control(CLIENT *cl, int request, char *info)
 	case CLSET_FD_CLOSE:
 		cu->cu_closeit = TRUE;
 		rpc_fd_unlock(dgtbl, cu->cu_fd);
-		trace2(TR_clnt_dg_control, 1, cl);
 		return (TRUE);
 	case CLSET_FD_NCLOSE:
 		cu->cu_closeit = FALSE;
 		rpc_fd_unlock(dgtbl, cu->cu_fd);
-		trace2(TR_clnt_dg_control, 1, cl);
 		return (TRUE);
 	}
 
 	/* for other requests which use info */
 	if (info == NULL) {
 		rpc_fd_unlock(dgtbl, cu->cu_fd);
-		trace2(TR_clnt_dg_control, 1, cl);
 		return (FALSE);
 	}
 	switch (request) {
@@ -783,7 +740,6 @@ clnt_dg_control(CLIENT *cl, int request, char *info)
 /* LINTED pointer alignment */
 		if (time_not_ok((struct timeval *)info)) {
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
-			trace2(TR_clnt_dg_control, 1, cl);
 			return (FALSE);
 		}
 /* LINTED pointer alignment */
@@ -795,13 +751,12 @@ clnt_dg_control(CLIENT *cl, int request, char *info)
 		break;
 	case CLGET_SERVER_ADDR:		/* Give him the fd address */
 		/* Now obsolete. Only for backword compatibility */
-		(void) memcpy(info, cu->cu_raddr.buf, (int)cu->cu_raddr.len);
+		(void) memcpy(info, cu->cu_raddr.buf, (size_t)cu->cu_raddr.len);
 		break;
 	case CLSET_RETRY_TIMEOUT:
 /* LINTED pointer alignment */
 		if (time_not_ok((struct timeval *)info)) {
 			rpc_fd_unlock(dgtbl, cu->cu_fd);
-			trace2(TR_clnt_dg_control, 1, cl);
 			return (FALSE);
 		}
 /* LINTED pointer alignment */
@@ -823,10 +778,9 @@ clnt_dg_control(CLIENT *cl, int request, char *info)
 /* LINTED pointer alignment */
 		addr = (struct netbuf *)info;
 		if (cu->cu_raddr.maxlen < addr->len) {
-			mem_free(cu->cu_raddr.buf, cu->cu_raddr.maxlen);
-			if ((cu->cu_raddr.buf = mem_alloc(addr->len)) == NULL) {
+			free(cu->cu_raddr.buf);
+			if ((cu->cu_raddr.buf = malloc(addr->len)) == NULL) {
 				rpc_fd_unlock(dgtbl, cu->cu_fd);
-				trace2(TR_clnt_dg_control, 1, cl);
 				return (FALSE);
 			}
 			cu->cu_raddr.maxlen = addr->len;
@@ -891,11 +845,9 @@ clnt_dg_control(CLIENT *cl, int request, char *info)
 
 	default:
 		rpc_fd_unlock(dgtbl, cu->cu_fd);
-		trace2(TR_clnt_dg_control, 1, cl);
 		return (FALSE);
 	}
 	rpc_fd_unlock(dgtbl, cu->cu_fd);
-	trace2(TR_clnt_dg_control, 1, cl);
 	return (TRUE);
 }
 
@@ -906,23 +858,20 @@ clnt_dg_destroy(CLIENT *cl)
 	struct cu_data *cu = (struct cu_data *)cl->cl_private;
 	int cu_fd = cu->cu_fd;
 
-	trace2(TR_clnt_dg_destroy, 0, cl);
-	rpc_fd_lock(dgtbl, cu_fd);
+	(void) rpc_fd_lock(dgtbl, cu_fd);
 	if (cu->cu_closeit)
 		(void) t_close(cu_fd);
 	XDR_DESTROY(&(cu->cu_outxdrs));
 	cu->cu_tr_data->udata.buf = NULL;
 	(void) t_free((char *)cu->cu_tr_data, T_UNITDATA);
-	mem_free(cu->cu_raddr.buf, cu->cu_raddr.len);
-	mem_free((caddr_t)cu,
-		(sizeof (*cu) + cu->cu_sendsz + cu->cu_recvsz));
+	free(cu->cu_raddr.buf);
+	free(cu);
 	if (cl->cl_netid && cl->cl_netid[0])
-		mem_free(cl->cl_netid, strlen(cl->cl_netid) +1);
+		free(cl->cl_netid);
 	if (cl->cl_tp && cl->cl_tp[0])
-		mem_free(cl->cl_tp, strlen(cl->cl_tp) +1);
-	mem_free((caddr_t)cl, sizeof (CLIENT));
+		free(cl->cl_tp);
+	free(cl);
 	rpc_fd_unlock(dgtbl, cu_fd);
-	trace2(TR_clnt_dg_destroy, 1, cl);
 }
 
 static struct clnt_ops *
@@ -933,7 +882,6 @@ clnt_dg_ops(void)
 
 /* VARIABLES PROTECTED BY ops_lock: ops */
 
-	trace1(TR_clnt_dg_ops, 0);
 	sig_mutex_lock(&ops_lock);
 	if (ops.cl_call == NULL) {
 		ops.cl_call = clnt_dg_call;
@@ -945,7 +893,6 @@ clnt_dg_ops(void)
 		ops.cl_control = clnt_dg_control;
 	}
 	sig_mutex_unlock(&ops_lock);
-	trace1(TR_clnt_dg_ops, 1);
 	return (&ops);
 }
 
@@ -955,8 +902,6 @@ clnt_dg_ops(void)
 static bool_t
 time_not_ok(struct timeval *t)
 {
-	trace1(TR_time_not_ok, 0);
-	trace1(TR_time_not_ok, 1);
 	return (t->tv_sec < -1 || t->tv_sec > 100000000 ||
 		t->tv_usec < -1 || t->tv_usec > 1000000);
 }
@@ -974,6 +919,7 @@ _rcv_unitdata_err(struct cu_data *cu)
 	struct t_uderr *uderr;
 
 	old = t_errno;
+	/* LINTED pointer cast */
 	uderr = (struct t_uderr *)
 		t_alloc(cu->cu_fd, T_UDERROR, T_ADDR);
 
@@ -984,17 +930,16 @@ _rcv_unitdata_err(struct cu_data *cu)
 		if (uderr->addr.len != cu->cu_raddr.len ||
 		    (memcmp(uderr->addr.buf, cu->cu_raddr.buf,
 		    cu->cu_raddr.len))) {
-			t_free((char *)uderr, T_UDERROR);
+			(void) t_free((char *)uderr, T_UDERROR);
 			return (0);
 		}
 		rpc_callerr.re_errno = uderr->error;
 		rpc_callerr.re_terrno = TSYSERR;
-		t_free((char *)uderr, T_UDERROR);
+		(void) t_free((char *)uderr, T_UDERROR);
 		return (1);
-	} else {
-		rpc_callerr.re_terrno = old;
-		if (uderr)
-			t_free((char *)uderr, T_UDERROR);
-		return (-1);
 	}
+	rpc_callerr.re_terrno = old;
+	if (uderr)
+		(void) t_free((char *)uderr, T_UDERROR);
+	return (-1);
 }

@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3 */
 
@@ -35,7 +34,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stropts.h>
-#include <rpc/trace.h>
 #include <xti.h>
 #include <sys/timod.h>
 #include "tx.h"
@@ -58,13 +56,8 @@ _tx_rcvconnect(int fd, struct t_call *call, int api_semantics)
 	struct strbuf ctlbuf;
 	int didalloc;
 
-	trace2(TR_t_rcvconnect, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_rcvconnect, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 
 	sig_mutex_lock(&tiptr->ti_lock);
 
@@ -76,7 +69,6 @@ _tx_rcvconnect(int fd, struct t_call *call, int api_semantics)
 		if (tiptr->ti_state != T_OUTCON) {
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_rcvconnect, 1, fd);
 			return (-1);
 		}
 	}
@@ -88,7 +80,6 @@ _tx_rcvconnect(int fd, struct t_call *call, int api_semantics)
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvconnect, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -115,7 +106,6 @@ _tx_rcvconnect(int fd, struct t_call *call, int api_semantics)
 	else
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_rcvconnect, 1, fd);
 	errno = sv_errno;
 	return (retval);
 }

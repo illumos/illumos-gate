@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,8 +146,8 @@ extern ulong_t getxdr_u_long(void);
 extern ulong_t showxdr_u_long(char *);
 extern longlong_t getxdr_longlong(void);
 extern longlong_t showxdr_longlong(char *);
-extern ulonglong_t getxdr_u_longlong(void);
-extern ulonglong_t showxdr_u_longlong(char *);
+extern u_longlong_t getxdr_u_longlong(void);
+extern u_longlong_t showxdr_u_longlong(char *);
 extern char *getxdr_opaque(char *, int);
 extern char *getxdr_string(char *, int);
 extern char *showxdr_string(int, char *);

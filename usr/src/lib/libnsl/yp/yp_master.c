@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,58 +36,46 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	NULL 0
+#include <stdlib.h>
+#include <unistd.h>
 #include <rpc/rpc.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include "yp_b.h"
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/ypclnt.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 
 static int domaster(char *, char *, struct dom_binding *, struct timeval,
     char **);
-int __yp_master_rsvdport();
+extern int __yp_master_rsvdport(char *, char *, char **);
 
 /*
  * This checks parameters, and implements the outer "until binding success"
  * loop.
  */
 int
-yp_master (domain, map, master)
-	char *domain;
-	char *map;
-	char **master;
+yp_master(char *domain, char *map, char **master)
 {
 	size_t domlen;
 	size_t maplen;
 	int reason;
 	struct dom_binding *pdomb;
 
-	trace1(TR_yp_master, 0);
-	if ((map == NULL) || (domain == NULL)) {
-		trace1(TR_yp_master, 1);
+	if ((map == NULL) || (domain == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	domlen = strlen(domain);
 	maplen = strlen(map);
 
 	if ((domlen == 0) || (domlen > YPMAXDOMAIN) ||
 	    (maplen == 0) || (maplen > YPMAXMAP) ||
-	    (master == NULL)) {
-		trace1(TR_yp_master, 1);
+	    (master == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	for (;;) {
 
-		if (reason = __yp_dobind(domain, &pdomb)) {
-			trace1(TR_yp_master, 1);
+		if (reason = __yp_dobind(domain, &pdomb))
 			return (reason);
-		}
 
 		if (pdomb->dom_binding->ypbind_hi_vers >= YPVERS) {
 
@@ -101,7 +91,6 @@ yp_master (domain, map, master)
 			}
 		} else {
 			__yp_rel_binding(pdomb);
-			trace1(TR_yp_master, 1);
 			return (YPERR_VERS);
 		}
 	}
@@ -118,7 +107,6 @@ yp_master (domain, map, master)
 			reason = rsvdreason;
 	}
 
-	trace1(TR_yp_master, 1);
 	return (reason);
 }
 
@@ -128,38 +116,28 @@ yp_master (domain, map, master)
  * '__yp_dobind_rsvdport' rather than '__yp_dobind'
  */
 int
-__yp_master_rsvdport (domain, map, master)
-	char *domain;
-	char *map;
-	char **master;
+__yp_master_rsvdport(char *domain, char *map, char **master)
 {
 	size_t domlen;
 	size_t maplen;
 	int reason;
 	struct dom_binding *pdomb;
 
-	trace1(TR_yp_master, 0);
-	if ((map == NULL) || (domain == NULL)) {
-		trace1(TR_yp_master, 1);
+	if ((map == NULL) || (domain == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	domlen = strlen(domain);
 	maplen = strlen(map);
 
 	if ((domlen == 0) || (domlen > YPMAXDOMAIN) ||
 	    (maplen == 0) || (maplen > YPMAXMAP) ||
-	    (master == NULL)) {
-		trace1(TR_yp_master, 1);
+	    (master == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	for (;;) {
 
-		if (reason = __yp_dobind_rsvdport(domain, &pdomb)) {
-			trace1(TR_yp_master, 1);
+		if (reason = __yp_dobind_rsvdport(domain, &pdomb))
 			return (reason);
-		}
 
 		if (pdomb->dom_binding->ypbind_hi_vers >= YPVERS) {
 
@@ -185,12 +163,9 @@ __yp_master_rsvdport (domain, map, master)
 			 */
 			__yp_rel_binding(pdomb);
 			free_dom_binding(pdomb);
-			trace1(TR_yp_master, 1);
 			return (YPERR_VERS);
 		}
 	}
-
-	trace1(TR_yp_master, 1);
 	return (reason);
 }
 
@@ -198,21 +173,16 @@ __yp_master_rsvdport (domain, map, master)
  * This talks v2 to ypserv
  */
 static int
-domaster (domain, map, pdomb, timeout, master)
-	char *domain;
-	char *map;
-	struct dom_binding *pdomb;
-	struct timeval timeout;
-	char **master;
+domaster(char *domain, char *map, struct dom_binding *pdomb,
+					struct timeval timeout, char **master)
 {
 	struct ypreq_nokey req;
 	struct ypresp_master resp;
 	unsigned int retval = 0;
 
-	trace1(TR_domaster, 0);
 	req.domain = domain;
 	req.map = map;
-	(void) memset((char *) &resp, 0, sizeof (struct ypresp_master));
+	(void) memset(&resp, 0, sizeof (struct ypresp_master));
 
 	/*
 	 * Do the get_master request.  If the rpc call failed, return with
@@ -222,31 +192,23 @@ domaster (domain, map, pdomb, timeout, master)
 	if (clnt_call(pdomb->dom_client,
 			YPPROC_MASTER, (xdrproc_t)xdr_ypreq_nokey,
 		    (char *)&req, (xdrproc_t)xdr_ypresp_master, (char *)&resp,
-		    timeout) != RPC_SUCCESS) {
-		trace1(TR_domaster, 1);
+		    timeout) != RPC_SUCCESS)
 		return (YPERR_RPC);
-	}
 
 	/* See if the request succeeded */
 
-	if (resp.status != YP_TRUE) {
+	if (resp.status != YP_TRUE)
 		retval = ypprot_err(resp.status);
-	}
 
 	/* Get some memory which the user can get rid of as he likes */
 
-	if (!retval && ((*master = malloc(strlen(resp.master) + 1))
-	    == NULL)) {
+	if (!retval && ((*master = malloc(strlen(resp.master) + 1)) == NULL))
 		retval = YPERR_RESRC;
 
-	}
-
-	if (!retval) {
+	if (!retval)
 		(void) strcpy(*master, resp.master);
-	}
 
 	CLNT_FREERES(pdomb->dom_client,
 		(xdrproc_t)xdr_ypresp_master, (char *)&resp);
-	trace1(TR_domaster, 1);
 	return (retval);
 }

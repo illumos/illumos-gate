@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +38,6 @@
 
 #include <rpcsvc/dbm.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
@@ -63,12 +63,10 @@ int  setbit(void);
 int  cmpdatum(datum, datum);
 
 int
-dbminit(file)
-	char *file;
+dbminit(char *file)
 {
 	struct stat statb;
 
-	trace1(TR_dbminit, 0);
 	dbrdonly = 0;
 	if (strlcpy(pagbuf, file, sizeof (pagbuf)) >= sizeof (pagbuf) ||
 	    strlcat(pagbuf, ".pag", sizeof (pagbuf)) >= sizeof (pagbuf)) {
@@ -76,7 +74,6 @@ dbminit(file)
 		 * file.pag does not fit into pagbuf.
 		 * fails with ENAMETOOLONG.
 		 */
-		trace1(TR_dbminit, 1);
 		errno = ENAMETOOLONG;
 		return (-1);
 	}
@@ -97,13 +94,10 @@ dbminit(file)
 		dirf = open(pagbuf, 0);
 		dbrdonly = 1;
 	}
-	if (pagf < 0 || dirf < 0) {
-		trace1(TR_dbminit, 1);
+	if (pagf < 0 || dirf < 0)
 		return (-1);
-	}
-	_FSTAT(dirf, &statb);
+	(void) _FSTAT(dirf, &statb);
 	maxbno = statb.st_size*BYTESIZ-1;
-	trace1(TR_dbminit, 1);
 	return (0);
 }
 
@@ -112,20 +106,17 @@ static long oldb2 = -1;
 
 /* Avoid using cached data for subsequent accesses. */
 int
-dbmflush()
+dbmflush(void)
 {
-	trace1(TR_dbmflush, 0);
 	oldb1 = -1;
 	oldb2 = -1;
-	trace1(TR_dbmflush, 1);
 	return (0);
 }
 
 /* Clean up after ourself. */
 int
-dbmclose()
+dbmclose(void)
 {
-	trace1(TR_dbmclose, 0);
 	(void) close(pagf);
 	(void) close(dirf);
 	bitno = 0;
@@ -134,17 +125,14 @@ dbmclose()
 	hmask = 0;
 	oldb1 = -1;
 	oldb2 = -1;
-	trace1(TR_dbmclose, 1);
 	return (0);
 }
 
 long
-forder(key)
-	datum key;
+forder(datum key)
 {
 	long hash;
 
-	trace1(TR_forder, 0);
 	hash = calchash(key);
 	for (hmask = 0; ; hmask = (hmask<<1) + 1) {
 		blkno = hash & hmask;
@@ -152,54 +140,43 @@ forder(key)
 		if (getbit() == 0)
 			break;
 	}
-	trace1(TR_forder, 1);
 	return (blkno);
 }
 
 datum
-fetch(key)
-	datum key;
+fetch(datum key)
 {
 	int i;
 	datum item;
 
-	trace1(TR_fetch, 0);
 	dbm_access(calchash(key));
 	for (i = 0; ; i += 2) {
 		item = makdatum(pagbuf, i);
 		if (item.dptr == NULL) {
-			trace1(TR_fetch, 1);
 			return (item);
 		}
 		if (cmpdatum(key, item) == 0) {
 			item = makdatum(pagbuf, i+1);
 			if (item.dptr == NULL)
 				(void) printf("items not in pairs\n");
-			trace1(TR_fetch, 1);
 			return (item);
 		}
 	}
 }
 
 int
-delete(key)
-	datum key;
+delete(datum key)
 {
 	int i;
 	datum item;
 
-	trace1(TR_delete, 0);
-	if (dbrdonly) {
-		trace1(TR_delete, 1);
+	if (dbrdonly)
 		return (-1);
-	}
 	dbm_access(calchash(key));
 	for (i = 0; ; i += 2) {
 		item = makdatum(pagbuf, i);
-		if (item.dptr == NULL) {
-			trace1(TR_delete, 1);
+		if (item.dptr == NULL)
 			return (-1);
-		}
 		if (cmpdatum(key, item) == 0) {
 			delitem(pagbuf, i);
 			delitem(pagbuf, i);
@@ -208,23 +185,18 @@ delete(key)
 	}
 	(void) lseek(pagf, blkno*PBLKSIZ, 0);
 	(void) write(pagf, pagbuf, PBLKSIZ);
-	trace1(TR_delete, 1);
 	return (0);
 }
 
 int
-store(key, dat)
-	datum key, dat;
+store(datum key, datum dat)
 {
 	int i;
 	datum item;
 	char ovfbuf[PBLKSIZ];
 
-	trace1(TR_store, 0);
-	if (dbrdonly) {
-		trace1(TR_store, 1);
+	if (dbrdonly)
 		return (-1);
-	}
 loop:
 	dbm_access(calchash(key));
 	for (i = 0; ; i += 2) {
@@ -246,16 +218,14 @@ loop:
 	}
 	(void) lseek(pagf, blkno*PBLKSIZ, 0);
 	(void) write(pagf, pagbuf, PBLKSIZ);
-	trace1(TR_store, 1);
 	return (0);
 
 split:
 	if (key.dsize + dat.dsize + 3 * sizeof (short) >= PBLKSIZ) {
 		(void) printf("entry too big\n");
-		trace1(TR_store, 1);
 		return (-1);
 	}
-	(void) memset((char *)&ovfbuf, 0, PBLKSIZ);
+	(void) memset(&ovfbuf, 0, PBLKSIZ);
 	for (i = 0; ; ) {
 		item = makdatum(pagbuf, i);
 		if (item.dptr == NULL)
@@ -276,43 +246,32 @@ split:
 	}
 	(void) lseek(pagf, blkno*PBLKSIZ, 0);
 	if (write(pagf, pagbuf, PBLKSIZ) < 0) {
-		trace1(TR_store, 1);
 		return (-1);
 	}
 	(void) lseek(pagf, (blkno+hmask+1)*PBLKSIZ, 0);
 	if (write(pagf, ovfbuf, PBLKSIZ) < 0) {
-		trace1(TR_store, 1);
 		return (-1);
 	}
 	if (setbit() < 0) {
-		trace1(TR_store, 1);
 		return (-1);
 	}
 	goto loop;
 }
 
 datum
-firstkey()
+firstkey(void)
 {
-	datum dummy;
-
-	trace1(TR_firstkey, 0);
-	dummy = firsthash(0L);
-	trace1(TR_firstkey, 1);
-	return (dummy);
+	return (firsthash(0L));
 }
 
 datum
-nextkey(key)
-	datum key;
+nextkey(datum key)
 {
 	int i;
 	datum item, bitem;
 	long hash;
 	int f;
-	datum dummy;
 
-	trace1(TR_nextkey, 0);
 #ifdef lint
 	bitem.dptr = NULL;
 	bitem.dsize = 0;
@@ -331,28 +290,20 @@ nextkey(key)
 			f = 0;
 		}
 	}
-	if (f == 0) {
-		trace1(TR_nextkey, 1);
+	if (f == 0)
 		return (bitem);
-	}
 	hash = hashinc(hash);
-	if (hash == 0) {
-		trace1(TR_nextkey, 1);
+	if (hash == 0)
 		return (item);
-	}
-	dummy = firsthash(hash);
-	trace1(TR_nextkey, 1);
-	return (dummy);
+	return (firsthash(hash));
 }
 
 datum
-firsthash(hash)
-	long hash;
+firsthash(long hash)
 {
 	int i;
 	datum item, bitem;
 
-	trace2(TR_firsthash, 0, hash);
 loop:
 	dbm_access(hash);
 	bitem = makdatum(pagbuf, 0);
@@ -363,25 +314,19 @@ loop:
 		if (cmpdatum(bitem, item) < 0)
 			bitem = item;
 	}
-	if (bitem.dptr != NULL) {
-		trace1(TR_firsthash, 1);
+	if (bitem.dptr != NULL)
 		return (bitem);
-	}
 	hash = hashinc(hash);
-	if (hash == 0) {
-		trace1(TR_firsthash, 1);
+	if (hash == 0)
 		return (item);
-	}
 	goto loop;
 }
 
 void
-dbm_access(hash)
-	long hash;
+dbm_access(long hash)
 {
 	ssize_t readsize;
 
-	trace2(TR_dbm_access, 0, hash);
 	for (hmask = 0; ; hmask = (hmask<<1) + 1) {
 		blkno = hash & hmask;
 		bitno = blkno + hmask;
@@ -392,14 +337,13 @@ dbm_access(hash)
 		(void) lseek(pagf, blkno*PBLKSIZ, 0);
 		readsize = read(pagf, pagbuf, PBLKSIZ);
 		if (readsize != PBLKSIZ) {
-			if (readsize < 0) readsize = 0;
-			(void) memset((char *)(&pagbuf+readsize),
-			    0, PBLKSIZ-readsize);
+			if (readsize < 0)
+				readsize = 0;
+			(void) memset((&pagbuf+readsize), 0, PBLKSIZ-readsize);
 		}
 		chkblk(pagbuf);
 		oldb1 = blkno;
 	}
-	trace1(TR_dbm_access, 1);
 }
 
 int
@@ -409,11 +353,8 @@ getbit(void)
 	ssize_t readsize;
 	long b, i, n;
 
-	trace1(TR_getbit, 0);
-	if (bitno > maxbno) {
-		trace1(TR_getbit, 1);
+	if (bitno > maxbno)
 		return (0);
-	}
 	n = bitno % BYTESIZ;
 	bn = bitno / BYTESIZ;
 	i = bn % DBLKSIZ;
@@ -422,17 +363,14 @@ getbit(void)
 		(void) lseek(dirf, (long)b*DBLKSIZ, 0);
 		readsize = read(dirf, dirbuf, DBLKSIZ);
 		if (readsize != DBLKSIZ) {
-			if (readsize < 0) readsize = 0;
-			(void) memset((char *)(&dirbuf+readsize),
-			    0, DBLKSIZ-readsize);
+			if (readsize < 0)
+				readsize = 0;
+			(void) memset(&dirbuf+readsize, 0, DBLKSIZ-readsize);
 		}
 		oldb2 = b;
 	}
-	if (dirbuf[i] & (1<<n)) {
-		trace1(TR_getbit, 1);
+	if (dirbuf[i] & (1<<n))
 		return (1);
-	}
-	trace1(TR_getbit, 1);
 	return (0);
 }
 
@@ -442,11 +380,8 @@ setbit(void)
 	long bn;
 	long i, n, b;
 
-	trace1(TR_setbit, 0);
-	if (dbrdonly) {
-		trace1(TR_setbit, 1);
+	if (dbrdonly)
 		return (-1);
-	}
 	if (bitno > maxbno) {
 		maxbno = bitno;
 		(void) getbit();
@@ -457,11 +392,8 @@ setbit(void)
 	b = bn / DBLKSIZ;
 	dirbuf[i] |= 1<<n;
 	(void) lseek(dirf, (long)b*DBLKSIZ, 0);
-	if (write(dirf, dirbuf, DBLKSIZ) < 0) {
-		trace1(TR_setbit, 1);
+	if (write(dirf, dirbuf, DBLKSIZ) < 0)
 		return (-1);
-	}
-	trace1(TR_setbit, 1);
 	return (0);
 }
 
@@ -472,7 +404,7 @@ makdatum(char buf[PBLKSIZ], int n)
 	int t;
 	datum item;
 
-	trace1(TR_makdatum, 0);
+	/* LINTED pointer cast */
 	sp = (short *)buf;
 	if (n < 0 || n >= sp[0])
 		goto null;
@@ -481,42 +413,31 @@ makdatum(char buf[PBLKSIZ], int n)
 		t = sp[n+1-1];
 	item.dptr = buf+sp[n+1];
 	item.dsize = t - sp[n+1];
-	trace1(TR_makdatum, 1);
 	return (item);
 
 null:
 	item.dptr = NULL;
 	item.dsize = 0;
-	trace1(TR_makdatum, 1);
 	return (item);
 }
 
 int
-cmpdatum(d1, d2)
-	datum d1, d2;
+cmpdatum(datum d1, datum d2)
 {
 	int n;
 	char *p1, *p2;
 
-	trace1(TR_cmpdatum, 0);
 	n = d1.dsize;
-	if (n != d2.dsize) {
-		trace1(TR_cmpdatum, 1);
+	if (n != d2.dsize)
 		return (n - d2.dsize);
-	}
-	if (n == 0) {
-		trace1(TR_cmpdatum, 1);
+	if (n == 0)
 		return (0);
-	}
 	p1 = d1.dptr;
 	p2 = d2.dptr;
 	do
-		if (*p1++ != *p2++) {
-			trace1(TR_cmpdatum, 1);
+		if (*p1++ != *p2++)
 			return (*--p1 - *--p2);
-		}
 	while (--n);
-	trace1(TR_cmpdatum, 1);
 	return (0);
 }
 
@@ -552,37 +473,29 @@ long	hltab[64]
 };
 
 long
-hashinc(hash)
-	long hash;
+hashinc(long hash)
 {
 	long bit;
 
-	trace2(TR_hashinc, 0, hash);
 	hash &= hmask;
 	bit = hmask+1;
 	for (; ; ) {
 		bit >>= 1;
-		if (bit == 0) {
-			trace1(TR_hashinc, 1);
+		if (bit == 0)
 			return (0L);
-		}
-		if ((hash&bit) == 0) {
-			trace1(TR_hashinc, 1);
+		if ((hash&bit) == 0)
 			return (hash|bit);
-		}
 		hash &= ~bit;
 	}
 }
 
 long
-calchash(item)
-	datum item;
+calchash(datum item)
 {
 	int i, j, f;
 	long hashl;
 	int hashi;
 
-	trace1(TR_calchash, 0);
 	hashl = 0;
 	hashi = 0;
 	for (i = 0; i < item.dsize; i++) {
@@ -593,19 +506,16 @@ calchash(item)
 			f >>= 4;
 		}
 	}
-	trace1(TR_calchash, 1);
 	return (hashl);
 }
 
 void
-delitem(buf, n)
-	char buf[PBLKSIZ];
-	int n;
+delitem(char buf[PBLKSIZ], int n)
 {
 	short *sp;
 	int i1, i2, i3;
 
-	trace1(TR_delitem, 0);
+	/* LINTED pointer cast */
 	sp = (short *)buf;
 	if (n < 0 || n >= sp[0])
 		goto bad;
@@ -626,52 +536,44 @@ delitem(buf, n)
 		sp[i1+1-1] = sp[i1+1] + i2;
 	sp[0]--;
 	sp[sp[0]+1] = 0;
-	trace1(TR_delitem, 1);
 	return;
 
 bad:
 	(void) printf("bad delitem\n");
-	trace1(TR_delitem, 1);
 	abort();
 }
 
 int
-additem(buf, item)
-	char buf[PBLKSIZ];
-	datum item;
+additem(char buf[PBLKSIZ], datum item)
 {
 	short *sp;
 	int i1, i2;
 
-	trace1(TR_additem, 0);
+	/* LINTED pointer cast */
 	sp = (short *)buf;
 	i1 = PBLKSIZ;
 	if (sp[0] > 0)
 		i1 = sp[sp[0]+1-1];
 	i1 -= item.dsize;
 	i2 = (sp[0]+2) * (int)sizeof (short);
-	if (i1 <= i2) {
-		trace1(TR_additem, 1);
+	if (i1 <= i2)
 		return (-1);
-	}
 	sp[sp[0]+1] = (short)i1;
 	for (i2 = 0; i2 < item.dsize; i2++) {
 		buf[i1] = item.dptr[i2];
 		i1++;
 	}
 	sp[0]++;
-	trace1(TR_additem, 1);
 	return (sp[0]-1);
 }
 
 void
-chkblk(buf)
-	char buf[PBLKSIZ];
+chkblk(char buf[PBLKSIZ])
 {
 	short *sp;
 	int t, i;
 
-	trace1(TR_chkblk, 0);
+	/* LINTED pointer cast */
 	sp = (short *)buf;
 	t = PBLKSIZ;
 	for (i = 0; i < sp[0]; i++) {
@@ -681,12 +583,10 @@ chkblk(buf)
 	}
 	if (t < (sp[0]+1) * sizeof (short))
 		goto bad;
-	trace1(TR_chkblk, 1);
 	return;
 
 bad:
 	(void) printf("bad block\n");
-	trace1(TR_chkblk, 1);
 	abort();
-	(void) memset((char *)&buf, 0, PBLKSIZ);
+	(void) memset(&buf, 0, PBLKSIZ);
 }

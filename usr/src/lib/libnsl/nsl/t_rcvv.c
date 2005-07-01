@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +34,6 @@
  */
 #include "mt.h"
 #include <stdlib.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stropts.h>
@@ -60,19 +60,13 @@ _tx_rcvv(int fd, struct t_iovec *tiov, unsigned int tiovcount,  int *flags,
 	unsigned int nbytes;
 	char *dataptr;
 
-	trace5(TR_t_rcvv, 0, fd, tiov, tiovcount, flags);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace5(TR_t_rcvv, 1, fd, tiov, tiovcount, flags);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype == T_CLTS) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_rcvv, 1, fd, tiov, tiovcount, flags);
 		return (-1);
 	}
 
@@ -81,15 +75,13 @@ _tx_rcvv(int fd, struct t_iovec *tiov, unsigned int tiovcount,  int *flags,
 	if (tiovcount == 0 || tiovcount > T_IOV_MAX) {
 		t_errno = TBADDATA;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_rcvv, 1, fd, tiov, tiovcount, flags);
 		return (-1);
 	}
 
-	if (! (tiptr->ti_state == T_DATAXFER ||
+	if (!(tiptr->ti_state == T_DATAXFER ||
 		tiptr->ti_state == T_OUTREL)) {
 		t_errno = TOUTSTATE;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_rcvv, 1, fd, tiov, tiovcount, flags);
 		return (-1);
 	}
 
@@ -127,7 +119,6 @@ _tx_rcvv(int fd, struct t_iovec *tiov, unsigned int tiovcount,  int *flags,
 			sv_errno = errno;
 			t_errno = TSYSERR;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace5(TR_t_rcvv, 1, fd, tiov, tiovcount, flags);
 			errno = sv_errno;
 			return (-1);
 		}
@@ -145,12 +136,11 @@ _tx_rcvv(int fd, struct t_iovec *tiov, unsigned int tiovcount,  int *flags,
 
 			tlbs = &tiptr->ti_lookbufs;
 			do {
+				/* LINTED pointer cast */
 				if (*((t_scalar_t *)tlbs->tl_lookcbuf)
 				    == T_DISCON_IND) {
 					t_errno = TLOOK;
 					sig_mutex_unlock(&tiptr->ti_lock);
-					trace5(TR_t_rcvv, 1, fd, tiov,
-					    tiovcount, flags);
 					return (-1);
 				}
 			} while ((tlbs = tlbs->tl_next) != NULL);
@@ -163,7 +153,6 @@ _tx_rcvv(int fd, struct t_iovec *tiov, unsigned int tiovcount,  int *flags,
 			 */
 			t_errno = TLOOK;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace5(TR_t_rcvv, 1, fd, tiov, tiovcount, flags);
 			return (-1);
 		}
 	}
@@ -175,7 +164,6 @@ _tx_rcvv(int fd, struct t_iovec *tiov, unsigned int tiovcount,  int *flags,
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_rcvv, 1, fd, tiov, tiovcount, flags);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -190,7 +178,6 @@ _tx_rcvv(int fd, struct t_iovec *tiov, unsigned int tiovcount,  int *flags,
 		else
 			tiptr->ti_ctlbuf = ctlbuf.buf;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_rcvv, 1, fd, tiov, tiovcount, flags);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -231,6 +218,7 @@ _tx_rcvv(int fd, struct t_iovec *tiov, unsigned int tiovcount,  int *flags,
 			goto err_out;
 		}
 
+		/* LINTED pointer cast */
 		pptr = (union T_primitives *)ctlbuf.buf;
 
 		switch (pptr->type) {
@@ -277,7 +265,6 @@ _tx_rcvv(int fd, struct t_iovec *tiov, unsigned int tiovcount,  int *flags,
 			if (dataptr != NULL)
 				free(dataptr);
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace5(TR_t_rcvv, 0, fd, tiov, tiovcount, flags);
 			return (databuf.len);
 
 		case T_ORDREL_IND:
@@ -405,7 +392,6 @@ _tx_rcvv(int fd, struct t_iovec *tiov, unsigned int tiovcount,  int *flags,
 		if (dataptr != NULL)
 			free(dataptr);
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_rcvv, 0, fd, tiov, tiovcount, flags);
 		return (databuf.len);
 	}
 	/* NOTREACHED */
@@ -420,7 +406,6 @@ err_out:
 		free(dataptr);
 	sig_mutex_unlock(&tiptr->ti_lock);
 
-	trace5(TR_t_rcvv, 1, fd, tiov, tiovcount, flags);
 	errno = sv_errno;
 	return (-1);
 }

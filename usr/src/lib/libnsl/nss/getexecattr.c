@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +32,6 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <nss_dbdefs.h>
-#include <rpc/trace.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/systeminfo.h>
@@ -66,30 +66,24 @@ static DEFINE_NSS_GETENT(context);
 void
 _nss_initf_execattr(nss_db_params_t *p)
 {
-	trace1(TR__nss_initf_execattr, 0);
 	p->name = NSS_DBNAM_EXECATTR;
 	p->config_name    = NSS_DBNAM_PROFATTR; /* use config for "prof_attr" */
-	trace1(TR__nss_initf_execattr, 1);
 }
 
 void
 _nsw_initf_execattr(nss_db_params_t *p)
 {
-	trace1(TR__nss_initf_execattr, 0);
 	p->name = NSS_DBNAM_EXECATTR;
 	p->flags |= NSS_USE_DEFAULT_CONFIG;
 	p->default_config = _nsw_search_path;
-	trace1(TR__nss_initf_execattr, 1);
 }
 
 void
 _nsw_initf_profattr(nss_db_params_t *p)
 {
-	trace1(TR__nss_initf_execattr, 0);
 	p->name = NSS_DBNAM_PROFATTR;
 	p->flags |= NSS_USE_DEFAULT_CONFIG;
 	p->default_config = _nsw_search_path;
-	trace1(TR__nss_initf_execattr, 1);
 }
 
 /*
@@ -101,26 +95,19 @@ _nsw_initf_profattr(nss_db_params_t *p)
 int
 str2execattr(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 {
-	char		*last = (char *)NULL;
+	char		*last = NULL;
 	char		*sep = KV_TOKEN_DELIMIT;
-	char		*empty = KV_EMPTY;
 	execstr_t	*exec = (execstr_t *)ent;
 
-	if (exec == NULL) {
+	if (exec == NULL)
 		return (NSS_STR_PARSE_PARSE);
-	}
 
-	trace3(TR_str2execattr, 0, lenstr, buflen);
 	if ((instr >= buffer && (buffer + buflen) > instr) ||
-	    (buffer >= instr && (instr + lenstr) > buffer)) {
-		trace3(TR_str2execattr, 1, lenstr, buflen);
+	    (buffer >= instr && (instr + lenstr) > buffer))
 		return (NSS_STR_PARSE_PARSE);
-	}
-	if (lenstr >= buflen) {
-		trace3(TR_str2execattr, 1, lenstr, buflen);
+	if (lenstr >= buflen)
 		return (NSS_STR_PARSE_ERANGE);
-	}
-	strncpy(buffer, instr, buflen);
+	(void) strncpy(buffer, instr, buflen);
 	/*
 	 * Remove newline that nis (yp_match) puts at the
 	 * end of the entry it retrieves from the map.
@@ -136,7 +123,7 @@ str2execattr(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 	exec->res2 = _strtok_escape(NULL, sep, &last);
 	exec->id = _strtok_escape(NULL, sep, &last);
 	exec->attr = _strtok_escape(NULL, sep, &last);
-	exec->next = (execstr_t *)NULL;
+	exec->next = NULL;
 
 	return (NSS_STR_PARSE_SUCCESS);
 }
@@ -145,19 +132,15 @@ str2execattr(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 void
 _setexecattr(void)
 {
-	trace1(TR_setexecattr, 0);
 	nss_setent(&exec_root, _nss_initf_execattr, &context);
-	trace1(TR_setexecattr, 0);
 }
 
 
 void
 _endexecattr(void)
 {
-	trace1(TR_endexecattr, 0);
 	nss_endent(&exec_root, _nss_initf_execattr, &context);
 	nss_delete(&exec_root);
-	trace1(TR_endexecattr, 0);
 }
 
 
@@ -167,12 +150,10 @@ _getexecattr(execstr_t *result, char *buffer, int buflen, int *errnop)
 	nss_status_t    res;
 	nss_XbyY_args_t arg;
 
-	trace2(TR_getexecattr, 0, buflen);
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2execattr);
 	res = nss_getent(&exec_root, _nss_initf_execattr, &context, &arg);
 	arg.status = res;
 	*errnop = arg.h_errno;
-	trace2(TR_getexecattr, 1, buflen);
 
 	return ((execstr_t *)NSS_XbyY_FINI(&arg));
 }
@@ -189,13 +170,12 @@ _getexecprof(char *name,
 {
 	int		getby_flag;
 	char		policy_buf[BUFSIZ];
-	const char	*empty = (const char *)NULL;
+	const char	*empty = NULL;
 	nss_status_t	res = NSS_NOTFOUND;
 	nss_XbyY_args_t	arg;
 	_priv_execattr	_priv_exec;
 	static mutex_t	_nsw_exec_lock = DEFAULTMUTEX;
 
-	trace2(TR_getexecprof, 0, _buflen);
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2execattr);
 
 	_priv_exec.name = (name == NULL) ? empty : (const char *)name;
@@ -204,13 +184,13 @@ _getexecprof(char *name,
 #ifdef SI_SECPOLICY
 	if (sysinfo(SI_SECPOLICY, policy_buf, BUFSIZ) == -1)
 #endif	/* SI_SECPOLICY */
-	strncpy(policy_buf, DEFAULT_POLICY, BUFSIZ);
+	(void) strncpy(policy_buf, DEFAULT_POLICY, BUFSIZ);
 
 retry_policy:
 	_priv_exec.policy = policy_buf;
 	_priv_exec.search_flag = search_flag;
-	_priv_exec.head_exec = (execstr_t *)NULL;
-	_priv_exec.prev_exec = (execstr_t *)NULL;
+	_priv_exec.head_exec = NULL;
+	_priv_exec.prev_exec = NULL;
 
 	if ((name != NULL) && (id != NULL)) {
 		getby_flag = NSS_DBOP_EXECATTR_BYNAMEID;
@@ -291,7 +271,6 @@ out:
 
 	arg.status = res;
 	*errnop = res;
-	trace2(TR_getexecprof, 1, buflen);
 	return ((execstr_t *)NSS_XbyY_FINI(&arg));
 }
 
@@ -314,7 +293,7 @@ _doexeclist(nss_XbyY_args_t *argp)
 		else
 			status = 0;
 	}
-	memset(argp->buf.buffer, NULL, argp->buf.buflen);
+	(void) memset(argp->buf.buffer, NULL, argp->buf.buflen);
 
 	return (status);
 
@@ -354,7 +333,7 @@ _exec_wild_id(char *id, const char *type)
 		/*
 		 * id = /usr/ccs/bin/what
 		 */
-		strcpy(pchar, KV_WILDCARD);
+		(void) strcpy(pchar, KV_WILDCARD);
 		return (id);
 	}
 
@@ -366,12 +345,11 @@ _exec_wild_id(char *id, const char *type)
 execstr_t *
 _dup_execstr(execstr_t *old_exec)
 {
-	execstr_t *new_exec = (execstr_t *)NULL;
+	execstr_t *new_exec = NULL;
 
-	if (old_exec == NULL) {
-		return ((execstr_t *)NULL);
-	}
-	if ((new_exec = (execstr_t *)malloc(sizeof (execstr_t))) != NULL) {
+	if (old_exec == NULL)
+		return (NULL);
+	if ((new_exec = malloc(sizeof (execstr_t))) != NULL) {
 		new_exec->name = _strdup_null(old_exec->name);
 		new_exec->type = _strdup_null(old_exec->type);
 		new_exec->policy = _strdup_null(old_exec->policy);

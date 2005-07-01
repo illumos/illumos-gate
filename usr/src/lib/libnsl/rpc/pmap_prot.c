@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -36,91 +38,58 @@
  * pmap_prot.c
  * Protocol for the local binder service, or pmap.
  * All the pmap xdr routines here.
- *
  */
 
 #include <rpc/types.h>
-#include <rpc/trace.h>
 #include <rpc/xdr.h>
 #include <rpc/pmap_prot.h>
 #include <rpc/pmap_rmt.h>
 
 bool_t
-xdr_pmap(xdrs, objp)
-	XDR *xdrs;
-	struct pmap *objp;
+xdr_pmap(XDR *xdrs, struct pmap *objp)
 {
+	rpc_inline_t *buf;
 
-	register rpc_inline_t *buf;
-	bool_t dummy;
-
-	trace1(TR_xdr_pmap, 0);
-	if (xdrs->x_op == XDR_ENCODE) {
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
 		buf = XDR_INLINE(xdrs, 4 * BYTES_PER_XDR_UNIT);
 		if (buf == NULL) {
-			if (!xdr_u_int(xdrs, (u_int *)&objp->pm_prog)) {
-				trace1(TR_xdr_pmap, 1);
+			if (!XDR_PUTINT32(xdrs, (int32_t *)&objp->pm_prog))
 				return (FALSE);
-			}
-			if (!xdr_u_int(xdrs, (u_int *)&objp->pm_vers)) {
-				trace1(TR_xdr_pmap, 1);
+			if (!XDR_PUTINT32(xdrs, (int32_t *)&objp->pm_vers))
 				return (FALSE);
-			}
-			if (!xdr_u_int(xdrs, (u_int *)&objp->pm_prot)) {
-				trace1(TR_xdr_pmap, 1);
+			if (!XDR_PUTINT32(xdrs, (int32_t *)&objp->pm_prot))
 				return (FALSE);
-			}
-			if (!xdr_u_int(xdrs, (u_int *)&objp->pm_port)) {
-				trace1(TR_xdr_pmap, 1);
+			if (!XDR_PUTINT32(xdrs, (int32_t *)&objp->pm_port))
 				return (FALSE);
-			}
 		} else {
 			IXDR_PUT_U_INT32(buf, objp->pm_prog);
 			IXDR_PUT_U_INT32(buf, objp->pm_vers);
 			IXDR_PUT_U_INT32(buf, objp->pm_prot);
 			IXDR_PUT_U_INT32(buf, objp->pm_port);
 		}
-
-		trace1(TR_xdr_pmap, 1);
 		return (TRUE);
-	} else if (xdrs->x_op == XDR_DECODE) {
+	case XDR_DECODE:
 		buf = XDR_INLINE(xdrs, 4 * BYTES_PER_XDR_UNIT);
 		if (buf == NULL) {
-			if (!xdr_u_int(xdrs, (u_int *)&objp->pm_prog)) {
-				trace1(TR_xdr_pmap, 1);
+			if (!XDR_GETINT32(xdrs, (int32_t *)&objp->pm_prog))
 				return (FALSE);
-			}
-			if (!xdr_u_int(xdrs, (u_int *)&objp->pm_vers)) {
-				trace1(TR_xdr_pmap, 1);
+			if (!XDR_GETINT32(xdrs, (int32_t *)&objp->pm_vers))
 				return (FALSE);
-			}
-			if (!xdr_u_int(xdrs, (u_int *)&objp->pm_prot)) {
-				trace1(TR_xdr_pmap, 1);
+			if (!XDR_GETINT32(xdrs, (int32_t *)&objp->pm_prot))
 				return (FALSE);
-			}
-			if (!xdr_u_int(xdrs, (u_int *)&objp->pm_port)) {
-				trace1(TR_xdr_pmap, 1);
+			if (!XDR_GETINT32(xdrs, (int32_t *)&objp->pm_port))
 				return (FALSE);
-			}
-
 		} else {
 			objp->pm_prog = IXDR_GET_U_INT32(buf);
 			objp->pm_vers = IXDR_GET_U_INT32(buf);
 			objp->pm_prot = IXDR_GET_U_INT32(buf);
 			objp->pm_port = IXDR_GET_U_INT32(buf);
 		}
-		trace1(TR_xdr_pmap, 1);
+		return (TRUE);
+	case XDR_FREE:
 		return (TRUE);
 	}
-
-	if (xdr_u_int(xdrs, (u_int *)&objp->pm_prog) &&
-	    xdr_u_int(xdrs, (u_int *)&objp->pm_vers) &&
-	    xdr_u_int(xdrs, (u_int *)&objp->pm_prot)) {
-		dummy = xdr_u_int(xdrs, (u_int *)&objp->pm_port);
-		trace1(TR_xdr_pmap, 1);
-		return (dummy);
-	}
-	trace1(TR_xdr_pmap, 1);
 	return (FALSE);
 }
 
@@ -147,9 +116,7 @@ xdr_pmap(xdrs, objp)
  * serialize the pmap elements.
  */
 bool_t
-xdr_pmaplist_ptr(xdrs, rp)
-	register XDR *xdrs;
-	register pmaplist_ptr *rp;
+xdr_pmaplist_ptr(XDR *xdrs, pmaplist_ptr *rp)
 {
 	/*
 	 * more_elements is pre-computed in case the direction is
@@ -157,22 +124,16 @@ xdr_pmaplist_ptr(xdrs, rp)
 	 * xdr_bool when the direction is XDR_DECODE.
 	 */
 	bool_t more_elements;
-	register int freeing = (xdrs->x_op == XDR_FREE);
+	int freeing = (xdrs->x_op == XDR_FREE);
 	pmaplist_ptr next;
 	pmaplist_ptr next_copy;
 
-	trace1(TR_xdr_pmaplist_ptr, 0);
-	/*CONSTANTCONDITION*/
-	while (TRUE) {
+	for (;;) {
 		more_elements = (bool_t)(*rp != NULL);
-		if (! xdr_bool(xdrs, &more_elements)) {
-			trace1(TR_xdr_pmaplist_ptr, 1);
+		if (!xdr_bool(xdrs, &more_elements))
 			return (FALSE);
-		}
-		if (! more_elements) {
-			trace1(TR_xdr_pmaplist_ptr, 1);
+		if (!more_elements)
 			return (TRUE);  /* we are done */
-		}
 		/*
 		 * the unfortunate side effect of non-recursion is that in
 		 * the case of freeing we must remember the next object
@@ -180,11 +141,9 @@ xdr_pmaplist_ptr(xdrs, rp)
 		 */
 		if (freeing)
 			next = (*rp)->pml_next;
-		if (! xdr_reference(xdrs, (caddr_t *)rp,
-		    (u_int)sizeof (struct pmaplist), (xdrproc_t) xdr_pmap)) {
-			trace1(TR_xdr_pmaplist_ptr, 1);
+		if (!xdr_reference(xdrs, (caddr_t *)rp,
+		    (uint_t)sizeof (struct pmaplist), (xdrproc_t)xdr_pmap))
 			return (FALSE);
-		}
 		if (freeing) {
 			next_copy = next;
 			rp = &next_copy;
@@ -205,14 +164,9 @@ xdr_pmaplist_ptr(xdrs, rp)
  * functionality to xdr_pmaplist_ptr().
  */
 bool_t
-xdr_pmaplist(xdrs, rp)
-	register XDR *xdrs;
-	register PMAPLIST **rp;
+xdr_pmaplist(XDR *xdrs, PMAPLIST **rp)
 {
-	bool_t	dummy;
-
-	dummy = xdr_pmaplist_ptr(xdrs, (pmaplist_ptr *)rp);
-	return (dummy);
+	return (xdr_pmaplist_ptr(xdrs, (pmaplist_ptr *)rp));
 }
 
 
@@ -221,23 +175,17 @@ xdr_pmaplist(xdrs, rp)
  * written for XDR_ENCODE direction only
  */
 bool_t
-xdr_rmtcallargs(xdrs, cap)
-	register XDR *xdrs;
-	register struct p_rmtcallargs *cap;
+xdr_rmtcallargs(XDR *xdrs, struct p_rmtcallargs *cap)
 {
-	u_int lenposition, argposition, position;
-	register    rpc_inline_t *buf;
+	uint_t lenposition, argposition, position;
+	rpc_inline_t *buf;
 
-
-	trace1(TR_xdr_rmtcallargs, 0);
 	buf = XDR_INLINE(xdrs, 3 * BYTES_PER_XDR_UNIT);
 	if (buf == NULL) {
-		if (!xdr_u_int(xdrs, (u_int *)&(cap->prog)) ||
-		    !xdr_u_int(xdrs, (u_int *)&(cap->vers)) ||
-		    !xdr_u_int(xdrs, (u_int *)&(cap->proc))) {
-			trace1(TR_xdr_rmtcallargs, 1);
+		if (!xdr_u_int(xdrs, (uint_t *)&(cap->prog)) ||
+		    !xdr_u_int(xdrs, (uint_t *)&(cap->vers)) ||
+		    !xdr_u_int(xdrs, (uint_t *)&(cap->proc)))
 			return (FALSE);
-		}
 	} else {
 		IXDR_PUT_U_INT32(buf, cap->prog);
 		IXDR_PUT_U_INT32(buf, cap->vers);
@@ -248,27 +196,18 @@ xdr_rmtcallargs(xdrs, cap)
 	 * All the jugglery for just getting the size of the arguments
 	 */
 	lenposition = XDR_GETPOS(xdrs);
-	if (! xdr_u_int(xdrs, &(cap->args.args_len)))  {
-		trace1(TR_xdr_rmtcallargs, 1);
+	if (!xdr_u_int(xdrs, &(cap->args.args_len)))
 		return (FALSE);
-	}
 	argposition = XDR_GETPOS(xdrs);
-	if (! (*cap->xdr_args)(xdrs, cap->args.args_val)) {
-		trace1(TR_xdr_rmtcallargs, 1);
+	if (!(*cap->xdr_args)(xdrs, cap->args.args_val))
 		return (FALSE);
-	}
 	position = XDR_GETPOS(xdrs);
 	cap->args.args_len = position - argposition;
 	XDR_SETPOS(xdrs, lenposition);
-	if (! xdr_u_int(xdrs, &(cap->args.args_len))) {
-		trace1(TR_xdr_rmtcallargs, 1);
+	if (!xdr_u_int(xdrs, &(cap->args.args_len)))
 		return (FALSE);
-	}
 	XDR_SETPOS(xdrs, position);
-	trace1(TR_xdr_rmtcallargs, 1);
 	return (TRUE);
-
-
 }
 
 /*
@@ -276,20 +215,10 @@ xdr_rmtcallargs(xdrs, cap)
  * written for XDR_DECODE direction only
  */
 bool_t
-xdr_rmtcallres(xdrs, crp)
-	register XDR *xdrs;
-	register struct p_rmtcallres *crp;
+xdr_rmtcallres(XDR *xdrs, struct p_rmtcallres *crp)
 {
-	bool_t	dummy;
-
-	trace1(TR_xdr_rmtcallres, 0);
-	if (xdr_u_int(xdrs, (u_int *)&crp->port) &&
-	    xdr_u_int(xdrs, &crp->res.res_len)) {
-
-		dummy = (*(crp->xdr_res))(xdrs, crp->res.res_val);
-		trace1(TR_xdr_rmtcallres, 1);
-		return (dummy);
-	}
-	trace1(TR_xdr_rmtcallres, 1);
+	if (xdr_u_int(xdrs, (uint_t *)&crp->port) &&
+	    xdr_u_int(xdrs, &crp->res.res_len))
+		return ((*(crp->xdr_res))(xdrs, crp->res.res_val));
 	return (FALSE);
 }

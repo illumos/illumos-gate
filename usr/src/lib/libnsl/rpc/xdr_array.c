@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -40,7 +42,6 @@
  */
 
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <syslog.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,6 +53,7 @@
 #define	LASTUNSIGNED	((uint_t)0-1)
 
 char mem_err_msg_arr[] = "xdr_array: out of memory";
+
 /*
  * XDR an array of arbitrary elements
  * *addrp is a pointer to the array, *sizep is the number of elements.
@@ -60,27 +62,22 @@ char mem_err_msg_arr[] = "xdr_array: out of memory";
  * xdr procedure to call to handle each element of the array.
  */
 bool_t
-xdr_array(XDR *xdrs, caddr_t *addrp, uint_t *sizep, uint_t maxsize,
-	uint_t elsize, xdrproc_t elproc)
+xdr_array(XDR *xdrs, caddr_t *addrp, uint_t *sizep, const uint_t maxsize,
+	const uint_t elsize, const xdrproc_t elproc)
 {
-	register uint_t i;
-	register caddr_t target = *addrp;
-	register uint_t c;  /* the actual element count */
-	register bool_t stat = TRUE;
-	register uint_t nodesize;
+	uint_t i;
+	caddr_t target = *addrp;
+	uint_t c;  /* the actual element count */
+	bool_t stat = TRUE;
+	uint_t nodesize;
 
-	trace3(TR_xdr_array, 0, maxsize, elsize);
 	/* like strings, arrays are really counted arrays */
-	if (! xdr_u_int(xdrs, sizep)) {
-		trace1(TR_xdr_array, 1);
+	if (!xdr_u_int(xdrs, sizep))
 		return (FALSE);
-	}
 	c = *sizep;
 	if ((c > maxsize || LASTUNSIGNED / elsize < c) &&
-	    xdrs->x_op != XDR_FREE) {
-		trace1(TR_xdr_array, 1);
+	    xdrs->x_op != XDR_FREE)
 		return (FALSE);
-	}
 	nodesize = c * elsize;
 
 	/*
@@ -90,21 +87,17 @@ xdr_array(XDR *xdrs, caddr_t *addrp, uint_t *sizep, uint_t maxsize,
 	if (target == NULL)
 		switch (xdrs->x_op) {
 		case XDR_DECODE:
-			if (c == 0) {
-				trace1(TR_xdr_array, 1);
+			if (c == 0)
 				return (TRUE);
-			}
-			*addrp = target = (caddr_t)mem_alloc(nodesize);
+			*addrp = target = malloc(nodesize);
 			if (target == NULL) {
 				(void) syslog(LOG_ERR, mem_err_msg_arr);
-				trace1(TR_xdr_array, 1);
 				return (FALSE);
 			}
 			(void) memset(target, 0, nodesize);
 			break;
 
 		case XDR_FREE:
-			trace1(TR_xdr_array, 1);
 			return (TRUE);
 	}
 
@@ -120,10 +113,9 @@ xdr_array(XDR *xdrs, caddr_t *addrp, uint_t *sizep, uint_t maxsize,
 	 * the array may need freeing
 	 */
 	if (xdrs->x_op == XDR_FREE) {
-		mem_free(*addrp, nodesize);
+		free(*addrp);
 		*addrp = NULL;
 	}
-	trace1(TR_xdr_array, 1);
 	return (stat);
 }
 
@@ -138,21 +130,17 @@ xdr_array(XDR *xdrs, caddr_t *addrp, uint_t *sizep, uint_t maxsize,
  * > xdr_elem: routine to XDR each element
  */
 bool_t
-xdr_vector(XDR *xdrs, char *basep, uint_t nelem,
-	uint_t elemsize, xdrproc_t xdr_elem)
+xdr_vector(XDR *xdrs, char *basep, const uint_t nelem,
+	const uint_t elemsize, const xdrproc_t xdr_elem)
 {
-	register uint_t i;
-	register char *elptr;
+	uint_t i;
+	char *elptr;
 
-	trace3(TR_xdr_vector, 0, nelem, elemsize);
 	elptr = basep;
 	for (i = 0; i < nelem; i++) {
-		if (! (*xdr_elem)(xdrs, elptr, LASTUNSIGNED)) {
-			trace1(TR_xdr_vector, 1);
+		if (!(*xdr_elem)(xdrs, elptr, LASTUNSIGNED))
 			return (FALSE);
-		}
 		elptr += elemsize;
 	}
-	trace1(TR_xdr_vector, 1);
 	return (TRUE);
 }

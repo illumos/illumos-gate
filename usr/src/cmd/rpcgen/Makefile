@@ -19,10 +19,12 @@
 #
 # CDDL HEADER END
 #
+
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Copyright (c) 1989 by Sun Microsystems, Inc.
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/rpcgen/Makefile
 
@@ -36,6 +38,7 @@ SRCS= $(OBJS:%.o=%.c)
 include ../Makefile.cmd
 
 LDLIBS += 
+CFLAGS +=	-v
 
 .KEEP_STATE:
 

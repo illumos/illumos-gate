@@ -19,16 +19,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
 #include "mt.h"
-#include <rpc/trace.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -67,35 +66,27 @@ _tx_sndv(int fd, const struct t_iovec *tiov, unsigned int tiovcount,
 	int doputmsg = 0;
 	int32_t tsdu_limit;
 
-	trace5(TR_t_sndv, 0, fd, tiov, tiovcount, flags);
 	assert(api_semantics == TX_XTI_XNS5_API);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace5(TR_t_sndv, 1, fd, tiov, tiovcount, flags);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype == T_CLTS) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_sndv, 1, fd, tiov, tiovcount, flags);
 		return (-1);
 	}
 
 	if (tiovcount == 0 || tiovcount > T_IOV_MAX) {
 		t_errno = TBADDATA;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_sndv, 1, fd, tiov, tiovcount, flags);
 		return (-1);
 	}
 
-	if (! (tiptr->ti_state == T_DATAXFER ||
+	if (!(tiptr->ti_state == T_DATAXFER ||
 	    tiptr->ti_state == T_INREL)) {
 		t_errno = TOUTSTATE;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_sndv, 1, fd, tiov, tiovcount, flags);
 		return (-1);
 	}
 	/*
@@ -107,7 +98,6 @@ _tx_sndv(int fd, const struct t_iovec *tiov, unsigned int tiovcount,
 	if ((flags & ~(TX_ALL_VALID_FLAGS)) != 0) {
 		t_errno = TBADFLAG;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_sndv, 1, fd, tiov, tiovcount, flags);
 		return (-1);
 	}
 	if (flags & T_EXPEDITED)
@@ -128,7 +118,6 @@ _tx_sndv(int fd, const struct t_iovec *tiov, unsigned int tiovcount,
 	    (nbytes > (uint32_t)tsdu_limit)) {
 		t_errno = TBADDATA;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_sndv, 1, fd, tiov, tiovcount, flags);
 		return (-1);
 	}
 
@@ -140,14 +129,12 @@ _tx_sndv(int fd, const struct t_iovec *tiov, unsigned int tiovcount,
 	if (lookevent < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_sndv, 1, fd, tiov, tiovcount, flags);
 		errno = sv_errno;
 		return (-1);
 	}
 	if (lookevent == T_DISCONNECT) {
 		t_errno = TLOOK;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_sndv, 1, fd, tiov, tiovcount, flags);
 		return (-1);
 	}
 
@@ -155,7 +142,6 @@ _tx_sndv(int fd, const struct t_iovec *tiov, unsigned int tiovcount,
 	if (nbytes == 0 && !(tiptr->ti_prov_flag & (SENDZERO|OLD_SENDZERO))) {
 		t_errno = TBADDATA;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace5(TR_t_sndv, 1, fd, tiov, tiovcount, flags);
 		return (-1);
 	}
 
@@ -173,7 +159,7 @@ _tx_sndv(int fd, const struct t_iovec *tiov, unsigned int tiovcount,
 		band = TI_NORMAL; /* band 0 */
 		if (flags & T_EXPEDITED) {
 			datareq.PRIM_type = T_EXDATA_REQ;
-			if (! (tiptr->ti_prov_flag & EXPINLINE))
+			if (!(tiptr->ti_prov_flag & EXPINLINE))
 				band = TI_EXPEDITED; /* band > 0 */
 		} else
 			datareq.PRIM_type = T_DATA_REQ;
@@ -186,8 +172,6 @@ _tx_sndv(int fd, const struct t_iovec *tiov, unsigned int tiovcount,
 			if ((dataptr = malloc((size_t)nbytes)) == NULL) {
 				sv_errno = errno;
 				sig_mutex_unlock(&tiptr->ti_lock);
-				trace5(TR_t_sndv, 1, fd, tiov, tiovcount,
-				    flags);
 				errno = sv_errno;
 				t_errno = TSYSERR;
 				return (-1); /* error */
@@ -283,24 +267,19 @@ _tx_sndv(int fd, const struct t_iovec *tiov, unsigned int tiovcount,
 					t_errno = TSYSERR;
 				if (dataptr)
 					free(dataptr);
-				sv_errno = errno;
-				trace5(TR_t_sndv, 1, fd, tiov, tiovcount,
-				    flags);
-				errno = sv_errno;
 				return (-1); /* return error */
-			} else {
-				/*
-				 * Not the first putmsg/write
-				 * [ partial completion of t_snd() case.
-				 *
-				 * Error on putmsg/write attempt but
-				 * some data was transmitted so don't
-				 * return error. Don't attempt to
-				 * send more (break from loop) but
-				 * return OK.
-				 */
-				break;
 			}
+			/*
+			 * Not the first putmsg/write
+			 * [ partial completion of t_snd() case.
+			 *
+			 * Error on putmsg/write attempt but
+			 * some data was transmitted so don't
+			 * return error. Don't attempt to
+			 * send more (break from loop) but
+			 * return OK.
+			 */
+			break;
 		}
 		bytes_remaining = bytes_remaining - bytes_sent;
 	} while (bytes_remaining != 0);
@@ -308,8 +287,5 @@ _tx_sndv(int fd, const struct t_iovec *tiov, unsigned int tiovcount,
 	if (dataptr != NULL)
 		free(dataptr);
 	_T_TX_NEXTSTATE(T_SND, tiptr, "t_snd: invalid state event T_SND");
-	sv_errno = errno;
-	trace5(TR_t_sndv, 0, fd, tiov, tiovcount, flags);
-	errno = sv_errno;
 	return (nbytes - bytes_remaining);
 }

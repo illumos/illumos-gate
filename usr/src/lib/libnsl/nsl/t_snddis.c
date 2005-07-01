@@ -19,20 +19,18 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4.3.1 */
 
 #include "mt.h"
-#include <rpc/trace.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stropts.h>
@@ -55,19 +53,13 @@ _tx_snddis(int fd, const struct t_call *call, int api_semantics)
 	int sv_errno;
 	int retval;
 
-	trace2(TR_t_snddis, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_snddis, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype == T_CLTS) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_snddis, 1, fd);
 		return (-1);
 	}
 
@@ -78,14 +70,13 @@ _tx_snddis(int fd, const struct t_call *call, int api_semantics)
 		 * Note: This is documented in TLI man page but never
 		 * done.
 		 */
-		if (! (tiptr->ti_state == T_DATAXFER ||
+		if (!(tiptr->ti_state == T_DATAXFER ||
 		    tiptr->ti_state == T_OUTCON ||
 		    tiptr->ti_state == T_OUTREL ||
 		    tiptr->ti_state == T_INREL ||
 		    (tiptr->ti_state == T_INCON && tiptr->ti_ocnt > 0))) {
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_snddis, 1, fd);
 			return (-1);
 		}
 
@@ -107,7 +98,6 @@ _tx_snddis(int fd, const struct t_call *call, int api_semantics)
 			 */
 			t_errno = TBADDATA;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_snddis, 1, fd);
 			return (-1);
 		}
 	}
@@ -120,7 +110,6 @@ _tx_snddis(int fd, const struct t_call *call, int api_semantics)
 	    (call == NULL)) {
 		t_errno = TBADSEQ;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_snddis, 1, fd);
 		return (-1);
 	}
 
@@ -131,7 +120,6 @@ _tx_snddis(int fd, const struct t_call *call, int api_semantics)
 	if (_t_look_locked(fd, tiptr, 0, api_semantics) == T_DISCONNECT) {
 		t_errno = TLOOK;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_snddis, 1, fd);
 		return (-1);
 	}
 
@@ -145,7 +133,6 @@ _tx_snddis(int fd, const struct t_call *call, int api_semantics)
 		sv_errno = errno;
 		t_errno = TSYSERR;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_snddis, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -168,11 +155,7 @@ _tx_snddis(int fd, const struct t_call *call, int api_semantics)
 	 */
 	sig_mutex_unlock(&tiptr->ti_lock);
 	if (putmsg(fd, &ctlbuf, (databuf.len? &databuf: NULL), 0) < 0) {
-		sv_errno = errno;
-
 		t_errno = TSYSERR;
-		trace2(TR_t_snddis, 1, fd);
-		errno = sv_errno;
 		return (-1);
 	}
 	sig_mutex_lock(&tiptr->ti_lock);
@@ -180,7 +163,6 @@ _tx_snddis(int fd, const struct t_call *call, int api_semantics)
 	if (_t_is_ok(fd, tiptr, T_DISCON_REQ) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_snddis, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -204,6 +186,5 @@ _tx_snddis(int fd, const struct t_call *call, int api_semantics)
 	}
 
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_snddis, 1, fd);
 	return (0);
 }

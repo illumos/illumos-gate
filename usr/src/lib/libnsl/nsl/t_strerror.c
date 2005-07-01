@@ -19,16 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
 
-
-/*LINTLIBRARY*/
 #include "mt.h"
 #include <unistd.h>
 #include <stdio.h>
@@ -89,30 +87,27 @@ _tx_strerror(int errnum, int api_semantics)
 	if (_T_IS_XTI(api_semantics)) {
 		if (errnum <= _xti_nerr && errnum >= 0)
 			return (dgettext(__nsl_dom, _xti_errlist[errnum]));
-		else {
-			snprintf(buf, sizeof (buf), "%d: %s", errnum,
-				dgettext(__nsl_dom, "error unknown"));
-			return (buf);
-		}
-	} else {		/* TX_TLI_API */
-		/*
-		 * This code for TLI only. It uses "t_nerr" and "t_errlist"
-		 * which are exposed interfaces in the t_error() man page.
-		 * XTI uses different array to avoid binary compatibility
-		 * issues in using the exposed array. [ XTI t_error() does
-		 * not mention the error message list array ]
-		 *
-		 * For the moment we simply index into the t_errlist[] array.
-		 * When the array fills (we cannot allow it to expand in size
-		 * or binary compatibility will be broken), this code will need
-		 * modification.  See the comment in _errlst.c.
-		 */
-		if (errnum < t_nerr && errnum >= 0)
-			return (dgettext(__nsl_dom, t_errlist[errnum]));
-		else {
-			snprintf(buf, sizeof (buf), "%d: %s", errnum,
-				dgettext(__nsl_dom, "error unknown"));
-			return (buf);
-		}
+		(void) snprintf(buf, sizeof (buf), "%d: %s", errnum,
+			dgettext(__nsl_dom, "error unknown"));
+		return (buf);
 	}
+
+	/* TX_TLI_API */
+	/*
+	 * This code for TLI only. It uses "t_nerr" and "t_errlist"
+	 * which are exposed interfaces in the t_error() man page.
+	 * XTI uses different array to avoid binary compatibility
+	 * issues in using the exposed array. [ XTI t_error() does
+	 * not mention the error message list array ]
+	 *
+	 * For the moment we simply index into the t_errlist[] array.
+	 * When the array fills (we cannot allow it to expand in size
+	 * or binary compatibility will be broken), this code will need
+	 * modification.  See the comment in _errlst.c.
+	 */
+	if (errnum < t_nerr && errnum >= 0)
+		return (dgettext(__nsl_dom, t_errlist[errnum]));
+	(void) snprintf(buf, sizeof (buf), "%d: %s", errnum,
+			dgettext(__nsl_dom, "error unknown"));
+	return (buf);
 }

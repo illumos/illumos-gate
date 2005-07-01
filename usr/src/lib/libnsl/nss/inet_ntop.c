@@ -1,9 +1,10 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/* Copyright (c) 1996 by Internet Software Consortium.
+/*
+ * Copyright (c) 1996 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,6 +19,7 @@
  * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
  * SOFTWARE.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
@@ -31,10 +33,11 @@
 #include <sys/socket.h>
 #include <errno.h>
 
-static const char *inet_ntop4(const u_char *, char *, socklen_t);
-static const char *inet_ntop6(const u_char *, char *, socklen_t);
+static const char *inet_ntop4(const uchar_t *, char *, socklen_t);
+static const char *inet_ntop6(const uchar_t *, char *, socklen_t);
 
-/* char *
+/*
+ * char *
  * inet_ntop(af, src, dst, size)
  *	convert a network format address to presentation format.
  * return:
@@ -55,45 +58,48 @@ inet_ntop(int af, const void *src, char *dst, socklen_t size)
 	/* NOTREACHED */
 }
 
-/* const char *
+/*
+ * const char *
  * inet_ntop4(src, dst, size)
  *	format an IPv4 address, more or less like inet_ntoa()
  * return:
  *	`dst' (as a const)
  * notes:
  *	(1) uses no statics
- *	(2) takes a u_char* not an in_addr as input
+ *	(2) takes a uchar_t* not an in_addr as input
  */
 
 #ifdef SPRINTF_CHAR
-# define SPRINTF(x) strlen(sprintf/**/x)
+/* CSTYLED */
+#define	SPRINTF(x) strlen(sprintf/**/x)
 #else
-# define SPRINTF(x) ((size_t)sprintf x)
+#define	SPRINTF(x) ((size_t)sprintf x)
 #endif
 
 static const char *
-inet_ntop4(const u_char *src, char *dst, socklen_t size)
+inet_ntop4(const uchar_t *src, char *dst, socklen_t size)
 {
 	static const char fmt[] = "%u.%u.%u.%u";
-	char tmp[sizeof "255.255.255.255"];
+	char tmp[sizeof ("255.255.255.255")];
 
 	if (SPRINTF((tmp, fmt, src[0], src[1], src[2], src[3])) > size) {
 		errno = ENOSPC;
 		return (NULL);
 	}
-	strcpy(dst, tmp);
+	(void) strcpy(dst, tmp);
 	return (dst);
 }
 
-/* const char *
+/*
+ * const char *
  * inet_ntop6(src, dst, size)
  *	convert IPv6 binary address into presentation (printable) format
  */
-#define INADDRSZ	4
+#define	INADDRSZ	4
 #define	IN6ADDRSZ	16
-#define INT16SZ		2
+#define	INT16SZ		2
 static const char *
-inet_ntop6(const u_char *src, char *dst, socklen_t size)
+inet_ntop6(const uchar_t *src, char *dst, socklen_t size)
 {
 	/*
 	 * Note that int32_t and int16_t need only be "at least" large enough
@@ -102,9 +108,9 @@ inet_ntop6(const u_char *src, char *dst, socklen_t size)
 	 * Keep this in mind if you think this function should have been coded
 	 * to use pointer overlays.  All the world's not a VAX.
 	 */
-	char tmp[sizeof "ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255"], *tp;
+	char tmp[sizeof ("ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255")], *tp;
 	struct { int base, len; } best, cur;
-	u_int words[IN6ADDRSZ / INT16SZ];
+	uint_t words[IN6ADDRSZ / INT16SZ];
 	int i;
 
 	/*
@@ -112,7 +118,7 @@ inet_ntop6(const u_char *src, char *dst, socklen_t size)
 	 *	Copy the input (bytewise) array into a wordwise array.
 	 *	Find the longest run of 0x00's in src[] for :: shorthanding.
 	 */
-	memset(words, '\0', sizeof words);
+	(void) memset(words, '\0', sizeof (words));
 	for (i = 0; i < IN6ADDRSZ; i++)
 		words[i / 2] |= (src[i] << ((1 - (i % 2)) << 3));
 	best.base = -1;
@@ -156,7 +162,7 @@ inet_ntop6(const u_char *src, char *dst, socklen_t size)
 		/* Is this address an encapsulated IPv4? */
 		if (i == 6 && best.base == 0 &&
 		    (best.len == 6 || (best.len == 5 && words[5] == 0xffff))) {
-			if (!inet_ntop4(src+12, tp, sizeof tmp - (tp - tmp)))
+			if (!inet_ntop4(src+12, tp, sizeof (tmp) - (tp - tmp)))
 				return (NULL);
 			tp += strlen(tp);
 			break;
@@ -175,7 +181,6 @@ inet_ntop6(const u_char *src, char *dst, socklen_t size)
 		errno = ENOSPC;
 		return (NULL);
 	}
-	strcpy(dst, tmp);
+	(void) strcpy(dst, tmp);
 	return (dst);
 }
-

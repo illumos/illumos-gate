@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +40,6 @@
 #include <rpc/rpc.h>
 #include <rpc/key_prot.h>
 #include <rpc/des_crypt.h>
-#include <rpc/trace.h>
 #include <rpc/pmap_prot.h>
 #include <sys/ioctl.h>
 #include <netdir.h>
@@ -106,16 +106,6 @@ int _des_crypt(char *buf, unsigned len, struct desparams *desp);
 
 /* dial.c */
 void undial(int fd);
-
-/* dkbreak.c */
-
-/* dkdial.c */
-
-/* dkerr.c */
-
-/* dkminor.c */
-
-/* dtnamer.c */
 
 /* getargs.c */
 
@@ -822,9 +812,9 @@ in_addr_t inet_netof(struct in_addr in);
 /* key_call.c */
 int key_setsecret(const char *secretkey);
 int key_secretkey_is_set(void);
-int key_encryptsession_pk(char *remotename, netobj *remotekey,
+int key_encryptsession_pk(const char *remotename, netobj *remotekey,
 				des_block *deskey);
-int key_decryptsession_pk(char *remotename, netobj *remotekey,
+int key_decryptsession_pk(const char *remotename, netobj *remotekey,
 				des_block *deskey);
 
 int key_encryptsession(const char *remotename, des_block *deskey);
@@ -836,16 +826,16 @@ int key_call(ulong_t proc, xdrproc_t xdr_arg, char *arg, xdrproc_t xdr_rslt,
 				char *rslt);
 
 /* key_prot.c */
-bool_t xdr_keystatus(register XDR *xdrs, keystatus *objp);
-bool_t xdr_keybuf(register XDR *xdrs, keybuf objp);
-bool_t xdr_netnamestr(register XDR *xdrs, netnamestr *objp);
-bool_t xdr_cryptkeyarg(register XDR *xdrs, cryptkeyarg *objp);
-bool_t xdr_cryptkeyarg2(register XDR *xdrs, cryptkeyarg2 *objp);
-bool_t xdr_cryptkeyres(register XDR *xdrs, cryptkeyres *objp);
-bool_t xdr_unixcred(register XDR *xdrs, unixcred *objp);
-bool_t xdr_getcredres(register XDR *xdrs, getcredres *objp);
-bool_t xdr_key_netstarg(register XDR *xdrs, key_netstarg *objp);
-bool_t xdr_key_netstres(register XDR *xdrs, key_netstres *objp);
+bool_t xdr_keystatus(XDR *xdrs, keystatus *objp);
+bool_t xdr_keybuf(XDR *xdrs, keybuf objp);
+bool_t xdr_netnamestr(XDR *xdrs, netnamestr *objp);
+bool_t xdr_cryptkeyarg(XDR *xdrs, cryptkeyarg *objp);
+bool_t xdr_cryptkeyarg2(XDR *xdrs, cryptkeyarg2 *objp);
+bool_t xdr_cryptkeyres(XDR *xdrs, cryptkeyres *objp);
+bool_t xdr_unixcred(XDR *xdrs, unixcred *objp);
+bool_t xdr_getcredres(XDR *xdrs, getcredres *objp);
+bool_t xdr_key_netstarg(XDR *xdrs, key_netstarg *objp);
+bool_t xdr_key_netstres(XDR *xdrs, key_netstres *objp);
 
 /* mt_misc.c */
 #ifdef rpc_createerr
@@ -942,8 +932,6 @@ AUTH *authdes_create(char *servername, uint_t window,
 		struct sockaddr_in *syncaddr, des_block *ckey);
 
 /* rpc_td.c */
-
-/* rpc_trace.c */
 
 /* rpcb_clnt.c */
 bool_t __rpc_control(int request, void *info);

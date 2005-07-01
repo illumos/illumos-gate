@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 1994-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ _door_gethostbyname_r(const char *name, struct hostent *result, char *buffer,
 	int		adata;
 	struct	hostent *resptr = NULL;
 
-	if ((name == (const char *)NULL) ||
+	if ((name == NULL) ||
 	    (strlen(name) >= (sizeof (space) - sizeof (nsc_data_t)))) {
 		errno = ERANGE;
 		if (h_errnop)
@@ -71,7 +71,7 @@ _door_gethostbyname_r(const char *name, struct hostent *result, char *buffer,
 	adata = (sizeof (nsc_call_t) + strlen(name) + 1);
 	ndata = sizeof (space);
 	space.s_d.nsc_call.nsc_callnumber = GETHOSTBYNAME;
-	strcpy(space.s_d.nsc_call.nsc_u.name, name);
+	(void) strcpy(space.s_d.nsc_call.nsc_u.name, name);
 	sptr = &space.s_d;
 
 	switch (_nsc_trydoorcall(&sptr, &ndata, &adata)) {
@@ -116,7 +116,7 @@ _door_gethostbyaddr_r(const char *addr, int length, int type,
 	int		adata;
 	struct	hostent *resptr = NULL;
 
-	if (addr == (const char *)NULL) {
+	if (addr == NULL) {
 		if (h_errnop)
 			*h_errnop = HOST_NOT_FOUND;
 		return (NULL);
@@ -129,7 +129,7 @@ _door_gethostbyaddr_r(const char *addr, int length, int type,
 	space.s_d.nsc_call.nsc_callnumber = GETHOSTBYADDR;
 	space.s_d.nsc_call.nsc_u.addr.a_type = type;
 	space.s_d.nsc_call.nsc_u.addr.a_length = length;
-	memcpy(space.s_d.nsc_call.nsc_u.addr.a_data, addr, length);
+	(void) memcpy(space.s_d.nsc_call.nsc_u.addr.a_data, addr, length);
 
 	switch (_nsc_trydoorcall(&sptr, &ndata, &adata)) {
 	    case SUCCESS:	/* positive cache hit */
@@ -183,7 +183,8 @@ process_gethost(struct hostent *result, char *buffer, int buflen,
 		return (NULL);
 	}
 
-	memcpy(buffer, sptr->nsc_ret.nsc_u.buff + sizeof (struct hostent),
+	(void) memcpy(buffer,
+	    sptr->nsc_ret.nsc_u.buff + sizeof (struct hostent),
 	    sptr->nsc_ret.nsc_bufferbytesused - sizeof (struct hostent));
 
 	sptr->nsc_ret.nsc_u.hst.h_name += (int)buffer;
@@ -274,7 +275,7 @@ process_gethost(struct hostent *result, char *buffer, int buflen,
 	/* fill out h_name */
 
 	start = sptr->nsc_ret.nsc_u.buff + sizeof (struct hostent32);
-	strcpy(dest, sptr->nsc_ret.nsc_u.hst.h_name + start);
+	(void) strcpy(dest, sptr->nsc_ret.nsc_u.hst.h_name + start);
 	strs = 1 + strlen(sptr->nsc_ret.nsc_u.hst.h_name + start);
 	result->h_name = dest;
 	dest += strs;
@@ -284,7 +285,7 @@ process_gethost(struct hostent *result, char *buffer, int buflen,
 	 */
 	for (i = 0; i < numaliases; i++) {
 		alias = (int *)(start + sptr->nsc_ret.nsc_u.hst.h_aliases);
-		strcpy(dest, start + alias[i]);
+		(void) strcpy(dest, start + alias[i]);
 		strs = 1 + strlen(start + alias[i]);
 		aliaseslist[i] = dest;
 		dest += strs;
@@ -301,7 +302,7 @@ process_gethost(struct hostent *result, char *buffer, int buflen,
 
 	for (i = 0; i < numaddrs; i++) {
 		address = (int *)(start + sptr->nsc_ret.nsc_u.hst.h_addr_list);
-		memcpy(dest, start + address[i],
+		(void) memcpy(dest, start + address[i],
 		    sptr->nsc_ret.nsc_u.hst.h_length);
 		strs = sptr->nsc_ret.nsc_u.hst.h_length;
 		addrlist[i] = dest;

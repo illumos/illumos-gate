@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@ int t_nerr = 19;
  * transport interface error list
  */
 
-const char *t_errlist[] = {
+char *t_errlist[] = {
 	"No Error",					/*  0 */
 	"Incorrect address format",			/*  1 */
 	"Incorrect options format",			/*  2 */
@@ -127,7 +127,7 @@ const char *t_errlist[] = {
 
 
 int *
-__t_errno()
+__t_errno(void)
 {
 	static pthread_key_t t_errno_key = 0;
 	int *ret;

@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
 
@@ -37,7 +36,6 @@
  * are applicable to the other file.
  */
 #include "mt.h"
-#include <rpc/trace.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <stropts.h>
@@ -59,19 +57,13 @@ _tx_sndudata(int fd, const struct t_unitdata *unitdata, int api_semantics)
 	int sv_errno;
 	int didalloc;
 
-	trace2(TR_t_sndudata, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_sndudata, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype != T_CLTS) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndudata, 1, fd);
 		return (-1);
 	}
 
@@ -83,7 +75,6 @@ _tx_sndudata(int fd, const struct t_unitdata *unitdata, int api_semantics)
 		if (tiptr->ti_state != T_IDLE) {
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_sndudata, 1, fd);
 			return (-1);
 		}
 	}
@@ -92,7 +83,6 @@ _tx_sndudata(int fd, const struct t_unitdata *unitdata, int api_semantics)
 	    !(tiptr->ti_prov_flag & (SENDZERO|OLD_SENDZERO))) {
 		t_errno = TBADDATA;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndudata, 1, fd);
 		return (-1);
 	}
 
@@ -105,7 +95,6 @@ _tx_sndudata(int fd, const struct t_unitdata *unitdata, int api_semantics)
 			t_errno = TBADDATA;
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndudata, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -117,11 +106,11 @@ _tx_sndudata(int fd, const struct t_unitdata *unitdata, int api_semantics)
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndudata, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
 
+	/* LINTED pointer cast */
 	udreq = (struct T_unitdata_req *)ctlbuf.buf;
 
 	udreq->PRIM_type = T_UNITDATA_REQ;
@@ -196,7 +185,6 @@ _tx_sndudata(int fd, const struct t_unitdata *unitdata, int api_semantics)
 	else
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_sndudata, 1, fd);
 	return (0);
 err_out:
 	sv_errno = errno;
@@ -205,7 +193,6 @@ err_out:
 	else
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_sndudata, 1, fd);
 	errno = sv_errno;
 	return (-1);
 }

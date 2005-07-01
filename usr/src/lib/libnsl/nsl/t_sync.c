@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,6 @@
 
 #include "mt.h"
 #include <errno.h>
-#include <rpc/trace.h>
 #include <xti.h>
 #include <stropts.h>
 #include <sys/timod.h>
@@ -42,10 +41,8 @@ int
 _tx_sync(int fd, int api_semantics)
 {
 	struct _ti_user *tiptr;
-	int sv_errno;
 	int force_sync = 0;
 
-	trace2(TR_t_sync, 0, fd);
 	/*
 	 * In case of fork/exec'd servers, _t_checkfd() has all
 	 * the code to synchronize the tli data structures.
@@ -58,12 +55,7 @@ _tx_sync(int fd, int api_semantics)
 	if (_T_IS_XTI(api_semantics))
 		force_sync = 1;
 
-	if ((tiptr = _t_checkfd(fd, force_sync, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_sync, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, force_sync, api_semantics)) == NULL)
 		return (-1);
-	}
-	trace2(TR_t_sync, 1, fd);
 	return (tiptr->ti_state);
 }

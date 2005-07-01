@@ -19,21 +19,19 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5.2.1 */
 
 #include "mt.h"
 #include <stdlib.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stropts.h>
@@ -65,19 +63,10 @@ _tx_accept(
 	int didalloc;
 	t_scalar_t conn_res_prim;
 
-	trace3(TR_t_accept, 0, fd, resfd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace3(TR_t_accept, 1, fd, resfd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
-	if ((restiptr = _t_checkfd(resfd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace3(TR_t_accept, 1, fd, resfd);
-		errno = sv_errno;
+	if ((restiptr = _t_checkfd(resfd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 
 	/*
 	 * We need to block signals to perform the I_FDINSERT operation
@@ -92,7 +81,6 @@ _tx_accept(
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
 		(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-		trace3(TR_t_accept, 1, fd, resfd);
 		return (-1);
 	}
 
@@ -112,12 +100,11 @@ _tx_accept(
 		if ((fd == resfd && tiptr->ti_state != T_INCON) ||
 		    (fd != resfd &&
 			((tiptr->ti_state != T_INCON) ||
-		    ! (restiptr->ti_state == T_IDLE ||
+		    !(restiptr->ti_state == T_IDLE ||
 			restiptr->ti_state == T_UNBND)))) {
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
 			(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-			trace3(TR_t_accept, 1, fd, resfd);
 			return (-1);
 		}
 
@@ -133,7 +120,6 @@ _tx_accept(
 			t_errno = TRESQLEN;
 			sig_mutex_unlock(&tiptr->ti_lock);
 			(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-			trace3(TR_t_accept, 1, fd, resfd);
 			return (-1);
 		}
 
@@ -141,7 +127,6 @@ _tx_accept(
 			t_errno = TINDOUT;
 			sig_mutex_unlock(&tiptr->ti_lock);
 			(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-			trace3(TR_t_accept, 1, fd, resfd);
 			return (-1);
 		}
 
@@ -168,7 +153,6 @@ _tx_accept(
 			t_errno = TSYSERR;
 			sig_mutex_unlock(&tiptr->ti_lock);
 			(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-			trace3(TR_t_accept, 1, fd, resfd);
 			errno = sv_errno;
 			return (-1);
 		}
@@ -176,7 +160,6 @@ _tx_accept(
 			t_errno = TBADF;
 			sig_mutex_unlock(&tiptr->ti_lock);
 			(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-			trace3(TR_t_accept, 1, fd, resfd);
 			return (-1);
 		}
 	}
@@ -189,7 +172,6 @@ _tx_accept(
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
 		(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-		trace3(TR_t_accept, 1, fd, resfd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -203,6 +185,7 @@ _tx_accept(
 			goto err_out;
 	}
 
+	/* LINTED pointer cast */
 	cres = (struct T_conn_res *)ctlbuf.buf;
 	cres->OPT_length = call->opt.len;
 	cres->OPT_offset = 0;
@@ -359,7 +342,6 @@ _tx_accept(
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-	trace3(TR_t_accept, 1, fd, resfd);
 	return (0);
 	/* NOTREACHED */
 err_out:
@@ -370,7 +352,6 @@ err_out:
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-	trace3(TR_t_accept, 1, fd, resfd);
 	errno = sv_errno;
 	return (-1);
 }

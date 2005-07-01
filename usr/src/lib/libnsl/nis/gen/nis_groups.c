@@ -19,12 +19,9 @@
  *
  * CDDL HEADER END
  */
-/*
- *	nis_groups.c
- */
 
 /*
- * Copyright 1988-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,24 +97,24 @@ get_g_cache(void)
 	if ((gc = groups_cache) != 0) {
 		return (gc);
 	}
-	rw_unlock(&g_cache_lock);
+	(void) rw_unlock(&g_cache_lock);
 
 	/* write lock the cache and try again */
-	rw_wrlock(&g_cache_lock);
+	(void) rw_wrlock(&g_cache_lock);
 	if ((gc = groups_cache) != 0) {
-		rw_unlock(&g_cache_lock);
-		rw_rdlock(&g_cache_lock);
+		(void) rw_unlock(&g_cache_lock);
+		(void) rw_rdlock(&g_cache_lock);
 		return (gc);
 	}
 
-	gc = groups_cache = (g_cache_ptr) calloc(1, sizeof (*groups_cache));
+	gc = groups_cache = calloc(1, sizeof (*groups_cache));
 	if (groups_cache == 0) {
-		rw_unlock(&g_cache_lock);
-		rw_rdlock(&g_cache_lock);
+		(void) rw_unlock(&g_cache_lock);
+		(void) rw_rdlock(&g_cache_lock);
 		return (0);
 	}
-	rw_unlock(&g_cache_lock);
-	rw_rdlock(&g_cache_lock);
+	(void) rw_unlock(&g_cache_lock);
+	(void) rw_rdlock(&g_cache_lock);
 	return (gc);
 }
 
@@ -127,21 +124,19 @@ int
 __nis_group_cache_stats(int *grpcachecall, int *grpcachehits,
     int *grpcachemisses)
 {
-	rw_rdlock(&g_cache_lock);
+	(void) rw_rdlock(&g_cache_lock);
 	if (groups_cache == 0) {
 		*grpcachecall = 0;
 		*grpcachehits = 0;
 		*grpcachemisses = 0;
-		rw_unlock(&g_cache_lock);
+		(void) rw_unlock(&g_cache_lock);
 		return (0);
-	} else {
-		*grpcachecall = groups_cache->ncalls;
-		*grpcachehits = groups_cache->nhits;
-		*grpcachemisses = groups_cache->nmisses;
-		rw_unlock(&g_cache_lock);
-		return (1);
 	}
-	/* NOTREACHED */
+	*grpcachecall = groups_cache->ncalls;
+	*grpcachehits = groups_cache->nhits;
+	*grpcachemisses = groups_cache->nmisses;
+	(void) rw_unlock(&g_cache_lock);
+	return (1);
 }
 
 /*
@@ -186,14 +181,14 @@ insert_explicit(g_varieties *varp, nis_name princp)
 	NIS_HASH_ITEM	*it;
 
 	if (varp->explicit == 0) {
-		if (0 == (varp->explicit = (NIS_HASH_TABLE *)
+		if (0 == (varp->explicit =
 		    calloc(1, sizeof (NIS_HASH_TABLE)))) {
 			return (FALSE);
 		}
 	}
 	/* Don't use nis_insert_name() because we don't need the strdup(), */
 	/*   so do the same sort of thing ourselves			   */
-	if (0 == (it = (NIS_HASH_ITEM *)malloc(sizeof (NIS_HASH_ITEM)))) {
+	if ((it = malloc(sizeof (NIS_HASH_ITEM))) == NULL) {
 		/* Memory is tight;  can we free some that we don't need? */
 		if (varp->explicit->first == 0) {
 			/* Yup, no entries in the hash-table, so free it */
@@ -260,7 +255,7 @@ push_namelist(struct cons **nlp, char *name)
 
 	/* Don't bother looking for duplicates.  They were quite likely */
 	/* with the old group semantics but would be pretty weird now.	*/
-	if (0 == (it = (struct cons *)malloc(sizeof (*it)))) {
+	if ((it = malloc(sizeof (*it))) == NULL) {
 		return (FALSE);
 	}
 	it->nom = name;
@@ -496,7 +491,7 @@ transform_group(
 	int		i;
 	nis_name	*ml;
 
-	ge = (g_entry *)calloc(1, sizeof (*ge));
+	ge = calloc(1, sizeof (*ge));
 	if (ge == 0) {
 		syslog(LOG_WARNING, "nislib:transform_group() out of memory");
 		*stat = NIS_NOMEMORY;
@@ -579,26 +574,26 @@ cached_group_entry(
 		/* Expire the group if necessary */
 		(void) gettimeofday(&tv, (struct timezone *)0);
 		if (ge->tte < tv.tv_sec) {
-			rw_unlock(&g_cache_lock);
-			rw_wrlock(&g_cache_lock);
+			(void) rw_unlock(&g_cache_lock);
+			(void) rw_wrlock(&g_cache_lock);
 			remove_g_entry(gc, group);
 			ge = 0;
 		}
 	}
 
 	if (ge != 0) {
-		rw_unlock(&g_cache_lock);
-		rw_wrlock(&g_cache_lock);
+		(void) rw_unlock(&g_cache_lock);
+		(void) rw_wrlock(&g_cache_lock);
 		gc->nhits++;
 		gc->ncalls++;
-		rw_unlock(&g_cache_lock);
-		rw_rdlock(&g_cache_lock);
+		(void) rw_unlock(&g_cache_lock);
+		(void) rw_rdlock(&g_cache_lock);
 		return (ge);
 	}
-	rw_unlock(&g_cache_lock);
+	(void) rw_unlock(&g_cache_lock);
 
 	/* write lock the cache and try again */
-	rw_wrlock(&g_cache_lock);
+	(void) rw_wrlock(&g_cache_lock);
 	ge = lookup_g_entry(gc, group);
 
 	if (ge != 0 && !visited(ge)) {
@@ -614,8 +609,8 @@ cached_group_entry(
 	if (ge != 0) {
 		gc->nhits++;
 		gc->ncalls++;
-		rw_unlock(&g_cache_lock);
-		rw_rdlock(&g_cache_lock);
+		(void) rw_unlock(&g_cache_lock);
+		(void) rw_rdlock(&g_cache_lock);
 		return (ge);
 	} else {
 		nis_object	*obj;
@@ -624,29 +619,29 @@ cached_group_entry(
 		obj = get_group(group, refname, lookup, stat);
 		if (obj == 0) {
 			gc->ncalls++;
-			rw_unlock(&g_cache_lock);
-			rw_rdlock(&g_cache_lock);
+			(void) rw_unlock(&g_cache_lock);
+			(void) rw_rdlock(&g_cache_lock);
 			return (0); /* Couldn't read it */
 		}
 		ge = transform_group(group, obj, stat);
 		if (ge == 0) {
 			gc->ncalls++;
-			rw_unlock(&g_cache_lock);
+			(void) rw_unlock(&g_cache_lock);
 			nis_destroy_object(obj);
-			rw_rdlock(&g_cache_lock);
+			(void) rw_rdlock(&g_cache_lock);
 			return (0);
 		}
 		if (insert_g_entry(gc, ge) == 0) {
 			gc->ncalls++;
-			rw_unlock(&g_cache_lock);
+			(void) rw_unlock(&g_cache_lock);
 			free_g_entry(ge);
-			rw_rdlock(&g_cache_lock);
+			(void) rw_rdlock(&g_cache_lock);
 			*stat = NIS_NOMEMORY;
 			return (0);
 		}
 		gc->ncalls++;
-		rw_unlock(&g_cache_lock);
-		rw_rdlock(&g_cache_lock);
+		(void) rw_unlock(&g_cache_lock);
+		(void) rw_rdlock(&g_cache_lock);
 		return (ge);
 	}
 	/* NOTREACHED */
@@ -676,7 +671,7 @@ mark_visit(g_entry *ge)
 }
 
 static void
-unmark_fatal()
+unmark_fatal(void)
 {
 	(void) printf("unmark: fatal error\n");
 	abort();
@@ -817,10 +812,10 @@ nis_ismember(
 	bool_t	ret;
 	nis_error x;
 
-	rw_rdlock(&g_cache_lock);
+	(void) rw_rdlock(&g_cache_lock);
 	/* Err on the side of security:  in case of doubt, return FALSE */
 	ret = (do_ismember_2(princp, group, 0, nis_lookup, &x) == ISMEM_YES);
-	rw_unlock(&g_cache_lock);
+	(void) rw_unlock(&g_cache_lock);
 	return (ret);
 }
 
@@ -840,10 +835,10 @@ __do_ismember(
 	nis_error stat;
 	enum ismem isit;
 
-	rw_rdlock(&g_cache_lock);
+	(void) rw_rdlock(&g_cache_lock);
 	/* Err on the side of security:  in case of doubt, return FALSE */
 	isit = do_ismember_2(princp, obj->zo_group, 0, lookup, &stat);
-	rw_unlock(&g_cache_lock);
+	(void) rw_unlock(&g_cache_lock);
 	if (isit == ISMEM_DUNNO) {
 		if (stat != NIS_SUCCESS) {
 			syslog(LOG_ERR,
@@ -862,18 +857,18 @@ nis_print_group_entry(
 	g_entry		*ge;
 	nis_error	stat;
 
-	rw_rdlock(&g_cache_lock);
+	(void) rw_rdlock(&g_cache_lock);
 	ge = cached_group_entry(group, (nis_name)0, nis_lookup, &stat);
 	if (ge == 0) {
 		(void) printf("Could not find group \"%s\".\n", group);
-		rw_unlock(&g_cache_lock);
+		(void) rw_unlock(&g_cache_lock);
 		return;
 	}
 
 	(void) printf("Group entry for \"%s\" group:\n", ge->hdata.name);
 	printf_varieties(&ge->include, "");
 	printf_varieties(&ge->exclude, "non");
-	rw_unlock(&g_cache_lock);
+	(void) rw_unlock(&g_cache_lock);
 }
 
 
@@ -885,11 +880,11 @@ nis_print_group_entry(
 void
 nis_flushgroups(void)
 {
-	rw_wrlock(&g_cache_lock);
+	(void) rw_wrlock(&g_cache_lock);
 	if (groups_cache != 0) {
 		delete_g_entry(groups_cache);
 	}
-	rw_unlock(&g_cache_lock);
+	(void) rw_unlock(&g_cache_lock);
 	/* Else there's no cache, so no flushing to do */
 }
 
@@ -905,11 +900,11 @@ nis_flushgroups(void)
 void
 __nis_flush_one_group(nis_name groupname) /* === new kinda public interface */
 {
-	rw_wrlock(&g_cache_lock);
+	(void) rw_wrlock(&g_cache_lock);
 	if (groups_cache != 0) {
 		remove_g_entry(groups_cache, groupname);
 	}
-	rw_unlock(&g_cache_lock);
+	(void) rw_unlock(&g_cache_lock);
 	/* Else there's no cache, so no flushing to do */
 }
 
@@ -928,7 +923,7 @@ __nis_flush_group_exp_name(nis_name groupname)
 		char tname[NIS_MAXNAMELEN];
 		char buf[NIS_MAXNAMELEN];
 
-		(void) sprintf(tname, "%s.%s",
+		(void) snprintf(tname, sizeof (tname), "%s.%s",
 			nis_leaf_of_r(groupname, buf, NIS_MAXNAMELEN),
 			nis_domain_of(domainname));
 		__nis_flush_one_group(tname);
@@ -1088,7 +1083,7 @@ nis_addmember(
 	ngrp = *obj; /* copy the object */
 	ngrp.GR_data.gr_members.gr_members_val =
 	    malloc((nm+1) * sizeof (nis_name));
-	if (! ngrp.GR_data.gr_members.gr_members_val) {
+	if (!ngrp.GR_data.gr_members.gr_members_val) {
 		syslog(LOG_ERR, "nis_addmember: Out of memory");
 		nis_destroy_object(obj);
 		return (NIS_NOMEMORY);
@@ -1098,7 +1093,8 @@ nis_addmember(
 	}
 	ngrp.GR_data.gr_members.gr_members_val[nm] = princp;
 	ngrp.GR_data.gr_members.gr_members_len = nm+1;
-	(void) sprintf(name, "%s.%s", obj->zo_name, obj->zo_domain);
+	(void) snprintf(name, sizeof (name),
+					"%s.%s", obj->zo_name, obj->zo_domain);
 	/* XXX overwrite problem if multiple writers ? */
 	res = nis_modify(name, &ngrp);
 	free(ngrp.GR_data.gr_members.gr_members_val);
@@ -1144,7 +1140,7 @@ nis_removemember(
 
 	ngrp = *obj; /* copy the object */
 	ngrp.GR_data.gr_members.gr_members_val = malloc(nm * sizeof (nis_name));
-	if (! ngrp.GR_data.gr_members.gr_members_val) {
+	if (!ngrp.GR_data.gr_members.gr_members_val) {
 		syslog(LOG_ERR, "nis_addmember: Out of memory");
 		nis_destroy_object(obj);
 		return (NIS_NOMEMORY);
@@ -1164,7 +1160,8 @@ nis_removemember(
 		}
 	}
 	ngrp.GR_data.gr_members.gr_members_len = x;
-	(void) sprintf(name, "%s.%s", obj->zo_name, obj->zo_domain);
+	(void) snprintf(name, sizeof (name),
+					"%s.%s", obj->zo_name, obj->zo_domain);
 	res = nis_modify(name, &ngrp);
 	free(ngrp.GR_data.gr_members.gr_members_val);
 	result = res->status;

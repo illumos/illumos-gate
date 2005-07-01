@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -42,8 +44,8 @@
  */
 #include "mt.h"
 #include "rpc_mt.h"
+#include <stdlib.h>
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <rpc/raw.h>
 #include <syslog.h>
 
@@ -66,8 +68,6 @@ static struct clnt_raw_private {
 
 static struct clnt_ops *clnt_raw_ops();
 
-extern char	*calloc();
-extern void	free();
 extern void svc_getreq_common(int);
 extern bool_t xdr_opaque_auth();
 
@@ -75,7 +75,7 @@ extern bool_t xdr_opaque_auth();
  * Create a client handle for memory based rpc.
  */
 CLIENT *
-clnt_raw_create(rpcprog_t prog, rpcvers_t vers)
+clnt_raw_create(const rpcprog_t prog, const rpcvers_t vers)
 {
 	struct clnt_raw_private *clp;
 	struct rpc_msg call_msg;
@@ -84,27 +84,23 @@ clnt_raw_create(rpcprog_t prog, rpcvers_t vers)
 
 /* VARIABLES PROTECTED BY clntraw_lock: clp */
 
-	trace3(TR_clnt_raw_create, 0, prog, vers);
-	mutex_lock(&clntraw_lock);
+	(void) mutex_lock(&clntraw_lock);
 	clp = clnt_raw_private;
 	if (clp == NULL) {
-/* LINTED pointer alignment */
-		clp = (struct clnt_raw_private *)calloc(1, sizeof (*clp));
+		clp = calloc(1, sizeof (*clp));
 		if (clp == NULL) {
-			mutex_unlock(&clntraw_lock);
-			trace3(TR_clnt_raw_create, 1, prog, vers);
-			return ((CLIENT *)NULL);
+			(void) mutex_unlock(&clntraw_lock);
+			return (NULL);
 		}
 		if (_rawcombuf == NULL) {
-			_rawcombuf = (char *)calloc(UDPMSGSIZE, sizeof (char));
+			_rawcombuf = calloc(UDPMSGSIZE, sizeof (char));
 			if (_rawcombuf == NULL) {
 				syslog(LOG_ERR, "clnt_raw_create: "
 					"out of memory.");
 				if (clp)
 					free(clp);
-				mutex_unlock(&clntraw_lock);
-				trace3(TR_clnt_raw_create, 1, prog, vers);
-				return ((CLIENT *)NULL);
+				(void) mutex_unlock(&clntraw_lock);
+				return (NULL);
 			}
 		}
 		clp->raw_buf = _rawcombuf; /* Share it with the server */
@@ -121,7 +117,7 @@ clnt_raw_create(rpcprog_t prog, rpcvers_t vers)
 	call_msg.rm_call.cb_prog = prog;
 	call_msg.rm_call.cb_vers = vers;
 	xdrmem_create(xdrs, clp->mashl_callmsg, MCALL_MSG_SIZE, XDR_ENCODE);
-	if (! xdr_callhdr(xdrs, &call_msg))
+	if (!xdr_callhdr(xdrs, &call_msg))
 		(void) syslog(LOG_ERR,
 			(const char *) "clnt_raw_create :  \
 			Fatal header serialization error.");
@@ -139,8 +135,7 @@ clnt_raw_create(rpcprog_t prog, rpcvers_t vers)
 	 */
 	client->cl_ops = clnt_raw_ops();
 	client->cl_auth = authnone_create();
-	mutex_unlock(&clntraw_lock);
-	trace3(TR_clnt_raw_create, 1, prog, vers);
+	(void) mutex_unlock(&clntraw_lock);
 	return (client);
 }
 
@@ -155,16 +150,14 @@ clnt_raw_call(CLIENT *h, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp,
 	enum clnt_stat status;
 	struct rpc_err error;
 
-	trace3(TR_clnt_raw_call, 0, h, proc);
-	mutex_lock(&clntraw_lock);
+	(void) mutex_lock(&clntraw_lock);
 	clp = clnt_raw_private;
 	xdrs = &clp->xdr_stream;
 	if (clp == NULL) {
-		mutex_unlock(&clntraw_lock);
-		trace3(TR_clnt_raw_call, 1, h, proc);
+		(void) mutex_unlock(&clntraw_lock);
 		return (RPC_FAILED);
 	}
-	mutex_unlock(&clntraw_lock);
+	(void) mutex_unlock(&clntraw_lock);
 
 call_again:
 	/*
@@ -174,13 +167,11 @@ call_again:
 	XDR_SETPOS(xdrs, 0);
 /* LINTED pointer alignment */
 	((struct rpc_msg *)clp->mashl_callmsg)->rm_xid++;
-	if ((! XDR_PUTBYTES(xdrs, clp->mashl_callmsg, clp->mcnt)) ||
-	    (! XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
-	    (! AUTH_MARSHALL(h->cl_auth, xdrs)) ||
-	    (! (*xargs)(xdrs, argsp))) {
-		trace3(TR_clnt_raw_call, 1, h, proc);
+	if ((!XDR_PUTBYTES(xdrs, clp->mashl_callmsg, clp->mcnt)) ||
+	    (!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
+	    (!AUTH_MARSHALL(h->cl_auth, xdrs)) ||
+	    (!(*xargs)(xdrs, argsp)))
 		return (RPC_CANTENCODEARGS);
-	}
 	(void) XDR_GETPOS(xdrs);  /* called just to cause overhead */
 
 	/*
@@ -198,10 +189,8 @@ call_again:
 	msg.acpted_rply.ar_verf = _null_auth;
 	msg.acpted_rply.ar_results.where = resultsp;
 	msg.acpted_rply.ar_results.proc = xresults;
-	if (! xdr_replymsg(xdrs, &msg)) {
-		trace3(TR_clnt_raw_call, 1, h, proc);
+	if (!xdr_replymsg(xdrs, &msg))
 		return (RPC_CANTDECODERES);
-	}
 	if ((msg.rm_reply.rp_stat == MSG_ACCEPTED) &&
 		    (msg.acpted_rply.ar_stat == SUCCESS))
 		status = RPC_SUCCESS;
@@ -211,7 +200,7 @@ call_again:
 	}
 
 	if (status == RPC_SUCCESS) {
-		if (! AUTH_VALIDATE(h->cl_auth, &msg.acpted_rply.ar_verf)) {
+		if (!AUTH_VALIDATE(h->cl_auth, &msg.acpted_rply.ar_verf)) {
 			status = RPC_AUTHERROR;
 		}
 		/* end successful completion */
@@ -222,7 +211,7 @@ call_again:
 	}
 
 	if (status == RPC_SUCCESS) {
-		if (! AUTH_VALIDATE(h->cl_auth, &msg.acpted_rply.ar_verf)) {
+		if (!AUTH_VALIDATE(h->cl_auth, &msg.acpted_rply.ar_verf)) {
 			status = RPC_AUTHERROR;
 		}
 		if (msg.acpted_rply.ar_verf.oa_base != NULL) {
@@ -231,7 +220,6 @@ call_again:
 					&(msg.acpted_rply.ar_verf));
 		}
 	}
-	trace3(TR_clnt_raw_call, 1, h, proc);
 	return (status);
 }
 
@@ -242,17 +230,14 @@ clnt_raw_send(CLIENT *h, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp)
 	struct clnt_raw_private *clp;
 	XDR *xdrs;
 
-	trace3(TR_clnt_raw_send, 0, h, proc);
-
-	mutex_lock(&clntraw_lock);
+	(void) mutex_lock(&clntraw_lock);
 	clp = clnt_raw_private;
 	xdrs = &clp->xdr_stream;
 	if (clp == NULL) {
-		mutex_unlock(&clntraw_lock);
-		trace3(TR_clnt_raw_send, 1, h, proc);
+		(void) mutex_unlock(&clntraw_lock);
 		return (RPC_FAILED);
 	}
-	mutex_unlock(&clntraw_lock);
+	(void) mutex_unlock(&clntraw_lock);
 
 	/*
 	 * send request
@@ -261,13 +246,11 @@ clnt_raw_send(CLIENT *h, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp)
 	XDR_SETPOS(xdrs, 0);
 /* LINTED pointer alignment */
 	((struct rpc_msg *)clp->mashl_callmsg)->rm_xid++;
-	if ((! XDR_PUTBYTES(xdrs, clp->mashl_callmsg, clp->mcnt)) ||
-	    (! XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
-	    (! AUTH_MARSHALL(h->cl_auth, xdrs)) ||
-	    (! (*xargs)(xdrs, argsp))) {
-		trace3(TR_clnt_raw_send, 1, h, proc);
+	if ((!XDR_PUTBYTES(xdrs, clp->mashl_callmsg, clp->mcnt)) ||
+	    (!XDR_PUTINT32(xdrs, (int32_t *)&proc)) ||
+	    (!AUTH_MARSHALL(h->cl_auth, xdrs)) ||
+	    (!(*xargs)(xdrs, argsp)))
 		return (RPC_CANTENCODEARGS);
-	}
 	(void) XDR_GETPOS(xdrs);  /* called just to cause overhead */
 
 	/*
@@ -284,8 +267,6 @@ clnt_raw_send(CLIENT *h, rpcproc_t proc, xdrproc_t xargs, caddr_t argsp)
 static void
 clnt_raw_geterr(CLIENT *cl, struct rpc_err *errp)
 {
-	trace1(TR_clnt_raw_geterr, 0);
-	trace1(TR_clnt_raw_geterr, 1);
 }
 
 /*ARGSUSED*/
@@ -294,38 +275,29 @@ clnt_raw_freeres(CLIENT *cl, xdrproc_t xdr_res, caddr_t res_ptr)
 {
 	struct clnt_raw_private *clp;
 	XDR *xdrs;
-	static bool_t dummy;
 
-	trace2(TR_clnt_raw_freeres, 0, cl);
-	mutex_lock(&clntraw_lock);
+	(void) mutex_lock(&clntraw_lock);
 	clp = clnt_raw_private;
 	xdrs = &clp->xdr_stream;
 	if (clp == NULL) {
-		mutex_unlock(&clntraw_lock);
-		trace2(TR_clnt_raw_freeres, 1, cl);
+		(void) mutex_unlock(&clntraw_lock);
 		return (FALSE);
 	}
-	mutex_unlock(&clntraw_lock);
+	(void) mutex_unlock(&clntraw_lock);
 	xdrs->x_op = XDR_FREE;
-	dummy  = (*xdr_res)(xdrs, res_ptr);
-	trace2(TR_clnt_raw_freeres, 1, cl);
-	return (dummy);
+	return ((*xdr_res)(xdrs, res_ptr));
 }
 
 /*ARGSUSED*/
 static void
 clnt_raw_abort(CLIENT *cl, struct rpc_err *errp)
 {
-	trace1(TR_clnt_raw_abort, 0);
-	trace1(TR_clnt_raw_abort, 1);
 }
 
 /*ARGSUSED*/
 static bool_t
 clnt_raw_control(CLIENT *cl, int request, char *info)
 {
-	trace1(TR_clnt_raw_control, 0);
-	trace1(TR_clnt_raw_control, 1);
 	return (FALSE);
 }
 
@@ -333,8 +305,6 @@ clnt_raw_control(CLIENT *cl, int request, char *info)
 static void
 clnt_raw_destroy(CLIENT *cl)
 {
-	trace1(TR_clnt_raw_destroy, 0);
-	trace1(TR_clnt_raw_destroy, 1);
 }
 
 static struct clnt_ops *
@@ -345,8 +315,7 @@ clnt_raw_ops(void)
 
 	/* VARIABLES PROTECTED BY ops_lock: ops */
 
-	trace1(TR_clnt_raw_ops, 0);
-	mutex_lock(&ops_lock);
+	(void) mutex_lock(&ops_lock);
 	if (ops.cl_call == NULL) {
 		ops.cl_call = clnt_raw_call;
 		ops.cl_send = clnt_raw_send;
@@ -356,7 +325,6 @@ clnt_raw_ops(void)
 		ops.cl_destroy = clnt_raw_destroy;
 		ops.cl_control = clnt_raw_control;
 	}
-	mutex_unlock(&ops_lock);
-	trace1(TR_clnt_raw_ops, 1);
+	(void) mutex_unlock(&ops_lock);
 	return (&ops);
 }

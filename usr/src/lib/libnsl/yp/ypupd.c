@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,64 +38,32 @@
 
 #include <rpc/rpc.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <rpcsvc/ypupd.h>
 
 /*
- * Compiled from ypupdate_prot.x using rpcgen
+ * Originally compiled from ypupdate_prot.x using rpcgen
  */
-
 bool_t
-xdr_yp_buf(xdrs, objp)
-	XDR *xdrs;
-	yp_buf *objp;
+xdr_yp_buf(XDR *xdrs, yp_buf *objp)
 {
-	trace1(TR_xdr_yp_buf, 0);
-	if (!xdr_bytes(xdrs, (char **)&objp->yp_buf_val,
-		(u_int *)&objp->yp_buf_len, MAXYPDATALEN)) {
-		trace1(TR_xdr_yp_buf, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_yp_buf, 1);
-	return (TRUE);
+	return (xdr_bytes(xdrs, (char **)&objp->yp_buf_val,
+		(uint_t *)&objp->yp_buf_len, MAXYPDATALEN));
 }
 
 bool_t
-xdr_ypupdate_args(xdrs, objp)
-	XDR *xdrs;
-	ypupdate_args *objp;
+xdr_ypupdate_args(XDR *xdrs, ypupdate_args *objp)
 {
-	trace1(TR_xdr_ypupdate_args, 0);
-	if (!xdr_string(xdrs, &objp->mapname, MAXMAPNAMELEN)) {
-		trace1(TR_xdr_ypupdate_args, 1);
+	if (!xdr_string(xdrs, &objp->mapname, MAXMAPNAMELEN))
 		return (FALSE);
-	}
-	if (!xdr_yp_buf(xdrs, &objp->key)) {
-		trace1(TR_xdr_ypupdate_args, 1);
+	if (!xdr_yp_buf(xdrs, &objp->key))
 		return (FALSE);
-	}
-	if (!xdr_yp_buf(xdrs, &objp->datum)) {
-		trace1(TR_xdr_ypupdate_args, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_ypupdate_args, 1);
-	return (TRUE);
+	return (xdr_yp_buf(xdrs, &objp->datum));
 }
 
 bool_t
-xdr_ypdelete_args(xdrs, objp)
-	XDR *xdrs;
-	ypdelete_args *objp;
+xdr_ypdelete_args(XDR *xdrs, ypdelete_args *objp)
 {
-	trace1(TR_xdr_ypdelete_args, 0);
-	if (!xdr_string(xdrs, &objp->mapname, MAXMAPNAMELEN)) {
-		trace1(TR_xdr_ypdelete_args, 1);
+	if (!xdr_string(xdrs, &objp->mapname, MAXMAPNAMELEN))
 		return (FALSE);
-	}
-	if (!xdr_yp_buf(xdrs, &objp->key)) {
-		trace1(TR_xdr_ypdelete_args, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_ypdelete_args, 1);
-	return (TRUE);
+	return (xdr_yp_buf(xdrs, &objp->key));
 }

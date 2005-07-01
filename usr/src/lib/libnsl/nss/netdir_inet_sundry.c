@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/libnsl/nss/netdir_inet_sundry.c
@@ -44,6 +45,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -63,7 +65,6 @@
 #include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <rpc/types.h>
-#include <rpc/trace.h>
 #include <rpc/rpc_com.h>
 #include <syslog.h>
 #include <values.h>
@@ -82,10 +83,9 @@
 #define	SOV_DEFAULT	1	/* Select based on so_default_version */
 #define	SOV_SOCKBSD	3	/* Socket with no streams operations */
 
-extern int _so_socket();
-extern int _so_connect();
-extern int _so_getsockname();
-extern int bzero();
+extern int _so_socket(int, int, int, char *, int);
+extern int _so_connect(int, struct sockaddr *, socklen_t, int);
+extern int _so_getsockname(int, struct sockaddr *, socklen_t *, int);
 
 
 static char *inet_netdir_mergeaddr(struct netconfig *, char *, char *);
@@ -98,11 +98,7 @@ static struct netbuf *ipv6_uaddr2taddr(char *);
 extern char *inet_ntoa_r(struct in_addr, char *);
 
 int
-__inet_netdir_options(tp, opts, fd, par)
-	struct netconfig *tp;
-	int opts;
-	int fd;
-	char *par;
+__inet_netdir_options(struct netconfig *tp, int opts, int fd, char *par)
 {
 	struct nd_mergearg *ma;
 
@@ -111,10 +107,13 @@ __inet_netdir_options(tp, opts, fd, par)
 		/* Every one is allowed to broadcast without asking */
 		return (ND_OK);
 	case ND_SET_RESERVEDPORT:	/* bind to a resered port */
+		/* LINTED pointer cast */
 		return (bindresvport(tp, fd, (struct netbuf *)par));
 	case ND_CHECK_RESERVEDPORT:	/* check if reserved prot */
+		/* LINTED pointer cast */
 		return (checkresvport((struct netbuf *)par));
 	case ND_MERGEADDR:	/* Merge two addresses */
+		/* LINTED pointer cast */
 		ma = (struct nd_mergearg *)(par);
 		ma->m_uaddr = inet_netdir_mergeaddr(tp, ma->c_uaddr,
 		    ma->s_uaddr);
@@ -132,9 +131,7 @@ __inet_netdir_options(tp, opts, fd, par)
  * address and p1-p2 are the port number.
  */
 char *
-__inet_taddr2uaddr(tp, addr)
-	struct netconfig	*tp;	/* the transport provider */
-	struct netbuf		*addr;	/* the netbuf struct */
+__inet_taddr2uaddr(struct netconfig *tp, struct netbuf *addr)
 {
 	struct sockaddr_in	*sa;	/* our internal format */
 	struct sockaddr_in6	*sa6;	/* our internal format */
@@ -146,10 +143,12 @@ __inet_taddr2uaddr(tp, addr)
 		return (NULL);
 	}
 	if (strcmp(tp->nc_protofmly, NC_INET) == 0) {
+		/* LINTED pointer cast */
 		sa = (struct sockaddr_in *)(addr->buf);
 		myport = ntohs(sa->sin_port);
-		inet_ntoa_r(sa->sin_addr, tmp);
+		(void) inet_ntoa_r(sa->sin_addr, tmp);
 	} else {
+		/* LINTED pointer cast */
 		sa6 = (struct sockaddr_in6 *)(addr->buf);
 		myport = ntohs(sa6->sin6_port);
 		if (inet_ntop(AF_INET6, (void *)sa6->sin6_addr.s6_addr,
@@ -168,9 +167,7 @@ __inet_taddr2uaddr(tp, addr)
  * to the internal format used by the Sun TLI TCP/IP provider.
  */
 struct netbuf *
-__inet_uaddr2taddr(tp, addr)
-	struct netconfig	*tp;	/* the transport provider */
-	char			*addr;	/* the address */
+__inet_uaddr2taddr(struct netconfig *tp, char *addr)
 {
 	if (!addr || !tp) {
 		_nderror = ND_BADARG;
@@ -265,7 +262,7 @@ ipv6_uaddr2taddr(char	*addr)
 		return (NULL);
 	}
 
-	strcpy(tmpaddr, addr);
+	(void) strcpy(tmpaddr, addr);
 
 	if ((dot = strrchr(tmpaddr, '.')) != 0) {
 		*dot = '\0';
@@ -332,7 +329,7 @@ static int numifs_last = 0;		/* number of interfaces last seen */
  * of IPV4 interfaces present.
  */
 static bool_t
-get_if_info()
+get_if_info(void)
 {
 	size_t		needed;
 	struct lifreq	*buf = NULL;
@@ -428,7 +425,7 @@ getifnum:
  * Update the interface cache based on last update time.
  */
 static bool_t
-update_if_cache()
+update_if_cache(void)
 {
 	time_t	curtime;
 
@@ -455,8 +452,7 @@ update_if_cache()
  * will not assume that this address belongs to this machine.
  */
 static bool_t
-is_my_address(addr)
-	struct in_addr addr;		/* address in network order */
+is_my_address(struct in_addr addr)
 {
 	time_t		curtime;
 	if_info_t	*ifn;
@@ -485,8 +481,7 @@ is_my_address(addr)
  * Given a host name, check if it is this host.
  */
 bool_t
-__inet_netdir_is_my_host(host)
-	char		*host;
+__inet_netdir_is_my_host(const char *host)
 {
 	int		error;
 	char		buf[NSS_BUFLEN_HOSTS];
@@ -500,7 +495,7 @@ __inet_netdir_is_my_host(host)
 	if (h->h_addrtype != AF_INET)
 		return (FALSE);
 	for (c = h->h_addr_list; *c != NULL; c++) {
-		(void) memcpy((char *)&in.s_addr, *c, sizeof (in.s_addr));
+		(void) memcpy(&in.s_addr, *c, sizeof (in.s_addr));
 		if (is_my_address(in))
 			return (TRUE);
 	}
@@ -513,8 +508,7 @@ __inet_netdir_is_my_host(host)
  * prefix match.  Return the address in network order.
  */
 static uint32_t
-get_best_match(addr)
-	struct in_addr addr;
+get_best_match(struct in_addr addr)
 {
 	if_info_t *bestmatch, *ifn;
 	int bestcount, count, limit;
@@ -652,17 +646,16 @@ is_myself(struct sockaddr_in6 *sa6)
 		return (0);
 	}
 
-	memcpy(&areq.sa_addr, (struct sockaddr_storage *)sa6,
-		sizeof (struct sockaddr_storage));
+	(void) memcpy(&areq.sa_addr, sa6, sizeof (struct sockaddr_storage));
 	areq.sa_res = -1;
 
 	if (ioctl(s, SIOCTMYADDR, (caddr_t)&areq) < 0) {
 		syslog(LOG_ERR, "is_myself:SIOCTMYADDR failed: %m");
-		close(s);
+		(void) close(s);
 		return (0);
 	}
 
-	close(s);
+	(void) close(s);
 	return (areq.sa_res);
 
 }
@@ -675,6 +668,7 @@ union any_in_addr {
 	struct in6_addr addr6;
 	struct in_addr addr;
 };
+
 static bool_t
 select_server_addr(union any_in_addr *dst_addr, int family,
     union any_in_addr *src_addr)
@@ -683,7 +677,7 @@ select_server_addr(union any_in_addr *dst_addr, int family,
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
 	int tmp_fd;
-	size_t sock_len;
+	socklen_t sock_len;
 
 	sock = calloc(1, sizeof (struct sockaddr_in6));
 	if (sock == NULL) {
@@ -691,12 +685,14 @@ select_server_addr(union any_in_addr *dst_addr, int family,
 	}
 
 	if (family == AF_INET) {
+		/* LINTED pointer cast */
 		sin = (struct sockaddr_in *)sock;
 		sin->sin_family = AF_INET;
 		sin->sin_port = 111;
 		sin->sin_addr = dst_addr->addr;
 		sock_len = sizeof (struct sockaddr_in);
 	} else {
+		/* LINTED pointer cast */
 		sin6 = (struct sockaddr_in6 *)sock;
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_port = 111;
@@ -727,7 +723,7 @@ select_server_addr(union any_in_addr *dst_addr, int family,
 			 * Since in6addr_any is not in the scope
 			 * use the following hack
 			 */
-			memset(src_addr->addr6.s6_addr,
+			(void) memset(src_addr->addr6.s6_addr,
 				0, sizeof (struct in6_addr));
 		(void) close(tmp_fd);
 		free(sock);
@@ -743,9 +739,11 @@ select_server_addr(union any_in_addr *dst_addr, int family,
 	}
 
 	if (family == AF_INET) {
+		/* LINTED pointer cast */
 		sin = (struct sockaddr_in *)sock;
 		src_addr->addr = sin->sin_addr;
 	} else {
+		/* LINTED pointer cast */
 		sin6 = (struct sockaddr_in6 *)sock;
 		src_addr->addr6 = sin6->sin6_addr;
 	}
@@ -760,10 +758,7 @@ select_server_addr(union any_in_addr *dst_addr, int family,
  * to the one which will make sense to the remote caller.
  */
 static char *
-inet_netdir_mergeaddr(tp, ruaddr, uaddr)
-	struct netconfig	*tp;	/* the transport provider */
-	char			*ruaddr; /* remote uaddr of the caller */
-	char			*uaddr;	/* the address */
+inet_netdir_mergeaddr(struct netconfig *tp, char *ruaddr, char *uaddr)
 {
 	char	tmp[SYS_NMLN], *cp;
 	int	j;
@@ -853,7 +848,6 @@ inet_netdir_mergeaddr(tp, ruaddr, uaddr)
 		/* IPv6 */
 		char *dot;
 		char *truaddr;
-		char  name2[SYS_NMLN];
 		struct sockaddr_in6 sa;
 		struct sockaddr_in6 server_addr;
 		union any_in_addr in_addr, out_addr;
@@ -866,7 +860,7 @@ inet_netdir_mergeaddr(tp, ruaddr, uaddr)
 		bzero(&sa, sizeof (sa));
 		bzero(&server_addr, sizeof (server_addr));
 		truaddr = &tmp[0];
-		strcpy(truaddr, ruaddr);
+		(void) strcpy(truaddr, ruaddr);
 
 		/*
 		 * now extract the server ip address from
@@ -903,8 +897,8 @@ inet_netdir_mergeaddr(tp, ruaddr, uaddr)
 			server_addr.sin6_addr = out_addr.addr6;
 		}
 		else
-			memcpy((char *)&server_addr, (char *)&sa,
-				sizeof (struct sockaddr_in6));
+			(void) memcpy(&server_addr, &sa,
+						sizeof (struct sockaddr_in6));
 #ifdef DEBUG
 		printf("%s\n", inet_ntop(af, out_addr.addr6.s6_addr,
 			tmp, sizeof (tmp)));
@@ -924,7 +918,7 @@ inet_netdir_mergeaddr(tp, ruaddr, uaddr)
 			p = --dot;
 			while (*p-- != '.');
 			p++;
-			strcat(tmp + strlen(tmp), p);
+			(void) strcat(tmp + strlen(tmp), p);
 			_nderror = ND_OK;
 		} else {
 			_nderror = ND_NOHOST;
@@ -936,10 +930,7 @@ inet_netdir_mergeaddr(tp, ruaddr, uaddr)
 }
 
 static int
-bindresvport(nconf, fd, addr)
-	struct netconfig *nconf;
-	int fd;
-	struct netbuf *addr;
+bindresvport(struct netconfig *nconf, int fd, struct netbuf *addr)
 {
 	int res;
 	struct sockaddr_in myaddr;
@@ -976,7 +967,7 @@ bindresvport(nconf, fd, addr)
 	if (strcmp(nconf->nc_protofmly, NC_INET) == 0) {
 		if (addr == NULL) {
 			sin = &myaddr;
-			(void) memset((char *)sin, 0, sizeof (*sin));
+			(void) memset(sin, 0, sizeof (*sin));
 			sin->sin_family = AF_INET;
 			u.buf = (char *)sin;
 		} else
@@ -984,7 +975,7 @@ bindresvport(nconf, fd, addr)
 	} else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0) {
 		if (addr == NULL) {
 			sin6 = &myaddr6;
-			(void) memset((char *)sin6, 0, sizeof (*sin6));
+			(void) memset(sin6, 0, sizeof (*sin6));
 			sin6->sin6_family = AF_INET6;
 			u.buf = (char *)sin6;
 		} else
@@ -998,6 +989,7 @@ bindresvport(nconf, fd, addr)
 	/* Transform sockaddr_in to netbuf */
 	if (t_getinfo(fd, &tinfo) == -1)
 		return (-1);
+	/* LINTED pointer cast */
 	tres = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR);
 	if (tres == NULL) {
 		_nderror = ND_NOMEM;
@@ -1029,6 +1021,7 @@ bindresvport(nconf, fd, addr)
 	req.flags = T_NEGOTIATE;
 	req.opt.len = sizeof (struct opthdr) + opt->len;
 	req.opt.buf = (char *)opt;
+	/* LINTED pointer cast */
 	optval = (int *)((char *)reqbuf + sizeof (struct opthdr));
 	*optval = 1;
 	resp.flags = 0;
@@ -1075,8 +1068,7 @@ bindresvport(nconf, fd, addr)
 }
 
 static int
-checkresvport(addr)
-	struct netbuf *addr;
+checkresvport(struct netbuf *addr)
 {
 	struct sockaddr_in *sin;
 	unsigned short port;
@@ -1089,6 +1081,7 @@ checkresvport(addr)
 	 * Still works for IPv6 since the first two memebers of
 	 * both address structure point to family and port # respectively
 	 */
+	/* LINTED pointer cast */
 	sin = (struct sockaddr_in *)(addr->buf);
 	port = ntohs(sin->sin_port);
 	if (port < IPPORT_RESERVED)

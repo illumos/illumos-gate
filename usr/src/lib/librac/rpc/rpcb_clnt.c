@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1986-1991,1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +33,6 @@
  */
 
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <rpc/rpcb_prot.h>
 #include <netconfig.h>
 #include <netdir.h>
@@ -99,7 +99,6 @@ check_cache(const char *host, char *netid)
 {
 	struct address_cache *cptr;
 
-	trace1(TR_check_cache, 0);
 	for (cptr = front; cptr != NULL; cptr = cptr->ac_next) {
 		if (strcmp(cptr->ac_host, host) == 0 &&
 		    strcmp(cptr->ac_netid, netid) == 0) {
@@ -107,12 +106,10 @@ check_cache(const char *host, char *netid)
 			fprintf(stderr, "Found cache entry for %s: %s\n",
 				host, netid);
 #endif
-			trace1(TR_check_cache, 1);
 			return (cptr);
 		}
 	}
-	trace1(TR_check_cache, 1);
-	return ((struct address_cache *)NULL);
+	return (NULL);
 }
 
 static void
@@ -120,7 +117,6 @@ delete_cache(struct address_cache *ad_cache)
 {
 	struct address_cache *cptr, *prevptr = NULL;
 
-	trace1(TR_delete_cache, 0);
 	for (cptr = front; cptr != NULL; cptr = cptr->ac_next) {
 		if (strcmp(cptr->ac_host, ad_cache->ac_host) == 0 &&
 		    strcmp(cptr->ac_netid, ad_cache->ac_netid) == 0) {
@@ -140,7 +136,6 @@ delete_cache(struct address_cache *ad_cache)
 		}
 		prevptr = cptr;
 	}
-	trace1(TR_delete_cache, 1);
 }
 
 static void
@@ -148,28 +143,20 @@ add_cache(const char *host, char *netid, struct netbuf *taddr, char *uaddr)
 {
 	struct address_cache  *ad_cache, *cptr, *prevptr;
 
-	trace1(TR_add_cache, 0);
-	ad_cache = (struct address_cache *)
-			malloc(sizeof (struct address_cache));
-	if (!ad_cache) {
-		trace1(TR_add_cache, 1);
+	ad_cache = malloc(sizeof (struct address_cache));
+	if (!ad_cache)
 		return;
-	}
 	ad_cache->ac_host = strdup(host);
 	ad_cache->ac_netid = strdup(netid);
 	ad_cache->ac_uaddr = uaddr ? strdup(uaddr) : NULL;
-	ad_cache->ac_taddr = (struct netbuf *)malloc(sizeof (struct netbuf));
+	ad_cache->ac_taddr = malloc(sizeof (struct netbuf));
 	if (!ad_cache->ac_host || !ad_cache->ac_netid || !ad_cache->ac_taddr ||
-		(uaddr && !ad_cache->ac_uaddr)) {
-		trace1(TR_add_cache, 1);
+					(uaddr && !ad_cache->ac_uaddr))
 		return;
-	}
 	ad_cache->ac_taddr->len = ad_cache->ac_taddr->maxlen = taddr->len;
-	ad_cache->ac_taddr->buf = (char *)malloc(taddr->len);
-	if (ad_cache->ac_taddr->buf == NULL) {
-		trace1(TR_add_cache, 1);
+	ad_cache->ac_taddr->buf = malloc(taddr->len);
+	if (ad_cache->ac_taddr->buf == NULL)
 		return;
-	}
 	(void) memcpy(ad_cache->ac_taddr->buf, taddr->buf, taddr->len);
 #ifdef ND_DEBUG
 	fprintf(stderr, "Added to cache: %s : %s\n", host, netid);
@@ -209,7 +196,6 @@ add_cache(const char *host, char *netid, struct netbuf *taddr, char *uaddr)
 		}
 		free(cptr);
 	}
-	trace1(TR_add_cache, 1);
 }
 
 /*
@@ -219,14 +205,13 @@ add_cache(const char *host, char *netid, struct netbuf *taddr, char *uaddr)
 static CLIENT *
 getclnthandle(const char *host, const struct netconfig *nconf, char **targaddr)
 {
-	register CLIENT *client;
+	CLIENT *client;
 	struct netbuf *addr;
 	struct nd_addrlist *nas;
 	struct nd_hostserv rpcbind_hs;
 	struct address_cache *ad_cache;
 	char *tmpaddr;
 
-	trace1(TR_getclnthandle, 0);
 	/* Get the address of the rpcbind.  Check cache first */
 	ad_cache = check_cache(host, nconf->nc_netid);
 	if (ad_cache != NULL) {
@@ -236,7 +221,6 @@ getclnthandle(const char *host, const struct netconfig *nconf, char **targaddr)
 		if (client != NULL) {
 			if (targaddr)
 				*targaddr = ad_cache->ac_uaddr;
-			trace1(TR_getclnthandle, 1);
 			return (client);
 		}
 		/*
@@ -255,8 +239,7 @@ getclnthandle(const char *host, const struct netconfig *nconf, char **targaddr)
 
 	if (netdir_getbyname((struct netconfig *)nconf, &rpcbind_hs, &nas)) {
 		rpc_createerr.cf_stat = RPC_N2AXLATEFAILURE;
-		trace1(TR_getclnthandle, 1);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 	/* XXX nas should perhaps be cached for better performance */
 
@@ -286,7 +269,7 @@ getclnthandle(const char *host, const struct netconfig *nconf, char **targaddr)
 	client = clnt_tli_create(RPC_ANYFD, nconf, addr, RPCBPROG,
 				RPCBVERS4, 0, 0);
 #ifdef ND_DEBUG
-	if (! client) {
+	if (!client) {
 		clnt_pcreateerror("rpcbind clnt interface");
 	}
 #endif
@@ -299,7 +282,6 @@ getclnthandle(const char *host, const struct netconfig *nconf, char **targaddr)
 			*targaddr = tmpaddr;
 	}
 	netdir_free((char *)nas, ND_ADDRLIST);
-	trace1(TR_getclnthandle, 1);
 	return (client);
 }
 
@@ -308,30 +290,28 @@ getclnthandle(const char *host, const struct netconfig *nconf, char **targaddr)
  * rpcbind. Returns NULL on error and free's everything.
  */
 static CLIENT *
-local_rpcb()
+local_rpcb(void)
 {
 	static CLIENT *client;
 	static struct netconfig *loopnconf;
 	static char *hostname;
 
-	trace1(TR_local_rpcb, 0);
 	if (loopnconf == NULL) {
 		struct utsname utsname;
 		struct netconfig *nconf, *tmpnconf = NULL;
 		void *nc_handle;
 
-		if (hostname == (char *)NULL) {
+		if (hostname == NULL) {
 			if ((uname(&utsname) == -1) ||
 			    ((hostname = strdup(utsname.nodename)) == NULL)) {
 				rpc_createerr.cf_stat = RPC_UNKNOWNHOST;
-				return ((CLIENT *)NULL);
+				return (NULL);
 			}
 		}
 		nc_handle = setnetconfig();
 		if (nc_handle == NULL) {
 			/* fails to open netconfig file */
 			rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-			trace1(TR_local_rpcb, 1);
 			return (NULL);
 		}
 		while (nconf = getnetconfig(nc_handle)) {
@@ -350,8 +330,7 @@ local_rpcb()
 		/* loopnconf is never freed */
 		(void) endnetconfig(nc_handle);
 	}
-	client = getclnthandle(hostname, loopnconf, (char **)NULL);
-	trace1(TR_local_rpcb, 1);
+	client = getclnthandle(hostname, loopnconf, NULL);
 	return (client);
 }
 
@@ -363,34 +342,28 @@ bool_t
 rpcb_set(const rpcprog_t program, const rpcvers_t version,
     const struct netconfig *nconf, const struct netbuf *address)
 {
-	register CLIENT *client;
+	CLIENT *client;
 	bool_t rslt = FALSE;
 	RPCB parms;
 	char uidbuf[32];
 
-	trace3(TR_rpcb_set, 0, program, version);
 	/* parameter checking */
-	if (nconf == (struct netconfig *)NULL) {
+	if (nconf == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		trace3(TR_rpcb_set, 1, program, version);
 		return (FALSE);
 	}
 	if (address == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNADDR;
-		trace3(TR_rpcb_set, 1, program, version);
 		return (FALSE);
 	}
 	client = local_rpcb();
-	if (! client) {
-		trace3(TR_rpcb_set, 1, program, version);
+	if (!client)
 		return (FALSE);
-	}
 
 	parms.r_addr = taddr2uaddr((struct netconfig *)nconf, (struct netbuf
 	*) address); /* convert to universal */
 	if (!parms.r_addr) {
 		rpc_createerr.cf_stat = RPC_N2AXLATEFAILURE;
-		trace3(TR_rpcb_set, 1, program, version);
 		return (FALSE); /* no universal address */
 	}
 	parms.r_prog = program;
@@ -409,7 +382,6 @@ rpcb_set(const rpcprog_t program, const rpcvers_t version,
 
 	CLNT_DESTROY(client);
 	free(parms.r_addr);
-	trace3(TR_rpcb_set, 1, program, version);
 	return (rslt);
 }
 
@@ -423,17 +395,14 @@ bool_t
 rpcb_unset(const rpcprog_t program, const rpcvers_t version,
     const struct netconfig *nconf)
 {
-	register CLIENT *client;
+	CLIENT *client;
 	bool_t rslt = FALSE;
 	RPCB parms;
 	char uidbuf[32];
 
-	trace3(TR_rpcb_unset, 0, program, version);
 	client = local_rpcb();
-	if (! client) {
-		trace3(TR_rpcb_unset, 1, program, version);
+	if (!client)
 		return (FALSE);
-	}
 
 	parms.r_prog = program;
 	parms.r_vers = version;
@@ -449,7 +418,6 @@ rpcb_unset(const rpcprog_t program, const rpcvers_t version,
 			(xdrproc_t)xdr_bool, (char *)&rslt, tottimeout);
 
 	CLNT_DESTROY(client);
-	trace3(TR_rpcb_unset, 1, program, version);
 	return (rslt);
 }
 
@@ -463,7 +431,6 @@ got_entry(rpcb_entry_list_ptr relp, const struct netconfig *nconf)
 	rpcb_entry_list_ptr sp;
 	rpcb_entry *rmap;
 
-	trace1(TR_got_entry, 0);
 	for (sp = relp; sp != NULL; sp = sp->rpcb_entry_next) {
 		rmap = &sp->rpcb_entry_map;
 		if ((strcmp(nconf->nc_proto, rmap->r_nc_proto) == 0) &&
@@ -482,7 +449,6 @@ got_entry(rpcb_entry_list_ptr relp, const struct netconfig *nconf)
 			break;
 		}
 	}
-	trace1(TR_got_entry, 1);
 	return (na);
 }
 
@@ -508,7 +474,7 @@ struct netbuf *
 __rpcb_findaddr(rpcprog_t program, rpcvers_t version,
     const struct netconfig *nconf, const char *host, CLIENT **clpp)
 {
-	register CLIENT *client = NULL;
+	CLIENT *client = NULL;
 	RPCB parms;
 	enum clnt_stat clnt_st;
 	char *ua = NULL;
@@ -516,11 +482,9 @@ __rpcb_findaddr(rpcprog_t program, rpcvers_t version,
 	struct netbuf *address = NULL;
 	uint_t start_vers = RPCBVERS4;
 
-	trace3(TR_rpcb_findaddr, 0, program, version);
 	/* parameter checking */
-	if (nconf == (struct netconfig *)NULL) {
+	if (nconf == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		trace3(TR_rpcb_findaddr, 1, program, version);
 		return (NULL);
 	}
 
@@ -544,13 +508,11 @@ __rpcb_findaddr(rpcprog_t program, rpcvers_t version,
 
 			if ((handle = __rpc_setconf("udp")) == NULL) {
 				rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-				trace3(TR_rpcb_findaddr, 1, program, version);
 				return (NULL);
 			}
 			if ((newnconf = __rpc_getconf(handle)) == NULL) {
 				__rpc_endconf(handle);
 				rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-				trace3(TR_rpcb_findaddr, 1, program, version);
 				return (NULL);
 			}
 			client = getclnthandle(host, newnconf, &parms.r_addr);
@@ -558,10 +520,8 @@ __rpcb_findaddr(rpcprog_t program, rpcvers_t version,
 		} else {
 			client = getclnthandle(host, nconf, &parms.r_addr);
 		}
-		if (client == (CLIENT *)NULL) {
-			trace3(TR_rpcb_findaddr, 1, program, version);
+		if (client == NULL)
 			return (NULL);
-		}
 
 		/* Set the version */
 		CLNT_CONTROL(client, CLSET_VERS, (char *)&pmapvers);
@@ -588,10 +548,8 @@ __rpcb_findaddr(rpcprog_t program, rpcvers_t version,
 		}
 		port = htons(port);
 		CLNT_CONTROL(client, CLGET_SVC_ADDR, (char *)&remote);
-		if (((address = (struct netbuf *)
-			malloc(sizeof (struct netbuf))) == NULL) ||
-		    ((address->buf = (char *)
-			malloc(remote.len)) == NULL)) {
+		if (((address = malloc(sizeof (struct netbuf))) == NULL) ||
+		    ((address->buf = malloc(remote.len)) == NULL)) {
 			rpc_createerr.cf_stat = RPC_SYSTEMERROR;
 			clnt_geterr(client, &rpc_createerr.cf_error);
 			if (address) {
@@ -645,7 +603,7 @@ try_rpcbind:
 				}
 				__rpc_endconf(handle);
 			}
-			if (client == (CLIENT *)NULL)
+			if (client == NULL)
 				goto regular_rpcbind;	/* Go the regular way */
 		} else {
 			/* This is a UDP PORTMAP handle.  Change to version 4 */
@@ -729,7 +687,7 @@ regular_rpcbind:
 #endif
 			xdr_free((xdrproc_t)xdr_wrapstring, (char *)&ua);
 
-			if (! address) {
+			if (!address) {
 				/* We don't know about your universal address */
 				rpc_createerr.cf_stat = RPC_N2AXLATEFAILURE;
 				goto error;
@@ -769,7 +727,6 @@ done:
 	} else if (client) {
 		CLNT_DESTROY(client);
 	}
-	trace3(TR_rpcb_findaddr, 1, program, version);
 	return (address);
 }
 
@@ -788,22 +745,19 @@ rpcb_getaddr(const rpcprog_t program, const rpcvers_t version,
 {
 	struct netbuf *na;
 
-	trace3(TR_rpcb_getaddr, 0, program, version);
 	if ((na = __rpcb_findaddr(program, version, (struct netconfig *)nconf,
-				(char *)host, (CLIENT **) NULL)) == NULL)
+				(char *)host, NULL)) == NULL)
 		return (FALSE);
 
 	if (na->len > address->maxlen) {
 		/* Too long address */
 		netdir_free((char *)na, ND_ADDR);
 		rpc_createerr.cf_stat = RPC_FAILED;
-		trace3(TR_rpcb_getaddr, 1, program, version);
 		return (FALSE);
 	}
-	(void) memcpy(address->buf, na->buf, (int)na->len);
+	(void) memcpy(address->buf, na->buf, (size_t)na->len);
 	address->len = na->len;
 	netdir_free((char *)na, ND_ADDR);
-	trace3(TR_rpcb_getaddr, 1, program, version);
 	return (TRUE);
 }
 
@@ -817,18 +771,14 @@ rpcb_getaddr(const rpcprog_t program, const rpcvers_t version,
 rpcblist *
 rpcb_getmaps(const struct netconfig *nconf, const char *host)
 {
-	rpcblist_ptr head = (rpcblist_ptr)NULL;
-	register CLIENT *client;
+	rpcblist_ptr head = NULL;
+	CLIENT *client;
 	enum clnt_stat clnt_st;
 	int vers = 0;
 
-	trace1(TR_rpcb_getmaps, 0);
-	client = getclnthandle((char *)host, (struct netconfig *)nconf,
-								(char **)NULL);
-	if (client == (CLIENT *)NULL) {
-		trace1(TR_rpcb_getmaps, 1);
+	client = getclnthandle((char *)host, (struct netconfig *)nconf, NULL);
+	if (client == NULL)
 		return (head);
-	}
 	clnt_st = CLNT_CALL(client, RPCBPROC_DUMP,
 			(xdrproc_t)xdr_void, NULL,
 			(xdrproc_t)xdr_rpcblist_ptr,
@@ -850,7 +800,7 @@ rpcb_getmaps(const struct netconfig *nconf, const char *host)
 		CLNT_CONTROL(client, CLSET_VERS, (char *)&vers);
 		if (CLNT_CALL(client, RPCBPROC_DUMP,
 			(xdrproc_t)xdr_void,
-			(char *)NULL, (xdrproc_t)xdr_rpcblist_ptr,
+			NULL, (xdrproc_t)xdr_rpcblist_ptr,
 			(char *)&head, tottimeout) == RPC_SUCCESS)
 				goto done;
 	}
@@ -859,7 +809,6 @@ rpcb_getmaps(const struct netconfig *nconf, const char *host)
 
 done:
 	CLNT_DESTROY(client);
-	trace1(TR_rpcb_getmaps, 1);
 	return (head);
 }
 
@@ -876,20 +825,15 @@ rpcb_rmtcall(const struct netconfig *nconf, const char *host,
     const xdrproc_t xdrargs, const caddr_t argsp, const xdrproc_t xdrres,
     const caddr_t resp, const struct timeval tout, struct netbuf *addr_ptr)
 {
-	register CLIENT *client;
+	CLIENT *client;
 	enum clnt_stat stat;
 	struct r_rpcb_rmtcallargs a;
 	struct r_rpcb_rmtcallres r;
 	int rpcb_vers;
 
-	trace4(TR_rpcb_rmtcall, 0, prog, vers, proc);
-
-	client = getclnthandle((char *)host, (struct netconfig *)nconf,
-								(char **)NULL);
-	if (client == (CLIENT *)NULL) {
-		trace4(TR_rpcb_rmtcall, 1, prog, vers, proc);
+	client = getclnthandle((char *)host, (struct netconfig *)nconf, NULL);
+	if (client == NULL)
 		return (RPC_FAILED);
-	}
 	CLNT_CONTROL(client, CLSET_RETRY_TIMEOUT, (char *)&rmttimeout);
 	a.prog = prog;
 	a.vers = vers;
@@ -909,7 +853,7 @@ rpcb_rmtcall(const struct netconfig *nconf, const char *host,
 			struct netbuf *na;
 
 			na = uaddr2taddr((struct netconfig *)nconf, r.addr);
-			if (! na) {
+			if (!na) {
 				stat = RPC_N2AXLATEFAILURE;
 				((struct netbuf *)addr_ptr)->len = 0;
 				goto error;
@@ -921,7 +865,7 @@ rpcb_rmtcall(const struct netconfig *nconf, const char *host,
 				((struct netbuf *)addr_ptr)->len = 0;
 				goto error;
 			}
-			(void) memcpy(addr_ptr->buf, na->buf, (int)na->len);
+			(void) memcpy(addr_ptr->buf, na->buf, (size_t)na->len);
 			((struct netbuf *)addr_ptr)->len = na->len;
 			netdir_free((char *)na, ND_ADDR);
 			break;
@@ -934,7 +878,6 @@ error:
 	CLNT_DESTROY(client);
 	if (r.addr)
 		xdr_free((xdrproc_t)xdr_wrapstring, (char *)&r.addr);
-	trace4(TR_rpcb_rmtcall, 1, prog, vers, proc);
 	return (stat);
 }
 
@@ -951,38 +894,32 @@ rpcb_gettime(const char *host, time_t *timep)
 	int vers;
 	enum clnt_stat st;
 
-	trace1(TR_rpcb_gettime, 0);
-
 	if ((host == NULL) || (host[0] == NULL)) {
 		(void) time(timep);
-		trace1(TR_rpcb_gettime, 1);
 		return (TRUE);
 	}
 
 	if ((handle = __rpc_setconf("netpath")) == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		trace1(TR_rpcb_gettime, 1);
 		return (FALSE);
 	}
 	rpc_createerr.cf_stat = RPC_SUCCESS;
-	while (client == (CLIENT *)NULL) {
+	while (client == NULL) {
 		if ((nconf = __rpc_getconf(handle)) == NULL) {
 			if (rpc_createerr.cf_stat == RPC_SUCCESS)
 				rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
 			break;
 		}
-		client = getclnthandle((char *)host, nconf, (char **)NULL);
+		client = getclnthandle((char *)host, nconf, NULL);
 		if (client)
 			break;
 	}
 	__rpc_endconf(handle);
-	if (client == (CLIENT *)NULL) {
-		trace1(TR_rpcb_gettime, 1);
+	if (client == NULL)
 		return (FALSE);
-	}
 
 	st = CLNT_CALL(client, RPCBPROC_GETTIME,
-		(xdrproc_t)xdr_void, (char *)NULL,
+		(xdrproc_t)xdr_void, NULL,
 		(xdrproc_t)xdr_int, (char *)timep, tottimeout);
 
 	if ((st == RPC_PROGVERSMISMATCH) || (st == RPC_PROGUNAVAIL)) {
@@ -992,14 +929,13 @@ rpcb_gettime(const char *host, time_t *timep)
 			vers = RPCBVERS;
 			CLNT_CONTROL(client, CLSET_VERS, (char *)&vers);
 			st = CLNT_CALL(client, RPCBPROC_GETTIME,
-				(xdrproc_t)xdr_void, (char *)NULL,
+				(xdrproc_t)xdr_void, NULL,
 				(xdrproc_t)xdr_int, (char *)timep,
 				tottimeout);
 		}
 	}
-	trace1(TR_rpcb_gettime, 1);
 	CLNT_DESTROY(client);
-	return (st == RPC_SUCCESS? TRUE: FALSE);
+	return (st == RPC_SUCCESS ? TRUE : FALSE);
 }
 
 /*
@@ -1012,30 +948,23 @@ rpcb_taddr2uaddr(struct netconfig *nconf, struct netbuf *taddr)
 	CLIENT *client;
 	char *uaddr = NULL;
 
-	trace1(TR_rpcb_taddr2uaddr, 0);
-
 	/* parameter checking */
-	if (nconf == (struct netconfig *)NULL) {
+	if (nconf == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		trace1(TR_rpcb_taddr2uaddr, 1);
 		return (NULL);
 	}
 	if (taddr == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNADDR;
-		trace1(TR_rpcb_taddr2uaddr, 1);
 		return (NULL);
 	}
 	client = local_rpcb();
-	if (! client) {
-		trace1(TR_rpcb_taddr2uaddr, 1);
+	if (!client)
 		return (NULL);
-	}
 
 	CLNT_CALL(client, RPCBPROC_TADDR2UADDR, (xdrproc_t)xdr_netbuf,
 		(char *)taddr, (xdrproc_t)xdr_wrapstring, (char *)&uaddr,
 		tottimeout);
 	CLNT_DESTROY(client);
-	trace1(TR_rpcb_taddr2uaddr, 1);
 	return (uaddr);
 }
 
@@ -1049,29 +978,22 @@ rpcb_uaddr2taddr(struct netconfig *nconf, char *uaddr)
 	CLIENT *client;
 	struct netbuf *taddr;
 
-	trace1(TR_rpcb_uaddr2taddr, 0);
-
 	/* parameter checking */
-	if (nconf == (struct netconfig *)NULL) {
+	if (nconf == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		trace1(TR_rpcb_uaddr2taddr, 1);
 		return (NULL);
 	}
 	if (uaddr == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNADDR;
-		trace1(TR_rpcb_uaddr2taddr, 1);
 		return (NULL);
 	}
 	client = local_rpcb();
-	if (! client) {
-		trace1(TR_rpcb_uaddr2taddr, 1);
+	if (!client)
 		return (NULL);
-	}
 
-	taddr = (struct netbuf *)calloc(1, sizeof (struct netbuf));
+	taddr = calloc(1, sizeof (struct netbuf));
 	if (taddr == NULL) {
 		CLNT_DESTROY(client);
-		trace1(TR_rpcb_uaddr2taddr, 1);
 		return (NULL);
 	}
 	if (CLNT_CALL(client, RPCBPROC_UADDR2TADDR, (xdrproc_t)xdr_wrapstring,
@@ -1081,6 +1003,5 @@ rpcb_uaddr2taddr(struct netconfig *nconf, char *uaddr)
 		taddr = NULL;
 	}
 	CLNT_DESTROY(client);
-	trace1(TR_rpcb_uaddr2taddr, 1);
 	return (taddr);
 }

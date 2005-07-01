@@ -19,11 +19,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,7 +33,6 @@
  * are applicable to the other file.
  */
 #include "mt.h"
-#include <rpc/trace.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <stropts.h>
@@ -62,35 +61,27 @@ _tx_rcvreldata(int fd, struct t_discon *discon, int api_semantics)
 	int flg = 0;
 
 
-	trace2(TR_t_rcvreldata, 0, fd);
 	assert(api_semantics == TX_XTI_XNS5_API);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == 0) {
-		sv_errno = errno;
-		trace2(TR_t_rcvreldata, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == 0)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype != T_COTS_ORD) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvreldata, 1, fd);
 		return (-1);
 	}
 
-	if (! (tiptr->ti_state == T_DATAXFER ||
+	if (!(tiptr->ti_state == T_DATAXFER ||
 	    tiptr->ti_state == T_OUTREL)) {
 		t_errno = TOUTSTATE;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvreldata, 1, fd);
 		return (-1);
 	}
 
 	if ((retval = _t_look_locked(fd, tiptr, 0, api_semantics)) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvreldata, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -102,7 +93,6 @@ _tx_rcvreldata(int fd, struct t_discon *discon, int api_semantics)
 		 */
 		t_errno = TLOOK;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvreldata, 1, fd);
 		return (-1);
 	}
 
@@ -114,6 +104,7 @@ _tx_rcvreldata(int fd, struct t_discon *discon, int api_semantics)
 	 */
 
 	if ((tiptr->ti_lookcnt > 0) &&
+	    /* LINTED pointer cast */
 	    (*((t_scalar_t *)tiptr->ti_lookbufs.tl_lookcbuf) == T_ORDREL_IND)) {
 		/*
 		 * Current look buffer event is T_ORDREL_IND.
@@ -123,13 +114,11 @@ _tx_rcvreldata(int fd, struct t_discon *discon, int api_semantics)
 		_T_TX_NEXTSTATE(T_RCVREL, tiptr,
 			"t_rcvreldata: invalid state event T_RCVREL");
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvreldata, 1, fd);
 		return (0);
 	} else {
 		if (retval != T_ORDREL) {
 			t_errno = TNOREL;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_rcvreldata, 1, fd);
 			return (-1);
 		}
 	}
@@ -144,7 +133,6 @@ _tx_rcvreldata(int fd, struct t_discon *discon, int api_semantics)
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvreldata, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -159,7 +147,6 @@ _tx_rcvreldata(int fd, struct t_discon *discon, int api_semantics)
 		else
 			tiptr->ti_ctlbuf = ctlbuf.buf;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvreldata, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -186,6 +173,7 @@ _tx_rcvreldata(int fd, struct t_discon *discon, int api_semantics)
 		errno = EIO;
 		goto err_out;
 	}
+	/* LINTED pointer cast */
 	pptr = (union T_primitives *)ctlbuf.buf;
 
 	if (ctlbuf.len < (int)sizeof (struct T_ordrel_ind)) {
@@ -230,7 +218,6 @@ _tx_rcvreldata(int fd, struct t_discon *discon, int api_semantics)
 	else
 		tiptr->ti_rcvbuf = databuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_rcvreldata, 1, fd);
 	return (0);
 
 err_out:
@@ -245,7 +232,6 @@ err_out:
 	else
 		tiptr->ti_rcvbuf = databuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_rcvreldata, 1, fd);
 	errno = sv_errno;
 	return (-1);
 }

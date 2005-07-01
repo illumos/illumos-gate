@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -41,6 +42,7 @@
  * rpc_parse.c, Parser for the RPC protocol compiler
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "rpc/types.h"
 #include "rpc_scan.h"
@@ -49,19 +51,30 @@
 
 #define	ARGNAME "arg"
 
-extern char *make_argname();
-extern char *strdup();
+extern char *make_argname(char *, char *);
+
+static void isdefined(definition *);
+static void def_struct(definition *);
+static void def_program(definition *);
+static void def_enum(definition *);
+static void def_const(definition *);
+static void def_union(definition *);
+static void def_typedef(definition *);
+static void get_declaration(declaration *, defkind);
+static void get_prog_declaration(declaration *, defkind, int);
+static void get_type(char **, char **, defkind);
+static void unsigned_dec(char **);
 
 /*
  * return the next definition you see
  */
 definition *
-get_definition()
+get_definition(void)
 {
 	definition *defp;
 	token tok;
 
-	defp = ALLOC(definition);
+	defp = calloc(1, sizeof (definition));
 	get_token(&tok);
 	switch (tok.kind) {
 	case TOK_STRUCT:
@@ -92,9 +105,8 @@ get_definition()
 	return (defp);
 }
 
-static
-isdefined(defp)
-	definition *defp;
+static void
+isdefined(definition *defp)
 {
 	STOREVAL(&defined, defp);
 }
@@ -102,6 +114,7 @@ isdefined(defp)
 /*
  * We treat s == NULL the same as *s == '\0'
  */
+static int
 streqn(const char *s1, const char *s2)
 {
 	if (s1 == NULL)
@@ -120,7 +133,6 @@ cmptype(definition *defp, char *type)
 	/* We only want typedef definitions */
 	if (streq(defp->def_name, type) && defp->def_kind == DEF_TYPEDEF)
 		return (1);
-
 	return (0);
 }
 
@@ -212,11 +224,11 @@ is_self_reference(definition *defp, declaration *decp)
 		 */
 		if (decp->rel == REL_POINTER && dp->def.ty.rel != REL_ALIAS)
 			return (0);
-		else if (decp->rel == REL_ALIAS &&
+		if (decp->rel == REL_ALIAS &&
 			(dp->def.ty.rel != REL_ALIAS &&
 			dp->def.ty.rel != REL_POINTER))
 			return (0);
-		else if (decp->rel != REL_ALIAS && decp->rel != REL_POINTER)
+		if (decp->rel != REL_ALIAS && decp->rel != REL_POINTER)
 			/* Should never get here */
 			return (0);
 
@@ -232,9 +244,8 @@ is_self_reference(definition *defp, declaration *decp)
 	return (1);
 }
 
-static
-def_struct(defp)
-	definition *defp;
+static void
+def_struct(definition *defp)
 {
 	token tok;
 	declaration dec;
@@ -250,7 +261,7 @@ def_struct(defp)
 	defp->def.st.tail = NULL;
 	do {
 		get_declaration(&dec, DEF_STRUCT);
-		decls = ALLOC(decl_list);
+		decls = calloc(1, sizeof (decl_list));
 		decls->decl = dec;
 		/*
 		 * Keep a referenct to the last declaration to check for
@@ -272,9 +283,8 @@ def_struct(defp)
 	defp->def.st.tail = endp;
 }
 
-static
-def_program(defp)
-	definition *defp;
+static void
+def_program(definition *defp)
 {
 	token tok;
 	declaration dec;
@@ -295,13 +305,13 @@ def_program(defp)
 	scan(TOK_VERSION, &tok);
 	do {
 		scan(TOK_IDENT, &tok);
-		vlist = ALLOC(version_list);
+		vlist = calloc(1, sizeof (version_list));
 		vlist->vers_name = tok.str;
 		scan(TOK_LBRACE, &tok);
 		ptailp = &vlist->procs;
 		do {
 			/* get result type */
-			plist = ALLOC(proc_list);
+			plist = calloc(1, sizeof (proc_list));
 			get_type(&plist->res_prefix, &plist->res_type,
 			    DEF_RESULT);
 			if (streq(plist->res_type, "opaque")) {
@@ -321,7 +331,7 @@ def_program(defp)
 			get_prog_declaration(&dec, DEF_PROGRAM, num_args);
 			if (streq(dec.type, "void"))
 				isvoid = TRUE;
-			decls = ALLOC(decl_list);
+			decls = calloc(1, sizeof (decl_list));
 			plist->args.decls = decls;
 			decls->decl = dec;
 			tailp = &decls->next;
@@ -330,7 +340,7 @@ def_program(defp)
 				num_args++;
 				get_prog_declaration(&dec, DEF_STRUCT,
 						    num_args);
-				decls = ALLOC(decl_list);
+				decls = calloc(1, sizeof (decl_list));
 				decls->decl = dec;
 				*tailp = decls;
 				if (streq(dec.type, "void"))
@@ -364,8 +374,7 @@ def_program(defp)
 		scan_num(&tok);
 		vlist->vers_num = tok.str;
 		/* make the argument structure name for each arg */
-		for (plist = vlist->procs; plist != NULL;
-		    plist = plist->next) {
+		for (plist = vlist->procs; plist != NULL; plist = plist->next) {
 			plist->args.argname = make_argname(plist->proc_name,
 							vlist->vers_num);
 			/* free the memory ?? */
@@ -379,10 +388,8 @@ def_program(defp)
 	*vtailp = NULL;
 }
 
-
-static
-def_enum(defp)
-	definition *defp;
+static void
+def_enum(definition *defp)
 {
 	token tok;
 	enumval_list *elist;
@@ -395,7 +402,7 @@ def_enum(defp)
 	tailp = &defp->def.en.vals;
 	do {
 		scan(TOK_IDENT, &tok);
-		elist = ALLOC(enumval_list);
+		elist = calloc(1, sizeof (enumval_list));
 		elist->name = tok.str;
 		elist->assignment = NULL;
 		scan3(TOK_COMMA, TOK_RBRACE, TOK_EQUAL, &tok);
@@ -410,9 +417,8 @@ def_enum(defp)
 	*tailp = NULL;
 }
 
-static
-def_const(defp)
-	definition *defp;
+static void
+def_const(definition *defp)
 {
 	token tok;
 
@@ -424,13 +430,12 @@ def_const(defp)
 	defp->def.co = tok.str;
 }
 
-static
-def_union(defp)
-	definition *defp;
+static void
+def_union(definition *defp)
 {
 	token tok;
 	declaration dec;
-	case_list *cases, *tcase;
+	case_list *cases;
 	case_list **tailp;
 	int flag;
 
@@ -447,7 +452,7 @@ def_union(defp)
 	scan(TOK_CASE, &tok);
 	while (tok.kind == TOK_CASE) {
 		scan2(TOK_IDENT, TOK_CHARCONST, &tok);
-		cases = ALLOC(case_list);
+		cases = calloc(1, sizeof (case_list));
 		cases->case_name = tok.str;
 		scan(TOK_COLON, &tok);
 		/* now peek at next token */
@@ -459,19 +464,15 @@ def_union(defp)
 				/* continued case statement */
 				*tailp = cases;
 				tailp = &cases->next;
-				cases = ALLOC(case_list);
+				cases = calloc(1, sizeof (case_list));
 				cases->case_name = tok.str;
 				scan(TOK_COLON, &tok);
 			} while (peekscan(TOK_CASE, &tok));
+		} else if (flag) {
+			*tailp = cases;
+			tailp = &cases->next;
+			cases = calloc(1, sizeof (case_list));
 		}
-		else
-			if (flag)
-			{
-
-				*tailp = cases;
-				tailp = &cases->next;
-				cases = ALLOC(case_list);
-			};
 
 		get_declaration(&dec, DEF_UNION);
 		cases->case_decl = dec;
@@ -486,7 +487,7 @@ def_union(defp)
 	if (tok.kind == TOK_DEFAULT) {
 		scan(TOK_COLON, &tok);
 		get_declaration(&dec, DEF_UNION);
-		defp->def.un.default_decl = ALLOC(declaration);
+		defp->def.un.default_decl = calloc(1, sizeof (declaration));
 		*defp->def.un.default_decl = dec;
 		scan(TOK_SEMICOLON, &tok);
 		scan(TOK_RBRACE, &tok);
@@ -495,8 +496,7 @@ def_union(defp)
 	}
 }
 
-static char *reserved_words[] =
-{
+static char *reserved_words[] = {
 	"array",
 	"bytes",
 	"destroy",
@@ -510,29 +510,27 @@ static char *reserved_words[] =
 	"union",
 	"vector",
 	NULL
-	};
+};
 
-static char *reserved_types[] =
-{
+static char *reserved_types[] = {
 	"opaque",
 	"string",
 	NULL
-	};
+};
 
 /*
  * check that the given name is not one that would eventually result in
  * xdr routines that would conflict with internal XDR routines.
  */
-static check_type_name(name, new_type)
-int new_type;
-char *name;
+static void
+check_type_name(char *name, int new_type)
 {
 	int i;
 	char tmp[100];
 
 	for (i = 0; reserved_words[i] != NULL; i++) {
 		if (strcmp(name, reserved_words[i]) == 0) {
-			snprintf(tmp, sizeof (tmp),
+			(void) snprintf(tmp, sizeof (tmp),
 				"illegal (reserved) name :\'%s\' "
 				"in type definition",
 				name);
@@ -542,7 +540,7 @@ char *name;
 	if (new_type) {
 		for (i = 0; reserved_types[i] != NULL; i++) {
 			if (strcmp(name, reserved_types[i]) == 0) {
-				snprintf(tmp, sizeof (tmp),
+				(void) snprintf(tmp, sizeof (tmp),
 					"illegal (reserved) name :\'%s\' "
 					"in type definition",
 					name);
@@ -552,11 +550,8 @@ char *name;
 	}
 }
 
-
-
-static
-def_typedef(defp)
-	definition *defp;
+static void
+def_typedef(definition *defp)
 {
 	declaration dec;
 
@@ -570,18 +565,15 @@ def_typedef(defp)
 	defp->def.ty.array_max = dec.array_max;
 }
 
-static
-get_declaration(dec, dkind)
-	declaration *dec;
-	defkind dkind;
+static void
+get_declaration(declaration *dec, defkind dkind)
 {
 	token tok;
 
 	get_type(&dec->prefix, &dec->type, dkind);
 	dec->rel = REL_ALIAS;
-	if (streq(dec->type, "void")) {
+	if (streq(dec->type, "void"))
 		return;
-	}
 
 	check_type_name(dec->type, 0);
 	scan2(TOK_STAR, TOK_IDENT, &tok);
@@ -591,19 +583,17 @@ get_declaration(dec, dkind)
 	}
 	dec->name = tok.str;
 	if (peekscan(TOK_LBRACKET, &tok)) {
-		if (dec->rel == REL_POINTER) {
+		if (dec->rel == REL_POINTER)
 			error("no array-of-pointer declarations "
 			    "-- use typedef");
-		}
 		dec->rel = REL_VECTOR;
 		scan_num(&tok);
 		dec->array_max = tok.str;
 		scan(TOK_RBRACKET, &tok);
 	} else if (peekscan(TOK_LANGLE, &tok)) {
-		if (dec->rel == REL_POINTER) {
+		if (dec->rel == REL_POINTER)
 			error("no array-of-pointer declarations "
 			    "-- use typedef");
-		}
 		dec->rel = REL_ARRAY;
 		if (peekscan(TOK_RANGLE, &tok)) {
 			dec->array_max = "~0";	/* unspecified size, use max */
@@ -624,12 +614,8 @@ get_declaration(dec, dkind)
 	}
 }
 
-
-static
-get_prog_declaration(dec, dkind, num)
-	declaration *dec;
-	defkind dkind;
-	int num;  /* arg number */
+static void
+get_prog_declaration(declaration *dec, defkind dkind, int num)
 {
 	token tok;
 	char name[sizeof (ARGNAME) + 10];
@@ -650,19 +636,17 @@ get_prog_declaration(dec, dkind, num)
 		dec->name = strdup(tok.str);
 	else {
 		/* default name of argument */
-		snprintf(name, sizeof (name), "%s%d", ARGNAME, num);
+		(void) snprintf(name, sizeof (name), "%s%d", ARGNAME, num);
 		dec->name = strdup(name);
 	}
 	if (dec->name == NULL)
 		error("internal error -- out of memory");
 
-	if (streq(dec->type, "void")) {
+	if (streq(dec->type, "void"))
 		return;
-	}
 
-	if (streq(dec->type, "opaque")) {
+	if (streq(dec->type, "opaque"))
 		error("opaque -- illegal argument type");
-	}
 	if (peekscan(TOK_STAR, &tok)) {
 		if (streq(dec->type, "string")) {
 			error("pointer to string not allowed "
@@ -701,13 +685,8 @@ get_prog_declaration(dec, dkind, num)
 	}
 }
 
-
-
-static
-get_type(prefixp, typep, dkind)
-	char **prefixp;
-	char **typep;
-	defkind dkind;
+static void
+get_type(char **prefixp, char **typep, defkind dkind)
 {
 	token tok;
 
@@ -769,9 +748,8 @@ get_type(prefixp, typep, dkind)
 	}
 }
 
-static
-unsigned_dec(typep)
-	char **typep;
+static void
+unsigned_dec(char **typep)
 {
 	token tok;
 

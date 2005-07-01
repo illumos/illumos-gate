@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -44,6 +46,11 @@
 #include "rpc_parse.h"
 #include "rpc_util.h"
 
+extern int nullproc(proc_list *);
+
+static void write_table(definition *);
+static void printit(char *, char *);
+
 #define	TABSIZE		8
 #define	TABCOUNT	5
 #define	TABSTOP		(TABSIZE*TABCOUNT)
@@ -54,35 +61,34 @@ static char tbl_hdr[] = "struct rpcgen_table %s_table[] = {\n";
 static char tbl_end[] = "};\n";
 
 static char null_entry_b[] = "\n\t(char *(*)())0,\n"
-			" \t(xdrproc_t) xdr_void,\t\t\t0,\n"
-			" \t(xdrproc_t) xdr_void,\t\t\t0,\n";
+			" \t(xdrproc_t)xdr_void,\t\t\t0,\n"
+			" \t(xdrproc_t)xdr_void,\t\t\t0,\n";
 
 static char null_entry[] = "\n\t(void *(*)())0,\n"
-			" \t(xdrproc_t) xdr_void,\t\t\t0,\n"
-			" \t(xdrproc_t) xdr_void,\t\t\t0,\n";
+			" \t(xdrproc_t)xdr_void,\t\t\t0,\n"
+			" \t(xdrproc_t)xdr_void,\t\t\t0,\n";
 
 
 static char tbl_nproc[] = "int %s_nproc =\n\tsizeof(%s_table)"
 				"/sizeof(%s_table[0]);\n\n";
 
 void
-write_tables()
+write_tables(void)
 {
 	list *l;
 	definition *def;
 
 	f_print(fout, "\n");
 	for (l = defined; l != NULL; l = l->next) {
-		def = (definition *) l->val;
+		def = (definition *)l->val;
 		if (def->def_kind == DEF_PROGRAM) {
 			write_table(def);
 		}
 	}
 }
 
-static
-write_table(def)
-	definition *def;
+static void
+write_table(definition *def)
 {
 	version_list *vp;
 	proc_list *proc;
@@ -93,7 +99,7 @@ write_table(def)
 
 	for (vp = def->def.pr.versions; vp != NULL; vp = vp->next) {
 		warning = 0;
-		s_print(progvers, "%s_%s",
+		(void) snprintf(progvers, sizeof (progvers), "%s_%s",
 		    locase(def->def_name), vp->vers_num);
 		/* print the table header */
 		f_print(fout, tbl_hdr, progvers);
@@ -140,7 +146,7 @@ write_table(def)
 
 			/* argument info */
 			if (proc->arg_num > 1)
-				printit((char *) NULL, proc->args.argname);
+				printit(NULL, proc->args.argname);
 			else
 			/* do we have to do something special for newstyle */
 				printit(proc->args.decls->decl.prefix,
@@ -155,20 +161,17 @@ write_table(def)
 	}
 }
 
-static
-printit(prefix, type)
-	char *prefix;
-	char *type;
+static void
+printit(char *prefix, char *type)
 {
 	int len;
 	int tabs;
 
 
-	if (streq(type, "oneway")) {
-		len = fprintf(fout, "\t(xdrproc_t) xdr_void,");
-	} else {
-		len = fprintf(fout, "\t(xdrproc_t) xdr_%s,", stringfix(type));
-	}
+	if (streq(type, "oneway"))
+		len = fprintf(fout, "\t(xdrproc_t)xdr_void,");
+	else
+		len = fprintf(fout, "\t(xdrproc_t)xdr_%s,", stringfix(type));
 	/* account for leading tab expansion */
 	len += TABSIZE - 1;
 	if (len >= TABSTOP) {

@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +43,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <unistd.h>
 #include <rpc/rpc.h>
@@ -136,8 +137,7 @@ static struct dom_binding	*bound_domains; /* List of bound domains */
  *  that cannot be referenced by another thread.
  */
 void
-free_dom_binding(p)
-	struct dom_binding *p;
+free_dom_binding(struct dom_binding *p)
 {
 	if (p->ref_count != 0) {
 		p->need_free = 1;
@@ -146,7 +146,7 @@ free_dom_binding(p)
 	(void) check_rdev(p);
 	clnt_destroy(p->dom_client);
 	free(p->dom_domain);
-	free((char *)p);
+	free(p);
 }
 
 /*
@@ -159,8 +159,7 @@ free_dom_binding(p)
  */
 
 static void
-__yp_unbind_nolock(domain)
-char *domain;
+__yp_unbind_nolock(char *domain)
 {
 	struct dom_binding *p;
 	struct dom_binding **prev;
@@ -198,15 +197,11 @@ char *domain;
 
 
 void
-yp_unbind(domain)
-char *domain;
+yp_unbind(char *domain)
 {
-
-	trace1(TR_yp_unbind, 0);
-	mutex_lock(&bound_domains_lock);
+	(void) mutex_lock(&bound_domains_lock);
 	__yp_unbind_nolock(domain);
-	mutex_unlock(&bound_domains_lock);
-	trace1(TR_yp_unbind, 1);
+	(void) mutex_unlock(&bound_domains_lock);
 }
 
 
@@ -218,13 +213,12 @@ char *domain;
  * all requests.
  */
 static void
-newborn()
+newborn(void)
 {
 	static pid_t mypid;	/* Cached to detect forks */
 	pid_t testpid;
 	struct dom_binding *p, *q;
 
-	trace1(TR_newborn, 0);
 	if ((testpid = getpid()) != mypid) {
 
 		mypid = testpid;
@@ -235,7 +229,6 @@ newborn()
 		}
 		bound_domains = 0;
 	}
-	trace1(TR_newborn, 1);
 }
 
 /*
@@ -250,15 +243,12 @@ newborn()
  * all requests.
  */
 static bool
-check_binding(domain, binding)
-char *domain;
-struct dom_binding **binding;
+check_binding(char *domain, struct dom_binding **binding)
 {
 	struct dom_binding *pdomb;
 	struct ypbind_resp *ypbind_resp;
 	int status;
 
-	trace1(TR_check_binding, 0);
 	for (pdomb = bound_domains; pdomb != NULL; pdomb = pdomb->dom_pnext) {
 
 		if (strcmp(domain, pdomb->dom_domain) == 0) {
@@ -272,7 +262,6 @@ struct dom_binding **binding;
 		 */
 
 			*binding = pdomb;
-			trace1(TR_check_binding, 1);
 			return (TRUE);
 		}
 	}
@@ -284,15 +273,11 @@ struct dom_binding **binding;
 	 */
 	if ((ypbind_resp = get_cached_domain(domain)) != 0) {
 		pdomb = load_dom_binding(ypbind_resp, domain, &status);
-		if (pdomb == 0) {
-			trace1(TR_check_binding, 1);
+		if (pdomb == 0)
 			return (FALSE);
-		}
 		*binding = pdomb;
-		trace1(TR_check_binding, 1);
 		return (TRUE);
 	}
-	trace1(TR_check_binding, 1);
 	return (FALSE);
 }
 
@@ -320,20 +305,19 @@ __yp_add_binding_netid(char *domain, char *addr, char *netid)
 	if (nconf == 0)
 		goto err;
 
-	svcaddr = (struct netbuf *)malloc(sizeof (struct netbuf));
+	svcaddr = malloc(sizeof (struct netbuf));
 	if (svcaddr == 0)
 		goto err;
 
 	svcaddr->maxlen = SOCKADDR_SIZE;
-	svcaddr->buf = (char *)malloc(SOCKADDR_SIZE);
+	svcaddr->buf = malloc(SOCKADDR_SIZE);
 	if (svcaddr->buf == 0)
 		goto err;
 
 	if (!rpcb_getaddr(YPPROG, YPVERS, nconf, svcaddr, addr))
 		goto err;
 
-	binding = (struct ypbind_binding *)
-				malloc(sizeof (struct ypbind_binding));
+	binding = malloc(sizeof (struct ypbind_binding));
 	if (binding == 0)
 		goto err;
 
@@ -348,10 +332,10 @@ __yp_add_binding_netid(char *domain, char *addr, char *netid)
 	resp.ypbind_status = YPBIND_SUCC_VAL;
 	resp.ypbind_resp_u.ypbind_bindinfo = binding;
 
-	mutex_lock(&bound_domains_lock);
+	(void) mutex_lock(&bound_domains_lock);
 	newborn();
 	pdomb = load_dom_binding(&resp, domain, &status);
-	mutex_unlock(&bound_domains_lock);
+	(void) mutex_unlock(&bound_domains_lock);
 
 	return (pdomb != 0);
 
@@ -360,8 +344,8 @@ err:
 		freenetconfigent(nconf);
 	if (svcaddr) {
 		if (svcaddr->buf)
-			free((void *)svcaddr->buf);
-		free((void *)svcaddr);
+			free(svcaddr->buf);
+		free(svcaddr);
 	}
 	if (binding) {
 		if (binding->ypbind_servername)
@@ -394,23 +378,17 @@ __yp_add_binding(char *domain, char *addr) {
  * all requests.
  */
 static struct dom_binding *
-load_dom_binding(ypbind_res, domain, err)
-struct ypbind_resp *ypbind_res;
-char *domain;
-int *err;
+load_dom_binding(struct ypbind_resp *ypbind_res, char *domain, int *err)
 {
 	int fd;
 	struct dom_binding *pdomb;
 
-	trace1(TR_load_dom_binding, 0);
-	pdomb = (struct dom_binding *)NULL;
+	pdomb = NULL;
 
-	if ((pdomb = (struct dom_binding *)malloc(sizeof (struct dom_binding)))
-	    == NULL) {
+	if ((pdomb = malloc(sizeof (struct dom_binding))) == NULL) {
 		syslog(LOG_ERR, "load_dom_binding:  malloc failure.");
 		*err = YPERR_RESRC;
-		trace1(TR_load_dom_binding, 1);
-		return (struct dom_binding *)(NULL);
+		return (NULL);
 	}
 
 	pdomb->dom_binding = ypbind_res->ypbind_resp_u.ypbind_bindinfo;
@@ -424,23 +402,21 @@ int *err;
 					    __ypipbufsize);
 	if (pdomb->dom_client == NULL) {
 		clnt_pcreateerror("yp_bind: clnt_tli_create");
-		free((char *)pdomb);
+		free(pdomb);
 		*err = YPERR_RPC;
-		trace1(TR_load_dom_binding, 1);
-		return (struct dom_binding *)(NULL);
+		return (NULL);
 	}
 #ifdef DEBUG
 (void) printf("yp_bind: clnt_tli_create suceeded\n");
 #endif
 
 	pdomb->dom_pnext = bound_domains;	/* Link this to the list as */
-	pdomb->dom_domain = malloc(strlen(domain)+(unsigned)1);
+	pdomb->dom_domain = malloc(strlen(domain) + (unsigned)1);
 	if (pdomb->dom_domain == NULL) {
 		clnt_destroy(pdomb->dom_client);
-		free((char *)pdomb);
+		free(pdomb);
 		*err = YPERR_RESRC;
-		trace1(TR_load_dom_binding, 1);
-		return (struct dom_binding *)(NULL);
+		return (NULL);
 	}
 	/*
 	 *  We may not have loaded from a cache file, but we assume the
@@ -454,9 +430,8 @@ int *err;
 	(void) strcpy(pdomb->dom_domain, domain); /* Remember the domain name */
 	pdomb->ref_count = 0;
 	pdomb->need_free = 0;
-	mutex_init(&pdomb->server_name_lock, USYNC_THREAD, 0);
+	(void) mutex_init(&pdomb->server_name_lock, USYNC_THREAD, 0);
 	bound_domains = pdomb;			/* ... the head entry */
-	trace1(TR_load_dom_binding, 1);
 	return (pdomb);
 }
 
@@ -465,32 +440,23 @@ int *err;
  * a reserved port.
  */
 static int
-tli_open_rsvdport(nconf)
-	struct netconfig *nconf;	/* netconfig structure */
+tli_open_rsvdport(struct netconfig *nconf)
 {
 	int fd;
 
-	trace1(TR_tli_open_rsvdport, 0);
-	if (nconf == (struct netconfig *)NULL) {
-		trace1(TR_tli_open_rsvdport, 1);
+	if (nconf == NULL)
 		return (-1);
-	}
 
 	fd = t_open(nconf->nc_device, O_RDWR, NULL);
-	if (fd == -1) {
-		trace1(TR_tli_open_rsvdport, 1);
+	if (fd == -1)
 		return (-1);
-	}
 
 	if (netdir_options(nconf, ND_SET_RESERVEDPORT, fd, NULL) == -1) {
-		if (t_bind(fd, (struct t_bind *)NULL,
-		    (struct t_bind *)NULL) == -1) {
+		if (t_bind(fd, NULL, NULL) == -1) {
 			(void) t_close(fd);
-			trace1(TR_tli_open_rsvdport, 1);
 			return (-1);
 		}
 	}
-	trace1(TR_tli_open_rsvdport, 1);
 	return (fd);
 }
 
@@ -510,24 +476,18 @@ tli_open_rsvdport(nconf)
  * using free_dom_binding().
  */
 static struct dom_binding *
-load_dom_binding_rsvdport(dom_binding, domain, err)
-struct ypbind_binding *dom_binding;
-char *domain;
-int *err;
+load_dom_binding_rsvdport(struct ypbind_binding *dom_binding, char *domain,
+								int *err)
 {
 	struct dom_binding *pdomb;
 	int fd;
 
-	trace1(TR_load_dom_binding_rsvdport, 0);
-	pdomb = (struct dom_binding *)NULL;
+	pdomb = NULL;
 
-	if ((pdomb = (struct dom_binding *)malloc(sizeof (struct dom_binding)))
-	    == NULL) {
-		syslog(LOG_ERR,
-				"load_dom_binding_rsvdport:  malloc failure.");
+	if ((pdomb = malloc(sizeof (struct dom_binding))) == NULL) {
+		syslog(LOG_ERR, "load_dom_binding_rsvdport:  malloc failure.");
 		*err = YPERR_RESRC;
-		trace1(TR_load_dom_binding_rsvdport, 1);
-		return ((struct dom_binding *)NULL);
+		return (NULL);
 	}
 
 	pdomb->dom_binding = dom_binding;
@@ -537,10 +497,9 @@ int *err;
 	fd = tli_open_rsvdport(pdomb->dom_binding->ypbind_nconf);
 	if (fd < 0) {
 		clnt_pcreateerror("yp_bind: tli_open_rsvdport");
-		free((char *)pdomb);
+		free(pdomb);
 		*err = YPERR_RPC;
-		trace1(TR_load_dom_binding_rsvdport, 1);
-		return ((struct dom_binding *)NULL);
+		return (NULL);
 	}
 	pdomb->dom_client = clnt_tli_create(fd,
 					    pdomb->dom_binding->ypbind_nconf,
@@ -549,31 +508,28 @@ int *err;
 					    __ypipbufsize);
 	if (pdomb->dom_client == NULL) {
 		clnt_pcreateerror("yp_bind: clnt_tli_create");
-		free((char *)pdomb);
+		free(pdomb);
 		*err = YPERR_RPC;
-		trace1(TR_load_dom_binding_rsvdport, 1);
-		return ((struct dom_binding *)NULL);
+		return (NULL);
 	}
 #ifdef DEBUG
 (void) printf("yp_bind: clnt_tli_create suceeded\n");
 #endif
-	(void) CLNT_CONTROL(pdomb->dom_client, CLSET_FD_CLOSE, (char *)NULL);
+	(void) CLNT_CONTROL(pdomb->dom_client, CLSET_FD_CLOSE, NULL);
 
-	pdomb->dom_domain = malloc(strlen(domain)+(unsigned)1);
+	pdomb->dom_domain = malloc(strlen(domain) + (unsigned)1);
 	if (pdomb->dom_domain == NULL) {
 		clnt_destroy(pdomb->dom_client);
-		free((char *)pdomb);
+		free(pdomb);
 		*err = YPERR_RESRC;
-		trace1(TR_load_dom_binding_rsvdport, 1);
-		return (struct dom_binding *)(NULL);
+		return (NULL);
 	}
 
 	(void) strcpy(pdomb->dom_domain, domain); /* Remember the domain name */
 	pdomb->ref_count = 0;
 	pdomb->need_free = 0;
 	set_rdev(pdomb);
-	mutex_init(&pdomb->server_name_lock, USYNC_THREAD, 0);
-	trace1(TR_load_dom_binding_rsvdport, 1);
+	(void) mutex_init(&pdomb->server_name_lock, USYNC_THREAD, 0);
 	return (pdomb);
 }
 
@@ -602,15 +558,12 @@ __yp_dobind_cflookup(
 	int status, err = YPERR_DOMAIN;
 	int tries = 4; /* if not hardlookup, try 4 times max to bind */
 	int first_try = 1;
-	CLIENT *tb = (CLIENT *)NULL;
+	CLIENT *tb = NULL;
 
-	trace1(TR___yp_dobind, 0);
-	if ((domain == NULL) ||(strlen(domain) == 0)) {
-		trace1(TR___yp_dobind, 1);
+	if ((domain == NULL) ||(strlen(domain) == 0))
 		return (YPERR_BADARGS);
-	}
 
-	mutex_lock(&bound_domains_lock);
+	(void) mutex_lock(&bound_domains_lock);
 	/*
 	 * ===>
 	 * If someone managed to fork() while we were holding this lock,
@@ -626,8 +579,7 @@ __yp_dobind_cflookup(
 		 */
 		if (!(*binding)->cache_bad && check_rdev(*binding)) {
 			(*binding)->ref_count += 1;
-			mutex_unlock(&bound_domains_lock);
-			trace1(TR___yp_dobind, 1);
+			(void) mutex_unlock(&bound_domains_lock);
 			return (0);		/* We are bound */
 		}
 
@@ -649,13 +601,12 @@ __yp_dobind_cflookup(
 			__yp_unbind_nolock(domain);
 		} else {
 			(*binding)->cache_bad = 1;
-			mutex_unlock(&bound_domains_lock);
+			(void) mutex_unlock(&bound_domains_lock);
 			yp_unbind(domain);
-			mutex_lock(&bound_domains_lock);
+			(void) mutex_lock(&bound_domains_lock);
 			if (check_binding(domain, binding)) {
 				(*binding)->ref_count += 1;
-				mutex_unlock(&bound_domains_lock);
-				trace1(TR___yp_dobind, 1);
+				(void) mutex_unlock(&bound_domains_lock);
 				return (0);
 			}
 		}
@@ -694,7 +645,7 @@ __yp_dobind_cflookup(
 			clnt_perror(tb,
 				"ypbindproc_domain_3: can't contact ypbind");
 			clnt_destroy(tb);
-			tb = (CLIENT *)NULL;
+			tb = NULL;
 			continue;
 		}
 		if (ypbind_resp->ypbind_status == YPBIND_SUCC_VAL) {
@@ -706,14 +657,13 @@ __yp_dobind_cflookup(
 			if (pdomb == 0) {
 				err = status;
 				clnt_destroy(tb);
-				tb = (CLIENT *)NULL;
+				tb = NULL;
 				continue;
 			}
 			clnt_destroy(tb);
 			pdomb->ref_count += 1;
-			mutex_unlock(&bound_domains_lock);
+			(void) mutex_unlock(&bound_domains_lock);
 			*binding = pdomb; /* Return ptr to the binding entry */
-			trace1(TR___yp_dobind, 1);
 			return (0);		/* This is the go path */
 		}
 		if (ypbind_resp->ypbind_resp_u.ypbind_error ==
@@ -722,12 +672,11 @@ __yp_dobind_cflookup(
 		else
 			err = YPERR_YPBIND;
 		clnt_destroy(tb);
-		tb = (CLIENT *)NULL;
+		tb = NULL;
 	}
-	if (tb != (CLIENT *)NULL)
+	if (tb != NULL)
 		clnt_destroy(tb);
-	mutex_unlock(&bound_domains_lock);
-	trace1(TR___yp_dobind, 1);
+	(void) mutex_unlock(&bound_domains_lock);
 	if (err)
 		return (err);
 	return (YPERR_DOMAIN);
@@ -743,14 +692,13 @@ __yp_dobind(
 }
 
 void
-__yp_rel_binding(binding)
-	struct dom_binding *binding;
+__yp_rel_binding(struct dom_binding *binding)
 {
-	mutex_lock(&bound_domains_lock);
+	(void) mutex_lock(&bound_domains_lock);
 	binding->ref_count -= 1;
 	if (binding->need_free && binding->ref_count == 0)
 		free_dom_binding(binding);
-	mutex_unlock(&bound_domains_lock);
+	(void) mutex_unlock(&bound_domains_lock);
 }
 
 /*
@@ -779,15 +727,12 @@ __yp_dobind_rsvdport_cflookup(
 	int status,  err = YPERR_DOMAIN;
 	int tries = 4; /* if not hardlookup, try a few times to bind */
 	int first_try = 1;
-	CLIENT *tb = (CLIENT *)NULL;
+	CLIENT *tb = NULL;
 
-	trace1(TR___yp_dobind_rsvdport, 0);
-	if ((domain == NULL) ||(strlen(domain) == 0)) {
-		trace1(TR___yp_dobind_rsvdport, 1);
+	if ((domain == NULL) ||(strlen(domain) == 0))
 		return (YPERR_BADARGS);
-	}
 
-	mutex_lock(&bound_domains_lock);
+	(void) mutex_lock(&bound_domains_lock);
 	/*
 	 * ===>
 	 * If someone managed to fork() while we were holding this lock,
@@ -811,14 +756,12 @@ __yp_dobind_rsvdport_cflookup(
 						(*binding)->dom_binding,
 							domain, &status);
 			if (pdomb == 0) {
-				mutex_unlock(&bound_domains_lock);
-				trace1(TR___yp_dobind_rsvdport, 1);
+				(void) mutex_unlock(&bound_domains_lock);
 				return (status);
 			}
 			pdomb->ref_count += 1;
-			mutex_unlock(&bound_domains_lock);
+			(void) mutex_unlock(&bound_domains_lock);
 			*binding = pdomb; /* Return ptr to the binding entry */
-			trace1(TR___yp_dobind_rsvdport, 1);
 			return (0);
 		}
 	}
@@ -856,7 +799,7 @@ __yp_dobind_rsvdport_cflookup(
 			clnt_perror(tb,
 				"ypbindproc_domain_3: can't contact ypbind");
 			clnt_destroy(tb);
-			tb = (CLIENT *)NULL;
+			tb = NULL;
 			continue;
 		}
 		if (ypbind_resp->ypbind_status == YPBIND_SUCC_VAL) {
@@ -870,14 +813,13 @@ __yp_dobind_rsvdport_cflookup(
 			if (pdomb == 0) {
 				err = status;
 				clnt_destroy(tb);
-				tb = (CLIENT *)NULL;
+				tb = NULL;
 				continue;
 			}
 			clnt_destroy(tb);
 			pdomb->ref_count += 1;
-			mutex_unlock(&bound_domains_lock);
+			(void) mutex_unlock(&bound_domains_lock);
 			*binding = pdomb; /* Return ptr to the binding entry */
-			trace1(TR___yp_dobind_rsvdport, 1);
 			return (0);		/* This is the go path */
 		}
 		if (ypbind_resp->ypbind_resp_u.ypbind_error ==
@@ -886,12 +828,11 @@ __yp_dobind_rsvdport_cflookup(
 		else
 			err = YPERR_YPBIND;
 		clnt_destroy(tb);
-		tb = (CLIENT *)NULL;
+		tb = NULL;
 	}
-	if (tb != (CLIENT *)NULL)
+	if (tb != NULL)
 		clnt_destroy(tb);
-	mutex_unlock(&bound_domains_lock);
-	trace1(TR___yp_dobind_rsvdport, 1);
+	(void) mutex_unlock(&bound_domains_lock);
 	if (err)
 		return (err);
 	return (YPERR_DOMAIN);
@@ -911,55 +852,44 @@ __yp_dobind_rsvdport(
  * functions which neither know nor care about struct dom_bindings.
  */
 int
-yp_bind(domain)
-char *domain;
+yp_bind(char *domain)
 {
 
 	struct dom_binding *binding;
-	int    dummy;
+	int    res;
 
-	trace1(TR_yp_bind, 0);
-	dummy = __yp_dobind(domain, &binding);
-	if (dummy == 0)
+	res = __yp_dobind(domain, &binding);
+	if (res == 0)
 		__yp_rel_binding(binding);
-	trace1(TR_yp_bind, 1);
-
-	return (dummy);
+	return (res);
 }
 
 static char *
-__default_domain()
+__default_domain(void)
 {
 	char temp[256];
 
-	trace1(TR___default_domain, 0);
-
-	mutex_lock(&default_domain_lock);
+	(void) mutex_lock(&default_domain_lock);
 
 	if (default_domain) {
-		mutex_unlock(&default_domain_lock);
-		trace1(TR___default_domain, 1);
+		(void) mutex_unlock(&default_domain_lock);
 		return (default_domain);
 	}
 	if (getdomainname(temp, sizeof (temp)) < 0) {
-		mutex_unlock(&default_domain_lock);
-		trace1(TR___default_domain, 1);
+		(void) mutex_unlock(&default_domain_lock);
 		return (0);
 	}
 	if (strlen(temp) > 0) {
-		default_domain = (char *)malloc((strlen(temp) + 1));
+		default_domain = malloc((strlen(temp) + 1));
 		if (default_domain == 0) {
-			mutex_unlock(&default_domain_lock);
-			trace1(TR___default_domain, 1);
+			(void) mutex_unlock(&default_domain_lock);
 			return (0);
 		}
 		(void) strcpy(default_domain, temp);
-		mutex_unlock(&default_domain_lock);
-		trace1(TR___default_domain, 1);
+		(void) mutex_unlock(&default_domain_lock);
 		return (default_domain);
 	}
-	mutex_unlock(&default_domain_lock);
-	trace1(TR___default_domain, 1);
+	(void) mutex_unlock(&default_domain_lock);
 	return (0);
 }
 
@@ -970,16 +900,10 @@ __default_domain()
  * get rejected elsewhere in the yp client package.
  */
 int
-yp_get_default_domain(domain)
-char **domain;
+yp_get_default_domain(char **domain)
 {
-	trace1(TR_yp_get_default_domain, 0);
-
-	if ((*domain = __default_domain()) != 0) {
-		trace1(TR_yp_get_default_domain, 1);
+	if ((*domain = __default_domain()) != 0)
 		return (0);
-	}
-	trace1(TR_yp_get_default_domain, 1);
 	return (YPERR_YPERR);
 }
 
@@ -987,19 +911,14 @@ char **domain;
  * ===> Nobody uses this, do they?  Can we nuke it?
  */
 int
-usingypmap(ddn, map)
-char **ddn;  /* the default domainname set by this routine */
-char *map;  /* the map we are interested in. */
+usingypmap(char **ddn, char *map)
 {
 	char in, *outval = NULL;
 	int outvallen, stat;
 	char *domain;
 
-	trace1(TR_usingypmap, 0);
-	if ((domain = __default_domain()) == 0) {
-		trace1(TR_usingypmap, 1);
+	if ((domain = __default_domain()) == 0)
 		return (FALSE);
-	}
 	*ddn = domain;
 	/* does the map exist ? */
 	in = (char)0xff;
@@ -1012,10 +931,8 @@ char *map;  /* the map we are interested in. */
 	case YPERR_KEY:  /* no such key in map */
 	case YPERR_NOMORE:
 	case YPERR_BUSY:
-		trace1(TR_usingypmap, 1);
 		return (TRUE);
 	}
-	trace1(TR_usingypmap, 1);
 	return (FALSE);
 }
 
@@ -1025,24 +942,19 @@ char *map;  /* the map we are interested in. */
  * it goes to is straddr.so.
  */
 CLIENT *
-__clnt_create_loopback(prog, vers, err)
-	rpcprog_t prog;	/* program number */
-	rpcvers_t vers;	/* version number */
-	int *err;		/* return the YP sepcific error code */
+__clnt_create_loopback(rpcprog_t prog, rpcvers_t vers, int *err)
 {
 	struct netconfig *nconf;
 	CLIENT *clnt = NULL;
 	void *nc_handle;	/* Net config handle */
 
-	trace3(TR___clnt_create_loopback, 0, prog, vers);
 	*err = 0;
 	nc_handle = setnetconfig();
-	if (nc_handle == (void *) NULL) {
+	if (nc_handle == NULL) {
 		/* fails to open netconfig file */
 		rpc_createerr.cf_stat = RPC_FAILED;
 		*err = YPERR_RPC;
-		trace1(TR___clnt_create_loopback, 1);
-		return ((CLIENT *) NULL);
+		return (NULL);
 	}
 	while (nconf = getnetconfig(nc_handle))
 		/* Try only one connection oriented loopback transport */
@@ -1052,23 +964,18 @@ __clnt_create_loopback(prog, vers, err)
 			clnt = getclnt(prog, vers, nconf, err);
 			break;
 		}
-	endnetconfig(nc_handle);
+	(void) endnetconfig(nc_handle);
 
-	if (clnt == (CLIENT *) NULL) {	/* no loopback transport available */
+	if (clnt == NULL) {	/* no loopback transport available */
 		if (rpc_createerr.cf_stat == 0)
 			rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
 		if (*err == 0) *err = YPERR_RPC;
 	}
-	trace1(TR___clnt_create_loopback, 1);
 	return (clnt);
 }
 
 static CLIENT *
-getclnt(prog, vers, nconf, err)
-rpcprog_t prog;	/* program number */
-rpcvers_t vers;	/* version number */
-struct netconfig *nconf;
-int *err;
+getclnt(rpcprog_t prog, rpcvers_t vers, struct netconfig *nconf, int *err)
 {
 	int fd;
 	struct netbuf *svcaddr;			/* servers address */
@@ -1082,12 +989,10 @@ int *err;
 	char *ua;
 	struct timeval tv = { 30, 0 };
 
-	trace3(TR_getclnt, 0, prog, vers);
-	if (nconf == (struct netconfig *)NULL) {
+	if (nconf == NULL) {
 		rpc_createerr.cf_stat = RPC_TLIERROR;
 		*err = YPERR_RPC;
-		trace1(TR_getclnt, 1);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 
 	/*
@@ -1113,21 +1018,18 @@ int *err;
 	if (netdir_getbyname(nconf, &rpcbind_hs, &nas) != ND_OK) {
 		rpc_createerr.cf_stat = RPC_N2AXLATEFAILURE;
 		*err = YPERR_RPC;
-		trace1(TR_getclnt, 1);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 	if ((fd = t_open(nconf->nc_device, O_RDWR, NULL)) == -1) {
 		rpc_createerr.cf_stat = RPC_TLIERROR;
 		*err = YPERR_RPC;
-		trace1(TR_getclnt, 1);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
-	if (t_bind(fd, (struct t_bind *)NULL, (struct t_bind *)NULL) == -1) {
+	if (t_bind(fd, NULL, NULL) == -1) {
 		rpc_createerr.cf_stat = RPC_TLIERROR;
 		*err = YPERR_RPC;
 		(void) t_close(fd);
-		trace1(TR_getclnt, 1);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 	sndcall.addr = *(nas->n_addrs);
 	sndcall.opt.len = 0;
@@ -1137,8 +1039,7 @@ int *err;
 		rpc_createerr.cf_stat = RPC_TLIERROR;
 		(void) t_close(fd);
 		*err = YPERR_PMAP;
-		trace1(TR_getclnt, 1);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 
 	/*
@@ -1147,11 +1048,10 @@ int *err;
 	cl = clnt_tli_create(fd, nconf, nas->n_addrs,
 		RPCBPROG, RPCBVERS, __ypipbufsize, __ypipbufsize);
 	netdir_free((char *)nas, ND_ADDRLIST);
-	if (cl == (CLIENT *)NULL) {
+	if (cl == NULL) {
 		(void) t_close(fd);
 		*err = YPERR_PMAP;
-		trace1(TR_getclnt, 1);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 	parms.r_prog = prog;
 	parms.r_vers = vers;
@@ -1165,13 +1065,12 @@ int *err;
 	clnt_destroy(cl);
 	if (clnt_st != RPC_SUCCESS) {
 		*err = YPERR_YPBIND;
-		trace1(TR_getclnt, 1);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 	if (strlen(uaddress) == 0) {
 		*err = YPERR_YPBIND;
 		rpc_createerr.cf_stat = RPC_PROGNOTREGISTERED;
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 
 create_client:
@@ -1179,31 +1078,25 @@ create_client:
 	cl = clnt_tli_create(RPC_ANYFD, nconf, svcaddr, prog, vers,
 					__ypipbufsize, __ypipbufsize);
 	netdir_free((char *)svcaddr, ND_ADDR);
-	if (cl == (CLIENT *)NULL) {
+	if (cl == NULL) {
 		*err = YPERR_YPBIND;
-		trace1(TR_getclnt, 1);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 	/*
 	 * The fd should be closed while destroying the handle.
 	 */
-	trace1(TR_getclnt, 1);
 	return (cl);
 }
 
-static
-int
-get_cached_transport(nconf, vers, uaddress, ulen)
-	struct netconfig *nconf;
-	int vers;
-	char *uaddress;
-	int ulen;
+static int
+get_cached_transport(struct netconfig *nconf, int vers, char *uaddress,
+								int ulen)
 {
 	ssize_t st;
 	int fd;
 
-	(void) sprintf(uaddress, "%s/xprt.%s.%d", BINDING, nconf->nc_netid,
-	    vers);
+	(void) snprintf(uaddress, ulen,
+		"%s/xprt.%s.%d", BINDING, nconf->nc_netid, vers);
 	fd = open(uaddress, O_RDONLY);
 	if (fd == -1)
 		return (0);
@@ -1225,10 +1118,8 @@ get_cached_transport(nconf, vers, uaddress, ulen)
 	return (1);
 }
 
-static
-ypbind_resp *
-get_cached_domain(domain)
-	char *domain;
+static ypbind_resp *
+get_cached_domain(char *domain)
 {
 	__NSL_FILE *fp;
 	int st;
@@ -1236,7 +1127,8 @@ get_cached_domain(domain)
 	static ypbind_resp res;
 	XDR xdrs;
 
-	(void) sprintf(filename, "%s/%s/cache_binding", BINDING, domain);
+	(void) snprintf(filename, sizeof (filename),
+					"%s/%s/cache_binding", BINDING, domain);
 	fp = __nsl_fopen(filename, "r");
 	if (fp == 0)
 		return (0);
@@ -1262,17 +1154,14 @@ get_cached_domain(domain)
 	return (0);
 }
 
-static
-int
-ypbind_running(err, status)
-	int err;
-	int status;
+static int
+ypbind_running(int err, int status)
 {
 	char filename[300];
 	int st;
 	int fd;
 
-	(void) sprintf(filename, "%s/ypbind.pid", BINDING);
+	(void) snprintf(filename, sizeof (filename), "%s/ypbind.pid", BINDING);
 	fd = open(filename, O_RDONLY);
 	if (fd == -1) {
 		if ((err == YPERR_YPBIND) && (status != RPC_PROGNOTREGISTERED))
@@ -1291,10 +1180,8 @@ ypbind_running(err, status)
 	return (1);
 }
 
-static
-void
-set_rdev(pdomb)
-	struct dom_binding *pdomb;
+static void
+set_rdev(struct dom_binding *pdomb)
 {
 	int fd;
 	struct stat stbuf;
@@ -1309,10 +1196,8 @@ set_rdev(pdomb)
 	pdomb->rdev = stbuf.st_rdev;
 }
 
-static
-int
-check_rdev(pdomb)
-	struct dom_binding *pdomb;
+static int
+check_rdev(struct dom_binding *pdomb)
 {
 	struct stat stbuf;
 
@@ -1323,7 +1208,7 @@ check_rdev(pdomb)
 		syslog(LOG_DEBUG, "yp_bind client:  can't stat %d", pdomb->fd);
 		/* could be because file descriptor was closed */
 		/* it's not our file descriptor, so don't try to close it */
-		clnt_control(pdomb->dom_client, CLSET_FD_NCLOSE, (char *)NULL);
+		clnt_control(pdomb->dom_client, CLSET_FD_NCLOSE, NULL);
 		return (0);
 	}
 	if (pdomb->rdev != stbuf.st_rdev) {
@@ -1331,7 +1216,7 @@ check_rdev(pdomb)
 		    "yp_bind client:  fd %d changed, old=0x%x, new=0x%x",
 		    pdomb->fd, pdomb->rdev, stbuf.st_rdev);
 		/* it's not our file descriptor, so don't try to close it */
-		clnt_control(pdomb->dom_client, CLSET_FD_NCLOSE, (char *)NULL);
+		clnt_control(pdomb->dom_client, CLSET_FD_NCLOSE, NULL);
 		return (0);
 	}
 	return (1);    /* fd is okay */

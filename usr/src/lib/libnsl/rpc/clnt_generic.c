@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -39,7 +40,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <rpc/nettype.h>
 #include <netdir.h>
 #include <string.h>
@@ -47,8 +47,8 @@
 
 extern int __td_setnodelay(int);
 extern bool_t __rpc_is_local_host(const char *);
-extern bool_t __rpc_try_doors(char *, bool_t *);
-extern CLIENT *_clnt_vc_create_timed(register int, struct netbuf *, rpcprog_t,
+extern bool_t __rpc_try_doors(const char *, bool_t *);
+extern CLIENT *_clnt_vc_create_timed(int, struct netbuf *, rpcprog_t,
 			rpcvers_t, uint_t, uint_t, const struct timeval *);
 
 CLIENT *_clnt_tli_create_timed(int, const struct netconfig *, struct netbuf *,
@@ -68,8 +68,9 @@ CLIENT *_clnt_tli_create_timed(int, const struct netconfig *, struct netbuf *,
  * pointer, which indicates that the default timeout should be used.
  */
 CLIENT *
-clnt_create_vers(const char *hostname, rpcprog_t prog, rpcvers_t *vers_out,
-	rpcvers_t vers_low, rpcvers_t vers_high, const char *nettype)
+clnt_create_vers(const char *hostname, const rpcprog_t prog,
+	rpcvers_t *vers_out, const rpcvers_t vers_low,
+	const rpcvers_t vers_high, const char *nettype)
 {
 	return (clnt_create_vers_timed(hostname, prog, vers_out, vers_low,
 				vers_high, nettype, NULL));
@@ -82,21 +83,19 @@ clnt_create_vers(const char *hostname, rpcprog_t prog, rpcvers_t *vers_out,
  * that the default timeout value should be used.
  */
 CLIENT *
-clnt_create_vers_timed(const char *hostname, rpcprog_t prog,
-    rpcvers_t *vers_out, rpcvers_t vers_low, rpcvers_t vers_high,
+clnt_create_vers_timed(const char *hostname, const rpcprog_t prog,
+    rpcvers_t *vers_out, const rpcvers_t vers_low, const rpcvers_t vers_high,
     const char *nettype, const struct timeval *tp)
 {
 	CLIENT *clnt;
 	struct timeval to;
 	enum clnt_stat rpc_stat;
 	struct rpc_err rpcerr;
+	rpcvers_t v_low, v_high;
 
-	trace4(TR_clnt_create_vers_timed, 0, prog, vers_low, vers_high);
 	clnt = clnt_create_timed(hostname, prog, vers_high, nettype, tp);
-	if (clnt == NULL) {
-		trace4(TR_clnt_create_vers_timed, 1, prog, vers_low, vers_high);
+	if (clnt == NULL)
 		return (NULL);
-	}
 	if (tp == NULL) {
 		to.tv_sec = 10;
 		to.tv_usec = 0;
@@ -104,35 +103,34 @@ clnt_create_vers_timed(const char *hostname, rpcprog_t prog,
 		to = *tp;
 
 	rpc_stat = clnt_call(clnt, NULLPROC, (xdrproc_t)xdr_void,
-			(char *)NULL, (xdrproc_t)xdr_void, (char *)NULL, to);
+			NULL, (xdrproc_t)xdr_void, NULL, to);
 	if (rpc_stat == RPC_SUCCESS) {
 		*vers_out = vers_high;
-		trace4(TR_clnt_create_vers_timed, 1, prog, vers_low, vers_high);
 		return (clnt);
 	}
-	while (rpc_stat == RPC_PROGVERSMISMATCH && vers_high > vers_low) {
+	v_low = vers_low;
+	v_high = vers_high;
+	while (rpc_stat == RPC_PROGVERSMISMATCH && v_high > v_low) {
 		unsigned int minvers, maxvers;
 
 		clnt_geterr(clnt, &rpcerr);
 		minvers = rpcerr.re_vers.low;
 		maxvers = rpcerr.re_vers.high;
-		if (maxvers < vers_high)
-			vers_high = maxvers;
+		if (maxvers < v_high)
+			v_high = maxvers;
 		else
-			vers_high--;
-		if (minvers > vers_low)
-			vers_low = minvers;
-		if (vers_low > vers_high) {
+			v_high--;
+		if (minvers > v_low)
+			v_low = minvers;
+		if (v_low > v_high) {
 			goto error;
 		}
-		CLNT_CONTROL(clnt, CLSET_VERS, (char *)&vers_high);
+		CLNT_CONTROL(clnt, CLSET_VERS, (char *)&v_high);
 		rpc_stat = clnt_call(clnt, NULLPROC, (xdrproc_t)xdr_void,
-				(char *)NULL, (xdrproc_t)xdr_void,
-				(char *)NULL, to);
+				NULL, (xdrproc_t)xdr_void,
+				NULL, to);
 		if (rpc_stat == RPC_SUCCESS) {
-			*vers_out = vers_high;
-			trace4(TR_clnt_create_vers_timed, 1, prog,
-				vers_low, vers_high);
+			*vers_out = v_high;
 			return (clnt);
 		}
 	}
@@ -142,7 +140,6 @@ error:
 	rpc_createerr.cf_stat = rpc_stat;
 	rpc_createerr.cf_error = rpcerr;
 	clnt_destroy(clnt);
-	trace4(TR_clnt_create_vers_timed, 1, prog, vers_low, vers_high);
 	return (NULL);
 }
 
@@ -160,7 +157,7 @@ error:
  * It calls clnt_create_timed() with the default timeout.
  */
 CLIENT *
-clnt_create(const char *hostname, rpcprog_t prog, rpcvers_t vers,
+clnt_create(const char *hostname, const rpcprog_t prog, const rpcvers_t vers,
     const char *nettype)
 {
 	return (clnt_create_timed(hostname, prog, vers, nettype, NULL));
@@ -175,8 +172,8 @@ clnt_create(const char *hostname, rpcprog_t prog, rpcvers_t vers,
  * This function calls clnt_tp_create_timed().
  */
 CLIENT *
-clnt_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
-    const char *netclass, const struct timeval *tp)
+clnt_create_timed(const char *hostname, const rpcprog_t prog,
+    const rpcvers_t vers, const char *netclass, const struct timeval *tp)
 {
 	struct netconfig *nconf;
 	CLIENT *clnt = NULL;
@@ -187,18 +184,15 @@ clnt_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
 	char *nettype = &nettype_array[0];
 	bool_t try_others;
 
-	trace3(TR_clnt_create, 0, prog, vers);
-
 	if (netclass == NULL)
 		nettype = NULL;
 	else {
 		size_t len = strlen(netclass);
 		if (len >= sizeof (nettype_array)) {
 			rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-			trace3(TR_clnt_create, 1, prog, vers);
-			return ((CLIENT *)NULL);
+			return (NULL);
 		}
-		strcpy(nettype, netclass);
+		(void) strcpy(nettype, netclass);
 	}
 
 	/*
@@ -213,7 +207,7 @@ clnt_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
 				return (clnt);
 			else {
 				if (rpc_createerr.cf_stat == RPC_SYSTEMERROR)
-					return ((CLIENT *)NULL);
+					return (NULL);
 				save_cf_stat = rpc_createerr.cf_stat;
 				save_cf_error = rpc_createerr.cf_error;
 			}
@@ -226,11 +220,10 @@ clnt_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
 
 	if ((handle = __rpc_setconf((char *)nettype)) == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		trace3(TR_clnt_create, 1, prog, vers);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 	rpc_createerr.cf_stat = RPC_SUCCESS;
-	while (clnt == (CLIENT *)NULL) {
+	while (clnt == NULL) {
 		if ((nconf = __rpc_getconf(handle)) == NULL) {
 			if (rpc_createerr.cf_stat == RPC_SUCCESS)
 				rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
@@ -281,7 +274,6 @@ clnt_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
 		rpc_createerr.cf_error = save_cf_error;
 	}
 	__rpc_endconf(handle);
-	trace3(TR_clnt_create, 1, prog, vers);
 	return (clnt);
 }
 
@@ -326,10 +318,9 @@ clnt_create_service_timed(const char *host, const char *service,
 		size_t len = strlen(netclass);
 		if (len >= sizeof (nettype_array)) {
 			rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-			trace3(TR_clnt_create, 1, prog, vers);
-			return ((CLIENT *)NULL);
+			return (NULL);
 		}
-		strcpy(nettype, netclass);
+		(void) strcpy(nettype, netclass);
 	}
 
 	if (tmout == NULL) {
@@ -340,7 +331,7 @@ clnt_create_service_timed(const char *host, const char *service,
 
 	if ((handle = __rpc_setconf(nettype)) == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 
 	/*
@@ -350,7 +341,7 @@ clnt_create_service_timed(const char *host, const char *service,
 		rpc_createerr.cf_stat = RPC_SYSTEMERROR;
 		rpc_createerr.cf_error.re_errno = (host ? errno : EINVAL);
 		rpc_createerr.cf_error.re_terrno = 0;
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 
 	if (service == NULL)
@@ -360,7 +351,7 @@ clnt_create_service_timed(const char *host, const char *service,
 		rpc_createerr.cf_stat = RPC_SYSTEMERROR;
 		rpc_createerr.cf_error.re_errno = errno;
 		rpc_createerr.cf_error.re_terrno = 0;
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 
 	hs.h_host = hostname;
@@ -386,7 +377,7 @@ clnt_create_service_timed(const char *host, const char *service,
 		goto done;
 
 	rpc_createerr.cf_stat = RPC_SUCCESS;
-	while (clnt == (CLIENT *)NULL) {
+	while (clnt == NULL) {
 		tbind = NULL;
 		if ((nconf = __rpc_getconf(handle)) == NULL) {
 			if (rpc_createerr.cf_stat == RPC_SUCCESS)
@@ -410,9 +401,10 @@ clnt_create_service_timed(const char *host, const char *service,
 		if (fd < __rpc_minfd)
 			fd = __rpc_raise_fd(fd);
 
+		/* LINTED pointer cast */
 		if ((tbind = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR))
 		    == NULL) {
-			t_close(fd);
+			(void) t_close(fd);
 			rpc_createerr.cf_stat = RPC_TLIERROR;
 			rpc_createerr.cf_error.re_errno = errno;
 			rpc_createerr.cf_error.re_terrno = t_errno;
@@ -423,21 +415,22 @@ clnt_create_service_timed(const char *host, const char *service,
 			if (rpc_createerr.cf_stat == RPC_SUCCESS)
 				rpc_createerr.cf_stat = RPC_UNKNOWNHOST;
 			if (tbind)
-				t_free((char *)tbind, T_BIND);
-			t_close(fd);
+				(void) t_free((char *)tbind, T_BIND);
+			(void) t_close(fd);
 			continue;
 		}
-		memcpy(tbind->addr.buf, raddrs->n_addrs->buf,
+		(void) memcpy(tbind->addr.buf, raddrs->n_addrs->buf,
 		    raddrs->n_addrs->len);
 		tbind->addr.len = raddrs->n_addrs->len;
 		netdir_free((void *)raddrs, ND_ADDRLIST);
 
 		if (port) {
-			/* LINTED pointer alignment */
 			if (strcmp(nconf->nc_protofmly, NC_INET) == NULL)
+				/* LINTED pointer alignment */
 				((struct sockaddr_in *)
 				tbind->addr.buf)->sin_port = htons(port);
 			else if (strcmp(nconf->nc_protofmly, NC_INET6) == NULL)
+				/* LINTED pointer alignment */
 				((struct sockaddr_in6 *)
 				tbind->addr.buf)->sin6_port = htons(port);
 		}
@@ -447,12 +440,12 @@ clnt_create_service_timed(const char *host, const char *service,
 
 		if (clnt == NULL) {
 			if (tbind)
-				t_free((char *)tbind, T_BIND);
-			t_close(fd);
+				(void) t_free((char *)tbind, T_BIND);
+			(void) t_close(fd);
 			continue;
 		}
 
-		(void) CLNT_CONTROL(clnt, CLSET_FD_CLOSE, (char *)NULL);
+		(void) CLNT_CONTROL(clnt, CLSET_FD_CLOSE, NULL);
 
 		/*
 		 * Check if we can reach the server with this clnt handle
@@ -471,7 +464,7 @@ clnt_create_service_timed(const char *host, const char *service,
 			clnt_destroy(clnt);
 			clnt = NULL;
 			if (tbind)
-				t_free((char *)tbind, T_BIND);
+				(void) t_free((char *)tbind, T_BIND);
 			continue;
 		} else
 			break;
@@ -479,7 +472,7 @@ clnt_create_service_timed(const char *host, const char *service,
 
 	__rpc_endconf(handle);
 	if (tbind)
-		t_free((char *)tbind, T_BIND);
+		(void) t_free((char *)tbind, T_BIND);
 
 done:
 	if (hostname)
@@ -499,7 +492,7 @@ done:
  * It calls clnt_tp_create_timed() with the default timeout.
  */
 CLIENT *
-clnt_tp_create(const char *hostname, rpcprog_t prog, rpcvers_t vers,
+clnt_tp_create(const char *hostname, const rpcprog_t prog, const rpcvers_t vers,
     const struct netconfig *nconf)
 {
 	return (clnt_tp_create_timed(hostname, prog, vers, nconf, NULL));
@@ -512,19 +505,18 @@ clnt_tp_create(const char *hostname, rpcprog_t prog, rpcvers_t vers,
  * value for the timeout should be used.
  */
 CLIENT *
-clnt_tp_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
-    const struct netconfig *nconf, const struct timeval *tp)
+clnt_tp_create_timed(const char *hostname, const rpcprog_t prog,
+    const rpcvers_t vers, const struct netconfig *nconf,
+    const struct timeval *tp)
 {
 	struct netbuf *svcaddr;			/* servers address */
 	CLIENT *cl = NULL;			/* client handle */
 	extern struct netbuf *__rpcb_findaddr_timed(rpcprog_t, rpcvers_t,
 	    struct netconfig *, char *, CLIENT **, struct timeval *);
 
-	trace3(TR_clnt_tp_create, 0, prog, vers);
-	if (nconf == (struct netconfig *)NULL) {
+	if (nconf == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		trace3(TR_clnt_tp_create, 1, prog, vers);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 
 	/*
@@ -534,10 +526,9 @@ clnt_tp_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
 			(struct netconfig *)nconf, (char *)hostname,
 			&cl, (struct timeval *)tp)) == NULL) {
 		/* appropriate error number is set by rpcbind libraries */
-		trace3(TR_clnt_tp_create, 1, prog, vers);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
-	if (cl == (CLIENT *)NULL) {
+	if (cl == NULL) {
 		cl = _clnt_tli_create_timed(RPC_ANYFD, nconf, svcaddr,
 					prog, vers, 0, 0, tp);
 	} else {
@@ -551,7 +542,7 @@ clnt_tp_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
 					syslog(LOG_ERR,
 						"clnt_tp_create_timed: "
 						"strdup failed.");
-					return ((CLIENT *)NULL);
+					return (NULL);
 				}
 			}
 			if (cl->cl_tp == NULL) {
@@ -564,7 +555,7 @@ clnt_tp_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
 					syslog(LOG_ERR,
 						"clnt_tp_create_timed: "
 						"strdup failed.");
-					return ((CLIENT *)NULL);
+					return (NULL);
 				}
 			}
 			(void) CLNT_CONTROL(cl, CLSET_PROG, (void *)&prog);
@@ -576,7 +567,6 @@ clnt_tp_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
 		}
 	}
 	netdir_free((char *)svcaddr, ND_ADDR);
-	trace3(TR_clnt_tp_create, 1, prog, vers);
 	return (cl);
 }
 
@@ -589,8 +579,9 @@ clnt_tp_create_timed(const char *hostname, rpcprog_t prog, rpcvers_t vers,
  * If sizes are 0; appropriate defaults will be chosen.
  */
 CLIENT *
-clnt_tli_create(int fd, const struct netconfig *nconf, struct netbuf *svcaddr,
-    rpcprog_t prog, rpcvers_t vers, uint_t sendsz, uint_t recvsz)
+clnt_tli_create(const int fd, const struct netconfig *nconf,
+    struct netbuf *svcaddr, const rpcprog_t prog, const rpcvers_t vers,
+    const uint_t sendsz, const uint_t recvsz)
 {
 	return (_clnt_tli_create_timed(fd, nconf, svcaddr, prog, vers, sendsz,
 		recvsz, NULL));
@@ -617,12 +608,10 @@ _clnt_tli_create_timed(int fd, const struct netconfig *nconf,
 	int retval;
 	extern int __rpc_minfd;
 
-	trace5(TR_clnt_tli_create, 0, prog, vers, sendsz, recvsz);
 	if (fd == RPC_ANYFD) {
-		if (nconf == (struct netconfig *)NULL) {
+		if (nconf == NULL) {
 			rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-			trace3(TR_clnt_tli_create, 1, prog, vers);
-			return ((CLIENT *)NULL);
+			return (NULL);
 		}
 
 		fd = t_open(nconf->nc_device, O_RDWR, NULL);
@@ -631,9 +620,8 @@ _clnt_tli_create_timed(int fd, const struct netconfig *nconf,
 		if (fd < __rpc_minfd)
 			fd = __rpc_raise_fd(fd);
 		madefd = TRUE;
-		if (t_bind(fd, (struct t_bind *)NULL,
-			(struct t_bind *)NULL) == -1)
-				goto err;
+		if (t_bind(fd, NULL, NULL) == -1)
+			goto err;
 		switch (nconf->nc_semantics) {
 		case NC_TPI_CLTS:
 			servtype = T_CLTS;
@@ -658,8 +646,7 @@ _clnt_tli_create_timed(int fd, const struct netconfig *nconf,
 		 * Check whether bound or not, else bind it
 		 */
 		if (((state = t_sync(fd)) == -1) ||
-		    ((state == T_UNBND) && (t_bind(fd, (struct t_bind *)NULL,
-				(struct t_bind *)NULL) == -1)) ||
+		    ((state == T_UNBND) && (t_bind(fd, NULL, NULL) == -1)) ||
 		    (t_getinfo(fd, &tinfo) == -1))
 			goto err;
 		servtype = tinfo.servtype;
@@ -688,7 +675,7 @@ _clnt_tli_create_timed(int fd, const struct netconfig *nconf,
 		goto err;
 	}
 
-	if (cl == (CLIENT *)NULL)
+	if (cl == NULL)
 		goto err1; /* borrow errors from clnt_dg/vc creates */
 	if (nconf) {
 		cl->cl_netid = strdup(nconf->nc_netid);
@@ -749,11 +736,10 @@ _clnt_tli_create_timed(int fd, const struct netconfig *nconf,
 			cl->cl_tp = "";
 	}
 	if (madefd) {
-		(void) CLNT_CONTROL(cl, CLSET_FD_CLOSE, (char *)NULL);
-/*		(void) CLNT_CONTROL(cl, CLSET_POP_TIMOD, (char *)NULL);  */
+		(void) CLNT_CONTROL(cl, CLSET_FD_CLOSE, NULL);
+/*		(void) CLNT_CONTROL(cl, CLSET_POP_TIMOD, NULL);  */
 	};
 
-	trace3(TR_clnt_tli_create, 1, prog, vers);
 	return (cl);
 
 err:
@@ -762,8 +748,7 @@ err:
 	rpc_createerr.cf_error.re_terrno = t_errno;
 err1:	if (madefd)
 		(void) t_close(fd);
-	trace3(TR_clnt_tli_create, 1, prog, vers);
-	return ((CLIENT *)NULL);
+	return (NULL);
 }
 
 /*
@@ -786,7 +771,7 @@ __rpc_raise_fd(int fd)
 		return (fd);
 
 	if (t_sync(nfd) == -1) {
-		close(nfd);
+		(void) close(nfd);
 		return (fd);
 	}
 

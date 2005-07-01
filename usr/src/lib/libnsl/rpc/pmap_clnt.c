@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -42,7 +44,6 @@
 #include "rpc_mt.h"
 #include <rpc/rpc.h>
 #include <rpc/nettype.h>
-#include <rpc/trace.h>
 #include <netdir.h>
 #include <rpc/pmap_prot.h>
 #include <rpc/pmap_clnt.h>
@@ -60,42 +61,28 @@ static const struct timeval rmttimeout = { 3, 0 };
  * Calls the pmap service remotely to do the mapping.
  */
 bool_t
-#ifdef __STDC__
-pmap_set(rpcprog_t program, rpcvers_t version, rpcprot_t protocol, u_short port)
-#else
-pmap_set(program, version, protocol, port)
-	rpcprog_t program;
-	rpcvers_t version;
-	rpcprot_t protocol;
-	u_short port;
-#endif
+pmap_set(rpcprog_t program, rpcvers_t version, rpcprot_t protocol,
+								ushort_t port)
 {
 	bool_t rslt;
 	struct netbuf *na;
 	struct netconfig *nconf;
 	char buf[32];
 
-	trace1(TR_pmap_set, 0);
-	if ((protocol != IPPROTO_UDP) && (protocol != IPPROTO_TCP)) {
-		trace1(TR_pmap_set, 1);
+	if ((protocol != IPPROTO_UDP) && (protocol != IPPROTO_TCP))
 		return (FALSE);
-	}
 	nconf = __rpc_getconfip(protocol == IPPROTO_UDP ? "udp" : "tcp");
-	if (! nconf) {
-		trace1(TR_pmap_set, 1);
+	if (!nconf)
 		return (FALSE);
-	}
-	sprintf(buf, "0.0.0.0.%d.%d", port >> 8 & 0xff, port & 0xff);
+	(void) sprintf(buf, "0.0.0.0.%d.%d", port >> 8 & 0xff, port & 0xff);
 	na = uaddr2taddr(nconf, buf);
-	if (! na) {
+	if (!na) {
 		freenetconfigent(nconf);
-		trace1(TR_pmap_set, 1);
 		return (FALSE);
 	}
 	rslt = rpcb_set(program, version, nconf, na);
 	netdir_free((char *)na, ND_ADDR);
 	freenetconfigent(nconf);
-	trace1(TR_pmap_set, 1);
 	return (rslt);
 }
 
@@ -104,15 +91,12 @@ pmap_set(program, version, protocol, port)
  * Calls the pmap service remotely to do the un-mapping.
  */
 bool_t
-pmap_unset(program, version)
-	rpcprog_t program;
-	rpcvers_t version;
+pmap_unset(rpcprog_t program, rpcvers_t version)
 {
 	struct netconfig *nconf;
 	bool_t udp_rslt = FALSE;
 	bool_t tcp_rslt = FALSE;
 
-	trace1(TR_pmap_unset, 0);
 	nconf = __rpc_getconfip("udp");
 	if (nconf) {
 		udp_rslt = rpcb_unset(program, version, nconf);
@@ -128,7 +112,6 @@ pmap_unset(program, version)
 	 * calls succeeded.  This was the best that could be
 	 * done for backward compatibility.
 	 */
-	trace1(TR_pmap_unset, 1);
 	return (tcp_rslt || udp_rslt);
 }
 
@@ -141,30 +124,26 @@ pmap_unset(program, version)
  * service.  There may be implementations out there which do not
  * run portmapper as a part of rpcbind.
  */
-u_short
-pmap_getport(address, program, version, protocol)
-	struct sockaddr_in *address;
-	rpcprog_t program;
-	rpcvers_t version;
-	rpcprot_t protocol;
+ushort_t
+pmap_getport(struct sockaddr_in *address, rpcprog_t program,
+					rpcvers_t version, rpcprot_t protocol)
 {
-	u_short port = 0;
+	ushort_t port = 0;
 	int fd = RPC_ANYFD;
-	register CLIENT *client;
+	CLIENT *client;
 	struct pmap parms;
 
-	trace1(TR_pmap_getport, 0);
 	address->sin_port = htons(PMAPPORT);
 	client = clntudp_bufcreate(address, PMAPPROG, PMAPVERS, timeout,
 				&fd, RPCSMALLMSGSIZE, RPCSMALLMSGSIZE);
-	if (client != (CLIENT *)NULL) {
+	if (client != NULL) {
 		parms.pm_prog = program;
 		parms.pm_vers = version;
 		parms.pm_prot = protocol;
 		parms.pm_port = 0;	/* not needed or used */
-		if (CLNT_CALL(client, PMAPPROC_GETPORT, (xdrproc_t) xdr_pmap,
-			(caddr_t) &parms, (xdrproc_t) xdr_u_short,
-			    (caddr_t) &port, tottimeout) != RPC_SUCCESS) {
+		if (CLNT_CALL(client, PMAPPROC_GETPORT, (xdrproc_t)xdr_pmap,
+			    (caddr_t)&parms, (xdrproc_t)xdr_u_short,
+			    (caddr_t)&port, tottimeout) != RPC_SUCCESS) {
 			rpc_createerr.cf_stat = RPC_PMAPFAILURE;
 			clnt_geterr(client, &rpc_createerr.cf_error);
 		} else if (port == 0) {
@@ -173,7 +152,6 @@ pmap_getport(address, program, version, protocol)
 		CLNT_DESTROY(client);
 	}
 	address->sin_port = 0;
-	trace1(TR_pmap_getport, 1);
 	return (port);
 }
 
@@ -182,30 +160,27 @@ pmap_getport(address, program, version, protocol)
  * Calls the pmap service remotely to do get the maps.
  */
 struct pmaplist *
-pmap_getmaps(address)
-	struct sockaddr_in *address;
+pmap_getmaps(struct sockaddr_in *address)
 {
-	pmaplist_ptr head = (pmaplist_ptr)NULL;
+	pmaplist_ptr head = NULL;
 	int fd = RPC_ANYFD;
 	struct timeval minutetimeout;
-	register CLIENT *client;
+	CLIENT *client;
 
-	trace1(TR_pmap_getmaps, 0);
 	minutetimeout.tv_sec = 60;
 	minutetimeout.tv_usec = 0;
 	address->sin_port = htons(PMAPPORT);
 	client = clnttcp_create(address, PMAPPROG, PMAPVERS, &fd, 50, 500);
-	if (client != (CLIENT *)NULL) {
-		if (CLNT_CALL(client, PMAPPROC_DUMP, (xdrproc_t) xdr_void,
-			    (caddr_t) NULL, (xdrproc_t) xdr_pmaplist_ptr,
-			    (caddr_t) &head, minutetimeout) != RPC_SUCCESS) {
-			(void) syslog(LOG_ERR,
+	if (client != NULL) {
+		if (CLNT_CALL(client, PMAPPROC_DUMP, (xdrproc_t)xdr_void,
+			    NULL, (xdrproc_t)xdr_pmaplist_ptr,
+			    (caddr_t)&head, minutetimeout) != RPC_SUCCESS) {
+			(void) syslog(LOG_ERR, "%s",
 			clnt_sperror(client, "pmap_getmaps rpc problem"));
 		}
 		CLNT_DESTROY(client);
 	}
 	address->sin_port = 0;
-	trace1(TR_pmap_getmaps, 1);
 	return ((struct pmaplist *)head);
 }
 
@@ -217,28 +192,20 @@ pmap_getmaps(address)
  * programs to do a lookup and call in one step.
  */
 enum clnt_stat
-pmap_rmtcall(addr, prog, vers, proc, xdrargs, argsp, xdrres, resp,
-    tout, port_ptr)
-	struct sockaddr_in *addr;
-	rpcprog_t prog;
-	rpcvers_t vers;
-	rpcproc_t proc;
-	xdrproc_t xdrargs, xdrres;
-	caddr_t argsp, resp;
-	struct timeval tout;
-	rpcport_t *port_ptr;
+pmap_rmtcall(struct sockaddr_in *addr, rpcprog_t prog, rpcvers_t vers,
+	rpcproc_t proc, xdrproc_t xdrargs, caddr_t argsp, xdrproc_t xdrres,
+	caddr_t resp, struct timeval tout, rpcport_t *port_ptr)
 {
 	int fd = RPC_ANYFD;
-	register CLIENT *client;
+	CLIENT *client;
 	struct p_rmtcallargs a;
 	struct p_rmtcallres r;
 	enum clnt_stat stat;
 	short tmp = addr->sin_port;
 
-	trace1(TR_pmap_rmtcall, 0);
 	addr->sin_port = htons(PMAPPORT);
 	client = clntudp_create(addr, PMAPPROG, PMAPVERS, rmttimeout, &fd);
-	if (client != (CLIENT *)NULL) {
+	if (client != NULL) {
 		a.prog = prog;
 		a.vers = vers;
 		a.proc = proc;
@@ -248,15 +215,14 @@ pmap_rmtcall(addr, prog, vers, proc, xdrargs, argsp, xdrres, resp,
 		r.xdr_res = xdrres;
 		stat = CLNT_CALL(client, PMAPPROC_CALLIT,
 				(xdrproc_t)xdr_rmtcallargs,
-				(caddr_t) &a, (xdrproc_t) xdr_rmtcallres,
-				(caddr_t) &r, tout);
+				(caddr_t)&a, (xdrproc_t)xdr_rmtcallres,
+				(caddr_t)&r, tout);
 		CLNT_DESTROY(client);
 	} else {
 		stat = RPC_FAILED;
 	}
 	addr->sin_port = tmp;
 	*port_ptr = r.port;
-	trace1(TR_pmap_rmtcall, 1);
 	return (stat);
 }
 #endif /* PORTMAP */

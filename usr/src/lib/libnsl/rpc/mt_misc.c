@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1986-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,19 +104,19 @@ cond_t	svc_thr_fdwait;		/* threads wait on this for work */
 static void
 _libnsl_prefork()
 {
-	mutex_lock(&_ti_userlock);
+	(void) mutex_lock(&_ti_userlock);
 }
 
 static void
 _libnsl_child_atfork()
 {
-	mutex_unlock(&_ti_userlock);
+	(void) mutex_unlock(&_ti_userlock);
 }
 
 static void
 _libnsl_parent_atfork()
 {
-	mutex_unlock(&_ti_userlock);
+	(void) mutex_unlock(&_ti_userlock);
 }
 
 #pragma init(_libnsl_lock_init)
@@ -128,12 +129,12 @@ _libnsl_lock_init()
 	(void) _sigfillset(&fillset);
 
 	for (i = 0; i <  (sizeof (mutex_table) / sizeof (mutex_table[0])); i++)
-		mutex_init(mutex_table[i], 0, (void *) 0);
+		(void) mutex_init(mutex_table[i], 0, (void *) 0);
 
 	for (i = 0; i < (sizeof (rwlock_table) / sizeof (rwlock_table[0])); i++)
-		rwlock_init(rwlock_table[i], 0, (void *) 0);
+		(void) rwlock_init(rwlock_table[i], 0, (void *) 0);
 
-	cond_init(&svc_thr_fdwait, USYNC_THREAD, 0);
+	(void) cond_init(&svc_thr_fdwait, USYNC_THREAD, 0);
 
 	/*
 	 * There is no way to unregister these atfork functions,

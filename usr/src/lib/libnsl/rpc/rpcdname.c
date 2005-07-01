@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -40,7 +42,6 @@
 #include "rpc_mt.h"
 #include <sys/types.h>
 #include <sys/time.h>
-#include <rpc/trace.h>
 #include <string.h>
 #include <syslog.h>
 
@@ -49,36 +50,31 @@ extern char *strdup();
 static char *default_domain = 0;
 
 static char *
-get_default_domain()
+get_default_domain(void)
 {
 	char temp[256];
 	extern mutex_t dname_lock;
 
 /* VARIABLES PROTECTED BY dname_lock: default_domain */
 
-	trace1(TR_get_default_domain, 0);
-	mutex_lock(&dname_lock);
+	(void) mutex_lock(&dname_lock);
 	if (default_domain) {
-		mutex_unlock(&dname_lock);
-		trace1(TR_get_default_domain, 1);
+		(void) mutex_unlock(&dname_lock);
 		return (default_domain);
 	}
 	if (getdomainname(temp, (size_t)sizeof (temp)) < 0) {
-		mutex_unlock(&dname_lock);
-		trace1(TR_get_default_domain, 1);
+		(void) mutex_unlock(&dname_lock);
 		return (0);
 	}
 	if ((int)strlen(temp) > 0) {
 		default_domain = strdup(temp);
 		if (default_domain == NULL) {
 			syslog(LOG_ERR, "get_default_domain : strdup failed.");
-			mutex_unlock(&dname_lock);
-			trace1(TR_get_default_domain, 1);
+			(void) mutex_unlock(&dname_lock);
 			return (0);
 		}
 	}
-	mutex_unlock(&dname_lock);
-	trace1(TR_get_default_domain, 1);
+	(void) mutex_unlock(&dname_lock);
 	return (default_domain);
 }
 
@@ -89,14 +85,9 @@ get_default_domain()
  * get rejected elsewhere in the yp client package.
  */
 int
-__rpc_get_default_domain(domain)
-	char **domain;
+__rpc_get_default_domain(char **domain)
 {
-	trace1(TR___rpc_get_default_domain, 0);
-	if ((*domain = get_default_domain()) != 0) {
-		trace1(TR___rpc_get_default_domain, 1);
+	if ((*domain = get_default_domain()) != 0)
 		return (0);
-	}
-	trace1(TR___rpc_get_default_domain, 1);
 	return (-1);
 }

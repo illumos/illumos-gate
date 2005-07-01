@@ -19,31 +19,35 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
 
 #include "mt.h"
-#include <errno.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <stdlib.h>
-#include <rpc/trace.h>
+#include <string.h>
+#include <strings.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stropts.h>
 #include <sys/stream.h>
 #define	_SUN_TPI_VERSION 2
 #include <sys/tihdr.h>
 #include <sys/timod.h>
+#include <sys/stat.h>
 #include <xti.h>
+#include <fcntl.h>
 #include <signal.h>
-#include <stropts.h>
+#include <assert.h>
+#include <syslog.h>
+#include <limits.h>
 #include "tx.h"
 
 int
@@ -56,13 +60,8 @@ _tx_getinfo(int fd, struct t_info *info, int api_semantics)
 	int retval, sv_errno, didalloc;
 	struct strbuf ctlbuf;
 
-	trace2(TR_t_getinfo, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == 0) {
-		sv_errno = errno;
-		trace2(TR_t_getinfo, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == 0)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	/*
@@ -73,11 +72,11 @@ _tx_getinfo(int fd, struct t_info *info, int api_semantics)
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_getinfo, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
 
+	/* LINTED pointer cast */
 	inforeqp =  (struct T_info_req *)ctlbuf.buf;
 	inforeqp->PRIM_type = T_INFO_REQ;
 
@@ -95,6 +94,7 @@ _tx_getinfo(int fd, struct t_info *info, int api_semantics)
 		goto err_out;
 	}
 
+	/* LINTED pointer cast */
 	infoackp = (struct T_info_ack *)ctlbuf.buf;
 
 	info->addr = infoackp->ADDR_size;
@@ -116,7 +116,6 @@ _tx_getinfo(int fd, struct t_info *info, int api_semantics)
 	else
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_getinfo, 1, fd);
 	return (0);
 
 err_out:
@@ -126,7 +125,6 @@ err_out:
 	else
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_getinfo, 1, fd);
 	errno = sv_errno;
 	return (-1);
 }

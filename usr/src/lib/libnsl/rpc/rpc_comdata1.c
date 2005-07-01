@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +36,7 @@
 #ifdef FD_SETSIZE
 #undef FD_SETSIZE
 #endif
-#define FD_SETSIZE 65536
+#define	FD_SETSIZE 65536
 
 #include <sys/select.h>
 
@@ -55,5 +56,8 @@
 
 fd_set _new_svc_fdset;
 #else
-extern int svc_fdset;	/* to avoid "empty translation unit" */
+
+#include <sys/select.h>
+
+extern fd_set svc_fdset;	/* to avoid "empty translation unit" */
 #endif

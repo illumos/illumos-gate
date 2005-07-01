@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,7 +136,7 @@ list_append_ent(void *ent, void **list, uint_t cnt, void (*free_ent)())
 {
 	void **new_l;
 
-	if (! (new_l = realloc(list, sizeof (*list) * (cnt + 1)))) {
+	if (!(new_l = realloc(list, sizeof (*list) * (cnt + 1)))) {
 		list_free_all(free_ent, list);
 		return (NULL);
 	}
@@ -153,7 +154,7 @@ list_copy(void *(*cp_ent)(), void **mpp)
 	void	*tp;
 	int 	diff;
 
-	if (! mpp)
+	if (!mpp)
 		return (NULL);
 
 	for (tpp = mpp; *tpp; tpp++)
@@ -161,11 +162,11 @@ list_copy(void *(*cp_ent)(), void **mpp)
 
 	diff = tpp - mpp;
 
-	if (! (tpp_h = calloc(diff + 1, sizeof (*mpp))))
+	if (!(tpp_h = calloc(diff + 1, sizeof (*mpp))))
 		return (NULL);
 
 	for (tpp = tpp_h; *mpp; mpp++) {
-		if (! (tp = (*cp_ent)(*mpp))) {
+		if (!(tp = (*cp_ent)(*mpp))) {
 			free(tpp_h);
 			return (NULL);
 		}
@@ -248,7 +249,7 @@ isnumberstr(const char *s)
 {
 
 	for (; *s; s++)
-		if (! isdigit(*s))
+		if (!isdigit(*s))
 			return (FALSE);
 
 	return (TRUE);
@@ -310,17 +311,17 @@ parse_line(char *linep, int minflds, int maxflds, int bufsiz)
 	char *cp;
 	int	i;
 
-	if (! fpp)
+	if (!fpp)
 		return (NULL);
 
-	if (! (cp = (char *)malloc(bufsiz))) {
+	if (!(cp = malloc(bufsiz))) {
 		free(fpp);
 		return (NULL);
 	}
 
 	for (i = 0; i < maxflds; i++, tpp++) {
 		char *tp;
-		if (! nextfield(&linep, cp, bufsiz)) {
+		if (!nextfield(&linep, cp, bufsiz)) {
 			free(cp);
 			if (i < minflds) {
 				free_fields(fpp, i);
@@ -328,7 +329,7 @@ parse_line(char *linep, int minflds, int maxflds, int bufsiz)
 			} else
 				return (fpp);
 		}
-		if (! (tp = strdup(cp))) {
+		if (!(tp = strdup(cp))) {
 			free_fields(fpp, i);
 			free(cp);
 			return (NULL);
@@ -383,7 +384,7 @@ cont:
 	if (cp == NULL)
 		return (NULL);
 
-	if (! (flds = parse_line(cp, num_flds_min, num_flds_max,
+	if (!(flds = parse_line(cp, num_flds_min, num_flds_max,
 					line_len)))
 		goto cont;
 
@@ -393,7 +394,7 @@ cont:
 		goto cont;
 	}
 
-	if (! (m = malloc(sizeof (mechanism_t)))) {
+	if (!(m = malloc(sizeof (mechanism_t)))) {
 		free_fields(flds, num_flds_max);
 		return (NULL);
 	}
@@ -411,7 +412,7 @@ cont:
 	 * Make qop NULL if the field was empty or was "default" or
 	 * was '-'.
 	 */
-	if (! *(flds + qp_offset) ||
+	if (!*(flds + qp_offset) ||
 	    (strncasecmp(*(flds + qp_offset), cf_secserv_default_str,
 				strlen(cf_secserv_default_str)) == 0) ||
 	    NIS_SEC_CF_NA_CMP(*(flds + qp_offset)))
@@ -494,7 +495,7 @@ sf_copy_mech_ent(mechanism_t *mp)
 {
 	mechanism_t *tp = calloc(1, sizeof (*mp));
 
-	if (! mp || ! tp)
+	if (!mp || !tp)
 		return (NULL);
 
 	tp->mechname = mp->mechname ? strdup(mp->mechname) : NULL;
@@ -575,7 +576,7 @@ __nis_get_mechanisms(bool_t qop_secserv)
 		}
 		mechs = mechs_no_dups = NULL;
 
-		if (! (fptr = __nsl_fopen(NIS_SEC_CF_PATHNAME, "r"))) {
+		if (!(fptr = __nsl_fopen(NIS_SEC_CF_PATHNAME, "r"))) {
 			(void) mutex_unlock(&nis_sec_cf_lock);
 			return (NULL);
 		}
@@ -585,7 +586,7 @@ __nis_get_mechanisms(bool_t qop_secserv)
 			 * Make sure entry is either the AUTH_DES compat
 			 * one or a valid GSS one that is installed.
 			 */
-			if (! (AUTH_DES_COMPAT_CHK(mp) ||
+			if (!(AUTH_DES_COMPAT_CHK(mp) ||
 				(NIS_SEC_CF_GSS_MECH(mp) &&
 					rpc_gss_is_installed(mp->mechname)))) {
 				continue;
@@ -659,7 +660,7 @@ __nis_translate_mechanism(const char *mechname, int *keylen, int *algtype)
 	mechanism_t **mpp;
 	mechanism_t **mpp_h;
 
-	if (! mechname || ! keylen || ! algtype)
+	if (!mechname || !keylen || !algtype)
 		return (-1);
 
 	/* AUTH_DES */
@@ -669,21 +670,21 @@ __nis_translate_mechanism(const char *mechname, int *keylen, int *algtype)
 		return (0);
 	}
 
-	if (! (mpp = __nis_get_mechanisms(FALSE)))
+	if (!(mpp = __nis_get_mechanisms(FALSE)))
 		return (-1);
 
 	mpp_h = mpp;
 	for (; *mpp; mpp++) {
 		mechanism_t *mp = *mpp;
 		if (mp->mechname &&
-		    (! strcasecmp(mechname, mp->mechname))) {
+		    (!strcasecmp(mechname, mp->mechname))) {
 				*keylen = mp->keylen;
 				*algtype = mp->algtype;
 				__nis_release_mechanisms(mpp_h);
 				return (0);
 		}
 		if (mp->alias &&
-		    (! strcasecmp(mechname, mp->alias))) {
+		    (!strcasecmp(mechname, mp->alias))) {
 				*keylen = mp->keylen;
 				*algtype = mp->algtype;
 				__nis_release_mechanisms(mpp_h);
@@ -712,10 +713,10 @@ __nis_mechname2alias(const char *mechname,	/* in */
 	mechanism_t **mpp;
 	mechanism_t **mpp_h;
 
-	if (! mechname || ! alias)
+	if (!mechname || !alias)
 		return (NULL);
 
-	if (! (mpp = __nis_get_mechanisms(FALSE)))
+	if (!(mpp = __nis_get_mechanisms(FALSE)))
 		return (NULL);
 
 	mpp_h = mpp;
@@ -771,7 +772,7 @@ __nis_authtype2mechalias(
 	const char *src = authtype;
 	const char *max = src + mechaliaslen;
 
-	if (! src || ! dst || mechaliaslen == 0)
+	if (!src || !dst || mechaliaslen == 0)
 		return (NULL);
 
 	while (*src && src < max - 1)
@@ -806,7 +807,7 @@ __nis_mechalias2authtype(
 	const char *max = src + authtypelen;
 	const int slen = strlen(cf_mech_dh1920_str);
 
-	if (! src || ! dst || ! authtypelen)
+	if (!src || !dst || !authtypelen)
 		return (NULL);
 
 	if (strncasecmp(src, cf_mech_dh1920_str, slen + 1)
@@ -845,7 +846,7 @@ __nis_keyalg2mechalias(
 {
 	mechanism_t	**mechs;  /* array of mechanisms */
 
-	if (! alias)
+	if (!alias)
 		return (NULL);
 
 	if (AUTH_DES_KEY(keylen, algtype)) {
@@ -862,7 +863,7 @@ __nis_keyalg2mechalias(
 			for (mpp = mechs; *mpp; mpp++) {
 				mechanism_t *mp = *mpp;
 
-				if (! VALID_MECH_ENTRY(mp) ||
+				if (!VALID_MECH_ENTRY(mp) ||
 				    AUTH_DES_COMPAT_CHK(mp))
 					continue;
 
@@ -902,13 +903,13 @@ __nis_keyalg2authtype(
 	char alias[MECH_MAXALIASNAME+1] = {0};
 
 
-	if (! authtype || authtype_len == 0)
+	if (!authtype || authtype_len == 0)
 		return (NULL);
 
-	if (! __nis_keyalg2mechalias(keylen, algtype, alias, sizeof (alias)))
+	if (!__nis_keyalg2mechalias(keylen, algtype, alias, sizeof (alias)))
 		return (NULL);
 
-	if (! __nis_mechalias2authtype(alias, authtype, authtype_len))
+	if (!__nis_mechalias2authtype(alias, authtype, authtype_len))
 		return (NULL);
 
 	return (authtype);
@@ -934,11 +935,11 @@ cont:
 	if (cp == NULL)
 		return (NULL);
 
-	if (! (flds = parse_line(cp, mech_file_flds_min,
+	if (!(flds = parse_line(cp, mech_file_flds_min,
 					mech_file_flds_max, MF_MAX_FLDLEN)))
 		goto cont;
 
-	if (! (m = malloc(sizeof (mfent_t)))) {
+	if (!(m = malloc(sizeof (mfent_t)))) {
 		free_fields(flds, mech_file_flds_max);
 		return (NULL);
 	}
@@ -957,7 +958,7 @@ mf_copy_ent(mfent_t *mp)
 {
 	mfent_t *tp = calloc(1, sizeof (*mp));
 
-	if (! mp || ! tp)
+	if (!mp || !tp)
 		return (NULL);
 
 	tp->mechname = mp->mechname ? strdup(mp->mechname) : NULL;
@@ -1021,7 +1022,7 @@ mf_get_mechs()
 			mechs = NULL;
 		}
 
-		if (! (fptr = __nsl_fopen(mech_file, "r"))) {
+		if (!(fptr = __nsl_fopen(mech_file, "r"))) {
 			(void) mutex_unlock(&mech_file_lock);
 			return (NULL);
 		}
@@ -1057,7 +1058,7 @@ mechfile_name2lib(const char *mechname, char *libname, int len)
 	mfent_t **mechs = mf_get_mechs();
 	mfent_t **mpp;
 
-	if (! mechs || ! mechname || ! libname || ! len)
+	if (!mechs || !mechname || !libname || !len)
 		return (NULL);
 
 	for (mpp = mechs; *mpp; mpp++) {
@@ -1086,12 +1087,13 @@ __nis_get_mechanism_library(keylen_t keylen, algtype_t algtype,
 {
 	char mechname[MAXDHNAME + 1];
 
-	if (keylen == 0 || ! buffer || buflen == 0)
+	if (keylen == 0 || !buffer || buflen == 0)
 		return (NULL);
 
-	(void) sprintf(mechname, "%s_%d_%d", dh_str, keylen, algtype);
+	(void) snprintf(mechname, sizeof (mechname),
+					"%s_%d_%d", dh_str, keylen, algtype);
 
-	if (! mechfile_name2lib(mechname, buffer, buflen))
+	if (!mechfile_name2lib(mechname, buffer, buflen))
 		return (NULL);
 
 	return (buffer);
@@ -1114,15 +1116,16 @@ __nis_get_mechanism_symbol(keylen_t keylen,
 	char libname[MAXDHNAME+1];
 	char libpath[MAXPATHLEN+1];
 
-	if (! __nis_get_mechanism_library(keylen, algtype, libname, MAXDHNAME))
+	if (!__nis_get_mechanism_library(keylen, algtype, libname, MAXDHNAME))
 		return (NULL);
 
 	if (strlen(MECH_LIB_PREFIX) + strlen(libname) + 1 > sizeof (libpath))
 		return (NULL);
 
-	(void) sprintf(libpath, "%s%s", MECH_LIB_PREFIX, libname);
+	(void) snprintf(libpath, sizeof (libpath),
+					"%s%s", MECH_LIB_PREFIX, libname);
 
-	if (! (handle = dlopen(libpath, RTLD_LAZY)))
+	if (!(handle = dlopen(libpath, RTLD_LAZY)))
 		return (NULL);
 
 	return (dlsym(handle, symname));

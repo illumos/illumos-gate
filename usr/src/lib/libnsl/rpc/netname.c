@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -55,7 +57,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <ctype.h>
 #include <string.h>
 #include <syslog.h>
@@ -82,7 +83,6 @@
 
 extern int __nis_principal();
 extern int getdomainname();
-extern char *strncpy();
 extern int key_call();
 #define	OPSYS_LEN 4
 #define	PKTABLE_LEN 12
@@ -124,11 +124,8 @@ static mutex_t serialize_netname = DEFAULTMUTEX;
  */
 
 static int
-user2netname_nisplus(err, netname, uid, domain)
-	int *err;
-	char netname[MAXNETNAMELEN + 1];
-	uid_t uid;
-	char *domain;
+user2netname_nisplus(int *err, char netname[MAXNETNAMELEN + 1], uid_t uid,
+								char *domain)
 {
 	key_netstres kres;
 	nis_result *nres;
@@ -140,8 +137,6 @@ user2netname_nisplus(err, netname, uid, domain)
 	mechanism_t **mechs;
 	char auth_type[MECH_MAXATNAME+1];
 
-	trace1(TR_user2netname_nisplus, 0);
-
 	my_uid = geteuid();
 
 	if (my_uid == uid && domain == NULL) {
@@ -150,7 +145,7 @@ user2netname_nisplus(err, netname, uid, domain)
 		 * netname is stored there.
 		 */
 		kres.key_netstres_u.knet.st_netname = NULL;
-		if (key_call((rpcproc_t)KEY_NET_GET, xdr_void, (char *)NULL,
+		if (key_call((rpcproc_t)KEY_NET_GET, xdr_void, NULL,
 				xdr_key_netstres, (char *)&kres) &&
 		    kres.status == KEY_SUCCESS) {
 			len = strlen(kres.key_netstres_u.knet.st_netname);
@@ -158,7 +153,6 @@ user2netname_nisplus(err, netname, uid, domain)
 				kres.key_netstres_u.knet.st_netname,
 				len +1);
 			free(kres.key_netstres_u.knet.st_netname);
-			trace1(TR_user2netname_nisplus, 1);
 			*err = __NSW_SUCCESS;
 			return (1);
 		}
@@ -202,7 +196,6 @@ user2netname_nisplus(err, netname, uid, domain)
 				nis_sperrno(status));
 		}
 
-		trace1(TR_user2netname_nisplus, 1);
 		return (0);
 	}
 
@@ -215,7 +208,6 @@ user2netname_nisplus(err, netname, uid, domain)
 	if ((strlen(principal)+strlen(domain)+PKTABLE_LEN+ 28) >
 		    (size_t)NIS_MAXNAMELEN) {
 		*err = __NSW_UNAVAIL;
-		trace1(TR_user2netname_nisplus, 1);
 		return (0);
 	}
 
@@ -233,14 +225,14 @@ user2netname_nisplus(err, netname, uid, domain)
 				__nis_release_mechanisms(mechs);
 				goto try_auth_des;
 			}
-			if (! VALID_MECH_ENTRY(mp))
+			if (!VALID_MECH_ENTRY(mp))
 				continue;
 
-			if (! __nis_mechalias2authtype(mp->alias, auth_type,
+			if (!__nis_mechalias2authtype(mp->alias, auth_type,
 							sizeof (auth_type)))
 				continue;
 
-			(void) sprintf(buf,
+			(void) snprintf(buf, sizeof (buf),
 				"[cname=\"%s\",auth_type=\"%s\"],%s.%s",
 				principal, auth_type, PKTABLE, domain);
 			if (buf[strlen(buf)-1] != '.')
@@ -264,7 +256,8 @@ user2netname_nisplus(err, netname, uid, domain)
 		 * No valid mechs exist or the AUTH_DES compat entry was
 		 * found in the security cf.
 		 */
-		(void) sprintf(buf, "[cname=\"%s\",auth_type=DES],%s.%s",
+		(void) snprintf(buf, sizeof (buf),
+					"[cname=\"%s\",auth_type=DES],%s.%s",
 			principal, PKTABLE, domain);
 		if (buf[strlen(buf)-1] != '.')
 			(void) strcat(buf, ".");
@@ -284,7 +277,6 @@ user2netname_nisplus(err, netname, uid, domain)
 	case NIS_NOSUCHTABLE:
 		*err = __NSW_NOTFOUND;
 		nis_freeresult(nres);
-		trace1(TR_user2netname_nisplus, 1);
 		return (0);
 	case NIS_S_NOTFOUND:
 	case NIS_TRYAGAIN:
@@ -293,14 +285,12 @@ user2netname_nisplus(err, netname, uid, domain)
 			"user2netname: (nis+ lookup): %s\n",
 			nis_sperrno(nres->status));
 		nis_freeresult(nres);
-		trace1(TR_user2netname_nisplus, 1);
 		return (0);
 	default:
 		*err = __NSW_UNAVAIL;
 		syslog(LOG_ERR, "user2netname: (nis+ lookup): %s\n",
 			nis_sperrno(nres->status));
 		nis_freeresult(nres);
-		trace1(TR_user2netname_nisplus, 1);
 		return (0);
 	}
 
@@ -321,14 +311,12 @@ user2netname_nisplus(err, netname, uid, domain)
 		syslog(LOG_ERR, "user2netname: netname of '%s' too long",
 			principal);
 		nis_freeresult(nres);
-		trace1(TR_user2netname_nisplus, 1);
 		return (0);
 	}
 	(void) strncpy(netname, ENTRY_VAL(nres->objects.objects_val, 2), len);
 	netname[len] = '\0';
 	nis_freeresult(nres);
 	*err = __NSW_SUCCESS;
-	trace1(TR_user2netname_nisplus, 1);
 	return (1);
 }
 
@@ -340,17 +328,13 @@ user2netname_nisplus(err, netname, uid, domain)
  */
 
 static int
-user2netname_nis(err, netname, uid, domain)
-	int *err;
-	char netname[MAXNETNAMELEN + 1];
-	uid_t uid;
-	char *domain;
+user2netname_nis(int *err, char netname[MAXNETNAMELEN + 1], uid_t uid,
+								char *domain)
 {
 	int i;
 	char *dfltdom;
 	if (domain == NULL) {
 		if (__rpc_get_default_domain(&dfltdom) != 0) {
-			trace1(TR_user2netname_nis, 1);
 			*err = __NSW_UNAVAIL;
 			return (0);
 		}
@@ -358,15 +342,14 @@ user2netname_nis(err, netname, uid, domain)
 	}
 	if ((strlen(domain) + OPSYS_LEN + 3 + MAXIPRINT) >
 						(size_t)MAXNETNAMELEN) {
-		trace1(TR_user2netname_nis, 1);
 		*err = __NSW_UNAVAIL;
 		return (0);
 	}
-	(void) sprintf(netname, "%s.%d@%s", OPSYS, (int)uid, domain);
+	(void) snprintf(netname, MAXNETNAMELEN + 1,
+					"%s.%d@%s", OPSYS, (int)uid, domain);
 	i = strlen(netname);
 	if (netname[i-1] == '.')
 		netname[i-1] = '\0';
-	trace1(TR_user2netname_nis, 1);
 	*err = __NSW_SUCCESS;
 	return (1);
 }
@@ -375,22 +358,14 @@ user2netname_nis(err, netname, uid, domain)
  * Figure out my fully qualified network name
  */
 int
-getnetname(name)
-	char name[MAXNETNAMELEN + 1];
+getnetname(char name[MAXNETNAMELEN + 1])
 {
 	uid_t uid;
-	int dummy;
-
-	trace1(TR_getnetname, 0);
 
 	uid = geteuid();
 	if (uid == 0)
-		dummy = host2netname(name, (char *)NULL, (char *)NULL);
-	else
-		dummy = user2netname(name, uid, (char *)NULL);
-
-	trace1(TR_getnetname, 1);
-	return (dummy);
+		return (host2netname(name, NULL, NULL));
+	return (user2netname(name, uid, NULL));
 }
 
 
@@ -399,21 +374,11 @@ getnetname(name)
  * This is a private interface.
  */
 int
-__getnetnamebyuid(name, uid)
-char name[MAXNETNAMELEN + 1];
-uid_t	uid;
+__getnetnamebyuid(char name[MAXNETNAMELEN + 1], uid_t uid)
 {
-	int dummy;
-
-	trace1(TR___getnetnamebyuid, 0);
-
 	if (uid == 0)
-		dummy = host2netname(name, (char *)NULL, (char *)NULL);
-	else
-		dummy = user2netname(name, uid, (char *)NULL);
-
-	trace1(TR___getnetnamebyuid, 1);
-	return (dummy);
+		return (host2netname(name, NULL, NULL));
+	return (user2netname(name, uid, NULL));
 }
 
 /*
@@ -428,18 +393,14 @@ uid_t	uid;
  * so only the first entry would be relevant for those cases.
  */
 int
-user2netname(netname, uid, domain)
-	char netname[MAXNETNAMELEN + 1];
-	const uid_t uid;
-	const char *domain;
+user2netname(char netname[MAXNETNAMELEN + 1], const uid_t uid,
+							const char *domain)
 {
 	struct __nsw_switchconfig *conf;
 	struct __nsw_lookup *look;
 	int needfree = 1, res = 0;
 	enum __nsw_parse_err perr;
 	int err;
-
-	trace1(TR_user2netname, 0);
 
 	/*
 	 * Take care of the special case of "nobody". If the uid is
@@ -454,10 +415,10 @@ user2netname(netname, uid, domain)
 
 	netname[0] = '\0';  /* make null first (no need for memset) */
 
-	mutex_lock(&serialize_netname);
+	(void) mutex_lock(&serialize_netname);
 
 	conf = __nsw_getconfig("publickey", &perr);
-	if (! conf) {
+	if (!conf) {
 		conf = &publickey_default;
 		needfree = 0;
 	}
@@ -485,8 +446,7 @@ user2netname(netname, uid, domain)
 			case __NSW_RETURN :
 				if (needfree)
 					__nsw_freeconfig(conf);
-				mutex_unlock(&serialize_netname);
-				trace1(TR_user2netname, 1);
+				(void) mutex_unlock(&serialize_netname);
 				return (res);
 			default :
 				syslog(LOG_ERR,
@@ -496,8 +456,7 @@ user2netname(netname, uid, domain)
 	}
 	if (needfree)
 		__nsw_freeconfig(conf);
-	mutex_unlock(&serialize_netname);
-	trace1(TR_user2netname, 1);
+	(void) mutex_unlock(&serialize_netname);
 	return (0);
 }
 
@@ -519,10 +478,8 @@ user2netname(netname, uid, domain)
  *	h.w.x	a.b		unix.h@a.b
  */
 int
-host2netname(netname, host, domain)
-	char netname[MAXNETNAMELEN + 1];
-	const char *host;
-	const char *domain;
+host2netname(char netname[MAXNETNAMELEN + 1], const char *host,
+							const char *domain)
 {
 	char *p;
 	char hostname[MAXHOSTNAMELEN + 1];
@@ -530,8 +487,6 @@ host2netname(netname, host, domain)
 	char *dot_in_host;
 	int i;
 	size_t len;
-
-	trace1(TR_host2netname, 0);
 
 	netname[0] = '\0';  /* make null first (no need for memset) */
 
@@ -589,11 +544,10 @@ host2netname(netname, host, domain)
 
 	if ((strlen(domainname) + strlen(hostname) + OPSYS_LEN + 3)
 	    > (size_t)MAXNETNAMELEN) {
-		trace1(TR_host2netname, 1);
 		return (0);
 	}
 
-	(void) sprintf(netname, "%s.%s@%s", OPSYS, hostname, domainname);
-	trace1(TR_host2netname, 1);
+	(void) snprintf(netname, MAXNETNAMELEN + 1,
+				"%s.%s@%s", OPSYS, hostname, domainname);
 	return (1);
 }

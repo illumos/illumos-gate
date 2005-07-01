@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -40,10 +42,17 @@
  * rpc_util.c, Utility routines for the RPC protocol compiler
  */
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <ctype.h>
+#include <string.h>
 #include "rpc_scan.h"
 #include "rpc_parse.h"
 #include "rpc_util.h"
+
+extern void crash(void);
+
+static void printwhere(void);
 
 #define	ARGEXT "argument"
 
@@ -65,9 +74,10 @@ list *defined;			/* list of defined things */
 /*
  * Reinitialize the world
  */
-reinitialize()
+void
+reinitialize(void)
 {
-	memset(curline, 0, MAXLINESIZE);
+	(void) memset(curline, 0, MAXLINESIZE);
 	where = curline;
 	linenum = 0;
 	defined = NULL;
@@ -76,9 +86,8 @@ reinitialize()
 /*
  * string equality
  */
-streq(a, b)
-	char *a;
-	char *b;
+int
+streq(char *a, char *b)
 {
 	return (strcmp(a, b) == 0);
 }
@@ -87,16 +96,11 @@ streq(a, b)
  * find a value in a list
  */
 definition *
-findval(lst, val, cmp)
-	list *lst;
-	char *val;
-	int (*cmp) ();
-
+findval(list *lst, char *val, int (*cmp)())
 {
 	for (; lst != NULL; lst = lst->next) {
-		if ((*cmp) (lst->val, val)) {
+		if ((*cmp) (lst->val, val))
 			return (lst->val);
-		}
 	}
 	return (NULL);
 }
@@ -105,45 +109,37 @@ findval(lst, val, cmp)
  * store a value in a list
  */
 void
-storeval(lstp, val)
-	list **lstp;
-	definition *val;
+storeval(list **lstp, definition *val)
 {
 	list **l;
 	list *lst;
 
-	for (l = lstp; *l != NULL; l = (list **) & (*l)->next);
-	lst = ALLOC(list);
+	for (l = lstp; *l != NULL; l = (list **)&(*l)->next);
+	lst = calloc(1, sizeof (list));
 	lst->val = val;
 	lst->next = NULL;
 	*l = lst;
 }
 
-static
-findit(def, type)
-	definition *def;
-	char *type;
+static int
+findit(definition *def, char *type)
 {
 	return (streq(def->def_name, type));
 }
 
 static char *
-fixit(type, orig)
-	char *type;
-	char *orig;
+fixit(char *type, char *orig)
 {
 	definition *def;
 
-	def = (definition *) FINDVAL(defined, type, findit);
-	if (def == NULL || def->def_kind != DEF_TYPEDEF) {
+	def = (definition *)FINDVAL(defined, type, findit);
+	if (def == NULL || def->def_kind != DEF_TYPEDEF)
 		return (orig);
-	}
 	switch (def->def.ty.rel) {
 	case REL_VECTOR:
 		if (streq(def->def.ty.old_type, "opaque"))
 			return ("char");
-		else
-			return (def->def.ty.old_type);
+		return (def->def.ty.old_type);
 
 	case REL_ALIAS:
 		return (fixit(def->def.ty.old_type, orig));
@@ -153,28 +149,21 @@ fixit(type, orig)
 }
 
 char *
-fixtype(type)
-	char *type;
+fixtype(char *type)
 {
 	return (fixit(type, type));
 }
 
 char *
-stringfix(type)
-	char *type;
+stringfix(char *type)
 {
-	if (streq(type, "string")) {
+	if (streq(type, "string"))
 		return ("wrapstring");
-	} else {
-		return (type);
-	}
+	return (type);
 }
 
 void
-ptype(prefix, type, follow)
-	char *prefix;
-	char *type;
-	int follow;
+ptype(char *prefix, char *type, int follow)
 {
 	if (prefix != NULL) {
 		if (streq(prefix, "enum")) {
@@ -194,21 +183,16 @@ ptype(prefix, type, follow)
 	}
 }
 
-static
-typedefed(def, type)
-	definition *def;
-	char *type;
+static int
+typedefed(definition *def, char *type)
 {
-	if (def->def_kind != DEF_TYPEDEF || def->def.ty.old_prefix != NULL) {
+	if (def->def_kind != DEF_TYPEDEF || def->def.ty.old_prefix != NULL)
 		return (0);
-	} else {
-		return (streq(def->def_name, type));
-	}
+	return (streq(def->def_name, type));
 }
 
-isvectordef(type, rel)
-	char *type;
-	relation rel;
+int
+isvectordef(char *type, relation rel)
 {
 	definition *def;
 
@@ -221,7 +205,7 @@ isvectordef(type, rel)
 		case REL_POINTER:
 			return (0);
 		case REL_ALIAS:
-			def = (definition *) FINDVAL(defined, type, typedefed);
+			def = (definition *)FINDVAL(defined, type, typedefed);
 			if (def == NULL)
 				return (0);
 			type = def->def.ty.old_type;
@@ -231,32 +215,26 @@ isvectordef(type, rel)
 }
 
 char *
-locase(str)
-	char *str;
+locase(char *str)
 {
 	char c;
 	static char buf[100];
 	char *p = buf;
 
-	while (c = *str++) {
+	while (c = *str++)
 		*p++ = (c >= 'A' && c <= 'Z') ? (c - 'A' + 'a') : c;
-	}
 	*p = 0;
 	return (buf);
 }
 
 void
-pvname_svc(pname, vnum)
-	char *pname;
-	char *vnum;
+pvname_svc(char *pname, char *vnum)
 {
 	f_print(fout, "%s_%s_svc", locase(pname), vnum);
 }
 
 void
-pvname(pname, vnum)
-	char *pname;
-	char *vnum;
+pvname(char *pname, char *vnum)
 {
 	f_print(fout, "%s_%s", locase(pname), vnum);
 }
@@ -265,8 +243,7 @@ pvname(pname, vnum)
  * print a useful (?) error message, and then die
  */
 void
-error(msg)
-	char *msg;
+error(char *msg)
 {
 	printwhere();
 	f_print(stderr, "%s, line %d: ", infilename, linenum);
@@ -278,26 +255,25 @@ error(msg)
  * Something went wrong, unlink any files that we may have created and then
  * die.
  */
-crash()
+void
+crash(void)
 {
 	int i;
 
-	for (i = 0; i < nfiles; i++) {
+	for (i = 0; i < nfiles; i++)
 		(void) unlink(outfiles[i]);
-	}
 	exit(1);
 }
 
 void
-record_open(file)
-	char *file;
+record_open(char *file)
 {
 	if (nfiles < NFILES) {
 		outfiles[nfiles++] = file;
-	} else {
-		f_print(stderr, "too many files!\n");
-		crash();
+		return;
 	}
+	f_print(stderr, "too many files!\n");
+	crash();
 }
 
 static char expectbuf[100];
@@ -307,11 +283,10 @@ static char *toktostr();
  * error, token encountered was not the expected one
  */
 void
-expected1(exp1)
-	tok_kind exp1;
+expected1(tok_kind exp1)
 {
-	s_print(expectbuf, "expected '%s'",
-		toktostr(exp1));
+	(void) snprintf(expectbuf,
+		sizeof (expectbuf), "expected '%s'", toktostr(exp1));
 	error(expectbuf);
 }
 
@@ -319,11 +294,10 @@ expected1(exp1)
  * error, token encountered was not one of two expected ones
  */
 void
-expected2(exp1, exp2)
-	tok_kind exp1, exp2;
+expected2(tok_kind exp1, tok_kind exp2)
 {
-	s_print(expectbuf, "expected '%s' or '%s'",
-		toktostr(exp1),
+	(void) snprintf(expectbuf,
+		sizeof (expectbuf), "expected '%s' or '%s'", toktostr(exp1),
 		toktostr(exp2));
 	error(expectbuf);
 }
@@ -332,26 +306,20 @@ expected2(exp1, exp2)
  * error, token encountered was not one of 3 expected ones
  */
 void
-expected3(exp1, exp2, exp3)
-	tok_kind exp1, exp2, exp3;
+expected3(tok_kind exp1, tok_kind exp2, tok_kind exp3)
 {
-	s_print(expectbuf, "expected '%s', '%s' or '%s'",
-		toktostr(exp1),
-		toktostr(exp2),
-		toktostr(exp3));
+	(void) snprintf(expectbuf,
+		sizeof (expectbuf), "expected '%s', '%s' or '%s'",
+		toktostr(exp1), toktostr(exp2), toktostr(exp3));
 	error(expectbuf);
 }
 
 void
-tabify(f, tab)
-	FILE *f;
-	int tab;
+tabify(FILE *f, int tab)
 {
-	while (tab--) {
+	while (tab--)
 		(void) fputc('\t', f);
-	}
 }
-
 
 static token tokstrings[] = {
 			{TOK_IDENT, "identifier"},
@@ -391,8 +359,7 @@ static token tokstrings[] = {
 };
 
 static char *
-toktostr(kind)
-	tok_kind kind;
+toktostr(tok_kind kind)
 {
 	token *sp;
 
@@ -400,30 +367,29 @@ toktostr(kind)
 	return (sp->str);
 }
 
-static
-printbuf()
+static void
+printbuf(void)
 {
 	char c;
 	int i;
 	int cnt;
 
-#	define TABSIZE 4
+#define	TABSIZE 4
 
-	for (i = 0; c = curline[i]; i++) {
+	for (i = 0; (c = curline[i]) != '\0'; i++) {
 		if (c == '\t') {
 			cnt = 8 - (i % TABSIZE);
 			c = ' ';
 		} else {
 			cnt = 1;
 		}
-		while (cnt--) {
+		while (cnt--)
 			(void) fputc(c, stderr);
-		}
 	}
 }
 
-static
-printwhere()
+static void
+printwhere(void)
 {
 	int i;
 	char c;
@@ -437,73 +403,64 @@ printwhere()
 		} else {
 			cnt = 1;
 		}
-		while (cnt--) {
+		while (cnt--)
 			(void) fputc('^', stderr);
-		}
 	}
 	(void) fputc('\n', stderr);
 }
 
 char *
-make_argname(pname, vname)
-    char *pname;
-    char *vname;
+make_argname(char *pname, char *vname)
 {
 	char *name;
+	size_t nlen;
 
-	name = malloc(strlen(pname) + strlen(vname) + strlen(ARGEXT) + 3);
-	if (!name) {
-		fprintf(stderr, "failed in malloc");
+	nlen = strlen(pname) + strlen(vname) + strlen(ARGEXT) + 3;
+	name = malloc(nlen);
+	if (name == NULL) {
+		(void) fprintf(stderr, "failed in malloc");
 		exit(1);
 	}
-	sprintf(name, "%s_%s_%s", locase(pname), vname, ARGEXT);
+	(void) snprintf(name, nlen, "%s_%s_%s", locase(pname), vname, ARGEXT);
 	return (name);
 }
 
 bas_type *typ_list_h;
 bas_type *typ_list_t;
 
-add_type(len, type)
-int len;
-char *type;
+void
+add_type(int len, char *type)
 {
 	bas_type *ptr;
 
-	if ((ptr = (bas_type *) malloc(sizeof (bas_type))) ==
-	    (bas_type *)NULL) {
-		fprintf(stderr, "failed in malloc");
+	if ((ptr = malloc(sizeof (bas_type))) == NULL) {
+		(void) fprintf(stderr, "failed in malloc");
 		exit(1);
 	}
 
 	ptr->name = type;
 	ptr->length = len;
 	ptr->next = NULL;
-	if (typ_list_t == NULL)
-	{
-
+	if (typ_list_t == NULL) {
 		typ_list_t = ptr;
 		typ_list_h = ptr;
-	}
-	else
-	{
+	} else {
 		typ_list_t->next = ptr;
 		typ_list_t = ptr;
-	};
+	}
 }
 
 
-bas_type *find_type(type)
-char *type;
+bas_type *
+find_type(char *type)
 {
-	bas_type * ptr;
+	bas_type *ptr;
 
 	ptr = typ_list_h;
-	while (ptr != NULL)
-	{
+	while (ptr != NULL) {
 		if (strcmp(ptr->name, type) == 0)
 			return (ptr);
-		else
-			ptr = ptr->next;
-	};
+		ptr = ptr->next;
+	}
 	return (NULL);
 }

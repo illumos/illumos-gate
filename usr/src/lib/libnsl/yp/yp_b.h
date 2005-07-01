@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,10 +33,17 @@
  * under license from the Regents of the University of California.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef _YP_B_H
+#define	_YP_B_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <rpc/types.h>
-#include "netconfig.h"
+#include <netconfig.h>
 #include <stdio.h>
 #include <synch.h>
 #include <netdb.h>
@@ -68,7 +76,7 @@ struct domain {
 	unsigned int	dom_error;
 	CLIENT * ping_clnt;
 	struct ypbind_binding *dom_binding;
-	int	dom_report_success;	/* Controls msg to /dev/console*/
+	int	dom_report_success;	/* Controls msg to /dev/console */
 	int	dom_broadcaster_pid;
 	int	bindfile;		/* File with binding info in it */
 	int 	broadcaster_fd;
@@ -95,7 +103,7 @@ struct ypbind_domain {
 	rpcvers_t ypbind_vers;
 };
 typedef struct ypbind_domain ypbind_domain;
-bool_t xdr_ypbind_domain(XDR *, ypbind_domain *);
+extern bool_t xdr_ypbind_domain(XDR *, ypbind_domain *);
 
 /*
  * This structure is used to store information about the server
@@ -111,24 +119,24 @@ struct ypbind_binding {
 	rpcvers_t ypbind_lo_vers;
 };
 typedef struct ypbind_binding ypbind_binding;
-bool_t xdr_ypbind_binding(XDR *, ypbind_binding *);
+extern bool_t xdr_ypbind_binding(XDR *, ypbind_binding *);
 
 struct ypbind_resp {
 	ypbind_resptype ypbind_status;
 	union {
-		u_int ypbind_error;
+		uint_t ypbind_error;
 		struct ypbind_binding *ypbind_bindinfo;
 	} ypbind_resp_u;
 };
 typedef struct ypbind_resp ypbind_resp;
-bool_t xdr_ypbind_resp(XDR *, ypbind_resp *);
+extern bool_t xdr_ypbind_resp(XDR *, ypbind_resp *);
 
 struct ypbind_setdom {
 	char *ypsetdom_domain;
 	struct ypbind_binding *ypsetdom_bindinfo;
 };
 typedef struct ypbind_setdom ypbind_setdom;
-bool_t xdr_ypbind_setdom(XDR *, ypbind_setdom *);
+extern bool_t xdr_ypbind_setdom(XDR *, ypbind_setdom *);
 
 #define	YPBINDPROG ((rpcprog_t)100007)
 #define	YPBINDVERS ((rpcvers_t)3)
@@ -152,3 +160,9 @@ extern CLIENT *__clnt_create_loopback(rpcprog_t, rpcvers_t, int *);
 
 extern int _fcntl(int, int, ...);
 extern uint_t _sleep(uint_t);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _YP_B_H */

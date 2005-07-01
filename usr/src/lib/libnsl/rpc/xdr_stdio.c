@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -46,7 +48,6 @@
 #include <stdio.h>
 #include <rpc/xdr.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <inttypes.h>
 
 static struct xdr_ops *xdrstdio_ops(void);
@@ -57,15 +58,13 @@ static struct xdr_ops *xdrstdio_ops(void);
  * Operation flag is set to op.
  */
 void
-xdrstdio_create(XDR *xdrs, FILE *file, enum xdr_op op)
+xdrstdio_create(XDR *xdrs, FILE *file, const enum xdr_op op)
 {
-	trace1(TR_xdrstdio_create, 0);
 	xdrs->x_op = op;
 	xdrs->x_ops = xdrstdio_ops();
 	xdrs->x_private = (caddr_t)file;
 	xdrs->x_handy = 0;
 	xdrs->x_base = 0;
-	trace1(TR_xdrstdio_create, 1);
 }
 
 /*
@@ -75,24 +74,20 @@ xdrstdio_create(XDR *xdrs, FILE *file, enum xdr_op op)
 static void
 xdrstdio_destroy(XDR *xdrs)
 {
-	trace1(TR_xdrstdio_destroy, 0);
+	/* LINTED pointer cast */
 	(void) fflush((FILE *)xdrs->x_private);
 	/* xx should we close the file ?? */
-	trace1(TR_xdrstdio_destroy, 1);
 }
 
 
 static bool_t
 xdrstdio_getint32(XDR *xdrs, int32_t *lp)
 {
-	trace1(TR_xdrstdio_getint32, 0);
 	if (fread((caddr_t)lp, sizeof (int32_t), 1,
-			(FILE *)xdrs->x_private) != 1) {
-		trace1(TR_xdrstdio_getint32, 1);
+			/* LINTED pointer cast */
+			(FILE *)xdrs->x_private) != 1)
 		return (FALSE);
-	}
 	*lp = ntohl(*lp);
-	trace1(TR_xdrstdio_getint32, 1);
 	return (TRUE);
 }
 
@@ -103,44 +98,33 @@ xdrstdio_putint32(XDR *xdrs, int32_t *lp)
 	int32_t mycopy = htonl(*lp);
 	lp = &mycopy;
 
-	trace1(TR_xdrstdio_putint32, 0);
 	if (fwrite((caddr_t)lp, sizeof (int32_t), 1,
-			(FILE *)xdrs->x_private) != 1) {
-		trace1(TR_xdrstdio_putint32, 1);
+			/* LINTED pointer cast */
+			(FILE *)xdrs->x_private) != 1)
 		return (FALSE);
-	}
-	trace1(TR_xdrstdio_putint32, 1);
 	return (TRUE);
 }
 
 static bool_t
-xdrstdio_getlong(xdrs, lp)
-	XDR *xdrs;
-	long *lp;
+xdrstdio_getlong(XDR *xdrs, long *lp)
 {
 	int32_t i;
 
 	if (!xdrstdio_getint32(xdrs, &i))
 		return (FALSE);
-
 	*lp = (long)i;
-
 	return (TRUE);
 }
 
 static bool_t
-xdrstdio_putlong(xdrs, lp)
-	XDR *xdrs;
-	long *lp;
+xdrstdio_putlong(XDR *xdrs, long *lp)
 {
 	int32_t i;
 
 #if defined(_LP64)
-	if ((*lp > INT32_MAX) || (*lp < INT32_MIN)) {
+	if ((*lp > INT32_MAX) || (*lp < INT32_MIN))
 		return (FALSE);
-	}
 #endif
-
 	i = (int32_t)*lp;
 
 	return (xdrstdio_putint32(xdrs, &i));
@@ -149,56 +133,42 @@ xdrstdio_putlong(xdrs, lp)
 static bool_t
 xdrstdio_getbytes(XDR *xdrs, caddr_t addr, int len)
 {
-	trace2(TR_xdrstdio_getbytes, 0, len);
 	if ((len != 0) &&
-		(fread(addr, (int)len, 1, (FILE *)xdrs->x_private) != 1)) {
-		trace1(TR_xdrstdio_getbytes, 1);
+		/* LINTED pointer cast */
+		(fread(addr, (int)len, 1, (FILE *)xdrs->x_private) != 1))
 		return (FALSE);
-	}
-	trace1(TR_xdrstdio_getbytes, 1);
 	return (TRUE);
 }
 
 static bool_t
 xdrstdio_putbytes(XDR *xdrs, caddr_t addr, int len)
 {
-	trace2(TR_xdrstdio_putbytes, 0, len);
 	if ((len != 0) &&
-		(fwrite(addr, (int)len, 1, (FILE *)xdrs->x_private) != 1)) {
-		trace1(TR_xdrstdio_putbytes, 1);
+		/* LINTED pointer cast */
+		(fwrite(addr, (int)len, 1, (FILE *)xdrs->x_private) != 1))
 		return (FALSE);
-	}
-	trace1(TR_xdrstdio_putbytes, 1);
 	return (TRUE);
 }
 
 static uint_t
 xdrstdio_getpos(XDR *xdrs)
 {
-	uint_t dummy1;
-
-	trace1(TR_xdrstdio_getpos, 0);
-	dummy1 = (uint_t)ftell((FILE *)xdrs->x_private);
-	trace1(TR_xdrstdio_getpos, 1);
-	return (dummy1);
+	/* LINTED pointer cast */
+	return ((uint_t)ftell((FILE *)xdrs->x_private));
 }
 
 static bool_t
 xdrstdio_setpos(XDR *xdrs, uint_t pos)
 {
-	bool_t dummy2;
-
-	trace2(TR_xdrstdio_setpos, 0, pos);
-	dummy2 = (fseek((FILE *)xdrs->x_private,
-			(int)pos, 0) < 0) ? FALSE : TRUE;
-	trace1(TR_xdrstdio_setpos, 1);
-	return (dummy2);
+	/* LINTED pointer cast */
+	return ((fseek((FILE *)xdrs->x_private,
+			(int)pos, 0) < 0) ? FALSE : TRUE);
 }
 
+/* ARGSUSED */
 static rpc_inline_t *
 xdrstdio_inline(XDR *xdrs, int len)
 {
-
 	/*
 	 * Must do some work to implement this: must insure
 	 * enough data in the underlying stdio buffer,
@@ -208,31 +178,25 @@ xdrstdio_inline(XDR *xdrs, int len)
 	 * most of the gains to be had here and require storage
 	 * management on this buffer, so we don't do this.
 	 */
-	trace2(TR_xdrstdio_inline, 0, len);
-	trace2(TR_xdrstdio_inline, 1, len);
 	return (NULL);
 }
 
+/* ARGSUSED */
 static bool_t
 xdrstdio_control(XDR *xdrs, int request, void *info)
 {
-	switch (request) {
-
-	default:
-		return (FALSE);
-	}
+	return (FALSE);
 }
 
 static struct xdr_ops *
-xdrstdio_ops()
+xdrstdio_ops(void)
 {
 	static struct xdr_ops ops;
 	extern mutex_t	ops_lock;
 
 /* VARIABLES PROTECTED BY ops_lock: ops */
 
-	trace1(TR_xdrstdio_ops, 0);
-	mutex_lock(&ops_lock);
+	(void) mutex_lock(&ops_lock);
 	if (ops.x_getlong == NULL) {
 		ops.x_getlong = xdrstdio_getlong;
 		ops.x_putlong = xdrstdio_putlong;
@@ -248,7 +212,6 @@ xdrstdio_ops()
 		ops.x_putint32 = xdrstdio_putint32;
 #endif
 	}
-	mutex_unlock(&ops_lock);
-	trace1(TR_xdrstdio_ops, 1);
+	(void) mutex_unlock(&ops_lock);
 	return (&ops);
 }

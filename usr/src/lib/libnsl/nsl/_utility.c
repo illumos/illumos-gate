@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,6 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <stropts.h>
 #include <sys/stream.h>
@@ -81,16 +80,14 @@ _t_checkfd(int fd, int force_sync, int api_semantics)
 	struct _ti_user *tiptr;
 	int retval, timodpushed;
 
-	trace2(TR__t_checkfd, 0, fd);
 	if (fd < 0) {
 		t_errno = TBADF;
-		trace2(TR__t_checkfd, 1, fd);
 		return (NULL);
 	}
 	tiptr = NULL;
 	sig_mutex_lock(&_ti_userlock);
 	if ((tiptr = find_tilink(fd)) != NULL) {
-		if (! force_sync) {
+		if (!force_sync) {
 			sig_mutex_unlock(&_ti_userlock);
 			return (tiptr);
 		}
@@ -122,7 +119,6 @@ _t_checkfd(int fd, int force_sync, int api_semantics)
 		 * test if we ever fix this for TLI
 		 */
 		t_errno = TBADF;
-		trace2(TR__t_checkfd, 1, fd);
 		return (NULL);
 	}
 
@@ -139,11 +135,7 @@ _t_checkfd(int fd, int force_sync, int api_semantics)
 		} while (retval < 0 && errno == EINTR);
 
 		if (retval < 0) {
-			int sv_errno = errno;
-
 			t_errno = TSYSERR;
-			trace2(TR_t_open, 1, flags);
-			errno = sv_errno;
 			return (NULL);
 		}
 		timodpushed = 1;
@@ -171,13 +163,11 @@ _t_checkfd(int fd, int force_sync, int api_semantics)
 		 */
 		if (timodpushed)
 			(void) _ioctl(fd, I_POP, 0);
-		trace2(TR__t_checkfd, 1, fd);
 		errno = sv_errno;
 		return (NULL);
 	}
 	sig_mutex_unlock(&_ti_userlock);
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-	trace2(TR__t_checkfd, 1, fd);
 	return (tiptr);
 }
 
@@ -193,8 +183,6 @@ _t_aligned_copy(
 	char *datap,
 	t_scalar_t *rtn_offset)
 {
-	trace1(TR__t_aligned_copy, 0);
-
 	*rtn_offset = ROUNDUP32(init_offset);
 	if ((*rtn_offset + len) > strbufp->maxlen) {
 		/*
@@ -204,7 +192,6 @@ _t_aligned_copy(
 	}
 	(void) memcpy(strbufp->buf + *rtn_offset, datap, (size_t)len);
 
-	trace1(TR__t_aligned_copy, 1);
 	return (0);
 }
 
@@ -234,9 +221,6 @@ _t_register_lookevent(
 {
 	struct _ti_lookbufs *tlbs;
 	int cbuf_size, dbuf_size;
-	int sv_errno;
-
-	trace3(TR__t_register_lookevent, 0, dsize, csize);
 
 	assert(MUTEX_HELD(&tiptr->ti_lock));
 
@@ -245,7 +229,6 @@ _t_register_lookevent(
 
 	if ((csize > cbuf_size) || dsize > dbuf_size) {
 		/* can't fit - return error */
-		trace3(TR__t_register_lookevent, 1, dsize, csize);
 		return (-1);	/* error */
 	}
 	/*
@@ -258,9 +241,11 @@ _t_register_lookevent(
 	 */
 	if (tiptr->ti_lookcnt > 0) { /* something already on looklist */
 		if (cptr && csize >= (int)sizeof (struct T_discon_ind) &&
+		    /* LINTED pointer cast */
 		    *(t_scalar_t *)cptr == T_DISCON_IND) {
 			/* appending discon ind */
 			assert(tiptr->ti_servtype != T_CLTS);
+			/* LINTED pointer cast */
 			if (*(t_scalar_t *)tiptr->ti_lookbufs.tl_lookcbuf ==
 			    T_ORDREL_IND) { /* T_ORDREL_IND is on list */
 				/*
@@ -286,13 +271,9 @@ _t_register_lookevent(
 		/*
 		 * signals are deferred, calls to malloc() are safe.
 		 */
-		if ((tlbs->tl_next = malloc(sizeof (struct _ti_lookbufs)))
-			== NULL) {
-			sv_errno = errno;
-			trace3(TR__t_register_lookevent, 1, dsize, csize);
-			errno = sv_errno;
+		if ((tlbs->tl_next = malloc(sizeof (struct _ti_lookbufs))) ==
+									NULL)
 			return (-1); /* error */
-		}
 		tlbs = tlbs->tl_next;
 		/*
 		 * Allocate the buffers. The sizes derived from the
@@ -301,20 +282,14 @@ _t_register_lookevent(
 		 */
 		if ((tlbs->tl_lookcbuf = malloc(cbuf_size)) == NULL) {
 			/* giving up - free other memory chunks */
-			sv_errno = errno;
 			free(tlbs);
-			trace3(TR__t_register_lookevent, 1, dsize, csize);
-			errno = sv_errno;
 			return (-1); /* error */
 		}
 		if ((dsize > 0) &&
 		    ((tlbs->tl_lookdbuf = malloc(dbuf_size)) == NULL)) {
 			/* giving up - free other memory chunks */
-			sv_errno = errno;
 			free(tlbs->tl_lookcbuf);
 			free(tlbs);
-			trace3(TR__t_register_lookevent, 1, dsize, csize);
-			errno = sv_errno;
 			return (-1); /* error */
 		}
 	}
@@ -326,7 +301,6 @@ _t_register_lookevent(
 	tlbs->tl_lookclen = csize;
 	tlbs->tl_next = NULL;
 	tiptr->ti_lookcnt++;
-	trace3(TR__t_register_lookevent, 1, dsize, csize);
 	return (0);		/* ok return */
 }
 
@@ -340,22 +314,16 @@ _t_is_event(int fd, struct _ti_user *tiptr)
 {
 	int size, retval;
 
-	trace2(TR__t_is_event, 0, fd);
 	assert(MUTEX_HELD(&tiptr->ti_lock));
 	if ((retval = _ioctl(fd, I_NREAD, &size)) < 0) {
-		int sv_errno = errno;
 		t_errno = TSYSERR;
-		trace2(TR__t_is_event, 1, fd);
-		errno = sv_errno;
 		return (-1);
 	}
 
 	if ((retval > 0) || (tiptr->ti_lookcnt > 0)) {
 		t_errno = TLOOK;
-		trace2(TR__t_is_event, 1, fd);
 		return (-1);
 	}
-	trace2(TR__t_is_event, 1, fd);
 	return (0);
 }
 
@@ -371,34 +339,24 @@ _t_is_ok(int fd, struct _ti_user *tiptr, t_scalar_t type)
 	union T_primitives *pptr;
 	int retval, cntlflag;
 	int size;
-	int sv_errno;
 	int didalloc, didralloc;
 	int flags = 0;
-
-	trace2(TR__t_is_ok, 0, fd);
 
 	assert(MUTEX_HELD(&tiptr->ti_lock));
 	/*
 	 * Acquire ctlbuf for use in sending/receiving control part
 	 * of the message.
 	 */
-	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
-		sv_errno = errno;
-		trace2(TR__t_is_ok, 1, fd);
-		errno = sv_errno;
+	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0)
 		return (-1);
-	}
 	/*
 	 * Acquire databuf for use in sending/receiving data part
 	 */
 	if (_t_acquire_databuf(tiptr, &databuf, &didralloc) < 0) {
-		sv_errno = errno;
 		if (didalloc)
 			free(ctlbuf.buf);
 		else
 			tiptr->ti_ctlbuf = ctlbuf.buf;
-		trace2(TR__t_is_ok, 1, fd);
-		errno = sv_errno;
 		return (-1);
 	}
 
@@ -444,6 +402,7 @@ _t_is_ok(int fd, struct _ti_user *tiptr, t_scalar_t type)
 	if (cntlflag & (O_NDELAY | O_NONBLOCK))
 		(void) _fcntl(fd, F_SETFL, cntlflag);
 
+	/* LINTED pointer cast */
 	pptr = (union T_primitives *)ctlbuf.buf;
 
 	switch (pptr->type) {
@@ -462,7 +421,6 @@ _t_is_ok(int fd, struct _ti_user *tiptr, t_scalar_t type)
 			free(databuf.buf);
 		else
 			tiptr->ti_rcvbuf = databuf.buf;
-		trace2(TR__t_is_ok, 1, fd);
 		return (0);
 
 	case T_ERROR_ACK:
@@ -498,7 +456,6 @@ _t_is_ok(int fd, struct _ti_user *tiptr, t_scalar_t type)
 		/* fallthru to err_out: */
 	}
 err_out:
-	sv_errno = errno;
 	if (didalloc)
 		free(ctlbuf.buf);
 	else
@@ -507,8 +464,6 @@ err_out:
 		free(databuf.buf);
 	else
 		tiptr->ti_rcvbuf = databuf.buf;
-	trace2(TR__t_is_ok, 1, fd);
-	errno = sv_errno;
 	return (-1);
 }
 
@@ -518,33 +473,27 @@ err_out:
 int
 _t_do_ioctl(int fd, char *buf, int size, int cmd, int *retlenp)
 {
-	int retval, sv_errno;
+	int retval;
 	struct strioctl strioc;
 
-	trace1(TR__t_do_ioctl, 0);
 	strioc.ic_cmd = cmd;
 	strioc.ic_timout = -1;
 	strioc.ic_len = size;
 	strioc.ic_dp = buf;
 
 	if ((retval = _ioctl(fd, I_STR, &strioc)) < 0) {
-		sv_errno = errno;
 		t_errno = TSYSERR;
-		trace1(TR__t_do_ioctl, 1);
-		errno = sv_errno;
 		return (-1);
 	}
 
 	if (retval > 0) {
 		t_errno = retval&0xff;
-		trace1(TR__t_do_ioctl, 1);
 		if (t_errno == TSYSERR)
 			errno = (retval >>  8)&0xff;
 		return (-1);
 	}
 	if (retlenp)
 		*retlenp = strioc.ic_len;
-	trace1(TR__t_do_ioctl, 1);
 	return (0);
 }
 
@@ -560,26 +509,17 @@ _t_alloc_bufs(int fd, struct _ti_user *tiptr, struct T_info_ack *tsap)
 	unsigned int csize, dsize, asize, osize;
 	char *ctlbuf, *rcvbuf;
 	char *lookdbuf, *lookcbuf;
-	int sv_errno;
 
-	trace2(TR__t_alloc_bufs, 0, fd);
 	csize = _t_setsize(tsap->CDATA_size);
 	dsize = _t_setsize(tsap->DDATA_size);
 
 	size1 = _T_MAX(csize, dsize);
 
 	if (size1 != 0) {
-		if ((rcvbuf = malloc(size1)) == NULL) {
-			sv_errno = errno;
-			trace2(TR__t_alloc_bufs, 1, fd);
-			errno = sv_errno;
+		if ((rcvbuf = malloc(size1)) == NULL)
 			return (-1);
-		}
 		if ((lookdbuf = malloc(size1)) == NULL) {
-			sv_errno = errno;
 			free(rcvbuf);
-			trace2(TR__t_alloc_bufs, 1, fd);
-			errno = sv_errno;
 			return (-1);
 		}
 	} else {
@@ -614,25 +554,19 @@ _t_alloc_bufs(int fd, struct _ti_user *tiptr, struct T_info_ack *tsap)
 		/* option buffer plus alignment */
 
 	if ((ctlbuf = malloc(size2)) == NULL) {
-		sv_errno = errno;
 		if (size1 != 0) {
 			free(rcvbuf);
 			free(lookdbuf);
 		}
-		trace2(TR__t_alloc_bufs, 1, fd);
-		errno = sv_errno;
 		return (-1);
 	}
 
 	if ((lookcbuf = malloc(size2)) == NULL) {
-		sv_errno = errno;
 		if (size1 != 0) {
 			free(rcvbuf);
 			free(lookdbuf);
 		}
 		free(ctlbuf);
-		trace2(TR__t_alloc_bufs, 1, fd);
-		errno = sv_errno;
 		return (-1);
 	}
 
@@ -651,7 +585,6 @@ _t_alloc_bufs(int fd, struct _ti_user *tiptr, struct T_info_ack *tsap)
 	tiptr->ti_lookbufs.tl_lookdlen = 0;
 	tiptr->ti_lookbufs.tl_lookdbuf = lookdbuf;
 
-	trace2(TR__t_alloc_bufs, 1, fd);
 	return (0);
 }
 
@@ -662,16 +595,12 @@ _t_alloc_bufs(int fd, struct _ti_user *tiptr, struct T_info_ack *tsap)
 static unsigned int
 _t_setsize(t_scalar_t infosize)
 {
-	trace2(TR__t_setsize, 0, infosize);
 	switch (infosize) {
 	case T_INFINITE /* -1 */:
-		trace2(TR__t_setsize, 1, infosize);
 		return (DEFSIZE);
 	case T_INVALID /* -2 */:
-		trace2(TR__t_setsize, 1, infosize);
 		return (0);
 	default:
-		trace2(TR__t_setsize, 1, infosize);
 		return ((unsigned int) infosize);
 	}
 }
@@ -690,7 +619,6 @@ _t_reinit_tiptr(struct _ti_user *tiptr)
 	 * is used for a fresh initialization.
 	 */
 
-	trace1(TR__t_reinit_tiptr, 0);
 	tiptr->ti_flags = 0;
 	tiptr->ti_rcvsize = 0;
 	tiptr->ti_rcvbuf = NULL;
@@ -712,8 +640,6 @@ _t_reinit_tiptr(struct _ti_user *tiptr)
 	tiptr->ti_ocnt = 0;
 	tiptr->ti_prov_flag = 0;
 	tiptr->ti_qlen = 0;
-
-	trace1(TR__t_reinit_tiptr, 1);
 }
 
 /*
@@ -783,8 +709,7 @@ add_tilink(int s)
 		/*
 		 * Allocate and link in a new one.
 		 */
-		if ((tiptr = (struct _ti_user *)malloc(sizeof (*tiptr)))
-		    == NULL)
+		if ((tiptr = malloc(sizeof (*tiptr))) == NULL)
 			return (NULL);
 		/*
 		 * First initialize fields common with reinitialization and
@@ -797,8 +722,7 @@ add_tilink(int s)
 		/*
 		 * First entry.
 		 */
-		if ((tiptr = (struct _ti_user *)malloc(sizeof (*tiptr)))
-		    == NULL)
+		if ((tiptr = malloc(sizeof (*tiptr))) == NULL)
 			return (NULL);
 		_t_reinit_tiptr(tiptr);
 		hash_bucket[x] = tiptr;
@@ -808,7 +732,7 @@ add_tilink(int s)
 	tiptr->ti_fd = s;
 	tiptr->ti_rdev = stbuf.st_rdev;
 	tiptr->ti_ino = stbuf.st_ino;
-	mutex_init(&tiptr->ti_lock, USYNC_THREAD, NULL);
+	(void) mutex_init(&tiptr->ti_lock, USYNC_THREAD, NULL);
 	return (tiptr);
 }
 
@@ -885,7 +809,7 @@ _t_delete_tilink(int s)
 				free(curptr->ti_rcvbuf);
 			free(curptr->ti_ctlbuf);
 			_t_free_lookbufs(curptr);
-			mutex_destroy(&curptr->ti_lock);
+			(void) mutex_destroy(&curptr->ti_lock);
 			free(curptr);
 			return (0);
 		}
@@ -902,7 +826,7 @@ _t_delete_tilink(int s)
  * doesn't support T_CAPABILITY_REQ TPI message.
  */
 struct _ti_user *
-_t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
+_t_create(int fd, struct t_info *info, int api_semantics, int *t_capreq_failed)
 {
 	/*
 	 * Aligned data buffer for ioctl.
@@ -936,8 +860,6 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 	int expected_acksize;
 	int retlen, rstate, sv_errno, rval;
 
-	trace2(TR__t_create, 0, flags);
-
 	assert(MUTEX_HELD(&_ti_userlock));
 
 	/*
@@ -961,9 +883,6 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 	expected_acksize = (int)sizeof (struct T_capability_ack);
 
 	if (rval < 0) {
-		sv_errno = errno;
-		trace2(TR__t_create, 1, flags);
-		errno = sv_errno;
 		/*
 		 * TI_CAPABILITY may fail when transport provider doesn't
 		 * support T_CAPABILITY_REQ message type. In this case file
@@ -980,21 +899,18 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 
 	if (retlen != expected_acksize) {
 		t_errno = TSYSERR;
-		trace2(TR__t_create, 1, flags);
 		errno = EIO;
 		return (NULL);
 	}
 
 	if ((tcap->CAP_bits1 & TC1_INFO) == 0) {
 		t_errno = TSYSERR;
-		trace2(TR__t_create, 1, flags);
 		errno = EPROTO;
 		return (NULL);
 	}
 	if (info != NULL) {
 		if (tiap->PRIM_type != T_INFO_ACK) {
 			t_errno = TSYSERR;
-			trace2(TR__t_create, 1, flags);
 			errno = EPROTO;
 			return (NULL);
 		}
@@ -1035,7 +951,6 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 	ntiptr = add_tilink(fd);
 	if (ntiptr == NULL) {
 		t_errno = TSYSERR;
-		trace2(TR__t_create, 1, flags);
 		errno = ENOMEM;
 		return (NULL);
 	}
@@ -1049,7 +964,6 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 		(void) _t_delete_tilink(fd);
 		t_errno = TSYSERR;
 		sig_mutex_unlock(&ntiptr->ti_lock);
-		trace2(TR__t_create, 1, flags);
 		errno = sv_errno;
 		return (NULL);
 	}
@@ -1095,7 +1009,6 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 			sv_errno = errno;
 			(void) _t_delete_tilink(fd);
 			sig_mutex_unlock(&ntiptr->ti_lock);
-			trace2(TR__t_create, 1, fd);
 			errno = sv_errno;
 			return (NULL);
 		}
@@ -1115,7 +1028,6 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 			sv_errno = errno;
 			(void) _t_delete_tilink(fd);
 			sig_mutex_unlock(&ntiptr->ti_lock);
-			trace2(TR__t_create, 1, fd);
 			errno = sv_errno;
 			return (NULL);
 		}
@@ -1131,7 +1043,6 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 			sv_errno = errno;
 			(void) _t_delete_tilink(fd);
 			sig_mutex_unlock(&ntiptr->ti_lock);
-			trace2(TR__t_create, 1, fd);
 			errno = sv_errno;
 			return (NULL);
 		}
@@ -1141,7 +1052,6 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 		t_errno = TSTATECHNG;
 		(void) _t_delete_tilink(fd);
 		sig_mutex_unlock(&ntiptr->ti_lock);
-		trace2(TR__t_create, 1, fd);
 		return (NULL);
 	}
 
@@ -1159,7 +1069,6 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 		(void) _t_delete_tilink(fd);
 		t_errno = TSYSERR;
 		sig_mutex_unlock(&ntiptr->ti_lock);
-		trace2(TR__t_create, 1, flags);
 		errno = sv_errno;
 		return (NULL);
 	}
@@ -1174,7 +1083,6 @@ _t_create(int fd,  struct t_info *info, int api_semantics, int *t_capreq_failed)
 		(void) _t_delete_tilink(fd);
 		t_errno = TSYSERR;
 		sig_mutex_unlock(&ntiptr->ti_lock);
-		trace2(TR__t_create, 1, flags);
 		errno = sv_errno;
 		return (NULL);
 	}
@@ -1229,6 +1137,7 @@ _t_adjust_state(int fd, int instate)
 			 * read (T_DATA_IND or M_DATA)
 			 */
 			if (((arg.ctlbuf.len == 4) &&
+			    /* LINTED pointer cast */
 			    ((*(int32_t *)arg.ctlbuf.buf) == T_DATA_IND)) ||
 			    ((arg.ctlbuf.len == 0) && arg.databuf.len)) {
 				outstate = T_DATAXFER;
@@ -1243,6 +1152,7 @@ _t_adjust_state(int fd, int instate)
 			 * from the stream head.
 			 */
 			if ((arg.ctlbuf.len == 4) &&
+				/* LINTED pointer cast */
 				((*(int32_t *)arg.ctlbuf.buf) == T_CONN_CON))
 				outstate = T_OUTCON;
 			break;
@@ -1254,6 +1164,7 @@ _t_adjust_state(int fd, int instate)
 			 * read (T_DATA_IND or M_DATA)
 			 */
 			if (((arg.ctlbuf.len == 4) &&
+			    /* LINTED pointer cast */
 			    ((*(int32_t *)arg.ctlbuf.buf) == T_DATA_IND)) ||
 			    ((arg.ctlbuf.len == 0) && arg.databuf.len)) {
 				outstate = T_DATAXFER;
@@ -1346,7 +1257,7 @@ _t_free_lookbufs(struct _ti_user *tiptr)
 		free(tlbs->tl_lookcbuf);
 		prev_tlbs = tlbs;
 		tlbs = tlbs->tl_next;
-		free((char *)prev_tlbs);
+		free(prev_tlbs);
 	}
 }
 
@@ -1423,7 +1334,7 @@ _t_flush_lookevents(struct _ti_user *tiptr)
 		free(tlbs->tl_lookcbuf);
 		prev_tlbs = tlbs;
 		tlbs = tlbs->tl_next;
-		free((char *)prev_tlbs);
+		free(prev_tlbs);
 	}
 }
 

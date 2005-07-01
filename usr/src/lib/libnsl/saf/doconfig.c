@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +39,6 @@
 #include <ulimit.h>
 #include <wait.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <sys/stat.h>
 #include <stropts.h>
 #include <ctype.h>
@@ -64,11 +64,11 @@ extern int	_fstat(int, struct stat *);
 
 extern char	**_environ;
 
-static char	*eatwhite();
-static int	doassign();
-static int	dopush();
-static int	dopop();
-static int	dorun();
+static char	*eatwhite(char *);
+static int	doassign(char *);
+static int	dopush(int, char *);
+static int	dopop(int, char *);
+static int	dorun(char *, int);
 
 /*
  * doconfig - the configuration script interpreter, if all is ok,
@@ -93,17 +93,12 @@ doconfig(int fd, char *script, long rflag)
 	char *p;		/* scratch pointer */
 
 	/* if the script does not exist, then there is nothing to do */
-	trace3(TR_doconfig, 0, fd, rflag);
-	if (_STAT(script, &statbuf) < 0) {
-		trace1(TR_doconfig, 1);
+	if (_STAT(script, &statbuf) < 0)
 		return (0);
-	}
 
 	fp = fopen(script, "r");
-	if (fp == NULL) {
-		trace1(TR_doconfig, 1);
+	if (fp == NULL)
 		return (-1);
-	}
 
 	line = 0;
 	while (fgets(buf, BUFSIZ, fp)) {
@@ -112,7 +107,6 @@ doconfig(int fd, char *script, long rflag)
 		/* if no \n, then line is too long */
 		if (p == NULL) {
 			(void) fclose(fp);
-			trace1(TR_doconfig, 1);
 			return (line);
 		}
 		*p = '\0';
@@ -142,52 +136,43 @@ doconfig(int fd, char *script, long rflag)
 		/* skip any whitespace here too (between command and args) */
 		p = eatwhite(p);
 
-		if (!strcmp(bp, "assign")) {
+		if (strcmp(bp, "assign") == 0) {
 			if ((rflag & NOASSIGN) || doassign(p)) {
 				(void) fclose(fp);
-				trace1(TR_doconfig, 1);
 				return (line);
 			}
-		} else if (!strcmp(bp, "push")) {
+		} else if (strcmp(bp, "push") == 0) {
 			if (dopush(fd, p)) {
 				(void) fclose(fp);
-				trace1(TR_doconfig, 1);
 				return (line);
 			}
-		} else if (!strcmp(bp, "pop")) {
+		} else if (strcmp(bp, "pop") == 0) {
 			if (dopop(fd, p)) {
 				(void) fclose(fp);
-				trace1(TR_doconfig, 1);
 				return (line);
 			}
-		} else if (!strcmp(bp, "run")) {
+		} else if (strcmp(bp, "run") == 0) {
 			if ((rflag & NORUN) || dorun(p, NOWAIT)) {
 				(void) fclose(fp);
-				trace1(TR_doconfig, 1);
 				return (line);
 			}
-		} else if (!strcmp(bp, "runwait")) {
+		} else if (strcmp(bp, "runwait") == 0) {
 			if ((rflag & NORUN) || dorun(p, WAIT)) {
 				(void) fclose(fp);
-				trace1(TR_doconfig, 1);
 				return (line);
 			}
 		} else {
 			/* unknown command */
 			(void) fclose(fp);
-			trace1(TR_doconfig, 1);
 			return (line);
 		}
 	}
 	if (!feof(fp)) {
 		(void) fclose(fp);
-		trace1(TR_doconfig, 1);
 		return (-1);
-	} else {
-		(void) fclose(fp);
-		trace1(TR_doconfig, 1);
-		return (0);
 	}
+	(void) fclose(fp);
+	return (0);
 }
 
 
@@ -207,37 +192,28 @@ doassign(char *p)
 	char delim;		/* delimiter char seen (for quoted strings ) */
 	char *tp;		/* scratch pointer */
 
-	trace1(TR_doassign, 0);
-	if (*p == '\0') {
-		trace1(TR_doassign, 1);
+	if (*p == '\0')
 		return (-1);
-	}
 	var = p;
 	/* skip first token, but stop if we see a '=' */
 	while (*p && !isspace(*p) && (*p != '='))
 		p++;
 
 	/* if we found end of string, it's an error */
-	if (*p == '\0') {
-		trace1(TR_doassign, 1);
+	if (*p == '\0')
 		return (-1);
-	}
 
 	/* if we found a space, look for the '=', otherwise it's an error */
 	if (isspace(*p)) {
 		*p++ = '\0';
 		while (*p && isspace(*p))
 			p++;
-		if (*p == '\0') {
-			trace1(TR_doassign, 1);
+		if (*p == '\0')
 			return (-1);
-		}
 		if (*p == '=')
 			p++;
-		else {
-			trace1(TR_doassign, 1);
+		else
 			return (-1);
-		}
 	} else {
 		/* skip over '=' */
 		*p = '\0';
@@ -252,7 +228,6 @@ doassign(char *p)
 		tp = val;
 		for (;;) {
 			if (*p == '\0') {
-				trace1(TR_doassign, 1);
 				return (-1);
 			} else if (*p == delim) {
 				if (*(p - 1) != '\\')
@@ -263,7 +238,10 @@ doassign(char *p)
 				*tp++ = *p++;
 		}
 		*tp = '\0';
-		/* these assignments make the comment below true (values of tp and p */
+		/*
+		 * these assignments make the comment below true
+		 * (values of tp and p
+		 */
 		tp = ++p;
 		p = val;
 	} else {
@@ -279,25 +257,17 @@ doassign(char *p)
  * the end of the line
  */
 
-	if (*tp) {
-		trace1(TR_doassign, 1);
+	if (*tp)
 		return (-1);
-	}
-	sprintf(scratch, "%s=%s", var, p);
+	(void) snprintf(scratch, sizeof (scratch), "%s=%s", var, p);
 	/* note: need to malloc fresh space so putenv works */
 	tp = malloc(strlen(scratch) + 1);
-	if (tp == NULL) {
-		trace1(TR_doassign, 1);
+	if (tp == NULL)
 		return (-1);
-	}
-	strcpy(tp, scratch);
-	if (putenv(tp)) {
-		trace1(TR_doassign, 1);
+	(void) strcpy(tp, scratch);
+	if (putenv(tp))
 		return (-1);
-	} else {
-		trace1(TR_doassign, 1);
-		return (0);
-	}
+	return (0);
 }
 
 
@@ -316,22 +286,15 @@ dopush(int fd, char *p)
 	int i;		/* scratch variable */
 	int npush;	/* count # of modules pushed */
 
-	trace2(TR_dopush, 0, fd);
-	if (*p == '\0') {
-		trace1(TR_dopush, 1);
+	if (*p == '\0')
 		return (-1);
-	}
 	npush = 0;
 	for (;;) {
-		if (*p == '\0') {	/* found end of line */
-			trace1(TR_dopush, 1);
+		if (*p == '\0')		/* found end of line */
 			return (0);
-		}
 		p = eatwhite(p);
-		if (*p == '\0') {
-			trace1(TR_dopush, 1);
+		if (*p == '\0')
 			return (-1);
-		}
 		tp = p;
 		while (*tp && !isspace(*tp) && (*tp != ','))
 			tp++;
@@ -345,14 +308,12 @@ dopush(int fd, char *p)
  */
 
 			for (i = 0; i < npush; ++i)
-				ioctl(fd, I_POP, 0);
-			trace1(TR_dopush, 1);
+				(void) ioctl(fd, I_POP, 0);
 			return (-1);
-		} else {
-			/* count the number of modules we've pushed */
-			npush++;
-			p = tp;
 		}
+		/* count the number of modules we've pushed */
+		npush++;
+		p = tp;
 	}
 }
 
@@ -371,16 +332,11 @@ dopop(int fd, char *p)
 	char *modp;		/* module name from argument to pop */
 	char buf[FMNAMESZ + 1];	/* scratch buffer */
 
-	trace2(TR_dopop, 0, fd);
 	if (*p == '\0') {
 		/* just a pop with no args */
-		if (ioctl(fd, I_POP, 0) < 0) {
-			trace1(TR_dopop, 1);
+		if (ioctl(fd, I_POP, 0) < 0)
 			return (-1);
-		} else {
-			trace1(TR_dopop, 1);
-			return (0);
-		}
+		return (0);
 	}
 
 	/* skip any whitespace in between */
@@ -390,46 +346,32 @@ dopop(int fd, char *p)
 	while (*p && !isspace(*p))
 		p++;
 
-	if (*p) {	/* if not end of line, extra junk on line */
-		trace1(TR_dopop, 1);
+	if (*p)		/* if not end of line, extra junk on line */
 		return (-1);
-	}
-	if (!strcmp(modp, "ALL")) {
+	if (strcmp(modp, "ALL") == 0) {
 		/* it's the magic name, pop them all */
 		while (ioctl(fd, I_POP, 0) == 0)
 			;
 		/* After all popped, we'll get an EINVAL, which is expected */
-		if (errno != EINVAL) {
-			trace1(TR_dopop, 1);
+		if (errno != EINVAL)
 			return (-1);
-		} else {
-			trace1(TR_dopop, 1);
-			return (0);
-		}
-	} else {
-		/* check to see if the named module is on the stream */
-		if (ioctl(fd, I_FIND, modp) != 1) {
-			trace1(TR_dopop, 1);
-			return (-1);
-		}
-
-		/* pop them until the right one is on top */
-		for (;;) {
-			if (ioctl(fd, I_LOOK, buf) < 0) {
-				trace1(TR_dopop, 1);
-				return (-1);
-			}
-			if (!strcmp(modp, buf)) {
-				trace1(TR_dopop, 1);
-				/* we're done */
-				return (0);
-			}
-			if (ioctl(fd, I_POP, 0) < 0) {
-				trace1(TR_dopop, 1);
-				return (-1);
-			}
-		}
+		return (0);
 	}
+	/* check to see if the named module is on the stream */
+	if (ioctl(fd, I_FIND, modp) != 1)
+		return (-1);
+
+	/* pop them until the right one is on top */
+	for (;;) {
+		if (ioctl(fd, I_LOOK, buf) < 0)
+			return (-1);
+		if (strcmp(modp, buf) == 0)
+			/* we're done */
+			return (0);
+		if (ioctl(fd, I_POP, 0) < 0)
+			return (-1);
+	}
+	/* NOTREACHED */
 }
 
 
@@ -446,23 +388,18 @@ dorun(char *p, int waitflg)
 {
 	char *tp;		/* scratch pointer */
 	char *ep;		/* scratch pointer (end of token) */
-	int nfiles;		/* # of possibly open files */
-	int i;			/* scratch variable */
 	char savech;		/* hold area */
 	int status;		/* return status from wait */
 	pid_t pid;		/* pid of child proc */
 	pid_t rpid;		/* returned pid from wait */
 	void (*func)();		/* return from signal */
 
-	trace2(TR_dorun, 0, waitflg);
-	if (*p == '\0') {
-		trace1(TR_dorun, 1);
+	if (*p == '\0')
 		return (-1);
-	}
 
-/*
- * get first token
- */
+	/*
+	 * get first token
+	 */
 
 	for (tp = p; *tp && !isspace(*tp); ++tp)
 		;
@@ -472,75 +409,59 @@ dorun(char *p, int waitflg)
 		*tp = '\0';
 	}
 
-/*
- * look for built-in's
- */
+	/*
+	 * look for built-in's
+	 */
 
-	if (!strcmp(p, "cd")) {
+	if (strcmp(p, "cd") == 0) {
 		*tp = savech;
 		tp = eatwhite(tp);
 		if (*tp == '\0')
 			/* if nothing there, try to cd to $HOME */
 			tp = getenv("HOME");
-		if (chdir(tp) < 0) {
-			trace1(TR_dorun, 1);
+		if (chdir(tp) < 0)
 			return (-1);
-		}
-	} else if (!strcmp(p, "ulimit")) {
+	} else if (strcmp(p, "ulimit") == 0) {
 		*tp = savech;
 		tp = eatwhite(tp);
 		/* must have an argument */
-		if (*tp == '\0') {
-			trace1(TR_dorun, 1);
+		if (*tp == '\0')
 			return (-1);
-		}
 		/* make sure nothing appears on line after arg */
 		for (ep = tp; *ep && !isspace(*ep); ++ep)
 			;
 		ep = eatwhite(ep);
-		if (*ep) {
-			trace1(TR_dorun, 1);
+		if (*ep)
 			return (-1);
-		}
-		if (!isdigit(*tp)) {
-			trace1(TR_dorun, 1);
+		if (!isdigit(*tp))
 			return (-1);
-		}
 
-		if (ulimit(2, atoi(tp)) < 0) {
-			trace1(TR_dorun, 1);
+		if (ulimit(2, atoi(tp)) < 0)
 			return (-1);
-		}
-	} else if (!strcmp(p, "umask")) {
+	} else if (strcmp(p, "umask") == 0) {
 		*tp = savech;
 		tp = eatwhite(tp);
 		/* must have an argument */
-		if (*tp == '\0') {
-			trace1(TR_dorun, 1);
+		if (*tp == '\0')
 			return (-1);
-		}
 		/* make sure nothing appears on line after arg */
 		for (ep = tp; *ep && !isspace(*ep); ++ep)
 			;
 		ep = eatwhite(ep);
-		if (*ep) {
-			trace1(TR_dorun, 1);
+		if (*ep)
 			return (-1);
-		}
-		if (!isdigit(*tp)) {
-			trace1(TR_dorun, 1);
+		if (!isdigit(*tp))
 			return (-1);
-		}
 		(void) umask(strtol(tp, NULL, 8));
 	} else {
 		/* not a built-in */
 		*tp = savech;
 		func = signal(SIGCLD, SIG_DFL);
 		if ((pid = fork()) < 0) {
-			signal(SIGCLD, func);
-			trace1(TR_dorun, 1);
+			(void) signal(SIGCLD, func);
 			return (-1);
-		} else if (pid) {
+		}
+		if (pid) {
 			if (waitflg == WAIT) {
 				status = 0;
 				rpid = -1;
@@ -548,12 +469,11 @@ dorun(char *p, int waitflg)
 					rpid = wait(&status);
 				if (status) {
 					/* child failed */
-					signal(SIGCLD, func);
-					trace1(TR_dorun, 1);
+					(void) signal(SIGCLD, func);
 					return (-1);
 				}
 			}
-			signal(SIGCLD, func);
+			(void) signal(SIGCLD, func);
 		} else {
 			/* set IFS for security */
 			(void) putenv("IFS=\" \"");
@@ -562,31 +482,25 @@ dorun(char *p, int waitflg)
 			 * access in the children.  Setup stdin, stdout,
 			 * and stderr to /dev/null.
 			 */
-			nfiles = ulimit(4, 0);
 			closefrom(0);
 			/* stdin */
-			if (open("/dev/null", O_RDWR) != 0) {
-				trace1(TR_dorun, 1);
+			if (open("/dev/null", O_RDWR) != 0)
 				return (-1);
-			}
 			/* stdout */
-			if (dup(0) != 1) {
-				trace1(TR_dorun, 1);
+			if (dup(0) != 1)
 				return (-1);
-			}
 			/* stderr */
-			if (dup(0) != 2) {
-				trace1(TR_dorun, 1);
+			if (dup(0) != 2)
 				return (-1);
-			}
-			execle("/usr/bin/sh", "sh", "-c", p, 0, _environ);
-			/* if we get here, there is a problem - remember that
-			   this is the child */
-			trace1(TR_dorun, 1);
+			(void) execle("/usr/bin/sh", "sh", "-c",
+							p, 0, _environ);
+			/*
+			 * if we get here, there is a problem - remember that
+			 * this is the child
+			 */
 			exit(1);
 		}
 	}
-	trace1(TR_dorun, 1);
 	return (0);
 }
 
@@ -602,9 +516,7 @@ dorun(char *p, int waitflg)
 static char *
 eatwhite(char *p)
 {
-	trace1(TR_eatwhite, 0);
 	while (*p && isspace(*p))
 		p++;
-	trace1(TR_eatwhite, 1);
 	return (p);
 }

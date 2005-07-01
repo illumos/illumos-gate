@@ -19,19 +19,18 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3.4.1 */
 
 #include "mt.h"
-#include <rpc/trace.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
@@ -54,13 +53,8 @@ _tx_unbind(int fd, int api_semantics)
 	int sv_errno, retval, didalloc;
 	struct strbuf ctlbuf;
 
-	trace2(TR_t_unbind, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_unbind, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 
 	if (_T_IS_XTI(api_semantics)) {
 		/*
@@ -69,7 +63,6 @@ _tx_unbind(int fd, int api_semantics)
 		 */
 		if (tiptr->ti_state != T_IDLE) {
 			t_errno = TOUTSTATE;
-			trace2(TR_t_unbind, 1, fd);
 			return (-1);
 		}
 	}
@@ -91,7 +84,6 @@ _tx_unbind(int fd, int api_semantics)
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
 		(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-		trace2(TR_t_bind, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -105,7 +97,6 @@ _tx_unbind(int fd, int api_semantics)
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-	trace2(TR_t_unbind, 1, fd);
 	errno = sv_errno;
 	return (retval);
 }
@@ -114,16 +105,12 @@ int
 _tx_unbind_locked(int fd, struct _ti_user *tiptr, struct strbuf *ctlbufp)
 {
 	struct T_unbind_req *unbind_reqp;
-	int sv_errno, retlen;
+	int retlen;
 
-	trace2(TR_t_unbind_locked, 0, fd);
-	if (_t_is_event(fd, tiptr) < 0) {
-		sv_errno = errno;
-		trace2(TR_t_unbind, 1, fd);
-		errno = sv_errno;
+	if (_t_is_event(fd, tiptr) < 0)
 		return (-1);
-	}
 
+	/* LINTED pointer cast */
 	unbind_reqp = (struct T_unbind_req *)ctlbufp->buf;
 	unbind_reqp->PRIM_type = T_UNBIND_REQ;
 
@@ -145,12 +132,8 @@ _tx_unbind_locked(int fd, struct _ti_user *tiptr, struct strbuf *ctlbufp)
 	_T_TX_NEXTSTATE(T_UNBIND, tiptr,
 			"t_unbind: invalid state event T_UNBIND");
 
-	trace2(TR_t_unbind_locked, 1, fd);
 	return (0);
 
 err_out:
-	sv_errno = errno;
-	trace2(TR_t_unbind_locked, 1, fd);
-	errno = sv_errno;
 	return (-1);
 }

@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -39,25 +41,19 @@
  * most common data items.  See xdr.h for more info on the interface to
  * xdr.
  */
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/isa_defs.h>
-#include <rpc/trace.h>
-
-#ifdef KERNEL
-#include <sys/param.h>
-#include <sys/systm.h>
-#else
 #include <syslog.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#endif
-
 #include <limits.h>
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 #include <inttypes.h>
 #include <sys/sysmacros.h>
+#include <assert.h>
 
 #pragma weak xdr_int64_t = xdr_hyper
 #pragma weak xdr_uint64_t = xdr_u_hyper
@@ -67,6 +63,12 @@
 #pragma weak xdr_uint16_t = xdr_u_short
 #pragma weak xdr_int8_t = xdr_char
 #pragma weak xdr_uint8_t = xdr_u_char
+
+/*
+ * The following routine was part of a workaround for an rpcgen
+ * that was fixed, this routine should be removed sometime.
+ */
+#pragma weak xdr_ulonglong_t = xdr_u_longlong_t
 
 /*
  * constants specific to the xdr "protocol"
@@ -83,7 +85,6 @@
  */
 static const char xdr_zero[BYTES_PER_XDR_UNIT]	= { 0 };
 
-#ifndef KERNEL
 /*
  * Free a data structure using XDR
  * Not a filter, but a convenient utility nonetheless
@@ -93,21 +94,16 @@ xdr_free(xdrproc_t proc, char *objp)
 {
 	XDR x;
 
-	trace1(TR_xdr_free, 0);
 	x.x_op = XDR_FREE;
 	(*proc)(&x, objp);
-	trace1(TR_xdr_free, 1);
 }
-#endif
 
 /*
  * XDR nothing
  */
 bool_t
-xdr_void()
+xdr_void(void)
 {
-	trace1(TR_xdr_void, 0);
-	trace1(TR_xdr_void, 1);
 	return (TRUE);
 }
 
@@ -120,10 +116,8 @@ xdr_void()
 bool_t
 xdr_time_t(XDR *xdrs, time_t *tp)
 {
-	bool_t dummy;
 	int32_t i;
 
-	trace1(TR_xdr_time_t, 0);
 	switch (xdrs->x_op) {
 	case XDR_ENCODE:
 	/*
@@ -138,24 +132,17 @@ xdr_time_t(XDR *xdrs, time_t *tp)
 		*tp = INT32_MIN;
 #endif
 		i =  (int32_t)*tp;
-		dummy = XDR_PUTINT32(xdrs, &i);
-		trace1(TR_xdr_time_t, 1);
-		return (dummy);
+		return (XDR_PUTINT32(xdrs, &i));
 
 	case XDR_DECODE:
-		if (!XDR_GETINT32(xdrs, &i)) {
-			trace1(TR_xdr_time_t, 1);
+		if (!XDR_GETINT32(xdrs, &i))
 			return (FALSE);
-		}
 		*tp = (time_t)i;
-		trace1(TR_xdr_time_t, 1);
 		return (TRUE);
 
 	case XDR_FREE:
-		trace1(TR_xdr_time_t, 1);
 		return (TRUE);
 	}
-	trace1(TR_xdr_time_t, 1);
 	return (FALSE);
 }
 
@@ -165,17 +152,14 @@ xdr_time_t(XDR *xdrs, time_t *tp)
 bool_t
 xdr_int(XDR *xdrs, int *ip)
 {
-	trace1(TR_xdr_int, 0);
-	if (xdrs->x_op == XDR_ENCODE)
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
 		return (XDR_PUTINT32(xdrs, ip));
-
-	if (xdrs->x_op == XDR_DECODE)
+	case XDR_DECODE:
 		return (XDR_GETINT32(xdrs, ip));
-
-	if (xdrs->x_op == XDR_FREE)
+	case XDR_FREE:
 		return (TRUE);
-
-	trace1(TR_xdr_int, 1);
+	}
 	return (FALSE);
 }
 
@@ -185,55 +169,44 @@ xdr_int(XDR *xdrs, int *ip)
 bool_t
 xdr_u_int(XDR *xdrs, uint_t *up)
 {
-	trace1(TR_xdr_u_int, 0);
-	if (xdrs->x_op == XDR_ENCODE)
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
 		return (XDR_PUTINT32(xdrs, (int *)up));
-
-	if (xdrs->x_op == XDR_DECODE)
+	case XDR_DECODE:
 		return (XDR_GETINT32(xdrs, (int *)up));
-
-	if (xdrs->x_op == XDR_FREE)
+	case XDR_FREE:
 		return (TRUE);
-
-	trace1(TR_xdr_u_int, 1);
+	}
 	return (FALSE);
 }
-
-#ifndef KERNEL
-static const char xdrlong_err[] =
-			"xdr_%s: value too large to be stored in data type";
-#endif
 
 /*
  * The definition of xdr_long()/xdr_u_long() is kept for backward
  * compatibitlity.
  * XDR long integers, same as xdr_u_long
  */
-
 bool_t
 xdr_long(XDR *xdrs, long *lp)
 {
-	bool_t dummy;
 	int32_t i;
 
-	trace1(TR_xdr_long, 0);
-	if (xdrs->x_op == XDR_ENCODE) {
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
 #if defined(_LP64)
-		if ((*lp > INT32_MAX) || (*lp < INT32_MIN)) {
+		if ((*lp > INT32_MAX) || (*lp < INT32_MIN))
 			return (FALSE);
-		}
 #endif
 		i = (int32_t)*lp;
-		dummy = XDR_PUTINT32(xdrs, &i);
-	} else if (xdrs->x_op == XDR_DECODE) {
-		dummy = XDR_GETINT32(xdrs, &i);
+		return (XDR_PUTINT32(xdrs, &i));
+	case XDR_DECODE:
+		if (!XDR_GETINT32(xdrs, &i))
+			return (FALSE);
 		*lp = (long)i;
-	} else if (xdrs->x_op == XDR_FREE)
-		dummy = TRUE;
-	else
-		dummy = FALSE;
-	trace1(TR_xdr_long, 1);
-	return (dummy);
+		return (TRUE);
+	case XDR_FREE:
+		return (TRUE);
+	}
+	return (FALSE);
 }
 
 /*
@@ -243,27 +216,25 @@ xdr_long(XDR *xdrs, long *lp)
 bool_t
 xdr_u_long(XDR *xdrs, ulong_t *ulp)
 {
-	bool_t dummy;
 	uint32_t ui;
 
-	trace1(TR_xdr_u_long, 0);
-	if (xdrs->x_op == XDR_ENCODE) {
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
 #if defined(_LP64)
-		if (*ulp > UINT32_MAX) {
+		if (*ulp > UINT32_MAX)
 			return (FALSE);
-		}
 #endif
 		ui = (uint32_t)*ulp;
-		dummy = XDR_PUTINT32(xdrs, (int32_t *)&ui);
-	} else if (xdrs->x_op == XDR_DECODE) {
-		dummy = XDR_GETINT32(xdrs, (int32_t *)&ui);
+		return (XDR_PUTINT32(xdrs, (int32_t *)&ui));
+	case XDR_DECODE:
+		if (!XDR_GETINT32(xdrs, (int32_t *)&ui))
+			return (FALSE);
 		*ulp = (ulong_t)ui;
-	} else if (xdrs->x_op == XDR_FREE)
-		dummy = TRUE;
-	else
-		dummy = FALSE;
-	trace1(TR_xdr_u_long, 1);
-	return (dummy);
+		return (TRUE);
+	case XDR_FREE:
+		return (TRUE);
+	}
+	return (FALSE);
 }
 
 /*
@@ -273,31 +244,19 @@ bool_t
 xdr_short(XDR *xdrs, short *sp)
 {
 	int32_t l;
-	bool_t dummy;
 
-	trace1(TR_xdr_short, 0);
 	switch (xdrs->x_op) {
-
 	case XDR_ENCODE:
 		l = (int32_t)*sp;
-		dummy = XDR_PUTINT32(xdrs, &l);
-		trace1(TR_xdr_short, 1);
-		return (dummy);
-
+		return (XDR_PUTINT32(xdrs, &l));
 	case XDR_DECODE:
-		if (!XDR_GETINT32(xdrs, &l)) {
-			trace1(TR_xdr_short, 1);
+		if (!XDR_GETINT32(xdrs, &l))
 			return (FALSE);
-		}
 		*sp = (short)l;
-		trace1(TR_xdr_short, 1);
 		return (TRUE);
-
 	case XDR_FREE:
-		trace1(TR_xdr_short, 1);
 		return (TRUE);
 	}
-	trace1(TR_xdr_short, 1);
 	return (FALSE);
 }
 
@@ -308,38 +267,19 @@ bool_t
 xdr_u_short(XDR *xdrs, ushort_t *usp)
 {
 	uint_t i;
-	bool_t dummy;
 
-
-	trace1(TR_xdr_u_short, 0);
 	switch (xdrs->x_op) {
-
 	case XDR_ENCODE:
 		i = (uint_t)*usp;
-		dummy = XDR_PUTINT32(xdrs, (int *)&i);
-		trace1(TR_xdr_u_short, 1);
-		return (dummy);
-
+		return (XDR_PUTINT32(xdrs, (int *)&i));
 	case XDR_DECODE:
-		if (!XDR_GETINT32(xdrs, (int *)&i)) {
-#ifdef KERNEL
-			printf("xdr_u_short: decode FAILED\n");
-#endif
-			trace1(TR_xdr_u_short, 1);
+		if (!XDR_GETINT32(xdrs, (int *)&i))
 			return (FALSE);
-		}
 		*usp = (ushort_t)i;
-		trace1(TR_xdr_u_short, 1);
 		return (TRUE);
-
 	case XDR_FREE:
-		trace1(TR_xdr_u_short, 1);
 		return (TRUE);
 	}
-#ifdef KERNEL
-	printf("xdr_u_short: bad op FAILED\n");
-#endif
-	trace1(TR_xdr_u_short, 1);
 	return (FALSE);
 }
 
@@ -352,22 +292,21 @@ xdr_char(XDR *xdrs, char *cp)
 {
 	int i;
 
-	trace1(TR_xdr_char, 0);
-
-	if (xdrs->x_op == XDR_ENCODE)
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
 		i = (*cp);
-
-	if (! xdr_int(xdrs, &i)) {
-		trace1(TR_xdr_char, 1);
-		return (FALSE);
-	}
-	if (xdrs->x_op == XDR_DECODE)
+		return (XDR_PUTINT32(xdrs, &i));
+	case XDR_DECODE:
+		if (!XDR_GETINT32(xdrs, &i))
+			return (FALSE);
 		*cp = (char)i;
-	trace1(TR_xdr_char, 1);
-	return (TRUE);
+		return (TRUE);
+	case XDR_FREE:
+		return (TRUE);
+	}
+	return (FALSE);
 }
 
-#ifndef KERNEL
 /*
  * XDR an unsigned char
  */
@@ -376,19 +315,20 @@ xdr_u_char(XDR *xdrs, uchar_t *cp)
 {
 	int i;
 
-	trace1(TR_xdr_u_char, 0);
-	if (xdrs->x_op == XDR_ENCODE)
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
 		i = (*cp);
-	if (! xdr_int(xdrs, &i)) {
-		trace1(TR_xdr_u_char, 1);
-		return (FALSE);
-	}
-	if (xdrs->x_op == XDR_DECODE)
+		return (XDR_PUTINT32(xdrs, &i));
+	case XDR_DECODE:
+		if (!XDR_GETINT32(xdrs, &i))
+			return (FALSE);
 		*cp = (uchar_t)i;
-	trace1(TR_xdr_u_char, 1);
-	return (TRUE);
+		return (TRUE);
+	case XDR_FREE:
+		return (TRUE);
+	}
+	return (FALSE);
 }
-#endif /* !KERNEL */
 
 /*
  * XDR booleans
@@ -397,37 +337,19 @@ bool_t
 xdr_bool(XDR *xdrs, bool_t *bp)
 {
 	int i;
-	bool_t dummy;
 
-	trace1(TR_xdr_bool, 0);
 	switch (xdrs->x_op) {
-
 	case XDR_ENCODE:
 		i = *bp ? XDR_TRUE : XDR_FALSE;
-		dummy = XDR_PUTINT32(xdrs, &i);
-		trace1(TR_xdr_bool, 1);
-		return (dummy);
-
+		return (XDR_PUTINT32(xdrs, &i));
 	case XDR_DECODE:
-		if (!XDR_GETINT32(xdrs, &i)) {
-#ifdef KERNEL
-			printf("xdr_bool: decode FAILED\n");
-#endif
-			trace1(TR_xdr_bool, 1);
+		if (!XDR_GETINT32(xdrs, &i))
 			return (FALSE);
-		}
 		*bp = (i == XDR_FALSE) ? FALSE : TRUE;
-		trace1(TR_xdr_bool, 1);
 		return (TRUE);
-
 	case XDR_FREE:
-		trace1(TR_xdr_bool, 1);
 		return (TRUE);
 	}
-#ifdef KERNEL
-	printf("xdr_bool: bad op FAILED\n");
-#endif
-	trace1(TR_xdr_bool, 1);
 	return (FALSE);
 }
 
@@ -437,39 +359,14 @@ xdr_bool(XDR *xdrs, bool_t *bp)
 bool_t
 xdr_enum(XDR *xdrs, enum_t *ep)
 {
-	bool_t dummy;
-
-#ifndef lint
 	enum sizecheck { SIZEVAL };	/* used to find the size of an enum */
 
 	/*
 	 * enums are treated as ints
 	 */
-	trace1(TR_xdr_enum, 0);
-	if (sizeof (enum sizecheck) == sizeof (int32_t)) {
-		dummy = xdr_int(xdrs, (int *)ep);
-		trace1(TR_xdr_enum, 1);
-		return (dummy);
-	} else if (sizeof (enum sizecheck) == sizeof (short)) {
-		dummy = xdr_short(xdrs, (short *)ep);
-		trace1(TR_xdr_enum, 1);
-		return (dummy);
-	} else if (sizeof (enum sizecheck) == sizeof (char)) {
-		dummy = xdr_char(xdrs, (char *)ep);
-		trace1(TR_xdr_enum, 1);
-		return (dummy);
-	} else {
-		trace1(TR_xdr_enum, 1);
-		return (FALSE);
-	}
-#else
-	trace1(TR_xdr_enum, 0);
-	(void) (xdr_char(xdrs, (char *)ep));
-	(void) (xdr_short(xdrs, (short *)ep));
-	dummy = xdr_int(xdrs, (int32_t *)ep);
-	trace1(TR_xdr_enum, 1);
-	return (dummy);
-#endif
+	/* CONSTCOND */
+	assert(sizeof (enum sizecheck) == sizeof (int32_t));
+	return (xdr_int(xdrs, (int *)ep));
 }
 
 /*
@@ -478,20 +375,16 @@ xdr_enum(XDR *xdrs, enum_t *ep)
  * cp points to the opaque object and cnt gives the byte length.
  */
 bool_t
-xdr_opaque(XDR *xdrs, caddr_t cp, uint_t cnt)
+xdr_opaque(XDR *xdrs, caddr_t cp, const uint_t cnt)
 {
-	bool_t dummy;
-	register uint_t rndup;
+	uint_t rndup;
 	char crud[BYTES_PER_XDR_UNIT];
 
 	/*
 	 * if no data we are done
 	 */
-	trace2(TR_xdr_opaque, 0, cnt);
-	if (cnt == 0) {
-		trace1(TR_xdr_opaque, 1);
+	if (cnt == 0)
 		return (TRUE);
-	}
 
 	/*
 	 * round byte count to full xdr units
@@ -500,50 +393,22 @@ xdr_opaque(XDR *xdrs, caddr_t cp, uint_t cnt)
 	if ((int)rndup > 0)
 		rndup = BYTES_PER_XDR_UNIT - rndup;
 
-	if (xdrs->x_op == XDR_DECODE) {
-		if (!XDR_GETBYTES(xdrs, cp, cnt)) {
-#ifdef KERNEL
-			printf("xdr_opaque: decode FAILED\n");
-#endif
-			trace1(TR_xdr_opaque, 1);
+	switch (xdrs->x_op) {
+	case XDR_DECODE:
+		if (!XDR_GETBYTES(xdrs, cp, cnt))
 			return (FALSE);
-		}
-		if (rndup == 0) {
-			trace1(TR_xdr_opaque, 1);
+		if (rndup == 0)
 			return (TRUE);
-		}
-		dummy = XDR_GETBYTES(xdrs, crud, rndup);
-		trace1(TR_xdr_opaque, 1);
-		return (dummy);
-	}
-
-	if (xdrs->x_op == XDR_ENCODE) {
-
-		if (!XDR_PUTBYTES(xdrs, cp, cnt)) {
-#ifdef KERNEL
-			printf("xdr_opaque: encode FAILED\n");
-#endif
-			trace1(TR_xdr_opaque, 1);
+		return (XDR_GETBYTES(xdrs, crud, rndup));
+	case XDR_ENCODE:
+		if (!XDR_PUTBYTES(xdrs, cp, cnt))
 			return (FALSE);
-		}
-		if (rndup == 0) {
-			trace1(TR_xdr_opaque, 1);
+		if (rndup == 0)
 			return (TRUE);
-		}
-		dummy = XDR_PUTBYTES(xdrs, (caddr_t)&xdr_zero[0], rndup);
-		trace1(TR_xdr_opaque, 1);
-		return (dummy);
-	}
-
-	if (xdrs->x_op == XDR_FREE) {
-		trace1(TR_xdr_opaque, 1);
+		return (XDR_PUTBYTES(xdrs, (caddr_t)&xdr_zero[0], rndup));
+	case XDR_FREE:
 		return (TRUE);
 	}
-
-#ifdef KERNEL
-	printf("xdr_opaque: bad op FAILED\n");
-#endif
-	trace1(TR_xdr_opaque, 1);
 	return (FALSE);
 }
 
@@ -553,16 +418,13 @@ xdr_opaque(XDR *xdrs, caddr_t cp, uint_t cnt)
  * If *cpp is NULL maxsize bytes are allocated
  */
 
-#ifndef KERNEL
 static const char xdr_err[] = "xdr_%s: out of memory";
-#endif
 
 bool_t
-xdr_bytes(XDR *xdrs, char **cpp, uint_t *sizep, uint_t maxsize)
+xdr_bytes(XDR *xdrs, char **cpp, uint_t *sizep, const uint_t maxsize)
 {
-	bool_t dummy;
-	register char *sp = *cpp;  /* sp is the actual string pointer */
-	register uint_t nodesize;
+	char *sp = *cpp;  /* sp is the actual string pointer */
+	uint_t nodesize;
 
 	/*
 	 * first deal with the length since xdr bytes are counted
@@ -570,62 +432,35 @@ xdr_bytes(XDR *xdrs, char **cpp, uint_t *sizep, uint_t maxsize)
 	 * advantages here will be miniscule compared to xdr_bytes.
 	 * This saved us 100 bytes in the library size.
 	 */
-	trace2(TR_xdr_bytes, 0, maxsize);
-	if (! xdr_u_int(xdrs, sizep)) {
-#ifdef KERNEL
-		printf("xdr_bytes: size FAILED\n");
-#endif
-		trace1(TR_xdr_bytes, 1);
+	if (!xdr_u_int(xdrs, sizep))
 		return (FALSE);
-	}
 	nodesize = *sizep;
-	if ((nodesize > maxsize) && (xdrs->x_op != XDR_FREE)) {
-#ifdef KERNEL
-		printf("xdr_bytes: bad size FAILED\n");
-#endif
-		trace1(TR_xdr_bytes, 1);
+	if ((nodesize > maxsize) && (xdrs->x_op != XDR_FREE))
 		return (FALSE);
-	}
 
 	/*
 	 * now deal with the actual bytes
 	 */
 	switch (xdrs->x_op) {
-
 	case XDR_DECODE:
-		if (nodesize == 0) {
-			trace1(TR_xdr_bytes, 1);
+		if (nodesize == 0)
 			return (TRUE);
-		}
-		if (sp == NULL) {
-			*cpp = sp = (char *)mem_alloc(nodesize);
-		}
-#ifndef KERNEL
+		if (sp == NULL)
+			*cpp = sp = malloc(nodesize);
 		if (sp == NULL) {
 			(void) syslog(LOG_ERR, xdr_err, (const char *)"bytes");
-			trace1(TR_xdr_bytes, 1);
 			return (FALSE);
 		}
-#endif
 		/*FALLTHROUGH*/
-
 	case XDR_ENCODE:
-		dummy = xdr_opaque(xdrs, sp, nodesize);
-		trace1(TR_xdr_bytes, 1);
-		return (dummy);
-
+		return (xdr_opaque(xdrs, sp, nodesize));
 	case XDR_FREE:
 		if (sp != NULL) {
-			mem_free(sp, nodesize);
+			free(sp);
 			*cpp = NULL;
 		}
-		trace1(TR_xdr_bytes, 1);
 		return (TRUE);
 	}
-#ifdef KERNEL
-	printf("xdr_bytes: bad op FAILED\n");
-#endif
-	trace1(TR_xdr_bytes, 1);
 	return (FALSE);
 }
 
@@ -635,12 +470,7 @@ xdr_bytes(XDR *xdrs, char **cpp, uint_t *sizep, uint_t maxsize)
 bool_t
 xdr_netobj(XDR *xdrs, struct netobj *np)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_netobj, 0);
-	dummy = xdr_bytes(xdrs, &np->n_bytes, &np->n_len, MAX_NETOBJ_SZ);
-	trace1(TR_xdr_netobj, 1);
-	return (dummy);
+	return (xdr_bytes(xdrs, &np->n_bytes, &np->n_len, MAX_NETOBJ_SZ));
 }
 
 /*
@@ -656,22 +486,15 @@ xdr_netobj(XDR *xdrs, struct netobj *np)
  */
 bool_t
 xdr_union(XDR *xdrs, enum_t *dscmp, char *unp,
-		const struct xdr_discrim *choices, xdrproc_t dfault)
+		const struct xdr_discrim *choices, const xdrproc_t dfault)
 {
-	register enum_t dscm;
-	bool_t dummy;
+	enum_t dscm;
 
 	/*
 	 * we deal with the discriminator;  it's an enum
 	 */
-	trace1(TR_xdr_union, 0);
-	if (! xdr_enum(xdrs, dscmp)) {
-#ifdef KERNEL
-		printf("xdr_enum: dscmp FAILED\n");
-#endif
-		trace1(TR_xdr_union, 1);
+	if (!xdr_enum(xdrs, dscmp))
 		return (FALSE);
-	}
 	dscm = *dscmp;
 
 	/*
@@ -679,20 +502,15 @@ xdr_union(XDR *xdrs, enum_t *dscmp, char *unp,
 	 * if we find one, execute the xdr routine for that value.
 	 */
 	for (; choices->proc != NULL_xdrproc_t; choices++) {
-		if (choices->value == dscm) {
-			dummy = (*(choices->proc))(xdrs, unp, LASTUNSIGNED);
-			trace1(TR_xdr_union, 1);
-			return (dummy);
-		}
+		if (choices->value == dscm)
+			return ((*(choices->proc))(xdrs, unp, LASTUNSIGNED));
 	}
 
 	/*
 	 * no match - execute the default xdr routine if there is one
 	 */
-	dummy = (dfault == NULL_xdrproc_t) ? FALSE :
-	    (*dfault)(xdrs, unp, LASTUNSIGNED);
-	trace1(TR_xdr_union, 1);
-	return (dummy);
+	return ((dfault == NULL_xdrproc_t) ? FALSE :
+	    (*dfault)(xdrs, unp, LASTUNSIGNED));
 }
 
 
@@ -711,23 +529,19 @@ xdr_union(XDR *xdrs, enum_t *dscmp, char *unp,
  * of the string as specified by a protocol.
  */
 bool_t
-xdr_string(XDR *xdrs, char **cpp, uint_t maxsize)
+xdr_string(XDR *xdrs, char **cpp, const uint_t maxsize)
 {
-	bool_t dummy;
-	register char *newsp, *sp = *cpp;  /* sp is the actual string pointer */
+	char *newsp, *sp = *cpp;  /* sp is the actual string pointer */
 	uint_t size, block;
 	uint64_t bytesread;
 
 	/*
 	 * first deal with the length since xdr strings are counted-strings
 	 */
-	trace2(TR_xdr_string, 0, maxsize);
 	switch (xdrs->x_op) {
 	case XDR_FREE:
-		if (sp == NULL) {
-			trace1(TR_xdr_string, 1);
+		if (sp == NULL)
 			return (TRUE);	/* already free */
-		}
 		/*FALLTHROUGH*/
 	case XDR_ENCODE:
 		size = (sp != NULL) ? (uint_t)strlen(sp) : 0;
@@ -738,27 +552,22 @@ xdr_string(XDR *xdrs, char **cpp, uint_t maxsize)
 	 * advantages here will be miniscule compared to xdr_string.
 	 * This saved us 100 bytes in the library size.
 	 */
-	if (! xdr_u_int(xdrs, &size)) {
-		trace1(TR_xdr_string, 1);
+	if (!xdr_u_int(xdrs, &size))
 		return (FALSE);
-	}
-	if (size > maxsize) {
-		trace1(TR_xdr_string, 1);
+	if (size > maxsize)
 		return (FALSE);
-	}
 
 	/*
 	 * now deal with the actual bytes
 	 */
 	switch (xdrs->x_op) {
-
 	case XDR_DECODE:
 		/* if buffer is already given, call xdr_opaque() directly */
 		if (sp != NULL) {
-			dummy = xdr_opaque(xdrs, sp, size);
+			if (!xdr_opaque(xdrs, sp, size))
+				return (FALSE);
 			sp[size] = 0;
-			trace1(TR_xdr_string, 1);
-			return (dummy);
+			return (TRUE);
 		}
 
 		/*
@@ -780,13 +589,11 @@ xdr_string(XDR *xdrs, char **cpp, uint_t maxsize)
 			if (newsp == NULL) {
 				if (sp != NULL)
 					free(sp);
-				trace1(TR_xdr_string, 1);
 				return (FALSE);
 			}
 			sp = newsp;
 			if (!xdr_opaque(xdrs, &sp[bytesread], block)) {
 				free(sp);
-				trace1(TR_xdr_string, 1);
 				return (FALSE);
 			}
 			bytesread += block;
@@ -794,124 +601,72 @@ xdr_string(XDR *xdrs, char **cpp, uint_t maxsize)
 
 		sp[bytesread] = 0; /* terminate the string with a NULL */
 		*cpp = sp;
-		trace1(TR_xdr_string, 1);
 		return (TRUE);
 	case XDR_ENCODE:
-		dummy = xdr_opaque(xdrs, sp, size);
-		trace1(TR_xdr_string, 1);
-		return (dummy);
+		return (xdr_opaque(xdrs, sp, size));
 	case XDR_FREE:
 		free(sp);
 		*cpp = NULL;
-		trace1(TR_xdr_string, 1);
 		return (TRUE);
 	}
-#ifdef KERNEL
-	printf("xdr_string: bad op FAILED\n");
-#endif
-	trace1(TR_xdr_string, 1);
 	return (FALSE);
 }
 
 bool_t
 xdr_hyper(XDR *xdrs, longlong_t *hp)
 {
-	bool_t	dummy;
-
-	trace1(TR_xdr_hyper, 0);
 	if (xdrs->x_op == XDR_ENCODE) {
 #if defined(_LONG_LONG_HTOL)
-		if (XDR_PUTINT32(xdrs, (int *)hp) == TRUE) {
-			dummy = XDR_PUTINT32(xdrs, (int *)((char *)hp +
-				BYTES_PER_XDR_UNIT));
-			trace1(TR_xdr_hyper, 1);
-			return (dummy);
-		}
-
+		if (XDR_PUTINT32(xdrs, (int *)hp) == TRUE)
+			/* LINTED pointer cast */
+			return (XDR_PUTINT32(xdrs, (int *)((char *)hp +
+				BYTES_PER_XDR_UNIT)));
 #else
+		/* LINTED pointer cast */
 		if (XDR_PUTINT32(xdrs, (int *)((char *)hp +
-			BYTES_PER_XDR_UNIT)) == TRUE) {
-			dummy = XDR_PUTINT32(xdrs, (int32_t *)hp);
-			trace1(TR_xdr_hyper, 1);
-			return (dummy);
-		}
-
+				BYTES_PER_XDR_UNIT)) == TRUE)
+			return (XDR_PUTINT32(xdrs, (int32_t *)hp));
 #endif
-		trace1(TR_xdr_hyper, 1);
 		return (FALSE);
+	}
 
-	} else if (xdrs->x_op == XDR_DECODE) {
+	if (xdrs->x_op == XDR_DECODE) {
 #if defined(_LONG_LONG_HTOL)
 		if (XDR_GETINT32(xdrs, (int *)hp) == FALSE ||
+		    /* LINTED pointer cast */
 		    (XDR_GETINT32(xdrs, (int *)((char *)hp +
-				BYTES_PER_XDR_UNIT)) == FALSE)) {
-			trace1(TR_xdr_hyper, 1);
+				BYTES_PER_XDR_UNIT)) == FALSE))
 			return (FALSE);
-		}
 #else
+		/* LINTED pointer cast */
 		if ((XDR_GETINT32(xdrs, (int *)((char *)hp +
 				BYTES_PER_XDR_UNIT)) == FALSE) ||
-				(XDR_GETINT32(xdrs, (int *)hp) == FALSE)) {
-			trace1(TR_xdr_hyper, 1);
+				(XDR_GETINT32(xdrs, (int *)hp) == FALSE))
 			return (FALSE);
-		}
 #endif
-		trace1(TR_xdr_hyper, 1);
 		return (TRUE);
 	}
-	trace1(TR_xdr_hyper, 1);
 	return (TRUE);
 }
 
 bool_t
 xdr_u_hyper(XDR *xdrs, u_longlong_t *hp)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_u_hyper, 0);
-	dummy = xdr_hyper(xdrs, (longlong_t *)hp);
-	trace1(TR_xdr_u_hyper, 1);
-	return (dummy);
+	return (xdr_hyper(xdrs, (longlong_t *)hp));
 }
 
 bool_t
 xdr_longlong_t(XDR *xdrs, longlong_t *hp)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_longlong_t, 0);
-	dummy = xdr_hyper(xdrs, hp);
-	trace1(TR_xdr_longlong_t, 1);
-	return (dummy);
+	return (xdr_hyper(xdrs, hp));
 }
 
 bool_t
 xdr_u_longlong_t(XDR *xdrs, u_longlong_t *hp)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_u_longlong_t, 0);
-	dummy = xdr_hyper(xdrs, (longlong_t *)hp);
-	trace1(TR_xdr_u_longlong_t, 1);
-	return (dummy);
-}
-/*
- * The following routine is part of a workaround for bug
- * #1128007.  When it is fixed, this routine should be
- * removed.
- */
-bool_t
-xdr_ulonglong_t(XDR *xdrs, u_longlong_t *hp)
-{
-	bool_t dummy;
-
-	trace1(TR_xdr_u_longlong_t, 0);
-	dummy = xdr_hyper(xdrs, (longlong_t *)hp);
-	trace1(TR_xdr_u_longlong_t, 1);
-	return (dummy);
+	return (xdr_hyper(xdrs, (longlong_t *)hp));
 }
 
-#ifndef KERNEL
 /*
  * Wrapper for xdr_string that can be called directly from
  * routines like clnt_call
@@ -919,12 +674,5 @@ xdr_ulonglong_t(XDR *xdrs, u_longlong_t *hp)
 bool_t
 xdr_wrapstring(XDR *xdrs, char **cpp)
 {
-	trace1(TR_xdr_wrapstring, 0);
-	if (xdr_string(xdrs, cpp, LASTUNSIGNED)) {
-		trace1(TR_xdr_wrapstring, 1);
-		return (TRUE);
-	}
-	trace1(TR_xdr_wrapstring, 1);
-	return (FALSE);
+	return (xdr_string(xdrs, cpp, LASTUNSIGNED));
 }
-#endif /* !KERNEL */

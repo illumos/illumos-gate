@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -43,7 +44,6 @@
  * what unix uses.
  */
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <sys/poll.h>
 #include <rpc/nettype.h>
@@ -59,17 +59,14 @@ extern int __rpc_timeval_to_msec();
 #endif
 
 #define	NYEARS	(1970 - 1900)
-#define	TOFFSET ((u_int)60*60*24*(365*NYEARS + (NYEARS/4)))
+#define	TOFFSET ((uint_t)60*60*24*(365*NYEARS + (NYEARS/4)))
 
 /*
  * This is based upon the internet time server, but it contacts it by
  * using TLI instead of socket.
  */
 int
-rtime_tli(host, timep, timeout)
-	char *host;
-	struct timeval *timep;
-	struct timeval *timeout;
+rtime_tli(char *host, struct timeval *timep, struct timeval *timeout)
 {
 	uint32_t thetime;
 	int flag;
@@ -79,16 +76,15 @@ rtime_tli(host, timep, timeout)
 	int foundit = 0;
 	int fd = -1;
 
-	trace1(TR_rtime_tli, 0);
 	nconf = __rpc_getconfip(timeout == NULL ? "tcp" : "udp");
-	if (nconf == (struct netconfig *)NULL)
+	if (nconf == NULL)
 		goto error;
 
 	if ((fd = t_open(nconf->nc_device, O_RDWR, NULL)) == -1) {
 		debug("open");
 		goto error;
 	}
-	if (t_bind(fd, (struct t_bind *) NULL, (struct t_bind *) NULL) < 0) {
+	if (t_bind(fd, NULL, NULL) < 0) {
 		debug("bind");
 		goto error;
 	}
@@ -108,7 +104,7 @@ rtime_tli(host, timep, timeout)
 
 		tu_data.addr = *nlist->n_addrs;
 		tu_data.udata.buf = (char *)&thetime;
-		tu_data.udata.len = (u_int) sizeof (thetime);
+		tu_data.udata.len = (uint_t)sizeof (thetime);
 		tu_data.udata.maxlen = tu_data.udata.len;
 		tu_data.opt.len = 0;
 		tu_data.opt.maxlen = 0;
@@ -141,8 +137,8 @@ rtime_tli(host, timep, timeout)
 			debug("tcp");
 			goto error;
 		}
-		if (t_rcv(fd, (char *)&thetime, (u_int) sizeof (thetime), &flag)
-				!= (u_int) sizeof (thetime)) {
+		if (t_rcv(fd, (char *)&thetime, (uint_t)sizeof (thetime), &flag)
+				!= (uint_t)sizeof (thetime)) {
 			debug("tcp");
 			goto error;
 		}
@@ -162,6 +158,5 @@ error:
 				netdir_free((char *)nlist, ND_ADDRLIST);
 		}
 	}
-	trace1(TR_rtime_tli, 1);
 	return (foundit);
 }

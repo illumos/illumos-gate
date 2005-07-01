@@ -19,12 +19,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * nis_misc.c
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,7 +171,7 @@ nis_dumplog(
 	enum clnt_stat		stat;
 	log_result	*result_ptr;
 
-	result_ptr = (log_result *)calloc(1, sizeof (log_result));
+	result_ptr = calloc(1, sizeof (log_result));
 	if (result_ptr == NULL) {
 		syslog(LOG_ERR, "nis_dumplog: Client out of memory.");
 		return (NULL);
@@ -246,7 +247,7 @@ nis_dump(
 	int			err;
 	log_result		*result_ptr;
 
-	result_ptr = (log_result *)calloc(1, sizeof (log_result));
+	result_ptr = calloc(1, sizeof (log_result));
 	if (result_ptr == NULL) {
 		syslog(LOG_ERR, "nis_dump: Client out of memory.");
 		return (NULL);
@@ -379,13 +380,13 @@ nis_sort_server_endpoints_inet(nis_server *svr)
 			ncp_inet6 = ncp;
 	}
 	if (ncp_inet == 0 && ncp_inet6 == 0) {
-		endnetconfig(nch);
+		(void) endnetconfig(nch);
 		return;
 	}
 
 	local_interfaces = __inet_get_local_interfaces();
 	if (local_interfaces == 0) {
-		endnetconfig(nch);
+		(void) endnetconfig(nch);
 		return;
 	}
 
@@ -425,7 +426,7 @@ nis_sort_server_endpoints_inet(nis_server *svr)
 
 	/* clean up */
 	__inet_free_local_interfaces(local_interfaces);
-	endnetconfig(nch);
+	(void) endnetconfig(nch);
 }
 
 /*
@@ -505,14 +506,14 @@ __nis_get_netconfig(endpoint *ep)
 	 *  netconfig entry.
 	 */
 	if (nc) {
-		p = (struct netconfig_list *)malloc(sizeof (*p));
+		p = malloc(sizeof (*p));
 		if (p == 0)
 			return (0);
 		p->nc = getnetconfigent(nc->nc_netid);
 		p->next = ncl;
 		ncl = p;
 	}
-	endnetconfig(nch);
+	(void) endnetconfig(nch);
 
 	return (nc);
 }
@@ -535,7 +536,7 @@ endpoint *
 __endpoint_dup(endpoint *src, endpoint *dst)
 {
 	if (dst == NULL) {
-		dst = (endpoint *)malloc(sizeof (endpoint));
+		dst = malloc(sizeof (endpoint));
 		if (dst == NULL)
 			return (NULL);
 	}
@@ -575,11 +576,12 @@ nis_server *
 __nis_server_dup(nis_server *src, nis_server *dst)
 {
 	if (dst == NULL) {
-		dst = (nis_server *)malloc(sizeof (nis_server));
+		dst = malloc(sizeof (nis_server));
 		if (dst == NULL)
 			return (NULL);
 	}
 	(void) memset((char *)dst, 0, sizeof (nis_server));
+	/* LINTED pointer cast */
 	return ((nis_server *)
 		__nis_xdr_dup(xdr_nis_server, (char *)src, (char *)dst));
 }
@@ -593,7 +595,7 @@ __nis_xdr_dup(xdrproc_t proc, char *src, char *dst)
 	XDR xdrs;
 
 	size = xdr_sizeof(proc, src);
-	data = (char *)malloc(size);
+	data = malloc(size);
 	if (data == NULL)
 		return (NULL);
 
@@ -619,8 +621,8 @@ __nis_path_free(char **names, int len)
 	int i;
 
 	for (i = 0; i < len; i++)
-		free((void *)names[i]);
-	free((void *)names);
+		free(names[i]);
+	free(names);
 }
 
 /*

@@ -19,19 +19,18 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
-#include <rpc/trace.h>
 #include <errno.h>
 #include <unistd.h>
 #include <sys/stream.h>
@@ -51,13 +50,8 @@ _tx_look(int fd, int api_semantics)
 	int do_expinline_peek;	 /* unusual XTI specific processing */
 	struct _ti_user *tiptr;
 
-	trace2(TR_t_look, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR__t_look, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (_T_IS_XTI(api_semantics))
@@ -69,7 +63,6 @@ _tx_look(int fd, int api_semantics)
 	sv_errno = errno;
 
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_look, 1, fd);
 	errno = sv_errno;
 	return (state);
 }
@@ -88,12 +81,10 @@ _t_look_locked(
 )
 {
 	struct strpeek strpeek;
-	int retval, sv_errno;
+	int retval;
 	union T_primitives *pptr;
 	t_scalar_t type;
 	t_scalar_t ctltype;
-
-	trace2(TR__t_look_locked, 0, fd);
 
 	assert(MUTEX_HELD(&tiptr->ti_lock));
 
@@ -142,9 +133,6 @@ _t_look_locked(
 	} while (retval < 0 && errno == EINTR);
 
 	if (retval < 0) {
-		sv_errno = errno;
-		trace2(TR__t_look_locked, 1, fd);
-		errno = sv_errno;
 		if (_T_IS_TLI(api_semantics)) {
 			/*
 			 * This return of T_ERROR event is ancient
@@ -158,14 +146,13 @@ _t_look_locked(
 			 * break apps in field ?
 			 */
 			return (T_ERROR);
-		} else {
-			/*
-			 * XTI semantics (also identical to documented,
-			 * but not implemented TLI semantics).
-			 */
-			t_errno = TSYSERR;
-			return (-1);
 		}
+		/*
+		 * XTI semantics (also identical to documented,
+		 * but not implemented TLI semantics).
+		 */
+		t_errno = TSYSERR;
+		return (-1);
 	}
 
 	/*
@@ -173,8 +160,10 @@ _t_look_locked(
 	 */
 	if ((tiptr->ti_lookcnt > 0) ||
 	((retval > 0) && (strpeek.ctlbuf.len >= (int)sizeof (t_scalar_t)))) {
+		/* LINTED pointer cast */
 		pptr = (union T_primitives *)strpeek.ctlbuf.buf;
 		if (tiptr->ti_lookcnt > 0) {
+			/* LINTED pointer cast */
 			type = *((t_scalar_t *)tiptr->ti_lookbufs.tl_lookcbuf);
 			/*
 			 * If message on stream head is a T_DISCON_IND, that
@@ -197,15 +186,12 @@ _t_look_locked(
 		switch (type) {
 
 		case T_CONN_IND:
-			trace2(TR__t_look_locked, 1, fd);
 			return (T_LISTEN);
 
 		case T_CONN_CON:
-			trace2(TR__t_look_locked, 1, fd);
 			return (T_CONNECT);
 
 		case T_DISCON_IND:
-			trace2(TR__t_look_locked, 1, fd);
 			return (T_DISCONNECT);
 
 		case T_DATA_IND: {
@@ -218,37 +204,28 @@ _t_look_locked(
 				retval = _t_expinline_queued(fd, &exp_on_q);
 				if (retval < 0) {
 					t_errno = TSYSERR;
-					sv_errno = errno;
-					trace2(TR__t_look_locked, 1, fd);
-					errno = sv_errno;
 					return (-1);
 				}
 				if (exp_on_q)
 					event = T_EXDATA;
 			}
-			trace2(TR__t_look_locked, 1, fd);
 			return (event);
 		}
 
 		case T_UNITDATA_IND:
-			trace2(TR__t_look_locked, 1, fd);
 			return (T_DATA);
 
 		case T_EXDATA_IND:
-			trace2(TR__t_look_locked, 1, fd);
 			return (T_EXDATA);
 
 		case T_UDERROR_IND:
-			trace2(TR__t_look_locked, 1, fd);
 			return (T_UDERR);
 
 		case T_ORDREL_IND:
-			trace2(TR__t_look_locked, 1, fd);
 			return (T_ORDREL);
 
 		default:
 			t_errno = TSYSERR;
-			trace2(TR__t_look_locked, 1, fd);
 			errno = EPROTO;
 			return (-1);
 		}
@@ -266,16 +243,11 @@ _t_look_locked(
 		    (tiptr->ti_prov_flag & EXPINLINE)) {
 			assert(_T_IS_XTI(api_semantics));
 			retval = _t_expinline_queued(fd, &exp_on_q);
-			if (retval < 0) {
-				sv_errno = errno;
-				trace2(TR__t_look_locked, 1, fd);
-				errno = sv_errno;
+			if (retval < 0)
 				return (-1);
-			}
 			if (exp_on_q)
 				event = T_EXDATA;
 		}
-		trace2(TR__t_look_locked, 1, fd);
 		return (event);
 	}
 
@@ -286,10 +258,8 @@ _t_look_locked(
 	 */
 	if ((retval > 0) && (strpeek.ctlbuf.len > 0)) {
 		t_errno = TSYSERR;
-		trace2(TR__t_look_locked, 1, fd);
 		errno = EPROTO;
 		return (-1);
 	}
-	trace2(TR__t_look_locked, 1, fd);
 	return (0);
 }

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -53,7 +54,6 @@
 #include <string.h>
 #include <rpc/rpc.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <syslog.h>
 #include <rpc/nettype.h>
 
@@ -89,28 +89,20 @@ static const char __no_mem_str[] = "out of memory";
  */
 
 int
-rpc_reg(prognum, versnum, procnum, progname, inproc, outproc, nettype)
-	rpcprog_t prognum;		/* program number */
-	rpcvers_t versnum;		/* version number */
-	rpcproc_t procnum;		/* procedure number */
-	char *(*progname)();		/* Server routine */
-	xdrproc_t inproc, outproc;	/* in/out XDR procedures */
-	const char *nettype;		/* nettype */
+rpc_reg(const rpcprog_t prognum, const rpcvers_t versnum,
+	const rpcproc_t procnum, char *(*progname)(), const xdrproc_t inproc,
+	const xdrproc_t outproc, const char *nettype)
 {
 	struct netconfig *nconf;
 	int done = FALSE;
 	void *handle;
 	extern mutex_t proglst_lock;
 
-
-
-	trace4(TR_rpc_reg, 0, prognum, versnum, procnum);
 	if (procnum == NULLPROC) {
 		(void) syslog(LOG_ERR, (const char *) "%s: %s %d",
 			rpc_reg_msg,
 			(const char *) "can't reassign procedure number %d",
 			NULLPROC);
-		trace4(TR_rpc_reg, 1, prognum, versnum, procnum);
 		return (-1);
 	}
 
@@ -121,7 +113,7 @@ rpc_reg(prognum, versnum, procnum, progname, inproc, outproc, nettype)
 		return (-1);
 	}
 /* VARIABLES PROTECTED BY proglst_lock: proglst */
-	mutex_lock(&proglst_lock);
+	(void) mutex_lock(&proglst_lock);
 	while (nconf = __rpc_getconf(handle)) {
 		struct proglst *pl;
 		SVCXPRT *svcxprt;
@@ -131,7 +123,7 @@ rpc_reg(prognum, versnum, procnum, progname, inproc, outproc, nettype)
 		char *netid;
 
 		madenow = FALSE;
-		svcxprt = (SVCXPRT *)NULL;
+		svcxprt = NULL;
 		for (pl = proglst; pl; pl = pl->p_nxt)
 			if (strcmp(pl->p_netid, nconf->nc_netid) == 0) {
 				svcxprt = pl->p_transp;
@@ -141,12 +133,11 @@ rpc_reg(prognum, versnum, procnum, progname, inproc, outproc, nettype)
 				break;
 			}
 
-		if (svcxprt == (SVCXPRT *)NULL) {
+		if (svcxprt == NULL) {
 			struct t_info tinfo;
 
-			svcxprt = svc_tli_create(RPC_ANYFD, nconf,
-					(struct t_bind *)NULL, 0, 0);
-			if (svcxprt == (SVCXPRT *)NULL)
+			svcxprt = svc_tli_create(RPC_ANYFD, nconf, NULL, 0, 0);
+			if (svcxprt == NULL)
 				continue;
 			if (t_getinfo(svcxprt->xp_fd, &tinfo) == -1) {
 				char errorstr[100];
@@ -202,8 +193,8 @@ rpc_reg(prognum, versnum, procnum, progname, inproc, outproc, nettype)
 			continue;
 		}
 
-		pl = (struct proglst *)malloc(sizeof (struct proglst));
-		if (pl == (struct proglst *)NULL) {
+		pl = malloc(sizeof (struct proglst));
+		if (pl == NULL) {
 			(void) syslog(LOG_ERR, rpc_reg_err, rpc_reg_msg,
 					__no_mem_str);
 			if (madenow) {
@@ -228,16 +219,14 @@ rpc_reg(prognum, versnum, procnum, progname, inproc, outproc, nettype)
 		done = TRUE;
 	}
 	__rpc_endconf(handle);
-	mutex_unlock(&proglst_lock);
+	(void) mutex_unlock(&proglst_lock);
 
 	if (done == FALSE) {
 		(void) syslog(LOG_ERR,
 			(const char *) "%s cant find suitable transport for %s",
 			rpc_reg_msg, nettype);
-		trace4(TR_rpc_reg, 1, prognum, versnum, procnum);
 		return (-1);
 	}
-	trace4(TR_rpc_reg, 1, prognum, versnum, procnum);
 	return (0);
 }
 
@@ -246,11 +235,8 @@ rpc_reg(prognum, versnum, procnum, progname, inproc, outproc, nettype)
  * It handles both the connectionless and the connection oriented cases.
  */
 
-static const char __univ_err[] = " prog %d vers %d";
 static void
-universal(rqstp, transp)
-	struct svc_req *rqstp;
-	SVCXPRT *transp;
+universal(struct svc_req *rqstp, SVCXPRT *transp)
 {
 	rpcprog_t prog;
 	rpcvers_t vers;
@@ -263,21 +249,18 @@ universal(rqstp, transp)
 	/*
 	 * enforce "procnum 0 is echo" convention
 	 */
-	trace1(TR_universal, 0);
 	if (rqstp->rq_proc == NULLPROC) {
-		if (svc_sendreply(transp, (xdrproc_t)xdr_void,
-			(char *)NULL) == FALSE) {
+		if (svc_sendreply(transp, (xdrproc_t)xdr_void, NULL) == FALSE) {
 			(void) syslog(LOG_ERR,
 				(const char *) "svc_sendreply failed");
 		}
-		trace1(TR_universal, 1);
 		return;
 	}
 	prog = rqstp->rq_prog;
 	vers = rqstp->rq_vers;
 	proc = rqstp->rq_proc;
-	mutex_lock(&proglst_lock);
-	for (pl = proglst; pl; pl = pl->p_nxt)
+	(void) mutex_lock(&proglst_lock);
+	for (pl = proglst; pl; pl = pl->p_nxt) {
 		if (pl->p_prognum == prog && pl->p_procnum == proc &&
 			pl->p_versnum == vers &&
 			(strcmp(pl->p_netid, transp->xp_netid) == 0)) {
@@ -292,36 +275,32 @@ universal(rqstp, transp)
 			 */
 			if (!svc_getargs(transp, pl->p_inproc, xdrbuf)) {
 				svcerr_decode(transp);
-				mutex_unlock(&proglst_lock);
-				trace1(TR_universal, 1);
+				(void) mutex_unlock(&proglst_lock);
 				return;
 			}
 			outdata = (*(pl->p_progname))(xdrbuf);
 			if (outdata == NULL &&
 				pl->p_outproc != (xdrproc_t)xdr_void) {
 				/* there was an error */
-				mutex_unlock(&proglst_lock);
-				trace1(TR_universal, 1);
+				(void) mutex_unlock(&proglst_lock);
 				return;
 			}
 			if (!svc_sendreply(transp, pl->p_outproc, outdata)) {
 				(void) syslog(LOG_ERR, (const char *)
 			"rpc: rpc_reg trouble replying to prog %d vers %d",
 				prog, vers);
-				mutex_unlock(&proglst_lock);
-				trace1(TR_universal, 1);
+				(void) mutex_unlock(&proglst_lock);
 				return;
 			}
 			/* free the decoded arguments */
 			(void) svc_freeargs(transp, pl->p_inproc, xdrbuf);
-			mutex_unlock(&proglst_lock);
-			trace1(TR_universal, 1);
+			(void) mutex_unlock(&proglst_lock);
 			return;
 		}
-	mutex_unlock(&proglst_lock);
+	}
+	(void) mutex_unlock(&proglst_lock);
 	/* This should never happen */
 	(void) syslog(LOG_ERR, (const char *)
 		"rpc: rpc_reg: never registered prog %d vers %d",
 		prog, vers);
-	trace1(TR_universal, 1);
 }

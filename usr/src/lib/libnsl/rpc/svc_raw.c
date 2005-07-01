@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -42,9 +44,9 @@
 
 #include "mt.h"
 #include "rpc_mt.h"
+#include <stdlib.h>
 #include <rpc/rpc.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <rpc/raw.h>
 #include <syslog.h>
 
@@ -63,41 +65,35 @@ static struct svc_raw_private {
 } *svc_raw_private;
 
 static struct xp_ops *svc_raw_ops();
-extern char *calloc();
-extern void free();
 extern mutex_t	svcraw_lock;
 
 
 
 SVCXPRT *
-svc_raw_create()
+svc_raw_create(void)
 {
 	struct svc_raw_private *srp;
 	bool_t flag1 = FALSE, flag2 = FALSE;
 
 /* VARIABLES PROTECTED BY svcraw_lock: svc_raw_private, srp */
-	trace1(TR_svc_raw_create, 0);
-	mutex_lock(&svcraw_lock);
+	(void) mutex_lock(&svcraw_lock);
 	srp = svc_raw_private;
 	if (srp == NULL) {
-/* LINTED pointer alignment */
-		srp = (struct svc_raw_private *)calloc(1, sizeof (*srp));
+		srp = calloc(1, sizeof (*srp));
 		if (srp == NULL) {
 			syslog(LOG_ERR, "svc_raw_create: out of memory");
-			mutex_unlock(&svcraw_lock);
-			trace1(TR_svc_raw_create, 1);
-			return ((SVCXPRT *)NULL);
+			(void) mutex_unlock(&svcraw_lock);
+			return (NULL);
 		}
 		flag1 = TRUE;
 		if (_rawcombuf == NULL) {
-			_rawcombuf = (char *)calloc(UDPMSGSIZE, sizeof (char));
+			_rawcombuf = calloc(UDPMSGSIZE, sizeof (char));
 			if (_rawcombuf == NULL) {
-				free((char *)srp);
+				free(srp);
 				syslog(LOG_ERR, "svc_raw_create: "
 					"out of memory");
-				mutex_unlock(&svcraw_lock);
-				trace1(TR_svc_raw_create, 1);
-				return ((SVCXPRT *)NULL);
+				(void) mutex_unlock(&svcraw_lock);
+				return (NULL);
 			}
 			flag2 = TRUE;
 		}
@@ -109,9 +105,8 @@ svc_raw_create()
 			free(svc_raw_private->raw_buf);
 		if (flag1)
 			free(svc_raw_private);
-		mutex_unlock(&svcraw_lock);
-		trace1(TR_svc_raw_create, 1);
-		return ((SVCXPRT *)NULL);
+		(void) mutex_unlock(&svcraw_lock);
+		return (NULL);
 	}
 	/*
 	 * By convention, using FD_SETSIZE as the psuedo file descriptor
@@ -122,169 +117,121 @@ svc_raw_create()
 	srp->server->xp_verf.oa_base = srp->verf_body;
 	xdrmem_create(&srp->xdr_stream, srp->raw_buf, UDPMSGSIZE, XDR_DECODE);
 	xprt_register(srp->server);
-	mutex_unlock(&svcraw_lock);
-	trace1(TR_svc_raw_create, 1);
+	(void) mutex_unlock(&svcraw_lock);
 	return (srp->server);
 }
 
 /*ARGSUSED*/
 static enum xprt_stat
-svc_raw_stat(xprt)
-SVCXPRT *xprt; /* args needed to satisfy ANSI-C typechecking */
+svc_raw_stat(SVCXPRT *xprt)
 {
-	trace1(TR_svc_raw_stat, 0);
-	trace1(TR_svc_raw_stat, 1);
 	return (XPRT_IDLE);
 }
 
 /*ARGSUSED*/
 static bool_t
-svc_raw_recv(xprt, msg)
-	SVCXPRT *xprt;
-	struct rpc_msg *msg;
+svc_raw_recv(SVCXPRT *xprt, struct rpc_msg *msg)
 {
 	struct svc_raw_private *srp;
 	XDR *xdrs;
 
-	trace1(TR_svc_raw_recv, 0);
-	mutex_lock(&svcraw_lock);
+	(void) mutex_lock(&svcraw_lock);
 	srp = svc_raw_private;
 	if (srp == NULL) {
-		mutex_unlock(&svcraw_lock);
-		trace1(TR_svc_raw_recv, 1);
+		(void) mutex_unlock(&svcraw_lock);
 		return (FALSE);
 	}
-	mutex_unlock(&svcraw_lock);
+	(void) mutex_unlock(&svcraw_lock);
 
 	xdrs = &srp->xdr_stream;
 	xdrs->x_op = XDR_DECODE;
 	(void) XDR_SETPOS(xdrs, 0);
-	if (! xdr_callmsg(xdrs, msg)) {
-		trace1(TR_svc_raw_recv, 1);
-		return (FALSE);
-	}
-	trace1(TR_svc_raw_recv, 1);
-	return (TRUE);
+	return (xdr_callmsg(xdrs, msg));
 }
 
 /*ARGSUSED*/
 static bool_t
-svc_raw_reply(xprt, msg)
-	SVCXPRT *xprt;
-	struct rpc_msg *msg;
+svc_raw_reply(SVCXPRT *xprt, struct rpc_msg *msg)
 {
 	struct svc_raw_private *srp;
 	XDR *xdrs;
 
-	trace1(TR_svc_raw_reply, 0);
-	mutex_lock(&svcraw_lock);
+	(void) mutex_lock(&svcraw_lock);
 	srp = svc_raw_private;
 	if (srp == NULL) {
-		mutex_unlock(&svcraw_lock);
-		trace1(TR_svc_raw_reply, 1);
+		(void) mutex_unlock(&svcraw_lock);
 		return (FALSE);
 	}
-	mutex_unlock(&svcraw_lock);
+	(void) mutex_unlock(&svcraw_lock);
 
 	xdrs = &srp->xdr_stream;
 	xdrs->x_op = XDR_ENCODE;
 	(void) XDR_SETPOS(xdrs, 0);
-	if (! xdr_replymsg(xdrs, msg)) {
-		trace1(TR_svc_raw_reply, 1);
-		return (FALSE);
-	}
-	(void) XDR_GETPOS(xdrs);  /* called just for overhead */
-	trace1(TR_svc_raw_reply, 1);
-	return (TRUE);
+	return (xdr_replymsg(xdrs, msg));
 }
 
 /*ARGSUSED*/
 static bool_t
-svc_raw_getargs(xprt, xdr_args, args_ptr)
-	SVCXPRT *xprt;
-	xdrproc_t xdr_args;
-	caddr_t args_ptr;
+svc_raw_getargs(SVCXPRT *xprt, xdrproc_t xdr_args, caddr_t args_ptr)
 {
 	struct svc_raw_private *srp;
-	bool_t dummy1;
 
-	trace1(TR_svc_raw_getargs, 0);
-	mutex_lock(&svcraw_lock);
+	(void) mutex_lock(&svcraw_lock);
 	srp = svc_raw_private;
 	if (srp == NULL) {
-		mutex_unlock(&svcraw_lock);
-		trace1(TR_svc_raw_getargs, 1);
+		(void) mutex_unlock(&svcraw_lock);
 		return (FALSE);
 	}
-	mutex_unlock(&svcraw_lock);
-	dummy1 = (*xdr_args)(&srp->xdr_stream, args_ptr);
-	trace1(TR_svc_raw_getargs, 1);
-	return (dummy1);
+	(void) mutex_unlock(&svcraw_lock);
+	return ((*xdr_args)(&srp->xdr_stream, args_ptr));
 }
 
 /*ARGSUSED*/
 static bool_t
-svc_raw_freeargs(xprt, xdr_args, args_ptr)
-	SVCXPRT *xprt;
-	xdrproc_t xdr_args;
-	caddr_t args_ptr;
+svc_raw_freeargs(SVCXPRT *xprt, xdrproc_t xdr_args, caddr_t args_ptr)
 {
 	struct svc_raw_private *srp;
 	XDR *xdrs;
-	bool_t dummy2;
 
-	trace1(TR_svc_raw_freeargs, 0);
-	mutex_lock(&svcraw_lock);
+	(void) mutex_lock(&svcraw_lock);
 	srp = svc_raw_private;
 	if (srp == NULL) {
-		mutex_unlock(&svcraw_lock);
-		trace1(TR_svc_raw_freeargs, 1);
+		(void) mutex_unlock(&svcraw_lock);
 		return (FALSE);
 	}
-	mutex_unlock(&svcraw_lock);
+	(void) mutex_unlock(&svcraw_lock);
 
 	xdrs = &srp->xdr_stream;
 	xdrs->x_op = XDR_FREE;
-	dummy2 = (*xdr_args)(xdrs, args_ptr);
-	trace1(TR_svc_raw_freeargs, 1);
-	return (dummy2);
+	return ((*xdr_args)(xdrs, args_ptr));
 }
 
 /*ARGSUSED*/
 static void
-svc_raw_destroy(xprt)
-SVCXPRT *xprt;
+svc_raw_destroy(SVCXPRT *xprt)
 {
-	trace1(TR_svc_raw_destroy, 0);
-	trace1(TR_svc_raw_destroy, 1);
 }
 
 /*ARGSUSED*/
 static bool_t
-svc_raw_control(xprt, rq, in)
-	SVCXPRT *xprt;
-	const uint_t	rq;
-	void		*in;
+svc_raw_control(SVCXPRT *xprt, const uint_t rq, void *in)
 {
-	trace3(TR_svc_raw_control, 0, xprt, rq);
 	switch (rq) {
 	case SVCGET_XID: /* fall through for now */
 	default:
-		trace1(TR_svc_raw_control, 1);
 		return (FALSE);
 	}
 }
 
 static struct xp_ops *
-svc_raw_ops()
+svc_raw_ops(void)
 {
 	static struct xp_ops ops;
 	extern mutex_t ops_lock;
 
 /* VARIABLES PROTECTED BY ops_lock: ops */
 
-	trace1(TR_svc_raw_ops, 0);
-	mutex_lock(&ops_lock);
+	(void) mutex_lock(&ops_lock);
 	if (ops.xp_recv == NULL) {
 		ops.xp_recv = svc_raw_recv;
 		ops.xp_stat = svc_raw_stat;
@@ -294,7 +241,6 @@ svc_raw_ops()
 		ops.xp_destroy = svc_raw_destroy;
 		ops.xp_control = svc_raw_control;
 	}
-	mutex_unlock(&ops_lock);
-	trace1(TR_svc_raw_ops, 1);
+	(void) mutex_unlock(&ops_lock);
 	return (&ops);
 }

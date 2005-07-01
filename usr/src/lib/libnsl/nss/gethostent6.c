@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/libnsl/nss/gethostent6.c
@@ -39,7 +40,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <nss_dbdefs.h>
-#include <rpc/trace.h>
 #include "nss.h"
 
 static int ipnodes_stayopen;
@@ -61,30 +61,24 @@ str2hostent6(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 void
 _nss_initf_ipnodes(nss_db_params_t *p)
 {
-	trace1(TR__nss_initf_ipnodes, 0);
 	p->name	= NSS_DBNAM_IPNODES;
 	p->default_config = NSS_DEFCONF_IPNODES;
-	trace1(TR__nss_initf_ipnodes, 1);
 }
 
 int
 __sethostent6(int stay)
 {
-	trace1(TR_sethostent6, 0);
 	ipnodes_stayopen |= stay;
 	nss_setent(&db_root, _nss_initf_ipnodes, &context);
-	trace1(TR_sethostent6, 1);
 	return (0);
 }
 
 int
 __endhostent6(void)
 {
-	trace1(TR_endhostent6, 0);
 	ipnodes_stayopen = 0;
 	nss_endent(&db_root, _nss_initf_ipnodes, &context);
 	nss_delete(&db_root);
-	trace1(TR_endhostent6, 1);
 	return (0);
 }
 
@@ -94,12 +88,10 @@ __gethostent6(struct hostent *result, char *buffer, int buflen, int *h_errnop)
 	nss_XbyY_args_t arg;
 	nss_status_t	res;
 
-	trace2(TR_gethostent6, 0, buflen);
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2hostent6);
 	res = nss_getent(&db_root, _nss_initf_ipnodes,
 	    &context, &arg);
 	arg.status = res;
 	*h_errnop = arg.h_errno;
-	trace2(TR_gethostent6, 1, buflen);
 	return ((struct hostent *)NSS_XbyY_FINI(&arg));
 }

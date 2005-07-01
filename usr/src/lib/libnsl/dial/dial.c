@@ -19,13 +19,19 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
-/*LINTLIBRARY*/
-/***************************************************************
+/*
+ * *************************************************************
  *	  dial() returns an fd for an open tty-line connected to the
  *	  specified remote.  The caller should trap all ways to
  *	  terminate, and call undial(). This will release the `lock'
@@ -59,7 +65,7 @@
  *			  char	*telno;		 ptr to tel-no digit string
  *		int	modem		no longer used --
  *					left in for backwards compatibility
- *		char 	*device		no longer used --
+ *		char	*device		no longer used --
  *					left in for backwards compatibility
  *		int	dev_len		no longer used --
  *					left in for backwards compatibility
@@ -77,7 +83,7 @@
  *			  NO_Ldv   -7: can't open Devices file
  *			  DV_NT_A  -8: specified device not available
  *			  DV_NT_K  -9: specified device not known
- *			  NO_BD_A -10: no device available at requested baud-rate
+ *			  NO_BD_A -10: no dev available at requested baud-rate
  *			  NO_BD_K -11: no device known at requested baud-rate
  *		DV_NT_E -12: requested speed does not match
  *		BAD_SYS -13: system not in Systems file
@@ -90,7 +96,8 @@
  *
  *	  With an error return (negative value), there will not be
  *	  any `lock-file' entry, so no need to call undial().
- ***************************************************************/
+ * *************************************************************
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -100,7 +107,6 @@
 #include <setjmp.h>
 #include <sys/stat.h>
 #include <sys/times.h>
-#include <rpc/trace.h>
 
 #include "dial.h"
 
@@ -118,82 +124,49 @@
 #include "sysfiles.c"
 #include "ulockf.c"
 
-#ifdef DATAKIT
-#include "dkbreak.c"
-#include "dkerr.c"
-#include "dkdial.c"
-#include "dkminor.c"
-#include "dtnamer.c"
-#endif
-
 static int rlfd;			/* fd for remote comm line */
 
-GLOBAL jmp_buf Sjbuf;		/* needed by connection routines */
+static jmp_buf Sjbuf;		/* needed by connection routines */
 
 /* VARARGS */
 /* ARGSUSED */
 static void
-assert(s1, s2, i1, s3, i2)
-#if defined(__STDC__)
-const char *s1, *s2, *s3;
-#else
-char *s1, *s2, *s3;
-#endif
-int i1, i2;
+assert(const char *s1, const char *s2, int i1, const char *s3, int i2)
 {					/* for ASSERT in conn() */
-	trace3(TR_assert, 0, i1, i2);
-	trace3(TR_assert, 1, i1, i2);
 }
 
 /* ARGSUSED */
 static void
-logent(s1, s2)
-#if defined(__STDC__)
-const char *s1, *s2;
-#else
-char *s1, *s2;
-#endif
+logent(const char *s1, const char *s2)
 {					/* so we can load unlockf() */
-	trace1(TR_logent, 0);
-	trace1(TR_logent, 1);
 }
 
 static void
-cleanup(Cn)		/* this is executed only in the parent process */
-int Cn;			/* fd for remote comm line */
+cleanup(int Cn)		/* this is executed only in the parent process */
 {
-
-	trace2(TR_cleanup, 0, Cn);
 	(void) restline();
 	(void) setuid(Euid);
 	if (Cn > 0)
 		(void) close(Cn);
 
-
-	rmlock((char*) NULL);	/* uucp routine in ulockf.c */
-	trace1(TR_cleanup, 1);
-	return;		/* code=negative for signal causing disconnect */
+	rmlock(NULL);	/* uucp routine in ulockf.c */
 }
 
 int
-dial(call)
-CALL call;
+dial(CALL call)
 {
-char *alt[7];
-char speed[10];		/* character value of speed passed to dial */
+	char *alt[7];
+	char speed[10];		/* character value of speed passed to dial */
 
 	/* set service so we know which Sysfiles entries to use, then	*/
 	/* be sure can access Devices file(s).  use "cu" entries ...	*/
 	/* dial is more like cu than like uucico.			*/
 
-	trace1(TR_dial, 0);
 	(void) strcpy(Progname, "cu");
 	setservice(Progname);
-	if (sysaccess(EACCESS_DEVICES) != 0) {
+	if (sysaccess(EACCESS_DEVICES) != 0)
 		/* can't read Devices file(s)	*/
-		trace1(TR_dial, 1);
 		return (NO_Ldv);
-	}
 
 	if (call.attr != NULL) {
 		if (call.attr->c_cflag & PARENB) {
@@ -204,9 +177,9 @@ char speed[10];		/* character value of speed passed to dial */
 	}
 
 	if (call.speed <= 0)
-		strcpy(speed, "Any");
+		(void) strcpy(speed, "Any");
 	else
-		sprintf(speed, "%d", call.speed);
+		(void) sprintf(speed, "%d", call.speed);
 
 	/* Determine whether contents of "telno" is a system name. */
 	if ((call.telno != NULL) &&
@@ -249,50 +222,38 @@ char speed[10];		/* character value of speed passed to dial */
 	if (rlfd < 0)
 		switch (Uerror) {
 			case SS_NO_DEVICE:
-							trace1(TR_dial, 1);
-							return (NO_BD_A);
+				return (NO_BD_A);
 			case SS_DIAL_FAILED:
-							trace1(TR_dial, 1);
-							return (D_HUNG);
+				return (D_HUNG);
 			case SS_LOCKED_DEVICE:
-							trace1(TR_dial, 1);
-							return (DV_NT_A);
+				return (DV_NT_A);
 			case SS_BADSYSTEM:
-							trace1(TR_dial, 1);
-							return (BAD_SYS);
+				return (BAD_SYS);
 			case SS_CANT_ACCESS_DEVICE:
-							trace1(TR_dial, 1);
-							return (L_PROB);
+				return (L_PROB);
 			case SS_CHAT_FAILED:
-							trace1(TR_dial, 1);
-							return (NO_ANS);
+				return (NO_ANS);
 			default:
-							trace1(TR_dial, 1);
-							return (-Uerror);
+				return (-Uerror);
 		}
 	(void) savline();
 	if ((call.attr) && ioctl(rlfd, TCSETA, call.attr) < 0) {
 		perror("stty for remote");
-		trace1(TR_dial, 1);
 		return (L_PROB);
 	}
 	Euid = geteuid();
 	if (setuid(getuid()) && setgid(getgid()) < 0)
 		undial(rlfd);
-	trace1(TR_dial, 1);
 	return (rlfd);
 }
 
 /*
-* undial(fd)
-*/
+ * undial(fd)
+ */
 void
-undial(fd)
-int fd;
+undial(int fd)
 {
-	trace2(TR_undial, 0, fd);
 	sethup(fd);
-	sleep(2);
+	(void) sleep(2);
 	cleanup(fd);
-	trace1(TR_undial, 1);
 }

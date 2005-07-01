@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Ye olde non-reentrant interface (MT-unsafe, caveat utor)
@@ -38,7 +39,6 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <nss_dbdefs.h>
-#include <rpc/trace.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
@@ -64,51 +64,36 @@ struct hostent *
 gethostbyname(const char *nam)
 {
 	nss_XbyY_buf_t  *b;
-	struct hostent  *res = 0;
 
-	trace1(TR_gethostbyname, 0);
-	if ((b = GETBUF()) != 0) {
-		res = gethostbyname_r(nam,
-		    b->result, b->buffer, b->buflen,
-		    &h_errno);
-	}
-	trace1(TR_gethostbyname, 1);
-	return (res);
+	if ((b = GETBUF()) == 0)
+		return (NULL);
+	return (gethostbyname_r(nam, b->result, b->buffer, b->buflen,
+		    &h_errno));
 }
 
 struct hostent *
 gethostbyaddr(const void *addr, socklen_t len, int type)
 {
 	nss_XbyY_buf_t	*b;
-	struct hostent	*res = 0;
-	char *c;
 
-	trace2(TR_gethostbyaddr, 0, len);
 	h_errno = 0;
 	if (type == AF_INET6)
 		return (getipnodebyaddr(addr, len, type, &h_errno));
 
-	if ((b = GETBUF()) != 0) {
-		res = gethostbyaddr_r(addr, len, type,
-		    b->result, b->buffer, b->buflen,
-		    &h_errno);
-	}
-	trace2(TR_gethostbyaddr, 1, len);
-	return (res);
+	if ((b = GETBUF()) == 0)
+		return (NULL);
+	return (gethostbyaddr_r(addr, len, type,
+		    b->result, b->buffer, b->buflen, &h_errno));
 }
 
 struct hostent *
 gethostent(void)
 {
 	nss_XbyY_buf_t	*b;
-	struct hostent	*res = 0;
 
-	trace1(TR_gethostent, 0);
-	if ((b = GETBUF()) != 0) {
-		res = gethostent_r(b->result, b->buffer, b->buflen, &h_errno);
-	}
-	trace1(TR_gethostent, 1);
-	return (res);
+	if ((b = GETBUF()) == 0)
+		return (NULL);
+	return (gethostent_r(b->result, b->buffer, b->buflen, &h_errno));
 }
 
 /*
@@ -130,14 +115,10 @@ __str2hostent(int af, const char *instr, int lenstr, void *ent, char *buffer,
 	struct in6_addr	*addrp6;
 	char		**addrvec;
 
-	trace3(TR_str2hostent, 0, lenstr, buflen);
 	if ((instr >= buffer && (buffer + buflen) > instr) ||
-	    (buffer >= instr && (instr + lenstr) > buffer)) {
-		trace3(TR_str2hostent, 1, lenstr, buflen);
+	    (buffer >= instr && (instr + lenstr) > buffer))
 		return (NSS_STR_PARSE_PARSE);
-	}
 	if (af != AF_INET && af != AF_INET6) {
-		trace3(TR_str2hostent, 1, lenstr, buflen);
 		/*
 		 * XXX - Returning ERANGE here is completely bogus.
 		 * Unfortunately, there's no error code identifying
@@ -193,10 +174,8 @@ __str2hostent(int af, const char *instr, int lenstr, void *ent, char *buffer,
 		addrvec -= naddr + 1;
 	}
 
-	if ((char *)addrvec < buffer) {
-		trace3(TR_str2hostent, 1, lenstr, buflen);
+	if ((char *)addrvec < buffer)
 		return (NSS_STR_PARSE_ERANGE);
-	}
 
 	/* For each addr, parse and get it */
 
@@ -208,44 +187,35 @@ __str2hostent(int af, const char *instr, int lenstr, void *ent, char *buffer,
 		if (limit == NULL)
 			limit = instr + lenstr;
 
-		while (p < limit && isspace(*p)) {
+		while (p < limit && isspace(*p))
 			p++;
-		}
 		addrstart = p;
-		while (p < limit && !isspace(*p)) {
+		while (p < limit && !isspace(*p))
 			p++;
-		}
-		if (p >= limit) {
+		if (p >= limit)
 		    /* Syntax error - no hostname present or truncated line */
-		    trace3(TR_str2hostent, 1, lenstr, buflen);
 		    return (NSS_STR_PARSE_PARSE);
-		}
 		addrlen = p - addrstart;
-		if (addrlen >= sizeof (addrbuf)) {
+		if (addrlen >= sizeof (addrbuf))
 			/* Syntax error -- supposed IP address is too long */
-			trace3(TR_str2hostent, 1, lenstr, buflen);
 			return (NSS_STR_PARSE_PARSE);
-		}
-		memcpy(addrbuf, addrstart, addrlen);
+		(void) memcpy(addrbuf, addrstart, addrlen);
 		addrbuf[addrlen] = '\0';
 
 		if (addrlen > ((af == AF_INET6) ? INET6_ADDRSTRLEN
-							: INET_ADDRSTRLEN)) {
+							: INET_ADDRSTRLEN))
 			/* Syntax error -- supposed IP address is too long */
-			trace3(TR_str2hostent, 4, lenstr, buflen);
 			return (NSS_STR_PARSE_PARSE);
-		}
 		if (af == AF_INET) {
 			/*
 			 * inet_pton() doesn't handle d.d.d, d.d, or d formats,
 			 * so we must use inet_addr() for IPv4 addresses.
 			 */
 			addrvec[i] = (char *)&addrp[i];
-			if ((addrp[i].s_addr = inet_addr(addrbuf)) == -1) {
+			if ((addrp[i].s_addr = inet_addr(addrbuf)) ==
+								0xffffffffU)
 				/* Syntax error -- bogus IPv4 address */
-				trace3(TR_str2hostent, 4, lenstr, buflen);
 				return (NSS_STR_PARSE_PARSE);
-			}
 		} else {
 			/*
 			 * In the case of AF_INET6, we can have both v4 and v6
@@ -254,18 +224,13 @@ __str2hostent(int af, const char *instr, int lenstr, void *ent, char *buffer,
 			 */
 			addrvec[i] = (char *)&addrp6[i];
 			if (strchr(addrbuf, ':') != 0) {
-				if (inet_pton(af, addrbuf, &addrp6[i]) != 1) {
-					trace3(TR_str2hostent, 4, lenstr,
-					    buflen);
+				if (inet_pton(af, addrbuf, &addrp6[i]) != 1)
 					return (NSS_STR_PARSE_PARSE);
-				}
 			} else {
 				struct in_addr in4;
-				if ((in4.s_addr = inet_addr(addrbuf)) == -1) {
-					trace3(TR_str2hostent, 4, lenstr,
-					    buflen);
+				if ((in4.s_addr = inet_addr(addrbuf)) ==
+								0xffffffffU)
 					return (NSS_STR_PARSE_PARSE);
-				}
 				IN6_INADDR_TO_V4MAPPED(&in4, &addrp6[i]);
 			}
 		}
@@ -310,8 +275,6 @@ __str2hostent(int af, const char *instr, int lenstr, void *ent, char *buffer,
 	host->h_addrtype  = af;
 	host->h_addr_list = addrvec;
 
-	trace3(TR_str2hostent, 1, lenstr, buflen);
 	return (res);
 }
-
 #endif	/* NSS_INCLUDE_UNSAFE */

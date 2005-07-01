@@ -19,24 +19,23 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h> 
-#include <rpc/trace.h> 
+#include <sys/types.h>
 
-# define VSTR	"# VERSION="
+#define	VSTR	"# VERSION="
 
 
 /*
@@ -49,36 +48,27 @@
 
 
 int
-check_version(ver, fname)
-int ver;
-char *fname;
+check_version(int ver, char *fname)
 {
 	FILE *fp;		/* file pointer for sactab */
 	char line[BUFSIZ];	/* temp buffer for input */
 	char *p;		/* working pointer */
 	int version;		/* version number from sactab */
 
-	trace2(TR_check_version, 0, ver);
-	if ((fp = fopen(fname, "r")) == NULL) {
-		trace2(TR_check_version, 1, ver);
-		return(2);
-	}
+	if ((fp = fopen(fname, "r")) == NULL)
+		return (2);
 	p = line;
 	while (fgets(p, BUFSIZ, fp)) {
-		if (!strncmp(p, VSTR, strlen(VSTR))) {
+		if (strncmp(p, VSTR, strlen(VSTR)) == 0) {
 			p += strlen(VSTR);
 			if (*p)
 				version = atoi(p);
-			else {
-				trace2(TR_check_version, 1, ver);
-				return(3);
-			}
+			else
+				return (3);
 			(void) fclose(fp);
-			trace2(TR_check_version, 1, ver);
-			return((version != ver) ? 1 : 0);
+			return ((version != ver) ? 1 : 0);
 		}
 		p = line;
 	}
-	trace2(TR_check_version, 1, ver);
-	return(3);
+	return (3);
 }

@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +41,7 @@ char *_strpbrk_escape(char *, char *);
 char *
 _strtok_escape(char *string, char *sepset, char **lasts)
 {
-	char	*q, *r;
+	char	*r;
 
 	/* first or subsequent call */
 	if (string == NULL)
@@ -52,7 +53,8 @@ _strtok_escape(char *string, char *sepset, char **lasts)
 	if (*string == '\0')		/* return if no tokens remaining */
 		return (NULL);
 
-	if ((r = _strpbrk_escape(string, sepset)) == NULL)/* move past token */
+	/* move past token */
+	if ((r = _strpbrk_escape(string, sepset)) == NULL)
 		*lasts = 0;	/* indicate this is last token */
 	else {
 		*r = '\0';
@@ -69,7 +71,6 @@ char *
 _strpbrk_escape(char *string, char *brkset)
 {
 	const char *p;
-	const char *first = string;
 
 	do {
 		for (p = brkset; *p != '\0' && *p != *string; ++p)
@@ -101,7 +102,7 @@ _escape(char *s, char *esc)
 	for (i = 0; i < len_s; i++)
 		if (strchr(esc, s[i]))
 			nescs++;
-	if ((tmp = (char *) malloc(nescs + len_s + 1)) == NULL)
+	if ((tmp = malloc(nescs + len_s + 1)) == NULL)
 		return (NULL);
 	for (i = 0, j = 0; i < len_s; i++) {
 		if (strchr(esc, s[i])) {
@@ -122,11 +123,11 @@ _unescape(char *s, char *esc)
 	char	*tmp;
 
 	if (s == NULL || esc == NULL)
-		return ((char *)NULL);
+		return (NULL);
 
 	len_s = strlen(s);
-	if ((tmp = (char *) malloc(len_s + 1)) == NULL)
-		return ((char *)NULL);
+	if ((tmp = malloc(len_s + 1)) == NULL)
+		return (NULL);
 	for (i = 0, j = 0; i < len_s; i++) {
 		if (s[i] == '\\' && strchr(esc, s[i + 1]))
 			tmp[j++] = s[++i];
@@ -157,7 +158,7 @@ _readbufline(char *mapbuf,	/* input mmap buffer */
 {
 	int	linelen;
 
-	while (1) {
+	for (;;) {
 		linelen = 0;
 		while (linelen < buflen - 1) {	/* "- 1" saves room for \n\0 */
 			if (*lastlen >= mapsize) {
@@ -196,4 +197,5 @@ _readbufline(char *mapbuf,	/* input mmap buffer */
 			(*lastlen)++;
 		};
 	}
+	/* NOTREACHED */
 }

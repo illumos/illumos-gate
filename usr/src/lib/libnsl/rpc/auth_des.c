@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -40,7 +42,6 @@
 #include "mt.h"
 #include "rpc_mt.h"
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <rpc/des_crypt.h>
 #include <syslog.h>
 #include <stdlib.h>
@@ -52,23 +53,14 @@
 #define	USEC_PER_SEC		1000000
 #define	RTIME_TIMEOUT		5	/* seconds to wait for sync */
 
-#define	AUTH_PRIVATE(auth)	(struct ad_private *)auth->ah_private
-#define	ALLOC(object_type)	(object_type *)mem_alloc(sizeof (object_type))
-#define	FREE(ptr, size)		mem_free((char *)(ptr), (int)size)
-#define	ATTEMPT(xdr_op)		if (!(xdr_op)) return (FALSE)
-
-#ifdef _KERNEL
-#define	gettimeofday(tvp, tzp)	uniqtime(tvp)	/* fake system call */
-#endif
-
 extern bool_t xdr_authdes_cred(XDR *, struct authdes_cred *);
 extern bool_t xdr_authdes_verf(XDR *, struct authdes_verf *);
-extern int key_encryptsession_pk();
+extern int key_encryptsession_pk(const char *, netobj *, des_block *);
 
 extern bool_t __rpc_get_time_offset(struct timeval *, nis_server *, char *,
 						char **, char **);
-static struct auth_ops *authdes_ops();
-static bool_t authdes_refresh();
+static struct auth_ops *authdes_ops(void);
+static bool_t authdes_refresh(AUTH *, void *);
 
 /*
  * This struct is pointed to by the ah_private field of an "AUTH *"
@@ -93,7 +85,7 @@ struct ad_private {
 	nis_server *ad_nis_srvr;	/* NIS+ server struct */
 };
 
-AUTH *authdes_pk_seccreate(const char *, netobj *, uint_t, const char *,
+extern AUTH *authdes_pk_seccreate(const char *, netobj *, uint_t, const char *,
 				const des_block *, nis_server *);
 
 /*
@@ -112,23 +104,19 @@ authdes_seccreate(const char *servername, const uint_t win,
 {
 	uchar_t	pkey_data[1024];
 	netobj	pkey;
-	AUTH	*dummy;
 
-	trace1(TR_authdes_seccreate, 0);
-	if (! getpublickey(servername, (char *)pkey_data)) {
+	if (!getpublickey(servername, (char *)pkey_data)) {
 		syslog(LOG_ERR,
 			"authdes_seccreate: no public key found for %s",
 			servername);
 
-		trace1(TR_authdes_seccreate, 1);
 		return (NULL);
 	}
 
 	pkey.n_bytes = (char *)pkey_data;
 	pkey.n_len = (uint_t)strlen((char *)pkey_data) + 1;
-	dummy = authdes_pk_seccreate(servername, &pkey, win, timehost,
-					ckey, NULL);
-	return (dummy);
+	return (authdes_pk_seccreate(servername, &pkey, win, timehost,
+					ckey, NULL));
 }
 
 /*
@@ -148,14 +136,12 @@ authdes_pk_seccreate(const char *servername, netobj *pkey, uint_t window,
 	/*
 	 * Allocate everything now
 	 */
-	trace2(TR_authdes_pk_seccreate, 0, window);
-	auth = ALLOC(AUTH);
+	auth = malloc(sizeof (AUTH));
 	if (auth == NULL) {
 		syslog(LOG_ERR, "authdes_pk_seccreate: out of memory");
-		trace1(TR_authdes_pk_seccreate, 1);
 		return (NULL);
 	}
-	ad = ALLOC(struct ad_private);
+	ad = malloc(sizeof (struct ad_private));
 	if (ad == NULL) {
 		syslog(LOG_ERR, "authdes_pk_seccreate: out of memory");
 		goto failed;
@@ -167,25 +153,25 @@ authdes_pk_seccreate(const char *servername, netobj *pkey, uint_t window,
 	ad->ad_nis_srvr = NULL;
 	ad->ad_timediff.tv_sec = 0;
 	ad->ad_timediff.tv_usec = 0;
-	memcpy(ad->ad_pkey, pkey->n_bytes, pkey->n_len);
+	(void) memcpy(ad->ad_pkey, pkey->n_bytes, pkey->n_len);
 	if (!getnetname(namebuf))
 		goto failed;
 	ad->ad_fullnamelen = RNDUP((uint_t)strlen(namebuf));
-	ad->ad_fullname = (char *)mem_alloc(ad->ad_fullnamelen + 1);
+	ad->ad_fullname = malloc(ad->ad_fullnamelen + 1);
 	ad->ad_servernamelen = strlen(servername);
-	ad->ad_servername = (char *)mem_alloc(ad->ad_servernamelen + 1);
+	ad->ad_servername = malloc(ad->ad_servernamelen + 1);
 
 	if (ad->ad_fullname == NULL || ad->ad_servername == NULL) {
 		syslog(LOG_ERR, "authdes_seccreate: out of memory");
 		goto failed;
 	}
 	if (timehost != NULL) {
-		ad->ad_timehost = (char *)mem_alloc(strlen(timehost) + 1);
+		ad->ad_timehost = malloc(strlen(timehost) + 1);
 		if (ad->ad_timehost == NULL) {
 			syslog(LOG_ERR, "authdes_seccreate: out of memory");
 			goto failed;
 		}
-		memcpy(ad->ad_timehost, timehost, strlen(timehost) + 1);
+		(void) memcpy(ad->ad_timehost, timehost, strlen(timehost) + 1);
 		ad->ad_dosync = TRUE;
 	} else if (srvr != NULL) {
 		ad->ad_nis_srvr = srvr;	/* transient */
@@ -193,8 +179,8 @@ authdes_pk_seccreate(const char *servername, netobj *pkey, uint_t window,
 	} else {
 		ad->ad_dosync = FALSE;
 	}
-	memcpy(ad->ad_fullname, namebuf, ad->ad_fullnamelen + 1);
-	memcpy(ad->ad_servername, servername, ad->ad_servernamelen + 1);
+	(void) memcpy(ad->ad_fullname, namebuf, ad->ad_fullnamelen + 1);
+	(void) memcpy(ad->ad_servername, servername, ad->ad_servernamelen + 1);
 	ad->ad_window = window;
 	if (ckey == NULL) {
 		if (key_gendes(&auth->ah_key) < 0) {
@@ -217,26 +203,24 @@ authdes_pk_seccreate(const char *servername, netobj *pkey, uint_t window,
 		goto failed;
 	}
 	ad->ad_nis_srvr = NULL; /* not needed any longer */
-	trace1(TR_authdes_pk_seccreate, 1);
 	return (auth);
 
 failed:
 	if (auth)
-		FREE(auth, sizeof (AUTH));
+		free(auth);
 	if (ad) {
 		if (ad->ad_fullname)
-			FREE(ad->ad_fullname, ad->ad_fullnamelen + 1);
+			free(ad->ad_fullname);
 		if (ad->ad_servername)
-			FREE(ad->ad_servername, ad->ad_servernamelen + 1);
+			free(ad->ad_servername);
 		if (ad->ad_timehost)
-			FREE(ad->ad_timehost, strlen(ad->ad_timehost) + 1);
+			free(ad->ad_timehost);
 		if (ad->ad_netid)
-			FREE(ad->ad_netid, strlen(ad->ad_netid) + 1);
+			free(ad->ad_netid);
 		if (ad->ad_uaddr)
-			FREE(ad->ad_uaddr, strlen(ad->ad_uaddr) + 1);
-		FREE(ad, sizeof (struct ad_private));
+			free(ad->ad_uaddr);
+		free(ad);
 	}
-	trace1(TR_authdes_pk_seccreate, 1);
 	return (NULL);
 }
 
@@ -251,8 +235,6 @@ failed:
 static void
 authdes_nextverf(AUTH *auth)
 {
-	trace1(TR_authdes_nextverf, 0);
-	trace1(TR_authdes_nextverf, 1);
 	/* what the heck am I supposed to do??? */
 }
 
@@ -264,7 +246,7 @@ static bool_t
 authdes_marshal(AUTH *auth, XDR *xdrs)
 {
 /* LINTED pointer alignment */
-	struct ad_private *ad = AUTH_PRIVATE(auth);
+	struct ad_private *ad = (struct ad_private *)auth->ah_private;
 	struct authdes_cred *cred = &ad->ad_cred;
 	struct authdes_verf *verf = &ad->ad_verf;
 	des_block cryptbuf[2];
@@ -277,8 +259,7 @@ authdes_marshal(AUTH *auth, XDR *xdrs)
 	 * Figure out the "time", accounting for any time difference
 	 * with the server if necessary.
 	 */
-	trace1(TR_authdes_marshal, 0);
-	(void) gettimeofday(&ad->ad_timestamp, (struct timezone *)NULL);
+	(void) gettimeofday(&ad->ad_timestamp, NULL);
 	ad->ad_timestamp.tv_sec += ad->ad_timediff.tv_sec;
 	ad->ad_timestamp.tv_usec += ad->ad_timediff.tv_usec;
 	while (ad->ad_timestamp.tv_usec >= USEC_PER_SEC) {
@@ -307,7 +288,6 @@ authdes_marshal(AUTH *auth, XDR *xdrs)
 	}
 	if (DES_FAILED(status)) {
 		syslog(LOG_ERR, "authdes_marshal: DES encryption failure");
-		trace1(TR_authdes_marshal, 1);
 		return (FALSE);
 	}
 	ad->ad_verf.adv_xtimestamp = cryptbuf[0];
@@ -333,22 +313,25 @@ authdes_marshal(AUTH *auth, XDR *xdrs)
 		IXDR_PUT_INT32(ixdr, AUTH_DES);
 		IXDR_PUT_INT32(ixdr, len);
 	} else {
-		ATTEMPT(xdr_putint32(xdrs, (int *)&auth->ah_cred.oa_flavor));
-		ATTEMPT(xdr_putint32(xdrs, &len));
+		if (!xdr_putint32(xdrs, (int *)&auth->ah_cred.oa_flavor))
+			return (FALSE);
+		if (!xdr_putint32(xdrs, &len))
+			return (FALSE);
 	}
-	ATTEMPT(xdr_authdes_cred(xdrs, cred));
+	if (!xdr_authdes_cred(xdrs, cred))
+		return (FALSE);
 
 	len = (2 + 1)*BYTES_PER_XDR_UNIT;
 	if (ixdr = xdr_inline(xdrs, 2*BYTES_PER_XDR_UNIT)) {
 		IXDR_PUT_INT32(ixdr, AUTH_DES);
 		IXDR_PUT_INT32(ixdr, len);
 	} else {
-		ATTEMPT(xdr_putint32(xdrs, (int *)&auth->ah_verf.oa_flavor));
-		ATTEMPT(xdr_putint32(xdrs, &len));
+		if (!xdr_putint32(xdrs, (int *)&auth->ah_verf.oa_flavor))
+			return (FALSE);
+		if (!xdr_putint32(xdrs, &len))
+			return (FALSE);
 	}
-	ATTEMPT(xdr_authdes_verf(xdrs, verf));
-	trace1(TR_authdes_marshal, 1);
-	return (TRUE);
+	return (xdr_authdes_verf(xdrs, verf));
 }
 
 
@@ -359,17 +342,14 @@ static bool_t
 authdes_validate(AUTH *auth, struct opaque_auth *rverf)
 {
 /* LINTED pointer alignment */
-	struct ad_private *ad = AUTH_PRIVATE(auth);
+	struct ad_private *ad = (struct ad_private *)auth->ah_private;
 	struct authdes_verf verf;
 	int status;
 	uint32_t *ixdr;
 	des_block buf;
 
-	trace1(TR_authdes_validate, 0);
-	if (rverf->oa_length != (2 + 1) * BYTES_PER_XDR_UNIT) {
-		trace1(TR_authdes_validate, 1);
+	if (rverf->oa_length != (2 + 1) * BYTES_PER_XDR_UNIT)
 		return (FALSE);
-	}
 /* LINTED pointer alignment */
 	ixdr = (uint32_t *)rverf->oa_base;
 	buf.key.high = (uint32_t)*ixdr++;
@@ -384,7 +364,6 @@ authdes_validate(AUTH *auth, struct opaque_auth *rverf)
 
 	if (DES_FAILED(status)) {
 		syslog(LOG_ERR, "authdes_validate: DES decryption failure");
-		trace1(TR_authdes_validate, 1);
 		return (FALSE);
 	}
 
@@ -399,10 +378,9 @@ authdes_validate(AUTH *auth, struct opaque_auth *rverf)
 	/*
 	 * validate
 	 */
-	if (memcmp((char *)&ad->ad_timestamp, (char *)&verf.adv_timestamp,
+	if (memcmp(&ad->ad_timestamp, &verf.adv_timestamp,
 		sizeof (struct timeval)) != 0) {
 		syslog(LOG_DEBUG, "authdes_validate: verifier mismatch");
-		trace1(TR_authdes_validate, 1);
 		return (FALSE);
 	}
 
@@ -411,7 +389,6 @@ authdes_validate(AUTH *auth, struct opaque_auth *rverf)
 	 */
 	ad->ad_nickname = verf.adv_nickname;
 	ad->ad_cred.adc_namekind = ADN_NICKNAME;
-	trace1(TR_authdes_validate, 1);
 	return (TRUE);
 }
 
@@ -423,18 +400,16 @@ static bool_t
 authdes_refresh(AUTH *auth, void *dummy)
 {
 /* LINTED pointer alignment */
-	struct ad_private *ad = AUTH_PRIVATE(auth);
+	struct ad_private *ad = (struct ad_private *)auth->ah_private;
 	struct authdes_cred *cred = &ad->ad_cred;
 	int		ok;
 	netobj		pkey;
-
-	trace1(TR_authdes_refresh, 0);
 
 	if (ad->ad_dosync) {
 		ok = __rpc_get_time_offset(&ad->ad_timediff, ad->ad_nis_srvr,
 					    ad->ad_timehost, &(ad->ad_uaddr),
 					    &(ad->ad_netid));
-		if (! ok) {
+		if (!ok) {
 			/*
 			 * Hope the clocks are synced!
 			 */
@@ -449,13 +424,11 @@ authdes_refresh(AUTH *auth, void *dummy)
 	if (key_encryptsession_pk(ad->ad_servername, &pkey, &ad->ad_xkey) < 0) {
 		syslog(LOG_INFO,
 	"authdes_refresh: keyserv(1m) is unable to encrypt session key");
-		trace1(TR_authdes_refresh, 1);
 		return (FALSE);
 	}
 	cred->adc_fullname.key = ad->ad_xkey;
 	cred->adc_namekind = ADN_FULLNAME;
 	cred->adc_fullname.name = ad->ad_fullname;
-	trace1(TR_authdes_refresh, 1);
 	return (TRUE);
 }
 
@@ -467,20 +440,18 @@ static void
 authdes_destroy(AUTH *auth)
 {
 /* LINTED pointer alignment */
-	struct ad_private *ad = AUTH_PRIVATE(auth);
+	struct ad_private *ad = (struct ad_private *)auth->ah_private;
 
-	trace1(TR_authdes_destroy, 0);
-	FREE(ad->ad_fullname, ad->ad_fullnamelen + 1);
-	FREE(ad->ad_servername, ad->ad_servernamelen + 1);
+	free(ad->ad_fullname);
+	free(ad->ad_servername);
 	if (ad->ad_timehost)
-		FREE(ad->ad_timehost, strlen(ad->ad_timehost) + 1);
+		free(ad->ad_timehost);
 	if (ad->ad_netid)
-		FREE(ad->ad_netid, strlen(ad->ad_netid) + 1);
+		free(ad->ad_netid);
 	if (ad->ad_uaddr)
-		FREE(ad->ad_uaddr, strlen(ad->ad_uaddr) + 1);
-	FREE(ad, sizeof (struct ad_private));
-	FREE(auth, sizeof (AUTH));
-	trace1(TR_authdes_destroy, 1);
+		free(ad->ad_uaddr);
+	free(ad);
+	free(auth);
 }
 
 static struct auth_ops *
@@ -491,8 +462,7 @@ authdes_ops(void)
 
 	/* VARIABLES PROTECTED BY ops_lock: ops */
 
-	trace1(TR_authdes_ops, 0);
-	mutex_lock(&ops_lock);
+	(void) mutex_lock(&ops_lock);
 	if (ops.ah_nextverf == NULL) {
 		ops.ah_nextverf = authdes_nextverf;
 		ops.ah_marshal = authdes_marshal;
@@ -500,7 +470,6 @@ authdes_ops(void)
 		ops.ah_refresh = authdes_refresh;
 		ops.ah_destroy = authdes_destroy;
 	}
-	mutex_unlock(&ops_lock);
-	trace1(TR_authdes_ops, 1);
+	(void) mutex_unlock(&ops_lock);
 	return (&ops);
 }

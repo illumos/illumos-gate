@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,7 +117,7 @@ typedef struct medium_private {
 	partition_handle_t	top_partitionp;
 	uid_t			uid;
 	vol_t			*volumep;
-	ulonglong_t		medium_capacity;
+	u_longlong_t		medium_capacity;
 } medium_private_t;
 
 #define	ALIAS_DIRECTORY_NAME	"/dev/aliases"

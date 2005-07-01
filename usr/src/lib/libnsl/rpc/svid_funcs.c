@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1991, 1997, 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,10 +36,7 @@
 
 #include <rpc/rpc.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <synch.h>
-
-/* LINTLIBRARY */
 
 #undef	auth_destroy
 #undef	clnt_call
@@ -61,216 +59,111 @@ extern void __svc_versquiet_off();
 extern void __svc_versquiet_on();
 
 void
-auth_destroy(auth)
-	AUTH	*auth;
+auth_destroy(AUTH *auth)
 {
-	trace1(TR_auth_destroy, 0);
 	((*((auth)->ah_ops->ah_destroy))(auth));
-	trace1(TR_auth_destroy, 1);
 }
 
 enum clnt_stat
-clnt_call(cl, proc, xargs, argsp, xres, resp, timeout)
-	CLIENT		*cl;
-	uint32_t	proc;
-	xdrproc_t	xargs;
-	caddr_t		argsp;
-	xdrproc_t	xres;
-	caddr_t		resp;
-	struct timeval	timeout;
+clnt_call(CLIENT *cl, uint32_t proc, xdrproc_t xargs, caddr_t argsp,
+			xdrproc_t xres, caddr_t resp, struct timeval timeout)
 {
-	enum clnt_stat dummy;
-
-	trace2(TR_clnt_call, 0, proc);
-	dummy = (*(cl)->cl_ops->cl_call)(cl, proc, xargs, argsp, xres, resp,
-		timeout);
-	trace2(TR_clnt_call, 1, proc);
-	return (dummy);
+	return ((*(cl)->cl_ops->cl_call)(cl, proc, xargs, argsp, xres, resp,
+		timeout));
 }
 
 enum clnt_stat
-clnt_send(cl, proc, xargs, argsp)
-	CLIENT		*cl;
-	uint32_t	proc;
-	xdrproc_t	xargs;
-	caddr_t		argsp;
+clnt_send(CLIENT *cl, uint32_t proc, xdrproc_t xargs, caddr_t argsp)
 {
-	enum clnt_stat dummy;
-
-	dummy = (*(cl)->cl_ops->cl_send)(cl, proc, xargs, argsp);
-	return (dummy);
+	return ((*(cl)->cl_ops->cl_send)(cl, proc, xargs, argsp));
 }
 
 bool_t
-clnt_control(cl, rq, in)
-	CLIENT	*cl;
-	uint_t	rq;
-	char	*in;
+clnt_control(CLIENT *cl, uint_t rq, char *in)
 {
-	bool_t dummy;
-
-	trace2(TR_clnt_control, 0, rq);
-	dummy = (*(cl)->cl_ops->cl_control)(cl, rq, in);
-	trace2(TR_clnt_control, 1, rq);
-	return (dummy);
+	return ((*(cl)->cl_ops->cl_control)(cl, rq, in));
 }
 
-
 void
-clnt_destroy(cl)
-	CLIENT	*cl;
+clnt_destroy(CLIENT *cl)
 {
-	trace2(TR_clnt_destroy, 0, cl);
 	((*(cl)->cl_ops->cl_destroy)(cl));
-	trace2(TR_clnt_destroy, 1, cl);
 }
 
 bool_t
-clnt_freeres(cl, xres, resp)
-	CLIENT		*cl;
-	xdrproc_t	xres;
-	caddr_t		resp;
+clnt_freeres(CLIENT *cl, xdrproc_t xres, caddr_t resp)
 {
-	bool_t dummy;
-
-	trace2(TR_clnt_freeres, 0, cl);
-	dummy = (*(cl)->cl_ops->cl_freeres)(cl, xres, resp);
-	trace2(TR_clnt_freeres, 1, cl);
-	return (dummy);
+	return ((*(cl)->cl_ops->cl_freeres)(cl, xres, resp));
 }
 
 void
-clnt_geterr(cl, errp)
-	CLIENT		*cl;
-	struct rpc_err	*errp;
+clnt_geterr(CLIENT *cl, struct rpc_err *errp)
 {
-	trace2(TR_clnt_geterr, 0, cl);
 	(*(cl)->cl_ops->cl_geterr)(cl, errp);
-	trace2(TR_clnt_geterr, 1, cl);
 }
 
 bool_t
-svc_control(xprt, rq, in)
-	SVCXPRT		*xprt;
-	const uint_t	rq;
-	void		*in;
+svc_control(SVCXPRT *xprt, const uint_t rq, void *in)
 {
-	bool_t retval;
-
-	trace2(TR_svc_control, 0, rq);
 	switch (rq) {
 	case SVCGET_VERSQUIET:
 		*((int *)in) = __svc_versquiet_get(xprt);
-		retval = TRUE;
-		break;
-
+		return (TRUE);
 	case SVCSET_VERSQUIET:
 		if (*((int *)in) == 0)
 			__svc_versquiet_off(xprt);
 		else
 			__svc_versquiet_on(xprt);
-		retval = TRUE;
-		break;
-
+		return (TRUE);
 	default:
-		retval = (*(xprt)->xp_ops->xp_control)(xprt, rq, in);
+		return ((*(xprt)->xp_ops->xp_control)(xprt, rq, in));
 	}
-	trace3(TR_svc_control, 1, rq, retval);
-	return (retval);
 }
 
 void
-svc_destroy(xprt)
-	SVCXPRT	*xprt;
+svc_destroy(SVCXPRT *xprt)
 {
-	trace1(TR_svc_destroy, 0);
 	(*(xprt)->xp_ops->xp_destroy)(xprt);
-	trace1(TR_svc_destroy, 1);
 }
 
 bool_t
-svc_freeargs(xprt, xargs, argsp)
-	SVCXPRT		*xprt;
-	xdrproc_t	xargs;
-	char		*argsp;
+svc_freeargs(SVCXPRT *xprt, xdrproc_t xargs, char *argsp)
 {
-	bool_t dummy;
-
-	trace1(TR_svc_freeargs, 0);
-	dummy = (*(xprt)->xp_ops->xp_freeargs)(xprt, xargs, argsp);
-	trace1(TR_svc_freeargs, 1);
-	return (dummy);
+	return ((*(xprt)->xp_ops->xp_freeargs)(xprt, xargs, argsp));
 }
 
 bool_t
-svc_getargs(xprt, xargs, argsp)
-	SVCXPRT		*xprt;
-	xdrproc_t	xargs;
-	char		*argsp;
+svc_getargs(SVCXPRT *xprt, xdrproc_t xargs, char *argsp)
 {
-	bool_t dummy;
-
-	trace1(TR_svc_getargs, 0);
-	dummy = (*(xprt)->xp_ops->xp_getargs)(xprt, xargs, argsp);
-	trace1(TR_svc_getargs, 1);
-	return (dummy);
+	return ((*(xprt)->xp_ops->xp_getargs)(xprt, xargs, argsp));
 }
 
 struct netbuf *
-svc_getrpccaller(xprt)
-	SVCXPRT	*xprt;
+svc_getrpccaller(SVCXPRT *xprt)
 {
-	struct netbuf *dummy;
-
-	trace1(TR_svc_getrpccaller, 0);
-	dummy = &(xprt)->xp_rtaddr;
-	trace1(TR_svc_getrpccaller, 1);
-	return (dummy);
+	return (&(xprt)->xp_rtaddr);
 }
 
 void
-xdr_destroy(xdrs)
-	XDR	*xdrs;
+xdr_destroy(XDR *xdrs)
 {
-	trace1(TR_xdr_destroy, 0);
 	(*(xdrs)->x_ops->x_destroy)(xdrs);
-	trace1(TR_xdr_destroy, 1);
 }
 
 uint_t
-xdr_getpos(xdrs)
-	XDR	*xdrs;
+xdr_getpos(XDR *xdrs)
 {
-	uint_t dummy;
-
-	trace1(TR_xdr_getpos, 0);
-	dummy = (*(xdrs)->x_ops->x_getpostn)(xdrs);
-	trace1(TR_xdr_getpos, 1);
-	return (dummy);
+	return ((*(xdrs)->x_ops->x_getpostn)(xdrs));
 }
 
 rpc_inline_t *
-xdr_inline(xdrs, len)
-	XDR	*xdrs;
-	int	len;
+xdr_inline(XDR *xdrs, int len)
 {
-	rpc_inline_t *dummy;
-
-	trace2(TR_xdr_inline, 0, len);
-	dummy = (*(xdrs)->x_ops->x_inline)(xdrs, len);
-	trace2(TR_xdr_inline, 1, len);
-	return (dummy);
+	return ((*(xdrs)->x_ops->x_inline)(xdrs, len));
 }
 
 bool_t
-xdr_setpos(xdrs, pos)
-	XDR	*xdrs;
-	uint_t	pos;
+xdr_setpos(XDR *xdrs, uint_t pos)
 {
-	bool_t dummy;
-
-	trace2(TR_xdr_setpos, 0, pos);
-	dummy = (*(xdrs)->x_ops->x_setpostn)(xdrs, pos);
-	trace2(TR_xdr_setpos, 1, pos);
-	return (dummy);
+	return ((*(xdrs)->x_ops->x_setpostn)(xdrs, pos));
 }

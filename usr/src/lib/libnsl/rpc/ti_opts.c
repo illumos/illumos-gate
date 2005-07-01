@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -39,7 +40,6 @@
 #include <netinet/udp.h>
 #include <inttypes.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <tiuser.h>
 #include <sys/socket.h>
 #include <net/if.h>
@@ -49,6 +49,7 @@
 #include <sys/stropts.h>
 #include <errno.h>
 #include <libintl.h>
+#include <string.h>
 #include <strings.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -57,7 +58,7 @@
 #include <stdlib.h>
 #include <zone.h>
 
-extern char *inet_ntop(int, const void *, char *, size_t);
+extern const char *inet_ntop(int, const void *, char *, socklen_t);
 extern bool_t __svc_get_door_ucred(const SVCXPRT *, ucred_t *);
 
 
@@ -78,13 +79,10 @@ extern bool_t __svc_get_door_ucred(const SVCXPRT *, ucred_t *);
  * Version for Solaris with new local transport code and ucred.
  */
 int
-__rpc_negotiate_uid(fd)
-	int fd;
+__rpc_negotiate_uid(int fd)
 {
 	struct strioctl strioc;
 	unsigned int set = 1;
-
-	trace2(TR___rpc_negotiate_uid, 0, fd);
 
 	/* For tcp we use getpeerucred and it needs no initialization. */
 	if (ioctl(fd, I_FIND, "tcp") > 0)
@@ -99,11 +97,8 @@ __rpc_negotiate_uid(fd)
 	    __rpc_tli_set_options(fd, SOL_SOCKET, SO_RECVUCRED, 1) == -1) {
 		syslog(LOG_ERR, "rpc_negotiate_uid (%s): %m",
 		    "ioctl:I_STR:TL_IOC_UCREDOPT/SO_RECVUCRED");
-		trace2(TR___rpc_negotiate_uid, 1, fd);
 		return (-1);
 	}
-
-	trace2(TR___rpc_negotiate_uid, 1, fd);
 	return (0);
 }
 
@@ -140,6 +135,7 @@ find_ucred_opt(const SVCXPRT *trans, ucred_t *uc, bool_t checkzone)
 #ifdef RPC_DEBUG
 	syslog(LOG_INFO, "find_ucred_opt %p %x", abuf->buf, abuf->len);
 #endif
+	/* LINTED pointer cast */
 	opth = (struct opthdr *)abuf->buf;
 	if (opth->level == TL_PROT_LEVEL &&
 	    opth->name == TL_OPT_PEER_UCRED &&
@@ -161,13 +157,14 @@ find_ucred_opt(const SVCXPRT *trans, ucred_t *uc, bool_t checkzone)
 	maxbufp = bufp + abuf->len;
 
 	while (bufp + sizeof (struct T_opthdr) < maxbufp) {
+		/* LINTED pointer cast */
 		struct T_opthdr *opt = (struct T_opthdr *)bufp;
 
 #ifdef RPC_DEBUG
 		syslog(LOG_INFO, "find_ucred_opt opt: %p %x, %d %d", opt,
 			opt->len, opt->name, opt->level);
 #endif
-		if (opt->len > maxbufp - bufp || opt->len < 0 || (opt->len & 3))
+		if (opt->len > maxbufp - bufp || (opt->len & 3))
 			return (-1);
 		if (opt->level == SOL_SOCKET && opt->name == SCM_UCRED &&
 		    opt->len - sizeof (struct T_opthdr) <= ucred_size()) {
@@ -202,21 +199,15 @@ __rpc_get_local_uid(SVCXPRT *trans, uid_t *uid_out)
 	ucred_t *uc = alloca(ucred_size());
 	int err;
 
-	trace1(TR___rpc_get_local_uid, 0);
-
 	/* LINTED - pointer alignment */
 	if (svc_type(trans) == SVC_DOOR)
 		err = __svc_get_door_ucred(trans, uc) == FALSE;
 	else
 		err = find_ucred_opt(trans, uc, B_TRUE);
 
-	if (err != 0) {
-		trace1(TR___rpc_get_local_uid, 1);
+	if (err != 0)
 		return (-1);
-	}
 	*uid_out = ucred_geteuid(uc);
-
-	trace1(TR___rpc_get_local_uid, 1);
 	return (0);
 }
 
@@ -347,7 +338,6 @@ __rpc_get_ltaddr(struct netbuf *nbufp, struct netbuf *ltaddr)
 					t_errno = TBADOPT;
 					return (-1);
 				}
-				/* LINTED pointer alignment */
 				bzero(&v4tmp, sizeof (v4tmp));
 				v4tmp.sin_family = AF_INET;
 				v4tmp.sin_addr = *(struct in_addr *)opt;
@@ -372,17 +362,18 @@ __rpc_get_ltaddr(struct netbuf *nbufp, struct netbuf *ltaddr)
 					return (1);
 				}
 
-				memcpy(&areq.sa_addr, (void *)&v4tmp,
-					sizeof (v4tmp));
+				(void) memcpy(&areq.sa_addr, &v4tmp,
+								sizeof (v4tmp));
 				areq.sa_res = -1;
 				if (ioctl(s, SIOCTMYADDR, (caddr_t)&areq) < 0) {
 					syslog(LOG_ERR,
 					    "get_ltaddr:ioctl for udp failed");
-					close(s);
+					(void) close(s);
 					return (1);
 				}
-				close(s);
+				(void) close(s);
 				if (areq.sa_res == 1) {
+				    /* LINTED pointer cast */
 				    ipv4sa = (struct sockaddr_in *)ltaddr->buf;
 				    ipv4sa->sin_family = AF_INET;
 				    ipv4sa->sin_addr = *(struct in_addr *)opt;
@@ -427,17 +418,18 @@ __rpc_get_ltaddr(struct netbuf *nbufp, struct netbuf *ltaddr)
 					return (1);
 				}
 
-				memcpy(&areq.sa_addr, (void *)&v6tmp,
-					sizeof (v6tmp));
+				(void) memcpy(&areq.sa_addr, &v6tmp,
+								sizeof (v6tmp));
 				areq.sa_res = -1;
 				if (ioctl(s, SIOCTMYADDR, (caddr_t)&areq) < 0) {
 					syslog(LOG_ERR,
 					    "get_ltaddr:ioctl for udp6 failed");
-					close(s);
+					(void) close(s);
 					return (1);
 				}
-				close(s);
+				(void) close(s);
 				if (areq.sa_res == 1) {
+				    /* LINTED pointer cast */
 				    ipv6sa = (struct sockaddr_in6 *)ltaddr->buf;
 				    ipv6sa->sin6_family = AF_INET6;
 				    ipv6sa->sin6_addr =
@@ -551,6 +543,6 @@ __tli_sys_strerror(char *buf, size_t buflen, int tli_err, int sys_err)
 			(void) strlcpy(buf, errorstr, buflen);
 	} else {
 		errorstr = t_strerror(tli_err);
-		strlcpy(buf, errorstr, buflen);
+		(void) strlcpy(buf, errorstr, buflen);
 	}
 }

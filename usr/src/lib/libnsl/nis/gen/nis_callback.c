@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -552,7 +553,7 @@ __nis_run_callback(
 		tv.tv_usec = 0;
 	}
 	while (! __cbdata->complete) {
-		rw_rdlock(&svc_fd_lock);	/* acquire svc_fdset lock */
+		(void) rw_rdlock(&svc_fd_lock);	/* acquire svc_fdset lock */
 		if (nfds != svc_max_pollfd) {
 			svc_pollset = realloc(svc_pollset,
 					sizeof (pollfd_t) * svc_max_pollfd);
@@ -560,13 +561,13 @@ __nis_run_callback(
 		}
 
 		if (nfds == 0) {
-			rw_unlock(&svc_fd_lock);
+			(void) rw_unlock(&svc_fd_lock);
 			break;	/* None waiting, hence return */
 		}
 
 		(void) memcpy(svc_pollset, svc_pollfd,
 			sizeof (pollfd_t) * svc_max_pollfd);
-		rw_unlock(&svc_fd_lock);
+		(void) rw_unlock(&svc_fd_lock);
 
 		switch (pollret = poll(svc_pollset, nfds,
 		    __rpc_timeval_to_msec(&tv))) {
@@ -626,6 +627,7 @@ __nis_run_callback(
  * is done, waits for completion, and returns the number of times that the
  * dispatch function was invoked.
  */
+/* ARGSUSED */
 int
 __nis_run_dump_callback(
 	netobj		*srvid,		/* Server's netobj		*/
@@ -635,8 +637,6 @@ __nis_run_dump_callback(
 {
 	int		count;
 	struct timeval	cbtv = {NIS_CBACK_TIMEOUT, 0};
-	enum clnt_stat	cs;
-	bool_t		is_up;
 
 	if (timeout == 0 || (timeout->tv_sec == 0 && timeout->tv_usec == 0))
 		timeout = &cbtv;
@@ -656,7 +656,7 @@ __nis_run_dump_callback(
 	}
 
 	/* Now it's our turn to wait (for completion) */
-	while (1) {
+	for (;;) {
 		timestruc_t	to;
 		int		ret;
 

@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -41,13 +43,7 @@
  */
 
 #include <sys/types.h>
-#include <rpc/trace.h>
-#ifdef _KERNEL
-#include <sys/param.h>
-#else
 #include <stdio.h>
-#endif
-
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 
@@ -112,7 +108,6 @@ static struct sgl_limits {
 bool_t
 xdr_float(XDR *xdrs, float *fp)
 {
-	bool_t dummy;
 #if defined(vax)
 	struct ieee_single is;
 	struct vax_single vs, *vsp;
@@ -120,15 +115,12 @@ xdr_float(XDR *xdrs, float *fp)
 	size_t i;
 #endif
 
-	trace1(TR_xdr_float, 0);
 	switch (xdrs->x_op) {
 
 	case XDR_ENCODE:
 #if defined(mc68000) || defined(sparc) || defined(u3b2) || \
 	defined(u3b15) || defined(i386)
-		dummy = XDR_PUTINT32(xdrs, (int *)fp);
-		trace1(TR_xdr_float, 1);
-		return (dummy);
+		return (XDR_PUTINT32(xdrs, (int *)fp));
 #else
 #if defined(vax)
 		vs = *((struct vax_single *)fp);
@@ -156,9 +148,7 @@ xdr_float(XDR *xdrs, float *fp)
 		is.mantissa = (vs.mantissa1 << 16) | vs.mantissa2;
 	shipit:
 		is.sign = vs.sign;
-		dummy = XDR_PUTINT32(xdrs, (int32_t *)&is);
-		trace1(TR_xdr_float, 1);
-		return (dummy);
+		return (XDR_PUTINT32(xdrs, (int32_t *)&is));
 #else
 		{
 		/*
@@ -174,9 +164,7 @@ xdr_float(XDR *xdrs, float *fp)
 		f = *fp;
 		if (f == 0) {
 			val = 0;
-			dummy = XDR_PUTINT32(xdrs, &val);
-			trace1(TR_xdr_float, 1);
-			return (dummy);
+			return (XDR_PUTINT32(xdrs, &val));
 		}
 		if (f < 0) {
 			f = 0 - f;
@@ -192,7 +180,6 @@ xdr_float(XDR *xdrs, float *fp)
 		}
 		if ((exp > 128) || (exp < -127)) {
 			/* over or under flowing ieee exponent */
-			trace1(TR_xdr_float, 1);
 			return (FALSE);
 		}
 		val = neg;
@@ -200,9 +187,7 @@ xdr_float(XDR *xdrs, float *fp)
 		val += 127 + exp;	/* 127 is the bias */
 		val = val << 23;	/* for the mantissa */
 		val += (int32_t)((f - 1) * 8388608);	/* 2 ^ 23 */
-		dummy = XDR_PUTINT32(xdrs, &val);
-		trace1(TR_xdr_float, 1);
-		return (dummy);
+		return (XDR_PUTINT32(xdrs, &val));
 		}
 #endif
 #endif
@@ -210,16 +195,12 @@ xdr_float(XDR *xdrs, float *fp)
 	case XDR_DECODE:
 #if defined(mc68000) || defined(sparc) || defined(u3b2) || \
 	defined(u3b15) || defined(i386)
-		dummy = XDR_GETINT32(xdrs, (int *)fp);
-		trace1(TR_xdr_float, 1);
-		return (dummy);
+		return (XDR_GETINT32(xdrs, (int *)fp));
 #else
 #if defined(vax)
 		vsp = (struct vax_single *)fp;
-		if (!XDR_GETINT32(xdrs, (int32_t *)&is)) {
-			trace1(TR_xdr_float, 1);
+		if (!XDR_GETINT32(xdrs, (int32_t *)&is))
 			return (FALSE);
-		}
 
 		for (i = 0, lim = sgl_limits;
 			i < (int)(sizeof (sgl_limits) /
@@ -251,7 +232,6 @@ xdr_float(XDR *xdrs, float *fp)
 		vsp->mantissa1 = (is.mantissa >> 16);
 	doneit:
 		vsp->sign = is.sign;
-		trace1(TR_xdr_float, 1);
 		return (TRUE);
 #else
 		{
@@ -270,10 +250,8 @@ xdr_float(XDR *xdrs, float *fp)
 		int exp = 0;
 		int32_t val;
 
-		if (!XDR_GETINT32(xdrs, (int32_t *)&val)) {
-			trace1(TR_xdr_float, 1);
+		if (!XDR_GETINT32(xdrs, (int32_t *)&val))
 			return (FALSE);
-		}
 		neg = val & 0x80000000;
 		exp = (val & 0x7f800000) >> 23;
 		exp -= 127;		/* subtract exponent base */
@@ -293,14 +271,13 @@ xdr_float(XDR *xdrs, float *fp)
 			f = 0 - f;
 		*fp = f;
 		}
+		return (TRUE);
 #endif
 #endif
 
 	case XDR_FREE:
-		trace1(TR_xdr_float, 1);
 		return (TRUE);
 	}
-	trace1(TR_xdr_float, 1);
 	return (FALSE);
 }
 
@@ -347,32 +324,26 @@ static struct dbl_limits {
 bool_t
 xdr_double(XDR *xdrs, double *dp)
 {
-	bool_t dummy;
-	register int *lp;
+	int *lp;
 #if defined(vax)
 	struct	ieee_double id;
 	struct	vax_double vd;
-	register struct dbl_limits *lim;
+	struct dbl_limits *lim;
 	size_t i;
 #endif
 
-	trace1(TR_xdr_double, 0);
 	switch (xdrs->x_op) {
 
 	case XDR_ENCODE:
 #if defined(mc68000) || defined(u3b2) || defined(u3b15) || \
 	defined(_LONG_LONG_HTOL)
 		lp = (int *)dp;
-		dummy = XDR_PUTINT32(xdrs, lp++) && XDR_PUTINT32(xdrs, lp);
-		trace1(TR_xdr_double, 1);
-		return (dummy);
+		return (XDR_PUTINT32(xdrs, lp++) && XDR_PUTINT32(xdrs, lp));
 #else
 #if defined(_LONG_LONG_LTOH)
 		lp = (int *)dp;
 		lp++;
-		dummy = XDR_PUTINT32(xdrs, lp--) && XDR_PUTINT32(xdrs, lp);
-		trace1(TR_xdr_double, 1);
-		return (dummy);
+		return (XDR_PUTINT32(xdrs, lp--) && XDR_PUTINT32(xdrs, lp));
 #else
 #if defined(vax)
 		vd = *((struct vax_double *)dp);
@@ -414,10 +385,8 @@ xdr_double(XDR *xdrs, double *dp)
 			val[0] = 0;
 			val[1] = 0;
 			lp = val;
-			dummy = XDR_PUTINT32(xdrs, lp++) &&
-				XDR_PUTINT32(xdrs, lp);
-			trace1(TR_xdr_double, 1);
-			return (dummy);
+			return (XDR_PUTINT32(xdrs, lp++) &&
+				XDR_PUTINT32(xdrs, lp));
 		}
 		if (d < 0) {
 			d = 0 - d;
@@ -433,7 +402,6 @@ xdr_double(XDR *xdrs, double *dp)
 		}
 		if ((exp > 1024) || (exp < -1023)) {
 			/* over or under flowing ieee exponent */
-			trace1(TR_xdr_double, 1);
 			return (FALSE);
 		}
 		val[0] = neg;
@@ -447,9 +415,7 @@ xdr_double(XDR *xdrs, double *dp)
 		lp = val;
 		}
 #endif
-		dummy = XDR_PUTINT32(xdrs, lp++) && XDR_PUTINT32(xdrs, lp);
-		trace1(TR_xdr_double, 1);
-		return (dummy);
+		return (XDR_PUTINT32(xdrs, lp++) && XDR_PUTINT32(xdrs, lp));
 #endif
 #endif
 
@@ -457,23 +423,17 @@ xdr_double(XDR *xdrs, double *dp)
 #if defined(mc68000) || defined(u3b2) || defined(u3b15) || \
 	defined(_LONG_LONG_HTOL)
 		lp = (int *)dp;
-		dummy = XDR_GETINT32(xdrs, lp++) && XDR_GETINT32(xdrs, lp);
-		trace1(TR_xdr_double, 1);
-		return (dummy);
+		return (XDR_GETINT32(xdrs, lp++) && XDR_GETINT32(xdrs, lp));
 #else
 #if defined(_LONG_LONG_LTOH)
 		lp = (int *)dp;
 		lp++;
-		dummy = XDR_GETINT32(xdrs, lp--) && XDR_GETINT32(xdrs, lp);
-		trace1(TR_xdr_double, 1);
-		return (dummy);
+		return (XDR_GETINT32(xdrs, lp--) && XDR_GETINT32(xdrs, lp));
 #else
 #if defined(vax)
 		lp = (int32_t *)&id;
-		if (!XDR_GETINT32(xdrs, lp++) || !XDR_GETINT32(xdrs, lp)) {
-			trace1(TR_xdr_double, 1);
+		if (!XDR_GETINT32(xdrs, lp++) || !XDR_GETINT32(xdrs, lp))
 			return (FALSE);
-		}
 		for (i = 0, lim = dbl_limits;
 			i < sizeof (dbl_limits)/sizeof (struct dbl_limits);
 			i++, lim++) {
@@ -493,7 +453,6 @@ xdr_double(XDR *xdrs, double *dp)
 	doneit:
 		vd.sign = id.sign;
 		*dp = *((double *)&vd);
-		trace1(TR_xdr_double, 1);
 		return (TRUE);
 #else
 		{
@@ -513,10 +472,8 @@ xdr_double(XDR *xdrs, double *dp)
 		int32_t val[2];
 
 		lp = val;
-		if (!XDR_GETINT32(xdrs, lp++) || !XDR_GETINT32(xdrs, lp)) {
-			trace1(TR_xdr_double, 1);
+		if (!XDR_GETINT32(xdrs, lp++) || !XDR_GETINT32(xdrs, lp))
 			return (FALSE);
-		}
 		neg = val[0] & 0x80000000;
 		exp = (val[0] & 0x7ff00000) >> 20;
 		exp -= 1023;		/* subtract exponent base */
@@ -543,49 +500,30 @@ xdr_double(XDR *xdrs, double *dp)
 #endif
 
 	case XDR_FREE:
-		trace1(TR_xdr_double, 1);
 		return (TRUE);
 	}
-	trace1(TR_xdr_double, 1);
 	return (FALSE);
 }
 
+/* ARGSUSED */
 bool_t
 xdr_quadruple(XDR *xdrs, long double *fp)
 {
-	bool_t dummy;
 /*
  * The Sparc uses IEEE FP encoding, so just do a byte copy
  */
 
-	trace1(TR_xdr_quadruple, 0);
+#if !defined(sparc)
+	return (FALSE);
+#else
 	switch (xdrs->x_op) {
 	case XDR_ENCODE:
-#if defined(sparc)
-		dummy = XDR_PUTBYTES(xdrs, (char *)fp, sizeof (long double));
-		trace1(TR_xdr_quadruple, 1);
-		return (dummy);
-#else
-		trace1(TR_xdr_quadruple, 1);
-		return (FALSE);
-
-#endif
+		return (XDR_PUTBYTES(xdrs, (char *)fp, sizeof (long double)));
 	case XDR_DECODE:
-#if defined(sparc)
-		dummy = XDR_GETBYTES(xdrs, (char *)fp, sizeof (long double));
-		trace1(TR_xdr_quadruple, 1);
-		return (dummy);
-#else
-		trace1(TR_xdr_quadruple, 1);
-		return (FALSE);
-
-#endif
+		return (XDR_GETBYTES(xdrs, (char *)fp, sizeof (long double)));
 	case XDR_FREE:
-		trace1(TR_xdr_quadruple, 1);
 		return (TRUE);
-
 	}
-	trace1(TR_xdr_quadruple, 1);
 	return (FALSE);
-
+#endif
 }

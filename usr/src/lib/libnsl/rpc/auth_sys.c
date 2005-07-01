@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -43,31 +45,21 @@
  */
 #include "mt.h"
 #include "rpc_mt.h"
-#ifdef KERNEL
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/user.h>
-#include <sys/kernel.h>
-#include <sys/proc.h>
-#else
 #include <stdio.h>
 #include <syslog.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#endif /* _KERNEL */
-
 #include <rpc/types.h>
-#include <rpc/trace.h>
 #include <rpc/xdr.h>
 #include <rpc/auth.h>
 #include <rpc/auth_sys.h>
 #include <synch.h>
 
-extern int gethostname();
-extern bool_t xdr_opaque_auth();
+extern int gethostname(char *, int);
+extern bool_t xdr_opaque_auth(XDR *, struct opaque_auth *);
 
-static struct auth_ops *authsys_ops();
+static struct auth_ops *authsys_ops(void);
 
 /*
  * This struct is pointed to by the ah_private field of an auth_handle.
@@ -87,14 +79,13 @@ static const char auth_sys_str[] = "%s : %s";
 static const char authsys_create_str[] = "authsys_create";
 static const char __no_mem_auth[] = "out of memory";
 
-#ifndef KERNEL
 /*
  * Create a (sys) unix style authenticator.
  * Returns an auth handle with the given stuff in it.
  */
 AUTH *
-authsys_create(const char *machname, uid_t uid, gid_t gid,
-	int len, const gid_t *aup_gids)
+authsys_create(const char *machname, const uid_t uid, const gid_t gid,
+	const int len, const gid_t *aup_gids)
 {
 	struct authsys_parms aup;
 	char mymem[MAX_AUTH_BYTES];
@@ -103,23 +94,20 @@ authsys_create(const char *machname, uid_t uid, gid_t gid,
 	AUTH *auth;
 	struct audata *au;
 
-	trace2(TR_authsys_create, 0, len);
 	/*
 	 * Allocate and set up auth handle
 	 */
-	auth = (AUTH *)mem_alloc(sizeof (*auth));
+	auth = malloc(sizeof (*auth));
 	if (auth == NULL) {
 		(void) syslog(LOG_ERR, auth_sys_str, authsys_create_str,
 			__no_mem_auth);
-		trace1(TR_authsys_create, 1);
 		return (NULL);
 	}
-	au = (struct audata *)mem_alloc(sizeof (*au));
+	au = malloc(sizeof (*au));
 	if (au == NULL) {
 		(void) syslog(LOG_ERR, auth_sys_str, authsys_create_str,
 			__no_mem_auth);
-		(void) mem_free((char *)auth, sizeof (*auth));
-		trace1(TR_authsys_create, 1);
+		free(auth);
 		return (NULL);
 	}
 	auth->ah_ops = authsys_ops();
@@ -142,31 +130,29 @@ authsys_create(const char *machname, uid_t uid, gid_t gid,
 	 * Serialize the parameters into origcred
 	 */
 	xdrmem_create(&xdrs, mymem, MAX_AUTH_BYTES, XDR_ENCODE);
-	if (! xdr_authsys_parms(&xdrs, &aup)) {
+	if (!xdr_authsys_parms(&xdrs, &aup)) {
 		(void) syslog(LOG_ERR, auth_sys_str, authsys_create_str,
 			":  xdr_authsys_parms failed");
-		trace1(TR_authsys_create, 1);
 		return (NULL);
 	}
-	au->au_origcred.oa_length = len = XDR_GETPOS(&xdrs);
+	au->au_origcred.oa_length = XDR_GETPOS(&xdrs);
 	au->au_origcred.oa_flavor = AUTH_SYS;
-	if ((au->au_origcred.oa_base =
-		(caddr_t)mem_alloc((uint_t)len)) == NULL) {
+	if ((au->au_origcred.oa_base = malloc(au->au_origcred.oa_length)) ==
+									NULL) {
 		(void) syslog(LOG_ERR, auth_sys_str, authsys_create_str,
 			__no_mem_auth);
-		(void) mem_free((char *)au, sizeof (*au));
-		(void) mem_free((char *)auth, sizeof (*auth));
-		trace1(TR_authsys_create, 1);
+		free(au);
+		free(auth);
 		return (NULL);
 	}
-	(void) memcpy(au->au_origcred.oa_base, mymem, (uint_t)len);
+	(void) memcpy(au->au_origcred.oa_base, mymem,
+					(size_t)au->au_origcred.oa_length);
 
 	/*
 	 * set auth handle to reflect new cred.
 	 */
 	auth->ah_cred = au->au_origcred;
 	(void) marshal_new_auth(auth);
-	trace1(TR_authsys_create, 1);
 	return (auth);
 }
 
@@ -188,12 +174,9 @@ authsys_create_default(void)
 	uid_t uid;
 	gid_t gid;
 	gid_t gids[NGRPS];
-	AUTH *dummy;
 
-	trace1(TR_authsys_create_default, 0);
 	if (gethostname(machname, MAX_MACHINE_NAME) == -1) {
 		(void) syslog(LOG_ERR, authsys_def_str, "hostname");
-		trace1(TR_authsys_create_default, 1);
 		return (NULL);
 	}
 	machname[MAX_MACHINE_NAME] = 0;
@@ -201,12 +184,9 @@ authsys_create_default(void)
 	gid = getegid();
 	if ((len = getgroups(NGRPS, gids)) < 0) {
 		(void) syslog(LOG_ERR, authsys_def_str, "groups");
-		trace2(TR_authsys_create_default, 1, len);
 		return (NULL);
 	}
-	dummy = authsys_create(machname, uid, gid, len, gids);
-	trace2(TR_authsys_create_default, 1, len);
-	return (dummy);
+	return (authsys_create(machname, uid, gid, len, gids));
 }
 
 /*
@@ -245,8 +225,6 @@ authsys_create_ruid(void)
 	return (res);
 }
 
-#endif /* !KERNEL */
-
 /*
  * authsys operations
  */
@@ -255,9 +233,7 @@ authsys_create_ruid(void)
 static void
 authsys_nextverf(AUTH *auth)
 {
-	trace1(TR_authsys_nextverf, 0);
 	/* no action necessary */
-	trace1(TR_authsys_nextverf, 1);
 }
 
 static bool_t
@@ -265,12 +241,8 @@ authsys_marshal(AUTH *auth, XDR *xdrs)
 {
 /* LINTED pointer alignment */
 	struct audata *au = AUTH_PRIVATE(auth);
-	bool_t dummy;
 
-	trace1(TR_authsys_marshal, 0);
-	dummy  = XDR_PUTBYTES(xdrs, au->au_marshed, au->au_mpos);
-	trace1(TR_authsys_marshal, 1);
-	return (dummy);
+	return (XDR_PUTBYTES(xdrs, au->au_marshed, au->au_mpos));
 }
 
 static bool_t
@@ -279,7 +251,6 @@ authsys_validate(AUTH *auth, struct opaque_auth *verf)
 	struct audata *au;
 	XDR xdrs;
 
-	trace1(TR_authsys_validate, 0);
 	if (verf->oa_flavor == AUTH_SHORT) {
 /* LINTED pointer alignment */
 		au = AUTH_PRIVATE(auth);
@@ -287,8 +258,7 @@ authsys_validate(AUTH *auth, struct opaque_auth *verf)
 			verf->oa_length, XDR_DECODE);
 
 		if (au->au_shcred.oa_base != NULL) {
-			mem_free(au->au_shcred.oa_base,
-			    au->au_shcred.oa_length);
+			free(au->au_shcred.oa_base);
 			au->au_shcred.oa_base = NULL;
 		}
 		if (xdr_opaque_auth(&xdrs, &au->au_shcred)) {
@@ -301,7 +271,6 @@ authsys_validate(AUTH *auth, struct opaque_auth *verf)
 		}
 		(void) marshal_new_auth(auth);
 	}
-	trace1(TR_authsys_validate, 1);
 	return (TRUE);
 }
 
@@ -312,40 +281,30 @@ authsys_refresh(AUTH *auth, void *dummy)
 /* LINTED pointer alignment */
 	struct audata *au = AUTH_PRIVATE(auth);
 	struct authsys_parms aup;
-#ifndef KERNEL
 	struct timeval now;
-#endif
 	XDR xdrs;
 	int stat;
 
-	trace1(TR_authsys_refresh, 0);
-	if (auth->ah_cred.oa_base == au->au_origcred.oa_base) {
-		/* there is no hope.  Punt */
-		trace1(TR_authsys_refresh, 1);
-		return (FALSE);
-	}
+	if (auth->ah_cred.oa_base == au->au_origcred.oa_base)
+		return (FALSE);	/* there is no hope.  Punt */
 	au->au_shfaults ++;
 
 	/* first deserialize the creds back into a struct authsys_parms */
 	aup.aup_machname = NULL;
-	aup.aup_gids = (gid_t *)NULL;
+	aup.aup_gids = NULL;
 	xdrmem_create(&xdrs, au->au_origcred.oa_base,
 	    au->au_origcred.oa_length, XDR_DECODE);
 	stat = xdr_authsys_parms(&xdrs, &aup);
-	if (! stat)
+	if (!stat)
 		goto done;
 
 	/* update the time and serialize in place */
-#ifdef KERNEL
-	aup.aup_time = time.tv_sec;
-#else
 	(void) gettimeofday(&now, (struct timezone *)0);
 	aup.aup_time = now.tv_sec;
-#endif
 	xdrs.x_op = XDR_ENCODE;
 	XDR_SETPOS(&xdrs, 0);
 	stat = xdr_authsys_parms(&xdrs, &aup);
-	if (! stat)
+	if (!stat)
 		goto done;
 	auth->ah_cred = au->au_origcred;
 	(void) marshal_new_auth(auth);
@@ -354,7 +313,6 @@ done:
 	xdrs.x_op = XDR_FREE;
 	(void) xdr_authsys_parms(&xdrs, &aup);
 	XDR_DESTROY(&xdrs);
-	trace1(TR_authsys_refresh, 1);
 	return (stat);
 }
 
@@ -364,15 +322,13 @@ authsys_destroy(AUTH *auth)
 /* LINTED pointer alignment */
 	struct audata *au = AUTH_PRIVATE(auth);
 
-	trace1(TR_authsys_destroy, 0);
-	mem_free(au->au_origcred.oa_base, au->au_origcred.oa_length);
+	free(au->au_origcred.oa_base);
 	if (au->au_shcred.oa_base != NULL)
-		mem_free(au->au_shcred.oa_base, au->au_shcred.oa_length);
-	mem_free(auth->ah_private, sizeof (struct audata));
+		free(au->au_shcred.oa_base);
+	free(auth->ah_private);
 	if (auth->ah_verf.oa_base != NULL)
-		mem_free(auth->ah_verf.oa_base, auth->ah_verf.oa_length);
-	mem_free((caddr_t)auth, sizeof (*auth));
-	trace1(TR_authsys_destroy, 1);
+		free(auth->ah_verf.oa_base);
+	free(auth);
 }
 
 /*
@@ -390,21 +346,14 @@ marshal_new_auth(AUTH *auth)
 /* LINTED pointer alignment */
 	struct audata *au = AUTH_PRIVATE(auth);
 
-	trace1(TR_marshal_new_auth, 0);
 	xdrmem_create(xdrs, au->au_marshed, MAX_AUTH_BYTES, XDR_ENCODE);
-	if ((! xdr_opaque_auth(xdrs, &(auth->ah_cred))) ||
-	    (! xdr_opaque_auth(xdrs, &(auth->ah_verf)))) {
-#ifdef KERNEL
-		printf(marshal_new_auth_str);
-#else
+	if ((!xdr_opaque_auth(xdrs, &(auth->ah_cred))) ||
+	    (!xdr_opaque_auth(xdrs, &(auth->ah_verf)))) {
 		(void) syslog(LOG_ERR, marshal_new_auth_str);
-
-#endif
 	} else {
 		au->au_mpos = XDR_GETPOS(xdrs);
 	}
 	XDR_DESTROY(xdrs);
-	trace1(TR_marshal_new_auth, 1);
 }
 
 static struct auth_ops *
@@ -415,8 +364,7 @@ authsys_ops(void)
 
 	/* VARIABLES PROTECTED BY ops_lock: ops */
 
-	trace1(TR_authsys_ops, 0);
-	mutex_lock(&ops_lock);
+	(void) mutex_lock(&ops_lock);
 	if (ops.ah_nextverf == NULL) {
 		ops.ah_nextverf = authsys_nextverf;
 		ops.ah_marshal = authsys_marshal;
@@ -424,7 +372,6 @@ authsys_ops(void)
 		ops.ah_refresh = authsys_refresh;
 		ops.ah_destroy = authsys_destroy;
 	}
-	mutex_unlock(&ops_lock);
-	trace1(TR_authsys_ops, 1);
+	(void) mutex_unlock(&ops_lock);
 	return (&ops);
 }

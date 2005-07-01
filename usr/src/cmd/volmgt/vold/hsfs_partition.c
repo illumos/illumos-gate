@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +90,7 @@ static partition_result_t create_hsfs_vnodes(partition_private_t *);
 static partition_result_t find_cdi_volume(partition_private_t *);
 static partition_result_t find_hsfs_volume(partition_private_t *);
 static partition_result_t find_iso9660_volume(partition_private_t *);
-static partition_result_t get_sector(int, int, uchar_t *, ulonglong_t);
+static partition_result_t get_sector(int, int, uchar_t *, u_longlong_t);
 static boolean_t has_audio(partition_private_t *);
 static boolean_t has_data(partition_private_t *);
 static partition_result_t read_label(partition_private_t *);
@@ -520,7 +521,7 @@ static partition_result_t
 get_sector(int				file_descriptor,
 	int				sector_number,
 	uchar_t				*sector_bufferp,
-	ulonglong_t			medium_capacity)
+	u_longlong_t			medium_capacity)
 {
 	off_t			offset;
 	partition_result_t	partition_result;

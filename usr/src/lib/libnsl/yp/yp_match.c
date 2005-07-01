@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,17 +36,15 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	NULL 0
+#include <stdlib.h>
+#include <unistd.h>
 #include "mt.h"
 #include "../rpc/rpc_mt.h"
 #include <rpc/rpc.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include "yp_b.h"
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/ypclnt.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <malloc.h>
 #include <string.h>
 #include <sys/time.h>
@@ -76,54 +76,39 @@ static struct cache	*head;
 #define	CACHETO 600
 
 static void
-freenode(n)
-	struct cache *n;
+freenode(struct cache *n)
 {
-	trace1(TR_freenode, 0);
 	if (n->val != 0)
-	    free(n->val);
+		free(n->val);
 	if (n->key != 0)
-	    free(n->key);
+		free(n->key);
 	if (n->map != 0)
-	    free(n->map);
+		free(n->map);
 	if (n->domain != 0)
-	    free(n->domain);
-	free((char *)n);
-	trace1(TR_freenode, 1);
+		free(n->domain);
+	free(n);
 }
 
 static struct cache *
-makenode(domain, map, keylen, vallen)
-	char *domain, *map;
-	int keylen, vallen;
+makenode(char *domain, char *map, int keylen, int vallen)
 {
 	struct cache *n;
 
-	trace3(TR_makenode, 0, keylen, vallen);
-	if ((n = (struct cache *)calloc(1, sizeof (*n))) == 0) {
-		trace1(TR_makenode, 1);
+	if ((n = calloc(1, sizeof (*n))) == 0)
 		return (0);
-	}
 	if (((n->domain = strdup(domain)) == 0) ||
 	    ((n->map = strdup(map)) == 0) ||
 	    ((n->key = malloc(keylen)) == 0) ||
 	    ((n->val = malloc(vallen)) == 0)) {
 		freenode(n);
-		trace1(TR_makenode, 1);
 		return (0);
 	}
-	trace1(TR_makenode, 1);
 	return (n);
 }
 
 static int
-in_cache(domain, map, key, keylen, val, vallen)
-	char *domain;
-	char *map;
-	char *key;
-	int  keylen;
-	char **val;		/* returns value array */
-	int  *vallen;		/* returns bytes in val */
+in_cache(char *domain, char *map, char *key, int keylen, char **val,
+								int *vallen)
 {
 	struct cache *c, **pp;
 	int cnt;
@@ -172,14 +157,8 @@ in_cache(domain, map, key, keylen, val, vallen)
  * (until success) sleep loop if 'hardlookup' parameter is set.
  */
 int
-__yp_match_cflookup(domain, map, key, keylen, val, vallen, hardlookup)
-	char *domain;
-	char *map;
-	char *key;
-	int  keylen;
-	char **val;		/* returns value array */
-	int  *vallen;		/* returns bytes in val */
-	int  hardlookup;	/* retry lookup until we get an answer */
+__yp_match_cflookup(char *domain, char *map, char *key, int keylen, char **val,
+						int *vallen, int hardlookup)
 {
 	size_t domlen;
 	size_t maplen;
@@ -193,23 +172,18 @@ __yp_match_cflookup(domain, map, key, keylen, val, vallen, hardlookup)
 	int  found_it;
 	int  cachegen;
 
-	trace2(TR_yp_match, 0, keylen);
-	if ((map == NULL) || (domain == NULL)) {
-		trace1(TR_yp_match, 1);
+	if ((map == NULL) || (domain == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	domlen = strlen(domain);
 	maplen = strlen(map);
 
 	if ((domlen == 0) || (domlen > YPMAXDOMAIN) ||
 	    (maplen == 0) || (maplen > YPMAXMAP) ||
-	    (key == NULL) || (keylen == 0)) {
-		trace1(TR_yp_match, 1);
+	    (key == NULL) || (keylen == 0))
 		return (YPERR_BADARGS);
-	}
 
-	mutex_lock(&cache_lock);
+	(void) mutex_lock(&cache_lock);
 	found_it = in_cache(domain, map, key, keylen, &my_val, &my_vallen);
 	cachegen = generation;
 
@@ -217,25 +191,20 @@ __yp_match_cflookup(domain, map, key, keylen, val, vallen, hardlookup)
 		/* NB: Copy two extra bytes; see below */
 		savesize = my_vallen + 2;
 		if ((*val = malloc((size_t)savesize)) == 0) {
-			trace1(TR_yp_match, 1);
-			mutex_unlock(&cache_lock);
+			(void) mutex_unlock(&cache_lock);
 			return (YPERR_RESRC);
 		}
 		(void) memcpy(*val, my_val, (size_t)savesize);
 		*vallen = my_vallen;
-		trace1(TR_yp_match, 1);
-		mutex_unlock(&cache_lock);
+		(void) mutex_unlock(&cache_lock);
 		return (0);	/* Success */
 	}
-	mutex_unlock(&cache_lock);
+	(void) mutex_unlock(&cache_lock);
 
 	for (;;) {
 
-		if (reason = __yp_dobind_cflookup(domain, &pdomb,
-						    hardlookup)) {
-			trace1(TR_yp_match, 1);
+		if (reason = __yp_dobind_cflookup(domain, &pdomb, hardlookup))
 			return (reason);
-		}
 
 		if (pdomb->dom_binding->ypbind_hi_vers >= YPVERS) {
 
@@ -248,22 +217,19 @@ __yp_match_cflookup(domain, map, key, keylen, val, vallen, hardlookup)
 				yp_unbind(domain);
 				if (hardlookup)
 					(void) _sleep(_ypsleeptime); /* retry */
-				else {
-					trace1(TR_yp_match, 1);
+				else
 					return (reason);
-				}
 			} else
 				break;
 		} else {
 			__yp_rel_binding(pdomb);
-			trace1(TR_yp_match, 1);
 			return (YPERR_VERS);
 		}
 	}
 
 	/* add to our cache */
 	if (reason == 0) {
-		mutex_lock(&cache_lock);
+		(void) mutex_lock(&cache_lock);
 		/*
 		 * Check whether some other annoying thread did the same
 		 * thing in parallel with us.  I hate it when that happens...
@@ -301,7 +267,7 @@ __yp_match_cflookup(domain, map, key, keylen, val, vallen, hardlookup)
 				++generation;
 			}
 		}
-		mutex_unlock(&cache_lock);
+		(void) mutex_unlock(&cache_lock);
 	} else if (reason == YPERR_MAP && geteuid() == 0) {
 		/*
 		 * Lookup could be for a secure map; fail over to retry
@@ -314,7 +280,6 @@ __yp_match_cflookup(domain, map, key, keylen, val, vallen, hardlookup)
 		if (rsvdreason == 0)
 			reason = rsvdreason;
 	}
-	trace1(TR_yp_match, 1);
 	return (reason);
 }
 
@@ -333,15 +298,15 @@ yp_match(
 }
 
 extern void
-__empty_yp_cache()
+__empty_yp_cache(void)
 {
 	struct cache *p, *n;
 
 	/* Copy the cache pointer and make it ZERO */
-	mutex_lock(&cache_lock);
+	(void) mutex_lock(&cache_lock);
 	p = head;
 	head = 0;
-	mutex_unlock(&cache_lock);
+	(void) mutex_unlock(&cache_lock);
 
 	if (p == 0)
 		return;
@@ -391,48 +356,39 @@ __yp_match_rsvdport_cflookup(
 	int  found_it;
 	int  cachegen;
 
-	trace2(TR_yp_match_rsvdport, 0, keylen);
-	if ((map == NULL) || (domain == NULL)) {
-		trace1(TR_yp_match_rsvdport, 1);
+	if ((map == NULL) || (domain == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	domlen = strlen(domain);
 	maplen = strlen(map);
 
 	if ((domlen == 0) || (domlen > YPMAXDOMAIN) ||
 	    (maplen == 0) || (maplen > YPMAXMAP) ||
-	    (key == NULL) || (keylen == 0)) {
-		trace1(TR_yp_match_rsvdport, 1);
+	    (key == NULL) || (keylen == 0))
 		return (YPERR_BADARGS);
-	}
 
-	mutex_lock(&cache_lock);
+	(void) mutex_lock(&cache_lock);
 	found_it = in_cache(domain, map, key, keylen, &my_val, &my_vallen);
 	cachegen = generation;
 	if (found_it) {
 		/* NB: Copy two extra bytes; see below */
 		savesize = my_vallen + 2;
 		if ((*val = malloc((size_t)savesize)) == 0) {
-			trace1(TR_yp_match_rsvdport, 1);
-			mutex_unlock(&cache_lock);
+			(void) mutex_unlock(&cache_lock);
 			return (YPERR_RESRC);
 		}
 		(void) memcpy(*val, my_val, (size_t)savesize);
 		*vallen = my_vallen;
-		trace1(TR_yp_match_rsvdport, 1);
-		mutex_unlock(&cache_lock);
+		(void) mutex_unlock(&cache_lock);
 		return (0);	/* Success */
 	}
-	mutex_unlock(&cache_lock);
+	(void) mutex_unlock(&cache_lock);
 
 	for (;;) {
 
 		if (reason = __yp_dobind_rsvdport_cflookup(domain, &pdomb,
-							hardlookup)) {
-			trace1(TR_yp_match_rsvdport, 1);
+							hardlookup))
 			return (reason);
-		}
 
 		if (pdomb->dom_binding->ypbind_hi_vers >= YPVERS) {
 
@@ -451,10 +407,8 @@ __yp_match_rsvdport_cflookup(
 				yp_unbind(domain);
 				if (hardlookup)
 					(void) _sleep(_ypsleeptime); /* retry */
-				else {
-					trace1(TR_yp_match, 1);
+				else
 					return (reason);
-				}
 			} else
 				break;
 		} else {
@@ -464,14 +418,13 @@ __yp_match_rsvdport_cflookup(
 			 */
 			__yp_rel_binding(pdomb);
 			free_dom_binding(pdomb);
-			trace1(TR_yp_match_rsvdport, 1);
 			return (YPERR_VERS);
 		}
 	}
 
 	/* add to our cache */
 	if (reason == 0) {
-		mutex_lock(&cache_lock);
+		(void) mutex_lock(&cache_lock);
 		/*
 		 * Check whether some other annoying thread did the same
 		 * thing in parallel with us.  I hate it when that happens...
@@ -509,9 +462,8 @@ __yp_match_rsvdport_cflookup(
 				++generation;
 			}
 		}
-		mutex_unlock(&cache_lock);
+		(void) mutex_unlock(&cache_lock);
 	}
-	trace1(TR_yp_match_rsvdport, 1);
 	return (reason);
 }
 
@@ -543,7 +495,6 @@ domatch(char *domain, char *map, char *key, int  keylen,
 	struct ypresp_val resp;
 	unsigned int retval = 0;
 
-	trace2(TR_domatch, 0, keylen);
 	req.domain = domain;
 	req.map = map;
 	req.keydat.dptr = key;
@@ -565,10 +516,8 @@ domatch(char *domain, char *map, char *key, int  keylen,
 	case RPC_SUCCESS:
 		break;
 	case RPC_TIMEDOUT:
-		trace1(TR_domatch, 1);
 		return (YPERR_YPSERV);
 	default:
-		trace1(TR_domatch, 1);
 		return (YPERR_RPC);
 	}
 
@@ -597,7 +546,5 @@ domatch(char *domain, char *map, char *key, int  keylen,
 
 	CLNT_FREERES(pdomb->dom_client,
 		(xdrproc_t)xdr_ypresp_val, (char *)&resp);
-	trace1(TR_domatch, 1);
 	return (retval);
-
 }

@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -48,8 +50,9 @@ typedef int bool_t;
 typedef int enum_t;
 
 /*
- * The following is part of a workaround for bug #1128007.
- * When it is fixed, this next typedef should be removed.
+ * The ulonglong_t type was introduced to workaround an rpcgen bug
+ * that has been fixed, this next typedef will be removed in a future release.
+ * Do *NOT* use!
  */
 typedef u_longlong_t ulonglong_t;
 

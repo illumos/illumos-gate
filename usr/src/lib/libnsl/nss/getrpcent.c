@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +32,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <rpc/rpcent.h>
-#include <rpc/trace.h>
 #include <nss_dbdefs.h>
 
 #ifdef	NSS_INCLUDE_UNSAFE
@@ -47,47 +47,32 @@ static nss_XbyY_buf_t *buffer;
 	/* === ?? set ENOMEM on failure?  */
 
 struct rpcent *
-getrpcbyname(nam)
-	const char	*nam;
+getrpcbyname(const char *nam)
 {
 	nss_XbyY_buf_t	*b;
-	struct rpcent	*res = 0;
 
-	trace1(TR_getrpcbyname, 0);
-	if ((b = GETBUF()) != 0) {
-		res = getrpcbyname_r(nam, b->result, b->buffer, b->buflen);
-	}
-	trace1(TR_getrpcbyname, 1);
-	return (res);
+	if ((b = GETBUF()) == 0)
+		return (NULL);
+	return (getrpcbyname_r(nam, b->result, b->buffer, b->buflen));
 }
 
 struct rpcent *
-getrpcbynumber(num)
-	const int	num;
+getrpcbynumber(const int num)
 {
 	nss_XbyY_buf_t	*b;
-	struct rpcent	*res = 0;
 
-	trace2(TR_getrpcbynumber, 0, num);
-	if ((b = GETBUF()) != 0) {
-		res = getrpcbynumber_r(num, b->result, b->buffer, b->buflen);
-	}
-	trace2(TR_getrpcbynumber, 1, num);
-	return (res);
+	if ((b = GETBUF()) == 0)
+		return (NULL);
+	return (getrpcbynumber_r(num, b->result, b->buffer, b->buflen));
 }
 
 struct rpcent *
-getrpcent()
+getrpcent(void)
 {
 	nss_XbyY_buf_t	*b;
-	struct rpcent	*res = 0;
 
-	trace1(TR_getrpcent, 0);
-	if ((b = GETBUF()) != 0) {
-		res = getrpcent_r(b->result, b->buffer, b->buflen);
-	}
-	trace1(TR_getrpcent, 1);
-	return (res);
+	if ((b = GETBUF()) == 0)
+		return (NULL);
+	return (getrpcent_r(b->result, b->buffer, b->buflen));
 }
-
 #endif	/* NSS_INCLUDE_UNSAFE */

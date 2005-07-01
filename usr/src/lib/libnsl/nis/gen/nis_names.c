@@ -19,12 +19,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	nis_names.c
  *
  *	Relative name search policies.
  *
- *	Copyright 1988-2003 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -217,7 +218,7 @@ parse_default(
 			 *	"foo" is not a label of "foo500" though
 			 *	it's a substring, hence not-a-match here.
 			 */
-			if ((mkr = strstr(tmpdom, tmpnam)) &&
+			if ((mkr = strstr(tmpdom, tmpnam)) != 0 &&
 			    *(mkr+strlen(tmpnam)) == '.') {
 				char *temp;	/* very temporary */
 
@@ -444,7 +445,7 @@ parse_path(const nis_name name, const char *path, const nis_name local,
 				break;	/* finish early */
 
 			result[cur++] = (nis_name) strdup(buf);
-			if (! result[cur-1])
+			if (!result[cur-1])
 				break; /* finish early */
 		}
 	}
@@ -640,14 +641,13 @@ __nis_getnames(nis_name name, nis_error *nis_err)
 				*tmp_path = NULL; /* The search path */
 	char			buf[NIS_MAXSRCHLEN];
 
-	if (! name) {
+	if (!name) {
 		*nis_err = NIS_BADNAME;
 		return (NULL);
 	}
 
 	if (name[strlen(name)-1] != '.') {
-		result = (nis_name *) malloc(NIS_MAXPATHDEPTH *
-			sizeof (nis_name));
+		result = malloc(NIS_MAXPATHDEPTH * sizeof (nis_name));
 		if (result == NULL) {
 			*nis_err = NIS_NOMEMORY;
 			return (NULL);
@@ -663,7 +663,7 @@ __nis_getnames(nis_name name, nis_error *nis_err)
 		append_orgdir(buf);
 #endif
 
-		if (! path)
+		if (!path)
 			path = "$"; /* default path */
 
 		/* if can't get local_dir, no need to continue */
@@ -695,8 +695,8 @@ __nis_getnames(nis_name name, nis_error *nis_err)
 
 	} else {
 		/* the simple case for a fully-qualified path */
-		result = (nis_name *) malloc(2 * sizeof (nis_name));
-		if (! result) {
+		result = malloc(2 * sizeof (nis_name));
+		if (!result) {
 			*nis_err = NIS_NOMEMORY;
 			return (NULL);
 		}

@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1988 AT&T */
@@ -29,7 +31,6 @@
 
 #include <sys/select.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <sys/time.h>
 #include <sys/poll.h>
 #include "rpc_mt.h"
@@ -47,16 +48,14 @@ __rpc_select_to_poll(
 	fd_set	*fdset,		/* source fd_set array */
 	struct pollfd	*p0)	/* target pollfd array */
 {
-	/* register declarations ordered by expected frequency of use */
-	register int j;		/* loop counter */
-	register int n;
-	register struct pollfd	*p = p0;
+	int j;		/* loop counter */
+	int n;
+	struct pollfd	*p = p0;
 
 	/*
 	 * For each fd, if the appropriate bit is set convert it into
 	 * the appropriate pollfd struct.
 	 */
-	trace2(TR___rpc_select_to_poll, 0, fdmax);
 	j = ((fdmax >= FD_SETSIZE) ? FD_SETSIZE : fdmax);
 	for (n = 0; n < j; n++) {
 		if (FD_ISSET(n, fdset)) {
@@ -66,7 +65,6 @@ __rpc_select_to_poll(
 			p++;
 		}
 	}
-	trace2(TR___rpc_select_to_poll, 1, fdmax);
 	return (p - p0);
 }
 
@@ -87,8 +85,6 @@ __rpc_compress_pollfd(int pollfdmax, pollfd_t *srcp, pollfd_t *p0)
 	int n;
 	pollfd_t *p = p0;
 
-	trace2(TR___rpc_compress_pollfd, 0, p0);
-
 	for (n = 0; n < pollfdmax; n++) {
 		if (POLLFD_ISSET(n, srcp)) {
 			p->fd = srcp[n].fd;
@@ -97,8 +93,6 @@ __rpc_compress_pollfd(int pollfdmax, pollfd_t *srcp, pollfd_t *p0)
 			p++;
 		}
 	}
-
-	trace2(TR___rpc_compress_pollfd, 1, pollfdmax);
 	return (p - p0);
 }
 
@@ -114,7 +108,6 @@ __rpc_timeval_to_msec(struct timeval *t)
 	 * We're really returning t->tv_sec * 1000 + (t->tv_usec / 1000)
 	 * but try to do so efficiently.  Note:  1000 = 1024 - 16 - 8.
 	 */
-	trace1(TR___rpc_timeval_to_msec, 0);
 	tmp = (int)t->tv_sec << 3;
 	t1 = -tmp;
 	t1 += t1 << 1;
@@ -122,6 +115,5 @@ __rpc_timeval_to_msec(struct timeval *t)
 	if (t->tv_usec)
 		t1 += t->tv_usec / 1000;
 
-	trace1(TR___rpc_timeval_to_msec, 1);
 	return (t1);
 }

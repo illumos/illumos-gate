@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -42,6 +43,7 @@
 
 #include <sys/types.h>
 #include <stdlib.h>
+#include "rpc_scan.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,10 +58,6 @@ extern "C" {
 #define	RPCGEN_MAJOR 1
 #define	RPCGEN_MINOR 1
 
-#define	alloc(size)		malloc((unsigned)(size))
-#define	ALLOC(object)   (object *) calloc(1, sizeof (object))
-
-#define	s_print	(void) sprintf
 #define	f_print (void) fprintf
 
 struct list {
@@ -107,7 +105,6 @@ extern FILE *fin;
 
 extern list *defined;
 
-
 extern bas_type *typ_list_h;
 extern bas_type *typ_list_t;
 extern xdrfunc *xdrfunc_head, *xdrfunc_tail;
@@ -142,64 +139,62 @@ extern pid_t childpid;
 /*
  * rpc_util routines
  */
-void storeval();
+extern void storeval(list **, definition *);
 
 #define	STOREVAL(list, item)	\
 	storeval(list, item)
 
-definition *findval();
+extern definition *findval(list *, char *, int (*)());
 
 #define	FINDVAL(list, item, finder) \
 	findval(list, item, finder)
 
-char *fixtype();
-char *stringfix();
-char *locase();
-void pvname_svc();
-void pvname();
-void ptype();
-int isvectordef();
-int streq();
-void error();
-void expected1();
-void expected2();
-void expected3();
-void tabify();
-void record_open();
-bas_type *find_type();
+extern char *fixtype(char *);
+extern char *stringfix(char *);
+extern char *locase(char *);
+extern void pvname_svc(char *, char *);
+extern void pvname(char *, char *);
+extern void ptype(char *, char *, int);
+extern int isvectordef(char *, relation);
+extern int streq(char *, char *);
+extern void error(char *);
+extern void expected1(tok_kind);
+extern void expected2(tok_kind, tok_kind);
+extern void expected3(tok_kind, tok_kind, tok_kind);
+extern void tabify(FILE *, int);
+extern void record_open(char *);
+extern bas_type *find_type(char *);
+
 /*
  * rpc_cout routines
  */
-void cprint();
-void emit();
+extern void emit(definition *);
 
 /*
  * rpc_hout routines
  */
-void print_datadef();
-void print_funcdef();
-void print_xdr_func_def();
+extern void print_datadef(definition *);
+extern void print_funcdef(definition *);
+extern void print_xdr_func_def(char *, int, int);
 
 /*
  * rpc_svcout routines
  */
-void write_most();
-void write_register();
-void write_rest();
-void write_programs();
-void write_svc_aux();
-void write_inetd_register();
-void write_netid_register();
-void write_nettype_register();
+extern void write_most(char *, int, int);
+extern void write_rest(void);
+extern void write_inetd_register(char *);
+extern void write_netid_register(char *);
+extern void write_nettype_register(char *);
+
 /*
  * rpc_clntout routines
  */
-void write_stubs();
+extern void write_stubs(void);
 
 /*
  * rpc_tblout routines
  */
-void write_tables();
+extern void write_tables(void);
 
 #ifdef __cplusplus
 }

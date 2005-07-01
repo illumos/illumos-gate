@@ -19,12 +19,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1997-2000, by Sun Microsystems Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * svc_auth_loopb.c
@@ -56,6 +57,7 @@ __svcauth_loopback(struct svc_req *rqst, struct rpc_msg *msg)
 	size_t str_len, gid_len;
 	int i;
 
+	/* LINTED pointer cast */
 	area = (struct area *)rqst->rq_clntcred;
 	aup = &area->area_aup;
 	aup->aup_machname = area->area_machname;
@@ -93,14 +95,9 @@ __svcauth_loopback(struct svc_req *rqst, struct rpc_msg *msg)
 		 * timestamp, hostname len (0), uid, gid, and gids len (0).
 		 */
 		if ((5 + gid_len) * BYTES_PER_XDR_UNIT + str_len > auth_len) {
-#ifdef	KERNEL
-			printf("bad auth_len gid %lu str %lu auth %lu",
-			    gid_len, str_len, auth_len);
-#else
 			(void) syslog(LOG_ERR,
 			    "bad auth_len gid %lu str %lu auth %lu",
 			    gid_len, str_len, auth_len);
-#endif
 			stat = AUTH_BADCRED;
 			goto done;
 		}

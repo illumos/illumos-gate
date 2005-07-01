@@ -19,14 +19,18 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "uucp.h"
-#include <rpc/trace.h>
 
 /*
  * generate a vector of pointers (arps) to the
@@ -40,14 +44,11 @@
  *	arps[i] = NULL
  */
 
-GLOBAL int
-getargs(s, arps, count)
-register char *s, *arps[];
-register int count;
+static int
+getargs(char *s, char *arps[], int count)
 {
-	register int i;
+	int i;
 
-	trace2(TR_getargs, 0, count);
 	for (i = 0; i < count; i++) {
 		while (*s == ' ' || *s == '\t')
 			*s++ = '\0';
@@ -56,12 +57,10 @@ register int count;
 		if (*s == '\0')
 			break;
 		arps[i] = s++;
-		while (*s != '\0' && *s != ' '
-			&& *s != '\t' && *s != '\n')
-				s++;
+		while (*s != '\0' && *s != ' ' && *s != '\t' && *s != '\n')
+			s++;
 	}
 	arps[i] = NULL;
-	trace1(TR_getargs, 1);
 	return (i);
 }
 
@@ -75,19 +74,17 @@ register int count;
  *	\n gets replaced by a newline
  *	\r gets replaced by a carriage return
  *	\b gets replaced by a backspace
- *	\s gets replaced by a blank 
+ *	\s gets replaced by a blank
  *	any other unknown \ sequence is left intact for further processing
  *	downline.
  */
 
-GLOBAL void
-bsfix (args)
-char **args;
+static void
+bsfix(char **args)
 {
-	register char *str, *to, *cp;
-	register int num;
+	char *str, *to, *cp;
+	int num;
 
-	trace1(TR_bsfix, 0);
 	for (; *args; args++) {
 		str = *args;
 		for (to = str; *str; str++) {
@@ -103,22 +100,19 @@ char **args;
 				case '5':
 				case '6':
 				case '7':
-					for ( num = 0, cp = str
-					    ; cp - str < 3
-					    ; cp++
-					    ) {
+					for (num = 0, cp = str;
+							cp - str < 3; cp++) {
 						if ('0' <= *cp && *cp <= '7') {
 							num <<= 3;
 							num += *cp - '0';
-						}
-						else
+						} else
 						    break;
 					}
 					if (num == 0) {
 						*to++ = '\\';
 						*to++ = 'N';
 					} else
-						*to++ = (char) num;
+						*to++ = (char)num;
 					str = cp-1;
 					break;
 
@@ -126,7 +120,7 @@ char **args;
 					*to++ = '\t';
 					break;
 
-				case 's':	
+				case 's':
 					*to++ = ' ';
 					break;
 
@@ -153,6 +147,4 @@ char **args;
 		}
 		*to = '\0';
 	}
-	trace1(TR_bsfix, 1);
-	return;
 }

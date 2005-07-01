@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -53,7 +54,6 @@
 #include <sys/types.h>
 #include <stropts.h>
 #include <sys/conf.h>
-#include <rpc/trace.h>
 #include <rpc/rpc.h>
 #ifdef PORTMAP
 #include <rpc/pmap_clnt.h>
@@ -133,14 +133,12 @@ static void __svc_remove_input_of_fd(int fd);
 
 struct _svc_user_fd_head;
 
-typedef struct
-{
+typedef struct {
 	struct _svc_user_fd_node *next;
 	struct _svc_user_fd_node *previous;
 } _svc_user_link;
 
-typedef struct _svc_user_fd_node
-{
+typedef struct _svc_user_fd_node {
 	/* The lnk field must be the first field. */
 	_svc_user_link lnk;
 	svc_input_id_t id;
@@ -150,8 +148,7 @@ typedef struct _svc_user_fd_node
 	void*	  cookie;
 } _svc_user_fd_node;
 
-typedef struct _svc_user_fd_head
-{
+typedef struct _svc_user_fd_head {
 	/* The lnk field must be the first field. */
 	_svc_user_link lnk;
 	unsigned int mask;    /* logical OR of all sub-masks */
@@ -188,8 +185,7 @@ static mutex_t svc_userfds_lock = DEFAULTMUTEX;
  * correct index to the user.
  */
 
-typedef struct _svc_management_user_fd
-{
+typedef struct _svc_management_user_fd {
 	bool_t free;
 	union {
 		svc_input_id_t next_free;
@@ -245,7 +241,6 @@ _svc_attribute_new_id(_svc_user_fd_node *node)
 		/* Allocate new entries */
 		int L_inOldSize = svc_nmgtuserfds;
 		int i;
-		_svc_management_user_fd* alloc_array;
 
 		svc_nmgtuserfds += USER_FD_INCREMENT;
 
@@ -289,10 +284,10 @@ __svc_getreq_user(struct pollfd *pfd)
 	bool_t invalHandled = FALSE;
 	_svc_user_fd_node *node;
 
-	mutex_lock(&svc_userfds_lock);
+	(void) mutex_lock(&svc_userfds_lock);
 
 	if ((fd < 0) || (fd >= svc_nuserfds)) {
-		mutex_unlock(&svc_userfds_lock);
+		(void) mutex_unlock(&svc_userfds_lock);
 		return;
 	}
 
@@ -300,7 +295,7 @@ __svc_getreq_user(struct pollfd *pfd)
 
 	/* check if at least one mask fits */
 	if (0 == (revents & svc_userfds[fd].mask)) {
-		mutex_unlock(&svc_userfds_lock);
+		(void) mutex_unlock(&svc_userfds_lock);
 		return;
 	}
 
@@ -323,7 +318,7 @@ __svc_getreq_user(struct pollfd *pfd)
 				 * user function, as this function can call
 				 * svc_remove_input() for example.
 				 */
-				mutex_unlock(&svc_userfds_lock);
+				(void) mutex_unlock(&svc_userfds_lock);
 				node->callback(node->id, node->fd,
 				    node->events & revents, node->cookie);
 				/*
@@ -331,7 +326,7 @@ __svc_getreq_user(struct pollfd *pfd)
 				 * could have been deallocated by the previous
 				 * callback.
 				 */
-				mutex_lock(&svc_userfds_lock);
+				(void) mutex_lock(&svc_userfds_lock);
 			}
 		}
 		node = next;
@@ -339,7 +334,7 @@ __svc_getreq_user(struct pollfd *pfd)
 
 	if ((revents & POLLNVAL) && !invalHandled)
 		__svc_remove_input_of_fd(fd);
-	mutex_unlock(&svc_userfds_lock);
+	(void) mutex_unlock(&svc_userfds_lock);
 }
 
 
@@ -361,7 +356,7 @@ __is_a_userfd(int fd)
 /* used in svc_run.c => no static */
 
 void
-__destroy_userfd()
+__destroy_userfd(void)
 {
 	int one_fd;
 	/* Clean user fd */
@@ -435,13 +430,13 @@ svc_add_input(int user_fd, unsigned int events,
 		return ((svc_input_id_t)-1);
 	}
 
-	mutex_lock(&svc_userfds_lock);
+	(void) mutex_lock(&svc_userfds_lock);
 
 	if ((user_fd < svc_nuserfds) &&
 	    (svc_userfds[user_fd].mask & events) != 0) {
 		/* Already registrated call-back */
 		errno = EEXIST;
-		mutex_unlock(&svc_userfds_lock);
+		(void) mutex_unlock(&svc_userfds_lock);
 		return ((svc_input_id_t)-1);
 	}
 
@@ -459,7 +454,7 @@ svc_add_input(int user_fd, unsigned int events,
 		if (svc_userfds == NULL) {
 			syslog(LOG_ERR, "svc_add_input: out of memory");
 			errno = ENOMEM;
-			mutex_unlock(&svc_userfds_lock);
+			(void) mutex_unlock(&svc_userfds_lock);
 			return ((svc_input_id_t)-1);
 		}
 
@@ -469,11 +464,11 @@ svc_add_input(int user_fd, unsigned int events,
 		}
 	}
 
-	new_node = (_svc_user_fd_node *)malloc(sizeof (_svc_user_fd_node));
+	new_node = malloc(sizeof (_svc_user_fd_node));
 	if (new_node == NULL) {
 		syslog(LOG_ERR, "svc_add_input: out of memory");
 		errno = ENOMEM;
-		mutex_unlock(&svc_userfds_lock);
+		(void) mutex_unlock(&svc_userfds_lock);
 		return ((svc_input_id_t)-1);
 	}
 
@@ -500,7 +495,7 @@ svc_add_input(int user_fd, unsigned int events,
 	/* refresh mask for the poll */
 	add_pollfd(user_fd, (svc_userfds[user_fd].mask));
 
-	mutex_unlock(&svc_userfds_lock);
+	(void) mutex_unlock(&svc_userfds_lock);
 	return (new_node->id);
 }
 
@@ -513,13 +508,13 @@ svc_remove_input(svc_input_id_t id)
 	_svc_user_fd_node* previous;
 	int fd;		/* caching optim */
 
-	mutex_lock(&svc_userfds_lock);
+	(void) mutex_lock(&svc_userfds_lock);
 
 	/* Immediately update data for id management */
 	if (user_fd_mgt_array == NULL || id >= svc_nmgtuserfds ||
 	    is_free_id(id)) {
 		errno = EINVAL;
-		mutex_unlock(&svc_userfds_lock);
+		(void) mutex_unlock(&svc_userfds_lock);
 		return (-1);
 	}
 
@@ -546,7 +541,7 @@ svc_remove_input(svc_input_id_t id)
 	}
 	/* <=> CLEAN NEEDED TO SHRINK MEMORY USAGE */
 
-	mutex_unlock(&svc_userfds_lock);
+	(void) mutex_unlock(&svc_userfds_lock);
 	return (0);
 }
 
@@ -558,11 +553,7 @@ svc_remove_input(svc_input_id_t id)
 
 /*ARGSUSED*/
 static int
-authany_wrap(auth, xdrs, xfunc, xwhere)
-	AUTH		*auth;
-	XDR		*xdrs;
-	xdrproc_t	xfunc;
-	caddr_t		xwhere;
+authany_wrap(AUTH *auth, XDR *xdrs, xdrproc_t xfunc, caddr_t xwhere)
 {
 	return (*xfunc)(xdrs, xwhere);
 }
@@ -576,8 +567,7 @@ struct svc_auth_ops svc_auth_any_ops = {
  * Return pointer to server authentication structure.
  */
 SVCAUTH *
-__svc_get_svcauth(xprt)
-	SVCXPRT	*xprt;
+__svc_get_svcauth(SVCXPRT *xprt)
 {
 /* LINTED pointer alignment */
 	return (&SVC_XP_AUTH(xprt));
@@ -589,8 +579,7 @@ __svc_get_svcauth(xprt)
 void (*__proc_cleanup_cb)() = NULL;
 
 void *
-__svc_set_proc_cleanup_cb(cb)
-	void	*cb;
+__svc_set_proc_cleanup_cb(void *cb)
 {
 	void	*tmp = (void *)__proc_cleanup_cb;
 
@@ -708,8 +697,7 @@ set_pollfd(int fd, short events)
  * remove a svc_pollfd entry; it does not shrink the memory
  */
 static void
-remove_pollfd(fd)
-	int fd;
+remove_pollfd(int fd)
 {
 	clear_pollfd(fd);
 	if (fd == (svc_max_fd - 1))
@@ -747,8 +735,7 @@ delete_pollfd(int fd)
  * Activate a transport handle.
  */
 void
-xprt_register(xprt)
-	const SVCXPRT *xprt;
+xprt_register(const SVCXPRT *xprt)
 {
 	int fd = xprt->xp_fd;
 #ifdef CALLBACK
@@ -756,8 +743,7 @@ xprt_register(xprt)
 #endif
 /* VARIABLES PROTECTED BY svc_fd_lock: svc_xports, svc_fdset */
 
-	trace1(TR_xprt_register, 0);
-	rw_wrlock(&svc_fd_lock);
+	(void) rw_wrlock(&svc_fd_lock);
 	if (svc_xports == NULL) {
 		/* allocate some small amount first */
 		svc_xports = calloc(FD_INCREMENT,  sizeof (SVCXPRT *));
@@ -809,16 +795,16 @@ xprt_register(xprt)
 		 * This happens only in one of the MT modes.
 		 * Wake up poller.
 		 */
-		write(svc_pipe[1], &dummy, sizeof (dummy));
+		(void) write(svc_pipe[1], &dummy, sizeof (dummy));
 	}
 	/*
 	 * If already dispatching door based services, start
 	 * dispatching TLI based services now.
 	 */
-	mutex_lock(&svc_door_mutex);
+	(void) mutex_lock(&svc_door_mutex);
 	if (svc_ndoorfds > 0)
-		cond_signal(&svc_door_waitcv);
-	mutex_unlock(&svc_door_mutex);
+		(void) cond_signal(&svc_door_waitcv);
+	(void) mutex_unlock(&svc_door_mutex);
 
 	if (svc_xdrs == NULL) {
 		/* allocate initial chunk */
@@ -830,9 +816,7 @@ xprt_register(xprt)
 			_exit(1);
 		}
 	}
-	rw_unlock(&svc_fd_lock);
-
-	trace1(TR_xprt_register, 1);
+	(void) rw_unlock(&svc_fd_lock);
 }
 
 /*
@@ -843,22 +827,19 @@ __xprt_unregister_private(const SVCXPRT *xprt, bool_t lock_not_held)
 {
 	int fd = xprt->xp_fd;
 
-	trace1(TR_xprt_unregister, 0);
 	if (lock_not_held)
-		rw_wrlock(&svc_fd_lock);
+		(void) rw_wrlock(&svc_fd_lock);
 	if ((fd < nsvc_xports) && (svc_xports[fd] == xprt)) {
-		svc_xports[fd] = (SVCXPRT *)NULL;
+		svc_xports[fd] = NULL;
 		delete_pollfd(fd);
 	}
 	if (lock_not_held)
-		rw_unlock(&svc_fd_lock);
+		(void) rw_unlock(&svc_fd_lock);
 	__svc_rm_from_xlist(&_svc_xprtlist, xprt, &xprtlist_lock);
-	trace1(TR_xprt_unregister, 1);
 }
 
 void
-xprt_unregister(xprt)
-	const SVCXPRT *xprt;
+xprt_unregister(const SVCXPRT *xprt)
 {
 	__xprt_unregister_private(xprt, TRUE);
 }
@@ -871,14 +852,9 @@ xprt_unregister(xprt)
  * program number comes in.
  */
 bool_t
-svc_reg(xprt, prog, vers, dispatch, nconf)
-	const SVCXPRT *xprt;
-	rpcprog_t prog;
-	rpcvers_t vers;
-	void (*dispatch)();
-	const struct netconfig *nconf;
+svc_reg(const SVCXPRT *xprt, const rpcprog_t prog, const rpcvers_t vers,
+			void (*dispatch)(), const struct netconfig *nconf)
 {
-	bool_t dummy;
 	struct svc_callout *prev;
 	struct svc_callout *s, **s2;
 	struct netconfig *tnconf;
@@ -887,7 +863,6 @@ svc_reg(xprt, prog, vers, dispatch, nconf)
 
 /* VARIABLES PROTECTED BY svc_lock: s, prev, svc_head */
 
-	trace3(TR_svc_reg, 0, prog, vers);
 	if (xprt->xp_netid) {
 		netid = strdup(xprt->xp_netid);
 		flag = 1;
@@ -900,27 +875,23 @@ svc_reg(xprt, prog, vers, dispatch, nconf)
 		flag = 1;
 		freenetconfigent(tnconf);
 	} /* must have been created with svc_raw_create */
-	if ((netid == NULL) && (flag == 1)) {
-		trace3(TR_svc_reg, 1, prog, vers);
+	if ((netid == NULL) && (flag == 1))
 		return (FALSE);
-	}
 
-	rw_wrlock(&svc_lock);
+	(void) rw_wrlock(&svc_lock);
 	if ((s = svc_find(prog, vers, &prev, netid)) != NULL_SVC) {
 		if (netid)
 			free(netid);
 		if (s->sc_dispatch == dispatch)
 			goto rpcb_it; /* he is registering another xptr */
-		trace3(TR_svc_reg, 1, prog, vers);
-		rw_unlock(&svc_lock);
+		(void) rw_unlock(&svc_lock);
 		return (FALSE);
 	}
-	s = (struct svc_callout *)mem_alloc(sizeof (struct svc_callout));
-	if (s == (struct svc_callout *)NULL) {
+	s = malloc(sizeof (struct svc_callout));
+	if (s == NULL) {
 		if (netid)
 			free(netid);
-		trace3(TR_svc_reg, 1, prog, vers);
-		rw_unlock(&svc_lock);
+		(void) rw_unlock(&svc_lock);
 		return (FALSE);
 	}
 
@@ -942,23 +913,17 @@ svc_reg(xprt, prog, vers, dispatch, nconf)
 		if ((((SVCXPRT *)xprt)->xp_netid = strdup(netid)) == NULL) {
 			syslog(LOG_ERR, "svc_reg : strdup failed.");
 			free(netid);
-			mem_free((char *)s,
-				(uint_t)sizeof (struct svc_callout));
+			free(s);
 			*s2 = NULL;
-			rw_unlock(&svc_lock);
-			trace3(TR_svc_reg, 1, prog, vers);
+			(void) rw_unlock(&svc_lock);
 			return (FALSE);
 		}
 
 rpcb_it:
-	rw_unlock(&svc_lock);
+	(void) rw_unlock(&svc_lock);
 	/* now register the information with the local binder service */
-	if (nconf) {
-		dummy = rpcb_set(prog, vers, nconf, &xprt->xp_ltaddr);
-		trace3(TR_svc_reg, 1, prog, vers);
-		return (dummy);
-	}
-	trace3(TR_svc_reg, 1, prog, vers);
+	if (nconf)
+		return (rpcb_set(prog, vers, nconf, &xprt->xp_ltaddr));
 	return (TRUE);
 }
 
@@ -966,17 +931,14 @@ rpcb_it:
  * Remove a service program from the callout list.
  */
 void
-svc_unreg(prog, vers)
-	rpcprog_t prog;
-	rpcvers_t vers;
+svc_unreg(const rpcprog_t prog, const rpcvers_t vers)
 {
 	struct svc_callout *prev;
 	struct svc_callout *s;
 
-	trace3(TR_svc_unreg, 0, prog, vers);
 	/* unregister the information anyway */
 	(void) rpcb_unset(prog, vers, NULL);
-	rw_wrlock(&svc_lock);
+	(void) rw_wrlock(&svc_lock);
 	while ((s = svc_find(prog, vers, &prev, NULL)) != NULL_SVC) {
 		if (prev == NULL_SVC) {
 			svc_head = s->sc_next;
@@ -985,12 +947,10 @@ svc_unreg(prog, vers)
 		}
 		s->sc_next = NULL_SVC;
 		if (s->sc_netid)
-			mem_free((char *)s->sc_netid,
-					(uint_t)sizeof (s->sc_netid) + 1);
-		mem_free((char *)s, (uint_t)sizeof (struct svc_callout));
+			free(s->sc_netid);
+		free(s);
 	}
-	rw_unlock(&svc_lock);
-	trace3(TR_svc_unreg, 1, prog, vers);
+	(void) rw_unlock(&svc_lock);
 }
 
 #ifdef PORTMAP
@@ -1000,25 +960,16 @@ svc_unreg(prog, vers)
  * program number comes in.
  * For version 2 portmappers.
  */
-#ifdef KERNEL
-/*ARGSUSED*/
-#endif
 bool_t
-svc_register(xprt, prog, vers, dispatch, protocol)
-	SVCXPRT *xprt;
-	rpcprog_t prog;
-	rpcvers_t vers;
-	void (*dispatch)();
-	int protocol;
+svc_register(SVCXPRT *xprt, rpcprog_t prog, rpcvers_t vers,
+					void (*dispatch)(), int protocol)
 {
-	bool_t dummy;
 	struct svc_callout *prev;
 	struct svc_callout *s;
 	struct netconfig *nconf;
 	char *netid = NULL;
 	int flag = 0;
 
-	trace4(TR_svc_register, 0, prog, vers, protocol);
 	if (xprt->xp_netid) {
 		netid = strdup(xprt->xp_netid);
 		flag = 1;
@@ -1030,31 +981,25 @@ svc_register(xprt, prog, vers, dispatch, protocol)
 		freenetconfigent(nconf);
 	} /* must be svc_raw_create */
 
-	if ((netid == NULL) && (flag == 1)) {
-		trace4(TR_svc_register, 1, prog, vers, protocol);
+	if ((netid == NULL) && (flag == 1))
 		return (FALSE);
-	}
 
-	rw_wrlock(&svc_lock);
+	(void) rw_wrlock(&svc_lock);
 	if ((s = svc_find(prog, vers, &prev, netid)) != NULL_SVC) {
 		if (netid)
 			free(netid);
 		if (s->sc_dispatch == dispatch)
 			goto pmap_it;  /* he is registering another xptr */
-		rw_unlock(&svc_lock);
-		trace4(TR_svc_register, 1, prog, vers, protocol);
+		(void) rw_unlock(&svc_lock);
 		return (FALSE);
 	}
-	s = (struct svc_callout *)mem_alloc(sizeof (struct svc_callout));
-#ifndef KERNEL
+	s = malloc(sizeof (struct svc_callout));
 	if (s == (struct svc_callout *)0) {
 		if (netid)
 			free(netid);
-		trace4(TR_svc_register, 1, prog, vers, protocol);
-		rw_unlock(&svc_lock);
+		(void) rw_unlock(&svc_lock);
 		return (FALSE);
 	}
-#endif
 	s->sc_prog = prog;
 	s->sc_vers = vers;
 	s->sc_dispatch = dispatch;
@@ -1067,24 +1012,16 @@ svc_register(xprt, prog, vers, dispatch, protocol)
 			syslog(LOG_ERR, "svc_register : strdup failed.");
 			free(netid);
 			svc_head = s->sc_next;
-			mem_free((char *)s,
-				(uint_t)sizeof (struct svc_callout));
-			rw_unlock(&svc_lock);
-			trace4(TR_svc_register, 1, prog, vers, protocol);
+			free(s);
+			(void) rw_unlock(&svc_lock);
 			return (FALSE);
 		}
 
 pmap_it:
-	rw_unlock(&svc_lock);
-#ifndef KERNEL
+	(void) rw_unlock(&svc_lock);
 	/* now register the information with the local binder service */
-	if (protocol) {
-		dummy = pmap_set(prog, vers, protocol, xprt->xp_port);
-		trace4(TR_svc_register, 1, prog, vers, protocol);
-		return (dummy);
-	}
-#endif
-	trace4(TR_svc_register, 1, prog, vers, protocol);
+	if (protocol)
+		return (pmap_set(prog, vers, protocol, xprt->xp_port));
 	return (TRUE);
 }
 
@@ -1093,15 +1030,12 @@ pmap_it:
  * For version 2 portmappers.
  */
 void
-svc_unregister(prog, vers)
-	rpcprog_t prog;
-	rpcvers_t vers;
+svc_unregister(rpcprog_t prog, rpcvers_t vers)
 {
 	struct svc_callout *prev;
 	struct svc_callout *s;
 
-	trace3(TR_svc_unregister, 0, prog, vers);
-	rw_wrlock(&svc_lock);
+	(void) rw_wrlock(&svc_lock);
 	while ((s = svc_find(prog, vers, &prev, NULL)) != NULL_SVC) {
 		if (prev == NULL_SVC) {
 			svc_head = s->sc_next;
@@ -1110,19 +1044,15 @@ svc_unregister(prog, vers)
 		}
 		s->sc_next = NULL_SVC;
 		if (s->sc_netid)
-			mem_free((char *)s->sc_netid,
-					(uint_t)sizeof (s->sc_netid) + 1);
-		mem_free((char *)s, (uint_t)sizeof (struct svc_callout));
-#ifndef KERNEL
+			free(s->sc_netid);
+		free(s);
 		/* unregister the information with the local binder service */
 		(void) pmap_unset(prog, vers);
-#endif
 	}
-	rw_unlock(&svc_lock);
-	trace3(TR_svc_unregister, 1, prog, vers);
+	(void) rw_unlock(&svc_lock);
 }
-
 #endif /* PORTMAP */
+
 /*
  * Search the callout list for a program number, return the callout
  * struct.
@@ -1131,15 +1061,9 @@ svc_unregister(prog, vers)
  * netid == NULL
  */
 static struct svc_callout *
-svc_find(prog, vers, prev, netid)
-	rpcprog_t prog;
-	rpcvers_t vers;
-	struct svc_callout **prev;
-	char *netid;
+svc_find(rpcprog_t prog, rpcvers_t vers, struct svc_callout **prev, char *netid)
 {
 	struct svc_callout *s, *p;
-
-	trace3(TR_svc_find, 0, prog, vers);
 
 /* WRITE LOCK HELD ON ENTRY: svc_lock */
 
@@ -1153,7 +1077,6 @@ svc_find(prog, vers, prev, netid)
 		p = s;
 	}
 	*prev = p;
-	trace3(TR_svc_find, 1, prog, vers);
 	return (s);
 }
 
@@ -1164,78 +1087,63 @@ svc_find(prog, vers, prev, netid)
  * Send a reply to an rpc request
  */
 bool_t
-svc_sendreply(xprt, xdr_results, xdr_location)
-	const SVCXPRT *xprt;
-	xdrproc_t xdr_results;
-	caddr_t xdr_location;
+svc_sendreply(const SVCXPRT *xprt, const xdrproc_t xdr_results,
+						const caddr_t xdr_location)
 {
-	bool_t dummy;
 	struct rpc_msg rply;
 
-	trace1(TR_svc_sendreply, 0);
 	rply.rm_direction = REPLY;
 	rply.rm_reply.rp_stat = MSG_ACCEPTED;
 	rply.acpted_rply.ar_verf = xprt->xp_verf;
 	rply.acpted_rply.ar_stat = SUCCESS;
 	rply.acpted_rply.ar_results.where = xdr_location;
 	rply.acpted_rply.ar_results.proc = xdr_results;
-	dummy = SVC_REPLY((SVCXPRT *)xprt, &rply);
-	trace1(TR_svc_sendreply, 1);
-	return (dummy);
+	return (SVC_REPLY((SVCXPRT *)xprt, &rply));
 }
 
 /*
  * No procedure error reply
  */
 void
-svcerr_noproc(xprt)
-	const SVCXPRT *xprt;
+svcerr_noproc(const SVCXPRT *xprt)
 {
 	struct rpc_msg rply;
 
-	trace1(TR_svcerr_noproc, 0);
 	rply.rm_direction = REPLY;
 	rply.rm_reply.rp_stat = MSG_ACCEPTED;
 	rply.acpted_rply.ar_verf = xprt->xp_verf;
 	rply.acpted_rply.ar_stat = PROC_UNAVAIL;
 	SVC_REPLY((SVCXPRT *)xprt, &rply);
-	trace1(TR_svcerr_noproc, 1);
 }
 
 /*
  * Can't decode args error reply
  */
 void
-svcerr_decode(xprt)
-	const SVCXPRT *xprt;
+svcerr_decode(const SVCXPRT *xprt)
 {
 	struct rpc_msg rply;
 
-	trace1(TR_svcerr_decode, 0);
 	rply.rm_direction = REPLY;
 	rply.rm_reply.rp_stat = MSG_ACCEPTED;
 	rply.acpted_rply.ar_verf = xprt->xp_verf;
 	rply.acpted_rply.ar_stat = GARBAGE_ARGS;
 	SVC_REPLY((SVCXPRT *)xprt, &rply);
-	trace1(TR_svcerr_decode, 1);
 }
 
 /*
  * Some system error
  */
 void
-svcerr_systemerr(xprt)
-	const SVCXPRT *xprt;
+svcerr_systemerr(const SVCXPRT *xprt)
 {
 	struct rpc_msg rply;
 
-	trace1(TR_svcerr_systemerr, 0);
 	rply.rm_direction = REPLY;
 	rply.rm_reply.rp_stat = MSG_ACCEPTED;
 	rply.acpted_rply.ar_verf = xprt->xp_verf;
 	rply.acpted_rply.ar_stat = SYSTEM_ERR;
 	SVC_REPLY((SVCXPRT *)xprt, &rply);
-	trace1(TR_svcerr_systemerr, 1);
 }
 
 /*
@@ -1245,40 +1153,28 @@ svcerr_systemerr(xprt)
  * protocol: the portmapper (or rpc binder).
  */
 void
-__svc_versquiet_on(xprt)
-	SVCXPRT *xprt;
+__svc_versquiet_on(const SVCXPRT *xprt)
 {
-	trace1(TR___svc_versquiet_on, 0);
 /* LINTED pointer alignment */
 	svc_flags(xprt) |= SVC_VERSQUIET;
-	trace1(TR___svc_versquiet_on, 1);
 }
 
 void
-__svc_versquiet_off(xprt)
-	SVCXPRT *xprt;
+__svc_versquiet_off(const SVCXPRT *xprt)
 {
-	trace1(TR___svc_versquiet_off, 0);
 /* LINTED pointer alignment */
 	svc_flags(xprt) &= ~SVC_VERSQUIET;
-	trace1(TR___svc_versquiet_off, 1);
 }
 
 void
-svc_versquiet(xprt)
-	SVCXPRT *xprt;
+svc_versquiet(const SVCXPRT *xprt)
 {
-	trace1(TR_svc_versquiet, 0);
 	__svc_versquiet_on(xprt);
-	trace1(TR_svc_versquiet, 1);
 }
 
 int
-__svc_versquiet_get(xprt)
-	SVCXPRT *xprt;
+__svc_versquiet_get(const SVCXPRT *xprt)
 {
-	trace1(TR___svc_versquiet_get, 0);
-	trace2(TR___svc_versquiet_get, 1, tmp);
 /* LINTED pointer alignment */
 	return (svc_flags(xprt) & SVC_VERSQUIET);
 }
@@ -1287,63 +1183,50 @@ __svc_versquiet_get(xprt)
  * Authentication error reply
  */
 void
-svcerr_auth(xprt, why)
-	const SVCXPRT *xprt;
-	enum auth_stat why;
+svcerr_auth(const SVCXPRT *xprt, const enum auth_stat why)
 {
 	struct rpc_msg rply;
 
-	trace1(TR_svcerr_auth, 0);
 	rply.rm_direction = REPLY;
 	rply.rm_reply.rp_stat = MSG_DENIED;
 	rply.rjcted_rply.rj_stat = AUTH_ERROR;
 	rply.rjcted_rply.rj_why = why;
 	SVC_REPLY((SVCXPRT *)xprt, &rply);
-	trace1(TR_svcerr_auth, 1);
 }
 
 /*
  * Auth too weak error reply
  */
 void
-svcerr_weakauth(xprt)
-	const SVCXPRT *xprt;
+svcerr_weakauth(const SVCXPRT *xprt)
 {
-	trace1(TR_svcerr_weakauth, 0);
 	svcerr_auth(xprt, AUTH_TOOWEAK);
-	trace1(TR_svcerr_weakauth, 1);
 }
 
 /*
  * Program unavailable error reply
  */
 void
-svcerr_noprog(xprt)
-	const SVCXPRT *xprt;
+svcerr_noprog(const SVCXPRT *xprt)
 {
 	struct rpc_msg rply;
 
-	trace1(TR_svcerr_noprog, 0);
 	rply.rm_direction = REPLY;
 	rply.rm_reply.rp_stat = MSG_ACCEPTED;
 	rply.acpted_rply.ar_verf = xprt->xp_verf;
 	rply.acpted_rply.ar_stat = PROG_UNAVAIL;
 	SVC_REPLY((SVCXPRT *)xprt, &rply);
-	trace1(TR_svcerr_noprog, 1);
 }
 
 /*
  * Program version mismatch error reply
  */
 void
-svcerr_progvers(xprt, low_vers, high_vers)
-	const SVCXPRT *xprt;
-	rpcvers_t low_vers;
-	rpcvers_t high_vers;
+svcerr_progvers(const SVCXPRT *xprt, const rpcvers_t low_vers,
+						const rpcvers_t high_vers)
 {
 	struct rpc_msg rply;
 
-	trace3(TR_svcerr_progvers, 0, low_vers, high_vers);
 	rply.rm_direction = REPLY;
 	rply.rm_reply.rp_stat = MSG_ACCEPTED;
 	rply.acpted_rply.ar_verf = xprt->xp_verf;
@@ -1351,7 +1234,6 @@ svcerr_progvers(xprt, low_vers, high_vers)
 	rply.acpted_rply.ar_vers.low = low_vers;
 	rply.acpted_rply.ar_vers.high = high_vers;
 	SVC_REPLY((SVCXPRT *)xprt, &rply);
-	trace3(TR_svcerr_progvers, 1, low_vers, high_vers);
 }
 
 /* ******************* SERVER INPUT STUFF ******************* */
@@ -1373,42 +1255,33 @@ svcerr_progvers(xprt, low_vers, high_vers)
  */
 
 void
-svc_getreq(rdfds)
-	int rdfds;
+svc_getreq(int rdfds)
 {
 	fd_set readfds;
 
-	trace2(TR_svc_getreq, 0, rdfds);
 	FD_ZERO(&readfds);
 	readfds.fds_bits[0] = rdfds;
 	svc_getreqset(&readfds);
-	trace2(TR_svc_getreq, 1, rdfds);
 }
 
 void
-svc_getreqset(readfds)
-	fd_set *readfds;
+svc_getreqset(fd_set *readfds)
 {
 	int i;
 
-	trace1(TR_svc_getreqset, 0);
 	for (i = 0; i < svc_max_fd; i++) {
 		/* fd has input waiting */
 		if (FD_ISSET(i, readfds))
 			svc_getreq_common(i);
 	}
-	trace1(TR_svc_getreqset, 1);
 }
 
 void
-svc_getreq_poll(pfdp, pollretval)
-	struct pollfd	*pfdp;
-	int	pollretval;
+svc_getreq_poll(struct pollfd *pfdp, const int pollretval)
 {
 	int i;
 	int fds_found;
 
-	trace2(TR_svc_getreq_poll, 0, pollretval);
 	for (i = fds_found = 0; fds_found < pollretval; i++) {
 		struct pollfd *p = &pfdp[i];
 
@@ -1428,25 +1301,24 @@ svc_getreq_poll(pfdp, pollretval)
 			 */
 			/* Handle user callback */
 			if (__is_a_userfd(p->fd) == TRUE) {
-				rw_rdlock(&svc_fd_lock);
+				(void) rw_rdlock(&svc_fd_lock);
 				__svc_getreq_user(p);
-				rw_unlock(&svc_fd_lock);
+				(void) rw_unlock(&svc_fd_lock);
 			} else {
 				if (p->revents & POLLNVAL) {
-					rw_wrlock(&svc_fd_lock);
+					(void) rw_wrlock(&svc_fd_lock);
 					remove_pollfd(p->fd);	/* XXX */
-					rw_unlock(&svc_fd_lock);
-				} else
+					(void) rw_unlock(&svc_fd_lock);
+				} else {
 					svc_getreq_common(p->fd);
+				}
 			}
 		}
 	}
-	trace2(TR_svc_getreq_poll, 1, pollretval);
 }
 
 void
-svc_getreq_common(fd)
-	int fd;
+svc_getreq_common(const int fd)
 {
 	SVCXPRT *xprt;
 	enum xprt_stat stat;
@@ -1454,9 +1326,7 @@ svc_getreq_common(fd)
 	struct svc_req *r;
 	char *cred_area;
 
-	trace2(TR_svc_getreq_common, 0, fd);
-
-	rw_rdlock(&svc_fd_lock);
+	(void) rw_rdlock(&svc_fd_lock);
 
 	/* HANDLE USER CALLBACK */
 	if (__is_a_userfd(fd) == TRUE) {
@@ -1465,7 +1335,7 @@ svc_getreq_common(fd)
 		virtual_fd.events = virtual_fd.revents = (short)0xFFFF;
 		virtual_fd.fd = fd;
 		__svc_getreq_user(&virtual_fd);
-		rw_unlock(&svc_fd_lock);
+		(void) rw_unlock(&svc_fd_lock);
 		return;
 	}
 
@@ -1480,11 +1350,10 @@ svc_getreq_common(fd)
 	 * xprt associated with the fd that had the original read event.
 	 */
 	if ((fd >= nsvc_xports) || (xprt = svc_xports[fd]) == NULL) {
-		rw_unlock(&svc_fd_lock);
-		trace2(TR_svc_getreq_common, 1, fd);
+		(void) rw_unlock(&svc_fd_lock);
 		return;
 	}
-	rw_unlock(&svc_fd_lock);
+	(void) rw_unlock(&svc_fd_lock);
 /* LINTED pointer alignment */
 	msg = SVCEXT(xprt)->msg;
 /* LINTED pointer alignment */
@@ -1505,12 +1374,12 @@ svc_getreq_common(fd)
 		 * Check if the xprt has been disconnected in a recursive call
 		 * in the service dispatch routine. If so, then break
 		 */
-		rw_rdlock(&svc_fd_lock);
+		(void) rw_rdlock(&svc_fd_lock);
 		if (xprt != svc_xports[fd]) {
-			rw_unlock(&svc_fd_lock);
+			(void) rw_unlock(&svc_fd_lock);
 			break;
 		}
-		rw_unlock(&svc_fd_lock);
+		(void) rw_unlock(&svc_fd_lock);
 
 		/*
 		 * Call cleanup procedure if set.
@@ -1523,14 +1392,10 @@ svc_getreq_common(fd)
 			break;
 		}
 	} while (stat == XPRT_MOREREQS);
-	trace2(TR_svc_getreq_common, 1, fd);
 }
 
 int
-_svc_prog_dispatch(xprt, msg, r)
-	SVCXPRT *xprt;
-	struct rpc_msg *msg;
-	struct svc_req *r;
+_svc_prog_dispatch(SVCXPRT *xprt, struct rpc_msg *msg, struct svc_req *r)
 {
 	struct svc_callout *s;
 	enum auth_stat why;
@@ -1539,7 +1404,6 @@ _svc_prog_dispatch(xprt, msg, r)
 	rpcvers_t high_vers;
 	void (*disp_fn)();
 
-	trace1(TR_prog_dispatch, 0);
 	r->rq_xprt = xprt;
 	r->rq_prog = msg->rm_call.cb_prog;
 	r->rq_vers = msg->rm_call.cb_vers;
@@ -1562,7 +1426,6 @@ _svc_prog_dispatch(xprt, msg, r)
 		if ((why = __gss_authenticate(r, msg,
 			&no_dispatch)) != AUTH_OK) {
 			svcerr_auth(xprt, why);
-			trace1(TR_prog_dispatch, 1);
 			return (0);
 		}
 		if (no_dispatch)
@@ -1572,7 +1435,7 @@ _svc_prog_dispatch(xprt, msg, r)
 	prog_found = FALSE;
 	low_vers = (rpcvers_t)(0 - 1);
 	high_vers = 0;
-	rw_rdlock(&svc_lock);
+	(void) rw_rdlock(&svc_lock);
 	for (s = svc_head; s != NULL_SVC; s = s->sc_next) {
 		if (s->sc_prog == r->rq_prog) {
 			prog_found = TRUE;
@@ -1582,13 +1445,11 @@ _svc_prog_dispatch(xprt, msg, r)
 				    (strcmp(xprt->xp_netid,
 					    s->sc_netid) == 0)) {
 					disp_fn = (*s->sc_dispatch);
-					rw_unlock(&svc_lock);
+					(void) rw_unlock(&svc_lock);
 					disp_fn(r, xprt);
-					trace1(TR_prog_dispatch, 1);
 					return (1);
-				} else {
-					prog_found = FALSE;
 				}
+				prog_found = FALSE;
 			}
 			if (s->sc_vers < low_vers)
 				low_vers = s->sc_vers;
@@ -1596,7 +1457,7 @@ _svc_prog_dispatch(xprt, msg, r)
 				high_vers = s->sc_vers;
 		}		/* found correct program */
 	}
-	rw_unlock(&svc_lock);
+	(void) rw_unlock(&svc_lock);
 
 	/*
 	 * if we got here, the program or version
@@ -1609,7 +1470,6 @@ _svc_prog_dispatch(xprt, msg, r)
 	} else {
 		svcerr_noprog(xprt);
 	}
-	trace1(TR_prog_dispatch, 1);
 	return (0);
 }
 
@@ -1619,7 +1479,7 @@ _svc_prog_dispatch(xprt, msg, r)
  * svc_xprt_alloc() - allocate a service transport handle
  */
 SVCXPRT *
-svc_xprt_alloc()
+svc_xprt_alloc(void)
 {
 	SVCXPRT		*xprt = NULL;
 	SVCXPRT_EXT	*xt = NULL;
@@ -1628,33 +1488,32 @@ svc_xprt_alloc()
 	struct svc_req	*req = NULL;
 	char		*cred_area = NULL;
 
-	if ((xprt = (SVCXPRT *)calloc(1, sizeof (SVCXPRT))) == NULL)
+	if ((xprt = calloc(1, sizeof (SVCXPRT))) == NULL)
 		goto err_exit;
 
-	if ((xt = (SVCXPRT_EXT *)calloc(1, sizeof (SVCXPRT_EXT))) == NULL)
+	if ((xt = calloc(1, sizeof (SVCXPRT_EXT))) == NULL)
 		goto err_exit;
 	xprt->xp_p3 = (caddr_t)xt; /* SVCEXT(xprt) = xt */
 
-	if ((xlist = (SVCXPRT_LIST *)calloc(1, sizeof (SVCXPRT_LIST))) == NULL)
+	if ((xlist = calloc(1, sizeof (SVCXPRT_LIST))) == NULL)
 		goto err_exit;
 	xt->my_xlist = xlist;
 	xlist->xprt = xprt;
 
-	if ((msg = (struct rpc_msg *)malloc(sizeof (struct rpc_msg))) == NULL)
+	if ((msg = malloc(sizeof (struct rpc_msg))) == NULL)
 		goto err_exit;
 	xt->msg = msg;
 
-	if ((req = (struct svc_req *)malloc(sizeof (struct svc_req))) == NULL)
+	if ((req = malloc(sizeof (struct svc_req))) == NULL)
 		goto err_exit;
 	xt->req = req;
 
-	if ((cred_area = (char *)malloc(2*MAX_AUTH_BYTES +
-							RQCRED_SIZE)) == NULL)
+	if ((cred_area = malloc(2*MAX_AUTH_BYTES + RQCRED_SIZE)) == NULL)
 		goto err_exit;
 	xt->cred_area = cred_area;
 
 /* LINTED pointer alignment */
-	mutex_init(&svc_send_mutex(xprt), USYNC_THREAD, (void *)0);
+	(void) mutex_init(&svc_send_mutex(xprt), USYNC_THREAD, (void *)0);
 	return (xprt);
 
 err_exit:
@@ -1667,8 +1526,7 @@ err_exit:
  * svc_xprt_free() - free a service handle
  */
 void
-svc_xprt_free(xprt)
-	SVCXPRT	*xprt;
+svc_xprt_free(SVCXPRT *xprt)
 {
 /* LINTED pointer alignment */
 	SVCXPRT_EXT	*xt = xprt ? SVCEXT(xprt) : NULL;
@@ -1678,17 +1536,17 @@ svc_xprt_free(xprt)
 	char		*cred_area = xt ? xt->cred_area : NULL;
 
 	if (xprt)
-		free((char *)xprt);
+		free(xprt);
 	if (xt)
-		free((char *)xt);
+		free(xt);
 	if (my_xlist)
-		free((char *)my_xlist);
+		free(my_xlist);
 	if (msg)
-		free((char *)msg);
+		free(msg);
 	if (req)
-		free((char *)req);
+		free(req);
 	if (cred_area)
-		free((char *)cred_area);
+		free(cred_area);
 }
 
 
@@ -1696,8 +1554,7 @@ svc_xprt_free(xprt)
  * svc_xprt_destroy() - free parent and child xprt list
  */
 void
-svc_xprt_destroy(xprt)
-	SVCXPRT		*xprt;
+svc_xprt_destroy(SVCXPRT *xprt)
 {
 	SVCXPRT_LIST	*xlist, *xnext = NULL;
 	int		type;
@@ -1734,8 +1591,7 @@ svc_xprt_destroy(xprt)
  * svc_copy() - make a copy of parent
  */
 SVCXPRT *
-svc_copy(xprt)
-	SVCXPRT *xprt;
+svc_copy(SVCXPRT *xprt)
 {
 /* LINTED pointer alignment */
 	switch (svc_type(xprt)) {
@@ -1746,7 +1602,7 @@ svc_copy(xprt)
 	case SVC_CONNECTION:
 		return (svc_fd_xprtcopy(xprt));
 	}
-	return ((SVCXPRT *)NULL);
+	return (NULL);
 }
 
 
@@ -1754,8 +1610,7 @@ svc_copy(xprt)
  * _svc_destroy_private() - private SVC_DESTROY interface
  */
 void
-_svc_destroy_private(xprt)
-	SVCXPRT *xprt;
+_svc_destroy_private(SVCXPRT *xprt)
 {
 /* LINTED pointer alignment */
 	switch (svc_type(xprt)) {
@@ -1776,9 +1631,7 @@ _svc_destroy_private(xprt)
  * call has been invoked to enable this feature.
  */
 bool_t
-svc_get_local_cred(xprt, lcred)
-	SVCXPRT			*xprt;
-	svc_local_cred_t	*lcred;
+svc_get_local_cred(SVCXPRT *xprt, svc_local_cred_t *lcred)
 {
 	/* LINTED pointer alignment */
 	if (svc_type(xprt) == SVC_DOOR)
@@ -1803,8 +1656,7 @@ svc_get_local_cred(xprt, lcred)
 
 
 /* dupcache header contains xprt specific information */
-struct dupcache
-{
+struct dupcache {
 	rwlock_t	dc_lock;
 	time_t		dc_time;
 	int		dc_buckets;
@@ -1846,24 +1698,24 @@ __svc_dupcache_init(void *condition, int basis, char **xprt_cache)
 	int i;
 	struct dupcache *dc;
 
-	mutex_lock(&initdc_lock);
+	(void) mutex_lock(&initdc_lock);
 	if (*xprt_cache != NULL) { /* do only once per xprt */
-		mutex_unlock(&initdc_lock);
+		(void) mutex_unlock(&initdc_lock);
 		syslog(LOG_ERR,
-		"__svc_dupcache_init: multiply defined dup cache");
+			"__svc_dupcache_init: multiply defined dup cache");
 		return (FALSE);
 	}
 
 	switch (basis) {
 	case DUPCACHE_FIXEDTIME:
-		dc = (struct dupcache *)mem_alloc(sizeof (struct dupcache));
+		dc = malloc(sizeof (struct dupcache));
 		if (dc == NULL) {
-			mutex_unlock(&initdc_lock);
+			(void) mutex_unlock(&initdc_lock);
 			syslog(LOG_ERR,
 				"__svc_dupcache_init: memory alloc failed");
 			return (FALSE);
 		}
-		rwlock_init(&(dc->dc_lock), USYNC_THREAD, NULL);
+		(void) rwlock_init(&(dc->dc_lock), USYNC_THREAD, NULL);
 		if (condition != NULL)
 			dc->dc_time = *((time_t *)condition);
 		else
@@ -1872,11 +1724,11 @@ __svc_dupcache_init(void *condition, int basis, char **xprt_cache)
 		dc->dc_maxsz = DUPCACHE_MAXSZ;
 		dc->dc_basis = basis;
 		dc->dc_mru = NULL;
-		dc->dc_hashtbl = (struct dupreq **)mem_alloc(dc->dc_buckets *
+		dc->dc_hashtbl = malloc(dc->dc_buckets *
 						sizeof (struct dupreq *));
 		if (dc->dc_hashtbl == NULL) {
-			mem_free(dc, sizeof (struct dupcache));
-			mutex_unlock(&initdc_lock);
+			free(dc);
+			(void) mutex_unlock(&initdc_lock);
 			syslog(LOG_ERR,
 				"__svc_dupcache_init: memory alloc failed");
 			return (FALSE);
@@ -1886,13 +1738,13 @@ __svc_dupcache_init(void *condition, int basis, char **xprt_cache)
 		*xprt_cache = (char *)dc;
 		break;
 	default:
-		mutex_unlock(&initdc_lock);
+		(void) mutex_unlock(&initdc_lock);
 		syslog(LOG_ERR,
-		"__svc_dupcache_init: undefined dup cache basis");
+			"__svc_dupcache_init: undefined dup cache basis");
 		return (FALSE);
 	}
 
-	mutex_unlock(&initdc_lock);
+	(void) mutex_unlock(&initdc_lock);
 
 	return (TRUE);
 }
@@ -1960,7 +1812,7 @@ __svc_dupcache_check(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
 {
 	struct dupreq *dr = NULL;
 
-	rw_rdlock(&(dc->dc_lock));
+	(void) rw_rdlock(&(dc->dc_lock));
 	dr = dc->dc_hashtbl[drhash];
 	while (dr != NULL) {
 		if (dr->dr_xid == drxid &&
@@ -1968,12 +1820,12 @@ __svc_dupcache_check(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
 		    dr->dr_prog == req->rq_prog &&
 		    dr->dr_vers == req->rq_vers &&
 		    dr->dr_addr.len == req->rq_xprt->xp_rtaddr.len &&
-		    memcmp((caddr_t)dr->dr_addr.buf,
-				(caddr_t)req->rq_xprt->xp_rtaddr.buf,
+		    memcmp(dr->dr_addr.buf,
+				req->rq_xprt->xp_rtaddr.buf,
 				dr->dr_addr.len) == 0) { /* entry found */
 			if (dr->dr_hash != drhash) {
 				/* sanity check */
-				rw_unlock((&dc->dc_lock));
+				(void) rw_unlock((&dc->dc_lock));
 				syslog(LOG_ERR,
 					"\n__svc_dupdone: hashing error");
 				return (DUP_ERROR);
@@ -1991,17 +1843,15 @@ __svc_dupcache_check(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
 				(dr->dr_status == DUP_DROP)) &&
 				resp_buf != NULL &&
 				dr->dr_resp.buf != NULL) {
-				*resp_buf = (caddr_t)mem_alloc
-					(dr->dr_resp.len);
+				*resp_buf = malloc(dr->dr_resp.len);
 				if (*resp_buf == NULL) {
 					syslog(LOG_ERR,
 					"__svc_dupcache_check: malloc failed");
-					rw_unlock(&(dc->dc_lock));
+					(void) rw_unlock(&(dc->dc_lock));
 					return (DUP_ERROR);
 				}
-				memset((caddr_t)*resp_buf, 0,
-					dr->dr_resp.len);
-				memcpy(*resp_buf, (caddr_t)dr->dr_resp.buf,
+				(void) memset(*resp_buf, 0, dr->dr_resp.len);
+				(void) memcpy(*resp_buf, dr->dr_resp.buf,
 					dr->dr_resp.len);
 				*resp_bufsz = dr->dr_resp.len;
 			} else {
@@ -2011,12 +1861,12 @@ __svc_dupcache_check(struct svc_req *req, caddr_t *resp_buf, uint_t *resp_bufsz,
 				if (resp_bufsz)
 					*resp_bufsz = 0;
 			}
-			rw_unlock(&(dc->dc_lock));
+			(void) rw_unlock(&(dc->dc_lock));
 			return (dr->dr_status);
 		}
 		dr = dr->dr_chain;
 	}
-	rw_unlock(&(dc->dc_lock));
+	(void) rw_unlock(&(dc->dc_lock));
 	return (DUP_NEW);
 }
 
@@ -2039,7 +1889,7 @@ __svc_dupcache_victim(struct dupcache *dc, time_t timenow)
 		 * Note that only DONE or DROPPED entries are on the lru
 		 * list but we do a sanity check anyway.
 		 */
-		rw_wrlock(&(dc->dc_lock));
+		(void) rw_wrlock(&(dc->dc_lock));
 		while ((dc->dc_mru) && (dr = dc->dc_mru->dr_next) &&
 				((timenow - dr->dr_time) > dc->dc_time)) {
 			/* clean and then free the entry */
@@ -2051,7 +1901,7 @@ __svc_dupcache_victim(struct dupcache *dc, time_t timenow)
 				 * DUP_DONE or DUP_DROP.
 				 */
 				syslog(LOG_ERR,
-				"__svc_dupcache_victim: bad victim");
+					"__svc_dupcache_victim: bad victim");
 #ifdef DUP_DEBUG
 				/*
 				 * Need to hold the reader/writers lock to
@@ -2061,16 +1911,16 @@ __svc_dupcache_victim(struct dupcache *dc, time_t timenow)
 				 */
 				__svc_dupcache_debug(dc);
 #endif /* DUP_DEBUG */
-				rw_unlock(&(dc->dc_lock));
+				(void) rw_unlock(&(dc->dc_lock));
 				return (NULL);
 			}
 			/* free buffers */
 			if (dr->dr_resp.buf) {
-				mem_free(dr->dr_resp.buf, dr->dr_resp.len);
+				free(dr->dr_resp.buf);
 				dr->dr_resp.buf = NULL;
 			}
 			if (dr->dr_addr.buf) {
-				mem_free(dr->dr_addr.buf, dr->dr_addr.len);
+				free(dr->dr_addr.buf);
 				dr->dr_addr.buf = NULL;
 			}
 
@@ -2083,30 +1933,30 @@ __svc_dupcache_victim(struct dupcache *dc, time_t timenow)
 				dc->dc_hashtbl[dr->dr_hash] = dr->dr_chain;
 
 			/* modify the lru pointers */
-			if (dc->dc_mru == dr)
+			if (dc->dc_mru == dr) {
 				dc->dc_mru = NULL;
-			else {
+			} else {
 				dc->dc_mru->dr_next = dr->dr_next;
 				dr->dr_next->dr_prev = dc->dc_mru;
 			}
-			mem_free(dr, sizeof (struct dupreq));
+			free(dr);
 			dr = NULL;
 		}
-		rw_unlock(&(dc->dc_lock));
+		(void) rw_unlock(&(dc->dc_lock));
 
 		/*
 		 * Allocate and return new clean entry as victim
 		 */
-		if ((dr = (struct dupreq *)mem_alloc(sizeof (*dr))) == NULL) {
+		if ((dr = malloc(sizeof (*dr))) == NULL) {
 			syslog(LOG_ERR,
-				"__svc_dupcache_victim: mem_alloc failed");
+				"__svc_dupcache_victim: malloc failed");
 			return (NULL);
 		}
-		memset((caddr_t)dr, 0, sizeof (*dr));
+		(void) memset(dr, 0, sizeof (*dr));
 		return (dr);
 	default:
 		syslog(LOG_ERR,
-		"__svc_dupcache_victim: undefined dup cache_basis");
+			"__svc_dupcache_victim: undefined dup cache_basis");
 		return (NULL);
 	}
 }
@@ -2126,15 +1976,14 @@ __svc_dupcache_enter(struct svc_req *req, struct dupreq *dr,
 	dr->dr_proc = req->rq_proc;
 	dr->dr_addr.maxlen = req->rq_xprt->xp_rtaddr.len;
 	dr->dr_addr.len = dr->dr_addr.maxlen;
-	if ((dr->dr_addr.buf = (caddr_t)mem_alloc(dr->dr_addr.maxlen))
-				== NULL) {
-		syslog(LOG_ERR, "__svc_dupcache_enter: mem_alloc failed");
-		mem_free(dr, sizeof (struct dupreq));
+	if ((dr->dr_addr.buf = malloc(dr->dr_addr.maxlen)) == NULL) {
+		syslog(LOG_ERR, "__svc_dupcache_enter: malloc failed");
+		free(dr);
 		return (DUP_ERROR);
 	}
-	memset(dr->dr_addr.buf, 0, dr->dr_addr.len);
-	memcpy((caddr_t)dr->dr_addr.buf,
-		(caddr_t)req->rq_xprt->xp_rtaddr.buf, dr->dr_addr.len);
+	(void) memset(dr->dr_addr.buf, 0, dr->dr_addr.len);
+	(void) memcpy(dr->dr_addr.buf, req->rq_xprt->xp_rtaddr.buf,
+							dr->dr_addr.len);
 	dr->dr_resp.buf = NULL;
 	dr->dr_resp.maxlen = 0;
 	dr->dr_resp.len = 0;
@@ -2143,13 +1992,13 @@ __svc_dupcache_enter(struct svc_req *req, struct dupreq *dr,
 	dr->dr_hash = drhash;	/* needed for efficient victim cleanup */
 
 	/* place entry at head of hash table */
-	rw_wrlock(&(dc->dc_lock));
+	(void) rw_wrlock(&(dc->dc_lock));
 	dr->dr_chain = dc->dc_hashtbl[drhash];
 	dr->dr_prevchain = NULL;
 	if (dc->dc_hashtbl[drhash] != NULL)
 		dc->dc_hashtbl[drhash]->dr_prevchain = dr;
 	dc->dc_hashtbl[drhash] = dr;
-	rw_unlock(&(dc->dc_lock));
+	(void) rw_unlock(&(dc->dc_lock));
 	return (DUP_NEW);
 }
 
@@ -2213,7 +2062,7 @@ __svc_dupcache_update(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
 	struct dupreq *dr = NULL;
 	time_t timenow = time(NULL);
 
-	rw_wrlock(&(dc->dc_lock));
+	(void) rw_wrlock(&(dc->dc_lock));
 	dr = dc->dc_hashtbl[drhash];
 	while (dr != NULL) {
 		if (dr->dr_xid == drxid &&
@@ -2221,12 +2070,12 @@ __svc_dupcache_update(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
 		    dr->dr_prog == req->rq_prog &&
 		    dr->dr_vers == req->rq_vers &&
 		    dr->dr_addr.len == req->rq_xprt->xp_rtaddr.len &&
-		    memcmp((caddr_t)dr->dr_addr.buf,
-				(caddr_t)req->rq_xprt->xp_rtaddr.buf,
+		    memcmp(dr->dr_addr.buf,
+				req->rq_xprt->xp_rtaddr.buf,
 				dr->dr_addr.len) == 0) { /* entry found */
 			if (dr->dr_hash != drhash) {
 				/* sanity check */
-				rw_unlock(&(dc->dc_lock));
+				(void) rw_unlock(&(dc->dc_lock));
 				syslog(LOG_ERR,
 				"\n__svc_dupdone: hashing error");
 				return (DUP_ERROR);
@@ -2234,15 +2083,15 @@ __svc_dupcache_update(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
 
 			/* store the results if bufer is not NULL */
 			if (resp_buf != NULL) {
-				if ((dr->dr_resp.buf = (caddr_t)
-					mem_alloc(resp_bufsz)) == NULL) {
-					rw_unlock(&(dc->dc_lock));
+				if ((dr->dr_resp.buf =
+						malloc(resp_bufsz)) == NULL) {
+					(void) rw_unlock(&(dc->dc_lock));
 					syslog(LOG_ERR,
-					"__svc_dupdone: mem_alloc failed");
+						"__svc_dupdone: malloc failed");
 					return (DUP_ERROR);
 				}
-				memset(dr->dr_resp.buf, 0, resp_bufsz);
-				memcpy((caddr_t)dr->dr_resp.buf, resp_buf,
+				(void) memset(dr->dr_resp.buf, 0, resp_bufsz);
+				(void) memcpy(dr->dr_resp.buf, resp_buf,
 					(uint_t)resp_bufsz);
 				dr->dr_resp.len = resp_bufsz;
 			}
@@ -2263,12 +2112,12 @@ __svc_dupcache_update(struct svc_req *req, caddr_t resp_buf, uint_t resp_bufsz,
 			}
 			dc->dc_mru = dr;
 
-			rw_unlock(&(dc->dc_lock));
+			(void) rw_unlock(&(dc->dc_lock));
 			return (status);
 		}
 		dr = dr->dr_chain;
 	}
-	rw_unlock(&(dc->dc_lock));
+	(void) rw_unlock(&(dc->dc_lock));
 	syslog(LOG_ERR, "__svc_dupdone: entry not in dup cache");
 	return (DUP_ERROR);
 }

@@ -1,9 +1,10 @@
 /*
- * Copyright (c) 1998, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-/* Copyright (c) 1996 by Internet Software Consortium.
+/*
+ * Copyright (c) 1996 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,6 +19,7 @@
  * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
  * SOFTWARE.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
@@ -31,10 +33,11 @@
 #include <sys/socket.h>
 #include <errno.h>
 
-static int	inet_pton4 (const char *src, u_char *dst);
-static int	inet_pton6 (const char *src, u_char *dst);
+static int	inet_pton4(const char *src, uchar_t *dst);
+static int	inet_pton6(const char *src, uchar_t *dst);
 
-/* int
+/*
+ * int
  * inet_pton(af, src, dst)
  *	convert from presentation format (which usually means ASCII printable)
  *	to network format (which is usually some kind of binary format).
@@ -46,10 +49,7 @@ static int	inet_pton6 (const char *src, u_char *dst);
  *	Paul Vixie, 1996.  Taken from on297-gate:dns stuff
  */
 int
-inet_pton(af, src, dst)
-	int af;
-	const char *src;
-	void *dst;
+inet_pton(int af, const char *src, void *dst)
 {
 	switch (af) {
 	case AF_INET:
@@ -63,7 +63,8 @@ inet_pton(af, src, dst)
 	/* NOTREACHED */
 }
 
-/* int
+/*
+ * int
  * inet_pton4(src, dst)
  *	like inet_aton() but without all the hexadecimal and shorthand.
  * return:
@@ -72,17 +73,16 @@ inet_pton(af, src, dst)
  *	does not touch `dst' unless it's returning 1.
  *
  */
-#define INADDRSZ	4
+#define	INADDRSZ	4
 #define	IN6ADDRSZ	16
-#define INT16SZ		2
+#define	INT16SZ		2
+
 static int
-inet_pton4(src, dst)
-	const char *src;
-	u_char *dst;
+inet_pton4(const char *src, uchar_t *dst)
 {
 	static const char digits[] = "0123456789";
 	int saw_digit, octets, ch;
-	u_char tmp[INADDRSZ], *tp;
+	uchar_t tmp[INADDRSZ], *tp;
 
 	saw_digit = 0;
 	octets = 0;
@@ -91,12 +91,12 @@ inet_pton4(src, dst)
 		const char *pch;
 
 		if ((pch = strchr(digits, ch)) != NULL) {
-			u_int new = *tp * 10 + (pch - digits);
+			uint_t new = *tp * 10 + (pch - digits);
 
 			if (new > 255)
 				return (0);
 			*tp = new;
-			if (! saw_digit) {
+			if (!saw_digit) {
 				if (++octets > 4)
 					return (0);
 				saw_digit = 1;
@@ -112,12 +112,13 @@ inet_pton4(src, dst)
 	if (octets < 4)
 		return (0);
 
-	memcpy(dst, tmp, INADDRSZ);
+	(void) memcpy(dst, tmp, INADDRSZ);
 	return (1);
 }
 
 
-/* int
+/*
+ * int
  * inet_pton6(src, dst)
  *	convert presentation level address to network order binary form.
  * return:
@@ -132,18 +133,16 @@ inet_pton4(src, dst)
 
 
 static int
-inet_pton6(src, dst)
-	const char *src;
-	u_char *dst;
+inet_pton6(const char *src, uchar_t *dst)
 {
 	static const char xdigits_l[] = "0123456789abcdef",
-			  xdigits_u[] = "0123456789ABCDEF";
-	u_char tmp[IN6ADDRSZ], *tp, *endp, *colonp;
+			xdigits_u[] = "0123456789ABCDEF";
+	uchar_t tmp[IN6ADDRSZ], *tp, *endp, *colonp;
 	const char *xdigits, *curtok;
 	int ch, saw_xdigit;
-	u_int val;
+	uint_t val;
 
-	memset((tp = tmp), '\0', IN6ADDRSZ);
+	(void) memset((tp = tmp), '\0', IN6ADDRSZ);
 	endp = tp + IN6ADDRSZ;
 	colonp = NULL;
 	/* Leading :: requires some special handling. */
@@ -178,8 +177,8 @@ inet_pton6(src, dst)
 			}
 			if (tp + INT16SZ > endp)
 				return (0);
-			*tp++ = (u_char) (val >> 8) & 0xff;
-			*tp++ = (u_char) val & 0xff;
+			*tp++ = (uchar_t)(val >> 8) & 0xff;
+			*tp++ = (uchar_t)val & 0xff;
 			saw_xdigit = 0;
 			val = 0;
 			continue;
@@ -195,8 +194,8 @@ inet_pton6(src, dst)
 	if (saw_xdigit) {
 		if (tp + INT16SZ > endp)
 			return (0);
-		*tp++ = (u_char) (val >> 8) & 0xff;
-		*tp++ = (u_char) val & 0xff;
+		*tp++ = (uchar_t)(val >> 8) & 0xff;
+		*tp++ = (uchar_t)val & 0xff;
 	}
 	if (colonp != NULL) {
 		/*
@@ -216,6 +215,6 @@ inet_pton6(src, dst)
 	}
 	if (tp != endp)
 		return (0);
-	memcpy(dst, tmp, IN6ADDRSZ);
+	(void) memcpy(dst, tmp, IN6ADDRSZ);
 	return (1);
 }

@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,17 +36,16 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	NULL 0
+#include <stdlib.h>
+#include <unistd.h>
 #include "mt.h"
 #include <rpc/rpc.h>
 #include <syslog.h>
 #include "yp_b.h"
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/ypclnt.h>
-#include <rpc/trace.h>
 #include <netdir.h>
 #include <string.h>
-#include <stdlib.h>
 
 extern int __yp_dobind_cflookup(char *, struct dom_binding **, int);
 
@@ -59,11 +60,8 @@ static char nullstring[] = "\000";
  * in number of times).
  */
 int
-__yp_all_cflookup(domain, map, callback, hardlookup)
-	char *domain;
-	char *map;
-	struct ypall_callback *callback;
-	int hardlookup;
+__yp_all_cflookup(char *domain, char *map, struct ypall_callback *callback,
+								int hardlookup)
 {
 	size_t domlen;
 	size_t maplen;
@@ -75,42 +73,33 @@ __yp_all_cflookup(domain, map, callback, hardlookup)
 	char server_name[MAXHOSTNAMELEN];
 	char errbuf[BUFSIZ];
 
-	trace1(TR_yp_all, 0);
-	if ((map == NULL) || (domain == NULL)) {
-		trace1(TR_yp_all, 1);
+	if ((map == NULL) || (domain == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	domlen = strlen(domain);
 	maplen = strlen(map);
 
 	if ((domlen == 0) || (domlen > YPMAXDOMAIN) ||
 	    (maplen == 0) || (maplen > YPMAXMAP) ||
-	    (callback == (struct ypall_callback *)NULL)) {
-		trace1(TR_yp_all, 1);
+	    (callback == NULL))
 		return (YPERR_BADARGS);
-	}
 
-	if (reason = __yp_dobind_cflookup(domain, &pdomb, hardlookup)) {
-		trace1(TR_yp_all, 1);
+	if (reason = __yp_dobind_cflookup(domain, &pdomb, hardlookup))
 		return (reason);
-	}
 
 	if (pdomb->dom_binding->ypbind_hi_vers < YPVERS) {
 		__yp_rel_binding(pdomb);
-		trace1(TR_yp_all, 1);
 		return (YPERR_VERS);
 	}
-	mutex_lock(&pdomb->server_name_lock);
+	(void) mutex_lock(&pdomb->server_name_lock);
 	if (!pdomb->dom_binding->ypbind_servername) {
-		mutex_unlock(&pdomb->server_name_lock);
+		(void) mutex_unlock(&pdomb->server_name_lock);
 		__yp_rel_binding(pdomb);
 		syslog(LOG_ERR, "yp_all: failed to get server's name\n");
-		trace1(TR_yp_all, 1);
 		return (YPERR_RPC);
 	}
 	(void) strcpy(server_name, pdomb->dom_binding->ypbind_servername);
-	mutex_unlock(&pdomb->server_name_lock);
+	(void) mutex_unlock(&pdomb->server_name_lock);
 	if (strcmp(server_name, nullstring) == 0) {
 		/*
 		 * This is the case where ypbind is running in broadcast mode,
@@ -126,11 +115,10 @@ __yp_all_cflookup(domain, map, callback, hardlookup)
 			syslog(LOG_ERR,
 				"yp_all: failed to get server's name\n");
 			__yp_rel_binding(pdomb);
-			trace1(TR_yp_all, 1);
 			return (YPERR_RPC);
 		}
 		/* check server name again, some other thread may have set it */
-		mutex_lock(&pdomb->server_name_lock);
+		(void) mutex_lock(&pdomb->server_name_lock);
 		if (strcmp(pdomb->dom_binding->ypbind_servername,
 					nullstring) == 0) {
 			pdomb->dom_binding->ypbind_servername =
@@ -138,16 +126,15 @@ __yp_all_cflookup(domain, map, callback, hardlookup)
 		}
 		(void) strcpy(server_name,
 		    pdomb->dom_binding->ypbind_servername);
-		mutex_unlock(&pdomb->server_name_lock);
+		(void) mutex_unlock(&pdomb->server_name_lock);
 		netdir_free((char *)nhs, ND_HOSTSERVLIST);
 	}
 	__yp_rel_binding(pdomb);
 	if ((allc = clnt_create(server_name, YPPROG,
-		YPVERS, "circuit_n")) == (CLIENT *) NULL) {
-			snprintf(errbuf, BUFSIZ, "yp_all \
+		YPVERS, "circuit_n")) == NULL) {
+			(void) snprintf(errbuf, BUFSIZ, "yp_all \
 - transport level create failure for domain %s / map %s", domain, map);
-			syslog(LOG_ERR, clnt_spcreateerror(errbuf));
-			trace1(TR_yp_all, 1);
+			syslog(LOG_ERR, "%s", clnt_spcreateerror(errbuf));
 			return (YPERR_RPC);
 	}
 
@@ -160,20 +147,17 @@ __yp_all_cflookup(domain, map, callback, hardlookup)
 	    (xdrproc_t)xdr_ypall, (char *)callback, tp_timout);
 
 	if (s != RPC_SUCCESS && s != RPC_TIMEDOUT) {
-		syslog(LOG_ERR, clnt_sperror(allc,
+		syslog(LOG_ERR, "%s", clnt_sperror(allc,
 		    "yp_all - RPC clnt_call (transport level) failure"));
 	}
 
 	clnt_destroy(allc);
 	switch (s) {
 	case RPC_SUCCESS:
-		trace1(TR_yp_all, 1);
 		return (0);
 	case RPC_TIMEDOUT:
-		trace1(TR_yp_all, 1);
 		return (YPERR_YPSERV);
 	default:
-		trace1(TR_yp_all, 1);
 		return (YPERR_RPC);
 	}
 }
@@ -190,10 +174,7 @@ __yp_all_cflookup(domain, map, callback, hardlookup)
  * by using the old protocol.
  */
 int
-yp_all(domain, map, callback)
-	char *domain;
-	char *map;
-	struct ypall_callback *callback;
+yp_all(char *domain, char *map, struct ypall_callback *callback)
 {
 	return (__yp_all_cflookup(domain, map, callback, 1));
 }
@@ -204,10 +185,7 @@ yp_all(domain, map, callback)
  * attempts to use reserve ports.
  */
 int
-__yp_all_rsvdport(domain, map, callback)
-	char *domain;
-	char *map;
-	struct ypall_callback *callback;
+__yp_all_rsvdport(char *domain, char *map, struct ypall_callback *callback)
 {
 	size_t domlen;
 	size_t maplen;
@@ -219,26 +197,19 @@ __yp_all_rsvdport(domain, map, callback)
 	char server_name[MAXHOSTNAMELEN];
 	char errbuf[BUFSIZ];
 
-	trace1(TR_yp_all, 0);
-	if ((map == NULL) || (domain == NULL)) {
-		trace1(TR_yp_all, 1);
+	if ((map == NULL) || (domain == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	domlen =  strlen(domain);
 	maplen =  strlen(map);
 
 	if ((domlen == 0) || (domlen > YPMAXDOMAIN) ||
 	    (maplen == 0) || (maplen > YPMAXMAP) ||
-	    (callback == (struct ypall_callback *)NULL)) {
-		trace1(TR_yp_all, 1);
+	    (callback == NULL))
 		return (YPERR_BADARGS);
-	}
 
-	if (reason = __yp_dobind_rsvdport(domain, &pdomb)) {
-		trace1(TR_yp_all, 1);
+	if (reason = __yp_dobind_rsvdport(domain, &pdomb))
 		return (reason);
-	}
 
 	if (pdomb->dom_binding->ypbind_hi_vers < YPVERS) {
 		/*
@@ -247,20 +218,18 @@ __yp_all_rsvdport(domain, map, callback)
 		 */
 		__yp_rel_binding(pdomb);
 		free_dom_binding(pdomb);
-		trace1(TR_yp_all, 1);
 		return (YPERR_VERS);
 	}
-	mutex_lock(&pdomb->server_name_lock);
+	(void) mutex_lock(&pdomb->server_name_lock);
 	if (!pdomb->dom_binding->ypbind_servername) {
-		mutex_unlock(&pdomb->server_name_lock);
+		(void) mutex_unlock(&pdomb->server_name_lock);
 		syslog(LOG_ERR, "yp_all: failed to get server's name\n");
 		__yp_rel_binding(pdomb);
 		free_dom_binding(pdomb);
-		trace1(TR_yp_all, 1);
 		return (YPERR_RPC);
 	}
 	(void) strcpy(server_name, pdomb->dom_binding->ypbind_servername);
-	mutex_unlock(&pdomb->server_name_lock);
+	(void) mutex_unlock(&pdomb->server_name_lock);
 	if (strcmp(server_name, nullstring) == 0) {
 		/*
 		 * This is the case where ypbind is running in broadcast mode,
@@ -277,11 +246,10 @@ __yp_all_rsvdport(domain, map, callback)
 				"yp_all: failed to get server's name\n");
 			__yp_rel_binding(pdomb);
 			free_dom_binding(pdomb);
-			trace1(TR_yp_all, 1);
 			return (YPERR_RPC);
 		}
 		/* check server name again, some other thread may have set it */
-		mutex_lock(&pdomb->server_name_lock);
+		(void) mutex_lock(&pdomb->server_name_lock);
 		if (strcmp(pdomb->dom_binding->ypbind_servername,
 					nullstring) == 0) {
 			pdomb->dom_binding->ypbind_servername =
@@ -289,20 +257,19 @@ __yp_all_rsvdport(domain, map, callback)
 		}
 		(void) strcpy(server_name,
 		    pdomb->dom_binding->ypbind_servername);
-		mutex_unlock(&pdomb->server_name_lock);
+		(void) mutex_unlock(&pdomb->server_name_lock);
 		netdir_free((char *)nhs, ND_HOSTSERVLIST);
 
 	}
 	__yp_rel_binding(pdomb);
 	if ((allc = __yp_clnt_create_rsvdport(server_name, YPPROG, YPVERS,
-	    "tcp6", 0, 0)) == (CLIENT *) NULL &&
+	    "tcp6", 0, 0)) == NULL &&
 		(allc = __yp_clnt_create_rsvdport(server_name, YPPROG, YPVERS,
-	    "tcp", 0, 0)) == (CLIENT *) NULL) {
-		snprintf(errbuf, BUFSIZ, "yp_all \
+	    "tcp", 0, 0)) == NULL) {
+		(void) snprintf(errbuf, BUFSIZ, "yp_all \
 - transport level create failure for domain %s / map %s", domain, map);
-		syslog(LOG_ERR, clnt_spcreateerror(errbuf));
+		syslog(LOG_ERR, "%s", clnt_spcreateerror(errbuf));
 		free_dom_binding(pdomb);
-		trace1(TR_yp_all, 1);
 		return (YPERR_RPC);
 	}
 
@@ -314,7 +281,7 @@ __yp_all_rsvdport(domain, map, callback)
 	    (xdrproc_t)xdr_ypall, (char *)callback, tp_timout);
 
 	if (s != RPC_SUCCESS && s != RPC_TIMEDOUT) {
-		syslog(LOG_ERR, clnt_sperror(allc,
+		syslog(LOG_ERR, "%s", clnt_sperror(allc,
 		    "yp_all - RPC clnt_call (transport level) failure"));
 	}
 
@@ -322,13 +289,10 @@ __yp_all_rsvdport(domain, map, callback)
 	free_dom_binding(pdomb);
 	switch (s) {
 	case RPC_SUCCESS:
-		trace1(TR_yp_all, 1);
 		return (0);
 	case RPC_TIMEDOUT:
-		trace1(TR_yp_all, 1);
 		return (YPERR_YPSERV);
 	default:
-		trace1(TR_yp_all, 1);
 		return (YPERR_RPC);
 	}
 }

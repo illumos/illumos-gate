@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
 
@@ -37,7 +36,6 @@
 #include <stropts.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include "tx.h"
 
 int
@@ -57,16 +55,17 @@ _tx_free(char *ptr, int struct_type, int api_semantics)
 	 * fields of each structure.
 	 */
 
-	trace2(TR_t_free, 0, struct_type);
 	switch (struct_type) {
 
 	case T_BIND:
+		/* LINTED pointer cast */
 		p.bind = (struct t_bind *)ptr;
 		if (p.bind->addr.buf != NULL)
 			free(p.bind->addr.buf);
 		break;
 
 	case T_CALL:
+		/* LINTED pointer cast */
 		p.call = (struct t_call *)ptr;
 		if (p.call->addr.buf != NULL)
 			free(p.call->addr.buf);
@@ -77,18 +76,21 @@ _tx_free(char *ptr, int struct_type, int api_semantics)
 		break;
 
 	case T_OPTMGMT:
+		/* LINTED pointer cast */
 		p.opt = (struct t_optmgmt *)ptr;
 		if (p.opt->opt.buf != NULL)
 			free(p.opt->opt.buf);
 		break;
 
 	case T_DIS:
+		/* LINTED pointer cast */
 		p.dis = (struct t_discon *)ptr;
 		if (p.dis->udata.buf != NULL)
 			free(p.dis->udata.buf);
 		break;
 
 	case T_UNITDATA:
+		/* LINTED pointer cast */
 		p.udata = (struct t_unitdata *)ptr;
 		if (p.udata->addr.buf != NULL)
 			free(p.udata->addr.buf);
@@ -99,6 +101,7 @@ _tx_free(char *ptr, int struct_type, int api_semantics)
 		break;
 
 	case T_UDERROR:
+		/* LINTED pointer cast */
 		p.uderr = (struct t_uderr *)ptr;
 		if (p.uderr->addr.buf != NULL)
 			free(p.uderr->addr.buf);
@@ -112,16 +115,13 @@ _tx_free(char *ptr, int struct_type, int api_semantics)
 	default:
 		if (_T_IS_XTI(api_semantics)) {
 			t_errno = TNOSTRUCTYPE;
-			trace2(TR_t_free, 1, struct_type);
 		} else {	/* TX_TLI_API */
 			t_errno = TSYSERR;
-			trace2(TR_t_free, 1, struct_type);
 			errno = EINVAL;
 		}
 		return (-1);
 	}
 
 	free(ptr);
-	trace2(TR_t_free, 1, struct_type);
 	return (0);
 }

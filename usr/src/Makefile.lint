@@ -19,6 +19,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -217,6 +218,7 @@ COMMON_SUBDIRS = \
 	cmd/rmformat \
 	cmd/rmt \
 	cmd/roles \
+	cmd/rpcgen \
 	cmd/rpcsvc/rpc.bootparamd \
 	cmd/runat \
 	cmd/sed_xpg4 \
@@ -303,6 +305,7 @@ COMMON_SUBDIRS = \
 	lib/libmalloc \
 	lib/libmd5 \
 	lib/libmp \
+	lib/libnsl \
 	lib/libnvpair \
 	lib/libpam \
 	lib/libpctx \

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1991, 1997-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,217 +33,128 @@
  */
 
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 
 /* Link list of all the stats about getport and getaddr */
 
 bool_t
-xdr_rpcbs_addrlist(xdrs, objp)
-	XDR *xdrs;
-	rpcbs_addrlist *objp;
+xdr_rpcbs_addrlist(XDR *xdrs, rpcbs_addrlist *objp)
 {
-	trace1(TR_xdr_rpcbs_addrlist, 0);
-
-	    if (!xdr_u_int(xdrs, (uint_t *)&objp->prog)) {
-		trace1(TR_xdr_rpcbs_addrlist, 1);
+	if (!xdr_u_int(xdrs, (uint_t *)&objp->prog))
 		return (FALSE);
-	    }
-	    if (!xdr_u_int(xdrs, (uint_t *)&objp->vers)) {
-		trace1(TR_xdr_rpcbs_addrlist, 1);
+	if (!xdr_u_int(xdrs, (uint_t *)&objp->vers))
 		return (FALSE);
-	    }
-	    if (!xdr_int(xdrs, &objp->success)) {
-		trace1(TR_xdr_rpcbs_addrlist, 1);
+	if (!xdr_int(xdrs, &objp->success))
 		return (FALSE);
-	    }
-	    if (!xdr_int(xdrs, &objp->failure)) {
-		trace1(TR_xdr_rpcbs_addrlist, 1);
+	if (!xdr_int(xdrs, &objp->failure))
 		return (FALSE);
-	    }
-	    if (!xdr_string(xdrs, &objp->netid, ~0)) {
-		trace1(TR_xdr_rpcbs_addrlist, 1);
-		return (FALSE);
-	    }
-
-	return (TRUE);
+	return (xdr_string(xdrs, &objp->netid, ~0));
 }
 
 /* Link list of all the stats about rmtcall */
 
 bool_t
-xdr_rpcbs_rmtcalllist(xdrs, objp)
-	XDR *xdrs;
-	rpcbs_rmtcalllist *objp;
+xdr_rpcbs_rmtcalllist(XDR *xdrs, rpcbs_rmtcalllist *objp)
 {
-	register rpc_inline_t *buf;
+	rpc_inline_t *buf;
 
-	trace1(TR_xdr_rpcbs_rmtcalllist, 0);
-	if (xdrs->x_op == XDR_ENCODE) {
-	buf = XDR_INLINE(xdrs, 6 * BYTES_PER_XDR_UNIT);
-	if (buf == NULL) {
-		if (!xdr_u_int(xdrs, (uint_t *)&objp->prog)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-			return (FALSE);
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
+		buf = XDR_INLINE(xdrs, 6 * BYTES_PER_XDR_UNIT);
+		if (buf == NULL) {
+			if (!xdr_u_int(xdrs, (uint_t *)&objp->prog))
+				return (FALSE);
+			if (!xdr_u_int(xdrs, (uint_t *)&objp->vers))
+				return (FALSE);
+			if (!xdr_u_int(xdrs, (uint_t *)&objp->proc))
+				return (FALSE);
+			if (!xdr_int(xdrs, &objp->success))
+				return (FALSE);
+			if (!xdr_int(xdrs, &objp->failure))
+				return (FALSE);
+			if (!xdr_int(xdrs, &objp->indirect))
+				return (FALSE);
+		} else {
+			IXDR_PUT_U_INT32(buf, objp->prog);
+			IXDR_PUT_U_INT32(buf, objp->vers);
+			IXDR_PUT_U_INT32(buf, objp->proc);
+			IXDR_PUT_INT32(buf, objp->success);
+			IXDR_PUT_INT32(buf, objp->failure);
+			IXDR_PUT_INT32(buf, objp->indirect);
 		}
-		if (!xdr_u_int(xdrs, (uint_t *)&objp->vers)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
+		if (!xdr_string(xdrs, &objp->netid, ~0))
 			return (FALSE);
+		return (xdr_pointer(xdrs, (char **)&objp->next,
+				(uint_t)sizeof (rpcbs_rmtcalllist),
+				(xdrproc_t)xdr_rpcbs_rmtcalllist));
+	case XDR_DECODE:
+		buf = XDR_INLINE(xdrs, 6 * BYTES_PER_XDR_UNIT);
+		if (buf == NULL) {
+			if (!xdr_u_int(xdrs, (uint_t *)&objp->prog))
+				return (FALSE);
+			if (!xdr_u_int(xdrs, (uint_t *)&objp->vers))
+				return (FALSE);
+			if (!xdr_u_int(xdrs, (uint_t *)&objp->proc))
+				return (FALSE);
+			if (!xdr_int(xdrs, &objp->success))
+				return (FALSE);
+			if (!xdr_int(xdrs, &objp->failure))
+				return (FALSE);
+			if (!xdr_int(xdrs, &objp->indirect))
+				return (FALSE);
+		} else {
+			objp->prog = IXDR_GET_U_INT32(buf);
+			objp->vers = IXDR_GET_U_INT32(buf);
+			objp->proc = IXDR_GET_U_INT32(buf);
+			objp->success = IXDR_GET_INT32(buf);
+			objp->failure = IXDR_GET_INT32(buf);
+			objp->indirect = IXDR_GET_INT32(buf);
 		}
-		if (!xdr_u_int(xdrs, (uint_t *)&objp->proc)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
+		if (!xdr_string(xdrs, &objp->netid, ~0))
 			return (FALSE);
-		}
-		if (!xdr_int(xdrs, &objp->success)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
+		return (xdr_pointer(xdrs, (char **)&objp->next,
+				(uint_t)sizeof (rpcbs_rmtcalllist),
+				(xdrproc_t)xdr_rpcbs_rmtcalllist));
+	case XDR_FREE:
+		if (!xdr_u_int(xdrs, (uint_t *)&objp->prog))
 			return (FALSE);
-		}
-		if (!xdr_int(xdrs, &objp->failure)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
+		if (!xdr_u_int(xdrs, (uint_t *)&objp->vers))
 			return (FALSE);
-		}
-		if (!xdr_int(xdrs, &objp->indirect)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
+		if (!xdr_u_int(xdrs, (uint_t *)&objp->proc))
 			return (FALSE);
-		}
-	} else {
-		IXDR_PUT_U_INT32(buf, objp->prog);
-		IXDR_PUT_U_INT32(buf, objp->vers);
-		IXDR_PUT_U_INT32(buf, objp->proc);
-		IXDR_PUT_INT32(buf, objp->success);
-		IXDR_PUT_INT32(buf, objp->failure);
-		IXDR_PUT_INT32(buf, objp->indirect);
-	}
-	if (!xdr_string(xdrs, &objp->netid, ~0)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
+		if (!xdr_int(xdrs, &objp->success))
+			return (FALSE);
+		if (!xdr_int(xdrs, &objp->failure))
+			return (FALSE);
+		if (!xdr_int(xdrs, &objp->indirect))
+			return (FALSE);
+		if (!xdr_string(xdrs, &objp->netid, ~0))
+			return (FALSE);
+		return (xdr_pointer(xdrs, (char **)&objp->next,
+				(uint_t)sizeof (rpcbs_rmtcalllist),
+				(xdrproc_t)xdr_rpcbs_rmtcalllist));
+	default:
 		return (FALSE);
 	}
-	if (!xdr_pointer(xdrs, (char **)&objp->next,
-			(uint_t)sizeof (rpcbs_rmtcalllist),
-			(xdrproc_t)xdr_rpcbs_rmtcalllist)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-	return (TRUE);
-	} else if (xdrs->x_op == XDR_DECODE) {
-	buf = XDR_INLINE(xdrs, 6 * BYTES_PER_XDR_UNIT);
-	if (buf == NULL) {
-		if (!xdr_u_int(xdrs, (uint_t *)&objp->prog)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-			return (FALSE);
-		}
-		if (!xdr_u_int(xdrs, (uint_t *)&objp->vers)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-			return (FALSE);
-		}
-		if (!xdr_u_int(xdrs, (uint_t *)&objp->proc)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-			return (FALSE);
-		}
-		if (!xdr_int(xdrs, &objp->success)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-			return (FALSE);
-		}
-		if (!xdr_int(xdrs, &objp->failure)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-			return (FALSE);
-		}
-		if (!xdr_int(xdrs, &objp->indirect)) {
-			trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-			return (FALSE);
-		}
-	} else {
-		objp->prog = IXDR_GET_U_INT32(buf);
-		objp->vers = IXDR_GET_U_INT32(buf);
-		objp->proc = IXDR_GET_U_INT32(buf);
-		objp->success = IXDR_GET_INT32(buf);
-		objp->failure = IXDR_GET_INT32(buf);
-		objp->indirect = IXDR_GET_INT32(buf);
-	}
-	if (!xdr_string(xdrs, &objp->netid, ~0)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	if (!xdr_pointer(xdrs, (char **)&objp->next,
-			(uint_t)sizeof (rpcbs_rmtcalllist),
-			(xdrproc_t)xdr_rpcbs_rmtcalllist)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-	return (TRUE);
-	}
-	if (!xdr_u_int(xdrs, (uint_t *)&objp->prog)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	if (!xdr_u_int(xdrs, (uint_t *)&objp->vers)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	if (!xdr_u_int(xdrs, (uint_t *)&objp->proc)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	if (!xdr_int(xdrs, &objp->success)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	if (!xdr_int(xdrs, &objp->failure)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	if (!xdr_int(xdrs, &objp->indirect)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->netid, ~0)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	if (!xdr_pointer(xdrs, (char **)&objp->next,
-			(uint_t)sizeof (rpcbs_rmtcalllist),
-			(xdrproc_t)xdr_rpcbs_rmtcalllist)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_rpcbs_rmtcalllist, 1);
-	return (TRUE);
 }
 
 bool_t
-xdr_rpcbs_proc(xdrs, objp)
-	XDR *xdrs;
-	rpcbs_proc objp;
+xdr_rpcbs_proc(XDR *xdrs, rpcbs_proc objp)
 {
-	trace1(TR_xdr_rpcbs_proc, 0);
-	if (!xdr_vector(xdrs, (char *)objp, RPCBSTAT_HIGHPROC, sizeof (int),
-			(xdrproc_t)xdr_int)) {
-		trace1(TR_xdr_rpcbs_proc, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_rpcbs_proc, 1);
-	return (TRUE);
+	return (xdr_vector(xdrs, (char *)objp, RPCBSTAT_HIGHPROC, sizeof (int),
+			(xdrproc_t)xdr_int));
 }
 
 bool_t
-xdr_rpcbs_addrlist_ptr(xdrs, objp)
-	XDR *xdrs;
-	rpcbs_addrlist_ptr *objp;
+xdr_rpcbs_addrlist_ptr(XDR *xdrs, rpcbs_addrlist_ptr *objp)
 {
 	bool_t			more_data;
 	rpcbs_addrlist_ptr	*nextp;
 
-	trace1(TR_xdr_rpcbs_addrlist_ptr, 0);
-
 	for (;;) {
-
 		more_data = (*objp != NULL);
 
-		if (!xdr_bool(xdrs, &more_data)) {
-			trace1(TR_xdr_rpcbs_addrlist_ptr, 1);
+		if (!xdr_bool(xdrs, &more_data))
 			return (FALSE);
-		}
 
 		if (!more_data)
 			break;
@@ -252,63 +164,35 @@ xdr_rpcbs_addrlist_ptr(xdrs, objp)
 
 		if (!xdr_reference(xdrs, (char **)objp,
 			(uint_t)sizeof (rpcbs_addrlist),
-			(xdrproc_t)xdr_rpcbs_addrlist)) {
-			trace1(TR_xdr_rpcbs_addrlist_ptr, 1);
+			(xdrproc_t)xdr_rpcbs_addrlist))
 			return (FALSE);
-		}
 
 		objp = (xdrs->x_op == XDR_FREE) ? nextp : &(*objp)->next;
 
 	}
 	*objp = NULL;
-	trace1(TR_xdr_rpcbs_addrlist_ptr, 1);
 	return (TRUE);
 }
 
 bool_t
-xdr_rpcbs_rmtcalllist_ptr(xdrs, objp)
-	XDR *xdrs;
-	rpcbs_rmtcalllist_ptr *objp;
+xdr_rpcbs_rmtcalllist_ptr(XDR *xdrs, rpcbs_rmtcalllist_ptr *objp)
 {
-	trace1(TR_xdr_rpcbs_rmtcalllist_ptr, 0);
-	if (!xdr_pointer(xdrs, (char **)objp, sizeof (rpcbs_rmtcalllist),
-			(xdrproc_t)xdr_rpcbs_rmtcalllist)) {
-		trace1(TR_xdr_rpcbs_rmtcalllist_ptr, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_rpcbs_rmtcalllist_ptr, 1);
-	return (TRUE);
+	return (xdr_pointer(xdrs, (char **)objp, sizeof (rpcbs_rmtcalllist),
+			(xdrproc_t)xdr_rpcbs_rmtcalllist));
 }
 
 bool_t
-xdr_rpcb_stat(xdrs, objp)
-	XDR *xdrs;
-	rpcb_stat *objp;
+xdr_rpcb_stat(XDR *xdrs, rpcb_stat *objp)
 {
-
-	trace1(TR_xdr_rpcb_stat, 0);
-	if (!xdr_rpcbs_proc(xdrs, objp->info)) {
-		trace1(TR_xdr_rpcb_stat, 1);
+	if (!xdr_rpcbs_proc(xdrs, objp->info))
 		return (FALSE);
-	}
-	if (!xdr_int(xdrs, &objp->setinfo)) {
-		trace1(TR_xdr_rpcb_stat, 1);
+	if (!xdr_int(xdrs, &objp->setinfo))
 		return (FALSE);
-	}
-	if (!xdr_int(xdrs, &objp->unsetinfo)) {
-		trace1(TR_xdr_rpcb_stat, 1);
+	if (!xdr_int(xdrs, &objp->unsetinfo))
 		return (FALSE);
-	}
-	if (!xdr_rpcbs_addrlist_ptr(xdrs, &objp->addrinfo)) {
-		trace1(TR_xdr_rpcb_stat, 1);
+	if (!xdr_rpcbs_addrlist_ptr(xdrs, &objp->addrinfo))
 		return (FALSE);
-	}
-	if (!xdr_rpcbs_rmtcalllist_ptr(xdrs, &objp->rmtinfo)) {
-		trace1(TR_xdr_rpcb_stat, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_rpcb_stat, 1);
-	return (TRUE);
+	return (xdr_rpcbs_rmtcalllist_ptr(xdrs, &objp->rmtinfo));
 }
 
 /*
@@ -316,16 +200,8 @@ xdr_rpcb_stat(xdrs, objp)
  * being monitored.
  */
 bool_t
-xdr_rpcb_stat_byvers(xdrs, objp)
-    XDR *xdrs;
-    rpcb_stat_byvers objp;
+xdr_rpcb_stat_byvers(XDR *xdrs, rpcb_stat_byvers objp)
 {
-	trace1(TR_xdr_rpcb_stat_byvers, 0);
-	if (!xdr_vector(xdrs, (char *)objp, RPCBVERS_STAT, sizeof (rpcb_stat),
-	    (xdrproc_t)xdr_rpcb_stat)) {
-		trace1(TR_xdr_rpcb_stat_byvers, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_rpcb_stat_byvers, 1);
-	return (TRUE);
+	return (xdr_vector(xdrs, (char *)objp, RPCBVERS_STAT,
+		sizeof (rpcb_stat), (xdrproc_t)xdr_rpcb_stat));
 }

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -47,7 +48,6 @@
 #include "rpc_mt.h"
 #include <stdio.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <rpc/rpc.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -73,14 +73,8 @@ extern mutex_t	rpcsoc_lock;
  * A common clnt create routine
  */
 static CLIENT *
-clnt_com_create(raddr, prog, vers, sockp, sendsz, recvsz, tp)
-	struct sockaddr_in *raddr;
-	rpcprog_t prog;
-	rpcvers_t vers;
-	int *sockp;
-	uint_t sendsz;
-	uint_t recvsz;
-	char *tp;
+clnt_com_create(struct sockaddr_in *raddr, rpcprog_t prog, rpcvers_t vers,
+	int *sockp, uint_t sendsz, uint_t recvsz, char *tp)
 {
 	CLIENT *cl;
 	int madefd = FALSE;
@@ -92,13 +86,11 @@ clnt_com_create(raddr, prog, vers, sockp, sendsz, recvsz, tp)
 	extern int __rpc_minfd;
 	bool_t locked = TRUE;
 
-	trace5(TR_clnt_com_create, 0, prog, vers, sendsz, recvsz);
-	mutex_lock(&rpcsoc_lock);
+	(void) mutex_lock(&rpcsoc_lock);
 	if ((nconf = __rpc_getconfip(tp)) == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		mutex_unlock(&rpcsoc_lock);
-		trace3(TR_clnt_com_create, 1, prog, vers);
-		return ((CLIENT *)NULL);
+		(void) mutex_unlock(&rpcsoc_lock);
+		return (NULL);
 	}
 	if (fd == RPC_ANYSOCK) {
 		fd = t_open(nconf->nc_device, O_RDWR, &tinfo);
@@ -116,7 +108,8 @@ clnt_com_create(raddr, prog, vers, sockp, sendsz, recvsz, tp)
 		uint_t proto;
 		ushort_t sport;
 
-		mutex_unlock(&rpcsoc_lock);	/* pmap_getport is recursive */
+		/* pmap_getport is recursive */
+		(void) mutex_unlock(&rpcsoc_lock);
 		proto = strcmp(tp, "udp") == 0 ? IPPROTO_UDP : IPPROTO_TCP;
 		sport = pmap_getport(raddr, prog, vers, proto);
 		if (sport == 0) {
@@ -124,14 +117,15 @@ clnt_com_create(raddr, prog, vers, sockp, sendsz, recvsz, tp)
 			goto err;
 		}
 		raddr->sin_port = htons(sport);
-		mutex_lock(&rpcsoc_lock);	/* pmap_getport is recursive */
+		/* pmap_getport is recursive */
+		(void) mutex_lock(&rpcsoc_lock);
 	}
 
 	/* Transform sockaddr_in to netbuf */
 	bindaddr.maxlen = bindaddr.len =  __rpc_get_a_size(tinfo.addr);
 	bindaddr.buf = (char *)raddr;
 
-	(void) __rpc_bindresvport(fd, (struct sockaddr_in *)NULL, &port, 0);
+	(void) __rpc_bindresvport(fd, NULL, &port, 0);
 	cl = clnt_tli_create(fd, nconf, &bindaddr, prog, vers,
 				sendsz, recvsz);
 	if (cl) {
@@ -139,12 +133,11 @@ clnt_com_create(raddr, prog, vers, sockp, sendsz, recvsz, tp)
 			/*
 			 * The fd should be closed while destroying the handle.
 			 */
-			(void) CLNT_CONTROL(cl, CLSET_FD_CLOSE, (char *)NULL);
+			(void) CLNT_CONTROL(cl, CLSET_FD_CLOSE, NULL);
 			*sockp = fd;
 		}
 		(void) freenetconfigent(nconf);
-		mutex_unlock(&rpcsoc_lock);
-		trace3(TR_clnt_com_create, 1, prog, vers);
+		(void) mutex_unlock(&rpcsoc_lock);
 		return (cl);
 	}
 	goto err;
@@ -158,91 +151,50 @@ err:	if (madefd == TRUE)
 		(void) t_close(fd);
 	(void) freenetconfigent(nconf);
 	if (locked == TRUE)
-		mutex_unlock(&rpcsoc_lock);
-	trace3(TR_clnt_com_create, 1, prog, vers);
-	return ((CLIENT *)NULL);
+		(void) mutex_unlock(&rpcsoc_lock);
+	return (NULL);
 }
 
 CLIENT *
-clntudp_bufcreate(raddr, prog, vers, wait, sockp, sendsz, recvsz)
-	struct sockaddr_in *raddr;
-	rpcprog_t prog;
-	rpcvers_t vers;
-	struct timeval wait;
-	int *sockp;
-	uint_t sendsz;
-	uint_t recvsz;
+clntudp_bufcreate(struct sockaddr_in *raddr, rpcprog_t prog, rpcvers_t vers,
+	struct timeval wait, int *sockp, uint_t sendsz, uint_t recvsz)
 {
 	CLIENT *cl;
 
-	trace5(TR_clntudp_bufcreate, 0, prog, vers, sendsz, recvsz);
 	cl = clnt_com_create(raddr, prog, vers, sockp, sendsz, recvsz, "udp");
-	if (cl == (CLIENT *)NULL) {
-		trace3(TR_clntudp_bufcreate, 1, prog, vers);
-		return ((CLIENT *)NULL);
-	}
+	if (cl == NULL)
+		return (NULL);
 	(void) CLNT_CONTROL(cl, CLSET_RETRY_TIMEOUT, (char *)&wait);
-	trace3(TR_clntudp_bufcreate, 1, prog, vers);
 	return (cl);
 }
 
 CLIENT *
-clntudp_create(raddr, program, version, wait, sockp)
-	struct sockaddr_in *raddr;
-	rpcprog_t program;
-	rpcvers_t version;
-	struct timeval wait;
-	int *sockp;
+clntudp_create(struct sockaddr_in *raddr, rpcprog_t program, rpcvers_t version,
+	struct timeval wait, int *sockp)
 {
-	CLIENT *dummy;
-
-	trace3(TR_clntudp_create, 0, program, version);
-	dummy = clntudp_bufcreate(raddr, program, version, wait, sockp,
-					UDPMSGSIZE, UDPMSGSIZE);
-	trace3(TR_clntudp_create, 1, program, version);
-	return (dummy);
+	return (clntudp_bufcreate(raddr, program, version, wait, sockp,
+					UDPMSGSIZE, UDPMSGSIZE));
 }
 
 CLIENT *
-clnttcp_create(raddr, prog, vers, sockp, sendsz, recvsz)
-	struct sockaddr_in *raddr;
-	rpcprog_t prog;
-	rpcvers_t vers;
-	int *sockp;
-	uint_t sendsz;
-	uint_t recvsz;
+clnttcp_create(struct sockaddr_in *raddr, rpcprog_t prog, rpcvers_t vers,
+	int *sockp, uint_t sendsz, uint_t recvsz)
 {
-	CLIENT *dummy;
-
-	trace5(TR_clnttcp_create, 0, prog, vers, sendsz, recvsz);
-	dummy = clnt_com_create(raddr, prog, vers, sockp, sendsz,
-			recvsz, "tcp");
-	trace3(TR_clnttcp_create, 1, prog, vers);
-	return (dummy);
+	return (clnt_com_create(raddr, prog, vers, sockp, sendsz,
+			recvsz, "tcp"));
 }
 
 CLIENT *
-clntraw_create(prog, vers)
-	rpcprog_t prog;
-	rpcvers_t vers;
+clntraw_create(rpcprog_t prog, rpcvers_t vers)
 {
-	CLIENT *dummy;
-
-	trace3(TR_clntraw_create, 0, prog, vers);
-	dummy = clnt_raw_create(prog, vers);
-	trace3(TR_clntraw_create, 1, prog, vers);
-	return (dummy);
+	return (clnt_raw_create(prog, vers));
 }
 
 /*
  * A common server create routine
  */
 static SVCXPRT *
-svc_com_create(fd, sendsize, recvsize, netid)
-	int fd;
-	uint_t sendsize;
-	uint_t recvsize;
-	char *netid;
+svc_com_create(int fd, uint_t sendsize, uint_t recvsize, char *netid)
 {
 	struct netconfig *nconf;
 	SVCXPRT *svc;
@@ -250,14 +202,12 @@ svc_com_create(fd, sendsize, recvsize, netid)
 	int port;
 	int res;
 
-	trace4(TR_svc_com_create, 0, fd, sendsize, recvsize);
 	if ((nconf = __rpc_getconfip(netid)) == NULL) {
 		(void) syslog(LOG_ERR, "Could not get %s transport", netid);
-		trace2(TR_svc_com_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 	if (fd == RPC_ANYSOCK) {
-		fd = t_open(nconf->nc_device, O_RDWR, (struct t_info *)NULL);
+		fd = t_open(nconf->nc_device, O_RDWR, NULL);
 		if (fd == -1) {
 			char errorstr[100];
 
@@ -267,93 +217,56 @@ svc_com_create(fd, sendsize, recvsize, netid)
 			"svc%s_create: could not open connection : %s", netid,
 				    errorstr);
 			(void) freenetconfigent(nconf);
-			trace2(TR_svc_com_create, 1, fd);
-			return ((SVCXPRT *)NULL);
+			return (NULL);
 		}
 		madefd = TRUE;
 	}
 
-	res = __rpc_bindresvport(fd, (struct sockaddr_in *)NULL, &port, 8);
-	svc = svc_tli_create(fd, nconf, (struct t_bind *)NULL,
+	res = __rpc_bindresvport(fd, NULL, &port, 8);
+	svc = svc_tli_create(fd, nconf, NULL,
 				sendsize, recvsize);
 	(void) freenetconfigent(nconf);
-	if (svc == (SVCXPRT *)NULL) {
+	if (svc == NULL) {
 		if (madefd)
 			(void) t_close(fd);
-		trace2(TR_svc_com_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
-	if (res == -1) {
+	if (res == -1)
+		/* LINTED pointer cast */
 		port = (((struct sockaddr_in *)svc->xp_ltaddr.buf)->sin_port);
-	}
 	svc->xp_port = ntohs(port);
-	trace2(TR_svc_com_create, 1, fd);
 	return (svc);
 }
 
 SVCXPRT *
-svctcp_create(fd, sendsize, recvsize)
-	int fd;
-	uint_t sendsize;
-	uint_t recvsize;
+svctcp_create(int fd, uint_t sendsize, uint_t recvsize)
 {
-	SVCXPRT *dummy;
-
-	trace4(TR_svctcp_create, 0, fd, sendsize, recvsize);
-	dummy = svc_com_create(fd, sendsize, recvsize, "tcp");
-	trace4(TR_svctcp_create, 1, fd, sendsize, recvsize);
-	return (dummy);
+	return (svc_com_create(fd, sendsize, recvsize, "tcp"));
 }
 
 SVCXPRT *
-svcudp_bufcreate(fd, sendsz, recvsz)
-	int fd;
-	uint_t sendsz, recvsz;
+svcudp_bufcreate(int fd, uint_t sendsz, uint_t recvsz)
 {
-	SVCXPRT *dummy;
-
-	trace4(TR_svcudp_bufcreate, 0, fd, sendsz, recvsz);
-	dummy = svc_com_create(fd, sendsz, recvsz, "udp");
-	trace4(TR_svcudp_bufcreate, 1, fd, sendsz, recvsz);
-	return (dummy);
+	return (svc_com_create(fd, sendsz, recvsz, "udp"));
 }
 
 SVCXPRT *
-svcfd_create(fd, sendsize, recvsize)
-	int fd;
-	uint_t sendsize;
-	uint_t recvsize;
+svcfd_create(int fd, uint_t sendsize, uint_t recvsize)
 {
-	SVCXPRT *dummy;
-
-	trace4(TR_svcfd_create, 0, fd, sendsize, recvsize);
-	dummy = svc_fd_create(fd, sendsize, recvsize);
-	trace4(TR_svcfd_create, 1, fd, sendsize, recvsize);
-	return (dummy);
+	return (svc_fd_create(fd, sendsize, recvsize));
 }
 
 
 SVCXPRT *
-svcudp_create(fd)
-	int fd;
+svcudp_create(int fd)
 {
-	SVCXPRT *dummy;
-
-	trace2(TR_svcudp_create, 0, fd);
-	dummy = svc_com_create(fd, UDPMSGSIZE, UDPMSGSIZE, "udp");
-	trace2(TR_svcudp_create, 1, fd);
-	return (dummy);
+	return (svc_com_create(fd, UDPMSGSIZE, UDPMSGSIZE, "udp"));
 }
 
 SVCXPRT *
-svcraw_create()
+svcraw_create(void)
 {
-	SVCXPRT *dummy;
-
-	trace1(TR_svcraw_create, 0);
-	dummy = svc_raw_create();
-	trace1(TR_svcraw_create, 1);
-	return (dummy);
+	return (svc_raw_create());
 }
 
 /*
@@ -381,15 +294,12 @@ __rpc_bindresvport_ipv6(int fd, struct sockaddr *sin, int *portp, int qlen,
 #define	ENDPORT (IPPORT_RESERVED - 1)
 #define	NPORTS	(ENDPORT - STARTPORT + 1)
 
-	trace3(TR_bindresvport, 0, fd, qlen);
 	if (sin == 0 && fmly == 0) {
 		errno = EINVAL;
-		trace2(TR_bindresvport, 1, fd);
 		return (-1);
 	}
 	if (geteuid()) {
 		errno = EACCES;
-		trace2(TR_bindresvport, 1, fd);
 		return (-1);
 	}
 	if ((i = t_getstate(fd)) != T_UNBND) {
@@ -397,7 +307,6 @@ __rpc_bindresvport_ipv6(int fd, struct sockaddr *sin, int *portp, int qlen,
 			errno = EBADF;
 		if (i != -1)
 			errno = EISCONN;
-		trace2(TR_bindresvport, 1, fd);
 		return (-1);
 	}
 	if (sin == 0) {
@@ -405,33 +314,33 @@ __rpc_bindresvport_ipv6(int fd, struct sockaddr *sin, int *portp, int qlen,
 		get_myaddress_ipv6(fmly, sin);
 	}
 	if (sin->sa_family == AF_INET) {
+		/* LINTED pointer cast */
 		sinport = &((struct sockaddr_in *)sin)->sin_port;
 	} else if (sin->sa_family == AF_INET6) {
+		/* LINTED pointer cast */
 		sinport = &((struct sockaddr_in6 *)sin)->sin6_port;
 	} else {
 		errno = EPFNOSUPPORT;
-		trace2(TR_bindresvport, 1, fd);
 		return (-1);
 	}
 
 	/* Transform sockaddr to netbuf */
 	if (t_getinfo(fd, &tinfo) == -1) {
-		trace2(TR_bindresvport, 1, fd);
 		return (-1);
 	}
+	/* LINTED pointer cast */
 	tres = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR);
-	if (tres == NULL) {
-		trace2(TR_bindresvport, 1, fd);
+	if (tres == NULL)
 		return (-1);
-	}
 
 	tbindstr.qlen = qlen;
 	tbindstr.addr.buf = (char *)sin;
 	tbindstr.addr.len = tbindstr.addr.maxlen = __rpc_get_a_size(tinfo.addr);
+	/* LINTED pointer cast */
 	sin = (struct sockaddr *)tbindstr.addr.buf;
 
 	res = -1;
-	mutex_lock(&portnum_lock);
+	(void) mutex_lock(&portnum_lock);
 	if (port == 0)
 		port = (getpid() % NPORTS) + STARTPORT;
 	for (i = 0; i < NPORTS; i++) {
@@ -449,12 +358,11 @@ __rpc_bindresvport_ipv6(int fd, struct sockaddr *sin, int *portp, int qlen,
 		} else if (t_errno != TSYSERR || errno != EADDRINUSE)
 			break;
 	}
-	mutex_unlock(&portnum_lock);
+	(void) mutex_unlock(&portnum_lock);
 
 	if ((portp != NULL) && (res == 0))
 		*portp = *sinport;
 	(void) t_free((char *)tres, T_BIND);
-	trace2(TR_bindresvport, 1, fd);
 	return (res);
 }
 
@@ -475,10 +383,10 @@ __rpc_bindresvport(int fd, struct sockaddr_in *sin, int *portp, int qlen)
 void
 get_myaddress_ipv6(char *fmly, struct sockaddr *addr)
 {
-	trace1(TR_get_myaddress, 0);
 	if (fmly != 0 && strcmp(fmly, NC_INET6) == 0) {
+		/* LINTED pointer cast */
 		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)addr;
-		memset(sin6, 0, sizeof (*sin6));
+		(void) memset(sin6, 0, sizeof (*sin6));
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_port = htons(PMAPPORT);
 		if (__can_use_af(AF_INET6)) {
@@ -491,13 +399,13 @@ get_myaddress_ipv6(char *fmly, struct sockaddr *addr)
 			IN6_INADDR_TO_V4MAPPED(&in4, &sin6->sin6_addr);
 		}
 	} else {
+		/* LINTED pointer cast */
 		struct sockaddr_in	*sin = (struct sockaddr_in *)addr;
-		memset(sin, 0, sizeof (*sin));
+		(void) memset(sin, 0, sizeof (*sin));
 		sin->sin_family = AF_INET;
 		sin->sin_port = htons(PMAPPORT);
 		sin->sin_addr.s_addr = INADDR_ANY;
 	}
-	trace1(TR_get_myaddress, 1);
 }
 
 void
@@ -520,7 +428,7 @@ getrpcport(char *host, rpcprog_t prognum, rpcvers_t versnum,
 
 	if ((hp = gethostbyname(host)) == NULL)
 		return (0);
-	memcpy((char *)&addr.sin_addr, hp->h_addr, hp->h_length);
+	(void) memcpy(&addr.sin_addr, hp->h_addr, hp->h_length);
 	addr.sin_family = AF_INET;
 	addr.sin_port =  0;
 	return (pmap_getport(&addr, prognum, versnum, proto));
@@ -530,41 +438,22 @@ getrpcport(char *host, rpcprog_t prognum, rpcvers_t versnum,
  * For connectionless "udp" transport. Obsoleted by rpc_call().
  */
 int
-callrpc(host, prognum, versnum, procnum, inproc, in, outproc, out)
-	char *host;
-	rpcprog_t prognum;
-	rpcvers_t versnum;
-	rpcproc_t procnum;
-	xdrproc_t inproc, outproc;
-	char *in, *out;
+callrpc(char *host, rpcprog_t prognum, rpcvers_t versnum, rpcproc_t procnum,
+	xdrproc_t inproc, char *in, xdrproc_t outproc, char *out)
 {
-	int dummy;
-
-	trace4(TR_callrpc, 0, prognum, versnum, procnum);
-	dummy = (int)rpc_call(host, prognum, versnum, procnum, inproc,
-				in, outproc, out, "udp");
-	trace4(TR_callrpc, 1, prognum, versnum, procnum);
-	return (dummy);
+	return ((int)rpc_call(host, prognum, versnum, procnum, inproc,
+				in, outproc, out, "udp"));
 }
 
 /*
  * For connectionless kind of transport. Obsoleted by rpc_reg()
  */
 int
-registerrpc(prognum, versnum, procnum, progname, inproc, outproc)
-	rpcprog_t prognum;
-	rpcvers_t versnum;
-	rpcproc_t procnum;
-	char *(*progname)();
-	xdrproc_t inproc, outproc;
+registerrpc(rpcprog_t prognum, rpcvers_t versnum, rpcproc_t procnum,
+	char *(*progname)(), xdrproc_t inproc, xdrproc_t outproc)
 {
-	int dummy;
-
-	trace4(TR_registerrpc, 0, prognum, versnum, procnum);
-	dummy = rpc_reg(prognum, versnum, procnum, progname, inproc,
-				outproc, "udp");
-	trace4(TR_registerrpc, 1, prognum, versnum, procnum);
-	return (dummy);
+	return (rpc_reg(prognum, versnum, procnum, progname, inproc,
+				outproc, "udp"));
 }
 
 /*
@@ -578,57 +467,44 @@ static resultproc_t	clnt_broadcast_result_main;
  * Need to translate the netbuf address into sockaddr_in address.
  * Dont care about netid here.
  */
+/* ARGSUSED2 */
 static bool_t
-rpc_wrap_bcast(resultp, addr, nconf)
-	char *resultp;		/* results of the call */
-	struct netbuf *addr;	/* address of the guy who responded */
-	struct netconfig *nconf; /* Netconf of the transport */
+rpc_wrap_bcast(char *resultp, struct netbuf *addr, struct netconfig *nconf)
 {
-	bool_t dummy;
 	resultproc_t clnt_broadcast_result;
 
-	trace1(TR_rpc_wrap_bcast, 0);
 	clnt_broadcast_result = thr_main()? clnt_broadcast_result_main :
 		(resultproc_t)pthread_getspecific(clnt_broadcast_key);
-	dummy = (*clnt_broadcast_result)(resultp,
-				(struct sockaddr_in *)addr->buf);
-	trace1(TR_rpc_wrap_bcast, 1);
-	return (dummy);
+	return ((*clnt_broadcast_result)(resultp,
+				/* LINTED pointer cast */
+				(struct sockaddr_in *)addr->buf));
 }
 
 /*
  * Broadcasts on UDP transport. Obsoleted by rpc_broadcast().
  */
 enum clnt_stat
-clnt_broadcast(prog, vers, proc, xargs, argsp, xresults, resultsp, eachresult)
-	rpcprog_t	prog;		/* program number */
-	rpcvers_t	vers;		/* version number */
-	rpcproc_t	proc;		/* procedure number */
-	xdrproc_t	xargs;		/* xdr routine for args */
-	caddr_t		argsp;		/* pointer to args */
-	xdrproc_t	xresults;	/* xdr routine for results */
-	caddr_t		resultsp;	/* pointer to results */
-	resultproc_t	eachresult;	/* call with each result obtained */
+clnt_broadcast(rpcprog_t prog, rpcvers_t vers, rpcproc_t proc, xdrproc_t xargs,
+	caddr_t argsp, xdrproc_t xresults,
+	caddr_t resultsp, resultproc_t eachresult)
 {
-	enum clnt_stat dummy;
 	extern mutex_t tsd_lock;
 
-	trace4(TR_clnt_broadcast, 0, prog, vers, proc);
-	if (thr_main())
+	if (thr_main()) {
 		clnt_broadcast_result_main = eachresult;
-	else {
+	} else {
 		if (clnt_broadcast_key == 0) {
-			mutex_lock(&tsd_lock);
+			(void) mutex_lock(&tsd_lock);
 			if (clnt_broadcast_key == 0)
-				pthread_key_create(&clnt_broadcast_key, NULL);
-			mutex_unlock(&tsd_lock);
+				(void) pthread_key_create(&clnt_broadcast_key,
+									NULL);
+			(void) mutex_unlock(&tsd_lock);
 		}
-		pthread_setspecific(clnt_broadcast_key, (void *) eachresult);
+		(void) pthread_setspecific(clnt_broadcast_key,
+							(void *)eachresult);
 	}
-	dummy = rpc_broadcast(prog, vers, proc, xargs, argsp, xresults,
-				resultsp, (resultproc_t)rpc_wrap_bcast, "udp");
-	trace4(TR_clnt_broadcast, 1, prog, vers, proc);
-	return (dummy);
+	return (rpc_broadcast(prog, vers, proc, xargs, argsp, xresults,
+				resultsp, (resultproc_t)rpc_wrap_bcast, "udp"));
 }
 
 /*
@@ -636,16 +512,11 @@ clnt_broadcast(prog, vers, proc, xargs, argsp, xresults, resultsp, eachresult)
  * authdes_seccreate().
  */
 AUTH *
-authdes_create(servername, window, syncaddr, ckey)
-	char *servername;		/* network name of server */
-	uint_t window;			/* time to live */
-	struct sockaddr_in *syncaddr;	/* optional hostaddr to sync with */
-	des_block *ckey;		/* optional conversation key to use */
+authdes_create(char *servername, uint_t window, struct sockaddr_in *syncaddr,
+	des_block *ckey)
 {
 	char *hostname = NULL;
-	AUTH *dummy;
 
-	trace2(TR_authdes_create, 0, window);
 	if (syncaddr) {
 		/*
 		 * Change addr to hostname, because that is the way
@@ -680,13 +551,9 @@ authdes_create(servername, window, syncaddr, ckey)
 		nauth = authdes_seccreate(servername, window, hostname, ckey);
 		(void) netdir_free((char *)hlist, ND_HOSTSERVLIST);
 		(void) freenetconfigent(nconf);
-		trace2(TR_authdes_create, 1, window);
 		return (nauth);
 	}
 fallback:
-	dummy = authdes_seccreate(servername, window, hostname, ckey);
-	trace2(TR_authdes_create, 1, window);
-	return (dummy);
+	return (authdes_seccreate(servername, window, hostname, ckey));
 }
-
 #endif /* PORTMAP */

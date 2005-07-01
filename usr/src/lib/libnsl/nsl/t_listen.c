@@ -19,20 +19,18 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
 
 #include "mt.h"
-#include <rpc/trace.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,14 +55,8 @@ _tx_listen(int fd, struct t_call *call, int api_semantics)
 	int didalloc, didralloc;
 	int flg = 0;
 
-	trace2(TR_t_listen, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_listen, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
-
 
 	sig_mutex_lock(&tiptr->ti_lock);
 
@@ -72,7 +64,6 @@ _tx_listen(int fd, struct t_call *call, int api_semantics)
 		sv_errno = errno;
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_listen, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -81,18 +72,16 @@ _tx_listen(int fd, struct t_call *call, int api_semantics)
 		 * User level state verification only done for XTI
 		 * because doing for TLI may break existing applications
 		 */
-		if (! (tiptr->ti_state == T_IDLE ||
+		if (!(tiptr->ti_state == T_IDLE ||
 		    tiptr->ti_state == T_INCON)) {
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_connect, 1, fd);
 			return (-1);
 		}
 
 		if (tiptr->ti_qlen == 0) {
 			t_errno = TBADQLEN;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_connect, 1, fd);
 			return (-1);
 		}
 
@@ -101,7 +90,6 @@ _tx_listen(int fd, struct t_call *call, int api_semantics)
 				tiptr->ti_flags |= TX_TQFULL_NOTIFIED;
 				t_errno = TQFULL;
 				sig_mutex_unlock(&tiptr->ti_lock);
-				trace2(TR_t_connect, 1, fd);
 				return (-1);
 			}
 		}
@@ -114,7 +102,6 @@ _tx_listen(int fd, struct t_call *call, int api_semantics)
 	if (tiptr->ti_lookcnt > 0) {
 		t_errno = TLOOK;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_listen, 1, fd);
 		return (-1);
 	}
 
@@ -125,7 +112,6 @@ _tx_listen(int fd, struct t_call *call, int api_semantics)
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_listen, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -140,7 +126,6 @@ _tx_listen(int fd, struct t_call *call, int api_semantics)
 		else
 			tiptr->ti_ctlbuf = ctlbuf.buf;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_listen, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -184,6 +169,7 @@ _tx_listen(int fd, struct t_call *call, int api_semantics)
 		goto err_out;
 	}
 
+	/* LINTED pointer cast */
 	pptr = (union T_primitives *)ctlbuf.buf;
 
 	switch (pptr->type) {
@@ -252,7 +238,6 @@ _tx_listen(int fd, struct t_call *call, int api_semantics)
 		else
 			tiptr->ti_rcvbuf = databuf.buf;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_listen, 1, fd);
 		return (0);
 
 	case T_DISCON_IND:
@@ -288,7 +273,6 @@ err_out:
 	else
 		tiptr->ti_rcvbuf = databuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_listen, 1, fd);
 	errno = sv_errno;
 	return (-1);
 }

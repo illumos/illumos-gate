@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,12 +146,12 @@ __nis_cast_proc(
 	char uaddrbuf[INET6_ADDRSTRLEN + sizeof (".255.255")];
 					/* large enough for an IPv6 uaddr */
 
-	if (sys_auth == (AUTH *) NULL) {
+	if (sys_auth == NULL) {
 		stat = RPC_SYSTEMERROR;
 		goto done_broad;
 	}
 
-	saddrs = (struct server_addr *)calloc(nbep, sizeof (*saddrs));
+	saddrs = calloc(nbep, sizeof (*saddrs));
 	if (saddrs == 0) {
 		syslog(LOG_ERR, "nis_cast: no memory");
 		stat = RPC_CANTSEND;
@@ -177,7 +178,7 @@ __nis_cast_proc(
 
 		pingable++;
 
-		trans = (struct transp *)malloc(sizeof (*trans));
+		trans = malloc(sizeof (*trans));
 		if (trans == NULL) {
 			syslog(LOG_ERR, "nis_cast: no memory");
 			stat = RPC_CANTSEND;
@@ -197,15 +198,15 @@ __nis_cast_proc(
 			stat = RPC_CANTSEND;
 			goto done_broad;
 		}
-		if (t_bind(trans->tr_fd, (struct t_bind *)NULL,
-		    (struct t_bind *)NULL) < 0) {
+		if (t_bind(trans->tr_fd, NULL, NULL) < 0) {
 			syslog(LOG_ERR, "nis_cast: t_bind: %m");
 			stat = RPC_CANTSEND;
 			goto done_broad;
 		}
 		trans->tr_taddr =
+		    /* LINTED pointer cast */
 		    (struct t_bind *)t_alloc(trans->tr_fd, T_BIND, T_ADDR);
-		if (trans->tr_taddr == (struct t_bind *)NULL) {
+		if (trans->tr_taddr == NULL) {
 			syslog(LOG_ERR, "nis_cast: t_alloc: %m");
 			stat = RPC_SYSTEMERROR;
 			goto done_broad;
@@ -341,10 +342,12 @@ __nis_cast_proc(
 			fd = saddrs[curr].sa_transp->tr_fd;
 			if (strcmp(NC_INET,
 				saddrs[curr].sa_transp->tr_protofmly) == 0) {
+				/* LINTED pointer cast */
 				*((uint32_t *)outbuf) = htonl(xid + curr);
 				t_udata.udata.buf = outbuf;
 				t_udata.udata.len = outlen;
 			} else {
+				/* LINTED pointer cast */
 				*((uint32_t *)outbuf6) = htonl(xid + curr);
 				t_udata.udata.buf = outbuf6;
 				t_udata.udata.len = outlen6;
@@ -573,8 +576,8 @@ ping_endpoints(nis_bound_directory *binding, int start, int end, int *fastest)
 
 	count = end - start;
 	st = __nis_cast_proc(binding, start, count, NULLPROC,
-			xdr_void, (void *)NULL,
-			xdr_void, (void *)NULL,
+			xdr_void, NULL,
+			xdr_void, NULL,
 			fastest, NIS_PING_TIMEOUT);
 	if (st == RPC_SUCCESS)
 		*fastest += start;

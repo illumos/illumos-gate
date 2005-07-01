@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -216,7 +217,7 @@ build_list(FILE *f, int *num)
 			    token[0] == '#') {
 				continue;
 			} else {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 					"non-recognized start of line");
 				goto bail;
 			}
@@ -232,7 +233,7 @@ build_list(FILE *f, int *num)
 			/* protocol number */
 			token = strtok_r(NULL, pipechar, &lasts);
 			if (token == NULL || (new_num = atoi(token)) == 0) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "invalid protocol number");
 				goto bail;
 			}
@@ -240,7 +241,7 @@ build_list(FILE *f, int *num)
 			/* protocol name */
 			token = strtok_r(NULL, pipechar, &lasts);
 			if (token == NULL) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "cannot read protocol name");
 				goto bail;
 			}
@@ -249,14 +250,14 @@ build_list(FILE *f, int *num)
 			/* execution mode */
 			token = strtok_r(NULL, pipechar, &lasts);
 			if (token == NULL) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "cannot read execution mode");
 				goto bail;
 			}
 			/* remove trailing '\n' */
 			token[strlen(token) - 1] = '\0';
 			if (_str_to_ipsec_exec_mode(token, &exec_mode) != 0) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "invalid execution mode: \"%s\"", token);
 				goto bail;
 			}
@@ -299,7 +300,7 @@ build_list(FILE *f, int *num)
 			/* protocol number */
 			token = strtok_r(NULL, pipechar, &lasts);
 			if (token == NULL || (new_num = atoi(token)) == 0) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "invalid algorithm number");
 				goto bail;
 			}
@@ -310,7 +311,7 @@ build_list(FILE *f, int *num)
 				if (new_proto->proto_num == new_num)
 					break;
 			if (new_proto == (rc + new_num)) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "invalid protocol number %d for algorithm",
 				    new_num);
 				goto bail;
@@ -319,7 +320,7 @@ build_list(FILE *f, int *num)
 			/* algorithm number */
 			token = strtok_r(NULL, pipechar, &lasts);
 			if (token == NULL) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "cannot read algorithm number");
 				goto bail;
 			}
@@ -329,7 +330,7 @@ build_list(FILE *f, int *num)
 			/* algorithm names */
 			token = strtok_r(NULL, pipechar, &lasts);
 			if (token == NULL) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "cannot read algorithm number");
 				goto bail;
 			}
@@ -338,7 +339,7 @@ build_list(FILE *f, int *num)
 			/* mechanism name */
 			token = strtok_r(NULL, pipechar, &lasts);
 			if (token == NULL) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "cannot read mechanism name for alg %d "
 				    "(proto %d)", alg_num,
 				    new_proto->proto_num);
@@ -349,7 +350,7 @@ build_list(FILE *f, int *num)
 			/* key sizes */
 			token = strtok_r(NULL, pipechar, &lasts);
 			if (token == NULL) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "cannot read key sizes for alg %d "
 				    "(proto %d)", alg_num,
 				    new_proto->proto_num);
@@ -360,7 +361,7 @@ build_list(FILE *f, int *num)
 			/* block sizes */
 			token = strtok_r(NULL, pipechar, &lasts);
 			if (token == NULL) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "cannot read mechanism name for alg %d "
 				    "(proto %d)", alg_num,
 				    new_proto->proto_num);
@@ -371,7 +372,7 @@ build_list(FILE *f, int *num)
 			/* extract key sizes */
 			key_increment = build_keysizes(&key_sizes, key_string);
 			if (key_increment == -1) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "invalid key sizes for alg %d (proto %d)",
 				    alg_num, new_proto->proto_num);
 				goto bail;
@@ -386,7 +387,7 @@ build_list(FILE *f, int *num)
 			num_sizes = 0;
 			token = strtok_r(block_string, comma, &lasts);
 			if (token == NULL) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "invalid block sizes for alg %d (proto %d)",
 				    alg_num, new_proto->proto_num);
 				free(key_sizes);
@@ -492,7 +493,7 @@ build_list(FILE *f, int *num)
 		    sizeof (LIBIPSEC_ALGS_LINE_PKGSTART) - 1) == 0) {
 			/* start of package delimiter */
 			if (doing_pkg) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "duplicate package start delimiters");
 				goto bail;
 			}
@@ -508,7 +509,7 @@ build_list(FILE *f, int *num)
 			char tmp_pkg[1024];
 
 			if (!doing_pkg) {
-				snprintf(diag_buf, sizeof (diag_buf),
+				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "end package delimiter without start");
 				goto bail;
 			}
@@ -567,14 +568,14 @@ _build_internal_algs(ipsec_proto_t **alg_context, int *alg_nums)
 		    (statbuf.st_mtime < proto_last_update &&
 			protos != NULL))
 			return;
-		rw_wrlock(&proto_rw);
+		(void) rw_wrlock(&proto_rw);
 	}
 
 	fd = open(INET_IPSECALGSFILE, O_RDONLY);
 	if (fd != -1) {
 		f = fdopen(fd, "r");
 		if (f == NULL) {
-			close(fd);
+			(void) close(fd);
 		} else {
 			rc = fstat(fd, &statbuf);
 			if (rc != -1) {
@@ -608,7 +609,7 @@ _build_internal_algs(ipsec_proto_t **alg_context, int *alg_nums)
 			 */
 			trash = NULL;
 		}
-		rw_unlock(&proto_rw);
+		(void) rw_unlock(&proto_rw);
 		_clean_trash(trash, trash_num);
 	} else {
 		/*
@@ -644,7 +645,7 @@ duplicate_intarr(int *orig)
 
 	iwalker = malloc(allocsize);
 	if (iwalker != NULL)
-		memcpy(iwalker, orig, allocsize);
+		(void) memcpy(iwalker, orig, allocsize);
 
 	return (iwalker);
 }
@@ -755,7 +756,7 @@ _real_getipsecprotos(int *nentries)
 
 	_build_internal_algs(NULL, NULL);
 
-	rw_rdlock(&proto_rw);
+	(void) rw_rdlock(&proto_rw);
 	*nentries = num_protos;
 	/*
 	 * Allocate 1 byte if there are no protocols so a non-NULL return
@@ -766,7 +767,7 @@ _real_getipsecprotos(int *nentries)
 		for (i = 0; i < num_protos; i++)
 			rc[i] = protos[i].proto_num;
 	}
-	rw_unlock(&proto_rw);
+	(void) rw_unlock(&proto_rw);
 	return (rc);
 }
 
@@ -781,7 +782,7 @@ _real_getipsecalgs(int *nentries, int proto_num)
 
 	_build_internal_algs(NULL, NULL);
 
-	rw_rdlock(&proto_rw);
+	(void) rw_rdlock(&proto_rw);
 	proto = findprotobynum(proto_num);
 	if (proto != NULL) {
 		*nentries = proto->proto_numalgs;
@@ -796,7 +797,7 @@ _real_getipsecalgs(int *nentries, int proto_num)
 				rc[i] = proto->proto_algs[i]->a_alg_num;
 		}
 	}
-	rw_unlock(&proto_rw);
+	(void) rw_unlock(&proto_rw);
 	return (rc);
 }
 
@@ -814,7 +815,7 @@ getipsecalgbyname(const char *name, int proto_num, int *errnop)
 		goto bail;
 	}
 
-	rw_rdlock(&proto_rw);
+	(void) rw_rdlock(&proto_rw);
 	proto = findprotobynum(proto_num);
 	if (proto != NULL) {
 		for (i = 0; i < proto->proto_numalgs; i++) {
@@ -829,7 +830,7 @@ getipsecalgbyname(const char *name, int proto_num, int *errnop)
 					rc = _duplicate_alg(
 					    proto->proto_algs[i]);
 					my_errno = (rc == NULL) ? ENOMEM : 0;
-					rw_unlock(&proto_rw);
+					(void) rw_unlock(&proto_rw);
 					goto bail;
 				}
 			}
@@ -838,7 +839,7 @@ getipsecalgbyname(const char *name, int proto_num, int *errnop)
 		my_errno = EINVAL;
 	}
 
-	rw_unlock(&proto_rw);
+	(void) rw_unlock(&proto_rw);
 bail:
 	if (errnop != NULL)
 		*errnop = my_errno;
@@ -854,7 +855,7 @@ getipsecalgbynum(int alg_num, int proto_num, int *errnop)
 
 	_build_internal_algs(NULL, NULL);
 
-	rw_rdlock(&proto_rw);
+	(void) rw_rdlock(&proto_rw);
 
 	proto = findprotobynum(proto_num);
 	if (proto != NULL) {
@@ -869,7 +870,7 @@ getipsecalgbynum(int alg_num, int proto_num, int *errnop)
 		my_errno = EINVAL;
 	}
 
-	rw_unlock(&proto_rw);
+	(void) rw_unlock(&proto_rw);
 	if (errnop != NULL)
 		*errnop = my_errno;
 	return (rc);
@@ -883,11 +884,11 @@ getipsecprotobyname(const char *proto_name)
 
 	_build_internal_algs(NULL, NULL);
 
-	rw_rdlock(&proto_rw);
+	(void) rw_rdlock(&proto_rw);
 	proto = findprotobyname(proto_name);
 	if (proto != NULL)
 		rc = proto->proto_num;
-	rw_unlock(&proto_rw);
+	(void) rw_unlock(&proto_rw);
 	return (rc);
 }
 
@@ -899,12 +900,12 @@ getipsecprotobynum(int proto_num)
 
 	_build_internal_algs(NULL, NULL);
 
-	rw_rdlock(&proto_rw);
+	(void) rw_rdlock(&proto_rw);
 	proto = findprotobynum(proto_num);
 	if (proto != NULL)
 		rc = strdup(proto->proto_name);
 
-	rw_unlock(&proto_rw);
+	(void) rw_unlock(&proto_rw);
 	return (rc);
 }
 

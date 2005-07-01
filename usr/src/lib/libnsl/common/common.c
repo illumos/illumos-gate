@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,15 +38,15 @@ thr_get_storage(pthread_key_t *keyp, size_t size, void (*destructor)(void *))
 	void *addr;
 
 	if ((key = *keyp) == 0) {
-		mutex_lock(&tsd_lock);
+		(void) mutex_lock(&tsd_lock);
 		if ((key = *keyp) == 0) {
 			if (pthread_key_create(keyp, destructor) != 0) {
-				mutex_unlock(&tsd_lock);
+				(void) mutex_unlock(&tsd_lock);
 				return (NULL);
 			}
 			key = *keyp;
 		}
-		mutex_unlock(&tsd_lock);
+		(void) mutex_unlock(&tsd_lock);
 	}
 
 	addr = pthread_getspecific(key);

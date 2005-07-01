@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -31,6 +32,8 @@
  * California.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * svc_vc.c -- Server side for Connection Oriented RPC.
  *
@@ -39,15 +42,12 @@
  * and a record stream.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include "rpc_mt.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <rpc/rpc.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/mkdev.h>
@@ -190,10 +190,10 @@ svc_vc_xprtfree(SVCXPRT *xprt)
 	}
 	if (r) {
 		if (r->t_call)
-			t_free((char *)r->t_call, T_CALL);
+			(void) t_free((char *)r->t_call, T_CALL);
 		if (r->t_bind)
-			t_free((char *)r->t_bind, T_BIND);
-		free((char *)r);
+			(void) t_free((char *)r->t_bind, T_BIND);
+		free(r);
 	}
 	svc_xprt_free(xprt);
 }
@@ -213,31 +213,27 @@ svc_vc_create_private(int fd, uint_t sendsize, uint_t recvsize)
 	SVCXPRT *xprt;
 	struct t_info tinfo;
 
-	trace4(TR_svc_vc_create, 0, fd, sendsize, recvsize);
 	if (RPC_FD_NOTIN_FDSET(fd)) {
 		errno = EBADF;
 		t_errno = TBADF;
 		(void) syslog(LOG_ERR, errstring, svc_vc_create_str,
 		    svc_vc_fderr);
-		trace2(TR_svc_dg_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
-	if ((xprt = svc_xprt_alloc()) == (SVCXPRT *)NULL) {
+	if ((xprt = svc_xprt_alloc()) == NULL) {
 		(void) syslog(LOG_ERR, errstring,
 		    svc_vc_create_str, no_mem_str);
-		trace2(TR_svc_vc_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 /* LINTED pointer alignment */
 	svc_flags(xprt) |= SVC_RENDEZVOUS;
 
-	r = (struct cf_rendezvous *)calloc(1, sizeof (*r));
-	if (r == (struct cf_rendezvous *)NULL) {
+	r = calloc(1, sizeof (*r));
+	if (r == NULL) {
 		(void) syslog(LOG_ERR, errstring,
 			svc_vc_create_str, no_mem_str);
 		svc_vc_xprtfree(xprt);
-		trace2(TR_svc_vc_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 	if (t_getinfo(fd, &tinfo) == -1) {
 		char errorstr[100];
@@ -246,10 +242,9 @@ svc_vc_create_private(int fd, uint_t sendsize, uint_t recvsize)
 				t_errno, errno);
 		(void) syslog(LOG_ERR, "%s : %s : %s",
 			svc_vc_create_str, no_tinfo_str, errorstr);
-		(void) mem_free((caddr_t)r, sizeof (*r));
+		free(r);
 		svc_vc_xprtfree(xprt);
-		trace2(TR_svc_vc_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 	/*
 	 * Find the receive and the send size
@@ -260,10 +255,9 @@ svc_vc_create_private(int fd, uint_t sendsize, uint_t recvsize)
 		syslog(LOG_ERR,
 		    "svc_vc_create:  transport does not support "
 		    "data transfer");
-		(void) mem_free((caddr_t)r, sizeof (*r));
+		free(r);
 		svc_vc_xprtfree(xprt);
-		trace2(TR_svc_vc_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 
 /* LINTED pointer alignment */
@@ -271,22 +265,20 @@ svc_vc_create_private(int fd, uint_t sendsize, uint_t recvsize)
 	if (r->t_call == NULL) {
 		(void) syslog(LOG_ERR, errstring,
 			svc_vc_create_str, no_mem_str);
-		(void) mem_free((caddr_t)r, sizeof (*r));
+		free(r);
 		svc_vc_xprtfree(xprt);
-		trace2(TR_svc_vc_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 
 /* LINTED pointer alignment */
 	r->t_bind = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR);
-	if (r->t_bind == (struct t_bind *)NULL) {
+	if (r->t_bind == NULL) {
 		(void) syslog(LOG_ERR, errstring,
 			svc_vc_create_str, no_mem_str);
-		t_free((char *)r->t_call, T_CALL);
-		(void) mem_free((caddr_t)r, sizeof (*r));
+		(void) t_free((char *)r->t_call, T_CALL);
+		free(r);
 		svc_vc_xprtfree(xprt);
-		trace2(TR_svc_vc_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 
 	r->cf_tsdu = tinfo.tsdu;
@@ -303,12 +295,11 @@ svc_vc_create_private(int fd, uint_t sendsize, uint_t recvsize)
 /* LINTED pointer alignment */
 	SVC_XP_AUTH(xprt).svc_ah_private = NULL;
 
-	trace2(TR_svc_vc_create, 1, fd);
 	return (xprt);
 }
 
 SVCXPRT *
-svc_vc_create(int fd, uint_t sendsize, uint_t recvsize)
+svc_vc_create(const int fd, const uint_t sendsize, const uint_t recvsize)
 {
 	SVCXPRT *xprt;
 
@@ -347,7 +338,7 @@ svc_vc_xprtcopy(SVCXPRT *parent)
 		if (xprt->xp_netid == NULL) {
 			syslog(LOG_ERR, "svc_vc_xprtcopy: strdup failed");
 			if (xprt->xp_tp)
-				free((char *)xprt->xp_tp);
+				free(xprt->xp_tp);
 			svc_vc_xprtfree(xprt);
 			return (NULL);
 		}
@@ -361,7 +352,7 @@ svc_vc_xprtcopy(SVCXPRT *parent)
 	xprt->xp_type = parent->xp_type;
 	xprt->xp_verf = parent->xp_verf;
 
-	if ((r = (struct cf_rendezvous *)calloc(1, sizeof (*r))) == NULL) {
+	if ((r = calloc(1, sizeof (*r))) == NULL) {
 		svc_vc_xprtfree(xprt);
 		return (NULL);
 	}
@@ -417,14 +408,12 @@ svc_fd_create_private(int fd, uint_t sendsize, uint_t recvsize)
 	SVCXPRT *dummy;
 	struct netbuf tres = {0};
 
-	trace4(TR_svc_fd_create, 0, fd, sendsize, recvsize);
 	if (RPC_FD_NOTIN_FDSET(fd)) {
 		errno = EBADF;
 		t_errno = TBADF;
 		(void) syslog(LOG_ERR, errstring,
 		    svc_fd_create_str, svc_vc_fderr);
-		trace2(TR_svc_dg_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 	if (t_getinfo(fd, &tinfo) == -1) {
 		char errorstr[100];
@@ -433,8 +422,7 @@ svc_fd_create_private(int fd, uint_t sendsize, uint_t recvsize)
 				t_errno, errno);
 		(void) syslog(LOG_ERR, "%s : %s : %s",
 			svc_fd_create_str, no_tinfo_str, errorstr);
-		trace2(TR_svc_fd_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 	/*
 	 * Find the receive and the send size
@@ -444,8 +432,7 @@ svc_fd_create_private(int fd, uint_t sendsize, uint_t recvsize)
 	if ((sendsize == 0) || (recvsize == 0)) {
 		syslog(LOG_ERR, errstring, svc_fd_create_str,
 			"transport does not support data transfer");
-		trace2(TR_svc_fd_create, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 	dummy = makefd_xprt(fd, sendsize, recvsize, tinfo.tsdu, NULL);
 				/* NULL signifies no dup cache */
@@ -455,12 +442,11 @@ svc_fd_create_private(int fd, uint_t sendsize, uint_t recvsize)
 	dummy->xp_ltaddr = tres;
 	/* Fill in type of service */
 	dummy->xp_type = tinfo.servtype;
-	trace2(TR_svc_fd_create, 1, fd);
 	return (dummy);
 }
 
 SVCXPRT *
-svc_fd_create(int fd, uint_t sendsize, uint_t recvsize)
+svc_fd_create(const int fd, const uint_t sendsize, const uint_t recvsize)
 {
 	SVCXPRT *xprt;
 
@@ -492,12 +478,12 @@ svc_fd_xprtfree(SVCXPRT *xprt)
 	}
 	if (cd) {
 		XDR_DESTROY(&(cd->xdrs));
-		free((char *)cd);
+		free(cd);
 	}
 	if (xt && (xt->parent == NULL) && xprt->xp_p2) {
 /* LINTED pointer alignment */
-		free((caddr_t)((struct netbuf *)xprt->xp_p2)->buf);
-		free((caddr_t)xprt->xp_p2);
+		free(((struct netbuf *)xprt->xp_p2)->buf);
+		free(xprt->xp_p2);
 	}
 	svc_xprt_free(xprt);
 }
@@ -509,22 +495,19 @@ makefd_xprt(int fd, uint_t sendsize, uint_t recvsize, t_scalar_t tsdu,
 	SVCXPRT *xprt;
 	struct cf_conn *cd;
 
-	trace5(TR_makefd_xprt, 0, fd, sendsize, recvsize, tsdu);
 	xprt = svc_xprt_alloc();
-	if (xprt == (SVCXPRT *)NULL) {
+	if (xprt == NULL) {
 		(void) syslog(LOG_ERR, errstring, makefd_xprt_str, no_mem_str);
-		trace2(TR_makefd_xprt, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 /* LINTED pointer alignment */
 	svc_flags(xprt) |= SVC_CONNECTION;
 
-	cd = (struct cf_conn *)mem_alloc(sizeof (struct cf_conn));
-	if (cd == (struct cf_conn *)NULL) {
+	cd = malloc(sizeof (struct cf_conn));
+	if (cd == NULL) {
 		(void) syslog(LOG_ERR, errstring, makefd_xprt_str, no_mem_str);
 		svc_fd_xprtfree(xprt);
-		trace2(TR_makefd_xprt, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 	cd->sendsize = sendsize;
 	cd->recvsize = recvsize;
@@ -538,24 +521,22 @@ makefd_xprt(int fd, uint_t sendsize, uint_t recvsize, t_scalar_t tsdu,
 			(int(*)())NULL, (int(*)(void *, char *, int))write_vc);
 	if (cd->xdrs.x_ops == NULL) {
 		(void) syslog(LOG_ERR, errstring, makefd_xprt_str, no_mem_str);
-		mem_free(cd, sizeof (struct cf_conn));
+		free(cd);
 		svc_fd_xprtfree(xprt);
-		trace2(TR_makefd_xprt, 1, fd);
-		return ((SVCXPRT *)NULL);
+		return (NULL);
 	}
 
-	rw_wrlock(&svc_fd_lock);
+	(void) rw_wrlock(&svc_fd_lock);
 	if (svc_xdrs == NULL) {
-		svc_xdrs = (XDR **)calloc(FD_INCREMENT,  sizeof (XDR *));
+		svc_xdrs = calloc(FD_INCREMENT,  sizeof (XDR *));
 		if (svc_xdrs == NULL) {
 			(void) syslog(LOG_ERR, errstring, makefd_xprt_str,
 								no_mem_str);
 			XDR_DESTROY(&(cd->xdrs));
-			mem_free(cd, sizeof (struct cf_conn));
+			free(cd);
 			svc_fd_xprtfree(xprt);
-			trace2(TR_makefd_xprt, 1, fd);
-			rw_unlock(&svc_fd_lock);
-			return ((SVCXPRT *)NULL);
+			(void) rw_unlock(&svc_fd_lock);
+			return (NULL);
 		}
 		nsvc_xdrs = FD_INCREMENT;
 	}
@@ -568,11 +549,10 @@ makefd_xprt(int fd, uint_t sendsize, uint_t recvsize, t_scalar_t tsdu,
 			(void) syslog(LOG_ERR, errstring, makefd_xprt_str,
 								no_mem_str);
 			XDR_DESTROY(&(cd->xdrs));
-			mem_free(cd, sizeof (struct cf_conn));
+			free(cd);
 			svc_fd_xprtfree(xprt);
-			trace2(TR_makefd_xprt, 1, fd);
-			rw_unlock(&svc_fd_lock);
-			return ((SVCXPRT *)NULL);
+			(void) rw_unlock(&svc_fd_lock);
+			return (NULL);
 		}
 
 		svc_xdrs = tmp_xdrs;
@@ -587,11 +567,10 @@ makefd_xprt(int fd, uint_t sendsize, uint_t recvsize, t_scalar_t tsdu,
 	} else if ((svc_xdrs[fd] = malloc(sizeof (XDR))) == NULL) {
 		(void) syslog(LOG_ERR, errstring, makefd_xprt_str, no_mem_str);
 		XDR_DESTROY(&(cd->xdrs));
-		mem_free(cd, sizeof (struct cf_conn));
+		free(cd);
 		svc_fd_xprtfree(xprt);
-		trace2(TR_makefd_xprt, 1, fd);
-		rw_unlock(&svc_fd_lock);
-		return ((SVCXPRT *)NULL);
+		(void) rw_unlock(&svc_fd_lock);
+		return (NULL);
 	}
 	(void) memset(svc_xdrs[fd], 0, sizeof (XDR));
 	xdrrec_create(svc_xdrs[fd], 0, recvsize, (caddr_t)xprt,
@@ -600,20 +579,18 @@ makefd_xprt(int fd, uint_t sendsize, uint_t recvsize, t_scalar_t tsdu,
 		free(svc_xdrs[fd]);
 		svc_xdrs[fd] = NULL;
 		XDR_DESTROY(&(cd->xdrs));
-		mem_free(cd, sizeof (struct cf_conn));
+		free(cd);
 		svc_fd_xprtfree(xprt);
-		trace2(TR_makefd_xprt, 1, fd);
-		rw_unlock(&svc_fd_lock);
-		return ((SVCXPRT *)NULL);
+		(void) rw_unlock(&svc_fd_lock);
+		return (NULL);
 	}
-	rw_unlock(&svc_fd_lock);
+	(void) rw_unlock(&svc_fd_lock);
 
 	xprt->xp_p1 = (caddr_t)cd;
 	xprt->xp_p2 = NULL;
 	xprt->xp_verf.oa_base = cd->verf_body;
 	xprt->xp_ops = svc_vc_ops();	/* truely deals with calls */
 	xprt->xp_fd = fd;
-	trace2(TR_makefd_xprt, 1, fd);
 	return (xprt);
 }
 
@@ -646,7 +623,7 @@ svc_fd_xprtcopy(SVCXPRT *parent)
 		if (xprt->xp_netid == NULL) {
 			syslog(LOG_ERR, "svc_fd_xprtcopy: strdup failed");
 			if (xprt->xp_tp)
-				free((char *)xprt->xp_tp);
+				free(xprt->xp_tp);
 			svc_fd_xprtfree(xprt);
 			return (NULL);
 		}
@@ -658,7 +635,7 @@ svc_fd_xprtcopy(SVCXPRT *parent)
 	xprt->xp_rtaddr = parent->xp_rtaddr;
 	xprt->xp_type = parent->xp_type;
 
-	if ((cd = (struct cf_conn *)malloc(sizeof (struct cf_conn))) == NULL) {
+	if ((cd = malloc(sizeof (struct cf_conn))) == NULL) {
 		svc_fd_xprtfree(xprt);
 		return (NULL);
 	}
@@ -704,7 +681,6 @@ rendezvous_request(SVCXPRT *xprt, struct rpc_msg *msg)
 	char devbuf[256];
 	static void do_accept();
 
-	trace1(TR_rendezvous_request, 0);
 /* LINTED pointer alignment */
 	r = (struct cf_rendezvous *)xprt->xp_p1;
 
@@ -712,7 +688,6 @@ again:
 	switch (t_look(xprt->xp_fd)) {
 	case T_DISCONNECT:
 		(void) t_rcvdis(xprt->xp_fd, NULL);
-		trace1(TR_rendezvous_request, 1);
 		return (FALSE);
 
 	case T_LISTEN:
@@ -725,12 +700,10 @@ again:
 				if (t_look(xprt->xp_fd) == T_DISCONNECT)
 				    (void) t_rcvdis(xprt->xp_fd, NULL);
 			}
-			trace1(TR_rendezvous_request, 1);
 			return (FALSE);
 		}
 		break;
 	default:
-		trace1(TR_rendezvous_request, 1);
 		return (FALSE);
 	}
 	/*
@@ -755,14 +728,13 @@ again:
 					"no suitable transport");
 			goto err;
 		}
-		strcpy(tpname, nconf->nc_device);
+		(void) strcpy(tpname, nconf->nc_device);
 		freenetconfigent(nconf);
 	}
 
 	do_accept(xprt->xp_fd, tpname, xprt->xp_netid, r->t_call, r);
 
 err:
-	trace1(TR_rendezvous_request, 1);
 	return (FALSE); /* there is never an rpc msg to be processed */
 }
 
@@ -772,16 +744,14 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 {
 	int	destfd;
 	struct t_call	t_call;
-	struct t_call	*tcp2 = (struct t_call *)NULL;
+	struct t_call	*tcp2 = NULL;
 	struct t_info	tinfo;
-	SVCXPRT	*xprt = (SVCXPRT *)NULL;
-	SVCXPRT	*xprt_srcfd = (SVCXPRT *)NULL;
+	SVCXPRT	*xprt = NULL;
+	SVCXPRT	*xprt_srcfd = NULL;
 	char *option, *option_ret;
 	struct opthdr *opt;
 	struct t_optmgmt optreq, optret;
 	int *p_optval;
-
-	trace1(TR_do_accept, 0);
 
 	destfd = t_open(tpname, O_RDWR, &tinfo);
 	if (check_nonblock_timestamps) {
@@ -792,9 +762,9 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 			 * get destroyed in case an attacker has been creating
 			 * many connections.
 			 */
-			mutex_lock(&svc_mutex);
+			(void) mutex_lock(&svc_mutex);
 			svc_timeout_nonblock_xprt_and_LRU(TRUE);
-			mutex_unlock(&svc_mutex);
+			(void) mutex_unlock(&svc_mutex);
 			destfd = t_open(tpname, O_RDWR, &tinfo);
 		} else {
 			/*
@@ -803,9 +773,9 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 			 * Do not destroy LRU xprt unless there are
 			 * too many open files.
 			 */
-			mutex_lock(&svc_mutex);
+			(void) mutex_lock(&svc_mutex);
 			svc_timeout_nonblock_xprt_and_LRU(FALSE);
-			mutex_unlock(&svc_mutex);
+			(void) mutex_unlock(&svc_mutex);
 		}
 	}
 	if (destfd == -1) {
@@ -816,9 +786,9 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 		(void) syslog(LOG_ERR, "%s : %s : %s", do_accept_str,
 				"can't open connection", errorstr);
 		(void) t_snddis(srcfd, tcp);
-		trace1(TR_do_accept, 1);
 		return;
-	} else if (destfd < 256) {
+	}
+	if (destfd < 256) {
 		int nfd;
 
 		nfd = _fcntl(destfd, F_DUPFD, 256);
@@ -842,7 +812,6 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 				    "could not t_sync() duped fd %d: %s",
 						destfd, errorstr);
 				(void) t_snddis(srcfd, tcp);
-				trace1(TR_do_accept, 1);
 				return;
 			}
 		}
@@ -854,7 +823,6 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 		(void) t_snddis(srcfd, tcp);
 		errno = EBADF;
 		t_errno = TBADF;
-		trace1(TR_do_accept, 1);
 		return;
 	}
 	(void) _fcntl(destfd, F_SETFD, 1); /* make it "close on exec" */
@@ -864,12 +832,11 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 				"do_accept:  illegal transport");
 		(void) t_close(destfd);
 		(void) t_snddis(srcfd, tcp);
-		trace1(TR_do_accept, 1);
 		return;
 	}
 
 
-	if (t_bind(destfd, (struct t_bind *)NULL, r->t_bind) == -1) {
+	if (t_bind(destfd, NULL, r->t_bind) == -1) {
 		char errorstr[100];
 
 		__tli_sys_strerror(errorstr, sizeof (errorstr), t_errno,
@@ -878,12 +845,11 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 			"t_bind failed", errorstr);
 		(void) t_close(destfd);
 		(void) t_snddis(srcfd, tcp);
-		trace1(TR_do_accept, 1);
 		return;
 	}
 
 	if (r->tcp_flag)	/* if TCP, set NODELAY flag */
-		__td_setnodelay(destfd);
+		(void) __td_setnodelay(destfd);
 
 	/*
 	 * This connection is not listening, hence no need to set
@@ -897,7 +863,7 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 	t_call = *tcp;
 	t_call.opt.len = 0;
 	t_call.opt.maxlen = 0;
-	t_call.opt.buf = (char *)NULL;
+	t_call.opt.buf = NULL;
 
 	while (t_accept(srcfd, destfd, &t_call) == -1) {
 		char errorstr[100];
@@ -913,22 +879,20 @@ again:
 				break;
 
 			case T_DISCONNECT:
-				(void) t_rcvdis(srcfd,
-					(struct t_discon *)NULL);
+				(void) t_rcvdis(srcfd, NULL);
 				break;
 
 			case T_LISTEN:
-				if (tcp2 == (struct t_call *)NULL)
+				if (tcp2 == NULL)
 /* LINTED pointer alignment */
 					tcp2 = (struct t_call *)t_alloc(srcfd,
 					    T_CALL, T_ADDR | T_OPT);
-				if (tcp2 == (struct t_call *)NULL) {
+				if (tcp2 == NULL) {
 
 					(void) t_close(destfd);
 					(void) t_snddis(srcfd, tcp);
 					syslog(LOG_ERR, errstring,
 						do_accept_str, no_mem_str);
-					trace1(TR_do_accept, 1);
 					return;
 					/* NOTREACHED */
 				}
@@ -945,7 +909,6 @@ again:
 					(void) t_free((char *)tcp2, T_CALL);
 					(void) t_close(destfd);
 					(void) t_snddis(srcfd, tcp);
-					trace1(TR_do_accept, 1);
 					return;
 					/* NOTREACHED */
 				}
@@ -959,7 +922,7 @@ again:
 			}
 			if (tcp2) {
 				(void) t_free((char *)tcp2, T_CALL);
-				tcp2 = (struct t_call *)NULL;
+				tcp2 = NULL;
 			}
 			break;
 
@@ -974,7 +937,6 @@ again:
 			 * operational situation that is recoverable.
 			 */
 			(void) t_close(destfd);
-			trace1(TR_do_accept, 1);
 			return;
 			/* NOTREACHED */
 
@@ -986,7 +948,6 @@ again:
 			if (t_getstate(srcfd) == T_IDLE) {
 				(void) t_close(destfd);
 				(void) t_snddis(srcfd, tcp);
-				trace1(TR_do_accept, 1);
 				return;
 			}
 			/* else FALL THROUGH TO */
@@ -999,18 +960,16 @@ again:
 			    errorstr, t_getstate(srcfd));
 			(void) t_close(destfd);
 			(void) t_snddis(srcfd, tcp);
-			trace1(TR_do_accept, 1);
 			return;
 			/* NOTREACHED */
 		}
 	}
 
 	if (r->tcp_flag && r->tcp_keepalive) {
-		option = (char *)malloc(sizeof (struct opthdr)
-					+ sizeof (int));
-		option_ret = (char *)malloc(sizeof (struct opthdr)
-					+ sizeof (int));
+		option = malloc(sizeof (struct opthdr) + sizeof (int));
+		option_ret = malloc(sizeof (struct opthdr) + sizeof (int));
 		if (option && option_ret) {
+			/* LINTED pointer cast */
 			opt = (struct opthdr *)option;
 			opt->level = SOL_SOCKET;
 			opt->name  = SO_KEEPALIVE;
@@ -1024,7 +983,7 @@ again:
 			optret.opt.maxlen = sizeof (struct opthdr)
 					+ sizeof (int);
 			optret.opt.buf = (char *)option_ret;
-			t_optmgmt(destfd, &optreq, &optret);
+			(void) t_optmgmt(destfd, &optreq, &optret);
 			free(option);
 			free(option_ret);
 		} else {
@@ -1041,7 +1000,7 @@ again:
 	 */
 	xprt = makefd_xprt(destfd, r->sendsize, r->recvsize, r->cf_tsdu,
 				r->cf_cache);
-	if (xprt == (SVCXPRT *)NULL) {
+	if (xprt == NULL) {
 		/*
 		 * makefd_xprt() returns a NULL xprt only when
 		 * it's out of memory.
@@ -1057,7 +1016,7 @@ again:
 	xprt->xp_rtaddr.maxlen = tcp->addr.len;
 	if ((xprt->xp_rtaddr.buf = malloc(tcp->addr.len)) == NULL)
 		goto memerr;
-	memcpy(xprt->xp_rtaddr.buf, tcp->addr.buf, tcp->addr.len);
+	(void) memcpy(xprt->xp_rtaddr.buf, tcp->addr.buf, tcp->addr.len);
 
 	if (strcmp(netid, "tcp") == 0) {
 		xprt->xp_ltaddr.maxlen = sizeof (struct sockaddr_in);
@@ -1083,8 +1042,8 @@ again:
 
 	xprt->xp_tp = strdup(tpname);
 	xprt->xp_netid = strdup(netid);
-	if ((xprt->xp_tp == (char *)NULL) ||
-	    (xprt->xp_netid == (char *)NULL)) {
+	if ((xprt->xp_tp == NULL) ||
+	    (xprt->xp_netid == NULL)) {
 		goto memerr;
 	}
 	if (tcp->opt.len > 0) {
@@ -1092,7 +1051,7 @@ again:
 
 		xprt->xp_p2 = malloc(sizeof (struct netbuf));
 
-		if (xprt->xp_p2 != (char *)NULL) {
+		if (xprt->xp_p2 != NULL) {
 /* LINTED pointer alignment */
 			netptr = (struct netbuf *)xprt->xp_p2;
 
@@ -1100,17 +1059,18 @@ again:
 			netptr->maxlen = tcp->opt.len;
 			if ((netptr->buf = malloc(tcp->opt.len)) == NULL)
 				goto memerr;
-			memcpy(netptr->buf, tcp->opt.buf, tcp->opt.len);
+			(void) memcpy(netptr->buf, tcp->opt.buf, tcp->opt.len);
 		} else
 			goto memerr;
 	}
-/*	(void) ioctl(destfd, I_POP, (char *)NULL);    */
+/*	(void) ioctl(destfd, I_POP, NULL);    */
 
 	/*
 	 * If a nonblocked connection fd has been requested,
 	 * perform the necessary operations.
 	 */
 	xprt_srcfd = svc_xports[srcfd];
+	/* LINTED pointer cast */
 	if (((struct cf_rendezvous *)(xprt_srcfd->xp_p1))->cf_connmaxrec) {
 		if (!svc_vc_nonblock(xprt_srcfd, xprt))
 			goto xprt_err;
@@ -1123,7 +1083,6 @@ again:
 	xprt->xp_closeclnt = xprt_srcfd->xp_closeclnt;
 	xprt_register(xprt);
 
-	trace1(TR_do_accept, 1);
 	return;
 
 memerr:
@@ -1132,11 +1091,7 @@ xprt_err:
 	if (xprt)
 		svc_vc_destroy(xprt);
 	(void) t_close(destfd);
-	trace1(TR_do_accept, 1);
-	return;
-
 }
-
 
 /*
  * This routine performs the necessary fcntl() operations to create
@@ -1151,7 +1106,9 @@ svc_vc_nonblock(SVCXPRT *xprt_rendezvous, SVCXPRT *xprt_conn)
 	int nn;
 	int fdconn = xprt_conn->xp_fd;
 	struct cf_rendezvous *r =
+		/* LINTED pointer cast */
 		(struct cf_rendezvous *)xprt_rendezvous->xp_p1;
+	/* LINTED pointer cast */
 	struct cf_conn *cd = (struct cf_conn *)xprt_conn->xp_p1;
 	uint32_t maxrecsz;
 
@@ -1187,20 +1144,16 @@ svc_vc_nonblock(SVCXPRT *xprt_rendezvous, SVCXPRT *xprt_conn)
 static enum xprt_stat
 rendezvous_stat(SVCXPRT *xprt)
 {
-	trace1(TR_rendezvous_stat, 0);
-	trace1(TR_rendezvous_stat, 1);
 	return (XPRT_IDLE);
 }
 
 static void
 svc_vc_destroy(SVCXPRT *xprt)
 {
-	trace1(TR_svc_vc_destroy, 0);
-	mutex_lock(&svc_mutex);
+	(void) mutex_lock(&svc_mutex);
 	_svc_vc_destroy_private(xprt, TRUE);
 	(void) svc_timeout_nonblock_xprt_and_LRU(FALSE);
-	mutex_unlock(&svc_mutex);
-	trace1(TR_svc_vc_destroy, 1);
+	(void) mutex_unlock(&svc_mutex);
 }
 
 void
@@ -1230,13 +1183,13 @@ _svc_vc_destroy_private(SVCXPRT *xprt, bool_t lock_not_held)
 	}
 
 	__xprt_unregister_private(xprt, lock_not_held);
-	t_close(xprt->xp_fd);
+	(void) t_close(xprt->xp_fd);
 
-	mutex_lock(&timestamp_lock);
+	(void) mutex_lock(&timestamp_lock);
 	if (timestamps && xprt->xp_fd < ntimestamps) {
 		timestamps[xprt->xp_fd] = 0;
 	}
-	mutex_unlock(&timestamp_lock);
+	(void) mutex_unlock(&timestamp_lock);
 
 	if (svc_mt_mode != RPC_SVC_MT_NONE) {
 		svc_xprt_destroy(xprt);
@@ -1253,29 +1206,20 @@ _svc_vc_destroy_private(SVCXPRT *xprt, bool_t lock_not_held)
 static bool_t
 svc_vc_control(SVCXPRT *xprt, const uint_t rq, void *in)
 {
-	trace3(TR_svc_vc_control, 0, xprt, rq);
 	switch (rq) {
 	case SVCSET_RECVERRHANDLER:
-		/*  00-07-18 */
 		xprt->xp_closeclnt = (svc_errorhandler_t)in;
 		return (TRUE);
 	case SVCGET_RECVERRHANDLER:
-		/*  00-07-18 */
 		*(svc_errorhandler_t *)in = xprt->xp_closeclnt;
 		return (TRUE);
 	case SVCGET_XID:
-		if (xprt->xp_p1 == NULL) {
-			trace1(TR_svc_vc_control, 1);
+		if (xprt->xp_p1 == NULL)
 			return (FALSE);
-		} else {
-			*(uint32_t *)in =
-			/* LINTED pointer alignment */
-			((struct cf_conn *)(xprt->xp_p1))->x_id;
-			trace1(TR_svc_vc_control, 1);
-			return (TRUE);
-		}
+		/* LINTED pointer alignment */
+		*(uint32_t *)in = ((struct cf_conn *)(xprt->xp_p1))->x_id;
+		return (TRUE);
 	default:
-		trace1(TR_svc_vc_control, 1);
 		return (FALSE);
 	}
 }
@@ -1284,27 +1228,23 @@ static bool_t
 rendezvous_control(SVCXPRT *xprt, const uint_t rq, void *in)
 {
 	struct cf_rendezvous *r;
-	uint32_t tmp_uint32;
 	int tmp;
 
-	trace3(TR_rendezvous_control, 0, xprt, rq);
 	switch (rq) {
 	case SVCSET_RECVERRHANDLER:
-		/*  00-07-18 */
 		xprt->xp_closeclnt = (svc_errorhandler_t)in;
 		return (TRUE);
 	case SVCGET_RECVERRHANDLER:
-		/*  00-07-18 */
 		*(svc_errorhandler_t *)in = xprt->xp_closeclnt;
 		return (TRUE);
 	case SVCSET_KEEPALIVE:
+		/* LINTED pointer cast */
 		r = (struct cf_rendezvous *)xprt->xp_p1;
 		if (r->tcp_flag) {
 			r->tcp_keepalive = (int)(intptr_t)in;
 			return (TRUE);
-		} else {
-			return (FALSE);
 		}
+		return (FALSE);
 	case SVCSET_CONNMAXREC:
 		/*
 		 * Override the default maximum record size, set via
@@ -1313,25 +1253,24 @@ rendezvous_control(SVCXPRT *xprt, const uint_t rq, void *in)
 		 * the connectionless case, so no need to check the
 		 * connection type here.
 		 */
+		/* LINTED pointer cast */
 		r = (struct cf_rendezvous *)xprt->xp_p1;
 		tmp = __rpc_legal_connmaxrec(*(int *)in);
 		if (r != 0 && tmp >= 0) {
 			r->cf_connmaxrec = tmp;
 			return (TRUE);
-		} else {
-			return (FALSE);
 		}
+		return (FALSE);
 	case SVCGET_CONNMAXREC:
+		/* LINTED pointer cast */
 		r = (struct cf_rendezvous *)xprt->xp_p1;
 		if (r != 0) {
 			*(int *)in = r->cf_connmaxrec;
 			return (TRUE);
-		} else {
-			return (FALSE);
 		}
+		return (FALSE);
 	case SVCGET_XID:	/* fall through for now */
 	default:
-		trace1(TR_rendezvous_control, 1);
 		return (FALSE);
 	}
 }
@@ -1348,11 +1287,11 @@ rendezvous_control(SVCXPRT *xprt, const uint_t rq, void *in)
 static void
 update_timestamps(int fd)
 {
-	mutex_lock(&timestamp_lock);
+	(void) mutex_lock(&timestamp_lock);
 	if (timestamps) {
 		struct timeval tv;
 
-		gettimeofday(&tv, NULL);
+		(void) gettimeofday(&tv, NULL);
 		while (fd >= ntimestamps) {
 			long *tmp_timestamps = timestamps;
 
@@ -1361,7 +1300,7 @@ update_timestamps(int fd)
 				sizeof (long) *
 				(ntimestamps + FD_INCREMENT));
 			if (tmp_timestamps == NULL) {
-				mutex_unlock(&timestamp_lock);
+				(void) mutex_unlock(&timestamp_lock);
 				syslog(LOG_ERR,
 					"update_timestamps: out of memory");
 				return;
@@ -1374,16 +1313,17 @@ update_timestamps(int fd)
 		}
 		timestamps[fd] = tv.tv_sec;
 	}
-	mutex_unlock(&timestamp_lock);
+	(void) mutex_unlock(&timestamp_lock);
 }
 
 static  void
 update_nonblock_timestamps(SVCXPRT *xprt_conn)
 {
 	struct timeval tv;
+	/* LINTED pointer cast */
 	struct cf_conn *cd = (struct cf_conn *)xprt_conn->xp_p1;
 
-	gettimeofday(&tv, NULL);
+	(void) gettimeofday(&tv, NULL);
 	cd->cf_conn_nonblock_timestamp = tv.tv_sec;
 }
 
@@ -1400,17 +1340,14 @@ read_vc(SVCXPRT *xprt, caddr_t buf, int len)
 	struct pollfd pfd;
 	int ret;
 
-	trace2(TR_read_vc, 0, len);
-
 	/*
 	 * Make sure the connection is not already dead.
 	 */
 /* LINTED pointer alignment */
-	if (svc_failed(xprt)) {
-		trace1(TR_read_vc, 1);
+	if (svc_failed(xprt))
 		return (-1);
-	}
 
+	/* LINTED pointer cast */
 	if (((struct cf_conn *)(xprt->xp_p1))->cf_conn_nonblock) {
 		/*
 		 * For nonblocked reads, only update the
@@ -1431,11 +1368,9 @@ read_vc(SVCXPRT *xprt, caddr_t buf, int len)
 				update_timestamps(fd);
 				update_nonblock_timestamps(xprt);
 			}
-			trace1(TR_read_vc, 1);
 			return (len);
-		} else {
-			goto fatal_err;
 		}
+		goto fatal_err;
 	}
 
 	if (!__is_xdrrec_first(xdrs)) {
@@ -1458,10 +1393,9 @@ read_vc(SVCXPRT *xprt, caddr_t buf, int len)
 		if (pfd.revents & POLLNVAL)
 			goto fatal_err;
 	}
-	__xdrrec_resetfirst(xdrs);
+	(void) __xdrrec_resetfirst(xdrs);
 	if ((len = t_rcvall(fd, buf, len)) > 0) {
 		update_timestamps(fd);
-		trace1(TR_read_vc, 1);
 		return (len);
 	}
 
@@ -1470,7 +1404,6 @@ fatal_err:
 	((struct cf_conn *)(xprt->xp_p1))->strm_stat = XPRT_DIED;
 /* LINTED pointer alignment */
 	svc_flags(xprt) |= SVC_FAILED;
-	trace1(TR_read_vc, 1);
 	return (-1);
 }
 
@@ -1482,21 +1415,19 @@ static int
 t_rcvnonblock(SVCXPRT *xprt, caddr_t buf, int len)
 {
 	int fd = xprt->xp_fd;
-	struct cf_conn *cd = (struct cf_conn *)(xprt->xp_p1);
 	int flag;
 	int res;
 
-	trace3(TR_t_rcvnonblock, 0, fd, len);
 	res = t_rcv(fd, buf, (unsigned)len, &flag);
 	if (res == -1) {
 		switch (t_errno) {
 		case TLOOK:
 			switch (t_look(fd)) {
 			case T_DISCONNECT:
-				t_rcvdis(fd, NULL);
+				(void) t_rcvdis(fd, NULL);
 				break;
 			case T_ORDREL:
-				t_rcvrel(fd);
+				(void) t_rcvrel(fd);
 				(void) t_sndrel(fd);
 				break;
 			default:
@@ -1516,7 +1447,6 @@ t_rcvnonblock(SVCXPRT *xprt, caddr_t buf, int len)
 			break;
 		}
 	}
-	trace2(TR_t_rcvnonblock, 1, fd);
 	return (res);
 }
 
@@ -1539,21 +1469,20 @@ svc_timeout_nonblock_xprt_and_LRU(bool_t destroy_lru)
 	int i, fd_idx = 0, dead_idx = 0;
 	struct timeval now;
 	time_t lasttime, maxctime = 0;
-	extern rwlock_t svc_lock;
 	extern rwlock_t svc_fd_lock;
 
 	if (!check_nonblock_timestamps)
 		return;
 
-	gettimeofday(&now, NULL);
+	(void) gettimeofday(&now, NULL);
 	if (svc_xports == NULL)
 		return;
 	/*
 	 * Hold svc_fd_lock to protect
 	 * svc_xports, svc_maxpollfd, svc_max_pollfd
 	 */
-	rw_wrlock(&svc_fd_lock);
-	while (1) {
+	(void) rw_wrlock(&svc_fd_lock);
+	for (;;) {
 		/*
 		 * Timeout upto CLEANUP_SIZE connection fds per
 		 * iteration for the while(1) loop
@@ -1563,9 +1492,11 @@ svc_timeout_nonblock_xprt_and_LRU(bool_t destroy_lru)
 				continue;
 			}
 			/* Only look at connection fds */
+			/* LINTED pointer cast */
 			if (svc_type(xprt) != SVC_CONNECTION) {
 				continue;
 			}
+			/* LINTED pointer cast */
 			cd = (struct cf_conn *)xprt->xp_p1;
 			if (!cd->cf_conn_nonblock)
 				continue;
@@ -1595,10 +1526,10 @@ svc_timeout_nonblock_xprt_and_LRU(bool_t destroy_lru)
 		if (fd_idx++ >= svc_max_pollfd)
 			break;
 	}
-	if ((destroy_lru) && (candidate_xprt != (SVCXPRT *)NULL)) {
+	if ((destroy_lru) && (candidate_xprt != NULL)) {
 		_svc_vc_destroy_private(candidate_xprt, FALSE);
 	}
-	rw_unlock(&svc_fd_lock);
+	(void) rw_unlock(&svc_fd_lock);
 }
 /*
  * Receive the required bytes of data, even if it is fragmented.
@@ -1610,17 +1541,16 @@ t_rcvall(int fd, char *buf, int len)
 	int final = 0;
 	int res;
 
-	trace3(TR_t_rcvall, 0, fd, len);
 	do {
 		res = t_rcv(fd, buf, (unsigned)len, &flag);
 		if (res == -1) {
 			if (t_errno == TLOOK) {
 				switch (t_look(fd)) {
 				case T_DISCONNECT:
-					t_rcvdis(fd, NULL);
+					(void) t_rcvdis(fd, NULL);
 					break;
 				case T_ORDREL:
-					t_rcvrel(fd);
+					(void) t_rcvrel(fd);
 					(void) t_sndrel(fd);
 					break;
 				default:
@@ -1633,7 +1563,6 @@ t_rcvall(int fd, char *buf, int len)
 		buf += res;
 		len -= res;
 	} while (len && (flag & T_MORE));
-	trace2(TR_t_rcvall, 1, fd);
 	return (res == -1 ? -1 : final);
 }
 
@@ -1649,11 +1578,10 @@ write_vc(SVCXPRT *xprt, caddr_t buf, int len)
 	int maxsz;
 	int nonblock;
 	struct pollfd pfd;
-	int ret;
 
-	trace2(TR_write_vc, 0, len);
 /* LINTED pointer alignment */
 	maxsz = ((struct cf_conn *)(xprt->xp_p1))->cf_tsdu;
+	/* LINTED pointer cast */
 	nonblock = ((struct cf_conn *)(xprt->xp_p1))->cf_conn_nonblock;
 	if (nonblock && maxsz <= 0)
 		maxsz = len;
@@ -1663,10 +1591,10 @@ write_vc(SVCXPRT *xprt, caddr_t buf, int len)
 			if (t_errno == TLOOK) {
 				switch (t_look(xprt->xp_fd)) {
 				case T_DISCONNECT:
-					t_rcvdis(xprt->xp_fd, NULL);
+					(void) t_rcvdis(xprt->xp_fd, NULL);
 					break;
 				case T_ORDREL:
-					t_rcvrel(xprt->xp_fd);
+					(void) t_rcvrel(xprt->xp_fd);
 					(void) t_sndrel(xprt->xp_fd);
 					break;
 				default:
@@ -1679,7 +1607,6 @@ write_vc(SVCXPRT *xprt, caddr_t buf, int len)
 /* LINTED pointer alignment */
 			svc_flags(xprt) |= SVC_FAILED;
 		}
-		trace1(TR_write_vc, 1);
 		return (len);
 	}
 
@@ -1702,10 +1629,10 @@ write_vc(SVCXPRT *xprt, caddr_t buf, int len)
 			if (t_errno == TLOOK) {
 				switch (t_look(xprt->xp_fd)) {
 				case T_DISCONNECT:
-					t_rcvdis(xprt->xp_fd, NULL);
+					(void) t_rcvdis(xprt->xp_fd, NULL);
 					break;
 				case T_ORDREL:
-					t_rcvrel(xprt->xp_fd);
+					(void) t_rcvrel(xprt->xp_fd);
 					break;
 				default:
 					break;
@@ -1715,8 +1642,7 @@ write_vc(SVCXPRT *xprt, caddr_t buf, int len)
 				i = 0;
 				/* Wait till we can write to the transport */
 				do {
-				    if ((ret = poll(&pfd, 1,
-							WAIT_PER_TRY)) < 0) {
+				    if (poll(&pfd, 1, WAIT_PER_TRY) < 0) {
 					/*
 					 * If errno is ERESTART, or
 					 * EAGAIN ignore error and repeat poll
@@ -1739,11 +1665,9 @@ fatal_err:
 					= XPRT_DIED;
 /* LINTED pointer alignment */
 			svc_flags(xprt) |= SVC_FAILED;
-			trace1(TR_write_vc, 1);
 			return (-1);
 		}
 	}
-	trace1(TR_write_vc, 1);
 	return (len);
 }
 
@@ -1753,26 +1677,18 @@ svc_vc_stat(SVCXPRT *xprt)
 /* LINTED pointer alignment */
 	SVCXPRT *parent = SVCEXT(xprt)->parent ? SVCEXT(xprt)->parent : xprt;
 
-	trace1(TR_svc_vc_stat, 0);
 /* LINTED pointer alignment */
-	if (svc_failed(parent) || svc_failed(xprt)) {
-		trace1(TR_svc_vc_stat, 1);
+	if (svc_failed(parent) || svc_failed(xprt))
 		return (XPRT_DIED);
-	}
-	if (! xdrrec_eof(svc_xdrs[xprt->xp_fd])) {
-		trace1(TR_svc_vc_stat, 1);
+	if (!xdrrec_eof(svc_xdrs[xprt->xp_fd]))
 		return (XPRT_MOREREQS);
-	}
 	/*
 	 * xdrrec_eof could have noticed that the connection is dead, so
 	 * check status again.
 	 */
 /* LINTED pointer alignment */
-	if (svc_failed(parent) || svc_failed(xprt)) {
-		trace1(TR_svc_vc_stat, 1);
+	if (svc_failed(parent) || svc_failed(xprt))
 		return (XPRT_DIED);
-	}
-	trace1(TR_svc_vc_stat, 1);
 	return (XPRT_IDLE);
 }
 
@@ -1785,7 +1701,6 @@ svc_vc_recv(SVCXPRT *xprt, struct rpc_msg *msg)
 	struct cf_conn *cd = (struct cf_conn *)(xprt->xp_p1);
 	XDR *xdrs = svc_xdrs[xprt->xp_fd];
 
-	trace1(TR_svc_vc_recv, 0);
 	xdrs->x_op = XDR_DECODE;
 
 	if (cd->cf_conn_nonblock) {
@@ -1801,21 +1716,18 @@ svc_vc_recv(SVCXPRT *xprt, struct rpc_msg *msg)
 			 * is being processed through the xdr routines.
 			 */
 			if (cd->strm_stat == XPRT_DIED)
+				/* LINTED pointer cast */
 				svc_flags(xprt) |= SVC_FAILED;
-			trace1(TR_svc_vc_recv, 1);
 			return (FALSE);
 		}
 	} else {
-		if (!xdrrec_skiprecord(xdrs)) {
-			trace1(TR_svc_vc_recv, 1);
+		if (!xdrrec_skiprecord(xdrs))
 			return (FALSE);
-		}
-		__xdrrec_setfirst(xdrs);
+		(void) __xdrrec_setfirst(xdrs);
 	}
 
 	if (xdr_callmsg(xdrs, msg)) {
 		cd->x_id = msg->rm_xid;
-		trace1(TR_svc_vc_recv, 1);
 		return (TRUE);
 	}
 
@@ -1824,27 +1736,24 @@ svc_vc_recv(SVCXPRT *xprt, struct rpc_msg *msg)
 	 * We are either under attack, or we're talking to a broken client.
 	 */
 	if (cd->cf_conn_nonblock) {
+		/* LINTED pointer cast */
 		svc_flags(xprt) |= SVC_FAILED;
 	}
 
-	trace1(TR_svc_vc_recv, 1);
 	return (FALSE);
 }
 
 static bool_t
 svc_vc_getargs(SVCXPRT *xprt, xdrproc_t xdr_args, caddr_t args_ptr)
 {
-	bool_t dummy1;
-
-	trace1(TR_svc_vc_getargs, 0);
+	bool_t dummy;
 
 /* LINTED pointer alignment */
-	dummy1 = SVCAUTH_UNWRAP(&SVC_XP_AUTH(xprt), svc_xdrs[xprt->xp_fd],
+	dummy = SVCAUTH_UNWRAP(&SVC_XP_AUTH(xprt), svc_xdrs[xprt->xp_fd],
 							xdr_args, args_ptr);
 	if (svc_mt_mode != RPC_SVC_MT_NONE)
 		svc_args_done(xprt);
-	trace1(TR_svc_vc_getargs, 1);
-	return (dummy1);
+	return (dummy);
 }
 
 static bool_t
@@ -1852,13 +1761,9 @@ svc_vc_freeargs(SVCXPRT *xprt, xdrproc_t xdr_args, caddr_t args_ptr)
 {
 /* LINTED pointer alignment */
 	XDR *xdrs = &(((struct cf_conn *)(xprt->xp_p1))->xdrs);
-	bool_t dummy2;
 
-	trace1(TR_svc_vc_freeargs, 0);
 	xdrs->x_op = XDR_FREE;
-	dummy2 = (*xdr_args)(xdrs, args_ptr);
-	trace1(TR_svc_vc_freeargs, 1);
-	return (dummy2);
+	return ((*xdr_args)(xdrs, args_ptr));
 }
 
 static bool_t
@@ -1872,14 +1777,12 @@ svc_vc_reply(SVCXPRT *xprt, struct rpc_msg *msg)
 	caddr_t xdr_location;
 	bool_t has_args;
 
-	trace1(TR_svc_vc_reply, 0);
-
 #ifdef __lock_lint
-	mutex_lock(&svc_send_mutex(SVCEXT(xprt)->parent));
+	(void) mutex_lock(&svc_send_mutex(SVCEXT(xprt)->parent));
 #else
 	if (svc_mt_mode != RPC_SVC_MT_NONE)
 /* LINTED pointer alignment */
-		mutex_lock(&svc_send_mutex(SVCEXT(xprt)->parent));
+		(void) mutex_lock(&svc_send_mutex(SVCEXT(xprt)->parent));
 #endif
 
 	if (msg->rm_reply.rp_stat == MSG_ACCEPTED &&
@@ -1902,27 +1805,25 @@ svc_vc_reply(SVCXPRT *xprt, struct rpc_msg *msg)
 	(void) xdrrec_endofrecord(xdrs, TRUE);
 
 #ifdef __lock_lint
-	mutex_unlock(&svc_send_mutex(SVCEXT(xprt)->parent));
+	(void) mutex_unlock(&svc_send_mutex(SVCEXT(xprt)->parent));
 #else
 	if (svc_mt_mode != RPC_SVC_MT_NONE)
 /* LINTED pointer alignment */
-		mutex_unlock(&svc_send_mutex(SVCEXT(xprt)->parent));
+		(void) mutex_unlock(&svc_send_mutex(SVCEXT(xprt)->parent));
 #endif
 
-	trace1(TR_svc_vc_reply, 1);
 	return (stat);
 }
 
 static struct xp_ops *
-svc_vc_ops()
+svc_vc_ops(void)
 {
 	static struct xp_ops ops;
 	extern mutex_t ops_lock;
 
 /* VARIABLES PROTECTED BY ops_lock: ops */
 
-	trace1(TR_svc_vc_ops, 0);
-	mutex_lock(&ops_lock);
+	(void) mutex_lock(&ops_lock);
 	if (ops.xp_recv == NULL) {
 		ops.xp_recv = svc_vc_recv;
 		ops.xp_stat = svc_vc_stat;
@@ -1932,19 +1833,17 @@ svc_vc_ops()
 		ops.xp_destroy = svc_vc_destroy;
 		ops.xp_control = svc_vc_control;
 	}
-	mutex_unlock(&ops_lock);
-	trace1(TR_svc_vc_ops, 1);
+	(void) mutex_unlock(&ops_lock);
 	return (&ops);
 }
 
 static struct xp_ops *
-svc_vc_rendezvous_ops()
+svc_vc_rendezvous_ops(void)
 {
 	static struct xp_ops ops;
 	extern mutex_t ops_lock;
 
-	trace1(TR_svc_vc_rendezvous_ops, 0);
-	mutex_lock(&ops_lock);
+	(void) mutex_lock(&ops_lock);
 	if (ops.xp_recv == NULL) {
 		ops.xp_recv = rendezvous_request;
 		ops.xp_stat = rendezvous_stat;
@@ -1954,8 +1853,7 @@ svc_vc_rendezvous_ops()
 		ops.xp_destroy = svc_vc_destroy;
 		ops.xp_control = rendezvous_control;
 	}
-	mutex_unlock(&ops_lock);
-	trace1(TR_svc_vc_rendezvous_ops, 1);
+	(void) mutex_unlock(&ops_lock);
 	return (&ops);
 }
 
@@ -2002,7 +1900,7 @@ fd_is_dead(int fd)
 }
 
 void
-__svc_nisplus_fdcleanup_hack()
+__svc_nisplus_fdcleanup_hack(void)
 {
 	SVCXPRT *xprt;
 	SVCXPRT *dead_xprt[CLEANUP_SIZE];
@@ -2010,8 +1908,8 @@ __svc_nisplus_fdcleanup_hack()
 
 	if (svc_xports == NULL)
 		return;
-	while (1) {
-		rw_wrlock(&svc_fd_lock);
+	for (;;) {
+		(void) rw_wrlock(&svc_fd_lock);
 		for (dead_idx = 0; fd_idx < svc_max_pollfd; fd_idx++) {
 			if ((xprt = svc_xports[fd_idx]) == NULL)
 				continue;
@@ -2029,29 +1927,29 @@ __svc_nisplus_fdcleanup_hack()
 			/* Still holding svc_fd_lock */
 			_svc_vc_destroy_private(dead_xprt[i], FALSE);
 		}
-		rw_unlock(&svc_fd_lock);
+		(void) rw_unlock(&svc_fd_lock);
 		if (fd_idx++ >= svc_max_pollfd)
 			return;
 	}
 }
 
 void
-__svc_nisplus_enable_timestamps()
+__svc_nisplus_enable_timestamps(void)
 {
-	mutex_lock(&timestamp_lock);
+	(void) mutex_lock(&timestamp_lock);
 	if (!timestamps) {
 		timestamps = calloc(FD_INCREMENT, sizeof (long));
 		if (timestamps != NULL)
 			ntimestamps = FD_INCREMENT;
 		else {
-			mutex_unlock(&timestamp_lock);
+			(void) mutex_unlock(&timestamp_lock);
 			syslog(LOG_ERR,
 				"__svc_nisplus_enable_timestamps: "
 				"out of memory");
 			return;
 		}
 	}
-	mutex_unlock(&timestamp_lock);
+	(void) mutex_unlock(&timestamp_lock);
 }
 
 void
@@ -2063,13 +1961,14 @@ __svc_nisplus_purge_since(long since)
 
 	if (svc_xports == NULL)
 		return;
-	while (1) {
-		rw_wrlock(&svc_fd_lock);
-		mutex_lock(&timestamp_lock);
+	for (;;) {
+		(void) rw_wrlock(&svc_fd_lock);
+		(void) mutex_lock(&timestamp_lock);
 		for (dead_idx = 0; fd_idx < svc_max_pollfd; fd_idx++) {
 			if ((xprt = svc_xports[fd_idx]) == NULL) {
 				continue;
 			}
+			/* LINTED pointer cast */
 			if (svc_type(xprt) != SVC_CONNECTION) {
 				continue;
 			}
@@ -2083,13 +1982,13 @@ __svc_nisplus_purge_since(long since)
 					break;
 			}
 		}
-		mutex_unlock(&timestamp_lock);
+		(void) mutex_unlock(&timestamp_lock);
 
 		for (i = 0; i < dead_idx; i++) {
 			/* Still holding svc_fd_lock */
 			_svc_vc_destroy_private(dead_xprt[i], FALSE);
 		}
-		rw_unlock(&svc_fd_lock);
+		(void) rw_unlock(&svc_fd_lock);
 		if (fd_idx++ >= svc_max_pollfd)
 			return;
 	}

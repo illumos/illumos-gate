@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1992,1999 by Sun Microsystems Inc.
- *	All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  *	auth_time.c
  *
@@ -54,6 +55,7 @@
 #include <syslog.h>
 #include <netdir.h>
 #include <string.h>
+#include <strings.h>
 #include <netconfig.h>
 #include <netdb.h>
 #include <signal.h>
@@ -75,13 +77,11 @@ extern bool_t	__nis_netconfig_matches_ep(struct netconfig *, endpoint *);
 #define	msg(x)
 #endif
 
-extern int bzero(caddr_t dst, int len);
-
 static int saw_alarm = 0;
 
+/* ARGSUSED */
 static void
-alarm_hndler(s)
-	int	s;
+alarm_hndler(int s)
 {
 	saw_alarm = 1;
 }
@@ -145,7 +145,7 @@ get_server(char *host, nis_server *srv, endpoint eps[], int  maxep)
 			netdir_free((char *)addrs, ND_ADDRLIST);
 		}
 	}
-	endnetconfig(nch);
+	(void) endnetconfig(nch);
 
 	srv->name = (nis_name) host;
 	srv->ep.ep_len = num_ep;
@@ -282,7 +282,7 @@ __rpc_get_time_offset(struct timeval *td, nis_server *srv,
 			}
 		}
 
-		endnetconfig(nc_handle);
+		(void) endnetconfig(nc_handle);
 
 		/*
 		 * epcand[] now contains the candidate transports. If there
@@ -353,8 +353,10 @@ __rpc_get_time_offset(struct timeval *td, nis_server *srv,
 		useua = epcand[i]->uaddr;
 		useid = epcand[i]->proto;
 		if (strcasecmp(nc->nc_protofmly, NC_INET) == 0) {
-			sscanf(useua, "%d.%d.%d.%d.", &a1, &a2, &a3, &a4);
-			sprintf(ipuaddr, "%d.%d.%d.%d.0.111", a1, a2, a3, a4);
+			(void) sscanf(useua,
+					"%d.%d.%d.%d.", &a1, &a2, &a3, &a4);
+			(void) sprintf(ipuaddr, "%d.%d.%d.%d.0.111",
+					a1, a2, a3, a4);
 			useua = &ipuaddr[0];
 		} else if (strcasecmp(nc->nc_protofmly, NC_INET6) == 0) {
 			size_t	len;
@@ -367,7 +369,7 @@ __rpc_get_time_offset(struct timeval *td, nis_server *srv,
 				return (0);
 			}
 
-			strcpy(ipuaddr, useua);
+			(void) strcpy(ipuaddr, useua);
 
 			/* get the IPv6 address out of the uaddr */
 			if ((dot = strrchr(ipuaddr, '.')) != 0) {
@@ -386,7 +388,7 @@ __rpc_get_time_offset(struct timeval *td, nis_server *srv,
 			}
 
 			/* now put in 0.111 */
-			strcat(ipuaddr + len, port);
+			(void) strcat(ipuaddr + len, port);
 			useua = ipuaddr;
 		}
 
@@ -461,9 +463,9 @@ __rpc_get_time_offset(struct timeval *td, nis_server *srv,
 			useid = epcand[i]->proto;
 
 			if (strcasecmp(nc->nc_protofmly, NC_INET) == 0)  {
-				sscanf(useua,
+				(void) sscanf(useua,
 					"%d.%d.%d.%d.", &a1, &a2, &a3, &a4);
-				sprintf(ut, "%d.%d.%d.%d.0.37",
+				(void) sprintf(ut, "%d.%d.%d.%d.0.37",
 							a1, a2, a3, a4);
 			} else if (strcasecmp(nc->nc_protofmly, NC_INET6) ==
 					0) {
@@ -474,7 +476,7 @@ __rpc_get_time_offset(struct timeval *td, nis_server *srv,
 					goto error;
 				}
 
-				strcpy(ut, useua);
+				(void) strcpy(ut, useua);
 
 				/* get the IPv6 address out of the uaddr */
 				if ((dot = strrchr(ut, '.')) != 0) {
@@ -492,7 +494,7 @@ __rpc_get_time_offset(struct timeval *td, nis_server *srv,
 					goto error;
 				}
 
-				strcat(ut + len, port);
+				(void) strcat(ut + len, port);
 
 			}
 
@@ -557,7 +559,7 @@ __rpc_get_time_offset(struct timeval *td, nis_server *srv,
 				oldsig = (void (*)())signal(SIGALRM,
 							alarm_hndler);
 				saw_alarm = 0; /* global tracking the alarm */
-				alarm(20); /* only wait 20 seconds */
+				(void) alarm(20); /* only wait 20 seconds */
 				if (t_connect(rtime_fd, &sndcall, NULL) ==
 						-1) {
 					msg("connect tcp endpoint failedd.");
@@ -607,8 +609,8 @@ error:
 		freenetconfigent(nc);
 
 	if (oldsig) {
-		alarm(0);	/* reset that alarm if its outstanding */
-		signal(SIGALRM, oldsig);
+		(void) alarm(0); /* reset that alarm if its outstanding */
+		(void) signal(SIGALRM, oldsig);
 	}
 
 	/*
@@ -636,7 +638,7 @@ error:
 			}
 		}
 
-		gettimeofday(&tv, 0);
+		(void) gettimeofday(&tv, 0);
 
 		/* Round to the nearest second */
 		tv.tv_sec += (tv.tv_sec > 500000) ? 1 : 0;

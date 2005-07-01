@@ -19,20 +19,18 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
 
 #include "mt.h"
-#include <rpc/trace.h>
 #include <errno.h>
 #include <unistd.h>
 #include <xti.h>
@@ -46,14 +44,8 @@ _tx_close(int fd, int api_semantics)
 	sigset_t mask;
 	int sv_errno;
 
-	trace2(TR_t_close, 0, fd);
-
-	if (_t_checkfd(fd, 0, api_semantics) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_close, 1, fd);
-		errno = sv_errno;
+	if (_t_checkfd(fd, 0, api_semantics) == NULL)
 		return (-1);
-	}
 
 	(void) thr_sigsetmask(SIG_SETMASK, &fillset, &mask);
 	sig_mutex_lock(&_ti_userlock);
@@ -61,7 +53,6 @@ _tx_close(int fd, int api_semantics)
 		sv_errno = errno;
 		sig_mutex_unlock(&_ti_userlock);
 		(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-		trace2(TR_t_close, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -74,6 +65,5 @@ _tx_close(int fd, int api_semantics)
 
 	sig_mutex_unlock(&_ti_userlock);
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-	trace2(TR_t_close, 1, fd);
 	return (0);
 }

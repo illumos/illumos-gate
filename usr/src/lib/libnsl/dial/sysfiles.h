@@ -19,19 +19,31 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#ifndef _DIAL_SYSFILES_H
+#define	_DIAL_SYSFILES_H
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define SYSDIR		(const char *)"/etc/uucp"
-#define SYSFILES	(const char *)"/etc/uucp/Sysfiles"
-#define SYSTEMS		(const char *)"/etc/uucp/Systems"
-#define DEVICES		(const char *)"/etc/uucp/Devices"
-#define DIALERS		(const char *)"/etc/uucp/Dialers"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define	SYSDIR		(const char *)"/etc/uucp"
+#define	SYSFILES	(const char *)"/etc/uucp/Sysfiles"
+#define	SYSTEMS		(const char *)"/etc/uucp/Systems"
+#define	DEVICES		(const char *)"/etc/uucp/Devices"
+#define	DIALERS		(const char *)"/etc/uucp/Dialers"
 #define	DEVCONFIG	(const char *)"/etc/uucp/Devconfig"
-#define CONFIG		(const char *)"/etc/uucp/Config"
+#define	CONFIG		(const char *)"/etc/uucp/Config"
 
 #define	SAME	0
 #define	TRUE	1
@@ -48,3 +60,8 @@
 #define	EACCESS_DEVICES	5
 #define	EACCESS_DIALERS	6
 
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _DIAL_SYSFILES_H */

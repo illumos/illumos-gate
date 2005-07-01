@@ -19,29 +19,35 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5.3.3 */
 
 #include "mt.h"
-#include <fcntl.h>
-#include <rpc/trace.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stropts.h>
+#include <sys/stream.h>
 #define	_SUN_TPI_VERSION 2
+#include <sys/tihdr.h>
 #include <sys/timod.h>
+#include <sys/stat.h>
 #include <xti.h>
+#include <fcntl.h>
 #include <signal.h>
+#include <assert.h>
 #include <syslog.h>
+#include <limits.h>
 #include "tx.h"
 
 /*
@@ -65,10 +71,8 @@ _tx_open(const char *path, int flags, struct t_info *info, int api_semantics)
 	int t_create_first_attempt = 1;
 	int ticap_ioctl_failed = 0;
 
-	trace2(TR_t_open, 0, flags);
 	if (!(flags & O_RDWR)) {
 		t_errno = TBADFLAG;
-		trace2(TR_t_open, 1, flags);
 		return (-1);
 	}
 
@@ -77,10 +81,6 @@ _tx_open(const char *path, int flags, struct t_info *info, int api_semantics)
 
 retry:
 	if ((fd = open(path, flags)) < 0) {
-		sv_errno = errno;
-
-		trace2(TR_t_open, 1, flags);
-		errno = sv_errno;
 		t_errno = TSYSERR;
 		if (_T_IS_XTI(api_semantics) && errno == ENOENT)
 			/* XTI only */
@@ -99,7 +99,6 @@ retry:
 
 		t_errno = TSYSERR;
 		(void) close(fd);
-		trace2(TR_t_open, 1, flags);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -121,7 +120,6 @@ retry:
 
 			t_errno = TSYSERR;
 			(void) close(fd);
-			trace2(TR_t_open, 1, flags);
 			errno = sv_errno;
 			return (-1);
 		}
@@ -187,6 +185,5 @@ retry:
 	 * descriptor and not a critical failure.
 	 */
 
-	trace2(TR_t_open, 1, flags);
 	return (fd);
 }

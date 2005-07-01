@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -34,11 +36,18 @@
  * contributors.
  */
 
+#ifndef _RPC_SCAN_H
+#define	_RPC_SCAN_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rpc_scan.h, Definitions for the RPCL scanner
  */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * kinds of tokens
@@ -89,7 +98,7 @@ enum tok_kind {
 typedef enum tok_kind tok_kind;
 
 /*
- * a token 
+ * a token
  */
 struct token {
 	tok_kind kind;
@@ -97,14 +106,19 @@ struct token {
 };
 typedef struct token token;
 
-
 /*
- * routine interface 
+ * routine interface
  */
-void scan();
-void scan2();
-void scan3();
-void scan_num();
-void peek();
-int peekscan();
-void get_token();
+extern void scan(tok_kind, token *);
+extern void scan2(tok_kind, tok_kind, token *);
+extern void scan3(tok_kind, tok_kind, tok_kind, token *);
+extern void scan_num(token *);
+extern void peek(token *);
+extern int peekscan(tok_kind, token *);
+extern void get_token(token *);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _RPC_SCAN_H */

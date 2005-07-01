@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -46,7 +47,6 @@
 #include "rpc_mt.h"
 #include <errno.h>
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <rpc/key_prot.h>
 #include <stdio.h>
 #include <syslog.h>
@@ -89,21 +89,18 @@ bool_t (*__key_gendes_LOCAL)() = NULL;
 
 
 int
-key_setsecret(secretkey)
-	const char *secretkey;
+key_setsecret(const char *secretkey)
 {
-	keystatus status;
 	char netName[MAXNETNAMELEN+1];
 	struct key_netstarg netst;
 	int ret;
 
-	trace1(TR_key_setsecret, 0);
 	if (getnetname(netName) == 0) {
 		debug("getnetname failed");
 		return (-1);
 	}
 
-	memcpy(netst.st_priv_key, secretkey, HEXKEYBYTES);
+	(void) memcpy(netst.st_priv_key, secretkey, HEXKEYBYTES);
 	netst.st_pub_key[0] = 0;
 	netst.st_netname = netName;
 
@@ -115,10 +112,9 @@ key_setsecret(secretkey)
 	 * set along with the key. Keylogin also uses KEY_NET_PUT.
 	 */
 	ret = key_setnet(&netst);
-	trace1(TR_key_setsecret, 1);
 
 	/* erase our copy of the secret key */
-	memset(netst.st_priv_key, '\0', HEXKEYBYTES);
+	(void) memset(netst.st_priv_key, '\0', HEXKEYBYTES);
 
 	if (ret == 1)
 		return (0);
@@ -136,27 +132,20 @@ key_setsecret_g(
 	setkeyarg3 arg;
 	keystatus status;
 
-	trace1(TR_key_setsecret_g, 0);
-	if (CLASSIC_PK_DH(keylen, algtype)) {
-		trace1(TR_key_setsecret_g, 1);
+	if (CLASSIC_PK_DH(keylen, algtype))
 		return (key_setsecret(secretkey));
-	}
 	arg.key.keybuf3_len = keylen/4 + 1;
 	arg.key.keybuf3_val = secretkey;
 	arg.algtype = algtype;
 	arg.keylen = keylen;
 	arg.userkey = userkey;
 	if (!key_call((rpcproc_t)KEY_SET_3, xdr_setkeyarg3, (char *)&arg,
-			xdr_keystatus, (char *)&status)) {
-		trace1(TR_key_setsecret_g, 1);
+			xdr_keystatus, (char *)&status))
 		return (-1);
-	}
 	if (status != KEY_SUCCESS) {
 		debug("set3 status is nonzero");
-		trace1(TR_key_setsecret_g, 1);
 		return (-1);
 	}
-	trace1(TR_key_setsecret_g, 1);
 	return (0);
 }
 
@@ -165,19 +154,15 @@ key_removesecret_g_ext(int use_uid)
 {
 	keystatus status;
 
-	trace1(TR_key_removesecret_g_ext, 0);
-	if (!key_call_ext((rpcproc_t)KEY_CLEAR_3, xdr_void, (char *)NULL,
+	if (!key_call_ext((rpcproc_t)KEY_CLEAR_3, xdr_void, NULL,
 			xdr_keystatus, (char *)&status, use_uid)) {
 		debug("remove secret key call failed");
-		trace1(TR_key_removesecret_g_ext, 1);
 		return (-1);
 	}
 	if (status != KEY_SUCCESS) {
 		debug("remove secret status is nonzero");
-		trace1(TR_key_setsecret_g_ext, 1);
 		return (-1);
 	}
-	trace1(TR_key_removesecret_g_ext, 1);
 	return (0);
 }
 
@@ -185,7 +170,7 @@ key_removesecret_g_ext(int use_uid)
  * Use effective uid.
  */
 int
-key_removesecret_g()
+key_removesecret_g(void)
 {
 	return (key_removesecret_g_ext(0));
 }
@@ -194,7 +179,7 @@ key_removesecret_g()
  * Use real uid.
  */
 int
-key_removesecret_g_ruid()
+key_removesecret_g_ruid(void)
 {
 	return (key_removesecret_g_ext(1));
 }
@@ -214,19 +199,17 @@ key_secretkey_is_set_ext(int use_ruid)
 {
 	struct key_netstres 	kres;
 
-	trace1(TR_key_secretkey_is_set_ext, 0);
-	memset((void*)&kres, 0, sizeof (kres));
-	if (key_call_ext((rpcproc_t)KEY_NET_GET, xdr_void, (char *)NULL,
+	(void) memset(&kres, 0, sizeof (kres));
+	if (key_call_ext((rpcproc_t)KEY_NET_GET, xdr_void, NULL,
 			xdr_key_netstres, (char *)&kres, use_ruid) &&
 	    (kres.status == KEY_SUCCESS) &&
 	    (kres.key_netstres_u.knet.st_priv_key[0] != 0)) {
 		/* avoid leaving secret key in memory */
-		memset(kres.key_netstres_u.knet.st_priv_key, 0, HEXKEYBYTES);
+		(void) memset(kres.key_netstres_u.knet.st_priv_key, 0,
+							HEXKEYBYTES);
 		xdr_free(xdr_key_netstres, (char *)&kres);
-		trace1(TR_key_secretkey_is_set_ext, 1);
 		return (1);
 	}
-	trace1(TR_key_secretkey_is_set_ext, 1);
 	return (0);
 }
 
@@ -263,36 +246,29 @@ key_secretkey_is_set_g_ext(keylen_t keylen, algtype_t algtype, int use_ruid)
 	mechtype arg;
 	key_netstres3 	kres;
 
-	trace1(TR_key_secretkey_is_set_g_ext, 0);
 	/*
 	 * key_secretkey_is_set_g_ext is tricky because keylen == 0
 	 * means check if any key exists for the caller (old/new, 192/1024 ...)
 	 * Rather than handle this on the server side, we call the old
 	 * routine if keylen == 0 and try the newer stuff only if that fails
 	 */
-	if ((keylen == 0) && key_secretkey_is_set_ext(use_ruid)) {
-		trace1(TR_key_secretkey_is_set_g_ext, 1);
+	if ((keylen == 0) && key_secretkey_is_set_ext(use_ruid))
 		return (1);
-	}
-	if (CLASSIC_PK_DH(keylen, algtype)) {
-		trace1(TR_key_secretkey_is_set_g_ext, 1);
+	if (CLASSIC_PK_DH(keylen, algtype))
 		return (key_secretkey_is_set_ext(use_ruid));
-	}
 	arg.keylen = keylen;
 	arg.algtype = algtype;
-	memset((void*)&kres, 0, sizeof (kres));
+	(void) memset(&kres, 0, sizeof (kres));
 	if (key_call_ext((rpcproc_t)KEY_NET_GET_3, xdr_mechtype, (char *)&arg,
 			xdr_key_netstres3, (char *)&kres, use_ruid) &&
 	    (kres.status == KEY_SUCCESS) &&
 	    (kres.key_netstres3_u.knet.st_priv_key.keybuf3_len != 0)) {
 		/* avoid leaving secret key in memory */
-		memset(kres.key_netstres3_u.knet.st_priv_key.keybuf3_val, 0,
-			kres.key_netstres3_u.knet.st_priv_key.keybuf3_len);
+		(void) memset(kres.key_netstres3_u.knet.st_priv_key.keybuf3_val,
+			0, kres.key_netstres3_u.knet.st_priv_key.keybuf3_len);
 		xdr_free(xdr_key_netstres3, (char *)&kres);
-		trace1(TR_key_secretkey_is_set_g_ext, 1);
 		return (1);
 	}
-	trace1(TR_key_secretkey_is_set_g_ext, 1);
 	return (0);
 }
 
@@ -316,30 +292,23 @@ key_secretkey_is_set_g_ruid(keylen_t keylen, algtype_t algtype)
 
 
 int
-key_encryptsession_pk(remotename, remotekey, deskey)
-	char *remotename;
-	netobj *remotekey;
-	des_block *deskey;
+key_encryptsession_pk(const char *remotename, netobj *remotekey,
+							des_block *deskey)
 {
 	cryptkeyarg2 arg;
 	cryptkeyres res;
 
-	trace1(TR_key_encryptsession_pk, 0);
-	arg.remotename = remotename;
+	arg.remotename = (char *)remotename;
 	arg.remotekey = *remotekey;
 	arg.deskey = *deskey;
 	if (!key_call((rpcproc_t)KEY_ENCRYPT_PK, xdr_cryptkeyarg2, (char *)&arg,
-			xdr_cryptkeyres, (char *)&res)) {
-		trace1(TR_key_encryptsession_pk, 1);
+			xdr_cryptkeyres, (char *)&res))
 		return (-1);
-	}
 	if (res.status != KEY_SUCCESS) {
 		debug("encrypt status is nonzero");
-		trace1(TR_key_encryptsession_pk, 1);
 		return (-1);
 	}
 	*deskey = res.cryptkeyres_u.deskey;
-	trace1(TR_key_encryptsession_pk, 1);
 	return (0);
 }
 
@@ -356,7 +325,6 @@ key_encryptsession_pk_g(
 	cryptkeyarg3 arg;
 	cryptkeyres3 res;
 
-	trace1(TR_key_encryptsession_pk_g, 0);
 	if (CLASSIC_PK_DH(remotekeylen, algtype)) {
 		int i;
 		netobj npk;
@@ -364,8 +332,7 @@ key_encryptsession_pk_g(
 		npk.n_len = remotekeylen/4 + 1;
 		npk.n_bytes = (char *)remotekey;
 		for (i = 0; i < keynum; i++) {
-			if (key_encryptsession_pk((char *)remotename,
-					&npk, &deskey[i]))
+			if (key_encryptsession_pk(remotename, &npk, &deskey[i]))
 				return (-1);
 		}
 		return (0);
@@ -377,53 +344,41 @@ key_encryptsession_pk_g(
 	arg.algtype = algtype;
 	arg.deskey.deskeyarray_len = keynum;
 	arg.deskey.deskeyarray_val = deskey;
-	memset(&res, 0, sizeof (res));
+	(void) memset(&res, 0, sizeof (res));
 	res.cryptkeyres3_u.deskey.deskeyarray_val = deskey;
 	if (!key_call((rpcproc_t)KEY_ENCRYPT_PK_3,
 			xdr_cryptkeyarg3, (char *)&arg,
-			xdr_cryptkeyres3, (char *)&res)) {
-		trace1(TR_key_encryptsession_pk_g, 1);
+			xdr_cryptkeyres3, (char *)&res))
 		return (-1);
-	}
 	if (res.status != KEY_SUCCESS) {
 		debug("encrypt3 status is nonzero");
-		trace1(TR_key_encryptsession_pk_g, 1);
 		return (-1);
 	}
 	if (res.cryptkeyres3_u.deskey.deskeyarray_len != keynum) {
 		debug("number of keys don't match");
-		trace1(TR_key_encryptsession_pk_g, 1);
 		return (-1);
 	}
-	trace1(TR_key_encryptsession_pk_g, 1);
 	return (0);
 }
 
 int
-key_decryptsession_pk(remotename, remotekey, deskey)
-	char *remotename;
-	netobj *remotekey;
-	des_block *deskey;
+key_decryptsession_pk(const char *remotename, netobj *remotekey,
+							des_block *deskey)
 {
 	cryptkeyarg2 arg;
 	cryptkeyres res;
 
-	trace1(TR_key_decryptsession_pk, 0);
-	arg.remotename = remotename;
+	arg.remotename = (char *)remotename;
 	arg.remotekey = *remotekey;
 	arg.deskey = *deskey;
 	if (!key_call((rpcproc_t)KEY_DECRYPT_PK, xdr_cryptkeyarg2, (char *)&arg,
-			xdr_cryptkeyres, (char *)&res)) {
-		trace1(TR_key_decryptsession_pk, 1);
+			xdr_cryptkeyres, (char *)&res))
 		return (-1);
-	}
 	if (res.status != KEY_SUCCESS) {
 		debug("decrypt status is nonzero");
-		trace1(TR_key_decryptsession_pk, 1);
 		return (-1);
 	}
 	*deskey = res.cryptkeyres_u.deskey;
-	trace1(TR_key_decryptsession_pk, 1);
 	return (0);
 }
 
@@ -440,7 +395,6 @@ key_decryptsession_pk_g(
 	cryptkeyarg3 arg;
 	cryptkeyres3 res;
 
-	trace1(TR_key_decryptsession_pk_g, 0);
 	if (CLASSIC_PK_DH(remotekeylen, algtype)) {
 		int i;
 		netobj npk;
@@ -448,7 +402,7 @@ key_decryptsession_pk_g(
 		npk.n_len = remotekeylen/4 + 1;
 		npk.n_bytes = (char *)remotekey;
 		for (i = 0; i < keynum; i++) {
-			if (key_decryptsession_pk((char *)remotename,
+			if (key_decryptsession_pk(remotename,
 					&npk, &deskey[i]))
 				return (-1);
 		}
@@ -461,51 +415,39 @@ key_decryptsession_pk_g(
 	arg.deskey.deskeyarray_val = deskey;
 	arg.algtype = algtype;
 	arg.keylen = remotekeylen;
-	memset(&res, 0, sizeof (res));
+	(void) memset(&res, 0, sizeof (res));
 	res.cryptkeyres3_u.deskey.deskeyarray_val = deskey;
 	if (!key_call((rpcproc_t)KEY_DECRYPT_PK_3,
 			xdr_cryptkeyarg3, (char *)&arg,
-			xdr_cryptkeyres3, (char *)&res)) {
-		trace1(TR_key_decryptsession_pk_g, 1);
+			xdr_cryptkeyres3, (char *)&res))
 		return (-1);
-	}
 	if (res.status != KEY_SUCCESS) {
 		debug("decrypt3 status is nonzero");
-		trace1(TR_key_decryptsession_pk_g, 1);
 		return (-1);
 	}
 	if (res.cryptkeyres3_u.deskey.deskeyarray_len != keynum) {
 		debug("number of keys don't match");
-		trace1(TR_key_encryptsession_pk_g, 1);
 		return (-1);
 	}
-	trace1(TR_key_decryptsession_pk_g, 1);
 	return (0);
 }
 
 int
-key_encryptsession(remotename, deskey)
-	const char *remotename;
-	des_block *deskey;
+key_encryptsession(const char *remotename, des_block *deskey)
 {
 	cryptkeyarg arg;
 	cryptkeyres res;
 
-	trace1(TR_key_encryptsession, 0);
 	arg.remotename = (char *)remotename;
 	arg.deskey = *deskey;
 	if (!key_call((rpcproc_t)KEY_ENCRYPT, xdr_cryptkeyarg, (char *)&arg,
-			xdr_cryptkeyres, (char *)&res)) {
-		trace1(TR_key_encryptsession, 1);
+			xdr_cryptkeyres, (char *)&res))
 		return (-1);
-	}
 	if (res.status != KEY_SUCCESS) {
 		debug("encrypt status is nonzero");
-		trace1(TR_key_encryptsession, 1);
 		return (-1);
 	}
 	*deskey = res.cryptkeyres_u.deskey;
-	trace1(TR_key_encryptsession, 1);
 	return (0);
 }
 
@@ -521,62 +463,47 @@ key_encryptsession_g(
 	cryptkeyarg3 arg;
 	cryptkeyres3 res;
 
-	trace1(TR_key_encryptsession_g, 0);
-	if (CLASSIC_PK_DH(keylen, algtype)) {
-		trace1(TR_key_encryptsession, 1);
+	if (CLASSIC_PK_DH(keylen, algtype))
 		return (key_encryptsession(remotename, deskey));
-	}
 	arg.remotename = (char *)remotename;
 	arg.algtype = algtype;
 	arg.keylen = keylen;
 	arg.deskey.deskeyarray_len = keynum;
 	arg.deskey.deskeyarray_val = deskey;
 	arg.remotekey.keybuf3_len = 0;
-	memset(&res, 0, sizeof (res));
+	(void) memset(&res, 0, sizeof (res));
 	res.cryptkeyres3_u.deskey.deskeyarray_val = deskey;
 	if (!key_call((rpcproc_t)KEY_ENCRYPT_3, xdr_cryptkeyarg3, (char *)&arg,
-			xdr_cryptkeyres3, (char *)&res)) {
-		trace1(TR_key_encryptsession_g, 1);
+			xdr_cryptkeyres3, (char *)&res))
 		return (-1);
-	}
 	if (res.status != KEY_SUCCESS) {
 		debug("encrypt3 status is nonzero");
-		trace1(TR_key_encryptsession_g, 1);
 		return (-1);
 	}
 	if (res.cryptkeyres3_u.deskey.deskeyarray_len != keynum) {
 		debug("encrypt3 didn't return same number of keys");
-		trace1(TR_key_encryptsession_g, 1);
 		return (-1);
 	}
-	trace1(TR_key_encryptsession_g, 1);
 	return (0);
 }
 
 
 int
-key_decryptsession(remotename, deskey)
-	const char *remotename;
-	des_block *deskey;
+key_decryptsession(const char *remotename, des_block *deskey)
 {
 	cryptkeyarg arg;
 	cryptkeyres res;
 
-	trace1(TR_key_decryptsession, 0);
 	arg.remotename = (char *)remotename;
 	arg.deskey = *deskey;
 	if (!key_call((rpcproc_t)KEY_DECRYPT, xdr_cryptkeyarg, (char *)&arg,
-			xdr_cryptkeyres, (char *)&res)) {
-		trace1(TR_key_decryptsession, 1);
+			xdr_cryptkeyres, (char *)&res))
 		return (-1);
-	}
 	if (res.status != KEY_SUCCESS) {
 		debug("decrypt status is nonzero");
-		trace1(TR_key_decryptsession, 1);
 		return (-1);
 	}
 	*deskey = res.cryptkeyres_u.deskey;
-	trace1(TR_key_decryptsession, 1);
 	return (0);
 }
 
@@ -592,49 +519,36 @@ key_decryptsession_g(
 	cryptkeyarg3 arg;
 	cryptkeyres3 res;
 
-	trace1(TR_key_decryptsession_g, 0);
-	if (CLASSIC_PK_DH(keylen, algtype)) {
-		trace1(TR_key_decryptsession, 1);
+	if (CLASSIC_PK_DH(keylen, algtype))
 		return (key_decryptsession(remotename, deskey));
-	}
 	arg.remotename = (char *)remotename;
 	arg.algtype = algtype;
 	arg.keylen = keylen;
 	arg.deskey.deskeyarray_len = keynum;
 	arg.deskey.deskeyarray_val = deskey;
 	arg.remotekey.keybuf3_len = 0;
-	memset(&res, 0, sizeof (res));
+	(void) memset(&res, 0, sizeof (res));
 	res.cryptkeyres3_u.deskey.deskeyarray_val = deskey;
 	if (!key_call((rpcproc_t)KEY_DECRYPT_3, xdr_cryptkeyarg3, (char *)&arg,
-			xdr_cryptkeyres3, (char *)&res)) {
-		trace1(TR_key_decryptsession_g, 1);
+			xdr_cryptkeyres3, (char *)&res))
 		return (-1);
-	}
 	if (res.status != KEY_SUCCESS) {
 		debug("decrypt3 status is nonzero");
-		trace1(TR_key_decryptsession_g, 1);
 		return (-1);
 	}
 	if (res.cryptkeyres3_u.deskey.deskeyarray_len != keynum) {
 		debug("decrypt3 didn't return same number of keys");
-		trace1(TR_key_encryptsession_g, 1);
 		return (-1);
 	}
-	trace1(TR_key_decryptsession_g, 1);
 	return (0);
 }
 
 int
-key_gendes(key)
-	des_block *key;
+key_gendes(des_block *key)
 {
-	trace1(TR_key_gendes, 0);
-	if (!key_call((rpcproc_t)KEY_GEN, xdr_void, (char *)NULL,
-			xdr_des_block, (char *)key)) {
-		trace1(TR_key_gendes, 1);
+	if (!key_call((rpcproc_t)KEY_GEN, xdr_void, NULL,
+			xdr_des_block, (char *)key))
 		return (-1);
-	}
-	trace1(TR_key_gendes, 1);
 	return (0);
 }
 
@@ -646,19 +560,14 @@ key_gendes_g(
 {
 	deskeyarray res;
 
-	trace1(TR_key_gendes_g, 0);
 	res.deskeyarray_val = deskey;
 	if (!key_call((rpcproc_t)KEY_GEN_3, xdr_keynum_t, (char *)&keynum,
-			xdr_deskeyarray, (char *)&res)) {
-		trace1(TR_key_gendes_g, 1);
+			xdr_deskeyarray, (char *)&res))
 		return (-1);
-	}
 	if (res.deskeyarray_len != keynum) {
 		debug("return length doesn't match\n");
-		trace1(TR_key_gendes_g, 1);
 		return (-1);
 	}
-	trace1(TR_key_gendes_g, 1);
 	return (0);
 }
 
@@ -673,19 +582,14 @@ key_setnet_ext(struct key_netstarg *arg, int use_ruid)
 {
 	keystatus status;
 
-	trace1(TR_key_setnet_ext, 0);
 	if (!key_call_ext((rpcproc_t)KEY_NET_PUT, xdr_key_netstarg,
-		(char *)arg, xdr_keystatus, (char *)&status, use_ruid)) {
-		trace1(TR_key_setnet, 1);
+		(char *)arg, xdr_keystatus, (char *)&status, use_ruid))
 		return (-1);
-	}
 
 	if (status != KEY_SUCCESS) {
 		debug("key_setnet status is nonzero");
-		trace1(TR_key_setnet_ext, 1);
 		return (-1);
 	}
-	trace1(TR_key_setnet_ext, 1);
 	return (1);
 }
 
@@ -732,7 +636,6 @@ key_setnet_g_ext(
 	key_netstarg3 arg;
 	keystatus status;
 
-	trace1(TR_key_setnet_g_ext, 0);
 	arg.st_netname = (char *)netname;
 	arg.algtype = algtype;
 	if (skeylen == 0) {
@@ -750,14 +653,12 @@ key_setnet_g_ext(
 	if (skeylen == 0) {
 		if (pkeylen == 0) {
 			debug("keylens are both 0");
-			trace1(TR_key_setnet_g_ext, 1);
 			return (-1);
 		}
 		arg.keylen = pkeylen;
 	} else {
 		if ((pkeylen != 0) && (skeylen != pkeylen)) {
 			debug("keylens don't match");
-			trace1(TR_key_setnet_g_ext, 1);
 			return (-1);
 		}
 		arg.keylen = skeylen;
@@ -766,33 +667,32 @@ key_setnet_g_ext(
 		key_netstarg tmp;
 
 		if (skeylen != 0) {
-			memcpy(&tmp.st_priv_key, skey,
+			(void) memcpy(&tmp.st_priv_key, skey,
 				sizeof (tmp.st_priv_key));
 		} else {
-			memset(&tmp.st_priv_key, 0, sizeof (tmp.st_priv_key));
+			(void) memset(&tmp.st_priv_key, 0,
+				sizeof (tmp.st_priv_key));
 		}
 		if (pkeylen != 0) {
-			memcpy(&tmp.st_pub_key, skey, sizeof (tmp.st_pub_key));
+			(void) memcpy(&tmp.st_pub_key, skey,
+				sizeof (tmp.st_pub_key));
 		} else {
-			memset(&tmp.st_pub_key, 0, sizeof (tmp.st_pub_key));
+			(void) memset(&tmp.st_pub_key, 0,
+				sizeof (tmp.st_pub_key));
 		}
 		tmp.st_netname = (char *)netname;
-		trace1(TR_key_setnet_g_ext, 1);
 		return (key_setnet(&tmp));
 	}
 	if (!key_call_ext((rpcproc_t)KEY_NET_PUT_3,
 		xdr_key_netstarg3, (char *)&arg,
 		xdr_keystatus, (char *)&status, use_ruid)) {
-		trace1(TR_key_setnet_g_ext, 1);
 		return (-1);
 	}
 
 	if (status != KEY_SUCCESS) {
 		debug("key_setnet3 status is nonzero");
-		trace1(TR_key_setnet_g_ext, 1);
 		return (-1);
 	}
-	trace1(TR_key_setnet_g_ext, 1);
 	return (0);
 }
 
@@ -819,25 +719,18 @@ key_setnet_g_ruid(const char *netname, const char *skey, keylen_t skeylen,
 }
 
 int
-key_get_conv(pkey, deskey)
-	char *pkey;
-	des_block *deskey;
+key_get_conv(char *pkey, des_block *deskey)
 {
 	cryptkeyres res;
 
-	trace1(TR_key_get_conv, 0);
 	if (!key_call((rpcproc_t)KEY_GET_CONV, xdr_keybuf, pkey,
-		xdr_cryptkeyres, (char *)&res)) {
-		trace1(TR_key_get_conv, 1);
+		xdr_cryptkeyres, (char *)&res))
 		return (-1);
-	}
 	if (res.status != KEY_SUCCESS) {
 		debug("get_conv status is nonzero");
-		trace1(TR_key_get_conv, 1);
 		return (-1);
 	}
 	*deskey = res.cryptkeyres_u.deskey;
-	trace1(TR_key_get_conv, 1);
 	return (0);
 }
 
@@ -853,34 +746,26 @@ key_get_conv_g(
 	deskeyarg3 arg;
 	cryptkeyres3 res;
 
-	trace1(TR_key_get_conv_g, 0);
-	if (CLASSIC_PK_DH(pkeylen, algtype)) {
-		trace1(TR_key_get_conv_g, 1);
+	if (CLASSIC_PK_DH(pkeylen, algtype))
 		return (key_get_conv((char *)pkey, deskey));
-	}
 	arg.pub_key.keybuf3_len = pkeylen/4 + 1;
 	arg.pub_key.keybuf3_val = (char *)pkey;
 	arg.nkeys = keynum;
 	arg.algtype = algtype;
 	arg.keylen = pkeylen;
-	memset(&res, 0, sizeof (res));
+	(void) memset(&res, 0, sizeof (res));
 	res.cryptkeyres3_u.deskey.deskeyarray_val = deskey;
 	if (!key_call((rpcproc_t)KEY_GET_CONV_3, xdr_deskeyarg3, (char *)&arg,
-		xdr_cryptkeyres3, (char *)&res)) {
-		trace1(TR_key_get_conv_g, 1);
+		xdr_cryptkeyres3, (char *)&res))
 		return (-1);
-	}
 	if (res.status != KEY_SUCCESS) {
 		debug("get_conv3 status is nonzero");
-		trace1(TR_key_get_conv_g, 1);
 		return (-1);
 	}
 	if (res.cryptkeyres3_u.deskey.deskeyarray_len != keynum) {
 		debug("get_conv3 number of keys dont match");
-		trace1(TR_key_get_conv_g, 1);
 		return (-1);
 	}
-	trace1(TR_key_get_conv_g, 1);
 	return (0);
 }
 
@@ -900,7 +785,7 @@ key_call_destroy(void *vp)
 	struct key_call_private *kcp = (struct key_call_private *)vp;
 
 	if (kcp != NULL && kcp->client != NULL) {
-		check_rdev(kcp);
+		(void) check_rdev(kcp);
 		clnt_destroy(kcp->client);
 		free(kcp);
 	}
@@ -982,13 +867,8 @@ getkeyserv_handle(int vers, int stale)
  * Returns  0 on failure, 1 on success
  */
 int
-key_call_ext(proc, xdr_arg, arg, xdr_rslt, rslt, use_ruid)
-	rpcproc_t proc;
-	xdrproc_t xdr_arg;
-	char *arg;
-	xdrproc_t xdr_rslt;
-	char *rslt;
-	int use_ruid;
+key_call_ext(rpcproc_t proc, xdrproc_t xdr_arg, char *arg, xdrproc_t xdr_rslt,
+						char *rslt, int use_ruid)
 {
 	CLIENT		*clnt;
 	struct timeval	wait_time = {0, 0};
@@ -1097,10 +977,8 @@ key_call_ruid(rpcproc_t proc, xdrproc_t xdr_arg, char *arg,
 	return (key_call_ext(proc, xdr_arg, arg, xdr_rslt, rslt, 1));
 }
 
-static
-void
-set_rdev(kcp)
-	struct key_call_private *kcp;
+static void
+set_rdev(struct key_call_private *kcp)
 {
 	int fd;
 	struct stat stbuf;
@@ -1115,10 +993,8 @@ set_rdev(kcp)
 	kcp->rdev = stbuf.st_rdev;
 }
 
-static
-int
-check_rdev(kcp)
-	struct key_call_private *kcp;
+static int
+check_rdev(struct key_call_private *kcp)
 {
 	struct stat stbuf;
 
@@ -1129,7 +1005,7 @@ check_rdev(kcp)
 		syslog(LOG_DEBUG, "keyserv_client:  can't stat %d", kcp->fd);
 		/* could be because file descriptor was closed */
 		/* it's not our file descriptor, so don't try to close it */
-		clnt_control(kcp->client, CLSET_FD_NCLOSE, (char *)NULL);
+		clnt_control(kcp->client, CLSET_FD_NCLOSE, NULL);
 
 		return (0);
 	}
@@ -1138,7 +1014,7 @@ check_rdev(kcp)
 		    "keyserv_client:  fd %d changed, old=0x%x, new=0x%x",
 		    kcp->fd, kcp->rdev, stbuf.st_rdev);
 		/* it's not our file descriptor, so don't try to close it */
-		clnt_control(kcp->client, CLSET_FD_NCLOSE, (char *)NULL);
+		clnt_control(kcp->client, CLSET_FD_NCLOSE, NULL);
 		return (0);
 	}
 	return (1);    /* fd is okay */

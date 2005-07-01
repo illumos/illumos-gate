@@ -19,14 +19,18 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"uucp.h"
-#include <rpc/trace.h> 
 
 #ifdef TLI
 
@@ -36,67 +40,61 @@
 #include <malloc.h>
 #include <sys/tiuser.h>
 #include <ctype.h>
-#define OCT	0
-#define HEX	1
-/* #include <nsaddr.h>
-*/
+#define	OCT	0
+#define	HEX	1
+/*
+ * #include <nsaddr.h>
+ */
 #define	toupper(c)	(islower(c) ? _toupper(c) : (c))
 #define	todigit(c)	((int)((c) - '0'))	/* char to digit */
 #define	toxdigit(c)	((isdigit(c))?todigit(c):(toupper(c)-(int)'A'+10))
 #define	isodigit(c)	(isdigit(c) && ((c) != '9') && ((c) != '8'))
-#define	itoac(i)	(((i) > 9) ? ((char)((i)-10) + 'A'):((char)(i) + '0'))	
+#define	itoac(i)	(((i) > 9) ? ((char)((i)-10) + 'A'):((char)(i) + '0'))
 #define	MASK(n)		((1 << (n)) - 1)
 
 #define	SBUFSIZE	128
 
-/* #define	TRUE	1;
- * #define	FALSE	0;
+/*
+ * #define	TRUE	1
+ * #define	FALSE	0
  */
 
 /*	local static functions	*/
-static int dobase();
-static void memcp();
-static char *xfer();
+static int dobase(char *, char *, int);
+static void memcp(char *, char *, int);
+static char *xfer(char *, char *, unsigned, unsigned);
 
 /*
-	stoa - convert string to address
+ *	stoa - convert string to address
+ *
+ *	If a string begins in \o or \O, the following address is octal
+ *	"  "   "       "    " \x or \X, the following address is hex
+ *
+ *	If ok, return pointer to netbuf structure.
+ *	A  NULL is returned on any error(s).
+ */
 
-	If a string begins in \o or \O, the following address is octal
-	"  "   "       "    " \x or \X, the following address is hex
-
-	If ok, return pointer to netbuf structure.
-	A  NULL is returned on any error(s).
-*/
-
-GLOBAL struct netbuf *
-stoa(str, addr)			/* Return netbuf ptr if success */
-char	*str;			/* Return NULL if error		*/
-struct netbuf	*addr;
+/* Return netbuf ptr if success */
+static struct netbuf *
+stoa(char *str, struct netbuf *addr)
 {
 	int	myadr;		/* was netbuf struct allocated here ? */
 	static	char *sbuf;
 
-	trace1(TR_stoa, 0);
 	myadr = FALSE;
 
-	if (!str) {
-		trace1(TR_stoa, 1);
+	if (!str)
 		return (NULL);
-	}
 	while (*str && isspace(*str))	/* leading whites are OK */
 		++str;
 
-	if (!str || !*str) {	/* Nothing to convert */
-		trace1(TR_stoa, 1);
+	if (!str || !*str)	/* Nothing to convert */
 		return (NULL);
-	}
 
 	if (!addr) {
-		if ((addr = (struct netbuf *)malloc(sizeof(struct netbuf))) == NULL) {
-			trace1(TR_stoa, 1);
+		if ((addr = malloc(sizeof (struct netbuf))) == NULL)
 			return (NULL);
-		}
-				
+
 		myadr = TRUE;
 		addr->buf = NULL;
 		addr->maxlen = 0;
@@ -104,7 +102,7 @@ struct netbuf	*addr;
 	}
 
 	if (sbuf == NULL) {
-		sbuf = (char *)malloc(SBUFSIZE);
+		sbuf = malloc(SBUFSIZE);
 		if (sbuf == NULL)
 			return (NULL);
 	}
@@ -133,46 +131,41 @@ struct netbuf	*addr;
 	if (addr->len == 0) {	/* Error in conversion */
 		if (myadr)
 			free(addr);
-		trace1(TR_stoa, 1);
 		return (NULL);
 	}
-	if ((addr->buf = xfer(addr->buf, sbuf, addr->len, addr->maxlen)) == NULL) {
-		trace1(TR_stoa, 1);
+	if ((addr->buf = xfer(addr->buf, sbuf, addr->len, addr->maxlen)) ==
+									NULL)
 		return (NULL);
-	} else {
-		trace1(TR_stoa, 1);
-		return addr;
-	}
+	return (addr);
 }
 
 /*
-	dobase :	converts a hex or octal ASCII string
-		to a binary address. Only HEX or OCT may be used
-		for type.
-	return length of binary string (in bytes), 0 if error.
-	The binary result is placed at buf.
-*/
+ *	dobase :	converts a hex or octal ASCII string
+ *		to a binary address. Only HEX or OCT may be used
+ *		for type.
+ *	return length of binary string (in bytes), 0 if error.
+ *	The binary result is placed at buf.
+ */
 
 static int
-dobase(s, buf, type)	/* read in an address */
-char	*s, *buf;	/* source ASCII, result binary string */
-int	type;
+dobase(char *s, char *buf, int type)
 {
 	int	bp = SBUFSIZE - 1;
 	int	shift = 0;
 	char	*end;
 
-	trace2(TR_dobase, 0, type);
 	for (end = s; *end && ((type == OCT) ? isodigit(*end) :
-		isxdigit(*end)); ++end) ;
+							isxdigit(*end)); ++end)
+		;
 
-	/* any non-white, non-digits cause address to be rejected,
-	   other fields are ignored */
-
+	/*
+	 * any non-white, non-digits cause address to be rejected,
+	 * other fields are ignored
+	 */
 	if ((*s == 0) || (end == s) || (!isspace(*end) && *end)) {
-		fprintf(stderr, "dobase: Illegal trailer on address string\n");
+		(void) fprintf(stderr,
+				"dobase: Illegal trailer on address string\n");
 		buf[0] = '\0';
-		trace1(TR_dobase, 1);
 		return (0);
 	}
 	--end;
@@ -188,15 +181,13 @@ int	type;
 			}
 			if ((shift = (shift + 3) % 8) == 0)
 				buf[--bp] = 0;
-		}
-		else	/* hex */
+		} else	/* hex */
 			if ((shift = (shift) ? 0 : 4) == 0)
-				buf[--bp] = 0;;
+				buf[--bp] = 0;
 		--end;
 	}
 	if (bp == 0) {
-		fprintf(stderr, "stoa: dobase: number to long\n");
-		trace1(TR_dobase, 1);
+		(void) fprintf(stderr, "stoa: dobase: number to long\n");
 		return (0);
 	}
 
@@ -204,48 +195,36 @@ int	type;
 	if (!shift)
 		bp++;
 	memcp(buf, &buf[bp], (SBUFSIZE - bp));
-	trace1(TR_dobase, 1);
 	return (SBUFSIZE - bp);
 }
 
 static void
-memcp(d, s, n)	/* safe memcpy for overlapping regions */
-char	*d, *s;
-int	n;
+memcp(char *d, char *s, int n)
 {
-	trace2(TR_memcp, 0, n);
 	while (n--)
 		*d++ = *s++;
-	trace1(TR_memcp, 1);
-	return;
 }
 
-/* transfer block to a given destination or allocate one of the
-    right size 
-    if max = 0 : ignore max
-*/
+/*
+ * transfer block to a given destination or allocate one of the
+ *	right size
+ *	if max = 0 : ignore max
+ */
 
 static char *
-xfer(dest, src, len, max)
-char	*dest, *src;
-unsigned	len, max;
+xfer(char *dest, char *src, unsigned len, unsigned max)
 {
-	trace3(TR_xfer, 0, len, max);
 	if (max && dest && max < len) {		/* No room */
-		fprintf(stderr, "xfer: destination not long enough\n");
-		trace1(TR_xfer, 1);
+		(void) fprintf(stderr, "xfer: destination not long enough\n");
 		return (NULL);
 	}
 	if (!dest)
 		if ((dest = malloc(len)) == NULL) {
-			fprintf(stderr, "xfer: malloc failed\n");
-			trace1(TR_xfer, 1);
+			(void) fprintf(stderr, "xfer: malloc failed\n");
 			return (NULL);
 		}
 
-	memcpy(dest, src, (int)len);
-	trace1(TR_xfer, 1);
+	(void) memcpy(dest, src, (size_t)len);
 	return (dest);
 }
-
 #endif /* TLI */

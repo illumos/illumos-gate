@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -34,17 +36,13 @@
 
 /*
  * authdes_prot.c, XDR routines for DES authentication
- *
  */
 
 #include <sys/types.h>
 #include <rpc/types.h>
-#include <rpc/trace.h>
 #include <rpc/xdr.h>
 #include <rpc/auth.h>
 #include <rpc/auth_des.h>
-
-#define	ATTEMPT(xdr_op) if (!(xdr_op)) return (FALSE)
 
 bool_t
 xdr_authdes_cred(XDR *xdrs, struct authdes_cred *cred)
@@ -52,41 +50,34 @@ xdr_authdes_cred(XDR *xdrs, struct authdes_cred *cred)
 	/*
 	 * Unrolled xdr
 	 */
-	trace1(TR_xdr_authdes_cred, 0);
-	ATTEMPT(xdr_enum(xdrs, (enum_t *)&cred->adc_namekind));
+	if (!xdr_enum(xdrs, (enum_t *)&cred->adc_namekind))
+		return (FALSE);
 	switch (cred->adc_namekind) {
 	case ADN_FULLNAME:
-		ATTEMPT(xdr_string(xdrs, &cred->adc_fullname.name,
-				MAXNETNAMELEN));
-		ATTEMPT(xdr_opaque(xdrs, (caddr_t)&cred->adc_fullname.key,
-				(u_int)sizeof (des_block)));
-		ATTEMPT(xdr_opaque(xdrs, (caddr_t)&cred->adc_fullname.window,
-				(u_int)sizeof (cred->adc_fullname.window)));
-		trace1(TR_xdr_authdes_cred, 1);
-		return (TRUE);
+		if (!xdr_string(xdrs, &cred->adc_fullname.name,
+				MAXNETNAMELEN))
+			return (FALSE);
+		if (!xdr_opaque(xdrs, (caddr_t)&cred->adc_fullname.key,
+				(uint_t)sizeof (des_block)))
+			return (FALSE);
+		return (xdr_opaque(xdrs, (caddr_t)&cred->adc_fullname.window,
+				(uint_t)sizeof (cred->adc_fullname.window)));
 	case ADN_NICKNAME:
-		ATTEMPT(xdr_opaque(xdrs, (caddr_t)&cred->adc_nickname,
-				(u_int)sizeof (cred->adc_nickname)));
-		trace1(TR_xdr_authdes_cred, 1);
-		return (TRUE);
-	default:
-		trace1(TR_xdr_authdes_cred, 1);
-		return (FALSE);
+		return (xdr_opaque(xdrs, (caddr_t)&cred->adc_nickname,
+				(uint_t)sizeof (cred->adc_nickname)));
 	}
+	return (FALSE);
 }
 
-
 bool_t
-xdr_authdes_verf(register XDR *xdrs, register struct authdes_verf *verf)
+xdr_authdes_verf(XDR *xdrs, struct authdes_verf *verf)
 {
 	/*
 	 * Unrolled xdr
 	 */
-	trace1(TR_xdr_authdes_verf, 0);
-	ATTEMPT(xdr_opaque(xdrs, (caddr_t)&verf->adv_xtimestamp,
-				(u_int)sizeof (des_block)));
-	ATTEMPT(xdr_opaque(xdrs, (caddr_t)&verf->adv_int_u,
-				(u_int)sizeof (verf->adv_int_u)));
-	trace1(TR_xdr_authdes_verf, 1);
-	return (TRUE);
+	if (!xdr_opaque(xdrs, (caddr_t)&verf->adv_xtimestamp,
+				(uint_t)sizeof (des_block)))
+		return (FALSE);
+	return (xdr_opaque(xdrs, (caddr_t)&verf->adv_int_u,
+				(uint_t)sizeof (verf->adv_int_u)));
 }

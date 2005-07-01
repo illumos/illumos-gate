@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +87,7 @@ add_cred_item(char *netname, char *pname)
 	if (old != NULL)
 		return;
 
-	foo = (struct creditem *)calloc(1, sizeof (struct creditem));
+	foo = calloc(1, sizeof (struct creditem));
 	if (foo == NULL)
 		return;
 
@@ -153,11 +154,13 @@ __nis_auth2princ(
 		}
 		return;
 	} else if (flavor == AUTH_SYS) { /* XXX ifdef this for 4.1 */
+		/* LINTED pointer cast */
 		au = (struct authsys_parms *)(auth);
 		rmtdomain = nis_domain_of(au->aup_machname);
 		if (au->aup_uid == 0) {
-			(void) sprintf(name, "%s", au->aup_machname);
-			if (! rmtdomain)
+			(void) snprintf(name, MAX_MACHINE_NAME,
+							"%s", au->aup_machname);
+			if (!rmtdomain)
 				(void) strcat(name, __nis_rpc_domain());
 			if (name[strlen(name) - 1] != '.')
 				(void) strcat(name, ".");
@@ -176,6 +179,7 @@ __nis_auth2princ(
 			(void) strcat(srch, ".");
 		}
 	} else if (flavor == AUTH_DES) {
+		/* LINTED pointer cast */
 		ad = (struct authdes_cred *)(auth);
 		if (refresh)
 			(void) delete_cred_item(ad->adc_fullname.name);
@@ -300,15 +304,15 @@ gss_OID_load()
 	gss_OID *OIDptr;
 	int stat = 0;
 
-	mutex_lock(&gss_load_lock);
+	(void) mutex_lock(&gss_load_lock);
 	if (GSS_EXPORT_NAME) {
-		mutex_unlock(&gss_load_lock);
+		(void) mutex_unlock(&gss_load_lock);
 		return (0);
 	}
 
 	/* if LIBGSS is not loaded return an error */
 	if ((dh = dlopen(LIBGSS, RTLD_NOLOAD)) == NULL) {
-		mutex_unlock(&gss_load_lock);
+		(void) mutex_unlock(&gss_load_lock);
 		return (0);
 	}
 
@@ -352,7 +356,7 @@ gss_OID_load()
 	}
 
 Done:
-	mutex_unlock(&gss_load_lock);
+	(void) mutex_unlock(&gss_load_lock);
 
 	if (stat == 0)
 		GSS_EXPORT_NAME = 0;
@@ -418,7 +422,7 @@ __nis_gssprin2netname(rpc_gss_principal_t prin, char netname[MAXNETNAMELEN+1])
 			 * and make sure that its null terminated.
 			 */
 			if (OID_IS_EQUAL(DH_NETNAME, name_type)) {
-				strncpy(netname,
+				(void) strncpy(netname,
 					(char *)display_name.value,
 					MAXNETNAMELEN);
 				netname[MAXNETNAMELEN] = '\0';
@@ -532,11 +536,13 @@ __nis_auth2princ_rpcgss(
 		}
 		return;
 	} else if (flavor == AUTH_SYS) { /* XXX ifdef this for 4.1 */
+		/* LINTED pointer cast */
 		au = (struct authsys_parms *)(auth);
 		rmtdomain = nis_domain_of(au->aup_machname);
 		if (au->aup_uid == 0) {
-			(void) sprintf(name, "%s", au->aup_machname);
-			if (! rmtdomain)
+			(void) snprintf(name, MAX_MACHINE_NAME,
+						"%s", au->aup_machname);
+			if (!rmtdomain)
 				(void) strcat(name, __nis_rpc_domain());
 			if (name[strlen(name) - 1] != '.')
 				(void) strcat(name, ".");
@@ -555,6 +561,7 @@ __nis_auth2princ_rpcgss(
 			(void) strcat(srch, ".");
 		}
 	} else if (flavor == AUTH_DES) {
+		/* LINTED pointer cast */
 		ad = (struct authdes_cred *)(auth);
 		if (refresh)
 			(void) delete_cred_item(ad->adc_fullname.name);
@@ -592,7 +599,7 @@ __nis_auth2princ_rpcgss(
 		rpc_gss_rawcred_t	*rcred;
 		void			*cookie;
 
-		if (! rpc_gss_getcred(req, &rcred, NULL, &cookie)) {
+		if (!rpc_gss_getcred(req, &rcred, NULL, &cookie)) {
 			if (verbose) {
 				syslog(LOG_WARNING,
 	"__nis_auth2princ_rpcgss: GSS getcred failure:  returning '%s'",
@@ -625,7 +632,7 @@ __nis_auth2princ_rpcgss(
 			char alias[MECH_MAXALIASNAME+1] = { 0 };
 
 			rmtdomain++;
-			if (! __nis_mechname2alias(rcred->mechanism, alias,
+			if (!__nis_mechname2alias(rcred->mechanism, alias,
 			    sizeof (alias))) {
 				syslog(LOG_ERR,
 	"__nis_auth2princ_rpcgss: mechname '%s' not found: returning 'nobody'",
@@ -750,7 +757,7 @@ __nis_ismaster(char *host, char *domain)
 	if ((strlen(domain) + 10) > (size_t)NIS_MAXNAMELEN)
 		return (FALSE);
 
-	(void) sprintf(buf, "org_dir.%s", domain);
+	(void) snprintf(buf, sizeof (buf), "org_dir.%s", domain);
 	if (buf[strlen(buf) - 1] != '.')
 		(void) strcat(buf, ".");
 
@@ -799,7 +806,7 @@ __nis_isadmin(char *princ, char *table, char *domain)
 		syslog(LOG_ERR, "__nis_isadmin: buffer too small");
 		return (FALSE);
 	}
-	(void) sprintf(buf, "%s.org_dir.%s", table, domain);
+	(void) snprintf(buf, sizeof (buf), "%s.org_dir.%s", table, domain);
 	if (buf[strlen(buf) - 1] != '.')
 		(void) strcat(buf, ".");
 
@@ -965,7 +972,7 @@ __nis_host2nis_server_g(const char *host,
 			if (num_ep == addr_size) {
 				addr_size += INC_SIZE;
 				oldaddr = addr;
-				addr = (endpoint *)realloc((void *)addr,
+				addr = realloc(addr,
 					addr_size * sizeof (endpoint));
 				if (addr == NULL) {
 				    if (errcode)
@@ -992,7 +999,7 @@ __nis_host2nis_server_g(const char *host,
 	}
 	(void) endnetconfig(nch);
 
-	if ((hostinfo = (nis_server *)calloc(1, sizeof (nis_server))) == NULL) {
+	if ((hostinfo = calloc(1, sizeof (nis_server))) == NULL) {
 		nis_free_endpoints(addr, num_ep);
 		if (errcode)
 			*errcode = NIS_NOMEMORY;
@@ -1033,7 +1040,7 @@ __nis_host2nis_server_g(const char *host,
 				binpadlen = ((binlen + 3) / 4) * 4;
 				hexkeylen = binlen * 2 + 1;
 
-				if (!(hexkey = (char *)malloc(hexkeylen))) {
+				if (!(hexkey = malloc(hexkeylen))) {
 					__nis_release_mechanisms(mechlist);
 					__free_nis_server(hostinfo);
 					free(keylist);
@@ -1058,8 +1065,7 @@ __nis_host2nis_server_g(const char *host,
 				keylistsize += sizeof (ushort_t) * 2 +
 					binpadlen;
 				oldkeylist = keylist;
-				if (!(keylist =
-					(extdhkey_t *)realloc(keylist,
+				if (!(keylist = realloc(keylist,
 							    keylistsize))) {
 					free(oldkeylist);
 					free(hexkey);
@@ -1071,6 +1077,7 @@ __nis_host2nis_server_g(const char *host,
 				}
 
 				entryoffset = (char *)keylist + keyoffset;
+				/* LINTED pointer cast */
 				curentry = (extdhkey_t *)entryoffset;
 
 				curentry->keylen = htons(keylen);
@@ -1130,8 +1137,10 @@ char *
 __nis_dhext_extract_pkey(netobj *no, keylen_t keylen, algtype_t algtype)
 {
 	char		*hexkey;
+	/* LINTED pointer cast */
 	extdhkey_t	*keyent = (extdhkey_t *)no->n_bytes;
 
+	/* LINTED pointer cast */
 	while (keyent < (extdhkey_t *)(no->n_bytes + no->n_len)) {
 		char	*keyoffset;
 		size_t	binlen = (ntohs(keyent->keylen) + 7) / 8;
@@ -1141,7 +1150,7 @@ __nis_dhext_extract_pkey(netobj *no, keylen_t keylen, algtype_t algtype)
 		if (keylen == ntohs(keyent->keylen) &&
 		    algtype == ntohs(keyent->algtype)) {
 
-			if (!(hexkey = (char *)malloc(hexkeylen)))
+			if (!(hexkey = malloc(hexkeylen)))
 				return (NULL);
 
 			(void) bin2hex(binlen, keyent->key, hexkey);
@@ -1149,6 +1158,7 @@ __nis_dhext_extract_pkey(netobj *no, keylen_t keylen, algtype_t algtype)
 		}
 		keyoffset = (char *)keyent + (sizeof (ushort_t) * 2) +
 			binpadlen;
+		/* LINTED pointer cast */
 		keyent = (extdhkey_t *)keyoffset;
 	}
 	return (NULL);
@@ -1164,11 +1174,12 @@ __nis_dhext_extract_keyinfo(nis_server *ns, extdhkey_t **retdat)
 {
 	extdhkey_t	*keyinfolist = NULL, *tmplist = NULL;
 	int		count = 0;
+	/* LINTED pointer cast */
 	extdhkey_t	*keyent = (extdhkey_t *)ns->pkey.n_bytes;
 
 	switch (ns->key_type) {
 	case	NIS_PK_DH:
-		if (!(keyinfolist = (extdhkey_t *)malloc(sizeof (extdhkey_t))))
+		if (!(keyinfolist = malloc(sizeof (extdhkey_t))))
 			return (0);
 		keyinfolist[0].keylen = 192;
 		keyinfolist[0].algtype = 0;
@@ -1177,6 +1188,7 @@ __nis_dhext_extract_keyinfo(nis_server *ns, extdhkey_t **retdat)
 		return (1);
 
 	case	NIS_PK_DHEXT:
+		/* LINTED pointer cast */
 		while (keyent < (extdhkey_t *)(ns->pkey.n_bytes +
 			ns->pkey.n_len)) {
 			size_t	binlen = (keyent->keylen + 7) / 8;
@@ -1185,8 +1197,7 @@ __nis_dhext_extract_keyinfo(nis_server *ns, extdhkey_t **retdat)
 
 			tmplist = keyinfolist;
 
-			if (!(keyinfolist =
-				(extdhkey_t *)realloc(keyinfolist,
+			if (!(keyinfolist = realloc(keyinfolist,
 						    (count + 1) *
 						    sizeof (extdhkey_t)))) {
 				free(tmplist);
@@ -1197,6 +1208,7 @@ __nis_dhext_extract_keyinfo(nis_server *ns, extdhkey_t **retdat)
 
 			keyoffset = (char *)keyent + (sizeof (ushort_t) * 2) +
 				binpadlen;
+			/* LINTED pointer cast */
 			keyent = (extdhkey_t *)keyoffset;
 			count++;
 		}

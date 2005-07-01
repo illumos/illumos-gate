@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,11 +33,18 @@
  * under license from the Regents of the University of California.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef _NSS_NETCSPACE_H
+#define	_NSS_NETCSPACE_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct nc_data {
-	char         *string;
-	unsigned int value;
+	char		*string;
+	unsigned int	value;
 };
 
 static struct nc_data nc_semantics[] = {
@@ -58,6 +66,11 @@ static struct nc_data nc_flag[] = {
 #define	NC_NOSET	2
 #define	NC_OPENFAIL	3
 #define	NC_BADLINE	4
-#define NC_NOTFOUND     5
-#define NC_NOMOREENTRIES 6
+#define	NC_NOTFOUND	5
+#define	NC_NOMOREENTRIES 6
 
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* _NSS_NETCSPACE_H */

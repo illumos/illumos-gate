@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1988-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,7 +243,8 @@ __nis_path_list(
 	/* construct a list of tables to search */
 	(void) strncpy(pathbuf, tbl_obj->TA_data.ta_path, NIS_MAXPATHLEN);
 	if (sf) {
-		(void) sprintf(firstpath, "%s.%s", tbl_obj->zo_name,
+		(void) snprintf(firstpath, sizeof (firstpath),
+						"%s.%s", tbl_obj->zo_name,
 						tbl_obj->zo_domain);
 		pathlist[0] = firstpath;
 		tnum = __nis_parse_path(pathbuf, &pathlist[1],
@@ -277,10 +279,10 @@ __nis_path_list(
 		ret_objs[i+1].objs = NULL;
 		ret_objs[i+1].len = 0;
 		if (cback) {
-			mutex_lock(&__nis_callback_lock);
+			(void) mutex_lock(&__nis_callback_lock);
 			local_res = __nis_core_lookup(req, flags, 1, cbdata,
 			    cback);
-			mutex_unlock(&__nis_callback_lock);
+			(void) mutex_unlock(&__nis_callback_lock);
 		} else
 			local_res = __nis_core_lookup(req, flags, 1, cbdata,
 			    cback);
@@ -383,8 +385,7 @@ __nis_path_list(
 	 */
 	if (total_objs) {
 		/* now build a list of objects that should be returned */
-		obj_list = (nis_object *) calloc(total_objs,
-							sizeof (nis_object));
+		obj_list = calloc(total_objs, sizeof (nis_object));
 		if (obj_list == NULL) {
 			res->status = NIS_NOMEMORY;
 			res->aticks += aticks;
@@ -450,7 +451,6 @@ nis_lookup(nis_name name, uint_t flags)
 	nis_error	nis_err = NIS_SUCCESS;
 	nis_name	*namelist;
 	nis_result	*res;
-	nis_error	err;
 	ib_request	req;
 	int		i;
 	unsigned int	aticks = 0,
@@ -458,7 +458,7 @@ nis_lookup(nis_name name, uint_t flags)
 			dticks = 0,
 			zticks = 0;
 
-	__start_clock(CLOCK_CLIENT);
+	(void) __start_clock(CLOCK_CLIENT);
 	__nis_CacheStart();
 	if (__nis_debug_calls) {
 		(void) fprintf(__nis_debug_file, "nis_lookup(%s, 0x%x)\n",
@@ -559,7 +559,7 @@ nis_list(
 	int		i, done;
 
 	/* start the client profiling clock */
-	__start_clock(CLOCK_CLIENT);
+	(void) __start_clock(CLOCK_CLIENT);
 
 	__nis_CacheStart();
 	if (__nis_debug_calls) {
@@ -639,9 +639,9 @@ nis_list(
 	i = (int)strlen(name);
 	if ((flags & EXPAND_NAME) == 0 || (i > 0 && name[i-1] == '.')) {
 		if (cback) {
-			mutex_lock(&__nis_callback_lock);
+			(void) mutex_lock(&__nis_callback_lock);
 			res = __nis_core_lookup(&req, flags, 1, cbdata, cback);
-			mutex_unlock(&__nis_callback_lock);
+			(void) mutex_unlock(&__nis_callback_lock);
 		} else
 			res = __nis_core_lookup(&req, flags, 1, cbdata, cback);
 		free(req.ibr_name);
@@ -663,10 +663,10 @@ nis_list(
 			/* replace with the candidate name */
 			req.ibr_name = namelist[i];
 			if (cback) {
-				mutex_lock(&__nis_callback_lock);
+				(void) mutex_lock(&__nis_callback_lock);
 				res = __nis_core_lookup(&req, flags, 1, cbdata,
 				    cback);
-				mutex_unlock(&__nis_callback_lock);
+				(void) mutex_unlock(&__nis_callback_lock);
 			} else
 				res = __nis_core_lookup(&req, flags, 1, cbdata,
 				    cback);
@@ -946,7 +946,7 @@ nis_nameops(nis_name name, nis_object *obj, rpcproc_t func)
 	state.flags = MASTER_ONLY;
 	state.parent_first = 1;
 
-	res = (nis_result *)calloc(1, sizeof (nis_result));
+	res = calloc(1, sizeof (nis_result));
 	if (res == NULL)
 		return (nis_make_error(NIS_NOMEMORY, 0, 0, 0, 0));
 
@@ -983,7 +983,7 @@ nis_add(nis_name name, nis_object *obj)
 {
 	nis_result	*res;
 
-	__start_clock(CLOCK_CLIENT); /* start the client clock */
+	(void) __start_clock(CLOCK_CLIENT); /* start the client clock */
 	__nis_CacheStart();
 	if (__nis_debug_calls) {
 		(void) fprintf(__nis_debug_file, "nis_add(%s, 0x%p\n",
@@ -1021,7 +1021,7 @@ nis_remove(nis_name name, nis_object *obj)
 {
 	nis_result	*res;
 
-	__start_clock(CLOCK_CLIENT); /* start the client clock */
+	(void) __start_clock(CLOCK_CLIENT); /* start the client clock */
 	__nis_CacheStart();
 	if (__nis_debug_calls) {
 		(void) fprintf(__nis_debug_file, "nis_remove(%s, 0x%p)\n",
@@ -1047,7 +1047,7 @@ nis_modify(nis_name name, nis_object *obj)
 {
 	nis_result	*res;
 
-	__start_clock(CLOCK_CLIENT); /* start the client clock */
+	(void) __start_clock(CLOCK_CLIENT); /* start the client clock */
 	__nis_CacheStart();
 	if (__nis_debug_calls) {
 		(void) fprintf(__nis_debug_file, "nis_modify(%s, 0x%p)\n",
@@ -1110,7 +1110,7 @@ name_to_cookie(char *name, nis_result *res)
 
 	offset = strlen(name) + 1;
 	len = offset + res->cookie.n_len;
-	p = (char *)malloc(len);
+	p = malloc(len);
 	if (p == 0) {
 		cookie->n_len = 0;    /* indicates a bad cookie */
 		syslog(LOG_ERR, "name_to_cookie: malloc failed");
@@ -1190,7 +1190,7 @@ nis_ibops(ib_request *req, rpcproc_t func)
 			obj->zo_owner = nis_local_group();
 	}
 
-	res = (nis_result *)calloc(1, sizeof (nis_result));
+	res = calloc(1, sizeof (nis_result));
 	if (res == NULL)
 		return (nis_make_error(NIS_NOMEMORY, 0, 0, 0, 0));
 
@@ -1276,7 +1276,7 @@ nis_add_entry(
 	ib_request	req;
 	nis_error	stat;
 
-	__start_clock(CLOCK_CLIENT);
+	(void) __start_clock(CLOCK_CLIENT);
 	__nis_CacheStart();
 	if (__nis_debug_calls) {
 		(void) fprintf(__nis_debug_file,
@@ -1314,7 +1314,7 @@ nis_remove_entry(
 	ib_request	req;
 	nis_error	stat;
 
-	__start_clock(CLOCK_CLIENT);
+	(void) __start_clock(CLOCK_CLIENT);
 	__nis_CacheStart();
 	if (__nis_debug_calls) {
 		(void) fprintf(__nis_debug_file,
@@ -1353,7 +1353,7 @@ nis_modify_entry(
 	ib_request	req;
 	nis_error	stat;
 
-	__start_clock(CLOCK_CLIENT);
+	(void) __start_clock(CLOCK_CLIENT);
 	__nis_CacheStart();
 	if (__nis_debug_calls) {
 		(void) fprintf(__nis_debug_file,
@@ -1389,7 +1389,7 @@ nis_first_entry(nis_name table)		/* Table to read 	*/
 	ib_request	req;
 	nis_error	stat;
 
-	__start_clock(CLOCK_CLIENT);
+	(void) __start_clock(CLOCK_CLIENT);
 	__nis_CacheStart();
 	if (__nis_debug_calls) {
 		(void) fprintf(__nis_debug_file, "nis_first_entry(%s)\n",
@@ -1435,7 +1435,7 @@ nis_next_entry(
 	ib_request	req;
 	nis_error	stat;
 
-	__start_clock(CLOCK_CLIENT);
+	(void) __start_clock(CLOCK_CLIENT);
 	__nis_CacheStart();
 	if (__nis_debug_calls) {
 		(void) fprintf(__nis_debug_file, "nis_next_entry(%s, 0x%p)\n",
@@ -1467,11 +1467,11 @@ nis_checkpoint(nis_name name)
 	nis_call_state state;
 	int times = 0;
 
-	__start_clock(CLOCK_CLIENT);
+	(void) __start_clock(CLOCK_CLIENT);
 
-	res = (nis_result *)calloc(1, sizeof (nis_result));
+	res = calloc(1, sizeof (nis_result));
 	if (res == NULL) {
-		__stop_clock(CLOCK_CLIENT);
+		(void) __stop_clock(CLOCK_CLIENT);
 		return (NULL);
 	}
 

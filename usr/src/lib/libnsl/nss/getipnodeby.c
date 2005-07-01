@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This file defines and implements the re-entrant getipnodebyname(),
@@ -43,7 +44,6 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <nss_dbdefs.h>
-#include <rpc/trace.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -109,9 +109,8 @@ struct hostent *
 _uncached_getipnodebyname(const char *nam, struct hostent *result,
 	char *buffer, int buflen, int af_family, int flags, int *h_errnop)
 {
-	return
-	(_switch_getipnodebyname_r(nam, result, buffer, buflen, af_family,
-					flags, h_errnop));
+	return (_switch_getipnodebyname_r(nam, result, buffer, buflen,
+					af_family, flags, h_errnop));
 }
 
 struct hostent *
@@ -135,7 +134,6 @@ _uncached_getipnodebyaddr(const char *addr, int length, int type,
 static uint_t
 getipnodebyname_processflags(const char *name, int af, int flags)
 {
-	int		ifnum6, ifnum4;
 	uint_t		ipnode_bits = IPNODE_DEFAULT;
 	boolean_t	ipv6configured = B_FALSE;
 	boolean_t	ipv4configured = B_FALSE;
@@ -203,7 +201,7 @@ getipnodebyname_processflags(const char *name, int af, int flags)
 		 */
 		ipnode_bits |= (IPNODE_WANTIPV6 | IPNODE_WANTIPV4);
 		ipnode_bits &= ~IPNODE_LOOKUPHOSTS;
-	} else if (inet_addr(name) != -1) {
+	} else if (inet_addr(name) != 0xffffffffU) {
 		/* Literal IPv4 address */
 		ipnode_bits |= (IPNODE_LITERAL | IPNODE_WANTIPV4);
 		ipnode_bits &= ~IPNODE_WANTIPV6;
@@ -224,10 +222,8 @@ getipnodebyname(const char *name, int af, int flags, int *error_num)
 	int			ret;
 	uint_t			ipnode_bits;
 
-	trace1(TR_getipnodebyname, 0);
 	if ((nconf = __rpc_getconfip("udp")) == NULL &&
 	    (nconf = __rpc_getconfip("tcp")) == NULL) {
-		trace2(TR_getipnodebyname, 1, buflen);
 		*error_num = NO_RECOVERY;
 		return (NULL);
 	}
@@ -409,7 +405,6 @@ cleanup:
 	}
 	(void) freenetconfigent(nconf);
 
-	trace1(TR_getipnodebyname, 1);
 	return (hp);
 }
 
@@ -430,7 +425,6 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 	int neterr;
 	char tmpbuf[64];
 
-	trace2(TR_gethostbyaddr, 0, len);
 	if (type == AF_INET6) {
 		if ((addr6 = (struct in6_addr *)src) == NULL) {
 			*error_num = HOST_NOT_FOUND;
@@ -464,15 +458,13 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 		}
 		if ((nconf = __rpc_getconfip("udp")) == NULL &&
 		    (nconf = __rpc_getconfip("tcp")) == NULL) {
-			trace3(TR__getipnodebyaddr, 0, len, buf->buflen);
 			*error_num = NO_RECOVERY;
 			__IPv6_cleanup(buf);
 			return (NULL);
 		}
 		nssin.op_t = NSS_HOST6;
 		if (IN6_IS_ADDR_V4COMPAT(addr6)) {
-			memcpy((void *)tmpbuf, (void *)addr6,
-						sizeof (*addr6));
+			(void) memcpy(tmpbuf, addr6, sizeof (*addr6));
 			tmpbuf[10] = 0xffU;
 			tmpbuf[11] = 0xffU;
 			nssin.arg.nss.host.addr = (const char *)tmpbuf;
@@ -497,7 +489,6 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 		(void) freenetconfigent(nconf);
 		if (neterr != ND_OK) {
 			/* Failover case, try hosts db for v4 address */
-			trace3(TR__getipnodebyaddr, 0, len, buf->buflen);
 			if (!gethostbyaddr_r(((char *)addr6) + 12,
 				sizeof (in_addr_t), AF_INET, buf->result,
 				buf->buffer, buf->buflen, error_num)) {
@@ -512,7 +503,7 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 			}
 			/* Convert IPv4 to mapped/compat address w/name */
 			hp = res->result;
-			__mapv4tov6(buf->result, 0, res,
+			(void) __mapv4tov6(buf->result, 0, res,
 						IN6_IS_ADDR_V4MAPPED(addr6));
 			__IPv6_cleanup(buf);
 			free(res);
@@ -525,6 +516,7 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 		 */
 		hp = buf->result;
 		if (IN6_IS_ADDR_V4COMPAT(addr6)) {
+			/* LINTED pointer cast */
 			addr6 = (struct in6_addr *)hp->h_addr_list[0];
 			addr6->s6_addr[10] = 0;
 			addr6->s6_addr[11] = 0;
@@ -546,7 +538,6 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 		IN6_INADDR_TO_V4MAPPED(addr4, addr6);
 		if ((nconf = __rpc_getconfip("udp")) == NULL &&
 		    (nconf = __rpc_getconfip("tcp")) == NULL) {
-			trace3(TR__getipnodebyaddr, 0, len, buf->buflen);
 			*error_num = NO_RECOVERY;
 			return (NULL);
 		}
@@ -575,7 +566,6 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 		(void) freenetconfigent(nconf);
 		if (neterr != ND_OK) {
 			/* Failover case, try hosts db for v4 address */
-			trace3(TR__getipnodebyaddr, 0, len, buf->buflen);
 			hp = buf->result;
 			if (!gethostbyaddr_r(src, len, type, buf->result,
 					buf->buffer, buf->buflen, error_num)) {
@@ -598,7 +588,6 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 	if (type == AF_INET6) {
 		if ((nconf = __rpc_getconfip("udp")) == NULL &&
 		    (nconf = __rpc_getconfip("tcp")) == NULL) {
-			trace3(TR__getipnodebyaddr, 0, len, buf->buflen);
 			*error_num = NO_RECOVERY;
 			return (NULL);
 		}
@@ -626,11 +615,9 @@ getipnodebyaddr(const void *src, size_t len, int type, int *error_num)
 
 		(void) freenetconfigent(nconf);
 		if (neterr != ND_OK) {
-			trace3(TR__getipnodebyaddr, 0, len, buf->buflen);
 			__IPv6_cleanup(buf);
 			return (NULL);
 		}
-		trace2(TR_gethostbyaddr, 1, len);
 		free(buf);
 		return (nssout.nss.host.hent);
 	}
@@ -761,6 +748,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 			 */
 				return (NULL);
 			}
+			/* LINTED pointer cast */
 			addr6p = (struct in6_addr *)buff_locp;
 			host->h_addr_list[count] = (char *)addr6p;
 			bzero(addr6p->s6_addr, sizeof (struct in6_addr));
@@ -784,7 +772,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 		 * V4 mapped literal address string for h_name.
 		 */
 			char	tmpstr[128];
-			inet_ntop(AF_INET6, host->h_addr_list[0], tmpstr,
+			(void) inet_ntop(AF_INET6, host->h_addr_list[0], tmpstr,
 							sizeof (tmpstr));
 			buff_locp -= (len = strlen(tmpstr) + 1);
 			h_namep = tmpstr;
@@ -862,6 +850,7 @@ __mapv4tov6(struct hostent *he4, struct hostent *he6, nss_XbyY_buf_t *res,
 			 */
 				return (NULL);
 			}
+			/* LINTED pointer cast */
 			addr6p = (struct in6_addr *)buff_locp;
 			host->h_addr_list[count] = (char *)addr6p;
 			bzero(addr6p->s6_addr, sizeof (struct in6_addr));
@@ -991,6 +980,7 @@ __mappedtov4(struct hostent *he, int *extract_error)
 	 * which is why there is a inet_addr() call.
 	 */
 		for (i = 0; he->h_addr_list[i] != NULL; i++) {
+			/* LINTED pointer cast */
 			if (!IN6_IS_ADDR_V4MAPPED((struct in6_addr *)
 							he->h_addr_list[i]))
 			continue;
@@ -1002,10 +992,12 @@ __mappedtov4(struct hostent *he, int *extract_error)
 			if (buff_locp <=
 				(char *)&(host->h_addr_list[count + 1]))
 				goto cleanup;
+			/* LINTED pointer cast */
 			addr4p = (struct in_addr *)buff_locp;
 			host->h_addr_list[count] = (char *)addr4p;
 			bzero((char *)&addr4p->s_addr,
 						sizeof (struct in_addr));
+			/* LINTED pointer cast */
 			IN6_V4MAPPED_TO_INADDR(
 					(struct in6_addr *)he->h_addr_list[i],
 					addr4p);
@@ -1067,7 +1059,6 @@ __filter_addresses(int af, struct hostent *he)
 	struct in6_addr	**in6addrlist, **in6addr;
 	boolean_t	isipv4mapped;
 	int		i = 0;
-	char		addrstr[INET6_ADDRSTRLEN];
 
 	if (he == NULL)
 		return (NULL);
@@ -1114,6 +1105,7 @@ __find_mapped(struct hostent *he, int find_both)
 	int v6_found = 0;
 
 	for (i = 0; he->h_addr_list[i] != NULL; i++) {
+		/* LINTED pointer cast */
 		if (IN6_IS_ADDR_V4MAPPED(
 				(struct in6_addr *)he->h_addr_list[i])) {
 			if (find_both)

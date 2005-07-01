@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +52,6 @@
  */
 
 #include <netdb.h>
-#include <rpc/trace.h>
 #include <netdir.h>
 #include <sys/types.h>
 #include <nss_netdir.h>
@@ -111,22 +111,18 @@ gethostbyname_r(const char *nam, struct hostent *result, char *buffer,
 	union	nss_netdirbyname_out nssout;
 	int neterr, dummy;
 
-	trace2(TR_gethostbyname_r, 0, buflen);
-
 	if (h_errnop == NULL)
 		h_errnop = &dummy;
 
 	if (strlen(nam) == 0) {
 		*h_errnop = HOST_NOT_FOUND;
-		trace2(TR_gethostbyname_r, 1, buflen);
-		return ((struct hostent *)NULL);
+		return (NULL);
 	}
 
 	if ((nconf = __rpc_getconfip("udp")) == NULL &&
 	    (nconf = __rpc_getconfip("tcp")) == NULL) {
 		*h_errnop = NO_RECOVERY;
-		trace2(TR_gethostbyname_r, 1, buflen);
-		return ((struct hostent *)NULL);
+		return (NULL);
 	}
 
 	nssin.op_t = NSS_HOST;
@@ -144,11 +140,8 @@ gethostbyname_r(const char *nam, struct hostent *result, char *buffer,
 	neterr = _get_hostserv_inetnetdir_byname(nconf, &nssin, &nssout);
 
 	(void) freenetconfigent(nconf);
-	if (neterr != ND_OK) {
-		trace2(TR_gethostbyname_r, 1, buflen);
-		return ((struct hostent *)NULL);
-	}
-	trace2(TR_gethostbyname_r, 1, buflen);
+	if (neterr != ND_OK)
+		return (NULL);
 	return (nssout.nss.host.hent);
 }
 
@@ -161,18 +154,15 @@ gethostbyaddr_r(const char *addr, int length, int type,
 	union	nss_netdirbyaddr_out nssout;
 	int neterr;
 
-	trace3(TR_gethostbyaddr_r, 0, length, buflen);
-
 	if (type != AF_INET) {
 		*h_errnop = HOST_NOT_FOUND;
-		return ((struct hostent *)NULL);
+		return (NULL);
 	}
 
 	if ((nconf = __rpc_getconfip("udp")) == NULL &&
 	    (nconf = __rpc_getconfip("tcp")) == NULL) {
 		*h_errnop = NO_RECOVERY;
-		trace3(TR_gethostbyaddr_r, 0, length, buflen);
-		return ((struct hostent *)NULL);
+		return (NULL);
 	}
 
 	nssin.op_t = NSS_HOST;
@@ -192,9 +182,7 @@ gethostbyaddr_r(const char *addr, int length, int type,
 	neterr = _get_hostserv_inetnetdir_byaddr(nconf, &nssin, &nssout);
 
 	(void) freenetconfigent(nconf);
-	if (neterr != ND_OK) {
-		trace3(TR_gethostbyaddr_r, 0, length, buflen);
-		return ((struct hostent *)NULL);
-	}
+	if (neterr != ND_OK)
+		return (NULL);
 	return (nssout.nss.host.hent);
 }

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +45,6 @@
 #include <rpcsvc/ypclnt.h>
 #include <rpcsvc/ypupd.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <stdlib.h>
 
 #define	WINDOW (60*60)
@@ -60,25 +60,18 @@
 extern AUTH *authdes_seccreate();
 
 int
-yp_update(domain, map, op, key, keylen, data, datalen)
-	char *domain;
-	char *map;
-	unsigned op;
-	char *key;
-	int keylen;
-	char *data;
-	int datalen;
+yp_update(char *domain, char *map, unsigned op, char *key, int keylen,
+							char *data, int datalen)
 {
 	struct ypupdate_args args;
-	u_int rslt;
+	uint_t rslt;
 	struct timeval total;
 	CLIENT *client;
 	char *ypmaster;
 	char ypmastername[MAXNETNAMELEN+1];
 	enum clnt_stat stat;
-	u_int proc;
+	uint_t proc;
 
-	trace3(TR_yp_update, 0, keylen, datalen);
 	switch (op) {
 	case YPOP_DELETE:
 		proc = YPU_DELETE;
@@ -93,12 +86,10 @@ yp_update(domain, map, op, key, keylen, data, datalen)
 		proc = YPU_STORE;
 		break;
 	default:
-		trace1(TR_yp_update, 1);
 		return (YPERR_BADARGS);
 	}
 	if (yp_master(domain, map, &ypmaster) != 0) {
 		debug("no master found");
-		trace1(TR_yp_update, 1);
 		return (YPERR_BADDB);
 	}
 
@@ -111,14 +102,12 @@ yp_update(domain, map, op, key, keylen, data, datalen)
 		}
 #endif /* DEBUG */
 		free(ypmaster);
-		trace1(TR_yp_update, 1);
 		return (YPERR_RPC);
 	}
 
-	if (! host2netname(ypmastername, ypmaster, domain)) {
+	if (!host2netname(ypmastername, ypmaster, domain)) {
 		clnt_destroy(client);
 		free(ypmaster);
-		trace1(TR_yp_update, 1);
 		return (YPERR_BADARGS);
 	}
 	client->cl_auth = authdes_seccreate(ypmastername, WINDOW,
@@ -127,7 +116,6 @@ yp_update(domain, map, op, key, keylen, data, datalen)
 	if (client->cl_auth == NULL) {
 		debug("auth create failed");
 		clnt_destroy(client);
-		trace1(TR_yp_update, 1);
 		return (YPERR_RPC);
 	}
 
@@ -155,6 +143,5 @@ yp_update(domain, map, op, key, keylen, data, datalen)
 	}
 	auth_destroy(client->cl_auth);
 	clnt_destroy(client);
-	trace1(TR_yp_update, 1);
 	return (rslt);
 }

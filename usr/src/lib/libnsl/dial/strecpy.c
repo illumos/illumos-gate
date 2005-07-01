@@ -19,39 +19,40 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
-#include	"uucp.h"
-#include <rpc/trace.h> 
 
 /*
-	strecpy(output, input, except)
-	strccpy copys the input string to the output string expanding
-	any non-graphic character with the C escape sequence.
-	Esacpe sequences produced are those defined in "The C Programming
-	Language" pages 180-181.
-	Characters in the except string will not be expanded.
-*/
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-GLOBAL char *
-strecpy(pout, pin, except)
-register char	*pout;
-register char	*pin;
-char	*except;
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include	"uucp.h"
+
+#ifndef SMALL
+/*
+ *	strecpy(output, input, except)
+ *	strccpy copys the input string to the output string expanding
+ *	any non-graphic character with the C escape sequence.
+ *	Escape sequences produced are those defined in "The C Programming
+ *	Language" pages 180-181.
+ *	Characters in the except string will not be expanded.
+ */
+
+static char *
+strecpy(char *pout, char *pin, char *except)
 {
-	register unsigned	c;
-	register char		*output;
+	unsigned	c;
+	char		*output;
 
-	trace1(TR_strecpy, 0);
 	output = pout;
 	while ((c = *pin++) != 0) {
-		if (!isprint(c)  &&  (!except  ||  !strchr(except, c))) {
+		if (!isprint(c) && (!except || !strchr(except, c))) {
 			*pout++ = '\\';
-			switch(c) {
+			switch (c) {
 			case '\n':
 				*pout++ = 'n';
 				continue;
@@ -78,11 +79,11 @@ char	*except;
 				continue;
 			}
 		}
-		if (c == '\\'  &&  (!except  ||  !strchr(except, c)))
+		if (c == '\\' && (!except || !strchr(except, c)))
 			*pout++ = '\\';
-		*pout++ = (char) c;
+		*pout++ = (char)c;
 	}
 	*pout = '\0';
-	trace1(TR_strecpy, 1);
-	return  (output);
+	return (output);
 }
+#endif

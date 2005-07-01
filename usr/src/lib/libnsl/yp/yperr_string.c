@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +38,6 @@
 
 #include <rpcsvc/ypclnt.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 
 /*
  * This returns a pointer to an error message string appropriate to an input
@@ -46,106 +47,43 @@
  */
 
 char *
-yperr_string(code)
-	int code;
+yperr_string(int code)
 {
-	char *pmesg;
-
-	trace2(TR_yperr_string, 0, code);
 	switch (code) {
-
-	case 0:  {
-		pmesg = "yp operation succeeded";
-		break;
+	case 0:
+		return ("yp operation succeeded");
+	case YPERR_BADARGS:
+		return ("args to yp function are bad");
+	case YPERR_RPC:
+		return ("RPC failure on yp operation");
+	case YPERR_DOMAIN:
+		return ("can't bind to a server which serves domain");
+	case YPERR_MAP:
+		return ("no such map in server's domain");
+	case YPERR_KEY:
+		return ("no such key in map");
+	case YPERR_YPERR:
+		return ("internal yp server or client error");
+	case YPERR_RESRC:
+		return ("local resource allocation failure");
+	case YPERR_NOMORE:
+		return ("no more records in map database");
+	case YPERR_PMAP:
+		return ("can't communicate with rpcbind");
+	case YPERR_YPBIND:
+		return ("can't communicate with ypbind");
+	case YPERR_YPSERV:
+		return ("can't communicate with ypserv");
+	case YPERR_NODOM:
+		return ("local domain name not set");
+	case YPERR_BADDB:
+		return ("yp map data base is bad");
+	case YPERR_VERS:
+		return ("yp client/server version mismatch");
+	case YPERR_ACCESS:
+		return ("permission denied");
+	case YPERR_BUSY:
+		return ("database is busy");
 	}
-
-	case YPERR_BADARGS:  {
-		pmesg = "args to yp function are bad";
-		break;
-	}
-
-	case YPERR_RPC:  {
-		pmesg = "RPC failure on yp operation";
-		break;
-	}
-
-	case YPERR_DOMAIN:  {
-		pmesg = "can't bind to a server which serves domain";
-		break;
-	}
-
-	case YPERR_MAP:  {
-		pmesg = "no such map in server's domain";
-		break;
-	}
-
-	case YPERR_KEY:  {
-		pmesg = "no such key in map";
-		break;
-	}
-
-	case YPERR_YPERR:  {
-		pmesg = "internal yp server or client error";
-		break;
-	}
-
-	case YPERR_RESRC:  {
-		pmesg = "local resource allocation failure";
-		break;
-	}
-
-	case YPERR_NOMORE:  {
-		pmesg = "no more records in map database";
-		break;
-	}
-
-	case YPERR_PMAP:  {
-		pmesg = "can't communicate with rpcbind";
-		break;
-		}
-
-	case YPERR_YPBIND:  {
-		pmesg = "can't communicate with ypbind";
-		break;
-		}
-
-	case YPERR_YPSERV:  {
-		pmesg = "can't communicate with ypserv";
-		break;
-		}
-
-	case YPERR_NODOM:  {
-		pmesg = "local domain name not set";
-		break;
-	}
-
-	case YPERR_BADDB:  {
-		pmesg = "yp map data base is bad";
-		break;
-	}
-
-	case YPERR_VERS:  {
-		pmesg = "yp client/server version mismatch";
-		break;
-	}
-
-	case YPERR_ACCESS: {
-		pmesg = "permission denied";
-		break;
-	}
-
-	case YPERR_BUSY: {
-		pmesg = "database is busy";
-		break;
-	}
-
-	default:  {
-		pmesg = "unknown yp client error code";
-		break;
-	}
-
-	}
-
-	trace1(TR_yperr_string, 1);
-	return (pmesg);
+	return ("unknown yp client error code");
 }

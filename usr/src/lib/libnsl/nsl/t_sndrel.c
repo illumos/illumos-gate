@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4 */
 
@@ -37,7 +36,6 @@
  * are applicable to the other file.
  */
 #include "mt.h"
-#include <rpc/trace.h>
 #include <errno.h>
 #include <stropts.h>
 #include <sys/stream.h>
@@ -53,21 +51,14 @@ _tx_sndrel(int fd, int api_semantics)
 	struct T_ordrel_req orreq;
 	struct strbuf ctlbuf;
 	struct _ti_user *tiptr;
-	int sv_errno;
 
-	trace2(TR_t_sndrel, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_sndrel, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype != T_COTS_ORD) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_sndrel, 1, fd);
 		return (-1);
 	}
 
@@ -76,11 +67,10 @@ _tx_sndrel(int fd, int api_semantics)
 		 * User level state verification only done for XTI
 		 * because doing for TLI may break existing applications
 		 */
-		if (! (tiptr->ti_state == T_DATAXFER ||
+		if (!(tiptr->ti_state == T_DATAXFER ||
 		    tiptr->ti_state == T_INREL)) {
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_sndrel, 1, fd);
 			return (-1);
 		}
 
@@ -88,7 +78,6 @@ _tx_sndrel(int fd, int api_semantics)
 		    api_semantics) == T_DISCONNECT) {
 			t_errno = TLOOK;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_sndrel, 1, fd);
 			return (-1);
 		}
 
@@ -106,20 +95,15 @@ _tx_sndrel(int fd, int api_semantics)
 	 */
 	sig_mutex_unlock(&tiptr->ti_lock);
 	if (putmsg(fd, &ctlbuf, NULL, 0) < 0) {
-		sv_errno = errno;
-
 		if (errno == EAGAIN)
 			t_errno = TFLOW;
 		else
 			t_errno = TSYSERR;
-		trace2(TR_t_sndrel, 1, fd);
-		errno = sv_errno;
 		return (-1);
 	}
 	sig_mutex_lock(&tiptr->ti_lock);
 	_T_TX_NEXTSTATE(T_SNDREL, tiptr,
 				"t_sndrel: invalid state on event T_SNDREL");
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_sndrel, 1, fd);
 	return (0);
 }

@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,43 +37,26 @@
 /*
  * rpcb_prot.c
  * XDR routines for the rpcbinder version 3.
- *
  */
 
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 #include <rpc/rpcb_prot.h>
 
 
 bool_t
-xdr_rpcb(xdrs, objp)
-	XDR *xdrs;
-	RPCB *objp;
+xdr_rpcb(XDR *xdrs, RPCB *objp)
 {
-	trace1(TR_xdr_rpcb, 0);
-	if (!xdr_u_int(xdrs, (u_int *)&objp->r_prog)) {
-		trace1(TR_xdr_rpcb, 1);
+	if (!xdr_u_int(xdrs, (uint_t *)&objp->r_prog))
 		return (FALSE);
-	}
-	if (!xdr_u_int(xdrs, (u_int *)&objp->r_vers)) {
-		trace1(TR_xdr_rpcb, 1);
+	if (!xdr_u_int(xdrs, (uint_t *)&objp->r_vers))
 		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->r_netid, ~0)) {
+	if (!xdr_string(xdrs, &objp->r_netid, ~0))
 		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->r_addr, ~0)) {
-		trace1(TR_xdr_rpcb, 1);
+	if (!xdr_string(xdrs, &objp->r_addr, ~0))
 		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->r_owner, ~0)) {
-		trace1(TR_xdr_rpcb, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_rpcb, 1);
-	return (TRUE);
+	return (xdr_string(xdrs, &objp->r_owner, ~0));
 }
 
 /*
@@ -98,9 +83,7 @@ xdr_rpcb(xdrs, objp)
  */
 
 bool_t
-xdr_rpcblist_ptr(xdrs, rp)
-	register XDR *xdrs;
-	register rpcblist_ptr *rp;
+xdr_rpcblist_ptr(XDR *xdrs, rpcblist_ptr *rp)
 {
 	/*
 	 * more_elements is pre-computed in case the direction is
@@ -108,22 +91,16 @@ xdr_rpcblist_ptr(xdrs, rp)
 	 * xdr_bool when the direction is XDR_DECODE.
 	 */
 	bool_t more_elements;
-	register int freeing = (xdrs->x_op == XDR_FREE);
+	int freeing = (xdrs->x_op == XDR_FREE);
 	rpcblist_ptr next;
 	rpcblist_ptr next_copy;
 
-	trace1(TR_xdr_rpcblist_ptr, 0);
-	/*CONSTANTCONDITION*/
-	while (TRUE) {
+	for (;;) {
 		more_elements = (bool_t)(*rp != NULL);
-		if (! xdr_bool(xdrs, &more_elements)) {
-			trace1(TR_xdr_rpcblist_ptr, 1);
+		if (!xdr_bool(xdrs, &more_elements))
 			return (FALSE);
-		}
-		if (! more_elements) {
-			trace1(TR_xdr_rpcblist_ptr, 1);
+		if (!more_elements)
 			return (TRUE);  /* we are done */
-		}
 		/*
 		 * the unfortunate side effect of non-recursion is that in
 		 * the case of freeing we must remember the next object
@@ -131,11 +108,9 @@ xdr_rpcblist_ptr(xdrs, rp)
 		 */
 		if (freeing)
 			next = (*rp)->rpcb_next;
-		if (! xdr_reference(xdrs, (caddr_t *)rp,
-		    (u_int) sizeof (rpcblist), (xdrproc_t)xdr_rpcb)) {
-			trace1(TR_xdr_rpcblist_ptr, 1);
+		if (!xdr_reference(xdrs, (caddr_t *)rp,
+		    (uint_t)sizeof (rpcblist), (xdrproc_t)xdr_rpcb))
 			return (FALSE);
-		}
 		if (freeing) {
 			next_copy = next;
 			rp = &next_copy;
@@ -156,51 +131,28 @@ xdr_rpcblist_ptr(xdrs, rp)
  * functionality to xdr_rpcblist_ptr().
  */
 bool_t
-xdr_rpcblist(xdrs, rp)
-	register XDR *xdrs;
-	register RPCBLIST **rp;
+xdr_rpcblist(XDR *xdrs, RPCBLIST **rp)
 {
-	bool_t	dummy;
-
-	dummy = xdr_rpcblist_ptr(xdrs, (rpcblist_ptr *)rp);
-	return (dummy);
+	return (xdr_rpcblist_ptr(xdrs, (rpcblist_ptr *)rp));
 }
 
 
 bool_t
-xdr_rpcb_entry(xdrs, objp)
-	XDR *xdrs;
-	rpcb_entry *objp;
+xdr_rpcb_entry(XDR *xdrs, rpcb_entry *objp)
 {
-	trace1(TR_xdr_rpcb_entry, 0);
-	if (!xdr_string(xdrs, &objp->r_maddr, ~0)) {
-		trace1(TR_xdr_rpcb_entry, 1);
+	if (!xdr_string(xdrs, &objp->r_maddr, ~0))
 		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->r_nc_netid, ~0)) {
-		trace1(TR_xdr_rpcb_entry, 1);
+	if (!xdr_string(xdrs, &objp->r_nc_netid, ~0))
 		return (FALSE);
-	}
-	if (!xdr_u_int(xdrs, &objp->r_nc_semantics)) {
-		trace1(TR_xdr_rpcb_entry, 1);
+	if (!xdr_u_int(xdrs, &objp->r_nc_semantics))
 		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->r_nc_protofmly, ~0)) {
-		trace1(TR_xdr_rpcb_entry, 1);
+	if (!xdr_string(xdrs, &objp->r_nc_protofmly, ~0))
 		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->r_nc_proto, ~0)) {
-		trace1(TR_xdr_rpcb_entry, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_rpcb_entry, 1);
-	return (TRUE);
+	return (xdr_string(xdrs, &objp->r_nc_proto, ~0));
 }
 
 bool_t
-xdr_rpcb_entry_list_ptr(xdrs, rp)
-	register XDR *xdrs;
-	register rpcb_entry_list_ptr *rp;
+xdr_rpcb_entry_list_ptr(XDR *xdrs, rpcb_entry_list_ptr *rp)
 {
 	/*
 	 * more_elements is pre-computed in case the direction is
@@ -208,22 +160,16 @@ xdr_rpcb_entry_list_ptr(xdrs, rp)
 	 * xdr_bool when the direction is XDR_DECODE.
 	 */
 	bool_t more_elements;
-	register int freeing = (xdrs->x_op == XDR_FREE);
+	int freeing = (xdrs->x_op == XDR_FREE);
 	rpcb_entry_list_ptr next;
 	rpcb_entry_list_ptr next_copy;
 
-	trace1(TR_xdr_rpcb_entry_list_ptr, 0);
-	/*CONSTANTCONDITION*/
-	while (TRUE) {
+	for (;;) {
 		more_elements = (bool_t)(*rp != NULL);
-		if (! xdr_bool(xdrs, &more_elements)) {
-			trace1(TR_xdr_rpcb_entry_list, 1);
+		if (!xdr_bool(xdrs, &more_elements))
 			return (FALSE);
-		}
-		if (! more_elements) {
-			trace1(TR_xdr_rpcb_entry_list, 1);
+		if (!more_elements)
 			return (TRUE);  /* we are done */
-		}
 		/*
 		 * the unfortunate side effect of non-recursion is that in
 		 * the case of freeing we must remember the next object
@@ -231,12 +177,10 @@ xdr_rpcb_entry_list_ptr(xdrs, rp)
 		 */
 		if (freeing)
 			next = (*rp)->rpcb_entry_next;
-		if (! xdr_reference(xdrs, (caddr_t *)rp,
-		    (u_int) sizeof (rpcb_entry_list),
-				    (xdrproc_t)xdr_rpcb_entry)) {
-			trace1(TR_xdr_rpcb_entry_list, 1);
+		if (!xdr_reference(xdrs, (caddr_t *)rp,
+		    (uint_t)sizeof (rpcb_entry_list),
+				    (xdrproc_t)xdr_rpcb_entry))
 			return (FALSE);
-		}
 		if (freeing) {
 			next_copy = next;
 			rp = &next_copy;
@@ -257,28 +201,19 @@ xdr_rpcb_entry_list_ptr(xdrs, rp)
  * written for XDR_ENCODE direction only
  */
 bool_t
-xdr_rpcb_rmtcallargs(xdrs, objp)
-	XDR *xdrs;
-	struct r_rpcb_rmtcallargs *objp;
+xdr_rpcb_rmtcallargs(XDR *xdrs, struct r_rpcb_rmtcallargs *objp)
 {
-	u_int lenposition, argposition, position;
-	register rpc_inline_t *buf;
+	uint_t lenposition, argposition, position;
+	rpc_inline_t *buf;
 
-	trace1(TR_xdr_rpcb_rmtcallargs, 0);
 	buf = XDR_INLINE(xdrs, 3 * BYTES_PER_XDR_UNIT);
 	if (buf == NULL) {
-		if (!xdr_u_int(xdrs, (u_int *)&objp->prog)) {
-			trace1(TR_xdr_rpcb_rmtcallargs, 1);
+		if (!xdr_u_int(xdrs, (uint_t *)&objp->prog))
 			return (FALSE);
-		}
-		if (!xdr_u_int(xdrs, (u_int *)&objp->vers)) {
-			trace1(TR_xdr_rpcb_rmtcallargs, 1);
+		if (!xdr_u_int(xdrs, (uint_t *)&objp->vers))
 			return (FALSE);
-		}
-		if (!xdr_u_int(xdrs, (u_int *)&objp->proc)) {
-			trace1(TR_xdr_rpcb_rmtcallargs, 1);
+		if (!xdr_u_int(xdrs, (uint_t *)&objp->proc))
 			return (FALSE);
-		}
 	} else {
 		IXDR_PUT_U_INT32(buf, objp->prog);
 		IXDR_PUT_U_INT32(buf, objp->vers);
@@ -289,24 +224,17 @@ xdr_rpcb_rmtcallargs(xdrs, objp)
 	 * All the jugglery for just getting the size of the arguments
 	 */
 	lenposition = XDR_GETPOS(xdrs);
-	if (! xdr_u_int(xdrs, &(objp->args.args_len))) {
-		trace1(TR_xdr_rpcb_rmtcallargs, 1);
+	if (!xdr_u_int(xdrs, &(objp->args.args_len)))
 		return (FALSE);
-	}
 	argposition = XDR_GETPOS(xdrs);
-	if (! (*objp->xdr_args)(xdrs, objp->args.args_val)) {
-		trace1(TR_xdr_rpcb_rmtcallargs, 1);
+	if (!(*objp->xdr_args)(xdrs, objp->args.args_val))
 		return (FALSE);
-	}
 	position = XDR_GETPOS(xdrs);
-	objp->args.args_len = (u_int)position - (u_int)argposition;
+	objp->args.args_len = (uint_t)position - (uint_t)argposition;
 	XDR_SETPOS(xdrs, lenposition);
-	if (! xdr_u_int(xdrs, &(objp->args.args_len))) {
-		trace1(TR_xdr_rpcb_rmtcallargs, 1);
+	if (!xdr_u_int(xdrs, &(objp->args.args_len)))
 		return (FALSE);
-	}
 	XDR_SETPOS(xdrs, position);
-	trace1(TR_xdr_rpcb_rmtcallargs, 1);
 	return (TRUE);
 }
 
@@ -315,40 +243,20 @@ xdr_rpcb_rmtcallargs(xdrs, objp)
  * written for XDR_DECODE direction only
  */
 bool_t
-xdr_rpcb_rmtcallres(xdrs, objp)
-	XDR *xdrs;
-	struct r_rpcb_rmtcallres *objp;
+xdr_rpcb_rmtcallres(XDR *xdrs, struct r_rpcb_rmtcallres *objp)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_rpcb_rmtcallres, 0);
-	if (!xdr_string(xdrs, &objp->addr, ~0)) {
-		trace1(TR_xdr_rpcb_rmtcallres, 1);
+	if (!xdr_string(xdrs, &objp->addr, ~0))
 		return (FALSE);
-	}
-	if (!xdr_u_int(xdrs, &objp->results.results_len)) {
-		trace1(TR_xdr_rpcb_rmtcallres, 1);
+	if (!xdr_u_int(xdrs, &objp->results.results_len))
 		return (FALSE);
-	}
-	dummy = (*(objp->xdr_res))(xdrs, objp->results.results_val);
-	trace1(TR_xdr_rpcb_rmtcallres, 1);
-	return (dummy);
+	return ((*(objp->xdr_res))(xdrs, objp->results.results_val));
 }
 
 bool_t
-xdr_netbuf(xdrs, objp)
-	XDR *xdrs;
-	struct netbuf *objp;
+xdr_netbuf(XDR *xdrs, struct netbuf *objp)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_netbuf, 0);
-	if (!xdr_u_int(xdrs, (u_int *) &objp->maxlen)) {
-		trace1(TR_xdr_netbuf, 1);
+	if (!xdr_u_int(xdrs, (uint_t *)&objp->maxlen))
 		return (FALSE);
-	}
-	dummy = xdr_bytes(xdrs, (char **)&(objp->buf),
-			(u_int *)&(objp->len), objp->maxlen);
-	trace1(TR_xdr_netbuf, 1);
-	return (dummy);
+	return (xdr_bytes(xdrs, (char **)&(objp->buf),
+			(uint_t *)&(objp->len), objp->maxlen));
 }

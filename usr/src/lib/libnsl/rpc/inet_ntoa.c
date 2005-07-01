@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -44,7 +45,6 @@
 #include "rpc_mt.h"
 #include <errno.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <ctype.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -60,7 +60,8 @@ inet_ntoa_r(in, b)
 
 	p = (char *)&in;
 #define	UC(b)	(((int)b)&0xff)
-	sprintf(b, "%d.%d.%d.%d", UC(p[0]), UC(p[1]), UC(p[2]), UC(p[3]));
+	(void) sprintf(b, "%d.%d.%d.%d",
+				UC(p[0]), UC(p[1]), UC(p[2]), UC(p[3]));
 	return (b);
 }
 
@@ -89,15 +90,14 @@ inet_ntoa(in)
  * cannot distinguish between failure and a local broadcast address.
  */
 int
-_inet_aton(char *cp, struct in_addr *addr)
+_inet_aton(const char *cp, struct in_addr *addr)
 {
 	uint32_t val;
 	int base, n;
 	char c;
 	unsigned int parts[4];
-	register unsigned int *pp = parts;
+	unsigned int *pp = parts;
 
-	trace1(TR_inet_aton, 0);
 
 	c = *cp;
 	for (;;) {
@@ -180,7 +180,6 @@ _inet_aton(char *cp, struct in_addr *addr)
 	}
 	if (addr)
 		addr->s_addr = htonl(val);
-	trace1(TR_inet_aton, 1);
 	return (1);
 }
 
@@ -192,7 +191,7 @@ _inet_aton(char *cp, struct in_addr *addr)
  * The value returned is in network order.
  */
 in_addr_t
-inet_addr(char *cp)
+inet_addr(const char *cp)
 {
 	struct in_addr val;
 
@@ -205,21 +204,14 @@ inet_addr(char *cp)
  * Return the network number from an internet
  * address; handles class a/b/c network #'s.
  */
-int
-inet_netof(in)
-	struct in_addr in;
+uint_t
+inet_netof(struct in_addr in)
 {
 	uint32_t i = ntohl(in.s_addr);
 
-	trace1(TR_inet_netof, 0);
-	if (IN_CLASSA(i)) {
-		trace1(TR_inet_netof, 1);
-		return (((i)&IN_CLASSA_NET) >> IN_CLASSA_NSHIFT);
-	} else if (IN_CLASSB(i)) {
-		trace1(TR_inet_netof, 1);
-		return (((i)&IN_CLASSB_NET) >> IN_CLASSB_NSHIFT);
-	} else {
-		trace1(TR_inet_netof, 1);
-		return (((i)&IN_CLASSC_NET) >> IN_CLASSC_NSHIFT);
-	}
+	if (IN_CLASSA(i))
+		return ((i & IN_CLASSA_NET) >> IN_CLASSA_NSHIFT);
+	if (IN_CLASSB(i))
+		return ((i & IN_CLASSB_NET) >> IN_CLASSB_NSHIFT);
+	return ((i & IN_CLASSC_NET) >> IN_CLASSC_NSHIFT);
 }

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +53,7 @@
 #include <string.h>
 #include <sys/file.h>
 #include <dlfcn.h>
-#include <rpc/trace.h>
+#include <stdlib.h>
 #include <malloc.h>
 #include <syslog.h>
 #include <nss_netdir.h>
@@ -99,7 +100,7 @@ static struct translator *load_xlate(char *);
 int	_nderror;
 
 int *
-__nderror()
+__nderror(void)
 {
 	static pthread_key_t nderror_key = 0;
 	int *ret;
@@ -124,8 +125,7 @@ __nderror()
  * and then update 'translate' with the old versions of the symbols.
  */
 void
-add_to_xlate_list(translate)
-struct translator *translate;
+add_to_xlate_list(struct translator *translate)
 {
 	struct translator	*t;
 
@@ -158,19 +158,15 @@ struct translator *translate;
  * returns none - Bug Id. 4276329
  */
 int
-netdir_getbyname(tp, serv, addrs)
-	struct netconfig	*tp;	/* The network config entry	*/
-	struct nd_hostserv	*serv;	/* the service, host pair	*/
-	struct nd_addrlist	**addrs; /* the answer			*/
+netdir_getbyname(struct netconfig *tp, struct nd_hostserv *serv,
+						struct nd_addrlist **addrs)
 {
-	trace1(TR_netdir_getbyname, 0);
 	if (tp == 0) {
 		_nderror = ND_BADARG;
-		trace1(TR_netdir_getbyname, 1);
 		return (_nderror);
 	}
 	if ((strcmp(tp->nc_protofmly, NC_INET) == 0) &&
-		(tp->nc_nlookups == 0)) {
+						(tp->nc_nlookups == 0)) {
 		struct	nss_netdirbyname_in nssin;
 		union	nss_netdirbyname_out nssout;
 
@@ -186,8 +182,9 @@ netdir_getbyname(tp, serv, addrs)
 		nssin.arg.nss.host6.flags = 0;
 		nssout.nd_alist = addrs;
 		return (_get_hostserv_inetnetdir_byname(tp, &nssin, &nssout));
-	} else if ((strcmp(tp->nc_protofmly, NC_INET6) == 0) &&
-		(tp->nc_nlookups == 0)) {
+	}
+	if ((strcmp(tp->nc_protofmly, NC_INET6) == 0) &&
+						(tp->nc_nlookups == 0)) {
 		struct	nss_netdirbyname_in nssin;
 		union	nss_netdirbyname_out nssout;
 
@@ -198,10 +195,8 @@ netdir_getbyname(tp, serv, addrs)
 		nssin.arg.nss.host6.flags = (AI_ALL | AI_V4MAPPED);
 		nssout.nd_alist = addrs;
 		return (_get_hostserv_inetnetdir_byname(tp, &nssin, &nssout));
-	} else {
-		trace1(TR_netdir_getbyname, 1);
-		return (__classic_netdir_getbyname(tp, serv, addrs));
 	}
+	return (__classic_netdir_getbyname(tp, serv, addrs));
 }
 
 /*
@@ -214,17 +209,14 @@ netdir_getbyname(tp, serv, addrs)
  * /etc/netconfig with an intent of bypassing the name service switch.
  */
 int
-__classic_netdir_getbyname(tp, serv, addrs)
-	struct netconfig	*tp;	/* The network config entry	*/
-	struct nd_hostserv	*serv;	/* the service, host pair	*/
-	struct nd_addrlist	**addrs; /* the answer			*/
+__classic_netdir_getbyname(struct netconfig *tp, struct nd_hostserv *serv,
+						struct nd_addrlist **addrs)
 {
 	struct translator	*t;	/* pointer to translator list	*/
 	struct nd_addrlist	*nn;	/* the results			*/
 	char			*lr;	/* routines to try		*/
 	int			i;	/* counts the routines		*/
 
-	trace1(TR_netdir_getbyname, 0);
 	_nderror = ND_SYSTEM;
 	for (i = 0; i < tp->nc_nlookups; i++) {
 		lr = *((tp->nc_lookups) + i);
@@ -233,34 +225,28 @@ __classic_netdir_getbyname(tp, serv, addrs)
 				nn = (*(t->gbn))(tp, serv);
 				if (nn) {
 					*addrs = nn;
-					trace1(TR_netdir_getbyname, 1);
 					return (0);
-				} else {
-					if (_nderror < 0) {
-						trace1(TR_netdir_getbyname, 1);
-						return (_nderror);
-					}
-					break;
 				}
+				if (_nderror < 0) {
+					return (_nderror);
+				}
+				break;
 			}
 		}
 		/* If we didn't find it try loading it */
 		if (!t) {
 			if ((t = load_xlate(lr)) != NULL) {
 				/* add it to the list */
-				mutex_lock(&xlate_lock);
+				(void) mutex_lock(&xlate_lock);
 				add_to_xlate_list(t);
-				mutex_unlock(&xlate_lock);
+				(void) mutex_unlock(&xlate_lock);
 				nn = (*(t->gbn))(tp, serv);
 				if (nn) {
 					*addrs = nn;
-					trace1(TR_netdir_getbyname, 1);
 					return (0);
-				} else {
-					if (_nderror < 0) {
-						trace1(TR_netdir_getbyname, 1);
-						return (_nderror);
-					}
+				}
+				if (_nderror < 0) {
+					return (_nderror);
 				}
 			} else {
 				if (_nderror == ND_SYSTEM) { /* retry cache */
@@ -271,7 +257,6 @@ __classic_netdir_getbyname(tp, serv, addrs)
 			}
 		}
 	}
-	trace1(TR_netdir_getbyname, 1);
 	return (_nderror);	/* No one works */
 }
 
@@ -280,15 +265,11 @@ __classic_netdir_getbyname(tp, serv, addrs)
  * the name by the address passed.
  */
 int
-netdir_getbyaddr(tp, serv, addr)
-	struct netconfig	*tp;	/* The netconfig entry		*/
-	struct nd_hostservlist	**serv;	/* the answer(s)		*/
-	struct netbuf		*addr;	/* the address we have		*/
+netdir_getbyaddr(struct netconfig *tp, struct nd_hostservlist **serv,
+							struct netbuf *addr)
 {
-	trace1(TR_netdir_getbyaddr, 0);
 	if (tp == 0) {
 		_nderror = ND_BADARG;
-		trace1(TR_netdir_getbyaddr, 1);
 		return (_nderror);
 	}
 	if ((strcmp(tp->nc_protofmly, NC_INET) == 0) &&
@@ -299,9 +280,9 @@ netdir_getbyaddr(tp, serv, addr)
 		nssin.op_t = NETDIR_BY;
 		nssin.arg.nd_nbuf = addr;
 		nssout.nd_hslist = serv;
-		trace1(TR_netdir_getbyaddr, 1);
 		return (_get_hostserv_inetnetdir_byaddr(tp, &nssin, &nssout));
-	} else if ((strcmp(tp->nc_protofmly, NC_INET6) == 0) &&
+	}
+	if ((strcmp(tp->nc_protofmly, NC_INET6) == 0) &&
 		(tp->nc_nlookups == 0)) {
 		struct	nss_netdirbyaddr_in nssin;
 		union	nss_netdirbyaddr_out nssout;
@@ -309,27 +290,20 @@ netdir_getbyaddr(tp, serv, addr)
 		nssin.op_t = NETDIR_BY6;
 		nssin.arg.nd_nbuf = addr;
 		nssout.nd_hslist = serv;
-		trace1(TR_netdir_getbyaddr, 1);
 		return (_get_hostserv_inetnetdir_byaddr(tp, &nssin, &nssout));
-	} else {
-		trace1(TR_netdir_getbyaddr, 1);
-		return (__classic_netdir_getbyaddr(tp, serv, addr));
 	}
+	return (__classic_netdir_getbyaddr(tp, serv, addr));
 }
 /*
  * This routine is similar to the one above except that it instructs the
  * _get_hostserv_inetnetdir_byaddr not to do a service lookup.
  */
 int
-__netdir_getbyaddr_nosrv(tp, serv, addr)
-	struct netconfig	*tp;	/* The netconfig entry		*/
-	struct nd_hostservlist	**serv;	/* the answer(s)		*/
-	struct netbuf		*addr;	/* the address we have		*/
+__netdir_getbyaddr_nosrv(struct netconfig *tp, struct nd_hostservlist **serv,
+							struct netbuf *addr)
 {
-	trace1(TR_netdir_getbyaddr, 0);
 	if (tp == 0) {
 		_nderror = ND_BADARG;
-		trace1(TR_netdir_getbyaddr, 1);
 		return (_nderror);
 	}
 	if ((strcmp(tp->nc_protofmly, NC_INET) == 0) &&
@@ -340,9 +314,9 @@ __netdir_getbyaddr_nosrv(tp, serv, addr)
 		nssin.op_t = NETDIR_BY_NOSRV;
 		nssin.arg.nd_nbuf = addr;
 		nssout.nd_hslist = serv;
-		trace1(TR_netdir_getbyaddr, 1);
 		return (_get_hostserv_inetnetdir_byaddr(tp, &nssin, &nssout));
-	} else if ((strcmp(tp->nc_protofmly, NC_INET6) == 0) &&
+	}
+	if ((strcmp(tp->nc_protofmly, NC_INET6) == 0) &&
 		(tp->nc_nlookups == 0)) {
 		struct	nss_netdirbyaddr_in nssin;
 		union	nss_netdirbyaddr_out nssout;
@@ -350,12 +324,9 @@ __netdir_getbyaddr_nosrv(tp, serv, addr)
 		nssin.op_t = NETDIR_BY_NOSRV6;
 		nssin.arg.nd_nbuf = addr;
 		nssout.nd_hslist = serv;
-		trace1(TR_netdir_getbyaddr, 1);
 		return (_get_hostserv_inetnetdir_byaddr(tp, &nssin, &nssout));
-	} else {
-		trace1(TR_netdir_getbyaddr, 1);
-		return (__classic_netdir_getbyaddr(tp, serv, addr));
 	}
+	return (__classic_netdir_getbyaddr(tp, serv, addr));
 }
 
 /*
@@ -367,17 +338,14 @@ __netdir_getbyaddr_nosrv(tp, serv, addr)
  * /etc/netconfig with an intent of bypassing the name service switch.
  */
 int
-__classic_netdir_getbyaddr(tp, serv, addr)
-	struct netconfig	*tp;	/* The netconfig entry		*/
-	struct nd_hostservlist	**serv;	/* the answer(s)		*/
-	struct netbuf		*addr;	/* the address we have		*/
+__classic_netdir_getbyaddr(struct netconfig *tp, struct nd_hostservlist **serv,
+						struct netbuf *addr)
 {
 	struct translator	*t;	/* pointer to translator list	*/
 	struct nd_hostservlist	*hs;	/* the results			*/
 	char			*lr;	/* routines to try		*/
 	int			i;	/* counts the routines		*/
 
-	trace1(TR_netdir_getbyaddr, 0);
 	_nderror = ND_SYSTEM;
 	for (i = 0; i < tp->nc_nlookups; i++) {
 		lr = *((tp->nc_lookups) + i);
@@ -386,35 +354,27 @@ __classic_netdir_getbyaddr(tp, serv, addr)
 				hs = (*(t->gba))(tp, addr);
 				if (hs) {
 					*serv = hs;
-					trace1(TR_netdir_getbyaddr, 1);
 					return (0);
-				} else {
-					if (_nderror < 0) {
-						trace1(TR_netdir_getbyaddr, 1);
-						return (_nderror);
-					}
-					break;
 				}
+				if (_nderror < 0)
+					return (_nderror);
+				break;
 			}
 		}
 		/* If we didn't find it try loading it */
 		if (!t) {
 			if ((t = load_xlate(lr)) != NULL) {
 				/* add it to the list */
-				mutex_lock(&xlate_lock);
+				(void) mutex_lock(&xlate_lock);
 				add_to_xlate_list(t);
-				mutex_unlock(&xlate_lock);
+				(void) mutex_unlock(&xlate_lock);
 				hs = (*(t->gba))(tp, addr);
 				if (hs) {
 					*serv = hs;
-					trace1(TR_netdir_getbyaddr, 1);
 					return (0);
-				} else {
-					if (_nderror < 0) {
-						trace1(TR_netdir_getbyaddr, 1);
-						return (_nderror);
-					}
 				}
+				if (_nderror < 0)
+					return (_nderror);
 			} else {
 				if (_nderror == ND_SYSTEM) { /* retry cache */
 					_nderror = ND_OK;
@@ -424,7 +384,6 @@ __classic_netdir_getbyaddr(tp, serv, addr)
 			}
 		}
 	}
-	trace1(TR_netdir_getbyaddr, 1);
 	return (_nderror);	/* No one works */
 }
 
@@ -438,27 +397,20 @@ __classic_netdir_getbyaddr(tp, serv, addr)
  * it simply calls the inet-specific built in implementation.
  */
 int
-netdir_options(tp, option, fd, par)
-	struct netconfig	*tp;	/* the netconfig entry		*/
-	int			option;	/* option number		*/
-	int			fd;	/* open file descriptor		*/
-	char			*par;	/* parameters if any		*/
+netdir_options(struct netconfig *tp, int option, int fd, char *par)
 {
 	struct translator	*t;	/* pointer to translator list	*/
 	char			*lr;	/* routines to try		*/
 	int			i;	/* counts the routines		*/
 
-	trace3(TR_netdir_options, 0, option, fd);
 	if (tp == 0) {
 		_nderror = ND_BADARG;
-		trace3(TR_netdir_options, 1, option, fd);
 		return (_nderror);
 	}
 
 	if ((strcmp(tp->nc_protofmly, NC_INET) == 0 ||
 		strcmp(tp->nc_protofmly, NC_INET6) == 0) &&
 		(tp->nc_nlookups == 0)) {
-		trace3(TR_netdir_options, 1, option, fd);
 		return (__inet_netdir_options(tp, option, fd, par));
 	}
 
@@ -466,30 +418,25 @@ netdir_options(tp, option, fd, par)
 	for (i = 0; i < tp->nc_nlookups; i++) {
 		lr = *((tp->nc_lookups) + i);
 		for (t = xlate_list; t; t = t->next) {
-			if (strcmp(lr, t->tr_name) == 0) {
-				trace3(TR_netdir_options, 1, option, fd);
+			if (strcmp(lr, t->tr_name) == 0)
 				return ((*(t->opt))(tp, option, fd, par));
-			}
 		}
 		/* If we didn't find it try loading it */
 		if (!t) {
 			if ((t = load_xlate(lr)) != NULL) {
 				/* add it to the list */
-				mutex_lock(&xlate_lock);
+				(void) mutex_lock(&xlate_lock);
 				add_to_xlate_list(t);
-				mutex_unlock(&xlate_lock);
-				trace3(TR_netdir_options, 1, option, fd);
+				(void) mutex_unlock(&xlate_lock);
 				return ((*(t->opt))(tp, option, fd, par));
-			} else {
-				if (_nderror == ND_SYSTEM) { /* retry cache */
-					_nderror = ND_OK;
-					i--;
-					continue;
-				}
+			}
+			if (_nderror == ND_SYSTEM) { /* retry cache */
+				_nderror = ND_OK;
+				i--;
+				continue;
 			}
 		}
 	}
-	trace3(TR_netdir_options, 1, option, fd);
 	return (_nderror);	/* No one works */
 }
 
@@ -501,25 +448,20 @@ netdir_options(tp, option, fd, par)
  * can translate it or it can't.
  */
 struct netbuf *
-uaddr2taddr(tp, addr)
-	struct netconfig	*tp;	/* the netconfig entry		*/
-	char			*addr;	/* The address in question	*/
+uaddr2taddr(struct netconfig *tp, char *addr)
 {
 	struct translator	*t;	/* pointer to translator list 	*/
 	struct netbuf		*x;	/* the answer we want 		*/
 	char			*lr;	/* routines to try		*/
 	int			i;	/* counts the routines		*/
 
-	trace1(TR_uaddr2taddr, 0);
 	if (tp == 0) {
 		_nderror = ND_BADARG;
-		trace1(TR_uaddr2taddr, 1);
 		return (0);
 	}
 	if ((strcmp(tp->nc_protofmly, NC_INET) == 0 ||
 		strcmp(tp->nc_protofmly, NC_INET6) == 0) &&
 		(tp->nc_nlookups == 0)) {
-		trace1(TR_uaddr2taddr, 1);
 		return (__inet_uaddr2taddr(tp, addr));
 	}
 	for (i = 0; i < tp->nc_nlookups; i++) {
@@ -527,32 +469,24 @@ uaddr2taddr(tp, addr)
 		for (t = xlate_list; t; t = t->next) {
 			if (strcmp(lr, t->tr_name) == 0) {
 				x = (*(t->u2t))(tp, addr);
-				if (x) {
-					trace1(TR_uaddr2taddr, 1);
+				if (x)
 					return (x);
-				}
-				if (_nderror < 0) {
-					trace1(TR_uaddr2taddr, 1);
+				if (_nderror < 0)
 					return (0);
-				}
 			}
 		}
 		/* If we didn't find it try loading it */
 		if (!t) {
 			if ((t = load_xlate(lr)) != NULL) {
 				/* add it to the list */
-				mutex_lock(&xlate_lock);
+				(void) mutex_lock(&xlate_lock);
 				add_to_xlate_list(t);
-				mutex_unlock(&xlate_lock);
+				(void) mutex_unlock(&xlate_lock);
 				x = (*(t->u2t))(tp, addr);
-				if (x) {
-					trace1(TR_uaddr2taddr, 1);
+				if (x)
 					return (x);
-				}
-				if (_nderror < 0) {
-					trace1(TR_uaddr2taddr, 1);
+				if (_nderror < 0)
 					return (0);
-				}
 			} else {
 				if (_nderror == ND_SYSTEM) { /* retry cache */
 					_nderror = ND_OK;
@@ -562,7 +496,6 @@ uaddr2taddr(tp, addr)
 			}
 		}
 	}
-	trace1(TR_uaddr2taddr, 1);
 	return (0);	/* No one works */
 }
 
@@ -574,25 +507,20 @@ uaddr2taddr(tp, addr)
  * can translate it or it can't.
  */
 char *
-taddr2uaddr(tp, addr)
-	struct netconfig	*tp;	/* the netconfig entry		*/
-	struct netbuf		*addr;	/* The address in question	*/
+taddr2uaddr(struct netconfig *tp, struct netbuf *addr)
 {
 	struct translator	*t;	/* pointer to translator list	*/
 	char			*lr;	/* routines to try		*/
 	char			*x;	/* the answer			*/
 	int			i;	/* counts the routines		*/
 
-	trace1(TR_taddr2uaddr, 0);
 	if (tp == 0) {
 		_nderror = ND_BADARG;
-		trace1(TR_taddr2uaddr, 1);
 		return (0);
 	}
 	if ((strcmp(tp->nc_protofmly, NC_INET) == 0 ||
 		strcmp(tp->nc_protofmly, NC_INET6) == 0) &&
 		(tp->nc_nlookups == 0)) {
-		trace1(TR_taddr2uaddr, 1);
 		return (__inet_taddr2uaddr(tp, addr));
 	}
 	for (i = 0; i < tp->nc_nlookups; i++) {
@@ -600,32 +528,24 @@ taddr2uaddr(tp, addr)
 		for (t = xlate_list; t; t = t->next) {
 			if (strcmp(lr, t->tr_name) == 0) {
 				x = (*(t->t2u))(tp, addr);
-				if (x) {
-					trace1(TR_taddr2uaddr, 1);
+				if (x)
 					return (x);
-				}
-				if (_nderror < 0) {
-					trace1(TR_taddr2uaddr, 1);
+				if (_nderror < 0)
 					return (0);
-				}
 			}
 		}
 		/* If we didn't find it try loading it */
 		if (!t) {
 			if ((t = load_xlate(lr)) != NULL) {
 				/* add it to the list */
-				mutex_lock(&xlate_lock);
+				(void) mutex_lock(&xlate_lock);
 				add_to_xlate_list(t);
-				mutex_unlock(&xlate_lock);
+				(void) mutex_unlock(&xlate_lock);
 				x = (*(t->t2u))(tp, addr);
-				if (x) {
-					trace1(TR_taddr2uaddr, 1);
+				if (x)
 					return (x);
-				}
-				if (_nderror < 0) {
-					trace1(TR_taddr2uaddr, 1);
+				if (_nderror < 0)
 					return (0);
-				}
 			} else {
 				if (_nderror == ND_SYSTEM) { /* retry cache */
 					_nderror = ND_OK;
@@ -635,7 +555,6 @@ taddr2uaddr(tp, addr)
 			}
 		}
 	}
-	trace1(TR_taddr2uaddr, 1);
 	return (0);	/* No one works */
 }
 
@@ -643,9 +562,7 @@ taddr2uaddr(tp, addr)
  * This is the routine that frees the objects that these routines allocate.
  */
 void
-netdir_free(ptr, type)
-	void	*ptr;	/* generic pointer	*/
-	int	type;	/* thing we are freeing */
+netdir_free(void *ptr, int type)
 {
 	struct netbuf		*na;
 	struct nd_addrlist	*nas;
@@ -653,17 +570,14 @@ netdir_free(ptr, type)
 	struct nd_hostservlist	*hss;
 	int			i;
 
-	trace2(TR_netdir_free, 0, type);
-	if (ptr == NULL) {
-		trace2(TR_netdir_free, 1, type);
+	if (ptr == NULL)
 		return;
-	}
 	switch (type) {
 	case ND_ADDR :
 		na = (struct netbuf *)ptr;
 		if (na->buf)
 			free(na->buf);
-		free((char *)na);
+		free(na);
 		break;
 
 	case ND_ADDRLIST :
@@ -679,8 +593,8 @@ netdir_free(ptr, type)
 		 */
 		if (nas->n_addrs->buf)
 			free(nas->n_addrs->buf);
-		free((char *)nas->n_addrs);
-		free((char *)nas);
+		free(nas->n_addrs);
+		free(nas);
 		break;
 
 	case ND_HOSTSERV :
@@ -689,7 +603,7 @@ netdir_free(ptr, type)
 			free(hs->h_host);
 		if (hs->h_serv)
 			free(hs->h_serv);
-		free((char *)hs);
+		free(hs);
 		break;
 
 	case ND_HOSTSERVLIST :
@@ -700,15 +614,14 @@ netdir_free(ptr, type)
 			if (hs->h_serv)
 				free(hs->h_serv);
 		}
-		free((char *)hss->h_hostservs);
-		free((char *)hss);
+		free(hss->h_hostservs);
+		free(hss);
 		break;
 
 	default :
 		_nderror = ND_UKNWN;
 		break;
 	}
-	trace2(TR_netdir_free, 1, type);
 }
 
 /*
@@ -716,8 +629,7 @@ netdir_free(ptr, type)
  * file specified by the network configuration structure.
  */
 static struct translator *
-load_xlate(name)
-	char	*name;		/* file name to load */
+load_xlate(char *name)
 {
 	struct translator	*t;
 	static struct xlate_list {
@@ -727,8 +639,7 @@ load_xlate(name)
 	struct xlate_list *xlp, **xlastp;
 	static mutex_t xlist_lock = DEFAULTMUTEX;
 
-	trace1(TR_load_xlate, 0);
-	mutex_lock(&xlist_lock);
+	(void) mutex_lock(&xlist_lock);
 	/*
 	 * We maintain a list of libraries we have loaded.  Loading a library
 	 * twice is double-plus ungood!
@@ -738,25 +649,22 @@ load_xlate(name)
 		if (xlp->library != NULL) {
 			if (strcmp(xlp->library, name) == 0) {
 				_nderror = ND_SYSTEM;	/* seen this lib */
-				mutex_unlock(&xlist_lock);
-				trace1(TR_load_xlate, 1);
+				(void) mutex_unlock(&xlist_lock);
 				return (0);
 			}
 		}
 	}
-	t = (struct translator *)malloc(sizeof (struct translator));
+	t = malloc(sizeof (struct translator));
 	if (!t) {
 		_nderror = ND_NOMEM;
-		mutex_unlock(&xlist_lock);
-		trace1(TR_load_xlate, 1);
+		(void) mutex_unlock(&xlist_lock);
 		return (0);
 	}
 	t->tr_name = strdup(name);
 	if (!t->tr_name) {
 		_nderror = ND_NOMEM;
-		free((char *)t);
-		mutex_unlock(&xlist_lock);
-		trace1(TR_load_xlate, 1);
+		free(t);
+		(void) mutex_unlock(&xlist_lock);
 		return (NULL);
 	}
 
@@ -805,7 +713,7 @@ load_xlate(name)
 	/*
 	 * Add this library to the list of loaded libraries.
 	 */
-	*xlastp = (struct xlate_list *)malloc(sizeof (struct xlate_list));
+	*xlastp = malloc(sizeof (struct xlate_list));
 	if (*xlastp == NULL) {
 		_nderror = ND_NOMEM;
 		goto error;
@@ -817,16 +725,14 @@ load_xlate(name)
 		goto error;
 	}
 	(*xlastp)->next = NULL;
-	mutex_unlock(&xlist_lock);
-	trace1(TR_load_xlate, 1);
+	(void) mutex_unlock(&xlist_lock);
 	return (t);
 error:
 	if (t->tr_fd != NULL)
 		(void) dlclose(t->tr_fd);
 	free(t->tr_name);
-	free((char *)t);
-	mutex_unlock(&xlist_lock);
-	trace1(TR_load_xlate, 1);
+	free(t);
+	(void) mutex_unlock(&xlist_lock);
 	return (NULL);
 }
 
@@ -838,21 +744,18 @@ error:
  * error in _nderror.
  */
 char *
-netdir_sperror()
+netdir_sperror(void)
 {
 	static pthread_key_t nderrbuf_key = 0;
 	static char buf_main[NDERR_BUFSZ];
 	char	*str;
 	char *dlerrstr;
 
-	trace1(TR_netdir_sperror, 0);
 	str = thr_main()?
 		buf_main :
 		thr_get_storage(&nderrbuf_key, NDERR_BUFSZ, free);
-	if (str == NULL) {
-		trace1(TR_netdir_sperror, 1);
+	if (str == NULL)
 		return (NULL);
-	}
 	dlerrstr = dlerror();
 	switch (_nderror) {
 	case ND_NOMEM :
@@ -915,7 +818,6 @@ netdir_sperror()
 			dgettext(__nsl_dom, "n2a: unknown error "), _nderror);
 		break;
 	}
-	trace1(TR_netdir_sperror, 1);
 	return (str);
 }
 
@@ -925,13 +827,10 @@ netdir_sperror()
  * colon first.
  */
 void
-netdir_perror(s)
-	char	*s;
+netdir_perror(char *s)
 {
 	char	*err;
 
-	trace1(TR_netdir_perror, 0);
 	err = netdir_sperror();
 	(void) fprintf(stderr, "%s: %s\n", s, err ? err : "n2a: error");
-	trace1(TR_netdir_perror, 1);
 }

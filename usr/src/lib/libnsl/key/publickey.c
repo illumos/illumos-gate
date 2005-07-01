@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +64,6 @@
 #include <syslog.h>
 #include <assert.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <pwd.h>
 #include "nsswitch.h"
 #include <rpc/rpc.h>
@@ -142,12 +142,7 @@ static DEFINE_NSS_DB_ROOT(db_root);
  * value returned by getpublickey.
  */
 static int
-getkeys_nis(errp, netname, pkey, skey, passwd)
-	int  *errp;
-	char *netname;
-	char *pkey;
-	char *skey;
-	char *passwd;
+getkeys_nis(int *errp, char *netname, char *pkey, char *skey, char *passwd)
 {
 	char 	*domain;
 	char	*keyval = NULL;
@@ -155,12 +150,9 @@ getkeys_nis(errp, netname, pkey, skey, passwd)
 	char	*p;
 	int	len;
 
-	trace1(TR_getkeys_nis, 0);
-
 	p = strchr(netname, '@');
-	if (! p) {
+	if (!p) {
 		*errp = __NSW_UNAVAIL;
-		trace1(TR_getkeys_nis, 1);
 		return (0);
 	}
 
@@ -180,13 +172,11 @@ getkeys_nis(errp, netname, pkey, skey, passwd)
 		if (keyval)
 			free(keyval);
 		*errp = __NSW_NOTFOUND;
-		trace1(TR_getkeys_nis, 1);
 		return (0);
 	default :
 		if (keyval)
 			free(keyval);
 		*errp = __NSW_UNAVAIL;
-		trace1(TR_getkeys_nis, 1);
 		return (0);
 	case 0:
 		break;
@@ -196,7 +186,6 @@ getkeys_nis(errp, netname, pkey, skey, passwd)
 	if (p == NULL) {
 		free(keyval);
 		*errp = __NSW_NOTFOUND;
-		trace1(TR_getkeys_nis, 1);
 		return (0);
 	}
 	*p = 0;
@@ -205,7 +194,6 @@ getkeys_nis(errp, netname, pkey, skey, passwd)
 		if (len > HEXKEYBYTES) {
 			free(keyval);
 			*errp = __NSW_NOTFOUND;
-			trace1(TR_getkeys_nis, 1);
 			return (0);
 		}
 		(void) strcpy(pkey, keyval);
@@ -216,7 +204,6 @@ getkeys_nis(errp, netname, pkey, skey, passwd)
 		r |= 2;
 	free(keyval);
 	*errp = __NSW_SUCCESS;
-	trace1(TR_getkeys_nis, 1);
 	return (r);
 }
 
@@ -235,12 +222,7 @@ getkeys_nis(errp, netname, pkey, skey, passwd)
  */
 
 static int
-getkeys_files(errp, netname, pkey, skey, passwd)
-	int	*errp;
-	char	*netname;
-	char	*pkey;
-	char	*skey;
-	char	*passwd;
+getkeys_files(int *errp, char *netname, char *pkey, char *skey, char *passwd)
 {
 	char *mkey;
 	char *mval;
@@ -251,12 +233,9 @@ getkeys_files(errp, netname, pkey, skey, passwd)
 	char *p;
 	char *lasts;
 
-	trace1(TR_getkeys_files, 0);
-
 	fd = __nsl_fopen(PKFILE, "r");
 	if (fd == (__NSL_FILE *)0) {
 		*errp = __NSW_UNAVAIL;
-		trace1(TR_getkeys_files, 1);
 		return (0);
 	}
 
@@ -273,7 +252,7 @@ getkeys_files(errp, netname, pkey, skey, passwd)
 							PKFILE, netname);
 				continue;
 			}
-			mval = strtok_r((char *)NULL, " \t#\n", &lasts);
+			mval = strtok_r(NULL, " \t#\n", &lasts);
 			if (mval == NULL) {
 				syslog(LOG_INFO,
 				"getpublickey: Bad record in %s for %s",
@@ -308,7 +287,6 @@ getkeys_files(errp, netname, pkey, skey, passwd)
 					r |= 2;
 				(void) __nsl_fclose(fd);
 				*errp = __NSW_SUCCESS;
-				trace1(TR_getkeys_files, 1);
 				return (r);
 			}
 		}
@@ -316,7 +294,6 @@ getkeys_files(errp, netname, pkey, skey, passwd)
 
 	(void) __nsl_fclose(fd);
 	*errp = __NSW_NOTFOUND;
-	trace1(TR_getkeys_files, 1);
 	return (0);
 }
 
@@ -327,19 +304,14 @@ getkeys_files(errp, netname, pkey, skey, passwd)
  */
 
 int
-__getpublickey_cached(netname, pkey, from_cache)
-	char	*netname;
-	char	*pkey;
-	int	*from_cache;
+__getpublickey_cached(char *netname, char *pkey, int *from_cache)
 {
 	return (__getpublickey_cached_g(netname, KEYSIZE, 0, pkey,
 					HEXKEYBYTES+1, from_cache));
 }
 
 int
-getpublickey(netname, pkey)
-	const char	*netname;
-	char		*pkey;
+getpublickey(const char *netname, char *pkey)
 {
 	return (__getpublickey_cached((char *)netname, pkey, (int *)0));
 }
@@ -351,10 +323,7 @@ __getpublickey_flush(const char *netname)
 }
 
 int
-getsecretkey(netname, skey, passwd)
-	const char	*netname;
-	char		*skey;
-	const char	*passwd;
+getsecretkey(const char *netname, char *skey, const char *passwd)
 {
 	return (getsecretkey_g(netname, KEYSIZE, 0, skey, HEXKEYBYTES+1,
 				passwd));
@@ -371,17 +340,15 @@ struct pkey_item {
 };
 
 static void
-pkey_cache_add(netname, pkey)
-	const char *netname;
-	char *pkey;
+pkey_cache_add(const char *netname, char *pkey)
 {
 	struct pkey_item *item;
 
-	if (! netname || ! pkey) {
+	if (!netname || !pkey) {
 		return;
 	}
 
-	item = (struct pkey_item *)calloc(1, sizeof (struct pkey_item));
+	item = calloc(1, sizeof (struct pkey_item));
 	if (item == NULL) {
 		return;
 	}
@@ -407,13 +374,11 @@ pkey_cache_add(netname, pkey)
 }
 
 static int
-pkey_cache_get(netname, pkey)
-	const char	*netname;
-	char		*pkey;
+pkey_cache_get(const char *netname, char *pkey)
 {
 	struct pkey_item *item;
 
-	if (! netname || ! pkey) {
+	if (!netname || !pkey) {
 		return (0);
 	}
 
@@ -428,8 +393,7 @@ pkey_cache_get(netname, pkey)
 }
 
 static void
-pkey_cache_flush(netname)
-	const char	*netname;
+pkey_cache_flush(const char *netname)
 {
 	struct pkey_item *item;
 
@@ -476,14 +440,12 @@ extract_secret_g(
 	char	*buf = malloc(strlen(raw) + 1); /* private tmp buf */
 	char	*p;
 
-	trace1(TR_extract_secret_g, 0);
-	if (! buf || ! passwd || ! raw || ! private || ! prilen ||
-		! VALID_KEYALG(keylen, algtype)) {
+	if (!buf || !passwd || !raw || !private || !prilen ||
+			!VALID_KEYALG(keylen, algtype)) {
 		if (private)
 			*private = NUL;
 		if (buf)
 			free(buf);
-		trace1(TR_extract_secret_g, 1);
 		return (0);
 	}
 
@@ -496,23 +458,20 @@ extract_secret_g(
 	}
 
 	/* raw buf has chksum appended, so let's verify it too */
-	if (! xdecrypt_g(buf, keylen, algtype, passwd, netname, TRUE)) {
+	if (!xdecrypt_g(buf, keylen, algtype, passwd, netname, TRUE)) {
 		private[0] = 0;
 		free(buf);
-		trace1(TR_extract_secret_g, 1);
 		return (1); /* yes, return 1 even if xdecrypt fails */
 	}
 
 	if (strlen(buf) >= prilen) {
 		private[0] = 0;
 		free(buf);
-		trace1(TR_extract_secret_g, 1);
 		return (0);
 	}
 
 	(void) strcpy(private, buf);
 	free(buf);
-	trace1(TR_extract_secret_g, 1);
 	return (1);
 }
 
@@ -524,10 +483,7 @@ extract_secret_g(
  * it uses the DES based function xdecrypt()
  */
 static int
-extract_secret(raw, private, passwd)
-	char	*raw;
-	char	*private;
-	char	*passwd;
+extract_secret(char *raw, char *private, char *passwd)
 {
 	return (extract_secret_g(raw, private, HEXKEYBYTES+1, passwd,
 					NULL, KEYSIZE, 0));
@@ -560,12 +516,9 @@ getkeys_nisplus_g(
 	int		len;
 	const bool_t	classic_des = AUTH_DES_KEY(keylen, algtype);
 
-	trace1(TR_getkeys_nisplus_g, 0);
-
 	domain = strchr(netname, '@');
-	if (! domain) {
+	if (!domain) {
 		*err = __NSW_UNAVAIL;
-		trace1(TR_getkeys_nisplus_g, 1);
 		return (0);
 	}
 	domain++;
@@ -586,7 +539,6 @@ getkeys_nisplus_g(
 						MAXNETNAMELEN, pkeylen,
 						algtype), pkey)) {
 			*err = __NSW_SUCCESS;
-			trace1(TR_getkeys_nisplus_g, 1);
 			return (1);
 		}
 		*retry_cache = 0;
@@ -595,7 +547,6 @@ getkeys_nisplus_g(
 	if ((strlen(netname)+PKTABLE_LEN+strlen(domain)+32) >
 		(size_t)NIS_MAXNAMELEN) {
 		*err = __NSW_UNAVAIL;
-		trace1(TR_getkeys_nisplus_g, 1);
 		return (0);
 	}
 
@@ -636,7 +587,6 @@ getkeys_nisplus_g(
 	case NIS_NOSUCHTABLE:
 		nis_freeresult(res);
 		*err = __NSW_NOTFOUND;
-		trace1(TR_getkeys_nisplus_g, 1);
 		return (0);
 	case NIS_S_NOTFOUND:
 	case NIS_TRYAGAIN:
@@ -644,7 +594,6 @@ getkeys_nisplus_g(
 			nis_sperrno(res->status));
 		nis_freeresult(res);
 		*err = __NSW_TRYAGAIN;
-		trace1(TR_getkeys_nisplus_g, 1);
 		return (0);
 	default:
 		*err = __NSW_UNAVAIL;
@@ -652,7 +601,6 @@ getkeys_nisplus_g(
 			"getkeys: (nis+ key lookup): %s\n",
 			nis_sperrno(res->status));
 		nis_freeresult(res);
-		trace1(TR_getkeys_nisplus_g, 1);
 		return (0);
 	}
 
@@ -715,7 +663,6 @@ getkeys_nisplus_g(
 
 	nis_freeresult(res);
 	*err = __NSW_SUCCESS;
-	trace1(TR_getkeys_nisplus_g, 1);
 	return (r);
 }
 
@@ -757,7 +704,6 @@ getkeys_ldap_g(
 	nss_XbyY_buf_t	*buf = NULL;
 	char		*keyval;
 
-	trace1(TR_getkeys_ldap_g, 0);
 	NSS_XbyY_ALLOC(&buf, 0, NSS_BUFLEN_PUBLICKEY);
 
 	NSS_XbyY_INIT(&arg, buf->result, buf->buffer, buf->buflen, NULL);
@@ -781,7 +727,6 @@ getkeys_ldap_g(
 			&arg) != NSS_SUCCESS) {
 		NSS_XbyY_FREE(&buf);
 		*err = __NSW_NOTFOUND;
-		trace1(TR_getkeys_ldap_g, 1);
 		return (0);
 	}
 	keyval = buf->buffer;
@@ -789,7 +734,6 @@ getkeys_ldap_g(
 	if (p == NULL) {
 		NSS_XbyY_FREE(&buf);
 		*err = __NSW_NOTFOUND;
-		trace1(TR_getkeys_ldap_g, 1);
 		return (0);
 	}
 	*p = 0;
@@ -798,7 +742,6 @@ getkeys_ldap_g(
 		if (len > HEXKEYBYTES) {
 			NSS_XbyY_FREE(&buf);
 			*err = __NSW_NOTFOUND;
-			trace1(TR_getkeys_ldap_g, 1);
 			return (0);
 		}
 		(void) strcpy(pkey, keyval);
@@ -809,7 +752,6 @@ getkeys_ldap_g(
 		r |= 2;
 	NSS_XbyY_FREE(&buf);
 	*err = __NSW_SUCCESS;
-	trace1(TR_getkeys_ldap_g, 1);
 	return (r);
 }
 
@@ -831,31 +773,23 @@ netname2hashname(
 {
 	const bool_t classic_des = AUTH_DES_KEY(keylen, algtype);
 
-	trace3(TR_netname2hashname, 0, keylen, algtype);
-	if (! netname || ! hashname || ! bufsiz) {
-		trace1(TR_netname2hashname, 1);
+	if (!netname || !hashname || !bufsiz)
 		return (NULL);
-	}
 
 	if (classic_des) {
 		if (bufsiz > strlen(netname))
 			(void) strcpy(hashname, netname);
-		else {
-			trace1(TR_netname2hashname, 1);
+		else
 			return (NULL);
-		}
 	} else {
 		char tmp[128];
 		(void) sprintf(tmp, ":%d-%d", keylen, algtype);
 		if (bufsiz > (strlen(netname) + strlen(tmp)))
 			(void) sprintf(hashname, "%s%s", netname, tmp);
-		else {
-			trace1(TR_netname2hashname, 1);
+		else
 			return (NULL);
-		}
 	}
 
-	trace1(TR_netname2hashname, 1);
 	return (hashname);
 }
 
@@ -891,12 +825,8 @@ __getpublickey_cached_g(const char netname[],	/* in  */
 	const bool_t classic_des = AUTH_DES_KEY(keylen, algtype);
 	int	retry_cache = 0;
 
-	trace1(TR_getpublickey_cached_g, 0);
-	if (! netname || ! pkey) {
-		trace1(TR_getpublickey_cached_g, 1);
+	if (!netname || !pkey)
 		return (0);
-	}
-
 
 	if (from_cache) {
 		char hashname[MAXNETNAMELEN];
@@ -904,7 +834,6 @@ __getpublickey_cached_g(const char netname[],	/* in  */
 						    MAXNETNAMELEN, keylen,
 						    algtype), pkey)) {
 			*from_cache = 1;
-			trace1(TR_getpublickey_cached_g, 1);
 			return (1);
 		}
 		*from_cache = 0;
@@ -912,34 +841,30 @@ __getpublickey_cached_g(const char netname[],	/* in  */
 	}
 
 	conf = __nsw_getconfig("publickey", &perr);
-	if (! conf) {
+	if (!conf) {
 		conf = &publickey_default;
 		needfree = 0;
 	}
 	for (look = conf->lookups; look; look = look->next) {
 		if (strcmp(look->service_name, "nisplus") == 0) {
 			res = getkeys_nisplus_g(&err, (char *)netname,
-						pkey, pkeylen,
-						(char *)NULL, 0,
-						(char *)NULL,
+						pkey, pkeylen, NULL, 0, NULL,
 						keylen, algtype, &retry_cache);
 			if (retry_cache)
 				*from_cache = 1;
 		} else if (strcmp(look->service_name, "ldap") == 0) {
 			res = getkeys_ldap_g(&err, (char *)netname,
-					    pkey, pkeylen,
-					    (char *)NULL, 0,
-					    (char *)NULL,
+					    pkey, pkeylen, NULL, 0, NULL,
 					    keylen, algtype);
 		/* long DH keys will not be in nis or files */
 		} else if (classic_des &&
 				strcmp(look->service_name, "nis") == 0)
 			res = getkeys_nis(&err, (char *)netname, pkey,
-					(char *)NULL, (char *)NULL);
+					NULL, NULL);
 		else if (classic_des &&
 				strcmp(look->service_name, "files") == 0)
 			res = getkeys_files(&err, (char *)netname, pkey,
-					(char *)NULL, (char *)NULL);
+					NULL, NULL);
 		else {
 			syslog(LOG_INFO, "Unknown publickey nameservice '%s'",
 						look->service_name);
@@ -964,7 +889,6 @@ __getpublickey_cached_g(const char netname[],	/* in  */
 		case __NSW_RETURN :
 			if (needfree)
 				__nsw_freeconfig(conf);
-			trace1(TR_getpublickey_cached_g, 1);
 			return ((res & 1) != 0);
 		default :
 			syslog(LOG_INFO, "Unknown action for nameservice %s",
@@ -974,7 +898,6 @@ __getpublickey_cached_g(const char netname[],	/* in  */
 
 	if (needfree)
 		__nsw_freeconfig(conf);
-	trace1(TR_getpublickey_cached_g, 1);
 	return (0);
 }
 
@@ -1044,7 +967,6 @@ getpublickey_g(
 	char *pkey,		/* out  */
 	size_t pkeylen)		/* in  */
 {
-	trace1(TR_getpublickey_g, 0);
 	return (__getpublickey_cached_g(netname, keylen, algtype, pkey,
 					pkeylen, (int *)0));
 }
@@ -1067,15 +989,12 @@ getsecretkey_g(
 	enum __nsw_parse_err perr;
 	const bool_t classic_des = AUTH_DES_KEY(keylen, algtype);
 
-	trace1(TR_getsecretkey_g, 0);
-	if (! netname || !skey || ! skeylen) {
-		trace1(TR_getsecretkey_g, 1);
+	if (!netname || !skey || !skeylen)
 		return (0);
-	}
 
 	conf = __nsw_getconfig("publickey", &perr);
 
-	if (! conf) {
+	if (!conf) {
 		conf = &publickey_default;
 		needfree = 0;
 	}
@@ -1083,20 +1002,20 @@ getsecretkey_g(
 	for (look = conf->lookups; look; look = look->next) {
 		if (strcmp(look->service_name, "nisplus") == 0)
 			res = getkeys_nisplus_g(&err, (char *)netname,
-					(char *)NULL, 0, skey, skeylen,
+					NULL, 0, skey, skeylen,
 					(char *)passwd, keylen, algtype, 0);
 		else if (strcmp(look->service_name, "ldap") == 0)
 			res = getkeys_ldap_g(&err, (char *)netname,
-					    (char *)NULL, 0, skey, skeylen,
+					    NULL, 0, skey, skeylen,
 					    (char *)passwd, keylen, algtype);
 		/* long DH keys will not be in nis or files */
 		else if (classic_des && strcmp(look->service_name, "nis") == 0)
 			res = getkeys_nis(&err, (char *)netname,
-					(char *)NULL, skey, (char *)passwd);
+					NULL, skey, (char *)passwd);
 		else if (classic_des &&
 				strcmp(look->service_name, "files") == 0)
 			res = getkeys_files(&err, (char *)netname,
-					(char *)NULL, skey, (char *)passwd);
+					NULL, skey, (char *)passwd);
 		else {
 			syslog(LOG_INFO, "Unknown publickey nameservice '%s'",
 						look->service_name);
@@ -1108,7 +1027,6 @@ getsecretkey_g(
 		case __NSW_RETURN :
 			if (needfree)
 				__nsw_freeconfig(conf);
-			trace1(TR_getsecretkey_g, 1);
 			return ((res & 2) != 0);
 		default :
 			syslog(LOG_INFO, "Unknown action for nameservice %s",
@@ -1117,6 +1035,5 @@ getsecretkey_g(
 	}
 	if (needfree)
 		__nsw_freeconfig(conf);
-	trace1(TR_getsecretkey_g, 1);
 	return (0);
 }

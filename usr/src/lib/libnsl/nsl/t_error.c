@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
 
@@ -37,7 +36,6 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
-#include <rpc/trace.h>
 
 /* ARGSUSED1 */
 int
@@ -46,10 +44,8 @@ _tx_error(const char *s, int api_semantics)
 	const char *c;
 	int n;
 
-	trace1(TR_t_error, 0);
 	c = t_strerror(t_errno);
-	if (s != (char *)NULL &&
-	    *s != '\0') {
+	if (s != NULL && *s != '\0') {
 		n = strlen(s);
 		if (n) {
 			(void) write(2, s, (unsigned)n);
@@ -62,6 +58,5 @@ _tx_error(const char *s, int api_semantics)
 		perror("");
 	} else
 		(void) write(2, "\n", 1);
-	trace1(TR_t_error, 1);
 	return (0);
 }

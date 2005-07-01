@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1986-1991,1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <tiuser.h>
 #include <rpc/nettype.h>
@@ -53,19 +53,15 @@ clnt_create_vers(const char *hostname, const rpcprog_t prog,
 	struct rpc_err rpcerr;
 	rpcvers_t v_low, v_high;
 
-	trace4(TR_clnt_create_vers, 0, prog, vers_low, vers_high);
 	clnt = clnt_create(hostname, prog, vers_high, nettype);
-	if (clnt == NULL) {
-		trace4(TR_clnt_create_vers, 1, prog, vers_low, vers_high);
+	if (clnt == NULL)
 		return (NULL);
-	}
 	to.tv_sec = 10;
 	to.tv_usec = 0;
 	rpc_stat = clnt_call(clnt, NULLPROC, (xdrproc_t)xdr_void,
-			(char *)NULL, (xdrproc_t)xdr_void, (char *)NULL, to);
+			NULL, (xdrproc_t)xdr_void, NULL, to);
 	if (rpc_stat == RPC_SUCCESS) {
 		*vers_out = vers_high;
-		trace4(TR_clnt_create_vers, 1, prog, vers_low, vers_high);
 		return (clnt);
 	}
 	if (rpc_stat == RPC_PROGVERSMISMATCH) {
@@ -83,12 +79,9 @@ clnt_create_vers(const char *hostname, const rpcprog_t prog,
 		}
 		CLNT_CONTROL(clnt, CLSET_VERS, (char *)&v_high);
 		rpc_stat = clnt_call(clnt, NULLPROC, (xdrproc_t)xdr_void,
-				(char *)NULL, (xdrproc_t)xdr_void,
-				(char *)NULL, to);
+				NULL, (xdrproc_t)xdr_void, NULL, to);
 		if (rpc_stat == RPC_SUCCESS) {
 			*vers_out = v_high;
-			trace4(TR_clnt_create_vers, 1, prog,
-				v_low, v_high);
 			return (clnt);
 		}
 	}
@@ -97,7 +90,6 @@ clnt_create_vers(const char *hostname, const rpcprog_t prog,
 error:	rpc_createerr.cf_stat = rpc_stat;
 	rpc_createerr.cf_error = rpcerr;
 	clnt_destroy(clnt);
-	trace4(TR_clnt_create_vers, 1, prog, vers_low, vers_high);
 	return (NULL);
 }
 
@@ -124,15 +116,13 @@ clnt_create(const char *hostname, const rpcprog_t prog, const rpcvers_t vers,
 	enum clnt_stat	save_cf_stat = RPC_SUCCESS;
 	struct rpc_err	save_cf_error;
 
-	trace3(TR_clnt_create, 0, prog, vers);
 	if ((handle = __rpc_setconf((char *)nettype)) == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		trace3(TR_clnt_create, 1, prog, vers);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 
 	rpc_createerr.cf_stat = RPC_SUCCESS;
-	while (clnt == (CLIENT *)NULL) {
+	while (clnt == NULL) {
 		if ((nconf = __rpc_getconf(handle)) == NULL) {
 			if (rpc_createerr.cf_stat == RPC_SUCCESS)
 				rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
@@ -172,7 +162,6 @@ clnt_create(const char *hostname, const rpcprog_t prog, const rpcvers_t vers,
 		rpc_createerr.cf_error = save_cf_error;
 	}
 	__rpc_endconf(handle);
-	trace3(TR_clnt_create, 1, prog, vers);
 	return (clnt);
 }
 
@@ -189,23 +178,20 @@ clnt_tp_create(const char *hostname, const rpcprog_t prog, const rpcvers_t vers,
 	struct netbuf *svcaddr;			/* servers address */
 	CLIENT *cl = NULL;			/* client handle */
 
-	trace3(TR_clnt_tp_create, 0, prog, vers);
-	if (nconf == (struct netconfig *)NULL) {
+	if (nconf == NULL) {
 		rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-		trace3(TR_clnt_tp_create, 1, prog, vers);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
 	/*
 	 * Get the address of the server
 	 */
 
 	if ((svcaddr = __rpcb_findaddr(prog, vers, nconf, hostname,
-		&cl)) == NULL) {
+							&cl)) == NULL) {
 		/* appropriate error number is set by rpcbind libraries */
-		trace3(TR_clnt_tp_create, 1, prog, vers);
-		return ((CLIENT *)NULL);
+		return (NULL);
 	}
-	if (cl == (CLIENT *)NULL) {
+	if (cl == NULL) {
 		cl = clnt_tli_create(RPC_ANYFD, nconf, svcaddr,
 					prog, vers, 0, 0);
 	} else {
@@ -224,7 +210,6 @@ clnt_tp_create(const char *hostname, const rpcprog_t prog, const rpcvers_t vers,
 		}
 	}
 	netdir_free((char *)svcaddr, ND_ADDR);
-	trace3(TR_clnt_tp_create, 1, prog, vers);
 	return (cl);
 }
 
@@ -247,21 +232,17 @@ clnt_tli_create(const int fd, const struct netconfig *nconf,
 	int servtype;
 	int nfd = fd;
 
-	trace5(TR_clnt_tli_create, 0, prog, vers, sendsz, recvsz);
-
 	if (nfd == RPC_ANYFD) {
-		if (nconf == (struct netconfig *)NULL) {
+		if (nconf == NULL) {
 			rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-			trace3(TR_clnt_tli_create, 1, prog, vers);
-			return ((CLIENT *)NULL);
+			return (NULL);
 		}
 		nfd = t_open(nconf->nc_device, O_RDWR, NULL);
 		if (nfd == -1)
 			goto err;
 		madefd = TRUE;
-		if (t_bind(nfd, (struct t_bind *)NULL,
-			(struct t_bind *)NULL) == -1)
-				goto err;
+		if (t_bind(nfd, NULL, NULL) == -1)
+			goto err;
 
 		switch (nconf->nc_semantics) {
 		case NC_TPI_CLTS:
@@ -287,8 +268,7 @@ clnt_tli_create(const int fd, const struct netconfig *nconf,
 		 * Check whether bound or not, else bind it
 		 */
 		if (((state = t_sync(nfd)) == -1) ||
-		    ((state == T_UNBND) && (t_bind(nfd, (struct t_bind *)NULL,
-				(struct t_bind *)NULL) == -1)) ||
+		    ((state == T_UNBND) && (t_bind(nfd, NULL, NULL) == -1)) ||
 		    (t_getinfo(nfd, &tinfo) == -1))
 			goto err;
 		servtype = tinfo.servtype;
@@ -308,7 +288,7 @@ clnt_tli_create(const int fd, const struct netconfig *nconf,
 		goto err;
 	}
 
-	if (cl == (CLIENT *)NULL)
+	if (cl == NULL)
 		goto err1; /* borrow errors from clnt_dg/vc creates */
 	if (nconf) {
 		cl->cl_netid = strdup(nconf->nc_netid);
@@ -318,9 +298,8 @@ clnt_tli_create(const int fd, const struct netconfig *nconf,
 		cl->cl_tp = "";
 	}
 	if (madefd)
-		(void) CLNT_CONTROL(cl, CLSET_FD_CLOSE, (char *)NULL);
+		(void) CLNT_CONTROL(cl, CLSET_FD_CLOSE, NULL);
 
-	trace3(TR_clnt_tli_create, 1, prog, vers);
 	return (cl);
 
 err:
@@ -329,6 +308,5 @@ err:
 	rpc_createerr.cf_error.re_terrno = t_errno;
 err1:	if (madefd)
 		(void) t_close(nfd);
-	trace3(TR_clnt_tli_create, 1, prog, vers);
-	return ((CLIENT *)NULL);
+	return (NULL);
 }

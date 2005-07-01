@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -35,7 +36,6 @@
 
 #include <sys/utsname.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <string.h>
 
 #ifndef i386
@@ -46,22 +46,17 @@ extern int _uname();
  * gethostname bsd compatibility
  */
 int
-gethostname(hname, hlen)
-	char *hname;
-	int hlen;
+gethostname(char *hname, int hlen)
 {
 	struct utsname u;
 
-	trace2(TR_gethostname, 0, hlen);
 #if defined(__i386) && !defined(__amd64)
 	if (_nuname(&u) < 0) {
 #else
 	if (_uname(&u) < 0) {
 #endif /* __i386 */
-		trace1(TR_gethostname, 1);
 		return (-1);
 	}
-	strncpy(hname, u.nodename, hlen);
-	trace1(TR_gethostname, 1);
+	(void) strncpy(hname, u.nodename, hlen);
 	return (0);
 }

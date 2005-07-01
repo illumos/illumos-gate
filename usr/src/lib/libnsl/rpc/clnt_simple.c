@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -43,7 +45,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <string.h>
 #include <sys/param.h>
 #include <stdlib.h>
@@ -87,19 +88,16 @@ rpc_call_destroy(void *vp)
  * The total time available is 25 seconds.
  */
 enum clnt_stat
-rpc_call(const char *host, rpcprog_t prognum, rpcvers_t versnum,
-	rpcproc_t procnum, xdrproc_t inproc, const char *in,
-	xdrproc_t outproc, char  *out, const char *netclass)
+rpc_call(const char *host, const rpcprog_t prognum, const rpcvers_t versnum,
+	const rpcproc_t procnum, const xdrproc_t inproc, const char *in,
+	const xdrproc_t outproc, char  *out, const char *netclass)
 {
 	struct rpc_call_private *rcp;
 	enum clnt_stat clnt_stat;
 	struct timeval timeout, tottimeout;
 	static pthread_key_t rpc_call_key;
-	int main_thread;
 	char nettype_array[NETIDLEN];
 	char *nettype = &nettype_array[0];
-
-	trace4(TR_rpc_call, 0, prognum, versnum, procnum);
 
 	if (netclass == NULL)
 		nettype = NULL;
@@ -107,17 +105,15 @@ rpc_call(const char *host, rpcprog_t prognum, rpcvers_t versnum,
 		size_t len = strlen(netclass);
 		if (len >= sizeof (nettype_array)) {
 			rpc_createerr.cf_stat = RPC_UNKNOWNPROTO;
-			trace4(TR_rpc_call, 1, prognum, versnum, procnum);
 			return (rpc_createerr.cf_stat);
 		}
-		strcpy(nettype, netclass);
+		(void) strcpy(nettype, netclass);
 	}
 
 	rcp = thr_get_storage(&rpc_call_key, sizeof (*rcp), rpc_call_destroy);
 	if (rcp == NULL) {
 		rpc_createerr.cf_stat = RPC_SYSTEMERROR;
 		rpc_createerr.cf_error.re_errno = errno;
-		trace4(TR_rpc_call, 1, prognum, versnum, procnum);
 		return (rpc_createerr.cf_stat);
 	}
 
@@ -139,10 +135,8 @@ rpc_call(const char *host, rpcprog_t prognum, rpcvers_t versnum,
 		 */
 		rcp->client = clnt_create(host, prognum, versnum, nettype);
 		rcp->pid = getpid();
-		if (rcp->client == (CLIENT *)NULL) {
-			trace4(TR_rpc_call, 1, prognum, versnum, procnum);
+		if (rcp->client == NULL)
 			return (rpc_createerr.cf_stat);
-		}
 		/*
 		 * Set time outs for connectionless case.  Do it
 		 * unconditionally.  Faster than doing a t_getinfo()
@@ -174,6 +168,5 @@ rpc_call(const char *host, rpcprog_t prognum, rpcvers_t versnum,
 	 */
 	if (clnt_stat != RPC_SUCCESS)
 		rcp->valid = 0;
-	trace4(TR_rpc_call, 1, prognum, versnum, procnum);
 	return (clnt_stat);
 }

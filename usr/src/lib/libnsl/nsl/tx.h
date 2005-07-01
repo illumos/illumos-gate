@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1992-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -285,22 +286,24 @@ extern int t_nerr;
  * UTILITY ROUTINES FUNCTION PROTOTYPES
  */
 
-void _t_adjust_iov(int, struct iovec *, int *);
-struct _ti_user *_t_checkfd(int, int, int);
-int _t_delete_tilink(int);
-int _t_rcv_conn_con(struct _ti_user *, struct t_call *, struct strbuf *, int);
-int _t_snd_conn_req(struct _ti_user *, const struct t_call *, struct strbuf *);
-int _t_aligned_copy(struct strbuf *, int, int, char *, t_scalar_t *);
-struct _ti_user *_t_create(int, struct t_info *, int, int *);
-int _t_do_ioctl(int, char *, int, int, int *);
-int _t_is_event(int, struct _ti_user *);
-int _t_is_ok(int, struct _ti_user *, t_scalar_t);
-int _t_look_locked(int, struct _ti_user *, int, int);
-int _t_register_lookevent(struct _ti_user *, caddr_t, int, caddr_t, int);
-void _t_free_looklist_head(struct _ti_user *);
-void _t_flush_lookevents(struct _ti_user *);
-int _t_acquire_ctlbuf(struct _ti_user *, struct strbuf *, int *);
-int _t_acquire_databuf(struct _ti_user *, struct strbuf *, int *);
+extern void _t_adjust_iov(int, struct iovec *, int *);
+extern struct _ti_user *_t_checkfd(int, int, int);
+extern int _t_delete_tilink(int);
+extern int _t_rcv_conn_con(struct _ti_user *, struct t_call *, struct strbuf *,
+							int);
+extern int _t_snd_conn_req(struct _ti_user *, const struct t_call *,
+							struct strbuf *);
+extern int _t_aligned_copy(struct strbuf *, int, int, char *, t_scalar_t *);
+extern struct _ti_user *_t_create(int, struct t_info *, int, int *);
+extern int _t_do_ioctl(int, char *, int, int, int *);
+extern int _t_is_event(int, struct _ti_user *);
+extern int _t_is_ok(int, struct _ti_user *, t_scalar_t);
+extern int _t_look_locked(int, struct _ti_user *, int, int);
+extern int _t_register_lookevent(struct _ti_user *, caddr_t, int, caddr_t, int);
+extern void _t_free_looklist_head(struct _ti_user *);
+extern void _t_flush_lookevents(struct _ti_user *);
+extern int _t_acquire_ctlbuf(struct _ti_user *, struct strbuf *, int *);
+extern int _t_acquire_databuf(struct _ti_user *, struct strbuf *, int *);
 
 /*
  * Core function TLI/XTI routines function prototypes

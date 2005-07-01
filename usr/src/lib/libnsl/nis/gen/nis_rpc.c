@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +37,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <syslog.h>
+#include <stdlib.h>
 #include <malloc.h>
 #include <unistd.h>
 #include <rpc/rpc.h>
@@ -606,8 +608,7 @@ new_address:
 		 * Allocate new server binding entry.
 		 */
 
-		if (srv_new = (struct server *)
-		    calloc(1, sizeof (struct server)))
+		if (srv_new = calloc(1, sizeof (struct server)))
 			srv_count++;
 
 		if (!srv_new) {
@@ -999,7 +1000,7 @@ __nis_get_server(nis_call_state *state)
 	directory_obj *dobj;
 	CLIENT *clnt;
 
-	__start_clock(CLOCK_CACHE);
+	(void) __start_clock(CLOCK_CACHE);
 	for (;;) {
 		switch (state->state) {
 		    case S_INIT:
@@ -1192,7 +1193,7 @@ check_rdev(server *srv)
 		syslog(LOG_DEBUG, "NIS+:  can't stat %d", srv->fd);
 		/* could be because file descriptor was closed */
 		/* it's not our file descriptor, so don't try to close it */
-		(void) clnt_control(srv->clnt, CLSET_FD_NCLOSE, (char *)NULL);
+		(void) clnt_control(srv->clnt, CLSET_FD_NCLOSE, NULL);
 		return (0);
 	}
 	if (srv->rdev != stbuf.st_rdev) {
@@ -1200,7 +1201,7 @@ check_rdev(server *srv)
 		    "NIS+:  fd %d changed, old=0x%lx, new=0x%lx",
 		    srv->fd, srv->rdev, stbuf.st_rdev);
 		/* it's not our file descriptor, so don't try to close it */
-		(void) clnt_control(srv->clnt, CLSET_FD_NCLOSE, (char *)NULL);
+		(void) clnt_control(srv->clnt, CLSET_FD_NCLOSE, NULL);
 		return (0);
 	}
 	return (1);    /* fd is okay */

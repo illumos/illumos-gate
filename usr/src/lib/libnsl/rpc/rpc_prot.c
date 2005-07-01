@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -44,19 +46,9 @@
  */
 
 #include <sys/param.h>
-#include <rpc/trace.h>
 #include <syslog.h>
-
-#ifdef KERNEL
-#include <rpc/types.h>		/* spell 'em out for make depend */
-#include <rpc/xdr.h>
-#include <rpc/auth.h>
-#include <rpc/clnt.h>
-#include <rpc/rpc_msg.h>
-#else
 #include <rpc/rpc.h>
 #include <malloc.h>
-#endif
 
 /* * * * * * * * * * * * * * XDR Authentication * * * * * * * * * * * */
 
@@ -67,20 +59,11 @@ struct opaque_auth _null_auth;
  * (see auth.h)
  */
 bool_t
-xdr_opaque_auth(xdrs, ap)
-	register XDR *xdrs;
-	register struct opaque_auth *ap;
+xdr_opaque_auth(XDR *xdrs, struct opaque_auth *ap)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_opaque_auth, 0);
-	if (xdr_enum(xdrs, &(ap->oa_flavor))) {
-		dummy = xdr_bytes(xdrs, &ap->oa_base,
-			&ap->oa_length, MAX_AUTH_BYTES);
-		trace1(TR_xdr_opaque_auth, 1);
-		return (dummy);
-	}
-	trace1(TR_xdr_opaque_auth, 1);
+	if (xdr_enum(xdrs, &(ap->oa_flavor)))
+		return (xdr_bytes(xdrs, &ap->oa_base,
+			&ap->oa_length, MAX_AUTH_BYTES));
 	return (FALSE);
 }
 
@@ -88,16 +71,9 @@ xdr_opaque_auth(xdrs, ap)
  * XDR a DES block
  */
 bool_t
-xdr_des_block(xdrs, blkp)
-	register XDR *xdrs;
-	register des_block *blkp;
+xdr_des_block(XDR *xdrs, des_block *blkp)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_des_block, 0);
-	dummy = xdr_opaque(xdrs, (caddr_t)blkp, (u_int) sizeof (des_block));
-	trace1(TR_xdr_des_block, 1);
-	return (dummy);
+	return (xdr_opaque(xdrs, (caddr_t)blkp, sizeof (des_block)));
 }
 
 /* * * * * * * * * * * * * * XDR RPC MESSAGE * * * * * * * * * * * * * * * */
@@ -106,39 +82,22 @@ xdr_des_block(xdrs, blkp)
  * XDR the MSG_ACCEPTED part of a reply message union
  */
 bool_t
-xdr_accepted_reply(xdrs, ar)
-	register XDR *xdrs;
-	register struct accepted_reply *ar;
+xdr_accepted_reply(XDR *xdrs, struct accepted_reply *ar)
 {
-	bool_t dummy;
-
 	/* personalized union, rather than calling xdr_union */
-	trace1(TR_xdr_accepted_reply, 0);
-	if (! xdr_opaque_auth(xdrs, &(ar->ar_verf))) {
-		trace1(TR_xdr_accepted_reply, 1);
+	if (!xdr_opaque_auth(xdrs, &(ar->ar_verf)))
 		return (FALSE);
-	}
-	if (! xdr_enum(xdrs, (enum_t *)&(ar->ar_stat))) {
-		trace1(TR_xdr_accepted_reply, 1);
+	if (!xdr_enum(xdrs, (enum_t *)&(ar->ar_stat)))
 		return (FALSE);
-	}
 
 	switch (ar->ar_stat) {
 	case SUCCESS:
-		dummy = (*(ar->ar_results.proc))(xdrs, ar->ar_results.where);
-		trace1(TR_xdr_accepted_reply, 1);
-		return (dummy);
-
+		return ((*(ar->ar_results.proc))(xdrs, ar->ar_results.where));
 	case PROG_MISMATCH:
-		if (!xdr_u_int(xdrs, (u_int *)&(ar->ar_vers.low))) {
-			trace1(TR_xdr_accepted_reply, 1);
+		if (!xdr_u_int(xdrs, (uint_t *)&(ar->ar_vers.low)))
 			return (FALSE);
-		}
-		dummy = xdr_u_int(xdrs, (u_int *)&(ar->ar_vers.high));
-		trace1(TR_xdr_accepted_reply, 1);
-		return (dummy);
+		return (xdr_u_int(xdrs, (uint_t *)&(ar->ar_vers.high)));
 	}
-	trace1(TR_xdr_accepted_reply, 1);
 	return (TRUE);  /* TRUE => open ended set of problems */
 }
 
@@ -146,34 +105,19 @@ xdr_accepted_reply(xdrs, ar)
  * XDR the MSG_DENIED part of a reply message union
  */
 bool_t
-xdr_rejected_reply(xdrs, rr)
-	register XDR *xdrs;
-	register struct rejected_reply *rr;
+xdr_rejected_reply(XDR *xdrs, struct rejected_reply *rr)
 {
-	bool_t dummy;
-
 	/* personalized union, rather than calling xdr_union */
-	trace1(TR_xdr_rejected_reply, 0);
-	if (! xdr_enum(xdrs, (enum_t *)&(rr->rj_stat))) {
-		trace1(TR_xdr_rejected_reply, 1);
+	if (!xdr_enum(xdrs, (enum_t *)&(rr->rj_stat)))
 		return (FALSE);
-	}
 	switch (rr->rj_stat) {
 	case RPC_MISMATCH:
-		if (! xdr_u_int(xdrs, (u_int *)&(rr->rj_vers.low))) {
-			trace1(TR_xdr_rejected_reply, 1);
+		if (!xdr_u_int(xdrs, (uint_t *)&(rr->rj_vers.low)))
 			return (FALSE);
-		}
-		dummy = xdr_u_int(xdrs, (u_int *)&(rr->rj_vers.high));
-		trace1(TR_xdr_rejected_reply, 1);
-		return (dummy);
-
+		return (xdr_u_int(xdrs, (uint_t *)&(rr->rj_vers.high)));
 	case AUTH_ERROR:
-		dummy = xdr_enum(xdrs, (enum_t *)&(rr->rj_why));
-		trace1(TR_xdr_rejected_reply, 1);
-		return (dummy);
+		return (xdr_enum(xdrs, (enum_t *)&(rr->rj_why)));
 	}
-	trace1(TR_xdr_rejected_reply, 1);
 	return (FALSE);
 }
 
@@ -181,18 +125,14 @@ xdr_rejected_reply(xdrs, rr)
  * XDR a reply message
  */
 bool_t
-xdr_replymsg(xdrs, rmsg)
-	register XDR *xdrs;
-	register struct rpc_msg *rmsg;
+xdr_replymsg(XDR *xdrs, struct rpc_msg *rmsg)
 {
 	struct xdr_discrim reply_dscrm[3];
-	register rpc_inline_t *buf;
-	register struct accepted_reply *ar;
-	register struct opaque_auth *oa;
-	register u_int rndup;
-	bool_t	dummy;
+	rpc_inline_t *buf;
+	struct accepted_reply *ar;
+	struct opaque_auth *oa;
+	uint_t rndup;
 
-	trace1(TR_xdr_replymsg, 0);
 	if (xdrs->x_op == XDR_ENCODE &&
 	    rmsg->rm_reply.rp_stat == MSG_ACCEPTED &&
 	    rmsg->rm_direction == REPLY &&
@@ -206,7 +146,7 @@ xdr_replymsg(xdrs, rmsg)
 		IXDR_PUT_ENUM(buf, oa->oa_flavor);
 		IXDR_PUT_INT32(buf, oa->oa_length);
 		if (oa->oa_length) {
-			(void) memcpy((caddr_t)buf, oa->oa_base, oa->oa_length);
+			(void) memcpy(buf, oa->oa_base, oa->oa_length);
 /* LINTED pointer alignment */
 			buf = (rpc_inline_t *)(((caddr_t)buf) + oa->oa_length);
 		}
@@ -221,40 +161,26 @@ xdr_replymsg(xdrs, rmsg)
 		IXDR_PUT_ENUM(buf, ar->ar_stat);
 		switch (ar->ar_stat) {
 		case SUCCESS:
-			dummy = (*(ar->ar_results.proc))
-				(xdrs, ar->ar_results.where);
-			trace1(TR_xdr_replymsg, 1);
-			return (dummy);
-
+			return ((*(ar->ar_results.proc))
+				(xdrs, ar->ar_results.where));
 		case PROG_MISMATCH:
-			if (! xdr_u_int(xdrs, (u_int *)&(ar->ar_vers.low))) {
-				trace1(TR_xdr_replymsg, 1);
+			if (!xdr_u_int(xdrs, (uint_t *)&(ar->ar_vers.low)))
 				return (FALSE);
-			}
-			dummy = xdr_u_int(xdrs, (u_int *)&(ar->ar_vers.high));
-			trace1(TR_xdr_replymsg, 1);
-			return (dummy);
+			return (xdr_u_int(xdrs, (uint_t *)&(ar->ar_vers.high)));
 		}
-		trace1(TR_xdr_replymsg, 1);
 		return (TRUE);
 	}
 	if (xdrs->x_op == XDR_DECODE &&
 	    (buf = XDR_INLINE(xdrs, 3 * BYTES_PER_XDR_UNIT)) != NULL) {
 		rmsg->rm_xid = IXDR_GET_INT32(buf);
 		rmsg->rm_direction = IXDR_GET_ENUM(buf, enum msg_type);
-		if (rmsg->rm_direction != REPLY) {
-			trace1(TR_xdr_replymsg, 1);
+		if (rmsg->rm_direction != REPLY)
 			return (FALSE);
-		}
 		rmsg->rm_reply.rp_stat = IXDR_GET_ENUM(buf, enum reply_stat);
 		if (rmsg->rm_reply.rp_stat != MSG_ACCEPTED) {
-			if (rmsg->rm_reply.rp_stat == MSG_DENIED) {
-				dummy = xdr_rejected_reply(xdrs,
-					&rmsg->rm_reply.rp_rjct);
-				trace1(TR_xdr_replymsg, 1);
-				return (dummy);
-			}
-			trace1(TR_xdr_replymsg, 1);
+			if (rmsg->rm_reply.rp_stat == MSG_DENIED)
+				return (xdr_rejected_reply(xdrs,
+					&rmsg->rm_reply.rp_rjct));
 			return (FALSE);
 		}
 		ar = &rmsg->rm_reply.rp_acpt;
@@ -265,84 +191,61 @@ xdr_replymsg(xdrs, rmsg)
 			oa->oa_length = IXDR_GET_INT32(buf);
 		} else {
 			if (xdr_enum(xdrs, &oa->oa_flavor) == FALSE ||
-			    xdr_u_int(xdrs, &oa->oa_length) == FALSE) {
-				trace1(TR_xdr_replymsg, 1);
+			    xdr_u_int(xdrs, &oa->oa_length) == FALSE)
 				return (FALSE);
-			}
 		}
 		if (oa->oa_length) {
-			if (oa->oa_length > MAX_AUTH_BYTES) {
-				trace1(TR_xdr_replymsg, 1);
+			if (oa->oa_length > MAX_AUTH_BYTES)
 				return (FALSE);
-			}
 			if (oa->oa_base == NULL) {
-				oa->oa_base = (caddr_t)
-					mem_alloc(oa->oa_length);
+				oa->oa_base = malloc(oa->oa_length);
 				if (oa->oa_base == NULL) {
 					syslog(LOG_ERR,
 						"xdr_replymsg : "
 						"out of memory.");
 					rpc_callerr.re_status = RPC_SYSTEMERROR;
-					trace1(TR_xdr_callmsg, 1);
 					return (FALSE);
 				}
 			}
 			buf = XDR_INLINE(xdrs, RNDUP(oa->oa_length));
 			if (buf == NULL) {
 				if (xdr_opaque(xdrs, oa->oa_base,
-				    oa->oa_length) == FALSE) {
-					trace1(TR_xdr_replymsg, 1);
+				    oa->oa_length) == FALSE)
 					return (FALSE);
-				}
 			} else {
-				(void) memcpy(oa->oa_base,
-					(caddr_t)buf, oa->oa_length);
+				(void) memcpy(oa->oa_base, buf, oa->oa_length);
 			}
 		}
 		/*
 		 * stat and rest of reply, copied from
 		 * xdr_accepted_reply
 		 */
-		if (! xdr_enum(xdrs, (enum_t *)&ar->ar_stat)) {
-			trace1(TR_xdr_replymsg, 1);
+		if (!xdr_enum(xdrs, (enum_t *)&ar->ar_stat))
 			return (FALSE);
-		}
 		switch (ar->ar_stat) {
 		case SUCCESS:
-			dummy = (*(ar->ar_results.proc))
-				(xdrs, ar->ar_results.where);
-			trace1(TR_xdr_replymsg, 1);
-			return (dummy);
-
+			return ((*(ar->ar_results.proc))
+				(xdrs, ar->ar_results.where));
 		case PROG_MISMATCH:
-			if (! xdr_u_int(xdrs, (u_int *)&(ar->ar_vers.low))) {
-				trace1(TR_xdr_replymsg, 1);
+			if (!xdr_u_int(xdrs, (uint_t *)&(ar->ar_vers.low)))
 				return (FALSE);
-			}
-			dummy = xdr_u_int(xdrs, (u_int *)&(ar->ar_vers.high));
-			trace1(TR_xdr_replymsg, 1);
-			return (dummy);
+			return (xdr_u_int(xdrs, (uint_t *)&(ar->ar_vers.high)));
 		}
-		trace1(TR_xdr_replymsg, 1);
 		return (TRUE);
 	}
 
 	reply_dscrm[0].value = (int)MSG_ACCEPTED;
-	reply_dscrm[0].proc = (xdrproc_t) xdr_accepted_reply;
+	reply_dscrm[0].proc = (xdrproc_t)xdr_accepted_reply;
 	reply_dscrm[1].value = (int)MSG_DENIED;
-	reply_dscrm[1].proc =  (xdrproc_t) xdr_rejected_reply;
+	reply_dscrm[1].proc =  (xdrproc_t)xdr_rejected_reply;
 	reply_dscrm[2].value = __dontcare__;
 	reply_dscrm[2].proc = NULL_xdrproc_t;
 	if (xdr_u_int(xdrs, &(rmsg->rm_xid)) &&
 	    xdr_enum(xdrs, (enum_t *)&(rmsg->rm_direction)) &&
-	    (rmsg->rm_direction == REPLY)) {
-		dummy = xdr_union(xdrs, (enum_t *)&(rmsg->rm_reply.rp_stat),
+	    (rmsg->rm_direction == REPLY))
+		return (xdr_union(xdrs, (enum_t *)&(rmsg->rm_reply.rp_stat),
 				(caddr_t)&(rmsg->rm_reply.ru),
-				reply_dscrm, NULL_xdrproc_t);
-		trace1(TR_xdr_replymsg, 1);
-		return (dummy);
-	}
-	trace1(TR_xdr_replymsg, 1);
+				reply_dscrm, NULL_xdrproc_t));
 	return (FALSE);
 }
 
@@ -352,115 +255,86 @@ xdr_replymsg(xdrs, rmsg)
  * The rm_xid is not really static, but the user can easily munge on the fly.
  */
 bool_t
-xdr_callhdr(xdrs, cmsg)
-	register XDR *xdrs;
-	register struct rpc_msg *cmsg;
+xdr_callhdr(XDR *xdrs, struct rpc_msg *cmsg)
 {
-	bool_t dummy;
-
-	trace1(TR_xdr_callhdr, 0);
 	cmsg->rm_direction = CALL;
 	cmsg->rm_call.cb_rpcvers = RPC_MSG_VERSION;
 	if (xdrs->x_op == XDR_ENCODE &&
 	    xdr_u_int(xdrs, &(cmsg->rm_xid)) &&
 	    xdr_enum(xdrs, (enum_t *)&(cmsg->rm_direction)) &&
-	    xdr_u_int(xdrs, (u_int *)&(cmsg->rm_call.cb_rpcvers)) &&
-	    xdr_u_int(xdrs, (u_int *)&(cmsg->rm_call.cb_prog))) {
-	    dummy = xdr_u_int(xdrs, (u_int *)&(cmsg->rm_call.cb_vers));
-	    trace1(TR_xdr_callhdr, 1);
-	    return (dummy);
+	    xdr_u_int(xdrs, (uint_t *)&(cmsg->rm_call.cb_rpcvers)) &&
+	    xdr_u_int(xdrs, (uint_t *)&(cmsg->rm_call.cb_prog))) {
+	    return (xdr_u_int(xdrs, (uint_t *)&(cmsg->rm_call.cb_vers)));
 	}
-	trace1(TR_xdr_callhdr, 1);
 	return (FALSE);
 }
 
 /* ************************** Client utility routine ************* */
 
 static void
-accepted(acpt_stat, error)
-	register enum accept_stat acpt_stat;
-	register struct rpc_err *error;
+accepted(enum accept_stat acpt_stat, struct rpc_err *error)
 {
-	trace1(TR_accepted, 0);
 	switch (acpt_stat) {
 
 	case PROG_UNAVAIL:
 		error->re_status = RPC_PROGUNAVAIL;
-		trace1(TR_accepted, 1);
 		return;
 
 	case PROG_MISMATCH:
 		error->re_status = RPC_PROGVERSMISMATCH;
-		trace1(TR_accepted, 1);
 		return;
 
 	case PROC_UNAVAIL:
 		error->re_status = RPC_PROCUNAVAIL;
-		trace1(TR_accepted, 1);
 		return;
 
 	case GARBAGE_ARGS:
 		error->re_status = RPC_CANTDECODEARGS;
-		trace1(TR_accepted, 1);
 		return;
 
 	case SYSTEM_ERR:
 		error->re_status = RPC_SYSTEMERROR;
-		trace1(TR_accepted, 1);
 		return;
 
 	case SUCCESS:
 		error->re_status = RPC_SUCCESS;
-		trace1(TR_accepted, 1);
 		return;
 	}
 	/* something's wrong, but we don't know what ... */
 	error->re_status = RPC_FAILED;
 	error->re_lb.s1 = (int32_t)MSG_ACCEPTED;
 	error->re_lb.s2 = (int32_t)acpt_stat;
-	trace1(TR_accepted, 1);
 }
 
 static void
-rejected(rjct_stat, error)
-	register enum reject_stat rjct_stat;
-	register struct rpc_err *error;
+rejected(enum reject_stat rjct_stat, struct rpc_err *error)
 {
-
-	trace1(TR_rejected, 0);
 	switch (rjct_stat) {
 	case RPC_MISMATCH:
 		error->re_status = RPC_VERSMISMATCH;
-		trace1(TR_rejected, 1);
 		return;
 
 	case AUTH_ERROR:
 		error->re_status = RPC_AUTHERROR;
-		trace1(TR_rejected, 1);
 		return;
 	}
 	/* something's wrong, but we don't know what ... */
 	error->re_status = RPC_FAILED;
 	error->re_lb.s1 = (int32_t)MSG_DENIED;
 	error->re_lb.s2 = (int32_t)rjct_stat;
-	trace1(TR_rejected, 1);
 }
 
 /*
  * given a reply message, fills in the error
  */
 void
-__seterr_reply(msg, error)
-	register struct rpc_msg *msg;
-	register struct rpc_err *error;
+__seterr_reply(struct rpc_msg *msg, struct rpc_err *error)
 {
 	/* optimized for normal, SUCCESSful case */
-	trace1(TR___seterr_reply, 0);
 	switch (msg->rm_reply.rp_stat) {
 	case MSG_ACCEPTED:
 		if (msg->acpted_rply.ar_stat == SUCCESS) {
 			error->re_status = RPC_SUCCESS;
-			trace1(TR___seterr_reply, 1);
 			return;
 		};
 		accepted(msg->acpted_rply.ar_stat, error);
@@ -491,5 +365,4 @@ __seterr_reply(msg, error)
 		error->re_vers.high = msg->acpted_rply.ar_vers.high;
 		break;
 	}
-	trace1(TR___seterr_reply, 1);
 }

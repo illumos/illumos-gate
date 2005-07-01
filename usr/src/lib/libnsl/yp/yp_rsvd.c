@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1995-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,9 +64,10 @@ __yp_clnt_create_rsvdport_netid_req(const char *hostname, rpcprog_t prog,
 	}
 
 	/* Attempt to set reserved port, but we don't care if it fails */
-	netdir_options(nconf, ND_SET_RESERVEDPORT, fd, NULL);
+	(void) netdir_options(nconf, ND_SET_RESERVEDPORT, fd, NULL);
 
-	if ((tbind = (struct t_bind *) t_alloc(fd, T_BIND, T_ADDR)) == NULL) {
+	/* LINTED pointer cast */
+	if ((tbind = (struct t_bind *)t_alloc(fd, T_BIND, T_ADDR)) == NULL) {
 		freenetconfigent(nconf);
 		return (NULL);
 	}
@@ -73,18 +75,18 @@ __yp_clnt_create_rsvdport_netid_req(const char *hostname, rpcprog_t prog,
 	svcaddr = &(tbind->addr);
 
 	if (!rpcb_getaddr(prog, vers, nconf, svcaddr, hostname)) {
-		t_close(fd);
-		t_free((char *) tbind, T_BIND);
+		(void) t_close(fd);
+		(void) t_free((char *)tbind, T_BIND);
 		freenetconfigent(nconf);
 		return (NULL);
 	}
 
 	if ((clnt = clnt_tli_create(fd, nconf, svcaddr,
 				prog, vers, sendsz, recvsz)) == NULL) {
-		t_close(fd);
-		t_free((char *) tbind, T_BIND);
+		(void) t_close(fd);
+		(void) t_free((char *)tbind, T_BIND);
 	} else {
-		t_free((char *) tbind, T_BIND);
+		(void) t_free((char *)tbind, T_BIND);
 		clnt_control(clnt, CLSET_FD_CLOSE, NULL);
 	}
 	freenetconfigent(nconf);

@@ -19,48 +19,56 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved	*/
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "uucp.h"
-#include <rpc/trace.h>
-GLOBAL char _Protocol[40];	/* working protocol string */
 static char _ProtoSys[40];	/* protocol string from Systems file entry */
 static char _ProtoDev[40];	/* protocol string from Devices file entry */
-EXTERN char _ProtoCfg[];	/* protocol string from Config  file entry */
+static char _ProtoCfg[];	/* protocol string from Config  file entry */
 
-EXTERN jmp_buf Sjbuf;
-EXTERN unsigned expecttime;
+static jmp_buf Sjbuf;
+static unsigned expecttime;
 
-GLOBAL int	Modemctrl;
+static int	Modemctrl;
 
-EXTERN void alarmtr();
-static void addProto(), mergeProto(), removeProto();
-static char *nextProto();
-EXTERN char *findProto();
-static void getProto();
-static int finds();
-EXTERN int getto();		/* make this static when ct uses altconn() */
-EXTERN int chat(), rddev(), expect(), wrstr(), wrchr();
-EXTERN int processdev(), getdevline(), getsysline(), sysaccess();
-EXTERN int clear_hup();
-EXTERN char *currsys(), *currdev();
-static int finds();
-static int wait_for_hangup(), expect_str();
+static void alarmtr(int);
+static void getProto(char *, char *);
+static int finds(char *, char *[], int);
+static int getto(char *[]);	/* make this static when ct uses altconn() */
+static int chat(int, char *[], int, char *, char *);
+static int rddev(char *, char *[], char *, int);
+static int expect(char *, int);
+static int wrstr(int, char *, int, int);
+static int wrchr(int, char *, int);
+static int processdev(char *[], char *[]);
+static int getdevline(char *, int);
+static int getsysline(char *, int);
+static int sysaccess(int);
+static int clear_hup(int);
+#ifndef SMALL
+static char *currsys(void);
+static char *currdev(void);
+#endif
+static int wait_for_hangup(int);
+static int expect_str(char *, int);
 
-EXTERN void sendthem(), nap();
-static int notin(), ifdate(), classmatch();
+static void sendthem(char *, int, char *, char *);
+static void nap(unsigned int);
+static int notin(char *, char *);
+static int ifdate(char *);
+static int classmatch(char *[], char *[]);
 
-GLOBAL char *Myline = CNULL;	/* to force which line will be used */
-GLOBAL char *Mytype = CNULL;	/* to force selection of specific device type */
+static char *Myline = CNULL;	/* to force which line will be used */
+static char *Mytype = CNULL;	/* to force selection of specific device type */
 
 /*
  * conn - place a telephone call to system and login, etc.
@@ -71,16 +79,13 @@ GLOBAL char *Mytype = CNULL;	/* to force selection of specific device type */
  * When a failure occurs, Uerror is set.
  */
 
-GLOBAL int
-conn(system)
-char *system;
+static int
+conn(char *system)
 {
 	int nf, fn = FAIL;
 	char *flds[F_MAX+1];
-	EXTERN void sysreset();
+	static void sysreset(void);
 
-
-	trace1(TR_conn, 0);
 	CDEBUG(4, "conn(%s)\n", system);
 	Uerror = 0;
 	while ((nf = finds(system, flds, F_MAX)) > 0) {
@@ -89,23 +94,22 @@ char *system;
 		if (fn < 0)
 			continue;
 		if (EQUALS(Progname, "uucico")) {
-			if (chat(nf - F_LOGIN, flds + F_LOGIN, fn,"","") == SUCCESS) {
+			if (chat(nf - F_LOGIN, flds + F_LOGIN, fn, "", "") ==
+								SUCCESS) {
 				sysreset();
-				trace1(TR_conn, 1);
 				return (fn); /* successful return */
 			}
 
 			/* login failed */
 			DEBUG(6, "close caller (%d)\n", fn);
 			fd_rmlock(fn);
-			close(fn);
+			(void) close(fn);
 			if (Dc[0] != NULLCHAR) {
-			/*EMPTY*/
-			DEBUG(6, "delock line (%s)\n", Dc);
+				/*EMPTY*/
+				DEBUG(6, "delock line (%s)\n", Dc);
 			}
 		} else {
 			sysreset();
-			trace1(TR_conn, 1);
 			return (fn);
 		}
 	}
@@ -113,7 +117,6 @@ char *system;
 	/* finds or getto failed */
 	sysreset();
 	CDEBUG(1, "Call Failed: %s\n", UERRORTEXT);
-	trace1(TR_conn, 1);
 	return (FAIL);
 }
 
@@ -125,23 +128,21 @@ char *system;
  *	FAIL  -  failed
  */
 
-GLOBAL int
-getto(flds)
-char *flds[];
+static int
+getto(char *flds[])
 {
 	char *dev[D_MAX+2], devbuf[BUFSIZ];
-	register int status;
-	register int dcf = -1;
+	int status;
+	int dcf = -1;
 	int reread = 0;
 	int tries = 0;	/* count of call attempts - for limit purposes */
-	EXTERN void devreset();
+	static void devreset(void);
 
-
-	trace1(TR_getto, 0);
 	CDEBUG(1, "Device Type %s wanted\n", flds[F_TYPE]);
 	Uerror = 0;
 	while (tries < TRYCALLS) {
-		if ((status=rddev(flds[F_TYPE], dev, devbuf, D_MAX)) == FAIL) {
+		if ((status = rddev(flds[F_TYPE], dev, devbuf, D_MAX)) ==
+								FAIL) {
 			if (tries == 0 || ++reread >= TRYCALLS)
 				break;
 			devreset();
@@ -157,7 +158,7 @@ char *flds[];
 		if ((dcf = processdev(flds, dev)) >= 0)
 			break;
 
-		switch(Uerror) {
+		switch (Uerror) {
 		case SS_CANT_ACCESS_DEVICE:
 		case SS_DEVICE_FAILED:
 		case SS_LOCKED_DEVICE:
@@ -172,45 +173,34 @@ char *flds[];
 		CDEBUG(1, "Requested Device Type Not Found\n%s", "");
 		Uerror = SS_NO_DEVICE;
 	}
-	trace1(TR_getto, 1);
 	return (dcf);
 }
 
 /*
  * classmatch - process 'Any' in Devices and Systems and
- * 	determine the correct speed, or match for ==
+ *	determine the correct speed, or match for ==
  */
 
 static int
-classmatch(flds, dev)
-char *flds[];
-char *dev[];
+classmatch(char *flds[], char *dev[])
 {
 	/* check class, check (and possibly set) speed */
-	trace1(TR_classmatch, 0);
-	if (EQUALS(flds[F_CLASS], "Any")
-	   && EQUALS(dev[D_CLASS], "Any")) {
+	if (EQUALS(flds[F_CLASS], "Any") && EQUALS(dev[D_CLASS], "Any")) {
 		dev[D_CLASS] = DEFAULT_BAUDRATE;
-		trace1(TR_classmatch, 1);
 		return (SUCCESS);
 	} else if (EQUALS(dev[D_CLASS], "Any")) {
 		dev[D_CLASS] = flds[F_CLASS];
-		trace1(TR_classmatch, 1);
 		return (SUCCESS);
 	} else if (EQUALS(flds[F_CLASS], "Any") ||
-	EQUALS(flds[F_CLASS], dev[D_CLASS])) {
-		trace1(TR_classmatch, 1);
+					EQUALS(flds[F_CLASS], dev[D_CLASS]))
 		return (SUCCESS);
-	}
-	else {
-		trace1(TR_classmatch, 1);
+	else
 		return (FAIL);
-	}
 }
 
 
 /*
- *	rddev - find and unpack a line from device file for this caller type 
+ *	rddev - find and unpack a line from device file for this caller type
  *	lines starting with whitespace of '#' are comments
  *
  *	return codes:
@@ -218,30 +208,28 @@ char *dev[];
  *		FAIL - EOF
  */
 
-GLOBAL int
+static int
 rddev(char *type, char *dev[], char *buf, int devcount)
 {
 	char *commap, d_type[BUFSIZ];
 	int na;
 
-
-	trace1(TR_rddev, 0);
 	while (getdevline(buf, BUFSIZ)) {
-		if (buf[0] == ' ' || buf[0] == '\t'
-			||  buf[0] == '\n' || buf[0] == '\0' || buf[0] == '#')
+		if (buf[0] == ' ' || buf[0] == '\t' || buf[0] == '\n' ||
+					buf[0] == '\0' || buf[0] == '#')
 			continue;
 		na = getargs(buf, dev, devcount);
 		ASSERT(na >= D_CALLER, "BAD LINE", buf, na);
 
-		if (strncmp(dev[D_LINE],"/dev/",5) == 0) {
+		if (strncmp(dev[D_LINE], "/dev/", 5) == 0) {
 			/* since cu (altconn()) strips off leading */
 			/* "/dev/",  do the same here.  */
-			strcpy(dev[D_LINE], &(dev[D_LINE][5]));
+			(void) strcpy(dev[D_LINE], &(dev[D_LINE][5]));
 		}
 
 		/* may have ",M" subfield in D_LINE */
 		Modemctrl = FALSE;
-		if ((commap = strchr(dev[D_LINE], ',')) != (char *)NULL) {
+		if ((commap = strchr(dev[D_LINE], ',')) != NULL) {
 			if (strcmp(commap, ",M") == SAME)
 				Modemctrl = TRUE;
 			*commap = '\0';
@@ -251,8 +239,8 @@ rddev(char *type, char *dev[], char *buf, int devcount)
 		 * D_TYPE field may have protocol subfield, which
 		 * must be pulled off before comparing to desired type.
 		 */
-		(void)strcpy(d_type, dev[D_TYPE]);
-		if ((commap = strchr(d_type, ',')) != (char *)NULL)
+		(void) strcpy(d_type, dev[D_TYPE]);
+		if ((commap = strchr(d_type, ',')) != NULL)
 			*commap = '\0';
 
 		/* to force the requested device type to be used. */
@@ -266,11 +254,9 @@ rddev(char *type, char *dev[], char *buf, int devcount)
 
 		if (EQUALS(d_type, type)) {
 			getProto(_ProtoDev, dev[D_TYPE]);
-			trace1(TR_rddev, 1);
 			return (na);
 		}
 	}
-	trace1(TR_rddev, 1);
 	return (FAIL);
 }
 
@@ -299,7 +285,8 @@ finds(char *sysnam, char *flds[], int fldcount)
 	static char *info;	/* dynamically allocated BUFSIZ */
 	int na;
 
-	/* format of fields
+	/*
+	 * format of fields
 	 *	0 name;
 	 *	1 time
 	 *	2 acu/hardwired
@@ -307,15 +294,13 @@ finds(char *sysnam, char *flds[], int fldcount)
 	 *	etc
 	 */
 
-	trace1(TR_finds, 0);
 	if (sysnam == 0 || *sysnam == 0) {
 		Uerror = SS_BADSYSTEM;
-		trace1(TR_finds, 1);
 		return (FAIL);
 	}
 
 	if (info == NULL) {
-		info = (char *)malloc(BUFSIZ);
+		info = malloc(BUFSIZ);
 		if (info == NULL) {
 			DEBUG(1, "malloc failed for info in finds\n", 0);
 			return (0);
@@ -327,8 +312,8 @@ finds(char *sysnam, char *flds[], int fldcount)
 		if (!EQUALSN(sysnam, flds[F_NAME], MAXBASENAME))
 			continue;
 		/* check if requested Mytype device type */
-		if ((Mytype != CNULL)
-			&& (!EQUALSN(flds[F_TYPE], Mytype, strlen(Mytype)))) {
+		if ((Mytype != CNULL) &&
+			    (!EQUALSN(flds[F_TYPE], Mytype, strlen(Mytype)))) {
 			DEBUG(7, "Skipping entry in '%s'", currsys());
 			DEBUG(7, " - type (%s) not wanted.\n", flds[F_TYPE]);
 			continue;
@@ -342,7 +327,6 @@ finds(char *sysnam, char *flds[], int fldcount)
 			/*  found a good entry  */
 			getProto(_ProtoSys, flds[F_TYPE]);
 			Uerror = 0;
-			trace1(TR_finds, 1);
 			return (na);	/* FOUND OK LINE */
 		}
 		CDEBUG(1, "Wrong Time To Call: %s\n", flds[F_TIME]);
@@ -350,7 +334,6 @@ finds(char *sysnam, char *flds[], int fldcount)
 	}
 	if (!Uerror)
 		Uerror = SS_BADSYSTEM;
-	trace1(TR_finds, 1);
 	return (FAIL);
 }
 
@@ -367,210 +350,16 @@ finds(char *sysnam, char *flds[], int fldcount)
  */
 
 static void
-getProto(save, str)
-char *save;
-char *str;
+getProto(char *save, char *str)
 {
-	register char *p;
+	char *p;
 
-
-	trace1(TR_getProto, 0);
 	*save = NULLCHAR;
-	if ((p=strchr(str, ',')) != NULL) {
+	if ((p = strchr(str, ',')) != NULL) {
 		*p = NULLCHAR;
 		(void) strcpy(save, p+1);
 		DEBUG(7, "Protocol = %s\n", save);
 	}
-	trace1(TR_getProto, 1);
-	return;
-}
-
-/*
- * check for a specified protocol selection string
- * return:
- *	protocol string pointer
- *	NULL if none specified for LOGNAME
- */
-GLOBAL char *
-protoString(valid)
-char *valid;
-{
-	char *save;
-
-	
-	trace1(TR_protoString, 0);
-	save =strdup(valid);
-	_Protocol[0] = '\0';
-
-	if (_ProtoSys[0] != '\0')
-		addProto(_ProtoSys, valid);
-	if (_ProtoDev[0] != '\0')
-		addProto(_ProtoDev, valid);
-	if (_ProtoCfg[0] != '\0')
-		addProto(_ProtoCfg, valid);
-
-	if (_Protocol[0] == '\0') {
-		(void) strcpy(valid, save);
-		(void) strcpy(_Protocol, save);
-	}
-
-	trace1(TR_protoString, 1);
-	return (_Protocol[0] == NULLCHAR ? NULL : _Protocol);
-}
-
-/*
- * addProto
- *
- * Verify that the desired protocols from the Systems and Devices file
- * have been compiled into this application.
- *
- * 	desired -	list of desired protocols
- *	valid -		list of protocols that are compiled in.
- */
-
-static void
-addProto (desired, valid)
-char *desired;
-char *valid;
-{
-	register char * protoPtr;
-	register char *	wantPtr;
-
-	trace1(TR_addProto, 0);
-	if (*desired == '\0') {
-		trace1(TR_addProto, 1);
-		return;
-	}
-
-	if (*(protoPtr = _Protocol) != NULLCHAR) {
-		while (*(protoPtr = nextProto(protoPtr)) != NULLCHAR) {
-		if (*(wantPtr = findProto(desired, *protoPtr)) == NULLCHAR) {
-			removeProto(valid, *protoPtr);	
-			removeProto(protoPtr, *protoPtr);	
-		} else {
-			mergeProto(protoPtr, wantPtr);
-			protoPtr++;
-		}
-		}
-	} else {
-		wantPtr = desired;
-		while (*(wantPtr = nextProto(wantPtr)) != NULLCHAR) {
-		if (*(findProto(valid, *wantPtr)) != NULLCHAR) {
-			mergeProto(protoPtr, wantPtr);
-		}
-		wantPtr++;
-		}
-	}
-	if (*(protoPtr = _Protocol) != NULLCHAR) {
-		while (*(protoPtr = nextProto(protoPtr)) != NULLCHAR)
-		*(valid++) = *(protoPtr++);
-		*valid = NULLCHAR;
-	}
-	trace1(TR_addProto, 1);
-	return;
-}
-
-/*
- * mergeProto
- *
- * input
- * 	char *tostring, *fromstring;
- */
-static void
-mergeProto(tostring, fromstring)
-char *tostring, *fromstring;
-{
-	char buffer[BUFSIZ];
-	int length;
-
-	trace1(TR_mergeProto, 0);
-	while (*(tostring = nextProto(tostring)) != NULLCHAR) {
-		if (*tostring == *fromstring)
-		break;
-		else
-		tostring++;
-	}
-	
-	if (*tostring == NULLCHAR) {
-		length = nextProto(fromstring + 1) - fromstring;
-		(void) strncpy(tostring, fromstring, length);
-		*(tostring + length) = NULLCHAR;
-	} else {
-		tostring++;
-		fromstring++;
-		if ((*tostring !=  '(') && (*fromstring == '(')) {
-		(void) strcpy(buffer, tostring);
-		length = nextProto(fromstring) - fromstring;
-			(void) strncpy(tostring, fromstring, length);
-		(void) strcpy(tostring+length, buffer);
-		}
-	}
-	trace1(TR_mergeProto, 1);
-	return;
-}
-
-/*
- * removeProto
- *
- * char *old
- * char letter
- *
- * return
- *	none
- */
-static void
-removeProto(string, letter)
-char *string, letter;
-{
-	trace1(TR_removeProto, 0);
-	while (*(string = nextProto(string)) != NULLCHAR) {
-		if (*string == letter)
-		(void) strcpy(string, nextProto(string+1));
-		else
-		string++;
-	}
-	trace1(TR_removeProto, 1);
-}
-
-/* 
- * nextProto
- *	char *string;
- * return
- *	char * to next non-parameter letter
- */
-static char *
-nextProto(string)
-char *string;
-{
-	trace1(TR_nextProto, 0);
-	if (*string == '(')
-		while (*string != NULLCHAR)
-		if (*(string++) == ')')
-			break;
-	trace1(TR_nextProto, 1);
-	return (string);
-}
-
-/* 
- * findProto
- *	char *desired,
- *	char protoPtr;
- * return
- *	char *pointer to found or string terminating NULLCHAR
- */
-GLOBAL char *
-findProto(string, letter)
-char *string;
-char letter;
-{
-	trace1(TR_findProto, 0);
-	while (*(string = nextProto(string)) != NULLCHAR)
-		if (*string == letter)
-		break;
-		else
-		string++;
-	trace1(TR_findProto, 1);
-	return (string);
 }
 
 /*
@@ -585,15 +374,12 @@ char letter;
  *	return codes:  0  |  FAIL
  */
 
-GLOBAL int
-chat(nf, flds, fn, phstr1, phstr2)
-char *flds[], *phstr1, *phstr2;
-int nf, fn;
+static int
+chat(int nf, char *flds[], int fn, char *phstr1, char *phstr2)
 {
 	char *want, *altern;
 	int k, ok;
 
-	trace3(TR_chat, 0, nf, fn);
 	for (k = 0; k < nf; k += 2) {
 		want = flds[k];
 		ok = FAIL;
@@ -607,7 +393,6 @@ int nf, fn;
 			if (altern == NULL) {
 				Uerror = SS_LOGIN_FAILED;
 				logent(UERRORTEXT, "FAILED");
-				trace1(TR_chat, 1);
 				return (FAIL);
 			}
 			want = index(altern, '-');
@@ -615,15 +400,14 @@ int nf, fn;
 				*want++ = NULLCHAR;
 			sendthem(altern, fn, phstr1, phstr2);
 		}
-		sleep(2);
+		(void) sleep(2);
 		if (flds[k+1])
 			sendthem(flds[k+1], fn, phstr1, phstr2);
 	}
-	trace1(TR_chat, 1);
 	return (0);
 }
 
-#define MR 1000
+#define	MR 1000
 
 /*
  *	expect(str, fn)	look for expected string w/ possible special chars
@@ -635,12 +419,10 @@ int nf, fn;
  *		some character  -  timed out
  */
 
-GLOBAL int
-expect(str, fn)
-char *str;
-int fn;
+static int
+expect(char *str, int fn)
 {
-	register char *bptr, *sptr;
+	char *bptr, *sptr;
 	char    buf[BUFSIZ];
 
 	bptr = buf;
@@ -685,21 +467,18 @@ int fn;
  *		some character  -  timed out
  */
 
-GLOBAL int
-expect_str(str, fn)
-char *str;
-int fn;
+static int
+expect_str(char *str, int fn)
 {
 	static char rdvec[MR];
 	char *rp = rdvec;
-	register int kr, c;
+	int kr, c;
 	char nextch;
 
-	trace2(TR_expect, 0, fn);
 	*rp = 0;
 
 	CDEBUG(4, "expect: (%s", "");
-	for (c=0; (kr=str[c]) != 0 ; c++)
+	for (c = 0; (kr = str[c]) != 0; c++)
 		if (kr < 040) {
 			/*EMPTY*/
 			CDEBUG(4, "^%c", kr | 0100);
@@ -711,26 +490,21 @@ int fn;
 
 	if (EQUALS(str, "\"\"")) {
 		CDEBUG(4, "got it\n%s", "");
-		trace1(TR_expect, 1);
 		return (0);
 	}
-	if (*str== '\0') {
-		return(0);
-	}
-	if (setjmp(Sjbuf)) {
-		trace1(TR_expect, 1);
+	if (*str == '\0')
+		return (0);
+	if (setjmp(Sjbuf))
 		return (FAIL);
-	}
 	(void) signal(SIGALRM, alarmtr);
-	alarm(expecttime);
+	(void) alarm(expecttime);
 	while (notin(str, rdvec)) {
 		errno = 0;
 		kr = (*Read)(fn, &nextch, 1);
 		if (kr <= 0) {
-			alarm(0);
+			(void) alarm(0);
 			CDEBUG(4, "lost line errno - %d\n", errno);
 			logent("LOGIN", "LOST LINE");
-			trace1(TR_expect, 1);
 			return (FAIL);
 		}
 		c = nextch & 0177;
@@ -740,15 +514,13 @@ int fn;
 			rp++;
 		if (rp >= rdvec + MR) {
 			CDEBUG(4, "enough already\n%s", "");
-			alarm(0);
-			trace1(TR_expect, 1);
+			(void) alarm(0);
 			return (FAIL);
 		}
 		*rp = NULLCHAR;
 	}
-	alarm(0);
+	(void) alarm(0);
 	CDEBUG(4, "got it\n%s", "");
-	trace1(TR_expect, 1);
 	return (0);
 }
 
@@ -757,32 +529,28 @@ int fn;
  *	alarmtr()  -  catch alarm routine for "expect".
  */
 /*ARGSUSED*/
-GLOBAL void
-alarmtr(sig)
-int sig;
+static void
+alarmtr(int sig)
 {
-	trace2(TR_alarmtr, 0, sig);
 	CDEBUG(6, "timed out\n%s", "");
 	longjmp(Sjbuf, 1);
-	trace2(TR_alarmtr, 1, sig);
 }
 
 /*
  *	wait_for_hangup() - wait for a hangup to occur on the given device
  */
 int
-wait_for_hangup(dcf)
-	int dcf;
+wait_for_hangup(int dcf)
 {
 	int rval;
 	char buff[BUFSIZ];
 
 	CDEBUG(4, "Waiting for hangup\n%s", "");
-	while((rval = read(dcf, buff, BUFSIZ)) > 0);
+	while ((rval = read(dcf, buff, BUFSIZ)) > 0)
+		;
 
-	if (rval < 0) {
+	if (rval < 0)
 		return (FAIL);
-	}
 	CDEBUG(4, "Received hangup\n%s", "");
 
 	if (clear_hup(dcf) != SUCCESS) {
@@ -791,7 +559,7 @@ wait_for_hangup(dcf)
 	}
 	return (SUCCESS);
 }
-	
+
 /*
  *	sendthem(str, fn, phstr1, phstr2)	send line of chat sequence
  *	char *str, *phstr;
@@ -799,38 +567,33 @@ wait_for_hangup(dcf)
  *	return codes:  none
  */
 
-#define FLUSH() {\
-	if ((bptr - buf) > 0)\
-		if (wrstr(fn, buf, bptr - buf, echocheck) != SUCCESS)\
-			goto err;\
-	bptr = buf;\
+#define	FLUSH() { \
+	if ((bptr - buf) > 0) \
+		if (wrstr(fn, buf, bptr - buf, echocheck) != SUCCESS) \
+			goto err; \
+	bptr = buf; \
 }
 
-GLOBAL void
-sendthem(str, fn, phstr1, phstr2)
-char *str, *phstr1, *phstr2;
-int fn;
+static void
+sendthem(char *str, int fn, char *phstr1, char *phstr2)
 {
 	int sendcr = 1, echocheck = 0;
-	register char	*sptr, *bptr;
+	char	*sptr, *bptr;
 	char	buf[BUFSIZ];
 	struct termio	ttybuf;
 
 	/* should be EQUALS, but previous versions had BREAK n for integer n */
 
-	trace2(TR_sendthem, 0, fn);
 	if (PREFIX("BREAK", str)) {
 		/* send break */
 		CDEBUG(5, "BREAK\n%s", "");
 		(*genbrk)(fn);
-		trace1(TR_sendthem, 1);
 		return;
 	}
 
 	if (EQUALS(str, "EOT")) {
 		CDEBUG(5, "EOT\n%s", "");
 		(void) (*Write)(fn, EOTMSG, strlen(EOTMSG));
-		trace1(TR_sendthem, 1);
 		return;
 	}
 
@@ -843,7 +606,7 @@ int fn;
 	CDEBUG(5, "sendthem (%s", "");
 	for (sptr = str; *sptr; sptr++) {
 		if (*sptr == '\\') {
-			switch(*++sptr) {
+			switch (*++sptr) {
 
 			/* adjust switches */
 			case 'c':	/* no CR after string */
@@ -859,13 +622,13 @@ int fn;
 			}
 
 			/* stash in buf and continue */
-			switch(*sptr) {
+			switch (*sptr) {
 			case 'D':	/* raw phnum */
-				strcpy(bptr, phstr1);
+				(void) strcpy(bptr, phstr1);
 				bptr += strlen(bptr);
 				continue;
 			case 'T':	/* translated phnum */
-				strcpy(bptr, phstr2);
+				(void) strcpy(bptr, phstr2);
 				bptr += strlen(bptr);
 				continue;
 			case 'N':	/* null */
@@ -879,7 +642,7 @@ int fn;
 				continue;
 			default:	/* send the backslash */
 				*bptr++ = '\\';
-				*bptr++ = *sptr;	
+				*bptr++ = *sptr;
 				continue;
 
 			/* flush buf, perform action, and continue */
@@ -896,7 +659,7 @@ int fn;
 			case 'd':	/* sleep briefly */
 				FLUSH();
 				CDEBUG(5, "DELAY\n%s", "");
-				sleep(2);
+				(void) sleep(2);
 				continue;
 			case 'p':	/* pause momentarily */
 				FLUSH();
@@ -913,17 +676,21 @@ int fn;
 				FLUSH();
 				CDEBUG(5, ")\n%s CLOCAL ",
 					(*sptr == 'M' ? "set" : "clear"));
-				if ((*Ioctl)(fn, TCGETA, &ttybuf) != 0 ) {
+				if ((*Ioctl)(fn, TCGETA, &ttybuf) != 0) {
 					/*EMPTY*/
-					CDEBUG(5, "ignored. TCGETA failed, errno %d", errno);
+					CDEBUG(5,
+					    "ignored. TCGETA failed, errno %d",
+					    errno);
 				} else {
 					if (*sptr == 'M')
 					ttybuf.c_cflag |= CLOCAL;
 					else
 					ttybuf.c_cflag &= ~CLOCAL;
 					if ((*Ioctl)(fn, TCSETAW, &ttybuf) != 0)
-					/*EMPTY*/
-					CDEBUG(5, "failed. TCSETAW failed, errno %d", errno);
+						/*EMPTY*/
+					CDEBUG(5,
+					    "failed. TCSETAW failed, errno %d",
+					    errno);
 				}
 				CDEBUG(5, "\n%s", "");
 				continue;
@@ -938,30 +705,24 @@ int fn;
 
 err:
 	CDEBUG(5, ")\n%s", "");
-	trace1(TR_sendthem, 1);
-	return;
 }
 
 #undef FLUSH
 
-GLOBAL int
+static int
 wrstr(int fn, char *buf, int len, int echocheck)
 {
-	int 	i;
-	int	 dummy;
+	int	i;
 	char dbuf[BUFSIZ], *dbptr = dbuf;
 
-	trace1(TR_wrstr, 0);
 	buf[len] = 0;
 
-	if (echocheck) {
-		dummy = wrchr(fn, buf, len);
-		trace1(TR_wrstr, 1);
-		return (dummy);
-	}
+	if (echocheck)
+		return (wrchr(fn, buf, len));
 
 	if (Debug >= 5) {
-		if (sysaccess(ACCESS_SYSTEMS) == 0) { /* Systems file access ok */
+		if (sysaccess(ACCESS_SYSTEMS) == 0) {
+			/* Systems file access ok */
 			for (i = 0; i < len; i++) {
 				*dbptr = buf[i];
 				if (*dbptr < 040) {
@@ -972,29 +733,23 @@ wrstr(int fn, char *buf, int len, int echocheck)
 			}
 			*dbptr = 0;
 		} else
-			strcpy(dbuf, "????????");
+			(void) strcpy(dbuf, "????????");
 		CDEBUG(5, "%s", dbuf);
 	}
-	if ((*Write)(fn, buf, len) != len) {
-		trace1(TR_wrstr, 1);
+	if ((*Write)(fn, buf, len) != len)
 		return (FAIL);
-	}
-	trace1(TR_wrstr, 1);
 	return (SUCCESS);
 }
 
-GLOBAL int
+static int
 wrchr(int fn, char *buf, int len)
 {
-	int 	i, saccess;
+	int	i, saccess;
 	char	cin, cout;
 
-	trace2(TR_wrchr, 0, fn);
 	saccess = (sysaccess(ACCESS_SYSTEMS) == 0); /* protect Systems file */
-	if (setjmp(Sjbuf)) {
-		trace1(TR_wrchr, 1);
+	if (setjmp(Sjbuf))
 		return (FAIL);
-	}
 	(void) signal(SIGALRM, alarmtr);
 
 	for (i = 0; i < len; i++) {
@@ -1007,16 +762,12 @@ wrchr(int fn, char *buf, int len)
 			/*EMPTY*/
 			CDEBUG(5, "?%s", "");
 		}
-		if (((*Write)(fn, &cout, 1)) != 1) {
-			trace1(TR_wrchr, 1);
+		if (((*Write)(fn, &cout, 1)) != 1)
 			return (FAIL);
-		}
 		do {
 			(void) alarm(expecttime);
-			if ((*Read)(fn, &cin, 1) != 1) {
-				trace1(TR_wrchr, 1);
+			if ((*Read)(fn, &cin, 1) != 1)
 				return (FAIL);
-			}
 			(void) alarm(0);
 			cin &= 0177;
 			if (saccess) {
@@ -1029,7 +780,6 @@ wrchr(int fn, char *buf, int len)
 			}
 		} while (cout != (cin & 0177));
 	}
-	trace1(TR_wrchr, 1);
 	return (SUCCESS);
 }
 
@@ -1044,19 +794,14 @@ wrchr(int fn, char *buf, int len)
  */
 
 static int
-notin(sh, lg)
-char *sh, *lg;
+notin(char *sh, char *lg)
 {
-	trace1(TR_notin, 0);
 	while (*lg != NULLCHAR) {
-		if (PREFIX(sh, lg)) {
-			trace1(TR_notin, 1);
+		if (PREFIX(sh, lg))
 			return (0);
-		}
 		else
 			lg++;
 	}
-	trace1(TR_notin, 1);
 	return (1);
 }
 
@@ -1081,8 +826,7 @@ char *sh, *lg;
  */
 
 static int
-ifdate(s)
-char *s;
+ifdate(char *s)
 {
 	static char *days[] = {
 		"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa", 0
@@ -1092,8 +836,7 @@ char *s;
 	char	*p;
 	struct tm	*tp;
 
-	trace1(TR_ifdate, 0);
-	time(&clock);
+	(void) time(&clock);
 	tp = localtime(&clock);
 	t__now = tp->tm_hour * 100 + tp->tm_min;	/* "navy" time */
 
@@ -1131,22 +874,16 @@ char *s;
 			while (isalpha(*s))	/* flush remaining day stuff */
 				s++;
 
-			if ((sscanf(s, "%d-%d", &t__low, &t__high) < 2)
-			 || (t__low == t__high)) {
-				trace1(TR_ifdate, 1);
+			if ((sscanf(s, "%d-%d", &t__low, &t__high) < 2) ||
+							(t__low == t__high))
 				return (1);
-			}
 
 			/* 0000 crossover? */
 			if (t__low < t__high) {
-				if (t__low <= t__now && t__now <= t__high) {
-					trace1(TR_ifdate, 1);
+				if (t__low <= t__now && t__now <= t__high)
 					return (1);
-				}
-			} else if (t__low <= t__now || t__now <= t__high) {
-				trace1(TR_ifdate, 1);
+			} else if (t__low <= t__now || t__now <= t__high)
 				return (1);
-			}
 
 			/* aim at next time slot */
 			if ((s = index(s, ',')) == NULL)
@@ -1155,7 +892,6 @@ char *s;
 		if (*s)
 			s++;
 	}
-	trace1(TR_ifdate, 1);
 	return (0);
 }
 
@@ -1166,170 +902,29 @@ char *s;
  *	return - pointer to first digit in string or end of string
  */
 
-GLOBAL char *
-fdig(cp)
-char *cp;
+static char *
+fdig(char *cp)
 {
 	char *c;
 
-	trace1(TR_fdig, 0);
 	for (c = cp; *c; c++)
 		if (*c >= '0' && *c <= '9')
 			break;
-	trace1(TR_fdig, 1);
 	return (c);
 }
-
-
-#ifdef FASTTIMER
-/*	Sleep in increments of 60ths of second.	*/
-GLOBAL void
-nap (time)
-register int time;
-{
-	static int fd;
-
-	trace2(TR_nap, 0, time);
-	if (fd == 0)
-		fd = open (FASTTIMER, 0);
-
-	(void) (*Read)(fd, 0, time);
-	trace1(TR_nap, 1);
-	return;
-}
-
-#endif /* FASTTIMER */
-
-#if defined(BSD4_2) || defined(ATTSVR4)
 
 	/* nap(n) -- sleep for 'n' ticks of 1/60th sec each. */
 	/* This version uses the select system call */
 
 
-GLOBAL void
-nap(n)
-unsigned n;
+static void
+nap(unsigned int n)
 {
 	struct timeval tv;
-	int rc;
 
-	trace2(TR_nap, 0, n);
-	if (n==0) {
-		trace1(TR_nap, 1);
+	if (n == 0)
 		return;
-	}
 	tv.tv_sec = n/60;
 	tv.tv_usec = ((n%60)*1000000L)/60;
-	rc = select(32, 0, 0, 0, &tv);
-	trace1(TR_nap, 1);
-	return;
-}
-
-#endif /* BSD4_2 || ATTSVR4 */
-
-#ifdef NONAP
-
-/*	nap(n) where n is ticks
- *
- *	loop using n/HZ part of a second
- *	if n represents more than 1 second, then
- *	use sleep(time) where time is the equivalent
- *	seconds rounded off to full seconds
- *	NOTE - this is a rough approximation and chews up
- *	processor resource!
- */
-
-GLOBAL void
-nap(n)
-unsigned n;
-{
-	struct tms	tbuf;
-	long endtime;
-	int i;
-
-	trace2(TR_nap, 0, n);
-	if (n > HZ) {
-		/* > second, use sleep, rounding time */
-		sleep((int) (((n)+HZ/2)/HZ));
-		trace1(TR_nap, 1);
-		return;
-	}
-
-	/* use timing loop for < 1 second */
-	endtime = times(&tbuf) + 3*n/4;	/* use 3/4 because of scheduler! */
-	while (times(&tbuf) < endtime) {
-		for (i=0; i<1000; i++, (void) (i*i))
-		;
-	}
-	trace1(TR_nap, 1);
-	return;
-}
-
-#endif /* NONAP */
-
-/*
-
- * altconn - place a telephone call to system 
- * from cu when telephone number or direct line used
- *
- * return codes:
- *	FAIL - connection failed
- *	>0  - file no.  -  connect ok
- * When a failure occurs, Uerror is set.
- */
-GLOBAL int
-altconn(call)
-struct call *call;
-{
-	int fn = FAIL;
-	char *alt[7];
-	EXTERN char *Myline;
-
-	/*
-	 * replace the Systems file fields
-	 * needed for getto(); [F_TYPE] and
-	 * [F_PHONE] assignment below.
-	 */
-	alt[F_NAME] = "dummy";
-	alt[F_TIME] = "Any";
-	alt[F_TYPE] = "";
-	alt[F_CLASS] = call->speed;
-	alt[F_PHONE] = "";
-	alt[F_LOGIN] = "";
-	alt[6] = NULL;
-
-	trace1(TR_altconn, 0);
-	CDEBUG(4,"altconn called\r\n%s", "");
-
-	/* cu -l dev ...					*/
-	/* if is "/dev/device", strip off "/dev/" because must	*/
-	/* exactly match entries in Devices file, which usually	*/
-	/* omit the "/dev/".  if doesn't begin with "/dev/",	*/
-	/* either they've omitted the "/dev/" or it's a non-	*/
-	/* standard path name.  in either case, leave it as is	*/
-
-	if (call->line != NULL) {
-		if (strncmp(call->line, "/dev/", 5) == 0) {
-			Myline = (call->line + 5);
-		} else {
-			Myline = call->line;
-		}
-	}
-
-	/* cu  ... telno */
-	if (call->telno != NULL) {
-		alt[F_PHONE] = call->telno;
-		alt[F_TYPE] = "ACU";
-	} else {
-	/* cu direct line */
-		alt[F_TYPE] = "Direct";
-	}
-	if (call->type != NULL)
-		alt[F_TYPE] = call->type;
-	fn = getto(alt);
-	CDEBUG(4, "getto ret %d\n", fn);
-
-	trace1(TR_altconn, 1);
-	return (fn);
-
+	(void) select(32, 0, 0, 0, &tv);
 }

@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1985 by Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,35 +31,27 @@
 #include <rpcsvc/yppasswd.h>
 
 bool_t
-xdr_passwd(xdrsp, pw)
-	XDR *xdrsp;
-	struct passwd *pw;
+xdr_passwd(XDR *xdrsp, struct passwd *pw)
 {
-	if (xdr_wrapstring(xdrsp, &pw->pw_name) == 0)
+	if (!xdr_wrapstring(xdrsp, &pw->pw_name))
 		return (FALSE);
-	if (xdr_wrapstring(xdrsp, &pw->pw_passwd) == 0)
+	if (!xdr_wrapstring(xdrsp, &pw->pw_passwd))
 		return (FALSE);
-	if (xdr_int(xdrsp, (int *)&pw->pw_uid) == 0)
+	if (!xdr_int(xdrsp, (int *)&pw->pw_uid))
 		return (FALSE);
-	if (xdr_int(xdrsp, (int *)&pw->pw_gid) == 0)
+	if (!xdr_int(xdrsp, (int *)&pw->pw_gid))
 		return (FALSE);
-	if (xdr_wrapstring(xdrsp, &pw->pw_gecos) == 0)
+	if (!xdr_wrapstring(xdrsp, &pw->pw_gecos))
 		return (FALSE);
-	if (xdr_wrapstring(xdrsp, &pw->pw_dir) == 0)
+	if (!xdr_wrapstring(xdrsp, &pw->pw_dir))
 		return (FALSE);
-	if (xdr_wrapstring(xdrsp, &pw->pw_shell) == 0)
-		return (FALSE);
-	return (TRUE);
+	return (xdr_wrapstring(xdrsp, &pw->pw_shell));
 }
 
 bool_t
-xdr_yppasswd(xdrsp, pp)
-	XDR *xdrsp;
-	struct yppasswd *pp;
+xdr_yppasswd(XDR *xdrsp, struct yppasswd *pp)
 {
-	if (xdr_wrapstring(xdrsp, &pp->oldpass) == 0)
+	if (!xdr_wrapstring(xdrsp, &pp->oldpass))
 		return (FALSE);
-	if (xdr_passwd(xdrsp, &pp->newpw) == 0)
-		return (FALSE);
-	return (TRUE);
+	return (xdr_passwd(xdrsp, &pp->newpw));
 }

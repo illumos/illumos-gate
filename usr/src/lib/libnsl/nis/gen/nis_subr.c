@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -236,9 +237,8 @@ __get_local_names(void)
 	return (names);
 }
 
-static
-char *
-get_nis_domain()
+static char *
+get_nis_domain(void)
 {
 	directory_obj dobj;
 	enum __nsw_parse_err pserr;
@@ -282,7 +282,7 @@ __get_local_names1(void)
 		return (ln);
 	}
 	/* First call goes this way */
-	ln = (struct local_names *)calloc(1, sizeof (*ln));
+	ln = calloc(1, sizeof (*ln));
 	if (ln == NULL) {
 		syslog(LOG_ERR, "__get_local_names: Out of heap.");
 		return (NULL);
@@ -308,10 +308,10 @@ __get_local_names1(void)
 	if (ln->domain[0] != '.')
 		(void) strcat(ln->host, ".");
 	if ((ln->rpcdomain = get_nis_domain()) != NULL) {
-		strcat(ln->host, ln->rpcdomain);
+		(void) strcat(ln->host, ln->rpcdomain);
 	} else {
 		ln->rpcdomain = strdup(ln->domain);
-		strcat(ln->host, ln->domain);
+		(void) strcat(ln->host, ln->domain);
 	}
 
 	t = getenv("NIS_GROUP");
@@ -626,8 +626,9 @@ __nis_principal(char *principal_name, uid_t uid, char *directory)
 		return (NIS_BADNAME);
 	}
 
-	(void) sprintf(buf, "[auth_name=%d,auth_type=LOCAL],%s.%s",
-		uid, PKTABLE, directory);
+	(void) snprintf(buf, sizeof (buf),
+		"[auth_name=%d,auth_type=LOCAL],%s.%s",
+		(int)uid, PKTABLE, directory);
 
 	if (buf[strlen(buf)-1] != '.')
 		(void) strcat(buf, ".");
@@ -694,7 +695,7 @@ nis_local_principal(void)
 		sig_mutex_unlock(&local_principal_lock);
 		return (ln->host);
 	}
-	p = (struct principal_list *)calloc(1, sizeof (*p));
+	p = calloc(1, sizeof (*p));
 	if (p == NULL)
 		return (NULL);
 	if (!ln->principal_map) {
@@ -799,12 +800,12 @@ nis_clone_object_r(
 	int		status; /* a counter variable */
 	XDR		in_xdrs, out_xdrs;
 
-	if (! nis_get_static_storage(clone_buf_ptr, 1,
+	if (!nis_get_static_storage(clone_buf_ptr, 1,
 					    xdr_sizeof(xdr_nis_object, obj)))
 		return (NULL);
 
-	memset(&in_xdrs, 0, sizeof (in_xdrs));
-	memset(&out_xdrs, 0, sizeof (out_xdrs));
+	(void) memset(&in_xdrs, 0, sizeof (in_xdrs));
+	(void) memset(&out_xdrs, 0, sizeof (out_xdrs));
 	xdrmem_create(&in_xdrs, clone_buf_ptr->buf, clone_buf_ptr->size,
 			XDR_ENCODE);
 	xdrmem_create(&out_xdrs, clone_buf_ptr->buf, clone_buf_ptr->size,
@@ -812,10 +813,10 @@ nis_clone_object_r(
 
 	/* Allocate a basic NIS object structure */
 	if (dest) {
-		(void) memset((char *)dest, 0, sizeof (nis_object));
+		(void) memset(dest, 0, sizeof (nis_object));
 		result = dest;
 	} else
-		result = (nis_object *)calloc(1, sizeof (nis_object));
+		result = calloc(1, sizeof (nis_object));
 
 	if (result == NULL)
 		return (NULL);
@@ -912,8 +913,8 @@ __break_name(
 			s++;
 		}
 	}
-	pieces = (char **)calloc(components+1, sizeof (char *));
-	if (! pieces) {
+	pieces = calloc(components+1, sizeof (char *));
+	if (!pieces) {
 		free(data);
 		return (NULL);
 	}
@@ -1000,10 +1001,10 @@ nis_make_error(
 {
 	nis_result	*nres;
 
-	nres = (nis_result *)malloc(sizeof (nis_result));
+	nres = malloc(sizeof (nis_result));
 	if (!nres)
 		return ((nis_result *)&__nomem_nis_result);
-	(void) memset((char *)nres, 0, sizeof (nis_result));
+	(void) memset(nres, 0, sizeof (nis_result));
 	nres->status = err;
 	nres->aticks = aticks;
 	nres->zticks = zticks;
@@ -1033,8 +1034,8 @@ __cvt2attr(
 	nis_attr	*zattrs;
 	char		*s;
 
-	zattrs = (nis_attr *)calloc(*na, sizeof (nis_attr));
-	if (! zattrs)
+	zattrs = calloc(*na, sizeof (nis_attr));
+	if (!zattrs)
 		return (NULL);
 
 	for (i = 0; i < *na; i++) {
@@ -1066,7 +1067,7 @@ __cvt2attr(
 		 *	    existing databases.
 		 * ANSWER : Always return an error.
 		 */
-		if (! zattrs[i].ZVAL) {
+		if (!zattrs[i].ZVAL) {
 			free(zattrs);
 			return (NULL);
 		}
@@ -1129,7 +1130,7 @@ nis_get_request(
 				 * space within an attribute value
 				 */
 
-	(void) memset((char *)req, 0, sizeof (ib_request));
+	(void) memset(req, 0, sizeof (ib_request));
 
 	/*
 	 * if we're passed an object but no name, use the name from
@@ -1140,7 +1141,8 @@ nis_get_request(
 			sizeof (namebuf)) {
 			return (NIS_BADNAME);
 		}
-		(void) sprintf(namebuf, "%s.%s", obj->zo_name, obj->zo_domain);
+		(void) snprintf(namebuf, sizeof (namebuf),
+					"%s.%s", obj->zo_name, obj->zo_domain);
 		name = namebuf;
 	}
 	if (!name || (name[0] == '\0'))
@@ -1157,7 +1159,7 @@ nis_get_request(
 		s++; /* Point past the opening bracket */
 
 		datalen = strlen(s);
-		data = (char *)calloc(1, datalen+1);
+		data = calloc(1, datalen+1);
 		if (!data)
 			return (NIS_NOMEMORY);
 
@@ -1229,8 +1231,8 @@ nis_get_request(
 		if (zn) {
 			/* Save this as the table name */
 			req->ibr_name = strdup(t);
-			attr = (char **)calloc(zn+1, sizeof (char *));
-			if (! attr) {
+			attr = calloc(zn+1, sizeof (char *));
+			if (!attr) {
 				free(data);
 				free(req->ibr_name);
 				req->ibr_name = 0;
@@ -1260,7 +1262,7 @@ nis_get_request(
 		req->ibr_srch.ibr_srch_len = zn;
 		req->ibr_srch.ibr_srch_val = __cvt2attr(&zn, attr);
 		free(attr); /* don't need this any more */
-		if (! (req->ibr_srch.ibr_srch_val)) {
+		if (!(req->ibr_srch.ibr_srch_val)) {
 			req->ibr_srch.ibr_srch_len = 0;
 			free(req->ibr_name);
 			req->ibr_name = 0;
@@ -1306,8 +1308,8 @@ nis_read_obj(char *f)	/* name of the object to read */
 	XDR	xdrs;	/* An xdr stream handle */
 	nis_object	*res;
 
-	res = (nis_object *)calloc(1, sizeof (nis_object));
-	if (! res)
+	res = calloc(1, sizeof (nis_object));
+	if (!res)
 		return (NULL);
 
 	rootfile = fopen(f, "r");
@@ -1398,9 +1400,8 @@ __map_addr(
 	}
 	client = __nis_clnt_create(RPC_ANYFD, nc, uaddr, 0, 0,
 					RPCBPROG, RPCBVERS, ilen, olen);
-	if (! client) {
+	if (!client)
 		return (NULL);
-	}
 
 	(void) clnt_control(client, CLSET_FD_CLOSE, NULL);
 
@@ -1428,7 +1429,7 @@ __map_addr(
 	if (clnt_st == RPC_SUCCESS) {
 		clnt_destroy(client);
 		if (*ua == '\0') {
-			mem_free(ua, 1);
+			free(ua);
 			return (NULL);
 		}
 		res = strdup(ua);
@@ -1453,6 +1454,7 @@ __map_addr(
 		char			buf[32];
 
 		(void) clnt_control(client, CLGET_SVC_ADDR, (char *)&remote);
+		/* LINTED pointer cast */
 		sa = (struct sockaddr_in *)(remote.buf);
 		protocol = strcmp(nc->nc_proto, NC_TCP) ?
 				IPPROTO_UDP : IPPROTO_TCP;
@@ -1505,7 +1507,7 @@ __nis_get_callback_addresses(endpoint *ep, endpoint **ret_eps)
 	void *nch;
 	struct netconfig *nc;
 
-	eps = (endpoint *)malloc(MAX_EP * sizeof (endpoint));
+	eps = malloc(MAX_EP * sizeof (endpoint));
 	if (eps == 0)
 		return (0);
 
@@ -1612,7 +1614,7 @@ create_rpcgss_secctx(
 		}
 
 		/* RPC GSS service names are of the form svc@host.dom */
-		(void) sprintf(svc_name,
+		(void) snprintf(svc_name, sizeof (svc_name),
 				"%s@%s", gss_svc ? gss_svc : NIS_SVCNAME_NISD,
 				srv->name);
 
@@ -1630,7 +1632,7 @@ create_rpcgss_secctx(
 				return (NULL);
 			}
 
-			if (! VALID_MECH_ENTRY(mp)) {
+			if (!VALID_MECH_ENTRY(mp)) {
 				syslog(LOG_ERR,
 					"%s: invalid mechanism entry name '%s'",
 					NIS_SEC_CF_PATHNAME,
@@ -1647,9 +1649,9 @@ create_rpcgss_secctx(
 			 */
 			if (MECH_PK_TECH(mp) &&
 				((srv->key_type == NIS_PK_DHEXT &&
-					! __nis_dhext_extract_pkey(&(srv->pkey),
+					!__nis_dhext_extract_pkey(&(srv->pkey),
 					mp->keylen,  mp->algtype)) ||
-					! key_secretkey_is_set_g(mp->keylen,
+					!key_secretkey_is_set_g(mp->keylen,
 							mp->algtype))) {
 #ifdef DHEXT_DEBUG
 					(void) fprintf(stderr,
@@ -1811,7 +1813,7 @@ nis_make_rpchandle_gss_svc_ext(
 
 
 	nc_handle = (void *) setnetconfig();
-	if (! nc_handle)
+	if (!nc_handle)
 		return (NULL);
 
 	ep = srv->ep.ep_val;
@@ -1917,7 +1919,7 @@ nis_make_rpchandle_gss_svc_ext(
 	}
 
 	/* Done with the netconfig handle regardless */
-	endnetconfig(nc_handle);
+	(void) endnetconfig(nc_handle);
 
 	/* If we still don't have a client handle, we're sunk */
 	if (clnt == 0) {
@@ -1938,7 +1940,7 @@ nis_make_rpchandle_gss_svc_ext(
 	if (create_rpcgss_secctx(clnt, srv, gss_svc, &try_auth_des))
 		return (clnt);
 
-	if (! try_auth_des)
+	if (!try_auth_des)
 		/* XXXX what's the meaning of going into a switch stmt??? */
 		goto auth_sys;
 
@@ -2030,12 +2032,12 @@ nis_get_static_storage(
 	uint_t	sz;
 
 	sz = nel * el;
-	if (! bs)
+	if (!bs)
 		return (NULL);
 
-	if (! bs->buf) {
-		bs->buf = (void *) malloc(sz);
-		if (! bs->buf)
+	if (!bs->buf) {
+		bs->buf = malloc(sz);
+		if (!bs->buf)
 			return (NULL);
 		bs->size = sz;
 		sig_mutex_lock(&__nis_ss_used_lock);
@@ -2046,11 +2048,11 @@ nis_get_static_storage(
 
 		free(bs->buf);
 		size_delta = - (bs->size);
-		bs->buf = (void *) malloc(sz);
+		bs->buf = malloc(sz);
 
 		/* check the result of malloc() first	*/
 		/* then update the statistic.		*/
-		if (! bs->buf)
+		if (!bs->buf)
 			return (NULL);
 		bs->size = sz;
 		size_delta += sz;
@@ -2074,7 +2076,7 @@ nis_old_data_r(
 
 	buf = (char *)nis_get_static_storage(bs_ptr, 1, 1024);
 
-	if (! buf)
+	if (!buf)
 		return (NULL);
 
 	/*
@@ -2087,7 +2089,7 @@ nis_old_data_r(
 		len = strlen(s) + 1;
 		if (len >= sizeof (temp))
 			return (NULL);
-		(void) sprintf(temp, "/%s", s);
+		(void) snprintf(temp, sizeof (temp), "/%s", s);
 	}
 	if (len + strlen(__nis_data_directory) +
 		strlen(nis_leaf_of(nis_local_host())) >= bs_ptr->size)
@@ -2128,7 +2130,7 @@ nis_data_r(char *s, struct nis_sdata *bs_ptr)
 
 	buf = (char *)nis_get_static_storage(bs_ptr, 1, 1024);
 
-	if (! buf)
+	if (!buf)
 		return (NULL);
 
 	/*
@@ -2141,7 +2143,7 @@ nis_data_r(char *s, struct nis_sdata *bs_ptr)
 		len = strlen(s) + 1;
 		if (len >= sizeof (temp))
 			return (NULL);
-		(void) sprintf(temp, "/%s", s);
+		(void) snprintf(temp, sizeof (temp), "/%s", s);
 	}
 	if (len + strlen(__nis_data_directory) +
 		strlen(NIS_DIR) >= bs_ptr->size)
@@ -2208,7 +2210,7 @@ __nis_local_root(void)
 		sig_mutex_unlock(&local_root_lock);
 		return (local_root);
 	}
-	local_root = (nis_name)calloc(1, LN_BUFSIZE);
+	local_root = calloc(1, LN_BUFSIZE);
 
 	if (!local_root) {
 		sig_mutex_unlock(&local_root_lock);
@@ -2295,7 +2297,7 @@ __nis_cache_server_pkeys(directory_obj *dir) {
 		case NIS_PK_DH:
 			if (srv->pkey.n_len < sizeof (pkey) &&
 				host2netname(netname, srv->name, NULL)) {
-				memcpy(pkey, srv->pkey.n_bytes,
+				(void) memcpy(pkey, srv->pkey.n_bytes,
 					srv->pkey.n_len);
 				pkey[srv->pkey.n_len] = '\0';
 				__pkey_cache_add(netname, pkey, 192, 0);
@@ -2307,6 +2309,7 @@ __nis_cache_server_pkeys(directory_obj *dir) {
 			for (s = 0; s < srv->pkey.n_len; ) {
 				keylen_t	k, kpadlen;
 				algtype_t	a;
+				/* LINTED pointer cast */
 				key = (extdhkey_t *)&(srv->pkey.n_bytes[s]);
 				k = ntohs(key->keylen);
 				if (k == 0)

@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -45,24 +47,24 @@
 #include "rpc_parse.h"
 #include "rpc_util.h"
 
-extern pdeclaration();
-void printarglist();
+extern void pdeclaration(char *, declaration *, int, char *);
+extern void printarglist(proc_list *, char *, char *, char *);
 
+static void write_program(definition *);
+static void printbody(proc_list *);
 
 static char RESULT[] = "clnt_res";
 
-
-#define DEFAULT_TIMEOUT 25	/* in seconds */
-
+#define	DEFAULT_TIMEOUT 25	/* in seconds */
 
 void
-write_stubs()
+write_stubs(void)
 {
 	list *l;
 	definition *def;
 
 	f_print(fout,
-		"\n/* Default timeout can be changed using clnt_control() */\n");
+	    "\n/* Default timeout can be changed using clnt_control() */\n");
 	f_print(fout, "static struct timeval TIMEOUT = { %d, 0 };\n",
 		DEFAULT_TIMEOUT);
 	for (l = defined; l != NULL; l = l->next) {
@@ -73,9 +75,8 @@ write_stubs()
 	}
 }
 
-static
-write_program(def)
-	definition *def;
+static void
+write_program(definition *def)
 {
 	version_list *vp;
 	proc_list *proc;
@@ -110,10 +111,8 @@ write_program(def)
 
 /* sample addargname = "clnt"; sample addargtype = "CLIENT * " */
 
-void printarglist(proc, result, addargname, addargtype)
-	proc_list *proc;
-	char *result;
-	char* addargname, * addargtype;
+void
+printarglist(proc_list *proc, char *result, char *addargname, char *addargtype)
 {
 	bool_t oneway = streq(proc->res_type, "oneway");
 	decl_list *l;
@@ -123,9 +122,9 @@ void printarglist(proc, result, addargname, addargtype)
 		if (Cflag) {	/* C++ style heading */
 			f_print(fout, "(");
 			ptype(proc->args.decls->decl.prefix,
-			      proc->args.decls->decl.type, 1);
+						proc->args.decls->decl.type, 1);
 
-			if (mtflag) {/* Generate result field */
+			if (mtflag) {	/* Generate result field */
 				f_print(fout, "*argp, ");
 				if (!oneway) {
 					ptype(proc->res_prefix,
@@ -135,7 +134,8 @@ void printarglist(proc, result, addargname, addargtype)
 				f_print(fout, "%s%s)\n",
 					addargtype, addargname);
 			} else
-				f_print(fout, "*argp, %s%s)\n", addargtype, addargname);
+				f_print(fout, "*argp, %s%s)\n",
+					addargtype, addargname);
 		} else {
 			if (!mtflag)
 				f_print(fout, "(argp, %s)\n", addargname);
@@ -162,7 +162,7 @@ void printarglist(proc, result, addargname, addargtype)
 		/* newstyle, 0 argument */
 		if (mtflag) {
 			f_print(fout, "(");
-				
+
 			if (Cflag) {
 				if (!oneway) {
 					ptype(proc->res_prefix,
@@ -172,7 +172,7 @@ void printarglist(proc, result, addargname, addargtype)
 				f_print(fout, "%s%s)\n",
 				    addargtype, addargname);
 			} else
-				f_print(fout, "(%s)\n", addargname);			
+				f_print(fout, "(%s)\n", addargname);
 
 		} else
 		if (Cflag)
@@ -186,12 +186,12 @@ void printarglist(proc, result, addargname, addargtype)
 			for (l = proc->args.decls;  l != NULL; l = l->next)
 				f_print(fout, "%s, ", l->decl.name);
 			if (mtflag && !oneway)
-				f_print(fout, "%s, ", result); 
+				f_print(fout, "%s, ", result);
 
 			f_print(fout, "%s)\n", addargname);
 			for (l = proc->args.decls; l != NULL; l = l->next) {
 				pdeclaration(proc->args.argname,
-					     &l->decl, 1, ";\n");
+							&l->decl, 1, ";\n");
 			}
 			if (mtflag && !oneway) {
 				f_print(fout, "\t");
@@ -203,7 +203,7 @@ void printarglist(proc, result, addargname, addargtype)
 			f_print(fout, "(");
 			for (l = proc->args.decls; l != NULL; l = l->next) {
 				pdeclaration(proc->args.argname, &l->decl, 0,
-					     ", ");
+									", ");
 			}
 			if (mtflag && !oneway) {
 				ptype(proc->res_prefix, proc->res_type, 1);
@@ -221,8 +221,7 @@ void printarglist(proc, result, addargname, addargtype)
 
 
 static char *
-ampr(type)
-	char *type;
+ampr(char *type)
 {
 	if (isvectordef(type, REL_ALIAS)) {
 		return ("");
@@ -231,21 +230,17 @@ ampr(type)
 	}
 }
 
-static
-printbody(proc)
-	proc_list *proc;
+static void
+printbody(proc_list *proc)
 {
 	decl_list *l;
 	bool_t args2 = (proc->arg_num > 1);
-	int i;
 	bool_t oneway = streq(proc->res_type, "oneway");
 
 	/*
 	 * For new style with multiple arguments, need a structure in which
 	 *  to stuff the arguments.
 	 */
-	
-
 	if (newstyle && args2) {
 		f_print(fout, "\t%s", proc->args.argname);
 		f_print(fout, " arg;\n");
@@ -261,7 +256,7 @@ printbody(proc)
 			f_print(fout, "%s;\n", RESULT);
 			f_print(fout, "\n");
 			f_print(fout,
-			    "\tmemset((char *)%s%s, 0, sizeof (%s));\n",
+			    "\t(void) memset(%s%s, 0, sizeof (%s));\n",
 			    ampr(proc->res_type), RESULT, RESULT);
 
 		}
@@ -275,11 +270,11 @@ printbody(proc)
 				f_print(fout, "\t if ");
 
 			f_print(fout,
-			    "(clnt_call(clnt, %s,\n\t\t(xdrproc_t) xdr_void, ",
+			    "(clnt_call(clnt, %s,\n\t\t(xdrproc_t)xdr_void, ",
 			    proc->proc_name);
 			f_print(fout,
-			    "(caddr_t) NULL,\n\t\t(xdrproc_t) xdr_%s, "
-			    "(caddr_t) %s%s,",
+			    "NULL,\n\t\t(xdrproc_t)xdr_%s, "
+			    "(caddr_t)%s%s,",
 			    stringfix(proc->res_type),
 			    (mtflag)?"":ampr(proc->res_type),
 			    RESULT);
@@ -304,11 +299,11 @@ printbody(proc)
 			else
 				f_print(fout, "\tif ");
 			f_print(fout,
-			    "(clnt_call(clnt, %s,\n\t\t(xdrproc_t) xdr_%s",
+			    "(clnt_call(clnt, %s,\n\t\t(xdrproc_t)xdr_%s",
 			    proc->proc_name, proc->args.argname);
 			f_print(fout,
-			    ", (caddr_t) &arg,\n\t\t(xdrproc_t) xdr_%s, "
-			    "(caddr_t) %s%s,",
+			    ", (caddr_t)&arg,\n\t\t(xdrproc_t)xdr_%s, "
+			    "(caddr_t)%s%s,",
 			    stringfix(proc->res_type),
 			    (mtflag)?"":ampr(proc->res_type),
 			    RESULT);
@@ -321,9 +316,9 @@ printbody(proc)
 			if (!mtflag)
 				f_print(fout,
 				    "\tif (clnt_call(clnt, "
-				    "%s,\n\t\t(xdrproc_t) xdr_%s, "
-				    "(caddr_t) %s%s,\n\t\t(xdrproc_t) xdr_%s, "
-				    "(caddr_t) %s%s,\n\t\tTIMEOUT) != "
+				    "%s,\n\t\t(xdrproc_t)xdr_%s, "
+				    "(caddr_t)%s%s,\n\t\t(xdrproc_t)xdr_%s, "
+				    "(caddr_t)%s%s,\n\t\tTIMEOUT) != "
 				    "RPC_SUCCESS) {\n",
 				    proc->proc_name,
 				    stringfix(proc->args.decls->decl.type),
@@ -337,9 +332,9 @@ printbody(proc)
 			else
 				f_print(fout,
 				    "\treturn (clnt_call(clnt, "
-				    "%s,\n\t\t(xdrproc_t) xdr_%s, "
-				    "(caddr_t) %s%s,\n\t\t(xdrproc_t) xdr_%s, "
-				    "(caddr_t) %s%s,\n\t\tTIMEOUT));\n",
+				    "%s,\n\t\t(xdrproc_t)xdr_%s, "
+				    "(caddr_t)%s%s,\n\t\t(xdrproc_t)xdr_%s, "
+				    "(caddr_t)%s%s,\n\t\tTIMEOUT));\n",
 				    proc->proc_name,
 				    stringfix(proc->args.decls->decl.type),
 				    (newstyle ? "&" : ""),
@@ -368,7 +363,7 @@ printbody(proc)
 			f_print(fout, "%s;\n", RESULT);
 			f_print(fout, "\n");
 			f_print(fout,
-			    "\tmemset((char *)&%s, 0, sizeof (%s));\n",
+			    "\t(void) memset(&%s, 0, sizeof (%s));\n",
 			    RESULT, RESULT);
 
 		}
@@ -382,10 +377,9 @@ printbody(proc)
 				f_print(fout, "\t if ((%s = ", RESULT);
 
 			f_print(fout,
-			    "clnt_send(clnt, %s,\n\t\t(xdrproc_t) xdr_void, ",
+			    "clnt_send(clnt, %s,\n\t\t(xdrproc_t)xdr_void, ",
 			    proc->proc_name);
-			f_print(fout,
-			    "(caddr_t) NULL)");
+			f_print(fout, "NULL)");
 
 			if (mtflag)
 				f_print(fout, ");\n");
@@ -406,10 +400,10 @@ printbody(proc)
 			else
 				f_print(fout, "\tif ((%s =", RESULT);
 			f_print(fout,
-			    "clnt_send(clnt, %s,\n\t\t(xdrproc_t) xdr_%s",
+			    "clnt_send(clnt, %s,\n\t\t(xdrproc_t)xdr_%s",
 			    proc->proc_name, proc->args.argname);
 			f_print(fout,
-			    ", (caddr_t) &arg)");
+			    ", (caddr_t)&arg)");
 			if (mtflag)
 				f_print(fout, ");\n");
 			else
@@ -418,8 +412,8 @@ printbody(proc)
 			if (!mtflag)
 				f_print(fout,
 				    "\tif ((%s = clnt_send(clnt, "
-				    "%s,\n\t\t(xdrproc_t) xdr_%s, "
-				    "(caddr_t) %s%s)) != RPC_SUCCESS) {\n",
+				    "%s,\n\t\t(xdrproc_t)xdr_%s, "
+				    "(caddr_t)%s%s)) != RPC_SUCCESS) {\n",
 				    RESULT,
 				    proc->proc_name,
 				    stringfix(proc->args.decls->decl.type),
@@ -431,8 +425,8 @@ printbody(proc)
 
 				f_print(fout,
 				    "\treturn (clnt_send(clnt, "
-				    "%s,\n\t\t(xdrproc_t) xdr_%s, "
-				    "(caddr_t) %s%s));\n",
+				    "%s,\n\t\t(xdrproc_t)xdr_%s, "
+				    "(caddr_t)%s%s));\n",
 				    proc->proc_name,
 				    stringfix(proc->args.decls->decl.type),
 				    (newstyle ? "&" : ""),

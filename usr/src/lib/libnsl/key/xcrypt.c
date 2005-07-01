@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +42,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <rpc/rpc.h>
 #include <rpc/key_prot.h>   /* for KEYCHECKSUMSIZE */
 #include <rpc/des_crypt.h>
@@ -91,12 +91,9 @@ xencrypt(secret, passwd)
 	int err;
 	int len;
 
-	trace1(TR_xencrypt, 0);
 	len = (int)strlen(secret) / 2;
-	if (len > MAX_KEY_CRYPT_LEN) {
-		trace1(TR_xencrypt, 1);
+	if (len > MAX_KEY_CRYPT_LEN)
 		return (0);
-	}
 	buf = malloc((unsigned)len);
 	(void) hex2bin(len, secret, buf);
 	(void) passwd2des(passwd, key);
@@ -105,16 +102,13 @@ xencrypt(secret, passwd)
 	err = cbc_crypt(key, buf, len, DES_ENCRYPT | DES_HW, ivec);
 	if (DES_FAILED(err)) {
 		free(buf);
-		trace1(TR_xencrypt, 1);
 		return (0);
 	}
 	(void) bin2hex(len, (unsigned char *) buf, secret);
 	free(buf);
-	trace1(TR_xencrypt, 1);
 	return (1);
 #if 0
 /* EXPORT DELETE END */
-	trace1(TR_xencrypt, 1);
 	return (0);
 /* EXPORT DELETE START */
 #endif
@@ -138,12 +132,9 @@ xdecrypt(secret, passwd)
 	int err;
 	int len;
 
-	trace1(TR_xdecrypt, 0);
 	len = (int)strlen(secret) / 2;
-	if (len > MAX_KEY_CRYPT_LEN) {
-		trace1(TR_xdecrypt, 1);
+	if (len > MAX_KEY_CRYPT_LEN)
 		return (0);
-	}
 	buf = malloc((unsigned)len);
 
 	(void) hex2bin(len, secret, buf);
@@ -153,16 +144,13 @@ xdecrypt(secret, passwd)
 	err = cbc_crypt(key, buf, len, DES_DECRYPT | DES_HW, ivec);
 	if (DES_FAILED(err)) {
 		free(buf);
-		trace1(TR_xdecrypt, 1);
 		return (0);
 	}
 	(void) bin2hex(len, (unsigned char *) buf, secret);
 	free(buf);
-	trace1(TR_xdecrypt, 1);
 	return (1);
 #if 0
 /* EXPORT DELETE END */
-	trace1(TR_xdecrypt, 1);
 	return (0);
 /* EXPORT DELETE START */
 #endif
@@ -179,13 +167,11 @@ passwd2des(pw, key)
 {
 	int i;
 
-	trace1(TR_passwd2des, 0);
 	(void) memset(key, 0, 8);
 	for (i = 0; *pw; i = (i+1) % 8) {
 		key[i] ^= *pw++ << 1;
 	}
 	des_setparity(key);
-	trace1(TR_passwd2des, 1);
 	return (1);
 }
 
@@ -201,12 +187,10 @@ hex2bin(len, hexnum, binnum)
 {
 	int i;
 
-	trace2(TR_hex2bin, 0, len);
 	for (i = 0; i < len; i++) {
 		*binnum++ = 16 * hexval(hexnum[2 * i]) +
 					hexval(hexnum[2 * i + 1]);
 	}
-	trace1(TR_hex2bin, 1);
 	return (1);
 }
 
@@ -222,14 +206,12 @@ bin2hex(len, binnum, hexnum)
 	int i;
 	unsigned val;
 
-	trace2(TR_bin2hex, 0, len);
 	for (i = 0; i < len; i++) {
 		val = binnum[i];
 		hexnum[i*2] = hex[val >> 4];
 		hexnum[i*2+1] = hex[val & 0xf];
 	}
 	hexnum[len*2] = 0;
-	trace1(TR_bin2hex, 1);
 	return (1);
 }
 
@@ -242,18 +224,13 @@ static char
 hexval(c)
 	char c;
 {
-	trace1(TR_hexval, 0);
 	if (c >= '0' && c <= '9') {
-		trace1(TR_hexval, 1);
 		return (c - '0');
 	} else if (c >= 'a' && c <= 'z') {
-		trace1(TR_hexval, 1);
 		return (c - 'a' + 10);
 	} else if (c >= 'A' && c <= 'Z') {
-		trace1(TR_hexval, 1);
 		return (c - 'A' + 10);
 	} else {
-		trace1(TR_hexval, 1);
 		return (-1);
 	}
 }
@@ -300,12 +277,8 @@ xencrypt_g(
 		hexkeybytes + 1;
 	char *hexkeybuf;
 
-	trace1(TR_xencrypt_g, 0);
-
-	if (!secret || !keylen || !passwd || !encrypted_secret) {
-		trace1(TR_xencrypt_g, 1);
+	if (!secret || !keylen || !passwd || !encrypted_secret)
 		return (0);
-	}
 
 	if ((hexkeybuf = malloc(bufsize)) == 0)
 		return (0);
@@ -336,7 +309,6 @@ xencrypt_g(
 
 	if (binkeybytes > MAX_KEY_CRYPT_LEN) {
 		free(hexkeybuf);
-		trace1(TR_xencrypt_g, 1);
 		return (0);
 	}
 	if ((binkeybuf = malloc((unsigned)binkeybytes)) == 0) {
@@ -363,17 +335,14 @@ xencrypt_g(
 	if (DES_FAILED(err)) {
 		free(hexkeybuf);
 		free(binkeybuf);
-		trace1(TR_xencrypt_g, 1);
 		return (0);
 	}
 	(void) bin2hex(binkeybytes, (unsigned char *) binkeybuf, hexkeybuf);
 	free(binkeybuf);
 	*encrypted_secret = hexkeybuf;
-	trace1(TR_xencrypt_g, 1);
 	return (1);
 #if 0
 /* EXPORT DELETE END */
-	trace1(TR_xencrypt_g, 1);
 	return (0);
 /* EXPORT DELETE START */
 #endif
@@ -415,12 +384,9 @@ xdecrypt_g(
 	const int hexkeybytes = BITS2NIBBLES(keylen);
 	const int keychecksumsize = classic_des ? KEYCHECKSUMSIZE : MD5HEXSIZE;
 
-	trace1(TR_xdecrypt_g, 0);
 	len = (int)strlen(secret) / 2;
-	if (len > MAX_KEY_CRYPT_LEN) {
-		trace1(TR_xdecrypt_g, 1);
+	if (len > MAX_KEY_CRYPT_LEN)
 		return (0);
-	}
 	if ((buf = malloc((unsigned)len)) == 0)
 		return (0);
 
@@ -433,7 +399,6 @@ xdecrypt_g(
 					(int)strlen(netname), &key, FALSE);
 		else {
 			free(buf);
-			trace1(TR_xdecrypt_g, 1);
 			return (0);
 		}
 	(void) memset(ivec, 0, 8);
@@ -441,7 +406,6 @@ xdecrypt_g(
 	err = cbc_crypt(key.c, buf, len, DES_DECRYPT | DES_HW, ivec);
 	if (DES_FAILED(err)) {
 		free(buf);
-		trace1(TR_xdecrypt_g, 1);
 		return (0);
 	}
 	(void) bin2hex(len, (unsigned char *) buf, secret);
@@ -452,7 +416,6 @@ xdecrypt_g(
 			if (memcmp(secret, &(secret[hexkeybytes]),
 					keychecksumsize) != 0) {
 				secret[0] = 0;
-				trace1(TR_xdecrypt_g, 1);
 				return (0);
 			}
 		} else {
@@ -470,20 +433,17 @@ xdecrypt_g(
 
 			/* does the digest match the appended one? */
 			if (memcmp(&(secret[hexkeybytes]),
-					(void *)md5hexbuf, MD5HEXSIZE) != 0) {
+					md5hexbuf, MD5HEXSIZE) != 0) {
 				secret[0] = 0;
-				trace1(TR_xdecrypt_g, 1);
 				return (0);
 			}
 		}
 
 	secret[hexkeybytes] = '\0';
 
-	trace1(TR_xdecrypt_g, 1);
 	return (1);
 #if 0
 /* EXPORT DELETE END */
-	trace1(TR_xdecrypt_g, 1);
 	return (0);
 /* EXPORT DELETE START */
 #endif
@@ -513,7 +473,6 @@ passwd2des_g(
 	char *text;
 	int  plen, tlen;
 
-	trace1(TR_passwd2des, 0);
 	(void) memset(tkey.c, 0, 8);
 	(void) memset(ivec.c, 0, 8);
 
@@ -528,13 +487,13 @@ passwd2des_g(
 #define	KEYLEN sizeof (tkey.c)
 	plen = strlen(pw);
 	tlen = ((plen + len + (KEYLEN-1))/KEYLEN)*KEYLEN;
-	if ((text = (char *)malloc(tlen)) == NULL) {
+	if ((text = malloc(tlen)) == NULL) {
 		return (0);
 	}
 
 	(void) memset(text, 0, tlen);
 
-	if (! altalg) {
+	if (!altalg) {
 
 /*
  * Concatenate the password and the mix-in string, fan-fold and XOR them
@@ -616,7 +575,6 @@ passwd2des_g(
 
 	(void) memcpy((*key).c, ivec.c, sizeof (ivec.c));
 
-	trace1(TR_passwd2des_g, 1);
 	return (1);
 
 }
@@ -656,15 +614,11 @@ weak_DES_key(des_block db)
 {
 	int i;
 
-	trace1(TR_weak_DES_key, 0);
 	for (i = 0; i < sizeof (weakDESkeys)/sizeof (struct DESkey); i++) {
 		if (weakDESkeys[i].h1 == db.key.high &&
-			weakDESkeys[i].h2 == db.key.low) {
-			trace1(TR_weak_DES_key, 1);
+			weakDESkeys[i].h2 == db.key.low)
 			return (1);
-		}
 	}
 
-	trace1(TR_weak_DES_key, 1);
 	return (0);
 }

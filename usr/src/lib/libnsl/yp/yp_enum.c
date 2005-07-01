@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,16 +36,14 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	NULL 0
+#include <stdlib.h>
+#include <unistd.h>
 #include <rpc/rpc.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include "yp_b.h"
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/ypclnt.h>
 #include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
 
 extern int __yp_dobind_cflookup(char *, struct dom_binding **, int);
 
@@ -74,28 +74,20 @@ __yp_first_cflookup(
 	struct dom_binding *pdomb;
 	int reason;
 
-	trace1(TR_yp_first, 0);
-	if ((map == NULL) || (domain == NULL)) {
-		trace1(TR_yp_first, 1);
+	if ((map == NULL) || (domain == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	domlen =  strlen(domain);
 	maplen =  strlen(map);
 
 	if ((domlen == 0) || (domlen > YPMAXDOMAIN) ||
-	    (maplen == 0) || (maplen > YPMAXMAP)) {
-		trace1(TR_yp_first, 1);
+	    (maplen == 0) || (maplen > YPMAXMAP))
 		return (YPERR_BADARGS);
-	}
 
 	for (;;) {
 
-		if (reason = __yp_dobind_cflookup(domain, &pdomb,
-						    hardlookup)) {
-			trace1(TR_yp_first, 1);
+		if (reason = __yp_dobind_cflookup(domain, &pdomb, hardlookup))
 			return (reason);
-		}
 
 		if (pdomb->dom_binding->ypbind_hi_vers == YPVERS) {
 
@@ -108,19 +100,15 @@ __yp_first_cflookup(
 				yp_unbind(domain);
 				if (hardlookup)
 					(void) _sleep(_ypsleeptime); /* retry */
-				else {
-					trace1(TR_yp_match, 1);
+				else
 					return (reason);
-				}
 			} else
 				break;
 		} else {
 			__yp_rel_binding(pdomb);
-			trace1(TR_yp_first, 1);
 			return (YPERR_VERS);
 		}
 	}
-	trace1(TR_yp_first, 1);
 	return (reason);
 }
 
@@ -157,7 +145,6 @@ dofirst(domain, map, pdomb, timeout, key, keylen, val, vallen)
 	struct ypresp_key_val resp;
 	unsigned int retval = 0;
 
-	trace1(TR_dofirst, 0);
 	req.domain = domain;
 	req.map = map;
 	resp.keydat.dptr = resp.valdat.dptr = NULL;
@@ -177,10 +164,8 @@ dofirst(domain, map, pdomb, timeout, key, keylen, val, vallen)
 	case RPC_SUCCESS:
 		break;
 	case RPC_TIMEDOUT:
-		trace1(TR_dofirst, 1);
 		return (YPERR_YPSERV);
 	default:
-		trace1(TR_dofirst, 1);
 		return (YPERR_RPC);
 	}
 
@@ -198,7 +183,7 @@ dofirst(domain, map, pdomb, timeout, key, keylen, val, vallen)
 
 			if ((*val = malloc(
 			    (size_t)resp.valdat.dsize + 2)) == NULL) {
-				free((char *)*key);
+				free(*key);
 				retval = YPERR_RESRC;
 			}
 
@@ -225,7 +210,6 @@ dofirst(domain, map, pdomb, timeout, key, keylen, val, vallen)
 
 	CLNT_FREERES(pdomb->dom_client,
 		(xdrproc_t)xdr_ypresp_key_val, (char *)&resp);
-	trace1(TR_dofirst, 1);
 	return (retval);
 }
 
@@ -255,27 +239,19 @@ __yp_next_cflookup(
 	int reason;
 
 
-	trace1(TR_yp_next, 0);
-	if ((map == NULL) || (domain == NULL) || (inkey == NULL)) {
-		trace1(TR_yp_next, 1);
+	if ((map == NULL) || (domain == NULL) || (inkey == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	domlen =  strlen(domain);
 	maplen =  strlen(map);
 
 	if ((domlen == 0) || (domlen > YPMAXDOMAIN) ||
-	    (maplen == 0) || (maplen > YPMAXMAP)) {
-		trace1(TR_yp_next, 1);
+	    (maplen == 0) || (maplen > YPMAXMAP))
 		return (YPERR_BADARGS);
-	}
 
 	for (;;) {
-		if (reason = __yp_dobind_cflookup(domain, &pdomb,
-						hardlookup)) {
-			trace1(TR_yp_next, 1);
+		if (reason = __yp_dobind_cflookup(domain, &pdomb, hardlookup))
 			return (reason);
-		}
 
 		if (pdomb->dom_binding->ypbind_hi_vers == YPVERS) {
 
@@ -289,20 +265,16 @@ __yp_next_cflookup(
 				yp_unbind(domain);
 				if (hardlookup)
 					(void) _sleep(_ypsleeptime); /* retry */
-				else {
-					trace1(TR_yp_match, 1);
+				else
 					return (reason);
-				}
 			} else
 				break;
 		} else {
 			__yp_rel_binding(pdomb);
-			trace1(TR_yp_next, 1);
 			return (YPERR_VERS);
 		}
 	}
 
-	trace1(TR_yp_next, 1);
 	return (reason);
 }
 
@@ -345,7 +317,6 @@ donext(domain, map, inkey, inkeylen, pdomb, timeout, outkey, outkeylen,
 	struct ypresp_key_val resp;
 	unsigned int retval = 0;
 
-	trace2(TR_donext, 0, inkeylen);
 	req.domain = domain;
 	req.map = map;
 	req.keydat.dptr = inkey;
@@ -366,10 +337,8 @@ donext(domain, map, inkey, inkeylen, pdomb, timeout, outkey, outkeylen,
 	case RPC_SUCCESS:
 		break;
 	case RPC_TIMEDOUT:
-		trace1(TR_dofirst, 1);
 		return (YPERR_YPSERV);
 	default:
-		trace1(TR_dofirst, 1);
 		return (YPERR_RPC);
 	}
 
@@ -387,7 +356,7 @@ donext(domain, map, inkey, inkeylen, pdomb, timeout, outkey, outkeylen,
 
 			if ((*val = malloc((size_t)
 			    resp.valdat.dsize + 2)) == NULL) {
-				free((char *)*outkey);
+				free(*outkey);
 				retval = YPERR_RESRC;
 			}
 
@@ -414,6 +383,5 @@ donext(domain, map, inkey, inkeylen, pdomb, timeout, outkey, outkeylen,
 
 	CLNT_FREERES(pdomb->dom_client, (xdrproc_t)xdr_ypresp_key_val,
 		    (char *)&resp);
-	trace1(TR_donext, 1);
 	return (retval);
 }

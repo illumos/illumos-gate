@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -41,7 +43,6 @@
 #include "rpc_mt.h"
 #include <rpc/rpc.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <stdlib.h>
 
 /*
@@ -97,19 +98,15 @@ static struct authsvc *Auths = NULL;
  * invalid.
  */
 enum auth_stat
-__gss_authenticate(rqst, msg, no_dispatch)
-	struct svc_req *rqst;
-	struct rpc_msg *msg;
-	bool_t *no_dispatch;
+__gss_authenticate(struct svc_req *rqst, struct rpc_msg *msg,
+							bool_t *no_dispatch)
 {
 	int cred_flavor;
 	struct authsvc *asp;
-	enum auth_stat dummy;
 	extern mutex_t authsvc_lock;
 
 /* VARIABLES PROTECTED BY authsvc_lock: asp, Auths */
 
-	trace1(TR___gss_authenticate, 0);
 	rqst->rq_cred = msg->rm_call.cb_cred;
 	rqst->rq_xprt->xp_verf.oa_flavor = _null_auth.oa_flavor;
 	rqst->rq_xprt->xp_verf.oa_length = 0;
@@ -117,46 +114,32 @@ __gss_authenticate(rqst, msg, no_dispatch)
 	*no_dispatch = FALSE;
 	switch (cred_flavor) {
 	case AUTH_NULL:
-		dummy = __svcauth_null(rqst, msg);
-		trace1(TR___gss_authenticate, 1);
-		return (dummy);
+		return (__svcauth_null(rqst, msg));
 	case AUTH_SYS:
-		dummy = __svcauth_sys(rqst, msg);
-		trace1(TR___gss_authenticate, 1);
-		return (dummy);
+		return (__svcauth_sys(rqst, msg));
 	case AUTH_SHORT:
-		dummy = __svcauth_short(rqst, msg);
-		trace1(TR___gss_authenticate, 1);
-		return (dummy);
+		return (__svcauth_short(rqst, msg));
 	case AUTH_DES:
-		dummy = __svcauth_des(rqst, msg);
-		trace1(TR___gss_authenticate, 1);
-		return (dummy);
+		return (__svcauth_des(rqst, msg));
 	case AUTH_LOOPBACK:
-		dummy = __svcauth_loopback(rqst, msg);
-		trace1(TR___gss_authenticate, 1);
-		return (dummy);
+		return (__svcauth_loopback(rqst, msg));
 	case RPCSEC_GSS:
-		dummy = __svcrpcsec_gss(rqst, msg, no_dispatch);
-		trace1(TR___gss_authenticate, 1);
-		return (dummy);
+		return (__svcrpcsec_gss(rqst, msg, no_dispatch));
 	}
 
 	/* flavor doesn't match any of the builtin types, so try new ones */
-	mutex_lock(&authsvc_lock);
+	(void) mutex_lock(&authsvc_lock);
 	for (asp = Auths; asp; asp = asp->next) {
 		if (asp->flavor == cred_flavor) {
 			enum auth_stat as;
 
 			as = (*asp->handler)(rqst, msg);
-			mutex_unlock(&authsvc_lock);
-			trace1(TR___gss_authenticate, 1);
+			(void) mutex_unlock(&authsvc_lock);
 			return (as);
 		}
 	}
-	mutex_unlock(&authsvc_lock);
+	(void) mutex_unlock(&authsvc_lock);
 
-	trace1(TR___gss_authenticate, 1);
 	return (AUTH_REJECTEDCRED);
 }
 
@@ -165,29 +148,17 @@ __gss_authenticate(rqst, msg, no_dispatch)
  * backward compatibility.
  */
 enum auth_stat
-__authenticate(rqst, msg)
-	struct svc_req *rqst;
-	struct rpc_msg *msg;
+__authenticate(struct svc_req *rqst, struct rpc_msg *msg)
 {
 	bool_t no_dispatch;
-	enum auth_stat st;
 
-	trace1(TR___authenticate, 0);
-
-	st = __gss_authenticate(rqst, msg, &no_dispatch);
-
-	trace1(TR___authenticate, 1);
-	return (st);
+	return (__gss_authenticate(rqst, msg, &no_dispatch));
 }
 
 /*ARGSUSED*/
 enum auth_stat
-__svcauth_null(rqst, msg)
-	struct svc_req *rqst;
-	struct rpc_msg *msg;
+__svcauth_null(struct svc_req *rqst, struct rpc_msg *msg)
 {
-	trace1(TR___svcauth_null, 0);
-	trace1(TR___svcauth_null, 1);
 	return (AUTH_OK);
 }
 
@@ -206,50 +177,40 @@ __svcauth_null(rqst, msg)
  */
 
 int
-svc_auth_reg(cred_flavor, handler)
-	int cred_flavor;
-	enum auth_stat (*handler)();
+svc_auth_reg(int cred_flavor, enum auth_stat (*handler)())
 {
 	struct authsvc *asp;
 	extern mutex_t authsvc_lock;
 
-	trace2(TR_svc_auth_reg, 0, cred_flavor);
 	switch (cred_flavor) {
-	    case AUTH_NULL:
-	    case AUTH_SYS:
-	    case AUTH_SHORT:
-	    case AUTH_DES:
-	    case AUTH_LOOPBACK:
-	    case RPCSEC_GSS:
+	case AUTH_NULL:
+	case AUTH_SYS:
+	case AUTH_SHORT:
+	case AUTH_DES:
+	case AUTH_LOOPBACK:
+	case RPCSEC_GSS:
 		/* already registered */
-		trace1(TR_svc_auth_reg, 1);
 		return (1);
-
-	    default:
-		mutex_lock(&authsvc_lock);
-		for (asp = Auths; asp; asp = asp->next) {
-			if (asp->flavor == cred_flavor) {
-				/* already registered */
-				mutex_unlock(&authsvc_lock);
-				trace1(TR_svc_auth_reg, 1);
-				return (1);
-			}
-		}
-
-		/* this is a new one, so go ahead and register it */
-		asp = (struct authsvc *)mem_alloc(sizeof (*asp));
-		if (asp == NULL) {
-			mutex_unlock(&authsvc_lock);
-			trace1(TR_svc_auth_reg, 1);
-			return (-1);
-		}
-		asp->flavor = cred_flavor;
-		asp->handler = handler;
-		asp->next = Auths;
-		Auths = asp;
-		mutex_unlock(&authsvc_lock);
-		break;
 	}
-	trace1(TR_svc_auth_reg, 1);
+	(void) mutex_lock(&authsvc_lock);
+	for (asp = Auths; asp; asp = asp->next) {
+		if (asp->flavor == cred_flavor) {
+			/* already registered */
+			(void) mutex_unlock(&authsvc_lock);
+			return (1);
+		}
+	}
+
+	/* this is a new one, so go ahead and register it */
+	asp = malloc(sizeof (*asp));
+	if (asp == NULL) {
+		(void) mutex_unlock(&authsvc_lock);
+		return (-1);
+	}
+	asp->flavor = cred_flavor;
+	asp->handler = handler;
+	asp->next = Auths;
+	Auths = asp;
+	(void) mutex_unlock(&authsvc_lock);
 	return (0);
 }

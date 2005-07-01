@@ -19,6 +19,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -377,7 +378,6 @@ f none usr/include/rpc/svc.h 644 root bin
 f none usr/include/rpc/svc_auth.h 644 root bin
 f none usr/include/rpc/svc_mt.h 644 root bin
 f none usr/include/rpc/svc_soc.h 644 root bin
-f none usr/include/rpc/trace.h 644 root bin
 f none usr/include/rpc/types.h 644 root bin
 f none usr/include/rpc/xdr.h 644 root bin
 d none usr/include/rpcsvc 755 root bin

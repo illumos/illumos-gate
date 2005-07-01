@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +35,6 @@
 #include "mt.h"
 #include "rpc_mt.h"
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <sys/poll.h>
 #include <syslog.h>

@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -33,7 +35,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 
 /*
  * This file should only contain common data (global data) that is exported

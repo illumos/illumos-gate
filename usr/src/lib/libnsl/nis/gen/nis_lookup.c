@@ -19,10 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	nis_lookup.c
- *
- * Copyright 1988-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,7 +67,7 @@ extern int __nis_debug_rpc;
 nis_result *
 __nis_remote_lookup(
 	ib_request	*req,		/* name parameters		*/
-	u_int		flags,		/* user flags			*/
+	uint_t		flags,		/* user flags			*/
 	int		list_op,	/* list semantics 		*/
 	void		*cbdata,	/* Callback data		*/
 	int		(*cback)())	/* Callback (for list calls) 	*/
@@ -92,7 +91,7 @@ __nis_remote_lookup(
 	 *  copy of the request so that we can reuse it while
 	 *  following links (without clobbering the callers copy).
 	 */
-	res = (nis_result *)malloc(sizeof (nis_result));
+	res = malloc(sizeof (nis_result));
 	if (res == NULL)
 		return (NULL);
 	local_req = *req;
@@ -218,7 +217,7 @@ call_done:
 				nis_freeresult(link_res);
 			}
 			link_res = res;
-			res = (nis_result *)malloc(sizeof (nis_result));
+			res = malloc(sizeof (nis_result));
 			if (res == NULL) {
 				nis_freeresult(link_res);
 				return (NULL);
@@ -265,7 +264,7 @@ call_done:
 nis_result *
 __nis_core_lookup(
 	ib_request	*req,		/* name parameters		*/
-	u_int		flags,		/* user flags			*/
+	uint_t		flags,		/* user flags			*/
 	int		list_op,	/* list semantics 		*/
 	void		*cbdata,	/* Callback data		*/
 	int		(*cback)())	/* Callback (for list calls) 	*/
@@ -282,7 +281,7 @@ __nis_finddirectory_remote(nis_bound_directory **binding, char *dname)
 	fd_result *res;
 	nis_call_state state;
 
-	res = (fd_result *)calloc(1, sizeof (fd_result));
+	res = calloc(1, sizeof (fd_result));
 	if (res == NULL)
 		return (NULL);
 

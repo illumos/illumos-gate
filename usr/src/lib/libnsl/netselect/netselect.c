@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,11 +39,12 @@
 #include "../rpc/rpc_mt.h"		/* for MT declarations only */
 #include <rpc/types.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <rpc/trace.h>
 #include <netconfig.h>
 #include <malloc.h>
+#include <libintl.h>
 #include <syslog.h>
 #include "netcspace.h"
 #include "nsl_stdio_prv.h"
@@ -53,30 +55,22 @@
  *	Local routines used by the library procedures
  */
 
-static int blank();
-static int comment();
-static struct netconfig *fgetnetconfig();
-static void netconfig_free();
-static unsigned int getflag();
-static char **getlookups();
-static struct netconfig **getnetlist();
-static unsigned int getnlookups();
-static char *gettoken();
-static unsigned int getvalue();
-static void shift1left();
-static void netlist_free();
-static void free_entry();
-static struct netconfig *netconfig_dup();
-
-/*
- *	System V routines used by the library procedures.
- */
-extern char *getenv();
-
-/* messaging stuff. */
+static int blank(char *);
+static int comment(char *);
+static struct netconfig *fgetnetconfig(__NSL_FILE *, char *);
+static void netconfig_free(struct netconfig *);
+static unsigned int getflag(char *);
+static char **getlookups(char *);
+static struct netconfig **getnetlist(void);
+static unsigned int getnlookups(char *);
+static char *gettoken(char *, int);
+static unsigned int getvalue(char *, struct nc_data nc_data[]);
+static void shift1left(char *);
+static void netlist_free(struct netconfig ***);
+static void free_entry(void *);
+static struct netconfig *netconfig_dup(struct netconfig *);
 
 extern const char __nsl_dom[];
-extern char *dgettext(const char *, const char *);
 
 /*
  *	Static global variables used by the library procedures:
@@ -109,7 +103,7 @@ static int fieldnum = 0;		/* "owned" by fgetnetconfig() */
 
 
 static int *
-__nc_error()
+__nc_error(void)
 {
 	static pthread_key_t nc_error_key = 0;
 	static int nc_error = NC_NOERROR;
@@ -130,26 +124,22 @@ __nc_error()
  */
 
 void *
-setnetconfig()
+setnetconfig(void)
 {
 	NCONF_HANDLE *retp;
 
-	trace1(TR_setnetconfig, 0);
-	mutex_lock(&netpp_mutex);
+	(void) mutex_lock(&netpp_mutex);
 	if ((netpp == NULL) && ((netpp = getnetlist()) == NULL)) {
-		mutex_unlock(&netpp_mutex);
-		trace1(TR_setnetconfig, 1);
+		(void) mutex_unlock(&netpp_mutex);
 		return (NULL);
 	}
-	mutex_unlock(&netpp_mutex);
-	if ((retp = (NCONF_HANDLE *) malloc(sizeof (NCONF_HANDLE))) == NULL) {
+	(void) mutex_unlock(&netpp_mutex);
+	if ((retp = malloc(sizeof (NCONF_HANDLE))) == NULL) {
 		nc_error = NC_NOMEM;
-		trace1(TR_setnetconfig, 1);
 		return (NULL);
 	}
 	nc_error = NC_NOERROR;
 	retp->nc_head = retp->nc_curr = netpp;
-	trace1(TR_setnetconfig, 1);
 	return ((void *)retp);
 }
 
@@ -158,24 +148,20 @@ setnetconfig()
  */
 
 int
-endnetconfig(vdata)
-void  *vdata;
+endnetconfig(void *vdata)
 {
 	NCONF_HANDLE *nconf_handlep = (NCONF_HANDLE *)vdata;
 
-	trace1(TR_endnetconfig, 0);
-	mutex_lock(&netpp_mutex);
+	(void) mutex_lock(&netpp_mutex);
 	if (netpp == NULL || nconf_handlep == NULL) {
 		nc_error = NC_NOSET;
-		mutex_unlock(&netpp_mutex);
-		trace1(TR_endnetconfig, 1);
+		(void) mutex_unlock(&netpp_mutex);
 		return (-1);
 	}
-	mutex_unlock(&netpp_mutex);
+	(void) mutex_unlock(&netpp_mutex);
 
 	nc_error = NC_NOERROR;
-	free((void *)nconf_handlep);
-	trace1(TR_endnetconfig, 1);
+	free(nconf_handlep);
 	return (0);
 }
 
@@ -189,22 +175,19 @@ void  *vdata;
  */
 
 struct netconfig *
-getnetconfig(vdata)
-void *vdata;
+getnetconfig(void *vdata)
 {
 	NCONF_HANDLE *nconf_handlep = (NCONF_HANDLE *)vdata;
 	struct netconfig *retp;  /* holds the return value */
 	int ipv6_present = -1;
 
-	trace1(TR_getnetconfig, 0);
-	mutex_lock(&netpp_mutex);
+	(void) mutex_lock(&netpp_mutex);
 	if ((netpp == NULL) || (nconf_handlep == NULL)) {
 		nc_error = NC_NOSET;
-		mutex_unlock(&netpp_mutex);
-		trace1(TR_getnetconfig, 1);
+		(void) mutex_unlock(&netpp_mutex);
 		return (NULL);
 	}
-	mutex_unlock(&netpp_mutex);
+	(void) mutex_unlock(&netpp_mutex);
 	for (;;) {
 		retp = *(nconf_handlep->nc_curr);
 		if (retp && (strcmp(retp->nc_netid, "udp6") == 0 ||
@@ -224,7 +207,6 @@ void *vdata;
 	} else {
 		nc_error = NC_NOMOREENTRIES;
 	}
-	trace1(TR_getnetconfig, 1);
 	return (retp);
 }
 
@@ -237,20 +219,17 @@ void *vdata;
  */
 
 struct netconfig *
-getnetconfigent(netid)
-const char *netid;
+getnetconfigent(const char *netid)
 {
 	struct netconfig **tpp;
 	int ipv6_present;
 
-	trace1(TR_getnetconfigent, 0);
-	mutex_lock(&netpp_mutex);
+	(void) mutex_lock(&netpp_mutex);
 	if ((netpp == NULL) && ((netpp = getnetlist()) == NULL)) {
-		mutex_unlock(&netpp_mutex);
-		trace1(TR_getnetconfigent, 1);
+		(void) mutex_unlock(&netpp_mutex);
 		return (NULL);
 	}
-	mutex_unlock(&netpp_mutex);
+	(void) mutex_unlock(&netpp_mutex);
 	for (tpp = netpp; *tpp; tpp++) {
 		if (strcmp((*tpp)->nc_netid, netid) == 0) {
 			if (*tpp && (strcmp((*tpp)->nc_netid, "udp6") == 0 ||
@@ -258,16 +237,13 @@ const char *netid;
 				ipv6_present = __can_use_af(AF_INET6);
 				if (!ipv6_present) {
 					nc_error = NC_NOTFOUND;
-					trace1(TR_getnetconfigent, 1);
 					return (NULL);
 				}
 			}
-			trace1(TR_getnetconfigent, 1);
 			return (netconfig_dup(*tpp));
 		}
 	}
 	nc_error = NC_NOTFOUND;
-	trace1(TR_getnetconfigent, 1);
 	return (NULL);
 }
 
@@ -276,12 +252,9 @@ const char *netid;
  */
 
 void
-freenetconfigent(netp)
-struct netconfig *netp;
+freenetconfigent(struct netconfig *netp)
 {
-	trace1(TR_freenetconfigent, 0);
 	netconfig_free(netp);
-	trace1(TR_freenetconfigent, 1);
 }
 
 /*
@@ -292,7 +265,7 @@ struct netconfig *netp;
  */
 
 static struct netconfig **
-getnetlist()
+getnetlist(void)
 {
 	char line[BUFSIZ];	/* holds each line of NETCONFIG */
 	__NSL_FILE *fp;		/* file stream for NETCONFIG */
@@ -300,10 +273,8 @@ getnetlist()
 	struct netconfig **tpp;	/* used to traverse the netconfig list */
 	int count;		/* the number of entries in file */
 
-	trace1(TR_getnetlist, 0);
 	if ((fp = __nsl_fopen(NETCONFIG, "r")) == NULL) {
 		nc_error = NC_OPENFAIL;
-		trace1(TR_getnetlist, 1);
 		return (NULL);
 	}
 
@@ -318,14 +289,12 @@ getnetlist()
 	if (count == 0) {
 		nc_error = NC_NOTFOUND;
 		(void) __nsl_fclose(fp);
-		trace1(TR_getnetlist, 1);
 		return (NULL);
 	}
-	if ((listpp = (struct netconfig **)malloc((count + 1) *
+	if ((listpp = malloc((count + 1) *
 	    sizeof (struct netconfig *))) == NULL) {
 		nc_error = NC_NOMEM;
 		(void) __nsl_fclose(fp);
-		trace1(TR_getnetlist, 1);
 		return (NULL);
 	}
 
@@ -344,7 +313,6 @@ getnetlist()
 
 	if (nc_error != NC_NOMOREENTRIES) /* Something is screwed up */
 		netlist_free(&listpp);
-	trace1(TR_getnetlist, 1);
 	return (listpp);
 }
 
@@ -355,9 +323,7 @@ getnetlist()
  */
 
 static struct netconfig *
-fgetnetconfig(fp, netid)
-__NSL_FILE *fp;
-char *netid;
+fgetnetconfig(__NSL_FILE *fp, char *netid)
 {
 	char linep[BUFSIZ];	/* pointer to a line in the file */
 	struct netconfig *netconfigp; /* holds the new netconfig structure */
@@ -365,7 +331,6 @@ char *netid;
 	char  *retvalp;		/* the return value of fgets() */
 	char *entnetid;		/* netid for the current entry */
 
-	trace1(TR_fgetnetconfig, 0);
 	/* skip past blank lines and comments. */
 	while (retvalp = __nsl_fgets(linep, BUFSIZ, fp)) {
 		linenum++;
@@ -376,26 +341,21 @@ char *netid;
 	}
 	if (retvalp == NULL) {
 		nc_error = NC_NOMOREENTRIES;
-		trace1(TR_fgetnetconfig, 1);
 		return (NULL);
 	}
 	fieldnum = 0;
 	if ((entnetid = gettoken(linep, FALSE)) == NULL) {
 		nc_error = NC_BADLINE;
-		trace1(TR_fgetnetconfig, 1);
 		return (NULL);
 	}
 	if (netid && (strcmp(netid, entnetid) != 0)) {
 		free(entnetid);
 		nc_error = NC_NOTFOUND;
-		trace1(TR_fgetnetconfig, 1);
 		return (NULL);
 	}
-	if ((netconfigp = (struct netconfig *)
-		calloc(1, sizeof (struct netconfig))) == NULL) {
+	if ((netconfigp = calloc(1, sizeof (struct netconfig))) == NULL) {
 		free(entnetid);
 		nc_error = NC_NOMEM;
-		trace1(TR_fgetnetconfig, 1);
 		return (NULL);
 	}
 
@@ -419,7 +379,6 @@ char *netid;
 	free(tok1);
 	free(tok2);
 	free(tok3);
-	trace1(TR_fgetnetconfig, 1);
 	return (netconfigp);
 }
 
@@ -432,7 +391,7 @@ char *netid;
  */
 
 void *
-setnetpath()
+setnetpath(void)
 {
 	int count;		    /* the number of entries in NETPATH	    */
 	char valid_netpath[BUFSIZ]; /* holds the valid entries if NETPATH   */
@@ -445,21 +404,18 @@ setnetpath()
 	char *tp;		    /* used to scan NETPATH string	    */
 	NCONF_HANDLE *retp;	    /* the return value			    */
 
-	trace1(TR_setnetpath, 0);
 	/*
 	 *	Read in the netconfig database if not already read in
 	 */
-	mutex_lock(&netpp_mutex);
+	(void) mutex_lock(&netpp_mutex);
 	if ((netpp == NULL) && ((netpp = getnetlist()) == NULL)) {
-		mutex_unlock(&netpp_mutex);
-		trace1(TR_setnetpath, 1);
+		(void) mutex_unlock(&netpp_mutex);
 		return (NULL);
 	}
-	mutex_unlock(&netpp_mutex);
+	(void) mutex_unlock(&netpp_mutex);
 
-	if ((retp = (NCONF_HANDLE *) malloc(sizeof (NCONF_HANDLE))) == NULL) {
+	if ((retp = malloc(sizeof (NCONF_HANDLE))) == NULL) {
 		nc_error = NC_NOMEM;
-		trace1(TR_setnetpath, 1);
 		return (NULL);
 	}
 
@@ -531,11 +487,10 @@ setnetpath()
 
 	/* Get space to hold the valid list (+1 for the NULL) */
 
-	if ((rnetpp = (struct netconfig **)malloc((count + 1) *
+	if ((rnetpp = malloc((count + 1) *
 			sizeof (struct netconfig *))) == NULL) {
-		free((void *) retp);
+		free(retp);
 		nc_error = NC_NOMEM;
-		trace1(TR_setnetpath, 1);
 		return (NULL);
 	}
 
@@ -564,7 +519,6 @@ setnetpath()
 	*curr_pp = NULL;
 
 	retp->nc_curr = retp->nc_head = rnetpp;
-	trace1(TR_setnetpath, 1);
 	return ((void *)retp);
 }
 
@@ -574,25 +528,21 @@ setnetpath()
  */
 
 int
-endnetpath(vdata)
-void *vdata;
+endnetpath(void *vdata)
 {
 	/* The argument is really a NCONF_HANDLE;  cast it here */
 	NCONF_HANDLE *nconf_handlep = (NCONF_HANDLE *)vdata;
 
-	trace1(TR_endnetpath, 0);
-	mutex_lock(&netpp_mutex);
+	(void) mutex_lock(&netpp_mutex);
 	if (netpp == NULL || nconf_handlep == NULL) {
 		nc_error = NC_NOSET;
-		mutex_unlock(&netpp_mutex);
-		trace1(TR_endnetpath, 1);
+		(void) mutex_unlock(&netpp_mutex);
 		return (-1);
 	}
-	mutex_unlock(&netpp_mutex);
+	(void) mutex_unlock(&netpp_mutex);
 
 	free(nconf_handlep->nc_head);
 	free(nconf_handlep);
-	trace1(TR_endnetpath, 1);
 	return (0);
 }
 
@@ -603,23 +553,20 @@ void *vdata;
  */
 
 struct netconfig *
-getnetpath(vdata)
-void *vdata;
+getnetpath(void *vdata)
 {
 	/* The argument is really a NCONF_HANDLE;  cast it here */
 	NCONF_HANDLE *nconf_handlep = (NCONF_HANDLE *)vdata;
 	struct netconfig *retp;  /* holds the return value */
 	int ipv6_present = -1;
 
-	trace1(TR_getnetpath, 0);
-	mutex_lock(&netpp_mutex);
+	(void) mutex_lock(&netpp_mutex);
 	if (netpp == NULL) {
 		nc_error = NC_NOSET;
-		mutex_unlock(&netpp_mutex);
-		trace1(TR_getnetpath, 1);
+		(void) mutex_unlock(&netpp_mutex);
 		return (NULL);
 	}
-	mutex_unlock(&netpp_mutex);
+	(void) mutex_unlock(&netpp_mutex);
 	for (;;) {
 		retp = *(nconf_handlep->nc_curr);
 		if (retp && (strcmp(retp->nc_netid, "udp6") == 0 ||
@@ -640,7 +587,6 @@ void *vdata;
 		nc_error = NC_NOMOREENTRIES;
 	}
 
-	trace1(TR_getnetpath, 1);
 	return (retp);
 }
 
@@ -649,14 +595,11 @@ void *vdata;
  */
 
 static int
-blank(cp)
-char *cp;
+blank(char *cp)
 {
-	trace1(TR_blank, 0);
 	while (*cp && isspace(*cp)) {
 		cp++;
 	}
-	trace1(TR_blank, 1);
 	return (*cp == '\0');
 }
 
@@ -665,14 +608,11 @@ char *cp;
  */
 
 static int
-comment(cp)
-char *cp;
+comment(char *cp)
 {
-	trace1(TR_comment, 0);
 	while (*cp && isspace(*cp)) {
 		cp++;
 	}
-	trace1(TR_comment, 1);
 	return (*cp == '#');
 }
 
@@ -682,19 +622,15 @@ char *cp;
  */
 
 static unsigned int
-getvalue(cp, nc_data)
-char *cp;
-struct nc_data nc_data[];
+getvalue(char *cp, struct nc_data nc_data[])
 {
 	int i;	/* used to index through the given struct nc_data array */
 
-	trace1(TR_getvalue, 0);
 	for (i = 0; nc_data[i].string; i++) {
 		if (strcmp(nc_data[i].string, cp) == 0) {
 			break;
 		}
 	}
-	trace1(TR_getvalue, 1);
 	return (nc_data[i].value);
 }
 
@@ -704,13 +640,11 @@ struct nc_data nc_data[];
  */
 
 static unsigned int
-getflag(cp)
-char *cp;
+getflag(char *cp)
 {
 	int i;			/* indexs through the nc_flag array */
 	unsigned int mask = 0; /* holds bitmask of flags */
 
-	trace1(TR_getflag, 0);
 	while (*cp) {
 		for (i = 0; nc_flag[i].string; i++) {
 			if (*nc_flag[i].string == *cp) {
@@ -720,7 +654,6 @@ char *cp;
 		}
 		cp++;
 	}
-	trace1(TR_getflag, 1);
 	return (mask);
 }
 
@@ -731,24 +664,18 @@ char *cp;
  */
 
 static char **
-getlookups(cp)
-char *cp;
+getlookups(char *cp)
 {
 	unsigned int num;	/* holds the number of entries in the list   */
 	char **listpp;		/* the beginning of the list of dir routines */
 	char **tpp;		/* traverses the list, populating it */
 	char *start;
 
-	trace1(TR_getlookups, 0);
 	num = getnlookups(cp);
-	if (num == 0) {
-		trace1(TR_getlookups, 1);
+	if (num == 0)
 		return (NULL);
-	}
-	if ((listpp = (char **)malloc((num + 1) * sizeof (char *))) == NULL) {
-		trace1(TR_getlookups, 1);
+	if ((listpp = malloc((num + 1) * sizeof (char *))) == NULL)
 		return (NULL);
-	}
 
 	tpp = listpp;
 	while (num--) {
@@ -774,12 +701,10 @@ char *cp;
 			for (tpp = listpp; *tpp; tpp++)
 				free(*tpp);
 			free(listpp);
-			trace1(TR_getlookups, 1);
 			return (NULL);
 		}
 	}
 	*tpp = NULL;
-	trace1(TR_getlookups, 1);
 	return (listpp);
 }
 
@@ -789,16 +714,12 @@ char *cp;
  */
 
 static unsigned int
-getnlookups(cp)
-char *cp;
+getnlookups(char *cp)
 {
 	unsigned int count;	/* the number of tokens in the string */
 
-	trace1(TR_getnlookups, 0);
-	if (strcmp(cp, "-") == 0) {
-		trace1(TR_getnlookups, 1);
+	if (strcmp(cp, "-") == 0)
 		return (0);
-	}
 
 	count = 1;
 	while (*cp) {
@@ -816,7 +737,6 @@ char *cp;
 		}
 		cp++;
 	}
-	trace1(TR_getnlookups, 1);
 	return (count);
 }
 
@@ -827,33 +747,26 @@ char *cp;
  */
 
 static char *
-gettoken(cp, skip)
-char	*cp;
-int skip;
+gettoken(char *cp, int skip)
 {
 	static char	*savep;	/* the place where we left off    */
 	char	*p;		/* the beginning of the new token */
 	char	*retp;		/* the token to be returned	  */
 
-	trace1(TR_gettoken, 0);
 	fieldnum++;
 
 	/* Determine if first or subsequent call  */
 	p = (cp == NULL)? savep: cp;
 
 	/* Return if no tokens remain.  */
-	if (p == 0) {
-		trace1(TR_gettoken, 1);
+	if (p == 0)
 		return (NULL);
-	}
 
 	while (isspace(*p))
 		p++;
 
-	if (*p == '\0') {
-		trace1(TR_gettoken, 1);
+	if (*p == '\0')
 		return (NULL);
-	}
 
 	/*
 	 *	Save the location of the token and then skip past it
@@ -885,7 +798,6 @@ int skip;
 		*p = '\0';
 		savep = ++p;
 	}
-	trace1(TR_gettoken, 1);
 	return (strdup(retp));
 }
 
@@ -895,25 +807,20 @@ int skip;
  */
 
 static void
-shift1left(p)
-char *p;
+shift1left(char *p)
 {
-	trace1(TR_shift1left, 0);
 	for (; *p; p++)
 		*p = *(p + 1);
-	trace1(TR_shift1left, 1);
 }
 
 char *
-nc_sperror()
+nc_sperror(void)
 {
 	static char buf_main[BUFSIZ];
 	static pthread_key_t perror_key;
 	char *retstr = thr_main()?
 		buf_main :
 		thr_get_storage(&perror_key, BUFSIZ, free);
-
-	trace1(TR_nc_sperror, 0);
 
 	if (retstr == NULL) {
 		syslog(LOG_WARNING,
@@ -959,47 +866,37 @@ nc_sperror()
 		    BUFSIZ);
 		break;
 	}
-	trace1(TR_nc_sperror, 1);
 	return (retstr);
 }
 
 void
 nc_perror(const char *string)
 {
-	trace1(TR_nc_perror, 0);
 	if (string)
-		fprintf(stderr, "%s: %s\n", string, nc_sperror());
+		(void) fprintf(stderr, "%s: %s\n", string, nc_sperror());
 	else
-		fprintf(stderr, "%s\n", nc_sperror());
-	trace1(TR_nc_perror, 1);
+		(void) fprintf(stderr, "%s\n", nc_sperror());
 }
 
 static void
-netlist_free(netppp)
-	struct netconfig ***netppp;
+netlist_free(struct netconfig ***netppp)
 {
 	struct netconfig **tpp;
 
-	trace1(TR_netlist_free, 0);
 	for (tpp = *netppp; *tpp; tpp++) {
 		netconfig_free(*tpp);
 	}
 	free(*netppp);
 	*netppp = NULL;
-	trace1(TR_netlist_free, 1);
 }
 
 static void
-netconfig_free(netconfigp)
-struct netconfig *netconfigp;
+netconfig_free(struct netconfig *netconfigp)
 {
 	int i;
 
-	trace1(TR_netconfig_free, 0);
-	if (netconfigp == NULL) {
-		trace1(TR_netconfig_free, 1);
+	if (netconfigp == NULL)
 		return;
-	}
 	free_entry(netconfigp->nc_netid);
 	free_entry(netconfigp->nc_protofmly);
 	free_entry(netconfigp->nc_proto);
@@ -1009,20 +906,16 @@ struct netconfig *netconfigp;
 			free_entry(netconfigp->nc_lookups[i]);
 	free_entry(netconfigp->nc_lookups);
 	free(netconfigp);
-	trace1(TR_netconfig_free, 1);
 }
 
 static struct netconfig *
-netconfig_dup(netconfigp)
-struct netconfig *netconfigp;
+netconfig_dup(struct netconfig *netconfigp)
 {
 	struct netconfig *nconf;
 	int i;
 
-	trace1(TR_netconfig_dup, 0);
-	nconf = (struct netconfig *)calloc(1, sizeof (struct netconfig));
+	nconf = calloc(1, sizeof (struct netconfig));
 	if (nconf == NULL) {
-		trace1(TR_netconfig_dup, 1);
 		nc_error = NC_NOMEM;
 		return (NULL);
 	}
@@ -1030,14 +923,13 @@ struct netconfig *netconfigp;
 	nconf->nc_protofmly = strdup(netconfigp->nc_protofmly);
 	nconf->nc_proto = strdup(netconfigp->nc_proto);
 	nconf->nc_device = strdup(netconfigp->nc_device);
-	nconf->nc_lookups = (char **)malloc((netconfigp->nc_nlookups + 1)
+	nconf->nc_lookups = malloc((netconfigp->nc_nlookups + 1)
 					* sizeof (char *));
 	if (!(nconf->nc_lookups && nconf->nc_netid &&
 		nconf->nc_protofmly && nconf->nc_proto &&
 		nconf->nc_device)) {
 		nc_error = NC_NOMEM;
 		netconfig_free(nconf);
-		trace1(TR_netconfig_dup, 1);
 		return (NULL);
 	}
 
@@ -1047,7 +939,6 @@ struct netconfig *netconfigp;
 			nconf->nc_nlookups = i;
 			netconfig_free(nconf);
 			nc_error = NC_NOMEM;
-			trace1(TR_netconfig_dup, 1);
 			return (NULL);
 		}
 	}
@@ -1055,16 +946,12 @@ struct netconfig *netconfigp;
 	nconf->nc_nlookups = netconfigp->nc_nlookups;
 	nconf->nc_flag = netconfigp->nc_flag;
 	nconf->nc_semantics = netconfigp->nc_semantics;
-	trace1(TR_netconfig_dup, 1);
 	return (nconf);
 }
 
 static void
-free_entry(foo)
-	void *foo;
+free_entry(void *foo)
 {
-	trace1(TR_free_entry, 0);
 	if (foo)
 		free(foo);
-	trace1(TR_free_entry, 1);
 }

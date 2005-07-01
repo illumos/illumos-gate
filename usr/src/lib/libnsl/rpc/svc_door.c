@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -96,86 +97,77 @@ static SVCXPRT_LIST *dxlist;	/* list of door based service handles */
  * List management routines.
  */
 bool_t
-__svc_add_to_xlist(list, xprt, lockp)
-	SVCXPRT_LIST	**list;
-	SVCXPRT		*xprt;
-	mutex_t		*lockp;
+__svc_add_to_xlist(SVCXPRT_LIST **list, SVCXPRT *xprt, mutex_t *lockp)
 {
 	SVCXPRT_LIST	*l;
 
-	if ((l = (SVCXPRT_LIST *) malloc(sizeof (*l))) == NULL)
+	if ((l = malloc(sizeof (*l))) == NULL)
 		return (FALSE);
 	l->xprt = xprt;
 	if (lockp != NULL)
-		mutex_lock(lockp);
+		(void) mutex_lock(lockp);
 	l->next = *list;
 	*list = l;
 	if (lockp != NULL)
-		mutex_unlock(lockp);
+		(void) mutex_unlock(lockp);
 	return (TRUE);
 }
 
 void
-__svc_rm_from_xlist(list, xprt, lockp)
-	SVCXPRT_LIST	**list;
-	SVCXPRT		*xprt;
-	mutex_t		*lockp;
+__svc_rm_from_xlist(SVCXPRT_LIST **list, SVCXPRT *xprt, mutex_t *lockp)
 {
 	SVCXPRT_LIST	**l, *tmp;
 
 	if (lockp != NULL)
-		mutex_lock(lockp);
+		(void) mutex_lock(lockp);
 	for (l = list; *l != NULL; l = &(*l)->next) {
 		if ((*l)->xprt == xprt) {
 			tmp = (*l)->next;
-			free((char *)(*l));
+			free(*l);
 			*l = tmp;
 			break;
 		}
 	}
 	if (lockp != NULL)
-		mutex_unlock(lockp);
+		(void) mutex_unlock(lockp);
 }
 
 void
-__svc_free_xlist(list, lockp)
-	SVCXPRT_LIST	**list;
-	mutex_t		*lockp;
+__svc_free_xlist(SVCXPRT_LIST **list, mutex_t *lockp)
 {
 	SVCXPRT_LIST	*tmp;
 
 	if (lockp != NULL)
-		mutex_lock(lockp);
+		(void) mutex_lock(lockp);
 	while (*list != NULL) {
 		tmp = (*list)->next;
 		free(*list);
 		*list = tmp;
 	}
 	if (lockp != NULL)
-		mutex_unlock(lockp);
+		(void) mutex_unlock(lockp);
 }
 
 /*
  * Destroy all door based service handles.
  */
 void
-__svc_cleanup_door_xprts()
+__svc_cleanup_door_xprts(void)
 {
 	SVCXPRT_LIST	*l, *tmp = NULL;
 
-	mutex_lock(&svc_door_mutex);
+	(void) mutex_lock(&svc_door_mutex);
 	for (l = dxlist; l != NULL; l = tmp) {
 		tmp = l->next;
 		svc_door_destroy_pvt(l->xprt);
 	}
-	mutex_unlock(&svc_door_mutex);
+	(void) mutex_unlock(&svc_door_mutex);
 }
 
 static bool_t
-make_tmp_dir()
+make_tmp_dir(void)
 {
 	struct stat statbuf;
-	mode_t mask;
 
 	if (stat(RPC_DOOR_DIR, &statbuf) < 0) {
 		(void) mkdir(RPC_DOOR_DIR, (mode_t)0755);
@@ -188,10 +180,7 @@ make_tmp_dir()
 }
 
 static void
-svc_door_dispatch(xprt, msg, r)
-	SVCXPRT			*xprt;
-	struct rpc_msg		*msg;
-	struct svc_req		*r;
+svc_door_dispatch(SVCXPRT *xprt, struct rpc_msg *msg, struct svc_req *r)
 {
 	enum auth_stat		why;
 /* LINTED pointer alignment */
@@ -251,22 +240,22 @@ door_server(void *cookie, char *argp, size_t arg_size,
 	 * allocate result buffer
 	 */
 /* LINTED pointer alignment */
-	result_buf = (char *)alloca(su_data(parent)->su_iosz);
+	result_buf = alloca(su_data(parent)->su_iosz);
 	if (result_buf == NULL) {
 		(void) syslog(LOG_ERR, "door_server: alloca failed");
 		(void) door_return(NULL, 0, NULL, 0);
 		/*NOTREACHED*/
 	}
 
-	mutex_lock(&svc_door_mutex);
+	(void) mutex_lock(&svc_door_mutex);
 	if ((xprt = get_xprt_copy(parent, result_buf)) == NULL) {
 		(void) syslog(LOG_ERR,
 				"door_server: memory allocation failure");
-		mutex_unlock(&svc_door_mutex);
+		(void) mutex_unlock(&svc_door_mutex);
 		(void) door_return(NULL, 0, NULL, 0);
 		/*NOTREACHED*/
 	}
-	mutex_unlock(&svc_door_mutex);
+	(void) mutex_unlock(&svc_door_mutex);
 
 /* LINTED pointer alignment */
 	msg = SVCEXT(xprt)->msg;
@@ -306,8 +295,7 @@ door_server(void *cookie, char *argp, size_t arg_size,
  */
 
 void
-svc_door_xprtfree(xprt)
-	SVCXPRT			*xprt;
+svc_door_xprtfree(SVCXPRT *xprt)
 {
 /* LINTED pointer alignment */
 	struct svc_door_data	*su = xprt ? su_data(xprt) : NULL;
@@ -315,20 +303,17 @@ svc_door_xprtfree(xprt)
 	if (xprt == NULL)
 		return;
 	if (xprt->xp_netid)
-		free((char *)xprt->xp_netid);
+		free(xprt->xp_netid);
 	if (xprt->xp_tp)
-		free((char *)xprt->xp_tp);
+		free(xprt->xp_tp);
 	if (su != NULL)
-		free((char *)su);
+		free(su);
 	svc_xprt_free(xprt);
 }
 
 SVCXPRT *
-svc_door_create(dispatch, prognum, versnum, sendsize)
-	void			(*dispatch)();	/* Dispatch function */
-	rpcprog_t		prognum;	/* Program number */
-	rpcvers_t		versnum;	/* Version number */
-	uint_t			sendsize;	/* Send buffer size */
+svc_door_create(void (*dispatch)(), const rpcprog_t prognum,
+				const rpcvers_t versnum, const uint_t sendsize)
 {
 	SVCXPRT			*xprt;
 	struct svc_door_data	*su = NULL;
@@ -336,14 +321,15 @@ svc_door_create(dispatch, prognum, versnum, sendsize)
 	int			fd;
 	int			did = -1;
 	mode_t			mask;
+	uint_t			ssize;
 
-	mutex_lock(&svc_door_mutex);
+	(void) mutex_lock(&svc_door_mutex);
 
 	if (!make_tmp_dir()) {
 		(void) syslog(LOG_ERR, "svc_door_create: cannot open %s",
 				RPC_DOOR_DIR);
-		mutex_unlock(&svc_door_mutex);
-		return ((SVCXPRT *)NULL);
+		(void) mutex_unlock(&svc_door_mutex);
+		return (NULL);
 	}
 
 	if ((xprt = svc_xprt_alloc()) == NULL) {
@@ -353,7 +339,8 @@ svc_door_create(dispatch, prognum, versnum, sendsize)
 /* LINTED pointer alignment */
 	svc_flags(xprt) |= SVC_DOOR;
 
-	(void) sprintf(rendezvous, RPC_DOOR_RENDEZVOUS, prognum, versnum);
+	(void) sprintf(rendezvous, RPC_DOOR_RENDEZVOUS, (int)prognum,
+								(int)versnum);
 	mask = umask(0);
 	fd =  open(rendezvous, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0644);
 	(void) umask(mask);
@@ -382,7 +369,7 @@ svc_door_create(dispatch, prognum, versnum, sendsize)
 			goto freedata;
 		}
 	}
-	close(fd);
+	(void) close(fd);
 	did = door_create(door_server, (void *)xprt, DOOR_REFUSE_DESC);
 	if (did < 0) {
 		(void) syslog(LOG_ERR,
@@ -403,16 +390,16 @@ svc_door_create(dispatch, prognum, versnum, sendsize)
 	 * Determine send size
 	 */
 	if (sendsize < __rpc_min_door_buf_size)
-		sendsize = __rpc_default_door_buf_size;
+		ssize = __rpc_default_door_buf_size;
 	else
-		sendsize = RNDUP(sendsize);
+		ssize = RNDUP(sendsize);
 
-	su = (struct svc_door_data *)mem_alloc(sizeof (*su));
+	su = malloc(sizeof (*su));
 	if (su == NULL) {
 		(void) syslog(LOG_ERR, "svc_door_create: out of memory");
 		goto freedata;
 	}
-	su->su_iosz = sendsize;
+	su->su_iosz = ssize;
 	su->call_info.prognum = prognum;
 	su->call_info.versnum = versnum;
 	su->call_info.dispatch = dispatch;
@@ -433,12 +420,12 @@ svc_door_create(dispatch, prognum, versnum, sendsize)
 	xprt->xp_fd = did;
 
 	svc_ndoorfds++;
-	if (!__svc_add_to_xlist(&dxlist, xprt, (mutex_t *)NULL)) {
+	if (!__svc_add_to_xlist(&dxlist, xprt, NULL)) {
 
 		(void) syslog(LOG_ERR, "svc_door_create: out of memory");
 		goto freedata;
 	}
-	mutex_unlock(&svc_door_mutex);
+	(void) mutex_unlock(&svc_door_mutex);
 	return (xprt);
 freedata:
 	(void) fdetach(rendezvous);
@@ -447,14 +434,13 @@ freedata:
 		(void) door_revoke(did);
 	if (xprt)
 		svc_door_xprtfree(xprt);
-	mutex_unlock(&svc_door_mutex);
-	return ((SVCXPRT *)NULL);
+	(void) mutex_unlock(&svc_door_mutex);
+	return (NULL);
 }
 
 
 static SVCXPRT *
-svc_door_xprtcopy(parent)
-	SVCXPRT			*parent;
+svc_door_xprtcopy(SVCXPRT *parent)
 {
 	SVCXPRT			*xprt;
 	struct svc_door_data	*su;
@@ -483,7 +469,7 @@ svc_door_xprtcopy(parent)
 		if (xprt->xp_netid == NULL) {
 			syslog(LOG_ERR, "svc_door_xprtcopy: strdup failed");
 			if (parent->xp_tp)
-				free((char *)parent->xp_tp);
+				free(parent->xp_tp);
 			svc_door_xprtfree(xprt);
 			return (NULL);
 		}
@@ -507,9 +493,7 @@ svc_door_xprtcopy(parent)
 
 
 static SVCXPRT *
-get_xprt_copy(parent, buf)
-	SVCXPRT			*parent;
-	char			*buf;
+get_xprt_copy(SVCXPRT *parent, char *buf)
 {
 /* LINTED pointer alignment */
 	SVCXPRT_LIST		*xlist = SVCEXT(parent)->my_xlist;
@@ -539,18 +523,17 @@ get_xprt_copy(parent, buf)
 }
 
 int
-return_xprt_copy(xprt)
-	SVCXPRT		*xprt;
+return_xprt_copy(SVCXPRT *xprt)
 {
 	SVCXPRT		*parent;
 	SVCXPRT_LIST	*xhead, *xlist;
 /* LINTED pointer alignment */
 	int		len = su_data(xprt)->len;
 
-	mutex_lock(&svc_door_mutex);
+	(void) mutex_lock(&svc_door_mutex);
 /* LINTED pointer alignment */
 	if ((parent = SVCEXT(xprt)->parent) == NULL) {
-		mutex_unlock(&svc_door_mutex);
+		(void) mutex_unlock(&svc_door_mutex);
 		return (0);
 	}
 /* LINTED pointer alignment */
@@ -574,25 +557,23 @@ return_xprt_copy(xprt)
 	if (svc_defunct(xprt)) {
 /* LINTED pointer alignment */
 		svc_flags(parent) |= SVC_DEFUNCT;
+		/* LINTED pointer cast */
 		if (SVCEXT(parent)->refcnt == 0)
 			svc_door_destroy(xprt);
 	}
-	mutex_unlock(&svc_door_mutex);
+	(void) mutex_unlock(&svc_door_mutex);
 	return (len);
 }
 
 /* ARGSUSED */
 static enum xprt_stat
-svc_door_stat(xprt)
-	SVCXPRT *xprt;
+svc_door_stat(SVCXPRT *xprt)
 {
 	return (XPRT_IDLE);
 }
 
 static bool_t
-svc_door_recv(xprt, msg)
-	SVCXPRT		*xprt;
-	struct rpc_msg	*msg;
+svc_door_recv(SVCXPRT *xprt, struct rpc_msg *msg)
 {
 /* LINTED pointer alignment */
 	struct svc_door_data	*su = su_data(xprt);
@@ -606,9 +587,7 @@ svc_door_recv(xprt, msg)
 }
 
 static bool_t
-svc_door_reply(xprt, msg)
-	SVCXPRT			*xprt;
-	struct rpc_msg		*msg;
+svc_door_reply(SVCXPRT *xprt, struct rpc_msg *msg)
 {
 /* LINTED pointer alignment */
 	struct svc_door_data	*su = su_data(xprt);
@@ -624,20 +603,14 @@ svc_door_reply(xprt, msg)
 }
 
 static bool_t
-svc_door_getargs(xprt, xdr_args, args_ptr)
-	SVCXPRT		*xprt;
-	xdrproc_t	xdr_args;
-	caddr_t		args_ptr;
+svc_door_getargs(SVCXPRT *xprt, xdrproc_t xdr_args, caddr_t args_ptr)
 {
 /* LINTED pointer alignment */
 	return ((*xdr_args)(&(su_data(xprt)->su_xdrs), args_ptr));
 }
 
 static bool_t
-svc_door_freeargs(xprt, xdr_args, args_ptr)
-	SVCXPRT		*xprt;
-	xdrproc_t	xdr_args;
-	caddr_t		args_ptr;
+svc_door_freeargs(SVCXPRT *xprt, xdrproc_t xdr_args, caddr_t args_ptr)
 {
 /* LINTED pointer alignment */
 	XDR		*xdrs = &(su_data(xprt)->su_xdrs);
@@ -647,17 +620,15 @@ svc_door_freeargs(xprt, xdr_args, args_ptr)
 }
 
 static void
-svc_door_destroy(xprt)
-	SVCXPRT		*xprt;
+svc_door_destroy(SVCXPRT *xprt)
 {
-	mutex_lock(&svc_door_mutex);
+	(void) mutex_lock(&svc_door_mutex);
 	svc_door_destroy_pvt(xprt);
-	mutex_unlock(&svc_door_mutex);
+	(void) mutex_unlock(&svc_door_mutex);
 }
 
 static void
-svc_door_destroy_pvt(xprt)
-	SVCXPRT		*xprt;
+svc_door_destroy_pvt(SVCXPRT *xprt)
 {
 /* LINTED pointer alignment */
 	if (SVCEXT(xprt)->parent)
@@ -669,7 +640,7 @@ svc_door_destroy_pvt(xprt)
 	if (SVCEXT(xprt)->refcnt > 0)
 		return;
 
-	__svc_rm_from_xlist(&dxlist, xprt, (mutex_t *)NULL);
+	__svc_rm_from_xlist(&dxlist, xprt, NULL);
 
 	if (xprt->xp_tp) {
 		(void) fdetach(xprt->xp_tp);
@@ -679,15 +650,13 @@ svc_door_destroy_pvt(xprt)
 
 	svc_xprt_destroy(xprt);
 	if (--svc_ndoorfds == 0)
-		cond_signal(&svc_door_waitcv);	/* wake up door dispatching */
+		/* wake up door dispatching */
+		(void) cond_signal(&svc_door_waitcv);
 }
 
 /* ARGSUSED */
 static bool_t
-svc_door_control(xprt, rq, in)
-	SVCXPRT		*xprt;
-	const uint_t	rq;
-	void		*in;
+svc_door_control(SVCXPRT *xprt, const uint_t rq, void *in)
 {
 	extern int __rpc_legal_connmaxrec(int);
 
@@ -703,12 +672,9 @@ svc_door_control(xprt, rq, in)
 			if (door_setparam(xprt->xp_fd, DOOR_PARAM_DATA_MAX,
 			    door_param) == 0)
 				return (TRUE);
-			else
-				return (FALSE);
-		} else {
 			return (FALSE);
 		}
-		break;
+		return (FALSE);
 	case SVCGET_CONNMAXREC:
 		if (door_getparam(xprt->xp_fd, DOOR_PARAM_DATA_MAX,
 		    &door_param) == 0) {
@@ -723,22 +689,19 @@ svc_door_control(xprt, rq, in)
 
 			*(int *)in = tmp;
 			return (TRUE);
-		} else {
-			return (FALSE);
 		}
-		break;
-	default:
 		return (FALSE);
 	}
+	return (FALSE);
 }
 
 static struct xp_ops *
-svc_door_ops()
+svc_door_ops(void)
 {
 	static struct xp_ops	ops;
 	extern mutex_t		ops_lock;
 
-	mutex_lock(&ops_lock);
+	(void) mutex_lock(&ops_lock);
 	if (ops.xp_recv == NULL) {
 		ops.xp_recv = svc_door_recv;
 		ops.xp_stat = svc_door_stat;
@@ -748,7 +711,7 @@ svc_door_ops()
 		ops.xp_destroy = svc_door_destroy;
 		ops.xp_control = svc_door_control;
 	}
-	mutex_unlock(&ops_lock);
+	(void) mutex_unlock(&ops_lock);
 	return (&ops);
 }
 

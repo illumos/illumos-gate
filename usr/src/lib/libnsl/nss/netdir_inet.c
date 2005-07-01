@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -82,7 +83,6 @@
 #include <sys/dlpi.h>
 #include <nss_dbdefs.h>
 #include <nss_netdir.h>
-#include <rpc/trace.h>
 #include <syslog.h>
 #include <nsswitch.h>
 #include "nss.h"
@@ -91,11 +91,6 @@
 #define	MAXIFS 32
 #define	UDPDEV	"/dev/udp"
 #define	UDP6DEV	"/dev/udp6"
-
-#define	GETHOSTBUF(host_buf)					\
-	NSS_XbyY_ALLOC(&host_buf, sizeof (struct hostent), NSS_BUFLEN_HOSTS)
-#define	GETSERVBUF(serv_buf)					\
-	NSS_XbyY_ALLOC(&serv_buf, sizeof (struct servent), NSS_BUFLEN_SERVICES)
 
 #ifdef PIC
 #define	DOOR_GETHOSTBYNAME_R	_door_gethostbyname_r
@@ -150,7 +145,6 @@ struct servent *_switch_getservbyport_r(int, const char *, struct servent *,
 
 static int __herrno2netdir(int h_errnop);
 static struct ifinfo *get_local_info(void);
-static int islocal();
 static int getbroadcastnets(struct netconfig *, struct in_addr **);
 static int hent2ndaddr(int, char **, int *, struct nd_addrlist **);
 static int ndaddr2hent(int, const char *, struct nd_addrlist *,
@@ -217,13 +211,13 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 		 */
 		if (strcmp(args->arg.nss.host.name, LOCALHOST) == 0) {
 
-			mutex_lock(&nd_addr_lock);
+			(void) mutex_lock(&nd_addr_lock);
 			IN_SET_LOOPBACK_ADDR(&sa_con);
 			_nderror = ndaddr2hent(AF_INET, args->arg.nss.host.name,
 			    &nd_conaddrlist, res->nss.host.hent,
 			    args->arg.nss.host.buf,
 			    args->arg.nss.host.buflen);
-			mutex_unlock(&nd_addr_lock);
+			(void) mutex_unlock(&nd_addr_lock);
 			if (_nderror != ND_OK)
 				*(res->nss.host.herrno_p) =
 				    nd2herrno(_nderror);
@@ -236,15 +230,15 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 		 */
 		if (_inet_aton(args->arg.nss.host.name,
 		    (struct in_addr *)&dotnameaddr)) {
-			mutex_lock(&nd_addr_lock);
-			(void) memset((char *)&sa_con, 0, sizeof (sa_con));
+			(void) mutex_lock(&nd_addr_lock);
+			(void) memset(&sa_con, 0, sizeof (sa_con));
 			sa_con.sin_family = AF_INET;
 			sa_con.sin_addr.s_addr = dotnameaddr;
 			_nderror = ndaddr2hent(AF_INET, args->arg.nss.host.name,
 			    &nd_conaddrlist, res->nss.host.hent,
 			    args->arg.nss.host.buf,
 			    args->arg.nss.host.buflen);
-			mutex_unlock(&nd_addr_lock);
+			(void) mutex_unlock(&nd_addr_lock);
 			if (_nderror != ND_OK)
 				*(res->nss.host.herrno_p) =
 				    nd2herrno(_nderror);
@@ -261,17 +255,17 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 		    &v6nameaddr) != 0)) {
 			int	ret;
 
-			mutex_lock(&nd6_addr_lock);
-			(void) memset((char *)&sa6_con, 0, sizeof (sa6_con));
+			(void) mutex_lock(&nd6_addr_lock);
+			(void) memset(&sa6_con, 0, sizeof (sa6_con));
 			sa6_con.sin6_family = AF_INET6;
-			memcpy((char *)&(sa6_con.sin6_addr.s6_addr),
+			(void) memcpy(&(sa6_con.sin6_addr.s6_addr),
 			    &v6nameaddr, sizeof (struct in6_addr));
 			ret = ndaddr2hent(AF_INET6,
 			    args->arg.nss.host6.name,
 			    &nd6_conaddrlist, res->nss.host.hent,
 			    args->arg.nss.host6.buf,
 			    args->arg.nss.host6.buflen);
-			mutex_unlock(&nd6_addr_lock);
+			(void) mutex_unlock(&nd6_addr_lock);
 			if (ret != ND_OK)
 				*(res->nss.host.herrno_p) = nd2herrno(ret);
 			else
@@ -376,8 +370,7 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 					_nderror = ND_NOHOST;
 					return (ND_NOHOST);
 				}
-				baddrlist =
-				    (char **)malloc((bnets+1)*sizeof (char *));
+				baddrlist = malloc((bnets+1)*sizeof (char *));
 				if (baddrlist == NULL)
 					FREE_return(ND_NOMEM);
 				for (i = 0; i < bnets; i++)
@@ -530,10 +523,8 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 		    args->arg.nss.host6.flags,
 		    res->nss.host.herrno_p);
 
-		if (he == NULL) {
-			trace1(TR__get_hostserv_inetnetdir_byname, 12);
+		if (he == NULL)
 			return (_nderror = ND_NOHOST);
-		}
 		return (_nderror = ND_OK);
 
 		case NSS_SERV:
@@ -560,7 +551,8 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 			 * an indexed database of well-known ports in the name
 			 * of performance ?
 			 */
-			GETSERVBUF(ndbuf4switch);
+			ndbuf4switch = _nss_XbyY_buf_alloc(
+				sizeof (struct servent), NSS_BUFLEN_SERVICES);
 			if (ndbuf4switch == 0)
 				FREE_return(ND_NOMEM);
 			se = _switch_getservbyname_r(args->arg.nd_hs->h_serv,
@@ -577,7 +569,9 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 		if (haddrlist == 0) {
 			int	h_errnop = 0;
 
-			GETHOSTBUF(ndbuf4switch);
+			ndbuf4switch = _nss_XbyY_buf_alloc(
+					sizeof (struct hostent),
+					NSS_BUFLEN_HOSTS);
 			if (ndbuf4switch == 0) {
 				_nderror = ND_NOMEM;
 				return (ND_NOMEM);
@@ -655,7 +649,9 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				 * ports in the name
 				 * of performance ?
 				 */
-				GETSERVBUF(ndbuf4switch);
+				ndbuf4switch = _nss_XbyY_buf_alloc(
+					sizeof (struct servent),
+					NSS_BUFLEN_SERVICES);
 				if (ndbuf4switch == 0)
 					FREE_return(ND_NOMEM);
 				se = _switch_getservbyname_r(
@@ -673,7 +669,9 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 			if (haddrlist == 0) {
 				int	h_errnop = 0;
 
-				GETHOSTBUF(ndbuf4switch);
+				ndbuf4switch = _nss_XbyY_buf_alloc(
+					sizeof (struct hostent),
+					NSS_BUFLEN_HOSTS);
 				if (ndbuf4switch == 0) {
 					_nderror = ND_NOMEM;
 					return (ND_NOMEM);
@@ -797,6 +795,7 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 		 */
 		_nderror = ndaddr2srent(service.h_serv,
 		    args->arg.nss.serv.proto,
+		    /* LINTED pointer cast */
 		    ((struct sockaddr_in *)addrs->n_addrs->buf)->sin_port,
 		    res->nss.serv,
 		    args->arg.nss.serv.buf, args->arg.nss.serv.buflen);
@@ -837,15 +836,16 @@ _get_hostserv_inetnetdir_byaddr(struct netconfig *nconf,
 		 * Worth the performance gain: assuming a lot of inet apps
 		 * actively use "127.0.0.1".
 		 */
+		/* LINTED pointer cast */
 		if (*(uint32_t *)(args->arg.nss.host.addr) ==
 					htonl(INADDR_LOOPBACK)) {
-			mutex_lock(&nd_addr_lock);
+			(void) mutex_lock(&nd_addr_lock);
 			IN_SET_LOOPBACK_ADDR(&sa_con);
 			_nderror = ndaddr2hent(AF_INET, LOCALHOST,
 			    &nd_conaddrlist, res->nss.host.hent,
 			    args->arg.nss.host.buf,
 			    args->arg.nss.host.buflen);
-			mutex_unlock(&nd_addr_lock);
+			(void) mutex_unlock(&nd_addr_lock);
 			if (_nderror != ND_OK)
 				*(res->nss.host.herrno_p) =
 				    nd2herrno(_nderror);
@@ -867,6 +867,7 @@ _get_hostserv_inetnetdir_byaddr(struct netconfig *nconf,
 			 * Validate the address which was passed
 			 * as the request.
 			 */
+			/* LINTED pointer cast */
 			sin = (struct sockaddr_in *)args->arg.nd_nbuf->buf;
 
 			if ((args->arg.nd_nbuf->len !=
@@ -892,6 +893,7 @@ _get_hostserv_inetnetdir_byaddr(struct netconfig *nconf,
 			 * Validate the address which was passed
 			 * as the request.
 			 */
+			/* LINTED pointer cast */
 			sin6 = (struct sockaddr_in6 *)args->arg.nd_nbuf->buf;
 
 			if ((args->arg.nd_nbuf->len !=
@@ -966,11 +968,13 @@ _get_hostserv_inetnetdir_byaddr(struct netconfig *nconf,
 		case NETDIR_BY:
 		case NETDIR_BY_NOSRV:
 
-		GETSERVBUF(ndbuf4serv);
+		ndbuf4serv = _nss_XbyY_buf_alloc(sizeof (struct servent),
+					NSS_BUFLEN_SERVICES);
 		if (ndbuf4serv == 0) {
 			_nderror = ND_NOMEM;
 			return (_nderror);
 		}
+		/* LINTED pointer cast */
 		sa = (struct sockaddr_in *)(args->arg.nd_nbuf->buf);
 		addr4 = (struct in_addr *)&(sa->sin_addr);
 
@@ -998,7 +1002,8 @@ _get_hostserv_inetnetdir_byaddr(struct netconfig *nconf,
 			}
 		}
 
-		GETHOSTBUF(ndbuf4host);
+		ndbuf4host = _nss_XbyY_buf_alloc(sizeof (struct hostent),
+					NSS_BUFLEN_HOSTS);
 		if (ndbuf4host == 0) {
 			if (ndbuf4serv)
 				NSS_XbyY_FREE(&ndbuf4serv);
@@ -1059,11 +1064,13 @@ _get_hostserv_inetnetdir_byaddr(struct netconfig *nconf,
 		case NETDIR_BY6:
 		case NETDIR_BY_NOSRV6:
 
-		GETSERVBUF(ndbuf4serv);
+		ndbuf4serv = _nss_XbyY_buf_alloc(sizeof (struct servent),
+					NSS_BUFLEN_SERVICES);
 		if (ndbuf4serv == 0) {
 			_nderror = ND_NOMEM;
 			return (ND_NOMEM);
 		}
+		/* LINTED pointer cast */
 		sin6 = (struct sockaddr_in6 *)(args->arg.nd_nbuf->buf);
 
 		/*
@@ -1089,7 +1096,8 @@ _get_hostserv_inetnetdir_byaddr(struct netconfig *nconf,
 			}
 		}
 
-		GETHOSTBUF(ndbuf4host);
+		ndbuf4host = _nss_XbyY_buf_alloc(sizeof (struct hostent),
+					NSS_BUFLEN_HOSTS);
 		if (ndbuf4host == 0) {
 			if (ndbuf4serv)
 				NSS_XbyY_FREE(&ndbuf4serv);
@@ -1137,6 +1145,7 @@ _get_hostserv_inetnetdir_byaddr(struct netconfig *nconf,
 
 		case NSS_HOST:
 
+		/* LINTED pointer cast */
 		sa.sin_addr.s_addr = *(uint32_t *)args->arg.nss.host.addr;
 		sa.sin_family = AF_INET;
 		/* Hopefully, third-parties get this optimization */
@@ -1302,7 +1311,6 @@ _switch_gethostbyname_r(const char *name, struct hostent *result, char *buffer,
 	nss_XbyY_args_t arg;
 	nss_status_t	res;
 
-	trace2(TR__switch_gethostbyname_r, 0, buflen);
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2hostent);
 	arg.key.name	= name;
 	arg.stayopen	= 0;
@@ -1312,7 +1320,6 @@ _switch_gethostbyname_r(const char *name, struct hostent *result, char *buffer,
 	*h_errnop = arg.h_errno;
 	if (arg.returnval != NULL)
 		order_haddrlist_af(result->h_addrtype, result->h_addr_list);
-	trace2(TR__switch_gethostbyname_r, 1, buflen);
 	return ((struct hostent *)NSS_XbyY_FINI(&arg));
 }
 
@@ -1323,7 +1330,6 @@ _switch_getipnodebyname_r(const char *name, struct hostent *result,
 	nss_XbyY_args_t arg;
 	nss_status_t	res;
 
-	trace2(TR__switch_getipnodebyname_r, 0, buflen);
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2hostent6);
 	arg.key.ipnode.name	= name;
 	arg.key.ipnode.af_family = af_family;
@@ -1335,7 +1341,6 @@ _switch_getipnodebyname_r(const char *name, struct hostent *result,
 	*h_errnop = arg.h_errno;
 	if (arg.returnval != NULL)
 		order_haddrlist_af(result->h_addrtype, result->h_addr_list);
-	trace2(TR__switch_getipnodebyname_r, 1, buflen);
 	return ((struct hostent *)NSS_XbyY_FINI(&arg));
 }
 
@@ -1346,7 +1351,6 @@ _switch_gethostbyaddr_r(const char *addr, int len, int type,
 	nss_XbyY_args_t arg;
 	nss_status_t	res;
 
-	trace3(TR__switch_gethostbyaddr_r, 0, len, buflen);
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2hostent);
 	arg.key.hostaddr.addr	= addr;
 	arg.key.hostaddr.len	= len;
@@ -1356,7 +1360,6 @@ _switch_gethostbyaddr_r(const char *addr, int len, int type,
 	    NSS_DBOP_HOSTS_BYADDR, &arg);
 	arg.status = res;
 	*h_errnop = arg.h_errno;
-	trace3(TR__switch_gethostbyaddr_r, 1, len, buflen);
 	return (struct hostent *)NSS_XbyY_FINI(&arg);
 }
 
@@ -1367,7 +1370,6 @@ _switch_getipnodebyaddr_r(const char *addr, int len, int type,
 	nss_XbyY_args_t arg;
 	nss_status_t	res;
 
-	trace3(TR__switch_getipnodebyaddr_r, 0, len, buflen);
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2hostent6);
 	arg.key.hostaddr.addr	= addr;
 	arg.key.hostaddr.len	= len;
@@ -1377,14 +1379,12 @@ _switch_getipnodebyaddr_r(const char *addr, int len, int type,
 	    NSS_DBOP_IPNODES_BYADDR, &arg);
 	arg.status = res;
 	*h_errnop = arg.h_errno;
-	trace3(TR__switch_getipnodebyaddr_r, 1, len, buflen);
 	return (struct hostent *)NSS_XbyY_FINI(&arg);
 }
 
 static void
 _nss_initf_services(nss_db_params_t *p)
 {
-	/* === need tracepoints */
 	p->name	= NSS_DBNAM_SERVICES;
 	p->default_config = NSS_DEFCONF_SERVICES;
 }
@@ -1689,7 +1689,9 @@ order_haddrlist_inet(char **haddrlist, size_t addrcount)
 	    (sizeof (struct in_addr *) + sizeof (addr_class_t));
 	if ((sortbuf = malloc(sortbuf_size)) == NULL)
 		return;
+	/* LINTED pointer cast */
 	sorted = (struct in_addr **)sortbuf;
+	/* LINTED pointer cast */
 	sortclass = (addr_class_t *)(sortbuf +
 	    (addrcount * sizeof (struct in_addr *)));
 
@@ -1738,7 +1740,7 @@ order_haddrlist_inet(char **haddrlist, size_t addrcount)
 	 * array to keep track of the number of addresses in each
 	 * class.
 	 */
-	memset(classcount, 0, sizeof (classcount));
+	(void) memset(classcount, 0, sizeof (classcount));
 	for (i = 0; i < addrcount; i++) {
 		if (__inet_address_is_local_af(localinfo, AF_INET,
 		    inaddrlist[i]))
@@ -1783,7 +1785,6 @@ static void
 order_haddrlist_inet6(char **haddrlist, size_t addrcount)
 {
 	struct dstinforeq *dinfo, *dinfoptr;
-	int index;
 	struct in6_addr **in6addrlist = (struct in6_addr **)haddrlist;
 	struct in6_addr	**in6addr;
 
@@ -2170,8 +2171,7 @@ hsents2ndhostservs(struct hostent *he, struct servent *se,
 	int	hosts, servs, i, j;
 	char	**hn, **sn;
 
-	if ((result = (struct nd_hostservlist *)
-		    malloc(sizeof (struct nd_hostservlist))) == 0)
+	if ((result = malloc(sizeof (struct nd_hostservlist))) == 0)
 		return (ND_NOMEM);
 
 	/*
@@ -2184,9 +2184,8 @@ hsents2ndhostservs(struct hostent *he, struct servent *se,
 	else
 		servs = 1;
 
-	if ((hs = (struct nd_hostserv *)calloc(hosts * servs,
-			sizeof (struct nd_hostserv))) == 0) {
-		free((void *)result);
+	if ((hs = calloc(hosts * servs, sizeof (struct nd_hostserv))) == 0) {
+		free(result);
 		return (ND_NOMEM);
 	}
 
@@ -2215,8 +2214,8 @@ hsents2ndhostservs(struct hostent *he, struct servent *se,
 				hs->h_serv = strdup(*sn++);
 
 			if ((hs->h_host == 0) || (hs->h_serv == 0)) {
-				free((void *)result->h_hostservs);
-				free((void *)result);
+				free(result->h_hostservs);
+				free(result);
 				return (ND_NOMEM);
 			}
 			hs++;
@@ -2271,6 +2270,7 @@ ndaddr2hent(int af, const char *nam, struct nd_addrlist *addrs,
 		for (na = addrs->n_addrs, i = 0;  i < count;  na++, i++) {
 			--addrp;
 			(void) memcpy(addrp,
+			    /* LINTED pointer cast */
 			    &((struct sockaddr_in *)na->buf)->sin_addr,
 			    sizeof (*addrp));
 			*addrvec++ = (char *)addrp;
@@ -2288,6 +2288,7 @@ ndaddr2hent(int af, const char *nam, struct nd_addrlist *addrs,
 		for (na = addrs->n_addrs, i = 0;  i < count;  na++, i++) {
 			--addr6p;
 			(void) memcpy(addr6p,
+			    /* LINTED pointer cast */
 			    &((struct sockaddr_in6 *)na->buf)->sin6_addr,
 			    sizeof (*addr6p));
 			*addrvec++ = (char *)addr6p;
@@ -2352,8 +2353,9 @@ ndhostserv2hent(struct netbuf *nbuf, struct nd_hostservlist *addrs,
 
 	/* First, give the lonely address a specious home in h_addr_list. */
 	aliasp   = (char  *)ROUND_UP(buffer, sizeof (sa->sin_addr));
+	/* LINTED pointer cast */
 	sa = (struct sockaddr_in *)nbuf->buf;
-	(void) memcpy(aliasp, (char *)&(sa->sin_addr), sizeof (sa->sin_addr));
+	(void) memcpy(aliasp, &(sa->sin_addr), sizeof (sa->sin_addr));
 	aliasvec = (char **)ROUND_UP(aliasp + sizeof (sa->sin_addr),
 		sizeof (*aliasvec));
 	result->h_addr_list = aliasvec;
@@ -2370,7 +2372,7 @@ ndhostserv2hent(struct netbuf *nbuf, struct nd_hostservlist *addrs,
 	result->h_aliases	= aliasvec;
 
 	hs = addrs->h_hostservs;
-	if (! hs)
+	if (!hs)
 		return (ND_NOHOST);
 
 	length = strlen(hs->h_host) + 1;
@@ -2433,7 +2435,7 @@ ndhostserv2srent(int port, const char *proto, struct nd_hostservlist *addrs,
 	result->s_aliases	= aliasvec;
 
 	hs = addrs->h_hostservs;
-	if (! hs)
+	if (!hs)
 		return (ND_NOHOST);
 	host_cname = hs->h_host;
 
@@ -2477,28 +2479,21 @@ ndhostserv2srent(int port, const char *proto, struct nd_hostservlist *addrs,
 static int
 nd2herrno(int nerr)
 {
-	trace1(TR_nd2herrno, 0);
 	switch (nerr) {
 	case ND_OK:
-		trace1(TR_nd2herrno, 1);
 		return (0);
 	case ND_TRY_AGAIN:
-		trace1(TR_nd2herrno, 1);
 		return (TRY_AGAIN);
 	case ND_NO_RECOVERY:
 	case ND_BADARG:
 	case ND_NOMEM:
-		trace1(TR_nd2herrno, 1);
 		return (NO_RECOVERY);
 	case ND_NO_DATA:
-		trace1(TR_nd2herrno, 1);
 		return (NO_DATA);
 	case ND_NOHOST:
 	case ND_NOSERV:
-		trace1(TR_nd2herrno, 1);
 		return (HOST_NOT_FOUND);
 	default:
-		trace1(TR_nd2herrno, 1);
 		return (NO_RECOVERY);
 	}
 }
@@ -2531,7 +2526,7 @@ nss_ioctl(int af, int cmd, void *arg)
 		if (errno != EINTR)
 	break;
 	}
-	close(fd);
+	(void) close(fd);
 	return (retv);
 }
 
@@ -2603,9 +2598,10 @@ getifnum:
 		_nderror = ND_SYSTEM;
 		return (NULL);
 	}
+	/* LINTED pointer cast */
 	lifr = (struct lifreq *)buf;
 	numifs = lifc.lifc_len/sizeof (lifreq);
-	localinfo = (struct ifinfo *)malloc(ifinfosize(numifs));
+	localinfo = malloc(ifinfosize(numifs));
 	if (localinfo == NULL) {
 		(void) syslog(LOG_ERR, "n2a get_local_info: malloc failed: %m");
 		free(buf);
@@ -2613,6 +2609,7 @@ getifnum:
 		return (NULL);
 	}
 
+	/* LINTED pointer cast */
 	localinfo->addresses = (struct __ifaddr *)
 	    ((char *)localinfo + sizeof (struct ifinfo));
 
@@ -2680,23 +2677,6 @@ __inet_ifassign(sa_family_t af, struct __ifaddr *ifa, __ifaddr_type type,
 	}
 
 	return (1);
-}
-
-static int
-islocal(struct ifinfo *localinfo, struct in_addr addr)
-{
-	int i;
-
-	if (!localinfo)
-	    return (0);
-
-	for (i = 0; i < localinfo->count; i++) {
-		if (ifaf(i) == AF_INET &&
-				((addr.s_addr & ifmask4(i).s_addr) ==
-				(ifaddr4(i).s_addr & ifmask4(i).s_addr)))
-			return (1);
-	}
-	return (0);
 }
 
 /*
@@ -2802,11 +2782,14 @@ __inet_uaddr_is_local(void *p, struct netconfig *nc, char *uaddr)
 	if (taddr == 0)
 		return (0);
 
+	/* LINTED pointer cast */
 	af = ((struct sockaddr *)taddr->buf)->sa_family;
 
 	ret = __inet_address_is_local_af(p, af,
 		(af == AF_INET6) ?
+		/* LINTED pointer cast */
 		(void *)&((struct sockaddr_in6 *)taddr->buf)->sin6_addr :
+		/* LINTED pointer cast */
 		(void *)&((struct sockaddr_in *)taddr->buf)->sin_addr);
 
 	netdir_free(taddr, ND_ADDR);
@@ -2855,7 +2838,6 @@ __inet_get_uaddr(void *p, struct netconfig *nc, int n)
 	char *uaddr;
 	struct sockaddr_in sin4;
 	struct sockaddr_in6 sin6;
-	struct sockaddr *sin;
 	struct netbuf nb;
 
 	if (localinfo == 0 || nc == 0 || n >= localinfo->count)
@@ -2864,7 +2846,7 @@ __inet_get_uaddr(void *p, struct netconfig *nc, int n)
 	if (ifaf(n) == AF_INET6) {
 		if (strcmp(NC_INET6, nc->nc_protofmly) != 0)
 			return (0);
-		memset(&sin6, 0, sizeof (sin6));
+		(void) memset(&sin6, 0, sizeof (sin6));
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_addr = ifaddr6(n);
 		nb.buf = (char *)&sin6;
@@ -2872,7 +2854,7 @@ __inet_get_uaddr(void *p, struct netconfig *nc, int n)
 	} else {
 		if (strcmp(NC_INET, nc->nc_protofmly) != 0)
 			return (0);
-		memset(&sin4, 0, sizeof (sin4));
+		(void) memset(&sin4, 0, sizeof (sin4));
 		sin4.sin_family = AF_INET;
 		sin4.sin_addr = ifaddr4(n);
 		nb.buf = (char *)&sin4;
@@ -2944,13 +2926,13 @@ getbroadcastnets(struct netconfig *tp, struct in_addr **addrs)
 	}
 	if (ioctl(fd, SIOCGIFNUM, (char *)&numifs) < 0)
 		numifs = MAXIFS;
-	buf = (char *)malloc(numifs * sizeof (struct ifreq));
+	buf = malloc(numifs * sizeof (struct ifreq));
 	if (buf == NULL) {
 		(void) syslog(LOG_ERR, "broadcast: malloc failed: %m");
 		(void) close(fd);
 		return (0);
 	}
-	*addrs = (struct in_addr *)malloc(numifs * sizeof (struct in_addr));
+	*addrs = malloc(numifs * sizeof (struct in_addr));
 	if (*addrs == NULL) {
 		(void) syslog(LOG_ERR, "broadcast: malloc failed: %m");
 		free(buf);
@@ -2973,6 +2955,7 @@ getbroadcastnets(struct netconfig *tp, struct in_addr **addrs)
 	}
 
 retry:
+	/* LINTED pointer cast */
 	ifr = (struct ifreq *)buf;
 	for (i = 0, n = ifc.ifc_len / (int)sizeof (struct ifreq);
 		n > 0; n--, ifr++) {
@@ -2986,6 +2969,7 @@ retry:
 		    (ifr->ifr_addr.sa_family != AF_INET))
 			continue;
 		if (ifreq.ifr_flags & IFF_BROADCAST) {
+			/* LINTED pointer cast */
 			sin = (struct sockaddr_in *)&ifr->ifr_addr;
 			if (ioctl(fd, SIOCGIFBRDADDR, (char *)&ifreq) < 0) {
 				/* May not work with other implementation */
@@ -2995,6 +2979,7 @@ retry:
 				if (!in_list(*addrs, i, a))
 					(*addrs)[i++] = a;
 			} else {
+				/* LINTED pointer cast */
 				a = ((struct sockaddr_in *)
 				    &ifreq.ifr_addr)->sin_addr;
 				if (!in_list(*addrs, i, a))
@@ -3003,6 +2988,7 @@ retry:
 			continue;
 		}
 		if (use_loopback && (ifreq.ifr_flags & IFF_LOOPBACK)) {
+			/* LINTED pointer cast */
 			sin = (struct sockaddr_in *)&ifr->ifr_addr;
 			a = sin->sin_addr;
 			if (!in_list(*addrs, i, a))
@@ -3012,6 +2998,7 @@ retry:
 		if (ifreq.ifr_flags & IFF_POINTOPOINT) {
 			if (ioctl(fd, SIOCGIFDSTADDR, (char *)&ifreq) < 0)
 				continue;
+			/* LINTED pointer cast */
 			a = ((struct sockaddr_in *)
 			    &ifreq.ifr_addr)->sin_addr;
 			if (!in_list(*addrs, i, a))
@@ -3089,6 +3076,6 @@ _read_nsw_file(void)
 			break;
 		}
 	}
-	__nsl_fclose(defl);
+	(void) __nsl_fclose(defl);
 	return (nosort);
 }

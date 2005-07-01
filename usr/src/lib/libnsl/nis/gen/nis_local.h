@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,54 +170,51 @@ extern void	__nis_release_server(nis_call_state *, CLIENT *,
 extern void	__nis_bad_auth_server(CLIENT *);
 
 extern void 	abort(void);
-void nis_sort_directory_servers(directory_obj *);
+extern void	nis_sort_directory_servers(directory_obj *);
 
-nis_error nis_bind_dir(char *, int, nis_bound_directory **, uint_t);
-CLIENT *nis_client_handle(nis_bound_directory *, int, uint_t);
-nis_server *__nis_server_dup(nis_server *, nis_server *);
-void *__inet_get_local_interfaces(void);
-void __inet_free_local_interfaces(void *);
-int __inet_address_is_local(void *, struct in_addr);
-int __inet_address_count(void *);
-int __inet_uaddr_is_local(void *, struct netconfig *, char *);
-char *__inet_get_uaddr(void *, struct netconfig *, int);
-char *__inet_get_networka(void *, int);
-int __inet_address_is_local_af(void *, sa_family_t, void *);
-int __nis_server_is_local(endpoint *, void *);
-endpoint *__get_bound_endpoint(nis_bound_directory *binding, int n);
-endpoint *__endpoint_dup(endpoint *src, endpoint *dst);
-void __endpoint_free(endpoint *ep);
-void nis_print_binding(nis_bound_directory *binding);
-char *__nis_get_server_address(struct netconfig *ncp, endpoint *ep);
-nis_error __nis_path(char *from, char *to, int *length, char ***);
-void __nis_path_free(char **names, int length);
-int32_t __nis_librand(void);
-int __nis_host_is_server(nis_server *srv, int nsrv);
-int __nis_parse_path(char *path, nis_name *list, int max);
-nis_name * __nis_getnames(nis_name name, nis_error *err);
-void __nis_print_result(nis_result *res);
-void __nis_print_rpc_result(enum clnt_stat status);
-void __nis_print_call(CLIENT *clnt, int proc);
-void __nis_print_fdreq(fd_args *);
-void __nis_print_req(ib_request *req);
-void __nis_print_nsreq(ns_request *req);
-void __nis_init_call_state(nis_call_state *state);
-void __nis_reset_call_state(nis_call_state *state);
-nis_error nis_bind_server(nis_server *srv, int nsrv,
-		nis_bound_directory **binding);
-nis_error nis_call(nis_call_state *state, rpcproc_t func,
-	xdrproc_t req_proc, char *req, xdrproc_t res_proc, char *res);
-nis_name __nis_nextsep_of(char *);
-int __rpc_timeval_to_msec(struct timeval *t);
-AUTH *authdes_pk_seccreate(char *servername, netobj *pkey, uint_t window,
-		char *timehost, des_block *ckey, nis_server *srvr);
-void __nis_netconfig2ep(struct netconfig *nc, endpoint *ep);
-bool_t __nis_netconfig_matches_ep(struct netconfig *nc, endpoint *ep);
-nis_server	*__nis_init_dump_callback(CLIENT *svc_clnt, int (*cbfunc)(),
-						void *userdata);
-int		__nis_run_dump_callback(netobj *srvid, rpcproc_t srvproc,
-					struct timeval *timeout,
-					CLIENT *myserv);
+extern nis_error nis_bind_dir(char *, int, nis_bound_directory **, uint_t);
+extern CLIENT	*nis_client_handle(nis_bound_directory *, int, uint_t);
+extern nis_server *__nis_server_dup(nis_server *, nis_server *);
+extern void	*__inet_get_local_interfaces(void);
+extern void	__inet_free_local_interfaces(void *);
+extern int	__inet_address_is_local(void *, struct in_addr);
+extern int	__inet_address_count(void *);
+extern int	__inet_uaddr_is_local(void *, struct netconfig *, char *);
+extern char	*__inet_get_uaddr(void *, struct netconfig *, int);
+extern char	*__inet_get_networka(void *, int);
+extern int	__inet_address_is_local_af(void *, sa_family_t, void *);
+extern int	__nis_server_is_local(endpoint *, void *);
+extern endpoint	*__get_bound_endpoint(nis_bound_directory *, int);
+extern endpoint	*__endpoint_dup(endpoint *, endpoint *);
+extern void	__endpoint_free(endpoint *);
+extern void	nis_print_binding(nis_bound_directory *);
+extern char	*__nis_get_server_address(struct netconfig *, endpoint *);
+extern nis_error __nis_path(char *, char *, int *, char ***);
+extern void	__nis_path_free(char **, int);
+extern int32_t	__nis_librand(void);
+extern int	__nis_host_is_server(nis_server *, int);
+extern int	__nis_parse_path(char *, nis_name *, int);
+extern nis_name * __nis_getnames(nis_name, nis_error *);
+extern void	__nis_print_result(nis_result *);
+extern void	__nis_print_rpc_result(enum clnt_stat);
+extern void	__nis_print_call(CLIENT *, int);
+extern void	__nis_print_fdreq(fd_args *);
+extern void	__nis_print_req(ib_request *);
+extern void	__nis_print_nsreq(ns_request *);
+extern void	__nis_init_call_state(nis_call_state *);
+extern void	__nis_reset_call_state(nis_call_state *);
+extern nis_error nis_bind_server(nis_server *, int, nis_bound_directory **);
+extern nis_error nis_call(nis_call_state *, rpcproc_t,
+	xdrproc_t, char *, xdrproc_t, char *);
+extern nis_name __nis_nextsep_of(char *);
+extern int	__rpc_timeval_to_msec(struct timeval *);
+extern AUTH	*authdes_pk_seccreate(const char *, netobj *, uint_t,
+	const char *, const des_block *, nis_server *);
+extern void	__nis_netconfig2ep(struct netconfig *, endpoint *);
+extern bool_t	__nis_netconfig_matches_ep(struct netconfig *, endpoint *);
+extern nis_server *__nis_init_dump_callback(CLIENT *, int (*)(), void *);
+extern int	__nis_run_dump_callback(netobj *, rpcproc_t,
+					struct timeval *, CLIENT *);
 
 /*
  * Internal variables

@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
 
@@ -37,7 +36,6 @@
  * are applicable to the other file.
  */
 #include "mt.h"
-#include <rpc/trace.h>
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -67,19 +65,13 @@ _tx_rcvudata(
 	int didalloc;
 	int flg = 0;
 
-	trace2(TR_t_rcvudata, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_rcvudata, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype != T_CLTS) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvudata, 1, fd);
 		return (-1);
 	}
 
@@ -91,7 +83,6 @@ _tx_rcvudata(
 		if (tiptr->ti_state != T_IDLE) {
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_rcvudata, 1, fd);
 			return (-1);
 		}
 	}
@@ -102,7 +93,6 @@ _tx_rcvudata(
 	 */
 	if (tiptr->ti_lookcnt > 0) {
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvudata, 1, fd);
 		t_errno = TLOOK;
 		return (-1);
 	}
@@ -114,7 +104,6 @@ _tx_rcvudata(
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvudata, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -141,7 +130,8 @@ _tx_rcvudata(
 	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
-	if (unitdata->udata.len == -1) unitdata->udata.len = 0;
+	if (((struct strbuf *)&unitdata->udata)->len == -1)
+		unitdata->udata.len = 0;
 
 	/*
 	 * is there control piece with data?
@@ -154,6 +144,7 @@ _tx_rcvudata(
 			goto err_out;
 		}
 
+		/* LINTED pointer cast */
 		pptr = (union T_primitives *)ctlbuf.buf;
 
 		switch (pptr->type) {
@@ -213,7 +204,6 @@ _tx_rcvudata(
 				tiptr->ti_ctlbuf = ctlbuf.buf;
 
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_rcvudata, 1, fd);
 			return (0);
 
 		case T_UDERROR_IND:
@@ -255,7 +245,6 @@ _tx_rcvudata(
 		else
 			tiptr->ti_ctlbuf = ctlbuf.buf;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvudata, 1, fd);
 		return (0);
 	}
 	/* NOTREACHED */
@@ -266,7 +255,6 @@ err_out:
 	else
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_rcvudata, 1, fd);
 	errno = sv_errno;
 	return (-1);
 }

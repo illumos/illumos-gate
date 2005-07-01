@@ -19,6 +19,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -36,14 +37,11 @@ SUBDIRS = spec .WAIT $(MACH) $(BUILD64) .WAIT $(MACH64)
 # objects are listed by source directory
 
 # common utility code used in more than one directory
-RPC_DERIVED_FILES= \
-	rpc/key_prot.c
+RPC_DERIVED_FILES=
 
 GEN_DERIVED_FILES= \
 	nis/gen/nis_clnt.h      \
-	nis/gen/nis_clnt.c	\
-	nis/gen/nis_xdr.c       \
-	nis/gen/nis_cback_xdr.c
+	nis/gen/nis_clnt.c
 
 CACHE_DERIVED_FILES= \
 	nis/cache/nis_clnt.h	\
@@ -74,7 +72,7 @@ CLEANFILES += $(DERIVED_FILES)
 # include library definitions
 include ../Makefile.lib
 
-TXTS +=		dial/dk.h	dial/uucp.h	dial/parms.h	dial/sysfiles.h
+TXTS +=		dial/uucp.h	dial/parms.h	dial/sysfiles.h
 
 SED=	sed
 CP=	cp
@@ -168,16 +166,6 @@ nis/gen/nis_clnt.c: $(PROTOCOL_DIR)/nis.x $(PROTOCOL_DIR)/nis_object.x
 	$(SED) -e 's/_3/_clnt/' > $@
 	$(RM) nis_clnt-tmp.c
 
-nis/gen/nis_xdr.c: $(PROTOCOL_DIR)/nis.x $(PROTOCOL_DIR)/nis_object.x 
-	$(RPCGEN) -C -c $(PROTOCOL_DIR)/nis.x > nis_xdr-tmp.c
-	$(SED) -e 's!\"$(PROTOCOL_DIR)/nis.h\"!\<rpcsvc/nis.h\>!' \
-	    < nis_xdr-tmp.c > $@
-	$(RM) nis_xdr-tmp.c
-
-nis/gen/nis_cback_xdr.c: $(PROTOCOL_DIR)/nis_callback.x
-	$(RPCGEN) -C -c $(PROTOCOL_DIR)/nis_callback.x |\
-	$(SED) -e 's!\"$(PROTOCOL_DIR)/nis_callback.h\"!\<rpcsvc/nis_callback.h\>!' > $@
-
 nis/cache/nis_cache_xdr.cc: $(PROTOCOL_DIR)/nis_cache.x
 	$(RPCGEN) -C -c $(PROTOCOL_DIR)/nis_cache.x |\
         $(SED) -e 's!\"$(PROTOCOL_DIR)/nis_cache.h\"!"nis_cache.h"!' > $@
@@ -189,10 +177,6 @@ nis/cache/nis_cache_clnt.cc: $(PROTOCOL_DIR)/nis_cache.x
 nis/cache/nis_cache.h: $(PROTOCOL_DIR)/nis_cache.x
 	$(RPCGEN) -C -h $(PROTOCOL_DIR)/nis_cache.x |\
         $(SED) -e 's!\"$(PROTOCOL_DIR)/nis_cache.h\"!"nis_cache.h"!' > $@
-
-rpc/key_prot.c: $(PROTOCOL_DIR)/key_prot.x
-	$(RPCGEN) -C -c $(PROTOCOL_DIR)/key_prot.x |\
-        $(SED) -e 's!"$(PROTOCOL_DIR)/key_prot.h"!<rpc/key_prot.h>!' > $@
 
 # include library targets
 include ../Makefile.targ

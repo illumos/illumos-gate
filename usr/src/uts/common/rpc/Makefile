@@ -19,10 +19,11 @@
 #
 # CDDL HEADER END
 #
+
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms. 
 #
 # uts/common/rpc/Makefile
@@ -40,7 +41,7 @@ bootparam.h	clnt.h		clnt_soc.h	clnt_stat.h	des_crypt.h \
 nettype.h	pmap_clnt.h	pmap_rmt.h \
 rac.h		raw.h		rpc.h		rpc_com.h	rpc_msg.h \
 rpcb_clnt.h	rpcent.h	svc.h		svc_auth.h	svc_soc.h \
-trace.h		types.h		xdr.h		rpcsec_gss.h	svc_mt.h \
+types.h		xdr.h		rpcsec_gss.h	svc_mt.h \
 rpcsys.h	rpc_rdma.h
 
 HDRS=			\
@@ -117,11 +118,8 @@ EXPORT_SRC:
 
 # EXPORT DELETE END 
 
-# The sed stuff is a workaround for an rpcgen bug (bugid 1128007).
 rpc_sztypes.h: rpc_sztypes.x
-	$(RPCGEN) -C -h rpc_sztypes.x > rpc_sztypes.tmp
-	sed -e s/ulonglong/u_longlong/ rpc_sztypes.tmp > $@
-	rm rpc_sztypes.tmp
+	$(RPCGEN) -C -h rpc_sztypes.x > $@
 
 rpcb_prot.h: rpcb_prot.x
 	$(RPCGEN) -h rpcb_prot.x > $@

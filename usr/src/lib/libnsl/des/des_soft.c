@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -45,7 +46,6 @@
  */
 
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <des/softdes.h>
 #include <des/desdata.h>
 #ifdef sun
@@ -66,8 +66,8 @@
 #define	btst(k, b)	(k[b >> 3] & (0x80 >> (b & 07)))
 #define	BIT28	(1<<28)
 
-static int	__des_encrypt(u_char *, struct deskeydata *);
-static int	__des_setkey(u_char[8], struct deskeydata *, unsigned);
+static int	__des_encrypt(uchar_t *, struct deskeydata *);
+static int	__des_setkey(uchar_t[8], struct deskeydata *, unsigned);
 
 
 /*
@@ -96,17 +96,14 @@ const char partab[128] = {
  * Add odd parity to low bit of 8 byte key
  */
 void
-des_setparity(p)
-	char *p;
+des_setparity(char *p)
 {
 	int i;
 
-	trace1(TR_des_setparity, 0);
 	for (i = 0; i < 8; i++) {
 		*p = partab[*p & 0x7f];
 		p++;
 	}
-	trace1(TR_des_setparity, 1);
 }
 
 static const unsigned char partab_g[256] = {
@@ -152,11 +149,9 @@ des_setparity_g(des_block *p)
 {
 	int i;
 
-	trace1(TR_des_setparity_g, 0);
 	for (i = 0; i < 8; i++) {
 		(*p).c[i] = partab_g[(*p).c[i]];
 	}
-	trace1(TR_des_setparity_g, 1);
 }
 
 /*
@@ -164,22 +159,18 @@ des_setparity_g(des_block *p)
  * Do the CBC ourselves if needed.
  */
 int
-__des_crypt(buf, len, desp)
-	register char *buf;
-	register unsigned len;
-	struct desparams *desp;
+__des_crypt(char *buf, unsigned len, struct desparams *desp)
 {
 /* EXPORT DELETE START */
-	register short i;
-	register unsigned mode;
-	register unsigned dir;
+	short i;
+	unsigned mode;
+	unsigned dir;
 	char nextiv[8];
 	struct deskeydata softkey;
 
-	trace2(TR___des_crypt, 0, len);
-	mode = (unsigned) desp->des_mode;
-	dir = (unsigned) desp->des_dir;
-	__des_setkey(desp->des_key, &softkey, dir);
+	mode = (unsigned)desp->des_mode;
+	dir = (unsigned)desp->des_dir;
+	(void) __des_setkey(desp->des_key, &softkey, dir);
 	while (len != 0) {
 		switch (mode) {
 		case CBC:
@@ -187,14 +178,14 @@ __des_crypt(buf, len, desp)
 			case ENCRYPT:
 				for (i = 0; i < 8; i++)
 					buf[i] ^= desp->des_ivec[i];
-				__des_encrypt((u_char *)buf, &softkey);
+				(void) __des_encrypt((uchar_t *)buf, &softkey);
 				for (i = 0; i < 8; i++)
 					desp->des_ivec[i] = buf[i];
 				break;
 			case DECRYPT:
 				for (i = 0; i < 8; i++)
 					nextiv[i] = buf[i];
-				__des_encrypt((u_char *)buf, &softkey);
+				(void) __des_encrypt((uchar_t *)buf, &softkey);
 				for (i = 0; i < 8; i++) {
 					buf[i] ^= desp->des_ivec[i];
 					desp->des_ivec[i] = nextiv[i];
@@ -203,14 +194,13 @@ __des_crypt(buf, len, desp)
 			}
 			break;
 		case ECB:
-			__des_encrypt((u_char *)buf, &softkey);
+			(void) __des_encrypt((uchar_t *)buf, &softkey);
 			break;
 		}
 		buf += 8;
 		len -= 8;
 	}
-	trace2(TR___des_crypt, 1, len);
-/* EXPORT DELETE END */	
+/* EXPORT DELETE END */
 	return (1);
 }
 
@@ -220,16 +210,12 @@ __des_crypt(buf, len, desp)
  * We build the 16 key entries here
  */
 static int
-__des_setkey(userkey, kd, dir)
-	u_char userkey[8];
-	register struct deskeydata *kd;
-	unsigned dir;
+__des_setkey(uchar_t userkey[8], struct deskeydata *kd, unsigned dir)
 {
 /* EXPORT DELETE START */
 	int32_t C, D;
-	register short i;
+	short i;
 
-	trace2(TR___des_setkey, 0, dir);
 	/*
 	 * First, generate C and D by permuting
 	 * the key. The low order bit of each
@@ -237,8 +223,8 @@ __des_setkey(userkey, kd, dir)
 	 * bits apiece.
 	 */
 	{
-		register short bit;
-		register const short *pcc = PC1_C, *pcd = PC1_D;
+		short bit;
+		const short *pcc = PC1_C, *pcd = PC1_D;
 
 		C = D = 0;
 		for (i = 0; i < 28; i++) {
@@ -258,8 +244,8 @@ __des_setkey(userkey, kd, dir)
 	 * using PC2.
 	 */
 	for (i = 0; i < 16; i++) {
-		register chunk_t *c;
-		register short j, k, bit;
+		chunk_t *c;
+		short j, k, bit;
 		uint32_t bbit;
 
 		/*
@@ -306,7 +292,6 @@ __des_setkey(userkey, kd, dir)
 		}
 
 	}
-	trace2(TR___des_setkey, 1, dir);
 /* EXPORT DELETE END */
 	return (1);
 }
@@ -321,14 +306,11 @@ __des_setkey(userkey, kd, dir)
  * processor byte-order independence.
  */
 static int
-__des_encrypt(data, kd)
-	register u_char *data;
-	register struct deskeydata *kd;
+__des_encrypt(uchar_t *data, struct deskeydata *kd)
 {
 /* EXPORT DELETE START */
 	chunk_t work1, work2;
 
-	trace1(TR___des_encrypt, 0);
 	/*
 	 * Initial permutation
 	 * and byte to chunk conversion
@@ -336,7 +318,7 @@ __des_encrypt(data, kd)
 	{
 		const uint32_t *lp;
 		uint32_t l0, l1, w;
-		register short i, pbit;
+		short i, pbit;
 
 		work1.byte0 = data[0];
 		work1.byte1 = data[1];
@@ -375,7 +357,7 @@ __des_encrypt(data, kd)
  * Expand 8 bits of 32 bit R to 48 bit R
  */
 #define	do_R_to_ER(op, b)	{			\
-	register const struct R_to_ER *p = &R_to_ER_tab[b][R.byte##b];	\
+	const struct R_to_ER *p = &R_to_ER_tab[b][R.byte##b];	\
 	e0 op p->l0;				\
 	e1 op p->l1;				\
 }
@@ -385,6 +367,7 @@ __des_encrypt(data, kd)
  * Expand R from 32 to 48 bits; xor key value;
  * apply S boxes; permute 32 bits of output
  */
+/* BEGIN CSTYLED */
 #define	do_F(iter, inR, outR) 	{			\
 	chunk_t R, ER;					\
 	uint32_t e0, e1;				\
@@ -410,6 +393,7 @@ __des_encrypt(data, kd)
 		P_tab[2][R.byte2] +			\
 		P_tab[3][R.byte3]; 			\
 }
+/* END CSTYLED */
 
 /*
  * Do a cipher step
@@ -456,7 +440,7 @@ __des_encrypt(data, kd)
 	{
 		uint32_t *lp;
 		uint32_t l0, l1, w;
-		register short i, pbit;
+		short i, pbit;
 
 		l0 = l1 = 0;
 		w = work1.long0;
@@ -491,7 +475,6 @@ __des_encrypt(data, kd)
 	data[6] = work2.byte6;
 	data[7] = work2.byte7;
 
-	trace1(TR___des_encrypt, 1);
 /* EXPORT DELETE END */
 	return (1);
 }

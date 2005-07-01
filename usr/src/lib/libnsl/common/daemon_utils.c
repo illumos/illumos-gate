@@ -19,13 +19,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -124,7 +124,7 @@ open_daemon_lock(const char *name, int mode)
 	 *   /etc/svc/volatile/nfs-status.lock
 	 * i.e., we want the last two path components in the name.
 	 */
-	strncpy(buf, name, MAXPATHLEN);
+	(void) strncpy(buf, name, MAXPATHLEN);
 
 	/* First, strip off ":<instance>", if present. */
 	p = strrchr(buf, ':');
@@ -167,9 +167,7 @@ _enter_daemon_lock(const char *name)
 	int		fd;
 	pid_t		pid;
 	char		line[BUFSIZ];
-	time_t		cur_time;
 	struct flock	lock;
-	struct stat	f_stat;
 
 	pid = getpid();
 	(void) snprintf(line, sizeof (line), "%ld\n", pid);

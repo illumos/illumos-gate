@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1994, 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_MED_LOCAL_H
@@ -56,7 +57,7 @@ extern "C" {
 /*
  * millisecond time
  */
-typedef	ulonglong_t	med_msec_t;
+typedef	u_longlong_t	med_msec_t;
 #endif	/* _REENTRANT */
 
 /*

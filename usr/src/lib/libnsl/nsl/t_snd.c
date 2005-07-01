@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3.1.2 */
 
@@ -37,7 +36,6 @@
  * are applicable to the other file.
  */
 #include "mt.h"
-#include <rpc/trace.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -65,19 +63,13 @@ _tx_snd(int fd, char *buf, unsigned nbytes, int flags, int api_semantics)
 	int doputmsg = 0;
 	int32_t tsdu_limit;
 
-	trace4(TR_t_snd, 0, fd, nbytes, flags);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace4(TR_t_snd, 1, fd, nbytes, flags);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype == T_CLTS) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace4(TR_t_snd, 1, fd, nbytes, flags);
 		return (-1);
 	}
 
@@ -90,7 +82,6 @@ _tx_snd(int fd, char *buf, unsigned nbytes, int flags, int api_semantics)
 		    tiptr->ti_state == T_INREL)) {
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace4(TR_t_snd, 1, fd, nbytes, flags);
 			return (-1);
 		}
 		/*
@@ -102,7 +93,6 @@ _tx_snd(int fd, char *buf, unsigned nbytes, int flags, int api_semantics)
 		if ((flags & ~(TX_ALL_VALID_FLAGS)) != 0) {
 			t_errno = TBADFLAG;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace4(TR_t_snd, 1, fd, nbytes, flags);
 			return (-1);
 		}
 		if (flags & T_EXPEDITED)
@@ -116,7 +106,6 @@ _tx_snd(int fd, char *buf, unsigned nbytes, int flags, int api_semantics)
 		    (nbytes > (uint32_t)tsdu_limit)) {
 			t_errno = TBADDATA;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace4(TR_t_snd, 1, fd, nbytes, flags);
 			return (-1);
 		}
 
@@ -128,7 +117,6 @@ _tx_snd(int fd, char *buf, unsigned nbytes, int flags, int api_semantics)
 		if (lookevent < 0) {
 			sv_errno = errno;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace4(TR_t_snd, 1, fd, nbytes, flags);
 			errno = sv_errno;
 			return (-1);
 		}
@@ -142,7 +130,6 @@ _tx_snd(int fd, char *buf, unsigned nbytes, int flags, int api_semantics)
 		    lookevent == T_ORDREL)) {
 			t_errno = TLOOK;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace4(TR_t_snd, 1, fd, nbytes, flags);
 			return (-1);
 		}
 	}
@@ -151,7 +138,6 @@ _tx_snd(int fd, char *buf, unsigned nbytes, int flags, int api_semantics)
 	if (nbytes == 0 && !(tiptr->ti_prov_flag & (SENDZERO|OLD_SENDZERO))) {
 		t_errno = TBADDATA;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace4(TR_t_snd, 1, fd, nbytes, flags);
 		return (-1);
 	}
 
@@ -231,31 +217,24 @@ _tx_snd(int fd, char *buf, unsigned nbytes, int flags, int api_semantics)
 					t_errno = TFLOW;
 				else
 					t_errno = TSYSERR;
-				sv_errno = errno;
-				trace4(TR_t_snd, 1, fd, nbytes, flags);
-				errno = sv_errno;
 				return (-1); /* return error */
-			} else {
-				/*
-				 * Not the first putmsg/write
-				 * [ partial completion of t_snd() case.
-				 *
-				 * Error on putmsg/write attempt but
-				 * some data was transmitted so don't
-				 * return error. Don't attempt to
-				 * send more (break from loop) but
-				 * return OK.
-				 */
-				break;
 			}
+			/*
+			 * Not the first putmsg/write
+			 * [ partial completion of t_snd() case.
+			 *
+			 * Error on putmsg/write attempt but
+			 * some data was transmitted so don't
+			 * return error. Don't attempt to
+			 * send more (break from loop) but
+			 * return OK.
+			 */
+			break;
 		}
 		bytes_remaining = bytes_remaining - bytes_sent;
 		curptr = curptr + bytes_sent;
 	} while (bytes_remaining != 0);
 
 	_T_TX_NEXTSTATE(T_SND, tiptr, "t_snd: invalid state event T_SND");
-	sv_errno = errno;
-	trace4(TR_t_snd, 1, fd, nbytes, flags);
-	errno = sv_errno;
 	return (nbytes - bytes_remaining);
 }

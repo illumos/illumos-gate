@@ -18,7 +18,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+
+/*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -52,7 +54,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <ctype.h>
 #include <grp.h>
 #include <pwd.h>
@@ -110,18 +111,13 @@ struct netid_userdata {
 };
 
 static int
-parse_uid(s, argp)
-	char *s;
-	struct netid_userdata *argp;
+parse_uid(char *s, struct netid_userdata *argp)
 {
 	uid_t	u;
-
-	trace1(TR_parse_uid, 0);
 
 	if (!s || !isdigit(*s)) {
 		syslog(LOG_ERR,
 			"netname2user: expecting uid '%s'", s);
-		trace1(TR_parse_uid, 1);
 		return (__NSW_NOTFOUND); /* xxx need a better error */
 	}
 
@@ -130,30 +126,24 @@ parse_uid(s, argp)
 
 	if (u == 0) {
 		syslog(LOG_ERR, "netname2user: should not have uid 0");
-		trace1(TR_parse_uid, 1);
 		return (__NSW_NOTFOUND);
 	}
 	*(argp->uidp) = u;
-	trace1(TR_parse_uid, 1);
 	return (__NSW_SUCCESS);
 }
 
 
 /* parse a comma separated gid list */
 static int
-parse_gidlist(p, argp)
-	char *p;
-	struct netid_userdata *argp;
+parse_gidlist(char *p, struct netid_userdata *argp)
 {
 	int len;
 	gid_t	g;
 
-	trace1(TR_parse_gidlist, 0);
-	if (! p || (! isdigit(*p))) {
+	if (!p || (!isdigit(*p))) {
 		syslog(LOG_ERR,
 			"netname2user: missing group id list in '%s'.",
 			p);
-		trace1(TR_parse_gidlist, 1);
 		return (__NSW_NOTFOUND);
 	}
 
@@ -164,7 +154,6 @@ parse_gidlist(p, argp)
 	while (p = strchr(p, ','))
 		argp->gidlist[len++] = (gid_t)atoi(++p);
 	*(argp->gidlenp) = len;
-	trace1(TR_parse_gidlist, 1);
 	return (__NSW_SUCCESS);
 }
 
@@ -179,59 +168,40 @@ parse_gidlist(p, argp)
  *
  */
 static int
-parse_netid_str(s, argp)
-	char	*s;
-	struct netid_userdata *argp;
+parse_netid_str(char *s, struct netid_userdata *argp)
 {
 	char	*p;
 	int	err;
 
-	trace1(TR_parse_netid_str, 0);
-
 	/* get uid */
 	err = parse_uid(s, argp);
-	if (err != __NSW_SUCCESS) {
-		trace1(TR_parse_netid_str, 1);
+	if (err != __NSW_SUCCESS)
 		return (err);
-	}
-
 
 	/* Now get the group list */
 	p = strchr(s, ':');
 	if (!p) {
 		syslog(LOG_ERR,
-			"netname2user: missing group id list in '%s'",
-			s);
-		trace1(TR_parse_netid_str, 1);
+			"netname2user: missing group id list in '%s'", s);
 		return (__NSW_NOTFOUND);
 	}
 	++p;			/* skip ':' */
 	err = parse_gidlist(p, argp);
-	trace1(TR_parse_netid_str, 1);
 	return (err);
 }
 
 static int
-parse_uid_gidlist(ustr, gstr, argp)
-	char *ustr;
-	char *gstr;
-	struct netid_userdata *argp;
+parse_uid_gidlist(char *ustr, char *gstr, struct netid_userdata *argp)
 {
 	int	err;
 
-	trace1(TR_parse_uid_gidlist, 0);
-
 	/* get uid */
 	err = parse_uid(ustr, argp);
-	if (err != __NSW_SUCCESS) {
-		trace1(TR_parse_uid_gidlist, 1);
+	if (err != __NSW_SUCCESS)
 		return (err);
-	}
 
 	/* Now get the group list */
-	err = parse_gidlist(gstr, argp);
-	trace1(TR_parse_uid_gidlist, 1);
-	return (err);
+	return (parse_gidlist(gstr, argp));
 }
 
 
@@ -242,10 +212,7 @@ parse_uid_gidlist(ustr, gstr, argp)
  * ie /etc/netid.
  */
 static int
-netname2user_files(err, netname, argp)
-int *err;
-char *netname;
-struct netid_userdata *argp;
+netname2user_files(int *err, char *netname, struct netid_userdata *argp)
 {
 	char 	buf[512];	/* one line from the file */
 	char	*name;
@@ -253,11 +220,9 @@ struct netid_userdata *argp;
 	char 	*res;
 	__NSL_FILE *fd;
 
-	trace1(TR_netname2user_files, 0);
 	fd = __nsl_fopen(NETIDFILE, "r");
 	if (fd == (__NSL_FILE *)0) {
 		*err = __NSW_UNAVAIL;
-		trace1(TR_netname2user_files, 1);
 		return (0);
 	}
 	/*
@@ -266,7 +231,7 @@ struct netid_userdata *argp;
 	 *	netid	uid:grp,grp,grp # for users
 	 *	netid	0:hostname	# for hosts
 	 */
-	while (! __nsl_feof(fd)) {
+	while (!__nsl_feof(fd)) {
 		res = __nsl_fgets(buf, 512, fd);
 		if (res == NULL)
 			break;
@@ -281,7 +246,7 @@ struct netid_userdata *argp;
 		if (*name == '\0')	/* blank line continue */
 			continue;
 		value = name;		/* will contain the value eventually */
-		while (! isspace(*value))
+		while (!isspace(*value))
 			value++;
 		if (*value == '\0') {
 			syslog(LOG_WARNING,
@@ -292,17 +257,15 @@ struct netid_userdata *argp;
 		*value++ = '\0'; /* nul terminate the name */
 
 		if (strcasecmp(name, netname) == 0) {
-			__nsl_fclose(fd);
+			(void) __nsl_fclose(fd);
 			while (isspace(*value))
 				value++;
 			*err = parse_netid_str(value, argp);
-			trace1(TR_netname2user_files, 1);
 			return (*err == __NSW_SUCCESS);
 		}
 	}
-	__nsl_fclose(fd);
+	(void) __nsl_fclose(fd);
 	*err = __NSW_NOTFOUND;
-	trace1(TR_netname2user_files, 1);
 	return (0);
 }
 
@@ -312,21 +275,16 @@ struct netid_userdata *argp;
  * This function reads the netid from the NIS (YP) nameservice.
  */
 static int
-netname2user_nis(err, netname, argp)
-	int *err;
-	char *netname;
-	struct netid_userdata *argp;
+netname2user_nis(int *err, char *netname, struct netid_userdata *argp)
 {
 	char *domain;
 	int yperr;
 	char *lookup;
 	int len;
 
-	trace1(TR_netname2user_nis, 0);
 	domain = strchr(netname, '@');
-	if (! domain) {
+	if (!domain) {
 		*err = __NSW_UNAVAIL;
-		trace1(TR_netname2user_nis, 1);
 		return (0);
 	}
 
@@ -345,20 +303,16 @@ netname2user_nis(err, netname, argp)
 			 * should err be set to NOTFOUND here?
 			 */
 			*err = __NSW_UNAVAIL;
-			trace1(TR_netname2user_nis, 1);
 			return (0);
 	}
 	if (lookup) {
 		lookup[len] = '\0';
 		*err = parse_netid_str(lookup, argp);
 		free(lookup);
-		trace1(TR_netname2user_nis, 1);
 		return (*err == __NSW_SUCCESS);
-	} else {
-		trace1(TR_netname2user_nis, 1);
-		*err = __NSW_NOTFOUND;
-		return (0);
 	}
+	*err = __NSW_NOTFOUND;
+	return (0);
 }
 
 /*
@@ -383,10 +337,7 @@ netname2user_nis(err, netname, argp)
  * secure, so we *must* use authenticated connections.
  */
 static int
-netname2user_nisplus(err, netname, argp)
-	int *err;
-	char *netname;
-	struct netid_userdata *argp;
+netname2user_nisplus(int *err, char *netname, struct netid_userdata *argp)
 {
 	char *domain;
 	nis_result *res;
@@ -394,14 +345,10 @@ netname2user_nisplus(err, netname, argp)
 	char	principal[NIS_MAXNAMELEN+1];
 	int len;
 
-	trace1(TR_netname2user_nisplus, 0);
-
-
 	/* 1.  Get home domain of user. */
 	domain = strchr(netname, '@');
-	if (! domain) {
+	if (!domain) {
 		*err = __NSW_UNAVAIL;
-		trace1(TR_netname2user_nisplus, 1);
 		return (0);
 	}
 	domain++;  /* skip '@' */
@@ -411,13 +358,13 @@ netname2user_nisplus(err, netname, argp)
 	if ((strlen(netname)+strlen(domain)+PKTABLE_LEN+32) >
 		(size_t)NIS_MAXNAMELEN) {
 		*err = __NSW_UNAVAIL;
-		trace1(TR_netname2user_nisplus, 1);
 		return (0);
 	}
-	sprintf(sname, "[auth_name=\"%s\",auth_type=DES],%s.%s",
+	(void) snprintf(sname, sizeof (sname),
+		"[auth_name=\"%s\",auth_type=DES],%s.%s",
 		netname, PKTABLE, domain);
 	if (sname[strlen(sname) - 1] != '.')
-		strcat(sname, ".");
+		(void) strcat(sname, ".");
 
 	/* must use authenticated call here */
 	/* XXX but we cant, for now. XXX */
@@ -433,7 +380,6 @@ netname2user_nisplus(err, netname, argp)
 	case NIS_NOSUCHTABLE:
 		*err = __NSW_NOTFOUND;
 		nis_freeresult(res);
-		trace1(TR_netname2user_nisplus, 1);
 		return (0);
 	case NIS_S_NOTFOUND:
 	case NIS_TRYAGAIN:
@@ -442,14 +388,12 @@ netname2user_nisplus(err, netname, argp)
 			"netname2user: (nis+ lookup): %s\n",
 			nis_sperrno(res->status));
 		nis_freeresult(res);
-		trace1(TR_netname2user_nisplus, 1);
 		return (0);
 	default:
 		*err = __NSW_UNAVAIL;
 		syslog(LOG_ERR, "netname2user: (nis+ lookup): %s\n",
 			nis_sperrno(res->status));
 		nis_freeresult(res);
-		trace1(TR_netname2user_nisplus, 1);
 		return (0);
 	}
 
@@ -466,13 +410,12 @@ netname2user_nisplus(err, netname, argp)
 	}
 
 	len = ENTRY_LEN(res->objects.objects_val, 0);
-	strncpy(principal, ENTRY_VAL(res->objects.objects_val, 0), len);
+	(void) strncpy(principal, ENTRY_VAL(res->objects.objects_val, 0), len);
 	principal[len] = '\0';
 	nis_freeresult(res);
 
 	if (principal[0] == '\0') {
 		*err = __NSW_UNAVAIL;
-		trace1(TR_netname2user_nisplus, 1);
 		return (0);
 	}
 
@@ -486,13 +429,13 @@ netname2user_nisplus(err, netname, argp)
 		*err = __NSW_UNAVAIL;
 		syslog(LOG_ERR, "netname2user: principal name '%s' too long",
 			principal);
-		trace1(TR_netname2user_nisplus, 1);
 		return (0);
 	}
-	sprintf(sname, "[cname=\"%s\",auth_type=LOCAL],%s.%s",
+	(void) snprintf(sname, sizeof (sname),
+		"[cname=\"%s\",auth_type=LOCAL],%s.%s",
 		principal, PKTABLE, domain);
 	if (sname[strlen(sname) - 1] != '.')
-		strcat(sname, ".");
+		(void) strcat(sname, ".");
 
 	/* must use authenticated call here */
 	/* XXX but we cant, for now. XXX */
@@ -505,7 +448,6 @@ netname2user_nisplus(err, netname, argp)
 	case NIS_NOSUCHTABLE:
 		*err = __NSW_NOTFOUND;
 		nis_freeresult(res);
-		trace1(TR_netname2user_nisplus, 1);
 		return (0);
 	case NIS_S_NOTFOUND:
 	case NIS_TRYAGAIN:
@@ -514,7 +456,6 @@ netname2user_nisplus(err, netname, argp)
 			"netname2user: (nis+ lookup): %s\n",
 			nis_sperrno(res->status));
 		nis_freeresult(res);
-		trace1(TR_netname2user_nisplus, 1);
 		return (0);
 	case NIS_SUCCESS:
 	case NIS_S_SUCCESS:
@@ -524,7 +465,6 @@ netname2user_nisplus(err, netname, argp)
 		syslog(LOG_ERR, "netname2user: (nis+ lookup): %s\n",
 			nis_sperrno(res->status));
 		nis_freeresult(res);
-		trace1(TR_netname2user_nisplus, 1);
 		return (0);
 	}
 
@@ -545,7 +485,6 @@ netname2user_nisplus(err, netname, argp)
 			ENTRY_VAL(res->objects.objects_val, 3), /* gids */
 			argp);
 	nis_freeresult(res);
-	trace1(TR_netname2user_nisplus, 1);
 	return (*err == __NSW_SUCCESS);
 }
 
@@ -559,14 +498,10 @@ netname2user_nisplus(err, netname, argp)
  * resolution for multiple domains.
  */
 static int
-netname2user_ldap(err, netname, argp)
-	int *err;
-	char *netname;
-	struct netid_userdata *argp;
+netname2user_ldap(int *err, char *netname, struct netid_userdata *argp)
 {
-
 	char buf[NSS_LINELEN_PASSWD];
-	char *p1, *p2, *lasts;
+	char *p2, *lasts;
 	struct passwd pw;
 	uid_t uidnu;
 	int ngroups = 0;
@@ -580,7 +515,7 @@ netname2user_ldap(err, netname, argp)
 	}
 
 	/* get the uid from the netname */
-	if ((p1 = strtok_r(buf, ".", &lasts)) == NULL) {
+	if (strtok_r(buf, ".", &lasts) == NULL) {
 		*err = __NSW_UNAVAIL;
 		return (0);
 	}
@@ -629,12 +564,8 @@ netname2user_ldap(err, netname, argp)
  * Convert network-name into unix credential
  */
 int
-netname2user(netname, uidp, gidp, gidlenp, gidlist)
-	const char netname[MAXNETNAMELEN + 1];
-	uid_t *uidp;
-	gid_t *gidp;
-	int *gidlenp;
-	gid_t *gidlist;
+netname2user(const char netname[MAXNETNAMELEN + 1], uid_t *uidp, gid_t *gidp,
+						int *gidlenp, gid_t *gidlist)
 {
 	struct __nsw_switchconfig *conf;
 	struct __nsw_lookup *look;
@@ -642,8 +573,6 @@ netname2user(netname, uidp, gidp, gidlenp, gidlist)
 	int needfree = 1, res;
 	struct netid_userdata argp;
 	int err;
-
-	trace1(TR_netname2user, 0);
 
 	/*
 	 * Take care of the special case of nobody. Compare the netname
@@ -665,23 +594,19 @@ netname2user(netname, uidp, gidp, gidlenp, gidlist)
 	 * NOTE: this code only recognizes names of the form :
 	 *		unix.UID@domainname
 	 */
-	if (strncmp(netname, OPSYS, OPSYS_LEN) != 0) {
-		trace1(TR_netname2user, 1);
+	if (strncmp(netname, OPSYS, OPSYS_LEN) != 0)
 		return (0);
-	}
-	if (! isdigit(netname[OPSYS_LEN+1])) { /* check for uid string */
-		trace1(TR_netname2user, 1);
+	if (!isdigit(netname[OPSYS_LEN+1]))	/* check for uid string */
 		return (0);
-	}
 
 	argp.uidp = uidp;
 	argp.gidp = gidp;
 	argp.gidlenp = gidlenp;
 	argp.gidlist = gidlist;
-	mutex_lock(&serialize_netname_r);
+	(void) mutex_lock(&serialize_netname_r);
 
 	conf = __nsw_getconfig("publickey", &perr);
-	if (! conf) {
+	if (!conf) {
 		conf = &publickey_default;
 		needfree = 0;
 	} else
@@ -709,8 +634,7 @@ netname2user(netname, uidp, gidp, gidlenp, gidlist)
 			case __NSW_RETURN :
 				if (needfree)
 					__nsw_freeconfig(conf);
-				mutex_unlock(&serialize_netname_r);
-				trace1(TR_netname2user, 1);
+				(void) mutex_unlock(&serialize_netname_r);
 				return (res);
 			default :
 				syslog(LOG_ERR,
@@ -720,8 +644,7 @@ netname2user(netname, uidp, gidp, gidlenp, gidlist)
 	}
 	if (needfree)
 		__nsw_freeconfig(conf);
-	mutex_unlock(&serialize_netname_r);
-	trace1(TR_netname2user, 1);
+	(void) mutex_unlock(&serialize_netname_r);
 	return (0);
 }
 
@@ -735,15 +658,11 @@ netname2user(netname, uidp, gidp, gidlenp, gidlist)
  * We just construct the hostname using information from the domainname.
  */
 int
-netname2host(netname, hostname, hostlen)
-	const char netname[MAXNETNAMELEN + 1];
-	char *hostname;
-	int hostlen;
+netname2host(const char netname[MAXNETNAMELEN + 1], char *hostname,
+							const int hostlen)
 {
 	char *p, *domainname;
 	int len, dlen;
-
-	trace1(TR_netname2host, 0);
 
 	if (!netname) {
 		syslog(LOG_ERR, "netname2host: null netname");
@@ -779,7 +698,7 @@ netname2host(netname, hostname, hostlen)
 	if (*p == '\0')			/* check for null hostname */
 		goto bad_netname;
 
-	strncpy(hostname, p, len);
+	(void) strncpy(hostname, p, len);
 
 	/* make into fully qualified hostname by concatenating domain part */
 	dlen = strlen(domainname);
@@ -790,18 +709,15 @@ netname2host(netname, hostname, hostlen)
 	}
 
 	hostname[len] = '.';
-	strncpy(hostname+len+1, domainname, dlen);
+	(void) strncpy(hostname+len+1, domainname, dlen);
 	hostname[len+dlen+1] = '\0';
 
-	trace1(TR_netname2host, 1);
 	return (1);
-
 
 bad_netname:
 	syslog(LOG_ERR, "netname2host: invalid host netname %s", netname);
 
 bad_exit:
 	hostname[0] = '\0';
-	trace1(TR_netname2host, 1);
 	return (0);
 }

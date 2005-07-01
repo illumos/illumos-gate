@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +33,6 @@
 
 #include	<sys/select.h>
 #include	<sys/types.h>
-#include	<rpc/trace.h>
 #include	<sys/time.h>
 #include	<sys/poll.h>
 #include	<rpc/rpc.h>
@@ -45,6 +45,7 @@
 #include 	<ctype.h>
 #include 	<sys/resource.h>
 #include 	<netconfig.h>
+#include 	<stdlib.h>
 #include 	<malloc.h>
 #include 	<string.h>
 
@@ -94,7 +95,7 @@ rac_send(CLIENT *cl, rpcproc_t proc, xdrproc_t xargs, void *argsp,
  * expensive call every time.
  */
 int
-__rpc_dtbsize()
+__rpc_dtbsize(void)
 {
 	static int tbsize = 0;
 	struct rlimit rl;
@@ -170,15 +171,13 @@ __rpc_getconfip(char *nettype)
 	char *netid;
 	static char *netid_tcp;
 	static char *netid_udp;
-	struct netconfig *dummy;
 
 	if (!netid_udp && !netid_tcp) {
 		struct netconfig *nconf;
 		void *confighandle;
 
-		if (!(confighandle = setnetconfig())) {
+		if (!(confighandle = setnetconfig()))
 			return (NULL);
-		}
 		while (nconf = getnetconfig(confighandle)) {
 			if (strcmp(nconf->nc_protofmly, NC_INET) == 0) {
 				if (strcmp(nconf->nc_proto, NC_TCP) == 0)
@@ -194,13 +193,11 @@ __rpc_getconfip(char *nettype)
 	else if (strcmp(nettype, "tcp") == 0)
 		netid = netid_tcp;
 	else {
-		return ((struct netconfig *)NULL);
+		return (NULL);
 	}
-	if ((netid == NULL) || (netid[0] == NULL)) {
-		return ((struct netconfig *)NULL);
-	}
-	dummy = getnetconfigent(netid);
-	return (dummy);
+	if ((netid == NULL) || (netid[0] == NULL))
+		return (NULL);
+	return (getnetconfigent(netid));
 }
 
 struct handle {
@@ -244,9 +241,8 @@ getnettype(char *nettype)
 {
 	int i;
 
-	if ((nettype == NULL) || (nettype[0] == NULL)) {
+	if ((nettype == NULL) || (nettype[0] == NULL))
 		return (_RPC_NETPATH);	/* Default */
-	}
 
 	nettype = strlocase(nettype);
 	for (i = 0; _rpctypelist[i].name; i++)
@@ -265,10 +261,9 @@ __rpc_setconf(char *nettype)
 {
 	struct handle *handle;
 
-	handle = (struct handle *)malloc(sizeof (struct handle));
-	if (handle == NULL) {
+	handle = malloc(sizeof (struct handle));
+	if (handle == NULL)
 		return (NULL);
-	}
 	switch (handle->nettype = getnettype(nettype)) {
 	case _RPC_NETPATH:
 	case _RPC_CIRCUIT_N:
@@ -307,16 +302,15 @@ __rpc_getconf(void *vhandle)
 	struct netconfig *nconf;
 
 	handle = (struct handle *)vhandle;
-	if (handle == NULL) {
+	if (handle == NULL)
 		return (NULL);
-	}
 	/* CONSTCOND */
 	while (1) {
 		if (handle->nflag)
 			nconf = getnetpath(handle->nhandle);
 		else
 			nconf = getnetconfig(handle->nhandle);
-		if (nconf == (struct netconfig *)NULL)
+		if (nconf == NULL)
 			break;
 		if ((nconf->nc_semantics != NC_TPI_CLTS) &&
 			(nconf->nc_semantics != NC_TPI_COTS) &&
@@ -371,9 +365,8 @@ __rpc_endconf(void *vhandle)
 	struct handle *handle;
 
 	handle = (struct handle *)vhandle;
-	if (handle == NULL) {
+	if (handle == NULL)
 		return;
-	}
 	if (handle->nflag) {
 		(void) endnetpath(handle->nhandle);
 	} else {
@@ -394,12 +387,11 @@ __rpc_endconf(void *vhandle)
 int
 __rpc_select_to_poll(int fdmax, fd_set *fdset, struct pollfd *p0)
 {
-	/* register declarations ordered by expected frequency of use */
-	register long *in;
-	register int j;		/* loop counter */
-	register ulong_t b;	/* bits to test */
-	register int n;
-	register struct pollfd	*p = p0;
+	long *in;
+	int j;		/* loop counter */
+	ulong_t b;	/* bits to test */
+	int n;
+	struct pollfd	*p = p0;
 
 	/*
 	 * For each fd, if the appropriate bit is set convert it into
@@ -446,67 +438,54 @@ __rpc_timeval_to_msec(struct timeval *t)
 static void
 accepted(enum accept_stat acpt_stat, struct rpc_err *error)
 {
-	trace1(TR_accepted, 0);
 	switch (acpt_stat) {
 
 	case PROG_UNAVAIL:
 		error->re_status = RPC_PROGUNAVAIL;
-		trace1(TR_accepted, 1);
 		return;
 
 	case PROG_MISMATCH:
 		error->re_status = RPC_PROGVERSMISMATCH;
-		trace1(TR_accepted, 1);
 		return;
 
 	case PROC_UNAVAIL:
 		error->re_status = RPC_PROCUNAVAIL;
-		trace1(TR_accepted, 1);
 		return;
 
 	case GARBAGE_ARGS:
 		error->re_status = RPC_CANTDECODEARGS;
-		trace1(TR_accepted, 1);
 		return;
 
 	case SYSTEM_ERR:
 		error->re_status = RPC_SYSTEMERROR;
-		trace1(TR_accepted, 1);
 		return;
 
 	case SUCCESS:
 		error->re_status = RPC_SUCCESS;
-		trace1(TR_accepted, 1);
 		return;
 	}
 	/* something's wrong, but we don't know what ... */
 	error->re_status = RPC_FAILED;
 	error->re_lb.s1 = (int32_t)MSG_ACCEPTED;
 	error->re_lb.s2 = (int32_t)acpt_stat;
-	trace1(TR_accepted, 1);
 }
 
 static void
 rejected(enum reject_stat rjct_stat, struct rpc_err *error)
 {
-
-	trace1(TR_rejected, 0);
 	switch (rjct_stat) {
 	case RPC_MISMATCH:
 		error->re_status = RPC_VERSMISMATCH;
-		trace1(TR_rejected, 1);
 		return;
 
 	case AUTH_ERROR:
 		error->re_status = RPC_AUTHERROR;
-		trace1(TR_rejected, 1);
 		return;
 	}
 	/* something's wrong, but we don't know what ... */
 	error->re_status = RPC_FAILED;
 	error->re_lb.s1 = (int32_t)MSG_DENIED;
 	error->re_lb.s2 = (int32_t)rjct_stat;
-	trace1(TR_rejected, 1);
 }
 
 /*

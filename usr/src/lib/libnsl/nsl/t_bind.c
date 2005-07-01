@@ -19,21 +19,19 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3.4.1 */
 
 #include "mt.h"
 #include <stdlib.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <string.h>
 #include <stropts.h>
@@ -64,13 +62,8 @@ _tx_bind(
 	int use_xpg41tpi;
 	struct strbuf ctlbuf;
 
-	trace2(TR_t_bind, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_bind, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 
 	/*
 	 * We block all signals since TI_BIND, which sends a TPI message
@@ -89,7 +82,6 @@ _tx_bind(
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
 			(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-			trace2(TR_t_bind, 1, fd);
 			return (-1);
 		}
 	}
@@ -102,11 +94,11 @@ _tx_bind(
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
 		(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-		trace2(TR_t_bind, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
 
+	/* LINTED pointer cast */
 	bind_reqp = (struct T_bind_req *)ctlbuf.buf;
 	size = (int)sizeof (struct T_bind_req);
 
@@ -148,6 +140,7 @@ _tx_bind(
 		goto err_out;
 	}
 
+	/* LINTED pointer cast */
 	bind_ackp = (struct T_bind_ack *)ctlbuf.buf;
 
 	if ((req != NULL) && req->addr.len != 0 &&
@@ -201,7 +194,6 @@ _tx_bind(
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-	trace2(TR_t_bind, 1, fd);
 	return (0);
 	/* NOTREACHED */
 err_out:
@@ -212,7 +204,6 @@ err_out:
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-	trace2(TR_t_bind, 1, fd);
 	errno = sv_errno;
 	return (-1);
 }

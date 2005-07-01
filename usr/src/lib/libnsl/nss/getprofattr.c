@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,7 +30,6 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <nss_dbdefs.h>
-#include <rpc/trace.h>
 #include <string.h>
 #include <prof_attr.h>
 
@@ -48,10 +48,8 @@ static DEFINE_NSS_GETENT(context);
 void
 _nss_initf_profattr(nss_db_params_t *p)
 {
-	trace1(TR__nss_initf_profattr, 0);
 	p->name    = NSS_DBNAM_PROFATTR;
 	p->default_config = NSS_DEFCONF_PROFATTR;
-	trace1(TR__nss_initf_profattr, 1);
 }
 
 
@@ -64,28 +62,22 @@ _nss_initf_profattr(nss_db_params_t *p)
 int
 str2profattr(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 {
-	char		*last = (char *)NULL;
+	char		*last = NULL;
 	char		*sep = KV_TOKEN_DELIMIT;
 	profstr_t	*prof = (profstr_t *)ent;
 
-	trace3(TR_str2profattr, 0, lenstr, buflen);
 	if ((instr >= buffer && (buffer + buflen) > instr) ||
-	    (buffer >= instr && (instr + lenstr) > buffer)) {
-		trace3(TR_str2profattr, 1, lenstr, buflen);
+	    (buffer >= instr && (instr + lenstr) > buffer))
 		return (NSS_STR_PARSE_PARSE);
-	}
-	if (lenstr >= buflen) {
-		trace3(TR_str2profattr, 1, lenstr, buflen);
+	if (lenstr >= buflen)
 		return (NSS_STR_PARSE_ERANGE);
-	}
-	strncpy(buffer, instr, buflen);
+	(void) strncpy(buffer, instr, buflen);
 	/*
 	 * Remove newline that nis (yp_match) puts at the
 	 * end of the entry it retrieves from the map.
 	 */
-	if (buffer[lenstr] == '\n') {
+	if (buffer[lenstr] == '\n')
 		buffer[lenstr] = '\0';
-	}
 
 	prof->name = _strtok_escape(buffer, sep, &last);
 	prof->res1 = _strtok_escape(NULL, sep, &last);
@@ -100,21 +92,17 @@ str2profattr(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 void
 _setprofattr(void)
 {
-	trace1(TR_setprofattr, 0);
 	profattr_stayopen = 0;
 	nss_setent(&db_root, _nss_initf_profattr, &context);
-	trace1(TR_setprofattr, 0);
 }
 
 
 void
 _endprofattr(void)
 {
-	trace1(TR_endprofattr, 0);
 	profattr_stayopen = 0;
 	nss_endent(&db_root, _nss_initf_profattr, &context);
 	nss_delete(&db_root);
-	trace1(TR_endprofattr, 0);
 }
 
 
@@ -124,12 +112,10 @@ _getprofattr(profstr_t *result, char *buffer, int buflen, int *h_errnop)
 	nss_XbyY_args_t arg;
 	nss_status_t    res;
 
-	trace2(TR_getprofattr, 0, buflen);
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2profattr);
 	res = nss_getent(&db_root, _nss_initf_profattr, &context, &arg);
 	arg.status = res;
 	*h_errnop = arg.h_errno;
-	trace2(TR_getprofattr, 1, buflen);
 	return ((profstr_t *)NSS_XbyY_FINI(&arg));
 }
 
@@ -141,14 +127,12 @@ _getprofnam(const char *name, profstr_t *result, char *buffer, int buflen,
 	nss_XbyY_args_t arg;
 	nss_status_t    res;
 
-	trace2(TR_getprofnam, 0, buflen);
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2profattr);
 	arg.key.name = name;
 	arg.stayopen = profattr_stayopen;
 	res = nss_search(&db_root, _nss_initf_profattr,
-	    NSS_DBOP_PROFATTR_BYNAME, &arg);
+						NSS_DBOP_PROFATTR_BYNAME, &arg);
 	arg.status = res;
 	*errnop = arg.h_errno;
-	trace2(TR_getprofnam, 1, buflen);
 	return ((profstr_t *)NSS_XbyY_FINI(&arg));
 }

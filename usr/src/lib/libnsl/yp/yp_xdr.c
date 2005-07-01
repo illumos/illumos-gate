@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,38 +40,35 @@
  * This contains ALL xdr routines used by the YP rpc interface.
  */
 
-#define	NULL 0
+#include <unistd.h>
+#include <stdlib.h>
 #include <rpc/rpc.h>
 #include "yp_b.h"
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/ypclnt.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
-#include <stdlib.h>
 #include <limits.h>
 
 static bool xdr_ypmaplist(XDR *, struct ypmaplist **);
 static bool xdr_ypmaplist_wrap_string(XDR *, char *);
 
 typedef struct xdr_discrim XDR_DISCRIM;
-bool xdr_ypreq_key(XDR *, struct ypreq_key *);
-bool xdr_ypreq_nokey(XDR *, struct ypreq_nokey *);
-bool xdr_ypresp_val(XDR *, struct ypresp_val *);
-bool xdr_ypresp_key_val(XDR *, struct ypresp_key_val *);
-bool xdr_ypmap_parms(XDR *, struct ypmap_parms *);
-bool xdr_ypowner_wrap_string(XDR *, char **);
-bool xdr_ypreq_newname_string(XDR *, char **);
+extern bool xdr_ypreq_key(XDR *, struct ypreq_key *);
+extern bool xdr_ypreq_nokey(XDR *, struct ypreq_nokey *);
+extern bool xdr_ypresp_val(XDR *, struct ypresp_val *);
+extern bool xdr_ypresp_key_val(XDR *, struct ypresp_key_val *);
+extern bool xdr_ypmap_parms(XDR *, struct ypmap_parms *);
+extern bool xdr_ypowner_wrap_string(XDR *, char **);
+extern bool xdr_ypreq_newname_string(XDR *, char **);
 
 
 /*
  * Serializes/deserializes a dbm datum data structure.
  */
 bool
-xdr_datum(xdrs, pdatum)
-	XDR * xdrs;
-	datum * pdatum;
+xdr_datum(XDR *xdrs, datum *pdatum)
 {
-	bool dummy;
+	bool res;
 	uint_t dsize;
 
 	/*
@@ -78,19 +77,18 @@ xdr_datum(xdrs, pdatum)
 	 * datum.dsize is a long, we need a new temporary to pass to
 	 * xdr_bytes()
 	 */
-	trace1(TR_xdr_datum, 0);
 	if (xdrs->x_op == XDR_ENCODE) {
 		if (pdatum->dsize > UINT_MAX)
 			return (FALSE);
 	}
 	dsize = (uint_t)pdatum->dsize;
-	dummy = xdr_bytes(xdrs, (char **)&(pdatum->dptr), &dsize, YPMAXRECORD);
+	res = (bool)xdr_bytes(xdrs, (char **)&(pdatum->dptr), &dsize,
+								YPMAXRECORD);
 	if (xdrs->x_op == XDR_DECODE) {
 		pdatum->dsize = dsize;
 	}
 
-	trace1(TR_xdr_datum, 1);
-	return (dummy);
+	return (res);
 }
 
 
@@ -99,16 +97,9 @@ xdr_datum(xdrs, pdatum)
  * xdr_string which knows about the maximum domain name size.
  */
 bool
-xdr_ypdomain_wrap_string(xdrs, ppstring)
-	XDR * xdrs;
-	char **ppstring;
+xdr_ypdomain_wrap_string(XDR *xdrs, char **ppstring)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypdomain_wrap_string, 0);
-	dummy = xdr_string(xdrs, ppstring, YPMAXDOMAIN);
-	trace1(TR_xdr_ypdomain_wrap_string, 1);
-	return (dummy);
+	return ((bool)xdr_string(xdrs, ppstring, YPMAXDOMAIN));
 }
 
 /*
@@ -116,172 +107,101 @@ xdr_ypdomain_wrap_string(xdrs, ppstring)
  * xdr_string which knows about the maximum map name size.
  */
 bool
-xdr_ypmap_wrap_string(xdrs, ppstring)
-	XDR * xdrs;
-	char **ppstring;
+xdr_ypmap_wrap_string(XDR *xdrs, char **ppstring)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypmap_wrap_string, 0);
-	dummy = xdr_string(xdrs, ppstring, YPMAXMAP);
-	trace1(TR_xdr_ypmap_wrap_string, 1);
-	return (dummy);
+	return ((bool)xdr_string(xdrs, ppstring, YPMAXMAP));
 }
 
 /*
  * Serializes/deserializes a ypreq_key structure.
  */
 bool
-xdr_ypreq_key(xdrs, ps)
-	XDR *xdrs;
-	struct ypreq_key *ps;
+xdr_ypreq_key(XDR *xdrs, struct ypreq_key *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypreq_key, 0);
-	dummy =  xdr_ypdomain_wrap_string(xdrs, &ps->domain) &&
+	return ((bool)(xdr_ypdomain_wrap_string(xdrs, &ps->domain) &&
 		    xdr_ypmap_wrap_string(xdrs, &ps->map) &&
-		    xdr_datum(xdrs, &ps->keydat);
-	trace1(TR_xdr_ypreq_key, 1);
-	return (dummy);
+		    xdr_datum(xdrs, &ps->keydat)));
 }
 
 /*
  * Serializes/deserializes a ypreq_nokey structure.
  */
 bool
-xdr_ypreq_nokey(xdrs, ps)
-	XDR * xdrs;
-	struct ypreq_nokey *ps;
+xdr_ypreq_nokey(XDR *xdrs, struct ypreq_nokey *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypreq_nokey, 0);
-	dummy = xdr_ypdomain_wrap_string(xdrs, &ps->domain) &&
-		    xdr_ypmap_wrap_string(xdrs, &ps->map);
-	trace1(TR_xdr_ypreq_nokey, 1);
-	return (dummy);
+	return ((bool)(xdr_ypdomain_wrap_string(xdrs, &ps->domain) &&
+		    xdr_ypmap_wrap_string(xdrs, &ps->map)));
 }
 
 /*
  * Serializes/deserializes a ypresp_val structure.
  */
-
 bool
-xdr_ypresp_val(xdrs, ps)
-	XDR * xdrs;
-	struct ypresp_val *ps;
+xdr_ypresp_val(XDR *xdrs, struct ypresp_val *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypresp_val, 0);
-	dummy = xdr_u_int(xdrs, &ps->status) &&
-		    xdr_datum(xdrs, &ps->valdat);
-	trace1(TR_xdr_ypresp_val, 1);
-	return (dummy);
+	return ((bool)(xdr_u_int(xdrs, &ps->status) &&
+		    xdr_datum(xdrs, &ps->valdat)));
 }
 
 /*
  * Serializes/deserializes a ypresp_key_val structure.
  */
 bool
-xdr_ypresp_key_val(xdrs, ps)
-	XDR * xdrs;
-	struct ypresp_key_val *ps;
+xdr_ypresp_key_val(XDR *xdrs, struct ypresp_key_val *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypresp_key_val, 0);
-	dummy = xdr_u_int(xdrs, &ps->status) &&
+	return ((bool)(xdr_u_int(xdrs, &ps->status) &&
 	    xdr_datum(xdrs, &ps->valdat) &&
-	    xdr_datum(xdrs, &ps->keydat);
-	trace1(TR_xdr_ypresp_key_val, 1);
-	return (dummy);
+	    xdr_datum(xdrs, &ps->keydat)));
 }
 
 /*
  * Serializes/deserializes a peer server's node name
  */
 bool
-xdr_ypowner_wrap_string(xdrs, ppstring)
-	XDR * xdrs;
-	char **ppstring;
+xdr_ypowner_wrap_string(XDR *xdrs, char **ppstring)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypowner_wrap_string, 0);
-	dummy = xdr_string(xdrs, ppstring, YPMAXPEER);
-	trace1(TR_xdr_ypowner_wrap_string, 1);
-	return (dummy);
+	return ((bool)xdr_string(xdrs, ppstring, YPMAXPEER));
 }
 
 /*
  * Serializes/deserializes a ypmap_parms structure.
  */
 bool
-xdr_ypmap_parms(xdrs, ps)
-	XDR *xdrs;
-	struct ypmap_parms *ps;
+xdr_ypmap_parms(XDR *xdrs, struct ypmap_parms *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypmap_parms, 0);
-	dummy = xdr_ypdomain_wrap_string(xdrs, &ps->domain) &&
+	return ((bool)(xdr_ypdomain_wrap_string(xdrs, &ps->domain) &&
 	    xdr_ypmap_wrap_string(xdrs, &ps->map) &&
 	    xdr_u_int(xdrs, &ps->ordernum) &&
-	    xdr_ypowner_wrap_string(xdrs, &ps->owner);
-	trace1(TR_xdr_ypmap_parms, 1);
-	return (dummy);
+	    xdr_ypowner_wrap_string(xdrs, &ps->owner)));
 }
 
 /*
  * Serializes/deserializes a ypreq_newxfr name
  */
 bool
-xdr_ypreq_newname_string(xdrs, ppstring)
-	XDR * xdrs;
-	char **ppstring;
+xdr_ypreq_newname_string(XDR *xdrs, char **ppstring)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypreq_newname_string, 0);
-	dummy =  xdr_string(xdrs, ppstring, 256);
-	trace1(TR_xdr_ypreq_newname_string, 1);
-	return (dummy);
+	return ((bool)xdr_string(xdrs, ppstring, 256));
 }
 
 /*
  * Serializes/deserializes a ypresp_master structure.
  */
 bool
-xdr_ypresp_master(xdrs, ps)
-	XDR * xdrs;
-	struct ypresp_master *ps;
+xdr_ypresp_master(XDR *xdrs, struct ypresp_master *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypresp_master, 0);
-	dummy = xdr_u_int(xdrs, &ps->status) &&
-	    xdr_ypowner_wrap_string(xdrs, &ps->master);
-	trace1(TR_xdr_ypresp_master, 1);
-	return (dummy);
+	return ((bool)(xdr_u_int(xdrs, &ps->status) &&
+	    xdr_ypowner_wrap_string(xdrs, &ps->master)));
 }
 
 /*
  * Serializes/deserializes a ypresp_order structure.
  */
 bool
-xdr_ypresp_order(xdrs, ps)
-	XDR * xdrs;
-	struct ypresp_order *ps;
+xdr_ypresp_order(XDR *xdrs, struct ypresp_order *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypresp_order, 0);
-	dummy =  xdr_u_int(xdrs, &ps->status) &&
-	    xdr_u_int(xdrs, &ps->ordernum);
-	trace1(TR_xdr_ypresp_order, 1);
-	return (dummy);
+	return ((bool)(xdr_u_int(xdrs, &ps->status) &&
+	    xdr_u_int(xdrs, &ps->ordernum)));
 }
 
 /*
@@ -290,56 +210,40 @@ xdr_ypresp_order(xdrs, ps)
  * containing the char array itself.
  */
 static bool
-xdr_ypmaplist_wrap_string(xdrs, pstring)
-	XDR * xdrs;
-	char *pstring;
+xdr_ypmaplist_wrap_string(XDR *xdrs, char *pstring)
 {
 	char *s;
-	bool dummy;
 
-
-	trace1(TR_xdr_ypmaplist_wrap_string, 0);
 	s = pstring;
-	dummy = xdr_string(xdrs, &s, YPMAXMAP);
-	trace1(TR_xdr_ypmaplist_wrap_string, 1);
-	return (dummy);
+	return ((bool)xdr_string(xdrs, &s, YPMAXMAP));
 }
 
 /*
  * Serializes/deserializes a ypmaplist.
  */
 static bool
-xdr_ypmaplist(xdrs, lst)
-	XDR *xdrs;
-	struct ypmaplist **lst;
+xdr_ypmaplist(XDR *xdrs, struct ypmaplist **lst)
 {
 	bool_t more_elements;
 	int freeing = (xdrs->x_op == XDR_FREE);
 	struct ypmaplist **next;
 
-	trace1(TR_xdr_ypmaplist, 0);
 	for (;;) {
-		more_elements = (*lst != (struct ypmaplist *) NULL);
+		more_elements = (*lst != NULL);
 
-		if (! xdr_bool(xdrs, &more_elements)) {
-			trace1(TR_xdr_ypmaplist, 1);
+		if (!xdr_bool(xdrs, &more_elements))
 			return (FALSE);
-		}
 
-		if (! more_elements) {
-			trace1(TR_xdr_ypmaplist, 1);
+		if (!more_elements)
 			return (TRUE);  /* All done */
-		}
 
 		if (freeing)
 			next = &((*lst)->ypml_next);
 
-		if (! xdr_reference(xdrs, (caddr_t *)lst,
-			(u_int) sizeof (struct ypmaplist),
-		    (xdrproc_t)xdr_ypmaplist_wrap_string)) {
-			trace1(TR_xdr_ypmaplist, 1);
+		if (!xdr_reference(xdrs, (caddr_t *)lst,
+			(uint_t)sizeof (struct ypmaplist),
+		    (xdrproc_t)xdr_ypmaplist_wrap_string))
 			return (FALSE);
-		}
 
 		lst = (freeing) ? next : &((*lst)->ypml_next);
 	}
@@ -350,34 +254,20 @@ xdr_ypmaplist(xdrs, lst)
  * Serializes/deserializes a ypresp_maplist.
  */
 bool
-xdr_ypresp_maplist(xdrs, ps)
-	XDR * xdrs;
-	struct ypresp_maplist *ps;
+xdr_ypresp_maplist(XDR *xdrs, struct ypresp_maplist *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypresp_maplist, 0);
-	dummy = xdr_u_int(xdrs, &ps->status) &&
-		xdr_ypmaplist(xdrs, &ps->list);
-	trace1(TR_xdr_ypresp_maplist, 1);
-	return (dummy);
+	return ((bool)(xdr_u_int(xdrs, &ps->status) &&
+		xdr_ypmaplist(xdrs, &ps->list)));
 }
 
 /*
  * Serializes/deserializes a yppushresp_xfr structure.
  */
 bool
-xdr_yppushresp_xfr(xdrs, ps)
-	XDR *xdrs;
-	struct yppushresp_xfr *ps;
+xdr_yppushresp_xfr(XDR *xdrs, struct yppushresp_xfr *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_yppushresp_xfr, 0);
-	dummy = xdr_u_int(xdrs, &ps->transid) &&
-	    xdr_u_int(xdrs, &ps->status);
-	trace1(TR_xdr_yppushresp_xfr, 1);
-	return (dummy);
+	return ((bool)(xdr_u_int(xdrs, &ps->transid) &&
+	    xdr_u_int(xdrs, &ps->status)));
 }
 
 
@@ -385,38 +275,24 @@ xdr_yppushresp_xfr(xdrs, ps)
  * Serializes/deserializes a ypreq_xfr structure.
  */
 bool
-xdr_ypreq_newxfr(xdrs, ps)
-	XDR * xdrs;
-	struct ypreq_newxfr *ps;
+xdr_ypreq_newxfr(XDR *xdrs, struct ypreq_newxfr *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypreq_newxfr, 0);
-	dummy = xdr_ypmap_parms(xdrs, &ps->map_parms) &&
+	return ((bool)(xdr_ypmap_parms(xdrs, &ps->map_parms) &&
 	    xdr_u_int(xdrs, &ps->transid) &&
 	    xdr_u_int(xdrs, &ps->proto) &&
-	    xdr_string(xdrs, &ps->name, 256);
-	trace1(TR_xdr_ypreq_newxfr, 1);
-	return (dummy);
+	    xdr_string(xdrs, &ps->name, 256)));
 }
 
 /*
  * Serializes/deserializes a ypreq_xfr structure.
  */
 bool
-xdr_ypreq_xfr(xdrs, ps)
-	XDR * xdrs;
-	struct ypreq_xfr *ps;
+xdr_ypreq_xfr(XDR *xdrs, struct ypreq_xfr *ps)
 {
-	bool dummy;
-
-	trace1(TR_xdr_ypreq_xfr, 0);
-	dummy =  xdr_ypmap_parms(xdrs, &ps->map_parms) &&
+	return ((bool)(xdr_ypmap_parms(xdrs, &ps->map_parms) &&
 	    xdr_u_int(xdrs, &ps->transid) &&
 	    xdr_u_int(xdrs, &ps->proto) &&
-	    xdr_u_short(xdrs, &ps->port);
-	trace1(TR_xdr_ypreq_xfr, 1);
-	return (dummy);
+	    xdr_u_short(xdrs, &ps->port)));
 }
 
 
@@ -425,26 +301,18 @@ xdr_ypreq_xfr(xdrs, ps)
  * only by the client side of the batch enumerate operation.
  */
 bool
-xdr_ypall(xdrs, callback)
-	XDR * xdrs;
-	struct ypall_callback *callback;
+xdr_ypall(XDR *xdrs, struct ypall_callback *callback)
 {
 	bool_t more;
 	struct ypresp_key_val kv;
-	bool s;
 	char keybuf[YPMAXRECORD];
 	char valbuf[YPMAXRECORD];
 
-	trace1(TR_xdr_ypall, 0);
-	if (xdrs->x_op == XDR_ENCODE) {
-		trace1(TR_xdr_ypall, 1);
+	if (xdrs->x_op == XDR_ENCODE)
 		return (FALSE);
-	}
 
-	if (xdrs->x_op == XDR_FREE) {
-		trace1(TR_xdr_ypall, 1);
+	if (xdrs->x_op == XDR_FREE)
 		return (TRUE);
-	}
 
 	kv.keydat.dptr = keybuf;
 	kv.valdat.dptr = valbuf;
@@ -452,76 +320,40 @@ xdr_ypall(xdrs, callback)
 	kv.valdat.dsize = YPMAXRECORD;
 
 	for (;;) {
-		if (! xdr_bool(xdrs, &more)) {
-			trace1(TR_xdr_ypall, 1);
+		if (!xdr_bool(xdrs, &more))
 			return (FALSE);
-		}
 
-		if (! more) {
-			trace1(TR_xdr_ypall, 1);
+		if (!more)
 			return (TRUE);
-		}
 
-		s = xdr_ypresp_key_val(xdrs, &kv);
-
-		if (s) {
-			s = (*callback->foreach)(kv.status, kv.keydat.dptr,
-			    kv.keydat.dsize, kv.valdat.dptr, kv.valdat.dsize,
-			    callback->data);
-
-			if (s) {
-				trace1(TR_xdr_ypall, 1);
-				return (TRUE);
-			}
-		} else {
-			trace1(TR_xdr_ypall, 1);
+		if (!xdr_ypresp_key_val(xdrs, &kv))
 			return (FALSE);
-		}
+		if ((*callback->foreach)(kv.status, kv.keydat.dptr,
+			    kv.keydat.dsize, kv.valdat.dptr, kv.valdat.dsize,
+			    callback->data))
+			return (TRUE);
 	}
 }
 
 bool_t
-xdr_netconfig(xdrs, objp)
-	XDR *xdrs;
-	struct netconfig *objp;
+xdr_netconfig(XDR *xdrs, struct netconfig *objp)
 {
-
-	trace1(TR_xdr_netconfig, 0);
-	if (!xdr_string(xdrs, &objp->nc_netid, ~0)) {
-		trace1(TR_xdr_netconfig, 1);
+	if (!xdr_string(xdrs, &objp->nc_netid, ~0))
 		return (FALSE);
-	}
-	if (!xdr_u_int(xdrs, &objp->nc_semantics)) {
-		trace1(TR_xdr_netconfig, 1);
+	if (!xdr_u_int(xdrs, &objp->nc_semantics))
 		return (FALSE);
-	}
-	if (!xdr_u_int(xdrs, &objp->nc_flag)) {
-		trace1(TR_xdr_netconfig, 1);
+	if (!xdr_u_int(xdrs, &objp->nc_flag))
 		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->nc_protofmly, ~0)) {
-		trace1(TR_xdr_netconfig, 1);
+	if (!xdr_string(xdrs, &objp->nc_protofmly, ~0))
 		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->nc_proto, ~0)) {
-		trace1(TR_xdr_netconfig, 1);
+	if (!xdr_string(xdrs, &objp->nc_proto, ~0))
 		return (FALSE);
-	}
-	if (!xdr_string(xdrs, &objp->nc_device, ~0)) {
-		trace1(TR_xdr_netconfig, 1);
+	if (!xdr_string(xdrs, &objp->nc_device, ~0))
 		return (FALSE);
-	}
-	if (!xdr_array(xdrs, (char **) &objp->nc_lookups,
-		(u_int *)&objp->nc_nlookups, 100, sizeof (char *),
-		xdr_wrapstring)) {
-		trace1(TR_xdr_netconfig, 1);
+	if (!xdr_array(xdrs, (char **)&objp->nc_lookups,
+		(uint_t *)&objp->nc_nlookups, 100, sizeof (char *),
+		xdr_wrapstring))
 		return (FALSE);
-	}
-	if (!xdr_vector(xdrs, (char *)objp->nc_unused,
-		8, sizeof (u_int), xdr_u_int)) {
-		trace1(TR_xdr_netconfig, 1);
-		return (FALSE);
-	}
-	trace1(TR_xdr_netconfig, 1);
-	return (TRUE);
+	return ((bool)xdr_vector(xdrs, (char *)objp->nc_unused,
+		8, sizeof (uint_t), xdr_u_int));
 }

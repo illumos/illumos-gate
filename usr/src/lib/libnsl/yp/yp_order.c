@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,15 +36,13 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	NULL 0
+#include <stdlib.h>
+#include <unistd.h>
 #include <rpc/rpc.h>
 #include "yp_b.h"
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/ypclnt.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 
 static int doorder(char *, char *, struct dom_binding *, struct timeval,
@@ -54,38 +54,28 @@ static int doorder(char *, char *, struct dom_binding *, struct timeval,
  * loop.
  */
 int
-yp_order (domain, map, order)
-	char *domain;
-	char *map;
-	unsigned long *order;
+yp_order(char *domain, char *map, unsigned long *order)
 {
 	size_t domlen;
 	size_t maplen;
 	int reason;
 	struct dom_binding *pdomb;
 
-	trace1(TR_yp_order, 0);
-	if ((map == NULL) || (domain == NULL)) {
-		trace1(TR_yp_order, 1);
+	if ((map == NULL) || (domain == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	domlen = strlen(domain);
 	maplen = strlen(map);
 
 	if ((domlen == 0) || (domlen > YPMAXDOMAIN) ||
 	    (maplen == 0) || (maplen > YPMAXMAP) ||
-	    (order == NULL)) {
-		trace1(TR_yp_order, 1);
+	    (order == NULL))
 		return (YPERR_BADARGS);
-	}
 
 	for (;;) {
 
-		if (reason = __yp_dobind(domain, &pdomb)) {
-			trace1(TR_yp_order, 1);
+		if (reason = __yp_dobind(domain, &pdomb))
 			return (reason);
-		}
 
 		if (pdomb->dom_binding->ypbind_hi_vers >= YPVERS) {
 
@@ -101,32 +91,24 @@ yp_order (domain, map, order)
 			}
 		} else {
 			__yp_rel_binding(pdomb);
-			trace1(TR_yp_order, 1);
 			return (YPERR_VERS);
 		}
 	}
 
-	trace1(TR_yp_order, 1);
 	return (reason);
-
 }
 
 /*
  * This talks v3 to ypserv
  */
 static int
-doorder (domain, map, pdomb, timeout, order)
-	char *domain;
-	char *map;
-	struct dom_binding *pdomb;
-	struct timeval timeout;
-	unsigned long *order;
+doorder(char *domain, char *map, struct dom_binding *pdomb,
+				struct timeval timeout, unsigned long *order)
 {
 	struct ypreq_nokey req;
 	struct ypresp_order resp;
 	unsigned int retval = 0;
 
-	trace1(TR_doorder, 0);
 	req.domain = domain;
 	req.map = map;
 	(void) memset((char *)&resp, 0, sizeof (struct ypresp_order));
@@ -138,11 +120,9 @@ doorder (domain, map, pdomb, timeout, order)
 
 	if (clnt_call(pdomb->dom_client, YPPROC_ORDER,
 			(xdrproc_t)xdr_ypreq_nokey,
-		    (char *)&req, (xdrproc_t) xdr_ypresp_order, (char *)&resp,
-		    timeout) != RPC_SUCCESS) {
-		trace1(TR_doorder, 1);
+		    (char *)&req, (xdrproc_t)xdr_ypresp_order, (char *)&resp,
+		    timeout) != RPC_SUCCESS)
 		return (YPERR_RPC);
-	}
 
 	/* See if the request succeeded */
 
@@ -153,7 +133,5 @@ doorder (domain, map, pdomb, timeout, order)
 	*order = (unsigned long)resp.ordernum;
 	CLNT_FREERES(pdomb->dom_client,
 		(xdrproc_t)xdr_ypresp_order, (char *)&resp);
-	trace1(TR_doorder, 1);
 	return (retval);
-
 }

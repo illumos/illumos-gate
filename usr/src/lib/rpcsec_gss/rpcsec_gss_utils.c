@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1986-1995,1997, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +39,6 @@
 #include <gssapi/gssapi_ext.h>
 #include <rpc/rpc.h>
 #include <rpc/rpcsec_defs.h>
-#include <rpc/trace.h>
 
 #define	SVC_INTEGRITY	"integrity"
 #define	SVC_PRIVACY	"privacy"
@@ -60,9 +60,9 @@ struct cu_data {
 	XDR			cu_outxdrs;
 	char			*cu_outbuf_start;
 	char			cu_outbuf[MCALL_MSG_SIZE];
-	u_int			cu_xdrpos;
-	u_int			cu_sendsz;	/* send size */
-	u_int			cu_recvsz;	/* recv size */
+	uint_t			cu_xdrpos;
+	uint_t			cu_sendsz;	/* send size */
+	uint_t			cu_recvsz;	/* recv size */
 	struct pollfd		pfdp;
 	char			cu_inbuf[1];
 };
@@ -71,42 +71,30 @@ struct cu_data {
  * Internal utility routines.
  */
 bool_t
-__rpc_gss_mech_to_oid(mech, oid)
-	char	*mech;
-	rpc_gss_OID	*oid;
+__rpc_gss_mech_to_oid(char *mech, rpc_gss_OID *oid)
 {
-
 	if (__gss_mech_to_oid(mech, (gss_OID*)oid) != GSS_S_COMPLETE)
 		return (FALSE);
-
 	return (TRUE);
 }
 
 char *
-__rpc_gss_oid_to_mech(oid)
-	rpc_gss_OID	oid;
+__rpc_gss_oid_to_mech(rpc_gss_OID oid)
 {
-
 	return ((char *)__gss_oid_to_mech((const gss_OID)oid));
 }
 
 
 bool_t
-__rpc_gss_qop_to_num(qop, mech, num)
-	char		*qop;
-	char		*mech;
-	OM_uint32	*num;
+__rpc_gss_qop_to_num(char *qop, char *mech, OM_uint32 *num)
 {
-
 	if (__gss_qop_to_num(qop, mech, num) != GSS_S_COMPLETE)
 		return (FALSE);
 	return (TRUE);
 }
 
 char *
-__rpc_gss_num_to_qop(mech, num)
-	char		*mech;
-	OM_uint32	num;
+__rpc_gss_num_to_qop(char *mech, OM_uint32 num)
 {
 	char *qop;
 
@@ -116,9 +104,7 @@ __rpc_gss_num_to_qop(mech, num)
 }
 
 bool_t
-__rpc_gss_svc_to_num(svc, num)
-	char			*svc;
-	rpc_gss_service_t	*num;
+__rpc_gss_svc_to_num(char *svc, rpc_gss_service_t *num)
 {
 	if (strcasecmp(svc, SVC_INTEGRITY) == 0)
 		*num = rpc_gss_svc_integrity;
@@ -134,8 +120,7 @@ __rpc_gss_svc_to_num(svc, num)
 }
 
 char *
-__rpc_gss_num_to_svc(num)
-	rpc_gss_service_t	num;
+__rpc_gss_num_to_svc(rpc_gss_service_t num)
 {
 	switch (num) {
 	case rpc_gss_svc_integrity:
@@ -156,12 +141,8 @@ __rpc_gss_num_to_svc(num)
  * specific principal name (for the user name) in exported form.
  */
 bool_t
-__rpc_gss_get_principal_name(principal, mech, user, node, secdomain)
-	rpc_gss_principal_t	*principal;
-	char			*mech;
-	char			*user;
-	char			*node;
-	char			*secdomain;
+__rpc_gss_get_principal_name(rpc_gss_principal_t *principal, char *mech,
+				char *user, char *node, char *secdomain)
 {
 	gss_name_t		gss_name, gss_canon_name;
 	gss_buffer_desc		name_buf = GSS_C_EMPTY_BUFFER;
@@ -239,7 +220,7 @@ __rpc_gss_get_principal_name(principal, mech, user, node, secdomain)
 	 *  Put the exported name into rpc_gss_principal_t structure.
 	 */
 	plen = RNDUP(name_buf.length) + sizeof (int);
-	(*principal) = (rpc_gss_principal_t)malloc(plen);
+	(*principal) = malloc(plen);
 	if ((*principal) == NULL) {
 		gss_release_buffer(&minor, &name_buf);
 		return (FALSE);
@@ -257,7 +238,7 @@ __rpc_gss_get_principal_name(principal, mech, user, node, secdomain)
  * Return supported mechanisms.
  */
 char **
-__rpc_gss_get_mechanisms()
+__rpc_gss_get_mechanisms(void)
 {
 	static char	*mech_list[MAX_MECH_OID_PAIRS+1];
 
@@ -279,9 +260,7 @@ __rpc_gss_get_mechanisms()
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*!!!!!!!!!!! */
 
 char **
-__rpc_gss_get_mech_info(mech, service)
-	char			*mech;
-	rpc_gss_service_t	*service;
+__rpc_gss_get_mech_info(char *mech, rpc_gss_service_t *service)
 {
 	char **l;
 
@@ -303,9 +282,7 @@ __rpc_gss_get_mech_info(mech, service)
  * Returns highest and lowest versions of RPCSEC_GSS flavor supported.
  */
 bool_t
-__rpc_gss_get_versions(vers_hi, vers_lo)
-	u_int	*vers_hi;
-	u_int	*vers_lo;
+__rpc_gss_get_versions(uint_t *vers_hi, uint_t *vers_lo)
 {
 	*vers_hi = RPCSEC_GSS_VERSION;
 	*vers_lo = RPCSEC_GSS_VERSION;
@@ -316,8 +293,7 @@ __rpc_gss_get_versions(vers_hi, vers_lo)
  * Check if a mechanism is installed.
  */
 bool_t
-__rpc_gss_is_installed(mech)
-	char	*mech;
+__rpc_gss_is_installed(char *mech)
 {
 	char **l;
 

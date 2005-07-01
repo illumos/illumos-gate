@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7.3.1 */
 
@@ -37,8 +36,6 @@
  * are applicable to the other file.
  */
 #include "mt.h"
-#include <rpc/trace.h>
-#include <rpc/trace.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <stropts.h>
@@ -64,20 +61,13 @@ _tx_rcvrel(int fd, int api_semantics)
 
 	int flg = 0;
 
-
-	trace2(TR_t_rcvrel, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == 0) {
-		sv_errno = errno;
-		trace2(TR_t_rcvrel, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == 0)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype != T_COTS_ORD) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvrel, 1, fd);
 		return (-1);
 	}
 
@@ -86,11 +76,10 @@ _tx_rcvrel(int fd, int api_semantics)
 		 * User level state verification only done for XTI
 		 * because doing for TLI may break existing applications
 		 */
-		if (! (tiptr->ti_state == T_DATAXFER ||
+		if (!(tiptr->ti_state == T_DATAXFER ||
 		    tiptr->ti_state == T_OUTREL)) {
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_rcvrel, 1, fd);
 			return (-1);
 		}
 	}
@@ -98,7 +87,6 @@ _tx_rcvrel(int fd, int api_semantics)
 	if ((retval = _t_look_locked(fd, tiptr, 0, api_semantics)) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvrel, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -110,11 +98,11 @@ _tx_rcvrel(int fd, int api_semantics)
 		 */
 		t_errno = TLOOK;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvrel, 1, fd);
 		return (-1);
 	}
 
 	if ((tiptr->ti_lookcnt > 0) &&
+	    /* LINTED pointer cast */
 	    (*((t_scalar_t *)tiptr->ti_lookbufs.tl_lookcbuf) == T_ORDREL_IND)) {
 		/*
 		 * Current look buffer event is T_ORDREL_IND.
@@ -124,13 +112,11 @@ _tx_rcvrel(int fd, int api_semantics)
 		_T_TX_NEXTSTATE(T_RCVREL, tiptr,
 					"t_rcv: invalid state event T_RCVREL");
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvrel, 1, fd);
 		return (0);
 	} else {
 		if (retval != T_ORDREL) {
 			t_errno = TNOREL;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace2(TR_t_rcvrel, 1, fd);
 			return (-1);
 		}
 	}
@@ -145,7 +131,6 @@ _tx_rcvrel(int fd, int api_semantics)
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvrel, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -160,7 +145,6 @@ _tx_rcvrel(int fd, int api_semantics)
 		else
 			tiptr->ti_ctlbuf = ctlbuf.buf;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace2(TR_t_rcvrel, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -187,6 +171,7 @@ _tx_rcvrel(int fd, int api_semantics)
 		errno = EIO;
 		goto err_out;
 	}
+	/* LINTED pointer cast */
 	pptr = (union T_primitives *)ctlbuf.buf;
 
 	if (ctlbuf.len < (int)sizeof (struct T_ordrel_ind)) {
@@ -231,7 +216,6 @@ _tx_rcvrel(int fd, int api_semantics)
 	else
 		tiptr->ti_rcvbuf = databuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_rcvrel, 1, fd);
 	return (0);
 
 err_out:
@@ -246,7 +230,6 @@ err_out:
 	else
 		tiptr->ti_rcvbuf = databuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
-	trace2(TR_t_rcvrel, 1, fd);
 	errno = sv_errno;
 	return (-1);
 }

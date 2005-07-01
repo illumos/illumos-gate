@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1174,7 +1175,7 @@ optimized_resync(mm_unit_t *un)
 
 static void
 recalc_resync_done(mm_unit_t *un, size_t resync_2_do, diskaddr_t initblock,
-    ulonglong_t blk_size, u_longlong_t skip)
+    u_longlong_t blk_size, u_longlong_t skip)
 {
 	diskaddr_t		x;
 	uint_t			factor = 1;

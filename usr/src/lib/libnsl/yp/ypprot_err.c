@@ -18,8 +18,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +40,6 @@
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/ypclnt.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 
 /*
  * Maps a yp protocol error code (as defined in
@@ -46,40 +47,25 @@
  * ypclnt.h).
  */
 int
-ypprot_err(yp_protocol_error)
-	int yp_protocol_error;
+ypprot_err(int yp_protocol_error)
 {
-	int reason;
-	trace2(TR_ypprot_err, 0, yp_protocol_error);
 	switch (yp_protocol_error) {
 	case YP_TRUE:
-		reason = 0;
-		break;
+		return (0);
 	case YP_NOMORE:
-		reason = YPERR_NOMORE;
-		break;
+		return (YPERR_NOMORE);
 	case YP_NOMAP:
-		reason = YPERR_MAP;
-		break;
+		return (YPERR_MAP);
 	case YP_NODOM:
-		reason = YPERR_DOMAIN;
-		break;
+		return (YPERR_DOMAIN);
 	case YP_NOKEY:
-		reason = YPERR_KEY;
-		break;
+		return (YPERR_KEY);
 	case YP_BADARGS:
-		reason = YPERR_BADARGS;
-		break;
+		return (YPERR_BADARGS);
 	case YP_BADDB:
-		reason = YPERR_BADDB;
-		break;
+		return (YPERR_BADDB);
 	case YP_VERS:
-		reason = YPERR_VERS;
-		break;
-	default:
-		reason = YPERR_YPERR;
-		break;
+		return (YPERR_VERS);
 	}
-	trace1(TR_ypprot_err, 1);
-	return (reason);
+	return (YPERR_YPERR);
 }

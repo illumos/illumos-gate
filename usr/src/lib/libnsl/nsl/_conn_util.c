@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
 #include "mt.h"
 #include <sys/param.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -61,26 +60,21 @@ _t_snd_conn_req(
 	struct strbuf *ctlbufp)
 {
 	struct T_conn_req *creq;
-	int size, sv_errno;
+	int size;
 	int fd;
 
-	trace2(TR__t_snd_conn_req, 0, fd);
 	assert(MUTEX_HELD(&tiptr->ti_lock));
 	fd = tiptr->ti_fd;
 
 	if (tiptr->ti_servtype == T_CLTS) {
 		t_errno = TNOTSUPPORT;
-		trace2(TR__t_snd_conn_req, 1, fd);
 		return (-1);
 	}
 
-	if (_t_is_event(fd, tiptr) < 0) {
-		sv_errno = errno;
-		trace2(TR__t_snd_conn_req, 1, fd);
-		errno = sv_errno;
+	if (_t_is_event(fd, tiptr) < 0)
 		return (-1);
-	}
 
+	/* LINTED pointer cast */
 	creq = (struct T_conn_req *)ctlbufp->buf;
 	creq->PRIM_type = T_CONN_REQ;
 	creq->DEST_length = call->addr.len;
@@ -98,7 +92,6 @@ _t_snd_conn_req(
 			 * return error.
 			 */
 			t_errno = TBADADDR;
-			trace2(TR__t_snd_conn_req, 1, fd);
 			return (-1);
 		}
 		size = creq->DEST_offset + creq->DEST_length;
@@ -112,7 +105,6 @@ _t_snd_conn_req(
 			 * return error.
 			 */
 			t_errno = TBADOPT;
-			trace2(TR__t_snd_conn_req, 1, fd);
 			return (-1);
 		}
 		size = creq->OPT_offset + creq->OPT_length;
@@ -127,7 +119,6 @@ _t_snd_conn_req(
 			 * provider.
 			 */
 			t_errno = TBADDATA;
-			trace2(TR__t_snd_conn_req, 1, fd);
 			return (-1);
 		}
 	}
@@ -140,20 +131,12 @@ _t_snd_conn_req(
 	 */
 	if (putmsg(fd, ctlbufp,
 	    (struct strbuf *)(call->udata.len? &call->udata: NULL), 0) < 0) {
-		sv_errno = errno;
 		t_errno = TSYSERR;
-		trace2(TR__t_snd_conn_req, 1, fd);
-		errno = sv_errno;
 		return (-1);
 	}
 
-	if (_t_is_ok(fd, tiptr, T_CONN_REQ) < 0) {
-		sv_errno = errno;
-		trace2(TR__t_snd_conn_req, 1, fd);
-		errno = sv_errno;
+	if (_t_is_ok(fd, tiptr, T_CONN_REQ) < 0)
 		return (-1);
-	}
-	trace2(TR__t_snd_conn_req, 1, fd);
 	return (0);
 }
 
@@ -179,13 +162,10 @@ _t_rcv_conn_con(
 
 	int flg = 0;
 
-	trace2(TR__t_rcv_conn_con, 0, fd);
-
 	fd = tiptr->ti_fd;
 
 	if (tiptr->ti_servtype == T_CLTS) {
 		t_errno = TNOTSUPPORT;
-		trace2(TR__t_rcv_conn_con, 1, fd);
 		return (-1);
 	}
 
@@ -194,7 +174,6 @@ _t_rcv_conn_con(
 	 */
 	if (tiptr->ti_lookcnt > 0) {
 		t_errno = TLOOK;
-		trace2(TR__t_rcv_conn_con, 1, fd);
 		return (-1);
 	}
 
@@ -202,12 +181,8 @@ _t_rcv_conn_con(
 	/*
 	 * Acquire databuf for use in sending/receiving data part
 	 */
-	if (_t_acquire_databuf(tiptr, &databuf, &didralloc) < 0) {
-		sv_errno = errno;
-		trace2(TR__t_rcv_conn_con, 1, fd);
-		errno = sv_errno;
+	if (_t_acquire_databuf(tiptr, &databuf, &didralloc) < 0)
 		return (-1);
-	}
 
 	/*
 	 * This is a call that may block indefinitely so we drop the
@@ -248,6 +223,7 @@ _t_rcv_conn_con(
 		goto err_out;
 	}
 
+	/* LINTED pointer cast */
 	pptr = (union T_primitives *)ctlbufp->buf;
 
 	switch (pptr->type) {
@@ -310,7 +286,6 @@ _t_rcv_conn_con(
 			free(databuf.buf);
 		else
 			tiptr->ti_rcvbuf = databuf.buf;
-		trace2(TR__t_rcv_conn_con, 1, fd);
 		return (0);
 
 	case T_DISCON_IND:
@@ -337,15 +312,11 @@ _t_rcv_conn_con(
 	}
 
 	t_errno = TSYSERR;
-	trace2(TR__t_rcv_conn_con, 1, fd);
 	errno = EPROTO;
 err_out:
-	sv_errno = errno;
 	if (didralloc)
 		free(databuf.buf);
 	else
 		tiptr->ti_rcvbuf = databuf.buf;
-	trace2(TR__t_rcv_conn_con, 1, fd);
-	errno = sv_errno;
 	return (-1);
 }

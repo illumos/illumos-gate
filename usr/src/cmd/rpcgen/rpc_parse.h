@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -65,7 +66,7 @@ enum relation {
 	REL_VECTOR,	/* fixed length array */
 	REL_ARRAY,	/* variable length array */
 	REL_POINTER,	/* pointer */
-	REL_ALIAS,	/* simple */
+	REL_ALIAS	/* simple */
 };
 typedef enum relation relation;
 

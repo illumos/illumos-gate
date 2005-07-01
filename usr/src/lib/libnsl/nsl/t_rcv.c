@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7 */
 
@@ -38,7 +37,6 @@
  */
 #include "mt.h"
 #include <stdlib.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stropts.h>
@@ -62,19 +60,13 @@ _tx_rcv(int fd, char *buf, unsigned nbytes, int *flags, int api_semantics)
 	int sv_errno;
 	int didalloc;
 
-	trace3(TR_t_rcv, 0, fd, nbytes);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace3(TR_t_rcv, 1, fd, nbytes);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 	sig_mutex_lock(&tiptr->ti_lock);
 
 	if (tiptr->ti_servtype == T_CLTS) {
 		t_errno = TNOTSUPPORT;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace3(TR_t_rcv, 1, fd, nbytes);
 		return (-1);
 	}
 
@@ -83,11 +75,10 @@ _tx_rcv(int fd, char *buf, unsigned nbytes, int *flags, int api_semantics)
 		 * User level state verification only done for XTI
 		 * because doing for TLI may break existing applications
 		 */
-		if (! (tiptr->ti_state == T_DATAXFER ||
+		if (!(tiptr->ti_state == T_DATAXFER ||
 			tiptr->ti_state == T_OUTREL)) {
 			t_errno = TOUTSTATE;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace3(TR_t_rcv, 1, fd, nbytes);
 			return (-1);
 		}
 	}
@@ -127,7 +118,6 @@ _tx_rcv(int fd, char *buf, unsigned nbytes, int *flags, int api_semantics)
 
 			t_errno = TSYSERR;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace3(TR_t_rcv, 1, fd, nbytes);
 			errno = sv_errno;
 			return (-1);
 		}
@@ -145,11 +135,11 @@ _tx_rcv(int fd, char *buf, unsigned nbytes, int *flags, int api_semantics)
 
 			tlbs = &tiptr->ti_lookbufs;
 			do {
+				/* LINTED pointer cast */
 				if (*((t_scalar_t *)tlbs->tl_lookcbuf)
 				    == T_DISCON_IND) {
 					t_errno = TLOOK;
 					sig_mutex_unlock(&tiptr->ti_lock);
-					trace3(TR_t_rcv, 1, fd, nbytes);
 					return (-1);
 				}
 			} while ((tlbs = tlbs->tl_next) != NULL);
@@ -162,7 +152,6 @@ _tx_rcv(int fd, char *buf, unsigned nbytes, int *flags, int api_semantics)
 			 */
 			t_errno = TLOOK;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace3(TR_t_rcv, 1, fd, nbytes);
 			return (-1);
 		}
 	}
@@ -174,7 +163,6 @@ _tx_rcv(int fd, char *buf, unsigned nbytes, int *flags, int api_semantics)
 	if (_t_acquire_ctlbuf(tiptr, &ctlbuf, &didalloc) < 0) {
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace3(TR_t_rcv, 1, fd, nbytes);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -215,6 +203,7 @@ _tx_rcv(int fd, char *buf, unsigned nbytes, int *flags, int api_semantics)
 			goto err_out;
 		}
 
+		/* LINTED pointer cast */
 		pptr = (union T_primitives *)ctlbuf.buf;
 
 		switch (pptr->type) {
@@ -258,7 +247,6 @@ _tx_rcv(int fd, char *buf, unsigned nbytes, int *flags, int api_semantics)
 			else
 				tiptr->ti_ctlbuf = ctlbuf.buf;
 			sig_mutex_unlock(&tiptr->ti_lock);
-			trace3(TR_t_rcv, 1, fd, nbytes);
 			return (databuf.len);
 
 		case T_ORDREL_IND:
@@ -383,7 +371,6 @@ _tx_rcv(int fd, char *buf, unsigned nbytes, int *flags, int api_semantics)
 		else
 			tiptr->ti_ctlbuf = ctlbuf.buf;
 		sig_mutex_unlock(&tiptr->ti_lock);
-		trace3(TR_t_rcv, 1, fd, nbytes);
 		return (databuf.len);
 	}
 	/* NOTREACHED */
@@ -396,7 +383,6 @@ err_out:
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
 
-	trace3(TR_t_rcv, 1, fd, nbytes);
 	errno = sv_errno;
 	return (-1);
 }

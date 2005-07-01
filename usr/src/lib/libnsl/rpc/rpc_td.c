@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -26,15 +27,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#if !defined(lint) && defined(SCCSIDS)
-static char sccsid[] = "@(#)rpc_td.c 1.32 89/03/16 Copyr 1988 Sun Micro";
-#endif
-
 #include "mt.h"
 #include "rpc_mt.h"
 #include <stdio.h>
 #include <rpc/rpc.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <tiuser.h>
 #include <string.h>
@@ -45,8 +41,7 @@ static char sccsid[] = "@(#)rpc_td.c 1.32 89/03/16 Copyr 1988 Sun Micro";
 #define	MAXOPTSIZE 64
 
 int
-__td_setnodelay(fd)
-	int fd;
+__td_setnodelay(int fd)
 {
 	int rval = 0;
 	static mutex_t td_opt_lock = DEFAULTMUTEX;
@@ -56,24 +51,23 @@ __td_setnodelay(fd)
 
 	/* VARIABLES PROTECTED BY td_opt_lock: t_optreq, t_optret */
 
-	trace2(TR__td_setnodelay, 0, fd);
-
 	if ((state = t_getstate(fd)) == -1)
 		return (-1);
 
-	mutex_lock(&td_opt_lock);
+	(void) mutex_lock(&td_opt_lock);
 	if ((state == T_IDLE) && (t_optreq.flags != T_NEGOTIATE)) {
 		int i = 1;
 		struct opthdr *opt;
 
 		t_optreq.flags = T_NEGOTIATE;
 		t_optreq.opt.maxlen = MAXOPTSIZE;
-		t_optreq.opt.buf = (char *)malloc(MAXOPTSIZE);
+		t_optreq.opt.buf = malloc(MAXOPTSIZE);
 		if (t_optreq.opt.buf == NULL) {
-			mutex_unlock(&td_opt_lock);
+			(void) mutex_unlock(&td_opt_lock);
 			t_errno = TSYSERR;
 			return (-1);
 		}
+		/* LINTED pointer cast */
 		opt = (struct opthdr *)(t_optreq.opt.buf);
 		opt->name = TCP_NODELAY;
 		opt->len = 4;
@@ -85,9 +79,9 @@ __td_setnodelay(fd)
 
 		t_optret.opt.maxlen = MAXOPTSIZE;
 		t_optret.opt.len = 0;
-		t_optret.opt.buf = (char *)malloc(MAXOPTSIZE);
+		t_optret.opt.buf = malloc(MAXOPTSIZE);
 		if (t_optret.opt.buf == NULL) {
-			mutex_unlock(&td_opt_lock);
+			(void) mutex_unlock(&td_opt_lock);
 			free(t_optreq.opt.buf);
 			t_errno = TSYSERR;
 			return (-1);
@@ -97,7 +91,6 @@ __td_setnodelay(fd)
 	if (state == T_IDLE)
 		rval = t_optmgmt(fd, &t_optreq, &t_optret);
 
-	mutex_unlock(&td_opt_lock);
-	trace2(TR__td_setnodelay, 1, fd);
+	(void) mutex_unlock(&td_opt_lock);
 	return (rval);
 }

@@ -19,16 +19,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
 #include "mt.h"
-#include <rpc/trace.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stropts.h>
@@ -42,7 +41,6 @@ _tx_sysconf(int name, int api_semantics)
 {
 	assert(api_semantics == TX_XTI_XNS5_API);
 	if (name != _SC_T_IOV_MAX) {
-		trace1(TR_t_sysconf, name);
 		t_errno = TBADFLAG;
 		return (-1);
 	}

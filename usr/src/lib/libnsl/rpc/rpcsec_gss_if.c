@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1986-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,12 +62,12 @@ static mutex_t rpcgss_calls_mutex = DEFAULTMUTEX;
 static bool_t initialized = FALSE;
 
 static bool_t
-rpcgss_calls_init()
+rpcgss_calls_init(void)
 {
 	void	*handle = NULL;
 	bool_t	ret = FALSE;
 
-	mutex_lock(&rpcgss_calls_mutex);
+	(void) mutex_lock(&rpcgss_calls_mutex);
 	if (initialized) {
 		ret = TRUE;
 		goto done;
@@ -134,10 +135,10 @@ rpcgss_calls_init()
 done:
 	if (!ret) {
 		if (handle != NULL)
-			dlclose(handle);
+			(void) dlclose(handle);
 	}
 	initialized = ret;
-	mutex_unlock(&rpcgss_calls_mutex);
+	(void) mutex_unlock(&rpcgss_calls_mutex);
 	return (ret);
 }
 
@@ -152,16 +153,13 @@ rpc_gss_seccreate(
 	rpc_gss_options_ret_t	*options_ret)	/* returned options */
 {
 	if (!initialized && !rpcgss_calls_init())
-		return ((AUTH *)NULL);
+		return (NULL);
 	return ((*calls.rpc_gss_seccreate)(clnt, principal, mechanism,
 				service_type, qop, options_req, options_ret));
 }
 
 bool_t
-rpc_gss_set_defaults(auth, service, qop)
-	AUTH			*auth;
-	rpc_gss_service_t	service;
-	char			*qop;
+rpc_gss_set_defaults(AUTH *auth, rpc_gss_service_t service, char *qop)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (FALSE);
@@ -183,27 +181,23 @@ rpc_gss_get_principal_name(
 }
 
 char **
-rpc_gss_get_mechanisms()
+rpc_gss_get_mechanisms(void)
 {
 	if (!initialized && !rpcgss_calls_init())
-		return ((char **)NULL);
+		return (NULL);
 	return ((*calls.rpc_gss_get_mechanisms)());
 }
 
 char **
-rpc_gss_get_mech_info(mechanism, service)
-	char			*mechanism;
-	rpc_gss_service_t	*service;
+rpc_gss_get_mech_info(char *mechanism, rpc_gss_service_t *service)
 {
 	if (!initialized && !rpcgss_calls_init())
-		return ((char **)NULL);
+		return (NULL);
 	return ((*calls.rpc_gss_get_mech_info)(mechanism, service));
 }
 
 bool_t
-rpc_gss_get_versions(vers_hi, vers_lo)
-	uint_t	*vers_hi;
-	uint_t	*vers_lo;
+rpc_gss_get_versions(uint_t *vers_hi, uint_t *vers_lo)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (FALSE);
@@ -211,8 +205,7 @@ rpc_gss_get_versions(vers_hi, vers_lo)
 }
 
 bool_t
-rpc_gss_is_installed(mechanism)
-	char	*mechanism;
+rpc_gss_is_installed(char *mechanism)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (FALSE);
@@ -234,8 +227,7 @@ rpc_gss_set_svc_name(
 }
 
 bool_t
-rpc_gss_set_callback(cb)
-	rpc_gss_callback_t	*cb;
+rpc_gss_set_callback(rpc_gss_callback_t *cb)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (FALSE);
@@ -243,11 +235,8 @@ rpc_gss_set_callback(cb)
 }
 
 bool_t
-rpc_gss_getcred(req, rcred, ucred, cookie)
-	struct svc_req		*req;
-	rpc_gss_rawcred_t	**rcred;
-	rpc_gss_ucred_t		**ucred;
-	void			**cookie;
+rpc_gss_getcred(struct svc_req *req, rpc_gss_rawcred_t **rcred,
+					rpc_gss_ucred_t **ucred, void **cookie)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (FALSE);
@@ -255,9 +244,7 @@ rpc_gss_getcred(req, rcred, ucred, cookie)
 }
 
 bool_t
-rpc_gss_mech_to_oid(mech, oid)
-	char	*mech;
-	rpc_gss_OID	*oid;
+rpc_gss_mech_to_oid(char *mech, rpc_gss_OID *oid)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (FALSE);
@@ -265,10 +252,7 @@ rpc_gss_mech_to_oid(mech, oid)
 }
 
 bool_t
-rpc_gss_qop_to_num(qop, mech, num)
-	char	*qop;
-	char	*mech;
-	uint_t	*num;
+rpc_gss_qop_to_num(char *qop, char *mech, uint_t *num)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (FALSE);
@@ -276,10 +260,7 @@ rpc_gss_qop_to_num(qop, mech, num)
 }
 
 enum auth_stat
-__svcrpcsec_gss(rqst, msg, no_dispatch)
-	struct svc_req		*rqst;
-	struct rpc_msg		*msg;
-	bool_t		*no_dispatch;
+__svcrpcsec_gss(struct svc_req *rqst, struct rpc_msg *msg, bool_t *no_dispatch)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (AUTH_FAILED);
@@ -287,13 +268,8 @@ __svcrpcsec_gss(rqst, msg, no_dispatch)
 }
 
 bool_t
-__rpc_gss_wrap(auth, buf, buflen, out_xdrs, xdr_func, xdr_ptr)
-	AUTH			*auth;
-	char			*buf;		/* encoded header */
-	uint_t			buflen;		/* encoded header length */
-	XDR			*out_xdrs;
-	bool_t			(*xdr_func)();
-	caddr_t			xdr_ptr;
+__rpc_gss_wrap(AUTH *auth, char *buf, uint_t buflen, XDR *out_xdrs,
+					bool_t (*xdr_func)(), caddr_t xdr_ptr)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (FALSE);
@@ -302,11 +278,8 @@ __rpc_gss_wrap(auth, buf, buflen, out_xdrs, xdr_func, xdr_ptr)
 }
 
 bool_t
-__rpc_gss_unwrap(auth, in_xdrs, xdr_func, xdr_ptr)
-	AUTH			*auth;
-	XDR			*in_xdrs;
-	bool_t			(*xdr_func)();
-	caddr_t			xdr_ptr;
+__rpc_gss_unwrap(AUTH *auth, XDR *in_xdrs, bool_t (*xdr_func)(),
+								caddr_t xdr_ptr)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (FALSE);
@@ -314,9 +287,7 @@ __rpc_gss_unwrap(auth, in_xdrs, xdr_func, xdr_ptr)
 }
 
 int
-rpc_gss_max_data_length(rpcgss_handle, max_tp_unit_len)
-	AUTH			*rpcgss_handle;
-	int			max_tp_unit_len;
+rpc_gss_max_data_length(AUTH *rpcgss_handle, int max_tp_unit_len)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (0);
@@ -325,9 +296,7 @@ rpc_gss_max_data_length(rpcgss_handle, max_tp_unit_len)
 }
 
 int
-rpc_gss_svc_max_data_length(req, max_tp_unit_len)
-	struct	svc_req		*req;
-	int			max_tp_unit_len;
+rpc_gss_svc_max_data_length(struct svc_req *req, int max_tp_unit_len)
 {
 	if (!initialized && !rpcgss_calls_init())
 		return (0);
@@ -335,8 +304,7 @@ rpc_gss_svc_max_data_length(req, max_tp_unit_len)
 }
 
 void
-rpc_gss_get_error(error)
-	rpc_gss_error_t		*error;
+rpc_gss_get_error(rpc_gss_error_t *error)
 {
 	if (!initialized && !rpcgss_calls_init()) {
 		error->rpc_gss_error = RPC_GSS_ER_SYSTEMERROR;

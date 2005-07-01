@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -42,7 +43,6 @@
 #include "rpc_mt.h"
 #include <stdio.h>
 #include <sys/types.h>
-#include <rpc/trace.h>
 #include <rpc/rpc.h>
 #include <rpc/nettype.h>
 #include <sys/param.h>
@@ -99,18 +99,14 @@ struct _rpcnettype {
  * maximum of FD_SETSIZE.
  */
 int
-__rpc_dtbsize()
+__rpc_dtbsize(void)
 {
 	static int tbsize;
 	struct rlimit rl;
 
-	trace1(TR___rpc_dtbsize, 0);
-	if (tbsize) {
-		trace1(TR___rpc_dtbsize, 1);
+	if (tbsize)
 		return (tbsize);
-	}
 	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
-		trace1(TR___rpc_dtbsize, 1);
 		tbsize = rl.rlim_max;
 		/*
 		 * backward compatibility; too many places
@@ -125,7 +121,6 @@ __rpc_dtbsize()
 	 * Something wrong.  I'll try to save face by returning a
 	 * pessimistic number.
 	 */
-	trace1(TR___rpc_dtbsize, 1);
 	return (32);
 }
 
@@ -137,12 +132,8 @@ __rpc_get_t_size(
 	t_scalar_t size,	/* Size requested */
 	t_scalar_t bufsize)	/* Supported by the transport */
 {
-	trace3(TR___rpc_get_t_size, 0, size, bufsize);
-	if (bufsize == -2) {
-		/* transfer of data unsupported */
-		trace3(TR___rpc_get_t_size, 1, size, bufsize);
+	if (bufsize == -2)	/* transfer of data unsupported */
 		return ((uint_t)0);
-	}
 	if (size == 0) {
 		if ((bufsize == -1) || (bufsize == 0)) {
 			/*
@@ -150,19 +141,13 @@ __rpc_get_t_size(
 			 * bufsize == 0 : Concept of tsdu foreign. Choose
 			 *			a value.
 			 */
-			trace3(TR___rpc_get_t_size, 1, size, bufsize);
 			return ((uint_t)RPC_MAXDATASIZE);
-		} else {
-			trace3(TR___rpc_get_t_size, 1, size, bufsize);
-			return ((uint_t)bufsize);
 		}
+		return ((uint_t)bufsize);
 	}
-	if ((bufsize == -1) || (bufsize == 0)) {
-		trace3(TR___rpc_get_t_size, 1, size, bufsize);
+	if ((bufsize == -1) || (bufsize == 0))
 		return ((uint_t)size);
-	}
 	/* Check whether the value is within the upper max limit */
-	trace3(TR___rpc_get_t_size, 1, size, bufsize);
 	return (size > bufsize ? (uint_t)bufsize : (uint_t)size);
 }
 
@@ -173,33 +158,14 @@ uint_t
 __rpc_get_a_size(
 	t_scalar_t size)	/* normally tinfo.addr */
 {
-	trace2(TR___rpc_get_a_size, 0, size);
-	if (size >= 0) {
-		trace2(TR___rpc_get_a_size, 1, size);
+	if (size >= 0)
 		return ((uint_t)size);
-	}
-	if (size <= -2) {
-		trace2(TR___rpc_get_a_size, 1, size);
+	if (size <= -2)
 		return ((uint_t)0);
-	}
 	/*
 	 * (size == -1) No limit on the size. we impose a limit here.
 	 */
-	trace2(TR___rpc_get_a_size, 1, size);
 	return ((uint_t)RPC_MAXADDRSIZE);
-}
-
-static char *
-strlocase(char *p)
-{
-	char *t = p;
-
-	trace1(TR_strlocase, 0);
-	for (; *p; p++)
-		if (isupper(*p))
-			*p = tolower(*p);
-	trace1(TR_strlocase, 1);
-	return (t);
 }
 
 /*
@@ -207,23 +173,16 @@ strlocase(char *p)
  * If nettype is NULL, it defaults to NETPATH.
  */
 static int
-getnettype(char *nettype)
+getnettype(const char *nettype)
 {
 	int i;
 
-	trace1(TR_getnettype, 0);
-	if ((nettype == NULL) || (nettype[0] == NULL)) {
-		trace1(TR_getnettype, 1);
+	if ((nettype == NULL) || (nettype[0] == NULL))
 		return (_RPC_NETPATH);	/* Default */
-	}
 
-	nettype = strlocase(nettype);
 	for (i = 0; _rpctypelist[i].name; i++)
-		if (strcmp(nettype, _rpctypelist[i].name) == 0) {
-			trace1(TR_getnettype, 1);
+		if (strcasecmp(nettype, _rpctypelist[i].name) == 0)
 			return (_rpctypelist[i].type);
-		}
-	trace1(TR_getnettype, 1);
 	return (_rpctypelist[i].type);
 }
 
@@ -235,32 +194,30 @@ struct netconfig *
 __rpc_getconfip(char *nettype)
 {
 	char *netid;
-	char *netid_tcp = (char *)NULL;
-	char *netid_udp = (char *)NULL;
+	char *netid_tcp = NULL;
+	char *netid_udp = NULL;
 	static char *netid_tcp_main;
 	static char *netid_udp_main;
 	static pthread_key_t tcp_key, udp_key;
 	int main_thread;
-	struct netconfig *dummy;
 	extern mutex_t tsd_lock;
 
-	trace1(TR___rpc_getconfip, 0);
 	if ((main_thread = thr_main())) {
 		netid_udp = netid_udp_main;
 		netid_tcp = netid_tcp_main;
 	} else {
 		if (tcp_key == 0) {
-			mutex_lock(&tsd_lock);
+			(void) mutex_lock(&tsd_lock);
 			if (tcp_key == 0)
-				pthread_key_create(&tcp_key, free);
-			mutex_unlock(&tsd_lock);
+				(void) pthread_key_create(&tcp_key, free);
+			(void) mutex_unlock(&tsd_lock);
 		}
 		netid_tcp = pthread_getspecific(tcp_key);
 		if (udp_key == 0) {
-			mutex_lock(&tsd_lock);
+			(void) mutex_lock(&tsd_lock);
 			if (udp_key == 0)
-				pthread_key_create(&udp_key, free);
-			mutex_unlock(&tsd_lock);
+				(void) pthread_key_create(&udp_key, free);
+			(void) mutex_unlock(&tsd_lock);
 		}
 		netid_udp = pthread_getspecific(udp_key);
 	}
@@ -268,10 +225,8 @@ __rpc_getconfip(char *nettype)
 		struct netconfig *nconf;
 		void *confighandle;
 
-		if (!(confighandle = setnetconfig())) {
-			trace1(TR___rpc_getconfip, 1);
+		if (!(confighandle = setnetconfig()))
 			return (NULL);
-		}
 		while (nconf = getnetconfig(confighandle)) {
 			if (strcmp(nconf->nc_protofmly, NC_INET) == 0) {
 				if (strcmp(nconf->nc_proto, NC_TCP) == 0) {
@@ -280,14 +235,13 @@ __rpc_getconfip(char *nettype)
 						syslog(LOG_ERR,
 							"__rpc_getconfip : "
 							"strdup failed");
-						trace1(TR___rpc_getconfip, 1);
-						return ((struct netconfig *)
-							NULL);
+						return (NULL);
 					}
 					if (main_thread)
 						netid_tcp_main = netid_tcp;
 					else
-						pthread_setspecific(tcp_key,
+						(void) pthread_setspecific(
+							tcp_key,
 							(void *)netid_tcp);
 				} else
 				if (strcmp(nconf->nc_proto, NC_UDP) == 0) {
@@ -296,35 +250,28 @@ __rpc_getconfip(char *nettype)
 						syslog(LOG_ERR,
 							"__rpc_getconfip : "
 							"strdup failed");
-						trace1(TR___rpc_getconfip, 1);
-						return ((struct netconfig *)
-							NULL);
+						return (NULL);
 					}
 					if (main_thread)
 						netid_udp_main = netid_udp;
 					else
-						pthread_setspecific(udp_key,
+						(void) pthread_setspecific(
+							udp_key,
 							(void *)netid_udp);
 				}
 			}
 		}
-		endnetconfig(confighandle);
+		(void) endnetconfig(confighandle);
 	}
 	if (strcmp(nettype, "udp") == 0)
 		netid = netid_udp;
 	else if (strcmp(nettype, "tcp") == 0)
 		netid = netid_tcp;
-	else {
-		trace1(TR___rpc_getconfip, 1);
-		return ((struct netconfig *)NULL);
-	}
-	if ((netid == NULL) || (netid[0] == NULL)) {
-		trace1(TR___rpc_getconfip, 1);
-		return ((struct netconfig *)NULL);
-	}
-	dummy = getnetconfigent(netid);
-	trace1(TR___rpc_getconfip, 1);
-	return (dummy);
+	else
+		return (NULL);
+	if ((netid == NULL) || (netid[0] == NULL))
+		return (NULL);
+	return (getnetconfigent(netid));
 }
 
 
@@ -337,12 +284,9 @@ __rpc_setconf(char *nettype)
 {
 	struct handle *handle;
 
-	trace1(TR___rpc_setconf, 0);
-	handle = (struct handle *)malloc(sizeof (struct handle));
-	if (handle == NULL) {
-		trace1(TR___rpc_setconf, 1);
+	handle = malloc(sizeof (struct handle));
+	if (handle == NULL)
 		return (NULL);
-	}
 	switch (handle->nettype = getnettype(nettype)) {
 	case _RPC_DOOR_NETPATH:
 	case _RPC_NETPATH:
@@ -350,7 +294,6 @@ __rpc_setconf(char *nettype)
 	case _RPC_DATAGRAM_N:
 		if (!(handle->nhandle = setnetpath())) {
 			free(handle);
-			trace1(TR___rpc_setconf, 1);
 			return (NULL);
 		}
 		handle->nflag = TRUE;
@@ -364,18 +307,15 @@ __rpc_setconf(char *nettype)
 	case _RPC_DOOR_LOCAL:
 		if (!(handle->nhandle = setnetconfig())) {
 			free(handle);
-			trace1(TR___rpc_setconf, 1);
 			return (NULL);
 		}
 		handle->nflag = FALSE;
 		break;
 	default:
 		free(handle);
-		trace1(TR___rpc_setconf, 1);
 		return (NULL);
 	}
 
-	trace1(TR___rpc_setconf, 1);
 	return (handle);
 }
 
@@ -389,19 +329,15 @@ __rpc_getconf(void *vhandle)
 	struct handle *handle;
 	struct netconfig *nconf;
 
-	trace1(TR___rpc_getconf, 0);
 	handle = (struct handle *)vhandle;
-	if (handle == NULL) {
-		trace1(TR___rpc_getconf, 1);
+	if (handle == NULL)
 		return (NULL);
-	}
-	/*CONSTANTCONDITION*/
-	while (1) {
+	for (;;) {
 		if (handle->nflag)
 			nconf = getnetpath(handle->nhandle);
 		else
 			nconf = getnetconfig(handle->nhandle);
-		if (nconf == (struct netconfig *)NULL)
+		if (nconf == NULL)
 			break;
 		if ((nconf->nc_semantics != NC_TPI_CLTS) &&
 		    (nconf->nc_semantics != NC_TPI_COTS) &&
@@ -458,7 +394,6 @@ __rpc_getconf(void *vhandle)
 		}
 		break;
 	}
-	trace1(TR___rpc_getconf, 1);
 	return (nconf);
 }
 
@@ -467,19 +402,15 @@ __rpc_endconf(void *vhandle)
 {
 	struct handle *handle;
 
-	trace1(TR___rpc_endconf, 0);
 	handle = (struct handle *)vhandle;
-	if (handle == NULL) {
-		trace1(TR___rpc_endconf, 1);
+	if (handle == NULL)
 		return;
-	}
 	if (handle->nflag) {
-		endnetpath(handle->nhandle);
+		(void) endnetpath(handle->nhandle);
 	} else {
-		endnetconfig(handle->nhandle);
+		(void) endnetconfig(handle->nhandle);
 	}
 	free(handle);
-	trace1(TR___rpc_endconf, 1);
 }
 
 /*
@@ -491,13 +422,9 @@ rpc_nullproc(CLIENT *clnt)
 {
 	struct timeval TIMEOUT = {25, 0};
 
-	trace2(TR_rpc_nullproc, 0, clnt);
-	if (clnt_call(clnt, NULLPROC, (xdrproc_t)xdr_void, (char *)NULL,
-		(xdrproc_t)xdr_void, (char *)NULL, TIMEOUT) != RPC_SUCCESS) {
-		trace2(TR_rpc_nullproc, 1, clnt);
-		return ((void *)NULL);
-	}
-	trace2(TR_rpc_nullproc, 1, clnt);
+	if (clnt_call(clnt, NULLPROC, (xdrproc_t)xdr_void, NULL,
+			(xdrproc_t)xdr_void, NULL, TIMEOUT) != RPC_SUCCESS)
+		return (NULL);
 	return ((void *)clnt);
 }
 
@@ -516,11 +443,8 @@ __rpcfd_to_nconf(int fd, int servtype)
 	major_t fdmajor;
 	struct t_info tinfo;
 
-	trace2(TR___rpcfd_to_nconf, 0, fd);
-	if (_FSTAT(fd, &statbuf) == -1) {
-		trace2(TR___rpcfd_to_nconf, 1, fd);
+	if (_FSTAT(fd, &statbuf) == -1)
 		return (NULL);
-	}
 
 	fdmajor = major(statbuf.st_rdev);
 	if (servtype == 0) {
@@ -532,17 +456,14 @@ __rpcfd_to_nconf(int fd, int servtype)
 			(void) syslog(LOG_ERR, "__rpcfd_to_nconf : %s : %s",
 					"could not get transport information",
 					errorstr);
-			trace2(TR___rpcfd_to_nconf, 1, fd);
 			return (NULL);
 		}
 		servtype = tinfo.servtype;
 	}
 
 	hndl = setnetconfig();
-	if (hndl == NULL) {
-		trace2(TR___rpcfd_to_nconf, 1, fd);
+	if (hndl == NULL)
 		return (NULL);
-	}
 	/*
 	 * Go through all transports listed in /etc/netconfig looking for
 	 *	transport device in use on fd.
@@ -567,8 +488,7 @@ __rpcfd_to_nconf(int fd, int servtype)
 	}
 	if (nconf)
 		newnconf = getnetconfigent(nconf->nc_netid);
-	endnetconfig(hndl);
-	trace2(TR___rpcfd_to_nconf, 1, fd);
+	(void) endnetconfig(hndl);
 	return (newnconf);
 }
 
@@ -603,11 +523,10 @@ __rpc_matchserv(int servtype, unsigned int nc_semantics)
  * Routines for RPC/Doors support.
  */
 
-extern bool_t __inet_netdir_is_my_host();
+extern bool_t __inet_netdir_is_my_host(const char *);
 
 bool_t
-__rpc_is_local_host(host)
-	char	*host;
+__rpc_is_local_host(const char *host)
 {
 	char	buf[MAXHOSTNAMELEN + 1];
 
@@ -624,9 +543,7 @@ __rpc_is_local_host(host)
 }
 
 bool_t
-__rpc_try_doors(nettype, try_others)
-	char	*nettype;
-	bool_t	*try_others;
+__rpc_try_doors(const char *nettype, bool_t *try_others)
 {
 	switch (getnettype(nettype)) {
 	case _RPC_DOOR:

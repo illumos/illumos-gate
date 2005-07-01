@@ -20,6 +20,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -5470,6 +5471,11 @@ mondo_loop() {
 	# Remove obsolete std.h
 	#
 	rm -f $usr/include/std.h
+
+	#
+	# Remove obsolete rpc/trace.h
+	#
+	rm -f $usr/include/rpc/trace.h
 
 	#
 	# Remove acpi_intp module

@@ -19,24 +19,21 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-		/* SVr4.0 1.3.4.1	*/
 
 #include "mt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <rpc/trace.h>
 #include <errno.h>
 #include <sys/stream.h>
 #define	_SUN_TPI_VERSION 2
@@ -78,13 +75,8 @@ _tx_optmgmt(
 	t_uscalar_t first_opt_level;
 	t_scalar_t optlen;
 
-	trace2(TR_t_optmgmt, 0, fd);
-	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL) {
-		sv_errno = errno;
-		trace2(TR_t_optmgmt, 1, fd);
-		errno = sv_errno;
+	if ((tiptr = _t_checkfd(fd, 0, api_semantics)) == NULL)
 		return (-1);
-	}
 
 	/*
 	 * We block all signals during the TI_OPTMGMT operation
@@ -105,7 +97,6 @@ _tx_optmgmt(
 		sv_errno = errno;
 		sig_mutex_unlock(&tiptr->ti_lock);
 		(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-		trace2(TR_t_optmgmt, 1, fd);
 		errno = sv_errno;
 		return (-1);
 	}
@@ -132,6 +123,7 @@ _tx_optmgmt(
 			goto err_out;
 		}
 
+		/* LINTED pointer cast */
 		opt_start = (struct t_opthdr *)req->opt.buf;
 
 		/*
@@ -148,11 +140,12 @@ _tx_optmgmt(
 		 *
 		 * If start of buffer is not aligned, we signal an error.
 		 */
-		if (! (ISALIGNED_XTI_opthdr(opt_start))) {
+		if (!(ISALIGNED_XTI_opthdr(opt_start))) {
 			t_errno = TBADOPT;
 			goto err_out;
 		}
 
+		/* LINTED pointer cast */
 		opt_end = (struct t_opthdr *)((char *)opt_start +
 						optlen);
 
@@ -198,6 +191,7 @@ _tx_optmgmt(
 			 *	   all options in the buffer have to be the
 			 *	   same level.
 			 */
+			/* LINTED pointer cast */
 			next_opt = (struct t_opthdr *)((uchar_t *)opt +
 			    ROUNDUP_XTI_opthdr(opt->len));
 
@@ -228,6 +222,7 @@ _tx_optmgmt(
 		}
 	}
 
+	/* LINTED pointer cast */
 	optreq = (struct T_optmgmt_req *)ctlbuf.buf;
 	if (_T_IS_XTI(api_semantics))
 		optreq->PRIM_type = T_OPTMGMT_REQ;
@@ -261,6 +256,7 @@ _tx_optmgmt(
 		goto err_out;
 	}
 
+	/* LINTED pointer cast */
 	optack = (struct T_optmgmt_ack *)ctlbuf.buf;
 
 	if (_T_IS_TLI(api_semantics) || ret->opt.maxlen > 0) {
@@ -318,7 +314,6 @@ _tx_optmgmt(
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-	trace2(TR_t_optmgmt, 1, fd);
 	return (0);
 	/* NOTREACHED */
 
@@ -330,7 +325,6 @@ err_out:
 		tiptr->ti_ctlbuf = ctlbuf.buf;
 	sig_mutex_unlock(&tiptr->ti_lock);
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-	trace2(TR_t_optmgmt, 1, fd);
 	errno = sv_errno;
 	return (-1);
 }
