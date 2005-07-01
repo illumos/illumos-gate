@@ -111,29 +111,6 @@ load_platform_drivers(void)
 		cmn_err(CE_WARN, "todds1337 driver failed to install");
 }
 
-/*
- * This routine is needed if a device error or timeout occurs before the
- * driver is loaded.
- */
-/*ARGSUSED*/
-int
-plat_ide_chipreset(dev_info_t *dip, int chno)
-{
-	int	ret = DDI_SUCCESS;
-
-	if (isa_handle == NULL) {
-		return (DDI_FAILURE);
-	}
-
-	/*
-	 * This will be filled in with the reset logic
-	 * for the ULI1573 when that becomes available.
-	 * currently this is just a stub.
-	 */
-	return (ret);
-}
-
-
 /*ARGSUSED*/
 int
 plat_cpu_poweron(struct cpu *cp)
