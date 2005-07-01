@@ -564,9 +564,14 @@ static sd_disk_config_t sd_disk_table[] = {
 	{ "IBM     3552",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "IBM     1722",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "IBM     1742",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "IBM     1815",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "IBM     FAStT",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "LSI     INF",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "ENGENIO INF",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "SGI     TP",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "SGI     IS",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "*CSM100_*",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "*CSM200_*",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "LSI",		SD_CONF_BSET_NRR_COUNT, &lsi_properties },
 	{ "SUN     T3", SD_CONF_BSET_THROTTLE |
 			SD_CONF_BSET_BSY_RETRY_COUNT|
@@ -615,6 +620,7 @@ static sd_disk_config_t sd_disk_table[] = {
 	{ "STK     OPENstorage", SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "STK     OpenStorage", SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "STK     BladeCtlr",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "STK     FLEXLINE",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "SYMBIOS", SD_CONF_BSET_NRR_COUNT, &symbios_properties },
 #endif /* fibre or NON-sparc platforms */
 #if ((defined(__sparc) && !defined(__fibre)) ||\
