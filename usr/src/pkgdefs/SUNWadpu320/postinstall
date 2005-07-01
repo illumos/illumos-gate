@@ -1,6 +1,6 @@
 #!/sbin/sh
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -107,5 +107,5 @@ check_add_drv()
 }
 
 
-check_add_drv -i '"pci9005,8000" "pci9005,8010" "pci9005,8011" "pci9005,8012" "pci9005,8014" "pci9005,8015" "pci9005,8016" "pci9005,8017" "pci9005,801d" "pci9005,801e" "pci9005,801f"' -b "$BASEDIR" -c scsi \
+check_add_drv -i '"pci9005,8000" "pci9005,8010" "pci9005,8011" "pci9005,8012" "pci9005,8014" "pci9005,8015" "pci9005,8016" "pci9005,8017" "pci9005,801d" "pci9005,801e" "pci9005,801f" "pci9005,808f"' -b "$BASEDIR" -c scsi \
                         -m 'adpu320ctl 0666 root root' adpu320
