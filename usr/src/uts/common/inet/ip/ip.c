@@ -93,9 +93,7 @@
 #include <inet/ipsec_info.h>
 #include <inet/sadb.h>
 #include <inet/ipsec_impl.h>
-/* EXPORT DELETE START */
 #include <sys/iphada.h>
-/* EXPORT DELETE END */
 #include <inet/tun.h>
 #include <inet/ipdrop.h>
 
@@ -12836,7 +12834,6 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 		    B_FALSE);
 		return (B_TRUE);
 	case M_CTL:
-/* EXPORT DELETE START */
 		if ((MBLKL(first_mp) >= sizeof (da_ipsec_t)) &&
 		    (((da_ipsec_t *)first_mp->b_rptr)->da_type ==
 			IPHADA_M_CTL)) {
@@ -12886,7 +12883,6 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 			*mpp = mp;
 			return (B_FALSE);
 		}
-/* EXPORT DELETE END */
 		putnext(q, mp);
 		return (B_TRUE);
 	case M_FLUSH:
@@ -15238,7 +15234,6 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	    (ipha->ipha_protocol != IPPROTO_UDP));
 
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-/* EXPORT DELETE START */
 	if (mctl_present &&
 	    ((da_ipsec_t *)first_mp->b_rptr)->da_type == IPHADA_M_CTL) {
 		ASSERT(MBLKL(first_mp) >= sizeof (da_ipsec_t));
@@ -15261,7 +15256,6 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		first_mp = mp;
 		mctl_present = B_FALSE;
 	}
-/* EXPORT DELETE END */
 
 	/*
 	 * IF M_CTL is not present, then ipsec_in_is_secure
@@ -22501,7 +22495,6 @@ send:
 void
 ipsec_hw_putnext(queue_t *q, mblk_t *mp)
 {
-/* EXPORT DELETE START */
 	mblk_t *hada_mp;	/* attributes M_CTL mblk */
 	da_ipsec_t *hada;	/* data attributes */
 	ill_t *ill = (ill_t *)q->q_ptr;
@@ -22510,9 +22503,7 @@ ipsec_hw_putnext(queue_t *q, mblk_t *mp)
 
 	if ((ill->ill_capabilities & (ILL_CAPAB_AH | ILL_CAPAB_ESP)) == 0) {
 		/* IPsec KSTATS: Bump lose counter here! */
-/* EXPORT DELETE END */
 		freemsg(mp);
-/* EXPORT DELETE START */
 		return;
 	}
 
@@ -22541,7 +22532,6 @@ ipsec_hw_putnext(queue_t *q, mblk_t *mp)
 	hada->da_type = IPHADA_M_CTL;
 
 	putnext(q, hada_mp);
-/* EXPORT DELETE END */
 }
 
 /*

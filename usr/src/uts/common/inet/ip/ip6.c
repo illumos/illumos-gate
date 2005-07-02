@@ -54,9 +54,7 @@
 #include <sys/vtrace.h>
 #include <sys/isa_defs.h>
 #include <sys/atomic.h>
-/* EXPORT DELETE START */
 #include <sys/iphada.h>
-/* EXPORT DELETE END */
 #include <sys/policy.h>
 #include <net/if.h>
 #include <net/if_arp.h>
@@ -6508,14 +6506,12 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		qwriter_ip(NULL, ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
 		return;
 	case M_CTL: {
-/* EXPORT DELETE START */
 		if ((MBLKL(mp) > sizeof (int)) &&
 		    ((da_ipsec_t *)mp->b_rptr)->da_type == IPHADA_M_CTL) {
 			ASSERT(MBLKL(mp) >= sizeof (da_ipsec_t));
 			mctl_present = B_TRUE;
 			break;
 		}
-/* EXPORT DELETE END */
 		putnext(q, mp);
 		return;
 	}

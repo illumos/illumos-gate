@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,9 +61,7 @@
 #include <inet/ipdrop.h>
 #include <sys/taskq.h>
 #include <sys/policy.h>
-/* EXPORT DELETE START */
 #include <sys/iphada.h>
-/* EXPORT DELETE END */
 #include <sys/strsun.h>
 
 #include <sys/crypto/common.h>
@@ -3300,7 +3298,6 @@ ah_outbound(mblk_t *ipsec_out)
 		return (IPSEC_STATUS_FAILED);
 	}
 
-/* EXPORT DELETE START */
 	if (oi->ipsec_out_is_capab_ill) {
 		ah3dbg(("ah_outbound: pkt can be accelerated\n"));
 		if (oi->ipsec_out_v4)
@@ -3309,7 +3306,6 @@ ah_outbound(mblk_t *ipsec_out)
 			return (ah_outbound_accelerated_v6(ipsec_out, assoc));
 	}
 	AH_BUMP_STAT(noaccel);
-/* EXPORT DELETE END */
 
 	/*
 	 * Insert pseudo header:
@@ -3389,7 +3385,6 @@ ah_inbound(mblk_t *ipsec_in_mp, void *arg)
 	 */
 	ah_offset = (uchar_t *)ah - data_mp->b_rptr;
 
-/* EXPORT DELETE START */
 	/*
 	 * Has this packet already been processed by a hardware
 	 * IPsec accelerator?
@@ -3401,7 +3396,6 @@ ah_inbound(mblk_t *ipsec_in_mp, void *arg)
 		    assoc, ah_offset));
 	}
 	AH_BUMP_STAT(noaccel);
-/* EXPORT DELETE END */
 
 	/*
 	 * We need to pullup until the ICV before we call
@@ -3455,7 +3449,6 @@ ah_inbound(mblk_t *ipsec_in_mp, void *arg)
 	    assoc));
 }
 
-/* EXPORT DELETE START */
 /*
  * ah_inbound_accelerated:
  * Called from ah_inbound() to process IPsec packets that have been
@@ -3876,7 +3869,6 @@ ah_outbound_accelerated_v6(mblk_t *ipsec_mp, ipsa_t *assoc)
 
 	return (IPSEC_STATUS_SUCCESS);
 }
-/* EXPORT DELETE END */
 
 /*
  * Invoked after processing of an inbound packet by the

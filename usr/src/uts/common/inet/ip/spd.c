@@ -506,15 +506,14 @@ ipsec_policy_init()
 
 /*
  * Sort algorithm lists.
- *	EXPORT DELETE START
+ *
  * I may need to split this based on
  * authentication/encryption, and I may wish to have an administrator
  * configure this list.  Hold on to some NDD variables...
- *	EXPORT DELETE END
  *
  * XXX For now, sort on minimum key size (GAG!).  While minimum key size is
- * not the ideal metric, it's the only quantifiable measure available in the
- * AUTH/ENCR PI.  We need a better metric for sorting algorithms by preference.
+ * not the ideal metric, it's the only quantifiable measure available.
+ * We need a better metric for sorting algorithms by preference.
  */
 static void
 alg_insert_sortlist(enum ipsec_algtype at, uint8_t algid)

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,14 +48,6 @@ extern "C" {
  *	  PF_KEY messages.  They flow between AH/ESP and keysock.
  */
 
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
-#if 0
-/*
- * I obscure the ipsec_info "prefix" for purposes of export control, and
- * domestic source distribution.
- */
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
-
 /*
  * The IPsec M_CTL value MUST be something that will not be even close
  * to an IPv4 or IPv6 header.  This means the first byte must not be
@@ -67,13 +59,7 @@ extern "C" {
  * datagram get sent from to TCP or UDP when an ICMP datagram affects a
  * TCP/UDP session.
  */
-
-#define	IPSEC_M_CTL	(('!' << 24) + ('@' << 16) + ('@' << 8))
-/* EXPORT DELETE START */ /* CRYPT DELETE START */
-#else
-#define	IPSEC_M_CTL	0x7dfaae00
-#endif	/* False */
-/* EXPORT DELETE END */ /* CRYPT DELETE END */
+#define	IPSEC_M_CTL	0x73706900
 
 /*
  * M_CTL types for IPsec messages.  Remember, the values 0x40 - 0x4f and 0x60

@@ -15,7 +15,6 @@ uts/common/sys/tivc.h
 uts/common/io/tivc.conf
 uts/common/io/tmux.c
 uts/common/io/tmux.conf
-uts/common/sys/iphada.h
 uts/common/sys/tmux.h
 uts/sparc/wsdrv
 uts/sun/io/wsdrv.c

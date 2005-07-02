@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/common/inet/Makefile
@@ -55,40 +55,3 @@ $(ROOTDIRS):
 	$(INS.dir)
 
 check:	$(CHECKHDRS)
-
-# EXPORT DELETE START
-# Special target to clean up the source tree for export distribution
-# Warning: This target changes the source tree
-EXPORT_SRC:
-	$(RM) Makefile+ ipsec_info.h+ ipsecesp.h+ 
-
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< ipsec_info.h > ipsec_info.h+
-	$(MV) ipsec_info.h+ ipsec_info.h
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< ipsecesp.h > ipsecesp.h+
-	$(MV) ipsecesp.h+ ipsecesp.h
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile ipsec_info.h ipsecesp.h
-
-# CRYPT DELETE START
-# Special target to clean up the source tree for domestic distribution
-# Warning: This target changes the source tree
-
-CRYPT_SRC:
-	$(RM) Makefile+ ipsec_info.h+ ipsecesp.h+
-	sed -e "/CRYPT DELETE START/,/CRYPT DELETE END/d" \
-		< ipsec_info.h > ipsec_info.h+
-	$(MV) ipsec_info.h+ ipsec_info.h
-	sed -e "/CRYPT DELETE START/,/CRYPT DELETE END/d" \
-		< ipsecesp.h > ipsecesp.h+
-	$(MV) ipsecesp.h+ ipsecesp.h
-	sed -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile ipsec_info.h ipsecesp.h
-
-# CRYPT DELETE END
-# EXPORT DELETE END

@@ -87,9 +87,7 @@
 #include <inet/ipsec_info.h>
 #include <inet/sadb.h>
 #include <inet/ipsec_impl.h>
-/* EXPORT DELETE START */
 #include <sys/iphada.h>
-/* EXPORT DELETE END */
 
 
 #include <netinet/igmp.h>
@@ -228,10 +226,8 @@ static void ill_capability_dispatch(ill_t *, mblk_t *, dl_capability_sub_t *,
 static void ill_capability_id_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static void ill_capability_mdt_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static void ill_capability_mdt_reset(ill_t *, mblk_t **);
-/* EXPORT DELETE START */
 static void ill_capability_ipsec_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static void ill_capability_ipsec_reset(ill_t *, mblk_t **);
-/* EXPORT DELETE END */
 static void ill_capability_hcksum_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static void ill_capability_hcksum_reset(ill_t *, mblk_t **);
 static void ill_capability_zerocopy_ack(ill_t *, mblk_t *,
@@ -1795,9 +1791,7 @@ ill_capability_reset(ill_t *ill)
 	ill_capability_mdt_reset(ill, &sc_mp);
 	ill_capability_hcksum_reset(ill, &sc_mp);
 	ill_capability_zerocopy_reset(ill, &sc_mp);
-/* EXPORT DELETE START */
 	ill_capability_ipsec_reset(ill, &sc_mp);
-/* EXPORT DELETE END */
 	ill_capability_poll_reset(ill, &sc_mp);
 
 	/* Nothing to send down in order to disable the capabilities? */
@@ -2079,7 +2073,6 @@ ill_capability_mdt_reset(ill_t *ill, mblk_t **sc_mp)
 		*sc_mp = mp;
 }
 
-/* EXPORT DELETE START */
 /*
  * Send a DL_NOTIFY_REQ to the specified ill to enable
  * DL_NOTE_PROMISC_ON/OFF_PHYS notifications.
@@ -2569,7 +2562,6 @@ ill_capability_ipsec_reset(ill_t *ill, mblk_t **sc_mp)
 	else
 		*sc_mp = mp;
 }
-/* EXPORT DELETE END */
 
 static void
 ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp,
@@ -2586,7 +2578,6 @@ ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp,
 	if (ill->ill_capab_state == IDMS_UNKNOWN)
 		return;
 
-/* EXPORT DELETE START */
 	/*
 	 * Note that only the following two sub-capabilities may be
 	 * considered as "legacy", since their original definitions
@@ -2599,7 +2590,6 @@ ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp,
 		legacy = B_TRUE;
 		break;
 	}
-/* EXPORT DELETE END */
 
 	/*
 	 * For legacy sub-capabilities which don't incorporate a queue_t
@@ -2614,12 +2604,10 @@ ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp,
 	}
 
 	switch (subp->dl_cap) {
-/* EXPORT DELETE START */
 	case DL_CAPAB_IPSEC_AH:
 	case DL_CAPAB_IPSEC_ESP:
 		ill_capability_ipsec_ack(ill, mp, subp);
 		break;
-/* EXPORT DELETE END */
 	case DL_CAPAB_MDT:
 		ill_capability_mdt_ack(ill, mp, subp);
 		break;

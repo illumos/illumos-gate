@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,9 +65,7 @@
 #include <inet/udp_impl.h>
 #include <sys/taskq.h>
 
-/* EXPORT DELETE START */
 #include <sys/iphada.h>
-/* EXPORT DELETE END */
 
 /* Packet dropper for ESP drops. */
 static ipdropper_t esp_dropper;
@@ -134,11 +132,9 @@ static void ipsecesp_rput(queue_t *, mblk_t *);
 static void ipsecesp_wput(queue_t *, mblk_t *);
 static void esp_send_acquire(ipsacq_t *, mblk_t *);
 
-/* EXPORT DELETE START */
 static ipsec_status_t esp_outbound_accelerated(mblk_t *, uint_t);
 static ipsec_status_t esp_inbound_accelerated(mblk_t *, mblk_t *,
     boolean_t, ipsa_t *);
-/* EXPORT DELETE END */
 
 static boolean_t esp_register_out(uint32_t, uint32_t, uint_t);
 static boolean_t esp_strip_header(mblk_t *, boolean_t, uint32_t,
@@ -208,10 +204,8 @@ typedef struct {
 	kstat_named_t esp_stat_crypto_sync;
 	kstat_named_t esp_stat_crypto_async;
 	kstat_named_t esp_stat_crypto_failures;
-/* EXPORT DELETE START */
 	kstat_named_t esp_stat_num_ealgs;
 	kstat_named_t esp_stat_bad_decrypt;
-/* EXPORT DELETE END */
 } esp_kstats_t;
 
 #define	ESP_BUMP_STAT(x) (esp_kstats->esp_stat_ ## x).value.ui64++
@@ -240,9 +234,7 @@ esp_kstat_init(void)
 #define	KI(x) kstat_named_init(&(esp_kstats->esp_stat_##x), #x, K64)
 
 	KI(num_aalgs);
-/* EXPORT DELETE START */
 	KI(num_ealgs);
-/* EXPORT DELETE END */
 	KI(good_auth);
 	KI(bad_auth);
 	KI(bad_padding);
@@ -259,9 +251,7 @@ esp_kstat_init(void)
 	KI(crypto_sync);
 	KI(crypto_async);
 	KI(crypto_failures);
-/* EXPORT DELETE START */
 	KI(bad_decrypt);
-/* EXPORT DELETE END */
 
 #undef KI
 #undef K64
@@ -288,9 +278,7 @@ esp_kstat_update(kstat_t *kp, int rw)
 
 	mutex_enter(&alg_lock);
 	ekp->esp_stat_num_aalgs.value.ui64 = ipsec_nalgs[IPSEC_ALG_AUTH];
-/* EXPORT DELETE START */
 	ekp->esp_stat_num_ealgs.value.ui64 = ipsec_nalgs[IPSEC_ALG_ENCR];
-/* EXPORT DELETE END */
 	mutex_exit(&alg_lock);
 
 	return (0);
@@ -832,9 +820,7 @@ esp_strip_header(mblk_t *data_mp, boolean_t isv4, uint32_t ivlen,
 		 */
 		if (padlen >= ntohs(ipha->ipha_length) - sizeof (ipha_t) - 2 -
 		    sizeof (esph_t) - ivlen) {
-/* EXPORT DELETE START */
 			ESP_BUMP_STAT(bad_decrypt);
-/* EXPORT DELETE END */
 			ipsec_rl_strlog(info.mi_idnum, 0, 0, SL_ERROR | SL_WARN,
 			    "Possibly corrupt ESP packet.");
 			esp1dbg(("padlen (%d) is greater than:\n", padlen));
@@ -879,9 +865,7 @@ esp_strip_header(mblk_t *data_mp, boolean_t isv4, uint32_t ivlen,
 
 		if (padlen >= ntohs(ip6h->ip6_plen) - 2 - sizeof (esph_t) -
 		    ivlen) {
-/* EXPORT DELETE START */
 			ESP_BUMP_STAT(bad_decrypt);
-/* EXPORT DELETE END */
 			ipsec_rl_strlog(info.mi_idnum, 0, 0, SL_ERROR | SL_WARN,
 			    "Possibly corrupt ESP packet.");
 			esp1dbg(("padlen (%d) is greater than:\n", padlen));
@@ -1127,7 +1111,6 @@ esp_inbound(mblk_t *ipsec_in_mp, void *arg)
 		return (IPSEC_STATUS_FAILED);
 	}
 
-/* EXPORT DELETE START */
 	/*
 	 * Has this packet already been processed by a hardware
 	 * IPsec accelerator?
@@ -1141,7 +1124,6 @@ esp_inbound(mblk_t *ipsec_in_mp, void *arg)
 		return (rv);
 	}
 	ESP_BUMP_STAT(noaccel);
-/* EXPORT DELETE END */
 
 	/*
 	 * Adjust the IP header's payload length to reflect the removal
@@ -1195,9 +1177,7 @@ esp_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs)
 
 	for (ap = acqrec->ipsacq_act; ap != NULL;
 	    ap = ap->ipa_next) {
-/* EXPORT DELETE START */
 		ipsec_alginfo_t *ealg = NULL;
-/* EXPORT DELETE END */
 		ipsec_alginfo_t *aalg = NULL;
 
 		if (ap->ipa_act.ipa_type != IPSEC_POLICY_APPLY)
@@ -1215,20 +1195,16 @@ esp_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs)
 				continue;
 		}
 
-/* EXPORT DELETE START */
 		ASSERT(prot->ipp_encr_alg > 0);
 		ealg = ipsec_alglists[IPSEC_ALG_ENCR][prot->ipp_encr_alg];
 		if (ealg == NULL || !ALG_VALID(ealg))
 			continue;
-/* EXPORT DELETE END */
 
 		comb->sadb_comb_flags = 0;
 		comb->sadb_comb_reserved = 0;
-/* EXPORT DELETE START */
 		comb->sadb_comb_encrypt = ealg->alg_id;
 		comb->sadb_comb_encrypt_minbits = prot->ipp_espe_minbits;
 		comb->sadb_comb_encrypt_maxbits = prot->ipp_espe_maxbits;
-/* EXPORT DELETE END */
 		if (aalg == NULL) {
 			comb->sadb_comb_auth = 0;
 			comb->sadb_comb_auth_minbits = 0;
@@ -1312,15 +1288,7 @@ esp_send_acquire(ipsacq_t *acqrec, mblk_t *extended)
 
 	mutex_enter(&alg_lock);
 
-/* EXPORT DELETE START */
-#if 0
-/* EXPORT DELETE END */
-	combs = ipsec_nalgs[IPSEC_ALG_AUTH];
-/* EXPORT DELETE START */
-#else
 	combs = ipsec_nalgs[IPSEC_ALG_AUTH] * ipsec_nalgs[IPSEC_ALG_ENCR];
-#endif
-/* EXPORT DELETE END */
 
 	allocsize += combs * sizeof (sadb_comb_t);
 
@@ -1588,13 +1556,10 @@ esp_in_done(mblk_t *ipsec_in_mp)
 	is_natt = ((assoc->ipsa_flags & IPSA_F_NATT) != 0);
 
 	/* get the pointer to the ESP header */
-/* EXPORT DELETE START */
 	if (assoc->ipsa_encr_alg == SADB_EALG_NULL) {
 		/* authentication-only ESP */
-/* EXPORT DELETE END */
 		espstart = ii->ipsec_in_crypto_data.cd_offset;
 		processed_len = ii->ipsec_in_crypto_data.cd_length;
-/* EXPORT DELETE START */
 	} else {
 		/* encryption present */
 		ivlen = assoc->ipsa_iv_len;
@@ -1611,7 +1576,6 @@ esp_in_done(mblk_t *ipsec_in_mp)
 			    ivlen;
 		}
 	}
-/* EXPORT DELETE END */
 
 	data_mp = ipsec_in_mp->b_cont;
 	esph = (esph_t *)(data_mp->b_rptr + espstart);
@@ -1852,7 +1816,6 @@ esp_crypto_failed(mblk_t *mp, boolean_t is_inbound, int kef_rc)
 	(data)->cd_length = len;					\
 }
 
-/* EXPORT DELETE START */
 #define	ESP_INIT_CRYPTO_DUAL_DATA(data, mp, off1, len1, off2, len2) {	\
 	(data)->dd_format = CRYPTO_DATA_MBLK;				\
 	(data)->dd_mp = mp;						\
@@ -1861,7 +1824,6 @@ esp_crypto_failed(mblk_t *mp, boolean_t is_inbound, int kef_rc)
 	(data)->dd_len2 = len2;						\
 	(data)->dd_offset2 = off2;					\
 }
-/* EXPORT DELETE END */
 
 static ipsec_status_t
 esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
@@ -1874,24 +1836,20 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 	int kef_rc = CRYPTO_FAILED;
 	uint_t icv_len = assoc->ipsa_mac_len;
 	crypto_ctx_template_t auth_ctx_tmpl;
-/* EXPORT DELETE START */
 	boolean_t do_encr;
 	uint_t encr_offset, encr_len;
 	uint_t iv_len = assoc->ipsa_iv_len;
 	crypto_ctx_template_t encr_ctx_tmpl;
-/* EXPORT DELETE END */
 
 	ASSERT(ii->ipsec_in_type == IPSEC_IN);
 
 	do_auth = assoc->ipsa_auth_alg != SADB_AALG_NONE;
-/* EXPORT DELETE START */
 	do_encr = assoc->ipsa_encr_alg != SADB_EALG_NULL;
 
 	/*
 	 * An inbound packet is of the form:
 	 * IPSEC_IN -> [IP,options,ESP,IV,data,ICV,pad]
 	 */
-/* EXPORT DELETE END */
 	esp_mp = ipsec_mp->b_cont;
 	msg_len = MBLKL(esp_mp);
 
@@ -1914,10 +1872,8 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 		/* authentication starts at the ESP header */
 		auth_offset = esph_offset;
 		auth_len = msg_len - auth_offset - icv_len;
-/* EXPORT DELETE START */
 		if (!do_encr) {
 			/* authentication only */
-/* EXPORT DELETE END */
 			/* initialize input data argument */
 			ESP_INIT_CRYPTO_DATA(&ii->ipsec_in_crypto_data,
 			    esp_mp, auth_offset, auth_len);
@@ -1927,12 +1883,9 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 			    &ii->ipsec_in_crypto_data,
 			    &assoc->ipsa_kcfauthkey, auth_ctx_tmpl,
 			    &ii->ipsec_in_crypto_mac, &call_req);
-/* EXPORT DELETE START */
 		}
-/* EXPORT DELETE END */
 	}
 
-/* EXPORT DELETE START */
 	if (do_encr) {
 		/* force asynchronous processing? */
 		if (ipsec_algs_exec_mode[IPSEC_ALG_ENCR] ==
@@ -1984,7 +1937,6 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 		    auth_ctx_tmpl, encr_ctx_tmpl, &ii->ipsec_in_crypto_mac,
 		    NULL, &call_req);
 	}
-/* EXPORT DELETE END */
 
 	switch (kef_rc) {
 	case CRYPTO_SUCCESS:
@@ -2016,11 +1968,9 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 	uint_t icv_len = assoc->ipsa_mac_len;
 	crypto_ctx_template_t auth_ctx_tmpl;
 	boolean_t do_auth;
-/* EXPORT DELETE START */
 	boolean_t do_encr;
 	uint_t iv_len = assoc->ipsa_iv_len;
 	crypto_ctx_template_t encr_ctx_tmpl;
-/* EXPORT DELETE END */
 	boolean_t is_natt = ((assoc->ipsa_flags & IPSA_F_NATT) != 0);
 	size_t esph_offset = (is_natt ? UDPH_SIZE : 0);
 
@@ -2028,18 +1978,14 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 
 	ASSERT(io->ipsec_out_type == IPSEC_OUT);
 
-/* EXPORT DELETE START */
 	do_encr = assoc->ipsa_encr_alg != SADB_EALG_NULL;
-/* EXPORT DELETE END */
 	do_auth = assoc->ipsa_auth_alg != SADB_AALG_NONE;
 
 	/*
-	 *	EXPORT DELETE START
 	 * Outbound IPsec packets are of the form:
 	 * IPSEC_OUT -> [IP,options] -> [ESP,IV] -> [data] -> [pad,ICV]
 	 * unless it's NATT, then it's
 	 * IPSEC_OUT -> [IP,options] -> [udp][ESP,IV] -> [data] -> [pad,ICV]
-	 *	EXPORT DELETE END
 	 * Get a pointer to the mblk containing the ESP header.
 	 */
 	ASSERT(ipsec_mp->b_cont != NULL && ipsec_mp->b_cont->b_cont != NULL);
@@ -2062,15 +2008,9 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 		    icv_len, icv_buf);
 
 		/* authentication starts at the ESP header */
-		auth_len = payload_len +
-/* EXPORT DELETE START */
-		    iv_len +
-/* EXPORT DELETE END */
-		    sizeof (esph_t);
-/* EXPORT DELETE START */
+		auth_len = payload_len + iv_len + sizeof (esph_t);
 		if (!do_encr) {
 			/* authentication only */
-/* EXPORT DELETE END */
 			/* initialize input data argument */
 			ESP_INIT_CRYPTO_DATA(&io->ipsec_out_crypto_data,
 			    esp_mp, esph_offset, auth_len);
@@ -2080,12 +2020,9 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 			    &io->ipsec_out_crypto_data,
 			    &assoc->ipsa_kcfauthkey, auth_ctx_tmpl,
 			    &io->ipsec_out_crypto_mac, &call_req);
-/* EXPORT DELETE START */
 		}
-/* EXPORT DELETE END */
 	}
 
-/* EXPORT DELETE START */
 	if (do_encr) {
 		/* force asynchronous processing? */
 		if (ipsec_algs_exec_mode[IPSEC_ALG_ENCR] ==
@@ -2140,7 +2077,6 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 		    &io->ipsec_out_crypto_dual_data,
 		    &io->ipsec_out_crypto_mac, &call_req);
 	}
-/* EXPORT DELETE END */
 
 	switch (kef_rc) {
 	case CRYPTO_SUCCESS:
@@ -2272,16 +2208,12 @@ esp_outbound(mblk_t *mp)
 		esplen += UDPH_SIZE;
 	}
 
-/* EXPORT DELETE START */
 	if (assoc->ipsa_encr_alg != SADB_EALG_NULL)
 		iv_len = assoc->ipsa_iv_len;
-/* EXPORT DELETE END */
 
-/* EXPORT DELETE START */
 	/*
 	 * Set up ESP header and encryption padding for ENCR PI request.
 	 */
-/* EXPORT DELETE END */
 
 	/*
 	 * Determine the padding length.   Pad to 4-bytes.
@@ -2291,36 +2223,27 @@ esp_outbound(mblk_t *mp)
 	 * calculating the actual length of the padding.
 	 */
 
-/* EXPORT DELETE START */
 	if (assoc->ipsa_encr_alg != SADB_EALG_NULL) {
 		padlen = ((unsigned)(iv_len - datalen - 2)) % iv_len;
 	} else {
-/* EXPORT DELETE END */
 		padlen = ((unsigned)(sizeof (uint32_t) - datalen - 2)) %
 		    sizeof (uint32_t);
-/* EXPORT DELETE START */
 	}
 
 	/* Allocate ESP header and IV. */
 	esplen += iv_len;
-/* EXPORT DELETE END */
 
 	/*
 	 * Update association byte-count lifetimes.  Don't forget to take
 	 * into account the padding length and next-header (hence the + 2).
-	 *	EXPORT DELETE START
+	 *
 	 * Use the amount of data fed into the "encryption algorithm".  This
 	 * is the IV, the data length, the padding length, and the final two
 	 * bytes (padlen, and next-header).
 	 *
-	 *	EXPORT DELETE END
 	 */
 
-	if (!esp_age_bytes(assoc, datalen + padlen +
-/* EXPORT DELETE START */
-	    iv_len +
-/* EXPORT DELETE END */
-	    2, B_FALSE)) {
+	if (!esp_age_bytes(assoc, datalen + padlen + iv_len + 2, B_FALSE)) {
 		/*
 		 * TODO:  Find the outbound IRE for this packet and
 		 * pass it to ip_drop_packet().
@@ -2386,7 +2309,6 @@ esp_outbound(mblk_t *mp)
 		return (IPSEC_STATUS_FAILED);
 	}
 
-/* EXPORT DELETE START */
 	/*
 	 * Set the IV to a random quantity.  We do not require the
 	 * highest quality random bits, but for best security with CBC
@@ -2395,7 +2317,6 @@ esp_outbound(mblk_t *mp)
 	 * influencing the plaintext.
 	 */
 	(void) random_get_pseudo_bytes((uint8_t *)(esph + 1), iv_len);
-/* EXPORT DELETE END */
 
 	/* Fix the IP header. */
 	alloclen = padlen + 2 + mac_len;
@@ -2467,7 +2388,6 @@ esp_outbound(mblk_t *mp)
 	*tailmp->b_wptr++ = i;
 	*tailmp->b_wptr++ = protocol;
 
-/* EXPORT DELETE START */
 	esp2dbg(("data_Mp before encryption:\n"));
 	esp2dbg((dump_msg(data_mp)));
 
@@ -2497,7 +2417,6 @@ esp_outbound(mblk_t *mp)
 	/*
 	 * Okay.  I've set up the pre-encryption ESP.  Let's do it!
 	 */
-/* EXPORT DELETE END */
 
 	if (mac_len > 0) {
 		ASSERT(tailmp->b_wptr + mac_len <= tailmp->b_datap->db_lim);
@@ -2649,20 +2568,16 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial)
 	mblk_t *pfkey_msg_mp, *keysock_out_mp;
 	sadb_msg_t *samsg;
 	sadb_supported_t *sasupp_auth = NULL;
-/* EXPORT DELETE START */
 	sadb_supported_t *sasupp_encr = NULL;
-/* EXPORT DELETE END */
 	sadb_alg_t *saalg;
 	uint_t allocsize = sizeof (*samsg);
 	uint_t i, numalgs_snap;
 	int current_aalgs;
 	ipsec_alginfo_t **authalgs;
 	uint_t num_aalgs;
-/* EXPORT DELETE START */
 	int current_ealgs;
 	ipsec_alginfo_t **encralgs;
 	uint_t num_ealgs;
-/* EXPORT DELETE END */
 
 	/* Allocate the KEYSOCK_OUT. */
 	keysock_out_mp = sadb_keysock_out(serial);
@@ -2694,7 +2609,6 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial)
 		allocsize += (num_aalgs * sizeof (*saalg));
 		allocsize += sizeof (*sasupp_auth);
 	}
-/* EXPORT DELETE START */
 	encralgs = ipsec_alglists[IPSEC_ALG_ENCR];
 	for (num_ealgs = 0, i = 0; i < IPSEC_MAX_ALGS; i++)
 		if (encralgs[i] != NULL && ALG_VALID(encralgs[i]))
@@ -2704,7 +2618,6 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial)
 		allocsize += (num_ealgs * sizeof (*saalg));
 		allocsize += sizeof (*sasupp_encr);
 	}
-/* EXPORT DELETE END */
 	keysock_out_mp->b_cont = allocb(allocsize, BPRI_HI);
 	if (keysock_out_mp->b_cont == NULL) {
 		mutex_exit(&alg_lock);
@@ -2754,7 +2667,6 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial)
 		saalg = (sadb_alg_t *)(pfkey_msg_mp->b_rptr + sizeof (*samsg));
 	}
 
-/* EXPORT DELETE START */
 	if (num_ealgs != 0) {
 		sasupp_encr = (sadb_supported_t *)saalg;
 		saalg = (sadb_alg_t *)(sasupp_encr + 1);
@@ -2788,12 +2700,9 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial)
 		}
 #endif /* DEBUG */
 	}
-/* EXPORT DELETE END */
 
 	current_aalgs = num_aalgs;
-/* EXPORT DELETE START */
 	current_ealgs = num_ealgs;
-/* EXPORT DELETE END */
 
 	mutex_exit(&alg_lock);
 
@@ -2821,7 +2730,6 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial)
 		sasupp_auth->sadb_supported_reserved = 0;
 	}
 
-/* EXPORT DELETE START */
 	if (sasupp_encr != NULL) {
 		sasupp_encr->sadb_supported_len =
 		    SADB_8TO64(sizeof (*sasupp_encr) +
@@ -2830,7 +2738,6 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial)
 		    SADB_EXT_SUPPORTED_ENCRYPT;
 		sasupp_encr->sadb_supported_reserved = 0;
 	}
-/* EXPORT DELETE END */
 
 	if (esp_pfkey_q != NULL)
 		putnext(esp_pfkey_q, keysock_out_mp);
@@ -2903,22 +2810,6 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 	sadb_t *sp;
 	int outhash;
 	mblk_t *lpkt;
-
-/* EXPORT DELETE START */
-#if 0
-	/*
-	 * Gross hack for export control.  Since esp_encr_keycheck
-	 * is gone, I have to somehow enforce that exportable ESP source
-	 * can't have encryption.
-	 */
-/* EXPORT DELETE END */
-	if (assoc->sadb_sa_encrypt != SADB_EALG_NULL) {
-		samsg->sadb_x_msg_diagnostic = SADB_X_DIAGNOSTIC_BAD_EALG;
-		return (EINVAL);
-	}
-/* EXPORT DELETE START */
-#endif
-/* EXPORT DELETE END */
 
 	/*
 	 * Locate the appropriate table(s).
@@ -3245,7 +3136,6 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic)
 		}
 	}
 
-/* EXPORT DELETE START */
 	/*
 	 * Then locate the encryption algorithm.
 	 */
@@ -3276,7 +3166,6 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic)
 			return (EINVAL);
 		}
 	}
-/* EXPORT DELETE END */
 	mutex_exit(&alg_lock);
 
 	return (esp_add_sa_finish(mp, (sadb_msg_t *)mp->b_cont->b_rptr, ksi));
@@ -3677,7 +3566,6 @@ ipsecesp_wput(queue_t *q, mblk_t *mp)
 	}
 }
 
-/* EXPORT DELETE START */
 /*
  * Process an outbound ESP packet that can be accelerated by a IPsec
  * hardware acceleration capable Provider.
@@ -3877,7 +3765,6 @@ esp_in_discard:
 
 	return (IPSEC_STATUS_FAILED);
 }
-/* EXPORT DELETE END */
 
 /*
  * Wrapper to allow IP to trigger an ESP association failure message

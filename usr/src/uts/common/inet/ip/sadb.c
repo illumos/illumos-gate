@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,9 +58,7 @@
 #include <inet/ipsecesp.h>
 #include <sys/random.h>
 #include <sys/dlpi.h>
-/* EXPORT DELETE START */
 #include <sys/iphada.h>
-/* EXPORT DELETE END */
 #include <inet/ip_if.h>
 #include <inet/ipdrop.h>
 #include <inet/ipclassifier.h>
@@ -585,7 +583,6 @@ sadb_walker(isaf_t *table, uint_t numentries,
 	}
 }
 
-/* EXPORT DELETE START */
 /*
  * From the given SA, construct a dl_ct_ipsec_key and
  * a dl_ct_ipsec structures to be sent to the adapter as part
@@ -602,11 +599,9 @@ sadb_walker(isaf_t *table, uint_t numentries,
  * Returns B_TRUE if the corresponding SA must be passed to
  * a provider, B_FALSE otherwise; frees *mp if it returns B_FALSE.
  */
-/* EXPORT DELETE END */
 static boolean_t
 sadb_req_from_sa(ipsa_t *sa, mblk_t *mp, boolean_t is_inbound)
 {
-/* EXPORT DELETE START */
 	dl_ct_ipsec_key_t *keyp;
 	dl_ct_ipsec_t *sap;
 	void *ct_sa = mp->b_wptr;
@@ -661,16 +656,8 @@ sadb_req_from_sa(ipsa_t *sa, mblk_t *mp, boolean_t is_inbound)
 
 	mp->b_wptr += sizeof (dl_ct_ipsec_t) + sizeof (dl_ct_ipsec_key_t);
 	return (B_TRUE);
-#if 0
-/* EXPORT DELETE END */
-	freemsg(mp);
-	return (B_FALSE);
-/* EXPORT DELETE START */
-#endif
-/* EXPORT DELETE END */
 }
 
-/* EXPORT DELETE START */
 /*
  * Called from AH or ESP to format a message which will be used to inform
  * IPsec-acceleration-capable ills of a SADB change.
@@ -685,18 +672,14 @@ sadb_req_from_sa(ipsa_t *sa, mblk_t *mp, boolean_t is_inbound)
  * This function returns an mblk chain that must be passed to IP
  * for forwarding to the IPsec capable providers.
  */
-/* EXPORT DELETE END */
 mblk_t *
 sadb_fmt_sa_req(uint_t dl_operation, uint_t sa_type, ipsa_t *sa,
     boolean_t is_inbound)
 {
-/* EXPORT DELETE START */
 	mblk_t *mp;
 	dl_control_req_t *ctrl;
 	boolean_t need_key = B_FALSE;
-/* EXPORT DELETE END */
 	mblk_t *ctl_mp = NULL;
-/* EXPORT DELETE START */
 	ipsec_ctl_t *ctl;
 
 	/*
@@ -780,7 +763,6 @@ sadb_fmt_sa_req(uint_t dl_operation, uint_t sa_type, ipsa_t *sa,
 	} else
 		ctl->ipsec_ctl_sa = NULL;
 
-/* EXPORT DELETE END */
 	return (ctl_mp);
 }
 
@@ -863,7 +845,6 @@ sadb_ill_df(ill_t *ill, mblk_t *mp, isaf_t *fanout, int num_entries,
 	}
 }
 
-/* EXPORT DELETE START */
 /*
  * Called by ill_ipsec_capab_add(). Sends a copy of the SADB of
  * the type specified by sa_type to the specified ill.
@@ -873,11 +854,9 @@ sadb_ill_df(ill_t *ill, mblk_t *mp, isaf_t *fanout, int num_entries,
  * each SADB entry in order to send a corresponding DL_CONTROL_REQ
  * message to the ill.
  */
-/* EXPORT DELETE END */
 void
 sadb_ill_download(ill_t *ill, uint_t sa_type)
 {
-/* EXPORT DELETE START */
 	mblk_t *protomp;	/* prototype message */
 	dl_control_req_t *ctrl;
 	sadbp_t *spp;
@@ -920,7 +899,6 @@ sadb_ill_download(ill_t *ill, uint_t sa_type)
 	sadb_ill_df(ill, protomp, sp->sdb_of, OUTBOUND_BUCKETS, B_FALSE);
 	sadb_ill_df(ill, protomp, sp->sdb_if, INBOUND_BUCKETS, B_TRUE);
 	freemsg(protomp);
-/* EXPORT DELETE END */
 }
 
 /*
@@ -2401,7 +2379,6 @@ sadb_init_alginfo(ipsa_t *sa)
 
 	mutex_enter(&alg_lock);
 
-/* EXPORT DELETE START */
 	if (sa->ipsa_encrkey != NULL) {
 		alg = ipsec_alglists[IPSEC_ALG_ENCR][sa->ipsa_encr_alg];
 		if (alg != NULL && ALG_VALID(alg)) {
@@ -2412,7 +2389,7 @@ sadb_init_alginfo(ipsa_t *sa)
 		} else
 			sa->ipsa_emech.cm_type = CRYPTO_MECHANISM_INVALID;
 	}
-/* EXPORT DELETE END */
+
 	if (sa->ipsa_authkey != NULL) {
 		alg = ipsec_alglists[IPSEC_ALG_AUTH][sa->ipsa_auth_alg];
 		if (alg != NULL && ALG_VALID(alg)) {
@@ -2728,7 +2705,6 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		/* XXX is this safe w.r.t db_ref, etc? */
 		bzero(ekey + 1, newbie->ipsa_encrkeylen);
 
-/* EXPORT DELETE START */
 		/*
 		 * Pre-initialize the kernel crypto framework key
 		 * structure.
@@ -2744,7 +2720,6 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 			mutex_exit(&newbie->ipsa_lock);
 			goto error;
 		}
-/* EXPORT DELETE END */
 	}
 
 	sadb_init_alginfo(newbie);
@@ -4242,7 +4217,6 @@ sadb_action_to_ecomb(uint8_t *start, uint8_t *limit, ipsec_action_t *act)
 				return (NULL);
 		}
 
-/* EXPORT DELETE START */
 		cur = sadb_new_algdesc(cur, limit, ecomb,
 		    SADB_SATYPE_ESP, SADB_X_ALGTYPE_CRYPT,
 		    ipp->ipp_encr_alg,
@@ -4250,7 +4224,6 @@ sadb_action_to_ecomb(uint8_t *start, uint8_t *limit, ipsec_action_t *act)
 		    ipp->ipp_espe_maxbits);
 		if (cur == NULL)
 			return (NULL);
-/* EXPORT DELETE END */
 		/* Fill in lifetimes if and only if AH didn't already... */
 		if (!ipp->ipp_use_ah)
 			ipsecesp_fill_defs(ecomb);
@@ -5407,12 +5380,10 @@ sadb_alg_update_cb(isaf_t *head, ipsa_t *entry, void *cookie)
 		if (entry->ipsa_auth_alg == update_state->alg_id)
 			ctx_tmpl = &entry->ipsa_authtmpl;
 		break;
-/* EXPORT DELETE START */
 	case IPSEC_ALG_ENCR:
 		if (entry->ipsa_encr_alg == update_state->alg_id)
 			ctx_tmpl = &entry->ipsa_encrtmpl;
 		break;
-/* EXPORT DELETE END */
 	default:
 		ctx_tmpl = NULL;
 	}
@@ -5503,13 +5474,11 @@ ipsec_create_ctx_tmpl(ipsa_t *sa, ipsec_algtype_t alg_type)
 		sa_tmpl = &sa->ipsa_authtmpl;
 		alg = ipsec_alglists[alg_type][sa->ipsa_auth_alg];
 		break;
-/* EXPORT DELETE START */
 	case IPSEC_ALG_ENCR:
 		key = &sa->ipsa_kcfencrkey;
 		sa_tmpl = &sa->ipsa_encrtmpl;
 		alg = ipsec_alglists[alg_type][sa->ipsa_encr_alg];
 		break;
-/* EXPORT DELETE END */
 	default:
 		alg = NULL;
 	}
