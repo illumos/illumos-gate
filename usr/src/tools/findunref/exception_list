@@ -151,7 +151,6 @@
 ./uts/common/gssapi/include/Makefile
 ./uts/common/gssapi/mechs/dummy/Makefile
 ./uts/common/gssapi/mechs/krb5/Makefile
-./uts/common/inet/ip/Makefile
 ./uts/sun4v/io/ncp/Makefile
 ./xmod
 
