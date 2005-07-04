@@ -375,9 +375,9 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 		printf("dump aborted: please record the above information!\n");
 
 	if (halt_on_panic)
-		mdboot(A_REBOOT, AD_HALT, NULL);
+		mdboot(A_REBOOT, AD_HALT, NULL, B_FALSE);
 	else
-		mdboot(A_REBOOT, panic_bootfcn, panic_bootstr);
+		mdboot(A_REBOOT, panic_bootfcn, panic_bootstr, B_FALSE);
 spin:
 	/*
 	 * Restore ipl to at most CLOCK_LEVEL so we don't end up spinning

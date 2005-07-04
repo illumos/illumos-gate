@@ -170,10 +170,15 @@ extern void pm_cfb_rele(void);
  * Machine dependent code to reboot.
  * "mdep" is interpreted as a character pointer; if non-null, it is a pointer
  * to a string to be used as the argument string when rebooting.
+ *
+ * "invoke_cb" is a boolean. It is set to true when mdboot() can safely
+ * invoke CB_CL_MDBOOT callbacks before shutting the system down, i.e. when
+ * we are in a normal shutdown sequence (interrupts are not blocked, the
+ * system is not panic'ing or being suspended).
  */
 /*ARGSUSED*/
 void
-mdboot(int cmd, int fcn, char *mdep)
+mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 {
 	extern void mtrr_resync(void);
 
@@ -218,6 +223,9 @@ mdboot(int cmd, int fcn, char *mdep)
 
 	/* make sure there are no more changes to the device tree */
 	devtree_freeze();
+
+	if (invoke_cb)
+		(void) callb_execute_class(CB_CL_MDBOOT, NULL);
 
 	/*
 	 * stop other cpus and raise our priority.  since there is only
@@ -775,7 +783,7 @@ panic_idle(void)
 		while (cpu_boot_cmd == BOOT_WAIT || cpu_boot_fcn == BOOT_WAIT)
 			drv_usecwait(10);
 
-		mdboot(cpu_boot_cmd, cpu_boot_fcn, NULL);
+		mdboot(cpu_boot_cmd, cpu_boot_fcn, NULL, B_FALSE);
 	}
 
 	for (;;);

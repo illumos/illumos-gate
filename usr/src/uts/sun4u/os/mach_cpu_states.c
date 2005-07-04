@@ -41,6 +41,7 @@
 #include <sys/intreg.h>
 #include <sys/consdev.h>
 #include <sys/kdi_impl.h>
+#include <sys/callb.h>
 
 #ifdef	TRAPTRACE
 #include <sys/traptrace.h>
@@ -55,10 +56,15 @@ extern int disable_watchdog_on_exit;
  * Machine dependent code to reboot.
  * "mdep" is interpreted as a character pointer; if non-null, it is a pointer
  * to a string to be used as the argument string when rebooting.
+ *
+ * "invoke_cb" is a boolean. It is set to true when mdboot() can safely
+ * invoke CB_CL_MDBOOT callbacks before shutting the system down, i.e. when
+ * we are in a normal shutdown sequence (interrupts are not blocked, the
+ * system is not panic'ing or being suspended).
  */
 /*ARGSUSED*/
 void
-mdboot(int cmd, int fcn, char *bootstr)
+mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 {
 	page_t *first, *pp;
 	extern void pm_cfb_check_and_powerup(void);
@@ -112,6 +118,9 @@ mdboot(int cmd, int fcn, char *bootstr)
 
 	/* make sure there are no more changes to the device tree */
 	devtree_freeze();
+
+	if (invoke_cb)
+		(void) callb_execute_class(CB_CL_MDBOOT, NULL);
 
 	/*
 	 * stop other cpus which also raise our priority. since there is only

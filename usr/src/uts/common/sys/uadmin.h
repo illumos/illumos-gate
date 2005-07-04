@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,7 @@ extern "C" {
 
 #if defined(_KERNEL)
 extern kmutex_t ualock;
-extern void mdboot(int, int, char *);
+extern void mdboot(int, int, char *, boolean_t);
 extern void mdpreboot(int, int, char *);
 extern int kadmin(int, int, void *, cred_t *);
 extern void killall(zoneid_t);

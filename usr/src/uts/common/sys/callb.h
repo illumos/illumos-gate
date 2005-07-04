@@ -66,7 +66,7 @@ extern "C" {
 #define	CB_CL_CPR_DMA		11
 #define	CB_CL_CPR_POST_USER	12
 #define	CB_CL_UADMIN_PRE_VFS    13
-#define	CB_CL_UADMIN_POST_VFS   CB_CL_UADMIN
+#define	CB_CL_MDBOOT		CB_CL_UADMIN
 #define	CB_CL_ENTER_DEBUGGER	14
 #define	CB_CL_CPR_POST_KERNEL	15
 #define	NCBCLASS		16 /* CHANGE ME if classes are added/removed */

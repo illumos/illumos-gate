@@ -20,10 +20,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -126,6 +125,7 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 	int locked = 0;
 	char *buf;
 	size_t buflen = 0;
+	boolean_t invoke_cb = B_FALSE;
 
 	/*
 	 * We might be called directly by the kernel's fault-handling code, so
@@ -247,9 +247,10 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		(void) VFS_MOUNTROOT(rootvfs, ROOT_UNMOUNT);
 		vfs_syncall();
 
-		(void) callb_execute_class(CB_CL_UADMIN_POST_VFS, NULL);
 		dump_ereports();
 		dump_messages();
+
+		invoke_cb = B_TRUE;
 
 		/* FALLTHROUGH */
 	}
@@ -257,9 +258,9 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 	case A_REBOOT:
 		if ((mdep != NULL) && (*(char *)mdep == '/')) {
 			buf = i_convert_boot_device_name(mdep, NULL, &buflen);
-			mdboot(cmd, fcn, buf);
+			mdboot(cmd, fcn, buf, invoke_cb);
 		} else
-			mdboot(cmd, fcn, mdep);
+			mdboot(cmd, fcn, mdep, invoke_cb);
 		/* no return expected */
 		break;
 

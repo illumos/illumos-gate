@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -276,7 +276,7 @@ cpr(int fcn)
 		 * Back from a successful checkpoint
 		 */
 		if (fcn == AD_CPR_TESTZ || fcn == AD_CPR_TESTNOZ) {
-			mdboot(0, AD_BOOT, "");
+			mdboot(0, AD_BOOT, "", B_FALSE);
 			/* NOTREACHED */
 		}
 
