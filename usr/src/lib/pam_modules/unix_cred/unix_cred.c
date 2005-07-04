@@ -513,7 +513,7 @@ adt_done:
 
 	if (def == NULL) {
 		def = priv_str_to_set("basic", ",", NULL);
-		if (pathconf("/", _PC_CHOWN_RESTRICTED) == 0)
+		if (pathconf("/", _PC_CHOWN_RESTRICTED) == -1)
 			(void) priv_addset(def, PRIV_FILE_CHOWN_SELF);
 	}
 	/*
