@@ -161,6 +161,7 @@ COMMON_SUBDIRS = \
 	cmd/logadm \
 	cmd/logger \
 	cmd/login \
+	cmd/logins \
 	cmd/logname \
 	cmd/ls \
 	cmd/lvm \

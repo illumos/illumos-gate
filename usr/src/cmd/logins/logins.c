@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.15.1.2 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.15.1.2 */
 
 /*
  * logins.c
@@ -37,82 +37,20 @@
  *	containing login-IDs and other requested information.
  */
 
-/*
- *  Header files referenced:
- *	sys/types.h	System data types
- *	stdio.h		Definitions for standard I/O functions and constants
- *	unistd.h	Standard UNIX definitions
- *	string.h	Definitions for string-handling functions
- *	ctype.h		Character-type definitions
- *	grp.h		Definitions for referencing the /etc/group file
- *	pwd.h		Definitions for referencing the /etc/passwd file
- *	shadow.h	Definitions for the shadow password file /etc/shadow
- *	time.h		Time definitions (ctime(), asctime(), etc.)
- *	stdarg.h	Definitions for using a variable argument list
- *	fmtmsg.h	Definitions for using the standard message generator
- */
-
-#include	<sys/types.h>
-#include	<stdio.h>
-#include	<unistd.h>
-#include	<string.h>
-#include	<ctype.h>
-#include	<grp.h>
-#include	<pwd.h>
-#include	<shadow.h>
-#include	<time.h>
-#include	<stdarg.h>
-#include	<fmtmsg.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <ctype.h>
+#include <grp.h>
+#include <pwd.h>
+#include <shadow.h>
+#include <time.h>
+#include <stdarg.h>
+#include <fmtmsg.h>
 #include <locale.h>
 
-/*
- *  Externals referenced (and not defined by a header file):
- *	malloc		Allocate memory from main memory
- *	getopt		Extract the next option from the command line
- *	optind		The argument count of the next option to extract
- *			from the command line
- *	optarg		A pointer to the argument of the option just extracted
- *			from the command line
- *	opterr		FLAG:  !0 tells getopt() to write an error message if
- *			it detects an error
- *	getpwent	Get next entry from the /etc/passwd file
- *	getpwuid	Get next entry from the /etc/passwd file that has a
- *			specific user-ID
- *	fgetpwent	Get next entry from an /etc/passwd-like file
- *	setpwent	Rewind the /etc/passwd file
- *	endpwent	Quit using the /etc/passwd file
- *	getgrent	Get next entry from the /etc/group file
- *	setgrent	Rewind the /etc/group file
- *	endgrent	Quit using the /etc/passwd file
- *	getspnam	Get the next entry for a specific login-ID from the
- *			/etc/shadow file
- *	setspent	Rewind the /etc/shadow file
- *	endspent	Quit using the /etc/shadow file
- *	fmtmsg		Interface to the standard message generation facility
- *	putenv		Modify the environment
- *	exit		Exit the program
- */
-
-extern	void	       *malloc();
-extern	int		getopt();
-extern	char	       *optarg;
-extern	int		optind;
-extern	int		opterr;
-extern	struct passwd  *getpwent();
-extern	struct passwd  *getpwuid();
-extern	struct passwd  *fgetpwent();
-extern	void		setpwent();
-extern	void		endpwent();
-extern	struct group   *getgrent();
-extern	void		setgrent();
-extern	void		endgrent();
-extern	struct spwd    *getspnam();
-extern	void		setspent();
-extern	void		endspent();
-extern	int		fmtmsg();
-extern	int		putenv();
-extern	void		exit();
-
 /*
  *  Local constant definitions
  *	TRUE			Boolean constant
@@ -129,14 +67,14 @@ extern	void		exit();
 #endif
 
 #ifndef	TRUE
-#define	TRUE			((int) 't')
+#define	TRUE			((int)'t')
 #endif
 
-#define	USAGE_MSG		"usage: logins [-admopstux] [-g groups] [-l logins]"
-#define	MAXLOGINSIZE		14
-#define	MAXSYSTEMLOGIN		99
-#define	OPTSTR			"adg:l:mopstux"
-#define	ROOT_ID			0
+#define	USAGE_MSG	"usage: logins [-admopstux] [-g groups] [-l logins]"
+#define	MAXLOGINSIZE	14
+#define	MAXSYSTEMLOGIN	99
+#define	OPTSTR		"adg:l:mopstux"
+#define	ROOT_ID		0
 
 /*
  *  The following macros do their function for now but will probably have
@@ -155,7 +93,7 @@ extern	void		exit();
  */
 
 #define	isauserlogin(pw)	(pw->pw_uid > MAXSYSTEMLOGIN)
-#define isasystemlogin(pw)	(pw->pw_uid <= MAXSYSTEMLOGIN)
+#define	isasystemlogin(pw)	(pw->pw_uid <= MAXSYSTEMLOGIN)
 
 
 /*
@@ -171,17 +109,17 @@ extern	void		exit();
 
 /*  Describes a specified group name (from the -g groups option)  */
 struct	reqgrp {
-	char	       *groupname;	/* Requested group name */
-	struct reqgrp  *next;		/* Next item in the list */
+	char		*groupname;	/* Requested group name */
+	struct reqgrp	*next;		/* Next item in the list */
 	int		found;		/* TRUE if group in /etc/group */
 	gid_t		groupID;	/* Group's ID */
 };
 
 /*  Describes a specified login name (from the -l logins option)  */
 struct	reqlogin {
-	char	        *loginname;	/* Requested login name */
-	struct reqlogin *next;		/* Next item in the list */
-	int	 	 found;		/* TRUE if login in /etc/passwd */
+	char		*loginname;	/* Requested login name */
+	struct reqlogin	*next;		/* Next item in the list */
+	int		found;		/* TRUE if login in /etc/passwd */
 };
 
 /*
@@ -189,22 +127,23 @@ struct	reqlogin {
  */
 
 struct	pwdinfo {
-	long		datechg;	/* Date the password was changed (mmddyy) */
-	char	       *passwdstatus;	/* Password status */
-	long		mindaystilchg;	/* Min days b4 pwd can change again */
-	long		maxdaystilchg;	/* Max days b4 pwd can change again */
-	long		warninterval;	/* Days before expire to warn user */
-	long		inactive;	/* Lapsed days of inactivity before lock */
-	long		expdate;	/* Date of expiration (mmddyy) */
+	long	datechg;	/* Date the password was changed (mmddyy) */
+	char	*passwdstatus;	/* Password status */
+	long	mindaystilchg;	/* Min days b4 pwd can change again */
+	long	maxdaystilchg;	/* Max days b4 pwd can change again */
+	long	warninterval;	/* Days before expire to warn user */
+	long	inactive;	/* Lapsed days of inactivity before lock */
+	long	expdate;	/* Date of expiration (mmddyy) */
 };
 
 /* This structure describes secondary groups that a user belongs to */
 struct	secgrp {
-	char	       *groupname;	/* Name of the group */
-	struct secgrp  *next;		/* Next item in the list */
-	gid_t	        groupID;	/* Group-ID */
+	char		*groupname;	/* Name of the group */
+	struct secgrp	*next;		/* Next item in the list */
+	gid_t		groupID;	/* Group-ID */
 };
-
+
+
 /*
  *  These functions handle error and warning message writing.
  *  (This deals with UNIX(r) standard message generation, so
@@ -221,7 +160,8 @@ struct	secgrp {
 
 static	char	fcnlbl[MM_MXLABELLN+1];	/* Buffer for message label */
 static	char	msgbuf[MM_MXTXTLN+1];	/* Buffer for message text */
-
+
+
 /*
  * void initmsg(p)
  *
@@ -238,23 +178,25 @@ static	char	msgbuf[MM_MXTXTLN+1];	/* Buffer for message text */
  */
 
 static void
-initmsg(p)
-	char   *p;	/* Command name (as invoked) */
+initmsg(char *p)
 {
-	/* Automatic data */
 	char   *q;	/* Local multi-use pointer */
 
 	/* Use only the simple filename if there is a slash in the name */
-	if (!(q = strrchr(p, '/'))) q = p;
-	else q++;
+	if (!(q = strrchr(p, '/'))) {
+		q = p;
+	} else {
+		q++;
+	}
 
 	/* Build the label for messages */
-	(void) sprintf(fcnlbl, "UX:%s", q);
+	(void) snprintf(fcnlbl, MM_MXLABELLN, "UX:%s", q);
 
 	/* Restrict messages to the text-component */
 	(void) putenv("MSGVERB=text");
 }
-
+
+
 /*
  *  void wrtmsg(severity, action, tag, text[, txtarg1[, txtarg2[, ...]]])
  *
@@ -272,11 +214,10 @@ initmsg(p)
  *
  *  Returns:  Void
  */
-/*VARARGS4*/
+/*PRINTFLIKE4*/
 static void
 wrtmsg(int severity, char *action, char *tag, char *text, ...)
 {
-	/* Automatic data */
 	int	errorflg;	/* TRUE if problem generating message */
 	va_list	argp;		/* Pointer into vararg list */
 
@@ -286,10 +227,12 @@ wrtmsg(int severity, char *action, char *tag, char *text, ...)
 
 	/* Generate the error message */
 	va_start(argp, text);
-	if (text != MM_NULLTXT) errorflg = vsprintf(msgbuf, text, argp) > MM_MXTXTLN;
+	if (text != MM_NULLTXT) {
+		errorflg = vsnprintf(msgbuf,
+		    MM_MXTXTLN, text, argp) > MM_MXTXTLN;
+	}
 	(void) fmtmsg(MM_PRINT, fcnlbl, severity,
-		      (text == MM_NULLTXT) ? MM_NULLTXT : msgbuf,
-		      action, tag);
+	    (text == MM_NULLTXT) ? MM_NULLTXT : msgbuf, action, tag);
 	va_end(argp);
 
 	/*
@@ -298,14 +241,14 @@ wrtmsg(int severity, char *action, char *tag, char *text, ...)
 	 *  static data space now
 	 */
 	if (errorflg) {
-	    (void) fmtmsg(MM_PRINT, fcnlbl, MM_WARNING,
-			  gettext("Internal message buffer overflow"),
-			  MM_NULLACT, MM_NULLTAG);
-	    exit(100);
+		(void) fmtmsg(MM_PRINT, fcnlbl, MM_WARNING,
+		    gettext("Internal message buffer overflow"),
+		    MM_NULLACT, MM_NULLTAG);
+		exit(100);
 	}
 }
-/*ARGSUSED*/
-
+
+
 /*
  *  These functions allocate space for the information we gather.
  *  It works by having a memory heap with strings allocated from
@@ -338,11 +281,12 @@ wrtmsg(int severity, char *action, char *tag, char *text, ...)
 
 #define	ALLOCBLKSZ	4096
 
-static	char   *nextblkaddr = (char *) NULL;
-static	char   *laststraddr = (char *) NULL;
+static	char   *nextblkaddr = NULL;
+static	char   *laststraddr = NULL;
 #define	MEMALLOCDIF	"Memory allocation difficulty.  Command terminates"
 #define	TOOMUCHSPACE	"Internal space allocation error.  Command terminates"
-
+
+
 /*
  *  void *allocblk(size)
  *	unsigned int	size
@@ -360,17 +304,14 @@ static	char   *laststraddr = (char *) NULL;
  */
 
 static void *
-allocblk(size)
-	unsigned int	size;
+allocblk(unsigned int size)
 {
-	/* Automatic data */
 	char   *rtnval;
-
 
 	/* Make sure the sizes are aligned correctly */
 	if ((size = size + (4 - (size % 4))) > ALLOCBLKSZ) {
-	    wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, gettext(TOOMUCHSPACE));
-	    exit(101);
+		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, gettext(TOOMUCHSPACE));
+		exit(101);
 	}
 
 	/* Set up the value we're going to return */
@@ -378,18 +319,20 @@ allocblk(size)
 
 	/* Get the space we need off of the heap */
 	if ((nextblkaddr += size) >= laststraddr) {
-	    if (!(rtnval = (char *) malloc(ALLOCBLKSZ))) {
-		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, gettext(MEMALLOCDIF));
-		exit(101);
-	    }
-	    laststraddr = rtnval + ALLOCBLKSZ;
-	    nextblkaddr = rtnval + size;
+		if (!(rtnval = (char *)malloc(ALLOCBLKSZ))) {
+			wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG,
+			    gettext(MEMALLOCDIF));
+			exit(101);
+		}
+		laststraddr = rtnval + ALLOCBLKSZ;
+		nextblkaddr = rtnval + size;
 	}
 
 	/* We're through */
-	return((void *) rtnval);
+	return ((void *)rtnval);
 }
-
+
+
 /*
  *  char *allocstr(nbytes)
  *	unsigned int	nbytes
@@ -406,24 +349,25 @@ allocblk(size)
  */
 
 static char *
-allocstr(nchars)
-	unsigned int	nchars;
+allocstr(unsigned int nchars)
 {
 	if (nchars > ALLOCBLKSZ) {
-	    wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, gettext(TOOMUCHSPACE));
-	    exit(101);
+		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, gettext(TOOMUCHSPACE));
+		exit(101);
 	}
 	if (laststraddr == NULL ||
 	    (laststraddr -= nchars) < nextblkaddr) {
-	    if (!(nextblkaddr = (char *) malloc(ALLOCBLKSZ))) {
-		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, gettext(MEMALLOCDIF));
-		exit(101);
-	    }
-	    laststraddr = nextblkaddr + ALLOCBLKSZ - nchars;
+		if (!(nextblkaddr = (char *)malloc(ALLOCBLKSZ))) {
+			wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG,
+			    gettext(MEMALLOCDIF));
+			exit(101);
+		}
+		laststraddr = nextblkaddr + ALLOCBLKSZ - nchars;
 	}
-	return(laststraddr);
+	return (laststraddr);
 }
-
+
+
 /*
  *  These functions control the group membership list, as found in
  *  the /etc/group file.
@@ -443,12 +387,13 @@ allocstr(nchars)
  */
 
 struct	grpmember {
-	char	               *membername;
-	struct grpmember       *next;
+	char			*membername;
+	struct grpmember	*next;
 };
 
-static	struct grpmember       *membershead;
-
+static	struct grpmember	*membershead;
+
+
 /*
  *  void initmembers()
  *
@@ -460,12 +405,13 @@ static	struct grpmember       *membershead;
  */
 
 static void
-initmembers()
+initmembers(void)
 {
 	/* Set up the members list to be a null member's list */
-	membershead = (struct grpmember *) NULL;
+	membershead = NULL;
 }
-
+
+
 /*
  *  void addmember(p)
  *	char   *p
@@ -482,18 +428,17 @@ initmembers()
  */
 
 static void
-addmember(p)
-	char   *p;
+addmember(char *p)
 {
-	/* Automatic data */
-	struct grpmember       *new;	/* Member being added */
+	struct grpmember	*new;	/* Member being added */
 
-	new = (struct grpmember *) allocblk(sizeof(struct grpmember));
-	new->membername = strcpy(allocstr((unsigned int) strlen(p)+1), p);
+	new = (struct grpmember *)allocblk(sizeof (struct grpmember));
+	new->membername = strcpy(allocstr((unsigned int)strlen(p)+1), p);
 	new->next = membershead;
 	membershead = new;
 }
-
+
+
 /*
  *  init isamember(p)
  *	char   *p
@@ -511,23 +456,23 @@ addmember(p)
  */
 
 static int
-isamember(p)
-	char   *p;
+isamember(char *p)
 {
-	/* Automatic Data */
 	int			found;	/* TRUE if login found in list */
-	struct grpmember       *pmem;	/* Group member being examined */
+	struct grpmember	*pmem;	/* Group member being examined */
 
 
 	/* Search the membership list for 'p' */
 	found = FALSE;
-	for (pmem = membershead ; !found && pmem ; pmem = pmem->next) {
-	    if (strcmp(p, pmem->membername) == 0) found = TRUE;
+	for (pmem = membershead; !found && pmem; pmem = pmem->next) {
+		if (strcmp(p, pmem->membername) == 0)
+			found = TRUE;
 	}
 
 	return (found);
 }
-
+
+
 /*
  *  These functions handle the display list.  The display list contains
  *  all of the information we're to display.  The list contains a pointer
@@ -561,21 +506,22 @@ isamember(p)
  */
 
 struct	display {
-	char	       *loginID;	/* Login name */
-	char	       *freefield;	/* Free (comment) field */
-	char	       *groupname;	/* Name of the primary group */
-	char	       *iwd;		/* Initial working directory */
-	char	       *shell;		/* Shell after login (may be null) */
-	struct pwdinfo *passwdinfo;	/* Password information structure */
-	struct secgrp  *secgrplist; 	/* Head of the secondary group list */
+	char		*loginID;	/* Login name */
+	char		*freefield;	/* Free (comment) field */
+	char		*groupname;	/* Name of the primary group */
+	char		*iwd;		/* Initial working directory */
+	char		*shell;		/* Shell after login (may be null) */
+	struct pwdinfo	*passwdinfo;	/* Password information structure */
+	struct secgrp 	*secgrplist; 	/* Head of the secondary group list */
 	uid_t		userID;		/* User ID */
 	gid_t		groupID;	/* Group ID of primary group */
-	struct display *nextlogin;	/* Next login in the list */
-	struct display *nextuid;	/* Next user-ID in the list */
+	struct display	*nextlogin;	/* Next login in the list */
+	struct display	*nextuid;	/* Next user-ID in the list */
 };
 
-static	struct display *displayhead;
-
+static	struct display	*displayhead;
+
+
 /*
  *  void initdisp()
  *
@@ -588,16 +534,17 @@ static	struct display *displayhead;
  */
 
 static void
-initdisp()
+initdisp(void)
 {
-	displayhead = (struct display *) allocblk(sizeof(struct display));
-	displayhead->nextlogin = (struct display *) NULL;
-	displayhead->nextuid = (struct display *) NULL;
+	displayhead = (struct display *)allocblk(sizeof (struct display));
+	displayhead->nextlogin = NULL;
+	displayhead->nextuid = NULL;
 	displayhead->loginID = "";
 	displayhead->freefield = "";
 	displayhead->userID = -1;
 }
-
+
+
 /*
  *  void adddisp(pwent)
  *	struct passwd  *pwent
@@ -619,10 +566,8 @@ initdisp()
  */
 
 static void
-adddisp(pwent)
-	struct passwd  *pwent;
+adddisp(struct passwd *pwent)
 {
-	/* Automatic data */
 	struct display *new;		/* Item being added to the list */
 	struct display *prev;		/* Previous item in the list */
 	struct display *current;	/* Next item in the list */
@@ -633,51 +578,68 @@ adddisp(pwent)
 	/* Find where this value belongs in the list */
 	prev = displayhead;
 	found = FALSE;
-	while (!found && (current = prev->nextlogin))
-	    if ((compare = strcmp(current->loginID, pwent->pw_name)) >= 0) found = TRUE;
-	    else prev = current;
+	while (!found && (current = prev->nextlogin)) {
+		if ((compare = strcmp(current->loginID, pwent->pw_name)) >= 0) {
+			found = TRUE;
+		} else {
+			prev = current;
+		}
 
+	}
 	/* Insert this value in the list, only if it is unique though */
 	if (compare != 0) {
-	    new = (struct display *) allocblk(sizeof(struct display));
-	    new->loginID = strcpy(allocstr((unsigned int) strlen(pwent->pw_name)+1), pwent->pw_name);
-	    if (pwent->pw_comment && pwent->pw_comment[0] != '\0')
-		    new->freefield =
-			    strcpy(allocstr((unsigned int)
-					    strlen(pwent->pw_comment)+1),
-				   pwent->pw_comment);
-	    else
-		    new->freefield =
-			    strcpy(allocstr((unsigned int)
-					    strlen(pwent->pw_gecos)+1),
-				   pwent->pw_gecos);
-	    if (!pwent->pw_shell || !(*pwent->pw_shell)) new->shell = "/sbin/sh";
-	    else new->shell = strcpy(allocstr((unsigned int) strlen(pwent->pw_shell)+1), pwent->pw_shell);
-	    new->iwd = strcpy(allocstr((unsigned int) strlen(pwent->pw_dir)+1), pwent->pw_dir);
-	    new->userID = pwent->pw_uid;
-	    new->groupID = pwent->pw_gid;
-	    new->secgrplist = (struct secgrp *) NULL;
-	    new->passwdinfo = (struct pwdinfo *) NULL;
-	    new->groupname = (char *) NULL;
+		new = (struct display *)allocblk(sizeof (struct display));
+		new->loginID = strcpy(allocstr(
+		    (unsigned int)strlen(pwent->pw_name)+1), pwent->pw_name);
+		if (pwent->pw_comment && pwent->pw_comment[0] != '\0') {
+			new->freefield = strcpy(allocstr(
+			    (unsigned int)strlen(pwent->pw_comment)+1),
+			    pwent->pw_comment);
+		} else {
+		    new->freefield = strcpy(allocstr(
+			(unsigned int)strlen(pwent->pw_gecos)+1),
+			pwent->pw_gecos);
+		}
+		if (!pwent->pw_shell || !(*pwent->pw_shell)) {
+			new->shell = "/sbin/sh";
+		} else {
+			new->shell = strcpy(allocstr(
+			    (unsigned int)strlen(pwent->pw_shell)+1),
+			    pwent->pw_shell);
+		}
+		new->iwd = strcpy(allocstr(
+		    (unsigned int)strlen(pwent->pw_dir)+1), pwent->pw_dir);
+		new->userID = pwent->pw_uid;
+		new->groupID = pwent->pw_gid;
+		new->secgrplist = NULL;
+		new->passwdinfo = NULL;
+		new->groupname = NULL;
 
-	    /* Add new display item to the list ordered by login-ID */
-	    new->nextlogin = current;
-	    prev->nextlogin = new;
+		/* Add new display item to the list ordered by login-ID */
+		new->nextlogin = current;
+		prev->nextlogin = new;
 
-	    /* Find the appropriate place for the new item in the list
-	     * ordered by userID */
-	    prev = displayhead;
-	    found = FALSE;
-	    while (!found && (current = prev->nextuid))
-		if (current->userID > pwent->pw_uid) found = TRUE;
-		else prev = current;
+		/*
+		 * Find the appropriate place for the new item in the list
+		 * ordered by userID
+		 */
+		prev = displayhead;
+		found = FALSE;
+		while (!found && (current = prev->nextuid)) {
+			if (current->userID > pwent->pw_uid) {
+				found = TRUE;
+			} else {
+				prev = current;
+			}
+		}
 
-	    /* Add the item into the list that is ordered by user-ID */
-	    new->nextuid = current;
-	    prev->nextuid = new;
+		/* Add the item into the list that is ordered by user-ID */
+		new->nextuid = current;
+		prev->nextuid = new;
 	}
 }
-
+
+
 /*
  *  int isuidindisp(pwent)
  *	struct passwd  *pwent
@@ -700,10 +662,8 @@ adddisp(pwent)
  */
 
 static int
-isuidindisp(pwent)
-	struct passwd  *pwent;		/* Struct of user to look for */
+isuidindisp(struct passwd *pwent)
 {
-	/* Automatic data */
 	struct display *dp;
 
 
@@ -714,13 +674,19 @@ isuidindisp(pwent)
 	 *  that this list is ordered by user-ID
 	 */
 
-	for (dp = displayhead->nextuid ; dp && (dp->userID < pwent->pw_uid) ; dp = dp->nextuid) ;
+	for (dp = displayhead->nextuid; dp && (dp->userID < pwent->pw_uid);
+	    dp = dp->nextuid) {
+		continue;
+	}
 
-	/* If the pointer "dp" points to a structure that has a
-	 * matching user-ID, return TRUE.  Otherwise FALSE */
+	/*
+	 * If the pointer "dp" points to a structure that has a
+	 * matching user-ID, return TRUE.  Otherwise FALSE
+	 */
 	return (dp && (dp->userID == pwent->pw_uid));
 }
-
+
+
 /*
  *  void applygroup(allgroups)
  *	int	allgroups
@@ -737,67 +703,89 @@ isuidindisp(pwent)
  */
 
 static void
-applygroup(allgroups)
-	int	allgroups;	/* TRUE if applying secondary groups */
+applygroup(int allgroups)
 {
-	/* Automatic Data */
-	struct display *dp;		/* Display list running ptr */
-	struct group   *grent;		/* Group info, from getgrent() */
-	char	       *p;		/* Temp char pointer */
-	char          **pp;		/* Temp char * pointer */
+	struct display	*dp;		/* Display list running ptr */
+	struct group	*grent;		/* Group info, from getgrent() */
+	char		*p;		/* Temp char pointer */
+	char		**pp;		/* Temp char * pointer */
 	int		compare;	/* Value from strcmp() */
 	int		done;		/* TRUE if finished, FALSE otherwise */
-	struct secgrp  *psecgrp;	/* Block allocated for this info */
-	struct secgrp  *psrch;		/* Secondary group -- for searching */
+	struct secgrp	*psecgrp;	/* Block allocated for this info */
+	struct secgrp	*psrch;		/* Secondary group -- for searching */
 
 
 	/* For each group-ID in the /etc/group file ... */
 	while (grent = getgrent()) {
-	    /*
-	     *  Set the primary group for the login-IDs in the display
-	     *  list.  For each group-ID we get, leaf through the display
-	     *  list and set the group-name if the group-IDs match
-	     */
+		/*
+		 *  Set the primary group for the login-IDs in the display
+		 *  list.  For each group-ID we get, leaf through the display
+		 *  list and set the group-name if the group-IDs match
+		 */
 
-	    p = (char *) NULL;
-	    for (dp = displayhead->nextuid ; dp ; dp = dp->nextuid)
-		if ((dp->groupID == grent->gr_gid) && !dp->groupname) {
-		    if (!p) p = strcpy(allocstr((unsigned int) strlen(grent->gr_name)+1), grent->gr_name);
-		    dp->groupname = p;
-		}
-
-	    /*
-	     *  If we're to be displaying secondary group membership,
-	     *  leaf through the list of group members.  Then, attempt
-	     *  to find that member in the display list.  When found,
-	     *  attach secondary group info to the user.
-	     */
-
-	    if (allgroups) for (pp = grent->gr_mem ; *pp ; pp++) {
-		done = FALSE;
-		for (dp = displayhead->nextlogin ; !done && dp ; dp = dp->nextlogin) {
-		    if (((compare = strcmp(dp->loginID, *pp)) == 0) && !(grent->gr_gid == dp->groupID)) {
-			if (!p) p = strcpy(allocstr((unsigned int) strlen(grent->gr_name)+1), grent->gr_name);
-			psecgrp = (struct secgrp *) allocblk(sizeof(struct secgrp));
-			psecgrp->groupID = grent->gr_gid;
-			psecgrp->groupname = p;
-			psecgrp->next = (struct secgrp *) NULL;
-			if (!dp->secgrplist) dp->secgrplist = psecgrp;
-			else {
-			    for (psrch = dp->secgrplist ; psrch->next ; psrch = psrch->next) ;
-			    psrch->next = psecgrp;
+		p = NULL;
+		for (dp = displayhead->nextuid; dp; dp = dp->nextuid) {
+			if ((dp->groupID == grent->gr_gid) && !dp->groupname) {
+				if (!p) {
+					p = strcpy(allocstr(
+					    (unsigned int)strlen(
+					    grent->gr_name)+1), grent->gr_name);
+				}
+				dp->groupname = p;
 			}
-			done = TRUE;
-		    }
-		    else if (compare > 0) done = TRUE;
 		}
-	    }
+
+		if (!allgroups) {
+			continue;
+		}
+		/*
+		 *  If we're to be displaying secondary group membership,
+		 *  leaf through the list of group members.  Then, attempt
+		 *  to find that member in the display list.  When found,
+		 *  attach secondary group info to the user.
+		 */
+
+		for (pp = grent->gr_mem; *pp; pp++) {
+			done = FALSE;
+			for (dp = displayhead->nextlogin; !done && dp;
+			    dp = dp->nextlogin) {
+				if (((compare = strcmp(dp->loginID,
+				    *pp)) == 0) &&
+				    !(grent->gr_gid == dp->groupID)) {
+					if (!p) {
+						p = strcpy(allocstr(
+						    (unsigned int)strlen(
+						    grent->gr_name)+1),
+						    grent->gr_name);
+					}
+					psecgrp = (struct secgrp *)allocblk(
+					    sizeof (struct secgrp));
+					psecgrp->groupID = grent->gr_gid;
+					psecgrp->groupname = p;
+					psecgrp->next = NULL;
+					if (!dp->secgrplist) {
+						dp->secgrplist = psecgrp;
+					} else {
+						for (psrch = dp->secgrplist;
+						    psrch->next;
+						    psrch = psrch->next) {
+							continue;
+						}
+						psrch->next = psecgrp;
+					}
+					done = TRUE;
+				} else if (compare > 0) {
+						done = TRUE;
+				}
+			}
+		}
 	}
 
 	/* Close the /etc/group file */
 	endgrent();
 }
-
+
+
 /*
  *  void applypasswd()
  *
@@ -812,19 +800,15 @@ applygroup(allgroups)
  */
 
 static void
-applypasswd()
+applypasswd(void)
 {
-	/*
-	 *  Local declarations
-	 */
-
-	struct pwdinfo *ppasswd;	/* Ptr to pwd desc in current element */
-	struct display *dp;		/* Ptr to current element */
-	struct spwd    *psp;		/* Pointer to a shadow-file entry */
-	struct tm      *ptm;		/* Pointer to a time-of-day structure */
-	char	       *p;		/* Running character pointer */
-	time_t 		pwchg;		/* System-time of last pwd chg */
-	time_t 		pwexp;		/* System-time of password expiration */
+	struct pwdinfo	*ppasswd;	/* Ptr to pwd desc in current element */
+	struct display	*dp;		/* Ptr to current element */
+	struct spwd	*psp;		/* Pointer to a shadow-file entry */
+	struct tm	*ptm;		/* Pointer to a time-of-day structure */
+	char		*p;		/* Running character pointer */
+	time_t		pwchg;		/* System-time of last pwd chg */
+	time_t		pwexp;		/* System-time of password expiration */
 
 
 	/*  Make sure the shadow file is rewound  */
@@ -835,115 +819,120 @@ applypasswd()
 	 *  For each item in the display list...
 	 */
 
-	for (dp = displayhead->nextuid ; dp ; dp = dp->nextuid) {
+	for (dp = displayhead->nextuid; dp; dp = dp->nextuid) {
 
-	    /* Allocate structure space for the password description */
-	    ppasswd = (struct pwdinfo *) allocblk(sizeof(struct pwdinfo));
-	    dp->passwdinfo = ppasswd;
-
-	    /*
-	     * If there's no entry in the /etc/shadow file, assume
-	     * that the login is locked
-	     */
-
-	    if (!(psp = getspnam(dp->loginID))) {
-		pwchg = 0L;			/* Epoch */
-		ppasswd->passwdstatus = "LK";	/* LK, Locked */
-		ppasswd->mindaystilchg = 0L;
-		ppasswd->maxdaystilchg = 0L;
-		ppasswd->warninterval = 0L;
-		ppasswd->inactive = 0L;
-		pwexp = 0L;
-	    }
-
-	    /*
-	     * Otherwise, fill in the password information from the
-	     * info in the shadow file entry
-	     */
-
-	    else {
-		/*  See if the login has no password  */
-		if (!psp->sp_pwdp || !(*psp->sp_pwdp)) ppasswd->passwdstatus = "NP";
+		/* Allocate structure space for the password description */
+		ppasswd = (struct pwdinfo *)allocblk(sizeof (struct pwdinfo));
+		dp->passwdinfo = ppasswd;
 
 		/*
-		 * See if the login is explicitly locked (encrypted
-		 * password is <13 characters)
+		 * If there's no entry in the /etc/shadow file, assume
+		 * that the login is locked
 		 */
 
-		else if (strlen(psp->sp_pwdp) != 13) ppasswd->passwdstatus = "LK";
-
-		/*
-		 * If it's a valid encrypted password, the login is
-		 * password protected
-		 */
-		else {
-		    ppasswd->passwdstatus = "PS";
-		    for (p = psp->sp_pwdp ; *p ; p++) {
-			if (!isalnum(*p) && (*p != '.') && (*p != '/')) {
-			    ppasswd->passwdstatus = "LK";
-			    break;
+		if (!(psp = getspnam(dp->loginID))) {
+			pwchg = 0L;			/* Epoch */
+			ppasswd->passwdstatus = "LK";	/* LK, Locked */
+			ppasswd->mindaystilchg = 0L;
+			ppasswd->maxdaystilchg = 0L;
+			ppasswd->warninterval = 0L;
+			ppasswd->inactive = 0L;
+			pwexp = 0L;
+		} else {
+			/*
+			 * Otherwise, fill in the password information from the
+			 * info in the shadow file entry
+			 */
+			/*  See if the login has no password  */
+			if (!psp->sp_pwdp || !(*psp->sp_pwdp)) {
+				ppasswd->passwdstatus = "NP";
+			} else if (strlen(psp->sp_pwdp) != 13) {
+				/*
+				 * See if the login is explicitly locked
+				 * (encrypted password is <13 characters)
+				 */
+				ppasswd->passwdstatus = "LK";
+			} else {
+				/*
+				 * If it's a valid encrypted password,
+				 * the login is password protected
+				 */
+				ppasswd->passwdstatus = "PS";
+				for (p = psp->sp_pwdp; *p; p++) {
+					if (!isalnum(*p) &&
+					    (*p != '.') &&
+					    (*p != '/')) {
+						ppasswd->passwdstatus = "LK";
+						break;
+					}
+				}
 			}
-		    }
+
+			/*
+			 * Set up the last-changed date,
+			 * the minimum days between changes,
+			 * the maximum life of a password,
+			 * the interval before expiration that the user
+			 * is warned,
+			 * the number of days a login can be inactive before
+			 * it expires, and the login expiration date
+			 */
+
+			pwchg = psp->sp_lstchg;
+			ppasswd->mindaystilchg = psp->sp_min;
+			ppasswd->maxdaystilchg = psp->sp_max;
+			ppasswd->warninterval = psp->sp_warn;
+			ppasswd->inactive = psp->sp_inact;
+			pwexp = psp->sp_expire;
 		}
 
 		/*
-		 * Set up the last-changed date, the minimum days between
-		 * changes, the maximum life of a password, the interval
-		 * before expiration that the user is warned, the number of
-		 * days a login can be inactive before it expires, and the
-		 * login expiration date
+		 * Convert the date of the last password change from days-
+		 * since-epoch to mmddyy (integer) form.  Involves the
+		 * intermediate step of converting the date from days-
+		 * since-epoch to seconds-since-epoch.  We'll set this to
+		 * somewhere near the middle of the day, since there are not
+		 * always 24*60*60 seconds in a year.  (Yeech)
+		 *
+		 * Note:  The form mmddyy should probably be subject to
+		 * internationalization -- Non-Americans will think that
+		 * 070888 is 07 August 88 when the software is trying to say
+		 * 08 July 88.  Systems Engineers seem to think that this isn't
+		 * a problem though...
 		 */
 
-		pwchg = psp->sp_lstchg;
-		ppasswd->mindaystilchg = psp->sp_min;
-		ppasswd->maxdaystilchg = psp->sp_max;
-		ppasswd->warninterval = psp->sp_warn;
-		ppasswd->inactive = psp->sp_inact;
-		pwexp = psp->sp_expire;
-	    }
+		if (pwchg != -1L) {
+			pwchg = (pwchg * DAY) + (DAY/2);
+			ptm = localtime(&pwchg);
+			ppasswd->datechg = ((long)(ptm->tm_mon+1) * 10000L) +
+			    (long)((ptm->tm_mday * 100) +
+			    (ptm->tm_year % 100));
+		} else {
+			ppasswd->datechg = 0L;
+		}
 
-	    /*
-	     * Convert the date of the last password change from days-
-	     * since-epoch to mmddyy (integer) form.  Involves the
-	     * intermediate step of converting the date from days-
-	     * since-epoch to seconds-since-epoch.  We'll set this to
-	     * somewhere near the middle of the day, since there are not
-	     * always 24*60*60 seconds in a year.  (Yeech)
-	     *
-	     * Note:  The form mmddyy should probably be subject to
-	     * internationalization -- Non-Americans will think that
-	     * 070888 is 07 August 88 when the software is trying to say
-	     * 08 July 88.  Systems Engineers seem to think that this isn't
-	     * a problem though...
-	     */
+		/*
+		 * Convert the passwd expiration date from days-since-epoch
+		 * to mmddyy (long integer) form using the same algorithm and
+		 * comments as above.
+		 */
 
-	    if (pwchg != -1L) {
-	        pwchg = (pwchg * DAY) + (DAY/2);
-		ptm = localtime(&pwchg);
-		ppasswd->datechg = ((long) (ptm->tm_mon+1) * 10000L) +
-				    (long) ((ptm->tm_mday * 100) + 
-					    (ptm->tm_year % 100));
-	    } else ppasswd->datechg = 0L;
-	    
-	    /*
-	     * Convert the passwd expiration date from days-since-epoch
-	     * to mmddyy (long integer) form using the same algorithm and
-	     * comments as above.
-	     */
-
-	    if (pwexp != -1L) {
-		pwexp = (pwexp * DAY) + (DAY/2);
-		ptm = localtime(&pwexp);
-		ppasswd->expdate = ((long) (ptm->tm_mon+1) * 10000L) +
-				    (long) ((ptm->tm_mday * 100) + 
-					    (ptm->tm_year % 100));
-	    } else ppasswd->expdate = 0L;
+		if (pwexp != -1L) {
+			pwexp = (pwexp * DAY) + (DAY/2);
+			ptm = localtime(&pwexp);
+			ppasswd->expdate = ((long)(ptm->tm_mon+1) * 10000L) +
+			    (long)((ptm->tm_mday * 100) +
+			    (ptm->tm_year % 100));
+		} else {
+			ppasswd->expdate = 0L;
+		}
 	}
 
 	/* Close the shadow password file */
 	endspent();
 }
-
+
+
 /*
  * int hasnopasswd(pwent)
  *	struct passwd  *pwent
@@ -964,10 +953,8 @@ applypasswd()
  */
 
 static int
-hasnopasswd(pwent)
-	struct passwd  *pwent;	/* /etc/passwd entry of login to check */
+hasnopasswd(struct passwd *pwent)
 {
-	/* Local definitions */
 	struct spwd    *psp;		/* /etc/shadow file struct */
 	int		nopwflag;	/* TRUE if login has no passwd */
 
@@ -976,28 +963,28 @@ hasnopasswd(pwent)
 	 *    1.  There exists an entry for that login in the
 	 *	  shadow password-file (/etc/passwd), and
 	 *    2.  The encrypted password in the structure describing
-	 *	  that entry is either:
-	 *	      a.  (char *) NULL
-	 *	      b.  A null string ("")
+	 *	  that entry is either:	 NULL or a null string ("")
 	 */
 
 	/* Get the login's entry in the shadow password file */
 	if (psp = getspnam(pwent->pw_name)) {
 
-	    /* Look at the encrypted password in that entry */
-	    if (psp->sp_pwdp == (char *)0 ||
-			 *psp->sp_pwdp == '\0') 
-		nopwflag = TRUE;
-	    else 
+		/* Look at the encrypted password in that entry */
+		if (psp->sp_pwdp == (char *)0 ||
+		    *psp->sp_pwdp == '\0') {
+			nopwflag = TRUE;
+		} else {
+			nopwflag = FALSE;
+		}
+	} else {
 		nopwflag = FALSE;
 	}
-	else 
-		nopwflag = FALSE;
 
 	/* Done ... */
-	return(nopwflag);
+	return (nopwflag);
 }
-
+
+
 /*
  *  void writeunformatted(current, xtndflag, expflag)
  *	struct display *current
@@ -1009,7 +996,7 @@ hasnopasswd(pwent)
  *  form of a colon-list.  It writes secondary group information if
  *  that information is in the structure, it writes extended
  *  (initial working directory, shell, and password-aging) info
- *  if the "xtndflag" is TRUE, and it writes password expiration 
+ *  if the "xtndflag" is TRUE, and it writes password expiration
  *  information if "expflag" is TRUE.
  *
  *  Arguments:
@@ -1023,51 +1010,51 @@ hasnopasswd(pwent)
  */
 
 static void
-writeunformatted(current, xtndflag, expflag)
-	struct display *current;	/* Struct with info to write */
-	int		xtndflag;	/* Write extended output flag */
-	int		expflag;	/* Write password expiration info flag */
+writeunformatted(struct display *current, int xtndflag, int expflag)
 {
-	/* Automatic data */
 	struct secgrp  *psecgrp;	/* Secondary group info */
 	struct pwdinfo *pwdinfo;	/* Password aging info */
 
 	/* Write the general information */
 	(void) fprintf(stdout, "%s:%ld:%s:%ld:%s",
-		       current->loginID,
-		       current->userID,
-		       current->groupname == (char *) NULL ? "" : current->groupname,
-		       current->groupID,
-		       current->freefield);
+	    current->loginID,
+	    current->userID,
+	    current->groupname == NULL ? "" : current->groupname,
+	    current->groupID,
+	    current->freefield);
 
 	/*
 	 * If the group information is there, write it (it's only
 	 * there if it's supposed to be written)
 	 */
-	for (psecgrp = current->secgrplist ; psecgrp ; psecgrp = psecgrp->next)
-	    (void) fprintf(stdout, ":%s:%ld", psecgrp->groupname, psecgrp->groupID);
+	for (psecgrp = current->secgrplist; psecgrp; psecgrp = psecgrp->next) {
+		(void) fprintf(stdout, ":%s:%ld",
+		    psecgrp->groupname, psecgrp->groupID);
+	}
 
 	/* If the extended info flag is TRUE, write the extended information */
 	if (xtndflag) {
-	    pwdinfo = current->passwdinfo;
-	    (void) fprintf(stdout, ":%s:%s:%s:%6.6ld:%ld:%ld:%ld",
-			   current->iwd, current->shell,
-			   pwdinfo->passwdstatus,
-			   pwdinfo->datechg,
-			   pwdinfo->mindaystilchg, pwdinfo->maxdaystilchg,
-			   pwdinfo->warninterval);
+		pwdinfo = current->passwdinfo;
+		(void) fprintf(stdout, ":%s:%s:%s:%6.6ld:%ld:%ld:%ld",
+		    current->iwd, current->shell,
+		    pwdinfo->passwdstatus,
+		    pwdinfo->datechg,
+		    pwdinfo->mindaystilchg, pwdinfo->maxdaystilchg,
+		    pwdinfo->warninterval);
 	}
 
 	/* If the password expiration information is requested, write it.  */
 	if (expflag) {
-	    pwdinfo = current->passwdinfo;
-	    (void) fprintf(stdout, ":%ld:%ld", pwdinfo->inactive, pwdinfo->expdate);
+		pwdinfo = current->passwdinfo;
+		(void) fprintf(stdout, ":%ld:%ld",
+		    pwdinfo->inactive, pwdinfo->expdate);
 	}
 
 	/* Terminate the information with a new-line */
 	(void) putc('\n', stdout);
 }
-
+
+
 /*
  *  void writeformatted(current, xtndflag, expflag)
  *	struct display *current
@@ -1084,59 +1071,66 @@ writeunformatted(current, xtndflag, expflag)
  *
  *  Arguments:
  *	current		Structure containing info to write.
- *	xtndflag	TRUE if extended information is to be written,
+ *	xtndflag	TRUE if extended information to be written,
  *			FALSE otherwise
- *	expflag		TRUE if password expiration information is to be written,
+ *	expflag 	TRUE if password expiration information to be written,
  *			FALSE otherwise
  *
  *  Returns:  void
  */
 
 static void
-writeformatted(current, xtndflag, expflag)
-	struct display *current;	/* Struct with info to write */
-	int		xtndflag;	/* Write extended output flag */
-	int		expflag;	/* Write password expiration info flag */
+writeformatted(struct display *current, int xtndflag, int expflag)
 {
-	/* Automatic data */
 	struct secgrp  *psecgrp;	/* Secondary group info */
 	struct pwdinfo *pwdinfo;	/* Password aging info */
 
 	/* Write general information */
 	(void) fprintf(stdout, "%-14s  %-6ld  %-14s  %-6ld  %s\n",
-		       current->loginID, current->userID,
-		       current->groupname == (char *) NULL ? "" : current->groupname,
-		       current->groupID, current->freefield);
+	    current->loginID, current->userID,
+	    current->groupname == NULL ? "" : current->groupname,
+	    current->groupID, current->freefield);
 
 	/*
 	 * Write information about secondary groups if the info exists
 	 * (it only exists if it is to be written)
 	 */
-	for (psecgrp = current->secgrplist ; psecgrp ; psecgrp = psecgrp->next)
+	for (psecgrp = current->secgrplist; psecgrp; psecgrp = psecgrp->next) {
 	    (void) fprintf(stdout, "                        %-14s  %-6ld\n",
-			   psecgrp->groupname, psecgrp->groupID);
-
-	/* If the extended information flag is TRUE, write the extended information */
-
-	if (xtndflag) {
-	    pwdinfo = current->passwdinfo;
-	    (void) fprintf(stdout, "                        %s\n", current->iwd);
-	    (void) fprintf(stdout, "                        %s\n", current->shell);
-	    (void) fprintf(stdout, "                        %s %6.6ld %ld %ld %ld\n", 
-			   pwdinfo->passwdstatus, 
-			   pwdinfo->datechg, pwdinfo->mindaystilchg,
-			   pwdinfo->maxdaystilchg,
-			   pwdinfo->warninterval);
+		psecgrp->groupname, psecgrp->groupID);
 	}
 
-	/* If the password expiration info flag is TRUE, write that information */
+	/*
+	 * If the extended information flag is TRUE,
+	 * write the extended information
+	 */
+
+	if (xtndflag) {
+		pwdinfo = current->passwdinfo;
+		(void) fprintf(stdout, "                        %s\n",
+		    current->iwd);
+		(void) fprintf(stdout, "                        %s\n",
+		    current->shell);
+		(void) fprintf(stdout, "                        %s "
+		    "%6.6ld %ld %ld %ld\n",
+		    pwdinfo->passwdstatus,
+		    pwdinfo->datechg, pwdinfo->mindaystilchg,
+		    pwdinfo->maxdaystilchg,
+		    pwdinfo->warninterval);
+	}
+
+	/*
+	 * If the password expiration info flag is TRUE,
+	 * write that information
+	 */
 	if (expflag) {
-	    pwdinfo = current->passwdinfo;
-	    (void) fprintf(stdout, "                        %ld %6.6ld\n",
-			   pwdinfo->inactive, pwdinfo->expdate);
-    }
+		pwdinfo = current->passwdinfo;
+		(void) fprintf(stdout, "                        %ld %6.6ld\n",
+		    pwdinfo->inactive, pwdinfo->expdate);
+	}
 }
-
+
+
 /*
  *  void genuidreport(pipeflag, xtndflag, expflag)
  *	int	pipeflag
@@ -1169,34 +1163,36 @@ writeformatted(current, xtndflag, expflag)
  */
 
 static void
-genuidreport(pipeflag, xtndflag, expflag)
-	int	pipeflag;	/* Parsible output flag */
-	int	xtndflag;	/* Extended info flag */
-	int	expflag;	/* Password expiration info flag */
+genuidreport(int pipeflag, int xtndflag, int expflag)
 {
 
-	/* Automatic data */
 	struct display *current;	/* Data being displayed */
 
 
 	/*
 	 *  Initialization for loop.
-	 *  (NOTE:  The first element in the list of logins to
-	 *          display is a dummy element.)
+	 *  (NOTE:  The first element in the list of logins to	display is
+	 *  a dummy element.)
 	 */
 	current = displayhead;
 
 	/*
 	 *  Display elements in the list
 	 */
-	if (pipeflag)
-	    for (current = displayhead->nextuid ; current ; current = current->nextuid)
-	    	writeunformatted(current, xtndflag, expflag);
-	else
-	    for (current = displayhead->nextuid ; current ; current = current->nextuid)
-	    	writeformatted(current, xtndflag, expflag);
+	if (pipeflag) {
+		for (current = displayhead->nextuid; current;
+		    current = current->nextuid) {
+			writeunformatted(current, xtndflag, expflag);
+		}
+	} else {
+		for (current = displayhead->nextuid; current;
+		    current = current->nextuid) {
+			writeformatted(current, xtndflag, expflag);
+		}
+	}
 }
-
+
+
 /*
  *  void genlogreport(pipeflag, xtndflag, expflag)
  *	int	pipeflag
@@ -1229,46 +1225,42 @@ genuidreport(pipeflag, xtndflag, expflag)
  */
 
 static void
-genlogreport(pipeflag, xtndflag, expflag)
-	int	pipeflag;	/* Parsable output flag */
-	int	xtndflag;	/* Extended info flag */
-	int	expflag;	/* Password expiration info flag */
+genlogreport(int pipeflag, int xtndflag, int expflag)
 {
-
-	/* Automatic data */
 	struct display *p;	/* Value being displayed */
 
 
 	/*
 	 *  Initialization for loop.
-	 *  (NOTE:  The first element in the list of logins to
-	 *          display is a dummy element.)
+	 *  (NOTE:  The first element in the list of logins to display is
+	 *  a dummy element.)
 	 */
 	p = displayhead;
 
 	/*
 	 *  Display elements in the list
 	 */
-	if (pipeflag)
-	    for (p = displayhead->nextlogin ; p ; p = p->nextlogin)
-	    	writeunformatted(p, xtndflag, expflag);
-	else
-	    for (p = displayhead->nextlogin ; p ; p = p->nextlogin)
-	    	writeformatted(p, xtndflag, expflag);
+	if (pipeflag) {
+		for (p = displayhead->nextlogin; p; p = p->nextlogin) {
+			writeunformatted(p, xtndflag, expflag);
+		}
+	} else {
+		for (p = displayhead->nextlogin; p; p = p->nextlogin) {
+			writeformatted(p, xtndflag, expflag);
+		}
+	}
 }
-
-char *
-strcpmalloc(str)
-char *str;
-{
-	char *cp;
 
+
+char *
+strcpmalloc(char *str)
+{
 	if (str == NULL)
-		return NULL;
+		return (NULL);
 
 	return (strcpy(allocstr((unsigned int)strlen(str)+1), str));
 }
-	
+
 struct localpw {
 	struct localpw *next;
 	struct passwd pw;
@@ -1276,18 +1268,18 @@ struct localpw {
 
 struct localpw *pwtable = NULL;
 
-struct localpw *pwptr;		/* Local passwd pointer for getpwent()
-				 * -- -1 means not in use, NULL for EOF */
+/* Local passwd pointer for getpwent() -- -1 means not in use, NULL for EOF */
+struct localpw *pwptr;
 
 int in_localgetpwent = 0;	/* Set if in local_getpwent */
 
 void
-build_localpw()
+build_localpw(void)
 {
 	struct localpw *next, *cur;
 	struct passwd *pw;
 
-	next = (struct localpw *) allocblk(sizeof (struct localpw));
+	next = (struct localpw *)allocblk(sizeof (struct localpw));
 
 	pwtable = next;
 
@@ -1305,7 +1297,8 @@ build_localpw()
 		next->pw.pw_dir = strcpmalloc(pw->pw_dir);
 		next->pw.pw_shell = strcpmalloc(pw->pw_shell);
 
-		next->next = (struct localpw *) allocblk(sizeof (struct localpw));
+		next->next = (struct localpw *)allocblk(
+		    sizeof (struct localpw));
 
 		cur = next;
 		next = next->next;
@@ -1316,48 +1309,49 @@ build_localpw()
 	 * sine alloclbk doesn't have a freeblk, we just leave it unreferenced.
 	 */
 
-	if (pwtable == next)
+	if (pwtable == next) {
 		pwtable = NULL;
-	else
+	} else {
 		cur->next = NULL;
+	}
 
 	endpwent();
 }
 
 struct passwd *
-local_getpwent()
+local_getpwent(void)
 {
 	if (!in_localgetpwent) {
 		in_localgetpwent = 1;
 		pwptr = pwtable;
-	} else if ( pwptr != NULL)
+	} else if (pwptr != NULL) {
 		pwptr = pwptr->next;
+	}
 
 	if (pwptr != NULL)
-		return &(pwptr->pw);
+		return (&(pwptr->pw));
 	else
-		return NULL;
+		return (NULL);
 }
 
 void
-local_endpwent()
+local_endpwent(void)
 {
 	in_localgetpwent = 0;
 }
 
 long
-local_pwtell()
+local_pwtell(void)
 {
-	return (long)pwptr;
+	return ((long)pwptr);
 }
 
 void
-local_pwseek(ptr)
-long ptr;
+local_pwseek(long ptr)
 {
 	pwptr = (struct localpw *)ptr;
 }
-
+
 /*
  * logins [-admopstux] [-l logins] [-g groups]
  *
@@ -1396,48 +1390,44 @@ long ptr;
  *	1	Usage error
  */
 
-main(argc, argv)
-	int	argc;	/* Number of args on the command line */
-	char   *argv[];	/* Pointers pointing to the arguments */
+int
+main(int argc, char *argv[])
 {
-
-	/* Automatic data */
-
-	struct passwd	       *plookpwd;	/* Ptr to searcher pw (-d) */
-	struct reqgrp	       *reqgrphead;	/* Head of the req'd group list */
-	struct reqgrp	       *pgrp;		/* Current item in req'd group list */
-	struct reqgrp	       *qgrp;		/* Prev item in the req'd group list */
-	struct reqlogin        *reqloginhead;	/* Head of req'd login list */
-	struct reqlogin	       *plogin;		/* Current item in the req'd login list */
-	struct reqlogin	       *qlogin;		/* Prev item in the req'd login list */
-	struct passwd	       *pwent;		/* /etc/passwd entry */
-	struct group	       *grent;		/* /etc/group entry */
-	char		       *token;		/* Token extracted by strtok() */
-	char		      **pp;		/* Group member */
-	char		       *g_arg;		/* -g option's argument */
-	char		       *l_arg;		/* -l option's argument */
-	long			lookpos;	/* File pos'n, rec we're looking for */
-	int			a_seen;		/* Is -a requested? */
-	int			d_seen;		/* Is -d requested? */
-	int	 	 	g_seen;		/* Is -g requested? */
-	int			l_seen;		/* Is -l requested? */
-	int			m_seen;		/* Is -m requested? */
-	int			o_seen;		/* Is -o requested? */
-	int			p_seen;		/* Is -p requested? */
-	int			s_seen;		/* Is -s requested? */
-	int			t_seen;		/* Is -t requested? */
-	int			u_seen;		/* Is -u requested? */
-	int			x_seen;		/* Is -x requested? */
-	int			errflg;		/* Is there a command-line problem */
-	int			done;		/* Is the process (?) is complete */
-	int			groupcount;	/* Number of groups specified by the user */
-	int			doall;		/* Are all logins to be reported */
-	int			c;		/* Character returned from getopt() */
+	struct passwd	*plookpwd;	/* Ptr to searcher pw (-d) */
+	struct reqgrp	*reqgrphead;	/* Head of the req'd group list */
+	struct reqgrp	*pgrp;		/* Current item in req'd group list */
+	struct reqgrp	*qgrp;		/* Prev item in the req'd group list */
+	struct reqlogin *reqloginhead;	/* Head of req'd login list */
+	struct reqlogin *plogin;	/* Current item in req'd login list */
+	struct reqlogin *qlogin;	/* Prev item in req'd login list */
+	struct passwd	*pwent;		/* /etc/passwd entry */
+	struct group	*grent;		/* /etc/group entry */
+	char		*token;		/* Token extracted by strtok() */
+	char		**pp;		/* Group member */
+	char		*g_arg;		/* -g option's argument */
+	char		*l_arg;		/* -l option's argument */
+	long		lookpos;	/* File pos'n, rec we're looking for */
+	int		a_seen;		/* Is -a requested? */
+	int		d_seen;		/* Is -d requested? */
+	int		g_seen;		/* Is -g requested? */
+	int		l_seen;		/* Is -l requested? */
+	int		m_seen;		/* Is -m requested? */
+	int		o_seen;		/* Is -o requested? */
+	int		p_seen;		/* Is -p requested? */
+	int		s_seen;		/* Is -s requested? */
+	int		t_seen;		/* Is -t requested? */
+	int		u_seen;		/* Is -u requested? */
+	int		x_seen;		/* Is -x requested? */
+	int		errflg;		/* Is there a command-line problem */
+	int		done;		/* Is the process (?) is complete */
+	int		groupcount;	/* Number of groups specified */
+	int		doall;		/* Are all logins to be reported */
+	int		c;		/* Character returned from getopt() */
 
 	(void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
-#define TEXT_DOMAIN "SYS_TEST"
+#define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -1446,9 +1436,7 @@ main(argc, argv)
 
 
 
-	/*
-	 *  Command-line processing
-	 */
+	/*  Command-line processing */
 
 	/* Initializations */
 	a_seen = FALSE;
@@ -1466,135 +1454,155 @@ main(argc, argv)
 	opterr = 0;
 	while (!errflg && ((c = getopt(argc, argv, OPTSTR)) != EOF)) {
 
-	    /* Case on the option character */
-	    switch(c) {
+		/* Case on the option character */
+		switch (c) {
 
-	    /*
-	     * -a option:
-	     * Display password expiration information
-	     */
+		/*
+		 * -a option:
+		 * Display password expiration information
+		 */
 
-	    case 'a':
-		if (a_seen) errflg = TRUE;
-		else a_seen = TRUE;
-		break;
+		case 'a':
+			if (a_seen)
+				errflg = TRUE;
+			else
+				a_seen = TRUE;
+			break;
 
-	    /*
-	     * -d option:
-	     * Display logins which share user-IDs with other logins
-	     */
+		/*
+		 * -d option:
+		 * Display logins which share user-IDs with other logins
+		 */
 
-	    case 'd':
-		if (d_seen) errflg = TRUE;
-		else d_seen = TRUE;
-		break;
+		case 'd':
+			if (d_seen)
+				errflg = TRUE;
+			else
+				d_seen = TRUE;
+			break;
 
-	    /*
-	     * -g <groups> option:
-	     * Display the specified groups
-	     */
+		/*
+		 * -g <groups> option:
+		 * Display the specified groups
+		 */
 
-	    case 'g':
-		if (g_seen) errflg = TRUE;
-		else {
-		    g_seen = TRUE;
-		    g_arg = optarg;
+		case 'g':
+			if (g_seen) {
+				errflg = TRUE;
+			} else {
+				g_seen = TRUE;
+				g_arg = optarg;
+			}
+			break;
+
+		/*
+		 * -l <logins> option:
+		 * Display the specified logins
+		 */
+
+		case 'l':
+			if (l_seen) {
+				errflg = TRUE;
+			} else {
+				l_seen = TRUE;
+				l_arg = optarg;
+			}
+			break;
+
+		/*
+		 * -m option:
+		 * Display multiple group information
+		 */
+
+		case 'm':
+			if (m_seen)
+				errflg = TRUE;
+			else
+				m_seen = TRUE;
+			break;
+
+		/*
+		 * -o option:
+		 * Display information as a colon-list
+		 */
+
+		case 'o':
+			if (o_seen)
+				errflg = TRUE;
+			else
+				o_seen = TRUE;
+			break;
+
+		/*
+		 * -p option:
+		 * Select logins that have no password
+		 */
+
+		case 'p':
+			if (p_seen)
+				errflg = TRUE;
+			else
+				p_seen = TRUE;
+			break;
+
+		/*
+		 * -s option:
+		 * Select system logins
+		 */
+
+		case 's':
+			if (s_seen)
+				errflg = TRUE;
+			else
+				s_seen = TRUE;
+			break;
+
+		/*
+		 * -t option:
+		 * Sort alphabetically by login-ID instead of numerically
+		 * by user-ID
+		 */
+
+		case 't':
+			if (t_seen)
+				errflg = TRUE;
+			else
+				t_seen = TRUE;
+			break;
+
+		/*
+		 * -u option:
+		 * Select user logins
+		 */
+
+		case 'u':
+			if (u_seen)
+				errflg = TRUE;
+			else
+				u_seen = TRUE;
+			break;
+
+		/*
+		 * -x option:
+		 * Display extended info (init working dir, shell, pwd info)
+		 */
+
+		case 'x':
+			if (x_seen)
+				errflg = TRUE;
+			else
+				x_seen = TRUE;
+			break;
+
+		default:		/* Oops.... */
+			errflg = TRUE;
 		}
-		break;
-
-	    /*
-	     * -l <logins> option:
-	     * Display the specified logins
-	     */
-
-	    case 'l':
-		if (l_seen) errflg = TRUE;
-		else {
-		    l_seen = TRUE;
-		    l_arg = optarg;
-		}
-		break;
-
-	    /*
-	     * -m option:
-	     * Display multiple group information
-	     */
-
-	    case 'm':
-		if (m_seen) errflg = TRUE;
-		else m_seen = TRUE;
-		break;
-
-	    /*
-	     * -o option:
-	     * Display information as a colon-list
-	     */
-
-	    case 'o':
-		if (o_seen) errflg = TRUE;
-		else o_seen = TRUE;
-		break;
-
-	    /*
-	     * -p option:
-	     * Select logins that have no password
-	     */
-
-	    case 'p':
-		if (p_seen) errflg = TRUE;
-		else p_seen = TRUE;
-		break;
-
-	    /*
-	     * -s option:
-	     * Select system logins
-	     */
-
-	    case 's':
-		if (s_seen) errflg = TRUE;
-		else s_seen = TRUE;
-		break;
-
-	    /*
-	     * -t option:
-	     * Sort alphabetically by login-ID instead of numerically
-	     * by user-ID
-	     */
-
-	    case 't':
-		if (t_seen) errflg = TRUE;
-		else t_seen = TRUE;
-		break;
-
-	    /*
-	     * -u option:
-	     * Select user logins
-	     */
-
-	    case 'u':
-		if (u_seen) errflg = TRUE;
-		else u_seen = TRUE;
-		break;
-
-	    /*
-	     * -x option:
-	     * Display extended info (init working dir, shell, pwd info)
-	     */
-
-	    case 'x':
-		if (x_seen) errflg = TRUE;
-		else x_seen = TRUE;
-		break;
-
-	    default:			/* Oops.... */
-		errflg = TRUE;
-	    }
 	}
 
 	/* Write out a usage message if necessary and quit */
 	if (errflg || (optind != argc)) {
-	    wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, gettext(USAGE_MSG));
-	    exit(1);
+		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, gettext(USAGE_MSG));
+		exit(1);
 	}
 
 
@@ -1619,26 +1627,28 @@ main(argc, argv)
 	 */
 
 	if (g_seen) {
-	    groupcount = 0;
-	    reqgrphead = (struct reqgrp *) NULL;
-	    if (token = strtok(g_arg, ",")) {
-		pgrp = (struct reqgrp *) allocblk(sizeof(struct reqgrp));
-		pgrp->groupname = token;
-		pgrp->found = FALSE;
-		pgrp->next = (struct reqgrp *) NULL;
-		groupcount++;
-		reqgrphead = pgrp;
-		qgrp = pgrp;
-		while (token = strtok(NULL, ",")) {
-		    pgrp = (struct reqgrp *) allocblk(sizeof(struct reqgrp));
-		    pgrp->groupname = token;
-		    pgrp->found = FALSE;
-		    pgrp->next = (struct reqgrp *) NULL;
-		    groupcount++;
-		    qgrp->next = pgrp;
-		    qgrp = pgrp;
+		groupcount = 0;
+		reqgrphead = NULL;
+		if (token = strtok(g_arg, ",")) {
+			pgrp = (struct reqgrp *)allocblk(
+			    sizeof (struct reqgrp));
+			pgrp->groupname = token;
+			pgrp->found = FALSE;
+			pgrp->next = NULL;
+			groupcount++;
+			reqgrphead = pgrp;
+			qgrp = pgrp;
+			while (token = strtok(NULL, ",")) {
+				pgrp = (struct reqgrp *)allocblk(
+				    sizeof (struct reqgrp));
+				pgrp->groupname = token;
+				pgrp->found = FALSE;
+				pgrp->next = NULL;
+				groupcount++;
+				qgrp->next = pgrp;
+				qgrp = pgrp;
+			}
 		}
-	    }
 	}
 
 
@@ -1648,36 +1658,35 @@ main(argc, argv)
 	 */
 
 	if (l_seen) {
-	    reqloginhead = (struct reqlogin *) NULL;
-	    if (token = strtok(l_arg, ",")) {
-		plogin = (struct reqlogin *) allocblk(sizeof(struct reqlogin));
-		plogin->loginname = token;
-		plogin->found = FALSE;
-		plogin->next = (struct reqlogin *) NULL;
-		reqloginhead = plogin;
-		qlogin = plogin;
-		while (token = strtok(NULL, ",")) {
-		    plogin = (struct reqlogin *) allocblk(sizeof(struct reqlogin));
-		    plogin->loginname = token;
-		    plogin->found = FALSE;
-		    plogin->next = (struct reqlogin *) NULL;
-		    qlogin->next = plogin;
-		    qlogin = plogin;
+		reqloginhead = NULL;
+		if (token = strtok(l_arg, ",")) {
+			plogin = (struct reqlogin *)allocblk(
+			    sizeof (struct reqlogin));
+			plogin->loginname = token;
+			plogin->found = FALSE;
+			plogin->next = NULL;
+			reqloginhead = plogin;
+			qlogin = plogin;
+			while (token = strtok(NULL, ",")) {
+				plogin = (struct reqlogin *)allocblk(
+				    sizeof (struct reqlogin));
+				plogin->loginname = token;
+				plogin->found = FALSE;
+				plogin->next = NULL;
+				qlogin->next = plogin;
+				qlogin = plogin;
+			}
 		}
-	    }
-	}
-
-	if (l_seen) {
-		while(pwent = local_getpwent()) {
+		while (pwent = local_getpwent()) {
 			done = FALSE;
-			for (plogin = reqloginhead ; !done && plogin ;
-						plogin = plogin->next) {
+			for (plogin = reqloginhead; !done && plogin;
+			    plogin = plogin->next) {
 				if (strcmp(pwent->pw_name,
-					   plogin->loginname) == 0) {
-				    	plogin->found = TRUE;
-			    		done = TRUE;
+				    plogin->loginname) == 0) {
+					plogin->found = TRUE;
+					done = TRUE;
 				}
-		    	}
+			}
 		}
 		local_endpwent();
 	}
@@ -1697,50 +1706,61 @@ main(argc, argv)
 
 	if (g_seen) {
 
-	    /* For each group in the /etc/group file ... */
-	    while (grent = getgrent()) {
+		/* For each group in the /etc/group file ... */
+		while (grent = getgrent()) {
 
-		/* For each group mentioned with the -g option ... */
-		for (pgrp = reqgrphead ; (groupcount > 0) && pgrp ; pgrp = pgrp->next) {
+			/* For each group mentioned with the -g option ... */
+			for (pgrp = reqgrphead; (groupcount > 0) && pgrp;
+			    pgrp = pgrp->next) {
 
-		    if (!pgrp->found) {
+				if (!pgrp->found) {
 
-			/*
-			 *  If the mentioned group is found in the
-			 *  /etc/group file ...
-			 */
-			if (strcmp(grent->gr_name, pgrp->groupname) == 0) {
+					/*
+					 *  If the mentioned group is found
+					 * in the  /etc/group file ...
+					 */
+					if (strcmp(grent->gr_name,
+					    pgrp->groupname) == 0) {
 
-			    /*
-			     * Mark the entry is found, remembering the
-			     * group-ID for later
-			     */
+						/*
+						 * Mark the entry is found,
+						 * remembering the group-ID
+						 * for later
+						 */
 
-			    pgrp->found = TRUE;
-			    groupcount--;
-			    pgrp->groupID = grent->gr_gid;
-			    for (pp = grent->gr_mem ; *pp ; pp++) addmember(*pp);
+						pgrp->found = TRUE;
+						groupcount--;
+						pgrp->groupID = grent->gr_gid;
+						for (pp = grent->gr_mem; *pp;
+						    pp++) {
+							addmember(*pp);
+						}
+					}
+				}
 			}
-		    }
 		}
-	    }
 
+		/*
+		 * If any groups weren't found, write a message indicating
+		 * such, then continue
+		 */
 
-	    /*
-	     * If any groups weren't found, write a message indicating
-	     * such, then continue
-	     */
-
-	    qgrp = (struct reqgrp *) NULL;
-	    for (pgrp = reqgrphead ; pgrp ; pgrp = pgrp->next) {
-		if (!pgrp->found) {
-		    wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG, gettext("%s was not found"), pgrp->groupname);
-		    if (!qgrp) reqgrphead = pgrp->next;
-		    else qgrp->next = pgrp->next;
+		qgrp = NULL;
+		for (pgrp = reqgrphead; pgrp; pgrp = pgrp->next) {
+			if (!pgrp->found) {
+				wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG,
+				    gettext("%s was not found"),
+				    pgrp->groupname);
+				if (!qgrp) {
+					reqgrphead = pgrp->next;
+				} else {
+				qgrp->next = pgrp->next;
+				}
+			} else {
+				qgrp = pgrp;
+			}
 		}
-		else qgrp = pgrp;
-	    }
-	    endgrent();
+		endgrent();
 	}
 
 
@@ -1757,99 +1777,104 @@ main(argc, argv)
 	 *  magnitude stays the same.)
 	 *
 	 *  Note:  This processing needs to be done before any other options
-	 *         are processed -- the algorithm contains an optimization
+	 *	   are processed -- the algorithm contains an optimization
 	 *	   that insists on the display list being empty before this
 	 *	   option is processed.
 	 */
 
 	if (d_seen) {
 
-	    /*
-	     * The following code is a quick&dirty reimplementation of the
-	     * original algorithm, which opened the password file twice (to
-	     * get two file pointer into the data) and then used fgetpwent()
-	     * in undocumented ways to scan through the file, checking for
-	     * duplicates.  This does not work when getpwent() is used to
-	     * go out over the network, since there is not file pointer.
-	     *
-	     * Instead an in-memory list of passwd structures is built, and then
-	     * this list is scanned.  The routines Local_getpwent(), etc.,
-	     * are designed to mimic the standard library routines, so this code
-	     * does not have to be extensively modified.
-	     */
-
-	    /*
-	     * For reference, here is the original comment about the next
-	     * section of code.  Some of the code has changed, but the algorithm
-	     * is the same:
-	     *
-	     * Open the system password file once.  This instance will be
-	     * used to leaf through the file once, reading each entry once,
-	     * and searching the remainder of the file for another login-ID
-	     * that has the same user-ID.  Note that there are lots of
-	     * contortions one has to go through when reading two instances
-	     * of the /etc/passwd file.  That's why there's some seeking,
-	     * re-reading of the same record, and other junk.  Luckily, this
-	     * feature won't be requested very often, and still isn't too
-	     * slow...
-	     */
-
-	    /* For each entry in the passwd database ... */
-	    while (plookpwd = local_getpwent()) {
 		/*
-		 *  Optimization -- If the login's user-ID is already in
-		 *  the display list, there's no reason to process this
-		 *  entry -- it's already there.
+		 * The following code is a quick&dirty reimplementation of the
+		 * original algorithm, which opened the password file twice (to
+		 * get two file pointer into the data) and then used fgetpwent()
+		 * in undocumented ways to scan through the file, checking for
+		 * duplicates.  This does not work when getpwent() is used to
+		 * go out over the network, since there is not file pointer.
+		 *
+		 * Instead an in-memory list of passwd structures is built,
+		 * and then this list is scanned.  The routines
+		 * Local_getpwent(), etc., are designed to mimic the standard
+		 * library routines, so this code does not have to be
+		 * extensively modified.
 		 */
- 		if (!isuidindisp(plookpwd)) {
 
-		    /*
-		     * Rememeber the current entry's position, so when we finish
-		     * scanning through the database looking for duplicates
-		     * we can return to the current place, so that the enclosing
-		     * loop will march in an orderly fashion through the passwd
-		     * database.
-		     */
-		    done = FALSE;
-		    lookpos = local_pwtell();
+		/*
+		 * For reference, here is the original comment about the next
+		 * section of code.  Some of the code has changed, but the
+		 * algorithm is the same:
+		 *
+		 * Open the system password file once.  This instance will be
+		 * used to leaf through the file once, reading each entry once,
+		 * and searching the remainder of the file for another login-ID
+		 * that has the same user-ID.  Note that there are lots of
+		 * contortions one has to go through when reading two instances
+		 * of the /etc/passwd file.  That's why there's some seeking,
+		 * re-reading of the same record, and other junk.  Luckily, this
+		 * feature won't be requested very often, and still isn't too
+		 * slow...
+		 */
 
-		    /*
-		     * For each record in the passwd database beyond
-		     * the searching record ...
-		     */
-		    while (pwent = local_getpwent()) {
-
+		/* For each entry in the passwd database ... */
+		while (plookpwd = local_getpwent()) {
 			/*
-			 * If there's a match between the searcher's user-
-			 * ID and the searchee's user-ID ...
+			 * Optimization -- If the login's user-ID is already
+			 * in the display list, there's no reason to process
+			 * this  entry -- it's already there.
 			 */
-			if (pwent->pw_uid == plookpwd->pw_uid) {
+			if (!isuidindisp(plookpwd)) {
+				/*
+				 * Rememeber the current entry's position,
+				 * so when we finish scanning through the
+				 * database looking for duplicates we can
+				 * return to the current place, so that the
+				 * enclosing loop will march in an orderly
+				 * fashion through the passwd database.
+				 */
+				done = FALSE;
+				lookpos = local_pwtell();
 
-			    /*
-			     * If this is the first duplicate of this searcher
-			     * that we find,
-			     * add the searcher's record to the display list
-			     * (It wants to be on the list first
-			     * to avoid ordering "flakeyness")
-			     */
-			    if (done == FALSE) {
-				adddisp(plookpwd);
-				done == TRUE;
-			    }
+				/*
+				 * For each record in the passwd database
+				 * beyond the searching record ...
+				 */
+				while (pwent = local_getpwent()) {
 
-			    /* 
-			     * Now add the searchee's record
-			     */
-			    adddisp(pwent);
+					/*
+					 * If there's a match between the
+					 * searcher's user-ID and the
+					 * searchee's user-ID ...
+					 */
+					if (pwent->pw_uid == plookpwd->pw_uid) {
+						/*
+						 * If this is the first
+						 * duplicate of this searcher
+						 * that we find,
+						 * add the searcher's
+						 * record to the display list
+						 * (It wants to be on the
+						 * list first to avoid
+						 * ordering "flakeyness")
+						 */
+						if (done == FALSE) {
+							adddisp(plookpwd);
+							done = TRUE;
+						}
 
-		    	}
-		    }
-		    /* Reposition to searcher record */
-		    local_pwseek(lookpos);
+						/*
+						 * Now add the searchee's
+						 * record
+						 */
+						adddisp(pwent);
+
+					}
+				}
+				/* Reposition to searcher record */
+				local_pwseek(lookpos);
+			}
 		}
-	    }
 
-	    local_endpwent();
+		local_endpwent();
 	}
 
 
@@ -1865,86 +1890,109 @@ main(argc, argv)
 
 	if (doall || s_seen || u_seen || p_seen || l_seen || g_seen) {
 
-	    while (pwent = local_getpwent()) {
-		done = FALSE;
+		while (pwent = local_getpwent()) {
+			done = FALSE;
 
-		/* If no user-specific options were specified,
-		 * include this login-ID */
-		if (doall) {
-		    adddisp(pwent);
-		    continue;
-		}
-
-		/* If the user specified system login-IDs,
-		 * and this is a system ID, include it */
-		if (s_seen) if (isasystemlogin(pwent)) {
-		    adddisp(pwent);
-		    continue;
-		}
-
-		/* If the user specified user login-IDs,
-		 * and this is a user ID, include it */
-		if (u_seen) if (isauserlogin(pwent)) {
-		    adddisp(pwent);
-		    continue;
-		}
-
-		/* If the user is asking for login-IDs that have
-		 * no password, and this one has no password,
-		 * include it */
-		if (p_seen) if (hasnopasswd(pwent)) {
-		    adddisp(pwent);
-		    continue;
-		}
-
-		/*
-		 * If specific logins were requested, leaf through
-		 * the list of logins they requested.  If this login
-		 * is on the list, include it.
-		 */
-		if (l_seen) {
-		    for (plogin = reqloginhead ; !done && plogin ; plogin = plogin->next) {
-			if (strcmp(pwent->pw_name, plogin->loginname) == 0) {
-			    plogin->found = TRUE;
-			    adddisp(pwent);
-			    done = TRUE;
+			/*
+			 * If no user-specific options were specified,
+			 * include this login-ID
+			 */
+			if (doall) {
+				adddisp(pwent);
+				continue;
 			}
-		    }
-		    if (done) continue;
+
+			/*
+			 * If the user specified system login-IDs,
+			 * and this is a system ID, include it
+			 */
+			if (s_seen) {
+				if (isasystemlogin(pwent)) {
+					adddisp(pwent);
+					continue;
+				}
+			}
+
+			/*
+			 * If the user specified user login-IDs,
+			 * and this is a user ID, include it
+			 */
+			if (u_seen) {
+				if (isauserlogin(pwent)) {
+					adddisp(pwent);
+					continue;
+				}
+			}
+
+			/*
+			 * If the user is asking for login-IDs that have
+			 * no password, and this one has no password, include it
+			 */
+			if (p_seen) {
+				if (hasnopasswd(pwent)) {
+					adddisp(pwent);
+					continue;
+				}
+			}
+
+			/*
+			 * If specific logins were requested, leaf through
+			 * the list of logins they requested.  If this login
+			 * is on the list, include it.
+			 */
+			if (l_seen) {
+				for (plogin = reqloginhead; !done && plogin;
+				    plogin = plogin->next) {
+					if (strcmp(pwent->pw_name,
+					    plogin->loginname) == 0) {
+						plogin->found = TRUE;
+						adddisp(pwent);
+						done = TRUE;
+					}
+				}
+				if (done)
+					continue;
+			}
+
+			/*
+			 * If specific groups were requested, leaf through the
+			 * list of login-IDs that belong to those groups.
+			 * If this login-ID is in that list, or its primary
+			 * group is one of those requested, include it.
+			 */
+
+			if (g_seen) {
+				for (pgrp = reqgrphead; !done && pgrp;
+				    pgrp = pgrp->next) {
+					if (pwent->pw_gid == pgrp->groupID) {
+						adddisp(pwent);
+						done = TRUE;
+					}
+				}
+				if (!done && isamember(pwent->pw_name)) {
+					adddisp(pwent);
+					done = TRUE;
+				}
+			}
+			if (done)
+				continue;
 		}
 
-		/*
-		 * If specific groups were requested, leaf through the
-		 * list of login-IDs that belong to those groups.  If this
-		 * login-ID is in that list, or its primary group is one
-		 * of those requested, include it.
-		 */
-
-		if (g_seen) {
-		    for (pgrp = reqgrphead ; !done && pgrp ; pgrp = pgrp->next)
-			if (pwent->pw_gid == pgrp->groupID) {
-			    adddisp(pwent);
-			    done = TRUE;
-		    }
-		    if (!done && isamember(pwent->pw_name)) {
-			adddisp(pwent);
-			done = TRUE;
-		    }
-		}
-		if (done) continue;
-	    }
-	    local_endpwent();
+		local_endpwent();
 	}
 
-	/* Let the user know about logins they requested that
-	 * don't exist */
-	if (l_seen) for (plogin = reqloginhead ; plogin ; plogin = plogin->next)
-	    if (!plogin->found)
-		wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG, gettext("%s was not found"), plogin->loginname);
+	/* Let the user know about logins they requested that don't exist */
+	if (l_seen) {
+		for (plogin = reqloginhead; plogin; plogin = plogin->next) {
+			if (!plogin->found) {
+				wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG,
+				    gettext("%s was not found"),
+				    plogin->loginname);
+			}
+		}
+	}
 
-	/*
-	 *  Apply group information
-	 */
+	/*  Apply group information */
 	applygroup(m_seen);
 
 
@@ -1952,23 +2000,19 @@ main(argc, argv)
 	 * Apply password information (only needed if the extended
 	 * set of information has been requested)
 	 */
-	if (x_seen || a_seen) applypasswd();
+	if (x_seen || a_seen)
+		applypasswd();
 
 
 	/*
-	 * Generate a report from this display items we've squirreled
-	 * away
+	 * Generate a report from this display items we've squirreled away
 	 */
 
-	if (t_seen) genlogreport(o_seen, x_seen, a_seen);
-	else genuidreport(o_seen, x_seen, a_seen);
+	if (t_seen)
+		genlogreport(o_seen, x_seen, a_seen);
+	else
+		genuidreport(o_seen, x_seen, a_seen);
 
-	/*
-	 *  We're through!
-	 */
-	exit(0);
-
-#ifdef	lint
-	return(0);
-#endif
+	/*  We're through! */
+	return (0);
 }
