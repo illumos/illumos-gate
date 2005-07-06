@@ -369,34 +369,37 @@ pic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	}
 
 	/* Check status register */
-	ntries = 0;
-	do {
-		if (++ntries > MAX_RETRIES) {
-			mutex_exit(&softc->mutex);
-			return (EBUSY);
-		}
-
+	for (ntries = 0; ntries < MAX_RETRIES; ntries++) {
 		status = ddi_get8(softc->cmd_handle,
 		    (uint8_t *)softc->cmd_reg + RF_STATUS);
+
+		if (status == 0xff) {
+			mutex_exit(&softc->mutex);
+			return (EIO);
+		}
+
+		if ((cmd == PIC_GET_STATUS) || (((status & ST_ENV_BUSY) == 0) &&
+		    ((status & ST_STALE_ADT_DATA) == 0) &&
+		    ((status & ST_STALE_LM_DATA) == 0))) {
+			break;
+		}
+
 		/*
 		 * We need 5us delay between 2 register reads
 		 * this give enough time for the pic to be updated.
 		 * we are waiting 10us to give us some breathing room.
 		 */
 		drv_usecwait(10);
+	}
 
-		/*
-		 * If we're asked to return status, we simply
-		 * return it as is.
-		 */
-		if (cmd == PIC_GET_STATUS)
-			break;
-
-	} while ((status & ST_ENV_BUSY) || (status & ST_STALE_ADT_DATA) ||
-	    (status & ST_STALE_LM_DATA));
+	if (ntries == MAX_RETRIES) {
+		mutex_exit(&softc->mutex);
+		return (EBUSY);
+	}
 
 	switch (cmd) {
 	case PIC_GET_TEMPERATURE:
+		drv_usecwait(10);
 
 		/* select the temp sensor */
 		(void) ddi_put8(softc->cmd_handle, (uint8_t *)softc->cmd_reg +
@@ -405,13 +408,10 @@ pic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		/* retrieve temperature data */
 		tempr =  (int16_t)ddi_get8(softc->cmd_handle,
 		    (uint8_t *)softc->cmd_reg + RF_IND_DATA);
+		mutex_exit(&softc->mutex);
 
-		drv_usecwait(10);
-
-		if (tempr == 0xff) {
-			mutex_exit(&softc->mutex);
+		if (tempr == 0xff)
 			return (EIO);
-		}
 
 		/*
 		 * The temp is passed in as a uint8 value, we need to convert
@@ -419,14 +419,12 @@ pic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		 * of -64 to 190 degrees.
 		 */
 		tempr -= 64;
-
-		/* In this case we need to return a signed int value */
-		mutex_exit(&softc->mutex);
 		(void) ddi_copyout(&tempr, (caddr_t)arg, sizeof (tempr), mode);
-
 		return (0);
 
 	case PIC_GET_FAN_SPEED:
+		drv_usecwait(10);
+
 		/* select fan */
 		(void) ddi_put8(softc->cmd_handle, (uint8_t *)softc->cmd_reg +
 		    RF_IND_ADDR, pic_nodes[node].reg_offset);
@@ -434,9 +432,13 @@ pic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		/* retrieve fan data */
 		in_command =  ddi_get8(softc->cmd_handle,
 		    (uint8_t *)softc->cmd_reg + RF_IND_DATA);
+		mutex_exit(&softc->mutex);
 
-		drv_usecwait(10);
-		break;
+		if (in_command == 0xff)
+			return (EIO);
+
+		(void) ddi_copyout(&in_command, (caddr_t)arg, 1, mode);
+		return (0);
 
 	case PIC_SET_FAN_SPEED:
 		/* select fan */
@@ -447,15 +449,20 @@ pic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		(void) ddi_put8(softc->cmd_handle,
 		    (uint8_t *)softc->cmd_reg + RF_IND_DATA, in_command);
 
-		drv_usecwait(10);
-
-		break;
+		mutex_exit(&softc->mutex);
+		return (0);
 
 	case PIC_GET_STATUS:
+		mutex_exit(&softc->mutex);
+
 		in_command = status;
-		break;
+		(void) ddi_copyout(&in_command, (caddr_t)arg, 1, mode);
+
+		return (0);
 
 	case PIC_GET_FAN_STATUS:
+		drv_usecwait(10);
+
 		/* read ffault register */
 		(void) ddi_put8(softc->cmd_handle, (uint8_t *)softc->cmd_reg +
 		    RF_IND_ADDR, RF_FAN_STATUS);
@@ -463,34 +470,23 @@ pic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		/* retrieve fan failure status */
 		in_command = ddi_get8(softc->cmd_handle,
 		    (uint8_t *)softc->cmd_reg + RF_IND_DATA);
+		mutex_exit(&softc->mutex);
+
+		if (in_command == 0xff)
+			return (EIO);
+
 		in_command = (in_command >> pic_nodes[node].ff_shift) & 0x1;
-
-		drv_usecwait(10);
-
-		break;
+		(void) ddi_copyout(&in_command, (caddr_t)arg, 1, mode);
+		return (0);
 
 	case PIC_SET_ESTAR_MODE:
 		(void) ddi_put8(softc->cmd_handle,
 		    (uint8_t *)softc->cmd_reg + RF_COMMAND, CMD_TO_ESTAR);
-		break;
+		return (0);
 
 	default:
 		mutex_exit(&softc->mutex);
 		cmn_err(CE_NOTE, "cmd %d isnt valid", cmd);
 		return (EINVAL);
-	}
-
-	mutex_exit(&softc->mutex);
-	(void) ddi_copyout(&in_command, (caddr_t)arg, 1, mode);
-
-	/*
-	 * 0xFF indicates an error when trying to read from the device,
-	 * ie. it can be busy, or being updated.
-	 * This will force picl to retry the read at another time.
-	 */
-	if (in_command == 0xff) {
-		return (EIO);
-	} else {
-		return (0);
 	}
 }

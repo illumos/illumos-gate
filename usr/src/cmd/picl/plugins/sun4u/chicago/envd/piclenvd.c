@@ -111,8 +111,8 @@ static int	get_disk_temp(env_disk_t *);
  * Env thread variables
  */
 static boolean_t  system_shutdown_started = B_FALSE;
-static boolean_t  system_temp_thr1_created = B_FALSE;
-static pthread_t  system_temp_thr1_id;
+static boolean_t  system_temp_thr_created = B_FALSE;
+static pthread_t  system_temp_thr_id;
 static pthread_attr_t thr_attr;
 static boolean_t  disk_temp_thr_created = B_FALSE;
 static pthread_t  disk_temp_thr_id;
@@ -295,8 +295,6 @@ static env_sensor_t *envd_sensors[] = {
 #define	ENABLE	1
 #define	DISABLE	0
 
-int	monitor_disk_temp	= 1;
-
 static	int	disk_high_warn_temperature	= DISK_HIGH_WARN_TEMPERATURE;
 static	int	disk_low_warn_temperature	= DISK_LOW_WARN_TEMPERATURE;
 static	int	disk_high_shutdown_temperature	=
@@ -322,7 +320,7 @@ static int 	disk_shutdown_interval	= DISK_SHUTDOWN_INTERVAL;
 static int	system_temp_monitor	= 1;	/* enabled */
 static int	fan_monitor		= 1;	/* enabled */
 static int	pm_monitor		= 1;	/* enabled */
-static int	front_panel_present	= 1;	/* enabled */
+int		disk_temp_monitor	= 1;	/* enabled */
 
 static char	shutdown_cmd[] = SHUTDOWN_CMD;
 
@@ -332,7 +330,6 @@ env_tuneable_t tuneables[] = {
 
 	{"fan-monitor", PICL_PTYPE_INT, &fan_monitor,
 	    &get_int_val, &set_int_val, sizeof (int)},
-
 
 	{"pm-monitor", PICL_PTYPE_INT, &pm_monitor,
 	    &get_int_val, &set_int_val, sizeof (int)},
@@ -384,7 +381,7 @@ env_tuneable_t tuneables[] = {
 	    &get_string_val, &set_string_val,
 	    sizeof (shutdown_cmd)},
 
-	{"monitor-disk-temp", PICL_PTYPE_INT, &monitor_disk_temp,
+	{"monitor-disk-temp", PICL_PTYPE_INT, &disk_temp_monitor,
 	    &get_int_val, &set_int_val, sizeof (int)},
 
 	{"disk-high-warn-temperature", PICL_PTYPE_INT,
@@ -401,14 +398,6 @@ env_tuneable_t tuneables[] = {
 
 	{"disk-low-shutdown-temperature", PICL_PTYPE_INT,
 	    &disk_low_shutdown_temperature, &get_int_val,
-	    &set_int_val, sizeof (int)},
-
-	/*
-	 * Check if the front panel exists.
-	 */
-
-	{"front-panel-present", PICL_PTYPE_INT,
-	    &front_panel_present, &get_int_val,
 	    &set_int_val, sizeof (int)},
 
 	{"verbose", PICL_PTYPE_INT, &env_debug,
@@ -541,15 +530,13 @@ disk_temperature(env_disk_t *diskp, tempr_t *temp)
 int
 get_fan_speed(env_fan_t *fanp, fanspeed_t *fanspeedp)
 {
-	int	fan_fd;
 	uint8_t tach;
 	int	real_tach;
 	int	retries;
 
-	fan_fd = fanp->fd;
-
-	if (fan_fd == -1)
+	if (fanp->fd == -1)
 		return (-1);
+
 	if (has_fan_failed(fanp)) {
 		*fanspeedp = 0;
 		return (0);
@@ -557,15 +544,14 @@ get_fan_speed(env_fan_t *fanp, fanspeed_t *fanspeedp)
 
 	/* try to read the fan information */
 	for (retries = 0; retries <= MAX_FAN_RETRIES; retries++) {
-		if (ioctl(fan_fd, PIC_GET_FAN_SPEED, &tach) == 0)
-			continue;
-		total_fan_retries++;
+		if (ioctl(fanp->fd, PIC_GET_FAN_SPEED, &tach) == 0)
+			break;
 		(void) sleep(1);
 	}
 
-	if (retries == MAX_FAN_RETRIES) {
+	total_fan_retries += retries;
+	if (retries == MAX_FAN_RETRIES)
 		return (-1);
-	}
 
 	if (total_fan_retries && env_debug) {
 		envd_log(LOG_WARNING, "total retries for fan = %d",
@@ -587,23 +573,19 @@ get_fan_speed(env_fan_t *fanp, fanspeed_t *fanspeedp)
 int
 set_fan_speed(env_fan_t *fanp, fanspeed_t fanspeed)
 {
-	int	fan_fd;
-	int	retval = 0;
 	uint8_t	speed;
 
-	fan_fd = fanp->fd;
-	if (fan_fd == -1)
+	if (fanp->fd == -1)
 		return (-1);
 
 	if (fanspeed < 0 || fanspeed > 100)
 		return (-2);
 
 	speed = fanspeed;
+	if (ioctl(fanp->fd, PIC_SET_FAN_SPEED, &speed) != 0)
+		return (-1);
 
-	if (ioctl(fan_fd, PIC_SET_FAN_SPEED, &speed) != 0)
-		retval = -1;
-
-	return (retval);
+	return (0);
 }
 
 /*
@@ -643,7 +625,6 @@ envd_close_sensors(void)
 
 /*
  * Open fan devices and initialize per fan data structure.
- * Returns #fans found.
  */
 static int
 envd_setup_fans(void)
@@ -680,8 +661,7 @@ envd_setup_fans(void)
 					continue;
 			}
 		}
-		fd = open(fanp->devfs_path, O_RDWR);
-		if (fd == -1) {
+		if ((fd = open(fanp->devfs_path, O_RDWR)) == -1) {
 			envd_log(LOG_CRIT,
 			    ENV_FAN_OPEN_FAIL, fanp->name,
 			    fanp->devfs_path, errno, strerror(errno));
@@ -690,8 +670,13 @@ envd_setup_fans(void)
 		}
 		fanp->fd = fd;
 		fanp->present = B_TRUE;
+		fancnt++;
 	}
-	return (fancnt);
+
+	if (fancnt == 0)
+		return (-1);
+
+	return (0);
 }
 
 static int
@@ -706,31 +691,30 @@ envd_setup_disks(void)
 
 	if (ptree_get_node_by_path(SCSI_CONTROLLER_NODE_PATH,
 	    &tnodeh) != PICL_SUCCESS) {
-		if (env_debug)
+		if (env_debug) {
 			envd_log(LOG_ERR,
 "On-Board SCSI controller %s not found in the system.\n",
 			    SCSI_CONTROLLER_NODE_PATH);
-		monitor_disk_temp = 0;
+		}
 		return (-1);
 	}
 
 	if ((ret = ptree_get_propval_by_name(tnodeh, VENDOR_ID,
-	    &vendor_id,
-	    sizeof (vendor_id))) != 0) {
-		if (env_debug)
+	    &vendor_id, sizeof (vendor_id))) != 0) {
+		if (env_debug) {
 			envd_log(LOG_ERR,
 "Error in getting vendor-id for SCSI controller. ret = %d errno = 0x%d\n",
 			    ret, errno);
-		monitor_disk_temp = 0;
+		}
 		return (-1);
 	}
 	if ((ret = ptree_get_propval_by_name(tnodeh, DEVICE_ID,
 	    &device_id, sizeof (device_id))) != 0) {
-		if (env_debug)
+		if (env_debug) {
 			envd_log(LOG_ERR,
 "Error in getting device-id for SCSI controller. ret = %d errno = 0x%d\n",
 			    ret, errno);
-		monitor_disk_temp = 0;
+		}
 		return (-1);
 	}
 
@@ -741,19 +725,20 @@ envd_setup_disks(void)
 		if (ptree_get_node_by_path(diskp->nodepath,
 		    &tnodeh) != PICL_SUCCESS) {
 			diskp->present = B_FALSE;
-			if (env_debug)
+			if (env_debug) {
 				envd_log(LOG_ERR,
-				"DISK %d: %s not found in the system.\n",
+				    "DISK %d: %s not found in the system.\n",
 				    diskp->id, diskp->nodepath);
+			}
 			continue;
 		}
-		diskp->fd = open(diskp->devfs_path, O_RDONLY);
-		if (diskp->fd == -1) {
+		if ((diskp->fd = open(diskp->devfs_path, O_RDONLY)) == -1) {
 			diskp->present = B_FALSE;
-			if (env_debug)
+			if (env_debug) {
 				envd_log(LOG_ERR,
-				"Error in opening %s errno = 0x%x\n",
+				    "Error in opening %s errno = 0x%x\n",
 				    diskp->devfs_path, errno);
+			}
 			continue;
 		}
 		diskp->present = B_TRUE;
@@ -767,38 +752,31 @@ envd_setup_disks(void)
 		/*
 		 * Find out if the Temperature page is supported by the disk.
 		 */
-		ret = scsi_log_sense(diskp, SUPPORTED_LPAGES,
-		    log_page, sizeof (log_page));
-		if (ret != 0)
+		if (scsi_log_sense(diskp, SUPPORTED_LPAGES, log_page,
+		    sizeof (log_page)) != 0) {
 			continue;
+		}
 
 		page_len = ((log_page[2] << 8) & 0xFF00) | log_page[3];
 
 		for (page_index = LOGPAGEHDRSIZE;
 		    page_index < page_len + LOGPAGEHDRSIZE; page_index++) {
-			switch (log_page[page_index]) {
-				case TEMPERATURE_PAGE:
-					diskp->tpage_supported = B_TRUE;
-				if (env_debug)
-					envd_log(LOG_ERR,
-					"tpage supported for %s\n",
-					    diskp->nodepath);
-				default:
-					break;
+			if (log_page[page_index] != TEMPERATURE_PAGE)
+				continue;
+
+			diskp->tpage_supported = B_TRUE;
+			if (env_debug) {
+				envd_log(LOG_ERR, "tpage supported for %s\n",
+				    diskp->nodepath);
 			}
 		}
-		ret = get_disk_temp(diskp);
-		if (ret != 0) {
-			if (env_debug) {
-				envd_log(LOG_ERR,
-			" error reading temperature of:%s\n",
-				    diskp->name);
-			}
-		} else {
-			if (env_debug) {
-				envd_log(LOG_ERR, "%s: temperature = %d\n",
-				    diskp->name, diskp->current_temp);
-			}
+
+		if (get_disk_temp(diskp) < 0) {
+			envd_log(LOG_ERR, " error reading temperature of:%s\n",
+			    diskp->name);
+		} else if (env_debug) {
+			envd_log(LOG_ERR, "%s: temperature = %d\n",
+			    diskp->name, diskp->current_temp);
 		}
 	}
 
@@ -807,7 +785,6 @@ envd_setup_disks(void)
 
 /*
  * Open temperature sensor devices and initialize per sensor data structure.
- * Returns #sensors found.
  */
 static int
 envd_setup_sensors(void)
@@ -817,7 +794,7 @@ envd_setup_sensors(void)
 	int		i;
 	picl_nodehdl_t	tnodeh;
 
-	for (i = 0; i < N_ENVD_SENSORS; ++i) {
+	for (i = 0; i < N_ENVD_SENSORS; i++) {
 		if (env_debug)
 			envd_log(LOG_ERR, "scanning sensor %d\n", i);
 
@@ -872,29 +849,28 @@ envd_setup_sensors(void)
 		 * the system if it is removed.
 		 */
 		if (sensorp->id == FRONT_PANEL_SENSOR_ID) {
-			tempr_t temp = -1;
-			int	retries;
+			tempr_t temp;
+			int	tries;
 
-			for (retries = 0; retries < MAX_SENSOR_RETRIES;
-			    retries++) {
-
-				if ((ioctl(sensorp->fd,
-				    PIC_GET_TEMPERATURE, temp) != 0)) {
-					if ((temp != 0) && (temp != 0xff))
-						continue;
+			for (tries = 0; tries < MAX_SENSOR_RETRIES; tries++) {
+				if (ioctl(sensorp->fd, PIC_GET_TEMPERATURE,
+				    &temp) == 0) {
+					break;
 				}
+				(void) sleep(1);
 			}
-
-			if (retries == MAX_SENSOR_RETRIES) {
-				front_panel_present = 0;
+			if (tries == MAX_SENSOR_RETRIES)
 				sensorp->present = B_FALSE;
-			}
 		}
 
 		sensorp->present = B_TRUE;
 		sensorcnt++;
 	}
-	return (sensorcnt);
+
+	if (sensorcnt == 0)
+		return (-1);
+
+	return (0);
 }
 
 /* ARGSUSED */
@@ -997,25 +973,11 @@ system_temp_thr(void *args)
 	time_t	ct;
 	tempr_t  temp;
 
-	/*
-	 * If front panel is not present, ignore readings from the
-	 * corresponding sensor. We do this by setting the thresholds
-	 * to the maximum (and minimum) values possible.
-	 */
-	if (!front_panel_present) {
-		envd_sensor_front_panel.high_shutdown = 0x7F;
-		envd_sensor_front_panel.high_warning = 0x7F;
-		envd_sensor_front_panel.high_power_off = 0x7F;
-		envd_sensor_front_panel.low_shutdown = -127;
-		envd_sensor_front_panel.low_warning = -127;
-		envd_sensor_front_panel.low_power_off = -127;
-	}
-
 	for (;;) {
-	/*
-	 * Sleep for specified seconds before issuing IOCTL
-	 * again.
-	 */
+		/*
+		 * Sleep for specified seconds before issuing IOCTL
+		 * again.
+		 */
 		(void) pthread_mutex_lock(&env_monitor_mutex);
 		ret = pthread_cond_reltimedwait_np(&env_monitor_cv,
 		    &env_monitor_mutex, &to);
@@ -1040,27 +1002,29 @@ system_temp_thr(void *args)
 				"%s temp = %d",
 				    sensorp->name, sensorp->cur_temp);
 			}
-		/*
-		 * If this sensor already triggered system shutdown, don't
-		 * log any more shutdown/warning messages for it.
-		 */
+
+			/*
+			 * If this sensor already triggered system shutdown,
+			 * don't log any more shutdown/warning messages for it.
+			 */
 			if (sensorp->shutdown_initiated)
 				continue;
 
-		/*
-		 * Check for the temperature in warning and shutdown range
-		 * and take appropriate action.
-		 */
+			/*
+			 * Check for the temperature in warning and shutdown
+			 * range and take appropriate action.
+			 */
 			if (SENSOR_TEMP_IN_WARNING_RANGE(sensorp->cur_temp,
 			    sensorp)) {
-			/*
-			 * Check if the temperature has been in warning
-			 * range during last sensor_warning_duration interval.
-			 * If so, the temperature is truly in warning
-			 * range and we need to log a warning message,
-			 * but no more than once every sensor_warning_interval
-			 * seconds.
-			 */
+				/*
+				 * Check if the temperature has been in
+				 * warning range during last
+				 * sensor_warning_duration interval. If so,
+				 * the temperature is truly in warning range
+				 * and we need to log a warning message, but
+				 * no more than once every
+				 * sensor_warning_interval seconds.
+				 */
 				time_t	wtstamp = sensorp->warning_tstamp;
 
 				ct = (time_t)(gethrtime() / NANOSEC);
@@ -1086,14 +1050,16 @@ system_temp_thr(void *args)
 				if (sensorp->shutdown_tstamp == 0)
 					sensorp->shutdown_tstamp = ct;
 
-			/*
-			 * Shutdown the system if the temperature remains
-			 * in the shutdown range for over
-			 * sensor_shutdown_interval seconds.
-			 */
+				/*
+				 * Shutdown the system if the temperature
+				 * remains in the shutdown range for over
+				 * sensor_shutdown_interval seconds.
+				 */
 				if ((ct - sensorp->shutdown_tstamp) >=
 				    sensor_shutdown_interval) {
-				/* log error */
+					/*
+					 * Log error
+					 */
 					sensorp->shutdown_initiated = B_TRUE;
 					(void) snprintf(msgbuf, sizeof (msgbuf),
 					    ENV_SHUTDOWN_MSG, sensorp->name,
@@ -1102,7 +1068,9 @@ system_temp_thr(void *args)
 					    sensorp->high_shutdown);
 					envd_log(LOG_ALERT, msgbuf);
 
-				/* shutdown the system (only once) */
+					/*
+					 * Shutdown the system (only once)
+					 */
 					if (system_shutdown_started ==
 					    B_FALSE) {
 						(void) snprintf(syscmd,
@@ -1155,17 +1123,19 @@ scsi_log_sense(env_disk_t *diskp, uchar_t page_code, uchar_t *pagebuf,
 	ucmd_buf.uscsi_timeout = 60;
 
 	ret_val = ioctl(diskp->fd, USCSICMD, ucmd_buf);
-	if (ret_val == 0 && ucmd_buf.uscsi_status == 0) {
+	if ((ret_val == 0) && (ucmd_buf.uscsi_status == 0)) {
 		if (env_debug)
 			envd_log(LOG_ERR,
 		"log sense command for page_code 0x%x succeeded\n", page_code);
 		return (ret_val);
 	}
-	if (env_debug)
-		envd_log(LOG_ERR,
-"log sense command for %s failed. page_code 0x%x ret_val = 0x%x status = 0x%x" \
-		    " errno = 0x%x\n", diskp->name, page_code, ret_val,
-		    ucmd_buf.uscsi_status, errno);
+	if (env_debug) {
+		envd_log(LOG_ERR, "log sense command for %s failed. "
+		    "page_code 0x%x ret_val = 0x%x "
+		    "status = 0x%x errno = 0x%x\n", diskp->name, page_code,
+		    ret_val, ucmd_buf.uscsi_status, errno);
+	}
+
 	return (1);
 }
 
@@ -1228,18 +1198,17 @@ disk_temp_thr(void *args)
 	int	disk_pm_fd;
 	time_t	ct;
 
-	disk_pm_fd = open(PM_DEVICE, O_RDWR);
-	if (disk_pm_fd == -1) {
-		envd_log(LOG_ERR,
-		    DISK_TEMP_THREAD_EXITING,
+	if ((disk_pm_fd = open(PM_DEVICE, O_RDWR)) == -1) {
+		envd_log(LOG_ERR, DISK_TEMP_THREAD_EXITING,
 		    errno, strerror(errno));
 		return (NULL);
 	}
+
 	for (;;) {
-	/*
-	 * Sleep for specified seconds before issuing IOCTL
-	 * again.
-	 */
+		/*
+		 * Sleep for specified seconds before issuing IOCTL
+		 * again.
+		 */
 		(void) pthread_mutex_lock(&env_monitor_mutex);
 		ret = pthread_cond_reltimedwait_np(&env_monitor_cv,
 		    &env_monitor_mutex, &to);
@@ -1455,80 +1424,72 @@ envd_setup(void)
 		return (-1);
 	}
 
-	/*
-	 * Setup temperature sensors and fail if we can't open
-	 * at least one sensor.
-	 */
-	if (envd_setup_sensors() <= 0) {
+	if (envd_setup_sensors() < 0) {
 		if (env_debug)
 			envd_log(LOG_ERR, "Failed to setup sensors\n");
-		/*
-		 * return (NULL);
-		 */
 		system_temp_monitor = 0;
 	}
 
-	/*
-	 * Setup fan device (don't fail even if we can't access
-	 * the fan as we can still monitor temeperature.
-	 */
-	(void) envd_setup_fans();
+	if (envd_setup_fans() < 0) {
+		if (env_debug)
+			envd_log(LOG_ERR, "Failed to setup fans\n");
+		fan_monitor = 0;
+		pm_monitor = 0;
+	}
 
-	/*
-	 * Environmental monitoring of SATA disks isn't ready yet.
-	 */
-	(void) envd_setup_disks();
+	if (envd_setup_disks() < 0) {
+		if (env_debug)
+			envd_log(LOG_ERR, "Failed to setup disks\n");
+		disk_temp_monitor = 0;
+	}
 
-	if (system_temp_monitor && system_temp_thr1_created == B_FALSE) {
-		if (pthread_create(&system_temp_thr1_id, &thr_attr,
-		    system_temp_thr, NULL) != 0)
+	if ((system_temp_monitor) && (system_temp_thr_created == B_FALSE)) {
+		if (pthread_create(&system_temp_thr_id, &thr_attr,
+		    system_temp_thr, NULL) != 0) {
 			envd_log(LOG_ERR, ENVTHR_THREAD_CREATE_FAILED);
-		else {
-			system_temp_thr1_created = B_TRUE;
+		} else {
+			system_temp_thr_created = B_TRUE;
 			if (env_debug)
 				envd_log(LOG_ERR,
 			"Created thread to monitor system temperatures\n");
 		}
 	}
 
-	if (fan_monitor && fan_thr_created == B_FALSE) {
-		if (pthread_create(&fan_thr_id, &thr_attr, fan_thr,
-		    NULL) != 0)
+	if ((fan_monitor) && (fan_thr_created == B_FALSE)) {
+		if (pthread_create(&fan_thr_id, &thr_attr, fan_thr, NULL) != 0)
 			envd_log(LOG_ERR, ENVTHR_THREAD_CREATE_FAILED);
 		else {
 			fan_thr_created = B_TRUE;
-			if (env_debug)
+			if (env_debug) {
 				envd_log(LOG_ERR,
-			"Created thread to monitor system fans\n");
+				    "Created thread to monitor system fans\n");
+			}
 		}
 	}
-	/*
-	 * Create a thread to monitor PM state
-	 */
-	if (pm_monitor && pmthr_created == B_FALSE) {
-		if (pthread_create(&pmthr_tid, &thr_attr, pmthr,
-		    NULL) != 0)
+
+	if ((pm_monitor) && (pmthr_created == B_FALSE)) {
+		if (pthread_create(&pmthr_tid, &thr_attr, pmthr, NULL) != 0)
 			envd_log(LOG_CRIT, PM_THREAD_CREATE_FAILED);
-		else	{
+		else {
 			pmthr_created = B_TRUE;
 			if (env_debug)
 				envd_log(LOG_ERR,
 			"Created thread to monitor system power state\n");
 		}
 	}
-	if (monitor_disk_temp) {
-		if (disk_temp_thr_created == B_FALSE) {
-			if (pthread_create(&disk_temp_thr_id, &thr_attr,
-			    disk_temp_thr, NULL) != 0)
-				envd_log(LOG_ERR, ENVTHR_THREAD_CREATE_FAILED);
-			else	{
-				disk_temp_thr_created = B_TRUE;
-				if (env_debug)
-					envd_log(LOG_ERR,
-				"Created thread for disk temperatures\n");
-			}
+
+	if ((disk_temp_monitor) && (disk_temp_thr_created == B_FALSE)) {
+		if (pthread_create(&disk_temp_thr_id, &thr_attr,
+		    disk_temp_thr, NULL) != 0) {
+			envd_log(LOG_ERR, ENVTHR_THREAD_CREATE_FAILED);
+		} else {
+			disk_temp_thr_created = B_TRUE;
+			if (env_debug)
+				envd_log(LOG_ERR,
+			"Created thread for disk temperatures\n");
 		}
 	}
+
 	return (0);
 }
 
@@ -1689,10 +1650,10 @@ boolean_t
 has_fan_failed(env_fan_t *fanp)
 {
 	fanspeed_t	fan_speed;
-	int		retry_count;
 	uchar_t		status;
 	uint8_t		tach;
 	int		real_tach;
+	int		ret, ntries;
 
 	if (fanp->fd == -1)
 		return (B_TRUE);
@@ -1701,32 +1662,22 @@ has_fan_failed(env_fan_t *fanp)
 	 * Read RF_FAN_STATUS bit of the fan fault register, retry if
 	 * the PIC is busy, with a 1 second delay to allow it to update.
 	 */
-	retry_count = MAX_RETRIES_FOR_FAN_FAULT;
-	while (retry_count > 0) {
-		if (ioctl(fanp->fd, PIC_GET_FAN_STATUS, &status) != 0) {
-			retry_count--;
-			(void) sleep(1);
-			continue;
-		} else {
-			if (status & 0x1) {
-				retry_count--;
-				(void) sleep(1);
-				continue;
-			}
-
+	for (ntries = 0; ntries < MAX_RETRIES_FOR_FAN_FAULT; ntries++) {
+		ret = ioctl(fanp->fd, PIC_GET_FAN_STATUS, &status);
+		if ((ret == 0) && ((status & 0x1) == 0))
 			break;
-		}
+		(void) sleep(1);
 	}
 
-	if (retry_count != MAX_RETRIES_FOR_FAN_FAULT) {
+	if (ntries > 0) {
 		if (env_debug) {
 			envd_log(LOG_ERR,
 			    "%d retries attempted in reading fan status.\n",
-			    (MAX_RETRIES_FOR_FAN_FAULT - retry_count));
+			    ntries);
 		}
 	}
 
-	if (retry_count == 0) {
+	if (ntries == MAX_RETRIES_FOR_FAN_FAULT) {
 		(void) strncpy(fan_status_string, NOT_AVAILABLE,
 		    sizeof (fan_status_string));
 		(void) strncpy(fan_rpm_string, NOT_AVAILABLE,

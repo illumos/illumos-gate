@@ -60,7 +60,7 @@
 typedef int ptree_vol_rdfunc_t(ptree_rarg_t *parg, void *buf);
 typedef int ptree_vol_wrfunc_t(ptree_warg_t *parg, const void *buf);
 
-extern int monitor_disk_temp;
+extern int disk_temp_monitor;
 extern env_tuneable_t	tuneables[];
 extern	int errno;
 extern	int	ntuneables;
@@ -977,7 +977,7 @@ env_picl_setup(void)
 	if (err == PICL_SUCCESS) {
 		sensor_err = add_sensor_nodes_and_props();
 		fan_err = add_fan_nodes_and_props();
-		if (monitor_disk_temp)
+		if (disk_temp_monitor)
 			disk_err = add_disk_nodes_and_props();
 	}
 

@@ -81,17 +81,8 @@ NODE frutree picl
 	    PROP SlotType string r 0 "system-board"
 	    PROP Label string r 0 "FIOB"
 	    NODE system-board fru
-		/*
-		 * FIXIT
-		 * Access to the front-io-fru-prom through the PIC i2c
-		 * bus is causing problems currently. Temporarily disabled
-		 * until the hw problem is resolved
-		 */
-		/*
-		 * PROP FRUDataAvailable void r
-		 * REFPROP _seeprom_source
-		 * 	/platform/ebus@1f,464000/i2c@3,80/front-io-fru-prom
-		 */
+		 PROP FRUDataAvailable void r
+		 REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/front-io-fru-prom
 	    ENDNODE
 	ENDNODE
 
@@ -140,17 +131,8 @@ NODE frutree picl
 	 * SAS/SATA Backplane
 	 */
 	NODE SAS-BP fru				
-	    /*
-	     * FIXIT
-	     * Access to the front-io-fru-prom through the PIC i2c
-	     * bus is causing problems currently. Temporarily disabled
-	     * until the hw problem is resolved
-	     */
-	    /*
-	     * PROP FRUDataAvailable void r
-	     * REFPROP _seeprom_source
-	     *		/platform/ebus@1f,464000/i2c@3,80/sas-backplane-fru-prom
-	     */
+	    PROP FRUDataAvailable void r
+	    REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/sas-backplane-fru-prom
 	    NODE HDD0 location
 		PROP SlotType string r 0 "disk-slot"
 		PROP Label string r 0 "HDD0"
@@ -174,12 +156,9 @@ ENDNODE
 /*
  * Add disk fru nodes for disks which are present.
  *
- * FIXIT: Currently, there is a bug (6239219) filed against dynamic disk target
- * numbers every time a disk is taken out and reinserted. When that bug gets
- * fixed the target numbers should be from 0 to 3.
- *
- * FIXIT: Also, current rev of the MB has LSI1064 as a PCI-X plugin card. This
- * will finally be on board; when that happens, the paths below will change.
+ * FIXIT: Rev R0B2 of the MB has LSI1064 onboard with the path
+ * 		/platform/pci@1e,600000/pci@0/pci@9/pci@0/LSILogic,sas@1
+ * Change the paths below appropriately when this is confirmed
  */
 name:/frutree/chassis/SAS-BP/HDD0
 REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@0,0
@@ -194,13 +173,14 @@ name:/frutree/chassis/SAS-BP/HDD3
 REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@3,0
 
 /*
- * FIXIT: DVDROM path is via 1573 which has problems as of now. As and when
- * this is resolved and devtree node gets created, we need to include it here
- * and uncomment this (also assumes that dvdrom drive is removable separately
+ * FIXIT: Latest DVDROM path via 1575 on R0B2 is
+ *
+ *   name:/frutree/chassis/FIOB
+ *   REFNODE cdrom fru WITH name:/platform/pci@1e,600000/pci@0/pci@1/pci@0/ide@1f/sd@0,0
+ *
+ * Enable it when this is confirmed (also assumes that dvdrom drive is removable separately
  * from the front panel interface board).
  *
- * name:/frutree/chassis/FIOB
- * REFNODE cdrom fru WITH name:/platform/pci@1e,600000/pci@0/pci@9/.../sd@0,0
  */
 
 #include "system-board.info"
