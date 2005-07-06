@@ -182,7 +182,8 @@ eat_signal(kthread_t *t, int sig)
 			t->t_schedflag |= TS_XSTART | TS_PSTART;
 			setrun_locked(t);
 		} else if (t != curthread && t->t_state == TS_ONPROC) {
-			if ((t != curthread) && (t->t_cpu != CPU))
+			aston(t);	/* make it do issig promptly */
+			if (t->t_cpu != CPU)
 				poke_cpu(t->t_cpu->cpu_id);
 			rval = 1;
 		} else if (t->t_state == TS_RUN) {
