@@ -2012,11 +2012,9 @@ tmp_map(
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
 
-	if (off > MAXOFF_T)
-		return (EFBIG);
-
-	if ((long)off < 0 || (long)(off + len) < 0)
-		return (EINVAL);
+	if (off < 0 || (off + len) < 0 ||
+	    off > MAXOFF_T || (off + len) > MAXOFF_T)
+		return (ENXIO);
 
 	if (vp->v_type != VREG)
 		return (ENODEV);
