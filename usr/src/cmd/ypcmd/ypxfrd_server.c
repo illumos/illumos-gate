@@ -20,9 +20,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/* Portions Copyright 2005 Juergen Keil */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -267,10 +268,12 @@ xdr_pages(XDR *xdrs, struct mycon *m)
 	res.status = mygetpage(res.pag_u.ok.blkdat, &(res.pag_u.ok.blkno), m);
 
 #ifdef DOSWAB
-	s = (short *)res.pag_u.ok.blkdat;
-	cnt = s[0];
-	for (i = 0; i <= cnt; i++)
-		s[i] = ntohs(s[i]);
+	if (res.status == OK) {
+		s = (short *)res.pag_u.ok.blkdat;
+		cnt = s[0];
+		for (i = 0; i <= cnt; i++)
+			s[i] = ntohs(s[i]);
+	}
 #endif
 
 	if (!xdr_pag(xdrs, &res))
@@ -283,10 +286,12 @@ xdr_pages(XDR *xdrs, struct mycon *m)
 					&(res.pag_u.ok.blkno), m);
 
 #ifdef DOSWAB
-		s = (short *)res.pag_u.ok.blkdat;
-		cnt = s[0];
-		for (i = 0; i <= cnt; i++)
-			s[i] = ntohs(s[i]);
+		if (res.status == OK) {
+			s = (short *)res.pag_u.ok.blkdat;
+			cnt = s[0];
+			for (i = 0; i <= cnt; i++)
+				s[i] = ntohs(s[i]);
+		}
 #endif
 
 		if (!xdr_pag(xdrs, &res))
