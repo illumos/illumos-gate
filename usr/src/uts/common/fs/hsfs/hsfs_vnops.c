@@ -1137,11 +1137,9 @@ hsfs_map(
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
 
-	if (off > MAXOFF_T)
-		return (EFBIG);
-
-	if (off < 0 || (offset_t)(off + len) < 0)
-		return (EINVAL);
+	if (off > MAXOFF_T || off < 0 ||
+	    (off + len) < 0 || (off + len) > MAXOFF_T)
+		return (ENXIO);
 
 	if (vp->v_type != VREG) {
 		return (ENODEV);
