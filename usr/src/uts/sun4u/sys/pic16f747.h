@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _PIC16f747_H
-#define	_PIC16f747_H
+#ifndef _PIC16F747_H
+#define	_PIC16F747_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -125,4 +125,4 @@ typedef struct minor_node_info {
 }
 #endif
 
-#endif /* _PIC16f747_H */
+#endif /* _PIC16F747_H */
