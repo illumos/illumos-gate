@@ -380,14 +380,16 @@ fifoinit(int fstype, char *name)
 }
 
 /*
- * Provide a shadow for a vnode. If vp already has a shadow in the hash list,
- * return its shadow.  Otherwise, create a vnode to shadow vp, hash the
- * new vnode and return its pointer to the caller.
+ * Provide a shadow for a vnode.  We create a new shadow before checking for an
+ * existing one, to minimize the amount of time we need to hold ftable_lock.
+ * If a vp already has a shadow in the hash list, return its shadow.  If not,
+ * we hash the new vnode and return its pointer to the caller.
  */
 vnode_t *
 fifovp(vnode_t *vp, cred_t *crp)
 {
 	fifonode_t *fnp;
+	fifonode_t *spec_fnp;   /* Speculative fnode ptr. */
 	fifodata_t *fdp;
 	vnode_t *newvp;
 	struct vattr va;
@@ -396,23 +398,12 @@ fifovp(vnode_t *vp, cred_t *crp)
 
 	fdp = kmem_cache_alloc(fnode_cache, KM_SLEEP);
 
-	mutex_enter(&ftable_lock);
-
-	if ((fnp = fifofind(vp)) != NULL) {
-		mutex_exit(&ftable_lock);
-#if DEBUG
-		fdp->fifo_fnode[0].fn_wcnt = 0;
-		fdp->fifo_fnode[0].fn_rcnt = 0;
-#endif
-		kmem_cache_free(fnode_cache, fdp);
-		return (FTOV(fnp));
-	}
-
 	fdp->fifo_lock.flk_ref = 1;
 	fnp = &fdp->fifo_fnode[0];
 	fnp->fn_realvp	= vp;
 	fnp->fn_wcnt	= 0;
 	fnp->fn_rcnt	= 0;
+
 #if FIFODEBUG
 	if (! Fifo_fastmode) {
 		fnp->fn_flag	= 0;
@@ -437,7 +428,29 @@ fifovp(vnode_t *vp, cred_t *crp)
 		fnp->fn_ctime = 0;
 	}
 
+	/*
+	 * Grab the VP here to avoid holding locks
+	 * whilst trying to acquire others.
+	 */
+
 	VN_HOLD(vp);
+
+	mutex_enter(&ftable_lock);
+
+	if ((spec_fnp = fifofind(vp)) != NULL) {
+		mutex_exit(&ftable_lock);
+
+		/*
+		 * Release the vnode and free up our pre-prepared fnode.
+		 * Zero the lock reference just to explicitly signal
+		 * this is unused.
+		 */
+		VN_RELE(vp);
+		fdp->fifo_lock.flk_ref = 0;
+		kmem_cache_free(fnode_cache, fdp);
+
+		return (FTOV(spec_fnp));
+	}
 
 	newvp = FTOV(fnp);
 	fifo_reinit_vp(newvp);
