@@ -2134,14 +2134,14 @@ spec_map(
 		 * for pages.
 		 */
 		if (off > spec_maxoffset(vp))
-			return (EINVAL);
+			return (ENXIO);
 
 		sp = VTOS(vp);
 		cvp = sp->s_commonvp;
 		ASSERT(cvp != NULL);
 
 		if (off < 0 || (off + len) < 0)
-			return (EINVAL);
+			return (ENXIO);
 
 		as_rangelock(as);
 		if ((flags & MAP_FIXED) == 0) {
