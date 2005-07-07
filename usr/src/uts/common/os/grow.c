@@ -756,13 +756,13 @@ smmap_common(caddr_t *addrp, size_t len,
 	/*
 	 * These checks were added as part of large files.
 	 *
-	 * Return EINVAL if the initial position is negative; return EOVERFLOW
+	 * Return ENXIO if the initial position is negative; return EOVERFLOW
 	 * if (offset + len) would overflow the maximum allowed offset for the
 	 * type of file descriptor being used.
 	 */
 	if (vp->v_type == VREG) {
-		if (pos < (offset_t)0)
-			return (EINVAL);
+		if (pos < 0)
+			return (ENXIO);
 		if ((offset_t)len > (OFFSET_MAX(fp) - pos))
 			return (EOVERFLOW);
 	}
