@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,5 +135,5 @@ instr_size(struct regs *rp, caddr_t *addrp, enum seg_rw rw)
 
 	return (dtrace_dis_isize(instr,
 	    rw == S_EXEC ? DIS_ISIZE_INSTR : DIS_ISIZE_OPERAND,
-	    DATAMODEL_NATIVE, NULL));
+	    curproc->p_model, NULL));
 }

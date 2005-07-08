@@ -2061,27 +2061,22 @@ ucopy(const void *ufrom, void *uto, size_t ulength)
 	SET_SIZE(copyout_noerr)
 
 	ENTRY(uzero)
-#ifdef DEBUG
-	cmpq	kernelbase(%rip), %rdi	/* addr < kernelbase */
-	jb	1f
-	leaq	.uzero_panic_msg(%rip), %rdi
-	jmp	call_panic		/* setup stack and call panic */
-1:
-#endif	
+	movq	kernelbase(%rip), %rax
+	cmpq	%rax, %rdi
+	jb	do_zero
+	movq	%rax, %rdi	/* force fault at kernelbase */
 	jmp	do_zero
 	SET_SIZE(uzero)
 
 	ENTRY(ucopy)
-#ifdef DEBUG
 	movq	kernelbase(%rip), %rax
-	cmpq 	%rax, %rdi		/* %rdi = ufrom */
-	jae	0f
-	cmpq	%rax, %rsi		/* %rsi = uto */
+	cmpq	%rax, %rdi
 	jb	1f
-0:	leaq	.ucopy_panic_msg(%rip), %rdi
-	jmp	call_panic		/* setup stack and call panic */
+	movq	%rax, %rdi
 1:
-#endif
+	cmpq	%rax, %rsi
+	jb	do_copy
+	movq	%rax, %rsi
 	jmp	do_copy
 	SET_SIZE(ucopy)
 
@@ -2118,32 +2113,22 @@ ucopy(const void *ufrom, void *uto, size_t ulength)
 	SET_SIZE(copyout_noerr)
 
 	ENTRY(uzero)
-#ifdef DEBUG
 	movl	kernelbase, %eax
 	cmpl	%eax, 4(%esp)
-	jb	1f
-	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	$.uzero_panic_msg
-	call	panic
-1:
-#endif	
+	jb	do_zero
+	movl	%eax, 4(%esp)	/* force fault at kernelbase */
 	jmp	do_zero
 	SET_SIZE(uzero)
 
 	ENTRY(ucopy)
-#ifdef DEBUG
 	movl	kernelbase, %eax
-	cmpl 	%eax, 4(%esp)
-	jae	0f
-	cmpl	%eax, 8(%esp)
+	cmpl	%eax, 4(%esp)
 	jb	1f
-0:	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	$.ucopy_panic_msg
-	call	panic
+	movl	%eax, 4(%esp)	/* force fault at kernelbase */
 1:
-#endif
+	cmpl	%eax, 8(%esp)
+	jb	do_copy
+	movl	%eax, 8(%esp)	/* force fault at kernelbase */
 	jmp	do_copy
 	SET_SIZE(ucopy)
 
@@ -2177,10 +2162,6 @@ ucopy(const void *ufrom, void *uto, size_t ulength)
 	.string "copyin_noerr: argument not in kernel address space"
 .cpyout_ne_pmsg:
 	.string "copyout_noerr: argument not in kernel address space"
-.uzero_panic_msg:
-	.string "uzero: argument is not in user space"
-.ucopy_panic_msg:
-	.string "ucopy: argument is not in user space"
 #endif
 
 #endif	/* __lint */

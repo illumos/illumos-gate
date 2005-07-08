@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1308,18 +1308,22 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 		size_t size;
 		int nldt;
 
-		nldt = Pldt(P, NULL, 0);
-		size = sizeof (struct ssd) * nldt;
-		if ((ldtp = malloc(size)) == NULL)
-			goto err;
+		/*
+		 * Only dump out non-zero sized LDT notes.
+		 */
+		if ((nldt = Pldt(P, NULL, 0)) != 0) {
+			size = sizeof (struct ssd) * nldt;
+			if ((ldtp = malloc(size)) == NULL)
+				goto err;
 
-		if (Pldt(P, ldtp, nldt) == -1 ||
-		    write_note(fd, NT_LDT, ldtp, size, &doff) != 0) {
+			if (Pldt(P, ldtp, nldt) == -1 ||
+			    write_note(fd, NT_LDT, ldtp, size, &doff) != 0) {
+				free(ldtp);
+				goto err;
+			}
+
 			free(ldtp);
-			goto err;
 		}
-
-		free(ldtp);
 	}
 #endif	/* __i386 || __amd64 */
 
