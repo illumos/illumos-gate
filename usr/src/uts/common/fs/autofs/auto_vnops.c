@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,6 +155,13 @@ auto_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cred)
 
 	AUTOFS_DPRINT((4, "auto_getattr vp %p\n", (void *)vp));
 
+	/*
+	 * Recursive auto_getattr/mount; go to the vfsp == NULL
+	 * case.
+	 */
+	if (vn_vfswlock_held(vp))
+		goto defattr;
+
 	if (error = vn_vfswlock_wait(vp))
 		return (error);
 
@@ -201,6 +208,7 @@ auto_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cred)
 		vn_vfsunlock(vp);
 	}
 
+defattr:
 	ASSERT(vp->v_type == VDIR || vp->v_type == VLNK);
 	vap->va_uid	= 0;
 	vap->va_gid	= 0;
