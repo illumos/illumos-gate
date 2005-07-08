@@ -535,8 +535,6 @@ secpolicy_fs_common(cred_t *cr, vnode_t *mvp, const vfs_t *vfsp,
 	 * When operating on an existing mount (either we're not mounting
 	 * or we're doing a remount and VFS_REMOUNT will be set), zones
 	 * can operate only on mounts established by the zone itself.
-	 * When remounting, we're interested in the covered vnode and
-	 * not the directory vnode which was passed in.
 	 */
 	if (!mounting || (vfsp->vfs_flag & VFS_REMOUNT) != 0) {
 		zoneid_t zoneid = crgetzoneid(cr);
@@ -545,16 +543,6 @@ secpolicy_fs_common(cred_t *cr, vnode_t *mvp, const vfs_t *vfsp,
 		    vfsp->vfs_zone->zone_id != zoneid) {
 			return (EPERM);
 		}
-		/*
-		 * If it's a remount, get the underlying mount point.
-		 * This check should really be (vfsp->vfs_flag & VFS_REMOUNT)
-		 * but we cannot depend on the VFS_REMOUNT flag being set
-		 * correctly if we're not in a mount system call.
-		 * But if we get here and we're mounting we're guaranteed
-		 * that VFS_REMOUNT is set by the logic above.
-		 */
-		if (mounting)
-			mvp = vfsp->vfs_vnodecovered;
 	}
 
 	if (mounting)
@@ -595,11 +583,25 @@ secpolicy_fs_common(cred_t *cr, vnode_t *mvp, const vfs_t *vfsp,
 	return (PRIV_POLICY(cr, PRIV_SYS_MOUNT, allzone, EPERM, NULL));
 }
 
+extern vnode_t *rootvp;
+extern vfs_t *rootvfs;
+
 int
 secpolicy_fs_mount(cred_t *cr, vnode_t *mvp, struct vfs *vfsp)
 {
 	boolean_t needoptchk;
 	int error;
+
+	/*
+	 * If it's a remount, get the underlying mount point,
+	 * except for the root where we use the rootvp.
+	 */
+	if ((vfsp->vfs_flag & VFS_REMOUNT) != 0) {
+		if (vfsp == rootvfs)
+			mvp = rootvp;
+		else
+			mvp = vfsp->vfs_vnodecovered;
+	}
 
 	error = secpolicy_fs_common(cr, mvp, vfsp, &needoptchk);
 
@@ -644,9 +646,6 @@ static int
 secpolicy_fs_owner(cred_t *cr, const struct vfs *vfsp)
 {
 	vnode_t *mvp;
-
-	extern vnode_t *rootvp;
-	extern vfs_t *rootvfs;
 
 	if (vfsp == NULL)
 		mvp = NULL;
