@@ -810,6 +810,7 @@ typedef struct bge {
 	 *		tc_lock[i]		(bge_recycle())
 	 */
 	kmutex_t		genlock[1];
+	krwlock_t		errlock[1];
 
 	/*
 	 * Current Ethernet address and multicast hash (bitmap) and

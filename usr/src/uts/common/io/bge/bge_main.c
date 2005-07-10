@@ -130,7 +130,6 @@ bge_reinit_send_ring(send_ring_t *srp)
 	/*
 	 * Reinitialise control variables ...
 	 */
-	ASSERT(rw_write_held(srp->tx_lock));
 	ASSERT(srp->tx_flow == 0);
 	srp->tx_next = 0;
 	srp->tx_free = srp->desc.nslots;
@@ -263,8 +262,7 @@ bge_reset(bge_t *bgep)
 		mutex_enter(bgep->recv[ring].rx_lock);
 	for (ring = 0; ring < BGE_BUFF_RINGS_MAX; ++ring)
 		mutex_enter(bgep->buff[ring].rf_lock);
-	for (ring = 0; ring < BGE_SEND_RINGS_MAX; ++ring)
-		rw_enter(bgep->send[ring].tx_lock, RW_WRITER);
+	rw_enter(bgep->errlock, RW_WRITER);
 	for (ring = 0; ring < BGE_SEND_RINGS_MAX; ++ring)
 		mutex_enter(bgep->send[ring].tc_lock);
 
@@ -290,8 +288,7 @@ bge_reset(bge_t *bgep)
 	 */
 	for (ring = BGE_SEND_RINGS_MAX; ring-- > 0; )
 		mutex_exit(bgep->send[ring].tc_lock);
-	for (ring = BGE_SEND_RINGS_MAX; ring-- > 0; )
-		rw_exit(bgep->send[ring].tx_lock);
+	rw_exit(bgep->errlock);
 	for (ring = BGE_BUFF_RINGS_MAX; ring-- > 0; )
 		mutex_exit(bgep->buff[ring].rf_lock);
 	for (ring = BGE_RECV_RINGS_MAX; ring-- > 0; )
@@ -1149,6 +1146,8 @@ bge_init_rings(bge_t *bgep)
 
 	mutex_init(bgep->genlock, NULL, MUTEX_DRIVER,
 	    (void *)(uintptr_t)bgep->intr_pri);
+	rw_init(bgep->errlock, NULL, RW_DRIVER,
+	    (void *)(uintptr_t)bgep->intr_pri);
 
 	/*
 	 * Perform one-off initialisation of each ring ...
@@ -1178,6 +1177,7 @@ bge_fini_rings(bge_t *bgep)
 	for (ring = 0; ring < BGE_SEND_RINGS_MAX; ++ring)
 		bge_fini_send_ring(bgep, ring);
 
+	rw_destroy(bgep->errlock);
 	mutex_destroy(bgep->genlock);
 }
 

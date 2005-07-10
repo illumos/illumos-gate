@@ -478,6 +478,7 @@ bge_m_tx(void *arg, mblk_t *mp)
 		return (mp);
 	}
 
+	rw_enter(bgep->errlock, RW_READER);
 	while (mp != NULL) {
 		next = mp->b_next;
 		mp->b_next = NULL;
@@ -489,6 +490,7 @@ bge_m_tx(void *arg, mblk_t *mp)
 
 		mp = next;
 	}
+	rw_exit(bgep->errlock);
 
 	return (mp);
 }
