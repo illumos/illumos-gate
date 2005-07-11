@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -703,18 +703,10 @@ ipcl_hash_remove_locked(conn_t *connp, connf_t	*connfp)
 	IPCL_HASH_REMOVE((connp));					\
 	mutex_enter(&(connfp)->connf_lock);				\
 	nconnp = (connfp)->connf_head;					\
-	if ((connp)->conn_flags & IPCL_ISV6) {				\
-		while (nconnp != NULL &&				\
-		    !IN6_IS_ADDR_UNSPECIFIED(&nconnp->conn_srcv6)) {	\
-			pconnp = nconnp;				\
-			nconnp = nconnp->conn_next;			\
-		}							\
-	} else {							\
-		while (nconnp != NULL &&                                \
-		    !IN6_IS_ADDR_V4MAPPED_ANY(&nconnp->conn_srcv6)) {    \
-			pconnp = nconnp;                                \
-			nconnp = nconnp->conn_next;                     \
-		}							\
+	while (nconnp != NULL &&					\
+	    !_IPCL_V4_MATCH_ANY(nconnp->conn_srcv6)) {			\
+		pconnp = nconnp;					\
+		nconnp = nconnp->conn_next;				\
 	}								\
 	if (pconnp != NULL) {						\
 		pconnp->conn_next = (connp);				\
