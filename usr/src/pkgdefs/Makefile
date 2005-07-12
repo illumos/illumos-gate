@@ -91,8 +91,8 @@ sparc_XMODS=
 i386_SUBDIRS= \
 	SUNWaac \
 	SUNWad810 \
-	SUNWagp	\
-	SUNWagph \
+        SUNWagp \
+        SUNWagph \
 	SUNWamr \
 	SUNWcakr.i \
 	SUNWcar.i  \
@@ -111,9 +111,10 @@ i386_SUBDIRS= \
 	SUNWvia823x
 
 i386_XMODS= \
+	SUNWadpu320 \
 	SUNWintgige \
-	SUNWnge \
-	SUNWadpu320
+	SUNWlsimega \
+	SUNWnge
 
 COMMON_SUBDIRS= \
 	SUNW1394h \
@@ -133,7 +134,7 @@ COMMON_SUBDIRS= \
 	SUNWast  \
 	SUNWav1394 \
 	SUNWbart  \
-	SUNWbge  \
+	SUNWbge \
 	SUNWbip \
 	SUNWbipr \
 	SUNWbnur  \

@@ -177,6 +177,11 @@ AAC_OBJS = aac.o
 AMR_OBJS = amr.o
 
 #
+#	LSIMEGA module
+#
+LSIMEGA_OBJS = lsimega.o
+
+#
 #	special files
 #
 MODSTUB_OBJ +=	 	\

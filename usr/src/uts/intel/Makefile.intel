@@ -529,7 +529,7 @@ SVVS		+= svvs
 #
 #	Modules eXcluded from the product:
 #
-XMODS		+= e1000g adpu320 nge
+XMODS		+= e1000g adpu320 nge lsimega
 XMODS		+= tavor daplt
 
 

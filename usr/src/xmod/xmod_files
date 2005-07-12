@@ -25,6 +25,8 @@ uts/common/io/nge
 uts/intel/nge
 uts/intel/io/adpu320
 uts/intel/adpu320
+uts/intel/io/lsimega
+uts/intel/lsimega
 uts/i86pc/spwr
 uts/i86pc/io/spwr
 cmd/openssl
