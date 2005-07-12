@@ -1,10 +1,10 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/* All Rights Reserved	*/
+/* All Rights Reserved  	*/
 
 /* Copyright (c) 1990  Mentat Inc. */
 
@@ -51,11 +51,9 @@
 #include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-#include <sys/stat.h>
 #include <sys/stream.h>
-#include <sys/sysmacros.h>
 #include <sys/tihdr.h>
-#include <sys/types.h>
+#include <sys/sysmacros.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -66,7 +64,6 @@
 #include <inet/mib2.h>
 #include <inet/ip.h>
 
-#include <limits.h>
 #include <locale.h>
 
 #include <errno.h>
@@ -76,8 +73,6 @@
 #include <string.h>
 #include <stropts.h>
 #include <fcntl.h>
-#include <setjmp.h>
-#include <stdarg.h>
 #include <assert.h>
 
 static struct keytab {
@@ -166,48 +161,15 @@ static struct keytab {
 	{"multirt",	K_MULTIRT},
 #define	K_SETSRC	42
 	{"setsrc",	K_SETSRC},
-#define	K_SHOW		43
-	{"show",	K_SHOW},
 	{0, 0}
 };
 
-/*
- * Size of buffers used to hold command lines from the saved route file as
- * well as error strings.
- */
-#define	BUF_SIZE 2048
-
-typedef union sockunion {
+static union	sockunion {
 	struct	sockaddr sa;
 	struct	sockaddr_in sin;
 	struct	sockaddr_dl sdl;
 	struct	sockaddr_in6 sin6;
-} su_t;
-
-/*
- * This structure represents the digested information from parsing arguments
- * to route add, change, delete, and get.
- *
- */
-typedef struct rtcmd_irep {
-	int ri_cmd;
-	int ri_flags;
-	int ri_af;
-	int ri_masklen;
-	ulong_t	ri_inits;
-	struct rt_metrics ri_metrics;
-	int ri_addrs;
-	su_t ri_dst;
-	char *ri_dest_str;
-	su_t ri_src;
-	su_t ri_gate;
-	struct hostent *ri_gate_hp;
-	char *ri_gate_str;
-	su_t ri_mask;
-	su_t ri_ifa;
-	su_t ri_ifp;
-	char *ri_ifp_str;
-} rtcmd_irep_t;
+} so_dst, so_gate, so_mask, so_ifa, so_ifp, so_src;
 
 typedef struct	mib_item_s {
 	struct mib_item_s	*next_item;
@@ -217,38 +179,21 @@ typedef struct	mib_item_s {
 	intmax_t		*valp;
 } mib_item_t;
 
-typedef enum {
-	ADDR_TYPE_ANY,
-	ADDR_TYPE_HOST,
-	ADDR_TYPE_NET
-} addr_type_t;
+typedef union sockunion *sup;
 
-typedef enum {
-	SEARCH_MODE_NULL,
-	SEARCH_MODE_PRINT,
-	SEARCH_MODE_DEL
-} search_mode_t;
-
-static boolean_t	args_to_rtcmd(rtcmd_irep_t *rcip, char **argv,
-    char *cmd_string);
 static void		bprintf(FILE *fp, int b, char *s);
-static boolean_t	compare_rtcmd(rtcmd_irep_t *srch_rt,
-    rtcmd_irep_t *file_rt);
 static void		delRouteEntry(mib2_ipRouteEntry_t *rp,
     mib2_ipv6RouteEntry_t *rp6, int seqno);
-static void		del_rtcmd_irep(rtcmd_irep_t *rcip);
 static void		flushroutes(int argc, char *argv[]);
-static boolean_t	getaddr(rtcmd_irep_t *rcip, int which, char *s,
-    addr_type_t atype);
+static boolean_t	getaddr(int which, char *s, struct hostent **hpp);
 static boolean_t	in6_getaddr(char *s, struct sockaddr_in6 *sin6,
     int *plenp, struct hostent **hpp);
 static boolean_t	in_getaddr(char *s, struct sockaddr_in *sin,
-    int *plenp, int which, struct hostent **hpp, addr_type_t atype,
-    rtcmd_irep_t *rcip);
+    int *plenp, int which, struct hostent **hpp);
 static int		in_getprefixlen(char *addr, int max_plen);
 static boolean_t	in_prefixlentomask(int prefixlen, int maxlen,
     uchar_t *mask);
-static void		inet_makenetandmask(rtcmd_irep_t *rcip, in_addr_t net,
+static void		inet_makenetandmask(in_addr_t net,
     struct sockaddr_in *sin);
 static in_addr_t	inet_makesubnetmask(in_addr_t addr, in_addr_t mask);
 static int		keyword(char *cp);
@@ -256,61 +201,32 @@ static void		link_addr(const char *addr, struct sockaddr_dl *sdl);
 static char		*link_ntoa(const struct sockaddr_dl *sdl);
 static mib_item_t	*mibget(int sd);
 static char		*netname(struct sockaddr *sa);
-static int		newroute(char **argv);
-static rtcmd_irep_t	*new_rtcmd_irep(void);
+static int		newroute(int argc, char **argv);
 static void		pmsg_addrs(char *cp, int addrs);
 static void		pmsg_common(struct rt_msghdr *rtm);
-static void		print_getmsg(rtcmd_irep_t *req_rt,
-    struct rt_msghdr *rtm, int msglen);
-static void		print_rtcmd_short(FILE *to, rtcmd_irep_t *rcip,
-    boolean_t gw_good, boolean_t to_saved);
+static void		print_getmsg(struct rt_msghdr *rtm, int msglen);
 static void		print_rtmsg(struct rt_msghdr *rtm, int msglen);
 static void		quit(char *s, int err);
 static char		*routename(struct sockaddr *sa);
 static void		rtmonitor(int argc, char *argv[]);
-static int		rtmsg(rtcmd_irep_t *rcip);
+static int		rtmsg(int cmd, int flags);
 static int		salen(struct sockaddr *sa);
-static void		save_route(int argc, char **argv);
-static void		save_string(char **dst, char *src);
-static int		search_rtfile(FILE *fp, FILE *temp_fp, rtcmd_irep_t *rt,
-    search_mode_t mode);
-static void		set_metric(rtcmd_irep_t *rcip, char *value, int key,
-    boolean_t lock);
-static int		show_saved_routes(int argc);
+static void		set_metric(char *value, int key);
 static void		sockaddr(char *addr, struct sockaddr *sa);
-static void		sodump(su_t *su, char *which);
-static void		syntax_arg_missing(char *keyword);
-static void		syntax_bad_keyword(char *keyword);
-static void		syntax_error(char *err, ...);
+static void		sodump(sup su, char *which);
 static void		usage(char *cp);
-static void		write_to_rtfile(FILE *fp, int argc, char **argv);
 
-static pid_t		pid;
+static int		pid, rtm_addrs;
 static int		s;
-static boolean_t	nflag;
+static boolean_t	forcehost, forcenet, nflag;
 static int		af = AF_INET;
 static boolean_t	qflag, tflag;
-static boolean_t	verbose;
-static boolean_t	debugonly;
+static boolean_t	iflag, verbose;
+static boolean_t	locking, lockrest, debugonly;
 static boolean_t	fflag;
-static boolean_t	perm_flag;
-static char		perm_file_sfx[] = "/etc/inet/static_routes";
-static char		*perm_file;
-static char		*root_dir;
-static char		temp_file_sfx[] = "/etc/inet/static_routes.tmp";
-static char		*temp_file;
-
-/*
- * WARNING:
- * This next variable indicates whether certain functions exit when an error
- * is detected in the user input.  Currently, exit_on_error is only set false
- * in search_rtfile(), when argument are being parsed.  Only those functions
- * used by search_rtfile() to parse its arguments are designed to work in
- * both modes.  Take particular care in setting this false to ensure that any
- * functions you call that might act on this flag properly return errors when
- * exit_on_error is false.
- */
-static int		exit_on_error = B_TRUE;
+static struct		rt_metrics rt_metrics;
+static ulong_t		rtm_inits;
+static int		masklen;
 
 static struct {
 	struct	rt_msghdr m_rtm;
@@ -336,46 +252,16 @@ static int ipv6RouteEntrySize;
 #define	BAD_ADDR	-1	/* prefix is invalid */
 #define	NO_PREFIX	-2	/* no prefix was found */
 
-
 void
 usage(char *cp)
 {
-	if (cp != NULL) {
+	if (cp != NULL)
 		(void) fprintf(stderr, gettext("route: botched keyword: %s\n"),
 		    cp);
-	}
-	(void) fprintf(stderr, gettext("usage: route [ -fnpqv ] "
-	    "[ -R <root-dir> ] cmd [[ -<qualifers> ] args ]\n"));
+	(void) fprintf(stderr,
+	    gettext("usage: route [ -fnqv ] cmd [[ -<qualifers> ] args ]\n"));
 	exit(1);
 	/* NOTREACHED */
-}
-
-/*PRINTFLIKE1*/
-void
-syntax_error(char *err, ...)
-{
-	va_list args;
-
-	if (exit_on_error) {
-		va_start(args, err);
-		(void) vfprintf(stderr, err, args);
-		va_end(args);
-		exit(1);
-	}
-	/* NOTREACHED */
-}
-
-void
-syntax_bad_keyword(char *keyword)
-{
-	syntax_error(gettext("route: botched keyword: %s\n"), keyword);
-}
-
-void
-syntax_arg_missing(char *keyword)
-{
-	syntax_error(gettext("route: argument required following keyword %s\n"),
-	    keyword);
 }
 
 void
@@ -393,11 +279,8 @@ int
 main(int argc, char **argv)
 {
 	extern int optind;
-	extern char *optarg;
 	int ch;
 	int key;
-	int rval;
-	size_t size;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -409,7 +292,7 @@ main(int argc, char **argv)
 	if (argc < 2)
 		usage((char *)NULL);
 
-	while ((ch = getopt(argc, argv, "R:nqdtvfp")) != EOF) {
+	while ((ch = getopt(argc, argv, "nqdtvf")) != EOF) {
 		switch (ch) {
 		case 'n':
 			nflag = B_TRUE;
@@ -429,12 +312,6 @@ main(int argc, char **argv)
 		case 'f':
 			fflag = B_TRUE;
 			break;
-		case 'p':
-			perm_flag = B_TRUE;
-			break;
-		case 'R':
-			root_dir = optarg;
-			break;
 		case '?':
 		default:
 			usage((char *)NULL);
@@ -451,29 +328,6 @@ main(int argc, char **argv)
 		s = socket(PF_ROUTE, SOCK_RAW, 0);
 	if (s < 0)
 		quit("socket", errno);
-
-	/*
-	 * Handle the -p and -R flags.  The -R flag only applies
-	 * when the -p flag is set.
-	 */
-	if (root_dir == NULL) {
-		perm_file = perm_file_sfx;
-		temp_file = temp_file_sfx;
-	} else {
-		size = strlen(root_dir) + sizeof (perm_file_sfx);
-		perm_file = malloc(size);
-		if (perm_file == NULL)
-			quit("malloc", errno);
-		(void) snprintf(perm_file, size, "%s%s", root_dir,
-		    perm_file_sfx);
-		size = strlen(root_dir) + sizeof (temp_file_sfx);
-		temp_file = malloc(size);
-		if (temp_file == NULL)
-			quit("malloc", errno);
-		(void) snprintf(temp_file, size, "%s%s", root_dir,
-		    temp_file_sfx);
-	}
-
 	if (fflag) {
 		/*
 		 * Accept an address family keyword after the -f.  Since the
@@ -492,56 +346,24 @@ main(int argc, char **argv)
 				break;
 			}
 		}
-		if (perm_flag && root_dir != NULL) {
-			/*
-			 * Act only on the file.
-			 */
-			save_route(argc, argv);
-		} else {
-			flushroutes(0, NULL);
-		}
+		flushroutes(0, NULL);
 	}
-
 	if (*argv != NULL) {
-		fflag = 0;
 		switch (keyword(*argv)) {
 		case K_GET:
 		case K_CHANGE:
 		case K_ADD:
 		case K_DELETE:
-			if (perm_flag && root_dir != NULL) {
-				/*
-				 * Act only on the file.
-				 */
-				rval = 0;
-			} else {
-				rval = newroute(argv);
-			}
-			if (perm_flag && (rval == 0 || rval == EEXIST ||
-			    rval == ESRCH)) {
-				save_route(argc, argv);
-				return (0);
-			}
-			return (rval);
-		case K_SHOW:
-			if (perm_flag) {
-				return (show_saved_routes(argc));
-			} else {
-				syntax_error(gettext(
-				    "route: show command requires -p"));
-			}
-			/* NOTREACHED */
+			return (newroute(argc, argv));
+
 		case K_MONITOR:
 			rtmonitor(argc, argv);
 			/* NOTREACHED */
 
 		case K_FLUSH:
 			flushroutes(argc, argv);
-			if (perm_flag) {
-				fflag = 1;
-				save_route(argc, argv);
-			}
-			return (0);
+			exit(0);
+			/* NOTREACHED */
 		}
 	}
 	if (!fflag)
@@ -1003,140 +825,14 @@ netname(struct sockaddr *sa)
 	return (line);
 }
 
-/*
- * Initialize a new structure.  Keep in mind that ri_dst_str, ri_gate_str and
- * ri_ifp_str will be freed by det_rtcmd_irep, so they should either be NULL
- * or point to dynamically allocated memory.
- */
-rtcmd_irep_t *
-new_rtcmd_irep(void)
-{
-	rtcmd_irep_t *rcip;
-
-	rcip = calloc(1, sizeof (rtcmd_irep_t));
-	if (rcip == NULL) {
-		quit("calloc", errno);
-	}
-	rcip->ri_af = AF_INET;
-	rcip->ri_flags = RTF_STATIC;
-	return (rcip);
-}
-
 void
-del_rtcmd_irep(rtcmd_irep_t *rcip)
-{
-	free(rcip->ri_dest_str);
-	free(rcip->ri_gate_str);
-	free(rcip->ri_ifp_str);
-	if (rcip->ri_gate_hp != NULL) {
-		freehostent(rcip->ri_gate_hp);
-	}
-	free(rcip);
-}
-
-void
-save_string(char **dst, char *src)
-{
-	free(*dst);
-	*dst = strdup(src);
-	if (*dst == NULL) {
-		quit("malloc", errno);
-	}
-}
-
-/*
- * Print the short form summary of a route command.
- * Eg. "add net default: gateway 10.0.0.1"
- * The final newline is not added, allowing the caller to append additional
- * information.
- */
-void
-print_rtcmd_short(FILE *to, rtcmd_irep_t *rcip, boolean_t gw_good,
-    boolean_t to_saved)
-{
-	char *cmd;
-	char obuf[INET6_ADDRSTRLEN];
-
-	switch (rcip->ri_cmd) {
-	case RTM_ADD:
-		cmd = "add";
-		break;
-	case RTM_CHANGE:
-		cmd = "change";
-		break;
-	case RTM_DELETE:
-		cmd = "delete";
-		break;
-	case RTM_GET:
-		cmd = "get";
-		break;
-	default:
-		assert(0);
-	}
-
-	(void) fprintf(to, "%s%s %s %s", cmd,
-	    (to_saved) ? " persistent" : "",
-	    (rcip->ri_flags & RTF_HOST) ? "host" : "net",
-	    (rcip->ri_dest_str == NULL) ? "NULL" : rcip->ri_dest_str);
-
-	if (rcip->ri_gate_str != NULL) {
-		switch (rcip->ri_af) {
-		case AF_INET:
-			if (nflag) {
-				(void) fprintf(to, ": gateway %s",
-				    inet_ntoa(rcip->ri_gate.sin.sin_addr));
-			} else if (gw_good &&
-			    rcip->ri_gate_hp != NULL &&
-			    rcip->ri_gate_hp->h_addr_list[1] != NULL) {
-				/*
-				 * Print the actual address used in the case
-				 * where there was more than one address
-				 * available for the name, and one was used
-				 * successfully.
-				 */
-				(void) fprintf(to, ": gateway %s (%s)",
-				    rcip->ri_gate_str,
-				    inet_ntoa(rcip->ri_gate.sin.sin_addr));
-			} else {
-				(void) fprintf(to, ": gateway %s",
-				    rcip->ri_gate_str);
-			}
-			break;
-		case AF_INET6:
-			if (inet_ntop(AF_INET6,
-				&rcip->ri_gate.sin6.sin6_addr, obuf,
-				INET6_ADDRSTRLEN) != NULL) {
-				if (nflag) {
-					(void) fprintf(to, ": gateway %s",
-					    obuf);
-					break;
-				}
-				if (gw_good &&
-				    rcip->ri_gate_hp->h_addr_list[1] != NULL) {
-					(void) fprintf(to, ": gateway %s (%s)",
-					    rcip->ri_gate_str, obuf);
-					break;
-				}
-			}
-			/* FALLTHROUGH */
-		default:
-			(void) fprintf(to, ": gateway %s",
-			    rcip->ri_gate_str);
-			break;
-		}
-	}
-}
-
-void
-set_metric(rtcmd_irep_t *rcip, char *value, int key, boolean_t lock)
+set_metric(char *value, int key)
 {
 	int flag = 0;
 	uint_t noval, *valp = &noval;
 
 	switch (key) {
-#define	caseof(x, y, z)	\
-	case (x): valp = &(rcip->ri_metrics.z); flag = (y); break
-
+#define	caseof(x, y, z)	case (x): valp = &rt_metrics.z; flag = (y); break
 	caseof(K_MTU, RTV_MTU, rmx_mtu);
 	caseof(K_HOPCOUNT, RTV_HOPCOUNT, rmx_hopcount);
 	caseof(K_EXPIRE, RTV_EXPIRE, rmx_expire);
@@ -1147,248 +843,165 @@ set_metric(rtcmd_irep_t *rcip, char *value, int key, boolean_t lock)
 	caseof(K_RTTVAR, RTV_RTTVAR, rmx_rttvar);
 #undef	caseof
 	}
-	rcip->ri_inits |= flag;
-	if (lock)
-		rcip->ri_metrics.rmx_locks |= flag;
+	rtm_inits |= flag;
+	if (lockrest || locking)
+		rt_metrics.rmx_locks |= flag;
+	if (locking)
+		locking = B_FALSE;
 	*valp = atoi(value);
 }
 
-/*
- * Parse the options give in argv[], filling in rcip with the results.
- * If cmd_string is non-null, argc and argv are ignored, and cmd_string is
- * tokenized to produce the command line.  Cmd_string is tokenized using
- * strtok, which will overwrite whitespace in the string with nulls.
- *
- * Returns B_TRUE on success and B_FALSE on failure.
- */
-boolean_t
-args_to_rtcmd(rtcmd_irep_t *rcip, char **argv, char *cmd_string)
+int
+newroute(int argc, char **argv)
 {
-	const char *ws = "\f\n\r\t\v ";
-	char *tok = cmd_string;
-	char *keyword_str;
-	addr_type_t atype = ADDR_TYPE_ANY;
-	boolean_t iflag = B_FALSE;
-	boolean_t locknext = B_FALSE;
-	boolean_t lockrest = B_FALSE;
-	boolean_t dash_keyword;
+	char *cmd, *dest = "", *gateway = "", *err;
+	boolean_t ishost = B_FALSE;
+	int ret, attempts, oerrno, flags = RTF_STATIC;
 	int key;
-	char *err;
+	struct hostent *hp = NULL;
+	static char obuf[INET6_ADDRSTRLEN];
 
-	if (cmd_string == NULL) {
-		tok = argv[0];
-	} else {
-		tok = strtok(cmd_string, ws);
+	cmd = argv[0];
+	if (*cmd != 'g' && !tflag) {
+		/* Don't want to read back our messages */
+		(void) shutdown(s, 0);
 	}
-
-	/*
-	 * The command keywords are already fully checked by main() or
-	 * search_rtfile().
-	 */
-	switch (*tok) {
-	case 'a':
-		rcip->ri_cmd = RTM_ADD;
-		break;
-	case 'c':
-		rcip->ri_cmd = RTM_CHANGE;
-		break;
-	case 'd':
-		rcip->ri_cmd = RTM_DELETE;
-		break;
-	case 'g':
-		rcip->ri_cmd = RTM_GET;
-		break;
-	default:
-		/* NOTREACHED */
-		quit(gettext("Internal Error"), EINVAL);
-		/* NOTREACHED */
-	}
-
-#define	NEXTTOKEN \
-	((tok = (cmd_string == NULL ? *++argv : strtok(NULL, ws))) != NULL)
-
-	while (NEXTTOKEN) {
-		keyword_str = tok;
-		if (*tok == '-') {
-			dash_keyword = B_TRUE;
-			key = keyword(tok + 1);
-		} else {
-			dash_keyword = B_FALSE;
-			key = keyword(tok);
-			if (key != K_HOST && key != K_NET) {
-				/* All others must be preceded by '-' */
-				key = 0;
-			}
-		}
-		switch (key) {
-		case K_HOST:
-			if (atype == ADDR_TYPE_NET) {
-				syntax_error(gettext("route: -host and -net "
-				    "are mutually exclusive\n"));
-				return (B_FALSE);
-			}
-			atype = ADDR_TYPE_HOST;
-			break;
-		case K_NET:
-			if (atype == ADDR_TYPE_HOST) {
-				syntax_error(gettext("route: -host and -net "
-				    "are mutually exclusive\n"));
-				return (B_FALSE);
-			}
-			atype = ADDR_TYPE_NET;
-			break;
-		case K_LINK:
-			rcip->ri_af = AF_LINK;
-			break;
-		case K_INET:
-			rcip->ri_af = AF_INET;
-			break;
-		case K_SA:
-			rcip->ri_af = PF_ROUTE;
-			break;
-		case K_INET6:
-			rcip->ri_af = AF_INET6;
-			break;
-		case K_IFACE:
-		case K_INTERFACE:
-			iflag = B_TRUE;
-			break;
-		case K_NOSTATIC:
-			rcip->ri_flags &= ~RTF_STATIC;
-			break;
-		case K_LOCK:
-			locknext = B_TRUE;
-			break;
-		case K_LOCKREST:
-			lockrest = B_TRUE;
-			break;
-		case K_REJECT:
-			rcip->ri_flags |= RTF_REJECT;
-			break;
-		case K_BLACKHOLE:
-			rcip->ri_flags |= RTF_BLACKHOLE;
-			break;
-		case K_PROTO1:
-			rcip->ri_flags |= RTF_PROTO1;
-			break;
-		case K_PROTO2:
-			rcip->ri_flags |= RTF_PROTO2;
-			break;
-		case K_CLONING:
-			rcip->ri_flags |= RTF_CLONING;
-			break;
-		case K_XRESOLVE:
-			rcip->ri_flags |= RTF_XRESOLVE;
-			break;
-		case K_STATIC:
-			rcip->ri_flags |= RTF_STATIC;
-			break;
-		case K_IFA:
-			if (!NEXTTOKEN) {
-				syntax_arg_missing(keyword_str);
-				return (B_FALSE);
-			}
-			if (!getaddr(rcip, RTA_IFA, tok, atype)) {
-				return (B_FALSE);
-			}
-			break;
-		case K_IFP:
-			if (!NEXTTOKEN) {
-				syntax_arg_missing(keyword_str);
-				return (B_FALSE);
-			}
-			if (!getaddr(rcip, RTA_IFP, tok, atype)) {
-				return (B_FALSE);
-			}
-			break;
-		case K_GATEWAY:
-			if (!NEXTTOKEN) {
-				syntax_arg_missing(keyword_str);
-				return (B_FALSE);
-			}
-			if (!getaddr(rcip, RTA_GATEWAY, tok, atype)) {
-				return (B_FALSE);
-			}
-			break;
-		case K_DST:
-			if (!NEXTTOKEN) {
-				syntax_arg_missing(keyword_str);
-				return (B_FALSE);
-			}
-			if (!getaddr(rcip, RTA_DST, tok, atype)) {
-				return (B_FALSE);
-			}
-			break;
-		case K_NETMASK:
-			if (!NEXTTOKEN) {
-				syntax_arg_missing(keyword_str);
-				return (B_FALSE);
-			}
-			if (!getaddr(rcip, RTA_NETMASK, tok, atype)) {
-				return (B_FALSE);
-			}
-			atype = ADDR_TYPE_NET;
-			break;
-		case K_MTU:
-		case K_HOPCOUNT:
-		case K_EXPIRE:
-		case K_RECVPIPE:
-		case K_SENDPIPE:
-		case K_SSTHRESH:
-		case K_RTT:
-		case K_RTTVAR:
-			if (!NEXTTOKEN) {
-				syntax_arg_missing(keyword_str);
-				return (B_FALSE);
-			}
-			set_metric(rcip, tok, key, locknext || lockrest);
-			locknext = B_FALSE;
-			break;
-		case K_PRIVATE:
-			rcip->ri_flags |= RTF_PRIVATE;
-			break;
-		case K_MULTIRT:
-			rcip->ri_flags |= RTF_MULTIRT;
-			break;
-		case K_SETSRC:
-			if (!NEXTTOKEN) {
-				syntax_arg_missing(keyword_str);
-				return (B_FALSE);
-			}
-			if (!getaddr(rcip, RTA_SRC, tok, atype)) {
-				return (B_FALSE);
-			}
-			rcip->ri_flags |= RTF_SETSRC;
-			break;
-		default:
-			if (dash_keyword) {
-				syntax_bad_keyword(tok + 1);
-				return (B_FALSE);
-			}
-			if ((rcip->ri_addrs & RTA_DST) == 0) {
-				if (!getaddr(rcip, RTA_DST, tok, atype)) {
-					return (B_FALSE);
-				}
-			} else if ((rcip->ri_addrs & RTA_GATEWAY) == 0) {
+	while (--argc > 0) {
+		key = keyword(*(++argv));
+		if (key == K_HOST) {
+			forcehost = B_TRUE;
+		} else if (key == K_NET) {
+			forcenet = B_TRUE;
+		} else if (**(argv) == '-') {
+			switch (key = keyword(1 + *argv)) {
+			case K_LINK:
+				af = AF_LINK;
+				break;
+			case K_INET:
+				af = AF_INET;
+				break;
+			case K_SA:
+				af = PF_ROUTE;
+				break;
+			case K_INET6:
+				af = AF_INET6;
+				break;
+			case K_IFACE:
+			case K_INTERFACE:
+				iflag = B_TRUE;
+				/* FALLTHROUGH */
+			case K_NOSTATIC:
+				flags &= ~RTF_STATIC;
+				break;
+			case K_LOCK:
+				locking = B_TRUE;
+				break;
+			case K_LOCKREST:
+				lockrest = B_TRUE;
+				break;
+			case K_HOST:
+				forcehost = B_TRUE;
+				break;
+			case K_REJECT:
+				flags |= RTF_REJECT;
+				break;
+			case K_BLACKHOLE:
+				flags |= RTF_BLACKHOLE;
+				break;
+			case K_PROTO1:
+				flags |= RTF_PROTO1;
+				break;
+			case K_PROTO2:
+				flags |= RTF_PROTO2;
+				break;
+			case K_CLONING:
+				flags |= RTF_CLONING;
+				break;
+			case K_XRESOLVE:
+				flags |= RTF_XRESOLVE;
+				break;
+			case K_STATIC:
+				flags |= RTF_STATIC;
+				break;
+			case K_IFA:
+				argc--;
+				(void) getaddr(RTA_IFA, *++argv, NULL);
+				break;
+			case K_IFP:
+				argc--;
+				(void) getaddr(RTA_IFP, *++argv, NULL);
+				break;
+			case K_GATEWAY:
 				/*
 				 * For the gateway parameter, retrieve the
 				 * pointer to the struct hostent so that all
 				 * possible addresses can be tried until one
 				 * is successful.
 				 */
-				if (!getaddr(rcip, RTA_GATEWAY, tok, atype)) {
-					return (B_FALSE);
-				}
+				argc--;
+				gateway = *++argv;
+				(void) getaddr(RTA_GATEWAY, *argv, &hp);
+				break;
+			case K_DST:
+				argc--;
+				ishost = getaddr(RTA_DST, *++argv, NULL);
+				dest = *argv;
+				break;
+			case K_NETMASK:
+				argc--;
+				(void) getaddr(RTA_NETMASK, *++argv, NULL);
+				/* FALLTHROUGH */
+			case K_NET:
+				forcenet = B_TRUE;
+				break;
+			case K_MTU:
+			case K_HOPCOUNT:
+			case K_EXPIRE:
+			case K_RECVPIPE:
+			case K_SENDPIPE:
+			case K_SSTHRESH:
+			case K_RTT:
+			case K_RTTVAR:
+				argc--;
+				set_metric(*++argv, key);
+				break;
+			case K_PRIVATE:
+				flags |= RTF_PRIVATE;
+				break;
+			case K_MULTIRT:
+				flags |= RTF_MULTIRT;
+				break;
+			case K_SETSRC:
+				argc--;
+				(void) getaddr(RTA_SRC, *++argv, NULL);
+				flags |= RTF_SETSRC;
+				break;
+			default:
+				usage(*argv + 1);
+				/* NOTREACHED */
+			}
+		} else {
+			if ((rtm_addrs & RTA_DST) == 0) {
+				dest = *argv;
+				ishost = getaddr(RTA_DST, *argv, NULL);
+			} else if ((rtm_addrs & RTA_GATEWAY) == 0) {
+				/*
+				 * For the gateway parameter, retrieve the
+				 * pointer to the struct hostent so that all
+				 * possible addresses can be tried until one
+				 * is successful.
+				 */
+				gateway = *argv;
+				(void) getaddr(RTA_GATEWAY, *argv, &hp);
 			} else {
-				ulong_t metric;
+				ulong_t metric = strtoul(*argv, &err, 10);
+
 				/*
 				 * Assume that a regular number is a metric.
 				 * Needed for compatibility with old route
 				 * command syntax.
 				 */
-				errno = 0;
-				metric = strtoul(tok, &err, 10);
-				if (errno == 0 && *err == '\0' &&
+				if (*argv != err && *err == '\0' &&
 				    metric < 0x80000000ul) {
 					iflag = (metric == 0);
 					if (verbose) {
@@ -1399,359 +1012,60 @@ args_to_rtcmd(rtcmd_irep_t *rcip, char **argv, char *cmd_string)
 					}
 					continue;
 				}
-				if (!getaddr(rcip, RTA_NETMASK, tok, atype)) {
-					return (B_FALSE);
-				}
+				(void) getaddr(RTA_NETMASK, *argv, NULL);
 			}
 		}
 	}
-#undef NEXTTOKEN
-
-	if ((rcip->ri_addrs & RTA_DST) == 0) {
-		syntax_error(gettext("route: destination required\n"));
-		return (B_FALSE);
-	} else if ((rcip->ri_cmd == RTM_ADD || rcip->ri_cmd == RTM_DELETE) &&
-	    (rcip->ri_addrs & RTA_GATEWAY) == 0) {
-		syntax_error(gettext(
-		    "route: gateway required for add or delete command\n"));
-		return (B_FALSE);
-	}
-
-	if (!iflag) {
-		rcip->ri_flags |= RTF_GATEWAY;
-	}
-
-	if (atype != ADDR_TYPE_NET && (rcip->ri_addrs & RTA_NETMASK)) {
-		if ((rcip->ri_af == AF_INET &&
-			rcip->ri_mask.sin.sin_addr.s_addr == IP_HOST_MASK) ||
-		    (rcip->ri_af == AF_INET6 &&
-			rcip->ri_masklen == IPV6_ABITS)) {
-			atype = ADDR_TYPE_HOST;
-		} else {
-			atype = ADDR_TYPE_NET;
-		}
-	}
-	if (atype == ADDR_TYPE_HOST) {
-		rcip->ri_flags |= RTF_HOST;
-	}
-	return (B_TRUE);
-}
-
-/*
- * This command always seeks to the end of the file prior to writing.
- */
-void
-write_to_rtfile(FILE *fp, int argc, char **argv)
-{
-	char file_line[BUF_SIZE];
-	int len;
-	int i;
-
-	len = 0;
-	for (i = 0; argc > 0 && len < BUF_SIZE; i++, argc--) {
-		len += snprintf(&file_line[len], BUF_SIZE - len, "%s ",
-		    argv[i]);
-	}
-	if (len >= BUF_SIZE)
-		quit(gettext("Internal Error"), EINVAL);
-	file_line[len - 1] = '\n';
-	if (fseek(fp, 0, SEEK_END) != 0 ||
-	    fputs(file_line, fp) == EOF) {
-		quit(gettext("failed to write to route file"),
-		    errno);
-	}
-}
-
-boolean_t
-compare_rtcmd(rtcmd_irep_t *srch_rt, rtcmd_irep_t *file_rt)
-{
-	if (strcmp(srch_rt->ri_dest_str, file_rt->ri_dest_str) != 0 ||
-	    memcmp(&srch_rt->ri_mask, &file_rt->ri_mask, sizeof (su_t)) != 0) {
-		return (B_FALSE);
-	}
-	return (srch_rt->ri_gate_str == NULL ||
-	    strcmp(srch_rt->ri_gate_str, file_rt->ri_gate_str) == 0);
-}
-
-/*
- * Search the route file for routes matching the supplied route.  There are 3
- * modes of operation:
- *    SEARCH_MODE_RET - no side effects.
- *    SEARCH_MODE_PRINT - prints each matching line.
- *    SEARCH_MODE_DEL - copies all valid, non-matching lines to tmp_fp.
- *
- * In all cases, the number of matches is returned.  If rt is NULL, all routes
- * matching the global af value are considered matching.
- */
-int
-search_rtfile(FILE *fp, FILE *temp_fp, rtcmd_irep_t *rt, search_mode_t mode)
-{
-	char *tmp_buf;
-	int match_cnt;
-	boolean_t match;
-	char file_line[BUF_SIZE + 4] = "add ";
-	rtcmd_irep_t *thisrt;
-
-	match_cnt = 0;
-
-	/*
-	 * Leave space at the beginning of file_line for "add ".
-	 */
-	while (fgets(file_line + 4, BUF_SIZE, fp) != NULL) {
-
-		if (file_line[4] == '#' || file_line[4] == '\n') {
-			/* Handle comments and blank lines */
-			if (mode == SEARCH_MODE_DEL &&
-			    fputs(file_line + 4, temp_fp) == EOF) {
-				quit(gettext(
-				    "route: failed to write to temp file"),
-				    errno);
-			}
-			continue;
-		}
-		thisrt = new_rtcmd_irep();
-
-		exit_on_error = B_FALSE;
-		tmp_buf = strdup(file_line);
-		/* args_to_rtcmd() will mangle the string passed. */
-		if (!args_to_rtcmd(thisrt, NULL, tmp_buf)) {
-			/* There was an error in args_to_rtcmd() or helpers */
-			del_rtcmd_irep(thisrt);
-			free(tmp_buf);
-			continue;
-		}
-		exit_on_error = B_TRUE;
-		free(tmp_buf);
-
-		if (thisrt->ri_gate_str == NULL) {
-			del_rtcmd_irep(thisrt);
-			continue;
-		}
-		match = (rt == NULL) ? (thisrt->ri_af == af) :
-		    compare_rtcmd(rt, thisrt);
-
-		if (match) match_cnt++;
-		if (match && mode == SEARCH_MODE_PRINT) {
-			(void) printf("persistent: route %s", file_line);
-		}
-		if (match && mode == SEARCH_MODE_DEL) {
-			thisrt->ri_cmd = RTM_DELETE;
-			print_rtcmd_short(stdout, thisrt, B_FALSE, B_TRUE);
-			(void) printf("\n");
-		}
-		del_rtcmd_irep(thisrt);
-
-		if (!match && mode == SEARCH_MODE_DEL &&
-		    fputs(file_line + 4, temp_fp) == EOF) {
-			quit(gettext("failed to write to temp file"),
-			    errno);
-		}
-	}
-	return (match_cnt);
-}
-
-/*
- * Perform the route operation given in argv on the persistent route file.
- * If fflag is set, argc and argv are ignored, and the persisten route file
- * is flushed of all routes matching the global family.
- */
-void
-save_route(int argc, char **argv)
-{
-	rtcmd_irep_t *rt;
-	int perm_fd;
-	FILE *perm_fp;
-	FILE *temp_fp;
-	mode_t fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-	struct flock lock;
-	struct stat st;
-	const char commentstr[] =
-	    "# File generated by route(1M) - do not edit.\n";
-
-	perm_fd = open(perm_file, O_RDWR | O_CREAT, fmode);
-	if (perm_fd == -1 || fstat(perm_fd, &st) == -1)
-		quit("failed to open route file", errno);
-
-	lock.l_type = F_WRLCK;
-	lock.l_whence = SEEK_SET;
-	lock.l_start = 0;
-	lock.l_len = 0;
-	if (fcntl(perm_fd, F_SETLK, &lock) != 0) {
-		quit(gettext("failed to lock route file"), errno);
-		/* NOTREACHED */
-	}
-	if (st.st_size == 0 &&
-	    write(perm_fd, commentstr, sizeof (commentstr) - 1) !=
-	    sizeof (commentstr) - 1)
-		quit(gettext("failed to open route file"), errno);
-
-	if ((perm_fp = fdopen(perm_fd, "r+")) == NULL) {
-		quit(gettext("failed to open route file"), errno);
-		/* NOTREACHED */
-	}
-
-	if (!fflag) {
-		rt = new_rtcmd_irep();
-		(void) args_to_rtcmd(rt, argv, NULL);
-	}
-	if (fflag || rt->ri_cmd == RTM_DELETE) {
-		if ((temp_fp = fopen(temp_file, "w")) == NULL) {
-			quit(gettext("failed to open temp file"), errno);
-			/* NOTREACHED */
-		}
-	}
-	if (fflag) {
-		(void) search_rtfile(perm_fp, temp_fp, NULL, SEARCH_MODE_DEL);
-		if (fclose(temp_fp) != 0 || rename(temp_file, perm_file) != 0) {
-			quit(gettext("failed to update route file"), errno);
-			/* NOTREACHED */
-		}
-		(void) fclose(perm_fp);
-		return;
-	}
-
-	switch (rt->ri_cmd) {
-	case RTM_ADD:
-		if (search_rtfile(perm_fp, NULL, rt, SEARCH_MODE_NULL) > 0) {
-			/* Route is already in the file */
-			print_rtcmd_short(stderr, rt, B_FALSE, B_TRUE);
-			(void) fprintf(stderr, ": entry exists\n");
-			exit(1);
-		}
-		write_to_rtfile(perm_fp, argc - 1, argv + 1);
-		print_rtcmd_short(stdout, rt, B_FALSE, B_TRUE);
-		(void) printf("\n");
-		break;
-
-	case RTM_CHANGE:
-		syntax_error(
-		    gettext("route: change command not supported with -p\n"));
-		/* NOTREACHED */
-
-	case RTM_DELETE:
-		if (search_rtfile(perm_fp, temp_fp, rt, SEARCH_MODE_DEL) <= 0) {
-			/* Route not found */
-			print_rtcmd_short(stderr, rt, B_FALSE, B_TRUE);
-			(void) fprintf(stderr, gettext(": not in file\n"));
-			exit(1);
-		}
-		if (fclose(temp_fp) != 0 || rename(temp_file, perm_file) != 0) {
-			quit(gettext("failed to update route file"), errno);
-			/* NOTREACHED */
-		}
-		break;
-
-	case RTM_GET:
-		if (search_rtfile(perm_fp, temp_fp, rt, SEARCH_MODE_PRINT) <=
-		    0) {
-			print_rtcmd_short(stdout, rt, B_FALSE, B_TRUE);
-			(void) printf(gettext(": not in file\n"));
-		}
-		break;
-
-	default:
-		quit(gettext("Internal Error"), EINVAL);
-		/* NOTREACHED */
+	if ((rtm_addrs & RTA_DST) == 0) {
+		(void) fprintf(stderr,
+		    gettext("route: destination required following command\n"));
+		usage((char *)NULL);
+	} else if ((*cmd == 'a' || *cmd == 'd') &&
+	    (rtm_addrs & RTA_GATEWAY) == 0) {
+		(void) fprintf(stderr,
+		    gettext("route: gateway required for add or delete "
+		    "command\n"));
+		usage((char *)NULL);
 	}
 
 	/*
-	 * Closing the file unlocks it.
+	 * If the netmask has been specified use it to determine RTF_HOST.
+	 * Otherwise rely on the "-net" and "-host" specifiers.
+	 * Final fallback is whether ot not any bits were set in the address
+	 * past the classful network component.
 	 */
-	(void) fclose(perm_fp);
-}
-
-int
-show_saved_routes(int argc)
-{
-	int perm_fd;
-	FILE *perm_fp;
-	struct flock lock;
-	int count = 0;
-
-	if (argc != 1) {
-		syntax_error(gettext("route: invalid arguments for show\n"));
+	if (rtm_addrs & RTA_NETMASK) {
+		if ((af == AF_INET &&
+			so_mask.sin.sin_addr.s_addr == IP_HOST_MASK) ||
+		    (af == AF_INET6 && masklen == IPV6_ABITS))
+			forcehost = B_TRUE;
+		else
+			forcenet = B_TRUE;
 	}
-
-	perm_fd = open(perm_file, O_RDONLY, 0);
-
-	if (perm_fd == -1) {
-		if (errno == ENOENT) {
-			(void) printf("No persistent routes are defined\n");
-			return (0);
-		} else {
-			quit(gettext("failed to open route file"), errno);
-		}
-	}
-	lock.l_type = F_RDLCK;
-	lock.l_whence = SEEK_SET;
-	lock.l_start = 0;
-	lock.l_len = 0;
-	if (fcntl(perm_fd, F_SETLK, &lock) != 0) {
-		quit(gettext("failed to lock route file"),
-		    errno);
-		/* NOTREACHED */
-	}
-	if ((perm_fp = fdopen(perm_fd, "r")) == NULL) {
-		quit(gettext("failed to open route file"), errno);
-		/* NOTREACHED */
-	}
-	count += search_rtfile(perm_fp, NULL, NULL, SEARCH_MODE_PRINT);
-	(void) fseek(perm_fp, 0, SEEK_SET);
-	af = AF_INET6;
-	count += search_rtfile(perm_fp, NULL, NULL, SEARCH_MODE_PRINT);
-
-	if (count == 0)
-		(void) printf("No persistent routes are defined\n");
-
-	(void) fclose(perm_fp);
-	return (0);
-}
-
-int
-newroute(char **argv)
-{
-	rtcmd_irep_t *newrt;
-	int ret, attempts, oerrno;
-	char *err;
-	char obuf[INET6_ADDRSTRLEN];
-#define	hp (newrt->ri_gate_hp)
-
-	newrt = new_rtcmd_irep();
-	(void) args_to_rtcmd(newrt, argv, NULL);
-
-	if (newrt->ri_cmd != RTM_GET && !tflag) {
-		/* Don't want to read back our messages */
-		(void) shutdown(s, 0);
-	}
-	if (newrt->ri_addrs & RTA_IFP) {
-		newrt->ri_ifp.sdl.sdl_index = if_nametoindex(newrt->ri_ifp_str);
-		if (newrt->ri_ifp.sdl.sdl_index == 0) {
-			if (errno != ENXIO) {
-				quit("if_nametoindex", errno);
-			} else {
-				(void) fprintf(stderr,
-				    gettext("route: %s: no such interface\n"),
-				    newrt->ri_ifp_str);
-				exit(1);
-			}
-		}
-		newrt->ri_ifp.sdl.sdl_family = AF_LINK;
-	}
+	if (forcehost)
+		ishost = B_TRUE;
+	if (forcenet)
+		ishost = B_FALSE;
+	flags |= RTF_UP;
+	if (ishost)
+		flags |= RTF_HOST;
+	if (!iflag)
+		flags |= RTF_GATEWAY;
 	for (attempts = 1; ; attempts++) {
 		errno = 0;
-		if ((ret = rtmsg(newrt)) == 0)
+		if ((ret = rtmsg(*cmd, flags)) == 0)
 			break;
 		if (errno != ENETUNREACH && errno != ESRCH)
 			break;
-		if ((newrt->ri_addrs & RTA_GATEWAY) && hp != NULL &&
+		if (*gateway != '\0' && hp != NULL &&
 		    hp->h_addr_list[attempts] != NULL) {
 			switch (af) {
 			case AF_INET:
-				(void) memmove(&newrt->ri_gate.sin.sin_addr,
+				(void) memmove(&so_gate.sin.sin_addr,
 				    hp->h_addr_list[attempts], hp->h_length);
 				continue;
 			case AF_INET6:
-				(void) memmove(&newrt->ri_gate.sin6.sin6_addr,
+				(void) memmove(&so_gate.sin6.sin6_addr,
 				    hp->h_addr_list[attempts], hp->h_length);
 				continue;
 			}
@@ -1759,40 +1073,69 @@ newroute(char **argv)
 		break;
 	}
 	oerrno = errno;
-
-	if (newrt->ri_cmd != RTM_GET) {
-		print_rtcmd_short(stdout, newrt, (ret == 0), B_FALSE);
-		if (ret == 0)
-			(void) printf("\n");
-	} else if (ret != 0) {
-		/*
-		 * Note: there is nothing additional to print for get
-		 * if ret == 0.
-		 */
-		if (nflag) {
-			switch (newrt->ri_af) {
+	if (*cmd != 'g') {
+		(void) printf("%s %s %s", cmd, ishost ? "host" : "net", dest);
+		if (*gateway != '\0') {
+			switch (af) {
 			case AF_INET:
-				(void) printf(" %s",
-				    inet_ntoa(newrt->ri_dst.sin.sin_addr));
+				if (nflag) {
+					(void) printf(": gateway %s",
+					    inet_ntoa(so_gate.sin.sin_addr));
+				} else if (attempts > 1 && ret == 0) {
+					(void) printf(": gateway %s (%s)",
+					    gateway,
+					    inet_ntoa(so_gate.sin.sin_addr));
+				} else {
+					(void) printf(": gateway %s", gateway);
+				}
 				break;
 			case AF_INET6:
 				if (inet_ntop(AF_INET6,
-					(void *)&newrt->ri_dst.sin6.sin6_addr,
-					obuf, INET6_ADDRSTRLEN) != NULL) {
-					(void) printf(" %s", obuf);
+				    (void *)&so_gate.sin6.sin6_addr, obuf,
+				    INET6_ADDRSTRLEN) != NULL) {
+					if (nflag) {
+						(void) printf(": gateway %s",
+						    obuf);
+					} else if (attempts > 1 && ret == 0) {
+						(void) printf(": gateway %s "
+						    "(%s)",
+						    gateway, obuf);
+					}
 					break;
 				}
 				/* FALLTHROUGH */
 			default:
-				(void) printf("%s", newrt->ri_dest_str);
+				(void) printf(": gateway %s", gateway);
 				break;
 			}
-		} else {
-			(void) printf("%s", newrt->ri_dest_str);
 		}
+		if (ret == 0)
+			(void) printf("\n");
 	}
-
 	if (ret != 0) {
+		if (*cmd == 'g') {
+			if (nflag) {
+				switch (af) {
+				case AF_INET:
+					(void) printf(" %s",
+					    inet_ntoa(so_dst.sin.sin_addr));
+					break;
+				case AF_INET6:
+					if (inet_ntop(AF_INET6,
+					    (void *)&so_dst.sin6.sin6_addr,
+					    obuf, INET6_ADDRSTRLEN) != NULL) {
+						(void) printf(" %s", obuf);
+						break;
+					}
+					/* FALLTHROUGH */
+				default:
+					(void) printf("%s", dest);
+					break;
+				}
+			} else {
+				(void) printf("%s", dest);
+			}
+		}
 		switch (oerrno) {
 		case ESRCH:
 			err = "not in table";
@@ -1815,11 +1158,14 @@ newroute(char **argv)
 		}
 		(void) printf(": %s\n", err);
 	}
-
-	del_rtcmd_irep(newrt);
+	/*
+	 * In the case of AF_INET6, one of the getipnodebyX() functions was used
+	 * so free the allocated hostent.
+	 */
+	if (af == AF_INET6 && hp != NULL)
+		freehostent(hp);
 
 	return (oerrno);
-#undef hp
 }
 
 
@@ -1829,9 +1175,10 @@ newroute(char **argv)
  * on the class of address.
  */
 static void
-inet_makenetandmask(rtcmd_irep_t *rcip, in_addr_t net, struct sockaddr_in *sin)
+inet_makenetandmask(in_addr_t net, struct sockaddr_in *sin)
 {
 	in_addr_t addr, mask;
+	char *cp;
 
 	if (net == 0) {
 		mask = addr = 0;
@@ -1866,11 +1213,14 @@ inet_makenetandmask(rtcmd_irep_t *rcip, in_addr_t net, struct sockaddr_in *sin)
 	}
 	sin->sin_addr.s_addr = htonl(addr);
 
-	if (!(rcip->ri_addrs & RTA_NETMASK)) {
-		rcip->ri_addrs |= RTA_NETMASK;
-		sin = &rcip->ri_mask.sin;
+	if (!(rtm_addrs & RTA_NETMASK)) {
+		rtm_addrs |= RTA_NETMASK;
+		sin = &so_mask.sin;
 		sin->sin_addr.s_addr = htonl(mask);
 		sin->sin_family = AF_INET;
+		cp = (char *)(&sin->sin_addr + 1);
+		while (*--cp == 0 && cp > (char *)sin)
+			;
 	}
 }
 
@@ -1946,61 +1296,67 @@ inet_makesubnetmask(in_addr_t addr, in_addr_t mask)
 }
 
 /*
- * Interpret an argument as a network address of some kind.
+ * Interpret an argument as a network address of some kind,
+ * returning B_TRUE if a host address, B_FALSE if a network address.
  *
  * If the address family is one looked up in getaddr() using one of the
  * getipnodebyX() functions (currently only AF_INET6), then callers should
  * freehostent() the returned "struct hostent" pointer if one was passed in.
- *
- * If exit_on_error is true, this function will cause route to exit on error by
- * calling syntax_error().  Otherwise, it returns B_TRUE on success or B_FALSE
- * on failure.
  */
 static boolean_t
-getaddr(rtcmd_irep_t *rcip, int which, char *s, addr_type_t atype)
+getaddr(int which, char *s, struct hostent **hpp)
 {
-	su_t *su;
-	struct hostent **hpp;
+	sup su;
 	struct hostent *hp;
 	boolean_t ret;
 
-	if (which == RTA_GATEWAY) {
-		hpp = &(rcip->ri_gate_hp);
-	} else {
-		hpp = &hp;
+	if (s == NULL) {
+		(void) fprintf(stderr,
+		    gettext("route: argument required following keyword\n"));
+		usage((char *)NULL);
 	}
+	if (hpp == NULL)
+		hpp = &hp;
 	*hpp = NULL;
-
-	rcip->ri_addrs |= which;
+	rtm_addrs |= which;
 	switch (which) {
 	case RTA_DST:
-		save_string(&rcip->ri_dest_str, s);
-		su = &rcip->ri_dst;
-		su->sa.sa_family = rcip->ri_af;
+		su = &so_dst;
+		su->sa.sa_family = af;
 		break;
 	case RTA_GATEWAY:
-		save_string(&rcip->ri_gate_str, s);
-		su = &rcip->ri_gate;
-		su->sa.sa_family = rcip->ri_af;
+		su = &so_gate;
+		su->sa.sa_family = af;
 		break;
 	case RTA_NETMASK:
-		su = &rcip->ri_mask;
-		su->sa.sa_family = rcip->ri_af;
+		su = &so_mask;
+		su->sa.sa_family = af;
 		break;
 	case RTA_IFP:
-		save_string(&rcip->ri_ifp_str, s);
-		return (B_TRUE);
+		so_ifp.sdl.sdl_index = if_nametoindex(s);
+		if (so_ifp.sdl.sdl_index == 0) {
+			if (errno == ENXIO) {
+				(void) fprintf(stderr,
+				    gettext("route: %s: no such interface\n"),
+					s);
+				exit(1);
+			} else {
+				quit("if_nametoindex", errno);
+			}
+		}
+		so_ifp.sdl.sdl_family = AF_LINK;
+		return (B_FALSE);
 		/*
 		 * RTA_SRC has overloaded meaning. It can represent the
 		 * src address of incoming or outgoing packets.
 		 */
 	case RTA_IFA:
-		su = &rcip->ri_ifa;
-		su->sa.sa_family = rcip->ri_af;
+		su = &so_ifa;
+		su->sa.sa_family = af;
 		break;
 	case RTA_SRC:
-		su = &rcip->ri_src;
-		su->sa.sa_family = rcip->ri_af;
+		su = &so_src;
+		su->sa.sa_family = af;
 		break;
 	default:
 		/* NOTREACHED */
@@ -2009,14 +1365,15 @@ getaddr(rtcmd_irep_t *rcip, int which, char *s, addr_type_t atype)
 	}
 	if (strcmp(s, "default") == 0) {
 		if (which == RTA_DST) {
-			return (getaddr(rcip, RTA_NETMASK, s, ADDR_TYPE_NET));
+			forcenet = B_TRUE;
+			(void) getaddr(RTA_NETMASK, s, NULL);
 		}
 		if (which == RTA_SRC) {
 			return (B_TRUE);
 		}
-		return (B_TRUE);
+		return (B_FALSE);
 	}
-	switch (rcip->ri_af) {
+	switch (af) {
 	case AF_LINK:
 		link_addr(s, &su->sdl);
 		return (B_TRUE);
@@ -2027,47 +1384,47 @@ getaddr(rtcmd_irep_t *rcip, int which, char *s, addr_type_t atype)
 		switch (which) {
 		case RTA_DST:
 			if (s[0] == '/') {
-				syntax_error(gettext(
-				    "route: %s: unexpected '/'\n"), s);
-				return (B_FALSE);
+				(void) fprintf(stderr,
+				    gettext("route: %s: unexpected '/'\n"), s);
+				exit(1);
 			}
-			ret = in6_getaddr(s, &su->sin6, &rcip->ri_masklen, hpp);
-			if (ret == B_FALSE) {
-				return (B_FALSE);
-			}
-			switch (rcip->ri_masklen) {
+			ret = in6_getaddr(s, &su->sin6, &masklen, hpp);
+			switch (masklen) {
 			case NO_PREFIX:
 				/* Nothing there - ok */
-				return (B_TRUE);
+				return (ret);
 			case BAD_ADDR:
-				syntax_error(gettext(
-				    "route: bad prefix length in %s\n"), s);
-				return (B_FALSE);
+				(void) fprintf(stderr,
+				    gettext("route: bad prefix length in %s\n"),
+					s);
+				exit(1);
+				/* NOTREACHED */
 			default:
-				(void) memset(&rcip->ri_mask.sin6.sin6_addr, 0,
-				    sizeof (rcip->ri_mask.sin6.sin6_addr));
-				if (!in_prefixlentomask(rcip->ri_masklen,
-				    IPV6_ABITS,
-				    (uchar_t *)&rcip->ri_mask.sin6.sin6_addr)) {
-					syntax_error(gettext(
-					    "route: bad prefix length: %d\n"),
-					    rcip->ri_masklen);
-					return (B_FALSE);
+				(void) memset(&so_mask.sin6.sin6_addr, 0,
+				    sizeof (so_mask.sin6.sin6_addr));
+				if (!in_prefixlentomask(masklen, IPV6_ABITS,
+				    (uchar_t *)&so_mask.sin6.sin6_addr)) {
+					(void) fprintf(stderr,
+					    gettext("route: bad prefix length: "
+					    "%d\n"), masklen);
+					exit(1);
 				}
 				break;
 			}
-			rcip->ri_mask.sin6.sin6_family = rcip->ri_af;
-			rcip->ri_addrs |= RTA_NETMASK;
-			return (B_TRUE);
+			so_mask.sin6.sin6_family = af;
+			rtm_addrs |= RTA_NETMASK;
+			return (ret);
 		case RTA_GATEWAY:
 		case RTA_IFA:
 		case RTA_SRC:
-			return (in6_getaddr(s, &su->sin6, NULL, hpp));
+			ret = in6_getaddr(s, &su->sin6, NULL, hpp);
+			return (ret);
 		case RTA_NETMASK:
-			syntax_error(
+			(void) fprintf(stderr,
 			    gettext("route: -netmask not supported for IPv6: "
-			    "use <prefix>/<prefix-length> instead\n"));
-			return (B_FALSE);
+			    "use <prefix>/<prefix-length> instead"));
+			exit(1);
+			/* NOTREACHED */
 		default:
 			quit(gettext("Internal Error"), EINVAL);
 			/* NOTREACHED */
@@ -2076,45 +1433,42 @@ getaddr(rtcmd_irep_t *rcip, int which, char *s, addr_type_t atype)
 		switch (which) {
 		case RTA_DST:
 			if (s[0] == '/') {
-				syntax_error(gettext(
-				    "route: %s: unexpected '/'\n"), s);
-				return (B_FALSE);
+				(void) fprintf(stderr,
+				    gettext("route: %s: unexpected '/'\n"), s);
+				exit(1);
 			}
-			ret = in_getaddr(s, &su->sin, &rcip->ri_masklen, which,
-			    hpp, atype, rcip);
-			if (ret == B_FALSE) {
-				return (B_FALSE);
-			}
-			switch (rcip->ri_masklen) {
+			ret = in_getaddr(s, &su->sin, &masklen, which, hpp);
+			switch (masklen) {
 			case NO_PREFIX:
 				/* Nothing there - ok */
-				return (B_TRUE);
+				return (ret);
 			case BAD_ADDR:
-				syntax_error(gettext(
-				    "route: bad prefix length in %s\n"), s);
-				return (B_FALSE);
+				(void) fprintf(stderr,
+				    gettext("route: bad prefix length in %s\n"),
+					    s);
+				exit(1);
+				/* NOTREACHED */
 			default:
-				(void) memset(&rcip->ri_mask.sin.sin_addr, 0,
-				    sizeof (rcip->ri_mask.sin.sin_addr));
-				if (!in_prefixlentomask(rcip->ri_masklen,
-				    IP_ABITS,
-				    (uchar_t *)&rcip->ri_mask.sin.sin_addr)) {
-					syntax_error(gettext(
-					    "route: bad prefix length: %d\n"),
-					    rcip->ri_masklen);
-					return (B_FALSE);
+				(void) memset(&so_mask.sin.sin_addr, 0,
+				    sizeof (so_mask.sin.sin_addr));
+				if (!in_prefixlentomask(masklen, IP_ABITS,
+				    (uchar_t *)&so_mask.sin.sin_addr)) {
+					(void) fprintf(stderr,
+					    gettext("route: bad prefix length: "
+					    "%d\n"), masklen);
+					exit(1);
 				}
 				break;
 			}
-			rcip->ri_mask.sin.sin_family = rcip->ri_af;
-			rcip->ri_addrs |= RTA_NETMASK;
-			return (B_TRUE);
+			so_mask.sin.sin_family = af;
+			rtm_addrs |= RTA_NETMASK;
+			return (ret);
 		case RTA_GATEWAY:
 		case RTA_IFA:
 		case RTA_NETMASK:
 		case RTA_SRC:
-			return (in_getaddr(s, &su->sin, NULL, which, hpp, atype,
-			    rcip));
+			ret = in_getaddr(s, &su->sin, NULL, which, hpp);
+			return (ret);
 		default:
 			quit(gettext("Internal Error"), EINVAL);
 			/* NOTREACHED */
@@ -2123,14 +1477,12 @@ getaddr(rtcmd_irep_t *rcip, int which, char *s, addr_type_t atype)
 		quit(gettext("Internal Error"), EINVAL);
 		/* NOTREACHED */
 	}
-	return (B_TRUE);
+
 }
 
 /*
  * Interpret an argument as an IPv4 network address of some kind,
- * returning B_TRUE on success or B_FALSE on failure.
- * This function will cause an exit() on failure if exit_on_failure is set.
- *
+ * returning B_TRUE if a host address, B_FALSE if a network address.
  * Note that this *always* tries host interpretation before network
  * interpretation.
  *
@@ -2141,7 +1493,7 @@ getaddr(rtcmd_irep_t *rcip, int which, char *s, addr_type_t atype)
  */
 static boolean_t
 in_getaddr(char *s, struct sockaddr_in *sin, int *plenp, int which,
-    struct hostent **hpp, addr_type_t atype, rtcmd_irep_t *rcip)
+    struct hostent **hpp)
 {
 	struct hostent *hp;
 	struct netent *np;
@@ -2163,8 +1515,9 @@ in_getaddr(char *s, struct sockaddr_in *sin, int *plenp, int which,
 		if (cp != NULL)
 			*cp = '\0';
 	} else if (strchr(str, '/') != NULL) {
-		syntax_error(gettext("route: %s: unexpected '/'\n"), str);
-		return (B_FALSE);
+		(void) fprintf(stderr, gettext("route: %s: unexpected '/'\n"),
+			str);
+		exit(1);
 	}
 
 	(void) memset(sin, 0, sizeof (*sin));
@@ -2176,50 +1529,42 @@ in_getaddr(char *s, struct sockaddr_in *sin, int *plenp, int which,
 	 */
 	if ((((val = inet_addr(str)) != (in_addr_t)-1) ||
 	    strcmp(str, "255.255.255.255") == 0) &&
-	    (which != RTA_DST || atype != ADDR_TYPE_NET)) {
+	    (which != RTA_DST || !forcenet)) {
 		sin->sin_addr.s_addr = val;
 		if (inet_lnaof(sin->sin_addr) != INADDR_ANY ||
-		    atype == ADDR_TYPE_HOST) {
-			if (rcip->ri_masklen == NO_PREFIX) {
-				rcip->ri_masklen = 32;
-			}
+		    forcehost)
 			return (B_TRUE);
-		}
 		val = ntohl(val);
 		if (which == RTA_DST)
-			inet_makenetandmask(rcip, val, sin);
-		return (B_TRUE);
+			inet_makenetandmask(val, sin);
+		return (B_FALSE);
 	}
-	if (atype != ADDR_TYPE_HOST && (val = inet_network(str)) !=
-	    (in_addr_t)-1) {
+	if (!forcehost && (val = inet_network(str)) != (in_addr_t)-1) {
 		if (which == RTA_DST)
-			inet_makenetandmask(rcip, val, sin);
-		return (B_TRUE);
+			inet_makenetandmask(val, sin);
+		return (B_FALSE);
 	}
-	if ((which != RTA_DST || atype != ADDR_TYPE_NET) &&
+	if ((which != RTA_DST || !forcenet) &&
 	    (hp = gethostbyname(str)) != NULL) {
 		*hpp = hp;
 		(void) memmove(&sin->sin_addr, hp->h_addr,
 		    hp->h_length);
-		if (rcip->ri_masklen == NO_PREFIX) {
-			rcip->ri_masklen = 32;
-		}
 		return (B_TRUE);
 	}
-	if (atype != ADDR_TYPE_HOST && (np = getnetbyname(str)) != NULL &&
+	if (!forcehost && (np = getnetbyname(str)) != NULL &&
 	    (val = np->n_net) != 0) {
 		if (which == RTA_DST)
-			inet_makenetandmask(rcip, val, sin);
-		return (B_TRUE);
+			inet_makenetandmask(val, sin);
+		return (B_FALSE);
 	}
-	syntax_error(gettext("%s: bad value\n"), s);
-	return (B_FALSE);
+	(void) fprintf(stderr, gettext("%s: bad value\n"), s);
+	exit(1);
+	/* NOTREACHED */
 }
 
 /*
  * Interpret an argument as an IPv6 network address of some kind,
- * returning B_TRUE on success or B_FALSE on failure.
- * This function will cause an exit() on failure if exit_on_failure is set.
+ * returning B_TRUE if a host address, B_FALSE if a network address.
  *
  * If the last argument is non-NULL allow a <addr>/<n> syntax and
  * pass out <n> in *plenp.
@@ -2249,8 +1594,9 @@ in6_getaddr(char *s, struct sockaddr_in6 *sin6, int *plenp,
 		if (cp != NULL)
 			*cp = '\0';
 	} else if (strchr(str, '/') != NULL) {
-		syntax_error(gettext("route: %s: unexpected '/'\n"), str);
-		return (B_FALSE);
+		(void) fprintf(stderr, gettext("route: %s: unexpected '/'\n"),
+			str);
+		exit(1);
 	}
 
 	(void) memset(sin6, 0, sizeof (struct sockaddr_in6));
@@ -2263,19 +1609,13 @@ in6_getaddr(char *s, struct sockaddr_in6 *sin6, int *plenp,
 		return (B_TRUE);
 	}
 	if (error_num == TRY_AGAIN) {
-		/*
-		 * This isn't a problem if we aren't going to use the address
-		 * right away.
-		 */
-		if (!exit_on_error) {
-			return (B_TRUE);
-		}
-		syntax_error(gettext("route: %s: bad address (try "
+		(void) fprintf(stderr, gettext("route: %s: bad address (try "
 		    "again later)\n"), s);
-		return (B_FALSE);
+	} else {
+		(void) fprintf(stderr, gettext("route: %s: bad address\n"), s);
 	}
-	syntax_error(gettext("route: %s: bad address\n"), s);
-	return (B_FALSE);
+	exit(1);
+	/* NOTREACHED */
 }
 
 /*
@@ -2374,7 +1714,7 @@ rtmonitor(int argc, char *argv[])
 }
 
 int
-rtmsg(rtcmd_irep_t *newrt)
+rtmsg(int cmd, int flags)
 {
 	static int seq;
 	int rlen;
@@ -2383,39 +1723,46 @@ rtmsg(rtcmd_irep_t *newrt)
 
 	errno = 0;
 	(void) memset(&m_rtmsg, 0, sizeof (m_rtmsg));
-
-	if (newrt->ri_cmd == RTM_GET) {
-		newrt->ri_ifp.sa.sa_family = AF_LINK;
-		newrt->ri_addrs |= RTA_IFP;
+	if (cmd == 'a') {
+		cmd = RTM_ADD;
+	} else if (cmd == 'c') {
+		cmd = RTM_CHANGE;
+	} else if (cmd == 'g') {
+		cmd = RTM_GET;
+		if (so_ifp.sa.sa_family == 0) {
+			so_ifp.sa.sa_family = AF_LINK;
+			rtm_addrs |= RTA_IFP;
+		}
+	} else {
+		cmd = RTM_DELETE;
 	}
-
 #define	rtm m_rtmsg.m_rtm
-	rtm.rtm_type = newrt->ri_cmd;
-	rtm.rtm_flags = newrt->ri_flags;
+	rtm.rtm_type = cmd;
+	rtm.rtm_flags = flags;
 	rtm.rtm_version = RTM_VERSION;
 	rtm.rtm_seq = ++seq;
-	rtm.rtm_addrs = newrt->ri_addrs;
-	rtm.rtm_rmx = newrt->ri_metrics;
-	rtm.rtm_inits = newrt->ri_inits;
+	rtm.rtm_addrs = rtm_addrs;
+	rtm.rtm_rmx = rt_metrics;
+	rtm.rtm_inits = rtm_inits;
 
 #define	NEXTADDR(w, u) \
-	if (newrt->ri_addrs & (w)) { \
+	if (rtm_addrs & (w)) { \
 		l = ROUNDUP_LONG(salen(&u.sa)); \
 		(void) memmove(cp, &(u), l); \
 		cp += l; \
 		if (verbose) \
 			sodump(&(u), #u); \
 	}
-	NEXTADDR(RTA_DST, newrt->ri_dst);
-	NEXTADDR(RTA_GATEWAY, newrt->ri_gate);
-	NEXTADDR(RTA_NETMASK, newrt->ri_mask);
-	NEXTADDR(RTA_IFP, newrt->ri_ifp);
-	NEXTADDR(RTA_IFA, newrt->ri_ifa);
+	NEXTADDR(RTA_DST, so_dst);
+	NEXTADDR(RTA_GATEWAY, so_gate);
+	NEXTADDR(RTA_NETMASK, so_mask);
+	NEXTADDR(RTA_IFP, so_ifp);
+	NEXTADDR(RTA_IFA, so_ifa);
 	/*
 	 * RTA_SRC has overloaded meaning. It can represent the
 	 * src address of incoming or outgoing packets.
 	 */
-	NEXTADDR(RTA_SRC, newrt->ri_src);
+	NEXTADDR(RTA_SRC, so_src);
 #undef	NEXTADDR
 	rtm.rtm_msglen = l = cp - (char *)&m_rtmsg;
 	if (verbose)
@@ -2443,7 +1790,7 @@ rtmsg(rtcmd_irep_t *newrt)
 		    "len\n"), rlen);
 		return (-1);
 	}
-	if (newrt->ri_cmd == RTM_GET) {
+	if (cmd == RTM_GET) {
 		do {
 			l = read(s, (char *)&m_rtmsg, sizeof (m_rtmsg));
 		} while (l > 0 && (rtm.rtm_seq != seq || rtm.rtm_pid != pid));
@@ -2452,7 +1799,7 @@ rtmsg(rtcmd_irep_t *newrt)
 			    gettext("route: read from routing socket: %s\n"),
 			    strerror(errno));
 		} else {
-			print_getmsg(newrt, &rtm, l);
+			print_getmsg(&rtm, l);
 		}
 	}
 #undef rtm
@@ -2549,7 +1896,7 @@ print_rtmsg(struct rt_msghdr *rtm, int msglen)
 }
 
 void
-print_getmsg(rtcmd_irep_t *req_rt, struct rt_msghdr *rtm, int msglen)
+print_getmsg(struct rt_msghdr *rtm, int msglen)
 {
 	struct sockaddr *dst = NULL, *gate = NULL, *mask = NULL, *src = NULL;
 	struct sockaddr_dl *ifp = NULL;
@@ -2557,7 +1904,7 @@ print_getmsg(rtcmd_irep_t *req_rt, struct rt_msghdr *rtm, int msglen)
 	char *cp;
 	int i;
 
-	(void) printf("   route to: %s\n", routename(&req_rt->ri_dst.sa));
+	(void) printf("   route to: %s\n", routename(&so_dst.sa));
 	if (rtm->rtm_version != RTM_VERSION) {
 		(void) fprintf(stderr,
 		    gettext("routing message version %d not understood\n"),
@@ -2740,7 +2087,7 @@ keyword(char *cp)
 }
 
 void
-sodump(su_t *su, char *which)
+sodump(sup su, char *which)
 {
 	static char obuf[INET6_ADDRSTRLEN];
 

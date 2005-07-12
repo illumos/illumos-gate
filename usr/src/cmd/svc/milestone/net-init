@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -219,16 +219,6 @@ else
 	defrouters=
 fi
 
-# Make a first pass through /etc/inet/static_routes, attempting to add
-# each route.  Ignore any errors since this will be attempted again once
-# the tunnels are up.
-#
-if [ -f /etc/inet/static_routes ]; then
-	/usr/bin/egrep -v "^(#|$)" /etc/inet/static_routes | while read line; do
-                /usr/sbin/route add $line
-	done > /dev/null 2>&1
-fi
-
 #
 # Use routeadm(1M) to configure forwarding and launch routing daemons for
 # IPv4 and IPv6 based on preset values.  These settings only apply to the
@@ -366,18 +356,6 @@ if [ "$ACCEPT6TO4RELAY" = yes ]; then
         else
                 /usr/sbin/6to4relay -e
         fi
-fi
-
-#
-# Make a second pass through /etc/inet/static_routes, attempting to add
-# each route.  This time, any errors except those for duplicates entries
-# are reported.
-#
-if [ -f /etc/inet/static_routes ]; then
-	/usr/bin/egrep -v "^(#|$)" /etc/inet/static_routes | while read line; do
-		/usr/sbin/route add $line
-	done | /usr/bin/egrep -v "^[^:]+:[^:]+(: entry exists)?\$" >\
-	    /dev/msglog 2>&1
 fi
 
 # Clear exit status.
