@@ -176,8 +176,8 @@ vga_probe(void)
 			fp = (char *)edifp;
 			ic.es = FP_SEG(fp);
 			ic.di = FP_OFF(fp);
-			dprintf("addr 0x%x, seg 0x%x, off 0x%x\n",
-				fp, FP_SEG(fp), FP_OFF(fp));
+			dprintf("addr 0x%p, seg 0x%lx, off 0x%lx\n",
+				(void *)fp, FP_SEG(fp), FP_OFF(fp));
 
 			ret = bios_doint(0x10, &ic);
 			dprintf(

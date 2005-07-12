@@ -51,6 +51,13 @@ typedef struct dev_ident {	/* device identifier block */
 	}		un_fs;
 } devid_t;
 
+/*
+ * Borrowed bits from i_flag
+ */
+#define	FI_CACHED		0x100000
+#define	FI_PARTIAL_CACHE	0x200000
+#define	FI_NOCACHE		0x400000
+
 typedef struct file_ident {	/* file identifier block */
 	uint_t		fi_filedes;
 	char		*fi_path;
@@ -59,6 +66,7 @@ typedef struct file_ident {	/* file identifier block */
 	off_t		fi_offset;
 	caddr_t		fi_memp;
 	char		fi_taken;
+	char		fi_flags;
 	devid_t		*fi_devp;
 	char		fi_buf[MAXBSIZE];
 	struct	inode	*fi_inode;

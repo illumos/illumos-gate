@@ -68,12 +68,14 @@ $(INSTALL_DIR)/%: $(INSTALL_DIR) %
 $(INSTALL_DIR):
 	$(INS.dir)
 
+lint:
 
 clean:
 	$(RM) $(PROGS) *.exec *.o $(INSTALLBOOT)
 
 clobber: clean
 	$(RM) $(INSTALL_TARGETS) $(INSTALLBOOT)
+
 
 #
 # Pattern matching rules for source in this directory

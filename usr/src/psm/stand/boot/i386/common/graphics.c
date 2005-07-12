@@ -30,6 +30,7 @@
 #include <sys/psw.h>
 #include <sys/memlist.h>
 #include <sys/bootvfs.h>
+#include <sys/salib.h>
 #include "graphics.h"
 #include "biosint.h"
 #include "vga.h"
@@ -124,12 +125,13 @@ static void BitMask(int value) {
 }
 
 /* Set the splash image */
-int graphics_set_splash(char *splashfile) {
-	/* filename can only be 64 characters due to our buffer size */
-	if (strlen(splashfile) > 63)
+int
+graphics_set_splash(char *splashfile)
+{
+	if (strlcpy(splashimage, splashfile,
+	    sizeof (splashimage)) >= sizeof (splashimage))
 		return (0);
-	strcpy(splashimage, splashfile);
-		return (1);
+	return (1);
 }
 
 /* Get the current splash image */
@@ -277,7 +279,7 @@ graphics_get_font()
 int
 graphics_set_palette(int index, int red, int green, int blue)
 {
-	int ret;
+	int ret, rval;
 	struct int_pb ic = {0};
 	/* wait vertical active display */
 	while (((inb(VGA_IO_IS) & 0x8)) == 0x8) {}
@@ -294,11 +296,9 @@ graphics_set_palette(int index, int red, int green, int blue)
 	ic.cx = ((green & 0xFF) <<8) | (blue & 0xFF);
 	ic.dx = (red & 0xFF) <<8;
 	ret = bios_doint(0x10, &ic); /* set palette registert */
-	if (ret & PS_C) {
-		dprintf("bios_doint returned: %d\r\n", ret);
-		return (0);
-	} else
-	return (1);
+	rval = (ret & PS_C) ? 0 : 1;
+	dprintf("graphics_set_palette: %d\r\n", rval);
+	return (rval);
 }
 
 /* Leave graphics mode */
@@ -306,7 +306,7 @@ void
 graphics_end(void)
 {
 	if (graphics_inited) {
-		set_videomode(saved_videomode);
+		(void) set_videomode(saved_videomode);
 		graphics_inited = 0;
 	}
 }
@@ -441,6 +441,7 @@ graphics_setcolor(int normal_color, int highlight_color)
 	graphics_setcolorstate(graphics_color_state);
 }
 
+/*ARGSUSED*/
 void
 graphics_setcursor(int on)
 {
@@ -470,7 +471,7 @@ read_image(char *s)
 	/* read header */
 	count = read(fd, (char *)&buf, 10);
 	if ((count < 10) || graphics_memcmp(buf, "/* XPM */\n", 10)) {
-	close(fd);
+	(void) close(fd);
 	dprintf("read header error\n");
 	return (0);
 	}
@@ -522,9 +523,9 @@ read_image(char *s)
 
 		while (read(fd, &c, 1) && c != '"')
 			;
-		read(fd, &c, 1);	   /* char */
+		(void) read(fd, &c, 1);		/* char */
 		base = c;
-		read(fd, buf, 4);	  /* \t c # */
+		(void) read(fd, buf, 4);	/* \t c # */
 
 		while (read(fd, &c, 1) && c != '"') {
 			if (len < sizeof (buf))
@@ -536,7 +537,7 @@ read_image(char *s)
 			int g = ((hex(buf[2]) << 4) | hex(buf[3])) >> 2;
 			int b = ((hex(buf[4]) << 4) | hex(buf[5])) >> 2;
 			pal[idx] = base;
-			graphics_set_palette(idx, r, g, b);
+			(void) graphics_set_palette(idx, r, g, b);
 			++idx;
 		}
 	}
@@ -553,9 +554,10 @@ read_image(char *s)
 
 	/* parse xpm data */
 	while (y < height) {
+		/*CONSTANTCONDITION*/
 		while (1) {
 			if (!read(fd, &c, 1)) {
-				close(fd);
+				(void) close(fd);
 				return (0);
 			}
 			if (c == '"')
@@ -589,14 +591,14 @@ read_image(char *s)
 		}
 	}
 
-	close(fd);
+	(void) close(fd);
 
-	graphics_set_palette(0, (background >> 16), (background >> 8) & 63,
-				background & 63);
-	graphics_set_palette(15, (foreground >> 16), (foreground >> 8) & 63,
-				foreground & 63);
-	graphics_set_palette(0x11, (border >> 16), (border >> 8) & 63,
-				border & 63);
+	(void) graphics_set_palette(0, (background >> 16),
+			(background >> 8) & 63, background & 63);
+	(void) graphics_set_palette(15, (foreground >> 16),
+			(foreground >> 8) & 63, foreground & 63);
+	(void) graphics_set_palette(0x11, (border >> 16),
+			(border >> 8) & 63, border & 63);
 
 	return (1);
 }

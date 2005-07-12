@@ -128,6 +128,7 @@ bkern_printf(struct bootops *bop, char *fmt, ...)
 /*
  * Translate register structure fit what /platform/i86pc/biosint expects.
  */
+/*ARGSUSED*/
 static void
 bkern_doint(struct bootops *bop, int intnum, struct bop_regs *rp)
 {

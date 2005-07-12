@@ -63,7 +63,7 @@ clear_screen(void)
 void
 text_init(void)
 {
-	set_videomode(0x3);
+	(void) set_videomode(0x3);
 	clear_screen();
 }
 
@@ -204,9 +204,9 @@ serial_adjust_prop(void)
 	    'a' + console - CONS_TTYA);
 	plen = bgetproplen(NULL, propname);
 	if (plen > 0 && plen <= sizeof (propval)) {
-		bgetprop(NULL, propname, propval);
+		(void) bgetprop(NULL, propname, propval);
 	} else {
-		strcpy(propval, "9600,8,n,1,-");
+		(void) strcpy(propval, "9600,8,n,1,-");
 	}
 
 	{
@@ -301,13 +301,12 @@ serial_adjust_prop(void)
 	    "tty%c-rts-dtr-off", 'a' + console - CONS_TTYA);
 	plen = bgetproplen(NULL, propname);
 	if (plen > 0 && plen <= sizeof (propval)) {
-		bgetprop(NULL, propname, propval);
+		(void) bgetprop(NULL, propname, propval);
 	} else {
-		strcpy(propval, "false");
+		(void) strcpy(propval, "false");
 	}
 
 	{
-		char *p;
 		uchar_t mcr = DTR | RTS;
 		if (propval[0] != 'f' && propval[0] != 'F')
 			mcr = 0;

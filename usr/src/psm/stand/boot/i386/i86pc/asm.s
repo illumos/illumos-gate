@@ -32,11 +32,12 @@ extern void printf(const char *, ...);
 uint_t bpd_loc;
 struct bootops *bop;
 
-void start(void) { main(0, 0, 0); }
+void start(void) {}
 void start_paging(void) { return; }
 void halt(char *msg) { printf("%s", msg); }
+/*ARGSUSED*/
 void exitto(int (*entrypoint)()) {}
-void reset(void);
+void reset(void) {}
 
 /* lint for inline functions in i86.il */
 /*ARGSUSED*/

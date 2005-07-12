@@ -67,7 +67,6 @@ int debug;
 
 multiboot_info_t *mbi;
 multiboot_header_t *mbh;
-void *elfbootvec;	/* XXX dummy for 32-bit exitto */
 
 char *bootfile_prop = NULL;
 char *inputdevice_prop = NULL;
@@ -88,7 +87,7 @@ int amd64_elf64;
 uint64_t elf64_go2;
 #endif	/* BOOTAMD64 */
 
-extern int get_bootenv_props(void);
+extern void get_bootenv_props(void);
 extern void vga_probe(void);
 
 void
@@ -141,7 +140,7 @@ main(ulong_t magic, ulong_t addr, ulong_t header)
 	if (verbosemode && is_amd64)
 		printf("cpu is amd64 capable\n");
 	if (is_amd64 == 0)
-		bsetprop(NULL, "CPU_not_amd64", "true", sizeof ("true"));
+		(void) bsetprop(NULL, "CPU_not_amd64", "true", sizeof ("true"));
 #endif  /* BOOTAMD64 */
 
 	/*
@@ -205,13 +204,13 @@ print_mbinfo(void)
 	int tmp;
 
 	/* multiboot header */
-	printf("header_addr = 0x%x\n", mbh->header_addr);
-	printf("load_addr = 0x%x, end = 0x%x, bss_end = 0x%x\n",
+	printf("header_addr = 0x%lx\n", mbh->header_addr);
+	printf("load_addr = 0x%lx, end = 0x%lx, bss_end = 0x%lx\n",
 	    mbh->load_addr, mbh->load_end_addr, mbh->bss_end_addr);
-	printf("entry_addr = 0x%x\n", mbh->entry_addr);
+	printf("entry_addr = 0x%lx\n", mbh->entry_addr);
 
 	/* multiboot info location */
-	printf("mbi = 0x%x, size = 0x%x\n", mbi, sizeof (*mbi));
+	printf("mbi = 0x%p, size = 0x%x\n", (void *) mbi, sizeof (*mbi));
 
 	/* flags */
 	printf("flags = 0x%x\n", (unsigned)mbi->flags);
@@ -271,7 +270,7 @@ print_mbinfo(void)
 
 	/* print drives info */
 	if (MB_CHECK_FLAG(mbi->flags, 7)) {
-		printf("drives length %d, driver addr 0x%x\n",
+		printf("drives length %ld, drives addr 0x%lx\n",
 		    mbi->drives_length, mbi->drives_addr);
 	}
 }

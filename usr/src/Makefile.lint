@@ -344,7 +344,8 @@ COMMON_SUBDIRS = \
 	lib/pkcs11 \
 	lib/smartcard \
 	lib/fm \
-	lib/udapl
+	lib/udapl \
+	psm
 
 i386_SUBDIRS= \
 	cmd/biosdev \
@@ -362,7 +363,8 @@ sparc_SUBDIRS= \
 	cmd/wrsmconf \
 	cmd/wrsmstat \
 	lib/libwrsmconf \
-	lib/wrsm
+	lib/wrsm \
+	stand
 
 LINTSUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 

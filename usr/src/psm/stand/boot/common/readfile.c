@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,7 +212,7 @@ readfile(int fd, int print)
 {
 #ifdef	_ELF64_SUPPORT
 #ifdef	BOOTAMD64
-	extern int bsetprop(struct bootops *, char *, caddr_t, int, phandle_t);
+	extern int bsetprop(struct bootops *, char *, void *, int);
 	extern struct bootops *bop;
 	extern uint64_t elf64_go2;
 #else	/* !BOOTAMD64 */
@@ -297,7 +297,7 @@ readfile(int fd, int print)
 #ifdef	BOOTAMD64
 				if (elf64_go2 != FAIL_READELF64)
 					(void) bsetprop(bop, "mmu-modlist",
-					    "mmu64", 0, 0);
+					    "mmu64", 0);
 
 				return ((elf64_go2 == FAIL_READELF64) ? FAIL :
 				    OK);

@@ -95,7 +95,7 @@ get_bootargs(char *args, int grub)
 
 		/* get the multiboot prog (must be present) */
 		bootprog = strtok(args, SPC);
-		strcpy(bootprog_buf, bootprog);
+		(void) strlcpy(bootprog_buf, bootprog, sizeof (bootprog_buf));
 		bootprog = bootprog_buf;
 		bootfile = strtok(NULL, SPC);
 		grub_line_present = (bootfile != NULL);
@@ -128,7 +128,8 @@ get_bootargs(char *args, int grub)
 			boothowto |= RB_KMDB;
 		} else {
 			/* copy to buf to avoid being overwritten */
-			strcpy(bootfile_buf, bootfile);
+			(void) strlcpy(bootfile_buf,
+			    bootfile, sizeof (bootprog_buf));
 			bootfile = bootfile_buf;
 		}
 		/* get the remainder of string */

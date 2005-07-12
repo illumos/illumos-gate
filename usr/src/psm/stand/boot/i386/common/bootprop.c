@@ -105,7 +105,7 @@ bnextprop(struct bootops *bop, char *prev)
 
 /*ARGSUSED*/
 int
-bsetprop(struct bootops *bop, char *name, char *value, int len)
+bsetprop(struct bootops *bop, char *name, void *value, int len)
 {
 	struct bootprop *bp;
 
@@ -243,7 +243,7 @@ setup_bootprop(void)
 		if (boot_device == MB_NETWORK_DRIVE)
 			netboot++;
 		(void) snprintf(str, 3, "%x", boot_device);
-		bsetprop(NULL, "bios-boot-device", str, 3);
+		(void) bsetprop(NULL, "bios-boot-device", str, 3);
 	} else {	/* assume netboot? */
 		netboot++;
 	}
@@ -267,7 +267,7 @@ setup_bootprop(void)
 				(struct sol_netinfo *)mbi->drives_addr;
 			switch (sip->sn_infotype) {
 			case SN_TYPE_BOOTP:
-				bsetprop(NULL, BP_BOOTP_RESPONSE,
+				(void) bsetprop(NULL, BP_BOOTP_RESPONSE,
 				    (void *)mbi->drives_addr,
 				    mbi->drives_length);
 				break;
@@ -283,7 +283,8 @@ setup_bootprop(void)
 	}
 
 	/* dummy properties needed by Install miniroot */
-	bsetprop(NULL, "stdout", (char *)&stdout_val, sizeof (stdout_val));
+	(void) bsetprop(NULL,
+		"stdout", &stdout_val, sizeof (stdout_val));
 }
 
 #define	BUFLEN	64
@@ -297,25 +298,25 @@ setup_rarp_props(struct sol_netinfo *sip)
 	val = (uint8_t *)&sip->sn_ciaddr;
 	(void) snprintf(buf, BUFLEN, "%d.%d.%d.%d",
 	    val[0], val[1], val[2], val[3]);
-	bsetprop(NULL, BP_HOST_IP, buf, strlen(buf) + 1);
+	(void) bsetprop(NULL, BP_HOST_IP, buf, strlen(buf) + 1);
 
 	val = (uint8_t *)&sip->sn_siaddr;
 	(void) snprintf(buf, BUFLEN, "%d.%d.%d.%d",
 	    val[0], val[1], val[2], val[3]);
-	bsetprop(NULL, BP_SERVER_IP, buf, strlen(buf) + 1);
+	(void) bsetprop(NULL, BP_SERVER_IP, buf, strlen(buf) + 1);
 
 	if (sip->sn_giaddr != 0) {
 		val = (uint8_t *)&sip->sn_giaddr;
 		(void) snprintf(buf, BUFLEN, "%d.%d.%d.%d",
 		    val[0], val[1], val[2], val[3]);
-		bsetprop(NULL, BP_ROUTER_IP, buf, strlen(buf) + 1);
+		(void) bsetprop(NULL, BP_ROUTER_IP, buf, strlen(buf) + 1);
 	}
 
 	if (sip->sn_netmask != 0) {
 		val = (uint8_t *)&sip->sn_netmask;
 		(void) snprintf(buf, BUFLEN, "%d.%d.%d.%d",
 		    val[0], val[1], val[2], val[3]);
-		bsetprop(NULL, BP_SUBNET_MASK, buf, strlen(buf) + 1);
+		(void) bsetprop(NULL, BP_SUBNET_MASK, buf, strlen(buf) + 1);
 	}
 
 	if (sip->sn_mactype != 4 || sip->sn_maclen != 6) {
@@ -327,5 +328,5 @@ setup_rarp_props(struct sol_netinfo *sip)
 	val = sip->sn_macaddr;
 	(void) snprintf(buf, BUFLEN, "%x:%x:%x:%x:%x:%x",
 	    val[0], val[1], val[2], val[3], val[4], val[5]);
-	bsetprop(NULL, BP_BOOT_MAC, buf, strlen(buf) + 1);
+	(void) bsetprop(NULL, BP_BOOT_MAC, buf, strlen(buf) + 1);
 }

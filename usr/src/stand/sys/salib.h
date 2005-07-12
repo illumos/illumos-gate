@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,14 +75,7 @@ extern void kern_resfree(caddr_t, size_t);
 extern int get_progmemory(caddr_t, size_t, int);
 
 #ifdef	__i386
-/* map_prog.c */
-extern caddr_t magic_phys;
-extern caddr_t top_bootmem;
-extern uint32_t map_mem(uint_t, uint_t, int);
-extern caddr_t phys_alloc(uint32_t, int);
-extern caddr_t idmap_mem(uint32_t, size_t, int);
-
-/* get.c */
+/* console.c */
 extern int cons_gets(char *, int);
 #endif
 

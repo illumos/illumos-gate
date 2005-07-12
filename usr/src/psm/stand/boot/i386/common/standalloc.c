@@ -243,7 +243,7 @@ setup_memlists(void)
 			memlist_insert(&pfreelistp, address, size);
 			/*FALLTHROUGH*/
 		default:	/* Take out of available pci memory space */
-			memlist_remove(&ppcimemp, address, size);
+			(void) memlist_remove(&ppcimemp, address, size);
 			break;
 		}
 	}
@@ -353,7 +353,7 @@ idmap_mem(uint32_t virthint, size_t bytes, int align)
 	}
 
 	if (addr == 0) {
-		printf("idmap_mem: failed to find phys 0x%x bytes at 0x%x\n",
+		printf("idmap_mem: failed to find phys 0x%lx bytes at 0x%x\n",
 		    bytes, virthint);
 		return (0);
 	}
@@ -364,16 +364,16 @@ idmap_mem(uint32_t virthint, size_t bytes, int align)
 	 * corresponding virtual memory is always available by design.
 	 */
 	if (memlist_remove(&vfreelistp, (uint64_t)addr, (uint64_t)bytes) != 0) {
-		printf("idmap_mem: failed to find virtual 0x%x bytes at 0x%x\n",
-		    bytes, addr);
+		printf("idmap_mem: failed to find virtual "
+		    "0x%lx bytes at 0x%p\n", bytes, (void *)addr);
 		(void) memlist_insert(&pfreelistp, (uint64_t)addr,
 		    (uint64_t)bytes);
 		return (0);
 	}
 
 	if (map_phys(0, bytes, addr, (uint64_t)addr) == -1) {
-		printf("idmap_mem: failed to 1:1 map 0x%x bytes at 0x%x\n",
-		    bytes, addr);
+		printf("idmap_mem: failed to 1:1 map 0x%lx bytes at 0x%p\n",
+		    bytes, (void *)addr);
 		(void) memlist_insert(&pfreelistp, (uint64_t)addr,
 		    (uint64_t)bytes);
 		(void) memlist_insert(&vfreelistp, (uint64_t)addr,
@@ -452,7 +452,8 @@ resalloc(enum RESOURCES type, size_t bytes, caddr_t virthint, int align)
 	}
 
 fail:
-	dprintf("resalloc of 0x%x bytes at 0x%x failed", bytes, virthint);
+	dprintf("resalloc of 0x%lx bytes at 0x%p failed",
+		bytes, (void *)virthint);
 	return (0);
 }
 
@@ -462,7 +463,8 @@ resfree(caddr_t addr, size_t bytes)
 	/* scratch memory is freed one one shot */
 	if ((uint_t)addr < magic_phys)
 		return;
-	dprintf("resfree: 0x%x 0x%x not implemented\n", addr, bytes);
+	dprintf("resfree: 0x%p 0x%lx not implemented\n",
+		(void *)addr, bytes);
 }
 
 int

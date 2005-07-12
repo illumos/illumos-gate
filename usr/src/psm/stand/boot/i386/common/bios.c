@@ -43,7 +43,7 @@
 #define	PCI_BIOS_PRESENT	0x1
 #define	dprintf	if (debug & D_BIOS) printf
 
-extern int openfile(char *, int);
+extern int openfile(char *, char *);
 int (*bios_doint)(int, struct int_pb *);
 
 static void
@@ -69,7 +69,7 @@ init_biosprog()
 	ssize_t count;
 
 	/* read biosint program to pfn 2 */
-	fd = openfile("biosint", 0);
+	fd = openfile("biosint", NULL);
 	if (fd == -1) {
 		printf("cannot open biosint\n");
 		return;
@@ -82,7 +82,7 @@ init_biosprog()
 	}
 
 	bios_doint = (int (*)(int, struct int_pb *))(buf);
-	dprintf("biosint loaded at 0x%x: %d bytes\r\n", buf, count);
+	dprintf("biosint loaded at 0x%p: %ld bytes\r\n", (void *)buf, count);
 	if (debug & D_BIOS)	/* run a check if debug */
 		pci_check_bios();
 	if (verbosemode)

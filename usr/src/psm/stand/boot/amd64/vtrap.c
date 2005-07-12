@@ -191,7 +191,6 @@ amd64_invoke_bootop(
 	struct bootops *bop)
 {
 	extern uint64_t amd64_boot_pml4;
-	static int amd64_io_quiesced = 0;
 
 	fnaddr64_t this = (fnaddr64_t)rp->r_rip;
 	enum tracetype {
@@ -642,6 +641,7 @@ static void dump_desctbr64(const char *, desctbr64_t *);
  * After stashing machine state we must convert the tss gdt entry from
  * busy to available type.
  */
+/*ARGSUSED*/
 void
 amd64_i386_clrtss(struct i386_machregs *rp)
 {

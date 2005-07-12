@@ -57,7 +57,7 @@ diskread(fileid_t *filep)
 	if (diskloc + filep->fi_count > (caddr_t)ramdisk_end) {
 		printf("diskread: reading beyond end of ramdisk\n");
 		printf("\tstart = 0x%p, size = 0x%x\n",
-		    diskloc, filep->fi_count);
+		    (void *)diskloc, filep->fi_count);
 		return (-1);
 	}
 

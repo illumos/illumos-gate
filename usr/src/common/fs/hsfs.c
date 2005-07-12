@@ -366,7 +366,7 @@ bhsfs_read(int fd, caddr_t buf, size_t count)
 		return (0);
 
 	while (i > 0) {
-		if (filep->fi_count <= 0) {
+		if (filep->fi_count == 0) {
 			if (getblock(filep) == -1)
 				return (0);
 		}
@@ -645,7 +645,7 @@ parse_dir(fileid_t *filep, int offset, struct hs_direct *hsdep)
 	/* System Use Fields */
 	ce_len = IDE_SUA_LEN(bufp);
 
-	if (ce_len <= 0)
+	if (ce_len == 0)
 		return (udp->d_reclen);
 
 	/* there is an SUA for this dir entry; go parse it */

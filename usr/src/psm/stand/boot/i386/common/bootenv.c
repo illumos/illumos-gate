@@ -131,7 +131,7 @@ get_bootenv_prop(char *line, int lineno)
 		if (*propp)
 			bkmem_free(*propp, strlen(*propp) + 1);
 		*propp = bkmem_zalloc(strlen(val)+1);
-		strcpy(*propp, val);
+		(void) strcpy(*propp, val);
 	}
 
 	return;
@@ -140,7 +140,7 @@ err:
 	printf("%s: syntax error on line %d\n", f_bootenv, lineno);
 }
 
-int
+void
 get_bootenv_props()
 {
 	int fd;
@@ -155,7 +155,7 @@ get_bootenv_props()
 	fd = openfile(f_bootenv, 0);
 	if (fd == -1) {
 		printf("error opening %s\n", f_bootenv);
-		return (0);
+		return;
 	}
 
 	buf = bkmem_zalloc(BOOTENV_BUFSIZE);
@@ -199,7 +199,5 @@ exit:
 	bkmem_free(buf, BOOTENV_BUFSIZE);
 	bkmem_free(line, BOOTENV_LINESIZE);
 
-	close(fd);
-
-	return (0);
+	(void) close(fd);
 }

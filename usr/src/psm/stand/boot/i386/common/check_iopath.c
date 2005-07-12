@@ -71,10 +71,10 @@ check_iopath(void)
 	cp2 = (uchar_t *)mod[1].mod_start;
 	size1 = mod[0].mod_end - mod[0].mod_start;
 	size2 = mod[1].mod_end - mod[1].mod_start;
-	printf("module 1: start = 0x%x, size = 0x%x (%s)\n",
-	    cp1, size1, mod[0].string);
-	printf("module 2: start = 0x%x, size = 0x%x (%s)\n",
-	    cp2, size2, mod[1].string);
+	printf("module 1: start = 0x%p, size = 0x%x (%s)\n",
+	    (void *)cp1, size1, (char *)mod[0].string);
+	printf("module 2: start = 0x%p, size = 0x%x (%s)\n",
+	    (void *)cp2, size2, (char *)mod[1].string);
 
 	if (size1 != size2) {
 		printf("Module sizes are different!\n");
