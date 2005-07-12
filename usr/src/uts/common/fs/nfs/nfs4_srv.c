@@ -3709,20 +3709,30 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		if ((error = VOP_REMOVE(dvp, nm, cs->cr)) == 0 &&
 			fp != NULL) {
 			struct vattr va;
+			vnode_t *tvp;
 
-			/*
-			 * This is va_seq safe because we are not
-			 * manipulating dvp.
-			 */
-			va.va_mask = AT_NLINK;
-			if (!VOP_GETATTR(fp->vp, &va, 0, cs->cr) &&
-				va.va_nlink == 0) {
-				/* The file is gone and so should the state */
-				if (in_crit) {
-					nbl_end_crit(vp);
-					in_crit = 0;
+			rfs4_dbe_lock(fp->dbe);
+			tvp = fp->vp;
+			if (tvp)
+				VN_HOLD(tvp);
+			rfs4_dbe_unlock(fp->dbe);
+
+			if (tvp) {
+				/*
+				 * This is va_seq safe because we are not
+				 * manipulating dvp.
+				 */
+				va.va_mask = AT_NLINK;
+				if (!VOP_GETATTR(tvp, &va, 0, cs->cr) &&
+					va.va_nlink == 0) {
+					/* Remove state on file remove */
+					if (in_crit) {
+						nbl_end_crit(vp);
+						in_crit = 0;
+					}
+					rfs4_close_all_state(fp);
 				}
-				rfs4_close_all_state(fp);
+				VN_RELE(tvp);
 			}
 		}
 	}
@@ -3968,16 +3978,26 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if ((error = VOP_RENAME(odvp, onm, ndvp, nnm, cs->cr)) == 0 &&
 		fp != NULL) {
 		struct vattr va;
+		vnode_t *tvp;
 
-		va.va_mask = AT_NLINK;
-		if (!VOP_GETATTR(fp->vp, &va, 0, cs->cr) &&
-			va.va_nlink == 0) {
-			/* The file is gone and so should the state */
-			if (in_crit_targ) {
-				nbl_end_crit(targvp);
-				in_crit_targ = 0;
+		rfs4_dbe_lock(fp->dbe);
+		tvp = fp->vp;
+		if (tvp)
+			VN_HOLD(tvp);
+		rfs4_dbe_unlock(fp->dbe);
+
+		if (tvp) {
+			va.va_mask = AT_NLINK;
+			if (!VOP_GETATTR(tvp, &va, 0, cs->cr) &&
+				va.va_nlink == 0) {
+				/* The file is gone and so should the state */
+				if (in_crit_targ) {
+					nbl_end_crit(targvp);
+					in_crit_targ = 0;
+				}
+				rfs4_close_all_state(fp);
 			}
-			rfs4_close_all_state(fp);
+			VN_RELE(tvp);
 		}
 	}
 

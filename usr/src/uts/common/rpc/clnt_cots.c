@@ -1716,7 +1716,9 @@ use_new_conn:
 			 * for needs disconnect.
 			 */
 			if (cm_entry->x_needdis) {
+				CONN_HOLD(cm_entry);
 				connmgr_dis_and_wait(cm_entry);
+				connmgr_release(cm_entry);
 				/*
 				 * connmgr_lock could have been
 				 * dropped for the disconnect
