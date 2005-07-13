@@ -142,6 +142,8 @@ void *per_pci_common_state;	/* per-psycho soft state pointer */
 kmutex_t pci_global_mutex;	/* attach/detach common struct lock */
 errorq_t *pci_ecc_queue = NULL;	/* per-system ecc handling queue */
 errorq_t *pci_target_queue = NULL;	/* per-system target handling queue */
+struct cb_ops *pcihp_ops = NULL;	/* hotplug module cb ops */
+
 
 extern void pci_child_cfg_save(dev_info_t *dip);
 extern void pci_child_cfg_restore(dev_info_t *dip);
@@ -1403,7 +1405,6 @@ pci_init_hotplug(struct pci *pci_p)
 {
 	pci_bus_range_t bus_range;
 	dev_info_t *dip;
-	struct cb_ops *ops;
 
 	/*
 	 * Before initializing hotplug - open up
@@ -1436,14 +1437,10 @@ pci_init_hotplug(struct pci *pci_p)
 			return;
 		}
 
-		if (ops = pcihp_get_cb_ops()) {
-			pci_ops.devo_cb_ops = ops;
+		if ((pcihp_ops = pcihp_get_cb_ops()) != NULL) {
 			DEBUG2(DBG_ATTACH, dip, "%s%d hotplug enabled",
 			    ddi_driver_name(dip), ddi_get_instance(dip));
-		} else {
-			return;
+			pci_p->hotplug_capable = B_TRUE;
 		}
-
-		pci_p->hotplug_capable = B_TRUE;
 	}
 }

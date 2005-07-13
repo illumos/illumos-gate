@@ -78,11 +78,15 @@ struct cb_ops pci_cb_ops = {
 	nodev				/* int (*cb_awrite)() */
 };
 
+extern struct cb_ops *pcihp_ops;
+
 /* ARGSUSED3 */
 static int
 pci_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 {
 	pci_t *pci_p;
+	int rval;
+	uint_t orig_pci_soft_state;
 
 	/*
 	 * Make sure the open is for the right file type.
@@ -102,6 +106,7 @@ pci_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	 */
 	DEBUG2(DBG_OPEN, pci_p->pci_dip, "devp=%x: flags=%x\n", devp, flags);
 	mutex_enter(&pci_p->pci_mutex);
+	orig_pci_soft_state = pci_p->pci_soft_state;
 	if (flags & FEXCL) {
 		if (pci_p->pci_soft_state != PCI_SOFT_STATE_CLOSED) {
 			mutex_exit(&pci_p->pci_mutex);
@@ -117,8 +122,18 @@ pci_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 		}
 		pci_p->pci_soft_state = PCI_SOFT_STATE_OPEN;
 	}
+
+	if (pci_p->hotplug_capable == B_TRUE) {
+		if (rval = pcihp_ops->cb_open(devp, flags, otyp, credp)) {
+			pci_p->pci_soft_state = orig_pci_soft_state;
+			mutex_exit(&pci_p->pci_mutex);
+			return (rval);
+		}
+	}
+
 	pci_p->pci_open_count++;
 	mutex_exit(&pci_p->pci_mutex);
+
 	return (0);
 }
 
@@ -128,6 +143,7 @@ static int
 pci_close(dev_t dev, int flags, int otyp, cred_t *credp)
 {
 	pci_t *pci_p;
+	int rval;
 
 	if (otyp != OTYP_CHR)
 		return (EINVAL);
@@ -138,6 +154,13 @@ pci_close(dev_t dev, int flags, int otyp, cred_t *credp)
 
 	DEBUG2(DBG_CLOSE, pci_p->pci_dip, "dev=%x: flags=%x\n", dev, flags);
 	mutex_enter(&pci_p->pci_mutex);
+
+	if (pci_p->hotplug_capable == B_TRUE)
+		if (rval = pcihp_ops->cb_close(dev, flags, otyp, credp)) {
+			mutex_exit(&pci_p->pci_mutex);
+			return (rval);
+		}
+
 	pci_p->pci_soft_state = PCI_SOFT_STATE_CLOSED;
 	pci_p->pci_open_count = 0;
 	mutex_exit(&pci_p->pci_mutex);
@@ -286,7 +309,12 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		break;
 
 	case PCIHP_DEVCTL_MINOR:
-		rv = pci_devctl_ioctl(dip, cmd, arg, mode, credp, rvalp);
+		if (pci_p->hotplug_capable == B_TRUE)
+			rv = pcihp_ops->cb_ioctl(
+			    dev, cmd, arg, mode, credp, rvalp);
+		else
+			rv = pci_devctl_ioctl(
+			    dip, cmd, arg, mode, credp, rvalp);
 		break;
 
 	default:
