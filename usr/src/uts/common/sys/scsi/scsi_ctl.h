@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,7 +57,7 @@ extern "C" {
 #define	SCSI_RESET_CANCEL	0x02	/* cancel the reset notification */
 
 /*
- * Define for scsi_get_addr/scsi_get_name first argument.
+ * Define for scsi_get_bus_addr/scsi_get_name first argument.
  */
 #define	SCSI_GET_INITIATOR_ID	((struct scsi_device *)NULL)
 					/* return initiator-id */

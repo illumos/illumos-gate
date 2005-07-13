@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_SCSI_ADDRESS_H
@@ -38,17 +38,30 @@ extern "C" {
 /*
  * SCSI address definition.
  *
- *	A target driver instance controls a target/lun instance.
- *	It sends the command to the device instance it controls.
- * 	In generic case	HBA driver maintains the target/lun information
- *	in the cloned transport structure pointed to by a_hba_tran field.
- *	This is the only way SCSI-3 devices will work.
+ * A scsi_address structure stores the host routing and device unit-address
+ * information necessary to reference a specific SCSI target device logical
+ * unit function.
  *
- *	a_target and a_lun fields are for compatibility with SCSI-2.
- *	They are not defined in SCSI-3 and target driver should use
- *	scsi_get_addr(9F) to get the target/lun information.
+ * The host routing information is stored in the scsi_hba_tran(9S) structure
+ * pointed to by the a_hba_tran field.
  *
- *	a_sublun was never used and was never part of DDI (scsi_address(9S)).
+ * The device unit-address information is SCSA's representation of the
+ * "@unit-address" portion of a SCSI target driver device node in the
+ * /devices tree.  Separate components of the device unit-address information
+ * define the target address and the logical unit address of a target.
+ * In general, device unit-address information is used exclusively by the
+ * host adapter driver (the exception being target drivers communicating
+ * with SCSI Parallel Interconnect (SPI) SCSI-1 devices that embed SCSI
+ * logical unit addressing in the CDB).
+ *
+ * Thus the a_target and a_lun fields are for compatibility purposes only.
+ * They are not defined in SCSI-3.  SCSI-3 target drivers which need to
+ * communicate with SPI SCSI-1 devices that embed logical unit addresses in
+ * the CDB should obtain target and logical unit addresses from the device's
+ * properties (SCSI_ADDR_PROP_TARGET and SCSI_ADDR_PROP_LUN).
+ *
+ * a_sublun is reserved for internal use only and is never part of DDI
+ * (scsi_address(9S)).
  */
 struct scsi_address {
 	struct scsi_hba_tran	*a_hba_tran;	/* Transport vectors */
@@ -57,6 +70,10 @@ struct scsi_address {
 	uchar_t			a_sublun;	/* Sublun on that Lun */
 						/* Not used */
 };
+
+/* Address property names */
+#define	SCSI_ADDR_PROP_TARGET		"target"
+#define	SCSI_ADDR_PROP_LUN		"lun"
 
 #ifdef	__cplusplus
 }

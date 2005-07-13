@@ -60,11 +60,15 @@
 		stp->x.value.ul++; \
 	}
 
-#define	FILL_SCSI1_LUN(devp, pkt) \
-	if ((devp->sd_address.a_lun > 0) && \
-	    (devp->sd_inq->inq_ansi == 0x1)) { \
-		((union scsi_cdb *)(pkt)->pkt_cdbp)->scc_lun = \
-		    devp->sd_address.a_lun; \
+#define	FILL_SCSI1_LUN(devp, pkt) 					\
+	if ((devp)->sd_inq->inq_ansi == 0x1) {				\
+		int _lun;						\
+		_lun = ddi_prop_get_int(DDI_DEV_T_ANY, (devp)->sd_dev,	\
+		    DDI_PROP_DONTPASS, SCSI_ADDR_PROP_LUN, 0);		\
+		if (_lun > 0) {						\
+			((union scsi_cdb *)(pkt)->pkt_cdbp)->scc_lun =	\
+			    _lun;					\
+		}							\
 	}
 
 #define	ST_NUM_MEMBERS(array)	(sizeof (array) / sizeof (array[0]))
@@ -1191,15 +1195,13 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 	int instance;
 	struct buf *bp;
 
-
 	/*
 	 * Call the routine scsi_probe to do some of the dirty work.
 	 * If the INQUIRY command succeeds, the field sd_inq in the
 	 * device structure will be filled in.
 	 */
 	ST_DEBUG(devp->sd_dev, st_label, SCSI_DEBUG,
-		"st_doattach(): probing %d.%d\n",
-		devp->sd_address.a_target, devp->sd_address.a_lun);
+		"st_doattach(): probing\n");
 
 	if (scsi_probe(devp, canwait) == SCSIPROBE_EXISTS) {
 

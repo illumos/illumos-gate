@@ -949,7 +949,6 @@ static int sd_pm_idletime = 1;
 #define	sd_write_label			ssd_write_label
 #define	sd_clear_vtoc			ssd_clear_vtoc
 #define	sd_clear_efi			ssd_clear_efi
-#define	sd_fill_scsi1_lun		ssd_fill_scsi1_lun
 #define	sd_get_tunables_from_conf	ssd_get_tunables_from_conf
 #define	sd_setup_next_xfer		ssd_setup_next_xfer
 #define	sd_dkio_get_temp		ssd_dkio_get_temp
@@ -1055,7 +1054,6 @@ static int	sd_spin_up_unit(struct sd_lun *un);
 static void	sd_enable_descr_sense(struct sd_lun *un);
 static void	sd_set_mmc_caps(struct sd_lun *un);
 
-static void sd_fill_scsi1_lun(struct sd_lun *un, struct scsi_pkt *);
 static void sd_read_unit_properties(struct sd_lun *un);
 static int  sd_process_sdconf_file(struct sd_lun *un);
 static void sd_get_tunables_from_conf(struct sd_lun *un, int flags,
@@ -2211,17 +2209,6 @@ _info(struct modinfo *modinfop)
 }
 
 
-static void
-sd_fill_scsi1_lun(struct sd_lun *un, struct scsi_pkt *pktp)
-{
-	ASSERT(pktp != NULL);
-	if (un->un_f_is_fibre == TRUE) {
-		return;
-	}
-
-	SD_FILL_SCSI1_LUN(SD_SCSI_DEVP(un), pktp);
-}
-
 /*
  * The following routines implement the driver message logging facility.
  * They provide component- and level- based debug output filtering.
@@ -2699,8 +2686,12 @@ sd_scsi_probe_with_cache(struct scsi_device *devp, int (*waitfn)())
 {
 	struct sd_scsi_probe_cache	*cp;
 	dev_info_t	*pdip = ddi_get_parent(devp->sd_dev);
-	int		lun   = devp->sd_address.a_lun;
-	int		tgt   = devp->sd_address.a_target;
+	int		lun, tgt;
+
+	lun = ddi_prop_get_int(DDI_DEV_T_ANY, devp->sd_dev, DDI_PROP_DONTPASS,
+	    SCSI_ADDR_PROP_LUN, 0);
+	tgt = ddi_prop_get_int(DDI_DEV_T_ANY, devp->sd_dev, DDI_PROP_DONTPASS,
+	    SCSI_ADDR_PROP_TARGET, -1);
 
 	/* Make sure caching enabled and target in range */
 	if ((tgt < 0) || (tgt >= NTARGETS_WIDE)) {
@@ -13039,7 +13030,7 @@ sd_setup_rw_pkt(struct sd_lun *un,
 				    ((bp->b_flags & B_READ) ?
 					SCMD_READ : SCMD_WRITE);
 
-				sd_fill_scsi1_lun(un, return_pktp);
+				SD_FILL_SCSI1_LUN(un, return_pktp);
 
 				/*
 				 * Fill in LBA and length
@@ -13140,7 +13131,7 @@ sd_setup_next_rw_pkt(struct sd_lun *un,
 		}
 
 		cdbp->scc_cmd = com;
-		sd_fill_scsi1_lun(un, pktp);
+		SD_FILL_SCSI1_LUN(un, pktp);
 		if (cdb_group_id == CDB_GROUPID_1) {
 			FORMG1ADDR(cdbp, lba);
 			FORMG1COUNT(cdbp, blockcount);
@@ -13251,7 +13242,7 @@ sd_initpkt_for_uscsi(struct buf *bp, struct scsi_pkt **pktpp)
 	(void) scsi_setup_cdb((union scsi_cdb *)pktp->pkt_cdbp,
 	    uscmd->uscsi_cdb[0], 0, 0, 0);
 
-	sd_fill_scsi1_lun(un, pktp);
+	SD_FILL_SCSI1_LUN(un, pktp);
 
 	/*
 	 * Set up the optional USCSI flags. See the uscsi (7I) man page
@@ -15394,7 +15385,7 @@ sd_alloc_rqs(struct scsi_device *devp, struct sd_lun *un)
 	(void) scsi_setup_cdb((union scsi_cdb *)un->un_rqs_pktp->pkt_cdbp,
 	    SCMD_REQUEST_SENSE, 0, SENSE_LENGTH, 0);
 
-	sd_fill_scsi1_lun(un, un->un_rqs_pktp);
+	SD_FILL_SCSI1_LUN(un, un->un_rqs_pktp);
 
 	/* Set up the other needed members in the ARQ scsi_pkt. */
 	un->un_rqs_pktp->pkt_comp   = sdintr;
@@ -17245,7 +17236,8 @@ sd_sense_key_not_ready(struct sd_lun *un,
 		if (un->un_startstop_timeid != NULL) {
 			SD_INFO(SD_LOG_ERROR, un,
 			    "sd_sense_key_not_ready: restart already issued to"
-			    " 0x%x : 0x%x\n", SD_TARGET(un), SD_LUN(un));
+			    " %s%d\n", ddi_driver_name(SD_DEVINFO(un)),
+			    ddi_get_instance(SD_DEVINFO(un)));
 			break;
 		}
 
@@ -18598,7 +18590,7 @@ sd_handle_mchange(struct sd_lun *un)
 static int
 sd_send_scsi_DOORLOCK(struct sd_lun *un, int flag, int path_flag)
 {
-	uchar_t			cdb_buf[CDB_GROUP0];
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
 	struct scsi_extended_sense	sense_buf;
 	int			status;
@@ -18613,14 +18605,14 @@ sd_send_scsi_DOORLOCK(struct sd_lun *un, int flag, int path_flag)
 		return (0);
 	}
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 
-	cdb_buf[0] = SCMD_DOORLOCK;
-	cdb_buf[4] = (uchar_t)flag;
+	cdb.scc_cmd = SCMD_DOORLOCK;
+	cdb.cdb_opaque[4] = (uchar_t)flag;
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
-	ucmd_buf.uscsi_cdblen	= sizeof (cdb_buf);
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP0;
 	ucmd_buf.uscsi_bufaddr	= NULL;
 	ucmd_buf.uscsi_buflen	= 0;
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
@@ -18685,7 +18677,7 @@ sd_send_scsi_READ_CAPACITY(struct sd_lun *un, uint64_t *capp, uint32_t *lbap,
 {
 	struct	scsi_extended_sense	sense_buf;
 	struct	uscsi_cmd	ucmd_buf;
-	uchar_t			cdb_buf[CDB_GROUP1];
+	union	scsi_cdb	cdb;
 	uint32_t		*capacity_buf;
 	uint64_t		capacity;
 	uint32_t		lbasize;
@@ -18707,15 +18699,15 @@ sd_send_scsi_READ_CAPACITY(struct sd_lun *un, uint64_t *capp, uint32_t *lbap,
 	 * Medium Indicator bit is cleared.  The address field must be
 	 * zero if the PMI bit is zero.
 	 */
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 
 	capacity_buf = kmem_zalloc(SD_CAPACITY_SIZE, KM_SLEEP);
 
-	cdb_buf[0] = SCMD_READ_CAPACITY;
+	cdb.scc_cmd = SCMD_READ_CAPACITY;
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
-	ucmd_buf.uscsi_cdblen	= sizeof (cdb_buf);
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP1;
 	ucmd_buf.uscsi_bufaddr	= (caddr_t)capacity_buf;
 	ucmd_buf.uscsi_buflen	= SD_CAPACITY_SIZE;
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
@@ -18890,7 +18882,7 @@ sd_send_scsi_READ_CAPACITY_16(struct sd_lun *un, uint64_t *capp,
 {
 	struct	scsi_extended_sense	sense_buf;
 	struct	uscsi_cmd	ucmd_buf;
-	uchar_t			cdb_buf[CDB_GROUP4];
+	union	scsi_cdb	cdb;
 	uint64_t		*capacity16_buf;
 	uint64_t		capacity;
 	uint32_t		lbasize;
@@ -18911,13 +18903,13 @@ sd_send_scsi_READ_CAPACITY_16(struct sd_lun *un, uint64_t *capp,
 	 * Medium Indicator bit is cleared.  The address field must be
 	 * zero if the PMI bit is zero.
 	 */
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 
 	capacity16_buf = kmem_zalloc(SD_CAPACITY_16_SIZE, KM_SLEEP);
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
-	ucmd_buf.uscsi_cdblen	= sizeof (cdb_buf);
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP4;
 	ucmd_buf.uscsi_bufaddr	= (caddr_t)capacity16_buf;
 	ucmd_buf.uscsi_buflen	= SD_CAPACITY_16_SIZE;
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
@@ -18930,16 +18922,13 @@ sd_send_scsi_READ_CAPACITY_16(struct sd_lun *un, uint64_t *capp,
 	 * command byte (0x9E) is overloaded for multiple operations,
 	 * with the second CDB byte specifying the desired operation
 	 */
-	cdb_buf[0] = SCMD_SVC_ACTION_IN_G4;
-	cdb_buf[1] = SSVC_ACTION_READ_CAPACITY_G4;
+	cdb.scc_cmd = SCMD_SVC_ACTION_IN_G4;
+	cdb.cdb_opaque[1] = SSVC_ACTION_READ_CAPACITY_G4;
 
 	/*
 	 * Fill in allocation length field
 	 */
-	cdb_buf[10] = (uchar_t)((ucmd_buf.uscsi_buflen & 0xff000000) >> 24);
-	cdb_buf[11] = (uchar_t)((ucmd_buf.uscsi_buflen & 0x00ff0000) >> 16);
-	cdb_buf[12] = (uchar_t)((ucmd_buf.uscsi_buflen & 0x0000ff00) >> 8);
-	cdb_buf[13] = (uchar_t)(ucmd_buf.uscsi_buflen & 0x000000ff);
+	FORMG4COUNT(&cdb, ucmd_buf.uscsi_buflen);
 
 	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
 	    UIO_SYSSPACE, UIO_SYSSPACE, path_flag);
@@ -19050,7 +19039,7 @@ static int
 sd_send_scsi_START_STOP_UNIT(struct sd_lun *un, int flag, int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
-	uchar_t			cdb_buf[CDB_GROUP0];
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
 	int			status;
 
@@ -19066,15 +19055,15 @@ sd_send_scsi_START_STOP_UNIT(struct sd_lun *un, int flag, int path_flag)
 		return (0);
 	}
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
 
-	cdb_buf[0] = SCMD_START_STOP;
-	cdb_buf[4] |= (uchar_t)flag;
+	cdb.scc_cmd = SCMD_START_STOP;
+	cdb.cdb_opaque[4] = (uchar_t)flag;
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
-	ucmd_buf.uscsi_cdblen	= sizeof (cdb_buf);
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP0;
 	ucmd_buf.uscsi_bufaddr	= NULL;
 	ucmd_buf.uscsi_buflen	= 0;
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
@@ -19245,7 +19234,7 @@ static int
 sd_send_scsi_INQUIRY(struct sd_lun *un, uchar_t *bufaddr, size_t buflen,
 	uchar_t evpd, uchar_t page_code, size_t *residp)
 {
-	uchar_t			cdb_buf[CDB_GROUP0];
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
 	int			status;
 
@@ -19255,17 +19244,17 @@ sd_send_scsi_INQUIRY(struct sd_lun *un, uchar_t *bufaddr, size_t buflen,
 
 	SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_INQUIRY: entry: un:0x%p\n", un);
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 	bzero(bufaddr, buflen);
 
-	cdb_buf[0] = SCMD_INQUIRY;
-	cdb_buf[1] = evpd;
-	cdb_buf[2] = page_code;
-	cdb_buf[4] = buflen;
+	cdb.scc_cmd = SCMD_INQUIRY;
+	cdb.cdb_opaque[1] = evpd;
+	cdb.cdb_opaque[2] = page_code;
+	FORMG0COUNT(&cdb, buflen);
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
-	ucmd_buf.uscsi_cdblen	= sizeof (cdb_buf);
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP0;
 	ucmd_buf.uscsi_bufaddr	= (caddr_t)bufaddr;
 	ucmd_buf.uscsi_buflen	= buflen;
 	ucmd_buf.uscsi_rqbuf	= NULL;
@@ -19316,7 +19305,7 @@ static int
 sd_send_scsi_TEST_UNIT_READY(struct sd_lun *un, int flag)
 {
 	struct	scsi_extended_sense	sense_buf;
-	uchar_t			cdb_buf[CDB_GROUP0];
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
 	int			status;
 
@@ -19345,14 +19334,14 @@ sd_send_scsi_TEST_UNIT_READY(struct sd_lun *un, int flag)
 		mutex_exit(SD_MUTEX(un));
 	}
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
 
-	cdb_buf[0] = SCMD_TEST_UNIT_READY;
+	cdb.scc_cmd = SCMD_TEST_UNIT_READY;
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
-	ucmd_buf.uscsi_cdblen	= sizeof (cdb_buf);
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP0;
 	ucmd_buf.uscsi_bufaddr	= NULL;
 	ucmd_buf.uscsi_buflen	= 0;
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
@@ -19421,8 +19410,8 @@ sd_send_scsi_PERSISTENT_RESERVE_IN(struct sd_lun *un, uchar_t  usr_cmd,
 	uint16_t data_len, uchar_t *data_bufp)
 {
 	struct scsi_extended_sense	sense_buf;
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
-	uchar_t			cdb_buf[CDB_GROUP1];
 	int			status;
 	int			no_caller_buf = FALSE;
 
@@ -19433,7 +19422,7 @@ sd_send_scsi_PERSISTENT_RESERVE_IN(struct sd_lun *un, uchar_t  usr_cmd,
 	SD_TRACE(SD_LOG_IO, un,
 	    "sd_send_scsi_PERSISTENT_RESERVE_IN: entry: un:0x%p\n", un);
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
 	if (data_bufp == NULL) {
@@ -19444,13 +19433,12 @@ sd_send_scsi_PERSISTENT_RESERVE_IN(struct sd_lun *un, uchar_t  usr_cmd,
 		no_caller_buf = TRUE;
 	}
 
-	cdb_buf[0] = SCMD_PERSISTENT_RESERVE_IN;
-	cdb_buf[1] = usr_cmd;
-	cdb_buf[7] = (uchar_t)(data_len >> 8);
-	cdb_buf[8] = (uchar_t)data_len;
+	cdb.scc_cmd = SCMD_PERSISTENT_RESERVE_IN;
+	cdb.cdb_opaque[1] = usr_cmd;
+	FORMG1COUNT(&cdb, data_len);
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
-	ucmd_buf.uscsi_cdblen	= sizeof (cdb_buf);
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP1;
 	ucmd_buf.uscsi_bufaddr	= (caddr_t)data_bufp;
 	ucmd_buf.uscsi_buflen	= data_len;
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
@@ -19522,8 +19510,8 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(struct sd_lun *un, uchar_t usr_cmd,
 	uchar_t	*usr_bufp)
 {
 	struct scsi_extended_sense	sense_buf;
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
-	uchar_t			cdb_buf[CDB_GROUP1];
 	int			status;
 	uchar_t			data_len = sizeof (sd_prout_t);
 	sd_prout_t		*prp;
@@ -19539,17 +19527,17 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(struct sd_lun *un, uchar_t usr_cmd,
 		return (EINVAL);
 	}
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
 	prp = kmem_zalloc(data_len, KM_SLEEP);
 
-	cdb_buf[0] = SCMD_PERSISTENT_RESERVE_OUT;
-	cdb_buf[1] = usr_cmd;
-	cdb_buf[8] = data_len;
+	cdb.scc_cmd = SCMD_PERSISTENT_RESERVE_OUT;
+	cdb.cdb_opaque[1] = usr_cmd;
+	FORMG1COUNT(&cdb, data_len);
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
-	ucmd_buf.uscsi_cdblen	= sizeof (cdb_buf);
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP1;
 	ucmd_buf.uscsi_bufaddr	= (caddr_t)prp;
 	ucmd_buf.uscsi_buflen	= data_len;
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
@@ -19573,7 +19561,7 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(struct sd_lun *un, uchar_t usr_cmd,
 
 		bcopy(ptr->key.key, prp->res_key, MHIOC_RESV_KEY_SIZE);
 		prp->scope_address = BE_32(ptr->scope_specific_addr);
-		cdb_buf[2] = ptr->type;
+		cdb.cdb_opaque[2] = ptr->type;
 		break;
 	}
 	case SD_SCSI3_PREEMPTANDABORT: {
@@ -19584,7 +19572,7 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(struct sd_lun *un, uchar_t usr_cmd,
 		bcopy(ptr->victim_key.key, prp->service_key,
 		    MHIOC_RESV_KEY_SIZE);
 		prp->scope_address = BE_32(ptr->resvdesc.scope_specific_addr);
-		cdb_buf[2] = ptr->resvdesc.type;
+		cdb.cdb_opaque[2] = ptr->resvdesc.type;
 		ucmd_buf.uscsi_flags |= USCSI_HEAD;
 		break;
 	}
@@ -19650,7 +19638,7 @@ static int
 sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un)
 {
 	struct	scsi_extended_sense	sense_buf;
-	uchar_t			cdb_buf[CDB_GROUP1];
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
 	int			status;
 
@@ -19660,14 +19648,14 @@ sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un)
 	SD_TRACE(SD_LOG_IO, un,
 	    "sd_send_scsi_SYNCHRONIZE_CACHE: entry: un:0x%p\n", un);
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
 
-	cdb_buf[0] = SCMD_SYNCHRONIZE_CACHE;
+	cdb.scc_cmd = SCMD_SYNCHRONIZE_CACHE;
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
-	ucmd_buf.uscsi_cdblen	= sizeof (cdb_buf);
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP1;
 	ucmd_buf.uscsi_bufaddr	= NULL;
 	ucmd_buf.uscsi_buflen	= 0;
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
@@ -19926,7 +19914,7 @@ sd_send_scsi_MODE_SENSE(struct sd_lun *un, int cdbsize, uchar_t *bufaddr,
 	size_t buflen,  uchar_t page_code, int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
-	uchar_t			cdb_buf[CDB_GROUP1];
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
 	int			status;
 
@@ -19939,27 +19927,24 @@ sd_send_scsi_MODE_SENSE(struct sd_lun *un, int cdbsize, uchar_t *bufaddr,
 	SD_TRACE(SD_LOG_IO, un,
 	    "sd_send_scsi_MODE_SENSE: entry: un:0x%p\n", un);
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
 	bzero(bufaddr, buflen);
 
 	if (cdbsize == CDB_GROUP0) {
-		cdb_buf[0] = SCMD_MODE_SENSE;
-		cdb_buf[2] = page_code;
-		cdb_buf[4] = buflen;
+		cdb.scc_cmd = SCMD_MODE_SENSE;
+		cdb.cdb_opaque[2] = page_code;
+		FORMG0COUNT(&cdb, buflen);
 	} else {
-		cdb_buf[0] = SCMD_MODE_SENSE_G1;
-		cdb_buf[2] = page_code;
-		cdb_buf[7] = (uchar_t)((buflen & 0xFF00) >> 8);
-		cdb_buf[8] = (uchar_t)(buflen & 0xFF);
+		cdb.scc_cmd = SCMD_MODE_SENSE_G1;
+		cdb.cdb_opaque[2] = page_code;
+		FORMG1COUNT(&cdb, buflen);
 	}
 
-	if ((SD_LUN(un) > 0) &&	(un->un_sd->sd_inq->inq_ansi == 0x01)) {
-		cdb_buf[1] |= (SD_LUN(un) << 5);
-	}
+	SD_FILL_SCSI1_LUN_CDB(un, &cdb);
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
 	ucmd_buf.uscsi_cdblen	= (uchar_t)cdbsize;
 	ucmd_buf.uscsi_bufaddr	= (caddr_t)bufaddr;
 	ucmd_buf.uscsi_buflen	= buflen;
@@ -20027,7 +20012,7 @@ sd_send_scsi_MODE_SELECT(struct sd_lun *un, int cdbsize, uchar_t *bufaddr,
 	size_t buflen,  uchar_t save_page, int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
-	uchar_t			cdb_buf[CDB_GROUP1];
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
 	int			status;
 
@@ -20040,30 +20025,29 @@ sd_send_scsi_MODE_SELECT(struct sd_lun *un, int cdbsize, uchar_t *bufaddr,
 	SD_TRACE(SD_LOG_IO, un,
 	    "sd_send_scsi_MODE_SELECT: entry: un:0x%p\n", un);
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
 
-	cdb_buf[1] = 0x10;	/* Set the PF bit for many third party drives */
+	/* Set the PF bit for many third party drives */
+	cdb.cdb_opaque[1] = 0x10;
 
+	/* Set the savepage(SP) bit if given */
 	if (save_page == SD_SAVE_PAGE) {
-		cdb_buf[1] |= 0x01;	/* Set the savepage(SP) bit if given */
+		cdb.cdb_opaque[1] |= 0x01;
 	}
 
 	if (cdbsize == CDB_GROUP0) {
-		cdb_buf[0] = SCMD_MODE_SELECT;
-		cdb_buf[4] = buflen;
+		cdb.scc_cmd = SCMD_MODE_SELECT;
+		FORMG0COUNT(&cdb, buflen);
 	} else {
-		cdb_buf[0] = SCMD_MODE_SELECT_G1;
-		cdb_buf[7] = (uchar_t)((buflen & 0xFF00) >> 8);
-		cdb_buf[8] = (uchar_t)(buflen & 0xFF);
+		cdb.scc_cmd = SCMD_MODE_SELECT_G1;
+		FORMG1COUNT(&cdb, buflen);
 	}
 
-	if ((SD_LUN(un) > 0) &&	(un->un_sd->sd_inq->inq_ansi == 0x01)) {
-		cdb_buf[1] |= (SD_LUN(un) << 5);
-	}
+	SD_FILL_SCSI1_LUN_CDB(un, &cdb);
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
 	ucmd_buf.uscsi_cdblen	= (uchar_t)cdbsize;
 	ucmd_buf.uscsi_bufaddr	= (caddr_t)bufaddr;
 	ucmd_buf.uscsi_buflen	= buflen;
@@ -20130,13 +20114,12 @@ sd_send_scsi_RDWR(struct sd_lun *un, uchar_t cmd, void *bufaddr,
 	size_t buflen, daddr_t start_block, int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
-	uchar_t			cdb_buf[CDB_GROUP4];	/* Use max size */
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
 	uint32_t		block_count;
 	int			status;
 	int			cdbsize;
 	uchar_t			flag;
-	int			i;
 
 	ASSERT(un != NULL);
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
@@ -20159,7 +20142,7 @@ sd_send_scsi_RDWR(struct sd_lun *un, uchar_t cmd, void *bufaddr,
 	    "bufaddr:0x%p buflen:0x%x start_block:0x%p block_count:0x%x\n",
 	    bufaddr, buflen, start_block, block_count);
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
 
@@ -20174,33 +20157,19 @@ sd_send_scsi_RDWR(struct sd_lun *un, uchar_t cmd, void *bufaddr,
 
 	switch (cdbsize) {
 	case CDB_GROUP0:	/* 6-byte CDBs */
-		cdb_buf[0] = cmd;
-		cdb_buf[1] = (uchar_t)((start_block & 0x001F0000) >> 16);
-		cdb_buf[2] = (uchar_t)((start_block & 0x0000FF00) >> 8);
-		cdb_buf[3] = (uchar_t)(start_block  & 0x000000FF);
-		cdb_buf[4] = (uchar_t)(block_count  & 0xFF);
+		cdb.scc_cmd = cmd;
+		FORMG0ADDR(&cdb, start_block);
+		FORMG0COUNT(&cdb, block_count);
 		break;
 	case CDB_GROUP1:	/* 10-byte CDBs */
-		cdb_buf[0] = cmd | SCMD_GROUP1;
-		cdb_buf[2] = (uchar_t)((start_block & 0xFF000000) >> 24);
-		cdb_buf[3] = (uchar_t)((start_block & 0x00FF0000) >> 16);
-		cdb_buf[4] = (uchar_t)((start_block & 0x0000FF00) >> 8);
-		cdb_buf[5] = (uchar_t)(start_block  & 0x000000FF);
-		cdb_buf[7] = (uchar_t)((block_count & 0xFF00) >> 8);
-		cdb_buf[8] = (uchar_t)(block_count  & 0xFF);
+		cdb.scc_cmd = cmd | SCMD_GROUP1;
+		FORMG1ADDR(&cdb, start_block);
+		FORMG1COUNT(&cdb, block_count);
 		break;
 	case CDB_GROUP4:	/* 16-byte CDBs */
-		cdb_buf[0] = cmd | SCMD_GROUP4;
-		/* Block address is in bytes 2 - 9 */
-		for (i = 9; i > 1; i--) {
-			cdb_buf[i] = (uchar_t)(start_block & 0xFF);
-			start_block >>= 8;
-		}
-		/* Block count is in bytes 10 - 13 */
-		for (i = 13; i > 9; i--) {
-			cdb_buf[i] = (uchar_t)(block_count & 0xFF);
-			block_count >>= 8;
-		}
+		cdb.scc_cmd = cmd | SCMD_GROUP4;
+		FORMG4LONGADDR(&cdb, (uint64_t)start_block);
+		FORMG4COUNT(&cdb, block_count);
 		break;
 	case CDB_GROUP5:	/* 12-byte CDBs (currently unsupported) */
 	default:
@@ -20209,11 +20178,9 @@ sd_send_scsi_RDWR(struct sd_lun *un, uchar_t cmd, void *bufaddr,
 	}
 
 	/* Set LUN bit(s) in CDB if this is a SCSI-1 device */
-	if ((SD_LUN(un) > 0) &&	(un->un_sd->sd_inq->inq_ansi == 0x01)) {
-		cdb_buf[1] |= (SD_LUN(un) << 5);
-	}
+	SD_FILL_SCSI1_LUN_CDB(un, &cdb);
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
 	ucmd_buf.uscsi_cdblen	= (uchar_t)cdbsize;
 	ucmd_buf.uscsi_bufaddr	= bufaddr;
 	ucmd_buf.uscsi_buflen	= buflen;
@@ -20270,7 +20237,7 @@ sd_send_scsi_LOG_SENSE(struct sd_lun *un, uchar_t *bufaddr, uint16_t buflen,
 
 {
 	struct	scsi_extended_sense	sense_buf;
-	uchar_t			cdb_buf[CDB_GROUP1];
+	union scsi_cdb		cdb;
 	struct uscsi_cmd	ucmd_buf;
 	int			status;
 
@@ -20279,19 +20246,18 @@ sd_send_scsi_LOG_SENSE(struct sd_lun *un, uchar_t *bufaddr, uint16_t buflen,
 
 	SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_LOG_SENSE: entry: un:0x%p\n", un);
 
-	bzero(cdb_buf, sizeof (cdb_buf));
+	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
 	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
 
-	cdb_buf[0] = SCMD_LOG_SENSE_G1;
-	cdb_buf[2] = (page_control << 6) | page_code;
-	cdb_buf[5] = (uchar_t)((param_ptr & 0xFF00) >> 8);
-	cdb_buf[6] = (uchar_t)(param_ptr  & 0x00FF);
-	cdb_buf[7] = (uchar_t)((buflen & 0xFF00) >> 8);
-	cdb_buf[8] = (uchar_t)(buflen  & 0x00FF);
+	cdb.scc_cmd = SCMD_LOG_SENSE_G1;
+	cdb.cdb_opaque[2] = (page_control << 6) | page_code;
+	cdb.cdb_opaque[5] = (uchar_t)((param_ptr & 0xFF00) >> 8);
+	cdb.cdb_opaque[6] = (uchar_t)(param_ptr  & 0x00FF);
+	FORMG1COUNT(&cdb, buflen);
 
-	ucmd_buf.uscsi_cdb	= (char *)cdb_buf;
-	ucmd_buf.uscsi_cdblen	= sizeof (cdb_buf);
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP1;
 	ucmd_buf.uscsi_bufaddr	= (caddr_t)bufaddr;
 	ucmd_buf.uscsi_buflen	= buflen;
 	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
@@ -20339,7 +20305,8 @@ sd_send_scsi_LOG_SENSE(struct sd_lun *un, uchar_t *bufaddr, uint16_t buflen,
 					mutex_enter(SD_MUTEX(un));
 					un->un_start_stop_cycle_page =
 					    START_STOP_CYCLE_VU_PAGE;
-					cdb_buf[2] = (char)(page_control << 6) |
+					cdb.cdb_opaque[2] =
+					    (char)(page_control << 6) |
 					    un->un_start_stop_cycle_page;
 					mutex_exit(SD_MUTEX(un));
 					status = sd_send_scsi_cmd(
@@ -21541,6 +21508,7 @@ sd_dkio_ctrl_info(dev_t dev, caddr_t arg, int flag)
 	struct sd_lun	*un = NULL;
 	struct dk_cinfo	*info;
 	dev_info_t	*pdip;
+	int		lun, tgt;
 
 	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
 		return (ENXIO);
@@ -21566,9 +21534,14 @@ sd_dkio_ctrl_info(dev_t dev, caddr_t arg, int flag)
 		    DK_DEVLEN - 1);
 	}
 
+	lun = ddi_prop_get_int(DDI_DEV_T_ANY, SD_DEVINFO(un),
+	    DDI_PROP_DONTPASS, SCSI_ADDR_PROP_LUN, 0);
+	tgt = ddi_prop_get_int(DDI_DEV_T_ANY, SD_DEVINFO(un),
+	    DDI_PROP_DONTPASS, SCSI_ADDR_PROP_TARGET, 0);
+
 	/* Unit Information */
 	info->dki_unit = ddi_get_instance(SD_DEVINFO(un));
-	info->dki_slave = ((SD_TARGET(un) << 3) | SD_LUN(un));
+	info->dki_slave = ((tgt << 3) | lun);
 	(void) strncpy(info->dki_dname, ddi_driver_name(SD_DEVINFO(un)),
 	    DK_DEVLEN - 1);
 	info->dki_flags = DKI_FMTVOL;
@@ -25452,7 +25425,7 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 		start_pktp->pkt_flags = FLAG_NOINTR;
 
 		mutex_enter(SD_MUTEX(un));
-		sd_fill_scsi1_lun(un, start_pktp);
+		SD_FILL_SCSI1_LUN(un, start_pktp);
 		mutex_exit(SD_MUTEX(un));
 		/*
 		 * Scsi_poll returns 0 (success) if the command completes and

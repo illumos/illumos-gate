@@ -711,8 +711,6 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_lun::un_fi_mutex,
 #define	SD_SCSI_DEVP(un)	((un)->un_sd)
 #define	SD_DEVINFO(un)		((un)->un_sd->sd_dev)
 #define	SD_INQUIRY(un)		((un)->un_sd->sd_inq)
-#define	SD_TARGET(un)		((un)->un_sd->sd_address.a_target)
-#define	SD_LUN(un)		((un)->un_sd->sd_address.a_lun)
 #define	SD_MUTEX(un)		(&((un)->un_sd->sd_mutex))
 #define	SD_ADDRESS(un)		(&((un)->un_sd->sd_address))
 #define	SD_GET_DEV(un)		(sd_make_device(SD_DEVINFO(un)))
@@ -1125,12 +1123,19 @@ struct sd_fi_arq {
 	}								\
 	(bp)->b_flags |= B_ERROR;					\
 
-#define	SD_FILL_SCSI1_LUN(devp, pktp)					\
-	if (((devp)->sd_address.a_lun > 0) &&				\
-	    ((devp)->sd_inq->inq_ansi == 0x01)) {			\
-		((union scsi_cdb *)(pktp)->pkt_cdbp)->scc_lun = 	\
-		    (devp)->sd_address.a_lun; 				\
+#define	SD_FILL_SCSI1_LUN_CDB(lunp, cdbp)				\
+	if (! (lunp)->un_f_is_fibre &&					\
+	    SD_INQUIRY((lunp))->inq_ansi == 0x01) {			\
+		int _lun = ddi_prop_get_int(DDI_DEV_T_ANY,		\
+		    SD_DEVINFO((lunp)), DDI_PROP_DONTPASS,		\
+		    SCSI_ADDR_PROP_LUN, 0);				\
+		if (_lun > 0) {						\
+			(cdbp)->scc_lun = _lun;				\
+		}							\
 	}
+
+#define	SD_FILL_SCSI1_LUN(lunp, pktp)					\
+	SD_FILL_SCSI1_LUN_CDB((lunp), (union scsi_cdb *)(pktp)->pkt_cdbp)
 
 /*
  * Disk driver states
