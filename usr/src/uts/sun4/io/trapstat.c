@@ -1113,10 +1113,9 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	 * the TLB return entry to determine the amount of time spent in the
 	 * TLB miss handler.
 	 *
-	 * Note that on sun4v platforms, we must also force the %gl value to 1
-	 * in %tstate and we must obtain the context information from the MMU
-	 * fault status area. (The base address of this MMU fault status area
-	 * is kept in the scratchpad register 0.)
+	 * Note that on sun4v platforms, we must obtain the context information
+	 * from the MMU fault status area. (The base address of this MMU fault
+	 * status area is kept in the scratchpad register 0.)
 	 */
 	static const uint32_t tlbent[] = {
 #ifndef sun4v
@@ -1160,15 +1159,15 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	    0x8728f008,			/* sllx  %g3, 8, %g3		*/
 	    0x84108003,			/* or    %g2, %g3, %g2		*/
 	    0x8740c000,			/* rd    %asi, %g3		*/
-	    0x03000040,			/* sethi %hi(0x10000), %g1	*/
-	    0x86104003,			/* or    %g1, %g3, %g3		*/
 	    0x8728f018,			/* sllx  %g3, 24, %g3		*/
+	    0x83540000,			/* rdpr  %gl, %g1		*/
+	    0x83287028,			/* sllx  %g1, 40, %g1		*/
+	    0x86104003,			/* or    %g1, %g3, %g3		*/
 	    0x84108003,			/* or    %g2, %g3, %g2		*/
 	    0x8350c000,			/* rdpr  %tt, %g1		*/
 	    0x8f902002,			/* wrpr  %g0, 2, %tl		*/
 	    0x85908000,			/* wrpr  %g2, %g0, %tstate	*/
 	    0x87904000,			/* wrpr  %g1, %g0, %tt		*/
-	    0xa1902001,			/* wrpr  %g0, 1, %gl		*/
 	    0xc2d80400,			/* ldxa  [%g0]ASI_SCRATCHPAD, %g1 */
 	    0xc2586000,			/* ldx  [%g1 + MMFSA_?_CTX], %g1 */
 	    0x02c04004,			/* brz,pn %g1, .+0x10		*/
