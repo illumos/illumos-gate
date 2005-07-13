@@ -1569,226 +1569,854 @@ TwoToMinus32:
 /* 0x0184	     */		std	%f0,[%i3+512]
 /* 0x0188	     */		std	%f0,[%i3+520]
 
-	
+!BEGIN HAND CODED PART	
+
+! cheetah schedule, no even-odd trick
+
+
 	add	%i3,%g0,%o5
 
-	fmovd %f40,%f0
-	fmovd %f14,%f18
-	fmovd %f44,%f14
-	fmovd %f46,%f16
+	fmovd	%f40,%f0
+	fmovd	%f14,%f2
+	fmovd	%f44,%f8
+	sethi	%hi(TwoTo32),%l5
+	fmovd	%f46,%f10
+	sethi	%hi(TwoToMinus32),%g5
+	ldd	[%i3],%f6
+	ldd	[%l0],%f4
 
-	ldd [%i4],%f2
-	ldd [%i3],%f8
-	ldd [%i1],%f10
-	ldd [%l0],%f24
+	ldd	[%i1],%f40
+	ldd	[%i1+8],%f42
+	ldd	[%i1+16],%f52
+	ldd	[%i1+48],%f54
+	ldd	[%i1+56],%f36
+	ldd	[%i1+64],%f56
+	ldd	[%i1+104],%f48
+	ldd	[%i1+112],%f58
 
-	ldd [%i1+8],%f26
-	ldd [%i1+16],%f40
-	ldd [%i1+48],%f46
-	ldd [%i1+56],%f30
-	ldd [%i1+64],%f54
-	ldd [%i1+104],%f34
-	ldd [%i1+112],%f58
-
-	ldd [%i4+8],%f28	
-	ldd [%i4+104],%f38
-	ldd [%i4+112],%f60
+	ldd	[%i4],%f44
+	ldd	[%i4+8],%f46	
+	ldd	[%i4+104],%f50
+	ldd	[%i4+112],%f60
 
 
 	.L99999999:
 !1
-	ldd	[%i1+24],%f32
-	fmuld	%f0,%f2,%f4
+	ldd	[%i1+24],%f20
+	fmuld	%f0,%f44,%f12
 !2
-	ldd	[%i4+24],%f36
-	fmuld	%f26,%f24,%f20
+	ldd	[%i4+24],%f22
+	fmuld	%f42,%f4,%f16
 !3
-	ldd	[%i1+40],%f42
-	fmuld	%f28,%f0,%f22
+	ldd	[%i1+40],%f24
+	fmuld	%f46,%f0,%f18
 !4
-	ldd	[%i4+40],%f44
-	fmuld	%f32,%f24,%f32
+	ldd	[%i4+40],%f26
+	fmuld	%f20,%f4,%f20
 !5
-	ldd	[%l0+8],%f6
-	faddd	%f4,%f8,%f4
-	fmuld	%f36,%f0,%f36
+	ldd	[%l0+8],%f38
+	faddd	%f12,%f6,%f12
+	fmuld	%f22,%f0,%f22
 !6
 	add	%l0,8,%l0
-	ldd	[%i4+56],%f50
-	fmuld	%f42,%f24,%f42
+	ldd	[%i4+56],%f30
+	fmuld	%f24,%f4,%f24
 !7
-	ldd	[%i1+72],%f52
-	faddd	%f20,%f22,%f20
-	fmuld	%f44,%f0,%f44
+	ldd	[%i1+72],%f32
+	faddd	%f16,%f18,%f16
+	fmuld	%f26,%f0,%f26
 !8
-	ldd	[%i3+16],%f22
-	fmuld	%f10,%f6,%f12
+	ldd	[%i3+16],%f18
+	fmuld	%f40,%f38,%f14
 !9
-	ldd	[%i4+72],%f56
-	faddd	%f32,%f36,%f32
-	fmuld	%f14,%f4,%f4
+	ldd	[%i4+72],%f34
+	faddd	%f20,%f22,%f20
+	fmuld	%f8,%f12,%f12
 !10
-	ldd	[%i3+48],%f36
-	fmuld	%f30,%f24,%f48
+	ldd	[%i3+48],%f22
+	fmuld	%f36,%f4,%f28
 !11
-	ldd	[%i3+8],%f8
-	faddd	%f20,%f22,%f20
-	fmuld	%f50,%f0,%f50	
+	ldd	[%i3+8],%f6
+	faddd	%f16,%f18,%f16
+	fmuld	%f30,%f0,%f30	
 !12
-	std	%f20,[%i3+16]
-	faddd	%f42,%f44,%f42
-	fmuld	%f52,%f24,%f52
+	std	%f16,[%i3+16]
+	faddd	%f24,%f26,%f24
+	fmuld	%f32,%f4,%f32
 !13
-	ldd	[%i3+80],%f44
-	faddd	%f4,%f12,%f4
-	fmuld	%f56,%f0,%f56
+	ldd	[%i3+80],%f26
+	faddd	%f12,%f14,%f12
+	fmuld	%f34,%f0,%f34
 !14
-	ldd	[%i1+88],%f20
-	faddd	%f32,%f36,%f32
+	ldd	[%i1+88],%f16
+	faddd	%f20,%f22,%f20
 !15
-	ldd	[%i4+88],%f22
-	faddd	%f48,%f50,%f48
+	ldd	[%i4+88],%f18
+	faddd	%f28,%f30,%f28
 !16
-	ldd	[%i3+112],%f50
-	faddd	%f52,%f56,%f52
+	ldd	[%i3+112],%f30
+	faddd	%f32,%f34,%f32
 !17
-	ldd	[%i3+144],%f56
-	faddd	%f4,%f8,%f8
-	fmuld	%f20,%f24,%f20
+	ldd	[%i3+144],%f34
+	faddd	%f12,%f6,%f6
+	fmuld	%f16,%f4,%f16
 !18
-	std	%f32,[%i3+48]
-	faddd	%f42,%f44,%f42
-	fmuld	%f22,%f0,%f22
+	std	%f20,[%i3+48]
+	faddd	%f24,%f26,%f24
+	fmuld	%f18,%f0,%f18
 !19
-	std	%f42,[%i3+80]
-	faddd	%f48,%f50,%f48
-	fmuld	%f34,%f24,%f32
+	std	%f24,[%i3+80]
+	faddd	%f28,%f30,%f28
+	fmuld	%f48,%f4,%f20
 !20
-	std	%f48,[%i3+112]
-	faddd	%f52,%f56,%f52
-	fmuld	%f38,%f0,%f36
+	std	%f28,[%i3+112]
+	faddd	%f32,%f34,%f32
+	fmuld	%f50,%f0,%f22
 !21
-	ldd	[%i1+120],%f42
-	fdtox	%f8,%f4
+	ldd	[%i1+120],%f24
+	fdtox	%f6,%f12
 !22
-	std	%f52,[%i3+144]
-	faddd	%f20,%f22,%f20
+	std	%f32,[%i3+144]
+	faddd	%f16,%f18,%f16
 !23
-	ldd	[%i4+120],%f44
+	ldd	[%i4+120],%f26
 !24
-	ldd	[%i3+176],%f22
-	faddd	%f32,%f36,%f32
-	fmuld	%f42,%f24,%f42
+	ldd	[%i3+176],%f18
+	faddd	%f20,%f22,%f20
+	fmuld	%f24,%f4,%f24
 !25
-	ldd	[%i4+16],%f50
-	fmovs	%f17,%f4
+	ldd	[%i4+16],%f30
+	fmovs	%f11,%f12
 !26
-	ldd	[%i1+32],%f52
-	fmuld	%f44,%f0,%f44
+	ldd	[%i1+32],%f32
+	fmuld	%f26,%f0,%f26
 !27
-	ldd	[%i4+32],%f56
-	fmuld	%f40,%f24,%f48
+	ldd	[%i4+32],%f34
+	fmuld	%f52,%f4,%f28
 !28
-	ldd	[%i3+208],%f36
-	faddd	%f20,%f22,%f20
-	fmuld	%f50,%f0,%f50
+	ldd	[%i3+208],%f22
+	faddd	%f16,%f18,%f16
+	fmuld	%f30,%f0,%f30
 !29
-	std	%f20,[%i3+176]
-	fxtod	%f4,%f4
-	fmuld	%f52,%f24,%f52
+	std	%f16,[%i3+176]
+	fxtod	%f12,%f12
+	fmuld	%f32,%f4,%f32
 !30
-	ldd	[%i4+48],%f22
-	faddd	%f42,%f44,%f42
-	fmuld	%f56,%f0,%f56
+	ldd	[%i4+48],%f18
+	faddd	%f24,%f26,%f24
+	fmuld	%f34,%f0,%f34
 !31
-	ldd	[%i3+240],%f44
-	faddd	%f32,%f36,%f32
-!32
-	std	%f32,[%i3+208]
-	faddd	%f48,%f50,%f48
-	fmuld	%f46,%f24,%f20
-!33
-	ldd	[%i3+32],%f50
-	fmuld	%f4,%f18,%f12
-!34
-	ldd	[%i4+64],%f36
-	faddd	%f52,%f56,%f52
-	fmuld	%f22,%f0,%f22
-!35
-	ldd	[%i3+64],%f56
-	faddd	%f42,%f44,%f42
-!36
-	std	%f42,[%i3+240]
-	faddd	%f48,%f50,%f48
-	fmuld	%f54,%f24,%f32
-!37
-	std	%f48,[%i3+32]
-	fmuld	%f12,%f14,%f4
-!38
-	ldd	[%i1+80],%f42
-	faddd	%f52,%f56,%f56	! yes, tmp52!
-	fmuld	%f36,%f0,%f36
-!39
-	ldd	[%i4+80],%f44
+	ldd	[%i3+240],%f26
 	faddd	%f20,%f22,%f20
+!32
+	std	%f20,[%i3+208]
+	faddd	%f28,%f30,%f28
+	fmuld	%f54,%f4,%f16
+!33
+	ldd	[%i3+32],%f30
+	fmuld	%f12,%f2,%f14
+!34
+	ldd	[%i4+64],%f22
+	faddd	%f32,%f34,%f32
+	fmuld	%f18,%f0,%f18
+!35
+	ldd	[%i3+64],%f34
+	faddd	%f24,%f26,%f24
+!36
+	std	%f24,[%i3+240]
+	faddd	%f28,%f30,%f28
+	fmuld	%f56,%f4,%f20
+!37
+	std	%f28,[%i3+32]
+	fmuld	%f14,%f8,%f12
+!38
+	ldd	[%i1+80],%f24
+	faddd	%f32,%f34,%f34	! yes, tmp52!
+	fmuld	%f22,%f0,%f22
+!39
+	ldd	[%i4+80],%f26
+	faddd	%f16,%f18,%f16
 !40
-	ldd	[%i1+96],%f48
-	fmuld	%f58,%f24,%f52
+	ldd	[%i1+96],%f28
+	fmuld	%f58,%f4,%f32
 !41
-	ldd	[%i4+96],%f50
-	fdtox	%f4,%f4
-	fmuld	%f42,%f24,%f42
+	ldd	[%i4+96],%f30
+	fdtox	%f12,%f12
+	fmuld	%f24,%f4,%f24
 !42
-	std	%f56,[%i3+64]	! yes, tmp52!
-	faddd	%f32,%f36,%f32
-	fmuld	%f44,%f0,%f44
+	std	%f34,[%i3+64]	! yes, tmp52!
+	faddd	%f20,%f22,%f20
+	fmuld	%f26,%f0,%f26
 !43
-	ldd	[%i3+96],%f22
-	fmuld	%f48,%f24,%f48
+	ldd	[%i3+96],%f18
+	fmuld	%f28,%f4,%f28
 !44
-	ldd	[%i3+128],%f36
-	fmovd	%f6,%f24
-	fmuld	%f50,%f0,%f50
+	ldd	[%i3+128],%f22
+	fmovd	%f38,%f4
+	fmuld	%f30,%f0,%f30
 !45
-	fxtod	%f4,%f4
-	fmuld	%f60,%f0,%f56
+	fxtod	%f12,%f12
+	fmuld	%f60,%f0,%f34
 !46
 	add	%i3,8,%i3
-	faddd	%f42,%f44,%f42
+	faddd	%f24,%f26,%f24
 !47
-	ldd	[%i3+160-8],%f44
-	faddd	%f20,%f22,%f20
+	ldd	[%i3+160-8],%f26
+	faddd	%f16,%f18,%f16
 !48
-	std	%f20,[%i3+96-8]
-	faddd	%f48,%f50,%f48
+	std	%f16,[%i3+96-8]
+	faddd	%f28,%f30,%f28
 !49
-	ldd	[%i3+192-8],%f50
-	faddd	%f52,%f56,%f52
-	fmuld	%f4,%f16,%f4
+	ldd	[%i3+192-8],%f30
+	faddd	%f32,%f34,%f32
+	fmuld	%f12,%f10,%f12
 !50
-	ldd	[%i3+224-8],%f56
-	faddd	%f32,%f36,%f32
+	ldd	[%i3+224-8],%f34
+	faddd	%f20,%f22,%f20
 !51
-	std	%f32,[%i3+128-8]
-	faddd	%f42,%f44,%f42
+	std	%f20,[%i3+128-8]
+	faddd	%f24,%f26,%f24
 !52
 	add	%l1,1,%l1
-	std	%f42,[%i3+160-8]
-	faddd	%f48,%f50,%f48
+	std	%f24,[%i3+160-8]
+	faddd	%f28,%f30,%f28
+!53
+	cmp	%l1,15
+	std	%f28,[%i3+192-8]
+	fsubd	%f14,%f12,%f0
+!54
+	faddd	%f32,%f34,%f32
+	ble,pt	%icc,.L99999999
+	std	%f32,[%i3+224-8]
+
+
+!
+	ldd	[%g5+%lo(TwoToMinus32)],%f8
+!
+	ldd	[%i3+8],%f16
+!
+	ldd	[%i3+16],%f20
+!
+	fmuld	%f8,%f16,%f18
+	ldd	[%i3+24],%f24
+!
+	fmuld	%f8,%f20,%f22
+	ldd	[%i3+32],%f28
+!
+	fmuld	%f8,%f24,%f26
+	ldd	[%l5+%lo(TwoTo32)],%f10
+!
+	fmuld	%f8,%f28,%f30
+!
+	fdtox	%f18,%f18
+!
+	fdtox	%f22,%f22
+!
+	fdtox	%f26,%f26
+	ldd	[%i3+40],%f32
+!
+	fdtox	%f30,%f30
+	ldd	[%i3+48],%f56
+!
+	fxtod	%f18,%f18
+	fmuld	%f8,%f32,%f34
+	ldd	[%i3+56],%f36
+!
+	fxtod	%f22,%f22
+	fmuld	%f8,%f56,%f58
+	ldd	[%i3+64],%f38
+!
+	fxtod	%f26,%f26
+	fmuld	%f8,%f36,%f60
+!
+	fxtod	%f30,%f30
+	fmuld	%f8,%f38,%f62
+!
+	fdtox	%f34,%f34
+	fmuld	%f10,%f18,%f40
+!
+	fdtox	%f58,%f58
+	fmuld	%f10,%f22,%f42
+!
+	fdtox	%f60,%f60
+	fmuld	%f10,%f26,%f44
+!
+	fdtox	%f62,%f62
+	fmuld	%f10,%f30,%f46
+!
+	fxtod	%f34,%f34
+!
+	fxtod	%f58,%f58
+!
+	fxtod	%f60,%f60
+!
+	fxtod	%f62,%f62
+!
+	fsubd	%f16,%f40,%f40
+	fmuld	%f10,%f34,%f48
+!
+	fsubd	%f20,%f42,%f42
+	fmuld	%f10,%f58,%f50
+!
+	fsubd	%f24,%f44,%f44
+	fmuld	%f10,%f60,%f52
+!
+	fsubd	%f28,%f46,%f46
+	fmuld	%f10,%f62,%f54
+!
+	std	%f40,[%i3+8]
+!
+	std	%f42,[%i3+16]
+!
+	faddd	%f18,%f44,%f44
+	std	%f44,[%i3+24]
+!
+	faddd	%f22,%f46,%f46
+	std	%f46,[%i3+32]
+!
+
+
+
+	fsubd	%f32,%f48,%f48
+	ldd	[%i3+64+8],%f16
+!
+	fsubd	%f56,%f50,%f50
+	ldd	[%i3+64+16],%f20
+!
+	fsubd	%f36,%f52,%f52
+	ldd	[%i3+64+24],%f24
+!
+	fsubd	%f38,%f54,%f54
+	ldd	[%i3+64+32],%f28
+!
+	faddd	%f26,%f48,%f48
+	fmuld	%f8,%f16,%f18
+	std	%f48,[%i3+40]
+!
+	faddd	%f30,%f50,%f50
+	fmuld	%f8,%f20,%f22
+	std	%f50,[%i3+48]
+!
+	faddd	%f34,%f52,%f52
+	fmuld	%f8,%f24,%f26
+	std	%f52,[%i3+56]
+!
+	faddd	%f58,%f54,%f54
+	fmuld	%f8,%f28,%f30
+	std	%f54,[%i3+64]
+!
+
+
+	fdtox	%f18,%f18
+!
+	fdtox	%f22,%f22
+!
+	fdtox	%f26,%f26
+	ldd	[%i3+64+40],%f32
+!
+	fdtox	%f30,%f30
+	ldd	[%i3+64+48],%f56
+!
+	fxtod	%f18,%f18
+	fmuld	%f8,%f32,%f34
+	ldd	[%i3+64+56],%f36
+!
+	fxtod	%f22,%f22
+	fmuld	%f8,%f56,%f58
+	ldd	[%i3+64+64],%f38
+!
+	fxtod	%f26,%f26
+	fmuld	%f8,%f36,%f12
+!
+	fxtod	%f30,%f30
+	fmuld	%f8,%f38,%f14
+!
+	fdtox	%f34,%f34
+	fmuld	%f10,%f18,%f40
+!
+	fdtox	%f58,%f58
+	fmuld	%f10,%f22,%f42
+!
+	fdtox	%f12,%f12
+	fmuld	%f10,%f26,%f44
+!
+	fdtox	%f14,%f14
+	fmuld	%f10,%f30,%f46
+!
+	fxtod	%f34,%f34
+!
+	fxtod	%f58,%f58
+!
+	fxtod	%f12,%f12
+!
+	fxtod	%f14,%f14
+!
+	fsubd	%f16,%f40,%f40
+	fmuld	%f10,%f34,%f48
+!
+	fsubd	%f20,%f42,%f42
+	fmuld	%f10,%f58,%f50
+!
+	fsubd	%f24,%f44,%f44
+	fmuld	%f10,%f12,%f52
+!
+	fsubd	%f28,%f46,%f46
+	fmuld	%f10,%f14,%f54
+!
+	faddd	%f60,%f40,%f40
+	std	%f40,[%i3+64+8]
+!
+	faddd	%f62,%f42,%f42
+	std	%f42,[%i3+64+16]
+!
+	faddd	%f18,%f44,%f44
+	std	%f44,[%i3+64+24]
+!
+	faddd	%f22,%f46,%f46
+	std	%f46,[%i3+64+32]
+!
+
+
+
+	fsubd	%f32,%f48,%f48
+	ldd	[%i3+64+64+8],%f16
+!
+	fsubd	%f56,%f50,%f50
+	ldd	[%i3+64+64+16],%f20
+!
+	fsubd	%f36,%f52,%f52
+	ldd	[%i3+64+64+24],%f24
+!
+	fsubd	%f38,%f54,%f54
+	ldd	[%i3+64+64+32],%f28
+!
+	faddd	%f26,%f48,%f48
+	fmuld	%f8,%f16,%f18
+	std	%f48,[%i3+64+40]
+!
+	faddd	%f30,%f50,%f50
+	fmuld	%f8,%f20,%f22
+	std	%f50,[%i3+64+48]
+!
+	faddd	%f34,%f52,%f52
+	fmuld	%f8,%f24,%f26
+	std	%f52,[%i3+64+56]
+!
+	faddd	%f58,%f54,%f54
+	fmuld	%f8,%f28,%f30
+	std	%f54,[%i3+64+64]
+!
+
+
+
+	fdtox	%f18,%f18
+!
+	fdtox	%f22,%f22
+!
+	fdtox	%f26,%f26
+	ldd	[%i3+64+64+40],%f32
+!
+	fdtox	%f30,%f30
+	ldd	[%i3+64+64+48],%f56
+!
+	fxtod	%f18,%f18
+	fmuld	%f8,%f32,%f34
+	ldd	[%i3+64+64+56],%f36
+!
+	fxtod	%f22,%f22
+	fmuld	%f8,%f56,%f58
+	ldd	[%i3+64+64+64],%f38
+!
+	fxtod	%f26,%f26
+	fmuld	%f8,%f36,%f60
+!
+	fxtod	%f30,%f30
+	fmuld	%f8,%f38,%f62
+!
+	fdtox	%f34,%f34
+	fmuld	%f10,%f18,%f40
+!
+	fdtox	%f58,%f58
+	fmuld	%f10,%f22,%f42
+!
+	fdtox	%f60,%f60
+	fmuld	%f10,%f26,%f44
+!
+	fdtox	%f62,%f62
+	fmuld	%f10,%f30,%f46
+!
+	fxtod	%f34,%f34
+!
+	fxtod	%f58,%f58
+!
+	fxtod	%f60,%f60
+!
+	fxtod	%f62,%f62
+!
+	fsubd	%f16,%f40,%f40
+	fmuld	%f10,%f34,%f48
+!
+	fsubd	%f20,%f42,%f42
+	fmuld	%f10,%f58,%f50
+!
+	fsubd	%f24,%f44,%f44
+	fmuld	%f10,%f60,%f52
+!
+	fsubd	%f28,%f46,%f46
+	fmuld	%f10,%f62,%f54
+!
+	faddd	%f12,%f40,%f40
+	std	%f40,[%i3+64+64+8]
+!
+	faddd	%f14,%f42,%f42
+	std	%f42,[%i3+64+64+16]
+!
+	faddd	%f18,%f44,%f44
+	std	%f44,[%i3+64+64+24]
+!
+	faddd	%f22,%f46,%f46
+	std	%f46,[%i3+64+64+32]
+!
+
+
+	fsubd	%f32,%f48,%f48
+	ldd	[%i3+64+64+64+8],%f16
+!
+	fsubd	%f56,%f50,%f50
+	ldd	[%i3+64+64+64+16],%f20
+!
+	fsubd	%f36,%f52,%f52
+	ldd	[%i3+64+64+64+24],%f24
+!
+	fsubd	%f38,%f54,%f54
+	ldd	[%i3+64+64+64+32],%f28
+!
+	faddd	%f26,%f48,%f48
+	fmuld	%f8,%f16,%f18
+	std	%f48,[%i3+64+64+40]
+!
+	faddd	%f30,%f50,%f50
+	fmuld	%f8,%f20,%f22
+	std	%f50,[%i3+64+64+48]
+!
+	faddd	%f34,%f52,%f52
+	fmuld	%f8,%f24,%f26
+	std	%f52,[%i3+64+64+56]
+!
+	faddd	%f58,%f54,%f54
+	fmuld	%f8,%f28,%f30
+	std	%f54,[%i3+64+64+64]
+!
+
+
+	fdtox	%f18,%f18
+!
+	fdtox	%f22,%f22
+!
+	fdtox	%f26,%f26
+	ldd	[%i3+64+64+64+40],%f32
+!
+	fdtox	%f30,%f30
+	ldd	[%i3+64+64+64+48],%f56
+!
+	fxtod	%f18,%f18
+	fmuld	%f8,%f32,%f34
+	ldd	[%i3+64+64+64+56],%f36
+!
+	fxtod	%f22,%f22
+	fmuld	%f8,%f56,%f58
+	ldd	[%i3+64+64+64+64],%f38
+!
+	fxtod	%f26,%f26
+	fmuld	%f8,%f36,%f12
+!
+	fxtod	%f30,%f30
+	fmuld	%f8,%f38,%f14
+!
+	fdtox	%f34,%f34
+	fmuld	%f10,%f18,%f40
+!
+	fdtox	%f58,%f58
+	fmuld	%f10,%f22,%f42
+!
+	fdtox	%f12,%f12
+	fmuld	%f10,%f26,%f44
+!
+	fdtox	%f14,%f14
+	fmuld	%f10,%f30,%f46
+!
+	sethi	%hi(TwoToMinus16),%g5
+	fxtod	%f34,%f34
+!
+	sethi	%hi(TwoTo16),%l5
+	fxtod	%f58,%f58
+!
+	fxtod	%f12,%f12
+!
+	fxtod	%f14,%f14
+!
+	fsubd	%f16,%f40,%f16
+	fmuld	%f10,%f34,%f48
+	ldd	[%g5+%lo(TwoToMinus16)],%f8
+!
+	fsubd	%f20,%f42,%f20
+	fmuld	%f10,%f58,%f50
+	ldd	[%i1],%f40	! should be %f40
+!
+	fsubd	%f24,%f44,%f24
+	fmuld	%f10,%f12,%f52
+	ldd	[%i1+8],%f42	! should be %f42
+!
+	fsubd	%f28,%f46,%f28
+	fmuld	%f10,%f14,%f54
+	ldd	[%i4],%f44	! should be %f44
+!
+	faddd	%f60,%f16,%f16
+	std	%f16,[%i3+64+64+64+8]
+!
+	faddd	%f62,%f20,%f20
+	std	%f20,[%i3+64+64+64+16]
+!
+	faddd	%f18,%f24,%f24
+	std	%f24,[%i3+64+64+64+24]
+!
+	faddd	%f22,%f28,%f28
+	std	%f28,[%i3+64+64+64+32]
+!
+	fsubd	%f32,%f48,%f32
+	ldd	[%i4+8],%f46	 ! should be %f46
+!
+	fsubd	%f56,%f50,%f56
+	ldd	[%i1+104],%f48	! should be %f48
+!
+	fsubd	%f36,%f52,%f36
+	ldd	[%i4+104],%f50	! should be %f50
+!
+	fsubd	%f38,%f54,%f38
+	ldd	[%i1+16],%f52	! should be %f52
+!
+	faddd	%f26,%f32,%f32
+	std	%f32,[%i3+64+64+64+40]
+!
+	faddd	%f30,%f56,%f56
+	std	%f56,[%i3+64+64+64+48]
+!
+	faddd	%f34,%f36,%f36
+	std	%f36,[%i3+64+64+64+56]
+!
+	faddd	%f58,%f38,%f38
+	std	%f38,[%i3+64+64+64+64]
+!
+	std	%f12,[%i3+64+64+64+64+8]
+!
+	std	%f14,[%i3+64+64+64+64+16]
+!
+
+	ldd	[%l5+%lo(TwoTo16)],%f10
+	ldd	[%i1+48],%f54
+	ldd	[%i1+56],%f36
+	ldd	[%i1+64],%f56
+	ldd	[%i1+112],%f58
+
+	ldd	[%i4+104],%f50
+	ldd	[%i4+112],%f60
+
+
+	.L99999998:
+!1
+	ldd	[%i1+24],%f20
+	fmuld	%f0,%f44,%f12
+!2
+	ldd	[%i4+24],%f22
+	fmuld	%f42,%f4,%f16
+!3
+	ldd	[%i1+40],%f24
+	fmuld	%f46,%f0,%f18
+!4
+	ldd	[%i4+40],%f26
+	fmuld	%f20,%f4,%f20
+!5
+	ldd	[%l0+8],%f38
+	faddd	%f12,%f6,%f12
+	fmuld	%f22,%f0,%f22
+!6
+	add	%l0,8,%l0
+	ldd	[%i4+56],%f30
+	fmuld	%f24,%f4,%f24
+!7
+	ldd	[%i1+72],%f32
+	faddd	%f16,%f18,%f16
+	fmuld	%f26,%f0,%f26
+!8
+	ldd	[%i3+16],%f18
+	fmuld	%f40,%f38,%f14
+!9
+	ldd	[%i4+72],%f34
+	faddd	%f20,%f22,%f20
+	fmuld	%f8,%f12,%f12
+!10
+	ldd	[%i3+48],%f22
+	fmuld	%f36,%f4,%f28
+!11
+	ldd	[%i3+8],%f6
+	faddd	%f16,%f18,%f16
+	fmuld	%f30,%f0,%f30	
+!12
+	std	%f16,[%i3+16]
+	faddd	%f24,%f26,%f24
+	fmuld	%f32,%f4,%f32
+!13
+	ldd	[%i3+80],%f26
+	faddd	%f12,%f14,%f12
+	fmuld	%f34,%f0,%f34
+!14
+	ldd	[%i1+88],%f16
+	faddd	%f20,%f22,%f20
+!15
+	ldd	[%i4+88],%f18
+	faddd	%f28,%f30,%f28
+!16
+	ldd	[%i3+112],%f30
+	faddd	%f32,%f34,%f32
+!17
+	ldd	[%i3+144],%f34
+	faddd	%f12,%f6,%f6
+	fmuld	%f16,%f4,%f16
+!18
+	std	%f20,[%i3+48]
+	faddd	%f24,%f26,%f24
+	fmuld	%f18,%f0,%f18
+!19
+	std	%f24,[%i3+80]
+	faddd	%f28,%f30,%f28
+	fmuld	%f48,%f4,%f20
+!20
+	std	%f28,[%i3+112]
+	faddd	%f32,%f34,%f32
+	fmuld	%f50,%f0,%f22
+!21
+	ldd	[%i1+120],%f24
+	fdtox	%f6,%f12
+!22
+	std	%f32,[%i3+144]
+	faddd	%f16,%f18,%f16
+!23
+	ldd	[%i4+120],%f26
+!24
+	ldd	[%i3+176],%f18
+	faddd	%f20,%f22,%f20
+	fmuld	%f24,%f4,%f24
+!25
+	ldd	[%i4+16],%f30
+	fmovs	%f11,%f12
+!26
+	ldd	[%i1+32],%f32
+	fmuld	%f26,%f0,%f26
+!27
+	ldd	[%i4+32],%f34
+	fmuld	%f52,%f4,%f28
+!28
+	ldd	[%i3+208],%f22
+	faddd	%f16,%f18,%f16
+	fmuld	%f30,%f0,%f30
+!29
+	std	%f16,[%i3+176]
+	fxtod	%f12,%f12
+	fmuld	%f32,%f4,%f32
+!30
+	ldd	[%i4+48],%f18
+	faddd	%f24,%f26,%f24
+	fmuld	%f34,%f0,%f34
+!31
+	ldd	[%i3+240],%f26
+	faddd	%f20,%f22,%f20
+!32
+	std	%f20,[%i3+208]
+	faddd	%f28,%f30,%f28
+	fmuld	%f54,%f4,%f16
+!33
+	ldd	[%i3+32],%f30
+	fmuld	%f12,%f2,%f14
+!34
+	ldd	[%i4+64],%f22
+	faddd	%f32,%f34,%f32
+	fmuld	%f18,%f0,%f18
+!35
+	ldd	[%i3+64],%f34
+	faddd	%f24,%f26,%f24
+!36
+	std	%f24,[%i3+240]
+	faddd	%f28,%f30,%f28
+	fmuld	%f56,%f4,%f20
+!37
+	std	%f28,[%i3+32]
+	fmuld	%f14,%f8,%f12
+!38
+	ldd	[%i1+80],%f24
+	faddd	%f32,%f34,%f34	!	yes, tmp52!
+	fmuld	%f22,%f0,%f22
+!39
+	ldd	[%i4+80],%f26
+	faddd	%f16,%f18,%f16
+!40
+	ldd	[%i1+96],%f28
+	fmuld	%f58,%f4,%f32
+!41
+	ldd	[%i4+96],%f30
+	fdtox	%f12,%f12
+	fmuld	%f24,%f4,%f24
+!42
+	std	%f34,[%i3+64]	! yes, tmp52!
+	faddd	%f20,%f22,%f20
+	fmuld	%f26,%f0,%f26
+!43
+	ldd	[%i3+96],%f18
+	fmuld	%f28,%f4,%f28
+!44
+	ldd	[%i3+128],%f22
+	fmovd	%f38,%f4
+	fmuld	%f30,%f0,%f30
+!45
+	fxtod	%f12,%f12
+	fmuld	%f60,%f0,%f34
+!46
+	add	%i3,8,%i3
+	faddd	%f24,%f26,%f24
+!47
+	ldd	[%i3+160-8],%f26
+	faddd	%f16,%f18,%f16
+!48
+	std	%f16,[%i3+96-8]
+	faddd	%f28,%f30,%f28
+!49
+	ldd	[%i3+192-8],%f30
+	faddd	%f32,%f34,%f32
+	fmuld	%f12,%f10,%f12
+!50
+	ldd	[%i3+224-8],%f34
+	faddd	%f20,%f22,%f20
+!51
+	std	%f20,[%i3+128-8]
+	faddd	%f24,%f26,%f24
+!52
+	add	%l1,1,%l1
+	std	%f24,[%i3+160-8]
+	faddd	%f28,%f30,%f28
 !53
 	cmp	%l1,31
-	std	%f48,[%i3+192-8]
-	fsubd	%f12,%f4,%f0
+	std	%f28,[%i3+192-8]
+	fsubd	%f14,%f12,%f0
 !54
-	faddd	%f52,%f56,%f52
-	ble,pt	%icc,.L99999999
-	std	%f52,[%i3+224-8]
+	faddd	%f32,%f34,%f32
+	ble,pt	%icc,.L99999998
+	std	%f32,[%i3+224-8]
 !55
-	std %f8,[%i3]
+	std	%f6,[%i3]
+
 	add	%o5,%g0,%i3
 
-	
-	
+
+!END HAND CODED PART
                        .L900000828:
 /* 0x03e4	 405 */		ba	.L900000852
 /* 0x03e8	 409 */		ldx	[%i3+%o0],%l1
