@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,6 @@
 /*
  *  glue routine for gss_acquire_cred
  */
-
 #include <mechglueP.h>
 #include <stdio.h>
 #ifdef HAVE_STDLIB_H
@@ -274,32 +273,51 @@ gss_add_cred(minor_status, input_cred_handle,
 			return (GSS_S_FAILURE);
 
 		(void) memset(union_cred, 0, sizeof (gss_union_cred_desc));
-
-		/* for default credentials we will use GSS_C_NO_NAME */
-		internal_name = GSS_C_NO_NAME;
 	} else {
+		/* Input Cred is non-NULL */
 		union_cred = (gss_union_cred_t)input_cred_handle;
-		if (__gss_get_mechanism_cred(union_cred, desired_mech) !=
-			GSS_C_NO_CREDENTIAL)
-			return (GSS_S_DUPLICATE_ELEMENT);
 
-		/* may need to create a mechanism specific name */
-		if (desired_name) {
-			union_name = (gss_union_name_t)desired_name;
-			if (union_name->mech_type &&
-				g_OID_equal(union_name->mech_type,
-						&mech->mech_type))
-				internal_name = union_name->mech_name;
-			else {
-				if (__gss_import_internal_name(minor_status,
-					&mech->mech_type, union_name,
-					&allocated_name) != GSS_S_COMPLETE)
-					return (GSS_S_BAD_NAME);
+		if (__gss_get_mechanism_cred(union_cred, desired_mech) !=
+			GSS_C_NO_CREDENTIAL) {
+			status = GSS_S_DUPLICATE_ELEMENT;
+			goto errout;
+		}
+
+		/*
+		 * If no name was given, determine the name from the
+		 * existing credential.
+		 */
+		if (desired_name == GSS_C_NO_NAME) {
+			if (gss_import_name(minor_status,
+				&union_cred->auxinfo.name,
+				union_cred->auxinfo.name_type,
+				&allocated_name) == GSS_S_COMPLETE &&
+			    (gss_canonicalize_name(minor_status,
+					allocated_name,
+					&mech->mech_type,
+					NULL) == GSS_S_COMPLETE)) {
 				internal_name = allocated_name;
 			}
+		} /* else, get the name from the desired_name below */
+	}
+	if (desired_name != GSS_C_NO_NAME) {
+		/* may need to create a mechanism specific name */
+		union_name = (gss_union_name_t)desired_name;
+
+		if (union_name->mech_type &&
+			g_OID_equal(union_name->mech_type,
+					&mech->mech_type))
+			internal_name = union_name->mech_name;
+		else {
+			if (__gss_import_internal_name(minor_status,
+				&mech->mech_type, union_name,
+				&allocated_name) != GSS_S_COMPLETE) {
+				status = GSS_S_BAD_NAME;
+				goto errout;
+			}
+			internal_name = allocated_name;
 		}
 	}
-
 
 	if (cred_usage == GSS_C_ACCEPT)
 		time_req = acceptor_time_req;
@@ -317,7 +335,7 @@ gss_add_cred(minor_status, input_cred_handle,
 	if (status != GSS_S_COMPLETE)
 		goto errout;
 
-	/* may need to set credential auxinfo strucutre */
+	/* may need to set credential auxinfo structure */
 	if (union_cred->auxinfo.creation_time == 0) {
 		union_cred->auxinfo.creation_time = time(NULL);
 		union_cred->auxinfo.time_rec = time_rec;
@@ -327,7 +345,7 @@ gss_add_cred(minor_status, input_cred_handle,
 		 * we must set the name; if name is not supplied
 		 * we must do inquire cred to get it
 		 */
-		if (internal_name == NULL) {
+		if (internal_name == GSS_C_NO_NAME) {
 			if (mech->gss_inquire_cred == NULL ||
 				((status = mech->gss_inquire_cred(
 						mech->context,

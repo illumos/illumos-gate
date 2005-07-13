@@ -106,7 +106,7 @@ static struct gss_config spnego_mechanism =
 	spnego_gss_display_name,
 	spnego_gss_import_name,
 	spnego_gss_release_name,
-	NULL,				/* gss_inquire_cred */
+	spnego_gss_inquire_cred,	/* gss_inquire_cred */
 	NULL,				/* gss_add_cred */
 /* EXPORT DELETE START */ /* CRYPT DELETE START */
 	spnego_gss_seal,		/* gss_seal */
@@ -253,7 +253,6 @@ create_spnego_ctx(void)
 		return (NULL);
 	}
 
-	spnego_ctx->magic_num = SPNEGO_MAGIC_ID;
 	spnego_ctx->ctx_handle = GSS_C_NO_CONTEXT;
 	spnego_ctx->internal_mech = NULL;
 	spnego_ctx->optionStr = NULL;
@@ -312,7 +311,7 @@ spnego_gss_init_sec_context(void *ct,
 	dsyslog("Entering init_sec_context\n");
 
 	if (context_handle == NULL)
-		return (GSS_S_FAILURE);
+		return (GSS_S_NO_CONTEXT);
 
 	*minor_status = 0;
 	output_token->length = 0;
@@ -362,7 +361,7 @@ spnego_gss_init_sec_context(void *ct,
 		}
 
 		if (input_token != NULL && input_token->value != NULL) {
-			ret = GSS_S_FAILURE;
+			ret = GSS_S_DEFECTIVE_TOKEN;
 			goto cleanup;
 		}
 
@@ -380,7 +379,7 @@ spnego_gss_init_sec_context(void *ct,
 		spnego_ctx = (spnego_gss_ctx_id_t)(*context_handle);
 
 		if (input_token == NULL || input_token->value == NULL) {
-			ret = GSS_S_FAILURE;
+			ret = GSS_S_DEFECTIVE_TOKEN;
 			goto cleanup;
 		}
 		ptr = (unsigned char *) input_token->value;
@@ -536,13 +535,6 @@ spnego_gss_init_sec_context(void *ct,
 		}
 	}
 
-	if (actual_mech) {
-		(void) generic_gss_release_oid(&mstat, actual_mech);
-		ret = generic_gss_copy_oid(&mstat,
-			(gss_OID) gss_mech_spnego, actual_mech);
-		if (ret != GSS_S_COMPLETE)
-			goto cleanup;
-	}
 
 	if (send_token == NO_TOKEN_SEND) {
 		output_token->length = 0;
@@ -633,12 +625,6 @@ spnego_gss_init_sec_context(void *ct,
 
 	if ((status == GSS_S_COMPLETE) &&
 	    (ret == GSS_S_COMPLETE)) {
-		/*
-		 * Now, switch the output context to refer to the
-		 * negotiated mechanism's context.
-		 */
-		*context_handle = (gss_ctx_id_t)spnego_ctx->ctx_handle;
-
 		if (actual_mech) {
 			(void) generic_gss_release_oid(&mstat, actual_mech);
 			ret = generic_gss_copy_oid(&mstat,
@@ -647,7 +633,6 @@ spnego_gss_init_sec_context(void *ct,
 				goto cleanup;
 		}
 
-		release_spnego_ctx(&spnego_ctx);
 	} else if (ret == GSS_S_CONTINUE_NEEDED) {
 		if (make_spnego_tokenInit_msg(spnego_ctx,
 				mechSet,
@@ -664,7 +649,8 @@ cleanup:
 	    ret != GSS_S_CONTINUE_NEEDED) {
 		if (spnego_ctx != NULL &&
 		    spnego_ctx->ctx_handle != NULL)
-			free(spnego_ctx->ctx_handle);
+			gss_delete_sec_context(&mstat, &spnego_ctx->ctx_handle,
+				GSS_C_NO_BUFFER);
 
 		if (spnego_ctx != NULL)
 			release_spnego_ctx(&spnego_ctx);
@@ -739,7 +725,7 @@ spnego_gss_accept_sec_context(void *ct,
 	dsyslog("Entering accept_sec_context\n");
 
 	if (context_handle == NULL)
-		return (GSS_S_FAILURE);
+		return (GSS_S_NO_CONTEXT);
 
 	if (src_name)
 		*src_name = (gss_name_t)NULL;
@@ -1047,14 +1033,7 @@ spnego_gss_accept_sec_context(void *ct,
 		}
 		ret = status;
 
-		/*
-		 * If we got this far OK, then switch the
-		 * returned context handle to reference the
-		 * "real" context handle for the mech.
-		 */
 		if (status == GSS_S_COMPLETE) {
-			*context_handle =
-				(gss_ctx_id_t)spnego_ctx->ctx_handle;
 			if (internal_name != NULL && src_name != NULL)
 				*src_name = internal_name;
 		}
@@ -1099,7 +1078,6 @@ senderror:
 	} else {
 		(void) gss_release_buffer(&mstat, output_token);
 	}
-	release_spnego_ctx(&spnego_ctx);
 
 cleanup:
 	if (ret != GSS_S_COMPLETE &&
@@ -1226,6 +1204,23 @@ spnego_gss_display_name(void *ctx,
 
 /*ARGSUSED*/
 OM_uint32
+spnego_gss_inquire_cred(void *ctx,
+	OM_uint32 *minor_status,
+	const gss_cred_id_t cred_handle,
+	gss_name_t *name,
+	OM_uint32 *lifetime,
+	gss_cred_usage_t *cred_usage,
+	gss_OID_set *mechanisms)
+{
+	/* A SPNEGO cred is just a standard libgss cred record */
+	return (gss_inquire_cred(minor_status,
+			cred_handle, name,
+			lifetime, cred_usage,
+			mechanisms));
+}
+
+/*ARGSUSED*/
+OM_uint32
 spnego_gss_inquire_names_for_mech(void *ctx,
 				OM_uint32	*minor_status,
 				gss_OID		mechanism,
@@ -1278,8 +1273,14 @@ spnego_gss_unseal(void *context,
 		int *qop_state)
 {
 	OM_uint32 ret;
+	spnego_gss_ctx_id_t ctx =
+		    (spnego_gss_ctx_id_t)context_handle;
+
+	if (context_handle == NULL)
+		return (GSS_S_NO_CONTEXT);
+
 	ret = gss_unseal(minor_status,
-			context_handle,
+			ctx->ctx_handle,
 			input_message_buffer,
 			output_message_buffer,
 			conf_state,
@@ -1299,8 +1300,14 @@ spnego_gss_seal(void *context,
 		gss_buffer_t output_message_buffer)
 {
 	OM_uint32 ret;
+	spnego_gss_ctx_id_t ctx =
+		    (spnego_gss_ctx_id_t)context_handle;
+
+	if (context_handle == NULL)
+		return (GSS_S_NO_CONTEXT);
+
 	ret = gss_seal(minor_status,
-		    context_handle,
+		    ctx->ctx_handle,
 		    conf_req_flag,
 		    qop_req,
 		    input_message_buffer,
@@ -1317,8 +1324,14 @@ spnego_gss_process_context_token(void *context,
 				const gss_buffer_t token_buffer)
 {
 	OM_uint32 ret;
+	spnego_gss_ctx_id_t ctx =
+		    (spnego_gss_ctx_id_t)context_handle;
+
+	if (context_handle == NULL)
+		return (GSS_S_NO_CONTEXT);
+
 	ret = gss_process_context_token(minor_status,
-					context_handle,
+					ctx->ctx_handle,
 					token_buffer);
 
 	return (ret);
@@ -1334,18 +1347,17 @@ spnego_gss_delete_sec_context(void *context,
 	spnego_gss_ctx_id_t *ctx =
 		    (spnego_gss_ctx_id_t *)context_handle;
 
-	if (context_handle == NULL)
-		return (GSS_S_FAILURE);
+	if (context_handle == NULL || *ctx == NULL)
+		return (GSS_S_NO_CONTEXT);
 
 	/*
-	 * If this is still an SPNEGO mech, release it locally.
+	 * If this is still a SPNEGO mech, release it locally.
 	 */
-	if (*ctx != NULL &&
-	    (*ctx)->magic_num == SPNEGO_MAGIC_ID) {
+	if ((*ctx)->ctx_handle == GSS_C_NO_CONTEXT) {
 		(void) release_spnego_ctx(ctx);
 	} else {
 		ret = gss_delete_sec_context(minor_status,
-				    context_handle,
+				    &(*ctx)->ctx_handle,
 				    output_token);
 	}
 
@@ -1359,9 +1371,16 @@ spnego_gss_context_time(void *context,
 			OM_uint32	*time_rec)
 {
 	OM_uint32 ret;
+	spnego_gss_ctx_id_t ctx =
+		    (spnego_gss_ctx_id_t)context_handle;
+
+	if (context_handle == NULL)
+		return (GSS_S_NO_CONTEXT);
+
 	ret = gss_context_time(minor_status,
-			    context_handle,
+			    ctx->ctx_handle,
 			    time_rec);
+
 	return (ret);
 }
 
@@ -1372,8 +1391,14 @@ spnego_gss_export_sec_context(void *context,
 			    gss_buffer_t interprocess_token)
 {
 	OM_uint32 ret;
+	spnego_gss_ctx_id_t *ctx =
+		    (spnego_gss_ctx_id_t *)context_handle;
+
+	if (context_handle == NULL || *ctx == NULL)
+		return (GSS_S_NO_CONTEXT);
+
 	ret = gss_export_sec_context(minor_status,
-				    context_handle,
+				    &(*ctx)->ctx_handle,
 				    interprocess_token);
 	return (ret);
 }
@@ -1385,9 +1410,16 @@ spnego_gss_import_sec_context(void *context,
 	gss_ctx_id_t		*context_handle)
 {
 	OM_uint32 ret;
+	spnego_gss_ctx_id_t *ctx =
+		    (spnego_gss_ctx_id_t *)context_handle;
+
+	if (context_handle == NULL || *ctx == NULL)
+		return (GSS_S_NO_CONTEXT);
+
 	ret = gss_import_sec_context(minor_status,
 				    interprocess_token,
-				    context_handle);
+				    &(*ctx)->ctx_handle);
+
 	return (ret);
 }
 
@@ -1404,9 +1436,14 @@ spnego_gss_inquire_context(void *context,
 			int		*open)
 {
 	OM_uint32 ret = GSS_S_COMPLETE;
+	spnego_gss_ctx_id_t ctx =
+		    (spnego_gss_ctx_id_t)context_handle;
+
+	if (context_handle == NULL)
+		return (GSS_S_NO_CONTEXT);
 
 	ret = gss_inquire_context(minor_status,
-				context_handle,
+				ctx->ctx_handle,
 				src_name,
 				targ_name,
 				lifetime_rec,
@@ -1428,8 +1465,14 @@ spnego_gss_wrap_size_limit(void *context,
 	OM_uint32	*max_input_size)
 {
 	OM_uint32 ret;
+	spnego_gss_ctx_id_t ctx =
+		    (spnego_gss_ctx_id_t)context_handle;
+
+	if (context_handle == NULL)
+		return (GSS_S_NO_CONTEXT);
+
 	ret = gss_wrap_size_limit(minor_status,
-				context_handle,
+				ctx->ctx_handle,
 				conf_req_flag,
 				qop_req,
 				req_output_size,
@@ -1446,11 +1489,18 @@ spnego_gss_sign(void *context,
 		gss_buffer_t message_token)
 {
 	OM_uint32 ret;
+	spnego_gss_ctx_id_t ctx =
+		    (spnego_gss_ctx_id_t)context_handle;
+
+	if (context_handle == NULL)
+		return (GSS_S_NO_CONTEXT);
+
 	ret = gss_sign(minor_status,
-		    context_handle,
+		    ctx->ctx_handle,
 		    qop_req,
 		    message_buffer,
 		    message_token);
+
 	return (ret);
 }
 
@@ -1463,8 +1513,14 @@ spnego_gss_verify(void *context,
 		int *qop_state)
 {
 	OM_uint32 ret;
+	spnego_gss_ctx_id_t ctx =
+		    (spnego_gss_ctx_id_t)context_handle;
+
+	if (context_handle == NULL)
+		return (GSS_S_NO_CONTEXT);
+
 	ret = gss_verify_mic(minor_status,
-			    context_handle,
+			    ctx->ctx_handle,
 			    msg_buffer,
 			    token_buffer,
 			    (uint32_t *)qop_state);
@@ -1482,7 +1538,11 @@ release_spnego_ctx(spnego_gss_ctx_id_t *ctx)
 {
 	spnego_gss_ctx_id_t context;
 	OM_uint32 minor_stat;
-	context = *ctx;
+
+	if (ctx != NULL)
+		context = *ctx;
+	else
+		return;
 
 	if (context != NULL) {
 		(void) gss_release_buffer(&minor_stat,
@@ -1495,6 +1555,11 @@ release_spnego_ctx(spnego_gss_ctx_id_t *ctx)
 			free(context->optionStr);
 			context->optionStr = NULL;
 		}
+		if (context->ctx_handle != GSS_C_NO_CONTEXT)
+			gss_delete_sec_context(&minor_stat,
+				&context->ctx_handle,
+				GSS_C_NO_BUFFER);
+
 		free(context);
 		*ctx = NULL;
 	}

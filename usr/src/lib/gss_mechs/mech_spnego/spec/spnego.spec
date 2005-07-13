@@ -105,3 +105,9 @@ end
 function	spnego_gss_verify
 version		SUNWprivate
 end
+
+function	spnego_gss_inquire_cred
+version		SUNWprivate
+end
+
+

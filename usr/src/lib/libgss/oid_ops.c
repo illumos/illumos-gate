@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,6 +103,12 @@ generic_gss_copy_oid(minor_status, oid, new_oid)
 	if (minor_status)
 		*minor_status = 0;
 
+	if (new_oid == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	if (oid == GSS_C_NO_OID)
+		return (GSS_S_CALL_INACCESSIBLE_READ);
+
 	p = (gss_OID) malloc(sizeof (gss_OID_desc));
 	if (!p) {
 		return (GSS_S_FAILURE);
@@ -127,6 +133,9 @@ gss_OID_set *oid_set;
 	if (minor_status)
 		*minor_status = 0;
 
+	if (oid_set == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
 	if ((*oid_set = (gss_OID_set) malloc(sizeof (gss_OID_set_desc)))) {
 		(void) memset(*oid_set, 0, sizeof (gss_OID_set_desc));
 		return (GSS_S_COMPLETE);
@@ -147,30 +156,34 @@ gss_OID_set *oid_set;
 	if (minor_status)
 		*minor_status = 0;
 
-	if (member_oid == NULL || member_oid->length == 0 ||
+	if (member_oid == GSS_C_NO_OID || member_oid->length == 0 ||
 		member_oid->elements == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_READ);
+
+	if (oid_set == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
 	elist = (*oid_set)->elements;
 	/* Get an enlarged copy of the array */
 	if (((*oid_set)->elements = (gss_OID) malloc(((*oid_set)->count+1) *
 					sizeof (gss_OID_desc)))) {
-	/* Copy in the old junk */
+		/* Copy in the old junk */
 		if (elist)
 			(void) memcpy((*oid_set)->elements, elist,
 				((*oid_set)->count * sizeof (gss_OID_desc)));
 
-	/* Duplicate the input element */
+		/* Duplicate the input element */
 		lastel = &(*oid_set)->elements[(*oid_set)->count];
 		if ((lastel->elements =
 			(void *) malloc(member_oid->length))) {
-		/* Success - copy elements */
+
+			/* Success - copy elements */
 			(void) memcpy(lastel->elements, member_oid->elements,
 					member_oid->length);
-		/* Set length */
+			/* Set length */
 			lastel->length = member_oid->length;
 
-		/* Update count */
+			/* Update count */
 			(*oid_set)->count++;
 			if (elist)
 				free(elist);
@@ -196,7 +209,7 @@ generic_gss_test_oid_set_member(minor_status, member, set, present)
 	if (minor_status)
 		*minor_status = 0;
 
-	if (member == NULL || set == NULL)
+	if (member == GSS_C_NO_OID || set == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_READ);
 
 	if (present == NULL)
@@ -235,13 +248,11 @@ gss_buffer_t oid_str;
 	if (minor_status)
 		*minor_status = 0;
 
-	if (oid == NULL || oid->length == 0 || oid->elements == NULL)
+	if (oid == GSS_C_NO_OID || oid->length == 0 || oid->elements == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_READ);
 
 	if (oid_str == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-
-	/* Decoded according to krb5/gssapi_krb5.c */
 
 	/* First determine the size of the string */
 	string_length = 0;

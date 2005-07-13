@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,26 +234,31 @@ gss_inquire_cred_by_mech(minor_status, cred_handle, mech_type, name,
 	if (mech_cred == NULL)
 		return (GSS_S_DEFECTIVE_CREDENTIAL);
 
-	status = mech->gss_inquire_cred_by_mech(mech->context, minor_status,
-						mech_cred, mech_type,
-						name ? &internal_name : NULL,
-						initiator_lifetime,
-						acceptor_lifetime, cred_usage);
+	if (mech->gss_inquire_cred_by_mech != NULL) {
+		status = mech->gss_inquire_cred_by_mech(mech->context,
+					minor_status,
+					mech_cred, mech_type,
+					name ? &internal_name : NULL,
+					initiator_lifetime,
+					acceptor_lifetime, cred_usage);
 
-	if (status != GSS_S_COMPLETE)
-		return (status);
-
-	if (name) {
-		/*
-		 * Convert internal_name into a union_name equivalent.
-		 */
-		status = __gss_convert_name_to_union_name(
-						&temp_minor_status, mech,
-						internal_name, name);
-		if (status != GSS_S_COMPLETE) {
-			*minor_status = temp_minor_status;
+		if (status != GSS_S_COMPLETE)
 			return (status);
+
+		if (name) {
+			/*
+			 * Convert internal_name into a union_name equivalent.
+			 */
+			status = __gss_convert_name_to_union_name(
+					&temp_minor_status, mech,
+					internal_name, name);
+			if (status != GSS_S_COMPLETE) {
+				*minor_status = temp_minor_status;
+				return (status);
+			}
 		}
+	} else {
+		return (GSS_S_UNAVAILABLE);
 	}
 
 	return (GSS_S_COMPLETE);

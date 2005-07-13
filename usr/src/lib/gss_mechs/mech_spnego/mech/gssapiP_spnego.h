@@ -91,17 +91,8 @@ typedef	enum {NO_TOKEN_SEND, INIT_TOKEN_SEND, CONT_TOKEN_SEND,
 
 typedef void *spnego_token_t;
 
-/* spnego name structure for internal representation. */
-typedef struct {
-	gss_OID type;
-	gss_buffer_t buffer;
-	gss_OID	mech_type;
-	gss_name_t	mech_name;
-} spnego_name_desc, *spnego_name_t;
-
 /* Structure for context handle */
 typedef struct {
-	OM_uint32	magic_num;
 	gss_buffer_desc DER_mechTypes;
 	gss_OID internal_mech;
 	gss_ctx_id_t ctx_handle;
@@ -110,12 +101,6 @@ typedef struct {
 	int optimistic;
 	OM_uint32 last_status;
 } spnego_gss_ctx_id_rec, *spnego_gss_ctx_id_t;
-
-/*
- * The magic number must be less than a standard pagesize
- * to avoid a possible collision with a real address.
- */
-#define	SPNEGO_MAGIC_ID  0x00000fed
 
 /* SPNEGO oid structure */
 static const gss_OID_desc spnego_oids[] = {
@@ -352,6 +337,18 @@ OM_uint32 spnego_gss_verify
 	const gss_buffer_t token_buffer,
 	int *qop_state
 );
+
+OM_uint32 spnego_gss_inquire_cred
+(
+	void *context,
+	OM_uint32 *minor_status,
+	const gss_cred_id_t cred_handle,
+	gss_name_t  *name,
+	OM_uint32 *lifetime,
+	gss_cred_usage_t *cred_usage,
+	gss_OID_set *mechanisms
+);
+
 
 #ifdef	__cplusplus
 }
