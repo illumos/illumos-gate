@@ -1889,7 +1889,6 @@ modrload(char *subdir, char *filename, struct modctl **rmodp)
 	char *fullname;
 	int retval = EINVAL;
 	int id = -1;
-	struct _buf *buf;
 
 	if (rmodp)
 		*rmodp = NULL;			/* avoid garbage */
@@ -1909,21 +1908,6 @@ modrload(char *subdir, char *filename, struct modctl **rmodp)
 		(void) sprintf(fullname, "%s/%s", subdir, filename);
 	} else {
 		fullname = filename;
-	}
-
-	/*
-	 * Verify that that module in question actually exists on disk.
-	 * Otherwise, modload_now will succeed if (for example) modload
-	 * is requested for sched/nfs if fs/nfs is already loaded, and
-	 * sched/nfs doesn't exist.
-	 */
-	if (modrootloaded && swaploaded) {
-		if ((buf = kobj_open_path(fullname, 1, 1)) ==
-		    (struct _buf *)-1) {
-			retval = ENOENT;
-			goto done;
-		}
-		kobj_close_file(buf);
 	}
 
 	modp = mod_hold_installed_mod(fullname, 1, &retval);
@@ -2277,6 +2261,24 @@ mod_hold_installed_mod(char *name, int usepath, int *r)
 {
 	struct modctl *modp;
 	int retval;
+	struct _buf *file;
+
+	/*
+	 * Verify that that module in question actually exists on disk
+	 * before allocation of module structure by mod_hold_by_name.
+	 */
+	if (modrootloaded && swaploaded) {
+		file = kobj_open_path(name, usepath, 1);
+#ifdef	MODDIR_SUFFIX
+		if (file == (struct _buf *)-1)
+			file = kobj_open_path(name, usepath, 0);
+#endif	/* MODDIR_SUFFIX */
+		if (file == (struct _buf *)-1) {
+			*r = ENOENT;
+			return (NULL);
+		}
+		kobj_close_file(file);
+	}
 
 	/*
 	 * Hold the module.
