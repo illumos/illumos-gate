@@ -848,6 +848,9 @@ typedef struct nfs4_debug_msg {
  *		mi_open_files
  *		mi_srvsettime
  *
+ *	The mntinfo4_t::mi_recovlock protects the following fields:
+ *		mi_srvsettime
+ *
  *	Locking order:
  *	  mi4_globals::mig_lock > mi_async_lock
  *	  mi_async_lock > nfs4_server_t::s_lock > mi_lock
@@ -856,6 +859,8 @@ typedef struct nfs4_debug_msg {
  *	  rnode4_t::r_rwlock > mi_rename_lock
  *	  nfs_rtable4_lock > mi_lock
  *	  nfs4_server_t::s_lock > mi_msg_list_lock
+ *	  mi_recovlock > nfs4_server_t::s_lock
+ *	  mi_recovlock > nfs4_server_lst_lock
  *
  * The 'mi_oo_list' represents the hash buckets that contain the
  * nfs4_open_owenrs for this particular mntinfo4.

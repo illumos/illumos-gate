@@ -2425,7 +2425,9 @@ int nfs4_num_sclid_retries = NFS4_NUM_SCLID_RETRIES;
  * already set.
  *
  * The recovery boolean should be set to TRUE if this function was called
- * by the recovery code, and FALSE otherwise.
+ * by the recovery code, and FALSE otherwise.  This is used to determine
+ * if we need to call nfs4_start/end_op as well as grab the mi_recovlock
+ * for adding a mntinfo4_t to a nfs4_server_t.
  *
  * Error is returned via 'n4ep'.  If there was a 'n4ep->stat' error, then
  * 'n4ep->error' is set to geterrno4(n4ep->stat).
@@ -2448,6 +2450,9 @@ nfs4setclientid(mntinfo4_t *mi, cred_t *cr, bool_t recovery, nfs4_error_t *n4ep)
 
 recov_retry:
 	nfs4_error_zinit(n4ep);
+	if (!recovery)
+		(void) nfs_rw_enter_sig(&mi->mi_recovlock, RW_READER, 0);
+
 	/* This locks np if it is found */
 	np = servinfo4_to_nfs4_server(svp);
 	ASSERT(np == NULL || MUTEX_HELD(&np->s_lock));
@@ -2465,10 +2470,19 @@ recov_retry:
 		 */
 		/* add mi to np's mntinfo4_list */
 		nfs4_add_mi_to_server(np, mi);
+		if (!recovery)
+			nfs_rw_exit(&mi->mi_recovlock);
 		mutex_exit(&np->s_lock);
 		nfs4_server_rele(np);
 		return;
 	}
+
+	/*
+	 * Drop the mi_recovlock since nfs4_start_op will
+	 * acquire it again for us.
+	 */
+	if (!recovery)
+		nfs_rw_exit(&mi->mi_recovlock);
 
 	if (!np)
 		np = new_nfs4_server(svp, cr);
@@ -2843,6 +2857,8 @@ nfs4_add_mi_to_server(nfs4_server_t *sp, mntinfo4_t *mi)
 	mntinfo4_t *tmi;
 	int in_list = 0;
 
+	ASSERT(nfs_rw_lock_held(&mi->mi_recovlock, RW_READER) ||
+	    nfs_rw_lock_held(&mi->mi_recovlock, RW_WRITER));
 	ASSERT(sp != &nfs4_server_lst);
 	ASSERT(MUTEX_HELD(&sp->s_lock));
 

@@ -855,8 +855,8 @@ get_sp:
 	sp = find_nfs4_server(mi);
 	if (sp != NULL) {
 		sp->s_otw_call_count++;
-		droplock_time = gethrestime_sec();
 		mutex_exit(&sp->s_lock);
+		droplock_time = gethrestime_sec();
 	}
 	nfs_rw_exit(&mi->mi_recovlock);
 
@@ -878,15 +878,8 @@ get_sp:
 	 * If the mntinfo4_t hasn't changed nfs4_sever_ts then
 	 * there's no point in double checking to make sure it
 	 * has switched.
-	 * XXX is there a better lock to use for mi_srvsettime
-	 * instead of s_lock?  mi_recovlock as READER would
-	 * be perfect.
 	 */
-	if (sp != NULL)
-		mutex_enter(&sp->s_lock);
 	if (sp == NULL || droplock_time < mi->mi_srvsettime) {
-		if (sp != NULL)
-			mutex_exit(&sp->s_lock);
 		tsp = find_nfs4_server(mi);
 		if (tsp != sp) {
 			/* try again */
@@ -911,9 +904,6 @@ get_sp:
 				tsp = NULL;
 			}
 		}
-	} else {
-		if (sp != NULL)
-			mutex_exit(&sp->s_lock);
 	}
 
 	if (sp != NULL) {
