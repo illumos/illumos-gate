@@ -196,6 +196,7 @@ typedef struct stdata {
 	kmutex_t	sd_lock;	/* protect head consistency */
 	kcondvar_t	sd_monitor;	/* open/close/push/pop monitor */
 	kcondvar_t	sd_iocmonitor;	/* ioctl single-threading */
+	kcondvar_t	sd_refmonitor;	/* sd_refcnt monitor */
 	ssize_t		sd_qn_minpsz;	/* These two fields are a performance */
 	ssize_t		sd_qn_maxpsz;	/* enhancements, cache the values in */
 					/* the stream head so we don't have */

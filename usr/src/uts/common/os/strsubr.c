@@ -633,6 +633,7 @@ stream_head_constructor(void *buf, void *cdrarg, int kmflags)
 	mutex_init(&stp->sd_qlock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&stp->sd_monitor, NULL, CV_DEFAULT, NULL);
 	cv_init(&stp->sd_iocmonitor, NULL, CV_DEFAULT, NULL);
+	cv_init(&stp->sd_refmonitor, NULL, CV_DEFAULT, NULL);
 	cv_init(&stp->sd_qcv, NULL, CV_DEFAULT, NULL);
 	cv_init(&stp->sd_zcopy_wait, NULL, CV_DEFAULT, NULL);
 	stp->sd_wrq = NULL;
@@ -651,6 +652,7 @@ stream_head_destructor(void *buf, void *cdrarg)
 	mutex_destroy(&stp->sd_qlock);
 	cv_destroy(&stp->sd_monitor);
 	cv_destroy(&stp->sd_iocmonitor);
+	cv_destroy(&stp->sd_refmonitor);
 	cv_destroy(&stp->sd_qcv);
 	cv_destroy(&stp->sd_zcopy_wait);
 }
@@ -4414,7 +4416,7 @@ retry:
 		mutex_enter(&stp1->sd_reflock);
 		if (stp1->sd_refcnt > 0) {
 			STRUNLOCKMATES(stp);
-			cv_wait(&stp1->sd_monitor, &stp1->sd_reflock);
+			cv_wait(&stp1->sd_refmonitor, &stp1->sd_reflock);
 			mutex_exit(&stp1->sd_reflock);
 			goto retry;
 		}
@@ -4422,7 +4424,7 @@ retry:
 		if (stp2->sd_refcnt > 0) {
 			STRUNLOCKMATES(stp);
 			mutex_exit(&stp1->sd_reflock);
-			cv_wait(&stp2->sd_monitor, &stp2->sd_reflock);
+			cv_wait(&stp2->sd_refmonitor, &stp2->sd_reflock);
 			mutex_exit(&stp2->sd_reflock);
 			goto retry;
 		}
@@ -4433,7 +4435,7 @@ retry:
 		mutex_enter(&stp->sd_reflock);
 		while (stp->sd_refcnt > 0) {
 			mutex_exit(&stp->sd_lock);
-			cv_wait(&stp->sd_monitor, &stp->sd_reflock);
+			cv_wait(&stp->sd_refmonitor, &stp->sd_reflock);
 			if (mutex_tryenter(&stp->sd_lock) == 0) {
 				mutex_exit(&stp->sd_reflock);
 				mutex_enter(&stp->sd_lock);
@@ -5435,8 +5437,8 @@ releasestr(queue_t *qp)
 
 	mutex_enter(&stp->sd_reflock);
 	ASSERT(stp->sd_refcnt != 0);
-	stp->sd_refcnt--;
-	cv_broadcast(&stp->sd_monitor);
+	if (--stp->sd_refcnt == 0)
+		cv_broadcast(&stp->sd_refmonitor);
 	mutex_exit(&stp->sd_reflock);
 }
 
