@@ -1742,7 +1742,7 @@ tl_wput(queue_t *wq, mblk_t *mp)
 				SL_TRACE|SL_ERROR,
 				"tl_wput:M_DATA invalid for ticlts driver"));
 			tl_merror(wq, mp, EPROTO);
-			break;
+			return;
 		}
 		tl_proc = tl_wput_data_ser;
 		break;
