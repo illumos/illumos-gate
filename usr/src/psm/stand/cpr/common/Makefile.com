@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/cpr/common/Makefile.com
@@ -132,7 +132,7 @@ $(ROOTDIR):
 	$(INS.dir)
 
 lint: $(L_COBJ) $(LINTLIBS)
-	@$(ECHO) "\nperforming global crosschecks: $@"
+	@$(ECHO) "\n$@: global crosschecks:"
 	@$(LINT.2) $(L_COBJ) $(LDLIBS)
 
 clean.lint:

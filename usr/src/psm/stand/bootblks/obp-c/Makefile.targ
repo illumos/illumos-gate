@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 1994-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/bootblks/obp-c/Makefile.targ
@@ -55,7 +55,7 @@ clobber: clean
 	-$(RM) $(MKVERS) $(MKBOOT)
 
 lint: $(BOOT_L_OBJS)
-	@echo "Global Cross-checks:"
+	@echo "\n$@: global crosschecks:"
 	$(LINT.2) $(BOOT_L_OBJS) $(LDLIBS)
 
 FRC:
