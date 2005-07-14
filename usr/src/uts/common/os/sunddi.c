@@ -1455,15 +1455,14 @@ i_ddi_prop_search(dev_t dev, char *name, uint_t flags, ddi_prop_t **list_head)
 
 	/*
 	 * find the property in child's devinfo:
+	 * Search order defined by this search function is first matching
+	 * property with input dev == DDI_DEV_T_ANY matching any dev or
+	 * dev == propp->prop_dev, name == propp->name, and the correct
+	 * data type as specified in the flags.  If a DDI_DEV_T_NONE dev
+	 * value made it this far then it implies a DDI_DEV_T_ANY search.
 	 */
-
-	/*
-	 * Search order defined by this search function is
-	 * first matching property with input dev ==
-	 * DDI_DEV_T_ANY matching any dev or dev == propp->prop_dev,
-	 * name == propp->name, and the correct data type as specified
-	 * in the flags
-	 */
+	if (dev == DDI_DEV_T_NONE)
+		dev = DDI_DEV_T_ANY;
 
 	for (propp = *list_head; propp != NULL; propp = propp->prop_next)  {
 
@@ -3639,20 +3638,18 @@ ddi_prop_change(dev_t dev, dev_info_t *dip, int flags,
     char *name, caddr_t value, int length)
 {
 	ddi_prop_t	*propp;
-	int		km_flags = KM_NOSLEEP;
+	ddi_prop_t	**ppropp;
 	caddr_t		p = NULL;
 
-	if (dev == DDI_DEV_T_ANY || name == (char *)0 || strlen(name) == 0)
+	if ((dev == DDI_DEV_T_ANY) || (name == NULL) || (strlen(name) == 0))
 		return (DDI_PROP_INVAL_ARG);
-
-	if (flags & DDI_PROP_CANSLEEP)
-		km_flags = KM_SLEEP;
 
 	/*
 	 * Preallocate buffer, even if we don't need it...
 	 */
 	if (length != 0)  {
-		p = kmem_alloc(length, km_flags);
+		p = kmem_alloc(length, (flags & DDI_PROP_CANSLEEP) ?
+		    KM_SLEEP : KM_NOSLEEP);
 		if (p == NULL)	{
 			cmn_err(CE_CONT, prop_no_mem_msg, name);
 			return (DDI_PROP_NO_MEMORY);
@@ -3660,49 +3657,51 @@ ddi_prop_change(dev_t dev, dev_info_t *dip, int flags,
 	}
 
 	/*
+	 * If the dev_t value contains DDI_MAJOR_T_UNKNOWN for the major
+	 * number, a real dev_t value should be created based upon the dip's
+	 * binding driver.  See ddi_prop_add...
+	 */
+	if (getmajor(dev) == DDI_MAJOR_T_UNKNOWN)
+		dev = makedevice(
+		    ddi_name_to_major(DEVI(dip)->devi_binding_name),
+		    getminor(dev));
+
+	/*
 	 * Check to see if the property exists.  If so we modify it.
 	 * Else we create it by calling ddi_prop_add().
 	 */
 	mutex_enter(&(DEVI(dip)->devi_lock));
-
-	propp = DEVI(dip)->devi_drv_prop_ptr;
+	ppropp = &DEVI(dip)->devi_drv_prop_ptr;
 	if (flags & DDI_PROP_SYSTEM_DEF)
-		propp = DEVI(dip)->devi_sys_prop_ptr;
+		ppropp = &DEVI(dip)->devi_sys_prop_ptr;
 	else if (flags & DDI_PROP_HW_DEF)
-		propp = DEVI(dip)->devi_hw_prop_ptr;
+		ppropp = &DEVI(dip)->devi_hw_prop_ptr;
 
-	while (propp != NULL) {
-		if (DDI_STRSAME(propp->prop_name, name) &&
-		    dev == propp->prop_dev) {
+	if ((propp = i_ddi_prop_search(dev, name, flags, ppropp)) != NULL) {
+		/*
+		 * Need to reallocate buffer?  If so, do it
+		 * carefully (reuse same space if new prop
+		 * is same size and non-NULL sized).
+		 */
+		if (length != 0)
+			bcopy(value, p, length);
 
-			/*
-			 * Need to reallocate buffer?  If so, do it
-			 * (carefully). (Reuse same space if new prop
-			 * is same size and non-NULL sized).
-			 */
+		if (propp->prop_len != 0)
+			kmem_free(propp->prop_val, propp->prop_len);
 
-			if (length != 0)
-				bcopy(value, p, length);
-
-			if (propp->prop_len != 0)
-				kmem_free(propp->prop_val, propp->prop_len);
-
-			propp->prop_len = length;
-			propp->prop_val = p;
-			propp->prop_flags &= ~DDI_PROP_UNDEF_IT;
-			mutex_exit(&(DEVI(dip)->devi_lock));
-			return (DDI_PROP_SUCCESS);
-		}
-		propp = propp->prop_next;
+		propp->prop_len = length;
+		propp->prop_val = p;
+		propp->prop_flags &= ~DDI_PROP_UNDEF_IT;
+		mutex_exit(&(DEVI(dip)->devi_lock));
+		return (DDI_PROP_SUCCESS);
 	}
 
 	mutex_exit(&(DEVI(dip)->devi_lock));
 	if (length != 0)
 		kmem_free(p, length);
+
 	return (ddi_prop_add(dev, dip, flags, name, value, length));
 }
-
-
 
 /*
  * Common update routine used to update and encode a property.	Creates
@@ -3843,8 +3842,7 @@ ddi_prop_modify(dev_t dev, dev_info_t *dip, int flag,
 	if (!(flag & DDI_PROP_CANSLEEP))
 		flag |= DDI_PROP_DONTSLEEP;
 	flag &= ~DDI_PROP_SYSTEM_DEF;
-	if (ddi_prop_exists((dev == DDI_DEV_T_NONE) ? DDI_DEV_T_ANY : dev,
-	    dip, (flag | DDI_PROP_NOTPROM), name) == 0)
+	if (ddi_prop_exists(dev, dip, (flag | DDI_PROP_NOTPROM), name) == 0)
 		return (DDI_PROP_NOT_FOUND);
 
 	return (ddi_prop_update_common(dev, dip,
@@ -3865,8 +3863,7 @@ e_ddi_prop_modify(dev_t dev, dev_info_t *dip, int flag,
 	if (dev == DDI_DEV_T_ANY || name == NULL || strlen(name) == 0)
 		return (DDI_PROP_INVAL_ARG);
 
-	if (ddi_prop_exists((dev == DDI_DEV_T_NONE) ? DDI_DEV_T_ANY : dev,
-	    dip, (flag | DDI_PROP_SYSTEM_DEF), name) == 0)
+	if (ddi_prop_exists(dev, dip, (flag | DDI_PROP_SYSTEM_DEF), name) == 0)
 		return (DDI_PROP_NOT_FOUND);
 
 	if (!(flag & DDI_PROP_CANSLEEP))
@@ -3896,7 +3893,7 @@ ddi_prop_lookup_common(dev_t match_dev, dev_info_t *dip,
 	prop_handle_t	ph;
 
 	if ((match_dev == DDI_DEV_T_NONE) ||
-		(name == NULL) || (strlen(name) == 0))
+	    (name == NULL) || (strlen(name) == 0))
 		return (DDI_PROP_INVAL_ARG);
 
 	ourflags = (flags & DDI_PROP_DONTSLEEP) ? flags :
