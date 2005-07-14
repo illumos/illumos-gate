@@ -375,6 +375,7 @@ extern	"C++" {
 #else
 extern char *strchr(const char *, int);
 #endif	/* __cplusplus >= 199711L */
+#define	DDI_STRSAME(s1, s2)	((*(s1) == *(s2)) && (strcmp((s1), (s2)) == 0))
 extern int strcmp(const char *, const char *) __PURE;
 extern int strncmp(const char *, const char *, size_t) __PURE;
 extern char *strncat(char *, const char *, size_t);

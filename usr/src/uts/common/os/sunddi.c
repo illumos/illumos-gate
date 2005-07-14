@@ -1467,7 +1467,7 @@ i_ddi_prop_search(dev_t dev, char *name, uint_t flags, ddi_prop_t **list_head)
 
 	for (propp = *list_head; propp != NULL; propp = propp->prop_next)  {
 
-		if (strcmp(propp->prop_name, name) != 0)
+		if (!DDI_STRSAME(propp->prop_name, name))
 			continue;
 
 		if ((dev != DDI_DEV_T_ANY) && (propp->prop_dev != dev))
@@ -1514,7 +1514,7 @@ i_ddi_search_global_prop(dev_t dev, char *name, uint_t flags)
 	    propp != NULL;
 	    propp = (ddi_prop_t *)propp->prop_next) {
 
-		if (strcmp(propp->prop_name, name) != 0)
+		if (!DDI_STRSAME(propp->prop_name, name))
 			continue;
 
 		if ((!(flags & LDI_DEV_T_ANY)) && (propp->prop_dev != dev))
@@ -3672,7 +3672,7 @@ ddi_prop_change(dev_t dev, dev_info_t *dip, int flags,
 		propp = DEVI(dip)->devi_hw_prop_ptr;
 
 	while (propp != NULL) {
-		if (strcmp(name, propp->prop_name) == 0 &&
+		if (DDI_STRSAME(propp->prop_name, name) &&
 		    dev == propp->prop_dev) {
 
 			/*
@@ -4385,7 +4385,7 @@ ddi_prop_remove_common(dev_t dev, dev_info_t *dip, char *name, int flag)
 	mutex_enter(&(DEVI(dip)->devi_lock));
 
 	for (propp = *list_head; propp != NULL; propp = propp->prop_next)  {
-		if ((strcmp(name, propp->prop_name) == 0) &&
+		if (DDI_STRSAME(propp->prop_name, name) &&
 		    (dev == propp->prop_dev)) {
 			/*
 			 * Unlink this propp allowing for it to
