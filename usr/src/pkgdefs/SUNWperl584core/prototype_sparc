@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -318,6 +318,9 @@ f none usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Exacct/File/File.
 d none usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Exacct/Object 0755 root bin
 f none usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Exacct/Object/Object.bs 0444 root bin
 f none usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Exacct/Object/Object.so 0555 root bin
+d none usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Intrs 0755 root bin
+f none usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Intrs/Intrs.bs 0444 root bin
+f none usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Intrs/Intrs.so 0555 root bin
 d none usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Kstat 0755 root bin
 f none usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Kstat/Kstat.bs 0444 root bin
 f none usr/perl5/5.8.4/lib/sun4-solaris-64int/auto/Sun/Solaris/Kstat/Kstat.so 0555 root bin

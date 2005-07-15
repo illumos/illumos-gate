@@ -19,22 +19,29 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# cmd/perl/contrib/Sun/Solaris/Intrs/Makefile.PL
 #
 
-include ../Makefile.com
-
-DATAFILES +=	i.etcsystem i.kcfconfbase i.manifest i.preserve i.renameold \
-		i.scsivhciconf
-
-.KEEP_STATE:
-
-all: $(FILES) preinstall postinstall
-
-install: all pkg
-
-include ../Makefile.targ
+require 5.6.1;
+use strict;
+use warnings;
+use ExtUtils::MakeMaker;
+# See lib/ExtUtils/MakeMaker.pm for details of how to influence
+# the contents of the Makefile that is written.
+WriteMakefile(
+    'NAME'		=> 'Sun::Solaris::Intrs',
+    'VERSION_FROM'	=> 'Intrs.pm', # finds $VERSION
+    'LIBS'		=> [''], # e.g., '-lm'
+    'DEFINE'		=> '', # e.g., '-DHAVE_SOMETHING'
+	# Insert -I. if you add *.h files later:
+    'INC'		=> '',
+	# Un-comment this if you add C files to link with later:
+    # 'OBJECT'		=> '$(O_FILES)', # link all the C files too
+);

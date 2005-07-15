@@ -193,6 +193,7 @@ COMMON_SUBDIRS=		\
 	init		\
 	initpkg		\
 	install.d	\
+	intrd		\
 	intrstat	\
 	ipcrm		\
 	ipcs		\
@@ -730,6 +731,7 @@ MANIFEST_TOPDIRS=			\
 	dumpadm				\
 	eeprom				\
 	fm				\
+	intrd				\
 	ipf				\
 	keyserv				\
 	ldapcachemgr			\

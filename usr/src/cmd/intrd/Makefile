@@ -19,22 +19,50 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+# Makefile for interrupt distribution daemon
+#
 
-include ../Makefile.com
+PROG=		intrd
+MANIFEST=	intrd.xml
+SVCMETHOD=	svc-intrd
 
-DATAFILES +=	i.etcsystem i.kcfconfbase i.manifest i.preserve i.renameold \
-		i.scsivhciconf
+include ../Makefile.cmd
+
+TARGET=	all
+
+ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
+$(ROOTMANIFEST)		:= FILEMODE= 444
+
+# install macros and rule
+#
+GROUP=		bin
+ROOTPROG=	$(ROOTLIB)/$(PROG)
+$(ROOTPROG)	:= FILEMODE= 555
 
 .KEEP_STATE:
 
-all: $(FILES) preinstall postinstall
+all: $(PROG)
 
-install: all pkg
+install: all .WAIT $(ROOTPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+clean:
+
+%: %.pl
+	$(CP) $< $@
+	$(CHMOD) 755 $@
+
+check:	$(CHKMANIFEST)
+
+${ROOTLIB}/%: %
+	${INS.file}
+
+lint:
 
 include ../Makefile.targ

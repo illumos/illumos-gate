@@ -19,22 +19,21 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include ../Makefile.com
+# If we are now installing intrd on this system for the first
+# time, we will need to call svcadm to enable the new service. We
+# must not do this if intrd is already installed, as the user may
+# have intentionally disabled it. Here we touch intrd.tmp as a
+# way of telling our matching postinstall script that it should
+# update /var/svc/profile/upgrade.
 
-DATAFILES +=	i.etcsystem i.kcfconfbase i.manifest i.preserve i.renameold \
-		i.scsivhciconf
-
-.KEEP_STATE:
-
-all: $(FILES) preinstall postinstall
-
-install: all pkg
-
-include ../Makefile.targ
+rm -f $BASEDIR/var/tmp/intrd.tmp
+if [ ! -f $BASEDIR/var/svc/manifest/system/intrd.xml ] ; then
+	touch $BASEDIR/var/tmp/intrd.tmp
+fi

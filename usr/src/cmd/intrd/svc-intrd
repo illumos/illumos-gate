@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -19,22 +20,25 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include ../Makefile.com
+. /lib/svc/share/smf_include.sh
 
-DATAFILES +=	i.etcsystem i.kcfconfbase i.manifest i.preserve i.renameold \
-		i.scsivhciconf
+# Don't start intrd if intrd can't be found or if intrd is already running.
 
-.KEEP_STATE:
+if [ ! -f /usr/lib/intrd ]; then
+	echo "$0: intrd daemon not installed"
+	exit $SMF_EXIT_ERR_CONFIG
+fi
 
-all: $(FILES) preinstall postinstall
+if /usr/bin/pgrep -x -z global intrd >/dev/null; then
+	echo "$0: intrd is already running"
+	exit $SMF_EXIT_ERR_FATAL
+fi
 
-install: all pkg
-
-include ../Makefile.targ
+/usr/lib/intrd &

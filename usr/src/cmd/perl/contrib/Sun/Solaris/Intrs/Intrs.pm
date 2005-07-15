@@ -1,4 +1,3 @@
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,23 +17,27 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-#
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Intrs.pm provides the bootstrap for the private Sun::Solaris::Intrs module.
 #
 
-include ../Makefile.com
+package Sun::Solaris::Intrs;
 
-DATAFILES +=	i.etcsystem i.kcfconfbase i.manifest i.preserve i.renameold \
-		i.scsivhciconf
+use strict;
+use warnings;
+use Exporter;
+use DynaLoader;
+use vars qw($VERSION @ISA @EXPORT_OK);
 
-.KEEP_STATE:
+our @ISA = qw(Exporter DynaLoader);
+our @EXPORT_OK = qw(intrmove);
+our $VERSION = '0.01';
 
-all: $(FILES) preinstall postinstall
-
-install: all pkg
-
-include ../Makefile.targ
+bootstrap Sun::Solaris::Intrs $VERSION;
+1;

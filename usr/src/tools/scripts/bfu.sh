@@ -314,6 +314,7 @@ superfluous_local_zone_files="
 	etc/wrsm
 	etc/zones
 	kernel
+	lib/svc/method/svc-intrd
 	var/adm/pool
 	var/fm
 	var/log/pool
@@ -326,6 +327,7 @@ superfluous_local_zone_files="
 	var/svc/manifest/system/cvc.xml
 	var/svc/manifest/system/dumpadm.xml
 	var/svc/manifest/system/fmd.xml
+	var/svc/manifest/system/intrd.xml
 	var/svc/manifest/system/mdmonitor.xml
 	var/svc/manifest/system/metainit.xml
 	var/svc/manifest/system/picl.xml
@@ -1037,6 +1039,11 @@ smf_handle_new_services () {
 	#
 	if [ ! -f $rootprefix/var/svc/profile/system/sac.xml ]; then
 		echo /usr/sbin/svcadm enable system/sac >> \
+		    $rootprefix/var/svc/profile/upgrade
+	fi
+	if [[ $zone = global &&
+            ! -f $rootprefix/var/svc/manifest/system/intrd.xml ]]; then
+		echo /usr/sbin/svcadm enable system/intrd >> \
 		    $rootprefix/var/svc/profile/upgrade
 	fi
 }

@@ -58,6 +58,9 @@
   <service name='system/identity' version='1' type='service'>
     <instance name='domain' enabled='true'/>
   </service>
+  <service name='system/intrd' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
   <service name='system/keymap' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>

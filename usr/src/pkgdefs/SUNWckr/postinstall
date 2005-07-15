@@ -19,6 +19,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -26,15 +27,8 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.com
-
-DATAFILES +=	i.etcsystem i.kcfconfbase i.manifest i.preserve i.renameold \
-		i.scsivhciconf
-
-.KEEP_STATE:
-
-all: $(FILES) preinstall postinstall
-
-install: all pkg
-
-include ../Makefile.targ
+if [ -f $BASEDIR/var/tmp/intrd.tmp ] ; then
+	echo "/usr/sbin/svcadm enable system/intrd" >> \
+	    $BASEDIR/var/svc/profile/upgrade
+	rm -f $BASEDIR/var/tmp/intrd.tmp
+fi
