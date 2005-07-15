@@ -414,13 +414,6 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", usb_bulk_req_t))
 #define	SCSA2USB_TRANSPORT	1
 #define	SCSA2USB_REJECT		-1
 
-
-/*
- * these cmds are not passed on but just accepted
- */
-#define	SCMD_PERSISTENT_RESERVE_IN	0x5E
-#define	SCMD_PERSISTENT_RESERVE_OUT	0x5F
-
 /*
  * The scsa2usb_cpr_info data structure is used for cpr related
  * callbacks. It is used for panic callbacks as well.

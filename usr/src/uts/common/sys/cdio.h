@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -331,15 +331,14 @@ struct cdrom_subcode32 {
  *	Group 2 Commands
  *
  */
-
+#define	SCMD_READ_SUBCHANNEL	0x42		/* optional SCSI command */
 #define	SCMD_READ_TOC		0x43		/* optional SCSI command */
+#define	SCMD_READ_HEADER	0x44		/* optional SCSI command */
+#define	SCMD_PLAYAUDIO10	0x45		/* optional SCSI command */
 #define	SCMD_PLAYAUDIO_MSF	0x47		/* optional SCSI command */
 #define	SCMD_PLAYAUDIO_TI	0x48		/* optional SCSI command */
-#define	SCMD_PAUSE_RESUME	0x4B		/* optional SCSI command */
-#define	SCMD_READ_SUBCHANNEL	0x42		/* optional SCSI command */
-#define	SCMD_PLAYAUDIO10	0x45		/* optional SCSI command */
 #define	SCMD_PLAYTRACK_REL10	0x49		/* optional SCSI command */
-#define	SCMD_READ_HEADER	0x44		/* optional SCSI command */
+#define	SCMD_PAUSE_RESUME	0x4B		/* optional SCSI command */
 
 /*
  *
@@ -348,6 +347,7 @@ struct cdrom_subcode32 {
  */
 #define	SCMD_PLAYAUDIO12	0xA5		/* optional SCSI command */
 #define	SCMD_PLAYTRACK_REL12	0xA9		/* optional SCSI command */
+#define	SCMD_SET_CDROM_SPEED	0xBB		/* optional SCSI command */
 #define	SCMD_READ_CD		0xBE	/* Universal way of accessing CD data */
 
 /*
@@ -370,7 +370,6 @@ struct cdrom_subcode32 {
  *	Group 6 Commands
  *
  */
-
 #define	SCMD_CD_PLAYBACK_CONTROL 0xC9	/* SONY unique SCSI command */
 #define	SCMD_CD_PLAYBACK_STATUS	0xC4	/* SONY unique SCSI command */
 #define	SCMD_READ_CDDA		0xD8	/* Vendor unique SCSI command */
@@ -378,6 +377,32 @@ struct cdrom_subcode32 {
 #define	SCMD_READ_ALL_SUBCODES	0xDF	/* Vendor unique SCSI command */
 
 #define	CDROM_MODE2_SIZE	2336
+
+/*
+ * scsi_key_strings for CDROM cdio SCMD_ definitions
+ */
+#define	SCSI_CMDS_KEY_STRINGS_CDIO				\
+/* 0x42 */ SCMD_READ_SUBCHANNEL,	"read_subchannel",		\
+/* 0x43 */ SCMD_READ_TOC,		"read_toc",			\
+/* 0x44 */ SCMD_REPORT_DENSITIES |					\
+		SCMD_READ_HEADER,	"report_densities/read_header",	\
+/* 0x45 */ SCMD_PLAYAUDIO10,		"playaudio",			\
+/* 0x46 */ SCMD_GET_CONFIGURATION,	"get_configuration",		\
+/* 0x47 */ SCMD_PLAYAUDIO_MSF,		"playaudio_msf",		\
+/* 0x48 */ SCMD_PLAYAUDIO_TI,		"playaudio_ti",			\
+/* 0x49 */ SCMD_PLAYTRACK_REL10,	"playaudio_rel",		\
+/* 0x4b */ SCMD_PAUSE_RESUME,		"pause_resume",			\
+									\
+/* 0xa5 */ SCMD_PLAYAUDIO12,		"playaudio(12)",		\
+/* 0xa9 */ SCMD_PLAYTRACK_REL12,	"playtrack_rel",		\
+/* 0xbb */ SCMD_SET_CDROM_SPEED,	"set_cd_speed",			\
+/* 0xbe */ SCMD_READ_CD,		"read_cd",			\
+									\
+/* 0xc4 */ SCMD_CD_PLAYBACK_STATUS,	"cd_playback_status",		\
+/* 0xc9 */ SCMD_CD_PLAYBACK_CONTROL,	"cd_playback_control",		\
+/* 0xd8 */ SCMD_READ_CDDA,		"read_cdda",			\
+/* 0xdb */ SCMD_READ_CDXA,		"read_cdxa",			\
+/* 0xdf */ SCMD_READ_ALL_SUBCODES,	"read_all_subcodes"
 
 #ifdef	__cplusplus
 }

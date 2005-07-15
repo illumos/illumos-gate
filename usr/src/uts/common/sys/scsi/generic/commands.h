@@ -38,7 +38,6 @@ extern "C" {
  *
  * Macros to determine known command sizes
  */
-
 #define	CDB_GROUPID(cmd)	((cmd >> 5) & 0x7)
 #define	CDB_GROUPID_0	0
 #define	CDB_GROUPID_1	1
@@ -60,18 +59,17 @@ extern "C" {
 
 /*
  * Generic Command Definitions
+ * NOTE: CDROM commands are defined in cdio.h
  */
 
 /*
  * Group 0 Commands (CDB range 0x00 - 0x1F)
  */
-
 #define	SCMD_GROUP0		0x00
 
 /*
  * Group 0 commands, All Devices
  */
-
 #define	SCMD_TEST_UNIT_READY	0x00
 #define	SCMD_REQUEST_SENSE	0x03
 #define	SCMD_INQUIRY		0x12
@@ -82,7 +80,6 @@ extern "C" {
 /*
  * Group 0 commands, Direct Access Devices
  */
-
 /*	SCMD_TEST_UNIT_READY	0x00	*/
 #define	SCMD_REZERO_UNIT	0x01
 /*	SCMD_REQUEST_SENSE	0x03	*/
@@ -105,7 +102,6 @@ extern "C" {
 /*
  * Group 0 commands, Sequential Access Devices
  */
-
 /*	SCMD_TEST_UNIT_READY	0x00	*/
 #define	SCMD_REWIND		0x01	/* Note similarity to SCMD_REZERO */
 /*	SCMD_REQUEST_SENSE	0x03	*/
@@ -134,7 +130,6 @@ extern "C" {
 /*
  * Group 0 commands, Printer Devices
  */
-
 /*	SCMD_TEST_UNIT_READY	0x00	*/
 /*	SCMD_REQUEST_SENSE	0x03	*/
 /*	SCMD_FORMAT		0x04	*/
@@ -168,7 +163,6 @@ extern "C" {
 /*
  * Group 0 commands, WORM Devices
  */
-
 /*	SCMD_TEST_UNIT_READY	0x00	*/
 /*	SCMD_REZERO_UNIT	0x01	*/
 /*	SCMD_REQUEST_SENSE	0x03	*/
@@ -190,7 +184,6 @@ extern "C" {
 /*
  * Group 0 commands, Read Only Devices
  */
-
 /*	SCMD_TEST_UNIT_READY	0x00	*/
 /*	SCMD_REZERO_UNIT	0x01	*/
 /*	SCMD_REQUEST_SENSE	0x03	*/
@@ -211,22 +204,21 @@ extern "C" {
 /*
  * Group 1 Commands (CDB range 0x20 - 0x3F)
  */
-
 #define	SCMD_GROUP1		0x20
 
 /*
  * Group 1 Commands, All Devices
  */
-
 #define	SCMD_COMPARE		0x39
 #define	SCMD_COPY_VERIFY	0x3A
-#define	SCMD_PRIN		0x5E
-#define	SCMD_PROUT		0x5F
+#define	SCMD_PERSISTENT_RESERVE_IN		0x5E
+#define	SCMD_PERSISTENT_RESERVE_OUT		0x5F
+#define	SCMD_PRIN		SCMD_PERSISTENT_RESERVE_IN
+#define	SCMD_PROUT		SCMD_PERSISTENT_RESERVE_OUT
 
 /*
  * Group 1 Commands, Direct Access Devices
  */
-
 #define	SCMD_READ_FORMAT_CAP	0x23
 #define	SCMD_READ_CAPACITY	0x25
 #define	SCMD_READ_G1		0x28	/* Note that only the group changed */
@@ -238,6 +230,7 @@ extern "C" {
 #define	SCMD_SEARCH_EQUAL	0x31
 #define	SCMD_SEARCH_LOW		0x32
 #define	SCMD_SET_LIMITS		0x33
+#define	SCMD_SYNCHRONIZE_CACHE	0x35
 #define	SCMD_READ_DEFECT_LIST	0x37
 #define	SCMD_WRITE_BUFFER	0x3B
 #define	SCMD_READ_BUFFER	0x3c
@@ -253,36 +246,25 @@ extern "C" {
 
 
 /*
- * The following have been included for the ATAPI devices
- */
-#define	ATAPI_SET_CD_SPEED	0xBB
-#define	ATAPI_CAPABILITIES	0x2A
-
-/*
  * Group 1 Commands, Sequential Access Devices
  */
-
 #define	SCMD_LOCATE		0x2B	/* Note similarity to SCMD_SEEK_G1 */
 #define	SCMD_READ_POSITION	0x34
 #define	SCMD_REPORT_DENSITIES	0x44
 
-
 /*
  * Group 1 Commands, Printer Devices
  */
-
 /* (None Defined) */
 
 /*
  * Group 1 Commands, Processor Devices
  */
-
 /* (None Defined) */
 
 /*
  * Group 1 Commands, WORM Devices
  */
-
 /*	SCMD_READ_CAPACITY	0x25	*/
 /*	SCMD_READ_G1		0x28	*/
 /*	SCMD_WRITE_G1		0x2a	*/
@@ -297,7 +279,6 @@ extern "C" {
 /*
  * Group 1 Commands, Read Only Devices
  */
-
 /*	SCMD_READ_CAPACITY	0x25	*/
 /*	SCMD_READ_G1		0x28	*/
 /*	SCMD_SEEK_G1		0x2b	*/
@@ -336,29 +317,111 @@ extern "C" {
  * Define for Group 5 command.
  */
 #define	SCMD_GROUP5		0xA0
+#define	SCMD_REPORT_LUNS	0xA0
 #define	SCMD_READ_G5		0xA8
 #define	SCMD_WRITE_G5		0xAA
 #define	SCMD_GET_PERFORMANCE	0xAC
-#define	SCMD_REPORT_LUNS	0xA0
 
+
+
+/*
+ * scsi_key_strings for SCMD_ definitions
+ *	NOTE: see SCSI_CMDS_KEY_STRINGS_CDIO in cdio.h for additional
+ *	command-to-string translations.
+ */
+#define	SCSI_CMDS_KEY_STRINGS						\
+/* 0x00 */ SCMD_TEST_UNIT_READY,	"test_unit_ready",		\
+/* 0x01 */ SCMD_REWIND |						\
+		SCMD_REZERO_UNIT,	"rezero/rewind",		\
+/* 0x03 */ SCMD_REQUEST_SENSE,		"request_sense",		\
+/* 0x04 */ SCMD_FORMAT,			"format",			\
+/* 0x05 */ SCMD_READ_BLKLIM,		"read_block_limits",		\
+/* 0x07 */ SCMD_REASSIGN_BLOCK,		"reassign",			\
+/* 0x08 */ SCMD_READ |							\
+		SCMD_RECEIVE,		"read",				\
+/* 0x0a */ SCMD_PRINT |							\
+		SCMD_SEND |						\
+		SCMD_WRITE,		"write",			\
+/* 0x0b */ SCMD_SEEK |							\
+		SCMD_SLEW_PRINT |					\
+		SCMD_TRK_SEL,		"seek",				\
+/* 0x0f */ SCMD_READ_REVERSE,		"read_reverse",			\
+/* 0x10 */ SCMD_WRITE_FILE_MARK |					\
+		SCMD_FLUSH_PRINT_BUF,	"write_file_mark",		\
+/* 0x11 */ SCMD_SPACE,			"space",			\
+/* 0x12 */ SCMD_INQUIRY,		"inquiry",			\
+/* 0x13 */ SCMD_VERIFY_G0,		"verify",			\
+/* 0x14 */ SCMD_RECOVER_BUF,		"recover_buffer_data",		\
+/* 0x15 */ SCMD_MODE_SELECT,		"mode_select",			\
+/* 0x16 */ SCMD_RESERVE,		"reserve",			\
+/* 0x17 */ SCMD_RELEASE,		"release",			\
+/* 0x18 */ SCMD_COPY,			"copy",				\
+/* 0x19 */ SCMD_ERASE,			"erase_tape",			\
+/* 0x1a */ SCMD_MODE_SENSE,		"mode_sense",			\
+/* 0x1b */ SCMD_LOAD |							\
+		SCMD_START_STOP |					\
+		SCMD_STOP_PRINT,	"load/start/stop",		\
+/* 0x1c */ SCMD_GDIAG,			"get_diagnostic_results",	\
+/* 0x1d */ SCMD_SDIAG,			"send_diagnostic_command",	\
+/* 0x1e */ SCMD_DOORLOCK,		"door_lock",			\
+/* 0x23 */ SCMD_READ_FORMAT_CAP,	"read_format_capacity",		\
+/* 0x25 */ SCMD_READ_CAPACITY,		"read_capacity",		\
+/* 0x28 */ SCMD_READ_G1,		"read(10)",			\
+/* 0x2a */ SCMD_WRITE_G1,		"write(10)",			\
+/* 0x2b */ SCMD_SEEK_G1 |						\
+		SCMD_LOCATE,		"seek(10)",			\
+/* 0x2e */ SCMD_WRITE_VERIFY,		"write_verify",			\
+/* 0x2f */ SCMD_VERIFY,			"verify(10)",			\
+/* 0x30 */ SCMD_SEARCH_HIGH,		"search_data_high",		\
+/* 0x31 */ SCMD_SEARCH_EQUAL,		"search_data_equal",		\
+/* 0x32 */ SCMD_SEARCH_LOW,		"search_data_low",		\
+/* 0x33 */ SCMD_SET_LIMITS,		"set_limits",			\
+/* 0x34 */ SCMD_READ_POSITION,		"read_position",		\
+/* 0x35 */ SCMD_SYNCHRONIZE_CACHE,	"synchronize_cache",		\
+/* 0x37 */ SCMD_READ_DEFECT_LIST,	"read_defect_data",		\
+/* 0x39 */ SCMD_COMPARE,		"compare",			\
+/* 0x3a */ SCMD_COPY_VERIFY,		"copy_verify",			\
+/* 0x3b */ SCMD_WRITE_BUFFER,		"write_buffer",			\
+/* 0x3c */ SCMD_READ_BUFFER,		"read_buffer",			\
+/* 0x3e */ SCMD_READ_LONG,		"read_long",			\
+/* 0x3f */ SCMD_WRITE_LONG,		"write_long",			\
+/* 0x44 */ SCMD_REPORT_DENSITIES |					\
+		/* SCMD_READ_HEADER (from cdio.h) | */			\
+		0,			"report_densities/read_header",	\
+/* 0x4c */ SCMD_LOG_SELECT_G1,		"log_select",			\
+/* 0x4d */ SCMD_LOG_SENSE_G1,		"log_sense",			\
+/* 0x55 */ SCMD_MODE_SELECT_G1,		"mode_select(10)",		\
+/* 0x56 */ SCMD_RESERVE_G1,		"reserve(10)",			\
+/* 0x57 */ SCMD_RELEASE_G1,		"release(10)",			\
+/* 0x5a */ SCMD_MODE_SENSE_G1,		"mode_sense(10)",		\
+/* 0x5e */ SCMD_PERSISTENT_RESERVE_IN,	"persistent_reserve_in",	\
+/* 0x5f */ SCMD_PERSISTENT_RESERVE_OUT,	"persistent_reserve_out",	\
+/* 0x83 */ SCMD_EXTENDED_COPY,		"extended_copy",		\
+/* 0x88 */ SCMD_READ_G4,		"read(16)",			\
+/* 0x8a */ SCMD_WRITE_G4,		"write(16)",			\
+/* 0xa0 */ SCMD_REPORT_LUNS,		"report_luns",			\
+/* 0xa8 */ SCMD_READ_G5,		"read(12)",			\
+/* 0xaa */ SCMD_WRITE_G5,		"write(12)",			\
+/* 0xac */ SCMD_GET_PERFORMANCE,	"get_performance"		\
+	/* see cdio.h for additional command-to-string translations */
+
+/* XXX not a command code, does not belong here */
+#define	ATAPI_CAPABILITIES	0x2A
 
 #ifdef	__cplusplus
 }
 #endif
 
-
 /*
  * Below are inclusions of files describing various command structures
  * of interest.
  */
-
 #include <sys/scsi/generic/inquiry.h>
 #include <sys/scsi/generic/sense.h>
 
 /*
  * Private Vendor Unique Commands - Each implementation provides this.
  */
-
 #include <sys/scsi/impl/commands.h>
 
 #endif	/* _SYS_SCSI_GENERIC_COMMANDS_H */

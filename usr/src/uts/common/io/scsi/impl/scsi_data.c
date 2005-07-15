@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,31 +31,34 @@
  */
 
 #include <sys/scsi/scsi.h>
+#include <sys/cdio.h>			/* CDROM SCMD_ commands */
 
 char *sense_keys[NUM_SENSE_KEYS + NUM_IMPL_SENSE_KEYS] = {
-	"No Additional Sense",		/* 0x00 */
-	"Soft Error",			/* 0x01 */
-	"Not Ready",			/* 0x02 */
-	"Media Error",			/* 0x03 */
-	"Hardware Error",		/* 0x04 */
-	"Illegal Request",		/* 0x05 */
-	"Unit Attention",		/* 0x06 */
-	"Write Protected",		/* 0x07 */
-	"Blank Check",			/* 0x08 */
-	"Vendor Unique",		/* 0x09 */
-	"Copy Aborted",			/* 0x0a */
-	"Aborted Command",		/* 0x0b */
-	"Equal Error",			/* 0x0c */
-	"Volume Overflow",		/* 0x0d */
-	"Miscompare Error",		/* 0x0e */
-	"Reserved",			/* 0x0f */
-	"fatal",			/* 0x10 */
-	"timeout",			/* 0x11 */
-	"EOF",				/* 0x12 */
-	"EOT",				/* 0x13 */
-	"length error",			/* 0x14 */
-	"BOT",				/* 0x15 */
-	"wrong tape media"		/* 0x16 */
+					/* ==== SCSI Standard Keys */
+	"No_Additional_Sense",		/* 0x00 KEY_NO_SENSE */
+	"Soft_Error",			/* 0x01 KEY_RECOVERABLE_ERROR */
+	"Not_Ready",			/* 0x02 KEY_NOT_READY */
+	"Media_Error",			/* 0x03 KEY_MEDIUM_ERROR */
+	"Hardware_Error",		/* 0x04 KEY_HARDWARE_ERROR */
+	"Illegal_Request",		/* 0x05 KEY_ILLEGAL_REQUEST */
+	"Unit_Attention",		/* 0x06 KEY_UNIT_ATTENTION */
+	"Write_Protected",		/* 0x07 KEY_WRITE_PROTECT */
+	"Blank_Check",			/* 0x08 KEY_BLANK_CHECK */
+	"Vendor_Unique",		/* 0x09 KEY_VENDOR_UNIQUE */
+	"Copy_Aborted",			/* 0x0a KEY_COPY_ABORTED */
+	"Aborted_Command",		/* 0x0b KEY_ABORTED_COMMAND */
+	"Equal_Error",			/* 0x0c KEY_EQUAL */
+	"Volume_Overflow",		/* 0x0d KEY_VOLUME_OVERFLOW */
+	"Miscompare_Error",		/* 0x0e KEY_MISCOMPARE */
+	"Reserved",			/* 0x0f KEY_RESERVED */
+					/* ==== SUN SCSA 'pseudo' keys */
+	"fatal",			/* 0x10 SUN_KEY_FATAL */
+	"timeout",			/* 0x11 SUN_KEY_TIMEOUT */
+	"EOF",				/* 0x12 SUN_KEY_EOF */
+	"EOT",				/* 0x13 SUN_KEY_EOT */
+	"length_error",			/* 0x14 SUN_KEY_LENGTH */
+	"BOT",				/* 0x15 SUN_KEY_BOT */
+	"wrong_tape_media"		/* 0x16 SUN_KEY_WRONGMEDIA */
 };
 
 
@@ -83,47 +86,7 @@ uchar_t	scsi_cdb_size[] = {
  * to pass to scsi_errmsg().
  */
 struct scsi_key_strings scsi_cmds[] = {
-/* 0x00 */ SCMD_TEST_UNIT_READY,		"test unit ready",
-/* 0x01 */ SCMD_REZERO_UNIT|SCMD_REWIND,	"rezero/rewind",
-/* 0x02 */ SCMD_REQUEST_SENSE,			"request sense",
-/* 0x04 */ SCMD_FORMAT,				"format",
-/* 0x05 */ SCMD_READ_BLKLIM,			"read block limits",
-/* 0x07 */ SCMD_REASSIGN_BLOCK,			"reassign",
-/* 0x08 */ SCMD_READ,				"read",
-/* 0x0a */ SCMD_WRITE,				"write",
-/* 0x0b */ SCMD_SEEK,				"seek",
-/* 0x0f */ SCMD_READ_REVERSE,			"read reverce",
-/* 0x10 */ SCMD_WRITE_FILE_MARK,		"write file mark",
-/* 0x11 */ SCMD_SPACE,				"space",
-/* 0x12 */ SCMD_INQUIRY,			"inquiry",
-/* 0x13 */ SCMD_VERIFY_G0,			"verify(8)",
-/* 0x14 */ SCMD_RECOVER_BUF,			"recover buffer data",
-/* 0x15 */ SCMD_MODE_SELECT,			"mode select",
-/* 0x16 */ SCMD_RESERVE,			"reserve",
-/* 0x17 */ SCMD_RELEASE,			"release",
-/* 0x18 */ SCMD_COPY,				"copy",
-/* 0x19 */ SCMD_ERASE,				"erase tape",
-/* 0x1a */ SCMD_MODE_SENSE,			"mode sense",
-/* 0x1b */ SCMD_START_STOP|SCMD_LOAD,		"load/start/stop",
-/* 0x1c */ SCMD_GDIAG,				"get diagnostic results",
-/* 0x1d */ SCMD_SDIAG,				"send diagnostic command",
-/* 0x1e */ SCMD_DOORLOCK,			"door lock",
-/* 0x23 */ SCMD_READ_FORMAT_CAP,		"read format capacity",
-/* 0x25 */ SCMD_READ_CAPACITY,			"read capacity",
-/* 0x28 */ SCMD_READ_G1,			"read(10)",
-/* 0x2a */ SCMD_WRITE_G1,			"write(10)",
-/* 0x2b */ SCMD_SEEK_G1|SCMD_LOCATE,		"locate/seek(10)",
-/* 0x2f */ SCMD_VERIFY,				"verify",
-/* 0x34 */ SCMD_READ_POSITION,			"read position",
-/* 0x37 */ SCMD_READ_DEFECT_LIST,		"read defect data",
-/* 0x3b */ SCMD_WRITE_BUFFER,			"write buffer",
-/* 0x3c */ SCMD_READ_BUFFER,			"read buffer",
-/* 0x44 */ SCMD_REPORT_DENSITIES,		"report densities",
-/* 0x46 */ SCMD_GET_CONFIGURATION,		"get configuration",
-/* 0x4c */ SCMD_LOG_SELECT_G1,			"log select(10)",
-/* 0x4d */ SCMD_LOG_SENSE_G1,			"log sense(10)",
-/* 0x5e */ SCMD_PRIN,				"persistent reservation in",
-/* 0x5f */ SCMD_PROUT,				"persistent reservation out",
-/* 0xa0 */ SCMD_REPORT_LUNS,			"report luns",
-	-1,					NULL
+	SCSI_CMDS_KEY_STRINGS,
+	SCSI_CMDS_KEY_STRINGS_CDIO,
+	-1,			NULL
 };

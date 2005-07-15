@@ -172,14 +172,6 @@ extern int vhci_debug;
 #define	CFLAG_NOWAIT		0x1000	/* don't sleep */
 #define	CFLAG_DMA_PARTIAL	0x2000	/* Support Partial DMA */
 
-#ifndef SCMD_PRIN
-#define	SCMD_PRIN			0x5E
-#endif
-
-#ifndef SCMD_PROUT
-#define	SCMD_PROUT			0x5F
-#endif
-
 /*
  * Maximum size of SCSI cdb in SCSI command
  */
@@ -579,7 +571,7 @@ struct scsi_failover_ops {
 
 #if	defined(_SYSCALL32)
 /*
- * 32 bit varients of sv_path_info_prop_t and sv_path_info_t;
+ * 32 bit variants of sv_path_info_prop_t and sv_path_info_t;
  * To be used only in the driver and NOT applications
  */
 typedef struct sv_path_info_prop32 {

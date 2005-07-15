@@ -407,7 +407,7 @@ struct sd_lun {
 	/*
 	 * Bit fields for various configuration/state/status info.
 	 * Comments indicate the condition if the value of the
-	 * varaible is TRUE (nonzero).
+	 * variable is TRUE (nonzero).
 	 */
 	uint32_t
 	    un_f_arq_enabled		:1,	/* Auto request sense is */
@@ -557,7 +557,7 @@ struct sd_lun {
  * for conversion between block counts and byte counts.  As used here,
  * "system" block size refers to the block size used by the kernel/
  * filesystem (this includes the disk label). The "target" block size
- * is the block size returned by the SCSI READ CAPACITY commmand.
+ * is the block size returned by the SCSI READ CAPACITY command.
  *
  * Note: These macros will round up to the next largest blocksize to accomodate
  * the number of blocks specified.
@@ -860,9 +860,6 @@ typedef struct sd_prout {
 	uint16_t	ext_len;
 } sd_prout_t;
 
-#define	SCMD_PERSISTENT_RESERVE_IN	0x5E
-#define	SCMD_PERSISTENT_RESERVE_OUT	0x5F
-
 #define	SD_READ_KEYS			0x00
 #define	SD_READ_RESV			0x01
 
@@ -1013,13 +1010,13 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data", sd_prout))
 
 #ifdef SD_FAULT_INJECTION
 /*
- * sd_fi_pkt replicates the varables that are exposed through pkt
+ * sd_fi_pkt replicates the variables that are exposed through pkt
  *
- * sd_fi_xb replicates the varables that are exposed through xb
+ * sd_fi_xb replicates the variables that are exposed through xb
  *
- * sd_fi_un replicates the varables that are exposed through un
+ * sd_fi_un replicates the variables that are exposed through un
  *
- * sd_fi_arq replicates the varables that are
+ * sd_fi_arq replicates the variables that are
  *           exposed for Auto-Reqeust-Sense
  *
  */
@@ -1640,7 +1637,7 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data", sd_uscsi_info))
 /*
  * Driver Property Bit Flag definitions
  *
- * Unfortunaltely, for historical reasons, the bit-flag definitions are
+ * Unfortunately, for historical reasons, the bit-flag definitions are
  * different on SPARC, INTEL, & FIBRE platforms.
  */
 
@@ -1879,8 +1876,6 @@ typedef struct sd_disk_config {
 #define	SCMD_READ_CDD4		0xd4	/* the one used by some first */
 					/* generation ATAPI CD drives */
 
-#define	SCMD_SYNCHRONIZE_CACHE	0x35
-
 /* expected sector type filter values for Play and Read CD CDBs */
 #define	CDROM_SECTOR_TYPE_CDDA		(1<<2)	/* IEC 908:1987 (CDDA) */
 #define	CDROM_SECTOR_TYPE_MODE1		(2<<2)	/* Yellow book 2048 bytes */
@@ -1897,8 +1892,6 @@ typedef struct sd_disk_config {
 #define	CDROM_READ_CD_EDC_ECC	0x08	/* read EDC and ECC field */
 #define	CDROM_READ_CD_C2	0x02	/* read C2 error data */
 #define	CDROM_READ_CD_C2_BEB	0x04	/* read C2 and Block Error Bits */
-
-#define	SCMD_SET_CDROM_SPEED	0xbb	/* Set CD Speed command */
 
 
 /*
