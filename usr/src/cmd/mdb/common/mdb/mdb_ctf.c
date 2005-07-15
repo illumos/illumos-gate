@@ -297,6 +297,7 @@ mdb_ctf_module_lookup(const char *name, mdb_ctf_id_t *p)
 	return (0);
 }
 
+/*ARGSUSED*/
 int
 mdb_ctf_func_info(const GElf_Sym *symp, const mdb_syminfo_t *sip,
     mdb_ctf_funcinfo_t *mfp)
@@ -304,20 +305,40 @@ mdb_ctf_func_info(const GElf_Sym *symp, const mdb_syminfo_t *sip,
 	ctf_file_t *fp = NULL;
 	ctf_funcinfo_t f;
 	mdb_tgt_t *t = mdb.m_target;
+	char name[MDB_SYM_NAMLEN];
+	const mdb_map_t *mp;
+	mdb_syminfo_t si;
+	int err;
 
-	if (symp == NULL || sip == NULL || mfp == NULL)
+	if (symp == NULL || mfp == NULL)
 		return (set_errno(EINVAL));
 
-	if ((fp = mdb_tgt_addr_to_ctf(t, symp->st_value)) == NULL)
+	/*
+	 * In case the input symbol came from a merged or private symbol table,
+	 * re-lookup the address as a symbol, and then perform a fully scoped
+	 * lookup of that symbol name to get the mdb_syminfo_t for its CTF.
+	 */
+	if ((fp = mdb_tgt_addr_to_ctf(t, symp->st_value)) == NULL ||
+	    (mp = mdb_tgt_addr_to_map(t, symp->st_value)) == NULL ||
+	    mdb_tgt_lookup_by_addr(t, symp->st_value, MDB_TGT_SYM_FUZZY,
+	    name, sizeof (name), NULL, NULL) != 0)
 		return (-1); /* errno is set for us */
 
-	if (ctf_func_info(fp, sip->sym_id, &f) == CTF_ERR)
+	if (strchr(name, '`') != NULL)
+		err = mdb_tgt_lookup_by_scope(t, name, NULL, &si);
+	else
+		err = mdb_tgt_lookup_by_name(t, mp->map_name, name, NULL, &si);
+
+	if (err != 0)
+		return (-1); /* errno is set for us */
+
+	if (ctf_func_info(fp, si.sym_id, &f) == CTF_ERR)
 		return (set_errno(ctf_to_errno(ctf_errno(fp))));
 
 	set_ctf_id(&mfp->mtf_return, fp, f.ctc_return);
 	mfp->mtf_argc = f.ctc_argc;
 	mfp->mtf_flags = f.ctc_flags;
-	mfp->mtf_symidx = sip->sym_id;
+	mfp->mtf_symidx = si.sym_id;
 
 	return (0);
 }
