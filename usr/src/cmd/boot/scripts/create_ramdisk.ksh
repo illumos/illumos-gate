@@ -29,8 +29,11 @@
 #
 # basic setup
 #
-rdfile=/tmp/ramdisk.$$
-rdmnt=/tmp/rd_mount.$$
+rddir=/tmp/create_ramdisk.$$.tmp
+rdfile=${rddir}/rd.file
+rdmnt=${rddir}/rd.mount
+errlog=${rddir}/rd.errlog
+
 format=ufs
 ALT_ROOT=
 NO_AMD64=
@@ -66,13 +69,17 @@ if [ $# -eq 1 ]; then
 	echo "Creating ram disk on ${ALT_ROOT}"
 fi
 
+# make directory for temp files safely
+rm -rf ${rddir}
+mkdir ${rddir}
+
 # Clean up upon exit.
 trap 'cleanup' EXIT
 
 function cleanup {
-	umount -f $rdmnt 2>/dev/null
-	lofiadm -d $rdfile 2>/dev/null
-	rm -fr $rdfile $rdfile.gz $rdmnt 2> /dev/null
+	umount -f ${rdmnt} 2>/dev/null
+	lofiadm -d ${rdfile} 2>/dev/null
+	rm -fr ${rddir} 2> /dev/null
 }
 
 function getsize {
@@ -104,7 +111,7 @@ function create_ufs
 
 	# do the actual copy
 	cd /${ALT_ROOT}
-	find $filelist -print ${NO_AMD64}| cpio -pdum $rdmnt 2> /dev/null
+	find $filelist -print ${NO_AMD64}| cpio -pdum ${rdmnt} 2> /dev/null
 	umount ${rdmnt}
 	lofiadm -d ${rdfile}
 	rmdir ${rdmnt}
@@ -134,16 +141,26 @@ function create_isofs
 	cd /${ALT_ROOT}
 	find $files 2> /dev/null | cpio -pdum ${rdmnt} 2> /dev/null
 	isocmd="$isocmd ${rdmnt}"
-	${isocmd} 2> /dev/null | gzip > ${ALT_ROOT}/${BOOT_ARCHIVE}-new
+	rm -f ${errlog}
+	${isocmd} 2> ${errlog} | gzip > ${ALT_ROOT}/${BOOT_ARCHIVE}-new
+	if [ -s ${errlog} ]; then
+		grep Error: ${errlog} >/dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			grep Error: ${errlog}
+			rm -f ${ALT_ROOT}/${BOOT_ARCHIVE}-new
+		fi
+	fi
+	rm -f ${errlog}
 }
 
 #
 # get filelist
 #
-filelist=$(< ${ALT_ROOT}/boot/solaris/filelist.ramdisk)
+files=${ALT_ROOT}/boot/solaris/filelist.ramdisk
 if [ -f ${ALT_ROOT}/etc/boot/solaris/filelist.ramdisk ]; then
-	filelist="$filelist $(< ${ALT_ROOT}/etc/boot/solaris/filelist.ramdisk)"
+	files="$files ${ALT_ROOT}/etc/boot/solaris/filelist.ramdisk"
 fi
+filelist=`cat $files | sort | uniq`
 
 #
 # decide if cpu is amd64 capable
@@ -159,6 +176,12 @@ else
 	create_isofs
 fi
 
+if [ ! -f ${ALT_ROOT}/${BOOT_ARCHIVE}-new ]; then
+	echo "update of ${ALT_ROOT}/${BOOT_ARCHIVE} failed"
+	rm -rf ${rddir}
+	exit 1
+fi
+
 #
 # For the diskless case, hardlink archive to /boot to make it
 # visible via tftp. /boot is lofs mounted under /tftpboot/<hostname>.
@@ -169,9 +192,12 @@ if [ $? = 0 ]; then
 	mv ${ALT_ROOT}/${BOOT_ARCHIVE}-new ${ALT_ROOT}/${BOOT_ARCHIVE}
 	rm -f ${ALT_ROOT}/boot/boot_archive
 	ln ${ALT_ROOT}/${BOOT_ARCHIVE} ${ALT_ROOT}/boot/boot_archive
+	rm -rf ${rddir}
 	exit
 fi
 
 lockfs -f /$ALT_ROOT
 mv ${ALT_ROOT}/${BOOT_ARCHIVE}-new ${ALT_ROOT}/${BOOT_ARCHIVE}
 lockfs -f /$ALT_ROOT
+
+rm -rf ${rddir}
