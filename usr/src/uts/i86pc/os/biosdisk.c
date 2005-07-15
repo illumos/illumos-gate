@@ -141,6 +141,7 @@ get_dev_params(uchar_t drivenum)
 	extern struct bootops		*bootops;
 	int i;
 	int index;
+	uchar_t *tmp;
 
 	dprintf(("In get_dev_params\n"));
 
@@ -149,6 +150,10 @@ get_dev_params(uchar_t drivenum)
 
 	bufp = (fn48_t *)BIOS_RES_BUFFER_ADDR;
 
+	/*
+	 * We cannot use bzero here as we're initializing data
+	 * at an address below kernel base.
+	 */
 	for (i = 0; i < sizeof (*bufp); i++)
 		((uchar_t *)bufp)[i] = 0;
 
@@ -169,10 +174,18 @@ get_dev_params(uchar_t drivenum)
 
 	index = drivenum - 0x80;
 	biosdev_info[index].edd_valid = 1;
-	biosdev_info[index].fn48_dev_params = *bufp;
+
+	/*
+	 * Some compilers turn a structure copy into a call
+	 * to memcpy.  Since we are copying data below kernel
+	 * base intentionally, and memcpy asserts that's not
+	 * the case, we do the copy manually here.
+	 */
+	tmp = (uchar_t *)&biosdev_info[index].fn48_dev_params;
+	for (i = 0; i < sizeof (*bufp); i++)
+		tmp[i] = ((uchar_t *)bufp)[i];
 
 	return (1);
-
 }
 
 static int

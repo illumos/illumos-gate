@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,10 +77,10 @@ usage() {
 }
 
 /*
- * common exit function which ensures releasing locks
+ * common cleanup/exit functions to ensure releasing locks
  */
-void
-rcmd_exit(int status)
+static void
+rcmd_cleanup(int status)
 {
 	if (status == 0) {
 		rcm_log_message(RCM_INFO,
@@ -93,7 +93,12 @@ rcmd_exit(int status)
 	if (hold_daemon_lock) {
 		exit_daemon_lock();
 	}
+}
 
+void
+rcmd_exit(int status)
+{
+	rcmd_cleanup(status);
 	exit(status);
 }
 
@@ -284,7 +289,7 @@ detachfromtty()
 	logflag = 1;
 }
 
-void
+int
 main(int argc, char **argv)
 {
 	int c;
@@ -432,8 +437,10 @@ main(int argc, char **argv)
 	rcmd_db_clean();
 
 	/*
-	 * Loop and shutdown daemon after a period of inactivity.
+	 * Loop within daemon and return after a period of inactivity.
 	 */
 	rcmd_start_timer(idle_timeout);
-	/* NOTREACHED */
+
+	rcmd_cleanup(0);
+	return (0);
 }

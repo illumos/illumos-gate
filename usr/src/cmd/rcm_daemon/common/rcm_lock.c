@@ -1322,8 +1322,6 @@ rcmd_start_timer(int timeout)
 	(void) script_main_fini();
 
 	rcm_log_message(RCM_INFO, gettext("rcm_daemon is shut down.\n"));
-	rcmd_exit(0);
-	/*NOTREACHED*/
 }
 
 /*

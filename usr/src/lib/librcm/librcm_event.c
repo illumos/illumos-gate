@@ -392,7 +392,7 @@ revoke_event_service(int fd)
 	/* wait for existing door calls to finish */
 	(void) sleep(1);
 
-	if ((cookie = (door_cookie_t *)info.di_data) != NULL) {
+	if ((cookie = (door_cookie_t *)(uintptr_t)info.di_data) != NULL) {
 		struct door_result *tmp = cookie->results;
 		while (tmp) {
 			cookie->results = tmp->next;
