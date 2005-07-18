@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +104,7 @@ write_audio(char **argv, int start_argc, int argc)
 
 	/* Put the device in track-at-once mode */
 	write_init(TRACK_MODE_AUDIO);
-	ti = (struct track_info *)my_zalloc(TRACK_INFO_SIZE);
+	ti = (struct track_info *)my_zalloc(sizeof (*ti));
 
 	/* Build information for next invisible track, -1 */
 	if ((build_track_info(target, -1, ti) == 0) ||

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -684,7 +684,7 @@ write_next_track(int mode, bstreamhandle h)
 	struct trackio_error *te;
 	off_t size;
 
-	ti = (struct track_info *)my_zalloc(TRACK_INFO_SIZE);
+	ti = (struct track_info *)my_zalloc(sizeof (*ti));
 	if ((build_track_info(target, -1, ti) == 0) ||
 	    ((ti->ti_flags & TI_NWA_VALID) == 0)) {
 		if ((device_type == DVD_PLUS) || (device_type ==
