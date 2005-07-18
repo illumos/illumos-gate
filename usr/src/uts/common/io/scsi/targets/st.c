@@ -41,6 +41,9 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/kstat.h>
+#include <sys/ddidmareq.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 #define	IOSP	KSTAT_IO_PTR(un->un_stats)
 /*
@@ -83,6 +86,36 @@ extern struct scsi_key_strings scsi_cmds[];
  */
 static void *st_state;
 static char *st_label = "st";
+
+#if defined(__i386) || defined(__amd64)
+/*
+ * We need to use below DMA attr to alloc physically contiguous
+ * memory to do I/O in big block size
+ */
+static ddi_dma_attr_t st_contig_mem_dma_attr = {
+	DMA_ATTR_V0,    /* version number */
+	0x0,		/* lowest usable address */
+	0xFFFFFFFFull,  /* high DMA address range */
+	0xFFFFFFFFull,  /* DMA counter register */
+	1,		/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0xFFFFFFFFull,  /* max DMA xfer size */
+	0xFFFFFFFFull,  /* segment boundary */
+	1,		/* s/g list length */
+	1,		/* granularity of device */
+	0		/* DMA transfer flags */
+};
+
+static ddi_device_acc_attr_t st_acc_attr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_NEVERSWAP_ACC,
+	DDI_STRICTORDER_ACC
+};
+
+/* set limitation for the number of contig_mem */
+static int st_max_contig_mem_num = ST_MAX_CONTIG_MEM_NUM;
+#endif
 
 /*
  * Tunable parameters
@@ -390,6 +423,17 @@ static int st_check_sequential_clean_bit(dev_t dev);
 static int st_check_sense_clean_bit(dev_t dev);
 static int st_clear_unit_attentions(dev_t dev_instance, int max_trys);
 static void st_calculate_timeouts(struct scsi_tape *un);
+
+#if defined(__i386) || defined(__amd64)
+/*
+ * routines for I/O in big block size
+ */
+static void st_release_contig_mem(struct scsi_tape *un, struct contig_mem *cp);
+static struct contig_mem *st_get_contig_mem(struct scsi_tape *un, size_t len,
+    int alloc_flags);
+static int st_bigblk_xfer_done(struct buf *bp);
+static struct buf *st_get_bigblk_bp(struct buf *bp);
+#endif
 
 /*
  * error statistics create/update functions
@@ -968,7 +1012,11 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		}
 		cv_destroy(&un->un_state_cv);
 
-
+#if defined(__i386) || defined(__amd64)
+		if (un->un_contig_mem_hdl != NULL) {
+			ddi_dma_free_handle(&un->un_contig_mem_hdl);
+		}
+#endif
 		if (un->un_sbufp) {
 			freerbuf(un->un_sbufp);
 		}
@@ -1280,6 +1328,9 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 	cv_init(&un->un_queue_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&un->un_clscv, NULL, CV_DRIVER, NULL);
 	cv_init(&un->un_state_cv, NULL, CV_DRIVER, NULL);
+#if defined(__i386) || defined(__amd64)
+	cv_init(&un->un_contig_mem_cv, NULL, CV_DRIVER, NULL);
+#endif
 
 	/* Initialize power managemnet condition variable */
 	cv_init(&un->un_suspend_cv, NULL, CV_DRIVER, NULL);
@@ -1298,6 +1349,16 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 
 	un->un_suspend_fileno 	= 0;
 	un->un_suspend_blkno 	= 0;
+
+#if defined(__i386) || defined(__amd64)
+	if (ddi_dma_alloc_handle(ST_DEVINFO, &st_contig_mem_dma_attr,
+		DDI_DMA_SLEEP, NULL, &un->un_contig_mem_hdl) != DDI_SUCCESS) {
+		ST_DEBUG6(devp->sd_dev, st_label, SCSI_DEBUG,
+		    "allocation of contiguous memory dma handle failed!");
+		un->un_contig_mem_hdl = NULL;
+		goto error;
+	}
+#endif
 
 	/*
 	 * Since this driver manages devices with "remote" hardware,
@@ -1342,6 +1403,11 @@ error:
 		if (un->un_uscsi_rqs_buf) {
 			kmem_free(un->un_uscsi_rqs_buf, SENSE_LENGTH);
 		}
+#if defined(__i386) || defined(__amd64)
+		if (un->un_contig_mem_hdl != NULL) {
+			ddi_dma_free_handle(&un->un_contig_mem_hdl);
+		}
+#endif
 		ddi_soft_state_free(st_state, instance);
 		devp->sd_private = NULL;
 	}
@@ -2329,6 +2395,9 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 {
 	int err = 0;
 	int norew, count, last_state;
+#if defined(__i386) || defined(__amd64)
+	struct contig_mem *cp, *cp_temp;
+#endif
 
 	GET_SOFT_STATE(dev);
 
@@ -2676,6 +2745,26 @@ error:
 		 */
 	}
 
+#if defined(__i386) || defined(__amd64)
+	/*
+	 * free any contiguous mem alloc'ed for big block I/O
+	 */
+	cp = un->un_contig_mem;
+	while (cp) {
+		if (cp->cm_addr) {
+			ddi_dma_mem_free(&cp->cm_acc_hdl);
+		}
+		if (cp->cm_bp) {
+			freerbuf(cp->cm_bp);
+		}
+		cp_temp = cp;
+		cp = cp->cm_next;
+		kmem_free(cp_temp, sizeof (struct contig_mem));
+	}
+	un->un_contig_mem_total_num = 0;
+	un->un_contig_mem_available_num = 0;
+	un->un_contig_mem = NULL;
+#endif
 
 	ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_close3: return val = %x, fileno=%x, blkno=%lx, un_eof=%x\n",
@@ -3229,7 +3318,17 @@ st_strategy(struct buf *bp)
 	    (void *)bp->b_forw, bp->b_bcount,
 	    bp->b_resid, bp->b_flags, (void *)BP_PKT(bp));
 
-
+#if defined(__i386) || defined(__amd64)
+	/*
+	 * We will replace bp with a new bp that can do big blk xfer
+	 * if the requested xfer size is bigger than ST_BIGBLK_XFER
+	 */
+	if (bp->b_bcount > ST_BIGBLK_XFER) {
+		mutex_exit(ST_MUTEX);
+		bp = st_get_bigblk_bp(bp);
+		mutex_enter(ST_MUTEX);
+	}
+#endif
 
 	/* put on wait queue */
 	ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -11362,3 +11461,249 @@ st_calculate_timeouts(struct scsi_tape *un)
 		}
 	}
 }
+
+#if defined(__i386) || defined(__amd64)
+
+/*
+ * release contig_mem and wake up waiting thread, if any
+ */
+static void
+st_release_contig_mem(struct scsi_tape *un, struct contig_mem *cp)
+{
+	mutex_enter(ST_MUTEX);
+
+	cp->cm_next = un->un_contig_mem;
+	un->un_contig_mem = cp;
+	un->un_contig_mem_available_num++;
+	cv_broadcast(&un->un_contig_mem_cv);
+
+	mutex_exit(ST_MUTEX);
+}
+
+/*
+ * St_get_contig_mem will return a contig_mem if there is one available
+ * in current system. Otherwise, it will try to alloc one, if the total
+ * number of contig_mem is within st_max_contig_mem_num.
+ * It will sleep, if allowed by caller or return NULL, if no contig_mem
+ * is available for now.
+ */
+static struct contig_mem *
+st_get_contig_mem(struct scsi_tape *un, size_t len, int alloc_flags)
+{
+	size_t rlen;
+	struct contig_mem *cp = NULL;
+	ddi_acc_handle_t acc_hdl;
+	caddr_t addr;
+	int (*dma_alloc_cb)() = (alloc_flags == KM_SLEEP) ?
+		DDI_DMA_SLEEP : DDI_DMA_DONTWAIT;
+
+	/* Try to get one available contig_mem */
+	mutex_enter(ST_MUTEX);
+	if (un->un_contig_mem_available_num > 0) {
+		cp = un->un_contig_mem;
+		un->un_contig_mem = cp->cm_next;
+		cp->cm_next = NULL;
+		un->un_contig_mem_available_num--;
+	} else if (un->un_contig_mem_total_num < st_max_contig_mem_num) {
+		/*
+		 * we failed to get one. we're going to
+		 * alloc one more contig_mem for this I/O
+		 */
+		mutex_exit(ST_MUTEX);
+		cp = (struct contig_mem *)
+		    kmem_zalloc(sizeof (struct contig_mem), alloc_flags);
+		if (cp == NULL) {
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "alloc contig_mem failure\n");
+			return (NULL); /* cannot get one */
+		}
+		mutex_enter(ST_MUTEX);
+		un->un_contig_mem_total_num++; /* one more available */
+	} else {
+		/*
+		 * we failed to get one and we're NOT allowed to
+		 * alloc more contig_mem
+		 */
+		if (alloc_flags == KM_SLEEP) {
+			while (un->un_contig_mem_available_num <= 0) {
+				cv_wait(&un->un_contig_mem_cv,
+				    ST_MUTEX);
+			}
+			cp = un->un_contig_mem;
+			un->un_contig_mem = cp->cm_next;
+			cp->cm_next = NULL;
+			un->un_contig_mem_available_num--;
+		} else {
+			mutex_exit(ST_MUTEX);
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "alloc contig_mem failure\n");
+			return (NULL); /* cannot get one */
+		}
+	}
+	mutex_exit(ST_MUTEX);
+
+	/* We need to check if this block of mem is big enough for this I/O */
+	if (cp->cm_len < len) {
+		/* not big enough, need to alloc a new one */
+		if (ddi_dma_mem_alloc(un->un_contig_mem_hdl, len, &st_acc_attr,
+			DDI_DMA_RDWR, dma_alloc_cb, NULL,
+			&addr, &rlen, &acc_hdl) != DDI_SUCCESS) {
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "alloc contig_mem failure: not enough mem\n");
+			st_release_contig_mem(un, cp);
+			return (NULL);
+		}
+		if (cp->cm_addr) {
+			/* release previous one before we attach new one */
+			ddi_dma_mem_free(&cp->cm_acc_hdl);
+		}
+		/* attach new mem to this cp */
+		cp->cm_addr = addr;
+		cp->cm_acc_hdl = acc_hdl;
+		cp->cm_len = len;
+
+		if (cp->cm_bp == NULL) {
+			cp->cm_bp = getrbuf(alloc_flags);
+			if (cp->cm_bp == NULL) {
+				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+				    "alloc contig_mem failure:"
+				    "no enough mem for bp\n");
+				st_release_contig_mem(un, cp);
+				return (NULL);
+			}
+		}
+	}
+
+	/* init bp attached to this cp */
+	bioinit(cp->cm_bp);
+	cp->cm_bp->b_un.b_addr = cp->cm_addr;
+	cp->cm_bp->b_private = (void *)cp;
+	return (cp);
+}
+
+/*
+ * this is the biodone func for the bp used in big block I/O
+ */
+static int
+st_bigblk_xfer_done(struct buf *bp)
+{
+	struct contig_mem *cp;
+	struct buf *orig_bp;
+	int remapped = 0;
+	int ioerr;
+	struct scsi_tape *un;
+
+	/* sanity check */
+	if (bp == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	un = ddi_get_soft_state(st_state, MTUNIT(bp->b_edev));
+	if (un == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	cp = (struct contig_mem *)bp->b_private;
+	orig_bp = cp->cm_bp; /* get back the bp we have replaced */
+	cp->cm_bp = bp;
+
+	/* special handling for special I/O */
+	if (cp->cm_use_sbuf) {
+		ASSERT(un->un_sbuf_busy);
+		un->un_sbufp = orig_bp;
+		cp->cm_use_sbuf = 0;
+	}
+
+	orig_bp->b_resid = bp->b_resid;
+	ioerr = geterror(bp);
+	if (ioerr != 0) {
+		bioerror(orig_bp, ioerr);
+	} else if (orig_bp->b_flags & B_READ) {
+		/* copy data back to original bp */
+		if (orig_bp->b_flags & (B_PHYS | B_PAGEIO)) {
+			bp_mapin(orig_bp);
+			remapped = 1;
+		}
+		bcopy(bp->b_un.b_addr, orig_bp->b_un.b_addr,
+			bp->b_bcount - bp->b_resid);
+		if (remapped)
+			bp_mapout(orig_bp);
+	}
+
+	st_release_contig_mem(un, cp);
+
+	biodone(orig_bp);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * We use this func to replace original bp that may not be able to do I/O
+ * in big block size with one that can
+ */
+static struct buf *
+st_get_bigblk_bp(struct buf *bp)
+{
+	struct contig_mem *cp;
+	struct scsi_tape *un;
+	struct buf *cont_bp;
+	int remapped = 0;
+
+	un = ddi_get_soft_state(st_state, MTUNIT(bp->b_edev));
+	if (un == NULL) {
+		return (bp);
+	}
+
+	/* try to get one contig_mem */
+	cp = st_get_contig_mem(un, bp->b_bcount, KM_SLEEP);
+	if (!cp) {
+		scsi_log(ST_DEVINFO, st_label, CE_WARN,
+			"Cannot alloc contig buf for I/O for %lu blk size",
+			bp->b_bcount);
+		return (bp);
+	}
+	cont_bp = cp->cm_bp;
+	cp->cm_bp = bp;
+
+	/* make sure that we "are" using un_sbufp for special I/O */
+	if (bp == un->un_sbufp) {
+		ASSERT(un->un_sbuf_busy);
+		un->un_sbufp = cont_bp;
+		cp->cm_use_sbuf = 1;
+	}
+
+	/* clone bp */
+	cont_bp->b_bcount = bp->b_bcount;
+	cont_bp->b_resid = bp->b_resid;
+	cont_bp->b_iodone = st_bigblk_xfer_done;
+	cont_bp->b_file = bp->b_file;
+	cont_bp->b_offset = bp->b_offset;
+	cont_bp->b_dip = bp->b_dip;
+	cont_bp->b_error = 0;
+	cont_bp->b_proc = NULL;
+	cont_bp->b_flags = bp->b_flags & ~(B_PAGEIO | B_PHYS | B_SHADOW);
+	cont_bp->b_shadow = NULL;
+	cont_bp->b_pages = NULL;
+	cont_bp->b_edev = bp->b_edev;
+	cont_bp->b_dev = bp->b_dev;
+	cont_bp->b_lblkno = bp->b_lblkno;
+	cont_bp->b_forw = bp->b_forw;
+	cont_bp->b_back = bp->b_back;
+	cont_bp->av_forw = bp->av_forw;
+	cont_bp->av_back = bp->av_back;
+	cont_bp->b_bufsize = bp->b_bufsize;
+
+	/* get data in original bp */
+	if (bp->b_flags & B_WRITE) {
+		if (bp->b_flags & (B_PHYS | B_PAGEIO)) {
+			bp_mapin(bp);
+			remapped = 1;
+		}
+		bcopy(bp->b_un.b_addr, cont_bp->b_un.b_addr, bp->b_bcount);
+		if (remapped)
+			bp_mapout(bp);
+	}
+
+	return (cont_bp);
+}
+#endif

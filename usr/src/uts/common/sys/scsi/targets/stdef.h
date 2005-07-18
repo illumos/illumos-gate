@@ -29,6 +29,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/sunddi.h>
 #include <sys/note.h>
 #include <sys/condvar.h>
 #include <sys/kstat.h>
@@ -508,6 +509,37 @@ struct read_blklim {
 	uchar_t	min_lo;			/* Minimum block length, low byte */
 };
 
+#ifdef _KERNEL
+
+#if defined(__i386) || defined(__amd64)
+/* Data structure used in big block I/O on x86/x64 platform */
+
+/*
+ * alloc more than one contig_mem, so mutiple I/O can be
+ * on-going simultaneously
+ */
+#define	ST_MAX_CONTIG_MEM_NUM	3
+
+/*
+ * 60K is used due to the limitation(size) of the intermediate buffer
+ * in DMA bind code(rootnex.c), which is 64K. If the I/O buf is page
+ * aligned, HBA can do 64K DMA, but if not, HBA can only do
+ * 64K - PAGESIZE = 60K DMA due to the copy to/from intermediate
+ * buffer will keep the page offset.
+ */
+#define	ST_BIGBLK_XFER		60 * 1024
+struct contig_mem {
+	struct contig_mem *cm_next;
+	size_t cm_len;
+	caddr_t cm_addr;
+	ddi_acc_handle_t cm_acc_hdl;
+	struct buf *cm_bp;
+	int cm_use_sbuf;
+};
+#endif
+
+#endif /* _KERNEL */
+
 /*
  * Private info for scsi tapes. Pointed to by the un_private pointer
  * of one of the SCSI_DEVICE chains.
@@ -601,6 +633,14 @@ struct scsi_tape {
 	uchar_t	un_rqs_state;		/* see define below */
 	caddr_t	un_uscsi_rqs_buf;	/* uscsi_rqs: buffer for RQS data */
 	uchar_t	un_data_mod;		/* Device required data mod */
+
+#if defined(__i386) || defined(__amd64)
+	ddi_dma_handle_t un_contig_mem_hdl;
+	struct contig_mem *un_contig_mem;
+	int un_contig_mem_available_num;
+	int un_contig_mem_total_num;
+	kcondvar_t un_contig_mem_cv;
+#endif
 };
 /*
  * device error kstats
