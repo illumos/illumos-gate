@@ -1151,7 +1151,7 @@ process_file_dg(inst_t *svcp, struct dependency_group *dg)
 		return;
 
 	if (!any_satisfied) {
-		for (; i >= 0; --i) {
+		while (--i >= 0) {
 			uu_list_remove(dg->entities, deps[i]);
 			r = uu_list_append(svcp->baddeps, deps[i]);
 			assert(r == 0);
