@@ -4269,7 +4269,7 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 	if (IN6_IS_ADDR_LOOPBACK(v6dstp)) {
 		ip1dbg(("ip_newroute_v6: dst with loopback addr\n"));
 		goto icmp_err_ret;
-	} else if (IN6_IS_ADDR_LOOPBACK(v6srcp)) {
+	} else if ((v6srcp != NULL) && IN6_IS_ADDR_LOOPBACK(v6srcp)) {
 		ip1dbg(("ip_newroute_v6: src with loopback addr\n"));
 		goto icmp_err_ret;
 	}
