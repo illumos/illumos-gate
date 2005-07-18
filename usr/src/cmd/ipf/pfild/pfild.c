@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -370,7 +370,7 @@ sendpkt(const void *buf, int len)
 		sin.sin_family = AF_INET;
 		sin.sin_port = 0;
 		sin.sin_addr = iph->ip_dst;
-		n = sendto(ip_fd, buf, n, 0, (void *)&sin, sizeof (sin));
+		n = sendto(ip_fd, buf, len, 0, (void *)&sin, sizeof (sin));
 	} else {
 		n = -1;
 		errno = EINVAL;
