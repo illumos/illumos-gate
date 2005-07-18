@@ -89,6 +89,8 @@ static ctid_t startdct = -1;
 #define	FMRI_STARTD_CONTRACT \
 	"svc:/system/svc/restarter:default/:properties/restarter/contract"
 
+#define	ZONEADM_PROG "/usr/sbin/zoneadm"
+
 static void
 stop_startd()
 {
@@ -365,6 +367,138 @@ gather_args(char **args, char *buf, size_t buf_sz)
 	return (0);
 }
 
+/*
+ * Halt every zone on the system.  We are committed to doing a shutdown
+ * even if something goes wrong here. If something goes wrong, we just
+ * continue with the shutdown.  Return non-zero if we need to wait for zones to
+ * halt later on.
+ */
+static int
+halt_zones(const char *name)
+{
+	pid_t pid;
+	zoneid_t *zones;
+	size_t nz, old_nz;
+	int i;
+	char zname[ZONENAME_MAX];
+
+	/*
+	 * Get a list of zones. If the number of zones changes in between the
+	 * two zone_list calls, try again.
+	 */
+
+	for (;;) {
+		(void) zone_list(NULL, &nz);
+		if (nz == 1)
+			return (0);
+		old_nz = nz;
+		zones = calloc(sizeof (zoneid_t), nz);
+		if (zones == NULL) {
+			(void) fprintf(stderr,
+			    gettext("%s: Could not halt zones"
+			    " (out of memory).\n"), name);
+			return (0);
+		}
+
+		(void) zone_list(zones, &nz);
+		if (old_nz == nz)
+			break;
+		free(zones);
+	}
+
+	if (nz == 2) {
+		(void) fprintf(stderr,
+		    gettext("%s: Halting 1 zone.\n"),
+		    name);
+	} else {
+		(void) fprintf(stderr,
+		    gettext("%s: Halting %i zones.\n"),
+		    name, nz - 1);
+	}
+
+	for (i = 0; i < nz; i++) {
+		if (zones[i] == GLOBAL_ZONEID)
+			continue;
+		if (getzonenamebyid(zones[i], zname, sizeof (zname)) < 0) {
+			/*
+			 * getzonenamebyid should only fail if we raced with
+			 * another process trying to shut down the zone.
+			 * We assume this happened and ignore the error.
+			 */
+			if (errno != EINVAL) {
+				(void) fprintf(stderr,
+				    gettext("%s: Unexpected error while "
+				    "looking up zone %ul: %s.\n"),
+				    name, zones[i], strerror(errno));
+			}
+
+			continue;
+		}
+		pid = fork();
+		if (pid < 0) {
+			(void) fprintf(stderr,
+			    gettext("%s: Zone \"%s\" could not be"
+			    " halted (could not fork(): %s).\n"),
+			    name, zname, strerror(errno));
+			continue;
+		}
+		if (pid == 0) {
+			(void) execl(ZONEADM_PROG, ZONEADM_PROG,
+			    "-z", zname, "halt", NULL);
+			(void) fprintf(stderr,
+			    gettext("%s: Zone \"%s\" could not be halted"
+			    " (cannot exec(" ZONEADM_PROG "): %s).\n"),
+			    name, zname, strerror(errno));
+			exit(0);
+		}
+	}
+
+	return (1);
+}
+
+/*
+ * This function tries to wait for all non-global zones to go away.
+ * It will timeout if no progress is made for 5 seconds, or a total of
+ * 30 seconds elapses.
+ */
+
+static void
+check_zones_haltedness(const char *name)
+{
+	int t = 0, t_prog = 0;
+	size_t nz = 0, last_nz;
+
+	do {
+		last_nz = nz;
+		(void) zone_list(NULL, &nz);
+		if (nz == 1)
+			return;
+
+		(void) sleep(1);
+
+		if (last_nz > nz)
+			t_prog = 0;
+
+		t++;
+		t_prog++;
+
+		if (t == 10) {
+			if (nz == 2) {
+				(void) fprintf(stderr,
+				    gettext("%s: Still waiting for 1 zone to "
+				    "halt. Will wait up to 20 seconds.\n"),
+				    name);
+			} else {
+				(void) fprintf(stderr,
+				    gettext("%s: Still waiting for %i zones "
+				    "to halt. Will wait up to 20 seconds.\n"),
+				    name, nz - 1);
+			}
+		}
+
+	} while ((t < 30) && (t_prog < 5));
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -377,6 +511,7 @@ main(int argc, char *argv[])
 	const char *usage;
 	zoneid_t zoneid = getzoneid();
 	pid_t init_pid = 1;
+	int need_check_zones;
 
 	char bootargs_buf[257];		/* uadmin()'s buffer is 257 bytes. */
 
@@ -514,6 +649,16 @@ main(int argc, char *argv[])
 		init_pid = -1;
 	}
 
+	/*
+	 * We start to fork a bunch of zoneadms to halt any active zones.
+	 * This will proceed with halt in parallel until we call
+	 * check_zone_haltedness later on.
+	 */
+	if (zoneid == GLOBAL_ZONEID && cmd != A_DUMP) {
+		need_check_zones = halt_zones(cmdname);
+	}
+
+
 	/* sync boot archive in the global zone */
 	if (getzoneid() == GLOBAL_ZONEID && !nosync) {
 		(void) system("/sbin/bootadm -a update_all");
@@ -545,6 +690,17 @@ main(int argc, char *argv[])
 		 * that are terminated.
 		 */
 		stop_restarters();
+
+		/*
+		 * Wait a little while for zones to shutdown.
+		 */
+		if (need_check_zones) {
+			check_zones_haltedness(cmdname);
+
+			(void) fprintf(stderr,
+			    gettext("%s: Completing system halt.\n"),
+			    cmdname);
+		}
 	}
 
 	/*
@@ -586,7 +742,6 @@ main(int argc, char *argv[])
 
 	(void) uadmin(cmd, fcn, mdep);
 	perror(cmdname);
-
 	do
 		r = remove(resetting);
 	while (r != 0 && errno == EINTR);
