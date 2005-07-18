@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,11 +47,7 @@ extern "C" {
 
 #ifndef _OPAQUE_T
 #define	_OPAQUE_T
-#ifdef	__STDC__
 typedef	void *opaque_t;
-#else	/* __STDC__ */
-typedef	char *opaque_t;
-#endif	/* __STDC__ */
 #endif  /* _OPAQUE_T */
 
 #ifdef	__cplusplus
@@ -73,7 +69,6 @@ typedef	char *opaque_t;
 /*
  * Generally useful files to include
  */
-
 #include <sys/scsi/scsi_params.h>
 #include <sys/scsi/scsi_address.h>
 #include <sys/scsi/scsi_pkt.h>
@@ -97,7 +92,6 @@ typedef	char *opaque_t;
 /*
  * Sun SCSI type definitions
  */
-
 #include <sys/scsi/impl/types.h>
 
 /*

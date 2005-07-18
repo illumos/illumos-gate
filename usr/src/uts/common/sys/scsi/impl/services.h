@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +39,6 @@ extern "C" {
 
 #ifdef	_KERNEL
 
-#ifdef	__STDC__
-
 struct scsi_key_strings {
 	int key;
 	char *message;
@@ -52,46 +50,37 @@ struct scsi_asq_key_strings {
 	char *message;
 };
 
-extern int scsi_poll(struct scsi_pkt *);
-extern struct scsi_pkt *get_pktiopb(struct scsi_address *,
-    caddr_t *datap, int cdblen, int statuslen,
-    int datalen, int readflag, int (*func)());
-extern void free_pktiopb(struct scsi_pkt *, caddr_t datap, int datalen);
-extern char *scsi_dname(int dtyp);
-extern char *scsi_rname(uchar_t reason);
-extern char *scsi_mname(uchar_t msg);
-extern char *scsi_cname(uchar_t cmd, char **cmdvec);
-extern char *scsi_cmd_name(uchar_t cmd, struct scsi_key_strings *cmdlist,
-    char *tmpstr);
-extern char *scsi_sname(uchar_t sense_key);
-extern char *scsi_esname(uint_t sense_key, char *tmpstr);
-extern char *scsi_asc_name(uint_t asc, uint_t ascq, char *tmpstr);
-extern void scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pktp,
-    char *drv_name, int severity, daddr_t blkno, daddr_t err_blkno,
-    struct scsi_key_strings *cmdlist, struct scsi_extended_sense *sensep,
-    struct scsi_asq_key_strings *asc_list,
-    char *(*decode_fru)(struct scsi_device *, char *, int, uchar_t));
-extern void scsi_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt,
-    char *label, int severity, daddr_t blkno, daddr_t err_blkno,
-    struct scsi_key_strings *cmdlist, struct scsi_extended_sense *sensep);
+int	scsi_poll(struct scsi_pkt *);
+struct scsi_pkt	*get_pktiopb(struct scsi_address *,
+		    caddr_t *datap, int cdblen, int statuslen,
+		    int datalen, int readflag, int (*func)(void));
+void		free_pktiopb(struct scsi_pkt *, caddr_t datap, int datalen);
+
+char	*scsi_dname(int dtyp);
+char	*scsi_rname(uchar_t reason);
+char	*scsi_mname(uchar_t msg);
+char	*scsi_cname(uchar_t cmd, char **cmdvec);
+char	*scsi_cmd_name(uchar_t cmd, struct scsi_key_strings *cmdlist,
+	    char *tmpstr);
+char	*scsi_sname(uchar_t sense_key);
+char	*scsi_esname(uint_t sense_key, char *tmpstr);
+char	*scsi_asc_name(uint_t asc, uint_t ascq, char *tmpstr);
+void	scsi_vu_errmsg(struct scsi_device *devp, struct scsi_pkt *pktp,
+	    char *drv_name, int severity, daddr_t blkno, daddr_t err_blkno,
+	    struct scsi_key_strings *cmdlist,
+	    struct scsi_extended_sense *sensep,
+	    struct scsi_asq_key_strings *asc_list,
+	    char *(*decode_fru)(struct scsi_device *, char *, int, uchar_t));
+void	scsi_errmsg(struct scsi_device *devp, struct scsi_pkt *pkt,
+	    char *label, int severity, daddr_t blkno, daddr_t err_blkno,
+	    struct scsi_key_strings *cmdlist,
+	    struct scsi_extended_sense *sensep);
 /*PRINTFLIKE4*/
-extern void scsi_log(dev_info_t *dev, char *label,
-    uint_t level, const char *fmt, ...) __KPRINTFLIKE(4);
-
-#else	/* __STDC__ */
-
-extern int scsi_poll();
-extern struct scsi_pkt *get_pktiopb();
-extern void free_pktiopb();
-extern char *scsi_dname(), *scsi_rname(), *scsi_cname(), *scsi_mname();
-extern char *scsi_sname(), *scsi_esname(), *scsi_asc_name();
-extern void scsi_vu_errmsg(), scsi_errmsg(), scsi_log();
-
-#endif	/* __STDC__ */
+void	scsi_log(dev_info_t *dev, char *label,
+	    uint_t level, const char *fmt, ...) __KPRINTFLIKE(4);
 
 extern char *scsi_state_bits;
 extern char *sense_keys[NUM_SENSE_KEYS + NUM_IMPL_SENSE_KEYS];
-
 
 #define	SCSI_DEBUG	0xDEB00000
 
@@ -127,6 +116,14 @@ extern char *sense_keys[NUM_SENSE_KEYS + NUM_IMPL_SENSE_KEYS];
 #define	SCSI_CAP_SCSI_VERSION		17
 #define	SCSI_CAP_INTERCONNECT_TYPE	18
 #define	SCSI_CAP_LUN_RESET		19
+#define	SCSI_CAP_ASCII		{					\
+		"dma-max", "msg-out", "disconnect", "synchronous",	\
+		"wide-xfer", "parity", "initiator-id", "untagged-qing",	\
+		"tagged-qing", "auto-rqsense", "linked-cmds",		\
+		"sector-size", "total-sectors", "geometry",		\
+		"reset-notification", "qfull-retries",			\
+		"qfull-retry-interval", "scsi-version",			\
+		"interconnect-type", "lun-reset", NULL }
 
 /*
  * Definitions used by some capabilities
@@ -143,11 +140,17 @@ extern char *sense_keys[NUM_SENSE_KEYS + NUM_IMPL_SENSE_KEYS];
 #define	INTERCONNECT_SSA		4	/* -EOLed */
 #define	INTERCONNECT_FABRIC		5	/* soft ALPA or Switch */
 #define	INTERCONNECT_USB		6
+#define	INTERCONNECT_ATAPI		7
+#define	INTERCONNECT_ISCSI		8
+#define	INTERCONNECT_IBSRP		9
+#define	INTERCONNECT_SATA		10
+#define	INTERCONNECT_TYPE_ASCII		{				\
+		"", "SPI", "FC", "1394", "", "FC", "USB",		\
+		"ATAPI", "iSCSI", "IB", "SATA", NULL }
 
 /*
  * Compatibility...
  */
-
 #define	scsi_cmd_decode	scsi_cname
 
 #endif	/* _KERNEL */

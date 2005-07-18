@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998-1999,2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,7 @@ extern "C" {
 #endif
 
 /*
- * SCSI subsystem options
+ * SCSI subsystem scsi_options
  */
 
 /*
@@ -65,9 +65,9 @@ extern "C" {
 #define	SCSI_OPTIONS_FAST320	0x4000	/* Global FAST320 scsi support */
 
 /*
- * the following 3 bits are for being able to limit the max. number of LUNs
+ * The following 3 bits are for being able to limit the max. number of LUNs
  * a nexus driver will allow -- "default" means that the adapter will
- * continue its default behaviour
+ * continue its default behavior.
  */
 #define	SCSI_OPTIONS_NLUNS_MASK		(0x70000)
 
@@ -88,7 +88,7 @@ extern "C" {
  * driver to check for existence  and readiness of a SCSI device. It is
  * defined as:
  *
- *	int scsi_slave(struct scsi_device *devp, int (*callback()))
+ *	int scsi_slave(struct scsi_device *devp, int (*callback)(void))
  *
  * where devp is the scsi_device structure passed to the target driver
  * at probe time, and where callback declares whether scsi_slave() can
@@ -126,25 +126,23 @@ extern "C" {
  * driver to check for bare-bones existence of a SCSI device. It is
  * defined as:
  *
- *	int scsi_probe(struct scsi_device *devp, int (*callback()))
+ *	int scsi_probe(struct scsi_device *devp, int (*callback)(void))
  *
  * scsi_probe() only executes an inquiry.
  *
  * Both functions return one of the integer values as defined below:
  */
-
 #define	SCSIPROBE_EXISTS	0	/* device exists, inquiry data valid */
 #define	SCSIPROBE_NONCCS	1	/* device exists, no inquiry data */
 #define	SCSIPROBE_NORESP	2	/* device didn't respond */
 #define	SCSIPROBE_NOMEM		3	/* no space available for structures */
 #define	SCSIPROBE_FAILURE	4	/* polled cmnd failure- unspecified */
 #define	SCSIPROBE_BUSY		5	/* device was busy */
-#define	SCSIPROBE_NOMEM_CB	6
-					/*
-					 * no space available for structures
-					 * but callback request has been
-					 * queued
-					 */
+#define	SCSIPROBE_NOMEM_CB	6	/* no space, callback queued */
+#define	SCSIPROBE_ASCII					\
+	{"EXISTS", "NONCCS", "NORESP", "NOMEM",		\
+	"FAILURE", "BUSY", "NOMEM_CB", NULL}
+
 /*
  * default value for scsi_reset_delay
  */
@@ -161,19 +159,14 @@ extern "C" {
 
 #ifdef	_KERNEL
 /*
- * Global SCSI config variables
+ * Global SCSI config variables / options
  */
-extern int	scsi_host_id, scsi_tag_age_limit;
-extern int	scsi_watchdog_tick;
-
-
-/*
- * Global SCSI options
- */
-extern int scsi_options;
-extern unsigned int scsi_reset_delay;	/* specified in milli seconds */
-extern int scsi_selection_timeout;	/* specified in milli seconds */
-
+extern int		scsi_options;
+extern unsigned int	scsi_reset_delay;	/* specified in milli seconds */
+extern int		scsi_tag_age_limit;
+extern int		scsi_watchdog_tick;
+extern int		scsi_selection_timeout;	/* specified in milli seconds */
+extern int		scsi_host_id;
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

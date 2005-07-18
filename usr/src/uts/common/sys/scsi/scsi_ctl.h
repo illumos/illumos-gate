@@ -43,7 +43,6 @@ extern "C" {
  * by target/ioctl)
  * RESET_BUS defined for tran_bus_reset (invoked by ioctl)
  */
-
 #define	RESET_ALL	0	/* reset SCSI bus, host adapter, everything */
 #define	RESET_TARGET	1	/* reset SCSI target */
 #define	RESET_BUS	2	/* reset SCSI bus only */
@@ -82,46 +81,25 @@ extern "C" {
 /*
  * Capabilities functions
  */
-
-#ifdef	__STDC__
-extern int scsi_ifgetcap(struct scsi_address *ap, char *cap, int whom);
-extern int scsi_ifsetcap(struct scsi_address *ap, char *cap, int value,
-	int whom);
-#else	/* __STDC__ */
-extern int scsi_ifgetcap(), scsi_ifsetcap();
-#endif	/* __STDC__ */
+int	scsi_ifgetcap(struct scsi_address *ap, char *cap, int whom);
+int	scsi_ifsetcap(struct scsi_address *ap, char *cap, int value, int whom);
 
 /*
  * Abort and Reset functions
  */
-
-#ifdef	__STDC__
-extern int scsi_abort(struct scsi_address *ap, struct scsi_pkt *pkt);
-extern int scsi_reset(struct scsi_address *ap, int level);
-extern int scsi_reset_notify(struct scsi_address *ap, int flag,
-	void (*callback)(caddr_t), caddr_t arg);
-extern int scsi_clear_task_set(struct scsi_address *ap);
-extern int scsi_terminate_task(struct scsi_address *ap, struct scsi_pkt *pkt);
-#else	/* __STDC__ */
-extern int scsi_abort(), scsi_reset();
-extern int scsi_reset_notify();
-extern int scsi_clear_task_set();
-extern int scsi_terminate_task();
-#endif	/* __STDC__ */
+int	scsi_abort(struct scsi_address *ap, struct scsi_pkt *pkt);
+int	scsi_reset(struct scsi_address *ap, int level);
+int	scsi_reset_notify(struct scsi_address *ap, int flag,
+	    void (*callback)(caddr_t), caddr_t arg);
+int	scsi_clear_task_set(struct scsi_address *ap);
+int	scsi_terminate_task(struct scsi_address *ap, struct scsi_pkt *pkt);
 
 /*
  * Other functions
  */
-
-#ifdef	__STDC__
-extern int scsi_clear_aca(struct scsi_address *ap);
-extern int scsi_get_bus_addr(struct scsi_device *devp, char *name, int len);
-extern int scsi_get_name(struct scsi_device *devp, char *name, int len);
-#else	/* __STDC__ */
-extern int scsi_clear_aca();
-extern int scsi_get_bus_addr();
-extern int scsi_get_name();
-#endif	/* __STDC__ */
+int	scsi_clear_aca(struct scsi_address *ap);
+int	scsi_get_bus_addr(struct scsi_device *devp, char *name, int len);
+int	scsi_get_name(struct scsi_device *devp, char *name, int len);
 
 #endif	/* _KERNEL */
 

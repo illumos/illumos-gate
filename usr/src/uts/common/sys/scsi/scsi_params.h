@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_SCSI_PARAMS_H
@@ -45,13 +45,13 @@ extern "C" {
 #define	NLUNS_PER_TARGET	8	/* number of luns per target */
 
 /*
- * the following defines are useful for settings max LUNs in nexus/target
- * drivers (the default of 8 is already defined above)
+ * the following defines are useful for setting max LUNs in
+ * nexus/target drivers
  */
+#define	SCSI_1LUN_PER_TARGET		1
+#define	SCSI_8LUN_PER_TARGET		NLUNS_PER_TARGET
 #define	SCSI_16LUNS_PER_TARGET		16
 #define	SCSI_32LUNS_PER_TARGET		32
-#define	SCSI_1LUN_PER_TARGET		1
-
 
 #ifdef	__cplusplus
 }

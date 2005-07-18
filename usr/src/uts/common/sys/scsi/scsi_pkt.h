@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,6 @@ extern "C" {
  *	the packet as it argument. From fields within the packet, the target
  *	driver can determine the success or failure of the command.
  */
-
 struct scsi_pkt {
 	opaque_t pkt_ha_private;	/* private data for host adapter */
 	struct scsi_address pkt_address;	/* destination packet is for */
@@ -103,7 +102,6 @@ struct scsi_pkt {
 				/* completion, ie. do not defer */
 
 
-
 /*
  * Following defines are for USCSI options.
  */
@@ -132,11 +130,11 @@ struct scsi_pkt {
 #define	CMD_TRAN_ERR	3	/* unspecified transport error */
 #define	CMD_RESET	4	/* Target completed hard reset sequence */
 #define	CMD_ABORTED	5	/* Command transport aborted on request */
-#define	CMD_TERMINATED	22	/* Command transport terminated on request */
 #define	CMD_TIMEOUT	6	/* Command timed out */
 #define	CMD_DATA_OVR	7	/* Data Overrun */
 #define	CMD_CMD_OVR	8	/* Command Overrun */
 #define	CMD_STS_OVR	9	/* Status Overrun */
+#define	CMD_TERMINATED	22	/* Command transport terminated on request */
 
 /*
  * Following defines are appropriate for SCSI parallel bus.
@@ -155,18 +153,24 @@ struct scsi_pkt {
 #define	CMD_TAG_REJECT	21	/* Target rejected our tag message */
 #define	CMD_DEV_GONE	24	/* The device has been removed */
 
+/* Used by scsi_rname(9F) */
+#define	CMD_REASON_ASCII	{ \
+	    "cmplt", "incomplete", "dma_derr", "tran_err", "reset", \
+	    "aborted", "timeout", "data_ovr", "cmd_ovr", "sts_ovr", \
+	    "badmsg", "nomsgout", "xid_fail", "ide_fail", "abort_fail", \
+	    "reject_fail", "nop_fail", "per_fail", "bdr_fail", "id_fail", \
+	    "unexpected_bus_free", "tag reject", "terminated", "", "gone", \
+	    NULL }
 
 /*
  * Definitions for the pkt_state field
  */
-
 #define	STATE_GOT_BUS		0x01	/* Success in getting SCSI bus */
 #define	STATE_GOT_TARGET	0x02	/* Successfully connected with target */
 #define	STATE_SENT_CMD		0x04	/* Command successfully sent */
 #define	STATE_XFERRED_DATA	0x08	/* Data transfer took place */
 #define	STATE_GOT_STATUS	0x10	/* SCSI status received */
 #define	STATE_ARQ_DONE		0x20	/* auto rqsense took place */
-
 
 /*
  * Definitions for the pkt_statistics field
@@ -188,11 +192,9 @@ struct scsi_pkt {
 #define	STAT_SYNC	0x2	/* Command did a synchronous data transfer */
 #define	STAT_PERR	0x4	/* Command experienced a SCSI parity error */
 
-
 /*
  * Definitions for what scsi_transport returns
  */
-
 #define	TRAN_ACCEPT		1
 #define	TRAN_BUSY		0
 #define	TRAN_BADPKT		-1
@@ -202,14 +204,9 @@ struct scsi_pkt {
 /*
  * Kernel function declarations
  */
+int	scsi_transport(struct scsi_pkt *pkt);
 
 #define	pkt_transport	scsi_transport
-
-#ifdef	__STDC__
-extern int scsi_transport(struct scsi_pkt *pkt);
-#else	/* __STDC__ */
-extern int scsi_transport();
-#endif	/* __STDC__ */
 
 #define	SCSI_POLL_TIMEOUT	60
 
