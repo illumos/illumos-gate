@@ -1656,7 +1656,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5703S:
 	case DEVICE_ID_5704C:
 	case DEVICE_ID_5704S:
-	case DEVICE_ID_5705:
+	case DEVICE_ID_5704:
 	case DEVICE_ID_5705M:
 	case DEVICE_ID_5705C:
 	case DEVICE_ID_5706:
@@ -1805,6 +1805,7 @@ bge_chip_id_init(bge_t *bgep)
 
 	case DEVICE_ID_5704C:
 	case DEVICE_ID_5704S:
+	case DEVICE_ID_5704:
 		/*
 		 * Revision A0 of the 5704/5794 had various errata
 		 * but we have workarounds, so it *is* supported.
@@ -1815,7 +1816,6 @@ bge_chip_id_init(bge_t *bgep)
 		dev_ok = B_TRUE;
 		break;
 
-	case DEVICE_ID_5705:
 	case DEVICE_ID_5705C:
 	case DEVICE_ID_5705M:
 	case DEVICE_ID_5705MA3:

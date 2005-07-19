@@ -33,7 +33,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "BCM579x driver v0.45";
+static char bge_ident[] = "BCM579x driver v0.46";
 
 /*
  * Property names
@@ -1604,11 +1604,12 @@ bge_unattach(bge_t *bgep)
 		mutex_enter(bgep->genlock);
 		bge_chip_reset(bgep, B_FALSE);
 		mutex_exit(bgep->genlock);
-		bge_fini_rings(bgep);
 	}
 
-	if (bgep->progress & PROGRESS_INTR)
+	if (bgep->progress & PROGRESS_INTR) {
 		bge_rem_intrs(bgep);
+		bge_fini_rings(bgep);
+	}
 
 	if (bgep->progress & PROGRESS_FACTOTUM)
 		ddi_remove_softintr(bgep->factotum_id);
@@ -1857,6 +1858,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 			bgep->intr_type = DDI_INTR_TYPE_MSI;
 			bgep->progress |= PROGRESS_INTR;
 		}
+		bge_log(bgep, "Using MSI interrupt type\n");
 	}
 
 	if (!(bgep->progress & PROGRESS_INTR) &&
@@ -1871,6 +1873,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 		bgep->intr_type = DDI_INTR_TYPE_FIXED;
 		bgep->progress |= PROGRESS_INTR;
+		bge_log(bgep, "Using Legacy interrupt type\n");
 	}
 
 	if (!(bgep->progress & PROGRESS_INTR)) {

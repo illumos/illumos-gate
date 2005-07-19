@@ -758,7 +758,6 @@ bge_update_copper(bge_t *bgep)
 	switch (bgep->chipid.device) {
 	case DEVICE_ID_5700:
 	case DEVICE_ID_5700x:
-	case DEVICE_ID_5705:
 	case DEVICE_ID_5705C:
 	case DEVICE_ID_5782:
 		/*
