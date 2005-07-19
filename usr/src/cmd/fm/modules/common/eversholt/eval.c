@@ -178,7 +178,21 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		    "payloadprop(\"%s\") ", np->u.quote.s);
 		if (funcnp->u.func.cachedval != NULL) {
 			*valuep = *(struct evalue *)(funcnp->u.func.cachedval);
-			out(O_ALTFP|O_VERB, "cached: %llu", valuep->v);
+
+			switch (valuep->t) {
+			case UINT64:
+			case NODEPTR:
+				out(O_ALTFP|O_VERB, "cached: %llu", valuep->v);
+				break;
+			case STRING:
+				out(O_ALTFP|O_VERB, "cached: \"%s\"",
+				    (char *)valuep->v);
+				break;
+			default:
+				out(O_ALTFP|O_VERB, "undefined");
+				break;
+			}
+
 			return (1);
 		} else if (platform_payloadprop(np, valuep)) {
 			/* platform_payloadprop() returned false, pass it on */
@@ -190,7 +204,21 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 			    MALLOC(sizeof (struct evalue));
 			*(struct evalue *)(funcnp->u.func.cachedval) =
 			    *valuep;
-			out(O_ALTFP|O_VERB, "returned: %llu", valuep->v);
+
+			switch (valuep->t) {
+			case UINT64:
+			case NODEPTR:
+				out(O_ALTFP|O_VERB, "cached: %llu", valuep->v);
+				break;
+			case STRING:
+				out(O_ALTFP|O_VERB, "cached: \"%s\"",
+				    (char *)valuep->v);
+				break;
+			default:
+				out(O_ALTFP|O_VERB, "undefined");
+				break;
+			}
+
 			return (1);
 		}
 	} else

@@ -42,6 +42,7 @@
 #include <errno.h>
 #include <stropts.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/filio.h>
 #include <sys/param.h>
@@ -950,6 +951,43 @@ platform_get_files(const char *dirname[], const char *fnstr, int nodups)
 }
 
 /*
+ * search for files in a standard set of directories
+ */
+static char **
+platform_get_files_stddirs(char *fname, int nodups)
+{
+	const char *dirlist[4];
+	char **flist;
+	char *eftgendir, *eftmachdir, *eftplatdir;
+
+	eftgendir = MALLOC(MAXPATHLEN);
+	eftmachdir = MALLOC(MAXPATHLEN);
+	eftplatdir = MALLOC(MAXPATHLEN);
+
+	/* Generic files that apply to any machine */
+	(void) snprintf(eftgendir, MAXPATHLEN, "%s/usr/lib/fm/eft", Root);
+
+	(void) snprintf(eftmachdir,
+	    MAXPATHLEN, "%s/usr/platform/%s/lib/fm/eft", Root, Mach);
+
+	(void) snprintf(eftplatdir,
+	    MAXPATHLEN, "%s/usr/platform/%s/lib/fm/eft", Root, Plat);
+
+	dirlist[0] = eftplatdir;
+	dirlist[1] = eftmachdir;
+	dirlist[2] = eftgendir;
+	dirlist[3] = NULL;
+
+	flist = platform_get_files(dirlist, fname, nodups);
+
+	FREE(eftplatdir);
+	FREE(eftmachdir);
+	FREE(eftgendir);
+
+	return (flist);
+}
+
+/*
  * platform_run_poller -- execute a poller
  *
  * when eft needs to know if a polled ereport exists this routine
@@ -1247,14 +1285,10 @@ arglist2argv(struct node *np, struct lut **globals, struct config *croot,
 	if (*argc == 0 && addthisarg != NULL) {
 		/*
 		 * first argument added is the command name.
-		 *
-		 * PHASE1.5: Once interface is available, get
-		 * directory names from fmd properties
 		 */
-		const char *dirname[] = { ".", NULL };
 		char **files;
 
-		files = platform_get_files(dirname, addthisarg, 0);
+		files = platform_get_files_stddirs(addthisarg, 0);
 
 		/* do not proceed if number of files found != 1 */
 		if (files[0] == NULL)
@@ -1353,6 +1387,7 @@ platform_call(struct node *np, struct lut **globals, struct config *croot,
 	 * errbuf[] is echoed out as an error message.
 	 */
 	char outbuf[256], errbuf[512];
+	struct stat buf;
 	char **argv, **envp;
 	int argc, argvlen, envc, envplen;
 	int i, ret;
@@ -1369,6 +1404,26 @@ platform_call(struct node *np, struct lut **globals, struct config *croot,
 	if (arglist2argv(np, globals, croot, arrowp, &argv, &argc, &argvlen) ||
 	    argc == 0)
 		return (1);
+
+	/*
+	 * make sure program has executable bit set
+	 */
+	if (stat(argv[0], &buf) == 0) {
+		int exec_bit_set = 0;
+
+		if (buf.st_uid == geteuid() && buf.st_mode & S_IXUSR)
+			exec_bit_set = 1;
+		else if (buf.st_gid == getegid() && buf.st_mode & S_IXGRP)
+			exec_bit_set = 1;
+		else if (buf.st_mode & S_IXOTH)
+			exec_bit_set = 1;
+
+		if (exec_bit_set == 0)
+			out(O_DIE, "call: executable bit not set on %s",
+			    argv[0]);
+	} else {
+		out(O_DIE, "call: failure in stat(), errno = %d\n", errno);
+	}
 
 	envp = NULL;
 	envc = 0;
@@ -1421,35 +1476,7 @@ platform_call(struct node *np, struct lut **globals, struct config *croot,
 char **
 platform_get_eft_files(void)
 {
-	const char *dirlist[4];
-	char **flist;
-	char *eftgendir, *eftmachdir, *eftplatdir;
-
-	eftgendir = MALLOC(MAXPATHLEN);
-	eftmachdir = MALLOC(MAXPATHLEN);
-	eftplatdir = MALLOC(MAXPATHLEN);
-
-	/* Generic files that apply to any machine */
-	(void) snprintf(eftgendir, MAXPATHLEN, "%s/usr/lib/fm/eft", Root);
-
-	(void) snprintf(eftmachdir,
-	    MAXPATHLEN, "%s/usr/platform/%s/lib/fm/eft", Root, Mach);
-
-	(void) snprintf(eftplatdir,
-	    MAXPATHLEN, "%s/usr/platform/%s/lib/fm/eft", Root, Plat);
-
-	dirlist[0] = eftplatdir;
-	dirlist[1] = eftmachdir;
-	dirlist[2] = eftgendir;
-	dirlist[3] = NULL;
-
-	flist = platform_get_files(dirlist, ".eft", 1);
-
-	FREE(eftplatdir);
-	FREE(eftmachdir);
-	FREE(eftgendir);
-
-	return (flist);
+	return (platform_get_files_stddirs(".eft", 1));
 }
 
 void
@@ -1536,38 +1563,94 @@ get_array_info(const char *inputstr, const char **name, unsigned int *index)
 int
 platform_payloadprop(struct node *np, struct evalue *valuep)
 {
+	nvlist_t *basenvp;
 	nvpair_t *nvpair;
-	const char *nameptr, *propname = NULL;
+	const char *nameptr, *propstr, *lastnameptr;
 	int not_array = 0;
 	unsigned int index = 0;
 	uint_t nelem;
-	char *nvpname;
+	char *nvpname, *nameslist = NULL;
 
 	ASSERT(np->t == T_QUOTE);
 	valuep->t = UNDEFINED;
 
-	nameptr = np->u.quote.s;
+	propstr = np->u.quote.s;
 	if (payloadnvp == NULL) {
-		out(O_ALTFP, "platform_payloadprop: no nvp for %s", nameptr);
+		out(O_ALTFP, "platform_payloadprop: no nvp for %s",
+		    propstr);
 		return (1);
 	}
+	basenvp = payloadnvp;
 
-	not_array = get_array_info(nameptr, &propname, &index);
-	if (not_array == 1)
-		propname = nameptr;
+	/*
+	 * first handle any embedded nvlists.  if propstr is "foo.bar[2]"
+	 * then lastnameptr should end up being "bar[2]" with basenvp set
+	 * to the nvlist for "foo".  (the search for "bar" within "foo"
+	 * will be done later.)
+	 */
+	if (strchr(propstr, '.') != NULL) {
+		nvlist_t **arraynvp;
+		uint_t nelem;
+		char *w;
+		int ier;
+
+		nameslist = STRDUP(propstr);
+		lastnameptr = strtok(nameslist, ".");
+
+		/*
+		 * decompose nameslist into its component names while
+		 * extracting the embedded nvlist
+		 */
+		while ((w = strtok(NULL, ".")) != NULL) {
+			if (get_array_info(lastnameptr, &nameptr, &index)) {
+				ier = nvlist_lookup_nvlist(basenvp,
+						    lastnameptr, &basenvp);
+			} else {
+				/* handle array of nvlists */
+				ier = nvlist_lookup_nvlist_array(basenvp,
+					    nameptr, &arraynvp, &nelem);
+				if (ier == 0) {
+					if ((uint_t)index > nelem - 1)
+						ier = 1;
+					else
+						basenvp = arraynvp[index];
+				}
+			}
+
+			if (ier) {
+				out(O_ALTFP, "platform_payloadprop: "
+				    " invalid list for %s (in %s)",
+				    lastnameptr, propstr);
+				FREE(nameslist);
+				return (1);
+			}
+
+			lastnameptr = w;
+		}
+	} else {
+		lastnameptr = propstr;
+	}
+
+	/* if property is an array reference, extract array name and index */
+	not_array = get_array_info(lastnameptr, &nameptr, &index);
+	if (not_array)
+		nameptr = stable(lastnameptr);
+
+	if (nameslist != NULL)
+		FREE(nameslist);
 
 	/* search for nvpair entry */
 	nvpair = NULL;
-	while ((nvpair = nvlist_next_nvpair(payloadnvp, nvpair)) != NULL) {
+	while ((nvpair = nvlist_next_nvpair(basenvp, nvpair)) != NULL) {
 		nvpname = nvpair_name(nvpair);
 		ASSERT(nvpname != NULL);
 
-		if (propname == stable(nvpname))
+		if (nameptr == stable(nvpname))
 			break;
 	}
 
 	if (nvpair == NULL) {
-		out(O_ALTFP, "platform_payloadprop: no entry for %s", propname);
+		out(O_ALTFP, "platform_payloadprop: no entry for %s", propstr);
 		return (1);
 	}
 
@@ -1763,14 +1846,14 @@ platform_payloadprop(struct node *np, struct evalue *valuep)
 	default :
 		out(O_DEBUG,
 		    "platform_payloadprop: unsupported data type for %s",
-		    propname);
+		    propstr);
 		return (1);
 	}
 
 	return (0);
 
 invalid:
-	out(O_DEBUG, "platform_payloadprop: invalid array"
-	    "reference for %s", propname);
+	out(O_DEBUG, "platform_payloadprop: invalid array reference for %s",
+	    propstr);
 	return (1);
 }

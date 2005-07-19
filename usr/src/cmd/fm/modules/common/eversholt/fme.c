@@ -780,8 +780,8 @@ pathstring2epnamenp(char *path)
  * returns true if engine tripped and *enamep and *ippp were filled in.
  */
 static int
-serd_eval(fmd_hdl_t *hdl, fmd_event_t *ffep, struct event *sp,
-    const char **enamep, const struct ipath **ippp)
+serd_eval(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase,
+	struct event *sp, const char **enamep, const struct ipath **ippp)
 {
 	struct node *serdinst;
 	char *serdname;
@@ -829,6 +829,7 @@ serd_eval(fmd_hdl_t *hdl, fmd_event_t *ffep, struct event *sp,
 		*enamep = tripinst->u.event.ename->u.name.s;
 		*ippp = ipath(tripinst->u.event.epname);
 
+		fmd_case_add_serd(hdl, fmcase, serdname);
 		fmd_serd_reset(hdl, serdname);
 		out(O_ALTFP|O_NONL, "[engine fired: %s, sending: ", serdname);
 		ipath_print(O_ALTFP|O_NONL, *enamep, *ippp);
@@ -891,8 +892,9 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 
 	ntrip = 0;
 	for (sp = fmep->suspects; sp; sp = sp->suspects)
-		if (sp->t == N_UPSET && serd_eval(fmep->hdl, ffep, sp,
-		    &tripped[ntrip].ename, &tripped[ntrip].ipp))
+		if (sp->t == N_UPSET &&
+		    serd_eval(fmep->hdl, ffep, fmep->fmcase, sp,
+			    &tripped[ntrip].ename, &tripped[ntrip].ipp))
 			ntrip++;
 
 	for (i = 0; i < ntrip; i++)

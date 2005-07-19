@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * itree.c -- instance tree creation and manipulation
@@ -79,15 +79,14 @@ struct wildcardinfo {
 	enum status {
 		WC_UNDEFINED,		/* struct is not yet initialized */
 		WC_UNDERCONSTRUCTION,	/* wildcard path not yet done */
-		WC_COMPLETE,		/* wildcard path done and is in use */
-		WC_REFERENCING		/* use another node's wildcard path */
+		WC_COMPLETE		/* wildcard path done and is in use */
 	} s;
 	struct wildcardpath {
 		struct node *ewname;	/* wildcard path */
 		struct config *cpstart;	/* starting cp node for oldepname */
-		struct config *cpforcedwc;	/* forced wildcard for this */
 		int refcount;		/* number of event nodes using this */
 	} *p;
+	struct wildcardpath *matchwc;	/* ptr to wc path to be matched */
 	struct wildcardinfo *next;
 };
 
@@ -755,6 +754,52 @@ iterinfo_destructor(void *left, void *right, void *arg)
 }
 
 /*
+ * return 1 if wildcard path for wcp matches another wildcard path;
+ * return 0 if otherwise.
+ */
+static int
+wc_paths_match(struct wildcardinfo *wcp)
+{
+	struct node *np1, *np2;
+
+	ASSERT(wcp->matchwc != NULL);
+
+	for (np1 = wcp->p->ewname, np2 = wcp->matchwc->ewname;
+	    np1 != NULL && np2 != NULL;
+	    np1 = np1->u.name.next, np2 = np2->u.name.next) {
+		/*
+		 * names must match
+		 */
+		if (np1->u.name.s != np2->u.name.s)
+			return (0);
+
+		/*
+		 * children must exist and have the same numerical value
+		 */
+		if (np1->u.name.child == NULL || np2->u.name.child == NULL)
+			return (0);
+
+		if (np1->u.name.child->t != T_NUM ||
+		    np2->u.name.child->t != T_NUM)
+			return (0);
+
+		if (np1->u.name.child->u.ull != np2->u.name.child->u.ull)
+			return (0);
+	}
+
+	/*
+	 * return true only if we have matches for all entries of n1 and
+	 * n2.  note that NULL wildcard paths (i.e., both wcp->p->ewname
+	 * and wcp->matchwc->ewname are NULL) will be considered as
+	 * matching paths.
+	 */
+	if (np1 == NULL && np2 == NULL)
+		return (1);
+
+	return (0);
+}
+
+/*
  * update epname to include the wildcarded portion
  */
 static void
@@ -815,10 +860,16 @@ undo_wildcardedpath(struct wildcardinfo **wcproot)
 	wcp->nptop->u.event.epname = wcp->oldepname;
 }
 
+enum wildcard_action {
+	WA_NONE,	/* do not do any wildcards */
+	WA_SINGLE,	/* do wildcard only for current cp node */
+	WA_ALL		/* do wildcards for all cp nodes */
+};
+
 static void
 vmatch_event(struct info *infop, struct config *cp, struct node *np,
 	    struct node *lnp, struct node *anp,
-	    struct wildcardinfo **wcproot, int dowildcard)
+	    struct wildcardinfo **wcproot, enum wildcard_action dowildcard)
 {
 	struct wildcardinfo *wcp;
 	char *cp_s;
@@ -829,29 +880,16 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 	if ((np == NULL && wcp->oldepname != NULL) ||
 	    (cp == NULL && wcp->oldepname == NULL)) {
 		/*
-		 * the pathname matched the config (but not necessarily a
-		 * match at the end)
+		 * get to this point if the pathname matched the config
+		 * (but not necessarily a match at the end).  first check
+		 * for any matching wildcard paths.
 		 */
+		if (wcp->matchwc != NULL && wc_paths_match(wcp) == 0)
+			return;
+
 		create_wildcardedpath(wcproot);
 		vmatch(infop, np, lnp, anp, wcproot);
 		undo_wildcardedpath(wcproot);
-
-		if (cp != NULL && wcp->s == WC_UNDERCONSTRUCTION) {
-			/*
-			 * pathname match did not occur at the end of the
-			 * configuration path.  more matches may be found
-			 * later in the path, so we set cpforcedwc to force
-			 * wildcarding for startcp.
-			 *
-			 * note that cpforcedwc may already have been set
-			 * in an earlier match due to vertical expansion on
-			 * the nonwildcarded epname.
-			 */
-			if (wcp->p->cpforcedwc != wcp->p->cpstart) {
-				ASSERT(wcp->p->cpforcedwc == NULL);
-				wcp->p->cpforcedwc = wcp->p->cpstart;
-			}
-		}
 
 		return;
 	}
@@ -864,8 +902,7 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 
 		if (cp_s == np->u.name.s &&
 		    ! (wcp->s == WC_UNDERCONSTRUCTION &&
-		    cp == wcp->p->cpstart &&
-		    wcp->p->cpstart == wcp->p->cpforcedwc)) {
+		    dowildcard == WA_SINGLE)) {
 			/* found a matching component name */
 			if (np->u.name.child &&
 			    np->u.name.child->t == T_NUM) {
@@ -920,7 +957,25 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 					 * iterator bound it to a different
 					 * instance number, so there's no
 					 * match here after all.
+					 *
+					 * however, it's possible that this
+					 * component should really be part of
+					 * the wildcard.  we explore this by
+					 * forcing this component into the
+					 * wildcarded section.
+					 *
+					 * for an more details of what's
+					 * going to happen now, see
+					 * comments block below entitled
+					 * "forcing components into
+					 * wildcard path".
 					 */
+					if (dowildcard == WA_ALL &&
+					    wcp->s == WC_UNDERCONSTRUCTION) {
+						vmatch_event(infop, cp, np,
+							    lnp, anp, wcproot,
+							    WA_SINGLE);
+					}
 					continue;
 				}
 				np->u.name.cp = cp;
@@ -931,7 +986,8 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 			 * stack, record the current cp as the first
 			 * matching and nonwildcarded cp.
 			 */
-			if (dowildcard && wcp->s == WC_UNDERCONSTRUCTION)
+			if (dowildcard == WA_ALL &&
+			    wcp->s == WC_UNDERCONSTRUCTION)
 				wcp->p->cpstart = cp;
 
 			/*
@@ -947,18 +1003,59 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 			 * wildcarding is now turned off.
 			 */
 			vmatch_event(infop, config_child(cp), np->u.name.next,
-				    lnp, anp, wcproot, 0);
+				    lnp, anp, wcproot, WA_NONE);
 
 			/*
-			 * if wildcarding is being forced for this
-			 * component, repeat call to vmatch_event() with
-			 * the same np
+			 * forcing components into wildcard path:
+			 *
+			 * if this component is the first match, force it
+			 * to be part of the wildcarded path and see if we
+			 * can get additional matches.  repeat call to
+			 * vmatch_event() with the same np, making sure
+			 * wildcarding is forced for this component alone
+			 * and not its peers by specifying vmatch_event(
+			 * ..., WA_SINGLE).  in other words, in the call to
+			 * vmatch_event() below, there should be no loop
+			 * over cp's peers since that is being done in the
+			 * current loop [i.e., the loop we're in now].
+			 *
+			 * here's an example.  suppose we have the
+			 * definition
+			 *	event foo@x/y
+			 * and configuration
+			 *	a0/x0/y0/a1/x1/y1
+			 *
+			 * the code up to this point will treat "a0" as the
+			 * wildcarded part of the path and "x0/y0" as the
+			 * nonwildcarded part, resulting in the instanced
+			 * event
+			 *	foo@a0/x0/y0
+			 *
+			 * in order to discover the next match (.../x1/y1)
+			 * in the configuration we have to force "x0" into
+			 * the wildcarded part of the path.  the following
+			 * call to vmatch_event(..., WA_SINGLE) does this.
+			 * by doing so, we discover the wildcarded part
+			 * "a0/x0/y0/a1" and the nonwildcarded part "x1/y1"
+			 *
+			 * the following call to vmatch_event() is also
+			 * needed to properly handle the configuration
+			 *	b0/x0/b1/x1/y1
+			 *
+			 * the recursions into vmatch_event() will start
+			 * off uncovering "b0" as the wildcarded part and
+			 * "x0" as the start of the nonwildcarded path.
+			 * however, the next recursion will not result in a
+			 * match since there is no "y" following "x0".  the
+			 * subsequent match of (wildcard = "b0/x0/b1" and
+			 * nonwildcard = "x1/y1") will be discovered only
+			 * if "x0" is forced to be a part of the wildcarded
+			 * path.
 			 */
-			if (dowildcard &&
-			    wcp->s == WC_UNDERCONSTRUCTION &&
-			    cp == wcp->p->cpforcedwc) {
+			if (dowildcard == WA_ALL &&
+			    wcp->s == WC_UNDERCONSTRUCTION) {
 				vmatch_event(infop, cp, np, lnp, anp,
-					    wcproot, 1);
+					    wcproot, WA_SINGLE);
 			}
 
 			if (np->u.name.it == IT_HORIZONTAL) {
@@ -970,7 +1067,8 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 				return;
 			}
 
-		} else if (dowildcard && wcp->s == WC_UNDERCONSTRUCTION) {
+		} else if ((dowildcard == WA_SINGLE || dowildcard == WA_ALL) &&
+			    wcp->s == WC_UNDERCONSTRUCTION) {
 			/*
 			 * no matching cp, and we are constructing our own
 			 * wildcard path.  (in other words, we are not
@@ -981,9 +1079,6 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 			 * child
 			 */
 			struct node *cpnode, *prevlast;
-
-			if (wcp->p->cpstart == wcp->p->cpforcedwc)
-				wcp->p->cpforcedwc = NULL;
 
 			cpnode = tree_name(cp_s, IT_NONE, NULL, 0);
 			cpnode->u.name.child = newnode(T_NUM, NULL, 0);
@@ -1001,7 +1096,7 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 			}
 
 			vmatch_event(infop, config_child(cp), np, lnp, anp,
-				    wcproot, 1);
+				    wcproot, WA_ALL);
 
 			/*
 			 * back out last addition to ewname and continue
@@ -1014,6 +1109,12 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 				prevlast->u.name.next = NULL;
 				wcp->p->ewname->u.name.last = prevlast;
 			}
+
+			/*
+			 * return if wildcarding is done only for this cp
+			 */
+			if (dowildcard == WA_SINGLE)
+				return;
 		}
 	}
 }
@@ -1029,7 +1130,7 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
  */
 static void
 add_wildcardentry(struct wildcardinfo **wcproot, struct config *cp,
-		struct node *np, struct config **cpstart)
+		struct node *np)
 {
 	struct wildcardinfo *wcpnew, *wcp;
 	struct node *np1, *np2;
@@ -1041,42 +1142,40 @@ add_wildcardentry(struct wildcardinfo **wcproot, struct config *cp,
 	bzero(wcpnew, sizeof (struct wildcardinfo));
 	wcpnew->nptop = np;
 	wcpnew->oldepname = np->u.event.epname;
-	np2 = wcpnew->oldepname;
+	wcpnew->s = WC_UNDERCONSTRUCTION;
+
+	wcpnew->p = MALLOC(sizeof (struct wildcardpath));
+	bzero(wcpnew->p, sizeof (struct wildcardpath));
+	wcpnew->p->cpstart = cp;
+	wcpnew->p->refcount = 1;
 
 	/*
 	 * search all completed entries for an epname whose first entry
 	 * matches.  note that NULL epnames are considered valid and can be
 	 * matched.
 	 */
+	np2 = wcpnew->oldepname;
 	for (wcp = *wcproot; wcp; wcp = wcp->next) {
-		ASSERT(wcp->s == WC_COMPLETE || wcp->s == WC_REFERENCING);
-		if (wcp->s != WC_COMPLETE)
-			continue;
+		ASSERT(wcp->s == WC_COMPLETE);
 
 		np1 = wcp->oldepname;
 		if ((np1 && np2 && np1->u.name.s == np2->u.name.s) ||
 		    (np1 == NULL && np2 == NULL)) {
-			wcpnew->p = wcp->p;
-			wcpnew->s = WC_REFERENCING;
+			/*
+			 * if we find a match in a completed entry, set
+			 * matchwc to indicate that we would like to match
+			 * it.  it is necessary to do this since wildcards
+			 * for each event are constructed independently.
+			 */
+			wcpnew->matchwc = wcp->p;
 
 			wcp->p->refcount++;
 			break;
 		}
 	}
 
-	if (wcpnew->p == NULL) {
-		wcpnew->s = WC_UNDERCONSTRUCTION;
-
-		wcpnew->p = MALLOC(sizeof (struct wildcardpath));
-		bzero(wcpnew->p, sizeof (struct wildcardpath));
-		wcpnew->p->cpstart = cp;
-		wcpnew->p->refcount = 1;
-	}
-
 	wcpnew->next = *wcproot;
 	*wcproot = wcpnew;
-
-	*cpstart = wcpnew->p->cpstart;
 }
 
 static void
@@ -1090,14 +1189,12 @@ delete_wildcardentry(struct wildcardinfo **wcproot)
 	switch (wcp->s) {
 	case WC_UNDERCONSTRUCTION:
 	case WC_COMPLETE:
+		if (wcp->matchwc != NULL)
+			wcp->matchwc->refcount--;
+
 		ASSERT(wcp->p->refcount == 1);
 		tree_free(wcp->p->ewname);
 		FREE(wcp->p);
-		break;
-
-	case WC_REFERENCING:
-		ASSERT(wcp->p->refcount > 1);
-		wcp->p->refcount--;
 		break;
 
 	default:
@@ -1216,12 +1313,9 @@ vmatch(struct info *infop, struct node *np, struct node *lnp,
 
 	switch (np->t) {
 	case T_EVENT: {
-		struct config *cpstart;
-
-		add_wildcardentry(wcproot, config_child(infop->croot),
-				np, &cpstart);
-		vmatch_event(infop, cpstart, np->u.event.epname, lnp, anp,
-			    wcproot, 1);
+		add_wildcardentry(wcproot, config_child(infop->croot), np);
+		vmatch_event(infop, config_child(infop->croot),
+			    np->u.event.epname, lnp, anp, wcproot, WA_ALL);
 		delete_wildcardentry(wcproot);
 		break;
 	}
