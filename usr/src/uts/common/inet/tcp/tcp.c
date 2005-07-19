@@ -10450,8 +10450,9 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 		case SO_SND_COPYAVOID:
 			if (!checkonly) {
 				/* we only allow enable at most once for now */
-				if (!tcp->tcp_snd_zcopy_aware &&
-				    (onoff != 1 || !tcp_zcopy_check(tcp))) {
+				if (tcp->tcp_loopback ||
+				    (!tcp->tcp_snd_zcopy_aware &&
+				    (onoff != 1 || !tcp_zcopy_check(tcp)))) {
 					*outlenp = 0;
 					return (EOPNOTSUPP);
 				}
