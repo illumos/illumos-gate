@@ -61,22 +61,27 @@ check		:=	TARGET= check
 
 def all clean clobber clean.lint:	$(ONTARIO_KMODS)
 
+lintlib:      unix
+
+modlintlib:   $(ONTARIO_KMODS)
+
 IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire-T200
+LINKED_PLATFORMS	= SUNW,Sun-Fire-T1000
 
 install:	$(ROOT_ONTARIO_DIR) $(USR_ONTARIO_DIR) \
 		$(USR_ONTARIO_SBIN_DIR) \
 		$(USR_ONTARIO_LIB_DIR) \
+		$(ROOT_ONTARIO_LIB_DIR) \
+		$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%) \
 		.WAIT $(ONTARIO_KMODS)
-
-modlintlib:	$(ONTARIO_KMODS)
 
 $(ONTARIO_KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
-install_h check:
+install_h check:	FRC
 
 lint:	modlintlib .WAIT $(LINT_DEPS)
- 
+
 LINT_LIBS	= $(LINT_LIB) \
 			-L$(ONTARIO_LINT_LIB_DIR) \
 			-L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
@@ -85,6 +90,14 @@ LINT_LIBS	= $(LINT_LIB) \
 lint.platmod:   modlintlib
 	@-$(ECHO) "\n$(IMPLEMENTED_PLATFORM) platform-dependent module: global crosschecks:"
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
+
+EXPORT_SRC:
+	$(RM) Makefile+	
+	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
+		< Makefile > Makefile+
+	$(MV) Makefile+ Makefile
+	$(CHMOD) 444 Makefile
+# EXPORT DELETE END
 
 #
 #	Include common targets.

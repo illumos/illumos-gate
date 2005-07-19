@@ -104,6 +104,9 @@ install_h check:	install_platforms $(IMPLEMENTATIONS) FRC
 $(ROOT_PLAT_DIRS): $(ROOT_PLAT_DIR)
 	-$(INS.dir.root.sys)
 
+$(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%): $(ROOT_PLAT_DIR)
+	$(INS.slink1)
+
 #
 # create directories in /usr/platform/ for the implementations that are
 # defined in $(IMPLEMENTED_PLATFORM)
@@ -134,6 +137,7 @@ PLATFORMS	+= $(IMPLEMENTED_PLATFORM)
 #
 install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(ROOT_PLAT_DIRS) $(USR_PLAT_DIRS) \
+			$(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%) \
 			$(USR_DESKTOP_DIR) $(USR_DESKTOP_INC_DIR) \
 			$(USR_DESKTOP_SBIN_DIR) $(USR_DESKTOP_LIB_DIR)
 

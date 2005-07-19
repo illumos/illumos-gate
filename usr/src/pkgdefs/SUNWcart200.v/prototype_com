@@ -19,7 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -42,13 +41,13 @@ i i.preserve
 #
 # source locations relative to the prototype file
 #
-# SUNWcar.v
+# SUNWcart200.v
 #
 d none platform 755 root sys
-d none platform/sun4v 755 root sys
-d none platform/sun4v/lib 755 root bin
-f none platform/sun4v/lib/libc_psr.so.1 644 root bin
-d none platform/sun4v/lib/libc_psr 755 root bin
-d none platform/sun4v/lib/sparcv9 755 root bin
-f none platform/sun4v/lib/sparcv9/libc_psr.so.1 644 root bin
-d none platform/sun4v/lib/sparcv9/libc_psr 755 root bin
+d none platform/SUNW,Sun-Fire-T200 755 root sys
+d none platform/SUNW,Sun-Fire-T200/kernel 755 root sys
+d none platform/SUNW,Sun-Fire-T200/kernel/misc 755 root sys
+d none platform/SUNW,Sun-Fire-T200/kernel/misc/sparcv9 755 root sys
+f none platform/SUNW,Sun-Fire-T200/kernel/misc/sparcv9/platmod 755 root sys
+s none platform/SUNW,Sun-Fire-T200/lib=../sun4v/lib
+s none platform/SUNW,Sun-Fire-T1000=sun4v

@@ -34,6 +34,7 @@
 #
 PLATFORM	 = sun4v
 OPLATFORM	 = sun4u
+LINKED_PLATFORMS += SUNW,Sun-Fire-T1000
 PROMIF		 = ieee1275
 PSMBASE		 = $(UTSBASE)/../psm
 

@@ -34,6 +34,7 @@ sparc_SUBDIRS= \
 	SUNWcakr.v \
 	SUNWcar.u  \
 	SUNWcar.v  \
+	SUNWcart200.v \
 	SUNWcg6.u \
 	SUNWcg6h  \
 	SUNWcpc.u \
@@ -65,6 +66,7 @@ sparc_SUBDIRS= \
 	SUNWkvm.m  \
 	SUNWkvm.u  \
 	SUNWkvm.v  \
+	SUNWkvmt200.v \
 	SUNWluxd.u \
 	SUNWluxl \
 	SUNWonmtst \

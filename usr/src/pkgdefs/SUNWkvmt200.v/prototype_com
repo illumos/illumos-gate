@@ -7,7 +7,7 @@
 # with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or http://www.opensolaris.org/os/licensing.
+# or http://www.opensolaris.org/o1s/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
 #
@@ -18,7 +18,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-#
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -38,17 +37,39 @@
 # packaging files
 i pkginfo
 i copyright
-i i.preserve
 #
 # source locations relative to the prototype file
 #
-# SUNWcar.v
+# SUNWkvmt200.v
 #
-d none platform 755 root sys
-d none platform/sun4v 755 root sys
-d none platform/sun4v/lib 755 root bin
-f none platform/sun4v/lib/libc_psr.so.1 644 root bin
-d none platform/sun4v/lib/libc_psr 755 root bin
-d none platform/sun4v/lib/sparcv9 755 root bin
-f none platform/sun4v/lib/sparcv9/libc_psr.so.1 644 root bin
-d none platform/sun4v/lib/sparcv9/libc_psr 755 root bin
+# platform directories
+#
+d none usr 755 root sys
+d none usr/platform 755 root sys
+d none usr/platform/SUNW,Sun-Fire-T200 755 root sys
+#
+# create links to sun4v platform
+#
+s none usr/platform/SUNW,Sun-Fire-T200/sbin=../sun4v/sbin
+#
+#
+# create lib directory for Sun-Fire-T200
+#
+d none usr/platform/SUNW,Sun-Fire-T200/lib 755 root bin
+#
+# add binary and libraries for prtdiag
+#
+f none usr/platform/SUNW,Sun-Fire-T200/lib/libprtdiag_psr.so.1 644 root bin
+#
+# create libpcp library
+#
+s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so=./libpcp.so.1
+f none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so.1 755 root bin
+#
+# platform-dependent boot object
+#
+s none usr/platform/SUNW,Sun-Fire-T200/lib/fs=../../sun4v/lib/fs
+#
+# add erie link
+#
+s none usr/platform/SUNW,Sun-Fire-T1000=SUNW,Sun-Fire-T200

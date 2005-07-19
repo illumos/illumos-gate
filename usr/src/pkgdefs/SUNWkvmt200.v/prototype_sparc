@@ -19,11 +19,10 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#	ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -35,20 +34,16 @@
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 
-# packaging files
-i pkginfo
-i copyright
-i i.preserve
+#
+# Include ISA independent files (prototype_com)
+#
+!include prototype_com
+#
+#
+#
+# List files which are SPARC specific here
 #
 # source locations relative to the prototype file
 #
-# SUNWcar.v
+# SUNWkvmt200.v
 #
-d none platform 755 root sys
-d none platform/sun4v 755 root sys
-d none platform/sun4v/lib 755 root bin
-f none platform/sun4v/lib/libc_psr.so.1 644 root bin
-d none platform/sun4v/lib/libc_psr 755 root bin
-d none platform/sun4v/lib/sparcv9 755 root bin
-f none platform/sun4v/lib/sparcv9/libc_psr.so.1 644 root bin
-d none platform/sun4v/lib/sparcv9/libc_psr 755 root bin

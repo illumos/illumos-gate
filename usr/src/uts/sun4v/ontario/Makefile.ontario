@@ -48,6 +48,7 @@ ROOT_ONTARIO_MISC_DIR	= $(ROOT_ONTARIO_MISC_DIR_$(CLASS))
 ROOT_PLAT_MOD_DIRS      += $(ROOT_ONTARIO_MOD_DIR)
 ROOT_PLAT_MISC_DIRS     += $(ROOT_ONTARIO_MISC_DIR)
 
+ROOT_ONTARIO_LIB_DIR  = $(ROOT_ONTARIO_DIR)/lib
 
 USR_SUN4V_PLAT_DIR	= $(USR_PLAT_DIR)/$(PLATFORM)
 USR_ONTARIO_DIR		= $(USR_PLAT_DIR)/SUNW,Sun-Fire-T200
@@ -59,6 +60,10 @@ USR_ONTARIO_ISYS_DIR	= $(USR_ONTARIO_INC_DIR)/sys
 
 ONTARIO_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/ontario/lint-libs/$(OBJS_DIR)
 
+#
+#	Define modules.
+#
+ONTARIO_KMODS = platmod
 
 #
 #	Include the makefiles which define build rule templates, the
@@ -72,12 +77,13 @@ ONTARIO_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/ontario/lint-libs/$(OBJS_DIR)
 #	interfaces.)
 #
 
+include $(UTSBASE)/sun4v/ontario/Makefile.files
 #
 #	Include common rules.
 #
 include $(UTSBASE)/sun4v/Makefile.sun4v
 
-
+MODSTUBS_DIR  = $(UNIX_DIR)
 LINTS_DIR	= $(OBJS_DIR)
 LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/ontario/lint-libs/$(OBJS_DIR)
 
@@ -86,3 +92,11 @@ LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/ontario/lint-libs/$(OBJS_DIR)
 #	Define the actual specific platforms
 MACHINE_DEFS	+= -D$(PLATFORM) -D_MACHDEP
 MACHINE_DEFS	+= -D_ONTARIO
+
+#	Define for inline pre-processing since
+#	cpp not smart about v9 yet.
+#
+
+CPP_DEFS_32   =
+CPP_DEFS_64   = -D__sparcv9
+CPP_DEFS      = $(CPP_DEFS_$(CLASS))

@@ -34,7 +34,7 @@
 # Rules for implementation subdirectories.
 #
 $(ROOT_ONTARIO_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.slink1)
+	-$(INS.dir.root.sys)
 
 $(ROOT_ONTARIO_MOD_DIR): $(ROOT_ONTARIO_DIR)
 	-$(INS.dir.root.sys)
@@ -44,6 +44,9 @@ $(ROOT_ONTARIO_DRV_DIR_32): $(ROOT_ONTARIO_MOD_DIR)
 
 $(ROOT_ONTARIO_DRV_DIR_64): $(ROOT_ONTARIO_DRV_DIR_32)
 	-$(INS.dir.root.sys)
+
+$(ROOT_ONTARIO_LIB_DIR): $(ROOT_ONTARIO_DIR)
+	-$(INS.slink2)
 
 $(ROOT_ONTARIO_MISC_DIR_32): $(ROOT_ONTARIO_MOD_DIR)
 	-$(INS.dir.root.sys)
@@ -75,7 +78,11 @@ $(USR_ONTARIO_SBIN_DIR):	$(USR_ONTARIO_DIR)
 $(USR_ONTARIO_LIB_DIR):	$(USR_ONTARIO_DIR)
 	-$(INS.dir.root.bin)
 
+$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%): $(USR_PLAT_DIR)
+	$(INS.slink3)
+
 #
 #	Include common targets.
 #
+include $(UTSBASE)/$(PLATFORM)/ontario/Makefile.rules
 include $(UTSBASE)/$(PLATFORM)/Makefile.targ
