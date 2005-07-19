@@ -89,3 +89,5 @@ WARNING:libkcs:gettext("calls KCMS library libkcs.so.1"):libkcs.so.1|*|*DIRECT*:
 WARNING:64-bit-ptrace:gettext("calls 64-bit ptrace(2) interface"):/usr/lib/sparcv9/libc.so.1|ptrace|*DIRECT*,/usr/lib/64/libc.so.1|ptrace|*DIRECT*:
 ###############################################################################
 WARNING:makecontext:gettext("possible makecontext(3C) source incompatibility"):libc.so.1|makecontext|*DIRECT*:
+###############################################################################
+WARNING:librac:gettext("calls obsolete RPC library librac.so.1"):librac.so.1|*|*DIRECT*:

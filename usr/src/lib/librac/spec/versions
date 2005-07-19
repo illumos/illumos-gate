@@ -31,21 +31,25 @@
 #
 
 sparcv9 {
+	SUNWobsolete;
 	SUNW_1.1:	{SUNW_0.7};
 	SUNW_0.7;
 	SUNWprivate_1.1;
 }
 sparc {
+	SUNWobsolete;
 	SUNW_1.1:	{SUNW_0.7};
 	SUNW_0.7;
 	SUNWprivate_1.1;
 }
 i386 {
+	SUNWobsolete;
 	SUNW_1.1:	{SUNW_0.7};
 	SUNW_0.7;
 	SUNWprivate_1.1;
 }
 amd64 {
+	SUNWobsolete;
 	SUNW_1.1:	{SUNW_0.7};
 	SUNW_0.7;
 	SUNWprivate_1.1;
