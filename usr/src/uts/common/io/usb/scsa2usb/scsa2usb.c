@@ -914,9 +914,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* free the dev_data tree, we no longer need it */
 	usb_free_descr_tree(dip, dev_data);
 
-	mutex_enter(&scsa2usbp->scsa2usb_mutex);
 	scsa2usb_pm_idle_component(scsa2usbp);
-	mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
 	/* log the conf file override string if there is one */
 	if (scsa2usbp->scsa2usb_override_str) {
@@ -1064,9 +1062,9 @@ scsa2usb_ugen_open(dev_t *devp, int flag, int sflag, cred_t *cr)
 			scsa2usbp->scsa2usb_busy_thread = NULL;
 			cv_signal(&scsa2usbp->scsa2usb_transport_busy_cv);
 		}
-		scsa2usb_pm_idle_component(scsa2usbp);
-
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
+
+		scsa2usb_pm_idle_component(scsa2usbp);
 	}
 
 	return (rval);
@@ -1104,8 +1102,9 @@ scsa2usb_ugen_close(dev_t dev, int flag, int otype, cred_t *cr)
 			scsa2usbp->scsa2usb_busy_thread = NULL;
 			cv_signal(&scsa2usbp->scsa2usb_transport_busy_cv);
 		}
-		scsa2usb_pm_idle_component(scsa2usbp);
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
+
+		scsa2usb_pm_idle_component(scsa2usbp);
 	}
 
 	return (rval);
@@ -2046,10 +2045,9 @@ scsa2usb_restore_device_state(dev_info_t *dip, scsa2usb_state_t *scsa2usbp)
 		/* change the flags to active */
 		mutex_enter(&scsa2usbp->scsa2usb_mutex);
 		scsa2usbp->scsa2usb_dev_state = USB_DEV_DISCONNECTED;
+		mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
 		scsa2usb_pm_idle_component(scsa2usbp);
-
-		mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
 		return;
 	}
@@ -2072,10 +2070,9 @@ scsa2usb_restore_device_state(dev_info_t *dip, scsa2usb_state_t *scsa2usbp)
 
 	scsa2usbp->scsa2usb_dev_state = USB_DEV_ONLINE;
 	scsa2usbp->scsa2usb_pkt_state = SCSA2USB_PKT_NONE;
+	mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
 	scsa2usb_pm_idle_component(scsa2usbp);
-
-	mutex_exit(&scsa2usbp->scsa2usb_mutex);
 }
 
 
@@ -2533,6 +2530,11 @@ scsa2usb_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	usba_add_to_list(&scsa2usbp->scsa2usb_waitQ[lun], &cmd->cmd_waitQ);
 
+	USB_DPRINTF_L3(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
+	    "scsa2usb_work_thread_id=0x%x, count=%d, lun=%d",
+	    scsa2usbp->scsa2usb_work_thread_id,
+	    usba_list_entry_count(&scsa2usbp->scsa2usb_waitQ[lun]), lun);
+
 	/* fire up a thread to start executing the protocol */
 	if (scsa2usbp->scsa2usb_work_thread_id == 0) {
 		if ((usb_async_req(scsa2usbp->scsa2usb_dip,
@@ -2557,6 +2559,7 @@ scsa2usb_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		}
 		scsa2usbp->scsa2usb_work_thread_id = (kthread_t *)1;
 	}
+
 	mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
 	return (TRAN_ACCEPT);
@@ -3819,10 +3822,11 @@ scsa2usb_work_thread(void *arg)
 	uint_t			lun;
 	uint_t			count;
 
-	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-	    "scsa2usb_work_thread:");
-
 	mutex_enter(&scsa2usbp->scsa2usb_mutex);
+	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
+	    "scsa2usb_work_thread start: thread_id=0x%x",
+	    scsa2usbp->scsa2usb_work_thread_id);
+
 	ASSERT(scsa2usbp->scsa2usb_work_thread_id == (kthread_t *)1);
 	scsa2usbp->scsa2usb_work_thread_id = curthread;
 
@@ -3857,8 +3861,6 @@ scsa2usb_work_thread(void *arg)
 		}
 	}
 
-	scsa2usb_pm_idle_component(scsa2usbp);
-
 	scsa2usbp->scsa2usb_work_thread_id = 0;
 
 	ASSERT(scsa2usbp->scsa2usb_ugen_open_count == 0);
@@ -3867,10 +3869,12 @@ scsa2usb_work_thread(void *arg)
 	scsa2usbp->scsa2usb_busy_thread = NULL;
 	cv_signal(&scsa2usbp->scsa2usb_transport_busy_cv);
 
-	mutex_exit(&scsa2usbp->scsa2usb_mutex);
-
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_work_thread: exit");
+
+	mutex_exit(&scsa2usbp->scsa2usb_mutex);
+
+	scsa2usb_pm_idle_component(scsa2usbp);
 }
 
 
@@ -5147,10 +5151,8 @@ scsa2usb_create_pm_components(dev_info_t *dip, scsa2usb_state_t *scsa2usbp)
 
 		mutex_enter(&scsa2usbp->scsa2usb_mutex);
 		pm->scsa2usb_pwr_states = (uint8_t)pwr_states;
-		scsa2usb_pm_busy_component(scsa2usbp);
+		scsa2usb_raise_power(scsa2usbp);
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
-
-		(void) pm_raise_power(dip, 0, USB_DEV_OS_FULL_PWR);
 	}
 
 	mutex_enter(&scsa2usbp->scsa2usb_mutex);
@@ -5171,8 +5173,8 @@ scsa2usb_raise_power(scsa2usb_state_t *scsa2usbp)
 
 	if (scsa2usbp->scsa2usb_pm) {
 		scsa2usb_pm_busy_component(scsa2usbp);
-		if (scsa2usbp->scsa2usb_pm->scsa2usb_current_power ==
-		    USB_DEV_OS_PWR_OFF) {
+		if (scsa2usbp->scsa2usb_pm->scsa2usb_current_power !=
+		    USB_DEV_OS_FULL_PWR) {
 			mutex_exit(&scsa2usbp->scsa2usb_mutex);
 			(void) pm_raise_power(scsa2usbp->scsa2usb_dip,
 			    0, USB_DEV_OS_FULL_PWR);
@@ -5339,26 +5341,35 @@ scsa2usb_power(dev_info_t *dip, int comp, int level)
 
 
 static void
-scsa2usb_pm_busy_component(scsa2usb_state_t *scsa2usb_statep)
+scsa2usb_pm_busy_component(scsa2usb_state_t *scsa2usbp)
 {
-	ASSERT(mutex_owned(&scsa2usb_statep->scsa2usb_mutex));
+	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
 
-	scsa2usb_statep->scsa2usb_pm->scsa2usb_pm_busy++;
-	mutex_exit(&scsa2usb_statep->scsa2usb_mutex);
+	if (scsa2usbp->scsa2usb_pm) {
+		scsa2usbp->scsa2usb_pm->scsa2usb_pm_busy++;
 
-	if (pm_busy_component(scsa2usb_statep->scsa2usb_dip, 0) !=
-	    DDI_SUCCESS) {
-		mutex_enter(&scsa2usb_statep->scsa2usb_mutex);
-		ASSERT(scsa2usb_statep->scsa2usb_pm->scsa2usb_pm_busy > 0);
-		scsa2usb_statep->scsa2usb_pm->scsa2usb_pm_busy--;
-		mutex_exit(&scsa2usb_statep->scsa2usb_mutex);
+		USB_DPRINTF_L4(DPRINT_MASK_PM,
+		    scsa2usbp->scsa2usb_log_handle,
+		    "scsa2usb_pm_busy_component: %d",
+		    scsa2usbp->scsa2usb_pm->scsa2usb_pm_busy);
+
+		mutex_exit(&scsa2usbp->scsa2usb_mutex);
+
+		if (pm_busy_component(scsa2usbp->scsa2usb_dip, 0) !=
+		    DDI_SUCCESS) {
+			mutex_enter(&scsa2usbp->scsa2usb_mutex);
+			ASSERT(scsa2usbp->scsa2usb_pm->scsa2usb_pm_busy > 0);
+			scsa2usbp->scsa2usb_pm->scsa2usb_pm_busy--;
+
+			USB_DPRINTF_L2(DPRINT_MASK_PM,
+			    scsa2usbp->scsa2usb_log_handle,
+			    "scsa2usb_pm_busy_component failed: %d",
+			    scsa2usbp->scsa2usb_pm->scsa2usb_pm_busy);
+
+			return;
+		}
+		mutex_enter(&scsa2usbp->scsa2usb_mutex);
 	}
-
-	mutex_enter(&scsa2usb_statep->scsa2usb_mutex);
-
-	USB_DPRINTF_L4(DPRINT_MASK_PM, scsa2usb_statep->scsa2usb_log_handle,
-	    "scsa2usb_pm_busy : %d",
-	    scsa2usb_statep->scsa2usb_pm->scsa2usb_pm_busy);
 }
 
 
@@ -5369,21 +5380,22 @@ scsa2usb_pm_busy_component(scsa2usb_state_t *scsa2usb_statep)
 static void
 scsa2usb_pm_idle_component(scsa2usb_state_t *scsa2usbp)
 {
-	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
+	ASSERT(!mutex_owned(&scsa2usbp->scsa2usb_mutex));
+
 	if (scsa2usbp->scsa2usb_pm) {
-		mutex_exit(&scsa2usbp->scsa2usb_mutex);
 		if (pm_idle_component(scsa2usbp->scsa2usb_dip, 0) ==
 		    DDI_SUCCESS) {
 			mutex_enter(&scsa2usbp->scsa2usb_mutex);
 			ASSERT(scsa2usbp->scsa2usb_pm->scsa2usb_pm_busy > 0);
 			scsa2usbp->scsa2usb_pm->scsa2usb_pm_busy--;
+
+			USB_DPRINTF_L4(DPRINT_MASK_PM,
+			    scsa2usbp->scsa2usb_log_handle,
+			    "scsa2usb_pm_idle_component: %d",
+			    scsa2usbp->scsa2usb_pm->scsa2usb_pm_busy);
+
 			mutex_exit(&scsa2usbp->scsa2usb_mutex);
 		}
-		mutex_enter(&scsa2usbp->scsa2usb_mutex);
-		USB_DPRINTF_L4(DPRINT_MASK_PM,
-		    scsa2usbp->scsa2usb_log_handle,
-		    "scsa2usb_pm_busy : %d",
-		    scsa2usbp->scsa2usb_pm->scsa2usb_pm_busy);
 	}
 }
 
