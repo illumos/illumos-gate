@@ -327,7 +327,7 @@ pcp_send_recv(int channel_fd, pcp_msg_t *req_msg, pcp_msg_t *resp_msg,
 	else
 		glvc_timeout = 0;
 
-	if ((datap = req_msg->msg_data) == NULL)
+	if ((req_msg->msg_len != 0) && ((datap = req_msg->msg_data) == NULL))
 		return (PCPL_INVALID_ARGS);
 
 	if (req_msg_hdr == NULL) {
