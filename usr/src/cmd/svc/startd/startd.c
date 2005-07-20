@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -593,8 +593,8 @@ noscfout:
 	if (env_opts == NULL)
 		return (ret);
 
-	cp = strtok_r(env_opts, ",", &lasts);
-	while (cp != NULL) {
+	for (cp = strtok_r(env_opts, ",", &lasts); cp != NULL;
+	    cp = strtok_r(NULL, ",", &lasts)) {
 		if (strcmp(cp, "debug") == 0) {
 			st->st_boot_flags = STARTD_BOOT_VERBOSE;
 			st->st_log_flags = STARTD_LOG_DEBUG;
@@ -645,8 +645,6 @@ noscfout:
 		} else {
 			uu_warn("Unknown SMF option \"%s\".\n", cp);
 		}
-
-		cp = strtok_r(NULL, ",", &lasts);
 	}
 
 	return (ret);
