@@ -51,6 +51,7 @@ typedef struct dtrace_cmd {
 	const char *dc_name;			/* name for error messages */
 	const char *dc_desc;			/* desc for error messages */
 	dtrace_prog_t *dc_prog;			/* program compiled from arg */
+	char dc_ofile[PATH_MAX];		/* derived output file name */
 } dtrace_cmd_t;
 
 #define	DMODE_VERS	0	/* display version information and exit (-V) */
@@ -616,25 +617,24 @@ anon_prog(const dtrace_cmd_t *dcp, dof_hdr_t *dof, int n)
  * file name.  Otherwise we use "d.out" as the default output file name.
  */
 static void
-link_prog(const dtrace_cmd_t *dcp)
+link_prog(dtrace_cmd_t *dcp)
 {
-	char file[PATH_MAX], *p;
+	char *p;
 
-	if (g_ofile != NULL) {
-		(void) snprintf(file, sizeof (file), g_cmdc > 1 ?
-		    "%s.%d" : "%s", g_ofile, (int)(dcp - g_cmdv));
+	if (g_cmdc == 1 && g_ofile != NULL) {
+		(void) strlcpy(dcp->dc_ofile, g_ofile, sizeof (dcp->dc_ofile));
 	} else if ((p = strrchr(dcp->dc_arg, '.')) != NULL &&
 	    strcmp(p, ".d") == 0) {
 		p[0] = '\0'; /* strip .d suffix */
-		(void) snprintf(file, sizeof (file),
+		(void) snprintf(dcp->dc_ofile, sizeof (dcp->dc_ofile),
 		    "%s.o", basename(dcp->dc_arg));
 	} else {
-		(void) snprintf(file, sizeof (file), g_cmdc > 1 ?
-		    "%s.%d" : "%s", "d.out", (int)(dcp - g_cmdv));
+		(void) snprintf(dcp->dc_ofile, sizeof (dcp->dc_ofile),
+		    g_cmdc > 1 ?  "%s.%d" : "%s", "d.out", (int)(dcp - g_cmdv));
 	}
 
 	if (dtrace_program_link(g_dtp, dcp->dc_prog, DTRACE_D_PROBES,
-	    file, g_objc - 1, g_objv + 1) != 0)
+	    dcp->dc_ofile, g_objc - 1, g_objv + 1) != 0)
 		dfatal("failed to link %s %s", dcp->dc_desc, dcp->dc_name);
 }
 
@@ -1393,6 +1393,18 @@ main(int argc, char *argv[])
 	case DMODE_LINK:
 		for (i = 0; i < g_cmdc; i++)
 			link_prog(&g_cmdv[i]);
+
+		if (g_cmdc > 1 && g_ofile != NULL) {
+			char **objv = alloca(g_cmdc * sizeof (char *));
+
+			for (i = 0; i < g_cmdc; i++)
+				objv[i] = g_cmdv[i].dc_ofile;
+
+			if (dtrace_program_link(g_dtp, NULL, DTRACE_D_PROBES,
+			    g_ofile, g_cmdc, objv) != 0)
+				dfatal("failed to link %s", g_ofile);
+		}
+
 		return (g_status);
 
 	case DMODE_LIST:

@@ -108,6 +108,7 @@ add_nmintr(int lvl, avfunc nmintr, char *name, caddr_t arg)
 	mem->av_intarg2 = NULL;
 	mem->av_intr_id = NULL;
 	mem->av_prilevel = lvl;
+	mem->av_dip = NULL;
 	mem->av_link = NULL;
 
 	mutex_enter(&av_lock);
@@ -296,6 +297,7 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 			p->av_intarg2 = arg2;
 			p->av_intr_id = intr_id;
 			p->av_prilevel = pri_level;
+			p->av_dip = dip;
 			if (pri_level > (int)vectp->avh_hi_pri) {
 				vectp->avh_hi_pri = (ushort_t)pri_level;
 			}
@@ -437,11 +439,12 @@ remove_av(void *intr_id, struct av_head *vectp, avfunc f, int pri_level,
 	target->av_vector = NULL;
 	wait_till_seen(ipl);
 	if (endp != target) {	/* vector to be removed is not last in chain */
+		target->av_vector = endp->av_vector;
 		target->av_intarg1 = endp->av_intarg1;
 		target->av_intarg2 = endp->av_intarg2;
-		target->av_prilevel = endp->av_prilevel;
 		target->av_intr_id = endp->av_intr_id;
-		target->av_vector = endp->av_vector;
+		target->av_prilevel = endp->av_prilevel;
+		target->av_dip = endp->av_dip;
 		/*
 		 * We have a hole here where the routine corresponding to
 		 * endp may not get called. Do a wait_till_seen to take care

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,6 +103,9 @@ sdt_argdesc_t sdt_args[] = {
 	{ "sched", "schedctl-nopreempt", 2, 1, "int" },
 	{ "sched", "schedctl-preempt", 0, 0, "kthread_t *", "lwpsinfo_t *" },
 	{ "sched", "schedctl-preempt", 1, 0, "kthread_t *", "psinfo_t *" },
+	{ "sched", "schedctl-yield", 0, 0, "int" },
+	{ "sched", "surrender", 0, 0, "kthread_t *", "lwpsinfo_t *" },
+	{ "sched", "surrender", 1, 0, "kthread_t *", "psinfo_t *" },
 	{ "proc", "create", 0, 0, "proc_t *", "psinfo_t *" },
 	{ "proc", "exec", 0, 0, "string" },
 	{ "proc", "exec-failure", 0, 0, "int" },

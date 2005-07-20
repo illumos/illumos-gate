@@ -81,12 +81,14 @@
 
 #define	DT_VERS_1_0	DT_VERSION_NUMBER(1, 0, 0)
 #define	DT_VERS_1_1	DT_VERSION_NUMBER(1, 1, 0)
-#define	DT_VERS_LATEST	DT_VERS_1_1
-#define	DT_VERS_STRING	"Sun D 1.1"
+#define	DT_VERS_1_2	DT_VERSION_NUMBER(1, 2, 0)
+#define	DT_VERS_LATEST	DT_VERS_1_2
+#define	DT_VERS_STRING	"Sun D 1.2"
 
 const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_0,	/* D API 1.0.0 (PSARC 2001/466) Solaris 10 FCS */
-	DT_VERS_1_1,	/* D API 1.1.0 Solaris 10 Update 1 */
+	DT_VERS_1_1,	/* D API 1.1.0 Solaris Express 6/05 */
+	DT_VERS_1_2,	/* D API 1.2.0 Solaris 10 Update 1 */
 	0
 };
 
@@ -315,6 +317,9 @@ static const dt_ident_t _dtrace_globals[] = {
 	&dt_idops_regs, NULL },
 { "ustack", DT_IDENT_ACTFUNC, 0, DT_ACT_USTACK, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "stack(...)" },
+{ "ustackdepth", DT_IDENT_SCALAR, 0, DIF_VAR_USTACKDEPTH,
+	DT_ATTR_STABCMN, DT_VERS_1_2,
+	&dt_idops_type, "uint32_t" },
 { "vtimestamp", DT_IDENT_SCALAR, 0, DIF_VAR_VTIMESTAMP,
 	DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "uint64_t" },

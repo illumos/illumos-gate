@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -355,7 +355,8 @@ dt_aggid_add(dtrace_hdl_t *dtp, dtrace_aggid_t id)
 			dtrace_stmtdesc_t *sdp;
 			dt_ident_t *aid;
 
-			sdp = (dtrace_stmtdesc_t *)agg->dtagd_rec[0].dtrd_uarg;
+			sdp = (dtrace_stmtdesc_t *)(uintptr_t)
+			    agg->dtagd_rec[0].dtrd_uarg;
 			aid = sdp->dtsd_aggdata;
 			agg->dtagd_name = aid->di_name;
 		}

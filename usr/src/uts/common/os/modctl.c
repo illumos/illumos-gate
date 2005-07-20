@@ -365,6 +365,7 @@ modctl_modload(int use_path, char *filename, int *rvp)
 	modp->mod_loadflags |= MOD_NOAUTOUNLOAD;
 	modid = modp->mod_id;
 	mod_release_mod(modp);
+	CPU_STATS_ADDQ(CPU, sys, modload, 1);
 	if (rvp != NULL && copyout(&modid, rvp, sizeof (modid)) != 0)
 		retval = EFAULT;
 out:
@@ -2968,8 +2969,10 @@ mod_uninstall_all(void)
 			continue;
 		}
 
-		if (moduninstall(mp) == 0)
+		if (moduninstall(mp) == 0) {
 			mod_unload(mp);
+			CPU_STATS_ADDQ(CPU, sys, modunload, 1);
+		}
 		mod_release_mod(mp);
 	}
 
@@ -3312,9 +3315,10 @@ mod_remove_by_name(char *name)
 		return (0);
 	}
 
-	if ((retval = moduninstall(mp)) == 0)
+	if ((retval = moduninstall(mp)) == 0) {
 		mod_unload(mp);
-	else if (retval == EALREADY)
+		CPU_STATS_ADDQ(CPU, sys, modunload, 1);
+	} else if (retval == EALREADY)
 		retval = 0;		/* already unloaded, not an error */
 	mod_release_mod(mp);
 	return (retval);

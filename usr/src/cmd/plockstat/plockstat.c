@@ -437,7 +437,7 @@ process_aggregate(dtrace_aggdata_t *agg, void *arg)
 	caddr_t data = agg->dtada_data;
 	dtrace_recdesc_t *rec;
 	uint64_t *a, count, avg;
-	char buf[40];
+	char buf[256];
 	uintptr_t lock;
 	pid_t pid;
 	uint64_t *stack;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@ static int g_cpus_per_line = INTRSTAT_CPUS_PER_LINE(80);
 static const char *g_pname = "intrstat";
 static const char *g_prog =
 "interrupt-start"
+"/arg0 != NULL/"
 "{"
 "	self->ts = vtimestamp;"
 "}"

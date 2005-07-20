@@ -555,7 +555,7 @@ dtrace_getupcstack_top(uint64_t *pcstack, int pcstack_limit, uintptr_t *sp)
 
 	rdpr	%cwp, %g4		! remember our window so we can return
 	rdpr	%canrestore, %g2	! compute the first non-user window
-	subcc	%g4, %g2, %g2		! current = %cwp - %otherwin
+	subcc	%g4, %g2, %g2		! current = %cwp - %canrestore
 
 	bge,pt	%xcc, 1f		! good to go if current is >= 0
 	mov	%g5, %o0		! we need to return the count
@@ -589,6 +589,47 @@ dtrace_getupcstack_top(uint64_t *pcstack, int pcstack_limit, uintptr_t *sp)
 	retl
 	nop
 	SET_SIZE(dtrace_getupcstack_top)
+
+#endif
+
+#if defined(lint)
+
+/*ARGSUSED*/
+int
+dtrace_getustackdepth_top(uintptr_t *sp)
+{ return (0); }
+
+#else
+
+	ENTRY(dtrace_getustackdepth_top)
+	mov	%o0, %o2
+	rdpr	%otherwin, %o0
+
+	brlez,a,pn %o0, 2f		! return 0 if there are no user wins
+	clr	%o0
+
+	rdpr	%cwp, %g4		! remember our window so we can return
+	rdpr	%canrestore, %g2	! compute the first user window
+	sub	%g4, %g2, %g2		! current = %cwp - %canrestore -
+	subcc	%g2, %o0, %g2		!     %otherwin
+
+	bge,pt	%xcc, 1f		! normalize the window if necessary
+	sethi	%hi(nwin_minus_one), %g3
+	ld	[%g3 + %lo(nwin_minus_one)], %g3
+	add	%g2, %g3, %g2
+	add	%g2, 1, %g2
+
+1:
+	wrpr	%g2, %cwp		! change to the first user window
+	mov	%i6, %g6		! stash the frame pointer
+	wrpr	%g4, %cwp		! change back to the original window
+
+	stn	%g6, [%o2]		! return the frame pointer
+
+2:
+	retl
+	nop
+	SET_SIZE(dtrace_getustackdepth_top)
 
 #endif
 

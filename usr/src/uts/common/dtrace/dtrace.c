@@ -2141,6 +2141,17 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		}
 		return (mstate->dtms_stackdepth);
 
+	case DIF_VAR_USTACKDEPTH:
+		if (!dtrace_priv_proc(state))
+			return (0);
+		if (!(mstate->dtms_present & DTRACE_MSTATE_USTACKDEPTH)) {
+			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
+			mstate->dtms_ustackdepth = dtrace_getustackdepth();
+			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
+			mstate->dtms_present |= DTRACE_MSTATE_USTACKDEPTH;
+		}
+		return (mstate->dtms_ustackdepth);
+
 	case DIF_VAR_CALLER:
 		if (!dtrace_priv_kernel(state))
 			return (0);
@@ -2157,7 +2168,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 				pc_t caller[2];
 
 				dtrace_getpcstack(caller, 2, aframes,
-				    (uint32_t *)mstate->dtms_arg[0]);
+				    (uint32_t *)(uintptr_t)mstate->dtms_arg[0]);
 				mstate->dtms_caller = caller[1];
 			} else if ((mstate->dtms_caller =
 			    dtrace_caller(aframes)) == -1) {
@@ -2596,8 +2607,8 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		 * relatively short, the complexity of Rabin-Karp or similar
 		 * hardly seems merited.)
 		 */
-		char *addr = (char *)tupregs[0].dttk_value;
-		char *substr = (char *)tupregs[1].dttk_value;
+		char *addr = (char *)(uintptr_t)tupregs[0].dttk_value;
+		char *substr = (char *)(uintptr_t)tupregs[1].dttk_value;
 		uint64_t size = state->dts_options[DTRACEOPT_STRSIZE];
 		size_t len = dtrace_strlen(addr, size);
 		size_t sublen = dtrace_strlen(substr, size);
@@ -3386,6 +3397,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 
 	dtrace_key_t tupregs[DIF_DTR_NREGS + 2]; /* +2 for thread and id */
 	uint64_t regs[DIF_DIR_NREGS];
+	uint64_t *tmp;
 
 	uint8_t cc_n = 0, cc_z = 0, cc_v = 0, cc_c = 0;
 	int64_t cc_r;
@@ -3769,7 +3781,8 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			}
 
 			ASSERT(svar->dtsv_size == NCPU * sizeof (uint64_t));
-			regs[rd] = ((uint64_t *)svar->dtsv_data)[CPU->cpu_id];
+			tmp = (uint64_t *)(uintptr_t)svar->dtsv_data;
+			regs[rd] = tmp[CPU->cpu_id];
 			break;
 
 		case DIF_OP_STLS:
@@ -3806,7 +3819,8 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			}
 
 			ASSERT(svar->dtsv_size == NCPU * sizeof (uint64_t));
-			((uint64_t *)svar->dtsv_data)[CPU->cpu_id] = regs[rd];
+			tmp = (uint64_t *)(uintptr_t)svar->dtsv_data;
+			tmp[CPU->cpu_id] = regs[rd];
 			break;
 
 		case DIF_OP_LDTS: {
@@ -6312,8 +6326,8 @@ dtrace_dofprov2hprov(dtrace_helper_provdesc_t *hprov,
 static void
 dtrace_helper_provide_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 {
-	dof_hdr_t *dof = (dof_hdr_t *)dhp->dofhp_dof;
 	uintptr_t daddr = (uintptr_t)dhp->dofhp_dof;
+	dof_hdr_t *dof = (dof_hdr_t *)daddr;
 	dof_sec_t *str_sec, *prb_sec, *arg_sec, *off_sec;
 	dof_provider_t *provider;
 	dof_probe_t *probe;
@@ -6327,19 +6341,19 @@ dtrace_helper_provide_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 	dtrace_mops_t *mops = &meta->dtm_mops;
 	void *parg;
 
-	provider = (dof_provider_t *)(daddr + sec->dofs_offset);
-	str_sec = (dof_sec_t *)(daddr + dof->dofh_secoff +
+	provider = (dof_provider_t *)(uintptr_t)(daddr + sec->dofs_offset);
+	str_sec = (dof_sec_t *)(uintptr_t)(daddr + dof->dofh_secoff +
 	    provider->dofpv_strtab * dof->dofh_secsize);
-	prb_sec = (dof_sec_t *)(daddr + dof->dofh_secoff +
+	prb_sec = (dof_sec_t *)(uintptr_t)(daddr + dof->dofh_secoff +
 	    provider->dofpv_probes * dof->dofh_secsize);
-	arg_sec = (dof_sec_t *)(daddr + dof->dofh_secoff +
+	arg_sec = (dof_sec_t *)(uintptr_t)(daddr + dof->dofh_secoff +
 	    provider->dofpv_prargs * dof->dofh_secsize);
-	off_sec = (dof_sec_t *)(daddr + dof->dofh_secoff +
+	off_sec = (dof_sec_t *)(uintptr_t)(daddr + dof->dofh_secoff +
 	    provider->dofpv_proffs * dof->dofh_secsize);
 
-	strtab = (char *)(daddr + str_sec->dofs_offset);
-	off = (uint32_t *)(daddr + off_sec->dofs_offset);
-	arg = (uint8_t *)(daddr + arg_sec->dofs_offset);
+	strtab = (char *)(uintptr_t)(daddr + str_sec->dofs_offset);
+	off = (uint32_t *)(uintptr_t)(daddr + off_sec->dofs_offset);
+	arg = (uint8_t *)(uintptr_t)(daddr + arg_sec->dofs_offset);
 
 	nprobes = prb_sec->dofs_size / prb_sec->dofs_entsize;
 
@@ -6357,8 +6371,8 @@ dtrace_helper_provide_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 	 * Create the probes.
 	 */
 	for (i = 0; i < nprobes; i++) {
-		probe = (dof_probe_t *)(daddr + prb_sec->dofs_offset +
-		    i * prb_sec->dofs_entsize);
+		probe = (dof_probe_t *)(uintptr_t)(daddr +
+		    prb_sec->dofs_offset + i * prb_sec->dofs_entsize);
 
 		dhpb.dthpb_mod = dhp->dofhp_mod;
 		dhpb.dthpb_func = strtab + probe->dofpr_func;
@@ -6379,15 +6393,15 @@ dtrace_helper_provide_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 static void
 dtrace_helper_provide(dof_helper_t *dhp, pid_t pid)
 {
-	dof_hdr_t *dof = (dof_hdr_t *)dhp->dofhp_dof;
 	uintptr_t daddr = (uintptr_t)dhp->dofhp_dof;
+	dof_hdr_t *dof = (dof_hdr_t *)daddr;
 	int i;
 
 	ASSERT(MUTEX_HELD(&dtrace_meta_lock));
 
 	for (i = 0; i < dof->dofh_secnum; i++) {
-		dof_sec_t *sec = (dof_sec_t *)(daddr + dof->dofh_secoff +
-		    i * dof->dofh_secsize);
+		dof_sec_t *sec = (dof_sec_t *)(uintptr_t)(daddr +
+		    dof->dofh_secoff + i * dof->dofh_secsize);
 
 		if (sec->dofs_type != DOF_SECT_PROVIDER)
 			continue;
@@ -6399,8 +6413,8 @@ dtrace_helper_provide(dof_helper_t *dhp, pid_t pid)
 static void
 dtrace_helper_remove_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 {
-	dof_hdr_t *dof = (dof_hdr_t *)dhp->dofhp_dof;
 	uintptr_t daddr = (uintptr_t)dhp->dofhp_dof;
+	dof_hdr_t *dof = (dof_hdr_t *)daddr;
 	dof_sec_t *str_sec;
 	dof_provider_t *provider;
 	char *strtab;
@@ -6408,11 +6422,11 @@ dtrace_helper_remove_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 	dtrace_meta_t *meta = dtrace_meta_pid;
 	dtrace_mops_t *mops = &meta->dtm_mops;
 
-	provider = (dof_provider_t *)(daddr + sec->dofs_offset);
-	str_sec = (dof_sec_t *)(daddr + dof->dofh_secoff +
+	provider = (dof_provider_t *)(uintptr_t)(daddr + sec->dofs_offset);
+	str_sec = (dof_sec_t *)(uintptr_t)(daddr + dof->dofh_secoff +
 	    provider->dofpv_strtab * dof->dofh_secsize);
 
-	strtab = (char *)(daddr + str_sec->dofs_offset);
+	strtab = (char *)(uintptr_t)(daddr + str_sec->dofs_offset);
 
 	/*
 	 * Create the provider.
@@ -6427,15 +6441,15 @@ dtrace_helper_remove_one(dof_helper_t *dhp, dof_sec_t *sec, pid_t pid)
 static void
 dtrace_helper_remove(dof_helper_t *dhp, pid_t pid)
 {
-	dof_hdr_t *dof = (dof_hdr_t *)dhp->dofhp_dof;
 	uintptr_t daddr = (uintptr_t)dhp->dofhp_dof;
+	dof_hdr_t *dof = (dof_hdr_t *)daddr;
 	int i;
 
 	ASSERT(MUTEX_HELD(&dtrace_meta_lock));
 
 	for (i = 0; i < dof->dofh_secnum; i++) {
-		dof_sec_t *sec = (dof_sec_t *)(daddr + dof->dofh_secoff +
-		    i * dof->dofh_secsize);
+		dof_sec_t *sec = (dof_sec_t *)(uintptr_t)(daddr +
+		    dof->dofh_secoff + i * dof->dofh_secsize);
 
 		if (sec->dofs_type != DOF_SECT_PROVIDER)
 			continue;
@@ -9769,7 +9783,7 @@ dtrace_dof_destroy(dof_hdr_t *dof)
 static dof_sec_t *
 dtrace_dof_sect(dof_hdr_t *dof, uint32_t type, dof_secidx_t i)
 {
-	dof_sec_t *sec = (dof_sec_t *)
+	dof_sec_t *sec = (dof_sec_t *)(uintptr_t)
 	    ((uintptr_t)dof + dof->dofh_secoff + i * dof->dofh_secsize);
 
 	if (i >= dof->dofh_secnum) {
@@ -9913,7 +9927,7 @@ dtrace_dof_difo(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		return (NULL);
 	}
 
-	dofd = (dof_difohdr_t *)(daddr + sec->dofs_offset);
+	dofd = (dof_difohdr_t *)(uintptr_t)(daddr + sec->dofs_offset);
 	n = (sec->dofs_size - sizeof (*dofd)) / sizeof (dof_secidx_t) + 1;
 
 	dp = kmem_zalloc(sizeof (dtrace_difo_t), KM_SLEEP);
@@ -10246,7 +10260,8 @@ static int
 dtrace_dof_relocate(dof_hdr_t *dof, dof_sec_t *sec, uint64_t ubase)
 {
 	uintptr_t daddr = (uintptr_t)dof;
-	dof_relohdr_t *dofr = (dof_relohdr_t *)(daddr + sec->dofs_offset);
+	dof_relohdr_t *dofr =
+	    (dof_relohdr_t *)(uintptr_t)(daddr + sec->dofs_offset);
 	dof_sec_t *ss, *rs, *ts;
 	dof_relodesc_t *r;
 	uint_t i, n;
@@ -10270,7 +10285,7 @@ dtrace_dof_relocate(dof_hdr_t *dof, dof_sec_t *sec, uint64_t ubase)
 		return (-1);
 	}
 
-	r = (dof_relodesc_t *)(daddr + rs->dofs_offset);
+	r = (dof_relodesc_t *)(uintptr_t)(daddr + rs->dofs_offset);
 	n = rs->dofs_size / rs->dofs_entsize;
 
 	for (i = 0; i < n; i++) {
@@ -11589,7 +11604,7 @@ dtrace_helper_trace(dtrace_helper_action_t *helper, dtrace_vstate_t *vstate,
 
 		ASSERT(svar->dtsv_size >= NCPU * sizeof (uint64_t));
 		ent->dtht_locals[i] =
-		    ((uint64_t *)svar->dtsv_data)[CPU->cpu_id];
+		    ((uint64_t *)(uintptr_t)svar->dtsv_data)[CPU->cpu_id];
 	}
 }
 
@@ -11939,8 +11954,10 @@ dtrace_helper_provider_remove(dtrace_helper_provider_t *hprov)
 	mutex_enter(&dtrace_lock);
 
 	if (--hprov->dthp_ref == 0) {
+		dof_hdr_t *dof;
 		mutex_exit(&dtrace_lock);
-		dtrace_dof_destroy((dof_hdr_t *)hprov->dthp_prov.dofhp_dof);
+		dof = (dof_hdr_t *)(uintptr_t)hprov->dthp_prov.dofhp_dof;
+		dtrace_dof_destroy(dof);
 		kmem_free(hprov, sizeof (dtrace_helper_provider_t));
 	} else {
 		mutex_exit(&dtrace_lock);
@@ -11967,7 +11984,7 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 		return (-1);
 	}
 
-	provider = (dof_provider_t *)(daddr + sec->dofs_offset);
+	provider = (dof_provider_t *)(uintptr_t)(daddr + sec->dofs_offset);
 	str_sec = dtrace_dof_sect(dof, DOF_SECT_STRTAB, provider->dofpv_strtab);
 	prb_sec = dtrace_dof_sect(dof, DOF_SECT_PROBES, provider->dofpv_probes);
 	arg_sec = dtrace_dof_sect(dof, DOF_SECT_PRARGS, provider->dofpv_prargs);
@@ -11977,7 +11994,7 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 	    arg_sec == NULL || off_sec == NULL)
 		return (-1);
 
-	strtab = (char *)(daddr + str_sec->dofs_offset);
+	strtab = (char *)(uintptr_t)(daddr + str_sec->dofs_offset);
 
 	if (provider->dofpv_name >= str_sec->dofs_size ||
 	    strlen(strtab + provider->dofpv_name) >= DTRACE_PROVNAMELEN) {
@@ -12011,7 +12028,7 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 		return (-1);
 	}
 
-	arg = (uint8_t *)(daddr + arg_sec->dofs_offset);
+	arg = (uint8_t *)(uintptr_t)(daddr + arg_sec->dofs_offset);
 
 	nprobes = prb_sec->dofs_size / prb_sec->dofs_entsize;
 
@@ -12019,8 +12036,8 @@ dtrace_helper_provider_validate(dof_hdr_t *dof, dof_sec_t *sec)
 	 * Take a pass through the probes to check for errors.
 	 */
 	for (j = 0; j < nprobes; j++) {
-		probe = (dof_probe_t *)(daddr + prb_sec->dofs_offset +
-		    j * prb_sec->dofs_entsize);
+		probe = (dof_probe_t *)(uintptr_t)(daddr +
+		    prb_sec->dofs_offset + j * prb_sec->dofs_entsize);
 
 		if (probe->dofpr_func >= str_sec->dofs_size) {
 			dtrace_dof_error(dof, "invalid function name");
@@ -12168,7 +12185,7 @@ dtrace_helper_slurp(dof_hdr_t *dof, dof_helper_t *dhp)
 		 * Look for helper probes.
 		 */
 		for (i = 0; i < dof->dofh_secnum; i++) {
-			dof_sec_t *sec = (dof_sec_t *)(daddr +
+			dof_sec_t *sec = (dof_sec_t *)(uintptr_t)(daddr +
 			    dof->dofh_secoff + i * dof->dofh_secsize);
 
 			if (sec->dofs_type != DOF_SECT_PROVIDER)
@@ -12180,7 +12197,7 @@ dtrace_helper_slurp(dof_hdr_t *dof, dof_helper_t *dhp)
 			}
 		}
 
-		dhp->dofhp_dof = (uint64_t)dof;
+		dhp->dofhp_dof = (uint64_t)(uintptr_t)dof;
 		if (err == 0 && dtrace_helper_provider_add(dhp) == 0)
 			destroy = 0;
 		else

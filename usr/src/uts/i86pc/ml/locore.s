@@ -1231,7 +1231,7 @@ cmntrap()
 	leaq	cpu_core(%rip), %r8
 	addq	%r8, %rax
 	movw	CPUC_DTRACE_FLAGS(%rax), %cx
-	andw	$CPU_DTRACE_NOFAULT, %cx
+	testw	$CPU_DTRACE_NOFAULT, %cx
 	jnz	.dtrace_induced
 
 	TRACE_PTR(%rdi, %rbx, %ebx, %rcx, $TT_TRAP) /* Uses labels 8 and 9 */
@@ -1360,7 +1360,7 @@ cmntrap()
 	shll	$CPU_CORE_SHIFT, %eax
 	addl	$cpu_core, %eax
 	movw	CPUC_DTRACE_FLAGS(%eax), %cx
-	andw	$CPU_DTRACE_NOFAULT, %cx
+	testw	$CPU_DTRACE_NOFAULT, %cx
 	jnz	0f
 
 	/*

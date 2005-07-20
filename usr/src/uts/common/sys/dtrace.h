@@ -227,6 +227,7 @@ typedef enum dtrace_probespec {
 #define	DIF_VAR_EXECNAME	0x0118	/* name of executable */
 #define	DIF_VAR_ZONENAME	0x0119	/* zone name associated with process */
 #define	DIF_VAR_WALLTIMESTAMP	0x011a	/* wall-clock timestamp */
+#define	DIF_VAR_USTACKDEPTH	0x011b	/* user-land stack depth */
 
 #define	DIF_SUBR_RAND			0
 #define	DIF_SUBR_MUTEX_OWNED		1

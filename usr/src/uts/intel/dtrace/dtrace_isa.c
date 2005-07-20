@@ -117,35 +117,19 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 	}
 }
 
-void
-dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
+static int
+dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
+    uintptr_t sp)
 {
 	klwp_t *lwp = ttolwp(curthread);
-	proc_t *p = ttoproc(curthread);
-	struct regs *rp;
-	uintptr_t pc, sp, oldcontext;
-	volatile uint8_t *flags =
-	    (volatile uint8_t *)&cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
+	proc_t *p = curproc;
+	uintptr_t oldcontext = lwp->lwp_oldcontext;
+	volatile uint16_t *flags =
+	    (volatile uint16_t *)&cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
 	size_t s1, s2;
+	int ret = 0;
 
-	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
-		return;
-
-	if (*flags & CPU_DTRACE_FAULT)
-		return;
-
-	if (pcstack_limit <= 0)
-		return;
-
-	*pcstack++ = (uint64_t)p->p_pid;
-	pcstack_limit--;
-
-	if (pcstack_limit <= 0)
-		return;
-
-	pc = rp->r_pc;
-	sp = rp->r_fp;
-	oldcontext = lwp->lwp_oldcontext;
+	ASSERT(pcstack == NULL || pcstack_limit > 0);
 
 	if (p->p_model == DATAMODEL_NATIVE) {
 		s1 = sizeof (struct frame) + 2 * sizeof (long);
@@ -155,23 +139,14 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 		s2 = s1 + sizeof (siginfo32_t);
 	}
 
-	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_ENTRY)) {
-		*pcstack++ = (uint64_t)pc;
-		pcstack_limit--;
-		if (pcstack_limit <= 0)
-			return;
-
-		if (p->p_model == DATAMODEL_NATIVE)
-			pc = dtrace_fulword((void *)rp->r_sp);
-		else
-			pc = dtrace_fuword32((void *)rp->r_sp);
-	}
-
 	while (pc != 0 && sp != 0) {
-		*pcstack++ = (uint64_t)pc;
-		pcstack_limit--;
-		if (pcstack_limit <= 0)
-			break;
+		ret++;
+		if (pcstack != NULL) {
+			*pcstack++ = (uint64_t)pc;
+			pcstack_limit--;
+			if (pcstack_limit <= 0)
+				break;
+		}
 
 		if (oldcontext == sp + s1 || oldcontext == sp + s2) {
 			if (p->p_model == DATAMODEL_NATIVE) {
@@ -216,8 +191,91 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 		}
 	}
 
+	return (ret);
+}
+
+void
+dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
+{
+	klwp_t *lwp = ttolwp(curthread);
+	proc_t *p = curproc;
+	struct regs *rp;
+	uintptr_t pc, sp;
+	volatile uint16_t *flags =
+	    (volatile uint16_t *)&cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
+	int n;
+
+	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
+		return;
+
+	if (*flags & CPU_DTRACE_FAULT)
+		return;
+
+	if (pcstack_limit <= 0)
+		return;
+
+	*pcstack++ = (uint64_t)p->p_pid;
+	pcstack_limit--;
+
+	if (pcstack_limit <= 0)
+		return;
+
+	pc = rp->r_pc;
+	sp = rp->r_fp;
+
+	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_ENTRY)) {
+		*pcstack++ = (uint64_t)pc;
+		pcstack_limit--;
+		if (pcstack_limit <= 0)
+			return;
+
+		if (p->p_model == DATAMODEL_NATIVE)
+			pc = dtrace_fulword((void *)rp->r_sp);
+		else
+			pc = dtrace_fuword32((void *)rp->r_sp);
+	}
+
+	n = dtrace_getustack_common(pcstack, pcstack_limit, pc, sp);
+	ASSERT(n >= 0);
+	ASSERT(n <= pcstack_limit);
+
+	pcstack += n;
+	pcstack_limit -= n;
+
 	while (pcstack_limit-- > 0)
 		*pcstack++ = NULL;
+}
+
+int
+dtrace_getustackdepth(void)
+{
+	klwp_t *lwp = ttolwp(curthread);
+	proc_t *p = curproc;
+	struct regs *rp;
+	uintptr_t pc, sp;
+	int n = 0;
+
+	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
+		return (0);
+
+	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_FAULT))
+		return (-1);
+
+	pc = rp->r_pc;
+	sp = rp->r_fp;
+
+	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_ENTRY)) {
+		n++;
+
+		if (p->p_model == DATAMODEL_NATIVE)
+			pc = dtrace_fulword((void *)rp->r_sp);
+		else
+			pc = dtrace_fuword32((void *)rp->r_sp);
+	}
+
+	n += dtrace_getustack_common(NULL, 0, pc, sp);
+
+	return (n);
 }
 
 /*ARGSUSED*/
@@ -225,11 +283,11 @@ void
 dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 {
 	klwp_t *lwp = ttolwp(curthread);
-	proc_t *p = ttoproc(curthread);
+	proc_t *p = curproc;
 	struct regs *rp;
 	uintptr_t pc, sp, oldcontext;
-	volatile uint8_t *flags =
-	    (volatile uint8_t *)&cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
+	volatile uint16_t *flags =
+	    (volatile uint16_t *)&cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
 	size_t s1, s2;
 
 	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)

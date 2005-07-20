@@ -889,6 +889,7 @@ typedef struct dtrace_vstate {
 #define	DTRACE_MSTATE_IPL		0x00000040
 #define	DTRACE_MSTATE_FLTOFFS		0x00000080
 #define	DTRACE_MSTATE_WALLTIMESTAMP	0x00000100
+#define	DTRACE_MSTATE_USTACKDEPTH	0x00000200
 
 typedef struct dtrace_mstate {
 	uintptr_t dtms_scratch_base;		/* base of scratch space */
@@ -900,6 +901,7 @@ typedef struct dtrace_mstate {
 	uint64_t dtms_timestamp;		/* cached timestamp */
 	hrtime_t dtms_walltimestamp;		/* cached wall timestamp */
 	int dtms_stackdepth;			/* cached stackdepth */
+	int dtms_ustackdepth;			/* cached ustackdepth */
 	struct dtrace_probe *dtms_probe;	/* current probe */
 	uintptr_t dtms_caller;			/* cached caller */
 	int dtms_ipl;				/* cached interrupt pri lev */
@@ -1218,6 +1220,7 @@ extern ulong_t dtrace_getreg(struct regs *, uint_t);
 extern int dtrace_getstackdepth(int);
 extern void dtrace_getupcstack(uint64_t *, int);
 extern void dtrace_getufpstack(uint64_t *, uint64_t *, int);
+extern int dtrace_getustackdepth(void);
 extern uintptr_t dtrace_fulword(void *);
 extern uint8_t dtrace_fuword8(void *);
 extern uint16_t dtrace_fuword16(void *);

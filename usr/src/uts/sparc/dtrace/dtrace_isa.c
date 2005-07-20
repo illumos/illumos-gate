@@ -34,6 +34,7 @@
 #include <sys/machpcb.h>
 #include <sys/procfs_isa.h>
 #include <sys/cmn_err.h>
+#include <sys/sysmacros.h>
 
 #define	DTRACE_FMT3OP3_MASK	0x81000000
 #define	DTRACE_FMT3OP3		0x80000000
@@ -55,6 +56,7 @@
 #define	DTRACE_JMPL		0x81c00000
 
 extern int dtrace_getupcstack_top(uint64_t *, int, uintptr_t *);
+extern int dtrace_getustackdepth_top(uintptr_t *);
 extern ulong_t dtrace_getreg_win(uint_t, uint_t);
 extern void dtrace_putreg_win(uint_t, ulong_t);
 extern int dtrace_fish(int, int, uintptr_t *);
@@ -74,8 +76,8 @@ extern int dtrace_fish(int, int, uintptr_t *);
  *	deliver as correct a stack as possible.  Details on the issues
  *	surrounding stack correctness are found below.
  *
- * (c)	dtrace_getpcstack() _always_ fills in pstack_limit pc_t's -- filling
- *	in the difference between the stack depth and pstack_limit with NULLs.
+ * (c)	dtrace_getpcstack() _always_ fills in pcstack_limit pc_t's -- filling
+ *	in the difference between the stack depth and pcstack_limit with NULLs.
  *	Due to this behavior dtrace_getpcstack() returns void.
  *
  * (d)	dtrace_getpcstack() takes a third parameter, aframes, that
@@ -306,16 +308,77 @@ leaf:
 	}
 }
 
+static int
+dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t sp)
+{
+	proc_t *p = curproc;
+	int ret = 0;
+
+	ASSERT(pcstack == NULL || pcstack_limit > 0);
+
+	if (p->p_model == DATAMODEL_NATIVE) {
+		for (;;) {
+			struct frame *fr = (struct frame *)(sp + STACK_BIAS);
+			uintptr_t pc;
+
+			if (sp == 0 || fr == NULL ||
+			    !IS_P2ALIGNED((uintptr_t)fr, STACK_ALIGN))
+				break;
+
+			pc = dtrace_fulword(&fr->fr_savpc);
+			sp = dtrace_fulword(&fr->fr_savfp);
+
+			if (pc == 0)
+				break;
+
+			ret++;
+
+			if (pcstack != NULL) {
+				*pcstack++ = pc;
+				pcstack_limit--;
+				if (pcstack_limit == 0)
+					break;
+			}
+		}
+	} else {
+		for (;;) {
+			struct frame32 *fr = (struct frame32 *)sp;
+			uint32_t pc;
+
+			if (sp == 0 ||
+			    !IS_P2ALIGNED((uintptr_t)fr, STACK_ALIGN32))
+				break;
+
+			pc = dtrace_fuword32(&fr->fr_savpc);
+			sp = dtrace_fuword32(&fr->fr_savfp);
+
+			if (pc == 0)
+				break;
+
+			ret++;
+
+			if (pcstack != NULL) {
+				*pcstack++ = pc;
+				pcstack_limit--;
+				if (pcstack_limit == 0)
+					break;
+			}
+		}
+	}
+
+	return (ret);
+}
+
 void
 dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 {
 	klwp_t *lwp = ttolwp(curthread);
-	proc_t *p = ttoproc(curthread);
+	proc_t *p = curproc;
 	struct regs *rp;
 	uintptr_t sp;
 	int n;
 
-	if (lwp == NULL || p == NULL || lwp->lwp_regs == NULL)
+	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
 		return;
 
 	if (pcstack_limit <= 0)
@@ -327,7 +390,6 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 	if (pcstack_limit <= 0)
 		return;
 
-	rp = lwp->lwp_regs;
 	*pcstack++ = (uint64_t)rp->r_pc;
 	pcstack_limit--;
 
@@ -349,46 +411,44 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 
 	pcstack += n;
 	pcstack_limit -= n;
+	if (pcstack_limit <= 0)
+		return;
 
-	if (p->p_model == DATAMODEL_NATIVE) {
-		while (pcstack_limit > 0) {
-			struct frame *fr = (struct frame *)(sp + STACK_BIAS);
-			uintptr_t pc;
+	n = dtrace_getustack_common(pcstack, pcstack_limit, sp);
+	ASSERT(n >= 0);
+	ASSERT(n <= pcstack_limit);
 
-			if (sp == 0 || fr == NULL ||
-			    ((uintptr_t)&fr->fr_savpc & 3) != 0 ||
-			    ((uintptr_t)&fr->fr_savfp & 3) != 0)
-				break;
-
-			pc = dtrace_fulword(&fr->fr_savpc);
-			sp = dtrace_fulword(&fr->fr_savfp);
-
-			if (pc == 0)
-				break;
-
-			*pcstack++ = pc;
-			pcstack_limit--;
-		}
-	} else {
-		while (pcstack_limit > 0) {
-			struct frame32 *fr = (struct frame32 *)sp;
-			uint32_t pc;
-
-			if (sp == 0 ||
-			    ((uintptr_t)&fr->fr_savpc & 3) != 0 ||
-			    ((uintptr_t)&fr->fr_savfp & 3) != 0)
-				break;
-
-			pc = dtrace_fuword32(&fr->fr_savpc);
-			sp = dtrace_fuword32(&fr->fr_savfp);
-
-			*pcstack++ = pc;
-			pcstack_limit--;
-		}
-	}
+	pcstack += n;
+	pcstack_limit -= n;
 
 	while (pcstack_limit-- > 0)
 		*pcstack++ = NULL;
+}
+
+int
+dtrace_getustackdepth(void)
+{
+	klwp_t *lwp = ttolwp(curthread);
+	proc_t *p = curproc;
+	struct regs *rp;
+	uintptr_t sp;
+	int n = 1;
+
+	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
+		return (0);
+
+	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_FAULT))
+		return (-1);
+
+	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_ENTRY))
+		n++;
+
+	sp = rp->r_sp;
+
+	n += dtrace_getustackdepth_top(&sp);
+	n += dtrace_getustack_common(NULL, 0, sp);
+
+	return (n);
 }
 
 void
@@ -399,7 +459,7 @@ dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 	struct regs *rp;
 	uintptr_t sp;
 
-	if (lwp == NULL || p == NULL || lwp->lwp_regs == NULL)
+	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
 		return;
 
 	if (pcstack_limit <= 0)
@@ -410,8 +470,6 @@ dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 
 	if (pcstack_limit <= 0)
 		return;
-
-	rp = lwp->lwp_regs;
 
 	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_ENTRY)) {
 		*fpstack++ = 0;
@@ -468,6 +526,9 @@ dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 
 			pc = dtrace_fuword32(&fr->fr_savpc);
 			sp = dtrace_fuword32(&fr->fr_savfp);
+
+			if (pc == 0)
+				break;
 
 			*fpstack++ = sp;
 			*pcstack++ = pc;

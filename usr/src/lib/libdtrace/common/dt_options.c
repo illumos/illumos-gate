@@ -744,7 +744,7 @@ dt_options_load(dtrace_hdl_t *dtp)
 		return (dt_set_errno(dtp, errno));
 
 	for (i = 0; i < dof->dofh_secnum; i++) {
-		sec = (dof_sec_t *)((uintptr_t)dof +
+		sec = (dof_sec_t *)(uintptr_t)((uintptr_t)dof +
 		    dof->dofh_secoff + i * dof->dofh_secsize);
 
 		if (sec->dofs_type != DOF_SECT_OPTDESC)
@@ -754,8 +754,8 @@ dt_options_load(dtrace_hdl_t *dtp)
 	}
 
 	for (offs = 0; offs < sec->dofs_size; offs += sec->dofs_entsize) {
-		dof_optdesc_t *opt = (dof_optdesc_t *)((uintptr_t)dof +
-		    sec->dofs_offset + offs);
+		dof_optdesc_t *opt = (dof_optdesc_t *)(uintptr_t)
+		    ((uintptr_t)dof + sec->dofs_offset + offs);
 
 		if (opt->dofo_strtab != DOF_SECIDX_NONE)
 			continue;

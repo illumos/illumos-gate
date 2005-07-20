@@ -1062,10 +1062,55 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
 {
 	char drti[PATH_MAX];
 	dof_hdr_t *dof;
-	int fd, status, i;
+	int fd, status, i, cur;
 	char *cmd, tmp;
 	size_t len;
 	int ret = 0;
+
+	/*
+	 * A NULL program indicates a special use in which we just link
+	 * together a bunch of object files specified in objv and then
+	 * unlink(2) those object files.
+	 */
+	if (pgp == NULL) {
+		const char *fmt = "%s -o %s -r";
+
+		len = snprintf(&tmp, 1, fmt, dtp->dt_ld_path, file) + 1;
+
+		for (i = 0; i < objc; i++)
+			len += strlen(objv[i]) + 1;
+
+		cmd = alloca(len);
+
+		cur = snprintf(cmd, len, fmt, dtp->dt_ld_path, file);
+
+		for (i = 0; i < objc; i++)
+			cur += snprintf(cmd + cur, len - cur, " %s", objv[i]);
+
+		if ((status = system(cmd)) == -1) {
+			return (dt_link_error(dtp, "failed to run %s: %s",
+			    dtp->dt_ld_path, strerror(errno)));
+		}
+
+		if (WIFSIGNALED(status)) {
+			return (dt_link_error(dtp,
+			    "failed to link %s: %s failed due to signal %d",
+			    file, dtp->dt_ld_path, WTERMSIG(status)));
+		}
+
+		if (WEXITSTATUS(status) != 0) {
+			return (dt_link_error(dtp,
+			    "failed to link %s: %s exited with status %d\n",
+			    file, dtp->dt_ld_path, WEXITSTATUS(status)));
+		}
+
+		for (i = 0; i < objc; i++) {
+			if (strcmp(objv[i], file) != 0)
+				(void) unlink(objv[i]);
+		}
+
+		return (0);
+	}
 
 	for (i = 0; i < objc; i++) {
 		if (process_obj(dtp, objv[i]) != 0)
@@ -1127,6 +1172,8 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
 	}
 
 	if (!dtp->dt_lazyload) {
+		const char *fmt = "%s -o %s -r -Blocal -Breduce /dev/fd/%d %s";
+
 		if (dtp->dt_oflags & DTRACE_O_LP64) {
 			(void) snprintf(drti, sizeof (drti),
 			    "%s/64/drti.o", _dtrace_libdir);
@@ -1135,13 +1182,12 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
 			    "%s/drti.o", _dtrace_libdir);
 		}
 
-		len = snprintf(&tmp, 1, "%s -o %s -r /dev/fd/%d %s",
-		    dtp->dt_ld_path, file, fd, drti) + 1;
+		len = snprintf(&tmp, 1, fmt, dtp->dt_ld_path, file, fd,
+		    drti) + 1;
 
 		cmd = alloca(len);
 
-		(void) snprintf(cmd, len, "%s -o %s -r /dev/fd/%d %s",
-		    dtp->dt_ld_path, file, fd, drti);
+		(void) snprintf(cmd, len, fmt, dtp->dt_ld_path, file, fd, drti);
 
 		if ((status = system(cmd)) == -1) {
 			ret = dt_link_error(dtp, "failed to run %s: %s",
