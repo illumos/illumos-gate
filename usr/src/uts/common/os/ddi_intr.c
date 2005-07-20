@@ -1377,7 +1377,7 @@ ddi_add_softintr(dev_info_t *dip, int preference, ddi_softintr_t *idp,
 
 	/* Translate the priority preference */
 	if (preference == DDI_SOFTINT_FIXED) {
-		softpri = *((uint64_t *)iblock_cookiep);
+		softpri = (uint64_t)(uintptr_t)*iblock_cookiep;
 		softpri = MIN(softpri, DDI_SOFT_INTR_PRI_H);
 	} else {
 		softpri = (uint64_t)((preference > DDI_SOFTINT_MED) ?
@@ -1399,7 +1399,7 @@ ddi_add_softintr(dev_info_t *dip, int preference, ddi_softintr_t *idp,
 	}
 
 	if (iblock_cookiep)
-		*iblock_cookiep = *((ddi_iblock_cookie_t *)(&softpri));
+		*iblock_cookiep =  (ddi_iblock_cookie_t)(uintptr_t)softpri;
 
 	if (idevice_cookiep) {
 		idevice_cookiep->idev_vector = 0;
