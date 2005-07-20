@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <sys/stream.h>
 #include <sys/tihdr.h>
 #include <sys/sysmacros.h>
+#include <sys/ccompile.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -206,7 +207,7 @@ static void		pmsg_addrs(char *cp, int addrs);
 static void		pmsg_common(struct rt_msghdr *rtm);
 static void		print_getmsg(struct rt_msghdr *rtm, int msglen);
 static void		print_rtmsg(struct rt_msghdr *rtm, int msglen);
-static void		quit(char *s, int err);
+static void		quit(char *s, int err) __NORETURN;
 static char		*routename(struct sockaddr *sa);
 static void		rtmonitor(int argc, char *argv[]);
 static int		rtmsg(int cmd, int flags);

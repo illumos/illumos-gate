@@ -12,6 +12,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <time.h>
 #include <sys/types.h>
 #ifdef PPP_DEFS_IN_NET
@@ -34,6 +35,12 @@ int tot_sent, tot_rcvd;
 extern int optind;
 extern char *optarg;
 
+void dumplog();
+void dumpppp();
+void show_time();
+void handle_ccp();
+
+int
 main(ac, av)
     int ac;
     char **av;
@@ -86,6 +93,7 @@ main(ac, av)
     exit(0);
 }
 
+void
 dumplog(f)
     FILE *f;
 {
@@ -229,6 +237,7 @@ struct pkt {
 
 unsigned char dbuf[8192];
 
+void
 dumpppp(f)
     FILE *f;
 {
@@ -415,6 +424,7 @@ struct compressor *compressors[] = {
     NULL
 };
 
+void
 handle_ccp(cp, dp, len)
     struct pkt *cp;
     u_char *dp;
@@ -471,6 +481,7 @@ handle_ccp(cp, dp, len)
     }
 }
 
+void
 show_time(f, c)
     FILE *f;
     int c;

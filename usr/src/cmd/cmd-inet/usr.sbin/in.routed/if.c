@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1993
@@ -638,7 +638,7 @@ check_dup(const char *name,	/* Don't return this interface */
     in_addr_t addr,	/* IP address, so network byte order */
     in_addr_t dstaddr,	/* ditto */
     in_addr_t mask,	/* mask, so host byte order */
-    int if_flags,	/* set IFF_POINTOPOINT to ignore local int_addr */
+    uint64_t if_flags,	/* set IFF_POINTOPOINT to ignore local int_addr */
     boolean_t allowdups)	/* set true to include duplicates */
 {
 	struct interface *best_ifp = NULL;

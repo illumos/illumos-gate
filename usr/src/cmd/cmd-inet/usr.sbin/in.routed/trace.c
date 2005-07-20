@@ -524,9 +524,9 @@ static struct or_bits origin_bits[] = {
 
 /* display a bit-field */
 struct bits {
-	uint_t	bits_mask;
-	uint_t	bits_clear;
-	const char *bits_name;
+	uint64_t	bits_mask;
+	uint64_t	bits_clear;
+	const char	*bits_name;
 };
 
 static struct bits if_bits[] = {
@@ -652,10 +652,10 @@ static struct bits ks_bits[] = {
 
 static void
 trace_bits(const struct bits *tbl,
-    uint_t field,
+    uint64_t field,
     boolean_t force)
 {
-	uint_t b;
+	uint64_t b;
 	char c;
 
 	if (force) {
@@ -681,7 +681,7 @@ trace_bits(const struct bits *tbl,
 	if (field != 0) {
 		if (c != '\0')
 			(void) putc(c, ftrace);
-		(void) fprintf(ftrace, "%#x", field);
+		(void) fprintf(ftrace, "%#llx", field);
 		c = '|';
 	}
 

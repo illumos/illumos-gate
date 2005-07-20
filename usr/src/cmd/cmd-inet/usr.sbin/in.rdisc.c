@@ -1,5 +1,5 @@
 /*
- * Copyright 1991-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -496,15 +496,15 @@ report(void)
 #define	TIMER_INTERVAL	6
 #define	GETIFCONF_TIMER	30
 
-static left_until_advertise;
+static int left_until_advertise;
 
 /* Called every TIMER_INTERVAL */
 static void
 timer(void)
 {
-	static time;
-	static left_until_getifconf;
-	static left_until_solicit;
+	static int time;
+	static int left_until_getifconf;
+	static int left_until_solicit;
 
 	time += TIMER_INTERVAL;
 
@@ -2226,7 +2226,7 @@ rtioctl(struct in_addr addr, int op)
 
 #include <syslog.h>
 
-static logging = 0;
+static int logging = 0;
 
 static void
 initlog(void)

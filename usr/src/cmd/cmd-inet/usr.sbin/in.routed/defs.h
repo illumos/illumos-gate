@@ -337,7 +337,7 @@ struct interface {
 	in_addr_t	int_std_net;	/* class A/B/C network (h) */
 	in_addr_t	int_std_mask;	/* class A/B/C netmask (h) */
 	in_addr_t	int_ripout_addr; /* RIP pkts sent to this addr */
-	int		int_if_flags;	/* some bits copied from kernel */
+	uint64_t	int_if_flags;	/* some bits copied from kernel */
 	uint32_t	int_state;
 	time_t		int_act_time;	/* last thought healthy (IS_REMOTE) */
 	time_t		int_query_time;	/* last query (IS_REMOTE) */
@@ -777,7 +777,7 @@ extern in_addr_t ripv1_mask_host(in_addr_t, const struct interface *);
 extern boolean_t check_dst(in_addr_t);
 extern boolean_t remote_address_ok(struct interface *, in_addr_t);
 extern struct interface *check_dup(const char *, in_addr_t, in_addr_t,
-    in_addr_t, int, boolean_t);
+    in_addr_t, uint64_t, boolean_t);
 extern boolean_t check_remote(struct interface *);
 extern void iftbl_alloc(void);
 extern void ifscan(void);

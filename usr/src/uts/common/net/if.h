@@ -153,14 +153,14 @@ struct ifnet {
  * The IFF_XRESOLV flag is an evolving interface and is subject
  * to change without notice.
  */
-#define	IFF_XRESOLV	0x0100000000	/* IPv6 external resolver */
-#define	IFF_COS_ENABLED	0x0200000000	/* If interface supports CoS marking */
-#define	IFF_PREFERRED	0x0400000000	/* Prefer as source address */
-#define	IFF_TEMPORARY	0x0800000000	/* RFC3041 */
+#define	IFF_XRESOLV	0x0100000000ll	/* IPv6 external resolver */
+#define	IFF_COS_ENABLED	0x0200000000ll	/* If interface supports CoS marking */
+#define	IFF_PREFERRED	0x0400000000ll	/* Prefer as source address */
+#define	IFF_TEMPORARY	0x0800000000ll	/* RFC3041 */
 
-#define	IFF_FIXEDMTU	0x1000000000	/* MTU manually set with SIOCSLIFMTU */
+#define	IFF_FIXEDMTU	0x1000000000ll	/* MTU manually set with SIOCSLIFMTU */
 
-#define	IFF_VIRTUAL	0x2000000000	/* Does not send or receive packets */
+#define	IFF_VIRTUAL	0x2000000000ll	/* Does not send or receive packets */
 
 /*
  * The IFF_MULTICAST flag indicates that the network can support the
