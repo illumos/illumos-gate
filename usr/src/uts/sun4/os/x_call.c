@@ -40,6 +40,7 @@
 #include <sys/xc_impl.h>
 #include <sys/ivintr.h>
 #include <sys/dmv.h>
+#include <sys/sysmacros.h>
 
 #ifdef DEBUG
 uint_t x_dstat[NCPU][XC_LOOP_EXIT+1];
@@ -74,6 +75,7 @@ uint64_t xc_mondo_time_limit;
 uint64_t xc_func_time_limit;
 
 uint64_t xc_scale = 1;	/* scale used to calculate timeout limits */
+uint64_t xc_mondo_multiplier = 10;
 
 uint_t sendmondo_in_recover;
 
@@ -85,14 +87,43 @@ void	send_one_mondo(int cpuid);
 void	send_mondo_set(cpuset_t set);
 
 /*
+ * Adjust xc_attention timeout if a faster cpu is dynamically added.
+ * Ignore the dynamic removal of a cpu that would lower these timeout
+ * values.
+ */
+static int
+xc_func_timeout_adj(cpu_setup_t what, int cpuid) {
+	uint64_t freq = cpunodes[cpuid].clock_freq;
+
+	switch (what) {
+	case CPU_ON:
+	case CPU_INIT:
+	case CPU_CONFIG:
+	case CPU_CPUPART_IN:
+		if (freq * xc_scale > xc_mondo_time_limit) {
+			xc_mondo_time_limit = freq * xc_scale;
+			xc_func_time_limit = xc_mondo_time_limit *
+			    xc_mondo_multiplier;
+		}
+		break;
+	case CPU_OFF:
+	case CPU_UNCONFIG:
+	case CPU_CPUPART_OUT:
+	default:
+		break;
+	}
+
+	return (0);
+}
+
+/*
  * xc_init - initialize x-call related locks
  */
 void
 xc_init(void)
 {
-#ifdef DEBUG
 	int pix;
-#endif /* DEBUG */
+	uint64_t maxfreq = 0;
 
 	mutex_init(&xc_sys_mutex, NULL, MUTEX_SPIN,
 	    (void *)ipltospl(XCALL_PIL));
@@ -119,14 +150,17 @@ xc_init(void)
 	/*
 	 * Maximum number of loops to wait before timing out in xc_attention.
 	 */
-	xc_mondo_time_limit = cpunodes[CPU->cpu_id].clock_freq * xc_scale;
+	for (pix = 0; pix < NCPU; pix++) {
+		maxfreq = MAX(cpunodes[pix].clock_freq, maxfreq);
+	}
+	xc_mondo_time_limit = maxfreq * xc_scale;
+	register_cpu_setup_func((cpu_setup_func_t *)xc_func_timeout_adj, NULL);
 
 	/*
 	 * Maximum number of loops to wait for a xcall function to be
-	 * executed on the target CPU.  Default to 10 times the value
-	 * of xc_mondo_time_limit.
+	 * executed on the target CPU.
 	 */
-	xc_func_time_limit = xc_mondo_time_limit * 10;
+	xc_func_time_limit = xc_mondo_time_limit * xc_mondo_multiplier;
 }
 
 /*
