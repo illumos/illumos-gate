@@ -33,7 +33,6 @@
 COMMON_STARTLST=""
 
 COMMON_STOPLST="\
-05volmgt \
 27boot.server"
 
 INIT_STOPLST="07snmpdx 07dmi"

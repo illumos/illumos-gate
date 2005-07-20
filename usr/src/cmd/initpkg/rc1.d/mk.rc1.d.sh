@@ -31,7 +31,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-COMMON_STOPLST="05volmgt 27boot.server"
+COMMON_STOPLST="27boot.server"
 
 INIT_STOPLST="07snmpdx 07dmi"
 

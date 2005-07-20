@@ -122,6 +122,8 @@ mutex_t	vold_main_mutex = DEFAULTMUTEX;
 
 bool_t		mount_complete = FALSE;
 
+extern int	umount_all(char *);
+
 void
 main(int argc, char **argv)
 {
@@ -348,6 +350,11 @@ main(int argc, char **argv)
 		debug(5, "main: have to set up root vvnode myself!?\n");
 		db_root();			/* funky but true */
 	}
+
+	/*
+	 * unmount /vol if it was still mounted
+	 */
+	(void) umount_all(vold_root);
 
 	/*
 	 *  Fork vold
@@ -780,7 +787,6 @@ usage(void)
 void
 catch(void)
 {
-	extern int	umount_all(char *);
 	pid_t		parentpid = getpid();
 	pid_t		childpid;
 	int			err;

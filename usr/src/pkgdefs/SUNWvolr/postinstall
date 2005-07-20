@@ -1,4 +1,4 @@
-#!/sbin/sh
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -20,38 +20,34 @@
 #
 # CDDL HEADER END
 #
-#	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
-#	  All Rights Reserved
-
-
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+EXIT=0
 
-STARTLST="16boot.server"
-
-INIT_STARTLST="76snmpdx 77dmi"
-
-INSDIR=${ROOT}/etc/rc3.d
-
-if [ ! -d ${INSDIR} ]
-then
-	mkdir ${INSDIR}
-	eval ${CH}chmod 755 ${INSDIR}
-	eval ${CH}chgrp sys ${INSDIR}
-	eval ${CH}chown root ${INSDIR}
+# check if user has disabled vold through commenting out
+# vold actions
+if [ -f $BASEDIR/etc/vold.conf ]; then
+	egrep "^(eject|insert|notify|remount)" $BASEDIR/etc/vold.conf
+	if [ $? != '0' ]; then
+		exit $EXIT
+	fi
 fi
-for f in ${STARTLST}
-do
-	name=`echo $f | sed -e 's/^..//'`
-	rm -f ${INSDIR}/S$f
-	ln ${ROOT}/etc/init.d/${name} ${INSDIR}/S$f
-done
-for f in ${INIT_STARTLST}
-do
-	name=`echo $f | sed -e 's/^..//'`
-	rm -f ${INSDIR}/S$f
-	ln ${ROOT}/etc/init.d/init.${name} ${INSDIR}/S$f
-done
+
+# check volfs should be enabled (volfs.tmp was set in
+# preinstall)
+if [ -f $BASEDIR/var/volfs.tmp ]; then
+	touch  $BASEDIR/var/svc/profile/upgrade
+	cat >> $BASEDIR/var/svc/profile/upgrade <<\_VOLFS
+if [ `/sbin/zonename` = global ]; then
+	/usr/sbin/svcadm enable svc:/network/rpc/smserver:default 
+	/usr/sbin/svcadm enable svc:/system/filesystem/volfs:default
+fi
+_VOLFS
+	rm -f $BASEDIR/var/volfs.tmp
+fi
+
+exit $EXIT

@@ -38,7 +38,7 @@ COMMON_STARTLST="\
 82mkdtab \
 98deallocate"
 
-STOPLST="05volmgt 27boot.server"
+STOPLST="27boot.server"
 
 INIT_STOPLST="07snmpdx 07dmi"
 

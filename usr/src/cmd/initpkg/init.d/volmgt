@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,12 +31,12 @@ case "$1" in
 	if [ -f /etc/vold.conf -a -f /usr/sbin/vold -a \
 	    "${_INIT_ZONENAME:=`/sbin/zonename`}" = "global" ]; then
 		echo 'volume management starting.'
-		/usr/sbin/vold >/dev/msglog 2>&1 &
+		svcadm enable svc:/system/filesystem/volfs:default
 	fi
 	;;
 
 'stop')
-	/usr/bin/pkill -x -u 0 -z ${_INIT_ZONENAME:=`/sbin/zonename`} vold
+	svcadm disable svc:/system/filesystem/volfs:default
 	;;
 
 *)

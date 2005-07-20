@@ -109,6 +109,9 @@
   <service name='system/filesystem/autofs' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>
+  <service name='system/filesystem/volfs' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
   <service name='system/power' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>

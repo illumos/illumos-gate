@@ -88,31 +88,22 @@ bsmunconvert()
 /usr/sbin/deallocate -Is
 /usr/sbin/devfsadm -d
 
-# let svcadm know that auditd shouldn't run
-/usr/sbin/svcadm disable system/auditd
+# disable auditd service
+/usr/sbin/svcadm disable system/auditd 
 
-# restore volume manager init file moved aside by bsmconv to prevent
-# running volume manager when bsm is enabled
-#
-# find where volmgt should be restored to
-name=`/usr/sbin/pkgchk -R ${ROOT}/ -l SUNWvolr | nawk -F ': ' '/S[0-9][0-9]volmgt/ {print $2}'`
-
-if [ -n "$name" ]
-then
-	if [ ! -f ${ROOT}${name} ]
-	then
-		form=`gettext "%s: INFO: restore %s%s."`
-		printf "${form}\n" $PROG $ROOT $name
-		if [ -r ${ROOT}/etc/security/spool/`basename ${name}` ]
-		then
-			mv ${ROOT}/etc/security/spool/`basename ${name}` \
-			    ${ROOT}${name}
-		else
-			form=`gettext "%s: INFO: unable to restore file %s%s."`
-			printf "${form}\n" $PROG $ROOT $name
-		fi
+# restore volume manager startup on next boot using the
+# previous state saved by bsmconv.sh
+state="enable"
+if [ -f ${ROOT}/etc/security/spool/vold.state ]; then 
+	prev_state=`cat ${ROOT}/etc/security/spool/vold.state`
+	if [ ${prev_state} != "online" ]; then
+		state="disable"
 	fi
 fi
+touch  ${ROOT}/var/svc/profile/upgrade
+cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
+svcadm ${state} svc:/system/filesystem/volfs:default
+SVC_UPGRADE
 
 # Turn off auditing in the loadable module
 

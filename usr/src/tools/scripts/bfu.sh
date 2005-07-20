@@ -841,6 +841,7 @@ smf_obsolete_rc_files="
 	etc/rc0.d/K00ANNOUNCE
 	etc/rc0.d/K01zones
 	etc/rc0.d/K03sshd
+	etc/rc0.d/K05volmgt
 	etc/rc0.d/K10rcapd
 	etc/rc0.d/K21dhcp
 	etc/rc0.d/K28kdc
@@ -871,6 +872,7 @@ smf_obsolete_rc_files="
 	etc/rc1.d/K00ANNOUNCE
 	etc/rc1.d/K01zones
 	etc/rc1.d/K03sshd
+	etc/rc1.d/K05volmgt
 	etc/rc1.d/K10rcapd
 	etc/rc1.d/K21dhcp
 	etc/rc1.d/K28kdc
@@ -897,6 +899,7 @@ smf_obsolete_rc_files="
 	etc/rc1.d/S01MOUNTFSYS
 	etc/rc2.d/K01zones
 	etc/rc2.d/K03sshd
+	etc/rc2.d/K05volmgt
 	etc/rc2.d/K21dhcp
 	etc/rc2.d/K28kdc
 	etc/rc2.d/K28kdc.master
@@ -934,10 +937,12 @@ smf_obsolete_rc_files="
 	etc/rc3.d/S14kdc
 	etc/rc3.d/S15nfs.server
 	etc/rc3.d/S34dhcp
+	etc/rc3.d/S81volmgt
 	etc/rc3.d/S89sshd
 	etc/rc3.d/S99zones
 	etc/rcS.d/K01zones
 	etc/rcS.d/K03sshd
+	etc/rcS.d/K05volmgt
 	etc/rcS.d/K10rcapd
 	etc/rcS.d/K21dhcp
 	etc/rcS.d/K28kdc
@@ -1044,6 +1049,11 @@ smf_handle_new_services () {
 	if [[ $zone = global &&
             ! -f $rootprefix/var/svc/manifest/system/intrd.xml ]]; then
 		echo /usr/sbin/svcadm enable system/intrd >> \
+		    $rootprefix/var/svc/profile/upgrade
+	fi
+	if [[ $zone = global &&
+	    ! -f $rootprefix/var/svc/profile/system/filesystem/volfs.xml ]]; then
+		echo /usr/sbin/svcadm enable system/filesystem/volfs >> \
 		    $rootprefix/var/svc/profile/upgrade
 	fi
 }

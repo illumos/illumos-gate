@@ -111,38 +111,16 @@ then
 	printf "${form}\n" $PROG
 fi
 
-# move aside volume manager init file to prevent
-# running volume manager when bsm is enabled
-#
-# find where volmgt is installed
-#
-name=`/usr/sbin/pkgchk -R ${ROOT}/ -l SUNWvolr | nawk -F ': ' '/S[0-9][0-9]volmgt/ {print $2}'`
+# Disable volume manager from running on reboot.
+touch ${ROOT}/var/svc/profile/upgrade
+cat >> ${ROOT}/var/svc/profile/upgrade <<SVC_UPGRADE
+svcadm disable svc:/system/filesystem/volfs:default
+SVC_UPGRADE
 
-if [ -n "$name" ]
-then
-  if [ -f ${ROOT}${name} ]
-  then
-    if [ -r ${ROOT}${name} ]
-    then
-      form=`gettext "%s: INFO: move aside %s%s."`
-      printf "${form}\n" $PROG $ROOT $name
-      if [ ! -d ${ROOT}/etc/security/spool ]
-      then
-	mkdir ${ROOT}/etc/security/spool
-	if [ $? != 0 ]
-	then
-	  form=`gettext "%s: ERROR: unable to create %s/etc/security/spool"`
-	  printf "${form}\n" $PROG $ROOT
-	  exit 5
-	fi
-      fi
-    fi
-    mv ${ROOT}${name} ${ROOT}/etc/security/spool
-  else
-    form=`gettext "%s: WARNING: %s does not exist"`
-    printf "${form}\n" $PROG ${ROOT}${name}
-  fi
-fi
+# store the current state of volfs service for restoring later
+# in bsmunconv.sh
+svcs -o state -H svc:/system/filesystem/volfs:default > \
+			${ROOT}/etc/security/spool/vold.state
 
 # Turn on auditing in the loadable module
 
