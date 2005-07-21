@@ -35,7 +35,9 @@
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
+#if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
 #include <sys/auxv.h>
+#endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
 
 #ifdef	__cplusplus
 extern "C" {

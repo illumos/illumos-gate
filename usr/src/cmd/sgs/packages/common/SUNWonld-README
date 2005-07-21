@@ -1480,3 +1480,14 @@ All the above change is incorporated in the following patches:
 6284941 excessive link times with many groups/sections
 6280467 dlclose() unmaps shared library before library's _fini() has finished
 6291547 ld.so mishandles LD_AUDIT causing security problems.
+--------------------------------------------------------------------------------
+All the above change is incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T117462-04
+    Solaris/SunOS 5.10_x86	patch T118345-04
+    Solaris/SunOS 5.9_sparc	patch T112963-22
+    Solaris/SunOS 5.9_x86	patch T113986-18
+    Solaris/SunOS 5.8_sparc	patch T109147-37
+    Solaris/SunOS 5.8_x86	patch T109148-37
+--------------------------------------------------------------------------------
+6295971 UNIX98/UNIX03 *vsx* DYNL.hdr/misc/dlfcn/T.dlfcn 14 fails, auxv.h syntax
+	error
