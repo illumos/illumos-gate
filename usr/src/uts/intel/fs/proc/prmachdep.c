@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -425,11 +425,11 @@ prstop(int why, int what)
 	struct regs *r = lwptoregs(lwp);
 
 	/*
-	 * Make sure we don't deadlock on a recursive call
-	 * to prstop().  stop() tests the lwp_nostop flag.
+	 * Make sure we don't deadlock on a recursive call to prstop().
+	 * stop() tests the lwp_nostop_r and lwp_nostop flags.
 	 */
-	ASSERT(lwp->lwp_nostop == 0);
-	lwp->lwp_nostop = 1;
+	lwp->lwp_nostop_r++;
+	lwp->lwp_nostop++;
 
 	if (copyin_nowatch((caddr_t)r->r_pc, &lwp->lwp_pcb.pcb_instr,
 		    sizeof (lwp->lwp_pcb.pcb_instr)) == 0)
@@ -440,8 +440,8 @@ prstop(int why, int what)
 	}
 
 	(void) save_syscall_args();
-	ASSERT(lwp->lwp_nostop == 1);
-	lwp->lwp_nostop = 0;
+	lwp->lwp_nostop--;
+	lwp->lwp_nostop_r--;
 }
 
 /*

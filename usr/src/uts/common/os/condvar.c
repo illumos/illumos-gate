@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -555,45 +555,49 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
 	(void) untimeout(id);
 
 	/*
-	 * Check for reasons to stop, if lwp_nostop is not true.
+	 * Check for reasons to stop, and stop if lwp_nostop is zero.
 	 * See issig_forreal() for explanations of the various stops.
+	 * Like issig_forreal(), we allow a PR_SUSPENDED/SUSPEND_NORMAL
+	 * to occur even if lwp_nostop is set.
 	 */
 	mutex_enter(&p->p_lock);
-	while (lwp->lwp_nostop == 0 && !(p->p_flag & SEXITLWPS)) {
+	while (!(p->p_flag & SEXITLWPS)) {
 		/*
 		 * Hold the lwp here for watchpoint manipulation.
 		 */
-		if (t->t_proc_flag & TP_PAUSE) {
+		if ((t->t_proc_flag & TP_PAUSE) && !lwp->lwp_nostop) {
 			stop(PR_SUSPENDED, SUSPEND_PAUSE);
 			continue;
 		}
 		/*
 		 * System checkpoint.
 		 */
-		if (t->t_proc_flag & TP_CHKPT) {
+		if ((t->t_proc_flag & TP_CHKPT) && !lwp->lwp_nostop) {
 			stop(PR_CHECKPOINT, 0);
 			continue;
 		}
 		/*
 		 * Honor fork1(), watchpoint activity (remapping a page),
-		 * and lwp_suspend() requests.
+		 * and lwp_suspend() regardless of whether lwp_nostop is
+		 * set but not if lwp_nostop_r is set (to avoid a recursive
+		 * call to prstop()).
 		 */
-		if ((p->p_flag & (SHOLDFORK1|SHOLDWATCH)) ||
-		    (t->t_proc_flag & TP_HOLDLWP)) {
+		if (((p->p_flag & (SHOLDFORK1|SHOLDWATCH)) ||
+		    (t->t_proc_flag & TP_HOLDLWP)) && !lwp->lwp_nostop_r) {
 			stop(PR_SUSPENDED, SUSPEND_NORMAL);
 			continue;
 		}
 		/*
 		 * Honor /proc requested stop.
 		 */
-		if (t->t_proc_flag & TP_PRSTOP) {
+		if ((t->t_proc_flag & TP_PRSTOP) && !lwp->lwp_nostop) {
 			stop(PR_REQUESTED, 0);
 		}
 		/*
 		 * If some lwp in the process has already stopped
 		 * showing PR_JOBCONTROL, stop in sympathy with it.
 		 */
-		if (p->p_stopsig && t != p->p_agenttp) {
+		if (p->p_stopsig && !lwp->lwp_nostop && (t != p->p_agenttp)) {
 			stop(PR_JOBCONTROL, p->p_stopsig);
 			continue;
 		}

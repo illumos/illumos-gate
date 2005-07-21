@@ -878,8 +878,10 @@ retry:
 		 * for a pagefault.  This is to avoid deadlock while debugging
 		 * a process via /proc over NFS (in particular).
 		 */
-		if (lwp != NULL)
+		if (lwp != NULL) {
 			lwp->lwp_nostop++;
+			lwp->lwp_nostop_r++;
+		}
 
 		/*
 		 * same length must be used when we softlock and softunlock.
@@ -957,8 +959,10 @@ retry:
 		seg = as_segat(as, raddr);
 		if (seg == NULL) {
 			AS_LOCK_EXIT(as, &as->a_lock);
-			if ((lwp != NULL) && (!is_xhat))
+			if ((lwp != NULL) && (!is_xhat)) {
 				lwp->lwp_nostop--;
+				lwp->lwp_nostop_r--;
+			}
 			return (FC_NOMAP);
 		}
 
@@ -1038,8 +1042,10 @@ retry:
 	}
 	if (as_lock_held)
 		AS_LOCK_EXIT(as, &as->a_lock);
-	if ((lwp != NULL) && (!is_xhat))
+	if ((lwp != NULL) && (!is_xhat)) {
 		lwp->lwp_nostop--;
+		lwp->lwp_nostop_r--;
+	}
 	/*
 	 * If the lower levels returned EDEADLK for a fault,
 	 * It means that we should retry the fault.  Let's wait
@@ -1077,8 +1083,10 @@ retry:
 	 * for a pagefault.  This is to avoid deadlock while debugging
 	 * a process via /proc over NFS (in particular).
 	 */
-	if (lwp != NULL)
+	if (lwp != NULL) {
 		lwp->lwp_nostop++;
+		lwp->lwp_nostop_r++;
+	}
 
 	raddr = (caddr_t)((uintptr_t)addr & (uintptr_t)PAGEMASK);
 	rsize = (((size_t)(addr + size) + PAGEOFFSET) & PAGEMASK) -
@@ -1088,8 +1096,10 @@ retry:
 	seg = as_segat(as, raddr);
 	if (seg == NULL) {
 		AS_LOCK_EXIT(as, &as->a_lock);
-		if (lwp != NULL)
+		if (lwp != NULL) {
 			lwp->lwp_nostop--;
+			lwp->lwp_nostop_r--;
+		}
 		return (FC_NOMAP);
 	}
 
@@ -1106,8 +1116,10 @@ retry:
 			break;
 	}
 	AS_LOCK_EXIT(as, &as->a_lock);
-	if (lwp != NULL)
+	if (lwp != NULL) {
 		lwp->lwp_nostop--;
+		lwp->lwp_nostop_r--;
+	}
 	/*
 	 * If the lower levels returned EDEADLK for a fault,
 	 * It means that we should retry the fault.  Let's wait

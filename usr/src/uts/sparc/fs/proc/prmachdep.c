@@ -880,11 +880,11 @@ prstop(int why, int what)
 	extern void fp_prsave(kfpu_t *);
 
 	/*
-	 * Make sure we don't deadlock on a recursive call
-	 * to prstop().  stop() tests the lwp_nostop flag.
+	 * Make sure we don't deadlock on a recursive call to prstop().
+	 * stop() tests the lwp_nostop_r and lwp_nostop flags.
 	 */
-	ASSERT(lwp->lwp_nostop == 0);
-	lwp->lwp_nostop = 1;
+	lwp->lwp_nostop_r++;
+	lwp->lwp_nostop++;
 	(void) flush_user_windows_to_stack(NULL);
 	if (lwp->lwp_pcb.pcb_step != STEP_NONE)
 		(void) prundostep();
@@ -967,8 +967,8 @@ prstop(int why, int what)
 	}
 
 	(void) save_syscall_args();
-	ASSERT(lwp->lwp_nostop == 1);
-	lwp->lwp_nostop = 0;
+	lwp->lwp_nostop--;
+	lwp->lwp_nostop_r--;
 }
 
 /*

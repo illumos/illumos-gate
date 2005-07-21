@@ -436,10 +436,10 @@ issig_justlooking(void)
 
 	if ((lwp->lwp_asleep && MUSTRETURN(p, t)) ||
 	    (p->p_flag & (SEXITLWPS|SKILLED)) ||
-	    (lwp->lwp_nostop == 0 &&
-	    (p->p_stopsig | (p->p_flag & (SHOLDFORK1|SHOLDWATCH)) |
-	    (t->t_proc_flag &
-	    (TP_PRSTOP|TP_HOLDLWP|TP_CHKPT|TP_PAUSE)))) ||
+	    (!lwp->lwp_nostop_r && ((p->p_flag & (SHOLDFORK1|SHOLDWATCH)) |
+		(t->t_proc_flag & TP_HOLDLWP))) ||
+	    (!lwp->lwp_nostop && (p->p_stopsig | (t->t_proc_flag &
+		(TP_PRSTOP|TP_CHKPT|TP_PAUSE)))) ||
 	    lwp->lwp_cursig)
 		return (1);
 
@@ -577,9 +577,15 @@ issig_forreal(void)
 		 * or is executing lwp_suspend() on this lwp.
 		 * Again, go back to top of loop to check if an exit
 		 * or hold event has occurred while stopped.
+		 * We explicitly allow this form of stopping of one
+		 * lwp in a process by another lwp in the same process,
+		 * even if lwp->lwp_nostop is set, because otherwise a
+		 * process can become deadlocked on a fork1().
+		 * Allow this only if lwp_nostop_r is not set,
+		 * to avoid a recursive call to prstop().
 		 */
 		if (((p->p_flag & (SHOLDFORK1|SHOLDWATCH)) ||
-		    (t->t_proc_flag & TP_HOLDLWP)) && !lwp->lwp_nostop) {
+		    (t->t_proc_flag & TP_HOLDLWP)) && !lwp->lwp_nostop_r) {
 			stop(PR_SUSPENDED, SUSPEND_NORMAL);
 			continue;
 		}
@@ -845,9 +851,11 @@ stop(int why, int what)
 
 	/*
 	 * Make sure we don't deadlock on a recursive call to prstop().
-	 * prstop() sets the lwp_nostop flag.
+	 * prstop() sets the lwp_nostop_r flag and increments lwp_nostop.
 	 */
-	if (lwp->lwp_nostop)
+	if (lwp->lwp_nostop_r ||
+	    (lwp->lwp_nostop &&
+	    (why != PR_SUSPENDED || what != SUSPEND_NORMAL)))
 		return;
 
 	/*
