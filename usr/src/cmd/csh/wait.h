@@ -1,6 +1,9 @@
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
  *
  *	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
  *	  All Rights Reserved
@@ -22,9 +25,9 @@
  */
 
 #ifndef _sys_wait_h
-#define _sys_wait_h
+#define	_sys_wait_h
 
-#include <sys/isa_defs.h>	/* included for _LITTLE_ENDIAN define */
+#include <sys/isa_defs.h>	/* included for _LITTLE_ENDIAN define	*/
 
 /*
  * Structure of the information in the first word returned by both
@@ -69,14 +72,14 @@ union wait	{
 	} w_S;
 };
 #define	w_termsig	w_T.w_Termsig
-#define w_coredump	w_T.w_Coredump
-#define w_retcode	w_T.w_Retcode
-#define w_stopval	w_S.w_Stopval
-#define w_stopsig	w_S.w_Stopsig
+#define	w_coredump	w_T.w_Coredump
+#define	w_retcode	w_T.w_Retcode
+#define	w_stopval	w_S.w_Stopval
+#define	w_stopsig	w_S.w_Stopsig
 
 
 #define	WSTOPPED	0177	/* value of s.stopval if process is stopped */
-#define	WCONTFLG	0177777 /* value of w.w_status due to SIGCONT, sysV */
+#define	WCONTFLG	0177777	/* value of w.w_status due to SIGCONT, sysV */
 
 /*
  * Option bits for the second argument of wait3.  WNOHANG causes the
@@ -87,24 +90,14 @@ union wait	{
  * this option is done, it is as though they were still running... nothing
  * about them is returned.
  */
-#define WNOHANG		1	/* dont hang in wait */
-#define WUNTRACED	2	/* tell about stopped, untraced children */
+#define	WNOHANG		1	/* dont hang in wait */
+#define	WUNTRACED	2	/* tell about stopped, untraced children */
 
-#define WIFSTOPPED(x)	((x).w_stopval == WSTOPPED)
-#define WIFSIGNALED(x)	((x).w_stopval != WSTOPPED && (x).w_termsig != 0)
-#define WIFEXITED(x)	((x).w_stopval != WSTOPPED && (x).w_termsig == 0)
+#define	WIFSTOPPED(x)	((x).w_stopval == WSTOPPED)
+#define	WIFSIGNALED(x)	((x).w_stopval != WSTOPPED && (x).w_termsig != 0)
+#define	WIFEXITED(x)	((x).w_stopval != WSTOPPED && (x).w_termsig == 0)
 
-#ifdef KERNEL
-/* 
- * Arguments to wait4() system call, included here so it may be called by
- * other routines in the kernel 
- */
-struct wait4_args {
-	int pid;
-	union wait *status;
-	int options;
-	struct rusage *rusage;
-};
-#endif KERNEL
+extern pid_t csh_wait3(union wait *w, int options, struct rusage *rp);
+extern pid_t csh_wait_noreap(void);
 
-#endif /*!_sys_wait_h*/
+#endif /* _sys_wait_h */

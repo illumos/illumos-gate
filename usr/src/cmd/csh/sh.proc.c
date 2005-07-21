@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,7 +230,29 @@ pjwait(pp)
 		while ((fp = (fp->p_friends)) != pp);
 		if ((jobflags & PRUNNING) == 0)
 			break;
-		sigpause(sigblock(0) &~ sigmask(SIGCHLD));
+		/*
+		 * At this point, csh used to call:
+		 *	sigpause(sigblock(0) &~ sigmask(SIGCHLD));
+		 * expecting to receive a SIGCHLD signal from the
+		 * termination of the child and to invoke the
+		 * signal handler, pchild(), as a result.
+		 *
+		 * However, vfork() now causes a vfork()'d child to
+		 * have all of its active signal handlers reset to
+		 * SIG_DFL, to forstall parent memory corruption due
+		 * to race conditions with signal handling.
+		 *
+		 * If this instance of csh is itself a child of vfork(),
+		 * which can happen when the top-level csh performs a
+		 * command substitution inside an i/o redirection, like:
+		 *	/bin/echo foo >`/bin/echo trash`
+		 * then we will never receive SIGCHLD.  To accommodate
+		 * this, we wait until one of our children terminates
+		 * (without actually reaping the child) and call the
+		 * SIGCHLD signal handler (pchild()) directly.
+		 */
+		if (csh_wait_noreap() > 0)
+			pchild();	/* simulate receipt of SIGCHLD */
 	}
 	(void) sigsetmask(omask);
 	if (tpgrp > 0)			/* get tty back */
