@@ -207,7 +207,8 @@ static void	foreachinterface(void (*func)(), int argc, char *argv[],
 		    int64_t lifc_flags);
 static void	ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp);
 static int	ifdad(char *ifname, struct sockaddr_in6 *laddr);
-static boolean_t	in_getmask(struct sockaddr_in *saddr);
+static boolean_t	in_getmask(struct sockaddr_in *saddr,
+			    boolean_t addr_set);
 static int	in_getprefixlen(char *addr, boolean_t slash, int plen);
 static boolean_t	in_prefixlentomask(int prefixlen, int maxlen,
 			    uchar_t *mask);
@@ -245,7 +246,8 @@ static int	updownifs(iface_t *ifs, int up);
 /* Refer to the comments in ifconfig() on the netmask "hack" */
 #define	NETMASK_CMD	"netmask"
 struct sockaddr_storage	g_netmask;
-boolean_t		g_netmask_set = _B_FALSE;
+enum { G_NETMASK_NIL, G_NETMASK_PENDING, G_NETMASK_SET }
+    g_netmask_set = G_NETMASK_NIL;
 
 struct	cmd {
 	char		*c_name;
@@ -797,6 +799,14 @@ ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp)
 	 * address.  This does not provide an extensible way to accommodate
 	 * future need for setting more than one attributes together.
 	 *
+	 * Note that if the "netmask" command argument is a "+", we need
+	 * to save this info and do the query after we know the address to
+	 * be set.  The reason is that if "addif" is used, the working
+	 * interface name will be changed later when the logical interface
+	 * is created.  In in_getmask(), if an address is not provided,
+	 * it will use the working interface's address to do the query.
+	 * It will be wrong now as we don't know the logical interface's name.
+	 *
 	 * ifconfig(1M) is too overloaded and the code is so convoluted
 	 * that it is "safer" not to re-architect the code to fix the above
 	 * issue, hence this "hack."  We may be better off to have a new
@@ -821,14 +831,11 @@ ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp)
 					break;
 				largv++;
 				if (strcmp(*largv, "+") == 0) {
-					if (in_getmask((struct sockaddr_in *)
-					    &g_netmask)) {
-						g_netmask_set = _B_TRUE;
-					}
+					g_netmask_set = G_NETMASK_PENDING;
 				} else {
 					in_getaddr(*largv, (struct sockaddr *)
 					    &g_netmask, NULL);
-					g_netmask_set = _B_TRUE;
+					g_netmask_set = G_NETMASK_SET;
 				}
 				/* Continue the scan. */
 			}
@@ -944,6 +951,46 @@ setverboseflag(char *val, int64_t arg)
 }
 
 /*
+ * This function fills in the given lifreq's lifr_addr field based on
+ * g_netmask_set.
+ */
+static void
+set_mask_lifreq(struct lifreq *lifr, struct sockaddr_storage *addr,
+    struct sockaddr_storage *mask)
+{
+	assert(addr != NULL);
+	assert(mask != NULL);
+
+	switch (g_netmask_set) {
+	case G_NETMASK_SET:
+		lifr->lifr_addr = g_netmask;
+		break;
+
+	case G_NETMASK_PENDING:
+		/*
+		 * "+" is used as the argument to "netmask" command.  Query
+		 * the database on the correct netmask based on the address to
+		 * be set.
+		 */
+		assert(afp->af_af == AF_INET);
+		g_netmask = *addr;
+		if (!in_getmask((struct sockaddr_in *)&g_netmask, _B_TRUE)) {
+			lifr->lifr_addr = *mask;
+			g_netmask_set = G_NETMASK_NIL;
+		} else {
+			lifr->lifr_addr = g_netmask;
+			g_netmask_set = G_NETMASK_SET;
+		}
+		break;
+
+	case G_NETMASK_NIL:
+	default:
+		lifr->lifr_addr = *mask;
+		break;
+	}
+}
+
+/*
  * Set the interface address. Handles <addr>, <addr>/<n> as well as /<n>
  * syntax for setting the address, the address plus netmask, and just
  * the netmask respectively.
@@ -998,7 +1045,7 @@ setifaddr(char *addr, int64_t param)
 		 * Just in case of funny setting of both prefix and netmask,
 		 * prefix should override the netmask command.
 		 */
-		g_netmask_set = _B_FALSE;
+		g_netmask_set = G_NETMASK_NIL;
 		break;
 	}
 	/* Tell parser that an address was set */
@@ -1035,7 +1082,7 @@ setifaddr(char *addr, int64_t param)
 	 * using the netmask command), set the mask first, so the address will
 	 * be interpreted correctly.
 	 */
-	lifr.lifr_addr = g_netmask_set ? g_netmask : netmask;
+	set_mask_lifreq(&lifr, &laddr, &netmask);
 	if (ioctl(s, SIOCSLIFNETMASK, (caddr_t)&lifr) < 0)
 		Perror0_exit("SIOCSLIFNETMASK");
 
@@ -1348,8 +1395,10 @@ setifnetmask(char *addr, int64_t param)
 	assert(afp->af_af != AF_INET6);
 
 	if (strcmp(addr, "+") == 0) {
-		if (in_getmask(&netmask) == 0)
+		if (!in_getmask(&netmask, _B_FALSE))
 			return (0);
+		(void) printf("Setting netmask of %s to %s\n", name,
+		    inet_ntoa(netmask.sin_addr));
 	} else {
 		in_getaddr(addr, (struct sockaddr *)&netmask, NULL);
 	}
@@ -1880,12 +1929,20 @@ addif(char *str, int64_t param)
 				exit(1);
 			}
 		}
+		g_netmask_set = G_NETMASK_NIL;
 		break;
 	}
 
-	/* Set the address and then the mask (if there was one) */
+	/*
+	 * This is a "hack" to get around the problem of SIOCLIFADDIF.  The
+	 * problem is that this ioctl does not include the netmask when
+	 * adding a logical interface.  This is the same problem described
+	 * in the ifconfig() comments.  To get around this problem, we first
+	 * add the logical interface with a 0 address.  After that, we set
+	 * the netmask if provided.  Finally we set the interface address.
+	 */
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-	lifr.lifr_addr = laddr;
+	(void) memset(&lifr.lifr_addr, 0, sizeof (lifr.lifr_addr));
 
 	/* Note: no need to do DAD here since the interface isn't up yet. */
 
@@ -1896,12 +1953,25 @@ addif(char *str, int64_t param)
 	    lifr.lifr_name);
 	(void) strncpy(name, lifr.lifr_name, sizeof (name));
 
-	if (prefixlen >= 0) {
-		(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-		lifr.lifr_addr = mask;
+	/*
+	 * Check and see if any "netmask" command is used and perform the
+	 * necessary operation.
+	 */
+	set_mask_lifreq(&lifr, &laddr, &mask);
+	/*
+	 * Only set the netmask if "netmask" command is used or a prefix is
+	 * provided.
+	 */
+	if (g_netmask_set == G_NETMASK_SET || prefixlen >= 0) {
 		if (ioctl(s, SIOCSLIFNETMASK, (caddr_t)&lifr) < 0)
 			Perror0_exit("addif: SIOCSLIFNETMASK");
 	}
+
+	/* Finally, we set the interface address. */
+	lifr.lifr_addr = laddr;
+	if (ioctl(s, SIOCSLIFADDR, (caddr_t)&lifr) < 0)
+		Perror0_exit("SIOCSLIFADDR");
+
 	/*
 	 * let parser know we got a source.
 	 * Next address, if given, should be dest
@@ -4408,28 +4478,37 @@ print_config_flags(uint64_t flags)
 }
 
 /*
- * Look in the NIS for the network mask.
- * returns true if we found one to set.
+ * Use the configured directory lookup mechanism (e.g. files/NIS/NIS+/...)
+ * to find the network mask.  Returns true if we found one to set.
+ *
+ * The parameter addr_set controls whether we should get the address of
+ * the working interface for the netmask query.  If addr_set is true,
+ * we will use the address provided.  Otherwise, we will find the working
+ * interface's address and use it instead.
  */
 static boolean_t
-in_getmask(struct sockaddr_in *saddr)
+in_getmask(struct sockaddr_in *saddr, boolean_t addr_set)
 {
 	struct sockaddr_in ifaddr;
 
 	/*
-	 * Read the address from the interface
+	 * Read the address from the interface if it is not passed in.
 	 */
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-	if (ioctl(s, SIOCGLIFADDR, (caddr_t)&lifr) < 0) {
-		if (errno != EADDRNOTAVAIL)
-			(void) fprintf(stderr, "Need net number for mask\n");
-		return (_B_FALSE);
+	if (!addr_set) {
+		(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
+		if (ioctl(s, SIOCGLIFADDR, (caddr_t)&lifr) < 0) {
+			if (errno != EADDRNOTAVAIL) {
+				(void) fprintf(stderr, "Need net number for "
+				    "mask\n");
+			}
+			return (_B_FALSE);
+		}
+		ifaddr = *((struct sockaddr_in *)&lifr.lifr_addr);
+	} else {
+		ifaddr.sin_addr = saddr->sin_addr;
 	}
-	ifaddr = *((struct sockaddr_in *)&lifr.lifr_addr);
 	if (getnetmaskbyaddr(ifaddr.sin_addr, &saddr->sin_addr) == 0) {
 		saddr->sin_family = AF_INET;
-		(void) printf("Setting netmask of %s to %s\n", name,
-		    inet_ntoa(saddr->sin_addr));
 		return (_B_TRUE);
 	}
 	return (_B_FALSE);
