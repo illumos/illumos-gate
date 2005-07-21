@@ -187,6 +187,8 @@ $(ASSYM_H): $(OFFSETS) $(GENASSYM)
 	    $(CC) $(CFLAGS) $(GOFLAGS) <$(OFFSETS) >$@
 	./$(GENASSYM) >>$@
 
+$(START_OBJS):	$(ASSYM_H)
+
 include $(BOOTSRCDIR)/Makefile.rules
 
 clean:
