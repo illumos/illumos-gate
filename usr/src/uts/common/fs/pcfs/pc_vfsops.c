@@ -74,7 +74,7 @@
  */
 #define	PC_SAFESECSIZE	(PC_SECSIZE * 2)
 
-static int pcfs_psuedo_floppy(dev_t);
+static int pcfs_pseudo_floppy(dev_t);
 
 static int pcfsinit(int, char *);
 static int pcfs_mount(struct vfs *, struct vnode *, struct mounta *,
@@ -148,7 +148,7 @@ extern struct mod_ops mod_fsops;
 
 static struct modlfs modlfs = {
 	&mod_fsops,
-	"filesystem for PC",
+	"PC filesystem v%I%",
 	&vfw
 };
 
@@ -507,9 +507,9 @@ pcfs_mount(
 
 	/*
 	 * special handling for PCMCIA memory card
-	 * with psuedo floppies organization
+	 * with pseudo floppies organization
 	 */
-	if (dos_ldrive == 0 && pcfs_psuedo_floppy(xdev)) {
+	if (dos_ldrive == 0 && pcfs_pseudo_floppy(xdev)) {
 		dosstart = (daddr_t)0;
 		fattype = PCFS_PCMCIA_NO_CIS;
 	} else {
@@ -1484,7 +1484,7 @@ pc_getfat(struct pcfs *fsp)
 
 	case MD_FIXED:
 		/*
-		 * PCMCIA psuedo floppy is type MD_FIXED,
+		 * PCMCIA pseudo floppy is type MD_FIXED,
 		 * but is accessed like a floppy
 		 */
 		if (!(fsp->pcfs_flags & PCFS_PCMCIA_NO_CIS)) {
@@ -1900,11 +1900,11 @@ pcfs_vget(struct vfs *vfsp, struct vnode **vpp, struct fid *fidp)
 }
 
 /*
- * if device is a PCMCIA psuedo floppy, return 1
+ * if device is a PCMCIA pseudo floppy, return 1
  * otherwise, return 0
  */
 static int
-pcfs_psuedo_floppy(dev_t rdev)
+pcfs_pseudo_floppy(dev_t rdev)
 {
 	int			error, err;
 	struct dk_cinfo		info;
@@ -1914,7 +1914,7 @@ pcfs_psuedo_floppy(dev_t rdev)
 	err = ldi_ident_from_mod(&modlinkage, &li);
 	if (err) {
 		PC_DPRINTF1(1,
-		    "pcfs_psuedo_floppy: ldi_ident_from_mod err=%d\n", err);
+		    "pcfs_pseudo_floppy: ldi_ident_from_mod err=%d\n", err);
 		return (0);
 	}
 
@@ -1922,7 +1922,7 @@ pcfs_psuedo_floppy(dev_t rdev)
 	ldi_ident_release(li);
 	if (err) {
 		PC_DPRINTF1(1,
-		    "pcfs_psuedo_floppy: ldi_open err=%d\n", err);
+		    "pcfs_pseudo_floppy: ldi_open err=%d\n", err);
 		return (0);
 	}
 
@@ -1933,7 +1933,7 @@ pcfs_psuedo_floppy(dev_t rdev)
 	err = ldi_close(lh, FREAD, CRED());
 	if (err != 0) {
 		PC_DPRINTF1(1,
-		    "pcfs_psuedo_floppy: ldi_close err=%d\n", err);
+		    "pcfs_pseudo_floppy: ldi_close err=%d\n", err);
 		return (0);
 	}
 
