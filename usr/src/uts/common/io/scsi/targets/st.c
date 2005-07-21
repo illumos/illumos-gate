@@ -3322,8 +3322,16 @@ st_strategy(struct buf *bp)
 	/*
 	 * We will replace bp with a new bp that can do big blk xfer
 	 * if the requested xfer size is bigger than ST_BIGBLK_XFER
+	 *
+	 * Also, we need to make sure that we're handling real I/O
+	 * by checking group 0/1 SCSI I/O commands, if needed
 	 */
-	if (bp->b_bcount > ST_BIGBLK_XFER) {
+	if (bp->b_bcount > ST_BIGBLK_XFER &&
+	    (bp != un->un_sbufp					||
+	    (uchar_t)(uintptr_t)bp->b_forw == SCMD_READ		||
+	    (uchar_t)(uintptr_t)bp->b_forw == SCMD_READ_G1	||
+	    (uchar_t)(uintptr_t)bp->b_forw == SCMD_WRITE	||
+	    (uchar_t)(uintptr_t)bp->b_forw == SCMD_WRITE_G1)) {
 		mutex_exit(ST_MUTEX);
 		bp = st_get_bigblk_bp(bp);
 		mutex_enter(ST_MUTEX);
