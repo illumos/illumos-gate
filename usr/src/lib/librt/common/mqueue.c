@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,17 @@
 #include "pos4obj.h"
 #include "pos4.h"
 
+/*
+ * The code assumes that _MQ_OPEN_MAX == -1 or "no fixed implementation limit".
+ * If this assumption is somehow invalidated, mq_open() needs to be changed
+ * back to the old version which kept a count and enforced a limit.
+ * We make sure that this is pointed out to those changing <sys/param.h>
+ * by checking _MQ_OPEN_MAX at compile time.
+ */
+#if _MQ_OPEN_MAX != -1
+#error "librt:mq_open() no longer enforces _MQ_OPEN_MAX and needs fixing."
+#endif
+
 #define	MQ_ALIGNSIZE	8	/* 64-bit alignment */
 
 #ifdef DEBUG
@@ -89,9 +100,6 @@
 #define	TAIL_PTR(m, n)	((uint64_t *)((uintptr_t)m + \
 			(uintptr_t)m->mq_tailpp + n * sizeof (uint64_t)))
 
-static	int open_count = 0; /* ref count to track the number of open M.Q.s */
-static	mqdes_t	*open_queue[_MQ_OPEN_MAX] = { NULL };	/* open msg queues */
-static	mutex_t	mqlock = DEFAULTMUTEX;
 #define	MQ_RESERVED	((mqdes_t *)-1)
 
 #define	ABS_TIME	0
@@ -100,22 +108,17 @@ static	mutex_t	mqlock = DEFAULTMUTEX;
 static int
 mq_is_valid(mqdes_t *mqdp)
 {
-	int i;
-
 	/*
-	 * We don't need to acquire mqlock; this is a read-only operation.
+	 * Any use of a message queue after it was closed is
+	 * undefined.  But the standard strongly favours EBADF
+	 * returns.  Before we dereference which could be fatal,
+	 * we first do some pointer sanity checks.
 	 */
-	if (mqdp != NULL && mqdp != MQ_RESERVED) {
-		for (i = 0; i < _MQ_OPEN_MAX; i++) {
-			if (open_queue[i] == mqdp) {
-				/*
-				 * The MQ_MAGIC test is not really necessary.
-				 * We could just return 1.
-				 */
-				return (mqdp->mqd_magic == MQ_MAGIC);
-			}
-		}
+	if (mqdp != NULL && mqdp != MQ_RESERVED &&
+	    ((uintptr_t)mqdp & 0x7) == 0) {
+		return (mqdp->mqd_magic == MQ_MAGIC);
 	}
+
 	return (0);
 }
 
@@ -287,7 +290,6 @@ _mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 	int		err;
 	int		cr_flag = 0;
 	int		locked = 0;
-	int		i;
 	uint64_t	total_size;
 	size_t		msgsize;
 	ssize_t		maxmsg;
@@ -296,28 +298,9 @@ _mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 	mqdes_t		*mqdp;
 	mqhdr_t		*mqhp;
 	struct mq_dn	*mqdnp;
-	mqdes_t		**open_slot = NULL;
 
 	if (__pos4obj_check(path) == -1)
 		return ((mqd_t)-1);
-
-	/* check that we do not exceed the max M.Q.s for this process */
-	(void) mutex_lock(&mqlock);
-	if (open_count >= _MQ_OPEN_MAX) {
-		errno = EMFILE;
-		(void) mutex_unlock(&mqlock);
-		return ((mqd_t)-1);
-	}
-	open_count++;
-	/* find an available slot in the array of open queues */
-	for (i = 0; i < _MQ_OPEN_MAX; i++) {
-		if (open_queue[i] == NULL) {
-			open_slot = &open_queue[i];
-			break;
-		}
-	}
-	*open_slot = MQ_RESERVED;
-	(void) mutex_unlock(&mqlock);
 
 	/* acquire MSGQ lock to have atomic operation */
 	if (__pos4obj_lock(path, MQ_LOCK_TYPE) < 0)
@@ -459,10 +442,9 @@ _mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 	mqdp->mqd_mq = mqhp;
 	mqdp->mqd_mqdn = mqdnp;
 	mqdp->mqd_magic = MQ_MAGIC;
-	if (__pos4obj_unlock(path, MQ_LOCK_TYPE) == 0) {
-		*open_slot = mqdp;
+	if (__pos4obj_unlock(path, MQ_LOCK_TYPE) == 0)
 		return ((mqd_t)mqdp);
-	}
+
 	locked = 0;	/* fall into the error case */
 out:
 	err = errno;
@@ -478,12 +460,6 @@ out:
 		(void) munmap((caddr_t)mqhp, (size_t)total_size);
 	if ((cr_flag & MQDNP_MMAP) != 0)
 		(void) munmap((caddr_t)mqdnp, sizeof (struct mq_dn));
-	if (open_slot) {
-		(void) mutex_lock(&mqlock);
-		*open_slot = NULL;
-		open_count--;
-		(void) mutex_unlock(&mqlock);
-	}
 	if (locked)
 		(void) __pos4obj_unlock(path, MQ_LOCK_TYPE);
 	errno = err;
@@ -497,7 +473,6 @@ _mq_close(mqd_t mqdes)
 	mqhdr_t *mqhp;
 	struct mq_dn *mqdnp;
 	int canstate;
-	int i;
 
 	if (!mq_is_valid(mqdp)) {
 		errno = EBADF;
@@ -521,16 +496,6 @@ _mq_close(mqd_t mqdes)
 	}
 	(void) sem_post(&mqhp->mq_exclusive);
 
-	(void) mutex_lock(&mqlock);
-	open_count--;
-	/* vacate the queue's open_queue[] slot */
-	for (i = 0; i < _MQ_OPEN_MAX; i++) {
-		if (open_queue[i] == mqdp) {
-			open_queue[i] = NULL;
-			break;
-		}
-	}
-	(void) mutex_unlock(&mqlock);
 	/* Invalidate the descriptor before freeing it */
 	mqdp->mqd_magic = 0;
 	free(mqdp);

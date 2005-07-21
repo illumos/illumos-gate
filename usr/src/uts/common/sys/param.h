@@ -424,7 +424,7 @@ extern const int _clsize;
  */
 #define	_AIO_LISTIO_MAX		(4096)
 #define	_AIO_MAX		(-1)
-#define	_MQ_OPEN_MAX		(32)
+#define	_MQ_OPEN_MAX		(-1)
 #define	_MQ_PRIO_MAX		(32)
 #define	_SEM_NSEMS_MAX		INT_MAX
 #define	_SEM_VALUE_MAX		INT_MAX
