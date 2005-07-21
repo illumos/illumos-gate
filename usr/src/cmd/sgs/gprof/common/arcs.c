@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1990-1998,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,7 +40,7 @@ addarc(nltype *parentp, nltype *childp, actype count)
 
 #ifdef DEBUG
 	if (debug & TALLYDEBUG) {
-		printf("[addarc] %lld arcs from %s to %s\n",
+		(void) printf("[addarc] %lld arcs from %s to %s\n",
 		    count, parentp->name, childp->name);
 	}
 #endif /* DEBUG */
@@ -51,12 +52,12 @@ addarc(nltype *parentp, nltype *childp, actype count)
 #ifdef DEBUG
 		if (!Dflag) {
 			if (debug & TALLYDEBUG) {
-				printf("[tally] hit %lld += %lld\n",
+				(void) printf("[tally] hit %lld += %lld\n",
 				    arcp->arc_count, count);
 			}
 		} else {
 			if (debug & TALLYDEBUG) {
-				printf("[tally] hit %lld -= %lld\n",
+				(void) printf("[tally] hit %lld -= %lld\n",
 				    arcp->arc_count, count);
 			}
 		}
@@ -98,8 +99,11 @@ addarc(nltype *parentp, nltype *childp, actype count)
 nltype	**topsortnlp;
 
 static int
-topcmp(nltype **npp1, nltype **npp2)
+topcmp(const void *arg1, const void *arg2)
 {
+	nltype **npp1 = (nltype **)arg1;
+	nltype **npp2 = (nltype **)arg2;
+
 	return ((*npp1)->toporder - (*npp2)->toporder);
 }
 
@@ -133,13 +137,13 @@ timepropagate(nltype *parentp)
 				continue;
 			}
 			if (parentp->toporder <= childp->toporder) {
-				fprintf(stderr,
+				(void) fprintf(stderr,
 				    "[propagate] toporder botches\n");
 			}
 			childp = childp->cyclehead;
 		} else {
 			if (parentp->toporder <= childp->toporder) {
-				fprintf(stderr,
+				(void) fprintf(stderr,
 				    "[propagate] toporder botches\n");
 				continue;
 			}
@@ -177,14 +181,14 @@ timepropagate(nltype *parentp)
 		}
 #ifdef DEBUG
 		if (debug & PROPDEBUG) {
-			printf("[dotime] child \t");
+			(void) printf("[dotime] child \t");
 			printname(childp);
-			printf(" with %f %f %lld/%lld\n",
+			(void) printf(" with %f %f %lld/%lld\n",
 			    childp->time, childp->childtime,
 			    arcp->arc_count, childp->ncall);
-			printf("[dotime] parent\t");
+			(void) printf("[dotime] parent\t");
 			printname(parentp);
-			printf("\n[dotime] share %f\n", share);
+			(void) printf("\n[dotime] share %f\n", share);
 		}
 #endif /* DEBUG */
 	}
@@ -192,7 +196,7 @@ timepropagate(nltype *parentp)
 
 
 static void
-cycletime()
+cycletime(void)
 {
 	int		cycle;
 	nltype		*cyclenlp;
@@ -216,7 +220,7 @@ cycletime()
 
 
 static void
-dotime()
+dotime(void)
 {
 	int	index;
 
@@ -228,10 +232,10 @@ dotime()
 
 
 static void
-cyclelink()
+cyclelink(void)
 {
-	register nltype	*nlp;
-	register nltype	*cyclenlp;
+	nltype	*nlp;
+	nltype	*cyclenlp;
 	int		cycle;
 	nltype		*memberp;
 	arctype		*arcp;
@@ -258,7 +262,7 @@ cyclelink()
 	 */
 	cyclenl = (nltype *) calloc(ncycle + 1, sizeof (nltype));
 	if (cyclenl == 0) {
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    "%s: No room for %d bytes of cycle headers\n",
 		    whoami, (ncycle + 1) * sizeof (nltype));
 		done();
@@ -306,9 +310,10 @@ cyclelink()
 			cyclenlp->children = 0;		/* callee arcs list */
 #ifdef DEBUG
 			if (debug & CYCLEDEBUG) {
-				printf("[cyclelink] ");
+				(void) printf("[cyclelink] ");
 				printname(nlp);
-				printf(" is the head of cycle %d\n", cycle);
+				(void) printf(" is the head of cycle %d\n",
+				    cycle);
 			}
 #endif /* DEBUG */
 			/*
@@ -464,7 +469,7 @@ check_parents(nltype *siblingp)
  *	and while we're here, sum time for functions.
  */
 static void
-doflags()
+doflags(void)
 {
 	int	index;
 	nltype	*childp;
@@ -487,9 +492,10 @@ doflags()
 		}
 #ifdef DEBUG
 		if (debug & PROPDEBUG) {
-			printf("[doflags] ");
+			(void) printf("[doflags] ");
 			printname(childp);
-			printf(" inherits printflag %d and propfraction %f\n",
+			(void) printf(
+			    " inherits printflag %d and propfraction %f\n",
 			    childp->printflag, childp->propfraction);
 		}
 #endif /* DEBUG */
@@ -548,12 +554,12 @@ doflags()
 		printtime += childp->propself;
 #ifdef DEBUG
 		if (debug & PROPDEBUG) {
-			printf("[doflags] ");
+			(void) printf("[doflags] ");
 			printname(childp);
-			printf(" ends up with printflag %d and "
+			(void) printf(" ends up with printflag %d and "
 			    "propfraction %f\n",
 			    childp->printflag, childp->propfraction);
-			printf("time %f propself %f printtime %f\n",
+			(void) printf("time %f propself %f printtime %f\n",
 			    childp->time, childp->propself, printtime);
 		}
 #endif /* DEBUG */
@@ -562,7 +568,7 @@ doflags()
 
 
 nltype **
-doarcs()
+doarcs(void)
 {
 	nltype	*parentp, **timesortnlp;
 	arctype	*arcp;
@@ -631,7 +637,7 @@ doarcs()
 	 */
 	topsortnlp = (nltype **) calloc(total_names, sizeof (nltype *));
 	if (topsortnlp == (nltype **) 0) {
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    "[doarcs] ran out of memory for topo sorting\n");
 	}
 	index = 0;
@@ -640,16 +646,15 @@ doarcs()
 		    topsortnlp[index++] = &(mi->nl[i]);
 	}
 
-	qsort(topsortnlp, total_names, sizeof (nltype *),
-	    (int (*)(const void *, const void *))topcmp);
+	qsort(topsortnlp, total_names, sizeof (nltype *), topcmp);
 #ifdef DEBUG
 	if (debug & DFNDEBUG) {
-		printf("[doarcs] topological sort listing\n");
+		(void) printf("[doarcs] topological sort listing\n");
 		for (index = 0; index < total_names; index += 1) {
-			printf("[doarcs] ");
-			printf("%d:", topsortnlp[ index ]->toporder);
+			(void) printf("[doarcs] ");
+			(void) printf("%d:", topsortnlp[ index ]->toporder);
 			printname(topsortnlp[ index ]);
-			printf("\n");
+			(void) printf("\n");
 		}
 	}
 #endif /* DEBUG */
@@ -674,7 +679,8 @@ doarcs()
 	timesortnlp = (nltype **) calloc(total_names + ncycle,
 							sizeof (nltype *));
 	if (timesortnlp == (nltype **) 0) {
-		fprintf(stderr, "%s: ran out of memory for sorting\n", whoami);
+		(void) fprintf(stderr,
+		    "%s: ran out of memory for sorting\n", whoami);
 	}
 
 	index = 0;
@@ -686,8 +692,7 @@ doarcs()
 	for (index = 1; index <= ncycle; index++)
 		timesortnlp[total_names+index-1] = &cyclenl[index];
 
-	qsort(timesortnlp, total_names + ncycle, sizeof (nltype *),
-			    (int(*)(const void *, const void *))totalcmp);
+	qsort(timesortnlp, total_names + ncycle, sizeof (nltype *), totalcmp);
 
 	for (index = 0; index < total_names + ncycle; index++)
 		timesortnlp[index]->index = index + 1;

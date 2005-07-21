@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1990-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,11 +37,6 @@ extern int find_run_directory(char *, char *, char *, char **, char *);
 void print_demangled_name(int, nltype *);
 void striped_name(char *, nltype **);
 
-
-extern char *demangle();
-char *strstr();
-char *parsename();
-char name_buffer[512];
 extern long hz;
 
 /*
@@ -50,8 +46,10 @@ char *splsym[] = {
 	PRF_ETEXT,
 	PRF_EXTSYM,
 	PRF_MEMTERM,
-	0
+	NULL
 };
+
+static bool is_special_sym(nltype *nlp);
 
 char *
 demangled_name(nltype *selfp)
@@ -60,12 +58,12 @@ demangled_name(nltype *selfp)
 	if (!Cflag)
 		return (selfp->name);
 
-	name = (char *) sgs_demangle(selfp->name);
+	name = (char *)sgs_demangle(selfp->name);
 	return (name);
 }
 
 void
-printprof()
+printprof(void)
 {
 	nltype	*np;
 	nltype	**sortednlp;
@@ -75,7 +73,7 @@ printprof()
 	mod_info_t	*mi;
 
 	actime = 0.0;
-	printf("\f\n");
+	(void) printf("\f\n");
 	flatprofheader();
 
 	/*
@@ -83,7 +81,7 @@ printprof()
 	 */
 	sortednlp = (nltype **) calloc(total_names, sizeof (nltype *));
 	if (sortednlp == (nltype **) 0) {
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    "[printprof] ran out of memory for time sorting\n");
 	}
 
@@ -93,8 +91,7 @@ printprof()
 			sortednlp[index++] = &(mi->nl[i]);
 	}
 
-	qsort(sortednlp, total_names, sizeof (nltype *),
-		(int(*)(const void *, const void *))timecmp);
+	qsort(sortednlp, total_names, sizeof (nltype *), timecmp);
 
 	for (index = 0; (index < total_names) && print_flag; index += 1) {
 		np = sortednlp[index];
@@ -109,8 +106,10 @@ printprof()
 }
 
 int
-timecmp(nltype **npp1, nltype **npp2)
+timecmp(const void *arg1, const void *arg2)
 {
+	nltype **npp1 = (nltype **)arg1;
+	nltype **npp2 = (nltype **)arg2;
 	double	timediff;
 	long	calldiff;
 
@@ -144,13 +143,14 @@ flatprofheader()
 		printblurb(FLAT_BLURB);
 
 	if (old_style) {
-		printf("\ngranularity: each sample hit covers %d byte(s)",
-					    (long)scale * sizeof (UNIT));
+		(void) printf(
+		    "\ngranularity: each sample hit covers %d byte(s)",
+		    (long)scale * sizeof (UNIT));
 		if (totime > 0.0) {
-			printf(" for %.2f%% of %.2f seconds\n\n",
+			(void) printf(" for %.2f%% of %.2f seconds\n\n",
 			    100.0/totime, totime / hz);
 		} else {
-			printf(" no time accumulated\n\n");
+			(void) printf(" no time accumulated\n\n");
 			/*
 			 * this doesn't hurt since all the numerators will
 			 * be zero.
@@ -159,9 +159,9 @@ flatprofheader()
 		}
 	}
 
-	printf("%5.5s %10.10s %8.8s %8.8s %8.8s %8.8s %-8.8s\n",
+	(void) printf("%5.5s %10.10s %8.8s %8.8s %8.8s %8.8s %-8.8s\n",
 	    "% ", "cumulative", "self ", "", "self ", "total ", "");
-	printf("%5.5s %10.10s %8.8s %8.8s %8.8s %8.8s %-8.8s\n",
+	(void) printf("%5.5s %10.10s %8.8s %8.8s %8.8s %8.8s %-8.8s\n",
 	    "time", "seconds ", "seconds", "calls",
 	    "ms/call", "ms/call", "name");
 }
@@ -181,18 +181,18 @@ flatprofline(nltype *np)
 
 	actime += np->time;
 
-	printf("%5.1f %10.2f %8.2f",
+	(void) printf("%5.1f %10.2f %8.2f",
 	    100 * np->time / totime, actime / hz, np->time / hz);
 
 	if (np->ncall != 0) {
-		printf(" %8lld %8.2f %8.2f  ", np->ncall,
+		(void) printf(" %8lld %8.2f %8.2f  ", np->ncall,
 		    1000 * np->time / hz / np->ncall,
 		    1000 * (np->time + np->childtime) / hz / np->ncall);
 	} else {
 		if (!Cflag)
-			printf(" %8.8s %8.8s %8.8s ", "", "", "");
+			(void) printf(" %8.8s %8.8s %8.8s ", "", "", "");
 		else
-			printf(" %8.8s %8.8s %8.8s  ", "", "", "");
+			(void) printf(" %8.8s %8.8s %8.8s  ", "", "", "");
 	}
 
 	printname(np);
@@ -200,7 +200,7 @@ flatprofline(nltype *np)
 	if (Cflag)
 		print_demangled_name(55, np);
 
-	printf("\n");
+	(void) printf("\n");
 }
 
 void
@@ -212,14 +212,15 @@ gprofheader()
 
 	if (old_style) {
 
-		printf("\ngranularity: each sample hit covers %d byte(s)",
-						(long)scale * sizeof (UNIT));
+		(void) printf(
+		    "\ngranularity: each sample hit covers %d byte(s)",
+		    (long)scale * sizeof (UNIT));
 
 		if (printtime > 0.0) {
-			printf(" for %.2f%% of %.2f seconds\n\n",
+			(void) printf(" for %.2f%% of %.2f seconds\n\n",
 			    100.0/printtime, printtime / hz);
 		} else {
-			printf(" no time propagated\n\n");
+			(void) printf(" no time propagated\n\n");
 			/*
 			 * this doesn't hurt, since all the numerators
 			 * will be 0.0
@@ -227,22 +228,23 @@ gprofheader()
 			printtime = 1.0;
 		}
 	} else {
-		printf("\ngranularity: each pc-hit is considered 1 tick");
+		(void) printf(
+		    "\ngranularity: each pc-hit is considered 1 tick");
 		if (hz != 1) {
-			printf(" (@ %4.3f seconds per tick)",
-							(double) 1.0 / hz);
+			(void) printf(" (@ %4.3f seconds per tick)",
+			    (double)1.0 / hz);
 		}
-		puts("\n\n");
+		(void) puts("\n\n");
 	}
 
-	printf("%6.6s %5.5s %7.7s %11.11s %7.7s/%-7.7s     %-8.8s\n",
+	(void) printf("%6.6s %5.5s %7.7s %11.11s %7.7s/%-7.7s     %-8.8s\n",
 	    "", "", "", "", "called", "total", "parents");
-	printf("%-6.6s %5.5s %7.7s %11.11s %7.7s+%-7.7s %-8.8s\t%5.5s\n",
+	(void) printf("%-6.6s %5.5s %7.7s %11.11s %7.7s+%-7.7s %-8.8s\t%5.5s\n",
 	    "index", "%time", "self", "descendents",
 	    "called", "self", "name", "index");
-	printf("%6.6s %5.5s %7.7s %11.11s %7.7s/%-7.7s     %-8.8s\n",
+	(void) printf("%6.6s %5.5s %7.7s %11.11s %7.7s/%-7.7s     %-8.8s\n",
 	    "", "", "", "", "called", "total", "children");
-	printf("\n");
+	(void) printf("\n");
 }
 
 void
@@ -250,20 +252,20 @@ gprofline(nltype *np)
 {
 	char	kirkbuffer[BUFSIZ];
 
-	sprintf(kirkbuffer, "[%d]", np->index);
-	printf("%-6.6s %5.1f %7.2f %11.2f", kirkbuffer,
+	(void) sprintf(kirkbuffer, "[%d]", np->index);
+	(void) printf("%-6.6s %5.1f %7.2f %11.2f", kirkbuffer,
 	    100 * (np->propself + np->propchild) / printtime,
 	    np->propself / hz, np->propchild / hz);
 
 	if ((np->ncall + np->selfcalls) != 0) {
-		printf(" %7lld", np->ncall);
+		(void) printf(" %7lld", np->ncall);
 
 		if (np->selfcalls != 0)
-			printf("+%-7lld ", np->selfcalls);
+			(void) printf("+%-7lld ", np->selfcalls);
 		else
-			printf(" %7.7s ", "");
+			(void) printf(" %7.7s ", "");
 	} else {
-		printf(" %7.7s %7.7s ", "", "");
+		(void) printf(" %7.7s %7.7s ", "", "");
 	}
 
 	printname(np);
@@ -271,7 +273,7 @@ gprofline(nltype *np)
 	if (Cflag)
 		print_demangled_name(50, np);
 
-	printf("\n");
+	(void) printf("\n");
 }
 
 static bool
@@ -331,9 +333,10 @@ printgprof(nltype **timesortnlp)
 			printchildren(parentp);
 		}
 
-		printf("\n");
-		printf("-----------------------------------------------\n");
-		printf("\n");
+		(void) printf("\n");
+		(void) printf(
+		    "-----------------------------------------------\n");
+		(void) printf("\n");
 
 		if (nflag) {
 			--print_count;
@@ -353,8 +356,10 @@ printgprof(nltype **timesortnlp)
  *	all else being equal, sort by names.
  */
 int
-totalcmp(nltype **npp1, nltype **npp2)
+totalcmp(const void *arg1, const void *arg2)
 {
+	nltype **npp1 = (nltype **)arg1;
+	nltype **npp2 = (nltype **)arg2;
 	nltype	*np1 = *npp1;
 	nltype	*np2 = *npp2;
 	double	diff;
@@ -399,7 +404,7 @@ printparents(nltype *childp)
 		cycleheadp = childp;
 
 	if (childp->parents == 0) {
-		printf("%6.6s %5.5s %7.7s %11.11s %7.7s %7.7s"
+		(void) printf("%6.6s %5.5s %7.7s %11.11s %7.7s %7.7s"
 		    "     <spontaneous>\n", "", "", "", "", "", "");
 		return;
 	}
@@ -413,19 +418,21 @@ printparents(nltype *childp)
 			/*
 			 *	selfcall or call among siblings
 			 */
-			printf("%6.6s %5.5s %7.7s %11.11s %7lld %7.7s     ",
+			(void) printf(
+			    "%6.6s %5.5s %7.7s %11.11s %7lld %7.7s     ",
 			    "", "", "", "", arcp->arc_count, "");
 			printname(parentp);
 
 			if (Cflag)
 				print_demangled_name(54, parentp);
 
-			printf("\n");
+			(void) printf("\n");
 		} else {
 			/*
 			 *	regular parent of child
 			 */
-			printf("%6.6s %5.5s %7.2f %11.2f %7lld/%-7lld     ", "",
+			(void) printf(
+			    "%6.6s %5.5s %7.2f %11.2f %7lld/%-7lld     ", "",
 			    "", arcp->arc_time / hz, arcp->arc_childtime / hz,
 			    arcp->arc_count, cycleheadp->ncall);
 			printname(parentp);
@@ -433,7 +440,7 @@ printparents(nltype *childp)
 			if (Cflag)
 				print_demangled_name(54, parentp);
 
-			printf("\n");
+			(void) printf("\n");
 		}
 	}
 }
@@ -453,26 +460,27 @@ printchildren(nltype *parentp)
 			/*
 			 * self call or call to sibling
 			 */
-			printf("%6.6s %5.5s %7.7s %11.11s %7lld %7.7s     ",
+			(void) printf(
+			    "%6.6s %5.5s %7.7s %11.11s %7lld %7.7s     ",
 			    "", "", "", "", arcp->arc_count, "");
 			printname(childp);
 
 			if (Cflag)
 				print_demangled_name(54, childp);
 
-			printf("\n");
+			(void) printf("\n");
 		} else {
 			/*
 			 *	regular child of parent
 			 */
 			if (childp->cyclehead)
-				printf("%6.6s %5.5s %7.2f %11.2f "
+				(void) printf("%6.6s %5.5s %7.2f %11.2f "
 				    "%7lld/%-7lld     ", "", "",
 				    arcp->arc_time / hz,
 				    arcp->arc_childtime / hz, arcp->arc_count,
 				    childp->cyclehead->ncall);
 			else
-				printf("%6.6s %5.5s %7.2f %11.2f "
+				(void) printf("%6.6s %5.5s %7.2f %11.2f "
 				    "%7lld %7.7s    ",
 				    "", "", arcp->arc_time / hz,
 				    arcp->arc_childtime / hz, arcp->arc_count,
@@ -483,7 +491,7 @@ printchildren(nltype *parentp)
 			if (Cflag)
 				print_demangled_name(54, childp);
 
-			printf("\n");
+			(void) printf("\n");
 		}
 	}
 }
@@ -496,27 +504,27 @@ printname(nltype *selfp)
 
 	if (selfp->name != 0) {
 		if (!Cflag)
-			printf("%s", selfp->name);
+			(void) printf("%s", selfp->name);
 		else
-			printf("%s", c);
+			(void) printf("%s", c);
 
 #ifdef DEBUG
 		if (debug & DFNDEBUG)
-			printf("{%d} ", selfp->toporder);
+			(void) printf("{%d} ", selfp->toporder);
 
 		if (debug & PROPDEBUG)
-			printf("%5.2f%% ", selfp->propfraction);
-#endif DEBUG
+			(void) printf("%5.2f%% ", selfp->propfraction);
+#endif /* DEBUG */
 	}
 
 	if (selfp->cycleno != 0)
-		printf("\t<cycle %d>", selfp->cycleno);
+		(void) printf("\t<cycle %d>", selfp->cycleno);
 
 	if (selfp->index != 0) {
 		if (selfp->printflag)
-			printf(" [%d]", selfp->index);
+			(void) printf(" [%d]", selfp->index);
 		else
-			printf(" (%d)", selfp->index);
+			(void) printf(" (%d)", selfp->index);
 	}
 }
 
@@ -531,14 +539,12 @@ print_demangled_name(int n, nltype *selfp)
 	if (strcmp(c, demangled_name(selfp)) == 0)
 		return;
 	else {
-		printf("\n");
+		(void) printf("\n");
 		for (i = 1; i < n; i++)
-			printf(" ");
-		printf("[%s]", selfp->name);
+			(void) printf(" ");
+		(void) printf("[%s]", selfp->name);
 	}
 }
-
-char *exotic();
 
 void
 sortchildren(nltype *parentp)
@@ -558,8 +564,10 @@ sortchildren(nltype *parentp)
 	 */
 	sorted.arc_childlist = 0;
 
+	/* LINTED: warning: assignment operator */
 	for ((arcp = parentp->children) && (detachedp = arcp->arc_childlist);
 	    arcp;
+	    /* LINTED: warning: assignment operator */
 	    (arcp = detachedp) && (detachedp = detachedp->arc_childlist)) {
 		/*
 		 *	consider *arcp as disconnected
@@ -599,8 +607,10 @@ sortparents(nltype *childp)
 	 */
 	sorted.arc_parentlist = 0;
 
+	/* LINTED: warning: assignment operator */
 	for ((arcp = childp->parents) && (detachedp = arcp->arc_parentlist);
 	    arcp;
+	    /* LINTED: warning: assignment operator */
 	    (arcp = detachedp) && (detachedp = detachedp->arc_parentlist)) {
 		/*
 		 *	consider *arcp as disconnected
@@ -626,18 +636,18 @@ printcycle(nltype *cyclep)
 {
 	char	kirkbuffer[BUFSIZ];
 
-	sprintf(kirkbuffer, "[%d]", cyclep->index);
-	printf("%-6.6s %5.1f %7.2f %11.2f %7lld", kirkbuffer,
+	(void) sprintf(kirkbuffer, "[%d]", cyclep->index);
+	(void) printf("%-6.6s %5.1f %7.2f %11.2f %7lld", kirkbuffer,
 	    100 * (cyclep->propself + cyclep->propchild) / printtime,
 	    cyclep -> propself / hz, cyclep -> propchild / hz,
 	    cyclep -> ncall);
 
 	if (cyclep->selfcalls != 0)
-		printf("+%-7lld", cyclep->selfcalls);
+		(void) printf("+%-7lld", cyclep->selfcalls);
 	else
-		printf(" %7.7s", "");
+		(void) printf(" %7.7s", "");
 
-	printf(" <cycle %d as a whole>\t[%d]\n", cyclep->cycleno,
+	(void) printf(" <cycle %d as a whole>\t[%d]\n", cyclep->cycleno,
 	    cyclep->index);
 }
 
@@ -652,20 +662,20 @@ printmembers(nltype *cyclep)
 	sortmembers(cyclep);
 
 	for (memberp = cyclep->cnext; memberp; memberp = memberp->cnext) {
-		printf("%6.6s %5.5s %7.2f %11.2f %7lld", "", "",
+		(void) printf("%6.6s %5.5s %7.2f %11.2f %7lld", "", "",
 		    memberp->propself / hz, memberp->propchild / hz,
 		    memberp->ncall);
 
 		if (memberp->selfcalls != 0)
-			printf("+%-7lld", memberp->selfcalls);
+			(void) printf("+%-7lld", memberp->selfcalls);
 		else
-			printf(" %7.7s", "");
+			(void) printf(" %7.7s", "");
 
-		printf("     ");
+		(void) printf("     ");
 		printname(memberp);
 		if (Cflag)
 			print_demangled_name(54, memberp);
-		printf("\n");
+		(void) printf("\n");
 	}
 }
 
@@ -686,8 +696,11 @@ sortmembers(nltype *cyclep)
 	todo = cyclep->cnext;
 	cyclep->cnext = 0;
 
+	/* LINTED: warning: assignment operator */
 	for ((doing = todo) && (todo = doing->cnext);
-	    doing; (doing = todo) && (todo = doing->cnext)) {
+	    doing;
+	    /* LINTED: warning: assignment operator */
+	    (doing = todo) && (todo = doing->cnext)) {
 		for (prev = cyclep; prev->cnext; prev = prev->cnext) {
 			if (membercmp(doing, prev->cnext) == GREATERTHAN)
 				break;
@@ -745,23 +758,23 @@ arccmp(arctype *thisp, arctype *thatp)
 
 #ifdef DEBUG
 	if (debug & TIMEDEBUG) {
-		printf("[arccmp] ");
+		(void) printf("[arccmp] ");
 		printname(thisparentp);
-		printf(" calls ");
+		(void) printf(" calls ");
 		printname(thischildp);
-		printf(" %f + %f %lld/%lld\n", thisp->arc_time,
+		(void) printf(" %f + %f %lld/%lld\n", thisp->arc_time,
 		    thisp->arc_childtime, thisp->arc_count,
 		    thischildp->ncall);
-		printf("[arccmp] ");
+		(void) printf("[arccmp] ");
 		printname(thatparentp);
-		printf(" calls ");
+		(void) printf(" calls ");
 		printname(thatchildp);
-		printf(" %f + %f %lld/%lld\n", thatp->arc_time,
+		(void) printf(" %f + %f %lld/%lld\n", thatp->arc_time,
 		    thatp->arc_childtime, thatp->arc_count,
 		    thatchildp->ncall);
-		printf("\n");
+		(void) printf("\n");
 	}
-#endif DEBUG
+#endif /* DEBUG */
 
 	if (thisparentp == thischildp) {
 		/*
@@ -850,7 +863,7 @@ printblurb(char *blurbname)
 		(void) fprintf(stderr, "Error in finding run directory.");
 		return;
 	} else {
-		strcat(blurb_directory, blurbname);
+		(void) strcat(blurb_directory, blurbname);
 	}
 
 	blurbfile = fopen(blurb_directory, "r");
@@ -860,16 +873,19 @@ printblurb(char *blurbname)
 	}
 
 	while ((input = getc(blurbfile)) != EOF)
-		putchar(input);
+		(void) putchar(input);
 
-	fclose(blurbfile);
+	(void) fclose(blurbfile);
 }
 
 char *s1, *s2;
 
-int
-namecmp(nltype **npp1, nltype **npp2)
+static int
+namecmp(const void *arg1, const void *arg2)
 {
+	nltype **npp1 = (nltype **)arg1;
+	nltype **npp2 = (nltype **)arg2;
+
 	if (!Cflag)
 		return (strcmp((*npp1)->name, (*npp2)->name));
 	else {
@@ -925,9 +941,9 @@ printmodules()
 {
 	mod_info_t	*mi;
 
-	printf("\f\nObject modules\n\n");
+	(void) printf("\f\nObject modules\n\n");
 	for (mi = &modules; mi; mi = mi->next)
-		printf(" %d: %s\n", mi->id, mi->name);
+		(void) printf(" %d: %s\n", mi->id, mi->name);
 }
 
 #define	IDFMT(id)	((id) < 10 ? 1 : 2)
@@ -949,7 +965,8 @@ printindex()
 	namesortnlp = calloc(total_names + ncycle, sizeof (nltype *));
 
 	if (namesortnlp == NULL)
-		fprintf(stderr, "%s: ran out of memory for sorting\n", whoami);
+		(void) fprintf(stderr, "%s: ran out of memory for sorting\n",
+		    whoami);
 
 	nnames = 0;
 	for (mi = &modules; mi; mi = mi->next) {
@@ -975,13 +992,12 @@ printindex()
 		s2 = malloc(500 * sizeof (char));
 	}
 
-	qsort(namesortnlp, nnames, sizeof (nltype *),
-	    (int(*)(const void *, const void *))namecmp);
+	qsort(namesortnlp, nnames, sizeof (nltype *), namecmp);
 
 	for (index = 1, todo = nnames; index <= ncycle; index++)
 		namesortnlp[todo++] = &cyclenl[index];
 
-	printf("\f\nIndex by function name\n\n");
+	(void) printf("\f\nIndex by function name\n\n");
 
 	if (!Cflag)
 		index = (todo + 2) / 3;
@@ -994,17 +1010,18 @@ printindex()
 				nlp = namesortnlp[j];
 
 				if (nlp->printflag) {
-					sprintf(peterbuffer,
+					(void) sprintf(peterbuffer,
 					    "[%d]", nlp->index);
 				} else {
-					sprintf(peterbuffer,
+					(void) sprintf(peterbuffer,
 					    "(%d)", nlp->index);
 				}
 
 				if (j < nnames) {
 					if (does_clash(namesortnlp,
 								j, nnames)) {
-						printf("%6.6s %*d:%-*.*s",
+						(void) printf(
+						    "%6.6s %*d:%-*.*s",
 							peterbuffer,
 							IDFMT(nlp->module->id),
 							nlp->module->id,
@@ -1012,229 +1029,45 @@ printindex()
 							NMFMT(nlp->module->id),
 							nlp->name);
 					} else {
-						printf("%6.6s %-19.19s",
+						(void) printf("%6.6s %-19.19s",
 						    peterbuffer, nlp->name);
 					}
 				} else {
-					printf("%6.6s ", peterbuffer);
-					sprintf(peterbuffer,
+					(void) printf("%6.6s ", peterbuffer);
+					(void) sprintf(peterbuffer,
 					    "<cycle %d>", nlp->cycleno);
-					printf("%-19.19s", peterbuffer);
+					(void) printf("%-19.19s", peterbuffer);
 				}
 			}
 		} else {
 			nlp = namesortnlp[i];
 
 			if (nlp->printflag)
-				sprintf(peterbuffer, "[%d]", nlp->index);
+				(void) sprintf(peterbuffer, "[%d]", nlp->index);
 			else
-				sprintf(peterbuffer, "(%d)", nlp->index);
+				(void) sprintf(peterbuffer, "(%d)", nlp->index);
 
 			if (i < nnames) {
 				char *d = demangled_name(nlp);
 
 				if (does_clash(namesortnlp, i, nnames)) {
-					printf("%6.6s %d:%s\n", peterbuffer,
-							nlp->module->id, d);
+					(void) printf("%6.6s %d:%s\n",
+					    peterbuffer, nlp->module->id, d);
 				} else
-					printf("%6.6s %s\n", peterbuffer, d);
+					(void) printf("%6.6s %s\n", peterbuffer,
+					    d);
 
 				if (d != nlp->name)
-					printf("%6.6s   [%s]", "", nlp->name);
+					(void) printf("%6.6s   [%s]", "",
+					    nlp->name);
 			} else {
-				printf("%6.6s ", peterbuffer);
-				sprintf(peterbuffer, "<cycle %d>",
+				(void) printf("%6.6s ", peterbuffer);
+				(void) sprintf(peterbuffer, "<cycle %d>",
 				    nlp->cycleno);
-				printf("%-33.33s", peterbuffer);
+				(void) printf("%-33.33s", peterbuffer);
 			}
 		}
-		printf("\n");
+		(void) printf("\n");
 	}
 	free(namesortnlp);
-}
-
-
-char dname[500];
-
-char *
-exotic(char *s)
-{
-	char *name;
-	int i = 0, j;
-	char *p, *s1 = "static constructor function for ";
-
-	name = malloc(500 * sizeof (char));
-
-	if (strncmp(s, "__sti__", 7) == 0) {
-		i = 0;
-		s += 7;
-
-		if ((p = strstr(s, "_c_")) == NULL) {
-			if ((p = strstr(s, "_C_")) == NULL) {
-				if ((p = strstr(s, "_cc_")) == NULL) {
-					if ((p = strstr(s, "_cxx_")) == NULL) {
-						if ((p =
-						    strstr(s, "_h_")) == NULL)
-							return (NULL);
-					}
-				}
-			}
-		} else {
-			p += 3;
-			*p = '\0';
-		}
-
-		for (i = 0; s1[i] != '\0'; i++)
-			dname[i] = s1[i];
-		j = i;
-
-		for (i = 0; s[i] != '\0'; i++)
-			dname[j + i] = s[i];
-		dname[j + i] = '\0';
-
-		free(name);
-		return (dname);
-	}
-
-	if (strncmp(s, "__std__", 7) == 0) {
-		char *s1 = "static destructor function for ";
-		i = 0;
-		s += 7;
-
-		if ((p = strstr(s, "_c_")) == NULL) {
-			if ((p = strstr(s, "_C_")) == NULL) {
-				if ((p = strstr(s, "_cc_")) == NULL) {
-					if ((p = strstr(s, "_cxx_")) == NULL) {
-						if ((p =
-						    strstr(s, "_h_")) == NULL)
-							return (NULL);
-					}
-				}
-			}
-		} else {
-			p += 3;
-			*p = '\0';
-		}
-
-		for (i = 0; s1[i] != '\0'; i++)
-			dname[i] = s1[i];
-		j = i;
-
-		for (i = 0; s[i] != '\0'; i++)
-			dname[j + i] = s[i];
-		dname[j + i] = '\0';
-
-		free(name);
-		return (dname);
-	}
-
-	if (strncmp(s, "__vtbl__", 8) == 0) {
-		char *s1 = "virtual table for ";
-		char *printname, *return_p = dname;
-
-		s += 8;
-		printname = parsename(s);
-		return_p = '\0';
-		strcat(return_p, s1);
-		strcat(return_p, printname);
-
-		free(name);
-		return (dname);
-	}
-
-	if (strncmp(s, "__ptbl__", 8) == 0) {
-		char *s1 = "pointer to the virtual table for ";
-		char *printname, *return_p = dname;
-
-		s += 8;
-		printname = parsename(s);
-		return_p = '\0';
-		strcat(return_p, s1);
-		strcat(return_p, printname);
-
-		free(name);
-		return (return_p);
-	}
-
-	free(name);
-	return (s);
-}
-
-char *
-parsename(char *s)
-{
-	char *d = name_buffer;
-	int len;
-	char c_init;
-	char *len_pointer = s;
-
-	*d = '\0';
-
-	strcat(d, "class ");
-
-	while (isdigit(*s))
-		s++;
-	c_init = *s;
-	*s = '\0';
-
-	len = atoi(len_pointer);
-	*s = c_init;
-
-	/*
-	 * only one class name
-	 */
-	if (*(s + len) == '\0') {
-		strcat(d, s);
-		return (d);
-	} else {
-		/*
-		 * two classname  %drootname__%dchildname
-		 */
-		char *child;
-		char *root;
-		int child_len;
-		char *child_len_p;
-		root = s;
-		child = s + len + 2;
-		child_len_p = child;
-
-		if (!isdigit(*child)) { /* ptbl file name */
-			c_init = *(root + len);
-			*(root + len) = '\0';
-			strcat(d, root);
-			*(root + len) = c_init;
-			strcat(d, " in ");
-			strcat(d, child);
-			return (d);
-		}
-
-		while (isdigit(*child))
-			child++;
-		c_init = *child;
-		*child = '\0';
-		child_len = atoi(child_len_p);
-		*child = c_init;
-		if (*(child + child_len) == '\0') {
-			strcat(d, child);
-			strcat(d, " derived from ");
-			c_init = *(root + len);
-			*(root + len) = '\0';
-			strcat(d, root);
-			*(root + len) = c_init;
-			return (d);
-		} else { /* %drootname__%dchildname__filename */
-			c_init = *(child + child_len);
-			*(child + child_len) = '\0';
-			strcat(d, child);
-			*(child+ child_len) = c_init;
-			strcat(d, " derived from ");
-			c_init = *(root + len);
-			*(root + len) = '\0';
-			strcat(d, root);
-			*(root + len) = c_init;
-			strcat(d, " in ");
-			strcat(d, child + child_len + 2);
-			return (d);
-		}
-	}
 }

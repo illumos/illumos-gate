@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -26,45 +32,30 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
-*	file: symintUtil.c
-*	desc: utilities for symint code
-*	date: 11/08/88
-*/
+ * file: symintUtil.c
+ * desc: utilities for symint code
+ * date: 11/08/88
+ */
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include "debug.h"
+#include "symint.h"
 
 /*
-*	_Malloc and _Realloc are used to monitor the allocation
-*	of memory.  If failure occurs, we detect it and exit.
-*/
+ * _Malloc is used to monitor the allocation
+ * of memory.  If failure occurs, we detect it and exit.
+ */
 
 void *
-_Malloc(item_count, item_size)
-uint item_count;
-uint item_size;
+_Malloc(uint_t item_count, uint_t item_size)
 {
-	char *malloc();
-	register void *p;
+	void *p;
 
-	if ((p = (void *) calloc(item_count, item_size)) == NULL) {
-		DEBUG_EXP(printf("- size=%d, count=%d\n", item_size, item_count));
+	if ((p = calloc(item_count, item_size)) == NULL) {
+		DEBUG_EXP(printf("- size=%d, count=%d\n",
+		    item_size, item_count));
 		_err_exit("calloc: Out of space");
 	}
 	return (p);
 }
-
-void *
-_Realloc(pointer, size)
-void *pointer;
-uint size;
-{
-	char *realloc();
-	register void *p;
-
-	if ((p = (void *) realloc(pointer, size)) == NULL) {
-		_err_exit("realloc: Out of space");
-	}
-	return (p);
-}
-

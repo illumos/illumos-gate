@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1990-1997,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,9 +55,9 @@ dfn(nltype *parentp)
 
 #ifdef DEBUG
 	if (debug & DFNDEBUG) {
-		printf("[dfn] dfn(");
+		(void) printf("[dfn] dfn(");
 		printname(parentp);
-		printf(")\n");
+		(void) printf(")\n");
 	}
 #endif /* DEBUG */
 
@@ -64,7 +65,7 @@ dfn(nltype *parentp)
 		dfn_sz = DFN_DEPTH;
 		dfn_stack = (dfntype *) malloc(dfn_sz * sizeof (dfntype));
 		if (!dfn_stack) {
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			    "fatal: can't malloc %d objects\n", dfn_sz);
 			exit(1);
 		}
@@ -112,7 +113,8 @@ dfn_pre_visit(nltype *parentp)
 		dfn_sz = DFN_DEPTH;
 		dfn_stack = (dfntype *) malloc(dfn_sz * sizeof (dfntype));
 		if (!dfn_stack) {
-			printf("fatal: can't malloc %d objects\n", dfn_sz);
+			(void) printf("fatal: can't malloc %d objects\n",
+			    dfn_sz);
 			exit(1);
 		}
 	}
@@ -125,7 +127,7 @@ dfn_pre_visit(nltype *parentp)
 		    dfn_sz * sizeof (dfntype));
 
 		if (!dfn_stack) {
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			    "fatal: can't realloc %d objects\n", dfn_sz);
 			exit(1);
 		}
@@ -137,9 +139,9 @@ dfn_pre_visit(nltype *parentp)
 
 #ifdef DEBUG
 	if (debug & DFNDEBUG) {
-		printf("[dfn_pre_visit]\t\t%d:", dfn_depth);
+		(void) printf("[dfn_pre_visit]\t\t%d:", dfn_depth);
 		printname(parentp);
-		printf("\n");
+		(void) printf("\n");
 	}
 #endif /* DEBUG */
 }
@@ -188,7 +190,8 @@ dfn_findcycle(nltype *childp)
 		 * don't report non existent functions
 		 */
 		if (childp->value) {
-			fprintf(stderr, "[dfn_findcycle] couldn't find head "
+			(void) fprintf(stderr,
+			    "[dfn_findcycle] couldn't find head "
 			    "of cycle for %s\n", childp->name);
 			return;
 		}
@@ -196,10 +199,10 @@ dfn_findcycle(nltype *childp)
 
 #ifdef DEBUG
 	if (debug & DFNDEBUG) {
-		printf("[dfn_findcycle] dfn_depth %d cycletop %d ",
+		(void) printf("[dfn_findcycle] dfn_depth %d cycletop %d ",
 		    dfn_depth, cycletop);
 		printname(cycleheadp);
-		printf("\n");
+		(void) printf("\n");
 	}
 #endif /* DEBUG */
 
@@ -220,9 +223,9 @@ dfn_findcycle(nltype *childp)
 			/* void: chase down to tail of things already glommed */
 #ifdef DEBUG
 			if (debug & DFNDEBUG) {
-				printf("[dfn_findcycle] tail ");
+				(void) printf("[dfn_findcycle] tail ");
 				printname(tailp);
-				printf("\n");
+				(void) printf("\n");
 			}
 #endif /* DEBUG */
 		}
@@ -236,9 +239,9 @@ dfn_findcycle(nltype *childp)
 			cycleheadp = cycleheadp->cyclehead;
 #ifdef DEBUG
 			if (debug & DFNDEBUG) {
-				printf("[dfn_findcycle] new cyclehead ");
+				(void) printf("[dfn_findcycle] new cyclehead ");
 				printname(cycleheadp);
-				printf("\n");
+				(void) printf("\n");
 			}
 #endif /* DEBUG */
 		}
@@ -255,11 +258,12 @@ dfn_findcycle(nltype *childp)
 				childp->cyclehead = cycleheadp;
 #ifdef DEBUG
 				if (debug & DFNDEBUG) {
-					printf("[dfn_findcycle] glomming ");
+					(void) printf(
+					    "[dfn_findcycle] glomming ");
 					printname(childp);
-					printf(" onto ");
+					(void) printf(" onto ");
 					printname(cycleheadp);
-					printf("\n");
+					(void) printf("\n");
 				}
 #endif /* DEBUG */
 				for (tailp = childp; tailp->cnext;
@@ -267,17 +271,17 @@ dfn_findcycle(nltype *childp)
 					tailp->cnext->cyclehead = cycleheadp;
 #ifdef DEBUG
 					if (debug & DFNDEBUG) {
-						printf("[dfn_findcycle]"
+						(void) printf("[dfn_findcycle]"
 						    " and its tail ");
 						printname(tailp->cnext);
-						printf(" onto ");
+						(void) printf(" onto ");
 						printname(cycleheadp);
-						printf("\n");
+						(void) printf("\n");
 					}
 #endif /* DEBUG */
 				}
 			} else if (childp->cyclehead != cycleheadp) {
-				fprintf(stderr, "[dfn_busy] glommed,"
+				(void) fprintf(stderr, "[dfn_busy] glommed,"
 				    " but not to cyclehead\n");
 			}
 		}
@@ -298,9 +302,9 @@ dfn_self_cycle(nltype *parentp)
 	 */
 #ifdef DEBUG
 	if (debug & DFNDEBUG) {
-		printf("[dfn_self_cycle] ");
+		(void) printf("[dfn_self_cycle] ");
 		printname(parentp);
-		printf("\n");
+		(void) printf("\n");
 	}
 #endif /* DEBUG */
 }
@@ -317,9 +321,9 @@ dfn_post_visit(nltype *parentp)
 
 #ifdef DEBUG
 	if (debug & DFNDEBUG) {
-		printf("[dfn_post_visit]\t%d: ", dfn_depth);
+		(void) printf("[dfn_post_visit]\t%d: ", dfn_depth);
 		printname(parentp);
-		printf("\n");
+		(void) printf("\n");
 	}
 #endif /* DEBUG */
 	/*
@@ -334,16 +338,18 @@ dfn_post_visit(nltype *parentp)
 			memberp->toporder = dfn_counter;
 #ifdef DEBUG
 			if (debug & DFNDEBUG) {
-				printf("[dfn_post_visit]\t\tmember ");
+				(void) printf("[dfn_post_visit]\t\tmember ");
 				printname(memberp);
-				printf(" -> toporder = %d\n", dfn_counter);
+				(void) printf(" -> toporder = %d\n",
+				    dfn_counter);
 			}
 #endif /* DEBUG */
 		}
 #ifdef DEBUG
 	} else {
 		if (debug & DFNDEBUG)
-			printf("[dfn_post_visit]\t\tis part of a cycle\n");
+			(void) printf(
+			    "[dfn_post_visit]\t\tis part of a cycle\n");
 #endif /* DEBUG */
 	}
 	dfn_depth -= 1;

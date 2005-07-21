@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1988 AT&T	*/
@@ -33,62 +33,42 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
-/* * * * * *
+/*
  * symintFcns.c -- symbol information interface routines.
- * 
+ *
  * these routines form a symbol information access
  * interface, for the profilers to get at object file
  * information.  this interface was designed to aid
  * in the COFF to ELF conversion of prof, lprof and friends.
- * 
+ *
  */
 
 
-/* * * * * *
+/*
  * _err_exit(format_s, va_alist)
  * format_s	- printf(3S) arg string.
  * va_alist	- var_args(3?) printf() arguments.
- * 
+ *
  * does not return - prints message and calls exit(3).
- * 
- * 
+ *
+ *
  * this routine spits out a message (passed as above)
  * and exits.
  */
 
+/* PRINTFLIKE1 */
+void
 _err_exit(char *format_s, ...)
 {
 	va_list ap;
 
-	fprintf(stderr, "fatal error: ");
+	(void) fprintf(stderr, "fatal error: ");
 	va_start(ap, format_s);
-	vfprintf(stderr, format_s, ap);
+	(void) vfprintf(stderr, format_s, ap);
 	va_end(ap);
-	fprintf(stderr, "\n");
-
-debugp1("--- this is where we exit ---\n")
+	(void) fprintf(stderr, "\n");
 
 	exit(1);
-}
-
-
-/* * * * * *
- * _err_warn(format_s, va_alist)
- * format_s	- printf(3S) arg string.
- * va_alist	- var_args(3?) printf() arguments.
- * 
- * 
- * This routine prints a warning (passed as above)
- */
-
-_err_warn(char *format_s, ...)
-{
-	va_list ap;
-
-	fprintf(stderr, "Warning: ");
-	va_start(ap, format_s);
-	vfprintf(stderr, format_s, ap);
-	va_end(ap);
-	fprintf(stderr, "\n");
 }

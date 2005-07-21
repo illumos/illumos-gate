@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1990-1998,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -86,7 +87,7 @@ nllookup(mod_info_t *module, pctype address, pctype *nxtsym)
 	}
 
 	if (searchmsg++ == 0)
-		fprintf(stderr, "[nllookup] binary search fails???\n");
+		(void) fprintf(stderr, "[nllookup] binary search fails???\n");
 
 	/* must never reach here! */
 	return (0);
@@ -98,12 +99,13 @@ arclookup(nltype *parentp, nltype *childp)
 	arctype	*arcp;
 
 	if (parentp == 0 || childp == 0) {
-		fprintf(stderr, "[arclookup] parentp == 0 || childp == 0\n");
+		(void) fprintf(stderr,
+		    "[arclookup] parentp == 0 || childp == 0\n");
 		return (0);
 	}
 #ifdef DEBUG
 	if (debug & LOOKUPDEBUG) {
-		printf("[arclookup] parent %s child %s\n",
+		(void) printf("[arclookup] parent %s child %s\n",
 		    parentp->name, childp->name);
 	}
 #endif /* DEBUG */
@@ -111,7 +113,8 @@ arclookup(nltype *parentp, nltype *childp)
 	for (arcp = parentp->children; arcp; arcp = arcp->arc_childlist) {
 #ifdef DEBUG
 		if (debug & LOOKUPDEBUG) {
-			printf("[arclookup]\t arc_parent %s arc_child %s\n",
+			(void) printf(
+			    "[arclookup]\t arc_parent %s arc_child %s\n",
 			    arcp->arc_parentp->name,
 			    arcp->arc_childp->name);
 		}

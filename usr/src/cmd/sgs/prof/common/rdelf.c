@@ -20,15 +20,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ELF support routines for processing versioned mon.out files.
  */
 
+#include <stdlib.h>
+#include <string.h>
 #include "profv.h"
 
 bool
@@ -39,28 +42,28 @@ is_shared_obj(char *name)
 	GElf_Ehdr	ehdr;
 
 	if ((fd = open(name, O_RDONLY)) == -1) {
-		fprintf(stderr, "%s: can't open `%s'\n", cmdname, name);
+		(void) fprintf(stderr, "%s: can't open `%s'\n", cmdname, name);
 		exit(ERR_ELF);
 	}
 
 	if (elf_version(EV_CURRENT) == EV_NONE) {
-		fprintf(stderr, "%s: libelf out of date\n", cmdname);
+		(void) fprintf(stderr, "%s: libelf out of date\n", cmdname);
 		exit(ERR_ELF);
 	}
 
 	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
-		fprintf(stderr, "%s: elf_begin failed\n", cmdname);
+		(void) fprintf(stderr, "%s: elf_begin failed\n", cmdname);
 		exit(ERR_ELF);
 	}
 
 	if (gelf_getehdr(elf, &ehdr) == NULL) {
-		fprintf(stderr, "%s: can't read ELF header of %s\n",
+		(void) fprintf(stderr, "%s: can't read ELF header of %s\n",
 								cmdname, name);
 		exit(ERR_ELF);
 	}
 
-	elf_end(elf);
-	close(fd);
+	(void) elf_end(elf);
+	(void) close(fd);
 
 	if (ehdr.e_type == ET_DYN)
 		return (TRUE);
@@ -140,8 +143,11 @@ rm_dups(nltype *nl, size_t *nfuncs)
 }
 
 int
-cmp_by_address(nltype *a, nltype *b)
+cmp_by_address(const void *arg1, const void *arg2)
 {
+	nltype *a = (nltype *)arg1;
+	nltype *b = (nltype *)arg2;
+
 	if (a->value < b->value)
 		return (-1);
 	else if (a->value > b->value)
@@ -194,7 +200,7 @@ is_function(Elf *elf, GElf_Sym *sym)
 		return (0);
 
 	scn = elf_getscn(elf, sym->st_shndx);
-	gelf_getshdr(scn, &shdr);
+	(void) gelf_getshdr(scn, &shdr);
 
 	if (!(shdr.sh_flags & SHF_EXECINSTR))
 		return (0);
@@ -222,10 +228,10 @@ fetch_symtab(Elf *elf, char *filename, mod_info_t *module)
 					shdr.sh_type == SHT_DYNSYM) {
 			GElf_Xword chk = shdr.sh_size / shdr.sh_entsize;
 
-			nsyms = (size_t) (shdr.sh_size / shdr.sh_entsize);
+			nsyms = (size_t)(shdr.sh_size / shdr.sh_entsize);
 
 			if (chk != (GElf_Xword) nsyms) {
-				fprintf(stderr, "%s: can't handle"
+				(void) fprintf(stderr, "%s: can't handle"
 					"more than 2^32 symbols", cmdname);
 				exit(ERR_INPUT);
 			}
@@ -242,19 +248,19 @@ fetch_symtab(Elf *elf, char *filename, mod_info_t *module)
 	}
 
 	if (sym == NULL || strndx == 0) {
-		fprintf(stderr, "%s: missing symbol table in %s\n",
+		(void) fprintf(stderr, "%s: missing symbol table in %s\n",
 						    cmdname, filename);
 		exit(ERR_ELF);
 	}
 
 	if ((symdata = elf_getdata(scn, NULL)) == NULL) {
-		fprintf(stderr, "%s: can't read symbol data from %s\n",
+		(void) fprintf(stderr, "%s: can't read symbol data from %s\n",
 						    cmdname, filename);
 		exit(ERR_ELF);
 	}
 
 	if ((npe = nl = (nltype *) calloc(nsyms, sizeof (nltype))) == NULL) {
-		fprintf(stderr, "%s: can't alloc %llx bytes for symbols\n",
+		(void) fprintf(stderr, "%s: can't alloc %x bytes for symbols\n",
 					cmdname, nsyms * sizeof (nltype));
 		exit(ERR_ELF);
 	}
@@ -270,7 +276,7 @@ fetch_symtab(Elf *elf, char *filename, mod_info_t *module)
 		GElf_Sym	gsym;
 		char		*name;
 
-		gelf_getsym(symdata, i, &gsym);
+		(void) gelf_getsym(symdata, i, &gsym);
 
 		name = elf_strptr(elf, strndx, gsym.st_name);
 
@@ -293,7 +299,7 @@ fetch_symtab(Elf *elf, char *filename, mod_info_t *module)
 	}
 
 	if (npe == nl) {
-		fprintf(stderr, "%s: no valid functions in %s\n",
+		(void) fprintf(stderr, "%s: no valid functions in %s\n",
 						    cmdname, filename);
 		exit(ERR_INPUT);
 	}
@@ -302,8 +308,7 @@ fetch_symtab(Elf *elf, char *filename, mod_info_t *module)
 	 * And finally, sort the symbols by increasing address
 	 * and remove the duplicates.
 	 */
-	qsort(nl, nfuncs, sizeof (nltype),
-			(int(*)(const void *, const void *)) cmp_by_address);
+	qsort(nl, nfuncs, sizeof (nltype), cmp_by_address);
 	rm_dups(nl, &nfuncs);
 
 	module->nl = nl;
@@ -320,7 +325,7 @@ get_txtorigin(Elf *elf, char *filename)
 	bool		first_load_seg = TRUE;
 
 	if (gelf_getehdr(elf, &ehdr) == NULL) {
-		fprintf(stderr, "%s: can't read ELF header of %s\n",
+		(void) fprintf(stderr, "%s: can't read ELF header of %s\n",
 						    cmdname, filename);
 		exit(ERR_ELF);
 	}
@@ -353,17 +358,17 @@ get_syms(char *filename, mod_info_t *mi)
 	}
 
 	if (elf_version(EV_CURRENT) == EV_NONE) {
-		fprintf(stderr, "%s: libelf out of date\n", cmdname);
+		(void) fprintf(stderr, "%s: libelf out of date\n", cmdname);
 		exit(ERR_ELF);
 	}
 
 	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
-		fprintf(stderr, "%s: elf_begin failed\n", cmdname);
+		(void) fprintf(stderr, "%s: elf_begin failed\n", cmdname);
 		exit(ERR_ELF);
 	}
 
 	if (gelf_getclass(elf) != ELFCLASS64) {
-		fprintf(stderr, "%s: unsupported mon.out format for "
+		(void) fprintf(stderr, "%s: unsupported mon.out format for "
 				    "this class of object\n", cmdname);
 		exit(ERR_ELF);
 	}

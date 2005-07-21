@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 
 #include	<sysexits.h>
 #include	<stdlib.h>
+#include	<stdio.h>
 #include	<unistd.h>
 #include	"gprof.h"
 #include	"profile.h"
@@ -41,7 +42,7 @@ static pctype	lowpc, highpc;		/* range profiled, in UNIT's */
 static char *defaultEs[] = {
 	"mcount",
 	"__mcleanup",
-	0
+	NULL
 };
 
 #ifdef DEBUG
@@ -51,14 +52,14 @@ static char *objname[] = {
 	"PROF_BUFFER_T",
 	"PROF_CALLGRAPH_T",
 	"PROF_MODULES_T",
-	0
+	NULL
 };
 #define	MAX_OBJTYPES	3
 
-#endif DEBUG
+#endif /* DEBUG */
 
 void
-done()
+done(void)
 {
 
 	exit(EX_OK);
@@ -88,13 +89,13 @@ min(pctype a, pctype b)
  *
  */
 static void
-alignentries()
+alignentries(void)
 {
-	register struct nl *	nlp;
+	struct nl *nlp;
 #ifdef DEBUG
 	pctype			bucket_of_entry;
 	pctype			bucket_of_code;
-#endif DEBUG
+#endif /* DEBUG */
 
 	/* for old-style gmon.out, nameslist is only in modules.nl */
 
@@ -105,12 +106,13 @@ alignentries()
 		bucket_of_code = (nlp->svalue + UNITS_TO_CODE - lowpc) / scale;
 		if (bucket_of_entry < bucket_of_code) {
 			if (debug & SAMPLEDEBUG) {
-				printf("[alignentries] pushing svalue 0x%llx "
-				"to 0x%llx\n", nlp->svalue,
-				nlp->svalue + UNITS_TO_CODE);
+				(void) printf(
+				    "[alignentries] pushing svalue 0x%llx "
+				    "to 0x%llx\n", nlp->svalue,
+				    nlp->svalue + UNITS_TO_CODE);
 			}
 		}
-#endif DEBUG
+#endif /* DEBUG */
 	}
 }
 
@@ -150,7 +152,7 @@ alignentries()
  *	have any overlap (the two end cases, above).
  */
 static void
-asgnsamples()
+asgnsamples(void)
 {
 	sztype		i, j;
 	unsigned_UNIT	ccnt;
@@ -176,10 +178,11 @@ asgnsamples()
 		time = ccnt;
 #ifdef DEBUG
 		if (debug & SAMPLEDEBUG) {
-			printf("[asgnsamples] pcl 0x%llx pch 0x%llx ccnt %d\n",
+			(void) printf(
+			    "[asgnsamples] pcl 0x%llx pch 0x%llx ccnt %d\n",
 			    pcl, pch, ccnt);
 		}
-#endif DEBUG
+#endif /* DEBUG */
 		totime += time;
 		for (j = (j ? j - 1 : 0); j < nname; j++) {
 			svalue0 = nl[j].svalue;
@@ -200,33 +203,33 @@ asgnsamples()
 			if (overlap != 0) {
 #ifdef DEBUG
 				if (debug & SAMPLEDEBUG) {
-					printf("[asgnsamples] "
+					(void) printf("[asgnsamples] "
 					    "(0x%llx->0x%llx-0x%llx) %s gets "
 					    "%f ticks %lld overlap\n",
 					    nl[j].value/sizeof (UNIT), svalue0,
 					    svalue1, nl[j].name,
 					    overlap * time / scale, overlap);
 				}
-#endif DEBUG
+#endif /* DEBUG */
 				nl[j].time += overlap * time / scale;
 			}
 		}
 	}
 #ifdef DEBUG
 	if (debug & SAMPLEDEBUG) {
-		printf("[asgnsamples] totime %f\n", totime);
+		(void) printf("[asgnsamples] totime %f\n", totime);
 	}
-#endif DEBUG
+#endif /* DEBUG */
 }
 
 
 static void
-dump_callgraph(FILE *fp, char *filename,
-				unsigned long tarcs, unsigned long ncallees)
+dump_callgraph(FILE *fp, char *filename, unsigned long tarcs,
+    unsigned long ncallees)
 {
 	ProfCallGraph		prof_cgraph;
 	ProfFunction		prof_func;
-	register arctype	*arcp;
+	arctype	*arcp;
 	mod_info_t		*mi;
 	nltype			*nlp;
 	size_t			cur_offset;
@@ -243,8 +246,9 @@ dump_callgraph(FILE *fp, char *filename,
 		perror(filename);
 		exit(EX_IOERR);
 	}
+	/* CONSTCOND */
 	if (CGRAPH_FILLER)
-		fseek(fp, CGRAPH_FILLER, SEEK_CUR);
+		(void) fseek(fp, CGRAPH_FILLER, SEEK_CUR);
 
 	/* Current offset inside the callgraph object */
 	cur_offset = prof_cgraph.functions;
@@ -296,8 +300,9 @@ dump_callgraph(FILE *fp, char *filename,
 					perror(filename);
 					exit(EX_IOERR);
 				}
+				/* CONSTCOND */
 				if (FUNC_FILLER)
-					fseek(fp, FUNC_FILLER, SEEK_CUR);
+					(void) fseek(fp, FUNC_FILLER, SEEK_CUR);
 
 				cur_offset += PROFFUNC_SZ;
 				caller_id++;
@@ -324,7 +329,7 @@ dump_hits(FILE *fp, char *filename, nltype *nlp)
 		nelem = PROF_BUFFER_SIZE;
 
 	if ((p = (Address *) calloc(nelem, sizeof (Address))) == NULL) {
-		fprintf(stderr, "%s: no room for %ld pcsamples\n",
+		(void) fprintf(stderr, "%s: no room for %d pcsamples\n",
 							    whoami, nelem);
 		exit(EX_OSERR);
 	}
@@ -354,11 +359,11 @@ dump_hits(FILE *fp, char *filename, nltype *nlp)
 }
 
 static void
-dump_pcsamples(FILE *fp, char *filename,
-				unsigned long *tarcs, unsigned long *ncallees)
+dump_pcsamples(FILE *fp, char *filename, unsigned long *tarcs,
+    unsigned long *ncallees)
 {
 	ProfBuffer		prof_buffer;
-	register arctype	*arcp;
+	arctype	*arcp;
 	mod_info_t		*mi;
 	nltype			*nlp;
 
@@ -371,8 +376,9 @@ dump_pcsamples(FILE *fp, char *filename,
 		perror(filename);
 		exit(EX_IOERR);
 	}
+	/* CONSTCOND */
 	if (BUF_FILLER)
-		fseek(fp, BUF_FILLER, SEEK_CUR);
+		(void) fseek(fp, BUF_FILLER, SEEK_CUR);
 
 	*tarcs = 0;
 	*ncallees = 0;
@@ -408,8 +414,8 @@ dump_modules(FILE *fp, char *filename, size_t pbuf_sz)
 
 	/* Allocate for path strings buffer */
 	pbuf_sz = CEIL(pbuf_sz, STRUCT_ALIGN);
-	if ((p = pbuf = (char *) calloc(pbuf_sz, sizeof (char))) == NULL) {
-		fprintf(stderr, "%s: no room for %ld bytes\n",
+	if ((p = pbuf = calloc(pbuf_sz, sizeof (char))) == NULL) {
+		(void) fprintf(stderr, "%s: no room for %d bytes\n",
 					    whoami, pbuf_sz * sizeof (char));
 		exit(EX_OSERR);
 	}
@@ -424,8 +430,9 @@ dump_modules(FILE *fp, char *filename, size_t pbuf_sz)
 		perror(filename);
 		exit(EX_IOERR);
 	}
+	/* CONSTCOND */
 	if (MODLIST_FILLER)
-		fseek(fp, MODLIST_FILLER, SEEK_CUR);
+		(void) fseek(fp, MODLIST_FILLER, SEEK_CUR);
 
 	/*
 	 * Initialize offsets for ProfModule elements.
@@ -447,10 +454,11 @@ dump_modules(FILE *fp, char *filename, size_t pbuf_sz)
 			exit(EX_IOERR);
 		}
 
+		/* CONSTCOND */
 		if (MOD_FILLER)
-			fseek(fp, MOD_FILLER, SEEK_CUR);
+			(void) fseek(fp, MOD_FILLER, SEEK_CUR);
 
-		strcpy(p, mi->name);
+		(void) strcpy(p, mi->name);
 		namelen = strlen(mi->name);
 		p += namelen + 1;
 
@@ -479,7 +487,7 @@ static void
 fixup_maps(size_t *pathsz)
 {
 	unsigned int	n_inactive = 0;
-	Address		lbase, lend;
+	Address		lbase = 0, lend;
 	mod_info_t	*mi;
 
 	/* Pick the lowest load address among modules */
@@ -547,15 +555,16 @@ dump_gprofhdr(FILE *fp, char *filename)
 		exit(EX_IOERR);
 	}
 
+	/* CONSTCOND */
 	if (HDR_FILLER)
-		fseek(fp, HDR_FILLER, SEEK_CUR);
+		(void) fseek(fp, HDR_FILLER, SEEK_CUR);
 }
 
 static void
 dumpsum_ostyle(char *sumfile)
 {
-	register nltype *nlp;
-	register arctype *arcp;
+	nltype *nlp;
+	arctype *arcp;
 	struct rawarc arc;
 	struct rawarc32 arc32;
 	FILE *sfile;
@@ -618,14 +627,15 @@ dumpsum_ostyle(char *sumfile)
 			}
 #ifdef DEBUG
 			if (debug & SAMPLEDEBUG) {
-				printf("[dumpsum_ostyle] frompc 0x%llx selfpc "
+				(void) printf(
+				    "[dumpsum_ostyle] frompc 0x%llx selfpc "
 				    "0x%llx count %lld\n", arc.raw_frompc,
 				    arc.raw_selfpc, arc.raw_count);
 			}
-#endif DEBUG
+#endif /* DEBUG */
 		}
 	}
-	fclose(sfile);
+	(void) fclose(sfile);
 }
 
 /*
@@ -682,7 +692,7 @@ dumpsum(char *sumfile)
 	dump_callgraph(sfile, sumfile, total_arcs, ncallees);
 
 
-	fclose(sfile);
+	(void) fclose(sfile);
 }
 
 static void
@@ -719,11 +729,11 @@ tally(mod_info_t *caller_mod, mod_info_t *callee_mod, struct rawarc *rawp)
 
 #ifdef DEBUG
 		if (debug & TALLYDEBUG) {
-			printf("[tally] arc from %s to %s traversed "
+			(void) printf("[tally] arc from %s to %s traversed "
 			    "%lld times\n", parentp->name,
 			    childp->name, rawp->raw_count);
 		}
-#endif DEBUG
+#endif /* DEBUG */
 		addarc(parentp, childp, rawp->raw_count);
 	}
 }
@@ -762,10 +772,7 @@ locate(Address	*pclist, size_t nelem, Address keypc)
 }
 
 static void
-assign_pcsamples(module, pcsmpl, n_samples)
-mod_info_t	*module;
-Address		*pcsmpl;
-size_t		n_samples;
+assign_pcsamples(mod_info_t *module, Address *pcsmpl, size_t n_samples)
 {
 	Address		*pcptr, *pcse = pcsmpl + n_samples;
 	pctype		nxt_func;
@@ -773,16 +780,17 @@ size_t		n_samples;
 	size_t		func_nticks;
 #ifdef DEBUG
 	size_t		n_hits_in_module = 0;
-#endif DEBUG
+#endif /* DEBUG */
 
 	/* Locate the first pc-hit for this module */
 	if ((pcptr = locate(pcsmpl, n_samples, module->load_base)) == NULL) {
 #ifdef DEBUG
 		if (debug & PCSMPLDEBUG) {
-			printf("[assign_pcsamples] no pc-hits in\n");
-			printf("                   `%s'\n", module->name);
+			(void) printf("[assign_pcsamples] no pc-hits in\n");
+			(void) printf(
+			    "                   `%s'\n", module->name);
 		}
-#endif DEBUG
+#endif /* DEBUG */
 		return;			/* no pc-hits in this module */
 	}
 
@@ -811,7 +819,7 @@ size_t		n_samples;
 
 #ifdef DEBUG
 			n_hits_in_module += func_nticks;
-#endif DEBUG
+#endif /* DEBUG */
 		} else {
 			/*
 			 * pc sample could not be assigned to function;
@@ -823,15 +831,19 @@ size_t		n_samples;
 
 #ifdef DEBUG
 	if (debug & PCSMPLDEBUG) {
-		printf("[assign_pcsamples] %ld hits in\n", n_hits_in_module);
-		printf("                   `%s'\n", module->name);
+		(void) printf(
+		    "[assign_pcsamples] %ld hits in\n", n_hits_in_module);
+		(void) printf("                   `%s'\n", module->name);
 	}
-#endif DEBUG
+#endif /* DEBUG */
 }
 
 int
-pc_cmp(Address *pc1, Address *pc2)
+pc_cmp(const void *arg1, const void *arg2)
 {
+	Address *pc1 = (Address *)arg1;
+	Address *pc2 = (Address *)arg2;
+
 	if (*pc1 > *pc2)
 		return (1);
 
@@ -842,8 +854,7 @@ pc_cmp(Address *pc1, Address *pc2)
 }
 
 static void
-process_pcsamples(bufp)
-ProfBuffer	*bufp;
+process_pcsamples(ProfBuffer *bufp)
 {
 	Address		*pc_samples;
 	mod_info_t	*mi;
@@ -852,10 +863,11 @@ ProfBuffer	*bufp;
 
 #ifdef DEBUG
 	if (debug & PCSMPLDEBUG) {
-		printf("[process_pcsamples] number of pcsamples = %lld\n",
-							    bufp->bufsize);
+		(void) printf(
+		    "[process_pcsamples] number of pcsamples = %lld\n",
+		    bufp->bufsize);
 	}
-#endif DEBUG
+#endif /* DEBUG */
 
 	/* buffer with no pc samples ? */
 	if (bufp->bufsize == 0)
@@ -872,7 +884,7 @@ ProfBuffer	*bufp;
 	/* Allocate for the pcsample chunk */
 	pc_samples = (Address *) calloc(chunk_size, sizeof (Address));
 	if (pc_samples == NULL) {
-		fprintf(stderr, "%s: no room for %ld sample pc's\n",
+		(void) fprintf(stderr, "%s: no room for %d sample pc's\n",
 							whoami, chunk_size);
 		exit(EX_OSERR);
 	}
@@ -880,14 +892,14 @@ ProfBuffer	*bufp;
 	/* Copy the current set of pcsamples */
 	nelem_read = 0;
 	nelem_to_read = bufp->bufsize;
-	p = (char *) bufp + bufp->buffer;
+	p = (char *)bufp + bufp->buffer;
 
 	while (nelem_read < nelem_to_read) {
-		memcpy((void *) pc_samples, p, chunk_size * sizeof (Address));
+		(void) memcpy((void *) pc_samples, p,
+		    chunk_size * sizeof (Address));
 
 		/* Sort the pc samples */
-		qsort(pc_samples, chunk_size, sizeof (Address),
-				(int (*)(const void *, const void *)) pc_cmp);
+		qsort(pc_samples, chunk_size, sizeof (Address), pc_cmp);
 
 		/*
 		 * Assign pcsamples to functions in the currently active
@@ -929,8 +941,7 @@ find_module(Address addr)
 }
 
 static void
-process_cgraph(cgp)
-ProfCallGraph	*cgp;
+process_cgraph(ProfCallGraph *cgp)
 {
 	struct rawarc	arc;
 	mod_info_t	*callee_mi, *caller_mi;
@@ -946,7 +957,8 @@ ProfCallGraph	*cgp;
 	for (callee_off = cgp->functions; callee_off;
 					    callee_off = calleep->next_to) {
 
-		calleep = (ProfFunction *) ((char *) cgp + callee_off);
+		/* LINTED: pointer cast */
+		calleep = (ProfFunction *)((char *)cgp + callee_off);
 
 		/*
 		 * We could choose either to sort the {caller, callee}
@@ -963,10 +975,11 @@ ProfCallGraph	*cgp;
 		if ((callee_mi = find_module(calleep->topc)) == NULL) {
 #ifdef DEBUG
 			if (debug & CGRAPHDEBUG) {
-				printf("[process_cgraph] callee %#llx missed\n",
-							    calleep->topc);
+				(void) printf(
+				    "[process_cgraph] callee %#llx missed\n",
+				    calleep->topc);
 			}
-#endif DEBUG
+#endif /* DEBUG */
 			continue;
 		} else
 			arc.raw_selfpc = calleep->topc;
@@ -974,15 +987,17 @@ ProfCallGraph	*cgp;
 		for (caller_off = callee_off; caller_off;
 					caller_off = callerp->next_from)  {
 
-			callerp = (ProfFunction *) ((char *) cgp + caller_off);
+			/* LINTED: pointer cast */
+			callerp = (ProfFunction *)((char *)cgp + caller_off);
 			if ((caller_mi = find_module(callerp->frompc)) ==
 									NULL) {
 #ifdef DEBUG
 				if (debug & CGRAPHDEBUG) {
-					printf("[process_cgraph] caller %#llx "
-						"missed\n", callerp->frompc);
+					(void) printf(
+					    "[process_cgraph] caller %#llx "
+					    "missed\n", callerp->frompc);
 				}
-#endif DEBUG
+#endif /* DEBUG */
 				continue;
 			}
 
@@ -991,18 +1006,19 @@ ProfCallGraph	*cgp;
 
 #ifdef DEBUG
 			if (debug & CGRAPHDEBUG) {
-				printf("[process_cgraph] arc <%#llx, %#llx, "
-						"%lld>\n", arc.raw_frompc,
-						arc.raw_selfpc, arc.raw_count);
+				(void) printf(
+				    "[process_cgraph] arc <%#llx, %#llx, "
+				    "%lld>\n", arc.raw_frompc, arc.raw_selfpc,
+				    arc.raw_count);
 			}
-#endif DEBUG
+#endif /* DEBUG */
 			tally(caller_mi, callee_mi, &arc);
 		}
 	}
 
 #ifdef DEBUG
 	puts("\n");
-#endif DEBUG
+#endif /* DEBUG */
 }
 
 /*
@@ -1028,7 +1044,7 @@ static bool
 is_same_as_aout(char *modpath, struct stat *buf)
 {
 	if (stat(modpath, buf) == -1) {
-		fprintf(stderr, "%s: can't get info on `%s'\n",
+		(void) fprintf(stderr, "%s: can't get info on `%s'\n",
 							whoami, modpath);
 		exit(EX_NOINPUT);
 	}
@@ -1040,25 +1056,24 @@ is_same_as_aout(char *modpath, struct stat *buf)
 }
 
 static void
-process_modules(modlp)
-ProfModuleList	*modlp;
+process_modules(ProfModuleList *modlp)
 {
 	ProfModule	*newmodp;
 	mod_info_t	*mi, *last, *new_module;
-	char		*so_path, *name;
+	char		*so_path;
 	bool		more_modules = TRUE;
 	struct stat	so_statbuf;
 
 #ifdef DEBUG
 	if (debug & MODULEDEBUG) {
-		printf("[process_modules] module obj version %u\n",
+		(void) printf("[process_modules] module obj version %u\n",
 							    modlp->version);
 	}
-#endif DEBUG
+#endif /* DEBUG */
 
 	/* Check version of module type object */
 	if (modlp->version > PROF_MODULES_VER) {
-		fprintf(stderr, "%s: version %d for module type objects"
+		(void) fprintf(stderr, "%s: version %d for module type objects"
 				"is not supported\n", whoami, modlp->version);
 		exit(EX_SOFTWARE);
 	}
@@ -1068,7 +1083,8 @@ ProfModuleList	*modlp;
 	 * Scan the PROF_MODULES_T list and add modules to current list
 	 * of modules, if they're not present already
 	 */
-	newmodp = (ProfModule *) ((char *) modlp + modlp->modules);
+	/* LINTED: pointer cast */
+	newmodp = (ProfModule *)((char *)modlp + modlp->modules);
 	do {
 		/*
 		 * Since the prog could've been renamed after its run, we
@@ -1076,7 +1092,7 @@ ProfModuleList	*modlp;
 		 * probably the renamed aout. We should also skip any other
 		 * non-sharedobj's that we see (or should we report an error ?)
 		 */
-		so_path = (caddr_t) modlp + newmodp->path;
+		so_path = (caddr_t)modlp + newmodp->path;
 		if (does_overlap(newmodp, &modules) ||
 				    is_same_as_aout(so_path, &so_statbuf) ||
 						(!is_shared_obj(so_path))) {
@@ -1084,20 +1100,22 @@ ProfModuleList	*modlp;
 			if (!newmodp->next)
 				more_modules = FALSE;
 
+			/* LINTED: pointer cast */
 			newmodp = (ProfModule *)
-					((caddr_t) modlp + newmodp->next);
+			    ((caddr_t)modlp + newmodp->next);
 #ifdef DEBUG
 			if (debug & MODULEDEBUG) {
-				printf("[process_modules] `%s'\n", so_path);
-				printf("                  skipped\n");
+				(void) printf(
+				    "[process_modules] `%s'\n", so_path);
+				(void) printf("                  skipped\n");
 			}
-#endif DEBUG
+#endif /* DEBUG */
 			continue;
 		}
 #ifdef DEBUG
 		if (debug & MODULEDEBUG)
-			printf("[process_modules] `%s'...\n", so_path);
-#endif DEBUG
+			(void) printf("[process_modules] `%s'...\n", so_path);
+#endif /* DEBUG */
 
 		/*
 		 * Check all modules (leave the first one, 'cos that
@@ -1105,7 +1123,7 @@ ProfModuleList	*modlp;
 		 * there in the list, update the load addresses and proceed.
 		 */
 		last = &modules;
-		while (mi = last->next) {
+		while ((mi = last->next) != NULL) {
 			/*
 			 * We expect the full pathname for all shared objects
 			 * needed by the program executable. In this case, we
@@ -1125,13 +1143,16 @@ ProfModuleList	*modlp;
 			if (does_overlap(newmodp, mi)) {
 #ifdef DEBUG
 				if (debug & MODULEDEBUG) {
-					printf("[process_modules] `%s'\n",
-								    so_path);
-					printf("                  overlaps\n");
-					printf("                  `%s'\n",
-								    mi->name);
+					(void) printf(
+					    "[process_modules] `%s'\n",
+					    so_path);
+					(void) printf(
+					    "                  overlaps\n");
+					(void) printf(
+					    "                  `%s'\n",
+					    mi->name);
 				}
-#endif DEBUG
+#endif /* DEBUG */
 				mi->active = FALSE;
 			}
 
@@ -1146,16 +1167,17 @@ ProfModuleList	*modlp;
 			if (!newmodp->next)
 				more_modules = FALSE;
 
+			/* LINTED: pointer cast */
 			newmodp = (ProfModule *)
-					((caddr_t) modlp + newmodp->next);
+			    ((caddr_t)modlp + newmodp->next);
 
 #ifdef DEBUG
 			if (debug & MODULEDEBUG) {
-				printf("[process_modules] base=%#llx, "
+				(void) printf("[process_modules] base=%#llx, "
 						"end=%#llx\n", mi->load_base,
 						mi->load_end);
 			}
-#endif DEBUG
+#endif /* DEBUG */
 			continue;
 		}
 
@@ -1164,16 +1186,16 @@ ProfModuleList	*modlp;
 		 * module we want to add
 		 */
 		if (gmonout_info.mtime < so_statbuf.st_mtime) {
-			fprintf(stderr, "%s: shared obj outdates prof info\n",
-								    whoami);
-			fprintf(stderr, "\t(newer %s)\n", so_path);
+			(void) fprintf(stderr,
+			    "%s: shared obj outdates prof info\n", whoami);
+			(void) fprintf(stderr, "\t(newer %s)\n", so_path);
 			exit(EX_NOINPUT);
 		}
 
 		/* Create a new module element */
-		new_module = (mod_info_t *) malloc(sizeof (mod_info_t));
+		new_module = malloc(sizeof (mod_info_t));
 		if (new_module == NULL) {
-			fprintf(stderr, "%s: no room for %ld bytes\n",
+			(void) fprintf(stderr, "%s: no room for %d bytes\n",
 						whoami, sizeof (mod_info_t));
 			exit(EX_OSERR);
 		}
@@ -1182,19 +1204,20 @@ ProfModuleList	*modlp;
 		new_module->id = n_modules + 1;
 		new_module->load_base = newmodp->startaddr;
 		new_module->load_end = newmodp->endaddr;
-		new_module->name = (char *) malloc(strlen(so_path) + 1);
+		new_module->name = malloc(strlen(so_path) + 1);
 		if (new_module->name == NULL) {
-			fprintf(stderr, "%s: no room for %ld bytes\n",
+			(void) fprintf(stderr, "%s: no room for %d bytes\n",
 						whoami, strlen(so_path) + 1);
 			exit(EX_OSERR);
 		}
-		strcpy(new_module->name, so_path);
+		(void) strcpy(new_module->name, so_path);
 #ifdef DEBUG
 		if (debug & MODULEDEBUG) {
-			printf("[process_modules] base=%#llx, end=%#llx\n",
-				new_module->load_base, new_module->load_end);
+			(void) printf(
+			    "[process_modules] base=%#llx, end=%#llx\n",
+			    new_module->load_base, new_module->load_end);
 		}
-#endif DEBUG
+#endif /* DEBUG */
 
 		/* Create this module's nameslist */
 		process_namelist(new_module);
@@ -1205,10 +1228,11 @@ ProfModuleList	*modlp;
 
 #ifdef DEBUG
 		if (debug & MODULEDEBUG) {
-			printf("[process_modules] total shared objects = %ld\n",
-							    n_modules - 1);
+			(void) printf(
+			    "[process_modules] total shared objects = %ld\n",
+			    n_modules - 1);
 		}
-#endif DEBUG
+#endif /* DEBUG */
 		/*
 		 * Move to the next module in the PROF_MODULES_T list
 		 * (if present)
@@ -1216,13 +1240,14 @@ ProfModuleList	*modlp;
 		if (!newmodp->next)
 			more_modules = FALSE;
 
-		newmodp = (ProfModule *) ((caddr_t) modlp + newmodp->next);
+		/* LINTED: pointer cast */
+		newmodp = (ProfModule *)((caddr_t)modlp + newmodp->next);
 
 	} while (more_modules);
 }
 
 static void
-reset_active_modules()
+reset_active_modules(void)
 {
 	mod_info_t	*mi;
 
@@ -1232,9 +1257,7 @@ reset_active_modules()
 }
 
 static void
-getpfiledata(memp, fsz)
-caddr_t	memp;
-size_t	fsz;
+getpfiledata(caddr_t memp, size_t fsz)
 {
 	ProfObject	*objp;
 	caddr_t		file_end;
@@ -1251,8 +1274,9 @@ size_t	fsz;
 	reset_active_modules();
 
 	file_end = memp + fsz;
-	objp = (ProfObject *) (memp + ((ProfHeader *) memp)->size);
-	while ((caddr_t) objp < file_end) {
+	/* LINTED: pointer cast */
+	objp = (ProfObject *)(memp + ((ProfHeader *)memp)->size);
+	while ((caddr_t)objp < file_end) {
 #ifdef DEBUG
 		{
 			unsigned int	type = 0;
@@ -1261,11 +1285,12 @@ size_t	fsz;
 				if (objp->type <= MAX_OBJTYPES)
 					type = objp->type;
 
-				printf("\n[getpfiledata] object %s [%#lx]\n",
+				(void) printf(
+				    "\n[getpfiledata] object %s [%#lx]\n",
 						objname[type], objp->type);
 			}
 		}
-#endif DEBUG
+#endif /* DEBUG */
 		switch (objp->type) {
 			case PROF_MODULES_T :
 				process_modules((ProfModuleList *) objp);
@@ -1282,22 +1307,23 @@ size_t	fsz;
 				break;
 
 			default :
-				fprintf(stderr,
+				(void) fprintf(stderr,
 					"%s: unknown prof object type=%d\n",
 							whoami, objp->type);
 				exit(EX_SOFTWARE);
 		}
-		objp = (ProfObject *) ((caddr_t) objp + objp->size);
+		/* LINTED: pointer cast */
+		objp = (ProfObject *)((caddr_t)objp + objp->size);
 	}
 
 	if (!found_cgraph || !found_pcsamples) {
-		fprintf(stderr,
+		(void) fprintf(stderr,
 			"%s: missing callgraph/pcsamples object\n", whoami);
 		exit(EX_SOFTWARE);
 	}
 
-	if ((caddr_t) objp > file_end) {
-		fprintf(stderr, "%s: malformed profile file.\n", whoami);
+	if ((caddr_t)objp > file_end) {
+		(void) fprintf(stderr, "%s: malformed profile file.\n", whoami);
 		exit(EX_SOFTWARE);
 	}
 
@@ -1306,8 +1332,7 @@ size_t	fsz;
 }
 
 static void
-readarcs(pfile)
-FILE	*pfile;
+readarcs(FILE *pfile)
 {
 	/*
 	 *	the rest of the file consists of
@@ -1382,11 +1407,11 @@ FILE	*pfile;
 
 #ifdef DEBUG
 		if (debug & SAMPLEDEBUG) {
-			printf("[getpfile] frompc 0x%llx selfpc "
+			(void) printf("[getpfile] frompc 0x%llx selfpc "
 			    "0x%llx count %lld\n", arc.raw_frompc,
 			    arc.raw_selfpc, arc.raw_count);
 		}
-#endif DEBUG
+#endif /* DEBUG */
 		/*
 		 *	add this arc
 		 */
@@ -1406,21 +1431,22 @@ readsamples(FILE *pfile)
 		samples = (unsigned_UNIT *) calloc(nsamples,
 		    sizeof (unsigned_UNIT));
 		if (samples == 0) {
-			fprintf(stderr, "%s: No room for %ld sample pc's\n",
+			(void) fprintf(stderr,
+			    "%s: No room for %d sample pc's\n",
 			    whoami, sampbytes / sizeof (unsigned_UNIT));
 			exit(EX_OSERR);
 		}
 	}
 
 	for (i = 0; i < nsamples; i++) {
-		fread(&sample, sizeof (unsigned_UNIT), 1, pfile);
+		(void) fread(&sample, sizeof (unsigned_UNIT), 1, pfile);
 		if (feof(pfile))
 			break;
 		samples[i] += sample;
 	}
 	if (i != nsamples) {
-		fprintf(stderr,
-		    "%s: unexpected EOF after reading %ld/%ld samples\n",
+		(void) fprintf(stderr,
+		    "%s: unexpected EOF after reading %d/%d samples\n",
 		    whoami, --i, nsamples);
 		exit(EX_IOERR);
 	}
@@ -1434,6 +1460,7 @@ handle_versioned(FILE *pfile, char *filename, size_t *fsz)
 	caddr_t		fmem;
 	struct stat	buf;
 	ProfHeader	prof_hdr;
+	off_t		lret;
 
 	/*
 	 * Check versioning info. For now, let's say we provide
@@ -1453,7 +1480,7 @@ handle_versioned(FILE *pfile, char *filename, size_t *fsz)
 	}
 
 	if (invalid_version) {
-		fprintf(stderr, "%s: version %d.%d not supported\n",
+		(void) fprintf(stderr, "%s: version %d.%d not supported\n",
 			whoami, prof_hdr.h_major_ver, prof_hdr.h_minor_ver);
 		exit(EX_SOFTWARE);
 	}
@@ -1461,20 +1488,21 @@ handle_versioned(FILE *pfile, char *filename, size_t *fsz)
 	/*
 	 * Map gmon.out onto memory.
 	 */
-	fclose(pfile);
+	(void) fclose(pfile);
 	if ((fd = open(filename, O_RDONLY)) == -1) {
 		perror(filename);
 		exit(EX_IOERR);
 	}
 
-	if ((*fsz = lseek(fd, 0, SEEK_END)) == -1) {
+	if ((lret = lseek(fd, 0, SEEK_END)) == -1) {
 		perror(filename);
 		exit(EX_IOERR);
 	}
+	*fsz = lret;
 
 	fmem = mmap(0, *fsz, PROT_READ, MAP_PRIVATE, fd, 0);
 	if (fmem == MAP_FAILED) {
-	    fprintf(stderr, "%s: can't map %s\n", whoami, filename);
+	    (void) fprintf(stderr, "%s: can't map %s\n", whoami, filename);
 	    exit(EX_IOERR);
 	}
 
@@ -1484,7 +1512,7 @@ handle_versioned(FILE *pfile, char *filename, size_t *fsz)
 	 * they were used to generate this gmon.out
 	 */
 	if (fstat(fd, &buf) == -1) {
-		fprintf(stderr, "%s: can't get info on `%s'\n",
+		(void) fprintf(stderr, "%s: can't get info on `%s'\n",
 							whoami, filename);
 		exit(EX_NOINPUT);
 	}
@@ -1493,18 +1521,16 @@ handle_versioned(FILE *pfile, char *filename, size_t *fsz)
 	gmonout_info.mtime = buf.st_mtime;
 	gmonout_info.size = buf.st_size;
 
-	close(fd);
+	(void) close(fd);
 
 	return ((void *) fmem);
 }
 
 static void *
-openpfile(filename, fsz)
-char	*filename;
-size_t	*fsz;
+openpfile(char *filename, size_t *fsz)
 {
 	struct hdr	tmp;
-	FILE *		pfile;
+	FILE		*pfile;
 	unsigned long	magic_num;
 	size_t		hdrsize = sizeof (struct hdr);
 	static bool	first_time = TRUE;
@@ -1532,7 +1558,7 @@ size_t	*fsz;
 	 */
 	if (magic_num == (unsigned int)PROF_MAGIC) {
 		if ((!first_time) && (old_style == TRUE)) {
-			fprintf(stderr, "%s: can't mix old & new format "
+			(void) fprintf(stderr, "%s: can't mix old & new format "
 						"profiled files\n", whoami);
 			exit(EX_SOFTWARE);
 		}
@@ -1542,7 +1568,7 @@ size_t	*fsz;
 	}
 
 	if ((!first_time) && (old_style == FALSE)) {
-		fprintf(stderr, "%s: can't mix old & new format "
+		(void) fprintf(stderr, "%s: can't mix old & new format "
 						"profiled files\n", whoami);
 		exit(EX_SOFTWARE);
 	}
@@ -1579,7 +1605,8 @@ size_t	*fsz;
 				exit(EX_IOERR);
 			}
 			if (l_hdr64.hd_version != PRF_VERSION_64) {
-				fprintf(stderr, "%s: expected version %d, "
+				(void) fprintf(stderr,
+				    "%s: expected version %d, "
 				    "got version %d when processing 64-bit "
 				    "run-time linker profiled file.\n",
 				    whoami, PRF_VERSION_64, l_hdr64.hd_version);
@@ -1602,7 +1629,8 @@ size_t	*fsz;
 				exit(EX_IOERR);
 			}
 			if (l_hdr.hd_version != PRF_VERSION) {
-				fprintf(stderr, "%s: expected version %d, "
+				(void) fprintf(stderr,
+				    "%s: expected version %d, "
 				    "got version %d when processing "
 				    "run-time linker profiled file.\n",
 				    whoami, PRF_VERSION, l_hdr.hd_version);
@@ -1642,17 +1670,19 @@ size_t	*fsz;
 	 */
 	if (tmp.lowpc >= tmp.highpc) {
 		if (rflag)
-			fprintf(stderr, "%s: badly formed profiled data.\n",
+			(void) fprintf(stderr,
+			    "%s: badly formed profiled data.\n",
 			    filename);
 		else
-			fprintf(stderr, "%s: badly formed gmon.out file.\n",
+			(void) fprintf(stderr,
+			    "%s: badly formed gmon.out file.\n",
 			    filename);
 		exit(EX_SOFTWARE);
 	}
 
 	if (s_highpc != 0 && (tmp.lowpc != h.lowpc ||
 	    tmp.highpc != h.highpc || tmp.ncnt != h.ncnt)) {
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    "%s: incompatible with first gmon file\n",
 		    filename);
 		exit(EX_IOERR);
@@ -1667,17 +1697,19 @@ size_t	*fsz;
 
 #ifdef DEBUG
 	if (debug & SAMPLEDEBUG) {
-		printf("[openpfile] hdr.lowpc 0x%llx hdr.highpc "
+		(void) printf("[openpfile] hdr.lowpc 0x%llx hdr.highpc "
 		    "0x%llx hdr.ncnt %lld\n",
 		    h.lowpc, h.highpc, h.ncnt);
-		printf("[openpfile]   s_lowpc 0x%llx   s_highpc 0x%llx\n",
+		(void) printf(
+		    "[openpfile]   s_lowpc 0x%llx   s_highpc 0x%llx\n",
 		    s_lowpc, s_highpc);
-		printf("[openpfile]     lowpc 0x%llx     highpc 0x%llx\n",
+		(void) printf(
+		    "[openpfile]     lowpc 0x%llx     highpc 0x%llx\n",
 		    lowpc, highpc);
-		printf("[openpfile] sampbytes %d nsamples %d\n",
+		(void) printf("[openpfile] sampbytes %d nsamples %d\n",
 		    sampbytes, nsamples);
 	}
-#endif DEBUG
+#endif /* DEBUG */
 
 	return ((void *) pfile);
 }
@@ -1698,24 +1730,23 @@ getpfile(char *filename)
 	handle = openpfile(filename, &fsz);
 
 	if (old_style) {
-		readsamples((FILE *) handle);
-		readarcs((FILE *) handle);
-		fclose((FILE *) handle);
+		readsamples((FILE *)handle);
+		readarcs((FILE *)handle);
+		(void) fclose((FILE *)handle);
 		return;
 	}
 
-	getpfiledata((caddr_t) handle, fsz);
-	munmap(handle, fsz);
+	getpfiledata((caddr_t)handle, fsz);
+	(void) munmap(handle, fsz);
 }
 
-main(int argc, char ** argv)
+int
+main(int argc, char **argv)
 {
 	char	**sp;
 	nltype	**timesortnlp;
 	int		c;
 	int		errflg;
-	extern char	*optarg;
-	extern int	optind;
 
 	prog_name = *argv;  /* preserve program name */
 	debug = 0;
@@ -1745,7 +1776,7 @@ main(int argc, char ** argv)
 		case 'd':
 			dflag = TRUE;
 			debug |= atoi(optarg);
-			printf("[main] debug = 0x%x\n", debug);
+			(void) printf("[main] debug = 0x%x\n", debug);
 			break;
 		case 'D':
 			Dflag = TRUE;
@@ -1823,7 +1854,7 @@ main(int argc, char ** argv)
 	hz = sysconf(_SC_CLK_TCK);
 	if (hz == -1) {
 		hz = 1;
-		fprintf(stderr, "time is in ticks, not seconds\n");
+		(void) fprintf(stderr, "time is in ticks, not seconds\n");
 	}
 
 	getnfile(a_outname);
@@ -1863,23 +1894,23 @@ main(int argc, char ** argv)
 	if (debug & ANYDEBUG) {
 		/* raw output of all symbols in all their glory */
 		int i;
-		printf(" Name, pc_entry_pt, svalue, tix_in_routine, "
+		(void) printf(" Name, pc_entry_pt, svalue, tix_in_routine, "
 		    "#calls, selfcalls, index \n");
 		for (i = 0; i < modules.nname; i++) { 	/* Print each symbol */
 			if (timesortnlp[i]->name)
-				printf(" %s ", timesortnlp[i]->name);
+				(void) printf(" %s ", timesortnlp[i]->name);
 			else
-				printf(" <cycle> ");
-			printf(" %lld ", timesortnlp[i]->value);
-			printf(" %lld ", timesortnlp[i]->svalue);
-			printf(" %f ", timesortnlp[i]->time);
-			printf(" %lld ", timesortnlp[i]->ncall);
-			printf(" %lld ", timesortnlp[i]->selfcalls);
-			printf(" %d ", timesortnlp[i]->index);
-			printf(" \n");
+				(void) printf(" <cycle> ");
+			(void) printf(" %lld ", timesortnlp[i]->value);
+			(void) printf(" %lld ", timesortnlp[i]->svalue);
+			(void) printf(" %f ", timesortnlp[i]->time);
+			(void) printf(" %lld ", timesortnlp[i]->ncall);
+			(void) printf(" %lld ", timesortnlp[i]->selfcalls);
+			(void) printf(" %d ", timesortnlp[i]->index);
+			(void) printf(" \n");
 		}
 	}
-#endif DEBUG
+#endif /* DEBUG */
 
 	printgprof(timesortnlp);
 	/*

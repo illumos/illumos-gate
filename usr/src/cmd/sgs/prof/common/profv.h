@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SGS_PROFV_H
@@ -191,7 +192,7 @@ extern void	profver(void);
 extern nltype	*nllookup(mod_info_t *, Address, Address *);
 extern Address	*locate(Address *, size_t, Address);
 extern void	get_syms(char *, mod_info_t *);
-extern int	cmp_by_address(nltype *, nltype *);
+extern int	cmp_by_address(const void *arg1, const void *arg2);
 extern bool	is_shared_obj(char *);
 
 #ifdef	__cplusplus

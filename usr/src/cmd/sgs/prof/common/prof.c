@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -26,17 +32,12 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  *	Program profiling report generator.
  *
  *	Usage:
  *
- *	prof [ -V ] [ -[ntca] ] [ -[ox] ] [ -g ] [ -l ] [ -z ] [ -s ] [ -C ]
- *		[ -m mdata ] [ prog ]
+ * 	prof [-ChsVz] [-a | c | n | t]  [-o  |  x]   [-g  |  l]
+ *	    [-m mdata] [prog]
  *
  *	Where "prog" is the program that was profiled; "a.out" by default.
  *	Options are:
@@ -52,7 +53,7 @@
  *	-o	Include symbol addresses in output (in octal).
  *	-x	Include symbol addresses in output (in hexadecimal).
  *	-g	Include non-global T-type symbols in output.
- *	-l	Do NOT inlcude local T-type symbols in output (default).
+ *	-l	Do NOT include local T-type symbols in output (default).
  *	-z	Include all symbols in profiling range, even if zero
  *			number of calls or time.
  *	-h	Suppress table header.
@@ -66,6 +67,7 @@
 #include <string.h>
 #include <errno.h>
 #include <dlfcn.h>
+#include <ctype.h>
 #include "sgs.h"
 #include "symint.h"
 #include "sys/param.h"			/* for HZ */
@@ -75,7 +77,6 @@
 
 #define	OLD_DEBUG(x)
 
-#define	PROC				/* Mark procedure names. */
 #define	Print	(void) printf
 #define	Fprint	(void) fprintf
 
@@ -148,33 +149,36 @@ char	*mon_fn = MON_OUT;	/* Default profile file name. */
 
 long bias;	/* adjusted bias */
 long temp;	/* for bias adjust */
-/* extern char *realloc(), *strncpy(), *optarg; */
-extern int optind;
-extern long strtol();
-extern void qsort(), exit(), perror();
 
+extern void profver(void);
 
 	/* For symbol table entries read from program file. */
 PROF_SYMBOL nl;
 
 /* Compare routines called from qsort() */
 
-int c_ccaddr();		/* Compare fnpc fields of cnt structures. */
-int c_sladdr();		/* Compare sl_addr fields of slist structures */
-int c_time();		/*	"  sl_time	"	"	"	*/
-int c_name();		/*	"  sl_name	" 	"	"	*/
-int c_ncalls();		/*	"  sl_count	"  	"	"	*/
+int c_ccaddr(const void *arg1, const void *arg2);
+int c_sladdr(const void *arg1, const void *arg2);
+int c_time(const void *arg1, const void *arg2);
+int c_ncalls(const void *arg1, const void *arg2);
+int c_name(const void *arg1, const void *arg2);
 
 /* Other stuff. */
 
 /* Return size of open file (arg is file descriptor) */
-off_t	fsize();
+static off_t fsize(int fd);
+
+static void snh(void);
+static void Perror(char *s);
+static void eofon(FILE *iop, char *fn);
+static void usage(void);
+static char *getname(PROF_FILE *ldpter, PROF_SYMBOL symbol);
 
 	/* Memory allocation. Like malloc(), but no return if error. */
-char	*_prof_Malloc();
+static void *_prof_Malloc(int item_count, int item_size);
 
 	/* Scan past path part (if any) in the ... */
-char	*basename();
+static char *basename(char *s);
 
 	/* command name, for error messages. */
 char	*cmdname;
@@ -193,8 +197,7 @@ struct slist {
 };
 
 	/* local structure for tracking synonyms in our symbol list */
-struct snymEntry
-{
+struct snymEntry {
 	char	*sym_addr;	/* address which has a synonym */
 	int	howMany;	/* # of synonyms for this symbol */
 	int	snymReported;	/* 'was printed in a report line already'  */
@@ -244,6 +247,9 @@ struct snymEntry *snymp;
 int snymCapacity;		/* #slots in snymList */
 int n_snyms;			/* #used slots in snymList */
 
+static int readnl(int symindex);
+static int fprecision(long count);
+
 /*
  * Sort flags. Mutually exclusive. These need to be identical to the ones
  * defined in profv.h
@@ -263,11 +269,8 @@ extern unsigned char sort_flag;	/* what type of sort ? */
 	 * since they are only printed when the First one
 	 * is seen.
 	 */
-PROC
 void
-printSnymNames(slp, snymp)
-struct	slist		*slp;
-struct	snymEntry	*snymp;
+printSnymNames(struct slist *slp, struct snymEntry *snymp)
 {
 	/* how many snyms for this addr, total, and their shared address */
 	int i = snymp->howMany;
@@ -283,7 +286,7 @@ struct	snymEntry	*snymp;
 		Print(", %s", slp->sl_name);
 	}
 	/* finally.. the trailing newline */
-	putchar('\n');
+	(void) putchar('\n');
 }
 
 
@@ -292,10 +295,8 @@ struct	snymEntry	*snymp;
 	 * (i.e. a synonym symbol) and return the address of the
 	 * snym entry if it was.
 	 */
-PROC
-struct snymEntry
-*getSnymEntry(sl_addr)
-char *sl_addr;
+struct snymEntry *
+getSnymEntry(char *sl_addr)
 {
 	struct snymEntry *p;
 	int i;
@@ -308,27 +309,25 @@ char *sl_addr;
 }
 
 
-PROC
-main(argc, argv)
-int argc;
-char **argv;
+int
+main(int argc, char **argv)
 {
 	char buffer[BUFSIZ];	/* buffer for printf */
 
 	WORD *pcounts;	/* Pointer to allocated area for */
 			/*	pcounts: PC clock hit counts */
 
-	register WORD *pcp;	/* For scanning pcounts. */
+	WORD *pcp;	/* For scanning pcounts. */
 
 	struct cnt *ccounts;	/* Pointer to allocated area for cnt */
 				/* structures: subr PC-call counts. */
 
-	register struct cnt *ccp;	/* For scanning ccounts. */
+	struct cnt *ccp;	/* For scanning ccounts. */
 
 	struct slist *slist;	/* Pointer to allocated slist structures: */
 				/* symbol name/address/time/call counts */
 
-	register struct slist *slp;	/* For scanning slist */
+	struct slist *slp;	/* For scanning slist */
 
 	int vn_cc, n_cc;	/* Number of cnt structures in profile data */
 				/*	file (later # ones used). */
@@ -347,11 +346,12 @@ char **argv;
 
 	int fdigits = 0; /* # of digits of precision for print msecs/call */
 
-	register int n, symct;
+	int n, symct;
 
 	long sf;	/* Scale for index into pcounts: */
 			/*	i(pc) = ((pc - pc_l) * sf)/bias. */
 
+	/* LINTED: set but not used */
 	long s_inv;	/* Inverse: i_inv(i) = */
 			/*		{pc00, pc00+1, ... pc00+s_inv-1}. */
 
@@ -359,9 +359,7 @@ char **argv;
 
 	float	t, t0;
 	float	t_tot;	/* Total time: PROFSEC(sum of all pcounts[i]) */
-	float	profOverhead = 0.0;
 	int	callTotal = 0;
-	char *getname();	/* get name from symbol */
 
 	DEBUG_LOC("main: top");
 	setbuf(stdout, buffer);
@@ -447,10 +445,7 @@ char **argv;
 			break;
 
 		case '?':	/* But no good. */
-			Fprint(stderr,
-			    "%s: Unrecognized option: %c\n", cmdname, n);
-			exit(1);
-
+			usage();
 		}	/* End switch (n) */
 	}	/* End while (getopt) */
 
@@ -518,7 +513,7 @@ char **argv;
 	/*		and allocate space for them. */
 
 	n_cc = head.nfns;
-	ccounts = (struct cnt *)_prof_Malloc(n_cc, sizeof (struct cnt));
+	ccounts = _prof_Malloc(n_cc, sizeof (struct cnt));
 
 		/* Read the call addr-count pairs. */
 	if (fread((char *)ccounts, sizeof (struct cnt), n_cc, mon_iop) != n_cc)
@@ -633,8 +628,7 @@ OLD_DEBUG(
 
 		/* Allocate space for qualified symbols. */
 
-	slist = slp =
-		(struct slist *)_prof_Malloc(n_syms, sizeof (struct slist));
+	slist = slp = _prof_Malloc(n_syms, sizeof (struct slist));
 
 		/*
 		 * Allocate space for synonym symbols
@@ -644,8 +638,7 @@ OLD_DEBUG(
 		 */
 
 	snymCapacity = n_syms/2;
-	snymList = snymp =
-		(struct snymEntry *)_prof_Malloc(snymCapacity,
+	snymList = snymp = _prof_Malloc(snymCapacity,
 		sizeof (struct snymEntry));
 	n_snyms = 0;
 
@@ -785,7 +778,7 @@ if (debug_value & 04) {
 			/* Start addr of next region, low addr of overlap. */
 		char *pc1, *pc10;
 		/* First index into pcounts for this region and next region. */
-		register int i0, i1;
+		int i0, i1;
 		long ticks;
 
 			/* Address of symbol (subroutine). */
@@ -1005,7 +998,7 @@ OLD_DEBUG(if (debug_value) Fprint(stderr,
 
 	if (!(flags & F_NHEAD)) {
 		if (flags & F_PADDR)
-			Print(atitle);	/* Title for addresses. */
+			Print("%s", atitle);	/* Title for addresses. */
 		(void) puts(" %Time Seconds Cumsecs  #Calls   msec/call  Name");
 	}
 	t = 0.0;			/* Init cumulative time. */
@@ -1043,8 +1036,10 @@ OLD_DEBUG(if (debug_value) Fprint(stderr,
 		else
 			n_nonzero++;
 
-		if (flags & F_PADDR)	/* Printing address of symbol? */
+		if (flags & F_PADDR) { /* Printing address of symbol? */
+			/* LINTED: variable format */
 			Print(aformat, slp->sl_addr);
+		}
 		t += t0;	/*  move here; compiler bug  !! */
 		Print("%6.1f%8.2f%8.2f", t0 * t_tot, t0, t);
 		fdigits = 0;
@@ -1077,19 +1072,19 @@ OLD_DEBUG(if (debug_value) Fprint(stderr,
 			    n_syms - n_nonzero);
 		else
 			(void) putc('\n', stderr);
-		Fprint(stderr, "%#x scale factor\n", (long)sf);
+		Fprint(stderr, "%#lx scale factor\n", (long)sf);
 	}
 
 	_symintClose(ldptr);
 	} else {
 	    Fprint(stderr, "prof: no call counts captured\n");
 	}
-	exit(0);
+	return (0);
 }
 /* Return size of file associated with file descriptor fd. */
 
-PROC off_t
-fsize(fd)
+static off_t
+fsize(int fd)
 {
 	struct stat sbuf;
 
@@ -1100,9 +1095,8 @@ fsize(fd)
 
 /* Read symbol entry. Return TRUE if satisfies conditions. */
 
-PROC
-readnl(symindex)
-int symindex;
+static int
+readnl(int symindex)
 {
 	nl = ldptr->pf_symarr_p[symindex];
 
@@ -1130,12 +1124,10 @@ OLD_DEBUG(
  * Guarantees good return (else none at all).
  */
 
-PROC char *
-_prof_Malloc(item_count, item_size)
-int item_count;
-int item_size;
+static void *
+_prof_Malloc(int item_count, int item_size)
 {
-	register char *p;
+	void *p;
 
 	if ((p = malloc((unsigned)item_count * (unsigned)item_size)) == NULL)  {
 		(void) fprintf(stderr, "%s: Out of space\n", cmdname);
@@ -1153,9 +1145,8 @@ int item_size;
  *	by the following routine.
  */
 
-PROC int
-fprecision(count)
-long count;
+static int
+fprecision(long count)
 {
 	return (count < 10 ? 0 : count < 100 ? 1 : count < 1000 ? 2 :
 	    count < 10000 ? 3 : 4);
@@ -1167,11 +1158,10 @@ long count;
  *	case of s == "/".
  */
 
-PROC char *
-basename(s)
-register char *s;
+static char *
+basename(char *s)
 {
-	register char *p;
+	char *p;
 
 	p = &s[strlen(s)];			/* End (+1) of string. */
 	while (p > s && *--p == '/')		/* Trim trailing '/'s. */
@@ -1186,10 +1176,8 @@ register char *s;
 }
 /* Here if unexpected read problem. */
 
-PROC
-eofon(iop, fn)
-register FILE *iop;
-register char *fn;
+static void
+eofon(FILE *iop, char *fn)
 {
 	if (ferror(iop))		/* Real error? */
 		Perror(fn);		/* Yes. */
@@ -1199,11 +1187,10 @@ register char *fn;
 
 /* Version of perror() that prints cmdname first. */
 
-PROC
-Perror(s)
-char *s;
+static void
+Perror(char *s)
 {				/* Print system error message & exit. */
-	register int err = errno;	/* Save current errno in case */
+	int err = errno;	/* Save current errno in case */
 
 	Fprint(stderr, "%s: ", cmdname);
 	errno = err;			/* Put real error back. */
@@ -1214,12 +1201,13 @@ char *s;
 
 /* Here for things that "Should Never Happen". */
 
-PROC
-snh()
+static void
+snh(void)
 {
 	Fprint(stderr, "%s: Internal error\n", cmdname);
 	(void) abort();
 }
+
 /*
  *	Various comparison routines for qsort. Uses:
  *
@@ -1234,52 +1222,55 @@ snh()
 #define	CMP2(v1, v2)	((v1) < (v2) ? -1 : (v1) == (v2) ? 0 : 1)
 #define	CMP1(v)		CMP2(v, 0)
 
-PROC
-c_ccaddr(p1, p2)
-register struct cnt *p1, *p2;
+int
+c_ccaddr(const void *arg1, const void *arg2)
 {
+	struct cnt *p1 = (struct cnt *)arg1;
+	struct cnt *p2 = (struct cnt *)arg2;
+
 	return (CMP2(p1->fnpc, p2->fnpc));
 }
 
-PROC
-c_sladdr(p1, p2)
-register struct slist *p1, *p2;
+int
+c_sladdr(const void *arg1, const void *arg2)
 {
+	struct slist *p1 = (struct slist *)arg1;
+	struct slist *p2 = (struct slist *)arg2;
+
 	return (CMP2(p1->sl_addr, p2->sl_addr));
 }
 
-PROC
-c_time(p1, p2)
-register struct slist *p1, *p2;
+int
+c_time(const void *arg1, const void *arg2)
 {
-	register float dtime = p2->sl_time - p1->sl_time; /* Decreasing time. */
+	struct slist *p1 = (struct slist *)arg1;
+	struct slist *p2 = (struct slist *)arg2;
+	float dtime = p2->sl_time - p1->sl_time; /* Decreasing time. */
 
 	return (CMP1(dtime));
 }
 
-PROC
-c_ncalls(p1, p2)
-register struct slist *p1, *p2;
+int
+c_ncalls(const void *arg1, const void *arg2)
 {
-	register int diff = p2->sl_count - p1->sl_count;
+	struct slist *p1 = (struct slist *)arg1;
+	struct slist *p2 = (struct slist *)arg2;
+	int diff = p2->sl_count - p1->sl_count;
 		/* Decreasing # calls. */
 	return (CMP1(diff));
 }
 
-PROC
-c_name(p1, p2)
-register struct slist *p1, *p2;
+int
+c_name(const void *arg1, const void *arg2)
 {
-	register int diff;
+	struct slist *p1 = (struct slist *)arg1;
+	struct slist *p2 = (struct slist *)arg2;
+	int diff;
 
 		/* flex names has variable length strings for names */
 	diff = strcmp(p1->sl_name, p2->sl_name);
 	return (CMP1(diff));
 }
-
-static int exotic();
-static void parsename();
-static void parse_fn_and_print();
 
 #define	STRSPACE 2400		/* guess at amount of string space */
 
@@ -1287,10 +1278,10 @@ char *format_buf;
 #define	FORMAT_BUF	"%s\n\t\t\t\t\t    [%s]"
 
 static char *
-demangled_name(s)
-char *s;
+demangled_name(char *s)
 {
 	char *name;
+	size_t	len;
 
 	name = (char *)sgs_demangle(s);
 
@@ -1300,25 +1291,22 @@ char *s;
 	if (format_buf != NULL)
 		free(format_buf);
 
-	format_buf = (char *)malloc(strlen(name) +
-		strlen(FORMAT_BUF) +
-		strlen(s) + 1);
+	len = strlen(name) + strlen(FORMAT_BUF) + strlen(s) + 1;
+	format_buf = malloc(len);
 	if (format_buf == NULL)
 		return (s);
-	(void) sprintf(format_buf, FORMAT_BUF, name, s);
+	(void) snprintf(format_buf, len, FORMAT_BUF, name, s);
 	return (format_buf);
 }
 
 /* getname - get the name of a symbol in a permanent fashion */
-char *
-getname(ldpter, symbol)
-PROF_FILE *ldpter;
-PROF_SYMBOL symbol;
+static char *
+getname(PROF_FILE *ldpter, PROF_SYMBOL symbol)
 {
 	static char *strtable = NULL;	/* space for names */
 	static int sp_used = 0;		/* space used so far */
 	static int size = 0;		/* size of string table */
-	char *name, *strcpy();		/* name to store */
+	char *name;			/* name to store */
 	int lth;			/* space needed for name */
 	int get;			/* amount of space to get */
 
@@ -1328,7 +1316,7 @@ PROF_SYMBOL symbol;
 	}
 
 	if (Cflag)
-		name = (char *)demangled_name(name);
+		name = demangled_name(name);
 
 	lth = strlen(name) + 1;
 	if ((sp_used + lth) > size)  {	 /* if need more space */
@@ -1344,155 +1332,12 @@ PROF_SYMBOL symbol;
 	return (name);
 }
 
-static char n_buf[512];
-static char d_buf[512];
-static char p_buf[512];
-static char *format = "%s\n\t\t\t\t\t    [%s]";
-
-
-static char *ctor_str = "static constructor function for %s";
-static char *dtor_str = "static destructor function for %s";
-static char *vtbl_str = "virtual table for %s";
-static char *ptbl_str = "pointer to the virtual table vector for %s";
-
-/*
- * Return 1 when s is an exotic name, 0 otherwise.  s remains unchanged,
- * the exotic name, if exists, is saved in d_buf.
- */
-int
-exotic(s)
-char *s;
+static void
+usage(void)
 {
-	int tag = 0;
-	if (strncmp(s, "__sti__", 7) == 0) {
-		s += 7; tag = 1;
-		parse_fn_and_print(ctor_str, s);
-	} else if (strncmp(s, "__std__", 7) == 0) {
-		s += 7; tag = 1;
-		parse_fn_and_print(dtor_str, s);
-	} else if (strncmp(s, "__vtbl__", 8) == 0) {
-		char *printname;
-		s += 8; tag = 1;
-		parsename(s);
-		sprintf(d_buf, vtbl_str, p_buf);
-	} else if (strncmp(s, "__ptbl_vec__", 12) == 0) {
-		s += 12; tag = 1;
-		parse_fn_and_print(ptbl_str, s);
-	}
-	return (tag);
-}
-
-void
-parsename(s)
-char *s;
-{
-	register int len;
-	char c, *orig = s;
-	*p_buf = '\0';
-	strcat(p_buf, "class ");
-	while (isdigit(*s)) s++;
-	c = *s;
-	*s = '\0';
-	len = atoi(orig);
-	*s = c;
-	if (*(s+len) == '\0') { /* only one class name */
-		strcat(p_buf, s);
-		return;
-	} else { /* two classname  %drootname__%dchildname */
-	char *root, *child, *child_len_p;
-	int child_len;
-	root = s;
-	child = s + len + 2;
-	child_len_p = child;
-	if (! isdigit(*child)) { /* ptbl file name */
-		/*  %drootname__%filename */
-		char *p;    /* kludge for getting rid of '_' in file name */
-		c = *(root + len);
-		*(root + len) = '\0';
-		strcat(p_buf, root);
-		*(root + len) = c;
-		strcat(p_buf, " in ");
-		for (p = child; *p != '_'; ++p);
-			c = *p;
-			*p = '.';
-			strcat(p_buf, child);
-			*p = c;
-			return;
-		}
-
-		while (isdigit(*child)) child++;
-		c = *child;
-		*child = '\0';
-		child_len = atoi(child_len_p);
-		*child = c;
-		if (*(child + child_len) == '\0') {
-			strcat(p_buf, child);
-			strcat(p_buf, " derived from ");
-			c = *(root + len);
-			*(root + len) = '\0';
-			strcat(p_buf, root);
-			*(root + len) = c;
-			return;
-		} else { /* %drootname__%dchildname__filename */
-			char *p;
-				/* kludge for getting rid of '_' in file name */
-			c = *(child + child_len);
-			*(child + child_len) = '\0';
-			strcat(p_buf, child);
-			*(child+child_len) = c;
-			strcat(p_buf, " derived from ");
-			c = *(root + len);
-			*(root + len) = '\0';
-			strcat(p_buf,  root);
-			*(root + len) = c;
-			strcat(p_buf, " in ");
-			for (p = child+child_len+2; *p != '_'; ++p);
-			c = *p;
-			*p = '.';
-			strcat(p_buf, child + child_len + 2);
-			*p = c;
-			return;
-		}
-	}
-}
-
-void
-parse_fn_and_print(str, s)
-char *str, *s;
-{
-	char c, *p1, *p2;
-	int yes = 1;
-
-	if ((p1 = p2 =  strstr(s, "_c_")) == NULL)
-		if ((p1 = p2 =  strstr(s, "_C_")) == NULL)
-			if ((p1 = p2 =  strstr(s, "_cc_")) == NULL)
-				if ((p1 = p2 =  strstr(s, "_cxx_")) == NULL)
-					if ((p1 = p2 =  strstr(s, "_h_"))
-							== NULL)
-						yes = 0;
-					else
-						p2 += 2;
-				else
-					p2 += 4;
-			else
-				p2 += 3;
-		else
-			p2 += 2;
-	else
-		p2 += 2;
-
-	if (yes) {
-		*p1 = '.';
-		c = *p2;
-		*p2 = '\0';
-	}
-
-	for (s = p1;  *s != '_';  --s);
-	++s;
-	sprintf(d_buf, str, s);
-
-	if (yes) {
-		*p1 = '_';
-		*p2 = c;
-	}
+	(void) fprintf(stderr,
+	    "usage: %s [-ChsVz] [-a | c | n | t]  [-o  |  x]   [-g  |  l]\n"
+	    "\t[-m mdata] [prog]\n",
+	    cmdname);
+	exit(1);
 }

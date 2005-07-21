@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1990-1997, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,10 +49,10 @@ addlist(struct stringlist *listp, char *funcname)
 {
 	struct stringlist	*slp;
 
-	slp = (struct stringlist *)malloc(sizeof (struct stringlist));
+	slp = malloc(sizeof (struct stringlist));
 
 	if (slp == NULL) {
-		fprintf(stderr, "gprof: ran out room for printlist\n");
+		(void) fprintf(stderr, "gprof: ran out room for printlist\n");
 		exit(1);
 	}
 

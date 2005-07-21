@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1993-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,10 +41,10 @@
 static void	debug_dup_del(nltype *, nltype *);
 
 #define	DPRINTF(msg, file)	if (debug & ELFDEBUG) \
-					printf(msg, file);
+					(void) printf(msg, file);
 
 #define	PRINTF(msg)		if (debug & ELFDEBUG) \
-					printf(msg);
+					(void) printf(msg);
 
 #define	DEBUG_DUP_DEL(keeper, louser)	if (debug & ELFDEBUG) \
 						debug_dup_del(keeper, louser);
@@ -54,24 +55,20 @@ static void	debug_dup_del(nltype *, nltype *);
 #define	DEBUG_DUP_DEL(keeper, louser)
 #endif
 
-
-
-#define	VOID_P		void *
-
 size_t	textbegin, textsize;
 
 /* Prototype definitions first */
 
 static void	process(char *filename, int fd);
-static void	get_symtab(Elf *elf, char *filename, mod_info_t *module);
-static void	get_textseg(Elf *elf, int fd, char *filename);
+static void	get_symtab(Elf *elf, mod_info_t *module);
+static void	get_textseg(Elf *elf, int fd);
 static void	save_aout_info(char *);
-static int	compare(nltype *a, nltype *b);
 
 static void
 fatal_error(char *error)
 {
-	fprintf(stderr, "Fatal ELF error: %s (%s)\n", error, elf_errmsg(-1));
+	(void) fprintf(stderr,
+	    "Fatal ELF error: %s (%s)\n", error, elf_errmsg(-1));
 	exit(EX_SOFTWARE);
 }
 
@@ -83,7 +80,7 @@ is_shared_obj(char *name)
 	GElf_Ehdr	ehdr;
 
 	if ((fd = open(name, O_RDONLY)) == -1) {
-		fprintf(stderr, "%s: can't open `%s'\n", whoami, name);
+		(void) fprintf(stderr, "%s: can't open `%s'\n", whoami, name);
 		exit(EX_NOINPUT);
 	}
 
@@ -96,8 +93,8 @@ is_shared_obj(char *name)
 	if (gelf_getehdr(elf, &ehdr) == NULL)
 		fatal_error("can't read ehdr");
 
-	elf_end(elf);
-	close(fd);
+	(void) elf_end(elf);
+	(void) close(fd);
 
 	if (ehdr.e_type == ET_DYN)
 		return (TRUE);
@@ -112,7 +109,7 @@ save_aout_info(char *aoutname)
 	extern fl_info_t	aout_info;
 
 	if (stat(aoutname, &buf) == -1) {
-		fprintf(stderr, "%s: can't get info on `%s'\n",
+		(void) fprintf(stderr, "%s: can't get info on `%s'\n",
 							whoami, aoutname);
 		exit(EX_NOINPUT);
 	}
@@ -177,7 +174,7 @@ process_namelist(mod_info_t *module)
 	if ((fd = open(module->name, O_RDONLY)) == -1) {
 		(void) fprintf(stderr, "%s: can't read %s\n",
 							whoami, module->name);
-		fprintf(stderr, "Exiting due to error(s)...\n");
+		(void) fprintf(stderr, "Exiting due to error(s)...\n");
 		exit(EX_NOINPUT);
 	}
 
@@ -190,7 +187,7 @@ process_namelist(mod_info_t *module)
 
 	module->next = NULL;
 	module->txt_origin = get_txtorigin(elf);
-	get_symtab(elf, module->name, module);
+	get_symtab(elf, module);
 	module->active = TRUE;
 }
 
@@ -223,25 +220,25 @@ process(char *filename, int fd)
 	modules.next = NULL;
 	modules.txt_origin = get_txtorigin(elf);
 	modules.load_base = modules.txt_origin;
-	if ((modules.name = (char *) malloc(strlen(filename) + 1)) == NULL) {
-		fprintf(stderr, "%s: can't malloc %d bytes",
+	if ((modules.name = malloc(strlen(filename) + 1)) == NULL) {
+		(void) fprintf(stderr, "%s: can't malloc %d bytes",
 					    whoami, strlen(filename) + 1);
 		exit(EX_UNAVAILABLE);
 	}
-	strcpy(modules.name, filename);
+	(void) strcpy(modules.name, filename);
 
-	get_symtab(elf, filename, &modules);
+	get_symtab(elf, &modules);
 
 	modules.load_end = modules.data_end;
 	modules.active = TRUE;
 	n_modules = 1;
 
 	if (cflag)
-		get_textseg(elf, fd, filename);
+		get_textseg(elf, fd);
 }
 
 static void
-get_textseg(Elf *elf, int fd, char *filename)
+get_textseg(Elf *elf, int fd)
 {
 	GElf_Ehdr ehdr;
 	GElf_Phdr phdr;
@@ -295,10 +292,10 @@ get_textseg(Elf *elf, int fd, char *filename)
 static void
 debug_dup_del(nltype * keeper, nltype * louser)
 {
-	printf("remove_dup_syms: discarding sym %s over sym %s\n",
+	(void) printf("remove_dup_syms: discarding sym %s over sym %s\n",
 		louser->name, keeper->name);
 }
-#endif DEBUG
+#endif /* DEBUG */
 
 static void
 remove_dup_syms(nltype *nl, sztype *sym_count)
@@ -309,11 +306,12 @@ remove_dup_syms(nltype *nl, sztype *sym_count)
 
 	nltype *	orig_list;
 	if ((orig_list = malloc(sizeof (nltype) * *sym_count)) == NULL) {
-		fprintf(stderr, "gprof: remove_dup_syms: malloc failed\n");
-		fprintf(stderr, "Exiting due to error(s)...\n");
+		(void) fprintf(stderr,
+		    "gprof: remove_dup_syms: malloc failed\n");
+		(void) fprintf(stderr, "Exiting due to error(s)...\n");
 		exit(EX_UNAVAILABLE);
 	}
-	memcpy(orig_list, nl, sizeof (nltype) * *sym_count);
+	(void) memcpy(orig_list, nl, sizeof (nltype) * *sym_count);
 
 	for (i = 0, index = 0, nextsym = 1; nextsym < *sym_count; nextsym++) {
 		int	i_type;
@@ -389,8 +387,11 @@ remove_dup_syms(nltype *nl, sztype *sym_count)
  * sort the symbols either by name or value when requested.
  */
 static int
-compare(nltype *a, nltype *b)
+compare(const void *arg1, const void *arg2)
 {
+	nltype *a = (nltype *)arg1;
+	nltype *b = (nltype *)arg2;
+
 	if (a->value > b->value)
 		return (1);
 	else
@@ -442,7 +443,7 @@ is_function(Elf *elf, GElf_Sym *sym)
 		return (0);
 
 	scn = elf_getscn(elf, sym->st_shndx);
-	gelf_getshdr(scn, &shdr);
+	(void) gelf_getshdr(scn, &shdr);
 
 	if (!(shdr.sh_flags & SHF_EXECINSTR))
 		return (0);
@@ -451,7 +452,7 @@ is_function(Elf *elf, GElf_Sym *sym)
 }
 
 static void
-get_symtab(Elf *elf, char *filename, mod_info_t *module)
+get_symtab(Elf *elf, mod_info_t *module)
 {
 	Elf_Scn		*scn = NULL, *sym = NULL;
 	GElf_Word	strndx = 0;
@@ -510,7 +511,7 @@ get_symtab(Elf *elf, char *filename, mod_info_t *module)
 		GElf_Sym gsym;
 		char *name;
 
-		gelf_getsym(symdata, i, &gsym);
+		(void) gelf_getsym(symdata, i, &gsym);
 
 		name = elf_strptr(elf, strndx, gsym.st_name);
 
@@ -576,8 +577,7 @@ get_symtab(Elf *elf, char *filename, mod_info_t *module)
 	 * We're almost done;  all we need to do is sort the symbols
 	 * and then remove the duplicates.
 	 */
-	qsort(l_nl, (size_t)l_nname, sizeof (nltype),
-	    (int(*)(const void *, const void *)) compare);
+	qsort(l_nl, (size_t)l_nname, sizeof (nltype), compare);
 	remove_dup_syms(l_nl, &l_nname);
 
 	module->nl = l_nl;

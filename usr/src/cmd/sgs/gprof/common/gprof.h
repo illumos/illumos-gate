@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1990-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SGS_GPROF_H
@@ -45,6 +46,7 @@ extern "C" {
 #include "sparc.h"
 #include "gelf.h"
 #include "monv.h"
+#include "sgs.h"
 
 
 /*
@@ -55,9 +57,7 @@ extern char	*whoami;
 /*
  * booleans
  */
-typedef int	bool;
-#define	FALSE	0
-#define	TRUE	1
+typedef Boolean	bool;
 
 /*
  * Alignment related constants
@@ -312,8 +312,6 @@ double	scale;			/* scale factor converting samples to pc */
 				/* values: each sample covers scale bytes */
 				/* -- all this is for old-style gmon.out only */
 
-off_t	ssiz;			/* size of the string table */
-
 unsigned char	*textspace;		/* text space of a.out in core */
 bool	first_file;			/* for difference option */
 
@@ -372,7 +370,7 @@ void	dfn_post_visit(nltype *);
 void	dfn_pre_visit(nltype *);
 void	dfn_self_cycle(nltype *);
 nltype	**doarcs(void);
-void	done();
+void	done(void);
 void	findcalls(nltype *, pctype, pctype);
 void	flatprofheader(void);
 void	flatprofline(nltype *);
@@ -381,8 +379,7 @@ void	getnfile(char *);
 void	process_namelist(mod_info_t *);
 void	gprofheader(void);
 void	gprofline(nltype *);
-int	pc_cmp(Address *, Address *);
-int	main();
+int	pc_cmp(const void *arg1, const void *arg2);
 int	membercmp(nltype *, nltype *);
 nltype	*nllookup(mod_info_t *, pctype, pctype *);
 bool	onlist(struct stringlist *, char *);
@@ -398,8 +395,8 @@ void	printprof(void);
 void	sortchildren(nltype *);
 void	sortmembers(nltype *);
 void	sortparents(nltype *);
-int	timecmp(nltype **, nltype **);
-int	totalcmp(nltype **, nltype **);
+int	timecmp(const void *arg1, const void *arg2);
+int	totalcmp(const void *arg1, const void *arg2);
 
 #define	LESSTHAN	-1
 #define	EQUALTO		0

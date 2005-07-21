@@ -19,10 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -31,6 +33,8 @@
  * form the complete set of files to profile new-style mon.out files.
  */
 
+#include <stdlib.h>
+#include <string.h>
 #include "profv.h"
 
 bool		time_in_ticks = FALSE;
@@ -44,20 +48,23 @@ struct stat	aout_stat, monout_stat;
 profrec_t	*profsym;
 
 int
-cmp_by_name(profrec_t *a, profrec_t *b)
+cmp_by_name(const void *arg1, const void *arg2)
 {
+	profrec_t *a = (profrec_t *)arg1;
+	profrec_t *b = (profrec_t *)arg2;
+
 	return (strcmp(a->demangled_name, b->demangled_name));
 }
 
 static void
-setup_demangled_names()
+setup_demangled_names(void)
 {
-	char		*p, *nbp, *nbe, *namebuf;
-	size_t		cur_len = 0, namebuf_sz = BUCKET_SZ;
-	register size_t	i, namelen;
+	char	*p, *nbp, *nbe, *namebuf;
+	size_t	cur_len = 0, namebuf_sz = BUCKET_SZ;
+	size_t	i, namelen;
 
-	if ((namebuf = (char *) malloc(namebuf_sz)) == NULL) {
-		fprintf(stderr, "%s: can't allocate %lld bytes\n",
+	if ((namebuf = malloc(namebuf_sz)) == NULL) {
+		(void) fprintf(stderr, "%s: can't allocate %d bytes\n",
 						    cmdname, namebuf_sz);
 		exit(ERR_MEMORY);
 	}
@@ -72,10 +79,11 @@ setup_demangled_names()
 		namelen = strlen(p);
 		if ((nbp + namelen + 1) > nbe) {
 			namebuf_sz += BUCKET_SZ;
-			namebuf = (char *) realloc(namebuf, namebuf_sz);
+			namebuf = realloc(namebuf, namebuf_sz);
 			if (namebuf == NULL) {
-				fprintf(stderr, "%s: can't alloc %lld bytes\n",
-							    cmdname, BUCKET_SZ);
+				(void) fprintf(stderr,
+				    "%s: can't alloc %d bytes\n",
+				    cmdname, BUCKET_SZ);
 				exit(ERR_MEMORY);
 			}
 
@@ -83,7 +91,7 @@ setup_demangled_names()
 			nbe = namebuf + namebuf_sz;
 		}
 
-		strcpy(nbp, p);
+		(void) strcpy(nbp, p);
 		profsym[i].demangled_name = nbp;
 
 		nbp += namelen + 1;
@@ -92,8 +100,11 @@ setup_demangled_names()
 }
 
 int
-cmp_by_time(profrec_t *a, profrec_t *b)
+cmp_by_time(const void *arg1, const void *arg2)
 {
+	profrec_t *a = (profrec_t *)arg1;
+	profrec_t *b = (profrec_t *)arg2;
+
 	if (a->percent_time > b->percent_time)
 		return (-1);
 	else if (a->percent_time < b->percent_time)
@@ -103,8 +114,11 @@ cmp_by_time(profrec_t *a, profrec_t *b)
 }
 
 int
-cmp_by_ncalls(profrec_t *a, profrec_t *b)
+cmp_by_ncalls(const void *arg1, const void *arg2)
 {
+	profrec_t *a = (profrec_t *)arg1;
+	profrec_t *b = (profrec_t *)arg2;
+
 	if (a->ncalls > b->ncalls)
 		return (-1);
 	else if (a->ncalls < b->ncalls)
@@ -115,10 +129,10 @@ cmp_by_ncalls(profrec_t *a, profrec_t *b)
 }
 
 static void
-print_profile_data()
+print_profile_data(void)
 {
 	int		i;
-	int		(*sort_func)();
+	int		(*sort_func)(const void *, const void *);
 	mod_info_t	*mi;
 	double		cumsecs = 0;
 	char		filler[20];
@@ -149,8 +163,7 @@ print_profile_data()
 
 
 	if (sort_func) {
-		qsort(profsym, total_funcs, sizeof (profrec_t),
-			(int (*)(const void *, const void *)) sort_func);
+		qsort(profsym, total_funcs, sizeof (profrec_t), sort_func);
 	}
 
 	/*
@@ -178,12 +191,14 @@ print_profile_data()
 	 */
 	if (!(flags & F_NHEAD)) {
 		if (flags & F_PADDR)
-			printf("        %s", atitle);
+			(void) printf("        %s", atitle);
 
 		if (time_in_ticks)
-		    puts(" %Time   Tiks  Cumtiks  #Calls   tiks/call  Name");
+			(void) puts(
+			    " %Time   Tiks  Cumtiks  #Calls   tiks/call  Name");
 		else
-		    puts(" %Time Seconds Cumsecs  #Calls   msec/call  Name");
+			(void) puts(
+			    " %Time Seconds Cumsecs  #Calls   msec/call  Name");
 	}
 
 	mi = NULL;
@@ -200,77 +215,81 @@ print_profile_data()
 		 */
 		if ((flags & F_VERBOSE) && (sort_flag == BY_ADDRESS)) {
 			if (mi != profsym[i].module) {
-				printf("\n");
+				(void) printf("\n");
 				mi = profsym[i].module;
 			}
 		}
 
 		if (flags & F_PADDR) {
 			if (aformat[2] == 'x')
-				printf("%16llx ", profsym[i].addr);
+				(void) printf("%16llx ", profsym[i].addr);
 			else
-				printf("%16llo ", profsym[i].addr);
+				(void) printf("%16llo ", profsym[i].addr);
 		}
 
 		cumsecs += profsym[i].seconds;
-		printf("%6.1f%8.2f%8.2f", profsym[i].percent_time,
+		(void) printf("%6.1f%8.2f%8.2f", profsym[i].percent_time,
 						profsym[i].seconds, cumsecs);
 
-		printf("%8ld%12.4f  ",
+		(void) printf("%8d%12.4f  ",
 				profsym[i].ncalls, profsym[i].msecs_per_call);
 
 		if (profsym[i].print_mid)
-			printf("%d:", (profsym[i].module)->id);
+			(void) printf("%d:", (profsym[i].module)->id);
 
-		printf("%s\n", profsym[i].demangled_name);
+		(void) printf("%s\n", profsym[i].demangled_name);
 	}
 
 	if (flags & F_PADDR)
-		sprintf(filler, "%16s", "");
+		(void) sprintf(filler, "%16s", "");
 	else
 		filler[0] = 0;
 
 	if (flags & F_VERBOSE) {
-		puts("\n");
-		printf("%s   Total Object Modules     %7d\n",
+		(void) puts("\n");
+		(void) printf("%s   Total Object Modules     %7d\n",
 						filler, n_modules);
-		printf("%s   Qualified Symbols        %7d\n",
+		(void) printf("%s   Qualified Symbols        %7d\n",
 						filler, total_funcs);
-		printf("%s   Symbols with zero usage  %7d\n",
+		(void) printf("%s   Symbols with zero usage  %7d\n",
 						filler, n_zeros);
-		printf("%s   Total pc-hits            %7d\n",
+		(void) printf("%s   Total pc-hits            %7d\n",
 						filler, n_pcsamples);
-		printf("%s   Accounted pc-hits        %7d\n",
+		(void) printf("%s   Accounted pc-hits        %7d\n",
 						filler, n_accounted_ticks);
 		if ((!gflag) && (n_pcsamples - n_accounted_ticks)) {
-			printf("%s   Missed pc-hits (try -g)  %7d\n\n",
+			(void) printf("%s   Missed pc-hits (try -g)  %7d\n\n",
 				    filler, n_pcsamples - n_accounted_ticks);
 		} else {
-			printf("%s   Missed pc-hits           %7d\n\n",
+			(void) printf("%s   Missed pc-hits           %7d\n\n",
 				    filler, n_pcsamples - n_accounted_ticks);
 		}
-		printf("%s   Module info\n", filler);
+		(void) printf("%s   Module info\n", filler);
 		for (mi = &modules; mi; mi = mi->next)
-			printf("%s      %d: `%s'\n", filler, mi->id, mi->path);
+			(void) printf("%s      %d: `%s'\n", filler,
+			    mi->id, mi->path);
 	}
 }
 
 int
-name_cmp(profnames_t *a, profnames_t *b)
+name_cmp(const void *arg1, const void *arg2)
 {
+	profnames_t *a = (profnames_t *)arg1;
+	profnames_t *b = (profnames_t *)arg2;
+
 	return (strcmp(a->name, b->name));
 }
 
 static void
-check_dupnames()
+check_dupnames(void)
 {
 	int		i;
 	profnames_t	*pn;
 
-	pn = (profnames_t *) calloc(total_funcs, sizeof (profnames_t));
+	pn = calloc(total_funcs, sizeof (profnames_t));
 	if (pn == NULL) {
-		fprintf(stderr, "%s: no room for %ld bytes\n", cmdname,
-					total_funcs * sizeof (profnames_t));
+		(void) fprintf(stderr, "%s: no room for %d bytes\n",
+		    cmdname, total_funcs * sizeof (profnames_t));
 		exit(ERR_MEMORY);
 	}
 
@@ -279,8 +298,7 @@ check_dupnames()
 		pn[i].pfrec = &profsym[i];
 	}
 
-	qsort(pn, total_funcs, sizeof (profnames_t),
-			(int (*)(const void *, const void *)) name_cmp);
+	qsort(pn, total_funcs, sizeof (profnames_t), name_cmp);
 
 	for (i = 0; i < total_funcs; i++) {
 		/*
@@ -310,29 +328,30 @@ compute_times(nltype *nl, profrec_t *psym)
 	}
 
 	if (time_in_ticks) {
-		psym->seconds = (double) nl->nticks;
+		psym->seconds = (double)nl->nticks;
 		if (nl->ncalls) {
-		    psym->msecs_per_call = (double) nl->nticks /
-							(double) nl->ncalls;
+		    psym->msecs_per_call = (double)nl->nticks /
+			(double)nl->ncalls;
 		} else
-		    psym->msecs_per_call = (double) 0.0;
+		    psym->msecs_per_call = (double)0.0;
 	} else {
-		psym->seconds = (double) nl->nticks / (double) hz;
+		psym->seconds = (double)nl->nticks / (double)hz;
 		if (nl->ncalls) {
-			psym->msecs_per_call = ((double) psym->seconds *
-						1000.0) / (double) nl->ncalls;
+			psym->msecs_per_call =
+			    ((double)psym->seconds * 1000.0) /
+			    (double)nl->ncalls;
 		} else
-			psym->msecs_per_call = (double) 0.0;
+			psym->msecs_per_call = (double)0.0;
 	}
 
 	if (n_pcsamples) {
-		psym->percent_time = ((double) nl->nticks /
-						(double) n_pcsamples) * 100;
+		psym->percent_time =
+		    ((double)nl->nticks / (double)n_pcsamples) * 100;
 	}
 }
 
 static void
-collect_profsyms()
+collect_profsyms(void)
 {
 	mod_info_t	*mi;
 	nltype		*nl;
@@ -342,10 +361,10 @@ collect_profsyms()
 	for (mi = &modules; mi; mi = mi->next)
 		total_funcs += mi->nfuncs;
 
-	profsym = (profrec_t *) calloc(total_funcs, sizeof (profrec_t));
+	profsym = calloc(total_funcs, sizeof (profrec_t));
 	if (profsym == NULL) {
-		fprintf(stderr, "%s: no room for %ld bytes\n", cmdname,
-					total_funcs * sizeof (profrec_t));
+		(void) fprintf(stderr, "%s: no room for %d bytes\n",
+		    cmdname, total_funcs * sizeof (profrec_t));
 		exit(ERR_MEMORY);
 	}
 
@@ -388,10 +407,8 @@ collect_profsyms()
 }
 
 static void
-assign_pcsamples(module, pcsmpl, n_samples)
-mod_info_t	*module;
-Address		*pcsmpl;
-size_t		n_samples;
+assign_pcsamples(mod_info_t *module, Address *pcsmpl,
+    size_t n_samples)
 {
 	Address		*pcptr, *pcse = pcsmpl + n_samples;
 	Address		nxt_func;
@@ -429,9 +446,12 @@ size_t		n_samples;
 	}
 }
 
-int
-pc_cmp(Address *pc1, Address *pc2)
+static int
+pc_cmp(const void *arg1, const void *arg2)
 {
+	Address *pc1 = (Address *)arg1;
+	Address *pc2 = (Address *)arg2;
+
 	if (*pc1 > *pc2)
 		return (1);
 
@@ -442,8 +462,7 @@ pc_cmp(Address *pc1, Address *pc2)
 }
 
 static void
-process_pcsamples(bufp)
-ProfBuffer	*bufp;
+process_pcsamples(ProfBuffer *bufp)
 {
 	Address		*pc_samples;
 	mod_info_t	*mi;
@@ -456,17 +475,16 @@ ProfBuffer	*bufp;
 	/* Allocate for the pcsample chunk */
 	pc_samples = (Address *) calloc(nelem, sizeof (Address));
 	if (pc_samples == NULL) {
-		fprintf(stderr, "%s: no room for %ld sample pc's\n",
-							    cmdname, nelem);
+		(void) fprintf(stderr, "%s: no room for %d sample pc's\n",
+		    cmdname, nelem);
 		exit(ERR_MEMORY);
 	}
 
-	memcpy((void *) pc_samples, (caddr_t) bufp + bufp->buffer,
-						    nelem * sizeof (Address));
+	(void) memcpy(pc_samples, (caddr_t)bufp + bufp->buffer,
+	    nelem * sizeof (Address));
 
 	/* Sort the pc samples */
-	qsort(pc_samples, nelem, sizeof (Address),
-			(int (*)(const void *, const void *)) pc_cmp);
+	qsort(pc_samples, nelem, sizeof (Address), pc_cmp);
 
 	/*
 	 * Assign pcsamples to functions in the currently active
@@ -485,8 +503,7 @@ ProfBuffer	*bufp;
 }
 
 static void
-process_cgraph(cgp)
-ProfCallGraph	*cgp;
+process_cgraph(ProfCallGraph *cgp)
 {
 	mod_info_t	*mi;
 	Address		f_end;
@@ -497,7 +514,8 @@ ProfCallGraph	*cgp;
 	for (callee_off = cgp->functions; callee_off;
 					    callee_off = calleep->next_to) {
 
-		calleep = (ProfFunction *) ((char *) cgp + callee_off);
+		/* LINTED: pointer cast */
+		calleep = (ProfFunction *)((char *)cgp + callee_off);
 		if (calleep->count == 0)
 			continue;
 
@@ -533,19 +551,19 @@ get_shobj_syms(char *pathname, GElf_Addr ld_base, GElf_Addr ld_end)
 	mod_info_t	*mi;
 
 	/* Create a new module element */
-	if ((mi = (mod_info_t *) malloc(sizeof (mod_info_t))) == NULL) {
-		fprintf(stderr, "%s: no room for %ld bytes\n",
-					    cmdname, sizeof (mod_info_t));
+	if ((mi = malloc(sizeof (mod_info_t))) == NULL) {
+		(void) fprintf(stderr, "%s: no room for %d bytes\n",
+		    cmdname, sizeof (mod_info_t));
 		exit(ERR_MEMORY);
 	}
 
-	mi->path = (char *) malloc(strlen(pathname) + 1);
+	mi->path = malloc(strlen(pathname) + 1);
 	if (mi->path == NULL) {
-		fprintf(stderr, "%s: can't allocate %ld bytes\n",
-						    strlen(pathname) + 1);
+		(void) fprintf(stderr, "%s: can't allocate %d bytes\n",
+		    cmdname, strlen(pathname) + 1);
 		exit(ERR_MEMORY);
 	}
-	strcpy(mi->path, pathname);
+	(void) strcpy(mi->path, pathname);
 	mi->next = NULL;
 
 	get_syms(pathname, mi);
@@ -566,9 +584,7 @@ get_shobj_syms(char *pathname, GElf_Addr ld_base, GElf_Addr ld_end)
  * each other.
  */
 static bool
-does_overlap(new, old)
-ProfModule	*new;
-mod_info_t	*old;
+does_overlap(ProfModule *new, mod_info_t *old)
 {
 	/* case 1: new module lies completely *before* the old one */
 	if (new->startaddr < old->load_base && new->endaddr <= old->load_base)
@@ -583,9 +599,7 @@ mod_info_t	*old;
 }
 
 static bool
-is_same_as_aout(modpath, buf)
-char		*modpath;
-struct stat	*buf;
+is_same_as_aout(char *modpath, struct stat *buf)
 {
 	if (stat(modpath, buf) == -1) {
 		perror(modpath);
@@ -600,8 +614,7 @@ struct stat	*buf;
 }
 
 static void
-process_modules(modlp)
-ProfModuleList	*modlp;
+process_modules(ProfModuleList *modlp)
 {
 	ProfModule	*newmodp;
 	mod_info_t	*mi, *last, *new_module;
@@ -611,8 +624,9 @@ ProfModuleList	*modlp;
 
 	/* Check version of module type object */
 	if (modlp->version > PROF_MODULES_VER) {
-		fprintf(stderr, "%s: unsupported version %d for modules\n",
-						cmdname, modlp->version);
+		(void) fprintf(stderr,
+		    "%s: unsupported version %d for modules\n",
+		    cmdname, modlp->version);
 		exit(ERR_INPUT);
 	}
 
@@ -621,7 +635,8 @@ ProfModuleList	*modlp;
 	 * Scan the PROF_MODULES_T list and add modules to current list
 	 * of modules, if they're not present already
 	 */
-	newmodp = (ProfModule *) ((caddr_t) modlp + modlp->modules);
+	/* LINTED: pointer cast */
+	newmodp = (ProfModule *)((caddr_t)modlp + modlp->modules);
 	do {
 		/*
 		 * Since the aout could've been renamed after its run, we
@@ -629,15 +644,16 @@ ProfModuleList	*modlp;
 		 * is probably the renamed aout. We should also skip any other
 		 * non-sharedobj's that we see (or should we report an error ?)
 		 */
-		so_path = (caddr_t) modlp + newmodp->path;
+		so_path = (caddr_t)modlp + newmodp->path;
 		if (does_overlap(newmodp, &modules) ||
 				    is_same_as_aout(so_path, &so_statbuf) ||
 						(!is_shared_obj(so_path))) {
 			if (!newmodp->next)
 				more_modules = FALSE;
 
+			/* LINTED: pointer cast */
 			newmodp = (ProfModule *)
-					((caddr_t) modlp + newmodp->next);
+			    ((caddr_t)modlp + newmodp->next);
 			continue;
 		}
 
@@ -647,7 +663,7 @@ ProfModuleList	*modlp;
 		 * there in the list, skip it.
 		 */
 		last = &modules;
-		while (mi = last->next) {
+		while ((mi = last->next) != NULL) {
 			/*
 			 * We expect the full pathname for all shared objects
 			 * needed by the program executable. In this case, we
@@ -675,8 +691,9 @@ ProfModuleList	*modlp;
 			if (!newmodp->next)
 				more_modules = FALSE;
 
+			/* LINTED: pointer cast */
 			newmodp = (ProfModule *)
-					((caddr_t) modlp + newmodp->next);
+			    ((caddr_t)modlp + newmodp->next);
 			continue;
 		}
 
@@ -685,8 +702,9 @@ ProfModuleList	*modlp;
 		 * module we want to add
 		 */
 		if (monout_stat.st_mtime < so_statbuf.st_mtime) {
-			fprintf(stderr, "%s: newer shared obj %s outdates "
-					"profile info\n", cmdname, so_path);
+			(void) fprintf(stderr,
+			    "%s: newer shared obj %s outdates profile info\n",
+			    cmdname, so_path);
 			exit(ERR_INPUT);
 		}
 
@@ -704,7 +722,8 @@ ProfModuleList	*modlp;
 		if (!newmodp->next)
 			more_modules = FALSE;
 
-		newmodp = (ProfModule *) ((caddr_t) modlp + newmodp->next);
+		/* LINTED: pointer cast */
+		newmodp = (ProfModule *)((caddr_t)modlp + newmodp->next);
 
 	} while (more_modules);
 }
@@ -720,40 +739,44 @@ process_mon_out(caddr_t memp, size_t fsz)
 	 * Save file end pointer and start after header
 	 */
 	file_end = memp + fsz;
-	objp = (ProfObject *) (memp + ((ProfHeader *) memp)->size);
-	while ((caddr_t) objp < file_end) {
+	/* LINTED: pointer cast */
+	objp = (ProfObject *)(memp + ((ProfHeader *)memp)->size);
+	while ((caddr_t)objp < file_end) {
 		switch (objp->type) {
 			case PROF_MODULES_T :
-				process_modules((ProfModuleList *) objp);
+				process_modules((ProfModuleList *)objp);
 				break;
 
 			case PROF_CALLGRAPH_T :
-				process_cgraph((ProfCallGraph *) objp);
+				process_cgraph((ProfCallGraph *)objp);
 				found_cgraph = TRUE;
 				break;
 
 			case PROF_BUFFER_T :
-				process_pcsamples((ProfBuffer *) objp);
+				process_pcsamples((ProfBuffer *)objp);
 				found_pcsamples = TRUE;
 				break;
 
 			default :
-				fprintf(stderr,
+				(void) fprintf(stderr,
 					"%s: unknown prof object type=%d\n",
 							cmdname, objp->type);
 				exit(ERR_INPUT);
 		}
-		objp = (ProfObject *) ((caddr_t) objp + objp->size);
+		/* LINTED: pointer cast */
+		objp = (ProfObject *)((caddr_t)objp + objp->size);
 	}
 
 	if (!found_cgraph || !found_pcsamples) {
-		fprintf(stderr, "%s: missing callgraph/pcsamples in `%s'\n",
-							    cmdname, mon_fn);
+		(void) fprintf(stderr,
+		    "%s: missing callgraph/pcsamples in `%s'\n",
+		    cmdname, mon_fn);
 		exit(ERR_INPUT);
 	}
 
-	if ((caddr_t) objp > file_end) {
-		fprintf(stderr, "%s: malformed file `%s'\n", cmdname, mon_fn);
+	if ((caddr_t)objp > file_end) {
+		(void) fprintf(stderr, "%s: malformed file `%s'\n",
+		    cmdname, mon_fn);
 		exit(ERR_INPUT);
 	}
 }
@@ -761,14 +784,14 @@ process_mon_out(caddr_t memp, size_t fsz)
 static void
 get_aout_syms(char *pathname, mod_info_t *mi)
 {
-	mi->path = (char *) malloc(strlen(pathname) + 1);
+	mi->path = malloc(strlen(pathname) + 1);
 	if (mi->path == NULL) {
-		fprintf(stderr, "%s: can't allocate %ld bytes\n",
-						    strlen(pathname) + 1);
+		(void) fprintf(stderr, "%s: can't allocate %d bytes\n",
+		    cmdname, strlen(pathname) + 1);
 		exit(ERR_MEMORY);
 	}
 
-	strcpy(mi->path, pathname);
+	(void) strcpy(mi->path, pathname);
 	mi->next = NULL;
 
 	get_syms(pathname, mi);
@@ -780,7 +803,7 @@ get_aout_syms(char *pathname, mod_info_t *mi)
 }
 
 void
-profver()
+profver(void)
 {
 	int		fd;
 	unsigned int	magic_num;
@@ -796,12 +819,12 @@ profver()
 		perror(mon_fn);
 		exit(ERR_SYSCALL);
 	}
-	if (read(fd, (char *) &magic_num, sizeof (unsigned int)) == -1) {
+	if (read(fd, (char *)&magic_num, sizeof (unsigned int)) == -1) {
 		perror("read");
 		exit(ERR_SYSCALL);
 	}
 	if (magic_num != (unsigned int) PROF_MAGIC) {
-		close(fd);
+		(void) close(fd);
 		return;
 	}
 
@@ -811,8 +834,8 @@ profver()
 	 * Check versioning info. For now, let's say we provide
 	 * backward compatibility, so we accept all older versions.
 	 */
-	lseek(fd, 0L, SEEK_SET);
-	if (read(fd, (char *) &prof_hdr, sizeof (ProfHeader)) == -1) {
+	(void) lseek(fd, 0L, SEEK_SET);
+	if (read(fd, (char *)&prof_hdr, sizeof (ProfHeader)) == -1) {
 		perror("read");
 		exit(ERR_SYSCALL);
 	}
@@ -824,8 +847,9 @@ profver()
 		invalid_version = FALSE;
 	}
 	if (invalid_version) {
-		fprintf(stderr, "%s: mon.out version %d.%d not supported\n",
-		cmdname, prof_hdr.h_major_ver, prof_hdr.h_minor_ver);
+		(void) fprintf(stderr,
+		    "%s: mon.out version %d.%d not supported\n",
+		    cmdname, prof_hdr.h_major_ver, prof_hdr.h_minor_ver);
 		exit(ERR_INPUT);
 	}
 
@@ -843,7 +867,7 @@ profver()
 		perror("mmap");
 		exit(ERR_SYSCALL);
 	}
-	close(fd);
+	(void) close(fd);
 
 
 	/*
@@ -884,6 +908,6 @@ profver()
 	print_profile_data();
 
 
-	munmap(fmem, monout_stat.st_size);
+	(void) munmap(fmem, monout_stat.st_size);
 	exit(0);
 }

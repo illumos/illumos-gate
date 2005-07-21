@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/prof/sparc/Makefile
@@ -43,6 +43,8 @@ SRCS=		$(COMOBJS:%.o=../common/%.c)
 INCLIST=	-I../common -I../../include -I../../include/sparc
 DEFLIST=	-DSPARC -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
+CFLAGS +=	$(CCVERBOSE)
+C99MODE=	$(C99_ENABLE)
 LDLIBS +=	../../sgsdemangler/$(MACH)/libdemangle.a -lelf
 LINTFLAGS +=	$(LDLIBS)
 CLEANFILES +=	$(LINTOUT)
