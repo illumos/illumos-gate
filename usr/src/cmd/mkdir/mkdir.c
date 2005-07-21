@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
 /*	  All Rights Reserved					*/
 /*								*/
-
-/*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -73,7 +74,7 @@ newmode(char *ms, mode_t new_mode, mode_t umsk, char *file, char *path);
 #define	ALLRWX (S_IRWXU | S_IRWXG | S_IRWXO)
 
 
-void
+int
 main(int argc, char *argv[])
 {
 	int 	pflag, errflg, mflag;
@@ -277,7 +278,7 @@ main(int argc, char *argv[])
 
 	if (local_errno)
 	    errno = local_errno;
-	exit(errno ? 2: 0);
+	return (errno ? 2: 0);
 }
 
 /*

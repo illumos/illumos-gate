@@ -20,15 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Huffman encoding program
@@ -127,6 +126,7 @@ static int mv_xattrs(int, int, char *, int);
 
 /* gather character frequency statistics */
 /* return 1 if successful, 0 otherwise */
+int
 input(char *source)
 {
 	register int i;
@@ -145,6 +145,7 @@ input(char *source)
 
 /* encode the current file */
 /* return 1 if successful, 0 otherwise */
+int
 output(char *source)
 {
 	int c, i, inleft;
@@ -341,6 +342,7 @@ packfile(char *source)
 	return (output(source));
 }
 
+int
 main(int argc, char *argv[])
 {
 	extern  int optind;

@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -6,11 +11,6 @@
  * Copyright (c) 1986 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
- */
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1754,10 +1754,10 @@ cl_block(count_long in_count)	/* table clear for block compress */
 #endif /* DEBUG */
 
 	/* shift will overflow */
-	if ((count_long)in_count > (count_long)0x007fffffffffffff) {
+	if ((count_long)in_count > 0x007fffffffffffffLL) {
 		rat = (count_long)bytes_out >> 8;
 		if (rat == 0) {		/* Don't divide by zero */
-			rat = 0x7fffffffffffffff;
+			rat = 0x7fffffffffffffffLL;
 		} else {
 			rat = (count_long)in_count / (count_long)rat;
 		}

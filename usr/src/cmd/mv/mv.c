@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,7 +144,7 @@ static int		cmdarg;		/* command line argument */
 static avl_tree_t	*stree = NULL;	/* source file inode search tree */
 
 
-void
+int
 main(int argc, char *argv[])
 {
 	int c, i, r, errflg = 0;
@@ -376,7 +376,7 @@ main(int argc, char *argv[])
 	 * Show errors by nonzero exit code.
 	 */
 
-	exit(r?2:0);
+	return (r?2:0);
 }
 
 static int
@@ -902,6 +902,7 @@ cleanup:
 		return (ret);
 	}
 	/*NOTREACHED*/
+	return (ret);
 }
 
 static int

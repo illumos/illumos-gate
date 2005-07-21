@@ -190,6 +190,7 @@ static wint_t	_fgetwc_pr(FILE *, int *);
 static size_t	freadw(wchar_t *, size_t, FILE *);
 
 
+int
 main(int argc, char **argv)
 {
 	FILS	fstr[NFILES];

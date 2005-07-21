@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,6 +95,7 @@ static type_t types[] = {
  * running.
  */
 
+int
 main(int argc, char *argv[])
 {
 	int c;
@@ -247,7 +248,6 @@ main(int argc, char *argv[])
 	}
 
 	return (errs != 0);
-	/* NOTREACHED */
 }
 
 static int
