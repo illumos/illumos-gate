@@ -40,7 +40,19 @@ void *slbidt;
 label: \
 	push	$0; \
 	push	$num; \
-	call	trap
+	jmp	_cmntrap
+
+	/*
+	 * VECT_EC pushes the trap number ONLY before jumping to cmnint
+	 * for traps that have pushed an error code on the stack already.
+	 * (So that cmnint can expect a common stack frame)
+	 */
+#define	VECT_EC(label, num) \
+	.align	4; \
+	.globl	label; \
+label: \
+	push	$num; \
+	jmp	_cmntrap
 
 	VECT(div0trap, 0)
 	VECT(dbgtrap, 1)
@@ -50,18 +62,18 @@ label: \
 	VECT(boundstrap, 5)
 	VECT(invoptrap, 6)
 	VECT(ndptrap0, 7)
-	VECT(dbfault, 8)
+	VECT_EC(dbfault, 8)
 	VECT(overrun, 9)
-	VECT(invtsstrap, 10)
-	VECT(segnptrap, 11)
-	VECT(stktrap, 12)
-	VECT(gptrap, 13)
-	VECT(pftrap, 14)
+	VECT_EC(invtsstrap, 10)
+	VECT_EC(segnptrap, 11)
+	VECT_EC(stktrap, 12)
+	VECT_EC(gptrap, 13)
+	VECT_EC(pftrap, 14)
 	VECT(resvtrap, 15)
 	VECT(ndperr, 16)
-	VECT(inval17, 17)
-	VECT(inval18, 18)
-	VECT(inval19, 19)
+	VECT_EC(alignflt, 17)
+	VECT(mceabort, 18)
+	VECT(simdflt, 19)
 	VECT(progent, 20)
 	VECT(inval21, 21)
 	VECT(inval22, 22)
@@ -218,11 +230,11 @@ slbidt:
 	.4byte	0x8f000010
 	.4byte	ndperr
 	.4byte	0x8f000010
-	.4byte	inval17
+	.4byte	alignflt
 	.4byte	0x8f000010
-	.4byte	inval18
+	.4byte	mceabort
 	.4byte	0x8f000010
-	.4byte	inval19
+	.4byte	simdflt
 	.4byte	0x8f000010
 	.4byte	progent
 	.4byte	0x8f000010

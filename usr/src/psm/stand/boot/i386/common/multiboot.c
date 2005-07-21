@@ -39,6 +39,7 @@
 #include <sys/types.h>
 #include <sys/memlist.h>
 #include <sys/reboot.h>
+#include <amd64/machregs.h>
 #include "multiboot.h"
 #include "debug.h"
 #include "standalloc.h"
@@ -64,6 +65,9 @@ static void print_mbinfo(void);
 int debug;
 
 #define	dprintf	if (debug & D_MBOOT) printf
+
+#define	STACK_LINES 9
+#define	WORDS_PER_LINE 6
 
 multiboot_info_t *mbi;
 multiboot_header_t *mbh;
@@ -275,10 +279,51 @@ print_mbinfo(void)
 	}
 }
 
-/*ARGSUSED*/
-void
-trap(int trapno, int err)
+static void
+show_regs_and_stack(struct i386_machregs *regs, int stack_lines)
 {
-	printf("trap type %d\n", trapno);
+	int i, j;
+	uint32_t *esp = (uint32_t *)regs->r_esp;
+
+	printf("trap type %d (0x%x) err code 0x%x eip=0x%x\n",
+		regs->r_trapno, regs->r_trapno, regs->r_err,
+		regs->r_eip);
+	printf("%%eflags = 0x%08x\t%%cs:%%eip = 0x%04x:0x%08x\n",
+		regs->r_efl, regs->r_cs, regs->r_eip);
+	printf("%%eax = 0x%08x\t%%ebx = 0x%08x\t%%ecx = 0x%08x\n",
+		regs->r_eax, regs->r_ebx, regs->r_ecx);
+	printf("%%edx = 0x%08x\t%%esi = 0x%08x\t%%edi = 0x%08x\n",
+		regs->r_edx, regs->r_esi, regs->r_edi);
+	printf("%%esp = 0x%08x\t%%ebp = 0x%08x\n",
+		regs->r_esp, regs->r_ebp);
+	printf("%%ss = 0x%04x\t%%ds = 0x%04x\t%%es = 0x%04x\t%%fs = 0x%04x\n",
+		regs->r_ss, regs->r_ds, regs->r_es, regs->r_fs);
+	printf("GDT @ 0x%08x lim 0x%04x\t\tIDT @ 0x%08x lim 0x%04x\n",
+		regs->r_gdt.dtr_base, regs->r_gdt.dtr_limit,
+		regs->r_idt.dtr_base, regs->r_idt.dtr_limit);
+	printf("LDT = 0x%04x\tTASK = 0x%04x\n",
+		regs->r_ldt, regs->r_tr);
+	printf("%%cr0 = 0x%08x\t%%cr2 = 0x%08x\t%%cr3 = 0x%08x\n",
+		regs->r_cr0, regs->r_cr2, regs->r_cr3);
+	printf("%%cr4 = 0x%08x\n",
+		regs->r_cr4);
+
+	printf("\nStack (starting at 0x%x):\n", (uint32_t)esp);
+	for (j = 0; j < stack_lines; j++) {
+		for (i = 0; i < WORDS_PER_LINE; i++) {
+			printf("0x%08x", esp[(j * WORDS_PER_LINE) + i]);
+			if (i < (WORDS_PER_LINE - 1))
+				printf("  ");
+		}
+		printf("\n");
+	}
+}
+
+void
+trap(struct i386_machregs *regs)
+{
+	/* Show registers and stack: [24 lines max (prevents scrolling)] */
+	show_regs_and_stack(regs, STACK_LINES);
+
 	panic("unexpected trap in boot loader\n");
 }

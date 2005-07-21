@@ -55,6 +55,7 @@ void outl(int port, uint32_t v) { *(uint32_t *)port = v; }
 #include <sys/asm_linkage.h>
 #include <sys/controlregs.h>
 #include <sys/segment.h>
+#include <assym.h>
 #include "../common/multiboot.h"
 
 .file	"asm.s"
@@ -241,6 +242,110 @@ donetable:
 	lidt	IDTptr		/ load faulty table
 	int	$10		/ trigger an interrupt
 	SET_SIZE(reset)
+
+	ENTRY(_cmntrap)
+	/
+	/ Stack looks like the following on entry:
+	/
+	/ EFLAGS		%esp + SIZEOF_i386_machregs + 16
+	/ CS			%esp + SIZEOF_i386_machregs + 12
+	/ EIP			%esp + SIZEOF_i386_machregs + 8
+	/ ERRCODE		%esp + SIZEOF_i386_machregs + 4
+	/ TRAPNO		%esp + SIZEOF_i386_machregs
+	/ STRUCT MACHREGS	%esp + 0
+	/
+	subl	$SIZEOF_i386_machregs, %esp
+
+	movl	%eax, i386_REG_EAX(%esp)
+	movl	%ebx, i386_REG_EBX(%esp)
+	movl	%ecx, i386_REG_ECX(%esp)
+	movl	%edx, i386_REG_EDX(%esp)
+	movl	%edi, i386_REG_EDI(%esp)
+	movl	%esi, i386_REG_ESI(%esp)
+	movl	%ebp, i386_REG_EBP(%esp)
+
+	/ Copy in the saved EFLAGS
+	leal	SIZEOF_i386_machregs(%esp), %eax
+	addl	$16, %eax
+	movl	(%eax), %eax
+	movl	%eax, i386_REG_EFL(%esp)
+
+	/ Copy in the saved CS
+	leal	SIZEOF_i386_machregs(%esp), %eax
+	addl	$12, %eax
+	movl	(%eax), %eax
+	movl	%eax, i386_REG_CS(%esp)
+
+	/ Copy in the saved EIP
+	leal	SIZEOF_i386_machregs(%esp), %eax
+	addl	$8, %eax
+	movl	(%eax), %eax
+	movl	%eax, i386_REG_EIP(%esp)
+
+	/ Copy in the saved ERRCODE
+	leal	SIZEOF_i386_machregs(%esp), %eax
+	addl	$4, %eax
+	movl	(%eax), %eax
+	movl	%eax, i386_REG_ERR(%esp)
+
+	/ Copy in the saved TRAPNO
+	leal	SIZEOF_i386_machregs(%esp), %eax
+	movl	(%eax), %eax
+	movl	%eax, i386_REG_TRAPNO(%esp)
+
+	movl	%esp, i386_REG_ESP(%esp)
+	movl	%esp, i386_REG_UESP(%esp)
+
+	/
+	/ The original %esp is +SIZEOF_i386_machregs
+	/
+	addl	$SIZEOF_i386_machregs, i386_REG_ESP(%esp)
+	addl	$SIZEOF_i386_machregs, i386_REG_UESP(%esp)
+
+	/ Save the segment registers
+	xorl	%eax, %eax
+
+	movw	%ss, %ax
+	movw	$0, [i386_REG_SS + 2](%esp)
+	movl	%eax, i386_REG_SS(%esp)
+	movw	%ds, %ax
+	movw	$0, [i386_REG_DS + 2](%esp)
+	movl	%eax, i386_REG_DS(%esp)
+	movw	%es, %ax
+	movw	$0, [i386_REG_ES + 2](%esp)
+	movl	%eax, i386_REG_ES(%esp)
+	movw	%fs, %ax
+	movw	$0, [i386_REG_FS + 2](%esp)
+	movl	%eax, i386_REG_FS(%esp)
+	movw	%gs, %ax
+	movw	$0, [i386_REG_GS + 2](%esp)
+	movl	%eax, i386_REG_GS(%esp)
+
+	/ Save the control registers
+	movl	%cr0, %eax
+	movl	%eax, i386_REG_CR0(%esp)
+	movl	%cr2, %eax
+	movl	%eax, i386_REG_CR2(%esp)
+	movl	%cr3, %eax
+	movl	%eax, i386_REG_CR3(%esp)
+	movl	%cr4, %eax
+	movl	%eax, i386_REG_CR4(%esp)
+
+	/ Save the task, interrupt, gdt, ldt registers
+	movw	$0, [i386_REG_TR + 2](%esp)
+	str	i386_REG_TR(%esp)
+	sidt	i386_REG_IDT(%esp)
+	sgdt	i386_REG_GDT(%esp)
+	movw	$0, [i386_REG_LDT + 2](%esp)
+	sldt	i386_REG_LDT(%esp)
+
+	pushl	%esp
+	call	trap
+	addl	$4, %esp
+
+	addl	$SIZEOF_i386_machregs, %esp
+	iret
+	SET_SIZE(_cmntrap)
 
 / Data definitions
 .align	4
