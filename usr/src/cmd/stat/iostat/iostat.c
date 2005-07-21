@@ -623,7 +623,7 @@ show_disk(void *v1, void *v2, void *data)
 		kps = krps + kwps;
 
 		/*
-		 * Average number of write transactions waiting
+		 * Average number of wait transactions waiting
 		 */
 		w_delta = hrtime_delta((u_longlong_t)
 		    (old ? old->is_stats.wlentime : 0),
@@ -635,7 +635,7 @@ show_disk(void *v1, void *v2, void *data)
 			avw = 0.0;
 
 		/*
-		 * Average number of read transactions waiting
+		 * Average number of run transactions waiting
 		 */
 		r_delta = hrtime_delta(old ? old->is_stats.rlentime : 0,
 		    new->is_stats.rlentime);

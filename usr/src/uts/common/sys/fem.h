@@ -51,9 +51,9 @@ struct fs_operation_def;	/* from vfs.h */
  * fem - file event monitoring
  *
  * File Event Monitoring is a formalized mechanism to monitor events on a
- * vnode or vfs by intercpting the vnode/vfs operations.  The framework enables
+ * vnode or vfs by intercepting the vnode/vfs operations.  The framework enables
  * the consumer to request event notifications for specified files and
- * directories.  The consumers, which intercepts the events, are responsible for
+ * directories.  The consumers, which intercept the events, are responsible for
  * delivering the event to the next interceptor or the terminal destination.
  *
  */

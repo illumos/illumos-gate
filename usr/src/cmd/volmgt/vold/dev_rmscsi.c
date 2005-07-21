@@ -46,7 +46,7 @@
 
 
 #ifdef	P0_WA
-#undef	P0_WA		/* that shit not done here! */
+#undef	P0_WA		/* disable P0_WA (P0 workaround) for Intel */
 #endif
 
 
