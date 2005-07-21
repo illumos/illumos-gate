@@ -22,7 +22,7 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI" 
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Special Cases Database. ABI Versions Exceptions.
 #
@@ -365,7 +365,8 @@ PSARC 2002/547: RULE W3: usr/lib/libinetsvc.so.1
 4947729: RULE W3: usr/lib/pool/libjpool.so.1
 4947729: RULE W3: usr/lib/pool/libjsyslog.so.1
 4940032: RULE W3: usr/lib/print/psm-lpsched.so.1
-
+6289029: RULE W3: lib/libdlpi.so.1
+ 
 #############################################
 # WARNINGs exempted from RULE W4 (See RULES section of intf_check manpage) 
 # exempts libraries with no versions found

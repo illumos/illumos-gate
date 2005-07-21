@@ -78,6 +78,7 @@ s none lib/libdl.so=libdl.so.1
 f none lib/libdl.so.1 755 root bin
 f none lib/libdladm.so.1 755 root bin
 f none lib/libdlpi.so.1 755 root bin
+s none lib/libdlpi.so=libdlpi.so.1
 f none lib/libdoor.so.1 755 root  bin
 s none lib/libdoor.so=libdoor.so.1
 s none lib/libefi.so=libefi.so.1

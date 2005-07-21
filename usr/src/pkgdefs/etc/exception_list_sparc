@@ -22,7 +22,7 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Exception List for protocmp
 #
@@ -77,7 +77,6 @@ usr/include/sys/dls_impl.h		sparc
 usr/include/sys/mac.h		sparc
 usr/include/sys/mac_impl.h		sparc
 usr/include/libdladm.h		sparc
-usr/include/libdlpi.h		sparc
 usr/include/liblaadm.h		sparc
 usr/include/libmacadm.h		sparc
 #
@@ -85,13 +84,10 @@ usr/include/libmacadm.h		sparc
 # Solaris MAC drivers and should not be shipped
 #
 lib/libdladm.so		sparc
-lib/libdlpi.so		sparc
 lib/liblaadm.so		sparc
 lib/libmacadm.so		sparc
 lib/llib-ldladm.ln		sparc
 lib/llib-ldladm		sparc
-lib/llib-ldlpi.ln		sparc
-lib/llib-ldlpi		sparc
 lib/llib-llaadm.ln		sparc
 lib/llib-llaadm		sparc
 lib/llib-lmacadm.ln		sparc

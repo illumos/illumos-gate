@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -71,6 +71,8 @@ f none lib/llib-ldevinfo 644 root bin
 f none lib/llib-ldevinfo.ln 644 root bin
 f none lib/llib-ldl 644 root bin
 f none lib/llib-ldl.ln 644 root bin
+f none lib/llib-ldlpi 644 root bin
+f none lib/llib-ldlpi.ln 644 root bin
 f none lib/llib-ldoor 644 root bin
 f none lib/llib-ldoor.ln 644 root bin
 f none lib/llib-lefi 644 root bin
