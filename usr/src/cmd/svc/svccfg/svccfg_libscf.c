@@ -152,6 +152,7 @@ static const char *emsg_invalid_pg_name;
 static const char *emsg_invalid_prop_name;
 static const char *emsg_no_such_pg;
 static const char *emsg_fmri_invalid_pg_name;
+static const char *emsg_fmri_invalid_pg_name_type;
 static const char *emsg_pg_added;
 static const char *emsg_pg_changed;
 static const char *emsg_pg_deleted;
@@ -829,6 +830,8 @@ lscf_init()
 	emsg_no_such_pg = gettext("No such property group \"%s\".\n");
 	emsg_fmri_invalid_pg_name = gettext("Service %s has property group "
 	    "with invalid name \"%s\".\n");
+	emsg_fmri_invalid_pg_name_type = gettext("Service %s has property "
+	    "group with invalid name \"%s\" or type \"%s\".\n");
 	emsg_pg_added = gettext("%s changed unexpectedly "
 	    "(property group \"%s\" added).\n");
 	emsg_pg_changed = gettext("%s changed unexpectedly "
@@ -1640,8 +1643,9 @@ add_pg:
 			return (stash_scferror(lcbdata));
 
 		case SCF_ERROR_INVALID_ARGUMENT:
-			warn(emsg_fmri_invalid_pg_name, lcbdata->sc_source_fmri,
-			    p->sc_pgroup_name);
+			warn(emsg_fmri_invalid_pg_name_type,
+			    lcbdata->sc_source_fmri,
+			    p->sc_pgroup_name, p->sc_pgroup_type);
 			return (stash_scferror(lcbdata));
 
 		case SCF_ERROR_PERMISSION_DENIED:
