@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,13 @@ static void grow_netbuf(struct netbuf *, size_t);
 static void loopb_u2t(const char *, struct netbuf *);
 
 #define	RPC_PMAP_TIMEOUT	15
+/*
+ * define for max length of an ip address and port address, the value was
+ * calculated using INET6_ADDRSTRLEN (46) + max port address (12) +
+ * seperator "."'s in port address (2) + null (1) = 61.
+ * Then there is IPV6_TOKEN_LEN which is 64, so the value is 64 to be safe.
+ */
+#define	RPC_MAX_IP_LENGTH	64
 
 /*
  * Kernel level debugging aid. The global variable "rpclog" is a bit
@@ -107,6 +114,96 @@ rpc_poptimod(vnode_t *vp)
 			return;
 		}
 	}
+}
+
+/*
+ * Check the passed in ip address for correctness (limited) and return its
+ * type.
+ *
+ * an ipv4 looks like this:
+ * "IP.IP.IP.IP.PORT[top byte].PORT[bottom byte]"
+ *
+ * an ipv6 looks like this:
+ * fec0:A02::2:202:4FCD
+ * or
+ * ::10.9.2.1
+ */
+int
+rpc_iptype(
+	char	*ipaddr,
+	int	*typeval)
+{
+	char	*cp;
+	int	chcnt = 0;
+	int	coloncnt = 0;
+	int	dotcnt = 0;
+	int	numcnt = 0;
+	int	hexnumcnt = 0;
+	int	othercnt = 0;
+
+	cp = ipaddr;
+
+	/* search for the different type of characters in the ip address */
+	while ((*cp != '\0') && (chcnt < RPC_MAX_IP_LENGTH)) {
+		switch (*cp) {
+		case ':':
+			coloncnt++;
+			break;
+		case '.':
+			dotcnt++;
+			break;
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
+		case '8':
+		case '9':
+			numcnt++;
+			break;
+		case 'a':
+		case 'A':
+		case 'b':
+		case 'B':
+		case 'c':
+		case 'C':
+		case 'd':
+		case 'D':
+		case 'e':
+		case 'E':
+		case 'f':
+		case 'F':
+			hexnumcnt++;
+			break;
+		default:
+			othercnt++;
+			break;
+		}
+		chcnt++;
+		cp++;
+	}
+
+	/* check for bad ip strings */
+	if ((chcnt == RPC_MAX_IP_LENGTH) || (othercnt))
+		return (-1);
+
+	/* if we have a coloncnt, it can only be an ipv6 address */
+	if (coloncnt) {
+		if ((coloncnt < 2) || (coloncnt > 7))
+			return (-1);
+
+		*typeval = AF_INET6;
+	} else {
+		/* since there are no colons, make sure it is ipv4 */
+		if ((hexnumcnt) || (dotcnt != 5))
+			return (-1);
+
+		*typeval = AF_INET;
+	}
+	return (0);
 }
 
 /*
@@ -310,7 +407,6 @@ grow_netbuf(struct netbuf *nb, size_t length)
 	nb->maxlen = (unsigned int)length;
 }
 
-
 /*
  * Try to get the address for the desired service by using the rpcbind
  * protocol.  Ignores signals.  If addr is a loopback address, it is
@@ -329,6 +425,7 @@ rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
 	k_sigset_t oldmask;
 	k_sigset_t newmask;
 	ushort_t port;
+	int iptype;
 
 	/*
 	 * Call rpcbind (local or remote) to get an address we can use
@@ -413,10 +510,20 @@ rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
 	 * answer.
 	 */
 	if (strcmp(config->knc_protofmly, NC_INET) == 0) {
-		port = rpc_uaddr2port(AF_INET, ua);
+		/* make sure that the ip address is the correct type */
+		if (rpc_iptype(ua, &iptype) != 0) {
+			status = RPC_UNKNOWNADDR;
+			goto out;
+		}
+		port = rpc_uaddr2port(iptype, ua);
 		put_inet_port(addr, ntohs(port));
 	} else if (strcmp(config->knc_protofmly, NC_INET6) == 0) {
-		port = rpc_uaddr2port(AF_INET6, ua);
+		/* make sure that the ip address is the correct type */
+		if (rpc_iptype(ua, &iptype) != 0) {
+			status = RPC_UNKNOWNADDR;
+			goto out;
+		}
+		port = rpc_uaddr2port(iptype, ua);
 		put_inet6_port(addr, ntohs(port));
 	} else if (strcmp(config->knc_protofmly, NC_LOOPBACK) == 0) {
 		loopb_u2t(ua, addr);
