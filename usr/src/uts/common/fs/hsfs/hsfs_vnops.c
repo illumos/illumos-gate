@@ -96,14 +96,11 @@ static int
 hsfs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 	struct caller_context *ct)
 {
-	struct hsnode *hp;
-	ulong_t off;
-	long mapon, on;
 	caddr_t base;
-	uint_t	filesize;
-	long nbytes, n;
-	uint_t flags;
+	offset_t diff;
 	int error;
+	struct hsnode *hp;
+	uint_t filesize;
 
 	hp = VTOH(vp);
 	/*
@@ -116,53 +113,80 @@ hsfs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 	}
 	filesize = hp->hs_dirent.ext_size;
 
-	if (uiop->uio_loffset >= MAXOFF_T) {
-		error = 0;
-		goto out;
-	}
-
-	if (uiop->uio_offset >= filesize) {
-		error = 0;
-		goto out;
-	}
+	/* Sanity checks. */
+	if (uiop->uio_resid == 0 ||		/* No data wanted. */
+	    uiop->uio_loffset >= MAXOFF_T ||	/* Offset too big. */
+	    uiop->uio_loffset >= filesize)	/* Past EOF. */
+		return (0);
 
 	do {
-		/* map file to correct page boundary */
-		off = uiop->uio_offset & MAXBMASK;
-		mapon = uiop->uio_offset & MAXBOFFSET;
+		/*
+		 * We want to ask for only the "right" amount of data.
+		 * In this case that means:-
+		 *
+		 * We can't get data from beyond our EOF. If asked,
+		 * we will give a short read.
+		 *
+		 * segmap_getmapflt returns buffers of MAXBSIZE bytes.
+		 * These buffers are always MAXBSIZE aligned.
+		 * If our starting offset is not MAXBSIZE aligned,
+		 * we can only ask for less than MAXBSIZE bytes.
+		 *
+		 * If our requested offset and length are such that
+		 * they belong in different MAXBSIZE aligned slots
+		 * then we'll be making more than one call on
+		 * segmap_getmapflt.
+		 *
+		 * This diagram shows the variables we use and their
+		 * relationships.
+		 *
+		 * |<-----MAXBSIZE----->|
+		 * +--------------------------...+
+		 * |.....mapon->|<--n-->|....*...|EOF
+		 * +--------------------------...+
+		 * uio_loffset->|
+		 * uio_resid....|<---------->|
+		 * diff.........|<-------------->|
+		 *
+		 * So, in this case our offset is not aligned
+		 * and our request takes us outside of the
+		 * MAXBSIZE window. We will break this up into
+		 * two segmap_getmapflt calls.
+		 */
+		size_t nbytes;
+		offset_t mapon;
+		size_t n;
+		uint_t flags;
 
-		/* set read in data size */
-		on = (uiop->uio_offset) & PAGEOFFSET;
-		nbytes = MIN(PAGESIZE - on, uiop->uio_resid);
-		/* adjust down if > EOF */
-		n = MIN((filesize - uiop->uio_offset), nbytes);
-		if (n == 0) {
-			error = 0;
-			goto out;
+		mapon = uiop->uio_loffset & MAXBOFFSET;
+		diff = filesize - uiop->uio_loffset;
+		nbytes = (size_t)MIN(MAXBSIZE - mapon, uiop->uio_resid);
+		n = MIN(diff, nbytes);
+		if (n <= 0) {
+			/* EOF or request satisfied. */
+			return (0);
 		}
 
-		/* map the file into memory */
-		base = segmap_getmapflt(segkmap, vp, (u_offset_t)off,
-					MAXBSIZE, 1, S_READ);
+		base = segmap_getmapflt(segkmap, vp,
+		    (u_offset_t)uiop->uio_loffset, n, 1, S_READ);
 
-		error = uiomove(base+mapon, (size_t)n, UIO_READ, uiop);
+		error = uiomove(base + mapon, n, UIO_READ, uiop);
+
 		if (error == 0) {
 			/*
 			 * if read a whole block, or read to eof,
 			 *  won't need this buffer again soon.
 			 */
-			if (n + on == PAGESIZE ||
-			    uiop->uio_offset == filesize)
+			if (n + mapon == MAXBSIZE ||
+			    uiop->uio_loffset == filesize)
 				flags = SM_DONTNEED;
 			else
 				flags = 0;
 			error = segmap_release(segkmap, base, flags);
 		} else
 			(void) segmap_release(segkmap, base, 0);
-
 	} while (error == 0 && uiop->uio_resid > 0);
 
-out:
 	return (error);
 }
 
@@ -718,6 +742,8 @@ reread:
 	extension -= (extension % PAGESIZE);
 	if (extension != 0 && extension < filsiz - off) {
 		len = extension;
+	} else {
+		len = PAGESIZE;
 	}
 	/*
 	 * Some cd writers don't write sectors that aren't used.  Also,
@@ -731,6 +757,9 @@ reread:
 	if (len > (filsiz - off)) {
 		len = filsiz - off;
 	}
+
+	/* A little paranoia. */
+	ASSERT(len > 0);
 
 	/*
 	 * After all that, make sure we're asking for things in units
@@ -782,7 +811,11 @@ again:
 			    SEMA_DEFAULT, NULL);
 		}
 
-		/* zero not-to-be-read page parts */
+		/*
+		 * If our filesize is not an integer multiple of PAGESIZE,
+		 * we zero that part of the last page that's between EOF and
+		 * the PAGESIZE boundary.
+		 */
 		xlen = io_len & PAGEOFFSET;
 		if (xlen != 0)
 			pagezero(pp->p_prev, xlen, PAGESIZE - xlen);
