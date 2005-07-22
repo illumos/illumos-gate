@@ -356,8 +356,12 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 
 	/* Obtain the object pointer. */
 	HANDLE2OBJECT(hKey, key_p, rv);
-	if (rv != CKR_OK)
-		goto clean_exit;
+	if (rv != CKR_OK) {
+		(void) pthread_mutex_lock(&session_p->session_mutex);
+		session_p->digest.flags = 0;
+		REFRELE(session_p, ses_lock_held);
+		return (rv);
+	}
 
 	/* Check the key type */
 	if (key_p->is_lib_obj && (key_p->class != CKO_SECRET_KEY)) {
@@ -376,6 +380,7 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 		 * We hold the session lock, and REFRELE()
 		 * will release the session lock for us.
 		 */
+		OBJ_REFRELE(key_p);
 		REFRELE(session_p, ses_lock_held);
 		return (CKR_OPERATION_NOT_INITIALIZED);
 	}
@@ -392,7 +397,6 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 		digest_key.dk_session = session_p->k_session;
 	}
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
-
 
 	if (!key_p->is_lib_obj) {
 		digest_key.dk_key.ck_format = CRYPTO_KEY_REFERENCE;
@@ -442,12 +446,14 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 		 * Decrement the session reference count.
 		 * We do not hold the session lock.
 		 */
-		REFRELE(session_p, ses_lock_held);
+		OBJ_REFRELE(key_p);
 		ses_lock_held = B_FALSE;
+		REFRELE(session_p, ses_lock_held);
 		return (CKR_OK);
 	}
 
 clean_exit:
+	OBJ_REFRELE(key_p);
 	/*
 	 * After an error occurred, terminate the current digest
 	 * operation by resetting the active and update flags.

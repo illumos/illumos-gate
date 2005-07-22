@@ -119,7 +119,10 @@ int kernel_fd = -1;
 /* protects kernel_initialized and entrance to C_Initialize/Finalize */
 static pthread_mutex_t globalmutex = PTHREAD_MUTEX_INITIALIZER;
 
-static CK_RV finalize_common(CK_VOID_PTR pReserved);
+ses_to_be_freed_list_t ses_delay_freed;
+object_to_be_freed_list_t obj_delay_freed;
+
+static void finalize_common();
 static void cleanup_library();
 static void kernel_fini();
 
@@ -216,6 +219,18 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 		return (rv);
 	}
 
+	/* Initialize the object_to_be_freed list */
+	(void) pthread_mutex_init(&obj_delay_freed.obj_to_be_free_mutex, NULL);
+	obj_delay_freed.count = 0;
+	obj_delay_freed.first = NULL;
+	obj_delay_freed.last = NULL;
+
+	/* Initialize the session_to_be_freed list */
+	(void) pthread_mutex_init(&ses_delay_freed.ses_to_be_free_mutex, NULL);
+	ses_delay_freed.count = 0;
+	ses_delay_freed.first = NULL;
+	ses_delay_freed.last = NULL;
+
 	kernel_initialized = B_TRUE;
 	kernel_pid = initialize_pid;
 
@@ -233,26 +248,9 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 CK_RV
 C_Finalize(CK_VOID_PTR pReserved)
 {
-
-	CK_RV rv;
+	int i;
 
 	(void) pthread_mutex_lock(&globalmutex);
-
-	rv = finalize_common(pReserved);
-
-	(void) pthread_mutex_unlock(&globalmutex);
-
-	return (rv);
-}
-
-/*
- * finalize_common() does the work for C_Finalize.  globalmutex
- * must be held before calling this function.
- */
-static CK_RV
-finalize_common(CK_VOID_PTR pReserved) {
-
-	int i;
 
 	if (!kernel_initialized) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
@@ -268,8 +266,26 @@ finalize_common(CK_VOID_PTR pReserved) {
 	 * resources
 	 */
 	for (i = 0; i < slot_count; i++) {
-		(void) kernel_delete_all_sessions(i, B_FALSE);
+		kernel_delete_all_sessions(i, B_FALSE);
 	}
+
+	finalize_common();
+
+	(void) pthread_mutex_unlock(&globalmutex);
+
+	return (CKR_OK);
+}
+
+/*
+ * finalize_common() does the work for C_Finalize.  globalmutex
+ * must be held before calling this function.
+ */
+static void
+finalize_common() {
+
+	int i;
+	kernel_object_t *delay_free_obj, *tmpo;
+	kernel_session_t *delay_free_ses, *tmps;
 
 	/*
 	 * Free the resources allocated for the slot table and reset
@@ -293,7 +309,24 @@ finalize_common(CK_VOID_PTR pReserved) {
 	kernel_initialized = B_FALSE;
 	kernel_pid = 0;
 
-	return (CKR_OK);
+	/*
+	 * free all entries in the delay_freed list
+	 */
+	delay_free_obj = obj_delay_freed.first;
+	while (delay_free_obj != NULL) {
+		tmpo = delay_free_obj->next;
+		free(delay_free_obj);
+		delay_free_obj = tmpo;
+	}
+	(void) pthread_mutex_destroy(&obj_delay_freed.obj_to_be_free_mutex);
+
+	delay_free_ses = ses_delay_freed.first;
+	while (delay_free_ses != NULL) {
+		tmps = delay_free_ses->next;
+		free(delay_free_ses);
+		delay_free_ses = tmps;
+	}
+	(void) pthread_mutex_destroy(&ses_delay_freed.ses_to_be_free_mutex);
 }
 
 /*
@@ -313,31 +346,10 @@ cleanup_library()
 	 */
 
 	for (i = 0; i < slot_count; i++) {
-		(void) kernel_delete_all_sessions(i, B_TRUE);
+		kernel_delete_all_sessions(i, B_TRUE);
 	}
 
-	/*
-	 * Free the resources allocated for the slot table and reset
-	 * slot_count to 0.
-	 */
-	if (slot_count > 0) {
-		for (i = 0; i < slot_count; i++) {
-			(void) pthread_mutex_destroy(&slot_table[i]->sl_mutex);
-			(void) free(slot_table[i]);
-		}
-		(void) free(slot_table);
-		slot_count = 0;
-	}
-
-	/* Close CRYPTO_DEVICE */
-	if (kernel_fd >= 0) {
-		(void) close(kernel_fd);
-	}
-
-	kernel_fd = -1;
-	kernel_initialized = B_FALSE;
-	kernel_pid = 0;
-
+	finalize_common();
 }
 
 /*

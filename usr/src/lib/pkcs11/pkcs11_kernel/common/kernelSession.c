@@ -105,6 +105,10 @@ C_CloseSession(CK_SESSION_HANDLE hSession)
 	 * Set SESSION_IS_CLOSING flag so any access to this
 	 * session will be rejected.
 	 */
+	if (session_p->ses_close_sync & SESSION_IS_CLOSING) {
+		REFRELE(session_p, ses_lock_held);
+		return (CKR_SESSION_CLOSED);
+	}
 	session_p->ses_close_sync |= SESSION_IS_CLOSING;
 
 	/*
@@ -124,7 +128,7 @@ C_CloseSession(CK_SESSION_HANDLE hSession)
 	 * kernel_delete_session() will reset SESSION_IS_CLOSING
 	 * flag after it is done.
 	 */
-	rv = kernel_delete_session(session_p->ses_slotid, session_p, B_FALSE,
+	kernel_delete_session(session_p->ses_slotid, session_p, B_FALSE,
 	    B_FALSE);
 	return (rv);
 }
@@ -133,15 +137,13 @@ C_CloseSession(CK_SESSION_HANDLE hSession)
 CK_RV
 C_CloseAllSessions(CK_SLOT_ID slotID)
 {
-	CK_RV rv = CKR_OK;
-
 	if (!kernel_initialized)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 
 	/* Delete all the sessions and release the allocated resources */
-	rv = kernel_delete_all_sessions(slotID, B_FALSE);
+	kernel_delete_all_sessions(slotID, B_FALSE);
 
-	return (rv);
+	return (CKR_OK);
 }
 
 CK_RV

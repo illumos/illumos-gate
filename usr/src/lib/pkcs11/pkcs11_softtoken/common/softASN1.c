@@ -1048,8 +1048,11 @@ asn1_to_rsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(key_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto cleanup_asn2rsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_RSA_MOD(keyp));
 
 	/* ... public exponent, */
@@ -1068,8 +1071,11 @@ asn1_to_rsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(key_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2rsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_RSA_PUBEXPO(keyp));
 
 	/* ... private exponent, */
@@ -1088,8 +1094,11 @@ asn1_to_rsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(key_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2rsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_RSA_PRIEXPO(keyp));
 
 	/* ... prime 1, */
@@ -1108,8 +1117,11 @@ asn1_to_rsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(key_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2rsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_RSA_PRIME1(keyp));
 
 	/* ... prime 2, */
@@ -1128,8 +1140,11 @@ asn1_to_rsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(key_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2rsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_RSA_PRIME2(keyp));
 
 	/* ... exponent 1, */
@@ -1148,8 +1163,11 @@ asn1_to_rsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(key_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2rsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_RSA_EXPO1(keyp));
 
 	/* ... exponent 2, */
@@ -1168,8 +1186,11 @@ asn1_to_rsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(key_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2rsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_RSA_EXPO2(keyp));
 
 	/* ... coefficient } end-sequence */
@@ -1189,8 +1210,11 @@ asn1_to_rsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	(void) ber_scanf(key_asn, "s",		/* "s}" ? */
 	    tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2rsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_RSA_COEF(keyp));
 
 	goto cleanup_asn2rsapri;
@@ -1308,8 +1332,11 @@ asn1_to_dsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(p8obj_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto cleanup_asn2dsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DSA_PRIME(keyp));
 
 	if (ber_next_element(p8obj_asn, &size, cookie) != LBER_INTEGER) {
@@ -1328,8 +1355,11 @@ asn1_to_dsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(p8obj_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2dsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DSA_SUBPRIME(keyp));
 
 	if (ber_next_element(p8obj_asn, &size, cookie) != LBER_INTEGER) {
@@ -1349,8 +1379,11 @@ asn1_to_dsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	(void) ber_scanf(p8obj_asn, "s",		/* "s}}" ? */
 	    tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2dsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DSA_BASE(keyp));
 
 	if (ber_next_element(p8obj_asn, &size, cookie) != LBER_OCTETSTRING) {
@@ -1389,8 +1422,11 @@ asn1_to_dsa_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	(void) ber_scanf(key_asn, "s",		/* "s}" ? */
 	    tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2dsapri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DSA_VALUE(keyp));
 
 	goto cleanup_asn2dsapri;
@@ -1504,8 +1540,11 @@ asn1_to_dh_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(p8obj_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto cleanup_asn2dhpri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DH_PRIME(keyp));
 
 	if (ber_next_element(p8obj_asn, &size, cookie) != LBER_INTEGER) {
@@ -1525,8 +1564,11 @@ asn1_to_dh_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	(void) ber_scanf(p8obj_asn, "s",		/* "s}}" ? */
 	    tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2dhpri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DH_BASE(keyp));
 
 	if (ber_next_element(p8obj_asn, &size, cookie) != LBER_OCTETSTRING) {
@@ -1565,8 +1607,11 @@ asn1_to_dh_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	(void) ber_scanf(key_asn, "s",		/* "s}" ? */
 	    tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2dhpri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DH_VALUE(keyp));
 
 	goto cleanup_asn2dhpri;
@@ -1679,8 +1724,11 @@ asn1_to_x942_dh_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(p8obj_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto cleanup_asn2x942dhpri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DH942_PRIME(keyp));
 
 	if (ber_next_element(p8obj_asn, &size, cookie) != LBER_INTEGER) {
@@ -1699,8 +1747,11 @@ asn1_to_x942_dh_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	}
 	(void) ber_scanf(p8obj_asn, "s", tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2x942dhpri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DH942_BASE(keyp));
 
 	if (ber_next_element(p8obj_asn, &size, cookie) != LBER_INTEGER) {
@@ -1720,8 +1771,11 @@ asn1_to_x942_dh_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	(void) ber_scanf(p8obj_asn, "s",		/* "s}}" ? */
 	    tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2x942dhpri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DH942_SUBPRIME(keyp));
 
 	if (ber_next_element(p8obj_asn, &size, cookie) != LBER_OCTETSTRING) {
@@ -1760,8 +1814,11 @@ asn1_to_x942_dh_pri(private_key_obj_t *keyp, uchar_t *buf, ulong_t buf_len)
 	(void) ber_scanf(key_asn, "s",		/* "s}" ? */
 	    tmp.big_value, &tmplen);
 	tmp.big_value_len = tmplen;
-	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK)
+	if ((rv = unpad_bigint_attr(tmp, &tmp_nopad)) != CKR_OK) {
+		free(tmp.big_value);
 		goto error_asn2x942dhpri;
+	}
+	free(tmp.big_value);
 	copy_bigint_attr(&tmp_nopad, KEY_PRI_DH942_VALUE(keyp));
 
 	goto cleanup_asn2x942dhpri;

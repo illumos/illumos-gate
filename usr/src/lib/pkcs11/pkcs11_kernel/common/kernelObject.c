@@ -132,22 +132,19 @@ C_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 		 */
 		rv = kernel_copy_object(old_object, &new_object, B_TRUE,
 		    session_p);
-
+		(void) pthread_mutex_unlock(&old_object->object_mutex);
 		if ((rv != CKR_OK) || (new_object == NULL)) {
-			/* Most likely we ran out of space. */
-			(void) pthread_mutex_unlock(&old_object->object_mutex);
-
 			/*
+			 * Most likely we ran out of space.
 			 * Decrement the session reference count.
 			 * We do not hold the session lock.
 			 */
+			OBJ_REFRELE(old_object);
 			REFRELE(session_p, ses_lock_held);
 			return (rv);
 		}
 
 		new_object->is_lib_obj = B_TRUE;
-		/* No need to hold the lock on the old object. */
-		(void) pthread_mutex_unlock(&old_object->object_mutex);
 
 		/* Modify the object attribute if requested */
 		for (i = 0; i < ulCount; i++) {
@@ -162,6 +159,7 @@ C_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 				 * Decrement the session reference count.
 				 * We do not hold the session lock.
 				 */
+				OBJ_REFRELE(old_object);
 				REFRELE(session_p, ses_lock_held);
 				return (rv);
 			}
@@ -174,6 +172,7 @@ C_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 		 * Decrement the session reference count.
 		 * We do not hold the session lock.
 		 */
+		OBJ_REFRELE(old_object);
 		REFRELE(session_p, ses_lock_held);
 
 		/* set handle of the new object */
@@ -186,13 +185,16 @@ C_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 		 */
 		new_object = calloc(1, sizeof (kernel_object_t));
 		if (new_object == NULL) {
-			rv = CKR_HOST_MEMORY;
-			goto failed_cleanup;
+			(void) pthread_mutex_unlock(&old_object->object_mutex);
+			OBJ_REFRELE(old_object);
+			REFRELE(session_p, ses_lock_held);
+			return (CKR_HOST_MEMORY);
 		}
 
 		/* Call CRYPTO_OBJECT_COPY ioctl to get a new object. */
 		object_copy.oc_session = session_p->k_session;
 		object_copy.oc_handle = old_object->k_handle;
+		(void) pthread_mutex_unlock(&old_object->object_mutex);
 		object_copy.oc_count = ulCount;
 		object_copy.oc_new_attributes = NULL;
 		if (ulCount > 0) {
@@ -221,9 +223,6 @@ C_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 		if (rv != CKR_OK) {
 			goto failed_cleanup;
 		}
-
-		/* No need to hold the lock on the old object. */
-		(void) pthread_mutex_unlock(&old_object->object_mutex);
 
 		/*
 		 * Store the kernel object handle in the object wrapper and
@@ -265,6 +264,7 @@ C_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 			 * Decrement the session reference count.
 			 * We do not hold the session lock.
 			 */
+			OBJ_REFRELE(old_object);
 			REFRELE(session_p, ses_lock_held);
 
 			/* Add into the slot token object list. */
@@ -276,6 +276,7 @@ C_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 			 * Decrement the session reference count.
 			 * We do not hold the session lock.
 			 */
+			OBJ_REFRELE(old_object);
 			REFRELE(session_p, ses_lock_held);
 		}
 
@@ -286,12 +287,11 @@ C_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 	return (rv);
 
 failed_cleanup:
-	(void) pthread_mutex_lock(&old_object->object_mutex);
-
 	if (new_object != NULL) {
 		(void) free(new_object);
 	}
 
+	OBJ_REFRELE(old_object);
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
 }
@@ -302,7 +302,7 @@ C_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)
 {
 	CK_RV rv;
 	kernel_object_t *object_p;
-	kernel_session_t *session_p;
+	kernel_session_t *session_p = (kernel_session_t *)(hSession);
 	kernel_slot_t	*pslot;
 	boolean_t ses_lock_held = B_FALSE;
 	CK_SESSION_HANDLE creating_session;
@@ -310,22 +310,28 @@ C_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)
 	if (!kernel_initialized)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 
-	/* Obtain the session pointer. */
-	rv = handle2session(hSession, &session_p);
-	if (rv != CKR_OK)
-		return (rv);
+	/*
+	 * The reason that we don't call handle2session is because
+	 * the argument hSession may not be the creating_session of
+	 * the object to be destroyed, and we want to avoid the lock
+	 * contention. The handle2session will be called later for
+	 * the creating_session.
+	 */
+	if ((session_p == NULL) ||
+	    (session_p->magic_marker != KERNELTOKEN_SESSION_MAGIC)) {
+		return (CKR_SESSION_HANDLE_INVALID);
+	}
 
-	/* Obtain the object pointer. */
-	HANDLE2OBJECT(hObject, object_p, rv);
+	/* Obtain the object pointer without incrementing reference count. */
+	HANDLE2OBJECT_DESTROY(hObject, object_p, rv);
 	if (rv != CKR_OK) {
-		goto clean_exit;
+		return (rv);
 	}
 
 	/* Only session objects can be destroyed at a read-only session. */
 	if ((session_p->ses_RO) &&
 	    (object_p->bool_attr_mask & TOKEN_BOOL_ON)) {
-		rv = CKR_SESSION_READ_ONLY;
-		goto clean_exit;
+		return (CKR_SESSION_READ_ONLY);
 	}
 
 	/*
@@ -334,13 +340,28 @@ C_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)
 	 * session handle from the caller, because the session used to
 	 * create the token object may no longer exist.
 	 */
-	if (!(object_p->bool_attr_mask & TOKEN_BOOL_ON)) {
-		REFRELE(session_p, ses_lock_held);
+	if (!(object_p->bool_attr_mask & TOKEN_BOOL_ON))
 		creating_session = object_p->session_handle;
-		rv = handle2session(creating_session, &session_p);
-		if (rv != CKR_OK)
-			return (rv);
+	else
+		creating_session = hSession;
+
+	rv = handle2session(creating_session, &session_p);
+	if (rv != CKR_OK) {
+		return (rv);
 	}
+
+	/*
+	 * Set OBJECT_IS_DELETING flag so any access to this
+	 * object will be rejected.
+	 */
+	(void) pthread_mutex_lock(&object_p->object_mutex);
+	if (object_p->obj_delete_sync & OBJECT_IS_DELETING) {
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
+		REFRELE(session_p, ses_lock_held);
+		return (CKR_OBJECT_HANDLE_INVALID);
+	}
+	object_p->obj_delete_sync |= OBJECT_IS_DELETING;
+	(void) pthread_mutex_unlock(&object_p->object_mutex);
 
 	if (object_p->bool_attr_mask & TOKEN_BOOL_ON) {
 		/*
@@ -362,8 +383,6 @@ C_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)
 		rv = kernel_delete_session_object(session_p, object_p, B_FALSE,
 		    B_FALSE);
 	}
-
-clean_exit:
 	/*
 	 * Decrement the session reference count.
 	 * We do not hold the session lock.
@@ -429,7 +448,7 @@ C_GetAttributeValue(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 				rv1 = rv;
 		}
 		rv = rv1;
-
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
 	} else {
 		/*
 		 * The object was created in HW provider, call ioctl to get
@@ -437,6 +456,7 @@ C_GetAttributeValue(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 		 */
 		obj_get_attr.og_session = session_p->k_session;
 		obj_get_attr.og_handle = object_p->k_handle;
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
 		obj_get_attr.og_count = ulCount;
 
 		rv = process_object_attributes(pTemplate, ulCount,
@@ -482,14 +502,11 @@ C_GetAttributeValue(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 	}
 
 clean_exit:
-
-	/* Release the object lock */
-	(void) pthread_mutex_unlock(&object_p->object_mutex);
-
 	/*
 	 * Decrement the session reference count.
 	 * We do not hold the session lock.
 	 */
+	OBJ_REFRELE(object_p);
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
 }
@@ -544,21 +561,19 @@ C_SetAttributeValue(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 		/* Cannot modify a token object with a READ-ONLY session */
 		if (session_p->ses_RO &&
 		    (object_p->bool_attr_mask & TOKEN_BOOL_ON)) {
-			rv = CKR_SESSION_READ_ONLY;
 			(void) pthread_mutex_unlock(&object_p->object_mutex);
-			REFRELE(session_p, ses_lock_held);
-			return (rv);
+			rv = CKR_SESSION_READ_ONLY;
+			goto clean_exit;
 		}
 
 		obj_set_attr.sa_session = session_p->k_session;
 		obj_set_attr.sa_handle = object_p->k_handle;
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
 		obj_set_attr.sa_count = ulCount;
 		rv = process_object_attributes(pTemplate, ulCount,
 		    &obj_set_attr.sa_attributes, NULL);
 		if (rv != CKR_OK) {
-			(void) pthread_mutex_unlock(&object_p->object_mutex);
-			REFRELE(session_p, ses_lock_held);
-			return (rv);
+			goto clean_exit;
 		}
 
 		while ((r = ioctl(kernel_fd, CRYPTO_OBJECT_SET_ATTRIBUTE_VALUE,
@@ -575,10 +590,7 @@ C_SetAttributeValue(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 
 		/* Free the attributes' space allocated for the ioctl call. */
 		free_object_attributes(obj_set_attr.sa_attributes, ulCount);
-
-		(void) pthread_mutex_unlock(&object_p->object_mutex);
-		REFRELE(session_p, ses_lock_held);
-		return (rv);
+		goto clean_exit;
 	}
 
 	/*
@@ -590,24 +602,15 @@ C_SetAttributeValue(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 	 * intact.
 	 */
 	rv = kernel_copy_object(object_p, &new_object, B_FALSE, NULL);
-
+	(void) pthread_mutex_unlock(&object_p->object_mutex);
 	if ((rv != CKR_OK) || (new_object == NULL)) {
-		/* Most likely we ran out of space. */
-		(void) pthread_mutex_unlock(&object_p->object_mutex);
-
 		/*
+		 * Most likely we ran out of space.
 		 * Decrement the session reference count.
 		 * We do not hold the session lock.
 		 */
-		REFRELE(session_p, ses_lock_held);
-		return (rv);
+		goto clean_exit;
 	}
-
-	/*
-	 * No need to hold the lock on the old object, because we
-	 * will be working on the new scratch object.
-	 */
-	(void) pthread_mutex_unlock(&object_p->object_mutex);
 
 	for (i = 0; i < ulCount; i++) {
 		/* Set the requested attribute into the new object. */
@@ -616,13 +619,7 @@ C_SetAttributeValue(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 
 		if (rv != CKR_OK) {
 			kernel_cleanup_object(new_object);
-			free(new_object);
-			/*
-			 * Decrement the session reference count.
-			 * We do not hold the session lock.
-			 */
-			REFRELE(session_p, ses_lock_held);
-			return (rv);
+			goto clean_exit;
 		}
 	}
 
@@ -633,16 +630,18 @@ C_SetAttributeValue(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 	 * have to keep the original object handle (address of object).
 	 */
 	(void) pthread_mutex_lock(&object_p->object_mutex);
-
 	kernel_merge_object(object_p, new_object);
-
 	(void) pthread_mutex_unlock(&object_p->object_mutex);
-	free(new_object);
+
+clean_exit:
+	if (new_object != NULL)
+		(void) free(new_object);
 
 	/*
 	 * Decrement the session reference count.
 	 * We do not hold the session lock.
 	 */
+	OBJ_REFRELE(object_p);
 	REFRELE(session_p, ses_lock_held);
 
 	return (rv);
@@ -698,6 +697,7 @@ C_GetObjectSize(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 		 */
 		obj_gs.gs_session = session_p->k_session;
 		obj_gs.gs_handle = object_p->k_handle;
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
 		while ((r = ioctl(kernel_fd, CRYPTO_OBJECT_GET_SIZE,
 		    &obj_gs)) < 0) {
 			if (errno != EINTR)
@@ -716,17 +716,14 @@ C_GetObjectSize(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 
 	} else {
 		rv = kernel_get_object_size(object_p, pulSize);
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
 	}
-
-clean_exit:
-
-	/* Release the object lock */
-	(void) pthread_mutex_unlock(&object_p->object_mutex);
 
 	/*
 	 * Decrement the session reference count.
 	 * We do not hold the session lock.
 	 */
+	OBJ_REFRELE(object_p);
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
 }
@@ -816,10 +813,8 @@ C_FindObjectsInit(CK_SESSION_HANDLE sh, CK_ATTRIBUTE_PTR pTemplate,
 
 	if (rv != CKR_OK) {
 		(void) pthread_mutex_lock(&session_p->session_mutex);
-		ses_lock_held = B_TRUE;
 		session_p->find_objects.flags = 0;
 		(void) pthread_mutex_unlock(&session_p->session_mutex);
-		ses_lock_held = B_FALSE;
 	}
 
 	/* decrement the session count, and unlock the mutex */

@@ -168,6 +168,7 @@ C_DecryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	HANDLE2OBJECT(hKey, key_p, rv);
 	if (rv == CKR_OK) {
 		rv = kernel_decrypt_init(session_p, key_p, pMechanism);
+		OBJ_REFRELE(key_p);
 	}
 
 	REFRELE(session_p, ses_lock_held);

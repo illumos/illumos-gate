@@ -449,6 +449,7 @@ C_WrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	/* Obtain the to_be_wrapped key object pointer. */
 	HANDLE2OBJECT(hKey, key_p, rv);
 	if (rv != CKR_OK) {
+		OBJ_REFRELE(wrappingkey_p);
 		REFRELE(session_p, ses_lock_held);
 		return (rv);
 	}
@@ -484,6 +485,8 @@ C_WrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		*pulWrappedKeyLen = obj_wrapkey.wk_wrapped_key_len;
 	}
 
+	OBJ_REFRELE(key_p);
+	OBJ_REFRELE(wrappingkey_p);
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
 }
@@ -532,7 +535,8 @@ C_UnwrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	/* Obtain the wrapping key object pointer. */
 	HANDLE2OBJECT(hUnwrappingKey, unwrappingkey_p, rv);
 	if (rv != CKR_OK) {
-		goto failed_exit;
+		REFRELE(session_p, ses_lock_held);
+		return (rv);
 	}
 
 	/*
@@ -596,6 +600,7 @@ C_UnwrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 			    ulAttributeCount + 1, phKey, session_p);
 			(void) free(clear_key_val);
 			(void) free(newTemplate);
+			OBJ_REFRELE(unwrappingkey_p);
 			REFRELE(session_p, ses_lock_held);
 			return (rv);
 		} else {
@@ -703,10 +708,12 @@ C_UnwrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	}
 
 	*phKey = (CK_OBJECT_HANDLE)new_objp;
+	OBJ_REFRELE(unwrappingkey_p);
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
 
 failed_exit:
+	OBJ_REFRELE(unwrappingkey_p);
 	if (new_objp != NULL)
 		(void) free(new_objp);
 
@@ -747,20 +754,21 @@ C_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		return (rv);
 
 	if ((pMechanism == NULL) || (phKey == NULL)) {
-		rv = CKR_ARGUMENTS_BAD;
-		goto failed_exit;
+		REFRELE(session_p, ses_lock_held);
+		return (CKR_ARGUMENTS_BAD);
 	}
 
 	if ((pTemplate == NULL && ulAttributeCount != 0) ||
 	    (pTemplate != NULL && ulAttributeCount == 0)) {
-		rv = CKR_ARGUMENTS_BAD;
-		goto failed_exit;
+		REFRELE(session_p, ses_lock_held);
+		return (CKR_ARGUMENTS_BAD);
 	}
 
 	/* Obtain the base key object pointer. */
 	HANDLE2OBJECT(hBaseKey, basekey_p, rv);
 	if (rv != CKR_OK) {
-		goto failed_exit;
+		REFRELE(session_p, ses_lock_held);
+		return (rv);
 	}
 
 	/* Get the kernel's internal mechanism number. */
@@ -855,10 +863,12 @@ C_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	}
 
 	*phKey = (CK_OBJECT_HANDLE)new_objp;
+	OBJ_REFRELE(basekey_p);
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
 
 failed_exit:
+	OBJ_REFRELE(basekey_p);
 	if (new_objp != NULL) {
 		(void) free(new_objp);
 	}

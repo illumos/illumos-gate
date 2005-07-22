@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,6 +174,9 @@ typedef struct object {
 
 	/* Session handle that the object belongs to */
 	CK_SESSION_HANDLE	session_handle;
+	uint32_t	obj_refcnt;	/* object reference count */
+	pthread_cond_t	obj_free_cond;	/* cond variable for signal and wait */
+	uint32_t	obj_delete_sync;	/* object delete sync flags */
 
 } kernel_object_t;
 
@@ -183,6 +186,26 @@ typedef struct find_context {
 	CK_ULONG num_results;
 	CK_ULONG next_result_index; /* next result object to return */
 } find_context_t;
+
+/*
+ * The following structure is used to link the to-be-freed session
+ * objects into a linked list. The objects on this linked list have
+ * not yet been freed via free() after C_DestroyObject() call; instead
+ * they are added to this list. The actual free will take place when
+ * the number of objects queued reaches MAX_OBJ_TO_BE_FREED, at which
+ * time the first object in the list will be freed.
+ */
+#define	MAX_OBJ_TO_BE_FREED		300
+
+typedef struct obj_to_be_freed_list {
+	kernel_object_t	*first;	/* points to first obj in the list */
+	kernel_object_t	*last;	/* points to last obj in the list */
+	uint32_t	count;	/* current total objs in the list */
+	pthread_mutex_t obj_to_be_free_mutex;
+} object_to_be_freed_list_t;
+
+extern object_to_be_freed_list_t obj_delay_freed;
+
 
 /*
  * The following definitions are the shortcuts
@@ -346,19 +369,55 @@ typedef struct find_context {
 				MODIFIABLE_BOOL_ON)
 
 /*
+ * Flag definitions for obj_delete_sync
+ */
+#define	OBJECT_IS_DELETING	1	/* Object is in a deleting state */
+#define	OBJECT_REFCNT_WAITING	2	/* Waiting for object reference */
+					/* count to become zero */
+
+/*
  * This macro is used to type cast an object handle to a pointer to
  * the object struct. Also, it checks to see if the object struct
  * is tagged with an object magic number. This is to detect when an
  * application passes a bogus object pointer.
+ * Also, it checks to see if the object is in the deleting state that
+ * another thread is performing. If not, increment the object reference
+ * count by one. This is to prevent this object from being deleted by
+ * other thread.
  */
-#define	HANDLE2OBJECT(hObject, object_p, rv) \
-	if (hObject == NULL) { \
-		rv = CKR_OBJECT_HANDLE_INVALID; \
+#define	HANDLE2OBJECT_COMMON(hObject, object_p, rv, REFCNT_CODE) { \
+	object_p = (kernel_object_t *)(hObject); \
+	if ((object_p == NULL) || \
+		(object_p->magic_marker != KERNELTOKEN_OBJECT_MAGIC)) {\
+			rv = CKR_OBJECT_HANDLE_INVALID; \
 	} else { \
-		object_p = (kernel_object_t *)(hObject); \
-		rv = ((object_p->magic_marker == KERNELTOKEN_OBJECT_MAGIC) \
-			? CKR_OK : CKR_OBJECT_HANDLE_INVALID); \
-	}
+		(void) pthread_mutex_lock(&object_p->object_mutex); \
+		if (!(object_p->obj_delete_sync & OBJECT_IS_DELETING)) { \
+			REFCNT_CODE; \
+			rv = CKR_OK; \
+		} else { \
+			rv = CKR_OBJECT_HANDLE_INVALID; \
+		} \
+		(void) pthread_mutex_unlock(&object_p->object_mutex); \
+	} \
+}
+
+#define	HANDLE2OBJECT(hObject, object_p, rv) \
+	HANDLE2OBJECT_COMMON(hObject, object_p, rv, object_p->obj_refcnt++)
+
+#define	HANDLE2OBJECT_DESTROY(hObject, object_p, rv) \
+	HANDLE2OBJECT_COMMON(hObject, object_p, rv, /* no refcnt increment */)
+
+
+#define	OBJ_REFRELE(object_p) { \
+	(void) pthread_mutex_lock(&object_p->object_mutex); \
+	if ((--object_p->obj_refcnt) == 0 && \
+	    (object_p->obj_delete_sync & OBJECT_REFCNT_WAITING)) { \
+		(void) pthread_cond_signal(&object_p->obj_free_cond); \
+	} \
+	(void) pthread_mutex_unlock(&object_p->object_mutex); \
+}
+
 
 /*
  * Function Prototypes.
@@ -446,6 +505,8 @@ void kernel_cleanup_pri_objects_in_slot(kernel_slot_t *pslot,
     kernel_session_t *sp);
 
 CK_RV kernel_get_object_size(kernel_object_t *objp, CK_ULONG_PTR pulSize);
+
+void kernel_object_delay_free(kernel_object_t *objp);
 
 #ifdef	__cplusplus
 }

@@ -37,6 +37,8 @@
 #include "kernelSession.h"
 #include "kernelSlot.h"
 
+static pthread_mutex_t delete_sessions_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /*
  * Delete all the sessions. First, obtain the slot lock.
  * Then start to delete one session at a time.  The boolean wrapper_only
@@ -46,50 +48,45 @@
  *   C_Finalize, wrapper_only is FALSE.
  * - When this function is called by cleanup_child, wrapper_only is TRUE.
  */
-CK_RV
+void
 kernel_delete_all_sessions(CK_SLOT_ID slotID, boolean_t wrapper_only)
 {
-	CK_RV rv = CKR_OK;
-	CK_RV rv1;
 	kernel_session_t *session_p;
-	kernel_session_t *session_p1;
 	kernel_slot_t *pslot;
 
-	/* Acquire the slot lock */
+	(void) pthread_mutex_lock(&delete_sessions_mutex);
+
 	pslot = slot_table[slotID];
-	(void) pthread_mutex_lock(&pslot->sl_mutex);
 
 	/*
 	 * Delete all the sessions in the slot's session list.
 	 * The routine kernel_delete_session() updates the linked list.
 	 * So, we do not need to maintain the list here.
 	 */
-	session_p = pslot->sl_sess_list;
-	while (session_p) {
-		session_p1 = session_p->next;
+	for (;;) {
+		(void) pthread_mutex_lock(&pslot->sl_mutex);
+		if (pslot->sl_sess_list == NULL)
+			break;
+
+		session_p = pslot->sl_sess_list;
 		/*
-		 * Delete a session by calling kernel_delete_session()
-		 * with a session pointer and a boolean arguments.
-		 * Boolean value TRUE is used to indicate that the
-		 * caller holds the slot lock.
+		 * Set SESSION_IS_CLOSING flag so any access to this
+		 * session will be rejected.
 		 */
-		rv1 = kernel_delete_session(slotID, session_p, B_TRUE,
-		    wrapper_only);
-
-		/* Record the very first error code */
-		if (rv == CKR_OK) {
-			rv = rv1;
+		(void) pthread_mutex_lock(&session_p->session_mutex);
+		if (session_p->ses_close_sync & SESSION_IS_CLOSING) {
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			continue;
 		}
+		session_p->ses_close_sync |= SESSION_IS_CLOSING;
+		(void) pthread_mutex_unlock(&session_p->session_mutex);
 
-		session_p = session_p1;
+		(void) pthread_mutex_unlock(&pslot->sl_mutex);
+		kernel_delete_session(slotID, session_p, B_FALSE, wrapper_only);
 	}
-
-	/* Release the slot lock */
 	(void) pthread_mutex_unlock(&pslot->sl_mutex);
-
-	return (rv);
+	(void) pthread_mutex_unlock(&delete_sessions_mutex);
 }
-
 
 /*
  * Create a new session struct, and add it to the slot's session list.
@@ -170,7 +167,6 @@ kernel_add_session(CK_SLOT_ID slotID, CK_FLAGS flags, CK_VOID_PTR pApplication,
 	return (CKR_OK);
 }
 
-
 /*
  * Delete a session:
  * - Remove the session from the slot's session list.
@@ -182,17 +178,15 @@ kernel_add_session(CK_SLOT_ID slotID, CK_FLAGS flags, CK_VOID_PTR pApplication,
  *   C_Finalize() or C_CloseAllSessions() -- slot_lock_held = TRUE.
  * - When called by C_CloseSession() -- slot_lock_held = FALSE.
  */
-CK_RV
+void
 kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *session_p,
     boolean_t slot_lock_held, boolean_t wrapper_only)
 {
-	CK_RV rv;
 	crypto_session_id_t k_session;
 	crypto_close_session_t close_session;
 	kernel_slot_t	*pslot;
 	kernel_object_t *objp;
 	kernel_object_t *objp1;
-	int r;
 
 	/*
 	 * Check to see if the caller holds the lock on the global
@@ -229,7 +223,6 @@ kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *session_p,
 		}
 	}
 
-
 	if (!slot_lock_held) {
 		/*
 		 * If the slot lock is obtained by
@@ -251,7 +244,7 @@ kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *session_p,
 	 */
 	if (session_p->magic_marker != KERNELTOKEN_SESSION_MAGIC) {
 		(void) pthread_mutex_unlock(&session_p->session_mutex);
-		return (CKR_OK);
+		return;
 	}
 
 	/*
@@ -287,7 +280,8 @@ kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *session_p,
 	(void) pthread_cond_destroy(&session_p->ses_free_cond);
 
 	/*
-	 * Remove all the objects created in this session.
+	 * Remove all the objects created in this session, waiting
+	 * until each object's refcnt is 0.
 	 */
 	kernel_delete_all_objects_in_session(session_p, wrapper_only);
 
@@ -318,42 +312,33 @@ kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *session_p,
 
 	if (!wrapper_only) {
 		close_session.cs_session = k_session;
-		while ((r = ioctl(kernel_fd, CRYPTO_CLOSE_SESSION,
-		    &close_session)) < 0) {
+		while (ioctl(kernel_fd, CRYPTO_CLOSE_SESSION,
+		    &close_session) < 0) {
 			if (errno != EINTR)
 				break;
 		}
-		if (r < 0) {
-			rv = CKR_FUNCTION_FAILED;
-		} else {
-			rv = crypto2pkcs11_error_number(
-			    close_session.cs_return_value);
-		}
+		/*
+		 * Ignore ioctl return codes. If the library tells the kernel
+		 * to close a session and the kernel says "I don't know what
+		 * session you're talking about", there's not much that can be
+		 * done.  All sessions in the kernel will be closed when the
+		 * application exits and closes /dev/crypto.
+		 */
 	}
-
-	/*
-	 * Ignore ioctl return codes. If the library tells the kernel to
-	 * close a session and the kernel says "I don't know what session
-	 * you're talking about", there's not much that can be done.  All
-	 * sessions in the kernel will be closed when the application exits
-	 * and closes /dev/crypto.
-	 */
-	rv = CKR_OK;
-	free(session_p);
+	kernel_session_delay_free(session_p);
 
 	/*
 	 * If there is no more session remained in this slot, reset the slot's
 	 * session state to CKU_PUBLIC.  Also, clean up all the token object
 	 * wrappers in the library for this slot.
 	 */
+	/* Acquire the slot lock if lock is not held */
+	if (!slot_lock_held) {
+		(void) pthread_mutex_lock(&pslot->sl_mutex);
+	}
+
 	if (pslot->sl_sess_list == NULL) {
-
-		/* Acquire the slot lock if lock is not held */
-		if (!slot_lock_held) {
-			(void) pthread_mutex_lock(&pslot->sl_mutex);
-		}
-
-		/* Reset the session auth. state. */
+		/* Reset the session auth state. */
 		pslot->sl_state = CKU_PUBLIC;
 
 		/* Clean up token object wrappers. */
@@ -361,20 +346,17 @@ kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *session_p,
 		while (objp) {
 			objp1 = objp->next;
 			(void) pthread_mutex_destroy(&objp->object_mutex);
-			(void) free(objp);
+			(void) kernel_object_delay_free(objp);
 			objp = objp1;
 		}
 		pslot->sl_tobj_list = NULL;
-
-		/* Release the slot lock if lock is not held */
-		if (!slot_lock_held) {
-			(void) pthread_mutex_unlock(&pslot->sl_mutex);
-		}
 	}
 
-	return (rv);
+	/* Release the slot lock if lock is not held */
+	if (!slot_lock_held) {
+		(void) pthread_mutex_unlock(&pslot->sl_mutex);
+	}
 }
-
 
 /*
  * This function is used to type cast a session handle to a pointer to
@@ -419,4 +401,40 @@ handle2session(CK_SESSION_HANDLE hSession, kernel_session_t **session_p)
 		*session_p = sp;
 
 	return (rv);
+}
+
+/*
+ * This function adds the to-be-freed session to a linked list.
+ * When the number of sessions queued in the linked list reaches the
+ * maximum threshold MAX_SES_TO_BE_FREED, it will free the first
+ * session (FIFO) in the list.
+ */
+void
+kernel_session_delay_free(kernel_session_t *sp)
+{
+	kernel_session_t *tmp;
+
+	(void) pthread_mutex_lock(&ses_delay_freed.ses_to_be_free_mutex);
+
+	/* Add the newly deleted session at the end of the list */
+	sp->next = NULL;
+	if (ses_delay_freed.first == NULL) {
+		ses_delay_freed.last = sp;
+		ses_delay_freed.first = sp;
+	} else {
+		ses_delay_freed.last->next = sp;
+		ses_delay_freed.last = sp;
+	}
+
+	if (++ses_delay_freed.count >= MAX_SES_TO_BE_FREED) {
+		/*
+		 * Free the first session in the list only if
+		 * the total count reaches maximum threshold.
+		 */
+		ses_delay_freed.count--;
+		tmp = ses_delay_freed.first->next;
+		free(ses_delay_freed.first);
+		ses_delay_freed.first = tmp;
+	}
+	(void) pthread_mutex_unlock(&ses_delay_freed.ses_to_be_free_mutex);
 }

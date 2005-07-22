@@ -67,7 +67,8 @@ C_SignInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	/* Obtain the object pointer. */
 	HANDLE2OBJECT(hKey, key_p, rv);
 	if (rv != CKR_OK) {
-		goto clean_exit;
+		REFRELE(session_p, ses_lock_held);
+		return (rv);
 	}
 
 	/* Check to see if key object supports signature. */
@@ -150,6 +151,7 @@ C_SignInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	}
 
 clean_exit:
+	OBJ_REFRELE(key_p);
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
 }
@@ -438,7 +440,8 @@ C_SignRecoverInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	/* Obtain the object pointer. */
 	HANDLE2OBJECT(hKey, key_p, rv);
 	if (rv != CKR_OK) {
-		goto clean_exit;
+		REFRELE(session_p, ses_lock_held);
+		return (rv);
 	}
 
 	/*
@@ -505,6 +508,7 @@ C_SignRecoverInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	}
 
 clean_exit:
+	OBJ_REFRELE(key_p);
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
 }

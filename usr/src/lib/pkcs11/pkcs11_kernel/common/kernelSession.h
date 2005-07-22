@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,12 +84,30 @@ typedef struct session {
 } kernel_session_t;
 
 /*
+ * The following structure is used to link the to-be-freed sessions
+ * into a linked list. The sessions on this linked list have
+ * not yet been freed via free() after C_CloseSession() call; instead
+ * they are added to this list. The actual free will take place when
+ * the number of sessions queued reaches MAX_SES_TO_BE_FREED, at which
+ * time the first session in the list will be freed.
+ */
+#define	MAX_SES_TO_BE_FREED		300
+
+typedef struct ses_to_be_freed_list {
+	kernel_session_t *first; /* points to the first session in the list */
+	kernel_session_t *last;  /* points to the last session in the list */
+	uint32_t	count;   /* current total sessions in the list */
+	pthread_mutex_t ses_to_be_free_mutex;
+} ses_to_be_freed_list_t;
+
+extern ses_to_be_freed_list_t ses_delay_freed;
+
+/*
  * Flag definitions for ses_close_sync
  */
 #define	SESSION_IS_CLOSING	1	/* Session is in a closing state */
 #define	SESSION_REFCNT_WAITING	2	/* Waiting for session reference */
 					/* count to become zero */
-
 /*
  * This macro is used to decrement the session reference count by one.
  *
@@ -123,7 +141,7 @@ typedef struct session {
  */
 CK_RV handle2session(CK_SESSION_HANDLE hSession, kernel_session_t **session_p);
 
-CK_RV kernel_delete_all_sessions(CK_SLOT_ID slotID, boolean_t wrapper_only);
+void kernel_delete_all_sessions(CK_SLOT_ID slotID, boolean_t wrapper_only);
 
 void kernel_delete_all_objects_in_session(kernel_session_t *sp,
     boolean_t wrapper_only);
@@ -131,8 +149,10 @@ void kernel_delete_all_objects_in_session(kernel_session_t *sp,
 CK_RV kernel_add_session(CK_SLOT_ID slotID, CK_FLAGS flags,
     CK_VOID_PTR pApplication, CK_NOTIFY notify, CK_ULONG *phSession);
 
-CK_RV kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *sp,
+void kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *sp,
     boolean_t lock_held, boolean_t wrapper_only);
+
+void kernel_session_delay_free(kernel_session_t *sp);
 
 #ifdef	__cplusplus
 }
