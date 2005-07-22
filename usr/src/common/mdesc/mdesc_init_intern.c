@@ -32,7 +32,8 @@
 #include <sys/mdesc_impl.h>
 
 md_t *
-md_init_intern(uint64_t *ptr, void *(*allocp)(size_t), void (*freep)(void *))
+md_init_intern(uint64_t *ptr, void *(*allocp)(size_t),
+			void (*freep)(void *, size_t))
 {
 	md_impl_t	*mdp;
 	int		idx;
@@ -160,6 +161,6 @@ cleanup:;
 	 * we build one.
 	 */
 cleanup_nohash:;
-	mdp->freep(mdp);
+	mdp->freep(mdp, sizeof (md_impl_t));
 	return (NULL);
 }

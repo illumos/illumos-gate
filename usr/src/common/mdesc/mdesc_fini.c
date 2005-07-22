@@ -37,8 +37,7 @@ md_fini(md_t *ptr)
 
 	mdp = (md_impl_t *)ptr;
 
-	mdp->freep(mdp->caddr);
-	mdp->freep(mdp);
+	mdp->freep(mdp, sizeof (md_impl_t));
 
 	return (0);
 }

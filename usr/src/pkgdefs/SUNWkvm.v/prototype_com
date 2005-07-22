@@ -60,7 +60,7 @@ d none usr/platform/sun4v/lib 755 root bin
 #
 # add binary and libraries for prtdiag
 #
-f none usr/platform/sun4v/sbin/prtdiag 2755 root bin
+f none usr/platform/sun4v/sbin/prtdiag 2755 root sys
 f none usr/platform/sun4v/lib/libprtdiag.so.1 755 root bin
 s none usr/platform/sun4v/lib/libprtdiag.so=./libprtdiag.so.1
 #

@@ -100,7 +100,7 @@ typedef void * md_t;
 
 extern md_t		*md_init(void *);
 extern md_t		*md_init_intern(uint64_t *, void*(*)(size_t),
-				void (*)(void*));
+				void (*)(void*, size_t));
 
 extern int		md_fini(md_t *);
 

@@ -112,7 +112,7 @@ md_scan_dag(md_t *ptr,
 		node_name_cookie, arc_name_cookie,
 		seenp, &idx, stashp, 0);
 
-	mdp->freep(seenp);
+	mdp->freep(seenp, mdp->element_count);
 
 	return (res >= 0 ? idx : res);
 }

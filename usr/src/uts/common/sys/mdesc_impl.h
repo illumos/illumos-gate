@@ -115,7 +115,7 @@ struct MACHINE_DESCRIPTION {
 	caddr_t		caddr;
 
 	void		*(*allocp)(size_t);
-	void		(*freep)(void*);
+	void		(*freep)(void*, size_t);
 
 	md_header_t	*headerp;
 	md_element_t	*mdep;

@@ -42,6 +42,8 @@
 #define	MDESC_PATH	"/devices/pseudo/mdesc@0:mdesc"
 #define	SIZE	8192
 
+static void mdesc_free(void *bufp, size_t size);
+
 md_t *
 mdesc_devinit(void)
 {
@@ -98,11 +100,18 @@ mdesc_devinit(void)
 	if (NULL == bufp)
 		return (NULL);
 
-	mdp = md_init_intern((uint64_t *)bufp, malloc, free);
+	mdp = md_init_intern((uint64_t *)bufp, malloc, mdesc_free);
 	if (NULL == mdp) {
 		free(bufp);
 		return (NULL);
 	}
 
 	return (mdp);
+}
+
+/*ARGSUSED*/
+void
+mdesc_free(void *bufp, size_t size)
+{
+	free(bufp);
 }
