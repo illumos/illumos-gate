@@ -1373,6 +1373,22 @@ ohci_init_ctlr(ohci_state_t	*ohcip)
 		}
 	}
 
+	/*
+	 * Workaround for ULI1575 chipset. Following OHCI Operational Memory
+	 * Registers are not cleared to their default value on reset.
+	 * Explicitly set the registers to default value.
+	 */
+	if (ohcip->ohci_vendor_id == PCI_ULI1575_VENID &&
+			ohcip->ohci_device_id == PCI_ULI1575_DEVID) {
+		Set_OpReg(hcr_control, HCR_CONTROL_DEFAULT);
+		Set_OpReg(hcr_intr_enable, HCR_INT_ENABLE_DEFAULT);
+		Set_OpReg(hcr_HCCA, HCR_HCCA_DEFAULT);
+		Set_OpReg(hcr_ctrl_head, HCR_CONTROL_HEAD_ED_DEFAULT);
+		Set_OpReg(hcr_bulk_head, HCR_BULK_HEAD_ED_DEFAULT);
+		Set_OpReg(hcr_frame_interval, HCR_FRAME_INTERVAL_DEFAULT);
+		Set_OpReg(hcr_periodic_strt, HCR_PERIODIC_START_DEFAULT);
+	}
+
 	/* Set the HcHCCA to the physical address of the HCCA block */
 	Set_OpReg(hcr_HCCA, (uint_t)ohcip->ohci_hcca_cookie.dmac_address);
 
@@ -1851,6 +1867,24 @@ ohci_cleanup(ohci_state_t	*ohcip)
 
 		/* Wait for sometime */
 		drv_usecwait(OHCI_TIMEWAIT);
+
+		/*
+		 * Workaround for ULI1575 chipset. Following OHCI Operational
+		 * Memory Registers are not cleared to their default value
+		 * on reset. Explicitly set the registers to default value.
+		 */
+		if (ohcip->ohci_vendor_id == PCI_ULI1575_VENID &&
+				ohcip->ohci_device_id == PCI_ULI1575_DEVID) {
+			Set_OpReg(hcr_control, HCR_CONTROL_DEFAULT);
+			Set_OpReg(hcr_intr_enable, HCR_INT_ENABLE_DEFAULT);
+			Set_OpReg(hcr_HCCA, HCR_HCCA_DEFAULT);
+			Set_OpReg(hcr_ctrl_head, HCR_CONTROL_HEAD_ED_DEFAULT);
+			Set_OpReg(hcr_bulk_head, HCR_BULK_HEAD_ED_DEFAULT);
+			Set_OpReg(hcr_frame_interval,
+					HCR_FRAME_INTERVAL_DEFAULT);
+			Set_OpReg(hcr_periodic_strt,
+					HCR_PERIODIC_START_DEFAULT);
+		}
 
 		mutex_exit(&ohcip->ohci_int_mutex);
 

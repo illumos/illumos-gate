@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,6 +98,26 @@ extern "C" {
 #define	OHCI_DMA_ATTR_ED_ALIGNMENT	0x010
 #define	OHCI_DMA_ATTR_TD_ALIGNMENT	0x020
 #define	OHCI_DMA_ATTR_HCCA_ALIGNMENT	0x100
+
+/*
+ * Vendor id and Device id for ULI1575 southbridge.
+ */
+#define	PCI_ULI1575_VENID	0x10B9
+#define	PCI_ULI1575_DEVID	0x5237
+
+/*
+ * Need a workaround for ULI1575 chipset. Following OHCI
+ * Operational Memory Registers are not cleared to their
+ * default value on reset. Explicitly set the registers
+ * to default value after reset.
+ */
+#define	HCR_CONTROL_DEFAULT		0x0
+#define	HCR_INT_ENABLE_DEFAULT		0x0
+#define	HCR_HCCA_DEFAULT		0x0
+#define	HCR_CONTROL_HEAD_ED_DEFAULT	0x0
+#define	HCR_BULK_HEAD_ED_DEFAULT	0x0
+#define	HCR_FRAME_INTERVAL_DEFAULT	0x2edf
+#define	HCR_PERIODIC_START_DEFAULT	0x0
 
 /*
  * OpenHCI Operational Registers
