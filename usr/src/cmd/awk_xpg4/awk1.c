@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -373,7 +373,7 @@ yyhex()
 	register wint_t c, c1;
 	int i;
 	static int savetoken = 0;
-	static wasfield;
+	static int wasfield;
 	static int isfuncdef;
 	static int nbrace, nparen, nbracket;
 	static struct ctosymstruct {
@@ -841,6 +841,7 @@ do_funparm:
 		return (np->n_type);
 	}
 	/* NOTREACHED */
+	return (0);
 }
 
 /*

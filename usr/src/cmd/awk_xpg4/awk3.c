@@ -274,6 +274,7 @@ top:
 		awkerr(gettext("lvalue required in assignment"));
 	}
 	/* NOTREACHED */
+	return (0);
 }
 
 /*
@@ -830,6 +831,7 @@ exprint(NODE *np)
 		awkerr(interr, "exprint");
 	}
 	/* NOTREACHED */
+	return (0);
 }
 
 /*
@@ -860,6 +862,7 @@ exprreal(NODE *np)
 		awkerr(interr, "exprreal");
 	}
 	/* NOTREACHED */
+	return (0);
 }
 
 /*
@@ -896,6 +899,7 @@ exprstring(NODE *np)
 		awkerr(interr, "exprstring");
 	}
 	/* NOTREACHED */
+	return (0);
 }
 
 /*
@@ -1225,6 +1229,7 @@ do_asn_op:
 		awkerr(gettext("panic: exprreduce(%d)"), t);
 		/* NOTREACHED */
 	}
+	return (0);
 }
 
 /*
@@ -1439,6 +1444,7 @@ do_strcmp:
 		awkerr(interr, "comparison");
 	}
 	/* NOTREACHED */
+	return (0);
 }
 
 /*

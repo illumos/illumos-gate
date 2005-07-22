@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -6,13 +11,8 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-    
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * test expression
@@ -28,10 +28,15 @@ int	ap;
 int	ac;
 char	**av;
 
-char	*nxtarg();
+void synbad(char *s1, char *s2);
+int tio(char *a, int f);
+int ftype(char *f, int field);
+int filtyp(char *f, int field);
+int fsizep(char *f);
+char *nxtarg(int mt);
 
-main(argc, argv)
-char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int status;
 
@@ -45,10 +50,12 @@ char *argv[];
 	status = (exp()?0:1);
 	if (nxtarg(1)!=0)
 		synbad("too many arguments","");
-	exit(status);
+	return (status);
 }
 
-char *nxtarg(mt) {
+char *
+nxtarg(int mt)
+{
 
 	if (ap>=ac) {
 		if(mt) {
@@ -60,7 +67,9 @@ char *nxtarg(mt) {
 	return(av[ap++]);
 }
 
-exp() {
+int
+exp(void)
+{
 	int p1;
 	char *p2;
 
@@ -76,7 +85,9 @@ exp() {
 	return(p1);
 }
 
-e1() {
+int
+e1(void)
+{
 	int p1;
 	char *p2;
 
@@ -88,16 +99,20 @@ e1() {
 	return(p1);
 }
 
-e2() {
+int
+e2(void)
+{
 	if (EQ(nxtarg(0), "!"))
 		return(!e3());
 	ap--;
 	return(e3());
 }
 
-e3() {
+int
+e3(void)
+{
 	int p1;
-	register char *a;
+	char *a;
 	char *p2;
 	int int1, int2;
 
@@ -202,11 +217,11 @@ e3() {
 
 	synbad("unknown operator ",p2);
 	/* NOTREACHED */
+	return (0);
 }
 
-tio(a, f)
-char *a;
-int f;
+int
+tio(char *a, int f)
 {
 
 	if (access(a, f) == 0)
@@ -215,9 +230,8 @@ int f;
 		return(0);
 }
 
-ftype(f, field)
-char *f;
-int field;
+int
+ftype(char *f, int field)
 {
 	struct stat statb;
 
@@ -228,9 +242,8 @@ int field;
 	return(0);
 }
 
-filtyp(f, field)
-char *f;
-int field;
+int
+filtyp(char *f, int field)
 {
 	struct stat statb;
 
@@ -247,8 +260,8 @@ int field;
 		return(0);
 }
 
-fsizep(f)
-char *f;
+int
+fsizep(char *f)
 {
 	struct stat statb;
 
@@ -257,8 +270,8 @@ char *f;
 	return(statb.st_size>0);
 }
 
-synbad(s1,s2)
-char *s1, *s2;
+void
+synbad(char *s1, char *s2)
 {
 	(void) write(2, "test: ", 6);
 	(void) write(2, s1, strlen(s1));
@@ -267,8 +280,8 @@ char *s1, *s2;
 	exit(255);
 }
 
-length(s)
-	char *s;
+int
+length(char *s)
 {
 	char *es=s;
 	while(*es++);
