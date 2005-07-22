@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tdef.h"
 #include "tw.h"
@@ -55,10 +54,11 @@ int	fontlab[NFONT+1] = { 0, 'R', 'I', 'B', PAIR('B','I'), 'S', 0 };
 
 extern	int	nchtab;
 
+int
 width(j)
-register tchar j;
+tchar j;
 {
-	register i, k;
+	int	i, k;
 
 	if (j & (ZBIT|MOT)) {
 		if (iszbit(j))
@@ -112,9 +112,9 @@ register tchar j;
 
 tchar setch()
 {
-	register j;
+	int	j;
 	char	temp[10];
-	register char	*s;
+	char	*s;
 
 	s = temp;
 	if ((*s++ = getach()) == 0 || (*s++ = getach()) == 0)
@@ -139,10 +139,11 @@ tchar setabs()		/* set absolute char from \C'...' */
 	return n + nchtab + _SPECCHAR_ST;
 }
 
+int
 findft(i)
-register int	i;
+int	i;
 {
-	register k;
+	int	k;
 
 	if ((k = i - '0') >= 0 && k <= nfonts && k < smnt)
 		return(k);
@@ -152,23 +153,27 @@ register int	i;
 	return(k);
 }
 
-
+int
 caseps()
 {
+	return (0);
 }
 
-
+int
 mchbits()
 {
 	chbits = 0;
 	setfbits(chbits, font);
 	sps = width(' ' | chbits);
+
+	return (0);
 }
 
 
+int
 setps()
 {
-	register i, j;
+	int	i, j;
 
 	i = cbits(getch());
 	if (ischar(i) && isdigit(i)) {		/* \sd or \sdd */
@@ -191,6 +196,8 @@ setps()
 			getch();
 		}
 	}
+
+	return (0);
 }
 
 
@@ -219,17 +226,21 @@ tchar setslant()		/* set slant from \S'...' */
 }
 
 
+int
 caseft()
 {
 	skip();
 	setfont(1);
+
+	return (0);
 }
 
 
+int
 setfont(a)
 int	a;
 {
-	register i, j;
+	int	i, j;
 
 	if (a)
 		i = getrq();
@@ -240,26 +251,29 @@ int	a;
 		goto s0;
 	}
 	if (i == 'S' || i == '0')
-		return;
+		return (0);
 	if ((j = findft(i, fontlab)) == -1)
-		return;
+		return (0);
 s0:
 	font1 = font;
 	font = j;
 	mchbits();
+
+	return (0);
 }
 
 
+int
 setwd()
 {
-	register base, wid;
-	register tchar i;
+	int	base, wid;
+	tchar i;
 	int	delim, emsz, k;
 	int	savhp, savapts, savapts1, savfont, savfont1, savpts, savpts1;
 
 	base = numtab[ST].val = numtab[ST].val = wid = numtab[CT].val = 0;
 	if (ismot(i = getch()))
-		return;
+		return (0);
 	delim = cbits(i);
 	savhp = numtab[HP].val;
 	numtab[HP].val = 0;
@@ -299,6 +313,8 @@ setwd()
 	pts1 = savpts1;
 	mchbits();
 	setwdf = 0;
+
+	return (0);
 }
 
 
@@ -319,8 +335,8 @@ tchar hmot()
 
 tchar mot()
 {
-	register int j, n;
-	register tchar i;
+	int j, n;
+	tchar i;
 
 	j = HOR;
 	getch(); /*eat delim*/
@@ -340,7 +356,7 @@ tchar mot()
 tchar sethl(k)
 int	k;
 {
-	register j;
+	int	j;
 	tchar i;
 
 	j = t.Halfline;
@@ -358,7 +374,7 @@ int	k;
 tchar makem(i)
 int	i;
 {
-	register tchar j;
+	tchar j;
 
 	if ((j = i) < 0)
 		j = -j;
@@ -378,32 +394,40 @@ tchar	i;
 }
 
 
+int
 caselg()
 {
+	return (0);
 }
 
 
+int
 casefp()
 {
-	register i, j;
+	int	i, j;
 
 	skip();
 	if ((i = cbits(getch()) - '0') < 0 || i > nfonts)
-		return;
+		return (0);
 	if (skip() || !(j = getrq()))
-		return;
+		return (0);
 	fontlab[i] = j;
+
+	return (0);
 }
 
 
+int
 casecs()
 {
+	return (0);
 }
 
 
+int
 casebd()
 {
-	register i, j, k;
+	int	i, j, k;
 
 	k = 0;
 bd0:
@@ -411,7 +435,7 @@ bd0:
 		if (k)
 			goto bd1;
 		else 
-			return;
+			return (0);
 	}
 	if (j == smnt) {
 		k = smnt;
@@ -426,12 +450,15 @@ bd1:
 	noscale++;
 	bdtab[j] = atoi();
 	noscale = 0;
+
+	return (0);
 }
 
 
+int
 casevs()
 {
-	register i;
+	int	i;
 
 	skip();
 	vflag++;
@@ -445,13 +472,16 @@ casevs()
 		i = VERT;	/* was VERT */
 	lss1 = lss;
 	lss = i;
+
+	return (0);
 }
 
 
 
-
+int
 casess()
 {
+	return (0);
 }
 
 

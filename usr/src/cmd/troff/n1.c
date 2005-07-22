@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 char *xxxvers = "@(#)roff:n1.c	2.13";
 /*
@@ -95,15 +94,17 @@ wchar_t	twc = 0;
 
 #ifdef	DEBUG
 int	debug = 0;	/*debug flag*/
-#endif	DEBUG
+#endif	/* DEBUG */
 
-main(argc, argv)
-int	argc;
-char	**argv;
+static char *sprintn(char *, long, int);
+static int printn(long, int);
+
+int
+main(int argc, char **argv)
 {
-	register char	*p, *q;
-	register j;
-	register tchar i;
+	char	*p, *q;
+	int	j;
+	tchar i;
 	int eileenct;		/*count to test for "Eileen's loop"*/
 	extern void catch(), kcatch();
 	char	**oargv, *getenv();
@@ -162,7 +163,7 @@ char	**argv;
 			save_tty();
 #else
 			errprint(gettext("-q option ignored in troff"));
-#endif	NROFF
+#endif	/* NROFF */
 			continue;
 		case 'n':
 			npn = ctoi(&argv[0][2]);
@@ -244,7 +245,7 @@ char	**argv;
 			debug = ctoi(&argv[0][2]);
 #else
 			errprint("DEBUG not enabled");
-#endif	DEBUG
+#endif	/* DEBUG */
 			continue;
 		default:
 			errprint(gettext("unknown option %s"), argv[0]);
@@ -269,7 +270,7 @@ loop:
 	if (debug & DB_LOOP)
 		fdprintf(stderr, "loop: NL=%d, ejf=%d, lss=%d, eileenct=%d\n",
 			numtab[NL].val, ejf, lss, eileenct);
-#endif	DEBUG
+#endif	/* DEBUG */
 		if (eileenct > 20) {
 			errprint(gettext("job looping; check abuse of macros"));
 			ejf = 0;	/*try to break Eileen's loop*/
@@ -312,8 +313,9 @@ Lt:
 }
 
 
+int
 tryfile(pat, fn, idx)
-register char *pat, *fn;
+char *pat, *fn;
 int idx;
 {
 	strcpy(mfiles[idx], pat);
@@ -335,20 +337,22 @@ void kcatch()
 	done3(01);
 }
 
-
+int
 init0()
 {
 	eibuf = ibufp = ibuf;
 	ibuf[0] = 0;
 	numtab[NL].val = -1;
+	return (0);
 }
 
 
+int
 init1(a)
 char	a;
 {
-	register char	*p;
-	register i;
+	char	*p;
+	int i;
 
 	p = tmp_name;
 	if (a == 'a')
@@ -361,12 +365,14 @@ char	a;
 	for (i = NTRTAB; --i; )
 		trtab[i] = i;
 	trtab[UNPAD] = ' ';
+	return (0);
 }
 
 
+int
 init2()
 {
-	register i, j;
+	int	i, j;
 	extern char	*setbrk();
 	extern char	*ttyname();
 
@@ -407,13 +413,14 @@ init2()
 	for (i = NEV; i--; )
 		write(ibf, (char *) & env, sizeof(env));
 #endif
+	return (0);
 }
 
-
+int
 cvtime()
 {
 	time_t	tt;
-	register struct tm *tm;
+	struct tm *tm;
 
 	tt = time((time_t *) 0);
 	tm = localtime(&tt);
@@ -422,13 +429,15 @@ cvtime()
 	numtab[YR].val = tm->tm_year;
 	numtab[MO].val = tm->tm_mon + 1;
 
+	return (0);
 }
 
 
+int
 ctoi(s)
-	register char *s;
+	char *s;
 {
-	register n;
+	int	n;
 
 	while (*s == ' ')
 		s++;
@@ -439,6 +448,7 @@ ctoi(s)
 }
 
 
+int
 mesg(f)
 int	f;
 {
@@ -453,8 +463,11 @@ int	f;
 		if (ttyp && *ttyp && mode)
 			chmod(ttyp, mode);
 	}
+
+	return (0);
 }
 
+int
 errprint(s, s1, s2, s3, s4, s5)	/* error message printer */
 	char *s, *s1, *s2, *s3, *s4, *s5;
 {
@@ -468,7 +481,8 @@ errprint(s, s1, s2, s3, s4, s5)	/* error message printer */
 #ifdef	DEBUG
 	if (debug)
 		abort();
-#endif	DEBUG
+#endif	/* DEBUG */
+	return (0);
 }
 
 
@@ -486,9 +500,9 @@ int	stderr	 = 2;	/* NOT stdio value */
 void
 fdprintf(int fd, char *fmt, ...)
 {
-	register c;
+	int	c;
 	char	*s;
-	register i;
+	int	i;
 	va_list	ap;
 
 	pfbp = pfbuf;
@@ -542,10 +556,12 @@ loop:
 /*
  * Print an unsigned integer in base b.
  */
-static printn(n, b)
-	register long	n;
+static int
+printn(n, b)
+	long	n;
+	int	b;
 {
-	register long	a;
+	long	a;
 
 	if (n < 0) {	/* shouldn't happen */
 		putchar('-');
@@ -554,6 +570,8 @@ static printn(n, b)
 	if (a = n / b)
 		printn(a, b);
 	putchar("0123456789ABCDEF"[(int)(n%b)]);
+
+	return (0);
 }
 
 /* scaled down version of library roff_sprintf */
@@ -563,10 +581,9 @@ static printn(n, b)
 /* VARARGS2 */
 char *roff_sprintf(char *str, char *fmt, ...)
 {
-	register c;
-	char *sprintn();
+	int	c;
 	char	*s;
-	register i;
+	int	i;
 	va_list ap;
 
 	va_start(ap, fmt);
@@ -609,10 +626,11 @@ loop:
  * Print an unsigned integer in base b.
  */
 static char *sprintn(s, n, b)
-	register char *s;
-	register long n;
+	char *s;
+	long n;
+	int b;
 {
-	register long	a;
+	long	a;
 
 	if (n < 0) {	/* shouldn't happen */
 		*s++ = '-';
@@ -625,10 +643,11 @@ static char *sprintn(s, n, b)
 }
 
 
+int
 control(a, b)
-register int	a, b;
+int	a, b;
 {
-	register int	j;
+	int	j;
 
 	if (a == 0 || (j = findmn(a)) == -1)
 		return(0);
@@ -660,7 +679,7 @@ register int	a, b;
 	if (debug & DB_MAC)
 		fdprintf(stderr, "control: macro %c%c, contab[%d]\n",
 			a&0177, (a>>BYTE)&0177 ? (a>>BYTE)&0177 : ' ', j);
-#endif	DEBUG
+#endif	/* DEBUG */
 	if (contab[j].f == 0) {
 		nxf->nargs = 0;
 		if (b)
@@ -673,10 +692,10 @@ register int	a, b;
 		return(0);
 }
 
-
+int
 getrq()
 {
-	register i, j;
+	int	i, j;
 
 	if (((i = getach()) == 0) || ((j = getach()) == 0))
 		goto rtn;
@@ -713,8 +732,8 @@ gchtab[] = {
 tchar
 getch()
 {
-	register int	k;
-	register tchar i, j;
+	int	k;
+	tchar i, j;
 	tchar setht(), setslant();
 
 g0:
@@ -723,7 +742,7 @@ g0:
 		if (debug & DB_GETC)
 			fdprintf(stderr, "getch: ch is %x (%c)\n",
 				ch, (ch&0177) < 040 ? 0177 : ch&0177);
-#endif	DEBUG
+#endif	/* DEBUG */
 		if (cbits(i) == '\n')
 			nlflg++;
 		ch = 0;
@@ -734,7 +753,7 @@ g0:
 	if (nlflg)
 		if (debug & DB_GETC)
 			fdprintf(stderr,"getch: nlflg is %x\n", nlflg);
-#endif	DEBUG
+#endif	/* DEBUG */
 	if (nlflg)
 		return('\n');
 	i = getch0();
@@ -742,7 +761,7 @@ g0:
 	if (debug & DB_GETC)
 		fdprintf(stderr, "getch: getch0 returns %x (%c)\n",
 			i, (i&0177) < 040 ? 0177 : i&0177);
-#endif	DEBUG
+#endif	/* DEBUG */
 	if (ismot(i))
 		return(i);
 	k = cbits(i);
@@ -959,15 +978,16 @@ gx:
 	/* NOTREACHED */
 }
 
+int
 setxon()	/* \X'...' for copy through */
 {
 	tchar xbuf[NC];
-	register tchar *i;
+	tchar *i;
 	tchar c;
 	int delim, k;
 
 	if (ismot(c = getch()))
-		return;
+		return (0);
 	delim = cbits(c);
 	i = xbuf;
 	*i++ = XON;
@@ -979,6 +999,8 @@ setxon()	/* \X'...' for copy through */
 	*i++ = XOFF;
 	*i = 0;
 	pushback(xbuf);
+
+	return (0);
 }
 
 
@@ -987,11 +1009,11 @@ char	ifilt[32] = {
 
 tchar getch0()
 {
-	register int	j;
-	register tchar i;
+	int	j;
+	tchar i;
 #ifdef	EUC
 #ifdef	NROFF
-	register int	n;
+	int	n;
 	int col_index;
 #endif	/* NROFF */
 #endif	/* EUC */
@@ -1112,10 +1134,11 @@ g4:
 	return(i);
 }
 
+int
 pushback(b)
-register tchar *b;
+tchar *b;
 {
-	register tchar *ob = b;
+	tchar *ob = b;
 
 	while (*b++)
 		;
@@ -1126,12 +1149,15 @@ register tchar *b;
 		errprint(gettext("pushback overflow"));
 		done(2);
 	}
+
+	return (0);
 }
 
+int
 cpushback(b)
-register char *b;
+char *b;
 {
-	register char *ob = b;
+	char *ob = b;
 
 	while (*b++)
 		;
@@ -1142,11 +1168,14 @@ register char *b;
 		errprint(gettext("cpushback overflow"));
 		done(2);
 	}
+
+	return (0);
 }
 
+int
 nextfile()
 {
-	register char	*p;
+	char	*p;
 
 n0:
 	if (ifile)
@@ -1188,10 +1217,11 @@ n1:
 }
 
 
+int
 popf()
 {
-	register i;
-	register char	*p, *q;
+	int	i;
+	char	*p, *q;
 	extern char	*ttyname();
 
 	ioff = offl[--ifi];
@@ -1219,10 +1249,11 @@ popf()
 }
 
 
+int
 flushi()
 {
 	if (nflush)
-		return;
+		return (0);
 	ch = 0;
 	copyf++;
 	while (!nlflg) {
@@ -1231,13 +1262,16 @@ flushi()
 		getch();
 	}
 	copyf--;
+
+	return (0);
 }
 
 
+int
 getach()
 {
-	register tchar i;
-	register j;
+	tchar i;
+	int	j;
 
 	lgf++;
 	j = cbits(i = getch());
@@ -1259,6 +1293,7 @@ getach()
 }
 
 
+int
 casenx()
 {
 	lgf++;
@@ -1274,12 +1309,15 @@ casenx()
 	pendt = 0;
 	frame = stk;
 	nxf = frame + 1;
+
+	return (0);
 }
 
 
+int
 getname()
 {
-	register int	j, k;
+	int	j, k;
 	tchar i;
 
 	lgf++;
@@ -1299,14 +1337,15 @@ getname()
 	nextf[k] = 0;
 	ch = i;
 	lgf--;
-	return(nextf[0]);
+	return((int)nextf[0]);
 }
 
 
+int
 caseso()
 {
-	register i;
-	register char	*p, *q;
+	int	i;
+	char	*p, *q;
 
 	lgf++;
 	nextf[0] = 0;
@@ -1334,23 +1373,29 @@ caseso()
 		while (p < eibuf)
 			*q++ = *p++;
 	}
+
+	return (0);
 }
 
+int
 caself()	/* set line number and file */
 {
 	int n;
 
 	if (skip())
-		return;
+		return (0);
 	n = atoi();
 	cfline[ifi] = numtab[CD].val = n - 2;
 	if (skip())
-		return;
+		return (0);
 	if (getname())
 		strcpy(cfname[ifi], nextf);
+
+	return (0);
 }
 
 
+int
 casecf()
 {	/* copy file without change */
 #ifndef NROFF
@@ -1375,9 +1420,11 @@ casecf()
 		write(ptid, buf, n);
 	close(fd);
 #endif
+	return (0);
 }
 
 
+int
 casesy()	/* call system */
 {
 	char	sybuf[NTM];
@@ -1393,16 +1440,19 @@ casesy()	/* call system */
 	system(sybuf);
 	copyf--;
 	lgf--;
+
+	return (0);
 }
 
 
+int
 getpn(a)
-	register char *a;
+	char *a;
 {
-	register int n, neg;
+	int n, neg;
 
 	if (*a == 0)
-		return;
+		return (0);
 	neg = 0;
 	for ( ; *a; a++)
 		switch (*a) {
@@ -1435,9 +1485,12 @@ getpn(a)
 	pnp = pnlist;
 	if (*pnp != -32767)
 		chkpn();
+
+	return (0);
 }
 
 
+int
 setrpt()
 {
 	tchar i, j;
@@ -1448,23 +1501,28 @@ setrpt()
 	copyf--;
 	raw--;
 	if (i < 0 || cbits(j = getch0()) == RPT)
-		return;
+		return (0);
 	i &= BYTEMASK;
 	while (i>0 && pbp < &pbbuf[NC-3]) {
 		i--;
 		*pbp++ = j;
 	}
+
+	return (0);
 }
 
 
+int
 casedb()
 {
 #ifdef	DEBUG
 	debug = 0;
 	if (skip())
-		return;
+		return (0);
 	noscale++;
 	debug = max(atoi(), 0);
 	noscale = 0;
-#endif	DEBUG
+#endif	/* DEBUG */
+
+	return (0);
 }

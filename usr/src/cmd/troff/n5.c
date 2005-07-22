@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef 	EUC
 #ifdef	NROFF
@@ -60,14 +59,15 @@
 int	iflist[NIF];
 int	ifx;
 
+int
 casead()
 {
-	register i;
+	int	i;
 
 	ad = 1;
 	/*leave admod alone*/
 	if (skip())
-		return;
+		return (0);
 	switch (i = cbits(getch())) {
 	case 'r':	/*right adj, left ragged*/
 		admod = 2;
@@ -91,43 +91,61 @@ casead()
 	case '5':
 		admod = (i - '0') / 2;
 	}
+
+	return (0);
 }
 
 
+int
 casena()
 {
 	ad = 0;
+
+	return (0);
 }
 
 
+int
 casefi()
 {
 	tbreak();
 	fi++;
 	pendnf = 0;
 	lnsize = LNSIZE;
+
+	return (0);
 }
 
 
+int
 casenf()
 {
 	tbreak();
 	fi = 0;
+
+	return (0);
 }
 
 
+int
 casers()
 {
 	dip->nls = 0;
+
+	return (0);
 }
 
 
+int
 casens()
 {
 	dip->nls++;
+
+	return (0);
 }
 
 
+int
 chget(c)
 int	c;
 {
@@ -141,58 +159,80 @@ int	c;
 }
 
 
+int
 casecc()
 {
 	cc = chget('.');
+
+	return (0);
 }
 
 
+int
 casec2()
 {
 	c2 = chget('\'');
+
+	return (0);
 }
 
 
+int
 casehc()
 {
 	ohc = chget(OHC);
+
+	return (0);
 }
 
 
+int
 casetc()
 {
 	tabc = chget(0);
+
+	return (0);
 }
 
 
+int
 caselc()
 {
 	dotc = chget(0);
+
+	return (0);
 }
 
 
+int
 casehy()
 {
-	register i;
+	int	i;
 
 	hyf = 1;
 	if (skip())
-		return;
+		return (0);
 	noscale++;
 	i = atoi();
 	noscale = 0;
 	if (nonumb)
-		return;
+		return (0);
 	hyf = max(i, 0);
+
+	return (0);
 }
 
 
+int
 casenh()
 {
 	hyf = 0;
+
+	return (0);
 }
 
 
+int
 max(aa, bb)
 int	aa, bb;
 {
@@ -203,9 +243,10 @@ int	aa, bb;
 }
 
 
+int
 casece()
 {
-	register i;
+	int	i;
 
 	noscale++;
 	skip();
@@ -215,12 +256,15 @@ casece()
 	tbreak();
 	ce = i;
 	noscale = 0;
+
+	return (0);
 }
 
 
+int
 casein()
 {
-	register i;
+	int	i;
 
 	if (skip())
 		i = in1;
@@ -233,12 +277,15 @@ casein()
 		un = in;
 		setnel();
 	}
+
+	return (0);
 }
 
 
+int
 casell()
 {
-	register i;
+	int	i;
 
 	if (skip())
 		i = ll1;
@@ -247,12 +294,15 @@ casell()
 	ll1 = ll;
 	ll = i;
 	setnel();
+
+	return (0);
 }
 
 
+int
 caselt()
 {
-	register i;
+	int	i;
 
 	if (skip())
 		i = lt1;
@@ -260,25 +310,31 @@ caselt()
 		i = max(hnumb(&lt), 0);
 	lt1 = lt;
 	lt = i;
+
+	return (0);
 }
 
 
+int
 caseti()
 {
-	register i;
+	int	i;
 
 	if (skip())
-		return;
+		return (0);
 	i = max(hnumb(&in), 0);
 	tbreak();
 	un1 = i;
 	setnel();
+
+	return (0);
 }
 
 
+int
 casels()
 {
-	register i;
+	int	i;
 
 	noscale++;
 	if (skip())
@@ -288,12 +344,15 @@ casels()
 	ls1 = ls;
 	ls = i;
 	noscale = 0;
+
+	return (0);
 }
 
 
+int
 casepo()
 {
-	register i;
+	int	i;
 
 	if (skip())
 		i = po1;
@@ -305,12 +364,14 @@ casepo()
 	if (!ascii)
 		esc += po - po1;
 #endif
+	return (0);
 }
 
 
+int
 casepl()
 {
-	register i;
+	int	i;
 
 	skip();
 	if ((i = vnumb(&pl)) == 0)
@@ -319,23 +380,26 @@ casepl()
 		pl = i;
 	if (numtab[NL].val > pl)
 		numtab[NL].val = pl;
+
+	return (0);
 }
 
 
+int
 casewh()
 {
-	register i, j, k;
+	int	i, j, k;
 
 	lgf++;
 	skip();
 	i = vnumb((int *)0);
 	if (nonumb)
-		return;
+		return (0);
 	skip();
 	j = getrq();
 	if ((k = findn(i)) != NTRAP) {
 		mlist[k] = j;
-		return;
+		return (0);
 	}
 	for (k = 0; k < NTRAP; k++)
 		if (mlist[k] == 0)
@@ -343,39 +407,45 @@ casewh()
 	if (k == NTRAP) {
 		flusho();
 		errprint(gettext("cannot plant trap."));
-		return;
+		return (0);
 	}
 	mlist[k] = j;
 	nlist[k] = i;
+
+	return (0);
 }
 
 
+int
 casech()
 {
-	register i, j, k;
+	int	i, j, k;
 
 	lgf++;
 	skip();
 	if (!(j = getrq()))
-		return;
+		return (0);
 	else 
 		for (k = 0; k < NTRAP; k++)
 			if (mlist[k] == j)
 				break;
 	if (k == NTRAP)
-		return;
+		return (0);
 	skip();
 	i = vnumb((int *)0);
 	if (nonumb)
 		mlist[k] = 0;
 	nlist[k] = i;
+
+	return (0);
 }
 
 
+int
 findn(i)
 int	i;
 {
-	register k;
+	int	k;
 
 	for (k = 0; k < NTRAP; k++)
 		if ((nlist[k] == i) && (mlist[k] != 0))
@@ -384,9 +454,10 @@ int	i;
 }
 
 
+int
 casepn()
 {
-	register i;
+	int	i;
 
 	skip();
 	noscale++;
@@ -396,16 +467,19 @@ casepn()
 		npn = i;
 		npnflg++;
 	}
+
+	return (0);
 }
 
 
+int
 casebp()
 {
-	register i;
-	register struct s *savframe;
+	int	i;
+	struct s *savframe;
 
 	if (dip != d)
-		return;
+		return (0);
 	savframe = frame;
 	skip();
 	if ((i = inumb(&numtab[PN].val)) < 0)
@@ -415,15 +489,18 @@ casebp()
 		npn = i;
 		npnflg++;
 	} else if (dip->nls)
-		return;
+		return (0);
 	eject(savframe);
+
+	return (0);
 }
 
 
+int
 casetm(ab) 
 	int ab;
 {
-	register i;
+	int	i;
 	char	tmbuf[NTM];
 
 	lgf++;
@@ -442,17 +519,20 @@ casetm(ab)
 	fdprintf(stderr, "%s", tmbuf);
 	copyf--;
 	lgf--;
+
+	return (0);
 }
 
 
+int
 casesp(a)
 int	a;
 {
-	register i, j, savlss;
+	int	i, j, savlss;
 
 	tbreak();
 	if (dip->nls || trap)
-		return;
+		return (0);
 	i = findt1();
 	if (!a) {
 		skip();
@@ -462,7 +542,7 @@ int	a;
 	} else 
 		j = a;
 	if (j == 0)
-		return;
+		return (0);
 	if (i < j)
 		j = i;
 	savlss = lss;
@@ -475,12 +555,15 @@ int	a;
 	lss = j;
 	newline(0);
 	lss = savlss;
+
+	return (0);
 }
 
 
+int
 casert()
 {
-	register a, *p;
+	int	a, *p;
 
 	skip();
 	if (dip != d)
@@ -491,35 +574,44 @@ casert()
 	if (nonumb)
 		a = dip->mkline;
 	if ((a < 0) || (a >= *p))
-		return;
+		return (0);
 	nb++;
 	casesp(a - *p);
+
+	return (0);
 }
 
 
+int
 caseem()
 {
 	lgf++;
 	skip();
 	em = getrq();
+
+	return (0);
 }
 
 
+int
 casefl()
 {
 	tbreak();
 	flusho();
+
+	return (0);
 }
 
 
+int
 caseev()
 {
-	register nxev;
+	int	nxev;
 
 	if (skip()) {
 e0:
 		if (evi == 0)
-			return;
+			return (0);
 		nxev =  evlist[--evi];
 		goto e1;
 	}
@@ -536,12 +628,12 @@ e0:
 			done2(040);
 		else 
 			edone(040);
-		return;
+		return (0);
 	}
 	evlist[evi++] = ev;
 e1:
 	if (ev == nxev)
-		return;
+		return (0);
 #ifdef INCORE
 	{
 		extern tchar corebuf[];
@@ -555,8 +647,11 @@ e1:
 	read(ibf, (char *) & env, sizeof(env));
 #endif
 	ev = nxev;
+
+	return (0);
 }
 
+int
 caseel()
 {
 	if (--ifx < 0) {
@@ -564,9 +659,12 @@ caseel()
 		iflist[0] = 0;
 	}
 	caseif(2);
+
+	return (0);
 }
 
 
+int
 caseie()
 {
 	if (ifx >= NIF) {
@@ -576,14 +674,17 @@ caseie()
 	}
 	caseif(1);
 	ifx++;
+
+	return (0);
 }
 
 
+int
 caseif(x)
 int	x;
 {
 	extern int falsef;
-	register notflag, true;
+	int	notflag, true;
 	tchar i;
 
 	if (x == 2) {
@@ -649,11 +750,14 @@ i2:
 		copyf--;
 		falsef--;
 	}
+
+	return (0);
 }
 
+int
 eatblk(inblk)
 int inblk;
-{	register int cnt, i;
+{	int cnt, i;
 
 	cnt = 0;
 	do {
@@ -677,18 +781,21 @@ int inblk;
 	} while ((!inblk && (i != '\n')) || (inblk && (i != RIGHT)));
 	if (i == '\n')
 		nlflg++;
+
+	return (0);
 }
 
 
+int
 cmpstr(c)
 tchar c;
 {
-	register j, delim;
-	register tchar i;
-	register val;
+	int	j, delim;
+	tchar i;
+	int	val;
 	int savapts, savapts1, savfont, savfont1, savpts, savpts1;
 	tchar string[1280];
-	register tchar *sp;
+	tchar *sp;
 
 	if (ismot(c))
 		return(0);
@@ -742,6 +849,7 @@ rtn:
 }
 
 
+int
 caserd()
 {
 
@@ -753,7 +861,7 @@ caserd()
 #ifdef	NROFF
 			echo_off();
 			flusho();
-#endif	NROFF
+#endif	/* NROFF */
 			fdprintf(stderr, "\007"); /*bell*/
 		} else {
 			if (nextf[0]) {
@@ -766,9 +874,12 @@ caserd()
 	collect();
 	tty++;
 	pushi(NBLIST*BLK, PAIR('r','d'));
+
+	return (0);
 }
 
 
+int
 rdtty()
 {
 	char	onechar;
@@ -832,26 +943,33 @@ rdtty()
 #ifdef	NROFF
 	if (quiet)
 		echo_on();
-#endif	NROFF
+#endif	/* NROFF */
 	return(0);
 }
 
 
+int
 caseec()
 {
 	eschar = chget('\\');
+
+	return (0);
 }
 
 
+int
 caseeo()
 {
 	eschar = 0;
+
+	return (0);
 }
 
 
+int
 caseta()
 {
-	register i;
+	int	i;
 
 	tabtab[0] = nonumb = 0;
 	for (i = 0; ((i < (NTAB - 1)) && !nonumb); i++) {
@@ -872,12 +990,15 @@ caseta()
 		nonumb = ch = 0;
 	}
 	tabtab[i] = 0;
+
+	return (0);
 }
 
 
+int
 casene()
 {
-	register i, j;
+	int	i, j;
 
 	skip();
 	i = vnumb((int *)0);
@@ -890,38 +1011,47 @@ casene()
 		newline(0);
 		lss = i;
 	}
+
+	return (0);
 }
 
 
+int
 casetr()
 {
-	register i, j;
+	int	i, j;
 	tchar k;
 
 	lgf++;
 	skip();
 	while ((i = cbits(k=getch())) != '\n') {
 		if (ismot(k))
-			return;
+			return (0);
 		if (ismot(k = getch()))
-			return;
+			return (0);
 		if ((j = cbits(k)) == '\n')
 			j = ' ';
 		trtab[i] = j;
 	}
+
+	return (0);
 }
 
 
+int
 casecu()
 {
 	cu++;
 	caseul();
+
+	return (0);
 }
 
 
+int
 caseul()
 {
-	register i;
+	int	i;
 
 	noscale++;
 	if (skip())
@@ -941,12 +1071,15 @@ caseul()
 	}
 	noscale = 0;
 	mchbits();
+
+	return (0);
 }
 
 
+int
 caseuf()
 {
-	register i, j;
+	int	i, j;
 
 	if (skip() || !(i = getrq()) || i == 'S' ||  (j = findft(i))  == -1)
 		ulfont = ULFONT; /*default underline position*/
@@ -956,12 +1089,14 @@ caseuf()
 	if (ulfont == FT)
 		ulfont = ULFONT;
 #endif
+	return (0);
 }
 
 
+int
 caseit()
 {
-	register i;
+	int	i;
 
 	lgf++;
 	it = itmac = 0;
@@ -972,30 +1107,36 @@ caseit()
 	if (!nonumb && (itmac = getrq()))
 		it = i;
 	noscale = 0;
+
+	return (0);
 }
 
 
+int
 casemc()
 {
-	register i;
+	int	i;
 
 	if (icf > 1)
 		ic = 0;
 	icf = 0;
 	if (skip())
-		return;
+		return (0);
 	ic = getch();
 	icf = 1;
 	skip();
 	i = max(hnumb((int *)0), 0);
 	if (!nonumb)
 		ics = i;
+
+	return (0);
 }
 
 
+int
 casemk()
 {
-	register i, j;
+	int	i, j;
 
 	if (dip != d)
 		j = dip->dnl; 
@@ -1003,31 +1144,37 @@ casemk()
 		j = numtab[NL].val;
 	if (skip()) {
 		dip->mkline = j;
-		return;
+		return (0);
 	}
 	if ((i = getrq()) == 0)
-		return;
+		return (0);
 	numtab[findr(i)].val = j;
+
+	return (0);
 }
 
 
+int
 casesv()
 {
-	register i;
+	int	i;
 
 	skip();
 	if ((i = vnumb((int *)0)) < 0)
-		return;
+		return (0);
 	if (nonumb)
 		i = 1;
 	sv += i;
 	caseos();
+
+	return (0);
 }
 
 
+int
 caseos()
 {
-	register savlss;
+	int	savlss;
 
 	if (sv <= findt1()) {
 		savlss = lss;
@@ -1036,16 +1183,19 @@ caseos()
 		lss = savlss;
 		sv = 0;
 	}
+
+	return (0);
 }
 
 
+int
 casenm()
 {
-	register i;
+	int	i;
 
 	lnmod = nn = 0;
 	if (skip())
-		return;
+		return (0);
 	lnmod++;
 	noscale++;
 	i = inumb(&numtab[LN].val);
@@ -1056,37 +1206,48 @@ casenm()
 	getnm(&ni, 0);
 	noscale = 0;
 	nmbits = chbits;
+
+	return (0);
 }
 
 
+int
 getnm(p, min)
 int	*p, min;
 {
-	register i;
+	int	i;
 
 	eat(' ');
 	if (skip())
-		return;
+		return (0);
 	i = atoi();
 	if (nonumb)
-		return;
+		return (0);
 	*p = max(i, min);
+
+	return (0);
 }
 
 
+int
 casenn()
 {
 	noscale++;
 	skip();
 	nn = max(atoi(), 1);
 	noscale = 0;
+
+	return (0);
 }
 
 
+int
 caseab()
 {
 	casetm(1);
 	done3(0);
+
+	return (0);
 }
 
 
@@ -1107,10 +1268,11 @@ struct termio	ttys;
 #else
 #include <sgtty.h>
 struct	sgttyb	ttys[2];
-#endif	USG
+#endif	/* USG */
 
 int	ttysave[2] = {-1, -1};
 
+int
 save_tty()			/*save any tty settings that may be changed*/
 {
 
@@ -1122,11 +1284,13 @@ save_tty()			/*save any tty settings that may be changed*/
 		ttysave[0] = ttys[0].sg_flags;
 	if (gtty(1, &ttys[1]) >= 0)
 		ttysave[1] = ttys[1].sg_flags;
-#endif	USG
+#endif	/* USG */
 
+	return (0);
 }
 
 
+int
 restore_tty()			/*restore tty settings from beginning*/
 {
 
@@ -1141,11 +1305,14 @@ restore_tty()			/*restore tty settings from beginning*/
 	if (ttysave[1] != -1) {
 		ttys[1].sg_flags = ttysave[1];
 		stty(1, &ttys[1]);
-#endif	USG
+#endif	/* USG */
 	}
+
+	return (0);
 }
 
 
+int
 set_tty()			/*this replaces the use of bset and breset*/
 {
 
@@ -1156,15 +1323,17 @@ set_tty()			/*this replaces the use of bset and breset*/
 		ttys[1].sg_flags &= ~CRMOD;
 		stty(1, &ttys[1]);
 	}
-#endif	USG
+#endif	/* USG */
 
+	return (0);
 }
 
 
+int
 echo_off()			/*turn off ECHO for .rd in "-q" mode*/
 {
 	if (ttysave[0] == -1)
-		return;
+		return (0);
 
 #ifdef	USG
 	ttys.c_lflag &= ~ECHO_USG;
@@ -1172,15 +1341,18 @@ echo_off()			/*turn off ECHO for .rd in "-q" mode*/
 #else
 	ttys[0].sg_flags &= ~ECHO;
 	stty(0, &ttys[0]);
-#endif	USG
+#endif	/* USG */
+
+	return (0);
 
 }
 
 
+int
 echo_on()			/*restore ECHO after .rd in "-q" mode*/
 {
 	if (ttysave[0] == -1)
-		return;
+		return (0);
 
 #ifdef	USG
 	ttys.c_lflag |= ECHO_USG;
@@ -1188,7 +1360,8 @@ echo_on()			/*restore ECHO after .rd in "-q" mode*/
 #else
 	ttys[0].sg_flags |= ECHO;
 	stty(0, &ttys[0]);
-#endif	USG
+#endif	/* USG */
 
+	return (0);
 }
-#endif	NROFF
+#endif	/* NROFF */

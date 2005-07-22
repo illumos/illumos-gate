@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef EUC
 #ifdef NROFF
@@ -84,28 +83,29 @@ wchar_t	cwc, owc, wceoll;
 #endif /* EUC */
 int	brflg;
 
+int
 tbreak()
 {
-	register pad, k;
-	register tchar	*i, j;
-	register int resol = 0;
+	int	pad, k;
+	tchar	*i, j;
+	int resol = 0;
 #ifdef EUC
 #ifdef NROFF
-	register tchar	l;
+	tchar	l;
 #endif /* NROFF */
 #endif /* EUC */
 
 	trap = 0;
 	if (nb)
-		return;
+		return (0);
 	if (dip == d && numtab[NL].val == -1) {
 		newline(1);
-		return;
+		return (0);
 	}
 	if (!nc) {
 		setnel();
 		if (!wch)
-			return;
+			return (0);
 		if (pendw)
 			getword(1);
 		movword();
@@ -214,12 +214,15 @@ tbreak()
 	for (k = ls - 1; k > 0 && !trap; k--)
 		newline(0);
 	spread = 0;
+
+	return (0);
 }
 
+int
 donum()
 {
-	register i, nw;
-	extern pchar();
+	int	i, nw;
+	extern int pchar();
 
 	nrbits = nmbits;
 	nw = width('1' | nrbits);
@@ -231,7 +234,7 @@ donum()
 		numtab[LN].val++;
 d1:
 		un += nw * (3 + nms + ni);
-		return;
+		return (0);
 	}
 	i = 0;
 	if (numtab[LN].val < 100)
@@ -243,24 +246,28 @@ d1:
 	fnumb(numtab[LN].val, pchar);
 	un += nw * nms;
 	numtab[LN].val++;
+
+	return (0);
 }
 
 extern int logf;
+
+int
 text()
 {
-	register tchar i;
+	tchar i;
 	static int	spcnt;
 
 	nflush++;
 	numtab[HP].val = 0;
 	if ((dip == d) && (numtab[NL].val == -1)) {
 		newline(1); 
-		return;
+		return (0);
 	}
 	setnel();
 	if (ce || !fi) {
 		nofill();
-		return;
+		return (0);
 	}
 	if (pendw)
 		goto t4;
@@ -281,7 +288,7 @@ text()
 t1:
 		nflush = pendt = ch = spcnt = 0;
 		callsp();
-		return;
+		return (0);
 	}
 	ch = i;
 	if (spcnt) {
@@ -330,13 +337,16 @@ t6:
 	ckul();
 rtn:
 	nflush = 0;
+
+	return (0);
 }
 
 
+int
 nofill()
 {
-	register j;
-	register tchar i;
+	int	j;
+	tchar i;
 
 	if (!pendnf) {
 		over = 0;
@@ -346,7 +356,7 @@ nofill()
 		if (nlflg) {
 			ch = nflush = 0;
 			callsp();
-			return;
+			return (0);
 		}
 		adsp = adrem = 0;
 		nwd = 10000;
@@ -359,7 +369,7 @@ nofill()
 			nflush = 0;
 			flushi();
 			ckul();
-			return;
+			return (0);
 		}
 		j = width(i);
 		widthp = j;
@@ -378,12 +388,15 @@ nofill()
 	ckul();
 rtn:
 	pendnf = nflush = 0;
+
+	return (0);
 }
 
 
+int
 callsp()
 {
-	register i;
+	int	i;
 
 	if (flss)
 		i = flss; 
@@ -391,9 +404,12 @@ callsp()
 		i = lss;
 	flss = 0;
 	casesp(i);
+
+	return (0);
 }
 
 
+int
 ckul()
 {
 	if (ul && (--ul == 0)) {
@@ -403,11 +419,14 @@ ckul()
 	}
 	if (it && (--it == 0) && itmac)
 		control(itmac, 0);
+
+	return (0);
 }
 
 
+int
 storeline(c, w)
-register tchar c;
+tchar c;
 {
 	if (linep >= line + lnsize - 1) {
 		if (!over) {
@@ -418,7 +437,7 @@ register tchar c;
 			w = -1;
 			goto s1;
 		}
-		return;
+		return (0);
 	}
 s1:
 	if (w == -1)
@@ -427,13 +446,16 @@ s1:
 	nel -= w;
 	*linep++ = c;
 	nc++;
+
+	return (0);
 }
 
 
+int
 newline(a)
 int	a;
 {
-	register i, j, nlss;
+	int	i, j, nlss;
 	int	opn;
 
 	if (a)
@@ -461,7 +483,7 @@ int	a;
 				trap++; 
 				dip->ditf++;
 			}
-		return;
+		return (0);
 	}
 	j = lss;
 	if (flss)
@@ -527,13 +549,16 @@ nl2:
 		}
 		trap = control(mlist[j], 0);
 	}
+
+	return (0);
 }
 
 
+int
 findn1(a)
 int	a;
 {
-	register i, j;
+	int	i, j;
 
 	for (i = 0; i < NTRAP; i++) {
 		if (mlist[i]) {
@@ -546,7 +571,7 @@ int	a;
 	return(i);
 }
 
-
+int
 chkpn()
 {
 	pto = *(pnp++);
@@ -560,13 +585,16 @@ chkpn()
 		print++;
 		pfrom = 0;
 	}
+
+	return (0);
 }
 
 
+int
 findt(a)
 int	a;
 {
-	register i, j, k;
+	int	i, j, k;
 
 	k = 32767;
 	if (dip != d) {
@@ -591,9 +619,10 @@ int	a;
 }
 
 
+int
 findt1()
 {
-	register i;
+	int	i;
 
 	if (dip != d)
 		i = dip->dnl;
@@ -603,20 +632,21 @@ findt1()
 }
 
 
+int
 eject(a)
 struct s *a;
 {
-	register savlss;
+	int	savlss;
 
 	if (dip != d)
-		return;
+		return (0);
 	ejf++;
 	if (a)
 		ejl = a;
 	else 
 		ejl = frame;
 	if (trap)
-		return;
+		return (0);
 e1:
 	savlss = lss;
 	lss = findt(numtab[NL].val);
@@ -624,13 +654,16 @@ e1:
 	lss = savlss;
 	if (numtab[NL].val && !trap)
 		goto e1;
+
+	return (0);
 }
 
 
+int
 movword()
 {
-	register w;
-	register tchar i, *wp;
+	int	w;
+	tchar i, *wp;
 	int	savwch, hys;
 
 	over = 0;
@@ -723,15 +756,19 @@ m5:
 }
 
 
+int		
 horiz(i)
 int	i;
 {
 	vflag = 0;
 	if (i)
 		pchar(makem(i));
+
+	return (0);
 }
 
 
+int
 setnel()
 {
 	if (!nc) {
@@ -743,14 +780,16 @@ setnel()
 		nel = ll - un;
 		ne = adsp = adrem = 0;
 	}
+
+	return (0);
 }
 
-
+int
 getword(x)
 int	x;
 {
-	register int j, k;
-	register tchar i, *wp;
+	int j, k;
+	tchar i, *wp;
 	int noword;
 #ifdef EUC
 #ifdef NROFF
@@ -989,9 +1028,10 @@ rtn:
 }
 
 
+int
 storeword(c, w)
-register tchar c;
-register int	w;
+tchar c;
+int	w;
 {
 
 	if (wordp >= &word[WDSIZE - 3]) {
@@ -1003,7 +1043,7 @@ register int	w;
 			w = -1;
 			goto s1;
 		}
-		return;
+		return (0);
 	}
 s1:
 	if (w == -1)
@@ -1012,6 +1052,8 @@ s1:
 	wne += w;
 	*wordp++ = c;
 	wch++;
+
+	return (0);
 }
 
 
@@ -1050,6 +1092,7 @@ tchar gettch()
 #endif
 #ifdef EUC
 #ifdef NROFF
+int
 collectmb(i)
 tchar	i;
 {

@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * t6.c
@@ -66,10 +65,11 @@ int	ccstab[NFONT+1];
 int	bdtab[NFONT+1];
 int	sbold = 0;
 
+int
 width(j)
-register tchar j;
+tchar j;
 {
-	register i, k;
+	int	i, k;
 
 	if (j & (ZBIT|MOT)) {
 		if (iszbit(j))
@@ -116,24 +116,28 @@ register tchar j;
 /*
  * clear width cache-- s means just space
  */
+int
 zapwcache(s)
 {
-	register i;
+	int	i;
 
 	if (s) {
 		widcache[0].fontpts = 0;
-		return;
+		return (0);
 	}
 	for (i=0; i<NWIDCACHE; i++)
 		widcache[i].fontpts = 0;
+
+	return (0);
 }
 
+int
 getcw(i)
-register int	i;
+int	i;
 {
-	register int	k;
-	register char	*p;
-	register int	x, j;
+	int	k;
+	char	*p;
+	int	x, j;
 	int nocache = 0;
 
 	bd = 0;
@@ -205,8 +209,9 @@ register int	i;
 	 */
 }
 
+int
 abscw(n)	/* return index of abs char n in fontab[], etc. */
-{	register int i, ncf;
+{	int i, ncf;
 
 	ncf = fontbase[xfont]->nwfont & BYTEMASK;
 	for (i = 0; i < ncf; i++)
@@ -215,10 +220,11 @@ abscw(n)	/* return index of abs char n in fontab[], etc. */
 	return 0;
 }
 
+int
 xbits(i, bitf)
-register tchar i;
+tchar i;
 {
-	register k;
+	int	k;
 
 	xfont = fbits(i);
 	k = sbits(i);
@@ -227,7 +233,7 @@ register tchar i;
 		oldbits = sfbits(i);
 		pfont = xfont;
 		ppts = xpts;
-		return;
+		return (0);
 	}
 	switch (bitf) {
 	case 0:
@@ -242,14 +248,16 @@ register tchar i;
 		xfont = mfont;
 		xpts = mpts;
 	}
+
+	return (0);
 }
 
 
 tchar setch()
 {
-	register j;
+	int	j;
 	char	temp[10];
-	register char	*s;
+	char	*s;
 	extern char	*chname;
 	extern short	*chtab;
 	extern int	nchtab;
@@ -280,10 +288,11 @@ tchar setabs()		/* set absolute char from \C'...' */
 
 
 
+int
 findft(i)
-register int	i;
+int	i;
 {
-	register k;
+	int	k;
 
 	if ((k = i - '0') >= 0 && k <= nfonts && k < smnt)
 		return(k);
@@ -294,9 +303,10 @@ register int	i;
 }
 
 
+int
 caseps()
 {
-	register i;
+	int	i;
 
 	if (skip())
 		i = apts1;
@@ -305,14 +315,17 @@ caseps()
 		i = inumb(&apts);	/* this is a disaster for fractional point sizes */
 		noscale = 0;
 		if (nonumb)
-			return;
+			return (0);
 	}
 	casps1(i);
+
+	return (0);
 }
 
 
+int
 casps1(i)
-register int	i;
+int	i;
 {
 
 /*
@@ -322,20 +335,23 @@ register int	i;
  * get back by matching \s+3's.
 
 	if (i <= 0)
-		return;
+		return (0);
 */
 	apts1 = apts;
 	apts = i;
 	pts1 = pts;
 	pts = findps(i);
 	mchbits();
+
+	return (0);
 }
 
 
+int
 findps(i)
-register int	i;
+int	i;
 {
-	register j, k;
+	int	j, k;
 
 	for (j=k=0 ; pstab[j] != 0 ; j++)
 		if (abs(pstab[j]-i) < abs(pstab[k]-i))
@@ -345,9 +361,10 @@ register int	i;
 }
 
 
+int
 mchbits()
 {
-	register i, j, k;
+	int	i, j, k;
 
 	i = pts;
 	for (j = 0; i > (k = pstab[j]); j++)
@@ -360,11 +377,14 @@ mchbits()
 	setfbits(chbits, font);
 	sps = width(' ' | chbits);
 	zapwcache(1);
+
+	return (0);
 }
 
+int
 setps()
 {
-	register int i, j;
+	int i, j;
 
 	i = cbits(getch());
 	if (ischar(i) && isdigit(i)) {		/* \sd or \sdd */
@@ -395,6 +415,8 @@ setps()
 		j += apts;
 	}
 	casps1(j);
+
+	return (0);
 }
 
 
@@ -432,17 +454,21 @@ tchar setslant()		/* set slant from \S'...' */
 }
 
 
+int
 caseft()
 {
 	skip();
 	setfont(1);
+
+	return (0);
 }
 
 
+int
 setfont(a)
 int	a;
 {
-	register i, j;
+	int	i, j;
 
 	if (a)
 		i = getrq();
@@ -453,27 +479,30 @@ int	a;
 		goto s0;
 	}
 	if (i == 'S' || i == '0')
-		return;
+		return (0);
 	if ((j = findft(i)) == -1)
 		if ((j = setfp(0, i, 0)) == -1)	/* try to put it in position 0 */
-			return;
+			return (0);
 s0:
 	font1 = font;
 	font = j;
 	mchbits();
+
+	return (0);
 }
 
 
+int
 setwd()
 {
-	register base, wid;
-	register tchar i;
+	int	base, wid;
+	tchar i;
 	int	delim, emsz, k;
 	int	savhp, savapts, savapts1, savfont, savfont1, savpts, savpts1;
 
 	base = numtab[ST].val = numtab[ST].val = wid = numtab[CT].val = 0;
 	if (ismot(i = getch()))
-		return;
+		return (0);
 	delim = cbits(i);
 	savhp = numtab[HP].val;
 	numtab[HP].val = 0;
@@ -513,6 +542,8 @@ setwd()
 	pts1 = savpts1;
 	mchbits();
 	setwdf = 0;
+
+	return (0);
 }
 
 
@@ -533,8 +564,8 @@ tchar hmot()
 
 tchar mot()
 {
-	register int j, n;
-	register tchar i;
+	int j, n;
+	tchar i;
 
 	j = HOR;
 	getch(); /*eat delim*/
@@ -554,7 +585,7 @@ tchar mot()
 tchar sethl(k)
 int	k;
 {
-	register j;
+	int	j;
 	tchar i;
 
 	j = EM / 2;
@@ -570,9 +601,9 @@ int	k;
 
 
 tchar makem(i)
-register int	i;
+int	i;
 {
-	register tchar j;
+	tchar j;
 
 	if ((j = i) < 0)
 		j = -j;
@@ -589,7 +620,7 @@ tchar getlg(i)
 tchar i;
 {
 	tchar j, k;
-	register int lf;
+	int lf;
 
 	if ((lf = fontbase[fbits(i)]->ligfont) == 0) /* font lacks ligatures */
 		return(i);
@@ -619,20 +650,24 @@ tchar i;
 }
 
 
+int
 caselg()
 {
 
 	lg = 1;
 	if (skip())
-		return;
+		return (0);
 	lg = atoi();
+
+	return (0);
 }
 
 
+int
 casefp()
 {
-	register int i, j;
-	register char *s;
+	int i, j;
+	char *s;
 
 	skip();
 	if ((i = cbits(getch()) - '0') <= 0 || i > nfonts)
@@ -643,13 +678,16 @@ casefp()
 		setfp(i, j, 0);
 	else		/* 3rd argument = filename */
 		setfp(i, j, nextf);
+
+	return (0);
 }
 
+int
 setfp(pos, f, truename)	/* mount font f at position pos[0...nfonts] */
 int pos, f;
 char *truename;
 {
-	register k;
+	int	k;
 	int n;
 	char longname[NS], shortname[20];
 	extern int nchtab;
@@ -702,9 +740,10 @@ char *truename;
 }
 
 
+int
 casecs()
 {
-	register i, j;
+	int	i, j;
 
 	noscale++;
 	skip();
@@ -721,12 +760,15 @@ casecs()
 rtn:
 	zapwcache(0);
 	noscale = 0;
+
+	return (0);
 }
 
 
+int
 casebd()
 {
-	register i, j, k;
+	int	i, j, k;
 
 	zapwcache(0);
 	k = 0;
@@ -735,7 +777,7 @@ bd0:
 		if (k)
 			goto bd1;
 		else 
-			return;
+			return (0);
 	}
 	if (j == smnt) {
 		k = smnt;
@@ -750,12 +792,15 @@ bd1:
 	noscale++;
 	bdtab[j] = atoi();
 	noscale = 0;
+
+	return (0);
 }
 
 
+int
 casevs()
 {
-	register i;
+	int	i;
 
 	skip();
 	vflag++;
@@ -769,12 +814,15 @@ casevs()
 		i = VERT;
 	lss1 = lss;
 	lss = i;
+
+	return (0);
 }
 
 
+int
 casess()
 {
-	register i;
+	int	i;
 
 	noscale++;
 	skip();
@@ -784,6 +832,8 @@ casess()
 		sps = width(' ' | chbits);
 	}
 	noscale = 0;
+
+	return (0);
 }
 
 

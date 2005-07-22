@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* starting values for typesetting parameters: */
 
@@ -384,9 +383,9 @@ extern	int	debug;	/*debug flag*/
 #define	DB_ALLC	02	/*print out message from alloc()*/
 #define	DB_GETC	04	/*print out message from getch()*/
 #define	DB_LOOP	010	/*print out message before "Eileen's loop" fix*/
-#endif	DEBUG
+#endif	/* DEBUG */
 
-extern	struct	d {	/* diversion */
+struct	d {	/* diversion */
 	filep	op;
 	int	dnl;
 	int	dimac;
@@ -401,7 +400,7 @@ extern	struct	d {	/* diversion */
 	int	curd;
 };
 
-extern	struct	s {	/* stack frame */
+struct	s {	/* stack frame */
 	int	nargs;
 	struct s *pframe;
 	filep	pip;

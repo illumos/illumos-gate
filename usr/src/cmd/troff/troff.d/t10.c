@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tdef.h"
 #include <ctype.h>
@@ -96,6 +95,7 @@ struct Font *fontbase[NFONT+1];
 tchar *ptout0();
 
 
+int
 ptinit()
 {
 	int	i, fin, nw;
@@ -163,7 +163,7 @@ ptinit()
 	ll = ll1 = lt = lt1 = LL;
 	specnames();	/* install names like "hyphen", etc. */
 	if (ascii)
-		return;
+		return (0);
 	fdprintf(ptid, "x T %s\n", devname);
 	fdprintf(ptid, "x res %d %d %d\n", Inch, Hor, Vert);
 	fdprintf(ptid, "x init\n");	/* do initialization for particular device */
@@ -181,8 +181,11 @@ ptinit()
 		fdprintf(ptid, " %s", &chname[chtab[i]]);
 	fdprintf(ptid, "\nx xxx\n");
   */
+
+	return (0);
 }
 
+int
 specnames()
 {
 	static struct {
@@ -211,12 +214,15 @@ specnames()
 
 	for (i = 0; spnames[i].n; i++)
 		*spnames[i].n = findch(spnames[i].v);
+
+	return (0);
 }
 
+int
 findch(s)	/* find char s in chname */
-register char	*s;
+char	*s;
 {
-	register int	i;
+	int	i;
 
 	for (i = 0; i < nchtab; i++)
 		if (strcmp(s, &chname[chtab[i]]) == 0)
@@ -224,20 +230,21 @@ register char	*s;
 	return(0);
 }
 
+int
 ptout(i)
-register tchar	i;
+tchar	i;
 {
-	register dv;
-	register tchar	*k;
+	int	dv;
+	tchar	*k;
 	int temp, a, b;
 
 	if (cbits(i) != '\n') {
 		*olinep++ = i;
-		return;
+		return (0);
 	}
 	if (olinep == oline) {
 		lead += lss;
-		return;
+		return (0);
 	}
 
 	hpos = po;	/* ??? */
@@ -271,15 +278,17 @@ register tchar	i;
 	fdprintf(ptid, "x xxx end of line: hpos=%d, vpos=%d\n", hpos, vpos);
 */
 	fdprintf(ptid, "n%d %d\n", b, a);	/* be nice to chuck */
+
+	return (0);
 }
 
 tchar *
 ptout0(pi)
 tchar	*pi;
 {
-	register short j, k, w;
+	short j, k, w;
 	short	z, dx, dy, dx2, dy2, n;
-	register tchar	i;
+	tchar	i;
 	int outsize;	/* size of object being printed */
 
 	outsize = 1;	/* default */
@@ -494,9 +503,10 @@ tchar	*pi;
 	return(pi+outsize);
 }
 
+int
 ptps()
 {
-	register i, j, k;
+	int	i, j, k;
 
 	i = xpts;
 	for (j = 0; i > (k = pstab[j]); j++)
@@ -506,32 +516,45 @@ ptps()
 		}
 	fdprintf(ptid, "s%d\n", k);	/* really should put out string rep of size */
 	mpts = i;
+
+	return (0);
 }
 
+int
 ptfont()
 {
 	mfont = xfont;
 	fdprintf(ptid, "f%d\n", xfont);
+
+	return (0);
 }
 
+int
 ptfpcmd(f, s)
 int	f;
 char	*s;
 {
 	if (ascii)
-		return;
+		return (0);
 	fdprintf(ptid, "x font %d %s\n", f, s);
 	ptfont();	/* make sure that it gets noticed */
+
+	return (0);
 }
 
+int
 ptlead()
 {
 	vpos += lead;
 	if (!ascii)
 		fdprintf(ptid, "V%d\n", vpos);
 	lead = 0;
+
+	return (0);
 }
 
+
+int
 ptesc()
 {
 	hpos += esc;
@@ -545,8 +568,12 @@ ptesc()
 	} else
 		fdprintf(ptid, "H%d\n", hpos);
 	esc = 0;
+
+	return (0);
 }
 
+
+int
 newpage(n)	/* called at end of each output page (we hope) */
 {
 	int i;
@@ -554,29 +581,38 @@ newpage(n)	/* called at end of each output page (we hope) */
 	ptlead();
 	vpos = 0;
 	if (ascii)
-		return;
+		return (0);
 	fdprintf(ptid, "p%d\n", n);	/* new page */
 	for (i = 0; i <= nfonts; i++)
 		if (fontbase[i]->namefont && fontbase[i]->namefont[0])
 			fdprintf(ptid, "x font %d %s\n", i, fontbase[i]->namefont);
 	ptps();
 	ptfont();
+
+	return (0);
 }
 
+int
 pttrailer()
 {
 	fdprintf(ptid, "x trailer\n");
+
+	return (0);
 }
 
+int
 ptstop()
 {
 	fdprintf(ptid, "x stop\n");
+
+	return (0);
 }
 
+int
 dostop()
 {
 	if (ascii)
-		return;
+		return (0);
 	ptlead();
 	vpos = 0;
 	/* fdprintf(ptid, "x xxx end of page\n");*/
@@ -589,4 +625,6 @@ dostop()
 	ptesc();
 	esc = po;
 	hpos = vpos = 0;	/* probably in wrong place */
+
+	return (0);
 }

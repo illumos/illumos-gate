@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	drive hp2621 terminal 
@@ -132,8 +131,8 @@ FILE *fp = stdin;	/* input file pointer */
 
 int	nowait = 0;	/* 0 => wait at bottom of each page */
 
-main(argc, argv)
-char *argv[];
+int
+main(int argc, char **argv)
 {
 	char buf[BUFSIZ];
 
@@ -173,8 +172,11 @@ char *argv[];
 			fclose(fp);
 		}
 	done();
+
+	return (0);
 }
 
+int
 outlist(s)	/* process list of page numbers to be printed */
 char *s;
 {
@@ -209,8 +211,11 @@ char *s;
 	if (dbg)
 		for (i=0; i<nolist; i += 2)
 			printf("%3d %3d\n", olist[i], olist[i+1]);
+
+	return (0);
 }
 
+int
 in_olist(n)	/* is n in olist? */
 int n;
 {
@@ -224,10 +229,11 @@ int n;
 	return(0);
 }
 
+int
 conv(fp)
-register FILE *fp;
+FILE *fp;
 {
-	register int c, k;
+	int c, k;
 	int m, n, i, n1, m1;
 	char str[100], buf[300];
 
@@ -349,8 +355,11 @@ register FILE *fp;
 			done();
 		}
 	}
+
+	return (0);
 }
 
+int
 devcntrl(fp)	/* interpret device control functions */
 FILE *fp;
 {
@@ -385,27 +394,38 @@ FILE *fp;
 	}
 	while (getc(fp) != '\n')	/* skip rest of input line */
 		;
+
+	return (0);
 }
 
+int
 fileinit()	/* read in font and code files, etc. */
 {
+	return (0);
 }
 
+int
 fontprint(i)	/* debugging print of font i (0,...) */
 {
+	return (0);
 }
 
+int
 loadcode(n, nw)	/* load codetab on position n (0...); #chars is nw */
 int n, nw;
 {
+	return (0);
 }
 
+int
 loadfont(n, s)	/* load font info for font s on position n (1...) */
 int n;
 char *s;
 {
+	return (0);
 }
 
+int
 error(f, s, a1, a2, a3, a4, a5, a6, a7) 
 char *s;
 {
@@ -414,6 +434,8 @@ char *s;
 	fprintf(stderr, "\n");
 	if (f)
 		exit(1);
+
+	return (0);
 }
 
 
@@ -443,6 +465,7 @@ int	DY	= 10;	/* step size in y for drawing */
 int	drawdot	= '.';	/* draw with this character */
 int	drawsize = 1;	/* shrink by this factor when drawing */
 
+int
 t_init(reinit)	/* initialize device */
 int reinit;
 {
@@ -450,6 +473,8 @@ int reinit;
 
 	fflush(stdout);
 	hpos = vpos = 0;
+
+	return (0);
 }
 
 #define	MAXSTATE	5
@@ -465,6 +490,7 @@ struct state {
 struct	state	state[MAXSTATE];
 struct	state	*statep = state;
 
+int
 t_push()	/* begin a new block */
 {
 	hflush();
@@ -480,8 +506,11 @@ t_push()	/* begin a new block */
 	if (statep++ >= state+MAXSTATE)
 		error(FATAL, "{ nested too deep");
 	hpos = vpos = 0;
+
+	return (0);
 }
 
+int
 t_pop()	/* pop to previous state */
 {
 	if (--statep < state)
@@ -492,6 +521,8 @@ t_pop()	/* pop to previous state */
 	vpos = statep->svpos;
 	horig = statep->shorig;
 	vorig = statep->svorig;
+
+	return (0);
 }
 
 int	np;	/* number of pages seen */
@@ -499,6 +530,7 @@ int	npmax;	/* high-water mark of np */
 int	pgnum[40];	/* their actual numbers */
 long	pgadr[40];	/* their seek addresses */
 
+int
 t_page(n)	/* do whatever new page functions */
 {
 	long ftell();
@@ -512,13 +544,13 @@ t_page(n)	/* do whatever new page functions */
 	if (output == 0) {
 		output = in_olist(n);
 		t_init(1);
-		return;
+		return (0);
 	}
 	/* have just printed something, and seen p<n> for next one */
 	putpage();
 	fflush(stdout);
 	if (nowait)
-		return;
+		return (0);
 
   next:
 	for (bp = buf; (*bp = readch()); )
@@ -532,7 +564,7 @@ t_page(n)	/* do whatever new page functions */
 	case '\n':
 		output = in_olist(n);
 		t_init(1);
-		return;
+		return (0);
 	case '!':
 		callunix(&buf[1]);
 		fputs("!\n", stderr);
@@ -561,7 +593,7 @@ t_page(n)	/* do whatever new page functions */
 		fseek(fp, pgadr[np], 0);
 		output = 1;
 		t_init(1);
-		return;
+		return (0);
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9':
 		m = atoi(&buf[0]);
@@ -576,12 +608,12 @@ t_page(n)	/* do whatever new page functions */
 		fseek(fp, pgadr[np], 0);
 		output = 1;
 		t_init(1);
-		return;
+		return (0);
 	case 'o':
 		outlist(&buf[1]);
 		output = 0;
 		t_init(1);
-		return;
+		return (0);
 	case '?':
 		fputs("!cmd	unix cmd\n", stderr);
 		fputs("p	print this page again\n", stderr);
@@ -598,29 +630,40 @@ t_page(n)	/* do whatever new page functions */
 	goto next;
 }
 
+int
 putpage()
 {
 	int i, j, k;
 
 	fflush(stdout);
+
+	return (0);
 }
 
+int
 t_newline()	/* do whatever for the end of a line */
 {
 	printf("\n");
 	hpos = 0;
+
+	return (0);
 }
 
+int
 t_size(n)	/* convert integer to internal size number*/
 int n;
 {
+	return (0);
 }
 
+int
 t_font(s)	/* convert string to internal font number */
 char *s;
 {
+	return (0);
 }
 
+int
 t_text(s)	/* print string s as text */
 char *s;
 {
@@ -628,7 +671,7 @@ char *s;
 	char str[100];
 
 	if (!output)
-		return;
+		return (0);
 	while ((c = *s++) != '\n') {
 		if (c == '\\') {
 			switch (c = *s++) {
@@ -648,8 +691,11 @@ char *s;
 		}
 		hmot(w);
 	}
+
+	return (0);
 }
 
+int
 t_reset(c)
 {
 	int n;
@@ -658,40 +704,59 @@ t_reset(c)
 	fflush(stdout);
 	if (c == 's')
 		t_page(9999);
+
+	return (0);
 }
 
+int
 t_trailer()
 {
+	return (0);
 }
 
+int
 hgoto(n)
 {
 	hpos = n;	/* this is where we want to be */
 			/* before printing a character, */
 			/* have to make sure it's true */
+
+	return (0);
 }
 
+int
 hmot(n)	/* generate n units of horizontal motion */
 int n;
 {
 	hgoto(hpos + n);
+
+	return (0);
 }
 
+int
 hflush()	/* actual horizontal output occurs here */
 {
+	return (0);
 }
 
+int
 vgoto(n)
 {
 	vpos = n;
+
+	return (0);
 }
 
+int
 vmot(n)	/* generate n units of vertical motion */
 int n;
 {
 	vgoto(vpos + n);	/* ignores rounding */
+
+	return (0);
 }
 
+int
 put1s(s)	/* s is a funny char name */
 char *s;
 {
@@ -702,7 +767,7 @@ char *s;
 	static int previ;
 
 	if (!output)
-		return;
+		return (0);
 	if (strcmp(s, prev) != 0) {
 		previ = -1;
 		for (i = 0; spectab[i] != 0; i += 2)
@@ -717,30 +782,41 @@ char *s;
 			putc(*p, stdout);
 	} else
 		prev[0] = 0;
+
+	return (0);
 }
 
+int
 put1(c)	/* output char c */
 int c;
 {
 	if (!output)
-		return;
+		return (0);
 	putc(c, stdout);
+
+	return (0);
 }
 
+int
 setsize(n)	/* set point size to n (internal) */
 int n;
 {
+	return (0);
 }
 
+int
 t_fp(n, s)	/* font position n now contains font s */
 int n;
 char *s;
 {
+	return (0);
 }
 
+int
 setfont(n)	/* set font to n */
 int n;
 {
+	return (0);
 }
 
 void done()
@@ -751,6 +827,7 @@ void done()
 	exit(0);
 }
 
+int
 callunix(line)
 char line[];
 {
@@ -762,13 +839,16 @@ char line[];
 		exit(255);
 	}
 	else if(unixpid == -1)
-		return;
+		return (0);
 	else{	signal(SIGINT, SIG_IGN); signal(SIGQUIT, SIG_IGN);
 		while( (rc = wait(&status)) != unixpid && rc != -1 ) ;
 		signal(SIGINT,(void(*)())done); signal(SIGQUIT,(void(*)())sigquit);
 	}
+
+	return (0);
 }
 
+int
 readch(){
 	char c;
 	if (read(2,&c,1)<1) c=0;

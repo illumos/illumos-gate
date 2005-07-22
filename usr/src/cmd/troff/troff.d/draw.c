@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<math.h>
@@ -64,6 +63,7 @@ int	maxdots	= 32000;	/* maximum number of dots in an object */
 #define	min(x,y)	((x) < (y) ? (x) : (y))
 #define	arcmove(x,y)	{ hgoto(x); vmot(-vpos-(y)); }
 
+int
 drawline(dx, dy, s)	/* draw line from here to dx, dy using s */
 int dx, dy;
 char *s;
@@ -93,7 +93,7 @@ char *s;
 		}
 		vgoto(ovpos + dy);
 		setsize(osize);
-		return;
+		return (0);
 	}
 	if (yd == 0) {
 		numdots = abs (xd);
@@ -104,7 +104,7 @@ char *s;
 		}
 		hgoto(ohpos + dx);
 		setsize(osize);
-		return;
+		return (0);
 	}
 	if (abs (xd) > abs (yd)) {
 		val = slope = (float) xd/yd;
@@ -143,8 +143,11 @@ char *s;
 	hgoto(ohpos + dx);
 	vgoto(ovpos + dy);
 	setsize(osize);
+
+	return (0);
 }
 
+int
 drawwig(s)	/* draw wiggly line */
 	char *s;
 {
@@ -194,6 +197,8 @@ drawwig(s)	/* draw wiggly line */
 		}
 	}
 	setsize(osize);
+
+	return (0);
 }
 
 char *getstr(p, temp)	/* copy next non-blank string from p to temp, update p */
@@ -211,6 +216,7 @@ char *p, *temp;
 	return(p);
 }
 
+int
 drawcirc(d)
 {
 	int xc, yc;
@@ -220,8 +226,11 @@ drawcirc(d)
 	conicarc(hpos + d/2, -vpos, hpos, -vpos, hpos, -vpos, d/2, d/2);
 	hgoto(xc + d);	/* circle goes to right side */
 	vgoto(yc);
+
+	return (0);
 }
 
+int
 dist(x1, y1, x2, y2)	/* integer distance from x1,y1 to x2,y2 */
 {
 	float dx, dy;
@@ -231,6 +240,7 @@ dist(x1, y1, x2, y2)	/* integer distance from x1,y1 to x2,y2 */
 	return sqrt(dx*dx + dy*dy) + 0.5;
 }
 
+int
 drawarc(dx1, dy1, dx2, dy2)
 {
 	int x0, y0, x2, y2, r;
@@ -241,8 +251,11 @@ drawarc(dx1, dy1, dx2, dy2)
 	y2 = y0 + dy2;
 	r = sqrt((float) dx1 * dx1 + (float) dy1 * dy1) + 0.5;
 	conicarc(x0, -y0, hpos, -vpos, x2, -y2, r, r);
+
+	return (0);
 }
 
+int
 drawellip(a, b)
 {
 	int xc, yc;
@@ -252,10 +265,13 @@ drawellip(a, b)
 	conicarc(hpos + a/2, -vpos, hpos, -vpos, hpos, -vpos, a/2, b/2);
 	hgoto(xc + a);
 	vgoto(yc);
+
+	return (0);
 }
 
 #define sqr(x) (long int)(x)*(x)
 
+int
 conicarc(x, y, x0, y0, x1, y1, a, b)
 {
 	/* based on Bresenham, CACM, Feb 77, pp 102-3 */
@@ -462,10 +478,15 @@ conicarc(x, y, x0, y0, x1, y1, a, b)
 
 	setsize(osize);
 	drawline((int)xc-ox1,(int)yc-oy1,".");
+
+	return (0);
 }
 
+int
 putdot(x, y)
 {
 	arcmove(x, y);
 	put1(drawdot);
+
+	return (0);
 }

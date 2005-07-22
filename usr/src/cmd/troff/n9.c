@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libintl.h>
 #include <stdlib.h>
@@ -82,16 +81,17 @@ tchar setz()
 	return(i);
 }
 
+int
 setline()
 {
-	register tchar *i;
+	tchar *i;
 	tchar c;
 	int	length;
 	int	w, cnt, delim, rem, temp;
 	tchar linebuf[NC];
 
 	if (ismot(c = getch()))
-		return;
+		return (0);
 	delim = cbits(c);
 	vflag = 0;
 	dfact = EM;
@@ -99,7 +99,7 @@ setline()
 	dfact = 1;
 	if (!length) {
 		eat(delim);
-		return;
+		return (0);
 	}
 s0:
 	if ((cbits(c = getch())) == delim) {
@@ -133,13 +133,16 @@ s1:
 	*i++ = 0;
 	eat(delim);
 	pushback(linebuf);
+
+	return (0);
 }
 
 
+int
 eat(c)
-register int	c;
+int	c;
 {
-	register i;
+	int	i;
 
 	while ((i = cbits(getch())) != c &&  (i != '\n'))
 		;
@@ -147,14 +150,15 @@ register int	c;
 }
 
 
+int
 setov()
 {
-	register j, k;
+	int	j, k;
 	tchar i, o[NOV];
 	int delim, w[NOV];
 
 	if (ismot(i = getch()))
-		return;
+		return (0);
 	delim = cbits(i);
 	for (k = 0; (k < NOV) && ((j = cbits(i = getch())) != delim) &&  (j != '\n'); k++) {
 		o[k] = i;
@@ -177,7 +181,7 @@ setov()
 			}
 		}
 	else 
-		return;
+		return (0);
 	*pbp++ = makem(w[0] / 2);
 	for (k = 0; o[k]; k++)
 		;
@@ -186,18 +190,21 @@ setov()
 		*pbp++ = makem(-((w[k] + w[k+1]) / 2));
 		*pbp++ = o[k];
 	}
+
+	return (0);
 }
 
 
+int
 setbra()
 {
-	register k;
+	int	k;
 	tchar i, *j, dwn;
 	int	cnt, delim;
 	tchar brabuf[NC];
 
 	if (ismot(i = getch()))
-		return;
+		return (0);
 	delim = cbits(i);
 	j = brabuf + 1;
 	cnt = 0;
@@ -213,10 +220,10 @@ setbra()
 		cnt++;
 	}
 	if (--cnt < 0)
-		return;
+		return (0);
 	else if (!cnt) {
 		ch = *(j - 2);
-		return;
+		return (0);
 	}
 	*j = 0;
 #ifdef NROFF
@@ -227,19 +234,22 @@ setbra()
 #endif
 	*--j &= ~ZBIT;
 	pushback(brabuf);
+
+	return (0);
 }
 
 
+int
 setvline()
 {
-	register i;
+	int	i;
 	tchar c, rem, ver, neg;
 	int	cnt, delim, v;
 	tchar vlbuf[NC];
-	register tchar *vlp;
+	tchar *vlp;
 
 	if (ismot(c = getch()))
-		return;
+		return (0);
 	delim = cbits(c);
 	dfact = lss;
 	vflag++;
@@ -248,7 +258,7 @@ setvline()
 	if (!i) {
 		eat(delim);
 		vflag = 0;
-		return;
+		return (0);
 	}
 	if ((cbits(c = getch())) == delim) {
 		c = BOXRULE | chbits;	/*default box rule*/
@@ -286,10 +296,13 @@ setvline()
 	*vlp++ = 0;
 	pushback(vlbuf);
 	vflag = 0;
+
+	return (0);
 }
 
 #define	NPAIR	(NC/2-6)	/* max pairs in spline, etc. */
 
+int
 setdraw()	/* generate internal cookies for a drawing function */
 {
 	int i, j, k, dx[NPAIR], dy[NPAIR], delim, type;
@@ -310,7 +323,7 @@ setdraw()	/* generate internal cookies for a drawing function */
 	/* f dx dy ...:	f is any other char:  like spline */
 
 	if (ismot(c = getch()))
-		return;
+		return (0);
 	delim = cbits(c);
 	type = cbits(getch());
 	for (i = 0; i < NPAIR ; i++) {
@@ -357,24 +370,28 @@ setdraw()	/* generate internal cookies for a drawing function */
 	drawbuf[j] = 0;
 	pushback(drawbuf);
 #endif
+	return (0);
 }
 
 
+int
 casefc()
 {
-	register i;
+	int	i;
 	tchar j;
 
 	gchtab[fc] &= ~FCBIT;
 	fc = IMP;
 	padc = ' ';
 	if (skip() || ismot(j = getch()) || (i = cbits(j)) == '\n')
-		return;
+		return (0);
 	fc = i;
 	gchtab[fc] |= FCBIT;
 	if (skip() || ismot(ch) || (ch = cbits(ch)) == fc)
-		return;
+		return (0);
 	padc = ch;
+
+	return (0);
 }
 
 
@@ -382,8 +399,8 @@ tchar
 setfield(x)
 int	x;
 {
-	register tchar ii, jj, *fp;
-	register i, j;
+	tchar ii, jj, *fp;
+	int	i, j;
 	int length, ws, npad, temp, type;
 	tchar **pp, *padptr[NPP];
 	tchar fbuf[FBUFSZ];
@@ -557,6 +574,8 @@ int localize()
 	}
 	wdbdg = wdbindf;
 	wddlm = wddelim;
+
+	return (0);
 }
 #endif /* EUC */
 #endif /* NROFF */

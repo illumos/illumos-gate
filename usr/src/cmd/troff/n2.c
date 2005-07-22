@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * n2.c
@@ -70,10 +69,11 @@ extern	jmp_buf	sjbuf;
 int	toolate;
 int	error;
 
+int
 pchar(i)
-	register tchar i;
+	tchar i;
 {
-	register int j;
+	int j;
 	static int hx = 0;	/* records if have seen HX */
 
 	if (hx) {
@@ -87,21 +87,21 @@ pchar(i)
 				dip->alss = j;
 			ralss = dip->alss;
 		}
-		return;
+		return (0);
 	}
 	if (ismot(i)) {
 		pchar1(i); 
-		return;
+		return (0);
 	}
 	switch (j = cbits(i)) {
 	case 0:
 	case IMP:
 	case RIGHT:
 	case LEFT:
-		return;
+		return (0);
 	case HX:
 		hx = 1;
-		return;
+		return (0);
 	case PRESC:
 		if (dip == &d[0])
 			j = eschar;	/* fall through */
@@ -118,30 +118,33 @@ pchar(i)
 #endif /* EUC */
 	}
 	pchar1(i);
+
+	return (0);
 }
 
 
+int
 pchar1(i)
-	register tchar i;
+	tchar i;
 {
-	register j;
+	int	j;
 
 	j = cbits(i);
 	if (dip != &d[0]) {
 		wbf(i);
 		dip->op = offset;
-		return;
+		return (0);
 	}
 	if (!tflg && !print) {
 		if (j == '\n')
 			dip->alss = dip->blss = 0;
-		return;
+		return (0);
 	}
 	if (no_out || j == FILLER)
-		return;
+		return (0);
 	if (tflg) {	/* transparent mode, undiverted */
 		fdprintf(ptid, "%c", j);
-		return;
+		return (0);
 	}
 #ifndef NROFF
 	if (ascii)
@@ -149,8 +152,11 @@ pchar1(i)
 	else
 #endif
 		ptout(i);
+
+	return (0);
 }
 
+int
 outascii(i)	/* print i in best-guess ascii */
 	tchar i;
 {
@@ -158,11 +164,11 @@ outascii(i)	/* print i in best-guess ascii */
 
 	if (ismot(i)) {
 		oput(' ');
-		return;
+		return (0);
 	}
 	if (j < 0177 && j >= ' ' || j == '\n') {
 		oput(j);
-		return;
+		return (0);
 	}
 	if (j == DRAWFCN)
 		oputs("\\D");
@@ -188,32 +194,41 @@ outascii(i)	/* print i in best-guess ascii */
 		oput(chname[chtab[j-128]]);
 		oput(chname[chtab[j-128]+1]);
 	}
+
+	return (0);
 }
 
 
 /*
  * now a macro
+int
 oput(i)
-	register int	i;
+	int	i;
 {
 	*obufp++ = i;
 	if (obufp >= &obuf[OBUFSZ])
 		flusho();
+
+	return (0);
 }
 */
 
+int
 oputs(i)
-register char	*i;
+char	*i;
 {
 	while (*i != 0)
 		oput(*i++);
+
+	return (0);
 }
 
 
+int
 flusho()
 {
 	if (obufp == obuf)
-		return;
+		return (0);
 	if (no_out == 0) {
 		if (!toolate) {
 			toolate++;
@@ -231,13 +246,16 @@ flusho()
 		toolate += write(ptid, obuf, obufp - obuf);
 	}
 	obufp = obuf;
+
+	return (0);
 }
 
 
+int
 done(x) 
 int	x;
 {
-	register i;
+	int	i;
 
 	error |= x;
 	app = ds = lgf = 0;
@@ -267,9 +285,12 @@ int	x;
 	nflush++;
 	eject((struct s *)0);
 	longjmp(sjbuf, 1);
+
+	return (0);
 }
 
 
+int
 done1(x) 
 int	x; 
 {
@@ -288,9 +309,12 @@ int	x;
 			pttrailer();
 		done2(0);
 	}
+
+	return (0);
 }
 
 
+int
 done2(x) 
 int	x; 
 {
@@ -301,8 +325,11 @@ int	x;
 #endif
 	flusho();
 	done3(x);
+
+	return (0);
 }
 
+int
 done3(x) 
 int	x;
 {
@@ -316,9 +343,12 @@ int	x;
 	if (ascii)
 		mesg(1);
 	exit(error);
+
+	return (0);
 }
 
 
+int
 edone(x) 
 int	x;
 {
@@ -326,25 +356,27 @@ int	x;
 	nxf = frame + 1;
 	ip = 0;
 	done(x);
+
+	return (0);
 }
 
 
-
+int
 casepi()
 {
-	register i;
+	int	i;
 	int	id[2];
 
 	if (toolate || skip() || !getname() || pipe(id) == -1 || (i = fork()) == -1) {
 		errprint(gettext("Pipe not created."));
-		return;
+		return (0);
 	}
 	ptid = id[1];
 	if (i > 0) {
 		close(id[0]);
 		toolate++;
 		pipeflg++;
-		return;
+		return (0);
 	}
 	close(0);
 	dup(id[0]);
@@ -352,4 +384,6 @@ casepi()
 	execl(nextf, nextf, 0);
 	errprint(gettext("Cannot exec %s"), nextf);
 	exit(-4);
+
+	return (0);
 }

@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<ctype.h>
 #include	"tdef.h"
@@ -57,17 +56,18 @@ tchar	*hyend;
 #define THRESH 160 /*digram goodness threshold*/
 int	thresh = THRESH;
 
+int
 hyphen(wp)
 	tchar *wp;
 {
-	register j;
-	register tchar *i;
+	int	j;
+	tchar *i;
 
 	i = wp;
 	while (punct(cbits(*i++)))
 		;
 	if (!alph(cbits(*--i)))
-		return;
+		return (0);
 	wdstart = i++;
 	while (alph(cbits(*i++)))
 		;
@@ -75,9 +75,9 @@ hyphen(wp)
 	while (punct(cbits(*i++)))
 		;
 	if (*--i)
-		return;
+		return (0);
 	if ((wdend - wdstart - 4) < 0)
-		return;
+		return (0);
 	hyp = hyptr;
 	*hyp = 0;
 	hyoff = 2;
@@ -96,9 +96,12 @@ hyphen(wp)
 				}
 			}
 		}
+
+	return (0);
 }
 
 
+int
 punct(i)
 {
 	if (!i || alph(i))
@@ -108,6 +111,7 @@ punct(i)
 }
 
 
+int
 alph(i)
 {
 	if (i >= 'a' && i <= 'z' || i >= 'A' && i <= 'Z')
@@ -117,21 +121,25 @@ alph(i)
 }
 
 
+int
 caseht()
 {
 	thresh = THRESH;
 	if (skip())
-		return;
+		return (0);
 	noscale++;
 	thresh = atoi();
 	noscale = 0;
+
+	return (0);
 }
 
 
+int
 casehw()
 {
-	register i, k;
-	register char	*j;
+	int	i, k;
+	char	*j;
 	tchar t;
 
 	k = 0;
@@ -149,7 +157,7 @@ casehw()
 				if (i == ' ')
 					break;
 				else
-					return;
+					return (0);
 			}
 			if (i == '-') {
 				k = HY_BIT;
@@ -161,17 +169,20 @@ casehw()
 				goto full;
 		}
 	}
-	return;
+	return (0);
 full:
 	errprint(gettext("exception word list full."));
 	*nexth = 0;
+
+	return (0);
 }
 
 
+int
 exword()
 {
-	register tchar *w;
-	register char	*e;
+	tchar *w;
+	char	*e;
 	char	*save;
 
 	e = hbuf;
@@ -203,13 +214,16 @@ exword()
 			while (*e++)
 				;
 	}
+
+	return (0);
 }
 
 
+int
 suffix()
 {
-	register tchar *w;
-	register char	*s, *s0;
+	tchar *w;
+	char	*s, *s0;
 	tchar i;
 	extern char	*suftab[];
 	extern tchar *chkvow();
@@ -258,8 +272,9 @@ mark:
 }
 
 
+int
 maplow(i)
-register int	i;
+int	i;
 {
 	if (ischar(i) && isupper(i)) 
 		i = tolower(i);
@@ -267,6 +282,7 @@ register int	i;
 }
 
 
+int
 vowel(i)
 int	i;
 {
@@ -294,20 +310,21 @@ tchar *w;
 }
 
 
+int
 digram() 
 {
-	register tchar *w;
-	register val;
+	tchar *w;
+	int	val;
 	tchar * nhyend, *maxw;
 	int	maxval;
 	extern char	bxh[26][13], bxxh[26][13], xxh[26][13], xhx[26][13], hxx[26][13];
 
 again:
 	if (!(w = chkvow(hyend + 1)))
-		return;
+		return (0);
 	hyend = w;
 	if (!(w = chkvow(hyend)))
-		return;
+		return (0);
 	nhyend = w;
 	maxval = 0;
 	w--;
@@ -333,11 +350,12 @@ again:
 }
 
 
+int
 dilook(a, b, t)
 int	a, b;
 char	t[26][13];
 {
-	register i, j;
+	int	i, j;
 
 	i = t[maplow(a)-'a'][(j = maplow(b)-'a')/2];
 	if (!(j & 01))

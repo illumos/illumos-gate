@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<ctype.h>
 #include "tdef.h"
@@ -58,10 +57,11 @@ int	falsef	= 0;	/* on if inside false branch of if */
 #define	NHASH(i)	((i>>6)^i)&0177
 struct	numtab	*nhash[128];	/* 128 == the 0177 on line above */
 
+int
 setn()
 {
-	register i, j;
-	register tchar ii;
+	int	i, j;
+	tchar ii;
 	int	f;
 
 	f = nform = 0;
@@ -74,7 +74,7 @@ setn()
 	if (falsef)
 		f = 0;
 	if ((i = getsn()) == 0)
-		return;
+		return (0);
 	if ((i & 0177) == '.')
 		switch (i >> BYTE) {
 		case 's': 
@@ -165,13 +165,13 @@ setn()
 			i = dip->curd;
 			*pbp++ = (i >> BYTE) & BYTEMASK;
 			*pbp++ = i & BYTEMASK;
-			return;
+			return (0);
 		case 'b': 
 			i = bdtab[font];
 			break;
 		case 'F':
 			cpushback(cfname[ifi]);
-			return;
+			return (0);
 
 		default:
 			goto s0;
@@ -186,11 +186,14 @@ s0:
 		}
 	}
 	setn1(i, nform, (tchar) 0);
+
+	return (0);
 }
 
 tchar	numbuf[17];
 tchar	*numbufp;
 
+int
 wrc(i)
 tchar i;
 {
@@ -203,6 +206,7 @@ tchar i;
 
 
 /* insert into input number i, in format form, with size-font bits bits */
+int
 setn1(i, form, bits)
 int	i;
 tchar bits;
@@ -215,13 +219,16 @@ tchar bits;
 	fnumb(i, wrc);
 	*numbufp = 0;
 	pushback(numbuf);
+
+	return (0);
 }
 
 
+int
 nrehash()
 {
-	register struct numtab *p;
-	register i;
+	struct numtab *p;
+	int	i;
 
 	for (i=0; i<128; i++)
 		nhash[i] = 0;
@@ -234,34 +241,39 @@ nrehash()
 		p->link = nhash[i];
 		nhash[i] = p;
 	}
+
+	return (0);
 }
 
+int
 nunhash(rp)
-register struct numtab *rp;
+struct numtab *rp;
 {	
-	register struct numtab *p;
-	register struct numtab **lp;
+	struct numtab *p;
+	struct numtab **lp;
 
 	if (rp->r == 0)
-		return;
+		return (0);
 	lp = &nhash[NHASH(rp->r)];
 	p = *lp;
 	while (p) {
 		if (p == rp) {
 			*lp = p->link;
 			p->link = 0;
-			return;
+			return (0);
 		}
 		lp = &p->link;
 		p = p->link;
 	}
+	return (0);
 }
 
+int
 findr(i)
-register int	i;
+int	i;
 {
-	register struct numtab *p;
-	register h = NHASH(i);
+	struct numtab *p;
+	int	h = NHASH(i);
 
 	if (i == 0)
 		return(-1);
@@ -280,12 +292,15 @@ register int	i;
 	errprint(gettext("too many number registers (%d)."), NN);
 	done2(04); 
 	/* NOTREACHED */
+
+	return (0);
 }
 
+int
 usedr(i)	/* returns -1 if nr i has never been used */
-register int	i;
+int	i;
 {
-	register struct numtab *p;
+	struct numtab *p;
 
 	if (i == 0)
 		return(-1);
@@ -296,10 +311,11 @@ register int	i;
 }
 
 
+int
 fnumb(i, f)
-register int	i, (*f)();
+int	i, (*f)();
 {
-	register j;
+	int	j;
 
 	j = 0;
 	if (i < 0) {
@@ -321,13 +337,16 @@ register int	i, (*f)();
 		return abc(i, f) + j;
 		break;
 	}
+
+	return (0);
 }
 
 
+int
 decml(i, f)
-register int	i, (*f)();
+int	i, (*f)();
 {
-	register j, k;
+	int	j, k;
 
 	k = 0;
 	nform--;
@@ -337,6 +356,7 @@ register int	i, (*f)();
 }
 
 
+int
 roman(i, f)
 int	i, (*f)();
 {
@@ -350,11 +370,12 @@ int	i, (*f)();
 }
 
 
+int
 roman0(i, f, onesp, fivesp)
 int	i, (*f)();
 char	*onesp, *fivesp;
 {
-	register q, rem, k;
+	int	q, rem, k;
 
 	k = 0;
 	if (!i)
@@ -378,6 +399,7 @@ char	*onesp, *fivesp;
 }
 
 
+int
 abc(i, f)
 int	i, (*f)();
 {
@@ -388,10 +410,11 @@ int	i, (*f)();
 }
 
 
+int
 abc0(i, f)
 int	i, (*f)();
 {
-	register j, k;
+	int	j, k;
 
 	k = 0;
 	if (j = i / 26)
@@ -401,8 +424,8 @@ int	i, (*f)();
 
 long	atoi0()
 {
-	register c, k, cnt;
-	register tchar ii;
+	int	c, k, cnt;
+	tchar ii;
 	long	i, acc;
 	extern long	ckph();
 
@@ -529,8 +552,8 @@ a0:
 
 long	ckph()
 {
-	register tchar i;
-	register long	j;
+	tchar i;
+	long	j;
 	extern long	atoi0();
 	extern long	atoi1();
 
@@ -544,10 +567,10 @@ long	ckph()
 
 
 long	atoi1(ii)
-register tchar ii;
+tchar ii;
 {
-	register i, j, digits;
-	register long	acc;
+	int	i, j, digits;
+	long	acc;
 	int	neg, abs, field;
 
 	neg = abs = field = digits = 0;
@@ -660,10 +683,11 @@ a2:
 }
 
 
+int
 caserr()
 {
-	register i, j;
-	register struct numtab *p;
+	int	i, j;
+	struct numtab *p;
 
 	lgf++;
 	while (!skip() && (i = getrq()) ) {
@@ -675,12 +699,15 @@ caserr()
 		p->r = p->val = p->inc = p->fmt = 0;
 		regcnt--;
 	}
+
+	return (0);
 }
 
 
+int
 casenr()
 {
-	register i, j;
+	int	i, j;
 
 	lgf++;
 	skip();
@@ -697,18 +724,19 @@ casenr()
 		goto rtn;
 	numtab[i].inc = j;
 rtn:
-	return;
+	return (0);
 }
 
 
+int
 caseaf()
 {
-	register i, k;
-	register tchar j, jj;
+	int	i, k;
+	tchar j, jj;
 
 	lgf++;
 	if (skip() || !(i = getrq()) || skip())
-		return;
+		return (0);
 	k = 0;
 	j = getch();
 	if (!ischar(jj = cbits(j)) || !isalpha(jj)) {
@@ -719,23 +747,29 @@ caseaf()
 	if (!k)
 		k = j;
 	numtab[findr(i)].fmt = k & BYTEMASK;
+
+	return (0);
 }
 
+int
 setaf()	/* return format of number register */
 {
-	register int i, j;
+	int i, j;
 
 	i = usedr(getsn());
 	if (i == -1)
-		return;
+		return (0);
 	if (numtab[i].fmt > 20)	/* it was probably a, A, i or I */
 		*pbp++ = numtab[i].fmt;
 	else
 		for (j = (numtab[i].fmt ? numtab[i].fmt : 1); j; j--)
 			*pbp++ = '0';
+
+	return (0);
 }
 
 
+int
 vnumb(i)
 int	*i;
 {
@@ -746,6 +780,7 @@ int	*i;
 }
 
 
+int
 hnumb(i)
 int	*i;
 {
@@ -755,11 +790,12 @@ int	*i;
 }
 
 
+int
 inumb(n)
 int	*n;
 {
-	register i, j, f;
-	register tchar ii;
+	int	i, j, f;
+	tchar ii;
 
 	f = 0;
 	if (n) {
@@ -782,10 +818,11 @@ int	*n;
 }
 
 
+int
 quant(n, m)
 int	n, m;
 {
-	register i, neg;
+	int	i, neg;
 
 	neg = 0;
 	if (n < 0) {

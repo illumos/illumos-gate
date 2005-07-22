@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tdef.h"
 
@@ -116,7 +115,7 @@ int	totout = 1;
 int	ulfont = ULFONT;
 int	tabch = TAB;
 int	ldrch = LEADER;
-extern caseds(), caseas(), casesp(), caseft(), caseps(), casevs(),
+extern int caseds(), caseas(), casesp(), caseft(), caseps(), casevs(),
 casenr(), caseif(), casepo(), casetl(), casetm(), casebp(), casech(),
 casepn(), tbreak(), caseti(), casene(), casenf(), casece(), casefi(),
 casein(), casell(), casens(), casemk(), casert(), caseam(),

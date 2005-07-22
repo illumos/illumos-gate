@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 
@@ -76,7 +75,7 @@ extern FILE		*tf;
 
 /*****************************************************************************/
 
-
+int
 newfile(name, size)
 
 
@@ -154,7 +153,7 @@ FILE *charfile(name, size)
 
 /*****************************************************************************/
 
-
+int
 save_env()
 
 
@@ -179,12 +178,13 @@ save_env()
 
 	env = 1;
 
+	return (0);
 }	/* End of save_env */
 
 
 /*****************************************************************************/
 
-
+int
 restore_env()
 
 
@@ -207,12 +207,13 @@ restore_env()
 
 	env = 0;
 
+	return (0);
 }	/* End of restore_env */
 
 
 /*****************************************************************************/
 
-
+int
 nconv(fp)
 
 
@@ -303,6 +304,7 @@ nconv(fp)
 
 	}	/* End while */
 
+	return (0);
 }	/* End of nconv */
 
 

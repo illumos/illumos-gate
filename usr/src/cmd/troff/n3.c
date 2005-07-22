@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * troff3.c
@@ -69,10 +68,11 @@ int	strflg;
 	tchar rbuf[BLK];
 #endif
 
+int
 caseig()
 {
-	register i;
-	register filep oldoff;
+	int	i;
+	filep oldoff;
 
 	oldoff = offset;
 	offset = 0;
@@ -80,17 +80,19 @@ caseig()
 	offset = oldoff;
 	if (i != '.')
 		control(i, 1);
+
+	return (0);
 }
 
-
+int
 casern()
 {
-	register i, j;
+	int	i, j;
 
 	lgf++;
 	skip();
 	if ((i = getrq()) == 0 || (oldmn = findmn(i)) < 0)
-		return;
+		return (0);
 	skip();
 	clrmn(findmn(j = getrq()));
 	if (j) {
@@ -98,45 +100,54 @@ casern()
 		contab[oldmn].rq = j;
 		maddhash(&contab[oldmn]);
 	}
+
+	return (0);
 }
 
+int
 maddhash(rp)
-register struct contab *rp;
+struct contab *rp;
 {
-	register struct contab **hp;
+	struct contab **hp;
 
 	if (rp->rq == 0)
-		return;
+		return (0);
 	hp = &mhash[MHASH(rp->rq)];
 	rp->link = *hp;
 	*hp = rp;
+
+	return (0);
 }
 
+int
 munhash(mp)
-register struct contab *mp;
+struct contab *mp;
 {	
-	register struct contab *p;
-	register struct contab **lp;
+	struct contab *p;
+	struct contab **lp;
 
 	if (mp->rq == 0)
-		return;
+		return (0);
 	lp = &mhash[MHASH(mp->rq)];
 	p = *lp;
 	while (p) {
 		if (p == mp) {
 			*lp = p->link;
 			p->link = 0;
-			return;
+			return (0);
 		}
 		lp = &p->link;
 		p = p->link;
 	}
+
+	return (0);
 }
 
+int
 mrehash()
 {
-	register struct contab *p;
-	register i;
+	struct contab *p;
+	int	i;
 
 	for (i=0; i<128; i++)
 		mhash[i] = 0;
@@ -149,8 +160,11 @@ mrehash()
 		p->link = mhash[i];
 		mhash[i] = p;
 	}
+
+	return (0);
 }
 
+int
 caserm()
 {
 	int j;
@@ -159,34 +173,46 @@ caserm()
 	while (!skip() && (j = getrq()) != 0)
 		clrmn(findmn(j));
 	lgf--;
+
+	return (0);
 }
 
 
+int
 caseas()
 {
 	app++;
 	caseds();
+
+	return (0);
 }
 
 
+int
 caseds()
 {
 	ds++;
 	casede();
+
+	return (0);
 }
 
 
+int
 caseam()
 {
 	app++;
 	casede();
+
+	return (0);
 }
 
 
+int
 casede()
 {
-	register i, req;
-	register filep savoff;
+	int	i, req;
+	filep savoff;
 	extern filep finds();
 
 	if (dip != d)
@@ -221,14 +247,15 @@ casede()
 		control(req, 1);
 de1:
 	ds = app = 0;
-	return;
+	return (0);
 }
 
 
+int
 findmn(i)
-register int	i;
+int	i;
 {
-	register struct contab *p;
+	struct contab *p;
 
 	for (p = mhash[MHASH(i)]; p; p = p->link)
 		if (i == p->rq)
@@ -237,8 +264,9 @@ register int	i;
 }
 
 
+int
 clrmn(i)
-register int	i;
+int	i;
 {
 	if (i >= 0) {
 		if (contab[i].mx)
@@ -248,14 +276,16 @@ register int	i;
 		contab[i].mx = 0;
 		contab[i].f = 0;
 	}
+
+	return (0);
 }
 
 
 filep finds(mn)
-register int	mn;
+int	mn;
 {
-	register i;
-	register filep savip;
+	int	i;
+	filep savip;
 	extern filep alloc();
 	extern filep incoff();
 
@@ -302,9 +332,10 @@ register int	mn;
 }
 
 
+int
 skip()			/*skip over blanks; return nlflg*/
 {
-	register tchar i;
+	tchar i;
 
 	while (cbits(i = getch()) == ' ')
 		;
@@ -313,10 +344,11 @@ skip()			/*skip over blanks; return nlflg*/
 }
 
 
+int
 copyb()
 {
-	register i, j, state;
-	register tchar ii;
+	int	i, j, state;
+	tchar ii;
 	int	req, k;
 	filep savoff;
 
@@ -380,9 +412,10 @@ c0:
 }
 
 
+int
 copys()
 {
-	register tchar i;
+	tchar i;
 
 	copyf++;
 	if (skip())
@@ -394,13 +427,15 @@ copys()
 c0:
 	wbt((tchar)0);
 	copyf--;
+
+	return (0);
 }
 
 
 filep alloc()		/*return free blist[] block in nextb*/
 {
-	register i;
-	register filep j;
+	int	i;
+	filep j;
 
 	for (i = 0; i < NBLIST; i++) {
 		if (blist[i] == 0)
@@ -425,38 +460,45 @@ filep alloc()		/*return free blist[] block in nextb*/
 		fdprintf(stderr, "newmn %d; nextb was %x, will be %x\n",
 			newmn, nextb, j);
 	}
-#endif	DEBUG
+#endif	/* DEBUG */
 	return(nextb = j);
 }
 
 
+int
 ffree(i)		/*free blist[i] and blocks pointed to*/
 filep i;
 {
-	register j;
+	int	j;
 
 	while (blist[j = blisti(i)] != (unsigned) ~0) {
 		i = (filep) blist[j];
 		blist[j] = 0;
 	}
 	blist[j] = 0;
+
+	return (0);
 }
 
+int
 wbt(i)
 tchar i;
 {
 	wbf(i);
 	wbfl();
+
+	return (0);
 }
 
 
+int
 wbf(i)			/*store i into blist[offset] (?) */
-register tchar i;
+tchar i;
 {
-	register j;
+	int	j;
 
 	if (!offset)
-		return;
+		return (0);
 	if (!woff) {
 		woff = offset;
 #ifdef INCORE
@@ -483,13 +525,16 @@ register tchar i;
 	}
 	if (wbfi >= BLK)
 		wbfl();
+
+	return (0);
 }
 
 
+int
 wbfl()			/*flush current blist[] block*/
 {
 	if (woff == 0)
-		return;
+		return (0);
 #ifndef INCORE
 	lseek(ibf, ((long)woff) * sizeof(tchar), 0);
 	write(ibf, (char *)wbuf, wbfi * sizeof(tchar));
@@ -497,13 +542,15 @@ wbfl()			/*flush current blist[] block*/
 	if ((woff & (~(BLK - 1))) == (roff & (~(BLK - 1))))
 		roff = -1;
 	woff = 0;
+
+	return (0);
 }
 
 
 tchar rbf()		/*return next char from blist[] block*/
 {
-	register tchar i;
-	register filep j, p;
+	tchar i;
+	filep j, p;
 	extern filep incoff();
 
 	if (ip == NBLIST*BLK) {		/* for rdtty */
@@ -555,10 +602,10 @@ tchar rbf()		/*return next char from blist[] block*/
 
 
 tchar rbf0(p)
-register filep p;
+filep p;
 {
 #ifndef INCORE
-	register filep i;
+	filep i;
 
 	if ((i = p & ~(BLK - 1)) != roff) {
 		roff = i;
@@ -574,7 +621,7 @@ register filep p;
 
 
 filep incoff(p)		/*get next blist[] block*/
-register filep p;
+filep p;
 {
 	p++;
 	if ((p & (BLK - 1)) == 0) {
@@ -589,7 +636,7 @@ register filep p;
 
 tchar popi()
 {
-	register struct s *p;
+	struct s *p;
 
 	if (frame == stk)
 		return(0);
@@ -610,11 +657,12 @@ tchar popi()
  */
 #define SPACETEST(base, size) while ((enda - (size)) <= (char *)(base)){setbrk(DELTA);}
 
+int
 pushi(newip, mname)
 filep newip;
 int mname;
 {
-	register struct s *p;
+	struct s *p;
 	extern char *setbrk();
 
 	SPACETEST(nxf, sizeof(struct s));
@@ -639,8 +687,8 @@ int mname;
 char	*setbrk(x)
 int	x;
 {
-	register char	*i, *k;
-	register j;
+	char	*i, *k;
+	int	j;
 	char	*sbrk();
 
 	if ((i = sbrk(x)) == (char *) -1) {
@@ -665,9 +713,10 @@ int	x;
 }
 
 
+int
 getsn()
 {
-	register i;
+	int	i;
 
 	if ((i = getach()) == 0)
 		return(0);
@@ -678,9 +727,10 @@ getsn()
 }
 
 
+int
 setstr()
 {
-	register i, j;
+	int	i, j;
 
 	lgf++;
 	if ((i = getsn()) == 0 || (j = findmn(i)) == -1 || !contab[j].mx) {
@@ -696,12 +746,12 @@ setstr()
 }
 
 
-
+int
 collect()
 {
-	register j;
-	register tchar i;
-	register tchar *strp;
+	int	j;
+	tchar i;
+	tchar *strp;
 	tchar * lim;
 	tchar * *argpp, **argppend;
 	int	quote;
@@ -747,7 +797,7 @@ collect()
 #if 0
 	errprint("savnxf=0x%x,nxf=0x%x,argpp=0x%x,strp=argppend=0x%x,lim=0x%x,enda=0x%x",
 		savnxf, nxf, argpp, strp, lim, enda);
-#endif 0
+#endif
 	strflg = 0;
 	while ((argpp != argppend) && (!skip())) {
 		*argpp++ = strp;
@@ -771,7 +821,7 @@ collect()
 #if 0
 				errprint("strp=0x%x, lim = 0x%x",
 					strp, lim);
-#endif 0
+#endif
 				errprint(gettext("Macro argument too long"));
 				copyf--;
 				edone(004);
@@ -785,30 +835,39 @@ collect()
 	argtop = strp;
 rtn:
 	copyf--;
+
+	return (0);
 }
 
 
+int
 seta()
 {
-	register i;
+	int	i;
 
 	i = cbits(getch()) - '0';
 	if (i > 0 && i <= APERMAC && i <= frame->nargs)
 		pushback(*(((tchar **)(frame + 1)) + i - 1));
+
+	return (0);
 }
 
 
+int
 caseda()
 {
 	app++;
 	casedi();
+
+	return (0);
 }
 
 
+int
 casedi()
 {
-	register i, j;
-	register *k;
+	int	i, j;
+	int	*k;
 
 	lgf++;
 	if (skip() || (i = getrq()) == 0) {
@@ -840,9 +899,12 @@ casedi()
 rtn:
 	app = 0;
 	diflg = 0;
+
+	return (0);
 }
 
 
+int
 casedt()
 {
 	lgf++;
@@ -850,18 +912,21 @@ casedt()
 	skip();
 	dip->ditrap = vnumb((int *)0);
 	if (nonumb)
-		return;
+		return (0);
 	skip();
 	dip->dimac = getrq();
+
+	return (0);
 }
 
 
+int
 casetl()
 {
-	register j;
+	int	j;
 	int w[3];
 	tchar buf[LNSIZE];
-	register tchar *tp;
+	tchar *tp;
 	tchar i, delim;
 
 	dip->nls = 0;
@@ -921,19 +986,25 @@ casetl()
 		if (numtab[NL].val > dip->hnl)
 			dip->hnl = numtab[NL].val;
 	}
+
+	return (0);
 }
 
 
+int
 casepc()
 {
 	pagech = chget(IMP);
+
+	return (0);
 }
 
 
+int
 casepm()
 {
-	register i, k;
-	register char	*p;
+	int	i, k;
+	char	*p;
 	int	xx, cnt, tcnt, kk, tot;
 	filep j;
 	char	pmline[10];
@@ -961,8 +1032,11 @@ casepm()
 		}
 	}
 	fdprintf(stderr, "pm: total %d, macros %d, space %d\n", tcnt, cnt, kk);
+
+	return (0);
 }
 
+int
 stackdump()	/* dumps stack of macros in process */
 {
 	struct s *p;
@@ -972,4 +1046,6 @@ stackdump()	/* dumps stack of macros in process */
 			fdprintf(stderr, "%c%c ", p->mname&0177, (p->mname>>BYTE)&0177);
 		fdprintf(stderr, "\n");
 	}
+
+	return (0);
 }

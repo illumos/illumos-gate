@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Note added 9/25/83
 	Setting the parameter biggestfont in the DESC file
@@ -210,8 +209,11 @@ int main(int argc, char *argv[])
 	for (i = 1; i < argc; i++)
 		dofont(argv[i]);
 	exit(0);
+
+	return (0);
 }
 
+int
 dofont(name)	/* create fitab and width tab for font */
 char *name;
 {
@@ -264,8 +266,9 @@ char *name;
 						sscanf(s3, "%d", &i);
 					code[nw] = i;
 				}
-				/* otherwise it's a synonym for previous character,
-				/* so leave previous values intact
+				/*
+				 * otherwise it's a synonym for previous character,
+				 * so leave previous values intact
 				*/
 				if (strlen(ch) == 1)	/* it's ascii */
 					fitab[ch[0] - 32] = nw;	/* fitab origin omits non-graphics */
@@ -306,6 +309,7 @@ char *name;
 	return v;
 }
 
+int
 getlig(fin)	/* pick up ligature list */
 	FILE *fin;
 {

@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 n10.c
@@ -101,10 +100,11 @@ int	c_lefthand;
 int	c_dagger;
 int	c_isalnum;
 
+int
 ptinit()
 {
-	register int i, j;
-	register char *p, *cp, *q;
+	int i, j;
+	char *p, *cp, *q;
 	int nread, fd;
 	extern char *skipstr(), *getstr(), *getint();
 	extern char *setbrk();
@@ -201,6 +201,8 @@ ptinit()
 	specnames();	/* install names like "hyphen", etc. */
 	if (eqflg)
 		t.Adj = t.Hor;
+
+	return (0);
 }
 
 char *skipstr(s)	/* skip over leading space plus string */
@@ -276,6 +278,7 @@ char *getint(s, pn)	/* find integer at s */
 	return s;
 }
 
+int
 specnames()
 {
 	static struct {
@@ -306,13 +309,16 @@ specnames()
 		*spnames[i].n = findch(spnames[i].v);
 	if (c_isalnum == 0)
 		c_isalnum = NROFFCHARS;
+
+	return (0);
 }
 
 
+int
 findch(s)	/* find char s in chname */
-register char	*s;
+char	*s;
 {
-	register int	i;
+	int	i;
 
 	for (i = 0; chtab[i] != 0; i++)
 		if (strcmp(s, &chname[chtab[i]]) == 0)
@@ -320,6 +326,7 @@ register char	*s;
 	return(0);
 }
 
+int
 twdone()
 {
 	int waitf;
@@ -333,9 +340,12 @@ twdone()
 		wait(&waitf);
 	}
 	restore_tty();
+
+	return (0);
 }
 
 
+int
 ptout(i)
 	tchar i;
 {
@@ -343,7 +353,7 @@ ptout(i)
 	if (olinep >= &oline[LNSIZE])
 		olinep--;
 	if (cbits(i) != '\n')
-		return;
+		return (0);
 	olinep--;
 	lead += dip->blss + lss - t.Newline;
 	dip->blss = 0;
@@ -359,17 +369,20 @@ ptout(i)
 	lead += dip->alss;
 	dip->alss = 0;
 	olinep = oline;
+
+	return (0);
 }
 
 
+int
 ptout1()
 {
-	register k;
-	register char	*codep;
+	int	k;
+	char	*codep;
 #ifdef EUC
 #ifdef NROFF
-	register int cnt;
-	register tchar *qq;
+	int cnt;
+	tchar *qq;
 #endif /* NROFF */
 #endif /* EUC */
 	extern char	*plot();
@@ -526,14 +539,16 @@ ptout1()
 			for (j = phyw / t.Char; j > 0; j--)
 				oput('\b');
 	}
+
+	return (0);
 }
 
 
 char	*plot(x)
 char	*x;
 {
-	register int	i;
-	register char	*j, *k;
+	int	i;
+	char	*j, *k;
 
 	oputs(t.ploton);
 	k = x;
@@ -568,10 +583,11 @@ char	*x;
 }
 
 
+int
 move()
 {
-	register k;
-	register char	*i, *j;
+	int	k;
+	char	*i, *j;
 	char	*p, *q;
 	int	iesct, dt;
 
@@ -644,23 +660,40 @@ move()
 		oputs(t.plotoff);
 	}
 	esc = lead = 0;
+
+	return (0);
 }
 
 
+int
 ptlead()
 {
 	move();
+
+	return (0);
 }
 
 
+int
 dostop()
 {
 	char	junk;
 
 	flusho();
 	read(2, &junk, 1);
+
+	return (0);
+}
+
+int
+newpage()
+{
+	return (0);
 }
 
 
-newpage(){;}
-pttrailer(){;}
+int
+pttrailer()
+{
+	return (0);
+}

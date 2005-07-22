@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
@@ -39,6 +36,8 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 char *xxxvers = "troff.d/devaps/daps.c	1.2";
 
@@ -145,14 +144,8 @@ char *xxxvers = "troff.d/devaps/daps.c	1.2";
 
 /*****************************************************************************/
 
-
-main(argc, argv)
-
-
-	int		argc;
-	char	*argv[];
-
-
+int
+main(int argc, char **argv)
 {
 
 
@@ -177,19 +170,14 @@ main(argc, argv)
 	account();						/* make sure we charge this guy */
 	done();							/* finish up this job and reset the APS */
 
+	return (0);
 }	/* End of main */
 
 
 /****************************************************************************/
 
-
-get_options(argc, argv)
-
-
-	int		argc;
-	char	*argv[];
-
-
+int
+get_options(int argc, char **argv)
 {
 
 
@@ -396,19 +384,14 @@ get_options(argc, argv)
 			fprintf(stderr, "tf is %x\n", tf);
 	}
 
+	return (0);
 }	/* End of get_options */
 
 
 /*****************************************************************************/
 
-
-process_input(argc, argv)
-
-
-	int		argc;		
-	char	*argv[];
-
-
+int
+process_input(int argc, char **argv)
 {
 
 
@@ -457,12 +440,13 @@ process_input(argc, argv)
 
 	COUNT_ARGS(save);					/* MACRO - adjust arg_index */
 
+	return (0);
 }	/* End of process_input */
 
 
 /****************************************************************************/
 
-
+int
 init_signals()
 
 
@@ -496,12 +480,13 @@ init_signals()
 		signal(SIGHUP, wrap_up);
 	}	/* End if */
 
+	return (0);
 }	/* End of init_signals */
 
 
 /*****************************************************************************/
 
-
+int
 debug_select(str)
 
 
@@ -544,12 +529,13 @@ debug_select(str)
 
 	}	/* End while */
 
+	return (0);
 }	/* End of debug_select */
 
 
 /*****************************************************************************/
 
-
+int
 debug_file(str)
 
 
@@ -577,12 +563,13 @@ debug_file(str)
 		error(NON_FATAL, "can't open debug file %s", str);
 	}	/* End if */
 
+	return (0);
 }	/* End of debug_file */
 
 
 /*****************************************************************************/
 
-
+int
 log_file(str)
 
 
@@ -610,12 +597,13 @@ log_file(str)
 		error(FATAL, "can't open log file %s", str);
 	}	/* End if */
 
+	return (0);
 }	/* End of log_file */
 
 
 /*****************************************************************************/
 
-
+int
 acct_file()
 
 
@@ -647,12 +635,13 @@ acct_file()
 
 	}	/* End if */
 
+	return (0);
 }	/* End of acct_file */
 
 
 /*****************************************************************************/
 
-
+int
 ban_file(str)
 
 
@@ -678,7 +667,7 @@ ban_file(str)
 
 	if ( (fp_ban = fopen(str, "r")) == NULL )  {
 		error(NON_FATAL, "can't open the banner file %s", str);
-		return;
+		return (0);
 	}	/* End if */
 
 	GET_LINE(fp_ban, ban_buf);			/* MACRO - banner is first line only */
@@ -686,12 +675,13 @@ ban_file(str)
 
 	fclose(fp_ban);						/* shouldn't need this file again */
 
+	return (0);
 }	/* End of ban_file */
 
 
 /*****************************************************************************/
 
-
+int
 out_file()
 
 
@@ -724,12 +714,13 @@ out_file()
 		}	/* End if */
 	}  while ( tf == NULL );
 
+	return (0);
 }	/* End of out_file */
 
 
 /*****************************************************************************/
 
-
+int
 outlist(str)
 
 
@@ -793,12 +784,13 @@ outlist(str)
 		for ( i = 0; i < nolist; i += 2 )
 			fprintf(fp_debug,"%3d  %3d\n", olist[i], olist[i+1]);
 
+	return (0);
 }	/* End of outlist */
 
 
 /*****************************************************************************/
 
-
+int
 error(kind, str, a1, a2, a3, a4, a5, a6, a7)
 
 
@@ -841,17 +833,18 @@ error(kind, str, a1, a2, a3, a4, a5, a6, a7)
 	fprintf(fp_error, "\n");
 
 	if ( ignore == YES  &&  privelege == ON )
-		return;
+		return (0);
 
 	if ( kind == FATAL )			/* can't ignore this error */
 		wrap_up();					/* so quit */
 
+	return (0);
 }	/* End of error */
 
 
 /*****************************************************************************/
 
-
+int
 done()
 
 
@@ -876,6 +869,7 @@ done()
 	t_reset('s');						/* get APS ready for the next job */
 	exit(x_stat);						/* quit with status x_stat */
 
+	return (0);
 }	/* End of done */
 
 
@@ -938,17 +932,17 @@ void wrap_up(sig)
 
 /*****************************************************************************/
 
-
+int
 conv(fp)
 
 
-	register FILE	*fp;				/* input file descriptor */
+	FILE	*fp;				/* input file descriptor */
 
 
 {
 
 
-	register int	ch;					/* first character of the command */
+	int	ch;					/* first character of the command */
 	int		c;							/* used only as a character */
 	int		n;							/* general purpose integer variable */
 	char	str[100], buf[300];			/* buffers for fscanf and fgets */
@@ -1087,12 +1081,13 @@ conv(fp)
 
 	x_stat &= ~FILE_STARTED;				/* turn off FILE_STARTED bit in x_stat */
 
+	return (0);
 }	/* End of conv */
 
 
 /*****************************************************************************/
 
-
+int
 drawfunct(buf, fp)
 
 
@@ -1155,12 +1150,13 @@ drawfunct(buf, fp)
 
 	}	/* End switch */
 
+	return (0);
 }	/* End of drawfunct */
 
 
 /*****************************************************************************/
 
-
+int
 devcntrl(fp)
 
 
@@ -1248,12 +1244,13 @@ devcntrl(fp)
 	SKIP_LINE(fp, c);						/* finished with this line */
 	line_number++;
 
+	return (0);
 }	/* End of devcntrl */
 
 
 /*****************************************************************************/
 
-
+int
 t_init()
 
 
@@ -1299,12 +1296,13 @@ t_init()
 		drawsize = 3;
 	}	/* End if */
 
+	return (0);
 }	/* End of t_init */
 
 
 /*****************************************************************************/
 
-
+int
 t_banner()
 
 
@@ -1366,12 +1364,13 @@ t_banner()
 	print_banner = NO;					/* don't print it again */
 	output = OFF;						/* output is controlled in t_page() */
 
+	return (0);
 }	/* End of t_banner */
 
 
 /*****************************************************************************/
 
-
+int
 t_page(n)
 
 
@@ -1414,7 +1413,7 @@ t_page(n)
 	if ( aps_slant )					/* then the APS was in oblique mode */
 		t_slant(aps_slant);				/* so go back to previous slant */
 
-	if ( nolist == 0 ) return;			/* no -o option, so print every page */
+	if ( nolist == 0 ) return (0);			/* no -o option, so print every page */
 	output = OFF;						/* otherwise -o option was specified */
 	for ( i = 0; i < nolist; i += 2 )	/* so check page pairs in olist[] */
 		if ( n >= olist[i]  &&  n <= olist[i+1] )  {
@@ -1422,12 +1421,13 @@ t_page(n)
 			break;
 		}	/* End if */
 
+	return (0);
 }	/* End of t_page */
 
 
 /*****************************************************************************/
 
-
+int
 t_newline()
 
 
@@ -1447,12 +1447,13 @@ t_newline()
 
 	hpos = 0;							/* return to left margin */
 
+	return (0);
 }	/* End of t_newline */
 
 
 /*****************************************************************************/
 
-
+int
 t_size(n)
 
 
@@ -1493,7 +1494,7 @@ t_size(n)
 
 /*****************************************************************************/
 
-
+int
 t_charht(n)
 
 
@@ -1526,7 +1527,7 @@ t_charht(n)
 
 	if ( range < 1  ||  range > MAX_RANGE )  {	/* something is wrong here */
 		error(FATAL, "illegal master range %d", range);
-		return;							/* in case this error is ignored */
+		return (0);							/* in case this error is ignored */
 	}	/* End if */
 
 	max = upper_limit(range);			/* internal upper limit for range */
@@ -1539,12 +1540,13 @@ t_charht(n)
 	PUTC(VSIZE, tf);					/* MACRO - set character height */
 	putint(10 * pstab[n-1]);			/* vertical size - in decipoints */
 
+	return (0);
 }	/* End of t_charht */
 
 
 /*****************************************************************************/
 
-
+int
 upper_limit(n)
 
 
@@ -1587,7 +1589,7 @@ upper_limit(n)
 
 /*****************************************************************************/
 
-
+int
 t_slant(n)
 
 
@@ -1633,12 +1635,13 @@ t_slant(n)
 
 	aps_slant = n;						/* angle that type is being set at */
 
+	return (0);
 }	/* End of t_slant */
 
 
 /*****************************************************************************/
 
-
+int
 t_font(str)
 
 
@@ -1677,7 +1680,7 @@ t_font(str)
 
 /*****************************************************************************/
 
-
+int
 t_text(str)
 
 
@@ -1712,7 +1715,7 @@ t_text(str)
 	if ( debug[2] )
 		fprintf(fp_debug,"input string = %s\n", str);
 
-	if ( output == OFF ) return;		/* not doing output on this page */
+	if ( output == OFF ) return (0);		/* not doing output on this page */
 
 	while ( (ch = *str++) != '\n'  &&  ch != '\0' )  {
 
@@ -1744,12 +1747,13 @@ t_text(str)
 
 	}	/* End while */
 
+	return (0);
 }	/* End of t_text */
 
 
 /*****************************************************************************/
 
-
+int
 t_reset(ch)
 
 
@@ -1807,12 +1811,13 @@ t_reset(ch)
 
 	fflush(tf);							/* flush any buffered output */
 
+	return (0);
 }	/* End of t_reset */
 
 
 /*****************************************************************************/
 
-
+int
 hflush()
 
 
@@ -1835,7 +1840,7 @@ hflush()
 
 
 
-	if ( output == OFF ) return;		/* not doing output for this page */
+	if ( output == OFF ) return (0);		/* not doing output for this page */
 
 	if ( abs(hpos - htrue) > SLOP )  {	/* positions are too different */
 		PUTC(SETTAB, tf);				/* MACRO - so set a tab */
@@ -1844,12 +1849,13 @@ hflush()
 		htrue = hpos;					/* the positions are the same now */
 	}	/* End if */
 
+	return (0);
 }	/* End of hflush */
 
 
 /*****************************************************************************/
 
-
+int
 hmot(n)
 
 
@@ -1878,12 +1884,13 @@ hmot(n)
 		hpos = 0;						/* in case we ignore this error */
 	}	/* End if */
 
+	return (0);
 }	/* End of hmot */
 
 
 /*****************************************************************************/
 
-
+int
 hgoto(n)
 
 
@@ -1909,12 +1916,13 @@ hgoto(n)
 		hpos = 0;						/* in case we ignore this error */
 	}	/* End if */
 
+	return (0);
 }	/* End of hgoto */
 
 
 /*****************************************************************************/
 
-
+int
 vgoto(n)
 
 
@@ -1942,12 +1950,13 @@ vgoto(n)
 
 	vmot(n - vpos);						/* move n-vpos units from here */
 
+	return (0);
 }	/* End of vgoto */
 
 
 /*****************************************************************************/
 
-
+int
 vmot(n)
 
 
@@ -1977,11 +1986,11 @@ vmot(n)
 
 
 
-	if ( output == OFF ) return;		/* not doing output on this page */
+	if ( output == OFF ) return (0);		/* not doing output on this page */
 
 	if ( cur_vpos + n < 0 )  {			/* trying to write on last job! */
 		error(FATAL, "can't backup past start of job");
-		return;							/* in case we ignore this error */
+		return (0);							/* in case we ignore this error */
 	}	/* End if */
 
 	sign = ( n > 0 ) ? 1 : -1;			/* up or down the page */
@@ -1998,12 +2007,13 @@ vmot(n)
 	if ( cur_vpos > max_vpos )			/* this is the farthest we have gone */
 		max_vpos = cur_vpos;
 
+	return (0);
 }	/* End of vmot */
 
 
 /*****************************************************************************/
 
-
+int
 put1s(s)
 
 
@@ -2040,7 +2050,7 @@ put1s(s)
 
 
 
-	if ( output == OFF ) return;		/* not doing output for this page */
+	if ( output == OFF ) return (0);		/* not doing output for this page */
 
 	for ( i = 0; i < nchtab; i++ )		/* lookup the special character */
 		if ( strcmp(&chname[chtab[i]], s) == SAME_STR )
@@ -2061,6 +2071,7 @@ put1s(s)
 		fprintf(fp_debug,"index = %d\n", i);
 	}	/* End if */
 
+	return (0);
 }	/* End of put1s */
 
 
@@ -2069,7 +2080,7 @@ put1s(s)
 
 #ifdef ADJUST
 
-
+int
 t_adjust(s)
 
 
@@ -2102,6 +2113,7 @@ t_adjust(s)
 			break;
 		}	/* End if */
 
+	return (0);
 }	/* End of t_adjust */
 
 #endif
@@ -2109,7 +2121,7 @@ t_adjust(s)
 
 /*****************************************************************************/
 
-
+int
 put1(c)
 
 
@@ -2119,8 +2131,8 @@ put1(c)
 {
 
 
-	register int	i;					/* c's index in font data structures */
-	register int	k;					/* look for c on this font */
+	int	i;					/* c's index in font data structures */
+	int	k;					/* look for c on this font */
 	int		j;							/* lookup failed on this many fonts */
 	int		k1;							/* if not found check this font next */
 	int		code;						/* APS-5 code for this character */
@@ -2157,7 +2169,7 @@ put1(c)
 
 
 
-	if ( output == OFF ) return;		/* not doing output on this page */
+	if ( output == OFF ) return (0);		/* not doing output on this page */
 
 	old_font = font;					/* may find c on a different font */
 	old_range = last_range = range;		/* and in a different master range */
@@ -2174,7 +2186,7 @@ put1(c)
 			error(FATAL, "non-printable character 0%o\n", c+32);
 
 		lastw = (widthtab[font][0] & BMASK) * pstab[size-1] / dev.unitwidth;
-		return;							/* lastw = space width (see t_text()) */
+		return (0);							/* lastw = space width (see t_text()) */
 	}	/* End if */
 
 
@@ -2194,7 +2206,7 @@ put1(c)
 		if ( i == 0  ||  j > nfonts )	
 			if ( c+32 < 128 || newfile(&chname[chtab[c+32-128]], pstab[size-1]) )
 				error(FATAL, "character 0%o not found", c+32);
-		return;
+		return (0);
 	}	/* End if */
 
 	if ( aps_font != fontname[k].number )	/* probably need a new font */
@@ -2231,12 +2243,13 @@ put1(c)
 	lastw = ((widthtab[k][i] & BMASK) * pstab[size-1] + dev.unitwidth/2) / dev.unitwidth;
 	htrue += lastw;						/* approximate right side of char */
 
+	return (0);
 }	/* End of put1 */
 
 
 /*****************************************************************************/
 
-
+int
 putint(n)
 
 
@@ -2259,12 +2272,13 @@ putint(n)
 	PUTC(n >> 8, tf);					
 	PUTC(n, tf);						
 
+	return (0);
 }	/* End of putint */
 
 
 /*****************************************************************************/
 
-
+int
 setsize(n)
 
 
@@ -2294,7 +2308,7 @@ setsize(n)
 
 
 
-	if ( output == OFF ) return;		/* not doing output on this page */
+	if ( output == OFF ) return (0);		/* not doing output on this page */
 
 	if ( n <= 0  ||  n > nsizes )  {	/* internal size out of range */
 		error(FATAL, "illegal internal size %d", n);
@@ -2306,12 +2320,13 @@ setsize(n)
 	PUTC(HVSIZE, tf);					/* MACRO - set the new point size */
 	putint(10 * pstab[n-1]);			/* APS expects 10 times the size */
 
+	return (0);
 }	/* End of setsize */
 
 
 /*****************************************************************************/
 
-
+int
 setfont(n)
 
 
@@ -2358,7 +2373,7 @@ setfont(n)
 
 
 
-	if ( output == OFF ) return;		/* not doing output for this page */
+	if ( output == OFF ) return (0);		/* not doing output for this page */
 
 	if ( n < 0  ||  n > nfonts )  {
 		error(FATAL, "requested font number %d out of range", n);
@@ -2369,12 +2384,13 @@ setfont(n)
 	CHANGE_FONT(n, oldrange);			/* change the APS font */
 	font = n;							/* current internal font number */
 
+	return (0);
 }	/* End of setfont */
 
 
 /*****************************************************************************/
 
-
+int
 change_font(n)
 
 
@@ -2430,12 +2446,13 @@ change_font(n)
 
 	aps_font = fontname[n].number;		/* font that the APS is using */
 
+	return (0);
 }	/* End of change_font */
 
 
 /*****************************************************************************/
 
-
+int
 t_fp(n, s, si)
 
 
@@ -2464,12 +2481,13 @@ t_fp(n, s, si)
 	fontname[n].number = atoi(si);
 	fontname[n].nwfont = fontbase[n]->nwfont;
 
+	return (0);
 }	/* End of t_fp */
 
 
 /*****************************************************************************/
 
-
+int
 account()
 
 
@@ -2510,12 +2528,13 @@ account()
 	if ( report == YES )
 		fprintf(stderr, " %-3.1f pages\n", pages);
 
+	return (0);
 }	/* End of account */
 
 
 /*****************************************************************************/
 
-
+int
 special_case(index, font)
 
 
@@ -2626,7 +2645,7 @@ special_case(index, font)
 
 /*****************************************************************************/
 
-
+int
 get_range(n)
 
 
@@ -2668,7 +2687,7 @@ get_range(n)
 
 /*****************************************************************************/
 
-
+int
 fileinit()
 
 
@@ -2767,12 +2786,13 @@ fileinit()
 	fontbase[0]->nwfont = 255;
 	close(fin);
 
+	return (0);
 }	/* End of fileinit */
 
 
 /*****************************************************************************/
 
-
+int
 fontprint(i)
 
 
@@ -2834,12 +2854,13 @@ fontprint(i)
 	fprintf(fp_debug, "\n CHARACTER COUNT FOR THIS FONT = %d\n", count);
 	fprintf(fp_debug, "\n\n");
 
+	return (0);
 }	/* End of fontprint */
 
 
 /*****************************************************************************/
 
-
+int
 loadfont(num, name, fdir)
 
 
@@ -2874,7 +2895,7 @@ loadfont(num, name, fdir)
 		error(FATAL, "illegal fp command %d %s", num, name);
 
 	if ( strcmp(name, fontbase[num]->namefont) == SAME_STR )	/* in already */
-		return;
+		return (0);
 
 	if ( fdir == NULL  ||  fdir[0] == '\0' )	/* no alternate directory */
 		 sprintf(temp, "%s/dev%s/%s.out", fontdir, devname, name);
@@ -2899,12 +2920,13 @@ loadfont(num, name, fdir)
 
 	if ( debug[6] ) fontprint(num);			/* dump font position num */
 
+	return (0);
 }	/* End of loadfont */
 
 
 /*****************************************************************************/
 
-
+int
 load_alt(font)
 
 
@@ -2949,6 +2971,7 @@ load_alt(font)
 	if ( debug[7] )						/* print all the font information */
 		fontprint(font);
 
+	return (0);
 }	/* End of load_alt */
 
 
