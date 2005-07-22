@@ -66,7 +66,7 @@ int
 main(argc, argv)
 char **argv;
 {
-	register n, nw, inp, outp;
+	int	n, nw, inp, outp;
 	struct mtop op;
 	size_t buf_size = size_64K;
 
@@ -181,7 +181,6 @@ char **argv;
 		(void) close(outp);
 	(void) printf("total length: %lld bytes\n", tsize);
 	return (0);
-	/* NOTREACHED */
 }
 
 void

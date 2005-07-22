@@ -19,14 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
-/*	Portions Copyright (c) 1988,1996,1999 by Sun Microsystems, Inc. */
-/*	All Rights Reserved.					*/
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -58,7 +60,7 @@ static	void	next_file_name();
 static	char	*progname;
 static	int	suffix_length = 2;
 
-
+int
 main(int argc, char **argv)
 {
 	long long	line_count = 0;
@@ -215,7 +217,7 @@ main(int argc, char **argv)
 		output_file_name = "x";
 
 	/* check options */
-	if (((int) strlen(output_file_name) + suffix_length) > FILENAME_MAX) {
+	if (((int)strlen(output_file_name) + suffix_length) > FILENAME_MAX) {
 		(void) fprintf(stderr, gettext(
 		"%s: Output file name too long\n"), progname);
 		return (1);
@@ -245,7 +247,7 @@ main(int argc, char **argv)
 	for (i = 0; output_file_name[i]; i++) {
 		fname[i] = output_file_name[i];
 	}
-	while (i < (int) strlen(output_file_name) + suffix_length) {
+	while (i < (int)strlen(output_file_name) + suffix_length) {
 		fname[i++] = 'a';
 	}
 	if (suffix_length)
@@ -347,7 +349,7 @@ main(int argc, char **argv)
 
 
 static	void
-next_file_name(char * name)
+next_file_name(char *name)
 {
 	int	i;
 

@@ -47,7 +47,7 @@
 #include <locale.h>
 
 
-void
+int
 main(int argc, char **argv)
 {
 
@@ -189,5 +189,5 @@ main(int argc, char **argv)
 			continue;
 		}
 	}
-	exit(errno ? 2 : 0);
+	return (errno ? 2 : 0);
 }

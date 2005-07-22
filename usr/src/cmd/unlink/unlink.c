@@ -19,15 +19,25 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4	*/
+#include <stdlib.h>
+#include <unistd.h>
+#include <libintl.h>
 #include <locale.h>
 
-main(argc, argv) char *argv[]; {
-
+int
+main(int argc, char **argv)
+{
 	char *p;
 	int res = 0;
 
@@ -48,5 +58,5 @@ main(argc, argv) char *argv[]; {
 	if (res = unlink(argv[1]))
 		perror("unlink");
 
-	exit(res);
+	return (res);
 }

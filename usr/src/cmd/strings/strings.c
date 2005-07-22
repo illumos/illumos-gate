@@ -96,7 +96,7 @@ static	char	*tbuf = NULL;
 static	size_t	buf_size = 0;
 static	int	rc = 0; /* exit code */
 
-
+int
 main(argc, argv)
 	int argc;
 	char *argv[];

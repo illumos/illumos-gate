@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -187,9 +187,8 @@ static	off_t	eofl_no;	/* what the last line of the file is */
 static	void	usage(void);
 static FILE	*pg_stdin;
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char **argv)
 {
 	char	*s;
 	char	*p;
@@ -331,8 +330,7 @@ char *argv[];
 	while (fnum < nfiles) {
 		if (strcmp(fnames[fnum], "") == 0)
 			fnames[fnum] = "-";
-		if ((in_file = checkf(fnames[fnum])) == NULL)
-		{
+		if ((in_file = checkf(fnames[fnum])) == NULL) {
 			status = 2;
 			fnum++;
 		} else {
@@ -1090,7 +1088,7 @@ help()
 "\n"
 "See the manual page for more detail.\n"
 "-------------------------------------------------------\n"),
-		stdout);
+	    stdout);
 }
 
 /*
