@@ -147,7 +147,7 @@ static	segkmem_lpcb_t segkmem_lpcb;
 
 /*
  * We use "segkmem_kmemlp_max" to limit the total amount of physical memory
- * consumed by the large page heap. By default this parameter is set to 1/4 of
+ * consumed by the large page heap. By default this parameter is set to 1/8 of
  * physmem but can be adjusted through /etc/system either directly or
  * indirectly by setting "segkmem_kmemlp_pcnt" to the percent of physmem
  * we allow for large page heap.
@@ -1182,7 +1182,7 @@ segkmem_alloc_lp(vmem_t *vmp, size_t *sizep, int vmflag)
 			 */
 			if (lpthrt > segkmem_lpthrottle_start &&
 			    (lpthrt & (lpthrt - 1))) {
-				atomic_add_64(&lpcb->allocs_throttled, 1L);
+				lpcb->allocs_throttled++;
 				lpthrt--;
 				if ((lpthrt & (lpthrt - 1)) == 0)
 					kmem_reap();
@@ -1254,10 +1254,10 @@ segkmem_alloc_lp(vmem_t *vmp, size_t *sizep, int vmflag)
 		}
 
 		if (vmflag & VM_NOSLEEP)
-			atomic_add_64(&lpcb->nosleep_allocs_failed, 1L);
+			lpcb->nosleep_allocs_failed++;
 		else
-			atomic_add_64(&lpcb->sleep_allocs_failed, 1L);
-		atomic_add_64(&lpcb->alloc_bytes_failed, size);
+			lpcb->sleep_allocs_failed++;
+		lpcb->alloc_bytes_failed += size;
 
 		/* if large page throttling is not started yet do it */
 		if (segkmem_use_lpthrottle && lpthrt == 0) {
@@ -1293,7 +1293,7 @@ segkmem_alloc_lpi(vmem_t *vmp, size_t size, int vmflag)
 
 	/* do not allow large page heap grow beyound limits */
 	if (vmem_size(vmp, VMEM_ALLOC) >= segkmem_kmemlp_max) {
-		atomic_add_64(&lpcb->allocs_limited, 1);
+		lpcb->allocs_limited++;
 		return (NULL);
 	}
 
@@ -1384,8 +1384,8 @@ segkmem_lpsetup()
 	/* set total amount of memory allowed for large page kernel heap */
 	if (segkmem_kmemlp_max == 0) {
 		if (segkmem_kmemlp_pcnt == 0 || segkmem_kmemlp_pcnt > 100)
-			segkmem_kmemlp_pcnt = 25;
-		segkmem_kmemlp_max = (memtotal * 100) / segkmem_kmemlp_pcnt;
+			segkmem_kmemlp_pcnt = 12;
+		segkmem_kmemlp_max = (memtotal * segkmem_kmemlp_pcnt) / 100;
 	}
 	segkmem_kmemlp_max = P2ROUNDUP(segkmem_kmemlp_max,
 	    segkmem_heaplp_quantum);
