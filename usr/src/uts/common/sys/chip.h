@@ -42,6 +42,7 @@ extern "C" {
 #include <sys/processor.h>
 #include <sys/bitmap.h>
 #include <sys/atomic.h>
+#include <sys/types.h>
 
 /*
  * Chip types
@@ -181,6 +182,10 @@ void		chip_kstat_create(chip_t *);
  * Platform chip operations
  */
 chipid_t	chip_plat_get_chipid(cpu_t *);
+#ifdef	sun4v
+id_t		chip_plat_get_pipeid(cpu_t *);
+#endif /* sun4v */
+
 void		chip_plat_define_chip(cpu_t *, chip_def_t *);
 int		chip_plat_get_clogid(cpu_t *);
 

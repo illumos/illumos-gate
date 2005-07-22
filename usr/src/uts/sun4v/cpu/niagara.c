@@ -238,6 +238,15 @@ cpu_init_private(struct cpu *cp)
 {
 	extern int niagara_kstat_init(void);
 
+	/*
+	 * This code change assumes that the virtual cpu ids are identical
+	 * to the physical cpu ids which is true for ontario but not for
+	 * niagara in general.
+	 * This is a temporary fix which will later be modified to obtain
+	 * the execution unit sharing information from MD table.
+	 */
+	cp->cpu_m.cpu_ipipe = (id_t)(cp->cpu_id / 4);
+
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	if (niagara_cpucnt++ == 0) {
 		(void) niagara_kstat_init();

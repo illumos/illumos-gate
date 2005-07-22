@@ -134,6 +134,17 @@ chip_kstat_create(chip_t *chp)
 	kstat_t		*chip_kstat;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
+	/*
+	 * Note: On sun4v systems, chip kstats don't currently
+	 * exist, since "chip" structures and policies are being
+	 * leveraged to implement core level balancing, and exporting
+	 * chip kstats in light of this would be both misleading
+	 * and confusing.
+	 */
+#ifdef	sun4v
+	return;
+	/*NOTREACHED*/
+#endif
 
 	if (chp->chip_kstat != NULL)
 		return;		/* already initialized */
@@ -200,8 +211,14 @@ chip_cpu_init(cpu_t *cp)
 
 	/*
 	 * Call into the platform to fetch this cpu's chipid
+	 * On sun4v platforms, the chip infrastructure is currently being
+	 * leveraged to implement core level load balancing.
 	 */
+#ifdef	sun4v
+	cid = chip_plat_get_pipeid(cp);
+#else
 	cid = chip_plat_get_chipid(cp);
+#endif /* sun4v */
 
 	chp = chip_find(cid);
 	if (chp == NULL) {

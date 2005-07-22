@@ -104,7 +104,7 @@ chip_plat_get_chipid(cpu_t *cp)
 void
 chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
 {
-	cd->chipd_type = CHIP_DEFAULT;
+	cd->chipd_type = CHIP_CMP_SHARED_CACHE;
 
 	/*
 	 * Define any needed adjustment of rechoose_interval
@@ -112,4 +112,16 @@ chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
 	 * will change with future processors.
 	 */
 	cd->chipd_rechoose_adj = 0;
+}
+
+/*
+ * Return a pipeline "id" for the given cpu_t
+ * cpu_t's sharing the same instruction pipeline
+ * should map to the same "id"
+ */
+
+id_t
+chip_plat_get_pipeid(cpu_t *cp)
+{
+	return (cp->cpu_m.cpu_ipipe);
 }

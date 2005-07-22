@@ -151,6 +151,7 @@ struct	machcpu {
 	uint64_t	mondo_data_ra;		/* mono data pa */
 	uint16_t	*cpu_list;		/* uint16_t [NCPU] */
 	uint64_t	cpu_list_ra;		/* cpu list ra */
+	id_t		cpu_ipipe;		/* cpu exec unit id */
 };
 
 typedef	struct machcpu	machcpu_t;

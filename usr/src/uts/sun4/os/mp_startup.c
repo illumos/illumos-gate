@@ -413,18 +413,21 @@ setup_cpu_common(int cpuid)
 	init_intr_threads(cp);
 
 	/*
-	 * Add CPU to list of available CPUs, and associate it
-	 * with a chip..  It'll be on the active list after it is
-	 * started.
+	 * Add CPU to list of available CPUs.
+	 * It'll be on the active list after it is started.
 	 */
 	cpu_add_unit(cp);
-	chip_cpu_init(cp);
 
 	/*
 	 * Allocate and init cpu module private data structures,
 	 * including scrubber.
 	 */
 	cpu_init_private(cp);
+
+	/*
+	 * Associate this CPU with a physical processor
+	 */
+	chip_cpu_init(cp);
 
 	cpu_intrq_setup(cp);
 }

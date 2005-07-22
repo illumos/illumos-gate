@@ -215,6 +215,12 @@ dtrace_flush_sec(uintptr_t addr)
 void
 cpu_init_private(struct cpu *cp)
 {
+	/*
+	 * The cpu_ipipe field is initialized based on the execution
+	 * unit sharing information from the Machine Description table.
+	 * It defaults to the CPU id in the absence of such information.
+	 */
+	cp->cpu_m.cpu_ipipe = (id_t)(cp->cpu_id);
 }
 
 void
