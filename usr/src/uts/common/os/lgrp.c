@@ -433,11 +433,23 @@ lgrp_main_init(void)
 
 		ASSERT(cp->cpu_lpl->lpl_lgrpid == LGRP_ROOTID);
 
+		/*
+		 * Destroy all lgroups except for root
+		 */
 		for (i = 0; i <= lgrp_alloc_max; i++) {
 			if (LGRP_EXISTS(lgrp_table[i]) &&
 			    lgrp_table[i] != lgrp_root)
 				lgrp_destroy(lgrp_table[i]);
 		}
+
+		/*
+		 * Fix up root to point at itself for leaves and resources
+		 * and not have any children
+		 */
+		lgrp_root->lgrp_childcnt = 0;
+		klgrpset_clear(lgrp_root->lgrp_children);
+		klgrpset_clear(lgrp_root->lgrp_leaves);
+		klgrpset_add(lgrp_root->lgrp_leaves, LGRP_ROOTID);
 		klgrpset_clear(lgrp_root->lgrp_set[LGRP_RSRC_MEM]);
 		klgrpset_add(lgrp_root->lgrp_set[LGRP_RSRC_MEM], LGRP_ROOTID);
 	}
