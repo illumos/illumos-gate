@@ -51,22 +51,22 @@
 #include	"msg.h"
 #include	"debug.h"
 
-
 /*
  * Structure for maintaining sorting state.
  */
 typedef struct {
-	Rt_map **	s_lmpa;		/* link-map[] (returned to caller) */
-	Rt_map *	s_lmp;		/* originating link-map */
-	Rt_map **	s_stack;	/* strongly connected component stack */
-	List 		s_scc;		/* cyclic list */
-	List		s_queue;	/* depth queue for cyclic components */
+	Rt_map		**s_lmpa;	/* link-map[] (returned to caller) */
+	Rt_map		*s_lmp;		/* originating link-map */
+	Rt_map		**s_stack;	/* strongly connected component stack */
+	Alist 		*s_scc;		/* cyclic list */
+	Alist		*s_queue;	/* depth queue for cyclic components */
 	int		s_sndx;		/* present stack index */
 	int 		s_lndx;		/* present link-map index */
 	int		s_num;		/* number of objects to sort */
 	int		s_initfirst;	/* no. of INITFIRST entries */
 } Sort;
 
+#define	AL_CNT_SCC	10
 
 /*
  * qsort(3c) comparison function.
@@ -74,8 +74,8 @@ typedef struct {
 static int
 compare(const void * lmpp1, const void * lmpp2)
 {
-	Rt_map *	lmp1 = *((Rt_map **)lmpp1);
-	Rt_map *	lmp2 = *((Rt_map **)lmpp2);
+	Rt_map	*lmp1 = *((Rt_map **)lmpp1);
+	Rt_map	*lmp2 = *((Rt_map **)lmpp2);
 
 	if (IDX(lmp1) > IDX(lmp2))
 		return (-1);
@@ -95,8 +95,7 @@ sort_scc(Sort * sort, int fndx, int flag)
 	static const char	*tfmt = 0, *ffmt;
 	static int		cnt = 1;
 	int			ndx;
-	Rt_map *		lmp;
-	Listnode *		lnp;
+	Rt_map			*lmp;
 	Word			lmflags = LIST(sort->s_lmp)->lm_flags;
 	Word			init, unref;
 
@@ -107,23 +106,27 @@ sort_scc(Sort * sort, int fndx, int flag)
 	 * of the number of objects that will be inspected (logic matches that
 	 * used by dlsym() to traverse lazy dependencies).
 	 */
-	if (sort->s_queue.head == 0) {
+	if (sort->s_queue == 0) {
+		Aliste	off;
+		Rt_map	*lmp, **lmpp;
+
 		lmp = sort->s_lmp;
 		ndx = 1;
 
-		if (list_append(&sort->s_queue, lmp) == 0)
+		if (alist_append(&(sort->s_queue), &lmp, sizeof (Rt_map *),
+		    sort->s_num) == 0)
 			return (0);
 
 		IDX(lmp) = ndx++;
 
-		for (LIST_TRAVERSE(&sort->s_queue, lnp, lmp)) {
-			Bnd_desc **	bdpp;
+		for (ALIST_TRAVERSE(sort->s_queue, off, lmpp)) {
+			Bnd_desc	**bdpp;
 			Aliste		off;
 
-			for (ALIST_TRAVERSE(DEPENDS(lmp), off, bdpp)) {
-				Rt_map *	_lmp = (*bdpp)->b_depend;
+			for (ALIST_TRAVERSE(DEPENDS(*lmpp), off, bdpp)) {
+				Rt_map	*lmp = (*bdpp)->b_depend;
 
-				if (IDX(_lmp))
+				if (IDX(lmp))
 					continue;
 
 				/*
@@ -131,13 +134,14 @@ sort_scc(Sort * sort, int fndx, int flag)
 				 * encies .init has been called, skip it.
 				 */
 				if ((flag & RT_SORT_REV) &&
-				    (FLAGS(_lmp) & FLG_RT_INITCALL))
+				    (FLAGS(lmp) & FLG_RT_INITCALL))
 					continue;
 
-				if (list_append(&sort->s_queue, _lmp) == 0)
+				if (alist_append(&(sort->s_queue), &lmp,
+				    sizeof (Rt_map *), sort->s_num) == 0)
 					return (0);
 
-				IDX(_lmp) = ndx++;
+				IDX(lmp) = ndx++;
 			}
 		}
 	}
@@ -150,7 +154,7 @@ sort_scc(Sort * sort, int fndx, int flag)
 
 	/*
 	 * Under ldd -i, or debugging, print this cycle.  Under ldd -i/-U assign
-	 * each object a group identified so that cyclic dependent callers can
+	 * each object a group identifier so that cyclic dependent callers can
 	 * be better traced (see trace_sort()), or analyzed for non-use.
 	 */
 	if (((init = (lmflags & LML_FLG_TRC_INIT)) == 0) &&
@@ -212,8 +216,8 @@ sort_scc(Sort * sort, int fndx, int flag)
 			 * references.
 			 */
 			for (ALIST_TRAVERSE(CALLERS(lmp), off, bdpp)) {
-				Bnd_desc *	bdp = *bdpp;
-				Rt_map *	clmp = bdp->b_caller;
+				Bnd_desc	*bdp = *bdpp;
+				Rt_map		*clmp = bdp->b_caller;
 
 				if ((bdp->b_flags & BND_REFER) == 0)
 					continue;
@@ -243,43 +247,47 @@ sort_scc(Sort * sort, int fndx, int flag)
  * to sort_scc() to sort these elements.
  */
 static int
-visit(Rt_map * lmp, Sort * sort, int flag)
+visit(Lm_list *lml, Rt_map * lmp, Sort * sort, int flag)
 {
-	List *		scc;
-	int		num;
-	Word		tracing = LIST(lmp)->lm_flags & LML_FLG_TRC_ENABLE;
-	Rt_map *	tlmp;
+	Alist		*alpp = 0;
+	int		num = sort->s_lndx;
+	Word		tracing = lml->lm_flags & LML_FLG_TRC_ENABLE;
+	Rt_map		*tlmp;
 
-	if (tracing) {
-		if ((scc = calloc(1, sizeof (List))) == NULL)
-			return (0);
-		if (list_append(&sort->s_scc, scc) == NULL)
-			return (0);
-	}
-
-	num = sort->s_lndx;
 	do {
 		tlmp = sort->s_stack[--(sort->s_sndx)];
 		sort->s_lmpa[(sort->s_lndx)++] = tlmp;
+
+		if (flag & RT_SORT_REV) {
+			FLAGS(tlmp) |= FLG_RT_INITCLCT;
+			lml->lm_init--;
+		} else
+			FLAGS(tlmp) |= FLG_RT_FINICLCT;
 
 		SORTVAL(sort->s_stack[sort->s_sndx]) = sort->s_num;
 
 		/*
 		 * If tracing, save the strongly connected component.
 		 */
-		if (tracing) {
-			if (list_append(scc, tlmp) == NULL)
-				return (0);
-		}
+		if (tracing && (alist_append(&alpp, &tlmp, sizeof (Rt_map *),
+		    AL_CNT_SCC) == 0))
+			return (0);
 	} while (tlmp != lmp);
 
 	/*
-	 * Determine if there are cyclic dependencies to process.
+	 * Determine if there are cyclic dependencies to process.  If so, sort
+	 * the components, and retain them for tracing output.
 	 */
 	if (sort->s_lndx > (num + 1)) {
 		if (sort_scc(sort, num, flag) == 0)
 			return (0);
-	}
+
+		if (tracing && (alist_append(&(sort->s_scc), &alpp,
+		    sizeof (Alist *), AL_CNT_SCC) == 0))
+			return (0);
+	} else if (alpp)
+		free(alpp);
+
 	return (1);
 }
 
@@ -294,6 +302,7 @@ dep_visit(Rt_map *lmp, Lm_list *lml, Sort *sort, uint_t *id, int flag)
 	Bnd_desc **	bdpp;
 
 	min = SORTVAL(lmp) = ++(*id);
+
 	sort->s_stack[(sort->s_sndx)++] = lmp;
 
 	if (FLAGS(lmp) & FLG_RT_INITFRST)
@@ -347,14 +356,8 @@ dep_visit(Rt_map *lmp, Lm_list *lml, Sort *sort, uint_t *id, int flag)
 			min = _min;
 	}
 
-	if (flag & RT_SORT_REV) {
-		FLAGS(lmp) |= FLG_RT_INITCLCT;
-		lml->lm_init--;
-	} else
-		FLAGS(lmp) |= FLG_RT_FINICLCT;
-
 	if (min == SORTVAL(lmp)) {
-		if (visit(lmp, sort, flag) == 0)
+		if (visit(lml, lmp, sort, flag) == 0)
 			return (0);
 	}
 	return (min);
@@ -415,17 +418,19 @@ fb_visit(Rt_map * lmp, Sort * sort, int flag)
 /*
  * Find corresponding strongly connected component structure.
  */
-static List *
+static Alist *
 trace_find_scc(Sort * sort, Rt_map * lmp)
 {
-	Listnode *	lnp1, * lnp2;
-	List *		scc;
-	Rt_map *	nlmp;
+	Alist		**alpp;
+	Aliste		off1;
 
-	for (LIST_TRAVERSE(&(sort->s_scc), lnp1, scc)) {
-		for (LIST_TRAVERSE(scc, lnp2, nlmp)) {
-			if (lmp == nlmp)
-				return (scc);
+	for (ALIST_TRAVERSE(sort->s_scc, off1, alpp)) {
+		Rt_map	**lmpp;
+		Aliste	off2;
+
+		for (ALIST_TRAVERSE(*alpp, off2, lmpp)) {
+			if (lmp == *lmpp)
+				return (*alpp);
 		}
 	}
 	return (NULL);
@@ -438,16 +443,15 @@ static void
 trace_sort(Sort * sort)
 {
 	int 		ndx = 0;
-	List *		scc;
-	Listnode *	lnp2;
-	Rt_map *	lmp1, * lmp2, * lmp3;
+	Alist		*alp;
+	Rt_map		*lmp1;
 
 	(void) printf(MSG_ORIG(MSG_STR_NL));
 
 	while ((lmp1 = sort->s_lmpa[ndx++]) != NULL) {
 		static const char	*ffmt, *cfmt = 0, *sfmt = 0;
 		Bnd_desc **		bdpp;
-		Aliste			off;
+		Aliste			off1;
 
 		if (INIT(lmp1) == 0)
 			continue;
@@ -461,9 +465,11 @@ trace_sort(Sort * sort)
 			continue;
 		}
 #endif
-
-		if (((scc = trace_find_scc(sort, lmp1)) != NULL) &&
-		    (scc->head == scc->tail)) {
+		/*
+		 * If the only component on the strongly connected list is
+		 * this link-map, then there are no dependencies.
+		 */
+		if ((alp = trace_find_scc(sort, lmp1)) == NULL) {
 			(void) printf(sfmt, NAME(lmp1));
 			continue;
 		}
@@ -478,19 +484,19 @@ trace_sort(Sort * sort)
 
 		(void) printf(cfmt, NAME(lmp1), CYCGROUP(lmp1));
 
-		for (ALIST_TRAVERSE(CALLERS(lmp1), off, bdpp)) {
-			lmp2 = (*bdpp)->b_caller;
+		for (ALIST_TRAVERSE(CALLERS(lmp1), off1, bdpp)) {
+			Rt_map	**lmpp3, *lmp2 = (*bdpp)->b_caller;
+			Aliste	off2;
 
-			for (LIST_TRAVERSE(scc, lnp2, lmp3)) {
-				if (lmp2 != lmp3)
+			for (ALIST_TRAVERSE(alp, off2, lmpp3)) {
+				if (lmp2 != *lmpp3)
 					continue;
 
-				(void) printf(ffmt, NAME(lmp3));
+				(void) printf(ffmt, NAME(*lmpp3));
 			}
 		}
 	}
 }
-
 
 /*
  * A reverse ordered list (for .init's) contains INITFIRST elements.  Move each
@@ -584,7 +590,6 @@ f_initfirst(Sort * sort, int end)
 Rt_map **
 tsort(Rt_map * lmp, int num, int flag)
 {
-	Listnode *	lnp1, * lnp2;
 	Rt_map *	_lmp;
 	Lm_list *	lml = LIST(lmp);
 	uint_t 		id = 0;
@@ -632,7 +637,6 @@ tsort(Rt_map * lmp, int num, int flag)
 		return (sort.s_lmpa);
 	}
 #endif
-
 	/*
 	 * We need to topologically sort the dependencies.
 	 */
@@ -722,50 +726,39 @@ tsort(Rt_map * lmp, int num, int flag)
 		trace_sort(&sort);
 
 	/*
-	 * Clean any temporary structures prior to return.  The caller is
-	 * responsible for freeing the lmpa.
+	 * Clean any temporary structures prior to return.
 	 */
 	if (sort.s_stack)
 		free(sort.s_stack);
 
+	if (sort.s_queue) {
+		Aliste	off;
+		Rt_map	**lmpp;
+
+		/*
+		 * Traverse the link-maps collected on the sort queue and
+		 * delete the depth index.  These link-maps may be traversed
+		 * again to sort other components either for .inits, and almost
+		 * certainly for .finis.
+		 */
+		for (ALIST_TRAVERSE(sort.s_queue, off, lmpp))
+			IDX(*lmpp) = 0;
+
+		free(sort.s_queue);
+	}
+
+	if (sort.s_scc) {
+		Aliste	off;
+		Alist	**alpp;
+
+		for (ALIST_TRAVERSE(sort.s_scc, off, alpp))
+			free(*alpp);
+		free(sort.s_scc);
+	}
+
 	/*
-	 * Traverse the link-maps collected on the sort queue and delete the
-	 * depth index.  They may be traversed again to sort other components
-	 * either for .inits and almost certainly for .finis.
+	 * The caller is responsible for freeing the sorted link-map list once
+	 * the associated .init/.fini's have been fired.
 	 */
-	if (sort.s_queue.head) {
-		Listnode *	lnp, * _lnp = 0;
-
-		for (LIST_TRAVERSE(&sort.s_queue, lnp, _lmp)) {
-			IDX(_lmp) = 0;
-			if (_lnp)
-				free(_lnp);
-			_lnp = lnp;
-		}
-		if (_lnp)
-			free(_lnp);
-
-		sort.s_queue.head = sort.s_queue.tail = 0;
-	}
-
-	lnp1 = sort.s_scc.head;
-	while (lnp1) {
-		Listnode *f1;
-		List *scc = (List *)lnp1->data;
-
-		lnp2 = scc->head;
-		while (lnp2) {
-			Listnode *f2;
-
-			f2 = lnp2;
-			lnp2 = lnp2->next;
-			free(f2);
-		}
-
-		f1 = lnp1;
-		lnp1 = lnp1->next;
-		free(f1->data);
-		free(f1);
-	}
 	return (sort.s_lmpa);
 }

@@ -1420,7 +1420,7 @@ All the above changes are incorporated in the following patches:
 6219538 112963-17: linker patch causes binary to dump core
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
-    Solaris/SunOS 5.10_sparc	patch T117462-01
+    Solaris/SunOS 5.10_sparc	patch T117461-01
     Solaris/SunOS 5.10_x86	patch T118345-01
     Solaris/SunOS 5.9_sparc	patch T112963-19
     Solaris/SunOS 5.9_x86	patch T113986-15
@@ -1431,7 +1431,7 @@ All the above changes are incorporated in the following patches:
 6219651 AMD64: Linker does not issue error for out of range R_AMD64_PC32
 --------------------------------------------------------------------------------
 All the above change is incorporated in the following patches:
-    Solaris/SunOS 5.10_sparc	patch T117462-02
+    Solaris/SunOS 5.10_sparc	patch T117461-02
     Solaris/SunOS 5.10_x86	patch T118345-02
     Solaris/SunOS 5.9_sparc	patch T112963-20
     Solaris/SunOS 5.9_x86	patch T113986-16
@@ -1466,7 +1466,7 @@ NOTE: The fix for 6219651 is only applicable for 5.10_x86 platform.
 6262789 Infosys wants a faster linker
 --------------------------------------------------------------------------------
 All the above change is incorporated in the following patches:
-    Solaris/SunOS 5.10_sparc	patch T117462-03
+    Solaris/SunOS 5.10_sparc	patch T117461-03
     Solaris/SunOS 5.10_x86	patch T118345-03
     Solaris/SunOS 5.9_sparc	patch T112963-21
     Solaris/SunOS 5.9_x86	patch T113986-17
@@ -1482,7 +1482,7 @@ All the above change is incorporated in the following patches:
 6291547 ld.so mishandles LD_AUDIT causing security problems.
 --------------------------------------------------------------------------------
 All the above change is incorporated in the following patches:
-    Solaris/SunOS 5.10_sparc	patch T117462-04
+    Solaris/SunOS 5.10_sparc	patch T117461-04
     Solaris/SunOS 5.10_x86	patch T118345-04
     Solaris/SunOS 5.9_sparc	patch T112963-22
     Solaris/SunOS 5.9_x86	patch T113986-18
@@ -1491,3 +1491,4 @@ All the above change is incorporated in the following patches:
 --------------------------------------------------------------------------------
 6295971 UNIX98/UNIX03 *vsx* DYNL.hdr/misc/dlfcn/T.dlfcn 14 fails, auxv.h syntax
 	error
+6299525 .init order failure when processing cycles
