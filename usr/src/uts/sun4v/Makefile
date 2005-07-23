@@ -51,6 +51,16 @@ LINT_LIBS	 = $(LINT_LIB) \
 		   $(LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(SPARC_LINTS:%=$(SPARC_LIB_DIR)/llib-l%.ln)
 
+# EXPORT DELETE START
+#
+# CRYPTO_EK_KMODS modules go in the encryption pack (SUNWcry*)
+# They need to be listed separately since they duplicate global symbols
+# causing the 2nd pass of lint on the kernel to complain. CRYPTO_EK_KMODS
+# should not be listed in the lint target.
+#
+CRYPTO_EK_KMODS	+= arcfour2048
+# EXPORT DELETE END
+
 def		:=	TARGET= def
 all		:=	TARGET= all
 install		:=	TARGET= install

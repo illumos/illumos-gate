@@ -105,7 +105,7 @@ static struct modlmisc modlmisc = {
 
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"MD5 Kernel SW Provider %I%"
+	"MD5 Kernel SW Provider 1.17"
 };
 
 static struct modlinkage modlinkage = {
@@ -356,25 +356,25 @@ static uint8_t PADDING[64] = { 0x80, /* all zeros */ };
  */
 
 #define	FF(a, b, c, d, x, s, ac) { \
-	(a) += F((b), (c), (d)) + (x) + (uint32_t)(ac); \
+	(a) += F((b), (c), (d)) + (x) + ((unsigned long long)(ac)); \
 	(a) = ROTATE_LEFT((a), (s)); \
 	(a) += (b); \
 	}
 
 #define	GG(a, b, c, d, x, s, ac) { \
-	(a) += G((b), (c), (d)) + (x) + (uint32_t)(ac); \
+	(a) += G((b), (c), (d)) + (x) + ((unsigned long long)(ac)); \
 	(a) = ROTATE_LEFT((a), (s)); \
 	(a) += (b); \
 	}
 
 #define	HH(a, b, c, d, x, s, ac) { \
-	(a) += H((b), (c), (d)) + (x) + (uint32_t)(ac); \
+	(a) += H((b), (c), (d)) + (x) + ((unsigned long long)(ac)); \
 	(a) = ROTATE_LEFT((a), (s)); \
 	(a) += (b); \
 	}
 
 #define	II(a, b, c, d, x, s, ac) { \
-	(a) += I((b), (c), (d)) + (x) + (uint32_t)(ac); \
+	(a) += I((b), (c), (d)) + (x) + ((unsigned long long)(ac)); \
 	(a) = ROTATE_LEFT((a), (s)); \
 	(a) += (b); \
 	}
@@ -392,9 +392,22 @@ static uint8_t PADDING[64] = { 0x80, /* all zeros */ };
  * If we get another CISC ISA, we'll have to change the ifdef.
  */
 
+/*
+ * Using the %asi register to achieve little endian loads - register
+ * is set using a inline template.
+ *
+ * Saves a few arithmetic ops as can now use an immediate offset with the
+ * lduwa instructions.
+ */
+
+extern void set_little(uint32_t);
+extern uint32_t get_little();
+
 #if defined(__i386) || defined(__amd64)
 
 #define	MD5_CONST(x)		(MD5_CONST_ ## x)
+#define	MD5_CONST_e(x)		MD5_CONST(x)
+#define	MD5_CONST_o(x)		MD5_CONST(x)
 
 #else
 /*
@@ -427,6 +440,17 @@ static uint8_t PADDING[64] = { 0x80, /* all zeros */ };
  * is compiled for.
  */
 
+#ifdef sun4v
+
+/*
+ * Going to load these consts in 8B chunks, so need to enforce 8B alignment
+ */
+
+/* CSTYLED */
+#pragma align 64 (md5_consts)
+
+#endif /* sun4v */
+
 static const uint32_t md5_consts[] = {
 	MD5_CONST_0,	MD5_CONST_1,	MD5_CONST_2,	MD5_CONST_3,
 	MD5_CONST_4,	MD5_CONST_5,	MD5_CONST_6,	MD5_CONST_7,
@@ -446,7 +470,25 @@ static const uint32_t md5_consts[] = {
 	MD5_CONST_60,	MD5_CONST_61,	MD5_CONST_62,	MD5_CONST_63
 };
 
-#define	MD5_CONST(x)		(md5_consts[x])
+
+#ifdef sun4v
+/*
+ * To reduce the number of loads, load consts in 64-bit
+ * chunks and then split.
+ *
+ * No need to mask upper 32-bits, as just interested in
+ * low 32-bits (saves an & operation and means that this
+ * optimization doesn't increases the icount.
+ */
+#define	MD5_CONST_e(x)		(md5_consts64[x/2] >> 32)
+#define	MD5_CONST_o(x)		(md5_consts64[x/2])
+
+#else
+
+#define	MD5_CONST_e(x)		(md5_consts[x])
+#define	MD5_CONST_o(x)		(md5_consts[x])
+
+#endif /* sun4v */
 
 #endif
 
@@ -488,6 +530,9 @@ void
 MD5Update(MD5_CTX *ctx, const void *inpp, unsigned int input_len)
 {
 	uint32_t		i, buf_index, buf_len;
+#ifdef	sun4v
+	uint32_t		old_asi;
+#endif	/* sun4v */
 	const unsigned char 	*input = (const unsigned char *)inpp;
 
 	/* compute (number of bytes computed so far) mod 64 */
@@ -514,6 +559,16 @@ MD5Update(MD5_CTX *ctx, const void *inpp, unsigned int input_len)
 		 * MD5Update().
 		 */
 
+#ifdef sun4v
+		/*
+		 * For N1 use %asi register. However, costly to repeatedly set
+		 * in MD5Transform. Therefore, set once here.
+		 * Should probably restore the old value afterwards...
+		 */
+		old_asi = get_little();
+		set_little(0x88);
+#endif /* sun4v */
+
 		if (buf_index) {
 			bcopy(input, &ctx->buf_un.buf8[buf_index], buf_len);
 
@@ -527,6 +582,14 @@ MD5Update(MD5_CTX *ctx, const void *inpp, unsigned int input_len)
 		for (; i + 63 < input_len; i += 64)
 			MD5Transform(ctx->state[0], ctx->state[1],
 			    ctx->state[2], ctx->state[3], ctx, &input[i]);
+
+
+#ifdef sun4v
+		/*
+		 * Restore old %ASI value
+		 */
+		set_little(old_asi);
+#endif /* sun4v */
 
 		/*
 		 * general optimization:
@@ -624,8 +687,55 @@ md5_calc(unsigned char *output, unsigned char *input, unsigned int inlen)
 
 /* Define alignment check because we can 4-byte load as little endian. */
 #define	_MD5_CHECK_ALIGNMENT
-extern	uint32_t load_little_32(uint32_t *);
-#define	LOAD_LITTLE_32(addr)	load_little_32((uint32_t *)(addr))
+
+extern  uint32_t load_little_32(uint32_t *);
+#define	LOAD_LITTLE_32(addr)    load_little_32((uint32_t *)(addr))
+
+#ifdef sun4v
+
+/*
+ * For N1 want to minimize number of arithmetic operations. This is best
+ * achieved by using the %asi register to specify ASI for the lduwa operations.
+ * Also, have a separate inline template for each word, so can utilize the
+ * immediate offset in lduwa, without relying on the compiler to do the right
+ * thing.
+ *
+ * Moving to 64-bit loads might also be beneficial.
+ */
+
+extern	uint32_t load_little_32_0(uint32_t *);
+extern	uint32_t load_little_32_1(uint32_t *);
+extern	uint32_t load_little_32_2(uint32_t *);
+extern	uint32_t load_little_32_3(uint32_t *);
+extern	uint32_t load_little_32_4(uint32_t *);
+extern	uint32_t load_little_32_5(uint32_t *);
+extern	uint32_t load_little_32_6(uint32_t *);
+extern	uint32_t load_little_32_7(uint32_t *);
+extern	uint32_t load_little_32_8(uint32_t *);
+extern	uint32_t load_little_32_9(uint32_t *);
+extern	uint32_t load_little_32_a(uint32_t *);
+extern	uint32_t load_little_32_b(uint32_t *);
+extern	uint32_t load_little_32_c(uint32_t *);
+extern	uint32_t load_little_32_d(uint32_t *);
+extern	uint32_t load_little_32_e(uint32_t *);
+extern	uint32_t load_little_32_f(uint32_t *);
+#define	LOAD_LITTLE_32_0(addr)	load_little_32_0((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_1(addr)	load_little_32_1((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_2(addr)	load_little_32_2((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_3(addr)	load_little_32_3((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_4(addr)	load_little_32_4((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_5(addr)	load_little_32_5((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_6(addr)	load_little_32_6((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_7(addr)	load_little_32_7((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_8(addr)	load_little_32_8((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_9(addr)	load_little_32_9((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_a(addr)	load_little_32_a((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_b(addr)	load_little_32_b((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_c(addr)	load_little_32_c((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_d(addr)	load_little_32_d((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_e(addr)	load_little_32_e((uint32_t *)(addr))
+#define	LOAD_LITTLE_32_f(addr)	load_little_32_f((uint32_t *)(addr))
+#endif /* sun4v */
 
 /* Placate lint */
 #if	defined(__lint)
@@ -678,6 +788,11 @@ MD5Transform(uint32_t a, uint32_t b, uint32_t c, uint32_t d,
 
 	register uint32_t	x_0, x_1, x_2,  x_3,  x_4,  x_5,  x_6,  x_7;
 	register uint32_t	x_8, x_9, x_10, x_11, x_12, x_13, x_14, x_15;
+#ifdef sun4v
+	unsigned long long 	*md5_consts64;
+
+	md5_consts64 = (unsigned long long *) md5_consts;
+#endif	/* sun4v */
 
 	/*
 	 * general optimization:
@@ -711,6 +826,25 @@ MD5Transform(uint32_t a, uint32_t b, uint32_t c, uint32_t d,
 #ifdef _MD5_CHECK_ALIGNMENT
 	if ((uintptr_t)block & 0x3) {		/* not 4-byte aligned? */
 		bcopy(block, ctx->buf_un.buf32, sizeof (ctx->buf_un.buf32));
+
+#ifdef sun4v
+		x_15 = LOAD_LITTLE_32_f(ctx->buf_un.buf32);
+		x_14 = LOAD_LITTLE_32_e(ctx->buf_un.buf32);
+		x_13 = LOAD_LITTLE_32_d(ctx->buf_un.buf32);
+		x_12 = LOAD_LITTLE_32_c(ctx->buf_un.buf32);
+		x_11 = LOAD_LITTLE_32_b(ctx->buf_un.buf32);
+		x_10 = LOAD_LITTLE_32_a(ctx->buf_un.buf32);
+		x_9  = LOAD_LITTLE_32_9(ctx->buf_un.buf32);
+		x_8  = LOAD_LITTLE_32_8(ctx->buf_un.buf32);
+		x_7  = LOAD_LITTLE_32_7(ctx->buf_un.buf32);
+		x_6  = LOAD_LITTLE_32_6(ctx->buf_un.buf32);
+		x_5  = LOAD_LITTLE_32_5(ctx->buf_un.buf32);
+		x_4  = LOAD_LITTLE_32_4(ctx->buf_un.buf32);
+		x_3  = LOAD_LITTLE_32_3(ctx->buf_un.buf32);
+		x_2  = LOAD_LITTLE_32_2(ctx->buf_un.buf32);
+		x_1  = LOAD_LITTLE_32_1(ctx->buf_un.buf32);
+		x_0  = LOAD_LITTLE_32_0(ctx->buf_un.buf32);
+#else
 		x_15 = LOAD_LITTLE_32(ctx->buf_un.buf32 + 15);
 		x_14 = LOAD_LITTLE_32(ctx->buf_un.buf32 + 14);
 		x_13 = LOAD_LITTLE_32(ctx->buf_un.buf32 + 13);
@@ -727,9 +861,29 @@ MD5Transform(uint32_t a, uint32_t b, uint32_t c, uint32_t d,
 		x_2  = LOAD_LITTLE_32(ctx->buf_un.buf32 +  2);
 		x_1  = LOAD_LITTLE_32(ctx->buf_un.buf32 +  1);
 		x_0  = LOAD_LITTLE_32(ctx->buf_un.buf32 +  0);
+#endif /* sun4v */
 	} else
 #endif
 	{
+
+#ifdef sun4v
+		x_15 = LOAD_LITTLE_32_f(block);
+		x_14 = LOAD_LITTLE_32_e(block);
+		x_13 = LOAD_LITTLE_32_d(block);
+		x_12 = LOAD_LITTLE_32_c(block);
+		x_11 = LOAD_LITTLE_32_b(block);
+		x_10 = LOAD_LITTLE_32_a(block);
+		x_9  = LOAD_LITTLE_32_9(block);
+		x_8  = LOAD_LITTLE_32_8(block);
+		x_7  = LOAD_LITTLE_32_7(block);
+		x_6  = LOAD_LITTLE_32_6(block);
+		x_5  = LOAD_LITTLE_32_5(block);
+		x_4  = LOAD_LITTLE_32_4(block);
+		x_3  = LOAD_LITTLE_32_3(block);
+		x_2  = LOAD_LITTLE_32_2(block);
+		x_1  = LOAD_LITTLE_32_1(block);
+		x_0  = LOAD_LITTLE_32_0(block);
+#else
 		x_15 = LOAD_LITTLE_32(block + 60);
 		x_14 = LOAD_LITTLE_32(block + 56);
 		x_13 = LOAD_LITTLE_32(block + 52);
@@ -746,79 +900,80 @@ MD5Transform(uint32_t a, uint32_t b, uint32_t c, uint32_t d,
 		x_2  = LOAD_LITTLE_32(block +  8);
 		x_1  = LOAD_LITTLE_32(block +  4);
 		x_0  = LOAD_LITTLE_32(block +  0);
+#endif /* sun4v */
 	}
 
 	/* round 1 */
-	FF(a, b, c, d, 	x_0, MD5_SHIFT_11, MD5_CONST(0));  /* 1 */
-	FF(d, a, b, c, 	x_1, MD5_SHIFT_12, MD5_CONST(1));  /* 2 */
-	FF(c, d, a, b, 	x_2, MD5_SHIFT_13, MD5_CONST(2));  /* 3 */
-	FF(b, c, d, a, 	x_3, MD5_SHIFT_14, MD5_CONST(3));  /* 4 */
-	FF(a, b, c, d, 	x_4, MD5_SHIFT_11, MD5_CONST(4));  /* 5 */
-	FF(d, a, b, c, 	x_5, MD5_SHIFT_12, MD5_CONST(5));  /* 6 */
-	FF(c, d, a, b, 	x_6, MD5_SHIFT_13, MD5_CONST(6));  /* 7 */
-	FF(b, c, d, a, 	x_7, MD5_SHIFT_14, MD5_CONST(7));  /* 8 */
-	FF(a, b, c, d, 	x_8, MD5_SHIFT_11, MD5_CONST(8));  /* 9 */
-	FF(d, a, b, c, 	x_9, MD5_SHIFT_12, MD5_CONST(9));  /* 10 */
-	FF(c, d, a, b, x_10, MD5_SHIFT_13, MD5_CONST(10)); /* 11 */
-	FF(b, c, d, a, x_11, MD5_SHIFT_14, MD5_CONST(11)); /* 12 */
-	FF(a, b, c, d, x_12, MD5_SHIFT_11, MD5_CONST(12)); /* 13 */
-	FF(d, a, b, c, x_13, MD5_SHIFT_12, MD5_CONST(13)); /* 14 */
-	FF(c, d, a, b, x_14, MD5_SHIFT_13, MD5_CONST(14)); /* 15 */
-	FF(b, c, d, a, x_15, MD5_SHIFT_14, MD5_CONST(15)); /* 16 */
+	FF(a, b, c, d, 	x_0, MD5_SHIFT_11, MD5_CONST_e(0));  /* 1 */
+	FF(d, a, b, c, 	x_1, MD5_SHIFT_12, MD5_CONST_o(1));  /* 2 */
+	FF(c, d, a, b, 	x_2, MD5_SHIFT_13, MD5_CONST_e(2));  /* 3 */
+	FF(b, c, d, a, 	x_3, MD5_SHIFT_14, MD5_CONST_o(3));  /* 4 */
+	FF(a, b, c, d, 	x_4, MD5_SHIFT_11, MD5_CONST_e(4));  /* 5 */
+	FF(d, a, b, c, 	x_5, MD5_SHIFT_12, MD5_CONST_o(5));  /* 6 */
+	FF(c, d, a, b, 	x_6, MD5_SHIFT_13, MD5_CONST_e(6));  /* 7 */
+	FF(b, c, d, a, 	x_7, MD5_SHIFT_14, MD5_CONST_o(7));  /* 8 */
+	FF(a, b, c, d, 	x_8, MD5_SHIFT_11, MD5_CONST_e(8));  /* 9 */
+	FF(d, a, b, c, 	x_9, MD5_SHIFT_12, MD5_CONST_o(9));  /* 10 */
+	FF(c, d, a, b, x_10, MD5_SHIFT_13, MD5_CONST_e(10)); /* 11 */
+	FF(b, c, d, a, x_11, MD5_SHIFT_14, MD5_CONST_o(11)); /* 12 */
+	FF(a, b, c, d, x_12, MD5_SHIFT_11, MD5_CONST_e(12)); /* 13 */
+	FF(d, a, b, c, x_13, MD5_SHIFT_12, MD5_CONST_o(13)); /* 14 */
+	FF(c, d, a, b, x_14, MD5_SHIFT_13, MD5_CONST_e(14)); /* 15 */
+	FF(b, c, d, a, x_15, MD5_SHIFT_14, MD5_CONST_o(15)); /* 16 */
 
 	/* round 2 */
-	GG(a, b, c, d,  x_1, MD5_SHIFT_21, MD5_CONST(16)); /* 17 */
-	GG(d, a, b, c,  x_6, MD5_SHIFT_22, MD5_CONST(17)); /* 18 */
-	GG(c, d, a, b, x_11, MD5_SHIFT_23, MD5_CONST(18)); /* 19 */
-	GG(b, c, d, a,  x_0, MD5_SHIFT_24, MD5_CONST(19)); /* 20 */
-	GG(a, b, c, d,  x_5, MD5_SHIFT_21, MD5_CONST(20)); /* 21 */
-	GG(d, a, b, c, x_10, MD5_SHIFT_22, MD5_CONST(21)); /* 22 */
-	GG(c, d, a, b, x_15, MD5_SHIFT_23, MD5_CONST(22)); /* 23 */
-	GG(b, c, d, a,  x_4, MD5_SHIFT_24, MD5_CONST(23)); /* 24 */
-	GG(a, b, c, d,  x_9, MD5_SHIFT_21, MD5_CONST(24)); /* 25 */
-	GG(d, a, b, c, x_14, MD5_SHIFT_22, MD5_CONST(25)); /* 26 */
-	GG(c, d, a, b,  x_3, MD5_SHIFT_23, MD5_CONST(26)); /* 27 */
-	GG(b, c, d, a,  x_8, MD5_SHIFT_24, MD5_CONST(27)); /* 28 */
-	GG(a, b, c, d, x_13, MD5_SHIFT_21, MD5_CONST(28)); /* 29 */
-	GG(d, a, b, c,  x_2, MD5_SHIFT_22, MD5_CONST(29)); /* 30 */
-	GG(c, d, a, b,  x_7, MD5_SHIFT_23, MD5_CONST(30)); /* 31 */
-	GG(b, c, d, a, x_12, MD5_SHIFT_24, MD5_CONST(31)); /* 32 */
+	GG(a, b, c, d,  x_1, MD5_SHIFT_21, MD5_CONST_e(16)); /* 17 */
+	GG(d, a, b, c,  x_6, MD5_SHIFT_22, MD5_CONST_o(17)); /* 18 */
+	GG(c, d, a, b, x_11, MD5_SHIFT_23, MD5_CONST_e(18)); /* 19 */
+	GG(b, c, d, a,  x_0, MD5_SHIFT_24, MD5_CONST_o(19)); /* 20 */
+	GG(a, b, c, d,  x_5, MD5_SHIFT_21, MD5_CONST_e(20)); /* 21 */
+	GG(d, a, b, c, x_10, MD5_SHIFT_22, MD5_CONST_o(21)); /* 22 */
+	GG(c, d, a, b, x_15, MD5_SHIFT_23, MD5_CONST_e(22)); /* 23 */
+	GG(b, c, d, a,  x_4, MD5_SHIFT_24, MD5_CONST_o(23)); /* 24 */
+	GG(a, b, c, d,  x_9, MD5_SHIFT_21, MD5_CONST_e(24)); /* 25 */
+	GG(d, a, b, c, x_14, MD5_SHIFT_22, MD5_CONST_o(25)); /* 26 */
+	GG(c, d, a, b,  x_3, MD5_SHIFT_23, MD5_CONST_e(26)); /* 27 */
+	GG(b, c, d, a,  x_8, MD5_SHIFT_24, MD5_CONST_o(27)); /* 28 */
+	GG(a, b, c, d, x_13, MD5_SHIFT_21, MD5_CONST_e(28)); /* 29 */
+	GG(d, a, b, c,  x_2, MD5_SHIFT_22, MD5_CONST_o(29)); /* 30 */
+	GG(c, d, a, b,  x_7, MD5_SHIFT_23, MD5_CONST_e(30)); /* 31 */
+	GG(b, c, d, a, x_12, MD5_SHIFT_24, MD5_CONST_o(31)); /* 32 */
 
 	/* round 3 */
-	HH(a, b, c, d,  x_5, MD5_SHIFT_31, MD5_CONST(32)); /* 33 */
-	HH(d, a, b, c,  x_8, MD5_SHIFT_32, MD5_CONST(33)); /* 34 */
-	HH(c, d, a, b, x_11, MD5_SHIFT_33, MD5_CONST(34)); /* 35 */
-	HH(b, c, d, a, x_14, MD5_SHIFT_34, MD5_CONST(35)); /* 36 */
-	HH(a, b, c, d,  x_1, MD5_SHIFT_31, MD5_CONST(36)); /* 37 */
-	HH(d, a, b, c,  x_4, MD5_SHIFT_32, MD5_CONST(37)); /* 38 */
-	HH(c, d, a, b,  x_7, MD5_SHIFT_33, MD5_CONST(38)); /* 39 */
-	HH(b, c, d, a, x_10, MD5_SHIFT_34, MD5_CONST(39)); /* 40 */
-	HH(a, b, c, d, x_13, MD5_SHIFT_31, MD5_CONST(40)); /* 41 */
-	HH(d, a, b, c,  x_0, MD5_SHIFT_32, MD5_CONST(41)); /* 42 */
-	HH(c, d, a, b,  x_3, MD5_SHIFT_33, MD5_CONST(42)); /* 43 */
-	HH(b, c, d, a,  x_6, MD5_SHIFT_34, MD5_CONST(43)); /* 44 */
-	HH(a, b, c, d,  x_9, MD5_SHIFT_31, MD5_CONST(44)); /* 45 */
-	HH(d, a, b, c, x_12, MD5_SHIFT_32, MD5_CONST(45)); /* 46 */
-	HH(c, d, a, b, x_15, MD5_SHIFT_33, MD5_CONST(46)); /* 47 */
-	HH(b, c, d, a,  x_2, MD5_SHIFT_34, MD5_CONST(47)); /* 48 */
+	HH(a, b, c, d,  x_5, MD5_SHIFT_31, MD5_CONST_e(32)); /* 33 */
+	HH(d, a, b, c,  x_8, MD5_SHIFT_32, MD5_CONST_o(33)); /* 34 */
+	HH(c, d, a, b, x_11, MD5_SHIFT_33, MD5_CONST_e(34)); /* 35 */
+	HH(b, c, d, a, x_14, MD5_SHIFT_34, MD5_CONST_o(35)); /* 36 */
+	HH(a, b, c, d,  x_1, MD5_SHIFT_31, MD5_CONST_e(36)); /* 37 */
+	HH(d, a, b, c,  x_4, MD5_SHIFT_32, MD5_CONST_o(37)); /* 38 */
+	HH(c, d, a, b,  x_7, MD5_SHIFT_33, MD5_CONST_e(38)); /* 39 */
+	HH(b, c, d, a, x_10, MD5_SHIFT_34, MD5_CONST_o(39)); /* 40 */
+	HH(a, b, c, d, x_13, MD5_SHIFT_31, MD5_CONST_e(40)); /* 41 */
+	HH(d, a, b, c,  x_0, MD5_SHIFT_32, MD5_CONST_o(41)); /* 42 */
+	HH(c, d, a, b,  x_3, MD5_SHIFT_33, MD5_CONST_e(42)); /* 43 */
+	HH(b, c, d, a,  x_6, MD5_SHIFT_34, MD5_CONST_o(43)); /* 44 */
+	HH(a, b, c, d,  x_9, MD5_SHIFT_31, MD5_CONST_e(44)); /* 45 */
+	HH(d, a, b, c, x_12, MD5_SHIFT_32, MD5_CONST_o(45)); /* 46 */
+	HH(c, d, a, b, x_15, MD5_SHIFT_33, MD5_CONST_e(46)); /* 47 */
+	HH(b, c, d, a,  x_2, MD5_SHIFT_34, MD5_CONST_o(47)); /* 48 */
 
 	/* round 4 */
-	II(a, b, c, d,  x_0, MD5_SHIFT_41, MD5_CONST(48)); /* 49 */
-	II(d, a, b, c,  x_7, MD5_SHIFT_42, MD5_CONST(49)); /* 50 */
-	II(c, d, a, b, x_14, MD5_SHIFT_43, MD5_CONST(50)); /* 51 */
-	II(b, c, d, a,  x_5, MD5_SHIFT_44, MD5_CONST(51)); /* 52 */
-	II(a, b, c, d, x_12, MD5_SHIFT_41, MD5_CONST(52)); /* 53 */
-	II(d, a, b, c,  x_3, MD5_SHIFT_42, MD5_CONST(53)); /* 54 */
-	II(c, d, a, b, x_10, MD5_SHIFT_43, MD5_CONST(54)); /* 55 */
-	II(b, c, d, a,  x_1, MD5_SHIFT_44, MD5_CONST(55)); /* 56 */
-	II(a, b, c, d,  x_8, MD5_SHIFT_41, MD5_CONST(56)); /* 57 */
-	II(d, a, b, c, x_15, MD5_SHIFT_42, MD5_CONST(57)); /* 58 */
-	II(c, d, a, b,  x_6, MD5_SHIFT_43, MD5_CONST(58)); /* 59 */
-	II(b, c, d, a, x_13, MD5_SHIFT_44, MD5_CONST(59)); /* 60 */
-	II(a, b, c, d,  x_4, MD5_SHIFT_41, MD5_CONST(60)); /* 61 */
-	II(d, a, b, c, x_11, MD5_SHIFT_42, MD5_CONST(61)); /* 62 */
-	II(c, d, a, b,  x_2, MD5_SHIFT_43, MD5_CONST(62)); /* 63 */
-	II(b, c, d, a,  x_9, MD5_SHIFT_44, MD5_CONST(63)); /* 64 */
+	II(a, b, c, d,  x_0, MD5_SHIFT_41, MD5_CONST_e(48)); /* 49 */
+	II(d, a, b, c,  x_7, MD5_SHIFT_42, MD5_CONST_o(49)); /* 50 */
+	II(c, d, a, b, x_14, MD5_SHIFT_43, MD5_CONST_e(50)); /* 51 */
+	II(b, c, d, a,  x_5, MD5_SHIFT_44, MD5_CONST_o(51)); /* 52 */
+	II(a, b, c, d, x_12, MD5_SHIFT_41, MD5_CONST_e(52)); /* 53 */
+	II(d, a, b, c,  x_3, MD5_SHIFT_42, MD5_CONST_o(53)); /* 54 */
+	II(c, d, a, b, x_10, MD5_SHIFT_43, MD5_CONST_e(54)); /* 55 */
+	II(b, c, d, a,  x_1, MD5_SHIFT_44, MD5_CONST_o(55)); /* 56 */
+	II(a, b, c, d,  x_8, MD5_SHIFT_41, MD5_CONST_e(56)); /* 57 */
+	II(d, a, b, c, x_15, MD5_SHIFT_42, MD5_CONST_o(57)); /* 58 */
+	II(c, d, a, b,  x_6, MD5_SHIFT_43, MD5_CONST_e(58)); /* 59 */
+	II(b, c, d, a, x_13, MD5_SHIFT_44, MD5_CONST_o(59)); /* 60 */
+	II(a, b, c, d,  x_4, MD5_SHIFT_41, MD5_CONST_e(60)); /* 61 */
+	II(d, a, b, c, x_11, MD5_SHIFT_42, MD5_CONST_o(61)); /* 62 */
+	II(c, d, a, b,  x_2, MD5_SHIFT_43, MD5_CONST_e(62)); /* 63 */
+	II(b, c, d, a,  x_9, MD5_SHIFT_44, MD5_CONST_o(63)); /* 64 */
 
 	ctx->state[0] += a;
 	ctx->state[1] += b;

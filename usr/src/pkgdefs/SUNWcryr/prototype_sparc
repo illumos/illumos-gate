@@ -64,6 +64,11 @@ d none platform/sun4u/kernel 755 root sys
 d none platform/sun4u/kernel/crypto 755 root sys
 d none platform/sun4u/kernel/crypto/sparcv9 755 root sys
 f none platform/sun4u/kernel/crypto/sparcv9/arcfour2048 755 root sys
+d none platform/sun4v 755 root sys
+d none platform/sun4v/kernel 755 root sys
+d none platform/sun4v/kernel/crypto 755 root sys
+d none platform/sun4v/kernel/crypto/sparcv9 755 root sys
+f none platform/sun4v/kernel/crypto/sparcv9/arcfour2048 755 root sys
 d none platform/SUNW,Netra-T12 755 root sys
 d none platform/SUNW,Netra-T4 755 root sys
 d none platform/SUNW,Sun-Blade-1000 755 root sys

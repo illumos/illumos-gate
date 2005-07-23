@@ -459,3 +459,12 @@ f none platform/sun4u/kernel/tod/sparcv9/todstarfire 755 root sys
 s none platform/sun4u/kernel/unix=sparcv9/unix
 f none platform/sun4u/ufsboot 644 root sys
 f none platform/sun4u/wanboot 644 root sys
+d none platform/sun4v 755 root sys
+d none platform/sun4v/kernel 755 root sys
+d none platform/sun4v/kernel/crypto 755 root sys
+d none platform/sun4v/kernel/crypto/sparcv9 755 root sys
+f none platform/sun4v/kernel/crypto/sparcv9/md5 755 root sys
+d none platform/sun4v/kernel/misc 755 root sys
+d none platform/sun4v/kernel/misc/sparcv9 755 root sys
+l none platform/sun4v/kernel/misc/sparcv9/md5=../../../kernel/crypto/sparcv9/md5
+f none platform/sun4v/kernel/crypto/sparcv9/arcfour 755 root sys

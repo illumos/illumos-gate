@@ -99,6 +99,10 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/mdesc/%.c
 $(OBJS_DIR)/%.o:		$(SRC)/common/atomic/sparcv9/%.s
 	$(COMPILE.s) -o $@ $<
 
+$(OBJS_DIR)/%.o:		$(SRC)/common/crypto/arcfour/sun4v/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)
 	nm -u $(UNIX_O) $(LIBS) | grep __dtrace_probe_ | sort | uniq | nawk '{ \
 	    printf("\t.global %s\n\t.type %s, #function\n%s:\n", \

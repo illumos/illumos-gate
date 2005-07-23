@@ -151,3 +151,10 @@ ASSYM_DEPS	+= mach_subr_asm.o swtch.o
 ASSYM_DEPS	+= mach_interrupt.o mach_xc.o
 ASSYM_DEPS	+= trap_table.o wbuf.o
 ASSYM_DEPS	+= mach_sfmmu_asm.o sfmmu_asm.o
+
+#
+#			kernel cryptographic framework
+#
+
+ARCFOUR_OBJS	+= arcfour.o arcfour_crypt.o
+

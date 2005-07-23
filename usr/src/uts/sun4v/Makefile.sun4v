@@ -362,6 +362,15 @@ SYS_KMODS	+=
 #
 MISC_KMODS	+= obpsym bootdev vis platmod
 
+#	md5 optimized for Niagara
+#
+MISC_KMODS	+= md5
+
+#
+#	Software Cryptographic Providers (/kernel/crypto):
+#
+CRYPTO_KMODS	+= arcfour
+
 #
 #	generic-unix module (/kernel/genunix):
 #

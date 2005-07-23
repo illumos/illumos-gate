@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,9 @@ extern "C" {
 
 typedef struct {
 	uchar_t i, j;
+#ifdef	sun4v
+	unsigned long long pad;
+#endif	/* sun4v */
 	uchar_t arr[256];
 } ARCFour_key;
 
