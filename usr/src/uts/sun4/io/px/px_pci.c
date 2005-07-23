@@ -172,6 +172,11 @@ static struct modlinkage modlinkage = {
 void *pxb_state;
 
 /*
+ * SW workaround for PLX HW bug Flag
+ */
+int pxb_tlp_count = 64;
+
+/*
  * forward function declarations:
  */
 static int pxb_intr_init(pxb_devstate_t *pxb, int intr_type);
@@ -325,6 +330,10 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		DBG(DBG_ATTACH, devi, "This is not a switch or bridge\n");
 		goto fail;
 	}
+
+	/* Save the vnedor id and device id */
+	pxb->pxb_vendor_id = pci_config_get16(config_handle, PCI_CONF_VENID);
+	pxb->pxb_device_id = pci_config_get16(config_handle, PCI_CONF_DEVID);
 
 	/*
 	 * Make sure the "device_type" property exists.
@@ -703,14 +712,20 @@ pxb_name_child(dev_info_t *child, char *name, int namelen)
 static int
 pxb_initchild(dev_info_t *child)
 {
-	char name[MAXNAMELEN];
-	pxb_devstate_t *pxb;
+	ddi_acc_handle_t	config_handle;
+	char 			name[MAXNAMELEN];
+	pxb_devstate_t		*pxb;
+	int			result = DDI_FAILURE;
+	int			i;
+	uint16_t		reg = 0;
 
 	/*
 	 * Name the child
 	 */
-	if (pxb_name_child(child, name, MAXNAMELEN) != DDI_SUCCESS)
-		return (DDI_FAILURE);
+	if (pxb_name_child(child, name, MAXNAMELEN) != DDI_SUCCESS) {
+		result = DDI_FAILURE;
+		goto done;
+	}
 
 	ddi_set_name_addr(child, name);
 	ddi_set_parent_data(child, NULL);
@@ -733,12 +748,15 @@ pxb_initchild(dev_info_t *child)
 			 * Merged ok - return failure to remove the node.
 			 */
 			pxb_removechild(child);
-			return (DDI_FAILURE);
+			result = DDI_FAILURE;
+			goto done;
 		}
 
 		/* workaround for ddivs to run under PCI */
-		if (pci_allow_pseudo_children)
-			return (DDI_SUCCESS);
+		if (pci_allow_pseudo_children) {
+			result = DDI_SUCCESS;
+			goto done;
+		}
 
 		/*
 		 * The child was not merged into a h/w node,
@@ -749,7 +767,8 @@ pxb_initchild(dev_info_t *child)
 		    ddi_driver_name(child), ddi_get_name_addr(child),
 		    ddi_driver_name(child));
 		pxb_removechild(child);
-		return (DDI_NOT_WELL_FORMED);
+		result = DDI_NOT_WELL_FORMED;
+		goto done;
 	}
 
 	ddi_set_parent_data(child, NULL);
@@ -760,9 +779,10 @@ pxb_initchild(dev_info_t *child)
 	if (pcie_pm_hold(pxb->pxb_dip) != DDI_SUCCESS) {
 		DBG(DBG_PWR, pxb->pxb_dip,
 		    "INITCHILD: px_pm_hold failed\n");
-		return (DDI_FAILURE);
+		result = DDI_FAILURE;
+		goto done;
 	}
-	/* Any return of DDI_FAILURE from here must call pcie_pm_release */
+	/* Any return from here must call pcie_pm_release */
 
 	/*
 	 * If configuration registers were previously saved by
@@ -777,18 +797,55 @@ pxb_initchild(dev_info_t *child)
 			" for %s@%s\n", ddi_node_name(child),
 				ddi_get_name_addr(child));
 
-		return (DDI_SUCCESS);
+		result = DDI_SUCCESS;
+		goto cleanup;
 	}
 
 	DBG(DBG_PWR, ddi_get_parent(child),
 	    "INITCHILD: config regs setup for %s@%s\n",
 	    ddi_node_name(child), ddi_get_name_addr(child));
 
-	pcie_initchild(child);
+	if (pcie_initchild(child) != DDI_SUCCESS) {
+		result = DDI_FAILURE;
+		goto cleanup;
+	}
 
+	/*
+	 * Due to a PLX HW bug, a SW workaround to prevent the chip from
+	 * wedging is needed.  SW just needs to tranfer 64 TLPs from
+	 * the downstream port to the child device.
+	 * The most benign way of doing this is to read the ID register
+	 * 64 times.  This SW workaround should have minimum performance
+	 * impact and shouldn't cause a problem for all other bridges
+	 * and switches.
+	 *
+	 * The code needs to be written in a way to make sure it isn't
+	 * optimized out.
+	 */
+	if ((!pxb_tlp_count) ||
+	    (pxb->pxb_vendor_id != PXB_VENDOR_PLX) ||
+	    ((pxb->pxb_device_id != PXB_DEVICE_PLX_8532) &&
+		(pxb->pxb_device_id != PXB_DEVICE_PLX_8532))) {
+		/* Workaround not needed return success */
+		result = DDI_SUCCESS;
+		goto cleanup;
+	}
+
+	if (pci_config_setup(child, &config_handle) != DDI_SUCCESS) {
+		result = DDI_FAILURE;
+		goto cleanup;
+	}
+
+	for (i = 0; i < pxb_tlp_count; i += 1)
+		reg |= pci_config_get16(config_handle, PCI_CONF_VENID);
+
+	pci_config_teardown(&config_handle);
+
+	result = DDI_SUCCESS;
+cleanup:
 	pcie_pm_release(pxb->pxb_dip);
-
-	return (DDI_SUCCESS);
+done:
+	return (result);
 }
 
 /*

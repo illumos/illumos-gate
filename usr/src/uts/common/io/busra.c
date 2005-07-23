@@ -931,7 +931,8 @@ pci_resource_setup(dev_info_t *dip)
 	    (caddr_t)&bus_type, &len) != DDI_SUCCESS)
 		return (NDI_FAILURE);
 
-	if (strcmp(bus_type, "pci") != 0) /* it is not a pci bus type */
+	/* it is not a pci bus type */
+	if ((strcmp(bus_type, "pci") != 0) && (strcmp(bus_type, "pciex") != 0))
 		return (NDI_FAILURE);
 
 	/* read the "available" property if it is available */
@@ -1106,7 +1107,8 @@ claim_pci_busnum(dev_info_t *dip, void *arg)
 	    (caddr_t)&bus_type, &len) != DDI_SUCCESS)
 		return (DDI_WALK_PRUNECHILD);
 
-	if (strcmp(bus_type, "pci") != 0) /* it is not a pci bus type */
+	/* it is not a pci bus type */
+	if ((strcmp(bus_type, "pci") != 0) && (strcmp(bus_type, "pciex") != 0))
 		return (DDI_WALK_PRUNECHILD);
 
 	/* look for the bus-range property */

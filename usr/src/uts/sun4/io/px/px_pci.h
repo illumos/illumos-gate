@@ -145,6 +145,10 @@ typedef struct {
 	int pxb_fm_cap;
 	ddi_iblock_cookie_t pxb_fm_ibc;
 
+	/* Vendor Device Id */
+	uint16_t		pxb_vendor_id;
+	uint16_t		pxb_device_id;
+
 } pxb_devstate_t;
 
 /*
@@ -166,6 +170,11 @@ extern void *pxb_state;
 #define	PXB_INIT_ENABLE			0x20
 #define	PXB_INIT_BLOCK			0x40
 #define	PXB_INIT_FM			0x80
+
+/* PLX Vendor/Device IDs for PLX HW workaround */
+#define	PXB_VENDOR_PLX			0x10B5
+#define	PXB_DEVICE_PLX_8532		0x8532
+#define	PXB_DEVICE_PLX_8516		0x8516
 
 #ifdef	__cplusplus
 }

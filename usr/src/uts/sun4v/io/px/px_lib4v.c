@@ -49,13 +49,15 @@ int
 px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 {
 	px_nexus_regspec_t	*rp;
-	int			reglen;
+	uint_t			reglen;
+	int			ret;
 
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dip 0x%p\n", dip);
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
-	    "reg", (caddr_t)&rp, &reglen) != DDI_SUCCESS) {
-		DBG(DBG_ATTACH, dip, "px_lib_dev_init failed\n");
+	ret = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "reg", (uchar_t **)&rp, &reglen);
+	if (ret != DDI_PROP_SUCCESS) {
+		DBG(DBG_ATTACH, dip, "px_lib_dev_init failed ret=%d\n", ret);
 		return (DDI_FAILURE);
 	}
 
@@ -66,6 +68,8 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	 * defined by the SUN4V Bus Binding to Open Firmware.
 	 */
 	*dev_hdl = (devhandle_t)((rp->phys_addr >> 32) & DEVHDLE_MASK);
+
+	ddi_prop_free(rp);
 
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dev_hdl 0x%llx\n", *dev_hdl);
 

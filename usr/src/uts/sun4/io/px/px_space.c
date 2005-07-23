@@ -160,7 +160,7 @@ uint64_t px_tlu_ce_count_mask	= PX_ERR_MASK_NONE;
  * Do not enable Link Interrupts
  */
 uint64_t px_tlu_oe_intr_mask	= PX_ERR_EN_ALL & ~0x80000000800;
-uint64_t px_tlu_oe_log_mask	= PX_ERR_EN_ALL;
+uint64_t px_tlu_oe_log_mask	= PX_ERR_EN_ALL & ~0x80000000800;
 uint64_t px_tlu_oe_count_mask	= PX_ERR_EN_ALL;
 
 uint64_t px_mmu_intr_mask	= PX_ERR_EN_ALL;
@@ -176,7 +176,7 @@ uint64_t px_imu_count_mask	= PX_ERR_EN_ALL;
  * (1ull << ILU_INTERRUPT_ENABLE_IHB_PE_P);
  */
 uint64_t px_ilu_intr_mask	= (((uint64_t)0x10 << 32) | 0x10);
-uint64_t px_ilu_log_mask	= 0x10; /* ILU_ERROR_LOG_ENABLE_IHB_PE */
+uint64_t px_ilu_log_mask	= (((uint64_t)0x10 << 32) | 0x10);
 uint64_t px_ilu_count_mask	= PX_ERR_EN_ALL;
 
 uint64_t px_cb_intr_mask	= PX_ERR_EN_ALL;

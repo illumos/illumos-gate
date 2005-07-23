@@ -171,6 +171,8 @@ pcie_initchild(dev_info_t *cdip)
 	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL)
 		pcie_enable_errors(cdip, config_handle);
 
+	pci_config_teardown(&config_handle);
+
 	return (DDI_SUCCESS);
 fail:
 	cmn_err(CE_WARN, "PCIE init child failed\n");

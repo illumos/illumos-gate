@@ -1874,7 +1874,8 @@ px_identity_chip(px_t *px_p)
 	    "module-revision#", 0);
 
 	/* Check for Fire driver binding name */
-	if (strcmp(name, "pci108e,80f0") == 0) {
+	if ((strcmp(name, "pci108e,80f0") == 0) ||
+	    (strcmp(name, "pciex108e,80f0") == 0)) {
 		DBG(DBG_ATTACH, dip, "px_identity_chip: %s%d: "
 		    "name %s module-revision %d\n", ddi_driver_name(dip),
 		    ddi_get_instance(dip), name, revision);
