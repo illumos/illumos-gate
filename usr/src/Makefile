@@ -319,28 +319,35 @@ ONC_PLUS:
 #
 
 cc-version:
-	@if [ -x "$($(MACH)_CC)" ]; then		\
-		$(ECHO) $($(MACH)_CC);			\
-		$($(MACH)_CC) -V 2>&1 | head -1;	\
-	elif [ -x "$(SPRO_VROOT)/bin/cc" ]; then	\
-		$(ECHO) $(SPRO_VROOT)/bin/cc;		\
-		$(SPRO_VROOT)/bin/cc -V 2>&1 | head -1;	\
-	else						\
-		$(ECHO) No compiler found;		\
-		exit 1;					\
+	@if [ -x "$($(MACH)_CC)" ]; then			\
+		$(ECHO) $($(MACH)_CC);				\
+		$($(MACH)_CC) -V 2>&1 | head -1;		\
+	else							\
+		__COMPILER=`$($(MACH)_CC) -_compiler 2>/dev/null || $(TRUE)`;\
+		if [ -z "$$__COMPILER" ]; then			\
+			$(ECHO) No compiler found;		\
+			exit 1;					\
+		else						\
+			$(ECHO) $($(MACH)_CC);			\
+			$(ECHO) $$__COMPILER;			\
+			$($(MACH)_CC) -V 2>&1 | head -1;	\
+		fi;						\
 	fi
 
 cc64-version:
-	@if [ -x "$($(MACH64)_CC)" ]; then		\
-		$(ECHO) 64-bit compiler;		\
-		$(ECHO) $($(MACH64)_CC);		\
-		$($(MACH64)_CC) -V 2>&1 | head -1;	\
-	elif [ -x "$(GNU_ROOT)/bin/gcc" ]; then		\
-		$(ECHO) 64-bit compiler;		\
-		$(ECHO) $(GNU_ROOT)/bin/gcc;		\
-		$(GNU_ROOT)/bin/gcc --version 2>&1 | head -1;	\
-	else						\
-		$(ECHO) No 64-bit compiler found;	\
+	@if [ -x "$($(MACH64)_CC)" ]; then			\
+		$(ECHO) $($(MACH64)_CC);			\
+		$($(MACH64)_CC) -V 2>&1 | head -1;		\
+	else							\
+		__COMPILER=`$($(MACH64)_CC) -_compiler 2>/dev/null || $(TRUE)`;\
+		if [ -z "$$__COMPILER" ]; then			\
+			$(ECHO) No 64-bit compiler found;	\
+			exit 1;					\
+		else						\
+			$(ECHO) $($(MACH64)_CC);		\
+			$(ECHO) $$__COMPILER;			\
+			$($(MACH64)_CC) -V 2>&1 | head -1;	\
+		fi;						\
 	fi
 
 java-version:

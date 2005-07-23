@@ -106,8 +106,8 @@ STRIPFLAG=$(DEF_STRIPFLAG)
 __GNUC=		$(POUND_SIGN)
 
 # set __GNUC64 to '#' in the environment to build 64-bit with the Studio
-# compiler.
-__GNUC64=
+# compiler.  The default is to use gcc for amd64 but not sparcv9.
+__GNUC64=	$(INTEL_BLD)
 
 # BUILD_TOOLS is the root of all tools including compilers.
 # ONBLD_TOOLS is the root of all the tools that are part of SUNWonbld.
@@ -383,8 +383,7 @@ CTF_FLAGS	= $(CTF_FLAGS_$(MACH))
 #
 # Flags used with genoffsets
 #
-GOFLAGS =
-$(INTEL_BLD)GOFLAGS = -_noecho \
+GOFLAGS = -_noecho \
 	-_gcc=-fno-eliminate-unused-debug-symbols \
 	-_gcc=-fno-eliminate-unused-debug-types	
 
@@ -571,15 +570,19 @@ GNU_ROOT=		$(SFW_ROOT)
 # Specify platform compiler versions for languages
 # that we use (currently only c and c++).
 #
-sparc_CC=		$(SPRO_VROOT)/bin/cc
-sparc_CCC=		$(SPRO_VROOT)/bin/CC
+sparc_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
+$(__GNUC)sparc_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
+sparc_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC
+$(__GNUC)sparc_CCC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_g++
 sparc_CPP=		/usr/ccs/lib/cpp
 sparc_AS=		/usr/ccs/bin/as -xregsym=no
 sparc_LD=		/usr/ccs/bin/ld
 sparc_LINT=		$(SPRO_VROOT)/bin/lint
 
-sparcv9_CC=		$(SPRO_VROOT)/bin/cc
-sparcv9_CCC=		$(SPRO_VROOT)/bin/CC
+sparcv9_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
+$(__GNUC64)sparcv9_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
+sparcv9_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC
+$(__GNUC64)sparcv9_CCC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_g++
 sparcv9_CPP=		/usr/ccs/lib/cpp
 sparcv9_AS=		/usr/ccs/bin/as -xregsym=no
 sparcv9_LD=		/usr/ccs/bin/ld

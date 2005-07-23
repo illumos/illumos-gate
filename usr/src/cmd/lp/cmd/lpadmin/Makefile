@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/lp/cmd/lpadmin/Makefile
@@ -31,8 +31,8 @@
 include		../../Makefile.lp
 
 CPPFLAGS =	-D_REENTRANT -I. -I$(LPINC) $(CPPFLAGS.master)
-$(INTEL_BLD)CFLAGS +=	-_gcc=-fwritable-strings
-$(INTEL_BLD)CFLAGS64 +=	-_gcc=-fwritable-strings
+CFLAGS +=	-_gcc=-fwritable-strings
+CFLAGS64 +=	-_gcc=-fwritable-strings
 
 SRCS=		chkopts.c	\
 		default.c	\

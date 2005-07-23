@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,8 +31,8 @@ PROG= cfgadm
 
 include ../Makefile.cmd
 
-$(INTEL_BLD)CFLAGS +=	-_gcc=-fwritable-strings
-$(INTEL_BLD)CFLAGS64 +=	-_gcc=-fwritable-strings
+CFLAGS +=	-_gcc=-fwritable-strings
+CFLAGS64 +=	-_gcc=-fwritable-strings
 
 SED= sed
 DCFILE= $(PROG).dc

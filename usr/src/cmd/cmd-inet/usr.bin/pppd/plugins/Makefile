@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,7 @@ LDLIBS +=	$(XXXLDLIBS)
 
 CPPFLAGS +=	-I.. -I$(SRC)/uts/common
 # XX64 -- this should not be needed -- fix me
-$(INTEL_BLD)DYNFLAGS +=	-_gcc=-nostdlib
+DYNFLAGS +=	-_gcc=-nostdlib
 DYNFLAGS +=	-M$(MAPFILE)
 
 CLOBBERFILES +=	$(LIBRARIES)
