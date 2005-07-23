@@ -19,8 +19,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,14 +108,14 @@ commands: command terminator
 			num_prop_vals = 0;
 		}
 		if (YYRECOVERING())
-			return;
+			YYABORT;
 		yyclearin;
 		yyerrok;
 	}
 	| error terminator
 	{
 		if (YYRECOVERING())
-			return;
+			YYABORT;
 		yyclearin;
 		yyerrok;
 	}

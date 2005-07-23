@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -177,8 +178,7 @@ cmd_to_str(int cmd_num)
 static char *
 long_help(int cmd_num)
 {
-	if (cmd_num < CMD_MIN || cmd_num > CMD_MAX)
-		return ("");
+	assert(cmd_num >= CMD_MIN && cmd_num <= CMD_MAX);
 	switch (cmd_num) {
 		case CMD_HELP:
 			return (gettext("Print usage message."));
@@ -228,6 +228,7 @@ long_help(int cmd_num)
 			    "action."));
 	}
 	/* NOTREACHED */
+	return (NULL);
 }
 
 /*

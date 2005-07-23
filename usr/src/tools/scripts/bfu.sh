@@ -340,6 +340,7 @@ superfluous_local_zone_files="
 # files to be preserved, ie unconditionally restored to "child" versions
 #
 preserve_files="
+	kernel/misc/amd64/sysinit
 	kernel/misc/sysinit
 	var/adm/aculog
 	var/adm/spellhist
