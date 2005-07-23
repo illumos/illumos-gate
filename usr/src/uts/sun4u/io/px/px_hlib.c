@@ -242,6 +242,7 @@ ilu_init(caddr_t csr_base, pxu_t *pxu_p)
 /*
  * Initialize the module, but do not enable interrupts.
  */
+/* ARGSUSED */
 static void
 tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 {
@@ -265,17 +266,8 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * NPWR_EN bit to force serialization of writes.
 	 */
 	val = CSR_XR(csr_base, TLU_CONTROL);
-
-	if (pxu_p->chip_id == FIRE_VER_10) {
-		val |= (TLU_CONTROL_L0S_TIM_DEFAULT <<
-		    FIRE10_TLU_CONTROL_L0S_TIM) |
-		    (1ull << FIRE10_TLU_CONTROL_NPWR_EN) |
-		    TLU_CONTROL_CONFIG_DEFAULT;
-	} else {
-		/* Default case is FIRE2.0 */
-		val |= (TLU_CONTROL_L0S_TIM_DEFAULT << TLU_CONTROL_L0S_TIM) |
-		    (1ull << TLU_CONTROL_NPWR_EN) | TLU_CONTROL_CONFIG_DEFAULT;
-	}
+	val |= (TLU_CONTROL_L0S_TIM_DEFAULT << TLU_CONTROL_L0S_TIM) |
+	    (1ull << TLU_CONTROL_NPWR_EN) | TLU_CONTROL_CONFIG_DEFAULT;
 
 	/*
 	 * Set Detect.Quiet. This will disable automatic link
@@ -627,6 +619,7 @@ tlu_init(caddr_t csr_base, pxu_t *pxu_p)
 	    CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_STATUS_CLEAR));
 }
 
+/* ARGSUSED */
 static void
 lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 {
@@ -634,34 +627,6 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	int link_width, max_payload;
 
 	uint64_t val;
-
-	/*
-	 * ACKNAK Latency Threshold Table.
-	 * See Fire PRM 1.0 sections 1.2.11.1, table 1-17.
-	 */
-	int fire10_acknak_timer_table[LINK_MAX_PKT_ARR_SIZE]
-	    [LINK_WIDTH_ARR_SIZE] = {
-		{0xED,   0x76,  0x70,  0x58},
-		{0x1A0,  0x76,  0x6B,  0x61},
-		{0x22F,  0x9A,  0x6A,  0x6A},
-		{0x42F,  0x11A, 0x96,  0x96},
-		{0x82F,  0x21A, 0x116, 0x116},
-		{0x102F, 0x41A, 0x216, 0x216}
-	};
-
-	/*
-	 * TxLink Replay Timer Latency Table
-	 * See Fire PRM 1.0 sections 1.2.11.2, table 1-18.
-	 */
-	int fire10_replay_timer_table[LINK_MAX_PKT_ARR_SIZE]
-	    [LINK_WIDTH_ARR_SIZE] = {
-		{0x2C7,  0x108, 0xF6,  0xBD},
-		{0x4E0,  0x162, 0x141, 0xF1},
-		{0x68D,  0x1CE, 0x102, 0x102},
-		{0xC8D,  0x34E, 0x1C2, 0x1C2},
-		{0x188D, 0x64E, 0x342, 0x342},
-		{0x308D, 0xC4E, 0x642, 0x642}
-	};
 
 	/*
 	 * ACKNAK Latency Threshold Table.
@@ -688,6 +653,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 		{0x1EB0, 0x7E1, 0x412, 0x412},
 		{0x3CB0, 0xF61, 0x7D2, 0x7D2}
 	};
+
 	/*
 	 * Get the Link Width.  See table above LINK_WIDTH_ARR_SIZE #define
 	 * Only Link Widths of x1, x4, and x8 are supported.
@@ -720,14 +686,8 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Get the Max Payload Size.
 	 * See table above LINK_MAX_PKT_ARR_SIZE #define
 	 */
-	if (pxu_p->chip_id == FIRE_VER_10) {
-		max_payload = CSR_FR(csr_base,
-		    FIRE10_LPU_LINK_LAYER_CONFIG, MAX_PAYLOAD);
-	} else {
-		/* Default case is FIRE2.0 */
-		max_payload = ((CSR_FR(csr_base, TLU_CONTROL, CONFIG) &
-		    TLU_CONTROL_MPS_MASK) >> TLU_CONTROL_MPS_SHIFT);
-	}
+	max_payload = ((CSR_FR(csr_base, TLU_CONTROL, CONFIG) &
+	    TLU_CONTROL_MPS_MASK) >> TLU_CONTROL_MPS_SHIFT);
 
 	DBG(DBG_LPU, NULL, "lpu_init - May Payload: %d\n",
 	    (0x80 << max_payload));
@@ -966,15 +926,8 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	/*
 	 * CSR_V LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD
 	 */
-	if (pxu_p->chip_id == FIRE_VER_10) {
-		val = fire10_acknak_timer_table[max_payload][link_width];
-	} else {
-		/* Default case is FIRE2.0 */
-		val = acknak_timer_table[max_payload][link_width];
-	}
-
-	CSR_XS(csr_base,
-	    LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD, val);
+	val = acknak_timer_table[max_payload][link_width];
+	CSR_XS(csr_base, LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD, val);
 
 	DBG(DBG_LPU, NULL, "lpu_init - "
 	    "LPU_TXLINK_FREQUENT_NAK_LATENCY_TIMER_THRESHOLD: 0x%llx\n",
@@ -990,13 +943,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	/*
 	 * CSR_V LPU_TXLINK_REPLAY_TIMER_THRESHOLD
 	 */
-	if (pxu_p->chip_id == FIRE_VER_10) {
-		val = fire10_replay_timer_table[max_payload][link_width];
-	} else {
-		/* Default case is FIRE2.0 */
-		val = replay_timer_table[max_payload][link_width];
-	}
-
+	val = replay_timer_table[max_payload][link_width];
 	CSR_XS(csr_base, LPU_TXLINK_REPLAY_TIMER_THRESHOLD, val);
 
 	DBG(DBG_LPU, NULL,

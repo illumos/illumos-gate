@@ -162,8 +162,8 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 
 	switch (chip_id) {
 	case FIRE_VER_10:
-		DBG(DBG_ATTACH, dip, "FIRE Hardware Version 1.0\n");
-		break;
+		cmn_err(CE_WARN, "FIRE Hardware Version 1.0 is not supported");
+		return (DDI_FAILURE);
 	case FIRE_VER_20:
 		DBG(DBG_ATTACH, dip, "FIRE Hardware Version 2.0\n");
 		break;
@@ -887,8 +887,6 @@ px_lib_msiq_gettail(dev_info_t *dip, msiqid_t msiq_id,
 void
 px_lib_get_msiq_rec(dev_info_t *dip, px_msiq_t *msiq_p, msiq_rec_t *msiq_rec_p)
 {
-	px_t		*px_p = DIP_TO_STATE(dip);
-	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
 	eq_rec_t	*eq_rec_p = (eq_rec_t *)msiq_p->msiq_curr;
 
 	DBG(DBG_LIB_MSIQ, dip, "px_lib_get_msiq_rec: dip 0x%p eq_rec_p 0x%p\n",
@@ -918,30 +916,14 @@ px_lib_get_msiq_rec(dev_info_t *dip, px_msiq_t *msiq_p, msiq_rec_t *msiq_rec_p)
 	case EQ_REC_MSI32:
 		msiq_rec_p->msiq_rec_type = MSI32_REC;
 
-		if (pxu_p->chip_id == FIRE_VER_10) {
-			msiq_rec_p->msiq_rec_data.msi.msi_data =
-			    (eq_rec_p->eq_rec_data0 & 0xFF) << 8 |
-			    (eq_rec_p->eq_rec_data0 & 0xFF00) >> 8;
-		} else {
-			/* Default case is FIRE2.0 */
-			msiq_rec_p->msiq_rec_data.msi.msi_data =
-			    eq_rec_p->eq_rec_data0;
-		}
-
+		msiq_rec_p->msiq_rec_data.msi.msi_data =
+		    eq_rec_p->eq_rec_data0;
 		break;
 	case EQ_REC_MSI64:
 		msiq_rec_p->msiq_rec_type = MSI64_REC;
 
-		if (pxu_p->chip_id == FIRE_VER_10) {
-			msiq_rec_p->msiq_rec_data.msi.msi_data =
-			    (eq_rec_p->eq_rec_data0 & 0xFF) << 8 |
-			    (eq_rec_p->eq_rec_data0 & 0xFF00) >> 8;
-		} else {
-			/* Default case is FIRE2.0 */
-			msiq_rec_p->msiq_rec_data.msi.msi_data =
-			    eq_rec_p->eq_rec_data0;
-		}
-
+		msiq_rec_p->msiq_rec_data.msi.msi_data =
+		    eq_rec_p->eq_rec_data0;
 		break;
 	case EQ_REC_MSG:
 		msiq_rec_p->msiq_rec_type = MSG_REC;
