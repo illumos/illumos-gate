@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 
 #include <stdio.h>
 #include <ctype.h>
@@ -34,13 +39,12 @@
 
 /* external functions */
 
-extern	char 	*malloc();
 extern	int	getopt();
 extern	void	exit();
 extern	int	atoi();
 extern	int	_filbuf();
 extern	char	*optarg;
-extern	int	optind, opterr;	
+extern	int	optind, opterr;
 
 /* static functions */
 
@@ -55,13 +59,13 @@ static  void	usage();
 /* static variables */
 
 static	int	eflg;		/* find strings in source file(s) */
-static	int	dflg;           /* use replaced string a second argument */
+static	int	dflg;		/* use replaced string a second argument */
 static  int	rflg;		/* replace strings by function calls */
-static  int	errflg;         /* syntax error on command line */
-static  char	*Fname;		/* name of source file */ 	
+static  int	errflg;		/* syntax error on command line */
+static  char	*Fname;		/* name of source file */
 static  int	Lineno;		/* line number in source file */
 static	int	Posno;		/* character position within line */
-static  int	flag;           /* sets when newline is encountered */
+static  int	flag;		/* sets when newline is encountered */
 static  jmp_buf	to_eof;
 
 
@@ -69,10 +73,10 @@ main(argc, argv)
 int	argc;
 char	*argv[];
 {
-	int	ch;		
+	int	ch;
 
 	while ((ch = getopt(argc, argv, "erd")) != -1)
-		switch(ch) {
+		switch (ch) {
 		    case 'e':
 			if (rflg)
 				errflg++;
@@ -94,25 +98,26 @@ char	*argv[];
 		    default:
 			errflg++;
 		}
-	if (optind ==  argc || errflg) 
+	if (optind ==  argc || errflg)
 		usage();
 	if (!rflg)
-		for(;optind<argc;optind++)
+		for (; optind < argc; optind++)
 			extract(argv[optind]);
 	else  {
 		if (optind+1 != argc)
 			usage();
 		replace(argv[optind]);
 	}
-	exit(0);
+	return (0);
 }
 
 static	void
 extract(name)
 char	*name;
 {
-	if (freopen(name,"r",stdin) == NULL) {
-		(void)fprintf(stderr,"exstr: ERROR: couldn't open file '%s'\n",name);
+	if (freopen(name, "r", stdin) == NULL) {
+		(void) fprintf(
+		    stderr, "exstr: ERROR: couldn't open file '%s'\n", name);
 		exit(1);
 	}
 	Fname = name;
@@ -151,7 +156,7 @@ char	*name;
 			ch = getachar();
 			if (ch == '*') {
 				int level = 0;
-				while(level != 2) {
+				while (level != 2) {
 					ch = getachar();
 					if (level == 0 && ch == '*')
 						level++;
@@ -178,7 +183,7 @@ yankstr()
 	saved_posno = Posno;
 	saved_lineno = Lineno;
 	while ((cc = getachar()) != '"') {
-		if(cc == '\\') {
+		if (cc == '\\') {
 			*dp++ = cc;
 			cc = getachar();
 		}
@@ -189,7 +194,7 @@ yankstr()
 		*dp++ = cc;
 	}
 	*dp = 0;
-	prstr(dbuf,saved_lineno,saved_posno);
+	prstr(dbuf, saved_lineno, saved_posno);
 }
 
 static	void
@@ -197,17 +202,18 @@ prstr(cp, lineno, posno)
 register char *cp;
 {
 	if (eflg)
-		(void)fprintf(stdout, "%s:%d:%d:::%s\n", Fname, lineno, posno, cp);
+		(void) fprintf(stdout, "%s:%d:%d:::%s\n", Fname, lineno, posno,
+		    cp);
 	else
-		(void)fprintf(stdout, "%s:%s\n", Fname, cp);
+		(void) fprintf(stdout, "%s:%s\n", Fname, cp);
 
 }
 
 static	void
 usage()
 {
-	(void)fprintf(stderr, "usage: exstr [-e] files\n");
-	(void)fprintf(stderr, "or   : exstr -r [-d] file\n");
+	(void) fprintf(stderr, "usage: exstr [-e] files\n");
+	(void) fprintf(stderr, "or   : exstr -r [-d] file\n");
 	exit(1);
 }
 
@@ -227,7 +233,7 @@ getachar()
 		longjmp(to_eof, 1);
 	if (cc == '\n')
 		flag = 1;
-	return(cc);
+	return (cc);
 }
 
 
@@ -235,20 +241,22 @@ static void
 replace(name)
 char	*name;
 {
-	char	linebuf[BUFSIZ];	/* buffer to read lines from source file */
+	char	linebuf[BUFSIZ];
 	char	*cp;
 	int	curlineno;		/* line number in strings file */
 	int	curposno;		/* character position in string file */
 	int	savelineno = 0;
 	int	curmsgno;		/* message number in strings file */
 	int	wrong_msg;		/* invalid message number */
-	int	cont_str = 0;		/* string continues in the next line */ 	
+	int	cont_str = 0;		/* string continues in the next line */
 	char	*repstr;
 	char	repbuf[BUFSIZ], *repbufp;
 	char	curline[BUFSIZ];
 	char	outbuf[BUFSIZ];
-	char	*inp;			/* keeps track of character position within input file */
-	char	*outp;			/* keeps track of character position within output buffer */
+	/* keeps track of character position within input file */
+	char	*inp;
+	/* keeps track of character position within output buffer */
+	char	*outp;
 	char	*msgfile;
 	FILE	*fi;			/* input source file pointer */
 
@@ -256,97 +264,104 @@ char	*name;
 	outp = outbuf;
 	linebuf[0] = '\0';
 	/* open input C source file */
-	if ((fi = fopen(name,"r")) == (FILE *)NULL) {
-		(void)fprintf(stderr,"exstr: ERROR: couldn't open file '%s'\n",name);
+	if ((fi = fopen(name, "r")) == (FILE *)NULL) {
+		(void) fprintf(stderr,
+		    "exstr: ERROR: couldn't open file '%s'\n", name);
 		exit(1);
 	}
 	Fname = name;
 
-	(void)fprintf(stdout, "extern char *gettxt();\n");
+	(void) fprintf(stdout, "extern char *gettxt();\n");
 
 	/* process file containing the list of strings */
-	while (fgets(repbuf,sizeof repbuf, stdin) != (char *)NULL) {
+	while (fgets(repbuf, sizeof (repbuf), stdin) != (char *)NULL) {
 
 		wrong_msg = 0;
 
 		/* save a copy of the current line */
-		(void)strcpy(curline, repbuf);
+		(void) strcpy(curline, repbuf);
 
 		/* take apart the input string */
-		repbufp = strchr(repbuf,':');
+		repbufp = strchr(repbuf, ':');
 		if (repbufp == (char *)NULL)
 			badformat(curline);
 		*repbufp++ = '\0';
 		/* verify that string belongs to the input C source file */
 		if (strcmp(repbuf, name) != NULL)
 			continue;
-		repstr = strchr(repbufp,':');
+		repstr = strchr(repbufp, ':');
 		if (repstr == (char *)NULL)
 			badformat(curline);
 		*repstr++ = '\0';
 		curlineno = atoi(repbufp);
 		if (curlineno < savelineno) {
-			(void)fprintf(stderr, "exstr: ERROR: stdin: line out of order\n");
-			(void)fprintf(stderr, "%s", curline);
+			(void) fprintf(stderr,
+			    "exstr: ERROR: stdin: line out of order\n");
+			(void) fprintf(stderr, "%s", curline);
 			exit(1);
 		}
 		savelineno = curlineno;
 		repbufp = repstr;
-		repstr = strchr(repbufp,':');
+		repstr = strchr(repbufp, ':');
 		if (repstr == (char *)NULL)
 			badformat(curline);
 		repstr[strlen(repstr) - 1 ] = '\0';
 		*repstr++ = '\0';
 		curposno = atoi(repbufp);
 		repbufp = repstr;
-		repstr = strchr(repbufp,':');
+		repstr = strchr(repbufp, ':');
 		if (repstr == (char *)NULL)
 			badformat(curline);
 		*repstr++ = '\0';
 		msgfile = repbufp;
-		if ( strlen(msgfile) > (size_t) 14 || *msgfile == '\0' ){
-			(void)fprintf(stderr, "exstr: ERROR: stdin: invalid message file name '%s'\n", msgfile);
-			(void)fprintf(stderr, "%s", curline);
+		if (strlen(msgfile) > (size_t)14 || *msgfile == '\0') {
+			(void) fprintf(stderr,
+			    "exstr: ERROR: stdin: invalid message file name "
+			    "'%s'\n", msgfile);
+			(void) fprintf(stderr, "%s", curline);
 			exit(1);
 		}
 		repbufp = repstr;
-		repstr = strchr(repbufp,':');
+		repstr = strchr(repbufp, ':');
 		if (repstr == (char *)NULL)
 			badformat(curline);
 		*repstr++ = '\0';
 		cp = repbufp;
-		while(*cp)
-			if(!isdigit(*cp++)) {
+		while (*cp)
+			if (!isdigit(*cp++)) {
 				wrong_msg++;
 				break;
 			}
-		if ( *repbufp == '\0' || wrong_msg ) {
-			(void)fprintf(stderr, "exstr: ERROR: stdin: invalid message number '%s'\n", repbufp);
-			(void)fprintf(stderr, "%s", curline);
+		if (*repbufp == '\0' || wrong_msg) {
+			(void) fprintf(stderr, "exstr: ERROR: stdin: invalid "
+			    "message number '%s'\n", repbufp);
+			(void) fprintf(stderr, "%s", curline);
 			exit(1);
-			}
+		}
 		curmsgno = atoi(repbufp);
 
 		/* move up to this line */
-		while (Lineno != curlineno ) {
+		while (Lineno != curlineno) {
 			if (outp != outbuf) {
-				while(*inp != '\0')
+				while (*inp != '\0')
 					*outp++ = *inp++;
 				*outp = '\0';
-				(void)fputs(outbuf,stdout);
+				(void) fputs(outbuf, stdout);
 			} else if (*linebuf != '\0')
-				(void)fputs(linebuf,stdout);
+				(void) fputs(linebuf, stdout);
 			outp = outbuf;
 			inp = linebuf;
-			if (fgets(linebuf, sizeof linebuf, fi) == (char *)NULL) {
-				(void)fprintf(stderr, "read error\n");
+			if (fgets(linebuf,
+			    sizeof (linebuf), fi) == (char *)NULL) {
+				(void) fprintf(stderr, "read error\n");
 				exit(1);
 			}
 			Lineno++;
 			Posno = 0;
 		}
 		if (Posno > curposno) {
-			(void)fprintf(stderr, "Bad input record line number %d\n",Lineno);
+			(void) fprintf(stderr,
+			    "Bad input record line number %d\n", Lineno);
 			exit(1);
 		}
 		while (Posno != curposno) {
@@ -354,13 +369,18 @@ char	*name;
 			Posno++;
 		}
 		if (*inp != '"') {
-			fprintf(stderr, "exstr: ERROR: cannot replace string '%s' in line (%d) of file (%s)\n", repstr, Lineno, Fname);
+			(void) fprintf(stderr, "exstr: ERROR: cannot replace "
+			    "string '%s' in line (%d) of file (%s)\n", repstr,
+			    Lineno, Fname);
 			exit(1);
 		}
 		/* check if string continues in next line */
-		while (inp[strlen(inp)-2] == '\\' && inp[strlen(inp)-1] == '\n') { 
-			if (fgets(linebuf,sizeof linebuf, fi) == (char *)NULL) {				
-				fprintf(stderr, "exstr: ERROR: read error in file (%s)\n", Fname);
+		while (inp[strlen(inp)-2] == '\\' &&
+		    inp[strlen(inp)-1] == '\n') {
+			if (fgets(linebuf,
+			    sizeof (linebuf), fi) == (char *)NULL) {
+				(void) fprintf(stderr, "exstr: ERROR: read "
+				    "error in file (%s)\n", Fname);
 				exit(1);
 			}
 			cont_str++;
@@ -368,18 +388,24 @@ char	*name;
 		}
 		if (cont_str) {
 			cp = linebuf;
-			while (*cp != '\0' && *cp++ != '"') ;
+			while (*cp != '\0' && *cp++ != '"')
+				;
 			if (*cp == '\0') {
-				fprintf(stderr, "exstr: ERROR: cannot replace string '%s' in line (%d) of file (%s)\n", repstr, Lineno, Fname);
+				(void) fprintf(stderr, "exstr: ERROR: cannot "
+				    "replace string '%s' in line (%d) of file "
+				    "(%s)\n", repstr, Lineno, Fname);
 				exit(1);
 			}
 			inp = cp;
 			Posno = cp - linebuf;
 		}
 		if (dflg)
-			outp += sprintf(outp,"gettxt(\"%s:%d\", \"%s\")",msgfile, curmsgno, repstr);
+			outp += snprintf(outp, BUFSIZ - (outp - outbuf),
+			    "gettxt(\"%s:%d\", \"%s\")", msgfile, curmsgno,
+			    repstr);
 		else
-			outp += sprintf(outp,"gettxt(\"%s:%d\", \"\")",msgfile,curmsgno);
+			outp += snprintf(outp, BUFSIZ - (outp - outbuf),
+			    "gettxt(\"%s:%d\", \"\")", msgfile, curmsgno);
 		if (!cont_str) {
 			inp += strlen(repstr)+2;
 			Posno += strlen(repstr)+2;
@@ -388,20 +414,22 @@ char	*name;
 			cont_str = 0;
 	}
 	if (outp != outbuf) {
-		while(*inp != '\0')
+		while (*inp != '\0')
 			*outp++ = *inp++;
 		*outp = '\0';
-		(void)fputs(outbuf,stdout);
+		(void) fputs(outbuf, stdout);
 	}
-	while(fgets(linebuf,sizeof linebuf, fi) != (char *)NULL)
-		(void)fputs(linebuf, stdout);
-	
+	while (fgets(linebuf, sizeof (linebuf), fi) != (char *)NULL)
+		(void) fputs(linebuf, stdout);
+
+	(void) fclose(fi);
 }
 
 static	void
 badformat(line)
 char  	*line;
 {
-	(void)fprintf(stderr, "exstr: ERROR: stdin: Badly formatted replacement string\n%s", line);
+	(void) fprintf(stderr, "exstr: ERROR: stdin: Badly formatted "
+	    "replacement string\n%s", line);
 	exit(1);
 }
