@@ -80,7 +80,7 @@ cpu_halt(void)
 	processorid_t cpun = cpup->cpu_id;
 	cpupart_t *cp;
 	int hset_update = 1;
-	int s;
+	uint_t s;
 
 	/*
 	 * If this CPU is online, and there's multiple CPUs
@@ -93,11 +93,11 @@ cpu_halt(void)
 		hset_update = 0;
 	/*
 	 * We're on our way to being halted.
-	 * Raise PIL now, so that we'll awaken immediately
+	 * Disable interrupts now, so that we'll awaken immediately
 	 * after halting if someone tries to poke us between now and
 	 * the time we actually halt.
 	 */
-	s = spl7();
+	s = disable_vec_intr();
 
 	/*
 	 * Add ourselves to the partition's halted CPUs bitmask
@@ -118,7 +118,7 @@ cpu_halt(void)
 	if (disp_anywork()) {
 		if (hset_update)
 			CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
-		(void) splx(s);
+		enable_vec_intr(s);
 		return;
 	}
 
@@ -130,7 +130,7 @@ cpu_halt(void)
 	/*
 	 * We're no longer halted
 	 */
-	(void) splx(s);
+	enable_vec_intr(s);
 	if (hset_update)
 		CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
 }
