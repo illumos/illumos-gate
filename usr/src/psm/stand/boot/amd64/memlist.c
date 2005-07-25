@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,8 +57,8 @@ amd64_convert_memlist(struct memlist *ml, struct memlist64 *ml64)
 			 * boot will panic if the memlists don't all fit on
 			 * one page so we may as well make the same assumption.
 			 */
-			if ((uint64_t)ml64 > ((uint64_t)amd64_memlistpage +
-			    AMD64_PAGESIZE))
+			if ((uint64_t)(uintptr_t)ml64 > ((uint64_t)(uintptr_t)
+			    amd64_memlistpage + AMD64_PAGESIZE))
 				amd64_panic("Memory space for 64-bit memlists "
 				    "exhausted when converting memlist @ 0x%x.",
 				    (uint32_t)ml->prev);

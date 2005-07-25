@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/varargs.h>
 #include <sys/promif.h>
+#include "asm/sunddi.h"
 
 /*
  * This header file contains most of the libc-like interfaces
@@ -40,6 +41,10 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+extern uchar_t inb(int);
+extern void outb(int, uint8_t);
+extern void sync_instruction_memory(caddr_t v, size_t len);
 
 extern void bzero(void *, size_t);
 extern void bcopy(const void *, void *, size_t);
@@ -51,8 +56,15 @@ extern char *strcpy(char *, const char *);
 extern char *strrchr(const char *, int);
 extern char *strstr(const char *, const char *);
 
+extern void prom_init(char *, void *);
+extern int openfile(char *, char *);
+extern int close(int);
+
 extern void printf(const char *, ...);
-extern void panic(const char *, ...);
+
+extern void reset(void) __NORETURN;
+extern void prom_panic(char *fmt) __NORETURN;
+extern void panic(const char *fmt, ...) __NORETURN;
 
 #ifdef	__cplusplus
 }

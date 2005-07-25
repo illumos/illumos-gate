@@ -32,6 +32,7 @@
 
 #include <sys/archsystm.h>
 #include <sys/vgareg.h>
+#include "util.h"
 #include "vga.h"
 
 #define	VGA_COLOR_CRTC_INDEX	0x3d4

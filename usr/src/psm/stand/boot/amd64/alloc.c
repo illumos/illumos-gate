@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,13 +37,14 @@ amd64_alloc_identity(size_t size)
 {
 	void *addr;
 
-	if (addr = (void *)idmap_mem((uint32_t)0, size, AMD64_PAGESIZE))
-		return (addr);
+	addr = (void *)idmap_mem((uint32_t)0, size, AMD64_PAGESIZE);
 
-	amd64_panic("amd64_alloc_identity: boot failed to identity map 0x%lx "
-	    "bytes\n", size);
-
-	/*NOTREACHED*/
+	if (addr == NULL) {
+		amd64_panic("amd64_alloc_identity: "
+		    "boot failed to identity map 0x%lx bytes\n", size);
+		/*NOTREACHED*/
+	}
+	return (addr);
 }
 
 void *

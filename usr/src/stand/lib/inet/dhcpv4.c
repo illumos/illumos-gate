@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Standalone dhcp client.
@@ -422,7 +422,7 @@ prt_server_msg(DHCP_OPT *p)
 	int len = p->len;
 	char scratch[DHCP_MAX_OPT_SIZE + 1];
 
-	if (p->len > DHCP_MAX_OPT_SIZE)
+	if (len > DHCP_MAX_OPT_SIZE)
 		len = DHCP_MAX_OPT_SIZE;
 	bcopy(p->value, scratch, len);
 	scratch[len] = '\0';

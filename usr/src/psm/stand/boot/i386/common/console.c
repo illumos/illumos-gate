@@ -31,6 +31,8 @@
 #include <sys/varargs.h>
 #include <sys/promif.h>
 #include <sys/salib.h>
+
+#include "util.h"
 #include "serial.h"
 #include "chario.h"
 #include "vga.h"

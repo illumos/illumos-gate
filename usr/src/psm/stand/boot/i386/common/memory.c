@@ -93,7 +93,7 @@ init_paging(void)
 	entry = pbooterp;
 	while (entry) {
 		(void) map_phys(mode, (size_t)entry->size,
-		    (caddr_t)entry->address, entry->address);
+		    (caddr_t)(uintptr_t)entry->address, entry->address);
 		entry = entry->next;
 	}
 
@@ -101,7 +101,7 @@ init_paging(void)
 	entry = pramdiskp;
 	while (entry) {
 		(void) map_phys(PG_P, (size_t)entry->size,
-		    (caddr_t)entry->address, entry->address);
+		    (caddr_t)(uintptr_t)entry->address, entry->address);
 		entry = entry->next;
 	}
 

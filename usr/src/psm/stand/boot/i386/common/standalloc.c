@@ -346,7 +346,8 @@ idmap_mem(uint32_t virthint, size_t bytes, int align)
 		return ((caddr_t)0);
 
 	if (virthint == 0) {
-		addr = (caddr_t)memlist_find(&pfreelistp, bytes, align);
+		addr = (caddr_t)(uintptr_t)
+		    memlist_find(&pfreelistp, bytes, align);
 	} else if (memlist_remove(
 	    &pfreelistp, (uint64_t)virthint, (uint64_t)bytes) == 0) {
 		addr = (caddr_t)virthint;
@@ -363,20 +364,21 @@ idmap_mem(uint32_t virthint, size_t bytes, int align)
 	 * either map it 1:1 or map it above kernelbase. Hence, the
 	 * corresponding virtual memory is always available by design.
 	 */
-	if (memlist_remove(&vfreelistp, (uint64_t)addr, (uint64_t)bytes) != 0) {
+	if (memlist_remove(&vfreelistp,
+	    (uint64_t)(uintptr_t)addr, (uint64_t)bytes) != 0) {
 		printf("idmap_mem: failed to find virtual "
 		    "0x%lx bytes at 0x%p\n", bytes, (void *)addr);
-		(void) memlist_insert(&pfreelistp, (uint64_t)addr,
+		(void) memlist_insert(&pfreelistp, (uint64_t)(uintptr_t)addr,
 		    (uint64_t)bytes);
 		return (0);
 	}
 
-	if (map_phys(0, bytes, addr, (uint64_t)addr) == -1) {
+	if (map_phys(0, bytes, addr, (uint64_t)(uintptr_t)addr) == -1) {
 		printf("idmap_mem: failed to 1:1 map 0x%lx bytes at 0x%p\n",
 		    bytes, (void *)addr);
-		(void) memlist_insert(&pfreelistp, (uint64_t)addr,
+		(void) memlist_insert(&pfreelistp, (uint64_t)(uintptr_t)addr,
 		    (uint64_t)bytes);
-		(void) memlist_insert(&vfreelistp, (uint64_t)addr,
+		(void) memlist_insert(&vfreelistp, (uint64_t)(uintptr_t)addr,
 		    (uint64_t)bytes);
 		return (0);
 	}
@@ -395,7 +397,7 @@ phys_alloc_mem(size_t bytes, int align)
 	if (bytes == 0)
 		return ((caddr_t)0);
 
-	return ((caddr_t)memlist_find(&pfreelistp, bytes, align));
+	return ((caddr_t)(uintptr_t)memlist_find(&pfreelistp, bytes, align));
 }
 
 /*ARGSUSED*/
@@ -417,7 +419,7 @@ resalloc(enum RESOURCES type, size_t bytes, caddr_t virthint, int align)
 	case RES_BOOTSCRATCH:
 
 		/* scratch memory */
-		vaddr = (caddr_t)scratchmem_end;
+		vaddr = (caddr_t)(uintptr_t)scratchmem_end;
 		bytes = roundup(bytes, PAGESIZE);
 		scratchmem_end += bytes;
 		if (scratchmem_end > magic_phys)
@@ -438,7 +440,7 @@ resalloc(enum RESOURCES type, size_t bytes, caddr_t virthint, int align)
 		bytes = roundup(bytes, PAGESIZE);
 
 		if (memlist_remove(&vfreelistp,
-		    (uint64_t)vaddr, (uint64_t)bytes))
+		    (uint64_t)(uintptr_t)vaddr, (uint64_t)bytes))
 			goto fail;	/* virtual memory not available */
 		if (align == 0)
 			align = 1;

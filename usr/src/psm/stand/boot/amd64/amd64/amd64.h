@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@ extern "C" {
 
 struct amd64_machregs;
 
-extern void amd64_system_reset(void);
+extern void amd64_system_reset(void) __NORETURN;
 
 extern const char *amd64_getmmulist(void);
 extern int amd64_config_cpu(void);

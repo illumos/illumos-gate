@@ -42,6 +42,10 @@
 #include <sys/bootvfs.h>
 #include <sys/platnames.h>
 
+#if defined(__i386)
+#include "util.h"
+#endif
+
 #ifdef	BOOTAMD64
 #include <amd64/amd64_page.h>
 #endif	/* BOOTAMD64 */
@@ -171,7 +175,6 @@ sync_instruction_memory(caddr_t v, size_t len)
 #else	/* lint */
 extern void sync_instruction_memory(caddr_t v, size_t len);
 #endif	/* lint */
-
 
 extern int 	verbosemode;
 extern int	boothowto;
@@ -934,8 +937,8 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 				 * We're all set up to read.
 				 * Now let's allocate some memory.
 				 */
-				if (get_progmemory((caddr_t)base, size,
-				    npagesize))
+				if (get_progmemory((caddr_t)(uintptr_t)base,
+				    size, npagesize))
 					goto elf64error;
 			}
 
@@ -944,8 +947,8 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 				(u_longlong_t)phdr->p_filesz,
 				(u_longlong_t)loadaddr);
 			}
-			if (xread(fd, (caddr_t)loadaddr, phdr->p_filesz) !=
-			    phdr->p_filesz)
+			if (xread(fd, (caddr_t)(uintptr_t)
+			    loadaddr, phdr->p_filesz) != phdr->p_filesz)
 				goto elf64error;
 
 			/* zero out BSS */
@@ -958,7 +961,7 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 					    phdr->p_filesz));
 				}
 
-				bzero((caddr_t)loadaddr,
+				bzero((caddr_t)(uintptr_t)loadaddr,
 				    phdr->p_memsz - phdr->p_filesz);
 				bss_seen++;
 				if (print)
@@ -969,8 +972,8 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 
 			/* force instructions to be visible to icache */
 			if (phdr->p_flags & PF_X)
-				sync_instruction_memory((caddr_t)phdr->p_vaddr,
-				    phdr->p_memsz);
+				sync_instruction_memory((caddr_t)(uintptr_t)
+				    phdr->p_vaddr, phdr->p_memsz);
 
 #ifdef	MPSAS
 			sas_symtab(phdr->p_vaddr,
@@ -1028,7 +1031,7 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 		AUX64(av, AT_BASE, entrypt);
 		AUX64(av, AT_ENTRY, elfhdrp->e_entry);
 		AUX64(av, AT_PAGESZ, pagesize);
-		AUX64(av, AT_PHDR, allphdrs);
+		AUX64(av, AT_PHDR, (uintptr_t)allphdrs);
 		AUX64(av, AT_PHNUM, elfhdrp->e_phnum);
 		AUX64(av, AT_PHENT, elfhdrp->e_phentsize);
 		if (npagesize)
@@ -1045,7 +1048,7 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 
 		AUX64(av, AT_SUN_IFLUSH, icache_flush);
 		if (cpulist != NULL)
-			AUX64(av, AT_SUN_CPU, cpulist);
+			AUX64(av, AT_SUN_CPU, (uintptr_t)cpulist);
 		AUX64(av, AT_NULL, 0);
 		/*
 		 * Realloc vectors and copy them.
@@ -1273,7 +1276,7 @@ iload64(char *rtld, Elf64_Phdr *thdr, Elf64_Phdr *dhdr, auxv64_t **avp)
 		goto errorx;
 	}
 	dprintf("Opened %s OK\n", rtld);
-	AUX64(*avp, AT_SUN_LDNAME, rtld);
+	AUX64(*avp, AT_SUN_LDNAME, (uintptr_t)rtld);
 	/*
 	 * Allocate and read the ELF header.
 	 */
@@ -1370,13 +1373,13 @@ iload64(char *rtld, Elf64_Phdr *thdr, Elf64_Phdr *dhdr, auxv64_t **avp)
 		 * If it's bss, just zero it out.
 		 */
 		if (sp->sh_type == SHT_NOBITS) {
-			bzero((caddr_t)load, sp->sh_size);
+			bzero((caddr_t)(uintptr_t)load, sp->sh_size);
 		} else {
 			/*
 			 * Read the section contents.
 			 */
 			if (lseek(fd, sp->sh_offset, 0) == -1 ||
-			    xread(fd, (caddr_t)load, sp->sh_size) !=
+			    xread(fd, (caddr_t)(uintptr_t)load, sp->sh_size) !=
 				sp->sh_size) {
 				    printf("boot: error reading section %d\n",
 					i);
@@ -1396,7 +1399,7 @@ iload64(char *rtld, Elf64_Phdr *thdr, Elf64_Phdr *dhdr, auxv64_t **avp)
 
 		/* force instructions to be visible to icache */
 		if (sp->sh_flags & SHF_EXECINSTR)
-			sync_instruction_memory((caddr_t)sp->sh_addr,
+			sync_instruction_memory((caddr_t)(uintptr_t)sp->sh_addr,
 			    sp->sh_size);
 	}
 	/*

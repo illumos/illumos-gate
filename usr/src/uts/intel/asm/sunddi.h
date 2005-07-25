@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,6 +104,15 @@ extern __inline__ void outl(int port, uint32_t value)
 		: /* no output */
 		: "a" (value), "d" (port16));
 }
+
+#if defined(_BOOT)
+
+extern __inline__ void sync_instruction_memory(caddr_t v, size_t len)
+{
+	__asm__ __volatile__("nop");
+}
+
+#endif /* _BOOT */
 
 #endif /* __i386 || __amd64 */
 

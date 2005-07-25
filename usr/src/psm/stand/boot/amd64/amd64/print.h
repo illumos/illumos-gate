@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,7 @@ extern int amd64_snprintf(char *, size_t, const char *, ...)
 extern int amd64_snprintf64(char *, size_t, const char *, ...)
 	__PRINTFLIKE(3);
 extern void amd64_vpanic(const char *, va_list)
-	__VPRINTFLIKE(1);
+	__VPRINTFLIKE(1) __NORETURN;
 extern void amd64_panic(const char *, ...)
 	__PRINTFLIKE(1);
 extern void amd64_warning(const char *, ...)

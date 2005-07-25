@@ -29,14 +29,10 @@
 #include <sys/types.h>
 #include <sys/bootconf.h>
 #include <sys/salib.h>
+#include "util.h"
 #include "debug.h"
 #include "multiboot.h"
 #include "bootprop.h"
-
-extern void prom_init(char *, void *);
-extern void prom_panic(char *);
-extern int openfile(char *, char *);
-extern int close(int);
 
 
 #define	BOOTENV_BUFSIZE		4096

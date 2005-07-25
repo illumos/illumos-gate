@@ -306,19 +306,19 @@ donetable:
 	xorl	%eax, %eax
 
 	movw	%ss, %ax
-	movw	$0, [i386_REG_SS + 2](%esp)
+	movw	$0, _CONST(i386_REG_SS + 2)(%esp)
 	movl	%eax, i386_REG_SS(%esp)
 	movw	%ds, %ax
-	movw	$0, [i386_REG_DS + 2](%esp)
+	movw	$0, _CONST(i386_REG_DS + 2)(%esp)
 	movl	%eax, i386_REG_DS(%esp)
 	movw	%es, %ax
-	movw	$0, [i386_REG_ES + 2](%esp)
+	movw	$0, _CONST(i386_REG_ES + 2)(%esp)
 	movl	%eax, i386_REG_ES(%esp)
 	movw	%fs, %ax
-	movw	$0, [i386_REG_FS + 2](%esp)
+	movw	$0, _CONST(i386_REG_FS + 2)(%esp)
 	movl	%eax, i386_REG_FS(%esp)
 	movw	%gs, %ax
-	movw	$0, [i386_REG_GS + 2](%esp)
+	movw	$0, _CONST(i386_REG_GS + 2)(%esp)
 	movl	%eax, i386_REG_GS(%esp)
 
 	/ Save the control registers
@@ -332,11 +332,11 @@ donetable:
 	movl	%eax, i386_REG_CR4(%esp)
 
 	/ Save the task, interrupt, gdt, ldt registers
-	movw	$0, [i386_REG_TR + 2](%esp)
+	movw	$0, _CONST(i386_REG_TR + 2)(%esp)
 	str	i386_REG_TR(%esp)
 	sidt	i386_REG_IDT(%esp)
 	sgdt	i386_REG_GDT(%esp)
-	movw	$0, [i386_REG_LDT + 2](%esp)
+	movw	$0, _CONST(i386_REG_LDT + 2)(%esp)
 	sldt	i386_REG_LDT(%esp)
 
 	pushl	%esp

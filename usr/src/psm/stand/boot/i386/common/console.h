@@ -41,8 +41,6 @@ extern "C" {
 
 #define	CONS_COLOR	7
 
-extern uchar_t inb(int);
-extern void outb(int, uchar_t);
 extern void kb_init(void);
 extern int kb_getchar(void);
 extern int kb_ischar(void);
@@ -54,7 +52,6 @@ extern void putchar(int);
 extern int getchar(void);
 extern int ischar(void);
 extern int cons_gets(char *, int);
-extern void reset();
 
 #ifdef __cplusplus
 }

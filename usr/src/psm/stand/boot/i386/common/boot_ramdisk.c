@@ -53,8 +53,8 @@ diskread(fileid_t *filep)
 	/* add in offset of root slice */
 	blocknum = filep->fi_blocknum;
 
-	diskloc = (caddr_t)(ramdisk_start + blocknum * DEV_BSIZE);
-	if (diskloc + filep->fi_count > (caddr_t)ramdisk_end) {
+	diskloc = (caddr_t)(uintptr_t)(ramdisk_start + blocknum * DEV_BSIZE);
+	if (diskloc + filep->fi_count > (caddr_t)(uintptr_t)ramdisk_end) {
 		printf("diskread: reading beyond end of ramdisk\n");
 		printf("\tstart = 0x%p, size = 0x%x\n",
 		    (void *)diskloc, filep->fi_count);

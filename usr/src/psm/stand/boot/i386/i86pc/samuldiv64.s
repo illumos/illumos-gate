@@ -1075,3 +1075,55 @@ __rem64(int64_t a, int64_t b)
 	ret	$16
 	SET_SIZE(__divrem64)
 #endif	/* lint */
+
+
+#if defined(__lint)
+/*ARGSUSED*/
+unsigned long long
+__udivdi3(unsigned long long a, unsigned long long b)
+{ return (0); }
+
+/*ARGSUSED*/
+unsigned long long
+__umoddi3(unsigned long long a, unsigned long long b)
+{ return (0); }
+
+#else
+
+/*
+ * __udivdi3
+ *
+ * Perform division of two unsigned 64-bit quantities, returning the
+ * quotient in %edx:%eax.
+ */
+	ENTRY(__udivdi3)
+	movl	4(%esp), %eax	/ x, x
+	movl	8(%esp), %edx	/ x, x
+	pushl	16(%esp)	/ y
+	pushl	16(%esp)
+	call	UDiv
+	addl	$8, %esp
+	ret
+	SET_SIZE(__udivdi3)
+
+/*
+ * __umoddi3
+ *
+ * Perform division of two unsigned 64-bit quantities, returning the
+ * remainder in %edx:%eax.
+ */
+	ENTRY(__umoddi3)
+	subl	$12, %esp
+	movl	%esp, %ecx	/, tmp65
+	movl	16(%esp), %eax	/ x, x
+	movl	20(%esp), %edx	/ x, x
+	pushl	%ecx		/ tmp65
+	pushl	32(%esp)	/ y
+	pushl	32(%esp)
+	call	UDivRem
+	movl	12(%esp), %eax	/ rem, rem
+	movl	16(%esp), %edx	/ rem, rem
+	addl	$24, %esp
+	ret
+	SET_SIZE(__umoddi3)
+#endif

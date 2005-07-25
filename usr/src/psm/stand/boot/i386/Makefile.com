@@ -36,6 +36,7 @@ CMN_DIR		= $(BOOTSRCDIR)/common
 MACH_DIR	= ../common
 PLAT_DIR	= .
 PAMD64_DIR	= $(BOOTSRCDIR)/amd64
+BOOT_DIR	= $(SRC)/psm/stand/boot
 
 TOP_CMN_C_SRC	= getoptstr.c string.c ufsops.c hsfs.c
 TOP_CMN_C_SRC	+= memcpy.c memmove.c memset.c bcopy.c bzero.c
@@ -97,12 +98,14 @@ CPPINCS		+= -I$(TOPDIR)/uts/intel -I$(TOPDIR)/uts/i86pc
 CPPINCS		+= -I$(TOPDIR)/uts/common
 CPPINCS		+= -I$(STANDDIR)/lib/sa
 CPPINCS		+= -I$(STANDDIR)
+CPPINCS		+= -I$(BOOT_DIR)/i386/common
 
 CPPFLAGS	= $(CPPDEFS) $(CPPINCS)
 CPPFLAGS	+= $(CCYFLAG)$(SYSDIR)/common
-ASFLAGS =	$(CPPDEFS) -P -D__STDC__ -D_BOOT -D_ASM $(CPPINCS)
+ASFLAGS =	-P $(CPPDEFS) -D__STDC__ -D_BOOT -D_ASM $(CPPINCS)
 
 CFLAGS	=	../common/i86.il $(COPTFLAG)
+
 #
 # Force 16-bit alignment in multiboot
 #
