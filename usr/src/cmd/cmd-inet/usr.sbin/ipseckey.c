@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -366,6 +366,7 @@ static struct toktable {
 	{"sport",		TOK_SRCPORT,		NEXTNUM},
 	{"dport",		TOK_DSTPORT,		NEXTNUM},
 	{"proto",		TOK_PROTO,		NEXTNUM},
+	{"ulp",			TOK_PROTO,		NEXTNUM},
 
 	{"saddr6",		TOK_SRCADDR6,		NEXTADDR},
 	{"srcaddr6",		TOK_SRCADDR6,		NEXTADDR},
@@ -452,6 +453,7 @@ parsestate(char *state)
 	warnx(gettext("Unknown state type %s."), state);
 	usage();
 	/* NOTREACHED */
+	return (0);
 }
 
 /*
@@ -516,6 +518,7 @@ parsealg(char *alg, int proto_num)
 		    alg);
 	usage();
 	/* NOTREACHED */
+	return (0);
 }
 
 /*
@@ -579,6 +582,7 @@ parseidtype(char *type)
 	warnx(gettext("Unknown identity type %s."), type);
 	usage();
 	/* NOTREACHED */
+	return (0);
 }
 
 /*

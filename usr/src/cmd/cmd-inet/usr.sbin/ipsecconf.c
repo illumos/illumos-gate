@@ -92,7 +92,7 @@ static char spdsock_diag_buf[SPDSOCK_DIAG_BUF_LEN];
  * are given, we can fail the request.
  */
 
-static enum ipsec_cmds {IPSEC_CONF_ADD = 1, IPSEC_CONF_DEL, IPSEC_CONF_VIEW,
+enum ipsec_cmds {IPSEC_CONF_ADD = 1, IPSEC_CONF_DEL, IPSEC_CONF_VIEW,
     IPSEC_CONF_FLUSH, IPSEC_CONF_LIST, IPSEC_CONF_SUB};
 
 static const char policy_conf_file[] = "/var/run/ipsecpolicy.conf";
@@ -109,7 +109,7 @@ static const char index_tag[] = "#INDEX";
 #define	VALID_ALG_LEN		40
 
 /* Types of Error messages */
-typedef enum error_tpye {BAD_ERROR, DUP_ERROR} error_type_t;
+typedef enum error_type {BAD_ERROR, DUP_ERROR, REQ_ERROR} error_type_t;
 
 static int cmd;
 static char *filename;
@@ -3506,8 +3506,11 @@ error_message(error_type_t error, int type, int line)
 	 * If we never read a newline character, we don't want
 	 * to print 0.
 	 */
-	warnx(gettext("%s %s on line: %d"), (error == BAD_ERROR) ?
-	    gettext("Bad") : gettext("Duplicate"), mesg,
+	warnx(gettext("%s%s%s %s on line: %d"),
+	    (error == BAD_ERROR) ? gettext("Bad") : "",
+	    (error == DUP_ERROR) ? gettext("Duplicate") : "",
+	    (error == REQ_ERROR) ? gettext("Requires") : "",
+	    mesg,
 	    (arg_indices[line] == 0) ? 1 : arg_indices[line]);
 }
 
@@ -4566,6 +4569,22 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 			cptr->ips_dir = SPD_RULE_FLAG_INBOUND;
 			break;
 		case TOK_ipsec:
+			if (old_style) {
+				/* Using saddr/daddr with ipsec action. */
+				if (!dir) {
+					/* No direction specified */
+					error_message(REQ_ERROR,
+					    IPSEC_CONF_IPSEC_DIR, line_no);
+					return (-1);
+				}
+				if (cptr->ips_dir == SPD_RULE_FLAG_INBOUND)
+					/*
+					 * Need to swap addresses if
+					 * 'dir in' or translation to
+					 * laddr/raddr will be incorrect.
+					 */
+					cptr->swap = 1;
+			}
 			if (!dir)
 				cptr->ips_dir =
 				    SPD_RULE_FLAG_INBOUND
