@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include "topo_enum.h"
 
 #define	TOPO_FILE	"platform.topo"
+#define	TOPO_SHARE_DIRECTIVE "share"
 
 void (*Outmethod)(const char *);
 
@@ -68,13 +69,22 @@ void
 topo_tree_release(tnode_t *node)
 {
 	tnode_t *ar = node;	/* actual root node */
+	struct t_extend *re;
+	struct tenum_alias *cur, *nxt;
 
 	if (ar->state != TOPO_ROOT)
 		ar = ar->root;
 
-	if (ar->extend != NULL)
-		tnode_hash_destroy((struct tnode_hash *)ar->extend);
-
+	if ((re = ar->extend) != NULL) {
+		tnode_hash_destroy(re->te_index);
+		cur = re->te_aliases;
+		while (cur != NULL) {
+			nxt = cur->tea_next;
+			topo_free(cur->tea_share);
+			topo_free(cur);
+			cur = nxt;
+		}
+	}
 	tnode_destroy(ar);
 }
 
@@ -199,7 +209,7 @@ topo_load(const char *basename, struct tnode *subroot)
 }
 
 #define	UPPER_MAX_RECURSE	10
-#define	DFLT_MAX_RECURSE	3
+#define	DFLT_MAX_RECURSE	5
 int Topo_max_recurse = DFLT_MAX_RECURSE;
 
 void
@@ -238,7 +248,8 @@ topo_subtree_parse(struct tnode *subroot)
 void
 syntax_error(const char *pathname, int lineno)
 {
-	topo_out(TOPO_ERR, "%s: syntax error on line %d\n", pathname, lineno);
+	topo_out(TOPO_ERR, "%s: syntax error or bad directive on line %d\n",
+	    pathname, lineno);
 }
 
 /*
@@ -333,7 +344,6 @@ topo_inst_from_str(char *src, int *min, int *max, int *instno)
 char *
 topo_component_from_path(char *src, char **name, char **inst)
 {
-	char *copybuf;
 	char *b = src;
 	char *e;
 	char s;
@@ -349,13 +359,10 @@ topo_component_from_path(char *src, char **name, char **inst)
 	if (*e == '\0' || *e == '\n')
 		return (NULL);
 
-	copybuf = alloca(MAXPATHLEN);
-
 	s = *e;
 	*e = '\0';
-	(void) strlcpy(copybuf, b, MAXPATHLEN);
+	*name = topo_strdup(b);
 	*e = s;
-	*name = topo_strdup(copybuf);
 
 	/* rest up to next slash is instance part */
 	b = e;
@@ -363,9 +370,8 @@ topo_component_from_path(char *src, char **name, char **inst)
 		e++;
 	s = *e;
 	*e = '\0';
-	(void) strlcpy(copybuf, b, MAXPATHLEN);
+	*inst = topo_strdup(b);
 	*e = s;
-	*inst = topo_strdup(copybuf);
 
 	return (e);
 }
@@ -373,7 +379,6 @@ topo_component_from_path(char *src, char **name, char **inst)
 static int
 prop_from_inbuf(char *src, char **name, char **val)
 {
-	char *copybuf;
 	char *b = src;
 	char *e;
 	char s;
@@ -392,13 +397,10 @@ prop_from_inbuf(char *src, char **name, char **val)
 	if (*e == '\0' || *e == '\n')
 		return (-1);
 
-	copybuf = alloca(MAXPATHLEN);
-
 	s = *e;
 	*e = '\0';
-	(void) strlcpy(copybuf, b, MAXPATHLEN);
+	*name = topo_strdup(b);
 	*e = s;
-	*name = topo_strdup(copybuf);
 
 	b = topo_whiteskip(e);
 	if (b == NULL || *b != '=') {
@@ -424,9 +426,8 @@ prop_from_inbuf(char *src, char **name, char **val)
 	}
 	s = *e;
 	*e = '\0';
-	(void) strlcpy(copybuf, b, MAXPATHLEN);
+	*val = topo_strdup(b);
 	*e = s;
-	*val = topo_strdup(copybuf);
 
 	if (quoted)
 		e++;
@@ -545,6 +546,52 @@ consume_prop(char *buf, struct tnode *addto)
 }
 
 struct tnode *
+consume_directive(char *buf, struct tnode *rnode)
+{
+	char *alias;
+	char *b, *e;
+	char s;
+
+	/* Skip exclamation declaring a directive, and any following space */
+	b = e = topo_whiteskip(++buf);
+
+	/* directive must start with alpha character or _ */
+	if (isalpha(*e) == 0 && *e != '_')
+		return (NULL);
+
+	e++;
+	while (isalpha(*e) != 0 || *e == '_')
+		e++;
+
+	/*
+	 * Presently we only have one valid directive.  If we add more
+	 * we should add a jump-table sort of structure.
+	 */
+	s = *e;
+	*e = '\0';
+	if (strcmp(TOPO_SHARE_DIRECTIVE, b) == 0) {
+		*e = s;
+		if (*e == '\0' || *e == '\n')
+			return (NULL);
+		b = e = topo_whiteskip(e);
+		e++;
+		while (isalpha(*e) != 0 || *e == '_')
+			e++;
+		/* No enumerator provided to share */
+		if (b == e)
+			return (NULL);
+		s = *e;
+		*e = '\0';
+		alias = topo_strdup(b);
+		tealias_add(rnode, alias);
+		*e = s;
+		return (rnode);
+	}
+	*e = s;
+	return (NULL);
+}
+
+struct tnode *
 chew(char *buf, struct tnode *root, struct tnode *lastleaf)
 {
 	char *t;
@@ -559,6 +606,10 @@ chew(char *buf, struct tnode *root, struct tnode *lastleaf)
 	if (*t == '/')
 		/* a new path to add, growpath returns the leaf node */
 		return (grow_path(t, root));
+
+	if (*t == '!')
+		/* a directive is (probably) present in the topology file */
+		return (consume_directive(t, root));
 
 	return (consume_prop(t, lastleaf));
 }

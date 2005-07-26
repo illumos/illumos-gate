@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,8 +86,9 @@ enumr_ready(struct tenumr *e)
 static void
 enum_all(tnode_t *start, void *arg)
 {
-	tnode_t *parent;
 	struct tenumr *enumr;
+	const char *enumrnm;
+	tnode_t *parent;
 	int inum, min, max;
 
 	topo_out(TOPO_DEBUG, "enumall: ");
@@ -118,10 +119,14 @@ enum_all(tnode_t *start, void *arg)
 
 	/*
 	 * Have a range and need to get the actual instances.
-	 * Determine if we have an enumerator already loaded.
+	 * Determine the name of the enumerator and if we have the
+	 * enumerator already loaded.
 	 */
-	if ((enumr = topo_enumr_hash_lookup(topo_name(start))) == NULL)
-		enumr = topo_load_enumerator(topo_name(start));
+	if ((enumrnm = tealias_find(start)) == NULL)
+		enumrnm = topo_name(start);
+
+	if ((enumr = topo_enumr_hash_lookup(enumrnm)) == NULL)
+		enumr = topo_load_enumerator(enumrnm);
 
 	if (enumr_ready(enumr))
 		enumr->te_enum(start);

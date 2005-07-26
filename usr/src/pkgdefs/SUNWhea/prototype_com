@@ -878,8 +878,9 @@ f none usr/include/sys/pathname.h 644 root bin
 f none usr/include/sys/pattr.h 644 root bin
 f none usr/include/sys/pbio.h 644 root bin
 f none usr/include/sys/pcb.h 644 root bin
-f none usr/include/sys/pci.h 644 root bin
 f none usr/include/sys/pccard.h 644 root bin
+f none usr/include/sys/pci.h 644 root bin
+f none usr/include/sys/pcie.h 644 root bin
 d none usr/include/sys/pcmcia 755 root bin
 f none usr/include/sys/pcmcia/pcata.h 644 root bin
 f none usr/include/sys/pcmcia/pcelx.h 644 root bin

@@ -25,6 +25,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = cpu pcibus pciexbus pciexrc
+MODULE = pciexrc
+CLASS = common
 
-include ../../../Makefile.subdirs
+include ../../Makefile.topoonly

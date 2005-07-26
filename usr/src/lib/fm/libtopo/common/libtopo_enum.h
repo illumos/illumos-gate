@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,7 @@ extern "C" {
 
 #define	ATTACHP "ATTACHMENT-POINT"
 #define	ATTACHD "DRIVER-ATTACHED"
+#define	DEVTYPE	"DEVTYPE"
 #define	DRIVER	"DRIVER"
 #define	LABEL	"LABEL"
 #define	SCAN	"SCAN"

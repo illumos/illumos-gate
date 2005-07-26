@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -60,6 +60,17 @@ struct tprop_hash {
 	struct tprop **tp_hash;		/* hash bucket array */
 	uint_t tp_hashlen;		/* size of hash bucket array */
 	uint_t tp_nelems;		/* number of nodes in the hash */
+};
+
+struct tenum_alias {
+	struct tenum_alias *tea_next;
+	const char *tea_type;
+	char *tea_share;
+};
+
+struct t_extend {
+	struct tnode_hash *te_index;
+	struct tenum_alias *te_aliases;
 };
 
 struct tnode {
@@ -131,6 +142,9 @@ void tprop_index(struct tnode *node, const char *propname);
 
 struct tnode_hash *tnode_hash_create(void);
 void tnode_hash_destroy(struct tnode_hash *);
+
+void tealias_add(struct tnode *, char *);
+const char *tealias_find(struct tnode *);
 
 /* Common usage between hc_path and hc_fmri routines */
 #define	MAXINSTLEN	256

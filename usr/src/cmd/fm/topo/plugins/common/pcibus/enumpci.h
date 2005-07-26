@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,20 +40,35 @@ extern "C" {
 #define	PCI_DEVICE	"pcidev"
 #define	PCI_FUNCTION	"pcifn"
 
+#define	PCIEX_ROOT	"pciexrc"
+#define	PCIEX_SWUP	"pciexswu"
+#define	PCIEX_SWDWN	"pciexswd"
+#define	PCIEX_BUS	"pciexbus"
+#define	PCIEX_DEVICE	"pciexdev"
+#define	PCIEX_FUNCTION	"pciexfn"
+
 extern struct tenumr *Pci_enumr;
 
-#define	PLAINPCI "pci"
+#define	PCIEXTYPE "pciex"
+#define	PCITYPE "pci"
+
 #define	SCHIZO "pcisch"
 #define	PSYCHO "pcipsy"
+#define	NPE "npe"
+#define	PCI "pci"
+#define	PX "px"
 
-#define	REGPROP "reg"
-#define	SLOTPROP "slot-names"
-#define	CLASSPROP "class-code"
+#define	DEVTYPEPROP	"device_type"
 #define	VENDIDPROP	"vendor-id"
 #define	DEVIDPROP	"device-id"
+#define	CLASSPROP	"class-code"
+#define	PHYSPROP	"physical-slot#"
+#define	SLOTPROP	"slot-names"
+#define	REGPROP		"reg"
 
 #define	VENDIDTPROP	"VENDOR-ID"
 #define	DEVIDTPROP	"DEVICE-ID"
+#define	EXCAPTPROP	"EXCAP"
 
 #define	GETCLASS(x) (((x) & 0xff0000) >> 16)
 #define	GETSUBCLASS(x) (((x) & 0xff00) >> 8)

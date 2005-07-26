@@ -25,6 +25,30 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = cpu pcibus pciexbus pciexrc
+.KEEP_STATE:
+.SUFFIXES:
 
-include ../../../Makefile.subdirs
+include ../../../../../Makefile.cmd
+
+TOPO = $(MODULE:%=%.topo)
+
+#
+# Set ROOTPROG and ROOTTOPO based on the values of MODULE, CLASS, and PLATFORMS
+# We expect these macros to be defined by the Makefile that is including us.
+#
+common_TOPODIR = $(ROOT)/usr/lib/fm/topo
+arch_TOPODIR = $(ROOT)/usr/lib/fm/topo/$(ARCH)
+ROOT_TOPO_DIR = $($(CLASS)_TOPODIR)
+
+ROOTTOPO = $(ROOT_TOPO_DIR)/$(TOPO)
+
+include ../../../Makefile.rootdirs
+
+all clean install_h lint _msg:
+
+install:= FILEMODE =	0444
+
+install: $(ROOTTOPO)
+
+clobber:
+	$(RM) $(ROOTTOPO)

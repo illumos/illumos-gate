@@ -25,6 +25,6 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = cpu pcibus pciexbus pciexrc
+!share pcibus
 
-include ../../../Makefile.subdirs
+/pciexbus[0-31]

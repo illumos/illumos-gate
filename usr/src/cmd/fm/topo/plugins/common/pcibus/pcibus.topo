@@ -25,4 +25,5 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 /pcidev[0-31]/pcifn[0-7]/pcibus[0-15]
+/pcidev[0-31]/pcifn[0-7]/pciexrc[0-31]
 /pcidev[32]/pcifn[0]

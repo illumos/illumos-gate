@@ -60,11 +60,11 @@
 #define	MOD_SEP	" :"
 
 static char *Moddirsave;
+static char *Suffixdir;
 
 static char *
 mod_filename_bindpath(const char *mod_filename)
 {
-	static char	*suffixdir = NULL;
 	char		*moddir;
 	char		path[MAXPATHLEN];
 	char		*dir = NULL;
@@ -85,26 +85,27 @@ mod_filename_bindpath(const char *mod_filename)
 			Moddirsave = topo_strdup("");
 			goto out;
 		}
+		topo_out(TOPO_DEBUG, "%s\n", Moddirsave);
 	}
 
 	/*
 	 * On first call, initialize architecture specific directory suffix.
 	 */
-	if (suffixdir == NULL) {
+	if (Suffixdir == NULL) {
 		char *tmpbuf = alloca(MAXPATHLEN);
+		char *sufbuf = alloca(MAXPATHLEN);
 
-		(void) sysinfo(SI_ARCHITECTURE, tmpbuf, MAXPATHLEN);
-		if (strcmp(tmpbuf, "sparc") == 0)
-			suffixdir = "drv/sparcv9";
-		else
-			suffixdir = "drv";
+		(void) sysinfo(SI_ARCHITECTURE_K, tmpbuf, MAXPATHLEN);
+		if (strcmp(tmpbuf, "i386") == 0) {
+			Suffixdir = topo_strdup("drv");
+		} else {
+			(void) snprintf(sufbuf, MAXPATHLEN, "drv/%s", tmpbuf);
+			Suffixdir = topo_strdup(sufbuf);
+		}
 	}
 
 	/* find the last '/' in mod_filename */
-	if (*suffixdir)
-		ls = strrchr(mod_filename, '/');
-	else
-		ls = NULL;
+	ls = strrchr(mod_filename, '/');
 
 	/* initialize for module path string breakup */
 	moddir = topo_strdup(Moddirsave);
@@ -114,21 +115,29 @@ mod_filename_bindpath(const char *mod_filename)
 	while (dir != NULL) {
 		/*
 		 * break out of loop if we find the file.
-		 * try the suffixdir ("sparcv9") specific path first
+		 * try the Suffixdir (e.g, "sparcv9") specific path first
 		 */
 		if (ls) {
-			/* add suffixdir to end of path ("drv/sparcv9/md") */
+			/*
+			 * split mod_filename into a path piece and a
+			 * file piece, then interject our suffix
+			 * between the pieces.
+			 *
+			 * i.e, if path comes in as drv/fish
+			 * and Suffixdir is determined to be sparcv9,
+			 * we end up with .../drv/sparcv9/fish.
+			 */
 			*ls = 0;
 			(void) snprintf(path, sizeof (path), "%s/%s/%s/%s",
-			    dir, mod_filename, suffixdir, &ls[1]);
+			    dir, mod_filename, Suffixdir, &ls[1]);
 			*ls = '/';
 			if ((stat(path, &st) == 0) &&
 			    ((st.st_mode & S_IFMT) == S_IFREG))
 				break;
-		} else if (*suffixdir) {
-			/* we don't have a '/' in path, suffixdir goes first */
+		} else {
+			/* we don't have a '/' in path, Suffixdir goes first */
 			(void) snprintf(path, sizeof (path),
-			    "%s/%s/%s", dir, suffixdir, mod_filename);
+			    "%s/%s/%s", dir, Suffixdir, mod_filename);
 			if ((stat(path, &st) == 0) &&
 			    ((st.st_mode & S_IFMT) == S_IFREG))
 				break;
@@ -355,5 +364,9 @@ topo_driver_fini(void)
 	if (Moddirsave != NULL) {
 		topo_free(Moddirsave);
 		Moddirsave = NULL;
+	}
+	if (Suffixdir != NULL) {
+		topo_free(Suffixdir);
+		Suffixdir = NULL;
 	}
 }

@@ -349,6 +349,7 @@ CHKHDRS=			\
 	pbio.h			\
 	pccard.h		\
 	pci.h			\
+	pcie.h			\
 	pci_impl.h		\
 	pcmcia.h		\
 	pctypes.h		\

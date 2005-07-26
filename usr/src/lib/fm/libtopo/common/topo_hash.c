@@ -20,9 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -227,22 +226,36 @@ tnode_hash_lookup(struct tnode_hash *tab, const char *key)
 	return (tab->tn_hash[idx]);
 }
 
+static struct t_extend *
+get_extend(struct tnode *node)
+{
+	struct tnode *rn;
+
+	if ((rn = node->root) == NULL)
+		return (NULL);
+
+	if (rn->extend == NULL)
+		rn->extend = topo_zalloc(sizeof (struct t_extend));
+
+	return (rn->extend);
+}
+
 void
 tprop_index(struct tnode *node, const char *propname)
 {
 	struct tnode_hash *ht;
-	struct tnode *rn;
+	struct t_extend *re;
 
 	/*
 	 * We keep an index of what nodes have what properties on the
 	 * root node
 	 */
-	if ((rn = node->root) == NULL)
+	if ((re = get_extend(node)) == NULL)
 		return;
 
-	if ((ht = (struct tnode_hash *)rn->extend) == NULL) {
+	if ((ht = re->te_index) == NULL) {
 		ht = tnode_hash_create();
-		rn->extend = ht;
+		re->te_index = ht;
 		topo_out(TOPO_HASH, "props index table is %p\n", (void *)ht);
 	}
 	tnode_hash_insert(ht, propname, node);
@@ -280,15 +293,16 @@ topo_find_propval(struct tnode *node, const char *name, const char *value,
 
 	if (*more == NULL) {
 		struct tnode_hash *ht;
-		struct tnode *rn;
+		struct t_extend *re;
+
 		/*
 		 * We keep an index of what nodes have what properties
 		 * on the root node
 		 */
-		if ((rn = node->root) == NULL)
+		if ((re = get_extend(node)) == NULL)
 			return (NULL);
 
-		if ((ht = (struct tnode_hash *)rn->extend) == NULL)
+		if ((ht = re->te_index) == NULL)
 			return (NULL);
 
 		*more = tnode_hash_lookup(ht, name);
@@ -298,4 +312,64 @@ topo_find_propval(struct tnode *node, const char *name, const char *value,
 	if (*more == NULL)
 		*more = (void *)1;
 	return (r);
+}
+
+void
+tealias_add(tnode_t *node, char *shared_enumr)
+{
+	struct tenum_alias *a, *na;
+	struct tenum_alias *pa = NULL;
+	struct t_extend *re;
+
+	/*
+	 * We keep an index of what node types have enumerator aliases
+	 * on the root node
+	 */
+	if ((re = get_extend(node)) == NULL)
+		return;
+
+	a = re->te_aliases;
+	while (a != NULL) {
+		if (strcmp(a->tea_type, topo_name(node)) == 0) {
+			/* found an alias, so just replace it */
+			topo_free(a->tea_share);
+			a->tea_share = shared_enumr;
+			return;
+		}
+		pa = a;
+		a = a->tea_next;
+	}
+	na = topo_zalloc(sizeof (struct tenum_alias));
+	na->tea_type = topo_name(node);
+	na->tea_share = shared_enumr;
+	if (pa == NULL)
+		re->te_aliases = na;
+	else
+		pa->tea_next = na;
+}
+
+const char *
+tealias_find(struct tnode *node)
+{
+	struct tenum_alias *a;
+	struct t_extend *re;
+
+	/*
+	 * We keep an index of what node types have enumerator aliases
+	 * on the root node
+	 */
+	if ((re = get_extend(node)) == NULL)
+		return (NULL);
+
+	a = re->te_aliases;
+	while (a != NULL) {
+		if (strcmp(a->tea_type, topo_name(node)) == 0) {
+			/* found an alias, so return it */
+			topo_out(TOPO_DEBUG, "for %s use %s.so\n",
+			    a->tea_type, a->tea_share);
+			return (a->tea_share);
+		}
+		a = a->tea_next;
+	}
+	return (NULL);
 }

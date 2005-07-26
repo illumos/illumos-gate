@@ -34,6 +34,7 @@
 #include <sys/fm/io/pci.h>
 #include <sys/fm/io/ddi.h>
 #include <sys/pci.h>
+#include <sys/pcie.h>
 #include <sys/pci_impl.h>
 #include <sys/epm.h>
 
@@ -93,6 +94,7 @@ pci_fm_err_t pci_bdg_err_tbl[] = {
 	PCI_SIG_TA,	PCI_STAT_S_TARG_AB,	NULL,
 	NULL, NULL,
 };
+
 void
 pci_ereport_setup(dev_info_t *dip)
 {
@@ -100,6 +102,12 @@ pci_ereport_setup(dev_info_t *dip)
 	struct i_ddi_fmhdl *fmhdl = devi->devi_fmhdl;
 	pci_erpt_t *erpt_p;
 	ddi_acc_hdl_t *hp;
+	uint16_t pci_devstat = 0;
+	uint16_t pcie_cap = 0;
+	uint8_t ecap_ptr = 0;
+	uint8_t cap_ptr = 0;
+	uint8_t cap_id = 0;
+	int have_pciex;
 
 	if (!DDI_FM_EREPORT_CAP(ddi_fm_capable(dip))) {
 		i_ddi_drv_ereport_post(dip, DVR_EFMCAP, NULL, DDI_SLEEP);
@@ -112,10 +120,78 @@ pci_ereport_setup(dev_info_t *dip)
 	if ((erpt_p = kmem_zalloc(sizeof (pci_erpt_t), KM_SLEEP)) == NULL)
 		return;
 
+	/*
+	 * Setup config space and store config address
+	 * in pci_erpt struct.
+	 */
 	if (pci_config_setup(dip, &erpt_p->pci_cfg_hdl) == DDI_SUCCESS) {
 		hp = impl_acc_hdl_get(erpt_p->pci_cfg_hdl);
 		erpt_p->pci_cfg_addr = (caddr_t)hp->ah_addr;
 		fmhdl->fh_bus_specific = (void *)erpt_p;
+	} else {
+		return;
+	}
+
+	/*
+	 * Determine if this device supports a capabilities list.  We
+	 * do so by looking at a bit in the status register. If we are
+	 * unable to retrieve the status register, something is horribly
+	 * wrong and we should just bail.
+	 */
+	if ((pci_devstat = ddi_get16(erpt_p->pci_cfg_hdl,
+	    (uint16_t *)(erpt_p->pci_cfg_addr + PCI_CONF_STAT))) == 0xff)
+		return;
+	if ((pci_devstat & PCI_STAT_CAP) == 0)
+		return;
+
+	/*
+	 * Determine if we are on a machine with pci express.  We do so
+	 * by looping through the capabilities of the device and looking
+	 * to see if one of those capabilities is support of PCI
+	 * express.
+	 */
+	have_pciex = 0;
+	if ((cap_ptr = ddi_get8(erpt_p->pci_cfg_hdl,
+	    (uint8_t *)(erpt_p->pci_cfg_addr + PCI_CONF_CAP_PTR))) !=
+	    0xff) {
+		while ((cap_id = ddi_get8(erpt_p->pci_cfg_hdl,
+		    (uint8_t *)(erpt_p->pci_cfg_addr + cap_ptr))) !=
+		    0xff) {
+			if (cap_id == PCI_CAP_ID_PCI_E) {
+				ecap_ptr = cap_ptr;
+				have_pciex = 1;
+				break;
+			}
+			if ((cap_ptr = ddi_get8(erpt_p->pci_cfg_hdl,
+			    (uint8_t *)(erpt_p->pci_cfg_addr +
+			    cap_ptr + 1))) == 0xff || cap_ptr == 0)
+				break;
+		}
+	}
+
+	/*
+	 * If not pci express, we're done
+	 */
+	if (have_pciex == 0)
+		return;
+
+	/*
+	 * Save and export the pci express capabilities reg.
+	 */
+	pcie_cap = ddi_get16(erpt_p->pci_cfg_hdl,
+	    (uint16_t *)(erpt_p->pci_cfg_addr + ecap_ptr + PCIE_PCIECAP));
+	(void) ndi_prop_update_int(DDI_DEV_T_NONE,
+	    dip, SAVED_PCIEX_CAP_REG, pcie_cap);
+
+	/*
+	 * Find and export any slot capabilities register
+	 */
+	if (pcie_cap & PCIE_PCIECAP_SLOT_IMPL) {
+		int sltcap = ddi_get32(erpt_p->pci_cfg_hdl,
+		    (uint32_t *)
+		    (erpt_p->pci_cfg_addr + ecap_ptr + PCIE_SLOTCAP));
+		(void) ndi_prop_update_int(DDI_DEV_T_NONE,
+		    dip, SAVED_PCIEX_SLOTCAP_REG, sltcap);
 	}
 }
 
@@ -135,6 +211,8 @@ pci_ereport_teardown(dev_info_t *dip)
 	if (erpt_p == NULL)
 		return;
 
+	(void) ndi_prop_remove(DDI_DEV_T_NONE, dip, SAVED_PCIEX_CAP_REG);
+	(void) ndi_prop_remove(DDI_DEV_T_NONE, dip, SAVED_PCIEX_SLOTCAP_REG);
 	pci_config_teardown(&erpt_p->pci_cfg_hdl);
 	kmem_free(erpt_p, sizeof (pci_erpt_t));
 	fmhdl->fh_bus_specific = NULL;

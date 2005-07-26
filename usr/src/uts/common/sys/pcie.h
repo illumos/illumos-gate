@@ -541,6 +541,12 @@ typedef struct pcie_msg {
 #define	PCIE_MSG_CODE_ERR_NONFATAL	0x31
 #define	PCIE_MSG_CODE_ERR_FATAL		0x33
 
+/*
+ * Exported PCI-express property names
+ */
+#define	SAVED_PCIEX_CAP_REG	"pciex-cap-reg"
+#define	SAVED_PCIEX_SLOTCAP_REG	"pciex-slotcap-reg"
+
 #ifdef	__cplusplus
 }
 #endif
