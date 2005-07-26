@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,15 +129,6 @@
 #else
 #define ISC_FORMAT_PRINTF(fmt, args)
 #endif
-
-/*
- * Several files in the ISC distribution use an ALIGN macro which doesn't
- * appear to be defined anywhere. From the context, it's intended to round
- * up its argument to the nearest suitable boundary. We'll guess that eight
- * byte alignment is sufficient.
- */
-#define	ALIGN(p)	(uint64_t)(((uintptr_t)(p) + (sizeof (uint64_t) - 1)) \
-			& ~(sizeof (uint64_t) - 1))
 
 #ifdef SUNW_SYNONYMS
 #include "synonyms.h"

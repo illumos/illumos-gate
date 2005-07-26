@@ -291,4 +291,13 @@ int isc__gettimeofday(struct timeval *, struct timezone *);
 		_u.k = konst; \
 		var = _u.v; \
 	} while (0)
+
+#ifndef ALIGN
+#if (OS_MAJOR == 5 && OS_MINOR > 8)
+#define ALIGN(x) (((uintptr_t)(x) + (sizeof(char*) - 1UL)) & ~(sizeof(char*) - 1UL))
+#else
+#define ALIGN(x) (((unsigned long)(x) + (sizeof(char*) - 1UL)) & ~(sizeof(char*) - 1UL))
+#endif
+#endif
+
 #endif /* ! PORT_AFTER_H */

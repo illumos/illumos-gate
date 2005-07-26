@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,18 +46,21 @@
 #include <netinet/in.h>
 #include <resolv.h>
 
+void
 res_sethostent(stayopen)
 {
 	if (stayopen)
 		_res.options |= RES_STAYOPEN | RES_USEVC;
 }
 
+void
 res_endhostent()
 {
 	_res.options &= ~(RES_STAYOPEN | RES_USEVC);
 	_res_close();
 }
 
+void
 res_sethostfile(name)
 char *name;
 {

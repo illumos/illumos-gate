@@ -339,11 +339,10 @@ res_gethostbyaddr(addr, len, type)
 	return ((struct hostent *)NULL);
 }
 
-static
-_sethtent(f)
-	int f;
+static void
+_sethtent(int f)
 {
-	if (__res_no_hosts_fallback()) return(0);
+	if (__res_no_hosts_fallback()) return;
 
 	if (hostf == NULL)
 		hostf = fopen(HOSTDB, "r");
@@ -352,10 +351,10 @@ _sethtent(f)
 	stayopen |= f;
 }
 
-static
-_endhtent()
+static void
+_endhtent(void)
 {
-	if (__res_no_hosts_fallback()) return(0);
+	if (__res_no_hosts_fallback()) return;
 
 	if (hostf && !stayopen) {
 		(void) fclose(hostf);

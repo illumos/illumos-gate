@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,7 +82,8 @@ struct state _res = {
  *
  * Return 0 if completes successfully, -1 on error
  */
-res_init()
+int
+res_init(void)
 {
 	register FILE *fp;
 	register char *cp, **pp;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,8 @@
 #include <stdio.h>
 #include <arpa/nameser.h>
 
-static dn_find();
+static int dn_find(u_char *exp_dn, u_char *msg, u_char **dnptrs,
+	u_char **lastdnptr);
 
 
 /*
@@ -55,6 +56,7 @@ static dn_find();
  * 'exp_dn' is a pointer to a buffer of size 'length' for the result.
  * Return size of compressed name or -1 if there was an error.
  */
+int
 dn_expand(msg, eomorig, comp_dn, exp_dn, length)
 	u_char *msg, *eomorig, *comp_dn, *exp_dn;
 	int length;
@@ -134,6 +136,7 @@ dn_expand(msg, eomorig, comp_dn, exp_dn, length)
  * If 'dnptr' is NULL, we don't try to compress names. If 'lastdnptr'
  * is NULL, we don't update the list.
  */
+int
 dn_comp(exp_dn, comp_dn, length, dnptrs, lastdnptr)
 	u_char *exp_dn, *comp_dn;
 	int length;
@@ -212,6 +215,7 @@ dn_comp(exp_dn, comp_dn, length, dnptrs, lastdnptr)
 /*
  * Skip over a compressed domain name. Return the size or -1.
  */
+int
 dn_skipname(comp_dn, eom)
 	u_char *comp_dn, *eom;
 {
@@ -243,10 +247,8 @@ dn_skipname(comp_dn, eom)
  * dnptrs is the pointer to the first name on the list,
  * not the pointer to the start of the message.
  */
-static
-dn_find(exp_dn, msg, dnptrs, lastdnptr)
-	u_char *exp_dn, *msg;
-	u_char **dnptrs, **lastdnptr;
+static int
+dn_find(u_char *exp_dn, u_char *msg, u_char **dnptrs, u_char **lastdnptr)
 {
 	register u_char *dn, *cp, **cpp;
 	register int n;
@@ -328,7 +330,7 @@ _getlong(msgp)
 	return (u | *p);
 }
 
-
+void
 putshort(s, msgp)
 	register u_short s;
 	register u_char *msgp;
@@ -338,6 +340,7 @@ putshort(s, msgp)
 	msgp[0] = s >> 8;
 }
 
+void
 putlong(l, msgp)
 	register u_long l;
 	register u_char *msgp;

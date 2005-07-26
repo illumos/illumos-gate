@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,6 +118,7 @@ static int _confcheck()
  * Form all types of queries.
  * Returns the size of the result or -1.
  */
+int
 res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 	int op;			/* opcode of query */
 	char *dname;		/* domain name */
@@ -136,7 +137,7 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 #ifdef DEBUG
 	if (_res.options & RES_DEBUG)
 		printf("res_mkquery(%d, %s, %d, %d)\n", op, dname, class, type);
-#endif DEBUG
+#endif /* DEBUG */
 	
 	/*
 	 * Check to see if we can bailout quickly.
@@ -304,7 +305,7 @@ res_mkquery(op, dname, class, type, data, datalen, newrr, buf, buflen)
 		hp->ancount = htons(0);
 		break;
 
-#endif ALLOW_UPDATES
+#endif /* ALLOW_UPDATES */
 	}
 	return (cp - buf);
 }

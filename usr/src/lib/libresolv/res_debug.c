@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 
 extern char *p_cdname(), *p_rr(), *p_type(), *p_class(), *p_time();
 extern char *inet_ntoa();
+void fp_query(char *msg, FILE *file);
 
 char *_res_opcodes[] = {
 	"QUERY",
@@ -87,6 +88,7 @@ char *_res_resultcodes[] = {
 	"NOCHANGE",
 };
 
+void
 p_query(msg)
 	char *msg;
 {
@@ -97,6 +99,7 @@ p_query(msg)
  * Print the contents of a query.
  * This is intended to be primarily a debugging routine.
  */
+void
 fp_query(msg, file)
 	char *msg;
 	FILE *file;

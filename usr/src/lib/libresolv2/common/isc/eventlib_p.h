@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,7 +189,7 @@ typedef struct {
 	ctx->field.result = lastnext;
 
 /* Any value other than EV_* values from <isc/eventlib.h> will do */
-#define	EV_WASNONBLOCKING	4000000001
+#define	EV_WASNONBLOCKING	4000000001U
 
 extern short	*__fd_eventfield(int fd, __evEmulMask *maskp);
 extern short	__poll_event(__evEmulMask *maskp);
