@@ -287,6 +287,7 @@ static void runbufcalls(void);
 static void sqenable(syncq_t *);
 static void sqfill_events(syncq_t *, queue_t *, mblk_t *, void (*)());
 static void wait_q_syncq(queue_t *);
+static void backenable_insertedq(queue_t *);
 
 static void queue_service(queue_t *);
 static void stream_service(stdata_t *);
@@ -4037,7 +4038,7 @@ strctty(stdata_t *stp)
  * Use pri == -1 to avoid the setqback
  */
 void
-backenable(queue_t *q, int pri)
+backenable(queue_t *q, uchar_t pri)
 {
 	queue_t	*nq;
 
@@ -4074,8 +4075,7 @@ backenable(queue_t *q, int pri)
 			ASSERT(MUTEX_HELD(QLOCK(nq)));
 		}
 #endif
-		if (pri != -1)
-			setqback(nq, pri);
+		setqback(nq, pri);
 		qenable_locked(nq);
 		if (freezer != curthread)
 			mutex_exit(QLOCK(nq));
@@ -4534,6 +4534,28 @@ strunlock(struct stdata *stp, sqlist_t *sqlist)
 	}
 }
 
+/*
+ * When the module has service procedure, we need check if the next
+ * module which has service procedure is in flow control to trigger
+ * the backenable.
+ */
+static void
+backenable_insertedq(queue_t *q)
+{
+	qband_t	*qbp;
+
+	claimstr(q);
+	if (q->q_qinfo->qi_srvp != NULL && q->q_next != NULL) {
+		if (q->q_next->q_nfsrv->q_flag & QWANTW)
+			backenable(q, 0);
+
+		qbp = q->q_next->q_nfsrv->q_bandp;
+		for (; qbp != NULL; qbp = qbp->qb_next)
+			if ((qbp->qb_flag & QB_WANTW) && qbp->qb_first != NULL)
+				backenable(q, qbp->qb_first->b_band);
+	}
+	releasestr(q);
+}
 
 /*
  * Given two read queues, insert a new single one after another.
@@ -4615,6 +4637,12 @@ insertq(struct stdata *stp, queue_t *new)
 		stp->sd_pushcnt++;
 
 	strunlock(stp, NULL);
+
+	/* check if the write Q needs backenable */
+	backenable_insertedq(wnew);
+
+	/* check if the read Q needs backenable */
+	backenable_insertedq(new);
 }
 
 /*

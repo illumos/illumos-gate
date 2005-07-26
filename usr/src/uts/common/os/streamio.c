@@ -204,15 +204,6 @@ push_mod(queue_t *qp, dev_t *devp, struct stdata *stp, const char *name,
 		return (error);
 
 	/*
-	 * If flow control is on, don't break it - enable
-	 * first back queue with svc procedure
-	 */
-	if (_RD(stp->sd_wrq)->q_flag & QWANTW) {
-		/* Note: no setqback here - use pri -1. */
-		backenable(_RD(stp->sd_wrq->q_next), -1);
-	}
-
-	/*
 	 * Check to see if caller wants a STREAMS anchor
 	 * put at this place in the stream, and add if so.
 	 */
@@ -3774,15 +3765,6 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			}
 		}
 
-		/*
-		 * If flow control is on, don't break it - enable
-		 * first back queue with svc procedure.
-		 */
-		if (rdq->q_flag & QWANTW) {
-			/* Note: no setqback here - use pri -1. */
-			backenable(_RD(wrq->q_next), -1);
-		}
-
 		mutex_enter(&stp->sd_lock);
 
 		/*
@@ -4053,18 +4035,6 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			strendplumb(stp);
 			mutex_exit(&stp->sd_lock);
 			return (error);
-		}
-		/*
-		 * If flow control is on, don't break it - enable
-		 * first back queue with svc procedure.
-		 */
-		if (_RD(tmp_wrq)->q_nfsrv->q_flag & QWANTW) {
-			/*
-			 * Note: no setqback here - use pri -1.
-			 * tmp_wrq->q_next is the new module.  We need
-			 * to backenable() the module below the new module.
-			 */
-			backenable(_RD(tmp_wrq->q_next->q_next), -1);
 		}
 
 		mutex_enter(&stp->sd_lock);

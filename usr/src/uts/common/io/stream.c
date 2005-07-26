@@ -1672,7 +1672,7 @@ mblk_t *
 getq(queue_t *q)
 {
 	mblk_t *bp;
-	int band = 0;
+	uchar_t band = 0;
 
 	bp = getq_noenab(q);
 	if (bp != NULL)
@@ -1778,7 +1778,7 @@ getq_noenab(queue_t *q)
  * But for the write side strwakeq might be invoked and it acquires sd_lock.
  */
 void
-qbackenable(queue_t *q, int band)
+qbackenable(queue_t *q, uchar_t band)
 {
 	int backenab = 0;
 	qband_t *qbp;
@@ -2053,7 +2053,7 @@ flushq_common(queue_t *q, int flag, int pcproto_flag)
 		mutex_exit(QLOCK(q));
 		for (bpri = q->q_nband; bpri != 0; bpri--)
 			if (qbf[bpri])
-				backenable(q, (int)bpri);
+				backenable(q, bpri);
 		if (qbf[0])
 			backenable(q, 0);
 	} else
@@ -2131,7 +2131,7 @@ flushband(queue_t *q, unsigned char pri, int flag)
 			q->q_flag &= ~QWANTW;
 			mutex_exit(QLOCK(q));
 
-			backenable(q, (int)pri);
+			backenable(q, pri);
 		} else
 			mutex_exit(QLOCK(q));
 	} else {	/* pri != 0 */
@@ -2170,7 +2170,7 @@ flushband(queue_t *q, unsigned char pri, int flag)
 		 * will need to be called.
 		 */
 		if (flushed)
-			qbackenable(q, (int)pri);
+			qbackenable(q, pri);
 	}
 }
 
