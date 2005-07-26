@@ -171,7 +171,8 @@ dcam_frame_rcv_init(dcam_state_t *softc_p, int vid_mode, int frame_rate,
 	size_t			num_bytes, num_bytes_left;
 	size_t			num_xfer_cmds, xfer_cmd;
 	size_t			max_ixl_buff_size;
-	caddr_t			ixl_buff_kaddr, ixl_buff_vaddr;
+	uint64_t		ixl_buff_kaddr;
+	caddr_t			ixl_buff_vaddr;
 
 	bytes_per_pkt = g_bytes_per_packet[vid_mode][frame_rate];
 	if (bytes_per_pkt == -1) {
@@ -257,7 +258,7 @@ dcam_frame_rcv_init(dcam_state_t *softc_p, int vid_mode, int frame_rate,
 			num_bytes_left = min(bytes_per_frame,
 			    buff_info_p->dma_cookie.dmac_size);
 
-			ixl_buff_kaddr = (caddr_t)
+			ixl_buff_kaddr =
 			    buff_info_p->dma_cookie.dmac_laddress;
 
 			ixl_buff_vaddr = buff_info_p->kaddr_p;
@@ -277,7 +278,7 @@ dcam_frame_rcv_init(dcam_state_t *softc_p, int vid_mode, int frame_rate,
 					    IXL1394_OP_RECV_PKT_ST;
 
 					new_ixl_xfpp->ixl_buf._dmac_ll =
-					    (uint64_t)ixl_buff_kaddr;
+					    ixl_buff_kaddr;
 					new_ixl_xfpp->size =
 					    (uint16_t)bytes_per_pkt;
 					new_ixl_xfpp->mem_bufp =
@@ -303,7 +304,7 @@ dcam_frame_rcv_init(dcam_state_t *softc_p, int vid_mode, int frame_rate,
 				new_ixl_xfbp->ixl_opcode = IXL1394_OP_RECV_BUF;
 
 				new_ixl_xfbp->ixl_buf._dmac_ll =
-				    (uint64_t)ixl_buff_kaddr;
+				    ixl_buff_kaddr;
 				new_ixl_xfbp->size = (uint16_t)num_bytes;
 				new_ixl_xfbp->pkt_size = bytes_per_pkt;
 				new_ixl_xfbp->mem_bufp = ixl_buff_vaddr;
