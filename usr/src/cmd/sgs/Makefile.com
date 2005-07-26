@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/Makefile.com
@@ -43,11 +43,14 @@ ROOTCCSBINPROG64=	$(PROG:%=$(ROOTCCSBIN64)/%)
 
 # Establish any global flags.
 
-# Setting DEBUG = -DDEBUG (or "make DEBUG=-DDEBUG ...")
-# enables ASSERT() checking in the library
-# This is automatically enabled for DEBUG builds, not for non debug builds.
+# Setting DEBUG = -DDEBUG (or "make DEBUG=-DDEBUG ...") enables ASSERT()
+# checking.  This is automatically enabled for DEBUG builds, not for non-debug
+# builds.  Unset the global C99_DISABLE flag to insure we uncover all compiler
+# warnings/errors.
 DEBUG=
 $(NOT_RELEASE_BUILD)DEBUG = -DDEBUG
+
+C99_DISABLE=	$(C99_ENABLE)
 
 CFLAGS +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
 CFLAGS64 +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)

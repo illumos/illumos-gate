@@ -143,7 +143,7 @@ const Rel_entry	reloc_table[R_AMD64_NUM] = {
  *
  */
 
-#define	HIBITS	0xffffffff80000000
+#define	HIBITS	0xffffffff80000000ULL
 
 int
 do_reloc(unsigned char rtype, unsigned char *off, Xword *value,

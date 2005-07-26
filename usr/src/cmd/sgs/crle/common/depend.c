@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -291,5 +291,5 @@ depend(Crle_desc *crle, const char *name, Half flags, GElf_Ehdr *ehdr)
 			/* NOTREACHED */
 		}
 	}
-	/* NOTREACHED */
+	return (0);
 }

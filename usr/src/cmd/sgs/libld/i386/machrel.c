@@ -109,22 +109,22 @@ calc_plt_addr(Sym_desc *sdp, Ofl_desc *ofl)
 static void
 plt_entry(Ofl_desc * ofl, Word rel_off, Sym_desc * sdp)
 {
-	unsigned char	*pltent, *gotent;
+	uchar_t		*pltent, *gotent;
 	Sword		plt_off;
 	Word		got_off;
 
 	got_off = sdp->sd_aux->sa_PLTGOTndx * M_GOT_ENTSIZE;
 	plt_off = M_PLT_RESERVSZ + ((sdp->sd_aux->sa_PLTndx - 1) *
 	    M_PLT_ENTSIZE);
-	pltent = (unsigned char *)(ofl->ofl_osplt->os_outdata->d_buf) + plt_off;
-	gotent = (unsigned char *)(ofl->ofl_osgot->os_outdata->d_buf) + got_off;
+	pltent = (uchar_t *)(ofl->ofl_osplt->os_outdata->d_buf) + plt_off;
+	gotent = (uchar_t *)(ofl->ofl_osgot->os_outdata->d_buf) + got_off;
 
 	/*
 	 * Fill in the got entry with the address of the next instruction.
 	 */
 	/* LINTED */
 	*(Word *)gotent = ofl->ofl_osplt->os_shdr->sh_addr + plt_off +
-		M_PLT_INSSIZE;
+	    M_PLT_INSSIZE;
 
 	if (!(ofl->ofl_flags & FLG_OF_SHAROBJ)) {
 		pltent[0] = M_SPECIAL_INST;
@@ -197,7 +197,7 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 		    (sdp->sd_isc->is_flags & FLG_IS_RELUPD) &&
 		    /* LINTED */
 		    (psym = am_I_partial(orsp, *(Xword *)
-		    ((unsigned char *)(orsp->rel_isdesc->is_indata->d_buf) +
+		    ((uchar_t *)(orsp->rel_isdesc->is_indata->d_buf) +
 		    orsp->rel_roffset)))) {
 			DBG_CALL(Dbg_move_outsctadj(psym));
 			sectmoved = 1;
@@ -303,7 +303,7 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 /*
  * i386 Instructions for TLS processing
  */
-static unsigned char tlsinstr_gd_ie[] = {
+static uchar_t tlsinstr_gd_ie[] = {
 	/*
 	 * 0x00	movl %gs:0x0, %eax
 	 */
@@ -315,7 +315,7 @@ static unsigned char tlsinstr_gd_ie[] = {
 	0x03, 0x80, 0x00, 0x00, 0x00, 0x00
 };
 
-static unsigned char tlsinstr_gd_le[] = {
+static uchar_t tlsinstr_gd_le[] = {
 	/*
 	 * 0x00 movl %gs:0x0, %eax
 	 */
@@ -331,7 +331,7 @@ static unsigned char tlsinstr_gd_le[] = {
 	0x90
 };
 
-static unsigned char tlsinstr_gd_ie_movgs[] = {
+static uchar_t tlsinstr_gd_ie_movgs[] = {
 	/*
 	 *	movl %gs:0x0,%eax
 	 */
@@ -359,14 +359,11 @@ tls_fixups(Rel_desc *arsp)
 {
 	Sym_desc	*sdp = arsp->rel_sym;
 	Word		rtype = arsp->rel_rtype;
-	unsigned char	*offset;
-	unsigned char	r1;
-	unsigned char	r2;
+	uchar_t		*offset, r1, r2;
 
-	offset = (unsigned char *)(arsp->rel_roffset +
-		_elf_getxoff(arsp->rel_isdesc->is_indata) +
-		(uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
-
+	offset = (uchar_t *)((uintptr_t)arsp->rel_roffset +
+	    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->is_indata) +
+	    (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
 
 	if (sdp->sd_ref == REF_DYN_NEED) {
 		/*
@@ -660,7 +657,7 @@ do_activerelocs(Ofl_desc *ofl)
 		/* LINTED */
 		for (arsp = (Rel_desc *)(rcp + 1);
 		    arsp < rcp->rc_free; arsp++) {
-			unsigned char	*addr;
+			uchar_t		*addr;
 			Word 		value;
 			Sym_desc	*sdp;
 			const char	*ifl_name;
@@ -739,8 +736,8 @@ do_activerelocs(Ofl_desc *ofl)
 				if ((sdp->sd_isc->is_flags & FLG_IS_RELUPD) &&
 				    /* LINTED */
 				    (sym = am_I_partial(arsp, *(Xword *)
-				    ((unsigned char *)
-				    (arsp->rel_isdesc->is_indata->d_buf) +
+				    ((uchar_t *)
+				    arsp->rel_isdesc->is_indata->d_buf +
 				    arsp->rel_roffset)))) {
 					/*
 					 * If the symbol is moved,
@@ -905,22 +902,22 @@ do_activerelocs(Ofl_desc *ofl)
 			/*
 			 * Get the address of the data item we need to modify.
 			 */
-			addr = (unsigned char *)_elf_getxoff(arsp->rel_isdesc->
-			    is_indata) + arsp->rel_roffset;
+			addr = (uchar_t *)((uintptr_t)arsp->rel_roffset +
+			    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->
+			    is_indata));
 
 			DBG_CALL(Dbg_reloc_doact(M_MACH, arsp->rel_rtype,
 			    (uintptr_t)addr, value, arsp->rel_sname,
 			    arsp->rel_osdesc));
 			addr += (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf;
 
-			if (((uintptr_t)addr > ((uintptr_t)ofl->ofl_ehdr +
-			    ofl->ofl_size)) || (arsp->rel_roffset >
+			if ((((uintptr_t)addr - (uintptr_t)ofl->ofl_ehdr) >
+			    ofl->ofl_size) || (arsp->rel_roffset >
 			    arsp->rel_osdesc->os_shdr->sh_size)) {
 				int	class;
 
 				if (((uintptr_t)addr -
-				    (uintptr_t)ofl->ofl_ehdr) >
-				    ofl->ofl_size)
+				    (uintptr_t)ofl->ofl_ehdr) > ofl->ofl_size)
 					class = ERR_FATAL;
 				else
 					class = ERR_WARNING;
@@ -953,7 +950,7 @@ do_activerelocs(Ofl_desc *ofl)
 			 */
 			if ((flags & FLG_OF_RELOBJ) ||
 			    !(dtflags1 & DF_1_NORELOC)) {
-				if (do_reloc((unsigned char)arsp->rel_rtype,
+				if (do_reloc((uchar_t)arsp->rel_rtype,
 				    addr, &value, arsp->rel_sname,
 				    ifl_name) == 0)
 					return_code = S_ERROR;
@@ -1272,7 +1269,6 @@ reloc_GOTOP(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	assert(0);
 	return (S_ERROR);
 }
-
 
 uintptr_t
 reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
@@ -1621,7 +1617,7 @@ fillin_gotplt1(Ofl_desc * ofl)
 
 		if ((sdp = sym_find(MSG_ORIG(MSG_SYM_DYNAMIC_U),
 		    SYM_NOHASH, 0, ofl)) != NULL) {
-			unsigned char	*genptr = ((unsigned char *)
+			uchar_t	*genptr = ((uchar_t *)
 			    ofl->ofl_osgot->os_outdata->d_buf +
 			    (M_GOT_XDYNAMIC * M_GOT_ENTSIZE));
 			/* LINTED */
@@ -1641,9 +1637,9 @@ fillin_gotplt1(Ofl_desc * ofl)
 	 *  }
 	 */
 	if ((ofl->ofl_flags & FLG_OF_DYNAMIC) && ofl->ofl_osplt) {
-		unsigned char *pltent;
+		uchar_t *pltent;
 
-		pltent = (unsigned char *)ofl->ofl_osplt->os_outdata->d_buf;
+		pltent = (uchar_t *)ofl->ofl_osplt->os_outdata->d_buf;
 		if (!(ofl->ofl_flags & FLG_OF_SHAROBJ)) {
 			pltent[0] = M_SPECIAL_INST;
 			pltent[1] = M_PUSHL_DISP;

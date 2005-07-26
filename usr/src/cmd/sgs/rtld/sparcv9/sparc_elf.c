@@ -495,7 +495,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	    (farplt && (addr % M_PLT_INSSIZE))) {
 		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_PLTREF),
 		    conv_reloc_SPARC_type_str(R_SPARC_JMP_SLOT),
-		    EC_XWORD(lmp), EC_XWORD(pltoff), EC_ADDR(from));
+		    EC_ADDR(lmp), EC_XWORD(pltoff), EC_ADDR(from));
 		rtldexit(LIST(lmp), 1);
 	}
 	reloff = pltndx * sizeof (Rela);

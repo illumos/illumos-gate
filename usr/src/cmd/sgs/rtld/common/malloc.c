@@ -82,7 +82,7 @@ static struct page	*memstart;
 
 /* LINTED */
 const ulong_t	patterns[] = {
-	(ulong_t)0xbaddcafebaddcafe, (ulong_t)0xdeadbeefdeadbeef
+	(ulong_t)0xbaddcafebaddcafeULL, (ulong_t)0xdeadbeefdeadbeefULL
 };
 
 static void

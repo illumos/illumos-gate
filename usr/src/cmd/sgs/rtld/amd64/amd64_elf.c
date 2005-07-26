@@ -244,7 +244,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltndx, caddr_t from)
 	    (ulong_t)PLTRELSZ(lmp) / (ulong_t)RELENT(lmp))) {
 		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_PLTREF),
 		    conv_reloc_amd64_type_str(R_AMD64_JUMP_SLOT),
-		    EC_XWORD(lmp), EC_XWORD(pltndx), EC_ADDR(from));
+		    EC_ADDR(lmp), EC_XWORD(pltndx), EC_ADDR(from));
 		rtldexit(LIST(lmp), 1);
 	}
 	reloff = pltndx * (ulong_t)RELENT(lmp);

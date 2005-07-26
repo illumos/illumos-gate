@@ -196,7 +196,7 @@ hdl_alloc()
 		return (0);
 
 	/* LINTED */
-	ndx = (uint64_t)ghp % HDLIST_SZ;
+	ndx = (uintptr_t)ghp % HDLIST_SZ;
 
 	if (list_append(&hdl_list[ndx], ghp) == 0) {
 		free(ghp);
@@ -309,7 +309,7 @@ hdl_create(Lm_list * lml, Rt_map * nlmp, Rt_map * clmp, uint_t flags)
 			uint_t	ndx;
 
 			/* LINTED */
-			ndx = (uint64_t)ghp % HDLIST_SZ;
+			ndx = (uintptr_t)ghp % HDLIST_SZ;
 
 			list_delete(&hdl_list[HDLIST_ORP], ghp);
 			(void) list_append(&hdl_list[ndx], ghp);
@@ -420,7 +420,7 @@ hdl_validate(Grp_hdl * ghp)
 	uint_t		ndx;
 
 	/* LINTED */
-	ndx = (uint64_t)ghp % HDLIST_SZ;
+	ndx = (uintptr_t)ghp % HDLIST_SZ;
 
 	for (LIST_TRAVERSE(&hdl_list[ndx], lnp, _ghp))
 		if ((_ghp == ghp) && (ghp->gh_refcnt != 0))

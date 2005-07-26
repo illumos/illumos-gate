@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,7 +48,7 @@
 #include "rdb.h"
 
 char *
-conv_lmid(Lmid_t ident, char * buf, size_t len)
+conv_lmid(Lmid_t ident, char *buf, size_t len)
 {
 	if (len < 17)
 		return ((char *)0);
@@ -63,9 +63,9 @@ conv_lmid(Lmid_t ident, char * buf, size_t len)
 }
 
 map_info_t *
-str_to_map(struct ps_prochandle * ph, const char * soname)
+str_to_map(struct ps_prochandle *ph, const char *soname)
 {
-	map_info_t *	mip;
+	map_info_t *mip;
 
 	if (soname == PS_OBJ_LDSO)
 		mip = (map_info_t *)&(ph->pp_ldsomap);
@@ -80,9 +80,9 @@ str_to_map(struct ps_prochandle * ph, const char * soname)
 }
 
 map_info_t *
-addr_to_map(struct ps_prochandle * ph, ulong_t addr)
+addr_to_map(struct ps_prochandle *ph, ulong_t addr)
 {
-	map_info_t *	mip;
+	map_info_t *mip;
 	if (ph->pp_lmaplist.ml_head == 0) {
 		/*
 		 * To early to have the full Link Map info available
@@ -109,10 +109,10 @@ addr_to_map(struct ps_prochandle * ph, ulong_t addr)
 
 
 retc_t
-display_linkmaps(struct ps_prochandle * ph)
+display_linkmaps(struct ps_prochandle *ph)
 {
 	char	flagstr[1024];
-	map_info_t *	mip;
+	map_info_t *mip;
 
 	if (ph->pp_lmaplist.ml_head == 0) {
 		printf("link-maps not yet available\n");
@@ -122,7 +122,7 @@ display_linkmaps(struct ps_prochandle * ph)
 	printf("---------\n");
 	for (mip = ph->pp_lmaplist.ml_head; mip; mip = mip->mi_next) {
 		char sbuf[32];
-		rd_loadobj_t *	lp = &mip->mi_loadobj;
+		rd_loadobj_t *lp = &mip->mi_loadobj;
 		printf("link-map: id: %s name: ",
 			conv_lmid(lp->rl_lmident, sbuf, 32));
 		if (mip->mi_refname)
@@ -150,11 +150,11 @@ display_linkmaps(struct ps_prochandle * ph)
 
 
 retc_t
-display_maps(struct ps_prochandle * ph)
+display_maps(struct ps_prochandle *ph)
 {
 	struct stat	stbuf;
-	void *		ptr;
-	prmap_t *	mapptr;
+	void 		*ptr;
+	prmap_t 	*mapptr;
 
 	if (fstat(ph->pp_mapfd, &stbuf) == -1)
 		perr("stat map");
@@ -173,7 +173,7 @@ display_maps(struct ps_prochandle * ph)
 	for (mapptr = (prmap_t *)ptr;
 	    (uintptr_t)mapptr < ((uintptr_t)ptr + stbuf.st_size);
 	    mapptr++) {
-		map_info_t *	mip;
+		map_info_t *mip;
 
 		if (ph->pp_dmodel == PR_MODEL_LP64)
 			printf("%#18lx %#08lx %#04x",
@@ -205,15 +205,15 @@ display_maps(struct ps_prochandle * ph)
 
 
 retc_t
-load_map(struct ps_prochandle * procp, caddr_t baddr, map_info_t * mp)
+load_map(struct ps_prochandle *procp, caddr_t baddr, map_info_t *mp)
 {
-	Elf *		elf;
+	Elf 		*elf;
 	GElf_Ehdr 	ehdr;
 	GElf_Phdr	phdr;
-	Elf_Scn *	scn = 0;
+	Elf_Scn 	*scn = 0;
 	int		cnt;
-	prmap_t *	mapptr;
-	void *		ptr;
+	prmap_t 	*mapptr;
+	void 		*ptr;
 	struct stat	stbuf;
 	int		filefd = -1;
 
@@ -272,7 +272,11 @@ load_map(struct ps_prochandle * procp, caddr_t baddr, map_info_t * mp)
 		mp->mi_flags |= FLG_MI_EXEC;
 
 	mp->mi_end = 0;
+#if	defined(_ELF64)
 	mp->mi_addr = (ulong_t)0xffffffffffffffff;
+#else
+	mp->mi_addr = (ulong_t)0xffffffff;
+#endif
 	for (cnt = 0; cnt < (int)(ehdr.e_phnum); cnt++) {
 		if (gelf_getphdr(mp->mi_elf, cnt, &phdr) == NULL) {
 			printf("gelf_getphdr(): %s\n", elf_errmsg(-1));
@@ -343,10 +347,10 @@ load_map(struct ps_prochandle * procp, caddr_t baddr, map_info_t * mp)
 
 
 static int
-map_iter(const rd_loadobj_t * lop, void * cd)
+map_iter(const rd_loadobj_t *lop, void *cd)
 {
-	struct ps_prochandle *	ph = (struct ps_prochandle *)cd;
-	map_info_t *		mip;
+	struct ps_prochandle 	*ph = (struct ps_prochandle *)cd;
+	map_info_t 		*mip;
 	char			buf[MAXPATHLEN];
 
 	if ((mip = (map_info_t *)calloc(1, sizeof (map_info_t))) == NULL) {
@@ -400,9 +404,9 @@ map_iter(const rd_loadobj_t * lop, void * cd)
 }
 
 void
-free_linkmaps(struct ps_prochandle * ph)
+free_linkmaps(struct ps_prochandle *ph)
 {
-	map_info_t *	cur, * prev;
+	map_info_t *cur, *prev;
 	for (cur = ph->pp_lmaplist.ml_head, prev = 0; cur;
 	    prev = cur, cur = cur->mi_next) {
 		if (prev) {
@@ -427,7 +431,7 @@ free_linkmaps(struct ps_prochandle * ph)
 
 
 retc_t
-get_linkmaps(struct ps_prochandle * ph)
+get_linkmaps(struct ps_prochandle *ph)
 {
 	free_linkmaps(ph);
 	rd_loadobj_iter(ph->pp_rap, map_iter, ph);
@@ -435,7 +439,7 @@ get_linkmaps(struct ps_prochandle * ph)
 }
 
 retc_t
-set_objpad(struct ps_prochandle * ph, size_t padsize)
+set_objpad(struct ps_prochandle *ph, size_t padsize)
 {
 	if (rd_objpad_enable(ph->pp_rap, padsize) != RD_OK) {
 		printf("rdb: error setting object padding\n");

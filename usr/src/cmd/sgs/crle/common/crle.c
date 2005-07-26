@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -109,6 +109,7 @@ typedef struct {
 	unsigned int	o_flags;
 } Objdir;
 
+int
 main(int argc, char ** argv)
 {
 	Crle_desc	crle = { 0 };

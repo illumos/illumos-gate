@@ -1492,3 +1492,8 @@ All the above change is incorporated in the following patches:
 6295971 UNIX98/UNIX03 *vsx* DYNL.hdr/misc/dlfcn/T.dlfcn 14 fails, auxv.h syntax
 	error
 6299525 .init order failure when processing cycles
+6273855 gcc and sgs/crle don't get along
+6273864 gcc and sgs/libld don't get along
+6273875 gcc and sgs/rtld don't get along
+6272563 gcc and amd64/krtld/doreloc.c don't get along
+6290157 gcc and sgs/librtld_db/rdb_demo don't get along

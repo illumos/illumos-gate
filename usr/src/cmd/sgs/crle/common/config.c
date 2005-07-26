@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,6 +55,7 @@ static const int hashsize[] = {
  * Generate a configuration file from the internal configuration information.
  * (very link-editor like).
  */
+int
 genconfig(Crle_desc * crle)
 {
 	int		ndx, bkt;
@@ -595,6 +596,7 @@ genconfig(Crle_desc * crle)
  * the memory reservation of those images is added to the configuration file.
  * The temporary file is then moved into its final resting place.
  */
+int
 updateconfig(Crle_desc * crle)
 {
 	Rtc_head *	head = (Rtc_head *)crle->c_tempaddr;

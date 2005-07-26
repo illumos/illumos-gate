@@ -224,7 +224,7 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 	if (!lmp || ((reloff % sizeof (Rel)) != 0)) {
 		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_PLTREF),
 		    conv_reloc_386_type_str(R_386_JMP_SLOT),
-		    EC_XWORD(lmp), EC_XWORD(reloff), EC_ADDR(from));
+		    EC_ADDR(lmp), EC_XWORD(reloff), EC_ADDR(from));
 		rtldexit(LIST(lmp), 1);
 	}
 

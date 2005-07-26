@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -379,7 +379,7 @@ elf_config(Rt_map * lmp, int aout)
 
 			if (((config->c_bgn <= head->ch_resbgn) &&
 			    (config->c_bgn >= head->ch_resend)) ||
-			    (nu_map((caddr_t)head->ch_resbgn,
+			    (nu_map((caddr_t)(uintptr_t)head->ch_resbgn,
 			    (head->ch_resend - head->ch_resbgn), PROT_NONE,
 			    MAP_FIXED | MAP_PRIVATE) == MAP_FAILED))
 				return (-1);

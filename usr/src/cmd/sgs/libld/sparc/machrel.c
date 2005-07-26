@@ -228,7 +228,7 @@ plt_far_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	Sxword		pltblockoff;	/* offset to Far plt block */
 	Sxword		pltoff;		/* offset to PLT instr. sequence */
 	Sxword		pltptroff;	/* offset to PLT addr ptr */
-	unsigned char	*pltbuf;	/* ptr to PLT's in file */
+	uchar_t		*pltbuf;	/* ptr to PLT's in file */
 
 
 	farblkcnt = ((ofl->ofl_pltcnt - 1 +
@@ -276,7 +276,7 @@ plt_far_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 		pltptroff += ((lastblkpltndx + 1) * M64_PLT_FENTSIZE) +
 			(farpltblkndx * M64_PLT_PSIZE);
 	}
-	pltbuf = (unsigned char *)ofl->ofl_osplt->os_outdata->d_buf;
+	pltbuf = (uchar_t *)ofl->ofl_osplt->os_outdata->d_buf;
 
 	/*
 	 * For far-plts, the Raddend and Roffset fields are defined
@@ -335,7 +335,7 @@ plt_far_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 static void
 plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 {
-	unsigned char	*pltent;	/* PLT entry being created. */
+	uchar_t		*pltent;	/* PLT entry being created. */
 	Sxword		pltoff;		/* Offset of this entry from PLT top */
 
 	/*
@@ -349,7 +349,7 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	}
 
 	pltoff = M_PLT_RESERVSZ + (pltndx - 1) * M_PLT_ENTSIZE;
-	pltent = (unsigned char *)ofl->ofl_osplt->os_outdata->d_buf +
+	pltent = (uchar_t *)ofl->ofl_osplt->os_outdata->d_buf +
 		pltoff;
 
 	*roffset = pltoff + (Xword)(ofl->ofl_osplt->os_shdr->sh_addr);
@@ -744,8 +744,8 @@ tls_fixups(Rel_desc *arsp)
 	Word		rtype = arsp->rel_rtype;
 	uint_t		*offset;
 
-	offset = (uint_t *)(arsp->rel_roffset +
-		_elf_getxoff(arsp->rel_isdesc->is_indata) +
+	offset = (uint_t *)((uintptr_t)arsp->rel_roffset +
+		(uintptr_t)_elf_getxoff(arsp->rel_isdesc->is_indata) +
 		(uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
 
 	if (sdp->sd_ref == REF_DYN_NEED) {
@@ -980,7 +980,7 @@ do_activerelocs(Ofl_desc *ofl)
 		/* LINTED */
 		for (arsp = (Rel_desc *)(rcp + 1);
 		    arsp < rcp->rc_free; arsp++) {
-			unsigned char	*addr;
+			uchar_t		*addr;
 			Xword		value;
 			Sym_desc	*sdp;
 			const char	*ifl_name;
@@ -1231,8 +1231,9 @@ do_activerelocs(Ofl_desc *ofl)
 			/*
 			 * Get the address of the data item we need to modify.
 			 */
-			addr = (unsigned char *)_elf_getxoff(arsp->rel_isdesc->
-			    is_indata) + arsp->rel_roffset;
+			addr = (uchar_t *)((uintptr_t)arsp->rel_roffset +
+			    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->
+			    is_indata));
 
 			/*LINTED*/
 			DBG_CALL(Dbg_reloc_doact(M_MACH, arsp->rel_rtype,
@@ -1270,9 +1271,8 @@ do_activerelocs(Ofl_desc *ofl)
 			 */
 			if ((flags & FLG_OF_RELOBJ) ||
 			    !(dtflags1 & DF_1_NORELOC)) {
-				if (do_reloc((unsigned char)arsp->rel_rtype,
-				    addr, &value, arsp->rel_sname,
-				    ifl_name) == 0)
+				if (do_reloc((uchar_t)arsp->rel_rtype, addr,
+				    &value, arsp->rel_sname, ifl_name) == 0)
 					return_code = S_ERROR;
 			}
 		}
@@ -2194,7 +2194,7 @@ fillin_gotplt1(Ofl_desc * ofl)
 
 		if ((sdp = sym_find(MSG_ORIG(MSG_SYM_DYNAMIC_U),
 		    SYM_NOHASH, 0, ofl)) != NULL) {
-			unsigned char	*genptr = ((unsigned char *)
+			uchar_t	*genptr = ((uchar_t *)
 			    ofl->ofl_osgot->os_outdata->d_buf +
 			    (-neggotoffset * M_GOT_ENTSIZE) +
 			    (M_GOT_XDYNAMIC * M_GOT_ENTSIZE));

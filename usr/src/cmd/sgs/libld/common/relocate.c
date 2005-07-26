@@ -108,7 +108,7 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *cpy)
 		 */
 		for (rend = (Rel *)((uintptr_t)reloc + (uintptr_t)rsize);
 		    reloc < rend;
-		    reloc = (Rel *)((uintptr_t)reloc + entsize)) {
+		    reloc = (Rel *)((uintptr_t)reloc + (uintptr_t)entsize)) {
 			const char	*str;
 			Word		rstndx;
 
@@ -1173,7 +1173,7 @@ reloc_section(Ofl_desc *ofl, Is_desc *isect, Is_desc *rsect, Os_desc *osect)
 
 	for (rend = (Rel *)((uintptr_t)reloc + (uintptr_t)rsize);
 	    reloc < rend;
-	    reloc = (Rel *)((uintptr_t)reloc + entsize)) {
+	    reloc = (Rel *)((uintptr_t)reloc + (uintptr_t)entsize)) {
 		Word	rsndx;
 
 		/*
@@ -1318,7 +1318,7 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 	 */
 	for (rend = (Rel *)((uintptr_t)reloc + (uintptr_t)rsize);
 	    reloc < rend;
-	    reloc = (Rel *)((uintptr_t)reloc + entsize)) {
+	    reloc = (Rel *)((uintptr_t)reloc + (uintptr_t)entsize)) {
 		Sym_desc *	psdp;
 		Move *		mp;
 		Word		rsndx;

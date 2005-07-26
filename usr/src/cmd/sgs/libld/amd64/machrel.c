@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -96,7 +96,7 @@ calc_plt_addr(Sym_desc *sdp, Ofl_desc *ofl)
  *	PUSHL	$index
  *	JMP	.PLT0
  */
-static unsigned char pltn_entry[M_PLT_ENTSIZE] = {
+static uchar_t pltn_entry[M_PLT_ENTSIZE] = {
 /* 0x00 jmpq *name1@GOTPCREL(%rip) */	0xff, 0x25, 0x00, 0x00, 0x00, 0x00,
 /* 0x06 pushq $index */			0x68, 0x00, 0x00, 0x00, 0x00,
 /* 0x0b jmpq  .plt0(%rip) */		0xe9, 0x00, 0x00, 0x00, 0x00
@@ -106,8 +106,7 @@ static unsigned char pltn_entry[M_PLT_ENTSIZE] = {
 static uintptr_t
 plt_entry(Ofl_desc * ofl, Sym_desc * sdp)
 {
-	unsigned char	*plt0;
-	unsigned char	*pltent, *gotent;
+	uchar_t		*plt0, *pltent, *gotent;
 	Sword		plt_off;
 	Word		got_off;
 	Xword		val1;
@@ -117,17 +116,17 @@ plt_entry(Ofl_desc * ofl, Sym_desc * sdp)
 	got_off = sdp->sd_aux->sa_PLTGOTndx * M_GOT_ENTSIZE;
 	plt_off = M_PLT_RESERVSZ + ((sdp->sd_aux->sa_PLTndx - 1) *
 	    M_PLT_ENTSIZE);
-	plt0 = (unsigned char *)(ofl->ofl_osplt->os_outdata->d_buf);
+	plt0 = (uchar_t *)(ofl->ofl_osplt->os_outdata->d_buf);
 	pltent = plt0 + plt_off;
-	gotent = (unsigned char *)(ofl->ofl_osgot->os_outdata->d_buf) + got_off;
+	gotent = (uchar_t *)(ofl->ofl_osgot->os_outdata->d_buf) + got_off;
 
 	bcopy(pltn_entry, pltent, sizeof (pltn_entry));
 	/*
 	 * Fill in the got entry with the address of the next instruction.
 	 */
 	/* LINTED */
-	*(Word *)gotent = ((uintptr_t)ofl->ofl_osplt->os_shdr->sh_addr +
-		(uintptr_t)plt_off + M_PLT_INSSIZE);
+	*(Word *)gotent = ofl->ofl_osplt->os_shdr->sh_addr + plt_off +
+	    M_PLT_INSSIZE;
 
 	/*
 	 * patchup:
@@ -176,9 +175,13 @@ plt_entry(Ofl_desc * ofl, Sym_desc * sdp)
 	/*
 	 * patchup:
 	 *	jmpq	.plt0(%rip)
-	 * NOTE: 0x10 represents next instruction
+	 * NOTE: 0x10 represents next instruction.  The rather complex series
+	 * of casts is necessary to sign extend an offset into a 64-bit value
+	 * while satisfying various compiler error checks.  Handle with care.
 	 */
-	val1 = (Xword)((Xword)plt0 - (uintptr_t)(&pltent[0x10]));
+	val1 = (Xword)((intptr_t)((uintptr_t)plt0 -
+	    (uintptr_t)(&pltent[0x10])));
+
 	/*
 	 * If '-z noreloc' is specified - skip the do_reloc
 	 * stage.
@@ -388,7 +391,7 @@ perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 /*
  * amd64 Instructions for TLS processing
  */
-static unsigned char tlsinstr_gd_ie[] = {
+static uchar_t tlsinstr_gd_ie[] = {
 	/*
 	 *	0x00 movq %fs:0, %rax
 	 */
@@ -401,7 +404,7 @@ static unsigned char tlsinstr_gd_ie[] = {
 	0x00, 0x00
 };
 
-static unsigned char tlsinstr_gd_le[] = {
+static uchar_t tlsinstr_gd_le[] = {
 	/*
 	 *	0x00 movq %fs:0, %rax
 	 */
@@ -414,7 +417,7 @@ static unsigned char tlsinstr_gd_le[] = {
 	0x00, 0x00
 };
 
-static unsigned char tlsinstr_ld_le[] = {
+static uchar_t tlsinstr_ld_le[] = {
 	/*
 	 * .byte 0x66
 	 */
@@ -440,12 +443,11 @@ tls_fixups(Rel_desc *arsp)
 {
 	Sym_desc	*sdp = arsp->rel_sym;
 	Word		rtype = arsp->rel_rtype;
-	unsigned char	*offset;
+	uchar_t		*offset;
 
-	offset = (unsigned char *)(arsp->rel_roffset +
-		_elf_getxoff(arsp->rel_isdesc->is_indata) +
-		(uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
-
+	offset = (uchar_t *)((uintptr_t)arsp->rel_roffset +
+	    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->is_indata) +
+	    (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
 
 	if (sdp->sd_ref == REF_DYN_NEED) {
 		/*
@@ -630,7 +632,7 @@ do_activerelocs(Ofl_desc *ofl)
 		/* LINTED */
 		for (arsp = (Rel_desc *)(rcp + 1);
 		    arsp < rcp->rc_free; arsp++) {
-			unsigned char	*addr;
+			uchar_t		*addr;
 			Xword 		value;
 			Sym_desc	*sdp;
 			const char	*ifl_name;
@@ -709,8 +711,8 @@ do_activerelocs(Ofl_desc *ofl)
 				if ((sdp->sd_isc->is_flags & FLG_IS_RELUPD) &&
 				    /* LINTED */
 				    (sym = am_I_partial(arsp, *(Xword *)
-				    ((unsigned char *)
-				    (arsp->rel_isdesc->is_indata->d_buf) +
+				    ((uchar_t *)
+				    arsp->rel_isdesc->is_indata->d_buf +
 				    arsp->rel_roffset)))) {
 					/*
 					 * If the symbol is moved,
@@ -746,7 +748,7 @@ do_activerelocs(Ofl_desc *ofl)
 			 * address.
 			 */
 			if ((arsp->rel_flags & FLG_REL_LOAD) &&
-			    !(ofl->ofl_flags & FLG_OF_RELOBJ))
+			    !(flags & FLG_OF_RELOBJ))
 				refaddr += arsp->rel_isdesc->is_osdesc->
 				    os_shdr->sh_addr;
 
@@ -895,12 +897,13 @@ do_activerelocs(Ofl_desc *ofl)
 			/*
 			 * Get the address of the data item we need to modify.
 			 */
-			addr = (unsigned char *)_elf_getxoff(arsp->rel_isdesc->
-			    is_indata) + arsp->rel_roffset;
+			addr = (uchar_t *)((uintptr_t)arsp->rel_roffset +
+			    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->
+			    is_indata));
 
 			/* LINTED */
 			DBG_CALL(Dbg_reloc_doact(M_MACH, arsp->rel_rtype,
-			    (Xword)addr, value, arsp->rel_sname,
+			    (uintptr_t)addr, value, arsp->rel_sname,
 			    arsp->rel_osdesc));
 			addr += (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf;
 
@@ -909,8 +912,8 @@ do_activerelocs(Ofl_desc *ofl)
 			    arsp->rel_osdesc->os_shdr->sh_size)) {
 				int	class;
 
-				if (((uintptr_t)addr - (Xword)ofl->ofl_ehdr) >
-				    ofl->ofl_size)
+				if (((uintptr_t)addr -
+				    (uintptr_t)ofl->ofl_ehdr) > ofl->ofl_size)
 					class = ERR_FATAL;
 				else
 					class = ERR_WARNING;
@@ -942,7 +945,7 @@ do_activerelocs(Ofl_desc *ofl)
 			 */
 			if ((flags & FLG_OF_RELOBJ) ||
 			    !(dtflags1 & DF_1_NORELOC)) {
-				if (do_reloc((unsigned char)arsp->rel_rtype,
+				if (do_reloc((uchar_t)arsp->rel_rtype,
 				    addr, &value, arsp->rel_sname,
 				    ifl_name) == 0)
 					return_code = S_ERROR;
@@ -1203,8 +1206,33 @@ reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 		return (1);
 	}
 
+	/*
+	 * If the relocation is against a 'non-allocatable' section
+	 * and we can not resolve it now - then give a warning
+	 * message.
+	 *
+	 * We can not resolve the symbol if either:
+	 *	a) it's undefined
+	 *	b) it's defined in a shared library and a
+	 *	   COPY relocation hasn't moved it to the executable
+	 *
+	 * Note: because we process all of the relocations against the
+	 *	text segment before any others - we know whether
+	 *	or not a copy relocation will be generated before
+	 *	we get here (see reloc_init()->reloc_segments()).
+	 */
 	if (!(rsp->rel_flags & FLG_REL_LOAD) &&
-	    (shndx == SHN_UNDEF)) {
+	    ((shndx == SHN_UNDEF) ||
+	    ((sdp->sd_ref == REF_DYN_NEED) &&
+	    ((sdp->sd_flags & FLG_SY_MVTOCOMM) == 0)))) {
+		/*
+		 * If the relocation is against a SHT_SUNW_ANNOTATE
+		 * section - then silently ignore that the relocation
+		 * can not be resolved.
+		 */
+		if (rsp->rel_osdesc &&
+		    (rsp->rel_osdesc->os_shdr->sh_type == SHT_SUNW_ANNOTATE))
+			return (0);
 		(void) eprintf(ERR_WARNING, MSG_INTL(MSG_REL_EXTERNSYM),
 		    conv_reloc_amd64_type_str(rsp->rel_rtype),
 		    rsp->rel_isdesc->is_file->ifl_name,
@@ -1328,7 +1356,6 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 			return (add_actrel(FLG_REL_STLS, rsp, ofl));
 		return (add_actrel((FLG_REL_TLSFIX | FLG_REL_STLS), rsp, ofl));
 	}
-
 
 	/*
 	 * Building a shared object
@@ -1574,7 +1601,7 @@ assign_plt_ndx(Sym_desc * sdp, Ofl_desc *ofl)
 	sdp->sd_aux->sa_PLTGOTndx = ofl->ofl_gotcnt++;
 }
 
-static unsigned char plt0_template[M_PLT_ENTSIZE] = {
+static uchar_t plt0_template[M_PLT_ENTSIZE] = {
 /* 0x00 PUSHQ GOT+8(%rip) */	0xff, 0x35, 0x00, 0x00, 0x00, 0x00,
 /* 0x06 JMP   *GOT+16(%rip) */	0xff, 0x25, 0x00, 0x00, 0x00, 0x00,
 /* 0x0c NOP */			0x90,
@@ -1597,8 +1624,8 @@ fillin_gotplt1(Ofl_desc * ofl)
 
 		if ((sdp = sym_find(MSG_ORIG(MSG_SYM_DYNAMIC_U),
 		    SYM_NOHASH, 0, ofl)) != NULL) {
-			unsigned char	*genptr = ((unsigned char *)
-			    ofl->ofl_osgot->os_outdata->d_buf +
+			uchar_t	*genptr =
+			    ((uchar_t *)ofl->ofl_osgot->os_outdata->d_buf +
 			    (M_GOT_XDYNAMIC * M_GOT_ENTSIZE));
 			/* LINTED */
 			*(Xword *)genptr = sdp->sd_sym->st_value;
@@ -1616,10 +1643,10 @@ fillin_gotplt1(Ofl_desc * ofl)
 	 *	0x0f NOP
 	 */
 	if ((flags & FLG_OF_DYNAMIC) && ofl->ofl_osplt) {
-		unsigned char	*pltent;
+		uchar_t		*pltent;
 		Xword		val1;
 
-		pltent = (unsigned char *)ofl->ofl_osplt->os_outdata->d_buf;
+		pltent = (uchar_t *)ofl->ofl_osplt->os_outdata->d_buf;
 		bcopy(plt0_template, pltent, sizeof (plt0_template));
 
 		/*
@@ -1678,8 +1705,8 @@ fillin_gotplt1(Ofl_desc * ofl)
 Addr
 fillin_gotplt2(Ofl_desc * ofl)
 {
-	if (ofl->ofl_osgot) {
+	if (ofl->ofl_osgot)
 		return (ofl->ofl_osgot->os_shdr->sh_addr);
-	} else
+	else
 		return (0);
 }
