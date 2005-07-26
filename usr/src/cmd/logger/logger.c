@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,9 +111,8 @@ static void	usage(void);
  *	result on the system log, along with a useful tag.
  */
 
-main(argc, argv)
-int argc;
-char **argv;
+int
+main(int argc, char **argv)
 {
 	char tmp[23];
 	char *tag = NULL;
@@ -160,8 +159,7 @@ char **argv;
 			if (strcmp(optarg, "-") == 0)
 				break;
 			infile = optarg;
-			if (freopen(infile, "r", stdin) == NULL)
-			{
+			if (freopen(infile, "r", stdin) == NULL) {
 				(void) fprintf(stderr, gettext("logger: "));
 				perror(infile);
 				exit(1);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -660,9 +660,8 @@ static char Bell = ctrl('G');
 ** string "string"
 */
 
-tailequ (path, string)
-char *path;
-register char *string;
+int
+tailequ(char *path, char *string)
 {
 	return (!strcmp(basename(path), string));
 }

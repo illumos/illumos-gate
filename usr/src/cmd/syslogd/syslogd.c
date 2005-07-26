@@ -3276,7 +3276,7 @@ nofile:
  * this is called before multiple threads are running, so no mutex
  * needs to be held at this time.
  */
-static
+static int
 filed_init(struct filed *f)
 {
 	pthread_attr_t stack_attr;

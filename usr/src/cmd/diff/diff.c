@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,7 +214,7 @@ ralloc(void *p, size_t n)	/* compacting reallocation */
 }
 
 
-void
+int
 main(int argc, char **argv)
 {
 	int k;
@@ -500,6 +500,7 @@ same:
 		(void) printf(gettext("No differences encountered\n"));
 	done();
 	/*NOTREACHED*/
+	return (0);
 }
 
 static int

@@ -19,14 +19,17 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- *
- * logadm/conf.c -- configuration file module
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * logadm/conf.c -- configuration file module
+ */
 
 #include <stdio.h>
 #include <libintl.h>
@@ -61,7 +64,7 @@ static boolean_t Confchanged;	/* true if we need to write changes back */
  * our structured representation of the configuration file
  * is made up of a list of these
  */
-static struct confinfo {
+struct confinfo {
 	struct confinfo *cf_next;
 	int cf_lineno;		/* line number in file */
 	const char *cf_entry;	/* name of entry, if line has an entry */

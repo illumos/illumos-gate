@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,11 +84,12 @@ char *month[] = {
 	"[Dd]ec"
 };
 
+static void read_tmpl(void);
 static void error(const char *fmt, ...);
+static void generate(char *);
 
-static
-tprint(t)
-time_t t;
+static void
+tprint(time_t t)
 {
 	struct tm *tm;
 	tm = localtime(&t);
@@ -97,7 +98,8 @@ time_t t;
 		month[tm->tm_mon], tm->tm_mon + 1, tm->tm_mday);
 }
 
-main()
+int
+main(int argc, char *argv[])
 {
 
 	(void) setlocale(LC_ALL, "");
@@ -128,12 +130,12 @@ main()
 		else
 			read_tmpl();
 	}
-	exit(0);
+	return (0);
 }
 
 
-static
-read_tmpl()
+static void
+read_tmpl(void)
 {
 	char	*clean_line();
 	FILE  *fp;
@@ -181,8 +183,7 @@ read_tmpl()
 
 
 char  *
-clean_line(s)
-char *s;
+clean_line(char *s)
 {
 	char  *ns;
 
@@ -214,9 +215,8 @@ error(const char *fmt, ...)
 	exit(1);
 }
 
-static
-generate(fmt)
-char *fmt;
+static void
+generate(char *fmt)
 {
 	char	timebuf[1024];
 	char	outbuf[2 * 1024];
@@ -227,15 +227,13 @@ char *fmt;
 	tb = timebuf;
 	ob = outbuf;
 	while (*tb)
-		if (isspace(*tb))
-			{
+		if (isspace(*tb)) {
 			++tb;
 			space++;
-			}
+		}
 		else
 			{
-			if (space)
-				{
+			if (space) {
 				*ob++ = '[';
 				*ob++ = ' ';
 				*ob++ = '\t';
@@ -243,15 +241,14 @@ char *fmt;
 				*ob++ = '*';
 				space = 0;
 				continue;
-				}
-			if (isalpha(*tb))
-				{
+			}
+			if (isalpha(*tb)) {
 				*ob++ = '[';
 				*ob++ = toupper(*tb);
 				*ob++ = tolower(*tb++);
 				*ob++ = ']';
 				continue;
-				}
+			}
 			else
 				*ob++ = *tb++;
 				if (*(tb - 1) == '0')

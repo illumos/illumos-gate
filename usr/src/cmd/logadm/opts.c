@@ -19,14 +19,17 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- *
- * logadm/opts.c -- options handling routines
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * logadm/opts.c -- options handling routines
+ */
 
 #include <stdio.h>
 #include <libintl.h>
@@ -334,6 +337,7 @@ opts_parse_bytes(const char *o, const char *optarg)
 	err(EF_FILE|EF_JMP,
 	    "Option '%c' requires number with suffix from [bkmg]", *o);
 	/*NOTREACHED*/
+	return (0);
 }
 
 /*
@@ -381,10 +385,11 @@ opts_parse_seconds(const char *o, const char *optarg)
 	err(EF_FILE|EF_JMP,
 	    "Option '%c' requires number with suffix from [hdwmy]", *o);
 	/*NOTREACHED*/
+	return (0);
 }
 
 /* info passed between opts_print() and printer() */
-static struct printerinfo {
+struct printerinfo {
 	FILE *stream;
 	int isswitch;
 	char *exclude;
