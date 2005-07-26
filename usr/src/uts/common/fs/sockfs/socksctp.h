@@ -113,8 +113,8 @@ extern struct cmsghdr *sosctp_find_cmsg(const uchar_t *control, socklen_t clen,
     int type);
 extern void sosctp_pack_cmsg(const uchar_t *, struct nmsghdr *, int);
 
-extern struct sctp_soassoc *sosctp_assoc(struct sctp_sonode *ss,
-    sctp_assoc_t id);
+extern int sosctp_assoc(struct sctp_sonode *ss, sctp_assoc_t id,
+    struct sctp_soassoc **ssa);
 extern struct sctp_soassoc *sosctp_assoc_create(struct sctp_sonode *ss,
     int kmflags);
 extern void sosctp_assoc_free(struct sctp_sonode *ss, struct sctp_soassoc *ssa);
@@ -146,7 +146,7 @@ extern int sosctp_uiomove(mblk_t *hdr_mp, ssize_t count, ssize_t blk_size,
 
 #define	SSA_REFHOLD(ssa)					\
 {								\
-	ASSERT(MUTEX_HELD(&ssa->ssa_sonode->ss_so.so_lock));	\
+	ASSERT(MUTEX_HELD(&(ssa)->ssa_sonode->ss_so.so_lock));	\
 	ASSERT((ssa)->ssa_refcnt > 0);				\
 	++(ssa)->ssa_refcnt;					\
 	dprint(3, ("ssa_refhold on %p %d (%s,%d)\n", (ssa),	\

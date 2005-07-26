@@ -136,29 +136,30 @@ sosctp_aid_grow(struct sctp_sonode *ss, sctp_assoc_t maxid, int kmflags)
  * Convert a id into a pointer to sctp_sockassoc structure.
  * Increments refcnt.
  */
-struct sctp_soassoc *
-sosctp_assoc(struct sctp_sonode *ss, sctp_assoc_t id)
+int
+sosctp_assoc(struct sctp_sonode *ss, sctp_assoc_t id, struct sctp_soassoc **ssa)
 {
-	struct sctp_soassoc *ssa;
-
+	ASSERT(*ssa != NULL);
 	ASSERT(MUTEX_HELD(&ss->ss_so.so_lock));
 	if ((uint32_t)id >= ss->ss_maxassoc) {
-		return (NULL);
+		*ssa = NULL;
+		return (EINVAL);
 	}
 
-	if ((ssa = ss->ss_assocs[id].ssi_assoc) == NULL) {
-		return (NULL);
+	if ((*ssa = ss->ss_assocs[id].ssi_assoc) == NULL) {
+		return (EINVAL);
 	}
-	if ((ssa->ssa_state & (SS_CANTSENDMORE|SS_CANTRCVMORE)) ==
+	if (((*ssa)->ssa_state & (SS_CANTSENDMORE|SS_CANTRCVMORE)) ==
 	    (SS_CANTSENDMORE|SS_CANTRCVMORE)) {
 		/*
 		 * Disconnected connection, shouldn't be found anymore
 		 */
-		return (NULL);
+		*ssa = NULL;
+		return (ESHUTDOWN);
 	}
-	SSA_REFHOLD(ssa)
+	SSA_REFHOLD(*ssa)
 
-	return (ssa);
+	return (0);
 }
 
 /*

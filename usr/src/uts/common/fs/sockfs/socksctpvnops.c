@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -468,9 +468,9 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		intval = STRUCT_FGET(opt, sopt_aid);
 		mutex_enter(&so->so_lock);
 		if ((so->so_type == SOCK_SEQPACKET) && intval) {
-			if ((ssa = sosctp_assoc(ss, intval)) == NULL) {
+			if ((error = sosctp_assoc(ss, intval, &ssa)) != 0) {
 				mutex_exit(&so->so_lock);
-				return (EINVAL);
+				return (error);
 			}
 			conn = ssa->ssa_conn;
 			ASSERT(conn != NULL);
@@ -533,9 +533,9 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		intval = STRUCT_FGET(opt, sopt_aid);
 		mutex_enter(&so->so_lock);
 		if (intval != 0) {
-			if ((ssa = sosctp_assoc(ss, intval)) == NULL) {
+			if ((error = sosctp_assoc(ss, intval, &ssa)) != 0) {
 				mutex_exit(&so->so_lock);
-				return (EINVAL);
+				return (error);
 			}
 			conn = ssa->ssa_conn;
 			ASSERT(conn != NULL);

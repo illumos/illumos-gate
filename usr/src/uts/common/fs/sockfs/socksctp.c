@@ -1389,9 +1389,7 @@ sosctp_seq_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		}
 		so_unlock_single(so, SOLOCKED);
 	} else {
-		ssa = sosctp_assoc(ss, aid);
-		if (ssa == NULL) {
-			error = EINVAL;
+		if ((error = sosctp_assoc(ss, aid, &ssa)) != 0) {
 			eprintsoline(so, error);
 			goto done;
 		}
@@ -1909,9 +1907,7 @@ sosctp_setsockopt(struct sonode *so, int level, int option_name,
 		 * Otherwise set the default setting of a socket.
 		 */
 		if (id != 0) {
-			ssa = sosctp_assoc(ss, id);
-			if (ssa == NULL) {
-				error = EINVAL;
+			if ((error = sosctp_assoc(ss, id, &ssa)) != 0) {
 				eprintsoline(so, error);
 				goto done;
 			}
@@ -1943,8 +1939,8 @@ sosctp_setsockopt(struct sonode *so, int level, int option_name,
 		    optlen);
 		mutex_enter(&so->so_lock);
 		for (aid = 1; aid < ss->ss_maxassoc; aid++) {
-			ssa = sosctp_assoc(ss, aid);
-			if (ssa == NULL) {
+			if ((error = sosctp_assoc(ss, aid, &ssa)) != 0) {
+				error = 0;
 				continue;
 			}
 			mutex_exit(&so->so_lock);
