@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.15	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 	news foo	prints /var/news/foo
@@ -85,11 +89,19 @@ char	time_buf[50];	/* holds date and time string */
 
 jmp_buf	save_addr;
 
-main (argc, argv)
-int	argc;
-char	**argv;
+void all_news(void);
+int ck_num(void);
+void count(char *);
+void initialize(void);
+void late_news(void(*)(), int);
+void notify(char *);
+void print_item(char *);
+void read_dir(void);
+
+int
+main(int argc, char **argv)
 {
-	int print_item(), notify(), count(),i;
+	int i;
 
 	(void)setlocale(LC_ALL, "");
 	setbuf (stdout, stdbuf);
@@ -151,7 +163,7 @@ char	**argv;
 
 	for (i=1; i<argc; i++) print_item (argv[i]);
 
-	exit(0);
+	return (0);
 }
 
 /*
@@ -160,7 +172,8 @@ char	**argv;
  *	modification date. We assume /var/news is the working directory.
  */
 
-read_dir()
+void
+read_dir(void)
 {
 	struct dirent *nf, *readdir();
 	struct stat sbuf;
@@ -221,7 +234,8 @@ read_dir()
 	closedir(dirp);
 }
 
-initialize()
+void
+initialize(void)
 {
 	if (signal (SIGQUIT, SIG_IGN) != (void(*)())SIG_IGN)
 		signal (SIGQUIT, _exit);
@@ -232,7 +246,8 @@ initialize()
 	}
 }
 
-all_news()
+void
+all_news(void)
 {
 	int i;
 
@@ -240,8 +255,8 @@ all_news()
 		print_item (n_list[i].n_name);
 }
 
-print_item (f)
-	char *f;
+void
+print_item(char *f)
 {
 	FILE *fd;
 	char fname[MAXNAMLEN+1];
@@ -332,8 +347,8 @@ finish:
 	}
 }
 
-late_news (emit, update)
-	int (*emit)(), update;
+void
+late_news(void(*emit)(), int update)
 {
 	long cutoff;
 	int i;
@@ -374,8 +389,8 @@ late_news (emit, update)
 	}
 }
 
-notify (s)
-	char *s;
+void
+notify(char *s)
 {
 	static int first = 1;
 
@@ -390,8 +405,8 @@ notify (s)
 }
 
 /*ARGSUSED*/
-count (s)
-	char *s;
+void
+count(char *s)
 {
 	static int nitems = 0;
 
@@ -414,9 +429,10 @@ onintr()
 	sleep(2);
 	longjmp(save_addr, 1);
 }
-ck_num()
+
+int
+ck_num(void)
 {
 	if (sopt && !number_read) printf("No news.\n");
 	return(0);
 }
-

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,8 +53,8 @@ hashlook(char *s)
 {
 	unsigned long h;
 	unsigned long t;
-	register bp;
-	register unsigned *wp;
+	int bp;
+	unsigned *wp;
 	long sum;
 	unsigned *tp;
 
@@ -111,7 +111,7 @@ hashlook(char *s)
 int
 prime(char *file)
 {
-	register FILE *f;
+	FILE *f;
 
 #ifdef pdp11	/* because of insufficient address space for buffers */
 	fd = dup(0);

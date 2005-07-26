@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2005 Sun Microsystems, Inc. All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -152,7 +151,7 @@ static char *untab(char l[]);
 static int patoi(char *b);
 static int equal(char *a, char *b);
 
-void
+int
 main(int argc, char *argv[])
 {
 	struct Comd comdstruct, *p;
@@ -186,6 +185,9 @@ main(int argc, char *argv[])
 	prompt = 0;
 	/*CONSTCOND*/	for (;;)
 		begin(p);
+
+	/* NOTREACHED */
+	return (0);
 }
 
 static void

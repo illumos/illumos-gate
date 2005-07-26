@@ -20,13 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Two output fields under the -i option will always be
@@ -37,7 +38,6 @@
  *	which Sun doesn't support per se.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -67,6 +67,7 @@ static	int	readvtoc(int fd, char *name, struct vtoc *vtoc);
 static	int	warn(char *what, char *why);
 static	void	usage(void);
 
+int
 main(int argc, char **argv)
 {
 	struct dk_geom  geom;

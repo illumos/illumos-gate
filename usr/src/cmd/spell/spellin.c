@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -67,7 +73,7 @@ append(register unsigned w1, register int i)
  *	hashed words in octal
  */
 
-void
+int
 main(int argc, char **argv)
 {
 	long h, k, d;
@@ -151,5 +157,5 @@ main(int argc, char **argv)
 	(void) fprintf(stderr, "%s: %f table bits/item, %f table+index bits\n",
 	    argv[0], (((float)BYTE * wp) * sizeof (*table) / count),
 	    (BYTE * ((float)wp * sizeof (*table) + sizeof (hindex)) / count));
-	exit(0);
+	return (0);
 }

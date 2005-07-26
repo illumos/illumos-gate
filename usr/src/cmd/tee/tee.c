@@ -20,15 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * tee - pipe fitting
@@ -55,6 +54,7 @@ static int openf[MAXFILES] = { 1 };
 static char in[PIPE_BUF];
 static const char *usage = "usage: tee [-ai] [file...]\n";
 
+int
 main(int argc, char **argv)
 {
 	int		w;

@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	factor	COMPILE:	cc -O factor.c -s -i -lm -o factor	*/
 /*
@@ -45,13 +49,14 @@ double sq[] = {
 	 2, 6, 4, 2, 4, 2,10, 2,
 };
 
-main(argc, argv)
-int argc;
-char *argv[];
+void try(double);
+
+int
+main(int argc, char *argv[])
 {
 	int test = 1;
 	int ret;
-	register j;
+	int j;
 	double junk, temp;
 	double fr;
 	double ii;
@@ -105,11 +110,11 @@ retry:
 		}
 		printf("\n");
 	}
-	exit(0);
+	return (0);
 }
 
-try(arg)
-double arg;
+void
+try(double arg)
 {
 	double temp;
 retry:
@@ -120,5 +125,4 @@ retry:
 		vv = 1 + sqrt(nn);
 		goto retry;
 	}
-	return;
 }

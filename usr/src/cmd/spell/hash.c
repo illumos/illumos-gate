@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,8 +68,8 @@ static signed char hashtab[] = {
 unsigned long
 hash(char *s)
 {
-	register c;
-	register long *lp;
+	int c;
+	long *lp;
 	unsigned long h = 0;
 	for (lp = pow2; (c = *s++) != 0; ) {
 		c = hashtab[c-' '];
@@ -86,7 +86,7 @@ hashinit(void)
 #if ((1L << (HASHWIDTH+LOCHWIDTH) == 0) || (1L << (HASHWIDTH+HICHWIDTH) == 0))
 	abort();	/* overflow is imminent */
 #else
-	register i;
+	int i;
 
 	pow2[0] = 1L<<(HASHWIDTH-CHARWIDTH-2);
 	for (i = 0; i < 2*NC-3; i += 2) {

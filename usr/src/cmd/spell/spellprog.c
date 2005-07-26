@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -233,11 +232,11 @@ static FILE *file, *found;
  *
  */
 
-void
+int
 main(int argc, char **argv)
 {
-	register char *ep, *cp;
-	register char *dp;
+	char *ep, *cp;
+	char *dp;
 	int fold;
 	int c, j;
 	int pass;
@@ -351,8 +350,8 @@ foundit:
 static int
 trysuff(char *ep, int lev)
 {
-	register struct suftab	*t;
-	register char *cp, *sp;
+	struct suftab	*t;
+	char *cp, *sp;
 
 	lev += DLEV;
 	deriv[lev] = deriv[lev-1] = 0;
@@ -582,8 +581,8 @@ VCe(char *ep, char *d, char *a, int lev)
 static char *
 lookuppref(char **wp, char *ep)
 {
-	register char **sp;
-	register char *bp, *cp;
+	char **sp;
+	char *bp, *cp;
 
 	for (sp = preftab; *sp; sp++) {
 		bp = *wp;
@@ -607,9 +606,9 @@ next:;
 static int
 trypref(char *ep, char *a, int lev)
 {
-	register char *cp;
+	char *cp;
 	char *bp;
-	register char *pp;
+	char *pp;
 	int val = 0;
 	char space[LINE_MAX * 2];
 	deriv[lev] = a;
@@ -634,7 +633,7 @@ trypref(char *ep, char *a, int lev)
 static int
 tryword(char *bp, char *ep, int lev)
 {
-	register i, j;
+	int i, j;
 	char duple[3];
 	if (ep-bp <= 1)
 		return (0);
@@ -708,7 +707,7 @@ vowel(int c)
 static void
 ise(void)
 {
-	register struct suftab *p;
+	struct suftab *p;
 
 	for (p = suftab; p->suf; p++) {
 		ztos(p->suf);
@@ -728,7 +727,7 @@ ztos(char *s)
 static int
 dict(char *bp, char *ep)
 {
-	register temp, result;
+	int temp, result;
 	if (xflag)
 		(void) fprintf(stdout, "=%.*s\n", ep-bp, bp);
 	temp = *ep;

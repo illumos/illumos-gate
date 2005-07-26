@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -33,7 +38,7 @@
 #include "hash.h"
 
 /* ARGSUSED */
-void
+int
 main(int argc, char **argv)
 {
 	char word[LINE_MAX];
@@ -49,5 +54,5 @@ main(int argc, char **argv)
 	while (gets(word)) {
 		(void) printf("%.*lo\n", (HASHWIDTH+2)/3, hash(word));
 	}
-	exit(0);
+	return (0);
 }

@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,12 +12,7 @@
  * specifies the terms and conditions for redistribution.
  */
      
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-  
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -30,10 +29,14 @@ char entry[WORDSIZE];
 char word[WORDSIZE];
 char key[WORDSIZE];
 
-main(argc,argv)
-char **argv;
+int	compare(char *, char *);
+void	canon(char *, char *);
+int	getword(char *);
+
+int
+main(int argc, char **argv)
 {
-	register c;
+	int c;
 	long top,bot,mid;
 	char *wstring, *ptr;
 
@@ -62,7 +65,7 @@ char **argv;
 		argv++;
 	}
 	if(argc<=1)
-		return;
+		return (1);
 	if(argc==2) {
 		fold++;
 		dict++;
@@ -111,11 +114,11 @@ char **argv;
 	fseek(dfile,bot,0);
 	while(ftell(dfile)<top) {
 		if(!getword(entry))
-			return;
+			return (0);
 		canon(entry,word);
 		switch(compare(key,word)) {
 		case -2:
-			return;
+			return (0);
 		case -1:
 		case 0:
 			puts(entry);
@@ -136,11 +139,11 @@ char **argv;
 		}
 		break;
 	}
-	exit(0);
+	return (0);
 }
 
-compare(s,t)
-register char *s,*t;
+int
+compare(char *s, char *t)
 {
 	for(;*s==*t;s++,t++)
 		if(*s==0)
@@ -151,11 +154,11 @@ register char *s,*t;
 		2);
 }
 
-getword(w)
-register char *w;
+int
+getword(char *w)
 {
-	register c;
-	register avail = WORDSIZE - 1;
+	int c;
+	int avail = WORDSIZE - 1;
 
 	while(avail--) {
 		c = getc(dfile);
@@ -171,11 +174,11 @@ register char *w;
 	return(1);
 }
 
-canon(old,new)
-char *old,*new;
+void
+canon(char *old, char *new)
 {
-	register c;
-	register avail = WORDSIZE - 1;
+	int c;
+	int avail = WORDSIZE - 1;
 
 	for(;;) {
 		*new = c = *old++;

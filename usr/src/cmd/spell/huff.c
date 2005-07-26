@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,7 +111,7 @@ struct huff huffcode;
 int
 decode(long y, long *pk)
 {
-	register l;
+	int l;
 	long v;
 	if (y < cs) {
 		*pk = y >> (long)(L+QW-w);
@@ -135,7 +135,7 @@ decode(long y, long *pk)
 int
 encode(long k, long *py)
 {
-	register l;
+	int l;
 	long y;
 	if (k < c) {
 		*py = k;
@@ -180,7 +180,7 @@ qlog(double x, double y, long p, double u)	/* find smallest p so x^p<=y */
 double
 huff(float a)
 {
-	register i, q;
+	int i, q;
 	long d, j;
 	double r = a/(1.0 + a);
 	double rc, rq;
