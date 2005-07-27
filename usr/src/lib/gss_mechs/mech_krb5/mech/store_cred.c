@@ -240,15 +240,12 @@ gss_cred_usage_t *cred_usage_stored;
 			goto cleanup;
 
 		maj = gss_add_oid_set_member(minor_status,
-			    (const gss_OID)gss_mech_krb5_old, &desired_mechs);
-		if (GSS_ERROR(maj))
+			    (const gss_OID)gss_mech_krb5, elements_stored);
+		if (GSS_ERROR(maj)) {
+			(void) gss_release_oid_set(&min, elements_stored);
+			*elements_stored = GSS_C_NULL_OID_SET;
 			goto cleanup;
-
-		maj = gss_add_oid_set_member(minor_status,
-			    (const gss_OID)gss_mech_krb5,
-				&desired_mechs);
-		if (GSS_ERROR(maj))
-			goto cleanup;
+		}
 	}
 
 cleanup:
@@ -261,8 +258,6 @@ cleanup:
 		(void) krb5_gss_release_name_no_lock(ctx, &min, &in_name);
 	if (cur_name != GSS_C_NO_NAME)
 		(void) krb5_gss_release_name_no_lock(ctx, &min, &cur_name);
-	if (elements_stored != NULL && *elements_stored != GSS_C_NULL_OID_SET)
-		(void) gss_release_oid_set(&min, elements_stored);
 
 	return (maj);
 }
