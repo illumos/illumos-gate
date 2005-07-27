@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,7 +196,7 @@ dumpfs(const char *name)
 		perror(name);
 		return (1);
 	}
-	llseek(0, (offset_t)SBLOCK * DEV_BSIZE, 0);
+	(void) llseek(0, (offset_t)SBLOCK * DEV_BSIZE, 0);
 	if (read(0, &afs, SBSIZE) != SBSIZE) {
 		perror(name);
 		return (1);
@@ -207,92 +207,95 @@ dumpfs(const char *name)
 	    (afs.fs_version > MTB_UFS_VERSION_1 ||
 	    afs.fs_version < MTB_UFS_VERSION_MIN))
 		return (31+1);
-	printf("%s\n", "ufs");
+	(void) printf("%s\n", "ufs");
 	if (!vflag)
 		return (0);
 	fsp = &afs;
 	t = (time_t)afs.fs_time;
-	printf("magic\t%x\tformat\t%s\ttime\t%s", afs.fs_magic,
+	(void) printf("magic\t%x\tformat\t%s\ttime\t%s", afs.fs_magic,
 	    afs.fs_postblformat == FS_42POSTBLFMT ? "static" : "dynamic",
 	    ctime(&t));
-	printf("sblkno\t%d\tcblkno\t%d\tiblkno\t%d\tdblkno\t%d\n",
+	(void) printf("sblkno\t%d\tcblkno\t%d\tiblkno\t%d\tdblkno\t%d\n",
 	    afs.fs_sblkno, afs.fs_cblkno, afs.fs_iblkno, afs.fs_dblkno);
-	printf("sbsize\t%d\tcgsize\t%d\tcgoffset %d\tcgmask\t0x%08x\n",
+	(void) printf("sbsize\t%d\tcgsize\t%d\tcgoffset %d\tcgmask\t0x%08x\n",
 	    afs.fs_sbsize, afs.fs_cgsize, afs.fs_cgoffset, afs.fs_cgmask);
-	printf("ncg\t%d\tsize\t%d\tblocks\t%d\n",
+	(void) printf("ncg\t%d\tsize\t%d\tblocks\t%d\n",
 	    afs.fs_ncg, afs.fs_size, afs.fs_dsize);
-	printf("bsize\t%d\tshift\t%d\tmask\t0x%08x\n",
+	(void) printf("bsize\t%d\tshift\t%d\tmask\t0x%08x\n",
 	    afs.fs_bsize, afs.fs_bshift, afs.fs_bmask);
-	printf("fsize\t%d\tshift\t%d\tmask\t0x%08x\n",
+	(void) printf("fsize\t%d\tshift\t%d\tmask\t0x%08x\n",
 	    afs.fs_fsize, afs.fs_fshift, afs.fs_fmask);
-	printf("frag\t%d\tshift\t%d\tfsbtodb\t%d\n",
+	(void) printf("frag\t%d\tshift\t%d\tfsbtodb\t%d\n",
 	    afs.fs_frag, afs.fs_fragshift, afs.fs_fsbtodb);
-	printf("minfree\t%d%%\tmaxbpg\t%d\toptim\t%s\n",
+	(void) printf("minfree\t%d%%\tmaxbpg\t%d\toptim\t%s\n",
 	    afs.fs_minfree, afs.fs_maxbpg,
 	    afs.fs_optim == FS_OPTSPACE ? "space" : "time");
-	printf("maxcontig %d\trotdelay %dms\trps\t%d\n",
+	(void) printf("maxcontig %d\trotdelay %dms\trps\t%d\n",
 	    afs.fs_maxcontig, afs.fs_rotdelay, afs.fs_rps);
-	printf("csaddr\t%d\tcssize\t%d\tshift\t%d\tmask\t0x%08x\n",
+	(void) printf("csaddr\t%d\tcssize\t%d\tshift\t%d\tmask\t0x%08x\n",
 	    afs.fs_csaddr, afs.fs_cssize, afs.fs_csshift, afs.fs_csmask);
-	printf("ntrak\t%d\tnsect\t%d\tspc\t%d\tncyl\t%d\n",
+	(void) printf("ntrak\t%d\tnsect\t%d\tspc\t%d\tncyl\t%d\n",
 	    afs.fs_ntrak, afs.fs_nsect, afs.fs_spc, afs.fs_ncyl);
-	printf("cpg\t%d\tbpg\t%d\tfpg\t%d\tipg\t%d\n",
+	(void) printf("cpg\t%d\tbpg\t%d\tfpg\t%d\tipg\t%d\n",
 	    afs.fs_cpg, afs.fs_fpg / afs.fs_frag, afs.fs_fpg, afs.fs_ipg);
-	printf("nindir\t%d\tinopb\t%d\tnspf\t%d\n",
+	(void) printf("nindir\t%d\tinopb\t%d\tnspf\t%d\n",
 	    afs.fs_nindir, afs.fs_inopb, afs.fs_nspf);
-	printf("nbfree\t%d\tndir\t%d\tnifree\t%d\tnffree\t%d\n",
+	(void) printf("nbfree\t%d\tndir\t%d\tnifree\t%d\tnffree\t%d\n",
 	    afs.fs_cstotal.cs_nbfree, afs.fs_cstotal.cs_ndir,
 	    afs.fs_cstotal.cs_nifree, afs.fs_cstotal.cs_nffree);
-	printf("cgrotor\t%d\tfmod\t%d\tronly\t%d\tlogbno\t%d\n",
+	(void) printf("cgrotor\t%d\tfmod\t%d\tronly\t%d\tlogbno\t%d\n",
 	    afs.fs_cgrotor, afs.fs_fmod, afs.fs_ronly, afs.fs_logbno);
-	printf("version\t%d\n", afs.fs_version);
+	(void) printf("version\t%d\n", afs.fs_version);
 	if (afs.fs_reclaim & (FS_RECLAIM | FS_RECLAIMING)) {
-		printf("fs_reclaim%s%s\n",
+		(void) printf("fs_reclaim%s%s\n",
 		    (afs.fs_reclaim & FS_RECLAIM)    ? " FS_RECLAIM"    : "",
 		    (afs.fs_reclaim & FS_RECLAIMING) ? " FS_RECLAIMING" : "");
 	} else {
-		printf("fs_reclaim is not set\n");
+		(void) printf("fs_reclaim is not set\n");
 	}
 	if (afs.fs_state + (long)afs.fs_time == FSOKAY) {
-		printf(gettext("file system state is valid, fsclean is %d\n"),
+		(void) printf(gettext(
+		    "file system state is valid, fsclean is %d\n"),
 		    afs.fs_clean);
 	} else {
-		printf(gettext("file system state is not valid\n"));
+		(void) printf(gettext("file system state is not valid\n"));
 	}
 	if (afs.fs_cpc != 0) {
-		printf(gettext("blocks available in each rotational position"));
+		(void) printf(gettext(
+		    "blocks available in each rotational position"));
 	} else {
-		printf(gettext(
+		(void) printf(gettext(
 		    "insufficient space to maintain rotational tables\n"));
 	}
 	for (c = 0; c < afs.fs_cpc; c++) {
-		printf(gettext("\ncylinder number %d:"), c);
+		(void) printf(gettext("\ncylinder number %d:"), c);
 		nrpos = (((fsp)->fs_postblformat == FS_DYNAMICPOSTBLFMT) ?
 		    (fsp)->fs_nrpos : NRPOS);
 		for (i = 0; i < nrpos; i++) {
 			if (fs_postbl(fsp, c)[i] == -1)
 				continue;
-			printf(gettext("\n   position %d:\t"), i);
+			(void) printf(gettext("\n   position %d:\t"), i);
 			/*CSTYLED*/
 			for (j = fs_postbl(fsp, c)[i], k = 1; ;
 			    j += fs_rotbl(fsp)[j], k++) {
-				printf("%5d", j);
+				(void) printf("%5d", j);
 				if (k % 12 == 0)
-					printf("\n\t\t");
+					(void) printf("\n\t\t");
 				if ((fs_rotbl(fsp))[j] == 0)
 					break;
 			}
 		}
 	}
-	printf("\ncs[].cs_(nbfree,ndir,nifree,nffree):\n\t");
+	(void) printf("\ncs[].cs_(nbfree,ndir,nifree,nffree):\n\t");
 	sip = calloc(1, afs.fs_cssize);
-	afs.fs_u.fs_csp = (struct csum *)sip;
+	/* void * cast is to convince lint that sip really is aligned */
+	afs.fs_u.fs_csp = (struct csum *)(void *)sip;
 	for (i = 0, j = 0; i < afs.fs_cssize; i += afs.fs_bsize, j++) {
 		size = afs.fs_cssize - i < afs.fs_bsize ?
 		    afs.fs_cssize - i : afs.fs_bsize;
 		offset = (offset_t)fsbtodb(
 		    &afs, (afs.fs_csaddr + j * afs.fs_frag)) * DEV_BSIZE;
-		llseek(0, offset, 0);
+		(void) llseek(0, offset, 0);
 		if (read(0, sip, size) != size) {
 			perror(name);
 			return (1);
@@ -302,18 +305,18 @@ dumpfs(const char *name)
 	for (i = 0; i < afs.fs_ncg; i++) {
 		struct csum *cs = &afs.fs_cs(&afs, i);
 		if (i && i % 4 == 0)
-			printf("\n\t");
-		printf("(%ld,%ld,%ld,%ld) ",
+			(void) printf("\n\t");
+		(void) printf("(%d,%d,%d,%d) ",
 		    cs->cs_nbfree, cs->cs_ndir, cs->cs_nifree, cs->cs_nffree);
 	}
-	printf("\n");
+	(void) printf("\n");
 	if (afs.fs_ncyl % afs.fs_cpg) {
-		printf(gettext("cylinders in last group %d\n"),
+		(void) printf(gettext("cylinders in last group %d\n"),
 		    i = afs.fs_ncyl % afs.fs_cpg);
-		printf(gettext("blocks in last group %d\n"),
+		(void) printf(gettext("blocks in last group %d\n"),
 		    i * afs.fs_spc / NSPB(&afs));
 	}
-	printf("\n");
+	(void) printf("\n");
 	for (i = 0; i < afs.fs_ncg; i++)
 		dumpcg(name, i);
 	if (afs.fs_logbno)
@@ -356,64 +359,66 @@ dumplog(const char *name)
 	extent_t	*ep;
 	ml_odunit_t	*ud;
 
-	printf("\nlog\n");
+	(void) printf("\nlog\n");
 	if (afs.fs_magic == FS_MAGIC)
-		printf("log allocation block %ld\n", afs.fs_logbno);
+		(void) printf("log allocation block %d\n", afs.fs_logbno);
 	else
-		printf("log allocation block (in frags) %ld\n", afs.fs_logbno);
+		(void) printf("log allocation block (in frags) %d\n",
+		    afs.fs_logbno);
 	(void) llseek(0, (offset_t)logbtodb(&afs, afs.fs_logbno) * DEV_BSIZE,
 	    0);
 	if (read(0, (char *)&eg, afs.fs_bsize) != afs.fs_bsize) {
-		printf(gettext(
+		(void) printf(gettext(
 			"dumplog: %s: error reading log allocation\n"),
 			name);
 		return;
 	}
 	ebp = (void *)eg;
 	if (ebp->type != LUFS_EXTENTS)
-		printf(gettext("Invalid log allocation type %x\n"), ebp->type);
+		(void) printf(gettext("Invalid log allocation type %x\n"),
+		    ebp->type);
 	if (!checksum(&ebp->chksum, (int32_t *)ebp, afs.fs_bsize))
-		printf(gettext("Invalid log checksum\n"));
+		(void) printf(gettext("Invalid log checksum\n"));
 
 	for (i = 0, ep = &ebp->extents[0]; i < ebp->nextents; ++i, ++ep) {
-		printf("\tlogical block\t%" PRId32
+		(void) printf("\tlogical block\t%" PRId32
 			"\tphysical block\t%" PRId32
 			"\tblocks\t%" PRId32 "\n",
 			ep->lbno, ep->pbno, ep->nbno);
 		tb += dbtob(ep->nbno);
 	}
-	printf("log size %" PRIu32 " bytes (%ld calculated)\n",
+	(void) printf("log size %" PRIu32 " bytes (%ld calculated)\n",
 		ebp->nbytes, tb);
-	printf("\n");
+	(void) printf("\n");
 	ep = &ebp->extents[0];
 	(void) llseek(0, (offset_t)logbtodb(&afs, ep->pbno) * DEV_BSIZE, 0);
 	if (read(0, (char *)&eg, dbtob(LS_SECTORS)) != dbtob(LS_SECTORS)) {
-		printf(gettext(
+		(void) printf(gettext(
 			"dumplog: %s: error reading log state\n"), name);
 		return;
 	}
 	ud = (void *)&eg;
-	printf("version\t\t%" PRIu32 "\t\t", ud->od_version);
+	(void) printf("version\t\t%" PRIu32 "\t\t", ud->od_version);
 	if (ud->od_badlog)
-		printf("logstate\tError\n");
+		(void) printf("logstate\tError\n");
 	else
-		printf("logstate\tOkay\n");
-	printf("bol\t\t%" PRId32 "\t\teol\t\t%" PRId32 "\n",
+		(void) printf("logstate\tOkay\n");
+	(void) printf("bol\t\t%" PRId32 "\t\teol\t\t%" PRId32 "\n",
 		ud->od_bol_lof, ud->od_eol_lof);
-	printf("requestsize\t%" PRIu32 "\n", ud->od_requestsize);
-	printf("statesize\t%" PRIu32 "\n", ud->od_statesize);
-	printf("logsize\t\t%" PRIu32 "\n", ud->od_logsize);
-	printf("maxtransfer\t%" PRIu32 "\t\tdevbsize\t%" PRIu32 "\n",
+	(void) printf("requestsize\t%" PRIu32 "\n", ud->od_requestsize);
+	(void) printf("statesize\t%" PRIu32 "\n", ud->od_statesize);
+	(void) printf("logsize\t\t%" PRIu32 "\n", ud->od_logsize);
+	(void) printf("maxtransfer\t%" PRIu32 "\t\tdevbsize\t%" PRIu32 "\n",
 		ud->od_maxtransfer, ud->od_devbsize);
-	printf("head\t\t%" PRId32 "\t\thead ident\t%#" PRIx32 "\n",
+	(void) printf("head\t\t%" PRId32 "\t\thead ident\t%#" PRIx32 "\n",
 		ud->od_head_lof, ud->od_head_ident);
-	printf("tail\t\t%" PRId32 "\t\ttail ident\t%#" PRIx32 "\n",
+	(void) printf("tail\t\t%" PRId32 "\t\ttail ident\t%#" PRIx32 "\n",
 		ud->od_tail_lof, ud->od_tail_ident);
-	printf("\t\t\t\tdebug\t\t%#" PRIx32 "\n", ud->od_debug);
+	(void) printf("\t\t\t\tdebug\t\t%#" PRIx32 "\n", ud->od_debug);
 	if (ud->od_head_ident + ud->od_tail_ident != ud->od_chksum)
-		printf("Bad chksum\t%#" PRIx32 "\n", ud->od_chksum);
+		(void) printf("Bad chksum\t%#" PRIx32 "\n", ud->od_chksum);
 	else
-		printf("Good chksum\t%#" PRIx32 "\n", ud->od_chksum);
+		(void) printf("Good chksum\t%#" PRIx32 "\n", ud->od_chksum);
 }
 
 static void
@@ -426,72 +431,73 @@ dumpcg(const char *name, const int c)
 	struct fs	*fsp;
 	time_t		t;
 
-	printf("\ncg %d:\n", c);
+	(void) printf("\ncg %d:\n", c);
 	off = llseek(0, (offset_t)fsbtodb(&afs, cgtod(&afs, c)) * DEV_BSIZE, 0);
 	if (read(0, (char *)&acg, afs.fs_bsize) != afs.fs_bsize) {
-		printf(gettext("dumpfs: %s: error reading cg\n"), name);
+		(void) printf(gettext("dumpfs: %s: error reading cg\n"), name);
 		return;
 	}
 	cgp = (struct cg *)&acg;
 	ocgp = (struct ocg *)&acg;
 	fsp = &afs;
 	if (!cg_chkmagic(cgp))
-	    printf(gettext("Invalid Cylinder grp magic fffs:%x  4.2 fs:%x\n"),
+	    (void) printf(gettext(
+		"Invalid Cylinder grp magic fffs:%x  4.2 fs:%x\n"),
 		cgp->cg_magic, ocgp->cg_magic);
 	if (cgp->cg_magic == CG_MAGIC) {
 		/* print FFFS 4.3 cyl grp format. */
 		t = (time_t)cgp->cg_time;
-		printf("magic\t%x\ttell\t%lx\ttime\t%s",
-		    cgp->cg_magic, (off_t)off, ctime(&t)); /* *** */
-		printf("cgx\t%d\tncyl\t%d\tniblk\t%d\tndblk\t%d\n",
+		(void) printf("magic\t%x\ttell\t%llx\ttime\t%s",
+		    cgp->cg_magic, off, ctime(&t)); /* *** */
+		(void) printf("cgx\t%d\tncyl\t%d\tniblk\t%d\tndblk\t%d\n",
 		    cgp->cg_cgx, cgp->cg_ncyl, cgp->cg_niblk, cgp->cg_ndblk);
-		printf("nbfree\t%d\tndir\t%d\tnifree\t%d\tnffree\t%d\n",
+		(void) printf("nbfree\t%d\tndir\t%d\tnifree\t%d\tnffree\t%d\n",
 		    cgp->cg_cs.cs_nbfree, cgp->cg_cs.cs_ndir,
 		    cgp->cg_cs.cs_nifree, cgp->cg_cs.cs_nffree);
-		printf("rotor\t%d\tirotor\t%d\tfrotor\t%d\nfrsum",
+		(void) printf("rotor\t%d\tirotor\t%d\tfrotor\t%d\nfrsum",
 		    cgp->cg_rotor, cgp->cg_irotor, cgp->cg_frotor);
 		for (i = 1, j = 0; i < afs.fs_frag; i++) {
-			printf("\t%d", cgp->cg_frsum[i]);
+			(void) printf("\t%d", cgp->cg_frsum[i]);
 			j += i * cgp->cg_frsum[i];
 		}
-		printf(gettext("\nsum of frsum: %d\niused:\t"), j);
+		(void) printf(gettext("\nsum of frsum: %d\niused:\t"), j);
 		pbits(cg_inosused(cgp), afs.fs_ipg);
-		printf(gettext("free:\t"));
+		(void) printf(gettext("free:\t"));
 		pbits(cg_blksfree(cgp), afs.fs_fpg);
-		printf("b:\n");
+		(void) printf("b:\n");
 		for (i = 0; i < afs.fs_cpg; i++) {
-			printf("   c%d:\t(%d)\t", i, cg_blktot(cgp)[i]);
+			(void) printf("   c%d:\t(%d)\t", i, cg_blktot(cgp)[i]);
 			for (j = 0; j < fsp->fs_nrpos; j++)	/* ****** */
-				printf(" %d", cg_blks(fsp, cgp, i)[j]);
-			printf("\n");
+				(void) printf(" %d", cg_blks(fsp, cgp, i)[j]);
+			(void) printf("\n");
 		}
 	} else if (ocgp->cg_magic == CG_MAGIC) {
 		/* print Old cyl grp format. */
 		t = (time_t)ocgp->cg_time;
-		printf("magic\t%x\ttell\t%lx\ttime\t%s",
-		    ocgp->cg_magic, (off_t)off, ctime(&t));
-		printf("cgx\t%d\tncyl\t%d\tniblk\t%d\tndblk\t%d\n",
+		(void) printf("magic\t%x\ttell\t%llx\ttime\t%s",
+		    ocgp->cg_magic, off, ctime(&t));
+		(void) printf("cgx\t%d\tncyl\t%d\tniblk\t%d\tndblk\t%d\n",
 		    ocgp->cg_cgx, ocgp->cg_ncyl, ocgp->cg_niblk,
 		    ocgp->cg_ndblk);
-		printf("nbfree\t%d\tndir\t%d\tnifree\t%d\tnffree\t%d\n",
+		(void) printf("nbfree\t%d\tndir\t%d\tnifree\t%d\tnffree\t%d\n",
 		    ocgp->cg_cs.cs_nbfree, ocgp->cg_cs.cs_ndir,
 		    ocgp->cg_cs.cs_nifree, ocgp->cg_cs.cs_nffree);
-		printf("rotor\t%d\tirotor\t%d\tfrotor\t%d\nfrsum",
+		(void) printf("rotor\t%d\tirotor\t%d\tfrotor\t%d\nfrsum",
 		    ocgp->cg_rotor, ocgp->cg_irotor, ocgp->cg_frotor);
 		for (i = 1, j = 0; i < afs.fs_frag; i++) {
-			printf("\t%d", ocgp->cg_frsum[i]);
+			(void) printf("\t%d", ocgp->cg_frsum[i]);
 			j += i * ocgp->cg_frsum[i];
 		}
-		printf(gettext("\nsum of frsum: %d\niused:\t"), j);
+		(void) printf(gettext("\nsum of frsum: %d\niused:\t"), j);
 		pbits(ocgp->cg_iused, afs.fs_ipg);
-		printf(gettext("free:\t"));
+		(void) printf(gettext("free:\t"));
 		pbits(ocgp->cg_free, afs.fs_fpg);
-		printf("b:\n");
+		(void) printf("b:\n");
 		for (i = 0; i < afs.fs_cpg; i++) {
-			printf("   c%d:\t(%d)\t", i, ocgp->cg_btot[i]);
+			(void) printf("   c%d:\t(%d)\t", i, ocgp->cg_btot[i]);
 			for (j = 0; j < NRPOS; j++)
-				printf(" %d", ocgp->cg_b[i][j]);
-			printf("\n");
+				(void) printf(" %d", ocgp->cg_b[i][j]);
+			(void) printf("\n");
 		}
 	}
 }
@@ -507,15 +513,16 @@ pbits(const void *p, const int max)
 	for (i = 0; i < max; i++) {
 		if (isset(cp, i)) {
 			if (count)
-				printf(",%s", (count % 9 == 8) ? "\n\t" : " ");
+				(void) printf(",%s",
+				    (count % 9 == 8) ? "\n\t" : " ");
 			count++;
-			printf("%d", i);
+			(void) printf("%d", i);
 			j = i;
 			while ((i + 1) < max && isset(cp, i+1))
 				i++;
 			if (i != j)
-				printf("-%d", i);
+				(void) printf("-%d", i);
 		}
 	}
-	printf("\n");
+	(void) printf("\n");
 }
