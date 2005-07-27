@@ -25,9 +25,12 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-sparc_SUBDIRS = sun4u sun4v
-i386_SUBDIRS =
+MODULE = etm
+CLASS = arch
+ARCH = sun4v
 
-SUBDIRS = common $($(MACH)_SUBDIRS)
+SRCS = etm.c etm_xport_api_dd.c
 
-include ../Makefile.subdirs
+include ../../Makefile.plugin
+
+LDLIBS += -lsysevent

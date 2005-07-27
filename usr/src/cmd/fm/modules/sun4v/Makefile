@@ -25,9 +25,6 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-sparc_SUBDIRS = sun4u sun4v
-i386_SUBDIRS =
+SUBDIRS = etm
 
-SUBDIRS = common $($(MACH)_SUBDIRS)
-
-include ../Makefile.subdirs
+include ../../Makefile.subdirs

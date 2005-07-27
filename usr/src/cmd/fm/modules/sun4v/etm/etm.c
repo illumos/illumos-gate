@@ -1,0 +1,1642 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
+ * etm.c	FMA Event Transport Module implementation, a plugin of FMD
+ *		for sun4v/Ontario
+ *
+ * plugin for sending/receiving FMA events to/from service processor
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * --------------------------------- includes --------------------------------
+ */
+
+#include <sys/fm/protocol.h>
+#include <sys/sysevent/eventdefs.h>
+#include <sys/fm/util.h>
+#include <netinet/in.h>
+#include <fm/fmd_api.h>
+#include <libsysevent.h>
+
+#include "etm_xport_api.h"
+#include "etm_etm_proto.h"
+#include "etm_impl.h"
+
+#include <pthread.h>
+#include <signal.h>
+#include <stropts.h>
+#include <locale.h>
+#include <strings.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <limits.h>
+#include <values.h>
+#include <alloca.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <time.h>
+
+/*
+ * ----------------------------- forward decls -------------------------------
+ */
+
+static void
+etm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class);
+
+/*
+ * ------------------------- data structs for FMD ----------------------------
+ */
+
+static const fmd_hdl_ops_t fmd_ops = {
+	etm_recv,	/* fmdo_recv */
+	NULL,		/* fmdo_timeout */
+	NULL,		/* fmdo_close */
+	NULL,		/* fmdo_stats */
+	NULL,		/* fmdo_gc */
+};
+
+static const fmd_prop_t fmd_props[] = {
+	{ ETM_PROP_NM_XPORT_ADDRS,	FMD_TYPE_STRING, "" },
+	{ ETM_PROP_NM_DEBUG_LVL,	FMD_TYPE_INT32, "0" },
+	{ ETM_PROP_NM_DEBUG_MAX_EV_CNT,	FMD_TYPE_INT32, "-1" },
+	{ NULL, 0, NULL }
+};
+
+static const fmd_hdl_info_t fmd_info = {
+	"FMA Event Transport Module", "1.0", &fmd_ops, fmd_props
+};
+
+/*
+ * ----------------------- private consts and defns --------------------------
+ */
+
+/* misc buffer for variable sized protocol header fields */
+
+#define	ETM_MISC_BUF_SZ	(4 * 1024)
+
+/* try limit for IO operations w/ capped exp backoff sleep on retry */
+
+/*
+ * Design_Note:	ETM will potentially retry forever IO operations that the
+ *		transport fails with EAGAIN (aka EWOULDBLOCK) rather than
+ *		giving up after some number of seconds. This avoids
+ *		dropping FMA events while the service processor is down,
+ *		but at the risk of pending fmdo_recv() forever and
+ *		overflowing FMD's event queue for ETM.
+ *		A future TBD enhancement would be to always recv
+ *		and send each ETM msg in a single read/write() to reduce
+ *		the risk of failure between ETM msg hdr and body,
+ *		assuming the MTU_SZ is large enough.
+ */
+
+#define	ETM_TRY_MAX_CNT		(MAXINT - 1)
+#define	ETM_TRY_BACKOFF_RATE	(4)
+#define	ETM_TRY_BACKOFF_CAP	(60)
+
+/* protocol transaction id consts for starting id and increment amt */
+
+#define	ETM_XID_BEG	(1)
+#define	ETM_XID_INC	(2)
+
+/*
+ * ---------------------------- global data ----------------------------------
+ */
+
+static int
+etm_debug_lvl = 0;	/* debug level: 0 is off, 1 is on, 2 is more, etc */
+
+static int
+etm_debug_max_ev_cnt = -1; /* max allowed event count for debugging */
+
+static pthread_t
+etm_svr_tid = NULL;	/* thread id of connection acceptance server */
+
+static volatile int
+etm_is_dying = 0;	/* bool for dying (killing self) */
+
+static uint32_t
+etm_xid_cur = ETM_XID_BEG; /* current transaction id for sends */
+
+static uint32_t
+etm_xid_ping = 0;	/* xid of last CONTROL msg sent requesting ping */
+
+static uint32_t
+etm_xid_ver_set = 0;	/* xid of last CONTROL msg sent requesting ver set */
+
+static struct stats {
+
+	/* ETM msg counters */
+
+	fmd_stat_t etm_rd_hdr_fmaevent;
+	fmd_stat_t etm_rd_hdr_control;
+	fmd_stat_t etm_rd_hdr_response;
+	fmd_stat_t etm_rd_body_fmaevent;
+	fmd_stat_t etm_rd_body_control;
+	fmd_stat_t etm_rd_body_response;
+	fmd_stat_t etm_wr_hdr_fmaevent;
+	fmd_stat_t etm_wr_hdr_control;
+	fmd_stat_t etm_wr_hdr_response;
+	fmd_stat_t etm_wr_body_fmaevent;
+	fmd_stat_t etm_wr_body_control;
+	fmd_stat_t etm_wr_body_response;
+
+	/* ETM byte counters */
+
+	fmd_stat_t etm_wr_fmd_bytes;
+	fmd_stat_t etm_rd_fmd_bytes;
+	fmd_stat_t etm_wr_xport_bytes;
+	fmd_stat_t etm_rd_xport_bytes;
+
+	fmd_stat_t etm_magic_drop_bytes;
+
+	/* ETM [dropped] FMA event counters */
+
+	fmd_stat_t etm_rd_fmd_fmaevent;
+	fmd_stat_t etm_wr_fmd_fmaevent;
+
+	fmd_stat_t etm_rd_drop_fmaevent;
+	fmd_stat_t etm_wr_drop_fmaevent;
+
+	/* ETM protocol failures */
+
+	fmd_stat_t etm_magic_bad;
+	fmd_stat_t etm_ver_bad;
+	fmd_stat_t etm_msgtype_bad;
+	fmd_stat_t etm_subtype_bad;
+	fmd_stat_t etm_xid_bad;
+	fmd_stat_t etm_fmaeventlen_bad;
+	fmd_stat_t etm_respcode_bad;
+	fmd_stat_t etm_timeout_bad;
+	fmd_stat_t etm_evlens_bad;
+
+	/* IO operation failures */
+
+	fmd_stat_t etm_xport_wr_fail;
+	fmd_stat_t etm_xport_rd_fail;
+	fmd_stat_t etm_xport_pk_fail;
+
+	/* IO operation retries */
+
+	fmd_stat_t etm_xport_wr_retry;
+	fmd_stat_t etm_xport_rd_retry;
+	fmd_stat_t etm_xport_pk_retry;
+
+	/* system and library failures */
+
+	fmd_stat_t etm_os_sysevent_publish_fail;
+	fmd_stat_t etm_os_sysevent_bind_fail;
+	fmd_stat_t etm_os_nvlist_pack_fail;
+	fmd_stat_t etm_os_nvlist_unpack_fail;
+	fmd_stat_t etm_os_nvlist_size_fail;
+	fmd_stat_t etm_os_pthread_create_fail;
+
+	/* xport API failures */
+
+	fmd_stat_t etm_xport_get_ev_addrv_fail;
+	fmd_stat_t etm_xport_open_fail;
+	fmd_stat_t etm_xport_close_fail;
+	fmd_stat_t etm_xport_accept_fail;
+	fmd_stat_t etm_xport_open_retry;
+
+	/* FMD entry point bad arguments */
+
+	fmd_stat_t etm_fmd_recv_badargs;
+	fmd_stat_t etm_fmd_init_badargs;
+	fmd_stat_t etm_fmd_fini_badargs;
+
+} etm_stats = {
+
+	/* ETM msg counters */
+
+	{ "etm_rd_hdr_fmaevent", FMD_TYPE_UINT64,
+		"ETM fmaevent msg headers rcvd from xport" },
+	{ "etm_rd_hdr_control", FMD_TYPE_UINT64,
+		"ETM control msg headers rcvd from xport" },
+	{ "etm_rd_hdr_response", FMD_TYPE_UINT64,
+		"ETM response msg headers rcvd from xport" },
+	{ "etm_rd_body_fmaevent", FMD_TYPE_UINT64,
+		"ETM fmaevent msg bodies rcvd from xport" },
+	{ "etm_rd_body_control", FMD_TYPE_UINT64,
+		"ETM control msg bodies rcvd from xport" },
+	{ "etm_rd_body_response", FMD_TYPE_UINT64,
+		"ETM response msg bodies rcvd from xport" },
+	{ "etm_wr_hdr_fmaevent", FMD_TYPE_UINT64,
+		"ETM fmaevent msg headers sent to xport" },
+	{ "etm_wr_hdr_control", FMD_TYPE_UINT64,
+		"ETM control msg headers sent to xport" },
+	{ "etm_wr_hdr_response", FMD_TYPE_UINT64,
+		"ETM response msg headers sent to xport" },
+	{ "etm_wr_body_fmaevent", FMD_TYPE_UINT64,
+		"ETM fmaevent msg bodies sent to xport" },
+	{ "etm_wr_body_control", FMD_TYPE_UINT64,
+		"ETM control msg bodies sent to xport" },
+	{ "etm_wr_body_response", FMD_TYPE_UINT64,
+		"ETM response msg bodies sent to xport" },
+
+	/* ETM byte counters */
+
+	{ "etm_wr_fmd_bytes", FMD_TYPE_UINT64,
+		"bytes of FMA events sent to FMD" },
+	{ "etm_rd_fmd_bytes", FMD_TYPE_UINT64,
+		"bytes of FMA events rcvd from FMD" },
+	{ "etm_wr_xport_bytes", FMD_TYPE_UINT64,
+		"bytes of FMA events sent to xport" },
+	{ "etm_rd_xport_bytes", FMD_TYPE_UINT64,
+		"bytes of FMA events rcvd from xport" },
+
+	{ "etm_magic_drop_bytes", FMD_TYPE_UINT64,
+		"bytes dropped from xport pre magic num" },
+
+	/* ETM [dropped] FMA event counters */
+
+	{ "etm_rd_fmd_fmaevent", FMD_TYPE_UINT64,
+		"FMA events rcvd from FMD" },
+	{ "etm_wr_fmd_fmaevent", FMD_TYPE_UINT64,
+		"FMA events sent to FMD" },
+
+	{ "etm_rd_drop_fmaevent", FMD_TYPE_UINT64,
+		"dropped FMA events from xport" },
+	{ "etm_wr_drop_fmaevent", FMD_TYPE_UINT64,
+		"dropped FMA events to xport" },
+
+	/* ETM protocol failures */
+
+	{ "etm_magic_bad", FMD_TYPE_UINT64,
+		"ETM msgs w/ invalid magic num" },
+	{ "etm_ver_bad", FMD_TYPE_UINT64,
+		"ETM msgs w/ invalid protocol version" },
+	{ "etm_msgtype_bad", FMD_TYPE_UINT64,
+		"ETM msgs w/ invalid message type" },
+	{ "etm_subtype_bad", FMD_TYPE_UINT64,
+		"ETM msgs w/ invalid sub type" },
+	{ "etm_xid_bad", FMD_TYPE_UINT64,
+		"ETM msgs w/ unmatched xid" },
+	{ "etm_fmaeventlen_bad", FMD_TYPE_UINT64,
+		"ETM msgs w/ invalid FMA event length" },
+	{ "etm_respcode_bad", FMD_TYPE_UINT64,
+		"ETM msgs w/ invalid response code" },
+	{ "etm_timeout_bad", FMD_TYPE_UINT64,
+		"ETM msgs w/ invalid timeout value" },
+	{ "etm_evlens_bad", FMD_TYPE_UINT64,
+		"ETM msgs w/ too many event lengths" },
+
+	/* IO operation failures */
+
+	{ "etm_xport_wr_fail", FMD_TYPE_UINT64,
+		"xport write failures" },
+	{ "etm_xport_rd_fail", FMD_TYPE_UINT64,
+		"xport read failures" },
+	{ "etm_xport_pk_fail", FMD_TYPE_UINT64,
+		"xport peek failures" },
+
+	/* IO operation retries */
+
+	{ "etm_xport_wr_retry", FMD_TYPE_UINT64,
+		"xport write retries" },
+	{ "etm_xport_rd_retry", FMD_TYPE_UINT64,
+		"xport read retries" },
+	{ "etm_xport_pk_retry", FMD_TYPE_UINT64,
+		"xport peek retries" },
+
+	/* system and library failures */
+
+	{ "etm_os_sysevent_publish_fail", FMD_TYPE_UINT64,
+		"sysevent_evc_publish failures" },
+	{ "etm_os_sysevent_bind_fail", FMD_TYPE_UINT64,
+		"sysevent_evc_bind failures" },
+	{ "etm_os_nvlist_pack_fail", FMD_TYPE_UINT64,
+		"nvlist_pack failures" },
+	{ "etm_os_nvlist_unpack_fail", FMD_TYPE_UINT64,
+		"nvlist_unpack failures" },
+	{ "etm_os_nvlist_size_fail", FMD_TYPE_UINT64,
+		"nvlist_size failures" },
+	{ "etm_os_pthread_create_fail", FMD_TYPE_UINT64,
+		"pthread_create failures" },
+
+	/* transport API failures */
+
+	{ "etm_xport_get_ev_addrv_fail", FMD_TYPE_UINT64,
+		"xport get event addrv API failures" },
+	{ "etm_xport_open_fail", FMD_TYPE_UINT64,
+		"xport open API failures" },
+	{ "etm_xport_close_fail", FMD_TYPE_UINT64,
+		"xport close API failures" },
+	{ "etm_xport_accept_fail", FMD_TYPE_UINT64,
+		"xport accept API failures" },
+	{ "etm_xport_open_retry", FMD_TYPE_UINT64,
+		"xport open API retries" },
+
+	/* FMD entry point bad arguments */
+
+	{ "etm_fmd_recv_badargs", FMD_TYPE_UINT64,
+		"bad arguments from fmd_recv entry point" },
+	{ "etm_fmd_init_badargs", FMD_TYPE_UINT64,
+		"bad arguments from fmd_init entry point" },
+	{ "etm_fmd_fini_badargs", FMD_TYPE_UINT64,
+		"bad arguments from fmd_fini entry point" }
+};
+
+/*
+ * -------------------------- support functions ------------------------------
+ */
+
+/*
+ * Design_Note:	Each failure worth reporting to FMD should be done using
+ *		a single call to fmd_hdl_error() as it logs an FMA event
+ *		for each call. Also be aware that all the fmd_hdl_*()
+ *		format strings currently use platform specific *printf()
+ *		routines; so "%p" under Solaris does not prepend "0x" to
+ *		the outputted hex digits, while Linux and VxWorks do.
+ */
+
+/*
+ * etm_hexdump - hexdump the given buffer (for debugging) using
+ *		the given FMD module handle
+ */
+
+static void
+etm_hexdump(fmd_hdl_t *hdl, void *buf, size_t byte_cnt)
+{
+	uint8_t		*bp;		/* byte ptr */
+	int		i, j;		/* index */
+	char		cb[80];		/* char buf */
+	unsigned int	n;		/* a byte of data for sprintf() */
+
+	bp = buf;
+	j = 0;
+
+	/*
+	 * Design_Note:	fmd_hdl_debug() auto adds a newline if missing;
+	 *		hence cb exists to accumulate a longer string.
+	 */
+
+	for (i = 1; i <= byte_cnt; i++) {
+		n = *bp++;
+		(void) sprintf(&cb[j], "%2.2x ", n);
+		j += 3;
+		/* add a newline every 16 bytes or at the buffer's end */
+		if (((i % 16) == 0) || (i >= byte_cnt)) {
+			cb[j-1] = '\0';
+			fmd_hdl_debug(hdl, "%s\n", cb);
+			j = 0;
+		}
+	} /* for each byte in the buffer */
+
+} /* etm_hexdump() */
+
+/*
+ * etm_sleep - sleep the caller for the given number of seconds,
+ *		return 0 or -errno value
+ *
+ * Design_Note:	To avoid interfering with FMD's signal mask (SIGALRM)
+ *		do not use [Solaris] sleep(3C) and instead use
+ *		pthread_cond_wait() or nanosleep(), both of which
+ *		are POSIX spec-ed to leave signal masks alone.
+ *		This is needed for Solaris and Linux (domain and SP).
+ */
+
+static int
+etm_sleep(unsigned sleep_sec)
+{
+	struct timespec	tms;	/* for nanosleep() */
+
+	tms.tv_sec = sleep_sec;
+	tms.tv_nsec = 0;
+
+	if (nanosleep(&tms, NULL) < 0) {
+		/* errno assumed set by above call */
+		return (-errno);
+	}
+	return (0);
+
+} /* etm_sleep() */
+
+/*
+ * etm_conn_open - open a connection to the given transport address,
+ *		return 0 and the opened connection handle
+ *		or -errno value
+ *
+ * caveats:	the err_substr is used in failure cases for calling
+ *		fmd_hdl_error()
+ */
+
+static int
+etm_conn_open(fmd_hdl_t *hdl, char *err_substr,
+		etm_xport_addr_t addr, etm_xport_conn_t *connp)
+{
+	etm_xport_conn_t	conn;	/* connection to return */
+	int			nev;	/* -errno value */
+
+	if ((conn = etm_xport_open(hdl, addr)) == NULL) {
+		nev = (-errno);
+		fmd_hdl_error(hdl, "error: %s: errno %d\n",
+					err_substr, errno);
+		etm_stats.etm_xport_open_fail.fmds_value.ui64++;
+		return (nev);
+	} else {
+		*connp = conn;
+		return (0);
+	}
+} /* etm_conn_open() */
+
+/*
+ * etm_conn_close - close the given connection,
+ *		return 0 or -errno value
+ *
+ * caveats:	the err_substr is used in failure cases for calling
+ *		fmd_hdl_error()
+ */
+
+static int
+etm_conn_close(fmd_hdl_t *hdl, char *err_substr, etm_xport_conn_t conn)
+{
+	int	nev;	/* -errno value */
+
+	if (etm_xport_close(hdl, conn) == NULL) {
+		nev = (-errno);
+		fmd_hdl_error(hdl, "warning: %s: errno %d\n",
+					err_substr, errno);
+		etm_stats.etm_xport_close_fail.fmds_value.ui64++;
+		return (nev);
+	} else {
+		return (0);
+	}
+} /* etm_conn_close() */
+
+/*
+ * etm_io_op - perform an IO operation on the given connection
+ *		with the given buffer,
+ *		accommodating MTU size and retrying op if needed,
+ *		return how many bytes actually done by the op
+ *		or -errno value
+ *
+ * caveats:	the err_substr is used in failure cases for calling
+ *		fmd_hdl_error()
+ */
+
+static ssize_t
+etm_io_op(fmd_hdl_t *hdl, char *err_substr, etm_xport_conn_t conn,
+				void *buf, size_t byte_cnt, int io_op)
+{
+	ssize_t		rv;		/* ret val / byte count */
+	ssize_t		n;		/* gen use */
+	uint8_t		*datap;		/* ptr to data */
+	size_t		mtu_sz;		/* MTU size in bytes */
+	int		(*io_func_ptr)(fmd_hdl_t *, etm_xport_conn_t,
+							void *, size_t);
+	size_t		io_sz;		/* byte count for io_func_ptr */
+	int		try_cnt;	/* number of tries done */
+	int		sleep_sec;	/* exp backoff sleep period in sec */
+	int		sleep_rv;	/* ret val from sleeping */
+	fmd_stat_t	io_retry_stat;	/* IO retry stat to update */
+	fmd_stat_t	io_fail_stat;	/* IO failure stat to update */
+
+	if ((conn == NULL) || (buf == NULL)) {
+		return (-EINVAL);
+	}
+	switch (io_op) {
+		case ETM_IO_OP_RD:
+			io_func_ptr = etm_xport_read;
+			io_retry_stat = etm_stats.etm_xport_rd_retry;
+			io_fail_stat = etm_stats.etm_xport_rd_fail;
+			break;
+		case ETM_IO_OP_WR:
+			io_func_ptr = etm_xport_write;
+			io_retry_stat = etm_stats.etm_xport_wr_retry;
+			io_fail_stat = etm_stats.etm_xport_wr_fail;
+			break;
+		case ETM_IO_OP_PK:
+			io_func_ptr = etm_xport_peek;
+			io_retry_stat = etm_stats.etm_xport_pk_retry;
+			io_fail_stat = etm_stats.etm_xport_pk_fail;
+			break;
+		default:
+			return (-EINVAL);
+	}
+	if (byte_cnt == 0) {
+		return (byte_cnt);	/* nop */
+	}
+
+	/* obtain [current] MTU size */
+
+	if ((n = etm_xport_get_opt(hdl, conn, ETM_XPORT_OPT_MTU_SZ)) < 0) {
+		mtu_sz = ETM_XPORT_MTU_SZ_DEF;
+	} else {
+		mtu_sz = n;
+	}
+
+	/* loop until all IO done, try limit exceeded, or real failure */
+
+	rv = 0;
+	datap = buf;
+	while (rv < byte_cnt) {
+		io_sz = MIN((byte_cnt - rv), mtu_sz);
+		try_cnt = 0;
+		sleep_sec = 0;
+
+		/* when give up, return -errno value even if partly done */
+
+		while ((n = (*io_func_ptr)(hdl, conn, datap, io_sz)) ==
+								(-EAGAIN)) {
+			try_cnt++;
+			if (try_cnt > ETM_TRY_MAX_CNT) {
+				rv = n;
+				goto func_ret;
+			}
+			if (etm_is_dying) {
+				rv = (-EINTR);
+				goto func_ret;
+			}
+			if ((sleep_rv = etm_sleep(sleep_sec)) < 0) {
+				rv = sleep_rv;
+				goto func_ret;
+			}
+			sleep_sec = ((sleep_sec == 0) ? 1 :
+					(sleep_sec * ETM_TRY_BACKOFF_RATE));
+			sleep_sec = MIN(sleep_sec, ETM_TRY_BACKOFF_CAP);
+			io_retry_stat.fmds_value.ui64++;
+			if (etm_debug_lvl >= 1) {
+				fmd_hdl_debug(hdl, "info: retrying io op %d "
+						"due to EAGAIN\n", io_op);
+			}
+		} /* while trying the io operation */
+
+		if (etm_is_dying) {
+			rv = (-EINTR);
+			goto func_ret;
+		}
+		if (n < 0) {
+			rv = n;
+			goto func_ret;
+		}
+		/* avoid spinning CPU when given 0 bytes but no error */
+		if (n == 0) {
+			if ((sleep_rv = etm_sleep(ETM_SLEEP_QUIK)) < 0) {
+				rv = sleep_rv;
+				goto func_ret;
+			}
+		}
+		rv += n;
+		datap += n;
+	} /* while still have more data */
+
+func_ret:
+
+	if (rv < 0) {
+		io_fail_stat.fmds_value.ui64++;
+		fmd_hdl_error(hdl, "error: %s: errno %d\n",
+					err_substr, (int)(-rv));
+	}
+	if (etm_debug_lvl >= 3) {
+		fmd_hdl_debug(hdl, "info: io op %d ret %d of %d\n",
+					io_op, (int)rv, (int)byte_cnt);
+	}
+	return (rv);
+
+} /* etm_io_op() */
+
+/*
+ * etm_magic_read - read the magic number of an ETM message header
+ *		from the given connection into the given buffer,
+ *		return 0 or -errno value
+ *
+ * Design_Note:	This routine is intended to help protect ETM from protocol
+ *		framing errors as might be caused by an SP reset / crash in
+ *		the middle of an ETM message send; the connection will be
+ *		read from for as many bytes as needed until the magic number
+ *		is found using a sliding buffer for comparisons.
+ */
+
+static int
+etm_magic_read(fmd_hdl_t *hdl, etm_xport_conn_t conn, uint32_t *magic_ptr)
+{
+	int		rv;		/* ret val */
+	uint32_t	magic_num;	/* magic number */
+	int		byte_cnt;	/* count of bytes read */
+	uint8_t		buf5[4+1];	/* sliding input buffer */
+	int		i, j;		/* indices into buf5 */
+	ssize_t		n;		/* gen use */
+	uint8_t		drop_buf[1024];	/* dropped bytes buffer */
+
+	rv = 0;		/* assume success */
+	magic_num = 0;
+	byte_cnt = 0;
+	j = 0;
+
+	/* magic number bytes are sent in network (big endian) order */
+
+	while (magic_num != ETM_PROTO_MAGIC_NUM) {
+		if ((n = etm_io_op(hdl, "bad io read on magic",
+				conn, &buf5[j], 1, ETM_IO_OP_RD)) < 0) {
+			rv = n;
+			goto func_ret;
+		}
+		byte_cnt++;
+		j = MIN((j + 1), sizeof (magic_num));
+		if (byte_cnt < sizeof (magic_num)) {
+			continue;
+		}
+
+		if (byte_cnt > sizeof (magic_num)) {
+			etm_stats.etm_magic_drop_bytes.fmds_value.ui64++;
+			i = MIN(byte_cnt - j - 1, sizeof (drop_buf) - 1);
+			drop_buf[i] = buf5[0];
+			for (i = 0; i < j; i++) {
+				buf5[i] = buf5[i+1];
+			} /* for sliding the buffer contents */
+		}
+		(void) memcpy(&magic_num, &buf5[0], sizeof (magic_num));
+		magic_num = ntohl(magic_num);
+	} /* for reading bytes until find magic number */
+
+func_ret:
+
+	if (byte_cnt != sizeof (magic_num)) {
+		fmd_hdl_error(hdl, "warning: bad proto frame "
+				"implies corrupt/lost msg(s)\n");
+	}
+	if ((byte_cnt > sizeof (magic_num)) && (etm_debug_lvl >= 2)) {
+		i = MIN(byte_cnt - sizeof (magic_num), sizeof (drop_buf));
+		fmd_hdl_debug(hdl, "info: magic drop hexdump "
+				"first %d of %d bytes:\n",
+				i, byte_cnt - sizeof (magic_num));
+		etm_hexdump(hdl, drop_buf, i);
+	}
+
+	if (rv == 0) {
+		*magic_ptr = magic_num;
+	}
+	return (rv);
+
+} /* etm_magic_read() */
+
+/*
+ * etm_hdr_read - allocate, read, and validate a [variable sized]
+ *		ETM message header from the given connection,
+ *		return the allocated ETM message header
+ *		(which is guaranteed to be large enough to reuse as a
+ *		RESPONSE msg hdr) and its size
+ *		or NULL and set errno on failure
+ */
+
+static void *
+etm_hdr_read(fmd_hdl_t *hdl, etm_xport_conn_t conn, size_t *szp)
+{
+	uint8_t			*hdrp;		/* ptr to header to return */
+	size_t			hdr_sz;		/* sizeof *hdrp */
+	etm_proto_v1_pp_t	pp; 		/* protocol preamble */
+	etm_proto_v1_ev_hdr_t	*ev_hdrp;	/* for FMA_EVENT msg */
+	etm_proto_v1_ctl_hdr_t	*ctl_hdrp;	/* for CONTROL msg */
+	etm_proto_v1_resp_hdr_t *resp_hdrp;	/* for RESPONSE msg */
+	uint32_t		*lenp;		/* ptr to FMA event length */
+	ssize_t			i, n;		/* gen use */
+	uint8_t	misc_buf[ETM_MISC_BUF_SZ];	/* for var sized hdrs */
+	int			dummy_int;	/* dummy var to appease lint */
+
+	hdrp = NULL; hdr_sz = 0;
+
+	/* read the magic number which starts the protocol preamble */
+
+	if ((n = etm_magic_read(hdl, conn, &pp.pp_magic_num)) < 0) {
+		errno = (-n);
+		etm_stats.etm_magic_bad.fmds_value.ui64++;
+		return (NULL);
+	}
+
+	/* read the rest of the protocol preamble all at once */
+
+	if ((n = etm_io_op(hdl, "bad io read on preamble",
+				conn, &pp.pp_proto_ver,
+				sizeof (pp) - sizeof (pp.pp_magic_num),
+				ETM_IO_OP_RD)) < 0) {
+		errno = (-n);
+		return (NULL);
+	}
+
+	/*
+	 * Design_Note:	The magic number was already network decoded; but
+	 *		some other preamble fields also need to be decoded,
+	 *		specifically pp_xid and pp_timeout. The rest of the
+	 *		preamble fields are byte sized and hence need no
+	 *		decoding.
+	 */
+
+	pp.pp_xid = ntohl(pp.pp_xid);
+	pp.pp_timeout = ntohl(pp.pp_timeout);
+
+	/* sanity check the header as best we can */
+
+	if (pp.pp_proto_ver != ETM_PROTO_V1) {
+		fmd_hdl_error(hdl, "error: bad proto ver %d\n",
+					(int)pp.pp_proto_ver);
+		errno = EPROTO;
+		etm_stats.etm_ver_bad.fmds_value.ui64++;
+		return (NULL);
+	}
+
+	dummy_int = pp.pp_msg_type;
+	if ((dummy_int <= ETM_MSG_TYPE_TOO_LOW) ||
+	    (dummy_int >= ETM_MSG_TYPE_TOO_BIG)) {
+		fmd_hdl_error(hdl, "error: bad msg type %d", dummy_int);
+		errno = EBADMSG;
+		etm_stats.etm_msgtype_bad.fmds_value.ui64++;
+		return (NULL);
+	}
+
+	/* handle [var sized] hdrs for FMA_EVENT, CONTROL, RESPONSE msgs */
+
+	if (pp.pp_msg_type == ETM_MSG_TYPE_FMA_EVENT) {
+
+		ev_hdrp = (void*)&misc_buf[0];
+		hdr_sz = sizeof (*ev_hdrp);
+		(void) memcpy(&ev_hdrp->ev_pp, &pp, sizeof (pp));
+
+		/* sanity check the header's timeout */
+
+		if (ev_hdrp->ev_pp.pp_timeout != ETM_PROTO_V1_TIMEOUT_NONE) {
+			errno = ETIME;
+			etm_stats.etm_timeout_bad.fmds_value.ui64++;
+			return (NULL);
+		}
+
+		/* get all FMA event lengths from the header */
+
+		lenp = (uint32_t *)&ev_hdrp->ev_lens[0]; lenp--;
+		i = -1;	/* cnt of length entries preceding 0 */
+		do {
+			i++; lenp++;
+			if ((sizeof (*ev_hdrp) + (i * sizeof (*lenp))) >=
+							ETM_MISC_BUF_SZ) {
+				errno = E2BIG;	/* ridiculous size */
+				etm_stats.etm_evlens_bad.fmds_value.ui64++;
+				return (NULL);
+			}
+			if ((n = etm_io_op(hdl, "bad io read on event len",
+						conn, lenp, sizeof (*lenp),
+						ETM_IO_OP_RD)) < 0) {
+				errno = (-n);
+				return (NULL);
+			}
+			*lenp = ntohl(*lenp);
+
+		} while (*lenp != 0);
+		i += 0; /* first len already counted by sizeof(ev_hdr) */
+		hdr_sz += (i * sizeof (*lenp));
+
+		etm_stats.etm_rd_hdr_fmaevent.fmds_value.ui64++;
+
+	} else if (pp.pp_msg_type == ETM_MSG_TYPE_CONTROL) {
+
+		ctl_hdrp = (void*)&misc_buf[0];
+		hdr_sz = sizeof (*ctl_hdrp);
+		(void) memcpy(&ctl_hdrp->ctl_pp, &pp, sizeof (pp));
+
+		/* sanity check the header's sub type (control selector) */
+
+		if ((ctl_hdrp->ctl_pp.pp_sub_type <= ETM_CTL_SEL_TOO_LOW) ||
+		    (ctl_hdrp->ctl_pp.pp_sub_type >= ETM_CTL_SEL_TOO_BIG)) {
+			fmd_hdl_error(hdl, "error: bad ctl sub type %d\n",
+					(int)ctl_hdrp->ctl_pp.pp_sub_type);
+			errno = EBADMSG;
+			etm_stats.etm_subtype_bad.fmds_value.ui64++;
+			return (NULL);
+		}
+
+		/* get the control length */
+
+		if ((n = etm_io_op(hdl, "bad io read on ctl len",
+					conn, &ctl_hdrp->ctl_len,
+					sizeof (ctl_hdrp->ctl_len),
+					ETM_IO_OP_RD)) < 0) {
+			errno = (-n);
+			return (NULL);
+		}
+
+		ctl_hdrp->ctl_len = ntohl(ctl_hdrp->ctl_len);
+
+		etm_stats.etm_rd_hdr_control.fmds_value.ui64++;
+
+	} else if (pp.pp_msg_type == ETM_MSG_TYPE_RESPONSE) {
+
+		resp_hdrp = (void*)&misc_buf[0];
+		hdr_sz = sizeof (*resp_hdrp);
+		(void) memcpy(&resp_hdrp->resp_pp, &pp, sizeof (pp));
+
+		/* sanity check the header's timeout */
+
+		if (resp_hdrp->resp_pp.pp_timeout !=
+						ETM_PROTO_V1_TIMEOUT_NONE) {
+			errno = ETIME;
+			etm_stats.etm_timeout_bad.fmds_value.ui64++;
+			return (NULL);
+		}
+
+		/* get the response code and length */
+
+		if ((n = etm_io_op(hdl, "bad io read on resp code+len",
+					conn, &resp_hdrp->resp_code,
+					sizeof (resp_hdrp->resp_code) +
+					sizeof (resp_hdrp->resp_len),
+					ETM_IO_OP_RD)) < 0) {
+			errno = (-n);
+			return (NULL);
+		}
+
+		resp_hdrp->resp_code = ntohl(resp_hdrp->resp_code);
+		resp_hdrp->resp_len = ntohl(resp_hdrp->resp_len);
+
+		etm_stats.etm_rd_hdr_response.fmds_value.ui64++;
+
+	} /* whether we have FMA_EVENT, CONTROL, RESPONSE msg */
+
+	/*
+	 * choose a header size that allows hdr reuse for RESPONSE msgs,
+	 * allocate and populate the message header, and
+	 * return alloc size to caller for later free of hdrp
+	 */
+
+	hdr_sz = MAX(hdr_sz, sizeof (*resp_hdrp));
+	hdrp = fmd_hdl_zalloc(hdl, hdr_sz, FMD_SLEEP);
+	(void) memcpy(hdrp, misc_buf, hdr_sz);
+
+	if (etm_debug_lvl >= 3) {
+		fmd_hdl_debug(hdl, "info: msg hdr hexdump %d bytes:\n",
+								hdr_sz);
+		etm_hexdump(hdl, hdrp, hdr_sz);
+	}
+	*szp = hdr_sz;
+	return (hdrp);
+
+} /* etm_hdr_read() */
+
+/*
+ * etm_hdr_write - create and write a [variable sized] ETM message header
+ *		to the given connection appropriate for the given FMA event
+ *		and type of nvlist encoding,
+ *		return the allocated ETM message header and its size
+ *		or NULL and set errno on failure
+ */
+
+static void*
+etm_hdr_write(fmd_hdl_t *hdl, etm_xport_conn_t conn, nvlist_t *evp,
+						int encoding, size_t *szp)
+{
+	etm_proto_v1_ev_hdr_t	*hdrp;		/* for FMA_EVENT msg */
+	size_t			hdr_sz;		/* sizeof *hdrp */
+	uint32_t		*lenp;		/* ptr to FMA event length */
+	size_t			evsz;		/* packed FMA event size */
+	ssize_t			n;		/* gen use */
+
+	/* allocate and populate the message header for 1 FMA event */
+
+	hdr_sz = sizeof (*hdrp) + (1 * sizeof (hdrp->ev_lens[0]));
+
+	hdrp = fmd_hdl_zalloc(hdl, hdr_sz, FMD_SLEEP);
+
+	/*
+	 * Design_Note: Although the ETM protocol supports it, sun4v/Ontario
+	 *		does not wait for responses/ACKs on FMA events. All
+	 *		such msgs are sent with ETM_PROTO_V1_TIMEOUT_NONE.
+	 */
+
+	hdrp->ev_pp.pp_magic_num = ETM_PROTO_MAGIC_NUM;
+	hdrp->ev_pp.pp_magic_num = htonl(hdrp->ev_pp.pp_magic_num);
+	hdrp->ev_pp.pp_proto_ver = ETM_PROTO_V1;
+	hdrp->ev_pp.pp_msg_type = ETM_MSG_TYPE_FMA_EVENT;
+	hdrp->ev_pp.pp_sub_type = 0;
+	hdrp->ev_pp.pp_rsvd_pad = 0;
+	hdrp->ev_pp.pp_xid = etm_xid_cur;
+	hdrp->ev_pp.pp_xid = htonl(hdrp->ev_pp.pp_xid);
+	etm_xid_cur += ETM_XID_INC;
+	hdrp->ev_pp.pp_timeout = ETM_PROTO_V1_TIMEOUT_NONE;
+	hdrp->ev_pp.pp_timeout = htonl(hdrp->ev_pp.pp_timeout);
+
+	lenp = &hdrp->ev_lens[0];
+
+	if ((n = nvlist_size(evp, &evsz, encoding)) != 0) {
+		errno = n;
+		fmd_hdl_free(hdl, hdrp, hdr_sz);
+		etm_stats.etm_os_nvlist_size_fail.fmds_value.ui64++;
+		return (NULL);
+	}
+
+	/* indicate 1 FMA event, network encode its length, and 0-terminate */
+
+	*lenp = evsz; *lenp = htonl(*lenp); lenp++;
+	*lenp = 0; *lenp = htonl(*lenp); lenp++;
+
+	/*
+	 * write the network encoded header to the transport, and
+	 * return alloc size to caller for later free
+	 */
+
+	if ((n = etm_io_op(hdl, "bad io write on event hdr",
+				conn, hdrp, hdr_sz, ETM_IO_OP_WR)) < 0) {
+		errno = (-n);
+		fmd_hdl_free(hdl, hdrp, hdr_sz);
+		return (NULL);
+	}
+
+	*szp = hdr_sz;
+	return (hdrp);
+
+} /* etm_hdr_write() */
+
+/*
+ * etm_post_to_fmd - post the given FMA event to FMD
+ *			[via sysevent or via a FMD transport API call ],
+ *			return 0 or -errno value
+ *
+ * Design_Note:	This routine exists to ease future porting to both
+ *		FMA Phase 2 FMD as well as porting to Linux which lacks
+ *		a native sysevent.
+ */
+
+static int
+etm_post_to_fmd(fmd_hdl_t *hdl, nvlist_t *evp)
+{
+	int			rv;		/* ret val */
+	evchan_t		*scp;		/* sysevent channel ptr */
+	ssize_t			n;		/* gen use */
+
+	rv = 0; /* default success */
+
+	scp = NULL;
+
+	if ((n = sysevent_evc_bind(FM_ERROR_CHAN, &scp,
+				EVCH_CREAT | EVCH_HOLD_PEND)) != 0) {
+		rv = (-n);
+		fmd_hdl_error(hdl, "error: FMA event dropped: "
+				"sysevent bind errno %d\n", n);
+		etm_stats.etm_os_sysevent_bind_fail.fmds_value.ui64++;
+		etm_stats.etm_rd_drop_fmaevent.fmds_value.ui64++;
+		goto func_ret;
+	}
+
+	if ((n = sysevent_evc_publish(scp, EC_FM, ESC_FM_ERROR, "com.sun",
+				getexecname(), evp, EVCH_SLEEP)) != 0) {
+		rv = (-n);
+		fmd_hdl_error(hdl, "error: FMA event dropped: "
+				"sysevent publish errno %d\n", n);
+		etm_stats.etm_os_sysevent_publish_fail.fmds_value.ui64++;
+		etm_stats.etm_rd_drop_fmaevent.fmds_value.ui64++;
+		goto func_ret;
+	}
+
+func_ret:
+
+	if (scp != NULL) {
+		sysevent_evc_unbind(scp);
+	}
+	if (rv == 0) {
+		etm_stats.etm_wr_fmd_fmaevent.fmds_value.ui64++;
+		(void) nvlist_size(evp, (size_t *)&n, NV_ENCODE_XDR);
+		etm_stats.etm_wr_fmd_bytes.fmds_value.ui64 += n;
+		if (etm_debug_lvl >= 1) {
+			fmd_hdl_debug(hdl, "info: event %p post ok to FMD\n",
+								evp);
+		}
+	}
+	return (rv);
+
+} /* etm_post_to_fmd() */
+
+/*
+ * etm_req_ver_negot - send an ETM control message to the other end requesting
+ *			that the ETM protocol version be negotiated/set
+ */
+
+static void
+etm_req_ver_negot(fmd_hdl_t *hdl)
+{
+	etm_xport_addr_t	*addrv;		/* default dst addr(s) */
+	etm_xport_conn_t	conn;		/* connection to other end */
+	etm_proto_v1_ctl_hdr_t	*ctl_hdrp;	/* for CONTROL msg */
+	size_t			hdr_sz;		/* sizeof header */
+	uint8_t			*body_buf;	/* msg body buffer */
+	uint32_t		body_sz;	/* sizeof *body_buf */
+	ssize_t			i;		/* gen use */
+
+	/* populate an ETM control msg to send */
+
+	hdr_sz = sizeof (*ctl_hdrp);
+	body_sz = (1 + 1);		/* V1 byte plus null byte */
+
+	ctl_hdrp = fmd_hdl_zalloc(hdl, hdr_sz + body_sz, FMD_SLEEP);
+
+	ctl_hdrp->ctl_pp.pp_magic_num = htonl(ETM_PROTO_MAGIC_NUM);
+	ctl_hdrp->ctl_pp.pp_proto_ver = ETM_PROTO_V1;
+	ctl_hdrp->ctl_pp.pp_msg_type = ETM_MSG_TYPE_CONTROL;
+	ctl_hdrp->ctl_pp.pp_sub_type = ETM_CTL_SEL_VER_SET_REQ;
+	ctl_hdrp->ctl_pp.pp_rsvd_pad = 0;
+	etm_xid_ver_set = etm_xid_cur;
+	etm_xid_cur += ETM_XID_INC;
+	ctl_hdrp->ctl_pp.pp_xid = htonl(etm_xid_ver_set);
+	ctl_hdrp->ctl_pp.pp_timeout = htonl(ETM_PROTO_V1_TIMEOUT_FOREVER);
+	ctl_hdrp->ctl_len = htonl(body_sz);
+
+	body_buf = (void*)&ctl_hdrp->ctl_len;
+	body_buf += sizeof (ctl_hdrp->ctl_len);
+	*body_buf++ = ETM_PROTO_V1;
+	*body_buf++ = '\0';
+
+	/*
+	 * open and close a connection to send the ETM control msg
+	 * to any/all of the default dst addrs
+	 */
+
+	if ((addrv = etm_xport_get_ev_addrv(hdl, NULL)) == NULL) {
+		fmd_hdl_error(hdl,
+			"error: bad ctl dst addrs errno %d\n", errno);
+		etm_stats.etm_xport_get_ev_addrv_fail.fmds_value.ui64++;
+		goto func_ret;
+	}
+
+	for (i = 0; addrv[i] != NULL; i++) {
+
+		if (etm_conn_open(hdl, "bad conn open during ver negot",
+					addrv[i], &conn) < 0) {
+			continue;
+		}
+		if (etm_io_op(hdl, "bad io write on ctl hdr+body",
+					conn, ctl_hdrp, hdr_sz + body_sz,
+					ETM_IO_OP_WR) >= 0) {
+			etm_stats.etm_wr_hdr_control.fmds_value.ui64++;
+			etm_stats.etm_wr_body_control.fmds_value.ui64++;
+		}
+		(void) etm_conn_close(hdl, "bad conn close during ver negot",
+									conn);
+
+	} /* foreach dst addr */
+
+func_ret:
+
+	if (addrv != NULL) {
+		etm_xport_free_addrv(hdl, addrv);
+	}
+	fmd_hdl_free(hdl, ctl_hdrp, hdr_sz + body_sz);
+
+} /* etm_req_ver_negot() */
+
+/*
+ * etm_handle_new_conn - receive an ETM message sent from the other end via
+ *			the given open connection, pull out any FMA events
+ *			and post them to the local FMD (or handle any ETM
+ *			control or response msg); when done, close the
+ *			connection
+ */
+
+static void
+etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
+{
+	etm_proto_v1_ev_hdr_t	*ev_hdrp;	/* for FMA_EVENT msg */
+	etm_proto_v1_ctl_hdr_t	*ctl_hdrp;	/* for CONTROL msg */
+	etm_proto_v1_resp_hdr_t *resp_hdrp;	/* for RESPONSE msg */
+	size_t			hdr_sz;		/* sizeof header */
+	uint8_t			*body_buf;	/* msg body buffer */
+	uint32_t		body_sz;	/* sizeof body_buf */
+	uint8_t			*bp;		/* byte ptr within body_buf */
+	nvlist_t		*evp;		/* ptr to unpacked FMA event */
+	char			*class;		/* FMA event class */
+	ssize_t			i, n;		/* gen use */
+
+	fmd_hdl_debug(hdl, "info: handling new conn %p\n", conn);
+
+	ev_hdrp = NULL;
+	ctl_hdrp = NULL;
+	resp_hdrp = NULL;
+	body_buf = NULL;
+	class = NULL;
+	evp = NULL;
+
+	/* read a network decoded message header from the connection */
+
+	/*
+	 * Design_Note:	We rely on the fact that all message types have
+	 *		a common protocol preamble; if this fact should
+	 *		ever change it may break the code below. We also
+	 *		rely on the fact that FMA_EVENT and CONTROL headers
+	 *		returned will be sized large enough to reuse them
+	 *		as RESPONSE headers if the remote endpt asked
+	 *		for a response via the pp_timeout field.
+	 */
+
+	if ((ev_hdrp = etm_hdr_read(hdl, conn, &hdr_sz)) == NULL) {
+		/* errno assumed set by above call */
+		fmd_hdl_error(hdl, "error: FMA event dropped: "
+					"bad hdr read errno %d\n", errno);
+		etm_stats.etm_rd_drop_fmaevent.fmds_value.ui64++;
+		goto func_ret;
+	}
+
+	/*
+	 * handle the message based on its preamble pp_msg_type
+	 * which is known to be valid from etm_hdr_read() checks
+	 */
+
+	if (ev_hdrp->ev_pp.pp_msg_type == ETM_MSG_TYPE_FMA_EVENT) {
+
+		fmd_hdl_debug(hdl, "info: rcvd FMA_EVENT msg from xport\n");
+
+		/* allocate buf large enough for whole body / all FMA events */
+
+		body_sz = 0;
+		for (i = 0; ev_hdrp->ev_lens[i] != 0; i++) {
+			body_sz += ev_hdrp->ev_lens[i];
+		} /* for summing sizes of all FMA events */
+
+		if (etm_debug_lvl >= 1) {
+			fmd_hdl_debug(hdl, "info: event lengths %d sum %d\n",
+								i, body_sz);
+		}
+
+		body_buf = fmd_hdl_zalloc(hdl, body_sz, FMD_SLEEP);
+
+		/* read all the FMA events at once */
+
+		if ((n = etm_io_op(hdl, "FMA event dropped: "
+					"bad io read on event bodies",
+					conn, body_buf, body_sz,
+					ETM_IO_OP_RD)) < 0) {
+			etm_stats.etm_rd_drop_fmaevent.fmds_value.ui64++;
+			goto func_ret;
+		}
+
+		etm_stats.etm_rd_xport_bytes.fmds_value.ui64 += body_sz;
+
+		/* immediately close the connection to improve xport thruput */
+
+		(void) etm_conn_close(hdl, "bad conn close "
+					"after event body read", conn);
+		conn = NULL;
+
+		/* unpack each FMA event and post it to FMD */
+
+		bp = body_buf;
+		for (i = 0; ev_hdrp->ev_lens[i] != 0; i++) {
+			if ((n = nvlist_unpack((char *)bp,
+					ev_hdrp->ev_lens[i], &evp, 0)) != 0) {
+				fmd_hdl_error(hdl, "error: FMA event dropped: "
+						"bad event body unpack "
+						"errno %d\n", n);
+				if (etm_debug_lvl >= 2) {
+					fmd_hdl_debug(hdl, "info: FMA event "
+						"hexdump %d bytes:\n",
+						ev_hdrp->ev_lens[i]);
+					etm_hexdump(hdl, bp,
+						ev_hdrp->ev_lens[i]);
+				}
+				etm_stats.etm_os_nvlist_unpack_fail.fmds_value.
+					ui64++;
+				etm_stats.etm_rd_drop_fmaevent.fmds_value.
+					ui64++;
+				bp += ev_hdrp->ev_lens[i];
+				continue;
+			}
+			etm_stats.etm_rd_body_fmaevent.fmds_value.ui64++;
+			if (etm_debug_lvl >= 1) {
+				(void) nvlist_lookup_string(evp, FM_CLASS,
+								&class);
+				if (class == NULL) {
+					class = "NULL";
+				}
+				fmd_hdl_debug(hdl, "info: FMA event %p "
+						"class %s\n", evp, class);
+			}
+			(void) etm_post_to_fmd(hdl, evp);
+			nvlist_free(evp);
+			bp += ev_hdrp->ev_lens[i];
+		} /* foreach FMA event in the body buffer */
+
+	} else if (ev_hdrp->ev_pp.pp_msg_type == ETM_MSG_TYPE_CONTROL) {
+
+		ctl_hdrp = (void*)ev_hdrp;
+
+		fmd_hdl_debug(hdl, "info: rcvd CONTROL msg from xport\n");
+		if (etm_debug_lvl >= 1) {
+			fmd_hdl_debug(hdl, "info: ctl sel %d xid 0x%x\n",
+					(int)ctl_hdrp->ctl_pp.pp_sub_type,
+					ctl_hdrp->ctl_pp.pp_xid);
+		}
+
+		/*
+		 * if we have a VER_SET_REQ read the body and validate
+		 * the protocol version set contained therein,
+		 * otherwise we have a PING_REQ (which has no body)
+		 * and we [also] fall thru to the code which sends a
+		 * response msg if the pp_timeout field requested one
+		 */
+
+		if (ctl_hdrp->ctl_pp.pp_sub_type == ETM_CTL_SEL_VER_SET_REQ) {
+
+			body_sz = ctl_hdrp->ctl_len;
+			body_buf = fmd_hdl_zalloc(hdl, body_sz, FMD_SLEEP);
+
+			if ((n = etm_io_op(hdl, "bad io read on ctl body",
+						conn, body_buf, body_sz,
+						ETM_IO_OP_RD)) < 0) {
+				goto func_ret;
+			}
+
+			/* complain if version set lacks our version */
+
+			n = 0;
+			for (i = 0; i < body_sz; i++) {
+				if (body_buf[i] == ETM_PROTO_V1) {
+					n = 1;
+					break;
+				}
+			}
+			if (n == 0) {
+				etm_stats.etm_ver_bad.fmds_value.ui64++;
+			}
+
+		} /* if got version set request */
+
+		etm_stats.etm_rd_body_control.fmds_value.ui64++;
+
+		/* if a response is requested send one (reuse received hdr) */
+
+		if (ctl_hdrp->ctl_pp.pp_timeout != ETM_PROTO_V1_TIMEOUT_NONE) {
+			resp_hdrp = (void*)ctl_hdrp;
+			resp_hdrp->resp_len = 0;
+			if (ctl_hdrp->ctl_pp.pp_sub_type ==
+						ETM_CTL_SEL_VER_SET_REQ) {
+				resp_hdrp->resp_len = 1;
+			}
+			resp_hdrp->resp_code = 0;
+			resp_hdrp->resp_pp.pp_timeout =
+						ETM_PROTO_V1_TIMEOUT_NONE;
+			resp_hdrp->resp_pp.pp_msg_type = ETM_MSG_TYPE_RESPONSE;
+			if ((n = etm_io_op(hdl, "bad io write on resp hdr",
+						conn, resp_hdrp,
+						sizeof (*resp_hdrp),
+						ETM_IO_OP_WR)) < 0) {
+				goto func_ret;
+			}
+			etm_stats.etm_wr_hdr_response.fmds_value.ui64++;
+			if (resp_hdrp->resp_pp.pp_sub_type ==
+						ETM_CTL_SEL_VER_SET_REQ) {
+				/* send our default proto ver in resp body */
+				bp = (void*)&i;
+				*bp = ETM_PROTO_V1;
+				if ((n = etm_io_op(hdl,
+						"bad io write on resp body",
+						conn, bp, 1,
+						ETM_IO_OP_WR)) < 0) {
+					goto func_ret;
+				}
+			} /* if need to send proto ver in [tmp] msg body */
+			etm_stats.etm_wr_body_response.fmds_value.ui64++;
+			fmd_hdl_debug(hdl, "info: response sent "
+					"xid 0x%x code %d body len %d\n",
+					resp_hdrp->resp_pp.pp_xid,
+					resp_hdrp->resp_code,
+					resp_hdrp->resp_len);
+		} /* if a response was requested */
+
+	} else if (ev_hdrp->ev_pp.pp_msg_type == ETM_MSG_TYPE_RESPONSE) {
+
+		resp_hdrp = (void*)ev_hdrp;
+
+		fmd_hdl_debug(hdl, "info: rcvd RESPONSE msg from xport\n");
+		if (etm_debug_lvl >= 1) {
+			fmd_hdl_debug(hdl, "info: resp xid 0x%x\n",
+					(int)resp_hdrp->resp_pp.pp_xid);
+		}
+
+		body_sz = resp_hdrp->resp_len;
+		body_buf = fmd_hdl_zalloc(hdl, body_sz, FMD_SLEEP);
+
+		if ((n = etm_io_op(hdl, "bad io read on resp len",
+				conn, body_buf, body_sz, ETM_IO_OP_RD)) < 0) {
+			goto func_ret;
+		}
+
+		etm_stats.etm_rd_body_response.fmds_value.ui64++;
+
+		/*
+		 * look up the xid to interpret response body
+		 *
+		 * ping is a nop; for ver set just confirm ETM_PROTO_V1
+		 * was negotiated
+		 */
+
+		if ((resp_hdrp->resp_pp.pp_xid != etm_xid_ping) &&
+			(resp_hdrp->resp_pp.pp_xid != etm_xid_ver_set)) {
+			etm_stats.etm_xid_bad.fmds_value.ui64++;
+			goto func_ret;
+		}
+
+		if (resp_hdrp->resp_pp.pp_xid == etm_xid_ver_set) {
+			if (body_buf[0] != ETM_PROTO_V1) {
+				etm_stats.etm_ver_bad.fmds_value.ui64++;
+				goto func_ret;
+			}
+		} /* if have resp to last req to set proto ver */
+
+	} /* whether we have a FMA_EVENT, CONTROL, or RESPONSE msg */
+
+func_ret:
+
+	if (conn != NULL) {
+		(void) etm_conn_close(hdl, "bad conn close after event recv",
+									conn);
+	}
+	if (ev_hdrp != NULL) {
+		fmd_hdl_free(hdl, ev_hdrp, hdr_sz);
+	}
+	if (body_buf != NULL) {
+		fmd_hdl_free(hdl, body_buf, body_sz);
+	}
+} /* etm_handle_new_conn() */
+
+/*
+ * etm_server - loop forever accepting new connections
+ *		using the given FMD handle,
+ *		handling any ETM msgs sent from the other side
+ *		via each such connection
+ */
+
+static void
+etm_server(void *arg)
+{
+	etm_xport_conn_t	conn;		/* connection handle */
+	ssize_t			n;		/* gen use */
+	fmd_hdl_t		*hdl;		/* FMD handle */
+
+	hdl = arg;
+
+	fmd_hdl_debug(hdl, "info: connection server starting\n");
+
+	while (!etm_is_dying) {
+		if ((conn = etm_xport_accept(hdl, NULL)) == NULL) {
+			/* errno assumed set by above call */
+			n = errno;
+			if (etm_is_dying) {
+				break;
+			}
+			fmd_hdl_debug(hdl,
+				"error: bad conn accept errno %d\n", n);
+			etm_stats.etm_xport_accept_fail.fmds_value.ui64++;
+			/* avoid spinning CPU */
+			(void) etm_sleep(ETM_SLEEP_SLOW);
+			continue;
+		}
+
+		/*
+		 * Design_Note: etm_handle_new_conn() will close the
+		 *		accepted connection when done. In early designs
+		 *		etm_handle_new_conn() was spawned as a
+		 *		separate thread via pthread_create();
+		 *		however fmd_thr_create() constrains thread
+		 *		creation to prevent spawned threads from
+		 *		spawning others (ie, no grandchildren).
+		 *		Hence etm_handle_new_conn() is now called
+		 *		as a simple function [w/ multiple args].
+		 */
+
+		etm_handle_new_conn(hdl, conn);
+
+	} /* while accepting new connections until ETM dies */
+
+	/* ETM is dying (probably due to "fmadm unload etm") */
+
+	if (etm_debug_lvl >= 1) {
+		fmd_hdl_debug(hdl, "info: connection server is dying\n");
+	}
+} /* etm_server() */
+
+/*
+ * -------------------------- FMD entry points -------------------------------
+ */
+
+/*
+ * _fmd_init - initialize the transport for use by ETM and start the
+ *		server daemon to accept new connections to us
+ *
+ *		FMD will read our *.conf and subscribe us to FMA events
+ */
+
+void
+_fmd_init(fmd_hdl_t *hdl)
+{
+	ssize_t			n;		/* gen use */
+
+	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0) {
+		return; /* invalid data in configuration file */
+	}
+
+	fmd_hdl_debug(hdl, "info: module initializing\n");
+
+	/* setup statistics and properties from FMD */
+
+	(void) fmd_stat_create(hdl, FMD_STAT_NOALLOC,
+				sizeof (etm_stats) / sizeof (fmd_stat_t),
+				(fmd_stat_t *)&etm_stats);
+
+	etm_debug_lvl = fmd_prop_get_int32(hdl, ETM_PROP_NM_DEBUG_LVL);
+	etm_debug_max_ev_cnt = fmd_prop_get_int32(hdl,
+						ETM_PROP_NM_DEBUG_MAX_EV_CNT);
+	fmd_hdl_debug(hdl, "info: etm_debug_lvl %d "
+			"etm_debug_max_ev_cnt %d\n",
+			etm_debug_lvl, etm_debug_max_ev_cnt);
+
+	/*
+	 * init the transport,
+	 * start the connection acceptance server, and
+	 * request protocol version be negotiated
+	 */
+
+	if ((n = etm_xport_init(hdl)) != 0) {
+		fmd_hdl_error(hdl, "error: bad xport init errno %d\n", (-n));
+		fmd_hdl_unregister(hdl);
+		return;
+	}
+
+	etm_svr_tid = fmd_thr_create(hdl, etm_server, hdl);
+	etm_req_ver_negot(hdl);
+
+	fmd_hdl_debug(hdl, "info: module initialized ok\n");
+
+} /* _fmd_init() */
+
+/*
+ * etm_recv - receive an FMA event from FMD and transport it
+ *		to the remote endpoint
+ */
+
+/*ARGSUSED*/
+void
+etm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *evp, const char *class)
+{
+	etm_xport_addr_t	*addrv;	/* vector of transport addresses */
+	etm_xport_conn_t	conn;	/* connection handle */
+	etm_proto_v1_ev_hdr_t	*hdrp;	/* for FMA_EVENT msg */
+	ssize_t			i, n;	/* gen use */
+	size_t			sz;	/* header size */
+	size_t			buflen;	/* size of packed FMA event */
+	uint8_t			*buf;	/* tmp buffer for packed FMA event */
+
+	buflen = 0;
+	(void) nvlist_size(evp, &buflen, NV_ENCODE_XDR);
+	etm_stats.etm_rd_fmd_bytes.fmds_value.ui64 += buflen;
+	etm_stats.etm_rd_fmd_fmaevent.fmds_value.ui64++;
+
+	fmd_hdl_debug(hdl, "info: rcvd event %p from FMD\n", evp);
+	fmd_hdl_debug(hdl, "info: cnt %llu class %s\n",
+		etm_stats.etm_rd_fmd_fmaevent.fmds_value.ui64, class);
+
+	/*
+	 * if the debug limit has been set, avoid excessive traffic,
+	 * for example, an infinite cycle using loopback nodes
+	 */
+
+	if ((etm_debug_max_ev_cnt >= 0) &&
+		(etm_stats.etm_rd_fmd_fmaevent.fmds_value.ui64 >
+						etm_debug_max_ev_cnt)) {
+		fmd_hdl_debug(hdl, "warning: FMA event dropped: "
+			"event %p cnt %llu > debug max %d\n", evp,
+			etm_stats.etm_rd_fmd_fmaevent.fmds_value.ui64,
+			etm_debug_max_ev_cnt);
+		etm_stats.etm_wr_drop_fmaevent.fmds_value.ui64++;
+		return;
+	}
+
+	/* allocate a buffer for the FMA event and nvlist pack it */
+
+	buf = fmd_hdl_zalloc(hdl, buflen, FMD_SLEEP);
+
+	if ((n = nvlist_pack(evp, (char **)&buf, &buflen,
+					NV_ENCODE_XDR, 0)) != 0) {
+		fmd_hdl_error(hdl, "error: FMA event dropped: "
+				"event pack errno %d\n", n);
+		etm_stats.etm_os_nvlist_pack_fail.fmds_value.ui64++;
+		etm_stats.etm_wr_drop_fmaevent.fmds_value.ui64++;
+		fmd_hdl_free(hdl, buf, buflen);
+		return;
+	}
+
+	/* get vector of dst addrs and send the FMA event to each one */
+
+	if ((addrv = etm_xport_get_ev_addrv(hdl, evp)) == NULL) {
+		fmd_hdl_error(hdl, "error: FMA event dropped: "
+				"bad event dst addrs errno %d\n", errno);
+		etm_stats.etm_xport_get_ev_addrv_fail.fmds_value.ui64++;
+		etm_stats.etm_wr_drop_fmaevent.fmds_value.ui64++;
+		fmd_hdl_free(hdl, buf, buflen);
+		return;
+	}
+
+	for (i = 0; addrv[i] != NULL; i++) {
+
+		/* open a new connection to this dst addr */
+
+		if ((n = etm_conn_open(hdl, "FMA event dropped: "
+				"bad conn open on new ev",
+				addrv[i], &conn)) < 0) {
+			etm_stats.etm_wr_drop_fmaevent.fmds_value.ui64++;
+			continue;
+		}
+
+		/* write the ETM message header */
+
+		if ((hdrp = etm_hdr_write(hdl, conn, evp, NV_ENCODE_XDR,
+							&sz)) == NULL) {
+			fmd_hdl_error(hdl, "error: FMA event dropped: "
+					"bad hdr write errno %d\n", errno);
+			(void) etm_conn_close(hdl,
+				"bad conn close per bad hdr wr", conn);
+			etm_stats.etm_wr_drop_fmaevent.fmds_value.ui64++;
+			continue;
+		}
+
+		fmd_hdl_free(hdl, hdrp, sz);	/* header not needed */
+		etm_stats.etm_wr_hdr_fmaevent.fmds_value.ui64++;
+		fmd_hdl_debug(hdl, "info: hdr xport write ok for event %p\n",
+								evp);
+
+		/* write the ETM message body, ie, the packed nvlist */
+
+		if ((n = etm_io_op(hdl, "FMA event dropped: "
+					"bad io write on event", conn,
+					buf, buflen, ETM_IO_OP_WR)) < 0) {
+			(void) etm_conn_close(hdl,
+				"bad conn close per bad body wr", conn);
+			etm_stats.etm_wr_drop_fmaevent.fmds_value.ui64++;
+			continue;
+		}
+
+		etm_stats.etm_wr_body_fmaevent.fmds_value.ui64++;
+		etm_stats.etm_wr_xport_bytes.fmds_value.ui64 += buflen;
+		fmd_hdl_debug(hdl, "info: body xport write ok for event %p\n",
+								evp);
+
+		/* close the connection */
+
+		(void) etm_conn_close(hdl, "bad conn close after event send",
+									conn);
+	} /* foreach dst addr in the vector */
+
+	etm_xport_free_addrv(hdl, addrv);
+	fmd_hdl_free(hdl, buf, buflen);
+
+} /* etm_recv() */
+
+/*
+ * _fmd_fini - stop the server daemon and teardown the transport
+ */
+
+void
+_fmd_fini(fmd_hdl_t *hdl)
+{
+	ssize_t	n;	/* gen use */
+
+	fmd_hdl_debug(hdl, "info: module finializing\n");
+
+	/* kill the connection server ; wait for it to die */
+
+	etm_is_dying = 1;
+
+	if (etm_svr_tid != NULL) {
+		fmd_thr_signal(hdl, etm_svr_tid);
+		fmd_thr_destroy(hdl, etm_svr_tid);
+		etm_svr_tid = NULL;
+	} /* if server thread was successfully created */
+
+	/* teardown the transport */
+
+	if ((n = etm_xport_fini(hdl)) != 0) {
+		fmd_hdl_error(hdl, "warning: xport fini errno %d\n", (-n));
+	}
+
+	fmd_hdl_debug(hdl, "info: module finalized ok\n");
+
+} /* _fmd_fini() */
