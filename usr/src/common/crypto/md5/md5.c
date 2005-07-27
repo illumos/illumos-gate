@@ -105,7 +105,7 @@ static struct modlmisc modlmisc = {
 
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"MD5 Kernel SW Provider 1.17"
+	"MD5 Kernel SW Provider %I%"
 };
 
 static struct modlinkage modlinkage = {

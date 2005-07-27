@@ -64,8 +64,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
 LINTFLAGS	+= -I$(COM_DIR)
-CPPFLAGS	+= -xarch=v9a -DCRYPTO_UNLIMITED
-COPTIMIZE	= -fast
+CPPFLAGS	+= -DCRYPTO_UNLIMITED
+COPTIMIZE	= -xO5 -xbuiltin=%all
 
 #
 # Override the default -xspace setting

@@ -75,8 +75,8 @@ CFLAGS += -dalign
 #
 # For niagara specific optimizations
 #
-CPPFLAGS	+= -fast -xarch=v9a
-COPTIMIZE	= -fast
+COPTIMIZE	= -xO5 -xbuiltin=%all
+
 #
 # Override the default -xspace setting
 #
