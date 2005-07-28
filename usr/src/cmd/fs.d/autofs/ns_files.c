@@ -22,7 +22,7 @@
 /*
  *	ns_files.c
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -319,6 +319,7 @@ done:
 	return (nserr);
 }
 
+int
 loadmaster_files(mastermap, defopts, stack, stkptr)
 	char *mastermap;
 	char *defopts;
@@ -410,6 +411,7 @@ pr_msg("Warning: invalid entry for %s in %s ignored.\n", dir, fname);
 	return (done ? __NSW_SUCCESS : __NSW_NOTFOUND);
 }
 
+int
 loaddirect_files(map, local_map, opts, stack, stkptr)
 	char *map, *local_map, *opts;
 	char **stack, ***stkptr;

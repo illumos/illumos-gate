@@ -22,8 +22,8 @@
 /*
  *	nfs_cast.c : broadcast to a specific group of NFS servers
  *
- *	Copyright (c) 1988-1996,1998,1999,2001 by Sun Microsystems, Inc.
- *	All rights reserved.
+ *      Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *      Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,7 +50,7 @@
 
 #define	PENALTY_WEIGHT    100000
 
-static struct tstamps {
+struct tstamps {
 	struct tstamps	*ts_next;
 	int		ts_penalty;
 	int		ts_inx;
@@ -60,7 +60,7 @@ static struct tstamps {
 
 /* A list of addresses - all belonging to the same transport */
 
-static struct addrs {
+struct addrs {
 	struct addrs		*addr_next;
 	struct mapfs		*addr_mfs;
 	struct nd_addrlist	*addr_addrs;
@@ -69,7 +69,7 @@ static struct addrs {
 
 /* A list of connectionless transports */
 
-static struct transp {
+struct transp {
 	struct transp		*tr_next;
 	int			tr_fd;
 	char			*tr_device;

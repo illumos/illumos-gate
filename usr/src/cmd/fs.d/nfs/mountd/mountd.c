@@ -104,8 +104,8 @@ static int rejecting;
 static int mount_vers_min = MOUNTVERS;
 static int mount_vers_max = MOUNTVERS3;
 
-void
-main(int argc, char **argv)
+int
+main(int argc, char *argv[])
 {
 	int pid;
 	int c;
@@ -376,6 +376,7 @@ main(int argc, char **argv)
 	syslog(LOG_ERR, "Error: svc_run shouldn't have returned");
 	abort();
 	/* NOTREACHED */
+	return (0);
 }
 
 /*
@@ -1155,6 +1156,7 @@ done:
  * not distinguished syntactically.  We check for hosts first because
  * it's cheaper (just M*N strcmp()s), then try netgroups.
  */
+int
 in_access_list(struct netbuf *nb, struct nd_hostservlist *clnames,
     char *access_list)	/* N.B. we clobber this "input" parameter */
 {

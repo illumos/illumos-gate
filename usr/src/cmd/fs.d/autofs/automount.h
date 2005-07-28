@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -233,8 +233,8 @@ extern char *sys_errlist[];
 extern struct autodir *dir_head;
 extern struct autodir *dir_tail;
 extern struct mntlist *current_mounts;
-extern struct autofs_args;
-extern struct mounta;			/* defined in sys/vfs.h */
+struct autofs_args;
+struct mounta;			/* defined in sys/vfs.h */
 extern struct myaddrs *myaddrs_head;
 
 extern rwlock_t	cache_lock;

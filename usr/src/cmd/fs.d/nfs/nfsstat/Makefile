@@ -22,7 +22,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.12	*/
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/fs.d/nfs/nfsstat/Makefile
@@ -31,7 +31,7 @@ PROG=		nfsstat
 
 include		../../../Makefile.cmd
 
-CFLAGS +=	$(CCVERBOSE) -o $@
+CFLAGS +=	$(CCVERBOSE)
 COMMON=	nfs_sec.o
 OBJS=	nfsstat.o $(COMMON)
 SRCS=	nfsstat.c ../lib/nfs_sec.c

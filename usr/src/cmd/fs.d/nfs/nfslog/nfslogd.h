@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _NFSLOGD_H
@@ -192,7 +192,7 @@ extern void nfslog_close_elf_file(void **);
 extern int nfslog_process_elf_rec(void *, nfslog_request_record *,
 		char *, char *);
 
-extern struct nfslog_trans_file;
+struct nfslog_trans_file;
 extern void *nfslog_open_trans_file(char *, uint32_t, uint32_t, int *);
 
 extern void nfslog_process_trans_timeout(struct nfslog_trans_file *,

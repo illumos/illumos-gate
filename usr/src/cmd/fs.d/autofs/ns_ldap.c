@@ -22,7 +22,7 @@
 /*
  *	ns_ldap.c
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -472,6 +472,7 @@ ldap_match(char *map, char *key, char **ldap_line, int *ldap_len)
 	return (__NSW_SUCCESS);
 }
 
+int
 loadmaster_ldap(char *mapname, char *defopts, char **stack, char ***stkptr)
 {
 	char searchfilter[LDAP_FILT_MAXSIZ];
@@ -539,6 +540,7 @@ loadmaster_ldap(char *mapname, char *defopts, char **stack, char ***stkptr)
 	return (__NSW_SUCCESS);
 }
 
+int
 loaddirect_ldap(char *nsmap, char *localmap, char *opts,
 char **stack, char ***stkptr)
 {

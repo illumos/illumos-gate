@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@
  *     (a) dir1 is identical to dir2
  *     (b) dir1's parent is dir2
  */
+int
 issubdir(dir1, dir2)
 	char *dir1;
 	char *dir2;

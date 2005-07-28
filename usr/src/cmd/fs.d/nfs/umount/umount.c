@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,9 +82,8 @@ static	int is_v4_mount(struct extmnttab *);
 static char *myname;
 static char typename[64];
 
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char *argv[])
 {
 	extern int optind;
 	int c;

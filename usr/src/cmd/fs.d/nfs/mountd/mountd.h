@@ -21,8 +21,8 @@
  */
 
 /*
- * Copyright (c) 1999, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_MOUNTD_H
@@ -38,7 +38,7 @@ extern "C" {
 
 #define	MAXIPADDRLEN	512
 
-extern struct nd_hostservlist;
+struct nd_hostservlist;
 extern void rmtab_load(void);
 extern void mntlist_send(SVCXPRT *transp);
 extern void mntlist_new(char *host, char *path);

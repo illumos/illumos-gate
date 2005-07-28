@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,7 +234,8 @@ nfs4_check_setting(FILE *src, const char *pattern)
 
 			if ((p = strchr(ibuf, '=')) != NULL) {
 				bzero(cur_domain, NFS4_MAX_DOM_LEN);
-				bcopy(chomp(++p), cur_domain, strlen(p));
+				p++;
+				bcopy(chomp(p), cur_domain, strlen(p));
 
 				/*
 				 * If the sysadmin specified "Auto" from the

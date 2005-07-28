@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -742,7 +742,7 @@ if (rdma_clnt_debug) {
 	 * Treat xid as opaque (xid is the first entity
 	 * in the rpc rdma message).
 	 */
-	xid = *(uint32_t *)recvlist->c_saddr;
+	xid = *(uint32_t *)(uintptr_t)recvlist->c_saddr;
 	/* Skip xid and set the xdr position accordingly. */
 	XDR_SETPOS(xdrs, sizeof (uint32_t));
 	(void) xdr_u_int(xdrs, &vers);

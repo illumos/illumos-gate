@@ -22,7 +22,7 @@
 /*
  *	ns_nisplus.c
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +157,7 @@ done:
 	return (nserr);
 }
 
+int
 loadmaster_nisplus(mapname, defopts, stack, stkptr)
 	char *mapname;
 	char *defopts;
@@ -203,6 +204,7 @@ loadmaster_nisplus(mapname, defopts, stack, stkptr)
 	return (__NSW_SUCCESS);
 }
 
+int
 loaddirect_nisplus(nsmap, localmap, opts, stack, stkptr)
 	char *nsmap, *localmap, *opts;
 	char **stack;
@@ -494,6 +496,7 @@ nisplus_match(map, colm_name, key, nis_line, nis_len)
 }
 
 
+int
 getmapkeys_nisplus(nsmap, list, error, cache_time, stack, stkptr)
 	char *nsmap;
 	struct dir_entry **list;

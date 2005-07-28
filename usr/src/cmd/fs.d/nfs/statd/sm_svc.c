@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -440,9 +440,8 @@ init_hostname(void)
 	return (0);
 }
 
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char *argv[])
 {
 	int c;
 	int ppid;
@@ -672,6 +671,7 @@ main(argc, argv)
 	syslog(LOG_ERR, "statd: svc_run returned\n");
 	/* NOTREACHED */
 	thr_exit((void *) 1);
+	return (0);
 
 }
 

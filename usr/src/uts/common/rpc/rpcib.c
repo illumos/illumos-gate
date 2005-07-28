@@ -818,7 +818,7 @@ rib_clnt_scq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 	 * Got a send completion
 	 */
 	    if (wc.wc_id != NULL) {	/* XXX can it be otherwise ???? */
-		struct send_wid *wd = (struct send_wid *)wc.wc_id;
+		struct send_wid *wd = (struct send_wid *)(uintptr_t)wc.wc_id;
 		CONN	*conn = qptoc(wd->qp);
 
 		mutex_enter(&wd->sendwait_lock);
@@ -879,7 +879,7 @@ rib_clnt_scq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			 */
 			for (i = 0; i < wd->nsbufs; i++) {
 				rib_rbuf_free(qptoc(wd->qp), SEND_BUFFER,
-					(void *)wd->sbufaddr[i]);
+					(void *)(uintptr_t)wd->sbufaddr[i]);
 			}
 			mutex_exit(&wd->sendwait_lock);
 			(void) rib_free_sendwait(wd);
@@ -920,7 +920,7 @@ rib_svc_scq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 	    }
 #endif
 	    if (wc.wc_id != NULL) { /* XXX NULL possible ???? */
-		struct send_wid *wd = (struct send_wid *)wc.wc_id;
+		struct send_wid *wd = (struct send_wid *)(uintptr_t)wc.wc_id;
 
 		mutex_enter(&wd->sendwait_lock);
 		if (wd->cv_sig == 1) {
@@ -940,7 +940,7 @@ rib_svc_scq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			 */
 			for (i = 0; i < wd->nsbufs; i++) {
 				rib_rbuf_free(qptoc(wd->qp), SEND_BUFFER,
-					(void *)wd->sbufaddr[i]);
+					(void *)(uintptr_t)wd->sbufaddr[i]);
 			}
 			mutex_exit(&wd->sendwait_lock);
 			(void) rib_free_sendwait(wd);
@@ -974,7 +974,7 @@ rib_clnt_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 		if (ibt_status != IBT_SUCCESS)
 		    return;
 
-		rwid = (struct recv_wid *)wc.wc_id;
+		rwid = (struct recv_wid *)(uintptr_t)wc.wc_id;
 		qp = rwid->qp;
 		if (wc.wc_status == IBT_WC_SUCCESS) {
 		    XDR			inxdrs, *xdrs;
@@ -983,13 +983,13 @@ rib_clnt_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 		    CONN *conn = qptoc(qp);
 
 		    xdrs = &inxdrs;
-		    xdrmem_create(xdrs, (caddr_t)rwid->addr,
+		    xdrmem_create(xdrs, (caddr_t)(uintptr_t)rwid->addr,
 			wc.wc_bytes_xfer, XDR_DECODE);
 		/*
 		 * Treat xid as opaque (xid is the first entity
 		 * in the rpc rdma message).
 		 */
-		    xid = *(uint32_t *)rwid->addr;
+		    xid = *(uint32_t *)(uintptr_t)rwid->addr;
 		/* Skip xid and set the xdr position accordingly. */
 		    XDR_SETPOS(xdrs, sizeof (uint32_t));
 		    (void) xdr_u_int(xdrs, &vers);
@@ -1004,7 +1004,8 @@ rib_clnt_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			if (conn->c_state != C_DISCONN_PEND)
 				conn->c_state = C_ERROR;
 			mutex_exit(&conn->c_lock);
-			rib_rbuf_free(conn, RECV_BUFFER, (void *)rwid->addr);
+			rib_rbuf_free(conn, RECV_BUFFER,
+				(void *)(uintptr_t)rwid->addr);
 			rib_free_wid(rwid);
 			continue;
 		    }
@@ -1024,7 +1025,7 @@ rib_clnt_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 				break;
 			    default:
 				rib_rbuf_free(qptoc(qp), RECV_BUFFER,
-						(void *)rwid->addr);
+						(void *)(uintptr_t)rwid->addr);
 				break;
 			    }
 			    break;
@@ -1040,7 +1041,7 @@ rib_clnt_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			    }
 #endif
 			rib_rbuf_free(qptoc(qp), RECV_BUFFER,
-				(void *)rwid->addr);
+				(void *)(uintptr_t)rwid->addr);
 		    }
 		} else if (wc.wc_status == IBT_WC_WR_FLUSHED_ERR) {
 			CONN *conn = qptoc(qp);
@@ -1049,7 +1050,8 @@ rib_clnt_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			 * Connection being flushed. Just free
 			 * the posted buffer
 			 */
-			rib_rbuf_free(conn, RECV_BUFFER, (void *)rwid->addr);
+			rib_rbuf_free(conn, RECV_BUFFER,
+				(void *)(uintptr_t)rwid->addr);
 		} else {
 			CONN *conn = qptoc(qp);
 /*
@@ -1070,7 +1072,8 @@ rib_clnt_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			if (conn->c_state != C_DISCONN_PEND)
 				conn->c_state = C_ERROR;
 			mutex_exit(&conn->c_lock);
-			rib_rbuf_free(conn, RECV_BUFFER, (void *)rwid->addr);
+			rib_rbuf_free(conn, RECV_BUFFER,
+				(void *)(uintptr_t)rwid->addr);
 		}
 		rib_free_wid(rwid);
 	}
@@ -1102,7 +1105,7 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 		if (ibt_status != IBT_SUCCESS)
 		    return;
 
-		s_recvp = (struct svc_recv *)wc.wc_id;
+		s_recvp = (struct svc_recv *)(uintptr_t)wc.wc_id;
 		qp = s_recvp->qp;
 		conn = qptoc(qp);
 		mutex_enter(&qp->posted_rbufs_lock);
@@ -1117,20 +1120,20 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 
 		    xdrs = &inxdrs;
 		    /* s_recvp->vaddr stores data */
-		    xdrmem_create(xdrs, (caddr_t)s_recvp->vaddr,
+		    xdrmem_create(xdrs, (caddr_t)(uintptr_t)s_recvp->vaddr,
 			wc.wc_bytes_xfer, XDR_DECODE);
 
 		/*
 		 * Treat xid as opaque (xid is the first entity
 		 * in the rpc rdma message).
 		 */
-		    xid = *(uint32_t *)s_recvp->vaddr;
+		    xid = *(uint32_t *)(uintptr_t)s_recvp->vaddr;
 		/* Skip xid and set the xdr position accordingly. */
 		    XDR_SETPOS(xdrs, sizeof (uint32_t));
 		    if (!xdr_u_int(xdrs, &vers) ||
 			!xdr_u_int(xdrs, &op)) {
 			rib_rbuf_free(conn, RECV_BUFFER,
-				(void *)s_recvp->vaddr);
+				(void *)(uintptr_t)s_recvp->vaddr);
 			XDR_DESTROY(xdrs);
 #ifdef DEBUG
 			cmn_err(CE_NOTE, "rib_svc_rcq_handler: "
@@ -1147,7 +1150,7 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			 * Invalid RPC/RDMA version. Drop rpc rdma message.
 			 */
 			rib_rbuf_free(conn, RECV_BUFFER,
-				(void *)s_recvp->vaddr);
+				(void *)(uintptr_t)s_recvp->vaddr);
 			(void) rib_free_svc_recv(s_recvp);
 			continue;
 		    }
@@ -1156,7 +1159,7 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			 */
 		    if (op == RDMA_DONE) {
 			rib_rbuf_free(conn, RECV_BUFFER,
-				(void *)s_recvp->vaddr);
+				(void *)(uintptr_t)s_recvp->vaddr);
 			/*
 			 * Wake up the thread waiting on
 			 * a RDMA_DONE for xid
@@ -1180,7 +1183,7 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			 */
 			rd = (struct recv_data *)mp->b_rptr;
 			rd->conn = conn;
-			rd->rpcmsg.addr = (caddr_t)s_recvp->vaddr;
+			rd->rpcmsg.addr = (caddr_t)(uintptr_t)s_recvp->vaddr;
 			rd->rpcmsg.type = RECV_BUFFER;
 			rd->rpcmsg.len = wc.wc_bytes_xfer;
 			rd->status = wc.wc_status;
@@ -1199,11 +1202,11 @@ rib_svc_rcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			 */
 			mutex_exit(&plugin_state_lock);
 			rib_rbuf_free(conn, RECV_BUFFER,
-			(void *)s_recvp->vaddr);
+			(void *)(uintptr_t)s_recvp->vaddr);
 		    }
 		} else {
 			rib_rbuf_free(conn, RECV_BUFFER,
-				(void *)s_recvp->vaddr);
+				(void *)(uintptr_t)s_recvp->vaddr);
 		}
 		(void) rib_free_svc_recv(s_recvp);
 	}
@@ -2005,7 +2008,7 @@ rib_sendwait(rib_qp_t *qp, struct send_wid *wd)
 		}
 		for (i = 0; i < wd->nsbufs; i++) {
 			rib_rbuf_free(qptoc(qp), SEND_BUFFER,
-				(void *)wd->sbufaddr[i]);
+				(void *)(uintptr_t)wd->sbufaddr[i]);
 		}
 		mutex_exit(&wd->sendwait_lock);
 		(void) rib_free_sendwait(wd);
@@ -2108,7 +2111,7 @@ rib_send_and_wait(CONN *conn, struct clist *cl, uint32_t msgid,
 		wdesc->sbufaddr[i] = sgl[i].ds_va;
 	}
 
-	tx_wr.wr_id = (ibt_wrid_t)wdesc;
+	tx_wr.wr_id = (ibt_wrid_t)(uintptr_t)wdesc;
 	tx_wr.wr_opcode = IBT_WRC_SEND;
 	tx_wr.wr_trans = IBT_RC_SRV;
 	tx_wr.wr_nds = nds;
@@ -2123,7 +2126,7 @@ rib_send_and_wait(CONN *conn, struct clist *cl, uint32_t msgid,
 		mutex_exit(&conn->c_lock);
 		for (i = 0; i < nds; i++) {
 			rib_rbuf_free(conn, SEND_BUFFER,
-				(void *)wdesc->sbufaddr[i]);
+				(void *)(uintptr_t)wdesc->sbufaddr[i]);
 		}
 		(void) rib_free_sendwait(wdesc);
 #ifdef DEBUG
@@ -2282,7 +2285,7 @@ rib_clnt_post(CONN* conn, struct clist *cl, uint32_t msgid)
 
 	rwid = rib_create_wid(qp, &sgl[0], msgid);
 	if (rwid) {
-	    recv_wr.wr_id = (ibt_wrid_t)rwid;
+	    recv_wr.wr_id = (ibt_wrid_t)(uintptr_t)rwid;
 	} else {
 		cmn_err(CE_WARN, "rib_clnt_post: out of memory");
 		ret = RDMA_NORESOURCE;
@@ -2318,7 +2321,7 @@ rib_clnt_post(CONN* conn, struct clist *cl, uint32_t msgid)
 
 done:
 	while (clp != NULL) {
-	    rib_rbuf_free(conn, RECV_BUFFER, (void *)clp->c_saddr);
+	    rib_rbuf_free(conn, RECV_BUFFER, (void *)(uintptr_t)clp->c_saddr);
 	    clp = clp->c_next;
 	}
 	return (ret);
@@ -2349,7 +2352,7 @@ rib_svc_post(CONN* conn, struct clist *cl)
 
 	if (nds != 1) {
 	    cmn_err(CE_WARN, "rib_svc_post: nds!=1\n");
-	    rib_rbuf_free(conn, RECV_BUFFER, (caddr_t)sgl[0].ds_va);
+	    rib_rbuf_free(conn, RECV_BUFFER, (caddr_t)(uintptr_t)sgl[0].ds_va);
 	    return (RDMA_FAILED);
 	}
 	bzero(&recv_wr, sizeof (ibt_recv_wr_t));
@@ -2357,7 +2360,8 @@ rib_svc_post(CONN* conn, struct clist *cl)
 	recv_wr.wr_sgl = sgl;
 
 	s_recvp = rib_init_svc_recv(qp, &sgl[0]);
-	recv_wr.wr_id = (ibt_wrid_t)s_recvp; /* Use s_recvp's addr as wr id */
+	/* Use s_recvp's addr as wr id */
+	recv_wr.wr_id = (ibt_wrid_t)(uintptr_t)s_recvp;
 	mutex_enter(&conn->c_lock);
 	if (conn->c_state & C_CONNECTED) {
 		ibt_status = ibt_post_recv(qp->qp_hdl, &recv_wr, 1, NULL);
@@ -2370,7 +2374,8 @@ rib_svc_post(CONN* conn, struct clist *cl)
 		    "ibt_post_recv(), status=%d",
 		    (void *)qp, ibt_status);
 #endif
-		rib_rbuf_free(conn, RECV_BUFFER, (caddr_t)sgl[0].ds_va);
+		rib_rbuf_free(conn, RECV_BUFFER,
+			(caddr_t)(uintptr_t)sgl[0].ds_va);
 		(void) rib_free_svc_recv(s_recvp);
 		return (RDMA_FAILED);
 	}
@@ -2453,7 +2458,7 @@ rib_recv(CONN *conn, struct clist **clp, uint32_t msgid)
 			 * Got message successfully
 			 */
 			clist_add(&cl, 0, rep->bytes_xfer, NULL,
-			    (caddr_t)rep->vaddr_cq, NULL, NULL);
+			    (caddr_t)(uintptr_t)rep->vaddr_cq, NULL, NULL);
 			*clp = cl;
 		} else {
 			if (rep->status != (uint_t)REPLY_WAIT) {
@@ -2463,7 +2468,7 @@ rib_recv(CONN *conn, struct clist **clp, uint32_t msgid)
 				 */
 				ret = rep->status;
 				rib_rbuf_free(conn, RECV_BUFFER,
-					(caddr_t)rep->vaddr_cq);
+					(caddr_t)(uintptr_t)rep->vaddr_cq);
 			}
 		}
 		(void) rib_remreply(qp, rep);
@@ -2535,7 +2540,7 @@ rib_write(CONN *conn, struct clist *cl, int wait)
 	}
 
 	wdesc = rib_init_sendwait(0, cv_sig, qp);
-	tx_wr.wr_id = (ibt_wrid_t)wdesc;
+	tx_wr.wr_id = (ibt_wrid_t)(uintptr_t)wdesc;
 	tx_wr.wr_opcode = IBT_WRC_RDMAW;
 	tx_wr.wr_trans = IBT_RC_SRV;
 	tx_wr.wr_nds = nds;
@@ -2614,7 +2619,7 @@ rib_read(CONN *conn, struct clist *cl, int wait)
 	}
 
 	wdesc = rib_init_sendwait(0, cv_sig, qp);
-	rx_wr.wr_id = (ibt_wrid_t)wdesc;
+	rx_wr.wr_id = (ibt_wrid_t)(uintptr_t)wdesc;
 	rx_wr.wr_opcode = IBT_WRC_RDMAR;
 	rx_wr.wr_trans = IBT_RC_SRV;
 	rx_wr.wr_nds = nds;
@@ -2785,7 +2790,7 @@ rib_srv_cm_handler(void *any, ibt_cm_event_t *event,
 		    }
 
 		    bzero(&cl, sizeof (cl));
-		    cl.c_saddr = (uint64)rdbuf.addr;
+		    cl.c_saddr = (uintptr_t)rdbuf.addr;
 		    cl.c_len = rdbuf.len;
 		    cl.c_smemhandle.mrc_lmr = rdbuf.handle.mrc_lmr; /* lkey */
 		    cl.c_next = NULL;
@@ -3703,7 +3708,7 @@ rib_registermem(CONN *conn, caddr_t buf, uint_t buflen,
 	 */
 	status = rib_reg_mem(hca, buf, buflen, 0, &mr_hdl, &mr_desc);
 	if (status == RDMA_SUCCESS) {
-		buf_handle->mrc_linfo = (uint64_t)mr_hdl;
+		buf_handle->mrc_linfo = (uintptr_t)mr_hdl;
 		buf_handle->mrc_lmr = (uint32_t)mr_desc.md_lkey;
 		buf_handle->mrc_rmr = (uint32_t)mr_desc.md_rkey;
 	} else {
@@ -3721,7 +3726,7 @@ rib_reg_mem(rib_hca_t *hca, caddr_t buf, uint_t size, ibt_mr_flags_t spec,
 	ibt_mr_attr_t	mem_attr;
 	ibt_status_t	ibt_status;
 
-	mem_attr.mr_vaddr = (uint64_t)buf;
+	mem_attr.mr_vaddr = (uintptr_t)buf;
 	mem_attr.mr_len = (ib_msglen_t)size;
 	mem_attr.mr_as = NULL;
 	mem_attr.mr_flags = IBT_MR_SLEEP | IBT_MR_ENABLE_LOCAL_WRITE |
@@ -3762,7 +3767,7 @@ rib_registermemsync(CONN *conn, caddr_t buf, uint_t buflen,
 	status = rib_reg_mem(hca, buf, buflen, IBT_MR_NONCOHERENT, &mr_hdl,
 			&mr_desc);
 	if (status == RDMA_SUCCESS) {
-		buf_handle->mrc_linfo = (uint64_t)mr_hdl;
+		buf_handle->mrc_linfo = (uintptr_t)mr_hdl;
 		buf_handle->mrc_lmr = (uint32_t)mr_desc.md_lkey;
 		buf_handle->mrc_rmr = (uint32_t)mr_desc.md_rkey;
 		*sync_handle = (RIB_SYNCMEM_HANDLE)mr_hdl;
@@ -3787,7 +3792,7 @@ rib_deregistermem(CONN *conn, caddr_t buf, struct mrc buf_handle)
 	 * before HCA_DETACH_EVENT can be accepted.
 	 */
 	(void) ibt_deregister_mr(hca->hca_hdl,
-			(ibt_mr_hdl_t)buf_handle.mrc_linfo);
+			(ibt_mr_hdl_t)(uintptr_t)buf_handle.mrc_linfo);
 	return (RDMA_SUCCESS);
 }
 
@@ -3811,7 +3816,7 @@ rib_syncmem(CONN *conn, RIB_SYNCMEM_HANDLE shandle, caddr_t buf,
 	ibt_mr_sync_t	mr_segment;
 
 	mr_segment.ms_handle = (ibt_mr_hdl_t)shandle;
-	mr_segment.ms_vaddr = (ib_vaddr_t)buf;
+	mr_segment.ms_vaddr = (ib_vaddr_t)(uintptr_t)buf;
 	mr_segment.ms_len = (ib_memlen_t)len;
 	if (cpu) {
 		/* make incoming data visible to memory */
@@ -3906,7 +3911,7 @@ rib_rbufpool_create(rib_hca_t *hca, int ptype, int num)
 	}
 	for (i = 0, buf = bp->buf; i < num; i++, buf += bp->rsize) {
 		bzero(&rbp->mr_desc[i], sizeof (ibt_mr_desc_t));
-		mem_attr.mr_vaddr = (uint64_t)buf;
+		mem_attr.mr_vaddr = (uintptr_t)buf;
 		mem_attr.mr_len = (ib_msglen_t)bp->rsize;
 		mem_attr.mr_as = NULL;
 		ibt_status = ibt_register_mr(hca->hca_hdl,
@@ -4100,9 +4105,9 @@ rib_rbuf_alloc(CONN *conn, rdma_buf_t *rdbuf)
 	rdbuf->addr = buf;
 	rdbuf->len = bp->rsize;
 	for (i = bp->numelems - 1; i >= 0; i--) {
-	    if ((ib_vaddr_t)buf == rbp->mr_desc[i].md_vaddr) {
+	    if ((ib_vaddr_t)(uintptr_t)buf == rbp->mr_desc[i].md_vaddr) {
 		rdbuf->handle.mrc_rmr = (uint32_t)rbp->mr_desc[i].md_rkey;
-		rdbuf->handle.mrc_linfo = (uint64_t)rbp->mr_hdl[i];
+		rdbuf->handle.mrc_linfo = (uintptr_t)rbp->mr_hdl[i];
 		rdbuf->handle.mrc_lmr = (uint32_t)rbp->mr_desc[i].md_lkey;
 		bp->buffree--;
 		if (rib_debug > 1)

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -388,7 +388,7 @@ nfslog_read_buffer(struct nfslog_buf *lbp)
 			free_lrp(lrp);
 			return (NULL);
 		}
-		sizebuf = (char *)lbp->next_rec;
+		sizebuf = (char *)(uintptr_t)lbp->next_rec;
 	}
 
 	/* We have to XDR the first int so we know how much is in this record */

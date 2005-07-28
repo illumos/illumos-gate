@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,9 +80,8 @@ void log_cant_reply();
 void setupfs();
 
 /*ARGSUSED*/
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char *argv[])
 {
 	register SVCXPRT *transp;
 
@@ -184,8 +183,7 @@ main(argc, argv)
 	 */
 	svc_run();
 	syslog(LOG_ERR, "Error: svc_run shouldn't have returned");
-	exit(1);
-	/* NOTREACHED */
+	return (1);
 }
 
 void
@@ -322,6 +320,7 @@ sendreply:
 		log_cant_reply(transp);
 }
 
+int
 quotactl(cmd, mountp, uid, dqp)
 	int	cmd;
 	char	*mountp;

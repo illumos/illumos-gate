@@ -212,7 +212,8 @@ static rpcvers_t vers_min_default = NFS_VERSMIN_DEFAULT;
  */
 static bool_t public_opt;
 
-main(int argc, char **argv)
+int
+main(int argc, char *argv[])
 {
 	struct mnttab mnt;
 	extern char *optarg;

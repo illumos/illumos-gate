@@ -144,6 +144,7 @@ static old_kstat_t old_aclreqcnt_v2_kstat, old_aclreqcnt_v3_kstat;
 
 
 
+int
 main(int argc, char *argv[])
 {
 	int c, go_forever, j;

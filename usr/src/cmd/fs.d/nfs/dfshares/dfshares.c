@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,9 +58,8 @@ void pr_exports();
 void free_ex();
 void usage();
 
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char *argv[])
 {
 
 	char hostbuf[256];
@@ -90,7 +89,7 @@ main(argc, argv)
 		pr_exports(hostbuf);
 	}
 
-	exit(0);
+	return (0);
 }
 
 struct	timeval	rpc_totout_new = {15, 0};
@@ -132,7 +131,7 @@ pr_exports(host)
 	tout.tv_usec = 0;
 
 	if (err = clnt_call(cl, MOUNTPROC_EXPORT, xdr_void,
-	    0, xdr_exports, (caddr_t) &ex, tout)) {
+	    0, xdr_exports, (caddr_t)&ex, tout)) {
 		(void) fprintf(stderr, "nfs dfshares: %s\n", clnt_sperrno(err));
 		clnt_destroy(cl);
 		exit(1);

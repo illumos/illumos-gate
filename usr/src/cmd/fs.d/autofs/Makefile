@@ -92,7 +92,7 @@ $(TYPEPROG) :=	LDLIBS += -lrpcsvc -lsocket -lnsl -lsldap -lcmd \
 		-lkstat
 $(TYPEPROG) :=	LDFLAGS += -R/usr/lib/fs/$(FSTYPE)
 
-CFLAGS +=	$(CCVERBOSE) -D_FILE_OFFSET_BITS=64 -o $@
+CFLAGS +=	$(CCVERBOSE) -D_FILE_OFFSET_BITS=64
 CPPFLAGS=	-I. -I.. -I../nfs/lib $(CPPFLAGS.master) -D_REENTRANT \
 			$(MALLOC_DEBUG)
 OBJS=		$(AUTOOBJS) $(MOUNTOBJS) $(TYPEOBJS) \

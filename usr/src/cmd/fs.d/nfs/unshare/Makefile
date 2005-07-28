@@ -22,8 +22,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989,1995,1999,2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 FSTYPE=		nfs
@@ -35,8 +35,6 @@ include		../../Makefile.fstype
 COMMON=		sharetab.o nfslogtab.o
 OBJS= 		$(LIBPROG).o $(COMMON) 
 SRCS=		$(LIBPROG).c ../lib/sharetab.c ../lib/nfslogtab.c
-
-CFLAGS +=	-o $@
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

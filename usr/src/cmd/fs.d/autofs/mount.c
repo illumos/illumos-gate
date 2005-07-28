@@ -58,9 +58,8 @@ static int  ro_given(char *options);
  */
 static char	*service_list[] = { AUTOMOUNTD, NULL };
 
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char *argv[])
 {
 	int error;
 	int c;

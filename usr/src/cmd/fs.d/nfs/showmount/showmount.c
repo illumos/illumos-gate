@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,9 +69,8 @@ static struct mountbody **table;
 
 struct	timeval	rpc_totout_new = {15, 0};
 
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char *argv[])
 {
 	int aflg = 0, dflg = 0, eflg = 0;
 	int err;
@@ -224,12 +223,14 @@ main(argc, argv)
 	return (0);
 }
 
+int
 sorthost(a, b)
 	struct mountbody **a, **b;
 {
 	return (strcmp((*a)->ml_hostname, (*b)->ml_hostname));
 }
 
+int
 sortpath(a, b)
 	struct mountbody **a, **b;
 {
@@ -270,7 +271,7 @@ printex(cl, host)
 	tout.tv_usec = 0;
 
 	if (err = clnt_call(cl, MOUNTPROC_EXPORT,
-	    xdr_void, 0, xdr_exports, (caddr_t) &ex, tout)) {
+	    xdr_void, 0, xdr_exports, (caddr_t)&ex, tout)) {
 		pr_err("%s\n", clnt_sperrno(err));
 		exit(1);
 	}

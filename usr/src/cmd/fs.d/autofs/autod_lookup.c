@@ -22,7 +22,7 @@
 /*
  *	autod_lookup.c
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #include <assert.h>
 #include "automount.h"
 
+int
 do_lookup1(mapname, key, subdir, mapopts, path, isdirect, action, linkp, cred)
 	char *mapname;
 	char *key;

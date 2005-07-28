@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,7 +118,8 @@ int	nfs_server_vers_max = NFS_VERSMAX_DEFAULT;
  */
 int	nfs_server_delegation = NFS_SERVER_DELEGATION_DEFAULT;
 
-main(int ac, char **av)
+int
+main(int ac, char *av[])
 {
 	char *dir = "/";
 	int allflag = 0;

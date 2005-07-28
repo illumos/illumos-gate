@@ -3657,6 +3657,7 @@ nopt(mnt, opt, valp)
 	return (0);
 }
 
+int
 nfsunmount(mnt)
 	struct mnttab *mnt;
 {

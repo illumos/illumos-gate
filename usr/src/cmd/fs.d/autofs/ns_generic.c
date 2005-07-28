@@ -22,7 +22,7 @@
 /*
  *	ns_generic.c
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,6 +183,7 @@ loadmaster_map(mapname, defopts, stack, stkptr)
 	return (__NSW_UNAVAIL);
 }
 
+int
 loaddirect_map(mapname, localmap, defopts, stack, stkptr)
 	char *mapname, *localmap, *defopts;
 	char **stack, ***stkptr;
@@ -277,6 +278,7 @@ done:	if (*list != NULL) {
 /*
  * enumerate all entries in the map in the various name services.
  */
+int
 getmapkeys(mapname, list, error, cache_time, stack, stkptr, uid)
 	char *mapname;
 	struct dir_entry **list;

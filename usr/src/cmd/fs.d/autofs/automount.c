@@ -80,9 +80,8 @@ mutex_t cleanup_lock;
 cond_t cleanup_start_cv;
 cond_t cleanup_done_cv;
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int c;
 	struct autofs_args ai;

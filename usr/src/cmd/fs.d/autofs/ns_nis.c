@@ -22,7 +22,7 @@
 /*
  *	ns_nis.c
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,6 +167,7 @@ done:
 
 }
 
+int
 loadmaster_nis(mapname, defopts, stack, stkptr)
 	char *mapname, *defopts;
 	char **stack;
@@ -308,6 +309,7 @@ pr_msg("Warning: invalid entry for %s in NIS map %s ignored.\n", dir, mapname);
 	}
 }
 
+int
 loaddirect_nis(nismap, localmap, opts, stack, stkptr)
 	char *nismap, *localmap, *opts;
 	char **stack;

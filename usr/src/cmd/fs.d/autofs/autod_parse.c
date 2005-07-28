@@ -54,14 +54,12 @@
  * This structure is used to determine the hierarchical
  * relationship between directories
  */
-static struct _hiernode
-{
+typedef struct _hiernode {
 	char dirname[MAXFILENAMELEN+1];
 	struct _hiernode *subdir;
 	struct _hiernode *leveldir;
 	struct mapent *mapent;
-};
-typedef struct _hiernode hiernode;
+} hiernode;
 
 void free_mapent(struct mapent *);
 
@@ -1315,6 +1313,7 @@ parse_fsinfo(char *mapname, struct mapent *mapents)
  * the hosts and the corresponding file system. The list
  * is then attatched to the mapent struct passed in.
  */
+int
 parse_nfs(mapname, me, fsw, fswq, lp, lq, wsize)
 	struct mapent *me;
 	char *mapname, *fsw, *fswq, **lp, **lq;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,7 +94,8 @@ int	(*Mysvc)(int, struct netbuf, struct netconfig *) = NULL;
 				/* used by cots_listen_event() */
 int	max_conns_allowed = -1;	/* used by cots_listen_event() */
 
-main(int argc, char **argv)
+int
+main(int argc, char *argv[])
 {
 	int pid;
 	int i;

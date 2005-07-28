@@ -98,9 +98,8 @@ static struct exportdata ex;
 static char *service_list[] =
 	{ STATD, LOCKD, MOUNTD, NFSD, NFSMAPID, RQUOTAD, NULL };
 
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char *argv[])
 {
 	extern int optind;
 	extern char *optarg;

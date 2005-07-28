@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,7 +39,6 @@ OBJS= 		$(LOCAL) $(COMMON)
 SRCS=		$(LOCAL:%.o=%.c) \
 		$(FSLIBSRC) ../lib/nfs_sec.c ../lib/sharetab.c
 LDLIBS +=	-lrpcsvc -lnsl -lbsm -lsocket -lcmd
-CFLAGS +=	-o $@
 CPPFLAGS +=	-D_REENTRANT
 
 $(TYPEPROG):	$(OBJS)

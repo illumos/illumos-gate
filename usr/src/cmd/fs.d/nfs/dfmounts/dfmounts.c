@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,9 +64,8 @@ static int sortpath(const void *, const void *);
 static void usage(void);
 static void pr_err(char *, ...);
 
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char *argv[])
 {
 
 	char hostbuf[256];
@@ -154,7 +153,7 @@ pr_mounts(host)
 	tout.tv_usec = 0;
 
 	if (err = clnt_call(cl, MOUNTPROC_DUMP, xdr_void,
-			    0, xdr_mountlist, (caddr_t) &ml, tout)) {
+			    0, xdr_mountlist, (caddr_t)&ml, tout)) {
 		pr_err("%s\n", clnt_sperrno(err));
 		clnt_destroy(cl);
 		return;
