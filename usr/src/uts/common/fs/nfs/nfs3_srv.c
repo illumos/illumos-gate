@@ -401,8 +401,6 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 	if (error)
 		goto out;
 
-	VN_SETPATH(rootdir, dvp, vp, args->what.name, strlen(args->what.name));
-
 	if (sec.sec_flags & SEC_QUERY) {
 		error = makefh3_ol(&resp->resok.object, exi, sec.sec_index);
 	} else {
@@ -1294,11 +1292,6 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 				error = VOP_LOOKUP(dvp, args->where.name, &tvp,
 						NULL, 0, NULL, cr);
 
-				if (!error)
-					VN_SETPATH(rootdir, dvp, tvp,
-						args->where.name,
-						strlen(args->where.name));
-
 				/*
 				 * Check to see if the file has been delegated
 				 * to a v4 client.  If so, then begin recall of
@@ -1416,9 +1409,6 @@ tryagain:
 			if (error == ENOENT)
 				goto tryagain;
 			goto out;
-		} else {
-			VN_SETPATH(rootdir, dvp, vp, args->where.name,
-				strlen(args->where.name));
 		}
 
 		/*
@@ -1778,10 +1768,6 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 		goto out;
 
 	error = VOP_LOOKUP(dvp, args->where.name, &vp, NULL, 0, NULL, cr);
-
-	if (!error)
-		VN_SETPATH(rootdir, dvp, vp, args->where.name,
-			strlen(args->where.name));
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -3125,7 +3111,6 @@ good:
 			dp = nextdp(dp);
 			continue;
 		}
-		VN_SETPATH(rootdir, vp, nvp, dp->d_name, strlen(dp->d_name));
 
 #ifdef DEBUG
 		if (rfs3_do_post_op_attr) {

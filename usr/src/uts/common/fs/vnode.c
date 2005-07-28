@@ -2093,20 +2093,9 @@ fs_new_caller_id()
 }
 
 /*
- * Returns the raw path associated with this vnode.  Normal consumers should
- * use the vnodetopath() function to get a validated, secure path.
- */
-char *
-vn_path(vnode_t *vp)
-{
-	return (vp->v_path);
-}
-
-/*
  * Given a starting vnode and a path, updates the path in the target vnode in
  * a safe manner.  If the vnode already has path information embedded, then the
- * cached path is left untouched.  Consumers should use the VN_SETPATH() macro,
- * which only calls this function if the path is already NULL.
+ * cached path is left untouched.
  */
 void
 vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
@@ -2329,16 +2318,15 @@ fop_open(
 		 */
 
 		if (*vpp != vp && *vpp != NULL) {
-			if (vfs_vnode_path)
-				vn_copypath(vp, *vpp);
-		    if (((*vpp)->v_type == VREG) && (mode & FREAD))
-			atomic_add_32(&((*vpp)->v_rdcnt), 1);
-		    if ((vp->v_type == VREG) && (mode & FREAD))
-			atomic_add_32(&(vp->v_rdcnt), -1);
-		    if (((*vpp)->v_type == VREG) && (mode & FWRITE))
-			atomic_add_32(&((*vpp)->v_wrcnt), 1);
-		    if ((vp->v_type == VREG) && (mode & FWRITE))
-			atomic_add_32(&(vp->v_wrcnt), -1);
+			vn_copypath(vp, *vpp);
+			if (((*vpp)->v_type == VREG) && (mode & FREAD))
+				atomic_add_32(&((*vpp)->v_rdcnt), 1);
+			if ((vp->v_type == VREG) && (mode & FREAD))
+				atomic_add_32(&(vp->v_rdcnt), -1);
+			if (((*vpp)->v_type == VREG) && (mode & FWRITE))
+				atomic_add_32(&((*vpp)->v_wrcnt), 1);
+			if ((vp->v_type == VREG) && (mode & FWRITE))
+				atomic_add_32(&(vp->v_wrcnt), -1);
 		}
 	}
 	VN_RELE(vp);
@@ -2457,7 +2445,13 @@ fop_lookup(
 	vnode_t *rdir,
 	cred_t *cr)
 {
-	return (*(dvp)->v_op->vop_lookup)(dvp, nm, vpp, pnp, flags, rdir, cr);
+	int ret;
+
+	ret = (*(dvp)->v_op->vop_lookup)(dvp, nm, vpp, pnp, flags, rdir, cr);
+	if (ret == 0 && *vpp && (*vpp)->v_path == NULL)
+		vn_setpath(rootdir, dvp, *vpp, nm, strlen(nm));
+
+	return (ret);
 }
 
 int
@@ -2475,8 +2469,8 @@ fop_create(
 
 	ret = (*(dvp)->v_op->vop_create)
 				(dvp, name, vap, excl, mode, vpp, cr, flag);
-	if (vfs_vnode_path && ret == 0 && *vpp)
-		VN_SETPATH(rootdir, dvp, *vpp, name, strlen(name));
+	if (ret == 0 && *vpp && (*vpp)->v_path == NULL)
+		vn_setpath(rootdir, dvp, *vpp, name, strlen(name));
 
 	return (ret);
 }
@@ -2522,8 +2516,8 @@ fop_mkdir(
 	int ret;
 
 	ret = (*(dvp)->v_op->vop_mkdir)(dvp, dirname, vap, vpp, cr);
-	if (vfs_vnode_path && ret == 0 && *vpp)
-		VN_SETPATH(rootdir, dvp, *vpp, dirname, strlen(dirname));
+	if (ret == 0 && *vpp && (*vpp)->v_path == NULL)
+		vn_setpath(rootdir, dvp, *vpp, dirname, strlen(dirname));
 
 	return (ret);
 }

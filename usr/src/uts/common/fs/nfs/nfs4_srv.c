@@ -890,8 +890,6 @@ do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 	if (error)
 		return (puterrno4(error));
 
-	VN_SETPATH(rootdir, dvp, vp, nm, strlen(nm));
-
 	/*
 	 * If the vnode is in a pseudo filesystem, or if the security flavor
 	 * used in the request is valid but not an explicitly shared flavor,
@@ -1593,8 +1591,6 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cr);
 		if (error)
 			break;
-
-		VN_SETPATH(rootdir, dvp, vp, nm, strlen(nm));
 
 		/*
 		 * va_seq is not safe over VOP calls, check it again
@@ -2423,8 +2419,6 @@ do_rfs4_op_lookup(char *nm, uint_t buflen, struct svc_req *req,
 	error = VOP_LOOKUP(cs->vp, nm, &vp, NULL, 0, NULL, cs->cr);
 	if (error)
 		return (puterrno4(error));
-
-	VN_SETPATH(rootdir, cs->vp, vp, nm, strlen(nm));
 
 	/*
 	 * If the vnode is in a pseudo filesystem, check whether it is visible.
@@ -3548,7 +3542,6 @@ rfs4_lookup_and_findfile(vnode_t *dvp, char *nm, vnode_t **vpp,
 		*vpp = NULL;
 
 	if ((error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cr)) == 0) {
-		VN_SETPATH(rootdir, dvp, vp, nm, strlen(nm));
 		if (vp->v_type == VREG)
 			fp = rfs4_findfile(vp, NULL, &fcreate);
 		if (vpp)
@@ -5449,8 +5442,6 @@ tryagain:
 			status = puterrno4(error);
 			return (status);
 		}
-
-		VN_SETPATH(rootdir, dvp, *vpp, nm, strlen(nm));
 
 		if (mode == UNCHECKED4) {
 			/* existing object must be regular file */

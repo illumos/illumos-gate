@@ -486,8 +486,6 @@ extern char rootfstype[];		/* name of root fstype */
 extern const int nfstype;		/* # of elements in vfssw array */
 extern vfsops_t *EIO_vfsops;		/* operations for vfs being torn-down */
 
-extern int vfs_vnode_path;		/* tunable to control paths in vnodes */
-
 /*
  * The following variables are private to the the kernel's vfs layer.  File
  * system implementations should not access them.

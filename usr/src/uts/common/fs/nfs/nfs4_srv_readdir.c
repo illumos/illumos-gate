@@ -118,8 +118,6 @@ nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 	if (error = VOP_LOOKUP(dvp, d_name, &vp, NULL, 0, NULL, cs->cr))
 		return (error);
 
-	VN_SETPATH(rootdir, dvp, vp, d_name, strlen(d_name));
-
 	/* Is this object mounted upon? */
 	ismntpt = vn_ismntpt(vp);
 	/*

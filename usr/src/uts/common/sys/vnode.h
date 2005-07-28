@@ -852,6 +852,11 @@ vnode_t *makespecvp(dev_t dev, vtype_t type);
 vn_vfslocks_entry_t *vn_vfslocks_getlock(void *);
 void	vn_vfslocks_rele(vn_vfslocks_entry_t *);
 
+void vn_copypath(struct vnode *src, struct vnode *dst);
+void vn_setpath_str(struct vnode *vp, const char *str, size_t len);
+void vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
+    const char *path, size_t plen);
+
 /* Vnode event notification */
 void	vnevent_rename_src(vnode_t *);
 void	vnevent_rename_dest(vnode_t *);
@@ -861,22 +866,6 @@ int	vnevent_support(vnode_t *);
 
 /* Context identification */
 u_longlong_t	fs_new_caller_id();
-
-char	*vn_path(struct vnode *vp);
-void	vn_setpath(struct vnode *rootvp, struct vnode *startvp,
-    struct vnode *vp, const char *path, size_t len);
-void	vn_setpath_str(struct vnode *vp, const char *str, size_t len);
-
-/*
- * This macro should be used instead of calling vn_setpath() directly.  It
- * optimizes for the common case, where the vnode already has a path.
- */
-#define	VN_SETPATH(rvp, svp, vp, p, len) {			\
-	if (vn_path(vp) == NULL)				\
-		vn_setpath((rvp), (svp), (vp), (p), (len));	\
-}
-
-void	vn_copypath(struct vnode *src, struct vnode *dst);
 
 int	vn_vmpss_usepageio(vnode_t *);
 

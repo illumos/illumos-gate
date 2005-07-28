@@ -436,8 +436,6 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	}
 
 	if (!error) {
-		VN_SETPATH(rootdir, dvp, vp, da->da_name,
-			strlen(da->da_name));
 		va.va_mask = AT_ALL;	/* we want everything */
 		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START,
 			"vop_getattr_start:");
@@ -1841,7 +1839,6 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 		if (!error) {
 			struct vattr at;
 
-			VN_SETPATH(rootdir, dvp, tvp, name, strlen(name));
 			lookup_ok = 1;
 			at.va_mask = AT_MODE;
 			TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START,
@@ -2459,8 +2456,6 @@ rfs_symlink(struct nfsslargs *args, enum nfsstat *status,
 	TRACE_0(TR_FAC_NFS, TR_VOP_LOOKUP_END,
 		"vop_lookup_end:");
 	if (!lerror) {
-		VN_SETPATH(rootdir, vp, svp, args->sla_from.da_name,
-			strlen(args->sla_from.da_name));
 		(void) VOP_FSYNC(svp, 0, cr);
 		VN_RELE(svp);
 	}

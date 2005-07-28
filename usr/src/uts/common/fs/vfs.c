@@ -222,8 +222,7 @@ fsop_root(vfs_t *vfsp, vnode_t **vpp)
 	 * Make sure this root has a path.  With lofs, it is possible to have
 	 * a NULL mountpoint.
 	 */
-	if (vfs_vnode_path && ret == 0 && vfsp->vfs_mntpt != NULL &&
-	    vn_path(*vpp) == NULL) {
+	if (ret == 0 && vfsp->vfs_mntpt != NULL && (*vpp)->v_path == NULL) {
 		mntpt = vfs_getmntpoint(vfsp);
 		vn_setpath_str(*vpp, refstr_value(mntpt),
 		    strlen(refstr_value(mntpt)));

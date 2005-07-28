@@ -213,7 +213,6 @@ lookuppnvp(
 	vnode_t *startvp;
 	vnode_t *zonevp = curproc->p_zone->zone_rootvp;		/* zone root */
 	int must_be_directory = 0;
-	size_t plen;
 
 	CPU_STATS_ADDQ(CPU, sys, namei, 1);
 	nlink = 0;
@@ -371,14 +370,6 @@ checkforroot:
 		if (must_be_directory && (error = pn_addslash(pnp)) != 0)
 			goto bad;
 		*dirvpp = vp;
-		/*
-		 * We cache the path of everything up to right before this
-		 * component and store that in the parent directory.
-		 */
-		if (vfs_vnode_path && pnp->pn_path != pnp->pn_buf) {
-			VN_SETPATH(rootvp, startvp, vp, pnp->pn_buf,
-			    pnp->pn_path - pnp->pn_buf);
-		}
 		if (compvpp != NULL)
 			*compvpp = NULL;
 		if (rootvp != rootdir)
@@ -565,18 +556,6 @@ checkforroot:
 				(void) pn_set(rpnp, "/");
 			else if (rpnp->pn_pathlen == 0)
 				(void) pn_set(rpnp, ".");
-		}
-
-		/*
-		 * Store the path for this vnode and/or its parent.
-		 */
-		if (vfs_vnode_path) {
-			plen = pnp->pn_path - pnp->pn_buf;
-			if (dirvpp != NULL && plen != 0)
-				VN_SETPATH(rootvp, startvp, *dirvpp,
-				    pnp->pn_buf, plen);
-			VN_SETPATH(rootvp, startvp, cvp, pnp->pn_buf,
-			    plen + pnp->pn_pathlen);
 		}
 
 		if (compvpp != NULL)
@@ -1205,8 +1184,8 @@ vnodetopath_common(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen,
 	 * Check to see if we have a cached path in the vnode.
 	 */
 	mutex_enter(&vp->v_lock);
-	if (vn_path(vp) != NULL) {
-		(void) pn_set(&pn, vn_path(vp));
+	if (vp->v_path != NULL) {
+		(void) pn_set(&pn, vp->v_path);
 		mutex_exit(&vp->v_lock);
 
 		pn_alloc(&rpn);
@@ -1251,8 +1230,8 @@ vnodetopath_common(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen,
 				(void) pn_set(&pn, local);
 			} else {
 				mutex_enter(&vp->v_lock);
-				if (vn_path(vp) != NULL) {
-					(void) pn_set(&pn, vn_path(vp));
+				if (vp->v_path != NULL) {
+					(void) pn_set(&pn, vp->v_path);
 					mutex_exit(&vp->v_lock);
 				} else {
 					mutex_exit(&vp->v_lock);
