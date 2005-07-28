@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -422,6 +422,14 @@ sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep)
 		return (ENOMEM);
 	}
 	ipif_obj->saddr_ipifp = ipif;
+	/*
+	 * If an address is added after association setup, we need to wait
+	 * for the peer to send us an ASCONF ACK before we can start using it.
+	 * saddr_ipif_dontsrc will be reset (to 0) when we get the ASCONF
+	 * ACK for this address.
+	 */
+	if (sctp->sctp_state > SCTP_LISTEN)
+		ipif_obj->saddr_ipif_dontsrc = 1;
 	list_insert_tail(&sctp->sctp_saddrs[seqid].sctp_ipif_list, ipif_obj);
 	sctp->sctp_saddrs[seqid].ipif_count++;
 	sctp->sctp_nsaddrs++;
@@ -758,7 +766,7 @@ sctp_update_ipif(ipif_t *ipif, int op)
 	case SCTP_IPIF_INSERT:
 		if (sctp_ipif != NULL) {
 			if (sctp_ipif->sctp_ipif_state == SCTP_IPIFS_CONDEMNED)
-				sctp_ipif->sctp_ipif_state = 0;
+				sctp_ipif->sctp_ipif_state = SCTP_IPIFS_INVALID;
 			rw_exit(&sctp_g_ipifs_lock);
 			rw_exit(&sctp_g_ills_lock);
 			return;
@@ -773,9 +781,8 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		}
 		sctp_ipif->sctp_ipif_id = ipif->ipif_seqid;
 		sctp_ipif->sctp_ipif_ill = sctp_ill;
-		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_DOWN;
+		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_INVALID;
 		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
-		sctp_ipif->sctp_ipif_saddr = ipif->ipif_v6lcl_addr;
 		sctp_ipif->sctp_ipif_zoneid = ipif->ipif_zoneid;
 		sctp_ipif->sctp_ipif_isv6 = ill->ill_isv6;
 		rw_init(&sctp_ipif->sctp_ipif_lock, NULL, RW_DEFAULT, NULL);
@@ -978,7 +985,9 @@ sctp_get_valid_addr(sctp_t *sctp, boolean_t isv6)
 			if (!obj->saddr_ipif_dontsrc &&
 			    ipif->sctp_ipif_isv6 == isv6 &&
 			    ipif->sctp_ipif_state == SCTP_IPIFS_UP &&
-			    !(ill->sctp_ill_flags & PHYI_LOOPBACK)) {
+			    !(ill->sctp_ill_flags & PHYI_LOOPBACK) &&
+			    (!ipif->sctp_ipif_isv6 ||
+			    !IN6_IS_ADDR_LINKLOCAL(&ipif->sctp_ipif_saddr))) {
 				return (ipif->sctp_ipif_saddr);
 			}
 			scanned++;
@@ -996,58 +1005,6 @@ got_none:
 		IN6_IPADDR_TO_V4MAPPED(0, &addr);
 
 	return (addr);
-}
-
-/* Given a list, get the combined lengths. Called with no locks held. */
-size_t
-sctp_addr_len(sctp_t *sctp, int af)
-{
-	int			i;
-	int			l;
-	sctp_saddr_ipif_t	*obj;
-	size_t			paramlen = 0;
-	int			scanned = 0;
-
-	for (i = 0; i < SCTP_IPIF_HASH; i++) {
-		if (sctp->sctp_saddrs[i].ipif_count == 0)
-			continue;
-		obj = list_head(&sctp->sctp_saddrs[i].sctp_ipif_list);
-		for (l = 0; l < sctp->sctp_saddrs[i].ipif_count; l++) {
-			in6_addr_t	addr;
-			sctp_ipif_t	*ipif;
-			sctp_ill_t	*ill;
-
-			ipif = obj->saddr_ipifp;
-			ill = ipif->sctp_ipif_ill;
-			scanned++;
-			if ((ipif->sctp_ipif_state != SCTP_IPIFS_UP) ||
-			    (ill->sctp_ill_flags & PHYI_LOOPBACK)) {
-				if (scanned >= sctp->sctp_nsaddrs)
-					return (paramlen);
-
-				obj = list_next(&sctp->sctp_saddrs[i].
-				    sctp_ipif_list, obj);
-				continue;
-			}
-			addr = ipif->sctp_ipif_saddr;
-			if (IN6_IS_ADDR_V4MAPPED(&addr)) {
-				/*
-				 * Only send v4 address if the other side
-				 * supports it.
-				 */
-				if (af & PARM_SUPP_V4)
-					paramlen += PARM_ADDR4_LEN;
-			} else if (!IN6_IS_ADDR_LINKLOCAL(&addr) &&
-			    (af & PARM_SUPP_V6)) {
-				paramlen += PARM_ADDR6_LEN;
-			}
-			if (scanned >= sctp->sctp_nsaddrs)
-				return (paramlen);
-			obj = list_next(&sctp->sctp_saddrs[i].sctp_ipif_list,
-			    obj);
-		}
-	}
-	return (paramlen);
 }
 
 /*
@@ -1124,16 +1081,17 @@ done:
 }
 
 /*
- * Given a list construct the list of addresses in p. Called with no locks
- * held
+ * Given the supported address family, walk through the source address list
+ * and return the total length of the available addresses. If 'p' is not
+ * null, construct the parameter list for the addresses in 'p'.
  */
 size_t
-sctp_addr_val(sctp_t *sctp, int supp_af, uchar_t *p)
+sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p)
 {
 	int			i;
 	int			l;
 	sctp_saddr_ipif_t	*obj;
-	size_t			added = 0;
+	size_t			paramlen = 0;
 	sctp_parm_hdr_t		*hdr;
 	int			scanned = 0;
 
@@ -1149,42 +1107,44 @@ sctp_addr_val(sctp_t *sctp, int supp_af, uchar_t *p)
 			ipif = obj->saddr_ipifp;
 			ill = ipif->sctp_ipif_ill;
 			scanned++;
-			if ((ipif->sctp_ipif_state != SCTP_IPIFS_UP) ||
+			if (!SCTP_IPIF_USABLE(ipif->sctp_ipif_state) ||
 			    (ill->sctp_ill_flags & PHYI_LOOPBACK)) {
-				if (scanned >= sctp->sctp_nsaddrs)
-					return (added);
-				obj = list_next(&sctp->sctp_saddrs[i].
-				    sctp_ipif_list, obj);
-				continue;
+				goto next_addr;
 			}
-			hdr = (sctp_parm_hdr_t *)(p + added);
+			if (p != NULL)
+				hdr = (sctp_parm_hdr_t *)(p + paramlen);
 			addr = ipif->sctp_ipif_saddr;
 			if (IN6_IS_ADDR_V4MAPPED(&addr)) {
 				struct in_addr	*v4;
 
 				/* The other side does not support v4 */
 				if (!(supp_af & PARM_SUPP_V4))
-					continue;
+					goto next_addr;
 
-				hdr->sph_type = htons(PARM_ADDR4);
-				hdr->sph_len = htons(PARM_ADDR4_LEN);
-				v4 = (struct in_addr *)(hdr + 1);
-				IN6_V4MAPPED_TO_INADDR(&addr, v4);
-				added += PARM_ADDR4_LEN;
+				if (p != NULL) {
+					hdr->sph_type = htons(PARM_ADDR4);
+					hdr->sph_len = htons(PARM_ADDR4_LEN);
+					v4 = (struct in_addr *)(hdr + 1);
+					IN6_V4MAPPED_TO_INADDR(&addr, v4);
+				}
+				paramlen += PARM_ADDR4_LEN;
 			} else if (!IN6_IS_ADDR_LINKLOCAL(&addr) &&
 			    (supp_af & PARM_SUPP_V6)) {
-				hdr->sph_type = htons(PARM_ADDR6);
-				hdr->sph_len = htons(PARM_ADDR6_LEN);
-				bcopy(&addr, hdr + 1, sizeof (addr));
-				added += PARM_ADDR6_LEN;
+				if (p != NULL) {
+					hdr->sph_type = htons(PARM_ADDR6);
+					hdr->sph_len = htons(PARM_ADDR6_LEN);
+					bcopy(&addr, hdr + 1, sizeof (addr));
+				}
+				paramlen += PARM_ADDR6_LEN;
 			}
+next_addr:
 			if (scanned >= sctp->sctp_nsaddrs)
-				return (added);
+				return (paramlen);
 			obj = list_next(&sctp->sctp_saddrs[i].sctp_ipif_list,
 			    obj);
 		}
 	}
-	return (added);
+	return (paramlen);
 }
 
 

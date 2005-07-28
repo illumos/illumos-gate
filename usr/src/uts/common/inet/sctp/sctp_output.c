@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -545,11 +545,15 @@ sctp_free_msg(mblk_t *ump)
 }
 
 mblk_t *
-sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen)
+sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
+    int *error)
 {
 	int hdrlen;
 	char *hdr;
 	int isv4 = fp->isv4;
+
+	if (error != NULL)
+		*error = 0;
 
 	if (isv4) {
 		hdrlen = sctp->sctp_hdr_len;
@@ -558,29 +562,24 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen)
 		hdrlen = sctp->sctp_hdr6_len;
 		hdr = sctp->sctp_iphc6;
 	}
-	if (SCTP_IS_ADDR_UNSPEC(fp->isv4, fp->saddr)) {
+	/*
+	 * A null fp->ire could mean that the address is 'down'. Similarly,
+	 * it is possible that the address went down, we tried to send an
+	 * heartbeat and ended up setting fp->saddr as unspec because we
+	 * didn't have any usable source address. In either case
+	 * sctp_ire2faddr() will try find an IRE, if available, and set
+	 * the source address, if needed. If we still don't have any
+	 * usable source address, fp->state will be SCTP_FADDRS_UNREACH and
+	 * we return EHOSTUNREACH.
+	 */
+	if (fp->ire == NULL || SCTP_IS_ADDR_UNSPEC(fp->isv4, fp->saddr)) {
 		sctp_ire2faddr(sctp, fp);
-	} else if (fp->ire == NULL) {
-		ipaddr_t addr4;
-
-		if (isv4) {
-			IN6_V4MAPPED_TO_IPADDR(&fp->faddr, addr4);
-
-			fp->ire = ire_cache_lookup(addr4, sctp->sctp_zoneid);
-		} else {
-			fp->ire = ire_cache_lookup_v6(&fp->faddr,
-			    sctp->sctp_zoneid);
-		}
-		if (fp->ire != NULL) {
-			IRE_REFHOLD_NOTR(fp->ire);
-			IRE_REFRELE(fp->ire);
-		}
-		if (fp->ire != NULL && fp->ire->ire_type == IRE_LOOPBACK &&
-		    !sctp->sctp_loopback) {
-			sctp->sctp_loopback = 1;
+		if (fp->state == SCTP_FADDRS_UNREACH) {
+			if (error != NULL)
+				*error = EHOSTUNREACH;
+			return (NULL);
 		}
 	}
-
 	/* Copy in IP header. */
 	if ((mp->b_rptr - mp->b_datap->db_base) <
 	    (sctp_wroff_xtra + hdrlen + sacklen) || DB_REF(mp) > 2) {
@@ -592,6 +591,8 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen)
 		 */
 		nmp = allocb(sctp_wroff_xtra + hdrlen + sacklen, BPRI_MED);
 		if (nmp == NULL) {
+			if (error !=  NULL)
+				*error = ENOMEM;
 			return (NULL);
 		}
 		nmp->b_rptr += sctp_wroff_xtra;
@@ -928,7 +929,7 @@ sctp_fast_rexmit(sctp_t *sctp)
 	mp = sctp_find_fast_rexmit_mblks(sctp, &pktlen, &fp);
 	if (mp == NULL)
 		return;
-	if ((head = sctp_add_proto_hdr(sctp, fp, mp, 0)) == NULL) {
+	if ((head = sctp_add_proto_hdr(sctp, fp, mp, 0, NULL)) == NULL) {
 		freemsg(mp);
 		return;
 	}
@@ -964,6 +965,7 @@ sctp_output(sctp_t *sctp)
 	sctp_faddr_t		*lfp;
 	sctp_data_hdr_t		*sdc;
 	int			error;
+	boolean_t		notsent = B_TRUE;
 
 	if (sctp->sctp_ftsn == sctp->sctp_lastacked + 1) {
 		sacklen = 0;
@@ -1049,8 +1051,23 @@ sctp_output(sctp_t *sctp)
 				goto unsent_data;
 			}
 			SCTP_CHUNK_CLEAR_FLAGS(nmp);
-			head = sctp_add_proto_hdr(sctp, fp, nmp, sacklen);
+			head = sctp_add_proto_hdr(sctp, fp, nmp, sacklen,
+			    &error);
 			if (head == NULL) {
+				/*
+				 * If none of the source addresses are
+				 * available (i.e error == EHOSTUNREACH),
+				 * pretend we have sent the data. We will
+				 * eventually time out trying to retramsmit
+				 * the data if the interface never comes up.
+				 * If we have already sent some stuff (i.e.,
+				 * notsent is B_FALSE) then we are fine, else
+				 * just mark this packet as sent.
+				 */
+				if (notsent && error == EHOSTUNREACH) {
+					SCTP_CHUNK_SENT(sctp, mp, sdc,
+					    fp, chunklen, meta);
+				}
 				freemsg(nmp);
 				goto unsent_data;
 			}
@@ -1081,8 +1098,22 @@ sctp_output(sctp_t *sctp)
 				goto unsent_data;
 			}
 			SCTP_CHUNK_CLEAR_FLAGS(nmp);
-			head = sctp_add_proto_hdr(sctp, fp, nmp, 0);
+			head = sctp_add_proto_hdr(sctp, fp, nmp, 0, &error);
 			if (head == NULL) {
+				/*
+				 * If none of the source addresses are
+				 * available (i.e error == EHOSTUNREACH),
+				 * pretend we have sent the data. We will
+				 * eventually time out trying to retramsmit
+				 * the data if the interface never comes up.
+				 * If we have already sent some stuff (i.e.,
+				 * notsent is B_FALSE) then we are fine, else
+				 * just mark this packet as sent.
+				 */
+				if (notsent && error == EHOSTUNREACH) {
+					SCTP_CHUNK_SENT(sctp, mp, sdc,
+					    fp, chunklen, meta);
+				}
 				freemsg(nmp);
 				goto unsent_data;
 			}
@@ -1187,6 +1218,7 @@ sctp_output(sctp_t *sctp)
 		/* arm rto timer (if not set) */
 		if (!fp->timer_running)
 			SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		notsent = B_FALSE;
 	}
 	sctp->sctp_active = now;
 	return;
@@ -1424,7 +1456,7 @@ ftsn_done:
 			fp = sctp->sctp_lastdata;
 		}
 	}
-	head = sctp_add_proto_hdr(sctp, fp, *nmp, sacklen);
+	head = sctp_add_proto_hdr(sctp, fp, *nmp, sacklen, NULL);
 	if (head == NULL) {
 		freemsg(*nmp);
 		*nmp = NULL;
@@ -1714,7 +1746,7 @@ out:
 		}
 	}
 	SCTP_CHUNK_CLEAR_FLAGS(nmp);
-	head = sctp_add_proto_hdr(sctp, fp, nmp, sacklen);
+	head = sctp_add_proto_hdr(sctp, fp, nmp, sacklen, NULL);
 	if (head == NULL) {
 		freemsg(nmp);
 		goto restart_timer;

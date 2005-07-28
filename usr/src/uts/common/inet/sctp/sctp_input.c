@@ -1736,7 +1736,7 @@ sctp_check_abandoned_msg(sctp_t *sctp, mblk_t *meta)
 			sctp->sctp_adv_pap = adv_pap;
 			return (ENOMEM);
 		}
-		head = sctp_add_proto_hdr(sctp, fp, nmp, 0);
+		head = sctp_add_proto_hdr(sctp, fp, nmp, 0, NULL);
 		if (head == NULL) {
 			sctp->sctp_adv_pap = adv_pap;
 			freemsg(nmp);

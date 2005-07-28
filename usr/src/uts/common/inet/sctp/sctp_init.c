@@ -268,7 +268,7 @@ sctp_addr_params_len(sctp_t *sctp, int af)
 	 */
 	if (sctp->sctp_nsaddrs == 1 || sctp->sctp_loopback)
 		return (0);
-	return (sctp_addr_len(sctp, af));
+	return (sctp_saddr_info(sctp, af, NULL));
 }
 
 size_t
@@ -277,5 +277,5 @@ sctp_addr_params(sctp_t *sctp, int af, uchar_t *p)
 	if (sctp->sctp_nsaddrs == 1 || sctp->sctp_loopback)
 		return (0);
 
-	return (sctp_addr_val(sctp, af, p));
+	return (sctp_saddr_info(sctp, af, p));
 }

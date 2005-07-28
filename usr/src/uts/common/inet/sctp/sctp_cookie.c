@@ -885,7 +885,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 
 	cemp->b_wptr = cemp->b_rptr + ceclen;
 
-	if (sctp->sctp_unsent != NULL) {
+	if (sctp->sctp_unsent > 0) {
 		sctp_msg_hdr_t	*smh;
 		mblk_t		*prev = NULL;
 		uint32_t	unsent = 0;
@@ -952,8 +952,14 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 	/* OK, if this fails */
 	cemp->b_cont = dupmsg(mp);
 sendcookie:
-	head = sctp_add_proto_hdr(sctp, fp, cemp, 0);
-	ASSERT(head != NULL);
+	head = sctp_add_proto_hdr(sctp, fp, cemp, 0, NULL);
+	if (head == NULL) {
+		freemsg(cemp);
+		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
+		if (errmp != NULL)
+			freeb(errmp);
+		return;
+	}
 	/*
 	 * Even if cookie-echo exceeds MTU for one of the hops, it'll
 	 * have a chance of getting there.

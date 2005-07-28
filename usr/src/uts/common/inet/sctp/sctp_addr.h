@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,15 @@ typedef struct sctp_ipif_s {
 #define	SCTP_IPIFS_DOWN		1
 #define	SCTP_IPIFS_UP		2
 
-/* SCTP source address structure for individual SCTP PCB */
+/*
+ * Individual SCTP source address structure.
+ * saddr_ipifp is the actual pointer to the ipif/address.
+ * saddr_ipif_dontsrc is used to mark an address as currently unusable. This
+ * would be the case when we have added/deleted an address using sctp_bindx()
+ * and are waiting for the ASCONF ACK from the peer to confirm the addition/
+ * deletion. Additionally, saddr_ipif_delete_pending is used to specifically
+ * indicate that an address delete operation is in progress.
+ */
 typedef struct sctp_saddrs_ipif_s {
 	list_node_t	saddr_ipif;
 	sctp_ipif_t 	*saddr_ipifp;
@@ -80,7 +88,14 @@ typedef struct sctp_saddrs_ipif_s {
 			pad : 30;
 } sctp_saddr_ipif_t;
 
-/* SCTP ILL structure - only relevant fields from ill_t retained */
+/*
+ * SCTP ILL structure - only relevant fields from ill_t retained.
+ * This pretty much reflects the ILL<->IPIF relation that IP maintains.
+ * At present the only state an ILL can be in is CONDEMNED or not.
+ * sctp_ill_ipifcnt gives the number of IPIFs for this ILL,
+ * sctp_ill_index is phyint_ifindex in the actual ILL structure (in IP)
+ * and sctp_ill_flags is ill_flags from the ILL structure.
+ */
 typedef struct sctp_ill_s {
 	list_node_t		sctp_ills;
 	int			sctp_ill_name_length;
@@ -138,8 +153,7 @@ extern int		sctp_dup_saddrs(sctp_t *, sctp_t *, int);
 extern int		sctp_compare_saddrs(sctp_t *, sctp_t *);
 extern sctp_saddr_ipif_t	*sctp_saddr_lookup(sctp_t *, in6_addr_t *);
 extern in6_addr_t	sctp_get_valid_addr(sctp_t *, boolean_t isv6);
-extern size_t		sctp_addr_len(sctp_t *, int);
-extern size_t		sctp_addr_val(sctp_t *, int, uchar_t *);
+extern size_t		sctp_saddr_info(sctp_t *, int, uchar_t *);
 extern void		sctp_del_saddr_list(sctp_t *, const void *, int,
 			    boolean_t);
 extern void		sctp_del_saddr(sctp_t *, sctp_saddr_ipif_t *);

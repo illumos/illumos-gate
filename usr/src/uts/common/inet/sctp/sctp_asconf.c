@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -717,6 +717,15 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 			bcopy(&ipha->ipha_src, ph + 1, IP_ADDR_LEN);
 		} else {
 			ipaddr = sctp_get_valid_addr(sctp, B_FALSE);
+			/*
+			 * All the addresses are down.
+			 * Maybe we might have better luck next time.
+			 */
+			if (IN6_IS_ADDR_V4MAPPED_ANY(&ipaddr)) {
+				SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
+				freeb(ipmp);
+				return;
+			}
 			IN6_V4MAPPED_TO_IPADDR(&ipaddr, addr4);
 			bcopy(&addr4, ph + 1, IP_ADDR_LEN);
 		}
@@ -730,6 +739,15 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 			bcopy(&ip6->ip6_src, ph + 1, IPV6_ADDR_LEN);
 		} else {
 			ipaddr = sctp_get_valid_addr(sctp, B_TRUE);
+			/*
+			 * All the addresses are down.
+			 * Maybe we might have better luck next time.
+			 */
+			if (IN6_IS_ADDR_UNSPECIFIED(&ipaddr)) {
+				SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
+				freeb(ipmp);
+				return;
+			}
 			bcopy(&ipaddr, ph + 1, IPV6_ADDR_LEN);
 		}
 	}

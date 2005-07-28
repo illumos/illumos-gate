@@ -921,7 +921,8 @@ extern void	sctp_add_sendq(sctp_t *, mblk_t *);
 extern void	sctp_add_unrec_parm(sctp_parm_hdr_t *, mblk_t **);
 extern size_t	sctp_addr_params(sctp_t *, int, uchar_t *);
 extern size_t	sctp_addr_params_len(sctp_t *, int);
-extern mblk_t	*sctp_add_proto_hdr(sctp_t *, sctp_faddr_t *, mblk_t *, int);
+extern mblk_t	*sctp_add_proto_hdr(sctp_t *, sctp_faddr_t *, mblk_t *, int,
+		    int *);
 extern void	sctp_addr_req(sctp_t *, mblk_t *);
 extern sctp_t	*sctp_addrlist2sctp(mblk_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
 		    uint_t, zoneid_t);

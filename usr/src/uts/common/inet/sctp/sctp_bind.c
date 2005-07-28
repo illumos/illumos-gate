@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -266,8 +266,20 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 			WAKE_SCTP(sctp);
 		return (EINVAL);
 	}
-	if (sctp->sctp_state > SCTPS_LISTEN && sctp_addip_enabled)
+
+	if (sctp->sctp_state > SCTPS_LISTEN) {
+		/*
+		 * Let's do some checking here rather than undoing the
+		 * add later (for these reasons).
+		 */
+		if (!sctp_addip_enabled || !sctp->sctp_understands_asconf ||
+		    !sctp->sctp_understands_addip) {
+			if (!caller_hold_lock)
+				WAKE_SCTP(sctp);
+			return (EINVAL);
+		}
 		do_asconf = B_TRUE;
+	}
 	err = sctp_valid_addr_list(sctp, addrs, addrcnt);
 	if (err != 0) {
 		if (!caller_hold_lock)
@@ -310,8 +322,19 @@ sctp_bind_del(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 			WAKE_SCTP(sctp);
 		return (EINVAL);
 	}
-	if (sctp->sctp_state > SCTPS_LISTEN && sctp_addip_enabled)
+	/*
+	 * Fail the remove if we are beyond listen, but can't send this
+	 * to the peer.
+	 */
+	if (sctp->sctp_state > SCTPS_LISTEN) {
+		if (!sctp_addip_enabled || !sctp->sctp_understands_asconf ||
+		    !sctp->sctp_understands_addip) {
+			if (!caller_hold_lock)
+				WAKE_SCTP(sctp);
+			return (EINVAL);
+		}
 		do_asconf = B_TRUE;
+	}
 
 	/* Can't delete the last address nor all of the addresses */
 	if (sctp->sctp_nsaddrs == 1 || addrcnt >= sctp->sctp_nsaddrs) {
