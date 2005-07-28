@@ -251,8 +251,8 @@ set_master_ops_debug_flags()
 			master_ops_debug = (unsigned long)data;
 			e_ddi_prop_remove(DDI_DEV_T_NONE, ddi_root_node(),
 			    "master_ops_debug");
-			e_ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN,
-			    ddi_root_node(), "master_ops_debug", data);
+			e_ddi_prop_update_int(DDI_DEV_T_NONE, ddi_root_node(),
+			    "master_ops_debug", data);
 		}
 		ddi_prop_free(prop);
 	}

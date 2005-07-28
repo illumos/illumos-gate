@@ -61,6 +61,13 @@ extern int acpica_eval_int(ACPI_HANDLE, char *, int *);
 extern int acpica_find_pciobj(dev_info_t *, ACPI_HANDLE *);
 extern int acpica_find_pcidip(ACPI_HANDLE, dev_info_t **);
 
+/*
+ * acpi_status property values
+ */
+#define	ACPI_BOOT_INIT		0x00000001
+#define	ACPI_BOOT_ENABLE	0x00000002
+#define	ACPI_BOOT_BOOTCONF	0x00000010
+
 #define	SCI_IPL	(LOCK_LEVEL-1)
 
 /*

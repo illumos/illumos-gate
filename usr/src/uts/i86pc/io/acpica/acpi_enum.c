@@ -996,7 +996,7 @@ acpi_isa_device_enum(dev_info_t *isa_dip)
 			acpi_enum_debug = (unsigned long)data;
 			e_ddi_prop_remove(DDI_DEV_T_NONE, ddi_root_node(),
 			    ACPI_ENUM_DEBUG);
-			e_ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN,
+			e_ddi_prop_update_int(DDI_DEV_T_NONE,
 			    ddi_root_node(), ACPI_ENUM_DEBUG, data);
 		}
 		ddi_prop_free(acpi_prop);
@@ -1014,7 +1014,7 @@ acpi_isa_device_enum(dev_info_t *isa_dip)
 	if (acpica_init() != AE_OK) {
 		cmn_err(CE_WARN, "!isa_enum: init failed");
 		/* Note, pickup by i8042 nexus */
-		(void) e_ddi_prop_update_string(DDI_MAJOR_T_UNKNOWN,
+		(void) e_ddi_prop_update_string(DDI_DEV_T_NONE,
 		    ddi_root_node(), "acpi-enum", "off");
 		return (0);
 	}

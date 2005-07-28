@@ -291,8 +291,8 @@ acpica_process_user_options()
 		if (ret == 0) {
 			e_ddi_prop_remove(DDI_DEV_T_NONE, ddi_root_node(),
 			    "acpi-user-options");
-			e_ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN,
-			    ddi_root_node(), "acpi-user-options", data);
+			e_ddi_prop_update_int(DDI_DEV_T_NONE, ddi_root_node(),
+			    "acpi-user-options", data);
 		}
 		ddi_prop_free(acpi_prop);
 	}
@@ -387,6 +387,15 @@ error:
 		}
 	} else
 		status = AE_OK;
+
+	/*
+	 * Set acpi-status to 13 if acpica has been initialized successfully.
+	 * This indicates that acpica is up and running.  This variable name
+	 * and value were chosen in order to remain compatible with acpi_intp.
+	 */
+	e_ddi_prop_update_int(DDI_DEV_T_NONE, ddi_root_node(), "acpi-status",
+		(status == AE_OK) ? (ACPI_BOOT_INIT | ACPI_BOOT_ENABLE |
+		ACPI_BOOT_BOOTCONF) : 0);
 
 	mutex_exit(&acpica_module_lock);
 	return (status);
