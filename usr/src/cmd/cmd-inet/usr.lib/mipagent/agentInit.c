@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1094,7 +1094,7 @@ setupInterface(char *configFile, char *Interface)
 	uint8_t reverseTunnelRequired = RT_NONE;
 	boolean_t PrefixFlags = _B_TRUE;
 	boolean_t advertiseOnBcast = _B_FALSE;
-	uint8_t	advInitCount = 1;
+	int	advInitCount = 1;
 	int	advInterval;
 	boolean_t	advLimitUnsolicited = _B_FALSE;
 	int i;

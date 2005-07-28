@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,7 +129,6 @@ char *err2str(int);
 #endif
 
 /* Definitions needed for refresh_mn_arp() module */
-#define	ABS(x)		((x) < 0 ? -(x) : (x))
 #define	BITSPERBYTE	8
 #define	IPADDRL		sizeof (struct in_addr)
 #define	DEVICEDIR	"/dev/"

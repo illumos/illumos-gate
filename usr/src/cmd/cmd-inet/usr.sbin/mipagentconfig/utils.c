@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 - 2002 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,6 +43,8 @@
 #include <ctype.h>
 #include "utils.h"
 
+static int strFunc(char *configFile, char *Section, char *Label, int command,
+    int argc, char *argv[], char *validStrings[], char *usageString);
 
 /*
  * Function: ynFunc

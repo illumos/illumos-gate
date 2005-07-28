@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _UTILS_H
@@ -48,7 +48,6 @@ int addEmptySection(char *, char *);
 void sectionDump(char *, char *, FuncEntry *);
 int fhFunc(char *, char *, char *, int, int, char **);
 int ynFunc(char *, char *, char *, int, int, char **);
-int strFunc(char *, char *, char *, int, int, char **, char **, char *);
 int ipFunc(char *, char *, char *, int, int, char **);
 int posIntFunc(char *, char *, char *, int, int, char **);
 int ipValid(char *);
