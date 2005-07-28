@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,8 +168,6 @@ main(int ac, char *av[])
 
 		rc = get_printer_description(path, &info);
 		if (rc == 0) {
-			int i = 0;
-
 			printf("%s:\n", path);
 			if (manufacturer != 0)
 				printf("\tManufacturer: %s\n",
@@ -184,10 +182,12 @@ main(int ac, char *av[])
 				printf("\tClass:        %s\n",
 						NP(info.class));
 			if (command_set != 0) {
+				int i;
+
 				printf("\tCommand set:\n");
-				while (info.command_set[i] != NULL)
+				for (i = 0; info.command_set[i] != NULL; i++)
 					printf("\t\tcmd[%d]: %s\n", i,
-						info.command_set[i++]);
+						info.command_set[i]);
 			}
 		} else
 			perror(path);

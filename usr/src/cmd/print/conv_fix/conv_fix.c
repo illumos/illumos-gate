@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,7 @@ _file_getline(FILE *fp)
 		return (strdup(entry));
 }
 
+int
 main(int ac, char *av[])
 {
 	int   c;
@@ -109,8 +110,8 @@ main(int ac, char *av[])
 			(void) strlcpy(ofile, optarg, sizeof (ofile));
 			break;
 		default:
-			(void) fprintf(stderr,
-				gettext("Usage: %s [-f file] [-o output file]\n"),
+			(void) fprintf(stderr, gettext(
+				"Usage: %s [-f file] [-o output file]\n"),
 				av[0]);
 			return (1);
 		}
@@ -129,7 +130,7 @@ main(int ac, char *av[])
 		}
 
 		lseek(fd, 0, SEEK_END);
-		
+
 		if ((fp2 = fdopen(fd, "a")) != NULL) {
 			while ((cp = _file_getline(fp)) != NULL) {
 				(void) fprintf(fp2, "%s", cp);

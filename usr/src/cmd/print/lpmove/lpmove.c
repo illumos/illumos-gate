@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,6 +123,7 @@ job_move(char *user, int id, ns_bsd_addr_t *src_binding,
 
 #define	OLD_LPMOVE	"/usr/lib/lp/local/lpmove"
 
+int
 main(int ac, char *av[])
 {
 	char	*program = NULL,
@@ -131,7 +132,7 @@ main(int ac, char *av[])
 	char	**argv = NULL;
 	int	remote_moved = 0,
 		i, argc = 0;
-	ns_bsd_addr_t * dst_binding;
+	ns_bsd_addr_t *dst_binding;
 
 	(void) setlocale(LC_ALL, "");
 

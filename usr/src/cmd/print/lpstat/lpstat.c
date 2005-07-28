@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,8 +242,8 @@ is_local_printer(char *server, char *printer)
 static int
 local_printers(ns_bsd_addr_t **printers)
 {
-	static local_printer_found = 0;
-	static already_looked = 0;
+	static int local_printer_found = 0;
+	static int already_looked = 0;
 
 	if (already_looked == 0) {
 		already_looked = 1;

@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,7 +48,8 @@
 #include <cancel_list.h>
 
 extern char *optarg;
-extern int optind, opterr, optopt, exit_code = 0;
+extern int optind, opterr, optopt;
+int exit_code = 0;
 extern char *getenv(const char *);
 
 static int all = 0;	/* global for canceling everything */
@@ -56,10 +57,10 @@ static int all = 0;	/* global for canceling everything */
 
 
 static char *
-vappend_list(void ** list)
+vappend_list(void **list)
 {
 	int current = 0;
-	char *  string;
+	char *string;
 	int stringlen;
 	int listlen;
 	int strsize = BUFSIZ;
@@ -120,7 +121,7 @@ vcancel_remote(cancel_req_t *entry, va_list ap)
 		*server = entry->binding->server;
 	int	nd,
 		rc;
-	char * string;
+	char *string;
 
 	if ((nd = net_open(server, 15)) < 0) {
 		(void) fprintf(stderr,
@@ -296,8 +297,8 @@ bsd_remove(int ac, char **av)
 			printer = optarg;
 			break;
 		default:
-			(void) fprintf(stderr,
-		gettext("Usage: %s [-P printer] [-] [job # ...] [username ...]\n"),
+			(void) fprintf(stderr, gettext(
+		"Usage: %s [-P printer] [-] [job # ...] [username ...]\n"),
 				av[0]);
 			exit(-1);
 		}

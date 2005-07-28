@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -963,6 +963,7 @@ build_string(char **list)
  * respond, become a daemon if none is currently running and attempt
  * to xfer all waiting jobs.
  */
+int
 main(int ac, char *av[])
 {
 	ns_bsd_addr_t *binding = NULL;
