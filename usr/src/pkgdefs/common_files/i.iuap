@@ -23,7 +23,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -78,6 +78,7 @@ do
 		add_driver cvc
 		add_driver sgcn
 		add_driver wc
+		add_driver qcn
 		remove_driver chanmux
 	fi
 done
