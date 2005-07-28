@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,12 +91,16 @@ static int
 meta_swap(
 	mdsetname_t	*sp,
 	mdname_t	*from_np,
+	md_common_t	*from_mdp,
 	mdname_t	*to_np,
+	md_common_t	*to_mdp,
 	md_renop_t	op,
 	int		flags,
 	md_error_t	*ep)
 {
 	md_rename_t	txn;
+	int		from_add_flag = 0;
+	int		to_add_flag = 0;
 
 	/*
 	 * If the device exists a key may already exist so need to find it
@@ -108,10 +112,26 @@ meta_swap(
 		    NULL, NULL, &from_np->key, ep);
 	}
 
+	if (to_np->dev != NODEV) {
+		(void) meta_getnmentbydev(sp->setno, MD_SIDEWILD, to_np->dev,
+		    NULL, NULL, &to_np->key, ep);
+	}
+
 	if ((from_np->key == MD_KEYWILD) || (from_np->key == MD_KEYBAD)) {
+		/*
+		 * If from does not have key and it is a component device
+		 * then something really goes wrong
+		 */
+		assert(!MD_HAS_PARENT(from_mdp->parent));
+
+		/*
+		 * So only add the entry if from is a top device
+		 */
 		if (add_key_name(sp, from_np, NULL, ep) != 0) {
 			assert(!mdisok(ep));
 			return (-1);
+		} else {
+			from_add_flag = 1;
 		}
 	}
 
@@ -123,27 +143,28 @@ meta_swap(
 	txn.from.mnum	= meta_getminor(from_np->dev);
 	txn.from.key	= from_np->key;
 
-	if ((txn.from.key == MD_KEYBAD) || (txn.from.key == MD_KEYWILD)) {
-		(void) mdmderror(ep, MDE_RENAME_SOURCE_BAD, txn.from.mnum,
-								from_np->cname);
-		return (-1);
-	}
-
 	if ((to_np->key == MD_KEYWILD) || (to_np->key == MD_KEYBAD)) {
+		/*
+		 * If to does not have key and is not a top device
+		 * then something really goes wrong
+		 */
+		assert(!MD_HAS_PARENT(to_mdp->parent));
+
+		/*
+		 * Add entry
+		 */
 		if (add_key_name(sp, to_np, NULL, ep) != 0) {
 			assert(!mdisok(ep));
+			if (from_add_flag)
+				(void) del_key_name(sp, from_np, ep);
 			return (-1);
+		} else {
+			to_add_flag = 1;
 		}
 	}
 
 	txn.to.mnum	= meta_getminor(to_np->dev);
 	txn.to.key	= to_np->key;
-
-	if ((txn.to.key == MD_KEYBAD) || (txn.to.key == MD_KEYWILD)) {
-		(void) mdmderror(ep, MDE_RENAME_TARGET_BAD, txn.to.mnum,
-								to_np->cname);
-		return (-1);
-	}
 
 	if (flags & NOISY) {
 		(void) fprintf(stderr, "\top: %s\n", OP_STR(txn.op));
@@ -157,8 +178,21 @@ meta_swap(
 
 	mdclrerror(ep);
 	if (metaioctl(MD_IOCRENAME, &txn, &txn.mde, from_np->cname) != 0) {
-		(void) del_key_name(sp, to_np, ep);
+		if (from_add_flag) {
+			(void) del_key_name(sp, from_np, ep);
+		}
+
+		if (op == MDRNOP_RENAME || to_add_flag) {
+			(void) del_key_name(sp, to_np, ep);
+		}
 		return (mdstealerror(ep, &txn.mde));
+	}
+
+	/*
+	 * If top device
+	 */
+	if (op == MDRNOP_RENAME && !MD_HAS_PARENT(from_mdp->parent)) {
+		(void) del_key_name(sp, to_np, ep);
 	}
 
 	/* force the name cache to re-read device state */
@@ -189,6 +223,7 @@ meta_rename(
 	md_error_t	 dummy_ep = mdnullerror;
 	int		 i, j;
 	md_mnnode_desc	*nd, *nd_del;
+	md_common_t	*from_mdp;
 
 	/* must have a set */
 	assert(sp != NULL);
@@ -213,12 +248,12 @@ meta_rename(
 
 	mdclrerror(ep);
 
-	if (meta_get_mdunit(sp, from_np, ep) == NULL) {
+	if ((from_mdp = meta_get_unit(sp, from_np, ep)) == NULL) {
 		assert(!mdisok(ep));
 		return (-1);
 	}
 
-	if (meta_get_mdunit(sp, to_np, ep) != NULL) {
+	if (meta_get_unit(sp, to_np, ep) != NULL) {
 		if (mdisok(ep)) {
 			(void) mdmderror(ep, MDE_UNIT_ALREADY_SETUP,
 					meta_getminor(to_np->dev),
@@ -357,7 +392,8 @@ meta_rename(
 		return (-1);
 	}
 
-	rc = meta_swap(sp, from_np, to_np, MDRNOP_RENAME, flags, ep);
+	rc = meta_swap(sp, from_np, from_mdp, to_np, NULL, MDRNOP_RENAME,
+		flags, ep);
 
 	if (rc == 0) {
 		if (options & MDCMD_PRINT) {
@@ -499,6 +535,7 @@ meta_exchange(
 	}
 	assert(mdisok(ep));
 
+
 	/* If FORCE is not set, check if metadevice is open */
 	if (!(flags & FORCE)) {
 		if (check_open(sp, from_np, ep) != 0) {
@@ -520,11 +557,12 @@ meta_exchange(
 	 */
 	if (((flags & NOFLIP) == 0) &&
 	    meta_exchange_need_to_flip(from_mdp, to_mdp)) {
-
-		rc = meta_swap(sp, to_np, from_np, MDRNOP_EXCHANGE, flags, ep);
+		rc = meta_swap(sp, to_np, to_mdp, from_np, from_mdp,
+			MDRNOP_EXCHANGE, flags, ep);
 
 	} else {
-		rc = meta_swap(sp, from_np, to_np, MDRNOP_EXCHANGE, flags, ep);
+		rc = meta_swap(sp, from_np, from_mdp, to_np, to_mdp,
+			MDRNOP_EXCHANGE, flags, ep);
 	}
 
 	if (rc == 0) {
