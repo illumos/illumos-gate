@@ -32,8 +32,6 @@ pcipsy	pci
 pcisch	pci
 simba	pci
 pci_pci	pci
-px	pci
-px_pci	pci
 ebus	ebus
 glm	scsi
 uata	dada
