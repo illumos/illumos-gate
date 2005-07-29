@@ -1400,22 +1400,34 @@ caddr_t data;
 		}
 	}
 
-	if (ipnn != NULL) {
-		KFREES(ipnn, sizeof(ipn) + ipn.ipn_dsize);
+	error = nat_insert(nat);
+	if (error == 0) {
+		if (ipnn != NULL) {
+			KFREES(ipnn, sizeof (ipn) + ipn.ipn_dsize);
+		}
+		return (0);
 	}
-	if (nat_insert(nat) == -1) {
-		KFREE(nat);
-		error = ENOMEM;
-		goto junkput;
-	}
-	return 0;
+	error = ENOMEM;
+
 junkput:
 	if (ipnn != NULL) {
-		KFREES(ipnn, sizeof(ipn) + ipn.ipn_dsize);
+		KFREES(ipnn, sizeof (ipn) + ipn.ipn_dsize);
 	}
-	if (nat != NULL)
-		nat_delete(nat, 0);
-	return error;
+	if (nat != NULL) {
+		if (aps != NULL) {
+			if (aps->aps_data != NULL) {
+				KFREES(aps->aps_data, aps->aps_psiz);
+			}
+			KFREE(aps);
+		}
+		if (in != NULL) {
+			if (in->in_apr)
+				appr_free(in->in_apr);
+			KFREE(in);
+		}
+		KFREE(nat);
+	}
+	return (error);
 }
 
 
@@ -1489,10 +1501,9 @@ int logtype;
 		else
 			ifq->ifq_tail = tqe->tqe_pnext;
 		tqe->tqe_ifq = NULL;
+		if ((ifq->ifq_flags & IFQF_USER) != 0)
+			fr_deletetimeoutqueue(ifq);
 	}
-
-	if ((ifq->ifq_flags & IFQF_USER) != 0)
-		fr_deletetimeoutqueue(ifq);
 
 	nat->nat_ref--;
 	if (nat->nat_ref > 0) {
