@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -653,13 +653,24 @@ pcihp_list_occupants(dev_info_t *dip, void *hdl)
 		if ((major == -1) || (i_ddi_node_state(dip) < DS_ATTACHED))
 			return (DDI_WALK_PRUNECHILD);
 
-		ctrl->occupant->id[ctrl->occupant->i] =
-		    kmem_alloc(sizeof (char[MAXPATHLEN]), KM_SLEEP);
+		/*
+		 * If we have used all our occupants then print mesage
+		 * and terminate walk.
+		 */
+		if (ctrl->occupant->i >= HPC_MAX_OCCUPANTS) {
+			cmn_err(CE_WARN,
+			    "pcihp (%s%d): unable to list all occupants",
+			    ddi_driver_name(ddi_get_parent(dip)),
+			    ddi_get_instance(ddi_get_parent(dip)));
+			return (DDI_WALK_TERMINATE);
+		}
 
 		/*
 		 * No need to hold the dip as ddi_walk_devs
 		 * has already arranged that for us.
 		 */
+		ctrl->occupant->id[ctrl->occupant->i] =
+		    kmem_alloc(sizeof (char[MAXPATHLEN]), KM_SLEEP);
 		(void) ddi_pathname(dip,
 		    (char *)ctrl->occupant->id[ctrl->occupant->i]);
 		ctrl->occupant->i++;
