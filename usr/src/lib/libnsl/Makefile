@@ -72,8 +72,6 @@ CLEANFILES += $(DERIVED_FILES)
 # include library definitions
 include ../Makefile.lib
 
-TXTS +=		dial/uucp.h	dial/parms.h	dial/sysfiles.h
-
 SED=	sed
 CP=	cp
 GREP=	grep
@@ -95,12 +93,10 @@ package :=	TARGET= package
 
 .KEEP_STATE:
 
-all:		$(PROTOCOL_DIR) $(DERIVED_FILES) txts .WAIT $(SUBDIRS)
+all:		$(PROTOCOL_DIR) $(DERIVED_FILES) .WAIT $(SUBDIRS)
 
 headers:	$(PROTOCOL_DIR) .WAIT $(PROTOCOL_FILES) $(PROTOCOL_FILES_UTS) \
 		$(DERIVED_FILES)
-
-txts:		$(TXTS)
 
 install:	all $(SUBDIRS)
 
