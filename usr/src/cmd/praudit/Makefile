@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,8 +39,8 @@ POFILE = praudit.po
 POFILES = $(OBJS:.o=.po)
 XGETFLAGS += -a -x praudit.xcl
 
-CPPFLAGS += -D_PRAUDIT
-CPPFLAGS += -I$(SRC)/lib/libbsm/common
+CPPFLAGS += -D_PRAUDIT -I$(SRC)/lib/libbsm/common
+CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 LDLIBS += -lbsm -lnsl -lpam
 

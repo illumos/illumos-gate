@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,7 @@ TEXT_DOMAIN=SUNW_OST_OSCMD
 POFILE=auditreduce.po
 POFILES=main.po option.po proc.po time.po token.po
 
-CPPFLAGS += -I$(TABLEDIR)
+CPPFLAGS += -I$(TABLEDIR) -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 LDLIBS += -lnsl -lbsm
 
 .KEEP_STATE:

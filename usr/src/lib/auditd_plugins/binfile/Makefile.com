@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,8 +39,8 @@ LIBS=		$(DYNLIB)
 LDLIBS		+= -lbsm -lsecdb -lc
 
 CFLAGS		+= $(CCVERBOSE)
-CPPFLAGS	+= -D_REENTRANT
-CPPFLAGS	+= -I$(LIBBSM)
+CPPFLAGS	+= -D_REENTRANT -I$(LIBBSM)
+CPPFLAGS	+= -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 MAPDIR=		../spec/$(TRANSMACH)
 SPECMAPFILE=	$(MAPDIR)/mapfile
