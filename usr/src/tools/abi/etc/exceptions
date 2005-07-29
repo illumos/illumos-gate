@@ -187,6 +187,7 @@ PSARC 2004/619: RULE E10: usr/xpg4/lib/amd64/libcurses.so.2: SUNW_1.2
 4773624: RULE W1: usr/platform/sun4u/lib/cfgadm/
 4773624: RULE W1: usr/platform/sun4u/lib/fm/fmd/plugins/
 4773624: RULE W1: usr/platform/sun4u/lib/mdb/
+6279063: RULE W1: usr/platform/sun4v/lib/fm/fmd/plugins/
 PSARC 2004/619: RULE W1: usr/platform/i86pc/lib/mdb/
 4773624: RULE W1: usr/platform/sun4u/lib/picl/plugins/
 4480868: RULE W1: usr/lib/iconv/geniconvtbl.so
