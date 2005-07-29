@@ -227,21 +227,24 @@ static struct bus_ops bofi_bus_ops = {
 };
 
 static struct cb_ops bofi_cb_ops = {
-	bofi_open,
-	bofi_close,
-	nodev,
-	nodev,
+	bofi_open,		/* open */
+	bofi_close,		/* close */
+	nodev,			/* strategy */
+	nodev,			/* print */
 	nodev,			/* dump */
-	nodev,
-	nodev,
-	bofi_ioctl,
+	nodev,			/* read */
+	nodev,			/* write */
+	bofi_ioctl,		/* ioctl */
 	nodev,			/* devmap */
-	nodev,
+	nodev,			/* mmap */
 	nodev,			/* segmap */
-	nochpoll,
-	nodev,
+	nochpoll,		/* chpoll */
+	ddi_prop_op,		/* prop_op */
 	NULL,			/* for STREAMS drivers */
-	D_NEW | D_MP		/* driver compatibility flag */
+	D_MP,			/* driver compatibility flag */
+	CB_REV,			/* cb_ops revision */
+	nodev,			/* aread */
+	nodev			/* awrite */
 };
 
 static struct dev_ops bofi_ops = {

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,9 +79,12 @@ static struct cb_ops    dp_cb_ops = {
 	nodev,			/* mmap */
 	nodev,			/* segmap */
 	dppoll,			/* poll */
-	nodev,			/* prop_op */
+	ddi_prop_op,		/* prop_op */
 	(struct streamtab *)0,	/* streamtab */
-	D_NEW | D_MP		/* flags */
+	D_MP,			/* flags */
+	CB_REV,			/* cb_ops revision */
+	nodev,			/* aread */
+	nodev			/* awrite */
 };
 
 static int dpattach(dev_info_t *, ddi_attach_cmd_t);
