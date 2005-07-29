@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -366,6 +366,14 @@ ndi_dc_allochdl(void *iocarg, struct devctl_iocdata **rdcp)
 	 * copyin and unpack a user defined nvlist if one was passed
 	 */
 	if (dcp->nvl_user != NULL) {
+		if (dcp->nvl_usersz == 0) {
+			if (dcp->c_nodename != NULL)
+				kmem_free(dcp->c_nodename, MAXNAMELEN);
+			if (dcp->c_unitaddr != NULL)
+				kmem_free(dcp->c_unitaddr, MAXNAMELEN);
+			kmem_free(dcp, sizeof (*dcp));
+			return (NDI_FAILURE);
+		}
 		cpybuf = kmem_alloc(dcp->nvl_usersz, KM_SLEEP);
 		if (copyin(dcp->nvl_user, cpybuf, dcp->nvl_usersz) != 0) {
 			kmem_free(cpybuf, dcp->nvl_usersz);
