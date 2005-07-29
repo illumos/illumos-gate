@@ -1450,8 +1450,10 @@ px_err_mmu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr)
 {
-	uint64_t	mmu_log_enable, mmu_intr_enable, mmu_tfa;
+	uint64_t	mmu_log_enable, mmu_intr_enable;
 	uint64_t	mask = BITMASK(err_bit_descr->bit);
+	uint64_t	mmu_tfa, mmu_ctrl;
+	uint64_t	mmu_enable_bit = 0;
 	int		err = PX_NONFATAL;
 	int		ret;
 
@@ -1459,8 +1461,26 @@ px_err_mmu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 	mmu_intr_enable = CSR_XR(csr_base, err_reg_descr->enable_addr);
 
 	mmu_tfa = CSR_XR(csr_base, MMU_TRANSLATION_FAULT_ADDRESS);
+	mmu_ctrl = CSR_XR(csr_base, MMU_CONTROL_AND_STATUS);
 
-	if (mmu_log_enable & mmu_intr_enable & mask) {
+	switch (err_bit_descr->bit) {
+	case MMU_INTERRUPT_STATUS_BYP_ERR_P:
+		mmu_enable_bit = BITMASK(MMU_CONTROL_AND_STATUS_BE);
+		break;
+	case MMU_INTERRUPT_STATUS_TRN_ERR_P:
+		mmu_enable_bit = BITMASK(MMU_CONTROL_AND_STATUS_TE);
+		break;
+	default:
+		mmu_enable_bit = 0;
+		break;
+	}
+
+	/*
+	 * If the interrupts are enabled and Translation/Bypass Enable bit
+	 * was set, then panic.  This error should not have occured.
+	 */
+	if (mmu_log_enable & mmu_intr_enable &
+	    (mmu_ctrl & mmu_enable_bit)) {
 		err = PX_FATAL_SW;
 	} else {
 		ret = px_handle_lookup(
@@ -1474,6 +1494,10 @@ px_err_mmu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 		/* enable error & intr reporting for this bit */
 		CSR_XS(csr_base, MMU_ERROR_LOG_ENABLE, mmu_log_enable | mask);
 		CSR_XS(csr_base, MMU_INTERRUPT_ENABLE, mmu_intr_enable | mask);
+
+		/* enable translation access/bypass enable */
+		CSR_XS(csr_base, MMU_CONTROL_AND_STATUS,
+		    mmu_ctrl | mmu_enable_bit);
 	}
 
 	return (err);
@@ -1606,7 +1630,7 @@ PX_ERPT_SEND_DEC(pciex_rx_oe)
 	    CSR_XR(csr_base, TLU_OTHER_EVENT_STATUS_SET),
 	    FIRE_TLU_RUEH1L, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_RECEIVE_OTHER_EVENT_HEADER1_LOG),
-	    FIRE_TLU_RUEH1L, DATA_TYPE_UINT64,
+	    FIRE_TLU_RUEH2L, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_RECEIVE_OTHER_EVENT_HEADER2_LOG),
 	    NULL);
 
@@ -1636,7 +1660,7 @@ PX_ERPT_SEND_DEC(pciex_rx_tx_oe)
 	    CSR_XR(csr_base, TLU_RECEIVE_OTHER_EVENT_HEADER2_LOG),
 	    FIRE_TLU_TOEEH1L, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_TRANSMIT_OTHER_EVENT_HEADER1_LOG),
-	    FIRE_TLU_TOEEH1L, DATA_TYPE_UINT64,
+	    FIRE_TLU_TOEEH2L, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_TRANSMIT_OTHER_EVENT_HEADER2_LOG),
 	    NULL);
 

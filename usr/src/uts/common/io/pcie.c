@@ -368,15 +368,12 @@ pcie_find_cap_reg(ddi_acc_handle_t config_handle, uint8_t cap_id)
 			break;
 		}
 
-/* 		reg = pci_config_get32(config_handle, caps_ptr); */
-/* 		cap = reg & 0xFF; */
 		cap = pci_config_get8(config_handle, caps_ptr);
 
 		if (cap == cap_id) {
 			break;
 		}
 
-/* 		caps_ptr = (reg >> 8) & 0xFF; */
 		caps_ptr = P2ALIGN(pci_config_get8(config_handle,
 				(caps_ptr + PCI_CAP_NEXT_PTR)), 4);
 	}
