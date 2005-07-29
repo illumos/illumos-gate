@@ -423,6 +423,7 @@ typedef struct mntinfo {
 #define	MI_DIRECTIO	0x40000		/* do direct I/O */
 #define	MI_EXTATTR	0x80000		/* server supports extended attrs */
 #define	MI_ASYNC_MGR_STOP	0x100000	/* tell async mgr to die */
+#define	MI_DEAD		0x200000	/* mount has been terminated */
 
 /*
  * Read-only mntinfo statistics

@@ -1038,7 +1038,7 @@ typedef struct mntinfo4 {
  *	MI4_MOUNTING		 mount in progress, don't failover
  *	MI4_POSIX_LOCK		 if server is using POSIX locking
  *	MI4_LOCK_DEBUG		 cmn_err'd posix lock err msg
- *	MI4_DEAD		 last VFS_RELE() called on mount
+ *	MI4_DEAD		 mount has been terminated
  *	MI4_INACTIVE_IDLE	 inactive thread idle
  *	MI4_BADOWNER_DEBUG	 badowner error msg per mount
  *	MI4_ASYNC_MGR_STOP	 tell async manager to die

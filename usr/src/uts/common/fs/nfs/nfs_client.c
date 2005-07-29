@@ -2518,9 +2518,23 @@ nfs_mi_shutdown(zoneid_t zoneid, void *data)
 	mntinfo_t *mi;
 
 	ASSERT(mig != NULL);
+again:
 	mutex_enter(&mig->mig_lock);
 	for (mi = list_head(&mig->mig_list); mi != NULL;
 	    mi = list_next(&mig->mig_list, mi)) {
+
+		/*
+		 * If we've done the shutdown work for this FS, skip.
+		 * Once we go off the end of the list, we're done.
+		 */
+		if (mi->mi_flags & MI_DEAD)
+			continue;
+
+		/*
+		 * We will do work, so not done.  Get a hold on the FS.
+		 */
+		VFS_HOLD(mi->mi_vfsp);
+
 		/*
 		 * purge the DNLC for this filesystem
 		 */
@@ -2535,15 +2549,24 @@ nfs_mi_shutdown(zoneid_t zoneid, void *data)
 		/*
 		 * Set MI_ASYNC_MGR_STOP so the async manager thread starts
 		 * getting ready to exit when it's done with its current work.
+		 * Also set MI_DEAD to note we've acted on this FS.
 		 */
 		mutex_enter(&mi->mi_lock);
-		mi->mi_flags |= MI_ASYNC_MGR_STOP;
+		mi->mi_flags |= (MI_ASYNC_MGR_STOP|MI_DEAD);
 		mutex_exit(&mi->mi_lock);
 		/*
 		 * Wake up the async manager thread.
 		 */
 		cv_broadcast(&mi->mi_async_reqs_cv);
 		mutex_exit(&mi->mi_async_lock);
+
+		/*
+		 * Drop lock and release FS, which may change list, then repeat.
+		 * We're done when every mi has been done or the list is empty.
+		 */
+		mutex_exit(&mig->mig_lock);
+		VFS_RELE(mi->mi_vfsp);
+		goto again;
 	}
 	mutex_exit(&mig->mig_lock);
 }

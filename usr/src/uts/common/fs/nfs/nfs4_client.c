@@ -2785,11 +2785,24 @@ nfs4_mi_shutdown(zoneid_t zoneid, void *data)
 	NFS4_DEBUG(nfs4_client_zone_debug, (CE_NOTE,
 	    "nfs4_mi_shutdown zone %d\n", zoneid));
 	ASSERT(mig != NULL);
+again:
 	mutex_enter(&mig->mig_lock);
 	for (mi = list_head(&mig->mig_list); mi != NULL;
 	    mi = list_next(&mig->mig_list, mi)) {
+		/*
+		 * If we've done the shutdown work for this FS, skip.
+		 * Once we go off the end of the list, we're done.
+		 */
+		if (mi->mi_flags & MI4_DEAD)
+			continue;
+
+		/*
+		 * We will do work, so not done.  Get a hold on the FS.
+		 */
 		NFS4_DEBUG(nfs4_client_zone_debug, (CE_NOTE,
 		    "nfs4_mi_shutdown stopping vfs %p\n", (void *)mi->mi_vfsp));
+		VFS_HOLD(mi->mi_vfsp);
+
 		/*
 		 * purge the DNLC for this filesystem
 		 */
@@ -2815,6 +2828,14 @@ nfs4_mi_shutdown(zoneid_t zoneid, void *data)
 		 */
 		cv_broadcast(&mi->mi_async_reqs_cv);
 		mutex_exit(&mi->mi_async_lock);
+
+		/*
+		 * Drop lock and release FS, which may change list, then repeat.
+		 * We're done when every mi has been done or the list is empty.
+		 */
+		mutex_exit(&mig->mig_lock);
+		VFS_RELE(mi->mi_vfsp);
+		goto again;
 	}
 	mutex_exit(&mig->mig_lock);
 	/*
