@@ -228,6 +228,7 @@ typedef enum {
 	D_PROV_INCOMPAT,		/* provider/probe interface mismatch */
 	D_PROV_PRDUP,			/* duplicate probe declaration */
 	D_PROV_PRARGLEN,		/* probe argument list too long */
+	D_PROV_PRXLATOR,		/* probe argument translator missing */
 	D_FREOPEN_INVALID		/* frename() filename is invalid */
 } dt_errtag_t;
 

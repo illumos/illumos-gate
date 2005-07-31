@@ -33,12 +33,13 @@
 #include <assert.h>
 
 #include <dt_impl.h>
+#include <dt_program.h>
 #include <dt_printf.h>
 
 dtrace_prog_t *
-dtrace_program_create(dtrace_hdl_t *dtp)
+dt_program_create(dtrace_hdl_t *dtp)
 {
-	dtrace_prog_t *pgp = calloc(1, sizeof (dtrace_prog_t));
+	dtrace_prog_t *pgp = dt_zalloc(dtp, sizeof (dtrace_prog_t));
 
 	if (pgp != NULL)
 		dt_list_append(&dtp->dt_programs, pgp);
@@ -49,18 +50,23 @@ dtrace_program_create(dtrace_hdl_t *dtp)
 }
 
 void
-dtrace_program_destroy(dtrace_hdl_t *dtp, dtrace_prog_t *pgp)
+dt_program_destroy(dtrace_hdl_t *dtp, dtrace_prog_t *pgp)
 {
 	dt_stmt_t *stp, *next;
+	uint_t i;
 
 	for (stp = dt_list_next(&pgp->dp_stmts); stp != NULL; stp = next) {
 		next = dt_list_next(stp);
-		dtrace_stmt_destroy(stp->ds_desc);
-		free(stp);
+		dtrace_stmt_destroy(dtp, stp->ds_desc);
+		dt_free(dtp, stp);
 	}
 
+	for (i = 0; i < pgp->dp_xrefslen; i++)
+		dt_free(dtp, pgp->dp_xrefs[i]);
+
+	dt_free(dtp, pgp->dp_xrefs);
 	dt_list_delete(&dtp->dt_programs, pgp);
-	free(pgp);
+	dt_free(dtp, pgp);
 }
 
 /*ARGSUSED*/
@@ -170,41 +176,35 @@ dtrace_program_exec(dtrace_hdl_t *dtp, dtrace_prog_t *pgp,
 	return (0);
 }
 
-void
-dtrace_ecbdesc_hold(dtrace_ecbdesc_t *edp)
+static void
+dt_ecbdesc_hold(dtrace_ecbdesc_t *edp)
 {
 	edp->dted_refcnt++;
 }
 
 void
-dtrace_ecbdesc_release(dtrace_ecbdesc_t *edp)
+dt_ecbdesc_release(dtrace_hdl_t *dtp, dtrace_ecbdesc_t *edp)
 {
-	dtrace_difo_t *dp;
-
 	if (--edp->dted_refcnt > 0)
 		return;
 
-	if ((dp = edp->dted_pred.dtpdd_difo) != NULL)
-		dtrace_difo_release(dp);
-
+	dt_difo_free(dtp, edp->dted_pred.dtpdd_difo);
 	assert(edp->dted_action == NULL);
-	free(edp);
+	dt_free(dtp, edp);
 }
 
 dtrace_ecbdesc_t *
-dtrace_ecbdesc_create(dtrace_hdl_t *dtp, const dtrace_probedesc_t *pdp)
+dt_ecbdesc_create(dtrace_hdl_t *dtp, const dtrace_probedesc_t *pdp)
 {
 	dtrace_ecbdesc_t *edp;
 
-	if ((edp = malloc(sizeof (dtrace_ecbdesc_t))) == NULL) {
+	if ((edp = dt_zalloc(dtp, sizeof (dtrace_ecbdesc_t))) == NULL) {
 		(void) dt_set_errno(dtp, EDT_NOMEM);
 		return (NULL);
 	}
 
-	bzero(edp, sizeof (dtrace_ecbdesc_t));
 	edp->dted_probe = *pdp;
-	dtrace_ecbdesc_hold(edp);
-
+	dt_ecbdesc_hold(edp);
 	return (edp);
 }
 
@@ -213,13 +213,10 @@ dtrace_stmt_create(dtrace_hdl_t *dtp, dtrace_ecbdesc_t *edp)
 {
 	dtrace_stmtdesc_t *sdp;
 
-	if ((sdp = malloc(sizeof (dtrace_stmtdesc_t))) == NULL) {
-		(void) dt_set_errno(dtp, EDT_NOMEM);
+	if ((sdp = dt_zalloc(dtp, sizeof (dtrace_stmtdesc_t))) == NULL)
 		return (NULL);
-	}
 
-	bzero(sdp, sizeof (dtrace_stmtdesc_t));
-	dtrace_ecbdesc_hold(edp);
+	dt_ecbdesc_hold(edp);
 	sdp->dtsd_ecbdesc = edp;
 	sdp->dtsd_descattr = _dtrace_defattr;
 	sdp->dtsd_stmtattr = _dtrace_defattr;
@@ -233,10 +230,8 @@ dtrace_stmt_action(dtrace_hdl_t *dtp, dtrace_stmtdesc_t *sdp)
 	dtrace_actdesc_t *new;
 	dtrace_ecbdesc_t *edp = sdp->dtsd_ecbdesc;
 
-	if ((new = malloc(sizeof (dtrace_actdesc_t))) == NULL) {
-		(void) dt_set_errno(dtp, EDT_NOMEM);
+	if ((new = dt_alloc(dtp, sizeof (dtrace_actdesc_t))) == NULL)
 		return (NULL);
-	}
 
 	if (sdp->dtsd_action_last != NULL) {
 		assert(sdp->dtsd_action != NULL);
@@ -267,10 +262,10 @@ dtrace_stmt_action(dtrace_hdl_t *dtp, dtrace_stmtdesc_t *sdp)
 int
 dtrace_stmt_add(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, dtrace_stmtdesc_t *sdp)
 {
-	dt_stmt_t *stp = malloc(sizeof (dt_stmt_t));
+	dt_stmt_t *stp = dt_alloc(dtp, sizeof (dt_stmt_t));
 
 	if (stp == NULL)
-		return (dt_set_errno(dtp, EDT_NOMEM));
+		return (-1); /* errno is set for us */
 
 	dt_list_append(&pgp->dp_stmts, stp);
 	stp->ds_desc = sdp;
@@ -295,7 +290,7 @@ dtrace_stmt_iter(dtrace_hdl_t *dtp, dtrace_prog_t *pgp,
 }
 
 void
-dtrace_stmt_destroy(dtrace_stmtdesc_t *sdp)
+dtrace_stmt_destroy(dtrace_hdl_t *dtp, dtrace_stmtdesc_t *sdp)
 {
 	dtrace_ecbdesc_t *edp = sdp->dtsd_ecbdesc;
 
@@ -319,11 +314,10 @@ dtrace_stmt_destroy(dtrace_stmtdesc_t *sdp)
 
 		assert(ap != NULL);
 
-		if (ap == edp->dted_action) {
+		if (ap == edp->dted_action)
 			edp->dted_action = last->dtad_next;
-		} else {
+		else
 			ap->dtad_next = last->dtad_next;
-		}
 
 		/*
 		 * We have now removed our action list from its ECB; we can
@@ -332,21 +326,16 @@ dtrace_stmt_destroy(dtrace_stmtdesc_t *sdp)
 		last->dtad_next = NULL;
 
 		for (ap = sdp->dtsd_action; ap != NULL; ap = next) {
-			dtrace_difo_t *dp;
-
 			assert(ap->dtad_uarg == (uintptr_t)sdp);
-
-			if ((dp = ap->dtad_difo) != NULL)
-				dtrace_difo_release(dp);
-
+			dt_difo_free(dtp, ap->dtad_difo);
 			next = ap->dtad_next;
-			free(ap);
+			dt_free(dtp, ap);
 		}
 	}
 
 	if (sdp->dtsd_fmtdata != NULL)
 		dt_printf_destroy(sdp->dtsd_fmtdata);
 
-	dtrace_ecbdesc_release(sdp->dtsd_ecbdesc);
-	free(sdp);
+	dt_ecbdesc_release(dtp, sdp->dtsd_ecbdesc);
+	dt_free(dtp, sdp);
 }

@@ -47,6 +47,7 @@
 #undef	_POSIX_PTHREAD_SEMANTICS
 
 #include <dt_impl.h>
+#include <dt_program.h>
 #include <dt_module.h>
 #include <dt_printf.h>
 #include <dt_string.h>
@@ -831,6 +832,7 @@ alloc:
 	dtp->dt_prcmode = DT_PROC_STOP_PREINIT;
 	dtp->dt_linkmode = DT_LINK_KERNEL;
 	dtp->dt_linktype = DT_LTYP_ELF;
+	dtp->dt_xlatemode = DT_XL_STATIC;
 	dtp->dt_stdcmode = DT_STDC_XA;
 	dtp->dt_version = version;
 	dtp->dt_fd = dtfd;
@@ -1176,7 +1178,7 @@ alloc:
 		return (set_open_errno(dtp, errp, EDT_HARDWIRE));
 	}
 
-	dtrace_program_destroy(dtp, pgp);
+	dt_program_destroy(dtp, pgp);
 
 	/*
 	 * Set up the default DTrace library path.  Once set, the next call to
@@ -1216,10 +1218,12 @@ dtrace_close(dtrace_hdl_t *dtp)
 	int i;
 
 	while ((pgp = dt_list_next(&dtp->dt_programs)) != NULL)
-		dtrace_program_destroy(dtp, pgp);
+		dt_program_destroy(dtp, pgp);
 
 	while ((dxp = dt_list_next(&dtp->dt_xlators)) != NULL)
 		dt_xlator_destroy(dtp, dxp);
+
+	dt_free(dtp, dtp->dt_xlatormap);
 
 	for (idp = dtp->dt_externs; idp != NULL; idp = ndp) {
 		ndp = idp->di_next;

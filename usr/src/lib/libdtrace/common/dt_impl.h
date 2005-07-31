@@ -56,6 +56,7 @@ struct dt_module;		/* see below */
 struct dt_pfdict;		/* see <dt_printf.h> */
 struct dt_arg;			/* see below */
 struct dt_provider;		/* see <dt_provider.h> */
+struct dt_xlator;		/* see <dt_xlator.h> */
 
 typedef struct dt_intrinsic {
 	const char *din_name;	/* string name of the intrinsic type */
@@ -189,6 +190,8 @@ struct dtrace_hdl {
 	ulong_t dt_gen;		/* compiler generation number */
 	dt_list_t dt_programs;	/* linked list of dtrace_prog_t's */
 	dt_list_t dt_xlators;	/* linked list of dt_xlator_t's */
+	struct dt_xlator **dt_xlatormap; /* dt_xlator_t's indexed by dx_id */
+	id_t dt_xlatorid;	/* next dt_xlator_t id to assign */
 	dt_ident_t *dt_externs;	/* linked list of external symbol identifiers */
 	dt_idhash_t *dt_macros;	/* hash table of macro variable identifiers */
 	dt_idhash_t *dt_aggs;	/* hash table of aggregation identifiers */
@@ -243,6 +246,7 @@ struct dtrace_hdl {
 	uint_t dt_prcmode;	/* dtrace process create mode (see dt_proc.h) */
 	uint_t dt_linkmode;	/* dtrace symbol linking mode (see below) */
 	uint_t dt_linktype;	/* dtrace link output file type (see below) */
+	uint_t dt_xlatemode;	/* dtrace translator linking mode (see below) */
 	uint_t dt_stdcmode;	/* dtrace stdc compatibility mode (see below) */
 	uint_t dt_treedump;	/* dtrace tree debug bitmap (see below) */
 	uint64_t dt_options[DTRACEOPT_MAX]; /* dtrace run-time options */
@@ -302,6 +306,13 @@ struct dtrace_hdl {
 #define	DT_LTYP_DOF	1	/* produce stand-alone DOF */
 
 /*
+ * Values for the dt_xlatemode property, which is used to determine whether
+ * references to dynamic translators are permitted.  Set using -xlate=<mode>.
+ */
+#define	DT_XL_STATIC	0	/* require xlators to be statically defined */
+#define	DT_XL_DYNAMIC	1	/* produce references to dynamic translators */
+
+/*
  * Values for the dt_stdcmode property, which is used by the compiler when
  * running cpp to determine the presence and setting of the __STDC__ macro.
  */
@@ -340,16 +351,6 @@ struct dtrace_hdl {
 
 #define	DT_STACK_CTFP(dtp)	((dtp)->dt_ddefs->dm_ctfp)
 #define	DT_STACK_TYPE(dtp)	((dtp)->dt_type_stack)
-
-typedef struct dt_stmt {
-	dt_list_t ds_list;	/* list forward/back pointers */
-	dtrace_stmtdesc_t *ds_desc; /* pointer to statement description */
-} dt_stmt_t;
-
-struct dtrace_prog {
-	dt_list_t dp_list;	/* list forward/back pointers */
-	dt_list_t dp_stmts;	/* linked list of dt_stmt_t's */
-};
 
 #define	DT_ACT_PRINTF		0	/* printf() action */
 #define	DT_ACT_TRACE		1	/* trace() action */
@@ -511,9 +512,13 @@ extern int dt_printf(dtrace_hdl_t *, FILE *, const char *, ...);
 extern void *dt_zalloc(dtrace_hdl_t *, size_t);
 extern void *dt_alloc(dtrace_hdl_t *, size_t);
 extern void dt_free(dtrace_hdl_t *, void *);
+extern void dt_difo_free(dtrace_hdl_t *, dtrace_difo_t *);
 
 extern int dt_gmatch(const char *, const char *);
 extern char *dt_basename(char *);
+
+extern ulong_t dt_popc(ulong_t);
+extern ulong_t dt_popcb(const ulong_t *, ulong_t);
 
 extern int dt_buffered_enable(dtrace_hdl_t *);
 extern int dt_buffered_flush(dtrace_hdl_t *, dtrace_probedata_t *,
@@ -541,6 +546,7 @@ extern void dt_pragma(dt_node_t *);
 extern int dt_reduce(dtrace_hdl_t *, dt_version_t);
 extern void dt_cg(dt_pcb_t *, dt_node_t *);
 extern dtrace_difo_t *dt_as(dt_pcb_t *);
+extern void dt_dis(const dtrace_difo_t *, FILE *);
 
 extern int dt_aggregate_go(dtrace_hdl_t *);
 extern int dt_aggregate_init(dtrace_hdl_t *);

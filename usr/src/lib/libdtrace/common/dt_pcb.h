@@ -67,14 +67,15 @@ typedef struct dt_pcb {
 	dt_strtab_t *pcb_strtab; /* string table for string references */
 	dt_regset_t *pcb_regs;	/* register set for code generation */
 	dt_irlist_t pcb_ir;	/* list of unrelocated IR instructions */
-	uint_t pcb_asvidx;	/* vartab index (used by assembler) */
+	uint_t pcb_asvidx;	/* assembler vartab index (see dt_as.c) */
+	ulong_t **pcb_asxrefs;	/* assembler imported xlators (see dt_as.c) */
+	uint_t pcb_asxreflen;	/* assembler xlator map length (see dt_as.c) */
 	const dtrace_probedesc_t *pcb_pdesc; /* probedesc for current context */
 	struct dt_probe *pcb_probe; /* probe associated with current context */
 	dtrace_probeinfo_t pcb_pinfo; /* info associated with current context */
 	dtrace_attribute_t pcb_amin; /* stability minimum for compilation */
 	dt_node_t *pcb_dret;	/* node containing return type for assembler */
 	dtrace_difo_t *pcb_difo; /* intermediate DIF object made by assembler */
-	dtrace_difo_t *pcb_pred; /* intermediate predicate made by compiler */
 	dtrace_prog_t *pcb_prog; /* intermediate program made by compiler */
 	dtrace_stmtdesc_t *pcb_stmt; /* intermediate stmt made by compiler */
 	dtrace_ecbdesc_t *pcb_ecbdesc; /* intermediate ecbdesc made by cmplr */

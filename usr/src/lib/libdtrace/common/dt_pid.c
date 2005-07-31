@@ -37,6 +37,7 @@
 #include <stddef.h>
 
 #include <dt_impl.h>
+#include <dt_program.h>
 #include <dt_pid.h>
 #include <dt_string.h>
 

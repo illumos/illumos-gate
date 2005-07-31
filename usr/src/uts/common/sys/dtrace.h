@@ -182,6 +182,8 @@ typedef enum dtrace_probespec {
 #define	DIF_OP_RLDUH	75		/* rlduh [r1], rd */
 #define	DIF_OP_RLDUW	76		/* rlduw [r1], rd */
 #define	DIF_OP_RLDX	77		/* rldx  [r1], rd */
+#define	DIF_OP_XLATE	78		/* xlate xlrindex, rd */
+#define	DIF_OP_XLARG	79		/* xlarg xlrindex, rd */
 
 #define	DIF_INTOFF_MAX		0xffff	/* highest integer table offset */
 #define	DIF_STROFF_MAX		0xffff	/* highest string table offset */
@@ -280,6 +282,7 @@ typedef uint32_t dif_instr_t;
 #define	DIF_INSTR_STRING(i)		(((i) >>  8) & 0xffff)
 #define	DIF_INSTR_SUBR(i)		(((i) >>  8) & 0xffff)
 #define	DIF_INSTR_TYPE(i)		(((i) >> 16) & 0xff)
+#define	DIF_INSTR_XLREF(i)		(((i) >>  8) & 0xffff)
 
 #define	DIF_INSTR_FMT(op, r1, r2, d) \
 	(((op) << 24) | ((r1) << 16) | ((r2) << 8) | (d))
@@ -304,6 +307,7 @@ typedef uint32_t dif_instr_t;
 #define	DIF_INSTR_FLUSHTS		(DIF_OP_FLUSHTS << 24)
 #define	DIF_INSTR_ALLOCS(r1, d)		(DIF_INSTR_FMT(DIF_OP_ALLOCS, r1, 0, d))
 #define	DIF_INSTR_COPYS(r1, r2, d)	(DIF_INSTR_FMT(DIF_OP_COPYS, r1, r2, d))
+#define	DIF_INSTR_XLATE(op, r, d)	(((op) << 24) | ((r) << 8) | (d))
 
 #define	DIF_REG_R0	0		/* %r0 is always set to zero */
 
@@ -629,6 +633,11 @@ typedef struct dof_sec {
 #define	DOF_SECT_PROFFS		18	/* uint32_t array (probe arg offsets) */
 #define	DOF_SECT_INTTAB		19	/* uint64_t array */
 #define	DOF_SECT_UTSNAME	20	/* struct utsname */
+#define	DOF_SECT_XLTAB		21	/* dof_xlref_t array */
+#define	DOF_SECT_XLMEMBERS	22	/* dof_xlmember_t array */
+#define	DOF_SECT_XLIMPORT	23	/* dof_xlator_t */
+#define	DOF_SECT_XLEXPORT	24	/* dof_xlator_t */
+#define	DOF_SECT_PREXPORT	25	/* dof_secidx_t array (exported objs) */
 
 #define	DOF_SECF_LOAD		1	/* section should be loaded */
 
@@ -719,6 +728,27 @@ typedef struct dof_probe {
 	uint32_t dofpr_pad;		/* reserved for future use */
 } dof_probe_t;
 
+typedef struct dof_xlator {
+	dof_secidx_t dofxl_members;	/* link to DOF_SECT_XLMEMBERS section */
+	dof_secidx_t dofxl_strtab;	/* link to DOF_SECT_STRTAB section */
+	dof_stridx_t dofxl_argv;	/* input parameter type strings */
+	uint32_t dofxl_argc;		/* input parameter list length */
+	dof_stridx_t dofxl_type;	/* output type string name */
+	dof_attr_t dofxl_attr;		/* output stability attributes */
+} dof_xlator_t;
+
+typedef struct dof_xlmember {
+	dof_secidx_t dofxm_difo;	/* member link to DOF_SECT_DIFOHDR */
+	dof_stridx_t dofxm_name;	/* member name */
+	dtrace_diftype_t dofxm_type;	/* member type */
+} dof_xlmember_t;
+
+typedef struct dof_xlref {
+	dof_secidx_t dofxr_xlator;	/* link to DOF_SECT_XLATORS section */
+	uint32_t dofxr_member;		/* index of referenced dof_xlmember */
+	uint32_t dofxr_argn;		/* index of argument for DIF_OP_XLARG */
+} dof_xlref_t;
+
 /*
  * DTrace Intermediate Format Object (DIFO)
  *
@@ -748,8 +778,10 @@ typedef struct dtrace_difo {
 #ifndef _KERNEL
 	dof_relodesc_t *dtdo_kreltab;	/* kernel relocations */
 	dof_relodesc_t *dtdo_ureltab;	/* user relocations */
-	uint32_t dtdo_krelen;		/* length of krelo table */
-	uint32_t dtdo_urelen;		/* length of urelo table */
+	struct dt_node **dtdo_xlmtab;	/* translator references */
+	uint_t dtdo_krelen;		/* length of krelo table */
+	uint_t dtdo_urelen;		/* length of urelo table */
+	uint_t dtdo_xlmlen;		/* length of translator table */
 #endif
 } dtrace_difo_t;
 

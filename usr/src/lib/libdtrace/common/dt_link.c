@@ -868,15 +868,18 @@ dt_modtext(char *p, GElf_Rela *rela, uint32_t *off)
 #error unknown ISA
 #endif
 
-/*PRINTFLIKE2*/
+/*PRINTFLIKE3*/
 static int
-dt_link_error(dtrace_hdl_t *dtp, const char *format, ...)
+dt_link_error(dtrace_hdl_t *dtp, Elf *elf, const char *format, ...)
 {
 	va_list ap;
 
 	va_start(ap, format);
 	dt_set_errmsg(dtp, NULL, NULL, NULL, 0, format, ap);
 	va_end(ap);
+
+	if (elf != NULL)
+		(void) elf_end(elf);
 
 	return (dt_set_errno(dtp, EDT_COMPILER));
 }
@@ -886,7 +889,7 @@ process_obj(dtrace_hdl_t *dtp, const char *obj)
 {
 	static const char dt_prefix[] = "__dtrace_";
 	int fd, i, ndx, mod = 0;
-	Elf *elf;
+	Elf *elf = NULL;
 	GElf_Ehdr ehdr;
 	Elf_Scn *scn_rel, *scn_sym, *scn_tgt;
 	Elf_Data *data_rel, *data_sym, *data_tgt;
@@ -901,13 +904,12 @@ process_obj(dtrace_hdl_t *dtp, const char *obj)
 	uint32_t off, eclass, emachine1, emachine2;
 
 	if ((fd = open64(obj, O_RDWR)) == -1) {
-		return (dt_link_error(dtp, "failed to open %s: %s", obj,
+		return (dt_link_error(dtp, elf, "failed to open %s: %s", obj,
 		    strerror(errno)));
 	}
 
-	if (elf_version(EV_CURRENT) == EV_NONE ||
-	    (elf = elf_begin(fd, ELF_C_RDWR, NULL)) == NULL) {
-		return (dt_link_error(dtp, "failed to process %s: %s", obj,
+	if ((elf = elf_begin(fd, ELF_C_RDWR, NULL)) == NULL) {
+		return (dt_link_error(dtp, elf, "failed to process %s: %s", obj,
 		    elf_errmsg(elf_errno())));
 	}
 
@@ -915,14 +917,14 @@ process_obj(dtrace_hdl_t *dtp, const char *obj)
 	case ELF_K_ELF:
 		break;
 	case ELF_K_AR:
-		return (dt_link_error(dtp, "archive files are not permitted %s;"
-		    " use the contents of the archive instead", obj));
+		return (dt_link_error(dtp, elf, "archives are not permitted;"
+		    " use the contents of the archive instead: %s", obj));
 	default:
-		return (dt_link_error(dtp, "invalid file type for %s", obj));
+		return (dt_link_error(dtp, elf, "invalid file type: %s", obj));
 	}
 
 	if (gelf_getehdr(elf, &ehdr) == NULL)
-		return (dt_link_error(dtp, "corrupt object file %s", obj));
+		return (dt_link_error(dtp, elf, "corrupt file: %s", obj));
 
 	if (dtp->dt_oflags & DTRACE_O_LP64) {
 		eclass = ELFCLASS64;
@@ -941,13 +943,14 @@ process_obj(dtrace_hdl_t *dtp, const char *obj)
 #endif
 	}
 
-	if (ehdr.e_ident[EI_CLASS] != eclass)
-		return (dt_link_error(dtp, "incorrect ELF class for object "
-		    "file %s", obj));
+	if (ehdr.e_ident[EI_CLASS] != eclass) {
+		return (dt_link_error(dtp, elf,
+		    "incorrect ELF class for object file: %s", obj));
+	}
 
 	if (ehdr.e_machine != emachine1 && ehdr.e_machine != emachine2)
-		return (dt_link_error(dtp, "incorrect ELF machine type for "
-		    "object file %s", obj));
+		return (dt_link_error(dtp, elf, "incorrect ELF machine type "
+		    "for object file: %s", obj));
 
 	scn_rel = NULL;
 	while ((scn_rel = elf_nextscn(elf, scn_rel)) != NULL) {
@@ -1012,12 +1015,12 @@ process_obj(dtrace_hdl_t *dtp, const char *obj)
 				goto err;
 
 			if ((pvp = dt_provider_lookup(dtp, pname)) == NULL) {
-				return (dt_link_error(dtp,
+				return (dt_link_error(dtp, elf,
 				    "no such provider %s", pname));
 			}
 
 			if ((prp = dt_probe_lookup(pvp, p)) == NULL) {
-				return (dt_link_error(dtp,
+				return (dt_link_error(dtp, elf,
 				    "no such probe %s", p));
 			}
 
@@ -1049,10 +1052,11 @@ process_obj(dtrace_hdl_t *dtp, const char *obj)
 	if (mod && elf_update(elf, ELF_C_WRITE) == -1)
 		goto err;
 
+	(void) elf_end(elf);
 	return (0);
 
 err:
-	return (dt_link_error(dtp,
+	return (dt_link_error(dtp, elf,
 	    "an error was encountered while processing %s", obj));
 }
 
@@ -1088,18 +1092,18 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
 			cur += snprintf(cmd + cur, len - cur, " %s", objv[i]);
 
 		if ((status = system(cmd)) == -1) {
-			return (dt_link_error(dtp, "failed to run %s: %s",
+			return (dt_link_error(dtp, NULL, "failed to run %s: %s",
 			    dtp->dt_ld_path, strerror(errno)));
 		}
 
 		if (WIFSIGNALED(status)) {
-			return (dt_link_error(dtp,
+			return (dt_link_error(dtp, NULL,
 			    "failed to link %s: %s failed due to signal %d",
 			    file, dtp->dt_ld_path, WTERMSIG(status)));
 		}
 
 		if (WEXITSTATUS(status) != 0) {
-			return (dt_link_error(dtp,
+			return (dt_link_error(dtp, NULL,
 			    "failed to link %s: %s exited with status %d\n",
 			    file, dtp->dt_ld_path, WEXITSTATUS(status)));
 		}
@@ -1126,7 +1130,7 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
 	 * processes as /dev/fd/<fd>.
 	 */
 	if ((fd = open64(file, O_RDWR | O_CREAT | O_TRUNC, 0666)) == -1) {
-		return (dt_link_error(dtp,
+		return (dt_link_error(dtp, NULL,
 		    "failed to open %s: %s", file, strerror(errno)));
 	}
 
@@ -1143,7 +1147,7 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
 			ret = errno;
 
 		if (ret != 0) {
-			return (dt_link_error(dtp,
+			return (dt_link_error(dtp, NULL,
 			    "failed to write %s: %s", file, strerror(ret)));
 		}
 
@@ -1153,7 +1157,7 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
 		break; /* fall through to the rest of dtrace_program_link() */
 
 	default:
-		return (dt_link_error(dtp,
+		return (dt_link_error(dtp, NULL,
 		    "invalid link type %u\n", dtp->dt_linktype));
 	}
 
@@ -1167,7 +1171,7 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
 		status = dump_elf32(dtp, dof, fd);
 
 	if (status != 0 || lseek(fd, 0, SEEK_SET) != 0) {
-		return (dt_link_error(dtp,
+		return (dt_link_error(dtp, NULL,
 		    "failed to write %s: %s", file, strerror(errno)));
 	}
 
@@ -1190,7 +1194,7 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
 		(void) snprintf(cmd, len, fmt, dtp->dt_ld_path, file, fd, drti);
 
 		if ((status = system(cmd)) == -1) {
-			ret = dt_link_error(dtp, "failed to run %s: %s",
+			ret = dt_link_error(dtp, NULL, "failed to run %s: %s",
 			    dtp->dt_ld_path, strerror(errno));
 			goto done;
 		}
@@ -1198,14 +1202,14 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
 		(void) close(fd); /* release temporary file */
 
 		if (WIFSIGNALED(status)) {
-			ret = dt_link_error(dtp,
+			ret = dt_link_error(dtp, NULL,
 			    "failed to link %s: %s failed due to signal %d",
 			    file, dtp->dt_ld_path, WTERMSIG(status));
 			goto done;
 		}
 
 		if (WEXITSTATUS(status) != 0) {
-			ret = dt_link_error(dtp,
+			ret = dt_link_error(dtp, NULL,
 			    "failed to link %s: %s exited with status %d\n",
 			    file, dtp->dt_ld_path, WEXITSTATUS(status));
 			goto done;

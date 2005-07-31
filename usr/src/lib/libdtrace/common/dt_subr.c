@@ -717,6 +717,23 @@ dt_free(dtrace_hdl_t *dtp, void *data)
 	free(data);
 }
 
+void
+dt_difo_free(dtrace_hdl_t *dtp, dtrace_difo_t *dp)
+{
+	if (dp == NULL)
+		return; /* simplify caller code */
+
+	dt_free(dtp, dp->dtdo_buf);
+	dt_free(dtp, dp->dtdo_inttab);
+	dt_free(dtp, dp->dtdo_strtab);
+	dt_free(dtp, dp->dtdo_vartab);
+	dt_free(dtp, dp->dtdo_kreltab);
+	dt_free(dtp, dp->dtdo_ureltab);
+	dt_free(dtp, dp->dtdo_xlmtab);
+
+	dt_free(dtp, dp);
+}
+
 /*
  * dt_gmatch() is similar to gmatch(3GEN) and dtrace(7D) globbing, but also
  * implements the behavior that an empty pattern matches any string.
@@ -736,6 +753,52 @@ dt_basename(char *str)
 		return (str);
 
 	return (last + 1);
+}
+
+/*
+ * dt_popc() is a fast implementation of population count.  The algorithm is
+ * from "Hacker's Delight" by Henry Warren, Jr with a 64-bit equivalent added.
+ */
+ulong_t
+dt_popc(ulong_t x)
+{
+#ifdef _ILP32
+	x = x - ((x >> 1) & 0x55555555UL);
+	x = (x & 0x33333333UL) + ((x >> 2) & 0x33333333UL);
+	x = (x + (x >> 4)) & 0x0F0F0F0FUL;
+	x = x + (x >> 8);
+	x = x + (x >> 16);
+	return (x & 0x3F);
+#endif
+#ifdef _LP64
+	x = x - ((x >> 1) & 0x5555555555555555ULL);
+	x = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);
+	x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
+	x = x + (x >> 8);
+	x = x + (x >> 16);
+	x = x + (x >> 32);
+	return (x & 0x7F);
+#endif
+}
+
+/*
+ * dt_popcb() is a bitmap-based version of population count that returns the
+ * number of one bits in the specified bitmap 'bp' at bit positions below 'n'.
+ */
+ulong_t
+dt_popcb(const ulong_t *bp, ulong_t n)
+{
+	ulong_t maxb = n & BT_ULMASK;
+	ulong_t maxw = n >> BT_ULSHIFT;
+	ulong_t w, popc = 0;
+
+	if (n == 0)
+		return (0);
+
+	for (w = 0; w < maxw; w++)
+		popc += dt_popc(bp[w]);
+
+	return (popc + dt_popc(bp[maxw] & ((1UL << maxb) - 1)));
 }
 
 struct _rwlock;

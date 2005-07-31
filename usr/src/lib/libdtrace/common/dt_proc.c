@@ -698,6 +698,16 @@ dt_proc_destroy(dtrace_hdl_t *dtp, struct ps_prochandle *P)
 		dpr->dpr_quit = B_TRUE;
 		(void) _lwp_kill(dpr->dpr_tid, SIGCANCEL);
 
+		/*
+		 * If the process is currently idling in dt_proc_stop(), re-
+		 * enable breakpoints and poke it into running again.
+		 */
+		if (dpr->dpr_stop & DT_PROC_STOP_IDLE) {
+			dt_proc_bpenable(dpr);
+			dpr->dpr_stop &= ~DT_PROC_STOP_IDLE;
+			(void) pthread_cond_broadcast(&dpr->dpr_cv);
+		}
+
 		while (!dpr->dpr_done)
 			(void) pthread_cond_wait(&dpr->dpr_cv, &dpr->dpr_lock);
 

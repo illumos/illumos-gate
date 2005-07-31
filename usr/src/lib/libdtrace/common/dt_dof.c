@@ -38,7 +38,9 @@
 
 #include <dt_impl.h>
 #include <dt_strtab.h>
+#include <dt_program.h>
 #include <dt_provider.h>
+#include <dt_xlator.h>
 #include <dt_dof.h>
 
 void
@@ -49,6 +51,8 @@ dt_dof_init(dtrace_hdl_t *dtp)
 	ddo->ddo_hdl = dtp;
 	ddo->ddo_nsecs = 0;
 	ddo->ddo_strsec = DOF_SECIDX_NONE;
+	ddo->ddo_xlimport = NULL;
+	ddo->ddo_xlexport = NULL;
 
 	dt_buf_create(dtp, &ddo->ddo_secs, "section headers", 0);
 	dt_buf_create(dtp, &ddo->ddo_strs, "string table", 0);
@@ -59,12 +63,17 @@ dt_dof_init(dtrace_hdl_t *dtp)
 	dt_buf_create(dtp, &ddo->ddo_args, "probe args", 0);
 	dt_buf_create(dtp, &ddo->ddo_offs, "probe offs", 0);
 	dt_buf_create(dtp, &ddo->ddo_rels, "probe rels", 0);
+
+	dt_buf_create(dtp, &ddo->ddo_xlms, "xlate members", 0);
 }
 
 void
 dt_dof_fini(dtrace_hdl_t *dtp)
 {
 	dt_dof_t *ddo = &dtp->dt_dof;
+
+	dt_free(dtp, ddo->ddo_xlimport);
+	dt_free(dtp, ddo->ddo_xlexport);
 
 	dt_buf_destroy(dtp, &ddo->ddo_secs);
 	dt_buf_destroy(dtp, &ddo->ddo_strs);
@@ -75,15 +84,35 @@ dt_dof_fini(dtrace_hdl_t *dtp)
 	dt_buf_destroy(dtp, &ddo->ddo_args);
 	dt_buf_destroy(dtp, &ddo->ddo_offs);
 	dt_buf_destroy(dtp, &ddo->ddo_rels);
+
+	dt_buf_destroy(dtp, &ddo->ddo_xlms);
 }
 
-void
-dt_dof_reset(dtrace_hdl_t *dtp)
+static int
+dt_dof_reset(dtrace_hdl_t *dtp, dtrace_prog_t *pgp)
 {
 	dt_dof_t *ddo = &dtp->dt_dof;
+	uint_t i, nx = dtp->dt_xlatorid;
+
+	assert(ddo->ddo_hdl == dtp);
+	ddo->ddo_pgp = pgp;
 
 	ddo->ddo_nsecs = 0;
 	ddo->ddo_strsec = DOF_SECIDX_NONE;
+
+	dt_free(dtp, ddo->ddo_xlimport);
+	dt_free(dtp, ddo->ddo_xlexport);
+
+	ddo->ddo_xlimport = dt_alloc(dtp, sizeof (dof_secidx_t) * nx);
+	ddo->ddo_xlexport = dt_alloc(dtp, sizeof (dof_secidx_t) * nx);
+
+	if (nx != 0 && (ddo->ddo_xlimport == NULL || ddo->ddo_xlexport == NULL))
+		return (-1); /* errno is set for us */
+
+	for (i = 0; i < nx; i++) {
+		ddo->ddo_xlimport[i] = DOF_SECIDX_NONE;
+		ddo->ddo_xlexport[i] = DOF_SECIDX_NONE;
+	}
 
 	dt_buf_reset(dtp, &ddo->ddo_secs);
 	dt_buf_reset(dtp, &ddo->ddo_strs);
@@ -94,6 +123,9 @@ dt_dof_reset(dtrace_hdl_t *dtp)
 	dt_buf_reset(dtp, &ddo->ddo_args);
 	dt_buf_reset(dtp, &ddo->ddo_offs);
 	dt_buf_reset(dtp, &ddo->ddo_rels);
+
+	dt_buf_reset(dtp, &ddo->ddo_xlms);
+	return (0);
 }
 
 /*
@@ -176,7 +208,7 @@ dof_attr(const dtrace_attribute_t *ap)
 static dof_secidx_t
 dof_add_difo(dt_dof_t *ddo, const dtrace_difo_t *dp)
 {
-	dof_secidx_t dsecs[4]; /* enough for all possible DIFO sections */
+	dof_secidx_t dsecs[5]; /* enough for all possible DIFO sections */
 	uint_t nsecs = 0;
 
 	dof_difohdr_t *dofd;
@@ -208,6 +240,35 @@ dof_add_difo(dt_dof_t *ddo, const dtrace_difo_t *dp)
 		dsecs[nsecs++] = dof_add_lsect(ddo, dp->dtdo_vartab,
 		    DOF_SECT_VARTAB, sizeof (uint_t), 0, sizeof (dtrace_difv_t),
 		    sizeof (dtrace_difv_t) * dp->dtdo_varlen);
+	}
+
+	if (dp->dtdo_xlmtab != NULL) {
+		dof_xlref_t *xlt, *xlp;
+		dt_node_t **pnp;
+
+		xlt = alloca(sizeof (dof_xlref_t) * dp->dtdo_xlmlen);
+		pnp = dp->dtdo_xlmtab;
+
+		/*
+		 * dtdo_xlmtab contains pointers to the translator members.
+		 * The translator itself is in sect ddo_xlimport[dxp->dx_id].
+		 * The XLMEMBERS entries are in order by their dn_membid, so
+		 * the member section offset is the population count of bits
+		 * in ddo_pgp->dp_xlrefs[] up to and not including dn_membid.
+		 */
+		for (xlp = xlt; xlp < xlt + dp->dtdo_xlmlen; xlp++) {
+			dt_node_t *dnp = *pnp++;
+			dt_xlator_t *dxp = dnp->dn_membexpr->dn_xlator;
+
+			xlp->dofxr_xlator = ddo->ddo_xlimport[dxp->dx_id];
+			xlp->dofxr_member = dt_popcb(
+			    ddo->ddo_pgp->dp_xrefs[dxp->dx_id], dnp->dn_membid);
+			xlp->dofxr_argn = (uint32_t)dxp->dx_arg;
+		}
+
+		dsecs[nsecs++] = dof_add_lsect(ddo, xlt, DOF_SECT_XLTAB,
+		    sizeof (dof_secidx_t), 0, sizeof (dof_xlref_t),
+		    sizeof (dof_xlref_t) * dp->dtdo_xlmlen);
 	}
 
 	/*
@@ -264,6 +325,66 @@ dof_add_difo(dt_dof_t *ddo, const dtrace_difo_t *dp)
 	}
 
 	return (hdrsec);
+}
+
+static void
+dof_add_translator(dt_dof_t *ddo, const dt_xlator_t *dxp, uint_t type)
+{
+	dtrace_hdl_t *dtp = ddo->ddo_hdl;
+	dof_xlmember_t dofxm;
+	dof_xlator_t dofxl;
+	dof_secidx_t *xst;
+
+	char buf[DT_TYPE_NAMELEN];
+	dt_node_t *dnp;
+	uint_t i = 0;
+
+	assert(type == DOF_SECT_XLIMPORT || type == DOF_SECT_XLEXPORT);
+	xst = type == DOF_SECT_XLIMPORT ? ddo->ddo_xlimport : ddo->ddo_xlexport;
+
+	if (xst[dxp->dx_id] != DOF_SECIDX_NONE)
+		return; /* translator has already been emitted */
+
+	dt_buf_reset(dtp, &ddo->ddo_xlms);
+
+	/*
+	 * Generate an array of dof_xlmember_t's into ddo_xlms.  If we are
+	 * importing the translator, add only those members referenced by the
+	 * program and set the dofxm_difo reference of each member to NONE.  If
+	 * we're exporting the translator, add all members and a DIFO for each.
+	 */
+	for (dnp = dxp->dx_members; dnp != NULL; dnp = dnp->dn_list, i++) {
+		if (type == DOF_SECT_XLIMPORT) {
+			if (!BT_TEST(ddo->ddo_pgp->dp_xrefs[dxp->dx_id], i))
+				continue; /* member is not referenced */
+			dofxm.dofxm_difo = DOF_SECIDX_NONE;
+		} else {
+			dofxm.dofxm_difo = dof_add_difo(ddo,
+			    dxp->dx_membdif[dnp->dn_membid]);
+		}
+
+		dofxm.dofxm_name = dof_add_string(ddo, dnp->dn_membname);
+		dt_node_diftype(dtp, dnp, &dofxm.dofxm_type);
+
+		dt_buf_write(dtp, &ddo->ddo_xlms,
+		    &dofxm, sizeof (dofxm), sizeof (uint32_t));
+	}
+
+	dofxl.dofxl_members = dof_add_lsect(ddo, NULL, DOF_SECT_XLMEMBERS,
+	    sizeof (uint32_t), 0, sizeof (dofxm), dt_buf_len(&ddo->ddo_xlms));
+
+	dt_buf_concat(dtp, &ddo->ddo_ldata, &ddo->ddo_xlms, sizeof (uint32_t));
+
+	dofxl.dofxl_strtab = ddo->ddo_strsec;
+	dofxl.dofxl_argv = dof_add_string(ddo, ctf_type_name(
+	    dxp->dx_src_ctfp, dxp->dx_src_type, buf, sizeof (buf)));
+	dofxl.dofxl_argc = 1;
+	dofxl.dofxl_type = dof_add_string(ddo, ctf_type_name(
+	    dxp->dx_dst_ctfp, dxp->dx_dst_type, buf, sizeof (buf)));
+	dofxl.dofxl_attr = dof_attr(&dxp->dx_souid.di_attr);
+
+	xst[dxp->dx_id] = dof_add_lsect(ddo, &dofxl, type,
+	    sizeof (uint32_t), 0, 0, sizeof (dofxl));
 }
 
 /*ARGSUSED*/
@@ -339,9 +460,29 @@ dof_add_provider(dt_dof_t *ddo, const dt_provider_t *pvp)
 	dtrace_hdl_t *dtp = ddo->ddo_hdl;
 	dof_provider_t dofpv;
 	dof_relohdr_t dofr;
+	dof_secidx_t *dofs;
+	ulong_t xr, nxr;
+	id_t i;
 
 	if (pvp->pv_flags & DT_PROVIDER_IMPL)
 		return; /* ignore providers that are exported by dtrace(7D) */
+
+	nxr = dt_popcb(pvp->pv_xrefs, pvp->pv_xrmax);
+	dofs = alloca(sizeof (dof_secidx_t) * (nxr + 1));
+	xr = 1; /* reserve dofs[0] for the provider itself */
+
+	/*
+	 * For each translator referenced by the provider (pv_xrefs), emit an
+	 * exported translator section for it if one hasn't been created yet.
+	 */
+	for (i = 0; i < pvp->pv_xrmax; i++) {
+		if (BT_TEST(pvp->pv_xrefs, i) &&
+		    dtp->dt_xlatemode == DT_XL_DYNAMIC) {
+			dof_add_translator(ddo,
+			    dt_xlator_lookup_id(dtp, i), DOF_SECT_XLEXPORT);
+			dofs[xr++] = ddo->ddo_xlexport[i];
+		}
+	}
 
 	dt_buf_reset(dtp, &ddo->ddo_probes);
 	dt_buf_reset(dtp, &ddo->ddo_args);
@@ -376,7 +517,7 @@ dof_add_provider(dt_dof_t *ddo, const dt_provider_t *pvp)
 	dofpv.dofpv_nameattr = dof_attr(&pvp->pv_desc.dtvd_attr.dtpa_name);
 	dofpv.dofpv_argsattr = dof_attr(&pvp->pv_desc.dtvd_attr.dtpa_args);
 
-	(void) dof_add_lsect(ddo, &dofpv, DOF_SECT_PROVIDER,
+	dofs[0] = dof_add_lsect(ddo, &dofpv, DOF_SECT_PROVIDER,
 	    sizeof (dof_secidx_t), 0, 0, sizeof (dof_provider_t));
 
 	dofr.dofr_strtab = dofpv.dofpv_strtab;
@@ -389,6 +530,12 @@ dof_add_provider(dt_dof_t *ddo, const dt_provider_t *pvp)
 
 	(void) dof_add_lsect(ddo, &dofr, DOF_SECT_URELHDR,
 	    sizeof (dof_secidx_t), 0, 0, sizeof (dof_relohdr_t));
+
+	if (nxr != 0 && dtp->dt_xlatemode == DT_XL_DYNAMIC) {
+		(void) dof_add_lsect(ddo, dofs, DOF_SECT_PREXPORT,
+		    sizeof (dof_secidx_t), 0, sizeof (dof_secidx_t),
+		    sizeof (dof_secidx_t) * (nxr + 1));
+	}
 }
 
 static int
@@ -443,6 +590,7 @@ dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
 	uint_t maxfmt = 0;
 
 	dt_provider_t *pvp;
+	dt_xlator_t *dxp;
 	dof_actdesc_t *dofa;
 	dof_sec_t *sp;
 	size_t ssize, lsize;
@@ -462,8 +610,8 @@ dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
 	if (dof_hdr(dtp, &h) != 0)
 		return (NULL);
 
-	assert(ddo->ddo_hdl == dtp);
-	dt_dof_reset(dtp);
+	if (dt_dof_reset(dtp, pgp) != 0)
+		return (NULL);
 
 	/*
 	 * Iterate through the statement list computing the maximum number of
@@ -495,6 +643,19 @@ dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
 
 	ddo->ddo_strsec = dof_add_lsect(ddo, NULL, DOF_SECT_STRTAB, 1, 0, 0, 0);
 	(void) dof_add_string(ddo, "");
+
+	/*
+	 * If there are references to dynamic translators in the program, add
+	 * an imported translator table entry for each referenced translator.
+	 */
+	if (pgp->dp_xrefslen != 0) {
+		for (dxp = dt_list_next(&dtp->dt_xlators);
+		    dxp != NULL; dxp = dt_list_next(dxp)) {
+			if (dxp->dx_id < pgp->dp_xrefslen &&
+			    pgp->dp_xrefs[dxp->dx_id] != NULL)
+				dof_add_translator(ddo, dxp, DOF_SECT_XLIMPORT);
+		}
+	}
 
 	/*
 	 * Now iterate through the statement list, creating the DOF section

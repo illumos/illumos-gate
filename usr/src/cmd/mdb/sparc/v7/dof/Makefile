@@ -25,21 +25,18 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-MODULE = dtrace.so
-MDBTGT = kvm
+MODULE = dof.so
+MDBTGT = raw
 
-MODSRCS = dtrace.c dof.c dof_names.c
+MODSRCS = dof.c dof_names.c
 
 include ../../../../Makefile.cmd
-include ../../../../Makefile.cmd.64
-include ../../Makefile.amd64
+include ../../Makefile.sparcv7
 include ../../../Makefile.module
 
-MODULE_BUILD_TYPE = mdb
 MODSRCS_DIR = ../../../common/modules/dtrace
 
-CPPFLAGS += -I$(SRC)/uts/i86pc
-LDLIBS	+= -ldtrace -lm
+LDLIBS  += -ldtrace
 CLEANFILES += dof_names.c
 
 dof_names.c: $(MODSRCS_DIR)/mkdof.sh $(SRC)/uts/common/sys/dtrace.h

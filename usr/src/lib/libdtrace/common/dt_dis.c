@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,9 @@
 
 #include <strings.h>
 #include <stdio.h>
-#include <dt_ident.h>
+
 #include <dt_impl.h>
+#include <dt_ident.h>
 
 /*ARGSUSED*/
 static void
@@ -198,50 +199,16 @@ dt_dis_ret(const dtrace_difo_t *dp, const char *name, dif_instr_t in, FILE *fp)
 static void
 dt_dis_call(const dtrace_difo_t *dp, const char *name, dif_instr_t in, FILE *fp)
 {
-	static const struct {
-		const char *name;
-		int subr;
-	} snames[] = {
-		{ "rand",			DIF_SUBR_RAND },
-		{ "mutex_owned",		DIF_SUBR_MUTEX_OWNED },
-		{ "mutex_owner",		DIF_SUBR_MUTEX_OWNER },
-		{ "mutex_type_adaptive",	DIF_SUBR_MUTEX_TYPE_ADAPTIVE },
-		{ "mutex_type_spin",		DIF_SUBR_MUTEX_TYPE_SPIN },
-		{ "rw_read_held",		DIF_SUBR_RW_READ_HELD },
-		{ "rw_write_held",		DIF_SUBR_RW_WRITE_HELD },
-		{ "rw_iswriter",		DIF_SUBR_RW_ISWRITER },
-		{ "copyin",			DIF_SUBR_COPYIN },
-		{ "copyinstr",			DIF_SUBR_COPYINSTR },
-		{ "speculation",		DIF_SUBR_SPECULATION },
-		{ "progenyof",			DIF_SUBR_PROGENYOF },
-		{ "strlen",			DIF_SUBR_STRLEN },
-		{ "copyout",			DIF_SUBR_COPYOUT },
-		{ "copyoutstr",			DIF_SUBR_COPYOUTSTR },
-		{ "alloca",			DIF_SUBR_ALLOCA },
-		{ "bcopy",			DIF_SUBR_BCOPY },
-		{ "copyinto",			DIF_SUBR_COPYINTO },
-		{ "msgdsize",			DIF_SUBR_MSGDSIZE },
-		{ "msgsize",			DIF_SUBR_MSGSIZE },
-		{ NULL, 0 }
-	};
+	uint_t subr = DIF_INSTR_SUBR(in);
 
-	uint_t subr = DIF_INSTR_SUBR(in), i;
-
-	(void) fprintf(fp, "%-4s DIF_SUBR(%u), %%r%u",
-	    name, subr, DIF_INSTR_RD(in));
-
-	for (i = 0; snames[i].name != NULL; i++) {
-		if (subr == snames[i].subr) {
-			(void) fprintf(fp, "\t\t! %s", snames[i].name);
-			return;
-		}
-	}
+	(void) fprintf(fp, "%-4s DIF_SUBR(%u), %%r%u\t\t! %s",
+	    name, subr, DIF_INSTR_RD(in), dtrace_subrstr(NULL, subr));
 }
 
 /*ARGSUSED*/
 static void
-dt_dis_pushts(const dtrace_difo_t *dp, const char *name,
-	dif_instr_t in, FILE *fp)
+dt_dis_pushts(const dtrace_difo_t *dp,
+    const char *name, dif_instr_t in, FILE *fp)
 {
 	static const char *const tnames[] = { "D type", "string" };
 	uint_t type = DIF_INSTR_TYPE(in);
@@ -251,6 +218,22 @@ dt_dis_pushts(const dtrace_difo_t *dp, const char *name,
 
 	if (type < sizeof (tnames) / sizeof (tnames[0]))
 		(void) fprintf(fp, "\t! DT_TYPE(%u) = %s", type, tnames[type]);
+}
+
+static void
+dt_dis_xlate(const dtrace_difo_t *dp,
+    const char *name, dif_instr_t in, FILE *fp)
+{
+	uint_t xlr = DIF_INSTR_XLREF(in);
+
+	(void) fprintf(fp, "%-4s DT_XLREF[%u], %%r%u",
+	    name, xlr, DIF_INSTR_RD(in));
+
+	if (xlr < dp->dtdo_xlmlen) {
+		(void) fprintf(fp, "\t\t! DT_XLREF[%u] = %u.%s", xlr,
+		    (uint_t)dp->dtdo_xlmtab[xlr]->dn_membexpr->dn_xlator->dx_id,
+		    dp->dtdo_xlmtab[xlr]->dn_membname);
+	}
 }
 
 static char *
@@ -343,7 +326,7 @@ dt_dis_rtab(const char *rtag, const dtrace_difo_t *dp, FILE *fp,
 }
 
 void
-dtrace_difo_print(const dtrace_difo_t *dp, FILE *fp)
+dt_dis(const dtrace_difo_t *dp, FILE *fp)
 {
 	static const struct opent {
 		const char *op_name;
@@ -428,14 +411,15 @@ dtrace_difo_print(const dtrace_difo_t *dp, FILE *fp)
 		{ "rlduh", dt_dis_load },	/* DIF_OP_RLDUH */
 		{ "rlduw", dt_dis_load },	/* DIF_OP_RLDUW */
 		{ "rldx", dt_dis_load },	/* DIF_OP_RLDX */
+		{ "xlate", dt_dis_xlate },	/* DIF_OP_XLATE */
+		{ "xlarg", dt_dis_xlate },	/* DIF_OP_XLARG */
 	};
 
 	const struct opent *op;
 	ulong_t i = 0;
-	char type[64];
+	char type[DT_TYPE_NAMELEN];
 
-	(void) fprintf(fp, "DIFO 0x%p refcnt=%u returns %s\n",
-	    (void *)dp, dp->dtdo_refcnt,
+	(void) fprintf(fp, "\nDIFO 0x%p returns %s\n", (void *)dp,
 	    dt_dis_typestr(&dp->dtdo_rtype, type, sizeof (type)));
 
 	(void) fprintf(fp, "%-3s %-8s    %s\n",
@@ -504,6 +488,19 @@ dtrace_difo_print(const dtrace_difo_t *dp, FILE *fp)
 		    &dp->dtdo_strtab[v->dtdv_name],
 		    v->dtdv_id, kind, scope, flags + 1,
 		    dt_dis_typestr(&v->dtdv_type, type, sizeof (type)));
+	}
+
+	if (dp->dtdo_xlmlen != 0) {
+		(void) fprintf(fp, "\n%-4s %-3s %-12s %s\n",
+		    "XLID", "ARG", "MEMBER", "TYPE");
+	}
+
+	for (i = 0; i < dp->dtdo_xlmlen; i++) {
+		dt_node_t *dnp = dp->dtdo_xlmtab[i];
+		dt_xlator_t *dxp = dnp->dn_membexpr->dn_xlator;
+		(void) fprintf(fp, "%-4u %-3d %-12s %s\n",
+		    (uint_t)dxp->dx_id, dxp->dx_arg, dnp->dn_membname,
+		    dt_node_type_name(dnp, type, sizeof (type)));
 	}
 
 	if (dp->dtdo_krelen != 0)

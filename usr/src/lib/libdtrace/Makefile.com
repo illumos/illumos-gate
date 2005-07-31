@@ -51,6 +51,7 @@ LIBSRCS = \
 	dt_program.c \
 	dt_map.c \
 	dt_module.c \
+	dt_names.c \
 	dt_parser.c \
 	dt_pcb.c \
 	dt_pid.c \
@@ -93,7 +94,8 @@ SPECMAPFILE = $(MAPDIR)/mapfile
 CLEANFILES += dt_lex.c dt_grammar.c dt_grammar.h y.output
 CLEANFILES += ../common/procfs.sed ../common/procfs.d
 CLEANFILES += ../common/io.sed ../common/io.d
-CLEANFILES += ../common/dt_errtags.c ../common/errno.d ../common/signal.d
+CLEANFILES += ../common/errno.d ../common/signal.d
+CLEANFILES += ../common/dt_errtags.c ../common/dt_names.c
 
 CLOBBERFILES += drti.o
 
@@ -143,6 +145,9 @@ pics/dt_lex.o pics/dt_grammar.o := CCVERBOSE =
 
 ../common/dt_errtags.c: ../common/mkerrtags.sh ../common/dt_errtags.h
 	sh ../common/mkerrtags.sh < ../common/dt_errtags.h > $@
+
+../common/dt_names.c: ../common/mknames.sh $(SRC)/uts/common/sys/dtrace.h
+	sh ../common/mknames.sh < $(SRC)/uts/common/sys/dtrace.h > $@
 
 ../common/errno.d: ../common/mkerrno.sh $(SRC)/uts/common/sys/errno.h
 	sh ../common/mkerrno.sh < $(SRC)/uts/common/sys/errno.h > $@

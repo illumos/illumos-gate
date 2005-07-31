@@ -49,6 +49,7 @@
 #include <assert.h>
 
 #include <dt_impl.h>
+#include <dt_program.h>
 #include <dt_provider.h>
 #include <dt_pcb.h>
 
@@ -108,6 +109,7 @@ void
 dt_pcb_pop(dtrace_hdl_t *dtp, int err)
 {
 	dt_pcb_t *pcb = yypcb;
+	uint_t i;
 
 	assert(pcb != NULL);
 	assert(pcb == dtp->dt_pcb);
@@ -125,14 +127,12 @@ dt_pcb_pop(dtrace_hdl_t *dtp, int err)
 		dt_xlator_t *dxp, *nxp;
 		dt_provider_t *pvp, *nvp;
 
-		if (pcb->pcb_pred != NULL)
-			dtrace_difo_release(pcb->pcb_pred);
 		if (pcb->pcb_prog != NULL)
-			dtrace_program_destroy(dtp, pcb->pcb_prog);
+			dt_program_destroy(dtp, pcb->pcb_prog);
 		if (pcb->pcb_stmt != NULL)
-			dtrace_stmt_destroy(pcb->pcb_stmt);
+			dtrace_stmt_destroy(dtp, pcb->pcb_stmt);
 		if (pcb->pcb_ecbdesc != NULL)
-			dtrace_ecbdesc_release(pcb->pcb_ecbdesc);
+			dt_ecbdesc_release(dtp, pcb->pcb_ecbdesc);
 
 		for (dxp = dt_list_next(&dtp->dt_xlators); dxp; dxp = nxp) {
 			nxp = dt_list_next(dxp);
@@ -171,8 +171,12 @@ dt_pcb_pop(dtrace_hdl_t *dtp, int err)
 		dt_strtab_destroy(pcb->pcb_strtab);
 	if (pcb->pcb_regs != NULL)
 		dt_regset_destroy(pcb->pcb_regs);
-	if (pcb->pcb_difo != NULL)
-		dtrace_difo_release(pcb->pcb_difo);
+
+	for (i = 0; i < pcb->pcb_asxreflen; i++)
+		dt_free(dtp, pcb->pcb_asxrefs[i]);
+
+	dt_free(dtp, pcb->pcb_asxrefs);
+	dt_difo_free(dtp, pcb->pcb_difo);
 
 	free(pcb->pcb_filetag);
 	free(pcb->pcb_sflagv);

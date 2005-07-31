@@ -288,10 +288,10 @@ provider_probe_list:
 
 provider_probe:
 		DT_KEY_PROBE DT_TOK_IDENT function DT_TOK_COLON function ';' {
-			$$ = dt_node_probe($2, $3, $5);
+			$$ = dt_node_probe($2, 2, $3, $5);
 		}
 	|	DT_KEY_PROBE DT_TOK_IDENT function ';' {
-			$$ = dt_node_probe($2, $3, NULL);
+			$$ = dt_node_probe($2, 1, $3, NULL);
 		}
 	;
 	

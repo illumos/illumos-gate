@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,26 +28,18 @@
 MODULE = dtrace.so
 MDBTGT = kvm
 
-MODSRCS = dtrace.c
+MODSRCS = dtrace.c dof.c dof_names.c
 
 include ../../../../Makefile.cmd
 include ../../Makefile.ia32
 include ../../../Makefile.module
 
-#
-# The dtrace dmod isn't currently built for kmdb.
-#
 MODULE_BUILD_TYPE = mdb
+MODSRCS_DIR = ../../../common/modules/dtrace
 
-#
-# This is unfortunately necessarily to be able to include mdb_param.h.
-# See the optimistic comment in genunix's Makefile about how this is a
-# "temporary" kludge.
-#
 CPPFLAGS += -I$(SRC)/uts/i86pc
-
-#
-# Until mdb itself links with libdtrace.so, the dtrace.so module needs to
-# pull in libdtrace.so.
-#
 LDLIBS	+= -ldtrace -lm
+CLEANFILES += dof_names.c
+
+dof_names.c: $(MODSRCS_DIR)/mkdof.sh $(SRC)/uts/common/sys/dtrace.h
+	sh $(MODSRCS_DIR)/mkdof.sh < $(SRC)/uts/common/sys/dtrace.h > $@

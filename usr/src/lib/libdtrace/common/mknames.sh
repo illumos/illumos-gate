@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -25,22 +26,28 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-MODULE = dtrace.so
-MDBTGT = kvm
+echo "\
+/*\n\
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.\n\
+ * Use is subject to license terms.\n\
+ */\n\
+\n\
+#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n\
+\n\
+#include <dtrace.h>\n\
+\n\
+/*ARGSUSED*/
+const char *\n\
+dtrace_subrstr(dtrace_hdl_t *dtp, int subr)\n\
+{\n\
+	switch (subr) {"
 
-MODSRCS = dtrace.c dof.c dof_names.c
+nawk '
+/^#define[ 	]*DIF_SUBR_/ && $2 != "DIF_SUBR_MAX" {
+	printf("\tcase %s: return (\"%s\");\n", $2, tolower(substr($2, 10)));
+}'
 
-include ../../../../Makefile.cmd
-include ../../../../Makefile.cmd.64
-include ../../Makefile.amd64
-include ../../../Makefile.module
-
-MODULE_BUILD_TYPE = mdb
-MODSRCS_DIR = ../../../common/modules/dtrace
-
-CPPFLAGS += -I$(SRC)/uts/i86pc
-LDLIBS	+= -ldtrace -lm
-CLEANFILES += dof_names.c
-
-dof_names.c: $(MODSRCS_DIR)/mkdof.sh $(SRC)/uts/common/sys/dtrace.h
-	sh $(MODSRCS_DIR)/mkdof.sh < $(SRC)/uts/common/sys/dtrace.h > $@
+echo "\
+	default: return (\"unknown\");\n\
+	}\n\
+}"

@@ -103,6 +103,7 @@
 #undef	_POSIX_PTHREAD_SEMANTICS
 
 #include <dt_module.h>
+#include <dt_program.h>
 #include <dt_provider.h>
 #include <dt_printf.h>
 #include <dt_pid.h>
@@ -292,19 +293,17 @@ dt_stmt_append(dtrace_stmtdesc_t *sdp, const dt_node_t *dnp)
 static void
 dt_action_difconst(dtrace_actdesc_t *ap, uint_t id, dtrace_actkind_t kind)
 {
-	dtrace_difo_t *dp = malloc(sizeof (dtrace_difo_t));
+	dtrace_hdl_t *dtp = yypcb->pcb_hdl;
+	dtrace_difo_t *dp = dt_zalloc(dtp, sizeof (dtrace_difo_t));
 
 	if (dp == NULL)
 		longjmp(yypcb->pcb_jmpbuf, EDT_NOMEM);
 
-	bzero(dp, sizeof (dtrace_difo_t));
-	dtrace_difo_hold(dp);
-
-	dp->dtdo_buf = malloc(sizeof (dif_instr_t) * 2);
-	dp->dtdo_inttab = malloc(sizeof (uint64_t));
+	dp->dtdo_buf = dt_alloc(dtp, sizeof (dif_instr_t) * 2);
+	dp->dtdo_inttab = dt_alloc(dtp, sizeof (uint64_t));
 
 	if (dp->dtdo_buf == NULL || dp->dtdo_inttab == NULL) {
-		dtrace_difo_release(dp);
+		dt_difo_free(dtp, dp);
 		longjmp(yypcb->pcb_jmpbuf, EDT_NOMEM);
 	}
 
@@ -606,7 +605,7 @@ dt_action_printflike(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp,
 			str = DT_FREOPEN_RESTORE;
 	}
 
-	sdp->dtsd_fmtdata = dt_printf_create(yypcb->pcb_hdl, str);
+	sdp->dtsd_fmtdata = dt_printf_create(dtp, str);
 
 	dt_printf_validate(sdp->dtsd_fmtdata, DT_PRINTF_EXACTLEN,
 	    dnp->dn_ident, 1, DTRACEACT_AGGREGATION, arg1);
@@ -615,19 +614,17 @@ dt_action_printflike(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp,
 		dif_instr_t *dbuf;
 		dtrace_difo_t *dp;
 
-		if ((dbuf = malloc(sizeof (dif_instr_t))) == NULL ||
-		    (dp = malloc(sizeof (dtrace_difo_t))) == NULL) {
-			free(dbuf);
+		if ((dbuf = dt_alloc(dtp, sizeof (dif_instr_t))) == NULL ||
+		    (dp = dt_zalloc(dtp, sizeof (dtrace_difo_t))) == NULL) {
+			dt_free(dtp, dbuf);
 			longjmp(yypcb->pcb_jmpbuf, EDT_NOMEM);
 		}
 
 		dbuf[0] = DIF_INSTR_RET(DIF_REG_R0); /* ret %r0 */
 
-		bzero(dp, sizeof (dtrace_difo_t));
 		dp->dtdo_buf = dbuf;
 		dp->dtdo_len = 1;
 		dp->dtdo_rtype = dt_int_rtype;
-		dp->dtdo_refcnt = 1;
 
 		ap = dt_stmt_action(dtp, sdp);
 		ap->dtad_difo = dp;
@@ -1146,7 +1143,7 @@ dt_compile_one_clause(dtrace_hdl_t *dtp, dt_node_t *cnp, dt_node_t *pnp)
 	if (DT_TREEDUMP_PASS(dtp, 2))
 		dt_node_printr(cnp, stderr, 0);
 
-	if ((edp = dtrace_ecbdesc_create(dtp, pnp->dn_desc)) == NULL)
+	if ((edp = dt_ecbdesc_create(dtp, pnp->dn_desc)) == NULL)
 		longjmp(yypcb->pcb_jmpbuf, EDT_NOMEM);
 
 	assert(yypcb->pcb_ecbdesc == NULL);
@@ -1189,7 +1186,7 @@ dt_compile_one_clause(dtrace_hdl_t *dtp, dt_node_t *cnp, dt_node_t *pnp)
 	}
 
 	assert(yypcb->pcb_ecbdesc == edp);
-	dtrace_ecbdesc_release(edp);
+	dt_ecbdesc_release(dtp, edp);
 	dt_endcontext(dtp);
 	yypcb->pcb_ecbdesc = NULL;
 }
@@ -1201,6 +1198,19 @@ dt_compile_clause(dtrace_hdl_t *dtp, dt_node_t *cnp)
 
 	for (pnp = cnp->dn_pdescs; pnp != NULL; pnp = pnp->dn_list)
 		dt_compile_one_clause(dtp, cnp, pnp);
+}
+
+static void
+dt_compile_xlator(dt_node_t *dnp)
+{
+	dt_xlator_t *dxp = dnp->dn_xlator;
+	dt_node_t *mnp;
+
+	for (mnp = dnp->dn_members; mnp != NULL; mnp = mnp->dn_list) {
+		assert(dxp->dx_membdif[mnp->dn_membid] == NULL);
+		dt_cg(yypcb, mnp);
+		dxp->dx_membdif[mnp->dn_membid] = dt_as(yypcb);
+	}
 }
 
 void
@@ -1539,7 +1549,7 @@ dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
 			dt_dprintf("skipping library: %s\n",
 			    dtrace_errmsg(dtp, dtrace_errno(dtp)));
 		} else
-			dtrace_program_destroy(dtp, pgp);
+			dt_program_destroy(dtp, pgp);
 	}
 
 	(void) closedir(dirp);
@@ -1671,7 +1681,7 @@ dt_compile(dtrace_hdl_t *dtp, int context, dtrace_probespec_t pspec, void *arg,
 		    !(yypcb->pcb_cflags & DTRACE_C_EMPTY))
 			xyerror(D_EMPTY, "empty D program translation unit\n");
 
-		if ((yypcb->pcb_prog = dtrace_program_create(dtp)) == NULL)
+		if ((yypcb->pcb_prog = dt_program_create(dtp)) == NULL)
 			longjmp(yypcb->pcb_jmpbuf, dtrace_errno(dtp));
 
 		for (; dnp != NULL; dnp = dnp->dn_list) {
@@ -1679,13 +1689,22 @@ dt_compile(dtrace_hdl_t *dtp, int context, dtrace_probespec_t pspec, void *arg,
 			case DT_NODE_CLAUSE:
 				dt_compile_clause(dtp, dnp);
 				break;
+			case DT_NODE_XLATOR:
+				if (dtp->dt_xlatemode == DT_XL_DYNAMIC)
+					dt_compile_xlator(dnp);
+				break;
 			case DT_NODE_PROVIDER:
 				(void) dt_node_cook(dnp, DT_IDFLG_REF);
 				break;
 			}
 		}
 
-		rv = pcb.pcb_prog;
+		yypcb->pcb_prog->dp_xrefs = yypcb->pcb_asxrefs;
+		yypcb->pcb_prog->dp_xrefslen = yypcb->pcb_asxreflen;
+		yypcb->pcb_asxrefs = NULL;
+		yypcb->pcb_asxreflen = 0;
+
+		rv = yypcb->pcb_prog;
 		break;
 
 	case DT_CTX_DEXPR:
@@ -1758,36 +1777,4 @@ dtrace_type_fcompile(dtrace_hdl_t *dtp, FILE *fp, dtrace_typeinfo_t *dtt)
 	(void) dt_compile(dtp, DT_CTX_DTYPE,
 	    DTRACE_PROBESPEC_NONE, dtt, 0, 0, NULL, fp, NULL);
 	return (dtp->dt_errno ? -1 : 0);
-}
-
-dtrace_difo_t *
-dtrace_difo_create(dtrace_hdl_t *dtp, const char *s)
-{
-	return (dt_compile(dtp, DT_CTX_DEXPR,
-	    DTRACE_PROBESPEC_NONE, NULL, 0, 0, NULL, NULL, s));
-}
-
-void
-dtrace_difo_hold(dtrace_difo_t *dp)
-{
-	dp->dtdo_refcnt++;
-	assert(dp->dtdo_refcnt != 0);
-}
-
-void
-dtrace_difo_release(dtrace_difo_t *dp)
-{
-	assert(dp->dtdo_refcnt != 0);
-
-	if (--dp->dtdo_refcnt != 0)
-		return;
-
-	free(dp->dtdo_buf);
-	free(dp->dtdo_inttab);
-	free(dp->dtdo_strtab);
-	free(dp->dtdo_vartab);
-	free(dp->dtdo_kreltab);
-	free(dp->dtdo_ureltab);
-
-	free(dp);
 }

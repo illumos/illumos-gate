@@ -61,6 +61,8 @@ f none usr/lib/llib-ldtrace 644 root bin
 f none usr/lib/llib-ldtrace.ln 644 root bin
 d none usr/lib/mdb 755 root sys
 d none usr/lib/mdb/kvm 755 root sys
+d none usr/lib/mdb/raw 755 root sys
+f none usr/lib/mdb/raw/dof.so 555 root sys
 d none usr/sbin 755 root bin
 l none usr/sbin/dtrace=../../usr/lib/isaexec
 l none usr/sbin/intrstat=../../usr/lib/isaexec

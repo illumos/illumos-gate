@@ -546,6 +546,7 @@ if (yypcb->pcb_token != 0) {
 <S0>"\\"\n	; /* discard */
 <S0>.		yyerror("syntax error near \"%c\"\n", yytext[0]);
 
+<S1>"/*"	yyerror("/* encountered inside a comment\n");
 <S1>"*/"	BEGIN(yypcb->pcb_cstate);
 <S1>.|\n	; /* discard */
 

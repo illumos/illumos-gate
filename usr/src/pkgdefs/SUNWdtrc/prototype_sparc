@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,6 +31,8 @@ d none usr/lib/dtrace/64 755 root bin
 f none usr/lib/dtrace/64/drti.o 644 root bin
 d none usr/lib/mdb/kvm/sparcv9 755 root sys
 f none usr/lib/mdb/kvm/sparcv9/dtrace.so 555 root sys
+d none usr/lib/mdb/raw/sparcv9 755 root sys
+f none usr/lib/mdb/raw/sparcv9/dof.so 555 root sys
 d none usr/lib/sparcv9 755 root bin
 f none usr/lib/sparcv9/libdtrace.so.1 755 root bin
 s none usr/lib/sparcv9/libdtrace.so=libdtrace.so.1
@@ -42,4 +44,3 @@ f none usr/sbin/sparcv9/dtrace 555 root bin
 f none usr/sbin/sparcv9/intrstat 555 root bin
 f none usr/sbin/sparcv9/lockstat 555 root bin
 f none usr/sbin/sparcv9/plockstat 555 root bin
-

@@ -427,6 +427,25 @@ dt_opt_tregs(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 	return (0);
 }
 
+/*ARGSUSED*/
+static int
+dt_opt_xlate(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
+{
+	if (arg == NULL)
+		return (dt_set_errno(dtp, EDT_BADOPTVAL));
+
+	if (strcmp(arg, "dynamic") == 0)
+		dtp->dt_xlatemode = DT_XL_DYNAMIC;
+	else if (strcmp(arg, "static") == 0)
+		dtp->dt_xlatemode = DT_XL_STATIC;
+	else
+		return (dt_set_errno(dtp, EDT_BADOPTVAL));
+
+	return (0);
+}
+
+/*ARGSUSED*/
+
 static int
 dt_opt_cflags(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 {
@@ -798,6 +817,7 @@ static const dt_option_t _dtrace_ctoptions[] = {
 	{ "iregs", dt_opt_iregs },
 	{ "kdefs", dt_opt_invcflags, DTRACE_C_KNODEF },
 	{ "knodefs", dt_opt_cflags, DTRACE_C_KNODEF },
+	{ "late", dt_opt_xlate },
 	{ "lazyload", dt_opt_lazyload },
 	{ "ldpath", dt_opt_ld_path },
 	{ "libdir", dt_opt_libdir },

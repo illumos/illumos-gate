@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,6 +175,8 @@ Pscantext(struct ps_prochandle *P)
 			nbytes -= sizeof (instr_t);
 		}
 	}
+
+	free(prbuf);
 
 	if ((P->sysaddr = sysaddr) != 0)
 		return (0);

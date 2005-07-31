@@ -894,7 +894,7 @@ dt_node_is_dynamic(const dt_node_t *dnp)
 	if (dnp->dn_kind == DT_NODE_VAR &&
 	    (dnp->dn_ident->di_flags & DT_IDFLG_INLINE)) {
 		const dt_idnode_t *inp = dnp->dn_ident->di_iarg;
-		return (dt_node_is_dynamic(inp->din_root));
+		return (inp->din_root ? dt_node_is_dynamic(inp->din_root) : 0);
 	}
 
 	return (dnp->dn_ctfp == DT_DYN_CTFP(yypcb->pcb_hdl) &&
@@ -1250,7 +1250,8 @@ dt_node_ident(char *name)
 	    (idp->di_flags & DT_IDFLG_INLINE)) {
 		dt_idnode_t *inp = idp->di_iarg;
 
-		if (inp->din_root->dn_kind == DT_NODE_INT) {
+		if (inp->din_root != NULL &&
+		    inp->din_root->dn_kind == DT_NODE_INT) {
 			free(name);
 
 			dnp = dt_node_alloc(DT_NODE_INT);
@@ -2339,6 +2340,7 @@ dt_node_xlator(dt_decl_t *ddp, dt_decl_t *sdp, char *name, dt_node_t *members)
 	dt_xlator_t *dxp;
 	dt_node_t *dnp;
 	int edst, esrc;
+	uint_t kind;
 
 	char n1[DT_TYPE_NAMELEN];
 	char n2[DT_TYPE_NAMELEN];
@@ -2367,6 +2369,19 @@ dt_node_xlator(dt_decl_t *ddp, dt_decl_t *sdp, char *name, dt_node_t *members)
 		    dt_node_type_name(&dn, n2, sizeof (n2)));
 	}
 
+	kind = ctf_type_kind(dst.dtt_ctfp,
+	    ctf_type_resolve(dst.dtt_ctfp, dst.dtt_type));
+
+	if (kind == CTF_K_FORWARD) {
+		xyerror(D_XLATE_SOU, "incomplete struct/union/enum %s\n",
+		    dt_type_name(dst.dtt_ctfp, dst.dtt_type, n1, sizeof (n1)));
+	}
+
+	if (kind != CTF_K_STRUCT && kind != CTF_K_UNION) {
+		xyerror(D_XLATE_SOU,
+		    "translator output type must be a struct or union\n");
+	}
+
 	dxp = dt_xlator_create(dtp, &src, &dst, name, members, yypcb->pcb_list);
 	yybegin(YYS_CLAUSE);
 	free(name);
@@ -2382,7 +2397,7 @@ dt_node_xlator(dt_decl_t *ddp, dt_decl_t *sdp, char *name, dt_node_t *members)
 }
 
 dt_node_t *
-dt_node_probe(char *s, dt_node_t *nargs, dt_node_t *xargs)
+dt_node_probe(char *s, int protoc, dt_node_t *nargs, dt_node_t *xargs)
 {
 	dtrace_hdl_t *dtp = yypcb->pcb_hdl;
 	int nargc, xargc;
@@ -2428,7 +2443,7 @@ dt_node_probe(char *s, dt_node_t *nargs, dt_node_t *xargs)
 	}
 
 	if (dnp->dn_ident == NULL || dt_probe_create(dtp,
-	    dnp->dn_ident, nargs, nargc, xargs, xargc) == NULL)
+	    dnp->dn_ident, protoc, nargs, nargc, xargs, xargc) == NULL)
 		longjmp(yypcb->pcb_jmpbuf, EDT_NOMEM);
 
 	return (dnp);
@@ -2439,6 +2454,7 @@ dt_node_provider(char *name, dt_node_t *probes)
 {
 	dtrace_hdl_t *dtp = yypcb->pcb_hdl;
 	dt_node_t *dnp = dt_node_alloc(DT_NODE_PROVIDER);
+	dt_node_t *lnp;
 
 	dnp->dn_provname = name;
 	dnp->dn_probes = probes;
@@ -2467,22 +2483,18 @@ dt_node_provider(char *name, dt_node_t *probes)
 		dnp->dn_provider->pv_flags |= DT_PROVIDER_INTF;
 
 	/*
-	 * If the provider is being redeclared, put the pcb_list back on to the
-	 * hold list (undo the effect of YYS_DEFINE on allocation).  Otherwise
-	 * store all parse nodes created since we consumed the DT_KEY_PROVIDER
+	 * Store all parse nodes created since we consumed the DT_KEY_PROVIDER
 	 * token with the provider and then restore our lexing state to CLAUSE.
+	 * Note that if dnp->dn_provred is true, we may end up storing dups of
+	 * a provider's interface and implementation: we eat this space because
+	 * the implementation will likely need to redeclare probe members, and
+	 * therefore may result in those member nodes becoming persistent.
 	 */
-	if (dnp->dn_provred) {
-		while (yypcb->pcb_list != NULL) {
-			dt_node_t *pnp = yypcb->pcb_list;
-			yypcb->pcb_list = pnp->dn_link;
-			pnp->dn_link = yypcb->pcb_hold;
-			yypcb->pcb_hold = pnp;
-		}
-	} else {
-		assert(dnp->dn_provider->pv_nodes == NULL);
-		dnp->dn_provider->pv_nodes = yypcb->pcb_list;
-	}
+	for (lnp = yypcb->pcb_list; lnp->dn_link != NULL; lnp = lnp->dn_link)
+		continue; /* skip to end of allocation list */
+
+	lnp->dn_link = dnp->dn_provider->pv_nodes;
+	dnp->dn_provider->pv_nodes = yypcb->pcb_list;
 
 	yybegin(YYS_CLAUSE);
 	return (dnp);
@@ -4126,21 +4138,6 @@ dt_cook_xlator(dt_node_t *dnp, uint_t idflags)
 
 	dtrace_attribute_t attr = _dtrace_maxattr;
 	ctf_membinfo_t ctm;
-	ctf_id_t type;
-	uint_t kind;
-
-	type = ctf_type_resolve(dxp->dx_dst_ctfp, dxp->dx_dst_type);
-	kind = ctf_type_kind(dxp->dx_dst_ctfp, type);
-
-	if (kind == CTF_K_FORWARD) {
-		xyerror(D_XLATE_SOU, "incomplete struct/union/enum %s\n",
-		    dt_type_name(dxp->dx_dst_ctfp, type, n1, sizeof (n1)));
-	}
-
-	if (kind != CTF_K_STRUCT && kind != CTF_K_UNION) {
-		xyerror(D_XLATE_SOU,
-		    "translator output type must be a struct or union\n");
-	}
 
 	/*
 	 * Before cooking each translator member, we push a reference to the
@@ -4220,10 +4217,9 @@ dt_node_provider_cmp_argv(dt_provider_t *pvp, dt_node_t *pnp, const char *kind,
 
 /*
  * Compare a new probe declaration with an existing probe definition (either
- * from a previous declaration or cached from the kernel).  If the new decl has
- * both an input and output parameter list, compare both lists.  If the new
- * decl has only one list, only compare the output lists (i.e. assume the new
- * declaration is a probe interface and does not specify implementation).
+ * from a previous declaration or cached from the kernel).  If the existing
+ * definition and declaration both have an input and output parameter list,
+ * compare both lists.  Otherwise compare only the output parameter lists.
  */
 static void
 dt_node_provider_cmp(dt_provider_t *pvp, dt_node_t *pnp,
@@ -4232,9 +4228,64 @@ dt_node_provider_cmp(dt_provider_t *pvp, dt_node_t *pnp,
 	dt_node_provider_cmp_argv(pvp, pnp, "output",
 	    old->pr_xargc, old->pr_xargs, new->pr_xargc, new->pr_xargs);
 
-	if (new->pr_nargs != new->pr_xargs) {
+	if (old->pr_nargs != old->pr_xargs && new->pr_nargs != new->pr_xargs) {
 		dt_node_provider_cmp_argv(pvp, pnp, "input",
 		    old->pr_nargc, old->pr_nargs, new->pr_nargc, new->pr_nargs);
+	}
+
+	if (old->pr_nargs == old->pr_xargs && new->pr_nargs != new->pr_xargs) {
+		if (pvp->pv_flags & DT_PROVIDER_IMPL) {
+			dnerror(pnp, D_PROV_INCOMPAT,
+			    "provider interface mismatch: %s\n"
+			    "\t current: probe %s:%s has an output prototype\n"
+			    "\tprevious: probe %s:%s has no output prototype\n",
+			    pvp->pv_desc.dtvd_name, pvp->pv_desc.dtvd_name,
+			    new->pr_ident->di_name, pvp->pv_desc.dtvd_name,
+			    old->pr_ident->di_name);
+		}
+
+		if (old->pr_ident->di_gen == yypcb->pcb_hdl->dt_gen)
+			old->pr_ident->di_flags |= DT_IDFLG_ORPHAN;
+
+		dt_idhash_delete(pvp->pv_probes, old->pr_ident);
+		dt_probe_declare(pvp, new);
+	}
+}
+
+static void
+dt_cook_probe(dt_node_t *dnp, dt_provider_t *pvp)
+{
+	dtrace_hdl_t *dtp = yypcb->pcb_hdl;
+	dt_probe_t *prp = dnp->dn_ident->di_data;
+
+	dt_xlator_t *dxp;
+	uint_t i;
+
+	char n1[DT_TYPE_NAMELEN];
+	char n2[DT_TYPE_NAMELEN];
+
+	if (prp->pr_nargs == prp->pr_xargs)
+		return;
+
+	for (i = 0; i < prp->pr_xargc; i++) {
+		dt_node_t *xnp = prp->pr_xargv[i];
+		dt_node_t *nnp = prp->pr_nargv[prp->pr_mapping[i]];
+
+		if ((dxp = dt_xlator_lookup(dtp,
+		    nnp, xnp, DT_XLATE_FUZZY)) != NULL) {
+			if (dt_provider_xref(dtp, pvp, dxp->dx_id) != 0)
+				longjmp(yypcb->pcb_jmpbuf, EDT_NOMEM);
+			continue;
+		}
+
+		if (dt_node_is_argcompat(nnp, xnp))
+			continue; /* no translator defined and none required */
+
+		dnerror(dnp, D_PROV_PRXLATOR, "translator for %s:%s output "
+		    "argument #%u from %s to %s is not defined\n",
+		    pvp->pv_desc.dtvd_name, dnp->dn_ident->di_name, i + 1,
+		    dt_node_type_name(nnp, n1, sizeof (n1)),
+		    dt_node_type_name(xnp, n2, sizeof (n2)));
 	}
 }
 
@@ -4271,6 +4322,8 @@ dt_cook_provider(dt_node_t *dnp, uint_t idflags)
 			    dnp->dn_provname, probename);
 		} else
 			dt_probe_declare(pvp, pnp->dn_ident->di_data);
+
+		dt_cook_probe(pnp, pvp);
 	}
 
 	return (dnp);
@@ -4397,10 +4450,16 @@ dt_node_link(dt_node_t *lp, dt_node_t *rp)
 	return (lp);
 }
 
+/*
+ * Compute the DOF dtrace_diftype_t representation of a node's type.  This is
+ * called from a variety of places in the library so it cannot assume yypcb
+ * is valid: any references to handle-specific data must be made through 'dtp'.
+ */
 void
-dt_node_diftype(const dt_node_t *dnp, dtrace_diftype_t *tp)
+dt_node_diftype(dtrace_hdl_t *dtp, const dt_node_t *dnp, dtrace_diftype_t *tp)
 {
-	if (dt_node_is_string(dnp)) {
+	if (dnp->dn_ctfp == DT_STR_CTFP(dtp) &&
+	    dnp->dn_type == DT_STR_TYPE(dtp)) {
 		tp->dtdt_kind = DIF_TYPE_STRING;
 		tp->dtdt_ckind = CTF_K_UNKNOWN;
 	} else {

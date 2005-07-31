@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -25,22 +26,27 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-MODULE = dtrace.so
-MDBTGT = kvm
+echo "\
+/*\n\
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.\n\
+ * Use is subject to license terms.\n\
+ */\n\
+\n\
+#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n\
+\n\
+#include <sys/dtrace.h>\n\
+\n\
+const char *\n\
+dof_sec_name(uint32_t type)\n\
+{\n\
+	switch (type) {"
 
-MODSRCS = dtrace.c dof.c dof_names.c
+pattern='^#define[	 ]DOF_SECT_\([A-Z0-9_]*\)[	 ]*.*$'
+replace='	case DOF_SECT_\1: return ("\1");'
 
-include ../../../../Makefile.cmd
-include ../../../../Makefile.cmd.64
-include ../../Makefile.amd64
-include ../../../Makefile.module
+sed -n "s/$pattern/$replace/p"
 
-MODULE_BUILD_TYPE = mdb
-MODSRCS_DIR = ../../../common/modules/dtrace
-
-CPPFLAGS += -I$(SRC)/uts/i86pc
-LDLIBS	+= -ldtrace -lm
-CLEANFILES += dof_names.c
-
-dof_names.c: $(MODSRCS_DIR)/mkdof.sh $(SRC)/uts/common/sys/dtrace.h
-	sh $(MODSRCS_DIR)/mkdof.sh < $(SRC)/uts/common/sys/dtrace.h > $@
+echo "\
+	default: return (NULL);\n\
+	}\n\
+}"

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,13 +29,14 @@
 # subdirectory will need to build.
 # 
 COMMON_MODULES_PROC = \
-	mdb_ds \
-	mdb_test \
+	dof \
 	libc \
 	libnvpair \
 	libsysevent \
 	libumem \
-	libuutil
+	libuutil \
+	mdb_ds \
+	mdb_test
 
 #
 # MDB modules used for debugging user processes which are only 32-bit

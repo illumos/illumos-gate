@@ -58,6 +58,7 @@ dt_provider_t *
 dt_provider_lookup(dtrace_hdl_t *dtp, const char *name)
 {
 	uint_t h = dt_strtab_hash(name, NULL) % dtp->dt_provbuckets;
+	dtrace_providerdesc_t desc;
 	dt_provider_t *pvp;
 
 	for (pvp = dtp->dt_provs[h]; pvp != NULL; pvp = pvp->pv_next) {
@@ -70,15 +71,18 @@ dt_provider_lookup(dtrace_hdl_t *dtp, const char *name)
 		return (NULL);
 	}
 
-	if ((pvp = dt_provider_create(dtp, name)) == NULL)
-		return (NULL); /* dt_errno is set for us */
+	bzero(&desc, sizeof (desc));
+	(void) strlcpy(desc.dtvd_name, name, DTRACE_PROVNAMELEN);
 
-	if (dt_ioctl(dtp, DTRACEIOC_PROVIDER, &pvp->pv_desc) == -1) {
+	if (dt_ioctl(dtp, DTRACEIOC_PROVIDER, &desc) == -1) {
 		(void) dt_set_errno(dtp, errno == ESRCH ? EDT_NOPROV : errno);
-		dt_provider_destroy(dtp, pvp);
 		return (NULL);
 	}
 
+	if ((pvp = dt_provider_create(dtp, name)) == NULL)
+		return (NULL); /* dt_errno is set for us */
+
+	bcopy(&desc, &pvp->pv_desc, sizeof (desc));
 	pvp->pv_flags |= DT_PROVIDER_IMPL;
 	return (pvp);
 }
@@ -136,7 +140,33 @@ dt_provider_destroy(dtrace_hdl_t *dtp, dt_provider_t *pvp)
 		dt_idhash_destroy(pvp->pv_probes);
 
 	dt_node_link_free(&pvp->pv_nodes);
+	dt_free(dtp, pvp->pv_xrefs);
 	dt_free(dtp, pvp);
+}
+
+int
+dt_provider_xref(dtrace_hdl_t *dtp, dt_provider_t *pvp, id_t id)
+{
+	size_t oldsize = BT_SIZEOFMAP(pvp->pv_xrmax);
+	size_t newsize = BT_SIZEOFMAP(dtp->dt_xlatorid);
+
+	assert(id >= 0 && id < dtp->dt_xlatorid);
+
+	if (newsize > oldsize) {
+		ulong_t *xrefs = dt_zalloc(dtp, newsize);
+
+		if (xrefs == NULL)
+			return (-1);
+
+		bcopy(pvp->pv_xrefs, xrefs, oldsize);
+		dt_free(dtp, pvp->pv_xrefs);
+
+		pvp->pv_xrefs = xrefs;
+		pvp->pv_xrmax = dtp->dt_xlatorid;
+	}
+
+	BT_SET(pvp->pv_xrefs, id);
+	return (0);
 }
 
 static uint8_t
@@ -258,7 +288,8 @@ dt_probe_discover(dt_provider_t *pvp, const dtrace_probedesc_t *pdp)
 		return (NULL);
 	}
 
-	if ((prp = dt_probe_create(dtp, idp, nargs, nc, xargs, xc)) == NULL) {
+	if ((prp = dt_probe_create(dtp, idp, 2,
+	    nargs, nc, xargs, xc)) == NULL) {
 		dt_ident_destroy(idp);
 		return (NULL);
 	}
@@ -356,7 +387,7 @@ dt_probe_lookup(dt_provider_t *pvp, const char *s)
 }
 
 dt_probe_t *
-dt_probe_create(dtrace_hdl_t *dtp, dt_ident_t *idp,
+dt_probe_create(dtrace_hdl_t *dtp, dt_ident_t *idp, int protoc,
     dt_node_t *nargs, uint_t nargc, dt_node_t *xargs, uint_t xargc)
 {
 	dt_module_t *dmp;
@@ -367,7 +398,14 @@ dt_probe_create(dtrace_hdl_t *dtp, dt_ident_t *idp,
 	assert(idp->di_kind == DT_IDENT_PROBE);
 	assert(idp->di_data == NULL);
 
-	if (xargs == NULL) {
+	/*
+	 * If only a single prototype is given, set xargc/s to nargc/s to
+	 * simplify subsequent use.  Note that we can have one or both of nargs
+	 * and xargs be specified but set to NULL, indicating a void prototype.
+	 */
+	if (protoc < 2) {
+		assert(xargs == NULL);
+		assert(xargc == 0);
 		xargs = nargs;
 		xargc = nargc;
 	}
@@ -519,6 +557,49 @@ dt_probe_define(dt_provider_t *pvp, dt_probe_t *prp,
 	return (0);
 }
 
+/*
+ * Lookup the dynamic translator type tag for the specified probe argument and
+ * assign the type to the specified node.  If the type is not yet defined, add
+ * it to the "D" module's type container as a typedef for an unknown type.
+ */
+dt_node_t *
+dt_probe_tag(dt_probe_t *prp, uint_t argn, dt_node_t *dnp)
+{
+	dtrace_hdl_t *dtp = prp->pr_pvp->pv_hdl;
+	dtrace_typeinfo_t dtt;
+	size_t len;
+	char *tag;
+
+	len = snprintf(NULL, 0, "__dtrace_%s___%s_arg%u",
+	    prp->pr_pvp->pv_desc.dtvd_name, prp->pr_name, argn);
+
+	tag = alloca(len + 1);
+
+	(void) snprintf(tag, len + 1, "__dtrace_%s___%s_arg%u",
+	    prp->pr_pvp->pv_desc.dtvd_name, prp->pr_name, argn);
+
+	if (dtrace_lookup_by_type(dtp, DTRACE_OBJ_DDEFS, tag, &dtt) != 0) {
+		dtt.dtt_object = DTRACE_OBJ_DDEFS;
+		dtt.dtt_ctfp = DT_DYN_CTFP(dtp);
+		dtt.dtt_type = ctf_add_typedef(DT_DYN_CTFP(dtp),
+		    CTF_ADD_ROOT, tag, DT_DYN_TYPE(dtp));
+
+		if (dtt.dtt_type == CTF_ERR ||
+		    ctf_update(dtt.dtt_ctfp) == CTF_ERR) {
+			xyerror(D_UNKNOWN, "cannot define type %s: %s\n",
+			    tag, ctf_errmsg(ctf_errno(dtt.dtt_ctfp)));
+		}
+	}
+
+	bzero(dnp, sizeof (dt_node_t));
+	dnp->dn_kind = DT_NODE_TYPE;
+
+	dt_node_type_assign(dnp, dtt.dtt_ctfp, dtt.dtt_type);
+	dt_node_attr_assign(dnp, _dtrace_defattr);
+
+	return (dnp);
+}
+
 /*ARGSUSED*/
 static int
 dt_probe_desc(dtrace_hdl_t *dtp, const dtrace_probedesc_t *pdp, void *arg)
@@ -628,7 +709,16 @@ dt_probe_info(dtrace_hdl_t *dtp,
 			}
 		}
 
-		if ((prp = dt_probe_discover(pvp, &pd)) == NULL)
+		/*
+		 * If we matched a probe exported by dtrace(7D), then discover
+		 * the real attributes.  Otherwise grab the static declaration.
+		 */
+		if (pd.dtpd_id != DTRACE_IDNONE)
+			prp = dt_probe_discover(pvp, &pd);
+		else
+			prp = dt_probe_lookup(pvp, pd.dtpd_name);
+
+		if (prp == NULL)
 			return (NULL); /* dt_errno is set for us */
 	}
 

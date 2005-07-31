@@ -44,6 +44,7 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb.h>
 
+#include <sys/dtrace.h>
 #include <fcntl.h>
 
 typedef struct rf_data {
@@ -297,10 +298,20 @@ static const mdb_dcmd_t rf_dcmds[] = {
 	{ NULL }
 };
 
+static const struct rf_magic {
+	const char *rfm_str;
+	size_t rfm_len;
+	const char *rfm_mod;
+} rf_magic[] = {
+	{ DOF_MAG_STRING, DOF_MAG_STRLEN, "dof" },
+	{ NULL, 0, NULL }
+};
+
 static void
 rf_activate(mdb_tgt_t *t)
 {
 	rf_data_t *rf = t->t_data;
+	const struct rf_magic *m;
 	mdb_var_t *v;
 	off64_t size;
 
@@ -308,13 +319,29 @@ rf_activate(mdb_tgt_t *t)
 
 	/*
 	 * We set the legacy adb variable 'd' to be the size of the file (data
-	 * segment).  To get this value, we call seek() on the underlying
-	 * fdio.
+	 * segment).  To get this value, we call seek() on the underlying fdio.
 	 */
 	if (rf->r_object_fio != NULL) {
 		size = IOP_SEEK(rf->r_object_fio, 0, SEEK_END);
 		if ((v = mdb_nv_lookup(&mdb.m_nv, "d")) != NULL)
 			mdb_nv_set_value(v, size);
+	}
+
+	/*
+	 * Load any debugging support modules that match the file type, as
+	 * determined by our poor man's /etc/magic.  If many clients need
+	 * to use this feature, rf_magic[] should be computed dynamically.
+	 */
+	for (m = rf_magic; m->rfm_str != NULL; m++) {
+		char *buf = mdb_alloc(m->rfm_len, UM_SLEEP);
+
+		if (mdb_tgt_vread(t, buf, m->rfm_len, 0) == m->rfm_len &&
+		    bcmp(buf, m->rfm_str, m->rfm_len) == 0) {
+			(void) mdb_module_load(m->rfm_mod,
+			    MDB_MOD_LOCAL | MDB_MOD_SILENT);
+		}
+
+		mdb_free(buf, m->rfm_len);
 	}
 }
 

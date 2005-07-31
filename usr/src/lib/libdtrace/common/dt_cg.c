@@ -53,7 +53,7 @@ dt_cg_node_alloc(uint_t label, dif_instr_t instr)
 
 	dip->di_label = label;
 	dip->di_instr = instr;
-	dip->di_ident = NULL;
+	dip->di_extern = NULL;
 	dip->di_next = NULL;
 
 	return (dip);
@@ -102,7 +102,7 @@ dt_cg_xsetx(dt_irlist_t *dlp, dt_ident_t *idp, uint_t lbl, int reg, uint64_t x)
 	dt_irlist_append(dlp, dt_cg_node_alloc(lbl, instr));
 
 	if (idp != NULL)
-		dlp->dl_last->di_ident = idp;
+		dlp->dl_last->di_extern = idp;
 }
 
 static void
@@ -532,7 +532,7 @@ dt_cg_arglist(dt_ident_t *idp, dt_node_t *args,
 		uint_t op;
 		int reg;
 
-		dt_node_diftype(dnp, &t);
+		dt_node_diftype(yypcb->pcb_hdl, dnp, &t);
 
 		isp->dis_args[i].dn_reg = dnp->dn_reg; /* re-use register */
 		dt_cg_typecast(dnp, &isp->dis_args[i], dlp, drp);
@@ -1089,8 +1089,10 @@ dt_cg_asgn_op(dt_node_t *dnp, dt_irlist_t *dlp, dt_regset_t *drp)
 		dxp->dx_ident->di_flags &= ~DT_IDFLG_CGREG;
 		dxp->dx_ident->di_id = 0;
 
+		if (dnp->dn_right->dn_reg != -1)
+			dt_regset_free(drp, dnp->dn_right->dn_reg);
+
 		assert(dnp->dn_reg == dnp->dn_right->dn_reg);
-		dt_regset_free(drp, dnp->dn_right->dn_reg);
 		dnp->dn_reg = r1;
 	}
 
@@ -1207,6 +1209,7 @@ dt_cg_array_op(dt_node_t *dnp, dt_irlist_t *dlp, dt_regset_t *drp)
 {
 	dt_probe_t *prp = yypcb->pcb_probe;
 	uintmax_t saved = dnp->dn_args->dn_value;
+	dt_ident_t *idp = dnp->dn_ident;
 
 	dif_instr_t instr;
 	uint_t op;
@@ -1214,31 +1217,41 @@ dt_cg_array_op(dt_node_t *dnp, dt_irlist_t *dlp, dt_regset_t *drp)
 	int reg, n;
 
 	assert(dnp->dn_kind == DT_NODE_VAR);
-	assert(!(dnp->dn_ident->di_flags & DT_IDFLG_LOCAL));
+	assert(!(idp->di_flags & DT_IDFLG_LOCAL));
 
 	assert(dnp->dn_args->dn_kind == DT_NODE_INT);
 	assert(dnp->dn_args->dn_list == NULL);
 
 	/*
 	 * If this is a reference in the args[] array, temporarily modify the
-	 * array index according to the static argument mapping (if any).
+	 * array index according to the static argument mapping (if any),
+	 * unless the argument reference is provided by a dynamic translator.
+	 * If we're using a dynamic translator for args[], then just set dn_reg
+	 * to an invalid reg and return: DIF_OP_XLARG will fetch the arg later.
 	 */
-	if (dnp->dn_ident->di_id == DIF_VAR_ARGS)
+	if (idp->di_id == DIF_VAR_ARGS) {
+		if ((idp->di_kind == DT_IDENT_XLPTR ||
+		    idp->di_kind == DT_IDENT_XLSOU) &&
+		    dt_xlator_dynamic(idp->di_data)) {
+			dnp->dn_reg = -1;
+			return;
+		}
 		dnp->dn_args->dn_value = prp->pr_mapping[saved];
+	}
 
 	dt_cg_node(dnp->dn_args, dlp, drp);
 	dnp->dn_args->dn_value = saved;
 
 	dnp->dn_reg = dnp->dn_args->dn_reg;
 
-	if (dnp->dn_ident->di_flags & DT_IDFLG_TLS)
+	if (idp->di_flags & DT_IDFLG_TLS)
 		op = DIF_OP_LDTA;
 	else
 		op = DIF_OP_LDGA;
 
-	dnp->dn_ident->di_flags |= DT_IDFLG_DIFR;
+	idp->di_flags |= DT_IDFLG_DIFR;
 
-	instr = DIF_INSTR_LDA(op, dnp->dn_ident->di_id,
+	instr = DIF_INSTR_LDA(op, idp->di_id,
 	    dnp->dn_args->dn_reg, dnp->dn_reg);
 
 	dt_irlist_append(dlp, dt_cg_node_alloc(DT_LBL_NONE, instr));
@@ -1254,7 +1267,7 @@ dt_cg_array_op(dt_node_t *dnp, dt_irlist_t *dlp, dt_regset_t *drp)
 	 * 32-bit argument must be retrieved from the stack, it is possible
 	 * (and it some cases, likely) that the upper bits will be garbage.
 	 */
-	if (dnp->dn_ident->di_id != DIF_VAR_ARGS || !dt_node_is_scalar(dnp))
+	if (idp->di_id != DIF_VAR_ARGS || !dt_node_is_scalar(dnp))
 		return;
 
 	if ((size = dt_node_type_size(dnp)) == sizeof (uint64_t))
@@ -1590,6 +1603,40 @@ dt_cg_node(dt_node_t *dnp, dt_irlist_t *dlp, dt_regset_t *drp)
 		break;
 
 	case DT_TOK_XLATE:
+		/*
+		 * An xlate operator appears in either an XLATOR, indicating a
+		 * reference to a dynamic translator, or an OP2, indicating
+		 * use of the xlate operator in the user's program.  For the
+		 * dynamic case, generate an xlate opcode with a reference to
+		 * the corresponding member, pre-computed for us in dn_members.
+		 */
+		if (dnp->dn_kind == DT_NODE_XLATOR) {
+			dt_xlator_t *dxp = dnp->dn_xlator;
+
+			assert(dxp->dx_ident->di_flags & DT_IDFLG_CGREG);
+			assert(dxp->dx_ident->di_id != 0);
+
+			if ((dnp->dn_reg = dt_regset_alloc(drp)) == -1)
+				longjmp(yypcb->pcb_jmpbuf, EDT_NOREG);
+
+			if (dxp->dx_arg == -1) {
+				instr = DIF_INSTR_MOV(
+				    dxp->dx_ident->di_id, dnp->dn_reg);
+				dt_irlist_append(dlp,
+				    dt_cg_node_alloc(DT_LBL_NONE, instr));
+				op = DIF_OP_XLATE;
+			} else
+				op = DIF_OP_XLARG;
+
+			instr = DIF_INSTR_XLATE(op, 0, dnp->dn_reg);
+			dt_irlist_append(dlp,
+			    dt_cg_node_alloc(DT_LBL_NONE, instr));
+
+			dlp->dl_last->di_extern = dnp->dn_xmember;
+			break;
+		}
+
+		assert(dnp->dn_kind == DT_NODE_OP2);
 		dt_cg_node(dnp->dn_right, dlp, drp);
 		dnp->dn_reg = dnp->dn_right->dn_reg;
 		break;
@@ -1634,7 +1681,8 @@ dt_cg_node(dt_node_t *dnp, dt_irlist_t *dlp, dt_regset_t *drp)
 			dxp->dx_ident->di_flags &= ~DT_IDFLG_CGREG;
 			dxp->dx_ident->di_id = 0;
 
-			dt_regset_free(drp, dnp->dn_left->dn_reg);
+			if (dnp->dn_left->dn_reg != -1)
+				dt_regset_free(drp, dnp->dn_left->dn_reg);
 			break;
 		}
 
@@ -1855,6 +1903,7 @@ void
 dt_cg(dt_pcb_t *pcb, dt_node_t *dnp)
 {
 	dif_instr_t instr;
+	dt_xlator_t *dxp;
 
 	if (pcb->pcb_regs == NULL && (pcb->pcb_regs =
 	    dt_regset_create(pcb->pcb_hdl->dt_conf.dtc_difintregs)) == NULL)
@@ -1886,8 +1935,26 @@ dt_cg(dt_pcb_t *pcb, dt_node_t *dnp)
 		    "of dynamic type\n");
 	}
 
+	/*
+	 * If we're generating code for a translator body, assign the input
+	 * parameter to the first available register (i.e. caller passes %r1).
+	 */
+	if (dnp->dn_kind == DT_NODE_MEMBER) {
+		dxp = dnp->dn_membxlator;
+		dnp = dnp->dn_membexpr;
+
+		dxp->dx_ident->di_flags |= DT_IDFLG_CGREG;
+		dxp->dx_ident->di_id = dt_regset_alloc(pcb->pcb_regs);
+	}
+
 	dt_cg_node(dnp, &pcb->pcb_ir, pcb->pcb_regs);
 	instr = DIF_INSTR_RET(dnp->dn_reg);
 	dt_regset_free(pcb->pcb_regs, dnp->dn_reg);
 	dt_irlist_append(&pcb->pcb_ir, dt_cg_node_alloc(DT_LBL_NONE, instr));
+
+	if (dnp->dn_kind == DT_NODE_MEMBER) {
+		dt_regset_free(pcb->pcb_regs, dxp->dx_ident->di_id);
+		dxp->dx_ident->di_id = 0;
+		dxp->dx_ident->di_flags &= ~DT_IDFLG_CGREG;
+	}
 }

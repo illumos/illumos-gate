@@ -1347,8 +1347,10 @@ main(int argc, char *argv[])
 		for (i = 0; i < g_cmdc; i++)
 			exec_prog(&g_cmdv[i]);
 
-		if (done && !g_grabanon)
+		if (done && !g_grabanon) {
+			dtrace_close(g_dtp);
 			return (g_status);
+		}
 		break;
 
 	case DMODE_ANON:
@@ -1358,8 +1360,10 @@ main(int argc, char *argv[])
 		dof_prune(g_ofile); /* strip out any old DOF directives */
 		etcsystem_prune(); /* string out any forceload directives */
 
-		if (g_cmdc == 0)
+		if (g_cmdc == 0) {
+			dtrace_close(g_dtp);
 			return (g_status);
+		}
 
 		if ((g_ofp = fopen(g_ofile, "a")) == NULL)
 			fatal("failed to open output file '%s'", g_ofile);
@@ -1388,6 +1392,7 @@ main(int argc, char *argv[])
 		etcsystem_add();
 		error("run update_drv(1M) or reboot to enable changes\n");
 
+		dtrace_close(g_dtp);
 		return (g_status);
 
 	case DMODE_LINK:
@@ -1402,9 +1407,10 @@ main(int argc, char *argv[])
 
 			if (dtrace_program_link(g_dtp, NULL, DTRACE_D_PROBES,
 			    g_ofile, g_cmdc, objv) != 0)
-				dfatal("failed to link %s", g_ofile);
+				dfatal(NULL); /* dtrace_errmsg() only */
 		}
 
+		dtrace_close(g_dtp);
 		return (g_status);
 
 	case DMODE_LIST:
@@ -1420,6 +1426,7 @@ main(int argc, char *argv[])
 		if (g_cmdc == 0)
 			(void) dtrace_probe_iter(g_dtp, NULL, list_probe, NULL);
 
+		dtrace_close(g_dtp);
 		return (g_status);
 	}
 

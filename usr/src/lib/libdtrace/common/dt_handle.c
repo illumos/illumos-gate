@@ -31,9 +31,11 @@
 #include <strings.h>
 #include <errno.h>
 #include <unistd.h>
-#include <dt_impl.h>
 #include <assert.h>
 #include <alloca.h>
+
+#include <dt_impl.h>
+#include <dt_program.h>
 
 static const char _dt_errprog[] =
 "dtrace:::ERROR"

@@ -52,4 +52,5 @@ f none usr/lib/mdb/proc/libuutil.so 555 root sys
 f none usr/lib/mdb/proc/mdb_ds.so 555 root sys
 f none usr/lib/mdb/proc/svc.configd.so 555 root sys
 f none usr/lib/mdb/proc/svc.startd.so 555 root sys
+d none usr/lib/mdb/raw 755 root sys
 d none usr/platform 755 root sys

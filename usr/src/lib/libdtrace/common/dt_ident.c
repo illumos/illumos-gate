@@ -310,7 +310,7 @@ dt_idcook_args(dt_node_t *dnp, dt_ident_t *idp, int argc, dt_node_t *ap)
 	dtrace_hdl_t *dtp = yypcb->pcb_hdl;
 	dt_probe_t *prp = yypcb->pcb_probe;
 
-	dt_node_t *nnp, *xnp;
+	dt_node_t tag, *nnp, *xnp;
 	dt_xlator_t *dxp;
 	dt_ident_t *xidp;
 
@@ -349,8 +349,7 @@ dt_idcook_args(dt_node_t *dnp, dt_ident_t *idp, int argc, dt_node_t *ap)
 	}
 
 	/*
-	 * In order to support statically-defined KSDT translators, look up the
-	 * native and translated argument types for the representative probe.
+	 * Look up the native and translated argument types for the probe.
 	 * If no translation is needed, these will be the same underlying node.
 	 * If translation is needed, look up the appropriate translator.  Once
 	 * we have the appropriate node, create a new dt_ident_t for this node,
@@ -369,10 +368,11 @@ dt_idcook_args(dt_node_t *dnp, dt_ident_t *idp, int argc, dt_node_t *ap)
 		    "%s[%lld]\n", idp->di_name, (longlong_t)ap->dn_value);
 	}
 
-	if (nnp == xnp || dt_node_is_argcompat(nnp, xnp)) {
+	if (dtp->dt_xlatemode == DT_XL_STATIC && (
+	    nnp == xnp || dt_node_is_argcompat(nnp, xnp))) {
 		dnp->dn_ident = dt_ident_create(idp->di_name, idp->di_kind,
 		    idp->di_flags | DT_IDFLG_ORPHAN, idp->di_id, idp->di_attr,
-		    idp->di_vers, idp->di_ops, idp->di_iarg, dtp->dt_gen);
+		    idp->di_vers, idp->di_ops, idp->di_iarg, idp->di_gen);
 
 		if (dnp->dn_ident == NULL)
 			longjmp(yypcb->pcb_jmpbuf, EDT_NOMEM);
@@ -382,16 +382,21 @@ dt_idcook_args(dt_node_t *dnp, dt_ident_t *idp, int argc, dt_node_t *ap)
 		    prp->pr_argv[ap->dn_value].dtt_type);
 
 	} else if ((dxp = dt_xlator_lookup(dtp,
-	    nnp, xnp, DT_XLATE_FUZZY)) != NULL) {
+	    nnp, xnp, DT_XLATE_FUZZY)) != NULL || (
+	    dxp = dt_xlator_lookup(dtp, dt_probe_tag(prp, ap->dn_value, &tag),
+	    xnp, DT_XLATE_EXACT | DT_XLATE_EXTERN)) != NULL) {
 
 		xidp = dt_xlator_ident(dxp, xnp->dn_ctfp, xnp->dn_type);
 
 		dnp->dn_ident = dt_ident_create(idp->di_name, xidp->di_kind,
 		    xidp->di_flags | DT_IDFLG_ORPHAN, idp->di_id, idp->di_attr,
-		    idp->di_vers, idp->di_ops, idp->di_iarg, dtp->dt_gen);
+		    idp->di_vers, idp->di_ops, idp->di_iarg, idp->di_gen);
 
 		if (dnp->dn_ident == NULL)
 			longjmp(yypcb->pcb_jmpbuf, EDT_NOMEM);
+
+		if (dt_xlator_dynamic(dxp))
+			dxp->dx_arg = (int)ap->dn_value;
 
 		/*
 		 * Propagate relevant members from the translator's internal
@@ -803,7 +808,8 @@ dt_idhash_delete(dt_idhash_t *dhp, dt_ident_t *key)
 	assert(dhp->dh_nelems != 0);
 	dhp->dh_nelems--;
 
-	dt_ident_destroy(idp);
+	if (!(idp->di_flags & DT_IDFLG_ORPHAN))
+		dt_ident_destroy(idp);
 }
 
 static int
@@ -962,6 +968,9 @@ dt_ident_resolve(dt_ident_t *idp)
 {
 	while (idp->di_flags & DT_IDFLG_INLINE) {
 		const dt_node_t *dnp = ((dt_idnode_t *)idp->di_iarg)->din_root;
+
+		if (dnp == NULL)
+			break; /* can't resolve any further yet */
 
 		switch (dnp->dn_kind) {
 		case DT_NODE_VAR:

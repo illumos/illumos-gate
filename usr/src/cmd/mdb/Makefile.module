@@ -45,7 +45,7 @@ KMODFILE = kmod/$(KMODULE)
 # The mess below is designed to pick the right set of objects to build and/or
 # lint.  We have three flavors:
 #
-#  1. proc modules.  Only $(MODOBJS) are built.
+#  1. proc and raw modules.  Only $(MODOBJS) are built.
 #  2. kvm modules for systems without kmdb.  Only $(MODOBJS) are built.
 #  3. kvm modules for systems with kmdb.  $(MODOBJS) and $(KMODOBJS) are built.
 #
@@ -71,6 +71,7 @@ TARGETS_disasm_mdb	= $(MODFILE)
 TARGETS_disasm_both	= $(TARGETS_disasm_mdb) $(TARGETS_disasm_kmdb)
 TARGETS_disasm		= $(TARGETS_disasm_$(TARGETS_kvm_type))
 TARGETS_proc		= $(MODFILE)
+TARGETS_raw		= $(MODFILE)
 TARGETS			= $(TARGETS_$(MDBTGT))
 
 # Where should we install that which we've built?
@@ -84,6 +85,7 @@ ROOTTGTS_disasm_mdb	= $(ROOTMOD)/$(MODULE)
 ROOTTGTS_disasm_both	= $(ROOTTGTS_disasm_mdb) $(ROOTTGTS_disasm_kmdb)
 ROOTTGTS_disasm		= $(ROOTTGTS_disasm_$(TARGETS_kvm_type))
 ROOTTGTS_proc		= $(ROOTMOD)/$(MODULE)
+ROOTTGTS_raw		= $(ROOTMOD)/$(MODULE)
 ROOTTGTS		= $(ROOTTGTS_$(MDBTGT))
 
 # What should we lint?
@@ -98,6 +100,7 @@ LINTFILES_disasm_both	= $(KLINTOBJS) $(LINTOBJS)
 LINTFILES_disasm_mdb	= $(LINTOBJS)
 LINTFILES_disasm	= $(LINTFILES_disasm_$(TARGETS_kvm_type))
 LINTFILES_proc		= $(LINTOBJS)
+LINTFILES_raw		= $(LINTOBJS)
 LINTFILES		= $(LINTFILES_$(MDBTGT))
 
 kvm_TGTFLAGS		= -D_KERNEL
@@ -146,10 +149,10 @@ clean.lint:
 	$(RM) $(LINTFILES)
 
 clean:
-	$(RM) $(MODOBJS) $(KMODOBJS)
+	$(RM) $(MODOBJS) $(KMODOBJS) $(CLEANFILES)
 
 clobber: clean clean.lint
-	$(RM) $(MODFILE) $(KMODFILE)
+	$(RM) $(MODFILE) $(KMODFILE) $(CLOBBERFILES)
 
 lint: $$(LINTFILES)
 

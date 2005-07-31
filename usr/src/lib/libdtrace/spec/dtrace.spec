@@ -104,39 +104,11 @@ function	dtrace_desc2str
 version		SUNWprivate_1.1
 end
 
-function	dtrace_difo_create
-version		SUNWprivate_1.1
-end
-
-function	dtrace_difo_hold
-version		SUNWprivate_1.1
-end
-
-function	dtrace_difo_print
-version		SUNWprivate_1.1
-end
-
-function	dtrace_difo_release
-version		SUNWprivate_1.1
-end
-
 function	dtrace_dof_create
 version		SUNWprivate_1.1
 end
 
 function	dtrace_dof_destroy
-version		SUNWprivate_1.1
-end
-
-function	dtrace_ecbdesc_create
-version		SUNWprivate_1.1
-end
-
-function	dtrace_ecbdesc_hold
-version		SUNWprivate_1.1
-end
-
-function	dtrace_ecbdesc_release
 version		SUNWprivate_1.1
 end
 
@@ -260,14 +232,6 @@ function	dtrace_proc_release
 version		SUNWprivate_1.1
 end
 
-function	dtrace_program_create
-version		SUNWprivate_1.1
-end
-
-function	dtrace_program_destroy
-version		SUNWprivate_1.1
-end
-
 function	dtrace_program_exec
 version		SUNWprivate_1.1
 end
@@ -337,6 +301,10 @@ version		SUNWprivate_1.1
 end
 
 function	dtrace_str2attr
+version		SUNWprivate_1.1
+end
+
+function	dtrace_subrstr
 version		SUNWprivate_1.1
 end
 

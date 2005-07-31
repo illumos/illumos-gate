@@ -76,6 +76,7 @@ extern void dtrace_close(dtrace_hdl_t *);
 extern int dtrace_errno(dtrace_hdl_t *);
 extern const char *dtrace_errmsg(dtrace_hdl_t *, int);
 extern const char *dtrace_faultstr(dtrace_hdl_t *, int);
+extern const char *dtrace_subrstr(dtrace_hdl_t *, int);
 
 extern int dtrace_setopt(dtrace_hdl_t *, const char *, const char *);
 extern int dtrace_getopt(dtrace_hdl_t *, const char *, dtrace_optval_t *);
@@ -87,9 +88,7 @@ extern int dtrace_ctlfd(dtrace_hdl_t *);
  * DTrace Program Interface
  *
  * DTrace programs can be created by compiling ASCII text files containing
- * D programs, by compiling C strings that specify a D program, or by
- * manually constructing statements and adding them to an existing program.
- * The dtrace_program_create() function can be used to create an empty program.
+ * D programs or by compiling in-memory C strings that specify a D program.
  * Once created, callers can examine the list of program statements and
  * enable the probes and actions described by these statements.
  */
@@ -141,9 +140,6 @@ extern void dtrace_dof_destroy(dtrace_hdl_t *, void *);
 extern void *dtrace_getopt_dof(dtrace_hdl_t *);
 extern void *dtrace_geterr_dof(dtrace_hdl_t *);
 
-extern dtrace_prog_t *dtrace_program_create(dtrace_hdl_t *);
-extern void dtrace_program_destroy(dtrace_hdl_t *, dtrace_prog_t *);
-
 typedef struct dtrace_stmtdesc {
 	dtrace_ecbdesc_t *dtsd_ecbdesc;		/* ECB description */
 	dtrace_actdesc_t *dtsd_action;		/* action list */
@@ -167,12 +163,7 @@ extern int dtrace_stmt_add(dtrace_hdl_t *, dtrace_prog_t *,
     dtrace_stmtdesc_t *);
 extern int dtrace_stmt_iter(dtrace_hdl_t *, dtrace_prog_t *,
     dtrace_stmt_f *, void *);
-extern void dtrace_stmt_destroy(dtrace_stmtdesc_t *);
-
-extern dtrace_ecbdesc_t *dtrace_ecbdesc_create(dtrace_hdl_t *,
-    const dtrace_probedesc_t *);
-extern void dtrace_ecbdesc_hold(dtrace_ecbdesc_t *);
-extern void dtrace_ecbdesc_release(dtrace_ecbdesc_t *);
+extern void dtrace_stmt_destroy(dtrace_hdl_t *, dtrace_stmtdesc_t *);
 
 /*
  * DTrace Data Consumption Interface
@@ -397,20 +388,6 @@ extern struct ps_prochandle *dtrace_proc_create(dtrace_hdl_t *,
 extern struct ps_prochandle *dtrace_proc_grab(dtrace_hdl_t *, pid_t, int);
 extern void dtrace_proc_release(dtrace_hdl_t *, struct ps_prochandle *);
 extern void dtrace_proc_continue(dtrace_hdl_t *, struct ps_prochandle *);
-
-/*
- * DTrace DIF Object (DIFO) Interface
- *
- * Library clients who wish to create their own custom DIF programs can use
- * the functions below to create a DIFO from a C string containing a D
- * expression statement.  Clients may also create raw DIF on-the-fly without
- * invoking the D compiler by simply constructing the dtrace_difo_t by hand.
- */
-
-extern dtrace_difo_t *dtrace_difo_create(dtrace_hdl_t *, const char *);
-extern void dtrace_difo_print(const dtrace_difo_t *, FILE *);
-extern void dtrace_difo_hold(dtrace_difo_t *);
-extern void dtrace_difo_release(dtrace_difo_t *);
 
 /*
  * DTrace Object, Symbol, and Type Interfaces

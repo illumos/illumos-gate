@@ -88,10 +88,13 @@ typedef struct dt_node {
 		struct {
 			char *_name;		/* string name of member */
 			struct dt_node *_expr;	/* expression node pointer */
+			dt_xlator_t *_xlator;	/* translator reference */
+			uint_t _id;		/* member identifier */
 		} _member;
 
 		struct {
 			dt_xlator_t *_xlator;	/* translator reference */
+			struct dt_node *_xmemb;	/* individual xlator member */
 			struct dt_node *_membs;	/* list of member nodes */
 		} _xlator;
 
@@ -126,7 +129,10 @@ typedef struct dt_node {
 #define	dn_desc		dn_u._pdesc._desc	/* DT_NODE_PDESC */
 #define	dn_membname	dn_u._member._name	/* DT_NODE_MEMBER */
 #define	dn_membexpr	dn_u._member._expr	/* DT_NODE_MEMBER */
+#define	dn_membxlator	dn_u._member._xlator	/* DT_NODE_MEMBER */
+#define	dn_membid	dn_u._member._id	/* DT_NODE_MEMBER */
 #define	dn_xlator	dn_u._xlator._xlator	/* DT_NODE_XLATOR */
+#define	dn_xmember	dn_u._xlator._xmemb	/* DT_NODE_XLATOR */
 #define	dn_members	dn_u._xlator._membs	/* DT_NODE_XLATOR */
 #define	dn_provname	dn_u._provider._name	/* DT_NODE_PROVIDER */
 #define	dn_provider	dn_u._provider._pvp	/* DT_NODE_PROVIDER */
@@ -200,7 +206,7 @@ extern dt_node_t *dt_node_clause(dt_node_t *, dt_node_t *, dt_node_t *);
 extern dt_node_t *dt_node_inline(dt_node_t *);
 extern dt_node_t *dt_node_member(dt_decl_t *, char *, dt_node_t *);
 extern dt_node_t *dt_node_xlator(dt_decl_t *, dt_decl_t *, char *, dt_node_t *);
-extern dt_node_t *dt_node_probe(char *, dt_node_t *, dt_node_t *);
+extern dt_node_t *dt_node_probe(char *, int, dt_node_t *, dt_node_t *);
 extern dt_node_t *dt_node_provider(char *, dt_node_t *);
 extern dt_node_t *dt_node_program(dt_node_t *);
 
@@ -224,7 +230,8 @@ extern dt_ident_t *dt_node_resolve(const dt_node_t *, uint_t);
 extern size_t dt_node_sizeof(const dt_node_t *);
 extern void dt_node_promote(dt_node_t *, dt_node_t *, dt_node_t *);
 
-extern void dt_node_diftype(const dt_node_t *, dtrace_diftype_t *);
+extern void dt_node_diftype(dtrace_hdl_t *,
+    const dt_node_t *, dtrace_diftype_t *);
 extern void dt_node_printr(dt_node_t *, FILE *, int);
 extern const char *dt_node_name(const dt_node_t *, char *, size_t);
 extern int dt_node_root(dt_node_t *);

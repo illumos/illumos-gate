@@ -43,6 +43,8 @@ typedef struct dt_provider {
 	dtrace_providerdesc_t pv_desc;	/* provider name and attributes */
 	dt_idhash_t *pv_probes;		/* probe defs (if user-declared) */
 	dt_node_t *pv_nodes;		/* parse node allocation list */
+	ulong_t *pv_xrefs;		/* translator reference bitmap */
+	ulong_t pv_xrmax;		/* number of valid bits in pv_xrefs */
 	ulong_t pv_gen;			/* generation # that created me */
 	dtrace_hdl_t *pv_hdl;		/* pointer to containing dtrace_hdl */
 	uint_t pv_flags;		/* flags (see below) */
@@ -88,8 +90,9 @@ typedef struct dt_probe {
 extern dt_provider_t *dt_provider_lookup(dtrace_hdl_t *, const char *);
 extern dt_provider_t *dt_provider_create(dtrace_hdl_t *, const char *);
 extern void dt_provider_destroy(dtrace_hdl_t *, dt_provider_t *);
+extern int dt_provider_xref(dtrace_hdl_t *, dt_provider_t *, id_t);
 
-extern dt_probe_t *dt_probe_create(dtrace_hdl_t *, dt_ident_t *,
+extern dt_probe_t *dt_probe_create(dtrace_hdl_t *, dt_ident_t *, int,
     dt_node_t *, uint_t, dt_node_t *, uint_t);
 
 extern dt_probe_t *dt_probe_info(dtrace_hdl_t *,
@@ -101,6 +104,8 @@ extern void dt_probe_destroy(dt_probe_t *);
 
 extern int dt_probe_define(dt_provider_t *, dt_probe_t *,
     const char *, uint32_t);
+
+extern dt_node_t *dt_probe_tag(dt_probe_t *, uint_t, dt_node_t *);
 
 #ifdef	__cplusplus
 }
