@@ -25,32 +25,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-function	dladm_link
-include		<libdladm.h>
-declaration	int	dladm_link(const char *, dladm_attr_t *, \
-			int, const char *, dladm_diag_t *)
-version		SUNWprivate_1.1
-end
-
-function	dladm_up
-include		<libdladm.h>
-declaration	int	dladm_up(const char *, dladm_diag_t *)
-version		SUNWprivate_1.1
-end
-
-function	dladm_unlink
-include		<libdladm.h>
-declaration	int	dladm_unlink(const char *, boolean_t, const char *, \
-			dladm_diag_t *)
-version		SUNWprivate_1.1
-end
-
-function	dladm_down
-include		<libdladm.h>
-declaration	int	dladm_down(const char *, dladm_diag_t *)
-version		SUNWprivate_1.1
-end
-
 function	dladm_walk
 include		<libdladm.h>
 declaration	int	dladm_walk(void (*fn)(void *, const char *), \
@@ -58,27 +32,15 @@ declaration	int	dladm_walk(void (*fn)(void *, const char *), \
 version		SUNWprivate_1.1
 end
 
+function	dladm_walk_vlan
+include		<libdladm.h>
+declaration	int	dladm_walk_vlan(void (*fn)(void *, const char *), \
+			void *)
+version		SUNWprivate_1.1
+end
+
 function	dladm_info
 include		<libdladm.h>
 declaration	int	dladm_info(const char *, dladm_attr_t *)
-version		SUNWprivate_1.1
-end
-
-function	dladm_db_walk
-include		<libdladm.h>
-declaration	int	dladm_db_walk(void (*)(void *, const char *,
-			dladm_attr_t *), void *)
-version		SUNWprivate_1.1
-end
-
-function	dladm_sync
-include		<libdladm.h>
-declaration	void	dladm_sync(void)
-version		SUNWprivate_1.1
-end
-
-function	dladm_diag
-include		<libdladm.h>
-declaration	const char *	dladm_diag(dladm_diag_t)
 version		SUNWprivate_1.1
 end

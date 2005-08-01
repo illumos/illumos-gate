@@ -852,13 +852,9 @@ const struct ioc {
 	    "laioc_add_rem"},
 	{ (uint_t)LAIOC_MODIFY,		"LAIOC_MODIFY",		"laioc_modify"},
 
-	/* dld data-link configuration ioctls */
-	{ (uint_t)DLDIOCCREATE,		"DLDIOCCREATE",
-	    "dld_ioc_create"},
-	{ (uint_t)DLDIOCDESTROY,	"DLDIOCDESTROY",
-	    "dld_ioc_destroy"},
+	/* dld data-link ioctls */
 	{ (uint_t)DLDIOCATTR,		"DLDIOCATTR",		"dld_ioc_attr"},
-
+	{ (uint_t)DLDIOCVLAN,		"DLDIOCVLAN",		"dld_ioc_vlan"},
 	{ (uint_t)0, NULL, NULL	}
 };
 

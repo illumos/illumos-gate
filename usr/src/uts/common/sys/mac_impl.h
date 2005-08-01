@@ -30,7 +30,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mac.h>
-#include <sys/ght.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -79,7 +78,6 @@ struct mac_impl_s {
 	uint_t			mi_port;
 	char			mi_name[MAXNAMELEN];
 
-	ghte_t			mi_hte;
 	uint32_t		mi_ref;
 	boolean_t		mi_destroying;
 

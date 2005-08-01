@@ -32,7 +32,6 @@
 
 #include	<sys/types.h>
 #include	<sys/modctl.h>
-#include	<sys/ght.h>
 #include	<sys/mac.h>
 
 #include	<sys/dls.h>

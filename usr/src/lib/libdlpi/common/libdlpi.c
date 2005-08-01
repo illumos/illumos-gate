@@ -178,12 +178,6 @@ dlpi_open(const char *provider)
 	if ((fd = open(devname, O_RDWR)) != -1)
 		return (fd);
 
-	(void) snprintf(devname, MAXPATHLEN, "/devices/pseudo/dld@0:%s",
-	    provider);
-
-	if ((fd = open(devname, O_RDWR)) != -1)
-		return (fd);
-
 	(void) snprintf(path, MAXPATHLEN, "/devices/pseudo/clone@0:%s",
 	    provider);
 

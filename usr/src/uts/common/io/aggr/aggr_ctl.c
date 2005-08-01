@@ -33,64 +33,49 @@
 #include <sys/ddi.h>
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
+#include <sys/strsun.h>
 
-static int aggr_ioc_create(int, void *, int);
-static int aggr_ioc_delete(int, void *, int);
-static int aggr_ioc_info(int, void *, int);
-static int aggr_ioc_add_remove(int, void *, int);
-static int aggr_ioc_status(int, void *, int);
-static int aggr_ioc_modify(int, void *, int);
+static int aggr_ioc_create(mblk_t *, int);
+static int aggr_ioc_delete(mblk_t *, int);
+static int aggr_ioc_info(mblk_t *, int);
+static int aggr_ioc_add(mblk_t *, int);
+static int aggr_ioc_remove(mblk_t *, int);
+static int aggr_ioc_status(mblk_t *, int);
+static int aggr_ioc_modify(mblk_t *, int);
 
 typedef struct ioc_cmd_s {
 	int ic_cmd;
-	int (*ic_func)(int, void *, int);
+	int (*ic_func)(mblk_t *, int);
 } ioc_cmd_t;
 
 static ioc_cmd_t ioc_cmd[] = {
 	{LAIOC_CREATE, aggr_ioc_create},
 	{LAIOC_DELETE, aggr_ioc_delete},
 	{LAIOC_INFO, aggr_ioc_info},
-	{LAIOC_ADD, aggr_ioc_add_remove},
-	{LAIOC_REMOVE, aggr_ioc_add_remove},
+	{LAIOC_ADD, aggr_ioc_add},
+	{LAIOC_REMOVE, aggr_ioc_remove},
 	{LAIOC_MODIFY, aggr_ioc_modify}};
 
-/*ARGSUSED*/
-int
-aggr_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
-{
-	/* only the control interface can be opened */
-	if (getminor(*devp) != AGGR_MINOR_CTL)
-		return (ENOSYS);
-	return (0);
-}
-
-/*ARGSUSED*/
-int
-aggr_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
-{
-	return (0);
-}
+#define	IOC_CMD_SZ	(sizeof (ioc_cmd) / sizeof (ioc_cmd_t))
 
 /*
  * Process a LAIOC_MODIFY request.
  */
-/* ARGSUSED */
 static int
-aggr_ioc_modify(int cmd, void *arg, int mode)
+aggr_ioc_modify(mblk_t *mp, int mode)
 {
-	STRUCT_DECL(laioc_modify, modify_arg);
+	STRUCT_HANDLE(laioc_modify, modify_arg);
 	uint32_t policy;
 	boolean_t mac_fixed;
 	uchar_t mac_addr[ETHERADDRL];
 	uint8_t modify_mask_arg, modify_mask = 0;
-	uint32_t key;
+	uint32_t rc, key;
 	aggr_lacp_mode_t lacp_mode;
 	aggr_lacp_timer_t lacp_timer;
 
-	STRUCT_INIT(modify_arg, mode);
-
-	if (copyin(arg, STRUCT_BUF(modify_arg), STRUCT_SIZE(modify_arg)) != 0)
-		return (EFAULT);
+	STRUCT_SET_HANDLE(modify_arg, mode, (void *)mp->b_cont->b_rptr);
+	if (MBLKL(mp->b_cont) < STRUCT_SIZE(modify_arg))
+		return (EINVAL);
 
 	key = STRUCT_FGET(modify_arg, lu_key);
 	modify_mask_arg = STRUCT_FGET(modify_arg, lu_modify_mask);
@@ -116,18 +101,21 @@ aggr_ioc_modify(int cmd, void *arg, int mode)
 		lacp_timer = STRUCT_FGET(modify_arg, lu_lacp_timer);
 	}
 
-	return (aggr_grp_modify(key, NULL, modify_mask, policy, mac_fixed,
-	    mac_addr, lacp_mode, lacp_timer));
+	rc = aggr_grp_modify(key, NULL, modify_mask, policy, mac_fixed,
+	    mac_addr, lacp_mode, lacp_timer);
+
+	freemsg(mp->b_cont);
+	mp->b_cont = NULL;
+	return (rc);
 }
 
 /*
  * Process a LAIOC_CREATE request.
  */
-/* ARGSUSED */
 static int
-aggr_ioc_create(int cmd, void *arg, int mode)
+aggr_ioc_create(mblk_t *mp, int mode)
 {
-	STRUCT_DECL(laioc_create, create_arg);
+	STRUCT_HANDLE(laioc_create, create_arg);
 	uint16_t nports;
 	laioc_port_t *ports = NULL;
 	uint32_t policy;
@@ -135,12 +123,11 @@ aggr_ioc_create(int cmd, void *arg, int mode)
 	uchar_t mac_addr[ETHERADDRL];
 	aggr_lacp_mode_t lacp_mode;
 	aggr_lacp_timer_t lacp_timer;
-	int rc;
+	int rc, len;
 
-	STRUCT_INIT(create_arg, mode);
-
-	if (copyin(arg, STRUCT_BUF(create_arg), STRUCT_SIZE(create_arg)) != 0)
-		return (EFAULT);
+	STRUCT_SET_HANDLE(create_arg, mode, (void *)mp->b_cont->b_rptr);
+	if ((len = MBLKL(mp->b_cont)) < STRUCT_SIZE(create_arg))
+		return (EINVAL);
 
 	nports = STRUCT_FGET(create_arg, lc_nports);
 	if (nports > AGGR_MAX_PORTS)
@@ -150,13 +137,10 @@ aggr_ioc_create(int cmd, void *arg, int mode)
 	lacp_mode = STRUCT_FGET(create_arg, lc_lacp_mode);
 	lacp_timer = STRUCT_FGET(create_arg, lc_lacp_timer);
 
-	ports = kmem_alloc(nports * sizeof (laioc_port_t), KM_SLEEP);
+	if (len < STRUCT_SIZE(create_arg) + (nports * sizeof (laioc_port_t)))
+		return (EINVAL);
 
-	if (copyin(STRUCT_FGETP(create_arg, lc_ports), ports,
-	    nports * sizeof (laioc_port_t)) != 0) {
-		rc = EFAULT;
-		goto bail;
-	}
+	ports = (laioc_port_t *)(STRUCT_BUF(create_arg) + 1);
 
 	bcopy(STRUCT_FGET(create_arg, lc_mac), mac_addr, ETHERADDRL);
 	mac_fixed = STRUCT_FGET(create_arg, lc_mac_fixed);
@@ -164,28 +148,31 @@ aggr_ioc_create(int cmd, void *arg, int mode)
 	rc = aggr_grp_create(STRUCT_FGET(create_arg, lc_key),
 	    nports, ports, policy, mac_fixed, mac_addr, lacp_mode, lacp_timer);
 
-bail:
-	kmem_free(ports, nports * sizeof (laioc_port_t));
+	freemsg(mp->b_cont);
+	mp->b_cont = NULL;
 	return (rc);
 }
 
-/* ARGSUSED */
 static int
-aggr_ioc_delete(int cmd, void *arg, int mode)
+aggr_ioc_delete(mblk_t *mp, int mode)
 {
-	STRUCT_DECL(laioc_delete, delete_arg);
+	STRUCT_HANDLE(laioc_delete, delete_arg);
+	int rc;
 
-	STRUCT_INIT(delete_arg, mode);
+	STRUCT_SET_HANDLE(delete_arg, mode, (void *)mp->b_cont->b_rptr);
+	if (STRUCT_SIZE(delete_arg) > MBLKL(mp))
+		return (EINVAL);
 
-	if (copyin(arg, STRUCT_BUF(delete_arg), STRUCT_SIZE(delete_arg)) != 0)
-		return (EFAULT);
+	rc = aggr_grp_delete(STRUCT_FGET(delete_arg, ld_key));
 
-	return (aggr_grp_delete(STRUCT_FGET(delete_arg, ld_key)));
+	freemsg(mp->b_cont);
+	mp->b_cont = NULL;
+	return (rc);
 }
 
 typedef struct aggr_ioc_info_state {
 	uint32_t bytes_left;
-	uchar_t *where;			/* in user buffer */
+	uchar_t *where;
 } aggr_ioc_info_state_t;
 
 static int
@@ -207,9 +194,7 @@ aggr_ioc_info_new_grp(void *arg, uint32_t key, uchar_t *mac,
 	grp.lg_lacp_mode = lacp_mode;
 	grp.lg_lacp_timer = lacp_timer;
 
-	if (copyout(&grp, state->where, sizeof (grp)) != 0)
-		return (EFAULT);
-
+	bcopy(&grp, state->where, sizeof (grp));
 	state->where += sizeof (grp);
 	state->bytes_left -= sizeof (grp);
 
@@ -232,9 +217,7 @@ aggr_ioc_info_new_port(void *arg, char *devname, uint32_t portnum,
 	port.lp_state = portstate;
 	port.lp_lacp_state = *lacp_state;
 
-	if (copyout(&port, state->where, sizeof (port)) != 0)
-		return (EFAULT);
-
+	bcopy(&port, state->where, sizeof (port));
 	state->where += sizeof (port);
 	state->bytes_left -= sizeof (port);
 
@@ -243,125 +226,130 @@ aggr_ioc_info_new_port(void *arg, char *devname, uint32_t portnum,
 
 /*ARGSUSED*/
 static int
-aggr_ioc_info(int cmd, void *arg, int mode)
+aggr_ioc_info(mblk_t *mp, int mode)
 {
-	laioc_info_t info_arg;
+	laioc_info_t *info_argp;
 	uint32_t ngroups, group_key;
-	int rc;
+	int rc, len;
 	aggr_ioc_info_state_t state;
 
-	if (copyin(arg, &info_arg, sizeof (info_arg)) != 0)
-		return (EFAULT);
+	if ((len = MBLKL(mp->b_cont)) < sizeof (*info_argp))
+		return (EINVAL);
 
+	info_argp = (laioc_info_t *)mp->b_cont->b_rptr;
 	/*
 	 * Key of the group to return. If zero, the call returns information
 	 * regarding all groups currently defined.
 	 */
-	group_key = info_arg.li_group_key;
+	group_key = info_argp->li_group_key;
 
-	state.bytes_left = info_arg.li_bufsize - sizeof (laioc_info_t);
-	state.where = (uchar_t *)arg + sizeof (laioc_info_t);
+	state.bytes_left = len - sizeof (laioc_info_t);
+	state.where = (uchar_t *)(info_argp + 1);
 
 	rc = aggr_grp_info(&ngroups, group_key, &state, aggr_ioc_info_new_grp,
 	    aggr_ioc_info_new_port);
-	if (rc == 0) {
-		info_arg.li_ngroups = ngroups;
-		if (copyout(&info_arg, arg, sizeof (info_arg)) != 0)
-			return (EFAULT);
-	}
+	if (rc == 0)
+		info_argp->li_ngroups = ngroups;
+
 	return (rc);
 }
 
-/*ARGSUSED*/
 static int
-aggr_ioc_add_remove(int cmd, void *arg, int mode)
+aggr_ioc_add(mblk_t *mp, int mode)
 {
-	STRUCT_DECL(laioc_add_rem, add_rem_arg);
-	uint16_t nports;
+	STRUCT_HANDLE(laioc_add_rem, add_arg);
+	uint32_t nports;
 	laioc_port_t *ports = NULL;
-	int rc;
+	int rc, len;
 
-	STRUCT_INIT(add_rem_arg, mode);
+	STRUCT_SET_HANDLE(add_arg, mode, (void *)mp->b_cont->b_rptr);
+	if ((len = MBLKL(mp->b_cont)) < STRUCT_SIZE(add_arg))
+		return (EINVAL);
 
-	if (copyin(arg, STRUCT_BUF(add_rem_arg), STRUCT_SIZE(add_rem_arg)) != 0)
-		return (EFAULT);
-
-	nports = STRUCT_FGET(add_rem_arg, la_nports);
+	nports = STRUCT_FGET(add_arg, la_nports);
 	if (nports > AGGR_MAX_PORTS)
 		return (EINVAL);
 
-	ports = kmem_alloc(nports * sizeof (laioc_port_t), KM_SLEEP);
+	if (len < STRUCT_SIZE(add_arg) + (nports * sizeof (laioc_port_t)))
+		return (EINVAL);
 
-	if (copyin(STRUCT_FGETP(add_rem_arg, la_ports), ports,
-	    nports * sizeof (laioc_port_t)) != 0) {
-		rc = EFAULT;
-		goto bail;
-	}
+	ports = (laioc_port_t *)(STRUCT_BUF(add_arg) + 1);
 
-	switch (cmd) {
-	case LAIOC_ADD:
-		rc = aggr_grp_add_ports(STRUCT_FGET(add_rem_arg, la_key),
-		    nports, ports);
-		break;
-	case LAIOC_REMOVE:
-		rc = aggr_grp_rem_ports(STRUCT_FGET(add_rem_arg, la_key),
-		    nports, ports);
-		break;
-	default:
-		rc = EINVAL;
-	}
+	rc = aggr_grp_add_ports(STRUCT_FGET(add_arg, la_key),
+	    nports, ports);
 
-bail:
-	if (ports != NULL)
-		kmem_free(ports, nports * sizeof (laioc_port_t));
+	freemsg(mp->b_cont);
+	mp->b_cont = NULL;
 	return (rc);
 }
 
-/*ARGSUSED*/
 static int
-aggr_ioc_remove(void *arg, int mode)
+aggr_ioc_remove(mblk_t *mp, int mode)
 {
-	STRUCT_DECL(laioc_add_rem, rem_arg);
-	uint16_t nports;
+	STRUCT_HANDLE(laioc_add_rem, rem_arg);
+	uint32_t nports;
 	laioc_port_t *ports = NULL;
-	int rc;
+	int rc, len;
 
-	STRUCT_INIT(rem_arg, mode);
-
-	if (copyin(arg, STRUCT_BUF(rem_arg), STRUCT_SIZE(rem_arg)) != 0)
-		return (EFAULT);
+	STRUCT_SET_HANDLE(rem_arg, mode, (void *)mp->b_cont->b_rptr);
+	if ((len = MBLKL(mp->b_cont)) < STRUCT_SIZE(rem_arg))
+		return (EINVAL);
 
 	nports = STRUCT_FGET(rem_arg, la_nports);
 	if (nports > AGGR_MAX_PORTS)
 		return (EINVAL);
 
-	ports = kmem_alloc(nports * sizeof (laioc_port_t), KM_SLEEP);
+	if (len < STRUCT_SIZE(rem_arg) + (nports * sizeof (laioc_port_t)))
+		return (EINVAL);
 
-	if (copyin(STRUCT_FGETP(rem_arg, la_ports), ports,
-	    nports * sizeof (laioc_port_t)) != 0) {
-		rc = EFAULT;
-		goto bail;
-	}
+	ports = (laioc_port_t *)(STRUCT_BUF(rem_arg) + 1);
 
 	rc = aggr_grp_rem_ports(STRUCT_FGET(rem_arg, la_key),
 	    nports, ports);
 
-bail:
-	if (ports != NULL)
-		kmem_free(ports, nports * sizeof (laioc_port_t));
+	freemsg(mp->b_cont);
+	mp->b_cont = NULL;
 	return (rc);
 }
 
-/*ARGSUSED*/
-int
-aggr_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rv)
+void
+aggr_ioctl(queue_t *wq, mblk_t *mp)
 {
-	int i;
+	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
+	int i, err = EINVAL;
+	mblk_t *nmp;
 
-	for (i = 0; i < sizeof (ioc_cmd) / sizeof (ioc_cmd_t); i++) {
-		if (cmd == ioc_cmd[i].ic_cmd)
-			return (ioc_cmd[i].ic_func(cmd, (void *)arg, mode));
+	if (mp->b_cont == NULL)
+		goto done;
+
+	/*
+	 * Construct contiguous message
+	 */
+	if ((nmp = msgpullup(mp->b_cont, -1)) == NULL) {
+		err = ENOMEM;
+		goto done;
 	}
 
-	return (EINVAL);
+	freemsg(mp->b_cont);
+	mp->b_cont = nmp;
+
+	for (i = 0; i < IOC_CMD_SZ; i++) {
+		if (iocp->ioc_cmd == ioc_cmd[i].ic_cmd) {
+			err = ioc_cmd[i].ic_func(mp, (int)iocp->ioc_flag);
+			break;
+		}
+	}
+
+	if (err == 0) {
+		int len = 0;
+
+		if (mp->b_cont != NULL) {
+			len = MBLKL(mp->b_cont);
+		}
+		miocack(wq, mp, len, 0);
+		return;
+	}
+
+done:
+	miocnak(wq, mp, 0, err);
 }

@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 CFLAGS				+= $(CCVERBOSE)
 $(RELEASE_BUILD)CFLAGS		+= -xinline=auto -xcrossfile
 $(RELEASE_BUILD)COPTIMIZE	= -xO5
-LDFLAGS				+= -dy -N misc/dls -N misc/mac -N misc/ght
+LDFLAGS				+= -dy -N misc/dls -N misc/mac
 
 #
 #	Default build targets.

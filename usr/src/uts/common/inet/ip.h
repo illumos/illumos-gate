@@ -2959,7 +2959,7 @@ struct ill_zerocopy_capab_s {
  * include mac.h in this file.
  */
 typedef void	(*ip_mac_blank_t)(void *, time_t, uint_t);
-typedef mblk_t *(*ip_mac_tx_t)(void *, mblk_t *);
+typedef void	(*ip_mac_tx_t)(void *, mblk_t *);
 
 struct ill_rx_ring {
 	ip_mac_blank_t		rr_blank; /* Driver interrupt blanking func */

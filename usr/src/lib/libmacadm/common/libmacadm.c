@@ -33,6 +33,8 @@
 #include <stropts.h>
 #include <sys/dld.h>
 #include <libdevinfo.h>
+#include <libdladm.h>
+#include <libdlpi.h>
 
 #define	_KERNEL
 #include <sys/sysmacros.h>
@@ -48,24 +50,39 @@
 
 typedef struct macadm_walk {
 	void	*mw_arg;
-	void	(*mw_fn)(void *, const char *, uint_t);
+	void	(*mw_fn)(void *, const char *);
 } macadm_walk_t;
 
 /*
- * Local callback invoked for each DDI_NT_MAC node.
+ * Local callback invoked for each DDI_NT_NET node.
  */
+/* ARGSUSED */
 static int
 i_macadm_apply(di_node_t node, di_minor_t minor, void *arg)
 {
 	macadm_walk_t	*mwp = arg;
 	char		dev[MAXNAMELEN];
-	uint_t		port;
+	dladm_attr_t	dlattr;
+	int		fd;
 
 	(void) snprintf(dev, MAXNAMELEN, "%s%d",
 	    di_driver_name(node), di_instance(node));
-	port = getminor(di_minor_devt(minor));
 
-	mwp->mw_fn(mwp->mw_arg, dev, port);
+	/*
+	 * We need to be able to report devices that are
+	 * reported by the walker, but have not yet attached
+	 * to the system. Attempting to opening them will
+	 * cause them to temporarely attach and be known
+	 * by dld.
+	 */
+	if ((fd = dlpi_open(dev)) == -1 && errno != EPERM)
+		return (DI_WALK_CONTINUE);
+	if (fd != 0)
+		(void) dlpi_close(fd);
+
+	/* invoke callback only for non-legacy devices */
+	if (dladm_info(dev, &dlattr) == 0)
+		mwp->mw_fn(mwp->mw_arg, dev);
 
 	return (DI_WALK_CONTINUE);
 }
@@ -74,7 +91,7 @@ i_macadm_apply(di_node_t node, di_minor_t minor, void *arg)
  * Invoke the specified callback for each DDI_NT_MAC node.
  */
 int
-macadm_walk(void (*fn)(void *, const char *, uint_t), void *arg,
+macadm_walk(void (*fn)(void *, const char *), void *arg,
     boolean_t use_cache)
 {
 	di_node_t	root;
@@ -94,7 +111,7 @@ macadm_walk(void (*fn)(void *, const char *, uint_t), void *arg,
 	mw.mw_fn = fn;
 	mw.mw_arg = arg;
 
-	(void) di_walk_minor(root, DDI_NT_MAC, 0, &mw, i_macadm_apply);
+	(void) di_walk_minor(root, DDI_NT_NET, 0, &mw, i_macadm_apply);
 	di_fini(root);
 
 	return (0);

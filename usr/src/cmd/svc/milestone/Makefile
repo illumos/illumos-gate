@@ -43,9 +43,6 @@ FSSVCS= \
 FSMANIFESTS= $(FSSVCS:%=$(ROOTSVCSYSTEMFILESYSTEM)/%)
 
 NETSVCS= \
-	datalink.xml \
-	datalink-init.xml \
-	aggregation.xml \
 	network-initial.xml \
 	network-loopback.xml \
 	network-physical.xml \
@@ -94,11 +91,8 @@ MANIFEST= $(FSSVCS) $(NETSVCS) $(MAINMILESTONES) $(SYSTEMSVCS) \
 	$(SYSDEVSVCS) $(SYSTEMSVCSVCS)
 
 SVCMETHOD=\
-	aggregation \
 	boot-archive \
 	console-login \
-	datalink \
-	datalink-init \
 	devices-local \
 	fs-local \
 	fs-minimal \

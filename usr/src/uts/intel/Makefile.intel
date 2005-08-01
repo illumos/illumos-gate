@@ -444,7 +444,6 @@ MISC_KMODS	+= diaudio
 MISC_KMODS	+= dls
 MISC_KMODS	+= fssnap_if
 MISC_KMODS	+= gda
-MISC_KMODS	+= ght
 MISC_KMODS	+= gld
 MISC_KMODS	+= hidparser
 MISC_KMODS	+= hpcsvc

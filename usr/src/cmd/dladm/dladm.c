@@ -96,11 +96,7 @@ static port_state_t port_states[] = {
 
 #define	NPORTSTATES	(sizeof (port_states) / sizeof (port_state_t))
 
-static void	do_create_vlan(int, char **);
-static void	do_delete_vlan(int, char **);
 static void	do_show_link(int, char **);
-static void	do_up_link(int, char **);
-static void	do_init_link(int, char **);
 static void	do_create_aggr(int, char **);
 static void	do_delete_aggr(int, char **);
 static void	do_add_aggr(int, char **);
@@ -129,11 +125,8 @@ typedef struct	cmd {
 } cmd_t;
 
 static cmd_t	cmds[] = {
-	{ "create-vlan", do_create_vlan },
-	{ "delete-vlan", do_delete_vlan },
 	{ "show-link", do_show_link },
-	{ "up-link", do_up_link },
-	{ "init-link", do_init_link },
+	{ "show-dev", do_show_dev },
 
 	{ "create-aggr", do_create_aggr },
 	{ "delete-aggr", do_delete_aggr },
@@ -142,9 +135,7 @@ static cmd_t	cmds[] = {
 	{ "modify-aggr", do_modify_aggr },
 	{ "show-aggr", do_show_aggr },
 	{ "up-aggr", do_up_aggr },
-	{ "down-aggr", do_down_aggr },
-
-	{ "show-dev", do_show_dev }
+	{ "down-aggr", do_down_aggr }
 };
 
 static const struct option longopts[] = {
@@ -176,9 +167,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
-	    "usage: dladm create-vlan [-t] [-R <root-dir>] -v <vlan> -d <dev>\n"
-	    "             delete-vlan [-t] [-R <root-dir>] -v <vlan> -d <dev>\n"
-	    "             create-aggr [-t] [-R <root-dir>] [-P <policy>]\n"
+	    "usage: dladm create-aggr [-t] [-R <root-dir>] [-P <policy>]\n"
 	    "                    [-l <mode>] [-T <time>]\n"
 	    "                    [-u <address>] -d <dev> ... <key>\n"
 	    "             delete-aggr [-t] [-R <root-dir>] <key>\n"
@@ -224,269 +213,6 @@ main(int argc, char *argv[])
 	return (0);
 }
 
-static void
-do_create_vlan(int argc, char *argv[])
-{
-	char		name[MAXNAMELEN];
-	char		driver[MAXNAMELEN];
-	int		instance;
-	dladm_attr_t	dlattr;
-	int		value;
-	char		option;
-	boolean_t	v_arg = B_FALSE;
-	boolean_t	d_arg = B_FALSE;
-	boolean_t	t_arg = B_FALSE;
-	char		*altroot = NULL;
-	char		*endp = NULL;
-	dladm_diag_t	diag = 0;
-
-	bzero(&dlattr, sizeof (dladm_attr_t));
-
-	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":d:R:tv:", longopts,
-	    NULL)) != -1) {
-		switch (option) {
-		case 'v':
-			if (v_arg) {
-				(void) fprintf(stderr, gettext("%s: the option "
-				    "-v cannot be specified more than once\n"),
-				    progname);
-				usage();
-			}
-
-			v_arg = B_TRUE;
-
-			errno = 0;
-			value = (int)strtol(optarg, &endp, 10);
-			if (errno != 0 || value < 1 || value > 4094 ||
-			    *endp != '\0') {
-				(void) fprintf(stderr,
-				    gettext("%s: illegal VLAN identifier"
-				    " '%d'\n"), progname, value);
-				exit(1);
-			}
-
-			dlattr.da_vid = (uint16_t)value;
-
-			break;
-		case 'd':
-			if (d_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -d cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
-
-			d_arg = B_TRUE;
-
-			if (strlcpy(dlattr.da_dev, optarg, MAXNAMELEN) >=
-			    MAXNAMELEN) {
-				(void) fprintf(stderr,
-				    gettext("%s: device name too long\n"),
-				    progname);
-				exit(1);
-			}
-			break;
-		case 't':
-			t_arg = B_TRUE;
-			break;
-		case 'R':
-			altroot = optarg;
-			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
-		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		}
-	}
-
-	if (optind != argc) {
-		usage();
-	}
-
-	if (dlattr.da_dev[0] == '\0') {
-		(void) fprintf(stderr,
-		    gettext("%s: no device specified\n"),
-		    progname);
-		exit(1);
-	}
-
-	if (dlattr.da_vid == 0) {
-		(void) fprintf(stderr,
-		    gettext("%s: no VLAN ID specified\n"),
-		    progname);
-		exit(1);
-	}
-
-	if (dlpi_if_parse(dlattr.da_dev, driver, &instance) < 0 ||
-	    instance < 0) {
-		(void) fprintf(stderr,
-		    gettext("%s: badly formatted device '%s'\n"),
-		    progname, dlattr.da_dev);
-		exit(1);
-	}
-
-	(void) snprintf(name, MAXNAMELEN, "%s%d", driver,
-	    (dlattr.da_vid * 1000) + instance);
-
-	/*
-	 * For aggregations, the da_dev is always AGGR_DEV, and the
-	 * aggregation key (the instance integer extracted above by
-	 * dlpi_if_parse) is da_port.
-	 */
-	if (strcmp(driver, AGGR_DRIVER) == 0) {
-		(void) strlcpy(dlattr.da_dev, AGGR_DEV, MAXNAMELEN);
-		dlattr.da_port = instance;
-	}
-
-	if (dladm_link(name, &dlattr, (t_arg ? DLADM_LINK_TEMP : 0),
-	    altroot, &diag) < 0) {
-		PRINT_ERR_DIAG("%s: link operation failed: %s", diag,
-		    dladm_diag);
-		exit(1);
-	}
-
-	if (dladm_sync() < 0) {
-		(void) fprintf(stderr,
-		    gettext("%s: sync operation failed"),
-		    progname);
-		perror(" ");
-		exit(1);
-	}
-}
-
-static void
-do_delete_vlan(int argc, char *argv[])
-{
-	char		option;
-	boolean_t	t_arg = B_FALSE;
-	boolean_t	v_arg = B_FALSE;
-	boolean_t	d_arg = B_FALSE;
-	char		device[MAXNAMELEN];
-	char		name[MAXNAMELEN];
-	char		driver[MAXNAMELEN];
-	int		instance;
-	int		vid;
-	char		*altroot = NULL;
-	char		*endp = NULL;
-	dladm_diag_t	diag = 0;
-
-	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":R:td:v:", longopts,
-	    NULL)) != -1) {
-		switch (option) {
-		case 'v':
-			if (v_arg) {
-				(void) fprintf(stderr, gettext("%s: the option "
-				    "-v cannot be specified more than once\n"),
-				    progname);
-				usage();
-			}
-
-			v_arg = B_TRUE;
-
-			errno = 0;
-			vid = (int)strtol(optarg, &endp, 10);
-			if (errno != 0 || vid < 1 || vid > 4094 ||
-			    *endp != '\0') {
-				(void) fprintf(stderr,
-				    gettext("%s: illegal VLAN identifier"
-				    " '%d'\n"), progname, vid);
-				exit(1);
-			}
-
-			break;
-		case 'd':
-			if (d_arg) {
-				(void) fprintf(stderr, gettext(
-				    "%s: the option -d cannot be specified "
-				    "more than once\n"), progname);
-				usage();
-			}
-
-			d_arg = B_TRUE;
-
-			if (strlcpy(device, optarg, MAXNAMELEN) >=
-			    MAXNAMELEN) {
-				(void) fprintf(stderr,
-				    gettext("%s: device name too long\n"),
-				    progname);
-				exit(1);
-			}
-			break;
-		case 't':
-			t_arg = B_TRUE;
-			break;
-		case 'R':
-			altroot = optarg;
-			break;
-		case ':':
-			(void) fprintf(stderr,
-			    gettext("%s: option requires a value '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		case '?':
-		default:
-			(void) fprintf(stderr,
-			    gettext("%s: unrecognized option '-%c'\n"),
-			    progname, optopt);
-			exit(1);
-			break;
-		}
-	}
-
-	if (optind != argc)
-		usage();
-
-	if (d_arg == B_FALSE) {
-		(void) fprintf(stderr,
-		    gettext("%s: no device specified\n"),
-		    progname);
-		exit(1);
-	}
-
-	if (v_arg == B_FALSE) {
-		(void) fprintf(stderr,
-		    gettext("%s: no VLAN ID specified\n"),
-		    progname);
-		exit(1);
-	}
-
-	if (dlpi_if_parse(device, driver, &instance) < 0 ||
-	    instance < 0) {
-		(void) fprintf(stderr,
-		    gettext("%s: badly formatted device '%s'\n"),
-		    progname, device);
-		exit(1);
-	}
-
-	(void) snprintf(name, MAXNAMELEN, "%s%d", driver,
-	    (vid * 1000) + instance);
-
-	if (dladm_unlink(name, t_arg, altroot, &diag) < 0) {
-		PRINT_ERR_DIAG("%s: unlink operation failed: %s", diag,
-		    dladm_diag);
-		exit(1);
-	}
-
-	if (dladm_sync() < 0) {
-		(void) fprintf(stderr,
-		    gettext("%s: sync operation failed"),
-		    progname);
-		perror(" ");
-		exit(1);
-	}
-}
 
 static void
 do_create_aggr(int argc, char *argv[])
@@ -1009,35 +735,6 @@ do_modify_aggr(int argc, char *argv[])
 }
 
 static void
-do_up_link(int argc, char *argv[])
-{
-	char		*name = NULL;
-	dladm_diag_t	diag = 0;
-
-	/* get link name (optional last argument) */
-	if (argc == 2)
-		name = argv[1];
-	else if (argc > 2)
-		usage();
-
-	if (dladm_up(name, &diag) < 0) {
-		if (name != NULL) {
-			(void) fprintf(stderr,
-			    gettext("%s: could not bring up link '%s' : %s"),
-			    progname, name, strerror(errno));
-			if (diag != 0)
-				(void) fprintf(stderr, " (%s)",
-				    dladm_diag(diag));
-			(void) fprintf(stderr, "\n");
-		} else {
-			PRINT_ERR_DIAG("%s: could not bring links up: %s",
-			    diag, dladm_diag);
-		}
-		exit(1);
-	}
-}
-
-static void
 do_up_aggr(int argc, char *argv[])
 {
 	uint16_t	key = 0;
@@ -1112,114 +809,118 @@ do_down_aggr(int argc, char *argv[])
 	}
 }
 
-static void
-create(void *arg, const char *dev, uint_t port)
-{
-	dladm_attr_t	dlattr;
-	dladm_diag_t	diag;
-	int		flags;
-
-	if (port != 0)
-		return;
-
-	if (strlcpy(dlattr.da_dev, dev, MAXNAMELEN) >= MAXNAMELEN) {
-		(void) fprintf(stderr,
-		    gettext("%s: device name too long\n"),
-		    progname);
-		exit(1);
-	}
-
-	dlattr.da_port = 0;
-	dlattr.da_vid = 0;
-
-	flags = DLADM_LINK_FORCED;
-	if (arg != NULL)
-		flags |= DLADM_LINK_TEMP;
-
-	(void) dladm_link(dlattr.da_dev, &dlattr, flags, NULL, &diag);
-}
-
-/* ARGSUSED */
-static void
-do_init_link(int argc, char *argv[])
-{
-	if (argc != 1 && strcmp(argv[1], "-t") != 0)
-		usage();
-
-	(void) macadm_walk(create, (void *)(argc > 1), B_FALSE);
-}
-
 #define	TYPE_WIDTH	10
-#define	MAC_WIDTH	23
-#define	MTU_WIDTH	11
-#define	STATE_WIDTH	15
+
+static void
+print_link_parseable(const char *name, dladm_attr_t *dap, boolean_t legacy)
+{
+	char		type[TYPE_WIDTH];
+
+	if (!legacy) {
+		if (dap->da_vid != 0) {
+			(void) snprintf(type, TYPE_WIDTH, "vlan %u",
+			    dap->da_vid);
+		} else {
+			(void) snprintf(type, TYPE_WIDTH, "non-vlan");
+		}
+		if (strcmp(dap->da_dev, AGGR_DEV) == 0) {
+			(void) printf("%s type=%s mtu=%d key=%u\n",
+			    name, type, dap->da_max_sdu, dap->da_port);
+		} else {
+			(void) printf("%s type=%s mtu=%d device=%s\n",
+			    name, type, dap->da_max_sdu, dap->da_dev);
+		}
+	} else {
+		(void) printf("%s type=legacy mtu=%d device=%s\n",
+		    name, dap->da_max_sdu, name);
+	}
+}
+
+static void
+print_link(const char *name, dladm_attr_t *dap, boolean_t legacy)
+{
+	char		type[TYPE_WIDTH];
+
+	if (!legacy) {
+		if (dap->da_vid != 0) {
+			(void) snprintf(type, TYPE_WIDTH, gettext("vlan %u"),
+			    dap->da_vid);
+		} else {
+			(void) snprintf(type, TYPE_WIDTH, gettext("non-vlan"));
+		}
+		if (strcmp(dap->da_dev, AGGR_DEV) == 0) {
+			(void) printf(gettext("%-9s\ttype: %s\tmtu: %d"
+			    "\taggregation: key %u\n"), name, type,
+			    dap->da_max_sdu, dap->da_port);
+		} else {
+			(void) printf(gettext("%-9s\ttype: %s\tmtu: "
+			    "%d\tdevice: %s\n"), name, type, dap->da_max_sdu,
+			    dap->da_dev);
+		}
+	} else {
+		(void) printf(gettext("%-9s\ttype: legacy\tmtu: "
+		    "%d\tdevice: %s\n"), name, dap->da_max_sdu, name);
+	}
+}
+
+static int
+get_if_info(const char *name, dladm_attr_t *dlattrp, boolean_t *legacy)
+{
+	int	err;
+
+	if ((err = dladm_info(name, dlattrp)) == 0) {
+		*legacy = B_FALSE;
+	} else if (err < 0 && errno == ENODEV) {
+		int		fd;
+		dlpi_if_attr_t	dia;
+		dl_info_ack_t	dlia;
+
+		/*
+		 * A return value of ENODEV means that the specified
+		 * device is not gldv3.
+		 */
+		if ((fd = dlpi_if_open(name, &dia, B_FALSE)) != -1 &&
+		    dlpi_info(fd, -1, &dlia, NULL, NULL, NULL, NULL,
+		    NULL, NULL) != -1) {
+			(void) dlpi_close(fd);
+
+			*legacy = B_TRUE;
+			bzero(dlattrp, sizeof (*dlattrp));
+			dlattrp->da_max_sdu = (uint_t)dlia.dl_max_sdu;
+		} else {
+			errno = ENOENT;
+			return (-1);
+		}
+	} else {
+		/*
+		 * If the return value is not ENODEV, this means that
+		 * user is either passing in a bogus interface name
+		 * or a vlan interface name that doesn't exist yet.
+		 */
+		errno = ENOENT;
+		return (-1);
+	}
+	return (0);
+}
 
 /* ARGSUSED */
 static void
 show_link(void *arg, const char *name)
 {
 	dladm_attr_t	dlattr;
-	char		type[TYPE_WIDTH];
-	int		fd;
-	dlpi_if_attr_t	dia;
-	dl_info_ack_t	dlia;
-	t_uscalar_t	dl_max_sdu;
+	boolean_t	legacy = B_TRUE;
 	show_link_state_t *state = (show_link_state_t *)arg;
 
-	if ((fd = dlpi_if_open(name, &dia, B_FALSE)) != -1 &&
-	    dlpi_info(fd, -1, &dlia, NULL, NULL, NULL, NULL,
-	    NULL, NULL) != -1) {
-		(void) dlpi_close(fd);
-		dl_max_sdu = dlia.dl_max_sdu;
-	} else {
-		(void) fprintf(stderr,
-		    gettext("%s: invalid device '%s'\n"),
+	if (get_if_info(name, &dlattr, &legacy) < 0) {
+		(void) fprintf(stderr, gettext("%s: invalid device '%s'\n"),
 		    progname, name);
 		exit(1);
 	}
 
-	if (dladm_info(name, &dlattr) < 0) {
-		if (!state->ls_parseable) {
-			(void) printf(gettext("%-9s\ttype: legacy"
-			    "\tmtu: %d\tdevice: %s\n"),
-			    name, (int)dl_max_sdu, name);
-		} else {
-			(void) printf("%s type=legacy mtu=%d device=%s\n",
-			    name, (int)dl_max_sdu, name);
-		}
+	if (state->ls_parseable) {
+		print_link_parseable(name, &dlattr, legacy);
 	} else {
-		if (dlattr.da_vid != 0) {
-			(void) snprintf(type, TYPE_WIDTH,
-			    state->ls_parseable ? "vlan %u" :
-			    gettext("vlan %u"), dlattr.da_vid);
-		} else {
-			(void) snprintf(type, TYPE_WIDTH,
-			    state->ls_parseable ? "non-vlan" :
-			    gettext("non-vlan"));
-		}
-
-		if (strcmp(dlattr.da_dev, AGGR_DEV) == 0) {
-			if (!state->ls_parseable) {
-				(void) printf(gettext("%-9s\ttype: %s"
-				    "\tmtu: %d\taggregation: key %u\n"),
-				    name, type, (int)dl_max_sdu,
-				    dlattr.da_port);
-			} else {
-				(void) printf("%s type=%s mtu=%d key=%u\n",
-				    name, type, (int)dl_max_sdu,
-				    dlattr.da_port);
-			}
-		} else {
-			if (!state->ls_parseable) {
-				(void) printf(gettext("%-9s\ttype: %s"
-				    "\tmtu: %d\tdevice: %s\n"),
-				    name, type, (int)dl_max_sdu,
-				    dlattr.da_dev);
-			} else {
-				(void) printf("%s type=%s mtu=%d device=%s\n",
-				    name, type, (int)dl_max_sdu, dlattr.da_dev);
-			}
-		}
+		print_link(name, &dlattr, legacy);
 	}
 }
 
@@ -1502,36 +1203,34 @@ kstat_value(kstat_t *ksp, const char *name, uint8_t type, void *buf)
 }
 
 static void
-show_dev(void *arg, const char *dev, uint_t port)
+show_dev(void *arg, const char *dev)
 {
-	show_mac_state_t	*state = (show_mac_state_t *)arg;
+	show_mac_state_t *state = (show_mac_state_t *)arg;
 
 	/* aggregations are already managed by a set of subcommands */
 	if (strcmp(dev, AGGR_DEV) == 0)
 		return;
 
 	(void) printf("%s", dev);
-	if (port != 0)
-		(void) printf("/%d", port);
 
 	if (!state->ms_parseable) {
 		(void) printf(gettext("\t\tlink: %s"),
-		    mac_link_state(dev, port));
+		    mac_link_state(dev, 0));
 		(void) printf(gettext("\tspeed: %-5u Mbps"),
-		    (unsigned int)(mac_ifspeed(dev, port) / 1000000ull));
+		    (unsigned int)(mac_ifspeed(dev, 0) / 1000000ull));
 		(void) printf(gettext("\tduplex: %s\n"),
-		    mac_link_duplex(dev, port));
+		    mac_link_duplex(dev, 0));
 	} else {
-		(void) printf(" link=%s", mac_link_state(dev, port));
+		(void) printf(" link=%s", mac_link_state(dev, 0));
 		(void) printf(" speed=%u",
-		    (unsigned int)(mac_ifspeed(dev, port) / 1000000ull));
-		(void) printf(" duplex=%s\n", mac_link_duplex(dev, port));
+		    (unsigned int)(mac_ifspeed(dev, 0) / 1000000ull));
+		(void) printf(" duplex=%s\n", mac_link_duplex(dev, 0));
 	}
 }
 
 /*ARGSUSED*/
 static void
-show_dev_stats(void *arg, const char *dev, uint_t port)
+show_dev_stats(void *arg, const char *dev)
 {
 	show_mac_state_t *state = (show_mac_state_t *)arg;
 	pktsum_t stats, diff_stats;
@@ -1548,12 +1247,10 @@ show_dev_stats(void *arg, const char *dev, uint_t port)
 		bzero(&state->ms_prevstats, sizeof (state->ms_prevstats));
 	}
 
-	get_mac_stats(dev, port, &stats);
+	get_mac_stats(dev, 0, &stats);
 	stats_diff(&diff_stats, &stats, &state->ms_prevstats);
 
 	(void) printf("%s", dev);
-	if (port != 0)
-		(void) printf("/%d", port);
 	(void) printf("\t\t%-10llu", diff_stats.ipackets);
 	(void) printf("%-12llu", diff_stats.rbytes);
 	(void) printf("%-8u", diff_stats.ierrors);
@@ -1648,10 +1345,11 @@ do_show_link(int argc, char *argv[])
 		return;
 	}
 
-	if (name == NULL)
+	if (name == NULL) {
 		(void) dladm_walk(show_link, &state);
-	else
+	} else {
 		show_link(&state, name);
+	}
 }
 
 static void
@@ -1886,29 +1584,22 @@ do_show_dev(int argc, char *argv[])
 	if (dev == NULL)
 		(void) macadm_walk(show_dev, &state, B_TRUE);
 	else
-		show_dev(&state, dev, 0);
+		show_dev(&state, dev);
 }
 
 /* ARGSUSED */
 static void
 link_stats(const char *link, uint32_t interval)
 {
-	show_link_state_t state;
+	dladm_attr_t		dlattr;
+	boolean_t		legacy;
+	show_link_state_t	state;
 
-	if (link != NULL) {
-		dlpi_if_attr_t dia;
-		int fd;
-
-		if ((fd = dlpi_if_open(link, &dia, B_FALSE)) != -1) {
-			(void) dlpi_close(fd);
-		} else {
-			(void) fprintf(stderr,
-			    gettext("%s: invalid device '%s'\n"),
-			    progname, link);
-			exit(1);
-		}
+	if (link != NULL && get_if_info(link, &dlattr, &legacy) < 0) {
+		(void) fprintf(stderr, gettext("%s: invalid device '%s'\n"),
+		    progname, link);
+		exit(1);
 	}
-
 	bzero(&state, sizeof (state));
 
 	/*
@@ -1932,7 +1623,6 @@ link_stats(const char *link, uint32_t interval)
 
 		(void) sleep(interval);
 	}
-
 }
 
 /* ARGSUSED */
@@ -1988,11 +1678,10 @@ dev_stats(const char *dev, uint32_t interval)
 		(void) printf("opackets	 obytes	     oerrors\n");
 
 		state.ms_donefirst = B_FALSE;
-		if (dev == NULL) {
+		if (dev == NULL)
 			(void) macadm_walk(show_dev_stats, &state, B_TRUE);
-		} else {
-			show_dev_stats(&state, dev, 0);
-		}
+		else
+			show_dev_stats(&state, dev);
 
 		if (interval == 0)
 			break;

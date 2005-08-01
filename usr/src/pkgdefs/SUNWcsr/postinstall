@@ -101,6 +101,32 @@ cat >> $BASEDIR/var/svc/profile/upgrade <<\_DEL_BIND8
 _DEL_BIND8
 
 #
+# Remove stale GLD services
+#
+SVCCFG_REPOSITORY=$PKG_INSTALL_ROOT/etc/svc/repository.db
+export SVCCFG_REPOSITORY
+if [ ! -r $PKG_INSTALL_ROOT/etc/svc/volatile/repository_door ]; then
+	#
+	# smf(5) is not presently running for the destination environment.	
+	# It is safe to remove the manifests from the repository.
+	#
+	svccfg delete svc:/network/aggregation
+	svccfg delete svc:/network/datalink-init
+	svccfg delete svc:/network/datalink
+else
+	#
+	# Local package install.  Need to disable the services first
+	# before deleting.
+	#
+	svcadm disable -s svc:/network/aggregation
+	svccfg delete svc:/network/aggregation
+	svcadm disable -s svc:/network/datalink-init
+	svccfg delete svc:/network/datalink-init
+	svcadm disable -s svc:/network/datalink
+	svccfg delete svc:/network/datalink
+fi
+
+#
 # svc:/network/rpc/keyserv is expected to be off on systems that don't
 # set domainname.  On systems that do define a default domain, leave the
 # setting as previously set.

@@ -37,7 +37,6 @@
 #include <sys/stream.h>
 #include <sys/mac.h>
 #include <sys/dls.h>
-#include <sys/ght.h>
 #include <net/if.h>
 
 #ifdef	__cplusplus
@@ -49,16 +48,13 @@ extern "C" {
  */
 #define	DLD_INFO	"Data-Link Driver v%I%"
 
+#define	DLD_MAX_PPA	999
+#define	DLD_MAX_MINOR	(DLD_MAX_PPA + 1)
+
 /*
  * Options: To enable an option set the property name to a non-zero value
  *	    in kernel/drv/dld.conf.
  */
-
-/*
- * Prevent creation of DLPI style 1 provider nodes (thus forcing stacks such
- * as TCP/IP to use style 2 nodes).
- */
-#define	DLD_PROP_NO_STYLE1	"no-style-1"
 
 /*
  * Prevent use of the IP fast-path (direct M_DATA transmit).
@@ -93,29 +89,36 @@ extern "C" {
  */
 #define	DLDIOC		('D' << 24 | 'L' << 16 | 'D' << 8)
 
-#define	DLDIOCCREATE	(DLDIOC | 0x01)
-
-typedef struct dld_ioc_create {
-	char		dic_name[IFNAMSIZ];
-	char		dic_dev[MAXNAMELEN];
-	uint_t		dic_port;
-	uint16_t	dic_vid;
-} dld_ioc_create_t;
-
-#define	DLDIOCDESTROY	(DLDIOC | 0x02)
-
-typedef struct dld_ioc_destroy {
-	char	did_name[IFNAMSIZ];
-} dld_ioc_destroy_t;
-
 #define	DLDIOCATTR	(DLDIOC | 0x03)
 
 typedef struct dld_ioc_attr {
 	char		dia_name[IFNAMSIZ];
 	char		dia_dev[MAXNAMELEN];
+	uint_t		dia_max_sdu;
 	uint_t		dia_port;
 	uint16_t	dia_vid;
 } dld_ioc_attr_t;
+
+#define	DLDIOCVLAN	(DLDIOC | 0x04)
+
+typedef struct dld_ioc_vlan {
+	uint_t		div_count;
+} dld_ioc_vlan_t;
+
+typedef struct dld_vlan_info {
+	char		dvi_name[IFNAMSIZ];
+	uint16_t	dvi_vid;
+} dld_vlan_info_t;
+
+#ifdef _KERNEL
+int	dld_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
+int	dld_open(queue_t *, dev_t *, int, int, cred_t *);
+int	dld_close(queue_t *);
+void	dld_wput(queue_t *, mblk_t *);
+void	dld_wsrv(queue_t *);
+void	dld_init_ops(struct dev_ops *, const char *);
+void	dld_fini_ops(struct dev_ops *);
+#endif
 
 #ifdef	__cplusplus
 }

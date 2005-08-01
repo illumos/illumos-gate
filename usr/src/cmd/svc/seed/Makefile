@@ -53,7 +53,6 @@ INSTALLSEED = $(ROOT)/usr/sadm/install
 #
 COMMON_DESCRIPTIONS = \
 	../milestone/boot-archive.xml \
-	../milestone/datalink.xml \
 	../milestone/devices-local.xml \
 	../milestone/identity.xml \
 	../milestone/local-fs.xml \
@@ -75,9 +74,7 @@ COMMON_DESCRIPTIONS = \
 #
 GLOBAL_ZONE_DESCRIPTIONS = \
 	../milestone/console-login.xml \
-	../milestone/datalink-init.xml \
 	../milestone/multi-user-server.xml \
-	../milestone/aggregation.xml \
 	../../cmd-inet/usr.lib/inetd/inetd-upgrade.xml \
 	../../utmpd/utmp.xml \
 	../../lvm/util/metainit.xml \
@@ -89,14 +86,12 @@ GLOBAL_ZONE_DESCRIPTIONS = \
 NONGLOBAL_ZONE_DESCRIPTIONS = \
 	../milestone/console-login.xml \
 	../milestone/multi-user-server.xml \
-	../milestone/aggregation.xml \
 	../../utmpd/utmp.xml
 
 #
 # Additional manifests for the install miniroot.
 #
 MINIROOT_DESCRIPTIONS= \
-	../milestone/datalink-init.xml \
 	../milestone/sysconfig.xml \
 	../../cmd-inet/usr.lib/inetd/inetd.xml \
 	../../cmd-inet/usr.sbin/login.xml \

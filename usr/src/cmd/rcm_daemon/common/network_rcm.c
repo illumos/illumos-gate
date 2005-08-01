@@ -40,9 +40,9 @@
 #include <libintl.h>
 #include <errno.h>
 #include <libdevinfo.h>
-#include <ctype.h>
 #include <sys/types.h>
-#include <libdlpi.h>
+#include <net/if.h>
+#include <liblaadm.h>
 #include "rcm_module.h"
 
 /*
@@ -69,8 +69,6 @@
  * If this ever changes we could add a delimiter with this macro.
  */
 #define	NET_DELIMITER	""
-
-#define	DLD_NAME	"dld"
 
 typedef struct net_cache
 {
@@ -114,6 +112,7 @@ static void cache_remove(net_cache_t *node);
 static net_cache_t *cache_lookup(const char *resource);
 static void free_node(net_cache_t *);
 static void cache_insert(net_cache_t *);
+static boolean_t is_aggregated(char *driver, int ppa);
 
 /*
  * Module-Private data
@@ -285,6 +284,18 @@ net_passthru(rcm_handle_t *hd, int op, const char *rsrc, uint_t flag,
 		    (timespec_t *)arg, dependent_reason);
 		break;
 	case NET_OFFLINE:
+		if (is_aggregated(node->driver, node->ppa)) {
+			/* device is aggregated */
+			*reason = strdup(gettext(
+			    "Resource is in use by aggregation"));
+			if (*reason == NULL) {
+				rcm_log_message(RCM_ERROR,
+				    gettext("NET: malloc failure"));
+			}
+			errno = EBUSY;
+			return (RCM_FAILURE);
+		}
+
 		rv = rcm_request_offline(hd, exported, flag, dependent_reason);
 		break;
 	case NET_ONLINE:
@@ -727,7 +738,6 @@ devfs_entry(di_node_t node, di_minor_t minor, void *arg)
 	char		ifname [MAXPATHLEN];	/* should be big enough! */
 	char		*devfspath;
 	char		resource[MAXPATHLEN];
-	char		dev_name[MAXPATHLEN];
 	char		*name;
 	char		*cp;
 	int		instance;
@@ -747,6 +757,9 @@ devfs_entry(di_node_t node, di_minor_t minor, void *arg)
 
 	instance = di_instance(node);
 
+	(void) snprintf(ifname, sizeof (ifname), "SUNW_network/%s%s%d",
+	    name, NET_DELIMITER, instance);
+
 	devfspath = di_devfs_path(node);
 	if (!devfspath) {
 		/* no devfs path?!? */
@@ -755,38 +768,15 @@ devfs_entry(di_node_t node, di_minor_t minor, void *arg)
 	}
 
 	if (strncmp("/pseudo", devfspath, strlen("/pseudo")) == 0) {
-		char *minor_name;
-
-		if (strcmp(DLD_NAME, name) != 0) {
-			/* ignore pseudo devices, probably not really NICs */
-			rcm_log_message(RCM_DEBUG, "NET: ignoring pseudo "
-			    "device %s\n", devfspath);
-			di_devfs_path_free(devfspath);
-			return (DI_WALK_CONTINUE);
-		}
-
-		/* we have a virtual datalink created by dld */
-		di_devfs_path_free(devfspath);
-		devfspath = di_devfs_minor_path(minor);
-		rcm_log_message(RCM_DEBUG, "NET: virtual datalink \"%s\"\n",
+		/* ignore pseudo devices, probably not really NICs */
+		rcm_log_message(RCM_DEBUG, "NET: ignoring pseudo device %s\n",
 		    devfspath);
-
-		minor_name = di_minor_name(minor);
-		if (dlpi_if_parse(minor_name, dev_name, &instance) < 0 ||
-		    instance < 0) {
-			rcm_log_message(RCM_DEBUG, "NET: ignoring \"%s\" "
-			    "(style 1)\n", devfspath);
-			di_devfs_path_free(devfspath);
-			return (DI_WALK_CONTINUE);
-		}
-		name = dev_name;
+		di_devfs_path_free(devfspath);
+		return (DI_WALK_CONTINUE);
 	}
 
 	(void) snprintf(resource, sizeof (resource), "/devices%s", devfspath);
 	di_devfs_path_free(devfspath);
-
-	(void) snprintf(ifname, sizeof (ifname), "SUNW_network/%s%s%d",
-	    name, NET_DELIMITER, instance);
 
 	probe = cache_lookup(resource);
 	if (probe != NULL) {
@@ -906,4 +896,55 @@ free_cache(void)
 		probe = cache_head.next;
 	}
 	(void) mutex_unlock(&cache_lock);
+}
+
+/*
+ * is_aggregated() checks whether a NIC being removed is part of an
+ * aggregation.
+ */
+
+typedef struct aggr_walker_state_s {
+	uint_t naggr;
+	char dev_name[LIFNAMSIZ];
+} aggr_walker_state_t;
+
+static int
+aggr_walker(void *arg, laadm_grp_attr_sys_t *grp)
+{
+	aggr_walker_state_t *state = arg;
+	laadm_port_attr_sys_t *port;
+	int i;
+
+	for (i = 0; i < grp->lg_nports; i++) {
+		port = &grp->lg_ports[i];
+
+		rcm_log_message(RCM_TRACE1, "MAC: aggr (%d) port %s/%d\n",
+		    grp->lg_key, port->lp_devname, port->lp_port);
+
+		if (strcmp(port->lp_devname, state->dev_name) != 0)
+			continue;
+
+		/* found matching MAC port */
+		state->naggr++;
+	}
+
+	return (0);
+}
+
+static boolean_t
+is_aggregated(char *driver, int ppa)
+{
+	aggr_walker_state_t state;
+
+	state.naggr = 0;
+	(void) snprintf(state.dev_name, sizeof (state.dev_name), "%s%d",
+	    driver, ppa);
+
+	if (laadm_walk_sys(aggr_walker, &state) != 0) {
+		rcm_log_message(RCM_ERROR, gettext("NET: cannot walk "
+		    "aggregations (%s)\n"), strerror(errno));
+		return (B_FALSE);
+	}
+
+	return (state.naggr > 0);
 }

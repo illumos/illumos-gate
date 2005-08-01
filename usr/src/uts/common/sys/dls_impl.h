@@ -32,7 +32,7 @@
 #include <sys/stream.h>
 #include <sys/dls.h>
 #include <sys/mac.h>
-#include <sys/ght.h>
+#include <sys/modhash.h>
 #include <sys/kstat.h>
 #include <net/if.h>
 
@@ -57,10 +57,11 @@ struct dls_link_s {
 	const mac_info_t	*dl_mip;
 	mac_rx_handle_t		dl_mrh;
 	mac_txloop_handle_t	dl_mth;
-	ghte_t			dl_hte;
 	uint_t			dl_ref;
 	uint_t			dl_macref;
-	ght_t			dl_impl_hash;
+	mod_hash_t		*dl_impl_hash;
+	krwlock_t		dl_impl_lock;
+	uint_t			dl_impl_count;
 	mac_txloop_t		dl_loopback;
 	kmutex_t		dl_promisc_lock;
 	uint_t			dl_npromisc;
@@ -71,7 +72,6 @@ struct dls_link_s {
 
 typedef struct dls_vlan_s {
 	char			dv_name[IFNAMSIZ];
-	ghte_t			dv_hte;
 	uint_t			dv_ref;
 	dls_link_t		*dv_dlp;
 	uint16_t		dv_id;
@@ -79,6 +79,7 @@ typedef struct dls_vlan_s {
 } dls_vlan_t;
 
 typedef struct dls_impl_s dls_impl_t;
+typedef struct dls_head_s dls_head_t;
 
 typedef mblk_t		*(*dls_priv_header_t)(dls_impl_t *,
     const uint8_t *, uint16_t, uint_t);
@@ -87,13 +88,13 @@ typedef void		(*dls_priv_header_info_t)(dls_impl_t *,
 
 struct dls_impl_s {
 	dls_impl_t			*di_nextp;
+	dls_head_t			*di_headp;
 	dls_vlan_t			*di_dvp;
 	mac_handle_t			di_mh;
 	mac_notify_handle_t		di_mnh;
 	const mac_info_t		*di_mip;
 	krwlock_t			di_lock;
 	uint16_t			di_sap;
-	ghte_t				di_hte;
 	uint_t				di_promisc;
 	dls_multicst_addr_t		*di_dmap;
 	dls_rx_t			di_rx;
@@ -105,6 +106,12 @@ struct dls_impl_s {
 	uint8_t				di_unicst_addr[MAXADDRLEN];
 	dls_priv_header_t		di_header;
 	dls_priv_header_info_t		di_header_info;
+};
+
+struct dls_head_s {
+	dls_impl_t			*dh_list;
+	uint_t				dh_ref;
+	mod_hash_key_t			dh_key;
 };
 
 extern void		dls_link_init(void);
@@ -124,8 +131,9 @@ extern int		dls_vlan_fini(void);
 extern int		dls_vlan_create(const char *, const char *, uint_t,
     uint16_t);
 extern int		dls_vlan_destroy(const char *);
-extern int		dls_vlan_hold(const char *, dls_vlan_t **);
+extern int		dls_vlan_hold(const char *, dls_vlan_t **, boolean_t);
 extern void		dls_vlan_rele(dls_vlan_t *);
+extern int		dls_vlan_walk(int (*)(dls_vlan_t *, void *), void *);
 
 extern void		dls_init(void);
 extern int		dls_fini(void);

@@ -31,7 +31,7 @@
  *
  * An instance of the structure aggr_grp_t is allocated for each
  * link aggregation group. When created, aggr_grp_t objects are
- * entered into the aggr_grp_hash hash table maintained by the GHT
+ * entered into the aggr_grp_hash hash table maintained by the modhash
  * module. The hash key is the port number associated with the link
  * aggregation group. The port number associated with a group corresponds
  * the key associated with the group.
@@ -52,7 +52,7 @@
 #include <sys/sunddi.h>
 #include <sys/atomic.h>
 #include <sys/stat.h>
-#include <sys/ght.h>
+#include <sys/modhash.h>
 #include <sys/strsun.h>
 #include <sys/dlpi.h>
 
@@ -75,10 +75,13 @@ static void aggr_stats_op(enum mac_stat, uint64_t *, uint64_t *, boolean_t);
 static void aggr_grp_capab_set(aggr_grp_t *);
 static boolean_t aggr_grp_capab_check(aggr_grp_t *, aggr_port_t *);
 
-static kmem_cache_t *aggr_grp_cache;
-static ght_t aggr_grp_hash;
+static kmem_cache_t	*aggr_grp_cache;
+static mod_hash_t	*aggr_grp_hash;
+static krwlock_t	aggr_grp_lock;
+static uint_t		aggr_grp_cnt;
 
 #define	GRP_HASHSZ		64
+#define	GRP_HASH_KEY(key)	((mod_hash_key_t)(uintptr_t)key)
 
 static uchar_t aggr_zero_mac[] = {0, 0, 0, 0, 0, 0};
 static uchar_t aggr_brdcst_mac[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
@@ -126,26 +129,37 @@ aggr_grp_destructor(void *buf, void *arg)
 void
 aggr_grp_init(void)
 {
-	int err;
-
 	aggr_grp_cache = kmem_cache_create("aggr_grp_cache",
 	    sizeof (aggr_grp_t), 0, aggr_grp_constructor,
 	    aggr_grp_destructor, NULL, NULL, NULL, 0);
 
-	err = ght_scalar_create("aggr_grp_hash", GRP_HASHSZ,
-	    &aggr_grp_hash);
-	ASSERT(err == 0);
+	aggr_grp_hash = mod_hash_create_idhash("aggr_grp_hash",
+	    GRP_HASHSZ, mod_hash_null_valdtor);
+	rw_init(&aggr_grp_lock, NULL, RW_DEFAULT, NULL);
+	aggr_grp_cnt = 0;
 }
 
 int
 aggr_grp_fini(void)
 {
-	int err;
+	if (aggr_grp_cnt > 0)
+		return (EBUSY);
 
-	if ((err = ght_destroy(aggr_grp_hash)) != 0)
-		return (err);
+	rw_destroy(&aggr_grp_lock);
+	mod_hash_destroy_idhash(aggr_grp_hash);
 	kmem_cache_destroy(aggr_grp_cache);
 	return (0);
+}
+
+uint_t
+aggr_grp_count(void)
+{
+	uint_t	count;
+
+	rw_enter(&aggr_grp_lock, RW_READER);
+	count = aggr_grp_cnt;
+	rw_exit(&aggr_grp_lock);
+	return (count);
 }
 
 /*
@@ -390,21 +404,18 @@ int
 aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 {
 	int rc, i, nadded = 0;
-	ghte_t hte;
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
 
 	/* get group corresponding to key */
-	ght_lock(aggr_grp_hash, GHT_READ);
-	if ((rc = ght_find(aggr_grp_hash, GHT_SCALAR_TO_KEY(key),
-	    &hte)) == ENOENT) {
-		ght_unlock(aggr_grp_hash);
-		return (rc);
+	rw_enter(&aggr_grp_lock, RW_READER);
+	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(key),
+	    (mod_hash_val_t *)&grp) != 0) {
+		rw_exit(&aggr_grp_lock);
+		return (ENOENT);
 	}
-	ASSERT(rc == 0);
-	grp = (aggr_grp_t *)GHT_VAL(hte);
 	AGGR_GRP_REFHOLD(grp);
-	ght_unlock(aggr_grp_hash);
+	rw_exit(&aggr_grp_lock);
 
 	AGGR_LACP_LOCK(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
@@ -479,18 +490,17 @@ aggr_grp_modify(uint32_t key, aggr_grp_t *grp_arg, uint8_t update_mask,
     aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer)
 {
 	int rc = 0;
-	ghte_t hte;
 	aggr_grp_t *grp = NULL;
 	boolean_t mac_addr_changed = B_FALSE;
 
 	if (grp_arg == NULL) {
 		/* get group corresponding to key */
-		ght_lock(aggr_grp_hash, GHT_READ);
-		if ((rc = ght_find(aggr_grp_hash, GHT_SCALAR_TO_KEY(key),
-		    &hte)) == ENOENT)
+		rw_enter(&aggr_grp_lock, RW_READER);
+		if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(key),
+		    (mod_hash_val_t *)&grp) != 0) {
+			rc = ENOENT;
 			goto bail;
-		ASSERT(rc == 0);
-		grp = (aggr_grp_t *)GHT_VAL(hte);
+		}
 		AGGR_LACP_LOCK(grp);
 		rw_enter(&grp->lg_lock, RW_WRITER);
 	} else {
@@ -551,7 +561,7 @@ bail:
 			rw_exit(&grp->lg_lock);
 			AGGR_LACP_UNLOCK(grp);
 		}
-		ght_unlock(aggr_grp_hash);
+		rw_exit(&aggr_grp_lock);
 		/* pass new unicast address up to MAC layer */
 		if (grp != NULL && mac_addr_changed && !grp->lg_closing)
 			mac_unicst_update(&grp->lg_mac, grp->lg_addr);
@@ -574,7 +584,6 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 {
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
-	ghte_t hte;
 	mac_t *mac;
 	mac_info_t *mip;
 	int err;
@@ -584,12 +593,13 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	if (nports == 0)
 		return (EINVAL);
 
-	ght_lock(aggr_grp_hash, GHT_WRITE);
+	rw_enter(&aggr_grp_lock, RW_WRITER);
 
 	/* does a group with the same key already exist? */
-	err = ght_find(aggr_grp_hash, GHT_SCALAR_TO_KEY(key), &hte);
-	if (err != ENOENT) {
-		ght_unlock(aggr_grp_hash);
+	err = mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(key),
+	    (mod_hash_val_t *)&grp);
+	if (err == 0) {
+		rw_exit(&aggr_grp_lock);
 		return (EEXIST);
 	}
 
@@ -688,18 +698,14 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	aggr_lacp_set_mode(grp, lacp_mode, lacp_timer);
 
 	/* add new group to hash table */
-	hte = ght_alloc(aggr_grp_hash, KM_SLEEP);
-	GHT_KEY(hte) = GHT_SCALAR_TO_KEY(key);
-	GHT_VAL(hte) = GHT_PTR_TO_VAL(grp);
-	grp->lg_hte = hte;
-
-	err = ght_insert(hte);
+	err = mod_hash_insert(aggr_grp_hash, GRP_HASH_KEY(key),
+	    (mod_hash_val_t)grp);
 	ASSERT(err == 0);
+	aggr_grp_cnt++;
 
 	rw_exit(&grp->lg_lock);
 	AGGR_LACP_UNLOCK(grp);
-	ght_unlock(aggr_grp_hash);
-
+	rw_exit(&aggr_grp_lock);
 	return (0);
 
 bail:
@@ -719,7 +725,7 @@ bail:
 		kmem_cache_free(aggr_grp_cache, grp);
 	}
 
-	ght_unlock(aggr_grp_hash);
+	rw_exit(&aggr_grp_lock);
 	return (err);
 }
 
@@ -837,22 +843,20 @@ int
 aggr_grp_rem_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 {
 	int rc = 0, i;
-	ghte_t hte;
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
 	boolean_t notify = B_FALSE, grp_mac_addr_changed;
 
 	/* get group corresponding to key */
-	ght_lock(aggr_grp_hash, GHT_READ);
-	if ((rc = ght_find(aggr_grp_hash, GHT_SCALAR_TO_KEY(key),
-	    &hte)) == ENOENT) {
-		ght_unlock(aggr_grp_hash);
-		return (rc);
+	rw_enter(&aggr_grp_lock, RW_READER);
+	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(key),
+	    (mod_hash_val_t *)&grp) != 0) {
+		rw_exit(&aggr_grp_lock);
+		return (ENOENT);
 	}
-	ASSERT(rc == 0);
-	grp = (aggr_grp_t *)GHT_VAL(hte);
 	AGGR_GRP_REFHOLD(grp);
-	ght_unlock(aggr_grp_hash);
+	rw_exit(&aggr_grp_lock);
+
 	AGGR_LACP_LOCK(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 
@@ -907,22 +911,17 @@ bail:
 int
 aggr_grp_delete(uint32_t key)
 {
-	int err;
-	ghte_t hte;
-	aggr_grp_t *grp;
+	aggr_grp_t *grp = NULL;
 	aggr_port_t *port, *cport;
+	mod_hash_val_t val;
 
-	ght_lock(aggr_grp_hash, GHT_WRITE);
+	rw_enter(&aggr_grp_lock, RW_WRITER);
 
-	err = ght_find(aggr_grp_hash, GHT_SCALAR_TO_KEY(key), &hte);
-	if (err == ENOENT) {
-		ght_unlock(aggr_grp_hash);
-		return (err);
+	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(key),
+	    (mod_hash_val_t *)&grp) != 0) {
+		rw_exit(&aggr_grp_lock);
+		return (ENOENT);
 	}
-	ASSERT(err == 0);
-
-	grp = (aggr_grp_t *)GHT_VAL(hte);
-
 	AGGR_LACP_LOCK(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 	grp->lg_closing = B_TRUE;
@@ -935,7 +934,7 @@ aggr_grp_delete(uint32_t key)
 	if (mac_unregister(&grp->lg_mac)) {
 		rw_exit(&grp->lg_lock);
 		AGGR_LACP_UNLOCK(grp);
-		ght_unlock(aggr_grp_hash);
+		rw_exit(&aggr_grp_lock);
 		return (EBUSY);
 	}
 
@@ -955,10 +954,13 @@ aggr_grp_delete(uint32_t key)
 	rw_exit(&grp->lg_lock);
 	AGGR_LACP_UNLOCK(grp);
 
-	ght_remove(hte);
-	ght_free(hte);
+	(void) mod_hash_remove(aggr_grp_hash, GRP_HASH_KEY(key), &val);
+	ASSERT(grp == (aggr_grp_t *)val);
 
-	ght_unlock(aggr_grp_hash);
+	ASSERT(aggr_grp_cnt > 0);
+	aggr_grp_cnt--;
+
+	rw_exit(&aggr_grp_lock);
 	AGGR_GRP_REFRELE(grp);
 
 	return (0);
@@ -976,17 +978,18 @@ aggr_grp_free(aggr_grp_t *grp)
  * their ports that must be passed up to user-space.
  */
 
-static boolean_t
-aggr_grp_info_walker(void *arg, ghte_t hte)
+/*ARGSUSED*/
+static uint_t
+aggr_grp_info_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 {
 	aggr_grp_t *grp;
 	aggr_port_t *port;
 	aggr_grp_info_state_t *state = arg;
 
 	if (state->ls_rc != 0)
-		return (B_FALSE);	/* terminate walk */
+		return (MH_WALK_TERMINATE);	/* terminate walk */
 
-	grp = (aggr_grp_t *)GHT_VAL(hte);
+	grp = (aggr_grp_t *)val;
 
 	rw_enter(&grp->lg_lock, RW_READER);
 
@@ -1018,7 +1021,7 @@ aggr_grp_info_walker(void *arg, ghte_t hte)
 
 bail:
 	rw_exit(&grp->lg_lock);
-	return (state->ls_rc == 0);
+	return ((state->ls_rc == 0) ? MH_WALK_CONTINUE : MH_WALK_TERMINATE);
 }
 
 int
@@ -1029,9 +1032,9 @@ aggr_grp_info(uint_t *ngroups, uint32_t group_key, void *fn_arg,
 	aggr_grp_info_state_t state;
 	int rc = 0;
 
-	ght_lock(aggr_grp_hash, GHT_READ);
+	rw_enter(&aggr_grp_lock, RW_READER);
 
-	*ngroups = ght_count(aggr_grp_hash);
+	*ngroups = aggr_grp_cnt;
 
 	bzero(&state, sizeof (state));
 	state.ls_group_key = group_key;
@@ -1039,13 +1042,13 @@ aggr_grp_info(uint_t *ngroups, uint32_t group_key, void *fn_arg,
 	state.ls_new_port_fn = new_port_fn;
 	state.ls_fn_arg = fn_arg;
 
-	ght_walk(aggr_grp_hash, aggr_grp_info_walker, &state);
+	mod_hash_walk(aggr_grp_hash, aggr_grp_info_walker, &state);
 
 	if ((rc = state.ls_rc) == 0 && group_key != 0 &&
 	    !state.ls_group_found)
 		rc = ENOENT;
 
-	ght_unlock(aggr_grp_hash);
+	rw_exit(&aggr_grp_lock);
 	return (rc);
 }
 
@@ -1059,16 +1062,6 @@ typedef struct aggr_grp_walker_state_s {
 } aggr_grp_walker_state_t;
 
 void
-aggr_grp_walker(void *arg, ghte_t hte)
-{
-	aggr_grp_walker_state_t *state = arg;
-	aggr_grp_t *grp;
-
-	grp = (aggr_grp_t *)GHT_VAL(hte);
-	state->ws_walker_fn(grp, state->ws_arg);
-}
-
-void
 aggr_grp_walk(aggr_grp_walker_fn_t walker, void *arg)
 {
 	aggr_grp_walker_state_t state;
@@ -1076,9 +1069,9 @@ aggr_grp_walk(aggr_grp_walker_fn_t walker, void *arg)
 	state.ws_walker_fn = walker;
 	state.ws_arg = arg;
 
-	ght_lock(aggr_grp_hash, GHT_READ);
-	ght_walk(aggr_grp_hash, aggr_grp_info_walker, &state);
-	ght_unlock(aggr_grp_hash);
+	rw_enter(&aggr_grp_lock, RW_READER);
+	mod_hash_walk(aggr_grp_hash, aggr_grp_info_walker, &state);
+	rw_exit(&aggr_grp_lock);
 }
 
 static void

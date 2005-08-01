@@ -29,7 +29,7 @@
 PROG= dladm
 
 ROOTFS_PROG= $(PROG)
-CONFIGFILES= datalink.conf aggregation.conf
+CONFIGFILES= aggregation.conf
 
 POFILE= $(PROG).po
 

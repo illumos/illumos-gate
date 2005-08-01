@@ -31,7 +31,6 @@
 
 #include <sys/types.h>
 #include <sys/stream.h>
-#include <sys/ght.h>
 #include <sys/mac.h>
 
 /*
@@ -66,9 +65,15 @@ extern "C" {
 	((sap) == 0) || \
 	((sap) <= ETHERMTU && (type) == DL_ETHER))
 
+/*
+ * Macros for converting ppas to instance #s and to Vlan IDs.
+ */
+#define	DLS_PPA2INST(ppa)	((int)((ppa) % 1000))
+#define	DLS_PPA2VID(ppa)	((uint16_t)((ppa) / 1000))
+
 #ifdef	_KERNEL
 
-extern int	dls_create(const char *, const char *, uint_t, uint16_t);
+extern int	dls_create(const char *, const char *, uint_t);
 extern int	dls_destroy(const char *);
 
 typedef	struct dls_t	*dls_channel_t;

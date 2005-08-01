@@ -61,6 +61,11 @@ SUNW_NO_MPATHD=; export SUNW_NO_MPATHD
 smf_netstrategy
 
 #
+# Bring up link aggregations
+#
+/sbin/dladm up-aggr
+
+#
 # If the system was net booted by DHCP, hand DHCP management off to the
 # DHCP agent (ifconfig communicates to the DHCP agent through the
 # loopback interface).

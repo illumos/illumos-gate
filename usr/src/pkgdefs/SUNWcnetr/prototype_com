@@ -39,11 +39,9 @@
 # packaging files
 i pkginfo
 i copyright
-i postinstall
 i i.ipsecalgsbase
 i i.preserve
 i i.sock2path
-i i.datalinkconf
 #
 # source locations relative to the prototype file
 #
@@ -51,7 +49,6 @@ i i.datalinkconf
 #
 d none etc 755 root sys
 e preserve etc/aggregation.conf 644 root sys
-e datalinkconf etc/datalink.conf 644 root sys
 d none etc/default 755 root sys
 e preserve etc/default/dhcpagent 644 root sys
 e preserve etc/default/inetinit 644 root sys

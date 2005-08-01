@@ -577,7 +577,6 @@ f none usr/lib/rcm/modules/SUNW_network_rcm.so 555 root bin
 f none usr/lib/rcm/modules/SUNW_swap_rcm.so 555 root bin
 f none usr/lib/rcm/modules/SUNW_cluster_rcm.so 555 root bin
 f none usr/lib/rcm/modules/SUNW_ip_anon_rcm.so 555 root bin
-f none usr/lib/rcm/modules/SUNW_mac_rcm.so 555 root bin
 f none usr/lib/rcm/modules/SUNW_mpxio_rcm.so 555 root bin
 f none usr/lib/rcm/rcm_daemon 555 root bin
 d none usr/lib/rcm/scripts 755 root bin

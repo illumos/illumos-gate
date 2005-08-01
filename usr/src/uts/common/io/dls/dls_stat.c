@@ -33,7 +33,6 @@
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/atomic.h>
-#include <sys/ght.h>
 #include <sys/kstat.h>
 #include <sys/vlan.h>
 #include <sys/mac.h>

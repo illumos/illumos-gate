@@ -54,8 +54,6 @@
 #include <libdevinfo.h>
 #include <sys/systeminfo.h>
 #include <netdb.h>
-#include <libdladm.h>
-#include <libdlpi.h>
 
 #include <ipmp_mpathd.h>
 #include "rcm_module.h"
@@ -86,8 +84,6 @@
 
 #define	RCM_STR_SUNW_IP		"SUNW_ip/"	/* IP address export prefix */
 #define	RCM_SIZE_SUNW_IP	9		/* strlen("SUNW_ip/") + 1 */
-
-#define	MAXINTSTR		11		/* max integer string len */
 
 /* ifconfig(1M) */
 #define	USR_SBIN_IFCONFIG	"/usr/sbin/ifconfig" /* ifconfig command */
@@ -2034,18 +2030,6 @@ ip_ipmp_undo_offline(ip_cache_t *node)
 }
 
 /*
- * is_virtual() - Determine whether the specified device is a virtual
- * device managed by dld.
- */
-static boolean_t
-is_virtual(char *ifname)
-{
-	dladm_attr_t attr;
-
-	return (dladm_info(ifname, &attr) == 0);
-}
-
-/*
  * getdlpi_style() - Determine the DLPI provider style of the interface
  */
 static int
@@ -2084,7 +2068,7 @@ get_ppa(char *rsrc)
 	if (m == 1) {
 		return (-1);
 	}
-	return (is_virtual(rsrc) ? p : VLAN_GET_PPA(p)); /* VLAN support */
+	return (VLAN_GET_PPA(p)); /* VLAN support */
 }
 
 /*
@@ -3014,8 +2998,6 @@ process_minor(char *devfs_path, char *name, int instance,
 	struct ni_list **pp;
 	char *cname;
 	size_t cnamelen;
-	char dev_name[MAXPATHLEN];
-	boolean_t virtual = B_FALSE;
 
 	rcm_log_message(RCM_TRACE1, "IP: process_minor\n");
 
@@ -3028,31 +3010,8 @@ process_minor(char *devfs_path, char *name, int instance,
 	rcm_log_message(RCM_TRACE1, "IP: Examining %s (%s)\n",
 	    devfs_path, mdata->minor_name);
 
-	/*
-	 * Virtual DDI_NT_NET nodes created by dld are exposed by devfs
-	 * for non-VLAN as well as VLANs. Determine if we're dealing
-	 * with a virtual device.
-	 */
-	if (strncmp("/pseudo", devfs_path, strlen("/pseudo")) == 0) {
-		rcm_log_message(RCM_TRACE1, "IP: pseudo node %s (%s)\n",
-		    devfs_path, mdata->minor_name);
-		if (strcmp(name, "dld") == 0) {
-			if (dlpi_if_parse(mdata->minor_name, dev_name,
-			    &instance) < 0 || instance < 0) {
-				/* dld always also creates a style-2 */
-				rcm_log_message(RCM_DEBUG, "IP: ignoring "
-				    "\"%s\" (style 1)\n", devfs_path);
-				return;
-			}
-			name = dev_name;
-			virtual = B_TRUE;
-			rcm_log_message(RCM_TRACE1, "IP: virtual datalink "
-			    "%s%d\n", name, instance);
-		}
-	}
-
 	/* Sanity check, instances > 999 are illegal */
-	if (!virtual && instance > 999) {
+	if (instance > 999) {
 		errno = EINVAL;
 		rcm_log_message(RCM_ERROR, _("IP: invalid instance %d(%s)\n"),
 		    instance, strerror(errno));
@@ -3077,7 +3036,7 @@ process_minor(char *devfs_path, char *name, int instance,
 	}
 	(void) memcpy(nip->type, name, cnamelen);
 
-	cnamelen += MAXINTSTR;
+	cnamelen += 3;
 	if ((cname = (char *)malloc(cnamelen)) == NULL) {
 		free(nip->type);
 		free(nip);

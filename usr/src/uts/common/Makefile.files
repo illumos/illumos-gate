@@ -487,8 +487,7 @@ CLONE_OBJS +=	clone.o
 
 CN_OBJS +=	cons.o
 
-DLD_OBJS +=	dld_drv.o dld_ioc.o dld_minor.o dld_node.o dld_ppa.o \
-		dld_proto.o dld_str.o 
+DLD_OBJS +=	dld_drv.o dld_proto.o dld_str.o
 		
 DLS_OBJS +=	dls.o dls_link.o dls_mod.o dls_stat.o dls_vlan.o
 
@@ -498,8 +497,6 @@ MAC_OBJS +=     mac.o mac_mod.o mac_stat.o
 
 AGGR_OBJS +=	aggr_dev.o aggr_ctl.o aggr_grp.o aggr_port.o \
 		aggr_send.o aggr_recv.o aggr_lacp.o
-
-GHT_OBJS +=	ght.o
 
 TAVOR_OBJS +=	tavor.o tavor_agents.o tavor_cfg.o tavor_ci.o tavor_cmd.o \
 		tavor_cq.o tavor_event.o tavor_ioctl.o tavor_misc.o \

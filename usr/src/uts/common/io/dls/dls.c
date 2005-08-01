@@ -35,7 +35,6 @@
 #include	<sys/strsun.h>
 #include	<sys/sysmacros.h>
 #include	<sys/atomic.h>
-#include	<sys/ght.h>
 #include	<sys/dlpi.h>
 #include	<sys/vlan.h>
 #include	<sys/ethernet.h>
@@ -295,9 +294,9 @@ dls_fini(void)
  */
 
 int
-dls_create(const char *name, const char *dev, uint_t port, uint16_t vid)
+dls_create(const char *name, const char *dev, uint_t port)
 {
-	return (dls_vlan_create(name, dev, port, vid));
+	return (dls_vlan_create(name, dev, port, 0));
 }
 
 int
@@ -316,8 +315,9 @@ dls_open(const char *name, dls_channel_t *dcp)
 
 	/*
 	 * Get a reference to the named dls_vlan_t.
+	 * Tagged vlans get created automatically.
 	 */
-	if ((err = dls_vlan_hold(name, &dvp)) != 0)
+	if ((err = dls_vlan_hold(name, &dvp, B_TRUE)) != 0)
 		return (err);
 
 	/*
@@ -433,7 +433,8 @@ dls_close(dls_channel_t dc)
 
 	/*
 	 * Release our reference to the dls_vlan_t allowing that to be
-	 * destroyed if there are no more dls_impl_t.
+	 * destroyed if there are no more dls_impl_t. An unreferenced tagged
+	 * vlan gets destroyed automatically.
 	 */
 	dls_vlan_rele(dvp);
 }

@@ -31,7 +31,6 @@
 
 #include <sys/types.h>
 #include <sys/mac.h>
-#include <sys/ght.h>
 #include <sys/aggr_lacp.h>
 
 #ifdef	__cplusplus
@@ -40,7 +39,7 @@ extern "C" {
 
 #ifdef _KERNEL
 
-#define	AGGR_MINOR_CTL	0			/* control interface minor */
+#define	AGGR_MINOR_CTL	1		/* control interface minor */
 
 /* flags for aggr_grp_modify() */
 #define	AGGR_MODIFY_POLICY		0x01
@@ -109,7 +108,6 @@ typedef struct aggr_grp_s {
 	uint32_t	lg_refs;		/* refcount */
 	uint16_t	lg_nports;		/* number of MAC ports */
 	uint8_t		lg_addr[ETHERADDRL];	/* group MAC address */
-	ghte_t		lg_hte;
 	uint16_t
 			lg_addr_fixed : 1,	/* fixed MAC address? */
 			lg_started : 1,		/* group started? */
@@ -162,10 +160,7 @@ typedef struct aggr_grp_s {
 }
 
 extern dev_info_t *aggr_dip;
-
-extern int aggr_open(dev_t *, int, int, cred_t *);
-extern int aggr_close(dev_t, int, int, cred_t *);
-extern int aggr_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
+extern void aggr_ioctl(queue_t *, mblk_t *);
 
 typedef int (*aggr_grp_info_new_grp_fn_t)(void *, uint32_t, uchar_t *,
     boolean_t, uint32_t, uint32_t, aggr_lacp_mode_t, aggr_lacp_timer_t);
@@ -193,6 +188,7 @@ extern int aggr_grp_modify(uint32_t, aggr_grp_t *, uint8_t, uint32_t,
     boolean_t, const uchar_t *, aggr_lacp_mode_t, aggr_lacp_timer_t);
 extern void aggr_grp_multicst_port(aggr_port_t *, boolean_t);
 extern void aggr_grp_walk(aggr_grp_walker_fn_t, void *);
+extern uint_t aggr_grp_count(void);
 
 extern void aggr_port_init(void);
 extern int aggr_port_fini(void);

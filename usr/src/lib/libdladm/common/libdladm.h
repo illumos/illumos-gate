@@ -41,44 +41,14 @@ typedef struct dladm_attr	dladm_attr_t;
 
 struct dladm_attr {
 	char		da_dev[MAXNAMELEN];
+	uint_t		da_max_sdu;
 	uint_t		da_port;
 	uint16_t	da_vid;
 };
 
-/* number of attributes per devices in database file */
-#define	DLADM_NATTR	3
-
-/*
- * Diagnostic codes. These supplement error messages.
- */
-typedef enum {
-	DLADM_DIAG_INVALID_LINKNAME	= 1,
-	DLADM_DIAG_INVALID_INTFNAME	= 2,
-	DLADM_DIAG_CORRUPT_REPOSITORY   = 3,
-	DLADM_DIAG_REPOSITORY_OPENFAIL  = 4,
-	DLADM_DIAG_REPOSITORY_WRITEFAIL = 5,
-	DLADM_DIAG_REPOSITORY_CLOSEFAIL = 6,
-	DLADM_DIAG_DEVICE_OPENFAIL	= 7
-} dladm_diag_t;
-
-/*
- * Flags recognized by dladm_link()
- */
-#define	DLADM_LINK_TEMP		0x01
-#define	DLADM_LINK_FORCED	0x02
-
-extern int	dladm_link(const char *, dladm_attr_t *,
-    int, const char *, dladm_diag_t *);
-extern int	dladm_up(const char *, dladm_diag_t *);
-extern int	dladm_unlink(const char *, boolean_t, const char *,
-    dladm_diag_t *);
-extern int	dladm_down(const char *, dladm_diag_t *);
 extern int	dladm_walk(void (*)(void *, const char *), void *);
+extern int	dladm_walk_vlan(void (*)(void *, const char *), void *);
 extern int	dladm_info(const char *, dladm_attr_t *);
-extern void	dladm_db_walk(void (*)(void *, const char *,
-    dladm_attr_t *), void *);
-extern int	dladm_sync(void);
-extern const char *dladm_diag(dladm_diag_t);
 
 #ifdef	__cplusplus
 }

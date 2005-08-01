@@ -36,7 +36,7 @@
 extern "C" {
 #endif
 
-extern int	macadm_walk(void (*)(void *, const char *, uint_t),
+extern int	macadm_walk(void (*)(void *, const char *),
     void *, boolean_t);
 
 #ifdef	__cplusplus

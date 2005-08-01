@@ -60,7 +60,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 
 #
-# Driver depends on GLD & IP
+# Driver depends on MAC & IP
 #
 LDFLAGS		+= -dy -N misc/mac -N drv/ip
 

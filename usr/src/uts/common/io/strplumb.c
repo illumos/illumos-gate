@@ -360,50 +360,6 @@ done:
 	return (err);
 }
 
-static int
-create_gldv3_linkobj(ldi_ident_t li, char *driver, int instance)
-{
-	ldi_handle_t		lh;
-	int			err;
-	struct strioctl		iocb;
-	int			rval;
-	dld_ioc_create_t	dic;
-
-	/*
-	 * gld v3 driver. open the DLD control node.
-	 */
-	if ((err = ldi_open_by_name(DLD_CONTROL_DEV, FREAD|FWRITE, CRED(), &lh,
-	    li)) != 0) {
-		printf("strplumb: open CTLDEV failed: %d\n", err);
-		return (ENXIO);
-	}
-
-	(void) snprintf(dic.dic_name, sizeof (dic.dic_name) - 1, "%s%d",
-	    driver, instance);
-	(void) snprintf(dic.dic_dev, sizeof (dic.dic_dev) - 1, "%s%d",
-	    driver, instance);
-	dic.dic_port = 0;
-	dic.dic_vid = 0;
-
-	iocb.ic_cmd = DLDIOCCREATE;
-	iocb.ic_timout = 15;
-	iocb.ic_len = sizeof (dic);
-	iocb.ic_dp = (char *)&dic;
-
-	/*
-	 * Try to create a data-link interface with the same name as the
-	 * device.
-	 */
-	if ((err = ldi_ioctl(lh, I_STR, (intptr_t)&iocb, FKIOCTL, CRED(),
-	    &rval)) != 0) {
-		cmn_err(CE_WARN, "strplumb: DLDIOCCREATE failed: %d\n", err);
-		return (ENXIO);
-	}
-
-	(void) ldi_close(lh, FREAD|FWRITE, CRED());
-	return (0);
-}
-
 /*
  * Can be set in /etc/system in the case of local booting. See comment below.
  */
@@ -420,13 +376,12 @@ int	ndev_unit = 0;
  * This can be overridden by setting "ndev_name" in /etc/system.
  */
 static int
-resolve_boot_path(ldi_ident_t li)
+resolve_boot_path(void)
 {
 	char			*devpath = NULL;
 	dev_info_t		*dip;
 	const char		*driver;
 	int			instance;
-	int			err;
 
 	if (strncmp(rootfs.bo_fstype, "nfs", 3) == 0)
 		devpath = rootfs.bo_name;
@@ -466,29 +421,12 @@ resolve_boot_path(ldi_ident_t li)
 		instance = ndev_unit;
 	}
 
-	/* legcy driver, use clone to open */
-	if (!GLDV3_DRV(ddi_name_to_major((char *)driver))) {
-		(void) snprintf(rootfs.bo_devname, BO_MAXOBJNAME,
-		    "/devices/pseudo/clone@0:%s", driver);
-		(void) snprintf(rootfs.bo_ifname, BO_MAXOBJNAME, "%s%d",
-		    driver, instance);
-		rootfs.bo_ppa = instance;
-		return (0);
-	}
-
-	/* GLDv3: create link object so open with succeed later */
-	err = create_gldv3_linkobj(li, (char *)driver, instance);
-	if (err != 0) {
-		return (err);
-	}
-
 	(void) snprintf(rootfs.bo_devname, BO_MAXOBJNAME,
-	    "/devices/pseudo/dld@0:%s", driver);
+	    "/devices/pseudo/clone@0:%s", driver);
 	(void) snprintf(rootfs.bo_ifname, BO_MAXOBJNAME, "%s%d",
 	    driver, instance);
 	rootfs.bo_ppa = instance;
-
-	return (err);
+	return (0);
 }
 
 static int
@@ -697,7 +635,7 @@ strplumb(void)
 	if ((err = strplumb_tcpq(li)) != 0)
 		goto done;
 
-	if ((err = resolve_boot_path(li)) != 0)
+	if ((err = resolve_boot_path()) != 0)
 		goto done;
 
 	DBG1("rootfs.bo_devname: %s\n", rootfs.bo_devname);

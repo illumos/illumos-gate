@@ -28,7 +28,7 @@
 function	macadm_walk
 include		<libmacadm.h>
 declaration	int	macadm_walk( \
-			void (*fn)(void *, const char *, uint_t), \
+			void (*fn)(void *, const char *), \
 			void *, boolean_t);
 version		SUNWprivate_1.1
 end

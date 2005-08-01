@@ -37,14 +37,18 @@
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/dlpi.h>
+#include <sys/modhash.h>
 #include <sys/mac.h>
 #include <sys/mac_impl.h>
-#include <sys/dld_impl.h>
+#include <sys/dls.h>
+#include <sys/dld.h>
 
 #define	IMPL_HASHSZ	67	/* prime */
 
 static kmem_cache_t	*i_mac_impl_cachep;
-static ght_t		i_mac_impl_hash;
+static mod_hash_t	*i_mac_impl_hash;
+krwlock_t		i_mac_impl_lock;
+uint_t			i_mac_impl_count;
 
 /*
  * Private functions.
@@ -110,7 +114,6 @@ i_mac_destructor(void *buf, void *arg)
 	mac_impl_t	*mip = buf;
 
 	ASSERT(mip->mi_mp == NULL);
-	ASSERT(mip->mi_hte == NULL);
 	ASSERT(mip->mi_ref == 0);
 	ASSERT(mip->mi_active == 0);
 	ASSERT(mip->mi_link == LINK_STATE_UNKNOWN);
@@ -130,13 +133,12 @@ i_mac_destructor(void *buf, void *arg)
 	mutex_destroy(&mip->mi_activelink_lock);
 }
 
-int
+static int
 i_mac_create(mac_t *mp)
 {
 	dev_info_t	*dip;
 	mac_impl_t	*mip;
-	int		err;
-	ghte_t		hte;
+	int		err = 0;
 
 	dip = mp->m_dip;
 	ASSERT(dip != NULL);
@@ -163,24 +165,16 @@ i_mac_create(mac_t *mp)
 	mp->m_impl = (void *)mip;
 
 	/*
-	 * Allocate a hash table entry.
-	 */
-	hte = ght_alloc(i_mac_impl_hash, KM_SLEEP);
-
-	GHT_KEY(hte) = GHT_PTR_TO_KEY(mip->mi_name);
-	GHT_VAL(hte) = GHT_PTR_TO_VAL(mip);
-
-	/*
 	 * Insert the hash table entry.
 	 */
-	ght_lock(i_mac_impl_hash, GHT_WRITE);
-	if ((err = ght_insert(hte)) != 0) {
-		ght_free(hte);
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	if (mod_hash_insert(i_mac_impl_hash,
+	    (mod_hash_key_t)mip->mi_name, (mod_hash_val_t)mip) != 0) {
 		kmem_cache_free(i_mac_impl_cachep, mip);
+		err = EEXIST;
 		goto done;
 	}
-
-	mip->mi_hte = hte;
+	i_mac_impl_count++;
 
 	/*
 	 * Copy the fixed 'factory' MAC address from the immutable info.
@@ -210,7 +204,7 @@ i_mac_create(mac_t *mp)
 	mac_stat_create(mip);
 
 done:
-	ght_unlock(i_mac_impl_hash);
+	rw_exit(&i_mac_impl_lock);
 	return (err);
 }
 
@@ -218,10 +212,10 @@ static void
 i_mac_destroy(mac_t *mp)
 {
 	mac_impl_t		*mip = mp->m_impl;
-	ghte_t			hte;
 	mac_multicst_addr_t	*p, *nextp;
+	mod_hash_val_t		val;
 
-	ght_lock(i_mac_impl_hash, GHT_WRITE);
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
 
 	ASSERT(mip->mi_ref == 0);
 	ASSERT(!mip->mi_activelink);
@@ -234,10 +228,12 @@ i_mac_destroy(mac_t *mp)
 	/*
 	 * Remove and destroy the hash table entry.
 	 */
-	hte = mip->mi_hte;
-	ght_remove(hte);
-	ght_free(hte);
-	mip->mi_hte = NULL;
+	(void) mod_hash_remove(i_mac_impl_hash,
+	    (mod_hash_key_t)mip->mi_name, &val);
+	ASSERT(mip == (mac_impl_t *)val);
+
+	ASSERT(i_mac_impl_count > 0);
+	i_mac_impl_count--;
 
 	/*
 	 * Free the list of multicast addresses.
@@ -261,7 +257,7 @@ i_mac_destroy(mac_t *mp)
 	 */
 	kmem_cache_free(i_mac_impl_cachep, mip);
 
-	ght_unlock(i_mac_impl_hash);
+	rw_exit(&i_mac_impl_lock);
 }
 
 static void
@@ -292,24 +288,26 @@ i_mac_notify(mac_impl_t *mip, mac_notify_type_t type)
 void
 mac_init(void)
 {
-	int	err;
-
 	i_mac_impl_cachep = kmem_cache_create("mac_impl_cache",
 	    sizeof (mac_impl_t), 0, i_mac_constructor, i_mac_destructor, NULL,
 	    NULL, NULL, 0);
 	ASSERT(i_mac_impl_cachep != NULL);
 
-	err = ght_str_create("mac_impl_hash", IMPL_HASHSZ, &i_mac_impl_hash);
-	ASSERT(err == 0);
+	i_mac_impl_hash = mod_hash_create_extended("mac_impl_hash",
+	    IMPL_HASHSZ, mod_hash_null_keydtor, mod_hash_null_valdtor,
+	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
+	rw_init(&i_mac_impl_lock, NULL, RW_DEFAULT, NULL);
+	i_mac_impl_count = 0;
 }
 
 int
 mac_fini(void)
 {
-	int	err;
+	if (i_mac_impl_count > 0)
+		return (EBUSY);
 
-	if ((err = ght_destroy(i_mac_impl_hash)) != 0)
-		return (err);
+	mod_hash_destroy_hash(i_mac_impl_hash);
+	rw_destroy(&i_mac_impl_lock);
 
 	kmem_cache_destroy(i_mac_impl_cachep);
 	return (0);
@@ -328,7 +326,6 @@ mac_open(const char *dev, uint_t port, mac_handle_t *mhp)
 	major_t		major;
 	dev_info_t	*dip;
 	mac_impl_t	*mip;
-	ghte_t		hte;
 	int		err;
 
 	/*
@@ -352,7 +349,11 @@ mac_open(const char *dev, uint_t port, mac_handle_t *mhp)
 
 	/*
 	 * Hold the given instance to prevent it from being detached.
-	 * (This will also attach it if it is not currently attached).
+	 * This will also attach the instance if it is not currently attached.
+	 * Currently we ensure that mac_register() (called by the driver's
+	 * attach entry point) and all code paths under it cannot possibly
+	 * call mac_open() because this would lead to a recursive attach
+	 * panic.
 	 */
 	if ((dip = ddi_hold_devi_by_instance(major, instance, 0)) == NULL)
 		return (EINVAL);
@@ -366,26 +367,31 @@ mac_open(const char *dev, uint_t port, mac_handle_t *mhp)
 	 * Look up its entry in the global hash table.
 	 */
 again:
-	ght_lock(i_mac_impl_hash, GHT_WRITE);
-	if ((err = ght_find(i_mac_impl_hash, GHT_PTR_TO_KEY(name), &hte)) != 0)
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	err = mod_hash_find(i_mac_impl_hash, (mod_hash_key_t)name,
+	    (mod_hash_val_t *)&mip);
+	if (err != 0) {
+		err = ENOENT;
 		goto failed;
-
-	mip = (mac_impl_t *)GHT_VAL(hte);
-	ASSERT(mip->mi_mp->m_dip == dip);
+	}
 
 	if (mip->mi_destroying) {
-		ght_unlock(i_mac_impl_hash);
+		rw_exit(&i_mac_impl_lock);
 		goto again;
 	}
 
+	/*
+	 * We currently only support the DL_ETHER media type.
+	 */
+	ASSERT(mip->mi_mp->m_info.mi_media == DL_ETHER);
 	mip->mi_ref++;
-	ght_unlock(i_mac_impl_hash);
+	rw_exit(&i_mac_impl_lock);
 
 	*mhp = (mac_handle_t)mip;
 	return (0);
 
 failed:
-	ght_unlock(i_mac_impl_hash);
+	rw_exit(&i_mac_impl_lock);
 	ddi_release_devi(dip);
 	return (err);
 }
@@ -396,14 +402,14 @@ mac_close(mac_handle_t mh)
 	mac_impl_t	*mip = (mac_impl_t *)mh;
 	dev_info_t	*dip = mip->mi_mp->m_dip;
 
-	ght_lock(i_mac_impl_hash, GHT_WRITE);
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
 
 	ASSERT(mip->mi_ref != 0);
 	if (--mip->mi_ref == 0) {
 		ASSERT(!mip->mi_activelink);
 	}
 	ddi_release_devi(dip);
-	ght_unlock(i_mac_impl_hash);
+	rw_exit(&i_mac_impl_lock);
 }
 
 const mac_info_t *
@@ -416,6 +422,12 @@ mac_info(mac_handle_t mh)
 	 * Return a pointer to the mac_info_t embedded in the mac_t.
 	 */
 	return (&(mp->m_info));
+}
+
+dev_info_t *
+mac_devinfo_get(mac_handle_t mh)
+{
+	return (((mac_impl_t *)mh)->mi_mp->m_dip);
 }
 
 uint64_t
@@ -1009,19 +1021,19 @@ mac_resource_set(mac_handle_t mh, mac_resource_add_t add, void *arg)
 int
 mac_register(mac_t *mp)
 {
-	int	err;
-	char	name[MAXNAMELEN], aggr_name[MAXNAMELEN];
+	int	err, instance;
+	char	name[MAXNAMELEN], devname[MAXNAMELEN];
+	const char *drvname;
 	struct devnames *dnp;
+	minor_t	minor;
 
-#ifdef	DEBUG
-	if (strcmp(mp->m_ident, MAC_IDENT) != 0)
+	drvname = ddi_driver_name(mp->m_dip);
+	instance = ddi_get_instance(mp->m_dip);
+
+	if (strcmp(mp->m_ident, MAC_IDENT) != 0) {
 		cmn_err(CE_WARN, "%s%d/%d: possible mac interface mismatch",
-		    ddi_driver_name(mp->m_dip),
-		    ddi_get_instance(mp->m_dip),
-		    mp->m_port);
-#endif	/* DEBUG */
-
-	ASSERT(!(mp->m_info.mi_addr_length & 1));
+		    drvname, instance, mp->m_port);
+	}
 
 	/*
 	 * Create a new mac_impl_t to pair with the mac_t.
@@ -1029,32 +1041,27 @@ mac_register(mac_t *mp)
 	if ((err = i_mac_create(mp)) != 0)
 		return (err);
 
-	/*
-	 * Create a DDI_NT_MAC minor node such that libdevinfo(3lib) can be
-	 * used to search for mac interfaces.
-	 */
-	(void) sprintf(name, "%d", mp->m_port);
-	if (ddi_create_minor_node(mp->m_dip, name, S_IFCHR, mp->m_port,
-	    DDI_NT_MAC, 0) != DDI_SUCCESS) {
-		i_mac_destroy(mp);
-		return (EEXIST);
+	err = EEXIST;
+	if (ddi_create_minor_node(mp->m_dip, (char *)drvname, S_IFCHR, 0,
+	    DDI_NT_NET, CLONE_DEV) != DDI_SUCCESS)
+		goto fail1;
+
+	(void) snprintf(devname, MAXNAMELEN, "%s%d", drvname, instance);
+
+	if (strcmp(drvname, "aggr") == 0) {
+		(void) snprintf(name, MAXNAMELEN, "aggr%u", mp->m_port);
+		minor = (minor_t)mp->m_port + 1;
+	} else {
+		(void) strlcpy(name, devname, MAXNAMELEN);
+		minor = (minor_t)instance + 1;
 	}
 
-	/*
-	 * Right now only the "aggr" driver creates nodes at mac_register
-	 * time, but it is expected that in the future with some
-	 * enhancement of devfs, all the drivers can create nodes here.
-	 */
-	if (strcmp(ddi_driver_name(mp->m_dip), "aggr") == 0) {
-		(void) snprintf(aggr_name, MAXNAMELEN, "aggr%u", mp->m_port);
-		err = dld_ppa_create(aggr_name, AGGR_DEV, mp->m_port, 0);
-		if (err != 0) {
-			ASSERT(err != EEXIST);
-			ddi_remove_minor_node(mp->m_dip, name);
-			i_mac_destroy(mp);
-			return (err);
-		}
-	}
+	if (ddi_create_minor_node(mp->m_dip, name, S_IFCHR, minor,
+	    DDI_NT_NET, 0) != DDI_SUCCESS)
+		goto fail2;
+
+	if ((err = dls_create(name, devname, mp->m_port)) != 0)
+		goto fail3;
 
 	/* set the gldv3 flag in dn_flags */
 	dnp = &devnamesp[ddi_driver_major(mp->m_dip)];
@@ -1062,38 +1069,52 @@ mac_register(mac_t *mp)
 	dnp->dn_flags |= DN_GLDV3_DRIVER;
 	UNLOCK_DEV_OPS(&dnp->dn_lock);
 
-	cmn_err(CE_NOTE, "!%s%d/%d registered",
-	    ddi_driver_name(mp->m_dip),
-	    ddi_get_instance(mp->m_dip),
-	    mp->m_port);
-
+	cmn_err(CE_NOTE, "!%s%d/%d registered", drvname, instance, mp->m_port);
 	return (0);
+
+fail3:
+	ddi_remove_minor_node(mp->m_dip, name);
+fail2:
+	ddi_remove_minor_node(mp->m_dip, (char *)drvname);
+fail1:
+	i_mac_destroy(mp);
+	return (err);
 }
 
 int
 mac_unregister(mac_t *mp)
 {
-	int		err;
+	int		err, instance;
 	char		name[MAXNAMELEN];
+	const char	*drvname;
 	mac_impl_t	*mip = mp->m_impl;
+
+	drvname = ddi_driver_name(mp->m_dip);
+	instance = ddi_get_instance(mp->m_dip);
 
 	/*
 	 * See if there are any other references to this mac_t (e.g., VLAN's).
 	 * If not, set mi_destroying to prevent any new VLAN's from being
 	 * created before we can perform the i_mac_destroy() below.
 	 */
-	ght_lock(i_mac_impl_hash, GHT_WRITE);
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
 	if (mip->mi_ref > 0) {
-		ght_unlock(i_mac_impl_hash);
+		rw_exit(&i_mac_impl_lock);
 		return (EBUSY);
 	}
 	mip->mi_destroying = B_TRUE;
-	ght_unlock(i_mac_impl_hash);
+	rw_exit(&i_mac_impl_lock);
 
-	if (strcmp(ddi_driver_name(mp->m_dip), "aggr") == 0) {
+	if (strcmp(drvname, "aggr") == 0)
 		(void) snprintf(name, MAXNAMELEN, "aggr%u", mp->m_port);
-		if ((err = dld_ppa_destroy(name)) != 0)
-			return (err);
+	else
+		(void) snprintf(name, MAXNAMELEN, "%s%d", drvname, instance);
+
+	if ((err = dls_destroy(name)) != 0) {
+		rw_enter(&i_mac_impl_lock, RW_WRITER);
+		mip->mi_destroying = B_FALSE;
+		rw_exit(&i_mac_impl_lock);
+		return (err);
 	}
 
 	/*
@@ -1102,16 +1123,13 @@ mac_unregister(mac_t *mp)
 	i_mac_destroy(mp);
 
 	/*
-	 * Remove the minor node.
+	 * Remove both style 1 and style 2 minor nodes
 	 */
-	(void) sprintf(name, "%d", mp->m_port);
+	ddi_remove_minor_node(mp->m_dip, (char *)drvname);
 	ddi_remove_minor_node(mp->m_dip, name);
 
-	cmn_err(CE_NOTE, "!%s%d/%d unregistered",
-	    ddi_driver_name(mp->m_dip),
-	    ddi_get_instance(mp->m_dip),
+	cmn_err(CE_NOTE, "!%s%d/%d unregistered", drvname, instance,
 	    mp->m_port);
-
 	return (0);
 }
 
@@ -1377,4 +1395,64 @@ mac_active_clear(mac_handle_t mh)
 	ASSERT(mip->mi_activelink);
 	mip->mi_activelink = B_FALSE;
 	mutex_exit(&mip->mi_activelink_lock);
+}
+
+/*
+ * mac_info_get() is used for retrieving the mac_info when a DL_INFO_REQ is
+ * issued before a DL_ATTACH_REQ. we walk the i_mac_impl_hash table and find
+ * the first mac_impl_t with a matching driver name; then we copy its mac_info_t
+ * to the caller. we do all this with i_mac_impl_lock held so the mac_impl_t
+ * cannot disappear while we are accessing it.
+ */
+typedef struct i_mac_info_state_s {
+	const char	*mi_name;
+	mac_info_t	*mi_infop;
+} i_mac_info_state_t;
+
+/*ARGSUSED*/
+static uint_t
+i_mac_info_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+{
+	i_mac_info_state_t	*statep = arg;
+	mac_impl_t		*mip = (mac_impl_t *)val;
+
+	if (mip->mi_destroying)
+		return (MH_WALK_CONTINUE);
+
+	if (strcmp(statep->mi_name,
+	    ddi_driver_name(mip->mi_mp->m_dip)) != 0)
+		return (MH_WALK_CONTINUE);
+
+	statep->mi_infop = &mip->mi_mp->m_info;
+	return (MH_WALK_TERMINATE);
+}
+
+boolean_t
+mac_info_get(const char *name, mac_info_t *minfop)
+{
+	i_mac_info_state_t	state;
+
+	rw_enter(&i_mac_impl_lock, RW_READER);
+	state.mi_name = name;
+	state.mi_infop = NULL;
+	mod_hash_walk(i_mac_impl_hash, i_mac_info_walker, &state);
+	if (state.mi_infop == NULL) {
+		rw_exit(&i_mac_impl_lock);
+		return (B_FALSE);
+	}
+	*minfop = *state.mi_infop;
+	rw_exit(&i_mac_impl_lock);
+	return (B_TRUE);
+}
+
+void
+mac_init_ops(struct dev_ops *ops, const char *name)
+{
+	dld_init_ops(ops, name);
+}
+
+void
+mac_fini_ops(struct dev_ops *ops)
+{
+	dld_fini_ops(ops);
 }

@@ -41,85 +41,6 @@
 extern "C" {
 #endif
 
-/*
- * dld_ppa_t object definition.
- */
-typedef	struct dld_node	dld_node_t;
-
-typedef struct dld_ppa {
-	/*
-	 * Name of the data-link.
-	 */
-	char		dp_name[IFNAMSIZ];
-
-	/*
-	 * The device and port of the MAC interface.
-	 */
-	char		dp_dev[MAXNAMELEN];
-	uint_t		dp_port;
-
-	/*
-	 * The VLAN identifier of the data-link interface.
-	 */
-	uint_t		dp_vid;
-
-	/*
-	 * Style 1 and style 2 provider nodes that reference the object.
-	 */
-	dld_node_t	*dp_style1;
-	dld_node_t	*dp_style2;
-
-	/*
-	 * Style 2 PPA index number of the object.
-	 */
-	t_scalar_t	dp_index;
-} dld_ppa_t;
-
-/*
- * dld_node_t object definition.
- */
-struct dld_node {
-	/*
-	 * Name of the node, this will be the name of the dev_t in the
-	 * file system.
-	 */
-	char		dn_name[IFNAMSIZ];
-
-	/*
-	 * DL_STYLE1 or DL_STYLE2.
-	 */
-	t_uscalar_t	dn_style;
-
-	/*
-	 * Minor number of the dev_t.
-	 */
-	minor_t		dn_minor;
-
-	/*
-	 * Global hash table entries that reference the object.
-	 */
-	ghte_t		dn_byminor_hte;
-	ghte_t		dn_byname_hte;
-
-	/*
-	 * Number of dld_ppa_t objects referencing the object.
-	 */
-	uint32_t	dn_ref;
-
-	/*
-	 * For style 1 nodes there is only a single dld_ppa_t object reference.
-	 * This field is used for that purpose.
-	 */
-	dld_ppa_t	*dn_dpp;
-
-	/*
-	 * For style 2 nodes there may be many dld_ppa_t references, keyed
-	 * by a PPA index number. The following hash table stores the
-	 * references and the subsequent methods are used to manage the table.
-	 */
-	ght_t		dn_hash;
-};
-
 #define	DLD_CONTROL	0x00000001
 #define	DLD_DLPI	0x00000002
 
@@ -142,6 +63,11 @@ typedef struct dld_str	dld_str_t;
  */
 struct dld_str {
 	/*
+	 * Major number of the device
+	 */
+	major_t			ds_major;
+
+	/*
 	 * Ephemeral minor number for the object.
 	 */
 	minor_t			ds_minor;
@@ -151,6 +77,11 @@ struct dld_str {
 	 */
 	queue_t			*ds_rq;
 	queue_t			*ds_wq;
+
+	/*
+	 * Lock to protect this structure.
+	 */
+	krwlock_t		ds_lock;
 
 	/*
 	 * Stream is open to DLD_CONTROL (control node) or
@@ -163,14 +94,14 @@ struct dld_str {
 	 */
 
 	/*
-	 * dld_node_t of the node that was opened.
-	 */
-	dld_node_t		*ds_dnp;
-
-	/*
 	 * Current DLPI state.
 	 */
 	t_uscalar_t		ds_dlstate;
+
+	/*
+	 * DLPI style
+	 */
+	t_uscalar_t		ds_style;
 
 	/*
 	 * Currently bound DLSAP.
@@ -241,10 +172,29 @@ struct dld_str {
 	dld_passivestate_t	ds_passivestate;
 
 	/*
-	 * Message handler jump tables.
+	 * Dummy mblk used for flow-control.
 	 */
-	struct str_msg_info	*ds_mi;
-	struct str_msg_info	*ds_pmi;
+	mblk_t			*ds_tx_flow_mp;
+
+	/*
+	 * Internal transmit queue and its parameters.
+	 */
+	kmutex_t		ds_tx_list_lock;
+	mblk_t			*ds_tx_list_head;
+	mblk_t			*ds_tx_list_tail;
+	uint_t			ds_tx_cnt;
+	uint_t			ds_tx_msgcnt;
+	boolean_t		ds_tx_qbusy;
+
+	/*
+	 * Number of threads currently in dld.  If there is a pending
+	 * DL_DETACH_REQ, the request is placed in the ds_detach_req
+	 * and the operation will be finished when the driver goes
+	 * single-threaded.
+	 */
+	kmutex_t		ds_thr_lock;
+	uint_t			ds_thr;
+	mblk_t			*ds_detach_req;
 } dld_str;
 
 /*
@@ -253,78 +203,37 @@ struct dld_str {
 
 extern void		dld_str_init(void);
 extern int		dld_str_fini(void);
-extern dld_str_t	*dld_str_create(queue_t *);
+extern dld_str_t	*dld_str_create(queue_t *, uint_t, major_t,
+    t_uscalar_t);
 extern void		dld_str_destroy(dld_str_t *);
-extern int		dld_str_attach(dld_str_t *, dld_ppa_t *);
+extern int		dld_str_attach(dld_str_t *, t_uscalar_t);
 extern void		dld_str_detach(dld_str_t *);
-extern void		dld_str_tx_raw(dld_str_t *);
-extern void		dld_str_tx_fastpath(dld_str_t *);
-extern void		dld_str_tx_drop(dld_str_t *);
 extern void		dld_str_rx_raw(void *, mac_resource_handle_t,
     mblk_t *, size_t);
 extern void		dld_str_rx_fastpath(void *, mac_resource_handle_t,
     mblk_t *, size_t);
 extern void		dld_str_rx_unitdata(void *, mac_resource_handle_t,
     mblk_t *, size_t);
-extern void		dld_str_put(dld_str_t *, mblk_t *);
-extern void		dld_str_srv(dld_str_t *, mblk_t *);
+extern void		dld_tx_flush(dld_str_t *);
+extern void		dld_tx_enqueue(dld_str_t *, mblk_t *, boolean_t);
 extern void		dld_str_notify_ind(dld_str_t *);
+
+extern void		str_mdata_fastpath_put(dld_str_t *, mblk_t *);
+extern void		str_mdata_raw_put(dld_str_t *, mblk_t *);
 
 /*
  * dld_proto.c
  */
 extern void		dld_proto(dld_str_t *, mblk_t *);
-
-/*
- * dld_ppa.c module.
- */
-extern void		dld_ppa_init(void);
-extern int		dld_ppa_fini(void);
-extern int		dld_ppa_create(const char *, const char *, uint_t,
-    uint16_t);
-extern int		dld_ppa_destroy(const char *);
-extern int		dld_ppa_attr(const char *, char *, uint_t *,
-    uint16_t *);
-
-/*
- * dld_node.c module.
- */
-extern void		dld_node_init(void);
-extern int		dld_node_fini(void);
-extern dld_node_t	*dld_node_hold(const char *, t_uscalar_t);
-extern void		dld_node_rele(dld_node_t *);
-extern dld_node_t	*dld_node_find(minor_t);
-extern int		dld_node_ppa_add(dld_node_t *, t_scalar_t,
-    dld_ppa_t *);
-extern int		dld_node_ppa_remove(dld_node_t *, t_scalar_t);
-extern dld_ppa_t	*dld_node_ppa_find(dld_node_t *, t_scalar_t);
-
-/*
- * dld_minor.c module.
- */
-extern void		dld_minor_init(void);
-extern int		dld_minor_fini(void);
-extern minor_t		dld_minor_hold(boolean_t);
-extern void		dld_minor_rele(minor_t);
-
-/*
- * dld_ioc.c module.
- */
-extern void		dld_ioc(dld_str_t *, mblk_t *);
-
-/*
- * dld_drv.c module.
- */
-extern dev_info_t	*dld_dip;
+extern void		dld_finish_pending_ops(dld_str_t *);
 
 /*
  * Options: there should be a separate bit defined here for each
  *          DLD_PROP... defined in dld.h.
  */
-#define	DLD_OPT_NO_STYLE1	0x00000001
-#define	DLD_OPT_NO_FASTPATH	0x00000002
-#define	DLD_OPT_NO_POLL		0x00000004
-#define	DLD_OPT_NO_ZEROCOPY	0x00000008
+#define	DLD_OPT_NO_FASTPATH	0x00000001
+#define	DLD_OPT_NO_POLL		0x00000002
+#define	DLD_OPT_NO_ZEROCOPY	0x00000004
 
 extern uint32_t		dld_opt;
 
@@ -334,6 +243,28 @@ extern uint32_t		dld_opt;
 
 #define	IMPLY(p, c)	(!(p) || (c))
 #define	AGGR_DEV	"aggr0"
+
+#define	DLD_ENTER(dsp) {					\
+	mutex_enter(&dsp->ds_thr_lock);				\
+	++dsp->ds_thr;						\
+	ASSERT(dsp->ds_thr != 0);				\
+	mutex_exit(&dsp->ds_thr_lock);				\
+}
+
+#define	DLD_EXIT(dsp) {							\
+	mutex_enter(&dsp->ds_thr_lock);					\
+	ASSERT(dsp->ds_thr > 0);					\
+	if (--dsp->ds_thr == 0 && dsp->ds_detach_req != NULL)		\
+		dld_finish_pending_ops(dsp);				\
+	else								\
+		mutex_exit(&dsp->ds_thr_lock);				\
+}
+
+#ifdef DEBUG
+#define	DLD_DBG		cmn_err
+#else
+#define	DLD_DBG		if (0) cmn_err
+#endif
 
 #ifdef	__cplusplus
 }

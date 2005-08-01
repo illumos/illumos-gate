@@ -30,31 +30,19 @@
  * Data-Link Driver
  */
 
-#include	<sys/types.h>
-#include	<sys/stream.h>
 #include	<sys/stropts.h>
 #include	<sys/strsun.h>
 #include	<sys/strsubr.h>
 #include	<sys/atomic.h>
-#include	<sys/sdt.h>
-#include	<sys/mac.h>
-#include	<sys/dls.h>
+#include	<sys/mkdev.h>
+#include	<sys/vlan.h>
 #include	<sys/dld.h>
 #include	<sys/dld_impl.h>
-#include	<sys/taskq.h>
-#include	<sys/vlan.h>
+#include	<sys/dls_impl.h>
+#include	<inet/common.h>
 
 static int	str_constructor(void *, void *, int);
 static void	str_destructor(void *, void *);
-static void	str_m_put(dld_str_t *, mblk_t *);
-static void	str_m_srv(dld_str_t *, mblk_t *);
-static void	str_mdata_fastpath_put(dld_str_t *, mblk_t *);
-static void	str_mdata_raw_put(dld_str_t *, mblk_t *);
-static void	str_mdata_srv(dld_str_t *, mblk_t *);
-static void	str_mproto_put(dld_str_t *, mblk_t *);
-static void	str_mpcproto_put(dld_str_t *, mblk_t *);
-static void	str_mioctl_put(dld_str_t *, mblk_t *);
-static void	str_mflush_put(dld_str_t *, mblk_t *);
 static mblk_t	*str_unitdata_ind(dld_str_t *, mblk_t *);
 static void	str_notify_promisc_on_phys(dld_str_t *);
 static void	str_notify_promisc_off_phys(dld_str_t *);
@@ -64,69 +52,420 @@ static void	str_notify_link_down(dld_str_t *);
 static void	str_notify_capab_reneg(dld_str_t *);
 static void	str_notify_speed(dld_str_t *, uint32_t);
 static void	str_notify(void *, mac_notify_type_t);
-static void	str_putbq(queue_t *q, mblk_t *mp);
+
+static void	ioc_raw(dld_str_t *, mblk_t *);
+static void	ioc_fast(dld_str_t *,  mblk_t *);
+static void	ioc(dld_str_t *, mblk_t *);
+static void	dld_ioc(dld_str_t *, mblk_t *);
+static minor_t	dld_minor_hold(boolean_t);
+static void	dld_minor_rele(minor_t);
 
 static uint32_t		str_count;
 static kmem_cache_t	*str_cachep;
+static vmem_t		*minor_arenap;
+static uint32_t		minor_count;
 
-typedef struct str_msg_info {
-	uint8_t		smi_type;
-	const char	*smi_txt;
-	void		(*smi_put)(dld_str_t *, mblk_t *);
-	void		(*smi_srv)(dld_str_t *, mblk_t *);
-} str_msg_info_t;
+#define	MINOR_TO_PTR(minor)	((void *)(uintptr_t)(minor))
+#define	PTR_TO_MINOR(ptr)	((minor_t)(uintptr_t)(ptr))
 
 /*
- * Normal priority message jump table.
+ * Some notes on entry points, flow-control, queueing and locking:
+ *
+ * This driver exports the traditional STREAMS put entry point as well as
+ * the non-STREAMS fast-path transmit routine which is provided to IP via
+ * the DL_CAPAB_POLL negotiation.  The put procedure handles all control
+ * and data operations, while the fast-path routine deals only with M_DATA
+ * fast-path packets.  Regardless of the entry point, all outbound packets
+ * will end up in str_mdata_fastpath_put(), where they will be delivered to
+ * the MAC driver.
+ *
+ * The transmit logic operates in two modes: a "not busy" mode where the
+ * packets will be delivered to the MAC for a send attempt, or "busy" mode
+ * where they will be enqueued in the internal queue because of flow-control.
+ * Flow-control happens when the MAC driver indicates the packets couldn't
+ * be transmitted due to lack of resources (e.g. running out of descriptors).
+ * In such case, the driver will place a dummy message on its write-side
+ * STREAMS queue so that the queue is marked as "full".  Any subsequent
+ * packets arriving at the driver will be enqueued in the internal queue,
+ * which is drained in the context of the service thread that gets scheduled
+ * whenever the driver is in the "busy" mode.  When all packets have been
+ * successfully delivered by MAC and the internal queue is empty, it will
+ * transition to the "not busy" mode by removing the dummy message from the
+ * write-side STREAMS queue; in effect this will trigger backenabling.
+ * The sizes of q_hiwat and q_lowat are set to 1 and 0, respectively, due
+ * to the above reasons.
+ *
+ * The driver implements an internal transmit queue independent of STREAMS.
+ * This allows for flexibility and provides a fast enqueue/dequeue mechanism
+ * compared to the putq() and get() STREAMS interfaces.  The only putq() and
+ * getq() operations done by the driver are those related to placing and
+ * removing the dummy message to/from the write-side STREAMS queue for flow-
+ * control purposes.
+ *
+ * Locking is done independent of STREAMS due to the driver being fully MT.
+ * Threads entering the driver (either from put or service entry points)
+ * will most likely be readers, with the exception of a few writer cases
+ * such those handling DLPI attach/detach/bind/unbind/etc. or any of the
+ * DLD-related ioctl requests.  The DLPI detach case is special, because
+ * it involves freeing resources and therefore must be single-threaded.
+ * Unfortunately the readers/writers lock can't be used to protect against
+ * it, because the lock is dropped prior to the driver calling places where
+ * putnext() may be invoked, and such places may depend on those resources
+ * to exist.  Because of this, the driver always completes the DLPI detach
+ * process when there are no other threads running in the driver.  This is
+ * done by keeping track of the number of threads, such that the the last
+ * thread leaving the driver will finish the pending DLPI detach operation.
  */
-str_msg_info_t	str_mi[] = {
-	{ M_DATA, "M_DATA", str_m_put, str_m_srv },
-	{ M_PROTO, "M_PROTO", str_mproto_put, str_m_srv },
-	{ 0x02, "undefined", str_m_put, str_m_srv },
-	{ 0x03, "undefined", str_m_put, str_m_srv },
-	{ 0x04, "undefined", str_m_put, str_m_srv },
-	{ 0x05, "undefined", str_m_put, str_m_srv },
-	{ 0x06, "undefined", str_m_put, str_m_srv },
-	{ 0x07, "undefined", str_m_put, str_m_srv },
-	{ M_BREAK, "M_BREAK", str_m_put, str_m_srv },
-	{ M_PASSFP, "M_PASSFP", str_m_put, str_m_srv },
-	{ M_EVENT, "M_EVENT", str_m_put, str_m_srv },
-	{ M_SIG, "M_SIG", str_m_put, str_m_srv },
-	{ M_DELAY, "M_DELAY", str_m_put, str_m_srv },
-	{ M_CTL, "M_CTL", str_m_put, str_m_srv },
-	{ M_IOCTL, "M_IOCTL", str_mioctl_put, str_m_srv },
-	{ M_SETOPTS, "M_SETOPTS", str_m_put, str_m_srv },
-	{ M_RSE, "M_RSE", str_m_put, str_m_srv }
-};
-
-#define	STR_MI_COUNT	(sizeof (str_mi) / sizeof (str_mi[0]))
 
 /*
- * High priority message jump table.
+ * dld_max_q_count is the queue depth threshold used to limit the number of
+ * outstanding packets or bytes allowed in the queue; once this limit is
+ * reached the driver will free any incoming ones until the queue depth
+ * drops below the threshold.
+ *
+ * This buffering is provided to accomodate clients which do not employ
+ * their own buffering scheme, and to handle occasional packet bursts.
+ * Clients which handle their own buffering will receive positive feedback
+ * from this driver as soon as it transitions into the "busy" state, i.e.
+ * when the queue is initially filled up; they will get backenabled once
+ * the queue is empty.
+ *
+ * The value chosen here is rather arbitrary; in future some intelligent
+ * heuristics may be involved which could take into account the hardware's
+ * transmit ring size, etc.
  */
-str_msg_info_t	str_pmi[] = {
-	{ 0x80,	 "undefined", str_m_put, str_m_srv },
-	{ M_IOCACK, "M_IOCACK", str_m_put, str_m_srv },
-	{ M_IOCNAK, "M_IOCNAK", str_m_put, str_m_srv },
-	{ M_PCPROTO, "M_PCPROTO", str_mpcproto_put, str_m_srv },
-	{ M_PCSIG, "M_PCSIG", str_m_put, str_m_srv },
-	{ M_READ, "M_READ", str_m_put, str_m_srv },
-	{ M_FLUSH, "M_FLUSH", str_mflush_put, str_m_srv },
-	{ M_STOP, "M_STOP", str_m_put, str_m_srv },
-	{ M_START, "M_START", str_m_put, str_m_srv },
-	{ M_HANGUP, "M_HANGUP", str_m_put, str_m_srv },
-	{ M_ERROR, "M_ERROR", str_m_put, str_m_srv },
-	{ M_COPYIN, "M_COPYIN", str_m_put, str_m_srv },
-	{ M_COPYOUT, "M_COPYOUT", str_m_put, str_m_srv },
-	{ M_IOCDATA, "M_IOCDATA", str_m_put, str_m_srv },
-	{ M_PCRSE, "M_PCRSE", str_m_put, str_m_srv },
-	{ M_STOPI, "M_STOPI", str_m_put, str_m_srv },
-	{ M_STARTI, "M_STARTI", str_m_put, str_m_srv },
-	{ M_PCEVENT, "M_PCEVENT", str_m_put, str_m_srv },
-	{ M_UNHANGUP, "M_UNHANGUP", str_m_put, str_m_srv }
-};
+uint_t dld_max_q_count = (16 * 1024 *1024);
 
-#define	STR_PMI_COUNT	(sizeof (str_pmi) / sizeof (str_pmi[0]))
+static dev_info_t *
+dld_finddevinfo(dev_t dev)
+{
+	minor_t		minor = getminor(dev);
+	char		*drvname = ddi_major_to_name(getmajor(dev));
+	char		name[MAXNAMELEN];
+	dls_vlan_t	*dvp = NULL;
+	dev_info_t	*dip = NULL;
+
+	if (drvname == NULL || minor == 0 || minor > DLD_MAX_PPA + 1)
+		return (NULL);
+
+	(void) snprintf(name, MAXNAMELEN, "%s%d", drvname, (int)minor - 1);
+	if (dls_vlan_hold(name, &dvp, B_FALSE) != 0)
+		return (NULL);
+
+	dip = mac_devinfo_get(dvp->dv_dlp->dl_mh);
+	dls_vlan_rele(dvp);
+	return (dip);
+}
+
+/*
+ * devo_getinfo: getinfo(9e)
+ */
+/*ARGSUSED*/
+int
+dld_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resp)
+{
+	dev_info_t	*devinfo;
+	minor_t		minor = getminor((dev_t)arg);
+	int		rc = DDI_FAILURE;
+
+	switch (cmd) {
+	case DDI_INFO_DEVT2DEVINFO:
+		if ((devinfo = dld_finddevinfo((dev_t)arg)) != NULL) {
+			*(dev_info_t **)resp = devinfo;
+			rc = DDI_SUCCESS;
+		}
+		break;
+	case DDI_INFO_DEVT2INSTANCE:
+		if (minor > 0 && minor <= DLD_MAX_PPA + 1) {
+			*(int *)resp = (int)minor - 1;
+			rc = DDI_SUCCESS;
+		}
+		break;
+	}
+	return (rc);
+}
+
+/*
+ * qi_qopen: open(9e)
+ */
+/*ARGSUSED*/
+int
+dld_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	dld_str_t	*dsp;
+	major_t		major;
+	minor_t		minor;
+	int		err;
+
+	if (sflag == MODOPEN)
+		return (ENOTSUP);
+
+	/*
+	 * This is a cloning driver and therefore each queue should only
+	 * ever get opened once.
+	 */
+	if (rq->q_ptr != NULL)
+		return (EBUSY);
+
+	major = getmajor(*devp);
+	minor = getminor(*devp);
+	if (minor > DLD_MAX_MINOR)
+		return (ENODEV);
+
+	/*
+	 * Create a new dld_str_t for the stream. This will grab a new minor
+	 * number that will be handed back in the cloned dev_t.  Creation may
+	 * fail if we can't allocate the dummy mblk used for flow-control.
+	 */
+	dsp = dld_str_create(rq, DLD_DLPI, major,
+	    ((minor == 0) ? DL_STYLE2 : DL_STYLE1));
+	if (dsp == NULL)
+		return (ENOSR);
+
+	ASSERT(dsp->ds_dlstate == DL_UNATTACHED);
+	if (minor != 0) {
+		/*
+		 * Style 1 open
+		 */
+
+		if ((err = dld_str_attach(dsp, (t_uscalar_t)minor - 1)) != 0)
+			goto failed;
+		ASSERT(dsp->ds_dlstate == DL_UNBOUND);
+	}
+
+	/*
+	 * Enable the queue srv(9e) routine.
+	 */
+	qprocson(rq);
+
+	/*
+	 * Construct a cloned dev_t to hand back.
+	 */
+	*devp = makedevice(getmajor(*devp), dsp->ds_minor);
+	return (0);
+
+failed:
+	dld_str_destroy(dsp);
+	return (err);
+}
+
+/*
+ * qi_qclose: close(9e)
+ */
+int
+dld_close(queue_t *rq)
+{
+	dld_str_t	*dsp = rq->q_ptr;
+
+	/*
+	 * Disable the queue srv(9e) routine.
+	 */
+	qprocsoff(rq);
+
+	/*
+	 * At this point we can not be entered by any threads via STREAMS
+	 * or the direct call interface, which is available only to IP.
+	 * After the interface is unplumbed, IP wouldn't have any reference
+	 * to this instance, and therefore we are now effectively single
+	 * threaded and don't require any lock protection.  Flush all
+	 * pending packets which are sitting in the transmit queue.
+	 */
+	ASSERT(dsp->ds_thr == 0);
+	dld_tx_flush(dsp);
+
+	/*
+	 * This stream was open to a provider node. Check to see
+	 * if it has been cleanly shut down.
+	 */
+	if (dsp->ds_dlstate != DL_UNATTACHED) {
+		/*
+		 * The stream is either open to a style 1 provider or
+		 * this is not clean shutdown. Detach from the PPA.
+		 * (This is still ok even in the style 1 case).
+		 */
+		dld_str_detach(dsp);
+	}
+
+	dld_str_destroy(dsp);
+	return (0);
+}
+
+/*
+ * qi_qputp: put(9e)
+ */
+void
+dld_wput(queue_t *wq, mblk_t *mp)
+{
+	dld_str_t *dsp = (dld_str_t *)wq->q_ptr;
+
+	DLD_ENTER(dsp);
+
+	switch (DB_TYPE(mp)) {
+	case M_DATA:
+		rw_enter(&dsp->ds_lock, RW_READER);
+		if (dsp->ds_dlstate != DL_IDLE ||
+		    dsp->ds_mode == DLD_UNITDATA) {
+			freemsg(mp);
+		} else if (dsp->ds_mode == DLD_FASTPATH) {
+			str_mdata_fastpath_put(dsp, mp);
+		} else if (dsp->ds_mode == DLD_RAW) {
+			str_mdata_raw_put(dsp, mp);
+		}
+		rw_exit(&dsp->ds_lock);
+		break;
+	case M_PROTO:
+	case M_PCPROTO:
+		dld_proto(dsp, mp);
+		break;
+	case M_IOCTL:
+		dld_ioc(dsp, mp);
+		break;
+	case M_FLUSH:
+		if (*mp->b_rptr & FLUSHW) {
+			dld_tx_flush(dsp);
+			*mp->b_rptr &= ~FLUSHW;
+		}
+
+		if (*mp->b_rptr & FLUSHR) {
+			qreply(wq, mp);
+		} else {
+			freemsg(mp);
+		}
+		break;
+	default:
+		freemsg(mp);
+		break;
+	}
+
+	DLD_EXIT(dsp);
+}
+
+/*
+ * qi_srvp: srv(9e)
+ */
+void
+dld_wsrv(queue_t *wq)
+{
+	mblk_t		*mp;
+	dld_str_t	*dsp = wq->q_ptr;
+
+	DLD_ENTER(dsp);
+	rw_enter(&dsp->ds_lock, RW_READER);
+	/*
+	 * Grab all packets (chained via b_next) off our transmit queue
+	 * and try to send them all to the MAC layer.  Since the queue
+	 * is independent of streams, we are able to dequeue all messages
+	 * at once without looping through getq() and manually chaining
+	 * them.  Note that the queue size parameters (byte and message
+	 * counts) are cleared as well, but we postpone the backenabling
+	 * until after the MAC transmit since some packets may end up
+	 * back at our transmit queue.
+	 */
+	mutex_enter(&dsp->ds_tx_list_lock);
+	if ((mp = dsp->ds_tx_list_head) == NULL) {
+		ASSERT(!dsp->ds_tx_qbusy);
+		ASSERT(dsp->ds_tx_flow_mp != NULL);
+		ASSERT(dsp->ds_tx_list_head == NULL);
+		ASSERT(dsp->ds_tx_list_tail == NULL);
+		ASSERT(dsp->ds_tx_cnt == 0);
+		ASSERT(dsp->ds_tx_msgcnt == 0);
+		mutex_exit(&dsp->ds_tx_list_lock);
+		goto done;
+	}
+	dsp->ds_tx_list_head = dsp->ds_tx_list_tail = NULL;
+	dsp->ds_tx_cnt = dsp->ds_tx_msgcnt = 0;
+	mutex_exit(&dsp->ds_tx_list_lock);
+
+	/*
+	 * Discard packets unless we are attached and bound; note that
+	 * the driver mode (fastpath/raw/unitdata) is irrelevant here,
+	 * because regardless of the mode all transmit will end up in
+	 * str_mdata_fastpath_put() where the packets may be queued.
+	 */
+	ASSERT(DB_TYPE(mp) == M_DATA);
+	if (dsp->ds_dlstate != DL_IDLE) {
+		freemsgchain(mp);
+		goto done;
+	}
+
+	/*
+	 * Attempt to transmit one or more packets.  If the MAC can't
+	 * send them all, re-queue the packet(s) at the beginning of
+	 * the transmit queue to avoid any re-ordering.
+	 */
+	if ((mp = dls_tx(dsp->ds_dc, mp)) != NULL)
+		dld_tx_enqueue(dsp, mp, B_TRUE);
+
+	/*
+	 * Grab the list lock again and check if the transmit queue is
+	 * really empty; if so, lift up flow-control and backenable any
+	 * writer queues.  If the queue is not empty, schedule service
+	 * thread to drain it.
+	 */
+	mutex_enter(&dsp->ds_tx_list_lock);
+	if (dsp->ds_tx_list_head == NULL) {
+		dsp->ds_tx_flow_mp = getq(wq);
+		ASSERT(dsp->ds_tx_flow_mp != NULL);
+		dsp->ds_tx_qbusy = B_FALSE;
+	}
+	mutex_exit(&dsp->ds_tx_list_lock);
+done:
+	rw_exit(&dsp->ds_lock);
+	DLD_EXIT(dsp);
+}
+
+void
+dld_init_ops(struct dev_ops *ops, const char *name)
+{
+	struct streamtab *stream;
+	struct qinit *rq, *wq;
+	struct module_info *modinfo;
+
+	modinfo = kmem_zalloc(sizeof (struct module_info), KM_SLEEP);
+	modinfo->mi_idname = kmem_zalloc(FMNAMESZ, KM_SLEEP);
+	(void) snprintf(modinfo->mi_idname, FMNAMESZ, "%s", name);
+	modinfo->mi_minpsz = 0;
+	modinfo->mi_maxpsz = 64*1024;
+	modinfo->mi_hiwat  = 1;
+	modinfo->mi_lowat = 0;
+
+	rq = kmem_zalloc(sizeof (struct qinit), KM_SLEEP);
+	rq->qi_qopen = dld_open;
+	rq->qi_qclose = dld_close;
+	rq->qi_minfo = modinfo;
+
+	wq = kmem_zalloc(sizeof (struct qinit), KM_SLEEP);
+	wq->qi_putp = (pfi_t)dld_wput;
+	wq->qi_srvp = (pfi_t)dld_wsrv;
+	wq->qi_minfo = modinfo;
+
+	stream = kmem_zalloc(sizeof (struct streamtab), KM_SLEEP);
+	stream->st_rdinit = rq;
+	stream->st_wrinit = wq;
+	ops->devo_cb_ops->cb_str = stream;
+
+	ops->devo_getinfo = &dld_getinfo;
+}
+
+void
+dld_fini_ops(struct dev_ops *ops)
+{
+	struct streamtab *stream;
+	struct qinit *rq, *wq;
+	struct module_info *modinfo;
+
+	stream = ops->devo_cb_ops->cb_str;
+	rq = stream->st_rdinit;
+	wq = stream->st_wrinit;
+	modinfo = rq->qi_minfo;
+	ASSERT(wq->qi_minfo == modinfo);
+
+	kmem_free(stream, sizeof (struct streamtab));
+	kmem_free(wq, sizeof (struct qinit));
+	kmem_free(rq, sizeof (struct qinit));
+	kmem_free(modinfo->mi_idname, FMNAMESZ);
+	kmem_free(modinfo, sizeof (struct module_info));
+}
 
 /*
  * Initialize this module's data structures.
@@ -140,6 +479,16 @@ dld_str_init(void)
 	str_cachep = kmem_cache_create("dld_str_cache", sizeof (dld_str_t),
 	    0, str_constructor, str_destructor, NULL, NULL, NULL, 0);
 	ASSERT(str_cachep != NULL);
+
+	/*
+	 * Allocate a vmem arena to manage minor numbers. The range of the
+	 * arena will be from DLD_MAX_MINOR + 1 to MAXMIN (maximum legal
+	 * minor number).
+	 */
+	minor_arenap = vmem_create("dld_minor_arena",
+	    MINOR_TO_PTR(DLD_MAX_MINOR + 1), MAXMIN, 1, NULL, NULL, NULL, 0,
+	    VM_SLEEP | VMC_IDENTIFIER);
+	ASSERT(minor_arenap != NULL);
 }
 
 /*
@@ -155,10 +504,16 @@ dld_str_fini(void)
 		return (EBUSY);
 
 	/*
+	 * Check to see if there are any minor numbers still in use.
+	 */
+	if (minor_count != 0)
+		return (EBUSY);
+
+	/*
 	 * Destroy object cache.
 	 */
 	kmem_cache_destroy(str_cachep);
-
+	vmem_destroy(minor_arenap);
 	return (0);
 }
 
@@ -166,15 +521,28 @@ dld_str_fini(void)
  * Create a new dld_str_t object.
  */
 dld_str_t *
-dld_str_create(queue_t *rq)
+dld_str_create(queue_t *rq, uint_t type, major_t major, t_uscalar_t style)
 {
 	dld_str_t	*dsp;
 
 	/*
 	 * Allocate an object from the cache.
 	 */
-	dsp = kmem_cache_alloc(str_cachep, KM_SLEEP);
 	atomic_add_32(&str_count, 1);
+	dsp = kmem_cache_alloc(str_cachep, KM_SLEEP);
+
+	/*
+	 * Allocate the dummy mblk for flow-control.
+	 */
+	dsp->ds_tx_flow_mp = allocb(1, BPRI_HI);
+	if (dsp->ds_tx_flow_mp == NULL) {
+		kmem_cache_free(str_cachep, dsp);
+		atomic_add_32(&str_count, -1);
+		return (NULL);
+	}
+	dsp->ds_type = type;
+	dsp->ds_major = major;
+	dsp->ds_style = style;
 
 	/*
 	 * Initialize the queue pointers.
@@ -183,6 +551,12 @@ dld_str_create(queue_t *rq)
 	dsp->ds_rq = rq;
 	dsp->ds_wq = WR(rq);
 	rq->q_ptr = WR(rq)->q_ptr = (void *)dsp;
+
+	/*
+	 * We want explicit control over our write-side STREAMS queue
+	 * where the dummy mblk gets added/removed for flow-control.
+	 */
+	noenable(WR(rq));
 
 	return (dsp);
 }
@@ -206,6 +580,18 @@ dld_str_destroy(dld_str_t *dsp)
 	rq->q_ptr = wq->q_ptr = NULL;
 	dsp->ds_rq = dsp->ds_wq = NULL;
 
+	ASSERT(!RW_LOCK_HELD(&dsp->ds_lock));
+	ASSERT(MUTEX_NOT_HELD(&dsp->ds_tx_list_lock));
+	ASSERT(dsp->ds_tx_list_head == NULL);
+	ASSERT(dsp->ds_tx_list_tail == NULL);
+	ASSERT(dsp->ds_tx_cnt == 0);
+	ASSERT(dsp->ds_tx_msgcnt == 0);
+	ASSERT(!dsp->ds_tx_qbusy);
+
+	ASSERT(MUTEX_NOT_HELD(&dsp->ds_thr_lock));
+	ASSERT(dsp->ds_thr == 0);
+	ASSERT(dsp->ds_detach_req == NULL);
+
 	/*
 	 * Reinitialize all the flags.
 	 */
@@ -213,6 +599,13 @@ dld_str_destroy(dld_str_t *dsp)
 	dsp->ds_passivestate = DLD_UNINITIALIZED;
 	dsp->ds_mode = DLD_UNITDATA;
 
+	/*
+	 * Free the dummy mblk if exists.
+	 */
+	if (dsp->ds_tx_flow_mp != NULL) {
+		freeb(dsp->ds_tx_flow_mp);
+		dsp->ds_tx_flow_mp = NULL;
+	}
 	/*
 	 * Free the object back to the cache.
 	 */
@@ -232,38 +625,19 @@ str_constructor(void *buf, void *cdrarg, int kmflags)
 	bzero(buf, sizeof (dld_str_t));
 
 	/*
-	 * Take a copy of the global message handler jump tables.
-	 */
-	ASSERT(dsp->ds_mi == NULL);
-	if ((dsp->ds_mi = kmem_zalloc(sizeof (str_mi), kmflags)) == NULL)
-		return (-1);
-
-	bcopy(str_mi, dsp->ds_mi, sizeof (str_mi));
-
-	ASSERT(dsp->ds_pmi == NULL);
-	if ((dsp->ds_pmi = kmem_zalloc(sizeof (str_pmi), kmflags)) == NULL) {
-		kmem_free(dsp->ds_mi, sizeof (str_mi));
-		dsp->ds_mi = NULL;
-		return (-1);
-	}
-
-	bcopy(str_pmi, dsp->ds_pmi, sizeof (str_pmi));
-
-	/*
 	 * Allocate a new minor number.
 	 */
-	if ((dsp->ds_minor = dld_minor_hold(kmflags == KM_SLEEP)) == 0) {
-		kmem_free(dsp->ds_mi, sizeof (str_mi));
-		dsp->ds_mi = NULL;
-		kmem_free(dsp->ds_pmi, sizeof (str_pmi));
-		dsp->ds_pmi = NULL;
+	if ((dsp->ds_minor = dld_minor_hold(kmflags == KM_SLEEP)) == 0)
 		return (-1);
-	}
 
 	/*
 	 * Initialize the DLPI state machine.
 	 */
 	dsp->ds_dlstate = DL_UNATTACHED;
+
+	mutex_init(&dsp->ds_thr_lock, NULL, MUTEX_DRIVER, NULL);
+	rw_init(&dsp->ds_lock, NULL, RW_DRIVER, NULL);
+	mutex_init(&dsp->ds_tx_list_lock, NULL, MUTEX_DRIVER, NULL);
 
 	return (0);
 }
@@ -299,170 +673,53 @@ str_destructor(void *buf, void *cdrarg)
 	ASSERT(!dsp->ds_polling);
 
 	/*
-	 * Make sure M_DATA message handling is disabled.
-	 */
-	ASSERT(dsp->ds_mi[M_DATA].smi_put == str_m_put);
-	ASSERT(dsp->ds_mi[M_DATA].smi_srv == str_m_srv);
-
-	/*
 	 * Release the minor number.
 	 */
 	dld_minor_rele(dsp->ds_minor);
 
-	/*
-	 * Clear down the jump tables.
-	 */
-	kmem_free(dsp->ds_mi, sizeof (str_mi));
-	dsp->ds_mi = NULL;
+	ASSERT(!RW_LOCK_HELD(&dsp->ds_lock));
+	rw_destroy(&dsp->ds_lock);
 
-	kmem_free(dsp->ds_pmi, sizeof (str_pmi));
-	dsp->ds_pmi = NULL;
-}
+	ASSERT(MUTEX_NOT_HELD(&dsp->ds_tx_list_lock));
+	mutex_destroy(&dsp->ds_tx_list_lock);
+	ASSERT(dsp->ds_tx_flow_mp == NULL);
 
-/*
- * Called from put(9e) to process a streams message.
- */
-void
-dld_str_put(dld_str_t *dsp, mblk_t *mp)
-{
-	uint8_t		type;
-	str_msg_info_t	*smip;
-
-	/*
-	 * Look up the message handler from the appropriate jump table.
-	 */
-	if ((type = DB_TYPE(mp)) & QPCTL) {
-		/*
-		 * Clear the priority bit to index into the jump table.
-		 */
-		type &= ~QPCTL;
-
-		/*
-		 * Check the message is not out of range for the jump table.
-		 */
-		if (type >= STR_PMI_COUNT)
-			goto unknown;
-
-		/*
-		 * Get the handler from the jump table.
-		 */
-		smip = &(dsp->ds_pmi[type]);
-
-		/*
-		 * OR the priorty bit back in to restore the original message
-		 * type.
-		 */
-		type |= QPCTL;
-	} else {
-		/*
-		 * Check the message is not out of range for the jump table.
-		 */
-		if (type >= STR_MI_COUNT)
-			goto unknown;
-
-		/*
-		 * Get the handler from the jump table.
-		 */
-		smip = &(dsp->ds_mi[type]);
-	}
-
-	ASSERT(smip->smi_type == type);
-	smip->smi_put(dsp, mp);
-	return;
-
-unknown:
-	str_m_put(dsp, mp);
-}
-
-/*
- * Called from srv(9e) to process a streams message.
- */
-void
-dld_str_srv(dld_str_t *dsp, mblk_t *mp)
-{
-	uint8_t		type;
-	str_msg_info_t	*smip;
-
-	/*
-	 * Look up the message handler from the appropriate jump table.
-	 */
-	if ((type = DB_TYPE(mp)) & QPCTL) {
-		/*
-		 * Clear the priority bit to index into the jump table.
-		 */
-		type &= ~QPCTL;
-
-		/*
-		 * Check the message is not out of range for the jump table.
-		 */
-		if (type >= STR_PMI_COUNT)
-			goto unknown;
-
-		/*
-		 * Get the handler from the jump table.
-		 */
-		smip = &(dsp->ds_pmi[type]);
-
-		/*
-		 * OR the priorty bit back in to restore the original message
-		 * type.
-		 */
-		type |= QPCTL;
-	} else {
-		/*
-		 * Check the message is not out of range for the jump table.
-		 */
-		if (type >= STR_MI_COUNT)
-			goto unknown;
-
-		/*
-		 * Get the handler from the jump table.
-		 */
-		ASSERT(type < STR_MI_COUNT);
-		smip = &(dsp->ds_mi[type]);
-	}
-
-	ASSERT(smip->smi_type == type);
-	smip->smi_srv(dsp, mp);
-	return;
-
-unknown:
-	str_m_srv(dsp, mp);
+	ASSERT(MUTEX_NOT_HELD(&dsp->ds_thr_lock));
+	mutex_destroy(&dsp->ds_thr_lock);
+	ASSERT(dsp->ds_detach_req == NULL);
 }
 
 /*
  * M_DATA put (IP fast-path mode)
  */
-static void
+void
 str_mdata_fastpath_put(dld_str_t *dsp, mblk_t *mp)
 {
-	queue_t		*q = dsp->ds_wq;
-
 	/*
-	 * If something is already queued then we must queue to avoid
-	 * re-ordering.
+	 * We get here either as a result of putnext() from above or
+	 * because IP has called us directly.  If we are in the busy
+	 * mode enqueue the packet(s) and return.  Otherwise hand them
+	 * over to the MAC driver for transmission; any remaining one(s)
+	 * which didn't get sent will be queued.
+	 *
+	 * Note here that we don't grab the list lock prior to checking
+	 * the busy flag.  This is okay, because a missed transition
+	 * will not cause any packet reordering for any particular TCP
+	 * connection (which is single-threaded).  The enqueue routine
+	 * will atomically set the busy flag and schedule the service
+	 * thread to run; the flag is only cleared by the service thread
+	 * when there is no more packet to be transmitted.
 	 */
-	if (q->q_first != NULL) {
-		(void) putq(q, mp);
-		return;
-	}
-
-	/*
-	 * Attempt to transmit the packet.
-	 */
-	if ((mp = dls_tx(dsp->ds_dc, mp)) != NULL) {
-		(void) putbq(q, mp);
-		qenable(q);
-	}
+	if (dsp->ds_tx_qbusy || (mp = dls_tx(dsp->ds_dc, mp)) != NULL)
+		dld_tx_enqueue(dsp, mp, B_FALSE);
 }
 
 /*
  * M_DATA put (raw mode)
  */
-static void
+void
 str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 {
-	queue_t			*q = dsp->ds_wq;
 	struct ether_header	*ehp;
 	mblk_t			*bp;
 	size_t			size;
@@ -496,7 +753,7 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 	 * know the first fragment was M_DATA otherwise we could not
 	 * have got here).
 	 */
-	for (bp = mp->b_next; bp != NULL; bp = bp->b_cont) {
+	for (bp = mp->b_cont; bp != NULL; bp = bp->b_cont) {
 		if (DB_TYPE(bp) != M_DATA)
 			goto discard;
 		size += MBLKL(bp);
@@ -505,22 +762,7 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 	if (size > dsp->ds_mip->mi_sdu_max + hdrlen)
 		goto discard;
 
-	/*
-	 * If something is already queued then we must queue to avoid
-	 * re-ordering.
-	 */
-	if (q->q_first != NULL) {
-		(void) putq(q, bp);
-		return;
-	}
-
-	/*
-	 * Attempt to transmit the packet.
-	 */
-	if ((mp = dls_tx(dsp->ds_dc, mp)) != NULL) {
-		(void) putbq(q, mp);
-		qenable(q);
-	}
+	str_mdata_fastpath_put(dsp, mp);
 	return;
 
 discard:
@@ -528,107 +770,35 @@ discard:
 }
 
 /*
- * M_DATA srv
- */
-static void
-str_mdata_srv(dld_str_t *dsp, mblk_t *mp)
-{
-	queue_t		*q = dsp->ds_wq;
-
-	/*
-	 * Attempt to transmit the packet.
-	 */
-	if ((mp = dls_tx(dsp->ds_dc, mp)) == NULL)
-		return;
-
-	(void) str_putbq(q, mp);
-	qenable(q);
-}
-
-/*
- * M_PROTO put
- */
-static void
-str_mproto_put(dld_str_t *dsp, mblk_t *mp)
-{
-	dld_proto(dsp, mp);
-}
-
-/*
- * M_PCPROTO put
- */
-static void
-str_mpcproto_put(dld_str_t *dsp, mblk_t *mp)
-{
-	dld_proto(dsp, mp);
-}
-
-/*
- * M_IOCTL put
- */
-static void
-str_mioctl_put(dld_str_t *dsp, mblk_t *mp)
-{
-	dld_ioc(dsp, mp);
-}
-
-/*
- * M_FLUSH put
- */
-/*ARGSUSED*/
-static void
-str_mflush_put(dld_str_t *dsp, mblk_t *mp)
-{
-	queue_t		*q = dsp->ds_wq;
-
-	if (*mp->b_rptr & FLUSHW) {
-		flushq(q, FLUSHALL);
-		*mp->b_rptr &= ~FLUSHW;
-	}
-
-	if (*mp->b_rptr & FLUSHR)
-		qreply(q, mp);
-	else
-		freemsg(mp);
-}
-
-/*
- * M_* put.
- */
-/*ARGSUSED*/
-static void
-str_m_put(dld_str_t *dsp, mblk_t *mp)
-{
-	freemsg(mp);
-}
-
-/*
- * M_* put.
- */
-/*ARGSUSED*/
-static void
-str_m_srv(dld_str_t *dsp, mblk_t *mp)
-{
-	freemsgchain(mp);
-}
-
-/*
  * Process DL_ATTACH_REQ (style 2) or open(2) (style 1).
  */
 int
-dld_str_attach(dld_str_t *dsp, dld_ppa_t *dpp)
+dld_str_attach(dld_str_t *dsp, t_uscalar_t ppa)
 {
 	int			err;
+	const char		*drvname;
+	char			name[MAXNAMELEN];
 	dls_channel_t		dc;
 	uint_t			addr_length;
 
 	ASSERT(dsp->ds_dc == NULL);
 
+	if ((drvname = ddi_major_to_name(dsp->ds_major)) == NULL)
+		return (EINVAL);
+
+	(void) snprintf(name, MAXNAMELEN, "%s%u", drvname, ppa);
+
+	if (strcmp(drvname, "aggr") != 0 &&
+	    qassociate(dsp->ds_wq, DLS_PPA2INST(ppa)) != 0)
+		return (EINVAL);
+
 	/*
 	 * Open a channel.
 	 */
-	if ((err = dls_open(dpp->dp_name, &dc)) != 0)
+	if ((err = dls_open(name, &dc)) != 0) {
+		(void) qassociate(dsp->ds_wq, -1);
 		return (err);
+	}
 
 	/*
 	 * Cache the MAC interface handle, a pointer to the immutable MAC
@@ -659,6 +829,8 @@ dld_str_attach(dld_str_t *dsp, dld_ppa_t *dpp)
 	dsp->ds_mnh = mac_notify_add(dsp->ds_mh, str_notify, (void *)dsp);
 
 	dsp->ds_dc = dc;
+	dsp->ds_dlstate = DL_UNBOUND;
+
 	return (0);
 }
 
@@ -669,15 +841,17 @@ dld_str_attach(dld_str_t *dsp, dld_ppa_t *dpp)
 void
 dld_str_detach(dld_str_t *dsp)
 {
+	ASSERT(dsp->ds_thr == 0);
+
 	/*
 	 * Remove the notify function.
 	 */
 	mac_notify_remove(dsp->ds_mh, dsp->ds_mnh);
 
 	/*
-	 * Make sure the M_DATA handler is reset.
+	 * Re-initialize the DLPI state machine.
 	 */
-	dld_str_tx_drop(dsp);
+	dsp->ds_dlstate = DL_UNATTACHED;
 
 	/*
 	 * Clear the polling and promisc flags.
@@ -691,46 +865,8 @@ dld_str_detach(dld_str_t *dsp)
 	dls_close(dsp->ds_dc);
 	dsp->ds_dc = NULL;
 	dsp->ds_mh = NULL;
-}
 
-/*
- * Enable raw mode for this stream. This mode is mutually exclusive with
- * fast-path and/or polling.
- */
-void
-dld_str_tx_raw(dld_str_t *dsp)
-{
-	/*
-	 * Enable M_DATA message handling.
-	 */
-	dsp->ds_mi[M_DATA].smi_put = str_mdata_raw_put;
-	dsp->ds_mi[M_DATA].smi_srv = str_mdata_srv;
-}
-
-/*
- * Enable fast-path for this stream.
- */
-void
-dld_str_tx_fastpath(dld_str_t *dsp)
-{
-	/*
-	 * Enable M_DATA message handling.
-	 */
-	dsp->ds_mi[M_DATA].smi_put = str_mdata_fastpath_put;
-	dsp->ds_mi[M_DATA].smi_srv = str_mdata_srv;
-}
-
-/*
- * Disable fast-path or raw mode.
- */
-void
-dld_str_tx_drop(dld_str_t *dsp)
-{
-	/*
-	 * Disable M_DATA message handling.
-	 */
-	dsp->ds_mi[M_DATA].smi_put = str_m_put;
-	dsp->ds_mi[M_DATA].smi_srv = str_m_srv;
+	(void) qassociate(dsp->ds_wq, -1);
 }
 
 /*
@@ -1150,7 +1286,6 @@ str_notify(void *arg, mac_notify_type_t type)
 
 	switch (type) {
 	case MAC_NOTE_TX:
-		enableok(q);
 		qenable(q);
 		break;
 
@@ -1236,36 +1371,308 @@ str_notify(void *arg, mac_notify_type_t type)
 }
 
 /*
- * Put a chain of packets back on the queue.
+ * Enqueue one or more messages to the transmit queue.
+ * Caller specifies the insertion position (head/tail).
+ */
+void
+dld_tx_enqueue(dld_str_t *dsp, mblk_t *mp, boolean_t head_insert)
+{
+	mblk_t	*tail;
+	queue_t *q = dsp->ds_wq;
+	uint_t	cnt, msgcnt;
+	uint_t	tot_cnt, tot_msgcnt;
+
+	ASSERT(DB_TYPE(mp) == M_DATA);
+	/* Calculate total size and count of the packet(s) */
+	for (tail = mp, cnt = msgdsize(mp), msgcnt = 1;
+	    tail->b_next != NULL; tail = tail->b_next) {
+		ASSERT(DB_TYPE(tail) == M_DATA);
+		cnt += msgdsize(tail);
+		msgcnt++;
+	}
+
+	mutex_enter(&dsp->ds_tx_list_lock);
+	/*
+	 * If the queue depth would exceed the allowed threshold, drop
+	 * new packet(s) and drain those already in the queue.
+	 */
+	tot_cnt = dsp->ds_tx_cnt + cnt;
+	tot_msgcnt = dsp->ds_tx_msgcnt + msgcnt;
+
+	if (!head_insert &&
+	    (tot_cnt >= dld_max_q_count || tot_msgcnt >= dld_max_q_count)) {
+		ASSERT(dsp->ds_tx_qbusy);
+		mutex_exit(&dsp->ds_tx_list_lock);
+		freemsgchain(mp);
+		goto done;
+	}
+
+	/* Update the queue size parameters */
+	dsp->ds_tx_cnt = tot_cnt;
+	dsp->ds_tx_msgcnt = tot_msgcnt;
+
+	/*
+	 * If the transmit queue is currently empty and we are
+	 * about to deposit the packet(s) there, switch mode to
+	 * "busy" and raise flow-control condition.
+	 */
+	if (!dsp->ds_tx_qbusy) {
+		dsp->ds_tx_qbusy = B_TRUE;
+		ASSERT(dsp->ds_tx_flow_mp != NULL);
+		(void) putq(q, dsp->ds_tx_flow_mp);
+		dsp->ds_tx_flow_mp = NULL;
+	}
+
+	if (!head_insert) {
+		/* Tail insertion */
+		if (dsp->ds_tx_list_head == NULL)
+			dsp->ds_tx_list_head = mp;
+		else
+			dsp->ds_tx_list_tail->b_next = mp;
+		dsp->ds_tx_list_tail = tail;
+	} else {
+		/* Head insertion */
+		tail->b_next = dsp->ds_tx_list_head;
+		if (dsp->ds_tx_list_head == NULL)
+			dsp->ds_tx_list_tail = tail;
+		dsp->ds_tx_list_head = mp;
+	}
+	mutex_exit(&dsp->ds_tx_list_lock);
+done:
+	/* Schedule service thread to drain the transmit queue */
+	qenable(q);
+}
+
+void
+dld_tx_flush(dld_str_t *dsp)
+{
+	mutex_enter(&dsp->ds_tx_list_lock);
+	if (dsp->ds_tx_list_head != NULL) {
+		freemsgchain(dsp->ds_tx_list_head);
+		dsp->ds_tx_list_head = dsp->ds_tx_list_tail = NULL;
+		dsp->ds_tx_cnt = dsp->ds_tx_msgcnt = 0;
+		if (dsp->ds_tx_qbusy) {
+			dsp->ds_tx_flow_mp = getq(dsp->ds_wq);
+			ASSERT(dsp->ds_tx_flow_mp != NULL);
+			dsp->ds_tx_qbusy = B_FALSE;
+		}
+	}
+	mutex_exit(&dsp->ds_tx_list_lock);
+}
+
+/*
+ * Process an M_IOCTL message.
  */
 static void
-str_putbq(queue_t *q, mblk_t *mp)
+dld_ioc(dld_str_t *dsp, mblk_t *mp)
 {
-	mblk_t	*bp = NULL;
-	mblk_t	*nextp;
+	uint_t			cmd;
 
-	/*
-	 * Reverse the order of the chain.
-	 */
-	while (mp != NULL) {
-		nextp = mp->b_next;
+	cmd = ((struct iocblk *)mp->b_rptr)->ioc_cmd;
+	ASSERT(dsp->ds_type == DLD_DLPI);
 
-		mp->b_next = bp;
-		bp = mp;
+	switch (cmd) {
+	case DLIOCRAW:
+		ioc_raw(dsp, mp);
+		break;
+	case DLIOCHDRINFO:
+		ioc_fast(dsp, mp);
+		break;
+	default:
+		ioc(dsp, mp);
+	}
+}
 
-		mp = nextp;
+/*
+ * DLIOCRAW
+ */
+static void
+ioc_raw(dld_str_t *dsp, mblk_t *mp)
+{
+	queue_t *q = dsp->ds_wq;
+
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+	if (dsp->ds_polling) {
+		rw_exit(&dsp->ds_lock);
+		miocnak(q, mp, 0, EPROTO);
+		return;
+	}
+
+	if (dsp->ds_mode != DLD_RAW && dsp->ds_dlstate == DL_IDLE) {
+		/*
+		 * Set the receive callback.
+		 */
+		dls_rx_set(dsp->ds_dc, dld_str_rx_raw, (void *)dsp);
+
+		/*
+		 * Note that raw mode is enabled.
+		 */
+		dsp->ds_mode = DLD_RAW;
+	}
+
+	rw_exit(&dsp->ds_lock);
+	miocack(q, mp, 0, 0);
+}
+
+/*
+ * DLIOCHDRINFO
+ */
+static void
+ioc_fast(dld_str_t *dsp, mblk_t *mp)
+{
+	dl_unitdata_req_t *dlp;
+	off_t		off;
+	size_t		len;
+	const uint8_t	*addr;
+	uint16_t	sap;
+	mblk_t		*nmp;
+	mblk_t		*hmp;
+	uint_t		addr_length;
+	queue_t		*q = dsp->ds_wq;
+	int		err;
+	dls_channel_t	dc;
+
+	if (dld_opt & DLD_OPT_NO_FASTPATH) {
+		err = ENOTSUP;
+		goto failed;
+	}
+
+	nmp = mp->b_cont;
+	if (nmp == NULL || MBLKL(nmp) < sizeof (dl_unitdata_req_t) ||
+	    (dlp = (dl_unitdata_req_t *)nmp->b_rptr,
+	    dlp->dl_primitive != DL_UNITDATA_REQ)) {
+		err = EINVAL;
+		goto failed;
+	}
+
+	off = dlp->dl_dest_addr_offset;
+	len = dlp->dl_dest_addr_length;
+
+	if (!MBLKIN(nmp, off, len)) {
+		err = EINVAL;
+		goto failed;
+	}
+
+	rw_enter(&dsp->ds_lock, RW_READER);
+	if (dsp->ds_dlstate != DL_IDLE) {
+		rw_exit(&dsp->ds_lock);
+		err = ENOTSUP;
+		goto failed;
+	}
+
+	addr_length = dsp->ds_mip->mi_addr_length;
+	if (len != addr_length + sizeof (uint16_t)) {
+		rw_exit(&dsp->ds_lock);
+		err = EINVAL;
+		goto failed;
+	}
+
+	addr = nmp->b_rptr + off;
+	sap = *(uint16_t *)(nmp->b_rptr + off + addr_length);
+	dc = dsp->ds_dc;
+
+	if ((hmp = dls_header(dc, addr, sap, dsp->ds_pri)) == NULL) {
+		rw_exit(&dsp->ds_lock);
+		err = ENOMEM;
+		goto failed;
 	}
 
 	/*
-	 * Walk the reversed chain and put each message back on the
-	 * queue.
+	 * This is a performance optimization.  We originally entered
+	 * as reader and only become writer upon transitioning into
+	 * the DLD_FASTPATH mode for the first time.  Otherwise we
+	 * stay as reader and return the fast-path header to IP.
 	 */
-	while (bp != NULL) {
-		nextp = bp->b_next;
-		bp->b_next = NULL;
+	if (dsp->ds_mode != DLD_FASTPATH) {
+		if (!rw_tryupgrade(&dsp->ds_lock)) {
+			rw_exit(&dsp->ds_lock);
+			rw_enter(&dsp->ds_lock, RW_WRITER);
 
-		(void) putbq(q, bp);
+			/*
+			 * State may have changed before we re-acquired
+			 * the writer lock in case the upgrade failed.
+			 */
+			if (dsp->ds_dlstate != DL_IDLE) {
+				rw_exit(&dsp->ds_lock);
+				err = ENOTSUP;
+				goto failed;
+			}
+		}
 
-		bp = nextp;
+		/*
+		 * Set the receive callback (unless polling is enabled).
+		 */
+		if (!dsp->ds_polling)
+			dls_rx_set(dc, dld_str_rx_fastpath, (void *)dsp);
+
+		/*
+		 * Note that fast-path mode is enabled.
+		 */
+		dsp->ds_mode = DLD_FASTPATH;
 	}
+	rw_exit(&dsp->ds_lock);
+
+	freemsg(nmp->b_cont);
+	nmp->b_cont = hmp;
+
+	miocack(q, mp, MBLKL(nmp) + MBLKL(hmp), 0);
+	return;
+failed:
+	miocnak(q, mp, 0, err);
+}
+
+/*
+ * Catch-all handler.
+ */
+static void
+ioc(dld_str_t *dsp, mblk_t *mp)
+{
+	queue_t	*q = dsp->ds_wq;
+	mac_handle_t mh;
+
+	rw_enter(&dsp->ds_lock, RW_READER);
+	if (dsp->ds_dlstate == DL_UNATTACHED) {
+		rw_exit(&dsp->ds_lock);
+		miocnak(q, mp, 0, EINVAL);
+		return;
+	}
+	mh = dsp->ds_mh;
+	ASSERT(mh != NULL);
+	rw_exit(&dsp->ds_lock);
+	mac_ioctl(mh, q, mp);
+}
+
+/*
+ * Allocate a new minor number.
+ */
+static minor_t
+dld_minor_hold(boolean_t sleep)
+{
+	minor_t		minor;
+
+	/*
+	 * Grab a value from the arena.
+	 */
+	atomic_add_32(&minor_count, 1);
+	if ((minor = PTR_TO_MINOR(vmem_alloc(minor_arenap, 1,
+	    (sleep) ? VM_SLEEP : VM_NOSLEEP))) == 0) {
+		atomic_add_32(&minor_count, -1);
+		return (0);
+	}
+
+	return (minor);
+}
+
+/*
+ * Release a previously allocated minor number.
+ */
+static void
+dld_minor_rele(minor_t minor)
+{
+	/*
+	 * Return the value to the arena.
+	 */
+	vmem_free(minor_arenap, MINOR_TO_PTR(minor), 1);
+
+	atomic_add_32(&minor_count, -1);
 }

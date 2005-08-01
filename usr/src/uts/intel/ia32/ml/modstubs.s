@@ -1129,10 +1129,22 @@ fcnname/**/_info:							\
 	END_MODULE(sha1);
 #endif
 
-#ifndef DLD_MODULE
+/*
+ * The following stubs are used by the mac module.
+ * Since dls and dld already depend on mac, these
+ * stubs are needed to avoid circular dependencies.
+ */
+#ifndef DLS_MODULE
+	MODULE(dls,misc);
+	STUB(dls, dls_create, nomod_einval);
+	STUB(dls, dls_destroy, nomod_einval);
+	END_MODULE(dls);
+#endif
+
+#ifndef	DLD_MODULE
 	MODULE(dld,drv);
-	STUB(dld, dld_ppa_create, nomod_einval);
-	STUB(dld, dld_ppa_destroy, nomod_einval);
+	STUB(dld, dld_init_ops, nomod_void);
+	STUB(dld, dld_fini_ops, nomod_void);
 	END_MODULE(dld);
 #endif
 

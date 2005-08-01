@@ -236,7 +236,6 @@ CHKHDRS=			\
 	fx.h			\
 	fxpriocntl.h		\
 	gfs.h			\
-	ght.h			\
 	gld.h			\
 	gldpriv.h		\
 	hdio.h			\

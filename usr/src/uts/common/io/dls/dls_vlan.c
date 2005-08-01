@@ -33,7 +33,7 @@
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/atomic.h>
-#include <sys/ght.h>
+#include <sys/modhash.h>
 #include <sys/kstat.h>
 #include <sys/vlan.h>
 #include <sys/mac.h>
@@ -42,7 +42,9 @@
 #include <sys/dls_impl.h>
 
 static kmem_cache_t	*i_dls_vlan_cachep;
-static ght_t		i_dls_vlan_hash;
+static mod_hash_t	*i_dls_vlan_hash;
+static krwlock_t	i_dls_vlan_lock;
+static uint_t		i_dls_vlan_count;
 
 #define	VLAN_HASHSZ	67	/* prime */
 
@@ -75,8 +77,6 @@ i_dls_vlan_destructor(void *buf, void *arg)
 void
 dls_vlan_init(void)
 {
-	int	err;
-
 	/*
 	 * Create a kmem_cache of dls_vlan_t structures.
 	 */
@@ -88,20 +88,24 @@ dls_vlan_init(void)
 	/*
 	 * Create a hash table, keyed by name, of dls_vlan_t.
 	 */
-	err = ght_str_create("dls_vlan_hash", VLAN_HASHSZ, &i_dls_vlan_hash);
-	ASSERT(err == 0);
+	i_dls_vlan_hash = mod_hash_create_extended("dls_vlan_hash",
+	    VLAN_HASHSZ, mod_hash_null_keydtor, mod_hash_null_valdtor,
+	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
+	rw_init(&i_dls_vlan_lock, NULL, RW_DEFAULT, NULL);
+	i_dls_vlan_count = 0;
 }
 
 int
 dls_vlan_fini(void)
 {
-	int	err;
+	if (i_dls_vlan_count > 0)
+		return (EBUSY);
 
 	/*
-	 * If the hash table is not empty then this call will return EBUSY.
+	 * Destroy the hash table
 	 */
-	if ((err = ght_destroy(i_dls_vlan_hash)) != 0)
-		return (err);
+	mod_hash_destroy_hash(i_dls_vlan_hash);
+	rw_destroy(&i_dls_vlan_lock);
 
 	/*
 	 * Destroy the kmem_cache.
@@ -120,7 +124,6 @@ dls_vlan_create(const char *name, const char *dev, uint_t port, uint16_t vid)
 	dls_link_t	*dlp;
 	dls_vlan_t	*dvp;
 	int		err;
-	ghte_t		hte;
 	uint_t		len;
 
 	/*
@@ -143,17 +146,6 @@ dls_vlan_create(const char *name, const char *dev, uint_t port, uint16_t vid)
 		return (err);
 
 	/*
-	 * If we're creating a tagged VLAN, grab a reference to the MAC.
-	 * Strictly speaking, this is only needed for aggregations (so that
-	 * they can't be deleted when there are configured VLAN's), but it
-	 * doesn't hurt for other MAC's either.
-	 */
-	if (vid != 0 && (err = dls_mac_hold(dlp)) != 0) {
-		dls_link_rele(dlp);
-		return (err);
-	}
-
-	/*
 	 * Allocate a new dls_vlan_t.
 	 */
 	dvp = kmem_cache_alloc(i_dls_vlan_cachep, KM_SLEEP);
@@ -162,33 +154,21 @@ dls_vlan_create(const char *name, const char *dev, uint_t port, uint16_t vid)
 	dvp->dv_dlp = dlp;
 
 	/*
-	 * Allocate a new hash table entry.
-	 */
-	hte = ght_alloc(i_dls_vlan_hash, KM_SLEEP);
-
-	GHT_KEY(hte) = GHT_PTR_TO_KEY(dvp->dv_name);
-	GHT_VAL(hte) = GHT_PTR_TO_VAL(dvp);
-
-	/*
 	 * Insert the entry into the table.
 	 */
-	ght_lock(i_dls_vlan_hash, GHT_WRITE);
-	if ((err = ght_insert(hte)) != 0) {
-		ght_free(hte);
+	rw_enter(&i_dls_vlan_lock, RW_WRITER);
+
+	if ((err = mod_hash_insert(i_dls_vlan_hash,
+	    (mod_hash_key_t)dvp->dv_name, (mod_hash_val_t)dvp)) != 0) {
 		kmem_cache_free(i_dls_vlan_cachep, dvp);
-		if (vid != 0)
-			dls_mac_rele(dlp);
 		dls_link_rele(dlp);
+		err = EEXIST;
 		goto done;
 	}
-
-	/*
-	 * Create kstats.
-	 */
-	dls_stat_create(dvp);
+	i_dls_vlan_count++;
 
 done:
-	ght_unlock(i_dls_vlan_hash);
+	rw_exit(&i_dls_vlan_lock);
 	return (err);
 }
 
@@ -196,50 +176,46 @@ int
 dls_vlan_destroy(const char *name)
 {
 	int		err;
-	ghte_t		hte;
 	dls_vlan_t	*dvp;
 	dls_link_t	*dlp;
+	mod_hash_val_t	val;
 
 	/*
 	 * Find the dls_vlan_t in the global hash table.
 	 */
-	ght_lock(i_dls_vlan_hash, GHT_WRITE);
-	if ((err = ght_find(i_dls_vlan_hash, GHT_PTR_TO_KEY(name), &hte)) != 0)
+	rw_enter(&i_dls_vlan_lock, RW_WRITER);
+
+	err = mod_hash_find(i_dls_vlan_hash, (mod_hash_key_t)name,
+	    (mod_hash_val_t *)&dvp);
+	if (err != 0) {
+		err = ENOENT;
 		goto done;
+	}
 
 	/*
-	 * Check to see if it is referenced by any dls_t.
+	 * Check to see if it is referenced by any dls_impl_t.
 	 */
-	dvp = (dls_vlan_t *)GHT_VAL(hte);
 	if (dvp->dv_ref != 0) {
 		err = EBUSY;
 		goto done;
 	}
 
 	/*
-	 * Destroy kstats before releasing dls_link_t and before destroying
-	 * the dls_vlan_t to ensure ks_update is safe.
-	 */
-	dls_stat_destroy(dvp);
-
-	/*
 	 * Remove and destroy the hash table entry.
 	 */
-	ght_remove(hte);
-	ght_free(hte);
+	err = mod_hash_remove(i_dls_vlan_hash, (mod_hash_key_t)name,
+	    (mod_hash_val_t *)&val);
+	ASSERT(err == 0);
+	ASSERT(dvp == (dls_vlan_t *)val);
 
+	ASSERT(i_dls_vlan_count > 0);
+	i_dls_vlan_count--;
+
+	/*
+	 * Save a reference to dv_dlp before freeing the dls_vlan_t back
+	 * to the cache.
+	 */
 	dlp = dvp->dv_dlp;
-
-	/*
-	 * If we're destroying a tagged VLAN, release the hold we acquired
-	 * in dls_vlan_create().
-	 */
-	if (dvp->dv_id != 0)
-		dls_mac_rele(dlp);
-
-	/*
-	 * Free the dls_vlan_t back to the cache.
-	 */
 	kmem_cache_free(i_dls_vlan_cachep, dvp);
 
 	/*
@@ -248,23 +224,76 @@ dls_vlan_destroy(const char *name)
 	 */
 	dls_link_rele(dlp);
 done:
-	ght_unlock(i_dls_vlan_hash);
+	rw_exit(&i_dls_vlan_lock);
 	return (err);
 }
 
 int
-dls_vlan_hold(const char *name, dls_vlan_t **dvpp)
+dls_vlan_hold(const char *name, dls_vlan_t **dvpp, boolean_t create_vlan)
 {
 	int		err;
-	ghte_t		hte;
 	dls_vlan_t	*dvp;
 	dls_link_t	*dlp;
+	boolean_t	vlan_created = B_FALSE;
 
-	ght_lock(i_dls_vlan_hash, GHT_WRITE);
-	if ((err = ght_find(i_dls_vlan_hash, GHT_PTR_TO_KEY(name), &hte)) != 0)
-		goto done;
+again:
+	rw_enter(&i_dls_vlan_lock, RW_WRITER);
 
-	dvp = (dls_vlan_t *)GHT_VAL(hte);
+	err = mod_hash_find(i_dls_vlan_hash, (mod_hash_key_t)name,
+	    (mod_hash_val_t *)&dvp);
+	if (err != 0) {
+		char		drv[MAXNAMELEN];
+		uint_t		index, port, len;
+		uint16_t	vid;
+
+		ASSERT(err == MH_ERR_NOTFOUND);
+
+		vlan_created = B_FALSE;
+		if (!create_vlan) {
+			err = ENOENT;
+			goto done;
+		}
+
+		/*
+		 * Only create tagged vlans on demand.
+		 * Note that if we get here, 'name' must be a sane
+		 * value because it must have been derived from
+		 * ddi_major_to_name().
+		 */
+		if (ddi_parse(name, drv, &index) != DDI_SUCCESS ||
+		    (vid = DLS_PPA2VID(index)) == VLAN_ID_NONE ||
+		    vid > VLAN_ID_MAX) {
+			err = EINVAL;
+			goto done;
+		}
+
+		if (strcmp(drv, "aggr") == 0) {
+			port = (uint_t)DLS_PPA2INST(index);
+			(void) strlcpy(drv, "aggr0", MAXNAMELEN);
+		} else {
+			port = 0;
+			len = strlen(drv);
+			ASSERT(len < MAXNAMELEN);
+			(void) snprintf(drv + len, MAXNAMELEN - len, "%d",
+			    DLS_PPA2INST(index));
+		}
+		rw_exit(&i_dls_vlan_lock);
+
+		if ((err = dls_vlan_create(name, drv, port, vid)) != 0) {
+			rw_enter(&i_dls_vlan_lock, RW_WRITER);
+			goto done;
+		}
+
+		/*
+		 * At this point someone else could do a dls_vlan_hold and
+		 * dls_vlan_rele on this new vlan and causes it to be
+		 * destroyed. This will at worst cause us to spin a few
+		 * times.
+		 */
+		vlan_created = B_TRUE;
+		goto again;
+	}
+
 	dlp = dvp->dv_dlp;
 
 	if ((err = dls_mac_hold(dlp)) != 0)
@@ -275,10 +304,20 @@ dls_vlan_hold(const char *name, dls_vlan_t **dvpp)
 		goto done;
 	}
 
-	dvp->dv_ref++;
+	if (dvp->dv_ref++ == 0)
+		dls_stat_create(dvp);
+
 	*dvpp = dvp;
 done:
-	ght_unlock(i_dls_vlan_hash);
+	rw_exit(&i_dls_vlan_lock);
+
+	/*
+	 * We could be destroying a vlan created by another thread. This
+	 * is ok because this other thread will just loop back up and
+	 * recreate the vlan.
+	 */
+	if (err != 0 && vlan_created)
+		(void) dls_vlan_destroy(name);
 	return (err);
 }
 
@@ -286,12 +325,62 @@ void
 dls_vlan_rele(dls_vlan_t *dvp)
 {
 	dls_link_t	*dlp;
+	char		name[IFNAMSIZ];
+	boolean_t	destroy_vlan = B_FALSE;
 
-	ght_lock(i_dls_vlan_hash, GHT_WRITE);
+	rw_enter(&i_dls_vlan_lock, RW_WRITER);
 	dlp = dvp->dv_dlp;
 
 	mac_stop(dlp->dl_mh);
 	dls_mac_rele(dlp);
-	--dvp->dv_ref;
-	ght_unlock(i_dls_vlan_hash);
+	if (--dvp->dv_ref == 0) {
+		dls_stat_destroy(dvp);
+		/*
+		 * Tagged vlans get destroyed when dv_ref drops
+		 * to 0. We need to copy dv_name here because
+		 * dvp could disappear after we drop i_dls_vlan_lock.
+		 */
+		if (dvp->dv_id != 0) {
+			(void) strlcpy(name, dvp->dv_name, IFNAMSIZ);
+			destroy_vlan = B_TRUE;
+		}
+	}
+	rw_exit(&i_dls_vlan_lock);
+	if (destroy_vlan)
+		(void) dls_vlan_destroy(name);
+}
+
+typedef struct dls_vlan_walk_state {
+	int	(*fn)(dls_vlan_t *, void *);
+	void	*arg;
+	int	rc;
+} dls_vlan_walk_state_t;
+
+/*ARGSUSED*/
+static uint_t
+dls_vlan_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+{
+	dls_vlan_walk_state_t	*statep = arg;
+	dls_vlan_t		*dvp;
+
+	dvp = (dls_vlan_t *)val;
+	statep->rc = statep->fn(dvp, statep->arg);
+
+	return ((statep->rc == 0) ? MH_WALK_CONTINUE : MH_WALK_TERMINATE);
+}
+
+int
+dls_vlan_walk(int (*fn)(dls_vlan_t *, void *), void *arg)
+{
+	dls_vlan_walk_state_t	state;
+
+	rw_enter(&i_dls_vlan_lock, RW_READER);
+
+	state.fn = fn;
+	state.arg = arg;
+	state.rc = 0;
+	mod_hash_walk(i_dls_vlan_hash, dls_vlan_walker, (void *)&state);
+
+	rw_exit(&i_dls_vlan_lock);
+	return (state.rc);
 }

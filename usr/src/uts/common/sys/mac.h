@@ -374,6 +374,7 @@ typedef mac_resource_handle_t	(*mac_resource_add_t)(void *, mac_resource_t *);
 extern int			mac_open(const char *, uint_t, mac_handle_t *);
 extern void			mac_close(mac_handle_t);
 extern const mac_info_t		*mac_info(mac_handle_t);
+extern boolean_t		mac_info_get(const char *, mac_info_t *);
 extern uint64_t			mac_stat_get(mac_handle_t, enum mac_stat);
 extern int			mac_start(mac_handle_t);
 extern void			mac_stop(mac_handle_t);
@@ -406,6 +407,7 @@ extern boolean_t		mac_active_set(mac_handle_t);
 extern void			mac_active_clear(mac_handle_t);
 extern void			mac_resource_set(mac_handle_t,
     mac_resource_add_t, void *);
+extern dev_info_t		*mac_devinfo_get(mac_handle_t);
 
 /*
  * Driver interface functions.
@@ -425,6 +427,8 @@ extern void			mac_unicst_refresh(mac_t *, mac_unicst_t,
     void *);
 extern void			mac_promisc_refresh(mac_t *, mac_promisc_t,
     void *);
+extern void			mac_init_ops(struct dev_ops *, const char *);
+extern void			mac_fini_ops(struct dev_ops *);
 
 #endif	/* _KERNEL */
 

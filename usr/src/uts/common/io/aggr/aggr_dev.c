@@ -38,17 +38,21 @@
 #include <sys/ksynch.h>
 #include <sys/kmem.h>
 #include <sys/stream.h>
+#include <sys/strsun.h>
 #include <sys/modctl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/atomic.h>
 #include <sys/stat.h>
 
+#include <sys/dld_impl.h>
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
+#include <inet/common.h>
 
 /* module description */
 #define	AGGR_LINKINFO	"Link Aggregation MAC"
+#define	AGGR_DRIVER_NAME	"aggr"
 
 /* device info ptr, only one for instance 0 */
 dev_info_t *aggr_dip;
@@ -58,50 +62,73 @@ static int aggr_dev_fini(void);
 static int aggr_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int aggr_attach(dev_info_t *, ddi_attach_cmd_t);
 static int aggr_detach(dev_info_t *, ddi_detach_cmd_t);
+static int aggr_open(queue_t *, dev_t *, int, int, cred_t *);
+static int aggr_close(queue_t *);
+static void aggr_wput(queue_t *, mblk_t *);
 
-static struct cb_ops aggr_cb_ops = {
-	aggr_open,		/* open */
-	aggr_close,		/* close */
-	nulldev,		/* strategy */
-	nulldev,		/* print */
-	nodev,			/* dump */
-	nodev,			/* read */
-	nodev,			/* write */
-	aggr_ioctl,		/* ioctl */
-	nodev,			/* devmap */
-	nodev,			/* mmap */
-	nodev,			/* segmap */
-	nochpoll,		/* poll */
-	ddi_prop_op,		/* cb_prop_op */
-	0,			/* streamtab  */
-	D_NEW | D_MP		/* driver compatibility flag */
+/*
+ * mi_hiwat is set to 1 because of the flow control mechanism implemented
+ * in dld. refer to the comments in dld_str.c for details.
+ */
+static struct module_info aggr_module_info = {
+	0,
+	AGGR_DRIVER_NAME,
+	0,
+	INFPSZ,
+	1,
+	0
 };
 
-static struct dev_ops aggr_ops = {
-	DEVO_REV,		/* devo_rev */
-	0,			/* refcnt */
-	aggr_getinfo,		/* getinfo */
-	nulldev,		/* identify */
-	nulldev,		/* probe */
-	aggr_attach,		/* attach */
-	aggr_detach,		/* detach */
-	nodev,			/* reset */
-	&aggr_cb_ops,		/* driver operations */
-	NULL,			/* bus operations */
-	nodev			/* dev power */
+static struct qinit aggr_r_qinit = {	/* read queues */
+	NULL,
+	NULL,
+	aggr_open,
+	aggr_close,
+	NULL,
+	&aggr_module_info
 };
 
-static struct modldrv modldrv = {
-	&mod_driverops,
-	AGGR_LINKINFO,
-	&aggr_ops
+static struct qinit aggr_w_qinit = {	/* write queues */
+	(pfi_t)dld_wput,
+	(pfi_t)dld_wsrv,
+	NULL,
+	NULL,
+	NULL,
+	&aggr_module_info
 };
 
-static struct modlinkage	modlinkage = {
+/*
+ * Entry points for aggr control node
+ */
+static struct qinit aggr_w_ctl_qinit = {
+	(pfi_t)aggr_wput,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	&aggr_module_info
+};
+
+static struct streamtab aggr_streamtab = {
+	&aggr_r_qinit,
+	&aggr_w_qinit
+};
+
+DDI_DEFINE_STREAM_OPS(aggr_dev_ops, nulldev, nulldev, aggr_attach, aggr_detach,
+    nodev, aggr_getinfo, D_MP, &aggr_streamtab);
+
+static struct modldrv aggr_modldrv = {
+	&mod_driverops,		/* Type of module.  This one is a driver */
+	AGGR_LINKINFO,		/* short description */
+	&aggr_dev_ops		/* driver specific ops */
+};
+
+static struct modlinkage modlinkage = {
 	MODREV_1,
-	&modldrv,
+	&aggr_modldrv,
 	NULL
 };
+
 
 int
 _init(void)
@@ -116,7 +143,6 @@ _init(void)
 	}
 
 	aggr_dip = NULL;
-
 	return (0);
 }
 
@@ -140,6 +166,53 @@ int
 _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
+}
+
+static int
+aggr_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	if (q->q_ptr != NULL)
+		return (EBUSY);
+
+	if (getminor(*devp) == AGGR_MINOR_CTL) {
+		dld_str_t	*dsp;
+
+		dsp = dld_str_create(q, DLD_CONTROL, getmajor(*devp),
+		    DL_STYLE1);
+		if (dsp == NULL)
+			return (ENOSR);
+
+		/*
+		 * The aggr control node uses its own set of entry points.
+		 */
+		WR(q)->q_qinfo = &aggr_w_ctl_qinit;
+		*devp = makedevice(getmajor(*devp), dsp->ds_minor);
+		qprocson(q);
+		return (0);
+	}
+	return (dld_open(q, devp, flag, sflag, credp));
+}
+
+static int
+aggr_close(queue_t *q)
+{
+	dld_str_t	*dsp = q->q_ptr;
+
+	if (dsp->ds_type == DLD_CONTROL) {
+		qprocsoff(q);
+		dld_str_destroy(dsp);
+		return (0);
+	}
+	return (dld_close(q));
+}
+
+static void
+aggr_wput(queue_t *q, mblk_t *mp)
+{
+	if (DB_TYPE(mp) == M_IOCTL)
+		aggr_ioctl(q, mp);
+	else
+		freemsg(mp);
 }
 
 static void
@@ -216,8 +289,11 @@ aggr_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	switch (cmd) {
 	case DDI_DETACH:
+		if (aggr_grp_count() > 0)
+			return (DDI_FAILURE);
+
 		aggr_dip = NULL;
-		ddi_remove_minor_node(dip, NULL);
+		ddi_remove_minor_node(dip, AGGR_DEVNAME_CTL);
 
 		return (DDI_SUCCESS);
 

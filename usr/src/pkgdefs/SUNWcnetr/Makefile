@@ -28,11 +28,11 @@
 
 include ../Makefile.com
 
-DATAFILES += i.ipsecalgsbase i.preserve i.sock2path i.datalinkconf
+DATAFILES += i.ipsecalgsbase i.preserve i.sock2path
 
 .KEEP_STATE:
 
-all: $(FILES) postinstall
+all: $(FILES)
 
 install: all pkg
 

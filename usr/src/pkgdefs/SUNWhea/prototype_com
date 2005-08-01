@@ -657,7 +657,6 @@ f none usr/include/sys/fss.h 644 root bin
 f none usr/include/sys/fsspriocntl.h 644 root bin
 f none usr/include/sys/fx.h 644 root bin
 f none usr/include/sys/fxpriocntl.h 644 root bin
-f none usr/include/sys/ght.h 644 root bin
 f none usr/include/sys/gld.h 644 root bin
 f none usr/include/sys/gldpriv.h 644 root bin
 d none usr/include/sys/hotplug 755 root bin

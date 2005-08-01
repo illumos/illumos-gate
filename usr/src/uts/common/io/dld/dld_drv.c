@@ -30,20 +30,23 @@
  * Data-Link Driver
  */
 
-#include	<sys/types.h>
-#include	<sys/stream.h>
 #include	<sys/conf.h>
-#include	<sys/stat.h>
-#include	<sys/ddi.h>
-#include	<sys/sunddi.h>
-#include	<sys/dlpi.h>
+#include	<sys/mkdev.h>
 #include	<sys/modctl.h>
-#include	<sys/kmem.h>
-#include	<inet/common.h>
-
-#include	<sys/dls.h>
+#include	<sys/stat.h>
+#include	<sys/strsun.h>
 #include	<sys/dld.h>
 #include	<sys/dld_impl.h>
+#include	<sys/dls_impl.h>
+#include	<inet/common.h>
+
+/*
+ * dld control node state, one per open control node session.
+ */
+typedef struct dld_ctl_str_s {
+	minor_t cs_minor;
+	queue_t *cs_wq;
+} dld_ctl_str_t;
 
 static void	drv_init(void);
 static int	drv_fini(void);
@@ -52,6 +55,11 @@ static int	drv_getinfo(dev_info_t	*, ddi_info_cmd_t, void *, void **);
 static int	drv_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	drv_detach(dev_info_t *, ddi_detach_cmd_t);
 
+/*
+ * The following entry points are private to dld and are used for control
+ * operations only. The entry points exported to mac drivers are defined
+ * in dld_str.c. Refer to the comment on top of dld_str.c for details.
+ */
 static int	drv_open(queue_t *, dev_t *, int, int, cred_t *);
 static int	drv_close(queue_t *);
 
@@ -59,13 +67,8 @@ static void	drv_uw_put(queue_t *, mblk_t *);
 static void	drv_uw_srv(queue_t *);
 
 dev_info_t	*dld_dip;		/* dev_info_t for the driver */
-uint32_t	dld_opt;		/* Global options */
-boolean_t	dld_open;		/* Flag to note that the control */
-					/* node is open */
-boolean_t	dld_aul = B_TRUE;	/* Set to B_FALSE to prevent driver */
-					/* unloading */
-
-static kmutex_t	drv_lock;		/* Needs no initialization */
+uint32_t	dld_opt = 0;		/* Global options */
+static vmem_t	*dld_ctl_vmem;		/* for control minor numbers */
 
 static	struct	module_info	drv_info = {
 	0,			/* mi_idnum */
@@ -104,7 +107,7 @@ static	struct streamtab	drv_stream = {
 };
 
 DDI_DEFINE_STREAM_OPS(drv_ops, nulldev, nulldev, drv_attach, drv_detach,
-    nodev, drv_getinfo, D_MP | D_MTQPAIR | D_MTPUTSHARED, &drv_stream);
+    nodev, drv_getinfo, D_MP, &drv_stream);
 
 /*
  * Module linkage information for the kernel.
@@ -129,12 +132,10 @@ _init(void)
 {
 	int	err;
 
+	drv_init();
+
 	if ((err = mod_install(&drv_modlinkage)) != 0)
 		return (err);
-
-#ifdef	DEBUG
-	cmn_err(CE_NOTE, "!%s loaded", DLD_INFO);
-#endif	/* DEBUG */
 
 	return (0);
 }
@@ -144,15 +145,13 @@ _fini(void)
 {
 	int	err;
 
-	if (!dld_aul)
-		return (ENOTSUP);
-
 	if ((err = mod_remove(&drv_modlinkage)) != 0)
 		return (err);
 
-#ifdef	DEBUG
-	cmn_err(CE_NOTE, "!%s unloaded", DLD_INFO);
-#endif	/* DEBUG */
+	if (drv_fini() != 0) {
+		(void) mod_install(&drv_modlinkage);
+		return (DDI_FAILURE);
+	}
 
 	return (err);
 }
@@ -165,15 +164,14 @@ _info(struct modinfo *modinfop)
 
 
 /*
- * Initialize compoment modules.
+ * Initialize component modules.
  */
 static void
 drv_init(void)
 {
-	dld_minor_init();
-	dld_node_init();
+	dld_ctl_vmem = vmem_create("dld_ctl", (void *)1, MAXMIN, 1,
+	    NULL, NULL, NULL, 1, VM_SLEEP | VMC_IDENTIFIER);
 	dld_str_init();
-	dld_ppa_init();
 }
 
 static int
@@ -181,18 +179,10 @@ drv_fini(void)
 {
 	int	err;
 
-	if ((err = dld_ppa_fini()) != 0)
+	if ((err = dld_str_fini()) != 0)
 		return (err);
 
-	err = dld_str_fini();
-	ASSERT(err == 0);
-
-	err = dld_node_fini();
-	ASSERT(err == 0);
-
-	err = dld_minor_fini();
-	ASSERT(err == 0);
-
+	vmem_destroy(dld_ctl_vmem);
 	return (0);
 }
 
@@ -227,34 +217,17 @@ static void
 drv_set_opt(dev_info_t *dip)
 {
 	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    DLD_PROP_NO_STYLE1, 0) != 0) {
-#ifdef	DEBUG
-		cmn_err(CE_NOTE, "%s: ON", DLD_PROP_NO_STYLE1);
-#endif	/* DEBUG */
-		dld_opt |= DLD_OPT_NO_STYLE1;
-	}
-
-	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    DLD_PROP_NO_FASTPATH, 0) != 0) {
-#ifdef	DEBUG
-		cmn_err(CE_NOTE, "%s: ON", DLD_PROP_NO_FASTPATH);
-#endif	/* DEBUG */
 		dld_opt |= DLD_OPT_NO_FASTPATH;
 	}
 
 	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    DLD_PROP_NO_POLL, 0) != 0) {
-#ifdef	DEBUG
-		cmn_err(CE_NOTE, "%s: ON", DLD_PROP_NO_POLL);
-#endif	/* DEBUG */
 		dld_opt |= DLD_OPT_NO_POLL;
 	}
 
 	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    DLD_PROP_NO_ZEROCOPY, 0) != 0) {
-#ifdef	DEBUG
-		cmn_err(CE_NOTE, "%s: ON", DLD_PROP_NO_ZEROCOPY);
-#endif	/* DEBUG */
 		dld_opt |= DLD_OPT_NO_ZEROCOPY;
 	}
 }
@@ -270,7 +243,6 @@ drv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	ASSERT(ddi_get_instance(dip) == 0);
 
-	drv_init();
 	drv_set_opt(dip);
 
 	/*
@@ -298,9 +270,6 @@ drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
-	if (drv_fini() != 0)
-		return (DDI_FAILURE);
-
 	ASSERT(dld_dip == dip);
 
 	/*
@@ -313,83 +282,41 @@ drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 }
 
 /*
- * qi_qopen: open(9e)
+ * dld control node open procedure.
  */
 /*ARGSUSED*/
 static int
 drv_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 {
-	dld_str_t	*dsp;
-	dld_node_t	*dnp;
-	dld_ppa_t	*dpp;
+	dld_ctl_str_t	*ctls;
 	minor_t		minor;
-	int		err;
+	queue_t *oq =	OTHERQ(rq);
 
-	ASSERT(sflag != MODOPEN);
+	if (sflag == MODOPEN)
+		return (ENOTSUP);
 
 	/*
 	 * This is a cloning driver and therefore each queue should only
 	 * ever get opened once.
 	 */
-	ASSERT(rq->q_ptr == NULL);
 	if (rq->q_ptr != NULL)
 		return (EBUSY);
 
-	/*
-	 * Grab the minor number of the dev_t that was opened. Because this
-	 * is a cloning driver this will be distinct from the actual minor
-	 * of the dev_t handed back.
-	 */
-	minor = getminor(*devp);
+	minor = (minor_t)(uintptr_t)vmem_alloc(dld_ctl_vmem, 1, VM_NOSLEEP);
+	if (minor == 0)
+		return (ENOMEM);
 
-	/*
-	 * Create a new dld_str_t for the stream. This will grab a new minor
-	 * number that will be handed back in the cloned dev_t.
-	 */
-	dsp = dld_str_create(rq);
-
-	if (minor != DLD_CONTROL_MINOR) {
-		/*
-		 * This is not the control node, so look up the DLPI
-		 * provider node that is being opened.
-		 */
-		if ((dnp = dld_node_find(minor)) == NULL) {
-			err = ENODEV;
-			goto failed;
-		}
-
-		dsp->ds_dnp = dnp;
-		dsp->ds_type = DLD_DLPI;
-
-		ASSERT(dsp->ds_dlstate == DL_UNATTACHED);
-		if (dnp->dn_style == DL_STYLE1) {
-			/*
-			 * This is a style 1 provider node so we have a
-			 * non-ambiguous PPA.
-			 */
-			dpp = dld_node_ppa_find(dnp, -1);
-
-			if ((err = dld_str_attach(dsp, dpp)) != 0)
-				goto failed;
-			dsp->ds_dlstate = DL_UNBOUND;
-		}
-	} else {
-		/*
-		 * This is the control node. It is exclusive-access so
-		 * verify that it is not already open.
-		 */
-		mutex_enter(&drv_lock);
-		if (dld_open) {
-			err = EBUSY;
-			mutex_exit(&drv_lock);
-			goto failed;
-		}
-
-		dld_open = B_TRUE;
-		mutex_exit(&drv_lock);
-
-		dsp->ds_type = DLD_CONTROL;
+	ctls = kmem_zalloc(sizeof (dld_ctl_str_t), KM_NOSLEEP);
+	if (ctls == NULL) {
+		vmem_free(dld_ctl_vmem, (void *)(uintptr_t)minor, 1);
+		return (ENOMEM);
 	}
+
+	ctls->cs_minor = minor;
+	ctls->cs_wq = WR(rq);
+
+	rq->q_ptr = ctls;
+	oq->q_ptr = ctls;
 
 	/*
 	 * Enable the queue srv(9e) routine.
@@ -399,102 +326,191 @@ drv_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 	/*
 	 * Construct a cloned dev_t to hand back.
 	 */
-	*devp = makedevice(getmajor(*devp), dsp->ds_minor);
+	*devp = makedevice(getmajor(*devp), ctls->cs_minor);
 	return (0);
-
-failed:
-	dld_str_destroy(dsp);
-	return (err);
 }
 
 /*
- * qi_qclose: close(9e)
+ * dld control node close procedure.
  */
 static int
 drv_close(queue_t *rq)
 {
-	dld_str_t	*dsp;
+	dld_ctl_str_t	*ctls;
 
-	dsp = rq->q_ptr;
-	ASSERT(dsp != NULL);
+	ctls = rq->q_ptr;
+	ASSERT(ctls != NULL);
 
 	/*
 	 * Disable the queue srv(9e) routine.
 	 */
 	qprocsoff(rq);
 
-	if (dsp->ds_type != DLD_CONTROL) {
-		/*
-		 * This stream was open to a provider node. Check to see
-		 * if it has been cleanly shut down.
-		 */
-		if (dsp->ds_dlstate != DL_UNATTACHED) {
-			/*
-			 * The stream is either open to a style 1 provider or
-			 * this is not clean shutdown. Detach from the PPA.
-			 * (This is still ok even in the style 1 case).
-			 */
-			dld_str_detach(dsp);
-			dsp->ds_dlstate = DL_UNATTACHED;
-		}
-	} else {
-		/*
-		 * This stream was open to the control node. Clear the flag
-		 * to allow another stream access.
-		 */
-		ASSERT(dld_open);
-		dld_open = B_FALSE;
-	}
+	vmem_free(dld_ctl_vmem, (void *)(uintptr_t)ctls->cs_minor, 1);
 
-	dld_str_destroy(dsp);
+	kmem_free(ctls, sizeof (dld_ctl_str_t));
+
 	return (0);
 }
 
 /*
- * qi_qputp: put(9e)
+ * DLDIOCATTR
  */
 static void
-drv_uw_put(queue_t *wq, mblk_t *mp)
+drv_ioc_attr(dld_ctl_str_t *ctls, mblk_t *mp)
 {
-	dld_str_t	*dsp;
+	dld_ioc_attr_t *diap;
+	dls_vlan_t	*dvp = NULL;
+	dls_link_t	*dlp = NULL;
+	int		err;
+	queue_t		*q = ctls->cs_wq;
 
-	dsp = wq->q_ptr;
-	ASSERT(dsp != NULL);
+	if ((err = miocpullup(mp, sizeof (dld_ioc_attr_t))) != 0)
+		goto failed;
 
-	/*
-	 * Call the put(9e) processor.
-	 */
-	dld_str_put(dsp, mp);
+	diap = (dld_ioc_attr_t *)mp->b_cont->b_rptr;
+	diap->dia_name[IFNAMSIZ - 1] = '\0';
+
+	if (dls_vlan_hold(diap->dia_name, &dvp, B_FALSE) != 0) {
+		err = ENOENT;
+		goto failed;
+	}
+
+	dlp = dvp->dv_dlp;
+	(void) strlcpy(diap->dia_dev, dlp->dl_dev, MAXNAMELEN);
+	diap->dia_port = dlp->dl_port;
+	diap->dia_vid = dvp->dv_id;
+	diap->dia_max_sdu = dlp->dl_mip->mi_sdu_max;
+
+	dls_vlan_rele(dvp);
+	miocack(q, mp, sizeof (dld_ioc_attr_t), 0);
+	return;
+
+failed:
+	ASSERT(err != 0);
+	if (err == ENOENT) {
+		char	devname[MAXNAMELEN];
+		uint_t	instance;
+		major_t	major;
+
+		/*
+		 * Try to detect if the specified device is gldv3
+		 * and return ENODEV if it is not.
+		 */
+		if (ddi_parse(diap->dia_name, devname, &instance) == 0 &&
+		    (major = ddi_name_to_major(devname)) != (major_t)-1 &&
+		    !GLDV3_DRV(major))
+			err = ENODEV;
+	}
+	miocnak(q, mp, 0, err);
+}
+
+
+/*
+ * DLDIOCVLAN
+ */
+typedef struct dld_ioc_vlan_state {
+	uint_t		bytes_left;
+	uint_t		count;
+	dld_vlan_info_t	*vlanp;
+} dld_ioc_vlan_state_t;
+
+static int
+drv_ioc_vlan_info(dls_vlan_t *dvp, void *arg)
+{
+	dld_ioc_vlan_state_t	*statep = arg;
+
+	if (statep->bytes_left < sizeof (dld_vlan_info_t))
+		return (ENOSPC);
+
+	(void) strlcpy(statep->vlanp->dvi_name, dvp->dv_name, IFNAMSIZ);
+	statep->vlanp->dvi_vid = dvp->dv_id;
+
+	statep->count++;
+	statep->bytes_left -= sizeof (dld_vlan_info_t);
+	statep->vlanp += 1;
+	return (0);
+}
+
+static void
+drv_ioc_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	dld_ioc_vlan_t		*divp;
+	dld_ioc_vlan_state_t	state;
+	int			err = EINVAL;
+	queue_t			*q = ctls->cs_wq;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_vlan_t))) != 0)
+		goto failed;
+
+	divp = (dld_ioc_vlan_t *)mp->b_cont->b_rptr;
+	state.bytes_left = MBLKL(mp->b_cont) - sizeof (dld_ioc_vlan_t);
+	state.count = 0;
+	state.vlanp = (dld_vlan_info_t *)(divp + 1);
+
+	err = dls_vlan_walk(drv_ioc_vlan_info, &state);
+	if (err != 0)
+		goto failed;
+
+	divp->div_count = state.count;
+	miocack(q, mp, sizeof (dld_ioc_vlan_t) +
+	    state.count * sizeof (dld_vlan_info_t), 0);
+	return;
+
+failed:
+	ASSERT(err != 0);
+	miocnak(q, mp, 0, err);
+}
+
+
+/*
+ * Process an IOCTL message received by the control node.
+ */
+static void
+drv_ioc(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	uint_t	cmd;
+
+	cmd = ((struct iocblk *)mp->b_rptr)->ioc_cmd;
+	switch (cmd) {
+	case DLDIOCATTR:
+		drv_ioc_attr(ctls, mp);
+		return;
+	case DLDIOCVLAN:
+		drv_ioc_vlan(ctls, mp);
+		return;
+	default:
+		miocnak(ctls->cs_wq, mp, 0, ENOTSUP);
+		return;
+	}
 }
 
 /*
- * qi_srvp: srv(9e)
+ * Write side put routine of the dld control node.
  */
 static void
-drv_uw_srv(queue_t *wq)
+drv_uw_put(queue_t *q, mblk_t *mp)
 {
-	mblk_t		*mp = NULL;
-	mblk_t		*p;
-	mblk_t		**pp;
-	dld_str_t	*dsp;
+	dld_ctl_str_t *ctls = q->q_ptr;
 
-	dsp = wq->q_ptr;
-	ASSERT(dsp != NULL);
+	switch (mp->b_datap->db_type) {
+	case M_IOCTL:
+		drv_ioc(ctls, mp);
+		break;
+	default:
+		freemsg(mp);
+		break;
+	}
+}
 
-	/*
-	 * Loop round and pull a chain of messages from the queue.
-	 */
-	for (pp = &mp; (p = getq(wq)) != NULL; pp = &(p->b_next))
-		*pp = p;
+/*
+ * Write-side service procedure.
+ */
+void
+drv_uw_srv(queue_t *q)
+{
+	mblk_t *mp;
 
-	/*
-	 * If there was nothing on the queue then there's nothing to do.
-	 */
-	if (mp == NULL)
-		return;
-
-	/*
-	 * Call the srv(9e) processor.
-	 */
-	dld_str_srv(dsp, mp);
+	while (mp = getq(q))
+		drv_uw_put(q, mp);
 }

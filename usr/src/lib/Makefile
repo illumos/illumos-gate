@@ -399,7 +399,7 @@ libefi:		libuuid
 libelfsign:	libike libcryptoutil pkcs11
 libinetcfg:	libnsl libsocket libdevinfo
 libnsl:		libmd5 libscf
-libmacadm:	libdevinfo
+libmacadm:	libdevinfo libdladm libdlpi
 libuuid:	libsocket
 libinetutil:	libsocket
 libsecdb:	libcmd libnsl

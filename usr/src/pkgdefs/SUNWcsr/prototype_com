@@ -328,11 +328,8 @@ f none lib/svc/bin/svc.configd 0555 root sys
 f none lib/svc/bin/svc.startd 0555 root sys
 d none lib/svc/capture 0755 root bin
 d none lib/svc/method 0755 root bin
-f none lib/svc/method/aggregation 0555 root bin
 f none lib/svc/method/boot-archive 0555 root bin
 f none lib/svc/method/console-login 0555 root bin
-f none lib/svc/method/datalink 0555 root bin
-f none lib/svc/method/datalink-init 0555 root bin
 f none lib/svc/method/devices-local 0555 root bin
 f none lib/svc/method/fs-local 0555 root bin
 f none lib/svc/method/fs-minimal 0555 root bin
@@ -463,9 +460,6 @@ f manifest var/svc/manifest/milestone/network.xml 0444 root sys
 f manifest var/svc/manifest/milestone/single-user.xml 0444 root sys
 f manifest var/svc/manifest/milestone/sysconfig.xml 0444 root sys
 d none var/svc/manifest/network 755 root sys
-f manifest var/svc/manifest/network/aggregation.xml 0444 root sys
-f manifest var/svc/manifest/network/datalink.xml 0444 root sys
-f manifest var/svc/manifest/network/datalink-init.xml 0444 root sys
 f manifest var/svc/manifest/network/inetd.xml 0444 root sys
 f manifest var/svc/manifest/network/inetd-upgrade.xml 0444 root sys
 f manifest var/svc/manifest/network/network-initial.xml 0444 root sys

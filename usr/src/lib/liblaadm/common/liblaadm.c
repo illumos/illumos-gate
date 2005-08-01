@@ -185,6 +185,18 @@ typedef struct add_db_state {
 
 static int i_laadm_fput_grp(FILE *, laadm_grp_attr_db_t *);
 
+static int
+i_laadm_strioctl(int fd, int cmd, void *ptr, int ilen)
+{
+	struct strioctl str;
+
+	str.ic_cmd = cmd;
+	str.ic_timout = 0;
+	str.ic_len = ilen;
+	str.ic_dp = ptr;
+
+	return (ioctl(fd, I_STR, &str));
+}
 
 /*
  * Open and lock the aggregation configuration file lock. The lock is
@@ -261,8 +273,7 @@ laadm_walk_sys(int (*fn)(void *, laadm_grp_attr_sys_t *), void *arg)
 	}
 
 tryagain:
-	ioc->li_bufsize = bufsize;
-	rc = ioctl(fd, LAIOC_INFO, ioc);
+	rc = i_laadm_strioctl(fd, LAIOC_INFO, ioc, bufsize);
 
 	if (rc != 0) {
 		if (errno == ENOSPC) {
@@ -501,19 +512,18 @@ failed:
 static int
 i_laadm_add_rem_sys(laadm_grp_attr_db_t *attr, int cmd, laadm_diag_t *diag)
 {
-	int i, rc, fd;
-	laioc_add_t ioc;
+	int i, rc, fd, len;
+	laioc_add_rem_t *iocp;
 	laioc_port_t *ports;
 
-	ioc.la_key = attr->lt_key;
-	ioc.la_nports = attr->lt_nports;
-
-	ioc.la_ports = malloc(attr->lt_nports * sizeof (laioc_port_t));
-	if (ioc.la_ports == NULL)
+	len = sizeof (*iocp) + attr->lt_nports * sizeof (laioc_port_t);
+	iocp = malloc(len);
+	if (iocp == NULL)
 		goto failed;
 
-	/* LINTED E_BAD_PTR_CAST_ALIGN */
-	ports = (laioc_port_t *)ioc.la_ports;
+	iocp->la_key = attr->lt_key;
+	iocp->la_nports = attr->lt_nports;
+	ports = (laioc_port_t *)(iocp + 1);
 
 	for (i = 0; i < attr->lt_nports; i++) {
 		if (strlcpy(ports[i].lp_devname,
@@ -528,17 +538,17 @@ i_laadm_add_rem_sys(laadm_grp_attr_db_t *attr, int cmd, laadm_diag_t *diag)
 		goto failed;
 	}
 
-	rc = ioctl(fd, cmd, &ioc);
+	rc = i_laadm_strioctl(fd, cmd, iocp, len);
 	if ((rc < 0) && (errno == EINVAL))
 		*diag = LAADM_DIAG_INVALID_INTFNAME;
 
 	(void) close(fd);
 
-	free(ioc.la_ports);
+	free(iocp);
 	return (rc);
 
 failed:
-	free(ioc.la_ports);
+	free(iocp);
 	return (-1);
 }
 
@@ -575,7 +585,7 @@ i_laadm_modify_sys(uint32_t key, uint32_t mask, laadm_modify_attr_t *attr,
 		return (-1);
 	}
 
-	rc = ioctl(fd, LAIOC_MODIFY, &ioc);
+	rc = i_laadm_strioctl(fd, LAIOC_MODIFY, &ioc, sizeof (ioc));
 	if ((rc < 0) && (errno == EINVAL))
 		*diag = LAADM_DIAG_INVALID_MACADDR;
 
@@ -590,28 +600,29 @@ i_laadm_modify_sys(uint32_t key, uint32_t mask, laadm_modify_attr_t *attr,
 static int
 i_laadm_create_sys(int fd, laadm_grp_attr_db_t *attr, laadm_diag_t *diag)
 {
-	int i, rc;
-	laioc_create_t ioc;
+	int i, rc, len;
+	laioc_create_t *iocp;
 	laioc_port_t *ports;
 
-	ioc.lc_key = attr->lt_key;
-	ioc.lc_nports = attr->lt_nports;
-	ioc.lc_policy = attr->lt_policy;
-	ioc.lc_lacp_mode = attr->lt_lacp_mode;
-	ioc.lc_lacp_timer = attr->lt_lacp_timer;
-
-	ioc.lc_ports = malloc(attr->lt_nports * sizeof (laioc_port_t));
-	if (ioc.lc_ports == NULL)
+	len = sizeof (*iocp) + attr->lt_nports * sizeof (laioc_port_t);
+	iocp = malloc(len);
+	if (iocp == NULL)
 		return (-1);
 
-	/* LINTED E_BAD_PTR_CAST_ALIGN */
-	ports = (laioc_port_t *)ioc.lc_ports;
+	iocp->lc_key = attr->lt_key;
+	iocp->lc_nports = attr->lt_nports;
+	iocp->lc_policy = attr->lt_policy;
+	iocp->lc_lacp_mode = attr->lt_lacp_mode;
+	iocp->lc_lacp_timer = attr->lt_lacp_timer;
+
+	ports = (laioc_port_t *)(iocp + 1);
 
 	for (i = 0; i < attr->lt_nports; i++) {
 		if (strlcpy(ports[i].lp_devname,
 		    attr->lt_ports[i].lp_devname,
 		    MAXNAMELEN) >= MAXNAMELEN) {
-			free(ioc.lc_ports);
+			errno = EINVAL;
+			free(iocp);
 			return (-1);
 		}
 		ports[i].lp_port = attr->lt_ports[i].lp_port;
@@ -622,18 +633,18 @@ i_laadm_create_sys(int fd, laadm_grp_attr_db_t *attr, laadm_diag_t *diag)
 	    (attr->lt_mac[0] & 0x01))) {
 		errno = EINVAL;
 		*diag = LAADM_DIAG_INVALID_MACADDR;
-		free(ioc.lc_ports);
+		free(iocp);
 		return (-1);
 	}
 
-	bcopy(attr->lt_mac, ioc.lc_mac, ETHERADDRL);
-	ioc.lc_mac_fixed = attr->lt_mac_fixed;
+	bcopy(attr->lt_mac, iocp->lc_mac, ETHERADDRL);
+	iocp->lc_mac_fixed = attr->lt_mac_fixed;
 
-	rc = ioctl(fd, LAIOC_CREATE, &ioc);
+	rc = i_laadm_strioctl(fd, LAIOC_CREATE, iocp, len);
 	if (rc < 0)
 		*diag = LAADM_DIAG_INVALID_INTFNAME;
 
-	free(ioc.lc_ports);
+	free(iocp);
 	return (rc);
 }
 
@@ -700,7 +711,7 @@ i_laadm_delete_sys(int fd, laadm_grp_attr_sys_t *attr)
 
 	ioc.ld_key = attr->lg_key;
 
-	return (ioctl(fd, LAIOC_DELETE, &ioc));
+	return (i_laadm_strioctl(fd, LAIOC_DELETE, &ioc, sizeof (ioc)));
 }
 
 /*
@@ -1486,9 +1497,17 @@ laadm_create(uint32_t key, uint32_t nports, laadm_port_attr_db_t *ports,
 			return (-1);
 	} else {
 		laadm_up_t up;
+		int rc;
+
 		up.lu_key = key;
 		up.lu_found = B_FALSE;
-		return (i_laadm_up((void *)&up, &attr, diag));
+		up.lu_fd = open(LAADM_DEV, O_RDWR);
+		if (up.lu_fd < 0)
+			return (-1);
+
+		rc = i_laadm_up((void *)&up, &attr, diag);
+		(void) close(up.lu_fd);
+		return (rc);
 	}
 
 	/* bring up the link aggregation group */

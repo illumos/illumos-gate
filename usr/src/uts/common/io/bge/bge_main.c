@@ -2075,40 +2075,8 @@ bge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 #undef	BGE_DBG
 #define	BGE_DBG		BGE_DBG_INIT	/* debug flag for this code	*/
 
-static struct cb_ops bge_cb_ops = {
-	nulldev,		/* cb_open */
-	nulldev,		/* cb_close */
-	nodev,			/* cb_strategy */
-	nodev,			/* cb_print */
-	nodev,			/* cb_dump */
-	nodev,			/* cb_read */
-	nodev,			/* cb_write */
-	nodev,			/* cb_ioctl */
-	nodev,			/* cb_devmap */
-	nodev,			/* cb_mmap */
-	nodev,			/* cb_segmap */
-	nochpoll,		/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
-	NULL,			/* cb_stream */
-	D_MP,			/* cb_flag */
-	CB_REV,			/* cb_rev */
-	nodev,			/* cb_aread */
-	nodev			/* cb_awrite */
-};
-
-static struct dev_ops bge_dev_ops = {
-	DEVO_REV,		/* devo_rev */
-	0,			/* devo_refcnt */
-	nulldev,		/* devo_getinfo */
-	nulldev,		/* devo_identify */
-	nulldev,		/* devo_probe */
-	bge_attach,		/* devo_attach */
-	bge_detach,		/* devo_detach */
-	nodev,			/* devo_reset */
-	&bge_cb_ops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	NULL			/* devo_power */
-};
+DDI_DEFINE_STREAM_OPS(bge_dev_ops, nulldev, nulldev, bge_attach, bge_detach,
+    nodev, NULL, D_MP, NULL);
 
 static struct modldrv bge_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
@@ -2132,9 +2100,12 @@ _init(void)
 {
 	int status;
 
+	mac_init_ops(&bge_dev_ops, "bge");
 	status = mod_install(&modlinkage);
 	if (status == DDI_SUCCESS)
 		mutex_init(bge_log_mutex, NULL, MUTEX_DRIVER, NULL);
+	else
+		mac_fini_ops(&bge_dev_ops);
 	return (status);
 }
 
@@ -2144,8 +2115,10 @@ _fini(void)
 	int status;
 
 	status = mod_remove(&modlinkage);
-	if (status == DDI_SUCCESS)
+	if (status == DDI_SUCCESS) {
+		mac_fini_ops(&bge_dev_ops);
 		mutex_destroy(bge_log_mutex);
+	}
 	return (status);
 }
 

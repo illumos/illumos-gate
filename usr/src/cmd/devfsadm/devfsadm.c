@@ -1936,7 +1936,7 @@ check_minor_type(di_node_t node, di_minor_t minor, void *arg)
 
 	if ((dcip->dci_flags & DCA_CHECK_TYPE) &&
 	    (nt = di_minor_nodetype(minor)) &&
-	    (strcmp(nt, DDI_NT_NET) == 0 || strcmp(nt, DDI_NT_MAC) == 0)) {
+	    (strcmp(nt, DDI_NT_NET) == 0)) {
 		dcip->dci_flags |= DCA_NOTIFY_RCM;
 		dcip->dci_flags &= ~DCA_CHECK_TYPE;
 	}
@@ -7589,83 +7589,15 @@ lookup_nvpair(nvlist_t *nvl, char *name, data_type_t type)
 	return (NULL);
 }
 
-/*
- * Send the specified event to RCM if the given nvlist contains a minor
- * node of the specified type.
- */
-static void
-notify_event(nvlist_t *nvl, char *minor_node_type, char *event)
-{
-	nvpair_t *nvp, *mnvp;
-	char *path, *driver, *type;
-	int instance;
-	int err;
-	boolean_t do_notify = B_FALSE;
-	uint_t nminor;
-	char *minor_byte_array;
-	nvlist_t *mnvl;
-
-	nvp = NULL;
-	while (!do_notify && ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL)) {
-		if (strcmp(nvpair_name(nvp), RCM_NV_MINOR_DATA) != 0)
-			continue;
-		if (nvpair_value_byte_array(nvp,
-		    (uchar_t **)&minor_byte_array, &nminor) != 0)
-			goto error;
-		if (nvlist_unpack(minor_byte_array,
-		    nminor, &mnvl, 0) != 0)
-			goto error;
-
-		mnvp = NULL;
-		while (!do_notify &&
-		    ((mnvp = nvlist_next_nvpair(mnvl, mnvp)) != NULL)) {
-			if (strcmp(nvpair_name(mnvp),
-			    RCM_NV_MINOR_NODE_TYPE) == 0) {
-				if (nvpair_value_string(mnvp, &type) != 0) {
-					nvlist_free(mnvl);
-					goto error;
-				}
-				do_notify = (strcmp(type,
-				    minor_node_type) == 0);
-			}
-		}
-
-		nvlist_free(mnvl);
-	}
-
-	if (!do_notify)
-		return;
-
-	if (librcm_notify_event(rcm_hdl, event, 0, nvl, NULL) == RCM_SUCCESS)
-		return;
-
-error:
-	err = errno;
-
-	if (((nvp = lookup_nvpair(nvl,
-	    RCM_NV_DEVFS_PATH, DATA_TYPE_STRING)) == NULL) ||
-	    (nvpair_value_string(nvp, &path) != 0))
-		path = "unknown";
-
-	if (((nvp = lookup_nvpair(nvl,
-	    RCM_NV_DRIVER_NAME, DATA_TYPE_STRING)) == NULL) ||
-	    (nvpair_value_string(nvp, &driver) != 0))
-		driver = "unknown";
-
-	if (((nvp = lookup_nvpair(nvl,
-	    RCM_NV_INSTANCE, DATA_TYPE_INT32)) == NULL) ||
-	    (nvpair_value_int32(nvp, &instance) != 0))
-		instance = -1;
-
-	err_print(RCM_NOTIFY_FAILED, path, driver,
-	    instance, strerror(err));
-}
-
 /*ARGSUSED*/
 static void
 process_rcm_events(void *arg)
 {
 	struct rcm_eventq *ev, *ev_next;
+	nvpair_t *nvp;
+	char *path, *driver;
+	int instance;
+	int err;
 	int need_to_exit;
 
 	for (;;) {
@@ -7686,12 +7618,32 @@ process_rcm_events(void *arg)
 			 * we do not know whether the failure occurred in
 			 * librcm, rcm_daemon or rcm modules or scripts.
 			 */
+			if (librcm_notify_event(rcm_hdl,
+			    RCM_RESOURCE_NETWORK_NEW, 0, ev->nvl, NULL)
+			    != RCM_SUCCESS) {
 
-			notify_event(ev->nvl, DDI_NT_NET,
-			    RCM_RESOURCE_NETWORK_NEW);
+				err = errno;
 
-			notify_event(ev->nvl, DDI_NT_MAC,
-			    RCM_RESOURCE_MAC_NEW);
+				if (((nvp = lookup_nvpair(ev->nvl,
+				    RCM_NV_DEVFS_PATH, DATA_TYPE_STRING))
+				    == NULL) ||
+				    (nvpair_value_string(nvp, &path) != 0))
+					    path = "unknown";
+
+				if (((nvp = lookup_nvpair(ev->nvl,
+				    RCM_NV_DRIVER_NAME, DATA_TYPE_STRING))
+				    == NULL) ||
+				    (nvpair_value_string(nvp, &driver) != 0))
+					    driver = "unknown";
+				if (((nvp = lookup_nvpair(ev->nvl,
+				    RCM_NV_INSTANCE, DATA_TYPE_INT32))
+				    == NULL) ||
+				    (nvpair_value_int32(nvp, &instance) != 0))
+					    instance = -1;
+
+				err_print(RCM_NOTIFY_FAILED, path, driver,
+				    instance, strerror(err));
+			}
 
 			ev_next = ev->next;
 			nvlist_free(ev->nvl);

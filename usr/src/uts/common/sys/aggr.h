@@ -117,7 +117,6 @@ typedef struct laioc_port {
 typedef struct laioc_create {
 	uint32_t	lc_key;
 	uint32_t	lc_nports;
-	caddr_t		lc_ports;	/* ptr to lacio_port_t */
 	uint32_t	lc_policy;
 	uchar_t		lc_mac[ETHERADDRL];
 	boolean_t	lc_mac_fixed;
@@ -130,7 +129,6 @@ typedef struct laioc_create {
 typedef struct laioc_create32 {
 	uint32_t	lc_key;
 	uint32_t	lc_nports;
-	caddr32_t	lc_ports;
 	uint32_t	lc_policy;
 	uchar_t		lc_mac[ETHERADDRL];
 	boolean_t	lc_mac_fixed;
@@ -187,7 +185,6 @@ typedef struct laioc_info_group {
 } laioc_info_group_t;
 
 typedef struct laioc_info {
-	uint32_t	li_bufsize;
 	uint32_t	li_ngroups;
 	uint32_t	li_group_key;	/* 0 returns all */
 } laioc_info_t;
@@ -198,15 +195,13 @@ typedef struct laioc_info {
 typedef struct laioc_add_rem {
 	uint32_t	la_key;
 	uint32_t	la_nports;
-	caddr_t		la_ports;
-} laioc_add_t;
+} laioc_add_rem_t;
 
 #ifdef _SYSCALL32
 
 typedef struct laioc_add_rem32 {
 	uint32_t	la_key;
 	uint32_t	la_nports;
-	caddr32_t	la_ports;
 } laioc_add_rem32_t;
 
 #endif /* _SYSCALL32 */

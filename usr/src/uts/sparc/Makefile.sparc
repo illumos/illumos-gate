@@ -339,7 +339,7 @@ MISC_KMODS	+= ibmf
 MISC_KMODS	+= ibtl
 MISC_KMODS	+= ctf 
 MISC_KMODS	+= zmod
-MISC_KMODS	+= mac dls ght
+MISC_KMODS	+= mac dls
 
 #
 #	Software Cryptographic Providers (/kernel/crypto):

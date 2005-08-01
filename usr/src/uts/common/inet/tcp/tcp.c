@@ -18759,15 +18759,7 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		ASSERT(ill_poll->ill_tx != NULL);
 		ASSERT(ill_poll->ill_tx_handle != NULL);
 
-		mp = ill_poll->ill_tx(ill_poll->ill_tx_handle, mp);
-		/*
-		 * Driver couldn't send it. Drop it here and the connections
-		 * will automatically slow down when no ack comes back. We
-		 * should make this a better mechanism but this is a very
-		 * rare case.
-		 */
-		if (mp != NULL)
-			freemsg(mp);
+		ill_poll->ill_tx(ill_poll->ill_tx_handle, mp);
 	} else {
 		putnext(ire->ire_stq, mp);
 	}
