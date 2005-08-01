@@ -2096,9 +2096,12 @@ ibmf_i_msg_transport(ibmf_client_t *clientp, ibmf_qp_handle_t ibmf_qp_handle,
 	msgimplp->im_mgt_class 	= madhdrp->MgmtClass;
 	msgimplp->im_unsolicited = B_FALSE;
 	msgimplp->im_trans_state_flags = IBMF_TRANS_STATE_FLAG_UNINIT;
+	bzero(&msgimplp->im_rmpp_ctx, sizeof (ibmf_rmpp_ctx_t));
 	msgimplp->im_rmpp_ctx.rmpp_state = IBMF_RMPP_STATE_UNDEFINED;
 	msgimplp->im_rmpp_ctx.rmpp_respt = IBMF_RMPP_DEFAULT_RRESPT;
 	msgimplp->im_rmpp_ctx.rmpp_retry_cnt = 0;
+	msgimplp->im_ref_count = 0;
+	msgimplp->im_pending_send_compls = 0;
 	IBMF_MSG_INCR_REFCNT(msgimplp);
 	if (msgimplp->im_retrans.retrans_retries == 0)
 		msgimplp->im_retrans.retrans_retries = IBMF_RETRANS_DEF_RETRIES;
@@ -2382,6 +2385,7 @@ ibmf_i_init_msg(ibmf_msg_impl_t *msgimplp, ibmf_msg_cb_t trans_cb,
 	msgimplp->im_trans_cb = trans_cb;
 	msgimplp->im_trans_cb_arg = trans_cb_arg;
 
+	bzero(&msgimplp->im_retrans, sizeof (ibmf_retrans_t));
 	if (retrans != NULL) {
 		bcopy((void *)retrans, (void *)&msgimplp->im_retrans,
 		    sizeof (ibmf_retrans_t));

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,12 +87,12 @@ ibmf_i_terminate_transaction(ibmf_client_t *clientp, ibmf_msg_impl_t *msgimplp,
 		    IBMF_TRANS_STATE_FLAG_RECV_DONE;
 
 		/*
-		 * if it's a sequenced transaction, make sure send is done
-		 * before marking as done
+		 * Check if last send is done before marking as done.
+		 * We should get here for sequenced transactions and
+		 * non-sequenced send RMPP transaction.
 		 */
-		if (((msgimplp->im_flags & IBMF_MSG_FLAGS_SEQUENCED) == 0) ||
-		    (msgimplp->im_trans_state_flags &
-		    IBMF_TRANS_STATE_FLAG_SEND_DONE)) {
+		if (msgimplp->im_trans_state_flags &
+		    IBMF_TRANS_STATE_FLAG_SEND_DONE) {
 			msgimplp->im_trans_state_flags |=
 			    IBMF_TRANS_STATE_FLAG_DONE;
 		}

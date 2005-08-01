@@ -747,6 +747,30 @@ ibmf_i_do_send_compl(ibmf_handle_t ibmf_handle, ibmf_msg_impl_t *msgimplp,
 			}
 		}
 
+		/*
+		 * If the transaction is a send-only RMPP, then
+		 * set the SEND_DONE flag on every send completion
+		 * as long as there are no outstanding ones.
+		 * This is needed so that the transaction can return
+		 * in the receive path, where ibmf_i_terminate_transaction
+		 * is called from ibmf_i_rmpp_sender_active_flow,
+		 * after checking if the SEND_DONE flag is set.
+		 * When a new MAD is sent as part of the RMPP transaction,
+		 * the SEND_DONE flag will get reset.
+		 * The RECV_DONE indicates that the last ACK was received.
+		 */
+		if ((msgimplp->im_flags & IBMF_MSG_FLAGS_SEQUENCED) == 0) {
+			if (msgimplp->im_pending_send_compls == 0) {
+				msgimplp->im_trans_state_flags |=
+				    IBMF_TRANS_STATE_FLAG_SEND_DONE;
+				if (msgimplp->im_trans_state_flags  &
+				    IBMF_TRANS_STATE_FLAG_RECV_DONE) {
+					msgimplp->im_trans_state_flags |=
+					    IBMF_TRANS_STATE_FLAG_DONE;
+				}
+			}
+		}
+
 		IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4,
 		    ibmf_i_do_send_compl_end, IBMF_TNF_TRACE, "",
 		    "ibmf_i_do_send_compl() exit\n");
@@ -812,6 +836,8 @@ ibmf_i_do_send_compl(ibmf_handle_t ibmf_handle, ibmf_msg_impl_t *msgimplp,
 		}
 	} else {
 		msgimplp->im_msg_status = IBMF_SUCCESS;
+		msgimplp->im_trans_state_flags |=
+		    IBMF_TRANS_STATE_FLAG_SEND_DONE;
 		msgimplp->im_trans_state_flags |= IBMF_TRANS_STATE_FLAG_DONE;
 	}
 

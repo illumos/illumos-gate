@@ -511,11 +511,6 @@ ibmf_i_send_timeout(void *argp)
 		ibmf_i_terminate_transaction(msgimplp->im_client,
 		    msgimplp, IBMF_TRANS_TIMEOUT);
 
-		/*
-		 * Force client notification from this point
-		 */
-		msgimplp->im_trans_state_flags |= IBMF_TRANS_STATE_FLAG_DONE;
-
 		msg_flags = msgimplp->im_trans_state_flags;
 
 		mutex_exit(&msgimplp->im_mutex);
@@ -590,10 +585,6 @@ ibmf_i_send_timeout(void *argp)
 		ibmf_i_terminate_transaction(msgimplp->im_client,
 		    msgimplp, IBMF_TRANS_TIMEOUT);
 
-		/*
-		 * Force client notification from this point
-		 */
-		msgimplp->im_trans_state_flags |= IBMF_TRANS_STATE_FLAG_DONE;
 	} else {
 
 		if (rmpp_ctx->rmpp_state == IBMF_RMPP_STATE_SENDER_ACTIVE) {
