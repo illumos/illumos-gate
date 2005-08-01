@@ -13849,8 +13849,11 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 		/*
 		 * If we are syncing or dumping, fail the command to
 		 * avoid recursively calling back into scsi_transport().
+		 * See panic.c for more information about the states
+		 * the system can be in during panic.
 		 */
-		if (ddi_in_panic()) {
+		if ((un->un_state == SD_STATE_DUMPING) ||
+		    (un->un_in_callback > 1)) {
 			SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
 			    "sd_start_cmds: panicking\n");
 			goto exit;
