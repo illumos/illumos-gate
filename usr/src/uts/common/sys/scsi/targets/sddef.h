@@ -2014,12 +2014,14 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data", mode_header_grp2))
 #define	SD_PROFILE_HEADER_LEN		8	/* bytes */
 
 /*
- * Define the length of the 3rd byte of the feature descriptor returned
- * in response to the GET CONFIGURATION command.  This 3rd byte
- * contains the current feature field that is of interest.  This field
- * begins after the feature header which is 8 bytes.
+ * Define the length of the data in response to the GET CONFIGURATION
+ * command.  The 3rd byte of the feature descriptor contains the
+ * current feature field that is of interest.  This field begins
+ * after the feature header which is 8 bytes.  This variable length
+ * was increased in size from 11 to 24 because some devices became
+ * unresponsive with the smaller size.
  */
-#define	SD_CURRENT_FEATURE_LEN		11	/* bytes */
+#define	SD_CURRENT_FEATURE_LEN		24	/* bytes */
 
 /*
  * Feature codes associated with GET CONFIGURATION command for supported

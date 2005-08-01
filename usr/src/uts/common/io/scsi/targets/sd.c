@@ -2962,15 +2962,26 @@ sd_set_mmc_caps(struct sd_lun *un)
 
 	/* See if writing DVD RAM is supported. */
 	un->un_f_dvdram_writable_device = (sense_page[3] & 0x20) ? TRUE : FALSE;
-	kmem_free(buf, BUFLEN_MODE_CDROM_CAP);
 	if (un->un_f_dvdram_writable_device == TRUE) {
+		kmem_free(buf, BUFLEN_MODE_CDROM_CAP);
 		return;
 	}
 
 	/*
+	 * If the device presents DVD or CD capabilities in the mode
+	 * page, we can return here since a RRD will not have
+	 * these capabilities.
+	 */
+	if ((sense_page[2] & 0x3f) || (sense_page[3] & 0x3f)) {
+		kmem_free(buf, BUFLEN_MODE_CDROM_CAP);
+		return;
+	}
+	kmem_free(buf, BUFLEN_MODE_CDROM_CAP);
+
+	/*
 	 * If un->un_f_dvdram_writable_device is still FALSE,
-	 * check for Iomega RRD type device.  Iomega is identifying
-	 * their RRD type devices by the features RANDOM_WRITABLE and
+	 * check for a Removable Rigid Disk (RRD).  A RRD
+	 * device is identified by the features RANDOM_WRITABLE and
 	 * HARDWARE_DEFECT_MANAGEMENT.
 	 */
 	out_data_rw = kmem_zalloc(SD_CURRENT_FEATURE_LEN, KM_SLEEP);
@@ -3029,6 +3040,11 @@ sd_check_for_writable_cd(struct sd_lun *un)
 	int				rtn;
 	uchar_t				*out_data_rw, *out_data_hd;
 	uchar_t				*rqbuf_rw, *rqbuf_hd;
+	struct mode_header_grp2		*sense_mhp;
+	uchar_t				*sense_page;
+	caddr_t				buf;
+	int				bd_len;
+	int				status;
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -3063,10 +3079,50 @@ sd_check_for_writable_cd(struct sd_lun *un)
 	kmem_free(rqbuf, SENSE_LENGTH);
 
 	/*
+	 * Determine if this is a RRD type device.
+	 */
+	mutex_exit(SD_MUTEX(un));
+	buf = kmem_zalloc(BUFLEN_MODE_CDROM_CAP, KM_SLEEP);
+	status = sd_send_scsi_MODE_SENSE(un, CDB_GROUP1, (uchar_t *)buf,
+	    BUFLEN_MODE_CDROM_CAP, MODEPAGE_CDROM_CAP, SD_PATH_DIRECT);
+	mutex_enter(SD_MUTEX(un));
+	if (status != 0) {
+		/* command failed; just return */
+		kmem_free(buf, BUFLEN_MODE_CDROM_CAP);
+		return;
+	}
+
+	/* Get to the page data */
+	sense_mhp = (struct mode_header_grp2 *)buf;
+	bd_len = (sense_mhp->bdesc_length_hi << 8) | sense_mhp->bdesc_length_lo;
+	if (bd_len > MODE_BLK_DESC_LENGTH) {
+		/*
+		 * We did not get back the expected block descriptor length so
+		 * we cannot check the mode page.
+		 */
+		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+		    "sd_check_for_writable_cd: Mode Sense returned "
+		    "invalid block descriptor length\n");
+		kmem_free(buf, BUFLEN_MODE_CDROM_CAP);
+		return;
+	}
+
+	/*
+	 * If the device presents DVD or CD capabilities in the mode
+	 * page, we can return here since a RRD device will not have
+	 * these capabilities.
+	 */
+	sense_page = (uchar_t *)(buf + MODE_HEADER_LENGTH_GRP2 + bd_len);
+	if ((sense_page[2] & 0x3f) || (sense_page[3] & 0x3f)) {
+		kmem_free(buf, BUFLEN_MODE_CDROM_CAP);
+		return;
+	}
+	kmem_free(buf, BUFLEN_MODE_CDROM_CAP);
+
+	/*
 	 * If un->un_f_mmc_writable_media is still FALSE,
-	 * check for Iomega RRD type media.  Iomega is identifying
-	 * their RRD type devices by the features RANDOM_WRITABLE and
-	 * HARDWARE_DEFECT_MANAGEMENT.
+	 * check for RRD type media.  A RRD device is identified
+	 * by the features RANDOM_WRITABLE and HARDWARE_DEFECT_MANAGEMENT.
 	 */
 	mutex_exit(SD_MUTEX(un));
 	out_data_rw = kmem_zalloc(SD_CURRENT_FEATURE_LEN, KM_SLEEP);
