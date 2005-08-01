@@ -54,11 +54,6 @@ plat_support_serial_kbd_and_ms() {
 	return (0);
 }
 
-int
-plat_usb_kb_path_override() {
-	return (1);
-}
-
 #define	CONS_INVALID	-1
 #define	CONS_SCREEN	0
 #define	CONS_TTYA	1

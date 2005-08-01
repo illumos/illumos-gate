@@ -740,6 +740,16 @@ conskbdioctl(queue_t *q, mblk_t *mp)
 
 	case I_LINK:
 	case I_PLINK:
+		if (conskbd.conskbd_bypassed == B_TRUE) {
+		/*
+		 * A legacy keyboard can NOT be connected to conskbd together
+		 * with other keyboards. So when a legacy keyboard is already
+		 * linked under conkbd, we just reject all others.
+		 */
+			miocnak(q, mp, 0, EAGAIN);
+			break;
+		}
+
 		mutex_enter(&conskbd_lq_lock);
 		conskbd_ioc_plink(q, mp);
 		mutex_exit(&conskbd_lq_lock);

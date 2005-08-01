@@ -618,8 +618,7 @@ consconfig_state_init(void)
 		sp->cons_fb_path = plat_fbpath();
 	}
 
-	if (plat_usb_kb_path_override() &&
-	    plat_stdin_is_keyboard() &&
+	if (plat_stdin_is_keyboard() &&
 	    usb_kb_path != NULL)  {
 		sp->cons_stdin_path = sp->cons_keyboard_path;
 	} else {

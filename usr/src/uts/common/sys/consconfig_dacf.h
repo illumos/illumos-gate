@@ -116,7 +116,6 @@ typedef struct cons_state {
  * Implementation functions from consplat
  */
 extern int	plat_use_polled_debug(void);
-extern int	plat_usb_kb_path_override(void);
 extern char	*plat_stdinpath(void);
 extern char	*plat_stdoutpath(void);
 extern char	*plat_fbpath(void);

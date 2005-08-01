@@ -60,11 +60,6 @@ plat_support_serial_kbd_and_ms()
 	return (1);
 }
 
-int
-plat_usb_kb_path_override() {
-	return (0);
-}
-
 /*
  * Return generic path to keyboard device from the alias.
  */
