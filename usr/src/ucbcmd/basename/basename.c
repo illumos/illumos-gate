@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -8,19 +13,14 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 
-main(argc, argv)
-char **argv;
+int
+main(int argc, char **argv)
 {
-	register char *p1, *p2, *p3;
+	char *p1, *p2, *p3;
 
 	if (argc < 2) {
 		(void)putchar('\n');
@@ -43,6 +43,5 @@ char **argv;
 output:
 	fputs(p2, stdout);
 	putc('\n', stdout);
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }

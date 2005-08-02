@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,7 @@
  * under license from the Regents of the University of California.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -42,6 +42,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>
+#include <stdlib.h>
+#include <strings.h>
 
 /*
  * Password file editor with locking.
@@ -49,16 +51,19 @@
 
 #define	DEFAULT_EDITOR	"/usr/bin/vi"
 
+static int copyfile(char *, char *);
+static int editfile(char *, char *, char *, time_t *);
+static int sanity_check(char *, time_t *, char *);
+static int validsh(char *);
+
 char	*ptemp = "/etc/ptmp";
 char	*stemp = "/etc/stmp";
 char	*passwd = "/etc/passwd";
 char	*shadow = "/etc/shadow";
 char	buf[BUFSIZ];
-char	*getenv();
-char	*index();
-extern	int errno;
 
-main()
+int
+main(void)
 {
 	int fd;
 	FILE *ft, *fp;
@@ -181,13 +186,13 @@ main()
 bad:
 	(void) unlink(ptemp);
 	(void) unlink(stemp);
-	exit(ok ? 0 : 1);
+	return (ok ? 0 : 1);
 	/* NOTREACHED */
 }
 
 
-copyfile(from, to)
-char *from, *to;
+int
+copyfile(char *from, char *to)
 {
 	int fd;
 	FILE *fp, *ft;
@@ -218,9 +223,8 @@ char *from, *to;
 	return( 0 );
 }
 
-editfile(editor, temp, orig, mtime)
-char *editor, *temp, *orig;
-time_t *mtime;
+int
+editfile(char *editor, char *temp, char *orig, time_t *mtime)
 {
 
 	(void)sprintf(buf, "%s %s", editor, temp);
@@ -231,8 +235,8 @@ time_t *mtime;
 }
 
 
-validsh(rootsh)
-	char	*rootsh;
+int
+validsh(char *rootsh)
 {
 
 	char	*sh, *getusershell();
@@ -253,9 +257,8 @@ validsh(rootsh)
  * sanity checks
  * return 0 if ok, 1 otherwise
  */
-sanity_check(temp, mtime, orig)
-char *temp, *orig;
-time_t *mtime;
+int
+sanity_check(char *temp, time_t *mtime, char *orig)
 {
 	int i, ok = 0;
 	FILE *ft;
@@ -287,7 +290,7 @@ time_t *mtime;
 	}
 
 	while (fgets(buf, sizeof (buf) - 1, ft) != NULL) {
-		register char *cp;
+		char *cp;
 
 		cp = index(buf, '\n');
 		if (cp == 0)

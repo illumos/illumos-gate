@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -7,13 +12,8 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * groups
@@ -24,15 +24,16 @@
 #include <pwd.h>
 #include <stdio.h>
 
+static void showgroups(char *);
+
 int	groups[NGROUPS_UMAX];
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int ngroups, i, j;
 	char *sep = "";
-	register struct group *gr;
+	struct group *gr;
 	struct passwd *pw;
 
 	if (argc > 1) {
@@ -58,16 +59,15 @@ main(argc, argv)
 		sep = " ";
 	}
 	printf("\n");
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
-showgroups(user)
-	register char *user;
+void
+showgroups(char *user)
 {
-	register struct group *gr;
-	register struct passwd *pw;
-	register char **cp;
+	struct group *gr;
+	struct passwd *pw;
+	char **cp;
 	char *sep = "";
 	int pwgid_printed = 0 ;
 

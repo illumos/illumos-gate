@@ -22,16 +22,17 @@
 #
 
 #
-# Copyright (c) 2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#ident	"%Z%%M%	%I%	%E% SMI" 
 
 echo_file usr/src/ucbcmd/Makefile.ucbcmd
 echo_file usr/src/ucbcmd/Makefile.ucbcmd.64
 echo_file usr/src/ucbcmd/Makefile.ucbtarg
 echo_file usr/src/cmd/Makefile.targ
 echo_file usr/src/cmd/mapfile_noexstk
+echo_file usr/src/cmd/mapfile_noexdata
 echo_file usr/src/cmd/sgs/mapfiles/sparc/map.pagealign
 echo_file usr/src/cmd/sgs/mapfiles/i386/map.pagealign

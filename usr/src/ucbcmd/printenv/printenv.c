@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,22 +41,25 @@
 
 /*
  * printenv
-*/
+ */
+
+#include <stdio.h>
 
 extern	char **environ;
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+static int prefix(char *cp, char *dp);
+
+int
+main(int argc, char *argv[])
 {
-	register char **ep;
+	char **ep;
 	int found = 0;
 
 	argc--, argv++;
 	if (environ)
 		for (ep = environ; *ep; ep++)
 			if (argc == 0 || prefix(argv[0], *ep)) {
-				register char *cp = *ep;
+				char *cp = *ep;
 
 				found++;
 				if (argc) {
@@ -65,14 +68,13 @@ main(argc, argv)
 					if (*cp == '=')
 						cp++;
 				}
-				(void)printf("%s\n", cp);
+				(void) printf("%s\n", cp);
 			}
-	exit (!found);
-	/* NOTREACHED */
+	return (!found);
 }
 
-prefix(cp, dp)
-	char *cp, *dp;
+int
+prefix(char *cp, char *dp)
 {
 
 	while (*cp && *dp && *cp == *dp)

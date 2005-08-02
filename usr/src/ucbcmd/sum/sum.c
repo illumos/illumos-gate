@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -8,12 +13,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983,1984,1985,1986,1987,1988,1996, by Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Sum bytes in file mod 2^16
@@ -21,13 +21,13 @@
 
 #include <stdio.h>
 
-main(argc,argv)
-char **argv;
+int
+main(int argc, char **argv)
 {
-	register unsigned sum;
-	register i, c;
-	register FILE *f;
-	register long long nbytes;
+	unsigned int sum;
+	int i, c;
+	FILE *f;
+	long long nbytes;
 	int errflg = 0;
 
 	i = 1;
@@ -61,5 +61,5 @@ char **argv;
 		printf("\n");
 		fclose(f);
 	} while(++i < argc);
-	exit(errflg);
+	return (errflg);
 }
