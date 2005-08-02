@@ -86,7 +86,8 @@ pn_alloc(struct pathname *pnp)
 void
 pn_free(struct pathname *pnp)
 {
-	kmem_free(pnp->pn_buf, MAXPATHLEN);
+	/* pn_bufsize is usually MAXPATHLEN, but may not be */
+	kmem_free(pnp->pn_buf, pnp->pn_bufsize);
 	pnp->pn_path = pnp->pn_buf = NULL;
 	pnp->pn_pathlen = pnp->pn_bufsize = 0;
 }
