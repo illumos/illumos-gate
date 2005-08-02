@@ -95,6 +95,7 @@ typedef struct scsa1394_lun_stat {
 
 	uint_t			stat_cmd_cnt;	/* # of commands submitted */
 	uint_t			stat_cmd_buf_max_nsegs;
+	uint_t			stat_cmd_buf_dma_partial;
 
 	/*
 	 * errors

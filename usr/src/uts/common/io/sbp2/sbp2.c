@@ -389,9 +389,11 @@ sbp2_tgt_fini_bus(sbp2_tgt_t *tp)
 	}
 	if (tp->t_mgt_cmd) {
 		SBP2_FREE_CMD(tp, tp->t_mgt_cmd);
+		tp->t_mgt_cmd = NULL;
 	}
 	if (tp->t_mgt_cmd_data) {
 		freeb(tp->t_mgt_cmd_data);
+		tp->t_mgt_cmd_data = NULL;
 	}
 }
 
@@ -951,7 +953,7 @@ error:
 	 * otherwise use callback.
 	 */
 	callback = (ap->a_active_task != new_task);
-	task = ap->a_active_task;
+	ASSERT(task == ap->a_active_task);
 	ap->a_active_task = NULL;
 	mutex_exit(&ap->a_mutex);
 	sbp2_agent_release(ap);
@@ -961,12 +963,12 @@ error:
 	 * to SBP2_TASK_COMP while it's still on the list, to avoid race with
 	 * upper layer driver (e.g. scsa1394).
 	 */
-	ret = sbp2_ses_remove_task(sp, new_task);
+	ret = sbp2_ses_remove_task(sp, task);
 	ASSERT(ret == SBP2_SUCCESS);
-	new_task->ts_state = SBP2_TASK_COMP;
+	task->ts_state = SBP2_TASK_COMP;
 
 	if (callback) {
-		sp->s_status_cb(sp->s_status_cb_arg, new_task);
+		sp->s_status_cb(sp->s_status_cb_arg, task);
 		return (SBP2_SUCCESS);
 	} else {
 		/* upper layer driver is responsible to call nudge */

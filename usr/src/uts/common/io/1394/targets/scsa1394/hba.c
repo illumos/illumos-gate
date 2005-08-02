@@ -873,12 +873,15 @@ scsa1394_scsi_tgt_init(dev_info_t *dip, dev_info_t *cdip, scsi_hba_tran_t *tran,
 			return (DDI_FAILURE);
 		}
 
-		ret = scsa1394_sbp2_login(sp, lun);
-
-		return (ret);
+		if (scsa1394_dev_is_online(sp)) {
+			return (scsa1394_sbp2_login(sp, lun));
+		} else {
+			return (DDI_FAILURE);
+		}
 	}
 
-	if ((lun >= sp->s_nluns) || (sp->s_lun[lun].l_cdip != NULL)) {
+	if ((lun >= sp->s_nluns) || (sp->s_lun[lun].l_cdip != NULL) ||
+	    !scsa1394_dev_is_online(sp)) {
 		return (DDI_FAILURE);
 	}
 
@@ -1447,6 +1450,7 @@ scsa1394_cmd_buf_dma_alloc(scsa1394_state_t *sp, scsa1394_cmd_t *cmd,
 			ddi_dma_free_handle(&cmd->sc_buf_dma_hdl);
 			return (DDI_FAILURE);
 		}
+		lp->l_stat.stat_cmd_buf_dma_partial++;
 		break;
 
 	case DDI_DMA_NORESOURCES:
@@ -1546,8 +1550,12 @@ scsa1394_cmd_dmac2seg(scsa1394_state_t *sp, scsa1394_cmd_t *cmd,
 		nsegs = max(ccount, cmd->sc_win_len / SBP2_PT_SEGSIZE_MAX) * 2;
 		segsize_max = SBP2_PT_SEGSIZE_MAX;
 	} else {
-		/* For Symbios workaround we know exactly the number of pages */
-		nsegs = howmany(cmd->sc_win_len, scsa1394_symbios_page_size);
+		/*
+		 * For Symbios workaround we know exactly the number of segments
+		 * Additional segment may be needed if buffer is not aligned.
+		 */
+		nsegs =
+		    howmany(cmd->sc_win_len, scsa1394_symbios_page_size) + 1;
 		segsize_max = scsa1394_symbios_page_size;
 	}
 
@@ -1777,7 +1785,9 @@ scsa1394_cmd_buf_dma_move(scsa1394_state_t *sp, scsa1394_cmd_t *cmd)
 	/*
 	 * setup page table if needed
 	 */
-	if ((ccount == 1) && (dmac.dmac_size <= SBP2_PT_SEGSIZE_MAX)) {
+	if ((ccount == 1) && (dmac.dmac_size <= SBP2_PT_SEGSIZE_MAX) &&
+	    (!sp->s_symbios ||
+	    (dmac.dmac_size <= scsa1394_symbios_page_size))) {
 		/* but first, free old resources */
 		if (cmd->sc_flags & SCSA1394_CMD_DMA_BUF_PT_VALID) {
 			scsa1394_cmd_pt_dma_free(sp, cmd);
@@ -1823,19 +1833,6 @@ scsa1394_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	scsa1394_lun_t	*lp = cmd->sc_lun;
 	int		ret;
 
-	mutex_enter(&sp->s_mutex);
-	if (sp->s_dev_state != SCSA1394_DEV_ONLINE) {
-		if (sp->s_dev_state == SCSA1394_DEV_BUS_RESET) {
-			/* this should prevent scary console messages */
-			mutex_exit(&sp->s_mutex);
-			return (TRAN_BUSY);
-		} else {
-			mutex_exit(&sp->s_mutex);
-			return (TRAN_FATAL_ERROR);
-		}
-	}
-	mutex_exit(&sp->s_mutex);
-
 	/*
 	 * since we don't support polled I/O, just accept the packet
 	 * so the rest of the file systems get synced properly
@@ -1849,6 +1846,20 @@ scsa1394_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	if (pkt->pkt_flags & FLAG_NOINTR) {
 		return (TRAN_BADPKT);
 	}
+
+	mutex_enter(&sp->s_mutex);
+	if (sp->s_dev_state != SCSA1394_DEV_ONLINE) {
+		/*
+		 * If device is temporarily gone due to bus reset,
+		 * return busy to prevent prevent scary console messages.
+		 * If permanently gone, leave it to scsa1394_cmd_fake_comp().
+		 */
+		if (sp->s_dev_state == SCSA1394_DEV_BUS_RESET) {
+			mutex_exit(&sp->s_mutex);
+			return (TRAN_BUSY);
+		}
+	}
+	mutex_exit(&sp->s_mutex);
 
 	if ((ap->a_lun >= sp->s_nluns) ||
 	    (ap->a_lun != pkt->pkt_address.a_lun)) {
@@ -1967,9 +1978,12 @@ scsa1394_cmd_fill_cdb_rbc(scsa1394_lun_t *lp, scsa1394_cmd_t *cmd)
 	case SCMD_WRITE_LONG:
 		lba = SCSA1394_LBA_10BYTE(pkt);
 		len = SCSA1394_LEN_10BYTE(pkt);
-		sz = SCSA1394_CDRW_BLKSZ(bp->b_bcount, len);
-		if (SCSA1394_VALID_CDRW_BLKSZ(sz)) {
-			blk_size = sz;
+		if ((lp->l_dtype_orig == DTYPE_RODIRECT) &&
+		    (bp != NULL) && (len != 0)) {
+			sz = SCSA1394_CDRW_BLKSZ(bp->b_bcount, len);
+			if (SCSA1394_VALID_CDRW_BLKSZ(sz)) {
+				blk_size = sz;
+			}
 		}
 		break;
 	case SCMD_READ_CD:
@@ -1990,12 +2004,12 @@ scsa1394_cmd_fill_cdb_rbc(scsa1394_lun_t *lp, scsa1394_cmd_t *cmd)
 		scsa1394_cmd_fill_cdb_other(lp, cmd);
 		return;
 	}
+	cmd->sc_blk_size = blk_size;
 
 	/* limit xfer length for Symbios workaround */
 	if (sp->s_symbios && (len * blk_size > scsa1394_symbios_size_max)) {
 		cmd->sc_flags |= SCSA1394_CMD_SYMBIOS_BREAKUP;
 
-		cmd->sc_blk_size = blk_size;
 		cmd->sc_total_blks = cmd->sc_resid_blks = len;
 
 		len = scsa1394_symbios_size_max / blk_size;
@@ -2026,9 +2040,12 @@ scsa1394_cmd_fill_cdb_other(scsa1394_lun_t *lp, scsa1394_cmd_t *cmd)
 {
 	struct scsi_pkt	*pkt = CMD2PKT(cmd);
 
-	bcopy(pkt->pkt_cdbp, cmd->sc_cdb, cmd->sc_cdb_len);
-
 	cmd->sc_xfer_bytes = cmd->sc_win_len;
+	cmd->sc_xfer_blks = cmd->sc_xfer_bytes / lp->l_lba_size;
+	cmd->sc_total_blks = cmd->sc_xfer_blks;
+	cmd->sc_lba = 0;
+
+	bcopy(pkt->pkt_cdbp, cmd->sc_cdb, cmd->sc_cdb_len);
 }
 
 /*
@@ -2162,6 +2179,21 @@ scsa1394_cmd_fake_comp(scsa1394_state_t *sp, scsa1394_cmd_t *cmd)
 	struct scsi_pkt	*pkt = CMD2PKT(cmd);
 	scsa1394_lun_t	*lp = cmd->sc_lun;
 	int		ret = DDI_SUCCESS;
+
+	/*
+	 * agreement with sd in case of device hot removal
+	 * is to fake completion with CMD_DEV_GONE
+	 */
+	mutex_enter(&sp->s_mutex);
+	if (sp->s_dev_state != SCSA1394_DEV_ONLINE) {
+		mutex_exit(&sp->s_mutex);
+		pkt->pkt_reason = CMD_DEV_GONE;
+		if (pkt->pkt_comp) {
+			(*pkt->pkt_comp)(pkt);
+		}
+		return (DDI_SUCCESS);
+	}
+	mutex_exit(&sp->s_mutex);
 
 	mutex_enter(&lp->l_mutex);
 

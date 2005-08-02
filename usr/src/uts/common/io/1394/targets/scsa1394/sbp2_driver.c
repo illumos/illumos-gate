@@ -497,36 +497,44 @@ scsa1394_sbp2_seg2pt_default(scsa1394_lun_t *lp, scsa1394_cmd_t *cmd)
 static void
 scsa1394_sbp2_seg2pt_symbios(scsa1394_lun_t *lp, scsa1394_cmd_t *cmd)
 {
-	size_t		offset;
-	int		start_page;
 	sbp2_pt_unrestricted_t *pt;
 	scsa1394_cmd_seg_t *seg;
-	size_t		resid;
 	int		nsegs;
+	size_t		resid, skiplen, dataoff, segoff, seglen;
+	uint64_t	baddr;
 
-	/* calculate page table address and size */
+	/* data offset within command */
 	if (cmd->sc_flags & SCSA1394_CMD_SYMBIOS_BREAKUP) {
-		offset = (cmd->sc_total_blks - cmd->sc_resid_blks) *
+		dataoff = (cmd->sc_total_blks - cmd->sc_resid_blks) *
 		    cmd->sc_blk_size;
 	} else {
-		offset = 0;
+		dataoff = 0;
 	}
-	start_page = offset / scsa1394_symbios_page_size;
+
+	/* skip dataoff bytes */
+	seg = &cmd->sc_buf_seg[0];
+	skiplen = 0;
+	while (skiplen + seg->ss_len <= dataoff) {
+		skiplen += seg->ss_len;
+		seg++;
+	}
+	segoff = dataoff - skiplen; /* offset within segment */
 
 	pt = (sbp2_pt_unrestricted_t *)cmd->sc_pt_kaddr;
-	seg = &cmd->sc_buf_seg[start_page];
 	resid = cmd->sc_xfer_bytes;
 	nsegs = 0;
 	while (resid > 0) {
 		ASSERT(seg->ss_len <= scsa1394_symbios_page_size);
 
-		pt->pt_seg_len = min(seg->ss_len, resid);
-		resid -= pt->pt_seg_len;
-		SBP2_SWAP16_1(pt->pt_seg_len);
+		seglen = min(seg->ss_len, resid) - segoff;
+		baddr = seg->ss_baddr + segoff;
 
-		pt->pt_seg_base_hi = SBP2_SWAP16(seg->ss_baddr >> 32);
-		pt->pt_seg_base_lo = SBP2_SWAP32(seg->ss_baddr & 0xFFFFFFFF);
+		pt->pt_seg_len = SBP2_SWAP16(seglen);
+		pt->pt_seg_base_hi = SBP2_SWAP16(baddr >> 32);
+		pt->pt_seg_base_lo = SBP2_SWAP32(baddr & 0xFFFFFFFF);
 
+		segoff = 0;
+		resid -= seglen;
 		nsegs++;
 		pt++;
 		seg++;
