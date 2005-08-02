@@ -27,8 +27,6 @@
 
 include ../Makefile.com
 
-DATAFILES =
-
 .KEEP_STATE:
 
 all: $(FILES)

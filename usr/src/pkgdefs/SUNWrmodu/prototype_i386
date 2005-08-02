@@ -34,6 +34,7 @@
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 
+i copyright
 i depend
 i pkginfo
 

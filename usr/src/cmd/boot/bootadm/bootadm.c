@@ -946,16 +946,20 @@ list2file(char *root, char *tmp, char *final, line_t *start)
 	}
 
 	/*
-	 * Set up desired attributes
+	 * Set up desired attributes.  Ignore failures on filesystems
+	 * not supporting these operations - pcfs reports unsupported
+	 * operations as EINVAL.
 	 */
 	ret = chmod(tmpfile, mode);
-	if (ret == -1) {
+	if (ret == -1 &&
+	    errno != EINVAL && errno != ENOTSUP) {
 		bam_error(CHMOD_FAIL, tmpfile, strerror(errno));
 		return (BAM_ERROR);
 	}
 
 	ret = chown(tmpfile, root_uid, sys_gid);
-	if (ret == -1) {
+	if (ret == -1 &&
+	    errno != EINVAL && errno != ENOTSUP) {
 		bam_error(CHOWN_FAIL, tmpfile, strerror(errno));
 		return (BAM_ERROR);
 	}
