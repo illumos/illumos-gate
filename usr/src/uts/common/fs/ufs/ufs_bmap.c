@@ -1136,7 +1136,8 @@ ufs_undo_allocation(
 
 /*
  * Find the next hole or data block in file starting at *off
- * Return found offset in *off.
+ * Return found offset in *off, which can be less than the
+ * starting offset if not block aligned.
  * This code is based on bmap_read().
  * Errors: ENXIO for end of file
  *         EIO for block read error.
@@ -1161,7 +1162,6 @@ bmap_find(struct inode *ip, boolean_t hole, u_offset_t *off)
 
 	ASSERT(*off < isz);
 	ASSERT(RW_LOCK_HELD(&ip->i_contents));
-	ASSERT(blkoff(fs, *off) == 0);
 	lbn = (daddr_t)lblkno(fs, *off);
 	ASSERT(lbn >= 0);
 
