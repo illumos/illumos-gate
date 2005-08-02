@@ -239,9 +239,12 @@ static const uint32_t save_instr[INSTR_ARRAY_SIZE] = {
 	0xd04d894c	/* movq %r9, -0x30(%rbp) */
 };
 
-static const uint32_t save_fp_instr[2] = {
+static const uint32_t save_fp_instr[] = {
 	0xe5894855,	/* pushq %rbp; movq %rsp,%rbp, encoding 1 */
-	0xec8b4855	/* pushq %rbp; movq %rsp,%rbp, encoding 2 */
+	0xec8b4855,	/* pushq %rbp; movq %rsp,%rbp, encoding 2 */
+	0xe58948cc,	/* int $0x3; movq %rsp,%rbp, encoding 1 */
+	0xec8b48cc,	/* int $0x3; movq %rsp,%rbp, encoding 2 */
+	NULL
 };
 
 /*
@@ -266,12 +269,12 @@ is_argsaved(mdb_tgt_t *t, uintptr_t fstart, uint64_t size, uint_t argc,
 	 * Make sure framepointer has been saved.
 	 */
 	n = INSTR4(ins, 0);
-	for (i = 0; i < 2; i++) {
+	for (i = 0; save_fp_instr[i] != NULL; i++) {
 		if (n == save_fp_instr[i])
 			break;
 	}
 
-	if (i >= 2)
+	if (save_fp_instr[i] == NULL)
 		return (0);
 
 	/*
