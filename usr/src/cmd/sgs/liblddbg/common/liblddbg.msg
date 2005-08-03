@@ -115,6 +115,7 @@
 # files		display input file processing (files and libraries)
 # got		display GOT symbol information (ld only)
 # help		display this help message
+# init		display init and fini processing (ld.so.1 only)
 # libs		display library search paths; detail flag shows actual
 #		    library lookup (-l) processing
 # long		display long object names without truncation
@@ -176,6 +177,10 @@
 
 # TRANSLATION_NOTE -- do not translate the first token `help'.
 @ MSG_USE_HELP		"help\t  display this help message"
+
+# TRANSLATION_NOTE -- do not translate the first token `init'.
+@ MSG_USE_INIT		"init\t  display init and fini processing \
+			 (ld.so.1 only)"
 
 # TRANSLATION_NOTE -- do not translate the first token `libs'.
 @ MSG_USE_LIBS		"libs\t  display library search paths; detail flag \
@@ -335,6 +340,10 @@
 
 @ MSG_FIL_BND_ADD	"file=%s;  add binding to:"
 @ MSG_FIL_BND_FILE	"    file=%s   %s"
+
+@ MSG_FIL_DEP_TITLE	"processing %s dependencies  %s:"
+@ MSG_FIL_DEP_NONE	"  file=%s;  has no dependencies"
+@ MSG_FIL_DEP_ENT	"  file=%s;  depends on:"
 
 @ MSG_FIL_DEP_ADD	"    file=%s;  object added  %s"
 @ MSG_FIL_DEP_DELETE	"    file=%s;  object deleting  %s"
@@ -595,24 +604,32 @@
 
 @ MSG_UTL_INIT		"calling .init (%s): %s"
 @ MSG_UTL_FINI		"calling .fini: %s"
-@ MSG_UTL_ARRAY		"calling %s:%s[%d]:0x%llx"
+@ MSG_UTL_ARRAY		"calling %s[%d]:0x%llx: %s"
 @ MSG_UTL_TRANS		"transferring control: %s"
-@ MSG_UTL_WAIT		"suspending thread: %s from %s for completion of .init \
+@ MSG_UTL_WAIT		"suspending thread: %s from %s for completion of init \
 			 for %s"
-@ MSG_UTL_BROAD		"signal suspended threads: %s .init complete"
+@ MSG_UTL_BROAD		"signal suspended threads: %s init complete"
 @ MSG_UTL_INTOOLATE	"loading after relocation has started: interposition \
 			 request (DF_1_INTERPOSE) ignored: %s"
+
+@ MSG_UTL_EDGE_TITLE	"traversing %s dependency edge:"
+@ MSG_UTL_EDGE_START	"  node (%d): file=%s"
+@ MSG_UTL_EDGE_IN	"  node (%d): file=%s: referenced by %s  %s"
+@ MSG_UTL_EDGE_OUT	"  node (%d): file=%s; cyclic dependency on %s"
+@ MSG_UTL_COLLECT	"    [%d]  %s;  collecting %s section"
 
 @ MSG_UTL_SORT		"from sorted order"
 @ MSG_UTL_PEND		"pending"
 @ MSG_UTL_DYN		"dynamically triggered"
 @ MSG_UTL_DONE		"done"
 
-@ MSG_UTL_NOINIT	"warning: calling %s whose .init has not completed"
+@ MSG_UTL_NOINIT	"warning: calling %s whose init has not completed"
 
 @ MSG_UTL_DBNOTIFY	"notify debugger: event: %s state: %s"
 
-@ MSG_SCC_TITLE		"%s cyclic dependencies detected:"
+@ MSG_UTL_SCC_TITLE	"  cycle detected - sorting cyclic dependencies in %s"
+@ MSG_UTL_SCC_SUBI	"reverse load-order"
+@ MSG_UTL_SCC_SUBF	"load-order"
 
 # Generic strings
 
@@ -695,6 +712,7 @@
 @ MSG_TOK_ENTRY		"entry"
 @ MSG_TOK_FILES		"files"
 @ MSG_TOK_HELP		"help"
+@ MSG_TOK_INIT		"init"
 @ MSG_TOK_LIBS		"libs"
 @ MSG_TOK_LONG		"long"
 @ MSG_TOK_MAP		"map"
@@ -723,8 +741,6 @@
 
 @ MSG_STR_EMPTY		""
 @ MSG_STR_DELIMIT	",:"
-@ MSG_STR_OSQBRKT	"["
-@ MSG_STR_CSQBRKT	"]"
 
 @ MSG_SCN_GOT		".got"
 @ MSG_SCN_PLT		".plt"
@@ -735,7 +751,7 @@
 @ MSG_SCN_FINIARRAY	".finiarray"
 @ MSG_SCN_PREINITARRAY	".preinitarray"
 
-@ MSG_SCC_ENTRY		"    [%d]  %s"
+@ MSG_UTL_SCC_ENTRY	"    [%d]  %s"
 
 @ MSG_FMT_INDEX		" [%d]"
 @ MSG_FMT_STR		"%s"
@@ -835,11 +851,6 @@
 @ MSG_MODE_GLOBNODEL	"[ GLOBAL  NODELETE ]"
 @ MSG_MODE_GLOB		"[ GLOBAL ]"
 @ MSG_MODE_NODEL	"[ NODELETE ]"
-
-# Binding mode strings
-
-@ MSG_BND_NEEDED	" NEEDED "
-@ MSG_BND_REFER		" REFERENCED "
 
 # NOTE: these are used by lari(1), use care when changing.
 @ MSG_BINFO_START	"  ("

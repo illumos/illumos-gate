@@ -1141,6 +1141,8 @@ remove_hdl(Grp_hdl * ghp, Rt_map * clmp, int *removed)
 		 * we're here in the first place - forgo the fini's but
 		 * continue to try cleaning up.
 		 */
+		lml->lm_flags |= LML_FLG_OBJDELETED;
+
 		if (((tobj = tsort(lml->lm_head, delcnt,
 		    (RT_SORT_DELETE | RT_SORT_FWD))) != 0) &&
 		    (tobj != (Rt_map **)S_ERROR)) {

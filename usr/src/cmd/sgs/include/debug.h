@@ -167,6 +167,7 @@ extern	void		dbg_print(const char *, ...);
 #define	Dbg_file_aout		Dbg_file_aout64
 #define	Dbg_file_archive	Dbg_file_archive64
 #define	Dbg_file_bind_entry	Dbg_file_bind_entry64
+#define	Dbg_file_bindings	Dbg_file_bindings64
 #define	Dbg_file_config_dis	Dbg_file_config_dis64
 #define	Dbg_file_config_obj	Dbg_file_config_obj64
 #define	Dbg_file_delete		Dbg_file_delete64
@@ -297,6 +298,7 @@ extern	void		Dbg_file_aout(const char *, ulong_t, ulong_t, ulong_t);
 extern	void		Dbg_file_archive(const char *, int);
 extern	void		Dbg_file_ar_rescan(void);
 extern	void		Dbg_file_bind_entry(Bnd_desc *);
+extern	void		Dbg_file_bindings(Rt_map *, int, Word);
 extern	void		Dbg_file_cntl(Lm_list *, Aliste, Aliste);
 extern	void		Dbg_file_config_dis(const char *, int);
 extern	void		Dbg_file_config_obj(const char *, const char *,
@@ -440,8 +442,6 @@ extern	void		Dbg_syms_dlsym(const char *, const char *, const char *,
 extern	void		Dbg_syms_lookup_aout(const char *);
 extern	void		Dbg_syms_lookup(const char *, const char *,
 			    const char *);
-extern	void		Dbg_scc_title(int);
-extern	void		Dbg_scc_entry(uint_t, const char *);
 extern	void		Dbg_tls_modactivity(void *, uint_t);
 extern	void		Dbg_tls_static_block(void *, ulong_t);
 extern	void		Dbg_audit_interface(const char *, const char *);
@@ -465,10 +465,15 @@ extern	void		Dbg_util_call_array(const char *, void *,
 extern	void		Dbg_util_call_fini(const char *);
 extern	void		Dbg_util_call_init(const char *, int);
 extern	void		Dbg_util_call_main(const char *);
+extern	void		Dbg_util_collect(const char *, int, int);
 extern	void		Dbg_util_dbnotify(rd_event_e, r_state_e);
+extern	void		Dbg_util_edge_in(Rt_map *, uint_t, Rt_map *, int, int);
+extern	void		Dbg_util_edge_out(const char *, int, const char *);
 extern	void		Dbg_util_intoolate(const char *);
 extern	void		Dbg_util_nl(void);
 extern	void		Dbg_util_no_init(const char *);
+extern	void		Dbg_util_scc_entry(uint_t, const char *);
+extern	void		Dbg_util_scc_title(int);
 extern	void		Dbg_util_str(const char *);
 extern	void		Dbg_util_wait(int, const char *, const char *);
 extern	void		Dbg_ver_avail_entry(Ver_index *, const char *);

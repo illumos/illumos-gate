@@ -835,8 +835,13 @@ dlmopen_check(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 		eprintf(ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_4));
 		return (0);
 	}
-	if (((mode & (RTLD_GROUP | RTLD_WORLD)) == 0) && !(mode & RTLD_NOLOAD))
+	if (((mode & (RTLD_GROUP | RTLD_WORLD)) == 0) &&
+	    ((mode & RTLD_NOLOAD) == 0))
 		mode |= (RTLD_GROUP | RTLD_WORLD);
+	if ((mode & RTLD_NOW) && (rtld_flags2 & RT_FL2_BINDLAZY)) {
+		mode &= ~RTLD_NOW;
+		mode |= RTLD_LAZY;
+	}
 
 	return (dlmopen_intn(lml, path, mode, clmp, 0, 0, loaded));
 }

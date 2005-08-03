@@ -37,7 +37,7 @@
 #	Policy for Shared Library Version Names and Interface Definitions
 
 
-SUNWprivate_4.45 {
+SUNWprivate_4.46 {
 	global:
 		Dbg_args_files;
 		Dbg_args_flags;
@@ -65,6 +65,7 @@ SUNWprivate_4.45 {
 		Dbg_file_archive;
 		Dbg_file_ar_rescan;
 		Dbg_file_bind_entry;
+		Dbg_file_bindings;
 		Dbg_file_cntl;
 		Dbg_file_config_dis;
 		Dbg_file_config_obj;
@@ -194,8 +195,6 @@ SUNWprivate_4.45 {
 		Dbg_support_action;
 		Dbg_support_load;
 		Dbg_support_req;
-		Dbg_scc_title;
-		Dbg_scc_entry;
 		Dbg_tls_modactivity;
 		Dbg_tls_static_block;
 		Dbg_unused_file;
@@ -207,10 +206,15 @@ SUNWprivate_4.45 {
 		Dbg_util_call_fini;
 		Dbg_util_call_init;
 		Dbg_util_call_main;
+		Dbg_util_collect;
 		Dbg_util_dbnotify;
+		Dbg_util_edge_in;
+		Dbg_util_edge_out;
 		Dbg_util_intoolate;
 		Dbg_util_nl;
 		Dbg_util_no_init;
+		Dbg_util_scc_entry;
+		Dbg_util_scc_title;
 		Dbg_util_str;
 		Dbg_util_wait;
 		Dbg_ver_avail_entry;
@@ -232,6 +236,7 @@ SUNWprivate_4.45 {
 		Dbg_file_aout64;
 		Dbg_file_archive64;
 		Dbg_file_bind_entry64;
+		Dbg_file_bindings64;
 		Dbg_file_config_dis64;
 		Dbg_file_config_obj64;
 		Dbg_file_delete64;

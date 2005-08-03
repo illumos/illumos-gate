@@ -78,6 +78,7 @@ typedef struct {
 #define	BND_NEEDED	0x0001		/* caller NEEDED the dependency */
 #define	BND_REFER	0x0002		/* caller relocation references the */
 					/*	dependency */
+#define	BND_FILTER	0x0004		/* pseudo binding to identify filter */
 
 /*
  * Private structure for communication between rtld_db and rtld.
@@ -311,10 +312,12 @@ typedef struct {
 #define	LML_FLG_IGNRELERR	0x00000200	/* ignore relocation errors - */
 						/*	internal for crle(1) */
 #define	LML_FLG_DBNOTIF		0x00000400	/* binding activity going on */
-#define	LML_FLG_BNDUNINIT	0x00000800	/* binding to a existing */
-						/*	uninit'd object */
-#define	LML_FLG_STARTREL	0x00001000	/* relocation started */
-
+#define	LML_FLG_STARTREL	0x00000800	/* relocation started */
+#define	LML_FLG_ATEXIT		0x00001000	/* atexit processing */
+#define	LML_FLG_OBJADDED	0x00002000	/* object(s) added */
+#define	LML_FLG_OBJDELETED	0x00004000	/* object(s) deleted */
+#define	LML_FLG_OBJREEVAL	0x00008000	/* existing object(s) needs */
+						/*	tsort reevaluation */
 #define	LML_FLG_TRC_LDDSTUB	0x00100000	/* identify lddstub */
 #define	LML_FLG_TRC_ENABLE	0x00200000	/* tracing enabled (ldd) */
 #define	LML_FLG_TRC_WARN	0x00400000	/* print warnings for undefs */
@@ -487,7 +490,7 @@ struct rt_map {
 	uint_t		rt_symsfltrcnt;	/* number of standard symbol filtees */
 	uint_t		rt_symafltrcnt;	/* number of auxiliary symbol filtees */
 	int		rt_mode;	/* usage mode, see RTLD mode flags */
-	uint_t		rt_sortval;	/* temporary buffer to traverse graph */
+	int		rt_sortval;	/* temporary buffer to traverse graph */
 	uint_t		rt_cycgroup;	/* cyclic group */
 	dev_t		rt_stdev;	/* device id and inode number for .so */
 	ino_t		rt_stino;	/*	multiple inclusion checks */
@@ -557,8 +560,8 @@ typedef struct rt_map32 {
 	uint32_t 	rt_objfltrndx;
 	uint32_t 	rt_symsfltrcnt;
 	uint32_t 	rt_symafltrcnt;
-	uint32_t	rt_mode;
-	uint32_t	rt_sortval;
+	int32_t		rt_mode;
+	int32_t		rt_sortval;
 	uint32_t	rt_cycgroup;
 	uint32_t	rt_stdev;
 	uint32_t	rt_stino;
@@ -736,7 +739,13 @@ typedef struct rt_map32 {
 #define	SFCAP(X)	((X)->rt_sfcap)
 #define	THREADID(X)	((X)->rt_threadid)
 
-
+/*
+ * Flags for tsorting.
+ */
+#define	RT_SORT_FWD	0x01		/* topological sort (.fini) */
+#define	RT_SORT_REV	0x02		/* reverse topological sort (.init) */
+#define	RT_SORT_DELETE	0x10		/* process FLG_RT_DELNEED objects */
+					/*	only (called via dlclose()) */
 /*
  * Flags for lookup_sym (and hence find_sym) routines.
  */

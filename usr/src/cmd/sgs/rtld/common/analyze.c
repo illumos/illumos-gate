@@ -284,6 +284,7 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 		 * ldd(1) this marking is necessary for -i (tsort) gathering.
 		 */
 		lml->lm_init++;
+		lml->lm_flags |= LML_FLG_OBJADDED;
 
 		/*
 		 * None of the following processing is necessary under ldd().
@@ -878,6 +879,7 @@ trace_so(Rt_map *clmp, Rej_desc *rej, const char *name, const char *path,
 int
 update_mode(Rt_map *lmp, int omode, int nmode)
 {
+	Lm_list	*lml = LIST(lmp);
 	int	pmode = 0;
 
 	/*
@@ -938,20 +940,25 @@ update_mode(Rt_map *lmp, int omode, int nmode)
 #endif
 
 	/*
-	 * If this objects init has been collected but not yet been called, mark
-	 * it as uncollected.  This object will be added to the tsort() that
-	 * follows this operation which may compensate for insufficient binding
-	 * information used by the tsort() it was originally part of.  For
+	 * If this objects .init has been collected but has not yet been called,
+	 * it may be necessary to reevaluate the object using tsort().  For
 	 * example, a new dlopen() hierarchy may bind to uninitialized objects
 	 * that are already loaded, or a dlopen(RTLD_NOW) can establish new
 	 * bindings between already loaded objects that require the tsort()
-	 * information be recomputed.
+	 * information be recomputed.  If however, no new objects have been
+	 * added to the process, and this object hasn't been promoted, don't
+	 * bother reevaluating the .init.  The present tsort() information is
+	 * probably as accurate as necessary, and by not establishing a parallel
+	 * tsort() we can help reduce the amount of recursion possible between
+	 * .inits.
 	 */
-	if ((FLAGS(lmp) & (FLG_RT_INITCLCT | FLG_RT_INITCALL)) ==
-	    FLG_RT_INITCLCT) {
+	if (((FLAGS(lmp) &
+	    (FLG_RT_INITCLCT | FLG_RT_INITCALL)) == FLG_RT_INITCLCT) &&
+	    ((lml->lm_flags & LML_FLG_OBJADDED) || ((pmode & RTLD_NOW) &&
+	    (FLAGS(lmp) & (FLG_RT_RELOCED | FLG_RT_RELOCING))))) {
 		FLAGS(lmp) &= ~FLG_RT_INITCLCT;
 		LIST(lmp)->lm_init++;
-		LIST(lmp)->lm_flags |= LML_FLG_BNDUNINIT;
+		LIST(lmp)->lm_flags |= LML_FLG_OBJREEVAL;
 	}
 
 	return (pmode);

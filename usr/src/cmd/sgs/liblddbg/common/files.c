@@ -36,6 +36,7 @@
 #include	"msg.h"
 #include	"_debug.h"
 #include	"libld.h"
+#include	"rtld.h"
 
 
 void
@@ -279,46 +280,86 @@ Dbg_file_hdl_action(Grp_hdl * ghp, Rt_map * lmp, int type)
 	}
 }
 
-#define	BINDSZ	MSG_STR_OSQBRKT_SIZE + \
-		MSG_BND_NEEDED_SIZE + \
-		MSG_BND_REFER_SIZE + \
-		MSG_STR_CSQBRKT_SIZE
-
 void
 Dbg_file_bind_entry(Bnd_desc *bdp)
 {
-	char		string[BINDSZ];
-	Rt_map		*clmp, *dlmp;
-	uint_t		flags;
-
 	if (DBG_NOTCLASS(DBG_FILES))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
-	clmp = bdp->b_caller;
-	dlmp = bdp->b_depend;
-	flags = bdp->b_flags;
-
-	/*
-	 * Evaluate the binding descriptors flags.
-	 */
-	if (flags) {
-		(void) strcpy(string, MSG_ORIG(MSG_STR_OSQBRKT));
-		if (flags & BND_NEEDED)
-			(void) strcat(string, MSG_ORIG(MSG_BND_NEEDED));
-		if (flags & BND_REFER)
-			(void) strcat(string, MSG_ORIG(MSG_BND_REFER));
-		(void) strcat(string, MSG_ORIG(MSG_STR_CSQBRKT));
-	} else
-		(void) strcpy(string, MSG_ORIG(MSG_STR_EMPTY));
-
 	/*
 	 * Print the dependency together with the modes of the binding.
 	 */
 	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
-	dbg_print(MSG_INTL(MSG_FIL_BND_ADD), NAME(clmp));
-	dbg_print(MSG_INTL(MSG_FIL_BND_FILE), NAME(dlmp), string);
+	dbg_print(MSG_INTL(MSG_FIL_BND_ADD), NAME(bdp->b_caller));
+	dbg_print(MSG_INTL(MSG_FIL_BND_FILE), NAME(bdp->b_depend),
+	    conv_bindent_str(bdp->b_flags));
+}
+
+void
+Dbg_file_bindings(Rt_map *lmp, int flag, Word lmflags)
+{
+	const char	*str;
+	Rt_map		*tlmp;
+	int		next = 0;
+
+	if (DBG_NOTCLASS(DBG_INIT))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	if (flag & RT_SORT_REV)
+		str = MSG_ORIG(MSG_SCN_INIT);
+	else
+		str = MSG_ORIG(MSG_SCN_FINI);
+
+	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+	dbg_print(MSG_INTL(MSG_FIL_DEP_TITLE), str, conv_binding_str(lmflags));
+
+	/* LINTED */
+	for (tlmp = lmp; tlmp; tlmp = (Rt_map *)NEXT(tlmp)) {
+		Bnd_desc **	bdpp;
+		Aliste		off;
+
+		/*
+		 * For .init processing, only collect objects that have been
+		 * relocated and haven't already been collected.
+		 * For .fini processing, only collect objects that have had
+		 * their .init collected, and haven't already been .fini
+		 * collected.
+		 */
+		if (flag & RT_SORT_REV) {
+			if ((FLAGS(tlmp) & (FLG_RT_RELOCED |
+			    FLG_RT_INITCLCT)) != FLG_RT_RELOCED)
+				continue;
+
+		} else {
+			if ((flag & RT_SORT_DELETE) &&
+			    ((FLAGS(tlmp) & FLG_RT_DELETE) == 0))
+				continue;
+			if (((FLAGS(tlmp) &
+			    (FLG_RT_INITCLCT | FLG_RT_FINICLCT)) ==
+			    FLG_RT_INITCLCT) == 0)
+				continue;
+		}
+
+		if (next++)
+			dbg_print(MSG_ORIG(MSG_STR_EMPTY));
+
+		if (DEPENDS(tlmp) == 0)
+			dbg_print(MSG_INTL(MSG_FIL_DEP_NONE), NAME(tlmp));
+		else {
+			dbg_print(MSG_INTL(MSG_FIL_DEP_ENT), NAME(tlmp));
+
+			for (ALIST_TRAVERSE(DEPENDS(tlmp), off, bdpp)) {
+				dbg_print(MSG_INTL(MSG_FIL_BND_FILE),
+				    NAME((*bdpp)->b_depend),
+				    conv_bindent_str((*bdpp)->b_flags));
+			}
+		}
+	}
+	dbg_print(MSG_ORIG(MSG_STR_EMPTY));
 }
 
 void

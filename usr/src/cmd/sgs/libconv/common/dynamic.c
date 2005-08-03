@@ -31,6 +31,7 @@
 #include	<stdio.h>
 #include	<string.h>
 #include	<sys/elf_SPARC.h>
+#include	"rtld.h"
 #include	"_conv.h"
 #include	"dynamic_msg.h"
 
@@ -307,4 +308,63 @@ conv_dyntag_str(uint64_t tag, ushort_t mach)
 		else
 			return (conv_invalid_str(string, STRSIZE, tag, 0));
 	}
+}
+
+#define	BINDESZ	MSG_GBL_OSQBRKT_SIZE + \
+		MSG_BND_NEEDED_SIZE + \
+		MSG_BND_REFER_SIZE + \
+		MSG_BND_FILTER_SIZE + \
+		MSG_GBL_CSQBRKT_SIZE
+
+const char *
+conv_bindent_str(uint_t flags)
+{
+	static char	string[BINDESZ] = { '\0' };
+
+	/*
+	 * Evaluate the binding descriptors flags.
+	 */
+	if (flags) {
+		(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
+		if (flags & BND_NEEDED)
+			(void) strcat(string, MSG_ORIG(MSG_BND_NEEDED));
+		if (flags & BND_REFER)
+			(void) strcat(string, MSG_ORIG(MSG_BND_REFER));
+		if (flags & BND_FILTER)
+			(void) strcat(string, MSG_ORIG(MSG_BND_FILTER));
+		(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
+
+		return ((const char *)string);
+	} else
+		return (MSG_ORIG(MSG_STR_EMPTY));
+}
+
+#define	BINDSSZ	MSG_GBL_OSQBRKT_SIZE + \
+		MSG_BND_ADDED_SIZE + \
+		MSG_BND_REEVAL_SIZE + \
+		MSG_GBL_CSQBRKT_SIZE
+
+const char *
+conv_binding_str(uint_t flags)
+{
+	static char	string[BINDSSZ] = { '\0' };
+
+	/*
+	 * Evaluate the binding descriptors flags.
+	 */
+	if (flags) {
+		(void) strcpy(string, MSG_ORIG(MSG_GBL_OSQBRKT));
+		if (flags & LML_FLG_OBJADDED)
+			(void) strcat(string, MSG_ORIG(MSG_BND_ADDED));
+		if (flags & LML_FLG_OBJREEVAL)
+			(void) strcat(string, MSG_ORIG(MSG_BND_REEVAL));
+		if (flags & LML_FLG_OBJDELETED)
+			(void) strcat(string, MSG_ORIG(MSG_BND_DELETED));
+		if (flags & LML_FLG_ATEXIT)
+			(void) strcat(string, MSG_ORIG(MSG_BND_ATEXIT));
+		(void) strcat(string, MSG_ORIG(MSG_GBL_CSQBRKT));
+
+		return ((const char *)string);
+	} else
+		return (MSG_ORIG(MSG_STR_EMPTY));
 }

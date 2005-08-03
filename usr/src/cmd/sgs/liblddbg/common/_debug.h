@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,6 +80,7 @@ extern	uint_t		_Dbg_mask;
 #define	DBG_STATISTICS	0x00100000
 #define	DBG_UNUSED	0x00200000
 #define	DBG_CAP		0x00400000
+#define	DBG_INIT	0x00800000
 
 typedef struct options {
 	const char	*o_name;	/* command line argument name */

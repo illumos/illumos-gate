@@ -168,7 +168,7 @@ sort_scc(Sort * sort, int fndx, int flag)
 		}
 		(void) printf(tfmt, cnt);
 	}
-	DBG_CALL(Dbg_scc_title(flag & RT_SORT_REV));
+	DBG_CALL(Dbg_util_scc_title(flag & RT_SORT_REV));
 
 	/*
 	 * Identify this cyclic group, and under ldd -i print the cycle in the
@@ -181,14 +181,14 @@ sort_scc(Sort * sort, int fndx, int flag)
 
 			if (init)
 				(void) printf(ffmt, NAME(lmp));
-			DBG_CALL(Dbg_scc_entry(IDX(lmp), NAME(lmp)));
+			DBG_CALL(Dbg_util_scc_entry(ndx, NAME(lmp)));
 		}
 		cnt++;
 
 	} else if (dbg_mask) {
 		for (ndx = sort->s_lndx - 1; ndx >= fndx; ndx--) {
 			lmp = sort->s_lmpa[ndx];
-			DBG_CALL(Dbg_scc_entry(IDX(lmp), NAME(lmp)));
+			DBG_CALL(Dbg_util_scc_entry(ndx, NAME(lmp)));
 		}
 	}
 
@@ -256,15 +256,29 @@ visit(Lm_list *lml, Rt_map * lmp, Sort * sort, int flag)
 
 	do {
 		tlmp = sort->s_stack[--(sort->s_sndx)];
+		SORTVAL(tlmp) = sort->s_num;
+		DBG_CALL(Dbg_util_collect(NAME(tlmp), sort->s_lndx, flag));
 		sort->s_lmpa[(sort->s_lndx)++] = tlmp;
 
 		if (flag & RT_SORT_REV) {
+			/*
+			 * Indicate the object has had its .init collected.
+			 * Note, that regardless of the object having a .init
+			 * the object is added to the tsort list, as it's from
+			 * this list that any post-init flags are established.
+			 */
 			FLAGS(tlmp) |= FLG_RT_INITCLCT;
 			lml->lm_init--;
-		} else
+		} else {
+			/*
+			 * Indicate the object has had its .fini collected.
+			 * Note, that regardless of the object having a .fini,
+			 * the object is added to the tsort list, as it's from
+			 * this list that any audit_objclose() activity is
+			 * triggered.
+			 */
 			FLAGS(tlmp) |= FLG_RT_FINICLCT;
-
-		SORTVAL(sort->s_stack[sort->s_sndx]) = sort->s_num;
+		}
 
 		/*
 		 * If tracing, save the strongly connected component.
@@ -291,36 +305,26 @@ visit(Lm_list *lml, Rt_map * lmp, Sort * sort, int flag)
 	return (1);
 }
 
-/*
- * Visit the dependencies of each object.
- */
-static uint_t
-dep_visit(Rt_map *lmp, Lm_list *lml, Sort *sort, uint_t *id, int flag)
+static int
+dep_visit(Rt_map *, uint_t, Rt_map *, Lm_list *, Sort *, int);
+
+static int
+_dep_visit(int min, Rt_map *clmp, Rt_map *dlmp, uint_t bflags, Lm_list *lml,
+    Sort *sort, int flag)
 {
-	uint_t 		min;
-	Aliste		off;
-	Bnd_desc **	bdpp;
-
-	min = SORTVAL(lmp) = ++(*id);
-
-	sort->s_stack[(sort->s_sndx)++] = lmp;
-
-	if (FLAGS(lmp) & FLG_RT_INITFRST)
-		sort->s_initfirst++;
+	int	_min;
 
 	/*
-	 * Traverse both explicit and implicit dependencies.
+	 * Only collect objects that belong to the callers link-map.  Catches
+	 * cross dependencies (filtering) to ld.so.1.
 	 */
-	for (ALIST_TRAVERSE(DEPENDS(lmp), off, bdpp)) {
-		Rt_map *	dlmp = (*bdpp)->b_depend;
-		uint_t		_min;
+	if (LIST(dlmp) != lml)
+		return (min);
 
-		/*
-		 * Only collect objects that belong to the callers link-map.
-		 */
-		if (LIST(dlmp) != lml)
-			continue;
-
+	/*
+	 * Determine if this object hasn't been inspected.
+	 */
+	if ((_min = SORTVAL(dlmp)) == -1) {
 		if (flag & RT_SORT_REV) {
 			/*
 			 * For .init processing, only collect objects that have
@@ -328,7 +332,14 @@ dep_visit(Rt_map *lmp, Lm_list *lml, Sort *sort, uint_t *id, int flag)
 			 */
 			if ((FLAGS(dlmp) & (FLG_RT_RELOCED |
 			    FLG_RT_INITCLCT)) != FLG_RT_RELOCED)
-				continue;
+				return (min);
+
+			/*
+			 * If this object contains no .init, there's no need to
+			 * establish a dependency.
+			 */
+			if ((INIT(dlmp) == 0) && (INITARRAY(dlmp) == 0))
+				return (min);
 		} else {
 			/*
 			 * For .fini processing only collect objects that have
@@ -337,28 +348,118 @@ dep_visit(Rt_map *lmp, Lm_list *lml, Sort *sort, uint_t *id, int flag)
 			 */
 			if ((FLAGS(dlmp) & (FLG_RT_INITCLCT |
 			    FLG_RT_FINICLCT)) != FLG_RT_INITCLCT)
-				continue;
+				return (min);
 
 			/*
-			 * If we're deleting a subset of objects only collect
+			 * If we're deleting a subset of objects, only collect
 			 * those marked for deletion.
 			 */
 			if ((flag & RT_SORT_DELETE) &&
 			    ((FLAGS(dlmp) & FLG_RT_DELETE) == 0))
-				continue;
+				return (min);
+
+			/*
+			 * If this object contains no .fini, there's no need to
+			 * establish a dependency.
+			 */
+			if ((FINI(dlmp) == 0) && (FINIARRAY(dlmp) == 0))
+				return (min);
 		}
 
-		if ((_min = SORTVAL(dlmp)) == 0) {
-			if ((_min = dep_visit(dlmp, lml, sort, id, flag)) == 0)
-				return (0);
-		}
-		if (_min < min)
-			min = _min;
+		/*
+		 * Inspect this new dependency.
+		 */
+		if ((_min = dep_visit(clmp, bflags, dlmp, lml,
+		    sort, flag)) == -1)
+			return (-1);
 	}
 
+	/*
+	 * Keep track of the smallest SORTVAL that has been encountered.  If
+	 * this value is smaller than the present object, then the dependency
+	 * edge has cycled back to objects that have been processed earlier
+	 * along this dependency edge.
+	 */
+	if (_min < min) {
+		DBG_CALL(Dbg_util_edge_out(NAME(clmp), SORTVAL(clmp),
+		    NAME(sort->s_stack[_min])));
+		return (_min);
+	} else
+		return (min);
+}
+
+/*
+ * Visit the dependencies of each object.
+ */
+static int
+dep_visit(Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Lm_list *lml, Sort *sort,
+    int flag)
+{
+	int 		min;
+	Aliste		off;
+	Bnd_desc	**bdpp;
+	Dyninfo		*dip;
+
+	min = SORTVAL(lmp) = sort->s_sndx;
+	sort->s_stack[(sort->s_sndx)++] = lmp;
+
+	if (FLAGS(lmp) & FLG_RT_INITFRST)
+		sort->s_initfirst++;
+
+	DBG_CALL(Dbg_util_edge_in(clmp, cbflags, lmp, min, flag));
+
+	/*
+	 * Traverse both explicit and implicit dependencies.
+	 */
+	for (ALIST_TRAVERSE(DEPENDS(lmp), off, bdpp)) {
+		if ((min = _dep_visit(min, lmp, (*bdpp)->b_depend,
+		    (*bdpp)->b_flags, lml, sort, flag)) == -1)
+			return (-1);
+	}
+
+	/*
+	 * Traverse any filtee dependencies.
+	 */
+	if (((dip = DYNINFO(lmp)) != 0) && (FLAGS1(lmp) & MSK_RT_FILTER)) {
+		uint_t	cnt, max = DYNINFOCNT(lmp);
+
+		for (cnt = 0; cnt < max; cnt++, dip++) {
+			Pnode	*pnp = (Pnode *)dip->di_info;
+
+			if ((pnp == 0) ||
+			    ((dip->di_flags & MSK_DI_FILTER) == 0))
+				continue;
+
+			for (; pnp; pnp = pnp->p_next) {
+				Grp_hdl		*ghp = (Grp_hdl *)dip->di_info;
+				Grp_desc	*gdp;
+
+				if ((pnp->p_len == 0) ||
+				    ((ghp = (Grp_hdl *)pnp->p_info) == 0))
+					continue;
+
+				for (ALIST_TRAVERSE(ghp->gh_depends, off,
+				    gdp)) {
+
+					if (gdp->gd_depend == lmp)
+						continue;
+					if ((min = _dep_visit(min, lmp,
+					    gdp->gd_depend, BND_FILTER, lml,
+					    sort, flag)) == -1)
+						return (-1);
+				}
+			}
+		}
+	}
+
+	/*
+	 * Having returned to where the minimum SORTVAL is equivalent to the
+	 * object that has just been processed, collect any dependencies that
+	 * are available on the sorting stack.
+	 */
 	if (min == SORTVAL(lmp)) {
 		if (visit(lml, lmp, sort, flag) == 0)
-			return (0);
+			return (-1);
 	}
 	return (min);
 }
@@ -384,6 +485,7 @@ rb_visit(Rt_map * lmp, Sort * sort)
 	    FLG_RT_RELOCED) {
 		sort->s_lmpa[(sort->s_lndx)++] = lmp;
 		FLAGS(lmp) |= FLG_RT_INITCLCT;
+		LIST(lmp)->lm_init--;
 	}
 }
 
@@ -453,7 +555,7 @@ trace_sort(Sort * sort)
 		Bnd_desc **		bdpp;
 		Aliste			off1;
 
-		if (INIT(lmp1) == 0)
+		if ((INIT(lmp1) == 0) || (FLAGS(lmp1) & FLG_RT_INITCALL))
 			continue;
 
 		if (sfmt == 0)
@@ -588,11 +690,10 @@ f_initfirst(Sort * sort, int end)
  * Sort the dependency
  */
 Rt_map **
-tsort(Rt_map * lmp, int num, int flag)
+tsort(Rt_map *lmp, int num, int flag)
 {
 	Rt_map *	_lmp;
 	Lm_list *	lml = LIST(lmp);
-	uint_t 		id = 0;
 	Word		init = lml->lm_flags & LML_FLG_TRC_INIT;
 	Sort		sort = { 0 };
 
@@ -628,7 +729,7 @@ tsort(Rt_map * lmp, int num, int flag)
 			fb_visit(lmp, &sort, flag);
 
 		/*
-		 * If tracing init sections (only meaningful for RT_SORT_REV)
+		 * If tracing .init sections (only meaningful for RT_SORT_REV)
 		 * print out the sorted dependencies.
 		 */
 		if (init)
@@ -646,20 +747,23 @@ tsort(Rt_map * lmp, int num, int flag)
 	/*
 	 * Determine where to start searching for tsort() candidates.  Any call
 	 * to tsort() for .init processing is passed the link-map from which to
-	 * start searching.  However, previously loaded, uninitialized objects
-	 * may be dependencies of newly loaded objects, and in this case start
-	 * at the head of the link-map list, not the new link-map itself.
+	 * start searching.  However, if new objects have dependencies on
+	 * existing objects, or existing objects have been promoted (RTLD_LAZY
+	 * to RTLD_NOW), then start  searching at the head of the link-map list.
 	 * These previously loaded objects will have been tagged for inclusion
 	 * in this tsort() pass.  They still remain on an existing tsort() list,
 	 * which must have been prempted for control to have arrived here.
 	 * However, they will be ignored when encountered on any previous
-	 * tsort() list if their init has already been called.
+	 * tsort() list if their .init has already been called.
 	 */
-	if (LIST(lmp)->lm_flags & LML_FLG_BNDUNINIT) {
-		LIST(lmp)->lm_flags &= ~LML_FLG_BNDUNINIT;
+	if (lml->lm_flags & LML_FLG_OBJREEVAL)
 		_lmp = LIST(lmp)->lm_head;
-	} else
+	else
 		_lmp = lmp;
+
+	DBG_CALL(Dbg_file_bindings(_lmp, flag, lml->lm_flags));
+	lml->lm_flags &=
+	    ~(LML_FLG_OBJREEVAL | LML_FLG_OBJADDED | LML_FLG_OBJDELETED);
 
 	for (; _lmp; _lmp = (Rt_map *)NEXT(_lmp)) {
 		if (flag & RT_SORT_REV) {
@@ -671,7 +775,7 @@ tsort(Rt_map * lmp, int num, int flag)
 			    FLG_RT_INITCLCT)) != FLG_RT_RELOCED)
 				continue;
 
-			if (dep_visit(_lmp, lml, &sort, &id, flag) == 0)
+			if (dep_visit(0, 0, _lmp, lml, &sort, flag) == -1)
 				return ((Rt_map **)S_ERROR);
 
 		} else if (!(flag & RT_SORT_DELETE) ||
@@ -685,7 +789,7 @@ tsort(Rt_map * lmp, int num, int flag)
 			    (FLG_RT_INITCLCT)))
 				continue;
 
-			if (dep_visit(_lmp, lml, &sort, &id, flag) == 0)
+			if (dep_visit(0, 0, _lmp, lml, &sort, flag) == -1)
 				return ((Rt_map **)S_ERROR);
 		}
 	}
@@ -719,7 +823,7 @@ tsort(Rt_map * lmp, int num, int flag)
 	}
 
 	/*
-	 * If tracing init sections (only meaningful for RT_SORT_REV), print
+	 * If tracing .init sections (only meaningful for RT_SORT_REV), print
 	 * out the sorted dependencies.
 	 */
 	if (init)
@@ -738,7 +842,7 @@ tsort(Rt_map * lmp, int num, int flag)
 		/*
 		 * Traverse the link-maps collected on the sort queue and
 		 * delete the depth index.  These link-maps may be traversed
-		 * again to sort other components either for .inits, and almost
+		 * again to sort other components either for inits, and almost
 		 * certainly for .finis.
 		 */
 		for (ALIST_TRAVERSE(sort.s_queue, off, lmpp))
@@ -760,5 +864,6 @@ tsort(Rt_map * lmp, int num, int flag)
 	 * The caller is responsible for freeing the sorted link-map list once
 	 * the associated .init/.fini's have been fired.
 	 */
+	DBG_CALL(Dbg_util_nl());
 	return (sort.s_lmpa);
 }

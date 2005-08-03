@@ -618,7 +618,6 @@ call_array(Addr * array, uint_t arraysz, Rt_map * lmp, uint_t shtype)
 void
 call_init(Rt_map ** tobj, int flag)
 {
-	void (*		iptr)();
 	Rt_map **	_tobj, ** _nobj;
 	static List	pending = { NULL, NULL };
 
@@ -653,6 +652,7 @@ call_init(Rt_map ** tobj, int flag)
 	 */
 	for (_tobj = _nobj = tobj, _nobj++; *_tobj != NULL; _tobj++, _nobj++) {
 		Rt_map *	lmp = *_tobj;
+		void (*		iptr)() = INIT(lmp);
 
 		if (FLAGS(lmp) & FLG_RT_INITCALL)
 			continue;
@@ -661,20 +661,11 @@ call_init(Rt_map ** tobj, int flag)
 
 		/*
 		 * Establish an initfirst state if necessary - no other inits
-		 * will be fired (because of addition relocation bindings) when
-		 * in this state.
+		 * will be fired (because of additional relocation bindings)
+		 * when in this state.
 		 */
 		if (FLAGS(lmp) & FLG_RT_INITFRST)
 			rtld_flags |= RT_FL_INITFIRST;
-
-		/*
-		 * It's the responsibility of MAIN(crt0) to call it's
-		 * _init section.
-		 */
-		if ((FLAGS(lmp) & FLG_RT_ISMAIN) == 0)
-			iptr = INIT(lmp);
-		else
-			iptr = 0;
 
 		if (INITARRAY(lmp) || iptr) {
 			Aliste		off;
@@ -717,7 +708,7 @@ call_init(Rt_map ** tobj, int flag)
 		 * Clear the sort field for use in later .fini processing.
 		 */
 		FLAGS(lmp) |= FLG_RT_INITDONE;
-		SORTVAL(lmp) = 0;
+		SORTVAL(lmp) = -1;
 
 		/*
 		 * Wake anyone up who might be waiting on this .init.
@@ -727,16 +718,6 @@ call_init(Rt_map ** tobj, int flag)
 			(void) rt_cond_broadcast(CONDVAR(lmp));
 			FLAGS1(lmp) &= ~FL1_RT_INITWAIT;
 		}
-
-		/*
-		 * Set the initdone flag regardless of whether this object
-		 * actually contains an .init section.  This flag prevents us
-		 * from processing this section again for an .init and also
-		 * signifies that a .fini must be called should it exist.
-		 * Clear the sort field for use in later .fini processing.
-		 */
-		FLAGS(lmp) |= FLG_RT_INITDONE;
-		SORTVAL(lmp) = 0;
 
 		/*
 		 * If we're firing an INITFIRST object, and other objects must
@@ -773,8 +754,7 @@ call_init(Rt_map ** tobj, int flag)
 void
 call_fini(Lm_list * lml, Rt_map ** tobj)
 {
-	Rt_map **	_tobj;
-	void (*		fptr)();
+	Rt_map **_tobj;
 
 	for (_tobj = tobj; *_tobj != NULL; _tobj++) {
 		Rt_map *	clmp, * lmp = *_tobj;
@@ -789,14 +769,7 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 		 */
 		if ((rtld_flags & RT_FL_CONCUR) ||
 		    (FLAGS(lmp) & FLG_RT_INITDONE)) {
-			/*
-			 * It's the responsibility of MAIN(crt0) to call it's
-			 * _fini section.
-			 */
-			if ((FLAGS(lmp) & FLG_RT_ISMAIN) == 0)
-				fptr = FINI(lmp);
-			else
-				fptr = 0;
+			void	(*fptr)() = FINI(lmp);
 
 			if (FINIARRAY(lmp) || fptr) {
 				/*
@@ -817,6 +790,12 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 				(void) enter();
 			}
 		}
+
+		/*
+		 * Skip main, this is explicitly called last in atexit_fini().
+		 */
+		if (FLAGS(lmp) & FLG_RT_ISMAIN)
+			continue;
 
 		/*
 		 * Audit `close' operations at this point.  The library has
@@ -867,6 +846,7 @@ atexit_fini()
 	rtld_flags |= RT_FL_ATEXIT;
 
 	lml = &lml_main;
+	lml->lm_flags |= LML_FLG_ATEXIT;
 	lmp = (Rt_map *)lml->lm_head;
 
 	/*
@@ -882,18 +862,15 @@ atexit_fini()
 		call_fini(lml, tobj);
 
 	/*
-	 * Add an explicit close to main and ld.so.1 (as their fini doesn't get
-	 * processed this auditing will not get caught in call_fini()).  This is
-	 * the reverse of the explicit calls to audit_objopen() made in setup().
+	 * Add an explicit close to main and ld.so.1.  Although main's .fini is
+	 * collected in call_fini() to provide for FINITARRAY processing, its
+	 * audit_objclose is explicitly skipped.  This provides for it to be
+	 * called last, here.  This is the reverse of the explicit calls to
+	 * audit_objopen() made in setup().
 	 */
 	if ((lml->lm_tflags | FLAGS1(lmp)) & LML_TFLG_AUD_MASK) {
 		audit_objclose(lmp, (Rt_map *)lml_rtld.lm_head);
-		/*
-		 * If the executable has a fini-array, then it was captured
-		 * as part of the call_fini() processing.
-		 */
-		if (FINIARRAY(lmp) == 0)
-			audit_objclose(lmp, lmp);
+		audit_objclose(lmp, lmp);
 	}
 
 	/*
@@ -915,6 +892,8 @@ atexit_fini()
 		if ((lmp = (Rt_map *)lml->lm_head) == 0)
 			continue;
 
+		lml->lm_flags |= LML_FLG_ATEXIT;
+
 		/*
 		 * Reverse topologically sort the link-map for .fini execution.
 		 */
@@ -930,6 +909,7 @@ atexit_fini()
 	 * .fini execution.
 	 */
 	lml = &lml_rtld;
+	lml->lm_flags |= LML_FLG_ATEXIT;
 	lmp = (Rt_map *)lml->lm_head;
 
 	dbg_mask = 0;
@@ -970,8 +950,8 @@ load_completion(Rt_map * nlmp, Rt_map * clmp)
 	if (nlmp && ((clmp == 0) ||
 	    ((LIST(clmp)->lm_flags & LML_FLG_NOAUDIT) == 0) ||
 	    (LIST(clmp) == LIST(nlmp)))) {
-		if ((tobj = tsort(nlmp, LIST(nlmp)->lm_init, RT_SORT_REV)) ==
-		    (Rt_map **)S_ERROR)
+		if ((tobj = tsort(nlmp, LIST(nlmp)->lm_init,
+		    RT_SORT_REV)) == (Rt_map **)S_ERROR)
 			tobj = 0;
 	}
 
@@ -1447,6 +1427,7 @@ static	u_longlong_t		prmisa;		/* permanent ISA specific */
 #define	ENV_FLG_VERBOSE		0x0400000000ULL
 #define	ENV_FLG_WARN		0x0800000000ULL
 #define	ENV_FLG_NOFLTCONFIG	0x1000000000ULL
+#define	ENV_FLG_BIND_LAZY	0x2000000000ULL
 
 #ifdef	SIEBEL_DISABLE
 #define	ENV_FLG_FIX_1		0x8000000000ULL
@@ -1519,7 +1500,13 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 	 * The LD_BIND family and LD_BREADTH (historic).
 	 */
 	else if (*s1 == 'B') {
-		if ((len == MSG_LD_BIND_NOW_SIZE) && (strncmp(s1,
+		if ((len == MSG_LD_BIND_LAZY_SIZE) && (strncmp(s1,
+		    MSG_ORIG(MSG_LD_BIND_LAZY),
+		    MSG_LD_BIND_LAZY_SIZE) == 0)) {
+			select |= SEL_ACT_RT2;
+			val = RT_FL2_BINDLAZY;
+			variable = ENV_FLG_BIND_LAZY;
+		} else if ((len == MSG_LD_BIND_NOW_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_BIND_NOW), MSG_LD_BIND_NOW_SIZE) == 0)) {
 			select |= SEL_ACT_RT2;
 			val = RT_FL2_BINDNOW;
@@ -2256,6 +2243,13 @@ readenv_user(const char ** envp, Word *lmflags, Word *lmtflags, int aout)
 		rpl_audit = profile_lib = profile_name = 0;
 	if ((*lmflags & LML_FLG_TRC_ENABLE) == 0)
 		*lmflags &= ~LML_MSK_TRC;
+
+	/*
+	 * If both LD_BIND_NOW and LD_BIND_LAZY are specified, the former wins.
+	 */
+	if ((rtld_flags2 & (RT_FL2_BINDNOW | RT_FL2_BINDLAZY)) ==
+	    (RT_FL2_BINDNOW | RT_FL2_BINDLAZY))
+		rtld_flags2 &= ~RT_FL2_BINDLAZY;
 
 	/*
 	 * If we have a locale setting make sure its worth processing further.

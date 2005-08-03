@@ -27,7 +27,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms.
  */ 
 
@@ -39,6 +39,8 @@
 #include	"sgs.h"
 
 void		conv_check_native(char **, char **);
+const char	*conv_binding_str(uint_t);
+const char	*conv_bindent_str(uint_t);
 const char	*conv_captag_str(uint64_t);
 const char	*conv_capval_str(uint64_t, uint64_t, ushort_t);
 const char	*conv_config_obj(ushort_t);

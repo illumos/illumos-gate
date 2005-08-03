@@ -708,6 +708,14 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 	FLAGS(mlmp) |= (FLG_RT_ISMAIN | FLG_RT_MODESET);
 	FLAGS1(mlmp) |= FL1_RT_USED;
+
+	/*
+	 * It's the responsibility of MAIN(crt0) to call it's _init and _fini
+	 * section, therefore null out any INIT/FINI so that this object isn't
+	 * collected during tsort processing.  And, if the application has no
+	 * initarray or finiarray we can economize on establishing bindings.
+	 */
+	INIT(mlmp) = FINI(mlmp) = 0;
 	if ((INITARRAY(mlmp) == 0) && (FINIARRAY(mlmp) == 0))
 		FLAGS1(mlmp) |= FL1_RT_NOINIFIN;
 
@@ -726,22 +734,6 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	argsinfo.dla_auxv = auxv;
 
 	(void) enter();
-
-	/*
-	 * If no .initarray or .finiarray are present on the executable do not
-	 * enter them into the 'sorting' mechanism for .init/.fini firing.
-	 *
-	 * This is to prevent them showing up during 'ldd -i ...'
-	 * output when they don't do anything.
-	 */
-	if (INITARRAY(mlmp) == 0) {
-		FLAGS(mlmp) |= (FLG_RT_INITCLCT | FLG_RT_INITCALL |
-		    FLG_RT_INITDONE);
-		LIST(mlmp)->lm_init--;
-	}
-
-	if (FINIARRAY(mlmp) == 0)
-		FLAGS(mlmp) |= FLG_RT_FINICLCT;
 
 	/*
 	 * Add our two main link-maps to the dynlm_list

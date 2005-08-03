@@ -1497,3 +1497,13 @@ All the above change is incorporated in the following patches:
 6273875 gcc and sgs/rtld don't get along
 6272563 gcc and amd64/krtld/doreloc.c don't get along
 6290157 gcc and sgs/librtld_db/rdb_demo don't get along
+--------------------------------------------------------------------------------
+All the above change is incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T117461-05
+    Solaris/SunOS 5.10_x86	patch T118345-05
+    Solaris/SunOS 5.9_sparc	patch T112963-23
+    Solaris/SunOS 5.9_x86	patch T113986-19
+    Solaris/SunOS 5.8_sparc	patch T109147-38
+    Solaris/SunOS 5.8_x86	patch T109148-38
+--------------------------------------------------------------------------------
+6301218 Matlab dumps core on startup when running on 112963-22  (D)

@@ -309,6 +309,7 @@ typedef struct {
 #define	RT_FL2_HWCAP	0x00000040	/* hardware capabilities available */
 #define	RT_FL2_FTL2WARN	0x00000080	/* convert fatal to warning messages */
 #define	RT_FL2_BINDNOW	0x00000100	/* LD_BIND_NOW in effect */
+#define	RT_FL2_BINDLAZY	0x00000200	/* disable RTLD_NOW (and LD_BIND_NOW) */
 
 /*
  * Information flags for env_info.
@@ -327,11 +328,6 @@ typedef struct {
 
 #define	ROUND(x, a)	(((int)(x) + ((int)(a) - 1)) & \
 				~((int)(a) - 1))
-
-#define	RT_SORT_FWD	0x01		/* topological sort (.fini) */
-#define	RT_SORT_REV	0x02		/* reverse topological sort (.init) */
-#define	RT_SORT_DELETE	0x10		/* process FLG_RT_DELNEED objects */
-					/*	only (called via dlclose()) */
 
 /*
  * Print buffer.

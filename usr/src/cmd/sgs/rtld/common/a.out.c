@@ -624,6 +624,7 @@ aout_new_lm(Lm_list *lml, const char *pname, const char *oname,
 	LIST(lmp) = lml;
 	THREADID(lmp) = rt_thr_self();
 	OBJFLTRNDX(lmp) = FLTR_DISABLED;
+	SORTVAL(lmp) = -1;
 
 	/*
 	 * Specific settings for a.out format.

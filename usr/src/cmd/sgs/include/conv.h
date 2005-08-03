@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -68,6 +68,8 @@ extern "C" {
  * Functions
  */
 extern	void		conv_check_native(char **, char **);
+extern	const char	*conv_binding_str(uint_t);
+extern	const char	*conv_bindent_str(uint_t);
 extern	const char	*conv_d_type_str(Elf_Type);
 extern	const char	*conv_deftag_str(Symref);
 extern	const char	*conv_dlflag_str(int, int);

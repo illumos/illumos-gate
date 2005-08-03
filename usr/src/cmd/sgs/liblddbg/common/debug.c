@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,6 +74,7 @@ static DBG_options _Dbg_options[] = {
 	{MSG_ORIG(MSG_TOK_DEMANGLE),	DBG_DEMANGLE},
 #endif
 	{MSG_ORIG(MSG_TOK_CAP),		DBG_CAP},
+	{MSG_ORIG(MSG_TOK_INIT),	DBG_INIT},
 	{NULL,				NULL},
 };
 
@@ -120,6 +121,7 @@ _Dbg_usage()
 	dbg_print(MSG_INTL(MSG_USE_FILES));
 	dbg_print(MSG_INTL(MSG_USE_GOT));
 	dbg_print(MSG_INTL(MSG_USE_HELP));
+	dbg_print(MSG_INTL(MSG_USE_INIT));
 	dbg_print(MSG_INTL(MSG_USE_LIBS));
 	dbg_print(MSG_INTL(MSG_USE_LIBS_2));
 	dbg_print(MSG_INTL(MSG_USE_LONG));

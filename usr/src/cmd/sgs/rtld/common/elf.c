@@ -2029,6 +2029,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 	PADIMLEN(lmp) = padimsize;
 	THREADID(lmp) = rt_thr_self();
 	OBJFLTRNDX(lmp) = FLTR_DISABLED;
+	SORTVAL(lmp) = -1;
 
 	MMAPS(lmp) = mmaps;
 	MMAPCNT(lmp) = mmapcnt;
@@ -2212,7 +2213,8 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				VERDEFNUM(lmp) = (int)ld->d_un.d_val;
 				break;
 			case DT_BIND_NOW:
-				if (ld->d_un.d_val & DF_BIND_NOW) {
+				if ((ld->d_un.d_val & DF_BIND_NOW) &&
+				    ((rtld_flags2 & RT_FL2_BINDLAZY) == 0)) {
 					MODE(lmp) |= RTLD_NOW;
 					MODE(lmp) &= ~RTLD_LAZY;
 				}
@@ -2222,7 +2224,8 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 					FLAGS1(lmp) |= FL1_RT_SYMBOLIC;
 				if (ld->d_un.d_val & DF_TEXTREL)
 					FLAGS1(lmp) |= FL1_RT_TEXTREL;
-				if (ld->d_un.d_val & DF_BIND_NOW) {
+				if ((ld->d_un.d_val & DF_BIND_NOW) &&
+				    ((rtld_flags2 & RT_FL2_BINDLAZY) == 0)) {
 					MODE(lmp) |= RTLD_NOW;
 					MODE(lmp) &= ~RTLD_LAZY;
 				}
@@ -2233,7 +2236,8 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				if (ld->d_un.d_val & DF_1_GROUP)
 					FLAGS(lmp) |=
 					    (FLG_RT_SETGROUP | FLG_RT_HANDLE);
-				if (ld->d_un.d_val & DF_1_NOW) {
+				if ((ld->d_un.d_val & DF_1_NOW) &&
+				    ((rtld_flags2 & RT_FL2_BINDLAZY) == 0)) {
 					MODE(lmp) |= RTLD_NOW;
 					MODE(lmp) &= ~RTLD_LAZY;
 				}

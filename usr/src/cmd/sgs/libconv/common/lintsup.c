@@ -23,7 +23,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,6 +43,7 @@
 #include <link.h>
 #include <demangle.h>
 #include <elfcap.h>
+#include <dwarf.h>
 #include "sgs.h"
 #include "rtld.h"
 #include "libld.h"
