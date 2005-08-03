@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,10 +168,29 @@ cascade_submit_job(const char *printer, const char *host, char *cf,
 		    char **df_list)
 {
 	FILE *fp;
+	char *s, *newcf;
 
 	syslog(LOG_DEBUG, "cascade_submit_job(%s, %s, 0x%x, 0x%x)",
 		(printer ? printer : "NULL"), (host ? host : "NULL"), cf,
 		df_list);
+
+	/*
+	 * Validate/Cleanup the control/metadata file.
+	 */
+	if ((newcf = calloc(1, strlen(cf) + 1)) == NULL)
+		return (-1);
+	for (s = strtok(cf, "\n"); s != NULL; s = strtok(NULL, "\n")) {
+		/*
+		 * If the first character is 'U' then make sure that the
+		 * filename does not contain '/'
+		 */
+		if ((s[0] == CF_UNLINK) && (strchr(s, '/') != NULL)) {
+			syslog(LOG_ALERT, "suspicious directive: %s", s);
+		} else {
+			strcat(newcf, s);
+			strcat(newcf, "\n");
+		}
+	}
 
 	/* write the control file */
 	df_list[0][0] = 'c';
@@ -182,10 +201,13 @@ cascade_submit_job(const char *printer, const char *host, char *cf,
 	 */
 	if (((fp = fopen(df_list[0], "w")) != NULL) &&
 		((lockf(fileno(fp), F_LOCK, 0)) == 0)) {
-		fprintf(fp, "%s", cf);
+		fprintf(fp, "%s", newcf);
+		free(newcf);
 		fclose(fp);
-	} else
+	} else {
+		free(newcf);
 		return (-1);
+	}
 
 	/* write a binding file */
 	df_list[0][0] = 'x';
