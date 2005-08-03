@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@ krb5int_pbkdf2_hmac_sha1(
 	CK_KEY_TYPE	keytype;
 	CK_OBJECT_HANDLE hKey;
 	int attrs = 0;
+	CK_ULONG outlen, passlen;
 
 	mechanism.mechanism = CKM_PKCS5_PBKD2;
 	mechanism.pParameter = &params;
@@ -92,8 +93,10 @@ krb5int_pbkdf2_hmac_sha1(
 	    enctype != ENCTYPE_DES3_CBC_SHA1 &&
 	    enctype != ENCTYPE_DES3_CBC_RAW) {
 		tmpl[attrs].type = CKA_VALUE_LEN;
-		tmpl[attrs].pValue = (void *)&out->length;
-		tmpl[attrs].ulValueLen = out->length;
+		/* using outlen to avoid 64bit alignment issues */
+		outlen = (CK_ULONG)out->length;
+		tmpl[attrs].pValue = &outlen;
+		tmpl[attrs].ulValueLen = sizeof(outlen);
 		attrs++;
 	}
 
@@ -105,7 +108,9 @@ krb5int_pbkdf2_hmac_sha1(
 	params.pPrfData = NULL;
 	params.ulPrfDataLen = 0;
 	params.pPassword = (CK_UTF8CHAR_PTR)pass->data;
-	params.ulPasswordLen = (CK_ULONG *)&pass->length;
+	/* using passlen to avoid 64bit alignment issues */
+	passlen = (CK_ULONG)pass->length;
+	params.ulPasswordLen = &passlen;
 
 	rv = C_GenerateKey(krb_ctx_hSession(context), &mechanism, tmpl,
 		attrs, &hKey);

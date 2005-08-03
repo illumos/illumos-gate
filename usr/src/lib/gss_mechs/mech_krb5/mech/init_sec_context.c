@@ -1293,8 +1293,10 @@ fail:
 	if (ctx_free->subkey)
 	   krb5_free_keyblock(context, ctx_free->subkey);
 	xfree(ctx_free);
-   } else
-        (void)krb5_gss_delete_sec_context(context, minor_status, context_handle, NULL);
+   } else {
+        (void)krb5_gss_delete_sec_context_no_lock(context, minor_status,
+	    context_handle, NULL);
+   }
 
    *minor_status = code;
    return (major_status);
@@ -1354,7 +1356,7 @@ mutual_auth(
 
    if (! krb5_principal_compare(context, ctx->there,
 				(krb5_principal) target_name)) {
-	(void)krb5_gss_delete_sec_context(context, minor_status,
+	(void)krb5_gss_delete_sec_context_no_lock(context, minor_status,
                                         context_handle, NULL);
 	code = 0;
 	major_status = GSS_S_BAD_NAME;
@@ -1364,7 +1366,7 @@ mutual_auth(
    /* verify the token and leave the AP_REP message in ap_rep */
 
    if (input_token == GSS_C_NO_BUFFER) {
-	(void)krb5_gss_delete_sec_context(context, minor_status,
+	(void)krb5_gss_delete_sec_context_no_lock(context, minor_status,
                                         context_handle, NULL);
 	code = 0;
 	major_status = GSS_S_DEFECTIVE_TOKEN;
@@ -1464,7 +1466,8 @@ mutual_auth(
    return GSS_S_COMPLETE;
 
 fail:
-   (void)krb5_gss_delete_sec_context(context, minor_status, context_handle, NULL);
+   (void)krb5_gss_delete_sec_context_no_lock(context, minor_status,
+       context_handle, NULL);
 
    *minor_status = code;
    return (major_status);
