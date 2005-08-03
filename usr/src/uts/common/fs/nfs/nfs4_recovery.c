@@ -2652,7 +2652,7 @@ nfs4_resend_lost_rqsts(recov_info_t *recovp, nfs4_server_t *sp)
 {
 	nfs4_lost_rqst_t	*lrp, *tlrp;
 	mntinfo4_t		*mi = recovp->rc_mi;
-	nfs4_error_t		e;
+	nfs4_error_t		n4e;
 #ifdef NOTYET
 	uint32_t		deny_bits = 0;
 #endif
@@ -2666,10 +2666,12 @@ nfs4_resend_lost_rqsts(recov_info_t *recovp, nfs4_server_t *sp)
 	lrp = list_head(&mi->mi_lost_state);
 	mutex_exit(&mi->mi_lock);
 	while (lrp != NULL) {
-		resend_one_op(lrp, &e, mi, sp);
+		nfs4_error_zinit(&n4e);
+		resend_one_op(lrp, &n4e, mi, sp);
 		NFS4_DEBUG(nfs4_lost_rqst_debug, (CE_NOTE,
 		    "nfs4_resend_lost_rqsts: resend request: for vp %p got "
-		    "error %d stat %d", (void *)lrp->lr_vp, e.error, e.stat));
+		    "error %d stat %d", (void *)lrp->lr_vp, n4e.error,
+		    n4e.stat));
 
 		/*
 		 * If we get a recovery error that we can actually
@@ -2678,11 +2680,11 @@ nfs4_resend_lost_rqsts(recov_info_t *recovp, nfs4_server_t *sp)
 		 * Don't requeue unless the zone is still healthy.
 		 */
 		if (zone_status_get(curproc->p_zone) < ZONE_IS_SHUTTING_DOWN &&
-		    nfs4_needs_recovery(&e, TRUE, mi->mi_vfsp) &&
-		    (nfs4_try_failover(&e) ||
-		    NFS4_FRC_UNMT_ERR(e.error, mi->mi_vfsp) ||
-		    (e.error == 0 && e.stat != NFS4ERR_BADHANDLE &&
-		    !nfs4_recov_marks_dead(e.stat)))) {
+		    nfs4_needs_recovery(&n4e, TRUE, mi->mi_vfsp) &&
+		    (nfs4_try_failover(&n4e) ||
+		    NFS4_FRC_UNMT_ERR(n4e.error, mi->mi_vfsp) ||
+		    (n4e.error == 0 && n4e.stat != NFS4ERR_BADHANDLE &&
+		    !nfs4_recov_marks_dead(n4e.stat)))) {
 			/*
 			 * For these three errors, we want to delay a bit
 			 * instead of pounding the server into submission.
@@ -2690,13 +2692,13 @@ nfs4_resend_lost_rqsts(recov_info_t *recovp, nfs4_server_t *sp)
 			 * processing for these errors only works for
 			 * non-recovery requests.
 			 */
-			if ((e.error == 0 && e.stat == NFS4ERR_DELAY) ||
-			    (e.error == 0 && e.stat == NFS4ERR_GRACE) ||
-			    (e.error == 0 && e.stat == NFS4ERR_RESOURCE) ||
-			    NFS4_FRC_UNMT_ERR(e.error, mi->mi_vfsp)) {
+			if ((n4e.error == 0 && n4e.stat == NFS4ERR_DELAY) ||
+			    (n4e.error == 0 && n4e.stat == NFS4ERR_GRACE) ||
+			    (n4e.error == 0 && n4e.stat == NFS4ERR_RESOURCE) ||
+			    NFS4_FRC_UNMT_ERR(n4e.error, mi->mi_vfsp)) {
 				delay(SEC_TO_TICK(nfs4err_delay_time));
 			} else {
-				(void) nfs4_start_recovery(&e,
+				(void) nfs4_start_recovery(&n4e,
 					mi, lrp->lr_dvp, lrp->lr_vp, NULL, NULL,
 					lrp->lr_op, NULL);
 			}
