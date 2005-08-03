@@ -720,15 +720,20 @@ i_ddi_remove_softint(ddi_softint_hdl_impl_t *hdlp)
 extern void (*setsoftint)(int);
 
 int
-i_ddi_trigger_softint(ddi_softint_hdl_impl_t *hdlp)
+i_ddi_trigger_softint(ddi_softint_hdl_impl_t *hdlp, void *arg2)
 {
-	if (!hdlp->ih_pending) {
+	int	ret = DDI_SUCCESS;
+
+	if (hdlp->ih_pending) {
+		ret = DDI_EPENDING;
+	} else {
 		update_avsoftintr_args((void *)hdlp,
-		    hdlp->ih_pri, hdlp->ih_cb_arg2);
+		    hdlp->ih_pri, arg2);
 		hdlp->ih_pending = 1;
 	}
+
 	(*setsoftint)(hdlp->ih_pri);
-	return (DDI_SUCCESS);
+	return (ret);
 }
 
 /*

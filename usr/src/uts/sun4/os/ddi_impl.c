@@ -579,7 +579,7 @@ i_ddi_remove_softint(ddi_softint_hdl_impl_t *hdlp)
 }
 
 int
-i_ddi_trigger_softint(ddi_softint_hdl_impl_t *hdlp)
+i_ddi_trigger_softint(ddi_softint_hdl_impl_t *hdlp, void *arg2)
 {
 	uint_t		intr_id;
 	int		ret;
@@ -590,7 +590,7 @@ i_ddi_trigger_softint(ddi_softint_hdl_impl_t *hdlp)
 	intr_id = (uint_t)hdlp->ih_private;
 
 	/* update the vector table for the 2nd arg */
-	ret = update_softint_arg2(intr_id, hdlp->ih_cb_arg2);
+	ret = update_softint_arg2(intr_id, arg2);
 	if (ret == DDI_SUCCESS)
 		setsoftint(intr_id);
 

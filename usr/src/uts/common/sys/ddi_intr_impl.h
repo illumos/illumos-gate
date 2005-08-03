@@ -197,7 +197,7 @@ int	i_ddi_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t op,
 
 int	i_ddi_add_softint(ddi_softint_hdl_impl_t *);
 void	i_ddi_remove_softint(ddi_softint_hdl_impl_t *);
-int	i_ddi_trigger_softint(ddi_softint_hdl_impl_t *);
+int	i_ddi_trigger_softint(ddi_softint_hdl_impl_t *, void *);
 int	i_ddi_set_softint_pri(ddi_softint_hdl_impl_t *, uint_t);
 
 void	i_ddi_intr_devi_init(dev_info_t *dip);

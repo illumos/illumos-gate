@@ -1013,34 +1013,24 @@ ddi_intr_remove_softint(ddi_softint_handle_t h)
 /*
  * Trigger a soft interrupt
  */
-/* ARGSUSED */
 int
 ddi_intr_trigger_softint(ddi_softint_handle_t h, void *arg2)
 {
 	ddi_softint_hdl_impl_t	*hdlp = (ddi_softint_hdl_impl_t *)h;
-	caddr_t			orig_arg2;
 	int			ret;
 
 	if (hdlp == NULL)
 		return (DDI_EINVAL);
 
-	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
-
-	/*
-	 * Need to reset "arg2" everytime.
-	 * Multiple invocations of trigger_softint() are blocked
-	 */
-	orig_arg2 = hdlp->ih_cb_arg2;
-	hdlp->ih_cb_arg2 = arg2;
-
-	if ((ret = i_ddi_trigger_softint(hdlp)) != DDI_SUCCESS) {
+	if ((ret = i_ddi_trigger_softint(hdlp, arg2)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_trigger_softint: failed, "
 		    " ret 0%x\n", ret));
-		hdlp->ih_cb_arg2 = orig_arg2;
+
+		return (ret);
 	}
 
-	rw_exit(&hdlp->ih_rwlock);
-	return (ret);
+	hdlp->ih_cb_arg2 = arg2;
+	return (DDI_SUCCESS);
 }
 
 /*
