@@ -1701,21 +1701,21 @@ dump_tss(void)
 	const char tss_fmt[] = "tss.%s:\t0x%p\n";  /* Format string */
 	struct tss *tss = CPU->cpu_tss;
 
-	printf(tss_fmt, "tss_link", (void *)tss->tss_link);
-	printf(tss_fmt, "tss_esp0", (void *)tss->tss_esp0);
-	printf(tss_fmt, "tss_ss0", (void *)tss->tss_ss0);
-	printf(tss_fmt, "tss_esp1", (void *)tss->tss_esp1);
-	printf(tss_fmt, "tss_ss1", (void *)tss->tss_ss1);
-	printf(tss_fmt, "tss_esp2", (void *)tss->tss_esp2);
-	printf(tss_fmt, "tss_ss2", (void *)tss->tss_ss2);
-	printf(tss_fmt, "tss_cr3", (void *)tss->tss_cr3);
-	printf(tss_fmt, "tss_eip", (void *)tss->tss_eip);
-	printf(tss_fmt, "tss_eflags", (void *)tss->tss_eflags);
-	printf(tss_fmt, "tss_eax", (void *)tss->tss_eax);
-	printf(tss_fmt, "tss_ebx", (void *)tss->tss_ebx);
-	printf(tss_fmt, "tss_ecx", (void *)tss->tss_ecx);
-	printf(tss_fmt, "tss_edx", (void *)tss->tss_edx);
-	printf(tss_fmt, "tss_esp", (void *)tss->tss_esp);
+	printf(tss_fmt, "tss_link", (void *)(uintptr_t)tss->tss_link);
+	printf(tss_fmt, "tss_esp0", (void *)(uintptr_t)tss->tss_esp0);
+	printf(tss_fmt, "tss_ss0", (void *)(uintptr_t)tss->tss_ss0);
+	printf(tss_fmt, "tss_esp1", (void *)(uintptr_t)tss->tss_esp1);
+	printf(tss_fmt, "tss_ss1", (void *)(uintptr_t)tss->tss_ss1);
+	printf(tss_fmt, "tss_esp2", (void *)(uintptr_t)tss->tss_esp2);
+	printf(tss_fmt, "tss_ss2", (void *)(uintptr_t)tss->tss_ss2);
+	printf(tss_fmt, "tss_cr3", (void *)(uintptr_t)tss->tss_cr3);
+	printf(tss_fmt, "tss_eip", (void *)(uintptr_t)tss->tss_eip);
+	printf(tss_fmt, "tss_eflags", (void *)(uintptr_t)tss->tss_eflags);
+	printf(tss_fmt, "tss_eax", (void *)(uintptr_t)tss->tss_eax);
+	printf(tss_fmt, "tss_ebx", (void *)(uintptr_t)tss->tss_ebx);
+	printf(tss_fmt, "tss_ecx", (void *)(uintptr_t)tss->tss_ecx);
+	printf(tss_fmt, "tss_edx", (void *)(uintptr_t)tss->tss_edx);
+	printf(tss_fmt, "tss_esp", (void *)(uintptr_t)tss->tss_esp);
 }
 
 #endif	/* __amd64 */

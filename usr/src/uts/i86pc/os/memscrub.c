@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -456,7 +456,8 @@ memscrub_add_span(uint64_t start, uint64_t bytes)
 		    (start < ns && end > ne))
 			panic("memscrub found overlapping memory ranges "
 			    "(0x%p-0x%p) and (0x%p-0x%p)",
-			    (void *)start, (void *)end, (void *)ns, (void *)ne);
+			    (void *)(uintptr_t)start, (void *)(uintptr_t)end,
+			    (void *)(uintptr_t)ns, (void *)(uintptr_t)ne);
 
 		/*
 		 * New span can be appended to an existing one.
