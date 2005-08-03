@@ -5,7 +5,6 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 5.1 (Berkeley) 6/5/85 */
 
 #include <ctype.h>
 
@@ -19,6 +18,7 @@ extern char	*l_idchars;	/* set of characters legal in identifiers
 				   in addition to letters and digits */
 
 extern char	*strchr();
+static void	expconv(void);
 
 #define isidchr(c)	\
 		(isalnum(c) || ((c) != NIL && strchr(l_idchars, (c)) != NIL))
@@ -29,9 +29,8 @@ extern char	*strchr();
  *		if l_onecase is set.
  */
 
-STRNCMP(s1, s2, len)
-	register char *s1,*s2;
-	register int len;
+int
+STRNCMP(char *s1, char *s2, int len)
 {
 	if (l_onecase) {
 	    do
@@ -112,10 +111,10 @@ char *ccre;		/* pointer to current position in converted exp*/
 char *malloc();
 
 char *
-convexp(re)
-    char *re;		/* unconverted irregular expression */
+convexp(char *re)
+	/* re - unconverted irregular expression */
 {
-    register char *cre;		/* pointer to converted regular expression */
+    char *cre;		/* pointer to converted regular expression */
 
     /* allocate room for the converted expression */
     if (re == NIL)
@@ -137,12 +136,13 @@ convexp(re)
     return (cre);
 }
 
-expconv()
+static void
+expconv(void)
 {
-    register char *cs;		/* pointer to current symbol in converted exp */
-    register char c;		/* character being processed */
-    register char *acs;		/* pinter to last alternate */
-    register int temp;
+    char *cs;		/* pointer to current symbol in converted exp */
+    char c;		/* character being processed */
+    char *acs;		/* pinter to last alternate */
+    int temp;
 
     /* let the conversion begin */
     acs = NIL;
@@ -280,7 +280,6 @@ expconv()
 	} while (temp != 0);
 	acs = NIL;
     }
-    return;
 }
 /* end of convertre */
 
@@ -311,14 +310,14 @@ boolean _escaped;		/* true if we are currently _escaped */
 char *Start;			/* start of string */
 
 char *
-expmatch (s, re, mstring)
-    register char *s;		/* string to check for a match in */
-    register char *re;		/* a converted irregular expression */
-    register char *mstring;	/* where to put whatever matches a \p */
+expmatch(char *s, char *re, char *mstring)
+	/* s - string to check for a match in */
+	/* re - a converted irregular expression */
+	/* mstring - where to put whatever matches a \p */
 {
-    register char *cs;		/* the current symbol */
-    register char *ptr,*s1;	/* temporary pointer */
-    boolean matched;		/* a temporary boolean */
+    char *cs;		/* the current symbol */
+    char *ptr, *s1;	/* temporary pointer */
+    boolean matched;	/* a temporary boolean */
 
     /* initial conditions */
     if (re == NIL)

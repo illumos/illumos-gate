@@ -117,15 +117,21 @@ boolean	l_onecase;		/* upper and lower case are equivalent */
 char	*l_idchars;		/* characters legal in identifiers in addition
 				   to letters and digits (default "_") */
 
+static void putcp(int c);
+static int width(char *s, char *os);
+static int tabs(char *s, char *os);
+static void putKcp(char *start, char *end, boolean force);
+static void putScp(char *os);
+static int iskw(char *s);
+
 /*
  * The code below emits troff macros and directives that consume part of the
  * troff macro and register space.  See tmac.vgrind for an enumeration of
  * these macros and registers.
  */
 
-main(argc, argv)
-    int argc;
-    char *argv[];
+int
+main(int argc, char *argv[])
 {
     FILE *in;
     char *fname;
@@ -415,16 +421,15 @@ flagsdone:
     if (!filter)
 	printf("'vE\n");
 
-    exit(0);
-    /* NOTREACHED */
+    return (0);
 }
 
 #define isidchr(c) (isalnum(c) || ((c) != NIL && strchr(l_idchars, (c)) != NIL))
 
-putScp(os)
-    char *os;
+static void
+putScp(char *os)
 {
-    register char *s = os;		/* pointer to unmatched string */
+    char *s = os;			/* pointer to unmatched string */
     char dummy[BUFSIZ];			/* dummy to be used by expmatch */
     char *comptr;			/* end of a comment delimiter */
     char *acmptr;			/* end of a comment delimiter */
@@ -610,10 +615,11 @@ skip:
     } while (*s);
 }
 
-putKcp (start, end, force)
-    char	*start;		/* start of string to write */
-    char	*end;		/* end of string to write */
-    boolean	force;		/* true if we should force nokeyw */
+static void
+putKcp(char *start, char *end, boolean force)
+	/* start - start of string to write */
+	/* end - end of string to write */
+	/* force - true if we should force nokeyw */
 {
     int i;
     int xfld = 0;
@@ -661,17 +667,17 @@ putKcp (start, end, force)
 }
 
 
-tabs(s, os)
-    char *s, *os;
+static int
+tabs(char *s, char *os)
 {
 
     return (width(s, os) / tabsize);
 }
 
-width(s, os)
-	register char *s, *os;
+static int
+width(char *s, char *os)
 {
-	register int i = 0;
+	int i = 0;
 	unsigned char c;
 	int n;
 
@@ -696,8 +702,8 @@ width(s, os)
 	return (i);
 }
 
-putcp(c)
-	register int c;
+static void
+putcp(int c)
 {
 
 	switch(c) {
@@ -813,12 +819,12 @@ isproc(s)
  *	Return its length if it is or 0 if it isn't.
  */
 
-iskw(s)
-	register char *s;
+static int
+iskw(char *s)
 {
-	register char **ss = l_keywds;
-	register int i = 1;
-	register char *cp = s;
+	char **ss = l_keywds;
+	int i = 1;
+	char *cp = s;
 
 	/* Get token length. */
 	while (++cp, isidchr(*cp))
