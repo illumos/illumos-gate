@@ -126,7 +126,7 @@ struct filesignatures {
 #define	filesig_v3_data		_u2.filesig_v3.filesig_v3_data
 
 #define	filesig_ALIGN(s)	(((s) + sizeof (uint64_t) - 1) & \
-				    ~sizeof (uint64_t))
+				    (-sizeof (uint64_t)))
 #define	filesig_next(ptr)	(struct filesig *)((void *)((char *)(ptr) + \
 				    filesig_ALIGN((ptr)->filesig_size)))
 
