@@ -80,7 +80,7 @@
  * -nolib	Same as -xnolib
  * -noqueue	Disable queuing of compiler license requests
  * -norunpath	Do not build in a runtime path for shared libraries
- * -O		Use default optimization level (-xO2)
+ * -O		Use default optimization level (-xO2 or -xO3. Check man page.)
  * -o <outputfile> Set name of output file to <outputfile>
  * -P		Compile source through preprocessor only, output to .i  file
  * -PIC		Alias for -KPIC or -xcode=pic32
@@ -204,7 +204,7 @@
  * -nolib			-nodefaultlibs
  * -noqueue			ignore
  * -norunpath			ignore
- * -O				-O2
+ * -O				-O1 (Check the man page to be certain)
  * -o <outputfile>		pass-thru
  * -P				-E -o filename.i (or error)
  * -PIC				-fPIC (C++ only)
