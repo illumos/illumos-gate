@@ -130,6 +130,7 @@ main(ulong_t magic, ulong_t addr, ulong_t header)
 	init_biosprog();	/* install bios service program */
 	get_bootenv_props();	/* read bootenv.rc properties */
 	vga_probe();		/* probe bios for vga */
+	setup_bootprop();	/* set up boot properties for the kernel */
 
 	/*
 	 * Set console as per eeprom(1M) if not yet specified.
@@ -160,7 +161,6 @@ main(ulong_t magic, ulong_t addr, ulong_t header)
 			    "kernel/amd64/unix" : "kernel/unix";
 		}
 	}
-	setup_bootprop();	/* set up boot properties for the kernel */
 
 	printf("\n");
 	fd = openfile(bootfile, 0);	/* open the kernel file */

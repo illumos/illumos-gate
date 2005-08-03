@@ -36,6 +36,8 @@ static unsigned long	netmask;
 /* Used by nfs.c */
 char *hostname = "";
 int hostnamelen = 0;
+/* Used by fsys_tftp.c */
+int use_bios_pxe = 0;
 static uint32_t xid;
 static unsigned char *end_of_rfc1533 = NULL;
 static const unsigned char broadcast[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
@@ -667,6 +669,10 @@ int dhcp(void)
 	struct dhcpip_t ip;
 	unsigned long  starttime;
 
+	/* try bios pxe stack first */
+	if (dhcp_undi())
+		return 1;
+
 	if(!grub_eth_probe())
 		return 0;
 
@@ -1202,10 +1208,8 @@ ifconfig (char *ip, char *sm, char *gw, char *svr)
 void print_network_configuration (void)
 {
 	EnterFunction("print_network_configuration");
-	if (! grub_eth_probe ())
-		grub_printf ("No ethernet card found.\n");
-	else if (! network_ready)
-		grub_printf ("Not initialized yet.\n");
+	if (! network_ready)
+		grub_printf ("Network interface not initialized yet.\n");
 	else {
 		etherboot_printf ("Address: %@\n", arptable[ARP_CLIENT].ipaddr.s_addr);
 		etherboot_printf ("Netmask: %@\n", netmask);
@@ -1260,7 +1264,49 @@ void cleanup_net (void)
 {
 	if (network_ready){
 		/* Stop receiving packets.  */
-		eth_disable ();
+		if (use_bios_pxe)
+			undi_pxe_disable();
+		else
+			eth_disable ();
 		network_ready = 0;
 	}
+}
+
+/*******************************************************************
+ * dhcp implementation reusing the BIOS pxe stack
+ */
+static void
+dhcp_copy(struct dhcp_t *dhcpreply)
+{
+	unsigned long time;
+	int ret, len = DHCP_OPT_LEN;
+
+	/* fill in netinfo */
+	dhcpack_length = sizeof (struct dhcp_t);
+	memcpy((char *)dhcpack_buf, (char *)dhcpreply, dhcpack_length);
+
+	memcpy(arptable[ARP_CLIENT].node, dhcpreply->bp_hwaddr, ETH_ALEN);
+	arptable[ARP_CLIENT].ipaddr.s_addr = dhcpreply->bp_yiaddr.s_addr;
+	dhcp_addr.s_addr = dhcpreply->bp_yiaddr.s_addr;
+	netmask = default_netmask();
+	arptable[ARP_SERVER].ipaddr.s_addr = dhcpreply->bp_siaddr.s_addr;
+	memset(arptable[ARP_SERVER].node, 0, ETH_ALEN);  /* Kill arp */
+	arptable[ARP_GATEWAY].ipaddr.s_addr = dhcpreply->bp_giaddr.s_addr;
+	memset(arptable[ARP_GATEWAY].node, 0, ETH_ALEN);  /* Kill arp */
+	/* We don't care bootpreply->bp_file. It must be 'pxegrub' */
+	memcpy((char *)rfc1533_venddata, (char *)(dhcpreply->bp_vend), len);
+	decode_rfc1533(rfc1533_venddata, 0, len, 1);
+}
+
+int dhcp_undi(void)
+{
+	struct dhcp_t *dhcpreply;
+
+	if (!undi_bios_pxe((void **)&dhcpreply))
+		return 0;
+
+	dhcp_copy(dhcpreply);
+	network_ready = 1;
+	use_bios_pxe = 1;
+	return (1);
 }

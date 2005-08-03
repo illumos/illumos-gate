@@ -26,6 +26,9 @@ $Id: undi.c,v 1.8 2003/10/25 13:54:53 mcb30 Exp $
 #include "undi.h"
 /* 8259 PIC defines */
 #include "pic8259.h"
+#include "bootp.h"
+#include "tftp.h"
+#include "shared.h"
 
 /* NIC specific static variables go here */
 static undi_t undi = { NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -44,6 +47,7 @@ int eb_pxenv_undi_shutdown ( void );
 int eb_pxenv_stop_undi ( void );
 int undi_unload_base_code ( void );
 int undi_full_shutdown ( void );
+int eb_pxenv_get_cached_info (uint8_t, void **info);
 
 /**************************************************************************
  * Utility functions
@@ -1193,3 +1197,125 @@ struct pci_driver undi_driver = {
  	.id_count = sizeof(undi_nics)/sizeof(undi_nics[0]),
 	.class    = PCI_CLASS_NETWORK_ETHERNET,
 };
+
+/************************************************
+ * Code for reusing the BIOS provided pxe stack
+ */
+
+/* Verify !PXE structure saved by pxeloader. */
+int undi_bios_pxe(void **dhcpreply)
+{
+	pxe_t *pxe;
+	uint16_t *ptr = (uint16_t *)0x7C80;
+
+	pxe = (pxe_t *) VIRTUAL(ptr[0], ptr[1]);
+	if (memcmp(pxe->Signature, "!PXE", 4) != 0) {
+		DBG ("invalid !PXE signature at %x:%x\n", ptr[0], ptr[1]);
+		return 0;
+	}
+
+	if (checksum(pxe, sizeof(pxe_t)) != 0) {
+		DBG ("invalid checksum\n");
+		return 0;
+	}
+
+	/* Zero out global undi structure */
+	memset (&undi, 0, sizeof(undi));
+
+	/* Allocate base memory data structures */
+	if (! allocate_base_mem_data()) return 0;
+
+	undi.pxe = pxe;
+	pxe_dump();
+
+	if (!eb_pxenv_get_cached_info(PXENV_PACKET_TYPE_DHCP_ACK, dhcpreply)) {
+		DBG ("failed to get cached DHCP reply\n");
+		return 0;
+	}
+	return 1;
+}
+
+void undi_pxe_disable(void)
+{
+	/* full shutdown is problematic for some machines */
+	(void) eb_pxenv_undi_shutdown();
+}
+
+/*
+ * Various helper functions for dhcp and tftp
+ */
+int eb_pxenv_get_cached_info (uint8_t type, void **info)
+{
+	int success;
+
+	memset(undi.pxs, 0, sizeof (undi.pxs));
+	/* Segment:offset pointer to DestAddr in base memory */
+	undi.pxs->get_cached_info.PacketType = type;
+	undi.pxs->get_cached_info.BufferSize = 0;
+	undi.pxs->get_cached_info.Buffer.segment = 0;
+	undi.pxs->get_cached_info.Buffer.offset = 0;
+
+	success = undi_call(PXENV_GET_CACHED_INFO);
+	DBG ("PXENV_GET_CACHED_INFO <= Status=%s\n", UNDI_STATUS(undi.pxs));
+
+	*info = (void *)VIRTUAL(undi.pxs->get_cached_info.Buffer.segment,
+	    undi.pxs->get_cached_info.Buffer.offset);
+	return success;
+}
+
+/* tftp help routines */
+int eb_pxenv_tftp_open(char *file, IP4_t serverip, IP4_t gatewayip,
+    uint16_t *pktlen)
+{
+	int success;
+	memset(undi.pxs, 0, sizeof (undi.pxs));
+	undi.pxs->tftp_open.ServerIPAddress = serverip;
+	undi.pxs->tftp_open.GatewayIPAddress = gatewayip;
+	undi.pxs->tftp_open.TFTPPort = htons(TFTP_PORT);
+	undi.pxs->tftp_open.PacketSize = TFTP_MAX_PACKET;
+	(void) sprintf(undi.pxs->tftp_open.FileName, "%s", file);
+	success = undi_call(PXENV_TFTP_OPEN);
+	DBG ("PXENV_TFTP_OPEN <= Status=%s\n", UNDI_STATUS(undi.pxs));
+	*pktlen = undi.pxs->tftp_open.PacketSize;
+	return success;
+}
+
+int eb_pxenv_tftp_read(uint8_t *buf, uint16_t *len)
+{
+	static int tftp_count = 0;
+
+	int success;
+	memset(undi.pxs, 0, sizeof (undi.pxs));
+	undi.pxs->tftp_read.Buffer.segment = SEGMENT(buf);
+	undi.pxs->tftp_read.Buffer.offset = OFFSET(buf);
+	success = undi_call(PXENV_TFTP_READ);
+	DBG ("PXENV_TFTP_READ <= Status=%s\n", UNDI_STATUS(undi.pxs));
+	*len = undi.pxs->tftp_read.BufferSize;
+	tftp_count++;
+	if ((tftp_count % 1000) == 0)
+		printf(".");
+	return success;
+}
+
+int eb_pxenv_tftp_close(void)
+{
+	int success;
+	memset(undi.pxs, 0, sizeof (undi.pxs));
+	success = undi_call(PXENV_TFTP_CLOSE);
+	DBG ("PXENV_TFTP_CLOSE <= Status=%s\n", UNDI_STATUS(undi.pxs));
+	return success;
+}
+
+int eb_pxenv_tftp_get_fsize(char *file, IP4_t serverip, IP4_t gatewayip,
+    uint32_t *fsize)
+{
+	int success;
+	memset(undi.pxs, 0, sizeof (undi.pxs));
+	undi.pxs->tftp_open.ServerIPAddress = serverip;
+	undi.pxs->tftp_open.GatewayIPAddress = gatewayip;
+	(void) sprintf(undi.pxs->tftp_open.FileName, "%s", file);
+	success = undi_call(PXENV_TFTP_GET_FSIZE);
+	DBG ("PXENV_TFTP_GET_FSIZE <= Status=%s\n", UNDI_STATUS(undi.pxs));
+	*fsize = undi.pxs->tftp_get_fsize.FileSize;
+	return success;
+}

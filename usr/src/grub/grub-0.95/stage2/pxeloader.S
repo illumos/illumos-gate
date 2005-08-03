@@ -25,9 +25,27 @@
 	
 	/* Let's go */
 .globl _start; _start:
+	movw	%sp, %bp
+	movw	%ss:4(%bp), %ax
+	pushw	%ax
+	movw	%ss:6(%bp), %ax
+	pushw	%ax
+	call	1f
+1:	popw	%bx
+
+	/* Save !PXE address */
+	popw	%ax
+	movw	%ax, %cs:(pxeseg-1b)(%bx)
+	popw	%ax
+	movw	%ax, %cs:(pxeoff-1b)(%bx)
+	movw	%ax, %bx
 
 	/* Jump to the real world */
 	ljmp	$0, $0x8200
+
+	. = _start + 0x7C80 - 0x7C00
+pxeseg:	.word	0
+pxeoff:	.word	0
 
 	/* This region is a junk. Do you say that this is wasteful?
 	   But I like that the memory layout of the body is consistent

@@ -912,6 +912,10 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		len = ((value ^ (value-1)) + 1) >> 1;
 		regs[nreg].pci_size_low = assigned[nasgn].pci_size_low = len;
 		nreg++, nasgn++;
+		/* take it out of the memory resource */
+		if (*mem_res && base != 0)
+			(void) memlist_remove(mem_res,
+			    (uint64_t)base, (uint64_t)len);
 	}
 
 	/*

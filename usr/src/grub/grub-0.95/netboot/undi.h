@@ -78,6 +78,15 @@ typedef union pxenv_structure {
 	t_PXENV_UNDI_ISR		undi_isr;
 	t_PXENV_STOP_UNDI		stop_undi;
 	t_PXENV_UNLOAD_STACK		unload_stack;
+	t_PXENV_GET_CACHED_INFO		get_cached_info;
+	t_PXENV_UDP_OPEN		udp_open;
+	t_PXENV_UDP_CLOSE		udp_close;
+	t_PXENV_UDP_READ		udp_read;
+	t_PXENV_UDP_WRITE		udp_write;
+	t_PXENV_TFTP_OPEN		tftp_open;
+	t_PXENV_TFTP_CLOSE		tftp_close;
+	t_PXENV_TFTP_READ		tftp_read;
+	t_PXENV_TFTP_GET_FSIZE		tftp_get_fsize;
 } pxenv_structure_t;
 
 /* UNDI status codes

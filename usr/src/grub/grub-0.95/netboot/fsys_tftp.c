@@ -35,6 +35,15 @@ Author: Martin Renters
 #include "tftp.h"
 #include "nic.h"
 
+static int tftp_file_read_undi(const char *name,
+    int (*fnc)(unsigned char *, unsigned int, unsigned int, int));
+static int tftp_read_undi(char *addr, int size);
+static int tftp_dir_undi(char *dirname);
+static void tftp_close_undi(void);
+static int buf_fill_undi(int abort);
+
+extern int use_bios_pxe;
+
 static int retry;
 static unsigned short iport = 2000;
 static unsigned short oport = 0;
@@ -45,7 +54,7 @@ static int packetsize;
 static int buf_eof, buf_read;
 static int saved_filepos;
 static unsigned short len, saved_len;
-static char *buf;
+static char *buf, *saved_name;
 
 /**
  * tftp_read
@@ -77,6 +86,9 @@ int tftp_file_read(const char *name, int (*fnc)(unsigned char *, unsigned int, u
 	struct tftpreq_t tp;
 	struct tftp_t  *tr;
 	int		rc;
+
+	if (use_bios_pxe)
+		return (tftp_file_read_undi(name, fnc));
 
 	retry = 0;
 	block = 0;
@@ -226,6 +238,9 @@ buf_fill (int abort)
   grub_printf ("buf_fill (%d)\n", abort);
 #endif
   
+  if (use_bios_pxe)
+	return (buf_fill_undi(abort));
+
   while (! buf_eof && (buf_read + packetsize <= FSYS_BUFLEN))
     {
       struct tftp_t *tr;
@@ -491,6 +506,9 @@ tftp_read (char *addr, int size)
   grub_printf ("tftp_read (0x%x, %d)\n", (int) addr, size);
 #endif
   
+  if (use_bios_pxe)
+	return (tftp_read_undi(addr, size));
+
   if (filepos < saved_filepos)
     {
       /* Uggh.. FILEPOS has been moved backwards. So reopen the file.  */
@@ -583,6 +601,9 @@ tftp_dir (char *dirname)
   grub_printf ("tftp_dir (%s)\n", dirname);
 #endif
   
+  if (use_bios_pxe)
+	return (tftp_dir_undi(dirname));
+
   /* In TFTP, there is no way to know what files exist.  */
   if (print_possibilities)
     return 1;
@@ -658,6 +679,199 @@ tftp_close (void)
   grub_printf ("tftp_close ()\n");
 #endif
   
+  if (use_bios_pxe) {
+	tftp_close_undi();
+	return;
+  }
+
   buf_read = 0;
   buf_fill (1);
+}
+
+/* tftp implementation using BIOS established PXE stack */
+
+static int tftp_file_read_undi(const char *name,
+    int (*fnc)(unsigned char *, unsigned int, unsigned int, int))
+{
+	int rc;
+	uint16_t len;
+	
+	buf = (char *)&nic.packet;
+	/* open tftp session */
+	if (eb_pxenv_tftp_open(name, arptable[ARP_SERVER].ipaddr,
+	    arptable[ARP_GATEWAY].ipaddr, &packetsize) == 0)
+		return (0);
+
+	/* read blocks and invoke fnc for each block */
+	for (;;) {
+		rc = eb_pxenv_tftp_read(buf, &len);
+		if (rc == 0)
+			break;
+		rc = fnc(buf, ++block, len, len < packetsize);
+		if (rc <= 0 || len < packetsize)
+			break;
+	}
+
+	(void) eb_pxenv_tftp_close();
+	return (rc > 0 ? 1 : 0);
+}
+
+/* Fill the buffer by reading the data via the TFTP protocol.  */
+static int
+buf_fill_undi(int abort)
+{
+	int rc;
+	uint8_t *tmpbuf;
+
+	while (! buf_eof && (buf_read + packetsize <= FSYS_BUFLEN)) {
+		poll_interruptions();
+		if (user_abort)
+			return 0;
+		if (abort) {
+			buf_eof = 1;
+			break;
+		}
+
+		if (eb_pxenv_tftp_read(buf + buf_read, &len) == 0)
+			return (0);
+
+		buf_read += len;
+
+		/* End of data.  */
+		if (len < packetsize)		
+			buf_eof = 1;
+	}
+	return 1;
+}
+
+static void
+tftp_reopen_undi(void)
+{
+	tftp_close();
+	(void) eb_pxenv_tftp_open(saved_name, arptable[ARP_SERVER].ipaddr,
+	    arptable[ARP_GATEWAY].ipaddr, &packetsize);
+
+	buf_eof = 0;
+	buf_read = 0;
+	saved_filepos = 0;
+}
+
+/* Read up to SIZE bytes, returned in ADDR.  */
+static int
+tftp_read_undi(char *addr, int size)
+{
+	int ret = 0;
+
+	if (filepos < saved_filepos) {
+		/* Uggh.. FILEPOS has been moved backwards. reopen the file. */
+		tftp_reopen_undi();
+	}
+
+	while (size > 0) {
+		int amt = buf_read + saved_filepos - filepos;
+
+		/* If the length that can be copied from the buffer is over
+		   the requested size, cut it down. */
+		if (amt > size)
+			amt = size;
+
+		if (amt > 0) {
+			/* Copy the buffer to the supplied memory space.  */
+			grub_memmove (addr, buf + filepos - saved_filepos, amt);
+			size -= amt;
+			addr += amt;
+			filepos += amt;
+			ret += amt;
+
+			/* If the size of the empty space becomes small,
+			 * move the unused data forwards.
+			 */
+			if (filepos - saved_filepos > FSYS_BUFLEN / 2) {
+				grub_memmove (buf, buf + FSYS_BUFLEN / 2,
+				    FSYS_BUFLEN / 2);
+				buf_read -= FSYS_BUFLEN / 2;
+				saved_filepos += FSYS_BUFLEN / 2;
+			}
+		} else {
+			/* Skip the whole buffer.  */
+			saved_filepos += buf_read;
+			buf_read = 0;
+		}
+
+		/* Read the data.  */
+		if (size > 0 && ! buf_fill (0)) {
+			errnum = ERR_READ;
+			return 0;
+		}
+
+		/* Sanity check.  */
+		if (size > 0 && buf_read == 0) {
+			errnum = ERR_READ;
+			return 0;
+		}
+	}
+
+	return ret;
+}
+
+static int
+tftp_dir_undi(char *dirname)
+{
+	int rc, ch;
+	uint16_t len;
+
+	/* In TFTP, there is no way to know what files exist.  */
+	if (print_possibilities)
+		return 1;
+
+	/* name may be space terminated */
+	nul_terminate(dirname);
+	saved_name = (char *)&saved_tp;
+	sprintf(saved_name, "%s", dirname);
+
+  	/* Restore the original dirname */
+	dirname[grub_strlen (dirname)] = ch;
+
+	/* get the file size; must call before tftp_open */
+	rc = eb_pxenv_tftp_get_fsize(saved_name, arptable[ARP_SERVER].ipaddr,
+	    arptable[ARP_GATEWAY].ipaddr, &filemax);
+
+	/* open tftp session */
+	if (eb_pxenv_tftp_open(saved_name, arptable[ARP_SERVER].ipaddr,
+	    arptable[ARP_GATEWAY].ipaddr, &packetsize) == 0)
+		return (0);
+
+	buf = (char *) FSYS_BUF;
+	buf_eof = 0;
+	buf_read = 0;
+	saved_filepos = 0;
+
+	if (rc == 0) {
+		/* Read the entire file to get filemax */
+		filemax = 0;
+		do {
+			/* Add the length of the downloaded data.  */
+			filemax += buf_read;
+			buf_read = 0;
+			if (! buf_fill (0)) {
+				errnum = ERR_READ;
+				return 0;
+			}
+		} while (! buf_eof);
+
+		/* Maybe a few amounts of data remains.  */
+		filemax += buf_read;
+
+		tftp_reopen_undi(); /* reopen file to read from beginning */
+	}
+
+	return (1);
+}
+
+static void
+tftp_close_undi(void)
+{
+	buf_read = 0;
+	buf_fill (1);
+	(void) eb_pxenv_tftp_close();
 }
