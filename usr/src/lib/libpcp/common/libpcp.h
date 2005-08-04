@@ -33,10 +33,6 @@
 extern "C" {
 #endif
 
-#define	PCPL_MIN_XID		(0xFF)
-#define	PCPL_MAX_XID		(0xFFFFFFFF)
-#define	PCPL_INIT_XID		(0xFF)
-
 #define	PCPL_MAX_TRY_CNT	5
 #define	PCP_CLEANUP_TIMEOUT	3
 

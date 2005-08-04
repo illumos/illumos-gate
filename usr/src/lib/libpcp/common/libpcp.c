@@ -44,6 +44,7 @@
 #include <inttypes.h>
 #include <umem.h>
 #include <strings.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/glvc.h>
@@ -68,7 +69,7 @@
 static int pcp_send_req_msg_hdr(pcp_req_msg_hdr_t *req_hdr);
 static int pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr);
 static int pcp_io_op(void *buf, int byte_cnt, int io_op);
-static int pcp_get_xid(void);
+static uint32_t pcp_get_xid(void);
 static int pcp_get_prop(int channel_fd, int prop, unsigned int *val);
 static int pcp_read(uint8_t *buf, int buf_len);
 static int pcp_write(uint8_t *buf, int buf_len);
@@ -183,11 +184,6 @@ pcp_init(char *channel_name)
 	if ((channel_fd = open(channel_name, O_RDWR|O_EXCL)) < 0) {
 		return (PCPL_GLVC_ERROR);
 	}
-
-	/*
-	 * Initialize Message Transaction ID.
-	 */
-	msg_xid = PCPL_INIT_XID;
 
 	/*
 	 * Get the Channel MTU size
@@ -992,15 +988,35 @@ pcp_recv_resp_msg_hdr(pcp_resp_msg_hdr_t *resp_hdr)
  * Every request and response message are matched
  * for same xid.
  */
-static int pcp_get_xid(void)
+
+static uint32_t
+pcp_get_xid(void)
 {
 	uint32_t ret;
+	struct timeval tv;
+	static boolean_t xid_initialized = B_FALSE;
 
-	ret = msg_xid;
-	if (msg_xid == PCPL_MAX_XID)
-		msg_xid = PCPL_MIN_XID;
-	else
-		++msg_xid;
+	if (xid_initialized == B_FALSE) {
+		xid_initialized = B_TRUE;
+		/*
+		 * starting xid is initialized to a different value everytime
+		 * user application is restarted so that user apps will not
+		 * receive previous session's packets.
+		 *
+		 * Note: The algorithm for generating initial xid is partially
+		 *	 taken from Solaris rpc code.
+		 */
+		(void) gettimeofday(&tv, NULL);
+		msg_xid = (uint32_t)((tv.tv_sec << 20) |
+				(tv.tv_usec >> 10));
+	}
+
+	ret = msg_xid++;
+
+	/* zero xid is not allowed */
+	if (ret == 0)
+		ret = msg_xid++;
+
 	return (ret);
 }
 
