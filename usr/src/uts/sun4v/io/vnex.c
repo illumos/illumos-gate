@@ -398,6 +398,7 @@ vnex_add_intr(dev_info_t *dip, dev_info_t *rdip,
 	 */
 
 	cfg = SUN4V_REG_SPEC2CFG_HDL(reg_p->physaddr);
+	kmem_free(reg_p, reglen);
 	ino = hdlp->ih_vector;
 
 	/*

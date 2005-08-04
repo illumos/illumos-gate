@@ -94,10 +94,14 @@ mach_descrip_init(void)
 	(void) hv_mach_desc((uint64_t)0, &md_size);
 	MDP(("MD: buffer size is %d\n", md_size));
 
-		/* Round allocated space to nearest page */
+	/*
+	 * Align allocated space to nearest page contig_mem_alloc_align
+	 * requires a Power of 2 alignment
+	 */
 	machine_descrip.space = P2ROUNDUP(md_size, PAGESIZE);
 	MDP(("MD: allocated space is %d\n", machine_descrip.space));
-	machine_descrip.va = contig_mem_alloc(machine_descrip.space);
+	machine_descrip.va = contig_mem_alloc_align(machine_descrip.space,
+	    PAGESIZE);
 	if (machine_descrip.va == NULL)
 		cmn_err(CE_PANIC, "Allocation for machine description failed");
 

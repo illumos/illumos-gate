@@ -288,6 +288,7 @@ qcn_remove_intrs(void)
 		(void) ddi_intr_remove_handler(qcn_state->qcn_htable[x]);
 		(void) ddi_intr_free(qcn_state->qcn_htable[x]);
 	}
+	kmem_free(qcn_state->qcn_htable, qcn_state->qcn_intr_size);
 }
 
 static void
@@ -366,6 +367,8 @@ qcn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (ddi_intr_get_softint_pri(qcn_state->qcn_softint_hdl,
 		    &soft_prip) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "qcn_attach: softint_pri failed\n");
+			(void) ddi_intr_remove_softint(
+			    qcn_state->qcn_softint_hdl);
 			qcn_remove_intrs();
 			return (DDI_FAILURE);
 		}
@@ -844,7 +847,7 @@ qcn_trigger_softint(void)
 			mutex_exit(&qcn_state->qcn_softlock);
 			(void) ddi_intr_trigger_softint(
 			    qcn_state->qcn_softint_hdl, NULL);
-	} else
+		} else
 			mutex_exit(&qcn_state->qcn_softlock);
 	}
 }

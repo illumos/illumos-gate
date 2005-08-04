@@ -485,7 +485,7 @@ mach_dump_buffer_init(void)
 	if (hvdump_buf_sz > HVDUMP_SIZE_MAX)
 		hvdump_buf_sz = HVDUMP_SIZE_MAX;
 
-	hvdump_buf_va = contig_mem_alloc(hvdump_buf_sz);
+	hvdump_buf_va = contig_mem_alloc_align(hvdump_buf_sz, PAGESIZE);
 	if (hvdump_buf_va == NULL)
 		return;
 

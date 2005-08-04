@@ -515,11 +515,29 @@ contig_vmem_xalloc_aligned_wrapper(vmem_t *vmp, size_t size, int vmflag)
 	return (vmem_xalloc(vmp, size, size, 0, 0, NULL, NULL, vmflag));
 }
 
+/*
+ * conting_mem_alloc_align allocates real contiguous memory with the specified
+ * alignment upto contig_mem_slab_size. The alignment must be a power of 2.
+ */
+void *
+contig_mem_alloc_align(size_t size, size_t align)
+{
+	if ((align & (align - 1)) != 0)
+		return (NULL);
+
+	return (vmem_xalloc(contig_mem_arena, size, align, 0, 0,
+	    NULL, NULL, VM_NOSLEEP));
+}
+
+/*
+ * Allocates size aligned contiguous memory upto contig_mem_slab_size.
+ * Size must be a power of 2.
+ */
 void *
 contig_mem_alloc(size_t size)
 {
-	return (vmem_xalloc(contig_mem_arena, size, size, 0, 0,
-	    NULL, NULL, VM_NOSLEEP));
+	ASSERT((size & (size - 1)) == 0);
+	return (contig_mem_alloc_align(size, size));
 }
 
 void
