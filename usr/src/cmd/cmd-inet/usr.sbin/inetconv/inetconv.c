@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,8 +66,10 @@
 #define	ALT_CONFIG		"/etc/inetd.conf"
 
 #define	MANIFEST_DIR		"/var/svc/manifest/network"
-#define	MANIFEST_RPC_DIR	MANIFEST_DIR ## "/rpc"
+#define	MANIFEST_RPC_DIR	MANIFEST_DIR  "/rpc"
 #define	SVCCFG_PATH		"/usr/sbin/svccfg"
+
+#define	RPCBIND_FMRI		"svc:/network/rpc/bind"
 
 /* maximum allowed length of an inetd.conf format line */
 #define	MAX_SRC_LINELEN		32768
@@ -127,6 +129,15 @@ static const char xml_service_name[] =
 "	name='network/%s'\n"
 "	type='service'\n"
 "	version='1'>\n\n";
+
+static const char xml_dependency[] =
+"	<dependency\n"
+"		name='%s'\n"
+"		grouping='require_all'\n"
+"		restart_on='restart'\n"
+"		type='service'>\n"
+"		<service_fmri value='%s' />\n"
+"	</dependency>\n\n";
 
 static const char xml_instance[] =
 "	<create_default_instance enabled='true'/>\n\n";
@@ -720,6 +731,10 @@ print_manifest(FILE *f, char *filename, struct inetconfent *iconf)
 		goto print_err;
 	if (fprintf(f, xml_restarter, INETD_INSTANCE_FMRI) < 0)
 		goto print_err;
+	if (iconf->isrpc) {
+		if (fprintf(f, xml_dependency, "rpcbind", RPCBIND_FMRI) < 0)
+			goto print_err;
+	}
 
 	if (fprintf(f, xml_exec_method_start, START_METHOD_NAME, PR_EXEC_NAME,
 	    iconf->exec, PR_USER_NAME, iconf->username, iconf->groupname) < 0)

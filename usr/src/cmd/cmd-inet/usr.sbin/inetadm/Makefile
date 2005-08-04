@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +32,6 @@ OBJS =		$(SRCS:%.c=%.o)
 
 include ../../../Makefile.cmd
 
-XGETFLAGS =	-a
 LDLIBS +=	-lscf -luutil -linetsvc
 
 lint := LINTFLAGS = -ux
