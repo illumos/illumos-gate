@@ -21,9 +21,13 @@
  * CDDL HEADER END
  */
 %}
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 %{
 #ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 2.10	*/
@@ -31,7 +35,7 @@
 
 %{
 #include "awk.h"
-yywrap() { return(1); }
+int yywrap(void) { return(1); }
 #ifndef	DEBUG
 #	define	PUTS(x)
 #endif
@@ -39,8 +43,10 @@ Node	*beginloc = 0, *endloc = 0;
 int	infunc	= 0;	/* = 1 if in arglist or body of func */
 uchar	*curfname = 0;
 Node	*arglist = 0;	/* list of args for current function */
-uchar	*strnode();
-Node	*notnull();
+static void	setfname(Cell *);
+static int	constnode(Node *);
+static uchar	*strnode(Node *);
+static Node	*notnull();
 %}
 
 %union {
@@ -232,7 +238,7 @@ pattern:
 	| pattern and pattern %prec AND
 		{ $$ = op2(AND, notnull($1), notnull($3)); }
 	| NOT pattern
-		{ $$ = op1(NOT, op2(NE,$2,valtonode(lookup("$zero&null",symtab),CCON))); }
+		{ $$ = op1(NOT, op2(NE,$2,valtonode(lookup((uchar *)"$zero&null",symtab),CCON))); }
 	| pattern EQ pattern		{ $$ = op2($2, $1, $3); }
 	| pattern GE pattern		{ $$ = op2($2, $1, $3); }
 	| pattern GT pattern		{ $$ = op2($2, $1, $3); }
@@ -428,8 +434,8 @@ while:
 
 %%
 
-setfname(p)
-	Cell *p;
+static void
+setfname(Cell *p)
 {
 	if (isarr(p))
 		ERROR "%s is an array, not a function", p->nval SYNTAX;
@@ -438,20 +444,21 @@ setfname(p)
 	curfname = p->nval;
 }
 
-constnode(p)
-	Node *p;
+
+static int
+constnode(Node *p)
 {
 	return p->ntype == NVALUE && ((Cell *) (p->narg[0]))->csub == CCON;
 }
 
-uchar *strnode(p)
-	Node *p;
+static uchar *
+strnode(Node *p)
 {
 	return ((Cell *)(p->narg[0]))->sval;
 }
 
-Node *notnull(n)
-	Node *n;
+static Node *
+notnull(Node *n)
 {
 	switch (n->nobj) {
 	case LE: case LT: case EQ: case NE: case GT: case GE:

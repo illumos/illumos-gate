@@ -1,15 +1,4 @@
 %{
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-%}
-%{
-/*	  All Rights Reserved  	*/
-%}
-
-%{
-/*								*/
-%}
-
-%{
 /*
  * CDDL HEADER START
  *
@@ -31,15 +20,18 @@
  *
  * CDDL HEADER END
  */
-/* Copyright (c) 1996, 2001 by Sun Microsystems, Inc.           */
-/* All rights reserved.                                         */
-%}
-%{
-/*								*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 %}
 
 %{
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 2.9	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 %}
 
 %Start A str sc reg comment
@@ -52,6 +44,9 @@
 
 #undef	input	/* defeat lex */
 #undef	unput
+
+static void unput(int);
+static void unputstr(char *);
 
 extern YYSTYPE	yylval;
 extern int	infunc;
@@ -67,15 +62,23 @@ int	parencnt = 0;
 #	define	RET(x)	return(x)
 #endif
 
+/*
+ * The standards (SUSV2) requires that Record size be atleast LINE_MAX.
+ * LINE_MAX is a standard variable defined in limits.h.
+ * Though nawk is not standards compliant, we let RECSIZE
+ * grow with LINE_MAX instead of the magic number 1024.
+ */
+#define	CBUFLEN	(3 * LINE_MAX)
+
 #define	CADD	cbuf[clen++] = yytext[0]; \
-		if (clen >= RECSIZE-1) { \
+		if (clen >= CBUFLEN-1) { \
 			ERROR "string/reg expr %.10s... too long", cbuf SYNTAX; \
 			BEGIN A; \
 		}
 
-uchar	cbuf[RECSIZE];
-uchar	*s;
-int	clen, cflag;
+static uchar	cbuf[CBUFLEN];
+static uchar	*s;
+static int	clen, cflag;
 %}
 
 A	[a-zA-Z_]
@@ -138,15 +141,16 @@ WS	[ \t]
 			unputstr(yytext+1);
 			return(INDIRECT);
 		  } else {
-			yylval.cp = setsymtab(yytext+1,"",0.0,STR|NUM,symtab);
+			yylval.cp = setsymtab((uchar *)yytext+1,
+				(uchar *)"",0.0,STR|NUM,symtab);
 			RET(IVAR);
 		  }
 		}
 <A>"$"		{ RET(INDIRECT); }
-<A>NF		{ yylval.cp = setsymtab(yytext, "", 0.0, NUM, symtab); RET(VARNF); }
+<A>NF		{ yylval.cp = setsymtab((uchar *)yytext, (uchar *)"", 0.0, NUM, symtab); RET(VARNF); }
 
 <A>({D}+("."?){D}*|"."{D}+)((e|E)("+"|-)?{D}+)?	{
-		  yylval.cp = setsymtab(yytext, tostring(yytext), atof(yytext), CON|NUM, symtab);
+		  yylval.cp = setsymtab((uchar *)yytext, tostring((uchar *)yytext), atof(yytext), CON|NUM, symtab);
 		  RET(NUMBER); }
 
 <A>while	{ RET(WHILE); }
@@ -191,7 +195,8 @@ WS	[ \t]
 			yylval.i = n;
 			RET(ARG);
 		  } else {
-			yylval.cp = setsymtab(yytext,"",0.0,STR|NUM,symtab);
+			yylval.cp = setsymtab((uchar *)yytext,
+				(uchar *)"",0.0,STR|NUM,symtab);
 			if (c == '(') {
 				RET(CALL);
 			} else {
@@ -243,6 +248,7 @@ WS	[ \t]
 
 %%
 
+void
 startreg()
 {
 	BEGIN reg;
@@ -257,7 +263,8 @@ startreg()
 uchar	ebuf[300];
 uchar	*ep = ebuf;
 
-input()
+int
+input(void)
 {
 	register int c;
 	extern uchar *lexprog;
@@ -277,7 +284,8 @@ input()
 	return *ep++ = c;
 }
 
-unput(c)
+static void
+unput(int c)
 {
 	yytchar = c;
 	if (yytchar == '\n')
@@ -288,8 +296,8 @@ unput(c)
 }
 
 
-unputstr(s)
-	char *s;
+static void
+unputstr(char *s)
 {
 	int i;
 

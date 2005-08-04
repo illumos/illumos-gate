@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,12 +123,6 @@ main()
 
 	printf("#include \"awk.h\"\n");
 	printf("#include \"y.tab.h\"\n\n");
-	printf("Cell *nullproc();\n");
-	for (i = SIZE; --i >= 0; )
-		names[i] = "";
-	for (p = proc; p->token != 0; p++)
-		if (p == proc || strcmp(p->name, (p-1)->name))
-			printf("extern Cell *%s();\n", p->name);
 
 	if ((fp = fopen("y.tab.h", "r")) == NULL) {
 		fprintf(stderr, gettext("maketab can't open y.tab.h!\n"));
@@ -163,12 +157,12 @@ main()
 			printf("\t%s,\t/* %s */\n", table[i], names[i]);
 	printf("};\n\n");
 
-	printf("uchar *tokname(n)\n");	/* print a tokname() function */
+	printf("uchar *\ntokname(int n)\n");	/* print a tokname() function */
 	printf("{\n");
-	printf("	static uchar buf[100];\n\n");
+	printf("	static char buf[100];\n\n");
 	printf("	if (n < FIRSTTOKEN || n > LASTTOKEN) {\n");
-	printf("		sprintf(buf, \"token %%d\", n);\n");
-	printf("		return buf;\n");
+	printf("		(void) sprintf(buf, \"token %%d\", n);\n");
+	printf("		return ((uchar *)buf);\n");
 	printf("	}\n");
 	printf("	return printname[n-257];\n");
 	printf("}\n");

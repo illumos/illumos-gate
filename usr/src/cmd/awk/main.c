@@ -19,15 +19,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 2.12	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -45,24 +46,20 @@ char	*version = "version Oct 11, 1989";
 
 int	dbg	= 0;
 uchar	*cmdname;	/* gets argv[0] for error messages */
-extern	FILE	*yyin;	/* lex input file */
 uchar	*lexprog;	/* points to program argument if it exists */
-extern	int errorflag;	/* non-zero if any syntax errors; set by yyerror */
 int	compile_time = 2;	/* for error printing: */
 				/* 2 = cmdline, 1 = compile, 0 = running */
-
-uchar	*pfile[20];	/* program filenames from -f's */
-int	npfile = 0;	/* number of filenames */
-int	curpfile = 0;	/* current filename */
 char	radixpoint = '.';
 
-main(argc, argv, envp)
-	int argc;
-	uchar *argv[], *envp[];
+static uchar	**pfile = NULL;	/* program filenames from -f's */
+static int	npfile = 0;	/* number of filenames */
+static int	curpfile = 0;	/* current filename */
+
+int
+main(int argc, char *argv[], char *envp[])
 {
 	uchar *fs = NULL;
 	char	*nl_radix;
-	extern void fpecatch();
 	/*
 	 * At this point, numbers are still scanned as in
 	 * the POSIX locale.
@@ -74,14 +71,14 @@ main(argc, argv, envp)
 #define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it weren't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-	cmdname = argv[0];
+	cmdname = (uchar *)argv[0];
 	if (argc == 1) {
-		fprintf(stderr, gettext(
-			"Usage: %s [-f programfile | 'program'] [-Ffieldsep] "
-			"[-v var=value] [files]\n"), cmdname);
+		(void) fprintf(stderr, gettext(
+		    "Usage: %s [-f programfile | 'program'] [-Ffieldsep] "
+		    "[-v var=value] [files]\n"), cmdname);
 		exit(1);
 	}
-	signal(SIGFPE, fpecatch);
+	(void) signal(SIGFPE, fpecatch);
 	yyin = NULL;
 	syminit();
 	while (argc > 1 && argv[1][0] == '-' && argv[1][1] != '\0') {
@@ -97,7 +94,10 @@ main(argc, argv, envp)
 			argv++;
 			if (argc <= 1)
 				ERROR "no program filename" FATAL;
-			pfile[npfile++] = argv[1];
+			pfile = realloc(pfile, sizeof (uchar *) * (npfile + 1));
+			if (pfile == NULL)
+				ERROR "out of space in main" FATAL;
+			pfile[npfile++] = (uchar *)argv[1];
 			break;
 		case 'F':	/* set field separator */
 			if (argv[1][2] != 0) {	/* arg is -Fsomething */
@@ -105,16 +105,16 @@ main(argc, argv, envp)
 				if (argv[1][2] == 't' && argv[1][3] == 0)
 					fs = (uchar *) "\t";
 				else if (argv[1][2] != 0)
-					fs = &argv[1][2];
+					fs = (uchar *)&argv[1][2];
 			} else {		/* arg is -F something */
 				argc--; argv++;
 				if (argc > 1) {
 					/* wart: t=>\t */
 					if (argv[1][0] == 't' &&
-						argv[1][1] == 0)
+					    argv[1][1] == 0)
 						fs = (uchar *) "\t";
 					else if (argv[1][0] != 0)
-						fs = &argv[1][0];
+						fs = (uchar *)&argv[1][0];
 				}
 			}
 			if (fs == NULL || *fs == '\0')
@@ -122,14 +122,14 @@ main(argc, argv, envp)
 			break;
 		case 'v':	/* -v a=1 to be done NOW.  one -v for each */
 			if (argv[1][2] == '\0' && --argc > 1 &&
-				isclvar((++argv)[1]))
-				setclvar(argv[1]);
+			    isclvar((uchar *)(++argv)[1]))
+				setclvar((uchar *)argv[1]);
 			break;
 		case 'd':
 			dbg = atoi(&argv[1][2]);
 			if (dbg == 0)
 				dbg = 1;
-			printf("awk %s\n", version);
+			(void) printf("awk %s\n", version);
 			break;
 		default:
 			ERROR "unknown option %s ignored", argv[1] WARNING;
@@ -143,18 +143,18 @@ main(argc, argv, envp)
 		if (argc <= 1)
 			ERROR "no program given" FATAL;
 		dprintf(("program = |%s|\n", argv[1]));
-		lexprog = argv[1];
+		lexprog = (uchar *)argv[1];
 		argc--;
 		argv++;
 	}
 	compile_time = 1;
-	argv[0] = cmdname;	/* put prog name at front of arglist */
+	argv[0] = (char *)cmdname;	/* put prog name at front of arglist */
 	dprintf(("argc=%d, argv[0]=%s\n", argc, argv[0]));
-	arginit(argc, argv);
-	envinit(envp);
+	arginit(argc, (uchar **)argv);
+	envinit((uchar **)envp);
 	yyparse();
 	if (fs)
-		*FS = tostring(qstring(fs, '\0'));
+		*FS = qstring(fs, '\0');
 	dprintf(("errorflag=%d\n", errorflag));
 	/*
 	 * done parsing, so now activate the LC_NUMERIC
@@ -169,10 +169,11 @@ main(argc, argv, envp)
 		run(winner);
 	} else
 		bracecheck();
-	exit(errorflag);
+	return (errorflag);
 }
 
-pgetc()		/* get program character */
+int
+pgetc(void)		/* get program character */
 {
 	int c;
 
@@ -180,14 +181,16 @@ pgetc()		/* get program character */
 		if (yyin == NULL) {
 			if (curpfile >= npfile)
 				return (EOF);
-			yyin = (strcmp((char *) pfile[curpfile], "-") == 0) ?
-				stdin : fopen((char *) pfile[curpfile], "r");
-			if (yyin == NULL)
+			yyin = (strcmp((char *)pfile[curpfile], "-") == 0) ?
+			    stdin : fopen((char *)pfile[curpfile], "r");
+			if (yyin == NULL) {
 				ERROR "can't open file %s",
-					pfile[curpfile] FATAL;
+				    pfile[curpfile] FATAL;
+			}
 		}
 		if ((c = getc(yyin)) != EOF)
 			return (c);
+		(void) fclose(yyin);
 		yyin = NULL;
 		curpfile++;
 	}

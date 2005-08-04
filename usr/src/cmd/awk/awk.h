@@ -19,17 +19,26 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-/*
- * Copyright (c) 1996, 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
+#ifndef AWK_H
+#define	AWK_H
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 2.13	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <libintl.h>
 #include <limits.h>
 
 typedef double	Awkfloat;
@@ -40,27 +49,31 @@ typedef	unsigned char uchar;
 #define	DEBUG
 #ifdef	DEBUG
 			/* uses have to be doubly parenthesized */
-#	define	dprintf(x)	if (dbg) printf x
+#define	dprintf(x)	if (dbg) (void) printf x
 #else
-#	define	dprintf(x)
+#define	dprintf(x)
 #endif
 
 extern	char	errbuf[200];
-#define	ERROR	sprintf(errbuf,
+extern	void	error(int, char *);
+#define	ERROR	(void) snprintf(errbuf, sizeof (errbuf),
+/*CSTYLED*/
 #define	FATAL	), error(1, errbuf)
+/*CSTYLED*/
 #define	WARNING	), error(0, errbuf)
+/*CSTYLED*/
 #define	SYNTAX	), yyerror(errbuf)
+/*CSTYLED*/
+#define	CONT	)
 
 extern int	compile_time;	/* 1 if compiling, 0 if running */
 
-/* The standards (SUSV2) requires that Record size be atleast LINE_MAX.
- * LINE_MAX is standard variable defined in limits.h.
- * Though nawk is not standards compliant, we let RECSIZE
- * grow with LINE_MAX instead of magic number 1024.
- */
-#define	RECSIZE	(3 * LINE_MAX)	/* sets limit on records, fields, etc., etc. */
+#define	FLD_INCR	64
+#define	LINE_INCR	256
 
-#define	MAXFLD	500
+/* ensure that there is extra 1 byte in the buffer */
+#define	expand_buf(p, n, r)	\
+	if (*(n) == 0 || (r) >= (*(n) - 1)) r_expand_buf(p, n, r)
 
 extern uchar	**FS;
 extern uchar	**RS;
@@ -76,13 +89,10 @@ extern Awkfloat *RSTART;
 extern Awkfloat *RLENGTH;
 
 extern uchar	*record;
-extern int	dbg;
-extern off_t	lineno;
+extern size_t	record_size;
 extern int	errorflag;
 extern int	donefld;	/* 1 if record broken into fields */
 extern int	donerec;	/* 1 if record is valid (no fld has changed */
-
-extern uchar	cbuf[RECSIZE];	/* miscellaneous character collection */
 
 extern	uchar	*patbeg;	/* beginning of pattern matched */
 extern	int	patlen;		/* length.  set in b.c */
@@ -95,7 +105,8 @@ typedef struct Cell {
 	uchar	*nval;		/* name, for variables only */
 	uchar	*sval;		/* string value */
 	Awkfloat fval;		/* value as number */
-	unsigned tval;		/* type info: STR|NUM|ARR|FCN|FLD|CON|DONTFREE */
+	unsigned tval;
+		/* type info: STR|NUM|ARR|FCN|FLD|CON|DONTFREE */
 	struct Cell *cnext;	/* ptr to next if chained */
 } Cell;
 
@@ -106,8 +117,9 @@ typedef struct {		/* symbol table array */
 } Array;
 
 #define	NSYMTAB	50	/* initial size of a symbol table */
-extern Array	*symtab, *makesymtab();
-extern Cell	*setsymtab(), *lookup();
+extern Array	*symtab, *makesymtab(int);
+extern Cell	*setsymtab(uchar *, uchar *, Awkfloat, unsigned int, Array *);
+extern Cell	*lookup(uchar *, Array *);
 
 extern Cell	*recloc;	/* location of input record */
 extern Cell	*nrloc;		/* NR */
@@ -119,20 +131,23 @@ extern Cell	*rlengthloc;	/* RLENGTH */
 /* Cell.tval values: */
 #define	NUM	01	/* number value is valid */
 #define	STR	02	/* string value is valid */
-#define DONTFREE 04	/* string space is not freeable */
+#define	DONTFREE 04	/* string space is not freeable */
 #define	CON	010	/* this is a constant */
 #define	ARR	020	/* this is an array */
 #define	FCN	040	/* this is a function name */
-#define FLD	0100	/* this is a field $1, $2, ... */
+#define	FLD	0100	/* this is a field $1, $2, ... */
 #define	REC	0200	/* this is $0 */
 
-#define freeable(p)	(!((p)->tval & DONTFREE))
+#define	freeable(p)	(!((p)->tval & DONTFREE))
 
-Awkfloat setfval(), getfval();
-uchar	*setsval(), *getsval();
-uchar	*tostring(), *tokname(), *qstring();
+extern Awkfloat setfval(Cell *, Awkfloat), getfval(Cell *), r_getfval(Cell *);
+extern uchar	*setsval(Cell *, uchar *), *getsval(Cell *), *r_getsval(Cell *);
+extern uchar	*tostring(uchar *), *tokname(int), *qstring(uchar *, int);
 
-double	log(), sqrt(), exp(), atof();
+#define	getfval(p)	\
+	(((p)->tval & (ARR|FLD|REC|NUM)) == NUM ? (p)->fval : r_getfval(p))
+#define	getsval(p)	\
+	(((p)->tval & (ARR|FLD|REC|STR)) == STR ? (p)->sval : r_getsval(p))
 
 /* function types */
 #define	FLENGTH	1
@@ -156,74 +171,81 @@ typedef struct Node {
 	struct	Node *nnext;
 	off_t lineno;
 	int	nobj;
-	struct Node *narg[1];	/* variable: actual size set by calling malloc */
+	struct Node *narg[1];
+		/* variable: actual size set by calling malloc */
 } Node;
 
-#define	NIL	((Node *) 0)
+#define	NIL	((Node *)0)
 
 extern Node	*winner;
 extern Node	*nullstat;
 extern Node	*nullnode;
 
 /* ctypes */
-#define OCELL	1
-#define OBOOL	2
-#define OJUMP	3
+#define	OCELL	1
+#define	OBOOL	2
+#define	OJUMP	3
 
 /* Cell subtypes: csub */
 #define	CFREE	7
-#define CCOPY	6
-#define CCON	5
-#define CTEMP	4
-#define CNAME	3 
-#define CVAR	2
-#define CFLD	1
+#define	CCOPY	6
+#define	CCON	5
+#define	CTEMP	4
+#define	CNAME	3
+#define	CVAR	2
+#define	CFLD	1
 
 /* bool subtypes */
-#define BTRUE	11
-#define BFALSE	12
+#define	BTRUE	11
+#define	BFALSE	12
 
 /* jump subtypes */
-#define JEXIT	21
-#define JNEXT	22
+#define	JEXIT	21
+#define	JNEXT	22
 #define	JBREAK	23
 #define	JCONT	24
 #define	JRET	25
 
 /* node types */
-#define NVALUE	1
-#define NSTAT	2
-#define NEXPR	3
+#define	NVALUE	1
+#define	NSTAT	2
+#define	NEXPR	3
 #define	NFIELD	4
 
-extern	Cell	*(*proctab[])();
-extern	Cell	*nullproc();
+extern	Cell	*(*proctab[])(Node **, int);
+extern	Cell	*nullproc(Node **, int);
 extern	int	pairstack[], paircnt;
-extern	Cell	*fieldadr();
 
-extern	Node	*stat1(), *stat2(), *stat3(), *stat4(), *pa2stat();
-extern	Node	*op1(), *op2(), *op3(), *op4();
-extern	Node	*linkum(), *valtonode(), *rectonode(), *exptostat();
-extern	Node	*makearr();
+extern	Node	*stat1(int, Node *), *stat2(int, Node *, Node *);
+extern	Node	*stat3(int, Node *, Node *, Node *);
+extern	Node	*stat4(int, Node *, Node *, Node *, Node *);
+extern	Node	*pa2stat(Node *, Node *, Node *);
+extern	Node	*op1(int, Node *), *op2(int, Node *, Node *);
+extern	Node	*op3(int, Node *, Node *, Node *);
+extern	Node	*op4(int, Node *, Node *, Node *, Node *);
+extern	Node	*linkum(Node *, Node *), *valtonode(Cell *, int);
+extern	Node	*rectonode(void), *exptostat(Node *);
+extern	Node	*makearr(Node *);
 
-#define notlegal(n)	(n <= FIRSTTOKEN || n >= LASTTOKEN || proctab[n-FIRSTTOKEN] == nullproc)
-#define isvalue(n)	((n)->ntype == NVALUE)
-#define isexpr(n)	((n)->ntype == NEXPR)
-#define isjump(n)	((n)->ctype == OJUMP)
-#define isexit(n)	((n)->csub == JEXIT)
+#define	notlegal(n)	\
+	(n <= FIRSTTOKEN || n >= LASTTOKEN || proctab[n-FIRSTTOKEN] == nullproc)
+#define	isvalue(n)	((n)->ntype == NVALUE)
+#define	isexpr(n)	((n)->ntype == NEXPR)
+#define	isjump(n)	((n)->ctype == OJUMP)
+#define	isexit(n)	((n)->csub == JEXIT)
 #define	isbreak(n)	((n)->csub == JBREAK)
 #define	iscont(n)	((n)->csub == JCONT)
 #define	isnext(n)	((n)->csub == JNEXT)
 #define	isret(n)	((n)->csub == JRET)
-#define isstr(n)	((n)->tval & STR)
-#define isnum(n)	((n)->tval & NUM)
-#define isarr(n)	((n)->tval & ARR)
-#define isfunc(n)	((n)->tval & FCN)
-#define istrue(n)	((n)->csub == BTRUE)
-#define istemp(n)	((n)->csub == CTEMP)
+#define	isstr(n)	((n)->tval & STR)
+#define	isnum(n)	((n)->tval & NUM)
+#define	isarr(n)	((n)->tval & ARR)
+#define	isfunc(n)	((n)->tval & FCN)
+#define	istrue(n)	((n)->csub == BTRUE)
+#define	istemp(n)	((n)->csub == CTEMP)
 
-#define NCHARS	(256+1)
-#define NSTATES	32
+#define	NCHARS	(256+1)
+#define	NSTATES	32
 
 typedef struct rrow {
 	int	ltype;
@@ -245,4 +267,105 @@ typedef struct fa {
 	struct	rrow re[1];
 } fa;
 
-extern	fa	*makedfa();
+/* b.c */
+extern	fa	*makedfa(uchar *, int);
+extern	int	nematch(fa *, uchar *);
+extern	int	match(fa *, uchar *);
+extern	int	pmatch(fa *, uchar *);
+
+/* lib.c */
+extern	int	isclvar(uchar *);
+extern	int	is_number(uchar *);
+extern	void	setclvar(uchar *);
+extern	int	readrec(uchar **, size_t *, FILE *);
+extern	void	bracecheck(void);
+extern	void	syminit(void);
+extern	void	yyerror(char *);
+extern	void	fldbld(void);
+extern	void	recbld(void);
+extern	int	getrec(uchar **, size_t *);
+extern	Cell	*fieldadr(int);
+extern	void	newfld(int);
+extern	Cell	*getfld(int);
+extern	int	fldidx(Cell *);
+extern	double	errcheck(double, char *);
+extern	void	fpecatch(int);
+extern	void	init_buf(uchar **, size_t *, size_t);
+extern	void	adjust_buf(uchar **, size_t);
+extern	void	r_expand_buf(uchar **, size_t *, size_t);
+
+extern	int	donefld;
+extern	int	donerec;
+extern	uchar	*recdata;
+extern	uchar	*record;
+extern	size_t	record_size;
+
+/* main.c */
+extern	int	dbg;
+extern	uchar	*cmdname;
+extern	uchar	*lexprog;
+extern	int	compile_time;
+extern	char	radixpoint;
+
+/* tran.c */
+extern	void	syminit(void);
+extern	void	arginit(int, uchar **);
+extern	void	envinit(uchar **);
+extern	void	freesymtab(Cell *);
+extern	void	freeelem(Cell *, uchar *);
+extern	void	funnyvar(Cell *, char *);
+extern	int	hash(uchar *, int);
+extern	Awkfloat *ARGC;
+
+/* run.c */
+extern	void	run(Node *);
+
+extern	int	paircnt;
+extern	Node	*winner;
+
+#ifndef input
+extern	int	input(void);
+#endif
+extern	int	yyparse(void);
+extern	FILE	*yyin;
+extern	off_t	lineno;
+
+/* proc */
+extern Cell *nullproc(Node **, int);
+extern Cell *program(Node **, int);
+extern Cell *boolop(Node **, int);
+extern Cell *relop(Node **, int);
+extern Cell *array(Node **, int);
+extern Cell *indirect(Node **, int);
+extern Cell *substr(Node **, int);
+extern Cell *sub(Node **, int);
+extern Cell *gsub(Node **, int);
+extern Cell *sindex(Node **, int);
+extern Cell *asprintf(Node **, int);
+extern Cell *arith(Node **, int);
+extern Cell *incrdecr(Node **, int);
+extern Cell *cat(Node **, int);
+extern Cell *pastat(Node **, int);
+extern Cell *dopa2(Node **, int);
+extern Cell *matchop(Node **, int);
+extern Cell *intest(Node **, int);
+extern Cell *aprintf(Node **, int);
+extern Cell *print(Node **, int);
+extern Cell *closefile(Node **, int);
+extern Cell *delete(Node **, int);
+extern Cell *split(Node **, int);
+extern Cell *assign(Node **, int);
+extern Cell *condexpr(Node **, int);
+extern Cell *ifstat(Node **, int);
+extern Cell *whilestat(Node **, int);
+extern Cell *forstat(Node **, int);
+extern Cell *dostat(Node **, int);
+extern Cell *instat(Node **, int);
+extern Cell *jump(Node **, int);
+extern Cell *bltin(Node **, int);
+extern Cell *call(Node **, int);
+extern Cell *arg(Node **, int);
+extern Cell *getnf(Node **, int);
+extern Cell *getline(Node **, int);
+
+#endif /* AWK_H */

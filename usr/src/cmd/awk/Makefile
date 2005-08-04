@@ -22,8 +22,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989,1996,2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/awk/Makefile
 #
@@ -49,6 +49,7 @@ XGETFLAGS += -a -x awk.xcl
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 YFLAGS += -d
 LDLIBS += -lm
+LINTFLAGS += -u
 CLEANFILES= maketab proctab.c awk.g.c awk.lx.c y.tab.h
 
 .KEEP_STATE:
@@ -79,7 +80,7 @@ install: all $(ROOTPROG) $(ROOTLINK)
 clean:
 	$(RM) $(OBJS) $(CLEANFILES)
 
-lint: lint_SRCS
+lint: awk.g.c lint_SRCS
 
 awk.g.c + y.tab.h: awk.g.y
 
