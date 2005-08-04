@@ -157,11 +157,13 @@ struct px {
 #define	PX_SOFT_STATE_CLOSED		0x04
 #define	PX_BYPASS_DMA_ALLOWED		0x10
 
-/* px_pm_flags definitions */
-#define	PX_PMETOACK_RECVD		0x1
-#define	PX_PME_TURNOFF_PENDING		0x2
-#define	PX_LINKUP_RECVD			0x4
-#define	PX_LINKUP_PENDING		0x8
+/* px_pm_flags definitions used with interrupts and FMA code */
+#define	PX_PMETOACK_RECVD		0x01 /* With PME_To_ACK interrupt */
+#define	PX_PME_TURNOFF_PENDING		0x02 /* With PME_To_ACK interrupt */
+#define	PX_LINKUP_RECVD			0x04 /* With link up soft interrupt */
+#define	PX_LINKUP_PENDING		0x08 /* With link up soft interrupt */
+#define	PX_LUP_EXPECTED			0x10 /* With FMA code */
+#define	PX_LDN_EXPECTED			0x20 /* With FMA code */
 
 #define	DIP_TO_INST(dip)	ddi_get_instance(dip)
 #define	INST_TO_STATE(inst)	ddi_get_soft_state(px_state_p, inst)

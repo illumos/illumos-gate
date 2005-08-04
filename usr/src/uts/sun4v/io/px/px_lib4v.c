@@ -710,13 +710,13 @@ px_lib_get_msiq_rec(dev_info_t *dip, px_msiq_t *msiq_p, msiq_rec_t *msiq_rec_p)
 
 	DBG(DBG_LIB_MSIQ, dip, "px_lib_get_msiq_rec: dip 0x%p\n", dip);
 
-	if (!curr_msiq_rec_p->msiq_rec_rid)
+	if (!curr_msiq_rec_p->msiq_rec_type)
 		return;
 
 	*msiq_rec_p = *curr_msiq_rec_p;
 
-	/* Zero out msiq_rec_rid field */
-	curr_msiq_rec_p->msiq_rec_rid  = 0;
+	/* Zero out msiq_rec_type field */
+	curr_msiq_rec_p->msiq_rec_type  = 0;
 }
 
 /*

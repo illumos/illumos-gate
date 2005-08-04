@@ -892,9 +892,9 @@ px_lib_get_msiq_rec(dev_info_t *dip, px_msiq_t *msiq_p, msiq_rec_t *msiq_rec_p)
 	DBG(DBG_LIB_MSIQ, dip, "px_lib_get_msiq_rec: dip 0x%p eq_rec_p 0x%p\n",
 	    dip, eq_rec_p);
 
-	if (!eq_rec_p->eq_rec_rid) {
-		/* Set msiq_rec_rid to zero */
-		msiq_rec_p->msiq_rec_rid = 0;
+	if (!eq_rec_p->eq_rec_fmt_type) {
+		/* Set msiq_rec_type to zero */
+		msiq_rec_p->msiq_rec_type = 0;
 
 		return;
 	}
@@ -945,8 +945,8 @@ px_lib_get_msiq_rec(dev_info_t *dip, px_msiq_t *msiq_p, msiq_rec_t *msiq_rec_p)
 	msiq_rec_p->msiq_rec_msi_addr = ((eq_rec_p->eq_rec_addr1 << 16) |
 	    (eq_rec_p->eq_rec_addr0 << 2));
 
-	/* Zero out eq_rec_rid field */
-	eq_rec_p->eq_rec_rid = 0;
+	/* Zero out eq_rec_fmt_type field */
+	eq_rec_p->eq_rec_fmt_type = 0;
 }
 
 /*
@@ -1627,6 +1627,8 @@ px_lib_pmctl(int cmd, px_t *px_p)
 	}
 }
 
+#define	MSEC_TO_USEC	1000
+
 /*
  * sends PME_Turn_Off message to put the link in L2/L3 ready state.
  * called by px_ioctl.
@@ -1656,6 +1658,17 @@ px_goto_l23ready(px_t *px_p)
 	mutex_enter(&px_p->px_l23ready_lock);
 	/* Clear the PME_To_ACK receieved flag */
 	px_p->px_pm_flags &= ~PX_PMETOACK_RECVD;
+	/*
+	 * When P25 is the downstream device, after receiving
+	 * PME_To_ACK, fire will go to Detect state, which causes
+	 * the link down event. Inform FMA that this is expected.
+	 * In case of all other cards complaint with the pci express
+	 * spec, this will happen when the power is re-applied. FMA
+	 * code will clear this flag after one instance of LDN. Since
+	 * there will not be a LDN event for the spec compliant cards,
+	 * we need to clear the flag after receiving PME_To_ACK.
+	 */
+	px_p->px_pm_flags |= PX_LDN_EXPECTED;
 	if (px_send_pme_turnoff(csr_base) != DDI_SUCCESS) {
 		ret = DDI_FAILURE;
 		goto l23ready_done;
@@ -1688,7 +1701,7 @@ px_goto_l23ready(px_t *px_p)
 		 * consequetive requests.
 		 */
 		mutex_exit(&px_p->px_l23ready_lock);
-		delay(5);
+		delay(drv_usectohz(50 * MSEC_TO_USEC));
 		mutex_held = 0;
 		if (!(px_p->px_pm_flags & PX_PMETOACK_RECVD)) {
 			ret = DDI_FAILURE;
@@ -1696,7 +1709,8 @@ px_goto_l23ready(px_t *px_p)
 			    " for PME_TO_ACK\n");
 		}
 	}
-	px_p->px_pm_flags &= ~(PX_PME_TURNOFF_PENDING | PX_PMETOACK_RECVD);
+	px_p->px_pm_flags &=
+	    ~(PX_PME_TURNOFF_PENDING | PX_PMETOACK_RECVD | PX_LDN_EXPECTED);
 
 l23ready_done:
 	if (mutex_held)
@@ -1708,10 +1722,20 @@ l23ready_done:
 	if (ret == DDI_SUCCESS) {
 		if (px_link_wait4l1idle(csr_base) != DDI_SUCCESS) {
 			DBG(DBG_PWR, px_p->px_dip, " Link is not at L1"
-			    "even though we received PME_To_ACK.\n");
-			ret = DDI_FAILURE;
-		} else
-			pwr_p->pwr_link_lvl = PM_LEVEL_L3;
+			    " even though we received PME_To_ACK.\n");
+			/*
+			 * Workaround for hardware bug with P25.
+			 * Due to a hardware bug with P25, link state
+			 * will be Detect state rather than L1 after
+			 * link is transitioned to L23Ready state. Since
+			 * we don't know whether link is L23ready state
+			 * without Fire's state being L1_idle, we delay
+			 * here just to make sure that we wait till link
+			 * is transitioned to L23Ready state.
+			 */
+			delay(drv_usectohz(100 * MSEC_TO_USEC));
+		}
+		pwr_p->pwr_link_lvl = PM_LEVEL_L3;
 
 	}
 	mutex_exit(&pwr_p->pwr_lock);
@@ -1728,6 +1752,7 @@ px_pmeq_intr(caddr_t arg)
 {
 	px_t	*px_p = (px_t *)arg;
 
+	DBG(DBG_PWR, px_p->px_dip, " PME_To_ACK received \n");
 	mutex_enter(&px_p->px_l23ready_lock);
 	cv_broadcast(&px_p->px_l23ready_cv);
 	if (px_p->px_pm_flags & PX_PME_TURNOFF_PENDING) {
@@ -1753,6 +1778,11 @@ px_pre_pwron_check(px_t *px_p)
 	    !(pwr_p = PCIE_NEXUS_PMINFO(px_p->px_dip)))
 		return (DDI_FAILURE);
 
+	/*
+	 * For the spec compliant downstream cards link down
+	 * is expected when the device is powered on.
+	 */
+	px_p->px_pm_flags |= PX_LDN_EXPECTED;
 	return (pwr_p->pwr_link_lvl == PM_LEVEL_L3 ? DDI_SUCCESS : DDI_FAILURE);
 }
 
@@ -1775,6 +1805,16 @@ px_goto_l0(px_t *px_p)
 	mutex_enter(&px_p->px_lupsoft_lock);
 	/* Clear the LINKUP_RECVD receieved flag */
 	px_p->px_pm_flags &= ~PX_LINKUP_RECVD;
+	/*
+	 * Set flags LUP_EXPECTED to inform FMA code that LUP is
+	 * expected as part of link training and no ereports should
+	 * be posted for this event. FMA code will clear this flag
+	 * after one instance of this event. In case of P25, there
+	 * will not be a LDN event. So clear the flag set at PRE_PWRON
+	 * time.
+	 */
+	px_p->px_pm_flags |=  PX_LUP_EXPECTED;
+	px_p->px_pm_flags &= ~PX_LDN_EXPECTED;
 	if (px_link_retrain(csr_base) != DDI_SUCCESS) {
 		ret = DDI_FAILURE;
 		goto l0_done;
@@ -1808,20 +1848,22 @@ px_goto_l0(px_t *px_p)
 		 */
 		mutex_exit(&px_p->px_lupsoft_lock);
 		mutex_held = 0;
-		delay(5);
+		delay(drv_usectohz(50 * MSEC_TO_USEC));
 		if (!(px_p->px_pm_flags & PX_LINKUP_RECVD)) {
 			ret = DDI_FAILURE;
 			DBG(DBG_PWR, px_p->px_dip, " Timed out while waiting"
 			    " for link up\n");
 		}
 	}
-	px_p->px_pm_flags &= ~(PX_LINKUP_PENDING | PX_LINKUP_RECVD);
+	px_p->px_pm_flags &=
+	    ~(PX_LINKUP_PENDING | PX_LINKUP_RECVD | PX_LUP_EXPECTED);
 
 l0_done:
 	if (mutex_held)
 		mutex_exit(&px_p->px_lupsoft_lock);
+	px_enable_detect_quiet(csr_base);
 	if (ret == DDI_SUCCESS)
-		px_enable_detect_quiet(csr_base);
+		pwr_p->pwr_link_lvl = PM_LEVEL_L0;
 	mutex_exit(&pwr_p->pwr_lock);
 	return (ret);
 }
@@ -1831,6 +1873,7 @@ px_lup_softintr(caddr_t arg)
 {
 	px_t *px_p = (px_t *)arg;
 
+	DBG(DBG_PWR, px_p->px_dip, " Link up soft interrupt received \n");
 	mutex_enter(&px_p->px_lup_lock);
 	if (!(px_p->px_lupsoft_pending > 0)) {
 		/* Spurious */

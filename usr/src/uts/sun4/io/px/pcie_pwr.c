@@ -449,26 +449,10 @@ pcie_add_comps(dev_info_t *dip, dev_info_t *cdip, pcie_pwr_t *pwr_p)
 	int comps = PM_NUMCMPTS(cdip);
 	pcie_pm_t *pcie_pm_p;
 	pcie_pwr_child_t *cpwr_p;
-	int i, total = 0;
 
 	ASSERT(MUTEX_HELD(&pwr_p->pwr_lock));
 	if (!comps)
 		return;
-
-	/*
-	 * Remove the hold done at the time of our attach.
-	 * This is done when we add the first child. If the
-	 * sum of our counters is zero, that means we are
-	 * adding the first child.
-	 */
-	for (i = 0; i < PCIE_MAX_PWR_LEVELS; i++) {
-		total += (pwr_p->pwr_counters)[i];
-	}
-	if (total == 0 && pwr_p->pwr_hold > 0) {
-		DBG(DBG_PWR, dip, "pm_add_comps: decrementing hold \n");
-		pwr_p->pwr_hold--;
-		ASSERT(pwr_p->pwr_flags & PCIE_PM_BUSY);
-	}
 
 	DBG(DBG_PWR, dip, "pcie_add_comps: unknown level counter incremented "
 	    "from %d by %d because of %s@%d\n",

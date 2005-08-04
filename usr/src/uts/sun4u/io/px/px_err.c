@@ -254,8 +254,8 @@ px_err_bit_desc_t px_err_tlu_oe_tbl[] = {
 	{ TLU_OE_BIT_DESC(EHP,		fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(LIN,		non_fatal,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(LRS,		non_fatal,	pciex_oe) },
-	{ TLU_OE_BIT_DESC(LDN,		non_fatal,	pciex_oe) },
-	{ TLU_OE_BIT_DESC(LUP,		tlu_lup,	pciex_oe) },
+	{ TLU_OE_BIT_DESC(LDN,		non_fatal,	pciex_ldn) },
+	{ TLU_OE_BIT_DESC(LUP,		tlu_lup,	pciex_lup) },
 	{ TLU_OE_BIT_DESC(ERU,		fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(ERO,		fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(EMP,		fatal_gos,	pciex_oe) },
@@ -1670,7 +1670,7 @@ PX_ERPT_SEND_DEC(pciex_rx_tx_oe)
 /* TLU Other Event - see io erpt doc, section 3.9 */
 PX_ERPT_SEND_DEC(pciex_oe)
 {
-	char		buf[FM_MAX_CLASS];
+	char			buf[FM_MAX_CLASS];
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
@@ -1687,4 +1687,40 @@ PX_ERPT_SEND_DEC(pciex_oe)
 	    NULL);
 
 	return (PX_OK);
+}
+
+/* TLU Other Event - Link Down see io erpt doc, section 3.9 */
+PX_ERPT_SEND_DEC(pciex_ldn)
+{
+	px_t			*px_p = DIP_TO_STATE(rpdip);
+
+	/*
+	 * Don't post ereport, if ldn event is due to
+	 * power management.
+	 */
+	if (px_p->px_pm_flags & PX_LDN_EXPECTED) {
+		px_p->px_pm_flags &= ~PX_LDN_EXPECTED;
+		return (PX_OK);
+	}
+	return (PX_ERPT_SEND(pciex_oe)(rpdip, csr_base, ss_reg, derr,
+	    class_name));
+
+}
+
+/* TLU Other Event - Link Up see io erpt doc, section 3.9 */
+PX_ERPT_SEND_DEC(pciex_lup)
+{
+	px_t			*px_p = DIP_TO_STATE(rpdip);
+
+	/*
+	 * Don't post ereport, if lup event is due to
+	 * power management.
+	 */
+	if (px_p->px_pm_flags & PX_LUP_EXPECTED) {
+		px_p->px_pm_flags &= ~PX_LUP_EXPECTED;
+		return (PX_OK);
+	}
+
+	return (PX_ERPT_SEND(pciex_oe)(rpdip, csr_base, ss_reg, derr,
+	    class_name));
 }

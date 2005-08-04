@@ -223,6 +223,8 @@ PX_ERPT_SEND_DEC(pciex_ce);
 PX_ERPT_SEND_DEC(pciex_rx_oe);
 PX_ERPT_SEND_DEC(pciex_rx_tx_oe);
 PX_ERPT_SEND_DEC(pciex_oe);
+PX_ERPT_SEND_DEC(pciex_lup);
+PX_ERPT_SEND_DEC(pciex_ldn);
 
 #ifdef	__cplusplus
 }

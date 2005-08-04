@@ -252,10 +252,10 @@ px_msiq_intr(caddr_t arg)
 	px_lib_get_msiq_rec(dip, msiq_p, msiq_rec_p);
 
 	/*
-	 * Process current MSIQ record as long as request id
+	 * Process current MSIQ record as long as record type
 	 * field is non-zero.
 	 */
-	while (msiq_rec_p->msiq_rec_rid) {
+	while (msiq_rec_p->msiq_rec_type) {
 		DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: MSIQ RECORD, "
 		    "msiq_rec_type 0x%llx msiq_rec_rid 0x%llx\n",
 		    msiq_rec_p->msiq_rec_type, msiq_rec_p->msiq_rec_rid);
@@ -355,8 +355,8 @@ px_msiq_intr(caddr_t arg)
 next_rec:
 		new_msiq_rec_cnt++;
 
-		/* Zero out msiq_rec_rid field */
-		msiq_rec_p->msiq_rec_rid = 0;
+		/* Zero out msiq_rec_type field */
+		msiq_rec_p->msiq_rec_type = 0;
 
 		/* Read next MSIQ record */
 		px_lib_get_msiq_rec(dip, msiq_p, msiq_rec_p);

@@ -304,6 +304,10 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pxb->pxb_config_handle = config_handle;
 	pxb->pxb_init_flags |= PXB_INIT_CONFIG_HANDLE;
 
+	/* Save the vnedor id and device id */
+	pxb->pxb_vendor_id = pci_config_get16(config_handle, PCI_CONF_VENID);
+	pxb->pxb_device_id = pci_config_get16(config_handle, PCI_CONF_DEVID);
+
 	/*
 	 * Power management setup. This also makes sure that switch/bridge
 	 * is at D0 during attach.
@@ -331,9 +335,6 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	/* Save the vnedor id and device id */
-	pxb->pxb_vendor_id = pci_config_get16(config_handle, PCI_CONF_VENID);
-	pxb->pxb_device_id = pci_config_get16(config_handle, PCI_CONF_DEVID);
 
 	/*
 	 * Make sure the "device_type" property exists.
@@ -825,7 +826,7 @@ pxb_initchild(dev_info_t *child)
 	if ((!pxb_tlp_count) ||
 	    (pxb->pxb_vendor_id != PXB_VENDOR_PLX) ||
 	    ((pxb->pxb_device_id != PXB_DEVICE_PLX_8532) &&
-		(pxb->pxb_device_id != PXB_DEVICE_PLX_8532))) {
+		(pxb->pxb_device_id != PXB_DEVICE_PLX_8516))) {
 		/* Workaround not needed return success */
 		result = DDI_SUCCESS;
 		goto cleanup;
@@ -1364,15 +1365,32 @@ static int
 pxb_pwr_setup(dev_info_t *dip)
 {
 	char *comp_array[5];
-	int i;
+	int i, instance;
 	ddi_acc_handle_t conf_hdl;
 	uint8_t cap_ptr, cap_id;
 	uint16_t pmcap;
 	pcie_pwr_t *pwr_p;
+	pxb_devstate_t *pxb;
 
 	ASSERT(PCIE_PMINFO(dip));
 	pwr_p = PCIE_NEXUS_PMINFO(dip);
 	ASSERT(pwr_p);
+
+	instance = ddi_get_instance(dip);
+	pxb = (pxb_devstate_t *)ddi_get_soft_state(pxb_state, instance);
+	/*
+	 * Disable PM for PLX 8532 switch. Transitioning one port on
+	 * this switch to low power causes links on other ports on the
+	 * same station to die.
+	 */
+	if ((pxb->pxb_vendor_id == PXB_VENDOR_PLX) &&
+	    ((pxb->pxb_device_id == PXB_DEVICE_PLX_8516) ||
+	    (pxb->pxb_device_id == PXB_DEVICE_PLX_8532))) {
+		DBG(DBG_PWR, dip, "pxb_pwr_setup: PLX8532/PLX8516 found "
+		    "disabling PM\n");
+		pwr_p->pwr_func_lvl = PM_LEVEL_D0;
+		return (DDI_SUCCESS);
+	}
 
 	/* Code taken from pci_pci driver */
 	if (pci_config_setup(dip, &pwr_p->pwr_conf_hdl) != DDI_SUCCESS) {
@@ -1424,7 +1442,7 @@ pxb_pwr_setup(dev_info_t *dip)
 	comp_array[i++] = "3=Full Power D0";
 
 	/*
-	 * Create pm-components property. If it does not already exist.
+	 * Create pm-components property, if it does not exist already.
 	 */
 	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
 	    "pm-components", comp_array, i) != DDI_PROP_SUCCESS) {
@@ -1472,17 +1490,6 @@ pxb_pwr_init_and_raise(dev_info_t *dip, pcie_pwr_t *pwr_p)
 	default:
 		break;
 	}
-	/*
-	 * Workaround to be revisted.
-	 * Transitioning the un-connected ports on a switch to low
-	 * power causes links on other ports to die. As a result a panic
-	 * might happen. To avoid any panics, increment pwr_hold and mark
-	 * ourselves busy so that PM framework will not call our power entry.
-	 */
-	DBG(DBG_PWR, dip, "pxb_attach: incrementing hold and marking busy\n");
-	pwr_p->pwr_hold++;
-	pwr_p->pwr_flags |= PCIE_PM_BUSY;
-	(void) pm_busy_component(dip, 0);
 
 	/* Raise the power to D0. */
 	if (pwr_p->pwr_func_lvl != PM_LEVEL_D0 &&
