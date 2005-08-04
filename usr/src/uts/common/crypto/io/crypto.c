@@ -2034,10 +2034,14 @@ copyin_attributes(int mode, uint_t count, caddr_t oc_attributes,
 			}
 		}
 
-		k_attrs[i].oa_value = (value == NULL) ? NULL : p;
+		if (value != NULL) {
+			k_attrs[i].oa_value = p;
+			p += roundup(value_len, sizeof (caddr_t));
+		} else {
+			k_attrs[i].oa_value = NULL;
+		}
 		k_attrs[i].oa_value_len = value_len;
 		ap += STRUCT_SIZE(oa);
-		p += roundup(value_len, sizeof (caddr_t));
 	}
 out:
 	if (attrs != NULL) {
