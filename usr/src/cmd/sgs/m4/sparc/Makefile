@@ -22,8 +22,9 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1995 by Sun Microsystems, Inc.
+# Copyright 2005 Sun Microsystems, Inc.
 # All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/sgs/m4/sparc/Makefile
 #
@@ -49,6 +50,8 @@ SRCS=		$(COBJS:%.o=../common/%.c) $(BLTSRCS)
 INCLIST=	-I../common
 DEFLIST=	-DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
+CFLAGS +=	$(CCVERBOSE)
+C99MODE=	$(C99_ENABLE)
 
 CLEANFILES +=	$(LINTOUT) $(BLTSRCS)
 

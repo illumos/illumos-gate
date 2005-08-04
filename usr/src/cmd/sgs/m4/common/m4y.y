@@ -21,14 +21,14 @@
  * CDDL HEADER END
  */
 %}
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 %{
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -84,7 +84,9 @@ e	: e OROR e	= { $$ = ($1 != 0 || $3 != 0) ? 1 : 0; }
 extern wchar_t *pe;
 static int peek(int c, int r1, int r2);
 
-yylex() {
+int
+yylex(void)
+{
 	while (*pe == ' ' || *pe == '\t' || *pe == '\n')
 		pe++;
 	switch (*pe) {
@@ -113,7 +115,7 @@ yylex() {
 	case '!':
 		return (peek('=', NE, '!'));
 	default: {
-		register	base;
+		int	base;
 
 		evalval = 0;
 
@@ -127,7 +129,7 @@ yylex() {
 			base = 10;
 
 		for (;;) {
-			register	c, dig;
+			int	c, dig;
 
 			c = *pe;
 
@@ -157,9 +159,8 @@ peek(int c, int r1, int r2)
 	return (r1);
 }
 
-/*VARARGS*/
+/*ARGSUSED*/
 static void
-yyerror()
+yyerror(YYCONST char *msg)
 {
-	;
 }

@@ -22,8 +22,9 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1993,2001 by Sun Microsystems, Inc.
+# Copyright 2005 Sun Microsystems, Inc.
 # All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/sgs/unifdef/i386/Makefile
 #
@@ -38,6 +39,8 @@ SRCS=		$(OBJS:%.o=../common/%.c)
 
 DEFLIST=	-DELF_OBJ -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
+CFLAGS +=	$(CCVERBOSE)
+C99MODE=	$(C99_ENABLE)
 LINTFLAGS +=	$(LDLIBS)
 
 CLEANFILES +=	$(LINTOUT)

@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -128,7 +128,7 @@ dodefn(wchar_t **ap, int c)
 static void
 dodiv(wchar_t **ap, int c)
 {
-	register int f;
+	int f;
 
 	f = wstoi(arg(1));
 	if (f >= 10 || f < 0) {
@@ -163,8 +163,8 @@ dodnl(wchar_t **ap, int c)
 static void
 dodump(wchar_t **ap, int c)
 {
-	register struct nlist *np;
-	register	i;
+	struct nlist *np;
+	int	i;
 
 	if (c > 0)
 		while (c--) {
@@ -309,7 +309,7 @@ doindex(wchar_t **ap, int c)
 {
 	wchar_t	*subj = arg(1);
 	wchar_t	*obj  = arg(2);
-	register	i;
+	int	i;
 
 	for (i = 0; *subj; ++i)
 		if (leftmatch(subj++, obj)) {
@@ -352,7 +352,7 @@ domake(wchar_t **ap, int c)
 static void
 dopopdef(wchar_t **ap, int c)
 {
-	register	i;
+	int	i;
 
 	for (i = 1; i <= c; ++i)
 		(void) undef(ap[i]);
@@ -462,7 +462,7 @@ dotransl(wchar_t **ap, int c)
 static void
 dotroff(wchar_t **ap, int c)
 {
-	register struct nlist	*np;
+	struct nlist	*np;
 
 	trace = 0;
 
@@ -474,7 +474,7 @@ dotroff(wchar_t **ap, int c)
 static void
 dotron(wchar_t **ap, int c)
 {
-	register struct nlist	*np;
+	struct nlist	*np;
 
 	trace = !*arg(1);
 
@@ -486,7 +486,7 @@ dotron(wchar_t **ap, int c)
 void
 doundef(wchar_t **ap, int c)
 {
-	register	i;
+	int	i;
 
 	for (i = 1; i <= c; ++i)
 		while (undef(ap[i]))
@@ -496,7 +496,7 @@ doundef(wchar_t **ap, int c)
 int
 undef(wchar_t *nam)
 {
-	register struct	nlist *np, *tnp;
+	struct	nlist *np, *tnp;
 
 	if ((np = lookup(nam))->name == NULL)
 		return (0);
@@ -518,7 +518,7 @@ undef(wchar_t *nam)
 static void
 doundiv(wchar_t **ap, int c)
 {
-	register int i;
+	int i;
 
 	if (c <= 0)
 		for (i = 1; i < 10; i++)

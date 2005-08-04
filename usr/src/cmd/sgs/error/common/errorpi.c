@@ -19,14 +19,17 @@
  *
  * CDDL HEADER END
  */
-/* Copyright 1990 Sun Microsystems. Inc */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/* - - - - -- - - - -- - - - - - - - - - - - - - - - - - - - - -*/
-
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
 #include "error.h"
 
 extern	char	*currentfilename;
@@ -69,7 +72,7 @@ static	char	**c_header = &unk_hdr[0];
  *	define msg = .*
  *	define digit = [0-9]
  *	definename = .*
- *	define date_format letter*3 letter*3 (digit | (digit digit)) 
+ *	define date_format letter*3 letter*3 (digit | (digit digit))
  *			(digit | (digit digit)):digit*2 digit*4
  *
  *	{e,E} (piptr) (msg)	Encounter an error during textual scan
@@ -80,7 +83,7 @@ static	char	**c_header = &unk_hdr[0];
  *	... (msg)		When refer to the previous line
  *	'In' ('procedure'|'function'|'program') (name):
  *				pi is now complaining about 2nd pass errors.
- *	
+ *
  *	Here is the output from a compilation
  *
  *
@@ -119,7 +122,7 @@ static	char	**c_header = &unk_hdr[0];
  */
 char *Months[] = {
 	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-	"Jul", "Aug", "Sep", "Oct","Nov", "Dec",
+	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 	0
 };
 char *Days[] = {
@@ -143,64 +146,61 @@ char *pi_und2[] = {"undefined", "on", "lines"};
 char *pi_imp1[] = {"improperly", "used", "on", "line"};
 char *pi_imp2[] = {"improperly", "used", "on", "lines"};
 
-boolean alldigits(string)
-	reg	char	*string;
+boolean
+alldigits(char *string)
 {
 	for (; *string && isdigit(*string); string++)
 		continue;
-	return(*string == '\0');
+	return (*string == '\0');
 }
-boolean instringset(member, set)
-		char	*member;
-	reg	char	**set;
+
+boolean
+instringset(char *member, char **set)
 {
-	for(; *set; set++){
+	for (; *set; set++) {
 		if (strcmp(*set, member) == 0)
-			return(TRUE);
+			return (TRUE);
 	}
-	return(FALSE);
+	return (FALSE);
 }
 
-boolean isdateformat(wordc, wordv)
-	int	wordc;
-	char	**wordv;
+boolean
+isdateformat(int wordc, char **wordv)
 {
-	return(
-	        (wordc == 5)
-	     && (instringset(wordv[0], Days))
-	     && (instringset(wordv[1], Months))
-	     && (alldigits(wordv[2]))
-	     && (alldigits(wordv[4])) );
+	return ((wordc == 5) &&
+	    (instringset(wordv[0], Days)) &&
+	    (instringset(wordv[1], Months)) &&
+	    (alldigits(wordv[2])) && (alldigits(wordv[4])));
 }
 
-boolean piptr(string)
-	reg	char	*string;
+boolean
+piptr(char *string)
 {
 	if (*string != '-')
-		return(FALSE);
+		return (FALSE);
 	while (*string && *string == '-')
 		string++;
 	if (*string != '^')
-		return(FALSE);
+		return (FALSE);
 	string++;
 	while (*string && *string == '-')
 		string++;
-	return(*string == '\0');
+	return (*string == '\0');
 }
 
 extern	int	wordc;
 extern	char	**wordv;
 
-Errorclass pi()
+Errorclass
+pi(void)
 {
 	char	**nwordv;
 
 	if (wordc < 2)
 		return (C_UNKNOWN);
-	if (   ( strlen(wordv[1]) == 1)
-	    && ( (wordv[1][0] == 'e') || (wordv[1][0] == 'E') )
-	    && ( piptr(wordv[2]) )
-	) {
+	if ((strlen(wordv[1]) == 1) &&
+	    ((wordv[1][0] == 'e') || (wordv[1][0] == 'E')) &&
+	    (piptr(wordv[2]))) {
 		boolean	longpiptr = 0;
 		/*
 		 *	We have recognized a first pass error of the form:
@@ -225,29 +225,32 @@ Errorclass pi()
 		 *	the pointer points into a tab preceded input line.
 		 */
 		language = INPI;
-		(void)substitute(wordv[2], '^', '|');
-		longpiptr = position(wordv[2],'|') > (6+8);
+		(void) substitute(wordv[2], '^', '|');
+		longpiptr = position(wordv[2], '|') > (6+8);
 		nwordv = wordvsplice(longpiptr ? 2 : 4, wordc, wordv+1);
 		nwordv[0] = strsave(currentfilename);
 		nwordv[1] = strsave(c_linenumber);
-		if (!longpiptr){
+		if (!longpiptr) {
 			nwordv[2] = "pascal errortype";
 			nwordv[3] = wordv[1];
 			nwordv[4] = strsave("%%%\n");
-			if (strlen(nwordv[5]) > (8-2))	/* this is the pointer */
-				nwordv[5] += (8-2);	/* bump over 6 characters */
+			if (strlen(nwordv[5]) > (8-2)) {
+				/* this is the pointer */
+				/* bump over 6 characters */
+				nwordv[5] += (8-2);
+			}
 		}
 		wordv = nwordv - 1;		/* convert to 1 based */
 		wordc += longpiptr ? 2 : 4;
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	if (   (wordc >= 4)
-	    && (strlen(wordv[1]) == 1)
-	    && ( (*wordv[1] == 'E') || (*wordv[1] == 'w') || (*wordv[1] == 'e') )
-	    && (alldigits(wordv[2]))
-	    && (strlen(wordv[3]) == 1)
-	    && (wordv[3][0] == '-')
-	){
+	if ((wordc >= 4) &&
+	    (strlen(wordv[1]) == 1) &&
+	    ((*wordv[1] == 'E') || (*wordv[1] == 'w') ||
+		(*wordv[1] == 'e')) &&
+	    (alldigits(wordv[2])) &&
+	    (strlen(wordv[3]) == 1) &&
+	    (wordv[3][0] == '-')) {
 		/*
 		 *	Message of the form: letter linenumber - message
 		 *	Turn into form: filename linenumber letter - message
@@ -260,14 +263,14 @@ Errorclass pi()
 		c_linenumber = wordv[2];
 		wordc += 1;
 		wordv = nwordv - 1;
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	if (   (wordc >= 3)
-	    && (strlen(wordv[1]) == 1)
-	    && ( (*(wordv[1]) == 'E') || (*(wordv[1]) == 'w') || (*(wordv[1]) == 'e') )
-	    && (strlen(wordv[2]) == 1)
-	    && (wordv[2][0] == '-')
-	) {
+	if ((wordc >= 3) &&
+	    (strlen(wordv[1]) == 1) &&
+	    ((*(wordv[1]) == 'E') || (*(wordv[1]) == 'w') ||
+		(*(wordv[1]) == 'e')) &&
+	    (strlen(wordv[2]) == 1) &&
+	    (wordv[2][0] == '-')) {
 		/*
 		 *	Message of the form: letter - message
 		 *	This happens only when we are traversing the tree
@@ -280,24 +283,25 @@ Errorclass pi()
 		 *
 		 *	Turns into a message of the form:
 		 *	filename (header) letter - message
-		 *	
+		 *
 		 *	First, see if it is a message referring to more than
 		 *	one line number.  Only of the form:
- 		 *		%s undefined on line%s
- 		 *		%s improperly used on line%s
+		 *		%s undefined on line%s
+		 *		%s improperly used on line%s
 		 */
 		boolean undefined = 0;
 		int	wordindex;
 
 		language = INPI;
-		if (    (undefined = (wordvcmp(wordv+2, 3, pi_und1) == 0) )
-		     || (undefined = (wordvcmp(wordv+2, 3, pi_und2) == 0) )
-		     || (wordvcmp(wordv+2, 4, pi_imp1) == 0)
-		     || (wordvcmp(wordv+2, 4, pi_imp2) == 0)
-		){
+		if (((undefined = (wordvcmp(wordv+2, 3, pi_und1) == 0)) != 0) ||
+			((undefined =
+			    (wordvcmp(wordv+2, 3, pi_und2) == 0)) != 0) ||
+		    (wordvcmp(wordv+2, 4, pi_imp1) == 0) ||
+		    (wordvcmp(wordv+2, 4, pi_imp2) == 0)) {
 			for (wordindex = undefined ? 5 : 6; wordindex <= wordc;
-			    wordindex++){
-				nwordv = wordvsplice(2, undefined ? 2 : 3, wordv+1);
+			    wordindex++) {
+				nwordv = wordvsplice(2, undefined ? 2 : 3,
+				    wordv+1);
 				nwordv[0] = strsave(currentfilename);
 				nwordv[1] = wordv[wordindex];
 				if (wordindex != wordc)
@@ -306,7 +310,7 @@ Errorclass pi()
 			}
 			wordc = undefined ? 4 : 5;
 			wordv = nwordv - 1;
-			return(C_TRUE);
+			return (C_TRUE);
 		}
 
 		nwordv = wordvsplice(1+3, wordc, wordv+1);
@@ -316,9 +320,9 @@ Errorclass pi()
 		nwordv[3] = strsave(c_header[2]);
 		wordv = nwordv - 1;
 		wordc += 1 + 3;
-		return(C_THISFILE);
+		return (C_THISFILE);
 	}
-	if (strcmp(wordv[1], "...") == 0){
+	if (strcmp(wordv[1], "...") == 0) {
 		/*
 		 *	have a continuation error message
 		 *	of the form: ... message
@@ -330,36 +334,34 @@ Errorclass pi()
 		nwordv[1] = strsave(c_linenumber);
 		wordv = nwordv - 1;
 		wordc += 1;
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	if(   (wordc == 6)
-	   && (lastchar(wordv[6]) == ':')
-	   && (isdateformat(5, wordv + 1))
-	){
+	if ((wordc == 6) &&
+	    (lastchar(wordv[6]) == ':') &&
+	    (isdateformat(5, wordv + 1))) {
 		/*
 		 *	Have message that tells us we have changed files
 		 */
 		language = INPI;
 		currentfilename = strsave(wordv[6]);
 		clob_last(currentfilename, '\0');
-		return(C_SYNC);
+		return (C_SYNC);
 	}
-	if(   (wordc == 3)
-	   && (strcmp(wordv[1], "In") == 0)
-	   && (lastchar(wordv[3]) == ':')
-	   && (instringset(wordv[2], Piroutines))
-	) {
+	if ((wordc == 3) &&
+	    (strcmp(wordv[1], "In") == 0) &&
+	    (lastchar(wordv[3]) == ':') &&
+	    (instringset(wordv[2], Piroutines))) {
 		language = INPI;
 		c_header = wordvsplice(0, wordc, wordv+1);
-		return(C_SYNC);
+		return (C_SYNC);
 	}
 	/*
 	 *	now, check for just the line number followed by the text
 	 */
-	if (alldigits(wordv[1])){
+	if (alldigits(wordv[1])) {
 		language = INPI;
 		c_linenumber = wordv[1];
-		return(C_IGNORE);
+		return (C_IGNORE);
 	}
 	/*
 	 *	Attempt to match messages refering to a line number
@@ -370,12 +372,12 @@ Errorclass pi()
 	 *	Inserted keyword end matching %s on line %d
 	 */
 	multiple = structured = 0;
-	if (
-	       ( (wordc == 6) && (wordvcmp(wordv+1, 2, pi_Endmatched) == 0))
-	    || ( (wordc == 8) && (wordvcmp(wordv+1, 4, pi_Inserted) == 0))
-	    || ( multiple = ((wordc == 9) && (wordvcmp(wordv+1,6, pi_multiple) == 0) ) )
-	    || ( structured = ((wordc == 10) && (wordvcmp(wordv+6,5, pi_structured) == 0 ) ))
-	){
+	if (((wordc == 6) && (wordvcmp(wordv+1, 2, pi_Endmatched) == 0)) ||
+	    ((wordc == 8) && (wordvcmp(wordv+1, 4, pi_Inserted) == 0)) ||
+	    (multiple = ((wordc == 9) &&
+		(wordvcmp(wordv+1, 6, pi_multiple) == 0))) ||
+	    (structured = ((wordc == 10) &&
+		(wordvcmp(wordv+6, 5, pi_structured) == 0)))) {
 		language = INPI;
 		nwordv = wordvsplice(2, wordc, wordv+1);
 		nwordv[0] = strsave(currentfilename);
@@ -383,11 +385,11 @@ Errorclass pi()
 		wordc += 2;
 		wordv = nwordv - 1;
 		if (!multiple)
-			return(C_TRUE);
+			return (C_TRUE);
 		erroradd(wordc, nwordv, C_TRUE, C_UNKNOWN);
 		nwordv = wordvsplice(0, wordc, nwordv);
 		nwordv[1] = wordv[wordc - 2];
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 }

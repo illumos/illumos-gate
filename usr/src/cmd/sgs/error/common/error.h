@@ -20,14 +20,20 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+#ifndef _ERROR_H
+#define	_ERROR_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 typedef	int	boolean;
-#define	reg	register
 
 #define	TRUE	1
 #define	FALSE	0
@@ -58,9 +64,12 @@ typedef	int	boolean;
 #define	INRI	17
 #define	INTROFF	18
 #define	INMOD2	19
-#define INSUNF77 20
+#define	INSUNF77 20
 
 extern	int	language;
+
+extern  boolean notouch;
+
 /*
  *	We analyze each line in the error message file, and
  *	attempt to categorize it by type, as well as language.
@@ -104,7 +113,7 @@ extern	int		class_count[];
 #define	TOSTDOUT	2	/* just print them out (ho-hum) */
 
 FILE	*errorfile;	/* where error file comes from */
-FILE	*queryfile;	/* where the query responses from the user come from*/
+FILE	*queryfile;	/* where the query responses from the user come from */
 
 extern	char	*currentfilename;
 extern	char	*processname;
@@ -112,8 +121,8 @@ extern	char	*scriptname;
 
 extern	boolean	query;
 extern	boolean	terse;
-int	inquire();			/* inquire for yes/no */
-/* 
+int	inquire(char *format, ...);			/* inquire for yes/no */
+/*
  *	codes for inquire() to return
  */
 #define	Q_NO	1			/* 'N' */
@@ -121,7 +130,7 @@ int	inquire();			/* inquire for yes/no */
 #define	Q_YES	3			/* 'Y' */
 #define	Q_yes	4			/* 'y' */
 
-int	probethisfile();
+int	probethisfile(char *name);
 /*
  *	codes for probethisfile to return
  */
@@ -133,7 +142,7 @@ int	probethisfile();
 /*
  *	Describes attributes about a language
  */
-struct lang_desc{
+struct lang_desc {
 	char	*lang_name;
 	char	*lang_incomment;	/* one of the following defines */
 	char	*lang_outcomment;	/* one of the following defines */
@@ -169,21 +178,21 @@ extern struct lang_desc lang_table[];
 #define	ERRORNAME	"/.errorrc"
 int	nignored;
 char	**names_ignored;
-/* 
+/*
  *	Structure definition for a full error
  */
 typedef struct edesc	Edesc;
 typedef	Edesc	*Eptr;
 
-struct edesc{
-	Eptr	error_next;		/*linked together*/
-	int	error_lgtext;		/* how many on the right hand side*/
-	char	**error_text;		/* the right hand side proper*/
-	Errorclass	error_e_class;	/* error category of this error*/
-	Errorclass	error_s_class;	/* sub descriptor of error_e_class*/
-	int	error_language;		/* the language for this error*/
+struct edesc {
+	Eptr	error_next;		/* linked together */
+	int	error_lgtext;		/* how many on the right hand side */
+	char	**error_text;		/* the right hand side proper */
+	Errorclass	error_e_class;	/* error category of this error */
+	Errorclass	error_s_class;	/* sub descriptor of error_e_class */
+	int	error_language;		/* the language for this error */
 	int	error_position;		/* oridinal position */
-	int	error_line;		/* discovered line number*/
+	int	error_line;		/* discovered line number */
 	int	error_no;		/* sequence number on input */
 };
 /*
@@ -191,12 +200,12 @@ struct edesc{
  */
 extern	int	nerrors;
 extern	Eptr	er_head;
-extern	Eptr	*errors;	
+extern	Eptr	*errors;
 /*
  *	Resources for each of the files mentioned
  */
 extern	int	nfiles;
-extern	Eptr	**files;	/* array of pointers into errors*/
+extern	Eptr	**files;	/* array of pointers into errors */
 boolean	*touchedfiles;			/* which files we touched */
 /*
  *	The langauge the compilation is in, as intuited from
@@ -207,16 +216,39 @@ extern	char	*currentfilename;
 /*
  *	Functional forwards
  */
-char	*Calloc();
-char	*strsave();
-char	*clobberfirst();
-char	lastchar();
-char	firstchar();
-char	next_lastchar();
-char	**wordvsplice();
-int	wordvcmp();
-boolean	persperdexplode();
+void	*Calloc(int nelements, int size);
+char	*strsave(char *instring);
+char	lastchar(char *string);
+char	firstchar(char *string);
+char	next_lastchar(char *string);
+char	**wordvsplice(int emptyhead, int wordc, char **wordv);
+int	wordvcmp(char **wordv1, int wordc, char **wordv2);
+boolean	persperdexplode(char *string, char **r_perd, char **r_pers);
 /*
  *	Printing hacks
  */
-char	*plural(), *verbform();
+char	*plural(int n);
+char	*verbform(int n);
+
+void erroradd(int errorlength, char **errorv, Errorclass errorclass,
+    Errorclass errorsubclass);
+void eaterrors(int *r_errorc, Eptr **r_errorv);
+void wordvbuild(char *string, int *r_wordc, char ***r_wordv);
+void wordvprint(FILE *fyle, int wordc, char *wordv[]);
+void printerrors(boolean look_at_subclass, int errorc, Eptr errorv[]);
+void clob_last(char *string, char newstuff);
+void arrayify(int *e_length, Eptr **e_array, Eptr header);
+void getignored(char *auxname);
+void filenames(int nfiles, Eptr **files);
+void findfiles(int nerrors, Eptr *errors, int *r_nfiles, Eptr ***r_files);
+void onintr(int sig);
+boolean touchfiles(int nfiles, Eptr **files, int *r_edargc, char ***r_edargv);
+Errorclass discardit(Eptr errorp);
+char *substitute(char *string, char chold, char chnew);
+int position(char *string, char ch);
+
+#ifdef  __cplusplus
+}
+#endif
+
+#endif /* _ERROR_H */

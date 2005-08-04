@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -62,9 +62,8 @@ static wint_t myfgetwc(FILE *, int);
 static wint_t myfputwc(wchar_t, FILE *);
 static int myfeof(int);
 
-main(argc, argv)
-int	argc;
-char 	**argv;
+int
+main(int argc, char **argv)
 {
 	wchar_t t;
 	int i, opt_end = 0;
@@ -191,7 +190,7 @@ char 	**argv;
 				puttok(token);
 			}
 		} else if (match(t, lquote)) {
-			register	qlev = 1;
+			int	qlev = 1;
 
 			for (;;) {
 				token[0] = t = getchr();
@@ -423,10 +422,10 @@ chkspace(char **argptr, int *xargc, char ***xargv)
 }
 
 static void
-initalloc()
+initalloc(void)
 {
-	static	done = 0;
-	register	t;
+	static int done = 0;
+	int	t;
 
 	if (done++)
 		return;
@@ -455,7 +454,7 @@ initalloc()
 void
 install(wchar_t *nam, wchar_t *val, int mode)
 {
-	register struct nlist *np;
+	struct nlist *np;
 	wchar_t	*cp;
 	int		l;
 
@@ -482,7 +481,7 @@ struct nlist *
 lookup(wchar_t *str)
 {
 	wchar_t	*s1;
-	register struct nlist	*np;
+	struct nlist	*np;
 	static struct nlist	nodef;
 
 	s1 = str;
@@ -503,7 +502,7 @@ static void
 expand(wchar_t **a1, int c)
 {
 	wchar_t	*dp;
-	register struct nlist	*sp;
+	struct nlist	*sp;
 
 	sp = (struct nlist *)a1[-1];
 
@@ -529,7 +528,7 @@ expand(wchar_t **a1, int c)
 			(*barray[builtin_idx(*dp)].bfunc)(a1, c);
 		} else if (dp[1] == '$') {
 			if (is_digit(*dp)) {
-				register	n;
+				int	n;
 				if ((n = *dp-'0') <= c)
 					pbstr(a1[n]);
 				++dp;
@@ -537,7 +536,7 @@ expand(wchar_t **a1, int c)
 				pbnum((long)c);
 				++dp;
 			} else if (*dp == '*' || *dp == '@') {
-				register i = c;
+				int i = c;
 				wchar_t **a = a1;
 
 				if (i > 0)
@@ -597,7 +596,7 @@ lnsync(FILE *iop)
 static void
 fpath(FILE *iop)
 {
-	register	i;
+	int	i;
 
 	if (fname[0] == NULL)
 		return;
@@ -620,7 +619,7 @@ catchsig(int i)
 void
 delexit(int code, int flushio)
 {
-	register i;
+	int i;
 
 	cf = stdout;
 
@@ -669,7 +668,7 @@ pbstr(wchar_t *str)
 void
 undiv(int i, int code)
 {
-	register FILE *fp;
+	FILE *fp;
 	wint_t c;
 
 	if (i < 1 || i > 9 || i == ofx || !ofile[i])
@@ -705,7 +704,7 @@ pbnum(long num)
 void
 pbnbr(long nbr, int base, int len)
 {
-	register	neg = 0;
+	int	neg = 0;
 
 	if (base <= 0)
 		return;
@@ -716,7 +715,7 @@ pbnbr(long nbr, int base, int len)
 		nbr = -nbr;
 
 	while (nbr < 0) {
-		register int	i;
+		int	i;
 		if (base > 1) {
 			i = nbr%base;
 			nbr /= base;
@@ -754,7 +753,7 @@ itochr(int i)
 long
 ctol(wchar_t *str)
 {
-	register sign;
+	int sign;
 	long num;
 
 	while (is_space(*str))
@@ -837,13 +836,14 @@ xmalloc(size_t size)
 static void *
 xcalloc(size_t nbr, size_t size)
 {
-	register void	*ptr;
+	void	*ptr;
 
 	ptr = xmalloc(nbr * size);
 	(void) memset(ptr, '\0', nbr * size);
 	return (ptr);
 }
 
+/* PRINTFLIKE1 */
 void
 error2(char *str, int num)
 {
@@ -866,7 +866,7 @@ static void
 error3()
 {
 	if (Cp) {
-		register struct call	*mptr;
+		struct call	*mptr;
 
 		/* fix limit */
 		*op = EOS;

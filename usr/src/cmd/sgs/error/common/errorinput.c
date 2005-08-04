@@ -19,14 +19,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1991 by Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
+#include <stdlib.h>
 #include "error.h"
 
 int	wordc;		/* how long the current error message is */
@@ -35,89 +39,91 @@ char	**wordv;	/* the actual error message */
 int	nerrors;
 int	language;
 
-Errorclass	onelong();
-Errorclass	cpp();
-Errorclass	pccccom();	/* Portable C Compiler C Compiler */
-Errorclass	richieccom();	/* Richie Compiler for 11 */
-Errorclass	lint0();
-Errorclass	lint1();
-Errorclass	lint2();
-Errorclass	lint3();
-Errorclass	make();
-Errorclass	f77();
-Errorclass	pi();
-Errorclass	ri();
-Errorclass	troff();
-Errorclass	mod2();
-Errorclass      sunf77();
+Errorclass	onelong(void);
+Errorclass	cpp(void);
+Errorclass	pccccom(void);	/* Portable C Compiler C Compiler */
+Errorclass	richieccom(void);	/* Richie Compiler for 11 */
+Errorclass	lint0(void);
+Errorclass	lint1(void);
+Errorclass	lint2(void);
+Errorclass	lint3(void);
+Errorclass	make(void);
+Errorclass	f77(void);
+Errorclass	pi(void);
+Errorclass	ri(void);
+Errorclass	troff(void);
+Errorclass	mod2(void);
+Errorclass	sunf77(void);
+
+static Errorclass catchall(void);
+
 /*
  *	Eat all of the lines in the input file, attempting to categorize
  *	them by their various flavors
  */
 static	char	inbuffer[BUFSIZ];
 
-eaterrors(r_errorc, r_errorv)
-	int	*r_errorc;
-	Eptr	**r_errorv;
+void
+eaterrors(int *r_errorc, Eptr **r_errorv)
 {
-	extern	boolean	piflag;
 	Errorclass	errorclass = C_SYNC;
 
-    for (;;){
-	if (fgets(inbuffer, BUFSIZ, errorfile) == NULL)
-		break;
-	wordvbuild(inbuffer, &wordc, &wordv);
-	/*
-	 *	for convience, convert wordv to be 1 based, instead
-	 *	of 0 based.
-	 */
-	wordv -= 1;
-	if ( wordc > 0 &&
-	   ((( errorclass = onelong() ) != C_UNKNOWN)
-	   || (( errorclass = cpp() ) != C_UNKNOWN)
-           || (( errorclass = sunf77() )!= C_UNKNOWN)
-          /* check for sunf77 errors has to be done before
-             pccccom to be able to distingush between the two */
-	   || (( errorclass = pccccom() ) != C_UNKNOWN)
-	   || (( errorclass = richieccom() ) != C_UNKNOWN)
-	   || (( errorclass = lint0() ) != C_UNKNOWN)
-	   || (( errorclass = lint1() ) != C_UNKNOWN)
-	   || (( errorclass = lint2() ) != C_UNKNOWN)
-	   || (( errorclass = lint3() ) != C_UNKNOWN)
-	   || (( errorclass = make() ) != C_UNKNOWN)
-	   || (( errorclass = f77() ) != C_UNKNOWN)
-	   || ((errorclass = pi() ) != C_UNKNOWN)
-	   || (( errorclass = ri() )!= C_UNKNOWN)
-	   || (( errorclass = troff() )!= C_UNKNOWN)
-	   || (( errorclass = mod2() )!= C_UNKNOWN)
-	   || (( errorclass = troff() )!= C_UNKNOWN))
-	) ;
-	else
-		errorclass = catchall();
-	if (wordc)
-		erroradd(wordc, wordv+1, errorclass, C_UNKNOWN);	
-    }
+	for (;;) {
+		if (fgets(inbuffer, BUFSIZ, errorfile) == NULL)
+			break;
+		wordvbuild(inbuffer, &wordc, &wordv);
+		/*
+		 * for convenience, convert wordv to be 1 based, instead
+		 * of 0 based.
+		 */
+		wordv -= 1;
+		/*
+		 * check for sunf77 errors has to be done before
+		 * pccccom to be able to distingush between the two
+		 */
+		if ((wordc > 0) &&
+		    (((errorclass = onelong()) != C_UNKNOWN) ||
+		    ((errorclass = cpp()) != C_UNKNOWN) ||
+		    ((errorclass = sunf77()) != C_UNKNOWN) ||
+		    ((errorclass = pccccom()) != C_UNKNOWN) ||
+		    ((errorclass = richieccom()) != C_UNKNOWN) ||
+		    ((errorclass = lint0()) != C_UNKNOWN) ||
+		    ((errorclass = lint1()) != C_UNKNOWN) ||
+		    ((errorclass = lint2()) != C_UNKNOWN) ||
+		    ((errorclass = lint3()) != C_UNKNOWN) ||
+		    ((errorclass = make()) != C_UNKNOWN) ||
+		    ((errorclass = f77()) != C_UNKNOWN) ||
+		    ((errorclass = pi()) != C_UNKNOWN) ||
+		    ((errorclass = ri()) != C_UNKNOWN) ||
+		    ((errorclass = troff()) != C_UNKNOWN) ||
+		    ((errorclass = mod2()) != C_UNKNOWN) ||
+		    ((errorclass = troff()) != C_UNKNOWN))) {
+		    /* EMPTY */
+		} else {
+			errorclass = catchall();
+		}
+		if (wordc)
+			erroradd(wordc, wordv+1, errorclass, C_UNKNOWN);
+	}
 #ifdef FULLDEBUG
-    printf("%d errorentrys\n", nerrors);
+	printf("%d errorentrys\n", nerrors);
 #endif
-    arrayify(r_errorc, r_errorv, er_head);
+	arrayify(r_errorc, r_errorv, er_head);
 }
 
 /*
  *	create a new error entry, given a zero based array and count
  */
-erroradd(errorlength, errorv, errorclass, errorsubclass)
-	int		errorlength;
-	char		**errorv;
-	Errorclass	errorclass;
-	Errorclass	errorsubclass;
+void
+erroradd(int errorlength, char **errorv, Errorclass errorclass,
+    Errorclass errorsubclass)
 {
-	reg	Eptr	newerror;
-	reg	char	*cp;
+	Eptr	newerror;
+	char	*cp;
 
-	if (errorclass == C_TRUE){
-		/* check canonicalization of the second argument*/
-		for(cp = errorv[1]; *cp && isdigit(*cp); cp++)
+	if (errorclass == C_TRUE) {
+		/* check canonicalization of the second argument */
+		for (cp = errorv[1]; *cp && isdigit(*cp); cp++)
 			continue;
 		errorclass = (*cp == '\0') ? C_TRUE : C_NONSPEC;
 #ifdef FULLDEBUG
@@ -126,8 +132,8 @@ erroradd(errorlength, errorv, errorclass, errorsubclass)
 				errorv[1]);
 #endif
 	}
-	if (errorlength > 0){
-		newerror = (Eptr)Calloc(1, sizeof(Edesc));
+	if (errorlength > 0) {
+		newerror = Calloc(1, sizeof (Edesc));
 		newerror->error_language = language; /* language is global */
 		newerror->error_text = errorv;
 		newerror->error_lgtext = errorlength;
@@ -135,7 +141,7 @@ erroradd(errorlength, errorv, errorclass, errorsubclass)
 			newerror->error_line = atoi(errorv[1]);
 		newerror->error_e_class = errorclass;
 		newerror->error_s_class = errorsubclass;
-		switch(newerror->error_e_class = discardit(newerror)){
+		switch (newerror->error_e_class = discardit(newerror)) {
 			case C_SYNC:		nsyncerrors++; break;
 			case C_DISCARD: 	ndiscard++; break;
 			case C_NULLED:		nnulled++; break;
@@ -151,10 +157,11 @@ erroradd(errorlength, errorv, errorclass, errorsubclass)
 	}	/* length > 0 */
 }
 
-Errorclass onelong()
+Errorclass
+onelong(void)
 {
 	char	**nwordv;
-	if ( (wordc == 1) && (language != INLD) ){
+	if ((wordc == 1) && (language != INLD)) {
 		/*
 		 *	We have either:
 		 *	a)	file name from cc
@@ -163,53 +170,61 @@ Errorclass onelong()
 		 *	c)	Random noise
 		 */
 		wordc = 0;
-		if (wordv[1] != NULL && strcmp(wordv[1], "Stop.") == 0){
-			language = INMAKE; return(C_SYNC);
+		if (wordv[1] != NULL && strcmp(wordv[1], "Stop.") == 0) {
+			language = INMAKE;
+			return (C_SYNC);
 		}
 		if (wordv[1] != NULL) {
-			if (strcmp(wordv[1], "Assembler:") == 0){
-				/* assembler always alerts us to what happened*/
-				language = INAS; return(C_SYNC);
-			} else 
-			if (strcmp(wordv[1], "Undefined:") == 0){
-				/* loader complains about unknown symbols*/
-				language = INLD; return(C_SYNC);
+			if (strcmp(wordv[1], "Assembler:") == 0) {
+				/*
+				 * assembler always alerts us to
+				 * what happened
+				 */
+				language = INAS;
+				return (C_SYNC);
+			} else if (strcmp(wordv[1], "Undefined:") == 0) {
+				/* loader complains about unknown symbols */
+				language = INLD;
+				return (C_SYNC);
 			}
 		}
-		if (lastchar(wordv[1]) == ':'){
+		if (lastchar(wordv[1]) == ':') {
 			/* cc tells us what file we are in */
-                        /* Sunf77 tells us what subroutine we are in */
+			/* Sunf77 tells us what subroutine we are in */
 			currentfilename = wordv[1];
-			(void)substitute(currentfilename, ':', '\0');
-			language = INCC; return(C_SYNC);
+			(void) substitute(currentfilename, ':', '\0');
+			language = INCC;
+			return (C_SYNC);
 		}
-	} else
-	if ( (wordc == 1) && (language == INLD) ){
-		nwordv = (char **)Calloc(4, sizeof(char *));
+	} else if ((wordc == 1) && (language == INLD)) {
+		nwordv = Calloc(4, sizeof (char *));
 		nwordv[0] = "ld:";
 		nwordv[1] = wordv[1];
 		nwordv[2] = "is";
 		nwordv[3] = "undefined.";
 		wordc = 4;
 		wordv = nwordv - 1;
-		return(C_NONSPEC);
+		return (C_NONSPEC);
+	} else if (wordc == 1) {
+		/*
+		 * any other single word messages are
+		 * considered synchronizing
+		 */
+		return (C_SYNC);
 	} else
-        /* any other single word messages are considered synchronizing */
-	if (wordc == 1){
-		return(C_SYNC);
-	} else
-        /* Sunf77 may derive 2-word synchronizing messages ending with a `:' */
-        if ( (wordc == 2) && (lastchar(wordv[2]) == ':') ){
-                wordc = 0;
-                language = INSUNF77;
-                 return(C_SYNC);
-        }
-       	return(C_UNKNOWN);
+	/* Sunf77 may derive 2-word synchronizing messages ending with a `:' */
+	if ((wordc == 2) && (lastchar(wordv[2]) == ':')) {
+		wordc = 0;
+		language = INSUNF77;
+		return (C_SYNC);
+	}
+	return (C_UNKNOWN);
 }	/* end of one long */
 
-Errorclass	cpp()
+Errorclass
+cpp(void)
 {
-	/* 
+	/*
 	 *	Now attempt a cpp error message match
 	 *	Examples:
 	 *		./morse.h: 23: undefined control
@@ -217,19 +232,20 @@ Errorclass	cpp()
 	 *		morsesend.c: 237: MAGNIBBL: argument mismatch
 	 *		test1.c: 6: undefined control
 	 */
-	if (   (language != INLD)		/* loader errors have almost same fmt*/
-	    && (lastchar(wordv[1]) == ':')
-	    && (isdigit(firstchar(wordv[2])))
-	    && (lastchar(wordv[2]) == ':') ){
+	if ((language != INLD) &&	/* loader errors have almost same fmt */
+	    (lastchar(wordv[1]) == ':') &&
+	    (isdigit(firstchar(wordv[2]))) &&
+	    (lastchar(wordv[2]) == ':')) {
 		language = INCPP;
 		clob_last(wordv[1], '\0');
 		clob_last(wordv[2], '\0');
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 }	/*end of cpp*/
 
-Errorclass pccccom()
+Errorclass
+pccccom(void)
 {
 	/*
 	 *	Now attempt a ccom error message match:
@@ -238,25 +254,26 @@ Errorclass pccccom()
 	 *	  "test.c", line 7: warning: old-fashioned initialization: use =
 	 *	  "subdir.d/foo2.h", line 1: illegal initialization
 	 */
-	if (   (firstchar(wordv[1]) == '"')
-	    && (lastchar(wordv[1]) == ',')
-	    && (next_lastchar(wordv[1]) == '"')
-	    && (strcmp(wordv[2],"line") == 0)
-	    && (isdigit(firstchar(wordv[3])))
-	    && (lastchar(wordv[3]) == ':') ){
+	if ((firstchar(wordv[1]) == '"') &&
+	    (lastchar(wordv[1]) == ',') &&
+	    (next_lastchar(wordv[1]) == '"') &&
+	    (strcmp(wordv[2], "line") == 0) &&
+	    (isdigit(firstchar(wordv[3]))) &&
+	    (lastchar(wordv[3]) == ':')) {
 		clob_last(wordv[1], '\0');	/* drop last , */
 		clob_last(wordv[1], '\0');	/* drop last " */
 		wordv[1]++;			/* drop first " */
 		clob_last(wordv[3], '\0');	/* drop : on line number */
 		wordv[2] = wordv[1];	/* overwrite "line" */
-		wordv++;		/*compensate*/
+		wordv++;		/* compensate */
 		wordc--;
 		currentfilename = wordv[1];
 		language = INCC;
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 }	/* end of ccom */
+
 /*
  *	Do the error message from the Richie C Compiler for the PDP11,
  *	which has this source:
@@ -266,17 +283,18 @@ Errorclass pccccom()
  *	fprintf(stderr, "%d: ", line);
  *
  */
-Errorclass richieccom()
+Errorclass
+richieccom(void)
 {
-	reg	char	*cp;
-	reg	char	**nwordv;
-		char	*file;
+	char	*cp;
+	char	**nwordv;
+	char	*file;
 
-	if (lastchar(wordv[1]) == ':'){
+	if (lastchar(wordv[1]) == ':') {
 		cp = wordv[1] + strlen(wordv[1]) - 1;
 		while (isdigit(*--cp))
 			continue;
-		if (*cp == ':'){
+		if (*cp == ':') {
 			clob_last(wordv[1], '\0');	/* last : */
 			*cp = '\0';			/* first : */
 			file = wordv[1];
@@ -287,35 +305,35 @@ Errorclass richieccom()
 			wordv = nwordv - 1;
 			language = INCC;
 			currentfilename = wordv[1];
-			return(C_TRUE);
+			return (C_TRUE);
 		}
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 }
 
-Errorclass lint0()
+Errorclass
+lint0(void)
 {
-	reg	char	**nwordv;
+	char	**nwordv;
 		char	*line, *file;
 	/*
 	 *	Attempt a match for the new lint style normal compiler
 	 *	error messages, of the form
-	 *	
+	 *
 	 *	printf("%s(%d): %s\n", filename, linenumber, message);
 	 */
-	if (wordc >= 2){
-		if (   (lastchar(wordv[1]) == ':')
-		    && (next_lastchar(wordv[1]) == ')')
-		) {
+	if (wordc >= 2) {
+		if ((lastchar(wordv[1]) == ':') &&
+		    (next_lastchar(wordv[1]) == ')')) {
 			clob_last(wordv[1], '\0'); /* colon */
-			if (persperdexplode(wordv[1], &line, &file)){
+			if (persperdexplode(wordv[1], &line, &file)) {
 				nwordv = wordvsplice(1, wordc, wordv+1);
 				nwordv[0] = file;	/* file name */
 				nwordv[1] = line;	/* line number */
 				wordc += 1;
 				wordv = nwordv - 1;
 				language = INLINT;
-				return(C_TRUE);
+				return (C_TRUE);
 			}
 			wordv[1][strlen(wordv[1])] = ':';
 		}
@@ -323,7 +341,8 @@ Errorclass lint0()
 	return (C_UNKNOWN);
 }
 
-Errorclass lint1()
+Errorclass
+lint1(void)
 {
 	char	*line1, *line2;
 	char	*file1, *file2;
@@ -335,32 +354,34 @@ Errorclass lint1()
 	 *
 	 *	Look first for type 1 lint errors
 	 */
-	if (wordc > 1 && strcmp(wordv[wordc-1], "::") == 0){
-	 /*
-  	  * %.7s, arg. %d used inconsistently %s(%d) :: %s(%d)
-  	  * %.7s value used inconsistently %s(%d) :: %s(%d)
-  	  * %.7s multiply declared %s(%d) :: %s(%d)
-  	  * %.7s value declared inconsistently %s(%d) :: %s(%d)
-  	  * %.7s function value type must be declared before use %s(%d) :: %s(%d)
-	  */
+	if (wordc > 1 && strcmp(wordv[wordc-1], "::") == 0) {
+	/*
+	 * %.7s, arg. %d used inconsistently %s(%d) :: %s(%d)
+	 * %.7s value used inconsistently %s(%d) :: %s(%d)
+	 * %.7s multiply declared %s(%d) :: %s(%d)
+	 * %.7s value declared inconsistently %s(%d) :: %s(%d)
+	 * %.7s function value type must be declared before use %s(%d) :: %s(%d)
+	 */
 		language = INLINT;
-		if (wordc > 2
-		     && (persperdexplode(wordv[wordc], &line2, &file2))
-		     && (persperdexplode(wordv[wordc-2], &line1, &file1)) ){
+		if ((wordc > 2) &&
+		    (persperdexplode(wordv[wordc], &line2, &file2)) &&
+		    (persperdexplode(wordv[wordc-2], &line1, &file1))) {
 			nwordv1 = wordvsplice(2, wordc, wordv+1);
 			nwordv2 = wordvsplice(2, wordc, wordv+1);
 			nwordv1[0] = file1; nwordv1[1] = line1;
-			erroradd(wordc+2, nwordv1, C_TRUE, C_DUPL); /* takes 0 based*/
+			/* takes 0 based */
+			erroradd(wordc+2, nwordv1, C_TRUE, C_DUPL);
 			nwordv2[0] = file2; nwordv2[1] = line2;
 			wordc = wordc + 2;
 			wordv = nwordv2 - 1;	/* 1 based */
-			return(C_TRUE);
+			return (C_TRUE);
 		}
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 } /* end of lint 1*/
 
-Errorclass lint2()
+Errorclass
+lint2(void)
 {
 	char	*file;
 	char	*line;
@@ -374,30 +395,32 @@ Errorclass lint2()
 	 *
 	 *	bufp defined( "./metric.h"(10) ), but never used
 	 */
-	if (   (lastchar(wordv[2]) == '(' /* ')' */ )	
-	    && (strcmp(wordv[4], "),") == 0) ){
+	if ((lastchar(wordv[2]) == '(' /* ')' */) &&
+	    (strcmp(wordv[4], "),") == 0)) {
 		language = INLINT;
-		if (persperdexplode(wordv[3], &line, &file)){
+		if (persperdexplode(wordv[3], &line, &file)) {
 			nwordv = wordvsplice(2, wordc, wordv+1);
 			nwordv[0] = file; nwordv[1] = line;
 			wordc = wordc + 2;
 			wordv = nwordv - 1;	/* 1 based */
-			return(C_TRUE);
+			return (C_TRUE);
 		}
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 } /* end of lint 2*/
 
 char	*Lint31[4] = {"returns", "value", "which", "is"};
 char	*Lint32[6] = {"value", "is", "used,", "but", "none", "returned"};
-Errorclass lint3()
+
+Errorclass
+lint3(void)
 {
-	if (   (wordvcmp(wordv+2, 4, Lint31) == 0)
-	    || (wordvcmp(wordv+2, 6, Lint32) == 0) ){
+	if ((wordvcmp(wordv+2, 4, Lint31) == 0) ||
+	    (wordvcmp(wordv+2, 6, Lint32) == 0)) {
 		language = INLINT;
-		return(C_NONSPEC);
+		return (C_NONSPEC);
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 }
 
 /*
@@ -406,9 +429,10 @@ Errorclass lint3()
 char	*F77_fatal[3] = {"Compiler", "error", "line"};
 char	*F77_error[3] = {"Error", "on", "line"};
 char	*F77_warning[3] = {"Warning", "on", "line"};
-char    *F77_no_ass[3] = {"Error.","No","assembly."};
+char    *F77_no_ass[3] = {"Error.", "No", "assembly."};
 
-f77()
+Errorclass
+f77(void)
 {
 	char	**nwordv;
 	/*
@@ -423,55 +447,57 @@ f77()
 	 */
 	if (wordc == 3 && wordvcmp(wordv+1, 3, F77_no_ass) == 0) {
 		wordc = 0;
-		return(C_SYNC);
+		return (C_SYNC);
 	}
 	if (wordc < 6)
-		return(C_UNKNOWN);
-	if (	(lastchar(wordv[6]) == ':')
-	    &&(
-	       (wordvcmp(wordv+1, 3, F77_fatal) == 0)
-	    || (wordvcmp(wordv+1, 3, F77_error) == 0)
-	    || (wordvcmp(wordv+1, 3, F77_warning) == 0) )
-	){
+		return (C_UNKNOWN);
+	if ((lastchar(wordv[6]) == ':') &&
+	    ((wordvcmp(wordv+1, 3, F77_fatal) == 0) ||
+		(wordvcmp(wordv+1, 3, F77_error) == 0) ||
+		(wordvcmp(wordv+1, 3, F77_warning) == 0))) {
 		language = INF77;
 		nwordv = wordvsplice(2, wordc, wordv+1);
 		nwordv[0] = wordv[6];
-		clob_last(nwordv[0],'\0');
+		clob_last(nwordv[0], '\0');
 		nwordv[1] = wordv[4];
 		wordc += 2;
 		wordv = nwordv - 1;	/* 1 based */
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 } /* end of f77 */
 
 char	*Make_Croak[3] = {"***", "Error", "code"};
 char	*Make_NotRemade[5] = {"not", "remade", "because", "of", "errors"};
-Errorclass make()
+
+Errorclass
+make(void)
 {
-	if (wordvcmp(wordv+1, 3, Make_Croak) == 0){
+	if (wordvcmp(wordv+1, 3, Make_Croak) == 0) {
 		language = INMAKE;
-		return(C_SYNC);
+		return (C_SYNC);
 	}
-	if  (wordvcmp(wordv+2, 5, Make_NotRemade) == 0){
+	if (wordvcmp(wordv+2, 5, Make_NotRemade) == 0) {
 		language = INMAKE;
-		return(C_SYNC);
+		return (C_SYNC);
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 }
-Errorclass ri()
+
+Errorclass
+ri(void)
 {
 /*
  *	Match an error message produced by ri; here is the
  *	procedure yanked from the distributed version of ri
  *	April 24, 1980.
- *	
+ *
  *	serror(str, x1, x2, x3)
  *		char str[];
  *		char *x1, *x2, *x3;
  *	{
  *		extern int yylineno;
- *		
+ *
  *		putc('"', stdout);
  *		fputs(srcfile, stdout);
  *		putc('"', stdout);
@@ -481,64 +507,67 @@ Errorclass ri()
  *		synerrs++;
  *	}
  */
-	if (  (firstchar(wordv[1]) == '"')
-	    &&(lastchar(wordv[1]) == '"')
-	    &&(lastchar(wordv[2]) == ':')
-	    &&(isdigit(firstchar(wordv[2]))) ){
+	if ((firstchar(wordv[1]) == '"') &&
+	    (lastchar(wordv[1]) == '"') &&
+	    (lastchar(wordv[2]) == ':') &&
+	    (isdigit(firstchar(wordv[2])))) {
 		clob_last(wordv[1], '\0');	/* drop the last " */
 		wordv[1]++;	/* skip over the first " */
 		clob_last(wordv[2], '\0');
 		language = INRI;
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 }
 
-Errorclass catchall()
+static Errorclass
+catchall(void)
 {
 	/*
 	 *	Catches random things.
 	 */
 	language = INUNKNOWN;
-	return(C_NONSPEC);
-} /* end of catch all*/
+	return (C_NONSPEC);
+}
 
-Errorclass troff()
+Errorclass
+troff(void)
 {
 	/*
 	 *	troff source error message, from eqn, bib, tbl...
 	 *	Just like pcc ccom, except uses `'
 	 */
-	if (   (firstchar(wordv[1]) == '`')
-	    && (lastchar(wordv[1]) == ',')
-	    && (next_lastchar(wordv[1]) == '\'')
-	    && (strcmp(wordv[2],"line") == 0)
-	    && (isdigit(firstchar(wordv[3])))
-	    && (lastchar(wordv[3]) == ':') ){
+	if ((firstchar(wordv[1]) == '`') &&
+	    (lastchar(wordv[1]) == ',') &&
+	    (next_lastchar(wordv[1]) == '\'') &&
+	    (strcmp(wordv[2], "line") == 0) &&
+	    (isdigit(firstchar(wordv[3]))) &&
+	    (lastchar(wordv[3]) == ':')) {
 		clob_last(wordv[1], '\0');	/* drop last , */
 		clob_last(wordv[1], '\0');	/* drop last " */
 		wordv[1]++;			/* drop first " */
 		clob_last(wordv[3], '\0');	/* drop : on line number */
 		wordv[2] = wordv[1];	/* overwrite "line" */
-		wordv++;		/*compensate*/
+		wordv++;		/* compensate */
 		currentfilename = wordv[1];
 		language = INTROFF;
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 }
-Errorclass mod2()
+
+Errorclass
+mod2(void)
 {
 	/*
 	 *	for decwrl modula2 compiler (powell)
 	 */
-	if (   (  (strcmp(wordv[1], "!!!") == 0)	/* early version */
-	        ||(strcmp(wordv[1], "File") == 0))	/* later version */
-	    && (lastchar(wordv[2]) == ',')	/* file name */
-	    && (strcmp(wordv[3], "line") == 0)
-	    && (isdigit(firstchar(wordv[4])))	/* line number */
-	    && (lastchar(wordv[4]) == ':')	/* line number */
-	){
+	if (((strcmp(wordv[1], "!!!") == 0) ||		/* early version */
+	    (strcmp(wordv[1], "File") == 0)) &&		/* later version */
+		(lastchar(wordv[2]) == ',') &&		/* file name */
+		(strcmp(wordv[3], "line") == 0) &&
+		(isdigit(firstchar(wordv[4]))) &&	/* line number */
+		(lastchar(wordv[4]) == ':')) {	/* line number */
 		clob_last(wordv[2], '\0');	/* drop last , on file name */
 		clob_last(wordv[4], '\0');	/* drop last : on line number */
 		wordv[3] = wordv[2];		/* file name on top of "line" */
@@ -546,40 +575,41 @@ Errorclass mod2()
 		wordc -= 2;
 		currentfilename = wordv[1];
 		language = INMOD2;
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 }
 
-Errorclass sunf77()
+Errorclass
+sunf77(void)
 {
 	/*
-	 *	Finally attempt a Sun f77 error message match:
-	 *	Examples:
-	 *	  "bar.f", line 237: Error: no label on format statement
-         *	  "test.f", line 7: ANSI extension: Hollerith constant
-	 *	  "dir/foo.h", line 1: Warning: missing END statement
+	 * Finally attempt a Sun f77 error message match:
+	 * Examples:
+	 *	"bar.f", line 237: Error: no label on format statement
+	 *	"test.f", line 7: ANSI extension: Hollerith constant
+	 *	"dir/foo.h", line 1: Warning: missing END statement
 	 */
-	if (   (firstchar(wordv[1]) == '"')
-	    && (lastchar(wordv[1]) == ',')
-	    && (next_lastchar(wordv[1]) == '"')
-	    && (strcmp(wordv[2],"line") == 0)
-	    && (isdigit(firstchar(wordv[3])))
-	    && (lastchar(wordv[3]) == ':')
-            && ((strcmp(wordv[4],"Error:") == 0)   ||
-                (strcmp(wordv[4],"Warning:") == 0) ||
-                ((strcmp(wordv[4],"ANSI") == 0) &&
-                 (strcmp(wordv[5],"extension:") == 0)))){
+	if ((firstchar(wordv[1]) == '"') &&
+	    (lastchar(wordv[1]) == ',') &&
+	    (next_lastchar(wordv[1]) == '"') &&
+	    (strcmp(wordv[2], "line") == 0) &&
+	    (isdigit(firstchar(wordv[3]))) &&
+	    (lastchar(wordv[3]) == ':') &&
+		((strcmp(wordv[4], "Error:") == 0) ||
+		    (strcmp(wordv[4], "Warning:") == 0) ||
+		    ((strcmp(wordv[4], "ANSI") == 0) &&
+		    (strcmp(wordv[5], "extension:") == 0)))) {
 		clob_last(wordv[1], '\0');	/* drop last , */
 		clob_last(wordv[1], '\0');	/* drop last " */
 		wordv[1]++;			/* drop first " */
 		clob_last(wordv[3], '\0');	/* drop : on line number */
 		wordv[2] = wordv[1];	/* overwrite "line" */
-		wordv++;		/*compensate*/
+		wordv++;		/* compensate */
 		wordc--;
 		currentfilename = wordv[1];
 		language = INSUNF77;
-		return(C_TRUE);
+		return (C_TRUE);
 	}
-	return(C_UNKNOWN);
+	return (C_UNKNOWN);
 }	/* end of Sun f77 */
