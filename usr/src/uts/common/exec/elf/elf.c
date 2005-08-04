@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -970,7 +970,8 @@ mapelfexec(
 				page = 0;
 			}
 
-			if (curproc->p_brkpageszc != 0 && phdr == dataphdrp) {
+			if (curproc->p_brkpageszc != 0 && phdr == dataphdrp &&
+			    (prot & PROT_WRITE)) {
 				/*
 				 * segvn only uses large pages for segments
 				 * that have the requested large page size

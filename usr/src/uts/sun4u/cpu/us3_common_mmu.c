@@ -214,7 +214,6 @@ mmu_init_mmu_page_sizes(int cinfo)
 		} else if (npanther > 0) {
 			panther_dtlb_restrictions = 1;
 		}
-		auto_lpg_maxszc = mmu_page_sizes - 1;
 		init_mmu_page_sizes = 1;
 		return (0);
 	}
