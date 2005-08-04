@@ -423,6 +423,13 @@ rc_node_rele_locked(rc_node_t *np)
 		if (np->rn_flags & RC_NODE_PARENT_REF)
 			par_ref = np->rn_parent_ref;
 
+		/*
+		 * Composed property groups are only as good as their
+		 * references.
+		 */
+		if (np->rn_id.rl_type == REP_PROTOCOL_ENTITY_CPROPERTYGRP)
+			np->rn_flags |= RC_NODE_DEAD;
+
 		if ((np->rn_flags & (RC_NODE_DEAD|RC_NODE_OLD)) &&
 		    np->rn_other_refs == 0 && np->rn_other_refs_held == 0)
 			unref = 1;
