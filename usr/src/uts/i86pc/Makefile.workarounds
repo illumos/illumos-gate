@@ -80,4 +80,7 @@ WORKAROUND_DEFS += -DOPTERON_ERRATUM_122
 # Bypassed Reads May Cause Data Corruption of System Hang in Dual Core
 # Processors
 #
-WORKAROUND_DEFS += -DOPTERON_ERRATUM_123
+# Solaris does not currently support PowerNow which is required for this
+# Erratum. Disable for now.
+#
+#WORKAROUND_DEFS += -DOPTERON_ERRATUM_123

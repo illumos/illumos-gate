@@ -747,13 +747,14 @@ workaround_errata(struct cpu *cpu)
 		missing++;
 #endif
 	}
+
+#if defined(OPTERON_ERRATUM_123)
 	/*LINTED*/
 	if (cpuid_opteron_erratum(cpu, 123) > 0) {
 		/*
 		 * Bypassed Reads May Cause Data Corruption of System Hang in
 		 * Dual Core Processors
 		 */
-#if defined(OPTERON_ERRATUM_123)
 		/*
 		 * Erratum 123 applies only to multi-core cpus.
 		 */
@@ -766,11 +767,8 @@ workaround_errata(struct cpu *cpu)
 			if (patchlevel == 0)
 				opteron_erratum_123++;
 		}
-#else
-		WARNING(cpu, 123);
-		missing++;
-#endif
 	}
+#endif
 	return (missing);
 }
 
