@@ -84,6 +84,7 @@ all_zones_files="
 	etc/cron.d/at.deny
 	etc/cron.d/cron.deny
 	etc/crypto/pkcs11.conf
+	etc/datalink.conf
 	etc/default/*
 	etc/dfs/dfstab
 	etc/dumpdates
@@ -317,6 +318,9 @@ superfluous_local_zone_files="
 	var/adm/pool
 	var/fm
 	var/log/pool
+	var/svc/manifest/network/aggregation.xml
+	var/svc/manifest/network/datalink-init.xml
+	var/svc/manifest/network/datalink.xml
 	var/svc/manifest/network/ipfilter.xml
 	var/svc/manifest/network/pfil.xml
 	var/svc/manifest/platform
@@ -427,6 +431,15 @@ smf_inetd_conversions="
 	uucp
 	walld
 "
+
+enable_next_boot () {
+	if [ -x /tmp/bfubin/svccfg ]; then
+	    svcadm disable -t $1
+	    [ $? = 0 ] || echo "warning: unable to temporarily disable $1"
+	    svccfg -s $1 setprop general/enabled = true
+	    [ $? = 0 ] || echo "warning: unable to enable $1 for next boot"
+	fi
+}
 
 smf_inetd_disable() {
 	inetconf=$rootprefix/etc/inet/inetd.conf
@@ -973,9 +986,6 @@ smf_obsolete_rc_files="
 smf_obsolete_manifests="
 	var/svc/manifest/network/tftp.xml
 	var/svc/manifest/network/lp.xml
-	var/svc/manifest/network/aggregation.xml
-	var/svc/manifest/network/datalink.xml
-	var/svc/manifest/network/datalink-init.xml
 "
 
 # smf services whose manifests have been renamed
@@ -987,9 +997,6 @@ smf_renamed_manifests="
 # Obsolete smf methods
 smf_obsolete_methods="
 	lib/svc/method/print-server
-	lib/svc/method/aggregation
-	lib/svc/method/datalink
-	lib/svc/method/datalink-init
 "
 
 smf_cleanup () {
@@ -1096,6 +1103,26 @@ smf_delete_renamed_manifests() {
 	(
 		cd $root;
 		rm -f $smf_renamed_manifests
+	)
+}
+
+smf_gldv3_manifests="
+	var/svc/manifest/network/aggregation.xml
+	var/svc/manifest/network/datalink.xml
+	var/svc/manifest/network/datalink-init.xml
+"
+smf_gldv3_methods="
+	lib/svc/method/aggregation
+	lib/svc/method/datalink
+	lib/svc/method/datalink-init
+"
+smf_cleanup_gldv3() {
+	(
+		for f in $smf_gldv3_manifests; do
+			smf_delete_manifest $f
+		done
+		cd $root;
+		rm -f $smf_gldv3_methods
 	)
 }
 
@@ -1332,6 +1359,9 @@ smf_apply_conf () {
 	done
 	smf_delete_methods
 	smf_delete_renamed_manifests
+	if [ $need_datalink = no ]; then
+		smf_cleanup_gldv3
+	fi
 
 	print "Disabling unneeded inetd.conf entries ..."
 	smf_inetd_disable
@@ -1621,6 +1651,52 @@ EOFA
 EOF
 	fi
 
+	# If we're in the global zone, and using an alternate root, see if
+	# we are in an smf root.  If so, import datalink and aggregation svcs.
+	# If we're not bfu'ing an alternate root, and we're post-smf,
+	# import datalink and aggregation.  This is to get them 
+	# in the repository before reboot.  If we're bfu'ing from pre-smf,
+	# this isn't an issue, as they are in the seed repository.
+	if [[ $zone = global &&
+	    -f $rootprefix/var/svc/manifest/network/datalink.xml ]]; then
+		if [[ -n $rootprefix ]]; then
+			if [ -x /usr/sbin/svccfg ]; then
+			SVCCFG_REPOSITORY=$rootprefix/etc/svc/repository.db
+			sed -e "s/enabled='true'/enabled='false'/" \
+			 $rootprefix/var/svc/manifest/network/aggregation.xml \
+			    | svccfg import -
+			sed -e "s/enabled='true'/enabled='false'/" \
+			    $rootprefix/var/svc/manifest/network/datalink.xml \
+			    | svccfg import -
+			sed -e "s/enabled='true'/enabled='false'/" \
+		       $rootprefix/var/svc/manifest/network/datalink-init.xml \
+			    | svccfg import -
+			else
+			echo "Warning: This system does not have SMF, so I"
+			echo "cannot ensure the pre-import of datalink and"
+			echo "network aggregation.  If they do not work"
+			echo "reboot your alternate root to fix it."
+			fi
+		elif [ -x /tmp/bfubin/svccfg ]; then
+			sed -e "s/enabled='true'/enabled='false'/" \
+			    /var/svc/manifest/network/aggregation.xml | \
+			    svccfg import -
+			sed -e "s/enabled='true'/enabled='false'/" \
+			    /var/svc/manifest/network/datalink.xml | \
+			    svccfg import -
+			sed -e "s/enabled='true'/enabled='false'/" \
+			    /var/svc/manifest/network/datalink-init.xml | \
+			    svccfg import -
+		fi
+
+		#
+		# Make sure the services are enabled after reboot.
+		#
+		enable_next_boot svc:/network/aggregation:default
+		enable_next_boot svc:/network/datalink:default
+		enable_next_boot svc:/network/datalink-init:default
+	fi
+
 	# Enable new NFS status and nlockmgr services if client is enabled
 	cat >> $rootprefix/var/svc/profile/upgrade <<-EOF
 	    cl="svc:/network/nfs/client:default"
@@ -1735,6 +1811,7 @@ have_realmode=no
 multiboot_archives=no
 dca_to_multi=no
 is_pcfs_boot=no
+need_datalink=no
 
 test $# -ge 1 || usage
 
@@ -1947,6 +2024,11 @@ if [[ $target_isa = i386 && -f $cpiodir/i86pc.root$ZFIX ]] && \
 		echo "bfu to onnv_12 first, then to a build with multiboot."
 		fail ""
 	fi
+fi
+
+if $ZCAT $cpiodir/generic.root$ZFIX | cpio -it 2>/dev/null | \
+    grep datalink.conf > /dev/null 2>&1 ; then
+	need_datalink=yes
 fi
 
 time_ref=/tmp/bfu.time_ref.$$
@@ -2266,6 +2348,49 @@ if [ $multiboot_archives = yes ]; then
 		chmod +x /tmp/bfubin/${file}
 	done
 fi
+
+create_datalink_conf()
+{
+	# /etc/datalink.conf needs to be populated.
+	drivers="bge xge"
+	conf=$rootprefix/etc/datalink.conf
+
+	if [ ! -f $conf ]; then
+		# nothing to do if we bfu'ed from an archive that doesn't
+		# provide /etc/datalink.conf
+		return
+	fi
+
+	ls -1 $rootprefix/etc | egrep -e '^hostname.|^hostname6.|^dhcp.' | \
+	    cut -d . -f2 | sort -u > /tmp/ifnames.$$
+
+	for driver in $drivers
+	do
+		grep $driver /tmp/ifnames.$$ | \
+		while read ifname
+		do
+			devnum=`echo $ifname | sed "s/$driver//g"`
+			if [ "$driver$devnum" != $ifname -o \
+			    -n "`echo $devnum | tr -d '[0-9]'`" ]; then
+				echo "skipping invalid interface $ifname"
+				continue
+			fi
+
+			vid=`expr $devnum / 1000`
+			inst=`expr $devnum % 1000`
+
+			awk '{ print $1 }' $conf | grep $ifname > /dev/null
+			if [ $? -ne 0 ]; then 
+				# An entry for that interface does not exist
+				printf \
+				    "$ifname\t$driver$inst\t0\t$vid\n" \
+				    >> $conf
+			fi
+		done
+	done
+
+	rm -f /tmp/ifnames.$$
+}
 
 remove_initd_links()
 {
@@ -5534,6 +5659,11 @@ mondo_loop() {
 
 	# Cleanup old Kerberos mechanisms
 	cleanup_kerberos_mechanisms
+
+	# Fix network datalink configuration
+	if [ $zone = global -a $need_datalink = yes ]; then
+		create_datalink_conf
+	fi
 
 	print "\nRestoring configuration files.\n"
 
