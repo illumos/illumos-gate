@@ -101,9 +101,16 @@ cpu_halt(void)
 
 	/*
 	 * Add ourselves to the partition's halted CPUs bitmask
-	 * if necessary.
+	 * and set our HALTED flag, if necessary.
+	 *
+	 * Note that the memory barrier after updating the HALTED flag
+	 * is needed to ensure that the HALTED flag has reached global
+	 * visibility before scanning the run queue for the last time
+	 * (via disp_anywork) and halting ourself.
 	 */
 	if (hset_update) {
+		cpup->cpu_disp_flags |= CPU_DISP_HALTED;
+		membar_producer();
 		cp = cpup->cpu_part;
 		CPUSET_ATOMIC_ADD(cp->cp_haltset, cpun);
 	}
@@ -116,8 +123,10 @@ cpu_halt(void)
 	 * ...which will pop us right back out of the halted state.
 	 */
 	if (disp_anywork()) {
-		if (hset_update)
+		if (hset_update) {
+			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
 			CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+		}
 		enable_vec_intr(s);
 		return;
 	}
@@ -131,8 +140,10 @@ cpu_halt(void)
 	 * We're no longer halted
 	 */
 	enable_vec_intr(s);
-	if (hset_update)
+	if (hset_update) {
+		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
 		CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+	}
 }
 
 /*

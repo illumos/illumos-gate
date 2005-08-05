@@ -111,21 +111,6 @@
 
 #endif
 
-#ifdef NIAGARA_ERRATUM_42
-
-#define	NI_GL_RESET_TT0	\
-	wrpr	%g0, 2, %gl			;\
-	wrpr	%g0, 1, %gl
-
-#define	NI_GL_RESET_TT0_INS	2
-
-#else /* NIAGARA_ERRATUM_42 */
-
-#define	NI_GL_RESET_TT0
-#define	NI_GL_RESET_TT0_INS	0
-
-#endif /* NIAGARA_ERRATUM_42 */
-
 /*
  * This macro is used to update per cpu mmu stats in perf critical
  * paths. It is only enabled in debug kernels or if SFMMU_STAT_GATHER
@@ -319,7 +304,6 @@
  * though this code only needs it to be four-byte aligned.
  */
 #define	SPILL_32bit(tail)					\
-	NI_GL_RESET_TT0						;\
 	srl	%sp, 0, %sp					;\
 1:	st	%l0, [%sp + 0]					;\
 	st	%l1, [%sp + 4]					;\
@@ -340,7 +324,7 @@
 	TT_TRACE_L(trace_win)					;\
 	saved							;\
 	retry							;\
-	SKIP(31-19-NI_GL_RESET_TT0_INS-TT_TRACE_L_INS)		;\
+	SKIP(31-19-TT_TRACE_L_INS)				;\
 	ba,a,pt	%xcc, fault_32bit_/**/tail			;\
 	.empty
 
@@ -352,7 +336,6 @@
  * aligned.
  */
 #define	SPILL_32bit_asi(asi_num, tail)				\
-	NI_GL_RESET_TT0						;\
 	srl	%sp, 0, %sp					;\
 1:	sta	%l0, [%sp + %g0]asi_num				;\
 	mov	4, %g1						;\
@@ -379,7 +362,7 @@
 	TT_TRACE_L(trace_win)					;\
 	saved							;\
 	retry							;\
-	SKIP(31-25-NI_GL_RESET_TT0_INS-TT_TRACE_L_INS)		;\
+	SKIP(31-25-TT_TRACE_L_INS)				;\
 	ba,a,pt %xcc, fault_32bit_/**/tail			;\
 	.empty
 
@@ -465,7 +448,6 @@
  * same.  The stack pointer is required to be eight-byte aligned.
  */
 #define	SPILL_64bit(tail)					\
-	NI_GL_RESET_TT0						;\
 2:	stx	%l0, [%sp + V9BIAS64 + 0]			;\
 	stx	%l1, [%sp + V9BIAS64 + 8]			;\
 	stx	%l2, [%sp + V9BIAS64 + 16]			;\
@@ -485,7 +467,7 @@
 	TT_TRACE_L(trace_win)					;\
 	saved							;\
 	retry							;\
-	SKIP(31-18-NI_GL_RESET_TT0_INS-TT_TRACE_L_INS)		;\
+	SKIP(31-18-TT_TRACE_L_INS)				;\
 	ba,a,pt	%xcc, fault_64bit_/**/tail			;\
 	.empty
 
@@ -509,7 +491,6 @@
  * aligned.
  */
 #define	SPILL_64bit_asi(asi_num, tail)				\
-	NI_GL_RESET_TT0						;\
 	mov	0 + V9BIAS64, %g1				;\
 2:	stxa	%l0, [%sp + %g1]asi_num				;\
 	mov	8 + V9BIAS64, %g2				;\
@@ -536,7 +517,7 @@
 	TT_TRACE_L(trace_win)					;\
 	saved							;\
 	retry							;\
-	SKIP(31-25-NI_GL_RESET_TT0_INS-TT_TRACE_L_INS)		;\
+	SKIP(31-25-TT_TRACE_L_INS)				;\
 	ba,a,pt %xcc, fault_64bit_/**/tail			;\
 	.empty
 
@@ -623,7 +604,6 @@
  * We won't need to clear them in 64 bit kernel.
  */
 #define	SPILL_mixed						\
-	NI_GL_RESET_TT0						;\
 	btst	1, %sp						;\
 	bz,a,pt	%xcc, 1b					;\
 	srl	%sp, 0, %sp					;\
@@ -668,7 +648,6 @@
  * window that didn't get a cleanwin trap.
  */
 #define	SPILL_32clean(asi_num, tail)				\
-	NI_GL_RESET_TT0						;\
 	srl	%sp, 0, %sp					;\
 	sta	%l0, [%sp + %g0]asi_num				;\
 	mov	4, %g1						;\
@@ -695,12 +674,11 @@
 	TT_TRACE_L(trace_win)					;\
 	b	.spill_clean					;\
 	  mov	WSTATE_USER32, %g7				;\
-	SKIP(31-25-NI_GL_RESET_TT0_INS-TT_TRACE_L_INS)		;\
+	SKIP(31-25-TT_TRACE_L_INS)				;\
 	ba,a,pt	%xcc, fault_32bit_/**/tail			;\
 	.empty
 
 #define	SPILL_64clean(asi_num, tail)				\
-	NI_GL_RESET_TT0						;\
 	mov	0 + V9BIAS64, %g1				;\
 	stxa	%l0, [%sp + %g1]asi_num				;\
 	mov	8 + V9BIAS64, %g2				;\
@@ -727,7 +705,7 @@
 	TT_TRACE_L(trace_win)					;\
 	b	.spill_clean					;\
 	  mov	WSTATE_USER64, %g7				;\
-	SKIP(31-25-NI_GL_RESET_TT0_INS-TT_TRACE_L_INS)		;\
+	SKIP(31-25-TT_TRACE_L_INS)				;\
 	ba,a,pt	%xcc, fault_64bit_/**/tail			;\
 	.empty
 
@@ -745,14 +723,12 @@
  * Floating point exceptions.
  */
 #define	FP_IEEE_TRAP			\
-	NI_GL_RESET_TT0			;\
 	TT_TRACE(trace_gen)		;\
 	ba,pt	%xcc,.fp_ieee_exception	;\
 	nop				;\
 	.align	32
 
 #define	FP_TRAP				\
-	NI_GL_RESET_TT0			;\
 	TT_TRACE(trace_gen)		;\
 	ba,pt	%xcc,.fp_exception	;\
 	nop				;\

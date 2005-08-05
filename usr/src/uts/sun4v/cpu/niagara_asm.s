@@ -144,7 +144,7 @@ cpu_inv_tsb(caddr_t tsb_base, uint_t tsb_bytes)
 	SET_SIZE(cpu_inv_tsb)
 #endif /* lint */
 
-#ifdef NIAGARA_ERRATUM_39
+#ifdef NIAGARA_CHK_VERSION
 
 /*
  * This workaround will be removed prior to the FCS release.
@@ -201,4 +201,4 @@ ni_getver:
 
 #endif	/* lint */
 
-#endif NIAGARA_ERRATUM_39
+#endif /* NIAGARA_CHK_VERSION */

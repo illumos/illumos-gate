@@ -65,8 +65,7 @@
 
 uint_t root_phys_addr_lo_mask = 0xffffffffU;
 
-#ifdef NIAGARA_ERRATUM_39
-extern int	niagara_erratum_39;
+#ifdef NIAGARA_CHK_VERSION
 static uint64_t	cpu_ver;			/* Niagara CPU version reg */
 
 /* Niagara CPU version register */
@@ -77,7 +76,7 @@ extern uint64_t	va_to_pa(void *);
 extern uint64_t	ni_getver();			/* HV code to get %hver */
 extern uint64_t	niagara_getver(uint64_t ni_getver_ra, uint64_t *cpu_version);
 
-#endif	/* NIAGARA_ERRATUM_39 */
+#endif	/* NIAGARA_CHK_VERSION */
 
 void
 cpu_setup(void)
@@ -88,19 +87,7 @@ cpu_setup(void)
 	extern int get_cpu_pagesizes(void);
 	extern int cpc_has_overflow_intr;
 
-#ifdef NIAGARA_ERRATUM_39
-	/*
-	 * Get CPU version and enable Niagara erratum 39 workaround only
-	 * on Niagara 1.x part. This workaround can also be enabled via
-	 * /etc/system.
-	 */
-	if (niagara_getver(va_to_pa((void *)ni_getver), &cpu_ver) == H_EOK &&
-	    ((cpu_ver >> VER_MASK_MAJOR_SHIFT) & VER_MASK_MAJOR_MASK) <= 1)
-		niagara_erratum_39 = 1;
-#endif
 	cache |= (CACHE_PTAG | CACHE_IOCOHERENT);
-
-	/* XXXQ */
 	at_flags = EF_SPARC_SUN_US3 | EF_SPARC_32PLUS | EF_SPARC_SUN_US1;
 
 	/*
@@ -147,16 +134,18 @@ cpu_setup(void)
 	cpu_hwcap_flags |= AV_SPARC_ASI_BLK_INIT;
 
 	/*
-	 * On Spitfire, there's a hole in the address space
-	 * that we must never map (the hardware only support 44-bits of
-	 * virtual address).  Later CPUs are expected to have wider
-	 * supported address ranges.
+	 * Niagara supports a 48-bit subset of the full 64-bit virtual
+	 * address space. Virtual addresses between 0x0000800000000000
+	 * and 0xffff.7fff.ffff.ffff inclusive lie within a "VA Hole"
+	 * and must never be mapped. In addition, software must not use
+	 * pages within 4GB of the VA hole as instruction pages to
+	 * avoid problems with prefetching into the VA hole.
 	 *
-	 * See address map on p23 of the UltraSPARC 1 user's manual.
+	 * VA hole information should be obtained from the machine
+	 * description.
 	 */
-/* XXXQ get from machine description */
-	hole_start = (caddr_t)0x80000000000ull;
-	hole_end = (caddr_t)0xfffff80000000000ull;
+	hole_start = (caddr_t)(0x800000000000ul - (1ul << 32));
+	hole_end = (caddr_t)(0xffff800000000000ul + (1ul << 32));
 
 	/*
 	 * The kpm mapping window.
@@ -237,6 +226,20 @@ void
 cpu_init_private(struct cpu *cp)
 {
 	extern int niagara_kstat_init(void);
+
+#ifdef NIAGARA_CHK_VERSION
+	/*
+	 * Prevent booting on a Niagara 1.x processor as it is no longer
+	 * supported.
+	 *
+	 * This is a temporary hack until everyone has switched to the
+	 * firmware which prevents booting on a Niagara 1.x processor.
+	 */
+	if (niagara_getver(va_to_pa((void *)ni_getver), &cpu_ver) == H_EOK &&
+	    ((cpu_ver >> VER_MASK_MAJOR_SHIFT) & VER_MASK_MAJOR_MASK) <= 1)
+		cmn_err(CE_PANIC, "CPU%d: Niagara 1.x no longer supported.",
+		    cp->cpu_id);
+#endif	/* NIAGARA_CHK_VERSION */
 
 	/*
 	 * This code change assumes that the virtual cpu ids are identical

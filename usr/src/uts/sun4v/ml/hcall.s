@@ -1085,32 +1085,6 @@ hv_ncs_request(int cmd, uint64_t realaddr, size_t sz)
 	 * hv_cpu_yield(void)
 	 */
 	ENTRY(hv_cpu_yield)
-#ifdef NIAGARA_ERRATUM_39
-	/*
-	 * If niagara_erratum_39 is set, then we need to halt the strand by
-	 * executing a synthetic "halt" instruction which maps to a
-	 * wrasr %asr26 with a data value which has bit 0 clear.
-	 *
-	 * Note that we don't halt the strand if there are any pending
-	 * soft interrupts (%asr22).
-	 */
-	set	niagara_erratum_39, %o0
-	ld	[%o0], %o1
-	brz	%o1, 2f
-	nop
-
-	rd	%asr26, %o0
-	andn	%o0, 1, %o0
-	rd	%asr22, %o1		! don't halt if soft interrupts pending
-	brnz	%o1, 1f
-	nop
-	wr	%o0, %asr26		! halt the strand
-1:
-	mov	%g0, %o0
-	retl
-	nop
-2:
-#endif /* NIAGARA_ERRATUM_39 */
 	mov	HV_CPU_YIELD, %o5
 	ta	FAST_TRAP
 	retl
@@ -1325,13 +1299,4 @@ hv_ncs_request(int cmd, uint64_t realaddr, size_t sz)
 	retl
 	nop
 	SET_SIZE(hv_ncs_request)
-
-#ifdef NIAGARA_ERRATUM_39
-	.seg	".data"
-	.align	4
-	.global	niagara_erratum_39
-niagara_erratum_39:
-	.word	0
-	.seg	".text"
-#endif
 #endif	/* lint || __lint */
