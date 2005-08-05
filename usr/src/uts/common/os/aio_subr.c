@@ -1320,107 +1320,28 @@ aio_close_port(void *arg, int port, pid_t pid, int lastclose)
 
 /*
  * aio_cleanup_dr_delete_memory is used by dr's delete_memory_thread
- * to force aio cleanup for a given process.  This is needed so that
- * delete_memory_thread can obtain writer locks on pages that need to
- * be relocated during a dr memory delete operation, otherwise a
- * deadly embrace may occur.
- * This implementation uses code from aio_cleanup_thread to move
- * entries from the doneq to the cleanupq; it also uses code from
- * aio_cleanup to cleanup the various queues and to signal the process's
- * aio_cleanup_thread.
- * Returns: non-zero if aio cleanup occurred, otherwise 0 is returned.
+ * to kick start the aio_cleanup_thread for the give process to do the
+ * necessary cleanup.
+ * This is needed so that delete_memory_thread can obtain writer locks
+ * on pages that need to be relocated during a dr memory delete operation,
+ * otherwise a deadly embrace may occur.
  */
 int
 aio_cleanup_dr_delete_memory(proc_t *procp)
 {
-	aio_req_t *cleanupqhead, *notifyqhead;
-	aio_req_t *cleanupport;
-	aio_req_t *portq;
-	int qflag;
-	void (*func)();
-	int signalled = 0;
 	struct aio *aiop = procp->p_aio;
+	struct as *as = procp->p_as;
+	int ret = 0;
 
 	ASSERT(MUTEX_HELD(&procp->p_lock));
-	ASSERT(aiop != NULL);
-	qflag = 0;
-	/*
-	 * we need to get aio_cleanupq_mutex.
-	 */
-	mutex_enter(&aiop->aio_cleanupq_mutex);
-	mutex_enter(&aiop->aio_mutex);
-	/*
-	 * do aio cleanup for this process, this code was shamelessly
-	 * stolen from aio_cleanup_thread and aio_cleanup
-	 */
-	if (aiop->aio_doneq) {
-		/* move doneq's aio_req_t's to cleanupq */
-		aio_req_t *doneqhead = aiop->aio_doneq;
-		aiop->aio_doneq = NULL;
-		aio_cleanupq_concat(aiop, doneqhead, AIO_DONEQ);
-	}
-	/*
-	 * take all the requests off the cleanupq, the notifyq,
-	 * and the event port queues (aio_portq and
-	 * aio_portcleanupq).  we cannot process the pollq from
-	 * a kernel thread that has an invalid secondary context,
-	 * as aio_copyout_result requires the secondary context
-	 * to be a valid user context.
-	 */
-	if ((cleanupqhead = aiop->aio_cleanupq) != NULL) {
-		aiop->aio_cleanupq = NULL;
-		qflag++;
-	}
-	if ((notifyqhead = aiop->aio_notifyq) != NULL) {
-		aiop->aio_notifyq = NULL;
-		qflag++;
-	}
-	if ((portq = aiop->aio_portq) != NULL)
-		qflag++;
-	if ((cleanupport = aiop->aio_portcleanupq) != NULL) {
-		aiop->aio_portcleanupq = NULL;
-		qflag++;
-	}
-	mutex_exit(&aiop->aio_mutex);
-	/*
-	 * return immediately if cleanupq and
-	 * notifyq are all empty. someone else must have
-	 * emptied them.
-	 */
-	if (!qflag) {
-		mutex_exit(&aiop->aio_cleanupq_mutex);
-		return (0);
-	}
 
-	/*
-	 * do cleanup for the various queues.
-	 */
-	if (cleanupqhead)
-		aio_cleanup_cleanupq(aiop, cleanupqhead, 0);
-	mutex_exit(&aiop->aio_cleanupq_mutex);
-	if (notifyqhead)
-		signalled = aio_cleanup_notifyq(aiop, notifyqhead, 0);
-	if (cleanupport || portq)
-		aio_cleanup_portq(aiop, cleanupport, 0);
-	/*
-	 * If we have an active aio_cleanup_thread it's possible for
-	 * this routine to push something on to the done queue after
-	 * an aiowait/aiosuspend thread has already decided to block.
-	 * This being the case, we need a cv_broadcast here to wake
-	 * these threads up. It is simpler and cleaner to do this
-	 * broadcast here than in the individual cleanup routines.
-	 */
-	mutex_enter(&aiop->aio_mutex);
-	/* also re-enable aio requests */
-	cv_broadcast(&aiop->aio_waitcv);
-	mutex_exit(&aiop->aio_mutex);
-	/*
-	 * Only if the process wasn't already signalled,
-	 * determine if a SIGIO signal should be delievered.
-	 */
-	if (!signalled &&
-	    (func = procp->p_user.u_signal[SIGIO - 1]) != SIG_DFL &&
-	    func != SIG_IGN)
-		sigtoproc(procp, NULL, SIGIO);
-	return (qflag);
+	mutex_enter(&as->a_contents);
+
+	if (aiop != NULL) {
+		aiop->aio_rqclnup = 1;
+		cv_broadcast(&as->a_cv);
+		ret = 1;
+	}
+	mutex_exit(&as->a_contents);
+	return (ret);
 }

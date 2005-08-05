@@ -2632,7 +2632,8 @@ aio_lio_alloc(aio_lio_t **head)
  * segment. If the process does unmap a segment with outstanding aio,
  * this special thread will guarentee that the locked pages due to
  * aphysio() are released, thereby permitting the segment to be
- * unmapped.
+ * unmapped. In addition to this, the cleanup thread is woken up
+ * during DR operations to release the locked pages.
  */
 
 static int
@@ -2643,6 +2644,7 @@ aio_cleanup_thread(aio_t *aiop)
 	int poked = 0;
 	kcondvar_t *cvp;
 	int exit_flag = 0;
+	int rqclnup = 0;
 
 	sigfillset(&curthread->t_hold);
 	sigdiffset(&curthread->t_hold, &cantmask);
@@ -2661,7 +2663,13 @@ aio_cleanup_thread(aio_t *aiop)
 		if ((aiop->aio_flags & AIO_CLEANUP) == 0) {
 			aiop->aio_flags |= AIO_CLEANUP;
 			mutex_enter(&as->a_contents);
-			if (AS_ISUNMAPWAIT(as) && aiop->aio_doneq) {
+			if (aiop->aio_rqclnup) {
+				aiop->aio_rqclnup = 0;
+				rqclnup = 1;
+			}
+
+			if ((rqclnup || AS_ISUNMAPWAIT(as)) &&
+					aiop->aio_doneq) {
 				aio_req_t *doneqhead = aiop->aio_doneq;
 				mutex_exit(&as->a_contents);
 				aiop->aio_doneq = NULL;
@@ -2689,24 +2697,31 @@ aio_cleanup_thread(aio_t *aiop)
 
 		/*
 		 * AIO_CLEANUP determines when the cleanup thread
-		 * should be active. This flag is only set when
-		 * the cleanup thread is awakened by as_unmap().
+		 * should be active. This flag is set when
+		 * the cleanup thread is awakened by as_unmap() or
+		 * due to DR operations.
 		 * The flag is cleared when the blocking as_unmap()
 		 * that originally awakened us is allowed to
 		 * complete. as_unmap() blocks when trying to
 		 * unmap a segment that has SOFTLOCKed pages. when
 		 * the segment's pages are all SOFTUNLOCKed,
-		 * as->a_flags & AS_UNMAPWAIT should be zero. The flag
-		 * shouldn't be cleared right away if the cleanup thread
-		 * was interrupted because the process is doing forkall().
-		 * This happens when cv_wait_sig() returns zero,
-		 * because it was awakened by a pokelwps(). If the
-		 * process is not exiting, it must be doing forkall().
+		 * as->a_flags & AS_UNMAPWAIT should be zero.
+		 *
+		 * In case of cleanup request by DR, the flag is cleared
+		 * once all the pending aio requests have been processed.
+		 *
+		 * The flag shouldn't be cleared right away if the
+		 * cleanup thread was interrupted because the process
+		 * is doing forkall(). This happens when cv_wait_sig()
+		 * returns zero, because it was awakened by a pokelwps().
+		 * If the process is not exiting, it must be doing forkall().
 		 */
 		if ((poked == 0) &&
-		    ((AS_ISUNMAPWAIT(as) == 0) || (aiop->aio_pending == 0))) {
+			((!rqclnup && (AS_ISUNMAPWAIT(as) == 0)) ||
+					(aiop->aio_pending == 0))) {
 			aiop->aio_flags &= ~(AIO_CLEANUP | AIO_CLEANUP_PORT);
 			cvp = &as->a_cv;
+			rqclnup = 0;
 		}
 		mutex_exit(&aiop->aio_mutex);
 		if (poked) {
@@ -2761,17 +2776,26 @@ aio_cleanup_thread(aio_t *aiop)
 			 *    to break the loop it is necessary that
 			 *    - AS_UNMAPWAIT is set (as_unmap is waiting for
 			 *	memory to be unlocked)
-			 *    - some transactions are still pending
 			 *    - AIO_CLEANUP is not set
 			 *	(if AIO_CLEANUP is set we have to wait for
 			 *	pending requests. aio_done will send a signal
 			 *	for every request which completes to continue
 			 *	unmapping the corresponding address range)
+			 * 3. A cleanup request will wake this thread up, ex.
+			 *    by the DR operations. The aio_rqclnup flag will
+			 *    be set.
 			 */
 			while (poked == 0) {
-				if ((AS_ISUNMAPWAIT(as) != 0) &&
-				    (aiop->aio_pending != 0) &&
-				    ((aiop->aio_flags & AIO_CLEANUP) == 0))
+				/*
+				 * we need to handle cleanup requests
+				 * that come in after we had just cleaned up,
+				 * so that we do cleanup of any new aio
+				 * requests that got completed and have
+				 * locked resources.
+				 */
+				if ((aiop->aio_rqclnup ||
+					(AS_ISUNMAPWAIT(as) != 0)) &&
+					(aiop->aio_flags & AIO_CLEANUP) == 0)
 					break;
 				poked = !cv_wait_sig(cvp, &as->a_contents);
 				if (AS_ISUNMAPWAIT(as) == 0)

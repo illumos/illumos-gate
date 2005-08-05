@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,6 +108,7 @@ typedef struct aio {
 	int		aio_outstanding;	/* total # of requests */
 	int		aio_ok;			/* everything ok when set */
 	int		aio_flags;		/* flags */
+	int		aio_rqclnup;		/* cleanup request used by DR */
 	int		aio_portpendcnt;	/* # pending req. per port */
 	aio_req_t	*aio_portq;  		/* port queue head */
 	aio_req_t	*aio_portcleanupq;	/* port cleanup queue head */
