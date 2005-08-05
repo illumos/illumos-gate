@@ -758,7 +758,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 			/* XXX Adjust first 4 IDE registers */
 			if (pciide) {
-				if (subclass == PCI_MASS_OTHER)
+				if (subclass != PCI_MASS_IDE)
 					progclass = (PCI_IDE_IF_NATIVE_PRI |
 					    PCI_IDE_IF_NATIVE_SEC);
 				hard_decode = pciIdeAdjustBAR(progclass, j,
