@@ -4418,6 +4418,7 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 	int path_len;
 	char rmlink[PATH_MAX + 1];
 	nvlist_t *nvl = NULL;
+	int skip;
 
 	/*
 	 * dev links can go away as part of hot cleanup.
@@ -4452,25 +4453,27 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 				 * the next valid link.
 				 */
 				head->nextlink = link->next;
-				if (strncmp(link->contents, path,
-					path_len) == 0) {
+				if (minor_name)
+					skip = strcmp(link->contents, path);
+				else
+					skip = strncmp(link->contents, path,
+					    path_len);
+				if (skip ||
+				    (call_minor_init(rm->modptr) ==
+				    DEVFSADM_FAILURE))
+					continue;
 
-					if (call_minor_init(rm->modptr) ==
-					    DEVFSADM_FAILURE)
-						continue;
-
-					vprint(REMOVE_MID,
-						"%sremoving %s -> %s\n", fcn,
-						link->devlink, link->contents);
-					/*
-					 * Use a copy of the cached link name
-					 * as the cache entry will go away
-					 * during link removal
-					 */
-					(void) snprintf(rmlink, sizeof (rmlink),
-					    "%s", link->devlink);
-					(*(rm->remove->callback_fcn))(rmlink);
-				}
+				vprint(REMOVE_MID,
+					"%sremoving %s -> %s\n", fcn,
+					link->devlink, link->contents);
+				/*
+				 * Use a copy of the cached link name
+				 * as the cache entry will go away
+				 * during link removal
+				 */
+				(void) snprintf(rmlink, sizeof (rmlink),
+				    "%s", link->devlink);
+				(*(rm->remove->callback_fcn))(rmlink);
 			}
 		}
 	}
