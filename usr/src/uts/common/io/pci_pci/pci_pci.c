@@ -203,9 +203,11 @@ static uint_t ppb_set_cache_line_size_register = 1;
  */
 static void ppb_removechild(dev_info_t *);
 static int ppb_initchild(dev_info_t *child);
-static int ppb_create_pci_prop(dev_info_t *);
 static void ppb_save_config_regs(ppb_devstate_t *ppb_p);
 static void ppb_restore_config_regs(ppb_devstate_t *ppb_p);
+#if	defined(__sparc)
+static int ppb_create_pci_prop(dev_info_t *);
+#endif	/* defined(__sparc) */
 
 
 int
@@ -400,7 +402,7 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	}
 
 	*(int *)result = 0;
-	if (ddi_getlongprop(DDI_DEV_T_NONE, rdip,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip,
 		DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
 		(caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -476,7 +478,6 @@ ppb_initchild(dev_info_t *child)
 {
 	struct ddi_parent_private_data *pdptr;
 	char name[MAXNAMELEN];
-	int ret;
 	ddi_acc_handle_t config_handle;
 	ushort_t command_preserve, command;
 #if !defined(__i386) && !defined(__amd64)
@@ -484,6 +485,7 @@ ppb_initchild(dev_info_t *child)
 	uchar_t header_type;
 #endif
 #if defined(__sparc)
+	int ret;
 	uchar_t min_gnt, latency_timer;
 	ppb_devstate_t *ppb;
 #endif
@@ -531,8 +533,11 @@ ppb_initchild(dev_info_t *child)
 		return (DDI_NOT_WELL_FORMED);
 	}
 
+	/* transfer select properties from PROM to kernel */
+#if	defined(__sparc)
 	if ((ret = ppb_create_pci_prop(child)) != DDI_SUCCESS)
 		return (ret);
+#endif	/* defined(__sparc) */
 
 	if (ddi_getprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS, "interrupts",
 		-1) != -1) {
@@ -663,6 +668,11 @@ ppb_removechild(dev_info_t *dip)
 	impl_rem_dev_props(dip);
 }
 
+/*
+ * Transfer select properties from PROM to kernel.
+ * For x86 pci is already enumerated by the kernel.
+ */
+#if	defined(__sparc)
 static int
 ppb_create_pci_prop(dev_info_t *child)
 {
@@ -671,7 +681,7 @@ ppb_create_pci_prop(dev_info_t *child)
 	int	value;
 
 	/* get child "reg" property */
-	value = ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_CANSLEEP,
+	value = ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_CANSLEEP,
 		"reg", (caddr_t)&pci_rp, &length);
 	if (value != DDI_SUCCESS)
 		return (value);
@@ -705,6 +715,7 @@ ppb_create_pci_prop(dev_info_t *child)
 		"interrupts", value);
 	return (DDI_SUCCESS);
 }
+#endif	/* defined(__sparc) */
 
 
 /*
