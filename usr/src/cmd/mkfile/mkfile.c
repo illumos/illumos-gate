@@ -22,7 +22,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
 #include <libintl.h>
 #include <errno.h>
 
-#define	WRITEBUF_SIZE	8192
-
 #define	MIN(a, b)	((a) < (b) ? (a) : (b))
 
 #define	BLOCK_SIZE	512		/* bytes */
@@ -49,8 +47,6 @@
 
 static void usage(void);
 
-char buf[WRITEBUF_SIZE];
-
 int
 main(int argc, char **argv)
 {
@@ -58,6 +54,8 @@ main(int argc, char **argv)
 	off_t	size;
 	size_t	len;
 	size_t	mult = 1;
+	char	*buf = NULL;
+	size_t	bufsz = 0;
 	int	errors = 0;
 	int	i;
 	int	verbose = 0;	/* option variable */
@@ -107,14 +105,15 @@ main(int argc, char **argv)
 			mult = GIGABYTE;
 			break;
 		default:
-			(void) fprintf(stderr, "unknown size %s\n", argv[1]);
+			(void) fprintf(stderr,
+			    gettext("unknown size %s\n"), argv[1]);
 			usage();
 		}
 
 		for (i = 0; i <= (len-2); i++) {
 			if (!isdigit(argv[1][i])) {
-				(void) fprintf(stderr, "unknown size "
-					"%s\n", argv[1]);
+				(void) fprintf(stderr,
+				    gettext("unknown size %s\n"), argv[1]);
 				usage();
 			}
 		}
@@ -129,8 +128,8 @@ main(int argc, char **argv)
 		int fd;
 
 		if (verbose)
-			(void) fprintf(stdout, "%s %lld bytes\n", argv[1],
-			    (offset_t)size);
+			(void) fprintf(stdout, gettext("%s %lld bytes\n"),
+			    argv[1], (offset_t)size);
 		fd = open(argv[1], O_CREAT|O_TRUNC|O_RDWR, FILE_MODE);
 		if (fd < 0) {
 			saverr = errno;
@@ -166,6 +165,7 @@ main(int argc, char **argv)
 
 		if (!nobytes) {
 			off_t written = 0;
+			struct stat64 st;
 
 			if (lseek(fd, (off_t)0, SEEK_SET) < 0) {
 				saverr = errno;
@@ -178,10 +178,37 @@ main(int argc, char **argv)
 				argc--;
 				continue;
 			}
+			if (fstat64(fd, &st) < 0) {
+				saverr = errno;
+				(void) fprintf(stderr, gettext(
+				    "Could not fstat64 %s: %s\n"),
+				    argv[1], strerror(saverr));
+				(void) close(fd);
+				errors++;
+				argv++;
+				argc--;
+				continue;
+			}
+			if (bufsz != st.st_blksize) {
+				if (buf)
+					free(buf);
+				bufsz = (size_t)st.st_blksize;
+				buf = calloc(bufsz, 1);
+				if (buf == NULL) {
+					(void) fprintf(stderr, gettext(
+					    "Could not allocate buffer of"
+					    " size %d\n"), (int)bufsz);
+					(void) close(fd);
+					bufsz = 0;
+					errors++;
+					argv++;
+					argc--;
+					continue;
+				}
+			}
 			while (written < size) {
 				ssize_t result;
-				size_t bytes = (size_t)MIN(sizeof (buf),
-					size-written);
+				size_t bytes = (size_t)MIN(bufsz, size-written);
 
 				if ((result = write(fd, buf, bytes)) !=
 				    (ssize_t)bytes) {
@@ -229,8 +256,8 @@ main(int argc, char **argv)
 		 * to fail, but do issue a warning.
 		 */
 		if (chmod(argv[1], FILE_MODE) < 0)
-			(void) fprintf(stderr,
-			    "warning: couldn't set mode to %#o\n", FILE_MODE);
+			(void) fprintf(stderr, gettext(
+			    "warning: couldn't set mode to %#o\n"), FILE_MODE);
 
 		argv++;
 		argc--;
@@ -240,8 +267,8 @@ main(int argc, char **argv)
 
 static void usage()
 {
-	(void) fprintf(stderr,
-		"Usage: mkfile [-nv] <size>[g|k|b|m] <name1> [<name2>] ...\n");
+	(void) fprintf(stderr, gettext(
+		"Usage: mkfile [-nv] <size>[g|k|b|m] <name1> [<name2>] ...\n"));
 	exit(1);
 	/* NOTREACHED */
 }
