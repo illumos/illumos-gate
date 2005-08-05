@@ -3648,11 +3648,14 @@ int
 i_ndi_make_spec_children(dev_info_t *pdip, uint_t flags)
 {
 	extern struct hwc_spec *hwc_get_child_spec(dev_info_t *, major_t);
+	int			circ;
+	struct hwc_spec		*list, *spec;
 
-	struct hwc_spec *list, *spec;
-
-	if (DEVI(pdip)->devi_flags & DEVI_MADE_CHILDREN)
+	ndi_devi_enter(pdip, &circ);
+	if (DEVI(pdip)->devi_flags & DEVI_MADE_CHILDREN) {
+		ndi_devi_exit(pdip, circ);
 		return (DDI_SUCCESS);
+	}
 
 	list = hwc_get_child_spec(pdip, (major_t)-1);
 	for (spec = list; spec != NULL; spec = spec->hwc_next) {
@@ -3663,6 +3666,7 @@ i_ndi_make_spec_children(dev_info_t *pdip, uint_t flags)
 	mutex_enter(&DEVI(pdip)->devi_lock);
 	DEVI(pdip)->devi_flags |= DEVI_MADE_CHILDREN;
 	mutex_exit(&DEVI(pdip)->devi_lock);
+	ndi_devi_exit(pdip, circ);
 	return (DDI_SUCCESS);
 }
 
@@ -5273,16 +5277,21 @@ ndi_devi_findchild(dev_info_t *pdip, char *devname)
 static int
 reset_nexus_flags(dev_info_t *dip, void *arg)
 {
-	struct hwc_spec *list;
+	struct hwc_spec	*list;
+	int		circ;
 
 	if (((DEVI(dip)->devi_flags & DEVI_MADE_CHILDREN) == 0) ||
 	    ((list = hwc_get_child_spec(dip, (major_t)(uintptr_t)arg)) == NULL))
 		return (DDI_WALK_CONTINUE);
 
 	hwc_free_spec_list(list);
+
+	/* coordinate child state update */
+	ndi_devi_enter(dip, &circ);
 	mutex_enter(&DEVI(dip)->devi_lock);
 	DEVI(dip)->devi_flags &= ~(DEVI_MADE_CHILDREN | DEVI_ATTACHED_CHILDREN);
 	mutex_exit(&DEVI(dip)->devi_lock);
+	ndi_devi_exit(dip, circ);
 
 	return (DDI_WALK_CONTINUE);
 }
