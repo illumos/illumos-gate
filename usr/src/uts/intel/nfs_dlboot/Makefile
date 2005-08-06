@@ -22,7 +22,7 @@
 #
 # uts/intel/nfs_dlboot/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,6 +63,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides.
 #
 CPPFLAGS	+= -DDHCP_CLIENT -I$(COM_DIR)
+LDFLAGS		+= -dy -Nmisc/strplumb -Nstrmod/rpcmod
 
 #
 #	Default build targets.

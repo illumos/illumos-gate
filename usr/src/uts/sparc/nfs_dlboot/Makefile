@@ -22,7 +22,7 @@
 #
 # uts/sparc/nfs_dlboot/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -64,6 +64,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
 LINTFLAGS	+= -I$(COM_DIR)
+LDFLAGS		+= -dy -Nmisc/strplumb -Nstrmod/rpcmod
 
 #
 #	Default build targets.

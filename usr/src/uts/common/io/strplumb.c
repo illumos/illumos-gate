@@ -659,10 +659,10 @@ static uchar_t boot_macaddr[16];
 static int boot_maclen;
 static uchar_t *getmacaddr(dev_info_t *dip, int *maclen);
 static int matchmac(dev_info_t *dip, void *arg);
-extern int dl_attach(ldi_handle_t lh, int unit);
-extern int dl_bind(ldi_handle_t lh, uint_t sap, uint_t max_conn,
+int dl_attach(ldi_handle_t lh, int unit);
+int dl_bind(ldi_handle_t lh, uint_t sap, uint_t max_conn,
     uint_t service, uint_t conn_mgmt);
-extern int dl_phys_addr(ldi_handle_t lh, struct ether_addr *eaddr);
+int dl_phys_addr(ldi_handle_t lh, struct ether_addr *eaddr);
 
 char *
 strplumb_get_netdev_path(void)
@@ -842,3 +842,238 @@ getmacaddr(dev_info_t *dip, int *maclenp)
 }
 
 #endif	/* !__sparc */
+
+int
+dl_attach(ldi_handle_t lh, int unit)
+{
+	dl_attach_req_t *attach_req;
+	dl_error_ack_t *error_ack;
+	union DL_primitives *dl_prim;
+	mblk_t *mp;
+	int error;
+
+	if ((mp = allocb(sizeof (dl_attach_req_t), BPRI_MED)) == NULL) {
+		cmn_err(CE_WARN, "dl_attach: allocb failed");
+		return (ENOSR);
+	}
+	mp->b_datap->db_type = M_PROTO;
+	mp->b_wptr += sizeof (dl_attach_req_t);
+
+	attach_req = (dl_attach_req_t *)mp->b_rptr;
+	attach_req->dl_primitive = DL_ATTACH_REQ;
+	attach_req->dl_ppa = unit;
+
+	(void) ldi_putmsg(lh, mp);
+	if ((error = ldi_getmsg(lh, &mp, (timestruc_t *)NULL)) != 0) {
+		printf("dl_attach: ldi_getmsg failed: %d\n", error);
+		return (error);
+	}
+
+	dl_prim = (union DL_primitives *)mp->b_rptr;
+	switch (dl_prim->dl_primitive) {
+	case DL_OK_ACK:
+		if ((mp->b_wptr-mp->b_rptr) < sizeof (dl_ok_ack_t)) {
+			printf("dl_attach: DL_OK_ACK protocol error\n");
+			break;
+		}
+		if (((dl_ok_ack_t *)dl_prim)->dl_correct_primitive !=
+		    DL_ATTACH_REQ) {
+			printf("dl_attach: DL_OK_ACK rtnd prim %u\n",
+			    ((dl_ok_ack_t *)dl_prim)->dl_correct_primitive);
+			break;
+		}
+		freemsg(mp);
+		return (0);
+
+	case DL_ERROR_ACK:
+		if ((mp->b_wptr-mp->b_rptr) < sizeof (dl_error_ack_t)) {
+			printf("dl_attach: DL_ERROR_ACK protocol error\n");
+			break;
+		}
+
+		error_ack = (dl_error_ack_t *)dl_prim;
+		switch (error_ack->dl_errno) {
+		case DL_BADPPA:
+			printf("dl_attach: DL_ERROR_ACK bad PPA\n");
+			break;
+
+		case DL_ACCESS:
+			printf("dl_attach: DL_ERROR_ACK access error\n");
+			break;
+
+		default:
+			printf("dl_attach: DLPI error %u\n",
+			    error_ack->dl_errno);
+			break;
+		}
+		break;
+
+	default:
+		printf("dl_attach: bad ACK header %u\n", dl_prim->dl_primitive);
+		break;
+	}
+
+	/*
+	 * Error return only.
+	 */
+	freemsg(mp);
+	return (-1);
+}
+
+int
+dl_bind(ldi_handle_t lh, uint_t sap, uint_t max_conn, uint_t service,
+	uint_t conn_mgmt)
+{
+	dl_bind_req_t *bind_req;
+	dl_error_ack_t *error_ack;
+	union DL_primitives *dl_prim;
+	mblk_t *mp;
+	int error;
+
+	if ((mp = allocb(sizeof (dl_bind_req_t), BPRI_MED)) == NULL) {
+		cmn_err(CE_WARN, "dl_bind: allocb failed");
+		return (ENOSR);
+	}
+	mp->b_datap->db_type = M_PROTO;
+
+	bind_req = (dl_bind_req_t *)mp->b_wptr;
+	mp->b_wptr += sizeof (dl_bind_req_t);
+	bind_req->dl_primitive = DL_BIND_REQ;
+	bind_req->dl_sap = sap;
+	bind_req->dl_max_conind = max_conn;
+	bind_req->dl_service_mode = service;
+	bind_req->dl_conn_mgmt = conn_mgmt;
+	bind_req->dl_xidtest_flg = 0;
+
+	(void) ldi_putmsg(lh, mp);
+	if ((error = ldi_getmsg(lh, &mp, (timestruc_t *)NULL)) != 0) {
+		printf("dl_bind: ldi_getmsg failed: %d\n", error);
+		return (error);
+	}
+
+	dl_prim = (union DL_primitives *)mp->b_rptr;
+	switch (dl_prim->dl_primitive) {
+	case DL_BIND_ACK:
+		if ((mp->b_wptr-mp->b_rptr) < sizeof (dl_bind_ack_t)) {
+			printf("dl_bind: DL_BIND_ACK protocol error\n");
+			break;
+		}
+		if (((dl_bind_ack_t *)dl_prim)->dl_sap != sap) {
+			printf("dl_bind: DL_BIND_ACK bad sap %u\n",
+			    ((dl_bind_ack_t *)dl_prim)->dl_sap);
+			break;
+		}
+		freemsg(mp);
+		return (0);
+
+	case DL_ERROR_ACK:
+		if ((mp->b_wptr-mp->b_rptr) < sizeof (dl_error_ack_t)) {
+			printf("dl_bind: DL_ERROR_ACK protocol error\n");
+			break;
+		}
+
+		error_ack = (dl_error_ack_t *)dl_prim;
+		printf("dl_bind: DLPI error %u\n", error_ack->dl_errno);
+		break;
+
+	default:
+		printf("dl_bind: bad ACK header %u\n", dl_prim->dl_primitive);
+		break;
+	}
+
+	/*
+	 * Error return only.
+	 */
+	freemsg(mp);
+	return (-1);
+}
+
+int
+dl_phys_addr(ldi_handle_t lh, struct ether_addr *eaddr)
+{
+	dl_phys_addr_req_t *phys_addr_req;
+	dl_phys_addr_ack_t *phys_addr_ack;
+	dl_error_ack_t *error_ack;
+	union DL_primitives *dl_prim;
+	mblk_t *mp;
+	int error;
+	uchar_t *addrp;
+	timestruc_t tv;
+
+	if ((mp = allocb(sizeof (dl_phys_addr_req_t), BPRI_MED)) ==
+	    (mblk_t *)NULL) {
+		cmn_err(CE_WARN, "dl_phys_addr: allocb failed");
+		return (ENOSR);
+	}
+	mp->b_datap->db_type = M_PROTO;
+	mp->b_wptr += sizeof (dl_phys_addr_req_t);
+
+	phys_addr_req = (dl_phys_addr_req_t *)mp->b_rptr;
+	phys_addr_req->dl_primitive = DL_PHYS_ADDR_REQ;
+	phys_addr_req->dl_addr_type = DL_CURR_PHYS_ADDR;
+
+	/*
+	 * In case some provider doesn't implement or nack the
+	 * request just wait for 15 seconds.
+	 */
+	tv.tv_sec = 15;
+	tv.tv_nsec = 0;
+
+	(void) ldi_putmsg(lh, mp);
+	error = ldi_getmsg(lh, &mp, &tv);
+	if (error == ETIME) {
+		printf("dl_phys_addr: timed out\n");
+		return (-1);
+	} else if (error != 0) {
+		printf("dl_phys_addr: ldi_getmsg failed: %d\n", error);
+		return (error);
+	}
+
+	dl_prim = (union DL_primitives *)mp->b_rptr;
+	switch (dl_prim->dl_primitive) {
+	case DL_PHYS_ADDR_ACK:
+		if ((mp->b_wptr-mp->b_rptr) < sizeof (dl_phys_addr_ack_t)) {
+			printf("dl_phys_addr: "
+				"DL_PHYS_ADDR_ACK protocol error\n");
+			break;
+		}
+		phys_addr_ack = &dl_prim->physaddr_ack;
+		if (phys_addr_ack->dl_addr_length != sizeof (*eaddr)) {
+			printf("dl_phys_addr: DL_PHYS_ADDR_ACK bad len %u\n",
+				phys_addr_ack->dl_addr_length);
+			break;
+		}
+		if (phys_addr_ack->dl_addr_length +
+		    phys_addr_ack->dl_addr_offset > (mp->b_wptr-mp->b_rptr)) {
+			printf("dl_phys_addr: DL_PHYS_ADDR_ACK bad len %u\n",
+				phys_addr_ack->dl_addr_length);
+			break;
+		}
+		addrp = mp->b_rptr + phys_addr_ack->dl_addr_offset;
+		bcopy(addrp, eaddr, sizeof (*eaddr));
+		freemsg(mp);
+		return (0);
+
+	case DL_ERROR_ACK:
+		if ((mp->b_wptr-mp->b_rptr) < sizeof (dl_error_ack_t)) {
+			printf("dl_phys_addr: DL_ERROR_ACK protocol error\n");
+			break;
+		}
+
+		error_ack = (dl_error_ack_t *)dl_prim;
+		printf("dl_phys_addr: DLPI error %u\n",
+		    error_ack->dl_errno);
+		break;
+
+	default:
+		printf("dl_phys_addr: bad ACK header %u\n",
+			dl_prim->dl_primitive);
+		break;
+	}
+
+	/*
+	 * Error return only.
+	 */
+	freemsg(mp);
+	return (-1);
+}

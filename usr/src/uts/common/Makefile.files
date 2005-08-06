@@ -1082,7 +1082,7 @@ KGSS_KRB5_OBJS += krb5mech.o \
 
 DES_OBJS +=	des_crypt.o des_cbc_crypt.o des_impl.o des_ks.o des_soft.o
 
-DLBOOT_OBJS +=	bootparam_xdr.o nfs_dlinet.o octet.o scan.o
+DLBOOT_OBJS +=	bootparam_xdr.o nfs_dlinet.o scan.o
 
 GLM_OBJS +=	glm.o
 
@@ -1106,7 +1106,7 @@ SCSI_VHCI_OBJS +=	scsi_vhci.o		\
 			emc_asymmetric_fops.o	\
 			proprietary_vhci_util.o
 
-STRPLUMB_OBJS += strplumb.o
+STRPLUMB_OBJS += strplumb.o octet.o
 
 CPR_OBJS +=	cpr_driver.o cpr_dump.o \
 		cpr_main.o cpr_misc.o cpr_mod.o cpr_stat.o \

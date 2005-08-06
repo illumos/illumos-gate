@@ -953,8 +953,8 @@ static void solaris_config_file (void)
 	} else {
 		char *cp = config_file;
 		/* skip leading slashes for tftp */
-		while (*cp++ == '/')
-			;
+		while (*cp == '/')
+			++cp;
 	  	grub_memmove (config_file, cp, strlen(cp) + 1);
 	}
 }

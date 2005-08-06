@@ -59,7 +59,8 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 # overrides
-LDFLAGS		+= -dy -Nmisc/nfs_dlboot -Nmisc/mac
+LDFLAGS	+= -dy -Nmisc/mac
+
 #
 #	Default build targets.
 #
