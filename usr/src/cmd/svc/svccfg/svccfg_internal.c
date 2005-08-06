@@ -391,7 +391,7 @@ internal_pgroup_free(pgroup_t *pg)
 	while ((prop = uu_list_teardown(pg->sc_pgroup_props, &cookie)) != NULL)
 		internal_property_free(prop);
 
-	free(pg);
+	uu_free(pg);
 }
 
 static pgroup_t *
@@ -1164,7 +1164,8 @@ prop_equal(property_t *p1, property_t *p2, const char *fmri, const char *pgname,
 }
 
 int
-pg_attrs_equal(pgroup_t *pg1, pgroup_t *pg2, const char *fmri, int new)
+pg_attrs_equal(const pgroup_t *pg1, const pgroup_t *pg2, const char *fmri,
+    int new)
 {
 	if (strcmp(pg1->sc_pgroup_name, pg2->sc_pgroup_name) != 0) {
 		assert(fmri == NULL);

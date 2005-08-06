@@ -160,6 +160,8 @@ static const char *emsg_pg_mod_perm;
 static const char *emsg_pg_add_perm;
 static const char *emsg_pg_del_perm;
 static const char *emsg_snap_perm;
+static const char *emsg_dpt_dangling;
+static const char *emsg_dpt_no_dep;
 
 static int li_only;
 static int no_refresh = 0;
@@ -177,23 +179,25 @@ static scf_iter_t *imp_iter = NULL;
 static scf_iter_t *imp_rpg_iter = NULL;
 static scf_iter_t *imp_up_iter = NULL;
 static scf_transaction_t *imp_tx = NULL;	/* always reset this */
-static scf_transaction_t *imp_tx2 = NULL;
 static char *imp_str = NULL;
 static size_t imp_str_sz;
 static char *imp_tsname = NULL;
 static char *imp_fe1 = NULL;		/* for fmri_equal() */
 static char *imp_fe2 = NULL;
+static uu_list_t *imp_deleted_dpts = NULL;	/* pgroup_t's to refresh */
 
 /* upgrade_dependents() globals */
 static scf_instance_t *ud_inst = NULL;
 static scf_snaplevel_t *ud_snpl = NULL;
 static scf_propertygroup_t *ud_pg = NULL;
 static scf_propertygroup_t *ud_cur_depts_pg = NULL;
-static int ud_cur_depts_pg_set = NULL;
+static scf_propertygroup_t *ud_run_dpts_pg = NULL;
+static int ud_run_dpts_pg_set = 0;
 static scf_property_t *ud_prop = NULL;
 static scf_property_t *ud_dpt_prop = NULL;
 static scf_value_t *ud_val = NULL;
 static scf_iter_t *ud_iter = NULL, *ud_iter2 = NULL;
+static scf_transaction_t *ud_tx = NULL;
 static char *ud_ctarg = NULL;
 static char *ud_oldtarg = NULL;
 static char *ud_name = NULL;
@@ -430,13 +434,15 @@ get_snaplevel(scf_snapshot_t *snap, int get_svc, scf_snaplevel_t *snpl)
  * pg to the property group named name in it.  If no such snaplevel could be
  * found, set pg to the service's current property group named name.
  *
+ * iter, inst, snap, and snpl are required scratch objects.
+ *
  * Returns
  *   0 - success
  *   ECONNABORTED - repository connection broken
  *   ECANCELED - ent was deleted
  *   ENOENT - no such property group
  *   EINVAL - name is an invalid property group name
- *   EBADF - snapshot is missing a snaplevel
+ *   EBADF - found running snapshot is missing a snaplevel
  */
 static int
 entity_get_running_pg(void *ent, int issvc, const char *name,
@@ -837,7 +843,7 @@ lscf_init()
 	emsg_pg_changed = gettext("%s changed unexpectedly "
 	    "(property group \"%s\" changed).\n");
 	emsg_pg_deleted = gettext("%s changed unexpectedly "
-	    "(property group \"%s\" deleted).\n");
+	    "(property group \"%s\" or an ancestor was deleted).\n");
 	emsg_pg_mod_perm = gettext("Could not modify property group \"%s\" "
 	    "in %s (permission denied).\n");
 	emsg_pg_add_perm = gettext("Could not create property group \"%s\" "
@@ -846,6 +852,13 @@ lscf_init()
 	    "in %s (permission denied).\n");
 	emsg_snap_perm = gettext("Could not take \"%s\" snapshot of %s "
 	    "(permission denied).\n");
+	emsg_dpt_dangling = gettext("Conflict upgrading %s (not importing "
+	    "new dependent \"%s\" because it already exists).  Warning: The "
+	    "current dependent's target (%s) does not exist.\n");
+	emsg_dpt_no_dep = gettext("Conflict upgrading %s (not importing new "
+	    "dependent \"%s\" because it already exists).  Warning: The "
+	    "current dependent's target (%s) does not have a dependency named "
+	    "\"%s\" as expected.\n");
 
 	string_pool = uu_list_pool_create("strings", sizeof (string_list_t),
 	    offsetof(string_list_t, node), NULL, 0);
@@ -1673,9 +1686,8 @@ add_pg:
 				return (stash_scferror(lcbdata));
 
 			case SCF_ERROR_NOT_FOUND:
-				warn(gettext("%s changed unexpectedly "
-				    "(property group \"%s\" added).\n"),
-				    lcbdata->sc_target_fmri, p->sc_pgroup_name);
+				warn(emsg_pg_deleted, lcbdata->sc_target_fmri,
+				    p->sc_pgroup_name);
 				lcbdata->sc_err = EBUSY;
 				return (UU_WALK_ERROR);
 
@@ -1693,9 +1705,8 @@ add_pg:
 		if (scf_pg_delete(imp_pg) != 0) {
 			switch (scf_error()) {
 			case SCF_ERROR_DELETED:
-				warn(gettext("%s changed unexpectedly "
-				    "(property group \"%s\" deleted).\n"),
-				    lcbdata->sc_target_fmri, p->sc_pgroup_name);
+				warn(emsg_pg_deleted, lcbdata->sc_target_fmri,
+				    p->sc_pgroup_name);
 				lcbdata->sc_err = EBUSY;
 				return (UU_WALK_ERROR);
 
@@ -1873,7 +1884,8 @@ lscf_import_instance_pgs(scf_instance_t *inst, const char *target_fmri,
  * Report the reasons why we can't upgrade pg2 to pg1.
  */
 static void
-report_pg_diffs(pgroup_t *pg1, pgroup_t *pg2, const char *fmri, int new)
+report_pg_diffs(const pgroup_t *pg1, const pgroup_t *pg2, const char *fmri,
+    int new)
 {
 	property_t *p1, *p2;
 
@@ -2449,6 +2461,8 @@ lscf_dependent_import(void *a1, void *pvt)
 
 static int upgrade_dependent(const scf_property_t *, const entity_t *,
     const scf_snaplevel_t *, scf_transaction_t *);
+static int handle_dependent_conflict(const entity_t *, const scf_property_t *,
+    const pgroup_t *);
 
 /*
  * Upgrade uncustomized dependents of ent to those specified in ient.  Read
@@ -2484,6 +2498,7 @@ static int upgrade_dependent(const scf_property_t *, const entity_t *,
  *   EBADF - snpl is corrupt (error printed)
  *	   - snpl has corrupt pg (error printed)
  *	   - dependency pg in target is corrupt (error printed)
+ *	   - target has corrupt snapshot (error printed)
  *   EEXIST - dependency pg already existed in target service (error printed)
  */
 static int
@@ -2493,254 +2508,19 @@ upgrade_dependents(const scf_propertygroup_t *li_dpts_pg,
 {
 	pgroup_t *new_dpt_pgroup;
 	scf_callback_t cbdata;
-	int r, unseen, tx_set;
+	int r, unseen, tx_started = 0;
+	int have_cur_depts;
 
 	const char * const dependents = "dependents";
 
 	const int issvc = (ient->sc_etype == SVCCFG_SERVICE_OBJECT);
 
-	/*
-	 * Algorithm: Each single-valued fmri (or astring) property in
-	 * li_dpts_pg represents a dependent tag in the old manifest.  For
-	 * each, decide whether it has been changed in the new manifest (via
-	 * ient).  Do nothing if it hasn't (thereby leaving any user
-	 * customizations).  If it has, decide whether the user has customized
-	 * the dependent since last-import.  If he hasn't, change it as
-	 * prescribed by the new manifest.  If he has, report a conflict and
-	 * don't change anything.
-	 */
-
-	/*
-	 * Clear the seen fields of the dependents, so we can tell which ones
-	 * are new.
-	 */
-	if (uu_list_walk(ient->sc_dependents, clear_int,
-	    (void *)offsetof(pgroup_t, sc_pgroup_seen), UU_DEFAULT) != 0)
-		bad_error("uu_list_walk", uu_error());
-
-	if (li_dpts_pg != NULL) {
-		ud_cur_depts_pg_set = 1;
-		if (running != NULL)
-			r = scf_snaplevel_get_pg(running, dependents,
-			    ud_cur_depts_pg);
-		else
-			r = entity_get_pg(ent, issvc, dependents,
-			    ud_cur_depts_pg);
-		if (r != 0) {
-			switch (scf_error()) {
-			case SCF_ERROR_NOT_FOUND:
-				break;
-
-			case SCF_ERROR_DELETED:
-			case SCF_ERROR_CONNECTION_BROKEN:
-				return (scferror2errno(scf_error()));
-
-			case SCF_ERROR_NOT_SET:
-			case SCF_ERROR_INVALID_ARGUMENT:
-			case SCF_ERROR_HANDLE_MISMATCH:
-			case SCF_ERROR_NOT_BOUND:
-			default:
-				bad_error("entity_get_pg", scf_error());
-			}
-
-			ud_cur_depts_pg_set = 0;
-		}
-
-		if (scf_iter_pg_properties(ud_iter, li_dpts_pg) != 0) {
-			switch (scf_error()) {
-			case SCF_ERROR_DELETED:
-				li_dpts_pg = NULL;
-				goto nodpg;
-
-			case SCF_ERROR_CONNECTION_BROKEN:
-				return (ECONNABORTED);
-
-			case SCF_ERROR_HANDLE_MISMATCH:
-			case SCF_ERROR_NOT_BOUND:
-			case SCF_ERROR_NOT_SET:
-			default:
-				bad_error("scf_iter_pg_properties",
-				    scf_error());
-			}
-		}
-
-		tx_set = 0;
-		if (entity_get_pg(ent, issvc, dependents, ud_pg) != 0) {
-			switch (scf_error()) {
-			case SCF_ERROR_NOT_FOUND:
-				break;
-
-			case SCF_ERROR_DELETED:
-			case SCF_ERROR_CONNECTION_BROKEN:
-				return (scferror2errno(scf_error()));
-
-			case SCF_ERROR_NOT_SET:
-			case SCF_ERROR_INVALID_ARGUMENT:
-			case SCF_ERROR_HANDLE_MISMATCH:
-			case SCF_ERROR_NOT_BOUND:
-			default:
-				bad_error("entity_get_pg", scf_error());
-			}
-		} else {
-			if (scf_transaction_start(imp_tx2, ud_pg) != 0) {
-				switch (scf_error()) {
-				case SCF_ERROR_BACKEND_ACCESS:
-				case SCF_ERROR_BACKEND_READONLY:
-				case SCF_ERROR_CONNECTION_BROKEN:
-					return (scferror2errno(scf_error()));
-
-				case SCF_ERROR_DELETED:
-					break;
-
-				case SCF_ERROR_PERMISSION_DENIED:
-					warn(emsg_pg_mod_perm, dependents,
-					    ient->sc_fmri);
-					return (scferror2errno(scf_error()));
-
-				case SCF_ERROR_HANDLE_MISMATCH:
-				case SCF_ERROR_IN_USE:
-				case SCF_ERROR_NOT_BOUND:
-				case SCF_ERROR_NOT_SET:
-				default:
-					bad_error("scf_transaction_start",
-					    scf_error());
-				}
-			} else {
-				tx_set = 1;
-			}
-		}
-
-		for (;;) {
-			int r;
-
-			r = scf_iter_next_property(ud_iter, ud_dpt_prop);
-			if (r == 0)
-				break;
-			if (r == 1) {
-				r = upgrade_dependent(ud_dpt_prop, ient, snpl,
-				    imp_tx2);
-				switch (r) {
-				case 0:
-					continue;
-
-				case ECONNABORTED:
-				case ENOMEM:
-				case ENOSPC:
-				case EBADF:
-				case EBUSY:
-				case EINVAL:
-				case EPERM:
-				case EROFS:
-				case EACCES:
-				case EEXIST:
-					goto txout;
-
-				case ECANCELED:
-					r = ENODEV;
-					goto txout;
-
-				default:
-					bad_error("upgrade_dependent", r);
-				}
-			}
-			if (r != -1)
-				bad_error("scf_iter_next_property", r);
-
-			switch (scf_error()) {
-			case SCF_ERROR_DELETED:
-				r = ENODEV;
-				goto txout;
-
-			case SCF_ERROR_CONNECTION_BROKEN:
-				r = ECONNABORTED;
-				goto txout;
-
-			case SCF_ERROR_NOT_SET:
-			case SCF_ERROR_INVALID_ARGUMENT:
-			case SCF_ERROR_NOT_BOUND:
-			case SCF_ERROR_HANDLE_MISMATCH:
-			default:
-				bad_error("scf_iter_next_property",
-				    scf_error());
-			}
-		}
-
-		if (!tx_set)
-			return (0);
-
-		r = scf_transaction_commit(imp_tx2);
-		switch (r) {
-		case 1:
-			r = 0;
-			break;
-
-		case 0:
-			warn(emsg_pg_changed, ient->sc_fmri, dependents);
-			r = EBUSY;
-			break;
-
-		case -1:
-			switch (scf_error()) {
-			case SCF_ERROR_BACKEND_READONLY:
-			case SCF_ERROR_BACKEND_ACCESS:
-			case SCF_ERROR_CONNECTION_BROKEN:
-			case SCF_ERROR_NO_RESOURCES:
-				r = scferror2errno(scf_error());
-				break;
-
-			case SCF_ERROR_DELETED:
-				warn(emsg_pg_deleted, ient->sc_fmri,
-				    dependents);
-				r = EBUSY;
-				break;
-
-			case SCF_ERROR_PERMISSION_DENIED:
-				warn(emsg_pg_mod_perm, dependents,
-				    ient->sc_fmri);
-				r = EPERM;
-				break;
-
-			case SCF_ERROR_NOT_SET:
-			case SCF_ERROR_INVALID_ARGUMENT:
-			case SCF_ERROR_NOT_BOUND:
-			default:
-				bad_error("scf_transaction_commit",
-				    scf_error());
-			}
-			break;
-
-		default:
-			bad_error("scf_transaction_commit", r);
-		}
-
-txout:
-		scf_transaction_destroy_children(imp_tx2);
-		scf_transaction_reset(imp_tx2);
-		return (r);
-	}
-
-nodpg:
-	/* import unseen dependents */
-	/* If there are none, exit early. */
-	unseen = 0;
-	for (new_dpt_pgroup = uu_list_first(ient->sc_dependents);
-	    new_dpt_pgroup != NULL;
-	    new_dpt_pgroup = uu_list_next(ient->sc_dependents,
-	    new_dpt_pgroup)) {
-		if (!new_dpt_pgroup->sc_pgroup_seen) {
-			unseen = 1;
-			break;
-		}
-	}
-
-	if (unseen == 0)
+	if (li_dpts_pg == NULL && uu_list_numnodes(ient->sc_dependents) == 0)
+		/* Nothing to do. */
 		return (0);
 
-	cbdata.sc_handle = g_hndl;
-	cbdata.sc_parent = ent;
-	cbdata.sc_service = issvc;
-	cbdata.sc_flags = 0;
-
+	/* Fetch the current version of the "dependents" property group. */
+	have_cur_depts = 1;
 	if (entity_get_pg(ent, issvc, dependents, ud_cur_depts_pg) != 0) {
 		switch (scf_error()) {
 		case SCF_ERROR_NOT_FOUND:
@@ -2758,6 +2538,191 @@ nodpg:
 			bad_error("entity_get_pg", scf_error());
 		}
 
+		have_cur_depts = 0;
+	}
+
+	/* Fetch the running version of the "dependents" property group. */
+	ud_run_dpts_pg_set = 0;
+	if (running != NULL)
+		r = scf_snaplevel_get_pg(running, dependents, ud_run_dpts_pg);
+	else
+		r = entity_get_pg(ent, issvc, dependents, ud_run_dpts_pg);
+	if (r == 0) {
+		ud_run_dpts_pg_set = 1;
+	} else {
+		switch (scf_error()) {
+		case SCF_ERROR_NOT_FOUND:
+			break;
+
+		case SCF_ERROR_DELETED:
+		case SCF_ERROR_CONNECTION_BROKEN:
+			return (scferror2errno(scf_error()));
+
+		case SCF_ERROR_NOT_SET:
+		case SCF_ERROR_INVALID_ARGUMENT:
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		default:
+			bad_error(running ? "scf_snaplevel_get_pg" :
+			    "entity_get_pg", scf_error());
+		}
+	}
+
+	/*
+	 * Clear the seen fields of the dependents, so we can tell which ones
+	 * are new.
+	 */
+	if (uu_list_walk(ient->sc_dependents, clear_int,
+	    (void *)offsetof(pgroup_t, sc_pgroup_seen), UU_DEFAULT) != 0)
+		bad_error("uu_list_walk", uu_error());
+
+	if (li_dpts_pg != NULL) {
+		/*
+		 * Each property in li_dpts_pg represents a dependent tag in
+		 * the old manifest.  For each, call upgrade_dependent(),
+		 * which will change ud_cur_depts_pg or dependencies in other
+		 * services as appropriate.  Note (a) that changes to
+		 * ud_cur_depts_pg are accumulated in ud_tx so they can all be
+		 * made en masse, and (b) it's ok if the entity doesn't have
+		 * a current version of the "dependents" property group,
+		 * because we'll just consider all dependents as customized
+		 * (by being deleted).
+		 */
+
+		if (scf_iter_pg_properties(ud_iter, li_dpts_pg) != 0) {
+			switch (scf_error()) {
+			case SCF_ERROR_DELETED:
+				return (ENODEV);
+
+			case SCF_ERROR_CONNECTION_BROKEN:
+				return (ECONNABORTED);
+
+			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_NOT_SET:
+			default:
+				bad_error("scf_iter_pg_properties",
+				    scf_error());
+			}
+		}
+
+		if (have_cur_depts &&
+		    scf_transaction_start(ud_tx, ud_cur_depts_pg) != 0) {
+			switch (scf_error()) {
+			case SCF_ERROR_BACKEND_ACCESS:
+			case SCF_ERROR_BACKEND_READONLY:
+			case SCF_ERROR_CONNECTION_BROKEN:
+				return (scferror2errno(scf_error()));
+
+			case SCF_ERROR_DELETED:
+				warn(emsg_pg_deleted, ient->sc_fmri,
+				    dependents);
+				return (EBUSY);
+
+			case SCF_ERROR_PERMISSION_DENIED:
+				warn(emsg_pg_mod_perm, dependents,
+				    ient->sc_fmri);
+				return (scferror2errno(scf_error()));
+
+			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_IN_USE:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_NOT_SET:
+			default:
+				bad_error("scf_transaction_start", scf_error());
+			}
+		}
+		tx_started = have_cur_depts;
+
+		for (;;) {
+			r = scf_iter_next_property(ud_iter, ud_dpt_prop);
+			if (r == 0)
+				break;
+			if (r == 1) {
+				r = upgrade_dependent(ud_dpt_prop, ient, snpl,
+				    tx_started ? ud_tx : NULL);
+				switch (r) {
+				case 0:
+					continue;
+
+				case ECONNABORTED:
+				case ENOMEM:
+				case ENOSPC:
+				case EBADF:
+				case EBUSY:
+				case EINVAL:
+				case EPERM:
+				case EROFS:
+				case EACCES:
+				case EEXIST:
+					break;
+
+				case ECANCELED:
+					r = ENODEV;
+					break;
+
+				default:
+					bad_error("upgrade_dependent", r);
+				}
+
+				if (tx_started)
+					scf_transaction_destroy_children(ud_tx);
+				return (r);
+			}
+			if (r != -1)
+				bad_error("scf_iter_next_property", r);
+
+			switch (scf_error()) {
+			case SCF_ERROR_DELETED:
+				r = ENODEV;
+				break;
+
+			case SCF_ERROR_CONNECTION_BROKEN:
+				r = ECONNABORTED;
+				break;
+
+			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_INVALID_ARGUMENT:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_HANDLE_MISMATCH:
+			default:
+				bad_error("scf_iter_next_property",
+				    scf_error());
+			}
+
+			if (tx_started)
+				scf_transaction_destroy_children(ud_tx);
+			return (r);
+		}
+	}
+
+	/* import unseen dependents */
+	unseen = 0;
+	for (new_dpt_pgroup = uu_list_first(ient->sc_dependents);
+	    new_dpt_pgroup != NULL;
+	    new_dpt_pgroup = uu_list_next(ient->sc_dependents,
+	    new_dpt_pgroup)) {
+		if (!new_dpt_pgroup->sc_pgroup_seen) {
+			unseen = 1;
+			break;
+		}
+	}
+
+	/* If there are none, exit early. */
+	if (unseen == 0)
+		goto commit;
+
+	/* Set up for lscf_dependent_import() */
+	cbdata.sc_handle = g_hndl;
+	cbdata.sc_parent = ent;
+	cbdata.sc_service = issvc;
+	cbdata.sc_flags = 0;
+
+	if (!have_cur_depts) {
+		/*
+		 * We have new dependents to import, so we need a "dependents"
+		 * property group.
+		 */
 		if (issvc)
 			r = scf_service_add_pg(ent, dependents,
 			    SCF_GROUP_FRAMEWORK, 0, ud_cur_depts_pg);
@@ -2774,8 +2739,7 @@ nodpg:
 				return (scferror2errno(scf_error()));
 
 			case SCF_ERROR_EXISTS:
-				warn(emsg_pg_added, ient->sc_fmri,
-				    dependents);
+				warn(emsg_pg_added, ient->sc_fmri, dependents);
 				return (EBUSY);
 
 			case SCF_ERROR_PERMISSION_DENIED:
@@ -2793,9 +2757,9 @@ nodpg:
 		}
 	}
 
-	cbdata.sc_trans = imp_tx2;
+	cbdata.sc_trans = ud_tx;
 
-	if (scf_transaction_start(imp_tx2, ud_cur_depts_pg) != 0) {
+	if (!tx_started && scf_transaction_start(ud_tx, ud_cur_depts_pg) != 0) {
 		switch (scf_error()) {
 		case SCF_ERROR_CONNECTION_BROKEN:
 		case SCF_ERROR_BACKEND_ACCESS:
@@ -2818,6 +2782,7 @@ nodpg:
 			bad_error("scf_transaction_start", scf_error());
 		}
 	}
+	tx_started = 1;
 
 	for (new_dpt_pgroup = uu_list_first(ient->sc_dependents);
 	    new_dpt_pgroup != NULL;
@@ -2826,30 +2791,86 @@ nodpg:
 		if (new_dpt_pgroup->sc_pgroup_seen)
 			continue;
 
+		if (ud_run_dpts_pg_set) {
+			/*
+			 * If the dependent is already there, then we have
+			 * a conflict.
+			 */
+			if (scf_pg_get_property(ud_run_dpts_pg,
+			    new_dpt_pgroup->sc_pgroup_name, ud_prop) == 0) {
+				r = handle_dependent_conflict(ient, ud_prop,
+				    new_dpt_pgroup);
+				switch (r) {
+				case 0:
+					continue;
+
+				case ECONNABORTED:
+				case ENOMEM:
+				case EBUSY:
+				case EBADF:
+				case EINVAL:
+					scf_transaction_destroy_children(ud_tx);
+					return (r);
+
+				default:
+					bad_error("handle_dependent_conflict",
+					    r);
+				}
+			} else {
+				switch (scf_error()) {
+				case SCF_ERROR_NOT_FOUND:
+					break;
+
+				case SCF_ERROR_INVALID_ARGUMENT:
+					warn(emsg_fmri_invalid_pg_name,
+					    ient->sc_fmri,
+					    new_dpt_pgroup->sc_pgroup_name);
+					scf_transaction_destroy_children(ud_tx);
+					return (EINVAL);
+
+				case SCF_ERROR_DELETED:
+					warn(emsg_pg_deleted, ient->sc_fmri,
+					    new_dpt_pgroup->sc_pgroup_name);
+					scf_transaction_destroy_children(ud_tx);
+					return (EBUSY);
+
+				case SCF_ERROR_CONNECTION_BROKEN:
+					scf_transaction_destroy_children(ud_tx);
+					return (ECONNABORTED);
+
+				case SCF_ERROR_NOT_BOUND:
+				case SCF_ERROR_HANDLE_MISMATCH:
+				case SCF_ERROR_NOT_SET:
+				default:
+					bad_error("scf_pg_get_property",
+					    scf_error());
+				}
+			}
+		}
+
 		r = lscf_dependent_import(new_dpt_pgroup, &cbdata);
 		if (r != UU_WALK_NEXT) {
 			if (r != UU_WALK_ERROR)
 				bad_error("lscf_dependent_import", r);
 
 			if (cbdata.sc_err == EALREADY) {
-				/*
-				 * Duplicate dependents should have been
-				 * caught.
-				 */
+				/* Collisions were handled preemptively. */
 				bad_error("lscf_dependent_import",
 				    cbdata.sc_err);
 			}
 
-			scf_transaction_destroy_children(imp_tx2);
-			scf_transaction_reset(imp_tx2);
+			scf_transaction_destroy_children(ud_tx);
 			return (cbdata.sc_err);
 		}
 	}
 
-	r = scf_transaction_commit(imp_tx2);
+commit:
+	if (!tx_started)
+		return (0);
 
-	scf_transaction_destroy_children(imp_tx2);
-	scf_transaction_reset(imp_tx2);
+	r = scf_transaction_commit(ud_tx);
+
+	scf_transaction_destroy_children(ud_tx);
 
 	switch (r) {
 	case 1:
@@ -2894,8 +2915,8 @@ nodpg:
  * prop is taken to be a property in the "dependents" property group of snpl,
  * which is taken to be the snaplevel of a last-import snapshot corresponding
  * to ient.  If prop is a valid dependents property, upgrade the dependent it
- * represents according to the repository & ient.  If ud_cur_depts_pg_set is
- * true, then ud_cur_depts_pg is taken to be the "dependents" property group
+ * represents according to the repository & ient.  If ud_run_dpts_pg_set is
+ * true, then ud_run_dpts_pg is taken to be the "dependents" property group
  * of the entity ient represents (possibly in the running snapshot).  If it
  * needs to be changed, an entry will be added to tx, if not NULL.
  *
@@ -2918,7 +2939,7 @@ nodpg:
  *	   - couldn't create dependent (repository read-only)
  *   EACCES - couldn't delete dependency pg (backend access denied)
  *	    - couldn't create dependent (backend access denied)
- *   EBUSY - ud_cur_depts_pg was deleted (error printed)
+ *   EBUSY - ud_run_dpts_pg was deleted (error printed)
  *	   - tx's pg was deleted (error printed)
  *	   - dependent pg was changed or deleted (error printed)
  *   EEXIST - dependency pg already exists in new target (error printed)
@@ -2996,7 +3017,9 @@ upgrade_dependent(const scf_property_t *prop, const entity_t *ient,
 
 	/* If it's not, delete it... if it hasn't been customized. */
 	if (new_dpt_pgroup == NULL) {
-		if (!ud_cur_depts_pg_set)
+		pgroup_t *dpt;
+
+		if (!ud_run_dpts_pg_set)
 			return (0);
 
 		if (scf_property_get_value(prop, ud_val) != 0) {
@@ -3023,7 +3046,7 @@ upgrade_dependent(const scf_property_t *prop, const entity_t *ient,
 		    max_scf_value_len + 1) < 0)
 			bad_error("scf_value_get_as_string", scf_error());
 
-		if (scf_pg_get_property(ud_cur_depts_pg, ud_name, ud_prop) !=
+		if (scf_pg_get_property(ud_run_dpts_pg, ud_name, ud_prop) !=
 		    0) {
 			switch (scf_error()) {
 			case SCF_ERROR_NOT_FOUND:
@@ -3248,6 +3271,25 @@ upgrade_dependent(const scf_property_t *prop, const entity_t *ient,
 			}
 		}
 
+		/*
+		 * This service was changed, so it must be refreshed.  But
+		 * since it's not mentioned in the new manifest, we have to
+		 * record its FMRI here for use later.  We record the name
+		 * & the entity (via sc_parent) in case we need to print error
+		 * messages during the refresh.
+		 */
+		dpt = internal_pgroup_new();
+		if (dpt == NULL)
+			return (ENOMEM);
+		dpt->sc_pgroup_name = strdup(ud_name);
+		dpt->sc_pgroup_fmri = strdup(ud_ctarg);
+		if (dpt->sc_pgroup_name == NULL || dpt->sc_pgroup_fmri == NULL)
+			return (ENOMEM);
+		dpt->sc_parent = (entity_t *)ient;
+		if (uu_list_insert_after(imp_deleted_dpts, NULL, dpt) != 0)
+			uu_die(gettext("libuutil error: %s\n"),
+			    uu_strerror(uu_error()));
+
 delprop:
 		if (tx == NULL)
 			return (0);
@@ -3386,12 +3428,11 @@ delprop:
 	if (new_dpt_pgroup->sc_pgroup_override)
 		goto nocust;
 
-	if (!ud_cur_depts_pg_set) {
+	if (!ud_run_dpts_pg_set) {
 		warn(cf_missing, ient->sc_fmri, ud_name);
 		r = 0;
 		goto out;
-	} else if (scf_pg_get_property(ud_cur_depts_pg, ud_name, ud_prop) !=
-	    0) {
+	} else if (scf_pg_get_property(ud_run_dpts_pg, ud_name, ud_prop) != 0) {
 		switch (scf_error()) {
 		case SCF_ERROR_NOT_FOUND:
 			warn(cf_missing, ient->sc_fmri, ud_name);
@@ -3963,6 +4004,193 @@ out:
 }
 
 /*
+ * new_dpt_pgroup was in the manifest but not the last-import snapshot, so we
+ * would import it, except it seems to exist in the service anyway.  Compare
+ * the existent dependent with the one we would import, and report any
+ * differences (if there are none, be silent).  prop is the property which
+ * represents the existent dependent (in the dependents property group) in the
+ * entity corresponding to ient.
+ *
+ * Returns
+ *   0 - success (Sort of.  At least, we can continue importing.)
+ *   ECONNABORTED - repository connection broken
+ *   EBUSY - ancestor of prop was deleted (error printed)
+ *   ENOMEM - out of memory
+ *   EBADF - corrupt property group (error printed)
+ *   EINVAL - new_dpt_pgroup has invalid target (error printed)
+ */
+static int
+handle_dependent_conflict(const entity_t * const ient,
+    const scf_property_t * const prop, const pgroup_t * const new_dpt_pgroup)
+{
+	int r;
+	scf_type_t ty;
+	scf_error_t scfe;
+	void *tptr;
+	int tissvc;
+	pgroup_t *pgroup;
+
+	if (scf_property_get_value(prop, ud_val) != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+			return (scferror2errno(scf_error()));
+
+		case SCF_ERROR_DELETED:
+			warn(emsg_pg_deleted, ient->sc_fmri,
+			    new_dpt_pgroup->sc_pgroup_name);
+			return (EBUSY);
+
+		case SCF_ERROR_CONSTRAINT_VIOLATED:
+		case SCF_ERROR_NOT_FOUND:
+			warn(gettext("Conflict upgrading %s (not importing "
+			    "dependent \"%s\" because it already exists.)  "
+			    "Warning: The \"%s/%2$s\" property has more or "
+			    "fewer than one value)).\n"), ient->sc_fmri,
+			    new_dpt_pgroup->sc_pgroup_name, "dependents");
+			return (0);
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_NOT_SET:
+		default:
+			bad_error("scf_property_get_value",
+			    scf_error());
+		}
+	}
+
+	ty = scf_value_type(ud_val);
+	assert(ty != SCF_TYPE_INVALID);
+	if (!(ty == SCF_TYPE_FMRI || ty == SCF_TYPE_ASTRING)) {
+		warn(gettext("Conflict upgrading %s (not importing dependent "
+		    "\"%s\" because it already exists).  Warning: The "
+		    "\"%s/%s\" property has unexpected type \"%s\")).\n"),
+		    ient->sc_fmri, new_dpt_pgroup->sc_pgroup_name,
+		    scf_type_to_string(ty), "dependents");
+		return (0);
+	}
+
+	if (scf_value_get_as_string(ud_val, ud_ctarg, max_scf_value_len + 1) <
+	    0)
+		bad_error("scf_value_get_as_string", scf_error());
+
+	r = fmri_equal(ud_ctarg, new_dpt_pgroup->sc_pgroup_fmri);
+	switch (r) {
+	case 0:
+		warn(gettext("Conflict upgrading %s (not importing dependent "
+		    "\"%s\" (target \"%s\") because it already exists with "
+		    "target \"%s\").\n"), ient->sc_fmri,
+		    new_dpt_pgroup->sc_pgroup_name,
+		    new_dpt_pgroup->sc_pgroup_fmri, ud_ctarg);
+		return (0);
+
+	case 1:
+		break;
+
+	case -1:
+		warn(gettext("Conflict upgrading %s (not importing dependent "
+		    "\"%s\" because it already exists).  Warning: The current "
+		    "dependent's target (%s) is invalid.\n"), ient->sc_fmri,
+		    new_dpt_pgroup->sc_pgroup_name, ud_ctarg);
+		return (0);
+
+	case -2:
+		warn(gettext("Dependent \"%s\" of %s has invalid target "
+		    "\"%s\".\n"), new_dpt_pgroup->sc_pgroup_name, ient->sc_fmri,
+		    new_dpt_pgroup->sc_pgroup_fmri);
+		return (EINVAL);
+
+	default:
+		bad_error("fmri_equal", r);
+	}
+
+	/* compare dependency pgs in target */
+	scfe = fmri_to_entity(g_hndl, ud_ctarg, &tptr, &tissvc);
+	switch (scfe) {
+	case SCF_ERROR_NONE:
+		break;
+
+	case SCF_ERROR_NO_MEMORY:
+		return (ENOMEM);
+
+	case SCF_ERROR_NOT_FOUND:
+		warn(emsg_dpt_dangling, ient->sc_fmri,
+		    new_dpt_pgroup->sc_pgroup_name, ud_ctarg);
+		return (0);
+
+	case SCF_ERROR_CONSTRAINT_VIOLATED:
+	case SCF_ERROR_INVALID_ARGUMENT:
+	default:
+		bad_error("fmri_to_entity", scfe);
+	}
+
+	r = entity_get_running_pg(tptr, tissvc, new_dpt_pgroup->sc_pgroup_name,
+	    ud_pg, ud_iter, ud_inst, imp_snap, ud_snpl);
+	switch (r) {
+	case 0:
+		break;
+
+	case ECONNABORTED:
+		return (r);
+
+	case ECANCELED:
+		warn(emsg_dpt_dangling, ient->sc_fmri,
+		    new_dpt_pgroup->sc_pgroup_name, ud_ctarg);
+		return (0);
+
+	case EBADF:
+		if (tissvc)
+			warn(gettext("%s has an instance with a \"%s\" "
+			    "snapshot which is missing a snaplevel.\n"),
+			    ud_ctarg, "running");
+		else
+			warn(gettext("%s has a \"%s\" snapshot which is "
+			    "missing a snaplevel.\n"), ud_ctarg, "running");
+		/* FALLTHROUGH */
+
+	case ENOENT:
+		warn(emsg_dpt_no_dep, ient->sc_fmri,
+		    new_dpt_pgroup->sc_pgroup_name, ud_ctarg,
+		    new_dpt_pgroup->sc_pgroup_name);
+		return (0);
+
+	case EINVAL:
+	default:
+		bad_error("entity_get_running_pg", r);
+	}
+
+	pgroup = internal_pgroup_new();
+	if (pgroup == NULL)
+		return (ENOMEM);
+
+	r = load_pg(ud_pg, &pgroup, ud_ctarg, NULL);
+	switch (r) {
+	case 0:
+		break;
+
+	case ECONNABORTED:
+	case EBADF:
+	case ENOMEM:
+		internal_pgroup_free(pgroup);
+		return (r);
+
+	case ECANCELED:
+		warn(emsg_dpt_no_dep, ient->sc_fmri,
+		    new_dpt_pgroup->sc_pgroup_name, ud_ctarg,
+		    new_dpt_pgroup->sc_pgroup_name);
+		internal_pgroup_free(pgroup);
+		return (0);
+
+	default:
+		bad_error("load_pg", r);
+	}
+
+	/* report differences */
+	report_pg_diffs(new_dpt_pgroup, pgroup, ud_ctarg, 1);
+	internal_pgroup_free(pgroup);
+	return (0);
+}
+
+/*
  * lipg is a property group in the last-import snapshot of ent, which is an
  * scf_service_t or an scf_instance_t (according to ient).  If lipg is not in
  * ient's pgroups, delete it from ent if it hasn't been customized.  If it is
@@ -3998,6 +4226,7 @@ out:
  *	   - dependent pg changed (error printed)
  *   EBADF - imp_snpl is corrupt (error printed)
  *	   - ent has bad pg (error printed)
+ *   EEXIST - dependent collision in target service (error printed)
  */
 static int
 process_old_pg(const scf_propertygroup_t *lipg, entity_t *ient, void *ent,
@@ -4072,10 +4301,14 @@ process_old_pg(const scf_propertygroup_t *lipg, entity_t *ient, void *ent,
 	pgrp.sc_pgroup_name = imp_str;
 	mpg = uu_list_find(ient->sc_pgroups, &pgrp, NULL, NULL);
 
-	if (mpg == NULL || mpg->sc_pgroup_delete) {
-		if (mpg != NULL)
-			mpg->sc_pgroup_seen = 1;
+	if (mpg != NULL)
+		mpg->sc_pgroup_seen = 1;
 
+	/* Special handling for dependents */
+	if (strcmp(imp_str, "dependents") == 0)
+		return (upgrade_dependents(lipg, imp_snpl, ient, running, ent));
+
+	if (mpg == NULL || mpg->sc_pgroup_delete) {
 		/* property group was deleted from manifest */
 		if (entity_get_pg(ent, issvc, imp_str, imp_pg2) != 0) {
 			switch (scf_error()) {
@@ -4181,11 +4414,6 @@ process_old_pg(const scf_propertygroup_t *lipg, entity_t *ient, void *ent,
 
 		return (0);
 	}
-
-	mpg->sc_pgroup_seen = 1;
-
-	if (strcmp(imp_str, "dependents") == 0)
-		return (upgrade_dependents(lipg, imp_snpl, ient, running, ent));
 
 	/*
 	 * Only dependent pgs can have override set, and we skipped those
@@ -4482,6 +4710,7 @@ out:
  *   EBADF - imp_snpl is corrupt (error printed)
  *	   - ent has corrupt pg (error printed)
  *	   - dependent has corrupt pg (error printed)
+ *	   - dependent target has a corrupt snapshot (error printed)
  *   EBUSY - pg was added, changed, or deleted (error printed)
  *	   - dependent target was deleted (error printed)
  *	   - dependent pg changed (error printed)
@@ -4550,6 +4779,7 @@ upgrade_props(void *ent, scf_snaplevel_t *running, scf_snaplevel_t *snpl,
 			case EBADF:
 			case EBUSY:
 			case EINVAL:
+			case EEXIST:
 				return (r);
 
 			default:
@@ -4811,6 +5041,7 @@ again:
  *   EBADF - instance has corrupt last-import snapshot (error printed)
  *	   - instance is corrupt (error printed)
  *	   - dependent has corrupt pg (error printed)
+ *	   - dependent target has a corrupt snapshot (error printed)
  *   -1 - unknown libscf error (error printed)
  */
 static int
@@ -4829,7 +5060,7 @@ lscf_instance_import(void *v, void *pvt)
 	const char * const emsg_tchg = gettext("Temporary instance svc:/%s:%s "
 	    "changed unexpectedly.\n");
 	const char * const emsg_del = gettext("%s changed unexpectedly "
-	    "(instance \"%s\" was deleted.\n");
+	    "(instance \"%s\" was deleted.)\n");
 	const char * const emsg_badsnap = gettext(
 	    "\"%s\" snapshot of %s is corrupt (missing a snaplevel).\n");
 
@@ -5465,6 +5696,7 @@ connaborted:
  *	   - a dependent is corrupt (error printed)
  *	   - an instance is corrupt (error printed)
  *	   - an instance has a corrupt last-import snapshot (error printed)
+ *	   - dependent target has a corrupt snapshot (error printed)
  *   -1 - unknown libscf error (error printed)
  */
 static int
@@ -6426,6 +6658,8 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 	entity_t *svc, *inst;
 	uu_list_t *insts;
 	int r;
+	pgroup_t *old_dpt;
+	void *cookie;
 
 	const char * const emsg_nomem = gettext("Out of memory.\n");
 	const char * const emsg_nores =
@@ -6454,20 +6688,22 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 	    (imp_rpg_iter = scf_iter_create(g_hndl)) == NULL ||
 	    (imp_up_iter = scf_iter_create(g_hndl)) == NULL ||
 	    (imp_tx = scf_transaction_create(g_hndl)) == NULL ||
-	    (imp_tx2 = scf_transaction_create(g_hndl)) == NULL ||
 	    (imp_str = malloc(imp_str_sz)) == NULL ||
 	    (imp_tsname = malloc(max_scf_name_len + 1)) == NULL ||
 	    (imp_fe1 = malloc(max_scf_fmri_len + 1)) == NULL ||
 	    (imp_fe2 = malloc(max_scf_fmri_len + 1)) == NULL ||
+	    (imp_deleted_dpts = uu_list_create(string_pool, NULL, 0)) == NULL ||
 	    (ud_inst = scf_instance_create(g_hndl)) == NULL ||
 	    (ud_snpl = scf_snaplevel_create(g_hndl)) == NULL ||
 	    (ud_pg = scf_pg_create(g_hndl)) == NULL ||
 	    (ud_cur_depts_pg = scf_pg_create(g_hndl)) == NULL ||
+	    (ud_run_dpts_pg = scf_pg_create(g_hndl)) == NULL ||
 	    (ud_prop = scf_property_create(g_hndl)) == NULL ||
 	    (ud_dpt_prop = scf_property_create(g_hndl)) == NULL ||
 	    (ud_val = scf_value_create(g_hndl)) == NULL ||
 	    (ud_iter = scf_iter_create(g_hndl)) == NULL ||
 	    (ud_iter2 = scf_iter_create(g_hndl)) == NULL ||
+	    (ud_tx = scf_transaction_create(g_hndl)) == NULL ||
 	    (ud_ctarg = malloc(max_scf_value_len + 1)) == NULL ||
 	    (ud_oldtarg = malloc(max_scf_value_len + 1)) == NULL ||
 	    (ud_name = malloc(max_scf_name_len + 1)) == NULL) {
@@ -6585,6 +6821,14 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 					goto progress;
 		}
 
+		for (old_dpt = uu_list_first(imp_deleted_dpts);
+		    old_dpt != NULL;
+		    old_dpt = uu_list_next(imp_deleted_dpts, old_dpt))
+			if (imp_refresh_fmri(old_dpt->sc_pgroup_fmri,
+			    old_dpt->sc_pgroup_name,
+			    old_dpt->sc_parent->sc_fmri) != 0)
+				goto progress;
+
 		result = 0;
 		goto out;
 	}
@@ -6660,6 +6904,8 @@ out:
 	free(ud_name);
 	ud_ctarg = ud_oldtarg = ud_name = NULL;
 
+	scf_transaction_destroy(ud_tx);
+	ud_tx = NULL;
 	scf_iter_destroy(ud_iter);
 	scf_iter_destroy(ud_iter2);
 	ud_iter = ud_iter2 = NULL;
@@ -6670,7 +6916,8 @@ out:
 	ud_prop = ud_dpt_prop = NULL;
 	scf_pg_destroy(ud_pg);
 	scf_pg_destroy(ud_cur_depts_pg);
-	ud_pg = ud_cur_depts_pg = NULL;
+	scf_pg_destroy(ud_run_dpts_pg);
+	ud_pg = ud_cur_depts_pg = ud_run_dpts_pg = NULL;
 	scf_snaplevel_destroy(ud_snpl);
 	ud_snpl = NULL;
 	scf_instance_destroy(ud_inst);
@@ -6682,9 +6929,17 @@ out:
 	free(imp_fe2);
 	imp_str = imp_tsname = imp_fe1 = imp_fe2 = NULL;
 
+	cookie = NULL;
+	while ((old_dpt = uu_list_teardown(imp_deleted_dpts, &cookie)) !=
+	    NULL) {
+		free((char *)old_dpt->sc_pgroup_name);
+		free((char *)old_dpt->sc_pgroup_fmri);
+		internal_pgroup_free(old_dpt);
+	}
+	uu_list_destroy(imp_deleted_dpts);
+
 	scf_transaction_destroy(imp_tx);
-	scf_transaction_destroy(imp_tx2);
-	imp_tx = imp_tx2 = NULL;
+	imp_tx = NULL;
 	scf_iter_destroy(imp_iter);
 	scf_iter_destroy(imp_rpg_iter);
 	scf_iter_destroy(imp_up_iter);

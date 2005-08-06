@@ -1065,7 +1065,7 @@ lxml_get_dependent(entity_t *entity, xmlNodePtr dependent)
 
 	pg = internal_pgroup_find_or_create(entity, "dependents",
 	    (char *)scf_group_framework);
-	p = internal_property_create((char *)name, SCF_TYPE_ASTRING, 1, fmri);
+	p = internal_property_create((char *)name, SCF_TYPE_FMRI, 1, fmri);
 	if (internal_attach_property(pg, p) != 0)
 		return (-1);
 

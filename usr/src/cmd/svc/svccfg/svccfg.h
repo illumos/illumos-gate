@@ -310,7 +310,7 @@ int load_pg_attrs(const scf_propertygroup_t *, pgroup_t **);
 int load_pg(const scf_propertygroup_t *, pgroup_t **, const char *,
     const char *);
 int prop_equal(property_t *, property_t *, const char *, const char *, int);
-int pg_attrs_equal(pgroup_t *, pgroup_t *, const char *, int);
+int pg_attrs_equal(const pgroup_t *, const pgroup_t *, const char *, int);
 int pg_equal(pgroup_t *, pgroup_t *);
 
 void lscf_cleanup(void);
