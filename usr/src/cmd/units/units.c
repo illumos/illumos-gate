@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -12,15 +16,12 @@
 
 #include <stdio.h>
 #include <locale.h>
+#include <signal.h>
 
 #define	NDIM	10
 #define	NTAB	1009
-extern int *signal();
 char	*dfile	= "/usr/share/lib/unittab";
 char	*unames[NDIM];
-double	getflt();
-int	fperr();
-struct	table	*hash();
 struct unit
 {
 	double	factor;
@@ -74,11 +75,22 @@ int	fperrc;
 int	peekc;
 int	dumpflg;
 
-main(argc, argv)
-char *argv[];
+void fperr(int sig);
+double getflt(void);
+struct table *hash(char *name);
+int get(void);
+void init(void);
+int equal(char *s1, char *s2);
+int lookup(char *name, struct unit *up, int den, int c);
+int convr(struct unit *up);
+int pu(int u, int i, int f);
+void units(struct unit *up);
+
+int
+main(int argc, char *argv[])
 {
-	register i;
-	register char *file;
+	int i;
+	char *file;
 	struct unit u1, u2;
 	double f;
 	
@@ -137,11 +149,11 @@ fp:
 	goto loop;
 }
 
-units(up)
-struct unit *up;
+void
+units(struct unit *up)
 {
-	register struct unit *p;
-	register f, i;
+	struct unit *p;
+	int f, i;
 
 	p = up;
 	printf("\t%e ", p->factor);
@@ -157,7 +169,8 @@ struct unit *up;
 	putchar('\n');
 }
 
-pu(u, i, f)
+int
+pu(int u, int i, int f)
 {
 
 	if(u > 0) {
@@ -175,12 +188,12 @@ pu(u, i, f)
 	return(0);
 }
 
-convr(up)
-struct unit *up;
+int
+convr(struct unit *up)
 {
-	register struct unit *p;
-	register c;
-	register char *cp;
+	struct unit *p;
+	int c;
+	char *cp;
 	char name[20];
 	int den, err;
 
@@ -226,13 +239,12 @@ loop:
 	goto loop;
 }
 
-lookup(name, up, den, c)
-char *name;
-struct unit *up;
+int
+lookup(char *name, struct unit *up, int den, int c)
 {
-	register struct unit *p;
-	register struct table *q;
-	register i;
+	struct unit *p;
+	struct table *q;
+	int i;
 	char *cp1, *cp2;
 	double e;
 
@@ -280,10 +292,10 @@ loop:
 	return(1);
 }
 
-equal(s1, s2)
-char *s1, *s2;
+int
+equal(char *s1, char *s2)
 {
-	register char *c1, *c2;
+	char *c1, *c2;
 
 	c1 = s1;
 	c2 = s2;
@@ -293,10 +305,11 @@ char *s1, *s2;
 	return(0);
 }
 
-init()
+void
+init(void)
 {
-	register char *cp;
-	register struct table *tp, *lp;
+	char *cp;
+	struct table *tp, *lp;
 	int c, i, f, t;
 	char *np;
 
@@ -387,9 +400,9 @@ redef:
 }
 
 double
-getflt()
+getflt(void)
 {
-	register c, i, dp;
+	int c, i, dp;
 	double d, e;
 	int f;
 
@@ -443,9 +456,10 @@ l1:
 	return(d);
 }
 
-get()
+int
+get(void)
 {
-	register c;
+	int c;
 
 	if(c=peekc) {
 		peekc = 0;
@@ -463,12 +477,11 @@ get()
 }
 
 struct table *
-hash(name)
-char *name;
+hash(char *name)
 {
-	register struct table *tp;
-	register char *np;
-	register unsigned h;
+	struct table *tp;
+	char *np;
+	unsigned int h;
 
 	h = 0;
 	np = name;
@@ -488,7 +501,8 @@ l0:
 	goto l0;
 }
 
-fperr()
+void
+fperr(int sig)
 {
 
 	signal(8, fperr);

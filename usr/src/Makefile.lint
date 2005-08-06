@@ -142,6 +142,7 @@ COMMON_SUBDIRS = \
 	cmd/groups \
 	cmd/halt \
 	cmd/head \
+	cmd/hostid \
 	cmd/init \
 	cmd/intrstat \
 	cmd/ipcrm \

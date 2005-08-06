@@ -20,16 +20,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
 
-main()
+int
+main(void)
 {
 	long hostval;
 
@@ -37,6 +39,6 @@ main()
 		(void) fprintf(stderr, "bad hostid format\n");
 		exit(1);
 	}
-	(void) printf("%08x\n", (unsigned long)hostval);
-	exit(0);
+	(void) printf("%08lx\n", (unsigned long)hostval);
+	return (0);
 }

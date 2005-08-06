@@ -139,7 +139,7 @@ static void	parseargs();
 static void	saveinput();
 
 
-void
+int
 main(int argc, char **argv)
 {
 	int	j;
@@ -468,13 +468,13 @@ main(int argc, char **argv)
 
 	(void) lseek(0, file_offset, SEEK_SET);
 	if (OK) {
-		exit(exitstat);
+		return (exitstat);
 	} else {
 		/*
 		 * if exitstat was set, to match XCU4 complience,
 		 * return that value, otherwise, return 1.
 		 */
-		exit(exitstat ? exitstat : 1);
+		return (exitstat ? exitstat : 1);
 	}
 }
 

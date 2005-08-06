@@ -50,7 +50,7 @@ static	void	diag(char *, char *);
 static	int	move(char *, wchar_t *);
 static	void	usage();
 
-
+int
 main(int argc, char **argv)
 {
 	int 		i, j, k, eofcount, nfiles, maxline, glue;
@@ -168,7 +168,7 @@ main(int argc, char **argv)
 				inptr[0] = fopen(argv[i], "r");
 				if (inptr[0] == NULL) {
 				    (void) fprintf(stderr, gettext(
-				        "paste: cannot open %s\n"), argv[i]);
+					"paste: cannot open %s\n"), argv[i]);
 				    error = 1;
 				}
 			}
