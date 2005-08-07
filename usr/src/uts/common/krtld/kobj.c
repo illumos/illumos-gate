@@ -3195,6 +3195,25 @@ kobj_boot_mod_lookup(const char *modname)
 }
 
 /*
+ * Determine if the module exists.
+ */
+int
+kobj_path_exists(char *name, int use_path)
+{
+	struct _buf *file;
+
+	file = kobj_open_path(name, use_path, 1);
+#ifdef	MODDIR_SUFFIX
+	if (file == (struct _buf *)-1)
+		file = kobj_open_path(name, use_path, 0);
+#endif	/* MODDIR_SUFFIX */
+	if (file == (struct _buf *)-1)
+		return (0);
+	kobj_close_file(file);
+	return (1);
+}
+
+/*
  * fullname is dynamically allocated to be able to hold the
  * maximum size string that can be constructed from name.
  * path is exactly like the shell PATH variable.

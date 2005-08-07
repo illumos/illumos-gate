@@ -189,6 +189,7 @@ extern char *kobj_getsymname(uintptr_t, ulong_t *);
 extern char *kobj_searchsym(struct module *, uintptr_t, ulong_t *);
 
 extern intptr_t kobj_open(char *);
+extern int kobj_path_exists(char *, int);
 extern struct _buf *kobj_open_path(char *, int, int);
 extern int kobj_read(intptr_t, char *, unsigned int, unsigned int);
 extern void kobj_close(intptr_t);

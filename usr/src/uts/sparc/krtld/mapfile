@@ -48,6 +48,7 @@
 		kobj_notify_remove;
 		kobj_open;
 		kobj_open_file;
+		kobj_path_exists;
 		kobj_open_path;
 		kobj_read;
 		kobj_read_file;

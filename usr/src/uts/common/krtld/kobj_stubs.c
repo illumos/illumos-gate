@@ -55,6 +55,13 @@ kobj_unload_module(struct modctl *modp)
 {}
 
 /*ARGSUSED*/
+int
+kobj_path_exists(char *name, int use_path)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
 struct _buf *
 kobj_open_path(char *name, int use_path, int use_moddir_suffix)
 {

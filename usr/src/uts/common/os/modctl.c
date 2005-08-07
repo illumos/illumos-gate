@@ -2262,23 +2262,16 @@ mod_hold_installed_mod(char *name, int usepath, int *r)
 {
 	struct modctl *modp;
 	int retval;
-	struct _buf *file;
 
 	/*
 	 * Verify that that module in question actually exists on disk
 	 * before allocation of module structure by mod_hold_by_name.
 	 */
 	if (modrootloaded && swaploaded) {
-		file = kobj_open_path(name, usepath, 1);
-#ifdef	MODDIR_SUFFIX
-		if (file == (struct _buf *)-1)
-			file = kobj_open_path(name, usepath, 0);
-#endif	/* MODDIR_SUFFIX */
-		if (file == (struct _buf *)-1) {
+		if (!kobj_path_exists(name, usepath)) {
 			*r = ENOENT;
 			return (NULL);
 		}
-		kobj_close_file(file);
 	}
 
 	/*
