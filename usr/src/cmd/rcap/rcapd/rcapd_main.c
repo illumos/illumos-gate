@@ -889,14 +889,6 @@ update_statistics(void)
 {
 	int fd, res;
 	static char template[LINELEN];
-	
-	/* 
- 	 * Try to create a directory irrespecitve of whether it is existing or not.
-	 * If it is not there then it will create. Otherwise any way it will fail at 
-	 * at mkstemp call below.	
-	 */
-       
-		mkdir(STAT_FILE_DIR, 755);
 
 	/*
 	 * Create a temporary file.
