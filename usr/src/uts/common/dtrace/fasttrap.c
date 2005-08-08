@@ -147,6 +147,9 @@ static int			fasttrap_count;		/* ref count */
 static int			fasttrap_pid_count;	/* pid ref count */
 static kmutex_t			fasttrap_count_mtx;	/* lock on ref count */
 
+#define	FASTTRAP_ENABLE_FAIL	1
+#define	FASTTRAP_ENABLE_PARTIAL	2
+
 static int fasttrap_tracepoint_enable(proc_t *, fasttrap_probe_t *, uint_t);
 static void fasttrap_tracepoint_disable(proc_t *, fasttrap_probe_t *, uint_t);
 
@@ -554,7 +557,7 @@ again:
 	 * we have the lock held and no one can screw with us.
 	 */
 	if (new_tp != NULL) {
-		int rc;
+		int rc = 0;
 
 		new_tp->ftt_next = bucket->ftb_data;
 		membar_producer();
@@ -563,19 +566,20 @@ again:
 		mutex_exit(&bucket->ftb_mtx);
 
 		/*
-		 * Activate the tracepoint in the isa-specific manner.
+		 * Activate the tracepoint in the ISA-specific manner.
+		 * If this fails, we need to report the failure, but
+		 * indicate that this tracepoint must still be disabled
+		 * by calling fasttrap_tracepoint_disable().
 		 */
-		if (fasttrap_tracepoint_install(p, new_tp) != 0) {
-			rc = 1;
-		} else {
-			/*
-			 * Increment the count of the number of tracepoints
-			 * active in the victim process.
-			 */
-			ASSERT(p->p_proc_flag & P_PR_LOCK);
-			p->p_dtrace_count++;
-			rc = 0;
-		}
+		if (fasttrap_tracepoint_install(p, new_tp) != 0)
+			rc = FASTTRAP_ENABLE_PARTIAL;
+
+		/*
+		 * Increment the count of the number of tracepoints active in
+		 * the victim process.
+		 */
+		ASSERT(p->p_proc_flag & P_PR_LOCK);
+		p->p_dtrace_count++;
 
 		return (rc);
 	}
@@ -603,7 +607,7 @@ again:
 	}
 
 	/*
-	 * If the isa-dependent initialization goes to plan, go back to the
+	 * If the ISA-dependent initialization goes to plan, go back to the
 	 * beginning and try to install this freshly made tracepoint.
 	 */
 	if (fasttrap_tracepoint_init(p, probe, new_tp, pc) == 0)
@@ -612,7 +616,7 @@ again:
 	new_tp->ftt_ids = NULL;
 	new_tp->ftt_retids = NULL;
 
-	return (1);
+	return (FASTTRAP_ENABLE_FAIL);
 }
 
 static void
@@ -847,7 +851,7 @@ fasttrap_pid_enable(void *arg, dtrace_id_t id, void *parg)
 {
 	fasttrap_probe_t *probe = parg;
 	proc_t *p;
-	int i;
+	int i, rc;
 
 	ASSERT(probe != NULL);
 	ASSERT(!probe->ftp_enabled);
@@ -891,12 +895,22 @@ fasttrap_pid_enable(void *arg, dtrace_id_t id, void *parg)
 	 * tracepoint's list of active probes.
 	 */
 	for (i = 0; i < probe->ftp_ntps; i++) {
-		if (fasttrap_tracepoint_enable(p, probe, i) != 0) {
+		if ((rc = fasttrap_tracepoint_enable(p, probe, i)) != 0) {
+			/*
+			 * If enabling the tracepoint failed completely,
+			 * we don't have to disable it; if the failure
+			 * was only partial we must disable it.
+			 */
+			if (rc == FASTTRAP_ENABLE_FAIL)
+				i--;
+			else
+				ASSERT(rc == FASTTRAP_ENABLE_PARTIAL);
+
 			/*
 			 * Back up and pull out all the tracepoints we've
 			 * created so far for this probe.
 			 */
-			while (--i >= 0) {
+			while (i-- >= 0) {
 				fasttrap_tracepoint_disable(p, probe, i);
 			}
 
