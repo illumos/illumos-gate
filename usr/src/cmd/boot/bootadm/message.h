@@ -41,7 +41,7 @@ extern "C" {
 
 #define	MUST_BE_ROOT gettext("you must be root to run this program\n")
 
-#define	NOT_NEWBOOT gettext("not a Newboot OS\n")
+#define	NOT_GRUB_BOOT gettext("%s: not a GRUB boot OS instance\n")
 
 #define	MULT_CMDS gettext("multiple commands specified: -%c\n")
 
@@ -260,6 +260,38 @@ the failsafe archive unbootable\n")
 #define	CHMOD_FAIL gettext("chmod operation on %s failed - %s\n")
 
 #define	CHOWN_FAIL gettext("chgrp operation on %s failed - %s\n")
+
+#define	MISSING_SLICE_FILE gettext("GRUB slice file %s missing: %s\n")
+
+#define	BAD_SLICE_FILE gettext("Invalid GRUB slice file %s\n")
+
+#define	MKDIR_FAILED gettext("mkdir of %s failed: %s\n")
+
+#define	MOUNT_FAILED gettext("mount of %s (fstype %s) at %s failed: %s\n")
+
+#define	RMDIR_FAILED gettext("rmdir of %s failed: %s\n")
+
+#define	UMOUNT_FAILED gettext("unmount of %s failed: %s\n")
+
+#define	CANNOT_RESTORE_GRUB_SLICE gettext("cannot restore GRUB slice\n")
+
+#define	RESTORE_GRUB_FAILED gettext("cannot restore GRUB loader\n")
+
+#define	MISSING_BACKUP_MENU gettext("no backup menu %s: %s\n")
+
+#define	RESTORE_MENU_FAILED gettext("cannot restore menu %s\n")
+
+#define	MISSING_ROOT_FILE gettext("file missing: %s: %s\n")
+
+#define	BAD_ROOT_FILE gettext("file is invalid: %s\n")
+
+#define	USING_GRUB_SLICE gettext("\nUsing GRUB menu on device %s\n\n")
+
+#define	RESTORING_GRUB \
+	gettext("No GRUB installation found. Restoring GRUB from backup\n")
+
+#define	REBOOT_WITH_ARGS_FAILED \
+	gettext("Cannot update menu. Cannot reboot with requested arguments\n")
 
 #ifdef	__cplusplus
 }

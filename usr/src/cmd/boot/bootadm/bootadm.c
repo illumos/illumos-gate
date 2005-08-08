@@ -58,6 +58,8 @@
 #include <grp.h>
 #include <device_info.h>
 
+#include <sys/mount.h>
+
 #include <libintl.h>
 #include <locale.h>
 
@@ -111,7 +113,7 @@ typedef enum {
 } option_t;
 
 typedef enum {
-    BAM_ERROR = -1,
+    BAM_ERROR = -1,	/* Must be negative. add_boot_entry() depends on it */
     BAM_SUCCESS = 0,
     BAM_WRITE = 2
 } error_t;
@@ -143,6 +145,19 @@ typedef struct {
 #define	CREATE_RAMDISK		"/boot/solaris/bin/create_ramdisk"
 #define	CREATE_DISKMAP		"/boot/solaris/bin/create_diskmap"
 #define	GRUBDISK_MAP		"/var/run/solaris_grubdisk.map"
+
+#define	GRUB_slice		"/etc/lu/GRUB_slice"
+#define	GRUB_root		"/etc/lu/GRUB_root"
+#define	GRUB_backup_menu	"/etc/lu/GRUB_backup_menu"
+#define	GRUB_slice_mntpt	"/tmp/GRUB_slice_mntpt"
+#define	LU_ACTIVATE_FILE	"/etc/lu/DelayUpdate/activate.sh"
+
+#define	INSTALLGRUB		"/sbin/installgrub"
+#define	STAGE1			"/boot/grub/stage1"
+#define	STAGE2			"/boot/grub/stage2"
+
+#define	QUIET			1
+
 
 /*
  * Default file attributes
@@ -217,6 +232,7 @@ static int bam_check;
 static int bam_smf_check;
 static int bam_lock_fd = -1;
 static char rootbuf[PATH_MAX] = "/";
+static int bam_update_all;
 
 /* function prototypes */
 static void parse_args_internal(int argc, char *argv[]);
@@ -617,12 +633,170 @@ check_subcmd_and_options(
 	return (BAM_SUCCESS);
 }
 
+
+static char *
+mount_grub_slice(int *mnted, char **physlice, int mode)
+{
+	struct extmnttab mnt;
+	struct stat sb;
+	char buf[BAM_MAXLINE], dev[PATH_MAX], phys[PATH_MAX], fstype[32];
+	char *mntpt;
+	int p, l, f;
+	FILE *fp;
+
+	assert(mnted);
+	*mnted = 0;
+
+	/*
+	 * physlice arg may be NULL
+	 */
+	if (physlice)
+		*physlice = NULL;
+
+	if (stat(GRUB_slice, &sb) != 0) {
+		bam_error(MISSING_SLICE_FILE, GRUB_slice, strerror(errno));
+		return (NULL);
+	}
+
+	fp = fopen(GRUB_slice, "r");
+	if (fp == NULL) {
+		bam_error(OPEN_FAIL, GRUB_slice, strerror(errno));
+		return (NULL);
+	}
+
+	dev[0] = fstype[0] = phys[0] = '\0';
+	p = sizeof ("PHYS_SLICE=") - 1;
+	l = sizeof ("LOG_SLICE=") - 1;
+	f = sizeof ("LOG_FSTYP=") - 1;
+	while (s_fgets(buf, sizeof (buf), fp) != NULL) {
+		if (strncmp(buf, "PHYS_SLICE=", p) == 0) {
+			(void) strlcpy(phys, buf + p, sizeof (phys));
+			continue;
+		}
+		if (strncmp(buf, "LOG_SLICE=", l) == 0) {
+			(void) strlcpy(dev, buf + l, sizeof (dev));
+			continue;
+		}
+		if (strncmp(buf, "LOG_FSTYP=", f) == 0) {
+			(void) strlcpy(fstype, buf + f, sizeof (fstype));
+			continue;
+		}
+	}
+	(void) fclose(fp);
+
+	if (dev[0] == '\0' || fstype[0] == '\0' || phys[0] == '\0') {
+		bam_error(BAD_SLICE_FILE, GRUB_slice);
+		return (NULL);
+	}
+
+	if (mode != QUIET)
+		bam_print(USING_GRUB_SLICE, dev);
+
+	if (physlice) {
+		*physlice = s_strdup(phys);
+	}
+
+	/*
+	 * Check if the slice is already mounted
+	 */
+	fp = fopen(MNTTAB, "r");
+	if (fp == NULL) {
+		bam_error(OPEN_FAIL, MNTTAB, strerror(errno));
+		if (physlice) {
+			free(*physlice);
+			*physlice = NULL;
+		}
+		return (NULL);
+	}
+
+	resetmnttab(fp);
+
+	mntpt = NULL;
+	while (getextmntent(fp, &mnt, sizeof (mnt)) == 0) {
+		if (strcmp(mnt.mnt_special, dev) == 0) {
+			mntpt = s_strdup(mnt.mnt_mountp);
+			break;
+		}
+	}
+
+	(void) fclose(fp);
+
+	if (mntpt) {
+		return (mntpt);
+	}
+
+
+	/*
+	 * GRUB slice is not mounted, we need to mount it now.
+	 * First create the mountpoint
+	 */
+	mntpt = s_calloc(1, PATH_MAX);
+	(void) snprintf(mntpt, PATH_MAX, "%s.%d", GRUB_slice_mntpt, getpid());
+	if (mkdir(mntpt, 0755) == -1 && errno != EEXIST) {
+		bam_error(MKDIR_FAILED, mntpt, strerror(errno));
+		free(mntpt);
+		if (physlice) {
+			free(*physlice);
+			*physlice = NULL;
+		}
+		return (NULL);
+	}
+
+	if (mount(dev, mntpt, 0, fstype, NULL, 0, NULL, 0) != 0) {
+		bam_error(MOUNT_FAILED, dev, fstype, mntpt, strerror(errno));
+		if (rmdir(mntpt) != 0) {
+			bam_error(RMDIR_FAILED, mntpt, strerror(errno));
+		}
+		free(mntpt);
+		if (physlice) {
+			free(*physlice);
+			*physlice = NULL;
+		}
+		return (NULL);
+	}
+
+	*mnted = 1;
+	return (mntpt);
+}
+
+static void
+umount_grub_slice(int mnted, char *mntpt, char *physlice)
+{
+	/*
+	 * If we have not dealt with GRUB slice
+	 * we have nothing to do - just return.
+	 */
+	if (mntpt == NULL)
+		return;
+
+
+	/*
+	 * If we mounted the filesystem earlier in mount_grub_slice()
+	 * unmount it now.
+	 */
+	if (mnted) {
+		if (umount(mntpt) != 0) {
+			bam_error(UMOUNT_FAILED, mntpt, strerror(errno));
+		}
+		if (rmdir(mntpt) != 0) {
+			bam_error(RMDIR_FAILED, mntpt, strerror(errno));
+		}
+	}
+	if (physlice)
+		free(physlice);
+	free(mntpt);
+}
+
 static error_t
 bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 {
 	error_t ret;
 	char menu_path[PATH_MAX];
 	menu_t *menu;
+	char *mntpt, *menu_root;
+	struct stat sb;
+	int mnted;	/* set if we did a mount */
+	int mode;
 	error_t (*f)(menu_t *mp, char *menu_path, char *opt);
 
 	/*
@@ -633,8 +807,25 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 		return (BAM_ERROR);
 	}
 
+	if (strcmp(subcmd, "update_temp") == 0)
+		mode = QUIET;
+	else
+		mode = 0;
+
+	mntpt = NULL;
+	mnted = 0;
+	if (stat(GRUB_slice, &sb) == 0) {
+		mntpt = mount_grub_slice(&mnted, NULL, mode);
+		if (mntpt == NULL) {
+			return (BAM_ERROR);
+		}
+		menu_root = mntpt;
+	} else {
+		menu_root = bam_root;
+	}
+
 	(void) snprintf(menu_path, sizeof (menu_path), "%s%s",
-	    bam_root, GRUB_MENU);
+	    menu_root, GRUB_MENU);
 
 	menu = menu_read(menu_path);
 	assert(menu);
@@ -645,11 +836,13 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	if (strcmp(subcmd, "set_option") == 0) {
 		if (largc != 1 || largv[0] == NULL) {
 			usage();
+			umount_grub_slice(mnted, mntpt, NULL);
 			return (BAM_ERROR);
 		}
 		opt = largv[0];
 	} else if (largc != 0) {
 		usage();
+		umount_grub_slice(mnted, mntpt, NULL);
 		return (BAM_ERROR);
 	}
 
@@ -662,10 +855,12 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	else
 		ret = f(menu, menu_path, opt);
 	if (ret == BAM_WRITE) {
-		ret = menu_write(bam_root, menu);
+		ret = menu_write(menu_root, menu);
 	}
 
 	menu_free(menu);
+
+	umount_grub_slice(mnted, mntpt, NULL);
 
 	return (ret);
 }
@@ -707,7 +902,14 @@ bam_archive(
 		return (BAM_ERROR);
 	}
 
-	return (f(bam_root, opt));
+	if (strcmp(subcmd, "update_all") == 0)
+		bam_update_all = 1;
+
+	ret = f(bam_root, opt);
+
+	bam_update_all = 0;
+
+	return (ret);
 }
 
 /*PRINTFLIKE1*/
@@ -1111,6 +1313,9 @@ read_one_list(char *root, filelist_t  *flistp, char *filelist)
 		return (BAM_ERROR);
 	}
 	while (s_fgets(buf, sizeof (buf), fp) != NULL) {
+		/* skip blank lines */
+		if (strspn(buf, " \t") == strlen(buf))
+			continue;
 		append_to_flist(flistp, buf);
 	}
 	if (fclose(fp) != 0) {
@@ -1447,11 +1652,13 @@ is_ramdisk(char *root)
 	struct extmnttab mnt;
 	FILE *fp;
 	int found;
+	char mntpt[PATH_MAX];
+	char *cp;
 
 	/*
 	 * There are 3 situations where creating archive is
 	 * of dubious value:
-	 *	- create boot_archive on a boot_archive
+	 *	- create boot_archive on a lofi-mounted boot_archive
 	 *	- create it on a ramdisk which is the root filesystem
 	 *	- create it on a ramdisk mounted somewhere else
 	 * The first is not easy to detect and checking for it is not
@@ -1467,9 +1674,18 @@ is_ramdisk(char *root)
 
 	resetmnttab(fp);
 
+	/*
+	 * Remove any trailing / from the mount point
+	 */
+	(void) strlcpy(mntpt, root, sizeof (mntpt));
+	if (strcmp(root, "/") != 0) {
+		cp = mntpt + strlen(mntpt) - 1;
+		if (*cp == '/')
+			*cp = '\0';
+	}
 	found = 0;
 	while (getextmntent(fp, &mnt, sizeof (mnt)) == 0) {
-		if (strcmp(mnt.mnt_mountp, root) == 0) {
+		if (strcmp(mnt.mnt_mountp, mntpt) == 0) {
 			found = 1;
 			break;
 		}
@@ -1477,7 +1693,7 @@ is_ramdisk(char *root)
 
 	if (!found) {
 		if (bam_verbose)
-			bam_error(NOT_IN_MNTTAB, root);
+			bam_error(NOT_IN_MNTTAB, mntpt);
 		(void) fclose(fp);
 		return (0);
 	}
@@ -1554,12 +1770,16 @@ update_archive(char *root, char *opt)
 	assert(opt == NULL);
 
 	/*
-	 * root must belong to a newboot OS,
+	 * root must belong to a GRUB boot OS,
 	 * don't care on sparc except for diskless clients
 	 */
 	if (!is_newboot(root)) {
-		if (bam_verbose)
-			bam_print(NOT_NEWBOOT);
+		/*
+		 * Emit message only if not in context of update_all.
+		 * If in update_all, emit only if verbose flag is set.
+		 */
+		if (!bam_update_all || bam_verbose)
+			bam_print(NOT_GRUB_BOOT, root);
 		return (BAM_SUCCESS);
 	}
 
@@ -1602,6 +1822,76 @@ update_archive(char *root, char *opt)
 	return (ret);
 }
 
+static void
+restore_grub_slice(void)
+{
+	struct stat sb;
+	char *mntpt, *physlice;
+	int mnted;	/* set if we did a mount */
+	char menupath[PATH_MAX], cmd[PATH_MAX];
+
+	if (stat(GRUB_slice, &sb) != 0) {
+		bam_error(MISSING_SLICE_FILE, GRUB_slice, strerror(errno));
+		return;
+	}
+
+	/*
+	 * If we are doing an luactivate, don't attempt to restore GRUB or else
+	 * we may not be able to get to DCA boot environments. Let luactivate
+	 * handle GRUB/DCA installation
+	 */
+	if (stat(LU_ACTIVATE_FILE, &sb) == 0) {
+		return;
+	}
+
+	mnted = 0;
+	physlice = NULL;
+	mntpt = mount_grub_slice(&mnted, &physlice, QUIET);
+	if (mntpt == NULL) {
+		bam_error(CANNOT_RESTORE_GRUB_SLICE);
+		return;
+	}
+
+	(void) snprintf(menupath, sizeof (menupath), "%s%s", mntpt, GRUB_MENU);
+	if (stat(menupath, &sb) == 0) {
+		umount_grub_slice(mnted, mntpt, physlice);
+		return;
+	}
+
+	/*
+	 * The menu is missing - we need to do a restore
+	 */
+	bam_print(RESTORING_GRUB);
+
+	(void) snprintf(cmd, sizeof (cmd), "%s %s %s %s",
+	    INSTALLGRUB, STAGE1, STAGE2, physlice);
+
+	if (exec_cmd(cmd, NULL, 0) != 0) {
+		bam_error(RESTORE_GRUB_FAILED);
+		umount_grub_slice(mnted, mntpt, physlice);
+		return;
+	}
+
+	if (stat(GRUB_backup_menu, &sb) != 0) {
+		bam_error(MISSING_BACKUP_MENU,
+		    GRUB_backup_menu, strerror(errno));
+		umount_grub_slice(mnted, mntpt, physlice);
+		return;
+	}
+
+	(void) snprintf(cmd, sizeof (cmd), "/bin/cp %s %s",
+	    GRUB_backup_menu, menupath);
+
+	if (exec_cmd(cmd, NULL, 0) != 0) {
+		bam_error(RESTORE_MENU_FAILED, menupath);
+		umount_grub_slice(mnted, mntpt, physlice);
+		return;
+	}
+
+	/* Success */
+	umount_grub_slice(mnted, mntpt, physlice);
+}
+
 static error_t
 update_all(char *root, char *opt)
 {
@@ -1627,7 +1917,8 @@ update_all(char *root, char *opt)
 	fp = fopen(MNTTAB, "r");
 	if (fp == NULL) {
 		bam_error(OPEN_FAIL, MNTTAB, strerror(errno));
-		return (BAM_ERROR);
+		ret = BAM_ERROR;
+		goto out;
 	}
 
 	resetmnttab(fp);
@@ -1658,6 +1949,11 @@ update_all(char *root, char *opt)
 	}
 
 	(void) fclose(fp);
+
+out:
+	if (stat(GRUB_slice, &sb) == 0) {
+		restore_grub_slice();
+	}
 
 	return (ret);
 }
@@ -2478,6 +2774,52 @@ update_entry(menu_t *mp, char *menu_root, char *opt)
 	return (BAM_WRITE);
 }
 
+static char *
+read_grub_root(void)
+{
+	FILE *fp;
+	struct stat sb;
+	char buf[BAM_MAXLINE];
+	char *rootstr;
+
+	if (stat(GRUB_slice, &sb) != 0) {
+		bam_error(MISSING_SLICE_FILE, GRUB_slice, strerror(errno));
+		return (NULL);
+	}
+
+	if (stat(GRUB_root, &sb) != 0) {
+		bam_error(MISSING_ROOT_FILE, GRUB_root, strerror(errno));
+		return (NULL);
+	}
+
+	fp = fopen(GRUB_root, "r");
+	if (fp == NULL) {
+		bam_error(OPEN_FAIL, GRUB_root, strerror(errno));
+		return (NULL);
+	}
+
+	if (s_fgets(buf, sizeof (buf), fp) == NULL) {
+		bam_error(EMPTY_FILE, GRUB_root, strerror(errno));
+		(void) fclose(fp);
+		return (NULL);
+	}
+
+	/*
+	 * Copy buf here as check below may trash the buffer
+	 */
+	rootstr = s_strdup(buf);
+
+	if (s_fgets(buf, sizeof (buf), fp) != NULL) {
+		bam_error(BAD_ROOT_FILE, GRUB_root);
+		free(rootstr);
+		rootstr = NULL;
+	}
+
+	(void) fclose(fp);
+
+	return (rootstr);
+}
+
 /*
  * This function is for supporting reboot with args.
  * The opt value can be:
@@ -2494,6 +2836,7 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 	int entry;
 	char *grubdisk, *rootdev;
 	char kernbuf[1024];
+	struct stat sb;
 
 	assert(mp);
 
@@ -2510,16 +2853,28 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 
 	/*
 	 * add a new menu entry base on opt and make it the default
-	 * 1. First get root disk name from mnttab
-	 * 2. Translate disk name to grub name
-	 * 3. Add the new menu entry
 	 */
-	rootdev = get_special("/");
-	if (rootdev) {
-		grubdisk = os_to_grubdisk(rootdev, 1);
-		free(rootdev);
+	grubdisk = NULL;
+	if (stat(GRUB_slice, &sb) != 0) {
+		/*
+		 * 1. First get root disk name from mnttab
+		 * 2. Translate disk name to grub name
+		 * 3. Add the new menu entry
+		 */
+		rootdev = get_special("/");
+		if (rootdev) {
+			grubdisk = os_to_grubdisk(rootdev, 1);
+			free(rootdev);
+		}
+	} else {
+		/*
+		 * This is an LU BE. The GRUB_root file
+		 * contains entry for GRUB's "root" cmd.
+		 */
+		grubdisk = read_grub_root();
 	}
 	if (grubdisk == NULL) {
+		bam_error(REBOOT_WITH_ARGS_FAILED);
 		return (BAM_ERROR);
 	}
 
@@ -2531,6 +2886,7 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 	free(grubdisk);
 
 	if (entry == BAM_ERROR) {
+		bam_error(REBOOT_WITH_ARGS_FAILED);
 		return (BAM_ERROR);
 	}
 	(void) set_global(mp, menu_cmds[DEFAULT_CMD], entry);
@@ -2547,6 +2903,14 @@ set_global(menu_t *mp, char *globalcmd, int val)
 
 	assert(mp);
 	assert(globalcmd);
+
+	if (strcmp(globalcmd, menu_cmds[DEFAULT_CMD]) == 0) {
+		if (val < 0 || mp->end == NULL || val > mp->end->entryNum) {
+			(void) snprintf(prefix, sizeof (prefix), "%d", val);
+			bam_error(INVALID_ENTRY, prefix);
+			return (BAM_ERROR);
+		}
+	}
 
 	found = last = NULL;
 	for (lp = mp->start; lp; lp = lp->next) {

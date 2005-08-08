@@ -29,16 +29,15 @@
 #
 # basic setup
 #
-PATH=${PATH}:/sbin
 GRUBDISKMAP=/var/run/solaris_grubdisk.map
 
-rm -f "$GRUBDISKMAP"
-touch "$GRUBDISKMAP"
-biosdev 2> /dev/null | while read diskno diskpath
+/bin/rm -f "$GRUBDISKMAP"
+/bin/touch "$GRUBDISKMAP"
+/sbin/biosdev 2> /dev/null | while read diskno diskpath
     do
-	devname=`ls -l /dev/rdsk/*p0 | grep $diskpath | nawk '{ print $9 }'`
-	ctdname=`echo $devname | sed "s#/dev/rdsk/##" | sed "s#p0##"`
-	grubdisk=`echo $diskno | sed "s/0x8//"`
+	devname=`/bin/ls -l /dev/rdsk/*p0 | /bin/grep $diskpath | /bin/nawk '{ print $9 }'`
+	ctdname=`echo $devname | /bin/sed "s#/dev/rdsk/##" | /bin/sed "s#p0##"`
+	grubdisk=`echo $diskno | /bin/sed "s/0x8//"`
 	echo "$grubdisk $ctdname $diskpath" >> "$GRUBDISKMAP"
     done
 
