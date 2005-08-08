@@ -532,6 +532,15 @@ struct sd_lun {
 	/* Callback routine active counter */
 	short		un_in_callback;
 
+	/*
+	 * Another bit fields for various configuration/state/status info.
+	 * Comments indicate the condition if the value of the
+	 * variable is TRUE (nonzero).
+	 */
+	uint32_t
+		un_f_cfg_is_lsi	:1,	/* Is LSI device, default to NO */
+		un_f_pad_uint32	:1;	/* padding, 31 bits available */
+
 #ifdef SD_FAULT_INJECTION
 	/* SD Fault Injection */
 #define	SD_FI_MAX_BUF 65536
@@ -737,10 +746,7 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_lun::un_fi_mutex,
  *
  * This is used in some vendor specific checks.
  */
-#define	SD_IS_LSI(un) \
-	((bcmp(SD_INQUIRY(un)->inq_vid, "Symbios", 7) == 0) || \
-	(bcmp(SD_INQUIRY(un)->inq_vid, "SYMBIOS", 7) == 0) || \
-	(bcmp(SD_INQUIRY(un)->inq_vid, "LSI", 3) == 0))
+#define	SD_IS_LSI(un)	((un)->un_f_cfg_is_lsi == TRUE)
 
 /*
  * Macros to check if the lun is a Sun T3 or a T4

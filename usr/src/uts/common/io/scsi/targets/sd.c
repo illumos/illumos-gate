@@ -325,29 +325,6 @@ static sd_tunables seagate_properties = {
 	0
 };
 
-static sd_tunables lsi_properties = {
-	0,
-	0,
-	LSI_NOTREADY_RETRIES,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0
-};
-
-static sd_tunables lsi_oem_properties = {
-	0,
-	0,
-	LSI_OEM_NOTREADY_RETRIES,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0
-};
 
 static sd_tunables fujitsu_properties = {
 	FUJITSU_THROTTLE_VALUE,
@@ -422,20 +399,10 @@ static sd_tunables pirus_properties = {
 };
 
 #endif
+
 #if (defined(__sparc) && !defined(__fibre)) || \
 	(defined(__i386) || defined(__amd64))
 
-static sd_tunables lsi_properties_scsi = {
-	LSI_THROTTLE_VALUE,
-	0,
-	LSI_NOTREADY_RETRIES,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0
-};
 
 static sd_tunables elite_properties = {
 	ELITE_THROTTLE_VALUE,
@@ -463,6 +430,18 @@ static sd_tunables st31200n_properties = {
 
 #endif /* Fibre or not */
 
+static sd_tunables lsi_properties_scsi = {
+	LSI_THROTTLE_VALUE,
+	0,
+	LSI_NOTREADY_RETRIES,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0
+};
+
 static sd_tunables symbios_properties = {
 	SYMBIOS_THROTTLE_VALUE,
 	0,
@@ -475,6 +454,29 @@ static sd_tunables symbios_properties = {
 	0
 };
 
+static sd_tunables lsi_properties = {
+	0,
+	0,
+	LSI_NOTREADY_RETRIES,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0
+};
+
+static sd_tunables lsi_oem_properties = {
+	0,
+	0,
+	LSI_OEM_NOTREADY_RETRIES,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0
+};
 
 
 
@@ -1022,6 +1024,8 @@ static int sd_pm_idletime = 1;
 #define	sd_failfast_flushq		ssd_failfast_flushq
 #define	sd_failfast_flushq_callback	ssd_failfast_flushq_callback
 
+#define	sd_is_lsi			ssd_is_lsi
+
 #endif	/* #if (defined(__fibre)) */
 
 
@@ -1501,6 +1505,11 @@ sddump_do_read_of_rmw(struct sd_lun *un, uint64_t blkno, uint64_t nblk,
  */
 static void sd_failfast_flushq(struct sd_lun *un);
 static int sd_failfast_flushq_callback(struct buf *bp);
+
+/*
+ * Function prototypes to check for lsi devices
+ */
+static void sd_is_lsi(struct sd_lun *un);
 
 /*
  * Function prototypes for x86 support
@@ -3193,6 +3202,9 @@ sd_read_unit_properties(struct sd_lun *un)
 		sd_process_sdconf_table(un);
 	}
 
+	/* check for LSI device */
+	sd_is_lsi(un);
+
 	/*
 	 * Set this in sd.conf to 0 in order to disable kstats.  The default
 	 * is 1, so they are enabled by default.
@@ -3248,9 +3260,6 @@ sd_read_unit_properties(struct sd_lun *un)
  * where the prop0 value will be used to set prop0 if bit0 set in the
  * flags, prop1 if bit1 set, etc. and N = SD_CONF_MAX_ITEMS -1
  *
- * If version = SD_CONF_VERSION_10 we have the following syntax:
- *
- * 	<data-property-name>:=<version>,<prop0>,<prop1>,<prop2>,<prop3>
  */
 
 static int
@@ -3961,6 +3970,48 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 		un->un_min_throttle = sd_min_throttle;
 	}
 }
+
+/*
+ *   Function: sd_is_lsi()
+ *
+ *   Description: Check for lsi devices, step throught the static device
+ *	table to match vid/pid.
+ *
+ *   Args: un - ptr to sd_lun
+ *
+ *   Notes:  When creating new LSI property, need to add the new LSI property
+ *		to this function.
+ */
+static void
+sd_is_lsi(struct sd_lun *un)
+{
+	char	*id = NULL;
+	int	table_index;
+	int	idlen;
+	void	*prop;
+
+	ASSERT(un != NULL);
+	for (table_index = 0; table_index < sd_disk_table_size;
+	    table_index++) {
+		id = sd_disk_table[table_index].device_id;
+		idlen = strlen(id);
+		if (idlen == 0) {
+			continue;
+		}
+
+		if (sd_sdconf_id_match(un, id, idlen) == SD_SUCCESS) {
+			prop = sd_disk_table[table_index].properties;
+			if (prop == &lsi_properties ||
+			    prop == &lsi_oem_properties ||
+			    prop == &lsi_properties_scsi ||
+			    prop == &symbios_properties) {
+				un->un_f_cfg_is_lsi = TRUE;
+			}
+			break;
+		}
+	}
+}
+
 
 /*
  * The following routines support reading and interpretation of disk labels,
@@ -29423,6 +29474,7 @@ sd_failfast_flushq_callback(struct buf *bp)
 	return (((sd_failfast_flushctl & SD_FAILFAST_FLUSH_ALL_BUFS) ||
 	    (bp->b_flags & B_FAILFAST)) ? TRUE : FALSE);
 }
+
 
 
 #if defined(__i386) || defined(__amd64)
