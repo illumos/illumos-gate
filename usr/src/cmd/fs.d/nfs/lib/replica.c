@@ -22,7 +22,7 @@
 /*
  * replica.c
  *
- * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,9 +51,24 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <errno.h>
 #include "replica.h"
+
+void
+free_replica(struct replica *list, int count)
+{
+	int i;
+
+	for (i = 0; i < count; i++) {
+		if (list[i].host)
+			free(list[i].host);
+		if (list[i].path)
+			free(list[i].path);
+	}
+	free(list);
+}
 
 struct replica *
 parse_replica(char *special, int *count)
@@ -94,10 +109,10 @@ parse_replica(char *special, int *count)
 			proot = root + 1;
 			root = y + 1;
 			v6addr = 1;
-			(*count)++;
-			list = realloc(list, *count * sizeof (struct replica));
-			if (!list)
+			if ((list = realloc(list, (*count + 1) *
+			    sizeof (struct replica))) == NULL)
 				goto bad;
+			bzero(&list[(*count)++], sizeof (struct replica));
 			*y = '\0';
 			list[*count-1].host = strdup(proot);
 			if (!list[*count-1].host)
@@ -127,11 +142,11 @@ parse_replica(char *special, int *count)
 			if (v6addr == 1)
 				v6addr = 0;
 			else {
-				(*count)++;
-				list = realloc(list, *count *
-					sizeof (struct replica));
-				if (!list)
+				if ((list = realloc(list, (*count + 1) *
+				    sizeof (struct replica))) == NULL)
 					goto bad;
+				bzero(&list[(*count)++],
+				    sizeof (struct replica));
 				list[*count-1].host = strdup(proot);
 				if (!list[*count-1].host)
 					goto bad;
@@ -160,11 +175,11 @@ parse_replica(char *special, int *count)
 			} else {
 				*root = '\0';
 				root++;
-				(*count)++;
-				list = realloc(list, *count *
-					sizeof (struct replica));
-				if (!list)
+				if ((list = realloc(list, (*count + 1) *
+				    sizeof (struct replica))) == NULL)
 					goto bad;
+				bzero(&list[(*count)++],
+				    sizeof (struct replica));
 				list[*count-1].host = strdup(proot);
 				if (!list[*count-1].host)
 					goto bad;
@@ -184,31 +199,10 @@ parse_replica(char *special, int *count)
 		return (list);
 	}
 bad:
-	if (list) {
-		int i;
-
-		for (i = 0; i < *count; i++) {
-			if (list[i].host)
-				free(list[i].host);
-			if (list[i].path)
-				free(list[i].path);
-		}
-		free(list);
-	}
+	if (list)
+		free_replica(list, *count);
 	if (!found_colon)
 		*count = -1;
 	free(special2);
 	return (NULL);
-}
-
-void
-free_replica(struct replica *list, int count)
-{
-	int i;
-
-	for (i = 0; i < count; i++) {
-		free(list[i].host);
-		free(list[i].path);
-	}
-	free(list);
 }
