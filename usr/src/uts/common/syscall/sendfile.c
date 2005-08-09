@@ -668,7 +668,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 #else
 	const u_offset_t maxoff = MAXOFF32_T;
 #endif
-	mblk_t	*dmp;
+	mblk_t	*dmp = NULL;
+	char	*buf = NULL;
 
 	fflag = fp->f_flag;
 	vp = fp->f_vnode;
@@ -835,18 +836,32 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			    readvp->v_vfsp->vfs_bsize);
 			size = sfv_len < size ? sfv_len : size;
 
+			if (vp->v_type != VSOCK) {
+				buf = kmem_alloc(size, KM_NOSLEEP);
+				if (buf == NULL) {
+					VOP_RWUNLOCK(readvp, readflg, NULL);
+					releasef(sfv->sfv_fd);
+					return (ENOMEM);
+				}
+			}
+
 			while (sfv_len > 0) {
 				size_t	iov_len;
 
 				iov_len = MIN(size, sfv_len);
 
-				dmp = allocb(iov_len, BPRI_HI);
-				if (dmp == NULL) {
-					VOP_RWUNLOCK(readvp, readflg, NULL);
-					releasef(sfv->sfv_fd);
-					return (ENOMEM);
+				if (vp->v_type == VSOCK) {
+					dmp = allocb(iov_len, BPRI_HI);
+					if (dmp == NULL) {
+						VOP_RWUNLOCK(readvp, readflg,
+						    NULL);
+						releasef(sfv->sfv_fd);
+						return (ENOMEM);
+					}
+					ptr = (caddr_t)dmp->b_rptr;
+				} else {
+					ptr = buf;
 				}
-				ptr = (caddr_t)dmp->b_rptr;
 
 				aiov.iov_base = ptr;
 				aiov.iov_len = iov_len;
@@ -874,7 +889,10 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					 * not implemented), we may now lose
 					 * data.
 					 */
-					freeb(dmp);
+					if (vp->v_type == VSOCK)
+						freeb(dmp);
+					else
+						kmem_free(buf, size);
 					VOP_RWUNLOCK(readvp, readflg, NULL);
 					releasef(sfv->sfv_fd);
 					return (error);
@@ -887,7 +905,10 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				 */
 				cnt = iov_len - auio.uio_resid;
 				if (cnt == 0) {
-					freeb(dmp);
+					if (vp->v_type == VSOCK)
+						freeb(dmp);
+					else
+						kmem_free(buf, size);
 					VOP_RWUNLOCK(readvp, readflg, NULL);
 					releasef(sfv->sfv_fd);
 					return (EINVAL);
@@ -937,7 +958,6 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					    (ulong_t)cnt;
 					*fileoff += cnt;
 					*count += cnt;
-					freeb(dmp);
 					if (error != 0) {
 						VOP_RWUNLOCK(readvp, readflg,
 									NULL);
@@ -945,6 +965,10 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 						return (error);
 					}
 				}
+			}
+			if (buf) {
+				kmem_free(buf, size);
+				buf = NULL;
 			}
 			VOP_RWUNLOCK(readvp, readflg, NULL);
 			releasef(sfv->sfv_fd);
