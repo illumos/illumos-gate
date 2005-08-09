@@ -66,9 +66,9 @@ $(ROOT_BOOT_GRUB) $(SRC_DIR):
 
 
 clean: _FORCE
-	$(RM) *.o $(PROGRAMS) $(DATA)
+	$(RM) *.o $(PROGRAMS)
 
 clobber: clean
-	$(RM) $(INSTALL_TARGETS)
+	$(RM) $(DATA)
 
 _FORCE:

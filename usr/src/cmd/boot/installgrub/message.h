@@ -68,7 +68,7 @@ extern "C" {
 
 #define	READ_FAIL_STAGE1	gettext("cannot read stage1 file %s\n")
 
-#define	READ_FAIL_STAGE2	gettext("cannot read stage1 file %s\n")
+#define	READ_FAIL_STAGE2	gettext("cannot read stage2 file %s\n")
 
 #define	READ_FAIL_BPB	gettext("cannot read bios parameter block\n")
 
@@ -93,8 +93,8 @@ extern "C" {
 
 #define	WRITE_STAGE2_PCFS	gettext("stage2 written to pcfs\n")
 
-#define	WRITE_STAGE2_DISK	gettext("stage2 written to to partition %d," \
-	" %d sectors starting %d (abs %d)\n")
+#define	WRITE_STAGE2_DISK	gettext("stage2 written to partition %d," \
+	" %d sectors starting at %d (abs %d)\n")
 
 #define	PCFS_FRAGMENTED	\
     gettext("cannot install stage2 on pcfs, too many fragments.\n")

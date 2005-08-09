@@ -43,6 +43,7 @@
 #include <libintl.h>
 #include <locale.h>
 #include "message.h"
+#include <errno.h>
 
 #ifndef	TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -513,8 +514,10 @@ modify_and_write_stage2(int dev_fd)
 			    nread, nwrite);
 			break;
 		}
-		nrecord ++;
-		offset ++;
+		if (nread > 0) {
+			nrecord ++;
+			offset ++;
+		}
 		if (nread < SECTOR_SIZE)
 			break;	/* end of file */
 	}

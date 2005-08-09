@@ -73,9 +73,9 @@ $(INSTALL_BINDIR) $(INSTALL_SBINDIR) $(SRC_DIR):
 
 
 clean: _FORCE
-	$(RM) *.o $(PROGRAMS) $(SCRIPTS)
+	$(RM) *.o $(NOINSTALL_SCRIPTS)
 
 clobber: clean
-	$(RM) $(INSTALL_TARGETS)
+	$(RM) $(PROGRAMS) $(INSTALL_SCRIPTS)
 
 _FORCE:

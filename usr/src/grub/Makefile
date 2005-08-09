@@ -42,9 +42,6 @@ $(ROOT_BOOT_GRUB):
 	$(INS.dir)
 
 
-clean: $(SUBDIRS)
-
-clobber: $(SUBDIRS)
-	$(RM) $(INST_TARGETS)
+clean clobber: $(SUBDIRS)
 
 FRC:

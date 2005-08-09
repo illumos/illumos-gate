@@ -164,6 +164,5 @@ clean: _FORCE
 	$(RM) *.o $(LIBDRIVERS)
 
 clobber: clean
-	$(RM) $(INSTALL_TARGETS)
 
 _FORCE:

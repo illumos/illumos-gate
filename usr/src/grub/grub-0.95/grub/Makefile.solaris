@@ -62,9 +62,9 @@ $(INSTALL_DIR) $(SRC_DIR):
 
 
 clean: _FORCE
-	$(RM) *.o $(PROGRAMS)
+	$(RM) *.o
 
 clobber: clean
-	$(RM) $(INSTALL_TARGETS)
+	$(RM) $(PROGRAMS)
 
 _FORCE:

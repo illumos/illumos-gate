@@ -52,7 +52,4 @@ $(SRC_DIR):
 	$(INS.dir)
 
 
-clobber: _FORCE
-	$(RM) $(INSTALL_TARGETS)
-
 _FORCE:

@@ -71,10 +71,10 @@ $(INSTALL_DIR):
 lint:
 
 clean:
-	$(RM) $(PROGS) *.exec *.o $(INSTALLBOOT)
+	$(RM) *.exec *.o
 
 clobber: clean
-	$(RM) $(INSTALL_TARGETS) $(INSTALLBOOT)
+	$(RM) $(PROGS) $(INSTALLBOOT)
 
 
 #

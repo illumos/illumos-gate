@@ -47,7 +47,7 @@ SRC_FILES	= Makefile.am Makefile.in boot.S boot.S.texi \
 INSTALL_TARGETS	+= $(SRC_FILES:%=$(SRC_DIR)/%)
 
 
-all:
+all clean clobber:
 
 
 install: all $(INSTALL_TARGETS)
@@ -66,11 +66,3 @@ $(SRC_DIR)/%: $(SRC_DIR) %
 
 $(INSTALL_MAN1_DIR) $(INSTALL_MAN8_DIR) $(INSTALL_INFO_DIR) $(SRC_DIR):
 	$(INS.dir)
-
-
-clean:
-
-clobber: clean
-	$(RM) $(INSTALL_TARGETS)
-
-_FORCE:

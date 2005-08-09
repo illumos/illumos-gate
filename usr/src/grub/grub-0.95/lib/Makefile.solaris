@@ -52,6 +52,5 @@ clean: _FORCE
 	$(RM) *.o $(LIBRARIES)
 
 clobber: clean
-	$(RM) $(INSTALL_TARGETS)
 
 _FORCE:
