@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -176,19 +180,39 @@ FILE	*fp_in;				/* read from this file */
 FILE	*fp_out = stdout;		/* and write stuff here */
 FILE	*fp_acct = NULL;		/* for accounting data */
 
+static void account(void);
+static void alpha(void);
+static void arguments(void);
+static int control(int);
+static int esc(void);
+static void done(void);
+static void draw(void);
+static void formfeed(void);
+static void gin(void);
+static void graph(void);
+static void header(void);
+static void home(void);
+static void incremental(void);
+static void init_signals(void);
+static void move(int, int);
+static int nextchar(void);
+static void options(void);
+static void point(void);
+static void redirect(int);
+static void reset(void);
+static void setfont(int);
+static void setmode(int);
+static void setup(void);
+static void statemachine(FILE *);
+static void text(void);
+
 
 /*****************************************************************************/
 
 
-main(agc, agv)
-
-
-    int		agc;
-    char	*agv[];
-
-
+int
+main(int agc, char *agv[])
 {
-
 
 /*
  *
@@ -197,7 +221,6 @@ main(agc, agv)
  * although things have been cleaned up some.
  *
  */
-
 
     argv = agv;				/* so everyone can use them */
     argc = agc;
@@ -212,7 +235,7 @@ main(agc, agv)
     done();				/* print the last page etc. */
     account();				/* job accounting data */
 
-    exit(x_stat);			/* nothing could be wrong */
+    return (x_stat);			/* nothing could be wrong */
 
 }   /* End of main */
 
@@ -220,14 +243,10 @@ main(agc, agv)
 /*****************************************************************************/
 
 
-init_signals()
-
-
+static void
+init_signals(void)
 {
-
-
     void		interrupt();		/* signal handler */
-
 
 /*
  *
@@ -253,15 +272,11 @@ init_signals()
 /*****************************************************************************/
 
 
-header()
-
-
+static void
+header(void)
 {
-
-
     int		ch;			/* return value from getopt() */
     int		old_optind = optind;	/* for restoring optind - should be 1 */
-
 
 /*
  *
@@ -303,14 +318,10 @@ header()
 /*****************************************************************************/
 
 
-options()
-
-
+static void
+options(void)
 {
-
-
     int		ch;			/* value returned by getopt() */
-
 
 /*
  *
@@ -455,12 +466,9 @@ char *get_font(name)
 
 /*****************************************************************************/
 
-
-setup()
-
-
+static void
+setup(void)
 {
-
 
 /*
  *
@@ -487,11 +495,9 @@ setup()
 /*****************************************************************************/
 
 
-arguments()
-
-
+static void
+arguments(void)
 {
-
 
 /*
  *
@@ -524,11 +530,9 @@ arguments()
 /*****************************************************************************/
 
 
-done()
-
-
+static void
+done(void)
 {
-
 
 /*
  *
@@ -550,11 +554,9 @@ done()
 /*****************************************************************************/
 
 
-account()
-
-
+static void
+account(void)
 {
-
 
 /*
  *
@@ -573,14 +575,10 @@ account()
 /*****************************************************************************/
 
 
-statemachine(fp)
-
-
-    FILE	*fp;			/* used to set fp_in */
-
-
+static void
+statemachine(FILE *fp)
+    /* used to set fp_in */
 {
-
 
 /*
  *
@@ -635,11 +633,9 @@ statemachine(fp)
 /*****************************************************************************/
 
 
-reset()
-
-
+static void
+reset(void)
 {
-
 
 /*
  *
@@ -659,15 +655,11 @@ reset()
 /*****************************************************************************/
 
 
-alpha()
-
-
+static void
+alpha(void)
 {
-
-
     int		c;			/* next character */
     int		x, y;			/* cursor will be here when we're done */
-
 
 /*
  *
@@ -751,20 +743,15 @@ alpha()
 
 /*****************************************************************************/
 
-
-graph()
-
-
+static void
+graph(void)
 {
-
-
     int			c;		/* next character */
     int			b;		/* for figuring out loy */
     int			x, y;		/* next point in the vector */
     static int		hix, hiy;	/* upper */
     static int		lox, loy;	/* and lower part of the address */
     static int		extra;		/* for extended addressing */
-
 
 /*
  *
@@ -831,15 +818,10 @@ graph()
 
 /*****************************************************************************/
 
-
-point()
-
-
+static void
+point(void)
 {
-
-
     int		c;			/* next input character */
-
 
 /*
  *
@@ -851,8 +833,10 @@ point()
 
 
     if ( dispmode == SPECIALPOINT )  {
-	if ( (c = nextchar()) < 040 || c > 0175 )
-	    return(control(c));
+	if ((c = nextchar()) < 040 || c > 0175) {
+		control(c);
+		return;
+	}
 
 	fprintf(fp_out, "%d %d i\n", intensity[c - ' '], c & 0100);
     }	/* End if */
@@ -865,10 +849,8 @@ point()
 
 /*****************************************************************************/
 
-
-incremental()
-
-
+static void
+incremental(void)
 {
 
 
@@ -915,12 +897,9 @@ incremental()
 
 /*****************************************************************************/
 
-
-gin()
-
-
+static void
+gin(void)
 {
-
 
 /*
  *
@@ -936,15 +915,10 @@ gin()
 
 /*****************************************************************************/
 
-
-control(c)
-
-
-    int		c;			/* check this control character */
-
-
+static int
+control(int c)
+    /* check this control character */
 {
-
 
 /*
  *
@@ -1021,15 +995,11 @@ control(c)
 /*****************************************************************************/
 
 
-esc()
-
-
+static int
+esc(void)
 {
-
-
     int		c;			/* next input character */
     int		ignore;			/* skip it if nonzero */
-
 
 /*
  *
@@ -1116,14 +1086,10 @@ esc()
 /*****************************************************************************/
 
 
-move(x, y)
-
-
-    int		x, y;			/* move the cursor here */
-
-
+static void
+move(int x, int y)
+    /* move the cursor here */
 {
-
 
 /*
  *
@@ -1140,15 +1106,10 @@ move(x, y)
 
 /*****************************************************************************/
 
-
-setmode(mode)
-
-
-    int		mode;			/* this should be the new mode */
-
-
+static void
+setmode(int mode)
+    /* this should be the new mode */
 {
-
 
 /*
  *
@@ -1180,12 +1141,9 @@ setmode(mode)
 
 /*****************************************************************************/
 
-
-home()
-
-
+static void
+home(void)
 {
-
 
 /*
  *
@@ -1202,13 +1160,9 @@ home()
 
 /*****************************************************************************/
 
-
-setfont(newfont)
-
-
-    int		newfont;		/* use this font next */
-
-
+static void
+setfont(int newfont)
+    /* use this font next */
 {
 
 
@@ -1232,12 +1186,9 @@ setfont(newfont)
 
 /*****************************************************************************/
 
-
-text()
-
-
+static void
+text(void)
 {
-
 
 /*
  *
@@ -1256,10 +1207,8 @@ text()
 
 /*****************************************************************************/
 
-
-draw()
-
-
+static void
+draw(void)
 {
 
 
@@ -1283,12 +1232,9 @@ draw()
 
 /*****************************************************************************/
 
-
-formfeed()
-
-
+static void
+formfeed(void)
 {
-
 
 /*
  *
@@ -1329,14 +1275,10 @@ formfeed()
 /*****************************************************************************/
 
 
-nextchar()
-
-
+static int
+nextchar(void)
 {
-
-
     int		ch;			/* next input character */
-
 
 /*
  *
@@ -1359,18 +1301,11 @@ nextchar()
 
 /*****************************************************************************/
 
-
-redirect(pg)
-
-
-    int		pg;			/* next page we're printing */
-
-
+static void
+redirect(int pg)
+    /* next page we're printing */
 {
-
-
     static FILE	*fp_null = NULL;	/* if output is turned off */
-
 
 /*
  *
@@ -1389,5 +1324,3 @@ redirect(pg)
 
 
 /*****************************************************************************/
-
-

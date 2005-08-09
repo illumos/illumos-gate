@@ -19,11 +19,23 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#ifndef	_DOWNLOAD_H
+#define	_DOWNLOAD_H
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef	__cpluplus
+extern {
+#endif
+
 /*
  *
  * The font data for a printer is saved in an array of the following type.
@@ -38,4 +50,8 @@ typedef struct map {
 
 } Map;
 
-Map	*allocate();
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _DOWNLOAD_H */

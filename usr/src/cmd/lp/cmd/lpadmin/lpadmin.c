@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,9 +70,8 @@ char			*Local_System = 0;
  ** main()
  **/
 
-int			main (argc, argv)
-	int			argc;
-	char			*argv[];
+int
+main(int argc, char *argv[])
 {
 	struct utsname	un;
 
@@ -211,6 +210,7 @@ int			main (argc, argv)
 	}
 	done (0);
 	/*NOTREACHED*/
+	return (0);
 }
 
 /**

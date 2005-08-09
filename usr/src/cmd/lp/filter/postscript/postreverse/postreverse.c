@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -657,6 +657,7 @@ PrintDocumentInfo(DOCUMENT * d)
 #endif				/* DEBUG */
 
 
+int
 main(int ac, char *av[])
 {
 	DOCUMENT *document;
@@ -716,5 +717,5 @@ main(int ac, char *av[])
 	if (unlinkFile)
 		unlink(unlinkFile);
 
-	exit(0);
+	return (0);
 }

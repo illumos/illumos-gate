@@ -20,17 +20,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.11	*/
 /* LINTLIBRARY */
-
 
 # include	<errno.h>
 # include	<string.h>
@@ -44,6 +43,8 @@ extern char	Endsync[];
 static int	Had_Full_Buffer = 1;
 int		Garbage_Bytes	= 0;
 int		Garbage_Messages= 0;
+
+static int _buffer(int);
 
 /*
 ** A real message is written in one piece, and the write
@@ -297,8 +298,7 @@ SyncUp:
 }
 
 static int
-_buffer (fifo)
-int	fifo;
+_buffer(int fifo)
 {
 	     int	   n, nbytes, count = 0;
     register fifobuffer_t  *fbp;

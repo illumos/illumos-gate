@@ -20,13 +20,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -67,6 +66,7 @@ static	char	* start_change();
 static	int	  end_change();
 #endif
 
+int
 #if defined(__STDC__)
 topq_reqid(char *reqid, char *machine)
 #else
@@ -134,7 +134,7 @@ char	*rqid;
 	}
 }
 
-static
+static int
 #if defined(__STDC__)
 end_change(char *rqid)
 #else
@@ -162,6 +162,7 @@ char	*rqid;
 **	Save the request-ids
 ** 	Follow the same method as in topq_reqid for each if the ids.
 */	
+int
 #if defined(__STDC__)
 topq_user(char *user, char *machine)
 #else

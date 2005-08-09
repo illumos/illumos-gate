@@ -19,9 +19,13 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -33,7 +37,7 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -153,13 +157,15 @@ extern char		*drawfile;
 extern char		*baselinefile;
 extern FILE		*tf;
 
+void			drawcirc(int);
+void			drawellip(int, int);
+static void		parsebuf(char *);
 
 /*****************************************************************************/
 
 
-getdraw()
-
-
+void
+getdraw(void)
 {
 
 
@@ -186,14 +192,10 @@ getdraw()
 /*****************************************************************************/
 
 
-drawline(dx, dy)
-
-
-    int		dx, dy;			/* endpoint is (hpos+dx, vpos+dy) */
-
-
+void
+drawline(int dx, int dy)
+    /* endpoint is (hpos+dx, vpos+dy) */
 {
-
 
 /*
  *
@@ -218,14 +220,10 @@ drawline(dx, dy)
 /*****************************************************************************/
 
 
-drawcirc(d)
-
-
-    int		d;			/* diameter of the circle */
-
-
+void
+drawcirc(int d)
+    /* diameter of the circle */
 {
-
 
 /*
  *
@@ -243,14 +241,10 @@ drawcirc(d)
 /*****************************************************************************/
 
 
-drawellip(a, b)
-
-
-    int		a, b;			/* axes lengths for the ellipse */
-
-
+void
+drawellip(int a, int b)
+    /* axes lengths for the ellipse */
 {
-
 
 /*
  *
@@ -277,16 +271,12 @@ drawellip(a, b)
 /*****************************************************************************/
 
 
-drawarc(dx1, dy1, dx2, dy2, c)
-
-
-    int		dx1, dy1;		/* vector from current pos to center */
-    int		dx2, dy2;		/* from center to end of the arc */
-    int		c;			/* clockwise if c is A */
-
-
+void
+drawarc(int dx1, int dy1, int dx2, int dy2, int c)
+    /* dx1, dy1 - vector from current pos to center */
+    /* dx2, dy2 - from center to end of the arc */
+    /* c - clockwise if c is A */
 {
-
 
 /*
  *
@@ -320,13 +310,10 @@ drawarc(dx1, dy1, dx2, dy2, c)
 /*****************************************************************************/
 
 
-drawspline(fp, flag)
-
-
-    FILE	*fp;			/* input for point list */
-    int		flag;			/* flag!=1 connect end points */
-
-
+void
+drawspline(FILE *fp, int flag)
+    /* fp - input for point list */
+    /* flag - flag!=1 connect end points */
 {
 
 
@@ -412,15 +399,11 @@ drawspline(fp, flag)
 /*****************************************************************************/
 
 
-beginpath(buf, copy)
-
-
-    char	*buf;			/* whatever followed "x X BeginPath" */
-    int		copy;			/* ignore *buf if FALSE */
-
-
+void
+beginpath(char *buf, int copy)
+    /* buf - whatever followed "x X BeginPath" */
+    /* copy - ignore *buf if FALSE */
 {
-
 
 /*
  *
@@ -467,15 +450,9 @@ beginpath(buf, copy)
 /*****************************************************************************/
 
 
-drawpath(buf, copy)
-
-
-    char	*buf;
-    int		copy;
-
-
+void
+drawpath(char *buf, int copy)
 {
-
 
 /*
  *
@@ -515,15 +492,10 @@ drawpath(buf, copy)
 /*****************************************************************************/
 
 
-parsebuf(buf)
-
-
-    char	*buf;			/* whatever followed "x X DrawPath" */
-
-
+static void
+parsebuf(char *buf)
+    /* whatever followed "x X DrawPath" */
 {
-
-
     char	*p;			/* usually the next token */
     char	*p1;			/* for grabbing arguments */
     char	*pend;			/* end of the original string (ie. *buf) */
@@ -622,12 +594,9 @@ parsebuf(buf)
 
 /*****************************************************************************/
 
-
-getbaseline()
-
-
+static void
+getbaseline(void)
 {
-
 
 /*
  *
@@ -650,15 +619,10 @@ getbaseline()
 /*****************************************************************************/
 
 
-newbaseline(buf)
-
-
-    char	*buf;			/* whatever followed "x X NewBaseline" */
-
-
+void
+newbaseline(char *buf)
+    /* whatever followed "x X NewBaseline" */
 {
-
-
     char	*p;			/* for eliminating white space etc. */
 
 
@@ -714,16 +678,10 @@ newbaseline(buf)
 
 /*****************************************************************************/
 
-
-drawtext(buf)
-
-
-    char	*buf;			/* whatever followed "x X DrawText */
-
-
+void
+drawtext(char *buf)
+    /* whatever followed "x X DrawText */
 {
-
-
     char	*p;			/* for eliminating white space etc. */
 
 
@@ -770,16 +728,9 @@ drawtext(buf)
 
 /*****************************************************************************/
 
-
-settext(buf)
-
-
-    char	*buf;
-
-
+void
+settext(char *buf)
 {
-
-
     char	*p;
 
 
@@ -824,7 +775,3 @@ settext(buf)
     resetpos();
 
 }   /* End of settext */
-
-
-/*****************************************************************************/
-

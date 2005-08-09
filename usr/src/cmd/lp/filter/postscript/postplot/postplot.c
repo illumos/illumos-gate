@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -178,13 +182,26 @@ FILE	*fp_in = stdin;			/* read from this file */
 FILE	*fp_out = stdout;		/* and write stuff here */
 FILE	*fp_acct = NULL;		/* for accounting data */
 
+static void account(void);
+static void arguments(void);
+static void connect(void);
+static void done(void);
+static void formfeed(void);
+static char *get_font(char *);
+static int getint(void);
+static void getstring(char *);
+static void header(void);
+static void init_signals(void);
+static void options(void);
+static void plot(void);
+static void redirect(int);
+static void setstyle(char *);
+static void setup(void);
+
 /*****************************************************************************/
 
-main(agc, agv)
-
-    int		agc;
-    char	*agv[];
-
+int
+main(int agc, char *agv[])
 {
 
 /*
@@ -206,16 +223,15 @@ main(agc, agv)
     done();				/* print the last page etc. */
     account();				/* job accounting data */
 
-    exit(x_stat);			/* not much could be wrong */
+    return (x_stat);			/* not much could be wrong */
 
 }   /* End of main */
 
 /*****************************************************************************/
 
-init_signals()
-
+static void
+init_signals(void)
 {
-
     void	interrupt();		/* signal handler */
 
 /*
@@ -239,10 +255,9 @@ init_signals()
 
 /*****************************************************************************/
 
-header()
-
+static void
+header(void)
 {
-
     int		ch;			/* return value from getopt() */
     int		old_optind = optind;	/* for restoring optind - should be 1 */
 
@@ -283,10 +298,9 @@ header()
 
 /*****************************************************************************/
 
-options()
-
+static void
+options(void)
 {
-
     int		ch;			/* return value from getopt() */
 
 /*
@@ -401,12 +415,10 @@ options()
 
 /*****************************************************************************/
 
-char *get_font(name)
-
-    char	*name;			/* name the user asked for */
-
+static char *
+get_font(char *name)
+    /* name the user asked for */
 {
-
     int		i;			/* for looking through fontmap[] */
 
 /*
@@ -427,8 +439,8 @@ char *get_font(name)
 
 /*****************************************************************************/
 
-setup()
-
+static void
+setup(void)
 {
 
 /*
@@ -453,8 +465,8 @@ setup()
 
 /*****************************************************************************/
 
-arguments()
-
+static void
+arguments(void)
 {
 
 /*
@@ -485,8 +497,8 @@ arguments()
 
 /*****************************************************************************/
 
-plot()
-
+static void
+plot(void)
 {
 
     int		c;
@@ -604,8 +616,8 @@ plot()
 
 /*****************************************************************************/
 
-connect()
-
+static void
+connect(void)
 {
 
     int		c;
@@ -640,12 +652,9 @@ connect()
 
 /*****************************************************************************/
 
-setstyle(str)
-
-    char	*str;
-
+static void
+setstyle(char *str)
 {
-
     int		i;
 
 /*
@@ -668,8 +677,8 @@ setstyle(str)
 
 /*****************************************************************************/
 
-getint()
-
+static int
+getint(void)
 {
     short	a, b;
 
@@ -691,13 +700,11 @@ getint()
 
 /*****************************************************************************/
 
-getstring(s)
-
-    char	*s;
-
+static void
+getstring(char *s)
 {
 
-    register int c;
+    int c;
 
 /*
  *
@@ -713,14 +720,13 @@ getstring(s)
     }	/* End for */
 
     *s = '\0';
-    return;
 
 }   /* End of getstring */
 
 /*****************************************************************************/
 
-done()
-
+static void
+done(void)
 {
 
 /*
@@ -740,8 +746,8 @@ done()
 
 /*****************************************************************************/
 
-account()
-
+static void
+account(void)
 {
 
 /*
@@ -758,8 +764,8 @@ account()
 
 /*****************************************************************************/
 
-formfeed()
-
+static void
+formfeed(void)
 {
 
 /*
@@ -801,12 +807,10 @@ formfeed()
 
 /*****************************************************************************/
 
-redirect(pg)
-
-    int		pg;			/* next page we're printing */
-
+static void
+redirect(int pg)
+    /* next page we're printing */
 {
-
     static FILE	*fp_null = NULL;	/* if output is turned off */
 
 /*
@@ -822,6 +826,3 @@ redirect(pg)
 	fp_out = fp_null = fopen("/dev/null", "w");
 
 }   /* End of redirect */
-
-/*****************************************************************************/
-

@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "unistd.h"
@@ -621,7 +621,6 @@ void GetRequestFiles(REQUEST *req, char *buffer, int length)
 void			(*lp_alloc_fail_handler)( void ) = 0;
 
 typedef void *alloc_type;
-extern etext;
 
 alloc_type
 _Malloc(size_t size, const char *file, int line)

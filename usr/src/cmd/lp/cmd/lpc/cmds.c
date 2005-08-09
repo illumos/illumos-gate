@@ -1,19 +1,18 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 ** lpc -- line printer control program -- commands:
@@ -306,7 +305,7 @@ char	**argv;
 	
 } 
 
-static
+static int
 #if defined(__STDC__)
 doarg(char *job)
 #else

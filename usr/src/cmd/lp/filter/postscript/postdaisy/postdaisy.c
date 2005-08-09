@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -167,19 +171,39 @@ FILE	*fp_in;				/* read from this file */
 FILE	*fp_out = stdout;		/* and write stuff here */
 FILE	*fp_acct = NULL;		/* for accounting data */
 
+static void account(void);
+static void arguments(void);
+static void backspace(void);
+static void carriage(void);
+static void changefont(char *);
+static void cleartabs(void);
+static void endline(void);
+static void endstring(void);
+static void escape(void);
+static void done(void);
+static void formfeed(void);
+static void header(void);
+static void hgoto(int);
+static void hmot(int);
+static void htab(void);
+static void inittabs(void);
+static void init_signals(void);
+static void linefeed(void);
+static void options(void);
+static void oput(int);
+static void redirect(int);
+static void setup(void);
+static void startline(void);
+static void text(void);
+static void vgoto(int);
+static void vmot(int);
+static void vtab(void);
 
 /*****************************************************************************/
 
-
-main(agc, agv)
-
-
-    int		agc;
-    char	*agv[];
-
-
+int
+main(int agc, char *agv[])
 {
-
 
 /*
  *
@@ -202,22 +226,17 @@ main(agc, agv)
     done();				/* print the last page etc. */
     account();				/* job accounting data */
 
-    exit(x_stat);			/* not much could be wrong */
+    return (x_stat);			/* not much could be wrong */
 
 }   /* End of main */
 
 
 /*****************************************************************************/
 
-
-init_signals()
-
-
+static void
+init_signals(void)
 {
-
-
     void	interrupt();		/* signal handler */
-
 
 /*
  *
@@ -242,16 +261,11 @@ init_signals()
 
 /*****************************************************************************/
 
-
-header()
-
-
+static void
+header(void)
 {
-
-
     int		ch;			/* return value from getopt() */
     int		old_optind = optind;	/* for restoring optind - should be 1 */
-
 
 /*
  *
@@ -292,16 +306,11 @@ header()
 
 /*****************************************************************************/
 
-
-options()
-
-
+static void
+options(void)
 {
-
-
     int		ch;			/* return value from getopt() */
     int		n;			/* for CR and LF modes */
-
 
 /*
  *
@@ -440,17 +449,11 @@ options()
 /*****************************************************************************/
 
 
-char *get_font(name)
-
-
-    char	*name;			/* name the user asked for */
-
-
+char *
+get_font(char *name)
+    /* name the user asked for */
 {
-
-
     int		i;			/* for looking through fontmap[] */
-
 
 /*
  *
@@ -473,12 +476,9 @@ char *get_font(name)
 
 /*****************************************************************************/
 
-
-setup()
-
-
+static void
+setup(void)
 {
-
 
 /*
  *
@@ -504,12 +504,9 @@ setup()
 
 /*****************************************************************************/
 
-
-arguments()
-
-
+static void
+arguments(void)
 {
-
 
 /*
  *
@@ -543,12 +540,9 @@ arguments()
 
 /*****************************************************************************/
 
-
-done()
-
-
+static void
+done(void)
 {
-
 
 /*
  *
@@ -568,12 +562,9 @@ done()
 
 /*****************************************************************************/
 
-
-account()
-
-
+static void
+account(void)
 {
-
 
 /*
  *
@@ -591,15 +582,10 @@ account()
 
 /*****************************************************************************/
 
-
-text()
-
-
+static void
+text(void)
 {
-
-
     int		ch;			/* next input character */
-
 
 /*
  *
@@ -669,15 +655,10 @@ text()
 
 /*****************************************************************************/
 
-
-inittabs()
-
-
+static void
+inittabs(void)
 {
-
-
     int		i;			/* loop index */
-
 
 /*
  *
@@ -698,15 +679,10 @@ inittabs()
 
 /*****************************************************************************/
 
-
-cleartabs()
-
-
+static void
+cleartabs(void)
 {
-
-
     int		i;			/* loop index */
-
 
 /*
  *
@@ -726,12 +702,9 @@ cleartabs()
 
 /*****************************************************************************/
 
-
-formfeed()
-
-
+static void
+formfeed(void)
 {
-
 
 /*
  *
@@ -775,15 +748,10 @@ formfeed()
 
 /*****************************************************************************/
 
-
-linefeed()
-
-
+static void
+linefeed(void)
 {
-
-
     int		line = 0;		/* current line - based on ovmi */
-
 
 /*
  *
@@ -811,12 +779,9 @@ linefeed()
 
 /*****************************************************************************/
 
-
-carriage()
-
-
+static void
+carriage(void)
 {
-
 
 /*
  *
@@ -842,16 +807,11 @@ carriage()
 
 /*****************************************************************************/
 
-
-htab()
-
-
+static void
+htab(void)
 {
-
-
     int		col;			/* 'column' we'll be at next */
     int		i;			/* loop index */
-
 
 /*
  *
@@ -880,10 +840,8 @@ htab()
 
 /*****************************************************************************/
 
-
-vtab()
-
-
+static void
+vtab(void)
 {
 
 
@@ -915,12 +873,9 @@ vtab()
 
 /*****************************************************************************/
 
-
-backspace()
-
-
+static void
+backspace(void)
 {
-
 
 /*
  *
@@ -943,15 +898,10 @@ backspace()
 
 /*****************************************************************************/
 
-
-escape()
-
-
+static void
+escape(void)
 {
-
-
     int		ch;			/* control character */
-
 
 /*
  *
@@ -1122,15 +1072,10 @@ escape()
 
 /*****************************************************************************/
 
-
-vmot(n)
-
-
-    int		n;			/* move this far vertically */
-
-
+static void
+vmot(int n)
+    /* move this far vertically */
 {
-
 
 /*
  *
@@ -1146,15 +1091,10 @@ vmot(n)
 
 /*****************************************************************************/
 
-
-vgoto(n)
-
-
-    int		n;			/* new vertical position */
-
-
+static void
+vgoto(int n)
+    /* new vertical position */
 {
-
 
 /*
  *
@@ -1170,15 +1110,10 @@ vgoto(n)
 
 /*****************************************************************************/
 
-
-hmot(n)
-
-
-    int		n;			/* move this horizontally */
-
-
+static void
+hmot(int n)
+    /* move this horizontally */
 {
-
 
 /*
  *
@@ -1197,15 +1132,10 @@ hmot(n)
 
 /*****************************************************************************/
 
-
-hgoto(n)
-
-
-    int		n;			/* go to this horizontal position */
-
-
+static void
+hgoto(int n)
+    /* go to this horizontal position */
 {
-
 
 /*
  *
@@ -1221,15 +1151,9 @@ hgoto(n)
 
 /*****************************************************************************/
 
-
-changefont(name)
-
-
-    char	*name;
-
-
+static void
+changefont(char *name)
 {
-
 
 /*
  *
@@ -1247,12 +1171,9 @@ changefont(name)
 
 /*****************************************************************************/
 
-
-startline()
-
-
+static void
+startline(void)
 {
-
 
 /*
  *
@@ -1278,12 +1199,9 @@ startline()
 
 /*****************************************************************************/
 
-
-endline()
-
-
+static void
+endline(void)
 {
-
 
 /*
  *
@@ -1303,12 +1221,9 @@ endline()
 
 /*****************************************************************************/
 
-
-endstring()
-
-
+static void
+endstring(void)
 {
-
 
 /*
  *
@@ -1330,15 +1245,10 @@ endstring()
 
 /*****************************************************************************/
 
-
-oput(ch)
-
-
-    int		ch;			/* next output character */
-
-
+static void
+oput(int ch)
+    /* next output character */
 {
-
 
 /*
  *
@@ -1386,18 +1296,11 @@ oput(ch)
 
 /*****************************************************************************/
 
-
-redirect(pg)
-
-
-    int		pg;			/* next page we're printing */
-
-
+static void
+redirect(int pg)
+    /* next page we're printing */
 {
-
-
     static FILE	*fp_null = NULL;	/* if output is turned off */
-
 
 /*
  *

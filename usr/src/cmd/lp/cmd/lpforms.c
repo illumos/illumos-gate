@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -137,9 +136,8 @@ static int L = 0;
  ** main()
  **/
 
-int			main (argc, argv)
-	int			argc;
-	char *			argv[];
+int
+main(int argc, char *argv[])
 {
 	extern int		optind;
 	extern int		opterr;
@@ -787,17 +785,17 @@ add_form (form, input, new_alert, u)
 
 #if	defined(__STDC__)
 
-static int	list ( char * , int (*)() );
-static int	_list_form ( FORM * , FALERT * , FILE * );
-static int	_list_alert ( FORM * , FALERT * );
-static int	_list_both ( FORM * , FALERT * , FILE * );
+static int	list ( char * , void (*)() );
+static void	_list_form ( FORM * , FALERT * , FILE * );
+static void	_list_alert ( FORM * , FALERT * );
+static void	_list_both ( FORM * , FALERT * , FILE * );
 
 #else
 
 static int	list();
-static int	_list_form();
-static int	_list_alert();
-static int	_list_both();
+static void	_list_form();
+static void	_list_alert();
+static void	_list_both();
 
 #endif
 
@@ -844,12 +842,12 @@ static int
 #if	defined(__STDC__)
 list (
 	char			*form,
-	int			(*subaction)()
+	void			(*subaction)()
 )
 #else
 list (form, subaction)
 	char			*form;
-	int			(*subaction)();
+	void			(*subaction)();
 #endif
 {
 	FORM			fbuf;
@@ -907,7 +905,7 @@ list (form, subaction)
  ** _list_form()
  **/
 
-static int
+static void
 #if	defined(__STDC__)
 _list_form (
 	FORM *			pf,
@@ -940,15 +938,13 @@ _list_form (pf, palert, align_fp)
 	if (align_fp)
 		while ((n = fread(buf, 1, BUFSIZ, align_fp)))
 			write (1, buf, n);
-
-	return;
 }
 
 /**
  ** _list_alert()
  **/
 
-static int
+static void
 #if	defined(__STDC__)
 _list_alert (
 	FORM *			ignore,
@@ -961,14 +957,13 @@ _list_alert (ignore, palert)
 #endif
 {
 	printalert (stdout, palert, 0);
-	return;
 }
 
 /**
  ** _list_both()
  **/
 
-static int
+static void
 #if	defined(__STDC__)
 _list_both (
 	FORM *			pf,
@@ -984,7 +979,6 @@ _list_both (pf, palert, align_fp)
 {
 	_list_alert (pf, palert);
 	_list_form (pf, palert, align_fp);
-	return;
 }
 
 /**

@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -156,6 +155,7 @@ void			options (argc, argv)
 	char		*cp,
 			*rest,
 			**av;
+	char stroptsw[3] = "-X";
 
 #if	defined(__STDC__)
 	typedef char * const *	stupid;	/* dumb-ass ANSI C */
@@ -258,12 +258,14 @@ void			options (argc, argv)
 			 * These options also must have non-null args.
 			 */
 			if (!*optarg) {
-				(cp = "-X")[1] = optsw;
+				stroptsw[1] = optsw;
+				cp = stroptsw;
 				LP_ERRMSG1 (ERROR, E_LP_NULLARG, cp);
 				done (1);
 			}
 			if (*optarg == '-') {
-				(cp = "-X")[1] = optsw;
+				stroptsw[1] = optsw;
+				cp = stroptsw;
 				LP_ERRMSG1 (ERROR, E_LP_OPTARG, cp);
 				done (1);
 			}
@@ -275,7 +277,8 @@ void			options (argc, argv)
 			 * These options can have a null arg.
 			 */
 			if (*optarg == '-') {
-				(cp = "-X")[1] = optsw;
+				stroptsw[1] = optsw;
+				cp = stroptsw;
 				LP_ERRMSG1 (ERROR, E_LP_OPTARG, cp);
 				done (1);
 			}
@@ -568,7 +571,9 @@ void			options (argc, argv)
 				done (0);
 
 			} else {
-				(cp = "-X")[1] = optopt;
+				stroptsw[1] = optsw;
+				cp = stroptsw;
+
 				if (strchr(OPT_LIST, optopt))
 					LP_ERRMSG1 (ERROR, E_LP_OPTARG, cp);
 				else

@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 1996-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -139,9 +138,8 @@ mkAlertCmd(char *reqfile)
 	return(str);
 }
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
     int letter;
     char *p, **templist, **stemp;
@@ -407,8 +405,7 @@ puterr:
     clean_up();
     ack_job();		/* issue request id message */
 
-    exit(exit_code);
-    return(0);
+    return (exit_code);
 }
 /* startup -- initialization routine */
 
@@ -732,6 +729,7 @@ start_ch(char *rqid)
     }
     err_exit();
     /*NOTREACHED*/
+    return (NULL);
 }
 
 static void
@@ -866,6 +864,7 @@ getfiles(int number)
     }
     err_exit();
     /*NOTREACHED*/
+    return (NULL);
 }
 
 static char *
@@ -955,6 +954,7 @@ que_job(REQUEST *rqp)
     }
     err_exit();
     /*NOTREACHED*/
+    return (NULL);
 }
 
 /* ack_job -- issue request id message */

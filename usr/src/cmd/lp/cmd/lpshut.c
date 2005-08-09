@@ -20,15 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <locale.h>
 #include "stdio.h"
@@ -58,9 +57,8 @@ void			startup(),
  ** main()
  **/
 
-int			main (argc, argv)
-	int			argc;
-	char			*argv[];
+int
+main(int argc, char *argv[])
 {
 	char			msgbuf[MSGMAX];
 	char *			tempo;
@@ -125,6 +123,7 @@ int			main (argc, argv)
 		done (1);
 	}
 	/*NOTREACHED*/
+	return (0);
 }
 
 /**

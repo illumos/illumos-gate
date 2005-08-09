@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *
  * Conditionally compiled routines for setting up and reading the line. Things
@@ -69,12 +69,9 @@ extern FILE *fp_log;
 
 
 #ifdef SYSV
-setupline()
-
-
+void
+setupline(void)
 {
-
-
     struct termio	termio;
     struct termios	termios;
     char buf[100];
@@ -157,9 +154,8 @@ setupline()
 /*****************************************************************************/
 
 
-resetline()
-
-
+int
+resetline(void)
 {
 
 
@@ -205,15 +201,10 @@ resetline()
 /*****************************************************************************/
 
 
-setupstdin(mode)
-
-
-    int		mode;			/* what to do with stdin settings */
-
-
+void
+setupstdin(int mode)
+    /* what to do with stdin settings */
 {
-
-
     struct termio		termio;
 
     static int			saved = FALSE;
@@ -260,9 +251,8 @@ setupstdin(mode)
 /*****************************************************************************/
 
 
-readline()
-
-
+int
+readline(void)
 {
 
 

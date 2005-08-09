@@ -20,13 +20,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -419,7 +418,8 @@ getbaud(char *rate)			/* string representing the baud rate */
 	    return (baudtable[i].val);
 
     error(FATAL, "don't recognize baud rate %s", rate);
-	/*NOTREACHED*/
+    /*NOTREACHED*/
+    return (0);
 
 }
 
@@ -1220,7 +1220,7 @@ Read(int fd, char *buf, int n)
 
 }
 
-#endif NEVER
+#endif	/* NEVER */
 
 
 /*

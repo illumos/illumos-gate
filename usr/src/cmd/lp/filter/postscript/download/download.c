@@ -20,15 +20,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
 /*
  *
  * download - host resident font downloader
@@ -113,13 +113,22 @@ int	atend = FALSE;			/* TRUE only if a comment says so */
 FILE	*fp_in = stdin;			/* next input file */
 FILE	*fp_temp = NULL;		/* for copying stdin */
 
+static Map *allocate(Map *, int);
+static void arguments(void);
+static void copyfonts(char *);
+static void copyinput(void);
+static void done(void);
+static void download(void);
+static void init_signals(void);
+static int lookup(char *);
+static void options(void);
+static void readmap(void);
+static void readresident(void);
+
 /*****************************************************************************/
 
-main(agc, agv)
-
-    int		agc;
-    char	*agv[];
-
+int
+main(int agc, char *agv[])
 {
 
 /*
@@ -141,16 +150,15 @@ main(agc, agv)
     arguments();			/* then process non-option arguments */
     done();				/* and clean things up */
 
-    exit(x_stat);			/* not much could be wrong */
+    return (x_stat);			/* not much could be wrong */
 
 }   /* End of main */
 
 /*****************************************************************************/
 
-init_signals()
-
+static void
+init_signals(void)
 {
-
     void	interrupt();		/* handles signals if we catching them */
 
 /*
@@ -174,8 +182,8 @@ init_signals()
 
 /*****************************************************************************/
 
-options()
-
+static void
+options(void)
 {
 
     int		ch;			/* return value from getopt() */
@@ -249,10 +257,9 @@ options()
 
 /*****************************************************************************/
 
-readmap()
-
+static void
+readmap(void)
 {
-
     char	*path;
     char	*ptr;
     int		fd;
@@ -312,10 +319,9 @@ readmap()
 
 /*****************************************************************************/
 
-readresident()
-
+static void
+readresident(void)
 {
-
     FILE	*fp;
     char	*path;
     int		ch;
@@ -351,8 +357,8 @@ readresident()
 
 /*****************************************************************************/
 
-arguments()
-
+static void
+arguments(void)
 {
 
 /*
@@ -387,8 +393,8 @@ arguments()
 
 /*****************************************************************************/
 
-done()
-
+static void
+done(void)
 {
 
 /*
@@ -404,10 +410,9 @@ done()
 
 /*****************************************************************************/
 
-download()
-
+static void
+download(void)
 {
-
     int		infontlist = FALSE;
 
 /*
@@ -454,12 +459,9 @@ download()
 
 /*****************************************************************************/
 
-copyfonts(list)
-
-    char	*list;
-
+static void
+copyfonts(char *list)
 {
-
     char	*font;
     char	*path;
     int		n;
@@ -496,8 +498,8 @@ copyfonts(list)
 
 /*****************************************************************************/
 
-copyinput()
-
+static void
+copyinput(void)
 {
 
 /*
@@ -524,12 +526,9 @@ copyinput()
 
 /*****************************************************************************/
 
-lookup(font)
-
-    char	*font;
-
+static int
+lookup(char *font)
 {
-
     int		i;
 
 /*
@@ -552,11 +551,8 @@ lookup(font)
 
 /*****************************************************************************/
 
-Map *allocate(ptr, num)
-
-    Map		*ptr;
-    int		num;
-
+static Map *
+allocate(Map *ptr, int num)
 {
 
 /*
@@ -576,6 +572,3 @@ Map *allocate(ptr, num)
     return(ptr);
 
 }   /* End of allocate */
-
-/*****************************************************************************/
-

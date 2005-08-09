@@ -20,15 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* lpusers [-q priority-level] -u (user-list | "")
    lpusers -d priority-level
@@ -54,9 +53,8 @@ char	*PRIORITY;
 
 int add_user(), del_user();
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
     int mtype, size, c,
 	list = FALSE, limit = -1, deflt = -1;
@@ -213,5 +211,5 @@ usage:
 Error:	LP_ERRMSG (ERROR, E_LPU_NOLOAD);
 
 NoError:(void)mclose ();
-    exit(0);
+    return (0);
 }

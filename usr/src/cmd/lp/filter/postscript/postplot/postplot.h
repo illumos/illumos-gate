@@ -19,11 +19,23 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#ifndef	_POSTPLOT_H
+#define	_POSTPLOT_H
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
 /*
  *
  * Definitions used by the PostScript translator for Unix plot files.
@@ -85,11 +97,8 @@ typedef struct {
 	    NULL, NULL							\
 	}
 
-/*
- *
- * Some of the non-integer functions in postplot.c.
- *
- */
+#ifdef	__cplusplus
+}
+#endif
 
-char	*get_font();
-
+#endif	/* _POSTPLOT_H */

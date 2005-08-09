@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  *
  * A simple program that can be used to filter jobs for PostScript
@@ -140,8 +140,17 @@ int	ttyi;			/* input */
 int	ttyo = 2;		/* and output file descriptors */
 
 FILE	*fp_log = stderr;	/* log file for data from the printer */
+
 
 
+static void filter(void);
+static int getstatus(int);
+static void initialize(void);
+static void options(int, char *[]);
+static int readblock(int);
+static int readline(void);
+static void reset(void);
+static int writeblock(void);
 
 void
 logit(char *mesg, ...)
@@ -207,9 +216,8 @@ error(int kind, char *mesg, ...)
 
 
 
-main(argc, argv)
-int	argc;
-char	*argv[];
+int
+main(int argc, char *argv[])
 {
 
 /*
@@ -225,7 +233,7 @@ char	*argv[];
 
     prog_name = argv[0];	/* really just for error messages */
 
-    options(argv, argc);
+    options(argc, argv);
 
     initialize();		/* Set printer up for printing */
 
@@ -233,7 +241,7 @@ char	*argv[];
 
     reset();			/* wait 'til it's finished & reset it*/
 
-    exit(0);		/* everything probably went OK */
+    return (0);		/* everything probably went OK */
 
 }   /* End of main */
 
@@ -241,10 +249,8 @@ char	*argv[];
 
 
 
-
-options(argc, argv)
-int	argc;
-char	*argv[];
+static void
+options(int argc, char *argv[])
 {
 
 
@@ -314,8 +320,8 @@ char	*argv[];
 
 
 
-
-initialize()
+static void
+initialize(void)
 {
     if ((block = malloc(blocksize)) == NULL)
 	error(FATAL, "no memory");
@@ -379,8 +385,8 @@ initialize()
 
 
 
-
-filter()
+static void
+filter(void)
 {
     static int	wflag = 0;	/* nonzero if we've written a block */
     int		fd_in = fileno(stdin);
@@ -468,9 +474,9 @@ filter()
 
 
 
-
-readblock(fd_in)
-int	fd_in;			/* current input file */
+static int
+readblock(int fd_in)
+    /* current input file */
 {
 
 /*
@@ -501,8 +507,8 @@ int	fd_in;			/* current input file */
 
 
 
-
-writeblock()
+static int
+writeblock(void)
 {
     int		count;		/* bytes successfully written */
 
@@ -529,15 +535,14 @@ writeblock()
 
 
 
-
-getstatus(t)
-int	t;			/* sleep time after sending '\024' */
+static int
+getstatus(int t)
+    /* sleep time after sending '\024' */
 {
     char	*state;		/* new printer state - from sbuf[] */
     int		i;		/* index of new state in status[] */
     static int	laststate = NOSTATUS;
 				/* last state we found out about */
-
 
 /*
  *
@@ -587,8 +592,8 @@ int	t;			/* sleep time after sending '\024' */
 
 
 
-
-reset()
+static void
+reset(void)
 {
     int		sleeptime = 15;		/* for 'out of paper' etc. */
     int		senteof = FALSE;
@@ -674,8 +679,8 @@ reset()
 
 
 
-
-readline()
+static int
+readline(void)
 {
     char	ch;			/* next character from ttyi */
     int		n;			/* read() return value */

@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -56,27 +60,26 @@ typedef struct {long start, end;} Section;
 
 extern char	*calloc(), *realloc();
 
+static void print(FILE *, char **);
+static void copy(FILE *, FILE *, Section *);
 
 /*****************************************************************************/
 
 
-ps_include(fin, fout, page_no, whiteout, outline, scaleboth, cx, cy, sx, sy, ax, ay, rot)
-
-
-    FILE	*fin, *fout;		/* input and output files */
-    int		page_no;		/* physical page number from *fin */
-    int		whiteout;		/* erase picture area */
-    int		outline;		/* draw a box around it and */
-    int		scaleboth;		/* scale both dimensions - if not zero */
-    double	cx, cy;			/* center of the picture and */
-    double	sx, sy;			/* its size - in current coordinates */
-    double	ax, ay;			/* left-right, up-down adjustment */
-    double	rot;			/* rotation - in clockwise degrees */
-
-
+void
+ps_include(FILE *fin, FILE *fout, int page_no, int whiteout,
+    int outline, int scaleboth, double cx, double cy,
+    double sx, double sy, double ax, double ay, double rot)
+    /* fin, fout - input and output files */
+    /* page_no physical page number from *fin */
+    /* whiteout - erase picture area */
+    /* outline - draw a box around it and */
+    /* scaleboth - scale both dimensions - if not zero */
+    /* cx, cy - center of the picture and */
+    /* sx, sy - its size - in current coordinates */
+    /* ax, ay - left-right, up-down adjustment */
+    /* rot - rotation - in clockwise degrees */
 {
-
-
     int		foundpage = 0;		/* found the page when non zero */
     int		nglobal = 0;		/* number of global defs so far */
     int		maxglobal = 0;		/* and the number we've got room for */
@@ -186,19 +189,15 @@ fprintf(stderr, "trailer=(%d,%d)\n", trailer.start, trailer.end);
 
 }
 
-static
-print(fout, s)
-FILE *fout;
-char **s;
+static void
+print(FILE *fout, char **s)
 {
 	while (*s)
 		fprintf(fout, "%s\n", *s++);
 }
 
-static
-copy(fin, fout, s)
-FILE *fin, *fout;
-Section *s;
+static void
+copy(FILE *fin, FILE *fout, Section *s)
 {
 	if (s->end <= s->start)
 		return;
@@ -207,4 +206,3 @@ Section *s;
 		if (buf[0] != '%')
 			fprintf(fout, "%s", buf);
 }
-

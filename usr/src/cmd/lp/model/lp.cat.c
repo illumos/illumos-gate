@@ -20,13 +20,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1989-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -396,11 +395,10 @@ int bpp_state(int);
  ** main()
  **/
 
-int			main (argc, argv)
-	int			argc;
-	char			*argv[];
+int
+main(int argc, char *argv[])
 {
-	register int		nin,
+	int			nin,
 				nout,
 				effective_rate,
 				max_delay	= 0,
@@ -641,8 +639,7 @@ gettext("Trouble identifying printer type \"%s\"; check the Terminfo database.\n
 
 	}
 
-	exit (E_SUCCESS);
-	/*NOTREACHED*/
+	return (E_SUCCESS);
 }
 
 /**

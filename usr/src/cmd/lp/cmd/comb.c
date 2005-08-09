@@ -20,15 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <signal.h>
@@ -48,10 +47,8 @@ char message[MSGMAX],
 
 void reject(), accept(), enable(), disable();
 
-void
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
     char *p;
 
@@ -72,6 +69,8 @@ char *argv[];
     if (STREQU(p, "accept")) accept(argc, argv);
     if (STREQU(p, "enable")) enable(argc, argv);
     if (STREQU(p, "disable")) disable(argc, argv);
+
+    return (0);
 }
 
 void startup(), cleanup(), err_exit();

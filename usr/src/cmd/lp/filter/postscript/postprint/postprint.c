@@ -19,15 +19,15 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All Rights Reserved
- * Use is subject to license terms
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -145,19 +145,28 @@ FILE	*fp_in = stdin;			/* read from this file */
 FILE	*fp_out = stdout;		/* and write stuff here */
 FILE	*fp_acct = NULL;		/* for accounting data */
 
+static void account(void);
+static void arguments(void);
+static void done(void);
+static void endline(void);
+static void formfeed(void);
+static void header(void);
+static void init_signals(void);
+static void newline(void);
+static void options(void);
+static void oput(int);
+static void redirect(int);
+static void setup(void);
+static void spaces(int);
+static void startline(void);
+static void text(void);
 
 /*****************************************************************************/
 
 
-main(agc, agv)
-
-
-    int		agc;
-    char	*agv[];
-
-
+int
+main(int agc, char *agv[])
 {
-
 
 /*
  *
@@ -174,13 +183,12 @@ main(agc, agv)
 
     init_signals();			/* sets up interrupt handling */
     header();				/* PostScript header and prologue */
-/*  options();				/* handle the command line options */
     setup();				/* for PostScript */
     arguments();			/* followed by each input file */
     done();				/* print the last page etc. */
     account();				/* job accounting data */
 
-    exit(x_stat);			/* not much could be wrong */
+    return (x_stat);			/* not much could be wrong */
 
 }   /* End of main */
 
@@ -188,14 +196,10 @@ main(agc, agv)
 /*****************************************************************************/
 
 
-init_signals()
-
-
+static void
+init_signals(void)
 {
-
-
     void	interrupt();		/* signal handler */
-
 
 /*
  *
@@ -221,15 +225,11 @@ init_signals()
 /*****************************************************************************/
 
 
-header()
-
-
+static void
+header(void)
 {
-
-
     int		ch;			/* return value from getopt() */
     int		old_optind = optind;	/* for restoring optind - should be 1 */
-
 
 /*
  *
@@ -274,12 +274,9 @@ header()
 /*****************************************************************************/
 
 
-options()
-
-
+static void
+options(void)
 {
-
-
     int		ch;			/* return value from getopt() */
     int		euro = 0;
     extern char *getenv(char *);
@@ -485,11 +482,9 @@ char *get_font(name)
 /*****************************************************************************/
 
 
-setup()
-
-
+static void
+setup(void)
 {
-
 
 /*
  *
@@ -500,7 +495,6 @@ setup()
  * POINTSIZE.
  *
  */
-
 
     writerequest(0, stdout);		/* global requests eg. manual feed */
     fprintf(stdout, "setup\n");
@@ -522,11 +516,9 @@ setup()
 /*****************************************************************************/
 
 
-arguments()
-
-
+static void
+arguments(void)
 {
-
 
 /*
  *
@@ -535,7 +527,6 @@ arguments()
  * we'll translate stdin.
  *
  */
-
 
     if ( argc < 1 )
 	text();
@@ -559,11 +550,9 @@ arguments()
 /*****************************************************************************/
 
 
-done()
-
-
+static void
+done(void)
 {
-
 
 /*
  *
@@ -599,11 +588,9 @@ done()
 /*****************************************************************************/
 
 
-account()
-
-
+static void
+account(void)
 {
-
 
 /*
  *
@@ -611,7 +598,6 @@ account()
  * requested using the -A or -J options.
  *
  */
-
 
     if ( fp_acct != NULL )
 	fprintf(fp_acct, " print %d\n copies %d\n", printed, copies);
@@ -622,14 +608,10 @@ account()
 /*****************************************************************************/
 
 
-text()
-
-
+static void
+text(void)
 {
-
-
     int		ch;			/* next input character */
-
 
 /*
  *
@@ -706,11 +688,9 @@ text()
 /*****************************************************************************/
 
 
-formfeed()
-
-
+static void
+formfeed(void)
 {
-
 
 /*
  *
@@ -758,11 +738,9 @@ formfeed()
 /*****************************************************************************/
 
 
-newline()
-
-
+static void
+newline(void)
 {
-
 
 /*
  *
@@ -770,7 +748,6 @@ newline()
  * that at least an empty string is on the stack.
  *
  */
-
 
     startline();
     endline();				/* print the current line */
@@ -784,18 +761,12 @@ newline()
 /*****************************************************************************/
 
 
-spaces(ch)
-
-
-    int		ch;			/* next input character */
-
-
+static void
+spaces(int ch)
+    /* next input character */
 {
-
-
     int		endcol;			/* ending column */
     int		i;			/* final distance - in spaces */
-
 
 /*
  *
@@ -847,11 +818,9 @@ spaces(ch)
 /*****************************************************************************/
 
 
-startline()
-
-
+static void
+startline(void)
 {
-
 
 /*
  *
@@ -874,9 +843,8 @@ startline()
 /*****************************************************************************/
 
 
-endline()
-
-
+static void
+endline(void)
 {
 
 
@@ -903,14 +871,10 @@ endline()
 /*****************************************************************************/
 
 
-oput(ch)
-
-
-    int		ch;			/* next output character */
-
-
+static void
+oput(int ch)
+    /* next output character */
 {
-
 
 /*
  *
@@ -935,17 +899,11 @@ oput(ch)
 /*****************************************************************************/
 
 
-redirect(pg)
-
-
-    int		pg;			/* next page we're printing */
-
-
+static void
+redirect(int pg)
+    /* next page we're printing */
 {
-
-
     static FILE	*fp_null = NULL;	/* if output is turned off */
-
 
 /*
  *

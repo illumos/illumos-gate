@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -133,11 +137,9 @@ extern FILE	*tf;
 /*****************************************************************************/
 
 
-getcolor()
-
-
+void
+getcolor(void)
 {
-
 
 /*
  *
@@ -160,18 +162,12 @@ getcolor()
 /*****************************************************************************/
 
 
-newcolor(name)
-
-
-    char	*name;			/* of the color */
-
-
+void
+newcolor(char *name)
+    /* of the color */
 {
-
-
     char	*p;			/* next character in *name */
     int		i;			/* goes in color[i] */
-
 
 /*
  *
@@ -204,15 +200,11 @@ newcolor(name)
 /*****************************************************************************/
 
 
-setcolor()
-
-
+void
+setcolor(void)
 {
-
-
     int		newencoding;		/* text encoding scheme that's needed */
     char	*p;			/* for converting what's in color[] */
-
 
 /*
  *
@@ -257,7 +249,3 @@ setcolor()
     }	/* End if */
 
 }   /* End of setcolor */
-
-
-/*****************************************************************************/
-

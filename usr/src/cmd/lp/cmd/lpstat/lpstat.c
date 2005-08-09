@@ -19,12 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	Copyright (c) 2001 by Sun Microsystems, Inc. */
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.12	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "stdio.h"
 #include "errno.h"
@@ -97,6 +100,7 @@ main (argc, argv)
 	parse (argc, argv);
 	done (0);
 	/*NOTREACHED*/
+	return (0);
 }
 
 /**

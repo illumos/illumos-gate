@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@ static void usage_exit();
 static void pipehandler(int);
 char data_file_type = 0;
 
+int
 main(int argc, char *argv[])
 {
 	extern char *optarg;

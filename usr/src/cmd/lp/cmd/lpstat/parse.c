@@ -20,15 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "string.h"
 #include "sys/types.h"
@@ -278,7 +277,7 @@ parse(int argc, char **argv)
 #ifdef NEVER
 	if (getenv("LPSTAT_NO_REMOTE"))
 		remote_cmd = 0;
-#endif NEVER
+#endif /* NEVER */
 
 	/*
 	 * Note: "argc" here, not "ac", to skip our fake option.

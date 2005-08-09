@@ -20,13 +20,13 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 1989-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 # All Rights Reserved
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/lp/Makefile.lp
 # Common makefile definitions (should be) used by all lp makefiles
@@ -95,6 +95,8 @@ LINTREQ	=	$(LPLIB)/requests/llib-llpreq.ln
 LINTSEC	=	$(LPLIB)/secure/llib-llpsec.ln
 LINTSYS	=	$(LPLIB)/systems/llib-llpsys.ln
 LINTUSR	=	$(LPLIB)/users/llib-llpusr.ln
+
+$(__GNUC)CFLAGS += -_gcc=-Wno-sequence-points
 
 all:=           TARGET= all
 install:=       TARGET= install

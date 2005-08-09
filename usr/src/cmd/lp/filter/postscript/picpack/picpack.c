@@ -19,16 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -100,17 +99,21 @@ int		quiet = FALSE;
 FILE		*fp_in = stdin;		/* input */
 FILE		*fp_out = stdout;	/* and output files */
 
+static void addpicfile(char *);
+static void arguments(void);
+static void copyfile(int, int);
+static FILE *copystdin(void);
+static void done(void);
+static void do_inline(char *);
+static int gotpicfile(char *);
+static void newkeys(char *);
+static void options(void);
+static void picpack(void);
 
 /*****************************************************************************/
 
-
-main(agc, agv)
-
-
-    int		agc;
-    char	*agv[];
-
-
+int
+main(int agc, char *agv[])
 {
 
 
@@ -132,20 +135,16 @@ main(agc, agv)
     arguments();			/* translate all the input files */
     done();				/* clean things up */
 
-    exit(x_stat);			/* everything probably went OK */
+    return (x_stat);			/* everything probably went OK */
 
 }   /* End of main */
 
 
 /*****************************************************************************/
 
-
-options()
-
-
+static void
+options(void)
 {
-
-
     int		ch;			/* name returned by getopt() */
 
     extern char	*optarg;		/* option argument set by getopt() */
@@ -198,20 +197,13 @@ options()
 
 /*****************************************************************************/
 
-
-newkeys(list)
-
-
-    char	*list;			/* comma or space separated key strings */
-
-
+static void
+newkeys(char *list)
+    /* comma or space separated key strings */
 {
-
-
     char	*p;			/* next key string from *list */
     int		i;			/* goes in keys[i] */
     int		n;			/* last key string slot in keys[] */
-
 
 /*
  *
@@ -237,15 +229,9 @@ newkeys(list)
 
 /*****************************************************************************/
 
-
-arguments()
-
-
+static void
+arguments(void)
 {
-
-
-    FILE	*copystdin();
-
 
 /*
  *
@@ -276,13 +262,9 @@ arguments()
 
 /*****************************************************************************/
 
-
-FILE *copystdin()
-
-
+static FILE *
+copystdin(void)
 {
-
-
     char	*tfile;			/* temporary file name */
     int		fd_out;			/* and its file descriptor */
     FILE	*fp;			/* return value - will be new input file */
@@ -317,20 +299,13 @@ FILE *copystdin()
 
 /*****************************************************************************/
 
-
-copyfile(fd_in, fd_out)
-
-
-    int		fd_in;			/* input */
-    int		fd_out;			/* and output files */
-
-
+static void
+copyfile(int fd_in, int fd_out)
+    /* fd_in -  input */
+    /* fd_out - and output files */
 {
-
-
     char	buf[512];		/* internal buffer for reads and writes */
     int		count;			/* number of bytes put in buf[] */
-
 
 /*
  *
@@ -349,12 +324,9 @@ copyfile(fd_in, fd_out)
 
 /*****************************************************************************/
 
-
-done()
-
-
+static void
+done(void)
 {
-
 
 /*
  *
@@ -372,17 +344,12 @@ done()
 
 /*****************************************************************************/
 
-
-picpack()
-
-
+static void
+picpack(void)
 {
-
-
     char	line[512];		/* next input line */
     char	name[100];		/* picture file names - from BP or PI */
     int		i;			/* for looking through keys[] */
-
 
 /*
  *
@@ -416,23 +383,16 @@ picpack()
 
 /*****************************************************************************/
 
-
-do_inline(name)
-
-
-    char	*name;			/* name of the in-line picture file */
-
-
+static void
+do_inline(char *name)
+    /* name of the in-line picture file */
 {
-
-
     long	size;			/* and its size in bytes - from fstat */
     FILE	*fp;			/* for reading file *name */
     int		ch;			/* next character from picture file */
     int		lastch = '\n';		/* so we know when to put out \! */
 
     struct stat	sbuf;			/* for the picture file size */
-
 
 /*
  *
@@ -469,19 +429,11 @@ do_inline(name)
 
 /*****************************************************************************/
 
-
-gotpicfile(name)
-
-
-    char	*name;
-
-
+static int
+gotpicfile(char *name)
 {
-
-
     char	buf[100];
     FILE	*fp_pic;
-
 
 /*
  *
@@ -510,18 +462,10 @@ gotpicfile(name)
 
 /*****************************************************************************/
 
-
-addpicfile(name)
-
-
-    char	*name;
-
-
+static void
+addpicfile(char *name)
 {
-
-
     FILE	*fp_pic;
-
 
 /*
  *
@@ -542,7 +486,3 @@ addpicfile(name)
     }	/* End if */
 
 }   /* End of addpicfile */
-
-
-/*****************************************************************************/
-

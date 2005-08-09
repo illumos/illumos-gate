@@ -20,13 +20,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -38,7 +37,7 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -447,7 +446,7 @@ char	*dest;
 }
 
 /* avoids compiler type checking problem */
-static
+static int
 #if defined(__STDC__)
 _strcmp(const void *s1, const void *s2)
 #else

@@ -1,19 +1,18 @@
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lpc -- line printer control program
@@ -67,8 +66,8 @@ static	void		  makeargv();
 static	void 		  startup();
 #endif
 
-main(argc, argv)
-char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	register struct cmd	*c;
 	struct passwd		*p;

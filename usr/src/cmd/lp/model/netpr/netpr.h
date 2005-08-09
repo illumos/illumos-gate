@@ -19,8 +19,10 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1996,  by Sun Microsystems, Inc.	*/
-/*	All rights reserved.				*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #ifndef	_NETPR_H
 #define	_NETPR_H
@@ -144,7 +146,6 @@ struct np_bsdjob {
 	np_data_t	*np_data;
 };
 
-extern append_list(np_data_t *, np_bsdjob_t *);
 extern char * long2str(long, char *);
 extern void null_sighandler(int);
 extern int open_network(char *, int);

@@ -20,15 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.12	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 # include	<errno.h>
 # include	<stdio.h>
@@ -199,7 +198,7 @@ char * next_user (int fd, char * buf, char ** pp )
 {
     long	temp;
     char	*p;
-    static	beg_line = 0; /* assumes a partial line is in buf to start */
+    static	int beg_line = 0; /* assumes a partial line is in buf to start */
 
     do
     {

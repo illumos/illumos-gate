@@ -20,15 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "signal.h"
 #include "stdio.h"
@@ -130,9 +129,8 @@ char *ps_m54 = "cartridge out";
  ** main()
  **/
 
-int			main (argc, argv)
-	int			argc;
-	char			*argv[];
+int
+main(int argc, char *argv[])
 {
 	char			*alert_text,
 				buf[BUFSIZ],
@@ -438,6 +436,8 @@ int			main (argc, argv)
 		
 	}
 	done (0);
+
+	return (0);
 }
 
 /**

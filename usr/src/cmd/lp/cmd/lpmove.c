@@ -19,20 +19,15 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*	Copyright (c) 1984 AT&T	*/
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	lpmove dest1 dest2 - move all requests from dest1 to dest2
  *	lpmove request ... dest - move requests to destination dest
@@ -59,6 +54,9 @@ char message[100],
 #define FALSE	0
 
 void startup(), cleanup(), err_exit();
+static int accept(char *);
+static int reject(char *, char *);
+
 #if	defined(__STDC__)
 void	catch();
 #else
@@ -82,10 +80,8 @@ usage()
 
 char *strncpy();
 
-void
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
     int i, type, size, rc = 0, wasrej;
     short status;
@@ -250,11 +246,11 @@ Errexit:	if (!wasrej) accept(argv[1]);
     }
 
     cleanup();
-    exit(rc);
+    return (rc);
 }
 
-accept(dest)
-char *dest;
+static int
+accept(char *dest)
 {
     int type, size;
     short status;
@@ -289,12 +285,11 @@ char *dest;
 	;
     }
 
-    return(0);
+    return (0);
 }
 
-reject(d1, d2)
-char *d1;
-char *d2;
+static int
+reject(char *d1, char *d2)
 {
     int type, size;
     short status;
@@ -334,7 +329,7 @@ char *d2;
 	break;
     }
 
-    return(0);
+    return (0);
 }
 
 void

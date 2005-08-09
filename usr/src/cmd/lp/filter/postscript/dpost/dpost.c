@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -574,19 +574,59 @@ char		*optnames = "a:c:e:m:n:o:p:tw:x:y:A:C:J:F:H:L:OP:R:S:T:DI";
 
 char		temp[150];
 
+static void account(void);
+static void addchar(int);
+static void addoctal(int);
+static void arguments(void);
+static void charlib(int);
+static void conv(FILE *);
+static void devcntrl(FILE *);
+static void documentfonts(void);
+static void done(void);
+static void endline(void);
+static void endstring(void);
+void endtext(void);
+static void fontinit(void);
+static void fontprint(int);
+static void getdevmap(void);
+static void header(void);
+void hgoto(int);
+static void hmot(int);
+static void init_signals(void);
+static void loaddefault(void);
+static void loadfont(int, char *, char *);
+static void loadspecial(void);
+static void options(void);
+static void oput(int);
+static void put1(int);
+static void put1s(char *);
+static void redirect(int);
+void reset(void);
+void resetpos(void);
+static void setfont(int);
+static void setpaths(char *);
+static void setsize(int);
+static void setup(void);
+static void starttext(void);
+static void t_charht(int);
+static void t_fp(int, char *, char *);
+static void t_init(void);
+static void t_newline(void);
+static void t_page(int);
+static void t_reset(int);
+void t_sf(void);
+static void t_slant(int);
+static void t_trailer(void);
+void vgoto(int);
+static void vmot(int);
+
 
 /*****************************************************************************/
 
 
-main(agc, agv)
-
-
-    int		agc;
-    char	*agv[];
-
-
+int
+main(int agc, char *agv[])
 {
-
 
 /*
  *
@@ -609,7 +649,7 @@ main(agc, agv)
     done();				/* add trailing comments etc. */
     account();				/* job accounting data */
 
-    exit(x_stat);			/* everything probably went OK */
+    return (x_stat);			/* everything probably went OK */
 
 }   /* End of main */
 
@@ -617,14 +657,10 @@ main(agc, agv)
 /*****************************************************************************/
 
 
-init_signals()
-
-
+static void
+init_signals(void)
 {
-
-
     void	interrupt();		/* signal handler */
-
 
 /*
  *
@@ -649,10 +685,8 @@ init_signals()
 
 /*****************************************************************************/
 
-
-header()
-
-
+static void
+header(void)
 {
 
 
@@ -700,17 +734,13 @@ header()
 /*****************************************************************************/
 
 
-options()
-
-
+static void
+options(void)
 {
-
-
     int		ch;			/* name returned by getopt() */
 
     extern char	*optarg;		/* option argument set by getopt() */
     extern int	optind;
-
 
 /*
  *
@@ -847,17 +877,11 @@ options()
 /*****************************************************************************/
 
 
-setpaths(name)
-
-
-    char	*name;			/* string that followed the -L option */
-
-
+static void
+setpaths(char *name)
+    /* string that followed the -L option */
 {
-
-
     char	*path;			/* start of the pathname */
-
 
 /*
  *
@@ -898,11 +922,9 @@ setpaths(name)
 /*****************************************************************************/
 
 
-setup()
-
-
+static void
+setup(void)
 {
-
 
 /*
  * Handles things that must be done after the options are read but before the
@@ -933,14 +955,10 @@ setup()
 /*****************************************************************************/
 
 
-arguments()
-
-
+static void
+arguments(void)
 {
-
-
     FILE	*fp;			/* next input file */
-
 
 /*
  *
@@ -972,11 +990,9 @@ arguments()
 /*****************************************************************************/
 
 
-done()
-
-
+static void
+done(void)
 {
-
 
 /*
  *
@@ -1007,11 +1023,9 @@ done()
 /*****************************************************************************/
 
 
-account()
-
-
+static void
+account(void)
 {
-
 
 /*
  *
@@ -1029,16 +1043,11 @@ account()
 /*****************************************************************************/
 
 
-conv(fp)
-
-
-    register FILE	*fp;		/* next input file */
-
-
+static void
+conv(FILE *fp)
+    /* next input file */
 {
-
-
-    register int	c;		/* usually first char in next command */
+    int			c;		/* usually first char in next command */
     int			m, n, n1, m1;	/* when we need to read integers */
     char		str[50];	/* for special chars and font numbers */
 
@@ -1209,12 +1218,9 @@ conv(fp)
 /*****************************************************************************/
 
 
-devcntrl(fp)
-
-
-    FILE	*fp;			/* current input file */
-
-
+static void
+devcntrl(FILE *fp)
+    /* current input file */
 {
 
 
@@ -1324,12 +1330,9 @@ devcntrl(fp)
 /*****************************************************************************/
 
 
-fontinit()
-
-
+static void
+fontinit(void)
 {
-
-
     int		fin;			/* for reading the DESC.out file */
     char	*filebase;		/* the whole thing goes here */
     int		i;			/* loop index */
@@ -1389,17 +1392,12 @@ fontinit()
 /*****************************************************************************/
 
 
-loadfont(n, s, s1)
-
-
-    int		n;			/* load this font position */
-    char	*s;			/* with the .out file for this font */
-    char	*s1;			/* taken from here - possibly */
-
-
+static void
+loadfont(int n, char *s, char *s1)
+    /* n - load this font position */
+    /* s - with the .out file for this font */
+    /* s1 - taken from here - possibly */
 {
-
-
     int		fin;			/* for reading *s.out file */
     int		nw;			/* number of width table entries */
 
@@ -1460,12 +1458,9 @@ loadfont(n, s, s1)
 /*****************************************************************************/
 
 
-loadspecial()
-
-
+static void
+loadspecial(void)
 {
-
-
     char	*p;			/* for next binary font file */
     int		nw;			/* width entries in next font */
     int		i;			/* loop index */
@@ -1501,7 +1496,8 @@ loadspecial()
 char *defaultFonts[] =
 	{ "R", "I", "B", "BI", "CW", "H", "HB", "HX", "S1", "S", NULL };
 
-loaddefault()
+static void
+loaddefault(void)
 {
   int i;
 
@@ -1510,15 +1506,10 @@ loaddefault()
 }
 
 
-fontprint(i)
-
-
-    int		i;			/* font's index in fontbase[] */
-
-
+static void
+fontprint(int i)
+    /* font's index in fontbase[] */
 {
-
-
     int		j, n;
     char	*p;
 
@@ -1564,15 +1555,10 @@ fontprint(i)
 /*****************************************************************************/
 
 
-char *mapfont(name)
-
-
-    char	*name;			/* troff wanted this font */
-
-
+char *
+mapfont(char *name)
+    /* troff wanted this font */
 {
-
-
     int		i;			/* loop index */
 
 
@@ -1609,9 +1595,8 @@ char *mapfont(name)
 /*****************************************************************************/
 
 
-getdevmap()
-
-
+static void
+getdevmap(void)
 {
 
 
@@ -1658,15 +1643,9 @@ getdevmap()
 /*****************************************************************************/
 
 
-char *mapdevfont(str)
-
-
-    char	*str;
-
-
+char *
+mapdevfont(char *str)
 {
-
-
     int		i;
 
 
@@ -1693,11 +1672,9 @@ char *mapdevfont(str)
 /*****************************************************************************/
 
 
-reset()
-
-
+void
+reset(void)
 {
-
 
 /*
  *
@@ -1719,9 +1696,8 @@ reset()
 /*****************************************************************************/
 
 
-resetpos()
-
-
+void
+resetpos(void)
 {
 
 
@@ -1746,12 +1722,9 @@ resetpos()
 /*****************************************************************************/
 
 
-t_init()
-
-
+static void
+t_init(void)
 {
-
-
     static int	initialized = FALSE;	/* only do most things once */
 
 
@@ -1788,15 +1761,10 @@ t_init()
 /*****************************************************************************/
 
 
-t_page(pg)
-
-
-    int		pg;			/* troff's current page number */
-
-
+static void
+t_page(int pg)
+    /* troff's current page number */
 {
-
-
     static int	lastpg = 0;		/* last one we started - for ENDPAGE */
 
 
@@ -1847,9 +1815,8 @@ t_page(pg)
 /*****************************************************************************/
 
 
-t_newline()
-
-
+static void
+t_newline(void)
 {
 
 
@@ -1869,15 +1836,10 @@ t_newline()
 /*****************************************************************************/
 
 
-t_size(n)
-
-
-    int		n;			/* convert this to an internal size */
-
-
+int
+t_size(int n)
+    /* convert this to an internal size */
 {
-
-
     int		i;			/* loop index */
 
 
@@ -1905,12 +1867,9 @@ t_size(n)
 /*****************************************************************************/
 
 
-setsize(n)
-
-
-    int		n;			/* new internal size */
-
-
+static void
+setsize(int n)
+    /* new internal size */
 {
 
 
@@ -1930,12 +1889,11 @@ setsize(n)
 /*****************************************************************************/
 
 
-t_fp(n, s, si)
-
-
-    int		n;			/* this position */
-    char	*s;			/* now has this font mounted */
-    char	*si;			/* its internal number */
+static void
+t_fp(int n, char *s, char *si)
+    /* n - this position */
+    /* s - now has this font mounted */
+    /* si - its internal number */
 
 
 {
@@ -1967,16 +1925,10 @@ t_fp(n, s, si)
 
 /*****************************************************************************/
 
-
-t_font(s)
-
-
-    char	*s;			/* use font in this position next */
-
-
+int
+t_font(char *s)
+    /* use font in this position next */
 {
-
-
     int		n;
 
 
@@ -2008,12 +1960,9 @@ t_font(s)
 /*****************************************************************************/
 
 
-setfont(n)
-
-
-    int		n;			/* use the font mounted here */
-
-
+static void
+setfont(int n)
+    /* use the font mounted here */
 {
 
 
@@ -2043,13 +1992,9 @@ setfont(n)
 
 /*****************************************************************************/
 
-
-t_sf()
-
-
+void
+t_sf(void)
 {
-
-
     int		fnum;			/* internal font number */
 
 
@@ -2097,14 +2042,10 @@ t_sf()
 /*****************************************************************************/
 
 
-t_charht(n)
-
-
-    int		n;			/* use this as the character height */
-
-
+static void
+t_charht(int n)
+    /* use this as the character height */
 {
-
 
 /*
  *
@@ -2122,14 +2063,10 @@ t_charht(n)
 /*****************************************************************************/
 
 
-t_slant(n)
-
-
-    int		n;			/* slant characters this many degrees */
-
-
+static void
+t_slant(int n)
+    /* slant characters this many degrees */
 {
-
 
 /*
  *
@@ -2147,14 +2084,10 @@ t_slant(n)
 /*****************************************************************************/
 
 
-t_reset(c)
-
-
-    int		c;			/* pause or restart */
-
-
+static void
+t_reset(int c)
+    /* pause or restart */
 {
-
 
 /*
  *
@@ -2171,11 +2104,9 @@ t_reset(c)
 /*****************************************************************************/
 
 
-t_trailer()
-
-
+static void
+t_trailer(void)
 {
-
 
 /*
  *
@@ -2193,12 +2124,9 @@ t_trailer()
 /*****************************************************************************/
 
 
-hgoto(n)
-
-
-    int		n;			/* new horizontal position */
-
-
+void
+hgoto(int n)
+    /* new horizontal position */
 {
 
 
@@ -2218,14 +2146,10 @@ hgoto(n)
 /*****************************************************************************/
 
 
-hmot(n)
-
-
-    int		n;			/* move this far horizontally */
-
-
+static void
+hmot(int n)
+    /* move this far horizontally */
 {
-
 
 /*
  *
@@ -2244,14 +2168,10 @@ hmot(n)
 /*****************************************************************************/
 
 
-vgoto(n)
-
-
-    int		n;			/* new vertical position */
-
-
+void
+vgoto(int n)
+    /* new vertical position */
 {
-
 
 /*
  *
@@ -2268,14 +2188,10 @@ vgoto(n)
 /*****************************************************************************/
 
 
-vmot(n)
-
-
-    int		n;			/* move this far vertically */
-
-
+static void
+vmot(int n)
+    /* move this far vertically */
 {
-
 
 /*
  *
@@ -2292,14 +2208,10 @@ vmot(n)
 /*****************************************************************************/
 
 
-xymove(x, y)
-
-
-    int		x, y;			/* this is where we want to be */
-
-
+void
+xymove(int x, int y)
+    /* this is where we want to be */
 {
-
 
 /*
  *
@@ -2322,17 +2234,11 @@ xymove(x, y)
 /*****************************************************************************/
 
 
-put1s(s)
-
-
-    register char	*s;		/* find and print this character */
-
-
+static void
+put1s(char *s)
+    /* find and print this character */
 {
-
-
     static int		i = 0;		/* last one we found - usually */
-
 
 /*
  *
@@ -2361,18 +2267,14 @@ put1s(s)
 /*****************************************************************************/
 
 
-put1(c)
-
-
-    register int	c;		/* want to print this character */
-
-
+static void
+put1(int c)
+    /* want to print this character */
 {
 
-
-    register int	i;		/* character code from fitab */
-    register int	j;		/* number of fonts we've checked so far */
-    register int	k;		/* font we're currently looking at */
+    int			i;		/* character code from fitab */
+    int			j;		/* number of fonts we've checked so far */
+    int			k;		/* font we're currently looking at */
     char		*pw;		/* font widthtab and */
     char		*p;		/* and codetab where c was found */
     int			code;		/* code used to get c printed */
@@ -2439,14 +2341,10 @@ put1(c)
 /*****************************************************************************/
 
 
-oput(c)
-
-
-    int		c;			/* want to print this character */
-
-
+static void
+oput(int c)
+    /* want to print this character */
 {
-
 
 /*
  *
@@ -2492,11 +2390,9 @@ oput(c)
 /*****************************************************************************/
 
 
-starttext()
-
-
+static void
+starttext(void)
 {
-
 
 /*
  * Called whenever we want to be sure we're ready to start collecting characters
@@ -2547,9 +2443,8 @@ starttext()
 /*****************************************************************************/
 
 
-endtext()
-
-
+void
+endtext(void)
 {
 
     int		i;			/* loop index */
@@ -2612,14 +2507,10 @@ endtext()
 /*****************************************************************************/
 
 
-endstring()
-
-
+static void
+endstring(void)
 {
-
-
     int		dx;
-
 
 /*
  *
@@ -2678,11 +2569,9 @@ endstring()
 /*****************************************************************************/
 
 
-endline()
-
-
+static void
+endline(void)
 {
-
 
 /*
  *
@@ -2706,14 +2595,10 @@ endline()
 /*****************************************************************************/
 
 
-addchar(c)
-
-
-    int		c;			/* next character in current string */
-
-
+static void
+addchar(int c)
+    /* next character in current string */
 {
-
 
 /*
  *
@@ -2745,12 +2630,9 @@ addchar(c)
 /*****************************************************************************/
 
 
-addoctal(c)
-
-
-    int		c;			/* add it as an octal escape */
-
-
+static void
+addoctal(int c)
+    /* add it as an octal escape */
 {
 
 
@@ -2785,15 +2667,10 @@ addoctal(c)
 /*****************************************************************************/
 
 
-charlib(code)
-
-
-    int		code;			/* either 1 or 2 */
-
-
+static void
+charlib(int code)
+    /* either 1 or 2 */
 {
-
-
     char	*name;			/* name of the character */
     char	tname[10];		/* in case it's a single ASCII character */
 
@@ -2848,15 +2725,10 @@ charlib(code)
 /*****************************************************************************/
 
 
-doglobal(name)
-
-
-    char	*name;			/* copy this to the output - globally */
-
-
+int
+doglobal(char *name)
+    /* copy this to the output - globally */
 {
-
-
     int		val = FALSE;		/* returned to the caller */
 
 
@@ -2887,12 +2759,9 @@ doglobal(name)
 /*****************************************************************************/
 
 
-documentfonts()
-
-
+static void
+documentfonts(void)
 {
-
-
     FILE	*fp_in;			/* PostScript font name read from here */
     FILE	*fp_out;		/* and added to this file */
 
@@ -2934,15 +2803,10 @@ documentfonts()
 /*****************************************************************************/
 
 
-redirect(pg)
-
-
-    int		pg;			/* next page we're printing */
-
-
+static void
+redirect(int pg)
+    /* next page we're printing */
 {
-
-
     static FILE	*fp_null = NULL;	/* if output is turned off */
 
 
@@ -2960,7 +2824,3 @@ redirect(pg)
 	tf = fp_null = fopen("/dev/null", "w");
 
 }   /* End of redirect */
-
-
-/*****************************************************************************/
-

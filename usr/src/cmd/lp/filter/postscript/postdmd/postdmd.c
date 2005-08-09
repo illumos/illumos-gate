@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -161,19 +165,26 @@ FILE	*fp_in = NULL;			/* read from this file */
 FILE	*fp_out = stdout;		/* and write stuff here */
 FILE	*fp_acct = NULL;		/* for accounting data */
 
+static void account(void);
+static void addrast(int);
+static void arguments(void);
+static void bitmap(FILE *);
+static int dimensions(void);
+static void done(void);
+static int getint(void);
+static void header(void);
+static void init_signals(void);
+static void options(void);
+static int patncmp(char *, int);
+static void putrast(void);
+static void redirect(int);
+static void setup(void);
 
 /*****************************************************************************/
 
-
-main(agc, agv)
-
-
-    int		agc;
-    char	*agv[];
-
-
+int
+main(int agc, char *agv[])
 {
-
 
 /*
  *
@@ -197,22 +208,17 @@ main(agc, agv)
     done();				/* print the last page etc. */
     account();				/* job accounting data */
 
-    exit(x_stat);			/* not much could be wrong */
+    return (x_stat);			/* not much could be wrong */
 
 }   /* End of main */
 
 
 /*****************************************************************************/
 
-
-init_signals()
-
-
+static void
+init_signals(void)
 {
-
-
     void	interrupt();		/* signal handler */
-
 
 /*
  *
@@ -237,16 +243,11 @@ init_signals()
 
 /*****************************************************************************/
 
-
-header()
-
-
+static void
+header(void)
 {
-
-
     int		ch;			/* return value from getopt() */
     int		old_optind = optind;	/* for restoring optind - should be 1 */
-
 
 /*
  *
@@ -287,15 +288,10 @@ header()
 
 /*****************************************************************************/
 
-
-options()
-
-
+static void
+options(void)
 {
-
-
     int		ch;			/* return value from getopt() */
-
 
 /*
  *
@@ -410,10 +406,8 @@ options()
 
 /*****************************************************************************/
 
-
-setup()
-
-
+static void
+setup(void)
 {
 
 
@@ -442,14 +436,10 @@ setup()
 /*****************************************************************************/
 
 
-arguments()
-
-
+static void
+arguments(void)
 {
-
-
     FILE	*fp;			/* next input file */
-
 
 /*
  *
@@ -481,12 +471,9 @@ arguments()
 
 /*****************************************************************************/
 
-
-done()
-
-
+static void
+done(void)
 {
-
 
 /*
  *
@@ -507,12 +494,9 @@ done()
 
 /*****************************************************************************/
 
-
-account()
-
-
+static void
+account(void)
 {
-
 
 /*
  *
@@ -530,19 +514,12 @@ account()
 
 /*****************************************************************************/
 
-
-bitmap(fp)
-
-
-    FILE	*fp;			/* next input file */
-
-
+static void
+bitmap(FILE *fp)
+    /* next input file */
 {
-
-
     int		count;			/* pattern repeats this many times */
     long	total;			/* expect this many patterns */
-
 
 /*
  *
@@ -596,17 +573,12 @@ bitmap(fp)
 
 /*****************************************************************************/
 
-
-dimensions()
-
-
+static int
+dimensions(void)
 {
-
-
     int		ox, oy;			/* coordinates of the origin */
     int		cx, cy;			/* and right corner of the bitmap */
     int		i;			/* loop index */
-
 
 /*
  *
@@ -652,20 +624,13 @@ dimensions()
 
 /*****************************************************************************/
 
-
-addrast(count)
-
-
-    int		count;			/* repeat count for next pattern */
-
-
+static void
+addrast(int count)
+    /* repeat count for next pattern */
 {
-
-
     int		size;			/* number of bytes in next pattern */
     int		l, h;			/* high and low bytes */
     int		i, j;			/* loop indices */
-
 
 /*
  *
@@ -699,17 +664,12 @@ addrast(count)
 
 /*****************************************************************************/
 
-
-putrast()
-
-
+static void
+putrast(void)
 {
-
-
     char	*p1, *p2;		/* starting and ending patterns */
     int		n;			/* set to bytes per pattern */
     int		i;			/* loop index */
-
 
 /*
  *
@@ -752,19 +712,12 @@ putrast()
 
 /*****************************************************************************/
 
-
-patncmp(p1, n)
-
-
-    char	*p1;			/* first patterns starts here */
-    int		n;			/* and extends this many bytes */
-
-
+static int
+patncmp(char *p1, int n)
+    /* p1 - first patterns starts here */
+    /* n - and extends this many bytes */
 {
-
-
     char	*p2;			/* address of the second pattern */
-
 
 /*
  *
@@ -787,15 +740,10 @@ patncmp(p1, n)
 
 /*****************************************************************************/
 
-
-getint()
-
-
+static int
+getint(void)
 {
-
-
     int		h, l;			/* high and low bytes */
-
 
 /*
  *
@@ -814,18 +762,11 @@ getint()
 
 /*****************************************************************************/
 
-
-redirect(pg)
-
-
-    int		pg;			/* next page we're printing */
-
-
+static void
+redirect(int pg)
+    /* next page we're printing */
 {
-
-
     static FILE	*fp_null = NULL;	/* if output is turned off */
-
 
 /*
  *
@@ -841,8 +782,3 @@ redirect(pg)
 	fp_out = fp_null = fopen("/dev/null", "w");
 
 }   /* End of redirect */
-
-
-/*****************************************************************************/
-
-

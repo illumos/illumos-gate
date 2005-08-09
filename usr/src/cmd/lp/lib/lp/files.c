@@ -60,6 +60,7 @@ is_printer_uri(char *value)
 	return (0);
 }
 
+int
 fdprintf(int fd, char *fmt, ...)
 {
 	char    buf[BUFSIZ];
@@ -88,18 +89,19 @@ fdgets(char *buf, int len, int fd)
 	return (NULL);
 }
 
+int
 fdputs(char *buf, int fd)
 {
 	return (fdprintf(fd, "%s", buf));
 }
 
+int
 fdputc(char c, int fd)
 {
 	if (fd == 1)
 		fflush(stdout);
 	return (write(fd, &c, 1));
 }
-
 
 int
 open_locked(char *path, char *type, mode_t mode)

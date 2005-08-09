@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -49,22 +54,17 @@ Request	request[MAXREQUEST];		/* next page or global request */
 int	nextreq = 0;			/* goes in request[nextreq] */
 char	*requestfile = REQUESTFILE;	/* default lookup file */
 
+void dumprequest(char *, char *, FILE *);
 
 /*****************************************************************************/
 
 
-saverequest(want)
-
-
-    char	*want;			/* grab code for this stuff */
-
-
+void
+saverequest(char *want)
+	/* grab code for this stuff */
 {
-
-
     char	*page;			/* and save it for this page */
     char	*strtok();
-
 
 /*
  *
@@ -94,17 +94,12 @@ saverequest(want)
 /*****************************************************************************/
 
 
-writerequest(page, fp_out)
-
-
-    int		page;			/* write everything for this page */
-    FILE	*fp_out;		/* to this file */
-
-
+void
+writerequest(int page, FILE *fp_out)
+	/* page - write everything for this page */
+	/* fp_out - to this file */
 {
-
     int		i;			/* loop index */
-
 
 /*
  *
@@ -124,20 +119,14 @@ writerequest(page, fp_out)
 /*****************************************************************************/
 
 
-dumprequest(want, file, fp_out)
-
-
-    char	*want;			/* look for this string */
-    char	*file;			/* in this file */
-    FILE	*fp_out;		/* and write the value out here */
-
-
+void
+dumprequest(char *want, char *file, FILE *fp_out)
+	/* want - look for this string */
+	/* file - in this file */
+	/* fp_out - and write the value out here */
 {
-
-
     char	buf[100];		/* line buffer for reading *file */
     FILE	*fp_in;
-
 
 /*
  *

@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 /*
  *
  * postmd - matrix display program for PostScript printers.
@@ -231,19 +236,34 @@ FILE	*fp_in = stdin;			/* read from this file */
 FILE	*fp_out = stdout;		/* and write stuff here */
 FILE	*fp_acct = NULL;		/* for accounting data */
 
+static void account(void);
+static void addcolormap(char *);
+static void arguments(void);
+static void buildilist(char *);
+static void copystdin(void);
+static void dimensions(void);
+static void done(void);
+static void getheader(void);
+static void header(void);
+static void init_signals(void);
+static int inrange(void);
+static int inwindow(void);
+static void labelmatrix(void);
+static int mapfloat(double);
+static void matrix(void);
+static void options(void);
+static int patncmp(char *, int);
+static void putrow(void);
+static void redirect(int);
+static char *savestring(char *);
+static void setup(void);
+static void setwindow(char *);
 
 /*****************************************************************************/
 
-
-main(agc, agv)
-
-
-    int		agc;
-    char	*agv[];
-
-
+int
+main(int agc, char *agv[])
 {
-
 
 /*
  *
@@ -268,22 +288,17 @@ main(agc, agv)
     done();				/* print the last page etc. */
     account();				/* job accounting data */
 
-    exit(x_stat);			/* not much could be wrong */
+    return (x_stat);			/* not much could be wrong */
 
 }   /* End of main */
 
 
 /*****************************************************************************/
 
-
-init_signals()
-
-
+static void
+init_signals(void)
 {
-
-
     void	interrupt();		/* signal handler */
-
 
 /*
  *
@@ -309,16 +324,11 @@ init_signals()
 
 /*****************************************************************************/
 
-
-header()
-
-
+static void
+header(void)
 {
-
-
     int		ch;			/* return value from getopt() */
     int		old_optind = optind;	/* for restoring optind - should be 1 */
-
 
 /*
  *
@@ -359,15 +369,10 @@ header()
 
 /*****************************************************************************/
 
-
-options()
-
-
+static void
+options(void)
 {
-
-
     int		ch;			/* return value from getopt() */
-
 
 /*
  *
@@ -490,12 +495,9 @@ options()
 
 /*****************************************************************************/
 
-
-setup()
-
-
+static void
+setup(void)
 {
-
 
 /*
  *
@@ -521,12 +523,9 @@ setup()
 
 /*****************************************************************************/
 
-
-arguments()
-
-
+static void
+arguments(void)
 {
-
 
 /*
  *
@@ -560,12 +559,9 @@ arguments()
 
 /*****************************************************************************/
 
-
-done()
-
-
+static void
+done(void)
 {
-
 
 /*
  *
@@ -587,10 +583,8 @@ done()
 
 /*****************************************************************************/
 
-
-account()
-
-
+static void
+account(void)
 {
 
 
@@ -610,10 +604,8 @@ account()
 
 /*****************************************************************************/
 
-
-matrix()
-
-
+static void
+matrix(void)
 {
 
 
@@ -688,18 +680,13 @@ matrix()
 
 /*****************************************************************************/
 
-
-copystdin()
-
-
+static void
+copystdin(void)
 {
-
-
     int		fd_out;			/* for the temporary file */
     int		fd_in;			/* for stdin */
     int		buf[512];		/* buffer for reads and writes */
     int		count;			/* number of bytes put in buf */
-
 
 /*
  *
@@ -736,17 +723,12 @@ copystdin()
 
 /*****************************************************************************/
 
-
-getheader()
-
-
+static void
+getheader(void)
 {
-
-
     char	buf[512];		/* temporary string space */
     char	*cmap = NULL;		/* remember header colormap list */
     long	pos;			/* for seeking back to first element */
-
 
 /*
  *
@@ -840,17 +822,12 @@ getheader()
 
 /*****************************************************************************/
 
-
-dimensions()
-
-
+static void
+dimensions(void)
 {
-
-
     char	buf[100];		/* temporary storage for the elements */
     long	count = 0;		/* number of elements in the matrix */
     long	pos;			/* matrix elements start here */
-
 
 /*
  *
@@ -898,16 +875,10 @@ dimensions()
 
 /*****************************************************************************/
 
-
-buildilist(list)
-
-
-    char	*list;			/* use this as the interval list */
-
-
+static void
+buildilist(char *list)
+    /* use this as the interval list */
 {
-
-
     static char	*templist = NULL;	/* a working copy of the list */
     char	*ptr;			/* next number in *templist */
     int		i;			/* loop index - for checking the list */
@@ -966,20 +937,13 @@ buildilist(list)
 
 /*****************************************************************************/
 
-
-addcolormap(list)
-
-
-    char	*list;			/* use this color map */
-
-
+static void
+addcolormap(char *list)
+    /* use this color map */
 {
-
-
     static char	*templist = NULL;	/* a working copy of the color list */
     char	*ptr;			/* next color in *templist */
     int		i = 0;			/* assigned to this region in ilist[] */
-
 
 /*
  *
@@ -1006,20 +970,13 @@ addcolormap(list)
 
 /*****************************************************************************/
 
-
-setwindow(list)
-
-
-    char	*list;			/* corners of window into the matrix */
-
-
+static void
+setwindow(char *list)
+    /* corners of window into the matrix */
 {
-
-
     static char	*templist = NULL;	/* a working copy of the window list */
     char	*ptr;			/* next window coordinate in *templist */
     int		i = 0;			/* assigned to this region in wlist[] */
-
 
 /*
  *
@@ -1048,16 +1005,11 @@ setwindow(list)
 
 /*****************************************************************************/
 
-
-inwindow()
-
-
+static int
+inwindow(void)
 {
-
-
     int		r;			/* row of the patcount element */
     int		c;			/* column of the patcount element */
-
 
 /*
  *
@@ -1076,12 +1028,9 @@ inwindow()
 
 /*****************************************************************************/
 
-
-inrange()
-
-
+static int
+inrange(void)
 {
-
 
 /*
  *
@@ -1099,18 +1048,11 @@ inrange()
 
 /*****************************************************************************/
 
-
-mapfloat(element)
-
-
-    double	element;		/* floating point matrix element */
-
-
+static int
+mapfloat(double element)
+    /* floating point matrix element */
 {
-
-
     int		i;			/* loop index */
-
 
 /*
  *
@@ -1134,17 +1076,12 @@ mapfloat(element)
 
 /*****************************************************************************/
 
-
-putrow()
-
-
+static void
+putrow(void)
 {
-
-
     char	*p1, *p2;		/* starting and ending columns */
     int		n;			/* set to bytes per pattern */
     int		i;			/* loop index */
-
 
 /*
  *
@@ -1183,16 +1120,11 @@ putrow()
 
 /*****************************************************************************/
 
-
-labelmatrix()
-
-
+static void
+labelmatrix(void)
 {
-
-
     int		total;			/* number of elements in the window */
     int		i;			/* loop index */
-
 
 /*
  *
@@ -1224,19 +1156,12 @@ labelmatrix()
 
 /*****************************************************************************/
 
-
-patncmp(p1, n)
-
-
-    char	*p1;			/* first patterns starts here */
-    int		n;			/* and extends this many bytes */
-
-
+static int
+patncmp(char *p1, int n)
+    /* p1 - first patterns starts here */
+    /* n - and extends this many bytes */
 {
-
-
     char	*p2;			/* address of the second pattern */
-
 
 /*
  *
@@ -1259,18 +1184,11 @@ patncmp(p1, n)
 
 /*****************************************************************************/
 
-
-char *savestring(str)
-
-
-    char	*str;			/* save this string */
-
-
+static char *
+savestring(char *str)
+    /* save this string */
 {
-
-
     char	*ptr = NULL;		/* at this address */
-
 
 /*
  *
@@ -1292,18 +1210,11 @@ char *savestring(str)
 
 /*****************************************************************************/
 
-
-redirect(pg)
-
-
-    int		pg;			/* next page we're printing */
-
-
+static void
+redirect(int pg)
+    /* next page we're printing */
 {
-
-
     static FILE	*fp_null = NULL;	/* if output is turned off */
-
 
 /*
  *
@@ -1319,7 +1230,3 @@ redirect(pg)
 	fp_out = fp_null = fopen("/dev/null", "w");
 
 }   /* End of redirect */
-
-
-/*****************************************************************************/
-

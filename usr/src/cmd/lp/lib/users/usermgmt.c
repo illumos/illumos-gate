@@ -20,15 +20,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.11	*/
 /* LINTLIBRARY */
 
 # include	<stdio.h>
@@ -36,7 +36,7 @@
 # include	"lp.h"
 # include	"users.h"
 
-static loaded = 0;
+static int loaded = 0;
 static struct user_priority *ppri_tbl;
 struct user_priority *ld_priority_file();
 static USER usr;

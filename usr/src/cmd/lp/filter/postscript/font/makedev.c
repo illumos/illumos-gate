@@ -19,9 +19,13 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -33,7 +37,8 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	
+
 /* Note added 9/25/83
 	Setting the parameter biggestfont in the DESC file
 	to be at least as big as the number of characters
@@ -115,8 +120,11 @@ int	fflag	= 0;	/* on if font table to be written */
 int	fdout;	/* output file descriptor */
 char	*fout	= "DESC.out";
 
-main(argc, argv)
-char *argv[];
+static int dofont(char *);
+static int getlig(FILE *);
+
+int
+main(int argc, char *argv[])
 {
 	FILE *fin;
 	char cmd[100], *p;
@@ -209,11 +217,11 @@ char *argv[];
 	}
 	for (i = 1; i < argc; i++)
 		dofont(argv[i]);
-	exit(0);
+	return (0);
 }
 
-dofont(name)	/* create fitab and width tab for font */
-char *name;
+static int
+dofont(char *name)	/* create fitab and width tab for font */
 {
 	FILE *fin;
 	int fdout;
@@ -316,11 +324,11 @@ char *name;
 	v = sizeof(struct Font) + 3 * n + dev.nchtab + 128-32;
 	fprintf(stderr, "%3s: %3d chars, width %3d, size %3d\n",
 		font.namefont, nw, width[0], v);
-	return v;
+	return (v);
 }
 
-getlig(fin)	/* pick up ligature list */
-	FILE *fin;
+static int
+getlig(FILE *fin)	/* pick up ligature list */
 {
 	int lig;
 	char temp[100];
@@ -341,5 +349,5 @@ getlig(fin)	/* pick up ligature list */
 			fprintf(stderr, "illegal ligature %s\n", temp);
 	}
 	skipline(fin);
-	return lig;
+	return (lig);
 }

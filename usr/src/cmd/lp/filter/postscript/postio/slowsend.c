@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *
  * Stuff that slows the transmission of jobs to PostScript printers. ONLY use it
@@ -55,18 +59,15 @@ extern char	*line;
 extern char	mesg[];
 extern int	ttyo;
 
+static int	writeblock(int);
 
 /*****************************************************************************/
 
 
-slowsend(fd_in)
-
-
-    int		fd_in;			/* next input file */
-
-
+void
+slowsend(int fd_in)
+    /* next input file */
 {
-
 
 /*
  *
@@ -127,17 +128,11 @@ slowsend(fd_in)
 /*****************************************************************************/
 
 
-static writeblock(num)
-
-
-    int		num;			/* most bytes we'll write */
-
-
+static int
+writeblock(int num)
+    /* most bytes we'll write */
 {
-
-
     int		count;			/* bytes successfully written */
-
 
 /*
  *

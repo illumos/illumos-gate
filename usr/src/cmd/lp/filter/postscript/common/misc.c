@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -51,6 +50,7 @@ int	olist[50];			/* processing range pairs */
 
 
 
+void
 error(int kind, char *mesg, ...)
 {
 
@@ -92,6 +92,7 @@ error(int kind, char *mesg, ...)
 /*****************************************************************************/
 
 
+void
 out_list(str)
 
 
@@ -136,6 +137,7 @@ out_list(str)
 /*****************************************************************************/
 
 
+int
 in_olist(num)
 
 
@@ -171,6 +173,7 @@ in_olist(num)
 /*****************************************************************************/
 
 
+int
 cat(file)
 
 
@@ -213,6 +216,7 @@ cat(file)
 /*****************************************************************************/
 
 
+int
 str_convert(str, err)
 
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -80,19 +80,15 @@ extern int	res, hpos, vpos;
 extern int	picflag;
 extern FILE	*tf;
 
+static void piccopy(FILE *, FILE *, long);
 
 /*****************************************************************************/
 
 
-picture(buf)
-
-
-    char	*buf;		/* stuff following 'x X PI' command */
-
-
+void
+picture(char *buf)
+    /* stuff following 'x X PI' command */
 {
-
-
     int		poffset;	/* page offset */
     int		indent;		/* indent */
     int		length;		/* line length  */
@@ -210,15 +206,10 @@ picture(buf)
 /*****************************************************************************/
 
 
-FILE *picopen(path)
-
-
-    char	*path;			/* picture file pathname */
-
-
+FILE *
+picopen(char *path)
+    /* picture file pathname */
 {
-
-
     char	name[100];		/* pathnames */
     long	total;			/* and sizes - from *fp_pic */
     char	*tname;			/* pathname */
@@ -263,16 +254,11 @@ FILE *picopen(path)
 /*****************************************************************************/
 
 
-inlinepic(fp, buf)
-
-
-    FILE	*fp;			/* current input file */
-    char	*buf;			/* whatever followed "x X InlinePicture" */
-
-
+void
+inlinepic(FILE *fp, char *buf)
+    /* fp - current input file */
+    /* buf - whatever followed "x X InlinePicture" */
 {
-
-
     char	*tname;			/* temp file pathname - for *fp_pic */
     char	name[100];		/* picture file pathname */
     long	total;			/* and size - both from *buf */
@@ -313,17 +299,12 @@ inlinepic(fp, buf)
 /*****************************************************************************/
 
 
-piccopy(fp_in, fp_out, total)
-
-
-    FILE	*fp_in;			/* input */
-    FILE	*fp_out;		/* and output file pointers */
-    long	total;			/* number of bytes to be copied */
-
-
+static void
+piccopy(FILE *fp_in, FILE *fp_out, long total)
+    /* fp_in - input */
+    /* fp_out - and output file pointers */
+    /* total - number of bytes to be copied */
 {
-
-
     long	i;			/* loop index */
 
 
@@ -342,7 +323,3 @@ piccopy(fp_in, fp_out, total)
     fflush(fp_out);
 
 }   /* End of piccopy */
-
-
-/*****************************************************************************/
-

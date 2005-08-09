@@ -20,13 +20,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -260,7 +259,7 @@ proto(int type, int rm_ok, ...)
 	struct stat		stbuf;
 
 
-	va_start (ap, type);
+	va_start(ap, rm_ok);
 
 	if ((err = va_makepath(&ap, &path)) < 0)
 		fail ("\"%s\" is a truncated name!\n", path);
