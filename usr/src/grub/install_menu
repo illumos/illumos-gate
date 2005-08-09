@@ -3,7 +3,6 @@
 #
 default=0
 timeout=60
-splashimage=/boot/grub/splash.xpm.gz
 title Solaris 
 	kernel /boot/multiboot kernel/unix -B install_media=cdrom
 	module /boot/x86.miniroot
