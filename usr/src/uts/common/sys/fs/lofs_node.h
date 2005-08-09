@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1989-1991, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,9 +47,20 @@ extern "C" {
 typedef struct lnode {
 	struct lnode	*lo_next;	/* link for hash chain */
 	struct vnode	*lo_vp;		/* pointer to real vnode */
-	uint_t		lo_looping; 	/* detect looping */
+	uint_t		lo_looping; 	/* looping flags (see below) */
 	struct vnode	*lo_vnode;	/* place holder vnode for file */
 } lnode_t;
+
+/*
+ * Flags used when looping has been detected.
+ */
+#define	LO_LOOPING	0x01	/* Looping detected */
+#define	LO_AUTOLOOP	0x02	/* Autonode looping detected */
+
+/*
+ * Flag passed to makelonode().
+ */
+#define	LOF_FORCE	0x1	/* Force creation of new lnode */
 
 /*
  * Convert between vnode and lnode
@@ -59,7 +70,7 @@ typedef struct lnode {
 #define	realvp(vp)	(vtol(vp)->lo_vp)
 
 #ifdef _KERNEL
-extern vnode_t *makelonode(vnode_t *, struct loinfo *);
+extern vnode_t *makelonode(vnode_t *, struct loinfo *, int);
 extern void freelonode(lnode_t *);
 
 extern struct vnode kvp;

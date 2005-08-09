@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -243,18 +243,26 @@ ldestroy(struct loinfo *li)
  * in a table hashed by vnode.  If the lnode for
  * this vnode is already in the table return it (ref count is
  * incremented by lfind).  The lnode will be flushed from the
- * table when lo_inactive calls freelonode.
+ * table when lo_inactive calls freelonode.  The creation of
+ * a new lnode can be forced via the LOF_FORCE flag even if
+ * the vnode exists in the table.  This is used in the creation
+ * of a terminating lnode when looping is detected.  A unique
+ * lnode is required for the correct evaluation of the current
+ * working directory.
  * NOTE: vp is assumed to be a held vnode.
  */
 struct vnode *
-makelonode(struct vnode *vp, struct loinfo *li)
+makelonode(struct vnode *vp, struct loinfo *li, int flag)
 {
 	lnode_t *lp, *tlp;
 	struct vfs *vfsp;
 	vnode_t *nvp;
 
+	lp = NULL;
 	TABLE_LOCK_ENTER(vp, li);
-	if ((lp = lfind(vp, li)) == NULL) {
+	if (flag != LOF_FORCE)
+		lp = lfind(vp, li);
+	if ((flag == LOF_FORCE) || (lp == NULL)) {
 		/*
 		 * Optimistically assume that we won't need to sleep.
 		 */
@@ -270,8 +278,11 @@ makelonode(struct vnode *vp, struct loinfo *li)
 			if (nvp == NULL) {
 				nvp = vn_alloc(KM_SLEEP);
 			}
+			lp = NULL;
 			TABLE_LOCK_ENTER(vp, li);
-			if ((lp = lfind(vp, li)) != NULL) {
+			if (flag != LOF_FORCE)
+				lp = lfind(vp, li);
+			if (lp != NULL) {
 				kmem_cache_free(lnode_cache, tlp);
 				vn_free(nvp);
 				VN_RELE(vp);

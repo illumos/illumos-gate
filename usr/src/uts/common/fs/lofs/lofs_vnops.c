@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,7 +77,7 @@ lo_open(vnode_t **vpp, int flag, struct cred *cr)
 		 * the FS which we called should have released the
 		 * new reference on vp
 		 */
-		*vpp = makelonode(rvp, vtoli(oldvp->v_vfsp));
+		*vpp = makelonode(rvp, vtoli(oldvp->v_vfsp), 0);
 		if (IS_DEVVP(*vpp)) {
 			vnode_t *svp;
 
@@ -278,10 +278,10 @@ lo_fid(vnode_t *vp, struct fid *fidp)
  * returning the shadow of the autonode corresponding to
  * "/net/jurassic/net/jurassic" will not terminate the
  * loop.   To solve this problem we allow the loop to go
- * through one more level component lookup.  If it hit
- * "net" after the loop as in "/net/jurassic/net/jurassic/net",
- * then returning the vnode covered by the autonode "net"
- * will terminate the loop.
+ * through one more level component lookup.  Whichever
+ * directory is then looked up in "/net/jurassic/net/jurassic"
+ * the vnode returned is the vnode covered by the autonode
+ * "net" and this will terminate the loop.
  *
  * Lookup for dot dot has to be dealt with separately.
  * It will be nice to have a "one size fits all" kind
@@ -306,8 +306,10 @@ lo_lookup(
 	vnode_t *realdvp = realvp(dvp);
 	struct loinfo *li = vtoli(dvp->v_vfsp);
 	int looping = 0;
+	int autoloop = 0;
 	int doingdotdot = 0;
 	int nosub = 0;
+	int mkflag = 0;
 
 	/*
 	 * If name is empty and no XATTR flags are set, then return
@@ -352,120 +354,99 @@ lo_lookup(
 	}
 
 	if (doingdotdot) {
-		if ((vtol(dvp))->lo_looping) {
+		if ((vtol(dvp))->lo_looping & LO_LOOPING) {
 			vfs_t *vfsp;
 
 			error = vn_vfswlock_wait(realdvp);
 			if (error)
 				goto out;
 			vfsp = vn_mountedvfs(realdvp);
-			if (vfsp != NULL) {
+			/*
+			 * In the standard case if the looping flag is set and
+			 * performing dotdot we would be returning from a
+			 * covered vnode, implying vfsp could not be null. The
+			 * exceptions being if we have looping and overlay
+			 * mounts or looping and covered file systems.
+			 */
+			if (vfsp == NULL) {
 				/*
-				 * if looping get the actual found vnode
-				 * instead of the vnode covered
-				 * Here we have to hold the lock for realdvp
-				 * since an unmount during the traversal to the
-				 * root vnode would turn *vfsp into garbage
-				 * which would be fatal.
+				 * Overlay mount or covered file system,
+				 * so just make the shadow node.
 				 */
-				vfs_lock_wait(vfsp);
 				vn_vfsunlock(realdvp);
+				*vpp = makelonode(vp, li, 0);
+				(vtol(*vpp))->lo_looping |= LO_LOOPING;
+				return (0);
+			}
+			/*
+			 * When looping get the actual found vnode
+			 * instead of the vnode covered.
+			 * Here we have to hold the lock for realdvp
+			 * since an unmount during the traversal to the
+			 * root vnode would turn *vfsp into garbage
+			 * which would be fatal.
+			 */
+			vfs_lock_wait(vfsp);
+			vn_vfsunlock(realdvp);
 
-				error = VFS_ROOT(vfsp, &tvp);
+			error = VFS_ROOT(vfsp, &tvp);
 
-				vfs_unlock(vfsp);
-				if (error)
-					goto out;
-				if ((tvp == li->li_rootvp)&&
-				    (vp == realvp(tvp))) {
-					/*
-					 * we're back at the real vnode
-					 * of the rootvp
-					 *
-					 * return the rootvp
-					 * Ex: /mnt/mnt/..
-					 * where / has been lofs-mounted
-					 * onto /mnt.  Return the lofs
-					 * node mounted at /mnt.
-					 */
-					*vpp = tvp;
-					VN_RELE(vp);
-					return (0);
-				} else {
-					/*
-					 * We are returning from a covered
-					 * node whose vfs_mountedhere is
-					 * not pointing to vfs of the current
-					 * root vnode.
-					 * This is a condn where in we
-					 * returned a covered node say Zc
-					 * but Zc is not the cover of current
-					 * root.
-					 * i.e.., if X is the root vnode
-					 * lookup(Zc,"..") is taking us to
-					 * X.
-					 * Ex: /net/X/net/X/net
-					 * We are encountering cover of net.
-					 * doing a dotdot from here means we
-					 * to take the lookup to the same state
-					 * that would have happened when we do
-					 * lookup of any Y under /net/X/net/X
-					 */
-					VN_RELE(tvp);
-					if (vp == realvp(li->li_rootvp)) {
-						VN_RELE(vp);
-						vp = li->li_rootvp;
-						vp = vp->v_vfsp->
-							vfs_vnodecovered;
-						VN_HOLD(vp);
-						*vpp = makelonode(vp, li);
-						(vtol(*vpp))->lo_looping = 1;
-						return (0);
-					}
-				}
+			vfs_unlock(vfsp);
+			if (error)
+				goto out;
+			if ((tvp == li->li_rootvp) && (vp == realvp(tvp))) {
+				/*
+				 * we're back at the real vnode
+				 * of the rootvp
+				 *
+				 * return the rootvp
+				 * Ex: /mnt/mnt/..
+				 * where / has been lofs-mounted
+				 * onto /mnt.  Return the lofs
+				 * node mounted at /mnt.
+				 */
+				*vpp = tvp;
+				VN_RELE(vp);
+				return (0);
 			} else {
 				/*
-				 * We are returning from a looping dvp.
-				 * If we are returning to rootvp return
-				 * the covered node with looping bit set.
+				 * We are returning from a covered
+				 * node whose vfs_mountedhere is
+				 * not pointing to vfs of the current
+				 * root vnode.
+				 * This is a condn where in we
+				 * returned a covered node say Zc
+				 * but Zc is not the cover of current
+				 * root.
+				 * i.e.., if X is the root vnode
+				 * lookup(Zc,"..") is taking us to
+				 * X.
+				 * Ex: /net/X/net/X/Y
 				 *
-				 * This means we are not returning from cover
-				 * but we should return to the root node by
-				 * giving the covered node with looping flag
-				 * set. We are returning from a non-covernode
-				 * with looping bit set means we couldn't stop
-				 * by giving the cover of root vnode.
-				 *
-				 *	Say X is the root vnode and lookup of
-				 * X again under X returns Xc(due to looping
-				 * condn). let Z=lookup(Xc,"path") and
-				 * if lookup(Z,"..") returns  the root vp X
-				 * return Xc with looping bit set or if a new
-				 * node Z.. is returned make a shadow with a
-				 * looping flag.
-				 *
-				 * Ex:- lookup of /net/X/net/X/Y/.. or
-				 * lookup of /net/X/net/X/Y/Z/.. .
-				 * In the first case we are returning to root
-				 * we will return the cover of root with
-				 * looping bit set.
+				 * If LO_AUTOLOOP (autofs/lofs looping detected)
+				 * has been set then we are encountering the
+				 * cover of Y (Y being any directory vnode
+				 * under /net/X/net/X/).
+				 * When performing a dotdot set the
+				 * returned vp to the vnode covered
+				 * by the mounted lofs, ie /net/X/net/X
 				 */
-				vn_vfsunlock(realdvp);
-				if (vp == li->li_rootvp) {
-					tvp = vp;
-					vp = (vp)->v_vfsp->vfs_vnodecovered;
-					VN_RELE(tvp);
+				VN_RELE(tvp);
+				if ((vtol(dvp))->lo_looping & LO_AUTOLOOP) {
+					VN_RELE(vp);
+					vp = li->li_rootvp;
+					vp = vp->v_vfsp->vfs_vnodecovered;
 					VN_HOLD(vp);
+					*vpp = makelonode(vp, li, 0);
+					(vtol(*vpp))->lo_looping |= LO_LOOPING;
+					return (0);
 				}
-				*vpp = makelonode(vp, li);
-				(vtol(*vpp))->lo_looping = 1;
-				return (0);
 			}
 		} else {
 			/*
 			 * No frills just make the shadow node.
 			 */
-			*vpp = makelonode(vp, li);
+			*vpp = makelonode(vp, li, 0);
 			return (0);
 		}
 	}
@@ -484,7 +465,7 @@ lo_lookup(
 	 * Make a lnode for the real vnode.
 	 */
 	if (vp->v_type != VDIR || nosub) {
-		*vpp = makelonode(vp, li);
+		*vpp = makelonode(vp, li, 0);
 		if (IS_DEVVP(*vpp)) {
 			vnode_t *svp;
 
@@ -514,7 +495,7 @@ lo_lookup(
 		 * or indirectly, return the covered node.
 		 */
 
-		if (!(vtol(dvp))->lo_looping) {
+		if (!((vtol(dvp))->lo_looping & LO_LOOPING)) {
 			if (vp == li->li_rootvp) {
 				/*
 				 * Direct looping condn.
@@ -590,9 +571,15 @@ lo_lookup(
 			 * We come here only when we are called with X_l as dvp
 			 * and look for something underneath.
 			 *
-			 * We need to find out if the vnode, which vp is
-			 * shadowing, is the rootvp of the autofs.
-			 *
+			 * Now that an autofs/lofs looping condition has been
+			 * identified any directory vnode contained within
+			 * dvp will be set to the vnode covered by the
+			 * mounted autofs. Thus all directories within dvp
+			 * will appear empty hence teminating the looping.
+			 * The LO_AUTOLOOP flag is set on the returned lonode
+			 * to indicate the termination of the autofs/lofs
+			 * looping. This is required for the correct behaviour
+			 * when performing a dotdot.
 			 */
 			realdvp = realvp(dvp);
 			while (vfs_matchops(realdvp->v_vfsp, lo_vfsops)) {
@@ -604,34 +591,39 @@ lo_lookup(
 				goto out;
 			/*
 			 * tvp now contains the rootvp of the vfs of the
-			 * real vnode of dvp
+			 * real vnode of dvp. The directory vnode vp is set
+			 * to the covered vnode to terminate looping. No
+			 * distinction is made between any vp as all directory
+			 * vnodes contained in dvp are returned as the covered
+			 * vnode.
 			 */
+			VN_RELE(vp);
+			vp = tvp;	/* this is an autonode */
 
-			if (realvp(dvp)->v_vfsp == realvp(vp)->v_vfsp &&
-			    tvp == realvp(vp)) {
-				/*
-				 * vp is the shadow of "net",
-				 * the rootvp of autofs
-				 */
-				VN_RELE(vp);
-				vp = tvp;	/* this is an autonode */
-
-				/*
-				 * Need to find the covered vnode
-				 */
-				vp = vp->v_vfsp->vfs_vnodecovered;
-				ASSERT(vp);
-				VN_HOLD(vp);
-				VN_RELE(tvp);
-			} else {
-				VN_RELE(tvp);
-			}
+			/*
+			 * Need to find the covered vnode
+			 */
+			vp = vp->v_vfsp->vfs_vnodecovered;
+			ASSERT(vp);
+			VN_HOLD(vp);
+			VN_RELE(tvp);
+			/*
+			 * Force the creation of a new lnode even if the hash
+			 * table contains a lnode that references this vnode.
+			 */
+			mkflag = LOF_FORCE;
+			autoloop++;
 		}
 	}
-	*vpp = makelonode(vp, li);
+	*vpp = makelonode(vp, li, mkflag);
 
-	if ((looping) || ((vtol(dvp))->lo_looping && !doingdotdot)) {
-		(vtol(*vpp))->lo_looping = 1;
+	if ((looping) ||
+	    (((vtol(dvp))->lo_looping & LO_LOOPING) && !doingdotdot)) {
+		(vtol(*vpp))->lo_looping |= LO_LOOPING;
+	}
+
+	if (autoloop) {
+		(vtol(*vpp))->lo_looping |= LO_AUTOLOOP;
 	}
 
 out:
@@ -680,7 +672,7 @@ lo_create(
 
 	error = VOP_CREATE(realvp(dvp), nm, va, exclusive, mode, &vp, cr, flag);
 	if (!error) {
-		*vpp = makelonode(vp, vtoli(dvp->v_vfsp));
+		*vpp = makelonode(vp, vtoli(dvp->v_vfsp), 0);
 		if (IS_DEVVP(*vpp)) {
 			vnode_t *svp;
 
@@ -806,7 +798,7 @@ lo_mkdir(
 		return (EACCES);
 	error = VOP_MKDIR(realvp(dvp), nm, va, vpp, cr);
 	if (!error)
-		*vpp = makelonode(*vpp, vtoli(dvp->v_vfsp));
+		*vpp = makelonode(*vpp, vtoli(dvp->v_vfsp), 0);
 	return (error);
 }
 

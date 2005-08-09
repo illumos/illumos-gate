@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -352,7 +352,7 @@ lo_mount(struct vfs *vfsp,
 	/*
 	 * Make the root vnode
 	 */
-	srootvp = makelonode(realrootvp, li);
+	srootvp = makelonode(realrootvp, li, 0);
 	srootvp->v_flag |= VROOT;
 	li->li_rootvp = srootvp;
 
