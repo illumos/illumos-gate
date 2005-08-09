@@ -108,6 +108,51 @@ static int	scsi_log_sense(env_disk_t *diskp, uchar_t page_code,
 static int	get_disk_temp(env_disk_t *);
 
 /*
+ * ES Segment stuff
+ */
+static es_sensor_blk_t sensor_ctl[MAX_SENSORS];
+
+/*
+ * Default limits for sensors, in case ES segment is not present, or has
+ * inconsistent information
+ */
+static es_sensor_blk_t sensor_default_ctl[MAX_SENSORS] = {
+	{
+	    CPU0_HIGH_POWER_OFF, CPU0_HIGH_SHUTDOWN, CPU0_HIGH_WARNING,
+	    CPU0_LOW_WARNING, CPU0_LOW_SHUTDOWN, CPU0_LOW_POWER_OFF
+	},
+	{
+	    CPU1_HIGH_POWER_OFF, CPU1_HIGH_SHUTDOWN, CPU1_HIGH_WARNING,
+	    CPU1_LOW_WARNING, CPU1_LOW_SHUTDOWN, CPU1_LOW_POWER_OFF
+	},
+	{
+	    ADT7462_HIGH_POWER_OFF, ADT7462_HIGH_SHUTDOWN, ADT7462_HIGH_WARNING,
+	    ADT7462_LOW_WARNING, ADT7462_LOW_SHUTDOWN, ADT7462_LOW_POWER_OFF
+	},
+	{
+	    MB_HIGH_POWER_OFF, MB_HIGH_SHUTDOWN, MB_HIGH_WARNING,
+	    MB_LOW_WARNING, MB_LOW_SHUTDOWN, MB_LOW_POWER_OFF
+	},
+	{
+	    LM95221_HIGH_POWER_OFF, LM95221_HIGH_SHUTDOWN, LM95221_HIGH_WARNING,
+	    LM95221_LOW_WARNING, LM95221_LOW_SHUTDOWN, LM95221_LOW_POWER_OFF
+	},
+	{
+	    FIRE_HIGH_POWER_OFF, FIRE_HIGH_SHUTDOWN, FIRE_HIGH_WARNING,
+	    FIRE_LOW_WARNING, FIRE_LOW_SHUTDOWN, FIRE_LOW_POWER_OFF
+	},
+	{
+	    LSI1064_HIGH_POWER_OFF, LSI1064_HIGH_SHUTDOWN, LSI1064_HIGH_WARNING,
+	    LSI1064_LOW_WARNING, LSI1064_LOW_SHUTDOWN, LSI1064_LOW_POWER_OFF
+	},
+	{
+	    FRONT_PANEL_HIGH_POWER_OFF, FRONT_PANEL_HIGH_SHUTDOWN,
+	    FRONT_PANEL_HIGH_WARNING, FRONT_PANEL_LOW_WARNING,
+	    FRONT_PANEL_LOW_SHUTDOWN, FRONT_PANEL_LOW_POWER_OFF
+	}
+};
+
+/*
  * Env thread variables
  */
 static boolean_t  system_shutdown_started = B_FALSE;
@@ -189,45 +234,29 @@ static env_disk_t envd_disk3 = {
  * Sensors
  */
 static env_sensor_t envd_sensor_cpu0 = {
-	SENSOR_CPU0, SENSOR_CPU0_DEVFS, CPU0_SENSOR_ID, -1,
-	CPU0_HIGH_SHUTDOWN, CPU0_HIGH_WARNING, CPU0_LOW_WARNING,
-	CPU0_LOW_SHUTDOWN, CPU0_LOW_POWER_OFF, CPU0_HIGH_POWER_OFF,
+	SENSOR_CPU0, SENSOR_CPU0_DEVFS, CPU0_SENSOR_ID, -1, NULL,
 };
 static env_sensor_t envd_sensor_cpu1 = {
-	SENSOR_CPU1, SENSOR_CPU1_DEVFS, CPU1_SENSOR_ID, -1,
-	CPU1_HIGH_SHUTDOWN, CPU1_HIGH_WARNING, CPU1_LOW_WARNING,
-	CPU1_LOW_SHUTDOWN, CPU1_LOW_POWER_OFF, CPU1_HIGH_POWER_OFF,
+	SENSOR_CPU1, SENSOR_CPU1_DEVFS, CPU1_SENSOR_ID, -1, NULL,
 };
 static env_sensor_t envd_sensor_adt7462 = {
-	SENSOR_ADT7462, SENSOR_ADT7462_DEVFS, ADT7462_SENSOR_ID, -1,
-	ADT7462_HIGH_SHUTDOWN, ADT7462_HIGH_WARNING, ADT7462_LOW_WARNING,
-	ADT7462_LOW_SHUTDOWN, ADT7462_LOW_POWER_OFF, ADT7462_HIGH_POWER_OFF,
+	SENSOR_ADT7462, SENSOR_ADT7462_DEVFS, ADT7462_SENSOR_ID, -1, NULL,
 };
 static env_sensor_t envd_sensor_mb = {
-	SENSOR_MB, SENSOR_MB_DEVFS, MB_SENSOR_ID, -1,
-	MB_HIGH_SHUTDOWN, MB_HIGH_WARNING, MB_LOW_WARNING,
-	MB_LOW_SHUTDOWN, MB_LOW_POWER_OFF, MB_HIGH_POWER_OFF,
+	SENSOR_MB, SENSOR_MB_DEVFS, MB_SENSOR_ID, -1, NULL,
 };
 static env_sensor_t envd_sensor_lm95221 = {
-	SENSOR_LM95221, SENSOR_LM95221_DEVFS, LM95221_SENSOR_ID, -1,
-	LM95221_HIGH_SHUTDOWN, LM95221_HIGH_WARNING, LM95221_LOW_WARNING,
-	LM95221_LOW_SHUTDOWN, LM95221_LOW_POWER_OFF, LM95221_HIGH_POWER_OFF,
+	SENSOR_LM95221, SENSOR_LM95221_DEVFS, LM95221_SENSOR_ID, -1, NULL,
 };
 static env_sensor_t envd_sensor_fire = {
-	SENSOR_FIRE, SENSOR_FIRE_DEVFS, FIRE_SENSOR_ID, -1,
-	FIRE_HIGH_SHUTDOWN, FIRE_HIGH_WARNING, FIRE_LOW_WARNING,
-	FIRE_LOW_SHUTDOWN, FIRE_LOW_POWER_OFF, FIRE_HIGH_POWER_OFF,
+	SENSOR_FIRE, SENSOR_FIRE_DEVFS, FIRE_SENSOR_ID, -1, NULL,
 };
 static env_sensor_t envd_sensor_lsi1064 = {
-	SENSOR_LSI1064, SENSOR_LSI1064_DEVFS, LSI1064_SENSOR_ID, -1,
-	LSI1064_HIGH_SHUTDOWN, LSI1064_HIGH_WARNING, LSI1064_LOW_WARNING,
-	LSI1064_LOW_SHUTDOWN, LSI1064_LOW_POWER_OFF, LSI1064_HIGH_POWER_OFF,
+	SENSOR_LSI1064, SENSOR_LSI1064_DEVFS, LSI1064_SENSOR_ID, -1, NULL,
 };
 static env_sensor_t envd_sensor_front_panel = {
-	SENSOR_FRONT_PANEL, SENSOR_FRONT_PANEL_DEVFS, FRONT_PANEL_SENSOR_ID, -1,
-	FRONT_PANEL_HIGH_SHUTDOWN, FRONT_PANEL_HIGH_WARNING,
-	FRONT_PANEL_LOW_WARNING, FRONT_PANEL_LOW_SHUTDOWN,
-	FRONT_PANEL_LOW_POWER_OFF, FRONT_PANEL_HIGH_POWER_OFF,
+	SENSOR_FRONT_PANEL, SENSOR_FRONT_PANEL_DEVFS, FRONT_PANEL_SENSOR_ID,
+	-1, NULL,
 };
 
 /*
@@ -317,12 +346,14 @@ static int	sensor_shutdown_interval = SENSOR_SHUTDOWN_INTERVAL;
 static int	disk_warning_interval	= DISK_WARNING_INTERVAL;
 static int	disk_warning_duration	= DISK_WARNING_DURATION;
 static int 	disk_shutdown_interval	= DISK_SHUTDOWN_INTERVAL;
+
 static int	system_temp_monitor	= 1;	/* enabled */
 static int	fan_monitor		= 1;	/* enabled */
 static int	pm_monitor		= 1;	/* enabled */
 int		disk_temp_monitor	= 1;	/* enabled */
 
 static char	shutdown_cmd[] = SHUTDOWN_CMD;
+const char	*iofru_devname = I2C_DEVFS "/" IOFRU_DEV;
 
 env_tuneable_t tuneables[] = {
 	{"system_temp-monitor", PICL_PTYPE_INT, &system_temp_monitor,
@@ -692,8 +723,8 @@ envd_setup_disks(void)
 	if (ptree_get_node_by_path(SCSI_CONTROLLER_NODE_PATH,
 	    &tnodeh) != PICL_SUCCESS) {
 		if (env_debug) {
-			envd_log(LOG_ERR,
-"On-Board SCSI controller %s not found in the system.\n",
+			envd_log(LOG_ERR, "On-Board SCSI controller %s "
+			    "not found in the system.\n",
 			    SCSI_CONTROLLER_NODE_PATH);
 		}
 		return (-1);
@@ -702,8 +733,8 @@ envd_setup_disks(void)
 	if ((ret = ptree_get_propval_by_name(tnodeh, VENDOR_ID,
 	    &vendor_id, sizeof (vendor_id))) != 0) {
 		if (env_debug) {
-			envd_log(LOG_ERR,
-"Error in getting vendor-id for SCSI controller. ret = %d errno = 0x%d\n",
+			envd_log(LOG_ERR, "Error in getting vendor-id "
+			    "for SCSI controller. ret = %d errno = 0x%d\n",
 			    ret, errno);
 		}
 		return (-1);
@@ -711,8 +742,8 @@ envd_setup_disks(void)
 	if ((ret = ptree_get_propval_by_name(tnodeh, DEVICE_ID,
 	    &device_id, sizeof (device_id))) != 0) {
 		if (env_debug) {
-			envd_log(LOG_ERR,
-"Error in getting device-id for SCSI controller. ret = %d errno = 0x%d\n",
+			envd_log(LOG_ERR, "Error in getting device-id "
+			    "for SCSI controller. ret = %d errno = 0x%d\n",
 			    ret, errno);
 		}
 		return (-1);
@@ -783,6 +814,162 @@ envd_setup_disks(void)
 	return (0);
 }
 
+static int
+envd_es_setup(void)
+{
+	seeprom_scn_t	scn_hdr;
+	seeprom_seg_t	seg_hdr;
+	es_data_t	*envseg;
+	es_sensor_t	*sensorp;
+	int		i, fd, id;
+	int		envseg_len, esd_len;
+	char		*envsegp;
+
+	/*
+	 * Open the front io fru
+	 */
+	if ((fd = open(iofru_devname, O_RDONLY)) == -1) {
+		envd_log(LOG_ERR, ENV_FRU_OPEN_FAIL, iofru_devname, errno);
+		return (-1);
+	}
+
+	/*
+	 * Read section header from the fru SEEPROM
+	 */
+	if (lseek(fd, SSCN_OFFSET, SEEK_SET) == (off_t)-1 ||
+	    read(fd, &scn_hdr, sizeof (scn_hdr)) != sizeof (scn_hdr)) {
+		envd_log(LOG_ERR, ENV_FRU_BAD_ENVSEG, iofru_devname);
+		(void) close(fd);
+		return (-1);
+	}
+	if ((scn_hdr.sscn_tag != SSCN_TAG) ||
+	    (GET_UNALIGN16(&scn_hdr.sscn_ver) != SSCN_VER)) {
+		envd_log(LOG_ERR, ENV_FRU_BAD_SCNHDR, scn_hdr.sscn_tag,
+		    GET_UNALIGN16(&scn_hdr.sscn_ver));
+		(void) close(fd);
+		return (-1);
+	}
+
+	/*
+	 * Locate environmental segment
+	 */
+	for (i = 0; i < scn_hdr.sscn_nsegs; i++) {
+		if (read(fd, &seg_hdr, sizeof (seg_hdr)) != sizeof (seg_hdr)) {
+			envd_log(LOG_ERR, ENV_FRU_BAD_ENVSEG, iofru_devname);
+			(void) close(fd);
+			return (-1);
+		}
+
+		if (env_debug) {
+			envd_log(LOG_INFO,
+			    "Seg name: %x off:%x len:%x\n",
+			    GET_UNALIGN16(&seg_hdr.sseg_name),
+			    GET_UNALIGN16(&seg_hdr.sseg_off),
+			    GET_UNALIGN16(&seg_hdr.sseg_len));
+		}
+
+		if (GET_UNALIGN16(&seg_hdr.sseg_name) == ENVSEG_NAME)
+			break;
+	}
+	if (i == scn_hdr.sscn_nsegs) {
+		envd_log(LOG_ERR, ENV_FRU_BAD_ENVSEG, iofru_devname);
+		(void) close(fd);
+		return (-1);
+	}
+
+	/*
+	 * Read environmental segment
+	 */
+	envseg_len = GET_UNALIGN16(&seg_hdr.sseg_len);
+	if ((envseg = malloc(envseg_len)) == NULL) {
+		envd_log(LOG_ERR, ENV_FRU_NOMEM_FOR_SEG, envseg_len);
+		(void) close(fd);
+		return (-1);
+	}
+
+	if (lseek(fd, (off_t)GET_UNALIGN16(&seg_hdr.sseg_off),
+	    SEEK_SET) == (off_t)-1 ||
+	    read(fd, envseg, envseg_len) != envseg_len) {
+		envd_log(LOG_ERR, ENV_FRU_BAD_ENVSEG, iofru_devname);
+		free(envseg);
+		(void) close(fd);
+		return (-1);
+	}
+
+	/*
+	 * Check environmental segment data for consistency
+	 */
+	esd_len = sizeof (*envseg) +
+	    (envseg->esd_nsensors - 1) * sizeof (envseg->esd_sensors[0]);
+	if (envseg->esd_ver != ENVSEG_VERSION || envseg_len < esd_len) {
+		envd_log(LOG_ERR, ENV_FRU_BAD_ENVSEG, iofru_devname);
+		free(envseg);
+		(void) close(fd);
+		return (-1);
+	}
+
+	/*
+	 * Process environmental segment data
+	 */
+	if (envseg->esd_nsensors > MAX_SENSORS) {
+		envd_log(LOG_ERR, ENV_FRU_BAD_ENVSEG, iofru_devname);
+		free(envseg);
+		(void) close(fd);
+		return (-1);
+	}
+
+	sensorp = &(envseg->esd_sensors[0]);
+	envsegp = (char *)envseg;
+	for (i = 0; i < envseg->esd_nsensors; i++) {
+		uint32_t ess_id;
+
+		(void) memcpy(&ess_id,
+			sensorp->ess_id, sizeof (sensorp->ess_id));
+
+		if (env_debug) {
+			envd_log(LOG_INFO, "\n Sensor Id %x offset %x",
+			    ess_id, sensorp->ess_off);
+		}
+		if (ess_id >= MAX_SENSORS) {
+			envd_log(LOG_ERR, ENV_FRU_BAD_ENVSEG, iofru_devname);
+			free(envseg);
+			(void) close(fd);
+			return (-1);
+		}
+		(void) memcpy(&sensor_ctl[ess_id], &envsegp[sensorp->ess_off],
+		    sizeof (es_sensor_blk_t));
+
+		sensorp++;
+	}
+
+	/*
+	 * Match sensor/ES id and point to correct data based on IDs
+	 */
+	for (i = 0; i < N_ENVD_SENSORS; i++) {
+		id = envd_sensors[i]->id;
+		envd_sensors[i]->es = &sensor_ctl[id];
+	}
+
+	/*
+	 * Cleanup and return
+	 */
+	free(envseg);
+	(void) close(fd);
+
+	return (0);
+}
+
+static void
+envd_es_default_setup(void)
+{
+	int	i, id;
+
+	for (i = 0; i < N_ENVD_SENSORS; i++) {
+		id = envd_sensors[i]->id;
+		envd_sensors[i]->es = &sensor_default_ctl[id];
+	}
+}
+
 /*
  * Open temperature sensor devices and initialize per sensor data structure.
  */
@@ -812,7 +999,7 @@ envd_setup_sensors(void)
 			    PICL_SUCCESS) {
 				if (env_debug) {
 					envd_log(LOG_ERR,
-					"get node by path failed for %s\n",
+					    "get node by path failed for %s\n",
 					    CPU0_PATH);
 				}
 				sensorp->present = B_FALSE;
@@ -824,7 +1011,7 @@ envd_setup_sensors(void)
 			    PICL_SUCCESS) {
 				if (env_debug) {
 					envd_log(LOG_ERR,
-					"get node by path failed for %s\n",
+					    "get node by path failed for %s\n",
 					    CPU1_PATH);
 				}
 				sensorp->present = B_FALSE;
@@ -1036,8 +1223,8 @@ system_temp_thr(void *args)
 				    sensor_warning_interval)) {
 					envd_log(LOG_CRIT, ENV_WARNING_MSG,
 					    sensorp->name, sensorp->cur_temp,
-					    sensorp->low_warning,
-					    sensorp->high_warning);
+					    sensorp->es->esb_low_warning,
+					    sensorp->es->esb_high_warning);
 					sensorp->warning_tstamp = ct;
 				}
 			} else if (sensorp->warning_start != 0)
@@ -1064,8 +1251,8 @@ system_temp_thr(void *args)
 					(void) snprintf(msgbuf, sizeof (msgbuf),
 					    ENV_SHUTDOWN_MSG, sensorp->name,
 					    sensorp->cur_temp,
-					    sensorp->low_shutdown,
-					    sensorp->high_shutdown);
+					    sensorp->es->esb_low_shutdown,
+					    sensorp->es->esb_high_shutdown);
 					envd_log(LOG_ALERT, msgbuf);
 
 					/*
@@ -1087,7 +1274,6 @@ system_temp_thr(void *args)
 				}
 			} else if (sensorp->shutdown_tstamp != 0)
 				sensorp->shutdown_tstamp = 0;
-
 		}
 	}	/* end of forever loop */
 
@@ -1344,7 +1530,7 @@ disk_temp_thr(void *args)
 		} else if (diskp->shutdown_tstamp != 0)
 			diskp->shutdown_tstamp = 0;
 		}
-	}	/* end of forever loop */
+	} /* end of forever loop */
 }
 
 static void *
@@ -1424,6 +1610,17 @@ envd_setup(void)
 		return (-1);
 	}
 
+	/*
+	 * If ES segment is not present or has inconsistent information, we
+	 * use default values for sensor limits. For the sake of simplicity,
+	 * we still store these limits internally in the 'es' member in the
+	 * structure.
+	 */
+	if (envd_es_setup() < 0) {
+		envd_log(LOG_WARNING, ENV_DEFAULT_LIMITS);
+		envd_es_default_setup();
+	}
+
 	if (envd_setup_sensors() < 0) {
 		if (env_debug)
 			envd_log(LOG_ERR, "Failed to setup sensors\n");
@@ -1443,6 +1640,9 @@ envd_setup(void)
 		disk_temp_monitor = 0;
 	}
 
+	/*
+	 * Create a thread to monitor system temperatures
+	 */
 	if ((system_temp_monitor) && (system_temp_thr_created == B_FALSE)) {
 		if (pthread_create(&system_temp_thr_id, &thr_attr,
 		    system_temp_thr, NULL) != 0) {
@@ -1455,6 +1655,9 @@ envd_setup(void)
 		}
 	}
 
+	/*
+	 * Create a thread to monitor fans
+	 */
 	if ((fan_monitor) && (fan_thr_created == B_FALSE)) {
 		if (pthread_create(&fan_thr_id, &thr_attr, fan_thr, NULL) != 0)
 			envd_log(LOG_ERR, ENVTHR_THREAD_CREATE_FAILED);
@@ -1467,6 +1670,9 @@ envd_setup(void)
 		}
 	}
 
+	/*
+	 * Create a thread to monitor PM state
+	 */
 	if ((pm_monitor) && (pmthr_created == B_FALSE)) {
 		if (pthread_create(&pmthr_tid, &thr_attr, pmthr, NULL) != 0)
 			envd_log(LOG_CRIT, PM_THREAD_CREATE_FAILED);
@@ -1478,6 +1684,9 @@ envd_setup(void)
 		}
 	}
 
+	/*
+	 * Create a thread to monitor disk temperature
+	 */
 	if ((disk_temp_monitor) && (disk_temp_thr_created == B_FALSE)) {
 		if (pthread_create(&disk_temp_thr_id, &thr_attr,
 		    disk_temp_thr, NULL) != 0) {
@@ -1576,8 +1785,7 @@ get_string_val(ptree_rarg_t *parg, void *buf)
 	if (tuneablep == NULL)
 		return (PICL_FAILURE);
 
-	(void) memcpy(buf, (caddr_t)tuneablep->value,
-	    tuneablep->nbytes);
+	(void) memcpy(buf, tuneablep->value, tuneablep->nbytes);
 
 	return (PICL_SUCCESS);
 }
@@ -1598,8 +1806,7 @@ set_string_val(ptree_warg_t *parg, const void *buf)
 	if (tuneablep == NULL)
 		return (PICL_FAILURE);
 
-	(void) memcpy((caddr_t)tuneables->value, (caddr_t)buf,
-	    tuneables->nbytes);
+	(void) memcpy(tuneables->value, buf, tuneables->nbytes);
 
 
 	return (PICL_SUCCESS);
@@ -1618,8 +1825,7 @@ get_int_val(ptree_rarg_t *parg, void *buf)
 	if (tuneablep == NULL)
 		return (PICL_FAILURE);
 
-	(void) memcpy((int *)buf, (int *)tuneablep->value,
-	    tuneablep->nbytes);
+	(void) memcpy(buf, tuneablep->value, tuneablep->nbytes);
 
 	return (PICL_SUCCESS);
 }
@@ -1640,8 +1846,7 @@ set_int_val(ptree_warg_t *parg, const void *buf)
 	if (tuneablep == NULL)
 		return (PICL_FAILURE);
 
-	(void) memcpy((int *)tuneablep->value, (int *)buf,
-	    tuneablep->nbytes);
+	(void) memcpy(tuneablep->value, buf, tuneablep->nbytes);
 
 	return (PICL_SUCCESS);
 }

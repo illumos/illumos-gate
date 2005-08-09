@@ -342,39 +342,39 @@ add_volatile_prop(picl_nodehdl_t nodeh, char *name, int type, int access,
  * Add temperature threshold properties
  */
 static void
-add_sensor_thresh_props(picl_nodehdl_t nodeh, env_sensor_t *sensorp)
+add_sensor_thresh_props(picl_nodehdl_t nodeh, es_sensor_blk_t *sensor_blkp)
 {
 	picl_prophdl_t	proph;
 
 	(void) add_regular_prop(nodeh, PICL_PROP_LOW_POWER_OFF,
 	    PICL_PTYPE_INT, PICL_READ,
-	    sizeof (sensorp->low_power_off),
-	    (void *)&(sensorp->low_power_off), &proph);
+	    sizeof (sensor_blkp->esb_low_power_off),
+	    &sensor_blkp->esb_low_power_off, &proph);
 
 	(void) add_regular_prop(nodeh, PICL_PROP_LOW_SHUTDOWN,
 	    PICL_PTYPE_INT, PICL_READ,
-	    sizeof (sensorp->low_shutdown),
-	    (void *)&(sensorp->low_shutdown), &proph);
+	    sizeof (sensor_blkp->esb_low_shutdown),
+	    &sensor_blkp->esb_low_shutdown, &proph);
 
 	(void) add_regular_prop(nodeh, PICL_PROP_LOW_WARNING,
 	    PICL_PTYPE_INT, PICL_READ,
-	    sizeof (sensorp->low_warning),
-	    (void *)&(sensorp->low_warning), &proph);
+	    sizeof (sensor_blkp->esb_low_warning),
+	    &sensor_blkp->esb_low_warning, &proph);
 
 	(void) add_regular_prop(nodeh, PICL_PROP_HIGH_WARNING,
 	    PICL_PTYPE_INT, PICL_READ,
-	    sizeof (sensorp->high_warning),
-	    (void *)&(sensorp->high_warning), &proph);
+	    sizeof (sensor_blkp->esb_high_warning),
+	    &sensor_blkp->esb_high_warning, &proph);
 
 	(void) add_regular_prop(nodeh, PICL_PROP_HIGH_SHUTDOWN,
 	    PICL_PTYPE_INT, PICL_READ,
-	    sizeof (sensorp->high_shutdown),
-	    (void *)&(sensorp->high_shutdown), &proph);
+	    sizeof (sensor_blkp->esb_high_shutdown),
+	    &sensor_blkp->esb_high_shutdown, &proph);
 
 	(void) add_regular_prop(nodeh, PICL_PROP_HIGH_POWER_OFF,
 	    PICL_PTYPE_INT, PICL_READ,
-	    sizeof (sensorp->high_power_off),
-	    (void *)&(sensorp->high_power_off), &proph);
+	    sizeof (sensor_blkp->esb_high_power_off),
+	    &sensor_blkp->esb_high_power_off, &proph);
 }
 
 
@@ -391,6 +391,7 @@ add_sensor_nodes_and_props()
 	picl_nodehdl_t	nodeh, cnodeh;
 	picl_prophdl_t	proph;
 	env_sensor_t	*sensorp;
+	es_sensor_blk_t	*sensor_blkp;
 	int		i;
 
 	for (i = 0; i < N_SENSOR_NODES; i++) {
@@ -454,10 +455,11 @@ add_sensor_nodes_and_props()
 		/*
 		 * Add threshold related properties
 		 */
-
-		add_sensor_thresh_props(cnodeh, sensorp);
-
+		sensor_blkp = sensorp->es;
+		if (sensor_blkp != NULL)
+			add_sensor_thresh_props(cnodeh, sensor_blkp);
 	}
+
 	if (err != PICL_SUCCESS) {
 		delete_sensor_nodes_and_props();
 		if (env_debug)

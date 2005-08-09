@@ -219,13 +219,121 @@ extern "C" {
  */
 typedef int16_t tempr_t;
 
+/*
+ *				SEEPROM LAYOUT
+ *
+ *      The layout of environmental segment in the SEEPROM in Chicago is as
+ *      shown below. Note that this is a stripped-down version of the Envseg
+ *      Definition v2.0 (but compatible). In particular, piclenvd in Chicago
+ *      does not use the #FanEntries and the list of FANn_ID/FANn_DOFF
+ *      pairs, and it doesn't use the SensorPolicy and the list of
+ *      Measured/Corrected pairs for the temperature sensor values either.
+ *
+ *
+ *                   0         1         2         3         4         5
+ *		+---------+------------------+----------+---------+---------+
+ *	0x1800:	| HDR_TAG |      HDR_VER     |  HDR_LEN | HDR_CRC |  N_SEGS |
+ *		+---------+---------+--------+----------+---------+---------+
+ *	0x1806:	|     SEG1_NAME	    |	            SEG1_DESC               |
+ *		+-------------------+-------------------+-------------------+
+ *	0x180C:	|     SEG1_OFF	    |	  SEG1_LEN	|      SEG2_NAME    |
+ *		+-------------------+-------------------+-------------------+
+ *		~							    ~
+ *		.							    .
+ *		~							    ~
+ *		+-------------------+-------------------+-------------------+
+ *	0xXXXX:	|     SEGn_OFF	    |	  SEGn_LEN	|
+ *		+-------------------+-------------------+
+ *
+ *
+ *              +---------+---------+---------------------------------------+
+ *  ENVSEG_OFF:	| ESEG_VER| N_SNSRS |            SENSOR1_ID                 |
+ *              +---------+---------+---------------------------------------+
+ *	        |    SNSR1_DOFF     |            SENSOR2_ID                 |
+ *              +-------------------+---------------------------------------+
+ *		~							    ~
+ *		~							    ~
+ *		+-------------------+---------------------------------------+
+ *	        |    SNSRm_DOFF     |
+ *              +-------------------+
+ *
+ *
+ *		+---------+---------+--------+----------+---------+---------+
+ * SNSRk_DOFF:	| HI_POFF | HI_SHUT | HI_WARN| LO_WARN  | LO_SHUT | LO_POFF |
+ *              +-------------------+--------+----------+---------+---------+
+ */
+
+#define	I2C_DEVFS		"/devices/ebus@1f,464000/i2c@3,80"
+#define	IOFRU_DEV		"front-io-fru-prom@0,a4:front-io-fru-prom"
+#define	FRU_SEEPROM_NAME	"front-io-fru-prom"
+
+/*
+ * SEEPROM section header
+ */
+#define	SSCN_TAG	0x08
+#define	SSCN_VER	0x0001
+#define	SSCN_OFFSET	0x1800
+typedef struct {
+	uint8_t sscn_tag;		/* section header tag */
+	uint8_t sscn_ver[2];		/* section header version */
+	uint8_t sscn_len;		/* section header length */
+	uint8_t sscn_crc;		/* unused */
+	uint8_t sscn_nsegs;		/* total number of segments */
+} seeprom_scn_t;
+
+/*
+ * SEEPROM segment header
+ */
+typedef struct {
+	uint16_t sseg_name;		/* segment name */
+	uint16_t sseg_desc[2];		/* segment descriptor */
+	uint16_t sseg_off;		/* segment data offset */
+	uint16_t sseg_len;		/* segment length */
+} seeprom_seg_t;
+#define	ENVSEG_NAME	0x4553		/* "ES" */
+
+/*
+ * Envseg layout V2 (stripped-down version)
+ */
+typedef struct {
+	uint8_t esb_high_power_off;
+	uint8_t esb_high_shutdown;
+	uint8_t esb_high_warning;
+	uint8_t esb_low_warning;
+	uint8_t esb_low_shutdown;
+	uint8_t esb_low_power_off;
+} es_sensor_blk_t;
+
+typedef struct {
+	uint16_t ess_id[2];		/* unique sensor id (on this FRU) */
+	uint16_t ess_off;		/* sensor data blk offset */
+} es_sensor_t;
+
+#define	ENVSEG_VERSION	2
+typedef struct {
+	uint8_t esd_ver;		/* envseg version */
+	uint8_t esd_nsensors;		/* envseg total number of sensor blks */
+	es_sensor_t esd_sensors[1];	/* sensor table (variable length) */
+} es_data_t;
+
+/*
+ * Macros to fetch 16 and 32 bit msb-to-lsb data from unaligned addresses
+ */
+#define	GET_UNALIGN16(addr)	\
+	(((*(uint8_t *)addr) << 8) | *((uint8_t *)addr + 1))
+#define	GET_UNALIGN32(addr)	\
+	(GET_UNALIGN16(addr) << 16) | GET_UNALIGN16((uint8_t *)addr + 2)
+
+/*
+ * Macros to check sensor/disk temperatures
+ */
 #define	SENSOR_TEMP_IN_WARNING_RANGE(val, sensorp) \
-	((val) > (sensorp)->high_warning || \
-	(val) < (char)((sensorp)->low_warning))
+	((val) > (sensorp)->es->esb_high_warning || \
+	(val) < (char)((sensorp)->es->esb_low_warning))
 
 #define	SENSOR_TEMP_IN_SHUTDOWN_RANGE(val, sensorp) \
-	((val) > (sensorp)->high_shutdown || \
-	(val) < (char)((sensorp)->low_shutdown))
+	((val) > (sensorp)->es->esb_high_shutdown || \
+	(val) < (char)((sensorp)->es->esb_low_shutdown))
 
 #define	DISK_TEMP_IN_WARNING_RANGE(val, diskp) \
 	((val) > (diskp)->high_warning || \
@@ -241,61 +349,65 @@ typedef int16_t tempr_t;
 #define	FAN_FAILED		1
 #define	FAN_OK			0
 
+/*
+ * Default limits for sensors in case environmental segment is absent
+ */
+#define	CPU0_HIGH_POWER_OFF		105
 #define	CPU0_HIGH_SHUTDOWN		100
-#define	CPU0_LOW_SHUTDOWN		0
 #define	CPU0_HIGH_WARNING		95
 #define	CPU0_LOW_WARNING		5
-#define	CPU0_HIGH_POWER_OFF		105
-#define	CPU0_LOW_POWER_OFF		-5
+#define	CPU0_LOW_SHUTDOWN		0
+#define	CPU0_LOW_POWER_OFF		0
 
+#define	CPU1_HIGH_POWER_OFF		105
 #define	CPU1_HIGH_SHUTDOWN		100
-#define	CPU1_LOW_SHUTDOWN		0
 #define	CPU1_HIGH_WARNING		95
 #define	CPU1_LOW_WARNING		5
-#define	CPU1_HIGH_POWER_OFF		105
-#define	CPU1_LOW_POWER_OFF		-5
+#define	CPU1_LOW_SHUTDOWN		0
+#define	CPU1_LOW_POWER_OFF		0
 
+#define	ADT7462_HIGH_POWER_OFF		80
 #define	ADT7462_HIGH_SHUTDOWN		75
-#define	ADT7462_LOW_SHUTDOWN		0
 #define	ADT7462_HIGH_WARNING		70
 #define	ADT7462_LOW_WARNING		5
-#define	ADT7462_HIGH_POWER_OFF		80
-#define	ADT7462_LOW_POWER_OFF		-5
+#define	ADT7462_LOW_SHUTDOWN		0
+#define	ADT7462_LOW_POWER_OFF		0
 
+#define	MB_HIGH_POWER_OFF		80
 #define	MB_HIGH_SHUTDOWN		75
-#define	MB_LOW_SHUTDOWN			0
 #define	MB_HIGH_WARNING			70
 #define	MB_LOW_WARNING			5
-#define	MB_HIGH_POWER_OFF		80
-#define	MB_LOW_POWER_OFF		-5
+#define	MB_LOW_SHUTDOWN			0
+#define	MB_LOW_POWER_OFF		0
 
+#define	LM95221_HIGH_POWER_OFF		80
 #define	LM95221_HIGH_SHUTDOWN		75
-#define	LM95221_LOW_SHUTDOWN		0
 #define	LM95221_HIGH_WARNING		70
 #define	LM95221_LOW_WARNING		5
-#define	LM95221_HIGH_POWER_OFF		80
-#define	LM95221_LOW_POWER_OFF		-5
+#define	LM95221_LOW_SHUTDOWN		0
+#define	LM95221_LOW_POWER_OFF		0
 
+#define	FIRE_HIGH_POWER_OFF		105
 #define	FIRE_HIGH_SHUTDOWN		100
-#define	FIRE_LOW_SHUTDOWN		0
 #define	FIRE_HIGH_WARNING		95
 #define	FIRE_LOW_WARNING		5
-#define	FIRE_HIGH_POWER_OFF		105
-#define	FIRE_LOW_POWER_OFF		-5
+#define	FIRE_LOW_SHUTDOWN		0
+#define	FIRE_LOW_POWER_OFF		0
 
+#define	LSI1064_HIGH_POWER_OFF		105
 #define	LSI1064_HIGH_SHUTDOWN		100
-#define	LSI1064_LOW_SHUTDOWN		0
 #define	LSI1064_HIGH_WARNING		95
 #define	LSI1064_LOW_WARNING		5
-#define	LSI1064_HIGH_POWER_OFF		105
-#define	LSI1064_LOW_POWER_OFF		-5
+#define	LSI1064_LOW_SHUTDOWN		0
+#define	LSI1064_LOW_POWER_OFF		0
 
+#define	FRONT_PANEL_HIGH_POWER_OFF	75
 #define	FRONT_PANEL_HIGH_SHUTDOWN	70
-#define	FRONT_PANEL_LOW_SHUTDOWN	0
 #define	FRONT_PANEL_HIGH_WARNING	60
 #define	FRONT_PANEL_LOW_WARNING		5
-#define	FRONT_PANEL_HIGH_POWER_OFF	75
-#define	FRONT_PANEL_LOW_POWER_OFF	-5
+#define	FRONT_PANEL_LOW_SHUTDOWN	0
+#define	FRONT_PANEL_LOW_POWER_OFF	0
+
 /*
  * Temperature sensor related data structure
  */
@@ -304,12 +416,7 @@ typedef struct env_sensor {
 	char		*devfs_path;		/* sensor device devfs path */
 	int		id;
 	int		fd;			/* device file descriptor */
-	char  		high_shutdown;
-	char  		high_warning;
-	char  		low_warning;
-	char  		low_shutdown;
-	char  		low_power_off;
-	char  		high_power_off;
+	es_sensor_blk_t	*es;
 	int		error;			/* error flag */
 	boolean_t 	present;		/* sensor present */
 	tempr_t		cur_temp;		/* current temperature */
@@ -435,6 +542,21 @@ extern void envd_log(int pri, const char *fmt, ...);
 #define	ENV_FAN_OK_MSG		\
 	gettext("SUNW_piclenvd: %s is OKAY.\n")
 
+#define	ENV_FRU_OPEN_FAIL		\
+	gettext("SUNW_piclenvd: can't open FRU SEEPROM path:%s errno:%d\n")
+
+#define	ENV_FRU_BAD_ENVSEG		\
+	gettext("SUNW_piclenvd: version mismatch or environmental segment " \
+		"header too short in FRU SEEPROM %s\n")
+
+#define	ENV_FRU_BAD_SCNHDR		\
+	gettext("SUNW_piclenvd: invalid section header tag:%x version:%x\n")
+
+#define	ENV_FRU_NOMEM_FOR_SEG		\
+	gettext("SUNW_piclenvd: cannot allocate %d bytes for env seg memory\n")
+
+#define	ENV_DEFAULT_LIMITS		\
+	gettext("SUNW_piclenvd: error reading ES segment, using defaults\n")
 
 #ifdef	__cplusplus
 }
