@@ -223,6 +223,7 @@
  * -Wl,<arg>			pass-thru
  * -W{m,0,2,h,i,u>		error/ignore
  * -Wu,-xmodel=kernel		-ffreestanding -mcmodel=kernel -mno-red-zone
+ * -Wu,-save_args		-msave-args
  * -w				pass-thru
  * -Xa				-std=iso9899:199409 or -ansi
  * -Xc				-ansi -pedantic
@@ -923,6 +924,10 @@ do_gcc(const char *dir, const char *cmd, int argc, char **argv,
 				newae(h, "-mno-red-zone");
 				model = "-mcmodel=kernel";
 				nolibc = 1;
+				break;
+			}
+			if (strcmp(arg, "-Wu,-save_args") == 0) {
+				newae(h, "-msave-args");
 				break;
 			}
 #endif	/* __x86 */
