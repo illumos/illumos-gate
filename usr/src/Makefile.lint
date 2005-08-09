@@ -347,7 +347,17 @@ COMMON_SUBDIRS = \
 	lib/smartcard \
 	lib/fm \
 	lib/udapl \
-	psm
+	psm \
+	ucbcmd/basename \
+	ucbcmd/biff \
+	ucbcmd/echo \
+	ucbcmd/groups \
+	ucbcmd/mkstr \
+	ucbcmd/printenv \
+	ucbcmd/sum \
+	ucbcmd/test \
+	ucbcmd/users \
+	ucbcmd/whoami
 
 i386_SUBDIRS= \
 	cmd/biosdev \

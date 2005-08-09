@@ -15,7 +15,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	<stdio.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 int
 main(int argc, char **argv)
@@ -23,7 +24,7 @@ main(int argc, char **argv)
 	char *p1, *p2, *p3;
 
 	if (argc < 2) {
-		(void)putchar('\n');
+		(void) putchar('\n');
 		exit(1);
 	}
 	p1 = argv[1];
@@ -32,16 +33,19 @@ main(int argc, char **argv)
 		if (*p1++ == '/')
 			p2 = p1;
 	}
-	if (argc>2) {
-		for(p3=argv[2]; *p3; p3++) 
-			;
-		while(p3>argv[2])
-			if(p1 <= p2 || *--p3 != *--p1)
+	if (argc > 2) {
+		p3 = argv[2];
+		while (*p3)
+			p3++;
+
+		while (p3 > argv[2])
+			if (p1 <= p2 || *--p3 != *--p1)
 				goto output;
 		*p1 = '\0';
 	}
 output:
-	fputs(p2, stdout);
-	putc('\n', stdout);
+
+	(void) fputs(p2, stdout);
+	(void) putc('\n', stdout);
 	return (0);
 }

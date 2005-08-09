@@ -19,83 +19,86 @@
  * groups
  */
 
+#include <sys/types.h>
 #include <sys/param.h>
 #include <grp.h>
 #include <pwd.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 
-static void showgroups(char *);
-
-int	groups[NGROUPS_UMAX];
+static void showgroups(char *user);
 
 int
 main(int argc, char *argv[])
 {
-	int ngroups, i, j;
+	int ngroups, i;
 	char *sep = "";
 	struct group *gr;
-	struct passwd *pw;
+	gid_t groups[NGROUPS_UMAX];
 
 	if (argc > 1) {
-		for (i=1; i < argc ; i++)
-        		showgroups(argv[i]);
-		exit(0) ;
+		for (i = 1; i < argc; i++)
+			showgroups(argv[i]);
+		exit(0);
 	}
 
 	ngroups = getgroups(NGROUPS_UMAX, groups);
-	if ((pw = getpwuid(getuid())) == NULL) {
-		fprintf(stderr, "groups: could not find passwd entry\n");
+	if (getpwuid(getuid()) == NULL) {
+		(void) fprintf(stderr, "groups: could not find passwd entry\n");
 		exit(1);
 	}
 
 	for (i = 0; i < ngroups; i++) {
 		gr = getgrgid(groups[i]);
 		if (gr == NULL) {
-			printf("%s%d", sep, groups[i]);
+			(void) printf("%s%ld", sep, groups[i]);
 			sep = " ";
 			continue;
 		}
-		printf("%s%s", sep, gr->gr_name);
+		(void) printf("%s%s", sep, gr->gr_name);
 		sep = " ";
 	}
-	printf("\n");
+
+	(void) printf("\n");
 	return (0);
 }
 
-void
+static void
 showgroups(char *user)
 {
 	struct group *gr;
 	struct passwd *pw;
 	char **cp;
 	char *sep = "";
-	int pwgid_printed = 0 ;
+	int pwgid_printed = 0;
 
 	if ((pw = getpwnam(user)) == NULL) {
-		fprintf(stderr, "groups: %s : No such user\n", user);
+		(void) fprintf(stderr, "groups: %s : No such user\n", user);
 		return;
 	}
-	setgrent() ;
-	printf("%s : ", user) ;
+	setgrent();
+	(void) printf("%s : ", user);
 	while (gr = getgrent()) {
 		if (pw->pw_gid == gr->gr_gid) {
-			/* 
-			 * To avoid duplicate group entries 
+			/*
+			 * To avoid duplicate group entries
 			 */
-			if (pwgid_printed==0) {
-			    printf("%s%s", sep, gr->gr_name);
+			if (pwgid_printed == 0) {
+			    (void) printf("%s%s", sep, gr->gr_name);
 			    sep = " ";
-			    pwgid_printed = 1 ;
+			    pwgid_printed = 1;
 			}
-			continue ;
-		}	
+			continue;
+		}
 		for (cp = gr->gr_mem; cp && *cp; cp++)
 			if (strcmp(*cp, user) == 0) {
-				printf("%s%s", sep, gr->gr_name);
+				(void) printf("%s%s", sep, gr->gr_name);
 				sep = " ";
 				break;
 			}
 	}
-	printf("\n");
-	endgrent() ;
+	(void) printf("\n");
+	endgrent();
 }

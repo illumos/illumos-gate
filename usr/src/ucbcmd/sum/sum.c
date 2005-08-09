@@ -32,9 +32,10 @@ main(int argc, char **argv)
 
 	i = 1;
 	do {
-		if(i < argc) {
+		if (i < argc) {
 			if ((f = fopen(argv[i], "r")) == NULL) {
-				fprintf(stderr, "sum: Can't open %s\n", argv[i]);
+				(void) fprintf(stderr,
+					"sum: Can't open %s\n", argv[i]);
 				errflg += 10;
 				continue;
 			}
@@ -53,13 +54,18 @@ main(int argc, char **argv)
 		}
 		if (ferror(f)) {
 			errflg++;
-			fprintf(stderr, "sum: read error on %s\n", argc>1?argv[i]:"-");
+			(void) fprintf(stderr,
+				"sum: read error on %s\n",
+				argc > 1 ? argv[i] : "-");
 		}
-		printf("%05u %5lld", sum, (nbytes+BUFSIZ-1)/BUFSIZ);
-		if(argc > 2)
-			printf(" %s", argv[i]);
-		printf("\n");
-		fclose(f);
-	} while(++i < argc);
+
+		(void) printf("%05u %5lld", sum,
+			(nbytes + BUFSIZ - 1) / BUFSIZ);
+		if (argc > 2)
+			(void) printf(" %s", argv[i]);
+		(void) printf("\n");
+		(void) fclose(f);
+	} while (++i < argc);
+
 	return (errflg);
 }

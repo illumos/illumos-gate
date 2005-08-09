@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -8,12 +13,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983-1998 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * users
@@ -23,23 +23,25 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <utmpx.h>
+#include <string.h>
 
-static	char	*strndup(char *p, int n);
+static char **names;
+static char **namp;
 
-struct utmpx *utmpx;
-char	**names;
-char	**namp;
+static char *strndup(char *p, int n);
+static int scmp(const void *p, const void *q);
+static void summary(void);
 
-main(argc, argv)
-char **argv;
+int
+main(int argc, char **argv)
 {
-	char	 *tp;
 	int	nusers = 0;
 	int	bufflen = BUFSIZ;
+	struct utmpx *utmpx;
 
 	if (argc == 2)
 		if (!utmpxname(argv[1])) {
-			fprintf(stderr, "Filename is too long\n");
+			(void) fprintf(stderr, "Filename is too long\n");
 			exit(1);
 		}
 
@@ -67,36 +69,37 @@ char **argv;
 	endutxent();
 
 	summary();
-	exit(0);
+	return (0);
 }
 
-static	char	*
+static char *
 strndup(char *p, int n)
 {
 
 	register char	*x;
 	x = malloc(n + 1);
-	strncpy(x, p, n);
-	*(x + n) = '\0';
+	(void) strlcpy(x, p, n + 1);
 	return (x);
 
 }
 
+static int
 scmp(const void *p, const void *q)
 {
 	return (strcmp((char *)p, (char *)q));
 }
 
-summary()
+static void
+summary(void)
 {
 	register char **p;
 
 	qsort(names, namp - names, sizeof (names[0]), scmp);
 	for (p = names; p < namp; p++) {
 		if (p != names)
-			putchar(' ');
-		fputs(*p, stdout);
+			(void) putchar(' ');
+		(void) fputs(*p, stdout);
 	}
 	if (namp != names)		/* at least one user */
-		putchar('\n');
+		(void) putchar('\n');
 }

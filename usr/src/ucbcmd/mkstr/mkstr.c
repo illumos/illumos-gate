@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,33 +54,39 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <locale.h>
+#include <sys/param.h>
 
 #define	ungetchar(c)	ungetc(c, stdin)
 
-long	ftell();
-char	*calloc();
+#define	NBUCKETS	511
 
-FILE	*mesgread, *mesgwrite;
-char	*progname;
-char	usagestr[] =	"usage: %s [ - ] mesgfile prefix file ...\n";
-char	name[100], *np;
+static char	usagestr[] =	"usage: %s [ - ] mesgfile prefix file ...\n";
 
-int hashit(char *str, char really, unsigned int fakept);
-void process(void);
-void inithash(void);
-int octdigit(char c);
-void copystr(void);
+static FILE	*mesgread, *mesgwrite;
+
+static void process(void);
+static int match(char *ocp);
+static void copystr(void);
+static int octdigit(char c);
+static void inithash(void);
+static int hashit(char *str, char really, unsigned int fakept);
+static int fgetNUL(char *obuf, int rmdr, FILE *file);
 
 int
 main(int argc, char *argv[])
 {
 	char addon = 0;
+	char *progname, *np, name[MAXPATHLEN];
+	size_t size = 0;
+	size_t len;
 
 	(void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)
-#define TEXT_DOMAIN "SYS_TEST"
+#define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -88,7 +94,7 @@ main(int argc, char *argv[])
 	if (argc > 1 && argv[0][0] == '-')
 		addon++, argc--, argv++;
 	if (argc < 3)
-		fprintf(stderr, gettext(usagestr), progname), exit(1);
+		(void) fprintf(stderr, gettext(usagestr), progname), exit(1);
 	mesgwrite = fopen(argv[0], addon ? "a" : "w");
 	if (mesgwrite == NULL)
 		perror(argv[0]), exit(1);
@@ -97,11 +103,26 @@ main(int argc, char *argv[])
 		perror(argv[0]), exit(1);
 	inithash();
 	argc--, argv++;
-	strcpy(name, argv[0]);
+
+	if (strlcpy(name, argv[0], sizeof (name)) >= sizeof (name)) {
+		(void) fprintf(stderr, gettext("%s: %s: string too long"),
+			progname, argv[0]);
+		exit(1);
+	}
+
 	np = name + strlen(name);
+
+	len = strlen(name);
+	np = name + len;
+	size = sizeof (name) - len;
 	argc--, argv++;
 	do {
-		strcpy(np, argv[0]);
+		if (strlcpy(np, argv[0], size) >= size) {
+			(void) fprintf(stderr,
+				gettext("%s: %s: string too long"),
+				progname, argv[0]);
+			exit(1);
+		}
 		if (freopen(name, "w", stdout) == NULL)
 			perror(name), exit(1);
 		if (freopen(argv[0], "r", stdin) == NULL)
@@ -109,13 +130,13 @@ main(int argc, char *argv[])
 		process();
 		argc--, argv++;
 	} while (argc > 0);
+
 	return (0);
 }
 
-void
+static void
 process(void)
 {
-	char *cp;
 	int c;
 
 	for (;;) {
@@ -123,21 +144,21 @@ process(void)
 		if (c == EOF)
 			return;
 		if (c != 'e') {
-			putchar(c);
+			(void) putchar(c);
 			continue;
 		}
 		if (match("error(")) {
-			printf(gettext("error("));
+			(void) printf(gettext("error("));
 			c = getchar();
 			if (c != '"')
-				putchar(c);
+				(void) putchar(c);
 			else
 				copystr();
 		}
 	}
 }
 
-int
+static int
 match(char *ocp)
 {
 	char *cp;
@@ -147,15 +168,15 @@ match(char *ocp)
 		c = getchar();
 		if (c != *cp) {
 			while (ocp < cp)
-				putchar(*ocp++);
-			ungetchar(c);
+				(void) putchar(*ocp++);
+			(void) ungetchar(c);
 			return (0);
 		}
 	}
 	return (1);
 }
 
-void
+static void
 copystr(void)
 {
 	int c, ch;
@@ -208,7 +229,7 @@ copystr(void)
 				ch = getchar();
 				if (!octdigit(ch))
 					break;
-				c <<= 3, c+= ch - '0', ch = -1;
+				c <<= 3, c += ch - '0', ch = -1;
 				break;
 			}
 		}
@@ -216,38 +237,36 @@ copystr(void)
 	}
 out:
 	*cp = 0;
-	printf("%d", hashit(buf, 1, NULL));
+	(void) printf("%d", hashit(buf, 1, NULL));
 }
 
-int
+static int
 octdigit(char c)
 {
 
 	return (c >= '0' && c <= '7');
 }
 
-void
+static void
 inithash(void)
 {
 	char buf[512];
 	int mesgpt = 0;
 
 	rewind(mesgread);
-	while (fgetNUL(buf, sizeof buf, mesgread) != NULL) {
-		hashit(buf, 0, mesgpt);
+	while (fgetNUL(buf, sizeof (buf), mesgread) != NULL) {
+		(void) hashit(buf, 0, mesgpt);
 		mesgpt += strlen(buf) + 2;
 	}
 }
 
-#define	NBUCKETS	511
-
-struct	hash {
+static struct	hash {
 	long	hval;
 	unsigned int hpt;
 	struct	hash *hnext;
 } *bucket[NBUCKETS];
 
-int
+static int
 hashit(char *str, char really, unsigned int fakept)
 {
 	int i;
@@ -257,8 +276,8 @@ hashit(char *str, char really, unsigned int fakept)
 	char *cp;
 
 	if (really)
-		fflush(mesgwrite);
-	for (cp = str; *cp;)
+		(void) fflush(mesgwrite);
+	for (cp = str; *cp; )
 		hashval = (hashval << 1) + *cp++;
 	i = hashval % NBUCKETS;
 	if (i < 0)
@@ -266,35 +285,27 @@ hashit(char *str, char really, unsigned int fakept)
 	if (really != 0)
 		for (hp = bucket[i]; hp != 0; hp = hp->hnext)
 		if (hp->hval == hashval) {
-			fseek(mesgread, (long) hp->hpt, 0);
-			fgetNUL(buf, sizeof buf, mesgread);
-/*
-			fprintf(stderr, gettext("Got (from %d) %s\n"), hp->hpt, buf);
-*/
+			(void) fseek(mesgread, (long)hp->hpt, 0);
+			(void) fgetNUL(buf, sizeof (buf), mesgread);
 			if (strcmp(buf, str) == 0)
 				break;
 		}
 	if (!really || hp == 0) {
-		hp = (struct hash *) calloc(1, sizeof *hp);
+		hp = (struct hash *)calloc(1, sizeof (*hp));
 		hp->hnext = bucket[i];
 		hp->hval = hashval;
 		hp->hpt = really ? ftell(mesgwrite) : fakept;
 		if (really) {
-			fwrite(str, sizeof (char), strlen(str) + 1, mesgwrite);
-			fwrite("\n", sizeof (char), 1, mesgwrite);
+			(void) fwrite(str, sizeof (char), strlen(str) + 1,
+				mesgwrite);
+			(void) fwrite("\n", sizeof (char), 1, mesgwrite);
 		}
 		bucket[i] = hp;
 	}
-/*
-	fprintf(stderr, gettext("%s hashed to %ld at %d\n"), str, hp->hval, hp->hpt);
-*/
 	return (hp->hpt);
 }
 
-#include <sys/types.h>
-#include <sys/stat.h>
-
-int
+static int
 fgetNUL(char *obuf, int rmdr, FILE *file)
 {
 	int c;
@@ -303,6 +314,6 @@ fgetNUL(char *obuf, int rmdr, FILE *file)
 	while (--rmdr > 0 && (c = getc(file)) != 0 && c != EOF)
 		*buf++ = c;
 	*buf++ = 0;
-	getc(file);
+	(void) getc(file);
 	return ((feof(file) || ferror(file)) ? NULL : 1);
 }

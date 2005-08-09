@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -56,6 +57,7 @@ main(int argc, char *argv[])
 	int found = 0;
 
 	argc--, argv++;
+
 	if (environ)
 		for (ep = environ; *ep; ep++)
 			if (argc == 0 || prefix(argv[0], *ep)) {
@@ -73,7 +75,7 @@ main(int argc, char *argv[])
 	return (!found);
 }
 
-int
+static int
 prefix(char *cp, char *dp)
 {
 

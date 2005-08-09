@@ -1,5 +1,5 @@
 /*
- * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -13,7 +13,6 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -29,6 +28,7 @@
 
 int
 main(int argc, char *argv[])
+/*ARGSUSED*/
 {
 	struct passwd *pp;
 	uid_t	euid;
@@ -46,6 +46,6 @@ main(int argc, char *argv[])
 		(void) printf(gettext(MSG), euid);
 		exit(1);
 	}
-	printf("%s\n", pp->pw_name);
+	(void) printf("%s\n", pp->pw_name);
 	return (0);
 }

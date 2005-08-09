@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,16 +44,15 @@
  * biff
  */
 
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <locale.h>
 
-char	*ttyname();
-
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char **argv)
 {
 	char *cp = ttyname(2);
 	struct stat stb;
@@ -60,17 +60,23 @@ main(argc, argv)
 	(void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)
-#define TEXT_DOMAIN "SYS_TEST"
+#define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
 	argc--, argv++;
-	if (cp == 0)
-		fprintf(stderr, gettext("biff failed:  cannot locate your tty:  ttyname() for file descriptor 2 returned NULL\n")), exit(1);
+	if (cp == 0) {
+		(void) fprintf(stderr,
+			gettext("biff failed:  cannot locate your tty:  "
+				"ttyname() for file descriptor 2 returned"
+				" NULL\n"));
+		exit(1);
+	}
 	if (stat(cp, &stb) < 0)
 		perror(cp), exit(1);
 	if (argc == 0) {
-		printf("is %s\n", stb.st_mode&0100 ? gettext("y") : gettext("n"));
+		(void) printf("is %s\n",
+			stb.st_mode&0100 ? gettext("y") : gettext("n"));
 		exit((stb.st_mode&0100) ? 0 : 1);
 	}
 	switch (argv[0][0]) {
@@ -86,9 +92,7 @@ main(argc, argv)
 		break;
 
 	default:
-		fprintf(stderr, gettext("usage: biff [y] [n]\n"));
+		(void) fprintf(stderr, gettext("usage: biff [y] [n]\n"));
 	}
-	exit((stb.st_mode&0100) ? 0 : 1);
-	/* NOTREACHED */
+	return ((stb.st_mode&0100) ? 0 : 1);
 }
-
