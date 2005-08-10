@@ -146,8 +146,6 @@ uint_t px_preserve_mmu_tsb = 1;
  */
 uintptr_t px_kmem_clid = 0;
 
-uint_t px_err_log_all = 0;
-
 uint64_t px_tlu_ue_intr_mask	= PX_ERR_EN_ALL;
 uint64_t px_tlu_ue_log_mask	= PX_ERR_EN_ALL;
 uint64_t px_tlu_ue_count_mask	= PX_ERR_EN_ALL;

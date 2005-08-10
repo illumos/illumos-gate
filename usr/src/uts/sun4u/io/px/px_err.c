@@ -841,9 +841,10 @@ px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
 					    err_bit_desc->class_name);
 			}
 		}
-		/* Log register status */
-		if ((px_err_log_all) || (ss_reg & *log_mask))
-			LOG(DBG_ERR_INTR, rpdip, "<%x>=%16llx %s\n",
+
+		/* Print register status */
+		if (ss_reg & *log_mask)
+			DBG(DBG_ERR_INTR, rpdip, "<%x>=%16llx %s\n",
 			    status_addr, ss_reg, err_reg_tbl->msg);
 
 		/* Clear the register and error */

@@ -112,15 +112,12 @@ typedef enum {	/* same sequence as px_debug_sym[] */
 
 #if defined(DEBUG)
 
-#define	LOG px_dbg
 #define	DBG px_dbg
 extern void px_dbg(px_debug_bit_t bit, dev_info_t *dip, char *fmt, ...);
 
 #else	/* DEBUG */
 
-#define	LOG px_log2ce
 #define	DBG 0 &&
-extern void px_log2ce(px_debug_bit_t bit, dev_info_t *dip, char *fmt, ...);
 
 #endif	/* DEBUG */
 

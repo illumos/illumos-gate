@@ -90,7 +90,6 @@ extern uint_t px_disable_fdvma;
 extern uint_t px_iommu_ctx_lock_failure;
 extern uint_t px_preserve_iommu_tsb;
 extern uintptr_t px_kmem_clid;
-extern uint_t px_err_log_all;
 
 #define	PX_ERR_EN_ALL			-1ull
 #define	PX_ERR_MASK_NONE		0ull
