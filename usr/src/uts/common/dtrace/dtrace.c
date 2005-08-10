@@ -7165,7 +7165,8 @@ dtrace_difo_cacheable(dtrace_difo_t *dp)
 
 	/*
 	 * This DIF object may be cacheable.  Now we need to look for any
-	 * load variant instructions, or any stores to thread-local variables.
+	 * array loading instructions, any memory loading instructions, or
+	 * any stores to thread-local variables.
 	 */
 	for (i = 0; i < dp->dtdo_len; i++) {
 		uint_t op = DIF_INSTR_OP(dp->dtdo_buf[i]);
@@ -7173,7 +7174,7 @@ dtrace_difo_cacheable(dtrace_difo_t *dp)
 		if ((op >= DIF_OP_LDSB && op <= DIF_OP_LDX) ||
 		    (op >= DIF_OP_ULDSB && op <= DIF_OP_ULDX) ||
 		    (op >= DIF_OP_RLDSB && op <= DIF_OP_RLDX) ||
-		    (op == DIF_OP_STTS))
+		    op == DIF_OP_LDGA || op == DIF_OP_STTS)
 			return (0);
 	}
 
@@ -8318,8 +8319,7 @@ dtrace_ecb_action_add(dtrace_ecb_t *ecb, dtrace_actdesc_t *desc)
 			break;
 
 		case DTRACEACT_SPECULATE:
-
-			if (ecb->dte_action != NULL && ecb->dte_size != 0)
+			if (ecb->dte_size > sizeof (dtrace_epid_t))
 				return (EINVAL);
 
 			if (dp == NULL)
