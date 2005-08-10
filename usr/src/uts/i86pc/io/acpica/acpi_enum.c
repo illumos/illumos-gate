@@ -1004,11 +1004,6 @@ acpi_isa_device_enum(dev_info_t *isa_dip)
 
 	if (acpi_enum_debug & ISA_DEVICE_ENUM) {
 		cmn_err(CE_NOTE, "acpi_isa_device_enum() called");
-#ifdef _LP64
-		cmn_err(CE_NOTE, "acpi_enum_debug = %lx\n", acpi_enum_debug);
-#else
-		cmn_err(CE_NOTE, "acpi_enum_debug = %llx\n", acpi_enum_debug);
-#endif
 	}
 
 	if (acpica_init() != AE_OK) {
