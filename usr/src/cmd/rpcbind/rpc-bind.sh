@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,7 @@ case ${RB_OPT} in
 		if [ ! -x /usr/sbin/rpcbind ]
 		then
 			echo "ERROR: /usr/sbin/rpcbind does not exist."
-			return $SMF_EXIT_ERR_CONFIG
+			exit $SMF_EXIT_ERR_CONFIG
 		fi
 
 		[ -d ${RB_DOOR} ] || /usr/bin/mkdir -p -m 1777 ${RB_DOOR}

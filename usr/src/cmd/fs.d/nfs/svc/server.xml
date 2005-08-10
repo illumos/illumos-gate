@@ -107,11 +107,17 @@
 	<!--
 	  The shareall done as part of the nfs-server method may take a
 	  long time, as the contents of dfstab can be arbitrarily large.
-	  Set the timeout appropriately.
+	  Set the timeout appropriately for both 'start' and 'refresh'.
 	-->
 	<exec_method
 	    type='method'
 	    name='start'
+	    exec='/lib/svc/method/nfs-server %m'
+	    timeout_seconds='3600' />
+
+	<exec_method
+	    type='method'
+	    name='refresh'
 	    exec='/lib/svc/method/nfs-server %m'
 	    timeout_seconds='3600' />
 

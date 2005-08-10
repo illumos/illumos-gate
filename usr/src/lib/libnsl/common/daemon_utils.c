@@ -62,7 +62,8 @@ _check_services(char **svcs)
 			continue;
 		if ((s = smf_get_state(*svcs)) != NULL) {
 			if (strcmp(SCF_STATE_STRING_DISABLED, s) == 0)
-				(void) smf_enable_instance(*svcs, 0);
+				(void) smf_enable_instance(*svcs,
+				    SMF_TEMPORARY);
 			free(s);
 		}
 	}

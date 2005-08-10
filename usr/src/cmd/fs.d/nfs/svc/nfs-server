@@ -35,7 +35,7 @@ case "$1" in
 'start')
 	# The NFS server is not supported in a local zone
 	if [ $zone != "global" ] ; then
-		/usr/sbin/svcadm disable svc:/network/nfs/server
+		/usr/sbin/svcadm disable -t svc:/network/nfs/server
 		echo "The NFS server is not supported in a local zone"
 		sleep 5 &
 		exit $SMF_EXIT_OK
@@ -74,11 +74,15 @@ case "$1" in
 		/usr/lib/nfs/mountd
 		/usr/lib/nfs/nfsd
 	else
-		/usr/sbin/svcadm disable svc:/network/nfs/server
+		/usr/sbin/svcadm disable -t svc:/network/nfs/server
 		echo "No NFS filesystems are shared"
 		sleep 5 &
 	fi
 
+	;;
+
+'refresh')
+	/usr/sbin/shareall -F nfs
 	;;
 
 'stop')
@@ -112,8 +116,9 @@ case "$1" in
 	smf_kill_contract $2 TERM 1
 	[ $? -ne 0 ] && exit 1
 	;;
+
 *)
-	echo "Usage: $0 { start | stop }"
+	echo "Usage: $0 { start | stop | refresh }"
 	exit 1
 	;;
 esac
