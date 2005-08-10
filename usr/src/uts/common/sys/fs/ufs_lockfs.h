@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991,1997-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS_FS_UFS_LOCKFS_H
@@ -66,7 +66,8 @@ extern "C" {
  * ul_vnops_cnt will get increment by 1 when a ufs vnodeops is entered;
  * it will be decremented by 1 when a ufs_vnodeops is exited.
  * A file system is in a quiescent state if ufs_vnops_cnt is zero.
- *
+ * Since ufs_pageio() has to change ul_vnops_cnt without using ul_lock
+ * all users of ul_vnops_cnt increment and decrement it via atomic_add_long().
  */
 
 #include <sys/fs/ufs_trans.h>
@@ -188,6 +189,8 @@ struct ulockfs {
 	kthread_id_t	ul_sbowner;	/* thread than can write superblock */
 	struct lockfs	ul_lockfs;	/* ioctl lock struct */
 };
+
+extern ulong_t ufs_quiesce_pend;
 
 #define	VTOUL(VP) \
 	((struct ulockfs *) \

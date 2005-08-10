@@ -53,6 +53,7 @@
 #include <sys/file.h>
 #include <sys/fcntl.h>
 #include <sys/flock.h>
+#include <sys/atomic.h>
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #include <sys/dnlc.h>
@@ -5439,6 +5440,7 @@ ufs_pageio(struct vnode *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 	int contig = 0;
 	int dolock;
 	int vmpss = 0;
+	struct ulockfs *ulp;
 
 	if ((flags & B_READ) && pp != NULL && pp->p_vnode == vp &&
 	    vp->v_mpssdata != NULL) {
@@ -5455,6 +5457,40 @@ ufs_pageio(struct vnode *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 	if ((ufsvfsp = ip->i_ufsvfs) == NULL)
 		return (EIO);
 
+	/*
+	 * For vmpss (pp can be NULL) case respect the quiesce protocol.
+	 * ul_lock must be taken before locking pages so we can't use it here
+	 * if pp is non NULL because segvn already locked pages
+	 * SE_EXCL. Instead we rely on the fact that a forced umount or
+	 * applying a filesystem lock via ufs_fiolfs() will block in the
+	 * implicit call to ufs_flush() until we unlock the pages after the
+	 * return to segvn. Other ufs_quiesce() callers keep ufs_quiesce_pend
+	 * above 0 until they are done. We have to be careful not to increment
+	 * ul_vnops_cnt here after forceful unmount hlocks the file system.
+	 *
+	 * If pp is NULL use ul_lock to make sure we don't increment
+	 * ul_vnops_cnt after forceful unmount hlocks the file system.
+	 */
+	if (vmpss || pp == NULL) {
+		ulp = &ufsvfsp->vfs_ulockfs;
+		if (pp == NULL)
+			mutex_enter(&ulp->ul_lock);
+		if (ulp->ul_fs_lock & ULOCKFS_GETREAD_MASK) {
+			if (pp == NULL) {
+				mutex_exit(&ulp->ul_lock);
+			}
+			return (vmpss ? EIO : EINVAL);
+		}
+		atomic_add_long(&ulp->ul_vnops_cnt, 1);
+		if (pp == NULL)
+			mutex_exit(&ulp->ul_lock);
+		if (ufs_quiesce_pend) {
+			if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
+				cv_broadcast(&ulp->ul_cv);
+			return (vmpss ? EIO : EINVAL);
+		}
+	}
+
 	if (dolock) {
 		/*
 		 * segvn may call VOP_PAGEIO() instead of VOP_GETPAGE() to
@@ -5468,6 +5504,8 @@ ufs_pageio(struct vnode *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 		if (!vmpss) {
 			rw_enter(&ip->i_contents, RW_READER);
 		} else if (!rw_tryenter(&ip->i_contents, RW_READER)) {
+			if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
+				cv_broadcast(&ulp->ul_cv);
 			return (EDEADLK);
 		}
 	}
@@ -5479,6 +5517,8 @@ ufs_pageio(struct vnode *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 	if (vmpss && btopr(io_off + io_len) > btopr(ip->i_size)) {
 		if (dolock)
 			rw_exit(&ip->i_contents);
+		if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
+			cv_broadcast(&ulp->ul_cv);
 		return (EFAULT);
 	}
 
@@ -5490,6 +5530,8 @@ ufs_pageio(struct vnode *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 		}
 		if (dolock)
 			rw_exit(&ip->i_contents);
+		if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
+			cv_broadcast(&ulp->ul_cv);
 		return (err);
 	}
 
@@ -5584,8 +5626,19 @@ ufs_pageio(struct vnode *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 			page_list_concat(&opp, &npp);
 		}
 	}
+
+	if (vmpss && !(ip->i_flag & IACC) && !ULOCKFS_IS_NOIACC(ulp) &&
+	    ufsvfsp->vfs_fs->fs_ronly == 0 && !ufsvfsp->vfs_noatime) {
+		mutex_enter(&ip->i_tlock);
+		ip->i_flag |= IACC;
+		ITIMES_NOLOCK(ip);
+		mutex_exit(&ip->i_tlock);
+	}
+
 	if (dolock)
 		rw_exit(&ip->i_contents);
+	if (vmpss && !atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
+		cv_broadcast(&ulp->ul_cv);
 	return (err);
 }
 

@@ -44,6 +44,7 @@
 #include <sys/file.h>
 #include <sys/fcntl.h>
 #include <sys/flock.h>
+#include <sys/atomic.h>
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #include <sys/conf.h>
@@ -349,6 +350,7 @@ ufs_fiosdio(
 	/* hold the mutex to prevent race with a lockfs request */
 	vfs_lock_wait(vp->v_vfsp);
 	mutex_enter(&ulp->ul_lock);
+	atomic_add_long(&ufs_quiesce_pend, 1);
 
 	if (ULOCKFS_IS_HLOCK(ulp)) {
 		error = EIO;
@@ -392,6 +394,7 @@ out:
 	/*
 	 * we need this broadcast because of the ufs_quiesce call above
 	 */
+	atomic_add_long(&ufs_quiesce_pend, -1);
 	cv_broadcast(&ulp->ul_cv);
 	mutex_exit(&ulp->ul_lock);
 	vfs_unlock(vp->v_vfsp);
@@ -428,6 +431,7 @@ ufs_fioffs(
 	vfs_lock_wait(vp->v_vfsp);
 	/* hold the mutex to prevent race with a lockfs request */
 	mutex_enter(&ulp->ul_lock);
+	atomic_add_long(&ufs_quiesce_pend, 1);
 
 	if (ULOCKFS_IS_HLOCK(ulp)) {
 		error = EIO;
@@ -489,6 +493,7 @@ ufs_fioffs(
 	error = ufs_flush(vp->v_vfsp);
 
 out:
+	atomic_add_long(&ufs_quiesce_pend, -1);
 	cv_broadcast(&ulp->ul_cv);
 	mutex_exit(&ulp->ul_lock);
 	vfs_unlock(vp->v_vfsp);

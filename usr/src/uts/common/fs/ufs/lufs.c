@@ -40,6 +40,7 @@
 #include <sys/fs/ufs_bio.h>
 #include <sys/fs/ufs_fsdir.h>
 #include <sys/debug.h>
+#include <sys/atomic.h>
 #include <sys/kmem.h>
 #include <sys/inttypes.h>
 #include <sys/vfs.h>
@@ -829,6 +830,7 @@ lufs_disable(vnode_t *vp, struct fiolog *flp)
 	vfs_lock_wait(ufsvfsp->vfs_vfs);
 	ulp = &ufsvfsp->vfs_ulockfs;
 	mutex_enter(&ulp->ul_lock);
+	atomic_add_long(&ufs_quiesce_pend, 1);
 	(void) ufs_quiesce(ulp);
 
 	(void) ufs_flush(ufsvfsp->vfs_vfs);
@@ -841,6 +843,7 @@ lufs_disable(vnode_t *vp, struct fiolog *flp)
 	 */
 	(void) lufs_unsnarf(ufsvfsp);
 
+	atomic_add_long(&ufs_quiesce_pend, -1);
 	mutex_exit(&ulp->ul_lock);
 	vfs_setmntopt(ufsvfsp->vfs_vfs, MNTOPT_NOLOGGING, NULL, 0);
 	vfs_unlock(ufsvfsp->vfs_vfs);
@@ -1032,6 +1035,7 @@ recheck:
 	vfs_setmntopt(vfsp, MNTOPT_LOGGING, NULL, 0);
 	ulp = &ufsvfsp->vfs_ulockfs;
 	mutex_enter(&ulp->ul_lock);
+	atomic_add_long(&ufs_quiesce_pend, 1);
 	(void) ufs_quiesce(ulp);
 
 	TRANS_DOMATAMAP(ufsvfsp);
@@ -1046,6 +1050,7 @@ recheck:
 	} else
 		fs->fs_reclaim |= reclaim;
 
+	atomic_add_long(&ufs_quiesce_pend, -1);
 	mutex_exit(&ulp->ul_lock);
 	vfs_unlock(vfsp);
 

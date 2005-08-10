@@ -56,6 +56,7 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
+#include <sys/atomic.h>
 #include <sys/uio.h>
 #include <sys/dkio.h>
 #include <sys/cred.h>
@@ -561,6 +562,7 @@ remountfs(struct vfs *vfsp, dev_t dev, void *raw_argsp, int args_len)
 	 * synchronize w/ufs ioctls
 	 */
 	mutex_enter(&ulp->ul_lock);
+	atomic_add_long(&ufs_quiesce_pend, 1);
 
 	/*
 	 * reset options
@@ -714,6 +716,7 @@ remountfs(struct vfs *vfsp, dev_t dev, void *raw_argsp, int args_len)
 	fsp->fs_fmod = 0;
 	fsp->fs_ronly = 0;
 
+	atomic_add_long(&ufs_quiesce_pend, -1);
 	cv_broadcast(&ulp->ul_cv);
 	mutex_exit(&ulp->ul_lock);
 
@@ -742,6 +745,7 @@ remountfs(struct vfs *vfsp, dev_t dev, void *raw_argsp, int args_len)
 remounterr:
 	if (tpt)
 		brelse(tpt);
+	atomic_add_long(&ufs_quiesce_pend, -1);
 	cv_broadcast(&ulp->ul_cv);
 	mutex_exit(&ulp->ul_lock);
 	return (error);
@@ -1395,6 +1399,7 @@ ufs_unmount(struct vfs *vfsp, int fflag, struct cred *cr)
 		 * hard lock it before unmounting.
 		 */
 		if (!ULOCKFS_IS_HLOCK(ulp)) {
+			atomic_add_long(&ufs_quiesce_pend, 1);
 			lockfs.lf_lock = LOCKFS_HLOCK;
 			lockfs.lf_flags = 0;
 			lockfs.lf_key = ulp->ul_lockfs.lf_key + 1;
@@ -1406,6 +1411,7 @@ ufs_unmount(struct vfs *vfsp, int fflag, struct cred *cr)
 			(void) ufs_quiesce(ulp);
 			(void) ufs_flush(vfsp);
 			(void) ufs_thaw(vfsp, ufsvfsp, ulp);
+			atomic_add_long(&ufs_quiesce_pend, -1);
 			ULOCKFS_CLR_BUSY(ulp);
 			LOCKFS_CLR_BUSY(&ulp->ul_lockfs);
 			poll_events |= POLLERR;
@@ -2110,6 +2116,7 @@ ufs_remountroot(struct vfs *vfsp)
 	ulp = &ufsvfsp->vfs_ulockfs;
 
 	mutex_enter(&ulp->ul_lock);
+	atomic_add_long(&ufs_quiesce_pend, 1);
 
 	(void) ufs_quiesce(ulp);
 	(void) ufs_flush(vfsp);
@@ -2233,6 +2240,7 @@ ufs_remountroot(struct vfs *vfsp)
 	rootdev = new_rootdev;
 	rootvp = new_rootvp;
 
+	atomic_add_long(&ufs_quiesce_pend, -1);
 	cv_broadcast(&ulp->ul_cv);
 	mutex_exit(&ulp->ul_lock);
 

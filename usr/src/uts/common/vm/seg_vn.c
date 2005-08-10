@@ -4332,17 +4332,6 @@ top:
 	}
 
 	/*
-	 * S_READ_NOCOW vs S_READ distinction was
-	 * only needed for the code above. After
-	 * that we treat it as S_READ.
-	 */
-	if (rw == S_READ_NOCOW) {
-		ASSERT(type == F_SOFTLOCK);
-		ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
-		rw = S_READ;
-	}
-
-	/*
 	 * Check to see if we need to allocate an anon_map structure.
 	 */
 	if (svd->amp == NULL && (svd->vp == NULL || brkcow)) {
@@ -4365,6 +4354,17 @@ top:
 		 * may have changed after we dropped the "read" lock.
 		 */
 		goto top;
+	}
+
+	/*
+	 * S_READ_NOCOW vs S_READ distinction was
+	 * only needed for the code above. After
+	 * that we treat it as S_READ.
+	 */
+	if (rw == S_READ_NOCOW) {
+		ASSERT(type == F_SOFTLOCK);
+		ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+		rw = S_READ;
 	}
 
 	amp = svd->amp;

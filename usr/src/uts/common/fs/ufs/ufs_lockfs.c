@@ -44,6 +44,7 @@
 #include <sys/file.h>
 #include <sys/fcntl.h>
 #include <sys/flock.h>
+#include <sys/atomic.h>
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #include <sys/conf.h>
@@ -221,6 +222,15 @@ ufs_freeze(struct ulockfs *ulp, struct lockfs *lockfsp)
 }
 
 /*
+ * All callers of ufs_quiesce() atomically increment ufs_quiesce_pend before
+ * starting ufs_quiesce() protocol and decrement it only when a file system no
+ * longer has to be in quiescent state. This allows ufs_pageio() to detect
+ * that another thread wants to quiesce a file system. See more comments in
+ * ufs_pageio().
+ */
+ulong_t ufs_quiesce_pend = 0;
+
+/*
  * ufs_quiesce
  *	wait for outstanding accesses to finish
  */
@@ -234,10 +244,16 @@ ufs_quiesce(struct ulockfs *ulp)
 	 * this lockfs request will not be starved
 	 */
 	ULOCKFS_SET_SLOCK(ulp);
+	ASSERT(ufs_quiesce_pend);
 
 	/* check if there is any outstanding ufs vnodeops calls */
 	while (ulp->ul_vnops_cnt)
-		if (!cv_wait_sig(&ulp->ul_cv, &ulp->ul_lock)) {
+		/*
+		 * use timed version of cv_wait_sig() to make sure we don't
+		 * miss a wake up call from ufs_pageio() when it doesn't use
+		 * ul_lock.
+		 */
+		if (!cv_timedwait_sig(&ulp->ul_cv, &ulp->ul_lock, lbolt + hz)) {
 			error = EINTR;
 			goto out;
 		}
@@ -839,6 +855,7 @@ ufs__fiolfs(
 	 */
 	vfs_lock_wait(vfsp);
 	mutex_enter(&ulp->ul_lock);
+	atomic_add_long(&ufs_quiesce_pend, 1);
 
 	/*
 	 * Quit if there is another lockfs request in progress
@@ -1048,6 +1065,7 @@ ufs__fiolfs(
 		    ulp->ul_lockfs.lf_comment && ulp->ul_lockfs.lf_comlen > 0 ?
 		    ulp->ul_lockfs.lf_comment: "user-applied error lock");
 
+	atomic_add_long(&ufs_quiesce_pend, -1);
 	mutex_exit(&ulp->ul_lock);
 	vfs_unlock(vfsp);
 
@@ -1078,6 +1096,7 @@ errout:
 	LOCKFS_CLR_BUSY(&ulp->ul_lockfs);
 
 errexit:
+	atomic_add_long(&ufs_quiesce_pend, -1);
 	mutex_exit(&ulp->ul_lock);
 	vfs_unlock(vfsp);
 
@@ -1163,7 +1182,7 @@ ufs_check_lockfs(struct ufsvfs *ufsvfsp, struct ulockfs *ulp, ulong_t mask)
 				return (EINTR);
 		}
 	}
-	ulp->ul_vnops_cnt++;
+	atomic_add_long(&ulp->ul_vnops_cnt, 1);
 	return (0);
 }
 
@@ -1229,7 +1248,7 @@ ufs_lockfs_begin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 	 */
 	mutex_enter(&ulp->ul_lock);
 	if (ULOCKFS_IS_JUSTULOCK(ulp))
-		ulp->ul_vnops_cnt++;
+		atomic_add_long(&ulp->ul_vnops_cnt, 1);
 	else {
 		if (error = ufs_check_lockfs(ufsvfsp, ulp, mask)) {
 			mutex_exit(&ulp->ul_lock);
@@ -1307,7 +1326,7 @@ ufs_lockfs_end(struct ulockfs *ulp)
 
 	mutex_enter(&ulp->ul_lock);
 
-	if (--ulp->ul_vnops_cnt == 0)
+	if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
 		cv_broadcast(&ulp->ul_cv);
 
 	mutex_exit(&ulp->ul_lock);
@@ -1372,7 +1391,7 @@ ufs_lockfs_begin_getpage(
 		/*
 		 * fs is not locked, simply inc the active-ops counter
 		 */
-		ulp->ul_vnops_cnt++;
+		atomic_add_long(&ulp->ul_vnops_cnt, 1);
 	else {
 		if (seg->s_ops == &segvn_ops &&
 		    ((struct segvn_data *)seg->s_data)->type != MAP_SHARED) {
