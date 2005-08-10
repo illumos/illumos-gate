@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,7 @@ extern int pfil_msg(uint32_t, void *, size_t);
  * used in the kernel and in the /dev/pfil messages.
  */
 
-static struct spannode {
+struct spannode {
 	struct spannode *next;
 	union {
 		struct pfil_v4span v4;
@@ -88,7 +88,7 @@ static struct spannode {
 	} span;
 };
 
-static struct addrset {
+struct addrset {
 	const char *name;
 	uint8_t af;
 	struct spannode *head;
