@@ -877,11 +877,11 @@ sysexit(private_t *pri, int dotrace)
 		 * If buffer contents for read or write have been requested and
 		 * this is a readv() or writev(), force verbose interpretation.
 		 */
-/* XXX add SYS_sendmsg and SYS_recvmsg */
 		if (prismember(&verbose, what) ||
-		    (what == SYS_readv && pri->Errno == 0 &&
-		    prismember(&readfd, fdp1)) ||
-		    ((what == SYS_writev || what == SYS_sendfilev) &&
+		    ((what == SYS_readv || what == SYS_recvmsg) &&
+		    pri->Errno == 0 && prismember(&readfd, fdp1)) ||
+		    ((what == SYS_writev || what == SYS_sendfilev ||
+		    what == SYS_sendmsg) &&
 		    prismember(&writefd, fdp1)))
 			expound(pri, pri->Rval1, raw);
 	}

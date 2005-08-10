@@ -3542,14 +3542,33 @@ show_sockaddr(private_t *pri,
 void
 show_msghdr(private_t *pri, long offset)
 {
+	const lwpstatus_t *Lsp = pri->lwpstat;
+	int what = Lsp->pr_what;
+	int err = pri->Errno;
 	struct msghdr msg;
+	int showbuf = FALSE;
+	int i = pri->sys_args[0]+1;
+	long nb = (what == SYS_recvmsg)? pri->Rval1 : 32*1024;
 
 	if (Pread(Proc, &msg, sizeof (msg), offset) != sizeof (msg))
 		return;
+
 	if (msg.msg_name != NULL && msg.msg_namelen != 0)
 		show_sockaddr(pri, "msg_name",
 			(long)msg.msg_name, 0, (long)msg.msg_namelen);
-	/* XXX add msg_iov printing */
+
+	/*
+	 * Print the iovec if the syscall was successful and the fd is
+	 * part of the set being traced.
+	 */
+	if ((what == SYS_recvmsg && !err &&
+	    prismember(&readfd, i)) ||
+	    (what == SYS_sendmsg &&
+	    prismember(&writefd, i)))
+		showbuf = TRUE;
+
+	show_iovec(pri, (long)msg.msg_iov, msg.msg_iovlen, showbuf, nb);
+
 }
 
 #ifdef _LP64
@@ -3558,15 +3577,35 @@ show_msghdr32(private_t *pri, long offset)
 {
 	struct msghdr32 {
 		caddr32_t	msg_name;
-		int32_t		msg_namelen;
+		uint32_t	msg_namelen;
+		caddr32_t 	msg_iov;
+		int32_t		msg_iovlen;
 	} msg;
+	const lwpstatus_t *Lsp = pri->lwpstat;
+	int what = Lsp->pr_what;
+	int err = pri->Errno;
+	int showbuf = FALSE;
+	int i = pri->sys_args[0]+1;
+	long nb = (what == SYS_recvmsg)? pri->Rval1 : 32*1024;
 
 	if (Pread(Proc, &msg, sizeof (msg), offset) != sizeof (msg))
 		return;
+
 	if (msg.msg_name != NULL && msg.msg_namelen != 0)
 		show_sockaddr(pri, "msg_name",
 			(long)msg.msg_name, 0, (long)msg.msg_namelen);
-	/* XXX add msg_iov printing */
+	/*
+	 * Print the iovec if the syscall was successful and the fd is
+	 * part of the set being traced.
+	 */
+	if ((what == SYS_recvmsg && !err &&
+	    prismember(&readfd, i)) ||
+	    (what == SYS_sendmsg &&
+	    prismember(&writefd, i)))
+		showbuf = TRUE;
+
+	show_iovec32(pri, (long)msg.msg_iov, msg.msg_iovlen, showbuf, nb);
+
 }
 #endif	/* _LP64 */
 
@@ -4766,7 +4805,7 @@ expound(private_t *pri, long r0, int raw)
 			break;
 		/* FALLTHROUGH */
 	case SYS_sendmsg:
-		if (pri->sys_nargs <= 1)
+		if (pri->sys_nargs <= 2)
 			break;
 #ifdef _LP64
 		if (lp64)
