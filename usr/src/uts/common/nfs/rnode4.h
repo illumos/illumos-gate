@@ -315,7 +315,6 @@ typedef struct rnode4 {
 	fattr4_fileid	r_mntd_fid;	/* mounted on fileid attr	  */
 	kthread_t	*r_serial;	/* attrcache validation thread */
 	kthread_t	*r_pgflush;	/* thread flushing page cache */
-	avl_node_t	r_fileid_map;	/* map fileids to extant rnodes */
 	list_t		r_indelmap;	/* list of delmap callers */
 	fattr4_fsid	r_srv_fsid;	/* fsid of srv fs containing object */
 					/* when rnode created; compare with */
@@ -348,7 +347,6 @@ typedef struct rnode4 {
 #define	R4ISXATTR	0x20000	/* rnode is a named attribute */
 #define	R4DELMAPLIST	0x40000	/* delmap callers tracked for as callback */
 #define	R4PGFLUSH	0x80000	/* page flush thread active */
-#define	R4FILEIDMAP	0x100000 /* rnode is in fileid map */
 #define	R4LOOKUP	0x200000 /* a lookup has been done in the directory */
 /*
  * Convert between vnode and rnode
@@ -385,9 +383,6 @@ extern void	rp4_addhash(rnode4_t *);
 extern void	rp4_rmhash(rnode4_t *);
 extern void	rp4_rmhash_locked(rnode4_t *);
 extern int	rtable4hash(nfs4_sharedfh_t *);
-extern void	rp4_fileid_map_init(avl_tree_t *);
-extern void	rp4_fileid_map_remove(rnode4_t *);
-extern void	destroy_fileid_map(struct vfs *);
 
 extern vnode_t *makenfs4node(nfs4_sharedfh_t *, nfs4_ga_res_t *, struct vfs *,
 				hrtime_t, cred_t *, vnode_t *, nfs4_fname_t *);

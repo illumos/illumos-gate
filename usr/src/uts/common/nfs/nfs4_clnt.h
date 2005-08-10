@@ -986,15 +986,6 @@ typedef struct mntinfo4 {
 	 */
 	nfs_rwlock_t			mi_fh_lock;
 	avl_tree_t			mi_filehandles;
-	/*
-	 * fileid map
-	 *
-	 * Used on servers with volatile filehandles, to check for
-	 * pre-existing rnodes with a given fileid, before we create
-	 * another rnode for the same file on the server.
-	 */
-	kmutex_t			mi_fileid_lock;
-	avl_tree_t			mi_fileid_map;
 
 	/*
 	 * Debug message queue.

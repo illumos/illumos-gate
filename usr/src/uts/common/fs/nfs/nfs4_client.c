@@ -2994,7 +2994,6 @@ nfs_free_mi4(mntinfo4_t *mi)
 	mutex_destroy(&mi->mi_lock);
 	mutex_destroy(&mi->mi_async_lock);
 	mutex_destroy(&mi->mi_msg_list_lock);
-	mutex_destroy(&mi->mi_fileid_lock);
 	nfs_rw_destroy(&mi->mi_recovlock);
 	nfs_rw_destroy(&mi->mi_rename_lock);
 	nfs_rw_destroy(&mi->mi_fh_lock);
@@ -3034,7 +3033,6 @@ nfs_free_mi4(mntinfo4_t *mi)
 	list_destroy(&mi->mi_bseqid_list);
 	list_destroy(&mi->mi_lost_state);
 	avl_destroy(&mi->mi_filehandles);
-	avl_destroy(&mi->mi_fileid_map);
 	fn_rele(&mi->mi_fname);
 	nfs4_mi_zonelist_remove(mi);
 	zone_rele(mi->mi_zone);

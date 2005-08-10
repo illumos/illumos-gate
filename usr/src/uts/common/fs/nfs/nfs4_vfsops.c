@@ -785,8 +785,6 @@ errout:
 			rp = VTOR4(rtvp);
 			if (rp->r_flags & R4HASHED)
 				rp4_rmhash(rp);
-			if (rp->r_flags & R4FILEIDMAP)
-				rp4_fileid_map_remove(rp);
 		}
 		if (mi != NULL) {
 			nfs4_async_stop(vfsp);
@@ -1719,12 +1717,6 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	mi->mi_fname = fn_get(NULL, ".");
 
 	/*
-	 * Initialize the fileid map.
-	 */
-	mutex_init(&mi->mi_fileid_lock, NULL, MUTEX_DEFAULT, NULL);
-	rp4_fileid_map_init(&mi->mi_fileid_map);
-
-	/*
 	 * Save server path we're attempting to mount.
 	 */
 	(void) nfs_rw_enter_sig(&svp->sv_lock, RW_WRITER, 0);
@@ -1926,8 +1918,6 @@ bad:
 		rp = VTOR4(rtvp);
 		if (rp->r_flags & R4HASHED)
 			rp4_rmhash(rp);
-		if (rp->r_flags & R4FILEIDMAP)
-			rp4_fileid_map_remove(rp);
 		VN_RELE(rtvp);
 	}
 	nfs4_async_stop(vfsp);
@@ -2017,7 +2007,6 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	 * rnode hash queues and purge any resources allocated to
 	 * them.
 	 */
-	destroy_fileid_map(vfsp);
 	destroy_rtable4(vfsp, cr);
 	vfsp->vfs_flag |= VFS_UNMOUNTED;
 	nfs4_remove_mi_from_server(mi, NULL);
@@ -3619,7 +3608,6 @@ nfs4_free_mount(vfs_t *vfsp, cred_t *cr)
 	 */
 	nfs4_async_manager_stop(vfsp);
 
-	destroy_fileid_map(vfsp);
 	destroy_rtable4(vfsp, cr);
 
 	nfs4_remove_mi_from_server(mi, NULL);

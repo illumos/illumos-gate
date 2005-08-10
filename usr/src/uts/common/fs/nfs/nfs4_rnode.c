@@ -120,7 +120,7 @@
  * The lock ordering is:
  *
  *	hash bucket lock -> vnode lock
- *	hash bucket lock -> freelist lock -> mi_fileid_lock -> r_statelock
+ *	hash bucket lock -> freelist lock -> r_statelock
  */
 r4hashq_t *rtable4;
 
@@ -138,7 +138,6 @@ static vnode_t	*make_rnode4(nfs4_sharedfh_t *, r4hashq_t *, struct vfs *,
 		    int (*)(vnode_t *, page_t *, u_offset_t *, size_t *, int,
 		    cred_t *),
 		    int *, cred_t *);
-static vnode_t	*nfs4fidcollide(rnode4_t *, mntinfo4_t *);
 static void	rp4_rmfree(rnode4_t *);
 int		nfs4_free_data_reclaim(rnode4_t *);
 static int	nfs4_active_data_reclaim(rnode4_t *);
@@ -149,8 +148,6 @@ static void	nfs4_reclaim(void *);
 static int	isrootfh(nfs4_sharedfh_t *, rnode4_t *);
 static void	uninit_rnode4(rnode4_t *);
 static void	destroy_rnode4(rnode4_t *);
-static int	rp4_fileid_cmp(const void *, const void *);
-
 
 #ifdef DEBUG
 static int r4_check_for_dups = 0; /* Flag to enable dup rnode detection. */
@@ -158,7 +155,6 @@ static int nfs4_rnode_debug = 0;
 /* if nonzero, kmem_cache_free() rnodes rather than place on freelist */
 static int nfs4_rnode_nofreelist = 0;
 /* give messages on colliding shared filehandles */
-static int nfs4_fidcollide_debug = 0;
 static void	r4_dup_check(rnode4_t *, vfs_t *);
 #endif
 
@@ -298,67 +294,6 @@ badrootfh_check(nfs4_sharedfh_t *fh, nfs4_fname_t *nm, mntinfo4_t *mi,
 
 	kmem_free(s, MAXNAMELEN);
 	return (fh);
-}
-
-/*
- * If we have volatile filehandles that may be expired while
- * a file is held open, we need to check to see if this new
- * rnode has the same fileid as an existing rnode.  If so,
- * then we drop this rnode and start again with the other
- * filehandle.
- */
-vnode_t *
-shfh_collide_check(vnode_t *vp, vnode_t **badvp, mntinfo4_t *mi,
-			nfs4_ga_res_t *garp)
-{
-	*badvp = NULL;
-
-	if (((mi->mi_fh_expire_type &
-	    (FH4_VOLATILE_ANY |
-		FH4_VOL_MIGRATION |
-		FH4_VOL_RENAME)) != 0) &&
-	    ((mi->mi_fh_expire_type & FH4_NOEXPIRE_WITH_OPEN) == 0)) {
-		rnode4_t *rp = VTOR4(vp);
-		vnode_t *tmpvp;
-
-		if (! (rp->r_attr.va_mask & AT_NODEID)) {
-			/*
-			 * if the rnode doesn't have its nodeid cached,
-			 * try to get it from the garp.
-			 */
-			if (garp != NULL) {
-				rp->r_attr.va_nodeid = garp->n4g_va.va_nodeid;
-				rp->r_attr.va_mask |= AT_NODEID;
-			}
-		}
-		if (rp->r_attr.va_mask & AT_NODEID) {
-			mutex_enter(&mi->mi_fileid_lock);
-			tmpvp = nfs4fidcollide(rp, mi);
-			mutex_exit(&mi->mi_fileid_lock);
-			if (tmpvp != NULL) {
-				/*
-				 * We got a collision.
-				 * badvp needs to be released, but not until
-				 * after we drop the hash bucket lock.
-				 * tmpvp is returned held.
-				 */
-				*badvp = vp;
-				vp = tmpvp;
-			}
-		} else if (! (vp->v_flag & VROOT)) {
-			/*
-			 * Don't issue a warning for the root, because when
-			 * we're creating the rootvp at mount time, we never
-			 * have the fileid.
-			 */
-			NFS4_DEBUG(nfs4_fidcollide_debug,
-			    (CE_NOTE, "rp %p: "
-				"cannot get fileid for duplicate check",
-				(void *) rp));
-		}
-	}
-
-	return (vp);
 }
 
 void
@@ -510,7 +445,6 @@ makenfs4node(nfs4_sharedfh_t *fh, nfs4_ga_res_t *garp, struct vfs *vfsp,
 	hrtime_t t, cred_t *cr, vnode_t *dvp, nfs4_fname_t *nm)
 {
 	vnode_t *vp;
-	vnode_t *badvp = NULL;
 	int newnode;
 	int index;
 	mntinfo4_t *mi = VFTOMI4(vfsp);
@@ -530,41 +464,7 @@ makenfs4node(nfs4_sharedfh_t *fh, nfs4_ga_res_t *garp, struct vfs *vfsp,
 	vp = make_rnode4(fh, &rtable4[index], vfsp, nfs4_vnodeops,
 	    nfs4_putapage, &newnode, cr);
 
-	/*
-	 * Check for shared filehandle collisions.  This only applies
-	 * to servers with volatile filehandles.
-	 */
-	vp = shfh_collide_check(vp, &badvp, mi, garp);
 	rp = VTOR4(vp);
-	/* If we had a shfh collision... */
-	if (badvp != NULL) {
-		int newindex;
-		nfs4_fname_t *tname = nm;
-		fn_hold(tname);
-
-		/*
-		 * We must activate the shadow vnode, even though the
-		 * rnode will be short-lived.  This is because other
-		 * things, especially things in inactive,
-		 *  assume that sv_dfh and sv_name are non-NULL.
-		 */
-		sv_activate(&badvp, dvp, &tname, newnode);
-
-		/*
-		 * Since the vnode we're replacing badvp with already
-		 * exists, it's not a newnode.
-		 */
-		newnode = 0;
-
-		/* check to see if we need a different hashq lock */
-		newindex = rtable4hash(rp->r_fh);
-		if (newindex != index) {
-			rw_exit(&rtable4[index].r_lock);
-			rw_enter(&rtable4[newindex].r_lock, RW_READER);
-			index = newindex;
-		}
-	}
-
 	sv_activate(&vp, dvp, &nm, newnode);
 	if (dvp->v_flag & V_XATTRDIR) {
 		mutex_enter(&rp->r_statelock);
@@ -575,9 +475,6 @@ makenfs4node(nfs4_sharedfh_t *fh, nfs4_ga_res_t *garp, struct vfs *vfsp,
 	/* if getting a bad file handle, do not cache the attributes. */
 	if (had_badfh) {
 		rw_exit(&rtable4[index].r_lock);
-		if (badvp != NULL) {
-			VN_RELE(badvp);
-		}
 		return (vp);
 	}
 
@@ -585,59 +482,7 @@ makenfs4node(nfs4_sharedfh_t *fh, nfs4_ga_res_t *garp, struct vfs *vfsp,
 	r4_do_attrcache(vp, garp, newnode, t, cr, index);
 	ASSERT(rw_owner(&rtable4[index].r_lock) != curthread);
 
-	/*
-	 * If a shared filehandle collision occured, release the newly
-	 * created rnode (in favor of the extant one).
-	 */
-	if (badvp != NULL) {
-		VN_RELE(badvp);
-	}
-
 	return (vp);
-}
-
-/*
- * Detect if there are any extant rnodes with the same fileid.  If
- * not, store this rnode in the table.
- *
- * Only call this if r_attr.va_nodeid is set with the correct fileid.
- *
- * Returns NULL if no collision; otherwise, returns the extant vnode that
- * has the same fileid as the one passed in.  The vnode is returned
- * held.
- */
-
-vnode_t *
-nfs4fidcollide(rnode4_t *rp, mntinfo4_t *mi)
-{
-	avl_index_t where;
-	rnode4_t *conflict;
-	vnode_t *rvp;
-
-	ASSERT(RW_LOCK_HELD(&rp->r_hashq->r_lock));
-	ASSERT(MUTEX_HELD(&mi->mi_fileid_lock));
-	ASSERT(rp->r_attr.va_mask & AT_NODEID);
-
-	conflict = avl_find(&mi->mi_fileid_map, rp, &where);
-
-	if (conflict == rp)
-		return (NULL);
-
-	if (conflict == NULL) {
-		avl_insert(&mi->mi_fileid_map,
-		    rp, where);
-		mutex_enter(&rp->r_statelock);
-		rp->r_flags |= R4FILEIDMAP;
-		mutex_exit(&rp->r_statelock);
-		return (NULL);
-	}
-
-	NFS4_DEBUG(nfs4_fidcollide_debug, (CE_NOTE,
-	    "nfs4fidcollide: fileid %lld remapping to rnode %p",
-	    rp->r_attr.va_nodeid, (void *) conflict));
-	rvp = RTOV4(conflict);
-	VN_HOLD(rvp);
-	return (rvp);
 }
 
 /*
@@ -691,8 +536,6 @@ start:
 
 		vp = RTOV4(rp);
 
-		if (rp->r_flags & R4FILEIDMAP)
-			rp4_fileid_map_remove(rp);
 		if (rp->r_flags & R4HASHED) {
 			rw_enter(&rp->r_hashq->r_lock, RW_WRITER);
 			mutex_enter(&vp->v_lock);
@@ -818,7 +661,6 @@ uninit_rnode4(rnode4_t *rp)
 	ASSERT(rp->r_lo_head.lo_next_rnode == &rp->r_lo_head);
 	ASSERT(rp->r_lo_head.lo_prev_rnode == &rp->r_lo_head);
 	ASSERT(!(rp->r_flags & R4HASHED));
-	ASSERT(!(rp->r_flags & R4FILEIDMAP));
 	ASSERT(rp->r_freef == NULL && rp->r_freeb == NULL);
 	nfs4_clear_open_streams(rp);
 	list_destroy(&rp->r_open_streams);
@@ -875,8 +717,6 @@ rp4_addfree(rnode4_t *rp, cred_t *cr)
 #endif
 	    rp->r_error || (rp->r_flags & R4RECOVERR) ||
 	    (vfsp->vfs_flag & VFS_UNMOUNTED)) && rp->r_count == 0)) {
-		if (rp->r_flags & R4FILEIDMAP)
-			rp4_fileid_map_remove(rp);
 		if (rp->r_flags & R4HASHED) {
 			rw_enter(&rp->r_hashq->r_lock, RW_WRITER);
 			mutex_enter(&vp->v_lock);
@@ -920,16 +760,6 @@ rp4_addfree(rnode4_t *rp, cred_t *cr)
 		 * either destroying the rnode or placing it on the
 		 * rnode freelist.  If there are no other references,
 		 * then the rnode may be safely destroyed.
-		 *
-		 * Another way for a reference to be acquired
-		 * is through the mi_fileid_map, which is used for
-		 * detecting and correcting shared fh collisions.
-		 * A race between this thread and the one using
-		 * mi_fileid_map would have blocked us, above, when
-		 * we called rp4_fileid_map_removed, and needed the
-		 * mi_fileid_lock mutex.  By the time the other thread
-		 * released that mutex, it would have done a VN_HOLD(),
-		 * which we check for here.
 		 */
 		mutex_enter(&vp->v_lock);
 		if (vp->v_count > 1) {
@@ -1112,70 +942,6 @@ rp4_rmhash(rnode4_t *rp)
 	rw_enter(&rp->r_hashq->r_lock, RW_WRITER);
 	rp4_rmhash_locked(rp);
 	rw_exit(&rp->r_hashq->r_lock);
-}
-
-/*
- * fileid map routines
- */
-
-void
-rp4_fileid_map_init(avl_tree_t *map)
-{
-	avl_create(map, rp4_fileid_cmp, sizeof (rnode4_t),
-	    offsetof(rnode4_t, r_fileid_map));
-}
-
-int
-rp4_fileid_cmp(const void *p1, const void *p2)
-{
-	const rnode4_t *rp1 = (const rnode4_t *) p1;
-	const rnode4_t *rp2 = (const rnode4_t *) p2;
-
-	if (rp1->r_attr.va_nodeid < rp2->r_attr.va_nodeid)
-		return (-1);
-	if (rp1->r_attr.va_nodeid > rp2->r_attr.va_nodeid)
-		return (1);
-	return (0);
-}
-
-void
-rp4_fileid_map_remove(rnode4_t *rp)
-{
-	mntinfo4_t *mi = VTOMI4(RTOV4(rp));
-	ASSERT(rp->r_flags & R4FILEIDMAP);
-
-	mutex_enter(&mi->mi_fileid_lock);
-	mutex_enter(&rp->r_statelock);
-	avl_remove(&mi->mi_fileid_map, rp);
-	rp->r_flags &= ~R4FILEIDMAP;
-	mutex_exit(&rp->r_statelock);
-	mutex_exit(&mi->mi_fileid_lock);
-}
-
-void
-destroy_fileid_map(struct vfs *vfsp)
-{
-	mntinfo4_t *mi;
-	rnode4_t *rp;
-	void *cookie = NULL;
-
-	if (vfsp == NULL)
-		return;
-
-	mi = VFTOMI4(vfsp);
-
-	/*
-	 * We cannot assert that any locks (e.g. hash bucket, free list) are
-	 * held.
-	 */
-
-	mutex_enter(&mi->mi_fileid_lock);
-	while ((rp = avl_destroy_nodes(&mi->mi_fileid_map, &cookie)) != NULL) {
-		mutex_enter(&rp->r_statelock);
-		rp->r_flags &= ~R4FILEIDMAP;
-		mutex_exit(&rp->r_statelock);
-	}
-	mutex_exit(&mi->mi_fileid_lock);
 }
 
 /*
@@ -1694,8 +1460,6 @@ nfs4_rnode_reclaim(void)
 	while ((rp = rp4freelist) != NULL) {
 		rp4_rmfree(rp);
 		mutex_exit(&rp4freelist_lock);
-		if (rp->r_flags & R4FILEIDMAP)
-			rp4_fileid_map_remove(rp);
 		if (rp->r_flags & R4HASHED) {
 			vp = RTOV4(rp);
 			rw_enter(&rp->r_hashq->r_lock, RW_WRITER);
