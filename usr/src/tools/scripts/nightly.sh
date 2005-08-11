@@ -325,6 +325,9 @@ build() {
 	NOISE=noise${SUFFIX}-${MACH}
 	CPIODIR=${CPIODIR_ORIG}${SUFFIX}
 	PKGARCHIVE=${PKGARCHIVE_ORIG}${SUFFIX}
+	if [ "$SPARC_RM_PKGARCHIVE_ORIG" ]; then
+		SPARC_RM_PKGARCHIVE=${SPARC_RM_PKGARCHIVE_ORIG}${SUFFIX}
+	fi
 
 	#remove old logs
 	OLDINSTALLOG=install${SUFFIX}
@@ -505,6 +508,17 @@ build() {
 		echo "Clearing out $PKGARCHIVE ..." >> $LOGFILE
 		rm -rf $PKGARCHIVE
 		mkdir -p $PKGARCHIVE
+
+		#
+		# Optional build of sparc realmode on i386
+		#
+		if [ "$MACH" = "i386" ] && [ "${SPARC_RM_PKGARCHIVE}" ]; then
+			echo "Clearing out ${SPARC_RM_PKGARCHIVE} ..." \
+				>> $LOGFILE
+			rm -rf ${SPARC_RM_PKGARCHIVE}
+			mkdir -p ${SPARC_RM_PKGARCHIVE}
+		fi
+
 		cd $SRC/pkgdefs
 		$MAKE -e install 2>&1 | \
 			tee -a $SRC/pkgdefs/${INSTALLOG}.out >> $LOGFILE
@@ -1320,7 +1334,9 @@ export ENVLDLIBS1 ENVLDLIBS2
 CPIODIR_ORIG=$CPIODIR
 PKGARCHIVE_ORIG=$PKGARCHIVE
 IA32_IHV_PKGS_ORIG=$IA32_IHV_PKGS
-SPARC_RM_PKGARCHIVE_ORIG=$SPARC_RM_PKGARCHIVE
+if [ "$SPARC_RM_PKGARCHIVE" ]; then
+	SPARC_RM_PKGARCHIVE_ORIG=$SPARC_RM_PKGARCHIVE
+fi
 
 #
 # Juggle the logs and optionally send mail on completion.

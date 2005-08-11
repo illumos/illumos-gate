@@ -24,22 +24,19 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
 
-include ../Makefile.com
+#!search <pathname pathname ...>	# where to find pkg objects
+#!include <filename>			# include another 'prototype' file
+#!default <mode> <owner> <group>	# default used if not specified on entry
+#!<param>=<value>			# puts parameter in pkg environment
 
-.KEEP_STATE:
+!include prototype_com
 
-all: $(FILES)
-install: all $(MACH)_pkg
+#
+# List sparc-specific files here
+#
 
-include ../Makefile.targ
-
-sparc_pkg: FRC
-	@if [ "$(SPARC_RM_PKGARCHIVE)" ]; then \
-		[ -d $(SPARC_RM_PKGARCHIVE) ] || \
-			mkdir -p $(SPARC_RM_PKGARCHIVE); \
-		pkgmk -a sparc -f prototype_sparc_realmode \
-			-d $(SPARC_RM_PKGARCHIVE) -r $(ROOT) -o $(PACKAGE); \
-	fi
-
-i386_pkg: pkg sparc_pkg

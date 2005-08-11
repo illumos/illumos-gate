@@ -34,12 +34,8 @@
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 
-i copyright
-i depend
-i pkginfo
+!include prototype_com
 
-d none usr 0755 root sys
-d none usr/lib 0755 root bin
-d none usr/lib/fs 0755 root sys
-d none usr/lib/fs/ufs 0755 root sys
-f none usr/lib/fs/ufs/mboot 0444 root bin
+#
+# List i386-specific files here
+#
