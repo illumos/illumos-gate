@@ -332,6 +332,8 @@ DRV_KMODS      += mdesc
 DRV_KMODS	+= ncp
 DRV_KMODS	+= ebus
 DRV_KMODS       += su
+DRV_KMODS	+= memtest
+
 #
 #	Exec Class Modules (/kernel/exec):
 #

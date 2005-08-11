@@ -71,7 +71,14 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/memtest/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4/io/memtest/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/memtest/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4/io/memtest/%.s
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pci/%.c
@@ -210,7 +217,13 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/i2c/nexus/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/memtest/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4/io/memtest/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/memtest/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4/io/memtest/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/pci/%.c

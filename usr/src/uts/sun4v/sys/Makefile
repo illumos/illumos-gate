@@ -56,6 +56,7 @@ SUN4_HDRS=			\
 	ivintr.h		\
 	memlist_plat.h	 	\
 	memnode.h		\
+	memtestio.h		\
 	nexusdebug.h		\
 	nexusintr_impl.h	\
 	prom_debug.h		\
@@ -79,6 +80,8 @@ HDRS=	\
 	machparam.h		\
 	machsystm.h		\
 	machthread.h		\
+	memtestio_ni.h		\
+	memtestio_v.h		\
 	mmu.h			\
 	niagaraasi.h		\
 	niagararegs.h		\

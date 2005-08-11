@@ -161,6 +161,7 @@ WRSM_OBJS	+= wci_common.o \
 			wrsm_tl.o \
 			wrsm_trap.o
 MEMTEST_OBJS	+= memtest.o memtest_asm.o \
+			memtest_u.o memtest_u_asm.o \
 			memtest_ch.o memtest_ch_asm.o \
 			memtest_chp.o memtest_chp_asm.o \
 			memtest_ja.o memtest_ja_asm.o \

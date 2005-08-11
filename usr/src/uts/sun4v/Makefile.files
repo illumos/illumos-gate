@@ -97,6 +97,13 @@ PX_OBJS		+= px_lib4v.o px_err.o
 TRAPSTAT_OBJS	+= trapstat.o
 
 #
+# 			CPU/Memory Error Injector (memtest) sun4v driver
+#
+MEMTEST_OBJS	+= memtest.o memtest_asm.o \
+			memtest_v.o memtest_v_asm.o \
+			memtest_ni.o memtest_ni_asm.o
+
+#
 #			sun4v virtual devices
 #
 QCN_OBJS	= qcn.o
