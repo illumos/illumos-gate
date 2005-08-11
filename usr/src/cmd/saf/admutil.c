@@ -21,20 +21,25 @@
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.8*/
-
-
-# include <stdio.h>
-# include <signal.h>
-# include <sac.h>
-# include <sys/types.h>
-# include <sys/stat.h>
-# include <unistd.h>
-# include "misc.h"
-# include "structs.h"
-# include "extern.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <signal.h>
+#include <sac.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include "misc.h"
+#include "structs.h"
+#include "extern.h"
 
 
 /*
@@ -170,14 +175,10 @@ char *tname;
  *		finish - ending line number (-1 indicates entire file)
  */
 
-
-copy_file(fp, tfp, start, finish)
-FILE *fp;
-FILE *tfp;
-register int start;
-register int finish;
+int
+copy_file(FILE *fp, FILE *tfp, int start, int finish)
 {
-	register int i;		/* loop variable */
+	int i;		/* loop variable */
 	char dummy[SIZE];	/* scratch buffer */
 
 /*
@@ -231,11 +232,10 @@ register int finish;
  *		pmtag - tag of port monitor we're looking for
  */
 
-find_pm(fp, pmtag)
-FILE *fp;
-char *pmtag;
+int
+find_pm(FILE *fp, char *pmtag)
 {
-	register char *p;	/* working pointer */
+	char *p;		/* working pointer */
 	int line = 0;		/* line number we found entry on */
 	struct sactab stab;	/* place to hold parsed info */
 	char buf[SIZE];	/* scratch buffer */
@@ -253,6 +253,7 @@ char *pmtag;
 		Saferrno = E_SYSERR;
 		error("error reading _sactab");
 		/* NOTREACHED */
+		return (0);
 	}
 	else
 		return(0);
@@ -271,9 +272,8 @@ char *pmtag;
  *		basename - name of script (relative to HOME (from misc.h))
  */
 
-do_config(script, basename)
-char *script;
-char *basename;
+int
+do_config(char *script, char *basename)
 {
 	FILE *ifp;		/* file pointer for source file */
 	FILE *ofp;		/* file pointer for target file */

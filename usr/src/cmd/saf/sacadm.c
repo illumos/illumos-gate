@@ -20,29 +20,30 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.15*/
 
-
-# include <stdio.h>
-# include <fcntl.h>
-# include <errno.h>
-# include <sys/types.h>
-# include <sys/stat.h>
-# include <signal.h>
-# include <unistd.h>
-# include <sac.h>
-# include "misc.h"
-# include "structs.h"
-# include "adm.h"
-# include "extern.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <unistd.h>
+#include <sac.h>
+#include "misc.h"
+#include "structs.h"
+#include "adm.h"
+#include "extern.h"
 
 
 /*
@@ -94,9 +95,8 @@ int	Saferrno;	/* internal `errno' for exit */
  * main - scan args for sacadm and call appropriate handling code
  */
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int c;			/* option letter */
 	uid_t uid;		/* invoker's real uid */
@@ -393,6 +393,7 @@ char *argv[];
 	}
 	quit();
 	/* NOTREACHED */
+	return (0);
 }
 
 
@@ -1017,6 +1018,7 @@ char **p;
  * openpipe - open up command pipe to SAC
  */
 
+int
 openpipe()
 {
 	int fd;		/* file descriptor associated with command pipe */
@@ -1230,6 +1232,7 @@ int dflag;
  *	single user mode)
  */
 
+int
 sac_home()
 {
 	int fd;		/* fd to sac logfile */

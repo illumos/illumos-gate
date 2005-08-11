@@ -19,9 +19,11 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * script
+ * script: Produce a record of a terminal session.
  */
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
 #include <locale.h>
@@ -36,9 +38,15 @@
 int 	grantpt();
 int 	unlockpt();
 char	*ptsname();
+void	doinput() __NORETURN;
+void	dooutput();
+void	doshell();
+void	fixtty();
+void	fail();
+void	done() __NORETURN;
+void	getmaster();
+void	getslave();
 
-char	*getenv();
-struct tm *localtime();
 char	*shell;
 FILE	*fscript;
 int	master;			/* file descriptor for master pseudo-tty */
@@ -57,9 +65,8 @@ char	*mptname = "/dev/ptmx";	/* master pseudo-tty device */
 
 int	aflg;
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	uid_t ruidt;
 	gid_t gidt;
@@ -71,7 +78,7 @@ main(argc, argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	shell = getenv("SHELL");
-	if (shell == 0)
+	if (shell == NULL)
 		shell = "/bin/sh";
 	argc--, argv++;
 	while (argc > 0 && argv[0][0] == '-') {
@@ -119,8 +126,11 @@ main(argc, argv)
 			doshell();
 	}
 	doinput();
+	/* NOTREACHED */
+	return (0);
 }
 
+void
 doinput()
 {
 	char ibuf[BUFSIZ];
@@ -168,6 +178,7 @@ finish()
 		done();
 }
 
+void
 dooutput()
 {
 	time_t tvec;
@@ -189,6 +200,7 @@ dooutput()
 	done();
 }
 
+void
 doshell()
 {
 
@@ -205,6 +217,7 @@ doshell()
 	fail();
 }
 
+void
 fixtty()
 {
 	struct termios sbuf;
@@ -218,6 +231,7 @@ fixtty()
 	(void) ioctl(0, TCSETSF, (char *)&sbuf);
 }
 
+void
 fail()
 {
 
@@ -225,6 +239,7 @@ fail()
 	done();
 }
 
+void
 done()
 {
 	time_t tvec;
@@ -243,6 +258,7 @@ done()
 	exit(0);
 }
 
+void
 getmaster()
 {
 	struct stat stb;
@@ -258,6 +274,7 @@ getmaster()
 	}
 }
 
+void
 getslave()
 {
 	char *slavename;	/* name of slave pseudo-tty */

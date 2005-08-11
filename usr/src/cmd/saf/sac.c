@@ -23,16 +23,18 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.14 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <ctype.h>
 #include <signal.h>
+#include <strings.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -83,6 +85,7 @@ void startpoll(void);
  *	  from sacadm via the command pipe
  */
 
+int
 main(int argc, char *argv[])
 {
 	int c;	/* place to hold options */

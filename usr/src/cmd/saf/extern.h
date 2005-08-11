@@ -23,12 +23,18 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.5*/
+#ifndef	_EXTERN_H
+#define	_EXTERN_H
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 extern	void	log();
 extern	void	initialize();
@@ -54,7 +60,7 @@ extern	void	sendack();
 extern	void	account();
 extern	void	cleanutx();
 extern	void	readutmpx();
-extern	void	quit();
+extern	void	quit() __NORETURN;
 extern	void	usage();
 
 extern	FILE	*open_temp();
@@ -63,30 +69,11 @@ extern	struct	sactab	*read_entry();
 extern	struct	sactab	*findpm();
 
 extern	char	*trim();
-extern	char	*pstate();
+extern	char	*pstate(unchar);
 extern	char	*nexttok();
 extern	char	**mkargv();
 extern	char	*make_tempname();
 extern	char	**dump_table();
-
-extern	time_t	time();
-extern	long	atol();
-extern	char	*ctime();
-extern	char	*strchr();
-extern	char	*strrchr();
-extern	char	*strcat();
-extern	char	*strpbrk();
-extern	char	*strtok();
-extern	char	*strcpy();
-extern	char	*fgets();
-extern	char	*malloc();
-extern	char	*calloc();
-extern	char	*mktemp();
-extern	void	free();
-extern	void	setutent();
-extern	void	endutent();
-extern	struct	utmp	*getutid();
-extern	struct	utmp	*getutent();
 
 extern	int	N_msgs;
 extern	unsigned	Stime;
@@ -101,7 +88,9 @@ extern	char	Comment[];
 extern	int	Saferrno;
 
 extern	char	**environ;
-extern	int	errno;
-extern	char	*optarg;
-extern	int	optind;
-extern	int	opterr;
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _EXTERN_H */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,22 +29,24 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-# include <stdio.h>
-# include <sys/types.h>
-# include <sys/stat.h>
-# include <unistd.h>
-# include "extern.h"
-# include "misc.h"
-# include <sac.h>
-# include "structs.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include "extern.h"
+#include "misc.h"
+#include <sac.h>
+#include "structs.h"
 
-# define ADD		0x1	/* -a or other required options seen */
-# define REMOVE		0x2	/* -r seen */
-# define ENABLE		0x4	/* -e seen */
-# define DISABLE	0x8	/* -d seen */
-# define PLIST		0x10	/* -l seen */
-# define LIST		0x20	/* -L seen */
-# define CONFIG		0x40	/* -g seen */
+#define	ADD		0x1	/* -a or other required options seen */
+#define	REMOVE		0x2	/* -r seen */
+#define	ENABLE		0x4	/* -e seen */
+#define	DISABLE		0x8	/* -d seen */
+#define	PLIST		0x10	/* -l seen */
+#define	LIST		0x20	/* -L seen */
+#define	CONFIG		0x40	/* -g seen */
 
 # define U_FLAG		0x1	/* -fu seen */
 # define X_FLAG		0x2	/* -fx seen */
@@ -103,9 +105,8 @@ int	Saferrno;	/* internal `errno' for exit */
  * main - scan args for pmadm and call appropriate handling code
  */
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int c;			/* option letter */
 	int ret;		/* return code from check_version */
@@ -868,8 +869,8 @@ char *svctag;
  */
 
 
-tell_sac(tag)
-char *tag;
+int
+tell_sac(char *tag)
 {
 	pid_t pid;	/* returned pid from fork */
 	int status;	/* return status from sacadm child */
@@ -1038,10 +1039,8 @@ char *svctag;
  *		svctag - tag of service we're looking for
  */
 
-find_svc(fp, tag, svctag)
-FILE *fp;
-char *tag;
-char *svctag;
+int
+find_svc(FILE *fp, char *tag, char *svctag)
 {
 	register char *p;	/* working pointer */
 	int line = 0;		/* line number we found entry on */
@@ -1061,10 +1060,10 @@ char *svctag;
 		(void) sprintf(buf, "error reading %s/%s/_pmtab", HOME, tag);
 		Saferrno = E_SYSERR;
 		error(buf);
-	}
-	else
-		return(0);
-	/* NOTREACHED */
+		/* NOTREACHED */
+		return (0);
+	} else
+		return (0);
 }
 
 
@@ -1328,8 +1327,8 @@ char *type;
 	if (!feof(fp)) {
 		Saferrno = E_SYSERR;
 		error("error reading _sactab");
-	}
-	else
-		return(thead ? thead : NULL);
-	/* NOTREACHED */
+		/* NOTREACHED */
+		return (0);
+	} else
+		return (thead ? thead : NULL);
 }

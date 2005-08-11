@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,9 +91,8 @@ extern int di_devperm_logout(const char *);
  *		  have login service on the fly
  */
 
-main(argc, argv)
-int	argc;
-char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	int	nfds;
 	extern	char	*lastname();

@@ -22,21 +22,27 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.8*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
-# include <stdio.h>
-# include <ctype.h>
-# include <sys/types.h>
-# include <unistd.h>
-# include "extern.h"
-# include "misc.h"
-# include <sac.h>
-# include "structs.h"
-# ifdef SAC
-# include "msgs.h"
-# endif
+#include <stdio.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <ctype.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include "extern.h"
+#include "misc.h"
+#include <sac.h>
+#include "structs.h"
+#ifdef SAC
+#include "msgs.h"
+#endif
 
 char	Comment[SIZE];	/* place holder for comments */
 
@@ -279,8 +285,7 @@ register char *p;
  */
 
 char *
-pstate(state)
-unchar state;
+pstate(unchar state)
 {
 	switch (state) {
 	case NOTRUNNING:
@@ -310,4 +315,5 @@ unchar state;
 # endif
 	}
 	/* NOTREACHED */
+	return (NULL);
 }

@@ -23,21 +23,22 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.12*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-# include <stdio.h>
-# include <signal.h>
-# include "misc.h"
-# include "msgs.h"
-# include <sac.h>
-# include "structs.h"
-# include <sys/types.h>
-# include <unistd.h>
-# include "extern.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include "misc.h"
+#include "msgs.h"
+#include <sac.h>
+#include "structs.h"
+#include <sys/types.h>
+#include <unistd.h>
+#include "extern.h"
 
 
 /*

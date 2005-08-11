@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <strings.h>
+#include <errno.h>
 
 #include "extern.h"
 #include "misc.h"

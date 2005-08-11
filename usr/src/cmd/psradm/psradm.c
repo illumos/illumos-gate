@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <syslog.h>
 #include <time.h>
 #include <utmpx.h>
+#include <assert.h>
 
 static char	*cmdname;	/* command name for messages */
 
@@ -97,7 +98,7 @@ psr_action_lookup(int action)
 			return (&psr_action[i]);
 		}
 	}
-	/* NOTREACHED */
+	return (NULL);
 }
 
 /*
@@ -285,6 +286,7 @@ main(int argc, char *argv[])
 	}
 
 	pac = psr_action_lookup(action);
+	assert(pac != NULL);
 
 	errors = 0;
 	if (all_flag) {

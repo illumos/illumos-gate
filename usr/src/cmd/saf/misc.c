@@ -21,25 +21,29 @@
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.9*/
-
-
-# include <stdio.h>
-# include <unistd.h>
-# include <fcntl.h>
-# include <sys/types.h>
-# include <sys/stropts.h>
-# include <signal.h>
-# include <sys/stat.h>
-# include <poll.h>
-# include "misc.h"
-# include "msgs.h"
-# include "extern.h"
-# include <sac.h>
-# include "adm.h"
-# include "structs.h"
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stropts.h>
+#include <signal.h>
+#include <sys/stat.h>
+#include <poll.h>
+#include "misc.h"
+#include "msgs.h"
+#include "extern.h"
+#include <sac.h>
+#include "adm.h"
+#include "structs.h"
 
 
 /*
@@ -511,10 +515,8 @@ register struct sacmsg *sm;
  *		signo - signal number to send
  */
 
-
-sendsig(sp, signo)
-register struct sactab *sp;
-int signo;
+int
+sendsig(struct sactab *sp, int signo)
 {
 	pid_t pid;	/* pid of designated port monitor */
 	pid_t checklock();
