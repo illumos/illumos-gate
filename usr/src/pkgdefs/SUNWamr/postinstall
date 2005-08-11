@@ -30,11 +30,6 @@ check_add_drv()
 
 	cmd="add_drv"
 
-	#amr driver do not support LSI 320-2x card - "pci1000,532"
-	/usr/bin/sed -e /amr\ \"pci1000,532\"/d $BASEDIR/etc/driver_aliases > /tmp/tmpfile
-	cp /tmp/tmpfile $BASEDIR/etc/driver_aliases
-	rm -f /tmp/tmpfile
-
 	NO_CMD=
 	while getopts i:b:m:c:N  opt
 	do
@@ -113,4 +108,4 @@ check_add_drv()
 }
 
 
-check_add_drv -i '"pci1028,e" "pci1028,f" "pci1028,493" "pci1028,518" "pci1028,520"' -b "$BASEDIR" -c scsi amr
+check_add_drv -i '"pci1000,532" "pci1028,e" "pci1028,f" "pci1028,493" "pci1028,518" "pci1028,520"' -b "$BASEDIR" -c scsi amr
