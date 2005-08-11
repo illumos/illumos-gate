@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -69,11 +69,16 @@ extern "C" {
 #define	AAC_ANSI_VER		2
 #define	AAC_RESP_DATA_FORMAT	2
 
+#define	AAC_TYPE_UNKNOW		0
+#define	AAC_TYPE_SCSI		1
+#define	AAC_TYPE_SATA		2
+
 struct aac_card_type {
 	uint16_t	vendor;
 	uint16_t	device;
 	uint16_t	subvendor;
 	uint16_t	subsys;
+	uint16_t	type;
 	char *desc;
 };
 

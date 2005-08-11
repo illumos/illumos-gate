@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -199,22 +199,22 @@ static struct aac_softstate  *aac_softstatep;
 
 /* desc will be used in inquiry(0x12) command the length should be 16 bytes */
 static struct aac_card_type aac_cards[] = {
-	{0x9005, 0x285, 0x9005, 0x285, "Adatpec 2200S   "},
-	{0x9005, 0x285, 0x9005, 0x286, "Adaptec 2120S   "},
-	{0x9005, 0x285, 0x9005, 0x290, "Adaptec 2410SA  "},
-	{0x9005, 0x285, 0x1028, 0x287, "Dell PERC 320/DC"},
-	{0x1028, 0xa, 0x1028, 0x121, "Dell PERC 3/Di"},
-	{0x1028, 0xa, 0x1028, 0x11b, "Dell PERC 3/Di"},
-	{0x1028, 0xa, 0x1028, 0x106, "Dell PERC 3/Di"},
-	{0x1028, 0x8, 0x1028, 0xcf, "Dell PERC 3/Di"},
-	{0x1028, 0x2, 0x1028, 0xd9, "Dell PERC 3/Di"},
-	{0x1028, 0x2, 0x1028, 0xd1, "Dell PERC 3/Di"},
-	{0x1028, 0x4, 0x1028, 0xd0, "Dell PERC 3/Si"},
-	{0x1028, 0x3, 0x1028, 0x3, "Dell PERC 3/Si"},
-	{0x1028, 0x2, 0x1028, 0x2, "Dell PERC 3/Di"},
-	{0x1028, 0x1, 0x1028, 0x1, "Dell PERC 3/Di"},
-	{0, 0, 0, 0, "AAC card      "},
-	{0, 0, 0, 0, NULL}
+	{0x9005, 0x285, 0x9005, 0x285, AAC_TYPE_SCSI, "Adatpec 2200S   "},
+	{0x9005, 0x285, 0x9005, 0x286, AAC_TYPE_SCSI, "Adaptec 2120S   "},
+	{0x9005, 0x285, 0x9005, 0x290, AAC_TYPE_SATA, "Adaptec 2410SA  "},
+	{0x9005, 0x285, 0x1028, 0x287, AAC_TYPE_SCSI, "Dell PERC 320/DC"},
+	{0x1028, 0xa, 0x1028, 0x121, AAC_TYPE_SCSI, "Dell PERC 3/Di"},
+	{0x1028, 0xa, 0x1028, 0x11b, AAC_TYPE_SCSI, "Dell PERC 3/Di"},
+	{0x1028, 0xa, 0x1028, 0x106, AAC_TYPE_SCSI, "Dell PERC 3/Di"},
+	{0x1028, 0x8, 0x1028, 0xcf, AAC_TYPE_SCSI, "Dell PERC 3/Di"},
+	{0x1028, 0x2, 0x1028, 0xd9, AAC_TYPE_SCSI, "Dell PERC 3/Di"},
+	{0x1028, 0x2, 0x1028, 0xd1, AAC_TYPE_SCSI, "Dell PERC 3/Di"},
+	{0x1028, 0x4, 0x1028, 0xd0, AAC_TYPE_SCSI, "Dell PERC 3/Si"},
+	{0x1028, 0x3, 0x1028, 0x3, AAC_TYPE_SCSI, "Dell PERC 3/Si"},
+	{0x1028, 0x2, 0x1028, 0x2, AAC_TYPE_SCSI, "Dell PERC 3/Di"},
+	{0x1028, 0x1, 0x1028, 0x1, AAC_TYPE_SCSI, "Dell PERC 3/Di"},
+	{0, 0, 0, 0, AAC_TYPE_UNKNOW, "AAC card      "},
+	{0, 0, 0, 0, AAC_TYPE_UNKNOW, NULL}
 };
 
 static ddi_device_acc_attr_t aac_acc_attr = {
@@ -640,6 +640,14 @@ aac_check_card_type(struct aac_softstate *softs)
 			(aac_cards[card_type_index].subvendor == subvendid) &&
 			(aac_cards[card_type_index].subsys == subsysid)) {
 			card_found = 1;
+			/*
+			 * SATA RAID adapter's DMA capability is worse
+			 * than SCSI RAID adapter.  So we need to change
+			 * dma_attr_count_max from 0xffff to 0xfff to meet
+			 * the requirement.
+			 */
+			if (aac_cards[card_type_index].type == AAC_TYPE_SATA)
+				aac_buf_dma_attr.dma_attr_count_max = 0xfffull;
 			break;
 		}
 		card_type_index++;
@@ -1216,6 +1224,8 @@ aac_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	AACDB_PRINT((CE_NOTE, "aac_tran_tgt_init: target = %d, lun = %d",
 		target, lun));
+	if ((0 > target) || (target >= AAC_MAX_LD))
+		return (DDI_FAILURE);
 	softs = AAC_TRAN2SOFTS(tran);
 	if (softs->container[target].valid && (lun == 0))
 		/* only support container that has been detected and valid */
