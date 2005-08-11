@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -38,6 +37,7 @@
 #include <limits.h>
 #include "dc.h"
 #include <locale.h>
+#include <stdlib.h>
 
 #define	LASTFUN 026
 long longest = 0, maxsize = 0, active = 0;
@@ -59,17 +59,17 @@ int lall = 0, lrel = 0, lcopy = 0, lmore = 0, lbytes = 0;
  * may vary on less common architectures.
  */
 
-int
-ctoint(c)
 #if __STDC__
-char	c;
+int
+ctoint(char c)
 #else
-unsigned char	c;
+int
+ctoint(unsigned char c)
 #endif
 {
 	int	i;
 
-	if (c <= SCHAR_MAX)
+	if ((unsigned char)c <= SCHAR_MAX)
 		return ((int)c);	/* Normal promotion will work */
 	for (i = 0; c++; i--);		/* Scan for negative value */
 	return (i);
@@ -79,7 +79,9 @@ unsigned char	c;
 #define	TEXT_DOMAIN "SYS_TEST"  /* Use this only if it weren't. */
 #endif
 
-void
+void	commnds(void)	__NORETURN;
+
+int
 main(int argc, char **argv)
 {
 	(void) setlocale(LC_ALL, "");
@@ -91,7 +93,7 @@ main(int argc, char **argv)
 }
 
 void
-commnds()
+commnds(void)
 {
 	int c;
 	struct blk *p, *q;
@@ -772,7 +774,7 @@ execute:
 }
 
 struct blk *
-div(struct blk *ddivd, struct blk *ddivr)
+dcdiv(struct blk *ddivd, struct blk *ddivr)
 {
 	int divsign, remsign, offset, divcarry;
 	int carry, dig, magic, d, dd, under;
@@ -931,7 +933,8 @@ ddone:
 }
 
 int
-dscale() {
+dscale(void)
+{
 	struct blk *dd, *dr, *r;
 	int c;
 
@@ -992,7 +995,7 @@ removr(struct blk *p, int n)
 		sputc(r, sgetc(p));
 	release(p);
 	if (n == 1) {
-		s = div(r, tenptr);
+		s = dcdiv(r, tenptr);
 		release(r);
 		rewind(rem);
 		if (sfeof(rem) == 0)
@@ -1045,11 +1048,11 @@ sqrt(struct blk *p)
 	} else
 		salterc(r, c);
 	for (; ; ) {
-		q = div(p, r);
+		q = dcdiv(p, r);
 		s = add(q, r);
 		release(q);
 		release(rem);
-		q = div(s, sqtemp);
+		q = dcdiv(s, sqtemp);
 		release(s);
 		release(rem);
 		s = copy(r, length(r));
@@ -1089,7 +1092,7 @@ exp(struct blk *base, struct blk *ex)
 		chsign(e);
 	}
 	while (length(e) != 0) {
-		e1 = div(e, sqtemp);
+		e1 = dcdiv(e, sqtemp);
 		release(e);
 		e = e1;
 		n = length(rem);
@@ -1236,7 +1239,8 @@ pushp(struct blk *p)
 }
 
 struct blk *
-pop() {
+pop(void)
+{
 	if (stkptr == stack) {
 		stkerr = 1;
 		return (0);
@@ -1245,7 +1249,8 @@ pop() {
 }
 
 struct blk *
-readin() {
+readin(void)
+{
 	struct blk *p, *q;
 	int dp, dpct;
 	int c;
@@ -1426,7 +1431,8 @@ chsign(struct blk *p)
 }
 
 char
-readc() {
+readc(void)
+{
 loop:
 	if ((readptr != &readstk[0]) && (*readptr != 0)) {
 		if (sfeof(*readptr) == 0)
@@ -1475,7 +1481,7 @@ binop(char c)
 		r = mult(arg1, arg2);
 		break;
 	case '/':
-		r = div(arg1, arg2);
+		r = dcdiv(arg1, arg2);
 		break;
 	}
 	release(arg1);
@@ -1534,7 +1540,7 @@ print(struct blk *hptr)
 	dec = getdec(p, sc);
 	p = removc(p, sc);
 	while (length(p) != 0) {
-		q = div(p, basptr);
+		q = dcdiv(p, basptr);
 		release(p);
 		p = q;
 		(*outdit)(rem, 0);
@@ -1594,7 +1600,7 @@ getdec(struct blk *p, int sc)
 			sputc(s, sgetc(t));
 		sputc(s, 0);
 		release(t);
-		t = div(s, tenptr);
+		t = dcdiv(s, tenptr);
 		release(s);
 		release(rem);
 		return (t);
@@ -1791,7 +1797,7 @@ bigot(struct blk *p, int flg)
 			chsign(p);
 		}
 		while (length(p) != 0) {
-			q = div(p, tenptr);
+			q = dcdiv(p, tenptr);
 			release(p);
 			p = q;
 			rewind(rem);
@@ -1874,7 +1880,7 @@ add(struct blk *a1, struct blk *a2)
 }
 
 int
-eqk() {
+eqk(void) {
 	struct blk *p, *q;
 	int skp, skq;
 
@@ -1916,7 +1922,7 @@ removc(struct blk *p, int n)
 	while (sfeof(p) == 0)
 		sputc(q, sgetc(p));
 	if (n == 1) {
-		r = div(q, tenptr);
+		r = dcdiv(q, tenptr);
 		release(q);
 		release(rem);
 		q = r;
@@ -1945,7 +1951,7 @@ scale(struct blk *p, int n)
 	sputc(q, n);
 	s = exp(inbas, q);
 	release(q);
-	q = div(t, s);
+	q = dcdiv(t, s);
 	release(t);
 	release(s);
 	release(rem);
@@ -1954,7 +1960,8 @@ scale(struct blk *p, int n)
 }
 
 int
-subt() {
+subt(void)
+{
 	arg1 = pop();
 	EMPTYS;
 	savk = sunputc(arg1);
@@ -1968,7 +1975,8 @@ subt() {
 }
 
 int
-command() {
+command(void)
+{
 	int c;
 	char line[100], *sl;
 	void (*savint)();
@@ -2043,7 +2051,8 @@ cond(char c)
 }
 
 void
-load() {
+load(void)
+{
 	int c;
 	struct blk *p, *q, *t, *s;
 
@@ -2130,7 +2139,8 @@ salloc(int size)
 }
 
 struct blk *
-morehd() {
+morehd(void)
+{
 	struct blk *h, *kk;
 	char *dcmalloc();
 

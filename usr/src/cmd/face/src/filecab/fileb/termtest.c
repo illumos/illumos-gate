@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<string.h>
@@ -32,6 +36,8 @@
 #include	<termio.h>
 #include	<sys/types.h>
 #include	<sys/times.h>
+#include	<stdlib.h>
+#include	<errno.h>
 #include	"wish.h"
 
 #define BREAK		0
@@ -46,7 +52,15 @@
 #define ARGSIZ	128
 #define MAXSEQ	256
 
-char    *strnsave();
+char	*get_response(char *);
+char    *strnsave(char *, unsigned int);
+void	proc_file(char *);
+void	interpret(char *, bool, char [][]);
+void	do_case(char *, bool, char [][]);
+void	debug_out(bool, char *, char *);
+void	output(char *);
+void	initialize(void);
+
 
 #define strsave(s)      ((s) ? strnsave(s, strlen(s)) : NULL )
 
@@ -68,15 +82,13 @@ int	Num_used;
 
 /* general purpose interrupt catcher */
 void
-intr(n)
-int	n;
+intr(int n)
 {
 	(void)signal(n, intr);
 }
 
 void
-cleanup(sig)
-int	sig;
+cleanup(int sig)
 {
 	if (sig)
 		(void)signal(sig, SIG_IGN);
@@ -84,14 +96,12 @@ int	sig;
 	exit(sig);
 }
 
-main(argc, argv)
-int	argc;
-char	*argv[];
+
+int
+main(int argc, char **argv)
 {
 	int	i;
 	struct termio	tty;
-	char	*getenv();
-	char	*get_response();
 
 	if (argc > 1 && strcmp(argv[1], "-d") == 0)
 		Debug = TRUE;
@@ -118,14 +128,14 @@ char	*argv[];
 	ioctl(0, TCSETAF, &Restore);
 	if (Retval)
 		fputs("Can't find identify file\n", stderr);
-	exit(Retval);
+	return (Retval);
 }
 
 /*
  * interprets an identify file
  */
-proc_file(dirname)
-char	*dirname;
+void
+proc_file(char *dirname)
 {
 	char	path[512];
 
@@ -149,12 +159,11 @@ char	*dirname;
  * expands "$0" to expand string
  */
 char *
-get_string(expand)
-char	expand[10][ARGSIZ];
+get_string(char expand[10][ARGSIZ])
 {
-	register char	*p;
-	register char	*s;
-	register  int	c;
+	char	*p;
+	char	*s;
+	int	c;
 	static char	buf[BUFSIZ];
 
 	/* skip white space, comments */
@@ -177,7 +186,7 @@ char	expand[10][ARGSIZ];
 			if (p = strchr(Woutbs, c))
 				c = Withbs[p - Woutbs];
 			else if (isdigit(c)) {
-				register int	ac;
+				int	ac;
 
 				c -= '0';
 				if (isdigit(ac = getc(Fp))) {
@@ -216,10 +225,11 @@ char	expand[10][ARGSIZ];
 /*
  * get string and tokenize it
  */
-get_token()
+int
+get_token(void)
 {
-	register char	*s;
-	register int	i;
+	char	*s;
+	int	i;
 
 	s = get_string(NULL);
 	if (s[0] == '\0')
@@ -234,13 +244,10 @@ get_token()
  * interpreter - executes 1 statement and returns
  * expects a token to be preread into Tok
  */
-interpret(recv, skip, arg)
-char	*recv;
-bool	skip;
-char	arg[10][ARGSIZ];
+void
+interpret(char *recv, bool skip, char arg[10][ARGSIZ])
 {
-	register char	*s = NULL;
-	char	*get_response();
+	char	*s = NULL;
 
 	switch (Tok) {
 	case QUERY:
@@ -297,15 +304,13 @@ char	arg[10][ARGSIZ];
 
 /* case statement */
 /*ARGSUSED*/
-do_case(recv, skip, arg)
-char	*recv;
-bool	skip;
-char	arg[10][ARGSIZ];
+void
+do_case(char *recv, bool skip, char arg[10][ARGSIZ])
 {
-	register char	*s;
-	register char	*ex;
+	char	*s;
+	char	*ex;
 	int	i;
-	register bool	fail;
+	bool	fail;
 	char	newarg[10][ARGSIZ];
 
 	fail = TRUE;
@@ -338,12 +343,10 @@ char	arg[10][ARGSIZ];
 }
 
 /* print debugging info */
-debug_out(skip, s1, s2)
-bool	skip;
-char	*s1;
-char	*s2;
+void
+debug_out(bool skip, char *s1, char *s2)
 {
-	register int	i;
+	int	i;
 
 	if (!Debug)
 		return;
@@ -355,15 +358,15 @@ char	*s2;
 	if (s2) {
 		putchar(' ');
 		putchar('\'');
-		output(s2, strlen(s2));
+		output(s2);
 		putchar('\'');
 	}
 	putchar('\n');
 }
 
 /* print a string "nicely" */
-output(s)
-register char	*s;
+void
+output(char *s)
 {
 	while (*s) {
 		if (isprint(*s))
@@ -386,8 +389,7 @@ register char	*s;
 
 /* query the terminal and return response */
 char *
-get_response(s)
-char	*s;
+get_response(char *s)
 {
 	char	*recv;
 	char	recvbuf[512];
@@ -395,7 +397,6 @@ char	*s;
 	int	numread;
 	char	*lookup();
 	char	*enter();
-	extern int errno;
 
 	if (s == NULL || *s == '\0') {
 		initialize();
@@ -429,10 +430,9 @@ char	*s;
  * to save sending/reading it again
  */
 char *
-lookup(s)
-char	*s;
+lookup(char *s)
 {
-	register int	i;
+	int	i;
 
 	for (i = 0; i < Num_used; i++)
 		if (!strcmp(s, SendRecv[i].send))
@@ -444,9 +444,7 @@ char	*s;
  * enter a send/response pair into the array of used sequences
  */
 char *
-enter(s, r)
-char	*s;
-char	*r;
+enter(char *s, char *r)
 {
 	struct SR	dummy;
 
@@ -461,17 +459,16 @@ char	*r;
  * clear out the used sequences array, so we can try a second time
  * to query the terminal
  */
-initialize()
+void
+initialize(void)
 {
 	Num_used = 0;
 }
 
 char	*
-strnsave(s, len)
-char	s[];
-unsigned int	len;
+strnsave(char s[], unsigned int len)
 {
-	register char	*p;
+	char	*p;
 
 	if ((p = malloc(len + 1)) == NULL)
 		return NULL;

@@ -19,21 +19,25 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <signal.h>
+#include <stdlib.h>
 #include "wish.h"
 
 bool _Debug = FALSE;
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char **argv)
 {
 	if (getenv("DEBUG"))
 		_Debug = TRUE;
@@ -41,7 +45,7 @@ char *argv[];
 	signal(SIGINT, SIG_IGN);
 	signal(SIGQUIT, SIG_IGN);
 	if (suspend(argv[1]) == FAIL)
-		exit(1);
+		return (1);
 	else
-		exit(0);
+		return (0);
 }

@@ -20,15 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -37,9 +36,8 @@
 #include <stdlib.h>
 #include "wish.h"
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char **argv)
 {
 	FILE *fp, *nfp;
 	char *home,  *penv, *fname;
@@ -59,11 +57,11 @@ char *argv[];
 
 	home = getenv(penv);
 	if (strcmp(penv, "HOME") == 0)
-		sprintf(spath, "%s/pref/services", home);
+		snprintf(spath, sizeof (spath), "%s/pref/services", home);
 	else
-		sprintf(spath, "%s/lib/services", home);
+		snprintf(spath, sizeof (spath), "%s/lib/services", home);
 
-	sprintf(item, "`echo 'name=\"%s\"';", mname);
+	snprintf(item, sizeof (item), "`echo 'name=\"%s\"';", mname);
 	comp_len = strlen(item);
 
 	/* Update the service file */
@@ -97,7 +95,8 @@ char *argv[];
 			fname = strtok(NULL, "'");
 			fname = strtok(NULL, "$");
 			fname = strtok(NULL, "`");
-			sprintf(hpath, "%s%s", home, &fname[strlen(penv)]);
+			snprintf(hpath, sizeof (hpath),
+			    "%s%s", home, &fname[strlen(penv)]);
 		}
 	}
 

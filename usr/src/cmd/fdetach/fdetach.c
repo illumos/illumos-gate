@@ -19,30 +19,37 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 #include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <stropts.h>
+
 /*
  * Unmount a STREAM from the command line.
  */
 
-main(argc, argv)
-	int argc;
-	char **argv;
+/* ARGSUSED */
+int
+main(int argc, char **argv)
 {
-	if (argv[1] == NULL)
-	{
-		printf("usage: fdetach pathname\n");
+	if (argv[1] == NULL) {
+		(void) printf("usage: fdetach pathname\n");
 		exit(-1);
 	}
-	if (fdetach(argv[1]) < 0)
-	{
+	if (fdetach(argv[1]) < 0) {
 		perror("fdetach");
 		exit(-1);
 	}
-	exit(0);
+	return (0);
 }

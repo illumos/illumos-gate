@@ -19,24 +19,28 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 #include "wish.h"
 
-main(argc,argv)
-int argc;
-char *argv[];
+int
+main(int argc, char **argv)
 {
 	FILE *fp;
-	char *home, *getenv();
+	char *home;
 	char *term, *mname, *appath, *dir, *penv, *oterm, *oname, *oapath, *odir; 
 	char hpath[PATHSIZ], path[PATHSIZ], command[BUFSIZ];
 
@@ -59,8 +63,8 @@ char *argv[];
 	home=getenv(penv);
 
 	if(strcmp(term,oterm) == 0 && strcmp(appath,oapath) == 0 && strcmp(dir,odir) == 0 ){
-		sprintf(hpath, "%s/bin/%s.ins",home,mname);
-		sprintf(path, "%s/bin/%s.ins",home,oname);
+		snprintf(hpath, sizeof (hpath), "%s/bin/%s.ins",home,mname);
+		snprintf(path, sizeof (path), "%s/bin/%s.ins",home,oname);
 
 		/* if file exist copy it to old.<name> */
 		if (strcmp(mname,oname) != 0)  {
@@ -68,13 +72,14 @@ char *argv[];
 				copyfile(path,hpath);
 				chmod(hpath, 0755);
 	        	}
-			sprintf(command, "$VMSYS/bin/delserve \"%s\" \"%s\"",oname,penv);
+			snprintf(command, sizeof (command),
+			    "$VMSYS/bin/delserve \"%s\" \"%s\"",oname,penv);
 			system(command);
 		}
 	}
 	else {
-		sprintf(hpath, "%s/bin/%s.ins",home,mname);
-		sprintf(path, "%s/bin/old.%s.ins",home,mname);
+		snprintf(hpath, sizeof (hpath), "%s/bin/%s.ins",home,mname);
+		snprintf(path, sizeof (path), "%s/bin/old.%s.ins",home,mname);
 		/* if file exist copy it to old.<name> */
 		if (access(hpath, 00) == 0) 
 			copyfile(hpath,path);
@@ -95,9 +100,10 @@ char *argv[];
 	/* Update the User's service file */
 	if(strcmp(mname,oname) != 0) {
 		if (strcmp(penv, "HOME") == 0)
-			sprintf(path, "%s/pref/services",home);
+			snprintf(path, sizeof (path), "%s/pref/services",home);
 		else
-			sprintf(path, "%s/OBJECTS/Menu.programs",home);
+			snprintf(path, sizeof (path),
+			    "%s/OBJECTS/Menu.programs",home);
 
 		if ((fp=fopen(path,"a")) == NULL) {
 			fprintf(stderr, "Cannot open file");
@@ -111,6 +117,8 @@ char *argv[];
 			fprintf(fp,"action=`run $VMSYS/bin/%s.ins`\n",mname);
 		fclose(fp);
 	}
+
+	return (0);
 }
 
 
@@ -120,13 +128,11 @@ char *argv[];
  * copy a file
  */
 FILE *
-cpfile(from, to)
-char	*from;
-char	*to;
+cpfile(char *from, char *to)
 {
-	register int	c;
-	register FILE	*src;
-	register FILE	*dst;
+	int	c;
+	FILE	*src;
+	FILE	*dst;
 
 	if ((src = fopen(from, "r")) == NULL)
 		return NULL;
@@ -146,9 +152,8 @@ char	*to;
 	return dst;
 }
 
-copyfile(from, to)
-char *from;
-char *to;
+int
+copyfile(char *from, char *to)
 {
 	FILE *fp;
 

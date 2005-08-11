@@ -19,13 +19,21 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 #include <stdio.h>
 #include <sys/types.h>
+#include <time.h>
+
 #define	FF	'\014'
 unsigned char	chrtab[][16] = {
 0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000,0000, /*, sp, */
@@ -126,14 +134,11 @@ unsigned char	chrtab[][16] = {
 0000,0176,0176,0176,0176,0176,0176,0176,0176,0176,0176,0000,0000,0000,0000,0000, /*, del, */
 };
 
-banner(out,s)
-FILE	*out;
-char	*s;
+void
+banner(FILE *out, char *s)
 {
-	extern char *ctime();
-	extern time_t time();
 	long timeb;
-	register char *sp;
+	char *sp;
 	int i, j, t, lsw;
 
 	for(lsw=0; s[lsw] && lsw<5; lsw++);

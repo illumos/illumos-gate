@@ -24,11 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * 			chkperm.c
@@ -158,6 +157,7 @@
 #include <pwd.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include "wish.h"
 
 #ifdef DEBUG
@@ -209,22 +209,21 @@ struct cap_file_type {
 char uname_in[L_cuserid];
 int uflg, eflg, vflg, dflg;
 
-main(argc, argv)
-int argc;
-char **argv;
+char	*get_uname(void);
+FILE	*open_file(void);
+int	list_user(void);
+int	del_user(void);
+int	get_value(int);
+int	set_value(int, int);
+int	cap_index(char *);
+
+int
+main(int argc, char **argv)
 {
-	register optchar;
-	extern char *optarg;
+	int optchar;
 	char caparg[CAPLENGTH];
 	int lflg = 0, tflg = 0, yflg = 0, nflg = 0, opterr = 0;
 
-	int list_user();
-	int del_user();
-	int get_value();
-	int set_value();
-	int cap_index();
-	extern uid_t getuid();
-	extern char *getenv();
 
 	uflg = 0;
 	eflg = 0;
@@ -346,14 +345,15 @@ char **argv;
 	fprintf (stderr, 
 	"Usage: chkperm -l|-d|-v|-t cap|-e cap|-y cap|-n cap [-u user-name]\n"
 		);
+
+	return (FAIL);
 }
 
 
 int
-cap_index(capname)
-char *capname;
+cap_index(char *capname)
 {
-	register index;
+	int index;
 
 	for (index = 0; index < CAPS; index++)
 		if (strcmp(capname, caps[index].name) == 0)
@@ -365,16 +365,12 @@ char *capname;
 
 
 int
-get_value(cap_index)
-int cap_index;
+get_value(int cap_index)
 {
 	char *uname;
 	FILE *fp;
 	struct cap_file_type *iobuf;
 	int found, index;
-
-	char *get_uname();
-	FILE *open_file();
 
 	if (cap_index == FAIL)
 		return (FAIL);
@@ -430,17 +426,13 @@ int cap_index;
 
 
 int
-set_value(cap_index, cap_value)
-int cap_index, cap_value;
+set_value(int cap_index, int cap_value)
 {
 	char *uname;
 	FILE *fp;
 	struct cap_file_type *iobuf;
 	int found, index;
 	long foff;
-
-	char *get_uname();
-	FILE *open_file();
 
 	if (cap_index == FAIL)
 		return (FAIL);
@@ -488,16 +480,13 @@ int cap_index, cap_value;
 }
 
 int
-del_user()
+del_user(void)
 {
 	char *uname;
 	FILE *fp;
 	struct cap_file_type *iobuf;
 	int found, index;
 	long foff;
-
-	char *get_uname();
-	FILE *open_file();
 
 	if ((uname = get_uname()) == NULL)
 		return (FAIL);
@@ -537,13 +526,11 @@ del_user()
 }
 
 int
-list_user()
+list_user(void)
 {
 	FILE *fp;
 	struct cap_file_type *iobuf;
 	int found = 0;
-
-	FILE *open_file();
 
 	if ((fp = open_file()) == NULL)
 		return (FAIL);
@@ -564,11 +551,10 @@ list_user()
 
 
 char *
-get_uname()
+get_uname(void)
 {
 	char *user;
 	struct passwd *pw;
-	extern uid_t getuid();
 
 	if (uflg)
 		return (uname_in);
@@ -591,13 +577,12 @@ get_uname()
 
 
 FILE *
-open_file()
+open_file(void)
 {
 	char fpath[BUFSIZ];
 	char *fpt;
 	FILE *fp;
 	int fd;
-	char *getenv();
 
 	if ((fpt = getenv(fbase)) == NULL) {
 		fprintf(stderr, "$%s must be set in the environment.\n", fbase);

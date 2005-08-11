@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -495,9 +495,8 @@ getauxsevs(ptr)
  * Open Issues:
  */
 
-main(argc, argv)
-	int	argc;			/* Argument count */
-	char   *argv[];			/* Pointers to arguments */
+int
+main(int argc, char **argv)
 {
 
 	/* Local automatic data */
@@ -824,6 +823,5 @@ main(argc, argv)
 	    if (msgrtn & MM_NOCON) exitval += 4;
 	}
 
-	exit(exitval);
 	return(exitval);
 }

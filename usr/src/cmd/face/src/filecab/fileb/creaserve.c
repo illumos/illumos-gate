@@ -19,31 +19,33 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdio.h>
 #include <string.h>
 #include <pwd.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include "wish.h"
 
-main(argc,argv)
-int argc;
-char *argv[];
+int
+main(int argc, char **argv)
 {
 	FILE *fp, *tp;
-	char *home, *getenv();
+	char *home;
 	char *prompt, *term, *mname, *appath, *dir, *penv, *npath;
 	char path[PATHSIZ], fpath[PATHSIZ], temp_name[PATHSIZ];
 	char io_buf[BUFSIZ], new_line[BUFSIZ];
-	extern char *tempnam();
-	extern pid_t getpid();
-	extern uid_t getuid();
-	extern gid_t getgid();
 	int exist, comp_len, written_yet, dos=0;
 	uid_t uid;
 	gid_t gid;
@@ -65,7 +67,7 @@ char *argv[];
 		dos = 1;
 
 	home=getenv(penv);
-	sprintf(fpath, "%s/bin", home);
+	snprintf(fpath, sizeof (fpath), "%s/bin", home);
 	if ( (npath = tempnam(fpath,"ins.")) == NULL ) {
 		fprintf(stderr,"Cannot create install file\n");
 		exit(FAIL);
@@ -102,9 +104,9 @@ char *argv[];
 
 	/* Update the User's service file */
 	if (strcmp(penv, "HOME") == 0)
-		sprintf(path, "%s/pref/services",home);
+		snprintf(path, sizeof (path), "%s/pref/services",home);
 	else
-		sprintf(path, "%s/lib/services",home);
+		snprintf(path, sizeof (path), "%s/lib/services",home);
 
 	exist = access(path, 00) ? 0 : 1;
 
@@ -132,7 +134,9 @@ char *argv[];
 	rewind(fp);
 	rewind(tp);
 
-	sprintf(new_line,"`echo 'name=\"%s\"';echo 'action=`run %s$%s%s`nop'`\n",mname,dos?"-n ":"",penv,&npath[strlen(home)]);
+	snprintf(new_line, sizeof (new_line),
+"`echo 'name=\"%s\"';echo 'action=`run %s$%s%s`nop'`\n",
+	    mname, dos ? "-n " : "", penv, &npath[strlen(home)]);
 
 	comp_len = strcspn(new_line,";");
 	written_yet = 0;
@@ -154,5 +158,5 @@ char *argv[];
 	chmod(path, 0644);
 	chown(path, uid, gid);
 	unlink(temp_name);
-	exit(SUCCESS);
+	return (SUCCESS);
 }

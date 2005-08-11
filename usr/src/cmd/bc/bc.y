@@ -21,17 +21,16 @@
  * CDDL HEADER END
  */
 %}
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 %{
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 %}
 %{
 #include <stdio.h>
@@ -41,9 +40,13 @@
 #include <locale.h>
 #include <signal.h>
 
-static int *getout(int);
+static void getout(int)	__NORETURN;
 static int *bundle(int, ...);
 static void usage(void);
+
+int	cpeek(char, int, char, int, char);
+void	yyerror(char *);
+
 %}
 %union {
 	int *iptr;
@@ -103,9 +106,9 @@ start	:
 	| start def dargs ')' '{' dlist slist '}'
 		= {
 			ttp = bundle(6, pre, $7, post, "0", numb[lev], "Q");
-			conout(ttp, $2);
+			conout(ttp, (char *)$2);
 			rcrs = crs;
-			output("");
+			output((int *)"");
 			lev = bindx = 0;
 		}
 	;
@@ -478,7 +481,8 @@ char *letr[26] = {
 	"u", "v", "w", "x", "y", "z"
 };
 
-yylex()
+int
+yylex(void)
 {
 	int c, ch;
 
@@ -674,8 +678,8 @@ gotit:
 	}
 }
 
-cpeek(c1, yes1, c2, yes2, none)
-char c1, c2, none;
+int
+cpeek(char c1, int yes1, char c2, int yes2, char none)
 {
 	int r;
 
@@ -690,7 +694,9 @@ char c1, c2, none;
 	return (r);
 }
 
-getch()
+
+int
+getch(void)
 {
 	int ch;
 	char mbuf[LINE_MAX];
@@ -751,21 +757,21 @@ bundle(int i, ...)
 	return (q);
 }
 
-routput(p)
-int *p;
+void
+routput(int *p)
 {
 	if (bdebug) printf("routput(%o)\n", p);
 	if (p >= &b_space[0] && p < &b_space[b_sp_max]) {
 		/* part of a bundle */
 		while (*p != 0)
-			routput(*p++);
+			routput((int *)*p++);
 	}
 	else
 		printf((char *)p);	 /* character string */
 }
 
-output(p)
-int *p;
+void
+output(int *p)
 {
 	routput(p);
 	b_sp_nxt = & b_space[0];
@@ -775,9 +781,8 @@ int *p;
 	crs = rcrs;
 }
 
-conout(p, s)
-int *p;
-char *s;
+void
+conout(int *p, char *s)
 {
 	printf("[");
 	routput(p);
@@ -786,8 +791,8 @@ char *s;
 	lev--;
 }
 
-yyerror(s)
-char *s;
+void
+yyerror(char *s)
 {
 	if (ifile >= sargc)
 		ss = "teletype";
@@ -806,7 +811,8 @@ char *s;
 	b_sp_nxt = &b_space[0];
 }
 
-checkbuffer()
+void
+checkbuffer(void)
 {
 	/* Do not exceed the last char in input line buffer */
 	if (cp >= cpend) {
@@ -815,8 +821,8 @@ checkbuffer()
 	}
 }
 
-pp(s)
-int *s;
+void
+pp(int *s)
 {
 	/* puts the relevant stuff on pre and post for the letter s */
 
@@ -826,8 +832,8 @@ int *s;
 	post = yyval.iptr;
 }
 
-tp(s)
-int *s;
+void
+tp(int *s)
 {		/* same as pp, but for temps */
 	bundle(3, "0S", s, pre);
 	pre = yyval.iptr;
@@ -835,9 +841,8 @@ int *s;
 	post = yyval.iptr;
 }
 
-yyinit(argc, argv)
-int argc;
-char *argv[];
+void
+yyinit(int argc, char **argv)
 {
 	char	mbuf[LINE_MAX];
 
@@ -860,9 +865,8 @@ char *argv[];
 	ss = sargv[0];
 }
 
-static int *
-getout(code)
-int code;
+static void
+getout(int code)
 {
 	printf("q");
 	(void) fflush(stdout);
@@ -870,22 +874,19 @@ int code;
 }
 
 int *
-getf(p)
-char *p;
+getf(char *p)
 {
 	return ((int *) &funtab[2*(*p -0141)]);
 }
 
 int *
-geta(p)
-char *p;
+geta(char *p)
 {
 	return ((int *) &atab[2*(*p - 0141)]);
 }
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char **argv)
 {
 	int	p[2];
 	int	cflag = 0;
@@ -972,6 +973,8 @@ char *argv[];
 #else
 	execl("/usr/bin/dc", "dc", "-", 0);
 #endif
+
+	return (1);
 }
 
 static void

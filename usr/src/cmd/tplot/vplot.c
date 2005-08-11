@@ -37,6 +37,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sgtty.h>
+#include <stdlib.h>
 
 #define	NB	88
 #define	BSIZ	512
@@ -89,16 +90,20 @@ int	in, out;
 char picname[] = "/var/tmp/rasterXXXXXX";
 char *picture;
 
-main(argc, argv)
-char **argv;
+void	getpict(void);
+void	plotch(int);
+void	putpict(void);
+void	line(int, int, int, int);
+void	point(int, int);
+void	getblk(int);
+void	onintr(void);
+
+int
+main(int argc, char **argv)
 {
-	extern void onintr();
-	register i;
-	extern char *optarg;
-	extern int optind;
-	register int c;
+	int i;
+	int c;
 	char *fname;
-	char *mktemp();
 
 	while ((c = getopt(argc, argv, "e:b:")) != EOF)
 	switch (c) {
@@ -131,11 +136,11 @@ char **argv;
 			    "vplot: cannot open %s\n", argv[optind]);
 			exit(1);
 		}
-	signal(SIGTERM, onintr);
+	signal(SIGTERM, (void (*)(int))onintr);
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
-		signal(SIGINT, onintr);
+		signal(SIGINT, (void (*)(int))onintr);
 	if (signal(SIGHUP, SIG_IGN) != SIG_IGN)
-		signal(SIGHUP, onintr);
+		signal(SIGHUP, (void (*)(int))onintr);
 another:
 	for (i = 0; i < NB; i++) {
 		bufs[i].bno = -1;
@@ -176,12 +181,13 @@ another:
 		goto another;
 	}
 	unlink(picture);
-	exit(0);
+	return (0);
 }
 
-getpict()
+void
+getpict(void)
 {
-	register x1, y1;
+	int x1, y1;
 
 	again = 0;
 	for (;;)
@@ -293,11 +299,11 @@ getpict()
 	}
 }
 
-plotch(c)
-register c;
+void
+plotch(int c)
 {
-	register j;
-	register char *cp;
+	int j;
+	char *cp;
 	int i;
 
 	if (c < ' ' || c > 0177)
@@ -317,10 +323,12 @@ register c;
 }
 
 int	f; /* versatec file number */
-putpict()
+
+void
+putpict(void)
 {
-	register x;
-	register short *ip, *op;
+	int x;
+	short *ip, *op;
 	int y;
 
 	if (f == 0) {
@@ -360,12 +368,12 @@ putpict()
 	}
 }
 
-line(x0, y0, x1, y1)
-register x0, y0;
+void
+line(int x0, int y0, int x1, int y1)
 {
 	int dx, dy;
 	int xinc, yinc;
-	register res1;
+	int res1;
 	int res2;
 	int slope;
 
@@ -418,10 +426,10 @@ register x0, y0;
 		point(x1, y1);
 }
 
-point(x, y)
-register x, y;
+void
+point(int x, int y)
 {
-	register bno;
+	int bno;
 
 	bno = ((x&03700)>>6) + ((y&03700)>>1);
 	if (bno != bufs[0].bno) {
@@ -432,11 +440,11 @@ register x, y;
 	bufs[0].block[((y&077)<<3)+((x>>3)&07)] |= 1 << (7-(x&07));
 }
 
-getblk(b)
-register b;
+void
+getblk(int b)
 {
-	register struct buf *bp1, *bp2;
-	register char *tp;
+	struct buf *bp1, *bp2;
+	char *tp;
 
 loop:
 	for (bp1 = bufs; bp1 < &bufs[NB]; bp1++) {
@@ -460,13 +468,15 @@ loop:
 }
 
 void
-onintr()
+onintr(void)
 {
 	unlink(picture);
 	exit(1);
 }
 
-zseek(a, b)
+
+int
+zseek(int a, int b)
 {
 	return (lseek(a, (long)b*512, 0));
 }

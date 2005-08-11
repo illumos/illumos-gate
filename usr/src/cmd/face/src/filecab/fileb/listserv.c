@@ -19,22 +19,26 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "wish.h"
 
-main(argc,argv)
-int argc;
-char *argv[];
+int
+main(int argc, char **argv)
 {
 	FILE *fp;
-	char *home, *getenv(), *label, *name, *penv, *fname;
+	char *home, *label, *name, *penv, *fname;
 	char tpath[PATHSIZ], hpath[PATHSIZ], buf[BUFSIZ], path[PATHSIZ], *opt;
 	int flag=0, cond=0, dos=0;
 	int app_type();
@@ -61,11 +65,11 @@ char *argv[];
 	home=getenv(penv);
 
 	if (strcmp(penv,"HOME") == 0) {
-		sprintf(hpath, "%s/pref/services",home);
+		snprintf(hpath, sizeof (hpath), "%s/pref/services",home);
 		sprintf(tpath,"$VMSYS/OBJECTS/%s",dos?"dos":"programs");
 	}
 	else {
-		sprintf(hpath, "%s/lib/services",home);
+		snprintf(hpath, sizeof (hpath), "%s/lib/services",home);
 		sprintf(tpath,"$OBJ_DIR");
 	}
 
@@ -82,7 +86,8 @@ char *argv[];
 
 		if (! strcmp(label,"name")) {
 			name=strtok(NULL,"\n");
-			sprintf(path,"%s/bin/%s.ins",home,name);
+			snprintf(path, sizeof (path),
+			    "%s/bin/%s.ins",home,name);
 		} else if (! strcmp(label,"`echo 'name")) {
 			name=strtok(NULL,"'");
 			fname=strtok(NULL,"=");
@@ -90,7 +95,8 @@ char *argv[];
 			if (! strncmp(fname,"OPEN",4))
 				continue;
 			fname=strtok(NULL,"`");
-			sprintf(path,"%s%s",home,&fname[strlen(penv)]);
+			snprintf(path, sizeof (path),
+			    "%s%s",home,&fname[strlen(penv)]);
 		} else
 			continue;
 		if ( access(path,00)==0 && app_type(path,dos) ) {
@@ -116,13 +122,11 @@ char *argv[];
 			printf("init=`message No Programs Installed`false\n");
 		exit(FAIL);
 	}
-	exit(SUCCESS);
+	return (SUCCESS);
 }
 
 int
-app_type(path,dos)
-char *path;
-int dos;
+app_type(char *path, int dos)
 {
 	FILE *fp;
 	char buf[BUFSIZ];

@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.19  */
 #define	FATAL 0
 #define	NFATAL 1
 #define	BLK sizeof (struct blk)
@@ -81,10 +86,10 @@ struct	wblk {
 	struct blk **lastw;
 };
 struct	blk *hfree;
-struct	blk *getwd();
-struct	blk *lookwd();
-struct	blk *getdec();
-struct	blk *morehd();
+struct	blk *getwd(struct blk *);
+struct	blk *lookwd(struct blk *);
+struct	blk *getdec(struct blk *, int);
+struct	blk *morehd(void);
 
 struct	blk *arg1, *arg2;
 int	svargc;
@@ -106,19 +111,21 @@ struct	blk *rem;
 int	k;
 struct	blk *irem;
 int	skd, skr;
-struct	blk *pop(), *readin(), *add0(), *mult();
-struct	blk *scalint();
-struct	blk *removc();
-struct	blk *add(), *div(), *removr();
-struct	blk *exp();
-struct	blk *sqrt();
-struct	blk *salloc(), *copy();
-struct	blk *scale();
-void	commnds();
+struct	blk *pop(void), *readin(void), *add0(struct blk *, int),
+    *mult(struct blk *, struct blk *);
+struct	blk *scalint(struct blk *);
+struct	blk *removc(struct blk *, int);
+struct	blk *add(struct blk *, struct blk *),
+    *dcdiv(struct blk *, struct blk *), *removr(struct blk *, int);
+struct	blk *exp(struct blk *, struct blk *);
+struct	blk *sqrt(struct blk *);
+struct	blk *salloc(int), *copy(struct blk *, int);
+struct	blk *scale(struct blk *, int);
+void	commnds(void);
 void	init(int, char **);
 void	pushp(struct blk *p);
 void	chsign(struct blk *p);
-char	readc();
+char	readc(void);
 void	unreadc(char);
 void	binop(char);
 void	print(struct blk *hptr);
@@ -129,7 +136,7 @@ void	ospace(char *s);
 void	garbage(char *s);
 void	more(struct blk *hptr);
 int	cond(char c);
-void	load();
+void	load(void);
 void	sdump(char *s1, struct blk *hptr);
 void	salterwd(struct wblk *hptr, struct blk *n);
 void	redef(struct blk *p);
@@ -150,14 +157,12 @@ long	all;
 long	headmor;
 long	obase;
 int	fw, fw1, ll;
-void	(*outdit)();
-void	bigot(), hexot();
+void	(*outdit)(struct blk *, int);
+void	bigot(struct blk *, int), hexot(struct blk *, int);
 int	logo;
 int	log10;
 int	count;
 char	*pp;
-void	onintr();
-char	*malloc();
-char	*nalloc();
-char	*realloc();
+void	onintr(int);
+char	*nalloc(char *, unsigned int);
 char	*dummy;

@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 #include <stdio.h>
 #include <math.h>
 #include <errno.h>
@@ -31,7 +37,13 @@
 float deltx = 4095.0;
 float delty = 4095.0;
 
-main(argc,argv)  char **argv; {
+static void	fplt(FILE *);
+static int	getsi(FILE *);
+static void	getsd(char *, FILE *);
+
+int
+main(int argc, char **argv)
+{
 	int std=1;
 	FILE *fin;
 
@@ -58,11 +70,13 @@ main(argc,argv)  char **argv; {
 		}
 	if (std)
 		fplt( stdin );
-	exit(0);
-	}
+	return (0);
+}
 
 
-fplt(fin)  FILE *fin; {
+static void
+fplt(FILE *fin)
+{
 	int c;
 	char s[256];
 	int xi,yi,x0,y0,x1,y1,r,dx,n,i;
@@ -137,8 +151,12 @@ fplt(fin)  FILE *fin; {
 			}
 		}
 	closepl();
-	}
-getsi(fin)  FILE *fin; {	/* get an integer stored in 2 ascii bytes. */
+}
+
+static int
+getsi(FILE *fin)
+{
+	/* get an integer stored in 2 ascii bytes. */
 	short a, b;
 	if((b = getc(fin)) == EOF)
 		return(EOF);
@@ -147,17 +165,18 @@ getsi(fin)  FILE *fin; {	/* get an integer stored in 2 ascii bytes. */
 	a = a<<8;
 	return(a|b);
 }
-getsd(s,fin)  char *s;  FILE *fin; {
+
+static void
+getsd(char *s, FILE *fin)
+{
 	for( ; *s = getc(fin); s++)
 		if(*s == '\n')
 			break;
 	*s = '\0';
-	return;
 }
 
-
-matherr(x)
-struct exception *x;
+int
+matherr(struct exception *x)
 {
 if(x->type==DOMAIN)
 	{errno=EDOM;
@@ -172,5 +191,3 @@ else  if ((x->type)==SING)
 	}
 else return(0);
 }
-
-

@@ -22,13 +22,16 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-/*	Portions Copyright (c) 1988, Sun Microsystems, Inc.	*/
-/*	All Rights Reserved. 					*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 #define NP 1000
 #define INF HUGE
@@ -169,7 +172,8 @@ where
 */
 
 REAL
-rhs(i){
+rhs(int i)
+{
 	int i_;
 	double zz;
 	i_ = i==n-1?0:i;
@@ -177,7 +181,9 @@ rhs(i){
 	return(6*((y.val[i_+1]-y.val[i_])/(x.val[i+1]-x.val[i]) - zz));
 }
 
-spline(){
+int
+spline(void)
+{
 	REAL d,s,u,v,hi,hi1;
 	REAL h;
 	REAL D2yi,D2yi1,D2yn1,x0,x1,yy,a;
@@ -243,19 +249,23 @@ spline(){
 			}
 		}
 	return(1);
-	}
-readin() {
+}
+
+void
+readin(void) {
 	for(n=0;n<NP;n++){
 		if(auta) x.val[n] = n*dx+x.lb;
 		else if(!getfloat(&x.val[n])) break;
-		if(!getfloat(&y.val[n])) break; } }
+		if(!getfloat(&y.val[n])) break; }
+}
 
-getfloat(p)
-	REAL *p;{
+int
+getfloat(REAL *p)
+{
 	char buf[30];
-	register c;
+	int c;
 	int i;
-	extern double atof();
+
 	for(;;){
 		c = getchar();
 		if (c==EOF) {
@@ -287,20 +297,21 @@ getfloat(p)
 		break; }
 	buf[i] = ' ';
 	*p = atof(buf);
-	return(1); }
+	return(1);
+}
 
-getlim(p)
-	struct proj *p; {
+void
+getlim(struct proj *p)
+{
 	int i;
 	for(i=0;i<n;i++) {
 		if(!p->lbf && p->lb>(p->val[i])) p->lb = p->val[i];
 		if(!p->ubf && p->ub<(p->val[i])) p->ub = p->val[i]; }
-	}
+}
 
-
-main(argc,argv)
-	char *argv[];{
-	extern char *malloc();
+int
+main(int argc, char **argv)
+{
 	int i;
 	x.lbf = x.ubf = y.lbf = y.ubf = 0;
 	x.lb = INF;
@@ -347,13 +358,12 @@ again:		switch(argv[0][0]) {
 	if(r==NULL||!spline()) for(i=0;i<n;i++){
 		printf("%f ",x.val[i]);
 		printf("%f\n",y.val[i]); }
-	exit(0);
+	return (0);
 }
-numb(np,argcp,argvp)
-	int *argcp;
-	REAL *np;
-	char ***argvp;{
-	double atof();
+
+int
+numb(REAL *np, int *argcp, char ***argvp)
+{
 	char c;
 	if(*argcp<=1) return(0);
 	c = (*argvp)[1][0];
@@ -361,5 +371,6 @@ numb(np,argcp,argvp)
 	*np = atof((*argvp)[1]);
 	(*argcp)--;
 	(*argvp)++; 
-	return(1); }
+	return(1);
+}
 

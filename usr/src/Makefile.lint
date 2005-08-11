@@ -113,6 +113,7 @@ COMMON_SUBDIRS = \
 	cmd/emul64ioctl \
 	cmd/env \
 	cmd/expand \
+	cmd/fdetach \
 	cmd/fdformat \
 	cmd/fgrep \
 	cmd/file \

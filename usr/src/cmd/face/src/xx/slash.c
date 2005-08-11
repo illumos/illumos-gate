@@ -19,23 +19,26 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <stdio.h>
+#include <stdlib.h>
 
-extern char *optarg;
-extern int optind;
-
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char **argv)
 {
-	register int c, fromstr;
-	register char *sptr;
-	FILE *fp, *fopen();
+	int c, fromstr;
+	char *sptr;
+	FILE *fp;
 	char *ifile;
 	int errflag;
 

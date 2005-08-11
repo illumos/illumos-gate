@@ -19,16 +19,23 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <pwd.h>
 #include <string.h>
 #include <sys/types.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 #define NUMARGS		6
 #define MAXARGS		25	
@@ -42,22 +49,16 @@ static char vmsys[BUFSIZ];
 static char home[BUFSIZ];
 static char pidbuf[BUFSIZ];
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char **argv)
 {
 	char *Objlist[MAXARGS];
 	char fmlibuf[BUFSIZ];
 	char introbuf[BUFSIZ];
 	char aliasbuf[BUFSIZ];
 	char cmdbuf[BUFSIZ];
-	register int i,j;
-	extern pid_t getpid();
-/*
-	int isatty();
-*/
-	static void sanity_check();
-	char *getenv();
+	int i,j;
+	static void sanity_check(void);
 	char *tmpenv;
 	char *newbuf;
 	char varbuf[BUFSIZ];
@@ -69,7 +70,7 @@ char *argv[];
 		exit(1);
 	}
 	else
-		strcpy(vmsys, tmpenv);
+		strlcpy(vmsys, tmpenv, sizeof (vmsys));
 
 	if ( (tmpenv = getenv("OASYS")) == NULL ) {
 		fprintf(stderr, "\r\nThe environment variable \"OASYS\" must be set in\nyour environment before you can use FACE.\r\n\n");
@@ -91,9 +92,9 @@ char *argv[];
 
 	sanity_check();
 
-	sprintf(introbuf, "%s%s", vmsys, "/bin/initial");
-	sprintf(aliasbuf, "%s%s", vmsys, "/pathalias");
-	sprintf(cmdbuf, "%s%s", vmsys, "/bin/cmdfile");
+	snprintf(introbuf, sizeof (introbuf), "%s%s", vmsys, "/bin/initial");
+	snprintf(aliasbuf, sizeof (aliasbuf), "%s%s", vmsys, "/pathalias");
+	snprintf(cmdbuf, sizeof (cmdbuf), "%s%s", vmsys, "/bin/cmdfile");
 	Objlist[0] = fmlibuf;
 	Objlist[1] = "-i";
 	Objlist[2] = introbuf; 
@@ -107,7 +108,8 @@ char *argv[];
 		 */
 		char objbuf[BUFSIZ];
 
-		sprintf(objbuf, "%s%s", vmsys, "/OBJECTS/Menu.face");
+		snprintf(objbuf, sizeof (objbuf),
+		    "%s%s", vmsys, "/OBJECTS/Menu.face");
 		Objlist[NUMARGS + 1] = objbuf;
 		Objlist[NUMARGS + 2] = NULL;
 	}
@@ -124,7 +126,7 @@ char *argv[];
 		system("tput init; stty tab3");
 */
 
-	sprintf(varbuf, "%s%s", home, "/pref/.variables");
+	snprintf(varbuf, sizeof (varbuf), "%s%s", home, "/pref/.variables");
 	fp = fopen(varbuf, "r");
 	while (fgets(buf, BUFSIZ, fp) != NULL) {
 		if (buf[strlen(buf) - 1] == '\n')
@@ -143,14 +145,14 @@ char *argv[];
 	execvp(fmlibuf, Objlist);
 
 	fprintf(stderr, "\r\nAn error has occurred while trying to use the \"AT&T FMLI\" package.\nThe file %s will not execute properly.\nThis situation must be corrected before you can proceed.\r\n\n",fmlibuf);
-	exit(1);
+	return (1);
 }
 
+static void	error(char *);
 char	user[20];
 
-static
-void
-sanity_check()
+static void
+sanity_check(void)
 {
 	char	pref[BUFSIZ];
 	char	environ[BUFSIZ];
@@ -161,25 +163,24 @@ sanity_check()
 	char	wastebasket[BUFSIZ];
 	char	wpref[BUFSIZ];
 	char	cmd[BUFSIZ];
-	char	*getenv();
 	uid_t	uid;
 	struct	passwd *ppw;
 
 	uid = geteuid();
 	ppw = getpwuid(uid);
-	strcpy(user, ppw->pw_name);
-	strcpy(home, getenv("HOME"));
+	strlcpy(user, ppw->pw_name, sizeof (user));
+	strlcpy(home, getenv("HOME"), sizeof (home));
 	if (access(home, 07))
 		error(home);
 
-	sprintf(pref, "%s/pref", home);
-	sprintf(environ, "%s/.environ", pref);
-	sprintf(variables, "%s/.variables", pref);
-	sprintf(color, "%s/.colorpref", pref);
-	sprintf(tmp, "%s/tmp", home);
-	sprintf(bin, "%s/bin", home);
-	sprintf(wastebasket, "%s/WASTEBASKET", home);
-	sprintf(wpref, "%s/.pref", wastebasket);
+	snprintf(pref, sizeof (pref), "%s/pref", home);
+	snprintf(environ, sizeof (environ), "%s/.environ", pref);
+	snprintf(variables, sizeof (variables), "%s/.variables", pref);
+	snprintf(color, sizeof (color), "%s/.colorpref", pref);
+	snprintf(tmp, sizeof (tmp), "%s/tmp", home);
+	snprintf(bin, sizeof (bin), "%s/bin", home);
+	snprintf(wastebasket, sizeof (wastebasket), "%s/WASTEBASKET", home);
+	snprintf(wpref, sizeof (wpref), "%s/.pref", wastebasket);
 
 	if (access(pref, 00)) 
 		mkdir(pref, 0777);
@@ -187,19 +188,21 @@ sanity_check()
 		error(pref);
 		
 	if (access(environ, 00)) {
-		sprintf(cmd, "cp %s%s %s", vmsys, ENVIRON, environ);
+		snprintf(cmd, sizeof (cmd),
+		    "cp %s%s %s", vmsys, ENVIRON, environ);
 		system(cmd);
 	} else if (access(environ, 06))
 		error(environ);
 
 	if (access(variables, 00)) {
-		sprintf(cmd, "cp %s%s %s", vmsys, VARIABLES, variables);
+		snprintf(cmd, sizeof (cmd),
+		    "cp %s%s %s", vmsys, VARIABLES, variables);
 		system(cmd);
 	} else if (access(variables, 06))
 		error(variables);
 
 	if (access(color, 00)) {
-		sprintf(cmd, "cp %s%s %s", vmsys, COLOR, color);
+		snprintf(cmd, sizeof (cmd), "cp %s%s %s", vmsys, COLOR, color);
 		system(cmd);
 	} else if (access(color, 06))
 		error(color);
@@ -218,13 +221,13 @@ sanity_check()
 		mkdir(wastebasket, 0777);
 
 	if (access(wpref, 00)) {
-		sprintf(cmd, "cp %s%s %s", vmsys, WPREF, wpref);
+		snprintf(cmd, sizeof (cmd), "cp %s%s %s", vmsys, WPREF, wpref);
 		system(cmd);
 	} 
 }
 
-error(object)
-char	*object;
+static void
+error(char *object)
 {
 	fprintf(stderr, "The permission of '%s' is not properly set for user '%s'.\n", object, user);
 	exit(1);

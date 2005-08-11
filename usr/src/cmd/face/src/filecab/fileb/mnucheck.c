@@ -19,15 +19,21 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include 	<string.h>
 #include 	<ctype.h>
+#include	<stdlib.h>
 #include	"wish.h"
 
 
@@ -36,18 +42,16 @@
 #define INVALID 3
 #define SUCCESS 0
 
-extern char *optarg;
 char	*string=NULL;
 char	*name=NULL;
 
-main(argc,argv)
-int argc;
-char *argv[];
+int
+main(int argc, char **argv)
 {
 
 	int     ret;
 	int 	opt;
-	char	hpath[PATHSIZ], path[PATHSIZ], *home, *vmsys, *str, *getenv();
+	char	hpath[PATHSIZ], path[PATHSIZ], *home, *vmsys, *str;
 	FILE    *fp, *nfp;
 
 	home=getenv("HOME");
@@ -74,8 +78,8 @@ char *argv[];
 	if (strcmp(string,name) == 0)
 		return(SUCCESS);
 
-	sprintf(hpath,"%s/pref/services",home);
-	sprintf(path, "%s/lib/services",vmsys);
+	snprintf(hpath, sizeof (hpath), "%s/pref/services",home);
+	snprintf(path, sizeof (path), "%s/lib/services",vmsys);
 
 	if(access(hpath, 00) == 0) {
 		if ((fp=fopen(hpath, "r")) == NULL) {
@@ -105,8 +109,8 @@ char *argv[];
 	return(SUCCESS);
 }
 
-mread(fp)
-FILE *fp;
+int
+mread(FILE *fp)
 {
 	char buf[BUFSIZ], *label, *mname;
 
