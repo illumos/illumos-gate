@@ -463,17 +463,19 @@ read_line(f, buffer, buflen)
 	}
 }
 
-static int _is_nss_lookup_by_name(int attrdb, nss_dbop_t op) {
+static int
+is_nss_lookup_by_name(int attrdb, nss_dbop_t op)
+{
 	int result = 0;
 
 	if ((attrdb != 0) &&
-		((op == NSS_DBOP_AUDITUSER_BYNAME) ||
-		(op == NSS_DBOP_USERATTR_BYNAME))) {
+	    ((op == NSS_DBOP_AUDITUSER_BYNAME) ||
+	    (op == NSS_DBOP_USERATTR_BYNAME))) {
 		result = 1;
 	} else if ((attrdb == 0) &&
-		((op == NSS_DBOP_GROUP_BYNAME) ||
-		(op == NSS_DBOP_PASSWD_BYNAME) ||
-		(op == NSS_DBOP_SHADOW_BYNAME))) {
+	    ((op == NSS_DBOP_GROUP_BYNAME) ||
+	    (op == NSS_DBOP_PASSWD_BYNAME) ||
+	    (op == NSS_DBOP_SHADOW_BYNAME))) {
 		result = 1;
 	}
 
@@ -694,29 +696,30 @@ _nss_compat_XY_all(be, args, check, op_num)
 			 * nss_search() before extracting the name via the
 			 * get_XXname() function. i.e. (*be->getnamef)(args).
 			 */
-		    if (_is_nss_lookup_by_name(0, op_num) != 0) {
-			/* compare then search */
-			if (!be->permit_netgroups ||
-				!netgr_in(be, instr + 2, args->key.name))
-				continue;
-			if (instr[0] == '+') {
-				/* need to search for "+" entry */
+			if (is_nss_lookup_by_name(0, op_num) != 0) {
+				/* compare then search */
+				if (!be->permit_netgroups ||
+				    !netgr_in(be, instr + 2, args->key.name))
+					continue;
+				if (instr[0] == '+') {
+					/* need to search for "+" entry */
+					nss_search(be->db_rootp, be->db_initf,
+					    op_num, args);
+					if (args->returnval == 0)
+						continue;
+				}
+			} else {
+				/* search then compare */
 				nss_search(be->db_rootp, be->db_initf, op_num,
-					args);
+				    args);
 				if (args->returnval == 0)
 					continue;
+				if (!be->permit_netgroups ||
+				    !netgr_in(be, instr + 2,
+				    (*be->getnamef)(args)))
+					continue;
 			}
-		    } else {
-			/* search then compare */
-			nss_search(be->db_rootp, be->db_initf, op_num, args);
-			if (args->returnval == 0)
-				continue;
-			if (!be->permit_netgroups ||
-				!netgr_in(be, instr + 2, (*be->getnamef)(args)))
-				continue;
-		    }
-		}	/* end of case 1 */
-		else if (instr[1] == '\0') {
+		} else if (instr[1] == '\0') {
 			/*
 			 * Case 2:
 			 * The entry is of the form "+" or "-".  The former
@@ -729,8 +732,7 @@ _nss_compat_XY_all(be, args, check, op_num)
 			nss_search(be->db_rootp, be->db_initf, op_num, args);
 			if (args->returnval == 0)
 				continue;
-		}	/* end of case 2 */
-		else {
+		} else {
 			/*
 			 * Case 3:
 			 * The entry is of the form "+name" or "-name".
@@ -740,28 +742,28 @@ _nss_compat_XY_all(be, args, check, op_num)
 			 * nss_search() before extracting the name via the
 			 * get_XXname() function. i.e. (*be->getnamef)(args).
 			 */
-			if (_is_nss_lookup_by_name(0, op_num) != 0) {
+			if (is_nss_lookup_by_name(0, op_num) != 0) {
 				/* compare then search */
 				if (strcmp(instr + 1, args->key.name) != 0)
 					continue;
 				if (instr[0] == '+') {
 					/* need to search for "+" entry */
 					nss_search(be->db_rootp, be->db_initf,
-						op_num, args);
+					    op_num, args);
 					if (args->returnval == 0)
 						continue;
 				}
 			} else {
 				/* search then compare */
 				nss_search(be->db_rootp, be->db_initf, op_num,
-					args);
+				    args);
 				if (args->returnval == 0)
 					continue;
 				if (strcmp(instr + 1, (*be->getnamef)(args))
-					!= 0)
+				    != 0)
 					continue;
 			}
-		} 	/* end of case 3 */
+		}
 		if (instr[0] == '-') {
 			/* no need to search for "-" entry */
 			args->returnval = 0;
@@ -769,7 +771,7 @@ _nss_compat_XY_all(be, args, check, op_num)
 			res = NSS_NOTFOUND;
 		} else {
 			if (colon != 0)
-			*colon = ':';	/* restoration */
+				*colon = ':';	/* restoration */
 			res = do_merge(be, args, instr, linelen);
 		}
 		break;
