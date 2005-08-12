@@ -82,7 +82,7 @@ px_mmu_attach(px_t *px_p)
 	mmu_p->mmu_dvma_base = dvma_prop->dvma_base;
 	mmu_p->mmu_dvma_end = dvma_prop->dvma_base +
 	    (dvma_prop->dvma_len - 1);
-	tsb_entries = dvma_prop->dvma_len >> 13;
+	tsb_entries = MMU_BTOP(dvma_prop->dvma_len);
 
 	kmem_free(dvma_prop, dvma_prop_len);
 
@@ -110,7 +110,7 @@ px_mmu_attach(px_t *px_p)
 
 	mmu_p->mmu_dvma_map = vmem_create(map_name,
 	    (void *)(mmu_p->mmu_dvma_fast_end + 1),
-	    (tsb_entries - cache_size) << MMU_PAGE_SHIFT, MMU_PAGE_SIZE,
+	    MMU_PTOB(tsb_entries) - cache_size, MMU_PAGE_SIZE,
 	    NULL, NULL, NULL, MMU_PAGE_SIZE, VM_SLEEP);
 
 	mutex_init(&mmu_p->dvma_debug_lock, NULL, MUTEX_DRIVER, NULL);
