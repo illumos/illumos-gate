@@ -490,7 +490,7 @@ void (*clnt_stop_idle)(queue_t *wq);
  */
 #define	REFRESHES	2	/* authentication refreshes */
 
-static int clnt_cots_do_bindresvport = 1; /* bind to reserved port */
+static int clnt_cots_do_bindresvport = 0; /* bind to a non-reserved port */
 
 static zone_key_t zone_cots_key;
 
@@ -1345,10 +1345,25 @@ read_again:
 				 * authentication errors to appropriate errno
 				 */
 				switch (p->cku_err.re_why) {
+				case AUTH_TOOWEAK:
+					/*
+					 * Could be an nfsportmon failure, set
+					 * useresvport and try again
+					 */
+					if (p->cku_useresvport != 1) {
+						p->cku_useresvport = 1;
+						p->cku_xid = 0;
+						(void) xdr_rpc_free_verifier
+							    (xdrs, &reply_msg);
+						freemsg(mp);
+						connmgr_cancelconn(cm_entry);
+						cm_entry = NULL;
+						goto call_again;
+					}
+					/* FALLTHRU */
 				case AUTH_BADCRED:
 				case AUTH_BADVERF:
 				case AUTH_INVALIDRESP:
-				case AUTH_TOOWEAK:
 				case AUTH_FAILED:
 				case RPCSEC_GSS_NOCRED:
 				case RPCSEC_GSS_FAILED:

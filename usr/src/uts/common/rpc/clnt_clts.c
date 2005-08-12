@@ -160,7 +160,7 @@ static call_table_t *clts_call_ht;
 static struct endpnt_type *endpnt_type_create(struct knetconfig *);
 static void endpnt_type_free(struct endpnt_type *);
 static int check_endpnt(struct endpnt *, struct endpnt **);
-static struct endpnt *endpnt_get(struct knetconfig *);
+static struct endpnt *endpnt_get(struct knetconfig *, int);
 static void endpnt_rele(struct endpnt *);
 static void endpnt_reap_settimer(endpnt_type_t *);
 static void endpnt_reap(endpnt_type_t *);
@@ -211,6 +211,7 @@ struct cku_private {
 	caddr_t			 cku_feedarg;	/* argument for feedback func */
 	uint32_t		 cku_xid;	/* current XID */
 	bool_t			 cku_bcast;	/* RPC broadcast hint */
+	int			cku_useresvport; /* Use reserved port */
 	struct rpc_clts_client	*cku_stats;	/* counters for the zone */
 };
 
@@ -253,7 +254,7 @@ static uint_t clts_rcstat_ndata =
 #define	SNDTRIES	4
 #define	REFRESHES	2	/* authentication refreshes */
 
-static int clnt_clts_do_bindresvport = 1; /* bind to reserved port */
+static int clnt_clts_do_bindresvport = 0; /* bind to a non-reserved port */
 #define	BINDRESVPORT_RETRIES 5
 
 void
@@ -340,6 +341,7 @@ clnt_clts_kcreate(struct knetconfig *config, struct netbuf *addr,
 	plen = strlen(config->knc_protofmly) + 1;
 	p->cku_config.knc_protofmly = kmem_alloc(plen, KM_SLEEP);
 	bcopy(config->knc_protofmly, p->cku_config.knc_protofmly, plen);
+	p->cku_useresvport = -1; /* value is has not been set */
 
 	cv_init(&p->cku_call.call_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&p->cku_call.call_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -462,6 +464,7 @@ clnt_clts_kcallit_addr(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 	enum clnt_stat status;
 	struct rpc_msg reply_msg;
 	enum clnt_stat re_status;
+	endpnt_t *endpt;
 
 	RCSTAT_INCR(p->cku_stats, rccalls);
 
@@ -553,8 +556,9 @@ call_again:
 	 * source port, so that the duplicate request cache may detect a
 	 * retry.
 	 */
+
 	if (p->cku_endpnt == NULL)
-		p->cku_endpnt = endpnt_get(&p->cku_config);
+		p->cku_endpnt = endpnt_get(&p->cku_config, p->cku_useresvport);
 
 	if (p->cku_endpnt == NULL) {
 		freemsg(mp);
@@ -895,20 +899,55 @@ getresponse:
 		 * authentication errors to appropriate errno
 		 */
 		switch (p->cku_err.re_why) {
-			case AUTH_BADCRED:
-			case AUTH_BADVERF:
-			case AUTH_INVALIDRESP:
-			case AUTH_TOOWEAK:
-			case AUTH_FAILED:
-			case RPCSEC_GSS_NOCRED:
-			case RPCSEC_GSS_FAILED:
-				p->cku_err.re_errno = EACCES;
-				break;
-			case AUTH_REJECTEDCRED:
-			case AUTH_REJECTEDVERF:
-			default:
-				p->cku_err.re_errno = EIO;
-				break;
+		case AUTH_TOOWEAK:
+			/*
+			 * Could be an nfsportmon failure, set
+			 * useresvport and try again.
+			 */
+			if (p->cku_useresvport != 1) {
+				p->cku_useresvport = 1;
+				(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
+				freemsg(mpdup);
+
+				call_table_remove(call);
+				mutex_enter(&call->call_lock);
+				if (call->call_reply != NULL) {
+					freemsg(call->call_reply);
+					call->call_reply = NULL;
+				}
+				mutex_exit(&call->call_lock);
+
+				freemsg(resp);
+				mpdup = NULL;
+				endpt = p->cku_endpnt;
+				if (endpt->e_tiptr != NULL) {
+					mutex_enter(&endpt->e_lock);
+					endpt->e_flags &= ~ENDPNT_BOUND;
+					(void) t_kclose(endpt->e_tiptr, 1);
+					endpt->e_tiptr = NULL;
+					mutex_exit(&endpt->e_lock);
+
+				}
+
+				p->cku_xid = alloc_xid();
+				endpnt_rele(p->cku_endpnt);
+				p->cku_endpnt = NULL;
+				goto call_again;
+			}
+			/* FALLTHRU */
+		case AUTH_BADCRED:
+		case AUTH_BADVERF:
+		case AUTH_INVALIDRESP:
+		case AUTH_FAILED:
+		case RPCSEC_GSS_NOCRED:
+		case RPCSEC_GSS_FAILED:
+			p->cku_err.re_errno = EACCES;
+			break;
+		case AUTH_REJECTEDCRED:
+		case AUTH_REJECTEDVERF:
+		default:
+			p->cku_err.re_errno = EIO;
+			break;
 		}
 		RPCLOG(1, "clnt_clts_kcallit : authentication failed "
 		    "with RPC_AUTHERROR of type %d\n",
@@ -1043,6 +1082,24 @@ clnt_clts_kcontrol(CLIENT *h, int cmd, char *arg)
 
 	case CLGET_BCAST:
 		*((uint32_t *)arg) = p->cku_bcast;
+		return (TRUE);
+	case CLSET_BINDRESVPORT:
+		if (arg == NULL)
+			return (FALSE);
+
+		if (*(int *)arg != 1 && *(int *)arg != 0)
+			return (FALSE);
+
+		p->cku_useresvport = *(int *)arg;
+
+		return (TRUE);
+
+	case CLGET_BINDRESVPORT:
+		if (arg == NULL)
+			return (FALSE);
+
+		*(int *)arg = p->cku_useresvport;
+
 		return (TRUE);
 
 	default:
@@ -1348,7 +1405,7 @@ static int endpnt_get_return_null = 0;
  * can be obtained.
  */
 static struct endpnt *
-endpnt_get(struct knetconfig *config)
+endpnt_get(struct knetconfig *config, int useresvport)
 {
 	struct endpnt_type	*n_etype = NULL;
 	struct endpnt_type	*np = NULL;
@@ -1609,8 +1666,13 @@ top:
 	 * Attempt to bind the endpoint.  If we fail then propogate
 	 * error back to calling subsystem, so that it can be handled
 	 * appropriately.
+	 * If the caller has not specified reserved port usage then
+	 * take the system default.
 	 */
-	if (clnt_clts_do_bindresvport &&
+	if (useresvport == -1)
+		useresvport = clnt_clts_do_bindresvport;
+
+	if (useresvport &&
 	    (strcmp(config->knc_protofmly, NC_INET) == 0 ||
 		strcmp(config->knc_protofmly, NC_INET6) == 0)) {
 
