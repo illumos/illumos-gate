@@ -33,6 +33,7 @@
 
 #include	<stdio.h>
 #include	<stdlib.h>
+#include	<errno.h>
 #include	"gssapiP_spnego.h"
 #include	<mechglueP.h>
 #include	<gssapi_err_generic.h>
@@ -1410,15 +1411,25 @@ spnego_gss_import_sec_context(void *context,
 	gss_ctx_id_t		*context_handle)
 {
 	OM_uint32 ret;
-	spnego_gss_ctx_id_t *ctx =
-		    (spnego_gss_ctx_id_t *)context_handle;
+	spnego_gss_ctx_id_t ctx;
 
-	if (context_handle == NULL || *ctx == NULL)
+	if (context_handle == NULL)
 		return (GSS_S_NO_CONTEXT);
+
+	if ((ctx = create_spnego_ctx()) == NULL) {
+		*minor_status = ENOMEM;
+		return (GSS_S_FAILURE);
+	}
 
 	ret = gss_import_sec_context(minor_status,
 				    interprocess_token,
-				    &(*ctx)->ctx_handle);
+				    &(ctx->ctx_handle));
+	if (GSS_ERROR(ret)) {
+		(void) release_spnego_ctx(&ctx);
+		return (ret);
+	}
+
+	*context_handle = (gss_ctx_id_t)ctx;
 
 	return (ret);
 }
