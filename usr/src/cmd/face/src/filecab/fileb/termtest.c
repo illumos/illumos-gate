@@ -55,8 +55,8 @@
 char	*get_response(char *);
 char    *strnsave(char *, unsigned int);
 void	proc_file(char *);
-void	interpret(char *, bool, char [][]);
-void	do_case(char *, bool, char [][]);
+void	interpret(char *, bool, char [10][ARGSIZ]);
+void	do_case(char *, bool, char [10][ARGSIZ]);
 void	debug_out(bool, char *, char *);
 void	output(char *);
 void	initialize(void);
