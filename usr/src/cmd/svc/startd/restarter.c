@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -409,6 +409,15 @@ deleted:
 		goto deleted;
 	}
 
+	(void) snprintf(logfilebuf, PATH_MAX, "%s:%s", svc_name, inst_name);
+	for (c = logfilebuf; *c != '\0'; c++)
+		if (*c == '/')
+			*c = '-';
+
+	inst->ri_logstem = startd_alloc(PATH_MAX);
+	(void) snprintf(inst->ri_logstem, PATH_MAX, "%s%s", logfilebuf,
+	    LOG_SUFFIX);
+
 	/*
 	 * If the restarter group is missing, use uninit/none.  Otherwise,
 	 * we're probably being restarted & don't want to mess up the states
@@ -626,15 +635,6 @@ deleted:
 		(void) restarter_instance_update_states(h, inst, state,
 		    next_state, RERR_NONE, NULL);
 
-	(void) snprintf(logfilebuf, PATH_MAX, "%s:%s", svc_name, inst_name);
-	for (c = logfilebuf; *c != '\0'; c++)
-		if (*c == '/')
-			*c = '-';
-
-	if ((inst->ri_logstem = uu_msprintf("%s%s", logfilebuf, LOG_SUFFIX)) ==
-	    NULL)
-		uu_die("Allocation failure\n");
-
 	log_framework(LOG_DEBUG, "%s is a %s-style service\n", name,
 	    service_style(inst->ri_flags));
 
@@ -705,7 +705,7 @@ restarter_delete_inst(restarter_inst_t *ri)
 	uu_list_destroy(ri->ri_queue);
 
 	startd_free((void *)ri->ri_i.i_fmri, strlen(ri->ri_i.i_fmri) + 1);
-	free(ri->ri_logstem);
+	startd_free(ri->ri_logstem, PATH_MAX);
 	startd_free(ri->ri_utmpx_prefix, max_scf_value_size);
 	(void) pthread_mutex_destroy(&ri->ri_lock);
 	(void) pthread_mutex_destroy(&ri->ri_queue_lock);
