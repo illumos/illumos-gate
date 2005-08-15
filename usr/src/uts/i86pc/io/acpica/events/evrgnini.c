@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evrgnini- ACPI AddressSpace (OpRegion) init
- *              $Revision: 76 $
+ *              $Revision: 78 $
  *
  *****************************************************************************/
 
@@ -304,10 +304,14 @@ AcpiEvPciConfigRegionSetup (
             Status = AcpiUtExecute_HID (PciRootNode, &ObjectHID);
             if (ACPI_SUCCESS (Status))
             {
-                /* Got a valid _HID, check if this is a PCI root */
-
+                /*
+                 * Got a valid _HID string, check if this is a PCI root.
+                 * New for ACPI 3.0: check for a PCI Express root also.
+                 */
                 if (!(ACPI_STRNCMP (ObjectHID.Value, PCI_ROOT_HID_STRING,
-                                    sizeof (PCI_ROOT_HID_STRING))))
+                                    sizeof (PCI_ROOT_HID_STRING))           ||
+                    !(ACPI_STRNCMP (ObjectHID.Value, PCI_EXPRESS_ROOT_HID_STRING,
+                                    sizeof (PCI_EXPRESS_ROOT_HID_STRING)))))
                 {
                     /* Install a handler for this PCI root bridge */
 

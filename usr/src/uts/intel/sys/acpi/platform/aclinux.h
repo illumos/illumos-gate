@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclinux.h - OS specific defines, etc.
- *       $Revision: 36 $
+ *       $Revision: 37 $
  *
  *****************************************************************************/
 
@@ -134,6 +134,11 @@
 #define strtoul simple_strtoul
 
 #define ACPI_MACHINE_WIDTH  BITS_PER_LONG
+
+/* Type(s) for the OSL */
+
+#define ACPI_CACHE_T kmem_cache_t
+
 
 #else /* !__KERNEL__ */
 

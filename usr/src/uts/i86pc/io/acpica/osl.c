@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -337,31 +338,17 @@ AcpiOsDeleteLock(ACPI_HANDLE Handle)
 	kmem_free((void *)Handle, sizeof (ksema_t));
 }
 
-void
-AcpiOsAcquireLock(ACPI_HANDLE Handle, UINT32 Flags)
+UINT32
+AcpiOsAcquireLock(ACPI_HANDLE Handle)
 {
-	/* FUTUREWORK: does it matter which context we call from? */
-	switch (Flags) {
-	case ACPI_NOT_ISR:
-		break;
-	case ACPI_ISR:
-		break;
-	}
-
 	sema_p((ksema_t *)Handle);
+	return (0);
 }
 
 void
 AcpiOsReleaseLock(ACPI_HANDLE Handle, UINT32 Flags)
 {
-
-	/* FUTUREWORK: does it matter which context we call from? */
-	switch (Flags) {
-	case ACPI_NOT_ISR:
-		break;
-	case ACPI_ISR:
-		break;
-	}
+	_NOTE(ARGUNUSED(Flags))
 
 	sema_v((ksema_t *)Handle);
 }
@@ -444,19 +431,25 @@ AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
 		void *Context)
 {
 	int retval;
+	int sci_vect;
+	iflag_t sci_flags;
 
-#ifdef	DEBUG
-	cmn_err(CE_NOTE, "!acpica: attaching SCI %d", InterruptNumber);
-#endif
 	acpi_isr = ServiceRoutine;
 	acpi_isr_context = Context;
 
 	/*
-	 * FUTUREWORK: the FADT SCI may be changed by MADT ISO someday
-	 * Right thing to do: move get_sci into acpica from psm_common
+	 * Get SCI (adjusted for PIC/APIC mode if necessary)
 	 */
+	if (acpica_get_sci(&sci_vect, &sci_flags) != AE_OK) {
+		return (AE_ERROR);
+	}
+
+#ifdef	DEBUG
+	cmn_err(CE_NOTE, "!acpica: attaching SCI %d", sci_vect);
+#endif
+
 	retval = add_avintr(NULL, SCI_IPL, (avfunc)acpi_wrapper_isr,
-				"ACPI SCI", InterruptNumber, NULL, NULL, NULL);
+				"ACPI SCI", sci_vect, NULL, NULL, NULL);
 	if (retval) {
 		intr_hooked = 1;
 		return (AE_OK);

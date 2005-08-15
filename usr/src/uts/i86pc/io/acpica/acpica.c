@@ -383,7 +383,6 @@ error:
 		if (acpica_init_state != ACPICA_INITIALIZED) {
 			cmn_err(CE_NOTE, "!failed to initialize"
 			    " ACPI services");
-			(void) AcpiTerminate(); /* in case of error */
 		}
 	} else
 		status = AE_OK;

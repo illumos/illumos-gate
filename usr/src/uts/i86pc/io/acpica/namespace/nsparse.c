@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsparse - namespace interface to AML parser
- *              $Revision: 7 $
+ *              $Revision: 9 $
  *
  *****************************************************************************/
 
@@ -162,7 +162,7 @@ AcpiNsOneCompleteParse (
 
     /* Create and initialize a new walk state */
 
-    WalkState = AcpiDsCreateWalkState (TableDesc->TableId,
+    WalkState = AcpiDsCreateWalkState (TableDesc->OwnerId,
                                     NULL, NULL, NULL);
     if (!WalkState)
     {
@@ -223,6 +223,7 @@ AcpiNsParseTable (
      * to service the entire parse.  The second pass of the parse then
      * performs another complete parse of the AML..
      */
+    ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** Start pass 1\n"));
     Status = AcpiNsOneCompleteParse (1, TableDesc);
     if (ACPI_FAILURE (Status))
     {
@@ -238,6 +239,7 @@ AcpiNsParseTable (
      * overhead of this is compensated for by the fact that the
      * parse objects are all cached.
      */
+    ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** Start pass 2\n"));
     Status = AcpiNsOneCompleteParse (2, TableDesc);
     if (ACPI_FAILURE (Status))
     {

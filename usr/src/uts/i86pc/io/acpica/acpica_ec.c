@@ -43,6 +43,12 @@
 #include <sys/acpica.h>
 
 /*
+ * Internal prototypes
+ */
+static int ec_wait_ibf_clear(int sc_addr);
+static int ec_wait_obf_set(int sc_addr);
+
+/*
  * EC status bits
  */
 #define	EC_IBF	(0x02)
@@ -68,6 +74,7 @@ struct ec_softstate {
 	uint16_t ec_base;	/* base of EC I/O port - data */
 	uint16_t ec_sc;		/*  EC status/command */
 	ACPI_HANDLE ec_obj;	/* handle to ACPI object for EC */
+	kmutex_t    ec_mutex;	/* serialize access to EC */
 } ec;
 
 /* I/O port range descriptor */
@@ -96,8 +103,11 @@ ec_setup(ACPI_HANDLE reg, UINT32 func, void *context, void **ret)
 static int
 ec_rd(int addr)
 {
-	int	cnt;
-	uint8_t sc = inb(ec.ec_sc);
+	int	cnt, rv;
+	uint8_t sc;
+
+	mutex_enter(&ec.ec_mutex);
+	sc = inb(ec.ec_sc);
 
 #ifdef	DEBUG
 	if (sc & EC_IBF) {
@@ -110,48 +120,40 @@ ec_rd(int addr)
 #endif
 
 	outb(ec.ec_sc, EC_RD);	/* output a read command */
-	cnt = 0;
-	while (inb(ec.ec_sc) & EC_IBF) {
-		cnt += 1;
-		drv_usecwait(10);
-		if (cnt > 10000) {
-			cmn_err(CE_NOTE, "!ec_rd:1: timed-out waiting "
-			    "for IBF to clear");
-			return (-1);
-		}
+	if (ec_wait_ibf_clear(ec.ec_sc) < 0) {
+		cmn_err(CE_NOTE, "!ec_rd:1: timed-out waiting "
+		    "for IBF to clear");
+		mutex_exit(&ec.ec_mutex);
+		return (-1);
 	}
 
 	outb(ec.ec_base, addr);	/* output addr */
-	cnt = 0;
-	while (inb(ec.ec_sc) & EC_IBF) {
-		cnt += 1;
-		drv_usecwait(10);
-		if (cnt > 10000) {
-			cmn_err(CE_NOTE, "!ec_rd:2: timed-out waiting"
-			    " for IBF to clear");
-			return (-1);
-		}
+	if (ec_wait_ibf_clear(ec.ec_sc) < 0) {
+		cmn_err(CE_NOTE, "!ec_rd:2: timed-out waiting "
+		    "for IBF to clear");
+		mutex_exit(&ec.ec_mutex);
+		return (-1);
+	}
+	if (ec_wait_obf_set(ec.ec_sc) < 0) {
+		cmn_err(CE_NOTE, "!ec_rd:1: timed-out waiting "
+		    "for OBF to set");
+		mutex_exit(&ec.ec_mutex);
+		return (-1);
 	}
 
-	cnt = 0;
-	while (!(inb(ec.ec_sc) & EC_OBF)) {
-		cnt += 1;
-		drv_usecwait(10);
-		if (cnt > 10000) {
-			cmn_err(CE_NOTE, "!ec_rd:1: timed-out waiting"
-			    " for OBF to set");
-			return (-1);
-		}
-	}
-
-	return (inb(ec.ec_base));
+	rv = inb(ec.ec_base);
+	mutex_exit(&ec.ec_mutex);
+	return (rv);
 }
 
 static int
 ec_wr(int addr, uint8_t *val)
 {
 	int	cnt;
-	uint8_t sc = inb(ec.ec_sc);
+	uint8_t sc;
+
+	mutex_enter(&ec.ec_mutex);
+	sc = inb(ec.ec_sc);
 
 #ifdef	DEBUG
 	if (sc & EC_IBF) {
@@ -164,85 +166,81 @@ ec_wr(int addr, uint8_t *val)
 #endif
 
 	outb(ec.ec_sc, EC_WR);	/* output a write command */
-	cnt = 0;
-	while (inb(ec.ec_sc) & EC_IBF) {
-		cnt += 1;
-		drv_usecwait(10);
-		if (cnt > 10000) {
-			cmn_err(CE_NOTE, "!ec_wr:1: timed-out waiting "
-			    "for IBF to clear");
-			return (-1);
-		}
+	if (ec_wait_ibf_clear(ec.ec_sc) < 0) {
+		cmn_err(CE_NOTE, "!ec_wr:1: timed-out waiting "
+		    "for IBF to clear");
+		mutex_exit(&ec.ec_mutex);
+		return (-1);
 	}
 
 	outb(ec.ec_base, addr);	/* output addr */
-	cnt = 0;
-	while (inb(ec.ec_sc) & EC_IBF) {
-		cnt += 1;
-		drv_usecwait(10);
-		if (cnt > 10000) {
-			cmn_err(CE_NOTE, "!ec_wr:2: timed-out waiting"
-			    " for IBF to clear");
-			return (-1);
-		}
+	if (ec_wait_ibf_clear(ec.ec_sc) < 0) {
+		cmn_err(CE_NOTE, "!ec_wr:2: timed-out waiting "
+		    "for IBF to clear");
+		mutex_exit(&ec.ec_mutex);
+		return (-1);
 	}
 
 	outb(ec.ec_base, *val);	/* write data */
-	while (inb(ec.ec_sc) & EC_IBF) {
-		cnt += 1;
-		drv_usecwait(10);
-		if (cnt > 10000) {
-			cmn_err(CE_NOTE, "!ec_wr:3: timed-out waiting"
-			    " for IBF to clear");
-			return (-1);
-		}
+	if (ec_wait_ibf_clear(ec.ec_sc) < 0) {
+		cmn_err(CE_NOTE, "!ec_wr:3: timed-out waiting "
+		    "for IBF to clear");
+		mutex_exit(&ec.ec_mutex);
+		return (-1);
 	}
 
+	mutex_exit(&ec.ec_mutex);
 	return (0);
 }
 
 static int
 ec_query(void)
 {
-	int	cnt;
-	uint8_t	sc = inb(ec.ec_sc);
+	int	cnt, rv;
+	uint8_t	sc;
 
-	if (!(sc & EC_SCI) || (sc & EC_IBF) || (sc & EC_OBF)) {
+	mutex_enter(&ec.ec_mutex);
+	outb(ec.ec_sc, EC_QR);	/* output a query command */
+	if (ec_wait_ibf_clear(ec.ec_sc) < 0) {
+		cmn_err(CE_NOTE, "!ec_query:1: timed-out waiting "
+		    "for IBF to clear");
+		mutex_exit(&ec.ec_mutex);
 		return (-1);
 	}
 
-	outb(ec.ec_sc, EC_QR);	/* output a query command */
-	cnt = 0;
-	while (inb(ec.ec_sc) & EC_IBF) {
-		cnt += 1;
-		drv_usecwait(10);
-		if (cnt > 10000) {
-			cmn_err(CE_NOTE, "!ec_query:1: timed-out waiting "
-			    "for IBF to clear");
-			return (-1);
-		}
+	if (ec_wait_obf_set(ec.ec_sc) < 0) {
+		cmn_err(CE_NOTE, "!ec_query:1: timed-out waiting "
+		    "for OBF to set");
+		mutex_exit(&ec.ec_mutex);
+		return (-1);
 	}
 
-	cnt = 0;
-	while (!(inb(ec.ec_sc) & EC_OBF)) {
-		cnt += 1;
-		drv_usecwait(10);
-		if (cnt > 10000) {
-			cmn_err(CE_NOTE, "!ec_query:1: timed-out waiting"
-			    " for OBF to set");
-			return (-1);
-		}
-	}
-
-	return (inb(ec.ec_base));
+	rv = inb(ec.ec_base);
+	mutex_exit(&ec.ec_mutex);
+	return (rv);
 }
 
 static ACPI_STATUS
 ec_handler(UINT32 func, ACPI_PHYSICAL_ADDRESS addr, UINT32 width,
 	    ACPI_INTEGER *val, void *context, void *regcontext)
 {
-	_NOTE(ARGUNUSED(width, context, regcontext))
+	_NOTE(ARGUNUSED(context, regcontext))
 	int tmp;
+
+	/*
+	 * Add safety checks for BIOSes not strictly compliant
+	 * with ACPI spec
+	 */
+	if ((width % 8) != 0) {
+		cmn_err(CE_NOTE, "!ec_handler: width %d not multiple of 8",
+		    width);
+		return (AE_ERROR);
+	}
+
+	if (width > 8) {
+		cmn_err(CE_NOTE, "!ec_handler: width %d greater than 8", width);
+		return (AE_ERROR);
+	}
 
 	switch (func) {
 	case ACPI_READ:
@@ -269,8 +267,12 @@ ec_gpe_callback(void *ctx)
 	_NOTE(ARGUNUSED(ctx))
 
 	char		query_str[5];
-	int		query = ec_query();
+	int		query;
 
+	if (!(inb(ec.ec_sc) & EC_SCI))
+		return;
+
+	query = ec_query();
 	if (query >= 0) {
 		(void) snprintf(query_str, 5, "_Q%02X", (uint8_t)query);
 		(void) AcpiEvaluateObject(ec.ec_obj, query_str, NULL, NULL);
@@ -286,6 +288,47 @@ ec_gpe_handler(void *ctx)
 	AcpiOsQueueForExecution(OSD_PRIORITY_GPE, ec_gpe_callback, NULL);
 	return (0);
 }
+
+/*
+ * Busy-wait for IBF to clear
+ * return < 0 for time out, 0 for no error
+ */
+static int
+ec_wait_ibf_clear(int sc_addr)
+{
+	int	cnt;
+
+	cnt = 0;
+	while (inb(sc_addr) & EC_IBF) {
+		cnt += 1;
+		drv_usecwait(10);
+		if (cnt > 10000) {
+			return (-1);
+		}
+	}
+	return (0);
+}
+
+/*
+ * Busy-wait for OBF to set
+ * return < 0 for time out, 0 for no error
+ */
+static int
+ec_wait_obf_set(int sc_addr)
+{
+	int	cnt;
+
+	cnt = 0;
+	while (!(inb(sc_addr) & EC_OBF)) {
+		cnt += 1;
+		drv_usecwait(10);
+		if (cnt > 10000) {
+			return (-1);
+		}
+	}
+	return (0);
+}
+
 
 
 /*
@@ -348,12 +391,20 @@ acpica_install_ec(ACPI_HANDLE obj, UINT32 nest, void *context, void **rv)
 		 * Increment ahead to next struct.
 		 */
 		i += 7;
-#if 0
-		cmn_err(CE_NOTE, "acpica_install_ec: ec_base = %x ec_sc = %x",
-		    ec.ec_base, ec.ec_sc);
-#endif
 	}
 	AcpiOsFree(crs.Pointer);
+
+	/*
+	 * Drain the EC data register if something is left over from
+	 * legacy mode
+	 */
+	if (inb(ec.ec_sc) & EC_OBF) {
+#ifndef	DEBUG
+		inb(ec.ec_base);	/* read and discard value */
+#else
+		cmn_err(CE_NOTE, "!EC had something: 0x%x\n", inb(ec.ec_base));
+#endif
+	}
 
 	/*
 	 * Get GPE
@@ -377,23 +428,32 @@ acpica_install_ec(ACPI_HANDLE obj, UINT32 nest, void *context, void **rv)
 	AcpiOsFree(buf.Pointer);
 
 	/*
-	 * Enable EC GPE
+	 * Initialize EC mutex here
 	 */
-
-	if ((status = AcpiInstallGpeHandler(NULL, gpe, ACPI_GPE_EDGE_TRIGGERED,
-	    ec_gpe_handler, NULL)) != AE_OK) {
-		cmn_err(CE_WARN, "!acpica: failed to install gpe handler status"
-		    " = %d", status);
-	}
-
-	status = AcpiSetGpeType(NULL, gpe, ACPI_GPE_TYPE_RUNTIME);
-	status = AcpiEnableGpe(NULL, gpe, ACPI_NOT_ISR);
+	mutex_init(&ec.ec_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	if (AcpiInstallAddressSpaceHandler(obj,
 	    ACPI_ADR_SPACE_EC, &ec_handler, &ec_setup, NULL) != AE_OK) {
 		cmn_err(CE_WARN, "!acpica: failed to add EC handler\n");
-		/* should remove GPE handler here */
+		mutex_destroy(&ec.ec_mutex);
+		return (AE_ERROR);
 	}
+
+	/*
+	 * Enable EC GPE
+	 */
+	if ((status = AcpiInstallGpeHandler(NULL, gpe, ACPI_GPE_EDGE_TRIGGERED,
+	    ec_gpe_handler, NULL)) != AE_OK) {
+		cmn_err(CE_WARN, "!acpica: failed to install gpe handler status"
+		    " = %d", status);
+		/*
+		 * don't return an error here - GPE won't work but the EC
+		 * handler may be OK
+		 */
+	}
+
+	status = AcpiSetGpeType(NULL, gpe, ACPI_GPE_TYPE_RUNTIME);
+	status = AcpiEnableGpe(NULL, gpe, ACPI_NOT_ISR);
 
 	return (AE_OK);
 }

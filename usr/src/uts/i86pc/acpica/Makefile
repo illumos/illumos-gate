@@ -50,7 +50,7 @@ LDFLAGS		+= -dy -Nmisc/pci_autoconfig
 #
 # lint pass one non-enforcement
 #
-CFLAGS += $(CCVERBOSE) -DPWRDMN
+CFLAGS += $(CCVERBOSE) -DPWRDMN -DACPI_USE_LOCAL_CACHE
 
 LINTFLAGS += -errchk=%none
 LINTFLAGS += -errhdr=%none

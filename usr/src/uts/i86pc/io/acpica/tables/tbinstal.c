@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 78 $
+ *              $Revision: 79 $
  *
  *****************************************************************************/
 
@@ -335,6 +335,7 @@ AcpiTbInitTableDescriptor (
 {
     ACPI_TABLE_LIST         *ListHead;
     ACPI_TABLE_DESC         *TableDesc;
+    ACPI_STATUS             Status;
 
 
     ACPI_FUNCTION_TRACE_U32 ("TbInitTableDescriptor", TableType);
@@ -346,6 +347,14 @@ AcpiTbInitTableDescriptor (
     if (!TableDesc)
     {
         return_ACPI_STATUS (AE_NO_MEMORY);
+    }
+
+    /* Get a new owner ID for the table */
+
+    Status = AcpiUtAllocateOwnerId (&TableDesc->OwnerId);
+    if (ACPI_FAILURE (Status))
+    {
+        return_ACPI_STATUS (Status);
     }
 
     /* Install the table into the global data structure */
@@ -417,8 +426,6 @@ AcpiTbInitTableDescriptor (
     TableDesc->AmlStart             = (UINT8 *) (TableDesc->Pointer + 1),
     TableDesc->AmlLength            = (UINT32) (TableDesc->Length -
                                         (UINT32) sizeof (ACPI_TABLE_HEADER));
-    TableDesc->TableId              = AcpiUtAllocateOwnerId (
-                                        ACPI_OWNER_TYPE_TABLE);
     TableDesc->LoadedIntoNamespace  = FALSE;
 
     /*
@@ -432,7 +439,7 @@ AcpiTbInitTableDescriptor (
 
     /* Return Data */
 
-    TableInfo->TableId          = TableDesc->TableId;
+    TableInfo->OwnerId          = TableDesc->OwnerId;
     TableInfo->InstalledDesc    = TableDesc;
 
     return_ACPI_STATUS (AE_OK);

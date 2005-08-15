@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbexec - debugger control method execution
- *              $Revision: 66 $
+ *              $Revision: 69 $
  *
  ******************************************************************************/
 
@@ -153,6 +153,12 @@ AcpiDbExecutionWalk (
     void                    *Context,
     void                    **ReturnValue);
 
+#ifdef ACPI_DBG_TRACK_ALLOCATIONS
+static UINT32
+AcpiDbGetCacheInfo (
+    ACPI_MEMORY_LIST        *Cache);
+#endif
+
 
 /*******************************************************************************
  *
@@ -276,6 +282,16 @@ AcpiDbExecuteSetup (
 }
 
 
+#ifdef ACPI_DBG_TRACK_ALLOCATIONS
+static UINT32
+AcpiDbGetCacheInfo (
+    ACPI_MEMORY_LIST        *Cache)
+{
+
+    return (Cache->TotalAllocated - Cache->TotalFreed - Cache->CurrentDepth);
+}
+#endif
+
 /*******************************************************************************
  *
  * FUNCTION:    AcpiDbGetOutstandingAllocations
@@ -297,15 +313,11 @@ AcpiDbGetOutstandingAllocations (
     UINT32                  Outstanding = 0;
 
 #ifdef ACPI_DBG_TRACK_ALLOCATIONS
-    UINT32                  i;
 
-
-    for (i = ACPI_MEM_LIST_FIRST_CACHE_LIST; i < ACPI_NUM_MEM_LISTS; i++)
-    {
-        Outstanding += (AcpiGbl_MemoryLists[i].TotalAllocated -
-                        AcpiGbl_MemoryLists[i].TotalFreed -
-                        AcpiGbl_MemoryLists[i].CacheDepth);
-    }
+    Outstanding += AcpiDbGetCacheInfo (AcpiGbl_StateCache);
+    Outstanding += AcpiDbGetCacheInfo (AcpiGbl_PsNodeCache);
+    Outstanding += AcpiDbGetCacheInfo (AcpiGbl_PsNodeExtCache);
+    Outstanding += AcpiDbGetCacheInfo (AcpiGbl_OperandCache);
 #endif
 
     return (Outstanding);
@@ -407,6 +419,7 @@ AcpiDbExecute (
     }
     else
     {
+        AcpiUtStrupr (Name);
         AcpiGbl_DbMethodInfo.Name = Name;
         AcpiGbl_DbMethodInfo.Args = Args;
         AcpiGbl_DbMethodInfo.Flags = Flags;
@@ -454,7 +467,7 @@ AcpiDbExecute (
             AcpiOsPrintf ("Execution of %s returned object %p Buflen %X\n",
                 AcpiGbl_DbMethodInfo.Pathname, ReturnObj.Pointer,
                 (UINT32) ReturnObj.Length);
-            AcpiDbDumpObject (ReturnObj.Pointer, 1);
+            AcpiDbDumpExternalObject (ReturnObj.Pointer, 1);
         }
         else
         {
@@ -520,7 +533,7 @@ AcpiDbMethodThread (
         {
             AcpiOsPrintf ("Execution of %s returned object %p Buflen %X\n",
                 Info->Pathname, ReturnObj.Pointer, (UINT32) ReturnObj.Length);
-            AcpiDbDumpObject (ReturnObj.Pointer, 1);
+            AcpiDbDumpExternalObject (ReturnObj.Pointer, 1);
         }
 #endif
     }

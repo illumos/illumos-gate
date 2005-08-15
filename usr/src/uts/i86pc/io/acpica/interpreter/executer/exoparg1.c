@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 167 $
+ *              $Revision: 171 $
  *
  *****************************************************************************/
 
@@ -189,8 +189,9 @@ AcpiExOpcode_0A_0T_1R (
             Status = AE_NO_MEMORY;
             goto Cleanup;
         }
-
+#if ACPI_MACHINE_WIDTH != 16
         ReturnDesc->Integer.Value = AcpiOsGetTimer ();
+#endif
         break;
 
     default:                /*  Unknown opcode  */
@@ -203,16 +204,17 @@ AcpiExOpcode_0A_0T_1R (
 
 Cleanup:
 
-    if (!WalkState->ResultObj)
-    {
-        WalkState->ResultObj = ReturnDesc;
-    }
-
     /* Delete return object on error */
 
-    if (ACPI_FAILURE (Status))
+    if ((ACPI_FAILURE (Status)) || WalkState->ResultObj)
     {
         AcpiUtRemoveReference (ReturnDesc);
+    }
+    else
+    {
+        /* Save the return value */
+
+        WalkState->ResultObj = ReturnDesc;
     }
 
     return_ACPI_STATUS (Status);
@@ -1022,6 +1024,7 @@ AcpiExOpcode_1A_0T_1R (
              */
             ReturnDesc = AcpiNsGetAttachedObject (
                             (ACPI_NAMESPACE_NODE *) Operand[0]);
+            AcpiUtAddReference (ReturnDesc);
         }
         else
         {
@@ -1075,21 +1078,11 @@ AcpiExOpcode_1A_0T_1R (
                      * add another reference to the referenced object, however.
                      */
                     ReturnDesc = *(Operand[0]->Reference.Where);
-                    if (!ReturnDesc)
+                    if (ReturnDesc)
                     {
-                        /*
-                         * We can't return a NULL dereferenced value.  This is
-                         * an uninitialized package element and is thus a
-                         * severe error.
-                         */
-                        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                            "NULL package element obj %p\n",
-                            Operand[0]));
-                        Status = AE_AML_UNINITIALIZED_ELEMENT;
-                        goto Cleanup;
+	                    AcpiUtAddReference (ReturnDesc);
                     }
 
-                    AcpiUtAddReference (ReturnDesc);
                     break;
 
 

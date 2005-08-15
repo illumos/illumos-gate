@@ -2,7 +2,7 @@
  *
  * Module Name: dsopcode - Dispatcher Op Region support and handling of
  *                         "control" opcodes
- *              $Revision: 102 $
+ *              $Revision: 103 $
  *
  *****************************************************************************/
 
@@ -195,7 +195,8 @@ AcpiDsExecuteArguments (
     WalkState = AcpiDsCreateWalkState (0, NULL, NULL, NULL);
     if (!WalkState)
     {
-        return_ACPI_STATUS (AE_NO_MEMORY);
+        Status = AE_NO_MEMORY;
+        goto Cleanup;
     }
 
     Status = AcpiDsInitAmlWalk (WalkState, Op, NULL, AmlStart,
@@ -203,7 +204,7 @@ AcpiDsExecuteArguments (
     if (ACPI_FAILURE (Status))
     {
         AcpiDsDeleteWalkState (WalkState);
-        return_ACPI_STATUS (Status);
+        goto Cleanup;
     }
 
     /* Mark this parse as a deferred opcode */
@@ -216,8 +217,7 @@ AcpiDsExecuteArguments (
     Status = AcpiPsParseAml (WalkState);
     if (ACPI_FAILURE (Status))
     {
-        AcpiPsDeleteParseTree (Op);
-        return_ACPI_STATUS (Status);
+        goto Cleanup;
     }
 
     /* Get and init the Op created above */
@@ -240,7 +240,8 @@ AcpiDsExecuteArguments (
     WalkState = AcpiDsCreateWalkState (0, NULL, NULL, NULL);
     if (!WalkState)
     {
-        return_ACPI_STATUS (AE_NO_MEMORY);
+        Status = AE_NO_MEMORY;
+        goto Cleanup;
     }
 
     /* Execute the opcode and arguments */
@@ -250,13 +251,15 @@ AcpiDsExecuteArguments (
     if (ACPI_FAILURE (Status))
     {
         AcpiDsDeleteWalkState (WalkState);
-        return_ACPI_STATUS (Status);
+        goto Cleanup;
     }
 
     /* Mark this execution as a deferred opcode */
 
     WalkState->DeferredNode = Node;
     Status = AcpiPsParseAml (WalkState);
+
+Cleanup:
     AcpiPsDeleteParseTree (Op);
     return_ACPI_STATUS (Status);
 }

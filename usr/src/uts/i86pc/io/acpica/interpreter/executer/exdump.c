@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 182 $
+ *              $Revision: 186 $
  *
  *****************************************************************************/
 
@@ -125,6 +125,11 @@
 #define _COMPONENT          ACPI_EXECUTER
         ACPI_MODULE_NAME    ("exdump")
 
+/*
+ * The following routines are used for debug output only
+ */
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
+
 /* Local prototypes */
 
 static void
@@ -147,11 +152,16 @@ AcpiExOutAddress (
     char                    *Title,
     ACPI_PHYSICAL_ADDRESS   Value);
 
+static void
+AcpiExDumpReference (
+    ACPI_OPERAND_OBJECT     *ObjDesc);
 
-/*
- * The following routines are used for debug output only
- */
-#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
+static void
+AcpiExDumpPackage (
+    ACPI_OPERAND_OBJECT     *ObjDesc,
+    UINT32                  Level,
+    UINT32                  Index);
+
 
 /*******************************************************************************
  *
@@ -193,7 +203,7 @@ AcpiExDumpOperand (
 
     if (ACPI_GET_DESCRIPTOR_TYPE (ObjDesc) == ACPI_DESC_TYPE_NAMED)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p is a NS Node: ", ObjDesc));
+        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p Namespace Node: ", ObjDesc));
         ACPI_DUMP_ENTRY (ObjDesc, ACPI_LV_EXEC);
         return;
     }
@@ -563,7 +573,7 @@ AcpiExDumpOperands (
     }
 
     ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-        "************* Stack dump from %s(%d), %s\n",
+        "************* Operand Stack dump from %s(%d), %s\n",
         ModuleName, LineNumber, Note));
     return;
 }
@@ -603,7 +613,7 @@ AcpiExOutInteger (
     char                    *Title,
     UINT32                  Value)
 {
-    AcpiOsPrintf ("%20s : %X\n", Title, Value);
+    AcpiOsPrintf ("%20s : %.2X\n", Title, Value);
 }
 
 static void
@@ -662,9 +672,156 @@ AcpiExDumpNode (
 
 /*******************************************************************************
  *
+ * FUNCTION:    AcpiExDumpReference
+ *
+ * PARAMETERS:  Object              - Descriptor to dump
+ *
+ * DESCRIPTION: Dumps a reference object
+ *
+ ******************************************************************************/
+
+static void
+AcpiExDumpReference (
+    ACPI_OPERAND_OBJECT     *ObjDesc)
+{
+    ACPI_BUFFER             RetBuf;
+    ACPI_STATUS             Status;
+
+
+    if (ObjDesc->Reference.Opcode == AML_INT_NAMEPATH_OP)
+    {
+        AcpiOsPrintf ("Named Object %p ", ObjDesc->Reference.Node);
+        RetBuf.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
+        Status = AcpiNsHandleToPathname (ObjDesc->Reference.Node, &RetBuf);
+        if (ACPI_FAILURE (Status))
+        {
+            AcpiOsPrintf ("Could not convert name to pathname\n");
+        }
+        else
+        {
+           AcpiOsPrintf ("%s\n", RetBuf.Pointer);
+           ACPI_MEM_FREE (RetBuf.Pointer);
+        }
+    }
+    else if (ObjDesc->Reference.Object)
+    {
+        AcpiOsPrintf ("\nReferenced Object: %p\n", ObjDesc->Reference.Object);
+    }
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiExDumpPackage
+ *
+ * PARAMETERS:  Object              - Descriptor to dump
+ *              Level               - Indentation Level
+ *              Index               - Package index for this object
+ *
+ * DESCRIPTION: Dumps the elements of the package
+ *
+ ******************************************************************************/
+
+static void
+AcpiExDumpPackage (
+    ACPI_OPERAND_OBJECT     *ObjDesc,
+    UINT32                  Level,
+    UINT32                  Index)
+{
+    UINT32                  i;
+
+
+    /* Indentation and index output */
+
+    if (Level > 0)
+    {
+        for (i = 0; i < Level; i++)
+        {
+            AcpiOsPrintf ("  ");
+        }
+
+        AcpiOsPrintf ("[%.2d] ", Index);
+    }
+
+    AcpiOsPrintf ("%p ", ObjDesc);
+
+    /* Null package elements are allowed */
+
+    if (!ObjDesc)
+    {
+        AcpiOsPrintf ("[Null Object]\n");
+        return;
+    }
+
+    /* Packages may only contain a few object types */
+
+    switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+    {
+    case ACPI_TYPE_INTEGER:
+
+        AcpiOsPrintf ("[Integer] = %8.8X%8.8X\n",
+                    ACPI_FORMAT_UINT64 (ObjDesc->Integer.Value));
+        break;
+
+
+    case ACPI_TYPE_STRING:
+
+        AcpiOsPrintf ("[String]  Value: ");
+        for (i = 0; i < ObjDesc->String.Length; i++)
+        {
+            AcpiOsPrintf ("%c", ObjDesc->String.Pointer[i]);
+        }
+        AcpiOsPrintf ("\n");
+        break;
+
+
+    case ACPI_TYPE_BUFFER:
+
+        AcpiOsPrintf ("[Buffer] Length %.2X = ", ObjDesc->Buffer.Length);
+        if (ObjDesc->Buffer.Length)
+        {
+            AcpiUtDumpBuffer ((UINT8 *) ObjDesc->Buffer.Pointer,
+                    ObjDesc->Buffer.Length, DB_DWORD_DISPLAY, _COMPONENT);
+        }
+        else
+        {
+            AcpiOsPrintf ("\n");
+        }
+        break;
+
+
+    case ACPI_TYPE_PACKAGE:
+
+        AcpiOsPrintf ("[Package] Contains %d Elements: \n",
+                ObjDesc->Package.Count);
+
+        for (i = 0; i < ObjDesc->Package.Count; i++)
+        {
+            AcpiExDumpPackage (ObjDesc->Package.Elements[i], Level+1, i);
+        }
+        break;
+
+
+    case ACPI_TYPE_LOCAL_REFERENCE:
+
+        AcpiOsPrintf ("[Object Reference] ");
+        AcpiExDumpReference (ObjDesc);
+        break;
+
+
+    default:
+
+        AcpiOsPrintf ("[Unknown Type] %X\n", ACPI_GET_OBJECT_TYPE (ObjDesc));
+        break;
+    }
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    AcpiExDumpObjectDescriptor
  *
- * PARAMETERS:  *Object             - Descriptor to dump
+ * PARAMETERS:  Object              - Descriptor to dump
  *              Flags               - Force display if TRUE
  *
  * DESCRIPTION: Dumps the members of the object descriptor given.
@@ -676,9 +833,6 @@ AcpiExDumpObjectDescriptor (
     ACPI_OPERAND_OBJECT     *ObjDesc,
     UINT32                  Flags)
 {
-    UINT32                  i;
-
-
     ACPI_FUNCTION_TRACE ("ExDumpObjectDescriptor");
 
 
@@ -751,25 +905,13 @@ AcpiExDumpObjectDescriptor (
     case ACPI_TYPE_PACKAGE:
 
         AcpiExOutInteger ("Flags",          ObjDesc->Package.Flags);
-        AcpiExOutInteger ("Count",          ObjDesc->Package.Count);
-        AcpiExOutPointer ("Elements",       ObjDesc->Package.Elements);
+        AcpiExOutInteger ("Elements",       ObjDesc->Package.Count);
+        AcpiExOutPointer ("Element List",   ObjDesc->Package.Elements);
 
         /* Dump the package contents */
 
-        if (ObjDesc->Package.Count > 0)
-        {
-            AcpiOsPrintf ("\nPackage Contents:\n");
-            for (i = 0; i < ObjDesc->Package.Count; i++)
-            {
-                AcpiOsPrintf ("[%.3d] %p", i, ObjDesc->Package.Elements[i]);
-                if (ObjDesc->Package.Elements[i])
-                {
-                    AcpiOsPrintf (" %s",
-                        AcpiUtGetObjectTypeName (ObjDesc->Package.Elements[i]));
-                }
-                AcpiOsPrintf ("\n");
-            }
-        }
+        AcpiOsPrintf ("\nPackage Contents:\n");
+        AcpiExDumpPackage (ObjDesc, 0, 0);
         break;
 
 
@@ -792,7 +934,7 @@ AcpiExDumpObjectDescriptor (
         AcpiExOutInteger ("ParamCount",     ObjDesc->Method.ParamCount);
         AcpiExOutInteger ("Concurrency",    ObjDesc->Method.Concurrency);
         AcpiExOutPointer ("Semaphore",      ObjDesc->Method.Semaphore);
-        AcpiExOutInteger ("OwningId",       ObjDesc->Method.OwningId);
+        AcpiExOutInteger ("OwnerId",        ObjDesc->Method.OwnerId);
         AcpiExOutInteger ("AmlLength",      ObjDesc->Method.AmlLength);
         AcpiExOutPointer ("AmlStart",       ObjDesc->Method.AmlStart);
         break;
@@ -897,11 +1039,7 @@ AcpiExDumpObjectDescriptor (
         AcpiExOutPointer ("Node",           ObjDesc->Reference.Node);
         AcpiExOutPointer ("Where",          ObjDesc->Reference.Where);
 
-        if (ObjDesc->Reference.Object)
-        {
-            AcpiOsPrintf ("\nReferenced Object:\n");
-            AcpiExDumpObjectDescriptor (ObjDesc->Reference.Object, Flags);
-        }
+        AcpiExDumpReference (ObjDesc);
         break;
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acstruct.h - Internal structs
- *       $Revision: 31 $
+ *       $Revision: 35 $
  *
  *****************************************************************************/
 
@@ -144,14 +144,13 @@ typedef struct acpi_walk_state
     UINT8                       WalkType;
     ACPI_OWNER_ID               OwnerId;                            /* Owner of objects created during the walk */
     BOOLEAN                     LastPredicate;                      /* Result of last predicate */
-    UINT8                       Reserved;                           /* For alignment */
     UINT8                       CurrentResult;                      /* */
     UINT8                       NextOpInfo;                         /* Info about NextOp */
     UINT8                       NumOperands;                        /* Stack pointer for Operands[] array */
     UINT8                       ReturnUsed;
     UINT16                      Opcode;                             /* Current AML opcode */
     UINT8                       ScopeDepth;
-    UINT8                       Reserved1;
+    UINT8                       PassNumber;                         /* Parse pass during table load */
     UINT32                      ArgCount;                           /* push for fixed or var args */
     UINT32                      AmlOffset;
     UINT32                      ArgTypes;
@@ -230,15 +229,18 @@ typedef struct acpi_device_walk_info
 typedef struct acpi_walk_info
 {
     UINT32                  DebugLevel;
-    UINT32                  OwnerId;
+    ACPI_OWNER_ID           OwnerId;
     UINT8                   DisplayType;
 
 } ACPI_WALK_INFO;
 
 /* Display Types */
 
-#define ACPI_DISPLAY_SUMMARY    0
-#define ACPI_DISPLAY_OBJECTS    1
+#define ACPI_DISPLAY_SUMMARY    (UINT8) 0
+#define ACPI_DISPLAY_OBJECTS    (UINT8) 1
+#define ACPI_DISPLAY_MASK       (UINT8) 1
+
+#define ACPI_DISPLAY_SHORT      (UINT8) 2
 
 typedef struct acpi_get_devices_info
 {

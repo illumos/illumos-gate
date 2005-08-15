@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acconfig.h - Global configuration constants
- *       $Revision: 183 $
+ *       $Revision: 189 $
  *
  *****************************************************************************/
 
@@ -137,7 +137,7 @@
 
 /* Version string */
 
-#define ACPI_CA_VERSION                 0x20050408
+#define ACPI_CA_VERSION                 0x20050708
 
 /*
  * OS name, used for the _OS object.  The _OS object is essentially obsolete,
@@ -151,11 +151,10 @@
 
 /* Maximum objects in the various object caches */
 
-#define ACPI_MAX_STATE_CACHE_DEPTH      64          /* State objects */
+#define ACPI_MAX_STATE_CACHE_DEPTH      96          /* State objects */
 #define ACPI_MAX_PARSE_CACHE_DEPTH      96          /* Parse tree objects */
-#define ACPI_MAX_EXTPARSE_CACHE_DEPTH   64          /* Parse tree objects */
-#define ACPI_MAX_OBJECT_CACHE_DEPTH     64          /* Interpreter operand objects */
-#define ACPI_MAX_WALK_CACHE_DEPTH       4           /* Objects for parse tree walks */
+#define ACPI_MAX_EXTPARSE_CACHE_DEPTH   96          /* Parse tree objects */
+#define ACPI_MAX_OBJECT_CACHE_DEPTH     96          /* Interpreter operand objects */
 
 /*
  * Should the subystem abort the loading of an ACPI table if the

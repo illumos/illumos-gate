@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 112 $
+ *              $Revision: 116 $
  *
  ******************************************************************************/
 
@@ -124,15 +124,105 @@
 #define _COMPONENT          ACPI_UTILITIES
         ACPI_MODULE_NAME    ("utmisc")
 
-/* Local prototypes */
 
-static ACPI_STATUS
-AcpiUtCreateMutex (
-    ACPI_MUTEX_HANDLE       MutexId);
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiUtAllocateOwnerId
+ *
+ * PARAMETERS:  OwnerId         - Where the new owner ID is returned
+ *
+ * DESCRIPTION: Allocate a table or method owner id
+ *
+ ******************************************************************************/
 
-static ACPI_STATUS
-AcpiUtDeleteMutex (
-    ACPI_MUTEX_HANDLE       MutexId);
+ACPI_STATUS
+AcpiUtAllocateOwnerId (
+    ACPI_OWNER_ID           *OwnerId)
+{
+    ACPI_NATIVE_UINT        i;
+    ACPI_STATUS             Status;
+    
+    
+    ACPI_FUNCTION_TRACE ("UtAllocateOwnerId");
+    
+    
+    Status = AcpiUtAcquireMutex (ACPI_MTX_CACHES);
+    if (ACPI_FAILURE (Status))
+    {
+        return_ACPI_STATUS (Status);
+    }
+
+    /* Find a free owner ID */
+
+    for (i = 0; i < 32; i++) 
+    {
+        if (!(AcpiGbl_OwnerIdMask & (1 << i)))
+        {
+            AcpiGbl_OwnerIdMask |= (1 << i);
+            *OwnerId = (ACPI_OWNER_ID) i;
+            goto exit;
+        }
+    }
+
+    /* 
+     * If we are here, all OwnerIds have been allocated. This probably should
+     * not happen since the IDs are reused after deallocation. The IDs are
+     * allocated upon table load (one per table) and method execution, and
+     * they are released when a table is unloaded or a method completes
+     * execution.
+     */
+    Status = AE_OWNER_ID_LIMIT;
+    ACPI_REPORT_ERROR ((
+        "Could not allocate new OwnerId (32 max), AE_OWNER_ID_LIMIT\n"));
+
+exit:
+    (void) AcpiUtReleaseMutex (ACPI_MTX_CACHES);
+    return_ACPI_STATUS (Status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiUtReleaseOwnerId
+ *
+ * PARAMETERS:  OwnerId         - A previously allocated owner ID
+ *
+ * DESCRIPTION: Release a table or method owner id
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiUtReleaseOwnerId (
+    ACPI_OWNER_ID           OwnerId)
+{
+    ACPI_STATUS             Status;
+
+
+    ACPI_FUNCTION_TRACE ("UtReleaseOwnerId");
+
+
+    Status = AcpiUtAcquireMutex (ACPI_MTX_CACHES);
+    if (ACPI_FAILURE (Status))
+    {
+        return_ACPI_STATUS (Status);
+    }
+
+    /* Free the owner ID */
+
+    if (AcpiGbl_OwnerIdMask & (1 << OwnerId))
+    {
+        AcpiGbl_OwnerIdMask ^= (1 << OwnerId);
+    }
+    else
+    {
+        /* This OwnerId has not been allocated */
+
+        Status = AE_NOT_EXIST;
+    }
+
+    (void) AcpiUtReleaseMutex (ACPI_MTX_CACHES);
+    return_ACPI_STATUS (Status);
+}
 
 
 /*******************************************************************************
@@ -158,6 +248,11 @@ AcpiUtStrupr (
 
     ACPI_FUNCTION_ENTRY ();
 
+
+    if (!SrcString)
+    {
+        return (NULL);
+    }
 
     /* Walk entire string, uppercasing the letters */
 
@@ -650,339 +745,6 @@ ErrorExit:
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiUtMutexInitialize
- *
- * PARAMETERS:  None.
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Create the system mutex objects.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiUtMutexInitialize (
-    void)
-{
-    UINT32                  i;
-    ACPI_STATUS             Status;
-
-
-    ACPI_FUNCTION_TRACE ("UtMutexInitialize");
-
-
-    /*
-     * Create each of the predefined mutex objects
-     */
-    for (i = 0; i < NUM_MUTEX; i++)
-    {
-        Status = AcpiUtCreateMutex (i);
-        if (ACPI_FAILURE (Status))
-        {
-            return_ACPI_STATUS (Status);
-        }
-    }
-
-    Status = AcpiOsCreateLock (&AcpiGbl_GpeLock);
-    return_ACPI_STATUS (Status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtMutexTerminate
- *
- * PARAMETERS:  None.
- *
- * RETURN:      None.
- *
- * DESCRIPTION: Delete all of the system mutex objects.
- *
- ******************************************************************************/
-
-void
-AcpiUtMutexTerminate (
-    void)
-{
-    UINT32                  i;
-
-
-    ACPI_FUNCTION_TRACE ("UtMutexTerminate");
-
-
-    /*
-     * Delete each predefined mutex object
-     */
-    for (i = 0; i < NUM_MUTEX; i++)
-    {
-        (void) AcpiUtDeleteMutex (i);
-    }
-
-    AcpiOsDeleteLock (AcpiGbl_GpeLock);
-    return_VOID;
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtCreateMutex
- *
- * PARAMETERS:  MutexID         - ID of the mutex to be created
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Create a mutex object.
- *
- ******************************************************************************/
-
-static ACPI_STATUS
-AcpiUtCreateMutex (
-    ACPI_MUTEX_HANDLE       MutexId)
-{
-    ACPI_STATUS             Status = AE_OK;
-
-
-    ACPI_FUNCTION_TRACE_U32 ("UtCreateMutex", MutexId);
-
-
-    if (MutexId > MAX_MUTEX)
-    {
-        return_ACPI_STATUS (AE_BAD_PARAMETER);
-    }
-
-    if (!AcpiGbl_MutexInfo[MutexId].Mutex)
-    {
-        Status = AcpiOsCreateSemaphore (1, 1,
-                        &AcpiGbl_MutexInfo[MutexId].Mutex);
-        AcpiGbl_MutexInfo[MutexId].OwnerId = ACPI_MUTEX_NOT_ACQUIRED;
-        AcpiGbl_MutexInfo[MutexId].UseCount = 0;
-    }
-
-    return_ACPI_STATUS (Status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtDeleteMutex
- *
- * PARAMETERS:  MutexID         - ID of the mutex to be deleted
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Delete a mutex object.
- *
- ******************************************************************************/
-
-static ACPI_STATUS
-AcpiUtDeleteMutex (
-    ACPI_MUTEX_HANDLE       MutexId)
-{
-    ACPI_STATUS             Status;
-
-
-    ACPI_FUNCTION_TRACE_U32 ("UtDeleteMutex", MutexId);
-
-
-    if (MutexId > MAX_MUTEX)
-    {
-        return_ACPI_STATUS (AE_BAD_PARAMETER);
-    }
-
-    Status = AcpiOsDeleteSemaphore (AcpiGbl_MutexInfo[MutexId].Mutex);
-
-    AcpiGbl_MutexInfo[MutexId].Mutex = NULL;
-    AcpiGbl_MutexInfo[MutexId].OwnerId = ACPI_MUTEX_NOT_ACQUIRED;
-
-    return_ACPI_STATUS (Status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtAcquireMutex
- *
- * PARAMETERS:  MutexID         - ID of the mutex to be acquired
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Acquire a mutex object.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiUtAcquireMutex (
-    ACPI_MUTEX_HANDLE       MutexId)
-{
-    ACPI_STATUS             Status;
-    UINT32                  ThisThreadId;
-
-
-    ACPI_FUNCTION_NAME ("UtAcquireMutex");
-
-
-    if (MutexId > MAX_MUTEX)
-    {
-        return (AE_BAD_PARAMETER);
-    }
-
-    ThisThreadId = AcpiOsGetThreadId ();
-
-#ifdef ACPI_MUTEX_DEBUG
-    {
-        UINT32                  i;
-        /*
-         * Mutex debug code, for internal debugging only.
-         *
-         * Deadlock prevention.  Check if this thread owns any mutexes of value
-         * greater than or equal to this one.  If so, the thread has violated
-         * the mutex ordering rule.  This indicates a coding error somewhere in
-         * the ACPI subsystem code.
-         */
-        for (i = MutexId; i < MAX_MUTEX; i++)
-        {
-            if (AcpiGbl_MutexInfo[i].OwnerId == ThisThreadId)
-            {
-                if (i == MutexId)
-                {
-                    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                        "Mutex [%s] already acquired by this thread [%X]\n",
-                        AcpiUtGetMutexName (MutexId), ThisThreadId));
-
-                    return (AE_ALREADY_ACQUIRED);
-                }
-
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Invalid acquire order: Thread %X owns [%s], wants [%s]\n",
-                    ThisThreadId, AcpiUtGetMutexName (i),
-                    AcpiUtGetMutexName (MutexId)));
-
-                return (AE_ACQUIRE_DEADLOCK);
-            }
-        }
-    }
-#endif
-
-    ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX,
-        "Thread %X attempting to acquire Mutex [%s]\n",
-        ThisThreadId, AcpiUtGetMutexName (MutexId)));
-
-    Status = AcpiOsWaitSemaphore (AcpiGbl_MutexInfo[MutexId].Mutex,
-                                    1, ACPI_WAIT_FOREVER);
-    if (ACPI_SUCCESS (Status))
-    {
-        ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Thread %X acquired Mutex [%s]\n",
-            ThisThreadId, AcpiUtGetMutexName (MutexId)));
-
-        AcpiGbl_MutexInfo[MutexId].UseCount++;
-        AcpiGbl_MutexInfo[MutexId].OwnerId = ThisThreadId;
-    }
-    else
-    {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Thread %X could not acquire Mutex [%s] %s\n",
-                ThisThreadId, AcpiUtGetMutexName (MutexId),
-                AcpiFormatException (Status)));
-    }
-
-    return (Status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtReleaseMutex
- *
- * PARAMETERS:  MutexID         - ID of the mutex to be released
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Release a mutex object.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiUtReleaseMutex (
-    ACPI_MUTEX_HANDLE       MutexId)
-{
-    ACPI_STATUS             Status;
-    UINT32                  i;
-    UINT32                  ThisThreadId;
-
-
-    ACPI_FUNCTION_NAME ("UtReleaseMutex");
-
-
-    ThisThreadId = AcpiOsGetThreadId ();
-    ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX,
-        "Thread %X releasing Mutex [%s]\n", ThisThreadId,
-        AcpiUtGetMutexName (MutexId)));
-
-    if (MutexId > MAX_MUTEX)
-    {
-        return (AE_BAD_PARAMETER);
-    }
-
-    /*
-     * Mutex must be acquired in order to release it!
-     */
-    if (AcpiGbl_MutexInfo[MutexId].OwnerId == ACPI_MUTEX_NOT_ACQUIRED)
-    {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Mutex [%s] is not acquired, cannot release\n",
-            AcpiUtGetMutexName (MutexId)));
-
-        return (AE_NOT_ACQUIRED);
-    }
-
-    /*
-     * Deadlock prevention.  Check if this thread owns any mutexes of value
-     * greater than this one.  If so, the thread has violated the mutex
-     * ordering rule.  This indicates a coding error somewhere in
-     * the ACPI subsystem code.
-     */
-    for (i = MutexId; i < MAX_MUTEX; i++)
-    {
-        if (AcpiGbl_MutexInfo[i].OwnerId == ThisThreadId)
-        {
-            if (i == MutexId)
-            {
-                continue;
-            }
-
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Invalid release order: owns [%s], releasing [%s]\n",
-                AcpiUtGetMutexName (i), AcpiUtGetMutexName (MutexId)));
-
-            return (AE_RELEASE_DEADLOCK);
-        }
-    }
-
-    /* Mark unlocked FIRST */
-
-    AcpiGbl_MutexInfo[MutexId].OwnerId = ACPI_MUTEX_NOT_ACQUIRED;
-
-    Status = AcpiOsSignalSemaphore (AcpiGbl_MutexInfo[MutexId].Mutex, 1);
-
-    if (ACPI_FAILURE (Status))
-    {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Thread %X could not release Mutex [%s] %s\n",
-            ThisThreadId, AcpiUtGetMutexName (MutexId),
-            AcpiFormatException (Status)));
-    }
-    else
-    {
-        ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Thread %X released Mutex [%s]\n",
-            ThisThreadId, AcpiUtGetMutexName (MutexId)));
-    }
-
-    return (Status);
-}
-
-
-/*******************************************************************************
- *
  * FUNCTION:    AcpiUtCreateUpdateStateAndPush
  *
  * PARAMETERS:  Object          - Object to be added to the new state
@@ -1023,367 +785,6 @@ AcpiUtCreateUpdateStateAndPush (
     AcpiUtPushGenericState (StateList, State);
     return (AE_OK);
 }
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtCreatePkgStateAndPush
- *
- * PARAMETERS:  Object          - Object to be added to the new state
- *              Action          - Increment/Decrement
- *              StateList       - List the state will be added to
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Create a new state and push it
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiUtCreatePkgStateAndPush (
-    void                    *InternalObject,
-    void                    *ExternalObject,
-    UINT16                  Index,
-    ACPI_GENERIC_STATE      **StateList)
-{
-    ACPI_GENERIC_STATE       *State;
-
-
-    ACPI_FUNCTION_ENTRY ();
-
-
-    State = AcpiUtCreatePkgState (InternalObject, ExternalObject, Index);
-    if (!State)
-    {
-        return (AE_NO_MEMORY);
-    }
-
-    AcpiUtPushGenericState (StateList, State);
-    return (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtPushGenericState
- *
- * PARAMETERS:  ListHead            - Head of the state stack
- *              State               - State object to push
- *
- * RETURN:      None
- *
- * DESCRIPTION: Push a state object onto a state stack
- *
- ******************************************************************************/
-
-void
-AcpiUtPushGenericState (
-    ACPI_GENERIC_STATE      **ListHead,
-    ACPI_GENERIC_STATE      *State)
-{
-    ACPI_FUNCTION_TRACE ("UtPushGenericState");
-
-
-    /* Push the state object onto the front of the list (stack) */
-
-    State->Common.Next = *ListHead;
-    *ListHead = State;
-
-    return_VOID;
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtPopGenericState
- *
- * PARAMETERS:  ListHead            - Head of the state stack
- *
- * RETURN:      The popped state object
- *
- * DESCRIPTION: Pop a state object from a state stack
- *
- ******************************************************************************/
-
-ACPI_GENERIC_STATE *
-AcpiUtPopGenericState (
-    ACPI_GENERIC_STATE      **ListHead)
-{
-    ACPI_GENERIC_STATE      *State;
-
-
-    ACPI_FUNCTION_TRACE ("UtPopGenericState");
-
-
-    /* Remove the state object at the head of the list (stack) */
-
-    State = *ListHead;
-    if (State)
-    {
-        /* Update the list head */
-
-        *ListHead = State->Common.Next;
-    }
-
-    return_PTR (State);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtCreateGenericState
- *
- * PARAMETERS:  None
- *
- * RETURN:      The new state object. NULL on failure.
- *
- * DESCRIPTION: Create a generic state object.  Attempt to obtain one from
- *              the global state cache;  If none available, create a new one.
- *
- ******************************************************************************/
-
-ACPI_GENERIC_STATE *
-AcpiUtCreateGenericState (
-    void)
-{
-    ACPI_GENERIC_STATE      *State;
-
-
-    ACPI_FUNCTION_ENTRY ();
-
-
-    State = AcpiUtAcquireFromCache (ACPI_MEM_LIST_STATE);
-
-    /* Initialize */
-
-    if (State)
-    {
-        State->Common.DataType = ACPI_DESC_TYPE_STATE;
-    }
-
-    return (State);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtCreateThreadState
- *
- * PARAMETERS:  None
- *
- * RETURN:      New Thread State. NULL on failure
- *
- * DESCRIPTION: Create a "Thread State" - a flavor of the generic state used
- *              to track per-thread info during method execution
- *
- ******************************************************************************/
-
-ACPI_THREAD_STATE *
-AcpiUtCreateThreadState (
-    void)
-{
-    ACPI_GENERIC_STATE      *State;
-
-
-    ACPI_FUNCTION_TRACE ("UtCreateThreadState");
-
-
-    /* Create the generic state object */
-
-    State = AcpiUtCreateGenericState ();
-    if (!State)
-    {
-        return_PTR (NULL);
-    }
-
-    /* Init fields specific to the update struct */
-
-    State->Common.DataType = ACPI_DESC_TYPE_STATE_THREAD;
-    State->Thread.ThreadId = AcpiOsGetThreadId ();
-
-    return_PTR ((ACPI_THREAD_STATE *) State);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtCreateUpdateState
- *
- * PARAMETERS:  Object          - Initial Object to be installed in the state
- *              Action          - Update action to be performed
- *
- * RETURN:      New state object, null on failure
- *
- * DESCRIPTION: Create an "Update State" - a flavor of the generic state used
- *              to update reference counts and delete complex objects such
- *              as packages.
- *
- ******************************************************************************/
-
-ACPI_GENERIC_STATE *
-AcpiUtCreateUpdateState (
-    ACPI_OPERAND_OBJECT     *Object,
-    UINT16                  Action)
-{
-    ACPI_GENERIC_STATE      *State;
-
-
-    ACPI_FUNCTION_TRACE_PTR ("UtCreateUpdateState", Object);
-
-
-    /* Create the generic state object */
-
-    State = AcpiUtCreateGenericState ();
-    if (!State)
-    {
-        return_PTR (NULL);
-    }
-
-    /* Init fields specific to the update struct */
-
-    State->Common.DataType = ACPI_DESC_TYPE_STATE_UPDATE;
-    State->Update.Object = Object;
-    State->Update.Value  = Action;
-
-    return_PTR (State);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtCreatePkgState
- *
- * PARAMETERS:  Object          - Initial Object to be installed in the state
- *              Action          - Update action to be performed
- *
- * RETURN:      New state object, null on failure
- *
- * DESCRIPTION: Create a "Package State"
- *
- ******************************************************************************/
-
-ACPI_GENERIC_STATE *
-AcpiUtCreatePkgState (
-    void                    *InternalObject,
-    void                    *ExternalObject,
-    UINT16                  Index)
-{
-    ACPI_GENERIC_STATE      *State;
-
-
-    ACPI_FUNCTION_TRACE_PTR ("UtCreatePkgState", InternalObject);
-
-
-    /* Create the generic state object */
-
-    State = AcpiUtCreateGenericState ();
-    if (!State)
-    {
-        return_PTR (NULL);
-    }
-
-    /* Init fields specific to the update struct */
-
-    State->Common.DataType  = ACPI_DESC_TYPE_STATE_PACKAGE;
-    State->Pkg.SourceObject = (ACPI_OPERAND_OBJECT *) InternalObject;
-    State->Pkg.DestObject   = ExternalObject;
-    State->Pkg.Index        = Index;
-    State->Pkg.NumPackages  = 1;
-
-    return_PTR (State);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtCreateControlState
- *
- * PARAMETERS:  None
- *
- * RETURN:      New state object, null on failure
- *
- * DESCRIPTION: Create a "Control State" - a flavor of the generic state used
- *              to support nested IF/WHILE constructs in the AML.
- *
- ******************************************************************************/
-
-ACPI_GENERIC_STATE *
-AcpiUtCreateControlState (
-    void)
-{
-    ACPI_GENERIC_STATE      *State;
-
-
-    ACPI_FUNCTION_TRACE ("UtCreateControlState");
-
-
-    /* Create the generic state object */
-
-    State = AcpiUtCreateGenericState ();
-    if (!State)
-    {
-        return_PTR (NULL);
-    }
-
-    /* Init fields specific to the control struct */
-
-    State->Common.DataType  = ACPI_DESC_TYPE_STATE_CONTROL;
-    State->Common.State     = ACPI_CONTROL_CONDITIONAL_EXECUTING;
-
-    return_PTR (State);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtDeleteGenericState
- *
- * PARAMETERS:  State               - The state object to be deleted
- *
- * RETURN:      None
- *
- * DESCRIPTION: Put a state object back into the global state cache.  The object
- *              is not actually freed at this time.
- *
- ******************************************************************************/
-
-void
-AcpiUtDeleteGenericState (
-    ACPI_GENERIC_STATE      *State)
-{
-    ACPI_FUNCTION_TRACE ("UtDeleteGenericState");
-
-
-    AcpiUtReleaseToCache (ACPI_MEM_LIST_STATE, State);
-    return_VOID;
-}
-
-
-#ifdef ACPI_ENABLE_OBJECT_CACHE
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtDeleteGenericStateCache
- *
- * PARAMETERS:  None
- *
- * RETURN:      None
- *
- * DESCRIPTION: Purge the global state object cache.  Used during subsystem
- *              termination.
- *
- ******************************************************************************/
-
-void
-AcpiUtDeleteGenericStateCache (
-    void)
-{
-    ACPI_FUNCTION_TRACE ("UtDeleteGenericStateCache");
-
-
-    AcpiUtDeleteGenericCache (ACPI_MEM_LIST_STATE);
-    return_VOID;
-}
-#endif
 
 
 /*******************************************************************************

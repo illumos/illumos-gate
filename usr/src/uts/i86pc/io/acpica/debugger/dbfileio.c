@@ -2,7 +2,7 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands.  These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              $Revision: 81 $
+ *              $Revision: 82 $
  *
  ******************************************************************************/
 
@@ -135,6 +135,9 @@
 FILE                        *AcpiGbl_DebugFile = NULL;
 #endif
 
+
+#ifdef ACPI_DEBUGGER
+
 /* Local prototypes */
 
 static ACPI_STATUS
@@ -148,7 +151,6 @@ AeLocalLoadTable (
     ACPI_TABLE_HEADER       *TablePtr);
 
 
-#ifdef ACPI_DEBUGGER
 /*******************************************************************************
  *
  * FUNCTION:    AcpiDbCloseDebugFile
@@ -217,7 +219,6 @@ AcpiDbOpenDebugFile (
 
 
 #ifdef ACPI_APPLICATION
-
 /*******************************************************************************
  *
  * FUNCTION:    AcpiDbCheckTextModeCorruption

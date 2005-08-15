@@ -1699,6 +1699,7 @@ apic_picinit(void)
 	uint_t isr;
 	volatile int32_t *ioapic;
 	apic_irq_t	*irqptr;
+	struct intrspec ispec;
 
 	/*
 	 * On UniSys Model 6520, the BIOS leaves vector 0x20 isr
@@ -1759,21 +1760,22 @@ apic_picinit(void)
 	/*
 	 * Hack alert: deal with ACPI SCI interrupt chicken/egg here
 	 */
-	if (apic_sci_vect >= 0) {
+	if (apic_sci_vect > 0) {
 		/*
 		 * acpica has already done add_avintr(); we just
 		 * to finish the job by mimicing translate_irq()
+		 *
+		 * Fake up an intrspec and setup the tables
 		 */
-		if (apic_setup_sci_irq_table(apic_sci_vect, SCI_IPL,
-		    &apic_sci_flags) < 0) {
+		ispec.intrspec_vec = apic_sci_vect;
+		ispec.intrspec_pri = SCI_IPL;
+
+		if (apic_setup_irq_table(NULL, apic_sci_vect, NULL,
+		    &ispec, &apic_sci_flags, DDI_INTR_TYPE_FIXED) < 0) {
 			cmn_err(CE_WARN, "!apic: SCI setup failed");
 			return;
 		}
 		irqptr = apic_irq_table[apic_sci_vect];
-
-		/* Assert we're the sole entry in the list */
-		ASSERT(irqptr != NULL);
-		ASSERT(irqptr->airq_next == NULL);
 
 		/* Program I/O APIC */
 		(void) apic_setup_io_intr(irqptr, apic_sci_vect);
@@ -3379,10 +3381,6 @@ apic_share_vector(int irqno, iflag_t *intr_flagp, short intr_index, int ipl,
 			continue;
 		irqptr = apic_irq_table[newirq];
 
-		/* don't share SCI */
-		if (irqptr->airq_mps_intr_index == SCI_INDEX)
-			continue;
-
 		if ((dummyirq.airq_rdt_entry & 0xFF00) !=
 		    (irqptr->airq_rdt_entry & 0xFF00))
 			/* not compatible */
@@ -3444,65 +3442,6 @@ apic_share_vector(int irqno, iflag_t *intr_flagp, short intr_index, int ipl,
 		return (VIRTIRQ(chosen_irq, share_id));
 	}
 	return (-1);
-}
-
-/*
- *
- */
-static int
-apic_setup_sci_irq_table(int irqno, uchar_t ipl, iflag_t *intr_flagp)
-{
-	int	intr_index;
-	uchar_t	ipin, ioapicindex, vector;
-	apic_irq_t *irqptr;
-
-	ASSERT(intr_flagp != NULL);
-
-	intr_index = SCI_INDEX;
-	ioapicindex = acpi_find_ioapic(irqno);
-	ASSERT(ioapicindex != 0xFF);
-	ipin = irqno - apic_io_vectbase[ioapicindex];
-	if (apic_irq_table[irqno] &&
-	    apic_irq_table[irqno]->airq_mps_intr_index == SCI_INDEX) {
-		ASSERT(apic_irq_table[irqno]->airq_intin_no == ipin &&
-		    apic_irq_table[irqno]->airq_ioapicindex ==
-		    ioapicindex);
-		return (irqno);
-	}
-
-	if ((vector = apic_allocate_vector(ipl, irqno, 0)) == 0) {
-		cmn_err(CE_WARN, "!apic: failed to allocate vector for SCI");
-		return (-1);
-	}
-	mutex_enter(&airq_mutex);
-	if (apic_irq_table[irqno] == NULL) {
-		irqptr = kmem_zalloc(sizeof (apic_irq_t), KM_SLEEP);
-		irqptr->airq_temp_cpu = IRQ_UNINIT;
-		apic_irq_table[irqno] = irqptr;
-	} else {
-		/*
-		 *  We assume that SCI is the first to attach this IRQ
-		 */
-		cmn_err(CE_WARN, "!acpi: apic_irq_t not empty for SCI");
-		return (-1);
-	}
-
-	apic_max_device_irq = max(irqno, apic_max_device_irq);
-	apic_min_device_irq = min(irqno, apic_min_device_irq);
-	mutex_exit(&airq_mutex);
-	irqptr->airq_ioapicindex = ioapicindex;
-	irqptr->airq_intin_no = ipin;
-	irqptr->airq_ipl = ipl;
-	irqptr->airq_vector = vector;
-	irqptr->airq_origirq = (uchar_t)irqno;
-	irqptr->airq_share_id = 0;
-	irqptr->airq_mps_intr_index = (short)intr_index;
-	irqptr->airq_dip = NULL;
-	irqptr->airq_major = 0;
-	irqptr->airq_cpu = 0;	/* SCI always on CPU 0 */
-	irqptr->airq_iflag = *intr_flagp;
-	apic_record_rdt_entry(irqptr, irqno);
-	return (irqno);
 }
 
 /*
@@ -3594,6 +3533,7 @@ apic_setup_irq_table(dev_info_t *dip, int irqno, struct apic_io_intr *intrp,
 			irqptr->airq_dip = dip;
 			irqptr->airq_major = major;
 			sdip = apic_irq_table[IRQINDEX(newirq)]->airq_dip;
+			/* This is OK to do really */
 			if (sdip == NULL) {
 				cmn_err(CE_WARN, "Sharing vectors: %s"
 				    " instance %d and SCI",
@@ -4185,7 +4125,7 @@ apic_record_rdt_entry(apic_irq_t *irqptr, int irq)
 			level = AV_LEVEL;
 		if (intr_index == FREE_INDEX && apic_defconf == 0)
 			apic_error |= APIC_ERR_INVALID_INDEX;
-	} else if (intr_index == ACPI_INDEX || intr_index == SCI_INDEX) {
+	} else if (intr_index == ACPI_INDEX) {
 		bus_type = irqptr->airq_iflag.bustype;
 		if (irqptr->airq_iflag.intr_el == INTR_EL_CONFORM) {
 			if (bus_type == BUS_PCI)

@@ -137,6 +137,9 @@ extern int acpi_get_irq_cache_ent(uchar_t bus, uchar_t dev, int ipin,
 
 extern int acpi_poweroff(void);
 
+extern void psm_set_elcr(int vecno, int val);
+extern int psm_get_elcr(int vecno);
+
 #ifdef	__cplusplus
 }
 #endif

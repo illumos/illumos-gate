@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsdump - Functions to display the resource structures.
- *              $Revision: 44 $
+ *              $Revision: 45 $
  *
  ******************************************************************************/
 
@@ -123,6 +123,9 @@
 #define _COMPONENT          ACPI_RESOURCES
         ACPI_MODULE_NAME    ("rsdump")
 
+
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
+
 /* Local prototypes */
 
 static void
@@ -178,7 +181,6 @@ AcpiRsDumpVendorSpecific (
     ACPI_RESOURCE_DATA      *Data);
 
 
-#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
 /*******************************************************************************
  *
  * FUNCTION:    AcpiRsDumpIrq

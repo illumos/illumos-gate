@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evgpe - General Purpose Event handling and dispatch
- *              $Revision: 49 $
+ *              $Revision: 50 $
  *
  *****************************************************************************/
 
@@ -486,6 +486,7 @@ AcpiEvGpeDetect (
     ACPI_GPE_REGISTER_INFO  *GpeRegisterInfo;
     UINT32                  StatusReg;
     UINT32                  EnableReg;
+    UINT32                  Flags;
     ACPI_STATUS             Status;
     ACPI_GPE_BLOCK_INFO     *GpeBlock;
     ACPI_NATIVE_UINT        i;
@@ -503,7 +504,7 @@ AcpiEvGpeDetect (
 
     /* Examine all GPE blocks attached to this interrupt level */
 
-    AcpiOsAcquireLock (AcpiGbl_GpeLock, ACPI_ISR);
+    Flags = AcpiOsAcquireLock (AcpiGbl_GpeLock);
     GpeBlock = GpeXruptList->GpeBlockListHead;
     while (GpeBlock)
     {
@@ -574,7 +575,7 @@ AcpiEvGpeDetect (
 
 UnlockAndExit:
 
-    AcpiOsReleaseLock (AcpiGbl_GpeLock, ACPI_ISR);
+    AcpiOsReleaseLock (AcpiGbl_GpeLock, Flags);
     return (IntStatus);
 }
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 152 $
+ *              $Revision: 157 $
  *
  *****************************************************************************/
 
@@ -135,26 +135,6 @@
         ACPI_MODULE_NAME    ("psparse")
 
 
-static UINT32               AcpiGbl_Depth = 0;
-
-/* Local prototypes */
-
-static void
-AcpiPsCompleteThisOp (
-    ACPI_WALK_STATE         *WalkState,
-    ACPI_PARSE_OBJECT       *Op);
-
-static ACPI_STATUS
-AcpiPsNextParseState (
-    ACPI_WALK_STATE         *WalkState,
-    ACPI_PARSE_OBJECT       *Op,
-    ACPI_STATUS             CallbackStatus);
-
-static ACPI_STATUS
-AcpiPsParseLoop (
-    ACPI_WALK_STATE         *WalkState);
-
-
 /*******************************************************************************
  *
  * FUNCTION:    AcpiPsGetOpcodeSize
@@ -208,9 +188,9 @@ AcpiPsPeekOpcode (
     Aml = ParserState->Aml;
     Opcode = (UINT16) ACPI_GET8 (Aml);
 
-    if (Opcode == AML_EXTOP)
+    if (Opcode == AML_EXTENDED_OP_PREFIX)
     {
-        /* Extended opcode */
+        /* Extended opcode, get the second opcode byte */
 
         Aml++;
         Opcode = (UINT16) ((Opcode << 8) | ACPI_GET8 (Aml));
@@ -227,13 +207,13 @@ AcpiPsPeekOpcode (
  * PARAMETERS:  WalkState       - Current State
  *              Op              - Op to complete
  *
- * RETURN:      None.
+ * RETURN:      Status
  *
  * DESCRIPTION: Perform any cleanup at the completion of an Op.
  *
  ******************************************************************************/
 
-static void
+ACPI_STATUS
 AcpiPsCompleteThisOp (
     ACPI_WALK_STATE         *WalkState,
     ACPI_PARSE_OBJECT       *Op)
@@ -251,7 +231,7 @@ AcpiPsCompleteThisOp (
 
     if (!Op)
     {
-        return_VOID;
+        return_ACPI_STATUS (AE_OK);  /* OK for now */
     }
 
     /* Delete this op and the subtree below it if asked to */
@@ -259,18 +239,26 @@ AcpiPsCompleteThisOp (
     if (((WalkState->ParseFlags & ACPI_PARSE_TREE_MASK) != ACPI_PARSE_DELETE_TREE) ||
          (WalkState->OpInfo->Class == AML_CLASS_ARGUMENT))
     {
-        return_VOID;
+        return_ACPI_STATUS (AE_OK);
     }
 
     /* Make sure that we only delete this subtree */
 
     if (Op->Common.Parent)
     {
+        Prev = Op->Common.Parent->Common.Value.Arg;
+        if (!Prev)
+        {
+            /* Nothing more to do */
+
+            goto Cleanup;
+        }
+
         /*
          * Check if we need to replace the operator and its subtree
          * with a return value op (placeholder op)
          */
-        ParentInfo  = AcpiPsGetOpcodeInfo (Op->Common.Parent->Common.AmlOpcode);
+        ParentInfo = AcpiPsGetOpcodeInfo (Op->Common.Parent->Common.AmlOpcode);
 
         switch (ParentInfo->Class)
         {
@@ -286,7 +274,7 @@ AcpiPsCompleteThisOp (
             ReplacementOp = AcpiPsAllocOp (AML_INT_RETURN_VALUE_OP);
             if (!ReplacementOp)
             {
-                goto Cleanup;
+                goto AllocateError;
             }
             break;
 
@@ -305,13 +293,11 @@ AcpiPsCompleteThisOp (
                 ReplacementOp = AcpiPsAllocOp (AML_INT_RETURN_VALUE_OP);
                 if (!ReplacementOp)
                 {
-                    goto Cleanup;
+                    goto AllocateError;
                 }
             }
-
-            if ((Op->Common.Parent->Common.AmlOpcode == AML_NAME_OP) &&
-                (WalkState->DescendingCallback != AcpiDsExecBeginOp))
-
+            else if ((Op->Common.Parent->Common.AmlOpcode == AML_NAME_OP) &&
+                     (WalkState->PassNumber <= ACPI_IMODE_LOAD_PASS2))
             {
                 if ((Op->Common.AmlOpcode == AML_BUFFER_OP) ||
                     (Op->Common.AmlOpcode == AML_PACKAGE_OP) ||
@@ -320,7 +306,7 @@ AcpiPsCompleteThisOp (
                     ReplacementOp = AcpiPsAllocOp (Op->Common.AmlOpcode);
                     if (!ReplacementOp)
                     {
-                        goto Cleanup;
+                        goto AllocateError;
                     }
 
                     ReplacementOp->Named.Data = Op->Named.Data;
@@ -330,16 +316,16 @@ AcpiPsCompleteThisOp (
             break;
 
         default:
+
             ReplacementOp = AcpiPsAllocOp (AML_INT_RETURN_VALUE_OP);
             if (!ReplacementOp)
             {
-                goto Cleanup;
+                goto AllocateError;
             }
         }
 
         /* We must unlink this op from the parent tree */
 
-        Prev = Op->Common.Parent->Common.Value.Arg;
         if (Prev == Op)
         {
             /* This op is the first in the list */
@@ -392,7 +378,15 @@ Cleanup:
     /* Now we can actually delete the subtree rooted at Op */
 
     AcpiPsDeleteParseTree (Op);
-    return_VOID;
+    return_ACPI_STATUS (AE_OK);
+
+
+AllocateError:
+
+    /* Always delete the subtree, even on error */
+
+    AcpiPsDeleteParseTree (Op);
+    return_ACPI_STATUS (AE_NO_MEMORY);
 }
 
 
@@ -411,7 +405,7 @@ Cleanup:
  *
  ******************************************************************************/
 
-static ACPI_STATUS
+ACPI_STATUS
 AcpiPsNextParseState (
     ACPI_WALK_STATE         *WalkState,
     ACPI_PARSE_OBJECT       *Op,
@@ -516,727 +510,6 @@ AcpiPsNextParseState (
         }
         break;
     }
-
-    return_ACPI_STATUS (Status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiPsParseLoop
- *
- * PARAMETERS:  WalkState           - Current state
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Parse AML (pointed to by the current parser state) and return
- *              a tree of ops.
- *
- ******************************************************************************/
-
-static ACPI_STATUS
-AcpiPsParseLoop (
-    ACPI_WALK_STATE         *WalkState)
-{
-    ACPI_STATUS             Status = AE_OK;
-    ACPI_PARSE_OBJECT       *Op = NULL;     /* current op */
-    ACPI_PARSE_OBJECT       *Arg = NULL;
-    ACPI_PARSE_OBJECT       *PreOp = NULL;
-    ACPI_PARSE_STATE        *ParserState;
-    UINT8                   *AmlOpStart = NULL;
-
-
-    ACPI_FUNCTION_TRACE_PTR ("PsParseLoop", WalkState);
-
-    if (WalkState->DescendingCallback == NULL)
-    {
-        return_ACPI_STATUS (AE_BAD_PARAMETER);
-    }
-
-    ParserState = &WalkState->ParserState;
-    WalkState->ArgTypes = 0;
-
-#if (!defined (ACPI_NO_METHOD_EXECUTION) && !defined (ACPI_CONSTANT_EVAL_ONLY))
-
-    if (WalkState->WalkType & ACPI_WALK_METHOD_RESTART)
-    {
-        /* We are restarting a preempted control method */
-
-        if (AcpiPsHasCompletedScope (ParserState))
-        {
-            /*
-             * We must check if a predicate to an IF or WHILE statement
-             * was just completed
-             */
-            if ((ParserState->Scope->ParseScope.Op) &&
-               ((ParserState->Scope->ParseScope.Op->Common.AmlOpcode == AML_IF_OP) ||
-                (ParserState->Scope->ParseScope.Op->Common.AmlOpcode == AML_WHILE_OP)) &&
-                (WalkState->ControlState) &&
-                (WalkState->ControlState->Common.State ==
-                    ACPI_CONTROL_PREDICATE_EXECUTING))
-            {
-                /*
-                 * A predicate was just completed, get the value of the
-                 * predicate and branch based on that value
-                 */
-                WalkState->Op = NULL;
-                Status = AcpiDsGetPredicateValue (WalkState, ACPI_TO_POINTER (TRUE));
-                if (ACPI_FAILURE (Status) &&
-                    ((Status & AE_CODE_MASK) != AE_CODE_CONTROL))
-                {
-                    if (Status == AE_AML_NO_RETURN_VALUE)
-                    {
-                        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                            "Invoked method did not return a value, %s\n",
-                            AcpiFormatException (Status)));
-
-                    }
-                    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                        "GetPredicate Failed, %s\n",
-                        AcpiFormatException (Status)));
-                    return_ACPI_STATUS (Status);
-                }
-
-                Status = AcpiPsNextParseState (WalkState, Op, Status);
-            }
-
-            AcpiPsPopScope (ParserState, &Op,
-                &WalkState->ArgTypes, &WalkState->ArgCount);
-            ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Popped scope, Op=%p\n", Op));
-        }
-        else if (WalkState->PrevOp)
-        {
-            /* We were in the middle of an op */
-
-            Op = WalkState->PrevOp;
-            WalkState->ArgTypes = WalkState->PrevArgTypes;
-        }
-    }
-#endif
-
-    /* Iterative parsing loop, while there is more AML to process: */
-
-    while ((ParserState->Aml < ParserState->AmlEnd) || (Op))
-    {
-        AmlOpStart = ParserState->Aml;
-        if (!Op)
-        {
-            /* Get the next opcode from the AML stream */
-
-            WalkState->AmlOffset = (UINT32) ACPI_PTR_DIFF (ParserState->Aml,
-                                                    ParserState->AmlStart);
-            WalkState->Opcode    = AcpiPsPeekOpcode (ParserState);
-
-            /*
-             * First cut to determine what we have found:
-             * 1) A valid AML opcode
-             * 2) A name string
-             * 3) An unknown/invalid opcode
-             */
-            WalkState->OpInfo = AcpiPsGetOpcodeInfo (WalkState->Opcode);
-            switch (WalkState->OpInfo->Class)
-            {
-            case AML_CLASS_ASCII:
-            case AML_CLASS_PREFIX:
-                /*
-                 * Starts with a valid prefix or ASCII char, this is a name
-                 * string.  Convert the bare name string to a namepath.
-                 */
-                WalkState->Opcode = AML_INT_NAMEPATH_OP;
-                WalkState->ArgTypes = ARGP_NAMESTRING;
-                break;
-
-            case AML_CLASS_UNKNOWN:
-
-                /* The opcode is unrecognized.  Just skip unknown opcodes */
-
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Found unknown opcode %X at AML address %p offset %X, ignoring\n",
-                    WalkState->Opcode, ParserState->Aml, WalkState->AmlOffset));
-
-                ACPI_DUMP_BUFFER (ParserState->Aml, 128);
-
-                /* Assume one-byte bad opcode */
-
-                ParserState->Aml++;
-                continue;
-
-            default:
-
-                /* Found opcode info, this is a normal opcode */
-
-                ParserState->Aml += AcpiPsGetOpcodeSize (WalkState->Opcode);
-                WalkState->ArgTypes = WalkState->OpInfo->ParseArgs;
-                break;
-            }
-
-            /* Create Op structure and append to parent's argument list */
-
-            if (WalkState->OpInfo->Flags & AML_NAMED)
-            {
-                /* Allocate a new PreOp if necessary */
-
-                if (!PreOp)
-                {
-                    PreOp = AcpiPsAllocOp (WalkState->Opcode);
-                    if (!PreOp)
-                    {
-                        Status = AE_NO_MEMORY;
-                        goto CloseThisOp;
-                    }
-                }
-
-                PreOp->Common.Value.Arg = NULL;
-                PreOp->Common.AmlOpcode = WalkState->Opcode;
-
-                /*
-                 * Get and append arguments until we find the node that contains
-                 * the name (the type ARGP_NAME).
-                 */
-                while (GET_CURRENT_ARG_TYPE (WalkState->ArgTypes) &&
-                      (GET_CURRENT_ARG_TYPE (WalkState->ArgTypes) != ARGP_NAME))
-                {
-                    Status = AcpiPsGetNextArg (WalkState, ParserState,
-                                GET_CURRENT_ARG_TYPE (WalkState->ArgTypes), &Arg);
-                    if (ACPI_FAILURE (Status))
-                    {
-                        goto CloseThisOp;
-                    }
-
-                    AcpiPsAppendArg (PreOp, Arg);
-                    INCREMENT_ARG_LIST (WalkState->ArgTypes);
-                }
-
-                /*
-                 * Make sure that we found a NAME and didn't run out of
-                 * arguments
-                 */
-                if (!GET_CURRENT_ARG_TYPE (WalkState->ArgTypes))
-                {
-                    Status = AE_AML_NO_OPERAND;
-                    goto CloseThisOp;
-                }
-
-                /* We know that this arg is a name, move to next arg */
-
-                INCREMENT_ARG_LIST (WalkState->ArgTypes);
-
-                /*
-                 * Find the object.  This will either insert the object into
-                 * the namespace or simply look it up
-                 */
-                WalkState->Op = NULL;
-
-                Status = WalkState->DescendingCallback (WalkState, &Op);
-                if (ACPI_FAILURE (Status))
-                {
-                    ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                        "During name lookup/catalog, %s\n",
-                        AcpiFormatException (Status)));
-                    goto CloseThisOp;
-                }
-
-                if (!Op)
-                {
-                    continue;
-                }
-
-                Status = AcpiPsNextParseState (WalkState, Op, Status);
-                if (Status == AE_CTRL_PENDING)
-                {
-                    Status = AE_OK;
-                    goto CloseThisOp;
-                }
-
-                if (ACPI_FAILURE (Status))
-                {
-                    goto CloseThisOp;
-                }
-
-                AcpiPsAppendArg (Op, PreOp->Common.Value.Arg);
-                AcpiGbl_Depth++;
-
-                if (Op->Common.AmlOpcode == AML_REGION_OP)
-                {
-                    /*
-                     * Defer final parsing of an OperationRegion body,
-                     * because we don't have enough info in the first pass
-                     * to parse it correctly (i.e., there may be method
-                     * calls within the TermArg elements of the body.)
-                     *
-                     * However, we must continue parsing because
-                     * the opregion is not a standalone package --
-                     * we don't know where the end is at this point.
-                     *
-                     * (Length is unknown until parse of the body complete)
-                     */
-                    Op->Named.Data    = AmlOpStart;
-                    Op->Named.Length  = 0;
-                }
-            }
-            else
-            {
-                /* Not a named opcode, just allocate Op and append to parent */
-
-                WalkState->OpInfo = AcpiPsGetOpcodeInfo (WalkState->Opcode);
-                Op = AcpiPsAllocOp (WalkState->Opcode);
-                if (!Op)
-                {
-                    Status = AE_NO_MEMORY;
-                    goto CloseThisOp;
-                }
-
-                if (WalkState->OpInfo->Flags & AML_CREATE)
-                {
-                    /*
-                     * Backup to beginning of CreateXXXfield declaration
-                     * BodyLength is unknown until we parse the body
-                     */
-                    Op->Named.Data    = AmlOpStart;
-                    Op->Named.Length  = 0;
-                }
-
-                AcpiPsAppendArg (AcpiPsGetParentScope (ParserState), Op);
-
-                if ((WalkState->DescendingCallback != NULL))
-                {
-                    /*
-                     * Find the object. This will either insert the object into
-                     * the namespace or simply look it up
-                     */
-                    WalkState->Op = Op;
-
-                    Status = WalkState->DescendingCallback (WalkState, &Op);
-                    Status = AcpiPsNextParseState (WalkState, Op, Status);
-                    if (Status == AE_CTRL_PENDING)
-                    {
-                        Status = AE_OK;
-                        goto CloseThisOp;
-                    }
-
-                    if (ACPI_FAILURE (Status))
-                    {
-                        goto CloseThisOp;
-                    }
-                }
-            }
-
-            Op->Common.AmlOffset = WalkState->AmlOffset;
-
-            if (WalkState->OpInfo)
-            {
-                ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
-                    "Opcode %4.4X [%s] Op %p Aml %p AmlOffset %5.5X\n",
-                     (UINT32) Op->Common.AmlOpcode, WalkState->OpInfo->Name,
-                     Op, ParserState->Aml, Op->Common.AmlOffset));
-            }
-        }
-
-
-        /*
-         * Start ArgCount at zero because we don't know if there are
-         * any args yet
-         */
-        WalkState->ArgCount  = 0;
-
-        /* Are there any arguments that must be processed? */
-
-        if (WalkState->ArgTypes)
-        {
-            /* Get arguments */
-
-            switch (Op->Common.AmlOpcode)
-            {
-            case AML_BYTE_OP:       /* AML_BYTEDATA_ARG */
-            case AML_WORD_OP:       /* AML_WORDDATA_ARG */
-            case AML_DWORD_OP:      /* AML_DWORDATA_ARG */
-            case AML_QWORD_OP:      /* AML_QWORDATA_ARG */
-            case AML_STRING_OP:     /* AML_ASCIICHARLIST_ARG */
-
-                /* Fill in constant or string argument directly */
-
-                AcpiPsGetNextSimpleArg (ParserState,
-                    GET_CURRENT_ARG_TYPE (WalkState->ArgTypes), Op);
-                break;
-
-            case AML_INT_NAMEPATH_OP:   /* AML_NAMESTRING_ARG */
-
-                Status = AcpiPsGetNextNamepath (WalkState, ParserState, Op, 1);
-                if (ACPI_FAILURE (Status))
-                {
-                    goto CloseThisOp;
-                }
-
-                WalkState->ArgTypes = 0;
-                break;
-
-            default:
-
-                /*
-                 * Op is not a constant or string, append each argument
-                 * to the Op
-                 */
-                while (GET_CURRENT_ARG_TYPE (WalkState->ArgTypes) &&
-                        !WalkState->ArgCount)
-                {
-                    WalkState->AmlOffset = (UINT32)
-                        ACPI_PTR_DIFF (ParserState->Aml, ParserState->AmlStart);
-
-                    Status = AcpiPsGetNextArg (WalkState, ParserState,
-                                GET_CURRENT_ARG_TYPE (WalkState->ArgTypes),
-                                &Arg);
-                    if (ACPI_FAILURE (Status))
-                    {
-                        goto CloseThisOp;
-                    }
-
-                    if (Arg)
-                    {
-                        Arg->Common.AmlOffset = WalkState->AmlOffset;
-                        AcpiPsAppendArg (Op, Arg);
-                    }
-                    INCREMENT_ARG_LIST (WalkState->ArgTypes);
-                }
-
-                /* Special processing for certain opcodes */
-
-                switch (Op->Common.AmlOpcode)
-                {
-                case AML_METHOD_OP:
-
-                    /*
-                     * Skip parsing of control method
-                     * because we don't have enough info in the first pass
-                     * to parse it correctly.
-                     *
-                     * Save the length and address of the body
-                     */
-                    Op->Named.Data   = ParserState->Aml;
-                    Op->Named.Length = (UINT32) (ParserState->PkgEnd -
-                                                 ParserState->Aml);
-
-                    /* Skip body of method */
-
-                    ParserState->Aml    = ParserState->PkgEnd;
-                    WalkState->ArgCount = 0;
-                    break;
-
-                case AML_BUFFER_OP:
-                case AML_PACKAGE_OP:
-                case AML_VAR_PACKAGE_OP:
-
-                    if ((Op->Common.Parent) &&
-                        (Op->Common.Parent->Common.AmlOpcode == AML_NAME_OP) &&
-                        (WalkState->DescendingCallback != AcpiDsExecBeginOp))
-                    {
-                        /*
-                         * Skip parsing of Buffers and Packages
-                         * because we don't have enough info in the first pass
-                         * to parse them correctly.
-                         */
-                        Op->Named.Data   = AmlOpStart;
-                        Op->Named.Length = (UINT32) (ParserState->PkgEnd -
-                                                     AmlOpStart);
-
-                        /* Skip body */
-
-                        ParserState->Aml    = ParserState->PkgEnd;
-                        WalkState->ArgCount = 0;
-                    }
-                    break;
-
-                case AML_WHILE_OP:
-
-                    if (WalkState->ControlState)
-                    {
-                        WalkState->ControlState->Control.PackageEnd =
-                            ParserState->PkgEnd;
-                    }
-                    break;
-
-                default:
-
-                    /* No action for all other opcodes */
-                    break;
-                }
-                break;
-            }
-        }
-
-        /* Check for arguments that need to be processed */
-
-        if (WalkState->ArgCount)
-        {
-            /*
-             * There are arguments (complex ones), push Op and
-             * prepare for argument
-             */
-            Status = AcpiPsPushScope (ParserState, Op,
-                        WalkState->ArgTypes, WalkState->ArgCount);
-            if (ACPI_FAILURE (Status))
-            {
-                goto CloseThisOp;
-            }
-            Op = NULL;
-            continue;
-        }
-
-        /*
-         * All arguments have been processed -- Op is complete,
-         * prepare for next
-         */
-        WalkState->OpInfo = AcpiPsGetOpcodeInfo (Op->Common.AmlOpcode);
-        if (WalkState->OpInfo->Flags & AML_NAMED)
-        {
-            if (AcpiGbl_Depth)
-            {
-                AcpiGbl_Depth--;
-            }
-
-            if (Op->Common.AmlOpcode == AML_REGION_OP)
-            {
-                /*
-                 * Skip parsing of control method or opregion body,
-                 * because we don't have enough info in the first pass
-                 * to parse them correctly.
-                 *
-                 * Completed parsing an OpRegion declaration, we now
-                 * know the length.
-                 */
-                Op->Named.Length = (UINT32) (ParserState->Aml - Op->Named.Data);
-            }
-        }
-
-        if (WalkState->OpInfo->Flags & AML_CREATE)
-        {
-            /*
-             * Backup to beginning of CreateXXXfield declaration (1 for
-             * Opcode)
-             *
-             * BodyLength is unknown until we parse the body
-             */
-            Op->Named.Length = (UINT32) (ParserState->Aml - Op->Named.Data);
-        }
-
-        /* This op complete, notify the dispatcher */
-
-        if (WalkState->AscendingCallback != NULL)
-        {
-            WalkState->Op     = Op;
-            WalkState->Opcode = Op->Common.AmlOpcode;
-
-            Status = WalkState->AscendingCallback (WalkState);
-            Status = AcpiPsNextParseState (WalkState, Op, Status);
-            if (Status == AE_CTRL_PENDING)
-            {
-                Status = AE_OK;
-                goto CloseThisOp;
-            }
-        }
-
-
-CloseThisOp:
-        /*
-         * Finished one argument of the containing scope
-         */
-        ParserState->Scope->ParseScope.ArgCount--;
-
-        /* Close this Op (will result in parse subtree deletion) */
-
-        AcpiPsCompleteThisOp (WalkState, Op);
-        Op = NULL;
-        if (PreOp)
-        {
-            AcpiPsFreeOp (PreOp);
-            PreOp = NULL;
-        }
-
-        switch (Status)
-        {
-        case AE_OK:
-            break;
-
-
-        case AE_CTRL_TRANSFER:
-
-            /* We are about to transfer to a called method. */
-
-            WalkState->PrevOp = Op;
-            WalkState->PrevArgTypes = WalkState->ArgTypes;
-            return_ACPI_STATUS (Status);
-
-
-        case AE_CTRL_END:
-
-            AcpiPsPopScope (ParserState, &Op,
-                &WalkState->ArgTypes, &WalkState->ArgCount);
-
-            if (Op)
-            {
-                WalkState->Op     = Op;
-                WalkState->OpInfo = AcpiPsGetOpcodeInfo (Op->Common.AmlOpcode);
-                WalkState->Opcode = Op->Common.AmlOpcode;
-
-                Status = WalkState->AscendingCallback (WalkState);
-                Status = AcpiPsNextParseState (WalkState, Op, Status);
-
-                AcpiPsCompleteThisOp (WalkState, Op);
-                Op = NULL;
-            }
-            Status = AE_OK;
-            break;
-
-
-        case AE_CTRL_BREAK:
-        case AE_CTRL_CONTINUE:
-
-            /* Pop off scopes until we find the While */
-
-            while (!Op || (Op->Common.AmlOpcode != AML_WHILE_OP))
-            {
-                AcpiPsPopScope (ParserState, &Op,
-                    &WalkState->ArgTypes, &WalkState->ArgCount);
-            }
-
-            /* Close this iteration of the While loop */
-
-            WalkState->Op     = Op;
-            WalkState->OpInfo = AcpiPsGetOpcodeInfo (Op->Common.AmlOpcode);
-            WalkState->Opcode = Op->Common.AmlOpcode;
-
-            Status = WalkState->AscendingCallback (WalkState);
-            Status = AcpiPsNextParseState (WalkState, Op, Status);
-
-            AcpiPsCompleteThisOp (WalkState, Op);
-            Op = NULL;
-
-            Status = AE_OK;
-            break;
-
-
-        case AE_CTRL_TERMINATE:
-
-            Status = AE_OK;
-
-            /* Clean up */
-            do
-            {
-                if (Op)
-                {
-                    AcpiPsCompleteThisOp (WalkState, Op);
-                }
-                AcpiPsPopScope (ParserState, &Op,
-                    &WalkState->ArgTypes, &WalkState->ArgCount);
-
-            } while (Op);
-
-            return_ACPI_STATUS (Status);
-
-
-        default:  /* All other non-AE_OK status */
-
-            do
-            {
-                if (Op)
-                {
-                    AcpiPsCompleteThisOp (WalkState, Op);
-                }
-                AcpiPsPopScope (ParserState, &Op,
-                    &WalkState->ArgTypes, &WalkState->ArgCount);
-
-            } while (Op);
-
-
-            /*
-             * TBD: Cleanup parse ops on error
-             */
-#if 0
-            if (Op == NULL)
-            {
-                AcpiPsPopScope (ParserState, &Op,
-                    &WalkState->ArgTypes, &WalkState->ArgCount);
-            }
-#endif
-            WalkState->PrevOp = Op;
-            WalkState->PrevArgTypes = WalkState->ArgTypes;
-            return_ACPI_STATUS (Status);
-        }
-
-        /* This scope complete? */
-
-        if (AcpiPsHasCompletedScope (ParserState))
-        {
-            AcpiPsPopScope (ParserState, &Op,
-                &WalkState->ArgTypes, &WalkState->ArgCount);
-            ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Popped scope, Op=%p\n", Op));
-        }
-        else
-        {
-            Op = NULL;
-        }
-
-    } /* while ParserState->Aml */
-
-
-    /*
-     * Complete the last Op (if not completed), and clear the scope stack.
-     * It is easily possible to end an AML "package" with an unbounded number
-     * of open scopes (such as when several ASL blocks are closed with
-     * sequential closing braces).  We want to terminate each one cleanly.
-     */
-    ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "AML package complete at Op %p\n", Op));
-    do
-    {
-        if (Op)
-        {
-            if (WalkState->AscendingCallback != NULL)
-            {
-                WalkState->Op     = Op;
-                WalkState->OpInfo = AcpiPsGetOpcodeInfo (Op->Common.AmlOpcode);
-                WalkState->Opcode = Op->Common.AmlOpcode;
-
-                Status = WalkState->AscendingCallback (WalkState);
-                Status = AcpiPsNextParseState (WalkState, Op, Status);
-                if (Status == AE_CTRL_PENDING)
-                {
-                    Status = AE_OK;
-                    goto CloseThisOp;
-                }
-
-                if (Status == AE_CTRL_TERMINATE)
-                {
-                    Status = AE_OK;
-
-                    /* Clean up */
-                    do
-                    {
-                        if (Op)
-                        {
-                            AcpiPsCompleteThisOp (WalkState, Op);
-                        }
-
-                        AcpiPsPopScope (ParserState, &Op,
-                            &WalkState->ArgTypes, &WalkState->ArgCount);
-
-                    } while (Op);
-
-                    return_ACPI_STATUS (Status);
-                }
-
-                else if (ACPI_FAILURE (Status))
-                {
-                    AcpiPsCompleteThisOp (WalkState, Op);
-                    return_ACPI_STATUS (Status);
-                }
-            }
-
-            AcpiPsCompleteThisOp (WalkState, Op);
-        }
-
-        AcpiPsPopScope (ParserState, &Op, &WalkState->ArgTypes,
-            &WalkState->ArgCount);
-
-    } while (Op);
 
     return_ACPI_STATUS (Status);
 }

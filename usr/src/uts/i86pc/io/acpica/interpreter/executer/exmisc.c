@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 130 $
+ *              $Revision: 131 $
  *
  *****************************************************************************/
 
@@ -386,7 +386,7 @@ AcpiExDoConcatenate (
         /* Result of two Integers is a Buffer */
         /* Need enough buffer space for two integers */
 
-        ReturnDesc = AcpiUtCreateBufferObject (
+        ReturnDesc = AcpiUtCreateBufferObject ((ACPI_SIZE)
                             ACPI_MUL_2 (AcpiGbl_IntegerByteWidth));
         if (!ReturnDesc)
         {

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utobject - ACPI object create/delete/size/cache routines
- *              $Revision: 95 $
+ *              $Revision: 97 $
  *
  *****************************************************************************/
 
@@ -422,7 +422,7 @@ AcpiUtAllocateObjectDescDbg (
     ACPI_FUNCTION_TRACE ("UtAllocateObjectDescDbg");
 
 
-    Object = AcpiUtAcquireFromCache (ACPI_MEM_LIST_OPERAND);
+    Object = AcpiOsAcquireObject (AcpiGbl_OperandCache);
     if (!Object)
     {
         _ACPI_REPORT_ERROR (ModuleName, LineNumber, ComponentId,
@@ -471,37 +471,9 @@ AcpiUtDeleteObjectDesc (
         return_VOID;
     }
 
-    AcpiUtReleaseToCache (ACPI_MEM_LIST_OPERAND, Object);
-
+    (void) AcpiOsReleaseObject (AcpiGbl_OperandCache, Object);
     return_VOID;
 }
-
-
-#ifdef ACPI_ENABLE_OBJECT_CACHE
-/*******************************************************************************
- *
- * FUNCTION:    AcpiUtDeleteObjectCache
- *
- * PARAMETERS:  None
- *
- * RETURN:      None
- *
- * DESCRIPTION: Purge the global state object cache.  Used during subsystem
- *              termination.
- *
- ******************************************************************************/
-
-void
-AcpiUtDeleteObjectCache (
-    void)
-{
-    ACPI_FUNCTION_TRACE ("UtDeleteObjectCache");
-
-
-    AcpiUtDeleteGenericCache (ACPI_MEM_LIST_OPERAND);
-    return_VOID;
-}
-#endif
 
 
 /*******************************************************************************

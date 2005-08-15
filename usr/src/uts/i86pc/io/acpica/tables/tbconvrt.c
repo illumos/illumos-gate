@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 63 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -167,7 +167,9 @@ AcpiTbGetTableCount (
     ACPI_FUNCTION_ENTRY ();
 
 
-    if (RSDP->Revision < 2)
+    /* RSDT pointers are 32 bits, XSDT pointers are 64 bits */
+
+    if (AcpiGbl_RootTableType == ACPI_TABLE_TYPE_RSDT)
     {
         PointerSize = sizeof (UINT32);
     }
@@ -232,7 +234,9 @@ AcpiTbConvertToXsdt (
 
     for (i = 0; i < AcpiGbl_RsdtTableCount; i++)
     {
-        if (AcpiGbl_RSDP->Revision < 2)
+        /* RSDT pointers are 32 bits, XSDT pointers are 64 bits */
+
+        if (AcpiGbl_RootTableType == ACPI_TABLE_TYPE_RSDT)
         {
             ACPI_STORE_ADDRESS (NewTable->TableOffsetEntry[i],
                 (ACPI_CAST_PTR (RSDT_DESCRIPTOR_REV1,

@@ -3,7 +3,7 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 169 $
+ *              $Revision: 171 $
  *
  ******************************************************************************/
 
@@ -184,7 +184,7 @@ AcpiHwClearAcpiStatus (
 
     /* Clear the GPE Bits in all GPE registers in all GPE blocks */
 
-    Status = AcpiEvWalkGpeList (AcpiHwClearGpeBlock, ACPI_ISR);
+    Status = AcpiEvWalkGpeList (AcpiHwClearGpeBlock);
 
 UnlockAndExit:
     if (Flags & ACPI_MTX_LOCK)
@@ -225,7 +225,7 @@ AcpiGetSleepTypeData (
 
 
     /* Validate parameters */
-    
+
     if ((SleepState > ACPI_S_STATES_MAX) ||
         !SleepTypeA || !SleepTypeB)
     {
@@ -233,7 +233,7 @@ AcpiGetSleepTypeData (
     }
 
     /* Evaluate the namespace object containing the values for this state */
-    
+
     Info.Parameters = NULL;
     Info.ReturnObject = NULL;
     SleepStateName = (char *) AcpiGbl_SleepStateNames[SleepState];
@@ -265,9 +265,9 @@ AcpiGetSleepTypeData (
         Status = AE_AML_OPERAND_TYPE;
     }
 
-    /* 
+    /*
      * The package must have at least two elements.  NOTE (March 2005): This
-     * goes against the current ACPI spec which defines this object as a 
+     * goes against the current ACPI spec which defines this object as a
      * package with one encoded DWORD element.  However, existing practice
      * by BIOS vendors seems to be to have 2 or more elements, at least
      * one per sleep type (A/B).
@@ -281,9 +281,9 @@ AcpiGetSleepTypeData (
 
     /* The first two elements must both be of type Integer */
 
-    else if ((ACPI_GET_OBJECT_TYPE (Info.ReturnObject->Package.Elements[0]) 
+    else if ((ACPI_GET_OBJECT_TYPE (Info.ReturnObject->Package.Elements[0])
                 != ACPI_TYPE_INTEGER) ||
-             (ACPI_GET_OBJECT_TYPE (Info.ReturnObject->Package.Elements[1]) 
+             (ACPI_GET_OBJECT_TYPE (Info.ReturnObject->Package.Elements[1])
                 != ACPI_TYPE_INTEGER))
     {
         ACPI_REPORT_ERROR ((
@@ -295,10 +295,10 @@ AcpiGetSleepTypeData (
     else
     {
         /* Valid _Sx_ package size, type, and value */
-        
-        *SleepTypeA = (UINT8) 
+
+        *SleepTypeA = (UINT8)
             (Info.ReturnObject->Package.Elements[0])->Integer.Value;
-        *SleepTypeB = (UINT8) 
+        *SleepTypeB = (UINT8)
             (Info.ReturnObject->Package.Elements[1])->Integer.Value;
     }
 

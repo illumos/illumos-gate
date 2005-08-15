@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acenv.h - Generation environment specific items
- *       $Revision: 114 $
+ *       $Revision: 116 $
  *
  *****************************************************************************/
 
@@ -122,35 +122,38 @@
  * Configuration for ACPI tools and utilities
  */
 
-#ifdef _ACPI_DUMP_APP
+#ifdef ACPI_LIBRARY
+#define ACPI_USE_LOCAL_CACHE
+#endif
+
+#ifdef ACPI_DUMP_APP
 #ifndef MSDOS
 #define ACPI_DEBUG_OUTPUT
 #endif
 #define ACPI_APPLICATION
 #define ACPI_DISASSEMBLER
 #define ACPI_NO_METHOD_EXECUTION
-#define ACPI_USE_SYSTEM_CLIBRARY
-#define ACPI_ENABLE_OBJECT_CACHE
 #endif
 
-#ifdef _ACPI_EXEC_APP
+#ifdef ACPI_EXEC_APP
 #undef DEBUGGER_THREADING
 #define DEBUGGER_THREADING      DEBUGGER_SINGLE_THREADED
 #define ACPI_DEBUG_OUTPUT
 #define ACPI_APPLICATION
 #define ACPI_DEBUGGER
 #define ACPI_DISASSEMBLER
-#define ACPI_USE_SYSTEM_CLIBRARY
-#define ACPI_ENABLE_OBJECT_CACHE
 #endif
 
-#ifdef _ACPI_ASL_COMPILER
+#ifdef ACPI_ASL_COMPILER
 #define ACPI_DEBUG_OUTPUT
 #define ACPI_APPLICATION
 #define ACPI_DISASSEMBLER
 #define ACPI_CONSTANT_EVAL_ONLY
+#endif
+
+#ifdef ACPI_APPLICATION
 #define ACPI_USE_SYSTEM_CLIBRARY
-#define ACPI_ENABLE_OBJECT_CACHE
+#define ACPI_USE_LOCAL_CACHE
 #endif
 
 /*

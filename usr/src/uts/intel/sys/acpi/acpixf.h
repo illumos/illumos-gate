@@ -443,7 +443,7 @@ AcpiInstallGpeBlock (
     ACPI_HANDLE             GpeDevice,
     ACPI_GENERIC_ADDRESS    *GpeBlockAddress,
     UINT32                  RegisterCount,
-    UINT32                  InterruptLevel);
+    UINT32                  InterruptNumber);
 
 ACPI_STATUS
 AcpiRemoveGpeBlock (

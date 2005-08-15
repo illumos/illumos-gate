@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actypes.h - Common data types for the entire ACPI subsystem
- *       $Revision: 278 $
+ *       $Revision: 282 $
  *
  *****************************************************************************/
 
@@ -279,10 +279,11 @@ typedef UINT32                          ACPI_SIZE;
 
 
 /*
- * Miscellaneous common types
+ * This type is used for bitfields in ACPI tables. The only type that is
+ * even remotely portable is UINT8. Anything else is not portable, so
+ * do not add any more bitfield types.
  */
-typedef UINT16                          UINT16_BIT;
-typedef UINT32                          UINT32_BIT;
+typedef UINT8                           UINT8_BIT;
 typedef ACPI_NATIVE_UINT                ACPI_PTRDIFF;
 
 /*
@@ -319,6 +320,14 @@ typedef struct acpi_pointer
 #define ACPI_LOGMODE_PHYSPTR            ACPI_LOGICAL_ADDRESSING  | ACPI_PHYSICAL_POINTER
 #define ACPI_LOGMODE_LOGPTR             ACPI_LOGICAL_ADDRESSING  | ACPI_LOGICAL_POINTER
 
+/*
+ * If ACPI_CACHE_T was not defined in the OS-dependent header,
+ * define it now. This is typically the case where the local cache
+ * manager implementation is to be used (ACPI_USE_LOCAL_CACHE)
+ */
+#ifndef ACPI_CACHE_T
+#define ACPI_CACHE_T                    ACPI_MEMORY_LIST
+#endif
 
 /*
  * Useful defines

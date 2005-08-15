@@ -3,7 +3,7 @@
  * Name: amlcode.h - Definitions for AML, as included in "definition blocks"
  *                   Declarations and definitions contained herein are derived
  *                   directly from the ACPI specification.
- *       $Revision: 81 $
+ *       $Revision: 82 $
  *
  *****************************************************************************/
 
@@ -142,7 +142,7 @@
 #define AML_MULTI_NAME_PREFIX_OP    (UINT16) 0x2f
 #define AML_NAME_CHAR_SUBSEQ        (UINT16) 0x30
 #define AML_NAME_CHAR_FIRST         (UINT16) 0x41
-#define AML_OP_PREFIX               (UINT16) 0x5b
+#define AML_EXTENDED_OP_PREFIX      (UINT16) 0x5b
 #define AML_ROOT_PREFIX             (UINT16) 0x5c
 #define AML_PARENT_PREFIX           (UINT16) 0x5e
 #define AML_LOCAL_OP                (UINT16) 0x60
@@ -219,7 +219,7 @@
 
 /* prefixed opcodes */
 
-#define AML_EXTOP                   (UINT16) 0x005b     /* prefix for 2-byte opcodes */
+#define AML_EXTENDED_OPCODE         (UINT16) 0x5b00     /* prefix for 2-byte opcodes */
 
 #define AML_MUTEX_OP                (UINT16) 0x5b01
 #define AML_EVENT_OP                (UINT16) 0x5b02

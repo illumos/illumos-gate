@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbutils - AML debugger utilities
- *              $Revision: 73 $
+ *              $Revision: 74 $
  *
  ******************************************************************************/
 
@@ -215,7 +215,7 @@ AcpiDbSetOutputDestination (
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiDbDumpObject
+ * FUNCTION:    AcpiDbDumpExternalObject
  *
  * PARAMETERS:  ObjDesc         - External ACPI object to dump
  *              Level           - Nesting level.
@@ -227,7 +227,7 @@ AcpiDbSetOutputDestination (
  ******************************************************************************/
 
 void
-AcpiDbDumpObject (
+AcpiDbDumpExternalObject (
     ACPI_OBJECT             *ObjDesc,
     UINT32                  Level)
 {
@@ -294,7 +294,7 @@ AcpiDbDumpObject (
 
         for (i = 0; i < ObjDesc->Package.Count; i++)
         {
-            AcpiDbDumpObject (&ObjDesc->Package.Elements[i], Level+1);
+            AcpiDbDumpExternalObject (&ObjDesc->Package.Elements[i], Level+1);
         }
         break;
 
@@ -320,7 +320,7 @@ AcpiDbDumpObject (
 
     default:
 
-        AcpiOsPrintf ("[Unknown Type] %X \n", ObjDesc->Type);
+        AcpiOsPrintf ("[Unknown Type] %X\n", ObjDesc->Type);
         break;
     }
 }

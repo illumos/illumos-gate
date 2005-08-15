@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acexcep.h - Exception codes returned by the ACPI subsystem
- *       $Revision: 74 $
+ *       $Revision: 75 $
  *
  *****************************************************************************/
 
@@ -168,8 +168,9 @@
 #define AE_ABORT_METHOD                 (ACPI_STATUS) (0x001C | AE_CODE_ENVIRONMENTAL)
 #define AE_SAME_HANDLER                 (ACPI_STATUS) (0x001D | AE_CODE_ENVIRONMENTAL)
 #define AE_WAKE_ONLY_GPE                (ACPI_STATUS) (0x001E | AE_CODE_ENVIRONMENTAL)
+#define AE_OWNER_ID_LIMIT               (ACPI_STATUS) (0x001F | AE_CODE_ENVIRONMENTAL)
 
-#define AE_CODE_ENV_MAX                 0x001E
+#define AE_CODE_ENV_MAX                 0x001F
 
 
 /*
@@ -299,7 +300,8 @@ char const   *AcpiGbl_ExceptionNames_Env[] =
     "AE_LOGICAL_ADDRESS",
     "AE_ABORT_METHOD",
     "AE_SAME_HANDLER",
-    "AE_WAKE_ONLY_GPE"
+    "AE_WAKE_ONLY_GPE",
+    "AE_OWNER_ID_LIMIT"
 };
 
 char const   *AcpiGbl_ExceptionNames_Pgm[] =

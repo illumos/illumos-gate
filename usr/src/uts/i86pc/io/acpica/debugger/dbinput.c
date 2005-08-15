@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbinput - user front-end to the AML debugger
- *              $Revision: 107 $
+ *              $Revision: 109 $
  *
  ******************************************************************************/
 
@@ -161,6 +161,7 @@ enum AcpiExDebuggerCommands
     CMD_ARGS,
     CMD_ARGUMENTS,
     CMD_BREAKPOINT,
+    CMD_BUSINFO,
     CMD_CALL,
     CMD_CLOSE,
     CMD_DEBUG,
@@ -220,6 +221,7 @@ static const COMMAND_INFO       AcpiGbl_DbCommands[] =
     {"ARGS",         0},
     {"ARGUMENTS",    0},
     {"BREAKPOINT",   1},
+    {"BUSINFO",      0},
     {"CALL",         0},
     {"CLOSE",        0},
     {"DEBUG",        1},
@@ -288,6 +290,8 @@ AcpiDbDisplayHelp (
     char                    *HelpType)
 {
 
+    AcpiUtStrupr (HelpType);
+
     /* No parameter, just give the overview */
 
     if (!HelpType)
@@ -342,20 +346,22 @@ AcpiDbDisplayHelp (
 
     case 'N':
         AcpiOsPrintf ("\nNamespace Access Commands\n\n");
+        AcpiOsPrintf ("Businfo                             Display system bus info\n");
         AcpiOsPrintf ("Disassemble <Method>                Disassemble a control method\n");
         AcpiOsPrintf ("Event <F|G> <Value>                 Generate AcpiEvent (Fixed/GPE)\n");
-        AcpiOsPrintf ("Find <Name>   (? is wildcard)       Find ACPI name(s) with wildcards\n");
+        AcpiOsPrintf ("Find <AcpiName>  (? is wildcard)    Find ACPI name(s) with wildcards\n");
         AcpiOsPrintf ("Gpe <GpeNum> <GpeBlock>             Simulate a GPE\n");
         AcpiOsPrintf ("Gpes                                Display info on all GPEs\n");
         AcpiOsPrintf ("Integrity                           Validate namespace integrity\n");
-        AcpiOsPrintf ("Method                              Display list of loaded control methods\n");
-        AcpiOsPrintf ("Namespace [<Addr>|<Path>] [Depth]   Display loaded namespace tree/subtree\n");
-        AcpiOsPrintf ("Notify <NamePath> <Value>           Send a notification\n");
+        AcpiOsPrintf ("Methods                             Display list of loaded control methods\n");
+        AcpiOsPrintf ("Namespace [Object] [Depth]          Display loaded namespace tree/subtree\n");
+        AcpiOsPrintf ("Notify <Object> <Value>             Send a notification on Object\n");
         AcpiOsPrintf ("Objects <ObjectType>                Display all objects of the given type\n");
         AcpiOsPrintf ("Owner <OwnerId> [Depth]             Display loaded namespace by object owner\n");
         AcpiOsPrintf ("Prefix [<NamePath>]                 Set or Get current execution prefix\n");
         AcpiOsPrintf ("References <Addr>                   Find all references to object at addr\n");
-        AcpiOsPrintf ("Resources xxx                       Get and display resources\n");
+        AcpiOsPrintf ("Resources <Device>                  Get and display Device resources\n");
+        AcpiOsPrintf ("Set N <NamedObject> <Value>         Set value for named integer\n");
         AcpiOsPrintf ("Sleep <SleepState>                  Simulate sleep/wake sequence\n");
         AcpiOsPrintf ("Terminate                           Delete namespace and all internal objects\n");
         AcpiOsPrintf ("Thread <Threads><Loops><NamePath>   Spawn threads to execute method(s)\n");
@@ -485,7 +491,6 @@ AcpiDbGetLine (
 
 
     ACPI_STRCPY (AcpiGbl_DbParsedBuf, InputBuffer);
-    AcpiUtStrupr (AcpiGbl_DbParsedBuf);
 
     This = AcpiGbl_DbParsedBuf;
     for (i = 0; i < ACPI_DEBUGGER_MAX_ARGS; i++)
@@ -629,6 +634,10 @@ AcpiDbCommandDispatch (
 
     case CMD_BREAKPOINT:
         AcpiDbSetMethodBreakpoint (AcpiGbl_DbArgs[1], WalkState, Op);
+        break;
+
+    case CMD_BUSINFO:
+        AcpiDbGetBusInfo ();
         break;
 
     case CMD_CALL:

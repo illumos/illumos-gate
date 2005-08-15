@@ -357,7 +357,6 @@ struct apic_io_intr {
 #define	ACPI_INDEX		(short)-3	/* ACPI */
 #define	MSI_INDEX		(short)-4	/* MSI */
 #define	MSIX_INDEX		(short)-5	/* MSI-X */
-#define	SCI_INDEX		(short)-6	/* SCI */
 #define	DEFAULT_INDEX		(short)0x7FFF
 	/* biggest positive no. to avoid conflict with actual index */
 

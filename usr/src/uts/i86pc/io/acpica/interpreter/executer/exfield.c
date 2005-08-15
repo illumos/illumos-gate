@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 123 $
+ *              $Revision: 124 $
  *
  *****************************************************************************/
 
@@ -163,6 +163,10 @@ AcpiExReadDataFromField (
     {
         return_ACPI_STATUS (AE_AML_NO_OPERAND);
     }
+    if (!RetBufferDesc)
+    {
+        return_ACPI_STATUS (AE_BAD_PARAMETER);
+    }
 
     if (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_BUFFER_FIELD)
     {
@@ -268,7 +272,7 @@ Exit:
     {
         AcpiUtRemoveReference (BufferDesc);
     }
-    else if (RetBufferDesc)
+    else
     {
         *RetBufferDesc = BufferDesc;
     }

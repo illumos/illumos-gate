@@ -1,7 +1,7 @@
 /******************************************************************************
  *
- * Module Name: psutils - Parser miscellaneous utilities (Parser only)
- *              $Revision: 65 $
+ * Module Name: utcache - local cache allocation routines
+ *              $Revision: 2 $
  *
  *****************************************************************************/
 
@@ -114,249 +114,305 @@
  *
  *****************************************************************************/
 
+#define __UTCACHE_C__
 
 #include "acpi.h"
-#include "acparser.h"
-#include "amlcode.h"
 
-#define _COMPONENT          ACPI_PARSER
-        ACPI_MODULE_NAME    ("psutils")
+#define _COMPONENT          ACPI_UTILITIES
+        ACPI_MODULE_NAME    ("utcache")
+
+
+#ifdef ACPI_USE_LOCAL_CACHE
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiOsCreateCache
+ *
+ * PARAMETERS:  CacheName       - Ascii name for the cache
+ *              ObjectSize      - Size of each cached object
+ *              MaxDepth        - Maximum depth of the cache (in objects)
+ *              ReturnCache     - Where the new cache object is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Create a cache object
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiOsCreateCache (
+    char                    *CacheName,
+    UINT16                  ObjectSize,
+    UINT16                  MaxDepth,
+    ACPI_MEMORY_LIST        **ReturnCache)
+{
+    ACPI_MEMORY_LIST        *Cache;
+
+
+    ACPI_FUNCTION_ENTRY ();
+
+
+    if (!CacheName || !ReturnCache || (ObjectSize < 16))
+    {
+        return (AE_BAD_PARAMETER);
+    }
+
+    /* Create the cache object */
+
+    Cache = AcpiOsAllocate (sizeof (ACPI_MEMORY_LIST));
+    if (!Cache)
+    {
+        return (AE_NO_MEMORY);
+    }
+
+    /* Populate the cache object and return it */
+
+    ACPI_MEMSET (Cache, 0, sizeof (ACPI_MEMORY_LIST));
+    Cache->LinkOffset = 8;
+    Cache->ListName   = CacheName;
+    Cache->ObjectSize = ObjectSize;
+    Cache->MaxDepth   = MaxDepth;
+
+    *ReturnCache = Cache;
+    return (AE_OK);
+}
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiPsCreateScopeOp
+ * FUNCTION:    AcpiOsPurgeCache
  *
- * PARAMETERS:  None
+ * PARAMETERS:  Cache           - Handle to cache object
  *
- * RETURN:      A new Scope object, null on failure
+ * RETURN:      Status
  *
- * DESCRIPTION: Create a Scope and associated namepath op with the root name
+ * DESCRIPTION: Free all objects within the requested cache.
  *
  ******************************************************************************/
 
-ACPI_PARSE_OBJECT *
-AcpiPsCreateScopeOp (
-    void)
+ACPI_STATUS
+AcpiOsPurgeCache (
+    ACPI_MEMORY_LIST        *Cache)
 {
-    ACPI_PARSE_OBJECT       *ScopeOp;
+    char                    *Next;
 
 
-    ScopeOp = AcpiPsAllocOp (AML_SCOPE_OP);
-    if (!ScopeOp)
+    ACPI_FUNCTION_ENTRY ();
+
+
+    if (!Cache)
+    {
+        return (AE_BAD_PARAMETER);
+    }
+
+    /* Walk the list of objects in this cache */
+
+    while (Cache->ListHead)
+    {
+        /* Delete and unlink one cached state object */
+
+        Next = *(ACPI_CAST_INDIRECT_PTR (char,
+                    &(((char *) Cache->ListHead)[Cache->LinkOffset])));
+        ACPI_MEM_FREE (Cache->ListHead);
+
+        Cache->ListHead = Next;
+        Cache->CurrentDepth--;
+    }
+
+    return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiOsDeleteCache
+ *
+ * PARAMETERS:  Cache           - Handle to cache object
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Free all objects within the requested cache and delete the
+ *              cache object.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiOsDeleteCache (
+    ACPI_MEMORY_LIST        *Cache)
+{
+    ACPI_STATUS             Status;
+
+
+    ACPI_FUNCTION_ENTRY ();
+
+
+   /* Purge all objects in the cache */
+
+    Status = AcpiOsPurgeCache (Cache);
+    if (ACPI_FAILURE (Status))
+    {
+        return (Status);
+    }
+
+    /* Now we can delete the cache object */
+
+    AcpiOsFree (Cache);
+    return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiOsReleaseObject
+ *
+ * PARAMETERS:  Cache       - Handle to cache object
+ *              Object      - The object to be released
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Release an object to the specified cache.  If cache is full,
+ *              the object is deleted.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiOsReleaseObject (
+    ACPI_MEMORY_LIST        *Cache,
+    void                    *Object)
+{
+    ACPI_STATUS             Status;
+
+
+    ACPI_FUNCTION_ENTRY ();
+
+
+    if (!Cache || !Object)
+    {
+        return (AE_BAD_PARAMETER);
+    }
+
+    /* If cache is full, just free this object */
+
+    if (Cache->CurrentDepth >= Cache->MaxDepth)
+    {
+        ACPI_MEM_FREE (Object);
+        ACPI_MEM_TRACKING (Cache->TotalFreed++);
+    }
+
+    /* Otherwise put this object back into the cache */
+
+    else
+    {
+        Status = AcpiUtAcquireMutex (ACPI_MTX_CACHES);
+        if (ACPI_FAILURE (Status))
+        {
+            return (Status);
+        }
+
+        /* Mark the object as cached */
+
+        ACPI_MEMSET (Object, 0xCA, Cache->ObjectSize);
+        ACPI_SET_DESCRIPTOR_TYPE (Object, ACPI_DESC_TYPE_CACHED);
+
+        /* Put the object at the head of the cache list */
+
+        * (ACPI_CAST_INDIRECT_PTR (char,
+            &(((char *) Object)[Cache->LinkOffset]))) = Cache->ListHead;
+        Cache->ListHead = Object;
+        Cache->CurrentDepth++;
+
+        (void) AcpiUtReleaseMutex (ACPI_MTX_CACHES);
+    }
+
+    return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiOsAcquireObject
+ *
+ * PARAMETERS:  Cache           - Handle to cache object
+ *
+ * RETURN:      the acquired object.  NULL on error
+ *
+ * DESCRIPTION: Get an object from the specified cache.  If cache is empty,
+ *              the object is allocated.
+ *
+ ******************************************************************************/
+
+void *
+AcpiOsAcquireObject (
+    ACPI_MEMORY_LIST        *Cache)
+{
+    ACPI_STATUS             Status;
+    void                    *Object;
+
+
+    ACPI_FUNCTION_NAME ("OsAcquireObject");
+
+
+    if (!Cache)
     {
         return (NULL);
     }
 
-    ScopeOp->Named.Name = ACPI_ROOT_NAME;
-    return (ScopeOp);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiPsInitOp
- *
- * PARAMETERS:  Op              - A newly allocated Op object
- *              Opcode          - Opcode to store in the Op
- *
- * RETURN:      None
- *
- * DESCRIPTION: Initialize a parse (Op) object
- *
- ******************************************************************************/
-
-void
-AcpiPsInitOp (
-    ACPI_PARSE_OBJECT       *Op,
-    UINT16                  Opcode)
-{
-    ACPI_FUNCTION_ENTRY ();
-
-
-    Op->Common.DataType = ACPI_DESC_TYPE_PARSER;
-    Op->Common.AmlOpcode = Opcode;
-
-    ACPI_DISASM_ONLY_MEMBERS (ACPI_STRNCPY (Op->Common.AmlOpName,
-            (AcpiPsGetOpcodeInfo (Opcode))->Name,
-                sizeof (Op->Common.AmlOpName)));
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiPsAllocOp
- *
- * PARAMETERS:  Opcode          - Opcode that will be stored in the new Op
- *
- * RETURN:      Pointer to the new Op, null on failure
- *
- * DESCRIPTION: Allocate an acpi_op, choose op type (and thus size) based on
- *              opcode.  A cache of opcodes is available for the pure
- *              GENERIC_OP, since this is by far the most commonly used.
- *
- ******************************************************************************/
-
-ACPI_PARSE_OBJECT*
-AcpiPsAllocOp (
-    UINT16                  Opcode)
-{
-    ACPI_PARSE_OBJECT       *Op;
-    const ACPI_OPCODE_INFO  *OpInfo;
-    UINT8                   Flags = ACPI_PARSEOP_GENERIC;
-
-
-    ACPI_FUNCTION_ENTRY ();
-
-
-    OpInfo = AcpiPsGetOpcodeInfo (Opcode);
-
-    /* Determine type of ParseOp required */
-
-    if (OpInfo->Flags & AML_DEFER)
+    Status = AcpiUtAcquireMutex (ACPI_MTX_CACHES);
+    if (ACPI_FAILURE (Status))
     {
-        Flags = ACPI_PARSEOP_DEFERRED;
-    }
-    else if (OpInfo->Flags & AML_NAMED)
-    {
-        Flags = ACPI_PARSEOP_NAMED;
-    }
-    else if (Opcode == AML_INT_BYTELIST_OP)
-    {
-        Flags = ACPI_PARSEOP_BYTELIST;
+        return (NULL);
     }
 
-    /* Allocate the minimum required size object */
+    ACPI_MEM_TRACKING (Cache->Requests++);
 
-    if (Flags == ACPI_PARSEOP_GENERIC)
+    /* Check the cache first */
+
+    if (Cache->ListHead)
     {
-        /* The generic op (default) is by far the most common (16 to 1) */
+        /* There is an object available, use it */
 
-        Op = AcpiOsAcquireObject (AcpiGbl_PsNodeCache);
+        Object = Cache->ListHead;
+        Cache->ListHead = *(ACPI_CAST_INDIRECT_PTR (char,
+                                &(((char *) Object)[Cache->LinkOffset])));
+
+        Cache->CurrentDepth--;
+
+        ACPI_MEM_TRACKING (Cache->Hits++);
+        ACPI_MEM_TRACKING (ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+            "Object %p from %s cache\n", Object, Cache->ListName)));
+
+        Status = AcpiUtReleaseMutex (ACPI_MTX_CACHES);
+        if (ACPI_FAILURE (Status))
+        {
+            return (NULL);
+        }
+
+        /* Clear (zero) the previously used Object */
+
+        ACPI_MEMSET (Object, 0, Cache->ObjectSize);
     }
     else
     {
-        /* Extended parseop */
+        /* The cache is empty, create a new object */
 
-        Op = AcpiOsAcquireObject (AcpiGbl_PsNodeExtCache);
+        ACPI_MEM_TRACKING (Cache->TotalAllocated++);
+
+        /* Avoid deadlock with ACPI_MEM_CALLOCATE */
+
+        Status = AcpiUtReleaseMutex (ACPI_MTX_CACHES);
+        if (ACPI_FAILURE (Status))
+        {
+            return (NULL);
+        }
+
+        Object = ACPI_MEM_CALLOCATE (Cache->ObjectSize);
+        if (!Object)
+        {
+            return (NULL);
+        }
     }
 
-    /* Initialize the Op */
-
-    if (Op)
-    {
-        AcpiPsInitOp (Op, Opcode);
-        Op->Common.Flags = Flags;
-    }
-
-    return (Op);
+    return (Object);
 }
+#endif /* ACPI_USE_LOCAL_CACHE */
 
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiPsFreeOp
- *
- * PARAMETERS:  Op              - Op to be freed
- *
- * RETURN:      None.
- *
- * DESCRIPTION: Free an Op object.  Either put it on the GENERIC_OP cache list
- *              or actually free it.
- *
- ******************************************************************************/
-
-void
-AcpiPsFreeOp (
-    ACPI_PARSE_OBJECT       *Op)
-{
-    ACPI_FUNCTION_NAME ("PsFreeOp");
-
-
-    if (Op->Common.AmlOpcode == AML_INT_RETURN_VALUE_OP)
-    {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Free retval op: %p\n", Op));
-    }
-
-    if (Op->Common.Flags & ACPI_PARSEOP_GENERIC)
-    {
-        AcpiOsReleaseObject (AcpiGbl_PsNodeCache, Op);
-    }
-    else
-    {
-        AcpiOsReleaseObject (AcpiGbl_PsNodeExtCache, Op);
-    }
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Utility functions
- *
- * DESCRIPTION: Low level character and object functions
- *
- ******************************************************************************/
-
-
-/*
- * Is "c" a namestring lead character?
- */
-BOOLEAN
-AcpiPsIsLeadingChar (
-    UINT32                  c)
-{
-    return ((BOOLEAN) (c == '_' || (c >= 'A' && c <= 'Z')));
-}
-
-
-/*
- * Is "c" a namestring prefix character?
- */
-BOOLEAN
-AcpiPsIsPrefixChar (
-    UINT32                  c)
-{
-    return ((BOOLEAN) (c == '\\' || c == '^'));
-}
-
-
-/*
- * Get op's name (4-byte name segment) or 0 if unnamed
- */
-UINT32
-AcpiPsGetName (
-    ACPI_PARSE_OBJECT       *Op)
-{
-
-    /* The "generic" object has no name associated with it */
-
-    if (Op->Common.Flags & ACPI_PARSEOP_GENERIC)
-    {
-        return (0);
-    }
-
-    /* Only the "Extended" parse objects have a name */
-
-    return (Op->Named.Name);
-}
-
-
-/*
- * Set op's name
- */
-void
-AcpiPsSetName (
-    ACPI_PARSE_OBJECT       *Op,
-    UINT32                  name)
-{
-
-    /* The "generic" object has no name associated with it */
-
-    if (Op->Common.Flags & ACPI_PARSEOP_GENERIC)
-    {
-        return;
-    }
-
-    Op->Named.Name = name;
-}
 

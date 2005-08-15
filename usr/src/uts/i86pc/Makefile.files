@@ -172,7 +172,8 @@ ACPICA_OBJS	+= dbcmds.o dbdisply.o \
 		   utalloc.o utclib.o utcopy.o utdebug.o utdelete.o \
 		   uteval.o utglobal.o utinit.o utmath.o utmisc.o \
 		   utobject.o utxface.o acpica.o acpi_enum.o master_ops.o \
-		   osl.o osl_ml.o acpica_ec.o
+		   osl.o osl_ml.o acpica_ec.o utcache.o utmutex.o utstate.o \
+		   psloop.o
 
 #
 #	Build up defines and paths.

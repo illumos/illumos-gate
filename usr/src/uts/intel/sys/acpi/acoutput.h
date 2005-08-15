@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acoutput.h -- debug output
- *       $Revision: 96 $
+ *       $Revision: 97 $
  *
  *****************************************************************************/
 
@@ -209,7 +209,7 @@
 /*
  * Debug level macros that are used in the DEBUG_PRINT macros
  */
-#define ACPI_DEBUG_LEVEL(dl)        (UINT32) dl,__LINE__,&_DebugInfo
+#define ACPI_DEBUG_LEVEL(dl)        (UINT32) dl,ACPI_DEBUG_PARAMETERS
 
 /* Exception level -- used in the global "DebugLevel" */
 

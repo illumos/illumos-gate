@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsmethod - Parser/Interpreter interface - control method parsing
- *              $Revision: 105 $
+ *              $Revision: 107 $
  *
  *****************************************************************************/
 
@@ -151,7 +151,6 @@ AcpiDsParseMethod (
     ACPI_OPERAND_OBJECT     *ObjDesc;
     ACPI_PARSE_OBJECT       *Op;
     ACPI_NAMESPACE_NODE     *Node;
-    ACPI_OWNER_ID           OwnerId;
     ACPI_WALK_STATE         *WalkState;
 
 
@@ -211,15 +210,20 @@ AcpiDsParseMethod (
      * objects (such as Operation Regions) can be created during the
      * first pass parse.
      */
-    OwnerId = AcpiUtAllocateOwnerId (ACPI_OWNER_TYPE_METHOD);
-    ObjDesc->Method.OwningId = OwnerId;
+    Status = AcpiUtAllocateOwnerId (&ObjDesc->Method.OwnerId);
+    if (ACPI_FAILURE (Status))
+    {
+        goto Cleanup;
+    }
 
     /* Create and initialize a new walk state */
 
-    WalkState = AcpiDsCreateWalkState (OwnerId, NULL, NULL, NULL);
+    WalkState = AcpiDsCreateWalkState (
+                    ObjDesc->Method.OwnerId, NULL, NULL, NULL);
     if (!WalkState)
     {
-        return_ACPI_STATUS (AE_NO_MEMORY);
+        Status = AE_NO_MEMORY;
+        goto Cleanup2;
     }
 
     Status = AcpiDsInitAmlWalk (WalkState, Op, Node,
@@ -228,7 +232,7 @@ AcpiDsParseMethod (
     if (ACPI_FAILURE (Status))
     {
         AcpiDsDeleteWalkState (WalkState);
-        return_ACPI_STATUS (Status);
+        goto Cleanup2;
     }
 
     /*
@@ -243,13 +247,17 @@ AcpiDsParseMethod (
     Status = AcpiPsParseAml (WalkState);
     if (ACPI_FAILURE (Status))
     {
-        return_ACPI_STATUS (Status);
+        goto Cleanup2;
     }
 
     ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
         "**** [%4.4s] Parsed **** NamedObj=%p Op=%p\n",
         AcpiUtGetNodeName (ObjHandle), ObjHandle, Op));
 
+Cleanup2:
+    (void) AcpiUtReleaseOwnerId (ObjDesc->Method.OwnerId);
+
+Cleanup:
     AcpiPsDeleteParseTree (Op);
     return_ACPI_STATUS (Status);
 }
@@ -349,7 +357,7 @@ AcpiDsCallControlMethod (
 {
     ACPI_STATUS             Status;
     ACPI_NAMESPACE_NODE     *MethodNode;
-    ACPI_WALK_STATE         *NextWalkState;
+    ACPI_WALK_STATE         *NextWalkState = NULL;
     ACPI_OPERAND_OBJECT     *ObjDesc;
     ACPI_PARAMETER_INFO     Info;
     UINT32                  i;
@@ -375,22 +383,26 @@ AcpiDsCallControlMethod (
         return_ACPI_STATUS (AE_NULL_OBJECT);
     }
 
-    ObjDesc->Method.OwningId = AcpiUtAllocateOwnerId (ACPI_OWNER_TYPE_METHOD);
-
+    Status = AcpiUtAllocateOwnerId (&ObjDesc->Method.OwnerId);
+    if (ACPI_FAILURE (Status))
+    {
+        return_ACPI_STATUS (Status);
+    }
+    
     /* Init for new method, wait on concurrency semaphore */
 
     Status = AcpiDsBeginMethodExecution (MethodNode, ObjDesc,
                     ThisWalkState->MethodNode);
     if (ACPI_FAILURE (Status))
     {
-        return_ACPI_STATUS (Status);
+        goto Cleanup;
     }
 
     if (!(ObjDesc->Method.MethodFlags & AML_METHOD_INTERNAL_ONLY))
     {
         /* 1) Parse: Create a new walk state for the preempting walk */
 
-        NextWalkState = AcpiDsCreateWalkState (ObjDesc->Method.OwningId,
+        NextWalkState = AcpiDsCreateWalkState (ObjDesc->Method.OwnerId,
                                                 Op, ObjDesc, NULL);
         if (!NextWalkState)
         {
@@ -423,7 +435,7 @@ AcpiDsCallControlMethod (
 
     /* 2) Execute: Create a new state for the preempting walk */
 
-    NextWalkState = AcpiDsCreateWalkState (ObjDesc->Method.OwningId,
+    NextWalkState = AcpiDsCreateWalkState (ObjDesc->Method.OwnerId,
                                             NULL, ObjDesc, Thread);
     if (!NextWalkState)
     {
@@ -478,6 +490,7 @@ AcpiDsCallControlMethod (
     /* On error, we must delete the new walk state */
 
 Cleanup:
+    (void) AcpiUtReleaseOwnerId (ObjDesc->Method.OwnerId);
     if (NextWalkState && (NextWalkState->MethodDesc))
     {
         /* Decrement the thread count on the method parse tree */
@@ -694,7 +707,7 @@ AcpiDsTerminateControlMethod (
          * Delete any namespace entries created anywhere else within
          * the namespace
          */
-        AcpiNsDeleteNamespaceByOwner (WalkState->MethodDesc->Method.OwningId);
+        AcpiNsDeleteNamespaceByOwner (WalkState->MethodDesc->Method.OwnerId);
         Status = AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
         if (ACPI_FAILURE (Status))
         {

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psxface - Parser external interfaces
- *              $Revision: 78 $
+ *              $Revision: 79 $
  *
  *****************************************************************************/
 
@@ -218,11 +218,15 @@ AcpiPsxExecute (
      * objects (such as Operation Regions) can be created during the
      * first pass parse.
      */
-    ObjDesc->Method.OwningId = AcpiUtAllocateOwnerId (ACPI_OWNER_TYPE_METHOD);
+    Status = AcpiUtAllocateOwnerId (&ObjDesc->Method.OwnerId);
+    if (ACPI_FAILURE (Status))
+    {
+        goto Cleanup2;
+    }
 
     /* Create and initialize a new walk state */
 
-    WalkState = AcpiDsCreateWalkState (ObjDesc->Method.OwningId,
+    WalkState = AcpiDsCreateWalkState (ObjDesc->Method.OwnerId,
                                     NULL, NULL, NULL);
     if (!WalkState)
     {

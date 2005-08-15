@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdispat.h - dispatcher (parser to interpreter interface)
- *       $Revision: 64 $
+ *       $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -520,11 +520,5 @@ ACPI_STATUS
 AcpiDsResultPopFromBottom (
     ACPI_OPERAND_OBJECT     **Object,
     ACPI_WALK_STATE         *WalkState);
-
-#ifdef ACPI_ENABLE_OBJECT_CACHE
-void
-AcpiDsDeleteWalkStateCache (
-    void);
-#endif
 
 #endif /* _ACDISPAT_H_ */

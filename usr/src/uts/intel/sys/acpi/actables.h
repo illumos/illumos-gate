@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actables.h - ACPI table management
- *       $Revision: 50 $
+ *       $Revision: 51 $
  *
  *****************************************************************************/
 
@@ -241,6 +241,10 @@ AcpiTbFindTable (
 ACPI_STATUS
 AcpiTbGetTableRsdt (
     void);
+
+ACPI_STATUS
+AcpiTbValidateRsdp (
+    RSDP_DESCRIPTOR         *Rsdp);
 
 
 /*

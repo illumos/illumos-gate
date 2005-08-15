@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsalloc - Namespace allocation and deletion utilities
- *              $Revision: 92 $
+ *              $Revision: 94 $
  *
  ******************************************************************************/
 
@@ -159,7 +159,7 @@ AcpiNsCreateNode (
         return_PTR (NULL);
     }
 
-    ACPI_MEM_TRACKING (AcpiGbl_MemoryLists[ACPI_MEM_LIST_NSNODE].TotalAllocated++);
+    ACPI_MEM_TRACKING (AcpiGbl_NsNodeList->TotalAllocated++);
 
     Node->Name.Integer   = Name;
     Node->ReferenceCount = 1;
@@ -233,7 +233,7 @@ AcpiNsDeleteNode (
         }
     }
 
-    ACPI_MEM_TRACKING (AcpiGbl_MemoryLists[ACPI_MEM_LIST_NSNODE].TotalFreed++);
+    ACPI_MEM_TRACKING (AcpiGbl_NsNodeList->TotalFreed++);
 
     /*
      * Detach an object if there is one then delete the node
@@ -272,7 +272,7 @@ AcpiNsInstallNode (
     ACPI_NAMESPACE_NODE     *Node,          /* New Child*/
     ACPI_OBJECT_TYPE        Type)
 {
-    UINT16                  OwnerId = 0;
+    ACPI_OWNER_ID           OwnerId = 0;
     ACPI_NAMESPACE_NODE     *ChildNode;
 #ifdef ACPI_ALPHABETIC_NAMESPACE
 
@@ -458,7 +458,7 @@ AcpiNsDeleteChildren (
 
         /* Now we can free this child object */
 
-        ACPI_MEM_TRACKING (AcpiGbl_MemoryLists[ACPI_MEM_LIST_NSNODE].TotalFreed++);
+        ACPI_MEM_TRACKING (AcpiGbl_NsNodeList->TotalFreed++);
 
         ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Object %p, Remaining %X\n",
             ChildNode, AcpiGbl_CurrentNodeCount));
@@ -664,7 +664,7 @@ AcpiNsRemoveReference (
 
 void
 AcpiNsDeleteNamespaceByOwner (
-    UINT16                  OwnerId)
+    ACPI_OWNER_ID            OwnerId)
 {
     ACPI_NAMESPACE_NODE     *ChildNode;
     ACPI_NAMESPACE_NODE     *DeletionNode;
@@ -749,6 +749,7 @@ AcpiNsDeleteNamespaceByOwner (
         }
     }
 
+    (void) AcpiUtReleaseOwnerId (OwnerId);
     return_VOID;
 }
 

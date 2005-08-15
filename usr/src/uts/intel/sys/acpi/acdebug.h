@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 79 $
+ *       $Revision: 80 $
  *
  *****************************************************************************/
 
@@ -187,6 +187,10 @@ AcpiDbSetMethodBreakpoint (
 void
 AcpiDbSetMethodCallBreakpoint (
     ACPI_PARSE_OBJECT       *Op);
+
+void
+AcpiDbGetBusInfo (
+    void);
 
 void
 AcpiDbDisassembleAml (
@@ -407,7 +411,7 @@ AcpiDbSetOutputDestination (
     UINT32                  Where);
 
 void
-AcpiDbDumpObject (
+AcpiDbDumpExternalObject (
     ACPI_OBJECT             *ObjDesc,
     UINT32                  Level);
 

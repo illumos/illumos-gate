@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: acobject.h - Definition of ACPI_OPERAND_OBJECT  (Internal object only)
- *       $Revision: 129 $
+ *       $Revision: 130 $
  *
  *****************************************************************************/
 
@@ -278,7 +278,7 @@ typedef struct acpi_object_method
     ACPI_INTERNAL_METHOD            Implementation;
     UINT8                           Concurrency;
     UINT8                           ThreadCount;
-    ACPI_OWNER_ID                   OwningId;
+    ACPI_OWNER_ID                   OwnerId;
 
 } ACPI_OBJECT_METHOD;
 

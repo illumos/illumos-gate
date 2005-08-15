@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evmisc - Miscellaneous event manager support functions
- *              $Revision: 83 $
+ *              $Revision: 84 $
  *
  *****************************************************************************/
 
@@ -693,7 +693,7 @@ AcpiEvTerminate (
 
         /* Disable all GPEs in all GPE blocks */
 
-        Status = AcpiEvWalkGpeList (AcpiHwDisableGpeBlock, ACPI_NOT_ISR);
+        Status = AcpiEvWalkGpeList (AcpiHwDisableGpeBlock);
 
         /* Remove SCI handler */
 
@@ -707,7 +707,7 @@ AcpiEvTerminate (
 
     /* Deallocate all handler objects installed within GPE info structs */
 
-    Status = AcpiEvWalkGpeList (AcpiEvDeleteGpeHandlers, ACPI_NOT_ISR);
+    Status = AcpiEvWalkGpeList (AcpiEvDeleteGpeHandlers);
 
     /* Return to original mode if necessary */
 

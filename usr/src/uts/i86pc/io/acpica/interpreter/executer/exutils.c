@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 116 $
+ *              $Revision: 117 $
  *
  *****************************************************************************/
 
@@ -454,7 +454,7 @@ AcpiExEisaIdToString (
  *
  * RETURN:      None, string
  *
- * DESCRIPTOIN: Convert a number to string representation. Assumes string
+ * DESCRIPTION: Convert a number to string representation. Assumes string
  *              buffer is large enough to hold the string.
  *
  ******************************************************************************/

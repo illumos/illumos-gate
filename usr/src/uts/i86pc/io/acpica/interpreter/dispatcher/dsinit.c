@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsinit - Object initialization namespace walk
- *              $Revision: 15 $
+ *              $Revision: 16 $
  *
  *****************************************************************************/
 
@@ -173,7 +173,7 @@ AcpiDsInitOneObject (
      * was just loaded
      */
     if (((ACPI_NAMESPACE_NODE *) ObjHandle)->OwnerId !=
-            Info->TableDesc->TableId)
+            Info->TableDesc->OwnerId)
     {
         return (AE_OK);
     }
@@ -248,7 +248,7 @@ AcpiDsInitOneObject (
          */
         AcpiNsDeleteNamespaceSubtree (ObjHandle);
         AcpiNsDeleteNamespaceByOwner (
-            ((ACPI_NAMESPACE_NODE *) ObjHandle)->Object->Method.OwningId);
+            ((ACPI_NAMESPACE_NODE *) ObjHandle)->Object->Method.OwnerId);
         break;
 
 
@@ -318,7 +318,7 @@ AcpiDsInitializeObjects (
 
     ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT,
         "\nTable [%4.4s](id %4.4X) - %hd Objects with %hd Devices %hd Methods %hd Regions\n",
-        TableDesc->Pointer->Signature, TableDesc->TableId, Info.ObjectCount,
+        TableDesc->Pointer->Signature, TableDesc->OwnerId, Info.ObjectCount,
         Info.DeviceCount, Info.MethodCount, Info.OpRegionCount));
 
     ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,

@@ -213,10 +213,9 @@ void
 AcpiOsDeleteLock (
     ACPI_HANDLE             Handle);
 
-void
+UINT32
 AcpiOsAcquireLock (
-    ACPI_HANDLE             Handle,
-    UINT32                  Flags);
+    ACPI_HANDLE             Handle);
 
 void
 AcpiOsReleaseLock (
@@ -250,6 +249,34 @@ ACPI_STATUS
 AcpiOsGetPhysicalAddress (
     void                    *LogicalAddress,
     ACPI_PHYSICAL_ADDRESS   *PhysicalAddress);
+
+
+/*
+ * Memory/Object Cache
+ */
+ACPI_STATUS
+AcpiOsCreateCache (
+    char                    *CacheName,
+    UINT16                  ObjectSize,
+    UINT16                  MaxDepth,
+    ACPI_CACHE_T            **ReturnCache);
+
+ACPI_STATUS
+AcpiOsDeleteCache (
+    ACPI_CACHE_T            *Cache);
+
+ACPI_STATUS
+AcpiOsPurgeCache (
+    ACPI_CACHE_T            *Cache);
+
+void *
+AcpiOsAcquireObject (
+    ACPI_CACHE_T            *Cache);
+
+ACPI_STATUS
+AcpiOsReleaseObject (
+    ACPI_CACHE_T            *Cache,
+    void                    *Object);
 
 
 /*

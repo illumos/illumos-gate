@@ -57,9 +57,16 @@ char *psm_module_name;	/* used to store name of psm module */
 
 /*
  * acpi_irq_check_elcr: when set elcr will also be consulted for building
- * the reserved irq list
+ * the reserved irq list.  When 0 (false), the existing state of the ELCR
+ * is ignored when selecting a vector during IRQ translation, and the ELCR
+ * is programmed to the proper setting for the type of bus (level-triggered
+ * for PCI, edge-triggered for non-PCI).  When non-zero (true), vectors
+ * set to edge-mode will not be used when in PIC-mode.  The default value
+ * is 0 (false).  Note that ACPI's SCI vector is always set to conform to
+ * ACPI-specification regardless of this.
+ *
  */
-int acpi_irq_check_elcr = 1;
+int acpi_irq_check_elcr = 0;
 
 /*
  * acpi_s5_slp_typ:
@@ -948,4 +955,39 @@ acpi_poweroff(void)
 	/* we should be off; if we get here it's an error */
 	PSM_VERBOSE_POWEROFF(("acpi_poweroff: failed to actually power off\n"));
 	return (1);
+}
+
+
+/*
+ * psm_set_elcr() sets ELCR bit for specified vector
+ */
+void
+psm_set_elcr(int vecno, int val)
+{
+	int elcr_port = ELCR_PORT1 + (vecno >> 3);
+	int elcr_bit = 1 << (vecno & 0x07);
+
+	ASSERT((vecno >= 0) && (vecno < 16));
+
+	if (val) {
+		/* set bit to force level-triggered mode */
+		outb(elcr_port, inb(elcr_port) | elcr_bit);
+	} else {
+		/* clear bit to force edge-triggered mode */
+		outb(elcr_port, inb(elcr_port) & ~elcr_bit);
+	}
+}
+
+/*
+ * psm_get_elcr() returns status of ELCR bit for specific vector
+ */
+int
+psm_get_elcr(int vecno)
+{
+	int elcr_port = ELCR_PORT1 + (vecno >> 3);
+	int elcr_bit = 1 << (vecno & 0x07);
+
+	ASSERT((vecno >= 0) && (vecno < 16));
+
+	return ((inb(elcr_port) & elcr_bit) ? 1 : 0);
 }

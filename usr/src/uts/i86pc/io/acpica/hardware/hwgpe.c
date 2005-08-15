@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwgpe - Low level GPE enable/disable/clear functions
- *              $Revision: 69 $
+ *              $Revision: 70 $
  *
  *****************************************************************************/
 
@@ -461,7 +461,7 @@ AcpiHwEnableWakeupGpeBlock (
  *
  * FUNCTION:    AcpiHwDisableAllGpes
  *
- * PARAMETERS:  Flags           - ACPI_NOT_ISR or ACPI_ISR
+ * PARAMETERS:  None
  *
  * RETURN:      Status
  *
@@ -471,7 +471,7 @@ AcpiHwEnableWakeupGpeBlock (
 
 ACPI_STATUS
 AcpiHwDisableAllGpes (
-    UINT32                  Flags)
+    void)
 {
     ACPI_STATUS             Status;
 
@@ -479,8 +479,8 @@ AcpiHwDisableAllGpes (
     ACPI_FUNCTION_TRACE ("HwDisableAllGpes");
 
 
-    Status = AcpiEvWalkGpeList (AcpiHwDisableGpeBlock, Flags);
-    Status = AcpiEvWalkGpeList (AcpiHwClearGpeBlock, Flags);
+    Status = AcpiEvWalkGpeList (AcpiHwDisableGpeBlock);
+    Status = AcpiEvWalkGpeList (AcpiHwClearGpeBlock);
     return_ACPI_STATUS (Status);
 }
 
@@ -489,7 +489,7 @@ AcpiHwDisableAllGpes (
  *
  * FUNCTION:    AcpiHwEnableAllRuntimeGpes
  *
- * PARAMETERS:  Flags           - ACPI_NOT_ISR or ACPI_ISR
+ * PARAMETERS:  None
  *
  * RETURN:      Status
  *
@@ -499,7 +499,7 @@ AcpiHwDisableAllGpes (
 
 ACPI_STATUS
 AcpiHwEnableAllRuntimeGpes (
-    UINT32                  Flags)
+    void)
 {
     ACPI_STATUS             Status;
 
@@ -507,7 +507,7 @@ AcpiHwEnableAllRuntimeGpes (
     ACPI_FUNCTION_TRACE ("HwEnableAllRuntimeGpes");
 
 
-    Status = AcpiEvWalkGpeList (AcpiHwEnableRuntimeGpeBlock, Flags);
+    Status = AcpiEvWalkGpeList (AcpiHwEnableRuntimeGpeBlock);
     return_ACPI_STATUS (Status);
 }
 
@@ -516,7 +516,7 @@ AcpiHwEnableAllRuntimeGpes (
  *
  * FUNCTION:    AcpiHwEnableAllWakeupGpes
  *
- * PARAMETERS:  Flags           - ACPI_NOT_ISR or ACPI_ISR
+ * PARAMETERS:  None
  *
  * RETURN:      Status
  *
@@ -526,7 +526,7 @@ AcpiHwEnableAllRuntimeGpes (
 
 ACPI_STATUS
 AcpiHwEnableAllWakeupGpes (
-    UINT32                  Flags)
+    void)
 {
     ACPI_STATUS             Status;
 
@@ -534,7 +534,7 @@ AcpiHwEnableAllWakeupGpes (
     ACPI_FUNCTION_TRACE ("HwEnableAllWakeupGpes");
 
 
-    Status = AcpiEvWalkGpeList (AcpiHwEnableWakeupGpeBlock, Flags);
+    Status = AcpiEvWalkGpeList (AcpiHwEnableWakeupGpeBlock);
     return_ACPI_STATUS (Status);
 }
 

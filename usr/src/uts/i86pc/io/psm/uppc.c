@@ -410,7 +410,6 @@ uppc_init_acpi(void)
 {
 	int verboseflags = 0;
 	int	sci;
-	int	elcr_port, elcr_bit;
 	iflag_t sci_flags;
 
 	/*
@@ -435,22 +434,10 @@ uppc_init_acpi(void)
 	 * as recommended by Intel ACPI CA team.
 	 */
 	if (sci >= 0) {
-		elcr_port = ELCR_PORT1 + (sci >> 3);
-		elcr_bit = 1 << (sci & 0x07);
-
 		ASSERT((sci_flags.intr_el == INTR_EL_LEVEL) ||
 		    (sci_flags.intr_el == INTR_EL_EDGE));
 
-		switch (sci_flags.intr_el) {
-		case INTR_EL_LEVEL:
-			/* set bit to force level-triggered mode */
-			outb(elcr_port, inb(elcr_port) | elcr_bit);
-			break;
-		case INTR_EL_EDGE:
-			/* clear bit to force edge-triggered mode */
-			outb(elcr_port, inb(elcr_port) & ~elcr_bit);
-			break;
-		}
+		psm_set_elcr(sci, sci_flags.intr_el == INTR_EL_LEVEL);
 	}
 
 	/*
@@ -542,6 +529,7 @@ uppc_acpi_translate_pci_irq(dev_info_t *dip, int busid, int devid,
 	if (status == ACPI_PSM_SUCCESS) {
 		acpi_new_irq_cache_ent(busid, devid, ipin, *pci_irqp,
 		    intr_flagp, &acpipsmlnk);
+		psm_set_elcr(*pci_irqp, 1); 	/* set IRQ to PCI mode */
 
 		UPPC_VERBOSE_IRQ((CE_CONT, "!uppc: [ACPI] "
 		    "new irq %d for device %s, instance #%d\n",
@@ -791,10 +779,13 @@ uppc_translate_irq(dev_info_t *dip, int irqno)
 
 		/* FALLTHRU to common case - returning irqno */
 	} else {
-		/* non pci */
+		/* non-PCI; assumes ISA-style edge-triggered */
+		psm_set_elcr(irqno, 0); 	/* set IRQ to ISA mode */
+
 		UPPC_VERBOSE_IRQ((CE_CONT, "!uppc: non-pci,"
 		    "irqno %d device %s instance %d\n", irqno,
 		    ddi_get_name(dip), ddi_get_instance(dip)));
+
 	}
 
 	return (irqno);

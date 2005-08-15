@@ -3,7 +3,7 @@
  *
  * Module Name: exstoren - AML Interpreter object store support,
  *                        Store to Node (namespace object)
- *              $Revision: 63 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -349,10 +349,6 @@ AcpiExStoreObjectToObject (
 
     case ACPI_TYPE_BUFFER:
 
-        /*
-         * Note: There is different store behavior depending on the original
-         * source type
-         */
         Status = AcpiExStoreBufferToBuffer (ActualSrcDesc, DestDesc);
         break;
 

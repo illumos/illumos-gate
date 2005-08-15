@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 84 $
+ *              $Revision: 85 $
  *
  ******************************************************************************/
 
@@ -735,23 +735,11 @@ AcpiDsStoreObjectToLocal (
         if (Opcode == AML_ARG_OP)
         {
             /*
-             * Make sure that the object is the correct type.  This may be
-             * overkill, butit is here because references were NS nodes in
-             *  the past.  Now they are operand objects of type Reference.
-             */
-            if (ACPI_GET_DESCRIPTOR_TYPE (CurrentObjDesc) != ACPI_DESC_TYPE_OPERAND)
-            {
-                ACPI_REPORT_ERROR ((
-                    "Invalid descriptor type while storing to method arg: [%s]\n",
-                    AcpiUtGetDescriptorName (CurrentObjDesc)));
-                return_ACPI_STATUS (AE_AML_INTERNAL);
-            }
-
-            /*
              * If we have a valid reference object that came from RefOf(),
              * do the indirect store
              */
-            if ((CurrentObjDesc->Common.Type == ACPI_TYPE_LOCAL_REFERENCE) &&
+            if ((ACPI_GET_DESCRIPTOR_TYPE (CurrentObjDesc) == ACPI_DESC_TYPE_OPERAND) &&
+                (CurrentObjDesc->Common.Type == ACPI_TYPE_LOCAL_REFERENCE) &&
                 (CurrentObjDesc->Reference.Opcode == AML_REF_OF_OP))
             {
                 ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,

@@ -2,7 +2,7 @@
  *
  * Module Name: tbxface - Public interfaces to the ACPI subsystem
  *                         ACPI table oriented interfaces
- *              $Revision: 67 $
+ *              $Revision: 68 $
  *
  *****************************************************************************/
 
@@ -344,8 +344,7 @@ AcpiUnloadTable (
          * "Scope" operator.  Thus, we need to track ownership by an ID, not
          * simply a position within the hierarchy
          */
-        AcpiNsDeleteNamespaceByOwner (TableDesc->TableId);
-
+        AcpiNsDeleteNamespaceByOwner (TableDesc->OwnerId);
         TableDesc = TableDesc->Next;
     }
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxface - External interfaces for ACPI events
- *              $Revision: 149 $
+ *              $Revision: 150 $
  *
  *****************************************************************************/
 
@@ -677,6 +677,7 @@ AcpiInstallGpeHandler (
     ACPI_GPE_EVENT_INFO     *GpeEventInfo;
     ACPI_HANDLER_INFO       *Handler;
     ACPI_STATUS             Status;
+    UINT32                  Flags;
 
 
     ACPI_FUNCTION_TRACE ("AcpiInstallGpeHandler");
@@ -735,7 +736,7 @@ AcpiInstallGpeHandler (
 
     /* Install the handler */
 
-    AcpiOsAcquireLock (AcpiGbl_GpeLock, ACPI_NOT_ISR);
+    Flags = AcpiOsAcquireLock (AcpiGbl_GpeLock);
     GpeEventInfo->Dispatch.Handler = Handler;
 
     /* Setup up dispatch flags to indicate handler (vs. method) */
@@ -743,7 +744,7 @@ AcpiInstallGpeHandler (
     GpeEventInfo->Flags &= ~(ACPI_GPE_XRUPT_TYPE_MASK | ACPI_GPE_DISPATCH_MASK);  /* Clear bits */
     GpeEventInfo->Flags |= (UINT8) (Type | ACPI_GPE_DISPATCH_HANDLER);
 
-    AcpiOsReleaseLock (AcpiGbl_GpeLock, ACPI_NOT_ISR);
+    AcpiOsReleaseLock (AcpiGbl_GpeLock, Flags);
 
 
 UnlockAndExit:
@@ -776,6 +777,7 @@ AcpiRemoveGpeHandler (
     ACPI_GPE_EVENT_INFO     *GpeEventInfo;
     ACPI_HANDLER_INFO       *Handler;
     ACPI_STATUS             Status;
+    UINT32                  Flags;
 
 
     ACPI_FUNCTION_TRACE ("AcpiRemoveGpeHandler");
@@ -829,7 +831,7 @@ AcpiRemoveGpeHandler (
 
     /* Remove the handler */
 
-    AcpiOsAcquireLock (AcpiGbl_GpeLock, ACPI_NOT_ISR);
+    Flags = AcpiOsAcquireLock (AcpiGbl_GpeLock);
     Handler = GpeEventInfo->Dispatch.Handler;
 
     /* Restore Method node (if any), set dispatch flags */
@@ -840,7 +842,7 @@ AcpiRemoveGpeHandler (
     {
         GpeEventInfo->Flags |= ACPI_GPE_DISPATCH_METHOD;
     }
-    AcpiOsReleaseLock (AcpiGbl_GpeLock, ACPI_NOT_ISR);
+    AcpiOsReleaseLock (AcpiGbl_GpeLock, Flags);
 
     /* Now we can free the handler object */
 

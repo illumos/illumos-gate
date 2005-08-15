@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 140 $
+ *       $Revision: 141 $
  *
  *****************************************************************************/
 
@@ -236,7 +236,7 @@ AcpiNsDeleteNamespaceSubtree (
 
 void
 AcpiNsDeleteNamespaceByOwner (
-    UINT16                  TableId);
+    ACPI_OWNER_ID           OwnerId);
 
 void
 AcpiNsDetachObject (
@@ -289,7 +289,7 @@ AcpiNsDumpObjects (
     ACPI_OBJECT_TYPE        Type,
     UINT8                   DisplayType,
     UINT32                  MaxDepth,
-    UINT32                  OwnderId,
+    ACPI_OWNER_ID           OwnerId,
     ACPI_HANDLE             StartHandle);
 
 

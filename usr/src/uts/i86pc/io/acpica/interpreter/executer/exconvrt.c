@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 66 $
+ *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -458,7 +458,7 @@ AcpiExConvertToAscii (
 
         /* HexLength: 2 ascii hex chars per data byte */
 
-        HexLength = ACPI_MUL_2 (DataWidth);
+        HexLength = (ACPI_NATIVE_UINT) ACPI_MUL_2 (DataWidth);
         for (i = 0, j = (HexLength-1); i < HexLength; i++, j--)
         {
             /* Get one hex digit, most significant digits first */

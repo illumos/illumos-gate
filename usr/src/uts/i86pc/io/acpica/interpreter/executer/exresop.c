@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresop - AML Interpreter operand/object resolution
- *              $Revision: 82 $
+ *              $Revision: 85 $
  *
  *****************************************************************************/
 
@@ -523,6 +523,11 @@ AcpiExResolveOperands (
 
                 return_ACPI_STATUS (Status);
             }
+
+            if (ObjDesc != *StackPtr)
+            {
+                AcpiUtRemoveReference (ObjDesc);
+            }
             goto NextOperand;
 
 
@@ -546,6 +551,11 @@ AcpiExResolveOperands (
                 }
 
                 return_ACPI_STATUS (Status);
+            }
+
+            if (ObjDesc != *StackPtr)
+            {
+                AcpiUtRemoveReference (ObjDesc);
             }
             goto NextOperand;
 
@@ -571,6 +581,11 @@ AcpiExResolveOperands (
                 }
 
                 return_ACPI_STATUS (Status);
+            }
+
+            if (ObjDesc != *StackPtr)
+            {
+                AcpiUtRemoveReference (ObjDesc);
             }
             goto NextOperand;
 
@@ -618,6 +633,11 @@ AcpiExResolveOperands (
                 if (ACPI_FAILURE (Status))
                 {
                     return_ACPI_STATUS (Status);
+                }
+
+                if (ObjDesc != *StackPtr)
+                {
+                    AcpiUtRemoveReference (ObjDesc);
                 }
                 break;
 

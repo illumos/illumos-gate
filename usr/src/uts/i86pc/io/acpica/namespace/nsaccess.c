@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 188 $
+ *              $Revision: 190 $
  *
  ******************************************************************************/
 
@@ -243,11 +243,11 @@ AcpiNsRootInitialize (
                 ObjDesc->Method.ParamCount = (UINT8) ACPI_TO_INTEGER (Val);
                 ObjDesc->Common.Flags |= AOPOBJ_DATA_VALID;
 
-#if defined (_ACPI_ASL_COMPILER) || defined (_ACPI_DUMP_APP)
+#if defined (ACPI_ASL_COMPILER) || defined (ACPI_DUMP_APP)
 
                 /*
                  * iASL Compiler cheats by putting parameter count
-                 * in the OwnerID
+                 * in the OwnerID (ParamCount max is 7)
                  */
                 NewNode->OwnerId = ObjDesc->Method.ParamCount;
 #else

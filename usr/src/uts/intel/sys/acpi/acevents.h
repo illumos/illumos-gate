@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acevents.h - Event subcomponent prototypes and defines
- *       $Revision: 100 $
+ *       $Revision: 103 $
  *
  *****************************************************************************/
 
@@ -118,7 +118,6 @@
 #define __ACEVENTS_H__
 
 
-
 /*
  * evevent
  */
@@ -196,8 +195,7 @@ AcpiEvValidGpeEvent (
 
 ACPI_STATUS
 AcpiEvWalkGpeList (
-    ACPI_GPE_CALLBACK       GpeWalkCallback,
-    UINT32                  Flags);
+    ACPI_GPE_CALLBACK       GpeWalkCallback);
 
 ACPI_STATUS
 AcpiEvDeleteGpeHandlers (
@@ -210,7 +208,7 @@ AcpiEvCreateGpeBlock (
     ACPI_GENERIC_ADDRESS    *GpeBlockAddress,
     UINT32                  RegisterCount,
     UINT8                   GpeBlockBaseNumber,
-    UINT32                  InterruptLevel,
+    UINT32                  InterruptNumber,
     ACPI_GPE_BLOCK_INFO     **ReturnGpeBlock);
 
 ACPI_STATUS

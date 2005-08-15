@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utxface - External interfaces for "global" ACPI functions
- *              $Revision: 110 $
+ *              $Revision: 112 $
  *
  *****************************************************************************/
 
@@ -120,8 +120,6 @@
 #include "acpi.h"
 #include "acevents.h"
 #include "acnamesp.h"
-#include "acparser.h"
-#include "acdispat.h"
 #include "acdebug.h"
 
 #define _COMPONENT          ACPI_UTILITIES
@@ -153,11 +151,6 @@ AcpiInitializeSubsystem (
 
     ACPI_DEBUG_EXEC (AcpiUtInitStackPtrTrace ());
 
-
-    /* Initialize all globals used by the subsystem */
-
-    AcpiUtInitGlobals ();
-
     /* Initialize the OS-Dependent layer */
 
     Status = AcpiOsInitialize ();
@@ -167,6 +160,10 @@ AcpiInitializeSubsystem (
             AcpiFormatException (Status)));
         return_ACPI_STATUS (Status);
     }
+
+    /* Initialize all globals used by the subsystem */
+
+    AcpiUtInitGlobals ();
 
     /* Create the default mutex objects */
 
@@ -622,13 +619,9 @@ AcpiPurgeCachedObjects (
 {
     ACPI_FUNCTION_TRACE ("AcpiPurgeCachedObjects");
 
-
-#ifdef ACPI_ENABLE_OBJECT_CACHE
-    AcpiUtDeleteGenericStateCache ();
-    AcpiUtDeleteObjectCache ();
-    AcpiDsDeleteWalkStateCache ();
-    AcpiPsDeleteParseCache ();
-#endif
-
+    (void) AcpiOsPurgeCache (AcpiGbl_StateCache);
+    (void) AcpiOsPurgeCache (AcpiGbl_OperandCache);
+    (void) AcpiOsPurgeCache (AcpiGbl_PsNodeCache);
+    (void) AcpiOsPurgeCache (AcpiGbl_PsNodeExtCache);
     return_ACPI_STATUS (AE_OK);
 }

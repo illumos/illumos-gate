@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: achware.h -- hardware specific interfaces
- *       $Revision: 77 $
+ *       $Revision: 78 $
  *
  *****************************************************************************/
 
@@ -214,15 +214,15 @@ AcpiHwGetGpeStatus (
 
 ACPI_STATUS
 AcpiHwDisableAllGpes (
-    UINT32                  Flags);
+    void);
 
 ACPI_STATUS
 AcpiHwEnableAllRuntimeGpes (
-    UINT32                  Flags);
+    void);
 
 ACPI_STATUS
 AcpiHwEnableAllWakeupGpes (
-    UINT32                  Flags);
+    void);
 
 ACPI_STATUS
 AcpiHwEnableRuntimeGpeBlock (

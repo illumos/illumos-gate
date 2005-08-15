@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxfevnt - External Interfaces, ACPI event disable/enable
- *              $Revision: 81 $
+ *              $Revision: 82 $
  *
  *****************************************************************************/
 
@@ -739,7 +739,7 @@ UnlockAndExit:
  * PARAMETERS:  GpeDevice           - Handle to the parent GPE Block Device
  *              GpeBlockAddress     - Address and SpaceID
  *              RegisterCount       - Number of GPE register pairs in the block
- *              InterruptLevel      - H/W interrupt for the block
+ *              InterruptNumber     - H/W interrupt for the block
  *
  * RETURN:      Status
  *
@@ -752,7 +752,7 @@ AcpiInstallGpeBlock (
     ACPI_HANDLE             GpeDevice,
     ACPI_GENERIC_ADDRESS    *GpeBlockAddress,
     UINT32                  RegisterCount,
-    UINT32                  InterruptLevel)
+    UINT32                  InterruptNumber)
 {
     ACPI_STATUS             Status;
     ACPI_OPERAND_OBJECT     *ObjDesc;
@@ -788,7 +788,7 @@ AcpiInstallGpeBlock (
      * is always zero
      */
     Status = AcpiEvCreateGpeBlock (Node, GpeBlockAddress, RegisterCount,
-                    0, InterruptLevel, &GpeBlock);
+                    0, InterruptNumber, &GpeBlock);
     if (ACPI_FAILURE (Status))
     {
         goto UnlockAndExit;

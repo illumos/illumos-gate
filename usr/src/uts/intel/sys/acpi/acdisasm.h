@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdisasm.h - AML disassembler
- *       $Revision: 19 $
+ *       $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -164,6 +164,7 @@ typedef struct acpi_op_walk_info
 {
     UINT32                  Level;
     UINT32                  BitOffset;
+    ACPI_WALK_STATE         *WalkState;
 
 } ACPI_OP_WALK_INFO;
 
@@ -285,7 +286,7 @@ AcpiDmByteList (
     ACPI_PARSE_OBJECT       *Op);
 
 void
-AcpiIsEisaId (
+AcpiDmIsEisaId (
     ACPI_PARSE_OBJECT       *Op);
 
 void

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 86 $
+ *              $Revision: 89 $
  *
  *****************************************************************************/
 
@@ -345,12 +345,12 @@ AcpiDsResultPopFromBottom (
     if (!*Object)
     {
         ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-            "Null operand! State=%p #Ops=%X, Index=%X\n",
+            "Null operand! State=%p #Ops=%X Index=%X\n",
             WalkState, State->Results.NumResults, (UINT32) Index));
         return (AE_AML_NO_RETURN_VALUE);
     }
 
-    ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p [%s], Results=%p State=%p\n",
+    ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p [%s] Results=%p State=%p\n",
         *Object, (*Object) ? AcpiUtGetObjectTypeName (*Object) : "NULL",
         State, WalkState));
 
@@ -778,7 +778,7 @@ AcpiDsCreateWalkState (
     ACPI_FUNCTION_TRACE ("DsCreateWalkState");
 
 
-    WalkState = AcpiUtAcquireFromCache (ACPI_MEM_LIST_WALK);
+    WalkState = ACPI_MEM_CALLOCATE (sizeof (ACPI_WALK_STATE));
     if (!WalkState)
     {
         return_PTR (NULL);
@@ -803,7 +803,7 @@ AcpiDsCreateWalkState (
     Status = AcpiDsResultStackPush (WalkState);
     if (ACPI_FAILURE (Status))
     {
-        AcpiUtReleaseToCache (ACPI_MEM_LIST_WALK, WalkState);
+        ACPI_MEM_FREE (WalkState);
         return_PTR (NULL);
     }
 
@@ -862,6 +862,7 @@ AcpiDsInitAmlWalk (
     /* The NextOp of the NextWalk will be the beginning of the method */
 
     WalkState->NextOp = NULL;
+    WalkState->PassNumber = (UINT8) PassNumber;
 
     if (Info)
     {
@@ -1018,36 +1019,9 @@ AcpiDsDeleteWalkState (
         AcpiUtDeleteGenericState (State);
     }
 
-    AcpiUtReleaseToCache (ACPI_MEM_LIST_WALK, WalkState);
+    ACPI_MEM_FREE (WalkState);
     return_VOID;
 }
-
-
-#ifdef ACPI_ENABLE_OBJECT_CACHE
-/******************************************************************************
- *
- * FUNCTION:    AcpiDsDeleteWalkStateCache
- *
- * PARAMETERS:  None
- *
- * RETURN:      None
- *
- * DESCRIPTION: Purge the global state object cache.  Used during subsystem
- *              termination.
- *
- ******************************************************************************/
-
-void
-AcpiDsDeleteWalkStateCache (
-    void)
-{
-    ACPI_FUNCTION_TRACE ("DsDeleteWalkStateCache");
-
-
-    AcpiUtDeleteGenericCache (ACPI_MEM_LIST_WALK);
-    return_VOID;
-}
-#endif
 
 
 #ifdef ACPI_OBSOLETE_FUNCTIONS
