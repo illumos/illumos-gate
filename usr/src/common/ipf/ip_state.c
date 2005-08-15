@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -606,6 +606,7 @@ caddr_t data;
 	fr = isn->is_rule;
 	if (fr == NULL) {
 		fr_stinsert(isn);
+		MUTEX_EXIT(&isn->is_lock);
 		return 0;
 	}
 
@@ -669,6 +670,7 @@ caddr_t data;
 		}
 	}
 	fr_stinsert(isn);
+	MUTEX_EXIT(&isn->is_lock);
 	return 0;
 }
 
@@ -681,6 +683,9 @@ caddr_t data;
 /* Inserts a state structure into the hash table (for lookups) and the list */
 /* of state entries (for enumeration).  Resolves all of the interface names */
 /* to pointers and adjusts running stats for the hash table as appropriate. */
+/*									    */
+/* NOTE:  Holds a lock for is_lock mutex upon return.                       */
+/*									    */
 /* ------------------------------------------------------------------------ */
 void fr_stinsert(is)
 ipstate_t *is;
@@ -692,6 +697,7 @@ ipstate_t *is;
 	is->is_sti.tqe_parent = is;
 
 	MUTEX_INIT(&is->is_lock, "ipf state entry");
+	MUTEX_ENTER(&is->is_lock);
 
 	/*
 	 * Look up all the interface names in the state entry.
@@ -1106,9 +1112,7 @@ u_int flags;
 		* timer on it as we'll never see an error if it fails to
 		* connect.
 		*/
-		MUTEX_ENTER(&is->is_lock);
 		(void) fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags);
-		MUTEX_EXIT(&is->is_lock);
 #ifdef	IPFILTER_SCAN
 		(void) isc_attachis(is);
 #endif
@@ -1119,6 +1123,7 @@ u_int flags;
 	if (ipstate_logging)
 		ipstate_log(is, ISL_NEW);
 
+	MUTEX_EXIT(&is->is_lock);
 	RWLOCK_EXIT(&ipf_state);
 	fin->fin_rev = IP6_NEQ(&is->is_dst, &fin->fin_daddr);
 	if (fin->fin_flx & FI_FRAG)
@@ -1277,9 +1282,10 @@ ipstate_t *is;
 				if (fr_tcpoptions(fin, tcp, fdata)) {
 					fdata->td_winflags = TCP_WSCALE_SEEN|
 							     TCP_WSCALE_FIRST;
+				} else {
+					if (!fdata->td_winscale)
+						tdata->td_winscale = 0;
 				}
-				if (!fdata->td_winscale)
-					tdata->td_winscale = 0;
 			}
 			if ((fin->fin_out != 0) && (is->is_pass & FR_NEWISN))
 				fr_checknewisn(fin, is);
@@ -1541,7 +1547,6 @@ ipstate_t *is;
 	clone->is_flags &= ~SI_CLONE;
 	clone->is_flags |= SI_CLONED;
 	fr_stinsert(clone);
-	MUTEX_ENTER(&clone->is_lock);
 	clone->is_ref = 1;
 	if (clone->is_p == IPPROTO_TCP) {
 		(void) fr_tcp_age(&clone->is_sti, fin, ips_tqtqb, clone->is_flags);
