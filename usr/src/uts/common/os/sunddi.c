@@ -6479,24 +6479,55 @@ fail:	*path = 0;
 int
 e_ddi_majorinstance_to_path(major_t major, int instance, char *path)
 {
+	struct devnames *dnp;
 	dev_info_t	*dip;
+
+	if ((major >= devcnt) || (instance == -1)) {
+		*path = 0;
+		return (DDI_FAILURE);
+	}
 
 	/* look for the major/instance in the instance tree */
 	if (e_ddi_instance_majorinstance_to_path(major, instance,
-	    path) != DDI_SUCCESS) {
-		/* not in instance tree, look in 'pseudo' branch */
-		if ((dip = ddi_hold_devi_by_instance(major,
-		    instance, E_DDI_HOLD_DEVI_NOATTACH)) == NULL) {
-			*path = 0;
-			return (DDI_FAILURE);
-		}
-		(void) ddi_pathname(dip, path);
-		ddi_release_devi(dip);
+	    path) == DDI_SUCCESS) {
+		ASSERT(strlen(path) < MAXPATHLEN);
+		return (DDI_SUCCESS);
 	}
-	ASSERT(strlen(path) < MAXPATHLEN);
-	return (DDI_SUCCESS);
-}
 
+	/*
+	 * Not in instance tree, find the instance on the per driver list and
+	 * construct path to instance via ddi_pathname(). This is how paths
+	 * down the 'pseudo' branch are constructed.
+	 */
+	dnp = &(devnamesp[major]);
+	LOCK_DEV_OPS(&(dnp->dn_lock));
+	for (dip = dnp->dn_head; dip;
+	    dip = (dev_info_t *)DEVI(dip)->devi_next) {
+		/* Skip if instance does not match. */
+		if (DEVI(dip)->devi_instance != instance)
+			continue;
+
+		/*
+		 * An ndi_hold_devi() does not prevent DS_INITIALIZED->DS_BOUND
+		 * node demotion, so it is not an effective way of ensuring
+		 * that the ddi_pathname result has a unit-address.  Instead,
+		 * we reverify the node state after calling ddi_pathname().
+		 */
+		if (i_ddi_node_state(dip) >= DS_INITIALIZED) {
+			(void) ddi_pathname(dip, path);
+			if (i_ddi_node_state(dip) < DS_INITIALIZED)
+				continue;
+			UNLOCK_DEV_OPS(&(dnp->dn_lock));
+			ASSERT(strlen(path) < MAXPATHLEN);
+			return (DDI_SUCCESS);
+		}
+	}
+	UNLOCK_DEV_OPS(&(dnp->dn_lock));
+
+	/* can't reconstruct the path */
+	*path = 0;
+	return (DDI_FAILURE);
+}
 
 #define	GLD_DRIVER_PPA "SUNW,gld_v0_ppa"
 
