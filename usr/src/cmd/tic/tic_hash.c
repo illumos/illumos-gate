@@ -19,11 +19,14 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/* 
+/*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
  * All Rights Reserved
@@ -83,10 +86,12 @@
  *
  */
 
+#include <strings.h>
 #include "curses_inc.h"
 #include "compiler.h"
 
-
+static void make_nte(void);
+static int hash_function(char *);
 
 /*
  *	make_hash_table()
@@ -124,9 +129,10 @@ make_hash_table()
 /*
  * Make the name_table_entry from the capnames.c set of tables.
  */
-make_nte()
+static void
+make_nte(void)
 {
-	register int i, n;
+	int i, n;
 	extern char *boolnames[], *numnames[], *strnames[];
 
 	n = 0;
@@ -172,8 +178,7 @@ make_nte()
  *
  */
 
-static
-int
+static int
 hash_function(char *string)
 {
 	long	sum = 0;

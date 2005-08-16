@@ -23,7 +23,8 @@
 
 
 /*
- * Copyright 1989, Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <stdio.h>
@@ -39,10 +40,8 @@ extern int _error(int do_perror, char *fmt, ...);
  * See <suntool/icon_load.h> for icon file format.
  */
 
-loadlogo(name, w, h, logo)
-	char *name;
-	int w, h;
-	char *logo;
+int
+loadlogo(char *name, int w, int h, char *logo)
 {
 	FILE *f;
 	int c = 0;
@@ -63,12 +62,12 @@ loadlogo(name, w, h, logo)
 		switch (c = getc(f)) {
 		case 'D':
 			if ((c = fscanf(f, "epth=%d", &nval)) == 1 &&
-				nval != 1)
+			    nval != 1)
 				goto badform;
 			break;
 		case 'F':
 			if ((c = fscanf(f, "ormat_version=%d", &nval)) == 1 &&
-				nval != 1)
+			    nval != 1)
 				goto badform;
 			break;
 		case 'H':
@@ -92,8 +91,8 @@ loadlogo(name, w, h, logo)
 
 eoh:
 	if (c == EOF ||
-		icw != w || ich != h ||
-		bits != 16 && bits != 32) {
+	    icw != w || ich != h ||
+	    bits != 16 && bits != 32) {
 badform:
 		(void) fclose(f);
 		return (_error(NO_PERROR, "header format error in %s", name));

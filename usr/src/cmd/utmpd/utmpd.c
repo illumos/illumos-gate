@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,7 +168,7 @@ static int pidcmp();		/* For sorting pids */
 static void clean_entry();	/* Removes entry from our table and calls ... */
 static void clean_utmpx_ent();	/* Cleans a utmpx entry */
 
-static void fatal();		/* Prints error message and calls exit */
+static void fatal() __NORETURN;	/* Prints error message and calls exit */
 static void nonfatal();		/* Prints error message */
 static void print_tables();	/* Prints out internal tables for Debug */
 static int proc_is_alive(pid_t pid);	/* Check if a process is alive */
@@ -178,13 +178,12 @@ static void warn_utmp(void);
  * main()  - Main does basic setup and calls wait_for_pids() to do the work
  */
 
-void
+int
 main(argc, argv)
 	char **argv;
 {
 	char *defp;
 	struct rlimit rlim;
-	char tstr[80];
 	int i;
 	time_t curtime, now;
 
@@ -205,7 +204,7 @@ main(argc, argv)
 				"%s: Wrong number of arguments\n", prog_name);
 			(void) fprintf(stderr,
 				"Usage: %s [-debug]\n", prog_name);
-			exit(-1);
+			exit(2);
 		}
 	}
 
@@ -221,7 +220,7 @@ main(argc, argv)
 		if ((defp = defread("WTMPX_UPDATE_FREQ=")) != NULL) {
 			WTMPX_ufreq = atol(defp);
 			dprintf(("WTMPX update frequency set to %d\n",
-				    WTMPX_ufreq));
+			    WTMPX_ufreq));
 		}
 
 		/*
@@ -308,6 +307,7 @@ main(argc, argv)
 	 * We only get here if we had a bunch of resets - so give up
 	 */
 	fatal("Too many resets, giving up");
+	return (1);
 }
 
 /*
@@ -448,12 +448,12 @@ wait_for_pids()
 			if (pread(pfd->fd, &psinfo, sizeof (psinfo), (off_t)0)
 			    != sizeof (psinfo)) {
 				dprintf(("! %d: terminated, status 0x%.4x\n", \
-				(int)pidtable[i].pl_pid, psinfo.pr_wstat));
+				    (int)pidtable[i].pl_pid, psinfo.pr_wstat));
 				pidtable[i].pl_status = psinfo.pr_wstat;
 
 			} else {
 				dprintf(("! %d: terminated\n", \
-						(int)pidtable[i].pl_pid));
+				    (int)pidtable[i].pl_pid));
 				pidtable[i].pl_status = 0;
 			}
 			/*
@@ -470,9 +470,7 @@ wait_for_pids()
 		 */
 		if (pfd->revents & (POLLNVAL|POLLERR)) {
 			dprintf(("Poll Err = %d pid = %d i = %d\n", \
-				pfd->revents, \
-				(int)pidtable[i].pl_pid, i));
-
+			    pfd->revents, (int)pidtable[i].pl_pid, i));
 
 			pid = pidtable[i].pl_pid; /* Save pid for below */
 			/*
@@ -649,7 +647,7 @@ drain_pipe()
 		}
 
 		dprintf(("drain_pipe: Recd command %d, pid %d\n",
-			p->pd_type, (int)p->pd_pid));
+		    p->pd_type, (int)p->pd_pid));
 		switch (p->pd_type) {
 		case ADDPID:
 			/*
@@ -976,13 +974,13 @@ fatal(char *str)
 {
 	int oerrno = errno;
 
-	syslog(LOG_ALERT, str);
+	syslog(LOG_ALERT, "%s", str);
 	if (Debug == 1) {
 		if ((errno = oerrno) != 0)
 			perror(prog_name);
 		dprintf(("%s\n", str));
 	}
-	exit(-1);
+	exit(1);
 }
 
 /*
@@ -992,7 +990,7 @@ fatal(char *str)
 static void
 nonfatal(char *str)
 {
-	syslog(LOG_WARNING, str);
+	syslog(LOG_WARNING, "%s", str);
 
 	if (Debug == 1) {
 		if (errno != 0)

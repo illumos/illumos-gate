@@ -19,31 +19,29 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.19 */
-/*	timex.c 1.19 of 7/21/89 	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <sys/types.h>
 #include <sys/times.h>
 #include <sys/param.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <signal.h>
+#include <strings.h>
 #include <time.h>
 #include <errno.h>
 #include <pwd.h>
 
-long	atol();
-extern	time_t time();
-int	isatty();
-char	*ttyname();
-char	*strcat();
-char	*strncpy();
-struct	passwd *getpwuid();
-
-extern int errno;
-extern char *sys_errlist[];
 char	fname[20];
 
 /*
@@ -51,9 +49,12 @@ char	fname[20];
  */
 char quant[] = { 10, 10, 10, 6, 10, 6, 10, 10, 10 };
 
-main(argc, argv)
-int argc;
-char **argv;
+void printt(char *, time_t);
+void hmstime(char[]);
+void diag(char *);
+
+int
+main(int argc, char **argv)
 {
 	struct	tms buffer, obuffer;
 	int	status;
@@ -66,7 +67,7 @@ char **argv;
 	extern	int	optind;
 	int	pflg = 0, sflg = 0, oflg = 0;
 	char	aopt[25];
-	FILE	*popen(), *pipin;
+	FILE	*pipin;
 	char	ttyid[12], line[150];
 	char	eol;
 	char	fld[20][12];
@@ -105,9 +106,9 @@ char **argv;
 		oflg = 0;
 		pflg = 0;
 		fprintf(stderr,
-			"Information from -p and -o options not available\n");
+		    "Information from -p and -o options not available\n");
 		fprintf(stderr,
-			" because process accounting is not operational.\n");
+		    " because process accounting is not operational.\n");
 	}
 
 	if (sflg) {
@@ -121,12 +122,13 @@ char **argv;
 	if (p == 0) {
 		setgid(getgid());
 		execvp(*(argv+optind), (argv+optind));
-		fprintf(stderr, "%s: %s\n", *(argv+optind), sys_errlist[errno]);
+		fprintf(stderr, "%s: %s\n", *(argv+optind), strerror(errno));
 		exit(1);
 	}
 	signal(SIGINT, SIG_IGN);
 	signal(SIGQUIT, SIG_IGN);
-	while (wait(&status) != p);
+	while (wait(&status) != p)
+		;
 	if ((status&0377) != 0)
 		fprintf(stderr, "Command terminated abnormally.\n");
 	signal(SIGINT, SIG_DFL);
@@ -145,18 +147,19 @@ char **argv;
 		if (isatty(0))
 			sprintf(ttyid, "-l %s", ttyname(0)+5);
 		sprintf(cmd, "acctcom -S %s -E %s -u %s %s -i %s",
-			stime, etime, getpwuid(getuid())->pw_name, ttyid, aopt);
+		    stime, etime, getpwuid(getuid())->pw_name, ttyid, aopt);
 		pipin = popen(cmd, "r");
 		while (fscanf(pipin, "%[^\n]%1c", line, &eol) > 1) {
 			if (pflg)
 				fprintf(stderr, "%s\n", line);
 			if (oflg)  {
 				nfld = sscanf(line,
-				"%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
-				fld[0], fld[1], fld[2], fld[3], fld[4],
-				fld[5], fld[6], fld[7], fld[8], fld[9],
-				fld[10], fld[11], fld[12], fld[13], fld[14],
-				fld[15], fld[16], fld[17], fld[18], fld[19]);
+				    "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+				    fld[0], fld[1], fld[2], fld[3], fld[4],
+				    fld[5], fld[6], fld[7], fld[8], fld[9],
+				    fld[10], fld[11], fld[12], fld[13], fld[14],
+				    fld[15], fld[16], fld[17], fld[18],
+				    fld[19]);
 				if (++iline == 3)
 					for (i = 0; i < nfld; i++)  {
 						if (strcmp(fld[i], "CHARS")
@@ -177,16 +180,15 @@ char **argv;
 		if (oflg)
 			if (iline > 4)
 				fprintf(stderr,
-				"\nCHARS TRNSFD = %ld\nBLOCKS READ  = %ld\n",
-				chars, bloks);
+				    "\nCHARS TRNSFD = %ld\n"
+				    "BLOCKS READ  = %ld\n", chars, bloks);
 			else
 				fprintf(stderr,
-					"\nNo process records found!\n");
+				    "\nNo process records found!\n");
 	}
 
 	if (sflg)  {
-		sprintf(cmd,
-			"/usr/bin/sar -ubdycwaqvmpgrk -f %s 1>&2", fname);
+		sprintf(cmd, "/usr/bin/sar -ubdycwaqvmpgrk -f %s 1>&2", fname);
 		system(cmd);
 		unlink(fname);
 	}
@@ -197,12 +199,11 @@ char *pad  = "000      ";
 char *sep  = "\0\0.\0:\0:\0\0";
 char *nsep = "\0\0.\0 \0 \0\0";
 
-printt(s, a)
-char	*s;
-time_t	a;
+void
+printt(char *s, time_t a)
 {
 	char	digit[9];
-	register	i;
+	int	i;
 	char	c;
 	int	nonzero;
 
@@ -226,11 +227,11 @@ time_t	a;
 }
 
 /*
-** hmstime() sets current time in hh:mm:ss string format in stime;
-*/
+ * hmstime() sets current time in hh:mm:ss string format in stime;
+ */
 
-hmstime(stime)
-char	stime[];
+void
+hmstime(char stime[])
 {
 	char	*ltime;
 	time_t tme;
@@ -241,8 +242,8 @@ char	stime[];
 	stime[8] = '\0';
 }
 
-diag(s)
-char *s;
+void
+diag(char *s)
 {
 	fprintf(stderr, "%s\n", s);
 	unlink(fname);

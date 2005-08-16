@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,38 +87,22 @@
  */
 
 #include <unistd.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
 #include "compiler.h"
-#ifdef __STDC__
-#include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
 
 extern char *string_table;
 extern short term_names;
 extern char *progname;
 
 /* VARARGS1 */
-#ifdef __STDC__
 void
 warning(char *fmt, ...)
-#else
-warning(va_alist)
-va_dcl
-#endif
 {
-#ifndef __STDC__
-	register char *fmt;
-#endif
 	va_list args;
 
-#ifdef __STDC__
 	va_start(args, fmt);
-#else
-	va_start(args);
-	fmt = va_arg(args, char *);
-#endif
 	fprintf(stderr, "%s: Warning: near line %d: ", progname, curr_line);
 	if (string_table != NULL) {
 		fprintf(stderr, "terminal '%s', ", string_table+term_names);
@@ -130,24 +114,12 @@ va_dcl
 
 
 /* VARARGS1 */
-#ifdef __STDC__
+void
 err_abort(char *fmt, ...)
-#else
-err_abort(va_alist)
-va_dcl
-#endif
 {
-#ifndef __STDC__
-	register char *fmt;
-#endif
 	va_list args;
 
-#ifdef __STDC__
 	va_start(args, fmt);
-#else
-	va_start(args);
-	fmt = va_arg(args, char *);
-#endif
 	fprintf(stderr, "%s: Line %d: ", progname, curr_line);
 	if (string_table != NULL) {
 		fprintf(stderr, "terminal '%s', ", string_table+term_names);
@@ -160,25 +132,12 @@ va_dcl
 
 
 /* VARARGS1 */
-#ifdef __STDC__
 void
 syserr_abort(char *fmt, ...)
-#else
-syserr_abort(va_alist)
-va_dcl
-#endif
 {
-#ifndef __STDC__
-	register char *fmt;
-#endif
 	va_list args;
 
-#ifdef __STDC__
 	va_start(args, fmt);
-#else
-	va_start(args);
-	fmt = va_arg(args, char *);
-#endif
 	fprintf(stderr, "PROGRAM ERROR: Line %d: ", curr_line);
 	if (string_table != NULL) {
 		fprintf(stderr, "terminal '%s', ", string_table+term_names);

@@ -28,27 +28,28 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8.2.4 */
-
-/*	saga.c 1.8.2.4 of 6/2/89	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "saghdr.h"
 #include <limits.h>
 #include <strings.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 char	fld[NFLD][10];
 char	cmd[300];
 long	sardoff;
-long	ftell();
 FILE	*sard;
-FILE	*fopen();
 
+static void printar(struct array *ptr);
+static void parse(struct p *p);
+static void plot(struct p[], int, char *, char *, char *, char *);
+static void scale(struct p[], int, char *, char *, char *, char *);
+
+int
 main(int argc, char *argv[])
 {
-	extern	char	*optarg;
-	extern	int	optind;
 	extern	char	cmd[];
 	extern	char	fld[NFLD][FLDCH];
 	char	sarg[10];
@@ -246,8 +247,8 @@ main(int argc, char *argv[])
 	exit(0);
 }
 
-printar(ptr)
-    struct	array	*ptr;
+static void
+printar(struct array *ptr)
 {
 	int	i;
 
@@ -268,8 +269,8 @@ printar(ptr)
  *	found in p->spec, placing field names in p->c[j].name,
  *	operators in p->c[j].op, and ranges in p->mn, p->mx, p->min, and p->max
  */
-parse(p)
-    struct	p	*p;
+static void
+parse(struct p *p)
 {
 	int	n, j;
 	char	f[11][18];
@@ -310,11 +311,9 @@ parse(p)
 	}
 }
 
-plot(p, nplot, xlab_s, xlab_e, title, Targ)
-    struct	p	p[];
-    int	nplot;
-    char	*xlab_s, *xlab_e, *title;
-    char	*Targ;
+static void
+plot(struct p p[], int nplot, char *xlab_s, char *xlab_e, char *title,
+    char *Targ)
 {
 	extern	char	cmd[];
 	FILE	*pipe, *popen();
@@ -449,6 +448,7 @@ plot(p, nplot, xlab_s, xlab_e, title, Targ)
 	system(cmd);
 }
 
+int
 reduce(struct p *pr)
 {
 	int	i, j;
@@ -499,11 +499,9 @@ reduce(struct p *pr)
 	return (0);
 }
 
-scale(p, nplot, sarg, earg, xlab_s, xlab_e)
-    struct	p	p[];
-    int	nplot;
-    char	*sarg, *earg;
-    char	*xlab_s, *xlab_e;
+static void
+scale(struct p p[], int nplot, char *sarg, char *earg, char *xlab_s,
+    char *xlab_e)
 {
 	/*
 	 *	Scans each data set to find and label those that contain

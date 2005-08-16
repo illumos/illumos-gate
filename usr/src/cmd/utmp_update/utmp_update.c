@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,20 +43,20 @@
 /*
  * Header files
  */
-#include	<stdio.h>
-#include	<sys/param.h>
-#include	<sys/types.h>
-#include	<sys/stat.h>
-#include	<utmpx.h>
-#include	<errno.h>
-#include	<fcntl.h>
-#include	<string.h>
-#include	<stdlib.h>
-#include	<unistd.h>
-#include	<pwd.h>
-#include	<ctype.h>
-#include	<stropts.h>
-#include	<syslog.h>
+#include <stdio.h>
+#include <sys/param.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <utmpx.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pwd.h>
+#include <ctype.h>
+#include <stropts.h>
+#include <syslog.h>
 
 /*
  * Invocation argument definitions
@@ -118,8 +118,6 @@ main(int argc, char *argv[])
 {
 	struct utmpx *rutmpx;
 	struct utmpx entryx;
-	int error = 0;
-	int num_args;
 #ifdef	DEBUG
 	int	debugger = 1;
 	printf("%d\n", getpid());
@@ -135,7 +133,7 @@ main(int argc, char *argv[])
 
 	if (argc != UTMPX_NARGS) {
 		usage();
-		exit(BAD_ARGS);
+		return (BAD_ARGS);
 	}
 	/*
 	 * we should never be called by root the code in libc already
@@ -147,7 +145,7 @@ main(int argc, char *argv[])
 	 */
 	if (getuid() == ROOT_UID) {
 		usage();
-		exit(ILLEGAL_ARGUMENT);
+		return (ILLEGAL_ARGUMENT);
 	}
 	/*
 	 * Search for matching entry by line name before put operation
@@ -173,7 +171,7 @@ main(int argc, char *argv[])
 			if (rutmpx->ut_type == USER_PROCESS) {
 				if (invalid_utmpx(&entryx, rutmpx)) {
 					usage();
-					exit(ILLEGAL_ARGUMENT);
+					return (ILLEGAL_ARGUMENT);
 				} else {
 					break;
 				}
@@ -182,9 +180,9 @@ main(int argc, char *argv[])
 	}
 
 	if (pututxline(&entryx) == (struct utmpx *)NULL) {
-		exit(PUTUTXLINE_FAILURE);
+		return (PUTUTXLINE_FAILURE);
 	}
-	exit(NORMAL_EXIT);
+	return (NORMAL_EXIT);
 }
 
 static int
@@ -196,10 +194,10 @@ hex2bin(unsigned char c)
 		return (10 + c - 'A');
 	else if ('a' <= c && c <= 'f')
 		return (10 + c - 'a');
-	else {
-		dprintf("Bad hex character: 0x%x\n", c);
-		exit(ILLEGAL_ARGUMENT);
-	}
+
+	dprintf("Bad hex character: 0x%x\n", c);
+	exit(ILLEGAL_ARGUMENT);
+	/* NOTREACHED */
 }
 
 
@@ -297,7 +295,6 @@ check_utmpx(struct utmpx *entryx)
 	char *line = buf;
 	struct passwd *pwd;
 	int uid;
-	int fd;
 	int hostlen;
 	char	*user;
 	uid_t	ruid = getuid();
@@ -325,7 +322,7 @@ check_utmpx(struct utmpx *entryx)
 
 		if (ruid != uid) {
 			dprintf3("Bad uid: user %s  = %d uid = %d \n",
-					entryx->ut_user, uid, getuid());
+			    entryx->ut_user, uid, getuid());
 			exit(ILLEGAL_ARGUMENT);
 		}
 
@@ -338,7 +335,7 @@ check_utmpx(struct utmpx *entryx)
 	 * Only USER_PROCESS and DEAD_PROCESS entries may be updated
 	 */
 	if (!(entryx->ut_type == USER_PROCESS ||
-					entryx->ut_type == DEAD_PROCESS)) {
+	    entryx->ut_type == DEAD_PROCESS)) {
 		dprintf("Bad type type = %d\n", entryx->ut_type);
 		exit(ILLEGAL_ARGUMENT);
 	}
@@ -406,7 +403,6 @@ bad_hostname(char *name, int len)
 static void
 check_id(char *id, char *line)
 {
-	char temp[4];
 	int i, len;
 
 	if (id[1] == '/' && id[2] == 's' && id[3] == 't') {
@@ -435,8 +431,8 @@ invalid_utmpx(struct utmpx *eutmpx, struct utmpx *rutmpx)
 #define	SUTMPX_USER	(sizeof (eutmpx->ut_user))
 
 	return (!nonuserx(*rutmpx) ||
-		strncmp(eutmpx->ut_id, rutmpx->ut_id, SUTMPX_ID) != 0 ||
-		strncmp(eutmpx->ut_user, rutmpx->ut_user, SUTMPX_USER) != 0);
+	    strncmp(eutmpx->ut_id, rutmpx->ut_id, SUTMPX_ID) != 0 ||
+	    strncmp(eutmpx->ut_user, rutmpx->ut_user, SUTMPX_USER) != 0);
 }
 
 static int
@@ -486,7 +482,7 @@ bad_line(char *line)
 		/*
 		 * It really is a tty, so return success
 		 */
-		close(fd);
+		(void) close(fd);
 		if (seteuid(ROOT_UID) != 0)
 			return (1);
 		return (0);
@@ -498,7 +494,7 @@ bad_line(char *line)
 	 */
 	if ((fstat(fd, &statbuf) < 0) || (statbuf.st_mode & S_IFCHR) == 0) {
 		dprintf("Bad line (fstat failed) (Not S_IFCHR) = %s\n", line);
-		close(fd);
+		(void) close(fd);
 		return (1);
 	}
 
@@ -507,7 +503,7 @@ bad_line(char *line)
 	 */
 	if (isastream(fd) != 1) {
 		dprintf("Bad line (isastream failed) = %s\n", line);
-		close(fd);
+		(void) close(fd);
 		return (1);
 	}
 
@@ -518,23 +514,23 @@ bad_line(char *line)
 	 */
 	if (ioctl(fd, I_PUSH, "ptem") == -1) {
 		dprintf("Bad line (I_PUSH of \"ptem\" failed) = %s\n", line);
-		close(fd);
+		(void) close(fd);
 		return (1);
 	}
 
 	if (isatty(fd) != 1) {
 		dprintf("Bad line (isatty failed) = %s\n", line);
-		close(fd);
+		(void) close(fd);
 		return (1);
 	}
 
 	if (ioctl(fd, I_POP, 0) == -1) {
 		dprintf("Bad line (I_POP of \"ptem\" failed) = %s\n", line);
-		close(fd);
+		(void) close(fd);
 		return (1);
 	}
 
-	close(fd);
+	(void) close(fd);
 
 	if (seteuid(ROOT_UID) != 0)
 		return (1);
@@ -572,8 +568,8 @@ fputmpx(struct utmpx *rutmpx)
 	printf("ut_pid = \"%d\" \n", rutmpx->ut_pid);
 	printf("ut_type = \"%d\" \n", rutmpx->ut_type);
 	printf("ut_exit.e_termination = \"%d\" \n",
-					rutmpx->ut_exit.e_termination);
+	    rutmpx->ut_exit.e_termination);
 	printf("ut_exit.e_exit = \"%d\" \n", rutmpx->ut_exit.e_exit);
 }
 
-#endif DEBUG
+#endif /* DEBUG */

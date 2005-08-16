@@ -4,7 +4,7 @@
 
 /*
  * Open Boot Prom eeprom utility
- * Copyright 1989-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,8 @@
 
 #define	MAXPROPSIZE	128
 #define	MAXNAMESIZE	MAXPROPSIZE
-#define	MAXVALSIZE	(8192 - MAXPROPSIZE - sizeof (u_int))
-#define	BUFSIZE		(MAXPROPSIZE + MAXVALSIZE + sizeof (u_int))
+#define	MAXVALSIZE	(8192 - MAXPROPSIZE - sizeof (uint_t))
+#define	BUFSIZE		(MAXPROPSIZE + MAXVALSIZE + sizeof (uint_t))
 typedef union {
 	char buf[BUFSIZE];
 	struct openpromio opp;
@@ -64,7 +64,8 @@ static void set_one(char *, char *);
 static void promclose();
 static int promopen(int);
 
-static getpropval(), setpropval();
+static int getpropval(struct openpromio *);
+static int setpropval(struct openpromio *);
 
 static char *badarchmsg = "Architecture does not support this command.\n";
 
@@ -132,8 +133,8 @@ main(int argc, char **argv)
 			break;
 		default:
 			exit(_error(NO_PERROR,
-		"Usage: %s [-v] [-f prom-device] [variable[=value] ...]",
-				argv[0]));
+			    "Usage: %s [-v] [-f prom-device] "
+			    "[variable[=value] ...]", argv[0]));
 		}
 
 	setprogname(argv[0]);
@@ -161,7 +162,7 @@ main(int argc, char **argv)
 				/* otherwise discard rest of line */
 				else
 					while ((c = getchar()) != '\n' &&
-						c != EOF)
+					    c != EOF)
 						/* nothing */;
 
 				do_var(line);
@@ -185,7 +186,7 @@ main(int argc, char **argv)
 static void
 do_var(char *var)
 {
-	register char *val;
+	char *val;
 
 	val = strchr(var, '=');
 
@@ -220,7 +221,7 @@ static void
 dump_all()
 {
 	Oppbuf	oppbuf;
-	register struct openpromio *opp = &(oppbuf.opp);
+	struct openpromio *opp = &(oppbuf.opp);
 
 	if (promopen(O_RDONLY))  {
 		(void) fprintf(stderr, badarchmsg);
@@ -253,14 +254,14 @@ static void
 print_one(char *var)
 {
 	Oppbuf	oppbuf;
-	register struct openpromio *opp = &(oppbuf.opp);
+	struct openpromio *opp = &(oppbuf.opp);
 
 	(void) strlcpy(opp->oprom_array, var, MAXNAMESIZE);
 	if (getpropval(opp) || opp->oprom_size <= 0)
 		(void) printf("%s: data not available.\n", var);
 	else {
 		/* If necessary, massage the output */
-		register struct opvar *v;
+		struct opvar *v;
 
 		for (v = opvar; v->name; v++)
 			if (strcmp(var, v->name) == 0)
@@ -280,8 +281,8 @@ static void
 set_one(char *var, char *val)
 {
 	Oppbuf	oppbuf;
-	register struct openpromio *opp = &(oppbuf.opp);
-	register struct opvar *v;
+	struct openpromio *opp = &(oppbuf.opp);
+	struct opvar *v;
 
 	if (verbose) {
 		(void) printf("old:");
@@ -346,8 +347,8 @@ promclose()
 		exit(_error(PERROR, "close error on %s", promdev));
 }
 
-static
-getpropval(register struct openpromio *opp)
+static int
+getpropval(struct openpromio *opp)
 {
 	opp->oprom_size = MAXVALSIZE;
 
@@ -357,8 +358,8 @@ getpropval(register struct openpromio *opp)
 	return (0);
 }
 
-static
-setpropval(register struct openpromio *opp)
+static int
+setpropval(struct openpromio *opp)
 {
 	/* Caller must set opp->oprom_size */
 
@@ -398,7 +399,7 @@ i_secure(char *var, char *val, struct openpromio *opp)
 {
 	int secure;
 	Oppbuf oppbuf;
-	register struct openpromio *opp2 = &(oppbuf.opp);
+	struct openpromio *opp2 = &(oppbuf.opp);
 	char pwbuf[PW_SIZE + 2];
 	int varlen1, varlen2;
 
@@ -428,7 +429,7 @@ i_secure(char *var, char *val, struct openpromio *opp)
 			/* no password yet, get one */
 			if (get_password(pwbuf, PW_SIZE)) {
 				(void) strcpy(opp2->oprom_array + varlen2,
-						pwbuf);
+				    pwbuf);
 				opp2->oprom_size = varlen2 + strlen(pwbuf);
 				/* set password first */
 				if (setpropval(opp2) || setpropval(opp))
@@ -467,7 +468,7 @@ i_passwd(char *var, char *val, struct openpromio *opp)
 {
 	int secure;
 	Oppbuf oppbuf;
-	register struct openpromio *opp2 = &(oppbuf.opp);
+	struct openpromio *opp2 = &(oppbuf.opp);
 	char pwbuf[PW_SIZE + 2];
 	int varlen;
 
@@ -550,8 +551,7 @@ tryagain:
 		ok = 1;
 	if (!ok && insist < 2) {
 	(void) printf("Please use %s.\n", flags == 1 ?
-			"at least one non-numeric character" :
-			"a longer password");
+	    "at least one non-numeric character" : "a longer password");
 		insist++;
 		goto tryagain;
 	}

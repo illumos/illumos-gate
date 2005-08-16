@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -94,6 +94,10 @@
 
 
 static int	first_column;		/* See 'next_char()' below */
+
+static void backspace(void);
+void reset_input(void);
+void panic_mode(int);
 
 
 
@@ -343,12 +347,13 @@ next_char()
 }
 
 
-backspace()
+static void
+backspace(void)
 {
 	curr_column--;
 
 	if (curr_column < 0)
-	    syserr_abort("Backspaced off beginning of line");
+		syserr_abort("Backspaced off beginning of line");
 }
 
 
@@ -360,7 +365,8 @@ backspace()
  *
  */
 
-reset_input()
+void
+reset_input(void)
 {
 	curr_column = -1;
 }
@@ -496,9 +502,10 @@ trans_string(char *ptr)
 /*
  * Panic mode error recovery - skip everything until a "ch" is found.
  */
+void
 panic_mode(int ch)
 {
-	register int c;
+	int c;
 
 	for (;;) {
 		c = next_char();

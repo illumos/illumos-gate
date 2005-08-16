@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All Rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -105,6 +105,7 @@ extern void compile();		/* should be in a header file :-( */
 extern void syserr_abort();		/* should be in a header file :-( */
 static void init();
 
+int
 main(int argc, char *argv[])
 {
 	int	i;

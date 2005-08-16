@@ -21,13 +21,17 @@
  */
 /*
  * Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
- * Copyright (c) 2000, 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <grp.h>
 #include <stdlib.h>
 #include <stropts.h>
@@ -40,6 +44,7 @@
  * 1) change the owner and mode of the pseudo terminal slave device.
  * 2) (re)create nodes and devlinks for pseduo terminal slave device.
  */
+int
 main(int argc, char **argv)
 {
 	int	fd;
@@ -50,7 +55,7 @@ main(int argc, char **argv)
 	struct	group	*gr_name_ptr;
 
 	if (argc > 2)
-		exit(1);
+		return (1);
 
 	if ((gr_name_ptr = getgrnam(DEFAULT_TTY_GROUP)) != NULL)
 		gid = gr_name_ptr->gr_gid;
@@ -61,10 +66,10 @@ main(int argc, char **argv)
 	if (argc == 1) {
 		pp = di_devlink_init("pts", DI_MAKE_LINK);
 		if (pp != NULL) {
-			di_devlink_fini(&pp);
-			exit(0);
+			(void) di_devlink_fini(&pp);
+			return (0);
 		}
-		exit(1);
+		return (1);
 	}
 
 	fd = atoi(argv[1]);
@@ -72,7 +77,7 @@ main(int argc, char **argv)
 	tty = ptsname(fd);
 
 	if (tty == NULL)
-		exit(1);
+		return (1);
 
 	/*
 	 * Detach all STREAMs.
@@ -106,10 +111,10 @@ main(int argc, char **argv)
 	}
 
 	if (chown(tty, getuid(), gid))
-		exit(1);
+		return (1);
 
 	if (chmod(tty, 00620))
-		exit(1);
+		return (1);
 
-	exit(0);
+	return (0);
 }

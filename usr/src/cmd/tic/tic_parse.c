@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
@@ -94,6 +94,8 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <strings.h>
+#include <unistd.h>
 #include "curses_inc.h"
 #include "compiler.h"
 #include "object.h"
@@ -119,6 +121,10 @@ struct use_header {
 
 struct use_header	use_list = {NULL, NULL};
 int			use_count = 0;
+
+void dequeue(struct use_item *);
+void init_structure(short Booleans[], short Numbers[], short Strings[]);
+void dump_structure(short Booleans[], short Numbers[], short Strings[]);
 
 /*
  *  The use_list is a doubly-linked list with NULLs terminating the lists:
@@ -228,8 +234,8 @@ compile()
 	}
 }
 
-dump_list(str)
-char *str;
+void
+dump_list(char *str)
 {
 	struct use_item *ptr;
 	char line[512];
@@ -277,8 +283,8 @@ do_entry(item_ptr)
 struct use_item	*item_ptr;
 {
 	long					entry_offset;
-	register int				token_type;
-	register struct name_table_entry	*entry_ptr;
+	int					token_type;
+	struct name_table_entry			*entry_ptr;
 	int					found_forward_use = FALSE;
 	short					Booleans[MAXBOOLS],
 						Numbers[MAXNUMS],
@@ -375,12 +381,10 @@ struct use_item	*item_ptr;
     have to be compatible with the pre-Vr3 format.
 */
 #ifndef NOCANCELCOMPAT
-elim_cancellations(Booleans, Numbers, Strings)
-short	Booleans[];
-short	Numbers[];
-short	Strings[];
+void
+elim_cancellations(short Booleans[], short Numbers[], short Strings[])
 {
-	register int i;
+	int i;
 	for (i = 0; i < BoolCount; i++) {
 		if (Booleans[i] == -2)
 			Booleans[i] = FALSE;
@@ -401,10 +405,10 @@ short	Strings[];
     Change the cancellation signal from the -2 used internally to
     the 2 used within the binary.
 */
-change_cancellations(Booleans)
-short	Booleans[];
+void
+change_cancellations(short Booleans[])
 {
-	register int i;
+	int i;
 	for (i = 0; i < BoolCount; i++) {
 		if (Booleans[i] == -2)
 			Booleans[i] = 2;
@@ -419,8 +423,8 @@ short	Booleans[];
  *
  */
 
-enqueue(offset)
-long	offset;
+void
+enqueue(long offset)
 {
 	struct use_item	*item;
 
@@ -451,8 +455,8 @@ long	offset;
  *
  */
 
-dequeue(ptr)
-struct use_item	*ptr;
+void
+dequeue(struct use_item *ptr)
 {
 	if (ptr->fptr == NULL)
 		use_list.tail = ptr->bptr;
@@ -480,8 +484,8 @@ struct use_item	*ptr;
  *
  */
 
-static int invalid_term_name(name)
-register char *name;
+static int
+invalid_term_name(char *name)
 {
 	int error = 0;
 	if (! isdigit(*name) && ! islower(*name) && ! isupper(*name))
@@ -519,15 +523,13 @@ register char *name;
  *
  */
 
-dump_structure(Booleans, Numbers, Strings)
-short	Booleans[];
-short	Numbers[];
-short	Strings[];
+void
+dump_structure(short Booleans[], short Numbers[], short Strings[])
 {
 	struct stat64	statbuf;
 	FILE		*fp;
 	char		name_list[1024];
-	register char	*first_name, *other_names, *cur_name;
+	char		*first_name, *other_names, *cur_name;
 	char		filename[128 + 2 + 1];
 	char		linkname[128 + 2 + 1];
 	int		len;
@@ -689,9 +691,9 @@ short	Strings[];
 	char		*namelist;
 	short		namelen;
 	char		zero = '\0';
-	register int	i;
+	int		i;
 	char		cBooleans[MAXBOOLS];
-	register int	l_next_free;
+	int		l_next_free;
 
 	namelist = term_names + string_table;
 	namelen = strlen(namelist) + 1;
@@ -800,9 +802,8 @@ char	*string;
  *
  */
 
-init_structure(Booleans, Numbers, Strings)
-short	Booleans[];
-short	Numbers[], Strings[];
+void
+init_structure(short Booleans[], short Numbers[], short Strings[])
 {
 	int	i;
 

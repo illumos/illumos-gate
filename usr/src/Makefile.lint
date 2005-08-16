@@ -210,6 +210,7 @@ COMMON_SUBDIRS = \
 	cmd/psradm \
 	cmd/psrinfo \
 	cmd/psrset \
+	cmd/pt_chmod \
 	cmd/ptools \
 	cmd/pwck \
 	cmd/ramdiskadm \
@@ -249,6 +250,8 @@ COMMON_SUBDIRS = \
 	cmd/truss \
 	cmd/tty \
 	cmd/uadmin \
+	cmd/utmp_update \
+	cmd/utmpd \
 	cmd/valtools \
 	cmd/wall \
 	cmd/wbem \
