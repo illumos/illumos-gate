@@ -320,3 +320,30 @@ pn_tlb_logout		PN_TLO_SIZE
 ch_tte_entry		CH_TLO_TTE_SIZE
 	ch_tte_tag	CH_TLO_TTE_TAG
 	ch_tte_data	CH_TLO_TTE_DATA
+
+ptl1_regs
+	ptl1_trap_regs
+	ptl1_g1
+	ptl1_g2
+	ptl1_g3
+	ptl1_g4
+	ptl1_g5
+	ptl1_g6
+	ptl1_g7
+	ptl1_tick
+	ptl1_dmmu_sfar
+	ptl1_dmmu_sfsr
+	ptl1_dmmu_tag_access
+	ptl1_immu_sfsr
+	ptl1_immu_tag_access
+	ptl1_rwindow
+	ptl1_softint
+	ptl1_pstate
+	ptl1_pil
+	ptl1_cwp
+	ptl1_wstate
+	ptl1_otherwin
+	ptl1_cleanwin
+	ptl1_cansave
+	ptl1_canrestore
+

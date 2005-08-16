@@ -57,8 +57,8 @@ typedef struct ptl1_trapregs {
 	uint64_t	ptl1_tnpc;
 } ptl1_trapregs_t;
 
-typedef struct ptl1_regs {
-	ptl1_trapregs_t	ptl1_trap_regs[PTL1_MAXTL];
+typedef struct ptl1_gregs {
+	uint64_t	ptl1_gl;
 	uint64_t	ptl1_g1;
 	uint64_t	ptl1_g2;
 	uint64_t	ptl1_g3;
@@ -66,12 +66,18 @@ typedef struct ptl1_regs {
 	uint64_t	ptl1_g5;
 	uint64_t	ptl1_g6;
 	uint64_t	ptl1_g7;
+} ptl1_gregs_t;
+
+typedef struct ptl1_regs {
+	ptl1_trapregs_t	ptl1_trap_regs[PTL1_MAXTL];
+	ptl1_gregs_t	ptl1_gregs[PTL1_MAXGL + 1];
 	uint64_t	ptl1_tick;
-	uint64_t	ptl1_dmmu_sfar;
-	uint64_t	ptl1_dmmu_sfsr;
-	uint64_t	ptl1_dmmu_tag_access;
-	uint64_t	ptl1_immu_sfsr;
-	uint64_t	ptl1_immu_tag_access;
+	uint64_t	ptl1_dmmu_type;
+	uint64_t	ptl1_dmmu_addr;
+	uint64_t	ptl1_dmmu_ctx;
+	uint64_t	ptl1_immu_type;
+	uint64_t	ptl1_immu_addr;
+	uint64_t	ptl1_immu_ctx;
 	struct rwindow	ptl1_rwindow[MAXWIN];
 	uint32_t	ptl1_softint;
 	uint16_t	ptl1_pstate;

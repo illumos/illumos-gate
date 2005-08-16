@@ -300,7 +300,8 @@ extern "C" {
 /*
  * Defines used for ptl1 related data structs.
  */
-#define	PTL1_MAXTL		4
+#define	PTL1_MAXTL		2
+#define	PTL1_MAXGL		2
 #define	PTL1_DEBUG_TRAP		0x7C
 #define	PTL1_SSIZE		1024	/* minimum stack size */
 #define	CPU_ALLOC_SIZE		MMU_PAGESIZE

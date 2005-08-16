@@ -1286,13 +1286,32 @@ save_cpu_state:
 	! save current global registers
 	! so that all them become available for use
 	!
-	stxa	%g1, [%g3 + PTL1_G1] %asi
-	stxa	%g2, [%g3 + PTL1_G2] %asi
-	stxa	%g3, [%g3 + PTL1_G3] %asi
-	stxa	%g4, [%g3 + PTL1_G4] %asi
-	stxa	%g5, [%g3 + PTL1_G5] %asi
-	stxa	%g6, [%g3 + PTL1_G6] %asi
-	stxa	%g7, [%g3 + PTL1_G7] %asi
+	stxa	%o1, [%g3 + PTL1_RWINDOW] %asi		! save %o1
+	stxa	%o2, [%g3 + PTL1_RWINDOW + 8] %asi	! save %o2
+	stxa	%o3, [%g3 + PTL1_RWINDOW + 16] %asi	! save %o3
+	rdpr	%gl, %o1
+	add	%g3, PTL1_GREGS, %o2		! %o4 = &ptl1_gregs[0]
+	mov	%g3, %o3
+6:
+	stxa	%o1, [%o2 + PTL1_GL] %asi
+	stxa	%g1, [%o2 + PTL1_G1] %asi
+	stxa	%g2, [%o2 + PTL1_G2] %asi
+	stxa	%g3, [%o2 + PTL1_G3] %asi
+	stxa	%g4, [%o2 + PTL1_G4] %asi
+	stxa	%g5, [%o2 + PTL1_G5] %asi
+	stxa	%g6, [%o2 + PTL1_G6] %asi
+	stxa	%g7, [%o2 + PTL1_G7] %asi
+	add	%o2, PTL1_GREGS_INCR, %o2
+	deccc	%o1
+	brgez,a,pt %o1, 6b
+	wrpr	%o1, %gl
+	!
+	! restore %g3, %o1, %o2 and %o3
+	!
+	mov	%o3, %g3
+	ldxa	[%g3 + PTL1_RWINDOW] %asi, %o1
+	ldxa	[%g3 + PTL1_RWINDOW + 8] %asi, %o2
+	ldxa	[%g3 + PTL1_RWINDOW + 16] %asi, %o3
 	!
 	! %tl, %tt, %tstate, %tpc, %tnpc for each TL
 	!
@@ -1334,16 +1353,18 @@ save_cpu_state:
 2:	stxa	%g1, [%g3 + PTL1_TICK] %asi
 
 	MMU_FAULT_STATUS_AREA(%g1)
-	ldx	[%g1 + MMFSA_D_ADDR], %g4
-	stxa	%g4, [%g3 + PTL1_DMMU_SFAR]%asi
 	ldx	[%g1 + MMFSA_D_TYPE], %g4
-	stxa	%g4, [%g3 + PTL1_DMMU_SFSR]%asi
-	ldx	[%g1 + MMFSA_I_TYPE], %g4
-	stxa	%g4, [%g3 + PTL1_IMMU_SFSR]%asi
+	stxa	%g4, [%g3 + PTL1_DMMU_TYPE] %asi
 	ldx	[%g1 + MMFSA_D_ADDR], %g4
-	stxa	%g4, [%g3 + PTL1_DMMU_TAG_ACCESS]%asi
+	stxa	%g4, [%g3 + PTL1_DMMU_ADDR] %asi
+	ldx	[%g1 + MMFSA_D_CTX], %g4
+	stxa	%g4, [%g3 + PTL1_DMMU_CTX] %asi
+	ldx	[%g1 + MMFSA_I_TYPE], %g4
+	stxa	%g4, [%g3 + PTL1_IMMU_TYPE] %asi
 	ldx	[%g1 + MMFSA_I_ADDR], %g4
-	stxa	%g4, [%g3 + PTL1_IMMU_TAG_ACCESS]%asi
+	stxa	%g4, [%g3 + PTL1_IMMU_ADDR] %asi
+	ldx	[%g1 + MMFSA_I_CTX], %g4
+	stxa	%g4, [%g3 + PTL1_IMMU_CTX] %asi
 
 	!
 	! Save register window state and register windows.

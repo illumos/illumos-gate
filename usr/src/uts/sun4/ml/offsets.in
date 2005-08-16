@@ -377,32 +377,6 @@ ptl1_state	PTL1_STATE_SIZE
 	ptl1_entry_count
 	ptl1_stktop
 
-ptl1_regs
-	ptl1_trap_regs
-	ptl1_g1
-	ptl1_g2
-	ptl1_g3
-	ptl1_g4
-	ptl1_g5
-	ptl1_g6
-	ptl1_g7
-	ptl1_tick
-	ptl1_dmmu_sfar
-	ptl1_dmmu_sfsr
-	ptl1_dmmu_tag_access
-	ptl1_immu_sfsr
-	ptl1_immu_tag_access
-	ptl1_rwindow
-	ptl1_softint
-	ptl1_pstate
-	ptl1_pil
-	ptl1_cwp
-	ptl1_wstate
-	ptl1_otherwin
-	ptl1_cleanwin
-	ptl1_cansave
-	ptl1_canrestore
-
 ptl1_trapregs
 	ptl1_tl
 	ptl1_tt

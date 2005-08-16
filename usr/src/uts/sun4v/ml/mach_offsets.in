@@ -248,3 +248,35 @@ cpu_node	CPU_NODE_SIZE
 	ecache_size	ECACHE_SIZE
 	ecache_linesize	ECACHE_LINESIZE
 	device_id	DEVICE_ID
+
+ptl1_regs
+	ptl1_trap_regs
+	ptl1_gregs
+	ptl1_tick
+	ptl1_dmmu_type
+	ptl1_dmmu_addr
+	ptl1_dmmu_ctx
+	ptl1_immu_type
+	ptl1_immu_addr
+	ptl1_immu_ctx
+	ptl1_rwindow
+	ptl1_softint
+	ptl1_pstate
+	ptl1_pil
+	ptl1_cwp
+	ptl1_wstate
+	ptl1_otherwin
+	ptl1_cleanwin
+	ptl1_cansave
+	ptl1_canrestore
+
+ptl1_gregs
+	ptl1_gl
+	ptl1_g1
+	ptl1_g2
+	ptl1_g3
+	ptl1_g4
+	ptl1_g5
+	ptl1_g6
+	ptl1_g7
+

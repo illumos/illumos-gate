@@ -438,7 +438,7 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 		"unexpected error from hypervisor call", /* PTL1_BAD_HCALL */
 	};
 
-	uint_t reason = pstate->ptl1_regs.ptl1_g1;
+	uint_t reason = pstate->ptl1_regs.ptl1_gregs[0].ptl1_g1;
 	uint_t tl = pstate->ptl1_regs.ptl1_trap_regs[0].ptl1_tl;
 	struct trap_info ti = { 0 };
 

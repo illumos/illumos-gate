@@ -206,6 +206,7 @@ ptl1_showtrap(ptl1_state_t *pstate)
 {
 	ptl1_regs_t *rp = &pstate->ptl1_regs;
 	short i, j, maxtl = rp->ptl1_trap_regs[0].ptl1_tl;
+	short curgl = rp->ptl1_gregs[0].ptl1_gl;
 
 	printf("%%tl %%tpc              %%tnpc             %%tstate"
 	    "           %%tt\n");
@@ -213,24 +214,36 @@ ptl1_showtrap(ptl1_state_t *pstate)
 	for (i = maxtl - 1; i >= 0; i--) {
 		ptl1_trapregs_t *ptp = &rp->ptl1_trap_regs[i];
 		uint64_t tstate = ptp->ptl1_tstate;
-		uint32_t ccr, asi, cwp, pstate;
+		uint32_t gl, ccr, asi, cwp, pstate;
 
 		cwp = (tstate >> TSTATE_CWP_SHIFT) & TSTATE_CWP_MASK;
 		pstate = (tstate >> TSTATE_PSTATE_SHIFT) & TSTATE_PSTATE_MASK;
 		asi = (tstate >> TSTATE_ASI_SHIFT) & TSTATE_ASI_MASK;
 		ccr = (tstate >> TSTATE_CCR_SHIFT) & TSTATE_CCR_MASK;
+		gl = (tstate >> TSTATE_GL_SHIFT) & TSTATE_GL_MASK;
 
 		printf(" %d  %016" PRIx64 "  %016" PRIx64 "  %010" PRIx64
 		    "        %03x\n", ptp->ptl1_tl, ptp->ptl1_tpc,
 		    ptp->ptl1_tnpc, tstate, ptp->ptl1_tt);
-		printf("    %%ccr: %02x  %%asi: %02x  %%cwp: %x  "
-		    "%%pstate: %b\n", ccr, asi, cwp, pstate, PSTATE_BITS);
+		printf("    %%gl: %02x  %%ccr: %02x  %%asi: %02x  %%cwp: %x  "
+		    "%%pstate: %b\n", gl, ccr, asi, cwp, pstate, PSTATE_BITS);
 	}
 
-	printf("%%g0-3: %016x %016" PRIx64 " %016" PRIx64 " %016"
-	    PRIx64 "\n", 0, rp->ptl1_g1, rp->ptl1_g2, rp->ptl1_g3);
-	printf("%%g4-7: %016" PRIx64 " %016" PRIx64 " %016" PRIx64 " %016"
-	    PRIx64 "\n", rp->ptl1_g4, rp->ptl1_g5, rp->ptl1_g6, rp->ptl1_g7);
+	/*
+	 * ptl1_gregs[] array holds global registers for GL 0 through
+	 * current GL. Note that the current GL global registers are
+	 * always stored at index 0 in the ptl1_gregs[] array.
+	 */
+	for (i = 0; i <= curgl; i++) {
+		ptl1_gregs_t *pgp = &rp->ptl1_gregs[i];
+
+		printf("    %%gl: %02" PRIx64 "\n", pgp->ptl1_gl);
+		printf("%%g0-3: %016x %016" PRIx64 " %016" PRIx64 " %016"
+		    PRIx64 "\n", 0, pgp->ptl1_g1, pgp->ptl1_g2, pgp->ptl1_g3);
+		printf("%%g4-7: %016" PRIx64 " %016" PRIx64 " %016"
+		    PRIx64 " %016" PRIx64 "\n", pgp->ptl1_g4, pgp->ptl1_g5,
+		    pgp->ptl1_g6, pgp->ptl1_g7);
+	}
 
 	i = rp->ptl1_cwp;
 	j = rp->ptl1_canrestore;
