@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2655,7 +2656,7 @@ di_minor_private_set(di_minor_t minor, void *data)
 void *
 di_minor_private_get(di_minor_t minor)
 {
-	return ((void *)DI_MINOR(minor)->user_private_data);
+	return ((void *)(uintptr_t)DI_MINOR(minor)->user_private_data);
 }
 
 void
@@ -2667,7 +2668,7 @@ di_node_private_set(di_node_t node, void *data)
 void *
 di_node_private_get(di_node_t node)
 {
-	return ((void *)DI_NODE(node)->user_private_data);
+	return ((void *)(uintptr_t)DI_NODE(node)->user_private_data);
 }
 
 void
@@ -2679,7 +2680,7 @@ di_lnode_private_set(di_lnode_t lnode, void *data)
 void *
 di_lnode_private_get(di_lnode_t lnode)
 {
-	return ((void *)DI_LNODE(lnode)->user_private_data);
+	return ((void *)(uintptr_t)DI_LNODE(lnode)->user_private_data);
 }
 
 void
@@ -2691,7 +2692,7 @@ di_link_private_set(di_link_t link, void *data)
 void *
 di_link_private_get(di_link_t link)
 {
-	return ((void *)DI_LINK(link)->user_private_data);
+	return ((void *)(uintptr_t)DI_LINK(link)->user_private_data);
 }
 
 di_lnode_t
