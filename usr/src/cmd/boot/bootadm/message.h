@@ -267,11 +267,11 @@ the failsafe archive unbootable\n")
 
 #define	MKDIR_FAILED gettext("mkdir of %s failed: %s\n")
 
-#define	MOUNT_FAILED gettext("mount of %s (fstype %s) at %s failed: %s\n")
+#define	MOUNT_FAILED gettext("mount of %s (fstype %s) at %s failed\n")
 
 #define	RMDIR_FAILED gettext("rmdir of %s failed: %s\n")
 
-#define	UMOUNT_FAILED gettext("unmount of %s failed: %s\n")
+#define	UMOUNT_FAILED gettext("unmount of %s failed\n")
 
 #define	CANNOT_RESTORE_GRUB_SLICE gettext("cannot restore GRUB slice\n")
 

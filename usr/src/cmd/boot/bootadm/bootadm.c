@@ -58,8 +58,6 @@
 #include <grp.h>
 #include <device_info.h>
 
-#include <sys/mount.h>
-
 #include <libintl.h>
 #include <locale.h>
 
@@ -640,6 +638,7 @@ mount_grub_slice(int *mnted, char **physlice, int mode)
 	struct extmnttab mnt;
 	struct stat sb;
 	char buf[BAM_MAXLINE], dev[PATH_MAX], phys[PATH_MAX], fstype[32];
+	char cmd[PATH_MAX];
 	char *mntpt;
 	int p, l, f;
 	FILE *fp;
@@ -742,8 +741,11 @@ mount_grub_slice(int *mnted, char **physlice, int mode)
 		return (NULL);
 	}
 
-	if (mount(dev, mntpt, 0, fstype, NULL, 0, NULL, 0) != 0) {
-		bam_error(MOUNT_FAILED, dev, fstype, mntpt, strerror(errno));
+	(void) snprintf(cmd, sizeof (cmd), "/sbin/mount -F %s %s %s",
+	    fstype, dev, mntpt);
+
+	if (exec_cmd(cmd, NULL, 0) != 0) {
+		bam_error(MOUNT_FAILED, dev, fstype, mntpt);
 		if (rmdir(mntpt) != 0) {
 			bam_error(RMDIR_FAILED, mntpt, strerror(errno));
 		}
@@ -762,6 +764,8 @@ mount_grub_slice(int *mnted, char **physlice, int mode)
 static void
 umount_grub_slice(int mnted, char *mntpt, char *physlice)
 {
+	char cmd[PATH_MAX];
+
 	/*
 	 * If we have not dealt with GRUB slice
 	 * we have nothing to do - just return.
@@ -775,8 +779,10 @@ umount_grub_slice(int mnted, char *mntpt, char *physlice)
 	 * unmount it now.
 	 */
 	if (mnted) {
-		if (umount(mntpt) != 0) {
-			bam_error(UMOUNT_FAILED, mntpt, strerror(errno));
+		(void) snprintf(cmd, sizeof (cmd), "/sbin/umount %s",
+		    mntpt);
+		if (exec_cmd(cmd, NULL, 0) != 0) {
+			bam_error(UMOUNT_FAILED, mntpt);
 		}
 		if (rmdir(mntpt) != 0) {
 			bam_error(RMDIR_FAILED, mntpt, strerror(errno));
