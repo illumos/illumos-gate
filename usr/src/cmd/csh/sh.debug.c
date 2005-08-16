@@ -1,5 +1,5 @@
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,8 @@ FILE *trace;
  * Initialie trace file.
  * Called from main.
  */
-trace_init()
+void
+trace_init(void)
 {
 	extern char *mktemp();
 	char name[128];
@@ -44,6 +45,7 @@ trace_init()
  * write message to trace file
  */
 /*VARARGS1*/
+void
 tprintf(fmt,a,b,c,d,e,f,g,h,i,j)
      char *fmt;
 {

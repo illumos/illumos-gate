@@ -1,4 +1,4 @@
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
@@ -24,8 +24,8 @@ include ../../Makefile.cmd
 
 MBCHAR	= -DMBCHAR	# Define this line to include multibyte input support
 DEFS	=  -DVFORK -DFILEC -DBSD_COMP -DFIVE	# No TELL when MBCHAR
-CPPFLAGS= -I. -s $(DEFS) $(MBCHAR) $(CPPFLAGS.master)
-CPPFLAGS +=	-I ../../sh
+CPPFLAGS= -I. $(DEFS) $(MBCHAR) $(CPPFLAGS.master)
+CPPFLAGS +=	-I../../sh
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 LAZYLIBS = $(ZLAZYLOAD) -lsecdb $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -lsecdb
@@ -74,7 +74,7 @@ $(ROOTPFCSH): $(ROOTPROG)
 sh.tconst.h: ../sh.tconst.c ../make.sh.tconst.h.ed 	
 	$(RM) $@
 	ed ../sh.tconst.c < ../make.sh.tconst.h.ed 
-	
+
 $(HDDEP): sh.tconst.h
 
 install: all $(ROOTBINPROG)  $(ROOTPROG) $(ROOTPFCSH)

@@ -22,9 +22,13 @@
  * C Shell - directory management
  */
 
-struct	directory *dfind();
-tchar *dfollow();
-tchar *dcanon();
+struct directory	*dfind(tchar *);
+tchar	*dfollow(tchar *);
+tchar	*dcanon(tchar *, tchar *);
+void	dtildepr(tchar *, tchar *);
+void	dfree(struct directory *);
+void	dnewcwd(struct directory *);
+
 struct	directory dhead;		/* "head" of loop */
 int	printd;				/* force name to be printed */
 static tchar *fakev[] = { S_dirs, NOSTR };
@@ -32,11 +36,11 @@ static tchar *fakev[] = { S_dirs, NOSTR };
 /*
  * dinit - initialize current working directory
  */
-dinit(hp)
-     tchar *hp;
+void
+dinit(tchar *hp)
 {
-	register tchar *cp;
-	register struct directory *dp;
+	tchar *cp;
+	struct directory *dp;
 	tchar path[MAXPATHLEN];
 
 #ifdef TRACE
@@ -70,10 +74,10 @@ dinit(hp)
 /*
  * dodirs - list all directories in directory loop
  */
-dodirs(v)
-     tchar **v;
+void
+dodirs(tchar **v)
 {
-	register struct directory *dp;
+	struct directory *dp;
 	bool lflag;
 	tchar *hp = value(S_home);
 
@@ -102,8 +106,8 @@ dodirs(v)
 	printf("\n");
 }
 
-dtildepr(home, dir)
-	register tchar *home, *dir;
+void
+dtildepr(tchar *home, tchar *dir)
 {
 
 #ifdef TRACE
@@ -118,11 +122,11 @@ dtildepr(home, dir)
 /*
  * dochngd - implement chdir command.
  */
-dochngd(v)
-     tchar **v;
+void
+dochngd(tchar **v)
 {
-	register tchar *cp;
-	register struct directory *dp;
+	tchar *cp;
+	struct directory *dp;
 
 #ifdef TRACE
 	tprintf("TRACE- dochngd()\n");
@@ -159,10 +163,9 @@ flushcwd:
  * dfollow - change to arg directory; fall back on cdpath if not valid
  */
 tchar *
-dfollow(cp)
-	register tchar *cp;
+dfollow(tchar *cp)
 {
-	register tchar *dp;
+	tchar *dp;
 	struct varent *c;
 	int cdhashval, cdhashval1;
 	int index;
@@ -194,9 +197,9 @@ dfollow(cp)
 	    && !prefix(S_DOTDOTSLA /* "../" */, cp)
 	    && (c = adrof(S_cdpath))
             && ( !havhash2 || slash) ) {
-	 tchar **cdp;
-		register tchar *p;
-	 tchar buf[MAXPATHLEN];
+		tchar **cdp;
+		tchar *p;
+		tchar buf[MAXPATHLEN];
 
 		for (cdp = c->vec; *cdp; cdp++) {
 			for (dp = buf, p = *cdp; *dp++ = *p++;)
@@ -263,7 +266,7 @@ dfollow(cp)
 			 * checked manually
 			 */
 			else {
-				register tchar *p;
+				tchar *p;
 				tchar buf[MAXPATHLEN];
 
 				for (dp = buf, p = *pv; *dp++ = *p++; )
@@ -299,7 +302,7 @@ dfollow(cp)
 
 gotcha:
 	if (*cp != '/') {
-		register tchar *p, *q;
+		tchar *p, *q;
 		int cwdlen;
 		int len;
 
@@ -361,10 +364,10 @@ gotcha:
  *	with no arguments exchange top and second.
  *	with numeric argument (+n) bring it to top.
  */
-dopushd(v)
-     tchar **v;
+void
+dopushd(tchar **v)
 {
-	register struct directory *dp;
+	struct directory *dp;
 
 #ifdef TRACE
 	tprintf("TRACE- dopushd()\n");
@@ -387,7 +390,7 @@ dopushd(v)
 		if (chdir_(dp->di_name) < 0)
 			Perror(dp->di_name);
 	} else {
-		register tchar *cp;
+		tchar *cp;
 
 		cp = dfollow(*v);
 		dp = (struct directory *)calloc(sizeof (struct directory), 1);
@@ -405,12 +408,11 @@ dopushd(v)
  * dfind - find a directory if specified by numeric (+n) argument
  */
 struct directory *
-dfind(cp)
-	register tchar *cp;
+dfind(tchar *cp)
 {
-	register struct directory *dp;
-	register int i;
-	register tchar *ep;
+	struct directory *dp;
+	int i;
+	tchar *ep;
 
 #ifdef TRACE
 	tprintf("TRACE- dfind()\n");
@@ -437,10 +439,10 @@ dfind(cp)
  * dopopd - pop a directory out of the directory stack
  *	with a numeric argument just discard it.
  */
-dopopd(v)
-     tchar **v;
+void
+dopopd(tchar **v)
 {
-	register struct directory *dp, *p;
+	struct directory *dp, *p;
 
 #ifdef TRACE
 	tprintf("TRACE- dopopd()\n");
@@ -470,8 +472,8 @@ dopopd(v)
 /*
  * dfree - free the directory (or keep it if it still has ref count)
  */
-dfree(dp)
-	register struct directory *dp;
+void
+dfree(struct directory *dp)
 {
 
 #ifdef TRACE
@@ -492,13 +494,12 @@ dfree(dp)
  *	resulting pathname to contain no symbolic link components.
  */
 tchar *
-dcanon(cp, p)
-	register tchar *cp, *p;
+dcanon(tchar *cp, tchar *p)
 {
-	register tchar *sp;	/* rightmost component currently under
+	tchar *sp;	/* rightmost component currently under
 				   consideration */
-	register tchar *p1,	/* general purpose */
-			*p2;
+	tchar *p1,	/* general purpose */
+	    *p2;
 	bool slash, dotdot, hardpaths;
 
 #ifdef TRACE
@@ -717,8 +718,8 @@ dcanon(cp, p)
  * dnewcwd - make a new directory in the loop the current one
  *	and export its name to the PWD environment variable.
  */
-dnewcwd(dp)
-	register struct directory *dp;
+void
+dnewcwd(struct directory *dp)
 {
 
 #ifdef TRACE
@@ -732,7 +733,7 @@ dnewcwd(dp)
 	 * here to verify that dcwd->di_name really does
 	 * name the current directory.  Later...
 	 */
-#endif notdef
+#endif /* notdef */
 
 	didchdir=1;
 	set(S_cwd, savestr(dcwd->di_name));

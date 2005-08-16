@@ -1,5 +1,5 @@
 /*
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -22,10 +22,11 @@
 /*
  * C Shell
  */
+tchar	**blkcat(tchar **, tchar **);
+tchar	**blkend(tchar **);
 
-any(c, s)
-	register int c;
-	register tchar *s;
+int
+any(int c, tchar *s)
 {
 
 	while (s && *s)
@@ -34,8 +35,8 @@ any(c, s)
 	return (0);
 }
 
-onlyread(cp)
-	tchar *cp;
+int
+onlyread(tchar *cp)
 {
 	extern char end[];
 
@@ -46,9 +47,8 @@ onlyread(cp)
 /*
  * WARNING: changes here also need to occur in the XFREE macro in sh.h.
  */
-
-xfree(cp)
-	char *cp;
+void
+xfree(char *cp)
 {
 	extern char end[];
 
@@ -64,11 +64,10 @@ xfree(cp)
 }
 
 tchar *
-savestr(s)
-	register tchar *s;
+savestr(tchar *s)
 {
 	tchar *n;
-	register tchar *p;
+	tchar *p;
 
 	if (s == 0)
 		s = S_ /* "" */;
@@ -87,11 +86,9 @@ savestr(s)
 }
 
 void *
-calloc(i, j)
-	register unsigned i;
-	unsigned j;
+calloc(size_t i, size_t j)
 {
-	register char *cp;
+	char *cp;
 
 	i *= j;
 	cp = (char *)xalloc(i);
@@ -99,8 +96,8 @@ calloc(i, j)
 	return (cp);
 }
 
-nomem(i)
-	unsigned i;
+int
+nomem(unsigned i)
 {
 #ifdef debug
 	static tchar *av[2] = {0, 0};
@@ -122,8 +119,7 @@ nomem(i)
 }
 
 tchar **
-blkend(up)
-	register tchar **up;
+blkend(tchar **up)
 {
 
 	while (*up)
@@ -131,8 +127,8 @@ blkend(up)
 	return (up);
 }
 
-blkpr(av)
-	register tchar **av;
+void
+blkpr(tchar **av)
 {
 
 	for (; *av; av++) {
@@ -142,10 +138,10 @@ blkpr(av)
 	}
 }
 
-blklen(av)
-	register tchar **av;
+int
+blklen(tchar **av)
 {
-	register int i = 0;
+	int i = 0;
 
 	while (*av++)
 		i++;
@@ -153,11 +149,9 @@ blklen(av)
 }
 
 tchar **
-blkcpy(oav, bv)
-	tchar **oav;
-	register tchar **bv;
+blkcpy(tchar **oav, tchar **bv)
 {
-	register tchar **av = oav;
+	tchar **av = oav;
 
 	while (*av++ = *bv++)
 		continue;
@@ -165,18 +159,17 @@ blkcpy(oav, bv)
 }
 
 tchar **
-blkcat(up, vp)
-	tchar **up, **vp;
+blkcat(tchar **up, tchar **vp)
 {
 
 	(void) blkcpy(blkend(up), vp);
 	return (up);
 }
 
-blkfree(av0)
-	tchar **av0;
+void
+blkfree(tchar **av0)
 {
-	register tchar **av = av0;
+	tchar **av = av0;
 
 	for (; *av; av++)
 		XFREE(*av)
@@ -184,10 +177,9 @@ blkfree(av0)
 }
 
 tchar **
-saveblk(v)
-	register tchar **v;
+saveblk(tchar **v)
 {
-	register tchar **newv =
+	tchar **newv =
 		(tchar **) calloc((unsigned) (blklen(v) + 1),
 				sizeof (tchar **));
 	tchar **onewv = newv;
@@ -198,11 +190,10 @@ saveblk(v)
 }
 
 tchar *
-strspl(cp, dp)
-	tchar *cp, *dp;
+strspl(tchar *cp, tchar *dp)
 {
 	tchar *ep;
-	register tchar *p, *q;
+	tchar *p, *q;
 
 #ifndef m32
 	for (p = cp; *p++; )
@@ -227,10 +218,9 @@ strspl(cp, dp)
 }
 
 tchar **
-blkspl(up, vp)
-	register tchar **up, **vp;
+blkspl(tchar **up, tchar **vp)
 {
-	register tchar **wp =
+	tchar **wp =
 		(tchar **) calloc((unsigned) (blklen(up) + blklen(vp) + 1),
 			sizeof (tchar **));
 
@@ -238,8 +228,8 @@ blkspl(up, vp)
 	return (blkcat(wp, vp));
 }
 
-lastchr(cp)
-	register tchar *cp;
+int
+lastchr(tchar *cp)
 {
 
 	if (!*cp)
@@ -249,7 +239,8 @@ lastchr(cp)
 	return (*cp);
 }
 
-donefds()
+void
+donefds(void)
 {
 	(void) close(0);
 	(void) close(1);
@@ -269,8 +260,8 @@ donefds()
  * If j is -1 then we just want to get i to a safe place,
  * i.e. to a unit > 2.  This also happens in dcopy.
  */
-dmove(i, j)
-	register int i, j;
+int
+dmove(int i, int j)
 {
 	int fd;
 
@@ -289,8 +280,8 @@ dmove(i, j)
 	return (j);
 }
 
-dcopy(i, j)
-	register int i, j;
+int
+dcopy(int i, int j)
 {
 
 	int fd;
@@ -308,10 +299,10 @@ dcopy(i, j)
 	return (renum(i, j));
 }
 
-renum(i, j)
-	register int i, j;
+int
+renum(int i, int j)
 {
-	register int k = dup(i);
+	int k = dup(i);
 
 	if (k < 0)
 		return (-1);
@@ -328,9 +319,8 @@ renum(i, j)
 }
 
 #ifndef copy
-copy(to, from, size)
-	register tchar *to, *from;
-	register int size;
+void
+copy(tchar *to, tchar *from, int size)
 {
 
 	if (size)
@@ -345,19 +335,18 @@ copy(to, from, size)
  * the first c arguments.  Used in "shift" commands
  * as well as by commands like "repeat".
  */
-lshift(v, c)
-	register tchar **v;
-	register int c;
+void
+lshift(tchar **v, int c)
 {
-	register tchar **u = v;
+	tchar **u = v;
 
 	while (*u && --c >= 0)
-		xfree(*u++);
+		xfree((char *)*u++);
 	(void) blkcpy(v, u);
 }
 
-number(cp)
-	tchar *cp;
+int
+number(tchar *cp)
 {
 
 	if (*cp == '-') {
@@ -371,10 +360,9 @@ number(cp)
 }
 
 tchar **
-copyblk(v)
-	register tchar **v;
+copyblk(tchar **v)
 {
-	register tchar **nv =
+	tchar **nv =
 		(tchar **) calloc((unsigned) (blklen(v) + 1),
 				sizeof (tchar **));
 
@@ -382,8 +370,7 @@ copyblk(v)
 }
 
 tchar *
-strend(cp)
-	register tchar *cp;
+strend(tchar *cp)
 {
 
 	while (*cp)
@@ -392,26 +379,25 @@ strend(cp)
 }
 
 tchar *
-strip(cp)
-	tchar *cp;
+strip(tchar *cp)
 {
-	register tchar *dp = cp;
+	tchar *dp = cp;
 
 	while (*dp++ &= TRIM)
 		continue;
 	return (cp);
 }
 
-udvar(name)
-	tchar *name;
+void
+udvar(tchar *name)
 {
 
 	setname(name);
 	bferr("Undefined variable");
 }
 
-prefix(sub, str)
-	register tchar *sub, *str;
+int
+prefix(tchar *sub, tchar *str)
 {
 
 	for (;;) {
@@ -429,8 +415,7 @@ prefix(sub, str)
  */
 
 char **
-blkend_(up)
-	register char **up;
+blkend_(char **up)
 {
 
 	while (*up)
@@ -438,10 +423,10 @@ blkend_(up)
 	return (up);
 }
 
-blklen_(av)
-	register char **av;
+int
+blklen_(char **av)
 {
-	register int i = 0;
+	int i = 0;
 
 	while (*av++)
 		i++;
@@ -449,11 +434,9 @@ blklen_(av)
 }
 
 char **
-blkcpy_(oav, bv)
-	char **oav;
-	register char **bv;
+blkcpy_(char **oav, char **bv)
 {
-	register char **av = oav;
+	char **av = oav;
 
 	while (*av++ = *bv++)
 		continue;
@@ -461,8 +444,7 @@ blkcpy_(oav, bv)
 }
 
 char **
-blkcat_(up, vp)
-	char **up, **vp;
+blkcat_(char **up, char **vp)
 {
 
 	(void) blkcpy_(blkend_(up), vp);
@@ -470,10 +452,9 @@ blkcat_(up, vp)
 }
 
 char **
-blkspl_(up, vp)
-	register char **up, **vp;
+blkspl_(char **up, char **vp)
 {
-	register char **wp =
+	char **wp =
 		(char **) calloc((unsigned) (blklen_(up) + blklen_(vp) + 1),
 			sizeof (char **));
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -301,6 +301,7 @@ rindex_(tchar *sp, tchar c)
 /* Additional misc functions. */
 
 /* Calculate the display width of a string.  */
+int
 tswidth(tchar *ts)
 {
 #ifdef MBCHAR
@@ -844,7 +845,7 @@ atoi_(tchar *str)
 tchar *
 simple(tchar *s)
 {
-	register tchar *sname = s;
+	tchar *sname = s;
 
 	while (1) {
 		if (any('/', sname)) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,15 +52,20 @@ int	dolcnt;			/* Count of further words */
 tchar	dolmod;			/* : modifier character */
 int	dolmcnt;		/* :gx -> 10000, else 1 */
 
+void	Dfix2(tchar **);
+void	Dgetdol(void);
+void	setDolp(tchar *);
+void	unDredc(int);
+
 /*
  * Fix up the $ expansions and quotations in the
  * argument list to command t.
  */
-Dfix(t)
-	register struct command *t;
+void
+Dfix(struct command *t)
 {
-	register tchar **pp;
-	register tchar *p;
+	tchar **pp;
+	tchar *p;
 
 #ifdef TRACE
 	tprintf("TRACE- Dfix()\n");
@@ -83,8 +88,7 @@ Dfix(t)
  * $ substitute one word, for i/o redirection
  */
 tchar *
-Dfix1(cp)
-	register tchar *cp;
+Dfix1(tchar *cp)
 {
 	tchar *Dv[2];
 
@@ -107,8 +111,8 @@ Dfix1(cp)
 /*
  * Subroutine to do actual fixing after state initialization.
  */
-Dfix2(v)
-     tchar **v;
+void
+Dfix2(tchar **v)
 {
 	tchar *agargv[GAVSIZ];
 
@@ -130,13 +134,14 @@ Dfix2(v)
  * here is that we don't get a newline to terminate our expansion.
  * Rather, DgetC will return a DEOF when we hit the end-of-input.
  */
-Dword()
+int
+Dword(void)
 {
-	register int c, c1;
+	int c, c1;
 	static tchar *wbuf = NULL;
 	static int wbufsiz = BUFSIZ;
-	register int wp = 0;
-	register bool dolflg;
+	int wp = 0;
+	bool dolflg;
 	bool sofar = 0;
 #define	DYNAMICBUFFER() \
 	do { \
@@ -270,10 +275,10 @@ ret:
  * Any QUOTES character which is returned from a $ expansion is
  * QUOTEd so that it will not be recognized above.
  */
-DgetC(flag)
-	register int flag;
+int
+DgetC(int flag)
 {
-	register int c;
+	int c;
 
 top:
 	if (c = Dpeekc) {
@@ -326,10 +331,11 @@ struct	varent nulargv = { nulvec, S_argv, 0 };
  * Handle the multitudinous $ expansion forms.
  * Ugh.
  */
-Dgetdol()
+void
+Dgetdol(void)
 {
-	register tchar *np;
-	register struct varent *vp;
+	tchar *np;
+	struct varent *vp;
 	tchar name[MAX_VREF_LEN];
 	int c, sc;
 	int subscr = 0, lwb = 1, upb = 0;
@@ -474,7 +480,7 @@ syntax:
 		if (!*np)
 			goto syntax;
 		if (digit(*np)) {
-			register int i = 0;
+			int i = 0;
 
 			while (digit(*np))
 				i = i * 10 + *np++ - '0';
@@ -493,7 +499,7 @@ oob:
 		else if (*np != '-')
 			goto syntax;
 		else {
-			register int i = upb;
+			int i = upb;
 
 			np++;
 			if (digit(*np)) {
@@ -553,10 +559,10 @@ eatbrac:
 	}
 }
 
-setDolp(cp)
-	register tchar *cp;
+void
+setDolp(tchar *cp)
 {
-	register tchar *dp;
+	tchar *dp;
 
 #ifdef TRACE
 	tprintf("TRACE- setDolp()\n");
@@ -575,16 +581,17 @@ setDolp(cp)
 	dolp = S_/*""*/;
 }
 
-unDredc(c)
-	int c;
+void
+unDredc(int c)
 {
 
 	Dpeekrd = c;
 }
 
+int
 Dredc()
 {
-	register int c;
+	int c;
 
 	if (c = Dpeekrd) {
 		Dpeekrd = 0;
@@ -600,8 +607,8 @@ Dredc()
 	return (' ');
 }
 
-Dtestq(c)
-	register int c;
+void
+Dtestq(int c)
 {
 
 	if (cmap(c, QUOTES))
@@ -613,14 +620,14 @@ Dtestq(c)
  * of the shell input up to a line the same as "term".
  * Unit 0 should have been closed before this call.
  */
-heredoc(term)
-     tchar *term;
+void
+heredoc(tchar *term)
 {
-	register int c;
+	int c;
 	tchar *Dv[2];
 	tchar obuf[BUFSIZ], lbuf[BUFSIZ], mbuf[BUFSIZ];
 	int ocnt, lcnt, mcnt;
-	register tchar *lbp, *obp, *mbp;
+	tchar *lbp, *obp, *mbp;
 	tchar **vp;
 	bool quoted;
 	tchar shtemp[] = {'/', 't', 'm', 'p', '/', 's', 'h', 'X', 'X', 'X',

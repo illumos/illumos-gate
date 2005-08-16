@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,14 +50,15 @@ struct limits {
 	-1,		0,
 };
 
+
 static int getval(struct limits *lp, tchar **v, rlim_t *);
-void islogin();
-int dolabel();
+void islogin(void);
+int dolabel(void);
 void reexecute(struct command *kp);
-void preread_();
-void doagain();
-void toend();
-void wfree();
+void preread_(void);
+void doagain(void);
+void toend(void);
+void wfree(void);
 void echo(tchar sep, tchar **v);
 void local_setenv(tchar *name, tchar *val);
 void local_unsetenv(tchar *name);
@@ -71,8 +72,7 @@ void search();
  * C shell
  */
 
-struct
-biltins *
+struct biltins *
 isbfunc(struct command *t)
 {
 	tchar *cp = t->t_dcom[0];
@@ -141,12 +141,12 @@ func(struct command *t, struct biltins *bp)
 }
 
 int
-dolabel()
+dolabel(void)
 {
 #ifdef TRACE
 	tprintf("TRACE- dolabel()\n");
 #endif
-
+	return (0);
 }
 
 void
@@ -182,7 +182,7 @@ doonintr(tchar **v)
 }
 
 void
-donohup()
+donohup(void)
 {
 
 #ifdef TRACE
@@ -200,13 +200,13 @@ donohup()
 }
 
 void
-dozip()
+dozip(void)
 {
 	;
 }
 
 void
-prvars()
+prvars(void)
 {
 #ifdef TRACE
 	tprintf("TRACE- prvars()\n");
@@ -254,7 +254,7 @@ unalias(tchar **v)
 }
 
 void
-dologout()
+dologout(void)
 {
 
 #ifdef TRACE
@@ -312,7 +312,7 @@ donewgrp(tchar **v)
 #endif
 
 void
-islogin()
+islogin(void)
 {
 
 #ifdef TRACE
@@ -391,7 +391,7 @@ reexecute(struct command *kp)
 }
 
 void
-doelse()
+doelse(void)
 {
 
 #ifdef TRACE
@@ -455,7 +455,7 @@ syntax:
 }
 
 void
-dobreak()
+dobreak(void)
 {
 
 #ifdef TRACE
@@ -585,7 +585,7 @@ dowhile(tchar **v)
 }
 
 void
-preread_()
+preread_(void)
 {
 #ifdef TRACE
 	tprintf("TRACE- preread()\n");
@@ -603,7 +603,7 @@ preread_()
 }
 
 void
-doend()
+doend(void)
 {
 
 #ifdef TRACE
@@ -617,7 +617,7 @@ doend()
 }
 
 void
-docontin()
+docontin(void)
 {
 #ifdef TRACE
 	tprintf("TRACE- docontin()\n");
@@ -630,7 +630,7 @@ docontin()
 }
 
 void
-doagain()
+doagain(void)
 {
 
 #ifdef TRACE
@@ -681,7 +681,7 @@ dorepeat(tchar **v, struct command *kp)
 }
 
 void
-doswbrk()
+doswbrk(void)
 {
 
 #ifdef TRACE
@@ -924,10 +924,12 @@ past:
 		bferr("label not found");
 	}
 	/*NOTREACHED*/
+
+	return (0);
 }
 
 void
-toend()
+toend(void)
 {
 
 #ifdef TRACE
@@ -943,7 +945,7 @@ toend()
 }
 
 void
-wfree()
+wfree(void)
 {
 	long o = btell();
 
@@ -1192,7 +1194,7 @@ local_setenv(tchar *name, tchar *val)
 	blk[0] = tstostr(NULL, ep_);
 	blk[1] = 0;
 	xfree(ep_);
-	environ = (char **)blkspl_((unsigned char **)environ, blk);
+	environ = (char **)blkspl_((char **)environ, blk);
 	xfree((void *)oep);
 	local_setenv(name, val);
 }
@@ -1205,7 +1207,7 @@ local_unsetenv(tchar *name)
 	char *dp;
 	char **oep = ep;
 	char *cp_;	/* tmp use */
-	static cnt = 0;	/* delete counter */
+	static int cnt = 0;	/* delete counter */
 
 #ifdef TRACE
 	tprintf("TRACE- local_unsetenv()\n");
@@ -1242,7 +1244,7 @@ local_unsetenv(tchar *name)
 		}
 		cp_ = *ep;
 		*ep = 0;
-		environ = (char **)blkspl_((unsigned char **)environ, ep+1);
+		environ = (char **)blkspl_((char **)environ, ep+1);
 		*ep = cp_;
 		xfree(cp_);
 		xfree((void *)oep);

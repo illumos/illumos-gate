@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,20 @@
  * of input buffering, and especially because of history substitution.
  */
 
-tchar *word();
+tchar	*word(void);
+tchar	getC1(int);
+tchar	*subword(tchar *, int, bool *);
+void	getdol(void);
+void	addla(tchar *);
+void	getexcl(tchar);
+void	noev(tchar *);
+void	setexclp(tchar *);
+void	unreadc(tchar);
+int	readc(bool);
+struct wordent	*dosub(int, struct wordent *, bool);
+struct Hist	*findev(tchar *, bool);
+struct wordent	*gethent(int);
+struct wordent	*getsub(struct wordent *);
 
 /*
  * Peekc is a peek characer for getC, peekread for readc.
@@ -71,10 +84,10 @@ tchar getCtmp;
 #define	ungetC(c)	peekc = c
 #define	ungetD(c)	peekd = c
 
-lex(hp)
-	register struct wordent *hp;
+bool
+lex(struct wordent *hp)
 {
-	register struct wordent *wdp;
+	struct wordent *wdp;
 	int c;
 
 #ifdef TRACE
@@ -100,7 +113,7 @@ lex(hp)
 	 * interrupted.
 	 */
 	do {
-		register struct wordent *new = (struct wordent *) xalloc(sizeof *wdp);
+		struct wordent *new = (struct wordent *) xalloc(sizeof *wdp);
 
 		new->word = 0;
 		new->prev = wdp;
@@ -116,10 +129,10 @@ lex(hp)
 	return (hadhist);
 }
 
-prlex(sp0)
-	struct wordent *sp0;
+void
+prlex(struct wordent *sp0)
 {
-	register struct wordent *sp = sp0->next;
+	struct wordent *sp = sp0->next;
 
 #ifdef TRACE
 	tprintf("TRACE- prlex()\n");
@@ -134,11 +147,10 @@ prlex(sp0)
 	}
 }
 
-copylex(hp, fp)
-	register struct wordent *hp;
-	register struct wordent *fp;
+void
+copylex(struct wordent *hp, struct wordent *fp)
 {
-	register struct wordent *wdp;
+	struct wordent *wdp;
 
 #ifdef TRACE
 	tprintf("TRACE- copylex()\n");
@@ -146,7 +158,7 @@ copylex(hp, fp)
 	wdp = hp;
 	fp = fp->next;
 	do {
-		register struct wordent *new = (struct wordent *) xalloc(sizeof *wdp);
+		struct wordent *new = (struct wordent *) xalloc(sizeof *wdp);
 
 		new->prev = wdp;
 		new->next = hp;
@@ -158,10 +170,10 @@ copylex(hp, fp)
 	hp->prev = wdp;
 }
 
-freelex(vp)
-	register struct wordent *vp;
+void
+freelex(struct wordent *vp)
 {
-	register struct wordent *fp;
+	struct wordent *fp;
 
 #ifdef TRACE
 	tprintf("TRACE- freelex()\n");
@@ -176,13 +188,13 @@ freelex(vp)
 }
 
 tchar *
-word()
+word(void)
 {
-	register tchar c, c1;
-	register tchar *wp;
+	tchar c, c1;
+	tchar *wp;
 	tchar wbuf[BUFSIZ];
-	register bool dolflg;
-	register int i;
+	bool dolflg;
+	int i;
 
 #ifdef TRACE
 	tprintf("TRACE- word()\n");
@@ -299,10 +311,10 @@ ret:
 	return (savestr(wbuf));
 }
 
-getC1(flag)
-	register int flag;
+tchar
+getC1(int flag)
 {
-	register tchar c;
+	tchar c;
 
 top:
 	if (c = peekc) {
@@ -358,11 +370,12 @@ top:
 	return (c);
 }
 
-getdol()
+void
+getdol(void)
 {
-	register tchar *np, *p;
+	tchar *np, *p;
 	tchar name[MAX_VREF_LEN];
-	register int c;
+	int c;
 	int sc;
 	bool special = 0;
 
@@ -463,8 +476,8 @@ vsyn:
 	goto ret;
 }
 
-addla(cp)
-	tchar *cp;
+void
+addla(tchar *cp)
 {
 	tchar *buf;
 	int len = 0;
@@ -494,12 +507,12 @@ tchar	slhs[32];
 tchar	rhsb[64];
 int	quesarg;
 
-getexcl(sc)
-	tchar sc;
+void
+getexcl(tchar sc)
 {
-	register struct wordent *hp, *ip;
+	struct wordent *hp, *ip;
 	int left, right, dol;
-	register int c;
+	int c;
 
 #ifdef TRACE
 	tprintf("TRACE- getexcl()\n");
@@ -575,12 +588,11 @@ subst:
 }
 
 struct wordent *
-getsub(en)
-	struct wordent *en;
+getsub(struct wordent *en)
 {
-	register tchar *cp;
+	tchar *cp;
 	int delim;
-	register int c;
+	int c;
 	int sc;
 	bool global = 0;
 	tchar orhsb[(sizeof rhsb)/(sizeof rhsb[0])];
@@ -707,23 +719,20 @@ ret:
 }
 
 struct wordent *
-dosub(sc, en, global)
-	int sc;
-	struct wordent *en;
-	bool global;
+dosub(int sc, struct wordent *en, bool global)
 {
 	struct wordent lex;
 	bool didsub = 0;
 	struct wordent *hp = &lex;
-	register struct wordent *wdp;
-	register int i = exclc;
+	struct wordent *wdp;
+	int i = exclc;
 
 #ifdef TRACE
 	tprintf("TRACE- dosub()\n");
 #endif
 	wdp = hp;
 	while (--i >= 0) {
-		register struct wordent *new = (struct wordent *) calloc(1, sizeof *wdp);
+		struct wordent *new = (struct wordent *) calloc(1, sizeof *wdp);
 
 		new->prev = wdp;
 		new->next = hp;
@@ -740,14 +749,11 @@ dosub(sc, en, global)
 }
 
 tchar *
-subword(cp, type, adid)
-	tchar *cp;
-	int type;
-	bool *adid;
+subword(tchar *cp, int type, bool *adid)
 {
 	tchar wbuf[BUFSIZ];
-	register tchar *wp, *mp, *np;
-	register int i;
+	tchar *wp, *mp, *np;
+	int i;
 
 #ifdef TRACE
 	tprintf("TRACE- subword()\n");
@@ -812,12 +818,10 @@ ovflo:
 }
 
 tchar *
-domod(cp, type)
-	tchar *cp;
-	int type;
+domod(tchar *cp, int type)
 {
-	register tchar *wp, *xp;
-	register int c;
+	tchar *wp, *xp;
+	int c;
 
 #ifdef TRACE
 	tprintf("TRACE- domod()\n");
@@ -861,8 +865,8 @@ domod(cp, type)
 	return (0);
 }
 
-matchs(str, pat)
-	register tchar *str, *pat;
+int
+matchs(tchar *str, tchar *pat)
 {
 
 #ifdef TRACE
@@ -873,12 +877,11 @@ matchs(str, pat)
 	return (*pat == 0);
 }
 
-getsel(al, ar, dol)
-	register int *al, *ar;
-	int dol;
+int
+getsel(int *al, int *ar, int dol)
 {
-	register int c = getC(0);
-	register int i;
+	int c = getC(0);
+	int i;
 	bool first = *al < 0;
 
 #ifdef TRACE
@@ -962,12 +965,11 @@ bad:
 }
 
 struct wordent *
-gethent(sc)
-	int sc;
+gethent(int sc)
 {
-	register struct Hist *hp;
-	register tchar *np;
-	register int c;
+	struct Hist *hp;
+	tchar *np;
+	int c;
 	int event;
 	bool back = 0;
 
@@ -1078,19 +1080,17 @@ skip:
 }
 
 struct Hist *
-findev(cp, anyarg)
-	tchar *cp;
-	bool anyarg;
+findev(tchar *cp, bool anyarg)
 {
-	register struct Hist *hp;
+	struct Hist *hp;
 
 #ifdef TRACE
 	tprintf("TRACE- findev()\n");
 #endif
 	for (hp = Histlist.Hnext; hp; hp = hp->Hnext) {
-	 tchar *dp;
-		register tchar *p, *q;
-		register struct wordent *lp = hp->Hlex.next;
+		tchar *dp;
+		tchar *p, *q;
+		struct wordent *lp = hp->Hlex.next;
 		int argno = 0;
 
 		if (lp->word[0] == '\n')
@@ -1123,8 +1123,8 @@ findev(cp, anyarg)
 	return (0);
 }
 
-noev(cp)
-	tchar *cp;
+void
+noev(tchar *cp)
 {
 
 #ifdef TRACE
@@ -1133,8 +1133,8 @@ noev(cp)
 	seterr2(cp, ": Event not found");
 }
 
-setexclp(cp)
-	register tchar *cp;
+void
+setexclp(tchar *cp)
 {
 
 #ifdef TRACE
@@ -1145,18 +1145,18 @@ setexclp(cp)
 	exclp = cp;
 }
 
-unreadc(c)
-	tchar c;
+void
+unreadc(tchar c)
 {
 
 	peekread = c;
 }
 
-readc(wanteof)
-	bool wanteof;
+int
+readc(bool wanteof)
 {
-	register int c;
-	static sincereal;
+	int c;
+	static int sincereal;
 
 	if (c = peekread) {
 		peekread = 0;
@@ -1259,12 +1259,13 @@ oops:
 	return (c);
 }
 
-bgetc()
+int
+bgetc(void)
 {
-	register int buf, off, c;
+	int buf, off, c;
 #ifdef FILEC
 	tchar ttyline[BUFSIZ];
-	register int numleft = 0, roomleft;
+	int numleft = 0, roomleft;
 #endif
 
 #ifdef TELL
@@ -1290,7 +1291,7 @@ bgetc()
 again:
 	buf = (int) fseekp / BUFSIZ;
 	if (buf >= fblocks) {
-		register tchar **nfbuf =
+		tchar **nfbuf =
 			 (tchar **) calloc((unsigned) (fblocks + 2),
 				sizeof  (tchar **));
 
@@ -1350,9 +1351,10 @@ again:
 	return (c);
 }
 
-bfree()
+void	
+bfree(void)
 {
-	register int sb, i;
+	int sb, i;
 
 #ifdef TELL
 	if (cantell)
@@ -1371,10 +1373,10 @@ bfree()
 	}
 }
 
-bseek(l)
-	off_t l;
+void
+bseek(off_t l)
 {
-	register struct whyle *wp;
+	struct whyle *wp;
 
 	fseekp = l;
 #ifdef TELL
@@ -1394,14 +1396,15 @@ bseek(l)
 /* any similarity to bell telephone is purely accidental */
 #ifndef btell
 off_t
-btell()
+btell(void)
 {
 
 	return (fseekp);
 }
 #endif
 
-btoeof()
+void
+btoeof(void)
 {
 
 	(void) lseek(SHIN, (off_t)0, 2);
@@ -1411,7 +1414,8 @@ btoeof()
 }
 
 #ifdef TELL
-settell()
+void
+settell(void)
 {
 
 	cantell = 0;

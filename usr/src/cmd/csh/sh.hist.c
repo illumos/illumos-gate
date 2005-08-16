@@ -1,5 +1,5 @@
 /*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -17,15 +17,20 @@
 #include "sh.h"
 #include "sh.tconst.h"
 
+struct Hist *enthist(int, struct wordent *, bool);
+void	hfree(struct Hist *);
+void	dohist1(struct Hist *, int *, int, int);
+void	phist(struct Hist *, int);
+
 /*
  * C shell
  */
 
-savehist(sp)
-	struct wordent *sp;
+void
+savehist(struct wordent *sp)
 {
-	register struct Hist *hp, *np;
-	register int histlen = 0;
+	struct Hist *hp, *np;
+	int histlen = 0;
 	tchar *cp;
 
 #ifdef TRACE
@@ -36,7 +41,7 @@ savehist(sp)
 		return;
 	cp = value(S_history /*"history"*/);
 	if (*cp) {
-		register tchar *p = cp;
+		tchar *p = cp;
 
 		while (*p) {
 			if (!digit(*p)) {
@@ -55,12 +60,9 @@ savehist(sp)
 }
 
 struct Hist *
-enthist(event, lp, docopy)
-	int event;
-	register struct wordent *lp;
-	bool docopy;
+enthist(int event, struct wordent *lp, bool docopy)
 {
-	register struct Hist *np;
+	struct Hist *np;
 
 #ifdef TRACE
 	tprintf("TRACE- enthist()\n");
@@ -80,8 +82,8 @@ enthist(event, lp, docopy)
 	return (np);
 }
 
-hfree(hp)
-	register struct Hist *hp;
+void
+hfree(struct Hist *hp)
 {
 #ifdef TRACE
 	tprintf("TRACE- hfree()\n");
@@ -91,8 +93,8 @@ hfree(hp)
 	xfree( (tchar *)hp);
 }
 
-dohist(vp)
-	tchar **vp;
+void
+dohist(tchar **vp)
 {
 	int n, rflg = 0, hflg = 0;
 #ifdef TRACE
@@ -128,9 +130,8 @@ dohist(vp)
 	dohist1(Histlist.Hnext, &n, rflg, hflg);
 }
 
-dohist1(hp, np, rflg, hflg)
-	struct Hist *hp;
-	int *np, rflg, hflg;
+void
+dohist1(struct Hist *hp, int *np, int rflg, int hflg)
 {
 	bool print = (*np) > 0;
 #ifdef TRACE
@@ -153,9 +154,8 @@ top:
 	goto top;
 }
 
-phist(hp, hflg)
-	register struct Hist *hp;
-	int hflg;
+void
+phist(struct Hist *hp, int hflg)
 {
 #ifdef TRACE
 	tprintf("TRACE- phist()\n");

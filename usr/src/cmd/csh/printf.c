@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,8 @@ printf(const char *format, ...)
 	va_start(stupid, format);
 	_print(p, &stupid);
 	va_end(stupid);
+
+	return (0);
 }
 
 /*

@@ -1,5 +1,5 @@
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -21,14 +21,26 @@
  * C shell
  */
 
+void	asyntax(struct wordent *, struct wordent *);
+void	asyn0(struct wordent *, struct wordent *);
+void	asyn3(struct wordent *, struct wordent *);
+void	chr_blkfree(char **);
+struct command	*syn0(struct wordent *, struct wordent *, int);
+struct command	*syn1(struct wordent *, struct wordent *, int);
+struct command	*syn1a(struct wordent *, struct wordent *, int);
+struct command	*syn1b(struct wordent *, struct wordent *, int);
+struct command	*syn2(struct wordent *, struct wordent *, int);
+struct command	*syn3(struct wordent *, struct wordent *, int);
+struct wordent	*freenod(struct wordent *, struct wordent *);
+
 /*
  * Perform aliasing on the word list lex
  * Do a (very rudimentary) parse to separate into commands.
  * If word 0 of a command has an alias, do it.
  * Repeat a maximum of 20 times.
  */
-alias(lex)
-	register struct wordent *lex;
+void
+alias(struct wordent *lex)
 {
 	int aleft = 21;
 	jmp_buf osetexit;
@@ -48,8 +60,8 @@ alias(lex)
 	resexit(osetexit);
 }
 
-asyntax(p1, p2)
-	register struct wordent *p1, *p2;
+void
+asyntax(struct wordent *p1, struct wordent *p2)
 {
 #ifdef TRACE
 	tprintf("TRACE- asyntax()\n");
@@ -67,12 +79,11 @@ asyntax(p1, p2)
 		}
 }
 
-asyn0(p1, p2)
-	struct wordent *p1;
-	register struct wordent *p2;
+void
+asyn0(struct wordent *p1, struct wordent *p2)
 {
-	register struct wordent *p;
-	register int l = 0;
+	struct wordent *p;
+	int l = 0;
 
 #ifdef TRACE
 	tprintf("TRACE- asyn0()\n");
@@ -109,13 +120,12 @@ asyn0(p1, p2)
 		asyn3(p1, p2);
 }
 
-asyn3(p1, p2)
-	struct wordent *p1;
-	register struct wordent *p2;
+void
+asyn3(struct wordent *p1, struct wordent *p2)
 {
-	register struct varent *ap;
+	struct varent *ap;
 	struct wordent alout;
-	register bool redid;
+	bool redid;
 
 #ifdef TRACE
 	tprintf("TRACE- asyn3()\n");
@@ -163,10 +173,9 @@ asyn3(p1, p2)
 }
 
 struct wordent *
-freenod(p1, p2)
-	register struct wordent *p1, *p2;
+freenod(struct wordent *p1, struct wordent *p2)
 {
-	register struct wordent *retp = p1->prev;
+	struct wordent *retp = p1->prev;
 
 #ifdef TRACE
 	tprintf("TRACE- freenod()\n");
@@ -192,9 +201,7 @@ freenod(p1, p2)
  *	syn0
  */
 struct command *
-syntax(p1, p2, flags)
-	register struct wordent *p1, *p2;
-	int flags;
+syntax(struct wordent *p1, struct wordent *p2, int flags)
 {
 #ifdef TRACE
 	tprintf("TRACE- syntax()\n");
@@ -217,12 +224,10 @@ syntax(p1, p2, flags)
  *	syn1 & syntax
  */
 struct command *
-syn0(p1, p2, flags)
-	struct wordent *p1, *p2;
-	int flags;
+syn0(struct wordent *p1, struct wordent *p2, int flags)
 {
-	register struct wordent *p;
-	register struct command *t, *t1;
+	struct wordent *p;
+	struct command *t, *t1;
 	int l;
 
 #ifdef TRACE
@@ -287,12 +292,10 @@ syn0(p1, p2, flags)
  *	syn1a ; syntax
  */
 struct command *
-syn1(p1, p2, flags)
-	struct wordent *p1, *p2;
-	int flags;
+syn1(struct wordent *p1, struct wordent *p2, int flags)
 {
-	register struct wordent *p;
-	register struct command *t;
+	struct wordent *p;
+	struct command *t;
 	int l;
 
 #ifdef TRACE
@@ -331,13 +334,11 @@ syn1(p1, p2, flags)
  *	syn1b || syn1a
  */
 struct command *
-syn1a(p1, p2, flags)
-	struct wordent *p1, *p2;
-	int flags;
+syn1a(struct wordent *p1, struct wordent *p2, int flags)
 {
-	register struct wordent *p;
-	register struct command *t;
-	register int l = 0;
+	struct wordent *p;
+	struct command *t;
+	int l = 0;
 
 #ifdef TRACE
 	tprintf("TRACE- syn1a()\n");
@@ -375,13 +376,11 @@ syn1a(p1, p2, flags)
  *	syn2 && syn1b
  */
 struct command *
-syn1b(p1, p2, flags)
-	struct wordent *p1, *p2;
-	int flags;
+syn1b(struct wordent *p1, struct wordent *p2, int flags)
 {
-	register struct wordent *p;
-	register struct command *t;
-	register int l = 0;
+	struct wordent *p;
+	struct command *t;
+	int l = 0;
 
 #ifdef TRACE
 	tprintf("TRACE- syn1b()\n");
@@ -419,13 +418,11 @@ syn1b(p1, p2, flags)
  *	syn3 |& syn2
  */
 struct command *
-syn2(p1, p2, flags)
-	struct wordent *p1, *p2;
-	int flags;
+syn2(struct wordent *p1, struct wordent *p2, int flags)
 {
-	register struct wordent *p, *pn;
-	register struct command *t;
-	register int l = 0;
+	struct wordent *p, *pn;
+	struct command *t;
+	int l = 0;
 	int f;
 
 #ifdef TRACE
@@ -473,14 +470,12 @@ tchar RELPAR[] = {'<', '>', '(', ')', 0};	/* "<>()" */
  *	KEYWORD = (@ exit foreach if set switch test while)
  */
 struct command *
-syn3(p1, p2, flags)
-	struct wordent *p1, *p2;
-	int flags;
+syn3(struct wordent *p1, struct wordent *p2, int flags)
 {
-	register struct wordent *p;
+	struct wordent *p;
 	struct wordent *lp, *rp;
-	register struct command *t;
-	register int l;
+	struct command *t;
+	int l;
 	tchar **av;
 	int n, c;
 	bool specp = 0;
@@ -647,8 +642,8 @@ savep:
 	return (t);
 }
 
-freesyn(t)
-	register struct command *t;
+void
+freesyn(struct command *t)
 {
 #ifdef TRACE
 	tprintf("TRACE- freesyn()\n");
@@ -685,10 +680,10 @@ lr:
 }
 
 
-chr_blkfree(vec)
-register char **vec;
+void
+chr_blkfree(char **vec)
 {
-	register char **av;
+	char **av;
 
 	for (av = vec; *av; av++)
 		xfree(*av);

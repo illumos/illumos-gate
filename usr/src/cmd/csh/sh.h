@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,7 +101,6 @@ typedef unsigned short int	tchar;
 #endif/*!MBCHAR*/
 #define	eq(a, b)	(strcmp_(a, b) == 0)
 
-extern	int	Putchar(tchar);
 
 /*
  * Global flags
@@ -228,7 +227,7 @@ struct	Bin {
 #define btell()	fseekp
 
 #ifndef btell
-off_t	btell();
+off_t	btell(void);
 #endif
 
 /*
@@ -422,9 +421,9 @@ short	gflag;				/* After tglob -> is globbing needed? */
  */
 #ifdef	notyet
 #define	GAVSIZ	(NCARGS / 6)
-#else	notyet
+#else	/* notyet */
 #define	GAVSIZ	(10240 / 6)
-#endif	notyet
+#endif	/* notyet */
 
 /*
  * Variables for filename expansion
@@ -493,72 +492,39 @@ void	*alloctmp;
 #define xalloc(i) ((alloctmp = (void *)malloc(i)) ? alloctmp : (void *)nomem(i))/*??*/
 #define	xrealloc(buf, i) ((alloctmp = (void *)realloc(buf, i)) ? alloctmp : \
 				(void *)nomem(i))
-
-tchar	*Dfix1();
-tchar	**blkcat();
-tchar	**blkcpy();
-tchar	**blkend();
-tchar	**blkspl();
-char	**blkspl_();
-void	*malloc(); 
-tchar	*cname();
-tchar	**copyblk();
-tchar	**dobackp();
-tchar	*domod();
-struct	wordent *dosub();
-tchar	*exp3();
-tchar	*exp3a();
-tchar	*exp4();
-tchar	*exp5();
-tchar	*exp6();
-struct	Hist *enthist();
-struct	Hist *findev();
-struct	wordent *freenod();
-char	*getenv();
-tchar	*getenv_(/* tchar * */);
-tchar	*getenvs_(/* char * */);
-tchar	*getinx();
-struct	varent *getvx();
-struct	passwd *getpwnam();
-struct	wordent *gethent();
-struct	wordent *getsub();
-char	*getwd();
-tchar	*getwd_();
-tchar	**glob();
-tchar	*globone();
-char	*index();
-tchar	*index_();
-struct	biltins *isbfunc();
-off_t	lseek();
-tchar	*operate();
-void	phup();
-void	pintr();
-void	pchild();
-tchar	*putn();
-char	*rindex();
-tchar	*rindex_();
-tchar	**saveblk();
-tchar	*savestr();
-char	*strcat();
-tchar	*strcat_();
-int		strlen_(tchar *);
-char	*strcpy();
-tchar	*strcpy_();
-tchar	*strend();
-tchar	*strip();
-tchar	*strspl();
-tchar	*subword();
-struct	command *syntax();
-struct	command *syn0();
-struct	command *syn1();
-struct	command *syn1a();
-struct	command *syn1b();
-struct	command *syn2();
-struct	command *syn3();
-tchar	*value1();
-tchar	*xhome();
-tchar	*xname();
-tchar	*xset();
+extern void	Putchar(tchar);
+extern void	bferr(char *)	__NORETURN;
+extern void	error()	__NORETURN;
+extern void	exitstat(void)	__NORETURN;
+extern tchar	*Dfix1(tchar *);
+extern tchar	**blkcpy(tchar **, tchar **);
+extern tchar	**blkspl(tchar **, tchar **);
+extern char	**blkspl_(char **, char **);
+extern tchar	**copyblk(tchar **);
+extern tchar	**dobackp(tchar *, bool);
+extern tchar	*domod(tchar *, int);
+extern struct	Hist *enthist(int, struct wordent *, bool);
+extern tchar	*getenv_(tchar *);
+extern tchar	*getenvs_(char *);
+extern tchar	*getwd_(tchar *);
+extern tchar	**glob(tchar **);
+extern tchar	*globone(tchar *);
+extern tchar	*index_(tchar *, tchar);
+extern struct biltins	*isbfunc(struct command *);
+extern void	pintr(void);
+extern void	pchild(void);
+extern tchar	*putn(int);
+extern tchar	*rindex_(tchar *, tchar);
+extern tchar	**saveblk(tchar **);
+extern tchar	*savestr(tchar *);
+extern tchar	*strcat_(tchar *, tchar *);
+extern int	strlen_(tchar *);
+extern tchar	*strcpy_(tchar *, tchar *);
+extern tchar	*strend(tchar *);
+extern tchar	*strip(tchar *);
+extern tchar	*strspl(tchar *, tchar *);
+extern struct command	*syntax(struct wordent *, struct wordent *, int);
+extern tchar	*value1(tchar *, struct varent *);
 
 #define	NOSTR	((tchar *) 0)
 

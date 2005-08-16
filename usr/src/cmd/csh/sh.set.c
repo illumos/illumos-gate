@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,16 +16,30 @@
 
 #include "sh.h"
 #include "sh.tconst.h"
-extern didchdir;
+extern int	didchdir;
 
 /*
  * C Shell
  */
 
-doset(v)
-	register tchar **v;
+void	asx(tchar *, int, tchar *);
+void	putn1(int);
+void	set(tchar *, tchar *);
+void	set1(tchar *, tchar **, struct varent *);
+void	setq(tchar *, tchar **, struct varent *);
+void	unset1(tchar *[], struct varent *);
+void	unsetv1(struct varent *);
+void	exportpath(tchar **);
+void	balance(struct varent *, int, int);
+tchar	*operate(tchar, tchar *, tchar *);
+tchar	*getinx(tchar *, int *);
+tchar	*xset(tchar *, tchar ***);
+struct varent	*getvx(tchar *, int);
+
+void
+doset(tchar **v)
 {
-	register tchar *p;
+	tchar *p;
 	tchar *vp, op;
 	tchar **vecp;
 	bool hadsub;
@@ -71,7 +85,7 @@ doset(v)
 setsyn:
 			bferr("Syntax error");
 		if (eq(p, S_LPAR/*"("*/)) {
-			register tchar **e = v;
+			tchar **e = v;
 
 			if (hadsub)
 				goto setsyn;
@@ -99,7 +113,7 @@ setsyn:
 			exportpath(adrof(S_path/*"path"*/)->vec);
 			dohash(xhash);
 		} else if (eq(vp, S_histchars/*"histchars"*/)) {
-			register tchar *p = value(S_histchars/*"histchars"*/);
+			tchar *p = value(S_histchars/*"histchars"*/);
 			HIST = *p++;
 			HISTSUB = *p;
 		} else if (eq(vp, S_user/*"user"*/))
@@ -118,9 +132,7 @@ setsyn:
 }
 
 tchar *
-getinx(cp, ip)
-	register tchar *cp;
-	register int *ip;
+getinx(tchar *cp, int *ip)
 {
 
 #ifdef TRACE
@@ -135,12 +147,10 @@ getinx(cp, ip)
 	return (cp);
 }
 
-asx(vp, subscr, p)
-	tchar *vp;
-	int subscr;
-	tchar *p;
+void
+asx(tchar *vp, int subscr, tchar *p)
 {
-	register struct varent *v = getvx(vp, subscr);
+	struct varent *v = getvx(vp, subscr);
 
 #ifdef TRACE
 	tprintf("TRACE- asx()\n");
@@ -150,10 +160,9 @@ asx(vp, subscr, p)
 }
 
 struct varent *
-getvx(vp, subscr)
-	tchar *vp;
+getvx(tchar *vp, int subscr)
 {
-	register struct varent *v = adrof(vp);
+	struct varent *v = adrof(vp);
 
 #ifdef TRACE
 	tprintf("TRACE- getvx()\n");
@@ -167,10 +176,10 @@ getvx(vp, subscr)
 
 tchar plusplus[2] = { '1', 0 };
 
-dolet(v)
-	tchar **v;
+void
+dolet(tchar **v)
 {
-	register tchar *p;
+	tchar *p;
 	tchar *vp, c, op;
 	bool hadsub;
 	int subscr;
@@ -256,10 +265,9 @@ letsyn:
 }
 
 tchar *
-xset(cp, vp)
-	tchar *cp, ***vp;
+xset(tchar *cp, tchar ***vp)
 {
-	register tchar *dp;
+	tchar *dp;
 
 #ifdef TRACE
 	tprintf("TRACE- xset()\n");
@@ -274,14 +282,13 @@ xset(cp, vp)
 }
 
 tchar *
-operate(op, vp, p)
-	tchar op, *vp, *p;
+operate(tchar op, tchar *vp, tchar *p)
 {
 	tchar opr[2];
 	tchar *vec[5];
-	register tchar **v = vec;
+	tchar **v = vec;
 	tchar **vecp = v;
-	register int i;
+	int i;
 
 	if (op != '=') {
 		if (*vp)
@@ -303,8 +310,7 @@ operate(op, vp, p)
 static tchar *putp;
  
 tchar *
-putn(n)
-	register int n;
+putn(int n)
 {
 	static tchar number[15];
 
@@ -332,8 +338,8 @@ putn(n)
 	return (savestr(number));
 }
 
-putn1(n)
-	register int n;
+void
+putn1(int n)
 {
 #ifdef TRACE
 	tprintf("TRACE- putn1()\n");
@@ -343,10 +349,10 @@ putn1(n)
 	*putp++ = n % 10 + '0';
 }
 
-getn(cp)
-	register tchar *cp;
+int
+getn(tchar *cp)
 {
-	register int n;
+	int n;
 	int sign;
 
 #ifdef TRACE
@@ -373,11 +379,9 @@ badnum:
 }
 
 tchar *
-value1(var, head)
-	tchar *var;
-	struct varent *head;
+value1(tchar *var, struct varent *head)
 {
-	register struct varent *vp;
+	struct varent *vp;
 
 #ifdef TRACE
 	tprintf("TRACE- value1()\n");
@@ -387,11 +391,9 @@ value1(var, head)
 }
 
 struct varent *
-madrof(pat, vp)
-	tchar *pat;
-	register struct varent *vp;
+madrof(tchar *pat, struct varent *vp)
 {
-	register struct varent *vp1;
+	struct varent *vp1;
 
 #ifdef TRACE
 	tprintf("TRACE- madrof()\n");
@@ -406,11 +408,9 @@ madrof(pat, vp)
 }
 
 struct varent *
-adrof1(name, v)
-	register tchar *name;
-	register struct varent *v;
+adrof1(tchar *name, struct varent *v)
 {
-	register cmp;
+	int cmp;
 
 #ifdef TRACE
 	tprintf("TRACE- adrof1()\n");
@@ -428,10 +428,10 @@ adrof1(name, v)
 /*
  * The caller is responsible for putting value in a safe place
  */
-set(var, val)
-	tchar *var, *val;
+void
+set(tchar *var, tchar *val)
 {
-	register tchar **vec =  (tchar **) xalloc(2 * sizeof  (tchar **));
+	tchar **vec =  (tchar **) xalloc(2 * sizeof  (tchar **));
 
 #ifdef TRACE
 	tprintf("TRACE- set()\n");
@@ -441,11 +441,10 @@ set(var, val)
 	set1(var, vec, &shvhed);
 }
 
-set1(var, vec, head)
-	tchar *var, **vec;
-	struct varent *head;
+void
+set1(tchar *var, tchar **vec, struct varent *head)
 {
-	register tchar **oldv = vec;
+	tchar **oldv = vec;
 
 #ifdef TRACE
 	tprintf("TRACE- set1()\n");
@@ -472,12 +471,11 @@ set1(var, vec, head)
 	setq(var, vec, head);
 }
 
-setq(name, vec, p)
-	tchar *name, **vec;
-	register struct varent *p;
+void
+setq(tchar *name, tchar **vec, struct varent *p)
 {
-	register struct varent *c;
-	register f;
+	struct varent *c;
+	int f;
 
 #ifdef TRACE
 	tprintf("TRACE- setq()\n");
@@ -502,8 +500,8 @@ found:
 	trim(c->vec = vec);
 }
 
-unset(v)
-	tchar *v[];
+void
+unset(tchar *v[])
 {
 
 #ifdef TRACE
@@ -520,12 +518,11 @@ unset(v)
 #endif
 }
 
-unset1(v, head)
-	register tchar *v[];
-	struct varent *head;
+void
+unset1(tchar *v[], struct varent *head)
 {
-	register struct varent *vp;
-	register int cnt;
+	struct varent *vp;
+	int cnt;
 
 #ifdef TRACE
 	tprintf("TRACE- unset1()\n");
@@ -539,10 +536,10 @@ unset1(v, head)
 	}
 }
 
-unsetv(var)
-	tchar *var;
+void
+unsetv(tchar *var)
 {
-	register struct varent *vp;
+	struct varent *vp;
 
 #ifdef TRACE
 	tprintf("TRACE- unsetv()\n");
@@ -552,11 +549,11 @@ unsetv(var)
 	unsetv1(vp);
 }
 
-unsetv1(p)
-	register struct varent *p;
+void
+unsetv1(struct varent *p)
 {
-	register struct varent *c, *pp;
-	register f;
+	struct varent *c, *pp;
+	int f;
 
 #ifdef TRACE
 	tprintf("TRACE- unsetv1()\n");
@@ -598,8 +595,8 @@ unsetv1(p)
 	balance(pp, f, 1);
 }
 
-setNS(cp)
-	tchar *cp;
+void
+setNS(tchar *cp)
 {
 #ifdef TRACE
 	tprintf("TRACE- setNS()\n");
@@ -608,11 +605,11 @@ setNS(cp)
 	set(cp, S_/*""*/);
 }
 
-shift(v)
-	register tchar **v;
+void
+shift(tchar **v)
 {
-	register struct varent *argv;
-	register tchar *name;
+	struct varent *argv;
+	tchar *name;
 
 #ifdef TRACE
 	tprintf("TRACE- shift()\n");
@@ -631,8 +628,8 @@ shift(v)
 	lshift(argv->vec, 1);
 }
 
-exportpath(val)
-	tchar **val;
+void
+exportpath(tchar **val)
 {
 	tchar exppath[PATHSIZ];
 
@@ -673,13 +670,12 @@ exportpath(val)
  * F == 0 means we've come from p's left child.
  * D == 1 means we've just done a delete, otherwise an insert.
  */
-balance(p, f, d)
-	register struct varent *p;
-	register f;
+void
+balance(struct varent *p, int f, int d)
 {
-	register struct varent *pp;
-	register struct varent *t;		/* used by the rotate macros */
-	register ff;
+	struct varent *pp;
+	struct varent *t;		/* used by the rotate macros */
+	int ff;
 
 #ifdef TRACE
 	tprintf("TRACE- balance()\n");
@@ -765,11 +761,11 @@ balance(p, f, d)
 	}
 }
 
-plist(p)
-	register struct varent *p;
+void
+plist(struct varent *p)
 {
-	register struct varent *c;
-	register len;
+	struct varent *c;
+	int len;
 
 #ifdef TRACE
 	tprintf("TRACE- plist()\n");

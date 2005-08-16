@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,15 +52,32 @@ extern	gid_t getegid(), getgid();
 extern	uid_t geteuid(), getuid();
 extern tchar **strblktotsblk(/* char **, int */);
 
-int siglwp();
-int sigwaiting();
+void	importpath(tchar *);
+void	srccat(tchar *, tchar *);
+void	srccat_inlogin(tchar *, tchar *);
+void	srcunit(int, bool, bool);
+void	rechist(void);
+void	goodbye(void);
+void	pintr1(bool);
+void	process(bool);
+void	dosource(tchar **);
+void	mailchk(void);
+void	printprompt(void);
+void	sigwaiting(void);
+void	siglwp(void);
+void	initdesc(int, char *[]);
+void	initdesc_x(int, char *[], int);
+void	closem(void);
+void	unsetfd(int);
+void	secpolicy_print(int, const char *);
+void	phup(void);
 
-main(c, av)
-	int c;
-	char **av;
+
+int
+main(int c, char **av)
 {
-	register tchar **v, *cp, *p, *q, *r;
-	register int f;
+	tchar **v, *cp, *p, *q, *r;
+	int f;
 	struct sigvec osv;
 	struct sigaction sa;
 	tchar s_prompt[MAXHOSTNAMELEN+3];
@@ -507,7 +524,8 @@ notty:
 	exitstat();
 }
 
-untty()
+void
+untty(void)
 {
 
 	if (tpgrp > 0) {
@@ -516,12 +534,12 @@ untty()
 	}
 }
 
-importpath(cp)
-	tchar *cp;
+void
+importpath(tchar *cp)
 {
-	register int i = 0;
-	register tchar *dp;
-	register tchar **pv;
+	int i = 0;
+	tchar *dp;
+	tchar **pv;
 	int c;
 	static tchar dot[2] = {'.', 0};
 
@@ -556,11 +574,11 @@ importpath(cp)
 /*
  * Source to the file which is the catenation of the argument names.
  */
-srccat(cp, dp)
-	tchar *cp, *dp;
+void
+srccat(tchar *cp, tchar *dp)
 {
-	register tchar *ep = strspl(cp, dp);
-	register int unit = dmove(open_(ep, 0), -1);
+	tchar *ep = strspl(cp, dp);
+	int unit = dmove(open_(ep, 0), -1);
 
 	(void) fcntl(unit, F_SETFD, 1);
 	xfree(ep);
@@ -575,11 +593,11 @@ srccat(cp, dp)
  * Source to the file which is the catenation of the argument names.
  * 	This one does not check the ownership.
  */
-srccat_inlogin(cp, dp)
-	tchar *cp, *dp;
+void
+srccat_inlogin(tchar *cp, tchar *dp)
 {
-	register tchar *ep = strspl(cp, dp);
-	register int unit = dmove(open_(ep, 0), -1);
+	tchar *ep = strspl(cp, dp);
+	int unit = dmove(open_(ep, 0), -1);
 
 	(void) fcntl(unit, F_SETFD, 1);
 	xfree(ep);
@@ -590,10 +608,8 @@ srccat_inlogin(cp, dp)
  * Source to a unit.  If onlyown it must be our file or our group or
  * we don't chance it.	This occurs on ".cshrc"s and the like.
  */
-srcunit(unit, onlyown, hflg)
-	register int unit;
-	bool onlyown;
-	bool hflg;
+void
+srcunit(int unit, bool onlyown, bool hflg)
 {
 	/* We have to push down a lot of state here */
 	/* All this could go into a structure */
@@ -670,7 +686,7 @@ srcunit(unit, onlyown, hflg)
 	if (setintr)
 		(void) sigsetmask(omask);
 	if (oSHIN >= 0) {
-		register int i;
+		int i;
 
 		/* We made it to the new state... free up its storage */
 		/* This code could get run twice but xfree doesn't care */
@@ -703,7 +719,8 @@ srcunit(unit, onlyown, hflg)
 		error(NULL);
 }
 
-rechist()
+void
+rechist(void)
 {
 	tchar buf[BUFSIZ];
 	int fp, ftmp, oldidfds;
@@ -730,7 +747,8 @@ rechist()
 	}
 }
 
-goodbye()
+void
+goodbye(void)
 {
 	if (loginsh) {
 		(void) signal(SIGQUIT, SIG_IGN);
@@ -744,7 +762,8 @@ goodbye()
 	exitstat();
 }
 
-exitstat()
+void
+exitstat(void)
 {
 
 #ifdef PROF
@@ -764,7 +783,7 @@ exitstat()
  * in the event of a HUP we want to save the history
  */
 void
-phup()
+phup(void)
 {
 	rechist();
 	exit(1);
@@ -779,15 +798,15 @@ tchar *jobargv[2] = { S_jobs/*"jobs"*/, 0 };
  * gets a chance to make the shell go away.
  */
 void
-pintr()
+pintr(void)
 {
 	pintr1(1);
 }
 
-pintr1(wantnl)
-	bool wantnl;
+void
+pintr1(bool wantnl)
 {
-	register tchar **v;
+	tchar **v;
 	int omask;
 
 	omask = sigblock(0);
@@ -835,11 +854,11 @@ pintr1(wantnl)
  * Note that if catch is not set then we will unwind on any error.
  * If an end-of-file occurs, we return.
  */
-process(catch)
-	bool catch;
+void
+process(bool catch)
 {
 	jmp_buf osetexit;
-	register struct command *t;
+	struct command *t;
 
 	getexit(osetexit);
 	for (;;) {
@@ -977,11 +996,11 @@ process(catch)
 	resexit(osetexit);
 }
 
-dosource(t)
-	register tchar **t;
+void
+dosource(tchar **t)
 {
-	register tchar *f;
-	register int u;
+	tchar *f;
+	int u;
 	bool hflg = 0;
 	tchar buf[BUFSIZ];
 
@@ -1011,10 +1030,11 @@ dosource(t)
  * knows, since the login program insists on saying
  * "You have mail."
  */
-mailchk()
+void
+mailchk(void)
 {
-	register struct varent *v;
-	register tchar **vp;
+	struct varent *v;
+	tchar **vp;
 	time_t t;
 	int intvl, cnt;
 	struct stat stb;
@@ -1053,13 +1073,13 @@ mailchk()
  * user whose home directory is sought is currently.
  * We write the home directory of the user back there.
  */
-gethdir(home)
-	tchar *home;
+int
+gethdir(tchar *home)
 {
 	/* getpwname will not be modified, so we need temp. buffer */
 	char home_str[BUFSIZ];
 	tchar home_ts[BUFSIZ];
-	register struct passwd *pp /*= getpwnam(home)*/;
+	struct passwd *pp /*= getpwnam(home)*/;
 
 	pp = getpwnam(tstostr(home_str, home));
 	if (pp == 0)
@@ -1070,12 +1090,12 @@ gethdir(home)
 
 
 /*
+void
 #ifdef PROF
-done(i)
+done(int i)
 #else
-exit(i)
+exit(int i)
 #endif
-	int i;
 {
 
 	untty();
@@ -1083,9 +1103,10 @@ exit(i)
 }
 */
 
-printprompt()
+void
+printprompt(void)
 {
-	register tchar *cp;
+	tchar *cp;
 
 	if (!whyles) {
 		/*
@@ -1112,11 +1133,9 @@ printprompt()
  * Save char * block.
  */
 tchar **
-strblktotsblk(v, num)
-	register char **v;
-	int num;
+strblktotsblk(char **v, int num)
 {
-	register tchar **newv =
+	tchar **newv =
 		 (tchar **) calloc((unsigned) (num+ 1), sizeof  (tchar **));
 	tchar **onewv = newv;
 
@@ -1126,13 +1145,14 @@ strblktotsblk(v, num)
 	return (onewv);
 }
 
-
-sigwaiting()
+void
+sigwaiting(void)
 {
 	_signal(SIGWAITING, sigwaiting);
 }
 
-siglwp()
+void
+siglwp(void)
 {
 	_signal(SIGLWP, siglwp); 
 }
@@ -1168,16 +1188,14 @@ static int NoFile = NOFILE;	/* The number of files I can use. */
  * If is_reinit is set in initdesc_x(), then we only close the file
  * descriptors that we actually opened (as recorded in fdinuse).
  */
-initdesc(argc, argv)
-	int argc;
-	char *argv[];
+void
+initdesc(int argc, char *argv[])
 {
 	initdesc_x(argc, argv, 0);
 }
 
-reinitdesc(argc, argv)
-	int argc;
-	char *argv[];
+void
+reinitdesc(int argc, char *argv[])
 {
 	initdesc_x(argc, argv, 1);
 }
@@ -1208,10 +1226,8 @@ close_inuse(void *cd, int fd)
 	return (0);
 }
 
-initdesc_x(argc, argv, is_reinit)
-	int argc;
-	char *argv[];
-	int is_reinit;
+void
+initdesc_x(int argc, char *argv[], int is_reinit)
 {
 
 	int script_fd = -1;
@@ -1292,9 +1308,10 @@ initdesc_x(argc, argv, is_reinit)
  * After you have removed the files, you can clear the
  * list and max_fd.
  */
-closem()
+void
+closem(void)
 {
-	register int f;
+	int f;
 
 	for (f = 3; f <= max_fd; f++) {
 		if (CSH_FD_ISSET(f, fdinuse) &&
@@ -1311,7 +1328,8 @@ closem()
  * if you want the process to affect fdinuse (e.g., fork, but
  * not vfork).
  */
-new_process()
+void
+new_process(void)
 {
 	my_pid = getpid();
 }
@@ -1334,8 +1352,8 @@ new_process()
  *		close(fd);
  *		unsetfd(fd);
  */
-setfd(fd)
-	int fd;
+void
+setfd(int fd)
 {
 	/*
 	 * Because you want to avoid
@@ -1352,10 +1370,10 @@ setfd(fd)
 	CSH_FD_SET(fd, fdinuse);
 }
 
-unsetfd(fd)
-	int fd;
+void
+unsetfd(int fd)
 {
-	register int i;
+	int i;
 
 	/*
 	 * Because you want to avoid
@@ -1392,7 +1410,7 @@ secpolicy_print(int level, const char *msg)
 		printf("%s: ", msg);	/* printf() does gettext() */
 		break;
 	case SECPOLICY_ERROR:
-		bferr(msg);		/* bferr() does gettext() */
+		bferr((char *)msg);		/* bferr() does gettext() */
 		break;
 	}
 }

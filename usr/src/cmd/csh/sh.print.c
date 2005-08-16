@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,9 +16,11 @@
 
 #include "sh.h"
 
-void p2dig_ull(unsigned long long i);
-void p2dig_int(int i);
-void flush();
+void	p2dig_ull(unsigned long long);
+void	p2dig_int(int);
+void	flush(void);
+void	Putchar(tchar);
+
 
 /*
  * C Shell
@@ -115,6 +117,7 @@ putbyte(int c)
  * character tc to some byte sequnce that represents the character
  * in EUC form.
  */
+void
 Putchar(tchar tc)
 {
 	int	n;
@@ -166,8 +169,8 @@ putbyte(int c)
  * For single-byte character only environment, there is no
  * difference between Putchar() and putbyte() though.
  */
-Putchar(tc)
-	tchar tc;
+void
+Putchar(tchar tc)
 {
 	putbyte((int)tc);
 }
@@ -175,13 +178,13 @@ Putchar(tc)
 #endif	/* !MBCHAR */
 
 void
-draino()
+draino(void)
 {
 	linp = linbuf;
 }
 
 void
-flush()
+flush(void)
 {
 	int unit;
 	int lmode;

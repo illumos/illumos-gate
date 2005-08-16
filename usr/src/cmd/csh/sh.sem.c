@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -24,6 +24,10 @@
  * C shell
  */
 
+void	doio(struct command *, int *, int *);
+void	mypipe(int *);
+void	chkclob(tchar *);
+
 /*
  * Return true if there is a back-quote (`) anywhere in the argument list.
  * Its presence would cause glob() to be invoked in the child process
@@ -45,8 +49,9 @@ AnyBquote(struct command *t)
 }
 
 /*VARARGS 1*/
+void
 execute(t, wanttty, pipein, pipeout)
-	register struct command *t;
+	struct command *t;
 	int wanttty, *pipein, *pipeout;
 {
 	bool forked = 0;
@@ -382,9 +387,9 @@ execute(t, wanttty, pipein, pipeout)
 
 #ifdef VFORK
 void
-vffree()
+vffree(void)
 {
-	register tchar **v;
+	tchar **v;
 
 #ifdef TRACE
 	tprintf("TRACE- vffree()\n");
@@ -401,12 +406,11 @@ vffree()
  * Perform io redirection.
  * We may or maynot be forked here.
  */
-doio(t, pipein, pipeout)
-	register struct command *t;
-	int *pipein, *pipeout;
+void
+doio(struct command *t, int *pipein, int *pipeout)
 {
-	register tchar *cp, *dp;
-	register int flags = t->t_dflg;
+	tchar *cp, *dp;
+	int flags = t->t_dflg;
 	int fd;
 
 #ifdef TRACE
@@ -485,8 +489,8 @@ doio(t, pipein, pipeout)
 	didfds = 1;
 }
 
-mypipe(pv)
-	register int *pv;
+void
+mypipe(int *pv)
 {
 
 #ifdef TRACE
@@ -505,8 +509,8 @@ oops:
 	error("Can't make pipe");
 }
 
-chkclob(cp)
-	register tchar *cp;
+void
+chkclob(tchar *cp)
 {
 	struct stat stb;
 	unsigned short	type;

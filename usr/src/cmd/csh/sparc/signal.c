@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,15 +64,12 @@ void (*_siguhandler[NSIG])() = { 0 };
  */
 
 static void
-sigvechandler(sig, sip, ucp) 
-	int sig;
-	siginfo_t *sip;
-	ucontext_t *ucp;
+sigvechandler(int sig, siginfo_t *sip, ucontext_t *ucp) 
 {
 	struct sigcontext sc;
 	int code;
 	char *addr;
-	register int i, j;
+	int i, j;
 	int gwinswitch = 0;
 	
 	sc.sc_onstack = ((ucp->uc_stack.ss_flags & SS_ONSTACK) != 0);
@@ -148,8 +145,8 @@ sigvechandler(sig, sip, ucp)
 	setcontext (ucp);
 }
 
-sigsetmask(mask)
-	int mask;
+int
+sigsetmask(int mask)
 {
 	sigset_t oset;
 	sigset_t nset;
@@ -160,8 +157,8 @@ sigsetmask(mask)
 	return set2mask(&oset);
 }
 
-sigblock(mask)
-	int mask;
+int
+sigblock(int mask)
 {
 	sigset_t oset;
 	sigset_t nset;
@@ -172,8 +169,8 @@ sigblock(mask)
 	return set2mask(&oset);
 }
 
-sigpause(mask)
-	int mask;
+int
+sigpause(int mask)
 {
 	sigset_t set;
 
@@ -182,10 +179,8 @@ sigpause(mask)
 	return (sigsuspend(&set));
 }
 
-sigvec(sig, nvec, ovec)
-        int sig;
-        struct sigvec *nvec;
-	struct sigvec *ovec;
+int
+sigvec(int sig, struct sigvec *nvec, struct sigvec *ovec)
 {
         struct sigaction nact;
         struct sigaction oact;
@@ -247,9 +242,7 @@ sigvec(sig, nvec, ovec)
 
 
 void (*
-signal(s, a))()
-        int s;
-        void (*a)();
+signal(int s, void (*a)()))()
 {
         struct sigvec osv;
 	struct sigvec nsv;

@@ -26,6 +26,18 @@
 
 #define BIGINDEX	9	/* largest desirable job index */
 
+void	pjwait(struct process *);
+void	pflush(struct process *);
+void	pclrcurr(struct process *);
+void	padd(struct command *);
+void	pads(tchar *);
+void	ptprint(struct process *);
+void	pkill(tchar **, int);
+void	pstart(struct process *, int);
+void	okpcntl(void);
+struct process	*pgetcurr(struct process *);
+struct process	*pfind(tchar *);
+
 /*
  * pchild - called at interrupt level by the SIGCHLD signal
  *	indicating that at least one child has terminated or stopped
@@ -34,11 +46,11 @@
  *	to mask interrupts when playing with the proclist data structures!
  */
 void
-pchild()
+pchild(void)
 {
-	register struct process *pp;
-	register struct process	*fp;
-	register int pid;
+	struct process *pp;
+	struct process	*fp;
+	int pid;
 	union wait w;
 	int jobflags;
 	struct rusage ru;
@@ -146,9 +158,10 @@ found:
 	goto loop;
 }
 
-pnote()
+void
+pnote(void)
 {
-	register struct process *pp;
+	struct process *pp;
 	int flags, omask;
 
 #ifdef TRACE
@@ -171,9 +184,10 @@ pnote()
  * pwait - wait for current job to terminate, maintaining integrity
  *	of current and previous job indicators.
  */
-pwait()
+void
+pwait(void)
 {
-	register struct process *fp, *pp;
+	struct process *fp, *pp;
 	int omask;
 
 #ifdef TRACE
@@ -201,10 +215,10 @@ pwait()
  * pjwait - wait for a job to finish or become stopped
  *	It is assumed to be in the foreground state (PFOREGND)
  */
-pjwait(pp)
-	register struct process *pp;
+void
+pjwait(struct process *pp)
 {
-	register struct process *fp;
+	struct process *fp;
 	int jobflags, reason, omask;
 
 #ifdef TRACE
@@ -286,9 +300,10 @@ pjwait(pp)
 /*
  * dowait - wait for all processes to finish
  */
-dowait()
+void
+dowait(void)
 {
-	register struct process *pp;
+	struct process *pp;
 	int omask;
 
 #ifdef TRACE
@@ -310,9 +325,10 @@ loop:
 /*
  * pflushall - flush all jobs from list (e.g. at fork())
  */
-pflushall()
+void
+pflushall(void)
 {
-	register struct process	*pp;
+	struct process	*pp;
 
 #ifdef TRACE
 	tprintf("TRACE- pflush()\n");
@@ -327,11 +343,11 @@ pflushall()
  *	the argument process for deletion.  The actual free of the
  *	space is not done here since pflush is called at interrupt level.
  */
-pflush(pp)
-	register struct process	*pp;
+void
+pflush(struct process *pp)
 {
-	register struct process *np;
-	register int index;
+	struct process *np;
+	int index;
 
 #ifdef TRACE
 	tprintf("TRACE- pflush()\n");
@@ -363,8 +379,8 @@ pflush(pp)
  * pclrcurr - make sure the given job is not the current or previous job;
  *	pp MUST be the job leader
  */
-pclrcurr(pp)
-	register struct process *pp;
+void
+pclrcurr(struct process *pp)
 {
 
 #ifdef TRACE
@@ -390,11 +406,10 @@ tchar	*cmdp;
  * palloc - allocate a process structure and fill it up.
  *	an important assumption is made that the process is running.
  */
-palloc(pid, t)
-	int pid;
-	register struct command *t;
+void
+palloc(int pid, struct command *t)
 {
-	register struct process	*pp;
+	struct process	*pp;
 	int i;
 
 #ifdef TRACE
@@ -455,8 +470,8 @@ palloc(pid, t)
 	(void) gettimeofday(&pp->p_btime, (struct timezone *)0);
 }
 
-padd(t)
-	register struct command *t;
+void
+padd(struct command *t)
 {
 	tchar **argp;
 
@@ -516,10 +531,10 @@ padd(t)
 	}
 }
 
-pads(cp)
-	tchar *cp;
+void
+pads(tchar *cp)
 {
-	register int i = strlen_(cp);
+	int i = strlen_(cp);
 
 #ifdef TRACE
 	tprintf("TRACE- pads()\n");
@@ -542,7 +557,8 @@ pads(cp)
  *	so another job can be created.  Used for { } in exp6
  *	and `` in globbing.
  */
-psavejob()
+void
+psavejob(void)
 {
 
 #ifdef TRACE
@@ -556,7 +572,8 @@ psavejob()
  * prestjob - opposite of psavejob.  This may be missed if we are interrupted
  *	somewhere, but pendjob cleans up anyway.
  */
-prestjob()
+void
+prestjob(void)
 {
 
 #ifdef TRACE
@@ -570,9 +587,10 @@ prestjob()
  * pendjob - indicate that a job (set of commands) has been completed
  *	or is about to begin.
  */
-pendjob()
+void
+pendjob(void)
 {
-	register struct process *pp, *tp;
+	struct process *pp, *tp;
 
 #ifdef TRACE
 	tprintf("TRACE- pendjob()\n");
@@ -595,10 +613,10 @@ pendjob()
 /*
  * pprint - print a job
  */
-pprint(pp, flag)
-	register struct process	*pp;
+int
+pprint(struct process *pp, int flag)
 {
-	register status, reason;
+	int status, reason;
 	struct process *tp;
 	extern char *linp, linbuf[];
 	int jobflags, pstatus;
@@ -728,14 +746,14 @@ prcomd:
 	return (jobflags);
 }
 
-ptprint(tp)
-	register struct process *tp;
+void
+ptprint(struct process *tp)
 {
 	struct timeval tetime, diff;
 	static struct timeval ztime;
 	struct rusage ru;
 	static struct rusage zru;
-	register struct process *pp = tp;
+	struct process *pp = tp;
 
 #ifdef TRACE
 	tprintf("TRACE- ptprint()\n");
@@ -754,11 +772,11 @@ ptprint(tp)
 /*
  * dojobs - print all jobs
  */
-dojobs(v)
-	tchar **v;
+void
+dojobs(tchar **v)
 {
-	register struct process *pp;
-	register int flag = NUMBER|NAME|REASON;
+	struct process *pp;
+	int flag = NUMBER|NAME|REASON;
 	int i;
 
 #ifdef TRACE
@@ -784,10 +802,10 @@ dojobs(v)
 /*
  * dofg - builtin - put the job into the foreground
  */
-dofg(v)
-	tchar **v;
+void
+dofg(tchar **v)
 {
-	register struct process *pp;
+	struct process *pp;
 
 #ifdef TRACE
 	tprintf("TRACE- dofg()\n");
@@ -804,10 +822,10 @@ dofg(v)
 /*
  * %... - builtin - put the job into the foreground
  */
-dofg1(v)
-	tchar **v;
+void
+dofg1(tchar **v)
 {
-	register struct process *pp;
+	struct process *pp;
 
 #ifdef TRACE
 	tprintf("TRACE- untty()\n");
@@ -821,10 +839,10 @@ dofg1(v)
 /*
  * dobg - builtin - put the job into the background
  */
-dobg(v)
-	tchar **v;
+void
+dobg(tchar **v)
 {
-	register struct process *pp;
+	struct process *pp;
 
 #ifdef TRACE
 	tprintf("TRACE- dobg()\n");
@@ -840,10 +858,10 @@ dobg(v)
 /*
  * %... & - builtin - put the job into the background
  */
-dobg1(v)
-	tchar **v;
+void
+dobg1(tchar **v)
 {
-	register struct process *pp;
+	struct process *pp;
 
 #ifdef TRACE
 	tprintf("TRACE- dobg1()\n");
@@ -855,8 +873,8 @@ dobg1(v)
 /*
  * dostop - builtin - stop the job
  */
-dostop(v)
-	tchar **v;
+void
+dostop(tchar **v)
 {
 
 #ifdef TRACE
@@ -868,11 +886,11 @@ dostop(v)
 /*
  * dokill - builtin - superset of kill (1)
  */
-dokill(v)
-	tchar **v;
+void
+dokill(tchar **v)
 {
-	register int signum;
-	register tchar *name;
+	int signum;
+	tchar *name;
 
 #ifdef TRACE
 	tprintf("TRACE- dokill()\n");
@@ -917,12 +935,11 @@ gotsig:
 	pkill(v, signum);
 }
 
-pkill(v, signum)
-	tchar **v;
-	int signum;
+void
+pkill(tchar **v, int signum)
 {
-	register struct process *pp, *np;
-	register int jobflags = 0;
+	struct process *pp, *np;
+	int jobflags = 0;
 	int omask, pid, err = 0;
 	tchar *cp;
 
@@ -986,11 +1003,10 @@ cont:
 /*
  * pstart - start the job in foreground/background
  */
-pstart(pp, foregnd)
-	register struct process *pp;
-	int foregnd;
+void
+pstart(struct process *pp, int foregnd)
 {
-	register struct process *np;
+	struct process *np;
 	int omask, jobflags = 0;
 
 #ifdef TRACE
@@ -1036,9 +1052,10 @@ pstart(pp, foregnd)
 	(void) sigsetmask(omask);
 }
 
-panystop(neednl)
+void
+panystop(int neednl)
 {
-	register struct process *pp;
+	struct process *pp;
 
 #ifdef TRACE
 	tprintf("TRACE- panystop()\n");
@@ -1050,10 +1067,9 @@ panystop(neednl)
 }
 
 struct process *
-pfind(cp)
-	tchar *cp;
+pfind(tchar *cp)
 {
-	register struct process *pp, *np;
+	struct process *pp, *np;
 
 #ifdef TRACE
 	tprintf("TRACE- pfind()\n");
@@ -1082,7 +1098,7 @@ pfind(cp)
 	for (pp = proclist.p_next; pp; pp = pp->p_next)
 		if (pp->p_pid == pp->p_jobid) {
 			if (cp[1] == '?') {
-				register tchar *dp;
+				tchar *dp;
 				for (dp = pp->p_command; *dp; dp++) {
 					if (*dp != cp[2])
 						continue;
@@ -1109,11 +1125,10 @@ match:
  * pgetcurr - find most recent job that is not pp, preferably stopped
  */
 struct process *
-pgetcurr(pp)
-	register struct process *pp;
+pgetcurr(struct process *pp)
 {
-	register struct process *np;
-	register struct process *xp = PNULL;
+	struct process *np;
+	struct process *xp = PNULL;
 
 #ifdef TRACE
 	tprintf("TRACE- pgetcurr()\n");
@@ -1132,10 +1147,10 @@ pgetcurr(pp)
 /*
  * donotify - flag the job so as to report termination asynchronously
  */
-donotify(v)
-	tchar **v;
+void
+donotify(tchar **v)
 {
-	register struct process *pp;
+	struct process *pp;
 
 #ifdef TRACE
 	tprintf("TRACE- donotify()\n");
@@ -1154,12 +1169,14 @@ donotify(v)
  *	 0:	already have tty; manipulate process pgrps only
  *	 1:	want to claim tty; manipulate process and tty pgrps
  * It is usually just the value of tpgrp.
+ *
+ * argument:
+ *	 t:	command we are forking for
  */
-pfork(t, wanttty)
-	struct command *t;	/* command we are forking for */
-	int wanttty;
+int
+pfork(struct command *t, int wanttty)
 {
-	register int pid;
+	int pid;
 	bool ignint = 0;
 	int pgrp, omask;
 	int child_pid;
@@ -1255,7 +1272,8 @@ pfork(t, wanttty)
 	return (pid);
 }
 
-okpcntl()
+void
+okpcntl(void)
 {
 #ifdef TRACE
 	tprintf("TRACE- okpcntl()\n");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,16 +41,22 @@
  */
 char *exerr;			/* Execution error message */
 
+void	pexerr(void);
+void	texec(struct command *, tchar *, tchar **);
+void	xechoit(tchar **);
+void	dohash(char []);
 
-extern DIR *opendir_();
+static void	tconvert(struct command *, tchar *, tchar **);
 
 
-doexec(t)
-	register struct command *t;
+extern DIR *opendir_(tchar *);
+
+void
+doexec(struct command *t)
 {
 	tchar *sav;
-	register tchar *dp, **pv, **av;
-	register struct varent *v;
+	tchar *dp, **pv, **av;
+	struct varent *v;
 	bool slash;
 	int hashval, hashval1, i;
 	tchar *blk[2];
@@ -166,7 +172,8 @@ cont:
 	pexerr();
 }
 
-pexerr()
+void
+pexerr(void)
 {
 
 #ifdef TRACE
@@ -183,14 +190,12 @@ pexerr()
  * Record error message if not found.
  * Also do shell scripts here.
  */
-texec(cmd, f, t)
-	register struct command *cmd;
-	tchar *f;
-	register tchar **t;
+void
+texec(struct command *cmd, tchar *f, tchar **t)
 {
-	register int	pfstatus = 0;
-	register struct	varent *v;
-	register tchar	**vp;
+	int	pfstatus = 0;
+	struct	varent *v;
+	tchar	**vp;
 	tchar		*lastsh[2];
 	
 #ifdef TRACE
@@ -224,7 +229,7 @@ texec(cmd, f, t)
 	case ENOEXEC:
 		/* check that this is not a binary file */
 		{       
-			register int ff = open_(f, 0);
+			int ff = open_(f, 0);
 			tchar ch;
 
 			if (ff != -1 && read_(ff, &ch, 1) == 1 && !isprint(ch)
@@ -247,7 +252,7 @@ texec(cmd, f, t)
 		v = adrof1(S_shell /*"shell"*/, &aliases);
 		if (v == 0) {
 #ifdef OTHERSH
-			register int ff = open_(f, 0);
+			int ff = open_(f, 0);
 			tchar ch;
 #endif
 
@@ -299,13 +304,11 @@ texec(cmd, f, t)
 }
 
 
-static
-tconvert(cmd, fname, list)
-register struct command *cmd;
-register tchar *fname, **list;
+static void
+tconvert(struct command *cmd, tchar *fname, tchar **list)
 {
-	register char **rc;
-	register int len;
+	char **rc;
+	int len;
 
 	cmd->cfname = tstostr(NULL, fname);
 
@@ -319,9 +322,8 @@ register tchar *fname, **list;
 
 
 /*ARGSUSED*/
-execash(t, kp)
-	tchar **t;
-	register struct command *kp;
+void
+execash(tchar **t, struct command *kp)
 {
 #ifdef TRACE
 	tprintf("TRACE- execash()\n");
@@ -337,8 +339,8 @@ execash(t, kp)
 	/*NOTREACHED*/
 }
 
-xechoit(t)
-	tchar **t;
+void
+xechoit(tchar **t)
 {
 #ifdef TRACE
 	tprintf("TRACE- xechoit()\n");
@@ -359,8 +361,8 @@ xechoit(t)
  * variable is not set with a value, then dohash
  * just exits.
  */
-
-dorehash()
+void
+dorehash(void)
 {
 	dohash(xhash);
 	dohash(xhash2);
@@ -369,13 +371,13 @@ dorehash()
 /*
  * Fill up caching arrays for path and cdpath
  */
-dohash(cachearray)
-char cachearray[];
+void
+dohash(char cachearray[])
 {
 	struct stat stb;
 	DIR *dirp;
-	register struct dirent *dp;
-	register int cnt;
+	struct dirent *dp;
+	int cnt;
 	int i = 0;
 	struct varent *v;
 	tchar **pv;
@@ -426,7 +428,8 @@ char cachearray[];
 	}
 }
 
-dounhash()
+void
+dounhash(void)
 {
 
 #ifdef TRACE
@@ -437,7 +440,8 @@ dounhash()
 }
 
 #ifdef VFORK
-hashstat()
+void
+hashstat(void)
 {
 #ifdef TRACE
 	tprintf("TRACE- hashstat_()\n");
@@ -452,10 +456,10 @@ hashstat()
 /*
  * Hash a command name.
  */
-hashname(cp)
-	register tchar *cp;
+int
+hashname(tchar *cp)
 {
-	register long h = 0;
+	long h = 0;
 
 #ifdef TRACE
 	tprintf("TRACE- hashname()\n");

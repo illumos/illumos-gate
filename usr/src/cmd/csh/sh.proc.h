@@ -1,5 +1,5 @@
 /*
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,8 +88,3 @@ struct	process	*pcurrent;		/* current job in table */
 struct	process *pprevious;		/* previous job in table */
 
 short	pmaxindex;			/* current maximum job index */
-
-int	psigint();
-struct	process	*pgetcurr();
-struct	process	*plookup();
-struct	process *pfind();

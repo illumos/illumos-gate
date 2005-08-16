@@ -1,5 +1,5 @@
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -17,6 +17,7 @@
 #include "sh.h"
 #include <locale.h>
 #include <dirent.h>
+#include <string.h>
 /*
  * #include <sys/ioctl.h>
  * #include <stdlib.h>
@@ -48,11 +49,12 @@ DIR *Dirp = NULL;
  * place error unwinds are ever caught.
  */
 /*VARARGS1*/
+void
 error(s, a1, a2)
      char	*s;
 {
-	register	tchar **v;
-	register	char *ep;
+	tchar **v;
+	char *ep;
 
 	/*
 	 * Must flush before we print as we wish output before the error
@@ -114,8 +116,8 @@ error(s, a1, a2)
  * Perror is the shells version of perror which should otherwise
  * never be called.
  */
-Perror(s)
-     tchar *s;
+void
+Perror(tchar *s)
 {
 	char	chbuf[BUFSIZ];
 
@@ -124,7 +126,7 @@ Perror(s)
 	 * we must set up unit 2 now else the diagnostic will disappear
 	 */
 	if (!didfds) {
-		register int oerrno = errno;
+		int oerrno = errno;
 
 		(void) dcopy(SHDIAG, 2);
 		errno = oerrno;
@@ -134,8 +136,8 @@ Perror(s)
 	error(NULL);		/* To exit or unwind */
 }
 
-bferr(cp)
-     char *cp;
+void
+bferr(char *cp)
 {
 
 	flush();
@@ -149,8 +151,8 @@ bferr(cp)
  * which sets the variable err as a side effect; later to be tested,
  * e.g. in process.
  */
-seterr(s)
-     char *s;
+void
+seterr(char *s)
 {
 
 	if (err == 0)
@@ -158,9 +160,8 @@ seterr(s)
 }
 
 /* Set err to a splice of cp and dp, to be freed later in error() */
-seterr2(cp, dp)
-     tchar *cp;
-     char *dp;
+void
+seterr2(tchar *cp, char *dp)
 {
 	char	chbuf[BUFSIZ];
 	char	*gdp;
@@ -179,9 +180,8 @@ seterr2(cp, dp)
 }
 
 /* Set err to a splice of cp with a string form of character d */
-seterrc(cp, d)
-     char	*cp;
-     tchar	 d;
+void
+seterrc(char *cp, tchar d)
 {
 	char	chbuf[MB_LEN_MAX+1]; 
 

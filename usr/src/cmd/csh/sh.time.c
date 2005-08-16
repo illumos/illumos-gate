@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,7 @@ void tvsub(struct timeval *tdiff, struct timeval *t1, struct timeval *t0);
  */
 
 void
-settimes()
+settimes(void)
 {
 	struct rusage ruch;
 
@@ -47,7 +47,7 @@ settimes()
  * prefix to another command
  */
 void
-dotime()
+dotime(void)
 {
 	struct timeval timedol;
 	struct rusage ru1, ruch;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,7 @@
 
 #define ESC	'\033'
 
-extern DIR *opendir_();
+extern DIR *opendir_(tchar *);
 
 static char *BELL = "\07";
 static char *CTRLR = "^R\n";
@@ -46,6 +46,10 @@ static jmp_buf osetexit;		/* saved setexit() state */
 static struct termios  tty_save;	/* saved terminal state */
 static struct termios  tty_new;		/* new terminal state */
 
+static int	is_prefix(tchar *, tchar *);
+static int	is_suffix(tchar *, tchar *);
+static int	ignored(tchar *);
+
 /*
  * Put this here so the binary can be patched with adb to enable file
  * completion by default.  Filec controls completion, nobeep controls
@@ -53,9 +57,8 @@ static struct termios  tty_new;		/* new terminal state */
  */
 bool filec = 0;
 
-static
-setup_tty(on)
-	int on;
+static void
+setup_tty(int on)
 {
 	int omask;
 #ifdef TRACE
@@ -103,16 +106,16 @@ setup_tty(on)
 	(void) sigsetmask(omask);
 }
 
-static
-termchars()
+static void
+termchars(void)
 {
 	extern char *tgetstr();
-	 char bp[1024];
+	char bp[1024];
 	static char area[256];
 	static int been_here = 0;
-	 char *ap = area;
-	register char *s;
-	 char *term;
+	char *ap = area;
+	char *s;
+	char *term;
 
 #ifdef TRACE
 	tprintf("TRACE- termchars()\n");
@@ -132,8 +135,8 @@ termchars()
 /*
  * Move back to beginning of current line
  */
-static
-back_to_col_1()
+static void
+back_to_col_1(void)
 {
 	int omask;
 
@@ -148,12 +151,10 @@ back_to_col_1()
 /*
  * Push string contents back into tty queue
  */
-static
-pushback(string, echoflag)
-	tchar *string;
-	int echoflag;
+static void
+pushback(tchar *string, int echoflag)
 {
-	register tchar *p;
+	tchar *p;
 	struct termios tty;
 	int omask;
 
@@ -190,9 +191,8 @@ pushback(string, echoflag)
  * Des is a string whose maximum length is count.
  * Always null terminate.
  */
-catn(des, src, count)
-	register tchar *des, *src;
-	register count;
+void
+catn(tchar *des, tchar *src, int count)
 {
 #ifdef TRACE
 	tprintf("TRACE- catn()\n");
@@ -206,7 +206,7 @@ catn(des, src, count)
 	*des = '\0';
 }
 
-static
+static int
 max(a, b)
 {
 
@@ -217,9 +217,8 @@ max(a, b)
  * Like strncpy but always leave room for trailing \0
  * and always null terminate.
  */
-copyn(des, src, count)
-	register tchar *des, *src;
-	register count;
+void
+copyn(tchar *des, tchar *src, int count)
 {
 
 #ifdef TRACE
@@ -234,9 +233,8 @@ copyn(des, src, count)
 /*
  * For qsort()
  */
-static
-fcompare(file1, file2)
-	tchar **file1, **file2;
+static int
+fcompare(tchar **file1, tchar **file2)
 {
 
 #ifdef TRACE
@@ -246,9 +244,7 @@ fcompare(file1, file2)
 }
 
 static char
-filetype(dir, file, nosym)
-	tchar *dir, *file;
-	int nosym;
+filetype(tchar *dir, tchar *file, int nosym)
 {
 	tchar path[MAXPATHLEN + 1];
 	struct stat statb;
@@ -279,12 +275,10 @@ filetype(dir, file, nosym)
 /*
  * Print sorted down columns
  */
-static
-print_by_column(dir, items, count, looking_for_command)
-	tchar *dir, *items[];
-	int looking_for_command;
+static void
+print_by_column(tchar *dir, tchar *items[], int count, int looking_for_command)
 {
-	register int i, rows, r, c, maxwidth = 0, columns;
+	int i, rows, r, c, maxwidth = 0, columns;
 
 #ifdef TRACE
 	tprintf("TRACE- print_by_column()\n");
@@ -301,7 +295,7 @@ print_by_column(dir, items, count, looking_for_command)
 		for (c = 0; c < columns; c++) {
 			i = c * rows + r;
 			if (i < count) {
-				register int w;
+				int w;
 
 				/*
 				 * Print filename followed by
@@ -330,11 +324,10 @@ print_by_column(dir, items, count, looking_for_command)
  *	home_directory_of_person/mumble
  */
 tchar *
-tilde(new, old)
-	tchar *new, *old;
+tilde(tchar *new, tchar *old)
 {
-	register tchar *o, *p;
-	register struct passwd *pw;
+	tchar *o, *p;
+	struct passwd *pw;
 	static tchar person[40];
 	char person_[40];		/* work */
 	tchar *pw_dir;			/* work */
@@ -365,8 +358,8 @@ tilde(new, old)
 /*
  * Cause pending line to be printed
  */
-static
-sim_retype()
+static void
+sim_retype(void)
 {
 #ifdef notdef
 	struct termios tty_pending;
@@ -387,8 +380,9 @@ sim_retype()
 #endif
 }
 
-static
-beep_outc (c) {
+static int
+beep_outc(int c)
+{
 	char	buf[1];
 
 	buf[0] = c;
@@ -398,8 +392,8 @@ beep_outc (c) {
 	return 0;
 }
 
-static
-beep()
+static void
+beep(void)
 {
 
 #ifdef TRACE
@@ -412,9 +406,8 @@ beep()
 /*
  * Erase that silly ^[ and print the recognized part of the string.
  */
-static
-print_recognized_stuff(recognized_part)
-	tchar *recognized_part;
+static void
+print_recognized_stuff(tchar *recognized_part)
 {
 	int unit =  didfds ? 1 : SHOUT;
 
@@ -456,11 +449,10 @@ print_recognized_stuff(recognized_part)
  * Parse full path in file into 2 parts: directory and file names
  * Should leave final slash (/) at end of dir.
  */
-static
-extract_dir_and_name(path, dir, name)
-	tchar *path, *dir, *name;
+static void
+extract_dir_and_name(tchar *path, tchar *dir, tchar *name)
 {
-	register tchar  *p;
+	tchar  *p;
 
 #ifdef TRACE
 	tprintf("TRACE- extract_dir_and_name()\n");
@@ -476,11 +468,10 @@ extract_dir_and_name(path, dir, name)
 }
 
 tchar *
-getentry(dir_fd, looking_for_lognames)
-	DIR *dir_fd;
+getentry(DIR *dir_fd, int looking_for_lognames)
 {
-	register struct passwd *pw;
-	register struct dirent *dirp;
+	struct passwd *pw;
+	struct dirent *dirp;
 	/*
 	 * For char * -> tchar * Conversion
 	 */
@@ -499,11 +490,10 @@ getentry(dir_fd, looking_for_lognames)
 	return (NULL);
 }
 
-static
-free_items(items)
-	register tchar **items;
+static void
+free_items(tchar **items)
 {
-	register int i;
+	int i;
 
 #ifdef TRACE
 	tprintf("TRACE- free_items()\n");
@@ -525,15 +515,13 @@ free_items(items)
 /*
  * Perform a RECOGNIZE or LIST command on string "word".
  */
-static
-search2(word, command, max_word_length)
-	tchar *word;
-	COMMAND command;
+static int
+search2(tchar *word, COMMAND command, int max_word_length)
 {
 	static tchar **items = NULL;
-	register DIR *dir_fd;
-	register numitems = 0, ignoring = TRUE, nignored = 0;
-	register name_length, looking_for_lognames;
+	DIR *dir_fd;
+	int numitems = 0, ignoring = TRUE, nignored = 0;
+	int name_length, looking_for_lognames;
 	tchar tilded_dir[MAXPATHLEN + 1], dir[MAXPATHLEN + 1];
 	tchar name[MAXNAMLEN + 1], extended_name[MAXNAMLEN+1];
 	tchar *entry;
@@ -638,8 +626,8 @@ again:	/* search for matches */
  * character mismatch between extended_name and entry.
  * If we shorten it back to the prefix length, stop searching.
  */
-recognize(extended_name, entry, name_length, numitems)
-	tchar *extended_name, *entry;
+int
+recognize(tchar *extended_name, tchar *entry, int name_length, int numitems)
 {
 
 #ifdef TRACE
@@ -648,8 +636,8 @@ recognize(extended_name, entry, name_length, numitems)
 	if (numitems == 1)				/* 1st match */
 		copyn(extended_name, entry, MAXNAMLEN);
 	else {					/* 2nd and subsequent matches */
-		register tchar *x, *ent;
-		register int len = 0;
+		tchar *x, *ent;
+		int len = 0;
 
 		x = extended_name;
 		for (ent = entry; *x && *x == *ent++; x++, len++)
@@ -666,9 +654,8 @@ recognize(extended_name, entry, name_length, numitems)
  * This differs from PWB imatch in that if check is null
  * it items anything
  */
-static
-is_prefix(check, template)
-	register tchar *check, *template;
+static int
+is_prefix(tchar *check, tchar *template)
 {
 #ifdef TRACE
 	tprintf("TRACE- is_prefix()\n");
@@ -685,11 +672,10 @@ is_prefix(check, template)
  *  Return true if the chars in template appear at the
  *  end of check, i.e., are its suffix.
  */
-static
-is_suffix(check, template)
-	tchar *check, *template;
+static int
+is_suffix(tchar *check, tchar *template)
 {
-	register tchar *c, *t;
+	tchar *c, *t;
 
 #ifdef TRACE
 	tprintf("TRACE- is_suffix()\n");
@@ -706,11 +692,10 @@ is_suffix(check, template)
 	}
 }
 
-tenex(inputline, inputline_size)
-	tchar *inputline;
-	int inputline_size;
+int
+tenex(tchar *inputline, int inputline_size)
 {
-	register int numitems, num_read, should_retype;
+	int numitems, num_read, should_retype;
 	int i;
 
 #ifdef TRACE
@@ -723,8 +708,8 @@ tenex(inputline, inputline_size)
 	while ((i = read_(SHIN, inputline+num_read, inputline_size-num_read))
 	    > 0) {
 		static tchar *delims = S_DELIM /*" '\"\t;&<>()|`"*/;
-		register tchar *str_end, *word_start, last_char;
-		register int space_left;
+		tchar *str_end, *word_start, last_char;
+		int space_left;
 		struct termios tty;
 		COMMAND command;
 
@@ -800,12 +785,11 @@ tenex(inputline, inputline_size)
 	return (num_read);
 }
 
-static
-ignored(entry)
-	register tchar *entry;
+static int
+ignored(tchar *entry)
 {
 	struct varent *vp;
-	register tchar **cp;
+	tchar **cp;
 
 #ifdef TRACE
 	tprintf("TRACE- ignored()\n");
@@ -818,4 +802,4 @@ ignored(entry)
 			return (TRUE);
 	return (FALSE);
 }
-#endif FILEC
+#endif /* FILEC */

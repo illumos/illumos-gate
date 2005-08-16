@@ -1,5 +1,5 @@
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,19 @@
 #define EQMATCH 7
 #define NOTEQMATCH 8
 
+int	exp0(tchar ***, bool);
+int	exp1(tchar ***, bool);
+int	exp2(tchar ***, bool);
+int	exp2a(tchar ***, bool);
+int	exp2b(tchar ***, bool);
+int	exp2c(tchar ***, bool);
+tchar	*exp3(tchar ***, bool);
+tchar	*exp3a(tchar ***, bool);
+tchar	*exp4(tchar ***, bool);
+tchar	*exp5(tchar ***, bool);
+tchar	*exp6(tchar ***, bool);
+void	evalav(tchar **);
+
 /*
  * Determine if file given by name is accessible with permissions
  * given by mode.
@@ -49,9 +62,8 @@
  * set to indicate the error
  */
 
-chk_access(path, mode)
-register tchar *path;
-mode_t mode; 
+int
+chk_access(tchar *path, mode_t mode)
 {	
 	static int flag;
 	static uid_t euid; 
@@ -84,8 +96,8 @@ mode_t mode;
 	return(-1);
 }
 
-exp(vp)
-	register tchar ***vp;
+int
+exp(tchar ***vp)
 {
 #ifdef TRACE
 	tprintf("TRACE- exp()\n");
@@ -94,11 +106,10 @@ exp(vp)
 	return (exp0(vp, 0));
 }
 
-exp0(vp, ignore)
-	register tchar ***vp;
-	bool ignore;
+int
+exp0(tchar ***vp, bool ignore)
 {
-	register int p1 = exp1(vp, ignore);
+	int p1 = exp1(vp, ignore);
 #ifdef TRACE
 	tprintf("TRACE- exp0()\n");
 #endif
@@ -107,7 +118,7 @@ exp0(vp, ignore)
 	etraci("exp0 p1", p1, vp);
 #endif
 	if (**vp && eq(**vp, S_BARBAR /*"||"*/)) {
-		register int p2;
+		int p2;
 
 		(*vp)++;
 		p2 = exp0(vp, (ignore&IGNORE) || p1);
@@ -119,10 +130,10 @@ exp0(vp, ignore)
 	return (p1);
 }
 
-exp1(vp, ignore)
-	register tchar ***vp;
+int
+exp1(tchar ***vp, bool ignore)
 {
-	register int p1 = exp2(vp, ignore);
+	int p1 = exp2(vp, ignore);
 
 #ifdef TRACE
 	tprintf("TRACE- exp1()\n");
@@ -131,7 +142,7 @@ exp1(vp, ignore)
 	etraci("exp1 p1", p1, vp);
 #endif
 	if (**vp && eq(**vp, S_ANDAND /*"&&" */)) {
-		register int p2;
+		int p2;
 
 		(*vp)++;
 		p2 = exp1(vp, (ignore&IGNORE) || !p1);
@@ -143,11 +154,10 @@ exp1(vp, ignore)
 	return (p1);
 }
 
-exp2(vp, ignore)
-	register tchar ***vp;
-	bool ignore;
+int
+exp2(tchar ***vp, bool ignore)
 {
-	register int p1 = exp2a(vp, ignore);
+	int p1 = exp2a(vp, ignore);
 
 #ifdef TRACE
 	tprintf("TRACE- exp2()\n");
@@ -156,7 +166,7 @@ exp2(vp, ignore)
 	etraci("exp3 p1", p1, vp);
 #endif
 	if (**vp && eq(**vp, S_BAR /*"|" */)) {
-		register int p2;
+		int p2;
 
 		(*vp)++;
 		p2 = exp2(vp, ignore);
@@ -168,11 +178,10 @@ exp2(vp, ignore)
 	return (p1);
 }
 
-exp2a(vp, ignore)
-	register tchar ***vp;
-	bool ignore;
+int
+exp2a(tchar ***vp, bool ignore)
 {
-	register int p1 = exp2b(vp, ignore);
+	int p1 = exp2b(vp, ignore);
 
 #ifdef TRACE
 	tprintf("TRACE- exp2a()\n");
@@ -181,7 +190,7 @@ exp2a(vp, ignore)
 	etraci("exp2a p1", p1, vp);
 #endif
 	if (**vp && eq(**vp, S_HAT /*"^" */)) {
-		register int p2;
+		int p2;
 
 		(*vp)++;
 		p2 = exp2a(vp, ignore);
@@ -193,11 +202,10 @@ exp2a(vp, ignore)
 	return (p1);
 }
 
-exp2b(vp, ignore)
-	register tchar ***vp;
-	bool ignore;
+int
+exp2b(tchar ***vp, bool ignore)
 {
-	register int p1 = exp2c(vp, ignore);
+	int p1 = exp2c(vp, ignore);
 
 #ifdef TRACE
 	tprintf("TRACE- exp2b()\n");
@@ -206,7 +214,7 @@ exp2b(vp, ignore)
 	etraci("exp2b p1", p1, vp);
 #endif
 	if (**vp && eq(**vp, S_AND /*"&"*/)) {
-		register int p2;
+		 int p2;
 
 		(*vp)++;
 		p2 = exp2b(vp, ignore);
@@ -218,13 +226,12 @@ exp2b(vp, ignore)
 	return (p1);
 }
 
-exp2c(vp, ignore)
-	register tchar ***vp;
-	bool ignore;
+int
+exp2c(tchar ***vp, bool ignore)
 {
-	register tchar *p1 = exp3(vp, ignore);
-	register tchar *p2;
-	register int i;
+	tchar *p1 = exp3(vp, ignore);
+	tchar *p2;
+	int i;
 
 #ifdef TRACE
 	tprintf("TRACE- exp2c()\n");
@@ -267,12 +274,10 @@ exp2c(vp, ignore)
 }
 
 tchar *
-exp3(vp, ignore)
-	register tchar ***vp;
-	bool ignore;
+exp3(tchar ***vp, bool ignore)
 {
-	register tchar *p1, *p2;
-	register int i;
+	tchar *p1, *p2;
+	int i;
 
 #ifdef TRACE
 	tprintf("TRACE- exp3()\n");
@@ -314,12 +319,10 @@ exp3(vp, ignore)
 }
 
 tchar *
-exp3a(vp, ignore)
-	register tchar ***vp;
-	bool ignore;
+exp3a(tchar ***vp, bool ignore)
 {
-	register tchar *p1, *p2, *op;
-	register int i;
+	tchar *p1, *p2, *op;
+	int i;
 
 #ifdef TRACE
 	tprintf("TRACE- exp3a()\n");
@@ -347,12 +350,10 @@ exp3a(vp, ignore)
 }
 
 tchar *
-exp4(vp, ignore)
-	register tchar ***vp;
-	bool ignore;
+exp4(tchar ***vp, bool ignore)
 {
-	register tchar *p1, *p2;
-	register int i = 0;
+	tchar *p1, *p2;
+	int i = 0;
 
 #ifdef TRACE
 	tprintf("TRACE- exp4()\n");
@@ -362,7 +363,7 @@ exp4(vp, ignore)
 	etracc("exp4 p1", p1, vp);
 #endif
 	if (isa(**vp, ADDOP)) {
-		register tchar *op = *(*vp)++;
+		tchar *op = *(*vp)++;
 
 		p2 = exp4(vp, ignore);
 #ifdef EDEBUG
@@ -385,12 +386,10 @@ exp4(vp, ignore)
 }
 
 tchar *
-exp5(vp, ignore)
-	register tchar ***vp;
-	bool ignore;
+exp5(tchar ***vp, bool ignore)
 {
-	register tchar *p1, *p2;
-	register int i = 0;
+	tchar *p1, *p2;
+	int i = 0;
 
 #ifdef TRACE
 	tprintf("TRACE- exp5()\n");
@@ -400,7 +399,7 @@ exp5(vp, ignore)
 	etracc("exp5 p1", p1, vp);
 #endif
 	if (isa(**vp, MULOP)) {
-		register tchar *op = *(*vp)++;
+		tchar *op = *(*vp)++;
 
 		p2 = exp5(vp, ignore);
 #ifdef EDEBUG
@@ -433,11 +432,10 @@ exp5(vp, ignore)
 }
 
 tchar *
-exp6(vp, ignore)
-	register tchar ***vp;
+exp6(tchar ***vp, bool ignore)
 {
 	int ccode, i;
-	register tchar *cp, *dp, *ep;
+	tchar *cp, *dp, *ep;
 
 #ifdef TRACE
 	tprintf("TRACE- exp6()\n");
@@ -476,7 +474,7 @@ exp6(vp, ignore)
 		return (putn(ccode));
 	}
 	if (eq(**vp, S_LBRA /* "{" */)) {
-		register tchar **v;
+		tchar **v;
 		struct command faket;
 		tchar *fakecom[2];
 
@@ -587,13 +585,13 @@ exp6(vp, ignore)
 	return (ignore&NOGLOB ? savestr(cp) : globone(cp));
 }
 
-evalav(v)
-	register tchar **v;
+void
+evalav(tchar **v)
 {
 	struct wordent paraml;
-	register struct wordent *hp = &paraml;
+	struct wordent *hp = &paraml;
 	struct command *t;
-	register struct wordent *wdp = hp;
+	struct wordent *wdp = hp;
 	
 #ifdef TRACE
 	tprintf("TRACE- evalav()\n");
@@ -602,7 +600,7 @@ evalav(v)
 	hp->prev = hp->next = hp;
 	hp->word = S_ /*""*/;
 	while (*v) {
-		register struct wordent *new = (struct wordent *) calloc(1, sizeof *wdp);
+		struct wordent *new = (struct wordent *) calloc(1, sizeof *wdp);
 
 		new->prev = wdp;
 		new->next = hp;
@@ -619,9 +617,8 @@ evalav(v)
 	freelex(&paraml), freesyn(t);
 }
 
-isa(cp, what)
-	register tchar *cp;
-	register int what;
+int
+isa(tchar *cp, int what)
 {
 
 #ifdef TRACE
@@ -669,8 +666,8 @@ isa(cp, what)
 	return (0);
 }
 
-egetn(cp)
-	register tchar *cp;
+int
+egetn(tchar *cp)
 {
 
 #ifdef TRACE
@@ -684,10 +681,8 @@ egetn(cp)
 /* Phew! */
 
 #ifdef EDEBUG
-etraci(str, i, vp)
-	tchar *str;
-	int i;
-	tchar ***vp;
+void
+etraci(tchar *str, int i, tchar ***vp)
 {
 
 	printf("%s=%d\t", str, i);
@@ -695,9 +690,8 @@ etraci(str, i, vp)
 	printf("\n");
 }
 
-etracc(str, cp, vp)
-	tchar *str, *cp;
-	tchar ***vp;
+void
+etracc(tchar *str, tchar *cp, tchar ***vp)
 {
 
 	printf("%s=%s\t", str, cp);

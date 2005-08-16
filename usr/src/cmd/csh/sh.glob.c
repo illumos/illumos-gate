@@ -1,5 +1,5 @@
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -17,6 +17,7 @@
 #include "sh.h"
 #include "sh.tconst.h"
 #include <dirent.h>
+#include <strings.h>
 #ifdef MBCHAR
 #include <widec.h>	/* wcsetno() */
 #include <fnmatch.h>	/* fnmatch() */
@@ -34,8 +35,21 @@ bool	noglob;
 bool	nonomatch;
 tchar	*entp;
 tchar	**sortbas;
-int	sortscmp();
-extern	DIR *opendir_();
+int	sortscmp(tchar **, tchar **);
+void	ginit(tchar **);
+void	collect(tchar *);
+void	acollect(tchar *);
+void	expand(tchar *);
+void	matchdir_(tchar *);
+void	Gcat(tchar *, tchar *);
+void	addpath(tchar);
+void	tglob(tchar **);
+tchar	**dobackp(tchar *, bool);
+void	backeval(tchar *, bool);
+void	psave(tchar);
+void	pword(void);
+
+extern	DIR *opendir_(tchar *);
 
 #define	sort()	qsort((char *)sortbas, &gargv[gargc] - sortbas, \
 			sizeof (*sortbas), (int (*)(const void *, \
@@ -43,8 +57,7 @@ extern	DIR *opendir_();
 
 
 tchar **
-glob(v)
-	register tchar **v;
+glob(tchar **v)
 {
 	tchar agpath[BUFSIZ];
 	tchar *agargv[GAVSIZ];
@@ -74,18 +87,18 @@ glob(v)
 		return (gargv = copyblk(gargv));
 }
 
-ginit(agargv)
-	tchar **agargv;
+void
+ginit(tchar **agargv)
 {
 
 	agargv[0] = 0; gargv = agargv; sortbas = agargv; gargc = 0;
 	gnleft = NCARGS - 4;
 }
 
-collect(as)
-	register tchar *as;
+void
+collect(tchar *as)
 {
-	register int i;
+	int i;
 
 #ifdef TRACE
 	tprintf("TRACE- collect()\n");
@@ -124,10 +137,10 @@ collect(as)
 		acollect(as);
 }
 
-acollect(as)
-	register tchar *as;
+void
+acollect(tchar *as)
 {
-	register long ogargc = gargc;
+	long ogargc = gargc;
 
 #ifdef TRACE
 	tprintf("TRACE- acollect()\n");
@@ -146,18 +159,18 @@ acollect(as)
 /*
  * String compare for qsort.  Also used by filec code in sh.file.c.
  */
-sortscmp(a1, a2)
-	tchar **a1, **a2;
+int
+sortscmp(tchar **a1, tchar **a2)
 {
 
 	return (strcoll_(*a1, *a2));
 }
 
-expand(as)
-	tchar *as;
+void
+expand(tchar *as)
 {
-	register tchar *cs;
-	register tchar *sgpathp, *oldcs;
+	tchar *cs;
+	tchar *sgpathp, *oldcs;
 	struct stat stb;
 
 #ifdef TRACE
@@ -212,12 +225,12 @@ endit:
 	*gpathp = 0;
 }
 
-matchdir_(pattern)
-	tchar *pattern;
+void
+matchdir_(tchar *pattern)
 {
 	struct stat stb;
-	register struct dirent *dp;
-	register DIR *dirp;
+	struct dirent *dp;
+	DIR *dirp;
 	tchar curdir_[MAXNAMLEN+1];
 	int slproc = 0;
 
@@ -265,11 +278,11 @@ patherr2:
 	Perror(gpath);
 }
 
-execbrc(p, s)
-	tchar *p, *s;
+int
+execbrc(tchar *p, tchar *s)
 {
 	tchar restbuf[BUFSIZ + 2];
-	register tchar *pe, *pm, *pl;
+	tchar *pe, *pm, *pl;
 	int brclev = 0;
 	tchar *lm, savec, *sgpathp;
 	int slproc = 0;
@@ -346,12 +359,11 @@ doit:
 	return (0);
 }
 
-match(s, p, slproc)
-	tchar *s, *p;
-	int *slproc;
+int
+match(tchar *s, tchar *p, int *slproc)
 {
-	register int c;
-	register tchar *sentp;
+	int c;
+	tchar *sentp;
 	tchar sglobbed = globbed;
 
 #ifdef TRACE
@@ -367,11 +379,10 @@ match(s, p, slproc)
 	return (c);
 }
 
-amatch(s, p, slproc)
-	register tchar *s, *p;
-	int *slproc;
+int
+amatch(tchar *s, tchar *p, int *slproc)
 {
-	register int scc;
+	int scc;
 	int ok, lc;
 	tchar *sgpathp;
 	struct stat stb;
@@ -479,10 +490,10 @@ slash:
 	}
 }
 
-Gmatch(s, p)
-	register tchar *s, *p;
+int
+Gmatch(tchar *s, tchar *p)
 {
-	register int scc;
+	int scc;
 	int ok, lc;
 	int c, cc;
 
@@ -548,10 +559,10 @@ Gmatch(s, p)
 	}
 }
 
-Gcat(s1, s2)
-	tchar *s1, *s2;
+void
+Gcat(tchar *s1, tchar *s2)
 {
-	register tchar *p, *q;
+	tchar *p, *q;
 	int n;
 
 #ifdef TRACE
@@ -573,8 +584,8 @@ Gcat(s1, s2)
 		;
 }
 
-addpath(c)
-	tchar c;
+void
+addpath(tchar c)
 {
 
 #ifdef TRACE
@@ -586,11 +597,10 @@ addpath(c)
 	*gpathp = 0;
 }
 
-rscan(t, f)
-	register tchar **t;
-	int (*f)();
+void
+rscan(tchar **t, int (*f)(int))
 {
-	register tchar *p;
+	tchar *p;
 
 #ifdef TRACE
 	tprintf("TRACE- rscan()\n");
@@ -600,10 +610,10 @@ rscan(t, f)
 			(*f)(*p++);
 }
 
-trim(t)
-	register tchar **t;
+void
+trim(tchar **t)
 {
-	register tchar *p;
+	tchar *p;
 
 #ifdef TRACE
 	tprintf("TRACE- trim()\n");
@@ -613,10 +623,10 @@ trim(t)
 			*p++ &= TRIM;
 }
 
-tglob(t)
-	register tchar **t;
+void
+tglob(tchar **t)
 {
-	register tchar *p, c;
+	tchar *p, c;
 
 #ifdef TRACE
 	tprintf("TRACE- tglob()\n");
@@ -634,12 +644,11 @@ tglob(t)
 }
 
 tchar *
-globone(str)
-	register tchar *str;
+globone(tchar *str)
 {
 	tchar *gv[2];
-	register tchar **gvp;
-	register tchar *cp;
+	tchar **gvp;
+	tchar *cp;
 
 #ifdef TRACE
 	tprintf("TRACE- globone()\n");
@@ -682,11 +691,9 @@ globone(str)
  * not crunch blanks and tabs, separating words only at newlines.
  */
 tchar **
-dobackp(cp, literal)
-	tchar *cp;
-	bool literal;
+dobackp(tchar *cp, bool literal)
 {
-	register tchar *lp, *rp;
+	tchar *lp, *rp;
 	tchar *ep;
 	tchar word[BUFSIZ];
 	tchar *apargv[GAVSIZ + 2];
@@ -734,15 +741,14 @@ oops:
 	}
 }
 
-backeval(cp, literal)
-	tchar *cp;
-	bool literal;
+void
+backeval(tchar *cp, bool literal)
 {
 	int pvec[2];
 	int quoted = (literal || (cp[0] & QUOTE)) ? QUOTE : 0;
 	tchar ibuf[BUFSIZ];
-	register int icnt = 0, c;
-	register tchar *ip;
+	int icnt = 0, c;
+	tchar *ip;
 	bool hadnl = 0;
 	tchar *fakecom[2];
 	struct command faket;
@@ -869,8 +875,8 @@ backeval(cp, literal)
 	prestjob();
 }
 
-psave(c)
-	tchar c;
+void
+psave(tchar c)
 {
 #ifdef TRACE
 	tprintf("TRACE- psave()\n");
@@ -881,7 +887,8 @@ psave(c)
 	*pargcp++ = c;
 }
 
-pword()
+void
+pword(void)
 {
 #ifdef TRACE
 	tprintf("TRACE- pword()\n");
@@ -906,9 +913,7 @@ pword()
  *  dir is a null-terminated string;
  */
 char *
-makename(dir, file)
-	char *dir;
-	char *file;
+makename(char *dir, char *file)
 {
 	/*
 	 *  Maximum length of a
@@ -918,7 +923,7 @@ makename(dir, file)
 	 */
 	static char dfile[MAXNAMLEN];
 
-	register char *dp, *fp;
+	char *dp, *fp;
 
 	dp = dfile;
 	fp = dir;
@@ -937,10 +942,8 @@ makename(dir, file)
 	return (rindex(dfile, '/') + 1);
 }
 
-sh_bracket_exp(t_ch, t_fch, t_lch)
-tchar	t_ch;
-tchar	t_fch;
-tchar	t_lch;
+int
+sh_bracket_exp(tchar t_ch, tchar t_fch, tchar t_lch)
 {
 	char	t_char[MB_LEN_MAX + 1];
 	char	t_patan[MB_LEN_MAX * 2 + 8];
