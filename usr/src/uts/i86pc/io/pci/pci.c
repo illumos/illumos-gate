@@ -164,6 +164,14 @@ struct dev_ops pci_ops = {
 };
 
 /*
+ * This variable controls the default setting of the command register
+ * for pci devices.  See pci_initchild() for details.
+ */
+static ushort_t pci_command_default = PCI_COMM_ME |
+					PCI_COMM_MAE |
+					PCI_COMM_IO;
+
+/*
  * Internal routines in support of particular pci_ctlops.
  */
 static int pci_removechild(dev_info_t *child);
@@ -1226,6 +1234,8 @@ pci_initchild(dev_info_t *child)
 {
 	struct ddi_parent_private_data *pdptr;
 	char name[80];
+	ddi_acc_handle_t config_handle;
+	ushort_t command_preserve, command;
 
 	if (pci_name_child(child, name, 80) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
@@ -1301,6 +1311,24 @@ pci_initchild(dev_info_t *child)
 	} else
 		ddi_set_parent_data(child, NULL);
 
+	/*
+	 * initialize command register
+	 */
+	if (pci_config_setup(child, &config_handle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	/*
+	 * Support for the "command-preserve" property.
+	 */
+	command_preserve = ddi_prop_get_int(DDI_DEV_T_ANY, child,
+						DDI_PROP_DONTPASS,
+						"command-preserve", 0);
+	command = pci_config_get16(config_handle, PCI_CONF_COMM);
+	command &= (command_preserve | PCI_COMM_BACK2BACK_ENAB);
+	command |= (pci_command_default & ~command_preserve);
+	pci_config_put16(config_handle, PCI_CONF_COMM, command);
+
+	pci_config_teardown(&config_handle);
 	return (DDI_SUCCESS);
 }
 
