@@ -84,6 +84,7 @@ topo_tree_release(tnode_t *node)
 			topo_free(cur);
 			cur = nxt;
 		}
+		topo_free(re);
 	}
 	tnode_destroy(ar);
 }

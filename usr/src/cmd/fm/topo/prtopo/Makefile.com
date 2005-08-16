@@ -19,8 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,7 +43,7 @@ CPPFLAGS += -I../common
 CFLAGS += $(CTF_FLAGS)
 
 LDFLAGS += -R/usr/lib/fm
-LDLIBS += -lnvpair -L$(ROOTLIB)/fm -ltopo
+LDLIBS += -lnvpair -lumem -L$(ROOTLIB)/fm -ltopo
 
 ROOTPDIR = $(ROOT)/usr/lib/fm
 ROOTPROG = $(ROOTPDIR)/$(PROG)
@@ -60,7 +59,7 @@ lint:	$(LINTSRCS)
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(CTFMRG)
+	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
 	$(POST_PROCESS)
 
 clean:
@@ -80,4 +79,4 @@ $(ROOTPDIR)/%: %
 
 %.o: ../common/%.c
 	$(COMPILE.c) $<
-	$(CTFCONVO)
+	$(CTFCONVERT_O)
