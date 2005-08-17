@@ -335,6 +335,8 @@ retry:
 		if ((errno == EBADF) && ((++retries < 2) &&
 		    (open_door() >= 0)))
 			goto retry;
+		(void) fprintf(stderr,
+		    gettext("Unable to communicate with in.iked\n"));
 		Bail("door_call failed");
 	}
 
@@ -357,7 +359,7 @@ static int
 parsecmd(char *cmdstr, char *objstr)
 {
 #define	MAXOBJS		10
-	static struct objtbl {
+	struct objtbl {
 		char	*obj;
 		int	token;
 	};
@@ -1451,8 +1453,17 @@ print_lifetime(char *prefix, ike_p1_xform_t *xfp, ike_p1_stats_t *sp,
 		if (strftime(tbuf, TBUF_SIZE, NULL, localtime(&exp)) == 0)
 			(void) strlcpy(tbuf,
 			    gettext("<time conversion failed>"), TBUF_SIZE);
-		(void) printf(gettext("%s SA expires in %lu seconds, at %s\n"),
-		    prefix, remain, tbuf);
+		/*
+		 * The SA may have expired but still exist because libike
+		 * has not freed it yet.
+		 */
+		if (remain > 0)
+			(void) printf(gettext(
+			    "%s SA expires in %lu seconds, at %s\n"),
+			    prefix, remain, tbuf);
+		else
+			(void) printf(gettext("%s SA Expired at %s\n"),
+			    prefix, tbuf);
 	}
 }
 
@@ -2815,8 +2826,11 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (open_door() < 0)
-		Bail("failed to open door");
+	if (open_door() < 0) {
+		(void) fprintf(stderr,
+		    gettext("Unable to communicate with in.iked\n"));
+		Bail("open_door failed");
+	}
 
 	if (*argv == NULL) {
 		/* no cmd-line args, do interactive mode */
