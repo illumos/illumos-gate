@@ -1,22 +1,21 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-  
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
-# include "e.h"
-# include "e.def"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include "e.h"
+#include "e.def"
 #include <locale.h>
 
 int	csp;
@@ -26,7 +25,14 @@ char	cs[420];
 
 int	lf, rf;	/* temporary spots for left and right fonts */
 
-text(t,p1) int t; char *p1; {
+void name4(int, int);
+void roman(int);
+void shim(void);
+int trans(int, char *);
+
+void
+text(int t, char *p1)
+{
 	int c;
 	char *p;
 	tbl *tp, *lookup();
@@ -36,43 +42,48 @@ text(t,p1) int t; char *p1; {
 	ebase[yyval] = 0;
 #ifndef NEQN
 	eht[yyval] = VERT(EM(1.0, EFFPS(ps)));	/* ht in machine units */
-#else NEQN
+#else	/* NEQN */
 	eht[yyval] = VERT(2);	/* 2 half-spaces */
-#endif NEQN
+#endif	/* NEQN */
 	lfont[yyval] = rfont[yyval] = ROM;
 	if (t == QTEXT)
 		p = p1;
-	else if ( t == SPACE )
+	else if (t == SPACE)
 		p = "\\ ";
-	else if ( t == THIN )
+	else if (t == THIN)
 		p = "\\|";
-	else if ( t == TAB )
+	else if (t == TAB)
 		p = "\\t";
 	else if ((tp = lookup(&restbl, p1, NULL)) != NULL)
 		p = tp->defn;
 	else {
 		lf = rf = 0;
-		for (csp=psp=0; (c=p1[psp++])!='\0';) {
+		for (csp = psp = 0; (c = p1[psp++]) != '\0'; ) {
 			rf = trans(c, p1);
 			if (lf == 0)
 				lf = rf;	/* save first */
-			if (csp>CSSIZE)
-				error(FATAL, gettext("converted token %.25s... too long") ,p1);
+			if (csp > CSSIZE)
+				error(FATAL, gettext(
+				    "converted token %.25s... too long"), p1);
 		}
 		cs[csp] = '\0';
 		p = cs;
 		lfont[yyval] = lf;
 		rfont[yyval] = rf;
 	}
-	if(dbg)printf(".\t%dtext: S%d <- %s; b=%d,h=%d,lf=%c,rf=%c\n",
-		t, yyval, p, ebase[yyval], eht[yyval], lfont[yyval], rfont[yyval]);
+	if (dbg)
+		printf(".\t%dtext: S%d <- %s; b=%d,h=%d,lf=%c,rf=%c\n",
+		    t, yyval, p, ebase[yyval], eht[yyval], lfont[yyval],
+		    rfont[yyval]);
 	printf(".ds %d \"%s\n", yyval, p);
 }
 
-trans(c,p1) int c; char *p1; {
+int
+trans(int c, char *p1)
+{
 	int f;
 	f = ROM;
-	switch( c) {
+	switch (c) {
 	case '0': case '1': case '2': case '3': case '4':
 	case '5': case '6': case '7': case '8': case '9':
 	case ':': case ';': case '!': case '%':
@@ -95,7 +106,7 @@ trans(c,p1) int c; char *p1; {
 	case '=':
 		if (rf == ITAL)
 			shim();
-		name4('e','q');
+		name4('e', 'q');
 		break;
 	case '+':
 		if (rf == ITAL)
@@ -105,26 +116,26 @@ trans(c,p1) int c; char *p1; {
 	case '>': case '<':
 		if (rf == ITAL)
 			shim();
-		if (p1[psp]=='=') {	/* look ahead for == <= >= */
-			name4(c,'=');
+		if (p1[psp] == '=') {	/* look ahead for == <= >= */
+			name4(c, '=');
 			psp++;
 		} else {
-			cs[csp++] = c;  
+			cs[csp++] = c;
 		}
 		break;
 	case '-':
 		if (rf == ITAL)
 			shim();
-		if (p1[psp]=='>') {
-			name4('-','>'); psp++;
+		if (p1[psp] == '>') {
+			name4('-', '>'); psp++;
 		} else {
-			name4('m','i');
+			name4('m', 'i');
 		}
 		break;
 	case '/':
 		if (rf == ITAL)
 			shim();
-		name4('s','l');
+		name4('s', 'l');
 		break;
 	case '~': case ' ':
 		shim(); shim(); break;
@@ -134,24 +145,29 @@ trans(c,p1) int c; char *p1; {
 		if (rf == ITAL)
 			shim();
 		cs[csp++] = c; cs[csp++] = c = p1[psp++]; cs[csp++] = p1[psp++];
-		if (c=='(') cs[csp++] = p1[psp++];
-		if (c=='*' && cs[csp-1] == '(') {
+		if (c == '(') cs[csp++] = p1[psp++];
+		if (c == '*' && cs[csp-1] == '(') {
 			cs[csp++] = p1[psp++];
 			cs[csp++] = p1[psp++];
 		}
 		break;
 	case '\'':
-		cs[csp++] = '\\'; cs[csp++] = 'f'; cs[csp++] = rf==ITAL ? ITAL : ROM;
-		name4('f','m');
+		cs[csp++] = '\\';
+		cs[csp++] = 'f';
+		cs[csp++] = rf == ITAL ? ITAL : ROM;
+		name4('f', 'm');
 		cs[csp++] = '\\'; cs[csp++] = 'f'; cs[csp++] = 'P';
-		f = rf==ITAL ? ITAL : ROM;
+		f = rf == ITAL ? ITAL : ROM;
 		break;
 
 	case 'f':
 		if (ft == ITAL) {
 			cs[csp++] = '\\'; cs[csp++] = '^';
 			cs[csp++] = 'f';
-			cs[csp++] = '\\'; cs[csp++] = '|';	/* trying | instead of ^ */
+
+			/* trying | instead of ^ */
+			cs[csp++] = '\\'; cs[csp++] = '|';
+
 			f = ITAL;
 		}
 		else
@@ -168,23 +184,29 @@ trans(c,p1) int c; char *p1; {
 		break;
 	default:
 		cs[csp++] = c;
-		f = ft==ITAL ? ITAL : ROM;
+		f = ft == ITAL ? ITAL : ROM;
 		break;
 	}
-	return(f);
+	return (f);
 }
 
-shim() {
+void
+shim(void)
+{
 	cs[csp++] = '\\'; cs[csp++] = '|';
 }
 
-roman(c) int c; {
+void
+roman(int c)
+{
 	cs[csp++] = '\\'; cs[csp++] = 'f'; cs[csp++] = ROM;
 	cs[csp++] = c;
 	cs[csp++] = '\\'; cs[csp++] = 'f'; cs[csp++] = 'P';
 }
 
-name4(c1,c2) int c1,c2; {
+void
+name4(int c1, int c2)
+{
 	cs[csp++] = '\\';
 	cs[csp++] = '(';
 	cs[csp++] = c1;

@@ -19,33 +19,41 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.14	*/
+/*
+ *	FUNCTION PAGE INDEX
+ * Function	Page		Description
+ * append	16	Append chars to end of line.
+ * begtrunc	16	Truncate characters from beginning of line.
+ * center	5	Center text in the work area.
+ * cnvtspec	7	Convert tab spec to tab positions.
+ * endtrunc	16	Truncate chars from end of line.
+ * inputtabs	17	Expand according to input tab specs.
+ * main		3	MAIN
+ * inputn	5	Read a command line option number.
+ * options	4	Process command line options.
+ * outputtabs	19	Contract according to output tab specs.
+ * prepend	16	Prepend chars to line.
+ * process	15	Process one line of input.
+ * readline	14	Read one line from the file.
+ * readspec	12	Read a tabspec from a file.
+ * sstrip	18	Strip SCCS SID char from beginning of line.
+ * sadd		18	Add SCCS SID chars to end of line.
+ * type		14	Determine type of a character.
+ */
 
-/*	FUNCTION PAGE INDEX
-Function	Page		Description
-append		16	Append chars to end of line.
-begtrunc	16	Truncate characters from beginning of line.
-center		5	Center text in the work area.
-cnvtspec	7	Convert tab spec to tab positions.
-endtrunc	16	Truncate chars from end of line.
-inputtabs	17	Expand according to input tab specs.
-main		3	MAIN
-inputn		5	Read a command line option number.
-options		4	Process command line options.
-outputtabs	19	Contract according to output tab specs.
-prepend		16	Prepend chars to line.
-process		15	Process one line of input.
-readline	14	Read one line from the file.
-readspec	12	Read a tabspec from a file.
-sstrip		18	Strip SCCS SID char from beginning of line.
-sadd		18	Add SCCS SID chars to end of line.
-type		14	Determine type of a character.	*/
-
-#include	<stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 
 #define	MAXOPTS	50
 #define	NCOLS	512
@@ -53,22 +61,22 @@ type		14	Determine type of a character.	*/
 #define	NUMBER	'0'
 #define	LINELEN	80
 
-int	tabtbl[500] = {		/* Table containing tab stops		*/
-	1,9,17,25,33,41,49,57,65,73,0,
-				/* Default tabs				*/
-	1,10,16,36,72,0,	/* IBM 370 Assembler			*/
-	1,10,16,40,72,0,	/* IBM 370 Assembler (alt.)		*/
-	1,8,12,16,20,55,0,	/* COBOL				*/
-	1,6,10,14,49,0,		/* COBOL (crunched)			*/
-	1,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,67,0,
-				/* COBOL (crunched, many cols.)		*/
-	1,7,11,15,19,23,0,	/* FORTRAN				*/
-	1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,0,
-				/* PL/1					*/
-	1,10,55,0,		/* SNOBOL				*/
-	1,12,20,44,0 },		/* UNIVAC Assembler			*/
+static int tabtbl[500] = {		/* Table containing tab stops	*/
+	1, 9, 17, 25, 33, 41, 49, 57, 65, 73, 0,
+					/* Default tabs			*/
+	1, 10, 16, 36, 72, 0,		/* IBM 370 Assembler		*/
+	1, 10, 16, 40, 72, 0,		/* IBM 370 Assembler (alt.)	*/
+	1, 8, 12, 16, 20, 55, 0,	/* COBOL			*/
+	1, 6, 10, 14, 49, 0,		/* COBOL (crunched)		*/
+	1, 6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 50, 54, 58, 62, 67, 0,
+					/* COBOL (crunched, many cols.)	*/
+	1, 7, 11, 15, 19, 23, 0,	/* FORTRAN			*/
+	1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 0,
+					/* PL/1				*/
+	1, 10, 55, 0,			/* SNOBOL			*/
+	1, 12, 20, 44, 0 },		/* UNIVAC Assembler		*/
 
-	*nexttab = &tabtbl[87],	/* Pointer to next empty slot		*/
+	*nexttab = &tabtbl[87],		/* Pointer to next empty slot	*/
 
 	*spectbl[40] = {	/* Table of pointers into tabtbl	*/
 	&tabtbl[0],		/* Default specification		*/
@@ -83,17 +91,17 @@ int	tabtbl[500] = {		/* Table containing tab stops		*/
 	&tabtbl[82] },		/* -u  specification			*/
 
 	savek;		/* Stores char count stripped from front of line. */
-int	nextspec = 10,		/* Index to next slot			*/
+static int nextspec = 10,	/* Index to next slot			*/
 	sitabspec = -1,		/* Index to "standard input" spec.	*/
 	effll	= 80,		/* Effective line length		*/
 	optionf = 0,		/* 'f' option set			*/
 	soption = 0,		/* 's' option used. */
 	files	= 0,		/* Number of input files		*/
 	kludge	= 0,		/* Kludge to allow reread of 1st line	*/
-	okludge = 0,		/* Kludge to indicate reading "o" option*/
+	okludge = 0,		/* Kludge to indicate reading "o" option */
 	lock	= 0;		/* Lock to prevent file indirection	*/
 
-char	pachar = ' ',		/* Prepend/append character		*/
+static char pachar = ' ',	/* Prepend/append character		*/
 	work[3*NCOLS+1],	/* Work area				*/
 	*pfirst,		/* Pointer to beginning of line 	*/
 	*plast,			/* Pointer to end of line		*/
@@ -101,55 +109,69 @@ char	pachar = ' ',		/* Prepend/append character		*/
 	*wlast  = &work[3*NCOLS], /* Pointer to end of work area	*/
 	siline[NCOLS],		/* First standard input line		*/
 	savchr[8],		/* Holds char stripped from line start */
-	format[80] = "-8",	/* Array to hold format line		*/
-	*strcpy();		/* Eliminates a warning by 'lint'. */
+	format[80] = "-8";	/* Array to hold format line		*/
 
-struct f {
+static struct f {
 	char	option;
 	int	param;
 	}	optl[MAXOPTS],	/* List of command line options 	*/
 		*flp = optl;	/* Pointer to next open slot		*/
-main(argc,argv)			/* Main procedure	 		*/
-int	argc;			/* Count of command line arguments	*/
-char	**argv;			/* Array of pointers to arguments	*/
+
+static void append(int);
+static void begtrunc(int);
+static void center(void);
+static int cnvtspec(char *);
+static void endtrunc(int);
+static int inputn(char *);
+static void inputtabs(int);
+static void options(int, char **);
+static void outputtabs(int);
+static void prepend(int);
+static void process(FILE *);
+static char *readline(FILE *, char *);
+static int readspec(char *);
+static void sadd(void);
+static void sstrip(void);
+static char type(char);
+
+int
+main(int argc, char **argv)
 {
 	char	*scan;		/* String scan pointer			*/
 	FILE	*fp;		/* Pointer to current file		*/
 
-	options(argc,argv);
-	if (optionf)		/* Write tab spec format line. */
-		{fputs("<:t",stdout);
-		fputs(format,stdout);
-		fputs(" d:>\n",stdout);
-		}
+	options(argc, argv);
+	if (optionf) {		/* Write tab spec format line. */
+		(void) fputs("<:t", stdout);
+		(void) fputs(format, stdout);
+		(void) fputs(" d:>\n", stdout);
+	}
 	if (files) {
 		while (--argc) {
 			scan = *++argv;
 			if (*scan != '-') {
-				if ((fp = fopen(scan,"r")) == NULL) {
-					fprintf(stderr,
-					"newform: can't open %s\n",scan);
+				if ((fp = fopen(scan, "r")) == NULL) {
+					(void) fprintf(stderr,
+					    "newform: can't open %s\n", scan);
 					exit(1);
-					}
-				process(fp);
-				fclose(fp);
 				}
+				process(fp);
+				(void) fclose(fp);
 			}
 		}
-	else {
+	} else {
 		process(stdin);
-		}
-	exit(0);
+	}
+	return (0);
 }
 
 
-options(argc, argv)		/* Process command line options		*/
-register int	argc;		/* Count of arguments			*/
-register char	**argv;		/* Array of pointers to arguments	*/
+static void
+options(int argc, char **argv)		/* Process command line options	*/
 {
 	int	n;		/* Temporary number holder		*/
-	register char	*scan,	/* Pointer to individual option strings	*/
-			c;	/* Option character			*/
+	char	*scan;		/* Pointer to individual option strings	*/
+	char	c;		/* Option character			*/
 
 /*	changes to option parsing includes checks for exceeding	*/
 /*	initial buffer sizes					*/
@@ -161,10 +183,12 @@ register char	**argv;		/* Array of pointers to arguments	*/
 			case 'a':
 				flp->option = 'a';
 				flp->param = inputn(scan);
-				if (flp->param <=NCOLS) 
+				if (flp->param <= NCOLS)
 					flp++;
 				else {
-					fprintf(stderr,"newform: prefix request larger than buffer, %d\n", NCOLS);
+					(void) fprintf(stderr, "newform: "
+					    "prefix request larger than "
+					    "buffer, %d\n", NCOLS);
 					exit(1);
 				}
 				break;
@@ -177,10 +201,12 @@ register char	**argv;		/* Array of pointers to arguments	*/
 			case 'p':
 				flp->option = 'p';
 				flp->param = inputn(scan);
-				if (flp->param <=NCOLS) 
+				if (flp->param <= NCOLS)
 					flp++;
 				else {
-					fprintf(stderr,"newform: prefix request larger than buffer, %d\n", NCOLS);
+					(void) fprintf(stderr, "newform: "
+					    "prefix request larger than "
+					    "buffer, %d\n", NCOLS);
 					exit(1);
 				}
 				break;
@@ -200,14 +226,17 @@ register char	**argv;		/* Array of pointers to arguments	*/
 				flp++;
 				break;
 			case 'o':
- 				if(*scan=='-' && *(scan+1)=='0' && *(scan+2)=='\0')break;
- 		/* Above allows the -o-0 option to be ignored. */
+				if (*scan == '-' && *(scan+1) == '0' &&
+				    *(scan+2) == '\0')
+					break;
+			/* Above allows the -o-0 option to be ignored. */
 				flp->option = 'o';
-				strcpy(format,scan);
+				(void) strcpy(format, scan);
 				okludge++;
 				flp->param = cnvtspec(scan);
 				okludge--;
-				if(flp->param == 0) strcpy(format,"-8");
+				if (flp->param == 0)
+					(void) strcpy(format, "-8");
 				flp++;
 				break;
 			case 'l':
@@ -216,7 +245,9 @@ register char	**argv;		/* Array of pointers to arguments	*/
 				if (flp->param <= (3*NCOLS))
 					flp++;
 				else {
-					fprintf(stderr, "newform: line length request larger than buffer, %d \n", (3*NCOLS));
+					(void) fprintf(stderr, "newform: "
+					    "line length request larger "
+					    "than buffer, %d \n", (3*NCOLS));
 					exit(1);
 				}
 				break;
@@ -234,15 +265,16 @@ register char	**argv;		/* Array of pointers to arguments	*/
 		}
 	return;
 usageerr:
-	fprintf(stderr,"usage: newform  [-s] [-itabspec] [-otabspec] ");
-	fprintf(stderr,"[-pn] [-en] [-an] [-f] [-cchar]\n\t\t");
-	fprintf(stderr,"[-ln] [-bn] [file ...]\n");
+	(void) fprintf(stderr, "usage: newform  [-s] [-itabspec] [-otabspec] ");
+	(void) fprintf(stderr, "[-pn] [-en] [-an] [-f] [-cchar]\n\t\t");
+	(void) fprintf(stderr, "[-ln] [-bn] [file ...]\n");
 	exit(1);
 }
 /* _________________________________________________________________ */
 
-int inputn(scan)		/* Read a command option number		*/
-register char	*scan;		/* Pointer to string of digits		*/
+static int
+inputn(char *scan)		/* Read a command option number		*/
+	/* Pointer to string of digits */
 {
 	int	n;		/* Number				*/
 	char	c;		/* Character being scanned		*/
@@ -250,51 +282,49 @@ register char	*scan;		/* Pointer to string of digits		*/
 	n = 0;
 	while ((c = *scan++) >= '0' && c <= '9')
 		n = n * 10 + c - '0';
-	return(n);
+	return (n);
 }
 /* _________________________________________________________________ */
 
-center()			/* Center the text in the work area.	*/
+static void
+center(void)			/* Center the text in the work area.	*/
 {
-	char	*tfirst,	/* Pointer for moving buffer down	*/
-		*tlast,		/* Pointer for moving buffer up		*/
-		*tptr;		/* Temporary				*/
+	char	*tfirst;	/* Pointer for moving buffer down	*/
+	char	*tlast;		/* Pointer for moving buffer up		*/
+	char	*tptr;		/* Temporary				*/
 
 	if (plast - pfirst > MAXLINE) {
-		fprintf(stderr,"newform: internal line too long\n");
+		(void) fprintf(stderr, "newform: internal line too long\n");
 		exit(1);
-		}
+	}
 	if (pfirst < &work[NCOLS]) {
 		tlast = plast + (&work[NCOLS] - pfirst);
 		tptr = tlast;
 		while (plast >= pfirst) *tlast-- = *plast--;
 		pfirst = ++tlast;
 		plast = tptr;
-		}
-	else {
+	} else {
 		tfirst = &work[NCOLS];
 		tptr = tfirst;
 		while (pfirst <= plast) *tfirst++ = *pfirst++;
 		plast = --tfirst;
 		pfirst = tptr;
-		}
+	}
 }
-int cnvtspec(p)		/* Convert tab specification to tab positions.	*/
-register char	*p;		/* Pointer to spec string.		*/
+
+static int
+cnvtspec(char *p)	/* Convert tab specification to tab positions.	*/
+	/* Pointer to spec string. */
 {
 	int	state,		/* DFA state				*/
 		spectype,	/* Specification type			*/
 		number[40],	/* Array of read-in numbers		*/
 		tp,		/* Pointer to last number		*/
 		ix;		/* Temporary				*/
-	int	tspec=0;	/* Tab spec pointer			*/
+	int	tspec = 0;	/* Tab spec pointer			*/
 	char	c,		/* Temporary				*/
-		*stptr,		/* Pointer to stdin 			*/
-		*filep,		/* Pointer to file name			*/
-		type(),		/* Function				*/
-		*readline();	/* Function				*/
-	FILE	*fopen(),	/* File open routine			*/
-		*fp;		/* File pointer				*/
+		*filep;		/* Pointer to file name			*/
+	FILE	*fp;		/* File pointer				*/
 
 	state = 0;
 	while (state >= 0) {
@@ -379,19 +409,17 @@ register char	*p;		/* Pointer to spec string.		*/
 			if (c == '\0') {
 				spectype = 12;
 				state = -1;
-				}
-			else {
+			} else {
 				filep = --p;
 				spectype = 13;
 				state = -1;
-				}
+			}
 			break;
 		case 5:
 			if (c == '\0') {
 				spectype = 1;
 				state = -1;
-				}
-			else if (c == '2')
+			} else if (c == '2')
 				state = 6;
 			else
 				goto tabspecerr;
@@ -472,29 +500,28 @@ register char	*p;		/* Pointer to spec string.		*/
 			if (type(c) == NUMBER) {
 				state = 14;
 				number[0] = number[0] * 10 + c - '0';
-				}
-			else if (c == '\0') {
+			} else if (c == '\0') {
 				spectype = 10;
 				state = -1;
-				}
-			else
+			} else
 				goto tabspecerr;
 			break;
-			}
 		}
-	if (spectype <= 9) return(spectype);
+	}
+	if (spectype <= 9)
+		return (spectype);
 	if (spectype == 10) {
 		spectype = nextspec++;
 		spectbl[spectype] = nexttab;
 		*nexttab = 1;
-	 	if(number[0] == 0)number[0] = 1; /* Prevent infinite loop. */
+		if (number[0] == 0) number[0] = 1; /* Prevent infinite loop. */
 		while (*nexttab < LINELEN) {
 			*(nexttab + 1) = *nexttab;
 			*++nexttab += number[0];
 			}
 		*nexttab++ = '\0';
-		return(spectype);
-		}
+		return (spectype);
+	}
 	if (spectype == 11) {
 		spectype = nextspec++;
 		spectbl[spectype] = nexttab;
@@ -505,19 +532,19 @@ register char	*p;		/* Pointer to spec string.		*/
 				goto tabspecerr;
 			}
 		*nexttab++ = '\0';
-		return(spectype);
-		}
+		return (spectype);
+	}
 	if (lock == 1) {
-		fprintf(stderr,"newform: tabspec indirection illegal\n");
+		(void) fprintf(stderr,
+		    "newform: tabspec indirection illegal\n");
 		exit(1);
-		}
+	}
 	lock = 1;
 	if (spectype == 12) {
 		if (sitabspec >= 0) {
 			tspec = sitabspec;
-			}
-		else {
-			if ( (stptr=readline(stdin,siline)) != NULL){
+		} else {
+			if (readline(stdin, siline) != NULL) {
 				kludge = 1;
 				tspec = readspec(siline);
 				sitabspec = tspec;
@@ -525,26 +552,30 @@ register char	*p;		/* Pointer to spec string.		*/
 		}
 	}
 	if (spectype == 13) {
-		if ((fp = fopen(filep,"r")) == NULL) {
-			fprintf(stderr,"newform: can't open %s\n", filep);
+		if ((fp = fopen(filep, "r")) == NULL) {
+			(void) fprintf(stderr,
+			    "newform: can't open %s\n", filep);
 			exit(1);
-			}
-		readline(fp,work);
-		fclose(fp);
-		tspec = readspec(work);
 		}
+		(void) readline(fp, work);
+		(void) fclose(fp);
+		tspec = readspec(work);
+	}
 	lock = 0;
-	return(tspec);
+	return (tspec);
 tabspecerr:
-	fprintf(stderr,"newform: tabspec in error\n");
-	fprintf(stderr,"tabspec is \t-a\t-a2\t-c\t-c2\t-c3\t-f\t-p\t-s\n");
-	fprintf(stderr,"\t\t-u\t--\t--file\t-number\tnumber,..,number\n");
+	(void) fprintf(stderr, "newform: tabspec in error\n");
+	(void) fprintf(stderr,
+	    "tabspec is \t-a\t-a2\t-c\t-c2\t-c3\t-f\t-p\t-s\n");
+	(void) fprintf(stderr,
+	    "\t\t-u\t--\t--file\t-number\tnumber,..,number\n");
 	exit(1);
-return(-1);	/* Stops 'lint's complaint about return(e) VS return. */
+	/* NOTREACHED */
 }
-int readspec(p)			/* Read a tabspec from a file		*/
 
-register char	*p;		/* Pointer to buffer to process		*/
+static int
+readspec(char *p)		/* Read a tabspec from a file		*/
+	/* Pointer to buffer to process */
 {
 	int	state,		/* Current state			*/
 		firsttime,	/* Flag to indicate spec found		*/
@@ -594,18 +625,20 @@ register char	*p;		/* Pointer to buffer to process		*/
 			}
 		if (c == '\n') state = -1;
 		}
-	if (okludge) strcpy(format,tabspecp);
+	if (okludge)
+		(void) strcpy(format, tabspecp);
 	value = (state == -1) ? 0 : cnvtspec(tabspecp);
 	*restore = repch;
-	return(value);
+	return (value);
 }
-char *readline(fp,area)		/* Read one line from the file.	*/
-FILE	*fp;			/* File to read from			*/
-char	*area;			/* Array of characters to read into	*/
+
+static char *
+readline(FILE *fp, char *area)		/* Read one line from the file.	*/
+	/* fp - File to read from */
+	/* area - Array of characters to read into */
 {
 	int	c;		/* Current character			*/
 	char	*xarea,		/* Temporary pointer to character array	*/
-		UNDEF = '\377',		/* Undefined char for return */
 		*temp;		/* Array pointer			*/
 
 
@@ -617,49 +650,51 @@ char	*area;			/* Array of characters to read into	*/
 	if (kludge && (fp == stdin)) {
 		if (fp != NULL) {
 			temp = siline;
-			while ((*area++ = *temp++) != '\n') ;
+			while ((*area++ = *temp++) != '\n')
+				;
 			kludge = 0;
-			return(xarea);
-		}
-		else
-			return(NULL);
-	}
-	else {
+			return (xarea);
+		} else
+			return (NULL);
+	} else {
 
 /* check for exceeding size of buffer when reading valid input */
 
-		while ( wlast - area ) {
-			switch(c = getc(fp)){
+		while (wlast - area) {
+			switch (c = getc(fp)) {
 			case EOF:
 				if (area == xarea)
-					return(NULL);
-			case '\n':	/*EOF falls through to here*/
+					return (NULL);
+				/* FALLTHROUGH */
+			case '\n':	/* EOF falls through to here */
 				*area = '\n';
-				return(xarea);
+				return (xarea);
 			}
-			*area=c;
-			*area++;
+			*area = c;
+			area++;
 		}
-		printf("newform: input line larger than buffer area \n");
+		(void) printf("newform: input line larger than buffer area \n");
 		exit(1);
 	}
-return(&UNDEF);	/* Stops 'lint's complaint about return(e) VS return. */
+	/* NOTREACHED */
 }
 /* _________________________________________________________________ */
 
-char type(c)			/* Determine type of a character	*/
-char c;				/* Character to check			*/
+static char
+type(char c)			/* Determine type of a character	*/
+	/* Character to check */
 {
-	return((c >= '0') && (c <= '9') ? NUMBER : c);
+	return ((c >= '0') && (c <= '9') ? NUMBER : c);
 }
-process(fp)			/* Process one line of input		*/
-FILE	*fp;			/* File pointer for current input	*/
+
+static void
+process(FILE *fp)		/* Process one line of input		*/
+	/* File pointer for current input */
 {
 	struct	f	*lp;	/* Pointer to structs			*/
-	char	*readline();	/* Function				*/
 	char	chrnow;		/* For int to char conversion. */
 
-	while (readline(fp,&work[NCOLS]) != NULL) {
+	while (readline(fp, &work[NCOLS]) != NULL) {
 		effll = 80;
 		pachar = ' ';
 		pfirst = plast = &work[NCOLS];
@@ -668,7 +703,7 @@ FILE	*fp;			/* File pointer for current input	*/
 /*	changes to line parsing includes checks for exceeding	*/
 /*	line size when modifying text				*/
 
-		for (lp = optl ; lp < flp ; lp++) {
+		for (lp = optl; lp < flp; lp++) {
 			switch (lp->option) {
 			case 'a':
 				append(lp->param);
@@ -677,7 +712,10 @@ FILE	*fp;			/* File pointer for current input	*/
 				if (lp->param <= (plast - pfirst))
 					begtrunc(lp->param);
 				else
-					fprintf(stderr,"newform: truncate request larger than line, %d \n", (plast - pfirst));
+					(void) fprintf(stderr,
+					    "newform: truncate "
+					    "request larger than line, %d \n",
+					    (plast - pfirst));
 				break;
 			case 'c':
 				chrnow = lp->param;
@@ -687,7 +725,10 @@ FILE	*fp;			/* File pointer for current input	*/
 				if (lp->param <= (plast - pfirst))
 					endtrunc(lp->param);
 				else
-					fprintf(stderr,"newform: truncate request larger than line, %d \n", (plast - pfirst));
+					(void) fprintf(stderr,
+					    "newform: truncate "
+					    "request larger than line, %d \n",
+					    (plast - pfirst));
 				break;
 			case 'f':
 				/* Ignored */
@@ -707,15 +748,17 @@ FILE	*fp;			/* File pointer for current input	*/
 			case 'p':
 				prepend(lp->param);
 				break;
-				}
 			}
-		if(soption)sadd();
-		*++plast = '\0';
-		fputs(pfirst,stdout);
 		}
+		if (soption) sadd();
+		*++plast = '\0';
+		(void) fputs(pfirst, stdout);
+	}
 }
-append(n)			/* Append characters to end of line.	*/
-int	n;			/* Number of characters to append.	*/
+
+static void
+append(int n)			/* Append characters to end of line.	*/
+	/* Number of characters to append. */
 {
 	if (plast - pfirst < effll) {
 		n = n ? n : effll - (plast - pfirst);
@@ -726,8 +769,9 @@ int	n;			/* Number of characters to append.	*/
 }
 /* _________________________________________________________________ */
 
-prepend(n)			/* Prepend characters to line.		*/
-int	n;			/* Number of characters to prepend.	*/
+static void
+prepend(int n)			/* Prepend characters to line.		*/
+	/* Number of characters to prepend. */
 {
 	if (plast - pfirst < effll) {
 		n = n ? n : effll - (plast - pfirst);
@@ -737,8 +781,9 @@ int	n;			/* Number of characters to prepend.	*/
 }
 /* _________________________________________________________________ */
 
-begtrunc(n)		/* Truncate characters from beginning of line.	*/
-int	n;			/* Number of characters to truncate.	*/
+static void
+begtrunc(int n)		/* Truncate characters from beginning of line.	*/
+	/* Number of characters to truncate. */
 {
 	if (plast - pfirst > effll) {
 		n = n ? n : plast - pfirst - effll;
@@ -749,8 +794,9 @@ int	n;			/* Number of characters to truncate.	*/
 }
 /* _________________________________________________________________ */
 
-endtrunc(n)			/* Truncate characters from end of line.*/
-int	n;			/* Number of characters to truncate.	*/
+static void
+endtrunc(int n)			/* Truncate characters from end of line. */
+	/* Number of characters to truncate. */
 {
 	if (plast - pfirst > effll) {
 		n = n ? n : plast - pfirst - effll;
@@ -761,13 +807,15 @@ int	n;			/* Number of characters to truncate.	*/
 			*plast = '\n';
 		}
 }
-inputtabs(p)		/* Expand according to input tab specifications.*/
-int	p;			/* Pointer to tab specification.	*/
+
+static void
+inputtabs(int p)	/* Expand according to input tab specifications. */
+	/* Pointer to tab specification. */
 {
 	int	*tabs;		/* Pointer to tabs			*/
 	char	*tfirst,	/* Pointer to new buffer start		*/
 		*tlast;		/* Pointer to new buffer end		*/
-	register char c;	/* Character being scanned		*/
+	char	c;		/* Character being scanned		*/
 	int	logcol;		/* Logical column			*/
 
 	tabs = spectbl[p];
@@ -798,51 +846,63 @@ int	p;			/* Pointer to tab specification.	*/
 	pfirst = tfirst;
 	plast = --tlast;
 }
-/* Add SCCS SID (generated by a "get -m" command) to the end of each line.
-Sequence is as follows for EACH line:
-	Check for at least 1 tab.  Err if none.
-	Strip off all char up to & including first tab.
-	If more than 8 char were stripped, the 8 th is replaced by
-		a '*' & the remainder are discarded.
-	Unless user specified an "a", append blanks to fill
-		out line to eff. line length (default= 72 char).
-	Truncate lines > eff. line length (default=72).
-	Add stripped char to end of line.	*/
-sstrip()
+/*
+ * Add SCCS SID (generated by a "get -m" command) to the end of each line.
+ * Sequence is as follows for EACH line:
+ *	Check for at least 1 tab.  Err if none.
+ *	Strip off all char up to & including first tab.
+ *	If more than 8 char were stripped, the 8 th is replaced by
+ *		a '*' & the remainder are discarded.
+ *	Unless user specified an "a", append blanks to fill
+ *		out line to eff. line length (default= 72 char).
+ *	Truncate lines > eff. line length (default=72).
+ *	Add stripped char to end of line.
+ */
+static void
+sstrip(void)
 {
-	register int i, k;
-	char *c,*savec;
+	int i, k;
+	char *c, *savec;
 
 	k = -1;
 	c = pfirst;
-	while(*c != '\t' && *c != '\n'){k++; c++;}
-	if(*c != '\t'){fprintf(stderr,"not -s format\r\n"); exit(1);}
+	while (*c != '\t' && *c != '\n') {
+		k++;
+		c++;
+	}
+	if (*c != '\t') {
+		(void) fprintf(stderr, "not -s format\r\n");
+		exit(1);
+	}
 
 	savec = c;
 	c = pfirst;
 	savek = (k > 7) ? 7 : k;
-	for(i=0; i <= savek; i++)savchr[i] = *c++;	/* Tab not saved */
-	if(k > 7)savchr[7] = '*';
+	for (i = 0; i <= savek; i++) savchr[i] = *c++;	/* Tab not saved */
+	if (k > 7) savchr[7] = '*';
 
 	pfirst = ++savec;		/* Point pfirst to char after tab */
 }
 /* ================================================================= */
 
-sadd()
+static void
+sadd(void)
 {
-	register int i;
+	int i;
 
-	for(i=0; i <= savek; i++)*plast++ = savchr[i];
+	for (i = 0; i <= savek; i++) *plast++ = savchr[i];
 	*plast = '\n';
 }
-outputtabs(p)	/* Contract according to output tab specifications.	*/
-int	p;			/* Pointer to tab specification.	*/
+
+static void
+outputtabs(int p)	/* Contract according to output tab specifications. */
+	/* Pointer to tab specification. */
 {
 	int	*tabs;		/* Pointer to tabs			*/
 	char	*tfirst,	/* Pointer to new buffer start		*/
 		*tlast,		/* Pointer to new buffer end		*/
 		*mark;		/* Marker pointer			*/
-	register char c;	/* Character being scanned		*/
+	char c;			/* Character being scanned		*/
 	int	logcol;		/* Logical column			*/
 
 	tabs = spectbl[p];

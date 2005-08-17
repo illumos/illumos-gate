@@ -1,19 +1,25 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
 
-# ident	"%Z%%M%	%I%	%E% SMI"	/* "@(#)ucbeqn:e.h 1.1" */
+#ifndef	_E_H
+#define	_E_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #include <stdio.h>
 
@@ -22,18 +28,18 @@
 #ifndef NEQN
 #define	ITAL	'2'
 #define	BLD	'3'
-#else NEQN
+#else	/* NEQN */
 #define	ITAL	'1'
 #define	BLD	'1'
-#endif NEQN
+#endif	/* NEQN */
 
 #ifndef NEQN
 #define	VERT(n)	((((n)+1)/3)*3)
-#define POINT	72
-#define EM(m, ps)	(int)((((float)(m)*(ps) * resolution) / POINT))
-#else NEQN
+#define	POINT	72
+#define	EM(m, ps)	(int)((((float)(m)*(ps) * resolution) / POINT))
+#else	/* NEQN */
 #define	VERT(n)	(20 * (n))
-#endif NEQN
+#endif	/* NEQN */
 #define	EFFPS(p)	((p) >= 6 ? (p) : 6)
 
 extern int	dbg;
@@ -70,3 +76,9 @@ typedef struct s_tbl {
 	struct s_tbl *next;
 } tbl;
 extern  char    *spaceval;  /* use in place of normal \x (for pic) */
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _E_H */

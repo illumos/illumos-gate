@@ -181,6 +181,7 @@ COMMON_SUBDIRS = \
 	cmd/msgid \
 	cmd/mt \
 	cmd/mv \
+	cmd/newform \
 	cmd/newtask \
 	cmd/nice \
 	cmd/nispasswd \

@@ -1,21 +1,20 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-  
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
-# include "e.h"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include "e.h"
 #include "e.def"
 #include <locale.h>
 
@@ -28,43 +27,43 @@ tbl	*deftbl[TBLSIZE];	/* user-defined names */
 struct {
 	char	*key;
 	int	keyval;
-} keyword[]	={
-	"sub", 	SUB, 
-	"sup", 	SUP, 
-	".EN", 	EOF, 
-	"from", 	FROM, 
-	"to", 	TO, 
-	"sum", 	SUM, 
-	"hat", 	HAT, 
-	"vec", VEC, 
-	"dyad", DYAD, 
-	"dot", 	DOT, 
-	"dotdot", 	DOTDOT, 
-	"bar", 	BAR, 
-	"tilde", 	TILDE, 
-	"under", 	UNDER, 
-	"prod", 	PROD, 
-	"int", 	INT, 
-	"integral", 	INT, 
-	"union", 	UNION, 
-	"inter", 	INTER, 
-	"pile", 	PILE, 
-	"lpile", 	LPILE, 
-	"cpile", 	CPILE, 
-	"rpile", 	RPILE, 
-	"over", 	OVER, 
-	"sqrt", 	SQRT, 
-	"above", 	ABOVE, 
-	"size", 	SIZE, 
-	"font", 	FONT, 
-	"fat", FAT, 
-	"roman", 	ROMAN, 
-	"italic", 	ITALIC, 
-	"bold", 	BOLD, 
-	"left", 	LEFT, 
-	"right", 	RIGHT, 
-	"delim", 	DELIM, 
-	"define", 	DEFINE, 
+} keyword[]	= {
+	"sub", 	SUB,
+	"sup", 	SUP,
+	".EN", 	EOF,
+	"from", 	FROM,
+	"to", 	TO,
+	"sum", 	SUM,
+	"hat", 	HAT,
+	"vec", VEC,
+	"dyad", DYAD,
+	"dot", 	DOT,
+	"dotdot", 	DOTDOT,
+	"bar", 	BAR,
+	"tilde", 	TILDE,
+	"under", 	UNDER,
+	"prod", 	PROD,
+	"int", 	INT,
+	"integral", 	INT,
+	"union", 	UNION,
+	"inter", 	INTER,
+	"pile", 	PILE,
+	"lpile", 	LPILE,
+	"cpile", 	CPILE,
+	"rpile", 	RPILE,
+	"over", 	OVER,
+	"sqrt", 	SQRT,
+	"above", 	ABOVE,
+	"size", 	SIZE,
+	"font", 	FONT,
+	"fat", FAT,
+	"roman", 	ROMAN,
+	"italic", 	ITALIC,
+	"bold", 	BOLD,
+	"left", 	LEFT,
+	"right", 	RIGHT,
+	"delim", 	DELIM,
+	"define", 	DEFINE,
 
 #ifdef	NEQN	/* make ndefine synonym for define, tdefine a no-op */
 
@@ -73,33 +72,33 @@ struct {
 
 #else		/* tdefine = define, ndefine = no-op */
 
-	"tdefine", 	DEFINE, 
-	"ndefine", 	NDEFINE, 
+	"tdefine", 	DEFINE,
+	"ndefine", 	NDEFINE,
 
 #endif
 
-	"gsize", 	GSIZE, 
-	".gsize", 	GSIZE, 
-	"gfont", 	GFONT, 
-	"include", 	INCLUDE, 
-	"up", 	UP, 
-	"down", 	DOWN, 
-	"fwd", 	FWD, 
-	"back", 	BACK, 
-	"mark", 	MARK, 
-	"lineup", 	LINEUP, 
-	"matrix", 	MATRIX, 
-	"col", 	COL, 
-	"lcol", 	LCOL, 
-	"ccol", 	CCOL, 
-	"rcol", 	RCOL, 
+	"gsize", 	GSIZE,
+	".gsize", 	GSIZE,
+	"gfont", 	GFONT,
+	"include", 	INCLUDE,
+	"up", 	UP,
+	"down", 	DOWN,
+	"fwd", 	FWD,
+	"back", 	BACK,
+	"mark", 	MARK,
+	"lineup", 	LINEUP,
+	"matrix", 	MATRIX,
+	"col", 	COL,
+	"lcol", 	LCOL,
+	"ccol", 	CCOL,
+	"rcol", 	RCOL,
 	0, 	0
 };
 
 struct {
 	char	*res;
 	char	*resval;
-} resword[]	={
+} resword[]	= {
 	">=",	"\\(>=",
 	"<=",	"\\(<=",
 	"==",	"\\(==",
@@ -199,13 +198,13 @@ struct {
 	0,	0
 };
 
-tbl *lookup(tblp, name, defn)	/* find name in tbl. if defn non-null, install */
-tbl **tblp;
-char *name, *defn;
+/* find name in tbl. if defn non-null, install */
+tbl *
+lookup(tbl **tblp, char *name, char *defn)
 {
-	register tbl *p;
-	register int h;
-	register unsigned char *s = (unsigned char *)name;
+	tbl *p;
+	int h;
+	unsigned char *s = (unsigned char *)name;
 	char *malloc();
 
 	for (h = 0; *s != '\0'; )
@@ -216,27 +215,28 @@ char *name, *defn;
 		if (strcmp(name, p->name) == 0) {	/* found it */
 			if (defn != NULL)
 				p->defn = defn;
-			return(p);
+			return (p);
 		}
 	/* didn't find it */
 	if (defn == NULL)
-		return(NULL);
+		return (NULL);
 	p = (tbl *) malloc(sizeof (tbl));
 	if (p == NULL)
-		error(FATAL, gettext("out of space in lookup"));
+		error(FATAL, gettext("out of space in lookup"), NULL);
 	p->name = name;
 	p->defn = defn;
 	p->next = tblp[h];
 	tblp[h] = p;
-	return(p);
+	return (p);
 }
 
-init_tbl()	/* initialize all tables */
+void
+init_tbl(void)	/* initialize all tables */
 {
 	int i;
 
 	for (i = 0; keyword[i].key != NULL; i++)
-		lookup(keytbl, keyword[i].key, keyword[i].keyval);
+		lookup(keytbl, keyword[i].key, (char *)keyword[i].keyval);
 	for (i = 0; resword[i].res != NULL; i++)
 		lookup(restbl, resword[i].res, resword[i].resval);
 }
