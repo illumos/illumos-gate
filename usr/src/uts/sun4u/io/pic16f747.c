@@ -344,10 +344,8 @@ pic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 {
 	int	inst;
 	int	node;
-	int	ntries;
 	struct pic_softc *softc;
 	uint8_t	in_command;
-	uint8_t	status;
 	int16_t	tempr;
 
 	inst = PIC_MINOR_TO_INST(getminor(dev));
@@ -366,35 +364,6 @@ pic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	if ((node >= N_PIC_NODES) || (node < 1)) {
 		mutex_exit(&softc->mutex);
 		return (ENXIO);
-	}
-
-	/* Check status register */
-	for (ntries = 0; ntries < MAX_RETRIES; ntries++) {
-		status = ddi_get8(softc->cmd_handle,
-		    (uint8_t *)softc->cmd_reg + RF_STATUS);
-
-		if (status == 0xff) {
-			mutex_exit(&softc->mutex);
-			return (EIO);
-		}
-
-		if ((cmd == PIC_GET_STATUS) || (((status & ST_ENV_BUSY) == 0) &&
-		    ((status & ST_STALE_ADT_DATA) == 0) &&
-		    ((status & ST_STALE_LM_DATA) == 0))) {
-			break;
-		}
-
-		/*
-		 * We need 5us delay between 2 register reads
-		 * this give enough time for the pic to be updated.
-		 * we are waiting 10us to give us some breathing room.
-		 */
-		drv_usecwait(10);
-	}
-
-	if (ntries == MAX_RETRIES) {
-		mutex_exit(&softc->mutex);
-		return (EBUSY);
 	}
 
 	switch (cmd) {
@@ -455,7 +424,8 @@ pic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	case PIC_GET_STATUS:
 		mutex_exit(&softc->mutex);
 
-		in_command = status;
+		/* we don't read the status reg anymore */
+		in_command = 0;
 		(void) ddi_copyout(&in_command, (caddr_t)arg, 1, mode);
 
 		return (0);
@@ -482,6 +452,7 @@ pic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	case PIC_SET_ESTAR_MODE:
 		(void) ddi_put8(softc->cmd_handle,
 		    (uint8_t *)softc->cmd_reg + RF_COMMAND, CMD_TO_ESTAR);
+		mutex_exit(&softc->mutex);
 		return (0);
 
 	default:
