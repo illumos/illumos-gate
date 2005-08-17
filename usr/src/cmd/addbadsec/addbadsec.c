@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,10 +64,12 @@ extern	int	gbadsl_chain_cnt;
 
 int		alts_fd;
 
-void
-main(argc, argv)
-int	argc;
-char	*argv[];
+static void giveusage(void);
+static void rd_gbad(FILE *badsecfd);
+static void add_gbad(int badsec_entry);
+
+int
+main(int argc, char *argv[])
 {
 	extern int	optind;
 	extern char	*optarg;
@@ -243,14 +245,15 @@ char	*argv[];
 	fclose(badsecfd);
 	close (alts_fd);
 	close (devfd);
-	exit(0);
+	return(0);
 }
 
 /*
  * Giveusage ()
  * Give a (not so) concise message on how to use this program.
  */
-giveusage()
+static
+void giveusage(void)
 {
 	fprintf(stderr, "%s [-p] [-a sector] [-f filename] raw-device\n", progname);
 	fprintf(stderr, "	p - Print existing bad block map\n");
@@ -264,8 +267,8 @@ giveusage()
 /*
  *	read in the additional growing bad sectors 
  */
-rd_gbad(badsecfd)
-FILE	*badsecfd;
+static void
+rd_gbad(FILE *badsecfd)
 {
 	int	badsec_entry;
 	int	status;
@@ -277,8 +280,8 @@ FILE	*badsecfd;
 	}
 }
 
-add_gbad(badsec_entry)
-int	badsec_entry;
+static void
+add_gbad(int badsec_entry)
 {
 	struct badsec_lst *blc_p;
 
@@ -385,6 +388,7 @@ byte_swap_16 (u_short niv)
 	return (rc);
 }
 
+int
 try_hw_remap ()
 {
 	struct badsec_lst *blc_p;

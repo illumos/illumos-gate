@@ -68,7 +68,7 @@ static char	eol = '\n';	  /* end-of-line char (if -n, we set to '\n') */
 static int	print_warn = 1;	  /* should the warning message be printed? */
 static int do_scan = VER_READ;
 
-void
+int
 main(int argc, char *argv[]) {
 	extern int	optind;
 	int		devfd;	/* device file descriptor */
@@ -151,7 +151,7 @@ main(int argc, char *argv[]) {
 	unix_base = part_info.p_start;
 	unix_size = part_info.p_length;
 	scandisk(device, devfd, do_scan);
-	exit(0);
+	return (0);
 }
 
 /*

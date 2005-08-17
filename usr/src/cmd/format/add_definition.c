@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,7 +138,7 @@ Neither the disk type nor the partitioning has been changed.\n");
 	 */
 	prompt = "Enter file name";
 	(void) strcpy(x.deflt_str, "./format.dat");
-	filename = (char *)input(FIO_OSTR, prompt,
+	filename = (char *)(uintptr_t)input(FIO_OSTR, prompt,
 		':', (u_ioparam_t *)NULL, &x.xfoo, DATA_INPUT);
 	assert(filename != NULL);
 	/*

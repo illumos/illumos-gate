@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,10 +79,8 @@ static void	get_disk_characteristics();
 /*
  * This is the main entry point.
  */
-void
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	int	i;
 	int	ret_code = 1;
@@ -312,10 +310,9 @@ main(argc, argv)
 	run_menu(menu_command, "FORMAT", "format", 1);
 
 	/*
-	 * normal ending. Explicitly exit(0);
+	 * normal ending. Explicitly return(0);
 	 */
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
 /*

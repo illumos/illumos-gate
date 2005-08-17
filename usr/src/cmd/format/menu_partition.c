@@ -330,7 +330,8 @@ p_name()
 	 * Ask for the name.  Note that the input routine will malloc
 	 * space for the name since we are using the OSTR input type.
 	 */
-	name = (char *)input(FIO_OSTR, "Enter table name (remember quotes)",
+	name = (char *)(uintptr_t)input(FIO_OSTR,
+	    "Enter table name (remember quotes)",
 	    ':', (u_ioparam_t *)NULL, (int *)NULL, DATA_INPUT);
 	/*
 	 * Lock out interrupts.

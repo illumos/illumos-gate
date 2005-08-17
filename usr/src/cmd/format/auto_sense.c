@@ -1314,7 +1314,8 @@ find_scsi_ctlr_type()
 	}
 
 	impossible("no SCSI controller type");
-	/*NOTREACHED*/
+
+	return ((struct ctlr_type *)NULL);
 }
 
 
@@ -1344,7 +1345,8 @@ find_scsi_ctlr_info(
 	}
 
 	impossible("no SCSI controller info");
-	/*NOTREACHED*/
+
+	return ((struct ctlr_info *)NULL);
 }
 
 
@@ -1519,7 +1521,8 @@ find_scsi_disk_info(
 	}
 
 	impossible("No SCSI disk info instance\n");
-	/*NOTREACHED*/
+
+	return ((struct disk_info *)NULL);
 }
 
 

@@ -1497,7 +1497,7 @@ c_label()
 		(void) strlcpy(cur_dtype->revision, efinfo.revision, 5);
 		cur_dtype->capacity = efinfo.capacity;
 		free(cur_dtype->dtype_asciilabel);
-		ncyl = pcyl = nsect = psect = acyl = psect = phead = 0;
+		ncyl = pcyl = nsect = psect = acyl = phead = 0;
 
 		return (0);
 	    }

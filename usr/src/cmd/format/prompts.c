@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991, 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -447,7 +447,7 @@ get_bps()
 char *
 get_asciilabel()
 {
-	return ((char *)input(FIO_OSTR,
+	return ((char *)(uintptr_t)input(FIO_OSTR,
 	    "Enter disk type name (remember quotes)", ':',
 	    (u_ioparam_t *)NULL, (int *)NULL, DATA_INPUT));
 }

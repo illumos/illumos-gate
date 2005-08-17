@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -558,8 +558,8 @@ d_dump()
 	 * input will be in malloc'd space since we are inputting
 	 * type OSTR.
 	 */
-	str = (char *)input(FIO_OSTR, "Enter name of defect file", ':',
-	    (u_ioparam_t *)NULL, (int *)NULL, DATA_INPUT);
+	str = (char *)(uintptr_t)input(FIO_OSTR, "Enter name of defect file",
+	    ':', (u_ioparam_t *)NULL, (int *)NULL, DATA_INPUT);
 	/*
 	 * Lock out interrupts so the file doesn't get half written.
 	 */
@@ -623,8 +623,8 @@ d_load()
 	 * Ask the user for the name of the defect file.  Note that the
 	 * input will be malloc'd space since we inputted type OSTR.
 	 */
-	str = (char *)input(FIO_OSTR, "Enter name of defect file", ':',
-	    (u_ioparam_t *)NULL, (int *)NULL, DATA_INPUT);
+	str = (char *)(uintptr_t)input(FIO_OSTR, "Enter name of defect file",
+	    ':', (u_ioparam_t *)NULL, (int *)NULL, DATA_INPUT);
 	/*
 	 * Copy the file name into local space then destroy the string
 	 * it came in.  This is simply a precaution against later having

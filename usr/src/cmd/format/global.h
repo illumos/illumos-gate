@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@ extern "C" {
 #define	L_TYPE_EFI	1
 
 #ifndef	UINT_MAX64
-#define	UINT_MAX64	0xffffffffffffffff
+#define	UINT_MAX64	0xffffffffffffffffULL
 #endif
 
 #ifndef UINT_MAX32

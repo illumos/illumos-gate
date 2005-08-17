@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,12 +69,37 @@ extern int	alts_fd;
 struct	alts_mempart alts_part = { 0, NULL, 0 };
 struct	alts_mempart *ap = &alts_part;	/* pointer to incore alts tables     */
 
+static void read_altsctr(struct partition *part, int badok);
+static void chk_badsec    (void);
+static void init_altsctr  (void);
+       void wr_altsctr    (void);
+static void get_badsec    (void);
+static int  count_badsec  (void);
+static void gen_alts_ent  (void);
+static void assign_altsctr(void);
+static void expand_map    (void);
+static void compress_map  (void);
+static int  altsmap_getbit(daddr_t badsec);
+static int  altsmap_alloc(daddr_t srt_ind, daddr_t end_ind, int cnt, int dir);
+static void ent_sort(struct alts_ent buf[], int cnt);
+static void ent_compress(struct alts_ent buf[], int cnt);
+static int  ent_merge(
+	struct alts_ent buf[],
+	struct alts_ent list1[],
+	int    lcnt1,
+	struct alts_ent list2[],
+	int    lcnt2);
+static int  ent_bsearch(struct alts_ent buf[], int cnt, struct alts_ent *key);
+static int  chk_bad_altsctr(daddr_t badsec);
+       int  print_altsec(struct partition *part);
+static void print_altsctr(void);
+static int  absdsk_io(int fd, uint srtsec, char *bufp, uint len, int ioflag);
+
 /*
  * updatebadsec () -- update bad sector/track mapping tables
  */
-updatebadsec(part, init_flag)
-int	init_flag;
-struct  partition *part;
+int
+updatebadsec(struct partition *part, int init_flag)
 {
 	if (init_flag)
 		ap->ap_flag |= ALTS_ADDPART;
@@ -91,9 +116,8 @@ struct  partition *part;
  * read_altsctr( ptr to alternate sector partition )
  *		-- read the alternate sector partition tables
  */
-read_altsctr(part, badok)
-struct 	partition *part;
-int badok;
+static void
+read_altsctr(struct partition *part, int badok)
 {
 	int ret;
 
@@ -149,7 +173,8 @@ int badok;
 /*
  *	checking duplicate bad sectors or bad sectors in ALTSCTR partition
  */
-chk_badsec()
+static void
+chk_badsec(void)
 {
 	daddr_t	badsec;
 	daddr_t	altsp_srtsec = ap->part.p_start;
@@ -209,7 +234,8 @@ chk_badsec()
 /*
  *	initialize the alternate partition tables
  */
-init_altsctr()
+static void
+init_altsctr(void)
 {
 	daddr_t	badsec;
 	daddr_t	altsp_srtsec = ap->part.p_start;
@@ -315,20 +341,21 @@ int badok;
 /*
  *	update the new alternate partition tables on disk
  */
-wr_altsctr()
+void
+wr_altsctr(void)
 {
 	int	mystatus = FAILURE;
 
 	if (ap->ap_tblp == NULL)
 		return;
-	if (absdsk_io(alts_fd, 0, ap->ap_tblp,
+	if (absdsk_io(alts_fd, 0, (char *)ap->ap_tblp,
 		ap->ap_tbl_secsiz, CMD_WRITE) == FAILURE) {
 	    perror("Unable to write alternate sector partition: ");
 	    exit(62);
 	}
 
 	if (absdsk_io(alts_fd, ap->ap_tblp->alts_map_base,
-	    		ap->ap_mapp, ap->ap_map_secsiz, CMD_WRITE) == FAILURE){
+		(char *)ap->ap_mapp, ap->ap_map_secsiz, CMD_WRITE) == FAILURE) {
 	    perror("Unable to write alternate sector partition map: ");
 	    exit(63);
 	}
@@ -350,7 +377,8 @@ wr_altsctr()
 /*
  *	get a list of bad sector
  */
-get_badsec()
+static void
+get_badsec(void)
 {
 	int	cnt;
 	struct	badsec_lst *blc_p;
@@ -396,7 +424,8 @@ get_badsec()
  *	merging the bad sector list from surface analysis and the
  *	one given through the command line
  */
-count_badsec()
+static int
+count_badsec(void)
 {
 
 	struct badsec_lst *blc_p;
@@ -418,7 +447,9 @@ count_badsec()
  *	generate alternate entry table by merging the existing and
  *	the new entry list.
  */
-gen_alts_ent() {
+static void
+gen_alts_ent(void)
+{
 	int	ent_used;
 	struct	alts_ent *entp;
 
@@ -461,7 +492,8 @@ gen_alts_ent() {
 /*
  *	assign alternate sectors for bad sector mapping
  */
-assign_altsctr()
+static void
+assign_altsctr(void)
 {
 	int	i;
 	int	j;
@@ -494,7 +526,8 @@ assign_altsctr()
 /*
  *	transform the disk image alts bit map to incore char map
  */
-expand_map()
+static void
+expand_map(void)
 {
 	int 	i;
 
@@ -506,7 +539,8 @@ expand_map()
 /*
  *	transform the incore alts char map to the disk image bit map
  */
-compress_map()
+static void
+compress_map(void)
 {
 
 	int 	i;
@@ -535,8 +569,8 @@ compress_map()
  *	given a bad sector number, search in the alts bit map
  *	and identify the sector as good or bad
  */
-altsmap_getbit(badsec)
-daddr_t	badsec;
+static int
+altsmap_getbit(daddr_t badsec)
 {
 	int	slot = badsec / 8;
 	int	field = badsec % 8;	
@@ -553,11 +587,8 @@ daddr_t	badsec;
 /*
  *	allocate a range of sectors from the alternate partition
  */
-altsmap_alloc(srt_ind, end_ind, cnt, dir)
-daddr_t	srt_ind;
-daddr_t	end_ind;
-int	cnt;
-int	dir;
+static int
+altsmap_alloc(daddr_t srt_ind, daddr_t end_ind, int cnt, int dir)
 {
 	int	i;
 	int	total;
@@ -574,7 +605,7 @@ int	dir;
 		return(first_ind);
 
 	}
-	return(NULL);
+	return(0);
 }
 
 
@@ -582,9 +613,8 @@ int	dir;
 /*
  * 	bubble sort the entry table into ascending order
  */
-ent_sort(buf, cnt)
-struct	alts_ent buf[];
-int	cnt;
+static void
+ent_sort(struct alts_ent buf[], int cnt)
 {
 struct	alts_ent temp;
 int	flag;
@@ -615,9 +645,8 @@ int	i,j;
  *	in the entry table. The entry table must be sorted into ascending
  *	before the compression.
  */
-ent_compress(buf, cnt)
-struct	alts_ent buf[];
-int	cnt;
+static void
+ent_compress(struct alts_ent buf[], int cnt)
 {
 int	keyp;
 int	movp;
@@ -643,12 +672,13 @@ int	i;
  *	merging two entry tables into a single table. In addition,
  *	all empty slots in the entry table will be removed.
  */
-ent_merge(buf, list1, lcnt1, list2, lcnt2)
-struct	alts_ent buf[];
-struct	alts_ent list1[];
-int	lcnt1;
-struct	alts_ent list2[];
-int	lcnt2;
+static int
+ent_merge(
+	struct alts_ent buf[],
+	struct alts_ent list1[],
+	int    lcnt1,
+	struct alts_ent list2[],
+	int    lcnt2)
 {
 	int	i;
 	int	j1,j2;
@@ -684,10 +714,8 @@ int	lcnt2;
 /*
  *	binary search for bad sector in the alternate entry table
  */
-ent_bsearch(buf, cnt, key)
-struct	alts_ent buf[];
-int	cnt;
-struct	alts_ent *key;
+static int
+ent_bsearch(struct alts_ent buf[], int cnt, struct alts_ent *key)
 {
 	int	i;
 	int	ind;
@@ -725,8 +753,8 @@ struct	alts_ent *key;
 /*
  *	check for bad sector in assigned alternate sectors
  */
-chk_bad_altsctr(badsec)
-daddr_t	badsec;
+static int
+chk_bad_altsctr(daddr_t badsec)
 {
 	int	i;
 	int	j;
@@ -761,8 +789,8 @@ daddr_t	badsec;
 /*
  * print_altsec () -- print alternate sector information
  */
-print_altsec(part)
-struct  partition *part;
+int
+print_altsec(struct partition *part)
 {
 	ap->ap_tblp = NULL;
 	ap->ap_flag &= ~ALTS_ADDPART;
@@ -771,7 +799,8 @@ struct  partition *part;
 	return(SUCCESS);
 }
 
-print_altsctr()
+static void
+print_altsctr(void)
 {
 	int	i;
 	int	totalloc;
@@ -806,12 +835,8 @@ print_altsctr()
 
 }
 
-absdsk_io(fd, srtsec, bufp, len, ioflag)
-int	fd;
-uint	srtsec;
-char	*bufp;
-uint	len;
-int	ioflag;
+static int
+absdsk_io(int fd, uint srtsec, char *bufp, uint len, int ioflag)
 {
 	int	rc;
 

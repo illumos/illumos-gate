@@ -21,7 +21,8 @@
  */
 
 /*
- * Copyright (c) 1991-2001 by Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_MAIN_H
@@ -36,7 +37,7 @@ extern "C" {
 /*
  *	Prototypes for ANSI C compilers
  */
-void	main(int argc, char *argv[]);
+int	main(int argc, char *argv[]);
 int	notify_unix(void);
 void	init_globals(struct disk_info *disk);
 
