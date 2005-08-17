@@ -84,3 +84,9 @@ WORKAROUND_DEFS += -DOPTERON_ERRATUM_122
 # Erratum. Disable for now.
 #
 #WORKAROUND_DEFS += -DOPTERON_ERRATUM_123
+
+#
+# Multiprocessor Systems with Four or More Cores May Deadlock Waiting for a
+# Probe Response
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_131

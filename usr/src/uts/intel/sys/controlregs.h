@@ -142,9 +142,16 @@ extern "C" {
 #define	AMD_DC_CFG_DIS_SMC_CHK_BUF	(UINT64_C(1) << 10)
 
 /* AMD's HWCR MSR */
+
 #define	MSR_AMD_HWCR	0xc0010015
 
 #define	AMD_HWCR_FFDIS	0x40		/* set to disable TLB Flush Filter */
+
+/* AMD's NorthBridge Config MSR, SHOULD ONLY BE WRITTEN TO BY BIOS */
+
+#define	MSR_AMD_NB_CFG	0xc001001f
+
+#define	AMD_NB_CFG_SRQ_HEARTBEAT	(UINT64_C(1) << 20)
 
 /* AMD */
 #define	MSR_AMD_PATCHLEVEL	0x8b

@@ -509,8 +509,8 @@ extern void *long_mode_64(void);
  * pessimal set of workarounds needed to cope with *any* of the CPUs in the
  * system.
  *
- * These workarounds are based on Rev 3.50 of the Revision Guide for
- * AMD Athlon(tm) 64 and AMD Opteron(tm) Processors, May 2005.
+ * These workarounds are based on Rev 3.57 of the Revision Guide for
+ * AMD Athlon(tm) 64 and AMD Opteron(tm) Processors, August 2005.
  */
 
 #if defined(OPTERON_ERRATUM_91)
@@ -541,6 +541,9 @@ int opteron_erratum_122;	/* if non-zero -> at least one cpu has it */
 int opteron_erratum_123;	/* if non-zero -> at least one cpu has it */
 #endif
 
+#if defined(OPTERON_ERRATUM_131)
+int opteron_erratum_131;	/* if non-zero -> at least one cpu has it */
+#endif
 
 #define	WARNING(cpu, n)						\
 	cmn_err(CE_WARN, "cpu%d: no workaround for erratum %d",	\
@@ -769,6 +772,31 @@ workaround_errata(struct cpu *cpu)
 		}
 	}
 #endif
+
+#if defined(OPTERON_ERRATUM_131)
+	/*LINTED*/
+	if (cpuid_opteron_erratum(cpu, 131) > 0) {
+		/*
+		 * Multiprocessor Systems with Four or More Cores May Deadlock
+		 * Waiting for a Probe Response
+		 */
+		/*
+		 * Erratum 131 applies to any system with four or more cores.
+		 */
+		if ((opteron_erratum_131 == 0) && ((lgrp_plat_node_cnt *
+		    cpuid_get_ncpu_per_chip(cpu)) >= 4)) {
+			uint64_t nbcfg;
+
+			/*
+			 * Workaround is to print a warning to upgrade
+			 * the BIOS
+			 */
+			(void) rdmsr(MSR_AMD_NB_CFG, &nbcfg);
+			if (!(nbcfg & AMD_NB_CFG_SRQ_HEARTBEAT))
+				opteron_erratum_131++;
+		}
+#endif
+	}
 	return (missing);
 }
 
@@ -777,18 +805,34 @@ workaround_errata_end()
 {
 #if defined(OPTERON_ERRATUM_109)
 	if (opteron_erratum_109) {
-		cmn_err(CE_WARN, "!BIOS microcode patch for AMD Processor"
-		    " Erratum 109 was not detected. Updating BIOS with the"
-		    " microcode patch is highly recommended.");
+		cmn_err(CE_WARN,
+		    "BIOS microcode patch for AMD Athlon(tm) 64/Opteron(tm)"
+		    " processor\nerratum 109 was not detected; updating your"
+		    " system's BIOS to a version\ncontaining this"
+		    " microcode patch is HIGHLY recommended or erroneous"
+		    " system\noperation may occur.\n");
 	}
-#endif
+#endif	/* OPTERON_ERRATUM_109 */
 #if defined(OPTERON_ERRATUM_123)
 	if (opteron_erratum_123) {
-		cmn_err(CE_WARN, "!BIOS microcode patch for AMD Processor"
-		    " Erratum 123 was not detected. Updating BIOS with the"
-		    " microcode patch is highly recommended.");
+		cmn_err(CE_WARN,
+		    "BIOS microcode patch for AMD Athlon(tm) 64/Opteron(tm)"
+		    " processor\nerratum 123 was not detected; updating your"
+		    " system's BIOS to a version\ncontaining this"
+		    " microcode patch is HIGHLY recommended or erroneous"
+		    " system\noperation may occur.\n");
 	}
-#endif
+#endif	/* OPTERON_ERRATUM_123 */
+#if defined(OPTERON_ERRATUM_131)
+	if (opteron_erratum_131) {
+		cmn_err(CE_WARN,
+		    "BIOS microcode patch for AMD Athlon(tm) 64/Opteron(tm)"
+		    " processor\nerratum 131 was not detected; updating your"
+		    " system's BIOS to a version\ncontaining this"
+		    " microcode patch is HIGHLY recommended or erroneous"
+		    " system\noperation may occur.\n");
+	}
+#endif	/* OPTERON_ERRATUM_131 */
 }
 
 static ushort_t *mp_map_warm_reset_vector();

@@ -1694,7 +1694,7 @@ cpuid_get_dtlb_nent(cpu_t *cpu, size_t pagesize)
  * if it is, and negative if the status of the erratum is unknown.
  *
  * See "Revision Guide for AMD Athlon(tm) 64 and AMD Opteron(tm)
- * Processors" #25759, Rev 3.50, May 2005
+ * Processors" #25759, Rev 3.57, August 2005
  */
 int
 cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
@@ -1852,6 +1852,8 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 		return (SH_C0(eax) || CG(eax) || D0(eax) || EX(eax));
 	case 123:
 		return (JH_E1(eax) || BH_E4(eax) || JH_E6(eax));
+	case 131:
+		return (1);
 
 	default:
 		return (-1);
