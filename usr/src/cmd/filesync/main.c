@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,7 +117,7 @@ static int num_restrs = 0;
  *	implements the features.  Only file names are really processed
  *	in this routine.
  */
-void
+int
 main(int argc, char **argv)
 {	int i;
 	int c;
@@ -162,7 +162,7 @@ main(int argc, char **argv)
 					dbg_usage();
 					exit(ERR_INVAL);
 				}
-				opt_debug |= strtol(optarg, (char **) NULL, 0);
+				opt_debug |= strtol(optarg, (char **)NULL, 0);
 				break;
 
 			case 'E':	/* error simulation	*/
@@ -379,7 +379,7 @@ main(int argc, char **argv)
 
 	/* all done	*/
 	cleanup(0);
-	exit(errs);
+	return (errs);
 }
 
 
