@@ -68,7 +68,6 @@ krb5_principal	my_principal;		/* The Kerberos principal we'll be */
 				/* running under, initialized in */
 				/* get_tickets() */
 krb5_ccache	ccache;		/* Credentials cache which we'll be using */
-/* krb5_creds 	my_creds;	/* My credentials */
 krb5_creds	creds;
 krb5_address	sender_addr;
 krb5_address	receiver_addr;

@@ -82,8 +82,7 @@ find_warning_info(char *);
 static bool_t
 parseConfigLine(char *buffer);
 
-extern
-warn_send(char *, char *);
+extern int warn_send(char *, char *);
 
 extern int kwarnd_debug;
 

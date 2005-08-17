@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,6 +108,7 @@ krb5_context util_context;
 osa_adb_policy_t policy_db;
 kadm5_config_params global_params;
 
+void
 usage()
 {
 	fprintf(stderr, "%s: "

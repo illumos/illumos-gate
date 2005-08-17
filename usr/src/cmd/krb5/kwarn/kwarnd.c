@@ -1,8 +1,9 @@
 /*
- * Copyright (c) 1998-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- *
- *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * Usermode daemon which is responsible for sending kerberos credentials
  * expiration warnings to the user, syslog or snmp (eventually), depending
  * on how it is configured through /etc/krb5/warn.conf.
@@ -76,15 +77,15 @@ char **argv;
 
 #ifdef DEBUG
 	(void) setuid(0);		/* DEBUG: set ruid to root */
-#endif DEBUG
+#endif /* DEBUG */
 	if (_getuid()) {
 		(void) fprintf(stderr,
 				gettext("[%s] must be run as root\n"), argv[0]);
 #ifdef DEBUG
 		(void) fprintf(stderr, gettext(" warning only\n"));
-#else !DEBUG
+#else /* !DEBUG */
 		exit(1);
-#endif DEBUG
+#endif /* DEBUG */
 	}
 
 	while ((c = getopt(argc, argv, "d")) != -1)

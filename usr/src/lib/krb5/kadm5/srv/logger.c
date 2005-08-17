@@ -1,5 +1,5 @@
 /*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,6 +98,7 @@ switch (errorno) {
 	case LOG_DEVICE_ERR:
 		return(gettext("%s: error writing to %s device\n"));
 	case LOG_UFO_STRING:
+        default:
 		return(gettext("???"));
 	case LOG_EMERG_STRING:
 		return(gettext("EMERGENCY"));
