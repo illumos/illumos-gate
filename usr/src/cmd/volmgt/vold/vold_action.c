@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,13 +64,13 @@ static action_t *remount = NULL;
 struct q 	reapq;
 
 char *actnames[] = {
-	{ "" },
-	{ "insert" },
-	{ "eject" },
-	{ "notify" },
-	{ "error" },
-	{ "remount" },
-	{ "close" },
+	"",
+	"insert",
+	"eject",
+	"notify",
+	"error",
+	"remount",
+	"close",
 };
 
 

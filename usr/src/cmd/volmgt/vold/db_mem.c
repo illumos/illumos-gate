@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +51,7 @@ static bool_t	memdb_testkey(char *, char *, char *);
  * of permanent storage to keep our id numbers (or objects, of course)
  * in.
  */
-#define	MEMID_BASE	0x4000000000000000
+#define	MEMID_BASE	0x4000000000000000ull
 static u_longlong_t	memid = MEMID_BASE+1;
 
 static struct dbops mem_dbops = {

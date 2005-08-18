@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,7 +78,7 @@ static struct devsw floppydevsw = {
 	floppy_remount		/* d_remount */
 };
 
-static struct fl_priv {
+struct fl_priv {
 	char		*fl_blockpath;	/* block device for floppy */
 	char		*fl_rawpath;	/* character device for floppy */
 	char		*fl_protopath;	/* core path */

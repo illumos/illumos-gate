@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,7 @@ static char	*pathify(char *);	/* add /vol/rdsk if needed */
 static int	cancel(char *);
 
 
-void
+int
 main(int argc, char **argv)
 {
 	extern int	optind;
@@ -133,7 +133,7 @@ main(int argc, char **argv)
 	(void) fflush(stderr);
 #endif
 
-	exit(excode);
+	return (excode);
 }
 
 

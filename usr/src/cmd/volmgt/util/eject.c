@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,7 +129,7 @@ extern void	_media_printaliases(void);
 #define	TIMEOUT_ON_WAITPID	2
 
 
-void
+int
 main(int argc, char **argv)
 {
 	int		c;
@@ -225,7 +225,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	exit(excode);
+	return (excode);
 }
 
 /*

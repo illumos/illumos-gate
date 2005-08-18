@@ -20,7 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1993 by Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,7 +63,7 @@ int	verbose;
 int	work(int, char **);
 
 
-void
+int
 main(int argc, char **argv)
 {
 	extern char 	*optarg;
@@ -122,7 +123,7 @@ main(int argc, char **argv)
 		rval = work(argc - optind, &argv[optind]);
 	}
 
-	exit(rval);
+	return (rval);
 }
 
 void

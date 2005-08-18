@@ -94,7 +94,7 @@
 #define	CDMAX_PARTS	CDMAX_P_PART
 #endif
 
-static struct cd_priv {
+struct cd_priv {
 	char	*cd_rawpath[S_AND_P][CDMAX_PARTS];
 	mutex_t	cd_killmutex;	/* mutex for killing thread */
 #ifdef CDROM_POLL

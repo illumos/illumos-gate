@@ -62,7 +62,7 @@ static const int	S_DEFAULT_PARTITION = 2;
 static const char	*S_PATH_FORMAT = "%ss%d";
 static const int	THREAD_STACK_SIZE = (64 * 1024);
 
-static struct rmdisk_priv {
+struct rmdisk_priv {
 	mutex_t	rmd_killmutex;
 	int	rmd_tid;
 	char	*rmd_rawpath[NUM_FS_TYPES][V_NUMPAR];

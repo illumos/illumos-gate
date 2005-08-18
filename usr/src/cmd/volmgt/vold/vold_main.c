@@ -124,7 +124,7 @@ bool_t		mount_complete = FALSE;
 
 extern int	umount_all(char *);
 
-void
+int
 main(int argc, char **argv)
 {
 	extern void		nfs_program_2(struct svc_req *, SVCXPRT *);
@@ -537,6 +537,7 @@ main(int argc, char **argv)
 	vold_run();
 	fatal(gettext("vold_run returned!\n"));
 	/*NOTREACHED*/
+	return (1);
 }
 
 /*

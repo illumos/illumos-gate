@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,7 +87,7 @@ static vvnode_t	*mtroot;			/* top of mt */
 vvnode_t	*root;				/* root of volmgt filesys */
 vvnode_t	*devroot;			/* top of dev */
 
-#define	TMPID_BASE	0x8000000000000000
+#define	TMPID_BASE	0x8000000000000000ull
 
 static u_longlong_t	tmpid = TMPID_BASE+1;
 
