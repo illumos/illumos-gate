@@ -19,27 +19,23 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 2.	*/
-
-
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+
 #include "mail.h"
 
-printhdr(type, hdrtype, hptr, fp)
-int		hdrtype;
-struct hdrs	*hptr;
-FILE		*fp;
+int
+printhdr(int type, int hdrtype, struct hdrs *hptr, FILE *fp)
 {
 	char		buf[1024];
-	register int	n;
+	int		n;
 	struct hdrs 	*contptr;
 
 

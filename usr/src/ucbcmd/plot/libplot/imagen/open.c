@@ -1,8 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -10,16 +12,16 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "imPcodes.h"
 #include "imp.h"
 
-openpl(){
+void setfont(char *, int);
+
+void
+openpl(void)
+{
 
 	putch(imP_SET_HV_SYSTEM);
 	  putch((3<<3)|5);
@@ -37,7 +39,9 @@ openpl(){
 	putch(imP_SET_ABS_V);
 	  putwd(0);
 }
-setfont(c, sz) char *c; int sz;
+
+void
+setfont(char *c, int sz)
 {
 	imPcsize = sz;
 	putch(imP_CREATE_FAMILY_TABLE);

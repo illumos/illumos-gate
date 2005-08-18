@@ -1,8 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -10,14 +12,10 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
-#
 #include <sgtty.h>
+
 /* gsi plotting output routines */
 # define DOWN 012
 # define UP 013
@@ -43,7 +41,8 @@ int xscale, xoffset, yscale;
 float botx = 0., boty = 0., obotx = 0., oboty = 0.;
 float scalex = 1., scaley = 1.;
 
-openpl ()
+void
+openpl(void)
 {
 	int reset();
 		xnow = ynow = 0;
@@ -60,6 +59,8 @@ openpl ()
 		return;
 }
 
-openvt(){
-openpl();
+void
+openvt(void)
+{
+	openpl();
 }

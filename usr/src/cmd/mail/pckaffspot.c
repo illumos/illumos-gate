@@ -19,12 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	 	/* SVr4.0 2.	*/
+
 #include "mail.h"
 /*
  * If any H_AFWDFROM lines in msg, decide where to put them.
@@ -33,10 +37,11 @@
  *	> 0 ==> Header line type after (before) which to place H_AFWDFROM
  *              lines and H_AFWDCNT
  */
-pckaffspot()
+int
+pckaffspot(void)
 {
 	static char pn[] = "pckaffspot";
-	register int	rc;	
+	int	rc;	
 
 	if (hdrlines[H_AFWDFROM].head == (struct hdrs *)NULL) {
 		rc = -1;

@@ -1,13 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -15,6 +12,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Displays plot files on a AED512 graphics terminal.
@@ -51,7 +49,8 @@ static int colors[] = {200, 200, 200, 0, 0, 125, 125, 0, 0, 125, 0, 0};
  *	Errors:		None.
  *---------------------------------------------------------
  */
-openpl()
+void
+openpl(void)
 {
     int flags, *p, i;
     char dum[4];

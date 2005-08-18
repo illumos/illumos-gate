@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,7 +153,7 @@ int utimes(const char *path, const struct timeval timeval_ptr[]);
 #define	OCTAL7CHAR 2
 #else
 /* normal values */
-#define	TAR_OFFSET_MAX	077777777777
+#define	TAR_OFFSET_MAX	077777777777ULL
 #define	OCTAL7CHAR	07777777
 #endif
 

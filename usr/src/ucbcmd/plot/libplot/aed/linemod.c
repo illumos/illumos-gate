@@ -1,13 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -15,6 +12,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "aed.h"
 
@@ -29,8 +27,8 @@
  *	or "dotdashed".  If s isn't recognized, then "solid" is used.
  *---------------------------------------------------------
  */
-linemod(s)
-char *s;
+void
+linemod(char *s)
 {
     if (strcmp(s, "dotted") == 0)
 	fputs("1AAFF", stdout);

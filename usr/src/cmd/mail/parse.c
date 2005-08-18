@@ -19,22 +19,27 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 2.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+
 #include "mail.h"
 /*
 	Parse the command line.
 	Return index of first non-option field (i.e. user)
 */
-parse(argc, argv)
-int	argc;
-char	**argv;
+int
+parse(int argc, char **argv)
 {
-	register int	 	c;
-	register char		*tmailsurr;
+	int	 		c;
+	char			*tmailsurr;
 	static char		pn[] = "parse";
 
 	/*

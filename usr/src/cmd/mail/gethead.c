@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -200,7 +199,7 @@ gethead(int current, int all)
 }
 
 void
-tmperr()
+tmperr(void)
 {
 	fclose(tmpf);
 	errmsg(E_TMP, "");
@@ -210,8 +209,8 @@ tmperr()
  *	Write a string out to tmp file, with error checking.
  *	Return 1 on success, else 0
  */
-wtmpf(str, length)
-char	*str;
+int
+wtmpf(char *str, int length)
 {
 	if (fwrite(str, 1, length, tmpf) != length) {
 		tmperr();
@@ -225,10 +224,7 @@ char	*str;
  *	return number of bytes in length
  */
 int
-getline(ptr2line, max, f)
-char *ptr2line;
-int max;
-FILE	*f;
+getline(char *ptr2line, int max, FILE *f)
 {
 	int	i, ch;
 	for (i = 0; i < max-1 && (ch = getc(f)) != EOF; )
@@ -241,7 +237,7 @@ FILE	*f;
  *	Make temporary file for letter
  */
 void
-mktmp()
+mktmp(void)
 {
 	static char tmpl[] = "/var/tmp/mailXXXXXX";
 	int fd = mkstemp(lettmp = tmpl);
@@ -257,8 +253,8 @@ mktmp()
  * Get a number from user's reply,
  * return its value or zero if none present, -1 on error
  */
-getnumbr(s)
-char	*s;
+int
+getnumbr(char *s)
 {
 	int	k = 0;
 
@@ -283,7 +279,8 @@ char	*s;
  *	If valid msgnum return 1,
  *		else print message and return 0
  */
-validmsg(i)
+int
+validmsg(int i)
 {
 	if ((i < 0) || (i > nlet)) {
 		printf("No such message\n");
@@ -296,9 +293,7 @@ validmsg(i)
  *	Set letter to passed status, and adjust changed as necessary
  */
 void
-setletr(letter, status)
-int	letter;
-int	status;
+setletr(int letter, int status)
 {
 	if (status == ' ') {
 		if (let[letter].change != ' ')

@@ -1,13 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -15,6 +12,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "aed.h"
 
@@ -35,12 +33,15 @@ static char hex[] = "0123456789ABCDEF";
  *	Side Effects:
  *	The string contains the value of the low-order nchars 4-bit chunks
  *	of val, as represented in hexadecimal.  String is zero-filled.
+ *
+ *	Parameters
+ *		val	- Integer value to be converted.
+ * 		string	- Pointer to area for converted result.
+ *		nchars	- Number of characters to be converted.
  *---------------------------------------------------------
  */
-chex(val, string, nchars)
-int val;			/* Integer value to be converted. */
-char *string;			/* Pointer to area for converted result. */
-int nchars;			/* Number of characters to be converted. */
+void
+chex(int val, char *string, int nchars)
 {
     string = &(string[nchars]);
     *string = '\0';
@@ -62,13 +63,15 @@ int nchars;			/* Number of characters to be converted. */
  *	for values indicated by "xy20" in the user manual.
  *
  *	Errors:		None.
+ *
+ *	Parameters:
+ *		x, y	- The coordinates to be output.  Note:  these
+ *			are world coordinates, not screen ones.  We
+ *			scale in this routine.
  *---------------------------------------------------------
  */
-outxy20(x, y)
-int x, y;			/* The coordinates to be output.  Note:
-				 * these are world coordinates, not screen
-				 * ones.  We scale in this routine.
-				 */
+void
+outxy20(int x, int y)
 {
     char s1[4], s2[4], s3[4];
     x = ((x - xbot) * scale)>>12;
@@ -87,12 +90,14 @@ int x, y;			/* The coordinates to be output.  Note:
  *	Side Effects:
  *	The current color in the display is set to pcolor, if it
  *	isn't that already.
+ *
+ *	Parameter:
+ *		pcolor	- Pointer to a string giving the desired color
+ *			in hexadecimal
  *---------------------------------------------------------
  */
-setcolor(pcolor)
-char *pcolor;			/* Pointer to a string giving the desired
-				 * color in hexadecimal.
-				 */
+void
+setcolor(char *pcolor)
 {
     static char curcolor[] = "xx";
     if ((pcolor[0] != curcolor[0]) || (pcolor[1] != curcolor[1]))

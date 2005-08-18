@@ -1,21 +1,18 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
- 
 /* 
  * Copyright (c) 1980 Regents of the University of California. 
  * All rights reserved. The Berkeley software License Agreement 
  * specifies the terms and conditions for redistribution. 
  */ 
  
-/* 
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc. 
- * All Rights Reserved.
- */ 
- 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 This driver is used with crtplot.c.
@@ -33,7 +30,13 @@ for crt's.
 float deltx;
 float delty;
 
-main(argc,argv)  char **argv; {
+static void	fplt(FILE *);
+static int	getsi(FILE *);
+static void	getstr(char *, FILE *);
+
+int
+main(int argc, char **argv)
+{
 	int std=1;
 	FILE *fin;
 
@@ -61,10 +64,12 @@ main(argc,argv)  char **argv; {
 	if (std)
 		fplt( stdin );
 
-	exit(0);
-	}
+	return (0);
+}
 
-fplt(fin)  FILE *fin; {
+static void
+fplt(FILE *fin)
+{
 	int c;
 	char s[256];
 	int xi,yi,x0,y0,x1,y1,r/*,dx,n,i*/;
@@ -134,8 +139,12 @@ fplt(fin)  FILE *fin; {
 			}
 		}
 	closepl();
-	}
-getsi(fin)  FILE *fin; {	/* get an integer stored in 2 ascii bytes. */
+}
+
+/* get an integer stored in 2 ascii bytes. */
+static int
+getsi(FILE *fin)
+{
 	short a, b;
 	if((b = getc(fin)) == EOF)
 		return(EOF);
@@ -144,7 +153,10 @@ getsi(fin)  FILE *fin; {	/* get an integer stored in 2 ascii bytes. */
 	a = a<<8;
 	return(a|b);
 }
-getstr(s,fin)  char *s;  FILE *fin; {
+
+static void
+getstr(char *s, FILE *fin)
+{
 	for( ; *s = getc(fin); s++)
 		if(*s == '\n')
 			break;

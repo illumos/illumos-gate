@@ -21,7 +21,7 @@
 #
 #
 #
-# Copyright 1989, 2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,7 +51,7 @@ MAILOBJS= 	add_recip.o cat.o ckdlivopts.o \
 		pickFrom.o pipletr.o poplist.o printhdr.o printmail.o \
 		pushlist.o savehdrs.o sel_disp.o  sendlist.o \
 		sendmail.o  setsig.o \
-		stamp.o Tout.o maid.o
+		stamp.o Tout.o
 
 MAILSRC=	 $(MAILOBJS:%.o=%.c)
 

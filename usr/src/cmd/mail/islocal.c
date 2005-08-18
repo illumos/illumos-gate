@@ -19,6 +19,11 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -30,9 +35,8 @@
 /*
  * islocal (char *user, uid_t *puid) - see if user exists on this system
  */
-islocal(user, puid)
-char *user;
-uid_t *puid;
+int
+islocal(char *user, uid_t *puid)
 {
 	char	fname[MAXPATHLEN];
 	struct stat statb;

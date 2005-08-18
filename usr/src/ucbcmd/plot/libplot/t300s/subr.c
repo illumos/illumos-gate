@@ -1,8 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -10,20 +12,30 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include "con.h"
-abval(q)
+
+#define DOUBLE 010
+#define ADDR 0100
+#define COM 060
+#define MAXX 070
+#define MAXY 07
+#define SPACES 7
+
+extern int xnow, ynow;
+
+void spew(int);
+
+int
+abval(int q)
 {
 	return (q>=0 ? q : -q);
 }
 
-xconv (xp)
+int
+xconv(int xp)
 {
 	/* x position input is -2047 to +2047, output must be 0 to PAGSIZ*HORZRES */
 	xp += 2048;
@@ -31,21 +43,24 @@ xconv (xp)
 	return (xoffset + xp /xscale);
 }
 
-yconv (yp)
+int
+yconv(int yp)
 {
 	/* see description of xconv */
 	yp += 2048;
 	return (yp / yscale);
 }
 
-inplot()
+void
+inplot(void)
 {
 	stty(OUTF, &PTTY);
 	spew(ESC);
 	spew (INPLOT);
 }
 
-outplot()
+void
+outplot(void)
 {
 	spew(ESC);
 	spew(ACK);
@@ -55,23 +70,27 @@ outplot()
 	stty (OUTF, &ITTY);
 }
 
-spew(ch)
+void
+spew(int ch)
 {
 	putc(ch, stdout);
 }
 
-tobotleft ()
+void
+tobotleft(void)
 {
 	move(-2048,-2048);
 }
-reset()
+
+void
+reset(void)
 {
 	outplot();
 	exit(0);
 }
 
 float
-dist2 (x1, y1, x2, y2)
+dist2(int x1, int y1, int x2, int y2)
 {
 	float t,v;
 	t = x2-x1;
@@ -79,8 +98,8 @@ dist2 (x1, y1, x2, y2)
 	return (t*t+v*v);
 }
 
-swap (pa, pb)
-int *pa, *pb;
+void
+swap(int *pa, int *pb)
 {
 	int t;
 	t = *pa;
@@ -88,14 +107,9 @@ int *pa, *pb;
 	*pb = t;
 }
 
-#define DOUBLE 010
-#define ADDR 0100
-#define COM 060
-#define MAXX 070
-#define MAXY 07
-extern xnow,ynow;
-#define SPACES 7
-movep(ix,iy){
+void
+movep(int ix, int iy)
+{
 	int dx,dy,remx,remy,pts,i;
 	int xd,yd;
 	int addr,command;
@@ -162,12 +176,18 @@ movep(ix,iy){
 	outplot();
 	return;
 }
-xsc(xi){
+
+int
+xsc(int xi)
+{
 	int xa;
 	xa = (xi - obotx) * scalex + botx;
 	return(xa);
 }
-ysc(yi){
+
+int
+ysc(int yi)
+{
 	int ya;
 	ya = (yi - oboty) *scaley +boty;
 	return(ya);

@@ -19,19 +19,23 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	 	/* SVr4.0 1.5	*/
 /*
     NAME
 	add_recip, madd_recip - add recipients to recipient list
 
     SYNOPSIS
 	int add_recip(reciplist *plist, char *name, int checkdups)
-	int madd_recip(reciplist *plist, char *name, int checkdups)
+	void madd_recip(reciplist *plist, char *name, int checkdups)
 
     DESCRIPTION
 	add_recip() adds the name to the recipient linked list.
@@ -44,10 +48,8 @@
 
 #include "mail.h"
 
-add_recip (plist, name, checkdups)
-reciplist	*plist;
-char		*name;
-int		checkdups;
+int
+add_recip(reciplist *plist, char *name, int checkdups)
 {
 	char		*p;
 	static char	pn[] = "add_recip";
@@ -95,10 +97,8 @@ int		checkdups;
 	return(1);
 }
 
-madd_recip (plist, namelist, checkdups)
-reciplist	*plist;
-char		*namelist;
-int		checkdups;
+void
+madd_recip(reciplist *plist, char *namelist, int checkdups)
 {
 	char	*name;
 	for (name = strtok(namelist, " \t"); name; name = strtok((char*)0, " \t"))

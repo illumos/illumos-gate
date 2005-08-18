@@ -19,12 +19,17 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI" 
-		/* SVr4.0 2.	*/
+
 #include "mail.h"
 /*
  * Get comment field, if any, from line.
@@ -33,12 +38,12 @@
  *     -1 ==> no closing (terminating) paren found for comment.
  */
 
-getcomment(s, q)
-register char	*s;
-register char	*q;	/* Copy comment, if found, to here */
+int
+getcomment(char *s, char *q)
+	/* Copy comment, if found, to q */
 {
-	register char	*p, *sav_q;
-	register int	depth = 0;
+	char	*p, *sav_q;
+	int	depth = 0;
 	
 	if ((p = strchr(s, '(')) == (char *)NULL) {
 		/* no comment found */

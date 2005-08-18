@@ -1,8 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -10,16 +12,13 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sgtty.h>
 #include "hp2648.h"
 
-handshake()
+void
+handshake(void)
 {
 	int i;
 	char ch;
@@ -42,8 +41,8 @@ handshake()
 	}
 }
 
-buffready(n)
-int n;
+void
+buffready(int n)
 {
 	buffcount = buffcount + n;
 	if(buffcount >= 80){
@@ -56,9 +55,8 @@ int n;
 	}
 }
 
-itoa(num,byte1,byte2)
-int num;
-char *byte1,*byte2;
+void
+itoa(int num, char *byte1, char *byte2)
 {
 	*byte1 = (num & 037) | 040;
 	*byte2 = ((num>>5) & 037) | 040;

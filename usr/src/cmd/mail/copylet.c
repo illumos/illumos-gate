@@ -19,18 +19,18 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mail.h"
+
 /*
     NAME
 	copylet - copy a given letter to a file pointer
@@ -49,8 +49,8 @@
 	Returns TRUE on a completely successful copy.
 */
 
-copylet(letnum, f, type) 
-register FILE *f;
+int
+copylet(int letnum, FILE *f, int type) 
 {
 	int		pos = ftell(f);
 	int		rc  = xxxcopylet(letnum, f, type);
@@ -68,8 +68,8 @@ register FILE *f;
 	return(rc);
 }
 
-xxxcopylet(letnum, f, type) 
-register FILE *f;
+int
+xxxcopylet(int letnum, FILE *f, int type) 
 {
 	static char	pn[] = "copylet";
 	char	buf[LSIZE], lastc;

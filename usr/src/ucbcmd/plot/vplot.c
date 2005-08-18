@@ -1,9 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
  
 /* 
  * Copyright (c) 1980 Regents of the University of California. 
@@ -11,11 +12,7 @@
  * specifies the terms and conditions for redistribution. 
  */ 
  
-/* 
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc. 
- * All Rights Reserved.
- */ 
- 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  Reads standard graphics input and produces a plot on the
@@ -80,12 +77,19 @@ struct	dispatch dispatch[256];
 char	*bits;
 char	*fontFile = "/usr/lib/vfont/R.6";
 
-main(argc, argv)
-int argc;
-char **argv;
+static void	circle(int, int, int);
+static int	getinteger(FILE *);
+static int	getpict(void);
+static void	InitFont(void);
+static void	line(int, int, int, int);
+static void	plotch(char);
+static void	point(int, int);
+
+int
+main(int argc, char **argv)
 {
-	register char *cp1, *arg;
-	register i;
+	char *cp1, *arg;
+	int i;
 	int again;
 
 	infile = stdin;
@@ -172,11 +176,15 @@ char **argv;
 	execv(LPR, lpargs);
 	fprintf(stderr, "can't exec %s\n", LPR);
 	cleanup();
+
+	/* NOTREACHED */
+	return (0);
 }
 
-getpict()
+static int
+getpict(void)
 {
-	register x1, y1;
+	int x1, y1;
 
 	for (;;) switch (x1 = getc(infile)) {
 
@@ -322,11 +330,11 @@ getpict()
 	}
 }
 
-plotch(ch)
-char ch;
+static void
+plotch(char ch)
 {
-	register int i,j,k;
-	register char *ptr,c;
+	int i,j,k;
+	char *ptr,c;
 	int nbytes;
 
 	if (!fontSet)
@@ -349,7 +357,8 @@ char ch;
 		lastx += dispatch['a'].width;
 }
 
-InitFont()
+static void
+InitFont(void)
 {
 	char *s;
 	int fonts;
@@ -394,12 +403,12 @@ InitFont()
 	}
 }
 
-line(x0, y0, x1, y1)
-register x0, y0;
+static void
+line(int x0, int y0, int x1, int y1)
 {
 	int dx, dy;
 	int xinc, yinc;
-	register res1;
+	int res1;
 	int res2;
 	int slope;
 
@@ -443,9 +452,10 @@ register x0, y0;
 
 #define labs(a) (a >= 0 ? a : -a)
 
-circle(x,y,c)
+static void
+circle(int x, int y, int c)
 {
-	register dx, dy;
+	int dx, dy;
 	long ep;
 	int de;
 
@@ -477,15 +487,16 @@ circle(x,y,c)
  * The origin is the top left-hand corner with increasing x towards the
  * right and increasing y going down.
  */
-point(x, y)
-register int x, y;
+static void
+point(int x, int y)
 {
-	register unsigned byte;
+	unsigned byte;
 
 	byte = y * DevRange8 + (x >> 3);
 	if (byte < bufsize)
 		obuf[byte] |= 1 << (7 - (x & 07));
 }
+
 void
 cleanup()
 {
@@ -496,10 +507,10 @@ cleanup()
 	exit(1);
 }
 
-getinteger(f)
-FILE *f;
+static int
+getinteger(FILE *f)
 {
-	register int low, high, result;
+	int low, high, result;
 
 	low = getc(f);
 	high = getc(f);

@@ -19,22 +19,27 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 int del = 20;
-step(d){
+
+void
+step(int d)
+{
 	del = d;
 }
-arc(x,y,x0,y0,x1,y1){
+
+void
+arc(int x, int y, int x0, int y0, int x1, int y1)
+{
 	double pc;
 	double sqrt();
 	int flg,m,xc,yc,xs,ys,qs,qf;
@@ -125,7 +130,10 @@ arc(x,y,x0,y0,x1,y1){
 		}
 	}
 }
-quad(x,y,xp,yp){
+
+int
+quad(int x, int y, int xp, int yp)
+{
 	if(x < xp)
 		if(y <= yp)return(1);
 		else return(4);
@@ -135,7 +143,10 @@ quad(x,y,xp,yp){
 	else if(y < yp)return(2);
 	else return(4);
 }
-abs(a){
+
+int
+abs(int a)
+{
 	if(a < 0)return(-a);
 	return(a);
 }

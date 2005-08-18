@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #ifndef _MAIL_H
 #define	_MAIL_H
@@ -332,7 +331,7 @@ extern	void	createmf(uid_t uid, char *file);
 extern	void	del_reciplist (reciplist *list);
 extern	void	delete(int);
 extern	void	doFopt(void);
-extern	void	done(int);
+extern	void	done(int) __NORETURN;
 extern	void	sig_done(int);
 extern	FILE	*doopen(char *file, char *type, int errnum);
 extern	int	dowait(pid_t pidval);
@@ -355,7 +354,7 @@ extern	int	islocal(char *user, uid_t *puid);
 extern	int	istext(unsigned char *s, int size);
 extern	int	legal(char *file);
 extern	void	lock(char	*user);
-extern	int	madd_recip(reciplist *plist, char *name, int checkdups);
+extern	void	madd_recip(reciplist *plist, char *name, int checkdups);
 extern	char	*mailcompile(string *pattern, int *retlen, int *retnbra);
 extern	void	mkdead(void);
 extern	void	mktmp(void);
@@ -433,7 +432,7 @@ extern	int	islocal();
 extern	int	istext();
 extern	int	legal();
 extern	void	lock();
-extern	int	madd_recip();
+extern	void	madd_recip();
 extern	char	*mailcompile();
 extern	void	mkdead();
 extern	void	mktmp();

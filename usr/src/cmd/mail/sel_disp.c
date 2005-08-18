@@ -19,9 +19,13 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI" 
 
@@ -34,13 +38,11 @@
  * the default output mode will be listed in the seldisp[] array.
  * This can all be overridden via the 'P' command at the ? prompt.
  */
-sel_disp (type, hdrtype, s)
-int	type;
-int	hdrtype;
-char	*s;
+int
+sel_disp(int type, int hdrtype, char *s)
 {
 	static char pn[] = "sel_disp";
-	register char	*p;
+	char		*p;
 	static	int	sav_lastrc = 0;
 	int		i, rc = 0;
 

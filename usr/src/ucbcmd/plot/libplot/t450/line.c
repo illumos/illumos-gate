@@ -19,27 +19,37 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "con.h"
-line(x0,y0,x1,y1){
+
+void iline(int, int, int, int);
+
+void
+line(int x0, int y0, int x1, int y1)
+{
 	iline(xconv(xsc(x0)),yconv(ysc(y0)),xconv(xsc(x1)),yconv(ysc(y1)));
 		return;
 }
-cont(x0,y0){
+
+void
+cont(int x0, int y0)
+{
 	iline(xnow,ynow,xconv(xsc(x0)),yconv(ysc(y0)));
 	return;
 }
-iline(cx0,cy0,cx1,cy1){
+
+void
+iline(int cx0, int cy0, int cx1, int cy1)
+{
 	int maxp,tt,j,np;
 	char chx,chy;
 	float xd,yd;

@@ -1,8 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
  
 /* 
@@ -11,11 +13,7 @@
  * specifies the terms and conditions for redistribution. 
  */ 
  
-/* 
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc. 
- * All Rights Reserved.
- */ 
- 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 This plotting routine interprets plot commands and outputs them onto
@@ -28,7 +26,6 @@ because some function names conflicted with the curses library.
 (That's what you get when you have a flat name space!)
 */
 
-
 #include <curses.h>
 #include <math.h>
 #include <signal.h>
@@ -39,16 +36,17 @@ because some function names conflicted with the curses library.
 
 #define plot_movech(y, x, ch)	{ plot_move(x, y); plot_addch(ch); }
 
-
 static double lowX, rangeX;	/* min and range of x */
 static double lowY, rangeY;	/* min and range of y */
 static int lastX, lastY;	/* last point plotted */
 
-
+void arc(int, int, int, int, int, int);
+void dda_line(char, int, int, int, int);
 char *getenv();
+
 /* This routine just moves the cursor. */
-screen_move(y, x)
-int x,y;
+void
+screen_move(int y, int x)
 {
 	/* must check for automatic wrap at last col */
 	if (!AM || (y < LINES -1) || (x < COLS -1)) {
@@ -60,8 +58,8 @@ int x,y;
 
 
 /* This routine assumes the cursor is positioned correctly. */
-plot_addch(ch)
-char ch;
+void
+plot_addch(char ch)
 {
 	putchar(ch);
 	if (++lastX >= COLS) {
@@ -78,51 +76,52 @@ char ch;
 
 
 /* See the curses manual for what is been done and why. */
-openpl()
+void
+openpl(void)
 {
-char *sp;
-void closepl();
+	char *sp;
+	void closepl();
 
-gettmode();
-if (sp=getenv("TERM"))
-	setterm(sp);
-signal(SIGINT, closepl);
-
+	gettmode();
+	if (sp=getenv("TERM"))
+		setterm(sp);
+	signal(SIGINT, closepl);
 }
 
 
 
 
-void closepl()
+void
+closepl(void)
 {
-signal(SIGINT, SIG_IGN);
-/* Leave cursor at top of screen. */
-mvcur(LINES-1, COLS-1, 0, 0);
-endwin();
-exit(0);
+	signal(SIGINT, SIG_IGN);
+	/* Leave cursor at top of screen. */
+	mvcur(LINES-1, COLS-1, 0, 0);
+	endwin();
+	exit(0);
 }
 
 
 
-plot_move(x,y)
-int x, y;
+void
+plot_move(int x, int y)
 {
-screen_move(scaleY(y), scaleX(x));
+	screen_move(scaleY(y), scaleX(x));
 }
 
 
 
-line(x0, y0, x1, y1)
-int x0, y0, x1, y1;
+void
+line(int x0, int y0, int x1, int y1)
 {
-plot_movech(y0, x0, '*');
-dda_line('*', scaleX(x0), scaleY(y0), scaleX(x1), scaleY(y1));
+	plot_movech(y0, x0, '*');
+	dda_line('*', scaleX(x0), scaleY(y0), scaleX(x1), scaleY(y1));
 }
 
-label(str)
-char *str;
+void
+label(char *str)
 {
-	reg i, length;
+	int i, length;
 	int strlen();
 
 	if ( (length=strlen(str)) > (COLS-lastX) )
@@ -131,65 +130,68 @@ char *str;
 		plot_addch(str[i]);
 }
 
-plot_erase()
+void
+plot_erase(void)
 {
-int _putchar();
+	int _putchar();
+	/*
+	Some of these functions probably belong in openpl().  However, if the
+	input is being typed in, putting them in openpl would not work
+	since "noecho", etc would prevent (sort of) input.  Notice that
+	the driver calls openpl before doing anything.  This is actually
+	wrong, but it is what whoever originally wrote the driver decided
+	to do.  (openpl() in libplot does nothing -- that is the main problem!)
+	*/
+	_puts(TI);
+	_puts(VS);
+
+	noecho();
+	nonl();
+	tputs(CL, LINES, _putchar);
+	mvcur(0, COLS-1, LINES-1, 0);
+	lastX = 0;
+	lastY = LINES-1;
+}
+
+
+void
+point(int x, int y)
+{
+	plot_movech(y, x, '*');
+}
+
+
+void
+cont(int x, int y)
+{
+	dda_line('*', lastX-1, lastY, scaleX(x), scaleY(y));
+}
+
+
+void
+space(int x0, int y0, int x1, int y1)
+{
+	lowX = (double) x0;
+	lowY = (double) y0;
+	rangeX = COLS/(double) (x1 - x0);
+	rangeY = LINES/(double) (y1 - y0);
+}
+
+
+void
+linemod(char *string)
+{
+}
+
+
 /*
-Some of these functions probably belong in openpl().  However, if the
-input is being typed in, putting them in openpl would not work
-since "noecho", etc would prevent (sort of) input.  Notice that
-the driver calls openpl before doing anything.  This is actually
-wrong, but it is what whoever originally wrote the driver decided
-to do.  (openpl() in libplot does nothing -- that is the main problem!)
-*/
-_puts(TI);
-_puts(VS);
-
-noecho();
-nonl();
-tputs(CL, LINES, _putchar);
-mvcur(0, COLS-1, LINES-1, 0);
-lastX = 0;
-lastY = LINES-1;
-}
-
-
-point(x, y)
-int x,y;
-{
-plot_movech(y, x, '*');
-}
-
-
-cont(x, y)
-int x,y;
-{
-dda_line('*', lastX-1, lastY, scaleX(x), scaleY(y));
-}
-
-
-space(x0, y0, x1, y1)
-int x0, y0, x1, y1;
-{
-lowX = (double) x0;
-lowY = (double) y0;
-rangeX = COLS/(double) (x1 - x0);
-rangeY = LINES/(double) (y1 - y0);
-}
-
-
-linemod(string)
-char *string;
-{
-}
-
-
-
-/* See Neuman & Sproul for explanation and rationale. */
-/* Does not plot first point -- assumed that it is already plotted */
-dda_line(ch, x0, y0, x1, y1)
-char ch;
-int x0, y0, x1, y1;	/* already transformed to screen coords */
+ * See Neuman & Sproul for explanation and rationale.
+ * Does not plot first point -- assumed that it is already plotted
+ *
+ * x0, y0, x1, and y1 are already transformed to screen coords
+ */
+void
+dda_line(char ch, int x0, int y0, int x1, int y1)
 {
 	int length, i;
 	double deltaX, deltaY;
@@ -197,31 +199,30 @@ int x0, y0, x1, y1;	/* already transformed to screen coords */
 	double floor();
 	int abs();
 
-length = abs(x1 - x0);
-if (abs(y1 -y0) > length)
-	length = abs(y1 - y0);
+	length = abs(x1 - x0);
+	if (abs(y1 -y0) > length)
+		length = abs(y1 - y0);
 
-if (length == 0)
-	return;
+	if (length == 0)
+		return;
 
-deltaX = (double) (x1 - x0)/(double) length;
-deltaY = (double) (y1 - y0)/(double) length;
+	deltaX = (double) (x1 - x0)/(double) length;
+	deltaY = (double) (y1 - y0)/(double) length;
 
-x = (double) x0 + 0.5;
-y = (double) y0 + 0.5;
+	x = (double) x0 + 0.5;
+	y = (double) y0 + 0.5;
 
-for (i=0; i < length; ++i)
-	{
-	x += deltaX;
-	y += deltaY;
-	screen_move((int) floor(y), (int) floor(x));
-	plot_addch(ch);
+	for (i=0; i < length; ++i) {
+		x += deltaX;
+		y += deltaY;
+		screen_move((int) floor(y), (int) floor(x));
+		plot_addch(ch);
 	}
 }
 
 
-circle (xc,yc,r)
-int xc,yc,r;
+void
+circle (int xc, int yc, int r)
 {
 	arc(xc,yc, xc+r,yc, xc-r,yc);
 	arc(xc,yc, xc-r,yc, xc+r,yc);
@@ -231,8 +232,8 @@ int xc,yc,r;
 /* should include test for equality? */
 #define side(x,y)	(a*(x)+b*(y)+c > 0.0 ? 1 : -1)
 
-arc(xc,yc,xbeg,ybeg,xend,yend)
-int xc,yc,xbeg,ybeg,xend,yend;
+void
+arc(int xc, int yc, int xbeg, int ybeg, int xend, int yend)
 {
 	double r, radius, costheta, sintheta;
 	double a, b, c, x, y, tempX;

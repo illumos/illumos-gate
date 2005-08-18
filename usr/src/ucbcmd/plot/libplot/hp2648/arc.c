@@ -1,8 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -10,16 +12,12 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "hp2648.h"
 
-arc(xcent,ycent,xbeg,ybeg,xend,yend)
-int xcent,ycent,xbeg,ybeg,xend,yend;
+void
+arc(int xcent, int ycent, int xbeg, int ybeg, int xend, int yend)
 {
 	double costheta,sintheta,x,y,xn,r;
 	double x1,y1,x2,y2;
@@ -50,8 +48,8 @@ int xcent,ycent,xbeg,ybeg,xend,yend;
 	} while( crosspflag == 0 || crossp >0);
 }
 
-cross_product(x1,y1,x2,y2,x3,y3)
-double x1,x2,x3,y1,y2,y3;
+int
+cross_product(double x1, double y1, double x2, double y2, double x3, double y3)
 {
 	double z,a,b;
 	a = (y3-y2)*(x2-x1);

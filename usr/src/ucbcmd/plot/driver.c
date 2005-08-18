@@ -1,21 +1,18 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
- 
 /* 
  * Copyright (c) 1980 Regents of the University of California. 
  * All rights reserved. The Berkeley software License Agreement 
  * specifies the terms and conditions for redistribution. 
  */ 
- 
-/* 
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc. 
- * All Rights Reserved.
- */ 
- 
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 
@@ -23,9 +20,12 @@ float deltx;
 float delty;
 int PlotRes;
 
-main(argc,argv)
-	int argc;
-	char *argv[];
+static void fplt(FILE *);
+static int getsi(FILE *);
+static void getstr(char *, FILE *);
+
+int
+main(int argc, char *argv[])
 {
 	int std = 1;
 	char *progname;
@@ -59,13 +59,13 @@ main(argc,argv)
 	}
 	if (std)
 		fplt(stdin);
-	exit(0);
+	return (0);
 }
 
-fplt(fin)
-	FILE *fin;
+static void
+fplt(FILE *fin)
 {
-	register int c;
+	int c;
 	char s[256];
 	int xi,yi,x0,y0,x1,y1,r,dx,n,i;
 	int pat[256];
@@ -143,8 +143,8 @@ fplt(fin)
 }
 
 /* get an integer stored in 2 ascii bytes. */
-getsi(fin)
-	register FILE *fin;
+static int
+getsi(FILE *fin)
 {
 	short a, b;
 
@@ -156,9 +156,8 @@ getsi(fin)
 	return(a|b);
 }
 
-getstr(s, fin)
-	register char *s;
-	register FILE *fin;
+static void
+getstr(char *s, FILE *fin)
 {
 
 	for( ; *s = getc(fin); s++)

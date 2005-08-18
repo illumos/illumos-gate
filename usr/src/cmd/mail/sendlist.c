@@ -19,13 +19,12 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-
-
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -53,11 +52,10 @@
 
 static char *sendmail_prog = SENDMAIL;
 
+static void notifybiff(char *);
+
 int
-sendlist(list, letnum, level)
-reciplist	*list;
-int		letnum;
-int		level;
+sendlist(reciplist *list, int letnum, int level)
 {
 	recip *to;
 	int rc = 0;
@@ -141,9 +139,7 @@ int		level;
 
 
 int
-send_mbox(mbox, letnum)
-char	*mbox;
-int	letnum;
+send_mbox(char *mbox, int letnum)
 {
 	char file[PATH_MAX];
 	char biffmsg[PATH_MAX];
@@ -211,8 +207,8 @@ done:
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-notifybiff(msg)
-	char *msg;
+static void
+notifybiff(char *msg)
 {
 	static struct sockaddr_in addr;
 	static int f = -1;

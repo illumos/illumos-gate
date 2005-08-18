@@ -1,8 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -10,11 +12,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "bg.h"
 
@@ -22,8 +20,8 @@
 #define side(x,y)	(a*(x)+b*(y)+c > 0.0 ? 1 : -1)
 
 /* The beginning and ending points must be distinct. */
-arc(xc,yc,xbeg,ybeg,xend,yend)
-int xc,yc,xbeg,ybeg,xend,yend;
+void
+arc(int xc, int yc, int xbeg, int ybeg, int xend, int yend)
 {
 	double r, radius, costheta, sintheta;
 	double a, b, c, x, y, tempX;

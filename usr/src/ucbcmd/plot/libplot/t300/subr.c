@@ -1,8 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -10,20 +12,21 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include "con.h"
-abval(q)
+
+void spew(int);
+
+int
+abval(int q)
 {
 	return (q>=0 ? q : -q);
 }
 
-xconv (xp)
+int
+xconv(int xp)
 {
 	/* x position input is -2047 to +2047, output must be 0 to PAGSIZ*HORZRES */
 	xp += 2048;
@@ -31,20 +34,23 @@ xconv (xp)
 	return (xoffset + xp /xscale);
 }
 
-yconv (yp)
+int
+yconv(int yp)
 {
 	/* see description of xconv */
 	yp += 2048;
 	return (yp / yscale);
 }
 
-inplot()
+void
+inplot(void)
 {
 	stty(OUTF, &PTTY);
 	spew (ACK);
 }
 
-outplot()
+void
+outplot(void)
 {
 	spew(ESC);
 	spew(ACK);
@@ -52,24 +58,28 @@ outplot()
 	stty(OUTF, &ITTY);
 }
 
-spew(ch)
+void
+spew(int ch)
 {
 	if(ch == UP)putc(ESC,stdout);
 	putc(ch, stdout);
 }
 
-tobotleft ()
+void
+tobotleft(void)
 {
 	move(-2048,-2048);
 }
-reset()
+
+void
+reset(void)
 {
 	outplot();
 	exit(0);
 }
 
 float
-dist2 (x1, y1, x2, y2)
+dist2(int x1, int y1, int x2, int y2)
 {
 	float t,v;
 	t = x2-x1;
@@ -77,15 +87,17 @@ dist2 (x1, y1, x2, y2)
 	return (t*t+v*v);
 }
 
-swap (pa, pb)
-int *pa, *pb;
+void
+swap(int *pa, int *pb)
 {
 	int t;
 	t = *pa;
 	*pa = *pb;
 	*pb = t;
 }
-movep (xg, yg)
+
+void
+movep(int xg, int yg)
 {
 	int i,ch;
 	if((xg == xnow) && (yg == ynow))return;
@@ -118,12 +130,17 @@ movep (xg, yg)
 	xnow = xg; ynow = yg;
 }
 
-xsc(xi){
+int
+xsc(int xi)
+{
 	int xa;
 	xa = (xi - obotx) * scalex + botx;
 	return(xa);
 }
-ysc(yi){
+
+int
+ysc(int yi)
+{
 	int ya;
 	ya = (yi - oboty) *scaley +boty;
 	return(ya);

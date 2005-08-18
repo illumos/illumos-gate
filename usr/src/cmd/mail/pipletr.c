@@ -19,18 +19,22 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI" 
 
 #include "mail.h"
 
-dowait(pidval)
-pid_t	pidval;
+int
+dowait(pid_t pidval)
 {
-	register pid_t w;
+	pid_t w;
 	int status;
 	void (*istat)(), (*qstat)();
 
@@ -61,8 +65,8 @@ pid_t	pidval;
 	return:
 		status	-> command exit status
 */
-systm(s)
-char *s;
+int
+systm(char *s)
 {
 	pid_t	pid;
 

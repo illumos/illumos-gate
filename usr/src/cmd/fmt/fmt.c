@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,7 @@
  * Author: Kurt Shoens (UCB) 12/7/78
  */
 
-#define	NOSTR	((wchar_t *) 0)	/* Null string pointer for lint */
+#define	NOSTR	((wchar_t *)0)	/* Null string pointer for lint */
 #define	MAXLINES	100	/* maximum mail header lines to verify */
 
 wchar_t	outbuf[BUFSIZ];			/* Sandbagged output line image */
@@ -85,12 +85,25 @@ enum hdr_type	hdr_state = not_in_hdr;
 wchar_t *hdrbuf[MAXLINES];	/* buffer to hold potential mail header lines */
 int 	h_lines;		/* index into lines of hdrbuf */
 
-int (*(split))();
+void (*(split))(wchar_t []);
 extern int scrwidth(wchar_t);
+extern int ishead(char []);
 
-static void fill_hdrbuf(wchar_t line[]);
+
+static void fill_hdrbuf(wchar_t []);
 static void header_chk(void);
 static void process_hdrbuf(void);
+static void leadin(void);
+static void tabulate(wchar_t []);
+static void oflush(void);
+static void pack(wchar_t []);
+static void msplit(wchar_t []);
+static void csplit(wchar_t []);
+static void _wckind_init(void);
+static void prefix(wchar_t []);
+static void fmt(FILE *);
+static int setopt(char *);
+int _wckind(wchar_t);
 
 /*
  * Drive the whole formatter by managing input files.  Also,
@@ -98,15 +111,14 @@ static void process_hdrbuf(void);
  * at the end.
  */
 
+int
 main(int argc, char **argv)
 {
-	register FILE *fi;
+	FILE *fi;
 	char sobuf[BUFSIZ];
-	register char *cp;
+	char *cp;
 	int nofile;
 	char *locale;
-	int csplit(), msplit();
-	void _wckind_init();
 
 	outp = NOSTR;
 	setbuf(stdout, sobuf);
@@ -116,7 +128,7 @@ main(int argc, char **argv)
 		split = csplit;
 	} else {
 		split = msplit;
-		(void) _wckind_init();
+		_wckind_init();
 	}
 	if (argc < 2) {
 single:
@@ -141,8 +153,7 @@ single:
 	if (nofile)
 		goto single;
 	oflush();
-	exit(errs);
-	/* NOTREACHED */
+	return (errs);
 }
 
 /*
@@ -151,11 +162,12 @@ single:
  * and sending each line down for analysis.
  */
 
+static void
 fmt(FILE *fi)
 {
 	wchar_t linebuf[BUFSIZ], canonb[BUFSIZ];
-	register wchar_t *cp, *cp2;
-	register int col;
+	wchar_t *cp, *cp2;
+	int col;
 	wchar_t	c;
 	char	cbuf[BUFSIZ];	/* stores wchar_t string as char string */
 
@@ -282,11 +294,11 @@ fmt(FILE *fi)
  * it on a line by itself.
  */
 
+static void
 prefix(wchar_t line[])
 {
-	register wchar_t *cp;
-	register int np;
-	register int i;
+	wchar_t *cp;
+	int np;
 	int nosplit = 0;	/* flag set if line should not be split */
 
 	if (line[0] == L'\0') {
@@ -368,9 +380,10 @@ prefix(wchar_t line[])
  * line packer.
  */
 
+static void
 csplit(wchar_t line[])
 {
-	register wchar_t *cp, *cp2;
+	wchar_t *cp, *cp2;
 	wchar_t word[BUFSIZ];
 	static const wchar_t *srchlist = (const wchar_t *) L".:!?";
 
@@ -406,9 +419,10 @@ csplit(wchar_t line[])
 	}
 }
 
+static void
 msplit(wchar_t line[])
 {
-	register wchar_t *cp, *cp2, prev;
+	wchar_t *cp, *cp2, prev;
 	wchar_t word[BUFSIZ];
 	static const wchar_t *srchlist = (const wchar_t *) L".:!?";
 
@@ -469,10 +483,11 @@ msplit(wchar_t line[])
  * just give it its own and hope for the best.
  */
 
+static void
 pack(wchar_t word[])
 {
-	register wchar_t *cp;
-	register int s, t;
+	wchar_t *cp;
+	int s, t;
 
 	if (outp == NOSTR)
 		leadin();
@@ -496,6 +511,7 @@ pack(wchar_t word[])
  * line prefix.
  */
 
+static void
 oflush(void)
 {
 	if (outp == NOSTR)
@@ -510,10 +526,11 @@ oflush(void)
  * output on standard output (finally).
  */
 
+static void
 tabulate(wchar_t line[])
 {
-	register wchar_t *cp, *cp2;
-	register int b, t;
+	wchar_t *cp;
+	int b, t;
 
 
 	/* Toss trailing blanks in the output line */
@@ -544,11 +561,12 @@ tabulate(wchar_t line[])
  * leading blanks.
  */
 
-leadin()
+static void
+leadin(void)
 {
-	register int b;
-	register wchar_t *cp;
-	register int l;
+	int b;
+	wchar_t *cp;
+	int l;
 
 	switch (crown_state) {
 	case c_head:
@@ -580,6 +598,7 @@ leadin()
  * Is s1 a prefix of s2??
  */
 
+static int
 ispref(wchar_t *s1, wchar_t *s2)
 {
 
@@ -593,8 +612,8 @@ ispref(wchar_t *s1, wchar_t *s2)
  * Set an input option
  */
 
-setopt(cp)
-	register char *cp;
+static int
+setopt(char *cp)
 {
 	static int ws = 0;
 
@@ -628,14 +647,14 @@ setopt(cp)
 #define	LIB_WDRESOLVE	"/usr/lib/locale/%s/LC_CTYPE/wdresolve.so"
 #define	WCHKIND		"_wdchkind_"
 
-static int	_wckind_c_locale();
+static int	_wckind_c_locale(wchar_t);
 
-static int	(*__wckind)() = _wckind_c_locale;
+static int	(*__wckind)(wchar_t) = _wckind_c_locale;
 static void	*dlhandle = NULL;
 
 
-void
-_wckind_init()
+static void
+_wckind_init(void)
 {
 	char	*locale;
 	char	path[MAXPATHLEN + 1];
@@ -653,7 +672,7 @@ _wckind_init()
 	(void) sprintf(path, LIB_WDRESOLVE, locale);
 
 	if ((dlhandle = dlopen(path, RTLD_LAZY)) != NULL) {
-		__wckind = (int (*)(int))dlsym(dlhandle, WCHKIND);
+		__wckind = (int (*)(wchar_t))dlsym(dlhandle, WCHKIND);
 		if (__wckind != NULL)
 			return;
 		(void) dlclose(dlhandle);
@@ -666,16 +685,14 @@ c_locale:
 
 
 int
-_wckind(wc)
-wchar_t	wc;
+_wckind(wchar_t wc)
 {
 	return (*__wckind) (wc);
 }
 
 
 static int
-_wckind_c_locale(wc)
-wchar_t	wc;
+_wckind_c_locale(wchar_t wc)
 {
 	int	ret;
 
@@ -732,7 +749,7 @@ header_chk(void)
 		for (l = 0; l < h_lines; l++) {
 			/* skip initial blanks */
 			for (cp = hdrbuf[l]; *cp == L' '; cp++);
-			for (hp = &headnames[0]; *hp != (wchar_t *) 0; hp++)
+			for (hp = &headnames[0]; *hp != (wchar_t *)0; hp++)
 				if (ispref(*hp, cp)) {
 					hdrcount++;
 					break;

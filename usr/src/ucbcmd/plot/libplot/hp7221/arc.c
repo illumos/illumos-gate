@@ -1,8 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -10,11 +12,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "hp7221.h"
 
@@ -34,8 +32,8 @@
    
 #define side(x,y)	(a*(x)+b*(y)+c > 0.0 ? 1 : -1)
 
-arc(xcent,ycent,xbeg,ybeg,xend,yend)
-int xcent,ycent,xbeg,ybeg,xend,yend;
+void
+arc(int xcent, int ycent, int xbeg, int ybeg, int xend, int yend)
 {
 	double radius2, c2;
 	double a,b,c;

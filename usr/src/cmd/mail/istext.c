@@ -19,23 +19,27 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+
 #include "mail.h"
 
 /*
  * istext(line, size) - check for text characters
  */
 int
-istext(s, size)
-register unsigned char	*s;
-int 	size;
+istext(unsigned char *s, int size)
 {
-	register unsigned char *ep;
-	register c;
+	unsigned char *ep;
+	int c;
 	
 	for (ep = s+size; --ep >= s; ) {
 		c = *ep;

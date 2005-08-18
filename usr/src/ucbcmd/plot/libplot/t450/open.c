@@ -19,34 +19,33 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
-
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#
 #include <sgtty.h>
+
 /* gsi plotting output routines */
-# define DOWN 012
-# define UP 013
-# define LEFT 010
-# define RIGHT 040
-# define BEL 007
-# define ACK 006
+#define DOWN 012
+#define UP 013
+#define LEFT 010
+#define RIGHT 040
+#define BEL 007
+#define ACK 006
 #define PLOTIN 063
 #define PLOTOUT 064
-# define CR 015
-# define FF 014
-# define VERTRESP 48
-# define HORZRESP 60.
-# define HORZRES 6.
-# define VERTRES 8.
+#define CR 015
+#define FF 014
+#define VERTRESP 48
+#define HORZRESP 60.
+#define HORZRES 6.
+#define VERTRES 8.
 /* down is line feed, up is reverse oyne feed,
    left is bwckspace, right is space.  48 points per inch
    vertically, 60 horizontally */
@@ -59,7 +58,8 @@ int xscale, xoffset, yscale;
 float botx = 0., boty = 0., obotx = 0., oboty = 0.;
 float scalex = 1., scaley = 1.;
 
-openpl ()
+void
+openpl(void)
 {
 	int reset();
 		xnow = ynow = 0;
@@ -77,6 +77,8 @@ openpl ()
 		return;
 }
 
-openvt(){
-openpl();
+void
+openvt(void)
+{
+	openpl();
 }

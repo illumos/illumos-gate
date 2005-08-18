@@ -19,12 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	 	/* SVr4.0 2.	*/
+
 #include "mail.h"
 /*
  * If any H_RECEIVED lines in msg, decide where to put them.
@@ -32,10 +36,11 @@
  *	-1 ==> No H_RECEIVED lines to be printed.
  *	> 0 ==> Header line type after (before) which to place H_RECEIVED lines
  */
-pckrcvspot()
+int
+pckrcvspot(void)
 {
 	static char pn[] = "pckrcvspot";
-	register int	rc;	
+	int	rc;	
 
 	if (hdrlines[H_RECEIVED].head == (struct hdrs *)NULL) {
 		rc = -1;
