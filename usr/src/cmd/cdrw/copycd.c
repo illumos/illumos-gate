@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,7 +118,7 @@ read_data_track(cd_device *dev, struct track_info *ti, bstreamhandle h)
 		}
 		blks_read += read_chunk;
 		cblk += read_chunk;
-		(void) progress((void *)(ti->ti_track_size), blks_read);
+		(void) progress((ti->ti_track_size), blks_read);
 	}
 	/* l10n_NOTE : 'done' as in "Reading track 1...done"  */
 	(void) str_print(gettext("done.\n"), progress_pos);

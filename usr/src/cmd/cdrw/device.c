@@ -714,7 +714,7 @@ write_next_track(int mode, bstreamhandle h)
 
 	print_n_flush(gettext("Writing track %d..."), (int)ti->ti_track_no);
 	init_progress();
-	if (!write_track(target, ti, h, progress, (void *)size, te)) {
+	if (!write_track(target, ti, h, progress, size, te)) {
 		if (te->err_type == TRACKIO_ERR_USER_ABORT) {
 			(void) str_print(gettext("Aborted.\n"), progress_pos);
 		} else {

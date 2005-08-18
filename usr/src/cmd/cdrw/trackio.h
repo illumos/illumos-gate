@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +76,7 @@ struct iobuf {
 #define	AUDIO_TRACK_BLKSIZE	2352
 
 int write_track(cd_device *dev, struct track_info *ti, bstreamhandle h,
-		int (*cb)(void *, int64_t), void *arg, struct
+		int (*cb)(int64_t, int64_t), int64_t arg, struct
 		trackio_error *te);
 
 #ifdef	__cplusplus

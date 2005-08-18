@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,10 @@ uscsi(int fd, struct uscsi_cmd *scmd)
 
 		max_retries = 500;
 	} else {
-		max_retries = 20;
+		/*
+		 * Pioneer A08/A09 retries approx 30 times.
+		 */
+		max_retries = 40;
 	}
 
 	/*

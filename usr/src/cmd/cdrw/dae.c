@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -207,7 +207,7 @@ read_audio_track(cd_device *dev, struct track_info *ti, bstreamhandle h)
 
 	for (c_blk = start_blk; c_blk < end_blk; c_blk += blocks_to_write) {
 		/* update progress indicator */
-		(void) progress((void *) (end_blk - start_blk),
+		(void) progress((end_blk - start_blk),
 		    (int64_t)(c_blk - start_blk));
 		blocks_to_read =  end_blk - c_blk + blks_to_overlap;
 

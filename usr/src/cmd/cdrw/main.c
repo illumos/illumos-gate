@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,7 +128,7 @@ setup_target(int flag)
 	return (scan_for_cd_device(flag, &target));
 }
 
-void
+int
 main(int argc, char **argv)
 {
 	int		c;
@@ -395,5 +395,5 @@ main(int argc, char **argv)
 		(void) printf(gettext("done.\n"));
 		exit(0);
 	}
-
+	return (0);
 }

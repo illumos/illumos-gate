@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,7 @@ void print_trackio_error(struct trackio_error *te);
 char *get_err_str(void);
 int get_audio_type(char *ext);
 void init_progress(void);
-int progress(void *arg, int64_t completed);
+int progress(int64_t arg, int64_t completed);
 void raise_priv(void);
 void lower_priv(void);
 int check_auth(uid_t uid);

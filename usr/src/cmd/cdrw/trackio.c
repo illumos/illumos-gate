@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,8 +63,8 @@ static mutex_t	pcb_mutex;
 static cond_t	pcb_cond;
 static uchar_t	pcb_user_abort, pcb_done, pcb_synch_initialized;
 static uint_t	pcb_completed_io_size;
-static int	(*pcb_cb)(void *, int64_t);
-static void	*pcb_arg;
+static int	(*pcb_cb)(int64_t, int64_t);
+static int64_t	pcb_arg;
 
 static void
 fini_tio_data(void)
@@ -259,7 +259,7 @@ trackio_sig_handler(int i)
 
 int
 write_track(cd_device *dev, struct track_info *ti, bstreamhandle h,
-		int (*cb)(void *, int64_t), void *arg, struct trackio_error *te)
+	int (*cb)(int64_t, int64_t), int64_t arg, struct trackio_error *te)
 {
 	int			blksize, i, sz_read, rem;
 	uint32_t		start_b;

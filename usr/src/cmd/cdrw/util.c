@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,10 +192,10 @@ init_progress(void)
 }
 
 int
-progress(void *arg, int64_t completed)
+progress(int64_t arg, int64_t completed)
 {
 	char s[BUFSIZE];
-	uint64_t total = (uintptr_t)arg & 0xffffffff;
+	uint64_t total = (uint64_t)arg & 0xffffffff;
 	if (completed == -1) {
 		/* Got ^C. Add 2 to progress pos to compensate for ^ and C */
 		progress_pos = str_print("(flushing ...)", progress_pos+2);
