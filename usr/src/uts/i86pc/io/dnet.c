@@ -2420,7 +2420,8 @@ dnet_alloc_bufs(gld_mac_info_t *macinfo)
 		    NULL, &cookie, &ncookies) != DDI_DMA_MAPPED)
 			return (FAILURE);
 
-		dnetp->setup_buf_paddr = (caddr_t)cookie.dmac_laddress;
+		dnetp->setup_buf_paddr = (caddr_t)(uintptr_t)
+		    cookie.dmac_laddress;
 		bzero(dnetp->setup_buf_vaddr, len);
 	}
 
@@ -2439,7 +2440,8 @@ dnet_alloc_bufs(gld_mac_info_t *macinfo)
 		    DDI_DMA_RDWR | DDI_DMA_STREAMING, DDI_DMA_SLEEP,
 		    NULL, &cookie, &ncookies) != DDI_DMA_MAPPED)
 			return (FAILURE);
-		dnetp->tx_desc_paddr = (caddr_t)cookie.dmac_laddress;
+		dnetp->tx_desc_paddr = (caddr_t)(uintptr_t)
+		    cookie.dmac_laddress;
 		bzero(dnetp->tx_desc, len);
 		dnetp->nxmit_desc = dnetp->max_tx_desc;
 
@@ -2466,7 +2468,8 @@ dnet_alloc_bufs(gld_mac_info_t *macinfo)
 		    NULL, &cookie, &ncookies) != DDI_DMA_MAPPED)
 			return (FAILURE);
 
-		dnetp->rx_desc_paddr = (caddr_t)cookie.dmac_laddress;
+		dnetp->rx_desc_paddr = (caddr_t)(uintptr_t)
+		    cookie.dmac_laddress;
 		bzero(dnetp->rx_desc, len);
 		dnetp->nrecv_desc = dnetp->max_rx_desc;
 
@@ -2821,14 +2824,14 @@ dnet_rbuf_init(dev_info_t *dip, int nbufs)
 		if (ncookies > 2)
 			goto fail_unbind;
 		if (ncookies == 1) {
-			rp->rbuf_endpaddr =
-			    (caddr_t)(cookie.dmac_laddress + rx_buf_size - 1);
+			rp->rbuf_endpaddr = (caddr_t)(uintptr_t)
+			    (cookie.dmac_laddress + rx_buf_size - 1);
 		} else {
 			ddi_dma_nextcookie(rp->rbuf_dmahdl, &cookie);
-			rp->rbuf_endpaddr = (caddr_t)
+			rp->rbuf_endpaddr = (caddr_t)(uintptr_t)
 			    (cookie.dmac_laddress + cookie.dmac_size - 1);
 		}
-		rp->rbuf_paddr = (caddr_t)cookie.dmac_laddress;
+		rp->rbuf_paddr = (caddr_t)(uintptr_t)cookie.dmac_laddress;
 
 		rp->rbuf_next = rbuf_freelist_head;
 		rbuf_freelist_head = rp;
@@ -2919,14 +2922,14 @@ dnet_rbuf_alloc(dev_info_t *dip, int cansleep)
 		if (ncookies > 2)
 			goto fail_unbind;
 		if (ncookies == 1) {
-			rp->rbuf_endpaddr =
-			    (caddr_t)(cookie.dmac_laddress + rx_buf_size - 1);
+			rp->rbuf_endpaddr = (caddr_t)(uintptr_t)
+			    (cookie.dmac_laddress + rx_buf_size - 1);
 		} else {
 			ddi_dma_nextcookie(rp->rbuf_dmahdl, &cookie);
-			rp->rbuf_endpaddr = (caddr_t)
+			rp->rbuf_endpaddr = (caddr_t)(uintptr_t)
 			    (cookie.dmac_laddress + cookie.dmac_size - 1);
 		}
-		rp->rbuf_paddr = (caddr_t)cookie.dmac_laddress;
+		rp->rbuf_paddr = (caddr_t)(uintptr_t)cookie.dmac_laddress;
 
 		rbuf_freelist_head = rp;
 		rbuf_pool_size++;
