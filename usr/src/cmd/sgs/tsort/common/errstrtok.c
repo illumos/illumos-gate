@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -32,7 +38,6 @@
  *	string(savept).
  */
 
-/*LINTLIBRARY*/
 /*
  * uses strpbrk and strspn to break string into tokens on
  * sequentially subsequent calls.  returns NULL when no
@@ -40,16 +45,12 @@
  * `subsequent' calls are calls with first argument NULL.
  */
 
-#define	NULL	(char *)0
-
-extern int strspn();
-extern char *strpbrk();
+#include <string.h>
 
 char *
-errstrtok(string, sepset)
-char	*string, *sepset;
+errstrtok(char *string, char *sepset)
 {
-	register char	*p, *q, *r;
+	char	*p, *q, *r;
 	static char	*savept;
 
 	/* first or subsequent call */

@@ -22,8 +22,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1998 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 
 objs/%.o \
 objs.xpg4/%.o:	../common/%.c
@@ -43,7 +43,7 @@ package:	all $(ROOTCCSBINPROG) $(ROOTXPG4PROG)
 
 catalog:	$(POFILE)
 
-lint:		$(LINTOUT32) $(SGSLINTOUT)
+lint:		$(LINTOUT)
 
 $(PROG):	$(OBJS)
 		$(LINK.c) -o $@ $(LLDFLAGS) $(OBJS) $(LDLIBS)
@@ -68,5 +68,7 @@ $(XPG4OBJS):	objs.xpg4
 objs objs.xpg4:
 		-@ mkdir -p $@
 
+$(LINTOUT):	$(SRCS)
+		$(LINT.c) $(SRCS) $(LDLIBS) > $(LINTOUT) 2>&1
+
 include		$(SRC)/cmd/Makefile.targ
-include		$(SRC)/cmd/sgs/Makefile.targ

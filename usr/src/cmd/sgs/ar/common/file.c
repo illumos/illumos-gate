@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -211,7 +211,7 @@ getfile(Cmd_info *cmd_info)
 }
 
 ARFILE *
-newfile()
+newfile(void)
 {
 	static ARFILE	*buffer =  NULL;
 	static int	count = 0;
@@ -809,7 +809,7 @@ writefile(Cmd_info *cmd_info)
 					exit(1);
 				}
 			}
-			fclose(f);
+			(void) fclose(f);
 		} else {
 			(void) memcpy(tmp_dst, fptr->ar_contents,
 				fptr->ar_size);
@@ -1246,15 +1246,15 @@ make_tmpname(char *filename) {
 		*slash = 0;
 		tmpname = (char *)malloc(strlen(filename) +
 			sizeof (template) + 2);
-		strcpy(tmpname, filename);
-		strcat(tmpname, "/");
-		strcat(tmpname, template);
-		mktemp(tmpname);
+		(void) strcpy(tmpname, filename);
+		(void) strcat(tmpname, "/");
+		(void) strcat(tmpname, template);
+		(void) mktemp(tmpname);
 		*slash = c;
 	} else {
 		tmpname = malloc(sizeof (template));
-		strcpy(tmpname, template);
-		mktemp(tmpname);
+		(void) strcpy(tmpname, template);
+		(void) mktemp(tmpname);
 	}
 	return (tmpname);
 }
@@ -1271,22 +1271,22 @@ ar_copy(char *from, char *to) {
 	tofd = open(to, O_CREAT | O_WRONLY | O_TRUNC, 0777);
 	if (tofd < 0) {
 		saved = errno;
-		close(fromfd);
+		(void) close(fromfd);
 		errno = saved;
 		return (-1);
 	}
 	while ((nread = read(fromfd, buf, sizeof (buf))) > 0) {
 		if (write(tofd, buf, nread) != nread) {
 			saved = errno;
-			close(fromfd);
-			close(tofd);
+			(void) close(fromfd);
+			(void) close(tofd);
 			errno = saved;
 			return (-1);
 		}
 	}
 	saved = errno;
-	close(fromfd);
-	close(tofd);
+	(void) close(fromfd);
+	(void) close(tofd);
 	if (nread < 0) {
 		errno = saved;
 		return (-1);
@@ -1295,7 +1295,8 @@ ar_copy(char *from, char *to) {
 }
 
 static int
-ar_rename(char *from, char *to) {
+ar_rename(char *from, char *to)
+{
 	int exists;
 	struct stat s;
 	int ret = 0;
@@ -1306,16 +1307,16 @@ ar_rename(char *from, char *to) {
 		ret = rename(from, to);
 		if (ret == 0) {
 			if (exists) {
-				chmod(to, s.st_mode & 0777);
+				(void) chmod(to, s.st_mode & 0777);
 				if (chown(to, s.st_uid, s.st_gid) >= 0)
-					chmod(to, s.st_mode & 07777);
+					(void) chmod(to, s.st_mode & 07777);
 				}
 		} else {
-			unlink(from);
+			(void) unlink(from);
 		}
 	} else {
 		ret = ar_copy(from, to);
-		unlink(from);
+		(void) unlink(from);
 	}
 	return (ret);
 }
@@ -1360,14 +1361,12 @@ static char *
 writelargefile(Cmd_info *cmd_info, long long_tab_size, int longnames,
 	ARFILEP *symlist, long nsyms, int found_obj, int new_archive)
 {
-	register ARFILE	* fptr;
-	register int i;
+	ARFILE	* fptr;
 	char *name = cmd_info->arnam;
 	int arsize;
 	char *dst;
 	char *tmp_dst;
 	int nfd;
-	off64_t fsize = (off64_t)0;
 	char  *new_name;
 	FILE *f;
 	struct stat stbuf;
@@ -1469,7 +1468,7 @@ writelargefile(Cmd_info *cmd_info, long long_tab_size, int longnames,
 				}
 			}
 			arwrite(name, nfd, fptr->ar_contents, fptr->ar_size);
-			fclose(f);
+			(void) fclose(f);
 			free(fptr->ar_contents);
 		} else {
 			arwrite(name, nfd, fptr->ar_contents, fptr->ar_size);
@@ -1499,7 +1498,7 @@ writelargefile(Cmd_info *cmd_info, long long_tab_size, int longnames,
 	(void) close(cmd_info->afd);
 
 	if (!new_archive) {
-		ar_rename(new_name, name);
+		(void) ar_rename(new_name, name);
 	}
 
 	return (dst);

@@ -19,40 +19,42 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
+#ifndef _ERRMSG_H
+#define	_ERRMSG_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/*LINTLIBRARY*/
+/*
+ * errmsg.h
+ *	Include file for error message interface.
+ *	Command and library version.
+ */
 
-/*	errmsg.h
-	Include file for error message interface.
-	Command and library version.
-*/
+#define	errmsg	errtag(__FILE__, __LINE__), errtext
 
-#define	errmsg	errtag( __FILE__, __LINE__ ), errtext
-
-extern  void 	erraction();
-extern	int     errafter();	/* routine run after text is printed */
-extern	void	errbefore();	/* routine run before text is printed */
-extern	int	errexit();	/* exit(2) code for actions that exit */
-extern	void	_errmsg(char *tag, int severity, char *format, ...);
-extern	void	errprefix();	/* prefix to error message, unique to each
-				supplier */
-extern	void	errsource();	/* source of error message, usually command name
-				*/
-extern	void	errtag();
-extern	void	errtext(int severity, char *format, ...);
-extern	void	errtofix();
-extern	void	errusage(char *format, ...);	/* routine to print command usage message */
-extern	void	errverb();	/* adjust verbosity of error messages */
+void erraction(int action);
+int errafter(int severity, char *format, ...);
+void errbefore(int severity, char *format, ...);
+int errexit(int e);
+void _errmsg(char *tag, int severity, char *format, ...);
+void errprefix(char *str);
+void errsource(char *str);
+void errtag(char *str, int num);
+void errtext(int severity, char *format, ...);
+void errtofix(char *str);
+void errusage(char *format, ...);
+char *errstrtok(char *string, char *sepset);
+void errverb(char *s);
 
 /* severities  first argument to errbefore(), errafter(), errtext() */
 #define	EIGNORE	-1	/* special severity, no message, no action, returns */
@@ -64,11 +66,12 @@ extern	void	errverb();	/* adjust verbosity of error messages */
 /* special errtext() argument that prints a standard message based on errno */
 #define	EERRNO	1
 
-/* actions : returned by errafter() used as an argument to erraction()
+/*
+ * actions : returned by errafter() used as an argument to erraction()
  */
 #define	EEXIT	100
 #define	EABORT  200
-#define ERETURN 300
+#define	ERETURN 300
 
 /* used to set verbosity */
 #define	ENO	0
@@ -87,8 +90,7 @@ struct Err {
 	char	vtext;
 			/* message content and context */
 	char	*prefix;	/* usually unique per manufacturer */
-	char	*envsource;	/* source from ERRSOURCE environmental variable
-				*/
+	char	*envsource;	/* source from ERRSOURCE environment variable */
 	char	*source;	/* usually command name */
 	int	severity;
 	char	**sevmsg;	/* error messages that depend on severity */
@@ -97,56 +99,13 @@ struct Err {
 	char	*tagstr;
 	int	exit;	/* exit(2) code to use if error causes exit */
 };
-extern struct Err	Err;
 
-/* declare Common Library Functions (CLF)
-	stdio.h needs to be defined (stdio.h handles itself properly if it is
-	included more than once).
-*/
+extern struct Err	Err;
 
 #include	<stdio.h>
 #include	<sys/types.h>
 
-extern	int	zaccess();
-extern	int	zacct();
-extern	char	*zcalloc();
-extern	int	zchdir();
-extern	int	zchmod();
-extern	int	zchown();
-extern	int	zchroot();
-extern	int	zclose();
-extern	int	zcreat();
-extern	char	*zcuserid();
-extern	int	zdup();
-extern	int	zexecvp();
-extern	int	zfclose();
-extern	int	zfcntl();
-extern	int	zferror();
-extern	int	zfread();
-extern	int	zfseek();
-extern	int	zfstat();
-extern	int	zfwrite();
-extern	int	zioctl();
-extern	int	zkill();
-extern	int	zlink();
-extern	long	zlseek();
-extern	char	*zmalloc();
-extern	int	zmknod();
-extern	int	zmount();
-extern	int	znice();
-extern	int	zopen();
-extern	int	zpipe();
-extern	int	zplock();
-extern	int	zptrace();
-extern	int	zread();
-extern	char	*zrealloc();
-extern	int	zsetgid();
-extern	int	zsetuid();
-extern	int	zstat();
-extern	daddr_t	zulimit();
-extern	int	zumount();
-extern	int	zuname();
-extern	int	zunlink();
-extern	int	zwait();
-extern	int	zwrite();
-extern	FILE    *zfopen();
+extern void *zmalloc(int severity, size_t n);
+FILE *zfopen(int severity, char *path, char *type);
+
+#endif /* _ERRMSG_H */

@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -33,12 +39,9 @@
 #include	<stdio.h>
 
 FILE *
-zfopen(severity, path, type)
-int	severity;
-char	*path;
-char	*type;
+zfopen(int severity, char *path, char *type)
 {
-	register FILE	*fp;	/* file pointer */
+	FILE	*fp;	/* file pointer */
 
 	if ((fp = fopen(path, type)) == NULL) {
 		char	*mode;

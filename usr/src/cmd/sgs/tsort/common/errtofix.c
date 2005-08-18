@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -31,9 +37,9 @@
 
 #include	"errmsg.h"
 
+/* LINTLIBRARY */
 void
-errtofix(str)
-char	*str;
+errtofix(char *str)
 {
 	Err.tofix = str;
 }

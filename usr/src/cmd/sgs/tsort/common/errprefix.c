@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -33,8 +39,7 @@
 
 
 void
-errprefix(str)
-char	*str;
+errprefix(char *str)
 {
 	Err.prefix = str;
 }

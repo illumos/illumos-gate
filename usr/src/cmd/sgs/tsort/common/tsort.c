@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -74,20 +74,22 @@ struct predlist {
 	struct nodelist *pred;
 };
 
-static struct nodelist *index();
-static struct nodelist *findloop();
-static struct nodelist *mark();
+static struct nodelist *index(char *s);
+static struct nodelist *findloop(void);
+static struct nodelist *mark(struct nodelist *i);
+static int present(struct nodelist *i, struct nodelist *j);
+static int anypred(struct nodelist *i);
 
 /*
  *	the first for loop reads in the graph,
  *	the second prints out the ordering
  */
-main(argc, argv)
-char **argv;
+int
+main(int argc, char **argv)
 {
-	register struct predlist *t;
+	struct predlist *t;
 	FILE *input = stdin;
-	register struct nodelist *i, *j;
+	struct nodelist *i, *j;
 	int x;
 	char precedes[FILENAME_MAX+1], follows[FILENAME_MAX+1];
 
@@ -147,7 +149,7 @@ char **argv;
 			break;
 		if (i->nextnode == NULL)
 			i = findloop();
-		puts(i->name);
+		(void) puts(i->name);
 		i->live = DEAD;
 	}
 	return (0);	/* Ensure zero return on normal termination */
@@ -156,11 +158,10 @@ char **argv;
 /*
  *	is i present on j's predecessor list?
  */
-static
-present(i, j)
-struct nodelist *i, *j;
+static int
+present(struct nodelist *i, struct nodelist *j)
 {
-	register struct predlist *t;
+	struct predlist *t;
 	for (t = j->inedges; t != NULL; t = t->nextpred)
 		if (t->pred == i)
 			return (1);
@@ -170,11 +171,10 @@ struct nodelist *i, *j;
 /*
  *	is there any live predecessor for i?
  */
-static
-anypred(i)
-struct nodelist *i;
+static int
+anypred(struct nodelist *i)
 {
-	register struct predlist *t;
+	struct predlist *t;
 	for (t = i->inedges; t != NULL; t = t->nextpred)
 		if (t->pred->live == LIVE)
 			return (1);
@@ -184,13 +184,11 @@ struct nodelist *i;
 /*
  *	turn a string into a node pointer
  */
-static
-struct nodelist *
-index(s)
-register char *s;
+static struct nodelist *
+index(char *s)
 {
-	register struct nodelist *i;
-	register char *t;
+	struct nodelist *i;
+	char *t;
 	for (i = &firstnode; i->nextnode != NULL; i = i->nextnode)
 		if (strcmp(s, i->name) == 0)
 			return (i);
@@ -211,11 +209,10 @@ register char *s;
  *	given that there is a cycle, find some
  *	node in it
  */
-static
-struct nodelist *
-findloop()
+static struct nodelist *
+findloop(void)
 {
-	register struct nodelist *i, *j;
+	struct nodelist *i, *j;
 
 	for (i = &firstnode; i->nextnode != NULL; i = i->nextnode)
 		if (i->live == LIVE)
@@ -236,13 +233,11 @@ findloop()
  *	VISITED is a temporary state recording the
  *	visits of the search
  */
-static
-struct nodelist *
-mark(i)
-register struct nodelist *i;
+static struct nodelist *
+mark(struct nodelist *i)
 {
-	register struct nodelist *j;
-	register struct predlist *t;
+	struct nodelist *j;
+	struct predlist *t;
 
 	if (i->live == DEAD)
 		return (NULL);
@@ -252,7 +247,7 @@ register struct nodelist *i;
 	for (t = i->inedges; t != NULL; t = t->nextpred) {
 		j = mark(t->pred);
 		if (j != NULL) {
-			fprintf(stderr, "\t%s\n", i->name);
+			(void) fprintf(stderr, "\t%s\n", i->name);
 			return (j);
 		}
 	}

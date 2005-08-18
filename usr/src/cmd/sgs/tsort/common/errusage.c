@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -41,20 +42,21 @@
  *	This routine prints the standard command usage message.
  */
 
+/* PRINTFLIKE1 */
 void
 errusage(char *format, ...)
 {
 	va_list	ap;
 
-	fputs(gettext("Usage:  "), stderr);
+	(void) fputs(gettext("Usage:  "), stderr);
 	if (Err.vsource && Err.source) {
-		fputs(Err.source, stderr);
-		fputc(' ', stderr);
+		(void) fputs(Err.source, stderr);
+		(void) fputc(' ', stderr);
 	}
 	va_start(ap, format);
-	vfprintf(stderr, format, ap);
+	(void) vfprintf(stderr, format, ap);
 	va_end(ap);
-	fputc('\n', stderr);
+	(void) fputc('\n', stderr);
 	(void) errexit(USAGENO);
 	erraction(EEXIT);
 }

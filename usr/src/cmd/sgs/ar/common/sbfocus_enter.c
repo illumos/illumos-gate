@@ -20,16 +20,13 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "sbfocus_enter.h"
-
-extern  void   sbfocus_symbol();
-extern  void   sbfocus_close();
 
 /*
  * sbfocus_symbol() will write one symbol to a pipe that has the program
@@ -53,11 +50,7 @@ extern  void   sbfocus_close();
  */
 
 void
-sbfocus_symbol(data, name, type, symbol)
-	Sbld	data;
-	char	*name;
-	char	*type;
-	char	*symbol;
+sbfocus_symbol(Sbld data, char *name, char *type, char *symbol)
 {
 	int	fd[2];
 
@@ -116,8 +109,7 @@ sbfocus_symbol(data, name, type, symbol)
  * block used with sbfocus_symbol().
  */
 void
-sbfocus_close(data)
-	Sbld	data;
+sbfocus_close(Sbld data)
 {
 	if ((data->fd != NULL) && (data->failed == 0)) {
 		(void) fclose(data->fd);

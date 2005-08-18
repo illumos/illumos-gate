@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -33,13 +39,11 @@
 
 #include	"errmsg.h"
 #include	<stdio.h>
-#include	<varargs.h>
+#include	<stdarg.h>
 
+/* ARGSUSED1 */
 int
-errafter(severity, format, print_args)
-int	severity;
-char	*format;
-va_list print_args;
+errafter(int severity, char *format, ...)
 {
 	switch (severity) {
 	case EHALT:

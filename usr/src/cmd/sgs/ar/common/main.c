@@ -23,7 +23,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 1995-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,21 +39,17 @@ static char *arnam;
  */
 static void setup(int, char **, Cmd_info *);
 static void setcom(Cmd_info *, int (*)());
-static void usage();
-static void sigexit();
+static void usage(void);
+static void sigexit(int sig);
 static int notfound(Cmd_info *);
 static void check_swap();
-
-#ifdef BROWSER
-extern  void    sbfocus_close();
-#endif
 
 #define	OPTSTR	":a:b:i:vucsrdxtplmqVCTzM"
 
 int
 main(int argc, char **argv)
 {
-	register int i;
+	int i;
 	int fd;
 	Cmd_info *cmd_info;
 	int ret;
@@ -165,9 +161,6 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
 	int Vflag = 0;
 	int c;
 	int usage_err = 0;
-	extern char *optarg;
-	extern int optind;
-	extern int optopt;
 
 	while ((c = getopt(argc, argv, OPTSTR)) != -1) {
 		switch (c) {
@@ -313,7 +306,7 @@ setcom(Cmd_info *cmd_info, int (*fun)())
 }
 
 static void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr, gettext(
 "usage: ar -d[-vV] archive file ...\n"
@@ -328,8 +321,7 @@ usage()
 
 /*ARGSUSED0*/
 static void
-sigexit(i)
-int i;
+sigexit(int sig)
 {
 	exit(100);
 }
@@ -339,7 +331,7 @@ int i;
 static int
 notfound(Cmd_info *cmd_info)
 {
-	register int i, n;
+	int i, n;
 
 	n = 0;
 	for (i = 0; i < cmd_info->namc; i++)
@@ -355,7 +347,7 @@ notfound(Cmd_info *cmd_info)
  * Debugging info
  */
 static void
-check_swap()
+check_swap(void)
 {
 	(void) system("/usr/sbin/swap -s");
 }

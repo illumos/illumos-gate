@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,17 +41,12 @@
 #include	<stdarg.h>
 #include	<string.h>
 #include	<errno.h>
-#ifdef __STDC__
 #include	<stdlib.h>
-#else
-	extern void perror();
-#endif
-
-extern	char    *getenv();
 
 /*
  *	Internal form, to handle both errtext() and _errmsg()
  */
+/* PRINTFLIKE2 */
 void
 __errtext(int severity, char *format, va_list ap)
 {
@@ -64,19 +60,19 @@ __errtext(int severity, char *format, va_list ap)
 		goto after;
 
 	if (Err.vbell)
-		fputc('\07', stderr);
+		(void) fputc('\07', stderr);
 	if (Err.vprefix && Err.prefix) {
-		fputs(Err.prefix, stderr);
-		fputc(' ', stderr);
+		(void) fputs(Err.prefix, stderr);
+		(void) fputc(' ', stderr);
 	}
 	if (Err.vsource) {
 		if (Err.envsource ||
 			(Err.envsource = getenv("ERRSOURCE"))) {
-			fprintf(stderr, "%s: ", Err.envsource);
+			(void) fprintf(stderr, "%s: ", Err.envsource);
 		}
 	}
 	if (Err.vsource && Err.source) {
-		fprintf(stderr, "%s: ", Err.source);
+		(void) fprintf(stderr, "%s: ", Err.source);
 	}
 	if (Err.vsevmsg) {
 		char	**e;
@@ -84,48 +80,48 @@ __errtext(int severity, char *format, va_list ap)
 		for (e = Err.sevmsg; *e; e++)
 			;
 		if (Err.severity < (e - Err.sevmsg))
-			fputs(Err.sevmsg[Err.severity], stderr);
+			(void) fputs(Err.sevmsg[Err.severity], stderr);
 		else
-			fputs("<UNKNOWN>", stderr);
+			(void) fputs("<UNKNOWN>", stderr);
 	}
 
 	if (Err.vtext) {
 		if (Err.vsyserr && ((int)format == EERRNO)) {
-			fflush(stderr);
+			(void) fflush(stderr);
 			perror("");
 			puterrno = 1;
 		} else {
-			vfprintf(stderr, format, ap);
-			fputs("\n", stderr);
+			(void) vfprintf(stderr, format, ap);
+			(void) fputs("\n", stderr);
 		}
 	}
 
 	if ((errno && ((int)format != EERRNO)) &&
 	    (Err.vsyserr == EYES || (Err.vsyserr ==  EDEF &&
 	    (Err.severity == EHALT || Err.severity == EERROR)))) {
-		fputc('\t', stderr);
-		fflush(stderr);
+		(void) fputc('\t', stderr);
+		(void) fflush(stderr);
 		perror("");
 		puterrno = 1;
 	}
 
 	if (Err.vtag) {
 		if (Err.tagnum)
-			fputc('\t', stderr);
+			(void) fputc('\t', stderr);
 		else
-			fputs("HELP FACILITY KEY: ", stderr);
+			(void) fputs("HELP FACILITY KEY: ", stderr);
 		if (Err.tagstr)
-			fputs(Err.tagstr, stderr);
+			(void) fputs(Err.tagstr, stderr);
 		if (Err.tagnum)
-			fprintf(stderr, ", line %d", Err.tagnum);
+			(void) fprintf(stderr, ", line %d", Err.tagnum);
 		if (puterrno)
-			fprintf(stderr, "\tUXerrno%d", errno);
-		fputc('\n', stderr);
+			(void) fprintf(stderr, "\tUXerrno%d", errno);
+		(void) fputc('\n', stderr);
 	}
 
 	if ((Err.vtext || Err.vtag) &&
 	    Err.vfix && Err.tofix && !Err.tagnum)
-		fprintf(stderr, "To Fix:\t%s\n", Err.tofix);
+		(void) fprintf(stderr, "To Fix:\t%s\n", Err.tofix);
 	after:
 	erraction(errafter(Err.severity, format, ap));
 }
@@ -162,15 +158,11 @@ _errmsg(char *tag, int severity, char *format, ...)
 }
 
 void
-errverb(s)
-register  char *s;
+errverb(char *s)
 {
-	char	*errstrtok();
 	char	buf[ BUFSIZ ];
-	register
 	char   *token;
-	static
-	char   space[] = ",\t\n";
+	static char   space[] = ",\t\n";
 
 	if (!s)
 		return;

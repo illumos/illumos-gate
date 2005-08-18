@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -92,10 +92,10 @@ static int create_extract(ARFILE *, int, int, Cmd_info *);
 int
 rcmd(Cmd_info *cmd_info)
 {
-	register FILE *f;
-	register ARFILE *fileptr;
-	register ARFILE	*abifile = NULL;
-	register ARFILE	*backptr = NULL;
+	FILE *f;
+	ARFILE *fileptr;
+	ARFILE	*abifile = NULL;
+	ARFILE	*backptr = NULL;
 	ARFILE	*endptr;
 	ARFILE	*moved_files;
 	ARFILE  *prev_entry, *new_listhead, *new_listend;
@@ -288,8 +288,8 @@ rcmd(Cmd_info *cmd_info)
 int
 dcmd(Cmd_info *cmd_info)
 {
-	register ARFILE	*fptr;
-	register ARFILE *backptr = NULL;
+	ARFILE	*fptr;
+	ARFILE *backptr = NULL;
 
 	for (fptr = getfile(cmd_info); fptr; fptr = getfile(cmd_info)) {
 		if (match(fptr->ar_longname, cmd_info) != NULL) {
@@ -325,8 +325,8 @@ dcmd(Cmd_info *cmd_info)
 int
 xcmd(Cmd_info *cmd_info)
 {
-	register int f;
-	register ARFILE *next;
+	int f;
+	ARFILE *next;
 	int rawname = 0;
 	int f_len = 0;
 
@@ -395,7 +395,7 @@ xcmd(Cmd_info *cmd_info)
 int
 pcmd(Cmd_info *cmd_info)
 {
-	register ARFILE	*next;
+	ARFILE	*next;
 
 	for (next = getfile(cmd_info); next; next = getfile(cmd_info)) {
 		if (cmd_info->namc == 0 ||
@@ -421,10 +421,10 @@ pcmd(Cmd_info *cmd_info)
 int
 mcmd(Cmd_info *cmd_info)
 {
-	register ARFILE	*fileptr;
-	register ARFILE	*abifile = NULL;
-	register ARFILE	*tmphead = NULL;
-	register ARFILE	*tmpend = NULL;
+	ARFILE	*fileptr;
+	ARFILE	*abifile = NULL;
+	ARFILE	*tmphead = NULL;
+	ARFILE	*tmpend = NULL;
 	ARFILE	*backptr1 = NULL;
 	ARFILE	*backptr2 = NULL;
 
@@ -489,8 +489,8 @@ mcmd(Cmd_info *cmd_info)
 int
 tcmd(Cmd_info *cmd_info)
 {
-	register ARFILE	*next;
-	register int	**mp;
+	ARFILE	*next;
+	int	**mp;
 	char   buf[DATESIZE];
 	int m1[] = {1, ROWN, 'r', '-'};
 	int m2[] = {1, WOWN, 'w', '-'};
@@ -555,7 +555,7 @@ tcmd(Cmd_info *cmd_info)
 int
 qcmd(Cmd_info *cmd_info)
 {
-	register ARFILE *fptr;
+	ARFILE *fptr;
 
 	if (opt_FLAG(cmd_info, a_FLAG) || opt_FLAG(cmd_info, b_FLAG)) {
 		error_message(USAGE_05_ERROR,
@@ -574,7 +574,7 @@ qcmd(Cmd_info *cmd_info)
 static char *
 match(char *file, Cmd_info *cmd_info)
 {
-	register int i;
+	int i;
 
 	for (i = 0; i < cmd_info->namc; i++) {
 		if (cmd_info->namv[i] == 0)
@@ -594,9 +594,9 @@ match(char *file, Cmd_info *cmd_info)
 static void
 cleanup(Cmd_info *cmd_info)
 {
-	register int i;
-	register FILE	*f;
-	register ARFILE	*fileptr;
+	int i;
+	FILE	*f;
+	ARFILE	*fileptr;
 	struct stat stbuf;
 
 	for (i = 0; i < cmd_info->namc; i++) {
@@ -717,7 +717,7 @@ movefil(ARFILE *fileptr, struct stat *stbuf)
 static FILE *
 stats(char *file, struct stat *stbuf)
 {
-	register FILE *f;
+	FILE *f;
 
 	f = fopen(file, "r");
 	if (f == NULL)
@@ -858,7 +858,7 @@ mesg(int c, char *file, Cmd_info *cmd_info)
 static void
 ar_select(int *pairp, unsigned long mode)
 {
-	register int n, *ap;
+	int n, *ap;
 
 	ap = pairp;
 	n = *ap++;

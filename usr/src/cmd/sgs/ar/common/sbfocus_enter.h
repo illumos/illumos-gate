@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifndef sbfocus_enter_h_INCLUDED
-#define sbfocus_enter_h_INCLUDED
+#ifndef _SBFOCUS_ENTER_H
+#define	_SBFOCUS_ENTER_H
 
 #include <stdio.h>
 #include <sys/param.h>
@@ -52,16 +52,17 @@ struct Sbld_tag {
  */
 struct nlist {
 	union {
-		char *n_name;              /* for use when in-core */
-		long n_strx;               /* index into file string table */
+		char *n_name;	/* for use when in-core */
+		long n_strx;	/* index into file string table */
 	} n_un;
-	unsigned char  n_type;             /* type flag (N_TEXT...) */
-	char     n_other;                  /* unused */
-	short    n_desc;                   /* see <stab.h> */
-	unsigned long  n_value;            /* value of symbol (or sdb offset) */
+	unsigned char  n_type;	/* type flag (N_TEXT...) */
+	char	n_other;	/* unused */
+	short	n_desc;	/* see <stab.h> */
+	unsigned long  n_value;	/* value of symbol (or sdb offset) */
 };
 
-extern  void    sbfocus_symbol();
-extern  void    sbfocus_close();
-Sbld_rec   sb_data; 
-#endif
+void sbfocus_symbol(Sbld data, char *name, char *type, char *symbol);
+void sbfocus_close(Sbld data);
+
+Sbld_rec   sb_data;
+#endif	/* _SBFOCUS_ENTER_H */

@@ -19,11 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright(c) 1991,1992,1993,1995 by Sun Microsystems, Inc.
- *	All Rights Reserved
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include "inc.h"
 
 static const char *msg[] = {
@@ -181,6 +184,7 @@ error_message(int args, ...)
 	case SYMTAB_03_ERROR:
 	case SYMTAB_05_ERROR:
 	case SYMTAB_07_ERROR:
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message);
 		break;
 	case ARCHIVE_IN_ARCHIVE_ERROR:
@@ -195,13 +199,16 @@ error_message(int args, ...)
 	case SYMTAB_04_ERROR:
 	case SYMTAB_06_ERROR:
 	case OVERRIDE_WARN_ERROR:
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message, va_arg(ap, char *));
 		break;
 	case USAGE_02_ERROR:
 	case USAGE_03_ERROR:
-		(void) fprintf(stderr, message, va_arg(ap, char));
+		/* LINTED: variable format */
+		(void) fprintf(stderr, message, va_arg(ap, int));
 		break;
 	case DIAG_01_ERROR:
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message, va_arg(ap, int));
 		break;
 	case DEBUG_INFO_01_ERROR: {
@@ -210,6 +217,7 @@ error_message(int args, ...)
 		a1 = va_arg(ap, int);
 		a2 = va_arg(ap, int);
 		a3 = va_arg(ap, int);
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message, a1, a2, a3);
 		break;
 	}
@@ -218,6 +226,7 @@ error_message(int args, ...)
 
 		a1 = va_arg(ap, char *);
 		a2 = va_arg(ap, char *);
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message, a1, a2);
 		break;
 	}
@@ -227,6 +236,7 @@ error_message(int args, ...)
 
 		a1 = va_arg(ap, char *);
 		a2 = va_arg(ap, int);
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message, a1, a2);
 		break;
 	}
@@ -236,6 +246,7 @@ error_message(int args, ...)
 	case SYS_LSEEK_ERROR:
 	case SYS_LSEEK_04_ERROR:
 	case SYS_WRITE_03_ERROR:
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message);
 		break;
 	case SYS_OPEN_ERROR:
@@ -243,10 +254,12 @@ error_message(int args, ...)
 	case SYS_WRITE_ERROR:
 	case SYS_WRITE_02_ERROR:
 	case SYS_CREATE_01_ERROR:
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message, va_arg(ap, char *));
 		break;
 	case SYS_LSEEK_02_ERROR:
 	case SYS_LSEEK_03_ERROR:
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message, va_arg(ap, int));
 		break;
 	/*
@@ -259,6 +272,7 @@ error_message(int args, ...)
 	case ELF_GETDATA_02_ERROR:
 	case W_ELF_NO_DATA_02_ERROR:
 	case ELF_RAWFILE_ERROR:
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message);
 		break;
 	case ELF_BEGIN_01_ERROR:
@@ -266,6 +280,7 @@ error_message(int args, ...)
 	case ELF_GETDATA_01_ERROR:
 	case W_ELF_NO_DATA_01_ERROR:
 	case ELF_02_ERROR:
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message, va_arg(ap, char *));
 		break;
 	case ELF_01_ERROR: {
@@ -273,6 +288,7 @@ error_message(int args, ...)
 
 		a1 = va_arg(ap, char *);
 		a2 = va_arg(ap, char *);
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message, a1, a2);
 		break;
 	}
@@ -282,6 +298,7 @@ error_message(int args, ...)
 
 		a1 = va_arg(ap, char *);
 		a2 = va_arg(ap, long);
+		/* LINTED: variable format */
 		(void) fprintf(stderr, message, a1, a2);
 		break;
 	}

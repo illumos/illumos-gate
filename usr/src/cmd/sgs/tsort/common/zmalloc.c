@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -31,20 +37,14 @@
 
 #include <stdio.h>
 #include "errmsg.h"
-#ifdef __STDC__
 #include <stdlib.h>
-#else
-extern char *malloc();
-#endif
 
-char *
-zmalloc(severity, n)
-int	severity;
-unsigned	n;
+void *
+zmalloc(int severity, size_t n)
 {
-	char	*p;
+	void	*p;
 
-	if ((p = (char *) malloc(n)) == NULL)
+	if ((p = malloc(n)) == NULL)
 		_errmsg("UXzmalloc1", severity,
 			"Cannot allocate a block of %d bytes.",
 			n);

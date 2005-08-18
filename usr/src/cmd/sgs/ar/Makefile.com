@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,6 +41,9 @@ XPG4OBJS=	$(COMOBJS:%=objs.xpg4/%)
 
 LLDFLAGS =	'-R$$ORIGIN/../../lib'
 CPPFLAGS=	-I../../include -DBROWSER $(CPPFLAGS.master)
+CFLAGS +=	$(CCVERBOSE)
+C99MODE=	$(C99_ENABLE)
+
 LDLIBS +=	-lelf
 LINTFLAGS=	-mx
 LINTFLAGS64=	-mx -Xarch=$(MACH64:sparcv9=v9)
