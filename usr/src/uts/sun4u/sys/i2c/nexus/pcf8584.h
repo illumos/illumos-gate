@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,6 +110,15 @@ enum tran_state {
 	TRAN_STATE_DUMMY_RD
 };
 
+/*
+ * different implementations of pcf8584
+ */
+enum impl_type {
+	GENERIC,
+	BBC,
+	PIC16F747
+};
+
 typedef struct pcf8584_regs {
 	uint8_t *pcf8584_regs_s0;
 	uint8_t *pcf8584_regs_s1;
@@ -136,6 +145,8 @@ typedef struct pcf8584 {
 	ddi_acc_handle_t	pcf8584_b_rhandle;
 	enum tran_state		pcf8584_tran_state;
 	char			pcf8584_name[12];
+	enum impl_type		pcf8584_impl_type;
+	uint32_t		pcf8584_impl_delay;
 } pcf8584_t;
 
 /*
@@ -151,11 +162,11 @@ typedef struct pcf8584_ppvt {
 } pcf8584_ppvt_t;
 
 #define	PCF8584_PIL			4
-#define	PCF8584_XFER_TIME		1000
-#define	PCF8584_INTR_OVERHEAD		2000000
 #define	PCF8584_POLL_MODE		1
 #define	PCF8584_INTR_MODE		2
 #define	PCF8584_INITIAL_SOFT_SPACE	4
+#define	PCF8584_GENERIC_DELAY		0
+#define	PCF8584_PIC16F747_DELAY		10
 
 /*
  * generic interrupt return values

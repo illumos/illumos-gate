@@ -183,6 +183,8 @@ pca9556_resume(dev_info_t *dip)
 	int		reg_offset, num_of_ports;
 	int		i, j;
 	uint8_t		reg, reg_num = 0;
+	extern int	do_polled_io;
+	int		saved_pio;
 
 	pcap = (pca9556_unit_t *)
 	    ddi_get_soft_state(pca9556_soft_statep, instance);
@@ -204,6 +206,13 @@ pca9556_resume(dev_info_t *dip)
 		reg_offset = 1;
 		num_of_ports = PCA9556_NUM_PORTS;
 	}
+
+	/*
+	 * Since the parent node that handles interrupts may have already
+	 * been suspended, perform the following i2c transfers in poll-mode.
+	 */
+	saved_pio = do_polled_io;
+	do_polled_io = 1;
 
 	for (i = 0; i < num_of_ports; i++) {
 		if (pcap->pca9555_device)
@@ -227,14 +236,16 @@ pca9556_resume(dev_info_t *dip)
 		}
 	}
 
-	/*
-	 * Clear busy flag so that transactions may continue
-	 */
 done:
+	do_polled_io = saved_pio;
 	if (err != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s Unable to restore registers",
 		    pcap->pca9556_name);
 	}
+
+	/*
+	 * Clear busy flag so that transactions may continue
+	 */
 	mutex_enter(&pcap->pca9556_mutex);
 	pcap->pca9556_flags = pcap->pca9556_flags & ~PCA9556_BUSYFLAG;
 	cv_broadcast(&pcap->pca9556_cv);
@@ -409,6 +420,8 @@ pca9556_suspend(dev_info_t *dip)
 	int		reg_offset, num_of_ports;
 	int		i, j;
 	uint8_t		reg, reg_num = 0;
+	extern int	do_polled_io;
+	int		saved_pio;
 
 	pcap = ddi_get_soft_state(pca9556_soft_statep, instance);
 
@@ -441,6 +454,13 @@ pca9556_suspend(dev_info_t *dip)
 	pcap->pca9556_transfer->i2c_flags = I2C_WR_RD;
 	pcap->pca9556_transfer->i2c_wlen = 1;
 	pcap->pca9556_transfer->i2c_rlen = 1;
+
+	/*
+	 * Since the parent node that handles interrupts may have not been
+	 * resumed yet, perform the following i2c transfers in poll-mode.
+	 */
+	saved_pio = do_polled_io;
+	do_polled_io = 1;
 
 	/*
 	 * The following for loop will run through once for a pca9556 device
@@ -482,6 +502,7 @@ pca9556_suspend(dev_info_t *dip)
 	}
 
 done:
+	do_polled_io = saved_pio;
 	if (err != DDI_SUCCESS) {
 		mutex_enter(&pcap->pca9556_mutex);
 		pcap->pca9556_flags = pcap->pca9556_flags & ~PCA9556_BUSYFLAG;

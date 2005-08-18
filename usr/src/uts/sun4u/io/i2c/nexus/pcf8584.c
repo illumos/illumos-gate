@@ -228,6 +228,11 @@ pcf8584_print(int flags, const char *fmt, ...)
 	} while (0)
 #endif
 
+#define	PCF8584_IMPL_DELAY(type, delay)	\
+	if (type == PIC16F747) {	\
+		drv_usecwait(delay);	\
+	}
+
 int
 _init(void)
 {
@@ -323,6 +328,21 @@ pcf8584_doattach(dev_info_t *dip)
 
 	(void) snprintf(i2c->pcf8584_name, sizeof (i2c->pcf8584_name),
 		"%s_%d", ddi_node_name(dip), instance);
+
+	/*
+	 * Identify which pcf8584 implementation is being attached to.
+	 */
+	if (strcmp(ddi_binding_name(i2c->pcf8584_dip), "SUNW,bbc-i2c") == 0) {
+		i2c->pcf8584_impl_type = BBC;
+		i2c->pcf8584_impl_delay = PCF8584_GENERIC_DELAY;
+	} else if (strcmp(ddi_binding_name(i2c->pcf8584_dip),
+	    "SUNW,i2c-pic16f747") == 0) {
+		i2c->pcf8584_impl_type = PIC16F747;
+		i2c->pcf8584_impl_delay = PCF8584_PIC16F747_DELAY;
+	} else {
+		i2c->pcf8584_impl_type = GENERIC;
+		i2c->pcf8584_impl_delay = PCF8584_GENERIC_DELAY;
+	}
 
 	if (ddi_prop_exists(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
@@ -741,10 +761,14 @@ pcf8584_put_s1(pcf8584_t *i2c, char cmd)
 	pcf8584_regs_t *rp = &i2c->pcf8584_regs;
 
 	ddi_put8(hp, rp->pcf8584_regs_s1, cmd);
+	PCF8584_IMPL_DELAY(i2c->pcf8584_impl_type,
+	    i2c->pcf8584_impl_delay);
 	/*
 	 * read status to make sure write is flushed
 	 */
 	(void) ddi_get8(hp, rp->pcf8584_regs_s1);
+	PCF8584_IMPL_DELAY(i2c->pcf8584_impl_type,
+	    i2c->pcf8584_impl_delay);
 }
 
 /*
@@ -757,10 +781,14 @@ pcf8584_put_s0(pcf8584_t *i2c, char data)
 	pcf8584_regs_t *rp = &i2c->pcf8584_regs;
 
 	ddi_put8(hp, rp->pcf8584_regs_s0, data);
+	PCF8584_IMPL_DELAY(i2c->pcf8584_impl_type,
+	    i2c->pcf8584_impl_delay);
 	/*
 	 * read status to make sure write is flushed
 	 */
 	(void) ddi_get8(hp, rp->pcf8584_regs_s1);
+	PCF8584_IMPL_DELAY(i2c->pcf8584_impl_type,
+	    i2c->pcf8584_impl_delay);
 }
 
 /*
@@ -771,8 +799,13 @@ pcf8584_get_s0(pcf8584_t *i2c)
 {
 	ddi_acc_handle_t hp = i2c->pcf8584_rhandle;
 	pcf8584_regs_t *rp = &i2c->pcf8584_regs;
+	uint8_t s0;
 
-	return (ddi_get8(hp, rp->pcf8584_regs_s0));
+	s0 = ddi_get8(hp, rp->pcf8584_regs_s0);
+	PCF8584_IMPL_DELAY(i2c->pcf8584_impl_type,
+	    i2c->pcf8584_impl_delay);
+
+	return (s0);
 }
 
 /*
@@ -783,8 +816,13 @@ pcf8584_get_s1(pcf8584_t *i2c)
 {
 	ddi_acc_handle_t hp = i2c->pcf8584_rhandle;
 	pcf8584_regs_t *rp = &i2c->pcf8584_regs;
+	uint8_t s1;
 
-	return (ddi_get8(hp, rp->pcf8584_regs_s1));
+	s1 = ddi_get8(hp, rp->pcf8584_regs_s1);
+	PCF8584_IMPL_DELAY(i2c->pcf8584_impl_type,
+	    i2c->pcf8584_impl_delay);
+
+	return (s1);
 }
 
 /*
@@ -965,7 +1003,7 @@ pcf8584_init(pcf8584_t *i2c)
 	 * BBC based systems are using the Safari clock as input, so select
 	 * the clk divisor based on it.
 	 */
-	if (strcmp(ddi_binding_name(i2c->pcf8584_dip), "SUNW,bbc-i2c") == 0) {
+	if (i2c->pcf8584_impl_type == BBC) {
 		dev_info_t *root_node;
 		int clock_freq;
 		root_node = ddi_root_node();
@@ -1029,7 +1067,7 @@ pcf8584_setup_regs(dev_info_t *dip, pcf8584_t *i2c)
 	/*
 	 * If i2c controller is on BBC, then s1 comes before s0.
 	 */
-	if (strcmp(ddi_binding_name(dip), "SUNW,bbc-i2c") == 0) {
+	if (i2c->pcf8584_impl_type == BBC) {
 		i2c->pcf8584_regs.pcf8584_regs_s0 =
 		    (uint8_t *)&reg_base[1];
 		i2c->pcf8584_regs.pcf8584_regs_s1 =
@@ -1107,6 +1145,7 @@ pcf8584_intr(caddr_t arg)
 	pcf8584_t *i2c = (pcf8584_t *)arg;
 	uint8_t s1;
 
+	ASSERT(i2c->pcf8584_mode != PCF8584_POLL_MODE);
 	PCF8584_DDB(pcf8584_print(PRT_INTR, "pcf8584_intr: enter\n"));
 
 	mutex_enter(&i2c->pcf8584_imutex);
@@ -1186,7 +1225,10 @@ pcf8584_process(pcf8584_t *i2c, uint8_t s1)
 		if (tp->i2c_flags == I2C_RD) {
 			addr |= I2C_READ;
 		}
-		pcf8584_put_s1(i2c, S1_START2 | S1_ENI);
+		if (i2c->pcf8584_mode == PCF8584_POLL_MODE)
+			pcf8584_put_s1(i2c, S1_START2);
+		else
+			pcf8584_put_s1(i2c, S1_START2 | S1_ENI);
 		pcf8584_put_s0(i2c, addr);
 		PCF8584_DDB(pcf8584_print(PRT_TRAN,
 		    "TRAN_STATE_START: write addr: %x\n", addr));
@@ -1235,7 +1277,10 @@ pcf8584_process(pcf8584_t *i2c, uint8_t s1)
 		 * to be sent on the I2C bus.
 		 */
 		if (tp->i2c_r_resid  == 1) {
-			pcf8584_put_s1(i2c, S1_ESO | S1_ENI);
+			if (i2c->pcf8584_mode == PCF8584_POLL_MODE)
+				pcf8584_put_s1(i2c, S1_ESO);
+			else
+				pcf8584_put_s1(i2c, S1_ESO | S1_ENI);
 		}
 
 		/*
@@ -1272,7 +1317,10 @@ pcf8584_process(pcf8584_t *i2c, uint8_t s1)
 		 * don't want to be ACK'd, so clear the ACK bit.
 		 */
 		if (tp->i2c_r_resid  == 2) {
-			pcf8584_put_s1(i2c, S1_ESO | S1_ENI);
+			if (i2c->pcf8584_mode == PCF8584_POLL_MODE)
+				pcf8584_put_s1(i2c, S1_ESO);
+			else
+				pcf8584_put_s1(i2c, S1_ESO | S1_ENI);
 		}
 
 		tp->i2c_rbuf[tp->i2c_rlen - tp->i2c_r_resid] =
@@ -1312,7 +1360,10 @@ pcf8584_process(pcf8584_t *i2c, uint8_t s1)
 			    tp->i2c_wbuf[tp->i2c_wlen -
 			    (tp->i2c_w_resid + 1)]));
 		} else {
-			pcf8584_put_s1(i2c, S1_START2 | S1_ENI);
+			if (i2c->pcf8584_mode == PCF8584_POLL_MODE)
+				pcf8584_put_s1(i2c, S1_START2);
+			else
+				pcf8584_put_s1(i2c, S1_START2 | S1_ENI);
 			pcf8584_put_s0(i2c, addr | I2C_READ);
 			i2c->pcf8584_tran_state =
 				TRAN_STATE_DUMMY_RD;
@@ -1357,7 +1408,7 @@ begin:
 	 * we need to usurp ownership of the I2C bus, bypassing any other
 	 * waiters.
 	 */
-	if ((do_polled_io || ddi_in_panic()) && (getpil() >= pcf8584_pil)) {
+	if (do_polled_io || ddi_in_panic()) {
 		pcf8584_take_over(i2c, dip, tp, &waiter, &saved_mode);
 		took_over = 1;
 	} else {
@@ -1400,7 +1451,10 @@ begin:
 	pcf8584_put_s0(i2c, DUMMY_ADDR);
 	PCF8584_DDB(pcf8584_print(PRT_TRAN,
 	    "FIRST WRITE DUMMY ADDR: write %x\n", DUMMY_ADDR));
-	pcf8584_put_s1(i2c, S1_START | S1_ENI);
+	if (i2c->pcf8584_mode ==  PCF8584_POLL_MODE)
+		pcf8584_put_s1(i2c, S1_START);
+	else
+		pcf8584_put_s1(i2c, S1_START | S1_ENI);
 
 	/*
 	 * Update transfer status so any polled i/o request coming in
@@ -1463,6 +1517,8 @@ pcf8584_take_over(pcf8584_t *i2c, dev_info_t *dip, i2c_transfer_t *tp,
     kcondvar_t **waiter, int *saved_mode)
 {
 	mutex_enter(&i2c->pcf8584_imutex);
+	*saved_mode = i2c->pcf8584_mode;
+	i2c->pcf8584_mode = PCF8584_POLL_MODE;
 
 	/*
 	 * We need to flush out any currently pending transaction before
@@ -1482,9 +1538,6 @@ pcf8584_take_over(pcf8584_t *i2c, dev_info_t *dip, i2c_transfer_t *tp,
 	 * the 'force' flag on.
 	 */
 	pcf8584_acquire(i2c, dip, tp, B_TRUE);
-
-	*saved_mode = i2c->pcf8584_mode;
-	i2c->pcf8584_mode = PCF8584_POLL_MODE;
 }
 
 /*
