@@ -61,7 +61,7 @@ set_platform_defaults(void)
 	extern char *tod_module_name;
 	/* Set appropriate tod module for Chicago */
 	if (tod_module_name == NULL)
-		tod_module_name = "todds1337";
+		tod_module_name = "todm5823";
 }
 
 /*
@@ -103,12 +103,6 @@ load_platform_drivers(void)
 	 * device, so the lock can be acquired.
 	 */
 	shared_mi2cv_dip = e_ddi_hold_devi_by_path(SHARED_MI2CV_PATH, 0);
-
-	/*
-	 * todds1337 needs early attach
-	 */
-	if (i_ddi_attach_hw_nodes("todds1337") != DDI_SUCCESS)
-		cmn_err(CE_WARN, "todds1337 driver failed to install");
 }
 
 /*ARGSUSED*/
