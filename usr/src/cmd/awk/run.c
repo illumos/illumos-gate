@@ -329,7 +329,7 @@ jump(Node **a, int n)
 	case EXIT:
 		if (a[0] != NULL) {
 			y = execute(a[0]);
-			errorflag = getfval(y);
+			errorflag = (int)getfval(y);
 			tempfree(y, "");
 		}
 		longjmp(env, 1);
@@ -698,7 +698,7 @@ indirect(Node **a, int n)
 	register uchar *s;
 
 	x = execute(a[0]);
-	m = getfval(x);
+	m = (int)getfval(x);
 	if (m == 0 && !is_number(s = getsval(x)))	/* suspicion! */
 		ERROR "illegal field $(%s)", s FATAL;
 	tempfree(x, "");
@@ -732,14 +732,14 @@ substr(Node **a, int nnn)
 		(void) setsval(x, (uchar *)"");
 		return (x);
 	}
-	m = getfval(y);
+	m = (int)getfval(y);
 	if (m <= 0)
 		m = 1;
 	else if (m > k)
 		m = k;
 	tempfree(y, "");
 	if (a[2] != 0) {
-		n = getfval(z);
+		n = (int)getfval(z);
 		tempfree(z, "");
 	} else
 		n = k - 1;
