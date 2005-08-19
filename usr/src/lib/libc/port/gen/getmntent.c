@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,7 +123,12 @@ getmntany(FILE *fp, struct mnttab *mgetp, struct mnttab *mrefp)
 	dev_t	brdev;
 	struct stat64	statb;
 
-	if (mrefp->mnt_special && stat64(mrefp->mnt_special, &statb) == 0 &&
+	/*
+	 * Ignore specials that don't correspond to real devices to avoid doing
+	 * unnecessary lookups in stat64().
+	 */
+	if (mrefp->mnt_special && mrefp->mnt_special[0] == '/' &&
+	    stat64(mrefp->mnt_special, &statb) == 0 &&
 	    ((bmode = (statb.st_mode & S_IFMT)) == S_IFBLK ||
 	    bmode == S_IFCHR)) {
 		bstat = 1;
