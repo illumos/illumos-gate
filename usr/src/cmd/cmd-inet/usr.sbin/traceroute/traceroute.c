@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -329,7 +329,7 @@ main(int argc, char **argv)
 				    prog);
 				exit(EXIT_FAILURE);
 			}
-			if (gw_count > MAXMAX_GWS) {
+			if (gw_count >= MAXMAX_GWS) {
 				Fprintf(stderr,
 				    "%s: Too many gateways\n", prog);
 				exit(EXIT_FAILURE);
@@ -696,7 +696,7 @@ resolve_nodes(int *family, struct addrinfo **ai_dstp)
 		}
 	}
 
-	*ai_dstp = ai_dst;
+	*ai_dstp = (num_v4 + num_v6 > 0) ? ai_dst : NULL;
 }
 
 /*
@@ -748,6 +748,7 @@ get_hostinfo(char *host, int family, struct addrinfo **aipp)
 		if (rc != EAI_NONAME)
 			Fprintf(stderr, "%s: getaddrinfo: %s\n", prog,
 			    gai_strerror(rc));
+		*aipp = NULL;
 		return;
 	}
 	*aipp = ai;
@@ -1101,10 +1102,12 @@ get_gwaddrs(char **gwlist, int family, union any_in_addr *gwIPlist,
 	if (check_v4 && gw_count >= MAX_GWS) {
 		check_v4 = _B_FALSE;
 		Fprintf(stderr, "%s: too many IPv4 gateways\n", prog);
+		num_v4 = 0;
 	}
 	if (check_v6 && gw_count >= MAX_GWS6) {
 		check_v6 = _B_FALSE;
 		Fprintf(stderr, "%s: too many IPv6 gateways\n", prog);
+		num_v6 = 0;
 	}
 
 	for (i = 0; i < gw_count; i++) {
@@ -1114,6 +1117,7 @@ get_gwaddrs(char **gwlist, int family, union any_in_addr *gwIPlist,
 		if (ai == NULL)
 			return;
 		if (check_v4 && num_v4 != 0) {
+			check_v4 = _B_FALSE;
 			for (aip = ai; aip != NULL; aip = aip->ai_next) {
 				if (aip->ai_family == AF_INET) {
 					/* LINTED E_BAD_PTR_CAST_ALIGN */
@@ -1122,6 +1126,7 @@ get_gwaddrs(char **gwlist, int family, union any_in_addr *gwIPlist,
 					    &gwIPlist[i].addr,
 					    aip->ai_addrlen);
 					(*resolved)++;
+					check_v4 = _B_TRUE;
 					break;
 				}
 			}
@@ -1129,6 +1134,7 @@ get_gwaddrs(char **gwlist, int family, union any_in_addr *gwIPlist,
 			check_v4 = _B_FALSE;
 		}
 		if (check_v6 && num_v6 != 0) {
+			check_v6 = _B_FALSE;
 			for (aip = ai; aip != NULL; aip = aip->ai_next) {
 				if (aip->ai_family == AF_INET6) {
 					/* LINTED E_BAD_PTR_CAST_ALIGN */
@@ -1137,6 +1143,7 @@ get_gwaddrs(char **gwlist, int family, union any_in_addr *gwIPlist,
 					    &gwIPlist6[i].addr6,
 					    aip->ai_addrlen);
 					(*resolved6)++;
+					check_v6 = _B_TRUE;
 					break;
 				}
 			}

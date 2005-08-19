@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,14 +151,16 @@ set_IPv4opt_sourcerouting(int sndsock, union any_in_addr *ip_addr,
 	struct ip_sourceroute *srp;
 	uchar_t optlist[MAX_IPOPTLEN];
 	int i;
+	int gwV4_count;
 
 	if ((pe = getprotobyname("ip")) == NULL) {
 		Fprintf(stderr, "%s: unknown protocol ip\n", prog);
 		exit(EXIT_FAILURE);
 	}
 
+	gwV4_count = (gw_count < MAX_GWS) ? gw_count : MAX_GWS - 1;
 	/* final hop */
-	gwIPlist[gw_count].addr = ip_addr->addr;
+	gwIPlist[gwV4_count].addr = ip_addr->addr;
 
 	/*
 	 * the option length passed to setsockopt() needs to be a multiple of
@@ -170,10 +172,10 @@ set_IPv4opt_sourcerouting(int sndsock, union any_in_addr *ip_addr,
 	srp = (struct ip_sourceroute *)&optlist[1];
 	srp->ipsr_code = IPOPT_LSRR;
 	/* 3 = 1 (code) + 1 (len) + 1 (ptr) */
-	srp->ipsr_len = 3 + (gw_count + 1) * sizeof (gwIPlist[0].addr);
+	srp->ipsr_len = 3 + (gwV4_count + 1) * sizeof (gwIPlist[0].addr);
 	srp->ipsr_ptr = IPOPT_MINOFF;
 
-	for (i = 0; i <= gw_count; i++) {
+	for (i = 0; i <= gwV4_count; i++) {
 		(void) bcopy((char *)&gwIPlist[i].addr, &srp->ipsr_addrs[i],
 		    sizeof (struct in_addr));
 	}
