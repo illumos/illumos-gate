@@ -38,6 +38,8 @@ extern "C" {
  */
 extern int pcie_initchild(dev_info_t *dip);
 extern void pcie_uninitchild(dev_info_t *dip);
+extern void pcie_clear_errors(dev_info_t *dip,
+    ddi_acc_handle_t config_handle);
 
 #ifdef	__cplusplus
 }

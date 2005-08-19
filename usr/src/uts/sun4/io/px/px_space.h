@@ -161,6 +161,23 @@ extern uint64_t px_linkup_timeout;
 extern uint32_t	px_pwr_pil;
 extern uint32_t px_max_l1_tries;
 
+/* Fabric Error that should cause panics */
+extern uint32_t px_fabric_die;
+extern uint32_t px_fabric_die_rc_ce;
+extern uint32_t px_fabric_die_rc_ue;
+extern uint32_t px_fabric_die_rc_ce_gos;
+extern uint32_t px_fabric_die_rc_ue_gos;
+extern uint32_t px_fabric_die_ce;
+extern uint32_t px_fabric_die_ue;
+extern uint32_t px_fabric_die_ce_gos;
+extern uint32_t px_fabric_die_ue_gos;
+extern uint16_t px_fabric_die_bdg_sts;
+extern uint16_t px_fabric_die_bdg_sts_gos;
+extern uint16_t px_fabric_die_sw_sts;
+extern uint16_t px_fabric_die_sw_sts_gos;
+extern uint32_t px_fabric_die_sue;
+extern uint32_t px_fabric_die_sue_gos;
+
 #ifdef	__cplusplus
 }
 #endif

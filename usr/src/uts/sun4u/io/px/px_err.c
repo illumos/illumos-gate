@@ -177,33 +177,40 @@ px_err_bit_desc_t px_err_ilu_tbl[] = {
 
 /*
  * PEC UE errors implementation is incomplete pending PCIE generic
- * fabric rules.
+ * fabric rules.  Must handle both PRIMARY and SECONDARY errors.
  */
 /* pec ue errors */
 #define	TLU_UC_BIT_DESC(bit, hdl, erpt) \
 	TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR_ ## bit ## _P, \
 	0, \
-	NULL, \
-	NULL, \
-	""
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_PEC_CLASS(bit) }, \
+	{ TLU_UNCORRECTABLE_ERROR_STATUS_CLEAR_ ## bit ## _S, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_PEC_CLASS(bit)
 px_err_bit_desc_t px_err_tlu_ue_tbl[] = {
 	/* PCI-E Receive Uncorrectable Errors - see io erpt doc, section 3.2 */
-	{ TLU_UC_BIT_DESC(UR,		NULL,		NULL) },
-	{ TLU_UC_BIT_DESC(ROF,		NULL,		NULL) },
-	{ TLU_UC_BIT_DESC(UC,		NULL,		NULL) },
+	{ TLU_UC_BIT_DESC(UR,		pciex_ue,	pciex_rx_ue) },
+	{ TLU_UC_BIT_DESC(UC,		pciex_ue,	pciex_rx_ue) },
 
 	/* PCI-E Transmit Uncorrectable Errors - see io erpt doc, section 3.3 */
-	{ TLU_UC_BIT_DESC(CTO,		NULL,		NULL) },
+	{ TLU_UC_BIT_DESC(CTO,		pciex_ue,	pciex_tx_ue) },
+	{ TLU_UC_BIT_DESC(ROF,		pciex_ue,	pciex_tx_ue) },
 
 	/* PCI-E Rx/Tx Uncorrectable Errors - see io erpt doc, section 3.4 */
-	{ TLU_UC_BIT_DESC(MFP,		NULL,		NULL) },
-	{ TLU_UC_BIT_DESC(PP,		NULL,		NULL) },
+	{ TLU_UC_BIT_DESC(MFP,		pciex_ue,	pciex_rx_tx_ue) },
+	{ TLU_UC_BIT_DESC(PP,		pciex_ue,	pciex_rx_tx_ue) },
 
 	/* Other PCI-E Uncorrectable Errors - see io erpt doc, section 3.5 */
-	{ TLU_UC_BIT_DESC(FCP,		NULL,		NULL) },
-	{ TLU_UC_BIT_DESC(DLP,		NULL,		NULL) },
-	{ TLU_UC_BIT_DESC(TE,		NULL,		NULL) },
-	{ TLU_UC_BIT_DESC(CA,		NULL,		NULL) }
+	{ TLU_UC_BIT_DESC(FCP,		pciex_ue,	pciex_ue) },
+	{ TLU_UC_BIT_DESC(DLP,		pciex_ue,	pciex_ue) },
+	{ TLU_UC_BIT_DESC(TE,		pciex_ue,	pciex_ue) },
+
+	/* Not used */
+	{ TLU_UC_BIT_DESC(CA,		pciex_ue,	do_not) }
 };
 #define	px_err_tlu_ue_keys \
 	(sizeof (px_err_tlu_ue_tbl)) / (sizeof (px_err_bit_desc_t))
@@ -216,16 +223,21 @@ px_err_bit_desc_t px_err_tlu_ue_tbl[] = {
 #define	TLU_CE_BIT_DESC(bit, hdl, erpt) \
 	TLU_CORRECTABLE_ERROR_STATUS_CLEAR_ ## bit ## _P, \
 	0, \
-	NULL, \
-	NULL, \
-	""
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_PEC_CLASS(bit) }, \
+	{ TLU_CORRECTABLE_ERROR_STATUS_CLEAR_ ## bit ## _S, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_PEC_CLASS(bit)
 px_err_bit_desc_t px_err_tlu_ce_tbl[] = {
 	/* PCI-E Correctable Errors - see io erpt doc, section 3.6 */
-	{ TLU_CE_BIT_DESC(RTO,		NULL,		NULL) },
-	{ TLU_CE_BIT_DESC(RNR,		NULL,		NULL) },
-	{ TLU_CE_BIT_DESC(BDP,		NULL,		NULL) },
-	{ TLU_CE_BIT_DESC(BTP,		NULL,		NULL) },
-	{ TLU_CE_BIT_DESC(RE,		NULL,		NULL) }
+	{ TLU_CE_BIT_DESC(RTO,		pciex_ce,	pciex_ce) },
+	{ TLU_CE_BIT_DESC(RNR,		pciex_ce,	pciex_ce) },
+	{ TLU_CE_BIT_DESC(BDP,		pciex_ce,	pciex_ce) },
+	{ TLU_CE_BIT_DESC(BTP,		pciex_ce,	pciex_ce) },
+	{ TLU_CE_BIT_DESC(RE,		pciex_ce,	pciex_ce) }
 };
 #define	px_err_tlu_ce_keys \
 	(sizeof (px_err_tlu_ce_tbl)) / (sizeof (px_err_bit_desc_t))
@@ -244,8 +256,8 @@ px_err_bit_desc_t px_err_tlu_oe_tbl[] = {
 	{ TLU_OE_BIT_DESC(MRC,		fatal_hw,	pciex_rx_oe) },
 
 	/* TLU Other Event Status (rx + tx) - see io erpt doc, section 3.8 */
-	{ TLU_OE_BIT_DESC(WUC,		fatal_stuck,	pciex_rx_tx_oe) },
-	{ TLU_OE_BIT_DESC(RUC,		fatal_stuck,	pciex_rx_tx_oe) },
+	{ TLU_OE_BIT_DESC(WUC,		non_fatal,	pciex_rx_tx_oe) },
+	{ TLU_OE_BIT_DESC(RUC,		non_fatal,	pciex_rx_tx_oe) },
 	{ TLU_OE_BIT_DESC(CRS,		non_fatal,	pciex_rx_tx_oe) },
 
 	/* TLU Other Event - see io erpt doc, section 3.9 */
@@ -831,15 +843,18 @@ px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
 					    err_reg_tbl,
 					    err_bit_desc);
 
-				/* Send the ereport for this bit */
+				/* Send the ereport if it's an UNEXPECTED err */
 				erpt_handler = err_bit_desc->erpt_handler;
-				if (erpt_handler)
-					(void) erpt_handler(rpdip,
-					    csr_base,
-					    ss_reg,
-					    derr,
-					    err_bit_desc->class_name);
+				if (derr->fme_flag == DDI_FM_ERR_UNEXPECTED) {
+					if (erpt_handler)
+						(void) erpt_handler(rpdip,
+						    csr_base,
+						    ss_reg,
+						    derr,
+						    err_bit_desc->class_name);
+				}
 			}
+
 		}
 
 		/* Print register status */
@@ -975,6 +990,13 @@ px_err_unknown_handle(dev_info_t *rpdip, caddr_t csr_base, ddi_fm_error_t *derr,
 {
 	return (PX_ERR_UNKNOWN);
 }
+
+/* ARGSUSED */
+PX_ERPT_SEND_DEC(do_not)
+{
+	return (PX_OK);
+}
+
 
 /* JBC FATAL - see io erpt doc, section 1.1 */
 PX_ERPT_SEND_DEC(jbc_fatal)
@@ -1588,6 +1610,136 @@ PX_ERPT_SEND_DEC(pec_ilu)
 	    NULL);
 
 	return (PX_OK);
+}
+
+/* PCIEX UE Errors */
+/* ARGSUSED */
+px_err_pciex_ue_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr)
+{
+	uint32_t	mask = (uint32_t)BITMASK(err_bit_descr->bit);
+
+	return ((err_bit_descr->bit >= 32 && px_fabric_die_rc_ue_gos) ?
+	    PX_FATAL_GOS : PX_FABRIC_ERR_SEV(mask, px_fabric_die_rc_ue,
+		px_fabric_die_rc_ue_gos));
+}
+
+/* PCI-E Uncorrectable Errors - see io erpt doc, section 3.2 */
+PX_ERPT_SEND_DEC(pciex_rx_ue)
+{
+	char		buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
+	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
+	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_TLU_UELE, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE),
+	    FIRE_TLU_UIE, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE),
+	    FIRE_TLU_UIS, DATA_TYPE_UINT64,
+	    ss_reg,
+	    FIRE_TLU_UESS, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_SET),
+	    FIRE_TLU_RUEH1L, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_RECEIVE_UNCORRECTABLE_ERROR_HEADER1_LOG),
+	    FIRE_TLU_RUEH2L, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_RECEIVE_UNCORRECTABLE_ERROR_HEADER2_LOG),
+	    NULL);
+
+	return (PX_OK);
+}
+
+/* PCI-E Uncorrectable Errors - see io erpt doc, section 3.3 */
+PX_ERPT_SEND_DEC(pciex_tx_ue)
+{
+	char		buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
+	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
+	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_TLU_UELE, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE),
+	    FIRE_TLU_UIE, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE),
+	    FIRE_TLU_UIS, DATA_TYPE_UINT64,
+	    ss_reg,
+	    FIRE_TLU_UESS, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_SET),
+	    FIRE_TLU_TUEH1L, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_TRANSMIT_UNCORRECTABLE_ERROR_HEADER1_LOG),
+	    FIRE_TLU_TUEH2L, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_TRANSMIT_UNCORRECTABLE_ERROR_HEADER2_LOG),
+	    NULL);
+
+	return (PX_OK);
+}
+
+/* PCI-E Uncorrectable Errors - see io erpt doc, section 3.4 */
+PX_ERPT_SEND_DEC(pciex_rx_tx_ue)
+{
+	char		buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
+	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
+	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_TLU_UELE, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE),
+	    FIRE_TLU_UIE, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE),
+	    FIRE_TLU_UIS, DATA_TYPE_UINT64,
+	    ss_reg,
+	    FIRE_TLU_UESS, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_SET),
+	    FIRE_TLU_RUEH1L, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_RECEIVE_UNCORRECTABLE_ERROR_HEADER1_LOG),
+	    FIRE_TLU_RUEH2L, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_RECEIVE_UNCORRECTABLE_ERROR_HEADER2_LOG),
+	    FIRE_TLU_TUEH1L, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_TRANSMIT_UNCORRECTABLE_ERROR_HEADER1_LOG),
+	    FIRE_TLU_TUEH2L, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_TRANSMIT_UNCORRECTABLE_ERROR_HEADER2_LOG),
+	    NULL);
+
+	return (PX_OK);
+}
+
+/* PCI-E Uncorrectable Errors - see io erpt doc, section 3.5 */
+PX_ERPT_SEND_DEC(pciex_ue)
+{
+	char		buf[FM_MAX_CLASS];
+
+	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
+	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
+	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_TLU_UELE, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE),
+	    FIRE_TLU_UIE, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_INTERRUPT_ENABLE),
+	    FIRE_TLU_UIS, DATA_TYPE_UINT64,
+	    ss_reg,
+	    FIRE_TLU_UESS, DATA_TYPE_UINT64,
+	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_STATUS_SET),
+	    NULL);
+
+	return (PX_OK);
+}
+
+/* PCIEX UE Errors */
+/* ARGSUSED */
+px_err_pciex_ce_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr)
+{
+	uint32_t	mask = (uint32_t)BITMASK(err_bit_descr->bit);
+
+	return ((err_bit_descr->bit >= 32 && px_fabric_die_rc_ce_gos) ?
+	    PX_FATAL_GOS : PX_FABRIC_ERR_SEV(mask, px_fabric_die_rc_ce,
+		px_fabric_die_rc_ce_gos));
 }
 
 /* PCI-E Correctable Errors - see io erpt doc, section 3.6 */

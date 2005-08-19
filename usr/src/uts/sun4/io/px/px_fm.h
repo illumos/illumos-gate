@@ -60,6 +60,14 @@ extern "C" {
 #define	PX_OK			DDI_FM_OK
 #define	PX_ERR_UNKNOWN		0x80
 
+#define	PX_FM_FABRIC_CLASS	PCIEX_FIRE ".fabric"
+#define	PX_FM_FABRIC_MSG_CODE	"msg_code"
+#define	PX_FM_FABRIC_REQ_ID	"req_id"
+
+#define	PX_FABRIC_ERR_SEV(reg, chk, chk_gos) \
+	((reg & chk) ? ((reg & chk_gos) ? \
+	PX_FATAL_GOS : PX_FATAL_SW) : PX_NONFATAL)
+
 /*
  * Error handling FMA hook
  */

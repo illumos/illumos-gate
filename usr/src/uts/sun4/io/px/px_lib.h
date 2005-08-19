@@ -199,6 +199,10 @@ typedef struct px_fault {
 
 extern int px_err_add_intr(px_fault_t *px_fault_p);
 extern void px_err_rem_intr(px_fault_t *px_fault_p);
+extern uint32_t px_fab_get(px_t *px_p, pcie_req_id_t bdf,
+    uint16_t offset);
+extern void px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
+    uint32_t val);
 
 #ifdef	__cplusplus
 }

@@ -41,6 +41,7 @@
 #include <sys/iommutsb.h>
 #include <sys/cpuvar.h>
 #include <sys/ivintr.h>
+#include <sys/byteorder.h>
 #include <px_obj.h>
 #include <pcie_pwr.h>
 #include "px_tools_var.h"
@@ -1965,3 +1966,43 @@ px_fill_rc_status(px_fault_t *px_fault_p, pciex_rc_error_regs_t *rc_status)
 	/* populate the rc_status by reading the registers - TBD */
 }
 #endif /* FMA */
+
+/*
+ * Unprotected raw reads/writes of fabric device's config space.
+ * Only used for temporary PCI-E Fabric Error Handling.
+ */
+uint32_t
+px_fab_get(px_t *px_p, pcie_req_id_t bdf, uint16_t offset) {
+	px_ranges_t	*rp = px_p->px_ranges_p;
+	uint64_t	range_prop, base_addr;
+	int		bank = PCI_REG_ADDR_G(PCI_ADDR_CONFIG);
+	uint32_t	val;
+
+	/* Get Fire's Physical Base Address */
+	range_prop = (((uint64_t)(rp[bank].parent_high & 0x7ff)) << 32) |
+	    rp[bank].parent_low;
+
+	/* Get config space first. */
+	base_addr = range_prop + PX_BDF_TO_CFGADDR(bdf, offset);
+
+	val = ldphysio(base_addr);
+
+	return (LE_32(val));
+}
+
+void
+px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
+    uint32_t val) {
+	px_ranges_t	*rp = px_p->px_ranges_p;
+	uint64_t	range_prop, base_addr;
+	int		bank = PCI_REG_ADDR_G(PCI_ADDR_CONFIG);
+
+	/* Get Fire's Physical Base Address */
+	range_prop = (((uint64_t)(rp[bank].parent_high & 0x7ff)) << 32) |
+	    rp[bank].parent_low;
+
+	/* Get config space first. */
+	base_addr = range_prop + PX_BDF_TO_CFGADDR(bdf, offset);
+
+	stphysio(base_addr, LE_32(val));
+}

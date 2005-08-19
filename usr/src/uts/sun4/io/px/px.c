@@ -1164,6 +1164,18 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 				    ddi_get_instance(rdip));
 				return (pcie_pm_hold(dip));
 			}
+			if (as->cmd == DDI_RESUME) {
+				ddi_acc_handle_t	config_handle;
+				DBG(DBG_PWR, dip, "PRE_RESUME for %s@%d\n",
+				    ddi_driver_name(rdip),
+				    ddi_get_instance(rdip));
+
+				if (pci_config_setup(rdip, &config_handle) ==
+				    DDI_SUCCESS) {
+					pcie_clear_errors(rdip, config_handle);
+					pci_config_teardown(&config_handle);
+				}
+			}
 			return (DDI_SUCCESS);
 
 		case DDI_POST:

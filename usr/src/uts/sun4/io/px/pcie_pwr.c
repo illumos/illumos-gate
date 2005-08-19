@@ -38,6 +38,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_implfuncs.h>
 #include <sys/pci.h>
+#include <sys/pcie_impl.h>
 #include "pcie_pwr.h"
 #include "px_debug.h"
 
@@ -764,6 +765,7 @@ pcie_pwr_resume(dev_info_t *dip)
 {
 	dev_info_t *cdip;
 	pcie_pwr_t *pwr_p = NULL;
+	ddi_acc_handle_t	config_handle;
 
 	if (PCIE_PMINFO(dip))
 		pwr_p = PCIE_NEXUS_PMINFO(dip);
@@ -806,6 +808,13 @@ pcie_pwr_resume(dev_info_t *dip)
 			DBG(DBG_PWR, dip,
 			    "DDI_RESUME: nexus restoring %s%d config regs\n",
 			    ddi_driver_name(cdip), ddi_get_instance(cdip));
+
+			if (pci_config_setup(cdip, &config_handle) ==
+			    DDI_SUCCESS) {
+				pcie_clear_errors(cdip, config_handle);
+				pci_config_teardown(&config_handle);
+			}
+
 			(void) pci_restore_config_regs(cdip);
 
 			if (ndi_prop_remove(DDI_DEV_T_NONE, cdip,

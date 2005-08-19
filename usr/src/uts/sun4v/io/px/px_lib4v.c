@@ -1815,3 +1815,28 @@ px_pmeq_intr(caddr_t arg)
 {
 	return (DDI_INTR_CLAIMED);
 }
+
+/*
+ * Unprotected raw reads/writes of fabric device's config space.
+ * Only used for temporary PCI-E Fabric Error Handling.
+ */
+uint32_t
+px_fab_get(px_t *px_p, pcie_req_id_t bdf, uint16_t offset) {
+	uint32_t 	data = 0;
+
+	(void) hvio_config_get(px_p->px_dev_hdl,
+	    (bdf << PX_RA_BDF_SHIFT), offset, 4,
+	    (pci_cfg_data_t *)&data);
+
+	return (data);
+}
+
+void
+px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
+    uint32_t val) {
+	pci_cfg_data_t	wdata = { 0 };
+
+	wdata.qw = (uint32_t)val;
+	(void) hvio_config_put(px_p->px_dev_hdl,
+	    (bdf << PX_RA_BDF_SHIFT), offset, 4, wdata);
+}

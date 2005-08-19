@@ -341,17 +341,20 @@ static int
 px_pcie_check_errors(dev_info_t *dip, ddi_fm_error_t *derr,
     px_rc_err_t *epkt, int caller)
 {
-	int		ret = DDI_FM_OK;
+	int		ret = PX_NONFATAL;
 	px_pec_err_t	*pec = (px_pec_err_t *)epkt;
 
 	switch (pec->pec_descr.dir) {
 	case DIR_INGRESS:
 	case DIR_EGRESS:
 	case DIR_LINK:
-		/* Will eventually call pciex_rc_check_status(...); */
+		ret |= PX_FABRIC_ERR_SEV(pec->ue_reg_status,
+		    px_fabric_die_rc_ue, px_fabric_die_rc_ue_gos);
+		ret |= PX_FABRIC_ERR_SEV(pec->ue_reg_status,
+		    px_fabric_die_rc_ce, px_fabric_die_rc_ce_gos);
 		break;
 	default:
-		ret = DDI_FM_OK;
+		ret = PX_ERR_UNKNOWN;
 		break;
 	}
 

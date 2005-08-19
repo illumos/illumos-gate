@@ -156,7 +156,7 @@ struct dev_ops pxb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"Standard PCI to PCI bridge nexus driver 1.5",
+	"PCIe/PCI nexus driver 1.5",
 	&pxb_ops,   /* driver ops */
 };
 
@@ -526,6 +526,19 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 				    ddi_driver_name(rdip),
 				    ddi_get_instance(rdip));
 				return (pcie_pm_hold(dip));
+			}
+			if (as->cmd == DDI_RESUME) {
+				ddi_acc_handle_t	config_handle;
+				DBG(DBG_PWR, dip, "PRE_RESUME for %s@%d\n",
+				    ddi_driver_name(rdip),
+				    ddi_get_instance(rdip));
+
+
+				if (pci_config_setup(rdip, &config_handle) ==
+				    DDI_SUCCESS) {
+					pcie_clear_errors(rdip, config_handle);
+					pci_config_teardown(&config_handle);
+				}
 			}
 			return (DDI_SUCCESS);
 
@@ -1536,6 +1549,7 @@ pxb_fm_init(pxb_devstate_t *pxb_p)
 	derr.fme_version = DDI_FME_VERSION;
 	derr.fme_flag = DDI_FM_ERR_EXPECTED;
 	pci_ereport_post(dip, &derr, NULL);
+	pci_bdg_ereport_post(dip, &derr, NULL);
 
 	/*
 	 * Register error callback with our parent.
@@ -1583,15 +1597,12 @@ pxb_fm_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
     const void *impl_data)
 {
 	/* Need to revisit when pcie fm is supported */
-#ifdef	FMA
 	uint16_t pci_cfg_stat, pci_cfg_sec_stat;
 
 	pci_ereport_post(dip, derr, &pci_cfg_stat);
 	pci_bdg_ereport_post(dip, derr, &pci_cfg_sec_stat);
 	return (pci_bdg_check_status(dip, derr, pci_cfg_stat,
 	    pci_cfg_sec_stat));
-#endif	/* FMA */
-	return (DDI_FM_OK);
 }
 
 /*

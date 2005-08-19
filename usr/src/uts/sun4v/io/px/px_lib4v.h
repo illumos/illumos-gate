@@ -45,6 +45,9 @@ extern "C" {
  */
 #define	DEVHDLE_MASK	0xFFFFFFF
 
+/* PX BDF Shift in a Phyiscal Address - used FMA Fabric only */
+#define	PX_RA_BDF_SHIFT			8
+
 extern uint64_t hvio_config_get(devhandle_t dev_hdl, pci_device_t bdf,
     pci_config_offset_t off, pci_config_size_t size, pci_cfg_data_t *data_p);
 extern uint64_t hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf,

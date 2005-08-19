@@ -39,7 +39,7 @@
 #include <sys/pcie.h>
 #include <sys/pcie_impl.h>
 
-static void 	pcie_enable_errors(dev_info_t *dip,
+static void pcie_enable_errors(dev_info_t *dip,
     ddi_acc_handle_t config_handle);
 static void 	pcie_disable_errors(dev_info_t *dip,
     ddi_acc_handle_t config_handle);
@@ -131,7 +131,7 @@ pcie_initchild(dev_info_t *cdip)
 	ddi_acc_handle_t	config_handle;
 	uint8_t			header_type;
 	uint8_t			bcr;
-	uint16_t		command_reg;
+	uint16_t		command_reg, status_reg;
 	uint16_t		cap_ptr;
 
 	if (pci_config_setup(cdip, &config_handle) != DDI_SUCCESS)
@@ -146,6 +146,8 @@ pcie_initchild(dev_info_t *cdip)
 	/*
 	 * Setup the device's command register
 	 */
+	status_reg = pci_config_get16(config_handle, PCI_CONF_STAT);
+	pci_config_put16(config_handle, PCI_CONF_STAT, status_reg);
 	command_reg = pci_config_get16(config_handle, PCI_CONF_COMM);
 	command_reg |= pcie_command_default;
 	pci_config_put16(config_handle, PCI_CONF_COMM, command_reg);
@@ -158,6 +160,10 @@ pcie_initchild(dev_info_t *cdip)
 	 * based on the settings in the command register.
 	 */
 	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
+		status_reg = pci_config_get16(config_handle,
+		    PCI_BCNF_SEC_STATUS);
+		pci_config_put16(config_handle, PCI_BCNF_SEC_STATUS,
+		    status_reg);
 		bcr = pci_config_get8(config_handle, PCI_BCNF_BCNTRL);
 		if (pcie_command_default & PCI_COMM_PARITY_DETECT)
 			bcr |= PCI_BCNF_BCNTRL_PARITY_ENABLE;
@@ -201,11 +207,61 @@ pcie_uninitchild(dev_info_t *cdip)
 	pcie_disable_errors(cdip, config_handle);
 }
 
+/* ARGSUSED */
+void
+pcie_clear_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
+{
+	uint16_t		cap_ptr, aer_ptr;
+	uint16_t		device_sts;
+	uint16_t		dev_type;
+
+	cap_ptr = pcie_find_cap_reg(config_handle, PCI_CAP_ID_PCI_E);
+	if (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
+		aer_ptr = pcie_find_ext_cap_reg(config_handle,
+		    PCIE_EXT_CAP_ID_AER);
+		dev_type = pci_config_get16(
+			config_handle,
+			cap_ptr + PCIE_PCIECAP) &
+		    PCIE_PCIECAP_DEV_TYPE_MASK;
+	} else {
+		aer_ptr = PCIE_EXT_CAP_NEXT_PTR_NULL;
+	}
+
+	/*
+	 * Clear any pending errors
+	 */
+	/* 1. clear the Advanced PCIe Errors */
+	if (aer_ptr != PCIE_EXT_CAP_NEXT_PTR_NULL) {
+		pci_config_put32(config_handle, aer_ptr + PCIE_AER_CE_STS, -1);
+		pci_config_put32(config_handle, aer_ptr + PCIE_AER_UCE_STS, -1);
+		if (dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) {
+			pci_config_put32(config_handle,
+			    aer_ptr + PCIE_AER_SUCE_STS, -1);
+		}
+	}
+
+	/* 2. clear the PCIe Errors */
+	device_sts = pci_config_get16(config_handle,
+	    cap_ptr + PCIE_DEVSTS);
+	pci_config_put16(config_handle, cap_ptr + PCIE_DEVSTS,
+	    device_sts);
+
+	/* 3. clear the Legacy PCI Errors */
+	device_sts = pci_config_get16(config_handle, PCI_CONF_STAT);
+	pci_config_put16(config_handle, PCI_CONF_STAT, device_sts);
+	if (dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) {
+		device_sts = pci_config_get16(config_handle,
+		    PCI_BCNF_SEC_STATUS);
+		pci_config_put16(config_handle, PCI_BCNF_SEC_STATUS,
+		    device_sts);
+	}
+}
+
 static void
 pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
 	uint16_t		cap_ptr, aer_ptr;
-	uint16_t		device_ctl, device_sts;
+	uint16_t		device_ctl;
 	uint16_t		dev_type;
 	uint32_t		aer_reg;
 
@@ -224,14 +280,7 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	/*
 	 * Clear any pending errors
 	 */
-	if (aer_ptr != PCIE_EXT_CAP_NEXT_PTR_NULL) {
-		pci_config_put32(config_handle, aer_ptr + PCIE_AER_CE_STS, -1);
-		pci_config_put32(config_handle, aer_ptr + PCIE_AER_UCE_STS, -1);
-	}
-	device_sts = pci_config_get16(config_handle,
-	    cap_ptr + PCIE_DEVSTS);
-	pci_config_put16(config_handle, cap_ptr + PCIE_DEVSTS,
-	    device_sts);
+	pcie_clear_errors(dip, config_handle);
 
 	/*
 	 * Enable PCI-Express Baseline Error Handling

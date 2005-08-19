@@ -97,6 +97,14 @@ typedef struct px_err_reg_desc {
 #define	PX_ERR_BIT_HANDLE(n)		px_err_ ## n ## _handle
 
 /*
+ * Macro to create the ereport forward declaration
+ */
+#define	PX_ERPT_SEND_DEC(n)	int px_err_ ## n ## _send_ereport\
+	(dev_info_t *rpdip, caddr_t csr_base, uint64_t ss_reg, \
+	ddi_fm_error_t *derr, char *class_name)
+#define	PX_ERPT_SEND(n)		px_err_ ## n ## _send_ereport
+
+/*
  * Predefined error handling functions.
  */
 int px_err_fatal_hw_handle(dev_info_t *rpdip, caddr_t csr_base,
@@ -122,12 +130,9 @@ int px_err_unknown_handle(dev_info_t *rpdip, caddr_t csr_base,
 	px_err_bit_desc_t *err_bit_descr);
 
 /*
- * Macro to create the ereport forward declaration
+ * Predefined ereport functions
  */
-#define	PX_ERPT_SEND_DEC(n)	int px_err_ ## n ## _send_ereport\
-	(dev_info_t *rpdip, caddr_t csr_base, uint64_t ss_reg, \
-	ddi_fm_error_t *derr, char *class_name)
-#define	PX_ERPT_SEND(n)		px_err_ ## n ## _send_ereport
+PX_ERPT_SEND_DEC(do_not);
 
 
 /*
@@ -214,6 +219,13 @@ int px_err_tlu_lup_handle(dev_info_t *rpdip, caddr_t csr_base,
 	px_err_bit_desc_t *err_bit_descr);
 
 /* Fire Ereport Handling Forward Declarations */
+int px_err_pciex_ue_handle(dev_info_t *rpdip, caddr_t csr_base,
+    ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+    px_err_bit_desc_t *err_bit_descr);
+int px_err_pciex_ce_handle(dev_info_t *rpdip, caddr_t csr_base,
+    ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+    px_err_bit_desc_t *err_bit_descr);
+
 PX_ERPT_SEND_DEC(pec_ilu);
 PX_ERPT_SEND_DEC(pciex_rx_ue);
 PX_ERPT_SEND_DEC(pciex_tx_ue);

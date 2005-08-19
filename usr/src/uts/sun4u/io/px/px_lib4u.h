@@ -232,6 +232,10 @@ typedef	struct eq_rec {
 /* TLU Control register bits */
 #define	TLU_REMAIN_DETECT_QUIET		8
 
+/* PX BDF Shift in a Phyiscal Address - used FMA Fabric only */
+#define	PX_PA_BDF_SHIFT			12
+#define	PX_BDF_TO_CFGADDR(bdf, offset) (((bdf) << PX_PA_BDF_SHIFT) + (offset))
+
 /*
  * The sequence of the chip_type appearance is significant.
  * There are code depending on it: PX_CHIP_TYPE(pxu_p) < PX_CHIP_FIRE.
