@@ -24,7 +24,7 @@
 /*	  All Rights Reserved					*/
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -872,13 +872,11 @@ asyinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 	struct asycom *asy;
 
 	instance = UNIT(dev);
-	asy = ddi_get_soft_state(asy_soft_state, instance);
-	if (asy == NULL)
-		return (DDI_FAILURE);
 
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:
-		if (asy->asy_dip == NULL)
+		asy = ddi_get_soft_state(asy_soft_state, instance);
+		if ((asy == NULL) || (asy->asy_dip == NULL))
 			error = DDI_FAILURE;
 		else {
 			*result = (void *) asy->asy_dip;
