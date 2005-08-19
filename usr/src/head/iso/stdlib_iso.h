@@ -97,7 +97,7 @@ typedef unsigned int    size_t;		/* (historical version) */
 /*
  * wchar_t is a built-in type in standard C++ and as such is not
  * defined here when using standard C++. However, the GNU compiler
- * fixincludes utility nonetheless creates it's own version of this
+ * fixincludes utility nonetheless creates its own version of this
  * header for use by gcc and g++. In that version it adds a redundant
  * guard for __cplusplus. To avoid the creation of a gcc/g++ specific
  * header we need to include the following magic comment:

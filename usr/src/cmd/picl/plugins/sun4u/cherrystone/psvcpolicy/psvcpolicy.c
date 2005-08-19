@@ -56,8 +56,8 @@
 /* Device paths for power supply hotplug handling */
 #define	SEG5_ADDR		0x30
 #define	EBUS_DEV_NAME		"/devices/pci@9,700000/ebus@1/"
-#define	SEG5_DEV_NAME		EBUS_DEV_NAME ## "i2c@1,30/"
-#define	SEG5_ADDR_DEV_FMT	EBUS_DEV_NAME ## "i2c@1,%x:devctl"
+#define	SEG5_DEV_NAME		EBUS_DEV_NAME "i2c@1,30/"
+#define	SEG5_ADDR_DEV_FMT	EBUS_DEV_NAME "i2c@1,%x:devctl"
 
 #define	QLC_NODE		 "/pci@9,600000/SUNW,qlc@2"
 

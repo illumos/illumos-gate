@@ -20,12 +20,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	__ZULUMOD_INCL__
-#define	__ZULUMOD_INCL__
+#ifndef	_ZULUMOD_H
+#define	_ZULUMOD_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -44,7 +44,7 @@ extern "C" {
 #define	ZULUVM_VERSION_STR(a)	#a
 #define	ZULUVM_VERSION(a)	ZULUVM_VERSION_STR(a)
 #define	ZULUVM_MOD_VERSION \
-	ZULUVM_VERSION(XHAT_PROVIDER_VERSION) ## "." ## \
+	ZULUVM_VERSION(XHAT_PROVIDER_VERSION) "." \
 	ZULUVM_VERSION(ZULUVM_INTERFACE_VERSION)
 
 #define	ZULUDCHKFUNC(_p1, _p2, _p3) \
@@ -260,4 +260,4 @@ void zuluvm_load_tte(struct zulu_hat *zhat, caddr_t addr, uint64_t pfn,
 }
 #endif
 
-#endif	/* __ZULUMOD_INCL__ */
+#endif	/* _ZULUMOD_H */

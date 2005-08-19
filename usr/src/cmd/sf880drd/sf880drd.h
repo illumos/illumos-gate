@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,11 +52,11 @@ int dakdr_debug = 0;
  * Device paths/names
  */
 #define	EBUS_DEV_NAME		"/devices/pci@9,700000/ebus@1/"
-#define	SEG5_DEV_NAME		EBUS_DEV_NAME ## "i2c@1,30/"
+#define	SEG5_DEV_NAME		EBUS_DEV_NAME "i2c@1,30/"
 
-#define	SSC050_LED_PORT		SEG5_DEV_NAME ## "ioexp@0,82:port_4"
+#define	SSC050_LED_PORT		SEG5_DEV_NAME "ioexp@0,82:port_4"
 
-#define	HPC3130_DEV_FMT SEG5_DEV_NAME ## "hotplug-controller@0,%2x:port_%1x"
+#define	HPC3130_DEV_FMT SEG5_DEV_NAME "hotplug-controller@0,%2x:port_%1x"
 
 /*
  * Front panel leds (Cf. Daktari spec 7.2.5.7).

@@ -91,6 +91,7 @@
  * -R<dir[:dir]> Build runtime search path list into executable
  * -S		Compile and only generate assembly code (.s)
  * -s		Strip symbol table from the executable file
+ * -t		Turn off duplicate symbol warnings when linking
  * -U<name>	Delete initial definition of preprocessor symbol <name>
  * -V		Report version number of each compilation phase
  * -v		Do stricter semantic checking
@@ -215,6 +216,7 @@
  * -R<dir[:dir]>		pass-thru
  * -S				pass-thru
  * -s				-Wl,-s
+ * -t				-Wl,-t
  * -U<name>			pass-thru
  * -V				--version
  * -v				-Wall
@@ -237,7 +239,7 @@
  * -xchar_byte_order=<o>	error
  * -xchip=<c>			table
  * -xcode=<c>			table
- * -xcrossfile[=<n>]		error
+ * -xcrossfile[=<n>]		ignore
  * -xe				error
  * -xF				error
  * -xhelp=<f>			error
@@ -827,6 +829,13 @@ do_gcc(const char *dir, const char *cmd, int argc, char **argv,
 			}
 			error(arg);
 			break;
+		case 't':
+			if (arglen == 1) {
+				newae(h, "-Wl,-t");
+				break;
+			}
+			error(arg);
+			break;
 		case 'V':
 			if (arglen == 1) {
 				echo = 0;
@@ -1002,6 +1011,8 @@ do_gcc(const char *dir, const char *cmd, int argc, char **argv,
 					break;
 				}
 				if (strncmp(arg, "-xcache=", 8) == 0)
+					break;
+				if (strncmp(arg, "-xcrossfile", 11) == 0)
 					break;
 				error(arg);
 				break;

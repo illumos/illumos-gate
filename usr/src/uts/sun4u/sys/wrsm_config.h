@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _WRSM_CONFIG_H
@@ -47,7 +47,7 @@ extern "C" {
 #else
 #define	WRSM_ALIGN_64(t, n) union {  struct {uint32_t pad; t n; } val; \
 				uint64_t align; } u_##n
-#define	WRSM_ALIGN_PTR(n) u_##n.val.##n
+#define	WRSM_ALIGN_PTR(n) u_##n.val.n
 #endif
 /*
  * If any of the data structures in this file are changed,

@@ -77,11 +77,11 @@ static int dak_policy_debug = 0;
 #endif
 
 #define	I2C_PATH	"/devices/pci@9,700000/ebus@1/i2c@1,30"
-#define	I2C_NODE	I2C_PATH##":devctl"
-#define	PCF8574		I2C_PATH##"/ioexp@0,%x:pcf8574"
-#define	PCF8591		I2C_PATH##"/adio@0,%x:port_0"
-#define	FRU		I2C_PATH##"/fru@0,%x:fru"
-#define	HPC3130_DEV	I2C_PATH##"/hotplug-controller@0,%2x:port_%1x"
+#define	I2C_NODE	I2C_PATH ":devctl"
+#define	PCF8574		I2C_PATH "/ioexp@0,%x:pcf8574"
+#define	PCF8591		I2C_PATH "/adio@0,%x:port_0"
+#define	FRU		I2C_PATH "/fru@0,%x:fru"
+#define	HPC3130_DEV	I2C_PATH "/hotplug-controller@0,%2x:port_%1x"
 #define	GEN_FAULT_LED	"FSP_GEN_FAULT_LED"
 #define	EMPTY_STRING	"EMPTY"
 #define	DEVICE_FAILURE_MSG	gettext("WARNING: Device %s failure detected")
