@@ -104,7 +104,10 @@ static char fan_rpm_string[REGISTER_INFORMATION_STRING_LENGTH] = {0};
 static char fan_status_string[REGISTER_INFORMATION_STRING_LENGTH] = {0};
 
 static int	scsi_log_sense(env_disk_t *diskp, uchar_t page_code,
+			void *pagebuf, uint16_t pagelen, int page_control);
+static int scsi_mode_select(env_disk_t *diskp, uchar_t page_code,
 			uchar_t *pagebuf, uint16_t pagelen);
+
 static int	get_disk_temp(env_disk_t *);
 
 /*
@@ -774,6 +777,7 @@ envd_setup_disks(void)
 		}
 		diskp->present = B_TRUE;
 		diskp->tpage_supported = B_FALSE;
+		diskp->smart_supported = B_FALSE;
 		diskp->warning_tstamp = 0;
 		diskp->shutdown_tstamp = 0;
 		diskp->high_warning = disk_high_warn_temperature;
@@ -784,22 +788,62 @@ envd_setup_disks(void)
 		 * Find out if the Temperature page is supported by the disk.
 		 */
 		if (scsi_log_sense(diskp, SUPPORTED_LPAGES, log_page,
-		    sizeof (log_page)) != 0) {
-			continue;
-		}
+		    sizeof (log_page), 1) == 0) {
 
-		page_len = ((log_page[2] << 8) & 0xFF00) | log_page[3];
+			page_len = ((log_page[2] << 8) & 0xFF00) | log_page[3];
 
-		for (page_index = LOGPAGEHDRSIZE;
-		    page_index < page_len + LOGPAGEHDRSIZE; page_index++) {
-			if (log_page[page_index] != TEMPERATURE_PAGE)
-				continue;
+			for (page_index = LOGPAGEHDRSIZE;
+			    page_index < page_len + LOGPAGEHDRSIZE;
+			    page_index++) {
+				if (log_page[page_index] != TEMPERATURE_PAGE)
+					continue;
 
-			diskp->tpage_supported = B_TRUE;
-			if (env_debug) {
-				envd_log(LOG_ERR, "tpage supported for %s\n",
-				    diskp->nodepath);
+				diskp->tpage_supported = B_TRUE;
+				if (env_debug) {
+					envd_log(LOG_ERR,
+					    "tpage supported for %s\n",
+					    diskp->nodepath);
+				}
 			}
+		}
+		/*
+		 * If the temp log page failed, we can check if this is
+		 * a SATA drive and attempt to read the temperature
+		 * using the SMART interface.
+		 */
+		if (diskp->tpage_supported != B_TRUE) {
+			uchar_t iec_page[IEC_PAGE_SIZE];
+
+			if (env_debug)
+				envd_log(LOG_ERR, "Turning on SMART\n");
+
+			(void) memset(iec_page, 0, sizeof (iec_page));
+			iec_page[0] = IEC_PAGE;	/* SMART PAGE */
+			iec_page[1] = 0xa;	/* length */
+			/* Notification, only when requested */
+			iec_page[3] = REPORT_ON_REQUEST;
+
+			ret = scsi_mode_select(diskp, IEC_PAGE,
+			    iec_page, sizeof (iec_page));
+
+			/*
+			 * Since we know this is a SMART capable
+			 * drive, we will try to set the page and
+			 * determine if the drive is not capable
+			 * of reading the TEMP page when we
+			 * try to read the temperature and disable
+			 * it then. We do not fail when reading
+			 * or writing this page because we will
+			 * determine the SMART capabilities
+			 * when reading the temperature.
+			 */
+			if ((ret != 0) && (env_debug)) {
+				envd_log(LOG_ERR,
+				    "Failed to set mode page");
+			}
+
+			diskp->smart_supported = B_TRUE;
+			diskp->tpage_supported = B_TRUE;
 		}
 
 		if (get_disk_temp(diskp) < 0) {
@@ -809,6 +853,7 @@ envd_setup_disks(void)
 			envd_log(LOG_ERR, "%s: temperature = %d\n",
 			    diskp->name, diskp->current_temp);
 		}
+
 	}
 
 	return (0);
@@ -1282,20 +1327,31 @@ system_temp_thr(void *args)
 }
 
 static int
-scsi_log_sense(env_disk_t *diskp, uchar_t page_code, uchar_t *pagebuf,
-		uint16_t pagelen)
+scsi_log_sense(env_disk_t *diskp, uchar_t page_code, void *pagebuf,
+		uint16_t pagelen, int page_control)
 {
 	struct uscsi_cmd	ucmd_buf;
 	uchar_t		cdb_buf[CDB_GROUP1];
 	struct	scsi_extended_sense	sense_buf;
 	int	ret_val;
 
-	bzero((void *)&cdb_buf, sizeof (cdb_buf));
-	bzero((void *)&ucmd_buf, sizeof (ucmd_buf));
-	bzero((void *)&sense_buf, sizeof (sense_buf));
+	bzero(&cdb_buf, sizeof (cdb_buf));
+	bzero(&ucmd_buf, sizeof (ucmd_buf));
+	bzero(&sense_buf, sizeof (sense_buf));
 
 	cdb_buf[0] = SCMD_LOG_SENSE_G1;
-	cdb_buf[2] = (0x01 << 6) | page_code;
+
+	/*
+	 * For SATA we need to have the current threshold value set.
+	 * For SAS drives we can use the current cumulative value.
+	 * This is set for non-SMART drives, by passing a non-zero
+	 * page_control.
+	 */
+	if (page_control)
+		cdb_buf[2] = (0x01 << 6) | page_code;
+	else
+		cdb_buf[2] = page_code;
+
 	cdb_buf[7] = (uchar_t)((pagelen & 0xFF00) >> 8);
 	cdb_buf[8] = (uchar_t)(pagelen  & 0x00FF);
 
@@ -1306,7 +1362,7 @@ scsi_log_sense(env_disk_t *diskp, uchar_t page_code, uchar_t *pagebuf,
 	ucmd_buf.uscsi_rqbuf = (caddr_t)&sense_buf;
 	ucmd_buf.uscsi_rqlen = sizeof (struct scsi_extended_sense);
 	ucmd_buf.uscsi_flags = USCSI_RQENABLE | USCSI_READ | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout = 60;
+	ucmd_buf.uscsi_timeout = DEFAULT_SCSI_TIMEOUT;
 
 	ret_val = ioctl(diskp->fd, USCSICMD, ucmd_buf);
 	if ((ret_val == 0) && (ucmd_buf.uscsi_status == 0)) {
@@ -1315,15 +1371,15 @@ scsi_log_sense(env_disk_t *diskp, uchar_t page_code, uchar_t *pagebuf,
 		"log sense command for page_code 0x%x succeeded\n", page_code);
 		return (ret_val);
 	}
-	if (env_debug) {
+	if (env_debug)
 		envd_log(LOG_ERR, "log sense command for %s failed. "
 		    "page_code 0x%x ret_val = 0x%x "
 		    "status = 0x%x errno = 0x%x\n", diskp->name, page_code,
 		    ret_val, ucmd_buf.uscsi_status, errno);
-	}
 
 	return (1);
 }
+
 
 static int
 get_disk_temp(env_disk_t *diskp)
@@ -1331,38 +1387,144 @@ get_disk_temp(env_disk_t *diskp)
 	int	ret;
 	uchar_t	tpage[256];
 
-	ret = scsi_log_sense(diskp, TEMPERATURE_PAGE, tpage, sizeof (tpage));
-	if (ret != 0) {
-		diskp->current_temp = DISK_INVALID_TEMP;
-		diskp->ref_temp = DISK_INVALID_TEMP;
-		return (-1);
-	}
-	/*
-	 * For the current temperature verify that the parameter
-	 * length is 0x02 and the parameter code is 0x00
-	 * Temperature value of 255(0xFF) is considered INVALID.
-	 */
-	if ((tpage[7] == 0x02) && (tpage[4] == 0x00) &&
-	    (tpage[5] == 0x00)) {
-		if (tpage[9] == 0xFF) {
-			diskp->current_temp = DISK_INVALID_TEMP;
-			return (-1);
-		} else {
-			diskp->current_temp = tpage[9];
-		}
-	}
+	if (diskp->smart_supported == B_TRUE) {
+		smart_structure	smartpage;
+		smart_attribute	*temp_attrib = NULL;
+		uint8_t		checksum;
+		uint8_t		*index;
+		int		i;
 
-	/*
-	 * For the reference temperature verify that the parameter
-	 * length is 0x02 and the parameter code is 0x01
-	 * Temperature value of 255(0xFF) is considered INVALID.
-	 */
-	if ((tpage[13] == 0x02) && (tpage[10] == 0x00) &&
-	    (tpage[11] == 0x01)) {
-		if (tpage[15] == 0xFF) {
+		bzero(&smartpage, sizeof (smartpage));
+
+		ret = scsi_log_sense(diskp, GET_SMART_INFO,
+		    &smartpage, sizeof (smartpage), 0);
+
+		if (ret != 0) {
+			diskp->current_temp = DISK_INVALID_TEMP;
 			diskp->ref_temp = DISK_INVALID_TEMP;
+			return (-1);
+		}
+
+		/*
+		 * verify the checksum of the data. A 2's compliment
+		 * of the result addition of the is stored in the
+		 * last byte. The sum of all the checksum should be
+		 * 0. If the checksum is bad, return an error for
+		 * this iteration.
+		 */
+		index = (uint8_t *)&smartpage;
+
+		for (i = checksum = 0; i < 512; i++)
+			checksum += index[i];
+
+		if ((checksum != 0) && env_debug) {
+			envd_log(LOG_ERR,
+			    "SMART checksum error! 0x%x\n", checksum);
+
+			/*
+			 * We got bad data back from the drive, fail this
+			 * time around and picl will retry again. If this
+			 * continues to fail picl will give this drive a
+			 * failed status.
+			 */
+			diskp->current_temp = DISK_INVALID_TEMP;
+			diskp->ref_temp = DISK_INVALID_TEMP;
+
+			return (-1);
+		}
+
+		/*
+		 * Scan through the various SMART data and look for
+		 * the complete drive temp.
+		 */
+
+		for (i = 0; (i < SMART_FIELDS) &&
+		    (smartpage.attribute[i].id != 0) &&
+		    (temp_attrib == NULL); i++) {
+
+			if (smartpage.attribute[i].id == HDA_TEMP) {
+				temp_attrib = &smartpage.attribute[i];
+			}
+		}
+
+		/*
+		 * If we dont find any temp SMART attributes, this drive
+		 * does not support this page, disable temp checking
+		 * for this drive.
+		 */
+		if (temp_attrib == NULL) {
+
+			/*
+			 * If the checksum is valid, the temp. attributes are
+			 * not supported, disable this drive from temp.
+			 * checking.
+			 */
+			if (env_debug)
+				envd_log(LOG_ERR,
+				    "Temp ATTRIBUTE not supported\n");
+			diskp->smart_supported = B_FALSE;
+			diskp->tpage_supported = B_FALSE;
+			diskp->current_temp = DISK_INVALID_TEMP;
+			diskp->ref_temp = DISK_INVALID_TEMP;
+
+			return (-1);
+		}
+
+		if (env_debug) {
+			envd_log(LOG_ERR, "flags = 0x%x%x,curr = 0x%x,"
+			"data = 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n",
+			temp_attrib->flags[0], temp_attrib->flags[1],
+			temp_attrib->raw_data[0], temp_attrib->raw_data[1],
+			temp_attrib->raw_data[2], temp_attrib->raw_data[3],
+			temp_attrib->raw_data[4], temp_attrib->raw_data[5],
+			temp_attrib->raw_data[6], temp_attrib->raw_data[7]);
+		}
+		if (temp_attrib->raw_data[1] != 0xFF) {
+			diskp->current_temp = temp_attrib->raw_data[2];
+			diskp->ref_temp	= temp_attrib->raw_data[2];
 		} else {
-			diskp->ref_temp = tpage[15];
+			diskp->ref_temp = DISK_INVALID_TEMP;
+			diskp->current_temp = DISK_INVALID_TEMP;
+
+			return (-1);
+		}
+
+	} else {
+		ret = scsi_log_sense(diskp, TEMPERATURE_PAGE, tpage,
+		    sizeof (tpage), 1);
+
+		if (ret != 0) {
+			diskp->current_temp = DISK_INVALID_TEMP;
+			diskp->ref_temp = DISK_INVALID_TEMP;
+			return (-1);
+		}
+		/*
+		 * For the current temperature verify that the parameter
+		 * length is 0x02 and the parameter code is 0x00
+		 * Temperature value of 255(0xFF) is considered INVALID.
+		 */
+		if ((tpage[7] == 0x02) && (tpage[4] == 0x00) &&
+		    (tpage[5] == 0x00)) {
+			if (tpage[9] == 0xFF) {
+				diskp->current_temp = DISK_INVALID_TEMP;
+				return (-1);
+			} else {
+				diskp->current_temp = tpage[9];
+			}
+		}
+
+		/*
+		 * For the reference temperature verify that the parameter
+		 * length is 0x02 and the parameter code is 0x01
+		 * Temperature value of 255(0xFF) is considered INVALID.
+		 */
+		if ((tpage[13] == 0x02) && (tpage[10] == 0x00) &&
+		    (tpage[11] == 0x01)) {
+			if (tpage[15] == 0xFF) {
+				diskp->ref_temp = DISK_INVALID_TEMP;
+			} else {
+				diskp->ref_temp = tpage[15];
+			}
 		}
 	}
 	return (0);
@@ -1913,4 +2075,47 @@ has_fan_failed(env_fan_t *fanp)
 	}
 
 	return (B_FALSE);
+}
+
+static int
+scsi_mode_select(env_disk_t *diskp, uchar_t page_code, uchar_t *pagebuf,
+    uint16_t pagelen)
+{
+	struct uscsi_cmd		ucmd_buf;
+	uchar_t				cdb_buf[CDB_GROUP1];
+	struct scsi_extended_sense	sense_buf;
+	int				ret_val;
+
+	bzero(&cdb_buf, sizeof (cdb_buf));
+	bzero(&ucmd_buf, sizeof (ucmd_buf));
+	bzero(&sense_buf, sizeof (sense_buf));
+
+	cdb_buf[0] = SCMD_MODE_SELECT_G1;
+	cdb_buf[1] = 1<<PAGE_FMT;
+
+	cdb_buf[7] = (uchar_t)((pagelen & 0xFF00) >> 8);
+	cdb_buf[8] = (uchar_t)(pagelen  & 0x00FF);
+
+	ucmd_buf.uscsi_cdb = (char *)cdb_buf;
+	ucmd_buf.uscsi_cdblen = sizeof (cdb_buf);
+	ucmd_buf.uscsi_bufaddr = (caddr_t)pagebuf;
+	ucmd_buf.uscsi_buflen = pagelen;
+	ucmd_buf.uscsi_rqbuf = (caddr_t)&sense_buf;
+	ucmd_buf.uscsi_rqlen = sizeof (struct scsi_extended_sense);
+	ucmd_buf.uscsi_flags = USCSI_RQENABLE | USCSI_WRITE | USCSI_SILENT;
+	ucmd_buf.uscsi_timeout = DEFAULT_SCSI_TIMEOUT;
+
+	ret_val = ioctl(diskp->fd, USCSICMD, ucmd_buf);
+
+	if (ret_val == 0 && ucmd_buf.uscsi_status == 0) {
+		return (ret_val);
+	}
+	if (env_debug)
+		envd_log(LOG_ERR, "mode select command for %s failed. "
+		    "page_code 0x%x ret_val = 0x%x "
+		    "status = 0x%x errno = 0x%x\n", diskp->name, page_code,
+		    ret_val, ucmd_buf.uscsi_status, errno);
+
+	return (1);
+
 }

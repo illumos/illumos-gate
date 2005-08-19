@@ -126,6 +126,24 @@ extern "C" {
 
 #define	TACH_TO_RPM(tach)		(90000 * 60)/tach
 
+/*
+ * constants used for retrieving SMART data
+ */
+#define	DEFAULT_SCSI_TIMEOUT		60
+#define	IEC_PAGE			0x1C
+#define	HDA_TEMP			0xc2
+#define	DRIVE_TEMP			0xe7
+#define	GET_SMART_INFO			0x31
+#define	SMART_FIELDS			30
+#define	REPORT_ON_REQUEST		0x6
+#define	PAGE_FMT			4
+#define	IEC_PAGE_SIZE			12
+#define	SMART_FLAG_SIZE			2
+#define	ATTRIBUTE_DATA_SIZE		8
+#define	VENDOR_ATTR_SIZE		131
+#define	SMART_RESERVED_SIZE		10
+#define	COLLECTION_DATA_SIZE		6
+
 #define	DISK0_PHYSPATH	\
 	"/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@0,0"
 
@@ -438,6 +456,7 @@ typedef struct env_disk {
 	int		fd;		/* device file descriptor */
 	boolean_t	present;	/* disk present */
 	boolean_t	tpage_supported;	/* Temperature page */
+	boolean_t	smart_supported;
 	int		current_temp;
 	int		ref_temp;
 	int		reliability_temp;
@@ -485,6 +504,28 @@ typedef struct env_tuneable {
 	int		nbytes;
 	picl_prophdl_t proph;
 } env_tuneable_t;
+
+/*
+ * Smart structures
+ */
+
+typedef	struct smart_field {
+	uint8_t id;
+	uint8_t flags[SMART_FLAG_SIZE];
+	uint8_t raw_data[ATTRIBUTE_DATA_SIZE];
+	uint8_t	reserved;
+} smart_attribute;
+
+typedef struct smart_struct {
+	uint16_t	revision;		/* SMART version # */
+	struct smart_field attribute[SMART_FIELDS];
+			/* offline collection information */
+	uint8_t		collection_status[COLLECTION_DATA_SIZE];
+	uint16_t	capability;		/* SMART capability */
+	uint8_t		reserved[SMART_RESERVED_SIZE];
+	uint8_t		vendor_specific[VENDOR_ATTR_SIZE];
+	uint8_t		checksum;		/* page checksum */
+} smart_structure;
 
 extern	env_fan_t *fan_lookup(char *fan_name);
 extern	int get_fan_speed(env_fan_t *, fanspeed_t *);
