@@ -239,6 +239,7 @@
  * -xchar_byte_order=<o>	error
  * -xchip=<c>			table
  * -xcode=<c>			table
+ * -xdebugformat=<format>	ignore (always use dwarf-2 for gcc)
  * -xcrossfile[=<n>]		ignore
  * -xe				error
  * -xF				error
@@ -272,6 +273,8 @@
  * -xtransition			-Wtransition
  * -xtrigraphs=<yes|no>		-trigraphs -notrigraphs
  * -xunroll=n			error
+ * -W0,-xdbggen=no%usedonly	-fno-eliminate-unused-debug-symbols
+ *				-fno-eliminate-unused-debug-types
  * -Y<c>,<dir>			error
  * -YA,<dir>			error
  * -YI,<dir>			-nostdinc -I<dir>
@@ -891,6 +894,11 @@ do_gcc(const char *dir, const char *cmd, int argc, char **argv,
 				 */
 				break;
 			}
+			if (strcmp(arg, "-W0,-xdbggen=no%usedonly") == 0) {
+				newae(h, "-fno-eliminate-unused-debug-symbols");
+				newae(h, "-fno-eliminate-unused-debug-types");
+				break;
+			}
 			if (strcmp(arg, "-W2,-Rcond_elim") == 0) {
 				/*
 				 * Elimination and expansion of conditionals;
@@ -1018,6 +1026,8 @@ do_gcc(const char *dir, const char *cmd, int argc, char **argv,
 				break;
 			case 'd':
 				if (strcmp(arg, "-xdepend") == 0)
+					break;
+				if (strncmp(arg, "-xdebugformat=", 14) == 0)
 					break;
 				error(arg);
 				break;
