@@ -1395,6 +1395,8 @@ pxb_pwr_setup(dev_info_t *dip)
 	 * Disable PM for PLX 8532 switch. Transitioning one port on
 	 * this switch to low power causes links on other ports on the
 	 * same station to die.
+	 * Due to PLX erratum #34, we can't allow the downstream device
+	 * go to non-D0 state.
 	 */
 	if ((pxb->pxb_vendor_id == PXB_VENDOR_PLX) &&
 	    ((pxb->pxb_device_id == PXB_DEVICE_PLX_8516) ||
@@ -1402,6 +1404,7 @@ pxb_pwr_setup(dev_info_t *dip)
 		DBG(DBG_PWR, dip, "pxb_pwr_setup: PLX8532/PLX8516 found "
 		    "disabling PM\n");
 		pwr_p->pwr_func_lvl = PM_LEVEL_D0;
+		pwr_p->pwr_flags = PCIE_NO_CHILD_PM;
 		return (DDI_SUCCESS);
 	}
 

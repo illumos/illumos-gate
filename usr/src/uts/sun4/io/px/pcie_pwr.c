@@ -292,8 +292,30 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		DBG(DBG_PWR, dip, "bus_power: %s@%d op %s %d->%d\n",
 		    ddi_driver_name(cdip), ddi_get_instance(cdip),
 		    pcie_decode_pwr_op(op), old_level, new_level);
+		/*
+		 * If the nexus doesn't want the child to go into
+		 * non-D0 state, mark the child busy. This way PM
+		 * framework will never try to lower the child's power.
+		 * In case of pm_lower_power, marking busy won't help.
+		 * So we need to specifically reject the attempt to
+		 * go to non-D0 state.
+		 */
+		if (pwr_p->pwr_flags & PCIE_NO_CHILD_PM) {
+			if (!PCIE_IS_COMPS_COUNTED(cdip)) {
+				DBG(DBG_PWR, dip, "bus_power: marking child "
+				    "busy to disable pm \n");
+				(void) pm_busy_component(cdip, 0);
+			}
+			if (new_level < PM_LEVEL_D0) {
+				DBG(DBG_PWR, dip, "bus_power: rejecting "
+				    "child's attempt to go to %d\n", new_level);
+				rv = DDI_FAILURE;
+			}
+		}
 		mutex_exit(&pwr_p->pwr_lock);
-		return (pcie_pm_hold(dip));
+		if (rv == DDI_SUCCESS)
+			rv = pcie_pm_hold(dip);
+		return (rv);
 
 	case BUS_POWER_HAS_CHANGED:
 	case BUS_POWER_POST_NOTIFICATION:
@@ -308,8 +330,28 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		 * by then. Also because a driver can make a pm call during
 		 * the attach.
 		 */
-		if (!PCIE_IS_COMPS_COUNTED(cdip))
+		if (!PCIE_IS_COMPS_COUNTED(cdip)) {
 			(void) pcie_pm_add_child(dip, cdip);
+			if ((pwr_p->pwr_flags & PCIE_NO_CHILD_PM) &&
+			    (op == BUS_POWER_HAS_CHANGED)) {
+				DBG(DBG_PWR, dip, "bus_power: marking child "
+				    "busy to disable pm \n");
+				(void) pm_busy_component(cdip, 0);
+				/*
+				 * If the driver has already changed to lower
+				 * power(pm_power_has_changed) on its own,
+				 * there is nothing we can do other than
+				 * logging the warning message on the console.
+				 */
+				if (new_level < PM_LEVEL_D0)
+					cmn_err(CE_WARN, "!Downstream device "
+					    "%s@%d went to non-D0 state: "
+					    "possible loss of link\n",
+					    ddi_driver_name(cdip),
+					    ddi_get_instance(cdip));
+			}
+		}
+
 
 		/*
 		 * If it is POST and device PM is supported, release the

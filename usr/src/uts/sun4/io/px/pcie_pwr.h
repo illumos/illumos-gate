@@ -128,6 +128,7 @@ typedef struct pcie_pm {
 #define	PCIE_ASPM_ENABLED		0x01
 #define	PCIE_SLOT_LOADED		0x02
 #define	PCIE_PM_BUSY			0x04
+#define	PCIE_NO_CHILD_PM		0x08
 
 #define	PM_LEVEL_L3	0
 #define	PM_LEVEL_L2	1
