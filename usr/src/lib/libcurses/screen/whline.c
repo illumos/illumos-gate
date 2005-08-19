@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,8 +52,8 @@ whline(WINDOW *win, chtype horch, int num_chars)
 	if (num_chars <= 0)
 		return (ERR);
 
-	if (num_chars > win->_maxx - curx + 1)
-		num_chars = win->_maxx - curx + 1;
+	if (num_chars > win->_maxx - curx)
+		num_chars = win->_maxx - curx;
 	if (horch == 0)
 		horch = ACS_HLINE;
 	a = _ATTR(horch);

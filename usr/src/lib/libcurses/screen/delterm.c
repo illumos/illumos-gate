@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,21 +61,31 @@ delterm(TERMINAL *terminal)
 	(void) delkeymap(terminal);
 	if (terminal->_check_fd >= 0)
 		(void) close(terminal->_check_fd);
+
+	if (terminal->_pairs_tbl)
+		free(terminal->_pairs_tbl);
+	if (terminal->_color_tbl)
+		free(terminal->_color_tbl);
+#ifdef	_VR3_COMPAT_CODE
+	if (terminal->_acs32map)
+		free(terminal->_acs32map);
+#else	/* _VR3_COMPAT_CODE */
+	if (terminal->_acsmap)
+		free(terminal->_acsmap);
+#endif	/* _VR3_COMPAT_CODE */
+
 	if (terminal == &_first_term) {
 		/* next setupterm can re-use static areas */
 		_called_before = FALSE;
 		if (terminal->_strtab != _frst_tblstr)
-			free((char *)terminal->_strtab);
+			free(terminal->_strtab);
 	} else {
-		free((char *)terminal->_bools);
-		free((char *)terminal->_nums);
-		free((char *)terminal->_strs);
-		free((char *)terminal->_strtab);
-		free((char *)terminal);
+		free(terminal->_bools);
+		free(terminal->_nums);
+		free(terminal->_strs);
+		free(terminal->_strtab);
+		free(terminal);
 	}
-	if (terminal->_pairs_tbl)
-		free((char *) terminal->_pairs_tbl);
-	if (terminal->_color_tbl)
-		free((char *) terminal->_color_tbl);
+
 	return (OK);
 }

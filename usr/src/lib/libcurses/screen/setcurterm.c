@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,9 +55,9 @@ setcurterm(TERMINAL *newterminal)
 
 	if (newterminal) {
 #ifdef	_VR3_COMPAT_CODE
-		acs_map = cur_term->_acs32map;
+		acs_map = newterminal->_acs32map;
 #else	/* _VR3_COMPAT_CODE */
-		acs_map = cur_term->_acsmap;
+		acs_map = newterminal->_acsmap;
 #endif	/* _VR3_COMPAT_CODE */
 		cur_bools = newterminal->_bools;
 		cur_nums = newterminal->_nums;

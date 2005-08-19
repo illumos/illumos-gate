@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,16 +107,18 @@ start_color(void)
 		int	i, nc;
 		char	**marks;
 
-		if ((marks = (char **) calloc((unsigned) LINES,
+		if ((marks = (char **)calloc((unsigned)LINES,
 		    sizeof (char *))) == NULL)
 			goto err;
 		SP->_color_mks = marks;
 		nc = (COLS / BITSPERBYTE) + (COLS % BITSPERBYTE ? 1 : 0);
-		if ((*marks = (char *) calloc((unsigned) nc * LINES,
+		if ((*marks = (char *)calloc((unsigned)nc * LINES,
 		    sizeof (char))) == NULL) {
 			free(marks);
 err:			free(color_tbl);
+			cur_term->_color_tbl = NULL;
 err1:			free(cur_term->_pairs_tbl);
+			cur_term->_pairs_tbl = NULL;
 err2:			return (ERR);
 		}
 

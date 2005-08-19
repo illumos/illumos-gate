@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,14 +49,14 @@ wvline(WINDOW *win, chtype vertch, int num_chars)
 {
 	short	cury = win->_cury, curx = win->_curx;
 	chtype  a, **fp = win->_y;
-	short   *firstch = &(win->_firstch[cury]),
-		*lastch = &(win->_lastch[cury]);
+	short   *firstch = &(win->_firstch[cury]);
+	short	*lastch = &(win->_lastch[cury]);
 
 	if (num_chars <= 0)
 		return (ERR);
 
-	if (num_chars > win->_maxy - cury + 1)
-		num_chars = win->_maxy - cury + 1;
+	if (num_chars > win->_maxy - cury)
+		num_chars = win->_maxy - cury;
 	if (vertch == 0)
 		vertch = ACS_VLINE;
 	a = _ATTR(vertch);
