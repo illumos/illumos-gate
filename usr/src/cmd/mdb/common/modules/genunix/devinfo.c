@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1270,6 +1270,7 @@ devnames(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		{ "DN_LEAF_DRIVER",	DN_LEAF_DRIVER, DN_LEAF_DRIVER},
 		{ "DN_NETWORK_DRIVER",	DN_NETWORK_DRIVER, DN_NETWORK_DRIVER},
 		{ "DN_NO_AUTODETACH",	DN_NO_AUTODETACH, DN_NO_AUTODETACH },
+		{ "DN_GLDV3_DRIVER",	DN_GLDV3_DRIVER, DN_GLDV3_DRIVER},
 		{ NULL, 0, 0 }
 	};
 
