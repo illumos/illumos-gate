@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -44,6 +43,8 @@
 #include "curses.h"
 #include <ctype.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 #include "otermcap.h"
 #include "print.h"
 
@@ -99,20 +100,6 @@ extern char *boolnames[], *boolcodes[];
 extern char *numnames[], *numcodes[];
 extern char *strnames[], *strcodes[];
 
-/* externs from libc.a */
-extern char *getenv();
-extern void exit();
-#if defined(SYSV) || defined(USG)  /* handle both Sys Vr2 and Vr3 curses */
-extern char *getcwd();
-#else
-extern char *getwd();
-#endif /* SYSV || USG */
-extern int getopt();
-extern int optind;
-extern char *optarg;
-extern int strncmp(), strcmp();
-extern char *strcpy();
-
 /* globals for this file */
 char *progname;			/* argv [0], the name of the program */
 static char *term_name;		/* the name of the terminal being worked on */
@@ -150,19 +137,19 @@ static int copycomments = 0;	/* copy comments from tercap source */
 
 #define	ispadchar(c)	(isdigit(c) || (c) == '.' || (c) == '*')
 
-static void getlongname();
-static void handleko();
-static void handlema();
-static void print_no_use_entry();
+static void getlongname(void);
+static void handleko(void);
+static void handlema(void);
+static void print_no_use_entry(void);
 static void print_use_entry(char *);
-static void captoinfo();
-static void use_etc_termcap();
-static void initdirname();
+static void captoinfo(void);
+static void use_etc_termcap(void);
+static void initdirname(void);
 static void setfilename(char *);
-static void setterm_name();
+static void setterm_name(void);
 static void use_file(char *);
 static void sorttable(char *[], char *[]);
-static void inittables();
+static void inittables(void);
 
 /*
  *  Verify that the names given in the termcap entry are all valid.
@@ -279,7 +266,7 @@ checktermcap()
  *  Fill up the termcap tables.
  */
 int
-filltables()
+filltables(void)
 {
 	int i, tret;
 
@@ -404,7 +391,7 @@ filltables()
  *  names.
  */
 static void
-getlongname()
+getlongname(void)
 {
 	char *b = &bp[0],  *l = buflongname;
 
@@ -427,8 +414,8 @@ getlongname()
 /*
  *  Return the value of the termcap string 'capname' as stored in our list.
  */
-char
-*getcapstr(char *capname)
+char *
+getcapstr(char *capname)
 {
 	int i;
 
@@ -484,7 +471,6 @@ search(char *names[], int max, char *infoname)
 			return (i);
 		return (-1);
 #else				/* this doesn't work for some reason */
-	extern char *bsearch();
 	char **bret;
 
 	bret = (char **)bsearch(infoname, (char *)names, max,
@@ -504,8 +490,8 @@ search(char *names[], int max, char *infoname)
 /*
  *  return the value of the terminfo string 'infoname'
  */
-char
-*getinfostr(char *infoname)
+char *
+getinfostr(char *infoname)
 {
 	int i;
 
@@ -582,7 +568,7 @@ putnum(char *infoname, int newvalue)
 
 	(void) fprintf(stderr, "%s: TERM=%s: the numeric name '%s' was not "
 	    "found!\n",
-	progname, term_name, infoname);
+	    progname, term_name, infoname);
 }
 
 /*
@@ -616,7 +602,7 @@ putstr(char *infoname, char *newvalue)
 
 	(void) fprintf(stderr, "%s: TERM=%s: the string name '%s' was not "
 	    "found!\n",
-	progname, term_name, infoname);
+	    progname, term_name, infoname);
 }
 
 /*
@@ -692,7 +678,7 @@ struct
  *  capabilities.
  */
 static void
-handleko()
+handleko(void)
 {
 	char capname[3];
 	char *capstr;
@@ -807,7 +793,7 @@ prchar(FILE *stream, int c)
 }
 
 static void
-handlema()
+handlema(void)
 {
 	char vichar;
 	char cap[2];
@@ -888,7 +874,7 @@ handlema()
  *  given. We'll assume that the defaults are in effect for this terminal.
  */
 void
-adddefaults()
+adddefaults(void)
 {
 	char *cap;
 	int sg;
@@ -984,8 +970,8 @@ adddefaults()
 /*
  *  add the string to the string table
  */
-char
-*caddstr(char *to, char *str)
+char *
+caddstr(char *to, char *str)
 {
 	while (*str)
 		*to++ = *str++;
@@ -1241,7 +1227,7 @@ changecalculations()
 }
 
 static void
-print_no_use_entry()
+print_no_use_entry(void)
 {
 	int i;
 
@@ -1316,7 +1302,7 @@ print_use_entry(char *usename)
 }
 
 static void
-captoinfo()
+captoinfo(void)
 {
 	char usename[512];
 	char *sterm_name;
@@ -1359,7 +1345,7 @@ captoinfo()
 #include <signal.h>   /* use this file to determine if this is SVR4.0 system */
 
 static void
-use_etc_termcap()
+use_etc_termcap(void)
 {
 	if (verbose)
 #ifdef  SIGSTOP
@@ -1372,7 +1358,7 @@ use_etc_termcap()
 }
 
 static void
-initdirname()
+initdirname(void)
 {
 #if defined(SYSV) || defined(USG)  /* handle both Sys Vr2 and Vr3 curses */
 	(void) getcwd(dirname, BUFSIZ-2);
@@ -1399,7 +1385,7 @@ setfilename(char *capfile)
 }
 
 static void
-setterm_name()
+setterm_name(void)
 {
 	if (verbose)
 		(void) fprintf(trace, "setting the environment "
@@ -1412,8 +1398,8 @@ setterm_name()
 /* As a side-effect, comment lines and blank lines */
 /* are copied to standard output. */
 
-char
-*getterm_name(char *line)
+char *
+getterm_name(char *line)
 {
 	char *lineptr = line;
 
@@ -1503,7 +1489,7 @@ sorttable(char *nametable[], char *codetable[])
  *  value tables.
  */
 static void
-inittables()
+inittables(void)
 {
 	unsigned int i;
 
@@ -1529,6 +1515,7 @@ inittables()
 	sorttable(strnames, strcodes);
 }
 
+int
 main(int argc, char **argv)
 {
 	int c;
@@ -1569,7 +1556,7 @@ main(int argc, char **argv)
 				(void) fprintf(stderr,
 				    "\t-V\tprint program version\n");
 				exit(-1);
-	    }
+		}
 
 	/* initialize */
 	pr_init(pr_terminfo);
@@ -1580,7 +1567,7 @@ main(int argc, char **argv)
 	else {
 		initdirname();
 	for (; optind < argc; optind++)
-	    use_file(argv [optind]);
+		use_file(argv [optind]);
 	}
 
 	return (0);
@@ -1589,4 +1576,8 @@ main(int argc, char **argv)
 /* fake out the modules in print.c so we don't have to load in */
 /* cexpand.c and infotocap.c */
 /* ARGSUSED */
-int cpr(stream, string) FILE *stream; char *string; { return 0; }
+int
+cpr(FILE *stream, char *string)
+{
+	return (0);
+}

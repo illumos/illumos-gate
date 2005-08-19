@@ -1,22 +1,23 @@
+/*
+ * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
   
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* t3.c: interpret commands affecting whole table */
 # include "t..c"
+#include <string.h>
+
 struct optstr {char *optnam; int *optadd;} options [] = {
 	"expand", &expflg,
 	"EXPAND", &expflg,
@@ -39,8 +40,11 @@ struct optstr {char *optnam; int *optadd;} options [] = {
 	"delim", &delim1,
 	"DELIM", &delim1,
 	0,0};
-extern char *strchr();
-getcomm()
+
+void	backrest(char *);
+
+void
+getcomm(void)
 {
 char line[200], *cp, nb[25], *t;
 struct optstr *lp;
@@ -99,8 +103,9 @@ cp++;
 backrest(cp);
 return;
 }
-backrest(cp)
-	char *cp;
+
+void
+backrest(char *cp)
 {
 char *s;
 for(s=cp; *s; s++);

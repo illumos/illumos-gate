@@ -1,5 +1,5 @@
 /*
- * Copyright 1983-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -18,7 +18,11 @@
  /* t4.c: read table specification */
 # include "t..c"
 int oncol;
-getspec()
+
+void	readspec(void);
+
+void
+getspec(void)
 {
 int icol, i;
 for(icol=0; icol<MAXCOL; icol++)
@@ -44,7 +48,9 @@ for(i=0; i<ncol; i++)
 	fprintf(tabout, " %02d", 80+i);
 fprintf(tabout, "\n");
 }
-readspec()
+
+void
+readspec(void)
 {
 int icol, c, sawchar, stopc, i;
 char sn[10], *snp, *temp;

@@ -1,6 +1,10 @@
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,16 +12,15 @@
  * specifies the terms and conditions for redistribution.
  */
      
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-  
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tu.c: draws horizontal lines */
 # include "t..c"
-makeline(i,c,lintype)
+
+void	drawline(int, int, int, int, int, int);
+
+void
+makeline(int i, int c, int lintype)
 {
 int cr, type, shortl;
 type = thish(i,c);
@@ -31,7 +34,9 @@ else
 	for(cr=c+1; cr<ncol && ctype(i,cr)=='s'; cr++);
 drawline(i, c, cr-1, lintype, 0, shortl);
 }
-fullwide(i, lintype)
+
+void
+fullwide(int i, int lintype)
 {
 int cr, cl;
 if (!pr1403)
@@ -53,7 +58,8 @@ if (!pr1403)
 	fprintf(tabout, ".vs \\n(%du\n", SVS);
 }
 
-drawline(i, cl, cr, lintype, noheight, shortl)
+void
+drawline(int i, int cl, int cr, int lintype, int noheight, int shortl)
 {
 	char *exhr, *exhl, *lnch;
 	int lcount, ln, linpos, oldpos, nodata;
@@ -144,7 +150,9 @@ if (oldpos!=0)
 if (!nodata)
 	fprintf(tabout, "\\v'+.5m'");
 }
-getstop()
+
+void
+getstop(void)
 {
 int i,c,k,junk, stopp;
 stopp=1;
@@ -160,8 +168,9 @@ for(i=0; i<nlin; i++)
 if (boxflg || allflg || dboxflg)
 	linestop[0]=1;
 }
-left(i,c, lwidp)
-	int *lwidp;
+
+int
+left(int i, int c, int *lwidp)
 {
 int kind, li, lj;
 	/* returns -1 if no line to left */
@@ -184,7 +193,9 @@ for(i= i+1; i<li; i++)
 		li=i;
 return(li);
 }
-lefdata(i,c)
+
+int
+lefdata(int i, int c)
 {
 int ck;
 if (i>=nlin) i=nlin-1;
@@ -202,7 +213,9 @@ if (allflg)return(1);
 if (boxflg && c==0) return(1);
 return(0);
 }
-next(i)
+
+int
+next(int i)
 {
 while (i+1 <nlin)
 	{
@@ -211,7 +224,9 @@ while (i+1 <nlin)
 	}
 return(i);
 }
-prev(i)
+
+int
+prev(int i)
 {
 while (--i >=0  && (fullbot[i] || instead[i]))
 	;

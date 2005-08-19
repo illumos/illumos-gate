@@ -1,6 +1,10 @@
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,16 +12,13 @@
  * specifies the terms and conditions for redistribution.
  */
      
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-  
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tf.c: save and restore fill mode around table */
 # include "t..c"
-savefill()
+
+void
+savefill(void)
 {
 /* remembers various things: fill mode, vs, ps in mac 35 (SF) */
 fprintf(tabout, ".de %d\n",SF);
@@ -33,11 +34,15 @@ fprintf(tabout, ".nf\n");
 fprintf(tabout, ".nr #~ 0\n");
 fprintf(tabout, ".if n .nr #~ 0.6n\n");
 }
-rstofill()
+
+void
+rstofill(void)
 {
 fprintf(tabout, ".%d\n",SF);
 }
-endoff()
+
+void
+endoff(void)
 {
 int i;
 	for(i=0; i<MAXHEAD; i++)
@@ -47,22 +52,30 @@ int i;
 		fprintf(tabout, ".rm %c+\n",texstr[i]);
 fprintf(tabout, "%s\n", last);
 }
-ifdivert()
+
+void
+ifdivert(void)
 {
 fprintf(tabout, ".ds #d .d\n");
 fprintf(tabout, ".if \\(ts\\n(.z\\(ts\\(ts .ds #d nl\n");
 }
-saveline()
+
+void
+saveline(void)
 {
 fprintf(tabout, ".if \\n+(b.=1 .nr d. \\n(.c-\\n(c.-1\n");
 linstart=iline;
 }
-restline()
+
+void
+restline(void)
 {
 fprintf(tabout,".if \\n-(b.=0 .nr c. \\n(.c-\\n(d.-%d\n", iline-linstart);
 linstart = 0;
 }
-cleanfc()
+
+void
+cleanfc(void)
 {
 fprintf(tabout, ".fc\n");
 }

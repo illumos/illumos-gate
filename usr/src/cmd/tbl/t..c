@@ -1,19 +1,18 @@
+/*
+ * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
   
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* t..c : external declarations */
 
@@ -29,7 +28,7 @@
 # define CLLEN 10
 # define SHORTLINE 4
 # define BIGBUF 8192
-extern char *gets1();
+extern char *gets1(char *, int);
 extern int nlin, ncol, iline, nclin, nslin;
 extern int style[MAXHEAD][MAXCOL];
 extern int ctop[MAXHEAD][MAXCOL];
@@ -58,10 +57,10 @@ extern int left1flg;
 extern int rightl;
 struct colstr {char *col, *rcol;};
 extern struct colstr *table[];
-extern int *alocv();
+extern int *alocv(int);
 extern char *cspace, *cstore;
-extern char *chspace();
-extern char *maknew();
+extern char *chspace(void);
+extern char *maknew(char *);
 extern char *exstore, *exlim;
 extern int sep[];
 extern int used[], lused[], rused[];

@@ -19,21 +19,25 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright (c) 1997, by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6.1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <locale.h>
 #include <libgen.h>
-FILE *fopen();
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 FILE *iobuf;
 int gotflg;
 char ofile[64];
@@ -41,12 +45,16 @@ char a1[1024];
 char a2[64];
 int c;
 
-main(argc, argv) char **argv;
+int	getnm(char);
+int	size(char *);
+
+int
+main(int argc, char **argv)
 {
-	register char *name, *str, *v;
+	char *name, *str, *v;
 	char *bp, *cp, *sv;
 	char *message;
-	int j, k, cflg = 0;
+	int k, cflg = 0;
 	int status = 0;
 
 	(void) setlocale(LC_ALL, "");
@@ -145,7 +153,7 @@ main(argc, argv) char **argv;
 						continue;
 					default:
 						if (c <= '7' && c >= '0')
-							*str++ = getnm(c);
+							*str++ = getnm((char)c);
 						else *str++ = c;
 						continue;
 					}
@@ -185,23 +193,26 @@ main(argc, argv) char **argv;
 		}
 		fclose(iobuf);
 	}
-	exit(status);
+	return (status);
 }
-size(p)
-char *p;
+
+int
+size(char *p)
 {
-	register i;
-	register char *q;
+	int i;
+	char *q;
 
 	i = 0;
 	q = p;
 	while (*q++) i++;
 	return (i);
 }
-getnm(j) char j;
+
+int
+getnm(char j)
 {
-	register int i;
-	register int k;
+	int i;
+	int k;
 	i = j - '0';
 	k = 1;
 	while (++k < 4 && (c = getc(iobuf)) >= '0' && c <= '7')

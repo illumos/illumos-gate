@@ -1,11 +1,10 @@
 /*
- * Copyright 1983-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -17,7 +16,11 @@
 
  /* t5.c: read data for table */
 # include "t..c"
-gettbl()
+
+void	permute(void);
+
+void
+gettbl(void)
 {
 int icol, ch;
 cstore=cspace= chspace();
@@ -113,7 +116,9 @@ permute();
 if (textflg) untext();
 return;
 }
-nodata(il)
+
+int
+nodata(int il)
 {
 int c;
 for (c=0; c<ncol;c++)
@@ -126,7 +131,9 @@ for (c=0; c<ncol;c++)
 	}
 return(1);
 }
-oneh(lin)
+
+int
+oneh(int lin)
 {
 int k, icol;
 k = ctype(lin,0);
@@ -137,8 +144,11 @@ for(icol=1; icol<ncol; icol++)
 	}
 return(k);
 }
+
 # define SPAN "\\^"
-permute()
+
+void
+permute(void)
 {
 int irow, jcol, is;
 char *start, *strig;
@@ -167,7 +177,9 @@ for(jcol=0; jcol<ncol; jcol++)
 		}
 	}
 }
-vspand(ir,ij,ifform)
+
+int
+vspand(int ir, int ij, int ifform)
 {
 if (ir<0) return(0);
 if (ir>=nlin)return(0);
@@ -178,8 +190,9 @@ if (table[ir][ij].rcol!=0) return(0);
 if (fullbot[ir]) return(0);
 return(vspen(table[ir][ij].col));
 }
-vspen(s)
-	char *s;
+
+int
+vspen(char *s)
 {
 if (s==0) return(0);
 if (!point(s)) return(0);

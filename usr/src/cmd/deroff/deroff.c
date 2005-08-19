@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -122,14 +121,14 @@ static void putmac(char *, int);
 static void putwords(int);
 static void regline(int, int);
 static void sce(void);
-static int skeqn();
+static int skeqn(void);
 static void sdis(char, char);
 static void stbl(void);
 static void tbl(void);
 static void usage(void);
-static void work(void);
+static void work(void)	__NORETURN;
 
-void
+int
 main(int ac, char **av)
 {
 	int i;
@@ -166,8 +165,10 @@ main(int ac, char **av)
 			errflg++;
 		}
 	}
-	if (errflg)
+	if (errflg) {
 		usage();
+		return (1);
+	}
 	if (optind == argc)
 		infile = stdin;
 	else
@@ -184,15 +185,12 @@ main(int ac, char **av)
 	chars['\''] = APOS;
 	chars['&'] = APOS;
 	work();
+	/* NOTREACHED */
 }
 
 
-
-
-
-
 static int
-skeqn()
+skeqn(void)
 {
 	while ((c = getc(infile)) != rdelim) {
 		if (c == EOF) {
@@ -317,7 +315,6 @@ usage(void)
 	(void) fputs(gettext(
 	    "usage: deroff [ -w ] [ -m (m s l) ] [ -i ] "
 	    "[ file ] ... \n"), stderr);
-	exit(1);
 }
 
 static void

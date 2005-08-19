@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -78,8 +77,8 @@
 
 static	char *tbuf;
 static	int hopcount;	/* detect infinite loops in termcap, init 0 */
-char	*tskip();
-char	*otgetstr();
+char	*tskip(char *);
+char	*otgetstr(char *, char **);
 
 /* Tony Hansen */
 int	TLHtcfound = 0;
@@ -87,7 +86,7 @@ char	TLHtcname[16];
 static	char *termname;
 
 static int _tgetent(char *, char *);
-static int otnchktc();
+static int otnchktc(void);
 static char *tdecode(char *, char **);
 static int otnamatch(char *);
 /*
@@ -95,6 +94,7 @@ static int otnamatch(char *);
  * from the termcap file.  Parse is very rudimentary;
  * we just notice escaped newlines.
  */
+int
 otgetent(char *bp, char *name)
 {
 	/* Tony Hansen */
@@ -202,7 +202,7 @@ _tgetent(char *bp, char *name)
  * Note that this works because of the left to right scan.
  */
 static int
-otnchktc()
+otnchktc(void)
 {
 	char *p, *q;
 #define	TERMNAMESIZE 16
@@ -283,7 +283,7 @@ otnamatch(char *np)
  * knowing about \: escapes or any such.  If necessary, :'s can be put
  * into the termcap file in octal.
  */
-/* static - TLH removed */ char *
+char *
 tskip(char *bp)
 {
 
@@ -302,6 +302,7 @@ tskip(char *bp)
  * a # character.  If the option is not found we return -1.
  * Note that we handle octal numbers beginning with 0.
  */
+int
 otgetnum(char *id)
 {
 	int i, base;
@@ -334,6 +335,7 @@ otgetnum(char *id)
  * of the buffer.  Return 1 if we find the option, or 0 if it is
  * not given.
  */
+int
 otgetflag(char *id)
 {
 	char *bp = tbuf;
@@ -414,7 +416,8 @@ nextc:
 				c -= '0', i = 2;
 				do
 					c <<= 3, c |= *str++ - '0';
-				while (--i && isdigit(*str));
+				while (--i && isdigit(*str))
+					;
 			}
 			break;
 		}

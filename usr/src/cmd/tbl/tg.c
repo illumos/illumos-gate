@@ -1,25 +1,25 @@
+/*
+ * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
   
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tg.c: process included text blocks */
 # include "t..c"
 /* get_text was originally gettext and was renamed */
-get_text(sp, ilin,icol, fn, sz)
-	char *sp, *fn, *sz;
+
+int
+get_text(char *sp, int ilin, int icol, char *fn, char *sz)
 {
 /* get a section of text */
 char line[BIGBUF];
@@ -79,7 +79,9 @@ oname=texname;
 texname = texstr[++texct];
 return(oname);
 }
-untext()
+
+void
+untext(void)
 {
 rstofill();
 fprintf(tabout, ".nf\n");

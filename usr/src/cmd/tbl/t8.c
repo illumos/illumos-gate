@@ -1,30 +1,41 @@
+/*
+ * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
   
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* t8.c: write out one line of output table */
 # include "t..c"
 # include <locale.h>
 # define realsplit ((ct=='a'||ct=='n') && table[nl][c].rcol)
+
 int watchout;
 int once;
 int topat[MAXCOL];
-putline(i, nl)
-	/* i is line number for deciding format */
-	/* nl is line number for finding data   usually identical */
+
+void	puttext(char *, char *, char *);
+void	funnies(int, int);
+void	putfont(char *);
+void	putsize(char *);
+
+/*
+ * parameters
+ *
+ * i:	line number for deciding format
+ * nl:	line number for finding data   usually identical
+ */
+void
+putline(int i, int nl)
 {
 int c, lf, ct, form, lwid, vspf, ip = -1, cmidx, exvspen, vforml;
 int vct, chfont;
@@ -253,8 +264,9 @@ if (vspf)
 			}
 	}
 }
-puttext(s,fn, size)
-	char *s, *size, *fn;
+
+void
+puttext(char *s, char *fn, char *size)
 {
 if (point(s))
 	{
@@ -265,7 +277,9 @@ if (point(s))
 	if (size!=0) putsize("0");
 	}
 }
-funnies( stl, lin)
+
+void
+funnies(int stl, int lin)
 {
 /* write out funny diverted things */
 int c, s, pl, lwid, dv, lf, ct;
@@ -331,14 +345,16 @@ for(c=dv=0; c<ncol; c++)
 if (dv)
 	fprintf(tabout,"\n");
 }
-putfont(fn)
-	char *fn;
+
+void
+putfont(char *fn)
 {
 if (fn && *fn)
 	fprintf(tabout,  fn[1] ? "\\f(%.2s" : "\\f%.2s",  fn);
 }
-putsize(s)
-	char *s;
+
+void
+putsize(char *s)
 {
 if (s && *s)
 	fprintf(tabout, "\\s%s",s);

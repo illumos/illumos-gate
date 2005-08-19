@@ -1,6 +1,10 @@
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,16 +12,13 @@
  * specifies the terms and conditions for redistribution.
  */
      
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-  
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tt.c: subroutines for drawing horizontal lines */
 # include "t..c"
-ctype(il, ic)
+
+int
+ctype(int il, int ic)
 {
 if (instead[il])
 	return(0);
@@ -26,16 +27,22 @@ if (fullbot[il])
 il = stynum[il];
 return(style[il][ic]);
 }
-min(a,b)
+
+int
+min(int a, int b)
 {
 return(a<b ? a : b);
 }
-fspan(i,c)
+
+int
+fspan(int i, int c)
 {
 c++;
 return(c<ncol && ctype(i,c)=='s');
 }
-lspan(i,c)
+
+int
+lspan(int i, int c)
 {
 int k;
 if (ctype(i,c) != 's') return(0);
@@ -45,7 +52,9 @@ if (c < ncol && ctype(i,c)== 's')
 for(k=0; ctype(i,--c) == 's'; k++);
 return(k);
 }
-ctspan(i,c)
+
+int
+ctspan(int i, int c)
 {
 int k;
 c++;
@@ -53,14 +62,18 @@ for(k=1; c<ncol && ctype(i,c)=='s'; k++)
 	c++;
 return(k);
 }
-tohcol(ic)
+
+void
+tohcol(int ic)
 {
 			if (ic==0)
 				fprintf(tabout, "\\h'|0'");
 			else
 				fprintf(tabout, "\\h'(|\\n(%du+|\\n(%du)/2u'", ic+CLEFT, ic+CRIGHT-1);
 }
-allh(i)
+
+int
+allh(int i)
 {
 /* return true if every element in line i is horizontal */
 /* also at least one must be horizontl */
@@ -75,7 +88,9 @@ for(one=c=0; c<ncol; c++)
 	}
 return(one);
 }
-thish(i,c)
+
+int
+thish(int i, int c)
 {
 	int t;
 	char *s;

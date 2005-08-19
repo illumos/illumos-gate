@@ -1,23 +1,24 @@
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
   
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tv.c: draw vertical lines */
 # include "t..c"
-drawvert(start,end, c, lwid)
+
+void
+drawvert(int start, int end, int c, int lwid)
 {
 char *exb=0, *ext=0;
 int tp=0, sl, ln, pos, epb, ept, vm;
@@ -125,8 +126,8 @@ for(ln=0; ln<lwid; ln++)
 	}
 }
 
-
-midbar(i,c)
+int
+midbar(int i, int c)
 {
 int k;
 k = midbcol(i,c);
@@ -134,7 +135,9 @@ if (k==0 && c>0)
 	k = midbcol(i, c-1);
 return(k);
 }
-midbcol(i,c)
+
+int
+midbcol(int i, int c)
 {
 int ct;
 while ( (ct=ctype(i,c)) == 's')
@@ -146,8 +149,8 @@ if (ct=barent(table[i][c].col))
 return(0);
 }
 
-barent(s)
-	char *s;
+int
+barent(char *s)
 {
 if (s==0) return (1);
 if (!point(s)) return(1);

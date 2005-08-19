@@ -1,25 +1,24 @@
+/*
+ * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
   
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tm.c: split numerical fields */
 # include "t..c"
+
 char *
-maknew(str)
-	char *str;
+maknew(char *str)
 {
 	/* make two numerical fields */
 	int c;
@@ -64,9 +63,10 @@ maknew(str)
 	} while (*exstore++ = *str++);
 	*p = 0;
 	return(q);
-	}
-ineqn (s, p)
-	char *s, *p;
+}
+
+int
+ineqn (char *s, char *p)
 {
 /* true if s is in a eqn within p */
 int ineq = 0, c;

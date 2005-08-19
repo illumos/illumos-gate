@@ -1,6 +1,10 @@
-/*	Co/pyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*
+ * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,18 +12,15 @@
  * specifies the terms and conditions for redistribution.
  */
      
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-  
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* t1.c: main control and input switching */
 #
 #include <locale.h>
 # include "t..c"
 #include <signal.h>
+#include <stdlib.h>
+
 # ifdef gcos
 /* required by GCOS because file is passed to "tbl" by troff preprocessor */
 # define _f1 _f
@@ -41,8 +42,10 @@ extern FILE *_f[];
 
 # define ever (;;)
 
-main(argc,argv)
-	char *argv[];
+void	setinp(int, char **);
+
+int
+main(int argc, char **argv)
 {
 # ifdef unix
 void badsig();
@@ -61,9 +64,8 @@ if(!intss()) tabout = fopen("qq", "w"); /* default media code is type 5 */
 exit(tbl(argc,argv));
 }
 
-
-tbl(argc,argv)
-	char *argv[];
+int
+tbl(int argc, char **argv)
 {
 char line[BIGBUF];
 /* required by GCOS because "stdout" is set by troff preprocessor */
@@ -78,10 +80,12 @@ while (gets1(line, sizeof line))
 fclose(tabin);
 return(0);
 }
+
 int sargc;
 char **sargv;
-setinp(argc,argv)
-	char **argv;
+
+void
+setinp(int argc, char **argv)
 {
 	sargc = argc;
 	sargv = argv;
@@ -89,7 +93,9 @@ setinp(argc,argv)
 	if (sargc>0)
 		swapin();
 }
-swapin()
+
+int
+swapin(void)
 {
 	while (sargc>0 && **sargv=='-') /* Mem fault if no test on sargc */
 		{
@@ -137,8 +143,10 @@ swapin()
 	sargv++;
 	return(1);
 }
+
 # ifdef unix
-void badsig()
+void
+badsig(void)
 {
 signal(SIGPIPE, SIG_IGN);
  exit(0);

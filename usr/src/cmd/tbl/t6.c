@@ -1,3 +1,8 @@
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -8,17 +13,16 @@
  * specifies the terms and conditions for redistribution.
  */
      
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-  
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* t6.c: compute tab stops */
 # define tx(a) (a>(char *)0 && a<(char *)128)
 # include "t..c"
-maktab()
+
+void	wide(char *, char *, char *);
+
+void
+maktab(void)
 {
 # define FN(i,c) font[stynum[i]][c]
 # define SZ(i,c) csize[stynum[i]][c]
@@ -196,8 +200,9 @@ fprintf(tabout,
  ".if t .if \\n(TW>\\n(.li .tm Table at line %d file %s is too wide - \\n(TW units\n", iline-1, ifile);
 return;
 }
-wide(s, fn, size)
-	char *s, *size, *fn;
+
+void
+wide(char *s, char *fn, char *size)
 {
 if (point(s))
 	{
@@ -212,8 +217,9 @@ if (point(s))
 else
 	fprintf(tabout, "\\n(%c-", s);
 }
-filler(s)
-	char *s;
+
+int
+filler(char *s)
 {
 return (point(s) && s[0]=='\\' && s[1] == 'R');
 }

@@ -1,24 +1,28 @@
 /*
- * Copyright (c) 1983-1998 by Sun Microsystems, Inc.
- * All Rights Reserved.
+ * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
   
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
- /* t7.c: control to write table entries */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"     
+
+/* t7.c: control to write table entries */
 # include "t..c"
 # define realsplit ((ct=='a'||ct=='n') && table[ldata][c].rcol)
-runout()
+
+void	need(void);
+void	deftail(void);
+
+void
+runout(void)
 {
 int i;
 if (boxflg || allflg || dboxflg) need();
@@ -40,7 +44,9 @@ fprintf(tabout, ".T# 1\n");
 if (ctrflg)
 	fprintf(tabout, ".in \\n(#Iu\n");
 }
-runtabs(lform, ldata)
+
+void
+runtabs(int lform, int ldata)
 {
 int c, ct, vforml, lf;
 fprintf(tabout, ".ta ");
@@ -72,8 +78,9 @@ for(c=0; c<ncol; c++)
 	}
 fprintf(tabout, "\n");
 }
-ifline(s)
-	char *s;
+
+int
+ifline(char *s)
 {
 if (!point(s)) return(0);
 if (s[0] == '\\') s++;
@@ -83,7 +90,8 @@ if (s[0] == '=') return('=');
 return(0);
 }
 
-need()
+void
+need(void)
 {
 	int texlin, horlin, i;
 
@@ -104,7 +112,8 @@ need()
 	(void) fprintf(tabout, ".if n .ne %dv\n", 2 * texlin + 2 * horlin + 2);
 }
 
-deftail()
+void
+deftail(void)
 {
 int i, c, lf, lwid;
 for(i=0; i<MAXHEAD; i++)

@@ -1,24 +1,25 @@
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-  
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* ti.c: classify line intersections */
 # include "t..c"
 /* determine local environment for intersections */
-interv(i,c)
+
+int
+interv(int i, int c)
 {
 int ku, kl;
 if (c>=ncol || c == 0)
@@ -42,7 +43,9 @@ if (ku ==2) return(TOP);
 if (kl==BOT) return(2);
 return(0);
 }
-interh(i,c)
+
+int
+interh(int i, int c)
 {
 int kl, kr;
 if (fullbot[i]== '=' || (dboxflg && (i==0 || i>= nlin-1)))
@@ -65,7 +68,9 @@ if (kl== '=') return(LEFT);
 if (kr== '=') return(RIGHT);
 return(0);
 }
-up1(i)
+
+int
+up1(int i)
 {
 i--;
 while (instead[i] && i>0) i--;

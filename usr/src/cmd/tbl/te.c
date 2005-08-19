@@ -1,16 +1,15 @@
+/*
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
- */
-     
-/*
- * Copyright 1983-1988,2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
   
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -19,8 +18,9 @@
 # include "t..c"
 # include <locale.h>
 # include <errno.h>
-error(s)
-	char *s;
+
+void
+error(char *s)
 {
 fprintf(stderr, gettext("\n%s: line %d: %s\n"), ifile, iline, s);
 # ifdef unix
@@ -32,9 +32,9 @@ fprintf(stderr, "run terminated due to error condition detected by tbl preproces
 exit(0);
 # endif
 }
+
 char *
-errmsg(errnum)
-	int errnum;
+errmsg(int errnum)
 {
 extern int sys_nerr;
 extern char *sys_errlist[];
@@ -47,10 +47,9 @@ if (errnum > sys_nerr)
 else
 	return (sys_errlist[errnum]);
 }
+
 char *
-gets1(s, len)
-	char *s;
-	int len;
+gets1(char *s, int len)
 {
 char *p;
 int nbl;
@@ -60,7 +59,7 @@ while(len > 0)
 	while ((p = fgets(s,len,tabin))==0)
 		{
 		if (swapin()==0)
-			return(0);
+			return((char *)0);
 		}
 
 	while (*s) s++;
@@ -89,10 +88,14 @@ while(len > 0)
 
 return(p);
 }
+
 # define BACKMAX 500
+
 char backup[BACKMAX];
 char *backp = backup;
-un1getc(c)
+
+void
+un1getc(int c)
 {
 if (c=='\n')
 	iline--;
@@ -100,7 +103,9 @@ if (c=='\n')
 if (backp >= backup+BACKMAX)
 	error(gettext("too much backup"));
 }
-get1char()
+
+int
+get1char(void)
 {
 int c;
 if (backp>backup)

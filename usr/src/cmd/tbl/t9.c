@@ -1,5 +1,5 @@
 /*
- * Copyright 1983-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -17,8 +17,11 @@
 
  /* t9.c: write lines for tables over 200 lines */
 # include "t..c"
-static useln;
-yetmore()
+
+static int useln;
+
+void
+yetmore(void)
 {
 for(useln=0; useln<MAXLIN && table[useln]==0; useln++);
 if (useln>=MAXLIN)
@@ -33,8 +36,9 @@ while (gets1(cstore=cspace, MAXSTR) && domore(cstore))
 last =cstore;
 return;
 }
-domore(dataln)
-	char *dataln;
+
+int
+domore(char *dataln)
 {
 	int icol, ch;
 if (prefix(".TE", dataln))

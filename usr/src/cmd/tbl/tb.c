@@ -1,23 +1,25 @@
+/*
+ * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
   
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* tb.c: check which entries exist, also storage allocation */
 # include "t..c"
-checkuse()
+#include <stdlib.h>
+
+void
+checkuse(void)
 {
 int i,c, k;
 for(c=0; c<ncol; c++)
@@ -41,21 +43,24 @@ for(c=0; c<ncol; c++)
 		}
 	}
 }
-real(s)
-	char *s;
+
+int
+real(char *s)
 {
 if (s==0) return(0);
 if (!point(s)) return(1);
 if (*s==0) return(0);
 return(1);
 }
+
 int spcount = 0;
-extern char * calloc();
+
 # define MAXVEC 20
+
 char *spvecs[MAXVEC];
 
 char *
-chspace()
+chspace(void)
 {
 char *pp;
 if (spvecs[spcount])
@@ -67,13 +72,15 @@ if (pp == 0)
 	error(gettext("no space for characters"));
 return(pp);
 }
+
 # define MAXPC 50
+
 char *thisvec;
 int tpcount = -1;
 char *tpvecs[MAXPC];
 
 int *
-alocv(n)
+alocv(int n)
 {
 int *tp, *q;
 if (tpcount<0 || thisvec+n > tpvecs[tpcount]+MAXCHS)
@@ -93,7 +100,9 @@ for(q=tp; q<(int *)thisvec; q++)
 	*q=0;
 return(tp);
 }
-release()
+
+void
+release(void)
 {
 extern char *exstore;
 /* give back unwanted space in some vectors */
