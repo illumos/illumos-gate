@@ -111,7 +111,8 @@ function create_ufs
 
 	# do the actual copy
 	cd /${ALT_ROOT}
-	find $filelist -print ${NO_AMD64}| cpio -pdum ${rdmnt} 2> /dev/null
+	find $filelist -print ${NO_AMD64} 2> /dev/null | \
+	     cpio -pdum ${rdmnt} 2> /dev/null
 	umount ${rdmnt}
 	lofiadm -d ${rdfile}
 	rmdir ${rdmnt}
@@ -134,8 +135,6 @@ function create_isofs
 			mkdir -p ${rdmnt}/$path
 		elif [ -f ${ALT_ROOT}/$path ]; then
 			files="$files $path"
-		else
-			echo "/${ALT_ROOT}/$path not present"
 		fi
 	done
 	cd /${ALT_ROOT}
