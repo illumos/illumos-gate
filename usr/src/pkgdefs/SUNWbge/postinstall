@@ -173,6 +173,7 @@ else if [ ${ARCH} = "sparc" ]
 	"pci14e4,1668"
 	"pci14e4,1669"
 	"pci14e4,1677"
+	"pci14e4,1678"
 	"pci14e4,167d"' \
 	-b "$BASEDIR" bge
 	fi

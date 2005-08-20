@@ -75,6 +75,7 @@ extern "C" {
 #define	DEVICE_ID_5721			0x1659
 #define	DEVICE_ID_5714C			0x1668
 #define	DEVICE_ID_5714S			0x1669
+#define	DEVICE_ID_5715C			0x1678
 
 #define	REVISION_ID_5700_B0		0x10
 #define	REVISION_ID_5700_B2		0x12
@@ -184,6 +185,7 @@ extern "C" {
 #define	MHCR_CHIP_ASIC_REV_5705		(0x3 << 28)
 #define	MHCR_CHIP_ASIC_REV_5721_5751	(0x4 << 28)
 #define	MHCR_CHIP_ASIC_REV_5714 	(0x5 << 28)
+#define	MHCR_CHIP_ASIC_REV_5715 	((uint32_t)0x9 << 28)
 
 
 /*

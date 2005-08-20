@@ -493,6 +493,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	case MHCR_CHIP_ASIC_REV_5705:
 	case MHCR_CHIP_ASIC_REV_5721_5751:
 	case MHCR_CHIP_ASIC_REV_5714:
+	case MHCR_CHIP_ASIC_REV_5715:
 		reset_ok = bge_phy_reset_and_check(bgep);
 		break;
 
@@ -1367,7 +1368,9 @@ bge_phys_init(bge_t *bgep)
 
 	/*
 	 * Probe for the (internal) PHY.  If it's not there, we'll assume
-	 * that this is a 5703/4S, with a SerDes interface rather than a PHY.
+	 * that this is a 5703/4S, with a SerDes interface rather than
+	 * a PHY. BCM5714S/BCM5715S are not supported.It are based on
+	 * BCM800x PHY.
 	 */
 	bgep->phy_mii_addr = 1;
 	if (bge_phy_probe(bgep)) {

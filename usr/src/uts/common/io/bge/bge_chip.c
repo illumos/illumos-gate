@@ -1667,6 +1667,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5721:
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
+	case DEVICE_ID_5715C:
 		config1 = bge_reg_get32(bgep, NVM_CONFIG1_REG);
 		if (config1 & NVM_CFG1_FLASH_MODE)
 			if (config1 & NVM_CFG1_BUFFERED_MODE)
@@ -1867,6 +1868,17 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
 		cidp->chip_label = 5714;
+		cidp->mbuf_base = bge_mbuf_pool_base_5721;
+		cidp->mbuf_length = bge_mbuf_pool_len_5721;
+		cidp->recv_slots = BGE_RECV_SLOTS_5721;
+		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5714;
+		cidp->bge_mlcr_default = bge_mlcr_default_5714;
+		cidp->pci_type = BGE_PCI_E;
+		dev_ok = B_TRUE;
+		break;
+
+	case DEVICE_ID_5715C:
+		cidp->chip_label = 5715;
 		cidp->mbuf_base = bge_mbuf_pool_base_5721;
 		cidp->mbuf_length = bge_mbuf_pool_len_5721;
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
