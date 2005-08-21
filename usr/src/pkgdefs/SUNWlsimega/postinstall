@@ -109,4 +109,4 @@ check_add_drv()
 }
 
 
-check_add_drv -i '"pci1000,407.1000.532"' -b "$BASEDIR" -c scsi lsimega
+check_add_drv -i '"pci1028,13.1028.16c" "pci1028,13.1028.16d" "pci1000,408.1028.2" "pci1000,407.1000.532"' -b "$BASEDIR" -c scsi lsimega
