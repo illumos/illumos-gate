@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -430,6 +431,7 @@ extern struct pid pid0;		/* p0's pid */
  * altered.
  */
 #define	SSYS	   0x00000001	/* system (resident) process */
+#define	SEXITING   0x00000002	/* process is exiting */
 #define	SITBUSY	   0x00000004	/* setitimer(ITIMER_REAL) in progress */
 #define	SWATCHOK   0x00000010	/* proc in acceptable state for watchpoints */
 #define	SKILLED    0x00000100	/* SIGKILL has been posted to the process */
@@ -540,6 +542,7 @@ extern void setrun(kthread_t *);
 extern void setrun_locked(kthread_t *);
 extern void exit(int, int);
 extern int proc_exit(int, int);
+extern void proc_is_exiting(proc_t *);
 extern void relvm(void);
 extern void add_ns(proc_t *, proc_t *);
 extern void delete_ns(proc_t *, proc_t *);

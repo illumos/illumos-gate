@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -260,13 +261,11 @@ top:
 				continue;
 
 			/*
-			 * Skip processes which are exiting.  This is
-			 * determined by checking p_lwpcnt since SZOMB is
-			 * set after the addressed space is released.
+			 * Skip processes that are exiting
+			 * or whose address spaces are locked.
 			 */
 			mutex_enter(&prp->p_lock);
-			if (prp->p_lwpcnt == 0 ||
-			    (prp->p_flag & SEXITLWPS) ||
+			if ((prp->p_flag & SEXITING) ||
 			    (prp->p_as != NULL && AS_ISPGLCK(prp->p_as))) {
 				mutex_exit(&prp->p_lock);
 				continue;
@@ -409,13 +408,11 @@ unload:
 		}
 
 		/*
-		 * Skip processes which are exiting.  This is determined
-		 * by checking p_lwpcnt since SZOMB is set after the
-		 * addressed space is released.
+		 * Skip processes that are exiting
+		 * or whose address spaces are locked.
 		 */
 		mutex_enter(&prp->p_lock);
-		if (prp->p_lwpcnt == 0 ||
-		    (prp->p_flag & SEXITLWPS) ||
+		if ((prp->p_flag & SEXITING) ||
 		    (prp->p_as != NULL && AS_ISPGLCK(prp->p_as))) {
 			mutex_exit(&prp->p_lock);
 			continue;
@@ -644,7 +641,7 @@ swapout(proc_t *pp, uint_t *swrss, int swapflags)
 
 	ASSERT(MUTEX_HELD(&pp->p_lock));
 
-	if (pp->p_lwpcnt == 0 || (pp->p_flag & SEXITLWPS))
+	if (pp->p_flag & SEXITING)
 		return (0);
 
 top:

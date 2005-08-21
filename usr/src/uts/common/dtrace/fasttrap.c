@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1206,14 +1207,16 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	 * process's uid to pass to dtrace_register().
 	 */
 	mutex_enter(&pidlock);
-	if ((p = prfind(pid)) == NULL ||
-	    (p->p_flag & (SVFORK | SEXITLWPS)) ||
-	    (p->p_lwpcnt == 0 && p->p_lwpdir != NULL)) {
+	if ((p = prfind(pid)) == NULL) {
 		mutex_exit(&pidlock);
 		return (NULL);
 	}
 	mutex_enter(&p->p_lock);
 	mutex_exit(&pidlock);
+	if (p->p_flag & (SVFORK | SEXITING)) {
+		mutex_exit(&p->p_lock);
+		return (NULL);
+	}
 
 	/*
 	 * Increment p_dtrace_probes so that the process knows to inform us

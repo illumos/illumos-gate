@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1964,17 +1965,18 @@ pr_agent(prnode_t *pnp, prgregset_t prgregset, int *unlocked)
 
 	/*
 	 * Cannot create the /proc agent lwp if :-
-	 *
 	 * - the process is not fully stopped or directed to stop.
 	 * - there is an agent lwp already.
+	 * - the process has been killed.
+	 * - the process is exiting.
 	 * - it's a vfork(2) parent.
 	 */
 	t = prchoose(p);	/* returns locked thread */
 	ASSERT(t != NULL);
 
-	if ((!ISTOPPED(t) &&
-	    !VSTOPPED(t) && !SUSPENDED(t) && !JDSTOPPED(t)) ||
-	    p->p_agenttp != NULL || (p->p_flag & SVFWAIT)) {
+	if ((!ISTOPPED(t) && !VSTOPPED(t) && !SUSPENDED(t) && !JDSTOPPED(t)) ||
+	    p->p_agenttp != NULL ||
+	    (p->p_flag & (SKILLED | SEXITING | SVFWAIT))) {
 		thread_unlock(t);
 		return (EBUSY);
 	}

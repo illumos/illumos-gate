@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -741,8 +742,7 @@ again:
 	 * and the 'zdisp' flag is set to ZNO indicating not to lock zombies.
 	 */
 	if (zdisp == ZNO &&
-	    ((pcp->prc_flags & PRC_DESTROY) || p->p_tlist == NULL ||
-	    (p->p_flag & SDOCORE))) {
+	    ((pcp->prc_flags & PRC_DESTROY) || (p->p_flag & SEXITING))) {
 		prunlock(pnp);
 		return (ENOENT);
 	}

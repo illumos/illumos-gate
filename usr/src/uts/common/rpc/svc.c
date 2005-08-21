@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2111,7 +2112,7 @@ svc_run(SVCPOOL *pool)
 		 * immediately without processing any more
 		 * requests.
 		 */
-		if (p->p_flag & (SEXITLWPS|SKILLED)) {
+		if (p->p_flag & (SEXITING | SKILLED)) {
 			svc_thread_exit(pool, clone_xprt);
 
 			/*

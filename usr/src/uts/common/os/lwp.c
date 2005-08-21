@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -694,17 +695,8 @@ lwp_exit(void)
 	 */
 	if (!(t->t_proc_flag & TP_DAEMON) &&
 	    p->p_lwpcnt == p->p_lwpdaemon + 1) {
-		int why, what;
-
-		if (p->p_flag & SEXITLWPS) {
-			why = CLD_KILLED;
-			what = SIGKILL;
-		} else {
-			why = CLD_EXITED;
-			what = 0;
-		}
 		mutex_exit(&p->p_lock);
-		if (proc_exit(why, what) == 0) {
+		if (proc_exit(CLD_EXITED, 0) == 0) {
 			/* Restarting init. */
 			return;
 		}
@@ -1472,6 +1464,7 @@ exitlwps(int coredump)
 	while (p->p_flag & (SHOLDFORK | SHOLDFORK1 | SHOLDWATCH)) {
 		cv_broadcast(&p->p_holdlwps);
 		cv_wait(&p->p_holdlwps, &p->p_lock);
+		prbarrier(p);
 	}
 	p->p_flag |= SHOLDFORK;
 	pokelwps(p);
@@ -1480,8 +1473,10 @@ exitlwps(int coredump)
 	 * Wait for process to become quiescent.
 	 */
 	--p->p_lwprcnt;
-	while (p->p_lwprcnt > 0)
+	while (p->p_lwprcnt > 0) {
 		cv_wait(&p->p_holdlwps, &p->p_lock);
+		prbarrier(p);
+	}
 	p->p_lwprcnt++;
 	ASSERT(p->p_lwprcnt == 1);
 
@@ -1515,8 +1510,10 @@ exitlwps(int coredump)
 	 * Wait for all other lwps to exit.
 	 */
 	--p->p_lwprcnt;
-	while (p->p_lwpcnt > 1)
+	while (p->p_lwpcnt > 1) {
 		cv_wait(&p->p_holdlwps, &p->p_lock);
+		prbarrier(p);
+	}
 	++p->p_lwprcnt;
 	ASSERT(p->p_lwpcnt == 1 && p->p_lwprcnt == 1);
 
@@ -1529,7 +1526,6 @@ out:
 		lwpent_t *lep;
 		int i;
 
-		prbarrier(p);
 		for (ldp = p->p_lwpdir, i = 0; i < p->p_lwpdir_sz; i++, ldp++) {
 			lep = ldp->ld_entry;
 			if (lep != NULL && lep->le_thread != curthread) {

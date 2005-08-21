@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,8 +196,9 @@ restart_init(int what, int why)
 	 */
 
 	mutex_enter(&p->p_lock);
+	prbarrier(p);
 
-	p->p_flag &= ~(SKILLED | SEXITLWPS | SEXTKILLED | SCOREDUMP | SDOCORE);
+	p->p_flag &= ~(SKILLED | SEXTKILLED | SEXITING | SDOCORE);
 	up->u_cmask = CMASK;
 
 	sigemptyset(&t->t_hold);
@@ -320,6 +322,20 @@ exit(int why, int what)
 }
 
 /*
+ * Set the SEXITING flag on the process, after making sure /proc does
+ * not have it locked.  This is done in more places than proc_exit(),
+ * so it is a separate function.
+ */
+void
+proc_is_exiting(proc_t *p)
+{
+	mutex_enter(&p->p_lock);
+	prbarrier(p);
+	p->p_flag |= SEXITING;
+	mutex_exit(&p->p_lock);
+}
+
+/*
  * Return value:
  *   1 - exitlwps() failed, call (or continue) lwp_exit()
  *   0 - restarting init.  Return through system call path
@@ -350,6 +366,7 @@ proc_exit(int why, int what)
 	 * unless some other lwp beat us to it.  If exitlwps() fails then
 	 * return and the calling lwp will call (or continue in) lwp_exit().
 	 */
+	proc_is_exiting(p);
 	if (exitlwps(0) != 0)
 		return (1);
 

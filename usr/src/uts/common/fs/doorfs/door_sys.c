@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1954,7 +1955,7 @@ door_slam(void)
 		proc_t *p = curproc;
 
 		/* Revoke our door if the process is exiting */
-		if (dp->door_target == p && (curproc->p_flag & SEXITLWPS)) {
+		if (dp->door_target == p && (p->p_flag & SEXITING)) {
 			door_list_delete(dp);
 			dp->door_target = NULL;
 			dp->door_flags |= DOOR_REVOKED;

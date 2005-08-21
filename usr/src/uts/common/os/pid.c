@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -397,7 +398,7 @@ sprlock_zone(pid_t pid, zoneid_t zoneid)
 		 * If the process is in some half-baked state, fail.
 		 */
 		if (p->p_stat == SZOMB || p->p_stat == SIDL ||
-		    p->p_tlist == NULL || (p->p_flag & SEXITLWPS)) {
+		    (p->p_flag & (SEXITING | SEXITLWPS))) {
 			mutex_exit(mp);
 			return (NULL);
 		}

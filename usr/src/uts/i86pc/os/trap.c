@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1650,6 +1651,7 @@ kern_gpfault(struct regs *rp)
 	 * Terminate all LWPs but don't discard them.  If another lwp beat us to
 	 * the punch by calling exit(), evaporate now.
 	 */
+	proc_is_exiting(p);
 	if (exitlwps(1) != 0) {
 		mutex_enter(&p->p_lock);
 		lwp_exit();

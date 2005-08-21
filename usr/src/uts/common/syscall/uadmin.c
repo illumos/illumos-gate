@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -171,7 +172,8 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		 * from a user context, however if we are calling kadmin() from
 		 * a kernel context then we do not release these resources.
 		 */
-		if (ttoproc(curthread) != &p0) {
+		if (p != &p0) {
+			proc_is_exiting(p);
 			if ((error = exitlwps(0)) != 0)
 				return (error);
 			mutex_enter(&p->p_lock);

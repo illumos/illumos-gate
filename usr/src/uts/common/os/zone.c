@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -2022,8 +2023,8 @@ zone_icode(void)
 		mutex_exit(&zone_status_lock);
 		/* It's gone bad, dispose of the process */
 		if (proc_exit(CLD_EXITED, p->p_zone->zone_boot_err) != 0) {
-			mutex_enter(&curproc->p_lock);
-			ASSERT(curproc->p_flag & SEXITLWPS);
+			mutex_enter(&p->p_lock);
+			ASSERT(p->p_flag & SEXITLWPS);
 			lwp_exit();
 		}
 	} else {

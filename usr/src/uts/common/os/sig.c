@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -161,6 +162,14 @@ sig_discardable(proc_t *p, int sig)
 
 /*
  * Return true if this thread is going to eat this signal soon.
+ * Note that, if the signal is SIGKILL, we force stopped threads to be
+ * set running (to make SIGKILL be a sure kill), but only if the process
+ * is not currently locked by /proc (the P_PR_LOCK flag).  Code in /proc
+ * relies on the fact that a process will not change shape while P_PR_LOCK
+ * is set (it drops and reacquires p->p_lock while leaving P_PR_LOCK set).
+ * We wish that we could simply call prbarrier() below, in sigtoproc(), to
+ * ensure that the process is not locked by /proc, but prbarrier() drops
+ * and reacquires p->p_lock and dropping p->p_lock here would be damaging.
  */
 int
 eat_signal(kthread_t *t, int sig)
@@ -176,7 +185,8 @@ eat_signal(kthread_t *t, int sig)
 		if (t->t_state == TS_SLEEP && (t->t_flag & T_WAKEABLE)) {
 			setrun_locked(t);
 			rval = 1;
-		} else if (t->t_state == TS_STOPPED && sig == SIGKILL) {
+		} else if (t->t_state == TS_STOPPED && sig == SIGKILL &&
+		    !(ttoproc(t)->p_proc_flag & P_PR_LOCK)) {
 			ttoproc(t)->p_stopsig = 0;
 			t->t_dtrace_stop = 0;
 			t->t_schedflag |= TS_XSTART | TS_PSTART;
@@ -317,7 +327,8 @@ sigtoproc(proc_t *p, kthread_t *t, int sig)
 		 * If the process is deadlocked, make somebody run and die.
 		 */
 		if (sig == SIGKILL && p->p_stat != SIDL &&
-		    p->p_lwprcnt == 0 && p->p_lwpcnt == su) {
+		    p->p_lwprcnt == 0 && p->p_lwpcnt == su &&
+		    !(p->p_proc_flag & P_PR_LOCK)) {
 			thread_lock(tt);
 			p->p_lwprcnt++;
 			tt->t_schedflag |= TS_CSTART;
@@ -1415,6 +1426,7 @@ psig(void)
 		 * If another lwp beat us to the punch by calling exit(),
 		 * evaporate now.
 		 */
+		proc_is_exiting(p);
 		if (exitlwps(1) != 0) {
 			mutex_enter(&p->p_lock);
 			lwp_exit();
