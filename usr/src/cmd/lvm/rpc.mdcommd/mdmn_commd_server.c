@@ -453,6 +453,46 @@ setup_debug(void)
 		    commdoutfile);
 	}
 }
+
+/*
+ * mdmn_is_node_dead checks to see if a node is dead using
+ * the SunCluster infrastructure which is a stable interface.
+ * If unable to contact SunCuster the node is assumed to be alive.
+ * Return values:
+ *	1 - node is dead
+ *	0 - node is alive
+ */
+int
+mdmn_is_node_dead(md_mnnode_desc *node)
+{
+	char	*fmt = "/usr/cluster/bin/scha_cluster_get -O NODESTATE_NODE ";
+	char	*cmd;
+	size_t	size;
+	char	buf[10];
+	FILE	*ptr;
+	int	retval = 0;
+
+	/* I know that I'm alive */
+	if (strcmp(node->nd_nodename, mynode()) == 0)
+		return (retval);
+
+	size = strlen(fmt) + strlen(node->nd_nodename) + 1;
+	cmd = Zalloc(size);
+	(void) strlcat(cmd, fmt, size);
+	(void) strlcat(cmd, node->nd_nodename, size);
+
+	if ((ptr = popen(cmd, "r")) != NULL) {
+		if (fgets(buf, sizeof (buf), ptr) != NULL) {
+			/* If scha_cluster_get returned DOWN - return dead */
+			if (strncmp(buf, "DOWN", 4) == 0)
+				retval = 1;
+		}
+		(void) pclose(ptr);
+	}
+	Free(cmd);
+	return (retval);
+}
+
 /*
  * global_init()
  *
@@ -600,9 +640,32 @@ mdmn_init_client(set_t setno, md_mn_nodeid_t nid)
 
 	/* if clnt_create has not been done for that node, do it now */
 	if (client[setno][nid] == (CLIENT *) NULL) {
-		client[setno][nid] = meta_client_create_retry(node->nd_nodename,
-			mdmn_clnt_create, (void *) node, MD_CLNT_CREATE_TOUT,
-			&ep);
+		time_t	tout = 0;
+
+		/*
+		 * While trying to create a connection to a node,
+		 * periodically check to see if the node has been marked
+		 * dead by the SunCluster infrastructure.
+		 * This periodic check is needed since a non-responsive
+		 * rpc.mdcommd (while it is attempting to create a connection
+		 * to a dead node) can lead to large delays and/or failures
+		 * in the reconfig steps.
+		 */
+		while ((client[setno][nid] == (CLIENT *) NULL) &&
+		    (tout < MD_CLNT_CREATE_TOUT)) {
+			client[setno][nid] = meta_client_create_retry
+				(node->nd_nodename, mdmn_clnt_create,
+				(void *) node, MD_CLNT_CREATE_SUBTIMEOUT, &ep);
+			/* Is the node dead? */
+			if (mdmn_is_node_dead(node) == 1) {
+				commd_debug(MD_MMV_SYSLOG,
+				    "rpc.mdcommd: no client for dead node %s\n",
+				    node->nd_nodename);
+				break;
+			} else
+				tout += MD_CLNT_CREATE_SUBTIMEOUT;
+		}
+
 		if (client[setno][nid] == (CLIENT *) NULL) {
 			clnt_pcreateerror(node->nd_nodename);
 			rw_unlock(&set_desc_rwlock[setno]);
@@ -781,6 +844,7 @@ mdmn_init_set(set_t setno, int todo)
 	}
 
 	for (node = sd->sd_nodelist; node != NULL; node = node->nd_next) {
+		time_t	tout = 0;
 		nid = node->nd_nodeid;
 
 		commd_debug(MD_MMV_INIT,
@@ -803,9 +867,30 @@ mdmn_init_set(set_t setno, int todo)
 			    node->nd_nodename ? node->nd_nodename : "NULL");
 			continue;
 		}
-		client[setno][nid] = meta_client_create_retry(node->nd_nodename,
-			mdmn_clnt_create, (void *)node, MD_CLNT_CREATE_TOUT,
-			&ep);
+
+		/*
+		 * While trying to create a connection to a node,
+		 * periodically check to see if the node has been marked
+		 * dead by the SunCluster infrastructure.
+		 * This periodic check is needed since a non-responsive
+		 * rpc.mdcommd (while it is attempting to create a connection
+		 * to a dead node) can lead to large delays and/or failures
+		 * in the reconfig steps.
+		 */
+		while ((client[setno][nid] == (CLIENT *) NULL) &&
+		    (tout < MD_CLNT_CREATE_TOUT)) {
+			client[setno][nid] = meta_client_create_retry
+				(node->nd_nodename, mdmn_clnt_create,
+				(void *) node, MD_CLNT_CREATE_SUBTIMEOUT, &ep);
+			/* Is the node dead? */
+			if (mdmn_is_node_dead(node) == 1) {
+				commd_debug(MD_MMV_SYSLOG,
+				    "rpc.mdcommd: no client for dead node %s\n",
+				    node->nd_nodename);
+				break;
+			} else
+				tout += MD_CLNT_CREATE_SUBTIMEOUT;
+		}
 
 		if (client[setno][nid] == (CLIENT *) NULL) {
 			clnt_pcreateerror(node->nd_nodename);

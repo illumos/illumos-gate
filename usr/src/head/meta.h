@@ -119,6 +119,13 @@ die right now
 #define	MD_CLNT_CREATE_TOUT	(60)
 
 /*
+ * If event needs to be checked during wait of MD_CLNT_CREATE_TOUT,
+ * spin checking for event and then waiting for MD_CLNT_CREATE_SUBTIMEOUT
+ * seconds until MD_CLNT_CREATE_TOUT seconds are used.
+ */
+#define	MD_CLNT_CREATE_SUBTIMEOUT	(5)
+
+/*
  * metaclust verbosity levels and what they are for. Messages upto MC_LOG2
  * will also be logged in syslog.
  */

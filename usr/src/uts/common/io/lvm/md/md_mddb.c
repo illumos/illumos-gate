@@ -161,7 +161,7 @@ static int 		update_locatorblock(mddb_set_t *s, md_dev64_t dev,
 static int
 mddb_rwdata(
 	mddb_set_t	*s,	/* incore db set structure */
-	int		flag,	/* B_ASYNC or 0 passed in here */
+	int		flag,	/* B_ASYNC, B_FAILFAST or 0 passed in here */
 	buf_t		*bp
 )
 {
@@ -1543,7 +1543,8 @@ getblks(
 	caddr_t		buffer,	/* buffer to read data into */
 	md_dev64_t	device,	/* device to read from */
 	daddr_t		blk,	/* physical block number to read */
-	int		cnt	/* number of blocks to read */
+	int		cnt,	/* number of blocks to read */
+	int		flag	/* flags for I/O */
 )
 {
 	buf_t		*bp;
@@ -1556,7 +1557,7 @@ getblks(
 	bp->b_un.b_addr = buffer;
 	bp->b_blkno = blk;
 	bp->b_edev = md_dev64_to_dev(device);
-	err = mddb_rwdata(s, B_READ, bp);
+	err = mddb_rwdata(s, (B_READ | flag), bp);
 	freebuffer(s, bfp);
 	if (err) {
 		SE_NOTIFY(EC_SVM_STATE, ESC_SVM_ERRED, SVM_TAG_REPLICA,
@@ -1578,7 +1579,8 @@ readblklst(
 	caddr_t		buffer,	/* buffer to be read (record block) */
 	mddb_block_t	blka[],	/* list of logical blocks to be read */
 	daddr_t		cnt,	/* number of logical blocks */
-	int		li	/* locator index */
+	int		li,	/* locator index */
+	int		flag	/* flags for I/O */
 )
 {
 	daddr_t		blk;
@@ -1608,7 +1610,7 @@ readblklst(
 				continue;
 			}
 		}
-		if (err = getblks(s, buffer, dev, blk, cons))
+		if (err = getblks(s, buffer, dev, blk, cons, flag))
 			return (err);
 		buffer += MDDB_BSIZE * cons;
 		cnt -= cons;
@@ -1649,7 +1651,7 @@ readblks(
 		blkarray = (mddb_block_t *)kmem_alloc(size, KM_SLEEP);
 		for (i = 0; i < cnt; i++)
 			blkarray[i] = blk + i;
-		ret = readblklst(s, buffer, blkarray, cnt, li);
+		ret = readblklst(s, buffer, blkarray, cnt, li, 0);
 		kmem_free(blkarray, size);
 		return (ret);
 	}
@@ -1660,7 +1662,7 @@ readblks(
 	if (device == NODEV64) {
 		return (1);
 	}
-	return (getblks(s, buffer, device, physblk, 1));
+	return (getblks(s, buffer, device, physblk, 1, 0));
 }
 
 static void
@@ -1784,7 +1786,7 @@ getmasters(
 	mbi = (mddb_mb_ic_t *)kmem_zalloc(MDDB_IC_BSIZE, KM_SLEEP);
 	mb = &(mbi->mbi_mddb_mb);
 	if (error = getblks(s, (caddr_t)mb, dev, blkno,
-	    btodb(MDDB_BSIZE))) {
+	    btodb(MDDB_BSIZE), 0)) {
 		error |= MDDB_F_EMASTER;
 	}
 	if (mb->mb_magic != MDDB_MAGIC_MB) {
@@ -1895,7 +1897,8 @@ getrecord(
 	dep->de_rb = (mddb_rb32_t *)kmem_zalloc(dep->de_recsize, KM_SLEEP);
 	rbp = dep->de_rb;
 
-	err = readblklst(s, (caddr_t)rbp, dep->de_blks, dep->de_blkcount, li);
+	err = readblklst(s, (caddr_t)rbp, dep->de_blks,
+	    dep->de_blkcount, li, 0);
 	if (err) {
 		return (MDDB_F_EDATA | err);
 	}
@@ -2401,7 +2404,7 @@ getoptrecord(
 			continue;
 
 		err = readblklst(s, (caddr_t)rbp, dep->de_blks,
-		    dep->de_blkcount, li);
+		    dep->de_blkcount, li, 0);
 
 		if (err)
 			continue;
@@ -2823,7 +2826,7 @@ checkcopy
 				continue;
 			rbp = (mddb_rb32_t *)dep->de_rb;
 			if (readblklst(s, (caddr_t)crbp, dep->de_blks,
-			    dep->de_blkcount, li)) {
+			    dep->de_blkcount, li, 0)) {
 				retval = MDDB_F_EREAD;
 				goto err;
 			}
@@ -3428,7 +3431,7 @@ dt_read(mddb_set_t *s, mddb_lb_t *lbp, mddb_ri_t *rip)
 
 	for (blk = 0; blk < lbp->lb_dtblkcnt; blk++) {
 		physblk = getphysblk((blk + lbp->lb_dtfirstblk), rip->ri_mbip);
-		err = getblks(s, tbuf, dev, physblk, btodb(MDDB_BSIZE));
+		err = getblks(s, tbuf, dev, physblk, btodb(MDDB_BSIZE), 0);
 		/* error reading the tag */
 		if (err) {
 			err = 1;
@@ -4791,7 +4794,7 @@ get_mbs_n_lbs(
 		for (blk = 0; blk < lb_blkcnt; blk++) {
 			physblk = getphysblk(blk, rip->ri_mbip);
 			err = getblks(s, buffer, dev, physblk,
-			    btodb(MDDB_BSIZE));
+			    btodb(MDDB_BSIZE), 0);
 			if (err) {
 				rip->ri_flags |= err;
 				break;
@@ -4917,7 +4920,7 @@ get_mbs_n_lbs(
 			    blk++) {
 				physblk = getphysblk(blk, rip->ri_mbip);
 				err = getblks(s, buffer, dev, physblk,
-				    btodb(MDDB_BSIZE));
+				    btodb(MDDB_BSIZE), 0);
 				if (err) {
 					rip->ri_flags |= err;
 					break;
@@ -5020,7 +5023,7 @@ get_mbs_n_lbs(
 				    did_info->info_blkcnt); blk++) {
 					physblk = getphysblk(blk, rip->ri_mbip);
 					err = getblks(s, buffer, dev, physblk,
-					    btodb(MDDB_BSIZE));
+					    btodb(MDDB_BSIZE), 0);
 					if (err) {
 						rip->ri_flags |= err;
 						break;
@@ -10662,8 +10665,11 @@ check_active_locators()
  *	The contents of the resync record will be overwritten by calling this
  *	routine. This means that callers that require the previous contents to
  *	be preserved must save the data before calling this routine.
+ *	Return values:
+ *	0 - successfully read in resync record from a mddb
+ *	1 - failure.  Unable to read resync record from either mddb.
  */
-static void
+static int
 regetoptrecord(
 	mddb_set_t	*s,
 	mddb_de_ic_t	*dep
@@ -10702,8 +10708,12 @@ regetoptrecord(
 		    (lp->l_flags & MDDB_F_EMASTER))
 			continue;
 
+		/*
+		 * re-read the optimized resync record with failfast set
+		 * since a failed disk could lead to a very long wait.
+		 */
 		err = readblklst(s, (caddr_t)rbp, dep->de_blks,
-		    dep->de_blkcount, li);
+		    dep->de_blkcount, li, B_FAILFAST);
 
 		if (err)
 			continue;
@@ -10733,12 +10743,13 @@ regetoptrecord(
 	if (rbp == crbp) {
 		rbp->rb_private = 0;
 		kmem_free((caddr_t)crbp, recsize);
-		return;
+		return (0);
 	}
 	uniqtime32(&rbp->rb_timestamp);
 	/* Generate the crc for this record */
 	rec_crcgen(s, dep, rbp);
 	kmem_free((caddr_t)crbp, recsize);
+	return (1);
 }
 
 /*
@@ -10754,7 +10765,7 @@ regetoptrecord(
  * Return Value:
  *	0	successful reread
  *	-1	invalid set (not multi-node or non-existant)
- *	>0	metadb state invalid
+ *	>0	metadb state invalid, failed to reread
  */
 int
 mddb_reread_rr(
@@ -10787,8 +10798,7 @@ mddb_reread_rr(
 	}
 
 	if (dep != NULL) {
-		regetoptrecord(s, dep);
-		err = 0;
+		err = regetoptrecord(s, dep);
 	} else {
 		err = -1;
 	}
