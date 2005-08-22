@@ -19,9 +19,12 @@
  *
  * CDDL HEADER END
  */
-/* Copyright (c) 1991-2001 by Sun Microsystems, Inc. */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * audio_clean - Clear any residual data that may be residing in the in the
@@ -96,6 +99,7 @@ first_field(char *string, char *item)
 	*item = 0;
 }
 
+int
 main(int argc, char *argv[])
 {
 	int	err = 0;

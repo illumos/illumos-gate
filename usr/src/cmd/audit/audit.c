@@ -88,6 +88,7 @@ static void	start_auditd();			/* start audit daemon */
  *		>0 - command failed
  */
 
+int
 main(int argc, char *argv[])
 {
 	pid_t pid; /* process id of auditd read from auditdatafile */

@@ -151,6 +151,7 @@ auditd_exit(int status)
 }
 
 /* ARGSUSED */
+int
 main(int argc, char *argv[])
 {
 	auditinfo_addr_t	as_null;	/* audit state to set */

@@ -24,7 +24,7 @@ static char sccsid[] = "%Z%%M%	%I%	%E% SMI";
 #endif
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,7 +149,7 @@ adr_int64(adr, lp, count)
 	for (; count-- > 0; lp++) {
 		for (i = 0, l = *(uint64_t *)lp; i < 8; i++) {
 			*adr->adr_now++ = (char)
-				((uint64_t)(l & 0xff00000000000000) >> 56);
+				((uint64_t)(l & 0xff00000000000000ULL) >> 56);
 			l <<= 8;
 		}
 	}

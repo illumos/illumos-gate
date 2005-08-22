@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,8 +125,8 @@ static void initmem();
 static int  expandmem(int, void **, int);
 static void no_memory(void);
 
-void
-main()
+int
+main(void)
 {
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -140,6 +140,8 @@ main()
 	dofloppy();		/* do floppy */
 
 	docd();			/* do cd */
+
+	return (0);
 }
 
 static void

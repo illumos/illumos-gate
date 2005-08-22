@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,8 +97,7 @@ parse_token(parse_context_t *ctx)
 
 	adrm_char(&(ctx->adr), &tokenid, 1);
 
-	if ((tokenid > 0) && (tokenid <= MAXTOKEN) &&
-	    (tokentable[tokenid].func != NOFUNC)) {
+	if ((tokenid > 0) && (tokentable[tokenid].func != NOFUNC)) {
 		rc = (*tokentable[tokenid].func)(ctx);
 		prev_tokenid = tokenid;
 		return (rc);
