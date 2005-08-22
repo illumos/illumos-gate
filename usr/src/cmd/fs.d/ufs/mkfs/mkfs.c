@@ -395,6 +395,7 @@ static void flush_writes(void);
 static long compute_maxcpg(long, long, long, long, long);
 static int in_64bit_mode(void);
 static int validate_size(int fd, diskaddr_t size);
+static void dump_sblock(void);
 
 union {
 	struct fs fs;
@@ -484,6 +485,8 @@ int	spc_flag = 0;			/* alternate sectors specified or */
 /* global state */
 int	Nflag;		/* do not write to disk */
 int	mflag;		/* return the command line used to create this FS */
+int	rflag;		/* report the superblock in an easily-parsed form */
+int	Rflag;		/* dump the superblock in binary */
 char	*fsys;
 time_t	mkfstime;
 char	*string;
@@ -660,6 +663,13 @@ main(int argc, char *argv[])
 				} else if (match("debug=")) {
 					debug = number(0, "debug", 0);
 				} else if (match("N")) {
+					Nflag++;
+				} else if (match("calcsb")) {
+					rflag++;
+					Nflag++;
+				} else if (match("calcbinsb")) {
+					rflag++;
+					Rflag++;
 					Nflag++;
 				} else if (*string == '\0') {
 					break;
@@ -1806,6 +1816,15 @@ grow30:
 grow40:
 
 	/*
+	 * If all that's needed is a dump of the superblock we
+	 * would use by default, we've got it now.  So, splat it
+	 * out and leave.
+	 */
+	if (rflag) {
+		dump_sblock();
+		lockexit(0);
+	}
+	/*
 	 * Dump out summary information about file system.
 	 */
 	(void) fprintf(stderr, gettext(
@@ -1971,9 +1990,6 @@ grow50:
 	sblock.fs_state = FSOKAY - sblock.fs_time;
 	wtfs((diskaddr_t)(SBOFF / sectorsize), sbsize, (char *)&sblock);
 	isbad = 0;
-
-	if (ismdd && islog && !islogok)
-		(void) ioctl(fso, _FIOLOGRESET, NULL);
 
 	if (fsync(fso) == -1) {
 		saverr = errno;
@@ -2156,8 +2172,9 @@ initcg(int cylno)
 	icg.cg_time = mkfstime;
 	icg.cg_magic = CG_MAGIC;
 	icg.cg_cgx = cylno;
+	/* last one gets whatever's left */
 	if (cylno == sblock.fs_ncg - 1)
-		icg.cg_ncyl = sblock.fs_ncyl % sblock.fs_cpg;
+		icg.cg_ncyl = sblock.fs_ncyl - (sblock.fs_cpg * cylno);
 	else
 		icg.cg_ncyl = sblock.fs_cpg;
 	icg.cg_niblk = sblock.fs_ipg;
@@ -3104,7 +3121,7 @@ usage()
 		" -o :ufs options: :nsect=%d,ntrack=%d,bsize=%d,fragsize=%d\n"
 		" -o :ufs options: :cgsize=%d,free=%d,rps=%d,nbpi=%d,opt=%c\n"
 		" -o :ufs options: :apc=%d,gap=%d,nrpos=%d,maxcontig=%d\n"
-		" -o :ufs options: :mtb=%c\n"
+		" -o :ufs options: :mtb=%c,calcsb,calcbinsb\n"
 "NOTE that all -o suboptions: must be separated only by commas so as to\n"
 "be parsed as a single argument\n"),
 		nsect, ntrack, bsize, fragsize, cpg, sblock.fs_minfree, rps,
@@ -3837,18 +3854,18 @@ checkmount(struct mnttab *mntp, char *bdevname)
 			if (strcmp(mntp->mnt_mountp, directory) != 0) {
 				(void) fprintf(stderr,
 				gettext("%s is mounted on %s, not %s\n"),
-					bdevname, mntp->mnt_mountp, directory);
+				    bdevname, mntp->mnt_mountp, directory);
 				lockexit(32);
 			}
 		} else {
 			if (grow)
 				(void) fprintf(stderr, gettext(
-					"%s is mounted on %s; can't growfs\n"),
-					bdevname, mntp->mnt_mountp);
+				    "%s is mounted on %s; can't growfs\n"),
+				    bdevname, mntp->mnt_mountp);
 			else
 				(void) fprintf(stderr,
-					gettext("%s is mounted, can't mkfs\n"),
-					bdevname);
+				    gettext("%s is mounted, can't mkfs\n"),
+				    bdevname);
 			lockexit(32);
 		}
 	}
@@ -4730,7 +4747,7 @@ extendcg(long cylno)
 
 	dupper = acg.cg_ndblk;
 	if (cylno == sblock.fs_ncg - 1)
-		acg.cg_ncyl = sblock.fs_ncyl % sblock.fs_cpg;
+		acg.cg_ncyl = sblock.fs_ncyl - (sblock.fs_cpg * cylno);
 	else
 		acg.cg_ncyl = sblock.fs_cpg;
 	cbase = cgbase(&sblock, cylno);
@@ -5300,4 +5317,140 @@ validate_size(int fd, diskaddr_t size)
 	else
 		rc = 1;
 	return (rc);
+}
+
+/*
+ * Print every field of the calculated superblock, along with
+ * its value.  To make parsing easier on the caller, the value
+ * is printed first, then the name.  Additionally, there's only
+ * one name/value pair per line.  All values are reported in
+ * hexadecimal (with the traditional 0x prefix), as that's slightly
+ * easier for humans to read.  Not that they're expected to, but
+ * debugging happens.
+ */
+static void
+dump_sblock(void)
+{
+	int row, column, pending, written;
+	caddr_t source;
+
+	if (Rflag) {
+		pending = sizeof (sblock);
+		source = (caddr_t)&sblock;
+		do {
+			written = write(fileno(stdout), source, pending);
+			pending -= written;
+			source += written;
+		} while ((pending > 0) && (written > 0));
+
+		if (written < 0) {
+			perror(gettext("Binary dump of superblock failed"));
+			lockexit(1);
+		}
+		return;
+	} else {
+		printf("0x%x sblock.fs_link\n", sblock.fs_link);
+		printf("0x%x sblock.fs_rolled\n", sblock.fs_rolled);
+		printf("0x%x sblock.fs_sblkno\n", sblock.fs_sblkno);
+		printf("0x%x sblock.fs_cblkno\n", sblock.fs_cblkno);
+		printf("0x%x sblock.fs_iblkno\n", sblock.fs_iblkno);
+		printf("0x%x sblock.fs_dblkno\n", sblock.fs_dblkno);
+		printf("0x%x sblock.fs_cgoffset\n", sblock.fs_cgoffset);
+		printf("0x%x sblock.fs_cgmask\n", sblock.fs_cgmask);
+		printf("0x%x sblock.fs_time\n", sblock.fs_time);
+		printf("0x%x sblock.fs_size\n", sblock.fs_size);
+		printf("0x%x sblock.fs_dsize\n", sblock.fs_dsize);
+		printf("0x%x sblock.fs_ncg\n", sblock.fs_ncg);
+		printf("0x%x sblock.fs_bsize\n", sblock.fs_bsize);
+		printf("0x%x sblock.fs_fsize\n", sblock.fs_fsize);
+		printf("0x%x sblock.fs_frag\n", sblock.fs_frag);
+		printf("0x%x sblock.fs_minfree\n", sblock.fs_minfree);
+		printf("0x%x sblock.fs_rotdelay\n", sblock.fs_rotdelay);
+		printf("0x%x sblock.fs_rps\n", sblock.fs_rps);
+		printf("0x%x sblock.fs_bmask\n", sblock.fs_bmask);
+		printf("0x%x sblock.fs_fmask\n", sblock.fs_fmask);
+		printf("0x%x sblock.fs_bshift\n", sblock.fs_bshift);
+		printf("0x%x sblock.fs_fshift\n", sblock.fs_fshift);
+		printf("0x%x sblock.fs_maxcontig\n", sblock.fs_maxcontig);
+		printf("0x%x sblock.fs_maxbpg\n", sblock.fs_maxbpg);
+		printf("0x%x sblock.fs_fragshift\n", sblock.fs_fragshift);
+		printf("0x%x sblock.fs_fsbtodb\n", sblock.fs_fsbtodb);
+		printf("0x%x sblock.fs_sbsize\n", sblock.fs_sbsize);
+		printf("0x%x sblock.fs_csmask\n", sblock.fs_csmask);
+		printf("0x%x sblock.fs_csshift\n", sblock.fs_csshift);
+		printf("0x%x sblock.fs_nindir\n", sblock.fs_nindir);
+		printf("0x%x sblock.fs_inopb\n", sblock.fs_inopb);
+		printf("0x%x sblock.fs_nspf\n", sblock.fs_nspf);
+		printf("0x%x sblock.fs_optim\n", sblock.fs_optim);
+#ifdef _LITTLE_ENDIAN
+		printf("0x%x sblock.fs_state\n", sblock.fs_state);
+#else
+		printf("0x%x sblock.fs_npsect\n", sblock.fs_npsect);
+#endif
+		printf("0x%x sblock.fs_si\n", sblock.fs_si);
+		printf("0x%x sblock.fs_trackskew\n", sblock.fs_trackskew);
+		printf("0x%x sblock.fs_id[0]\n", sblock.fs_id[0]);
+		printf("0x%x sblock.fs_id[1]\n", sblock.fs_id[1]);
+		printf("0x%x sblock.fs_csaddr\n", sblock.fs_csaddr);
+		printf("0x%x sblock.fs_cssize\n", sblock.fs_cssize);
+		printf("0x%x sblock.fs_cgsize\n", sblock.fs_cgsize);
+		printf("0x%x sblock.fs_ntrak\n", sblock.fs_ntrak);
+		printf("0x%x sblock.fs_nsect\n", sblock.fs_nsect);
+		printf("0x%x sblock.fs_spc\n", sblock.fs_spc);
+		printf("0x%x sblock.fs_ncyl\n", sblock.fs_ncyl);
+		printf("0x%x sblock.fs_cpg\n", sblock.fs_cpg);
+		printf("0x%x sblock.fs_ipg\n", sblock.fs_ipg);
+		printf("0x%x sblock.fs_fpg\n", sblock.fs_fpg);
+		printf("0x%x sblock.fs_cstotal\n", sblock.fs_cstotal);
+		printf("0x%x sblock.fs_fmod\n", sblock.fs_fmod);
+		printf("0x%x sblock.fs_clean\n", sblock.fs_clean);
+		printf("0x%x sblock.fs_ronly\n", sblock.fs_ronly);
+		printf("0x%x sblock.fs_flags\n", sblock.fs_flags);
+		printf("0x%x sblock.fs_fsmnt\n", sblock.fs_fsmnt);
+		printf("0x%x sblock.fs_cgrotor\n", sblock.fs_cgrotor);
+		printf("0x%x sblock.fs_u.fs_csp\n", sblock.fs_u.fs_csp);
+		printf("0x%x sblock.fs_cpc\n", sblock.fs_cpc);
+
+		/*
+		 * No macros are defined for the dimensions of the
+		 * opostbl array.
+		 */
+		for (row = 0; row < 16; row++) {
+			for (column = 0; column < 8; column++) {
+				printf("0x%x sblock.fs_opostbl[%d][%d]\n",
+				    sblock.fs_opostbl[row][column],
+				    row, column);
+			}
+		}
+
+		/*
+		 * Ditto the size of sparecon.
+		 */
+		for (row = 0; row < 51; row++) {
+			printf("0x%x sblock.fs_sparecon[%d]\n",
+			    sblock.fs_sparecon[row], row);
+		}
+
+		printf("0x%x sblock.fs_version\n", sblock.fs_version);
+		printf("0x%x sblock.fs_logbno\n", sblock.fs_logbno);
+		printf("0x%x sblock.fs_reclaim\n", sblock.fs_reclaim);
+		printf("0x%x sblock.fs_sparecon2\n", sblock.fs_sparecon2);
+#ifdef _LITTLE_ENDIAN
+		printf("0x%x sblock.fs_npsect\n", sblock.fs_npsect);
+#else
+		printf("0x%x sblock.fs_state\n", sblock.fs_state);
+#endif
+		printf("0x%llx sblock.fs_qbmask\n", sblock.fs_qbmask);
+		printf("0x%llx sblock.fs_qfmask\n", sblock.fs_qfmask);
+		printf("0x%x sblock.fs_postblformat\n", sblock.fs_postblformat);
+		printf("0x%x sblock.fs_nrpos\n", sblock.fs_nrpos);
+		printf("0x%x sblock.fs_postbloff\n", sblock.fs_postbloff);
+		printf("0x%x sblock.fs_rotbloff\n", sblock.fs_rotbloff);
+		printf("0x%x sblock.fs_magic\n", sblock.fs_magic);
+
+		/*
+		 * fs_space isn't of much use in this context, so we'll
+		 * just ignore it for now.
+		 */
+	}
 }

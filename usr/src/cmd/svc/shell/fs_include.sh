@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
@@ -110,6 +110,7 @@ checkmessage2() {
 #	32	file system is unmounted and needs checking (fsck -m only)
 #	33	file system is already mounted
 #	34	cannot stat device
+#	35	modified root or something equally dangerous
 #	36	uncorrectable errors detected - terminate normally (4.1 code 8)
 #	37	a signal was caught during processing (4.1 exit 12)
 #	39	uncorrectable errors detected - terminate rightaway (4.1 code 8)

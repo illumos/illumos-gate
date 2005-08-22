@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,46 +27,43 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 #include <sys/param.h>
 #include <sys/types.h>
-#include <sys/sysmacros.h>
 #include <sys/mntent.h>
-
-#define	bcopy(f, t, n)    memcpy(t, f, n)
-#define	bzero(s, n)	memset(s, 0, n)
-#define	bcmp(s, d, n)	memcmp(s, d, n)
-
-#define	index(s, r)	strchr(s, r)
-#define	rindex(s, r)	strrchr(s, r)
-
 #include <sys/fs/ufs_fs.h>
 #include <sys/vnode.h>
+#define	_KERNEL
+#include <sys/fs/ufs_fsdir.h>
+#undef _KERNEL
 #include <sys/fs/ufs_inode.h>
-#include <sys/fs/ufs_log.h>
 #include "fsck.h"
 
 /*
- * for each large file ( size > MAXOFF_T) this global counter
- * gets incremented here.
+ * for each large file (size > MAXOFF_T), the global largefile_count
+ * gets incremented during this pass.
  */
 
-extern uint_t largefile_count;
+static uint32_t badblk;		/* number seen for the current inode */
+static uint32_t dupblk;		/* number seen for the current inode */
 
-static uint32_t badblk;
-static uint32_t dupblk;
-int pass1check();
-struct dinode *getnextinode();
+static void clear_attr_acl(fsck_ino_t, fsck_ino_t, char *);
+static void verify_inode(fsck_ino_t, struct inodesc *, fsck_ino_t);
+static void check_dirholes(fsck_ino_t, struct inodesc *);
+static void collapse_dirhole(fsck_ino_t, struct inodesc *);
+static void note_used(daddr32_t);
 
-pass1()
+void
+pass1(void)
 {
-	uint_t c, i, j;
-	struct dinode *dp;
-	struct zlncnt *zlnp;
-	int ndb, cgd;
+	uint_t c, i;
+	daddr32_t cgd;
 	struct inodesc idesc;
-	ino_t inumber, shadow, attrinode;
-	ino_t maxinumber;
-	int32_t	tmpblks;
+	fsck_ino_t inumber;
+	fsck_ino_t maxinumber;
 
 	/*
 	 * Set file system reserved blocks in used block map.
@@ -74,46 +71,35 @@ pass1()
 	for (c = 0; c < sblock.fs_ncg; c++) {
 		cgd = cgdmin(&sblock, c);
 		if (c == 0) {
+			/*
+			 * Doing the first cylinder group, account for
+			 * the cg summaries as well.
+			 */
 			i = cgbase(&sblock, c);
 			cgd += howmany(sblock.fs_cssize, sblock.fs_fsize);
-		} else
+		} else {
 			i = cgsblock(&sblock, c);
-		for (; i < cgd; i++)
-			setbmap(i);
-	}
-	/*
-	 * Record log blocks
-	 */
-	if (islog && islogok && sblock.fs_logbno) {
-		struct bufarea *bp;
-		extent_block_t *ebp;
-		extent_t *ep;
-		daddr32_t nfno, fno;
-		int	i;
-		int	j;
-
-		bp = getdatablk(logbtofrag(&sblock,
-		    sblock.fs_logbno), sblock.fs_bsize);
-		ebp = (void *)bp->b_un.b_buf;
-		ep = &ebp->extents[0];
-		for (i = 0; i < ebp->nextents; ++i, ++ep) {
-			fno = logbtofrag(&sblock, ep->pbno);
-			nfno = dbtofsb(&sblock, ep->nbno);
-			for (j = 0; j < nfno; ++j, ++fno)
-				setbmap(fno);
 		}
-		brelse(bp);
-
-		fno = logbtofrag(&sblock, sblock.fs_logbno);
-		for (j = 0; j < sblock.fs_frag; ++j, ++fno)
-			setbmap(fno);
+		for (; i < cgd; i++) {
+			note_used(i);
+		}
 	}
 	/*
-	 * Find all allocated blocks.
+	 * Note blocks being used by the log, so we don't declare
+	 * them as available and some time in the future we get a
+	 * freeing free block panic.
 	 */
-	bzero((char *)&idesc, sizeof (struct inodesc));
-	idesc.id_type = ADDR;
-	idesc.id_func = pass1check;
+	if (islog && islogok && sblock.fs_logbno)
+		examinelog(sblock.fs_logbno, &note_used);
+
+	/*
+	 * Find all allocated blocks.  This must be completed before
+	 * we read the contents of any directories, as dirscan() et al
+	 * don't want to know about block allocation holes.  So, part
+	 * of this pass is to truncate any directories with holes to
+	 * just before those holes, so dirscan() can remain blissfully
+	 * ignorant.
+	 */
 	inumber = 0;
 	n_files = n_blks = 0;
 	resetinodebuf();
@@ -122,471 +108,631 @@ pass1()
 		for (i = 0; i < sblock.fs_ipg; i++, inumber++) {
 			if (inumber < UFSROOTINO)
 				continue;
-			dp = getnextinode(inumber);
-			if ((dp->di_mode & IFMT) == 0) {
-				/* mode and type of file is not set */
-				if (bcmp((char *)dp->di_db, (char *)zino.di_db,
-					NDADDR * sizeof (daddr32_t)) ||
-				    bcmp((char *)dp->di_ib, (char *)zino.di_ib,
-					NIADDR * sizeof (daddr32_t)) ||
-				    dp->di_mode || dp->di_size) {
-					pfatal("PARTIALLY ALLOCATED INODE I=%u",
-						inumber);
-					if (reply("CLEAR") == 1) {
-						dp = ginode(inumber);
-						clearinode(dp);
-						inodirty();
-					}
-				}
-				statemap[inumber] = USTATE;
-				continue;
-			}
-			lastino = inumber;
-			if (dp->di_size > (u_offset_t)UFS_MAXOFFSET_T) {
-				if (debug)
-					printf("bad size %llu:",
-							dp->di_size);
-				goto unknown;
-			}
-			if (!preen && (dp->di_mode & IFMT) == IFMT &&
-			    reply("BAD MODE: MAKE IT A FILE") == 1) {
-				dp = ginode(inumber);
-				dp->di_size = (u_offset_t)sblock.fs_fsize;
-				dp->di_mode = IFREG|0600;
-				inodirty();
-			}
-			/* number of blocks is a 32 bit value */
-			ndb = howmany(dp->di_size,
-						(u_offset_t)sblock.fs_bsize);
-			if (ndb < 0) {
-				if (debug)
-					printf("bad size %llu ndb %d:",
-					dp->di_size, ndb);
-				goto unknown;
-			}
-			if (dp->di_blocks < 0) {
-				if (debug) {
-					printf("bad number of sectors %d: ",
-					    dp->di_blocks);
-				}
-				dp = ginode(inumber);
-				tmpblks = (int32_t)
-				    ((dp->di_size + (512 - 1)) >> 9);
-				dp->di_blocks = (int32_t)(ndb*16);
-				inodirty();
-				if (debug) {
-					printf("new number of sectors "
-					    "%d (0x%x,0x%x)\n", dp->di_blocks,
-					    dp->di_blocks, tmpblks);
-				}
-
-			}
-			if ((dp->di_mode & IFMT) == IFBLK ||
-			    (dp->di_mode & IFMT) == IFCHR) {
-			    for (j = 0; j < NDADDR; j++) {
-				if (dp->di_db[j] != 0 &&
-				    &dp->di_db[j] != &dp->di_ordev) {
-					if (debug) {
-printf("special file contains value %d at indirect addr[%d] - should be 0\n",
-						dp->di_db[j], j);
-					}
-					goto unknown;
-				}
-			    }
-			} else {
-			    for (j = ndb; j < NDADDR; j++)
-				if (dp->di_db[j] != 0) {
-					if (debug) {
-			    printf("bad direct addr[%lld]: 0x%x mode:%o\n",
-						j, dp->di_db[j], dp->di_mode);
-					}
-					goto unknown;
-				}
-			}
-			for (j = 0, ndb -= NDADDR; ndb > 0; j++)
-				ndb /= NINDIR(&sblock);
-			for (; j < NIADDR; j++)
-				if (dp->di_ib[j] != 0) {
-					if (debug) {
-					printf("bad indirect addr: %d\n",
-							dp->di_ib[j]);
-					}
-					goto unknown;
-				}
-			if (ftypeok(dp) == 0) {
-				printf("mode: %o\n", dp->di_mode);
-				goto unknown;
-			}
-			n_files++;
-			lncntp[inumber] = dp->di_nlink;
-			/*
-			 * if errorlocked then open deleted files will
-			 * manifest as di_nlink <= 0 and di_mode != 0
-			 * so skip them; they're ok.
-			 */
-			if (dp->di_nlink <= 0 &&
-					!(errorlocked && dp->di_mode == 0)) {
-				zlnp = (struct zlncnt *)malloc(sizeof (*zlnp));
-				if (zlnp == NULL) {
-					pfatal("LINK COUNT TABLE OVERFLOW");
-					if (reply("CONTINUE") == 0)
-						errexit("");
-				} else {
-					zlnp->zlncnt = inumber;
-					zlnp->next = zlnhead;
-					zlnhead = zlnp;
-				}
-			}
-
-			/*
-			 * Check for holes in a directory inode.
-			 *
-			 * Handle holes in direct blocks here.
-			 * Holes in indirect blocks for large directories
-			 * (>NDADDR blocks) will be checked in ckinode().
-			 */
-
-			idesc.id_llbna = 0;
-			idesc.id_hasholes = 0;
-			if ((((dp->di_mode & IFMT) == IFDIR) ||
-			    ((dp->di_mode & IFMT) == IFATTRDIR)) &&
-			    dp->di_size > 0) {
-
-				ndb = howmany(dp->di_size,
-						(u_offset_t)sblock.fs_bsize);
-				ndb = ndb < NDADDR ? ndb : NDADDR;
-
-				for (j = 0; j < ndb; j++) {
-					if (dp->di_db[j] == 0) {
-						pwarn("DIRECTORY I=%d "
-						    "HAS HOLES",
-						    inumber);
-						if (preen)
-							printf("(CORRECTED)\n");
-						else if (reply("CORRECT") == 0)
-							break;
-						idesc.id_hasholes = 1;
-						break;
-					} else {
-						idesc.id_llbna++;
-					}
-				}
-
-				if (idesc.id_hasholes) {
-					dp = ginode(inumber);
-
-					/*
-					 * Move the existing entries in the
-					 * direct block list, down.
-					 *
-					 * Do this only if the hole is
-					 * not in the first block, or else
-					 * the "." & the ".." entries will be
-					 * missing and cannot be fixed.
-					 * Such directories will get cleared.
-					 */
-					for (; j > 0 && j < ndb; j++) {
-						if (!dp->di_db[j])
-							continue;
-						dp->di_db[idesc.id_llbna++] =
-							dp->di_db[j];
-					}
-					/*
-					 * Clear out rest of the direct block
-					 * entries as they could be non zero
-					 * as a result of the above operation.
-					 */
-					for (j = idesc.id_llbna; j < NDADDR;
-					    j++)
-						dp->di_db[j] = 0;
-					/*
-					 * Clear out indirect blocks, if any.
-					 * We don't move indirect blocks down
-					 * into the direct blocks, as it gets
-					 * complicated.
-					 *
-					 * These blocks have not been accounted
-					 * for yet. All the resulting orphaned
-					 * directory entries will be taken
-					 * care of in this run of pass1() and
-					 * hence we do not need another run of
-					 * fsck(no need for setting dirholes)
-					 */
-					for (j = 0; j < NIADDR; j++)
-						dp->di_ib[j] = 0;
-
-					/*
-					 * update the inode size & blocks count
-					 */
-					dp->di_size = (idesc.id_llbna) *
-						sblock.fs_bsize;
-					dp->di_blocks = dp->di_size / DEV_BSIZE;
-					inodirty();
-				}
-			}
-			if (((dp->di_mode & IFMT) == IFDIR) ||
-			    ((dp->di_mode & IFMT) == IFATTRDIR)) {
-				if (dp->di_size == 0)
-					statemap[inumber] = DCLEAR;
-				else
-					statemap[inumber] = DSTATE;
-				cacheino(dp, inumber);
-			} else if ((dp->di_mode & IFMT) == IFSHAD) {
-				if (dp->di_size == 0)
-					statemap[inumber] = SCLEAR;
-				else
-					statemap[inumber] = SSTATE;
-				cacheacl(dp, inumber);
-			} else
-				statemap[inumber] = FSTATE;
-			badblk = dupblk = 0;
-			idesc.id_number = inumber;
-			idesc.id_fix = DONTKNOW;
-			if (dp->di_size > (u_offset_t)MAXOFF_T) {
-				largefile_count++;
-				if (debug)
-					printf("largefile: size=%lld,"
-					    "count=%d\n", dp->di_size,
-					    largefile_count);
-			}
-			(void) ckinode(dp, &idesc);
-
-			/*
-			 * Check if we have holes in the directory's indirect
-			 * blocks. Update the size. This requires another
-			 * pass1 run (fsck once again).
-			 */
-			ndb = howmany(dp->di_size,
-						(u_offset_t)sblock.fs_bsize);
-			if ((((dp->di_mode & IFMT) == IFDIR) ||
-			    ((dp->di_mode & IFMT) == IFATTRDIR)) &&
-			    idesc.id_hasholes && idesc.id_llbna >= NDADDR &&
-			    idesc.id_llbna < ndb) {
-
-				pwarn("DIRECTORY I=%d HAS HOLES", inumber);
-
-				if (preen || reply("CORRECT") == 1) {
-					/*
-					 * update the size
-					 */
-					dp = ginode(inumber);
-					dp->di_size = (idesc.id_llbna) *
-						sblock.fs_bsize;
-					/*
-					 * Clear out indirect blocks in the
-					 * inode beyond the new size.
-					 *
-					 * All the disk block pointers in the
-					 * the indirect blocks past the hole
-					 * will get cleared out by the pass1()
-					 * run as part of the re-check.
-					 */
-					ndb = howmany(dp->di_size,
-						(u_offset_t)sblock.fs_bsize);
-					for (j = 0, ndb -= NDADDR; ndb > 0; j++)
-						ndb /= NINDIR(&sblock);
-					for (; j < NIADDR; j++)
-						dp->di_ib[j] = 0;
-
-					inodirty();
-					/*
-					 * flag that we need to re-check this
-					 * filesystem to recover the blocks we
-					 * just orphaned.
-					 */
-					dirholes = 1;
-				}
-				if (preen)
-					printf(" (CORRECTED)\n");
-			}
-
-			idesc.id_entryno *= btodb(sblock.fs_fsize);
-			if (dp->di_blocks != idesc.id_entryno) {
-			pwarn("INCORRECT BLOCK COUNT I=%u (%d should be %d)",
-			    inumber, (uint32_t)dp->di_blocks,
-			    idesc.id_entryno);
-				if (preen)
-					printf(" (CORRECTED)\n");
-				else if (reply("CORRECT") == 0)
-					continue;
-				dp = ginode(inumber);
-				dp->di_blocks = idesc.id_entryno;
-				inodirty();
-			}
-			if (((dp->di_mode & IFMT) == IFDIR) ||
-			    ((dp->di_mode & IFMT) == IFATTRDIR))
-				if (dp->di_blocks == 0)
-					statemap[inumber] = DCLEAR;
-			/*
-			 * Check that the ACL is on a valid file type
-			 */
-			shadow = dp->di_shadow;
-			if (shadow != 0) {
-				if (acltypeok(dp) == 0) {
-					pwarn("NON-ZERO ACL REFERENCE,  I=%ld",
-					    inumber);
-					if (preen)
-						printf(" (CORRECTED)\n");
-					else if (reply("CORRECT") == 0)
-						continue;
-					dp = ginode(inumber);
-					dp->di_shadow = 0;
-					inodirty();
-				} else if ((shadow <= UFSROOTINO) ||
-					(shadow > maxinumber)) {
-				/*
-				 * The shadow inode # must be realistic -
-				 * either 0 or a real inode number.
-				 */
-					pwarn("BAD ACL REFERENCE I=%ld",
-					    inumber);
-					if (preen)
-						printf(" (CORRECTED)\n");
-					else if (reply("CORRECT") == 0)
-						continue;
-					dp = ginode(inumber);
-					dp->di_shadow = 0;
-					dp->di_mode &= IFMT;
-					dp->di_smode = dp->di_mode;
-					inodirty();
-				} else {
-					/*
-					 * "register" this inode/shadow pair
-					 */
-					registershadowclient(shadow,
-						inumber, &shadowclientinfo);
-				}
-			}
-
-			attrinode = dp->di_oeftflag;
-			if (attrinode != 0) {
-				if ((attrinode <= UFSROOTINO) ||
-					(attrinode > maxinumber)) {
-				/*
-				 * The attrdir inode # must be realistic -
-				 * either 0 or a real inode number.
-				 */
-					pwarn("BAD ATTRIBUTE REFERENCE I=%ld"
-						" parent file/dir I=%ld",
-					    attrinode, inumber);
-					if (preen)
-						printf(" (CORRECTED)\n");
-					else if (reply("CORRECT") == 0)
-						continue;
-					dp = ginode(inumber);
-					dp->di_oeftflag = 0;
-					dp->di_mode &= IFMT;
-					dp->di_smode = dp->di_mode;
-					inodirty();
-				} else {
-					/*
-					 * "register" this inode/shadow pair
-					 */
-					dp = ginode(attrinode);
-					if ((dp->di_mode & IFMT) != IFATTRDIR) {
-						pwarn("BAD ATTRIBUTE DIR I=%ld"
-						    " parent file/dir I=%ld",
-						    attrinode, inumber);
-						if (preen)
-							printf(
-							    " (CORRECTED)\n");
-						else if (reply("CORRECT") ==
-								0)
-							continue;
-						dp = ginode(inumber);
-						dp->di_oeftflag = 0;
-						inodirty();
-					} else {
-						registershadowclient(attrinode,
-							inumber,
-							&attrclientinfo);
-					}
-				}
-			}
-			continue;
-	unknown:
-			pfatal("UNKNOWN FILE TYPE I=%u", inumber);
-			if (((dp->di_mode & IFMT) == IFDIR) ||
-			    ((dp->di_mode & IFMT) == IFATTRDIR)) {
-				statemap[inumber] = DCLEAR;
-				cacheino(dp, inumber);
-			} else
-				statemap[inumber] = FCLEAR;
-			if (reply("CLEAR") == 1) {
-				statemap[inumber] = USTATE;
-				dp = ginode(inumber);
-				clearinode(dp);
-				inodirty();
-			}
+			init_inodesc(&idesc);
+			idesc.id_type = ADDR;
+			idesc.id_func = pass1check;
+			verify_inode(inumber, &idesc, maxinumber);
 		}
 	}
 	freeinodebuf();
 }
 
-pass1check(idesc)
-	struct inodesc *idesc;
+/*
+ * Perform checks on an inode and setup/track the state of the inode
+ * in maps (statemap[], lncntp[]) for future reference and validation.
+ * Initiate the calls to ckinode and in turn pass1check() to handle
+ * further validation.
+ */
+static void
+verify_inode(fsck_ino_t inumber, struct inodesc *idesc, fsck_ino_t maxinumber)
+{
+	int j, clear, flags;
+	int isdir;
+	char *err;
+	fsck_ino_t shadow, attrinode;
+	daddr32_t ndb;
+	struct dinode *dp;
+	struct inoinfo *iip;
+
+	dp = getnextinode(inumber);
+	if ((dp->di_mode & IFMT) == 0) {
+		/* mode and type of file is not set */
+		if ((memcmp((void *)dp->di_db, (void *)zino.di_db,
+			    NDADDR * sizeof (daddr32_t)) != 0) ||
+		    (memcmp((void *)dp->di_ib, (void *)zino.di_ib,
+			    NIADDR * sizeof (daddr32_t)) != 0) ||
+		    (dp->di_mode != 0) || (dp->di_size != 0)) {
+			pfatal("PARTIALLY ALLOCATED INODE I=%u", inumber);
+			if (reply("CLEAR") == 1) {
+				dp = ginode(inumber);
+				clearinode(dp);
+				inodirty();
+			} else {
+				iscorrupt = 1;
+			}
+		}
+		statemap[inumber] = USTATE;
+		return;
+	}
+
+	isdir = ((dp->di_mode & IFMT) == IFDIR) ||
+		((dp->di_mode & IFMT) == IFATTRDIR);
+
+	lastino = inumber;
+	if (dp->di_size > (u_offset_t)UFS_MAXOFFSET_T) {
+		pfatal("NEGATIVE SIZE %lld I=%d",
+		    (longlong_t)dp->di_size, inumber);
+		goto bogus;
+	}
+
+	/*
+	 * A more precise test of the type is done later on.  Just get
+	 * rid of the blatantly-wrong ones before we do any
+	 * significant work.
+	 */
+	if ((dp->di_mode & IFMT) == IFMT) {
+		pfatal("BAD MODE 0%o I=%d",
+		    dp->di_mode & IFMT, inumber);
+		if (reply("BAD MODE: MAKE IT A FILE") == 1) {
+			statemap[inumber] = FSTATE;
+			dp = ginode(inumber);
+			dp->di_mode = IFREG | 0600;
+			inodirty();
+			truncino(inumber, sblock.fs_fsize, TI_NOPARENT);
+			dp = getnextrefresh();
+		} else {
+			iscorrupt = 1;
+		}
+	}
+
+	ndb = howmany(dp->di_size, (u_offset_t)sblock.fs_bsize);
+	if (ndb < 0) {
+		/* extra space to distinguish from previous pfatal() */
+		pfatal("NEGATIVE SIZE %lld  I=%d",
+		    (longlong_t)dp->di_size, inumber);
+		goto bogus;
+	}
+
+	if ((dp->di_mode & IFMT) == IFBLK ||
+	    (dp->di_mode & IFMT) == IFCHR) {
+		if (dp->di_size != 0) {
+			pfatal("SPECIAL FILE WITH NON-ZERO LENGTH %lld I=%d",
+			    (longlong_t)dp->di_size, inumber);
+			goto bogus;
+		}
+
+		for (j = 0; j < NDADDR; j++) {
+			/*
+			 * It's a device, so all the block pointers
+			 * should be zero except for di_ordev.
+			 * di_ordev is overlayed on the block array,
+			 * but where varies between big and little
+			 * endian, so make sure that the only non-zero
+			 * element is the correct one.  There can be
+			 * a device whose ordev is zero, so we can't
+			 * check for the reverse.
+			 */
+			if (dp->di_db[j] != 0 &&
+			    &dp->di_db[j] != &dp->di_ordev) {
+				if (debug) {
+					(void) printf(
+					    "spec file di_db[%d] has %d\n",
+					    j, dp->di_db[j]);
+				}
+				pfatal(
+			    "SPECIAL FILE WITH NON-ZERO FRAGMENT LIST  I=%d",
+				    inumber);
+				goto bogus;
+			}
+		}
+
+		for (j = 0; j < NIADDR; j++) {
+			if (dp->di_ib[j] != 0) {
+				if (debug)
+					(void) printf(
+					    "special has %d at ib[%d]\n",
+					    dp->di_ib[j], j);
+				pfatal(
+			    "SPECIAL FILE WITH NON-ZERO FRAGMENT LIST  I=%d",
+				    inumber);
+				goto bogus;
+			}
+		}
+	} else {
+		/*
+		 * This assignment is mostly here to appease lint, but
+		 * doesn't hurt.
+		 */
+		err = "Internal error: unexpected variant of having "
+		    "blocks past end of file  I=%d";
+
+		clear = 0;
+
+		/*
+		 * If it's not a device, it has to follow the
+		 * rules for files.  In particular, no blocks after
+		 * the last one that di_size says is in use.
+		 */
+		for (j = ndb; j < NDADDR; j++) {
+			if (dp->di_db[j] != 0) {
+				if (debug) {
+					(void) printf("bad file direct "
+					    "addr[%d]: block 0x%x "
+					    "format: 0%o\n",
+					    j, dp->di_db[j],
+					    dp->di_mode & IFMT);
+				}
+				err = "FILE WITH FRAGMENTS PAST END  I=%d";
+				clear = 1;
+				break;
+			}
+		}
+
+		/*
+		 * Find last indirect pointer that should be in use,
+		 * and make sure any after it are clear.
+		 */
+		if (!clear) {
+			for (j = 0, ndb -= NDADDR; ndb > 0; j++) {
+				ndb /= NINDIR(&sblock);
+			}
+			for (; j < NIADDR; j++) {
+				if (dp->di_ib[j] != 0) {
+					if (debug) {
+						(void) printf("bad file "
+						    "indirect addr: block %d\n",
+						    dp->di_ib[j]);
+					}
+					err =
+					    "FILE WITH FRAGMENTS PAST END I=%d";
+					clear = 2;
+					break;
+				}
+			}
+		}
+
+		if (clear) {
+			/*
+			 * The discarded blocks will be garbage-
+			 * collected in pass5.  If we're told not to
+			 * discard them, it's just lost blocks, which
+			 * isn't worth setting iscorrupt for.
+			 */
+			pwarn(err, inumber);
+			if (preen || reply("DISCARD EXCESS FRAGMENTS") == 1) {
+				dp = ginode(inumber);
+				if (clear == 1) {
+					for (; j < NDADDR; j++)
+						dp->di_db[j] = 0;
+					j = 0;
+				}
+				for (; j < NIADDR; j++)
+					dp->di_ib[j] = 0;
+				inodirty();
+				dp = getnextrefresh();
+				if (preen)
+					(void) printf(" (TRUNCATED)");
+			}
+		}
+	}
+
+	if (ftypeok(dp) == 0) {
+		pfatal("UNKNOWN FILE TYPE 0%o  I=%d", dp->di_mode, inumber);
+		goto bogus;
+	}
+	n_files++;
+	TRACK_LNCNTP(inumber, lncntp[inumber] = dp->di_nlink);
+
+	/*
+	 * We can't do anything about it right now, so note that its
+	 * processing is being delayed.  Otherwise, we'd be changing
+	 * the block allocations out from under ourselves, which causes
+	 * no end of confusion.
+	 */
+	flags = statemap[inumber] & INDELAYD;
+
+	/*
+	 * if errorlocked or logging, then open deleted files will
+	 * manifest as di_nlink <= 0 and di_mode != 0
+	 * so skip them; they're ok.
+	 */
+	if (dp->di_nlink <= 0 &&
+	    !((errorlocked || islog) && dp->di_mode == 0)) {
+		flags |= INZLINK;
+		if (debug)
+			(void) printf(
+		    "marking i=%d INZLINK; nlink %d, mode 0%o, islog %d\n",
+			    inumber, dp->di_nlink, dp->di_mode, islog);
+	}
+
+	switch (dp->di_mode & IFMT) {
+	case IFDIR:
+	case IFATTRDIR:
+		if (dp->di_size == 0) {
+			/*
+			 * INCLEAR means it will be ignored by passes 2 & 3.
+			 */
+			if ((dp->di_mode & IFMT) == IFDIR)
+				(void) printf("ZERO-LENGTH DIR  I=%d\n",
+				    inumber);
+			else
+				(void) printf("ZERO-LENGTH ATTRDIR  I=%d\n",
+				    inumber);
+			add_orphan_dir(inumber);
+			flags |= INCLEAR;
+		}
+		statemap[inumber] = DSTATE | flags;
+		cacheino(dp, inumber);
+		countdirs++;
+		break;
+
+	case IFSHAD:
+		if (dp->di_size == 0) {
+			(void) printf("ZERO-LENGTH SHADOW  I=%d\n", inumber);
+			flags |= INCLEAR;
+		}
+		statemap[inumber] = SSTATE | flags;
+		cacheacl(dp, inumber);
+		break;
+
+	default:
+		statemap[inumber] = FSTATE | flags;
+	}
+
+	badblk = 0;
+	dupblk = 0;
+	idesc->id_number = inumber;
+	idesc->id_fix = DONTKNOW;
+	if (dp->di_size > (u_offset_t)MAXOFF_T) {
+		largefile_count++;
+	}
+
+	(void) ckinode(dp, idesc, CKI_TRAVERSE);
+	if (isdir && (idesc->id_firsthole >= 0))
+		check_dirholes(inumber, idesc);
+
+	if (dp->di_blocks != idesc->id_entryno) {
+		/*
+		 * The kernel releases any blocks it finds in the lists,
+		 * ignoring the block count itself.  So, a bad count is
+		 * not grounds for setting iscorrupt.
+		 */
+		pwarn("INCORRECT DISK BLOCK COUNT I=%u (%d should be %d)",
+		    inumber, (uint32_t)dp->di_blocks, idesc->id_entryno);
+		if (!preen && (reply("CORRECT") == 0))
+			return;
+		dp = ginode(inumber);
+		dp->di_blocks = idesc->id_entryno;
+		iip = getinoinfo(inumber);
+		if (iip != NULL)
+			iip->i_isize = dp->di_size;
+		inodirty();
+		if (preen)
+			(void) printf(" (CORRECTED)\n");
+	}
+	if (isdir && (dp->di_blocks == 0)) {
+		/*
+		 * INCLEAR will cause passes 2 and 3 to skip it.
+		 */
+		(void) printf("DIR WITH ZERO BLOCKS  I=%d\n", inumber);
+		statemap[inumber] = DCLEAR;
+		add_orphan_dir(inumber);
+	}
+
+	/*
+	 * Check that the ACL is on a valid file type
+	 */
+	shadow = dp->di_shadow;
+	if (shadow != 0) {
+		if (acltypeok(dp) == 0) {
+			clear_attr_acl(inumber, -1,
+			    "NON-ZERO ACL REFERENCE, I=%d\n");
+		} else if ((shadow <= UFSROOTINO) ||
+		    (shadow > maxinumber)) {
+			clear_attr_acl(inumber, -1,
+			    "BAD ACL REFERENCE I=%d\n");
+		} else {
+			registershadowclient(shadow,
+			    inumber, &shadowclientinfo);
+		}
+	}
+
+	attrinode = dp->di_oeftflag;
+	if (attrinode != 0) {
+		if ((attrinode <= UFSROOTINO) ||
+		    (attrinode > maxinumber)) {
+			clear_attr_acl(attrinode, inumber,
+			    "BAD ATTRIBUTE REFERENCE TO I=%d FROM I=%d\n");
+		} else {
+			dp = ginode(attrinode);
+			if ((dp->di_mode & IFMT) != IFATTRDIR) {
+				clear_attr_acl(attrinode, inumber,
+			    "BAD ATTRIBUTE DIR REF TO I=%d FROM I=%d\n");
+			} else if (dp->di_size == 0) {
+				clear_attr_acl(attrinode, inumber,
+		    "REFERENCE TO ZERO-LENGTH ATTRIBUTE DIR I=%d from I=%d\n");
+			} else {
+				registershadowclient(attrinode, inumber,
+				    &attrclientinfo);
+			}
+		}
+	}
+	return;
+
+	/*
+	 * If we got here, we've not had the chance to see if a
+	 * directory has holes, but we know the directory's bad,
+	 * so it's safe to always return false (no holes found).
+	 *
+	 * Also, a pfatal() is always done before jumping here, so
+	 * we know we're not in preen mode.
+	 */
+bogus:
+	if (isdir) {
+		/*
+		 * INCLEAR makes passes 2 & 3 skip it.
+		 */
+		statemap[inumber] = DCLEAR;
+		add_orphan_dir(inumber);
+		cacheino(dp, inumber);
+	} else {
+		statemap[inumber] = FCLEAR;
+	}
+	if (reply("CLEAR") == 1) {
+		(void) tdelete((void *)inumber, &limbo_dirs, ino_t_cmp);
+		freeino(inumber, TI_PARENT);
+		inodirty();
+	} else {
+		iscorrupt = 1;
+	}
+}
+
+/*
+ * Do fixup for bad acl/attr references.  If PARENT is -1, then
+ * we assume we're working on a shadow, otherwise an extended attribute.
+ * FMT must be a printf format string, with one %d directive for
+ * the inode number.
+ */
+static void
+clear_attr_acl(fsck_ino_t inumber, fsck_ino_t parent, char *fmt)
+{
+	fsck_ino_t victim = inumber;
+	struct dinode *dp;
+
+	if (parent != -1)
+		victim = parent;
+
+	if (fmt != NULL) {
+		if (parent == -1)
+			pwarn(fmt, (int)inumber);
+		else
+			pwarn(fmt, (int)inumber, (int)parent);
+	}
+
+	if (debug)
+		(void) printf("parent file/dir I=%d\nvictim I=%d",
+		    (int)parent, (int)victim);
+
+	if (!preen && (reply("REMOVE REFERENCE") == 0)) {
+		iscorrupt = 1;
+		return;
+	}
+
+	dp = ginode(victim);
+	if (parent == -1) {
+		/*
+		 * The file had a bad shadow/acl, so lock it down
+		 * until someone can protect it the way they need it
+		 * to be (i.e., be conservatively paranoid).
+		 */
+		dp->di_shadow = 0;
+		dp->di_mode &= IFMT;
+	} else {
+		dp->di_oeftflag = 0;
+	}
+
+	inodirty();
+	if (preen)
+		(void) printf(" (CORRECTED)\n");
+}
+
+/*
+ * Check if we have holes in the directory's indirect
+ * blocks.  If there are, get rid of everything after
+ * the first hole.
+ */
+static void
+check_dirholes(fsck_ino_t inumber, struct inodesc *idesc)
+{
+	char pathbuf[MAXPATHLEN + 1];
+
+	getpathname(pathbuf, idesc->id_number, idesc->id_number);
+	pfatal("I=%d  DIRECTORY %s: CONTAINS EMPTY BLOCKS",
+	    idesc->id_number, pathbuf);
+	if (reply("TRUNCATE AT FIRST EMPTY BLOCK") == 1) {
+		/*
+		 * We found a hole, so get rid of it.
+		 */
+		collapse_dirhole(inumber, idesc);
+
+		if (preen)
+			(void) printf(" (TRUNCATED)\n");
+	} else {
+		iscorrupt = 1;
+	}
+}
+
+/*
+ * Truncate a directory to its first hole.  If there are non-holes
+ * in the direct blocks after the problem block, move them down so
+ * that there's somewhat less lossage.  Doing this for indirect blocks
+ * is left as an exercise for the reader.
+ */
+static void
+collapse_dirhole(fsck_ino_t inumber, struct inodesc *idesc)
+{
+	offset_t new_size;
+	int blocks;
+
+	if (idesc->id_firsthole < 0) {
+		return;
+	}
+
+	/*
+	 * Since truncino() adjusts the size, we don't need to do that here,
+	 * but we have to tell it what final size we want.
+	 *
+	 * We need to count from block zero up through the last block
+	 * before the hole.  If the hole is in the indirect blocks, chop at
+	 * the start of the nearest level of indirection.  Orphans will
+	 * get reconnected, so we're not actually losing anything by doing
+	 * it this way, and we're simplifying truncation significantly.
+	 */
+	new_size = idesc->id_firsthole * (offset_t)sblock.fs_bsize;
+	blocks = howmany(new_size, sblock.fs_bsize);
+	if (blocks > NDADDR) {
+		if (blocks < (NDADDR + NINDIR(&sblock)))
+			blocks = NDADDR;
+		else if (blocks < (NDADDR + NINDIR(&sblock) +
+		    (NINDIR(&sblock) * NINDIR(&sblock))))
+			blocks = NDADDR + NINDIR(&sblock);
+		else
+			blocks = NDADDR + NINDIR(&sblock) +
+				(NINDIR(&sblock) * NINDIR(&sblock));
+		new_size = blocks * sblock.fs_bsize;
+		if (debug)
+			(void) printf("to %lld (blocks %d)\n",
+			    (longlong_t)new_size, blocks);
+	}
+	truncino(inumber, new_size, TI_NOPARENT);
+
+	/*
+	 * Technically, there are still the original number of fragments
+	 * associated with the object.  However, that number is not used
+	 * to control anything, so we can do the in-memory truncation of
+	 * it without bad things happening.
+	 */
+	idesc->id_entryno = btodb(new_size);
+}
+
+int
+pass1check(struct inodesc *idesc)
 {
 	int res = KEEPON;
 	int anyout;
-	int	nfrags;
-	daddr32_t blkno = idesc->id_blkno;
-	struct dups *dlp;
-	struct dups *new;
+	int nfrags;
+	daddr32_t lbn;
+	daddr32_t fragno = idesc->id_blkno;
+	struct dinode *dp;
 
-	if ((anyout = chkrange(blkno, idesc->id_numfrags)) != 0) {
-		blkerror(idesc->id_number, "BAD", blkno);
+	if ((anyout = chkrange(fragno, idesc->id_numfrags)) != 0) {
+		/*
+		 * Note that blkerror() exits when preening.
+		 */
+		blkerror(idesc->id_number, "OUT OF RANGE",
+		    fragno, idesc->id_lbn * sblock.fs_frag);
+
+		dp = ginode(idesc->id_number);
+		if ((((dp->di_mode & IFMT) == IFDIR) ||
+		    ((dp->di_mode & IFMT) == IFATTRDIR)) &&
+		    (idesc->id_firsthole < 0)) {
+			idesc->id_firsthole = idesc->id_lbn;
+		}
+
 		if (++badblk >= MAXBAD) {
-			pwarn("EXCESSIVE BAD BLKS I=%u",
-				idesc->id_number);
-			if (preen)
-				printf(" (SKIPPING)\n");
-			else if (reply("CONTINUE") == 0)
-				errexit("");
-			return (STOP);
+			pwarn("EXCESSIVE BAD FRAGMENTS I=%u",
+			    idesc->id_number);
+			if (reply("CONTINUE") == 0)
+				errexit("Program terminated.");
+			/*
+			 * See discussion below as to why we don't
+			 * want to short-circuit the processing of
+			 * this inode.  However, we know that this
+			 * particular block is bad, so we don't need
+			 * to go through the dup check loop.
+			 */
+			return (SKIP | STOP);
 		}
 	}
-	for (nfrags = idesc->id_numfrags; nfrags > 0; blkno++, nfrags--) {
-		if (anyout && chkrange(blkno, 1)) {
+
+	/*
+	 * For each fragment, verify that it is a legal one (either
+	 * by having already found the entire run to be legal, or by
+	 * individual inspection), and if it is legal, see if we've
+	 * seen it before or not.  If we haven't, note that we've seen
+	 * it and continue on.  If we have (our in-core bitmap shows
+	 * it as already being busy), then this must be a duplicate
+	 * allocation.  Whine and moan accordingly.
+	 *
+	 * Note that for full-block allocations, this will produce
+	 * a complaint for each fragment making up the block (i.e.,
+	 * fs_frags' worth).  Among other things, this could be
+	 * considered artificially inflating the dup-block count.
+	 * However, since it is possible that one file has a full
+	 * fs block allocated, but another is only claiming a frag
+	 * or two out of the middle, we'll just live it.
+	 */
+	for (nfrags = 0; nfrags < idesc->id_numfrags; fragno++, nfrags++) {
+		if (anyout && chkrange(fragno, 1)) {
+			/* bad fragment number */
 			res = SKIP;
-		} else if (!testbmap(blkno)) {
-			n_blks++;
-			setbmap(blkno);
+		} else if (!testbmap(fragno)) {
+			/* no other claims seen as yet */
+			note_used(fragno);
 		} else {
-			blkerror(idesc->id_number, "DUP", blkno);
-			if (++dupblk >= MAXDUP) {
-				pwarn("EXCESSIVE DUP BLKS I=%u",
+			/*
+			 * We have a duplicate claim for the same fragment.
+			 *
+			 * blkerror() exits when preening.
+			 *
+			 * We want to report all the dups up until
+			 * hitting MAXDUP.  Fortunately, blkerror()'s
+			 * side-effects on statemap[] are idempotent,
+			 * so the ``extra'' calls are harmless.
+			 */
+			lbn = idesc->id_lbn * sblock.fs_frag + nfrags;
+			if (dupblk < MAXDUP)
+				blkerror(idesc->id_number, "DUP", fragno, lbn);
+
+			/*
+			 * Use ==, so we only complain once, no matter
+			 * how far over the limit we end up going.
+			 */
+			if (++dupblk == MAXDUP) {
+				pwarn("EXCESSIVE DUPLICATE FRAGMENTS I=%u",
 					idesc->id_number);
-				if (preen)
-					printf(" (SKIPPING)\n");
-				else if (reply("CONTINUE") == 0)
-					errexit("");
-				return (STOP);
-			}
-			new = (struct dups *)malloc(sizeof (struct dups));
-			if (new == NULL) {
-				pfatal("DUP TABLE OVERFLOW.");
 				if (reply("CONTINUE") == 0)
-					errexit("");
-				return (STOP);
+					errexit("Program terminated.");
+
+				/*
+				 * If we stop the traversal here, then
+				 * there may be more dups in the
+				 * inode's block list that don't get
+				 * flagged.  Later, if we're told to
+				 * clear one of the files claiming
+				 * these blocks, but not the other, we
+				 * will release blocks that are
+				 * actually still in use.  An additional
+				 * fsck run would be necessary to undo
+				 * the damage.  So, instead of the
+				 * traditional return (STOP) when told
+				 * to continue, we really do just continue.
+				 */
 			}
-			new->dup = blkno;
-			if (muldup == 0) {
-				duplist = muldup = new;
-				new->next = 0;
-			} else {
-				new->next = muldup->next;
-				muldup->next = new;
-			}
-			for (dlp = duplist; dlp != muldup; dlp = dlp->next)
-				if (dlp->dup == blkno)
-					break;
-			if (dlp == muldup && dlp->dup != blkno)
-				muldup = new;
+			(void) find_dup_ref(fragno, idesc->id_number, lbn,
+					    DB_CREATE | DB_INCR);
 		}
 		/*
-		 * count the number of blocks found in id_entryno
+		 * id_entryno counts the number of disk blocks found.
 		 */
-		idesc->id_entryno++;
+		idesc->id_entryno += btodb(sblock.fs_fsize);
 	}
 	return (res);
+}
+
+static void
+note_used(daddr32_t frag)
+{
+	n_blks++;
+	setbmap(frag);
 }

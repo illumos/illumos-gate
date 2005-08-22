@@ -22,10 +22,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1997 by Sun Microsystems, Inc.
-#
-# Copyright (c) 1989,1996 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/fs.d/ufs/fsck/Makefile
 
@@ -36,28 +34,63 @@ ATTMK=		$(LIBPROG)
 include		../../Makefile.fstype
 include		../Makefile.roll
 
-FSCKOBJS=	main.o dir.o inode.o pass1.o pass1b.o pass2.o \
+FSCKOBJS=	main.o dir.o dup_avl.o inode.o pass1.o pass1b.o \
+		pass2b.o \
 		pass3.o pass3b.o pass4.o pass5.o setup.o \
 		utilities.o
 FSCKSRCS=	$(FSCKOBJS:%.o=%.c)
 
 UFSDIR=		../../../../uts/common/fs/ufs
 UFSOBJS=	ufs_subr.o ufs_tables.o
-UFSSRCS=	$(UFSOBJS:%.o=%.c)
+UFSSRCS=	$(UFSOBJS:%.o=$(UFSDIR)/%.c)
 ROLLDIR=	../roll_log
 
-OBJS=		$(FSCKOBJS) $(UFSOBJS) $(ROLLOBJS)
-SRCS=		$(FSCKSRCS) $(UFSSRCS) $(ROLLSRCS)
+AVLDIR=		../../../../common/avl
+AVLOBJS=	avl.o
+AVLSRCS=	$(AVLOBJS:%.o=$(AVLDIR)/%.c)
 
-CPPFLAGS +=	-D_LARGEFILE64_SOURCE
+OBJS=		$(FSCKOBJS) $(UFSOBJS) $(ROLLOBJS) $(AVLOBJS) $(FSLIB)
+SRCS=		$(FSCKSRCS) $(UFSSRCS) $(ROLLSRCS) $(AVLSRCS) $(FSLIBSRC)
+
+CPPFLAGS +=	-D_LARGEFILE64_SOURCE -I../../ -I../../../../lib/libadm/inc
+LDLIBS +=	-lefi
+
 $(LIBPROG):	$(OBJS)
-		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+		$(LINK.c) -o $@ $(OBJS) $(LDLIBS) $(CTFMERGE_HOOK)
 		$(POST_PROCESS)
 
 %.o:	$(UFSDIR)/%.c
-	$(COMPILE.c) $<
+	$(COMPILE.c) $< $(CTFCONVERT_HOOK)
+
+%.o:	$(AVLDIR)/%.c
+	$(COMPILE.c) $< $(CTFCONVERT_HOOK)
+
+# Use DEVLINTFLAGS and the definition of LINT.c below for development
+# checking.  Prior to putback, increase Nlevel to 4 for extra sanity.
+# Nlevel=2 is the default applied by lint.
+#
+# Remember to comment LINT.c out before doing the putback, as we shouldn't
+# be overriding the top-level settings under normal circumstances.
+#
+# Note that you have to have a proto area with populated usr/include and
+# usr/include/sys (or the parent workspace needs it).  Otherwise lint gets
+# very confused.  Unfortunately, we also have to tell it where its own
+# include directory is, or it gets the wrong version of note.h.
+
+SECLEVEL=core
+DEVLINTFLAGS =	-errtags=yes -U__PRAGMA_REDEFINE_EXTNAME \
+		$(C99LMODE) -errsecurity=$(SECLEVEL) \
+		-x -Nlevel=2 \
+		-I/net/tools-sparc/export/tools.sparc/on10-tools/SUNWspro/SOS8/prod/include/lint
+
+#LINT.c=		$(LINT) $(DEVLINTFLAGS) $(CPPFLAGS)
 
 lint:	lint_SRCS
 
 clean:     
-	$(RM) $(FSCKOBJS) $(UFSOBJS)
+	$(RM) $(FSCKOBJS) $(UFSOBJS) $(AVLOBJS)
+
+cscope.out tags: FRC
+	$(XREF) -f -x $@
+
+FRC:

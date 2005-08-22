@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -261,7 +261,7 @@ make_mp(log_info_t *lip)
 	char			mountpt_dir[MAXPATHLEN + 1];
 	static size_t		list_len = sizeof (tmp_dir_list) /
 						sizeof (const char *);
-	int			merr;
+	int			merr = 0;
 
 	/*
 	 * Sequence of events:
@@ -275,14 +275,16 @@ make_mp(log_info_t *lip)
 	(void) mktemp(dirname);
 	for (i = 0; i < list_len; i++) {
 		/* Make the directory containing the mount-point */
-		(void) sprintf(tmp_dir, "%s%s", tmp_dir_list[i], dirname);
+		(void) snprintf(tmp_dir, sizeof (tmp_dir), "%s%s",
+				tmp_dir_list[i], dirname);
 		if (mkdir(tmp_dir, 0) == SYSERR) {
 			merr = errno;
 			continue;
 		}
 
 		/* Now, make the mount-point */
-		(void) sprintf(mountpt_dir, "%s/%s", tmp_dir, dirname);
+		(void) snprintf(mountpt_dir, sizeof (mountpt_dir), "%s/%s",
+				tmp_dir, dirname);
 		if (mkdir(mountpt_dir, 0) == SYSERR) {
 			merr = errno;
 			continue;
@@ -399,9 +401,8 @@ rlmount(log_info_t *lip, int mntopt)
 		break;
 	default:
 		return (RL_FAIL);
-		break;
 	}
-	(void) sprintf(opt, "%s,%s,%s",
+	(void) snprintf(opt, sizeof (opt), "%s,%s,%s",
 		optstr, MNTOPT_NOSUID, MNTOPT_LARGEFILES);
 	if (mount(lip->li_blkname, lip->li_tmpmp,
 			optflg | MS_DATA | MS_OPTIONSTR,
@@ -459,7 +460,7 @@ rl_log_control(char *bdev, int request)
 	rl_result_t	alreadymounted;
 	int		fd;
 	fiolog_t	fl;
-	int		logenabled;
+	int		logenabled = 0;
 
 	if ((request != _FIOLOGENABLE) && (request != _FIOLOGDISABLE))
 		return (RL_FAIL);

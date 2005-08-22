@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,88 +27,90 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 #include <sys/param.h>
-#include <sys/sysmacros.h>
 #include <sys/mntent.h>
-
-#define	bcopy(f, t, n)    memcpy(t, f, n)
-#define	bzero(s, n)	memset(s, 0, n)
-#define	bcmp(s, d, n)	memcmp(s, d, n)
-
-#define	index(s, r)	strchr(s, r)
-#define	rindex(s, r)	strrchr(s, r)
-
 #include <sys/fs/ufs_fs.h>
 #include <sys/vnode.h>
 #include <sys/fs/ufs_inode.h>
 #include "fsck.h"
 
-pass5()
+static int check_maps(uchar_t *, uchar_t *, int, int, char *, int, int);
+
+void
+pass5(void)
 {
-	int32_t c, blk, frags, savednrpos, savednpsect;
+	caddr_t err;
+	int32_t c, blk, frags;
+	int cg_fatal;
 	size_t	basesize, sumsize, mapsize;
+	int excessdirs;
+	int inomapsize, blkmapsize;
+	int update_csums, bad_csum, update_bitmaps;
 	struct fs *fs = &sblock;
 	struct cg *cg = &cgrp;
 	diskaddr_t dbase, dmax;
 	diskaddr_t d;
 	uint64_t i, j;
 	struct csum *cs;
+	struct csum backup_cs;
 	time_t now;
 	struct csum cstotal;
 	struct inodesc idesc;
-	char buf[MAXBSIZE];
-	struct cg *newcg = (struct cg *)buf;
-	struct ocg *ocg = (struct ocg *)buf;
+	union {				/* keep lint happy about alignment */
+		struct cg cg;		/* the rest of buf has the bitmaps */
+		char buf[MAXBSIZE];
+	} u;
+	caddr_t buf = u.buf;
+	struct cg *newcg = &u.cg;
 
-	bzero((char *)newcg, (size_t)fs->fs_cgsize);
+	(void) memset((void *)buf, 0, sizeof (u.buf));
 	newcg->cg_niblk = fs->fs_ipg;
-	switch (fs->fs_postblformat) {
 
-	case FS_42POSTBLFMT:
-		basesize = (char *)(&ocg->cg_btot[0]) - (char *)(&ocg->cg_link);
-		sumsize = &ocg->cg_iused[0] - (char *)(&ocg->cg_btot[0]);
-		mapsize = &ocg->cg_free[howmany(fs->fs_fpg, NBBY)] -
-			(uchar_t *)&ocg->cg_iused[0];
-		ocg->cg_magic = CG_MAGIC;
-		savednrpos = fs->fs_nrpos;
-		fs->fs_nrpos = 8;
-		fs->fs_trackskew = 0;
-		if ((fs->fs_npsect < 0) || (fs->fs_npsect > fs->fs_spc)) {
-			/* Migration aid from fs_state */
-			fs->fs_npsect = fs->fs_nsect;
-		}
-		savednpsect = fs->fs_npsect;
-		fs->fs_npsect = fs->fs_nsect;
-		break;
-
-	case FS_DYNAMICPOSTBLFMT:
-		newcg->cg_btotoff =
-			&newcg->cg_space[0] - (uchar_t *)(&newcg->cg_link);
-		newcg->cg_boff =
-			newcg->cg_btotoff + fs->fs_cpg * sizeof (long);
-		newcg->cg_iusedoff = newcg->cg_boff +
-			fs->fs_cpg * fs->fs_nrpos * sizeof (short);
-		newcg->cg_freeoff =
-			newcg->cg_iusedoff + howmany(fs->fs_ipg, NBBY);
-		newcg->cg_nextfreeoff = newcg->cg_freeoff +
-			howmany(fs->fs_cpg * fs->fs_spc / NSPF(fs),
-				NBBY);
-		newcg->cg_magic = CG_MAGIC;
-		basesize = &newcg->cg_space[0] - (uchar_t *)(&newcg->cg_link);
-		sumsize = newcg->cg_iusedoff - newcg->cg_btotoff;
-		mapsize = newcg->cg_nextfreeoff - newcg->cg_iusedoff;
-		break;
-
-	default:
-		pfatal("UNKNOWN ROTATIONAL TABLE FORMAT %d\n",
+	if (fs->fs_postblformat != FS_DYNAMICPOSTBLFMT) {
+		pfatal("UNSUPPORTED ROTATIONAL TABLE FORMAT %d\n",
 			fs->fs_postblformat);
-		errexit("");
+		errexit("Program terminated.");
+		/* NOTREACHED */
 	}
 
-	bzero((char *)&idesc, sizeof (struct inodesc));
+	/* LINTED this subtraction can't overflow and is int32-aligned */
+	basesize = &newcg->cg_space[0] - (uchar_t *)newcg;
+
+	/*
+	 * We reserve the space for the old rotation summary
+	 * tables for the benefit of old kernels, but do not
+	 * maintain them in modern kernels. In time, they could
+	 * theoretically go away, if we wanted to deal with
+	 * changing the on-disk format.
+	 */
+
+	/*
+	 * Note that we don't use any of the cg_*() macros until
+	 * after cg_sanity() has approved of what we've got.
+	 */
+	newcg->cg_btotoff = basesize;
+	newcg->cg_boff = newcg->cg_btotoff + fs->fs_cpg * sizeof (daddr32_t);
+	newcg->cg_iusedoff = newcg->cg_boff +
+		fs->fs_cpg * fs->fs_nrpos * sizeof (uint16_t);
+	(void) memset(&newcg->cg_space[0], 0, newcg->cg_iusedoff - basesize);
+
+	inomapsize = howmany(fs->fs_ipg, NBBY);
+	newcg->cg_freeoff = newcg->cg_iusedoff + inomapsize;
+	blkmapsize = howmany(fs->fs_fpg, NBBY);
+	newcg->cg_nextfreeoff = newcg->cg_freeoff + blkmapsize;
+	newcg->cg_magic = CG_MAGIC;
+
+	sumsize = newcg->cg_iusedoff - newcg->cg_btotoff;
+	mapsize = newcg->cg_nextfreeoff - newcg->cg_iusedoff;
+
+	init_inodesc(&idesc);
 	idesc.id_type = ADDR;
-	bzero((char *)&cstotal, sizeof (struct csum));
-	(void) time(&now);
+	(void) memset((void *)&cstotal, 0, sizeof (struct csum));
+	now = time(NULL);
 
 	/*
 	 * If the last fragments in the file system don't make up a
@@ -120,25 +122,59 @@ pass5()
 	j = blknum(fs, (uint64_t)fs->fs_size + fs->fs_frag - 1);
 	for (i = fs->fs_size; i < j; i++)
 		setbmap(i);
+
+	/*
+	 * The cg summaries are not always updated when using
+	 * logging.  Since we're really concerned with getting a
+	 * sane filesystem, rather than in trying to debug UFS
+	 * corner cases, logically we would just always recompute
+	 * them.  However, it is disconcerting to users to be asked
+	 * about updating the summaries when, from their point of
+	 * view, there's been no indication of a problem up to this
+	 * point.  So, only do it if we find a discrepancy.
+	 */
+	update_csums = -1;
+	update_bitmaps = 0;
 	for (c = 0; c < fs->fs_ncg; c++) {
-		getblk(&cgblk, (diskaddr_t)cgtod(fs, c), fs->fs_cgsize);
-		if (!cg_chkmagic(cg))
-			pfatal("CG %d: BAD MAGIC NUMBER\n", c);
-		dbase = cgbase(fs, c);
-		dmax = dbase + fs->fs_fpg;
-		if (dmax > fs->fs_size)
-			dmax = fs->fs_size;
+		backup_cs = cstotal;
+
+		/*
+		 * cg_sanity() will catch i/o errors for us.
+		 */
+		(void) getblk(&cgblk, (diskaddr_t)cgtod(fs, c),
+		    (size_t)fs->fs_cgsize);
+		err = cg_sanity(cg, c, &cg_fatal);
+		if (err != NULL) {
+			pfatal("CG %d: %s\n", c, err);
+			free((void *)err);
+			if (cg_fatal)
+				errexit(
+	    "Irreparable cylinder group header problem.  Program terminated.");
+			if (reply("REPAIR") == 0)
+				errexit("Program terminated.");
+			fix_cg(cg, c);
+		}
+		/*
+		 * If the on-disk timestamp is in the future, then it
+		 * by definition is wrong.  Otherwise, if it's in
+		 * the past, then use that value so that we don't
+		 * declare a spurious mismatch.
+		 */
 		if (now > cg->cg_time)
 			newcg->cg_time = cg->cg_time;
 		else
 			newcg->cg_time = now;
 		newcg->cg_cgx = c;
+		dbase = cgbase(fs, c);
+		dmax = dbase + fs->fs_fpg;
+		if (dmax > fs->fs_size)
+			dmax = fs->fs_size;
+		newcg->cg_ndblk = dmax - dbase;
 		if (c == fs->fs_ncg - 1)
 			newcg->cg_ncyl = fs->fs_ncyl % fs->fs_cpg;
 		else
 			newcg->cg_ncyl = fs->fs_cpg;
 		newcg->cg_niblk = sblock.fs_ipg;
-		newcg->cg_ndblk = dmax - dbase;
 		newcg->cg_cs.cs_ndir = 0;
 		newcg->cg_cs.cs_nffree = 0;
 		newcg->cg_cs.cs_nbfree = 0;
@@ -155,13 +191,15 @@ pass5()
 			newcg->cg_irotor = cg->cg_irotor;
 		else
 			newcg->cg_irotor = 0;
-		bzero((char *)&newcg->cg_frsum[0], sizeof (newcg->cg_frsum));
-		bzero((char *)&cg_blktot(newcg)[0], sumsize + mapsize);
-		if (fs->fs_postblformat == FS_42POSTBLFMT)
-			ocg->cg_magic = CG_MAGIC;
+		(void) memset((void *)&newcg->cg_frsum[0], 0,
+		    sizeof (newcg->cg_frsum));
+		(void) memset((void *)cg_inosused(newcg), 0, (size_t)mapsize);
+		/* LINTED macro is int32-aligned per newcg->cg_btotoff above */
+		(void) memset((void *)&cg_blktot(newcg)[0], 0,
+		    sumsize + mapsize);
 		j = fs->fs_ipg * c;
 		for (i = 0; i < fs->fs_ipg; j++, i++) {
-			switch (statemap[j]) {
+			switch (statemap[j] & ~(INORPHAN | INDELAYD)) {
 
 			case USTATE:
 				break;
@@ -169,11 +207,13 @@ pass5()
 			case DSTATE:
 			case DCLEAR:
 			case DFOUND:
+			case DZLINK:
 				newcg->cg_cs.cs_ndir++;
-				/* fall through */
+				/* FALLTHROUGH */
 
 			case FSTATE:
 			case FCLEAR:
+			case FZLINK:
 			case SSTATE:
 			case SCLEAR:
 				newcg->cg_cs.cs_nifree--;
@@ -183,15 +223,21 @@ pass5()
 			default:
 				if (j < UFSROOTINO)
 					break;
-				errexit("BAD STATE %d FOR INODE I=%d",
-				    statemap[j], j);
+				errexit("BAD STATE 0x%x FOR INODE I=%d",
+				    statemap[j], (int)j);
 			}
 		}
-		if (c == 0)
+		if (c == 0) {
 			for (i = 0; i < UFSROOTINO; i++) {
 				setbit(cg_inosused(newcg), i);
 				newcg->cg_cs.cs_nifree--;
 			}
+		}
+		/*
+		 * Count up what fragments and blocks are free, and
+		 * reflect the relevant section of blockmap[] into
+		 * newcg's map.
+		 */
 		for (i = 0, d = dbase;
 		    d < dmax;
 		    d += fs->fs_frag, i += fs->fs_frag) {
@@ -205,7 +251,9 @@ pass5()
 			if (frags == fs->fs_frag) {
 				newcg->cg_cs.cs_nbfree++;
 				j = cbtocylno(fs, i);
+				/* LINTED macro is int32-aligned per above */
 				cg_blktot(newcg)[j]++;
+				/* LINTED cg_blks(newcg) is aligned */
 				cg_blks(fs, newcg, j)[cbtorpos(fs, i)]++;
 			} else if (frags > 0) {
 				newcg->cg_cs.cs_nffree += frags;
@@ -213,74 +261,267 @@ pass5()
 				fragacct(fs, blk, newcg->cg_frsum, 1);
 			}
 		}
-/*
- *		for (frags = d; d < dmax; d++) {
- *			if (getbmap(d))
- *				continue;
- *			setbit(newcg->cg_free, d - dbase);
- *			newcg->cg_cs.cs_nffree++;
- *		}
- *		if (frags != d) {
- *			blk = blkmap(&sblock, newcg->cg_free, (frags - dbase));
- *			fragacct(&sblock, blk, newcg->cg_frsum, 1);
- *		}
- */
 		cstotal.cs_nffree += newcg->cg_cs.cs_nffree;
 		cstotal.cs_nbfree += newcg->cg_cs.cs_nbfree;
 		cstotal.cs_nifree += newcg->cg_cs.cs_nifree;
 		cstotal.cs_ndir += newcg->cg_cs.cs_ndir;
 
+		/*
+		 * Note that, just like the kernel, we dynamically
+		 * allocated an array to hold the csums and stuffed
+		 * the pointer into the in-core superblock's fs_u.fs_csp
+		 * field.  This means that the fs_u field contains a
+		 * random value when the disk version is examined, but
+		 * fs_cs() gives us a valid pointer nonetheless.
+		 */
 		cs = &fs->fs_cs(fs, c);
-		if (bcmp((char *)&newcg->cg_cs, (char *)cs,
-		    sizeof (*cs)) != 0 &&
-		    dofix(&idesc, "FREE BLK COUNT(S) WRONG IN SUPERBLK")) {
-			bcopy((char *)&newcg->cg_cs, (char *)cs, sizeof (*cs));
+		bad_csum = (memcmp((void *)cs, (void *)&newcg->cg_cs,
+		    sizeof (*cs)) != 0);
+
+		/*
+		 * Has the user told us what to do yet?  If not, find out.
+		 */
+		if (bad_csum && (update_csums == -1)) {
+			if (preen) {
+				update_csums = 1;
+				(void) printf("CORRECTING BAD CG SUMMARIES\n");
+			} else if (update_csums == -1) {
+				update_csums = (reply(
+				    "CORRECT BAD CG SUMMARIES") == 1);
+			}
+		}
+
+		if (bad_csum && (update_csums == 1)) {
+			(void) memmove((void *)cs, (void *)&newcg->cg_cs,
+			    sizeof (*cs));
 			sbdirty();
-		}
-		if (cvtflag) {
-			bcopy((char *)newcg, (char *)cg, (size_t)fs->fs_cgsize);
+
+			(void) memmove((void *)cg, (void *)newcg,
+			    (size_t)basesize);
+			/* LINTED per cg_sanity() */
+			(void) memmove((void *)&cg_blktot(cg)[0],
+			    /* LINTED macro aligned as above */
+			    (void *)&cg_blktot(newcg)[0], sumsize);
 			cgdirty();
-			continue;
-		}
-		if ((bcmp((char *)newcg, (char *)cg, (size_t)basesize) != 0 ||
-		    bcmp((char *)&cg_blktot(newcg)[0],
-			    (char *)&cg_blktot(cg)[0], sumsize) != 0) &&
-		    dofix(&idesc, "SUMMARY INFORMATION BAD")) {
-			bcopy((char *)newcg, (char *)cg, (size_t)basesize);
-			bcopy((char *)&cg_blktot(newcg)[0],
-			    (char *)&cg_blktot(cg)[0], sumsize);
-			cgdirty();
-		}
-		if (bcmp(cg_inosused(newcg),
-			    cg_inosused(cg), mapsize) != 0 &&
-		    dofix(&idesc, "BLK(S) MISSING IN BIT MAPS")) {
-			bcopy(cg_inosused(newcg), cg_inosused(cg), mapsize);
-			cgdirty();
+			(void) printf("CORRECTED SUMMARY FOR CG %d\n", c);
 		}
 
-		cs = &sblock.fs_cs(&sblock, c);
-		if (bcmp((char *)&newcg->cg_cs, (char *)cs,
-		    sizeof (*cs)) != 0 &&
-		    dofix(&idesc, "FREE BLK COUNT(S) WRONG IN SUPERBLK")) {
-	/*
-	 *		bcopy((char *)&newcg->cg_cs, (char *)cs, sizeof (*cs));
-	 *		sbdirty();
-	 */
+		excessdirs = cg->cg_cs.cs_ndir - newcg->cg_cs.cs_ndir;
+		if (excessdirs < 0) {
+			pfatal("LOST %d DIRECTORIES IN CG %d\n",
+			    -excessdirs, c);
+			excessdirs = 0;
+		}
+		if (excessdirs > 0) {
+			if (check_maps((uchar_t *)cg_inosused(newcg),
+			    (uchar_t *)cg_inosused(cg), inomapsize,
+			    cg->cg_cgx * fs->fs_ipg, "DIR", 0, excessdirs)) {
+				if (!verbose)
+					(void) printf("DIR BITMAP WRONG ");
+				if (preen || update_bitmaps ||
+				    reply("FIX") == 1) {
+					(void) memmove((void *)cg_inosused(cg),
+					    (void *)cg_inosused(newcg),
+					    inomapsize);
+					cgdirty();
+					if (preen ||
+					    (!verbose && update_bitmaps))
+						(void) printf("(CORRECTED)\n");
+					update_bitmaps = 1;
+				}
+			}
 		}
 
+		if (check_maps((uchar_t *)cg_inosused(newcg),
+		    (uchar_t *)cg_inosused(cg), inomapsize,
+		    cg->cg_cgx * fs->fs_ipg, "FILE", excessdirs, fs->fs_ipg)) {
+			if (!verbose)
+				(void) printf("FILE BITMAP WRONG ");
+			if (preen || update_bitmaps || reply("FIX") == 1) {
+				(void) memmove((void *)cg_inosused(cg),
+				    (void *)cg_inosused(newcg), inomapsize);
+				cgdirty();
+				if (preen ||
+				    (!verbose && update_bitmaps))
+					(void) printf("(CORRECTED)\n");
+				update_bitmaps = 1;
+			}
+		}
+
+		if (check_maps((uchar_t *)cg_blksfree(cg),
+		    (uchar_t *)cg_blksfree(newcg), blkmapsize,
+		    cg->cg_cgx * fs->fs_fpg, "FRAG", 0, fs->fs_fpg)) {
+			if (!verbose)
+				(void) printf("FRAG BITMAP WRONG ");
+			if (preen || update_bitmaps || reply("FIX") == 1) {
+				(void) memmove((void *)cg_blksfree(cg),
+				    (void *)cg_blksfree(newcg), blkmapsize);
+				cgdirty();
+				if (preen ||
+				    (!verbose && update_bitmaps))
+					(void) printf("(CORRECTED)\n");
+				update_bitmaps = 1;
+			}
+		}
+
+		/*
+		 * Fixing one set of problems often shows up more in the
+		 * same cg.  Just to make sure, go back and check it
+		 * again if we found something this time through.
+		 */
+		if (cgisdirty()) {
+			cgflush();
+			cstotal = backup_cs;
+			c--;
+		}
 	}
-	if (fs->fs_postblformat == FS_42POSTBLFMT) {
-		fs->fs_nrpos = savednrpos;
-		fs->fs_npsect = savednpsect;
-	}
+
 	if ((fflag || !(islog && islogok)) &&
-	    bcmp((char *)&cstotal, (char *)&fs->fs_cstotal,
-	    sizeof (struct csum)) != 0 &&
-	    dofix(&idesc, "FREE BLK COUNT(S) WRONG IN SUPERBLK")) {
-		bcopy((char *)&cstotal, (char *)&fs->fs_cstotal,
-			sizeof (struct csum));
-		fs->fs_ronly = 0;
-		fs->fs_fmod = 0;
-		sbdirty();
+	    (memcmp((void *)&cstotal, (void *)&fs->fs_cstotal,
+	    sizeof (struct csum)) != 0)) {
+		if (dofix(&idesc, "CORRECT GLOBAL SUMMARY")) {
+			(void) memmove((void *)&fs->fs_cstotal,
+			    (void *)&cstotal, sizeof (struct csum));
+			fs->fs_ronly = 0;
+			fs->fs_fmod = 0;
+			sbdirty();
+		} else {
+			iscorrupt = 1;
+		}
 	}
+}
+
+/*
+ * Compare two allocation bitmaps, reporting any discrepancies.
+ *
+ * If a mismatch is found, if the bit is set in map1, it's considered
+ * to be an indication that the corresponding resource is supposed
+ * to be free, but isn't.  Otherwise, it's considered marked as allocated
+ * but not found to be so.  In other words, if the two maps being compared
+ * use a set bit to indicate something is free, pass the on-disk map
+ * first.  Otherwise, pass the calculated map first.
+ */
+static int
+check_maps(
+	uchar_t *map1,	/* map of claimed allocations */
+	uchar_t *map2,	/* map of determined allocations */
+	int mapsize,	/* size of above two maps */
+	int startvalue,	/* resource value for first element in map */
+	char *name,	/* name of resource found in maps */
+	int skip,	/* number of entries to skip before starting to free */
+	int limit)	/* limit on number of entries to free */
+{
+	long i, j, k, l, m, n, size;
+	int astart, aend, ustart, uend;
+	int mismatch;
+
+	mismatch = 0;
+	astart = ustart = aend = uend = -1;
+	for (i = 0; i < mapsize; i++) {
+		j = *map1++;
+		k = *map2++;
+		if (j == k)
+			continue;
+		for (m = 0, l = 1; m < NBBY; m++, l <<= 1) {
+			if ((j & l) == (k & l))
+				continue;
+			n = startvalue + i * NBBY + m;
+			if ((j & l) != 0) {
+				if (astart == -1) {
+					astart = aend = n;
+					continue;
+				}
+				if (aend + 1 == n) {
+					aend = n;
+					continue;
+				}
+				if (verbose) {
+					if (astart == aend)
+						pwarn(
+			    "ALLOCATED %s %d WAS MARKED FREE ON DISK\n",
+						    name, astart);
+					else
+						pwarn(
+			    "ALLOCATED %sS %d-%d WERE MARKED FREE ON DISK\n",
+						    name, astart, aend);
+				}
+				mismatch = 1;
+				astart = aend = n;
+			} else {
+				if (ustart == -1) {
+					ustart = uend = n;
+					continue;
+				}
+				if (uend + 1 == n) {
+					uend = n;
+					continue;
+				}
+				size = uend - ustart + 1;
+				if (size <= skip) {
+					skip -= size;
+					ustart = uend = n;
+					continue;
+				}
+				if (skip > 0) {
+					ustart += skip;
+					size -= skip;
+					skip = 0;
+				}
+				if (size > limit)
+					size = limit;
+				if (verbose) {
+					if (size == 1)
+						pwarn(
+			    "UNALLOCATED %s %d WAS MARKED USED ON DISK\n",
+						    name, ustart);
+					else
+						pwarn(
+			    "UNALLOCATED %sS %d-%ld WERE MARKED USED ON DISK\n",
+						    name, ustart,
+						    ustart + size - 1);
+				}
+				mismatch = 1;
+				limit -= size;
+				if (limit <= 0)
+					return (mismatch);
+				ustart = uend = n;
+			}
+		}
+	}
+	if (astart != -1) {
+		if (verbose) {
+			if (astart == aend)
+				pwarn(
+			    "ALLOCATED %s %d WAS MARKED FREE ON DISK\n",
+				    name, astart);
+			else
+				pwarn(
+			    "ALLOCATED %sS %d-%d WERE MARKED FREE ON DISK\n",
+				    name, astart, aend);
+		}
+		mismatch = 1;
+	}
+	if (ustart != -1) {
+		size = uend - ustart + 1;
+		if (size <= skip)
+			return (mismatch);
+		if (skip > 0) {
+			ustart += skip;
+			size -= skip;
+		}
+		if (size > limit)
+			size = limit;
+		if (verbose) {
+			if (size == 1)
+				pwarn(
+			    "UNALLOCATED %s %d WAS MARKED USED ON DISK\n",
+				    name, ustart);
+			else
+				pwarn(
+		    "UNALLOCATED %sS %d-%ld WERE MARKED USED ON DISK\n",
+				    name, ustart, ustart + size - 1);
+		}
+		mismatch = 1;
+	}
+	return (mismatch);
 }

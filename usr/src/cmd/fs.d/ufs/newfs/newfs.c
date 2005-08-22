@@ -26,7 +26,7 @@
 /*
  * newfs: friendly front end to mkfs
  *
- * Copyright 1991, 1997, 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,6 +130,8 @@ static int	apc_set = 0;	/* true if the user specified apc */
 static int 	rot = -1;	/* rotational delay (msecs) */
 static int	rot_set = 0;	/* true if the user specified rot */
 static int 	maxcontig = -1;	/* maximum number of contig blocks */
+static int	text_sb = 0;	/* no disk changes; just final sb text dump */
+static int	binary_sb = 0;	/* no disk changes; just final sb binary dump */
 static int	label_type;	/* see types below */
 
 #define	LABEL_TYPE_VTOC		1
@@ -163,9 +165,15 @@ main(int argc, char *argv[])
 	(void) textdomain(TEXT_DOMAIN);
 
 	opterr = 0;	/* We print our own errors, disable getopt's message */
-	while ((option = getopt(argc, argv, "vNs:C:d:t:o:a:b:f:c:m:n:r:i:T"))
-	    != EOF) {
+	while ((option = getopt(argc, argv,
+	    "vNBSs:C:d:t:o:a:b:f:c:m:n:r:i:T")) != EOF) {
 		switch (option) {
+		case 'S':
+			text_sb++;
+			break;
+		case 'B':
+			binary_sb++;
+			break;
 		case 'v':
 			verbose++;
 			break;
@@ -601,8 +609,9 @@ main(int argc, char *argv[])
 	 * need to get apc from dp->d_apc if no -a switch???
 	 */
 	(void) sprintf(cmd,
-	"mkfs -F ufs %s%s %lld %d %d %d %d %d %d %d %d %s %d %d %d %d %s",
-	    Nflag ? "-o N " : "", special,
+	"mkfs -F ufs %s%s%s%s %lld %d %d %d %d %d %d %d %d %s %d %d %d %d %s",
+	    Nflag ? "-o N " : "", binary_sb ? "-o calcbinsb " : "",
+	    text_sb ? "-o calcsb " : "", special,
 	    fssize, nsectors, ntracks, bsize, fsize, cpg, minfree, rpm/60,
 	    density, optim == FS_OPTSPACE ? "s" : "t", apc, rot, nrpos,
 	    maxcontig, Tflag ? "y" : "n");
@@ -1080,6 +1089,10 @@ usage(void)
 	(void) fprintf(stderr, gettext("\t-d rotational delay\n"));
 	(void) fprintf(stderr, gettext(
 	    "\t-n number of rotational positions\n"));
+	(void) fprintf(stderr, gettext(
+"\t-S print a textual version of the calculated superblock to stdout\n"));
+	(void) fprintf(stderr, gettext(
+"\t-B dump a binary version of the calculated superblock to stdout\n"));
 }
 
 /*

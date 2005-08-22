@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,7 @@ int	nargc = 2;
 int	options = 0;
 int	mnt_passno = 0;
 int	exitstat = 0;
+int	verbose = 0;
 char	*nargv[ARGV_MAX];
 char	*myname, *fstype;
 char	*malloc();
@@ -228,7 +229,7 @@ main(argc, argv)
 	else
 		myname = argv[0];
 
-	while ((cc = getopt(argc, argv, "?F:mnNo:VyY")) != -1) {
+	while ((cc = getopt(argc, argv, "?F:mnNo:vVyY")) != -1) {
 		switch (cc) {
 		case '?':
 			questflg++;
@@ -247,7 +248,7 @@ main(argc, argv)
 				usage();
 			}
 			fstype = optarg;
-			if (strlen(fstype) > (size_t) FSTYPE_MAX) {
+			if (strlen(fstype) > (size_t)FSTYPE_MAX) {
 				fprintf(stderr,
 			gettext("%s: Fstype %s exceeds %d characters\n"),
 					myname, fstype, FSTYPE_MAX);
@@ -271,6 +272,8 @@ main(argc, argv)
 				subopt++;
 			}
 			OPTARG("-o");
+		case 'v':
+			OPTION("-v");
 		case 'V':
 			Vflg++;
 			if (Vflg > 1)
@@ -813,7 +816,7 @@ do_exec(fstype, nargv)
 	char	full_path[PATH_MAX];
 	char	*vfs_path = VFS_PATH;
 
-	if (strlen(fstype) > (size_t) FSTYPE_MAX) {
+	if (strlen(fstype) > (size_t)FSTYPE_MAX) {
 		fprintf(stderr,
 			gettext("%s: Fstype %s exceeds %d characters\n"),
 			myname, fstype, FSTYPE_MAX);

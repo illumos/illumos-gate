@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,76 +27,69 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/mntent.h>
-
-#define	bcopy(f, t, n)    memcpy(t, f, n)
-#define	bzero(s, n)	memset(s, 0, n)
-#define	bcmp(s, d, n)	memcmp(s, d, n)
-
-#define	index(s, r)	strchr(s, r)
-#define	rindex(s, r)	strrchr(s, r)
-
 #include <sys/fs/ufs_fs.h>
 #include <sys/vnode.h>
 #include <sys/fs/ufs_inode.h>
 #include "fsck.h"
 
-int	pass1bcheck();
-static  struct dups *duphead;
+static int pass1bcheck(struct inodesc *);
 
-pass1b()
+void
+pass1b(void)
 {
-	int c, i;
 	struct dinode *dp;
 	struct inodesc idesc;
-	ino_t inumber;
+	fsck_ino_t inumber;
 
-	bzero((char *)&idesc, sizeof (struct inodesc));
-	idesc.id_type = ADDR;
-	idesc.id_func = pass1bcheck;
-	duphead = duplist;
-	inumber = 0;
-	for (c = 0; c < sblock.fs_ncg; c++) {
-		for (i = 0; i < sblock.fs_ipg; i++, inumber++) {
-			if (inumber < UFSROOTINO)
-				continue;
-			dp = ginode(inumber);
-			if (dp == NULL)
-				continue;
-			idesc.id_number = inumber;
-			idesc.id_fix = DONTKNOW;
-			if (statemap[inumber] != USTATE &&
-			    (ckinode(dp, &idesc) & STOP))
-				return;
-		}
+	/*
+	 * We can get STOP failures from ckinode() that
+	 * are completely independent of our dup checks.
+	 * If that were not the case, then we could track
+	 * when we've seen all of the dups and short-
+	 * circuit our search.  As it is, we need to
+	 * keep going, so there's no point in looking
+	 * at what ckinode() returns to us.
+	 */
+
+	for (inumber = UFSROOTINO; inumber < maxino; inumber++) {
+		init_inodesc(&idesc);
+		idesc.id_type = ADDR;
+		idesc.id_func = pass1bcheck;
+		idesc.id_number = inumber;
+		idesc.id_fix = DONTKNOW;
+		dp = ginode(inumber);
+		if (statemap[inumber] != USTATE)
+			(void) ckinode(dp, &idesc, CKI_TRAVERSE);
 	}
 }
 
-pass1bcheck(idesc)
-	struct inodesc *idesc;
+static int
+pass1bcheck(struct inodesc *idesc)
 {
-	struct dups *dlp;
 	int res = KEEPON;
-	int	nfrags;
+	int nfrags;
+	daddr32_t lbn;
 	daddr32_t blkno = idesc->id_blkno;
 
-	for (nfrags = idesc->id_numfrags; nfrags > 0; blkno++, nfrags--) {
-		if (chkrange(blkno, 1))
+	for (nfrags = 0; nfrags < idesc->id_numfrags; blkno++, nfrags++) {
+		if (chkrange(blkno, 1)) {
 			res = SKIP;
-		for (dlp = duphead; dlp; dlp = dlp->next) {
-			if (dlp->dup == blkno) {
-				blkerror(idesc->id_number, "DUP", blkno);
-				dlp->dup = duphead->dup;
-				duphead->dup = blkno;
-				duphead = duphead->next;
-			}
-			if (dlp == muldup)
-				break;
+		} else {
+			/*
+			 * Note that we only report additional dup claimants
+			 * in this pass, as the first claimant found was
+			 * listed during pass 1.
+			 */
+			lbn = idesc->id_lbn * sblock.fs_frag + nfrags;
+			if (find_dup_ref(blkno, idesc->id_number, lbn, DB_INCR))
+				blkerror(idesc->id_number, "DUP", blkno, lbn);
 		}
-		if (muldup == 0 || duphead == muldup->next)
-			return (STOP);
 	}
 	return (res);
 }

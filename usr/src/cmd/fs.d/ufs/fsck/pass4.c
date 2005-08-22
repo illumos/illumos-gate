@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,115 +27,205 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/mntent.h>
-
-#define	bcopy(f, t, n)    memcpy(t, f, n)
-#define	bzero(s, n)	memset(s, 0, n)
-#define	bcmp(s, d, n)	memcmp(s, d, n)
-
-#define	index(s, r)	strchr(s, r)
-#define	rindex(s, r)	strrchr(s, r)
-
 #include <sys/fs/ufs_fs.h>
 #include <sys/vnode.h>
 #include <sys/fs/ufs_inode.h>
 #include "fsck.h"
 
-int	pass4check();
-
-pass4()
+void
+pass4(void)
 {
-	ino_t inumber;
-	struct zlncnt *zlnp;
+	fsck_ino_t inumber;
 	struct dinode *dp;
 	struct inodesc idesc;
-	int n;
+	int n, was_dir;
+	int need_rescan;
+	int scan_pass = 0;
 
-	bzero((char *)&idesc, sizeof (struct inodesc));
-	idesc.id_type = ADDR;
-	idesc.id_func = pass4check;
-	for (inumber = UFSROOTINO; inumber <= lastino; inumber++) {
-		idesc.id_number = inumber;
-		idesc.id_fix = DONTKNOW;
-		switch (statemap[inumber]) {
+	/*
+	 * If we clear a directory, it may have produced orphans which
+	 * we need to go pick up.  So, do this until done.  It can be
+	 * proven that the loop terminates because at most there can
+	 * be lastino directories, and we only rescan if we clear a
+	 * directory.
+	 */
+	do {
+		if (debug)
+			(void) printf("pass4 scan %d\n", scan_pass++);
 
-		case FSTATE:
-		case SSTATE:
-		case DFOUND:
-			n = lncntp[inumber];
-			if (n)
-				adjust(&idesc, (short)n);
-			else {
-				for (zlnp = zlnhead; zlnp; zlnp = zlnp->next)
-					if (zlnp->zlncnt == inumber) {
-						zlnp->zlncnt = zlnhead->zlncnt;
-						zlnp = zlnhead;
-						zlnhead = zlnhead->next;
-						free((char *)zlnp);
-						if (!willreclaim)
-						    clri(&idesc, "UNREF", 1);
-						break;
+		need_rescan = 0;
+		for (inumber = UFSROOTINO; inumber <= lastino; inumber++) {
+			init_inodesc(&idesc);
+			idesc.id_type = ADDR;
+			idesc.id_func = pass4check;
+			idesc.id_number = inumber;
+
+			was_dir = (statemap[inumber] & DSTATE) == DSTATE;
+
+			switch (statemap[inumber] & ~(INORPHAN | INDELAYD
+			    | INZLINK)) {
+
+			case FZLINK:
+			case DZLINK:
+				/*
+				 * INZLINK gets set if the inode claimed zero
+				 * links when we first looked at it in pass 1.
+				 * If lncntp[] also claims it has zero links,
+				 * it really is unreferenced.  However, we
+				 * could have found a link to it during one of
+				 * the other passes, so we have to check the
+				 * final count in lncntp[].
+				 */
+				if (lncntp[inumber] == 0) {
+					clri(&idesc, "UNREF", CLRI_VERBOSE,
+					    CLRI_NOP_OK);
+					if (was_dir &&
+					    (statemap[inumber] == USTATE))
+						need_rescan = 1;
+					break;
+				}
+				/* FALLTHROUGH */
+
+			case FSTATE:
+			case DFOUND:
+			case SSTATE:
+				n = lncntp[inumber];
+				if (n || (statemap[inumber] &
+				    (INDELAYD | INZLINK))) {
+					/*
+					 * adjust() will clear the inode if
+					 * the link count goes to zero.  If
+					 * it isn't cleared, we need to note
+					 * that we've adjusted the count
+					 * already, so we don't do it again
+					 * on a rescan.
+					 */
+					adjust(&idesc, n);
+					if (was_dir &&
+					    (statemap[inumber] == USTATE)) {
+						need_rescan = 1;
+					} else {
+						TRACK_LNCNTP(inumber,
+						    lncntp[inumber] = 0);
 					}
-			}
-			break;
-
-		case DSTATE:
-			if (!willreclaim)
-				clri(&idesc, "UNREF", 1);
-			break;
-
-		case DCLEAR:
-			dp = ginode(inumber);
-			if (dp->di_size == 0) {
-				if (!willreclaim)
-					clri(&idesc, "ZERO LENGTH", 1);
+				}
 				break;
+
+			case DSTATE:
+				clri(&idesc, "UNREF", CLRI_VERBOSE,
+				    CLRI_NOP_OK);
+				if (was_dir && (statemap[inumber] == USTATE))
+					need_rescan = 1;
+				break;
+
+			case DCLEAR:
+				dp = ginode(inumber);
+				if (dp->di_size == 0) {
+					clri(&idesc, "ZERO LENGTH",
+					    CLRI_VERBOSE, CLRI_NOP_CORRUPT);
+					break;
+				}
+				/* FALLTHROUGH */
+
+			case FCLEAR:
+				clri(&idesc, "BAD/DUP", CLRI_VERBOSE,
+				    CLRI_NOP_CORRUPT);
+				break;
+
+			case SCLEAR:
+				clri(&idesc, "BAD", CLRI_VERBOSE,
+				    CLRI_NOP_CORRUPT);
+				break;
+
+			case USTATE:
+				break;
+
+			default:
+				errexit("BAD STATE 0x%x FOR INODE I=%d",
+					(int)statemap[inumber], inumber);
 			}
-			/* fall through */
-		case FCLEAR:
-			clri(&idesc, "BAD/DUP", 1);
-			break;
-
-		case SCLEAR:
-			clri(&idesc, "BAD", 1);
-			break;
-
-		case USTATE:
-			break;
-
-		default:
-			errexit("BAD STATE %d FOR INODE I=%d",
-			    statemap[inumber], inumber);
 		}
-	}
+	} while (need_rescan);
 }
 
-pass4check(idesc)
-	struct inodesc *idesc;
+int
+pass4check(struct inodesc *idesc)
 {
-	struct dups *dlp;
-	int	nfrags;
+	int fragnum, cg_frag;
 	int res = KEEPON;
 	daddr32_t blkno = idesc->id_blkno;
+	int cylno;
+	struct cg *cgp = &cgrp;
+	caddr_t err;
+	int cg_fatal;
 
-	for (nfrags = idesc->id_numfrags; nfrags > 0; blkno++, nfrags--) {
-		if (chkrange(blkno, 1)) {
+	if ((idesc->id_truncto >= 0) && (idesc->id_lbn < idesc->id_truncto)) {
+		if (debug)
+			(void) printf(
+		    "pass4check: skipping inode %d lbn %d with truncto %d\n",
+			    idesc->id_number, idesc->id_lbn,
+			    idesc->id_truncto);
+		return (KEEPON);
+	}
+
+	for (fragnum = 0; fragnum < idesc->id_numfrags; fragnum++) {
+		if (chkrange(blkno + fragnum, 1)) {
 			res = SKIP;
-		} else if (testbmap(blkno)) {
-			for (dlp = duplist; dlp; dlp = dlp->next) {
-				if (dlp->dup != blkno)
-					continue;
-				dlp->dup = duplist->dup;
-				dlp = duplist;
-				duplist = duplist->next;
-				free((char *)dlp);
-				break;
-			}
-			if (dlp == 0) {
-				clrbmap(blkno);
+		} else if (testbmap(blkno + fragnum)) {
+			/*
+			 * The block's in use.  Remove our reference
+			 * from it.
+			 *
+			 * If it wasn't a dup, or everybody's done with
+			 * it, then this is the last reference and it's
+			 * safe to actually deallocate the on-disk block.
+			 *
+			 * We depend on pass 5 resolving the on-disk bitmap
+			 * effects.
+			 */
+			cg_frag = blkno + fragnum;
+			if (!find_dup_ref(cg_frag, idesc->id_number,
+			    idesc->id_lbn * sblock.fs_frag + fragnum,
+			    DB_DECR)) {
+
+				if (debug)
+					(void) printf("p4c marking %d avail\n",
+					    cg_frag);
+				clrbmap(cg_frag);
 				n_blks--;
+
+				/*
+				 * Do the same for the on-disk bitmap, so
+				 * that we don't need another pass to figure
+				 * out what's really being used.  We'll let
+				 * pass5() work out the fragment/block
+				 * accounting.
+				 */
+				cylno = dtog(&sblock, cg_frag);
+				(void) getblk(&cgblk, cgtod(&sblock, cylno),
+				    (size_t)sblock.fs_cgsize);
+				err = cg_sanity(cgp, cylno, &cg_fatal);
+				if (err != NULL) {
+					pfatal("CG %d: %s\n", cylno, err);
+					free((void *)err);
+					if (cg_fatal)
+						errexit(
+	    "Irreparable cylinder group header problem.  Program terminated.");
+					if (reply("REPAIR") == 0)
+						errexit("Program terminated.");
+					fix_cg(cgp, cylno);
+				}
+				clrbit(cg_blksfree(cgp),
+				    dtogd(&sblock, cg_frag));
+				cgdirty();
+
+				res |= ALTERED;
 			}
 		}
 	}
