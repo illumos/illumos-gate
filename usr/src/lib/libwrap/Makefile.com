@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,8 @@ CPPFLAGS +=	$(NETGROUP) $(TLI) $(ALWAYS_HOSTNAME) $(AUTH) \
 		-I$(SRCDIR) 
 CFLAGS +=	$(CCVERBOSE) -erroff=E_FUNC_EXPECTS_TO_RETURN_VALUE \
 		-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT \
-		-erroff=E_OLD_STYLE_DECL_HIDES_PROTO
+		-erroff=E_OLD_STYLE_DECL_HIDES_PROTO \
+		-_gcc=-Wno-return-type
 
 DISTFILES =	clean_exit.c diag.c eval.c fix_options.c fromhost.c \
 		hosts_access.c hosts_ctl.c misc.c mystdarg.h options.c \

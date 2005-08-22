@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -10,7 +10,8 @@ PROG =		safe_finger tcpd tcpdchk tcpdmatch try-from
 include ../Makefile.cmd
 
 ERROFF =	-erroff=E_FUNC_HAS_NO_RETURN_STMT \
-		-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
+		-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT \
+		-_gcc=-Wno-return-type -_gcc=-Wno-implicit
 CFLAGS +=	$(CCVERBOSE) $(ERROFF)
 CPPFLAGS +=	$(ACCESS) $(PARANOID) $(NETGROUP) $(TLI) \
 		$(UMASK) $(STYLE) $(TABLES) $(KILL_OPT) $(BUGS) \
