@@ -19,8 +19,9 @@ uts/common/sys/tmux.h
 uts/sparc/wsdrv
 uts/sun/io/wsdrv.c
 uts/sun/io/wsdrv.conf
-uts/intel/io/e1000g
+uts/common/io/e1000g
 uts/intel/e1000g
+uts/sparc/e1000g
 uts/common/io/nge
 uts/intel/nge
 uts/intel/io/adpu320

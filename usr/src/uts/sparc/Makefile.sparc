@@ -382,7 +382,7 @@ SVVS		+= svvs
 #
 #	Modules eXcluded from the product:
 #
-XMODS		+= wsdrv tavor daplt
+XMODS		+= wsdrv tavor daplt e1000g
 
 #
 #	'Dacf' Modules (/kernel/dacf):

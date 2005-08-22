@@ -62,7 +62,6 @@ elxl		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 ibd		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 iprb		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 pcelx		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-e1000g	read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 spwr		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 dld		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 #

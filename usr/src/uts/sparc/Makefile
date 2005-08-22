@@ -41,7 +41,8 @@ LINT_LIBS	 = $(LINT_LIB) $(GEN_LINT_LIB) \
 
 # EXPORT DELETE START
 LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-LINT_LIBS	+= $(XMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+LINT_XMODLIBS	= $(XMODS:e1000g=)
+LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 DRV_KMODS	+= dprov
 #
 # CRYPTO_EK_KMODS modules go in the encryption pack (SUNWcry*)

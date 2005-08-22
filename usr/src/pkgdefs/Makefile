@@ -115,7 +115,6 @@ i386_SUBDIRS= \
 
 i386_XMODS= \
 	SUNWadpu320 \
-	SUNWintgige \
 	SUNWlsimega \
 	SUNWnge
 
@@ -335,6 +334,7 @@ COMMON_XMODS= \
 	SUNWcry \
 	SUNWcryr \
 	SUNWcryptoint \
+	SUNWintgige \
 	SUNWkdcr \
 	SUNWkdcu \
 	SUNWopenssl-libraries \

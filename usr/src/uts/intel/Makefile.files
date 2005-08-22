@@ -136,14 +136,6 @@ FBT_OBJS += fbt.o
 SDT_OBJS += sdt.o
 
 #
-# 	e1000g module
-#
-IGIGE_OBJS = e1000g_debug.o e1000_hw.o e1000g_dlpi.o \
-             e1000g_alloc.o e1000g_tx.o e1000g_rx.o \
-             e1000g_stat.o e1000g_pci_chipset_detect.o \
-             e1000g_main.o
-
-#
 #	adpu320 module
 #
 ADPU320_OBJS  = adpu320.o hwminit.o hwmhrst.o hwmtask.o \

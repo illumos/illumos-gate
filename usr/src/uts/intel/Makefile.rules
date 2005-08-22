@@ -98,10 +98,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/scsi/targets/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:                $(UTSBASE)/intel/io/e1000g/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:  $(DRVDIR)/%.c $(ADPU_HEADERS) $(DRVDIR)/adpu320.h \
 		  $(DRVDIR)/release.h
 	$(COMPILE.c) -o $@ $<
