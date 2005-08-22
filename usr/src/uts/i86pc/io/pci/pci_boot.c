@@ -70,6 +70,7 @@ static void add_model_prop(dev_info_t *, uint_t);
 static void add_bus_range_prop(int);
 static void add_ppb_ranges_prop(int);
 static void add_bus_available_prop(int);
+static void alloc_res_array();
 
 /*
  * Enumerate all PCI devices
@@ -79,8 +80,7 @@ pci_setup_tree()
 {
 	uchar_t i, root_bus_addr = 0;
 
-	pci_bus_res = (struct pci_bus_resource *)kmem_zalloc(
-	    (pci_bios_nbus + 1) * sizeof (struct pci_bus_resource), KM_SLEEP);
+	alloc_res_array();
 	for (i = 0; i <= pci_bios_nbus; i++) {
 		pci_bus_res[i].par_bus = (uchar_t)-1;
 		pci_bus_res[i].root_addr = (uchar_t)-1;
@@ -994,9 +994,18 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func)
 	uint_t val, io_range[2], mem_range[2], pmem_range[2];
 	uchar_t secbus = pci_getb(bus, dev, func, PCI_BCNF_SECBUS);
 	uchar_t subbus = pci_getb(bus, dev, func, PCI_BCNF_SUBBUS);
-	ASSERT(secbus != 0 && secbus <= pci_bios_nbus);
-	ASSERT(pci_bus_res[secbus].dip == NULL);
+	ASSERT(secbus <= subbus);
 
+	/*
+	 * Some BIOSes lie about max pci busses, we allow for
+	 * such mistakes here
+	 */
+	if (subbus > pci_bios_nbus) {
+		pci_bios_nbus = subbus;
+		alloc_res_array();
+	}
+
+	ASSERT(pci_bus_res[secbus].dip == NULL);
 	pci_bus_res[secbus].dip = dip;
 	pci_bus_res[secbus].par_bus = bus;
 
@@ -1230,4 +1239,32 @@ add_bus_available_prop(int bus)
 	    "available", (int *)sp,
 	    i * sizeof (struct pci_phys_spec) / sizeof (int));
 	kmem_free(sp, count * sizeof (*sp));
+}
+
+static void
+alloc_res_array(void)
+{
+	static int array_max = 0;
+	int old_max;
+	void *old_res;
+
+	if (array_max > pci_bios_nbus + 1)
+		return;	/* array is big enough */
+
+	old_max = array_max;
+	old_res = pci_bus_res;
+
+	if (array_max == 0)
+		array_max = 16;	/* start with a reasonable number */
+
+	while (array_max < pci_bios_nbus + 1)
+		array_max <<= 1;
+	pci_bus_res = (struct pci_bus_resource *)kmem_zalloc(
+	    array_max * sizeof (struct pci_bus_resource), KM_SLEEP);
+
+	if (old_res) {	/* copy content and free old array */
+		bcopy(old_res, pci_bus_res,
+		    old_max * sizeof (struct pci_bus_resource));
+		kmem_free(old_res, old_max * sizeof (struct pci_bus_resource));
+	}
 }

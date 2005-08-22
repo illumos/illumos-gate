@@ -209,14 +209,15 @@ find(char *path, fileid_t *filep)
 			q++;
 		c = *q;
 		*q = '\0';
+		n = dlook(path, filep);
+		*q = c;
+		path = q;
 
-		if ((n = dlook(path, filep)) != 0) {
+		if (n != 0) {
 			if (c == '\0')
 				break;
 			if (opendir(n, filep))
 				return (0);
-			*q = c;
-			path = q;
 			continue;
 		} else {
 			return (0);
