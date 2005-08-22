@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,13 +145,13 @@ cpc_take_sample(cpc_event_t *this)
 int
 cpc_count_usr_events(int enable)
 {
-	return (syscall(SYS_cpc, CPC_USR_EVENTS, -1, (void *)enable, 0));
+	return (syscall(SYS_cpc, CPC_USR_EVENTS, -1, enable, 0));
 }
 
 int
 cpc_count_sys_events(int enable)
 {
-	return (syscall(SYS_cpc, CPC_SYS_EVENTS, -1, (void *)enable, 0));
+	return (syscall(SYS_cpc, CPC_SYS_EVENTS, -1, enable, 0));
 }
 
 int
