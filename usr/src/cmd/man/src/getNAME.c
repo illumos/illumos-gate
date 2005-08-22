@@ -1,18 +1,18 @@
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
+/*	Copyright 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	All Rights Reserved   */
 
 /*
- * Copyright (c) 1980 Regents of the University of California.
+ * Copyright 1980 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Get name sections from manual pages.
@@ -220,9 +220,17 @@ section(char *name, char *buf)
 	if (*(dp+1) == 's')
 		plen = PLEN + 1;
 
-	dp = dp ? dp+plen+1 : dir+plen;
+	if (dp != NULL) {
+		dp = dp+plen+1;
+	} else {
+		dir+plen;
+	}
 	np = strrchr(fname, '.');
-	np = np ? ++np : "";
+	if (np != NULL) {
+		++np;
+	} else {
+		np = "";
+	}
 	for (i = 0; i < 2; i++) {
 		while (*p && *p != ' ' && *p != '\t')
 			p++;
@@ -263,7 +271,7 @@ roff_trim(char *cp)
 		strcpy(cp, cp+1);
 	}
 	while (*cp) {
-		if (strncmp(cp,"\\f",2) == 0) {
+		if (strncmp(cp, "\\f", 2) == 0) {
 			if ((*(cp+2) >= 48) && (*(cp+2) <= 57)) {
 				strcpy(cp, cp+3);
 			}

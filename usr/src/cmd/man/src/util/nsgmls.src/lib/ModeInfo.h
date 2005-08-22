@@ -1,9 +1,20 @@
-// Copyright (c) 1994 James Clark
-// See the file COPYING for copying permission.
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
+ * Copyright 1994 James Clark
+ * See the file COPYING for copying permission.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifndef _MODEINFO_H
+#define	_MODEINFO_H
+
 #ifndef ModeInfo_INCLUDED
-#define ModeInfo_INCLUDED 1
+#define	ModeInfo_INCLUDED 1
 #ifdef __GNUG__
 #pragma interface
 #endif
@@ -19,22 +30,22 @@ namespace SP_NAMESPACE {
 #endif
 
 struct TokenInfo {
-  enum Type {
-    delimType,
-    setType,
-    functionType,
-    delimDelimType,
-    delimSetType
-    };
-  Type type;
-  Priority::Type priority;
-  Token token;
-  Syntax::DelimGeneral delim1;
-  union {
-    Syntax::DelimGeneral delim2;
-    Syntax::Set set;
-    Syntax::StandardFunction function;
-  };
+	enum Type {
+		delimType,
+		setType,
+		functionType,
+		delimDelimType,
+		delimSetType
+		};
+	Type type;
+	Priority::Type priority;
+	Token token;
+	Syntax::DelimGeneral delim1;
+	union {
+		Syntax::DelimGeneral delim2;
+		Syntax::Set set;
+		Syntax::StandardFunction function;
+	};
 };
 
 class Sd;
@@ -42,19 +53,19 @@ struct PackedTokenInfo;
 
 class ModeInfo {
 public:
-  ModeInfo(Mode mode, const Sd &sd);
-  Boolean nextToken(TokenInfo *);
-  Boolean includesShortref() const;
+	ModeInfo(Mode mode, const Sd &sd);
+	Boolean nextToken(TokenInfo *);
+	Boolean includesShortref() const;
 private:
-  Mode mode_;
-  const PackedTokenInfo *p_;		// points to next
-  size_t count_;
-  unsigned missingRequirements_;
+	Mode mode_;
+	const PackedTokenInfo *p_;		// points to next
+	size_t count_;
+	unsigned missingRequirements_;
 };
 
 inline Boolean ModeInfo::includesShortref() const
 {
-  return mode_ >= minShortrefMode;
+	return (mode_ >= (enum Mode) minShortrefMode);
 }
 
 #ifdef SP_NAMESPACE
@@ -62,3 +73,5 @@ inline Boolean ModeInfo::includesShortref() const
 #endif
 
 #endif /* not ModeInfo_INCLUDED */
+
+#endif /* _MODEINFO_H */

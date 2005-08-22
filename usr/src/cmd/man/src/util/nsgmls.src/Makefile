@@ -1,8 +1,12 @@
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1994, 1995 James Clark
-# See the file COPYING for copying permission.
+#
+# Copyright 1994, 1995 James Clark
+#
+
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../../../../Makefile.cmd
 prefix=$(ROOTLIB)
@@ -44,6 +48,7 @@ CXXFLAGS=
 LDFLAGS += -norunpath -nolib
 OPT=
 CFLAGS += $(OPT) $(DEBUG) 
+CCFLAGS += -noex
 # Missing library functions
 # Uncomment these if your C++ system doesn't provide them.
 LIBOBJS=#strerror.o memmove.o
@@ -53,7 +58,9 @@ LIBOBJS=#strerror.o memmove.o
 # -lnsl on SunOS 4.1.3
 XLIBS=-lsocket -lnsl
 # -L/usr/local/lib may be needed on the RS/6000
-LIBS += $(ENVLDLIBS1) $(ENVLDLIBS2) $(XLIBS) -lC -lc
+# Link time macros for g++ compiler
+$(__GNUC)CCNEEDED=-lstdc++
+LIBS += $(ENVLDLIBS1) $(ENVLDLIBS2) $(XLIBS) $(CCNEEDED) -lc
 # If you're building in another directory, copy or link this Makefile
 # to the build directory, and set srcdir to point to the source directory.
 srcdir=.
@@ -77,6 +84,7 @@ PURIFYFLAGS=
 PURIFY=purify $(PURIFYFLAGS) -g++=yes -collector=`dirname \`gcc -print-libgcc-file-name\``/ld
 
 MDEFINES='CXX=$(CXX)' 'CC=$(CC)' 'LIBOBJS=$(LIBOBJS)' 'CXXFLAGS=$(CXXFLAGS)' \
+ 'CCFLAGS=$(CCFLAGS)' \
  'CFLAGS=$(CFLAGS)' 'LDFLAGS=$(LDFLAGS)' 'DEFINES=$(DEFINES)' \
  'srcdir=$(srcdir)' 'AR=$(AR)' 'RANLIB=$(RANLIB)' \
  'M4=$(M4)' 'PERL=$(PERL)' 'LIBS=$(LIBS)' 'PURIFY=$(PURIFY)' \

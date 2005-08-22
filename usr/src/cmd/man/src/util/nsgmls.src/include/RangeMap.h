@@ -1,9 +1,20 @@
-// Copyright (c) 1994 James Clark
-// See the file COPYING for copying permission.
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
+ * Copyright 1994 James Clark
+ * See the file COPYING for copying permission.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifndef _RANGEMAP_H
+#define	_RANGEMAP_H
+
 #ifndef RangeMap_INCLUDED
-#define RangeMap_INCLUDED 1
+#define	RangeMap_INCLUDED 1
 
 #include "Vector.h"
 #include "Boolean.h"
@@ -15,47 +26,51 @@
 namespace SP_NAMESPACE {
 #endif
 
-template<class From, class To>
+template < class From, class To >
 struct RangeMapRange {
-  From fromMin;
-  From fromMax;
-  To toMin;
+	From fromMin;
+	From fromMax;
+	To toMin;
 };
 
-template<class From, class To> class RangeMapIter;
+template < class From, class To > class RangeMapIter;
+template < class From, class To > class RangeMap;
 
-template<class From, class To>
+template < class From, class To >
 class RangeMap {
 public:
-  RangeMap();
-  Boolean map(From, To &, From &alsoMax) const;
-  // Return 0 for no matches, 1 for 1, 2 for more than 1.
-  unsigned inverseMap(To, From &, ISet<WideChar> &, WideChar &count) const;
-  void addRange(From, From, To);
+	RangeMap();
+	Boolean map(From, To &, From &alsoMax) const;
+	// Return 0 for no matches, 1 for 1, 2 for more than 1.
+	unsigned inverseMap(To, From &, ISet < WideChar > &, \
+		WideChar &count) const;
+	void addRange(From, From, To);
 private:
-  Vector<RangeMapRange<From,To> > ranges_;
-  friend class RangeMapIter<From,To>;
+	Vector < RangeMapRange < From, To > > ranges_;
+	friend class RangeMapIter < From, To >\
+;
 };
 
-template<class From, class To>
+template < class From, class To >
 class RangeMapIter {
 public:
-  RangeMapIter(const RangeMap<From,To> &map);
-  Boolean next(From &fromMin, From &fromMax, To &toMin) {
-    if (!count_)
-      return 0;
-    else {
-      fromMin = ptr_->fromMin;
-      fromMax = ptr_->fromMax;
-      toMin = ptr_->toMin;
-      ptr_++;
-      count_--;
-      return 1;
-    }
-  }
+	RangeMapIter(const RangeMap < From, To > &map);
+	Boolean next(From &fromMin, From &fromMax, To &toMin) {
+		if (!count_)
+			return (0);
+		else {
+			fromMin = ptr_->fromMin;
+			fromMax = ptr_->fromMax;
+			toMin = ptr_->toMin;
+			ptr_++;
+			count_--;
+			return (1);
+		}
+	}
 private:
-  size_t count_;
-  Vector<RangeMapRange<From,To> >::const_iterator ptr_;
+	size_t count_;
+	typename Vector < RangeMapRange < From, To > >\
+::const_iterator ptr_;
 };
 
 #ifdef SP_NAMESPACE
@@ -67,3 +82,5 @@ private:
 #ifdef SP_DEFINE_TEMPLATES
 #include "RangeMap.cxx"
 #endif
+
+#endif /* _RANGEMAP_H */
