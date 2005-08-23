@@ -249,6 +249,21 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	rep_passwd = al[0].data.val_s;
 
+	/*
+	 * Chop off old SunOS-style password aging information.
+	 *
+	 * Note: old style password aging is only defined for UNIX-style
+	 *	 crypt strings, hence the comma will always be at position 14.
+	 * Note: This code is here because some other vendors might still
+	 *	 support this style of password aging. If we don't remove
+	 *	 the age field, users won't be able to change their password.
+	 * XXX   yank this code when we're certain this "compatibility"
+	 *	 isn't needed anymore.
+	 */
+	if (rep_passwd != NULL && rep_passwd[0] != '$' &&
+	    strlen(rep_passwd) > 13 && rep_passwd[13] == ',')
+		rep_passwd[13] = '\0';
+
 	if (strcmp(crypt(password, rep_passwd), rep_passwd) != 0) {
 		retval = PAM_AUTH_ERR;
 		goto out;
