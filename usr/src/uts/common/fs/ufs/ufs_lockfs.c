@@ -312,6 +312,8 @@ ufs_flush(struct vfs *vfsp)
 	int		saverror = 0;
 	struct ufsvfs	*ufsvfsp	= (struct ufsvfs *)vfsp->vfs_data;
 	struct fs	*fs		= ufsvfsp->vfs_fs;
+	ml_unit_t	*ul	= ufsvfsp->vfs_log;
+	mt_map_t	*mtm	= ul->un_deltamap;
 
 	ASSERT(vfs_lock_held(vfsp));
 
@@ -367,19 +369,30 @@ ufs_flush(struct vfs *vfsp)
 		ufs_checkclean(vfsp);
 
 	/*
-	 * flush any outstanding transactions and roll the log
+	 * Flush any outstanding transactions and roll the log
+	 * only if we are supposed to do, i.e. LDL_NOROLL not set.
+	 * We can not simply check for fs_ronly here since fsck also may
+	 * use this code to roll the log on a read-only filesystem, e.g.
+	 * root during early stages of boot, if other then a sanity check is
+	 * done, it will clear LDL_NOROLL before.
+	 * In addition we assert that the deltamap does not contain any deltas
+	 * in case LDL_NOROLL is set since this is not supposed to happen.
 	 */
 	if (TRANS_ISTRANS(ufsvfsp)) {
-		curthread->t_flag |= T_DONTBLOCK;
-		TRANS_BEGIN_SYNC(ufsvfsp, TOP_COMMIT_FLUSH, TOP_COMMIT_SIZE,
-		    error);
-		if (!error) {
-			TRANS_END_SYNC(ufsvfsp, saverror, TOP_COMMIT_FLUSH,
-			    TOP_COMMIT_SIZE);
-		}
-		curthread->t_flag &= ~T_DONTBLOCK;
+		if (ul->un_flags & LDL_NOROLL) {
+			ASSERT(mtm->mtm_nme == 0);
+		} else {
+			curthread->t_flag |= T_DONTBLOCK;
+			TRANS_BEGIN_SYNC(ufsvfsp, TOP_COMMIT_FLUSH,
+			    TOP_COMMIT_SIZE, error);
+			if (!error) {
+				TRANS_END_SYNC(ufsvfsp, saverror,
+				    TOP_COMMIT_FLUSH, TOP_COMMIT_SIZE);
+			}
+			curthread->t_flag &= ~T_DONTBLOCK;
 
-		logmap_roll_dev(ufsvfsp->vfs_log); /* fully roll the log */
+			logmap_roll_dev(ufsvfsp->vfs_log);
+		}
 	}
 
 	return (saverror);
