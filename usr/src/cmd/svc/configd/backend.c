@@ -20,11 +20,19 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * sqlite is not compatible with _FILE_OFFSET_BITS=64, but we need to
+ * be able to statvfs(2) possibly large systems.  This define gives us
+ * access to the transitional interfaces.  See lfcompile64(5) for how
+ * _LARGEFILE64_SOURCE works.
+ */
+#define	_LARGEFILE64_SOURCE
 
 #include <assert.h>
 #include <door.h>
@@ -37,6 +45,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <unistd.h>
 #include <zone.h>
 
@@ -72,9 +82,10 @@ typedef struct sqlite_backend {
 	pthread_t	be_thread;	/* thread holding lock */
 	struct sqlite	*be_db;
 	const char	*be_path;	/* path to db */
-	int		be_readonly;	/* backend is read-only */
+	int		be_readonly;	/* readonly at start, and still is */
 	int		be_writing;	/* held for writing */
 	backend_type_t	be_type;	/* type of db */
+	hrtime_t	be_lastcheck;	/* time of last read-only check */
 	backend_totals_t be_totals[2];	/* one for reading, one for writing */
 } sqlite_backend_t;
 
@@ -118,6 +129,9 @@ pthread_t backend_panic_thread = 0;
 int backend_do_trace = 0;		/* invoke tracing callback */
 int backend_print_trace = 0;		/* tracing callback prints SQL */
 int backend_panic_abort = 0;		/* abort when panicking */
+
+/* interval between read-only checks while starting up */
+#define	BACKEND_READONLY_CHECK_INTERVAL	(2 * (hrtime_t)NANOSEC)
 
 /*
  * Any change to the below schema should bump the version number
@@ -319,16 +333,47 @@ backend_fail_if_seen(void *arg, int columns, char **vals, char **names)
 	return (BACKEND_CALLBACK_ABORT);
 }
 
+/*
+ * check to see if we can successfully start a transaction;  if not, the
+ * filesystem is mounted read-only.
+ */
 static int
-backend_is_readonly(struct sqlite *db, char **errp)
+backend_is_readonly(struct sqlite *db, const char *path)
 {
-	int r = sqlite_exec(db,
+	int r;
+	statvfs64_t stat;
+
+	if (statvfs64(path, &stat) == 0 && (stat.f_flag & ST_RDONLY))
+		return (SQLITE_READONLY);
+
+	r = sqlite_exec(db,
 	    "BEGIN TRANSACTION; "
 	    "UPDATE schema_version SET schema_version = schema_version; ",
-	    NULL, NULL, errp);
-
+	    NULL, NULL, NULL);
 	(void) sqlite_exec(db, "ROLLBACK TRANSACTION", NULL, NULL, NULL);
 	return (r);
+}
+
+/*
+ * Check to see if the administrator has removed the writable bits on the
+ * repository file.  If they have, we don't allow modifications.
+ *
+ * Since we normally run with PRIV_FILE_DAC_WRITE, we have to use a separate
+ * check.
+ */
+static int
+backend_check_perm(const char *path)
+{
+	struct stat64 stat;
+
+	if (access(path, W_OK) < 0)
+		return (SQLITE_READONLY);
+
+	if (stat64(path, &stat) == 0 &&
+	    !(stat.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)))
+		return (SQLITE_READONLY);
+
+	return (SQLITE_OK);
 }
 
 static void
@@ -655,6 +700,68 @@ backend_backup_base(sqlite_backend_t *be, const char *name,
 }
 
 /*
+ * See if a backup is needed.  We do a backup unless both files are
+ * byte-for-byte identical.
+ */
+static int
+backend_check_backup_needed(const char *rep_name, const char *backup_name)
+{
+	int repfd = open(rep_name, O_RDONLY);
+	int fd = open(backup_name, O_RDONLY);
+	struct stat s_rep, s_backup;
+	int c1, c2;
+
+	FILE *f_rep = NULL;
+	FILE *f_backup = NULL;
+
+	if (repfd < 0 || fd < 0)
+		goto fail;
+
+	if (fstat(repfd, &s_rep) < 0 || fstat(fd, &s_backup) < 0)
+		goto fail;
+
+	/*
+	 * if they are the same file, we need to do a backup to break the
+	 * hard link or symlink involved.
+	 */
+	if (s_rep.st_ino == s_backup.st_ino && s_rep.st_dev == s_backup.st_dev)
+		goto fail;
+
+	if (s_rep.st_size != s_backup.st_size)
+		goto fail;
+
+	if ((f_rep = fdopen(repfd, "r")) == NULL ||
+	    (f_backup = fdopen(fd, "r")) == NULL)
+		goto fail;
+
+	do {
+		c1 = getc(f_rep);
+		c2 = getc(f_backup);
+		if (c1 != c2)
+			goto fail;
+	} while (c1 != EOF);
+
+	if (!ferror(f_rep) && !ferror(f_backup)) {
+		(void) fclose(f_rep);
+		(void) fclose(f_backup);
+		(void) close(repfd);
+		(void) close(fd);
+		return (0);
+	}
+
+fail:
+	if (f_rep != NULL)
+		(void) fclose(f_rep);
+	if (f_backup != NULL)
+		(void) fclose(f_backup);
+	if (repfd >= 0)
+		(void) close(repfd);
+	if (fd >= 0)
+		(void) close(fd);
+	return (1);
+}
+
+/*
  * Can return:
  *	_BAD_REQUEST		name is not valid
  *	_TRUNCATED		name is too long for current repository path
@@ -692,6 +799,10 @@ backend_create_backup_locked(sqlite_backend_t *be, const char *name)
 	result = backend_backup_base(be, name, finalpath, sizeof (finalpath));
 	if (result != REP_PROTOCOL_SUCCESS)
 		return (result);
+
+	if (!backend_check_backup_needed(be->be_path, finalpath)) {
+		return (REP_PROTOCOL_SUCCESS);
+	}
 
 	/*
 	 * remember the original length, and the basename location
@@ -819,6 +930,58 @@ fail:
 	return (result);
 }
 
+static int
+backend_check_readonly(sqlite_backend_t *be, int writing, hrtime_t t)
+{
+	char *errp;
+	struct sqlite *new;
+	int r;
+
+	assert(be->be_readonly);
+	assert(be == bes[BACKEND_TYPE_NORMAL]);
+
+	/*
+	 * If we don't *need* to be writable, only check every once in a
+	 * while.
+	 */
+	if (!writing) {
+		if ((uint64_t)(t - be->be_lastcheck) <
+		    BACKEND_READONLY_CHECK_INTERVAL)
+			return (REP_PROTOCOL_SUCCESS);
+		be->be_lastcheck = t;
+	}
+
+	new = sqlite_open(be->be_path, 0600, &errp);
+	if (new == NULL) {
+		backend_panic("reopening %s: %s\n", be->be_path, errp);
+		/*NOTREACHED*/
+	}
+	r = backend_is_readonly(new, be->be_path);
+
+	if (r != SQLITE_OK) {
+		sqlite_close(new);
+		if (writing)
+			return (REP_PROTOCOL_FAIL_BACKEND_READONLY);
+		return (REP_PROTOCOL_SUCCESS);
+	}
+
+	/*
+	 * We can write!  Swap the db handles, mark ourself writable,
+	 * and make a backup.
+	 */
+	sqlite_close(be->be_db);
+	be->be_db = new;
+	be->be_readonly = 0;
+
+	if (backend_create_backup_locked(be, REPOSITORY_BOOT_BACKUP) !=
+	    REP_PROTOCOL_SUCCESS) {
+		configd_critical(
+		    "unable to create \"%s\" backup of \"%s\"\n",
+		    REPOSITORY_BOOT_BACKUP, be->be_path);
+	}
+
+	return (REP_PROTOCOL_SUCCESS);
+}
 
 /*
  * If t is not BACKEND_TYPE_NORMAL, can fail with
@@ -859,41 +1022,23 @@ backend_lock(backend_type_t t, int writing, sqlite_backend_t **bep)
 	}
 	be->be_thread = pthread_self();
 
-	if (writing && be->be_readonly) {
-		char *errp;
-		struct sqlite *new;
+	if (be->be_readonly) {
 		int r;
-
 		assert(t == BACKEND_TYPE_NORMAL);
 
-		new = sqlite_open(be->be_path, 0600, &errp);
-		if (new == NULL) {
-			backend_panic("reopening %s: %s\n", be->be_path, errp);
-			/*NOTREACHED*/
-		}
-		r = backend_is_readonly(new, &errp);
-		if (r != SQLITE_OK) {
-			free(errp);
-			sqlite_close(new);
+		r = backend_check_readonly(be, writing, ts);
+		if (r != REP_PROTOCOL_SUCCESS) {
 			be->be_thread = 0;
 			(void) pthread_mutex_unlock(&be->be_lock);
-			return (REP_PROTOCOL_FAIL_BACKEND_READONLY);
+			return (r);
 		}
+	}
 
-		/*
-		 * We can write!  Swap our db handles, mark ourself writable,
-		 * and make a backup.
-		 */
-		sqlite_close(be->be_db);
-		be->be_db = new;
-		be->be_readonly = 0;
-
-		if (backend_create_backup_locked(be, REPOSITORY_BOOT_BACKUP) !=
-		    REP_PROTOCOL_SUCCESS) {
-			configd_critical(
-			    "unable to create \"%s\" backup of \"%s\"\n",
-			    REPOSITORY_BOOT_BACKUP, be->be_path);
-		}
+	if (writing && t == BACKEND_TYPE_NORMAL &&
+	    backend_check_perm(be->be_path) != SQLITE_OK) {
+		be->be_thread = 0;
+		(void) pthread_mutex_unlock(&be->be_lock);
+		return (REP_PROTOCOL_FAIL_BACKEND_READONLY);
 	}
 
 	if (backend_do_trace)
@@ -1192,7 +1337,7 @@ integrity_fail:
 	/*
 	 * check if we are writable
 	 */
-	r = backend_is_readonly(be->be_db, &errp);
+	r = backend_is_readonly(be->be_db, be->be_path);
 
 	if (r == SQLITE_BUSY || r == SQLITE_LOCKED) {
 		free(errp);

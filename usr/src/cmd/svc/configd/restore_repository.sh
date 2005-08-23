@@ -21,28 +21,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 PATH=/sbin:/usr/bin:/usr/sbin
+LC_ALL=C
+export PATH LC_ALL
 
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/fs_include.sh
 
-echo >&2 "
-Repository Restore utility
-
-See http://sun.com/msg/SMF-8000-MY for more information on the use of
-this script to restore backup copies of the smf(5) repository.
-
-If there are any problems which need human intervention, this script will
-give instructions and then exit back to your shell."
-
 usage()
 {
 	echo "usage: $0 [-r rootdir]" >&2
+	echo "
+See http://sun.com/msg/SMF-8000-MY for more information on the use of
+this script."
 	exit 2;
 }
 
@@ -79,6 +75,23 @@ if [ $OPTIND -le $# ]; then
 	usage
 fi
 
+#
+# Note that the below test is carefully constructed to fail *open*;  if
+# anything goes wrong, it will drive onward.
+#
+if [ -x /usr/bin/id -a -x /usr/bin/grep ] &&
+    /usr/bin/id 2>/dev/null | /usr/bin/grep -v '^[^=]*=0(' >/dev/null 2>&1; then
+	echo "$0: may only be invoked by root" >&2
+	exit 2
+fi
+
+echo >&2 "
+See http://sun.com/msg/SMF-8000-MY for more information on the use of
+this script to restore backup copies of the smf(5) repository.
+
+If there are any problems which need human intervention, this script will
+give instructions and then exit back to your shell."
+
 if [ "$myroot" -eq / ]; then
 	system="system"
 	[ "`/sbin/zonename`" != global ] && system="zone"
@@ -99,6 +112,7 @@ rootro=false
 if [ ! -x /usr/bin/pgrep ]; then
 	nouser=true
 fi
+
 if [ ! -w "$myroot" ]; then
 	rootro=true
 fi
@@ -142,7 +156,8 @@ if [ -z "$oldreps" ]; then
 	cat >&2 <<EOF
 There are no available backups of $myroot$repositorydir/$repository.db.
 The only available repository is "-seed-".  Note that restoring the seed
-will lose all customizations, and XXX other issues?
+will lose all customizations, including those made by the system during
+the installation and/or upgrade process.
 
 EOF
 	prompt="Enter -seed- to restore from the seed, or -quit- to exit: \c"
@@ -160,13 +175,17 @@ the repository after system boot.  Backups beginning with "manifest_import"
 are made after svc:/system/manifest-import:default finishes its processing.
 The time of backup is given in YYYYMMDD_HHMMSS format.
 
-Please enter one of:
-	1) boot, for the most recent post-boot backup
-	2) manifest_import, for the most recent manifest_import backup.
-	3) a specific backup repository from the above list
-	4) -seed-, the initial starting repository.  (All customizations
-	   will be lost.)
-	5) -quit-, to cancel.
+Please enter either a specific backup repository from the above list to
+restore it, or one of the following choices:
+
+	CHOICE		  ACTION
+	----------------  ----------------------------------------------
+	boot		  restore the most recent post-boot backup
+	manifest_import	  restore the most recent manifest_import backup
+	-seed-		  restore the initial starting repository  (All
+			    customizations will be lost, including those
+			    made by the install/upgrade process.)
+	-quit-		  cancel script and quit
 
 EOF
 	prompt="Enter response [boot]: \c"

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,8 +106,8 @@ uutil_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    "ADDR", "POOL", "PARENT", "NODES", "FLAGS");
 
 	mdb_printf("%0?p %0?p %0?p %6u    %c%c\n",
-	    addr, ul.ul_pool, ul.ul_parent, ul.ul_numnodes,
-	    ul.ul_sorted ? 'S' : ' ', ul.ul_debug? 'D' : ' ');
+	    addr, ul.ul_pool, UU_PTR_DECODE(ul.ul_parent_enc),
+	    ul.ul_numnodes, ul.ul_sorted ? 'S' : ' ', ul.ul_debug? 'D' : ' ');
 
 	return (DCMD_OK);
 }
@@ -185,21 +185,23 @@ typedef struct uutil_list_walk {
 int
 uutil_list_walk_init(mdb_walk_state_t *wsp)
 {
-	uu_list_t null_list;
 	uutil_list_walk_t *ulw;
 	uu_list_pool_t ulp;
-
-	bzero(&null_list, sizeof (uu_list_t));
 
 	if (mdb_vread(&ulp, sizeof (uu_list_pool_t), wsp->walk_addr) == -1) {
 		mdb_warn("failed to read uu_list_pool_t at given address\n");
 		return (WALK_ERR);
 	}
 
+	if (UU_LIST_PTR(ulp.ulp_null_list.ul_next_enc) ==
+	    &((uu_list_pool_t *)wsp->walk_addr)->ulp_null_list)
+		return (WALK_DONE);
+
 	ulw = mdb_alloc(sizeof (uutil_list_walk_t), UM_SLEEP);
 
-	ulw->ulw_final = (uintptr_t)ulp.ulp_null_list.ul_prev;
-	ulw->ulw_current = (uintptr_t)ulp.ulp_null_list.ul_next;
+	ulw->ulw_final = (uintptr_t)UU_LIST_PTR(ulp.ulp_null_list.ul_prev_enc);
+	ulw->ulw_current =
+	    (uintptr_t)UU_LIST_PTR(ulp.ulp_null_list.ul_next_enc);
 	wsp->walk_data = ulw;
 
 	return (WALK_NEXT);
@@ -222,7 +224,7 @@ uutil_list_walk_step(mdb_walk_state_t *wsp)
 	if (ulw->ulw_current == ulw->ulw_final)
 		return (WALK_DONE);
 
-	ulw->ulw_current = (uintptr_t)ul.ul_next;
+	ulw->ulw_current = (uintptr_t)UU_LIST_PTR(ul.ul_next_enc);
 
 	return (status);
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 #include <door.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <priv.h>
 #include <procfs.h>
 #include <pthread.h>
@@ -162,7 +163,8 @@ thread_exiting(void *arg)
 {
 	thread_info_t *ti = arg;
 
-	log_enter(&ti->ti_log);
+	if (ti != NULL)
+		log_enter(&ti->ti_log);
 
 	(void) pthread_mutex_lock(&thread_lock);
 	if (ti != NULL) {
@@ -471,6 +473,23 @@ daemonize_ready(void)
 	(void) close(pipe_fd);
 }
 
+const char *
+regularize_path(const char *dir, const char *base, char *tmpbuf)
+{
+	if (base == NULL)
+		return (NULL);
+	if (base[0] == '/')
+		return (base);
+
+	if (snprintf(tmpbuf, PATH_MAX, "%s/%s", dir, base) >= PATH_MAX) {
+		(void) fprintf(stderr, "svc.configd: %s/%s: path too long\n",
+		    dir, base);
+		exit(CONFIGD_EXIT_BAD_ARGS);
+	}
+
+	return (tmpbuf);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -485,6 +504,12 @@ main(int argc, char *argv[])
 	int c;
 	int ret;
 	int fd;
+
+	char curdir[PATH_MAX];
+	char dbtmp[PATH_MAX];
+	char npdbtmp[PATH_MAX];
+	char doortmp[PATH_MAX];
+
 	const char *dbpath = NULL;
 	const char *npdbpath = NULL;
 	const char *doorpath = REPOSITORY_DOOR_NAME;
@@ -495,13 +520,20 @@ main(int argc, char *argv[])
 
 	closefrom(3);			/* get rid of extraneous fds */
 
+	if (getcwd(curdir, sizeof (curdir)) == NULL) {
+		(void) fprintf(stderr,
+		    "%s: unable to get current directory: %s\n",
+		    argv[0], strerror(errno));
+		exit(CONFIGD_EXIT_INIT_FAILED);
+	}
+
 	while ((c = getopt(argc, argv, "Dnpd:r:t:")) != -1) {
 		switch (c) {
 		case 'n':
 			daemonize = 0;
 			break;
 		case 'd':
-			doorpath = optarg;
+			doorpath = regularize_path(curdir, optarg, doortmp);
 			is_main_repository = 0;
 			have_npdb = 0;		/* default to no non-persist */
 			break;
@@ -527,11 +559,11 @@ main(int argc, char *argv[])
 			privileged_psinfo_fd = fd;
 			break;
 		case 'r':
-			dbpath = optarg;
+			dbpath = regularize_path(curdir, optarg, dbtmp);
 			is_main_repository = 0;
 			break;
 		case 't':
-			npdbpath = optarg;
+			npdbpath = regularize_path(curdir, optarg, npdbtmp);
 			is_main_repository = 0;
 			break;
 		default:

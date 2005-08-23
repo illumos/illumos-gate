@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,7 +177,35 @@ transaction_entry_compare(const void *l_arg, const void *r_arg, void *private)
 	ret = strcmp(l_prop, r_prop);
 	if (ret > 0)
 		return (1);
-	else if (ret < 0)
+	if (ret < 0)
+		return (-1);
+	return (0);
+}
+
+static int
+datael_compare(const void *l_arg, const void *r_arg, void *private)
+{
+	uint32_t l_id = ((scf_datael_t *)l_arg)->rd_entity;
+	uint32_t r_id = (r_arg != NULL) ? ((scf_datael_t *)r_arg)->rd_entity :
+	    *(uint32_t *)private;
+
+	if (l_id > r_id)
+		return (1);
+	if (l_id < r_id)
+		return (-1);
+	return (0);
+}
+
+static int
+iter_compare(const void *l_arg, const void *r_arg, void *private)
+{
+	uint32_t l_id = ((scf_iter_t *)l_arg)->iter_id;
+	uint32_t r_id = (r_arg != NULL) ? ((scf_iter_t *)r_arg)->iter_id :
+	    *(uint32_t *)private;
+
+	if (l_id > r_id)
+		return (1);
+	if (l_id < r_id)
 		return (-1);
 	return (0);
 }
@@ -209,11 +237,11 @@ lowlevel_init(void)
 
 		datael_pool = uu_list_pool_create("SUNW,libscf_datael",
 		    sizeof (scf_datael_t), offsetof(scf_datael_t, rd_node),
-		    NULL, UU_LIST_POOL_DEBUG);
+		    datael_compare, UU_LIST_POOL_DEBUG);
 
 		iter_pool = uu_list_pool_create("SUNW,libscf_iter",
 		    sizeof (scf_iter_t), offsetof(scf_iter_t, iter_node),
-		    NULL, UU_LIST_POOL_DEBUG);
+		    iter_compare, UU_LIST_POOL_DEBUG);
 
 		assert_nolint(offsetof(scf_transaction_entry_t,
 		    entry_property) == 0);
@@ -506,14 +534,22 @@ handle_is_bound(scf_handle_t *h)
 }
 
 static int
-handle_has_server(scf_handle_t *h)
+handle_has_server_locked(scf_handle_t *h)
 {
 	door_info_t i;
+	assert(MUTEX_HELD(&h->rh_lock));
+
+	return (handle_is_bound(h) && door_info(h->rh_doorfd, &i) != -1 &&
+	    i.di_target != -1);
+}
+
+static int
+handle_has_server(scf_handle_t *h)
+{
 	int ret;
 
 	(void) pthread_mutex_lock(&h->rh_lock);
-	ret = (handle_is_bound(h) && door_info(h->rh_doorfd, &i) != -1 &&
-	    i.di_target != -1);
+	ret = handle_has_server_locked(h);
 	(void) pthread_mutex_unlock(&h->rh_lock);
 
 	return (ret);
@@ -1267,24 +1303,91 @@ scf_myname(scf_handle_t *h, char *out, size_t len)
 }
 
 static uint32_t
-handle_alloc_entityid(scf_handle_t *handle)
+handle_alloc_entityid(scf_handle_t *h)
 {
-	assert(MUTEX_HELD(&handle->rh_lock));
-	return (++handle->rh_nextentity);
+	uint32_t nextid;
+
+	assert(MUTEX_HELD(&h->rh_lock));
+
+	if (uu_list_numnodes(h->rh_dataels) == UINT32_MAX)
+		return (0);		/* no ids available */
+
+	/*
+	 * The following loop assumes that there are not a huge number of
+	 * outstanding entities when we've wrapped.  If that ends up not
+	 * being the case, the O(N^2) nature of this search will hurt a lot,
+	 * and the data structure should be switched to an AVL tree.
+	 */
+	nextid = h->rh_nextentity + 1;
+	for (;;) {
+		scf_datael_t *cur;
+
+		if (nextid == 0) {
+			nextid++;
+			h->rh_flags |= HANDLE_WRAPPED_ENTITY;
+		}
+		if (!(h->rh_flags & HANDLE_WRAPPED_ENTITY))
+			break;
+
+		cur = uu_list_find(h->rh_dataels, NULL, &nextid, NULL);
+		if (cur == NULL)
+			break;		/* not in use */
+
+		if (nextid == h->rh_nextentity)
+			return (0);	/* wrapped around; no ids available */
+		nextid++;
+	}
+
+	h->rh_nextentity = nextid;
+	return (nextid);
 }
 
 static uint32_t
-handle_alloc_iterid(scf_handle_t *handle)
+handle_alloc_iterid(scf_handle_t *h)
 {
-	assert(MUTEX_HELD(&handle->rh_lock));
-	return (++handle->rh_nextiter);
+	uint32_t nextid;
+
+	assert(MUTEX_HELD(&h->rh_lock));
+
+	if (uu_list_numnodes(h->rh_iters) == UINT32_MAX)
+		return (0);		/* no ids available */
+
+	/* see the comment in handle_alloc_entityid */
+	nextid = h->rh_nextiter + 1;
+	for (;;) {
+		scf_iter_t *cur;
+
+		if (nextid == 0) {
+			nextid++;
+			h->rh_flags |= HANDLE_WRAPPED_ITER;
+		}
+		if (!(h->rh_flags & HANDLE_WRAPPED_ITER))
+			break;			/* not yet wrapped */
+
+		cur = uu_list_find(h->rh_iters, NULL, &nextid, NULL);
+		if (cur == NULL)
+			break;		/* not in use */
+
+		if (nextid == h->rh_nextiter)
+			return (0);	/* wrapped around; no ids available */
+		nextid++;
+	}
+
+	h->rh_nextiter = nextid;
+	return (nextid);
 }
 
 static uint32_t
-handle_alloc_changeid(scf_handle_t *handle)
+handle_next_changeid(scf_handle_t *handle)
 {
+	uint32_t nextid;
+
 	assert(MUTEX_HELD(&handle->rh_lock));
-	return (++handle->rh_nextchangeid);
+
+	nextid = ++handle->rh_nextchangeid;
+	if (nextid == 0)
+		nextid = ++handle->rh_nextchangeid;
+	return (nextid);
 }
 
 /*
@@ -1320,6 +1423,11 @@ datael_init(scf_datael_t *dp, scf_handle_t *h, uint32_t type)
 		return (scf_set_error(SCF_ERROR_HANDLE_DESTROYED));
 	}
 	dp->rd_entity = handle_alloc_entityid(h);
+	if (dp->rd_entity == 0) {
+		(void) pthread_mutex_unlock(&h->rh_lock);
+		uu_list_node_fini(dp, &dp->rd_node, datael_pool);
+		return (scf_set_error(SCF_ERROR_NO_MEMORY));
+	}
 
 	ret = datael_attach(dp);
 	if (ret == 0) {
@@ -1767,7 +1875,7 @@ datael_add_child(const scf_datael_t *dp, const char *name, uint32_t type,
 	request.rpr_childid = cp->rd_entity;
 
 	datael_finish_reset(dp);
-	request.rpr_changeid = handle_alloc_changeid(h);
+	request.rpr_changeid = handle_next_changeid(h);
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
 	(void) pthread_mutex_unlock(&h->rh_lock);
@@ -1831,7 +1939,7 @@ datael_add_pg(const scf_datael_t *dp, const char *name, const char *type,
 
 	datael_finish_reset(dp);
 	datael_finish_reset(cp);
-	request.rpr_changeid = handle_alloc_changeid(h);
+	request.rpr_changeid = handle_next_changeid(h);
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
 	(void) pthread_mutex_unlock(&h->rh_lock);
@@ -1867,7 +1975,7 @@ datael_delete(const scf_datael_t *dp)
 	request.rpr_entityid = dp->rd_entity;
 
 	datael_finish_reset(dp);
-	request.rpr_changeid = handle_alloc_changeid(h);
+	request.rpr_changeid = handle_next_changeid(h);
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
 	(void) pthread_mutex_unlock(&h->rh_lock);
@@ -1913,6 +2021,12 @@ scf_iter_create(scf_handle_t *h)
 
 	(void) pthread_mutex_lock(&h->rh_lock);
 	iter->iter_id = handle_alloc_iterid(h);
+	if (iter->iter_id == 0) {
+		(void) pthread_mutex_unlock(&h->rh_lock);
+		uu_list_node_fini(iter, &iter->iter_node, iter_pool);
+		(void) scf_set_error(SCF_ERROR_NO_MEMORY);
+		return (NULL);
+	}
 	if (iter_attach(iter) == -1) {
 		uu_list_node_fini(iter, &iter->iter_node, iter_pool);
 		(void) pthread_mutex_unlock(&h->rh_lock);
@@ -2030,7 +2144,7 @@ scf_iter_handle_scopes(scf_iter_t *iter, const scf_handle_t *handle)
 		return (scf_set_error(SCF_ERROR_NOT_BOUND));
 	}
 
-	if (!handle_has_server(h)) {
+	if (!handle_has_server_locked(h)) {
 		(void) pthread_mutex_unlock(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_CONNECTION_BROKEN));
 	}
@@ -2894,7 +3008,7 @@ datael_update(scf_datael_t *dp)
 	request.rpr_entityid = dp->rd_entity;
 
 	datael_finish_reset(dp);
-	request.rpr_changeid = handle_alloc_changeid(h);
+	request.rpr_changeid = handle_next_changeid(h);
 
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
@@ -6606,7 +6720,7 @@ _scf_request_backup(scf_handle_t *h, const char *name)
 
 	(void) pthread_mutex_lock(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_BACKUP;
-	request.rpr_changeid = handle_alloc_changeid(h);
+	request.rpr_changeid = handle_next_changeid(h);
 
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));

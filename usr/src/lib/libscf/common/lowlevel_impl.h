@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,8 +101,10 @@ struct scf_handle {
 	scf_property_t		*rh_property;
 	scf_value_t		*rh_value;
 };
-#define	HANDLE_DEAD	0x0001
-#define	HANDLE_UNREFED	0x0002
+#define	HANDLE_DEAD		0x0001
+#define	HANDLE_UNREFED		0x0002
+#define	HANDLE_WRAPPED_ENTITY	0x0004
+#define	HANDLE_WRAPPED_ITER	0x0008
 
 #define	RH_HOLD_ITER		0x0001
 #define	RH_HOLD_SCOPE		0x0002

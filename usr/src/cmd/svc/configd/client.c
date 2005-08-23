@@ -72,8 +72,8 @@
 #pragma align 64(client_hash)
 static client_bucket_t client_hash[CLIENT_HASH_SIZE];
 
-static uu_list_pool_t *entity_pool;
-static uu_list_pool_t *iter_pool;
+static uu_avl_pool_t *entity_pool;
+static uu_avl_pool_t *iter_pool;
 static uu_list_pool_t *client_pool;
 
 #define	CLIENT_HASH(id)		(&client_hash[((id) & (CLIENT_HASH_SIZE - 1))])
@@ -228,14 +228,14 @@ client_hash_init(void)
 	int x;
 
 	assert_nolint(offsetof(repcache_entity_t, re_id) == 0);
-	entity_pool = uu_list_pool_create("repcache_entitys",
+	entity_pool = uu_avl_pool_create("repcache_entitys",
 	    sizeof (repcache_entity_t), offsetof(repcache_entity_t, re_link),
-	    entity_compare, UU_LIST_POOL_DEBUG);
+	    entity_compare, UU_AVL_POOL_DEBUG);
 
 	assert_nolint(offsetof(repcache_iter_t, ri_id) == 0);
-	iter_pool = uu_list_pool_create("repcache_iters",
+	iter_pool = uu_avl_pool_create("repcache_iters",
 	    sizeof (repcache_iter_t), offsetof(repcache_iter_t, ri_link),
-	    iter_compare, UU_LIST_POOL_DEBUG);
+	    iter_compare, UU_AVL_POOL_DEBUG);
 
 	assert_nolint(offsetof(repcache_client_t, rc_id) == 0);
 	client_pool = uu_list_pool_create("repcache_clients",
@@ -266,12 +266,12 @@ client_alloc(void)
 	if (cp == NULL)
 		return (NULL);
 
-	cp->rc_entity_list = uu_list_create(entity_pool, cp, UU_LIST_SORTED);
-	if (cp->rc_entity_list == NULL)
+	cp->rc_entities = uu_avl_create(entity_pool, cp, 0);
+	if (cp->rc_entities == NULL)
 		goto fail;
 
-	cp->rc_iter_list = uu_list_create(iter_pool, cp, UU_LIST_SORTED);
-	if (cp->rc_iter_list == NULL)
+	cp->rc_iters = uu_avl_create(iter_pool, cp, 0);
+	if (cp->rc_iters == NULL)
 		goto fail;
 
 	uu_list_node_init(cp, &cp->rc_link, client_pool);
@@ -286,10 +286,10 @@ client_alloc(void)
 	return (cp);
 
 fail:
-	if (cp->rc_iter_list != NULL)
-		uu_list_destroy(cp->rc_iter_list);
-	if (cp->rc_entity_list != NULL)
-		uu_list_destroy(cp->rc_entity_list);
+	if (cp->rc_iters != NULL)
+		uu_avl_destroy(cp->rc_iters);
+	if (cp->rc_entities != NULL)
+		uu_avl_destroy(cp->rc_entities);
 	uu_free(cp);
 	return (NULL);
 }
@@ -301,10 +301,10 @@ client_free(repcache_client_t *cp)
 	assert(cp->rc_refcnt == 0);
 	assert(cp->rc_doorfd == -1);
 	assert(cp->rc_doorid == INVALID_DOORID);
-	assert(uu_list_first(cp->rc_entity_list) == NULL);
-	assert(uu_list_first(cp->rc_iter_list) == NULL);
-	uu_list_destroy(cp->rc_entity_list);
-	uu_list_destroy(cp->rc_iter_list);
+	assert(uu_avl_first(cp->rc_entities) == NULL);
+	assert(uu_avl_first(cp->rc_iters) == NULL);
+	uu_avl_destroy(cp->rc_entities);
+	uu_avl_destroy(cp->rc_iters);
 	uu_list_node_fini(cp, &cp->rc_link, client_pool);
 	(void) pthread_mutex_destroy(&cp->rc_lock);
 	uu_free(cp);
@@ -398,7 +398,7 @@ entity_alloc(repcache_client_t *cp)
 {
 	repcache_entity_t *ep = uu_zalloc(sizeof (repcache_entity_t));
 	if (ep != NULL) {
-		uu_list_node_init(ep, &ep->re_link, entity_pool);
+		uu_avl_node_init(ep, &ep->re_link, entity_pool);
 	}
 	return (ep);
 }
@@ -406,13 +406,13 @@ entity_alloc(repcache_client_t *cp)
 static void
 entity_add(repcache_client_t *cp, repcache_entity_t *ep)
 {
-	uu_list_index_t idx;
+	uu_avl_index_t idx;
 
 	(void) pthread_mutex_lock(&cp->rc_lock);
 	assert(cp->rc_insert_thr == pthread_self());
 
-	(void) uu_list_find(cp->rc_entity_list, ep, NULL, &idx);
-	uu_list_insert(cp->rc_entity_list, ep, idx);
+	(void) uu_avl_find(cp->rc_entities, ep, NULL, &idx);
+	uu_avl_insert(cp->rc_entities, ep, idx);
 
 	(void) pthread_mutex_unlock(&cp->rc_lock);
 }
@@ -423,7 +423,7 @@ entity_find(repcache_client_t *cp, uint32_t id)
 	repcache_entity_t *ep;
 
 	(void) pthread_mutex_lock(&cp->rc_lock);
-	ep = uu_list_find(cp->rc_entity_list, &id, NULL, NULL);
+	ep = uu_avl_find(cp->rc_entities, &id, NULL, NULL);
 	if (ep != NULL) {
 		add_log_ptr(get_log(), RC_PTR_TYPE_ENTITY, id, ep);
 		(void) pthread_mutex_lock(&ep->re_lock);
@@ -449,8 +449,8 @@ entity_find2(repcache_client_t *cp, uint32_t id1, repcache_entity_t **out1,
 		return (REP_PROTOCOL_FAIL_DUPLICATE_ID);
 
 	(void) pthread_mutex_lock(&cp->rc_lock);
-	e1 = uu_list_find(cp->rc_entity_list, &id1, NULL, NULL);
-	e2 = uu_list_find(cp->rc_entity_list, &id2, NULL, NULL);
+	e1 = uu_avl_find(cp->rc_entities, &id1, NULL, NULL);
+	e2 = uu_avl_find(cp->rc_entities, &id2, NULL, NULL);
 	if (e1 == NULL || e2 == NULL) {
 		(void) pthread_mutex_unlock(&cp->rc_lock);
 		return (REP_PROTOCOL_FAIL_UNKNOWN_ID);
@@ -496,7 +496,7 @@ entity_destroy(repcache_entity_t *entity)
 	rc_node_clear(&entity->re_node, 0);
 	(void) pthread_mutex_unlock(&entity->re_lock);
 
-	uu_list_node_fini(entity, &entity->re_link, entity_pool);
+	uu_avl_node_fini(entity, &entity->re_link, entity_pool);
 	(void) pthread_mutex_destroy(&entity->re_lock);
 	uu_free(entity);
 }
@@ -507,9 +507,9 @@ entity_remove(repcache_client_t *cp, uint32_t id)
 	repcache_entity_t *entity;
 
 	(void) pthread_mutex_lock(&cp->rc_lock);
-	entity = uu_list_find(cp->rc_entity_list, &id, NULL, NULL);
+	entity = uu_avl_find(cp->rc_entities, &id, NULL, NULL);
 	if (entity != NULL)
-		uu_list_remove(cp->rc_entity_list, entity);
+		uu_avl_remove(cp->rc_entities, entity);
 	(void) pthread_mutex_unlock(&cp->rc_lock);
 
 	if (entity != NULL)
@@ -523,7 +523,7 @@ entity_cleanup(repcache_client_t *cp)
 	void *cookie = NULL;
 
 	(void) pthread_mutex_lock(&cp->rc_lock);
-	while ((ep = uu_list_teardown(cp->rc_entity_list, &cookie)) != NULL) {
+	while ((ep = uu_avl_teardown(cp->rc_entities, &cookie)) != NULL) {
 		(void) pthread_mutex_unlock(&cp->rc_lock);
 		entity_destroy(ep);
 		(void) pthread_mutex_lock(&cp->rc_lock);
@@ -538,7 +538,7 @@ iter_alloc(repcache_client_t *cp)
 	repcache_iter_t *iter;
 	iter = uu_zalloc(sizeof (repcache_iter_t));
 	if (iter != NULL)
-		uu_list_node_init(iter, &iter->ri_link, iter_pool);
+		uu_avl_node_init(iter, &iter->ri_link, iter_pool);
 	return (iter);
 }
 
@@ -550,8 +550,8 @@ iter_add(repcache_client_t *cp, repcache_iter_t *iter)
 	(void) pthread_mutex_lock(&cp->rc_lock);
 	assert(cp->rc_insert_thr == pthread_self());
 
-	(void) uu_list_find(cp->rc_iter_list, iter, NULL, &idx);
-	uu_list_insert(cp->rc_iter_list, iter, idx);
+	(void) uu_avl_find(cp->rc_iters, iter, NULL, &idx);
+	uu_avl_insert(cp->rc_iters, iter, idx);
 
 	(void) pthread_mutex_unlock(&cp->rc_lock);
 }
@@ -563,7 +563,7 @@ iter_find(repcache_client_t *cp, uint32_t id)
 
 	(void) pthread_mutex_lock(&cp->rc_lock);
 
-	iter = uu_list_find(cp->rc_iter_list, &id, NULL, NULL);
+	iter = uu_avl_find(cp->rc_iters, &id, NULL, NULL);
 	if (iter != NULL) {
 		add_log_ptr(get_log(), RC_PTR_TYPE_ITER, id, iter);
 		(void) pthread_mutex_lock(&iter->ri_lock);
@@ -586,8 +586,8 @@ iter_find_w_entity(repcache_client_t *cp, uint32_t iter_id,
 	request_log_entry_t *rlp;
 
 	(void) pthread_mutex_lock(&cp->rc_lock);
-	iter = uu_list_find(cp->rc_iter_list, &iter_id, NULL, NULL);
-	ep = uu_list_find(cp->rc_entity_list, &entity_id, NULL, NULL);
+	iter = uu_avl_find(cp->rc_iters, &iter_id, NULL, NULL);
+	ep = uu_avl_find(cp->rc_entities, &entity_id, NULL, NULL);
 
 	assert(iter == NULL || !MUTEX_HELD(&iter->ri_lock));
 	assert(ep == NULL || !MUTEX_HELD(&ep->re_lock));
@@ -626,7 +626,7 @@ iter_destroy(repcache_iter_t *iter)
 	rc_iter_destroy(&iter->ri_iter);
 	(void) pthread_mutex_unlock(&iter->ri_lock);
 
-	uu_list_node_fini(iter, &iter->ri_link, iter_pool);
+	uu_avl_node_fini(iter, &iter->ri_link, iter_pool);
 	(void) pthread_mutex_destroy(&iter->ri_lock);
 	uu_free(iter);
 }
@@ -637,9 +637,9 @@ iter_remove(repcache_client_t *cp, uint32_t id)
 	repcache_iter_t *iter;
 
 	(void) pthread_mutex_lock(&cp->rc_lock);
-	iter = uu_list_find(cp->rc_iter_list, &id, NULL, NULL);
+	iter = uu_avl_find(cp->rc_iters, &id, NULL, NULL);
 	if (iter != NULL)
-		uu_list_remove(cp->rc_iter_list, iter);
+		uu_avl_remove(cp->rc_iters, iter);
 	(void) pthread_mutex_unlock(&cp->rc_lock);
 
 	if (iter != NULL)
@@ -653,7 +653,7 @@ iter_cleanup(repcache_client_t *cp)
 	void *cookie = NULL;
 
 	(void) pthread_mutex_lock(&cp->rc_lock);
-	while ((iter = uu_list_teardown(cp->rc_iter_list, &cookie)) != NULL) {
+	while ((iter = uu_avl_teardown(cp->rc_iters, &cookie)) != NULL) {
 		(void) pthread_mutex_unlock(&cp->rc_lock);
 		iter_destroy(iter);
 		(void) pthread_mutex_lock(&cp->rc_lock);

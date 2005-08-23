@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -404,7 +404,7 @@ enum repcache_txstate {
 
 typedef struct repcache_entity {
 	uint32_t	re_id;
-	uu_list_node_t	re_link;
+	uu_avl_node_t	re_link;
 	uint32_t	re_changeid;
 
 	pthread_mutex_t	re_lock;
@@ -415,7 +415,7 @@ typedef struct repcache_entity {
 
 typedef struct repcache_iter {
 	uint32_t	ri_id;
-	uu_list_node_t	ri_link;
+	uu_avl_node_t	ri_link;
 
 	uint32_t	ri_type;	/* result type */
 
@@ -452,10 +452,10 @@ typedef struct repcache_client {
 	rc_node_ptr_t	rc_notify_ptr;
 
 	/*
-	 * register lists, protected by rc_lock
+	 * register sets, protected by rc_lock
 	 */
-	uu_list_t	*rc_entity_list; /* entities */
-	uu_list_t	*rc_iter_list;	/* iters */
+	uu_avl_t	*rc_entities;
+	uu_avl_t	*rc_iters;
 
 	/*
 	 * Variables, protected by rc_lock
@@ -660,7 +660,7 @@ int object_create_pg(rc_node_t *, uint32_t, const char *, const char *,
 int object_delete(rc_node_t *);
 void object_free_values(const char *, uint32_t, size_t, size_t);
 
-int object_fill_snapshot(rc_snapshot_t *sp);
+int object_fill_snapshot(rc_snapshot_t *);
 
 int object_snapshot_take_new(rc_node_t *, const char *, const char *,
     const char *, rc_node_t **);

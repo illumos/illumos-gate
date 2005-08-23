@@ -94,6 +94,14 @@ typedef struct object_info {
 	int (*obj_delete_start)(rc_node_t *, delete_info_t *);
 } object_info_t;
 
+static void
+string_to_id(const char *str, uint32_t *output, const char *fieldname)
+{
+	if (uu_strtouint(str, output, sizeof (*output), 0, 0, 0) == -1)
+		backend_panic("invalid integer \"%s\" in field \"%s\"",
+		    str, fieldname);
+}
+
 #define	NUM_NEEDED	50
 
 static int
@@ -191,10 +199,8 @@ push_delete_callback(void *data, int columns, char **vals, char **names)
 
 	assert(columns == 2);
 
-	if (uu_strtouint(id_str, &id, sizeof (id), 0, 0, 0) == -1)
-		backend_panic("invalid integer in database");
-	if (uu_strtouint(gen_str, &gen, sizeof (gen), 0, 0, 0) == -1)
-		backend_panic("invalid integer in database");
+	string_to_id(id_str, &id, "id");
+	string_to_id(gen_str, &gen, "gen_id");
 
 	info->dci_result = delete_stack_push(info->dci_dip, info->dci_be,
 	    info->dci_cb, id, gen);
@@ -536,8 +542,7 @@ fill_child_callback(void *data, int columns, char **vals, char **names)
 
 	cur = *vals++;
 	columns--;
-	if (uu_strtouint(cur, &main_id, sizeof (main_id), 0, 0, 0) == -1)
-		backend_panic("invalid integer in database");
+	string_to_id(cur, &main_id, "id");
 
 	lp->rl_main_id = main_id;
 
@@ -572,9 +577,9 @@ fill_snapshot_callback(void *data, int columns, char **vals, char **names)
 	columns--;
 	snap = *vals++;
 	columns--;
-	if (uu_strtouint(cur, &main_id, sizeof (main_id), 0, 0, 0) == -1 ||
-	    uu_strtouint(snap, &snap_id, sizeof (snap_id), 0, 0, 0) == -1)
-		backend_panic("invalid integer in database");
+
+	string_to_id(cur, &main_id, "lnk_id");
+	string_to_id(snap, &snap_id, "lnk_snap_id");
 
 	lp->rl_main_id = main_id;
 
@@ -609,23 +614,20 @@ fill_pg_callback(void *data, int columns, char **vals, char **names)
 
 	cur = *vals++;		/* pg_id */
 	columns--;
-	if (uu_strtouint(cur, &main_id, sizeof (main_id), 0, 0, 0) == -1)
-		backend_panic("invalid integer in database");
+	string_to_id(cur, &main_id, "pg_id");
 
 	lp->rl_main_id = main_id;
 
 	cur = *vals++;		/* pg_gen_id */
 	columns--;
-	if (uu_strtouint(cur, &gen_id, sizeof (gen_id), 0, 0, 0) == -1)
-		backend_panic("invalid integer in database");
+	string_to_id(cur, &gen_id, "pg_gen_id");
 
 	type = *vals++;		/* pg_type */
 	columns--;
 
 	cur = *vals++;		/* pg_flags */
 	columns--;
-	if (uu_strtouint(cur, &flags, sizeof (flags), 0, 0, 0) == -1)
-		backend_panic("invalid integer in database");
+	string_to_id(cur, &flags, "pg_flags");
 
 	if ((newnode = rc_node_alloc()) == NULL)
 		return (BACKEND_CALLBACK_ABORT);
@@ -723,8 +725,7 @@ fill_property_callback(void *data, int columns, char **vals, char **names)
 	name = *vals++;
 
 	cur = *vals++;
-	if (uu_strtouint(cur, &main_id, sizeof (main_id), 0, 0, 0) == -1)
-		backend_panic("invalid integer in database");
+	string_to_id(cur, &main_id, "lnk_prop_id");
 
 	cur = *vals++;
 	assert(('a' <= cur[0] && 'z' >= cur[0]) ||
@@ -1764,17 +1765,12 @@ fill_snapshot_cb(void *data, int columns, char **vals, char **names)
 	lvl->rsl_next = sp->rs_levels;
 	sp->rs_levels = lvl;
 
-	if (uu_strtouint(num, &lvl->rsl_level_num,
-	    sizeof (lvl->rsl_level_num), 0, 0, 0) == -1 ||
-	    uu_strtouint(id, &lvl->rsl_level_id,
-	    sizeof (lvl->rsl_level_id), 0, 0, 0) == -1 ||
-	    uu_strtouint(service_id, &lvl->rsl_service_id,
-	    sizeof (lvl->rsl_level_num), 0, 0, 0) == -1 ||
-	    (instance_id != NULL &&
-	    uu_strtouint(instance_id, &lvl->rsl_instance_id,
-	    sizeof (lvl->rsl_instance_id), 0, 0, 0) == -1)) {
-		backend_panic("invalid integer in database");
-	}
+	string_to_id(num, &lvl->rsl_level_num, "snap_level_num");
+	string_to_id(id, &lvl->rsl_level_id, "snap_level_id");
+	string_to_id(service_id, &lvl->rsl_service_id, "snap_level_service_id");
+	if (instance_id != NULL)
+		string_to_id(instance_id, &lvl->rsl_instance_id,
+		    "snap_level_instance_id");
 
 	lvl->rsl_scope = (const char *)"localhost";
 	lvl->rsl_service = strdup(service);
@@ -1834,6 +1830,226 @@ object_fill_snapshot(rc_snapshot_t *sp)
 			}
 		}
 	}
+	return (result);
+}
+
+/*
+ * This represents a property group in a snapshot.
+ */
+typedef struct check_snapshot_elem {
+	uint32_t cse_parent;
+	uint32_t cse_pg_id;
+	uint32_t cse_pg_gen;
+	char	cse_seen;
+} check_snapshot_elem_t;
+
+#define	CSI_MAX_PARENTS		COMPOSITION_DEPTH
+typedef struct check_snapshot_info {
+	size_t			csi_count;
+	size_t			csi_array_size;
+	check_snapshot_elem_t	*csi_array;
+	size_t			csi_nparents;
+	uint32_t		csi_parent_ids[CSI_MAX_PARENTS];
+} check_snapshot_info_t;
+
+/*ARGSUSED*/
+static int
+check_snapshot_fill_cb(void *data, int columns, char **vals, char **names)
+{
+	check_snapshot_info_t *csip = data;
+	check_snapshot_elem_t *cur;
+	const char *parent;
+	const char *pg_id;
+	const char *pg_gen_id;
+
+	if (columns == 1) {
+		uint32_t *target;
+
+		if (csip->csi_nparents >= CSI_MAX_PARENTS)
+			backend_panic("snaplevel table has too many elements");
+
+		target = &csip->csi_parent_ids[csip->csi_nparents++];
+		string_to_id(vals[0], target, "snap_level_*_id");
+
+		return (BACKEND_CALLBACK_CONTINUE);
+	}
+
+	assert(columns == 3);
+
+	parent = vals[0];
+	pg_id = vals[1];
+	pg_gen_id = vals[2];
+
+	if (csip->csi_count == csip->csi_array_size) {
+		size_t newsz = (csip->csi_array_size > 0) ?
+		    csip->csi_array_size * 2 : 8;
+		check_snapshot_elem_t *new = uu_zalloc(newsz * sizeof (*new));
+
+		if (new == NULL)
+			return (BACKEND_CALLBACK_ABORT);
+
+		(void) memcpy(new, csip->csi_array,
+		    sizeof (*new) * csip->csi_array_size);
+		uu_free(csip->csi_array);
+		csip->csi_array = new;
+		csip->csi_array_size = newsz;
+	}
+
+	cur = &csip->csi_array[csip->csi_count++];
+
+	string_to_id(parent, &cur->cse_parent, "snap_level_*_id");
+	string_to_id(pg_id, &cur->cse_pg_id, "snaplvl_pg_id");
+	string_to_id(pg_gen_id, &cur->cse_pg_gen, "snaplvl_gen_id");
+	cur->cse_seen = 0;
+
+	return (BACKEND_CALLBACK_CONTINUE);
+}
+
+static int
+check_snapshot_elem_cmp(const void *lhs_arg, const void *rhs_arg)
+{
+	const check_snapshot_elem_t *lhs = lhs_arg;
+	const check_snapshot_elem_t *rhs = rhs_arg;
+
+	if (lhs->cse_parent < rhs->cse_parent)
+		return (-1);
+	if (lhs->cse_parent > rhs->cse_parent)
+		return (1);
+
+	if (lhs->cse_pg_id < rhs->cse_pg_id)
+		return (-1);
+	if (lhs->cse_pg_id > rhs->cse_pg_id)
+		return (1);
+
+	if (lhs->cse_pg_gen < rhs->cse_pg_gen)
+		return (-1);
+	if (lhs->cse_pg_gen > rhs->cse_pg_gen)
+		return (1);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+check_snapshot_check_cb(void *data, int columns, char **vals, char **names)
+{
+	check_snapshot_info_t *csip = data;
+	check_snapshot_elem_t elem;
+	check_snapshot_elem_t *cur;
+
+	const char *parent = vals[0];
+	const char *pg_id = vals[1];
+	const char *pg_gen_id = vals[2];
+
+	assert(columns == 3);
+
+	string_to_id(parent, &elem.cse_parent, "snap_level_*_id");
+	string_to_id(pg_id, &elem.cse_pg_id, "snaplvl_pg_id");
+	string_to_id(pg_gen_id, &elem.cse_pg_gen, "snaplvl_gen_id");
+
+	if ((cur = bsearch(&elem, csip->csi_array, csip->csi_count,
+	    sizeof (*csip->csi_array), check_snapshot_elem_cmp)) == NULL)
+		return (BACKEND_CALLBACK_ABORT);
+
+	if (cur->cse_seen)
+		backend_panic("duplicate property group reported");
+	cur->cse_seen = 1;
+	return (BACKEND_CALLBACK_CONTINUE);
+}
+
+/*
+ * Check that a snapshot matches up with the latest in the repository.
+ * Returns:
+ *	REP_PROTOCOL_SUCCESS		if it is up-to-date,
+ *	REP_PROTOCOL_DONE		if it is out-of-date, or
+ *	REP_PROTOCOL_FAIL_NO_RESOURCES	if we ran out of memory.
+ */
+static int
+object_check_snapshot(uint32_t snap_id)
+{
+	check_snapshot_info_t csi;
+	backend_query_t *q;
+	int result;
+	size_t idx;
+
+	/* if the snapshot has never been taken, it must be out of date. */
+	if (snap_id == 0)
+		return (REP_PROTOCOL_DONE);
+
+	(void) memset(&csi, '\0', sizeof (csi));
+
+	q = backend_query_alloc();
+	backend_query_add(q,
+	    "SELECT\n"
+	    "    CASE snap_level_instance_id\n"
+	    "        WHEN 0 THEN snap_level_service_id\n"
+	    "        ELSE snap_level_instance_id\n"
+	    "    END\n"
+	    "FROM snaplevel_tbl\n"
+	    "WHERE snap_id = %d;\n"
+	    "\n"
+	    "SELECT\n"
+	    "    CASE snap_level_instance_id\n"
+	    "        WHEN 0 THEN snap_level_service_id\n"
+	    "        ELSE snap_level_instance_id\n"
+	    "    END,\n"
+	    "    snaplvl_pg_id,\n"
+	    "    snaplvl_gen_id\n"
+	    "FROM snaplevel_tbl, snaplevel_lnk_tbl\n"
+	    "WHERE\n"
+	    "    (snaplvl_level_id = snap_level_id AND\n"
+	    "    snap_id = %d);",
+	    snap_id, snap_id);
+
+	result = backend_run(BACKEND_TYPE_NORMAL, q, check_snapshot_fill_cb,
+	    &csi);
+	if (result == REP_PROTOCOL_DONE)
+		result = REP_PROTOCOL_FAIL_NO_RESOURCES;
+	backend_query_free(q);
+
+	if (result != REP_PROTOCOL_SUCCESS)
+		goto fail;
+
+	if (csi.csi_count > 0) {
+		qsort(csi.csi_array, csi.csi_count, sizeof (*csi.csi_array),
+		    check_snapshot_elem_cmp);
+	}
+
+#if COMPOSITION_DEPTH == 2
+	if (csi.csi_nparents != COMPOSITION_DEPTH) {
+		result = REP_PROTOCOL_DONE;
+		goto fail;
+	}
+
+	q = backend_query_alloc();
+	backend_query_add(q,
+	    "SELECT "
+	    "    pg_parent_id, pg_id, pg_gen_id "
+	    "FROM "
+	    "    pg_tbl "
+	    "WHERE (pg_parent_id = %d OR pg_parent_id = %d)",
+	    csi.csi_parent_ids[0], csi.csi_parent_ids[1]);
+
+	result = backend_run(BACKEND_TYPE_NORMAL, q, check_snapshot_check_cb,
+	    &csi);
+#else
+#error This code must be updated
+#endif
+	/*
+	 * To succeed, the callback must not have aborted, and we must have
+	 * found all of the items.
+	 */
+	if (result == REP_PROTOCOL_SUCCESS) {
+		for (idx = 0; idx < csi.csi_count; idx++) {
+			if (csi.csi_array[idx].cse_seen == 0) {
+				result = REP_PROTOCOL_DONE;
+				goto fail;
+			}
+		}
+	}
+
+fail:
+	uu_free(csi.csi_array);
 	return (result);
 }
 
@@ -2115,6 +2331,10 @@ object_snapshot_attach(rc_node_lookup_t *snapi, uint32_t *snapid_ptr,
 		return (REP_PROTOCOL_FAIL_TYPE_MISMATCH);
 
 	if (takesnap) {
+		/* first, check that we're actually out of date */
+		if (object_check_snapshot(snapid) == REP_PROTOCOL_SUCCESS)
+			return (REP_PROTOCOL_SUCCESS);
+
 		result = object_snapshot_do_take(instid, NULL,
 		    svcid, NULL, &tx, &snapid);
 		if (result != REP_PROTOCOL_SUCCESS)

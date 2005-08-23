@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,8 +98,8 @@ uu_avl_pool_create(const char *name, size_t objsize, size_t nodeoffset,
 
 	(void) pthread_mutex_init(&pp->uap_lock, NULL);
 
-	pp->uap_null_avl.ua_next = &pp->uap_null_avl;
-	pp->uap_null_avl.ua_prev = &pp->uap_null_avl;
+	pp->uap_null_avl.ua_next_enc = UU_PTR_ENCODE(&pp->uap_null_avl);
+	pp->uap_null_avl.ua_prev_enc = UU_PTR_ENCODE(&pp->uap_null_avl);
 
 	(void) pthread_mutex_lock(&uu_apool_list_lock);
 	pp->uap_next = next = &uu_null_apool;
@@ -115,8 +115,10 @@ void
 uu_avl_pool_destroy(uu_avl_pool_t *pp)
 {
 	if (pp->uap_debug) {
-		if (pp->uap_null_avl.ua_next != &pp->uap_null_avl ||
-		    pp->uap_null_avl.ua_prev != &pp->uap_null_avl) {
+		if (pp->uap_null_avl.ua_next_enc !=
+		    UU_PTR_ENCODE(&pp->uap_null_avl) ||
+		    pp->uap_null_avl.ua_prev_enc !=
+		    UU_PTR_ENCODE(&pp->uap_null_avl)) {
 			uu_panic("uu_avl_pool_destroy: Pool \"%.*s\" (%p) has "
 			    "outstanding avls, or is corrupt.\n",
 			    sizeof (pp->uap_name), pp->uap_name, pp);
@@ -209,7 +211,7 @@ uu_avl_create(uu_avl_pool_t *pp, void *parent, uint32_t flags)
 {
 	uu_avl_t *ap, *next, *prev;
 
-	if (flags & UU_AVL_DEBUG) {
+	if (flags & ~UU_AVL_DEBUG) {
 		uu_set_error(UU_ERROR_UNKNOWN_FLAG);
 		return (NULL);
 	}
@@ -221,7 +223,7 @@ uu_avl_create(uu_avl_pool_t *pp, void *parent, uint32_t flags)
 	}
 
 	ap->ua_pool = pp;
-	ap->ua_parent = parent;
+	ap->ua_parent_enc = UU_PTR_ENCODE(parent);
 	ap->ua_debug = pp->uap_debug || (flags & UU_AVL_DEBUG);
 	ap->ua_index = (pp->uap_last_index = INDEX_NEXT(pp->uap_last_index));
 
@@ -232,10 +234,12 @@ uu_avl_create(uu_avl_pool_t *pp, void *parent, uint32_t flags)
 	ap->ua_null_walk.uaw_prev = &ap->ua_null_walk;
 
 	(void) pthread_mutex_lock(&pp->uap_lock);
-	ap->ua_next = next = &pp->uap_null_avl;
-	ap->ua_prev = prev = next->ua_prev;
-	next->ua_prev = ap;
-	prev->ua_next = ap;
+	next = &pp->uap_null_avl;
+	prev = UU_PTR_DECODE(next->ua_prev_enc);
+	ap->ua_next_enc = UU_PTR_ENCODE(next);
+	ap->ua_prev_enc = UU_PTR_ENCODE(prev);
+	next->ua_prev_enc = UU_PTR_ENCODE(ap);
+	prev->ua_next_enc = UU_PTR_ENCODE(ap);
 	(void) pthread_mutex_unlock(&pp->uap_lock);
 
 	return (ap);
@@ -257,11 +261,11 @@ uu_avl_destroy(uu_avl_t *ap)
 		}
 	}
 	(void) pthread_mutex_lock(&pp->uap_lock);
-	ap->ua_next->ua_prev = ap->ua_prev;
-	ap->ua_prev->ua_next = ap->ua_next;
+	UU_AVL_PTR(ap->ua_next_enc)->ua_prev_enc = ap->ua_prev_enc;
+	UU_AVL_PTR(ap->ua_prev_enc)->ua_next_enc = ap->ua_next_enc;
 	(void) pthread_mutex_unlock(&pp->uap_lock);
-	ap->ua_prev = NULL;
-	ap->ua_next = NULL;
+	ap->ua_prev_enc = UU_PTR_ENCODE(NULL);
+	ap->ua_next_enc = UU_PTR_ENCODE(NULL);
 
 	ap->ua_pool = NULL;
 	avl_destroy(&ap->ua_tree);
@@ -451,7 +455,16 @@ uu_avl_remove(uu_avl_t *ap, void *elem)
 void *
 uu_avl_teardown(uu_avl_t *ap, void **cookie)
 {
-	return (avl_destroy_nodes(&ap->ua_tree, cookie));
+	void *elem = avl_destroy_nodes(&ap->ua_tree, cookie);
+
+	if (elem != NULL) {
+		uu_avl_pool_t *pp = ap->ua_pool;
+		uintptr_t *na = NODE_ARRAY(pp, elem);
+
+		na[0] = POOL_TO_MARKER(pp);
+		na[1] = NULL;
+	}
+	return (elem);
 }
 
 void *
