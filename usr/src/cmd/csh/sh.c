@@ -23,6 +23,9 @@
 #include <pwd.h>
 #include <stdlib.h>
 #include "sh_policy.h"		/* for pfcsh */
+#ifdef	TRACE
+#include <stdio.h>
+#endif
 
 /*
  * We use these csh(1) private versions of the select macros, (see select(3C))
@@ -72,6 +75,42 @@ void	unsetfd(int);
 void	secpolicy_print(int, const char *);
 void	phup(void);
 
+#ifdef	TRACE
+FILE *trace;
+/*
+ * Trace routines
+ */
+#define	TRACEFILE	"/tmp/trace.XXXXXX"
+
+/*
+ * Initialize trace file.
+ * Called from main.
+ */
+void
+trace_init(void)
+{
+	char name[128];
+	char *p;
+
+	strcpy(name, TRACEFILE);
+	p = mktemp(name);
+	trace = fopen(p, "w");
+}
+
+/*
+ * write message to trace file
+ */
+/*VARARGS1*/
+void
+tprintf(fmt, a, b, c, d, e, f, g, h, i, j)
+	char *fmt;
+{
+	if (trace) {
+		fprintf(trace, fmt, a, b, c, d, e, f, g, h, i, j);
+		fflush(trace);
+	}
+}
+#endif
 
 int
 main(int c, char **av)
