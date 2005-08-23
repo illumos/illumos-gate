@@ -797,10 +797,9 @@ ibcm_saa_path_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 		    idx, dgid.gid_prefix, dgid.gid_guid);
 
 		if ((dgid.gid_prefix >> 56ULL & 0xFF) == 0xFF) {
-			if (extra) {
+			if (extra)
 				num_path_plus = num_path + 1;
-				extra--;
-			} else
+			else
 				num_path_plus = num_path;
 
 			IBTF_DPRINTF_L3(cmlog, "ibcm_saa_path_rec: Get %d Paths"
@@ -819,6 +818,8 @@ ibcm_saa_path_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 				    retval);
 				continue;
 			}
+			if (extra)
+				extra--;
 
 			rec_found += num_path_plus;
 		} else {
@@ -869,10 +870,10 @@ ibcm_saa_path_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	    unicast_dgid_present);
 
 	if ((unicast_dgid_present != 0) && (num_path_plus > 0)) {
-		IBTF_DPRINTF_L3(cmlog, "ibcm_saa_path_rec: MultiSM=%d, #SRC=%d,"
-		    "Dest%d", sl->p_multism, sl->p_count, unicast_dgid_present);
+		IBTF_DPRINTF_L3(cmlog, "ibcm_saa_path_rec: MultiSM=%X, #SRC=%d,"
+		    "Dest%d", sl->p_multi, sl->p_count, unicast_dgid_present);
 
-		if ((sl->p_multism == 1) ||
+		if ((sl->p_multi != IBTL_CM_SIMPLE_SETUP) ||
 		    ((unicast_dgid_present == 1) && (sl->p_count == 1))) {
 			/*
 			 * Use SinglePathRec if we are dealing w/ MultiSM or
@@ -893,11 +894,12 @@ ibcm_saa_path_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 		}
 	}
 
-	if (rec_found == 0) {
-		if (retval == IBT_SUCCESS)
-			retval = IBT_PATH_RECORDS_NOT_FOUND;
-	} else if (rec_found != *max_count)
+	if ((rec_found == 0) && (retval == IBT_SUCCESS))
+		retval = IBT_PATH_RECORDS_NOT_FOUND;
+	else if (rec_found != *max_count)
 		retval = IBT_INSUFF_DATA;
+	else if (rec_found != 0)
+		retval = IBT_SUCCESS;
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_saa_path_rec: done. Status = %d, "
 	    "Found %d/%d Paths", retval, rec_found, *max_count);
@@ -1002,7 +1004,7 @@ ibcm_get_single_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	size_t			length;
 	ibt_status_t		retval;
 	int			i, j, k;
-	int			found, p_fnd, a_fnd;
+	int			found, p_fnd;
 	ibt_path_attr_t		*attrp = &p_arg->attr;
 	ibmf_saa_handle_t	saa_handle;
 
@@ -1111,7 +1113,7 @@ ibcm_get_single_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 		c_mask |= SA_PR_COMPMASK_DGID;
 	}
 
-	p_fnd = a_fnd = found = 0;
+	p_fnd = found = 0;
 
 	for (i = 0; i < sl->p_count; i++) {
 		/* SGID */
@@ -1123,6 +1125,25 @@ ibcm_get_single_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 			if (idx == 0xFF) {		/* DGID */
 				if (dinfo->dest[k].d_tag != 0)
 					continue;
+
+				if (pathrec_req.SGID.gid_prefix !=
+				    dinfo->dest[k].d_gid.gid_prefix) {
+					IBTF_DPRINTF_L3(cmlog,
+					    "ibcm_get_single_pathrec: SGID_pfx="
+					    "%llX, DGID_pfx=%llX doesn't match",
+					    pathrec_req.SGID.gid_prefix,
+					    dinfo->dest[k].d_gid.gid_prefix);
+					continue;
+				} else if (pathrec_req.SGID.gid_guid ==
+				    pathrec_req.DGID.gid_guid) {
+					IBTF_DPRINTF_L3(cmlog,
+					    "ibcm_get_single_pathrec: Why "
+					    "LoopBack request came here!!!! "
+					    "GID(%llX:%llX)",
+					    pathrec_req.SGID.gid_prefix,
+					    pathrec_req.SGID.gid_guid);
+					continue;
+				}
 
 				pathrec_req.DGID = dinfo->dest[k].d_gid;
 				c_mask |= SA_PR_COMPMASK_DGID;
@@ -1151,25 +1172,6 @@ ibcm_get_single_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 			IBTF_DPRINTF_L3(cmlog, "ibcm_get_single_pathrec: CMask"
 			    "=0x%llX, PKey=0x%X", c_mask, pathrec_req.P_Key);
 
-			if ((idx == 0xFF) && (pathrec_req.SGID.gid_prefix !=
-			    pathrec_req.DGID.gid_prefix)) {
-				IBTF_DPRINTF_L3(cmlog, "ibcm_get_single_pathrec"
-				    ": SGID_pfx=%llX, DGID_pfx=%llX doesn't "
-				    "match", pathrec_req.SGID.gid_prefix,
-				    pathrec_req.DGID.gid_prefix);
-				continue;
-			} else if ((pathrec_req.SGID.gid_prefix ==
-			    pathrec_req.DGID.gid_prefix) &&
-			    (pathrec_req.SGID.gid_guid ==
-			    pathrec_req.DGID.gid_guid)) {
-				IBTF_DPRINTF_L2(cmlog, "ibcm_get_single_pathrec"
-				    ": Why LoopBack request came here!!!! "
-				    "GID(%llX:%llX)",
-				    pathrec_req.SGID.gid_prefix,
-				    pathrec_req.SGID.gid_guid);
-				continue;
-			}
-
 			/* Contact SA Access to retrieve Path Records. */
 			access_args.sq_attr_id = SA_PATHRECORD_ATTRID;
 			access_args.sq_template = &pathrec_req;
@@ -1193,7 +1195,6 @@ ibcm_get_single_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 			    "FOUND %d/%d path requested", num_rec, *num_path);
 
 			if ((results_p == NULL) || (num_rec == 0)) {
-				retval = IBT_PATH_RECORDS_NOT_FOUND;
 				if (idx != 0xFF)
 					break;
 				else
@@ -1210,25 +1211,30 @@ ibcm_get_single_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 					    "Fill Alternate Path");
 					retval = ibcm_update_cep_info(pr_resp,
 					    sl, NULL,
-					    &paths[found].pi_alt_cep_path);
+					    &paths[found - 1].pi_alt_cep_path);
 					if (retval != IBT_SUCCESS)
 						continue;
 
 					/* Update some leftovers */
-					paths[found].pi_alt_pkt_lt =
+					paths[found - 1].pi_alt_pkt_lt =
 					    pr_resp->PacketLifeTime;
+					p_fnd = 0;
 				} else {
 					IBTF_DPRINTF_L3(cmlog,
 					    "ibcm_get_single_pathrec: "
 					    "Fill Primary Path");
+
+					if (found == *num_path)
+						break;
+
 					retval = ibcm_update_pri(pr_resp, sl,
-					    dinfo, &paths[p_fnd]);
+					    dinfo, &paths[found]);
 					if (retval != IBT_SUCCESS)
 						continue;
+					p_fnd = 1;
+					found++;
 				}
 
-				if (++found == *num_path)
-					break;
 			}
 			/* Deallocate the memory for results_p. */
 			kmem_free(results_p, length);
@@ -1236,27 +1242,16 @@ ibcm_get_single_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 			if (idx != 0xFF)
 				break;		/* We r here for MGID */
 		}
-
-		if (p_fnd == 0)
-			p_fnd = found;
-		else if ((p_arg->flags & IBT_PATH_APM) && (a_fnd == 0))
-			a_fnd = found;
-		else
-			p_fnd += found;
-
-		if ((found == *num_path) && (idx != 0xFF))
-			break;
-		else
-			found = 0;
+		if ((idx != 0xFF) && (found == *num_path))
+			break;		/* We r here for MGID */
 	}
 
-	found = (p_fnd > a_fnd) ? p_fnd : a_fnd;
-
-	if ((found != 0) && (found != *num_path)) {
-		IBTF_DPRINTF_L3(cmlog, "ibcm_get_single_pathrec: Status %d, "
-		    "Found %d", retval, found);
+	if (found == 0)
+		retval = IBT_PATH_RECORDS_NOT_FOUND;
+	else if (found != *num_path)
 		retval = IBT_INSUFF_DATA;
-	}
+	else
+		retval = IBT_SUCCESS;
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_get_single_pathrec: done. Status %d, "
 	    "Found %d/%d Paths", retval, found, *num_path);
@@ -1658,12 +1653,12 @@ get_multi_pathrec_end:
 	}
 	kmem_free(mpr_req, template_len);
 
-	if (retval == IBT_SUCCESS) {
-		if (found == 0)
-			retval = IBT_PATH_RECORDS_NOT_FOUND;
-		else if (found != *num_path)
-			retval = IBT_INSUFF_DATA;
-	}
+	if (found == 0)
+		retval = IBT_PATH_RECORDS_NOT_FOUND;
+	else if (found != *num_path)
+		retval = IBT_INSUFF_DATA;
+	else
+		retval = IBT_SUCCESS;
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_get_multi_pathrec: Done (status %d). "
 	    "Found %d/%d Paths", retval, found, *num_path);
@@ -1950,7 +1945,7 @@ ibcm_saa_service_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	void			*results_p;
 	uint64_t		component_mask = 0;
 	size_t			length;
-	uint8_t			i, j, k, rec_found;
+	uint8_t			i, j, k, rec_found, s;
 	ibmf_saa_access_args_t	access_args;
 	ibt_status_t		retval;
 	ibt_path_attr_t		*attrp = &p_arg->attr;
@@ -2024,16 +2019,31 @@ ibcm_saa_service_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	access_args.sq_callback = NULL;
 	access_args.sq_callback_arg = NULL;
 
-	retval = ibcm_contact_sa_access(sl->p_saa_hdl, &access_args,
-	    &length, &results_p);
+	for (s = 0; s < sl->p_count; s++) {
+		retval = ibcm_contact_sa_access(sl[s].p_saa_hdl, &access_args,
+		    &length, &results_p);
+		if (retval != IBT_SUCCESS)
+			if (sl[s].p_multi & IBTL_CM_MULTI_SM)
+				continue;
+			else
+				return (retval);
+
+		if ((results_p == NULL) || (length == 0)) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_saa_service_rec: SvcRec "
+			    "Not Found: res_p %p, len %d", results_p, length);
+			if (sl[s].p_multi & IBTL_CM_MULTI_SM) {
+				retval = IBT_SERVICE_RECORDS_NOT_FOUND;
+				continue;
+			} else
+				return (IBT_SERVICE_RECORDS_NOT_FOUND);
+		}
+
+		/* if we are here, we got some records. so break. */
+		break;
+	}
+
 	if (retval != IBT_SUCCESS)
 		return (retval);
-
-	if ((results_p == NULL) || (length == 0)) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_saa_service_rec: SvcRec Not Found:"
-		    " res_p %p, len %d", results_p, length);
-		return (IBT_SERVICE_RECORDS_NOT_FOUND);
-	}
 
 	num_req = length / sizeof (sa_service_record_t);
 
@@ -2145,7 +2155,7 @@ ibcm_saa_service_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 				stmp = (sa_service_record_t *)results_p;
 				a_gid.gid_prefix = a_gid.gid_guid = 0;
 
-				if (sl->p_multism) {
+				if (sl->p_multi & IBTL_CM_MULTI_SM) {
 					/* validate sn_pfx */
 					a_gid = ibcm_saa_get_agid(sl,
 					    gidp, n_gids);

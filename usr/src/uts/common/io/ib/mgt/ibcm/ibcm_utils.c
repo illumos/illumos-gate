@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1571,7 +1571,8 @@ ibcm_insert_trace(void *statep, ibcm_state_rc_trace_qualifier_t event_qualifier)
 {
 	ibcm_conn_trace_t	*conn_trace;
 	uint8_t			conn_trace_ind;
-	clock_t			time_diff;
+	hrtime_t		time_diff;
+	hrtime_t		hrt;
 
 	if (!(((ibcm_state_data_t *)statep)->conn_trace))
 		return;
@@ -1598,10 +1599,13 @@ ibcm_insert_trace(void *statep, ibcm_state_rc_trace_qualifier_t event_qualifier)
 	conn_trace->conn_trace_events[conn_trace_ind] = event_qualifier;
 
 	if ((ibcm_enable_trace & 1) == 0) {
-		time_diff = gethrtime() - conn_trace->conn_base_tm;
-		time_diff = time_diff >> 10;
-		if (time_diff >= TM_DIFF_MAX)
+		hrt = gethrtime();
+		time_diff = (hrt - conn_trace->conn_base_tm) >> 10;
+		if (time_diff >= TM_DIFF_MAX) {
+			/* RESET, future times are relative to new base time. */
+			conn_trace->conn_base_tm = hrt;
 			time_diff = 0;
+		}
 		conn_trace->conn_trace_event_times[conn_trace_ind] = time_diff;
 	}
 
@@ -1662,7 +1666,7 @@ ibcm_dump_conn_trbuf(void *statep, char *line_prefix, char *buf, int buf_size)
 
 	/* Print statep, local comid, local qpn */
 	cur_size = snprintf(&buf[next_data], rem_size, "%s%s0x%p\n%s%s0x%p\n"
-	    "%s%s0x%x/%llx/%d\n%s%s0x%x\n%s%s0x%x/%llx\n%s%s0x%x\n%s%s%lu\n",
+	    "%s%s0x%x/%llx/%d\n%s%s0x%x\n%s%s0x%x/%llx\n%s%s0x%x\n%s%s%llu\n",
 	    line_prefix, event_str[IBCM_DISPLAY_SID], (void *)sp,
 	    line_prefix, event_str[IBCM_DISPLAY_CHAN], (void *)sp->channel,
 	    line_prefix, event_str[IBCM_DISPLAY_LCID], sp->local_comid,

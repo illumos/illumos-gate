@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,27 +141,6 @@ typedef enum ibt_clnt_class_e {
 					(class) == IBT_TEST_DEV)
 /*
  * Event record & status returns for asynchronous events and errors.
- *
- * The table below shows additional details about which async_event
- * struct members are defined.
- *
- *					additional
- *	async_code			async_event fields
- * IBT_EVENT_PATH_MIGRATED		ev_chan_hdl
- * IBT_EVENT_SQD			ev_chan_hdl
- * IBT_ERROR_CATASTROPHIC_CHAN		ev_chan_hdl, ev_fma_ena
- * IBT_ERROR_PATH_MIGRATE_REQ		ev_chan_hdl, ev_fma_ena
- * IBT_ERROR_INVALID_REQUEST_CHAN	ev_chan_hdl, ev_fma_ena
- * IBT_ERROR_ACCESS_VIOLATION_CHAN	ev_chan_hdl, ev_fma_ena
- * IBT_ERROR_CQ				ev_cq_hdl, ev_fma_ena
- * IBT_ERROR_PORT_DOWN			ev_hca_guid, ev_port
- * IBT_EVENT_PORT_UP			ev_hca_guid, ev_port
- * IBT_ERROR_LOCAL_CATASTROPHIC		ev_hca_guid, ev_fma_ena
- * IBT_HCA_ATTACH_EVENT			ev_hca_guid
- * IBT_HCA_DETACH_EVENT			ev_hca_guid
- * IBT_EVENT_LIMIT_REACHED_SRQ		ev_srq_hdl
- * IBT_EVENT_EMPTY_CHAN			ev_chan_hdl
- * IBT_ERROR_CATASTROPHIC_SRQ		ev_srq_hdl, ev_fma_ena
  */
 typedef struct ibt_async_event_s {
 	uint64_t		ev_fma_ena;		/* FMA Error data */
@@ -179,19 +158,6 @@ typedef struct ibt_async_event_s {
  *	Pointer to an async event/error handler function.  This function is
  *	called when an async event/error is detected on a HCA that is being
  *	used by the IBT client driver that registered the function.
- *
- *	clnt_private	An IBTF opaque that is the client handle, and
- *			passed into the IBTF on an ibt_attach() call.
- *			This is likely to be the address of the IBT
- *			client per device soft state structure.
- *
- *	hca_hdl		The IBT handle of the HCA on which the event occurred.
- *
- *	code		Code (ibt_async_code_t) for this async event/error.
- *
- *	event		A pointer to an ibt_async_event_t struct that describes
- *			the event.
- *
  */
 typedef void (*ibt_async_handler_t)(void *clnt_private,
     ibt_hca_hdl_t hca_hdl, ibt_async_code_t code, ibt_async_event_t *event);
@@ -201,21 +167,6 @@ typedef void (*ibt_async_handler_t)(void *clnt_private,
  *
  * ibt_memory_handler_t
  *	Pointer to an memory event/error handler function.
- *
- *	clnt_private	An IBTF opaque that is the client handle, and
- *			passed into the IBTF on an ibt_attach() call.
- *			This is likely to be the address of the IBT
- *			client per device soft state structure.
- *
- *	hca_hdl		The IBT handle of the HCA associated with the
- *			memory region or area.
- *
- *	code		Code (ibt_mem_code_t) identifies the event/error
- *			as being associated with a memory region or memory
- *			area.
- *
- *	data		A pointer to an ibt_mem_data_t struct that contains
- *			error information.
  */
 typedef void (*ibt_memory_handler_t)(void *clnt_private,
     ibt_hca_hdl_t hca_hdl, ibt_mem_code_t code, ibt_mem_data_t *data);
@@ -323,12 +274,6 @@ typedef struct ibt_cq_sched_attr_s {
  *	Pointer to a work request completion handler function.  This function
  *	is called when a WR completes on a CQ that is being used by the IBTF
  *	client driver that registered the function.
- *
- * 	ibt_cq		The IBT CQ handle upon which the completion occurred.
- *
- *	arg		The IBTF client private argument that was specified
- *			when the handler was registered via
- *			ibt_set_cq_handler()
  */
 typedef void (*ibt_cq_handler_t)(ibt_cq_hdl_t ibt_cq, void *arg);
 
@@ -803,22 +748,7 @@ typedef struct ibt_prop_update_payload_s {
 /*
  * ibt_attach() and ibt_detach():
  *	These are the calls into IBTF used during client driver attach() and
- *	detach(). The ibt_attach() routine takes three input arguments:
- *
- *	mod_infop	Points to the client's module information struct,
- *			which contains amongst other things an
- *			ibt_clnt_class_t that identifies the type of
- *			client, see the definition of ibt_clnt_class_t
- *			for valid classes.
- *
- *	arg		If the Client driver is associated with a device node
- *			then this is the pointer to its device information
- *			structure.  Otherwise this is NULL.
- *
- *	clnt_private	A client private data pointer (probably the client
- *			device soft state struct). This pointer is returned
- *			back to the client in all client callbacks.  This
- *			value is used as the first argument of async callbacks.
+ *	detach().
  *
  *	The IBTF returns an ibt_clnt_hdl_t to the client. This handle is used
  *	to identify this client device in all subsequent calls into the IBTF.
@@ -839,11 +769,6 @@ ibt_status_t ibt_detach(ibt_clnt_hdl_t ibt_hdl);
  * ibt_get_hca_list()
  *	Returns the number of HCAs in a system and their node GUIDS.
  *
- *	hca_list_p	NULL or points to an array of ib_guid_t's allocated
- *			by the IBTF.
- *
- *	return value	The number of valid ib_guid_t's returned.
- *
  *	If hca_list_p is not NULL then the memory for the array of GUIDs is
  *	allocated by the IBTF and should be freed by the caller using
  *	ibt_free_hca_list(). If hca_list_p is NULL then no memory is allocated
@@ -853,12 +778,6 @@ ibt_status_t ibt_detach(ibt_clnt_hdl_t ibt_hdl);
  *
  * ibt_free_hca_list()
  *	Free the memory allocated by ibt_get_hca_list().
- *
- *	hca_list	Pointer to an array of ib_guid_t's allocated by the
- *			IBTF during ibt_get_hca_list().
- *
- *	entries		The number of entries in hca_list (return value
- *			from previous call to ibt_get_hca_list()).
  */
 uint_t ibt_get_hca_list(ib_guid_t **hca_list_p);
 
@@ -869,13 +788,6 @@ void ibt_free_hca_list(ib_guid_t *hca_list, uint_t entries);
  * ibt_close_hca()	  once. ibt_open_hca() takes a client's ibt handle
  *			  and a GUID and returns a unique IBT client HCA
  *			  handle.
- *
- *	ibt_hdl		The handle returned to the client by the IBTF from
- *			an ibt_attach() call.
- *
- *	hca_guid	The HCA' s node GUID.
- *
- *	hca_hdl		The returned ibt_hca_hdl_t.
  *
  * These routines can not be called from interrupt context.
  */
@@ -889,14 +801,6 @@ ibt_status_t ibt_close_hca(ibt_hca_hdl_t hca_hdl);
  * ibt_query_hca()
  * ibt_query_hca_byguid()
  * 	Returns the static attributes of the specified HCA
- *
- *	hca_hdl		Is the HCA handle.
- *
- *	hca_guid	Is the HCA Node GUID.
- *
- *	hca_attrs	Is a pointer to a ibt_hca_attr_t allocated by the
- *			caller, into which the hca attributes are copied.
- *
  */
 ibt_status_t ibt_query_hca(ibt_hca_hdl_t hca_hdl, ibt_hca_attr_t *hca_attrs);
 
@@ -912,29 +816,8 @@ ibt_status_t ibt_query_hca_byguid(ib_guid_t hca_guid,
  *	ibt_hca_portinfo_t struct as well as the memory required for the SGID
  *	and P_Key tables contained within that struct.
  *
- *	hca_hdl		Is the HCA handle.
- *
- *	hca_guid	Is the HCA Node GUID.
- *
- *	port		Port number to query. If port is 0, all ports are
- *			queried.
- *
- *	port_info_p	Is the address of a pointer to an array of
- *			ibt_hca_portinfo_t structs.
- *
- *	ports_p		The number of ibt_hca_portinfo_t structs returned,
- *			which are pointed to by the returned "port_info_p".
- *
- *	size_p		Size of the memory allocated by IBTF for port_info_p,
- *			to be freed by calling ibt_free_portinfo().
- *
  * ibt_free_portinfo()
  *	Frees the memory allocated for a specified ibt_hca_portinfo_t struct.
- *
- *	port_info	Is the a pointer to an array of ibt_hca_portinfo_t
- *			structs.
- *
- *	size		Memory Size as returned from ibt_query_hca_ports().
  */
 ibt_status_t ibt_query_hca_ports(ibt_hca_hdl_t hca_hdl, uint8_t port,
     ibt_hca_portinfo_t **port_info_p, uint_t *ports_p, uint_t *size_p);
@@ -947,10 +830,6 @@ void ibt_free_portinfo(ibt_hca_portinfo_t *port_info, uint_t size);
 /*
  * ibt_set_hca_private()	- Set/get the client private data.
  * ibt_get_hca_private()
- *
- *	hca_hdl		The ibt_hca_hdl_t of the opened HCA.
- *
- *	clnt_private	The client private data.
  */
 void ibt_set_hca_private(ibt_hca_hdl_t hca_hdl, void *clnt_private);
 void *ibt_get_hca_private(ibt_hca_hdl_t hca_hdl);
@@ -960,21 +839,12 @@ void *ibt_get_hca_private(ibt_hca_hdl_t hca_hdl);
  *	A helper function to retrieve HCA GUID for the specified handle.
  *	Returns HCA GUID on which the specified Channel is allocated. Valid
  *	if it is non-NULL on return.
- *
- *	hca		HCA Handle.
  */
 ib_guid_t ibt_hca_handle_to_guid(ibt_hca_hdl_t hca);
 
 /*
  * ibt_hca_guid_to_handle()
  *	A helper function to retrieve a hca handle from a HCA GUID.
- *
- *	ibt_hdl		The handle returned to the client by the IBTF from
- *			an ibt_attach() call.
- *
- *	hca_guid	HCA GUID
- *
- *	hca_hdl		Returned ibt_hca_hdl_t IBT HCA Handle.
  */
 ibt_status_t ibt_hca_guid_to_handle(ibt_clnt_hdl_t ibt_hdl, ib_guid_t hca_guid,
     ibt_hca_hdl_t *hca_hdl);
@@ -1015,68 +885,6 @@ ibt_status_t ibt_aget_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
  *	the IBTL) that satisfies the requirements specified in an
  *	ibt_alt_path_attr_t struct.  The specified channel must have been
  *	previously opened successfully using ibt_open_rc_channel.
- *	This function also ensures that the service being accessed by the
- *	channel is available at the selected alternate port.
- *
- *	chan		Existing channel for which alternate path needs
- *			to be found.
- *
- *	flags 		IBT_PATH_NO_FLAGS	If no flags specified, IBTL
- *						assumes IBT_PATH_AVAIL.
- *			IBT_PATH_AVAIL		IBTF will attempt to select
- *						an alternate path that is most
- *						unique to the primary path of
- *						the channel specified, ensuring
- *						that the local port selected
- *						shall be on the local hca of
- *						the existing channel, and the
- *						remote 	port shall be on the
- *						remote hca of the existing
- *						channel.
- *			IBT_PATH_PERF		The IBTF will attempt to select
- *						an alternate path that is
- *						having highest performance
- *						attributes, between the local
- *						hca and remote hca of the
- *						existing channel, but not same
- *						as the primary path of the
- *						existing channel.
- *						IBT_PATH_AVAIL and
- *						IBT_PATH_PERF cannot be
- *						selected together.
- *
- *	attr		Points to an ibt_alt_path_attr_t struct that contains
- *			required and optional attributes.
- *
- *	alt_path	An ibt_alt_path_info_t struct filled in by
- *			ibt_get_alt_path() as output parameters.
- *
- *			pi_alt_cep_path		Alternate Path info.
- *			pi_alt_pkt_lt		Alternate Path Pkt lifetime.
- *
- * A client can specify various desired attributes for the alternate paths,
- * but must specify an existing channel.
- *
- * Required and optional attributes are:
- *
- * Required:
- *	chan		Existing channel for which alternate path needs
- *			to be found.
- *
- * Optional:
- *	flags		optional flags to influence IBTF alternate path
- *			selection.
- *	apa_sgid	Local HCA GID.
- *	apa_dgid	Remote HCA GID.
- *	apa_srate	Static rate.
- *	apa_flow	FlowLabel.
- *	apa_hop		HopLimit.
- *	apa_tclass	Traffic Class.
- *	apa_sl		Service level.
- * Note:
- *	The pa_dgid must be on the same destination channel adapter,
- *	if specified.
- *
  */
 ibt_status_t ibt_get_alt_path(ibt_channel_hdl_t chan, ibt_path_flags_t flags,
     ibt_alt_path_attr_t *attr, ibt_alt_path_info_t *alt_path);
@@ -1085,160 +893,6 @@ ibt_status_t ibt_get_alt_path(ibt_channel_hdl_t chan, ibt_path_flags_t flags,
  * ibt_open_rc_channel
  * 	ibt_open_rc_channel() opens a previously allocated RC communication
  *	channel. The IBTL initiates the channel establishment protocol.
- *
- *	rc_chan		The opaque channel handle returned in a previous call
- *			to ibt_alloc_rc_channel(), specifies the channel to
- *			open.
- *
- *	flags		Open RC Channel flags - ibt_chan_open_flags_t
- *
- *			IBT_OCHAN_NO_FLAGS
- *			IBT_OCHAN_REDIRECTED
- *						Reopen a channel that was
- *						previously redirected with a
- *						IBT_CM_REDIRECT_CM status.
- *			IBT_OCHAN_PORT_REDIRECTED
- *						Reopen a channel that was
- *						previously redirected with a
- *						IBT_CM_REDIRECT_PORT status.
- *			IBT_OCHAN_DUP		Duplicate a connection.
- *						Connect rc_chan to the same
- *						destination, with the same
- *						channel attributes as the
- *						args->rc_dup_channel.
- *			IBT_OCHAN_RETRY		Indicates that
- *						optional->rc_cm_retry_cnt is
- *						used instead of the CM default.
- *
- *	mode		IBT_BLOCKING		Do not return until CM protocol
- *						is completed. Client would be
- *						notified about CM protocol
- *						progress via the oc_cm_handler.
- *
- *			IBT_NONBLOCKING		Return as soon as possible,
- *						after initiating the CM
- *						protocol. Client would be
- *						notified about CM protocol
- *						progress via the oc_cm_handler.
- *
- *	args		Address of an ibt_chan_open_args_s struct.
- *
- *			oc_path			A pointer to an ibt_path_info_t
- *						struct (normally filled in by a
- *						call to ibt_get_paths()), that
- *						contains both primary and
- *						alternate path (optional)
- *						details.
- *			oc_path_retry_cnt	The number of times the remote
- *						side should retry timeout,
- *						packet sequence, etc errors
- *						before posting a completion
- *						error.
- *			oc_path_rnr_retry_cnt	The number of times that the
- *						remote side should retry RNR NAK
- *						errors before posting a
- *						completion.
- *			oc_cm_handler		Handler for CM callbacks. A
- *						handler that minimally supports
- *						the IBT_CM_EVENT_CONN_CLOSED
- *						CM event must be supplied.
- *			oc_cm_clnt_private	First argument to cm_handler
- *						callbacks.
- *			oc_priv_data_len	The length (in bytes) of the
- *						buffer pointed to by
- *						rc_priv_data.
- *			oc_priv_data		Vendor specific data to be sent
- *						in a REQ message.
- *
- *			The following parameters are enabled by corresponding
- *			bits in the "flags" argument.
- *
- *			oc_redirected_gid	If a previous call to open
- *						channel resulted in an
- *						IBT_CM_REDIRECT_PORT rc_status
- *						returned, then the channel
- *						should be reopened with the
- *						rc_redirected_gid set to the
- *						returned gid.
- *						(ibt_arej_info_t->ari_gid).
- *			oc_rdma_ra_out		The max RDMA-R/Atomic sent.
- *						Number of RDMA RD's & Atomics
- *						outstanding.
- *			oc_rdma_ra_in		The Incoming RDMA-R/Atomic
- *						Responder resources for handling
- *						incoming RDMA RD's & Atomics.
- *			oc_dup_channel		Duplicate this channel.
- *			oc_cm_redirect_qpn	If a previous call to open
- *			oc_cm_redirect_qkey	channel resulted in an
- *						IBT_CM_REDIRECT_CM rc_status
- *						returned, then ibt_get_paths()
- *						should be called to obtain a
- *						path to the redirected node as
- *						specified in the returned
- *						ibt_arej_info_t->ari_redirect
- *						struct. The channel should then
- *						be re-opened with
- *						oc_cm_redirect_qp set to
- *						ibt_arej_info_t->ari_redirect.
- *						rdi_qpn. And oc_cm_redirect_qkey
- *						to ibt_arej_info_t->ari_redirect
- *						.ari_qkey.
- *
- *	returns		An optional pointer to a ibt_rc_return_s struct. Should
- *			be set if ibt_open_rc_channel() is called in blocking
- *			mode, contains:
- *
- *			rc_rdma_ra_in		Arbitrated responder resources.
- *			rc_rdma_ra_out		Arbitrated initiator depth.
- *			rc_arej_info		Valid for some cm status returns
- *						(see ibt_arej_info_t definition)
- *						contains additional error
- *						information.
- *			rc_status		Indicates if the channel was
- *						opened successfully. If the
- *						channel was not opened the
- *						status code gives an indication
- *						why.
- *			rc_failover_status	Failover Port status:
- *						  IBT_CM_FAILOVER_ACCEPT
- *						  IBT_CM_FAILOVER_REJ_NOTSUPP
- *						  IBT_CM_FAILOVER_REJ
- *						Only valid if an alternate path
- *						was supplied.
- *			rc_priv_data_len	The length (in bytes) of the
- *						buffer pointed to by
- *						rc_priv_data.
- *			rc_priv_data		REP private data.
- *
- *	This function can execute in blocking or non blocking modes. In non
- *	blocking mode the function returns immediately. An IBT client channel
- *	handler function is called with a status code that indicates if the
- *	channel was opened successfully. If the channel was not opened, the
- *	status code gives an indication why. For blocking mode the function
- *	does not return until the channel is either opened successfully or the
- *	attempt to open the channel is terminated by the IBTF.
- *
- *	If ibt_open_rc_channel() returns with an IBT_CM_FAILURE status
- *	and rc_status is IBT_CM_DUP_CONN_REQ then remote node is initiating a
- * 	simultaneous duplicate connection to this host, and that CM has
- *	deferred to it. The local host cm handler will be called with a
- *	REQ RCVD event.
- *
- *	If connection establishment is successful, then channel is returned
- *	in IBT_STATE_RTS Operational (ie., RTS) state. If connection
- *	establishment fails, then the channel is returned either in
- *	IBT_STATE_INIT or IBT_STATE_ERROR state. If channel is returned in
- *	IBT_STATE_INIT, then client can attempt to reopen the channel based
- *	on failure status and returned error data. If the channel is returned
- *	in IBT_STATE_ERROR, then it is not possible to attempt a reopen. The
- *	channel is returned in IBT_STATE_ERROR for the following rc_status
- *	codes:
- *		IBT_CM_CI_FAILURE
- *		IBT_CM_CHAN_INVALID_STATE
- *
- *	Note : Aborting a connection establishment by calling
- *	ibt_close_rc_channel() results in the channel being returned in
- *	IBT_STATE_ERROR.
  */
 ibt_status_t ibt_open_rc_channel(ibt_channel_hdl_t rc_chan,
     ibt_chan_open_flags_t flags, ibt_execution_mode_t mode,
@@ -1253,60 +907,6 @@ ibt_status_t ibt_open_rc_channel(ibt_channel_hdl_t rc_chan,
  *
  *	This function will reuse CM event Handler provided in
  *	ibt_open_rc_channel().
- *
- *	rc_chan			The opaque RC channel handle.
- *
- *	mode			IBT_BLOCKING	Do not return until completed.
- *				IBT_NONBLOCKING	Return as soon as possible. The
- *						oc_cm_handler is called with
- *						the IBT_CM_EVENT_CONN_CLOSED
- *						event when the close operation
- *						is complete.
- *
- *	priv_data		A Pointer to a byte array that contains the
- *				data that to be placed in the DREQ.
- *
- *	priv_data_len		The length (in bytes) of the buffer pointed to
- *				by priv_data. Should be less or equal to
- *				IBT_DREQ_PRIV_DATA_SZ
- *
- *	ret_status		Close status can be one of:
- *					IBT_CM_CLOSED_DREP_RCVD
- *					IBT_CM_CLOSED_TIMEOUT
- *					IBT_CM_CLOSED_DUP
- *					IBT_CM_CLOSED_ABORT
- *
- *	ret_priv_data		Only valid if called in IBT_BLOCKING mode.
- *				Should be NULL if the caller does not require
- *				return private data, otherwise should point to
- *				a byte array which is <= IBT_DREP_PRIV_DATA_SZ.
- *
- *	ret_priv_data_len_p	Only valid if called in IBT_BLOCKING mode.
- *				On input, the maximum number of bytes of
- *				private data to be copied into ret_priv_data.
- *				Upon return, this value is updated to the
- *				actual number of bytes copied (may be 0
- *				because of a DREQ timeout or DREQ crossover).
- *
- * If ibt_close_rc_channel() is called  with mode set to IBT_NONBLOCKING,
- * then it returns immediately, and the caller's CM handler function is called
- * to indicate completion of the channel close operation. The cm handler may be
- * called before returning from a NON-BLOCKING ibt_close_rc_channel.
- *
- * If ibt_close_rc_channel is called before connection is established, then
- * CM shall attempt to abort the connection establishment process. If CM could
- * successfully abort the connection establishment that is in progress, the
- * client would be notified via cm handler as well as from the return status
- * of a blocking ibt_open_rc-Channel.
- *
- * Client must not call ibt_close_rc_channel from cm callback either to close
- * an established channel or to abort an in-progress connection establishment.
- *
- * If channel is associated with a valid connection and connection closure is
- * successful, then channel is returned in error state.
- *
- * ibt_close_rc_channel may return failure, if client has already been notified
- * about connection closure via cm handler.
  */
 ibt_status_t ibt_close_rc_channel(ibt_channel_hdl_t rc_chan,
     ibt_execution_mode_t mode, void *priv_data,
@@ -1326,9 +926,6 @@ ibt_status_t ibt_close_rc_channel(ibt_channel_hdl_t rc_chan,
  *
  *	ibt_prime_close_rc_channel() can only be called on a previously opened
  *	channel.
- *
- *	rc_chan		The opaque RC channel handle.
- *
  */
 ibt_status_t ibt_prime_close_rc_channel(ibt_channel_hdl_t rc_chan);
 
@@ -1340,35 +937,6 @@ ibt_status_t ibt_prime_close_rc_channel(ibt_channel_hdl_t rc_chan);
  *      state (IBT_STATE_ERROR) to the state ready for use by
  *      ibt_open_rc_channel. Basically, this function is very similar to
  *      ibt_alloc_rc_channel, but reuses an existing RC channel.
- *
- *      rc_chan      A channel handle returned from
- *                   ibt_alloc_rc_channel.
- *
- *      control      Control flags. Enables RDMA read, RDMA write and atomic
- *                   operations.  Each flag needs to explicitly be set to
- *                   enable the operation  (IBT_CEP_RDMA_RD, IBT_CEP_RDMA_WR
- *                   or IBT_CEP_ATOMIC). If none of these are desired,
- *                   IBT_CEP_NO_FLAGS can be specified.
- *
- *      hca_port_num HCA port number. Specifies the HCA port to associate
- *                   the recycled channel with. This should be set to the
- *                   port indicated in the pi_prim_cep_path of the
- *                   ibt_path_info_t returned by ibt_get_paths for a
- *                   destination to be reached using this channel.
- *
- *     func          NULL or a pointer to an ibt_recycle_handler_t function
- *                   to call when ibt_recycle_rc() completes. If
- *                   'func' is not NULL then ibt_recycle_rc() will
- *                   return as soon as possible after initiating the
- *                   recycling process. 'func' is then called when the
- *                   process completes. An ibt_recycle_handler_t function is
- *                   defined as:
- *
- *                   void func(ibt_status_t ibt_status, void *arg)
- *
- *     			ibt_status	The operation status for ibt_recycle_rc.
- *
- *     arg           The argument to 'func'.
  *
  * Clients are allowed to make resource clean up/free calls in the CM handler
  *
@@ -1390,18 +958,6 @@ ibt_status_t ibt_recycle_rc(ibt_channel_hdl_t rc_chan, ibt_cep_flags_t control,
  *      state (IBT_STATE_ERROR) to a usable state (IBT_STATE_RTS).
  *      Basically, this function is very similar to ibt_alloc_ud_channel,
  *	but reuses an existing UD channel.
- *
- *      ud_chan		A channel handle returned from ibt_alloc_ud_channel.
- *
- *      hca_port_num	HCA port number. Specifies the HCA port to associate
- *			the recycled channel with. This should be set to the
- *			port indicated in the pi_prim_cep_path of the
- *			ibt_path_info_t returned by ibt_get_paths() for a
- *			destination to be reached using this channel.
- *
- *	pkey_ix		Partition key index.
- *
- *	qkey		Queue Key (Q_Key).
  */
 ibt_status_t ibt_recycle_ud(ibt_channel_hdl_t ud_chan, uint8_t hca_port_num,
     uint16_t pkey_ix, ib_qkey_t qkey);
@@ -1416,15 +972,6 @@ ibt_status_t ibt_recycle_ud(ibt_channel_hdl_t ud_chan, uint8_t hca_port_num,
  *	Place the send queue of the specified channel into the send queue
  *	drained state.
  *	Applicable for both RC and UD channels.
- *
- *	chan		A previously allocated channel handle.
- *
- *	modify_flags	Channel End Point (CEP) Modify Flags.
- *
- *			IBT_CEP_SET_SQD_EVENT	When this is set, a call to
- *						the client's async handler is
- *						made after the Send Queue has
- *						Drained.
  */
 ibt_status_t ibt_pause_sendq(ibt_channel_hdl_t chan,
     ibt_cep_modify_flags_t modify_flags);
@@ -1436,22 +983,6 @@ ibt_status_t ibt_unpause_sendq(ibt_channel_hdl_t chan);
  *	Resize the SendQ/RecvQ sizes of a channel.
  *
  *	Applicable for both RC and UD channels.
- *
- *	chan		A previously allocated channel handle.
- *
- *	flags
- *			IBT_SEND_Q	Operation applies to the SendQ
- *			IBT_RECV_Q	Operation applies to the RecvQ
- *
- *	request_sz	This is the address of an ibt_queue_size_s struct that
- *			contains:
- *			sq_sz		Requested new SendQ size.
- *			rq_sz		Requested new RecvQ size.
- *
- *	actual_sz	NULL or a pointer to ibt_queue_size_s struct to
- *			return new queue sizes.
- *			sq_sz		Returned new SendQ size.
- *			rq_sz		Returned new RecvQ size.
  */
 ibt_status_t ibt_resize_queues(ibt_channel_hdl_t chan, ibt_qflags_t flags,
     ibt_queue_sizes_t *request_sz, ibt_queue_sizes_t *actual_sz);
@@ -1461,13 +992,6 @@ ibt_status_t ibt_resize_queues(ibt_channel_hdl_t chan, ibt_qflags_t flags,
  *
  *	Query the SendQ/RecvQ sizes of a channel.
  *	Applicable for both RC and UD channels.
- *
- *	chan		A previously allocated channel handle.
- *
- *	actual_sz	The address of a ibt_queue_size_s struct where
- *			queue sizes are returned.
- *			sq_sz		Returned new SendQ size.
- *			rq_sz		Returned new RecvQ size.
  */
 ibt_status_t ibt_query_queues(ibt_channel_hdl_t chan,
     ibt_queue_sizes_t *actual_sz);
@@ -1477,22 +1001,6 @@ ibt_status_t ibt_query_queues(ibt_channel_hdl_t chan,
  *	Enable/disable RDMA operations.
  *
  *	Applicable for RC channels only.
- *
- *	rc_chan		A previously allocated channel handle.
- *
- *	modify_flags	Flags that identify which flags in the "flags"
- *			argument are to be modified.
- *
- *			IBT_CEP_SET_RDMA_R	Enable/Disable RDMA RD
- *			IBT_CEP_SET_RDMA_W	Enable/Disable RDMA WR
- *			IBT_CEP_SET_ATOMIC	Enable/Disable Atomics
- *
- *	flags		Channel End Point (CEP) Disable Flags.
- *			A flag that is not specified means "enable".
- *
- *			IBT_CEP_RDMA_RD	Enable incoming RDMA RD's
- *			IBT_CEP_RDMA_WR	Enable incoming RDMA WR's
- *			IBT_CEP_ATOMIC	Enable incoming Atomics.
  */
 ibt_status_t ibt_modify_rdma(ibt_channel_hdl_t rc_chan,
     ibt_cep_modify_flags_t modify_flags, ibt_cep_flags_t flags);
@@ -1502,18 +1010,6 @@ ibt_status_t ibt_modify_rdma(ibt_channel_hdl_t rc_chan,
  * ibt_set_rdma_resource
  *	Change the number of resources to be used for incoming and outgoing
  *	RDMA reads & Atomics.
- *
- *	rc_chan		A previously allocated channel handle.
- *
- *	modify_flags	Identifies which attribute of the channel is to be
- *			modified, one or both of:
- *
- *			IBT_CEP_SET_RDMARA_OUT
- *			IBT_CEP_SET_RDMARA_IN
- *
- *	rdma_ra_out	Outgoing RDMA Reads/Atomics
- *
- *	rdma_ra_in	Incoming RDMA Reads/Atomics
  */
 ibt_status_t ibt_set_rdma_resource(ibt_channel_hdl_t rc_chan,
     ibt_cep_modify_flags_t modify_flags, uint8_t rdma_ra_out,
@@ -1525,10 +1021,6 @@ ibt_status_t ibt_set_rdma_resource(ibt_channel_hdl_t rc_chan,
  *	if HCA supports this capability).  Can only be called on a paused
  *	channel.
  *	Applicable for RC channels only.
- *
- *	rc_chan		A previously allocated RC channel handle.
- *
- *	port_num	New HCA port
  */
 ibt_status_t ibt_change_port(ibt_channel_hdl_t rc_chan, uint8_t port_num);
 
@@ -1566,21 +1058,6 @@ ibt_status_t ibt_unbind_all_services(ibt_srv_hdl_t srv_hdl);
  *	A client CM handler/srv_handler function can call this function to
  *	extend its response time to a CM event.
  *	Applicable for RC channels only.
- *
- *	flags		Indicates what CM message processing is being delayed
- *			by the CM handler, valid values are:
- *				IBT_CM_DELAY_REQ
- *				IBT_CM_DELAY_REP
- *				IBT_CM_DELAY_LAP
- *
- *	cm_session_id	The session ID that was passed to the
- *			client srv_handler by the CM.
- *
- *	service_time	The extended service time in microseconds.
- *
- *	priv_data	Optional private data for the MRA MAD.
- *
- *	priv_data_len	Number of bytes in priv_data.
  */
 ibt_status_t ibt_cm_delay(ibt_cmdelay_flags_t flags, void *cm_session_id,
     clock_t service_time, void *priv_data, ibt_priv_data_len_t priv_data_len);
@@ -1593,71 +1070,7 @@ ibt_status_t ibt_cm_delay(ibt_cmdelay_flags_t flags, void *cm_session_id,
  * callback. CM events that can be deferred and continued with ibt_cm_proceed()
  * are REQ_RCV, REP_RCV, LAP_RCV, and DREQ_RCV.
  *
- *  Arguments:
- *
- *	event		The event being continued, valid values are:
- *
- *				IBT_CM_EVENT_REQ_RCV
- *				IBT_CM_EVENT_REP_RCV
- *				IBT_CM_EVENT_LAP_RCV
- *				IBT_CM_EVENT_DREQ_RCV
- *
- *	cm_session_id	The session ID that was passed to the client srv_handler
- *			by the CM.
- *
- *	status		Indicates if the client is accepting/rejecting the CM
- *			event, valid values are:
- *
- *			  IBT_CM_ACCEPT		The CM handler function accepts
- *						the specified event.
- *			  IBT_CM_REJECT		The CM handler rejects the
- *						specified event. The CM should
- *						issue a REJ message with a
- *						reason of IBT_CM_REJ_CONSUMER.
- *			  IBT_CM_REDIRECT	The CM handler is redirecting a
- *						REQ indicating that the service
- *						is provided at another port.
- *			  IBT_CM_NO_CHANNEL	Unable to allocate a channel.
- *
- *	cm_event_data	A pointer to a ibt_cm_proceed_reply_t union that
- *			contains:
- *
- *			  rep	should only be updated for a cm_event of
- *				REQ_RCV if the client/server accepts the
- *				connection, contains:
- *
- *				channel		An ibt_channel_hdl_t. The
- *						service handler function, if it
- *						decides to accept the
- *						connection request, should
- *						allocate a ibt_channel_hdl_t
- *						over which the connection will
- *						be established and return the
- *						handle to the CM via this
- *						parameter.
- *				rdma_ra_out	Initiator depth - the max
- *						RDMA-R/Atomic sent Number of
- *						RDMA RD's & Atomics outstanding
- *				rdma_ra_in   	Responder resources - Incoming
- *						RDMA-R/Atomics.
- *
- *			  rej	should only be updated for cm_event of REQ_RCV
- *				or REP_RCV if the client/server rejects the
- *				connection. Contains Additional reject
- *				information.
- *
- *			  apr	Should be updated for cm_event of LAP_RCV.
- *				Contains Alternate path response data
- *
- *	priv_data	A pointer to optional private data to be placed in the
- *			next reply message generated by CM. Should be NULL if
- *			there is no private data.
- *
- *	priv_data_len	The Number of bytes in priv_data. Should be 0 if
- *			priv_data is NULL.
- *
  * NOTE :
- *
  *
  * Typically CM completes processing of a client's CM handler return, with
  * IBT_CM_DEFER status, before  processing of the corresponding ibt_cm_proceed()
@@ -1683,42 +1096,6 @@ ibt_status_t ibt_cm_proceed(ibt_cm_event_type_t event, void *session_id,
  * An IBT client calls ibt_cm_ud_proceed() to proceed with an
  * IBT_CM_UD_EVENT_SIDR_REQ  UD event that was previously deferred by the
  * client returning IBT_CM_DEFER on a CM UD handler callback.
- *
- *  Arguments:
- *
- *	cm_session_id	The session ID that was passed to the client CM handler
- *			by the CM.
- *
- *	ud_channel	If the client handler has decided to accept the service
- *			request, ud_channel is the destination channel to which
- *			the remote node should use to communicate with the
- *			service.
- *
- *	status		Indicates if the client is accepting/rejecting the CM
- *			event, valid values are:
- *
- *			  IBT_CM_ACCEPT		The CM handler function accepts
- *						the specified event.
- *			  IBT_CM_REJECT		The CM handler rejects the
- *						specified event. The CM should
- *						issue a REJ message with a
- *						reason of IBT_CM_REJ_CONSUMER.
- *			  IBT_CM_REDIRECT	The CM handler is redirecting a
- *						REQ indicating that the service
- *						is provided at another port.
- *			  IBT_CM_NO_CHANNEL	Unable to allocate a channel.
- *
- *	redirect_infop	A pointer to a ibt_redirect_info_t structure that
- *			should only be updated if the client is Redirecting
- *			the IBT_CM_UD_EVENT_SIDR_REQ request.
- *
- *	priv_data	A pointer to optional private data to be placed in the
- *			next reply message generated by CM. Should be NULL if
- *			there is no private data.
- *
- *	priv_data_len	The Number of bytes in priv_data. Should be 0 if
- *			priv_data is NULL.
- *
  * NOTE :
  *
  * Typically CM completes processing of a client's CM handler return, with
@@ -1746,37 +1123,8 @@ ibt_status_t ibt_cm_ud_proceed(void *session_id, ibt_channel_hdl_t ud_channel,
  * ibt_alloc_cq_sched()
  *	Reserve CQ scheduling class resources
  *
- * 	hca_hdl		The HCA handle.
- *
- *	attr		A pointer to a ibt_cq_sched_attr_t that contains:
- *
- *			flags
- *			    IBT_CQS_NO_FLAGS, IBT_CQS_USER_MAP,
- *			    IBT_CQS_DEFER_ALLOC, IBT_CQS_WARM_CACHE,
- *			    IBT_CQS_AFFINITY or IBT_CQS_SCHED_GROUP
- *
- *			priority
- *			    The IBTF will attempt to implement a coarse 3 level
- *			    priority scheme (IBT_CQ_LOW, IBT_CQ_MEDIUM,
- *			    IBT_CQ_HIGH) based on the class of client driver.
- *			    This parameter is optional and should be specified
- *			    as IBT_CQ_DEFAULT if a default indicator is desired.
- *
- *			load
- *			    Expected CQ load in class. 0 = unspecified If not
- *			    zero, is increasing the expected CQ load.
- *
- *			affinity_hdl
- *			    Valid if IBT_CQ_AFFINITY set.
- *
- *	sched_hdl_p	Returned scheduling handle.
- *
  * ibt_free_cq_sched()
  *	Free CQ scheduling class resources
- *
- * 	hca_hdl		The HCA handle.
- *	sched_hdl	Scheduling handle returned from ibt_alloc_cq_sched.
- *	load		CQ load being removed
  */
 ibt_status_t ibt_alloc_cq_sched(ibt_hca_hdl_t hca_hdl,
     ibt_cq_sched_attr_t *attr, ibt_sched_hdl_t *sched_hdl_p);
@@ -1787,21 +1135,6 @@ ibt_status_t ibt_free_cq_sched(ibt_hca_hdl_t hca_hdl,
 /*
  * ibt_alloc_cq()
  *	Allocate a completion queue.
- *
- *	hca_hdl		The CQ's HCA
- *
- *	cq_attr		- cq_size	The minimum acceptable size of the CQ.
- *			- cq_sched	The scheduling class hint from
- *					ibt_alloc_cq_sched(), NULL if not
- *					specified.
- *			- cq_flags	IBT_CQ_NO_FLAGS,
- *					IBT_CQ_HANDLER_IN_THREAD,
- *					IBT_CQ_USER_MAP or IBT_CQ_DEFER_ALLOC.
- *
- * 	ibt_cq_p	Address for the CQ handle return value.
- *
- * 	real_size	The actual size (number of entries) of the CQ.
- *
  */
 ibt_status_t ibt_alloc_cq(ibt_hca_hdl_t hca_hdl, ibt_cq_attr_t *cq_attr,
     ibt_cq_hdl_t *ibt_cq_p, uint_t *real_size);
@@ -1809,8 +1142,6 @@ ibt_status_t ibt_alloc_cq(ibt_hca_hdl_t hca_hdl, ibt_cq_attr_t *cq_attr,
 /*
  * ibt_free_cq()
  *	Free allocated CQ resources.
- *
- * 	ibt_cq		A CQ handle returned from an ibt_alloc_cq() call.
  */
 ibt_status_t ibt_free_cq(ibt_cq_hdl_t ibt_cq);
 
@@ -1819,12 +1150,6 @@ ibt_status_t ibt_free_cq(ibt_cq_hdl_t ibt_cq);
  * ibt_enable_cq_notify()
  *	Enable notification requests on the specified CQ.
  *	Applicable for both RC and UD channels.
- *
- * 	ibt_cq		The CQ handle.
- *
- *	notify_type 	Enable notifications for all (IBT_NEXT_COMPLETION)
- * 			completions, or the next Solicited completion
- *			(IBT_NEXT_SOLICITED) only.
  *
  *	Completion notifications are disabled by setting the completion
  *	handler to NULL by calling ibt_set_cq_handler().
@@ -1836,14 +1161,6 @@ ibt_status_t ibt_enable_cq_notify(ibt_cq_hdl_t ibt_cq,
  * ibt_set_cq_handler()
  *	Register a work request completion handler with the IBTF.
  *	Applicable for both RC and UD channels.
- *
- * 	ibt_cq			The CQ handle.
- *
- *	completion_handler	The completion handler.
- *
- *	arg			The IBTF client private argument to be passed
- *				back to the client when calling the CQ
- *				completion handler.
  *
  *	Completion notifications are disabled by setting the completion
  *	handler to NULL. When setting the handler to NULL, no additional
@@ -1860,20 +1177,6 @@ void ibt_set_cq_handler(ibt_cq_hdl_t ibt_cq,
  *	Poll the specified CQ for the completion of work requests (WRs).
  *	If the CQ contains completed WRs, up to num_wc of them are returned.
  *	Applicable for both RC and UD channels.
- *
- * 	ibt_cq			The CQ handle.
- *
- *	work_completions	Address of the array of work completions.
- *
- *	num_wc			Size of the work_completions array, which
- *				is the maximum number of WCs to be returned.
- *
- *	num_polled		Address to store the number of completions
- *				successfully returned.  "num_polled" may be
- *				NULL when "num_wc" is 1 because the number
- *				of returned WCs can be deduced from the
- *				function's return value (IBT_SUCCESS implies 1,
- *				otherwise 0 WCs were returned).
  */
 ibt_status_t ibt_poll_cq(ibt_cq_hdl_t ibt_cq, ibt_wc_t *work_completions,
     uint_t num_wc, uint_t *num_polled);
@@ -1881,23 +1184,12 @@ ibt_status_t ibt_poll_cq(ibt_cq_hdl_t ibt_cq, ibt_wc_t *work_completions,
 /*
  * ibt_query_cq()
  *	Return the total number of entries in the CQ.
- *
- *	ibt_cq		The CQ handle.
- *
- *	entries		Address to return the size of the CQ.
- *
  */
 ibt_status_t ibt_query_cq(ibt_cq_hdl_t ibt_cq, uint_t *entries);
 
 /*
  * ibt_resize_cq()
  *	Change the size of a CQ.
- *
- *	ibt_cq		The CQ handle.
- *
- *	new_sz		Requested size of CQ on a resize operation.
- *
- *	real_sz		The actual size of the resized CQ.
  */
 ibt_status_t ibt_resize_cq(ibt_cq_hdl_t ibt_cq, uint_t new_sz, uint_t *real_sz);
 
@@ -1905,10 +1197,6 @@ ibt_status_t ibt_resize_cq(ibt_cq_hdl_t ibt_cq, uint_t new_sz, uint_t *real_sz);
  * ibt_set_cq_private()
  * ibt_get_cq_private()
  *	Set/get the client private data.
- *
- *	ibt_cq		The ibt_cq_hdl_t of the allocated CQ.
- *
- *	clnt_private	The client private data.
  */
 void ibt_set_cq_private(ibt_cq_hdl_t ibt_cq, void *clnt_private);
 void *ibt_get_cq_private(ibt_cq_hdl_t ibt_cq);
@@ -1954,65 +1242,6 @@ void *ibt_get_cq_private(ibt_cq_hdl_t ibt_cq);
  *
  * ibt_free_mw()
  *	De-allocate the Memory Window.
- *
- *	hca_hdl		Is the HCA handle.
- *
- *	pd		A protection domain handle.
- *
- *	bp		A pointer to a buf(9S) struct.
- *
- *	mem_attr	Requested memory region attributes, contains:
- *			  mr_vaddr	The virtual address of the first byte
- *					of the region to be registered.
- *			  mr_len	The length of the region to be
- *					registered.
- *			  as		A pointer to an address space structure.
- *					This parameter should be set to NULL,
- *					which implies kernel address space.
- *			  mr_flags	Access control & reregister flags.
- *
- *	mem_sattr	Requested memory region shared attributes, contains:
- *			  mr_vaddr	The virtual address of the first byte
- *					of the region to be registered.
- *			  mr_flags	Access control & reregister flags.
- *
- *	mem_bpattr	Additional requested memory region attributes used
- *			during ibt_register_buf() and ibt_reregister_buf() are:
- *			  mr_vaddr	The requested IOVA.
- *			  mr_flags	Access control & reregister flags.
- *					If mr_vaddr is supplied, then it should
- *					be indicated by IBT_MR_PHYS_IOVA flag.
- *
- *	mem_desc	Returned memory descriptor, contains:
- *			  md_vaddr	The IOVA of the memory region. For
- *					ibt_register_mr() &
- *					ibt_reregister_mr() this will be the
- *					same as the mem_attr->vaddr.
- *			  md_lkey	The L_Key used for local access.
- *			  md_rkey	The R_Key used for remote access, NULL
- *					if remote access was not requested.
- *
- *	mr_hdl_p	The memory region IBT handle returned from a memory
- *			register call.
- *
- *	rkey		The IBT R_Key handle returned from ibt_alloc_mw.
- *
- *	mr_hdl		IBT Memory Region handle.
- *
- *	mw_hdl		IBT Memory Window handle.
- *
- *	attr		Memory region attributes, returned by
- *			ibt_query_mr(), contains:
- *
- *			  mr_lkey	The L_Key used for local access.
- *			  mr_rkey	The R_Key used for remote access, NULL
- *					if remote access was not requested.
- *			  mr_lbounds	Actual local protection bounds enforced
- *					by the CI.
- *			  mr_rbounds	Actual local protection bounds enforced
- *					by the CI.
- *			  mr_access	Access control flags.
- *	flags		Memory Window alloc flags.
  */
 ibt_status_t ibt_register_mr(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
     ibt_mr_attr_t *mem_attr, ibt_mr_hdl_t *mr_hdl_p, ibt_mr_desc_t *mem_desc);
@@ -2055,28 +1284,6 @@ ibt_status_t ibt_free_mw(ibt_hca_hdl_t hca_hdl, ibt_mw_hdl_t mw_hdl);
  *	registrations.
  *
  *	Applicable for both RC and UD channels.
- *
- *	hca_hdl		Is the HCA handle.
- *
- *	pd		A protection domain handle.
- *
- *	flags		Access control, specify IBT_LKEY_REMOTE to request
- *			remote access (R_Key returned).
- *
- *	phys_buf_list_sz Requested size of Physical Buffer List (PBL) resources
- *			to be allocated.
- *
- *	mr_hdl_p	The returned IBT memory region IBT handle.
- *
- *	mem_desc_p	Returned memory descriptor, contains:
- *			  pmd_iova		Ignore, returned as NULL.
- *			  pmd_sync_required	Ignore, returned as B_FALSE.
- *			  pmd_lkey		The L_Key used for local access.
- *			  pmd_rkey		The R_Key used for remote
- *						access, NULL if remote access
- *						was not requested.
- *			  pmd_phys_buf_list_sz	Actual size of PBL resources
- *						allocated.
  */
 ibt_status_t ibt_alloc_lkey(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
     ibt_lkey_flags_t flags, uint_t phys_buf_list_sz, ibt_mr_hdl_t *mr_p,
@@ -2092,35 +1299,6 @@ ibt_status_t ibt_alloc_lkey(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
  *
  * ibt_reregister_phys_mr()
  *	Modify the attributes of an existing memory region.
- *
- *	hca_hdl		Is the HCA handle.
- *
- *	pd		A protection domain handle.
- *
- *	mem_pattr	Requested memory region physical attributes, contains:
- *			   pmr_iova	The requested IOVA.
- *			   pmr_len	The length of the region to be
- *					registered.
- *			   pmr_offset	Offset of the regions starting iova.
- *					within the 1st physical buffer.
- *			   pmr_flags	Access control & reregister flags.
- *			   pmr_lkey	Reregister only.
- *			   pmr_rkey	Reregister only.
- *			   pmr_num_buf	Num of entries in the mr_buf_list.
- *			   pmr_buf_list	List of physical buffers accessed
- *					as an array.
- *
- *	mr_hdl_p	The returned IBT memory region handle.
- *
- *	mem_desc_p	Returned memory descriptor, contains:
- *			  pmd_iova		Ignore, returned as NULL.
- *			  pmd_sync_required	Ignore, returned as B_FALSE.
- *			  pmd_lkey		The L_Key used for local access.
- *			  pmd_rkey		The R_Key used for remote
- *						access, NULL if remote access
- *						was not requested.
- *			  pmd_phys_buf_list_sz	Actual size of PBL resources
- *						allocated.
  */
 ibt_status_t ibt_register_phys_mr(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
     ibt_pmr_attr_t *mem_pattr, ibt_mr_hdl_t *mr_hdl_p,
@@ -2141,23 +1319,6 @@ ibt_status_t ibt_reregister_phys_mr(ibt_hca_hdl_t hca_hdl, ibt_mr_hdl_t mr_hdl,
  *	A set of physical addresses, that can be used with "Reserved L_Key",
  *	register physical,  and "Fast Registration Work Request" operations
  *	is returned.
- *
- *	hca_hdl		HCA Handle.
- *
- *	va_attrs	A pointer to an ibt_va_attr_t that describes the VA
- *			to be translated.
- *
- *	paddr_list_len	The number of entries in the 'paddr_list_p' array.
- *
- *	paddr_list_p	Array of ibt_phys_buf_t (allocated by the caller), in
- *			which the physical buffers that map the virtual buffer
- *			are returned.
- *
- *	num_paddr_p	The actual number of ibt_phys_buf_t that were returned
- *			in the 'paddr_list_p' array.
- *
- *	ma_hdl_p	Memory Area Handle
- *
  */
 ibt_status_t ibt_map_mem_area(ibt_hca_hdl_t hca_hdl, ibt_va_attr_t *va_attrs,
     uint_t paddr_list_len, ibt_phys_buf_t *paddr_list_p, uint_t *num_paddr_p,
@@ -2179,22 +1340,6 @@ ibt_status_t ibt_unmap_mem_area(ibt_hca_hdl_t hca_hdl, ibt_ma_hdl_t ma_hdl);
  * ibt_post_recv()
  * ibt_post_srq()
  *	Post receive work requests to the specified channel.
- *
- *	chan		The opaque channel handle returned in a previous
- *			call to ibt_alloc_rc_channel() & ibt_alloc_ud_channel()
- *
- *	srq		A Shared Receive Queue handle.
- *
- *	wr_list		A pointer to an array of WRs to be posted to the
- *			specified channel.
- *
- *	num_wr		The size of the WR array, which must be greater than 0.
- *
- *	posted		Address to store the number of WRs successfully posted.
- *			When "num_wr" is 1, it can make sense for "posted" to
- *			be NULL because the number of WRs successfully posted
- *			can be deduced from the function's return value
- *			(IBT_SUCCESS implies 1, otherwise 0 WRs were posted).
  */
 ibt_status_t ibt_post_send(ibt_channel_hdl_t chan, ibt_send_wr_t *wr_list,
     uint_t num_wr, uint_t *posted);
@@ -2257,15 +1402,6 @@ ibt_status_t ibt_migrate_path(ibt_channel_hdl_t rc_chan);
  *	multicast message addressed to the group specified by the MGID
  *	(mcg_info->mc_adds_vect.av_dgid) and received on the HCA port with
  *	which the channel is associated.
- *
- *	ud_chan		An UD channel handle, obtained from
- *			ibt_alloc_ud_channel(). This is the UD channel handle,
- *			that is to be used to receive data sent to the
- *			multicast group.
- *
- *	mcg_info	A pointer to an ibt_mcg_info_t struct returned from an
- *			ibt_join_mcg() or ibt_query_mcg() call, that identifies
- *			the multicast group to attach this channel to.
  */
 ibt_status_t ibt_attach_mcg(ibt_channel_hdl_t ud_chan,
     ibt_mcg_info_t *mcg_info);
@@ -2273,13 +1409,6 @@ ibt_status_t ibt_attach_mcg(ibt_channel_hdl_t ud_chan,
 /*
  * ibt_detach_mcg()
  *	Detach the specified UD channel from the specified multicast group.
- *
- *	ud_chan		An UD channel handle returned from
- *			ibt_alloc_ud_channel().
- *
- *	mcg_info	A pointer to an ibt_mcg_info_t struct returned from an
- *			ibt_join_mcg() or ibt_query_mcg() call, that identifies
- *			the multicast group to detach this channel from.
  */
 ibt_status_t ibt_detach_mcg(ibt_channel_hdl_t ud_chan,
     ibt_mcg_info_t *mcg_info);
@@ -2288,29 +1417,6 @@ ibt_status_t ibt_detach_mcg(ibt_channel_hdl_t ud_chan,
  * ibt_join_mcg()
  *	Join a multicast group.  The first full member "join" causes the MCG
  *	to be created.
- *
- *	rgid		The request GID that defines the HCA port from which a
- *			contact to SA Access is performed to add the specified
- *			endport GID ((mcg_attr->mc_pgid) to a multicast group.
- *			If mcg_attr->mc_pgid is null, then this (rgid) will be
- *			treated as endport GID that is to be added to the
- *			multicast group.
- *
- *	mcg_attr	A pointer to an ibt_mcg_attr_t structure that defines
- *			the attributes of the desired multicast group to be
- *			created or joined.
- *
- *	mcg_info_p	A pointer to the ibt_mcg_info_t structure, allocated
- *			by the caller, where the attributes of the created or
- *			joined multicast group are copied.
- *
- *	func		NULL or a pointer to a function to call when
- *			ibt_join_mcg() completes. If 'func' is not NULL then
- *			ibt_join_mcg() will return as soon as possible after
- *			initiating the multicast group join/create process.
- *			'func' is then called when the process completes.
- *
- *	arg		 Argument to the 'func'.
  */
 ibt_status_t ibt_join_mcg(ib_gid_t rgid, ibt_mcg_attr_t *mcg_attr,
     ibt_mcg_info_t *mcg_info_p,  ibt_mcg_handler_t func, void  *arg);
@@ -2325,36 +1431,6 @@ ibt_status_t ibt_join_mcg(ib_gid_t rgid, ibt_mcg_attr_t *mcg_attr,
  *
  *	The last full member to leave causes the destruction of the Multicast
  *	Group.
- *
- *	rgid		The request GID that defines the HCA port upon which
- *			to send the request to the Subnet Administrator, to
- *			remove the specified port (port_gid) from the multicast
- *			group.  If 'port_gid' is the Reserved GID (i.e.
- *			port_gid.gid_prefix = 0 and port_gid.gid_guid = 0),
- *			then the end-port associated with 'rgid' is removed
- *			from the multicast group.
- *
- *	mc_gid		A multicast group GID as returned from ibt_join_mcg()
- *			call.  This is optional, if not specified (i.e.
- *			mc_gid.mgid_prefix must have 8-bits of 11111111 at the
- *			start of the GID to identify this as being a multicast
- *			GID), then the port is removed from all the multicast
- *			groups of which it is a member.
- *
- *	port_gid	This is optional, if not the Reserved GID (gid_prefix
- *			and gid_guid not equal to 0), then this specifies the
- *			endport GID of the multicast group member being deleted
- *			from the group. If it is the Reserved GID (gid_prefix
- *			and gid_guid equal to 0) then the member endport GID is
- *			determined from 'rgid'.
- *
- *	mc_join_state	The Join State attribute used when the group was joined
- *			using ibt_join_mcg(). This Join State component must
- *			contains at least one bit set to 1 in the same position
- *			as that used during ibt_join_mcg(). i.e. the logical
- *			AND of the two JoinState components is not all zeros.
- *			This Join State component must not have some bits set
- *			which are not set using ibt_join_mcg().
  */
 ibt_status_t ibt_leave_mcg(ib_gid_t rgid, ib_gid_t mc_gid, ib_gid_t port_gid,
     uint8_t mc_join_state);
@@ -2368,27 +1444,6 @@ ibt_status_t ibt_leave_mcg(ib_gid_t rgid, ib_gid_t mc_gid, ib_gid_t port_gid,
  *	pointer to the array (mcgs_p) and the number of entries in the array
  *	(entries_p). This memory should be freed by the client using
  *	ibt_free_mcg_info().
- *
- *	rgid		The request GID that defines the HCA port upon which
- *			to send the request to the Subnet Administrator, to
- *			retrieve Multicast Records matching attributes as
- *			specified through 'mcg_attr' argument.
- *
- *	mcg_attr	NULL or a pointer to an ibt_mcg_attr_t structure that
- *			specifies MCG attributes that are to be matched.
- *			Attributes that are not required can be wild carded
- *			by specifying as '0'.
- *
- *	mcgs_max_num	The maximum number of matching multicast groups to
- *			return.  If zero, then all available matching multicast
- *			groups are returned.
- *
- *	mcgs_info_p	The address of an ibt_mcg_info_t pointer, where
- *			multicast group information is returned.  The actual
- *			number of entries filled in the array is returned in
- *			entries_p.
- *
- *	entries_p	The number of ibt_mcg_attr_t entries returned.
  */
 ibt_status_t ibt_query_mcg(ib_gid_t rgid, ibt_mcg_attr_t *mcg_attr,
     uint_t mcgs_max_num, ibt_mcg_info_t **mcgs_info_p, uint_t *entries_p);
@@ -2396,10 +1451,6 @@ ibt_status_t ibt_query_mcg(ib_gid_t rgid, ibt_mcg_attr_t *mcg_attr,
 /*
  * ibt_free_mcg_info()
  *	Free the memory allocated by successful ibt_query_mcg()
- *
- *	mcgs_info	Pointer returned by ibt_query_mcg().
- *
- *	entries		The number of ibt_mcg_info_t entries to free.
  */
 void ibt_free_mcg_info(ibt_mcg_info_t *mcgs_info, uint_t entries);
 
@@ -2418,10 +1469,6 @@ void ibt_register_subnet_notices(ibt_clnt_hdl_t ibt_hdl,
  * ibt_alloc_pd()
  * ibt_free_pd()
  * 	Allocate/Release a protection domain
- *
- *	hca_hdl		The IBT HCA handle.
- *	flags		IBT_PD_NO_FLAGS, IBT_PD_USER_MAP or IBT_PD_DEFER_ALLOC
- *	pd		The IBT PD handle.
  */
 ibt_status_t ibt_alloc_pd(ibt_hca_hdl_t hca_hdl, ibt_pd_flags_t flags,
     ibt_pd_hdl_t *pd);
@@ -2435,18 +1482,6 @@ ibt_status_t ibt_free_pd(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd);
  *
  * ibt_index2pkey_byguid
  * ibt_index2pkey	Convert a P_Key Index into a P_Key.
- *
- *	hca_hdl		HCA Handle.
- *
- *	hca_guid	The HCA Node GUID.
- *
- *	port_num	Port number defining the P_Key table.
- *
- *	pkey		The input P_Key for ibt_pkey2index() or the returned
- *			P_Key for ibt_index2pkey().
- *
- *	pkey_ix		The input P_Key Index for ibt_index2pkey() or
- *			the returned P_Key index for ibt_pkey2index().
  */
 ibt_status_t ibt_pkey2index(ibt_hca_hdl_t hca_hdl, uint8_t port_num,
     ib_pkey_t pkey, uint16_t *pkey_ix);
@@ -2464,23 +1499,6 @@ ibt_status_t ibt_index2pkey_byguid(ib_guid_t hca_guid, uint8_t port_num,
  *  ibt_ci_data_in()
  *
  *  Pass CI specific userland data for CI objects to the CI.
- *
- *	hca			Identifies the HCA.
- *
- *	flags			IBT_CI_COMPLETE_ALLOC
- *				Finish a deferred alloc.
- *
- *	object			Identifies the type object pointed to by
- *				ibt_object_handle.
- *
- *	ibt_object_handle	The handle of the object to be associated with
- *				the data in.
- *
- *	data_p			Pointer to data passed in to the CI. The buffer
- *				should be allocated by the caller.
- *
- *	data_sz			The size of the buffer pointed to by
- *				data_p.
  */
 ibt_status_t ibt_ci_data_in(ibt_hca_hdl_t hca, ibt_ci_data_flags_t flags,
     ibt_object_type_t object, void *ibt_object_handle, void *data_p,
@@ -2490,23 +1508,6 @@ ibt_status_t ibt_ci_data_in(ibt_hca_hdl_t hca, ibt_ci_data_flags_t flags,
  *  ibt_ci_data_out()
  *
  *  Obtain CI specific userland data for CI objects.
- *
- *	hca			Identifies the HCA.
- *
- *	flags			IBT_CI_NO_FLAGS.
- *
- *	object			Identifies the type object pointed to by
- *				ibt_object_handle.
- *
- *	ibt_object_handle	The handle of the object to be associated with
- *				the data in.
- *
- *	data_p			Pointer a data buffer in which to return CI
- *				private data. The buffer should be allocated
- *				by the caller.
- *
- *	data_sz			The size of the buffer pointed to by
- *				data_p.
  */
 ibt_status_t ibt_ci_data_out(ibt_hca_hdl_t hca, ibt_ci_data_flags_t flags,
     ibt_object_type_t object, void *ibt_object_handle, void *data_p,
@@ -2539,27 +1540,12 @@ typedef struct ibt_node_info_s {
 /*
  * ibt_gid_to_node_info()
  *	Retrieve node information for the specified GID.
- *
- *	gid		Identifies the IB Node and port for which to obtain
- *			node information.
- *
- *	node_info_p	A pointer to an ibt_node_info_t structure (allocated
- *			by the caller) in which to return the node information.
  */
 ibt_status_t ibt_gid_to_node_info(ib_gid_t gid, ibt_node_info_t *node_info_p);
 
 /*
  * ibt_reprobe_dev
  *	Reprobe properties for IOC device node.
- *
- *	dip		IBTF Client dip
- *
- * Returns :
- *	IBT_SUCCESS	Successfully initiated a reprobe for device
- *	IBT_NOT_SUPPORTED
- *			Returned for HCA port, VPPA or Pseudo IBTF client
- *	IBT_INSUFF_KERNEL_RESOURCE
- *			Resource allocation failed
  */
 ibt_status_t	ibt_reprobe_dev(dev_info_t *dip);
 
@@ -2581,22 +1567,6 @@ ibt_status_t ibt_get_companion_port_gids(ib_gid_t gid, ib_guid_t hca_guid,
 /*
  * ibt_alloc_srq()
  *	Allocate a shared receive queue.
- *
- *	hca_hdl		The SRQ's HCA
- *
- *	flags		IBT_SRQ_NO_FLAGS, IBT_SRQ_USER_MAP or
- *			IBT_SRQ_DEFER_ALLOC.
- *
- *	pd		A protection domain handle.
- *
- *	sizes		Pointer to an ibt_srq_sizes_t struct, that contains the
- *			SRQ size and max length of SGL of WRs posted to the SRQ.
- *
- * 	ibt_srq_p	Address for the SRQ handle return value.
- *
- * 	real_size_p	Pointer to an ibt_srq_sizes_t struct, that contains the
- *			returned actual SRQ size and max length of SGL of WRs
- *                      posted to the SRQ.
  */
 ibt_status_t ibt_alloc_srq(ibt_hca_hdl_t hca_hdl, ibt_srq_flags_t flags,
     ibt_pd_hdl_t pd, ibt_srq_sizes_t *sizes, ibt_srq_hdl_t *ibt_srq_p,
@@ -2605,23 +1575,12 @@ ibt_status_t ibt_alloc_srq(ibt_hca_hdl_t hca_hdl, ibt_srq_flags_t flags,
 /*
  * ibt_free_srq()
  *	Free allocated SRQ resources.
- *
- * 	ibt_srq		An SRQ handle returned from an ibt_alloc_srq() call.
  */
 ibt_status_t ibt_free_srq(ibt_srq_hdl_t ibt_srq);
 
 /*
  * ibt_query_srq()
  *	Query a shared receive queue.
- *
- * 	ibt_srq		An SRQ handle returned from an ibt_alloc_srq() call.
- *
- *	pd_p		The PD associated with the SRQ.
- *
- *	sizes_p		Pointer to an ibt_srq_sizes_t struct, that contains the
- *			SRQ size and max length of SGL of WRs posted to the SRQ.
- *
- *	limit_p		The SRQ WR limit.
  */
 ibt_status_t ibt_query_srq(ibt_srq_hdl_t ibt_srq, ibt_pd_hdl_t *pd_p,
     ibt_srq_sizes_t *sizes_p, uint_t *limit_p);
@@ -2629,17 +1588,6 @@ ibt_status_t ibt_query_srq(ibt_srq_hdl_t ibt_srq, ibt_pd_hdl_t *pd_p,
 /*
  * ibt_modify_srq()
  *	Modify a shared receive queue.
- *
- * 	ibt_srq		An SRQ handle returned from an ibt_alloc_srq() call.
- *
- *	flags		Modify flags, specifies if SRQ size or SRQ Limit, or
- *			both are to be modified.
- *
- *	size		SRQ size.
- *
- *	limit		The SRQ WR limit.
- *
- *	real_size_p	The returned real size.
  */
 ibt_status_t ibt_modify_srq(ibt_srq_hdl_t ibt_srq, ibt_srq_modify_flags_t flags,
     uint_t size, uint_t limit, uint_t *real_size_p);
@@ -2648,10 +1596,6 @@ ibt_status_t ibt_modify_srq(ibt_srq_hdl_t ibt_srq, ibt_srq_modify_flags_t flags,
  * ibt_set_srq_private()
  * ibt_get_srq_private()
  *	Set/get the SRQ client private data.
- *
- *	ibt_srq		The ibt_srq_hdl_t of the allocated SRQ.
- *
- *	clnt_private	The client private data.
  */
 void ibt_set_srq_private(ibt_srq_hdl_t ibt_srq, void *clnt_private);
 void *ibt_get_srq_private(ibt_srq_hdl_t ibt_srq);
@@ -2659,10 +1603,6 @@ void *ibt_get_srq_private(ibt_srq_hdl_t ibt_srq);
 /*
  * ibt_check_failure()
  * 	Function to test for special case failures
- *
- *	status		An ibt_status_t returned from an IBTF function call.
- *
- *	reserved_p	Reserved for future use - set to NULL.
  */
 ibt_failure_type_t ibt_check_failure(ibt_status_t status, uint64_t *reserved_p);
 
@@ -2707,13 +1647,6 @@ ibt_status_t ibt_query_ar(ib_gid_t *sgid, ibt_ar_t *queryp, ibt_ar_t *resultp);
  * ibt_modify_system_image()
  * ibt_modify_system_image_byguid()
  *	Modify specified HCA's system image GUID.
- *
- *	hca_hdl		Is the HCA handle.
- *
- *	hca_guid	Is the HCA Node GUID.
- *
- *	sys_guid	Is the New system image GUID.
- *
  */
 ibt_status_t ibt_modify_system_image(ibt_hca_hdl_t hca_hdl, ib_guid_t sys_guid);
 
@@ -2725,18 +1658,6 @@ ibt_status_t ibt_modify_system_image_byguid(ib_guid_t hca_guid,
  * ibt_modify_port()
  * ibt_modify_port_byguid()
  *	Modify the specified port, or all ports attribute(s).
- *
- *	hca_hdl		Is the HCA handle.
- *
- *	hca_guid	Is the HCA Node GUID.
- *
- *	port		Specifies the port to modify.
- *
- *	flags		Specifies which attribute of the port to modify.
- *
- *	init_type	Optional value only required if IBT_PORT_SET_INIT_TYPE
- *			is set in flags.  See IBT_PINIT_* definitions.
- *
  */
 ibt_status_t ibt_modify_port(ibt_hca_hdl_t hca_hdl, uint8_t port,
     ibt_port_modify_flags_t flags, uint8_t init_type);
@@ -2751,18 +1672,6 @@ ibt_status_t ibt_modify_port_byguid(ib_guid_t hca_guid, uint8_t port,
  *	Return the most commonly requested attributes of an HCA port.
  *	If the link state is not IBT_PORT_ACTIVE, the other returned values
  *	are undefined.
- *
- *	hca_hdl		The HCA handle.
- *
- *	hca_guid	The HCA Node GUID.
- *
- *	port		Port number (1 to N) to query.
- *
- *	sgid_p		Returned sgid[0], NULL implies no return value.
- *			Note: sgid[0] contains the subnet prefix and the
- *			GUID for the port.
- *
- *	base_lid_p	Returned base_lid, NULL implies no return value.
  */
 ibt_status_t ibt_get_port_state(ibt_hca_hdl_t hca_hdl, uint8_t port,
     ib_gid_t *sgid_p, ib_lid_t *base_lid_p);

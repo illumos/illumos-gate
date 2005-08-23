@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,77 +45,6 @@ typedef	struct ibc_rdd_s	*ibt_rdd_hdl_t;	/* ibt_alloc_eec() */
 
 /*
  * Channel Modify flags - ibt_cep_modify_flags_t
- *
- * Opaque definitions for channel modify flags.
- *
- *    IBT_CEP_SET_RESET_INIT	Transit the channel (QP) from RESET to INIT
- *				state.
- *
- *				Attributes modified during this transition
- *				(depends on type of channel) are:
- *				Required:
- *					P_Key Index
- *					HCA Port Number
- *					Q_Key
- *					IBT_CEP_RDMA_RD
- *					IBT_CEP_RDMA_WR
- *					IBT_CEP_ATOMIC
- *
- *    IBT_CEP_SET_INIT_RTR	Transit the channel (QP) from INIT to RESET
- *				state.
- *
- *				Attributes modified during this transition
- *				(depends on type of channel) are:
- *				Required:
- *					Number of responder resources for RDMA
- *					read/atomic ops.
- *					Primary Path Address Vector Info.
- *					Destination QPN.
- *					PSN for ReceiveQ.
- *					Minimum RNR NAK Timer field value.
- *				Optional:
- *					Alternate Path Info.
- *					P_Key Index.
- *					Q_Key
- *					SendQ Size.
- *					ReceiveQ Size.
- *					IBT_CEP_RDMA_RD
- *					IBT_CEP_RDMA_WR
- *					IBT_CEP_ATOMIC
- *
- *    IBT_CEP_SET_RTR_RTS	Transit the channel (QP) from RTR to RTS state.
- *
- *				Attributes modified during this transition
- *				(depends on type of channel) are:
- *				Required:
- *					Local ACK Timeout.
- *					Retry Count.
- *					RNR Retry Count.
- *					SendQ PSN.
- *					Number of outstanding RDMA Reads/atomic
- *					ops at destination.
- *				Optional:
- *					Alternate Path Info.
- *					Q_Key
- *					SendQ Size.
- *					ReceiveQ Size.
- *					Minimum RNR NAK Timer field value.
- *					IBT_CEP_RDMA_RD
- *					IBT_CEP_RDMA_WR
- *					IBT_CEP_ATOMIC
- *
- *    IBT_CEP_SET_STATE		This flag needs to be set to qualify for all
- *				specified next state transitions - qp_state.
- *
- *    IBT_CEP_SET_MTU		Modify Path MTU (RC & UC Only).  This flag is
- *				only valid when transiting from the INIT to RTR
- *				state.
- *
- *    IBT_CEP_SET_TIMEOUT	Primary Local ACK Timeout (RC only).
- *
- *    IBT_CEP_SET_PKEY_IX	Primary P_Key Index (RC, UC & UD Only).
- *
- *    IBT_CEP_SET_MIG		Path Migration State (RC & UC only).
  *
  *    Note:
  *	That the IBT_CEP_SET_RESET_INIT, IBT_CEP_SET_INIT_RTR

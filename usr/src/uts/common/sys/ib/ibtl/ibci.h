@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,31 +212,6 @@ typedef struct ibc_cq_handler_attr_s {
  * Event data for asynchronous events and errors. The QP/EEC/CQ/SRQ handle,
  * or port number associated with the Event/Error is passed as an argument
  * to the async handler.
- *
- * Here is the table that describes which async_event struct members need
- * to be defined when ibc_async_handler is called.
- *
- *		async_code		async_event fields
- *	IBT_EVENT_PATH_MIGRATED_QP		ev_qp_hdl
- *	IBT_EVENT_SQD				ev_qp_hdl
- *	IBT_EVENT_COM_EST_QP			ev_qp_hdl
- *	IBT_ERROR_CATASTROPHIC_QP		ev_qp_hdl
- *	IBT_ERROR_INVALID_REQUEST_QP		ev_qp_hdl
- *	IBT_ERROR_ACCESS_VIOLATION_QP		ev_qp_hdl
- *	IBT_ERROR_PATH_MIGRATE_REQ_QP		ev_qp_hdl
- *
- *	IBT_EVENT_PATH_MIGRATED_EEC		ev_eec_hdl
- *	IBT_EVENT_COM_EST_EEC			ev_eec_hdl
- *	IBT_ERROR_PATH_MIGRATE_REQ_EEC		ev_eec_hdl
- *	IBT_ERROR_CATASTROPHIC_EEC		ev_eec_hdl
- *
- *	IBT_ERROR_CQ				ev_cq_hdl
- *	IBT_ERROR_LOCAL_CATASTROPHIC		none
- *	IBT_ERROR_PORT_DOWN			ev_port
- *	IBT_EVENT_PORT_UP			ev_port
- *	IBT_EVENT_LIMIT_REACHED_SRQ		ev_srq_hdl
- *	IBT_EVENT_EMPTY_QP			ev_qp_hdl
- *	IBT_ERROR_CATASTROPHIC_SRQ		ev_srq_hdl
  */
 typedef struct ibc_async_event_s {
 	uint64_t	ev_fma_ena;	/* fault management error data */
@@ -412,7 +387,6 @@ typedef struct ibc_operations_s {
  * IBTF assumes that the structures pointed to by the hca_ops and hca_attr
  * structure members are persistent.
  */
-
 typedef struct ibc_hca_info_s {
 	ibc_version_t		hca_ci_vers;	/* CI Version */
 	dev_info_t		*hca_dip;	/* HCA dev_info */
@@ -440,30 +414,17 @@ typedef enum ibc_status_e {
  *
  * ibc_fini
  *	Un-Registers CI clients with the Solaris I/O framework
- *
- *	modlp           - Pointer to IBC client module linkage structure
  */
-
 int ibc_init(struct modlinkage *modlp);
 void ibc_fini(struct modlinkage *modlp);
 
 /*
  * ibc_attach
- *	Register HCA device with IBTF.
- *
- *	ibc_hdl_p	An IBTF HCA device info handle, assigned by IBTF.
- *			To be used by the HCA driver in all its kernel
- *			function calls to IBTF.
- *
- *	info_p		Pointer to ibc_hca_info_t() struct, which contains
- *			HCA driver's information needed by IBTF.
+ *	Register HCA device with IBTF. During this call HCA driver provides
+ *	driver's information neededby IBTF.
  *
  * ibc_post_attach
  *	After a successful ibc_attach, this must be called.
- *
- *	ibc_hdl		The IBTF HCA device info handle that was returned
- *			as the result of a previously successful call to
- *			ibc_attach.
  *
  * ibc_pre_detach
  *	Attempt to De-Register HCA Device from IBTF.
@@ -471,19 +432,11 @@ void ibc_fini(struct modlinkage *modlp);
  *	stop using this HCA.  Upon success, the HCA driver
  *	is committed to calling ibc_detach.
  *
- *	ibc_hdl		An IBTF HCA device info handle.
- *			Obtained by ibc_attach().
- *
- *	cmd		Type of detach command - DDI_DETACH.
- *
  * ibc_detach
  *	De-Register HCA Device from IBTF.
  *	This function will succeed if ibc_pre_detach has previously
  *	succeeded for this device.
- *
- *	ibc_hdl		An IBTF HCA device info handle.
  */
-
 ibc_status_t ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p);
 void ibc_post_attach(ibc_clnt_hdl_t ibc_hdl);
 ibc_status_t ibc_pre_detach(ibc_clnt_hdl_t ibc_hdl, ddi_detach_cmd_t cmd);
@@ -492,46 +445,19 @@ void ibc_detach(ibc_clnt_hdl_t ibc_hdl);
 /*
  * ibc_cq_handler
  *	IBTF Completion Queue Notification Handler.
- *
- *	ibc_hdl		An IBTF HCA device info handle.
- *			Obtained by ibc_attach().
- *
- *	ibt_cq		An IBT CQ handle, on which completion notification
- *			has occurred. This is passed to HCA driver during
- *			ibc_alloc_cq().
  */
 void ibc_cq_handler(ibc_clnt_hdl_t ibc_hdl, ibt_cq_hdl_t ibt_cq);
 
 /*
  * ibc_async_handler
  *	IBTF Asynchronous event/error handler.
- *
- *	ibc_hdl		An IBTF HCA device info handle.
- *			Obtained by ibc_attach().
- *
- *	code		Asynchronous event code.
- *
- *	event_p		Pointer to ibc_async_event_t struct, to return event
- *			information.
  */
 void ibc_async_handler(ibc_clnt_hdl_t ibc_hdl, ibt_async_code_t code,
     ibc_async_event_t *event_p);
+
 /*
  * ibc_memory_handler
  *	IBTF memory event/error handler.
- *
- *	ibc_hdl		An IBTF HCA device info handle.
- *			Obtained by ibc_attach().
- *
- *	code		Indicates if the Event/Error is with an Memory Area or
- *			Memory Region.
- *
- *	data_p		Pointer to ibt_mem_data_t struct.
- *
- *	ibtl_reserved	The private data associated with either the MR or MA
- *			handle contained in the ibt_mem_data_t struct, that
- *			was passed to the CI on a memory registration or memory
- *			map operation.
  */
 void ibc_memory_handler(ibc_clnt_hdl_t ibc_hdl, ibt_mem_code_t code,
     ibt_mem_data_t *data_p, void *ibtl_reserved);
@@ -541,9 +467,6 @@ void ibc_memory_handler(ibc_clnt_hdl_t ibc_hdl, ibt_mem_code_t code,
  *
  *	Used to obtain a special IBTF failure code for CI specific failures,
  *	failures other than those defined in ibt_status_t.
- *
- *	ena	'0' or the ENA the CI intends to use in an ereport for this
- *		failure.
  */
 ibt_status_t ibc_get_ci_failure(uint64_t ena);
 

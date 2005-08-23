@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,7 +206,7 @@ typedef enum ibt_srq_flags_e {
 } ibt_srq_flags_t;
 
 /*
- * L_Key alloc flags
+ * ibt_alloc_lkey() alloc flags
  */
 typedef enum ibt_lkey_flags_e {
 	IBT_KEY_NO_FLAGS	= 0,
@@ -514,7 +514,8 @@ typedef enum ibt_port_modify_flags_e {
 } ibt_port_modify_flags_t;
 
 /*
- * Modify HCA port InitType bit definitions.
+ * Modify HCA port InitType bit definitions, applicable only if
+ * IBT_PORT_SET_INIT_TYPE modify flag (ibt_port_modify_flags_t) is set.
  */
 #define	IBT_PINIT_NO_LOAD		0x1
 #define	IBT_PINIT_PRESERVE_CONTENT	0x2
@@ -613,71 +614,6 @@ typedef enum ibt_cep_flags_e {
 
 /*
  * Channel Modify Flags
- *
- * These flags specify which attributes in either ibt_rc_chan_modify_attr_t or
- * ibt_ud_chan_modify_attr_t should be modified on an ibt_modify_rc_channel()
- * or ibt_modify_ud_channel() call.
- *
- *
- *	Flag			Comments
- *	----			--------
- *	IBT_CEP_SET_RDMA_R	Modify RDMA reads as indicated by the control
- *				ibt_cep_flags_t attribute (RC & RD only).
- *
- *				  IBT_CEP_RDMA_RD = 0 - Disable RDMA reads.
- *				  IBT_CEP_RDMA_RD = 1 - Enable RDMA reads.
- *
- *	IBT_CEP_SET_RDMA_W	Modify RDMA writes as indicated by the control
- *				ibt_cep_flags_t attribute (RC, UC & RD only).
- *
- *				  IBT_CEP_RDMA_WR = 0 - Disable RDMA writes.
- *				  IBT_CEP_RDMA_WR = 1 - Enable RDMA writes.
- *
- *	IBT_CEP_SET_ATOMIC	Modify atomic operations as indicated by the
- *				control ibt_cep_flags_t attribute
- *				(RC & RD only).
- *
- *				  IBT_CEP_ATOMIC = 0 - Disable atomics.
- *				  IBT_CEP_ATOMIC = 1 - Enable atomics.
- *
- *	IBT_CEP_SET_SQ_SIZE	Resize the maximum outstanding Work Requests
- *				on Send Queue.
- *
- *	IBT_CEP_SET_RQ_SIZE	Resize the maximum outstanding Work Requests
- *				on Receive Queue.
- *
- *	IBT_CEP_SET_ALT_PATH 	Modify Alternate Path Address Vector and HCA
- *				Port number (RC & UC only).
- *
- *	IBT_CEP_SET_ADDS_VECT	Modify Primary Path Address Vector information.
- *				(RC & UC Only).
- *
- *	IBT_CEP_SET_PORT	Modify Primary physical Port (RC, UC & UD only).
- *
- *	IBT_CEP_SET_RETRY	Modify Retry Count (RC only). This limits the
- *				number of times a requester can retry a request
- *				due to a Local ACK timeout or NAK-Sequence
- *				Error.
- *
- *	IBT_CEP_SET_RNR_NAK_RETRY	Modify RNR Retry Count (RC only). The
- *					RNR NAK retry counter limits the number
- *					of times a requester can retry a request
- *					that was RNR NAK'ed.
- *
- *	IBT_CEP_SET_MIN_RNR_NAK	Minimum RNR NAK timer field value
- *				(RC & RD only).
- *
- *	IBT_CEP_SET_QKEY	Modify Q_Key (UD & RD only).
- *
- *	IBT_CEP_SET_RDMARA_OUT	Modify Initiator depth, Number of outstanding
- *				RDMA Read/atomic operations at destination
- *				(RC Only).
- *
- *	IBT_CEP_SET_RDMARA_IN	Modify Responder Resources, Number of local
- *				RDMA Read/ atomic responder resources (RC Only).
- *
- *	IBT_CEP_SET_SQD_EVENT	Cause the SQD async event (only for RTS => SQD).
- *
  */
 typedef enum ibt_cep_modify_flags_e {
 	IBT_CEP_SET_NOTHING		= 0,
@@ -918,6 +854,7 @@ typedef struct ibt_mw_query_attr_s {
 } ibt_mw_query_attr_t;
 
 
+/* Memory Region Sync Flags. */
 #define	IBT_SYNC_READ	0x1	/* Make memory changes visible to incoming */
 				/* RDMA reads */
 
@@ -981,14 +918,6 @@ typedef uint8_t ibt_wrc_opcode_t;
 /*
  * Work Request Completion flags - These flags indicate what type
  *   of data is present in the Work Request Completion structure
- *
- *   IBT_WC_GRH_PRESENT 	- indicates that a Global Route Header was
- *				  received and inserted into the first 40
- *				  bytes of the buffer pointed to by the recv
- *				  SGL.
- *
- *   IBT_WC_IMMED_DATA_PRESENT	- indicates that the received request
- *				  contained immediate data.
  */
 typedef uint8_t ibt_wc_flags_t;
 
@@ -1002,19 +931,6 @@ typedef uint8_t ibt_wc_flags_t;
 /*
  * Work Request Completion - This structure encapsulates the information
  *   necessary to define a work request completion.
- *
- *   wc_id 		- contains the work request ID of the completing WR.
- *   wc_bytes_xfer 	- indicates the number of bytes transferred in the
- *			  request.
- *   wc_flags 		- Work Request Completion Flags, see ibt_wc_flags_t
- *   wc_immed_data 	- Immediate Data.
- *   wc_freed_rc	- indicates the freed resource count. Always valid
- *			  regardless of the wc_status.
- *   wc_type 		- indicates the type of WR completion
- *			  (see ibt_wrc_opcode_t above).
- *   wc_status		- indicates request completion status.
- *   wc_sl		- Service Lane
- *   wc_ethertype	- Ethertype, RawEther only.
  */
 typedef struct ibt_wc_s {
 	ibt_wrid_t		wc_id;		/* Work Request Id */
@@ -1144,7 +1060,7 @@ typedef struct ibt_wr_reg_pmr_s {
 	ibt_mr_hdl_t	pmr_mr_hdl;
 	ibt_phys_buf_t	*pmr_buf_list;	/* List of physical buffers accessed */
 					/* as an array */
-	uint_t		pmr_num_buf;	/* Num of entries in the mr_buf_list */
+	uint_t		pmr_num_buf;	/* Num of entries in the pmr_buf_list */
 	ibt_lkey_t	pmr_lkey;
 	ibt_rkey_t	pmr_rkey;
 	ibt_mr_flags_t	pmr_flags;
@@ -1284,32 +1200,7 @@ typedef struct ibt_recv_wr_s {
 /*
  * Asynchronous Events and Errors.
  *
- *  IBT_EVENT_PATH_MIGRATED	- Connection migrated to alternate path.
- *  IBT_EVENT_SQD		- Send queue has drained.
- *  IBT_EVENT_COM_EST		- First packet arrived on receive WQ while the
- *				  QP is in RTR state (before receiving RTU).
- *				  This event is not given to the client,
- *				  but instead, is given to CM.
- *  IBT_ERROR_CATASTROPHIC_CHAN	- Channel, or SRQ  (if channel is associated
- *				  with an SRQ) error, prevents reporting of
- *				  completions.
- *  IBT_ERROR_INVALID_REQUEST_CHAN - Detection of a transport opcode violation
- *				     at the responder.
- *  IBT_ERROR_ACCESS_VIOLATION_CHAN - Detection of a request access violation
- *				      at the responder.
- *  IBT_ERROR_PATH_MIGRATE_REQ	- Incoming path migration req not accepted.
- *  IBT_ERROR_CQ		- CQ protection error or CQ overrun.
- *  IBT_EVENT_PORT_UP		- HCA port/link available.
- *  IBT_ERROR_PORT_DOWN		- HCA port/link unavailable.
- *  IBT_ERROR_LOCAL_CATASTROPHIC - HCA Local Catastrophic (all QPs in error).
- *  IBT_EVENT_LIMIT_REACHED_SRQ - Shared Receive Queue Limit is reached. Number
- *				  of SRQ WQEs is less than the SRQ limit.
- *  IBT_EVENT_EMPTY_CHAN	- Channel in Error state associated with an
- *				  SRQ is empty (last WQE reached).
- *  IBT_ERROR_CATASTROPHIC_SRQ	- SRQ error, prevents reporting of
- *                                completions.
- *
- * Here are codes that are not used in calls to ibc_async_handler, but
+ * The following codes are not used in calls to ibc_async_handler, but
  * are used by IBTL to inform IBT clients of a significant event.
  *
  *  IBT_HCA_ATTACH_EVENT	- New HCA available.

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,6 +189,10 @@ ibt_status_t ibtl_cm_query_hca_ports_byguid(ib_guid_t hca_guid, uint8_t port,
  *	Frees the memory allocated in ibtl_cm_get_active_plist().
  */
 
+#define	IBTL_CM_SIMPLE_SETUP	0
+#define	IBTL_CM_MULTI_SM	(1 << 0)
+#define	IBTL_CM_MULTI_HCA	(1 << 1)
+
 typedef struct ibtl_cm_port_list_s {
 	ib_guid_t	p_hca_guid;
 	ib_gid_t	p_sgid;
@@ -196,8 +200,8 @@ typedef struct ibtl_cm_port_list_s {
 	ib_mtu_t	p_mtu;
 	uint8_t		p_sgid_ix;
 	uint8_t		p_port_num;
-	uint_t		p_count;
-	uint_t		p_multism;
+	uint8_t		p_count;
+	uint8_t		p_multi;
 	void		*p_saa_hdl;
 } ibtl_cm_port_list_t;
 

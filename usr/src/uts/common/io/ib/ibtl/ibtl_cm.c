@@ -365,8 +365,9 @@ ibtl_cm_get_cnt(ibt_path_attr_t *attr, ibt_path_flags_t flags,
 						plistp->p_sgid_ix = j;
 						plistp->p_sgid = gid;
 						plistp->p_count = cnt;
-						plistp->p_multism =
-						    hdevp->hd_multism;
+						if (hdevp->hd_multism)
+							plistp->p_multi |=
+							    IBTL_CM_MULTI_SM;
 
 						IBTF_DPRINTF_L3(ibtf_cm,
 						    "ibtl_cm_get_cnt: HCA"
@@ -398,6 +399,9 @@ ibtl_cm_get_cnt(ibt_path_attr_t *attr, ibt_path_flags_t flags,
 				} else {
 					attr->pa_hca_guid = hca_guid;
 				}
+			} else if ((pcount == 0) && (tmp_hca_guid) &&
+			    (hdevp->hd_hca_dev_link != NULL)) {
+				attr->pa_hca_guid = tmp_hca_guid;
 			}
 		}
 		hdevp = hdevp->hd_hca_dev_link;
@@ -425,6 +429,7 @@ ibtl_cm_get_active_plist(ibt_path_attr_t *attr, ibt_path_flags_t flags,
 	ibtl_cm_port_list_t	*p_listp, tmp;
 	uint_t			i, j;
 	uint_t			count, rcount;
+	boolean_t		multi_hca = B_FALSE;
 	ibt_status_t		retval = IBT_SUCCESS;
 
 	IBTF_DPRINTF_L3(ibtf_cm, "ibtl_cm_get_active_plist(%p, %X)",
@@ -479,6 +484,21 @@ get_plist_start:
 
 	_NOTE(NO_COMPETING_THREADS_NOW)
 
+	for (i = 0; i < count - 1; i++) {
+		for (j = 0; j < count - 1 - i; j++) {
+			if (p_listp[j].p_hca_guid != p_listp[j+1].p_hca_guid) {
+				multi_hca = B_TRUE;
+				break;
+			}
+		}
+		if (multi_hca == B_TRUE)
+			break;
+	}
+
+	if (multi_hca == B_TRUE)
+		for (i = 0; i < count; i++)
+			p_listp[i].p_multi |= IBTL_CM_MULTI_HCA;
+
 	/*
 	 * Sort (bubble sort) the list based on MTU quality (higher on top).
 	 * Sorting is only performed, if IBT_PATH_AVAIL is set.
@@ -496,7 +516,8 @@ get_plist_start:
 		}
 	}
 
-	if ((flags & IBT_PATH_AVAIL) && (!(flags & IBT_PATH_APM))) {
+	if ((p_listp->p_multi & IBTL_CM_MULTI_HCA) &&
+	    (flags & IBT_PATH_AVAIL) && (!(flags & IBT_PATH_APM))) {
 		/* Avoid having same HCA next to each other in the list. */
 		for (i = 0; i < count - 1; i++) {
 			for (j = 0; j < (count - 1 - i); j++) {

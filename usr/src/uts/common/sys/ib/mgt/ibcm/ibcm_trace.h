@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,7 +160,7 @@ typedef		uint32_t			tm_diff_type;
  *	Allocated number of trace entries
  */
 typedef struct ibcm_conn_trace_s {
-	clock_t			conn_base_tm;
+	hrtime_t		conn_base_tm;
 	uint8_t			*conn_trace_events;
 	tm_diff_type		*conn_trace_event_times;
 	uint8_t			conn_trace_ind;

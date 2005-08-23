@@ -2333,12 +2333,17 @@ ibt_cm_delay(ibt_cmdelay_flags_t flags, void *cm_session_id,
 	    (statep->state == IBCM_STATE_REP_RCVD)) {
 		statep->state = IBCM_STATE_MRA_REP_SENT;
 	} else if (statep->mode == IBCM_PASSIVE_MODE) {
-		if (statep->state == IBCM_STATE_REQ_RCVD)
+		if (statep->state == IBCM_STATE_REQ_RCVD) {
 			statep->state = IBCM_STATE_MRA_SENT;
-		else if (statep->ap_state == IBCM_AP_STATE_LAP_RCVD) {
+		} else if (statep->ap_state == IBCM_AP_STATE_LAP_RCVD) {
 			statep->ap_state = IBCM_AP_STATE_MRA_LAP_RCVD;
+		} else {
+			IBTF_DPRINTF_L2(cmlog, "ibt_cm_delay: invalid state"
+			    "/ap_state/mode %x, %x, %x", statep->state,
+			    statep->ap_state, statep->mode);
+			mutex_exit(&statep->state_mutex);
+			return (IBT_CHAN_STATE_INVALID);
 		}
-
 	} else {
 		IBTF_DPRINTF_L2(cmlog, "ibt_cm_delay: invalid state"
 		    "/ap_state/mode %x, %x, %x", statep->state,
@@ -2347,6 +2352,9 @@ ibt_cm_delay(ibt_cmdelay_flags_t flags, void *cm_session_id,
 
 		return (IBT_CHAN_STATE_INVALID);
 	}
+	/* service time is usecs, stale_clock is nsecs */
+	statep->stale_clock += (hrtime_t)service_time * (1000 *
+	    statep->max_cm_retries);
 
 	statep->send_mad_flags |= IBCM_MRA_POST_BUSY;
 	IBCM_REF_CNT_INCR(statep);	/* for ibcm_post_mra_complete */
@@ -3008,6 +3016,9 @@ ibt_deregister_service(ibt_clnt_hdl_t ibt_hdl, ibt_srv_hdl_t srv_hdl)
 	}
 	svc.sid = srv_hdl->svc_id;
 	svc.num_sids = 1;
+	IBTF_DPRINTF_L3(cmlog, "ibt_deregister_service: SID 0x%llX, numsids %d",
+	    srv_hdl->svc_id, srv_hdl->svc_num_sids);
+
 #ifdef __lock_lint
 	ibcm_svc_compare(NULL, NULL);
 #endif
@@ -5651,6 +5662,7 @@ ibt_get_companion_port_gids(ib_gid_t gid, ib_guid_t hca_guid,
 	boolean_t		local_hca = B_FALSE;
 	ib_guid_t		h_guid = hca_guid;
 	ib_gid_t		*gidp = NULL, *t_gidp = NULL;
+	int			multi_hca_loop = 0;
 
 	IBTF_DPRINTF_L4(cmlog, "ibt_get_companion_port_gids(%llX:%llX, %llX, "
 	    "%llX)", gid.gid_prefix, gid.gid_guid, hca_guid, sysimg_guid);
@@ -5742,8 +5754,8 @@ ibt_get_companion_port_gids(ib_gid_t gid, ib_guid_t hca_guid,
 		goto get_comp_pgid_exit;
 	}
 
+get_comp_for_multihca:
 	/* We will be here, if request is for remote node */
-
 	for (i = 0; i < num_hcas; i++) {
 		int		multism;
 		uint8_t		count = 0;
@@ -5788,7 +5800,8 @@ get_comp_for_multism:
 			 * from this port.
 			 */
 			sgid = hcap->hca_port_info[port].port_sgid0;
-			if ((gid.gid_prefix != 0) && (multi_sm_loop == 0) &&
+			if ((h_guid == 0) && (gid.gid_prefix != 0) &&
+			    (multi_sm_loop == 0) &&
 			    (gid.gid_prefix != sgid.gid_prefix)) {
 				IBTF_DPRINTF_L2(cmlog,
 				    "ibt_get_companion_port_gids: SnPrefix of "
@@ -5797,9 +5810,6 @@ get_comp_for_multism:
 				retval = IBT_NODE_RECORDS_NOT_FOUND;
 				continue;
 			}
-
-			/* Retrieve Node Records from SA Access. */
-			bzero(&nr_req, sizeof (sa_node_record_t));
 
 			/*
 			 * If HCA GUID or System Image GUID is specified, then
@@ -5839,6 +5849,8 @@ get_comp_for_multism:
 					retval = IBT_NODE_RECORDS_NOT_FOUND;
 					continue;
 				}
+
+				bzero(&nr_req, sizeof (sa_node_record_t));
 				nr_req.LID = path->DLID;	/* LID */
 
 				IBTF_DPRINTF_L3(cmlog,
@@ -5882,6 +5894,7 @@ get_comp_for_multism:
 				kmem_free(res_p, len);
 			}
 
+			bzero(&nr_req, sizeof (sa_node_record_t));
 			if (h_guid != 0) {
 				nr_req.NodeInfo.NodeGUID = h_guid;
 				c_mask = SA_NODEINFO_COMPMASK_NODEGUID;
@@ -5970,6 +5983,9 @@ get_comp_for_multism:
 					}
 				}
 				retval = IBT_SUCCESS;	/* done!. */
+				kmem_free(res_p, len);
+				ibcm_dec_hca_acc_cnt(hcap);
+				goto get_comp_pgid_exit;
 			} else {
 				IBTF_DPRINTF_L2(cmlog,
 				    "ibt_get_companion_port_gids: "
@@ -5996,6 +6012,18 @@ get_comp_for_multism:
 			}
 		}
 		ibcm_dec_hca_acc_cnt(hcap);
+
+		/*
+		 * We may be on dual HCA with dual SM configured system.  And
+		 * the input attr GID was visible from second HCA. So in order
+		 * to get the companion portgid we need to re-look from the
+		 * first HCA ports.
+		 */
+		if ((num_hcas > 1) && (i > 0) && (h_guid != 0) &&
+		    (multi_hca_loop != 1)) {
+			multi_hca_loop = 1;
+			goto get_comp_for_multihca;
+		}
 	}
 
 get_comp_pgid_exit:

@@ -1380,7 +1380,7 @@ ibcm_handle_cep_req_response(ibcm_state_data_t *statep, ibcm_status_t response,
 	else {
 		ASSERT(response == IBCM_SEND_REJ);
 		IBTF_DPRINTF_L4(cmlog, "ibcm_handle_cep_req_response: statep %p"
-		    "posting REJ reject_reason = %x", statep, reject_reason);
+		    " posting REJ reject_reason = %d", statep, reject_reason);
 
 		ibcm_post_rej_mad(statep,
 		    reject_reason, IBT_CM_FAILURE_REQ,
@@ -1793,7 +1793,7 @@ ibcm_handle_cep_rep_response(ibcm_state_data_t *statep, ibcm_status_t response,
 		ibcm_cep_send_rtu(statep);
 	} else {
 		IBTF_DPRINTF_L4(cmlog, "ibcm_process_rep_msg: statep 0x%p"
-		    "posting REJ reject_reason = %x", statep, reject_reason);
+		    " posting REJ reject_reason = %d", statep, reject_reason);
 
 		ASSERT(response == IBCM_SEND_REJ);
 		ibcm_post_rej_mad(statep, reject_reason, IBT_CM_FAILURE_REP,
@@ -1977,9 +1977,11 @@ ibcm_process_mra_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 			 * statep->timer_value
 			 */
 			statep->timer_stored_state = statep->state;
-			statep->timerid = IBCM_TIMEOUT(statep, ibt_ib2usec(
-			    mra_msgp->mra_service_timeout_plus >> 3) +
-			    statep->pkt_life_time);
+			statep->timer_value = statep->pkt_life_time +
+			    ibt_ib2usec(mra_msgp->mra_service_timeout_plus
+			    >> 3);
+			statep->timerid = IBCM_TIMEOUT(statep,
+			    statep->timer_value);
 		}
 
 	} else if (statep->state == IBCM_STATE_DELETE) {
@@ -2937,7 +2939,7 @@ ibcm_post_rej_mad(ibcm_state_data_t *statep, ibt_cm_reason_t reject_reason,
 
 	/* Message printed if connection gets REJed */
 	IBTF_DPRINTF_L3(cmlog, "ibcm_post_rej_mad: "
-	    "statep = %p, reject_reason = %x", statep, reject_reason);
+	    "statep = %p, reject_reason = %d", statep, reject_reason);
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*rej_msg))
 
@@ -3002,7 +3004,7 @@ ibcm_build_n_post_rej_mad(uint8_t *input_madp, ib_com_id_t remote_comid,
 	ibcm_mad_addr_t	rej_reply_addr;
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_build_n_post_rej_mad: "
-	    "remote_comid: %x reject_reason %x", remote_comid, reject_reason);
+	    "remote_comid: %x reject_reason %d", remote_comid, reject_reason);
 
 	if (ibcm_alloc_out_msg(cm_mad_addr->ibmf_hdl, &cm_rej_msg,
 	    MAD_METHOD_SEND) != IBT_SUCCESS) {
@@ -6309,6 +6311,9 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 		*arej_len = sizeof (ib_gid_t);
 		bcopy(&tgid, &rej_msgp->rej_addl_rej_info, sizeof (ib_gid_t));
 
+		IBTF_DPRINTF_L3(cmlog, "ibcm_process_cep_req_cm_hdlr: ari_gid= "
+		    "%llX:%llX", tgid.gid_prefix, tgid.gid_guid);
+
 	} else if (cb_status == IBT_CM_REDIRECT) {
 		ibcm_classportinfo_msg_t	tclp;
 
@@ -6912,7 +6917,7 @@ ibcm_cep_state_rej(ibcm_state_data_t *statep, ibcm_rej_msg_t *rej_msgp,
 		event.cm_event.failed.cf_reason =
 			b2h16(rej_msgp->rej_rejection_reason);
 
-		IBTF_DPRINTF_L4(cmlog, "ibcm_cep_state_rej: rej_reason = %x",
+		IBTF_DPRINTF_L3(cmlog, "ibcm_cep_state_rej: rej_reason = %d",
 		    event.cm_event.failed.cf_reason);
 
 		ibcm_copy_addl_rej(statep, rej_msgp, &event.cm_event.failed);
@@ -6946,6 +6951,9 @@ ibcm_copy_addl_rej(ibcm_state_data_t *statep, ibcm_rej_msg_t *rej_msgp,
 
 	failed->cf_arej_info_valid = B_FALSE;
 
+	IBTF_DPRINTF_L3(cmlog, "ibcm_copy_addl_rej: rej_reason = %d "
+	    "ari_len = %d", rej_reason, ari_len);
+
 	if ((statep->mode == IBCM_PASSIVE_MODE) &&
 	    (rej_reason != IBT_CM_CONSUMER))
 		return;
@@ -6962,6 +6970,10 @@ ibcm_copy_addl_rej(ibcm_state_data_t *statep, ibcm_rej_msg_t *rej_msgp,
 		cf_addl->ari_gid.gid_guid = b2h64(cf_addl->ari_gid.gid_guid);
 		cf_addl->ari_gid.gid_prefix =
 		    b2h64(cf_addl->ari_gid.gid_prefix);
+
+		IBTF_DPRINTF_L4(cmlog, "ibcm_copy_addl_rej: ari_gid= %llX:%llX",
+		    cf_addl->ari_gid.gid_prefix, cf_addl->ari_gid.gid_guid);
+
 		break;
 	case IBT_CM_PRIM_LID:
 	case IBT_CM_ALT_LID:
@@ -6971,6 +6983,9 @@ ibcm_copy_addl_rej(ibcm_state_data_t *statep, ibcm_rej_msg_t *rej_msgp,
 		bcopy(rej_msgp->rej_addl_rej_info, &cf_addl->ari_lid,
 		    sizeof (ib_lid_t));
 		cf_addl->ari_lid = b2h16(cf_addl->ari_lid);
+		IBTF_DPRINTF_L4(cmlog, "ibcm_copy_addl_rej: ari_lid= 0x%lX",
+		    cf_addl->ari_lid);
+
 		break;
 	case IBT_CM_INVALID_PRIM_SL:
 	case IBT_CM_INVALID_ALT_SL:
@@ -7065,6 +7080,10 @@ ibcm_init_clp_to_mad(ibcm_classportinfo_msg_t *clp, ibt_redirect_info_t *rinfo)
 	clp->RedirectQ_Key = h2b32(rinfo->rdi_qkey);
 	clp->RedirectP_Key = h2b16(rinfo->rdi_pkey);
 
+	IBTF_DPRINTF_L4(cmlog, "ibcm_init_clp_to_mad: RedirectGID= %llX:%llX,"
+	    " RedirectLID= 0x%lX", clp->RedirectGID_hi, clp->RedirectGID_lo,
+	    clp->RedirectLID);
+
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*clp))
 }
 
@@ -7086,6 +7105,10 @@ ibcm_init_clp_from_mad(ibcm_classportinfo_msg_t *clp,
 	rinfo->rdi_qpn = b2h32(clp->RedirectQP_plus & 0xffffff);
 	rinfo->rdi_qkey = b2h32(clp->RedirectQ_Key);
 	rinfo->rdi_pkey = b2h16(clp->RedirectP_Key);
+
+	IBTF_DPRINTF_L4(cmlog, "ibcm_init_clp_from_mad: RedirectGID= %llX:%llX,"
+	    " RedirectLID= 0x%lX", rinfo->rdi_gid.gid_prefix,
+	    rinfo->rdi_gid.gid_guid, rinfo->rdi_dlid);
 }
 
 

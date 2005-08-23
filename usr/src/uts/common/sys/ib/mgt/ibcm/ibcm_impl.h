@@ -466,7 +466,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ibcm_state_data_s::state_mutex,
 _NOTE(READ_ONLY_DATA(ibcm_state_data_s::{mode channel svcid hcap
     local_comid local_hca_guid local_qpn remote_comid remote_hca_guid
     remote_qpn pkt_life_time remote_ack_delay rc_alt_pkt_lt stored_reply_addr
-    stale_clock max_cm_retries cep_retry_cnt local_srate local_alt_srate pkey
+    max_cm_retries cep_retry_cnt local_srate local_alt_srate pkey
     prim_port alt_port starting_psn state_svc_infop avl_active_link
     avl_passive_link avl_passive_comid_link defer_cm_msg recycle_arg
     conn_trace}))
