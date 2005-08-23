@@ -476,7 +476,7 @@ dt_aggregate_keycmp(const void *lhs, const void *rhs)
 	dtrace_aggdesc_t *ragg = rh->dtahe_data.dtada_desc;
 	dtrace_recdesc_t *lrec, *rrec;
 	char *ldata, *rdata;
-	int rval, i;
+	int rval, i, j;
 
 	if ((rval = dt_aggregate_hashcmp(lhs, rhs)) != 0)
 		return (rval);
@@ -524,9 +524,9 @@ dt_aggregate_keycmp(const void *lhs, const void *rhs)
 			break;
 
 		default:
-			for (i = 0; i < lrec->dtrd_size; i++) {
-				lval = ((uint8_t *)ldata)[i];
-				rval = ((uint8_t *)rdata)[i];
+			for (j = 0; j < lrec->dtrd_size; j++) {
+				lval = ((uint8_t *)ldata)[j];
+				rval = ((uint8_t *)rdata)[j];
 
 				if (lval < rval)
 					return (-1);
