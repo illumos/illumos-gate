@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -538,27 +538,27 @@ usb_get_conf_rec(char *buf, usb_configrec_t **rec, char **errmsg)
 					switch (cfgvar) {
 					case USB_SELECTION:
 						user_rec->selection =
-						    (char *)llptr;
+						    (char *)(uintptr_t)llptr;
 						parse_state = USB_NEWVAR;
 						break;
 					case USB_SRNO:
 						user_rec->serialno =
-						    (char *)llptr;
+						    (char *)(uintptr_t)llptr;
 						parse_state = USB_NEWVAR;
 						break;
 					case USB_PATH:
 						user_rec->pathname =
-						    (char *)llptr;
+						    (char *)(uintptr_t)llptr;
 						parse_state = USB_NEWVAR;
 						break;
 					case USB_DRIVER:
 						user_rec->driver =
-						    (char *)llptr;
+						    (char *)(uintptr_t)llptr;
 						parse_state = USB_NEWVAR;
 						break;
 					default:
 						parse_state = USB_ERROR;
-						free((char *)llptr);
+						free((char *)(uintptr_t)llptr);
 					}
 				} else {
 					parse_state = USB_ERROR;

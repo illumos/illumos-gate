@@ -31,9 +31,6 @@ PROG= cfgadm
 
 include ../Makefile.cmd
 
-CFLAGS +=	-_gcc=-fwritable-strings
-CFLAGS64 +=	-_gcc=-fwritable-strings
-
 SED= sed
 DCFILE= $(PROG).dc
 

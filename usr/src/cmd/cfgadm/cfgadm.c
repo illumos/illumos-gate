@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,6 +115,7 @@ static cfga_err_t set_class_flt(cfga_list_data_t *p, const char *val);
 
 static char *get_dyn(const char *ap_id);
 static void remove_dyn(char *ap_id);
+static char *s_strdup(char *str);
 
 /*
  * global data
@@ -190,7 +191,7 @@ static void do_post_filter(ap_out_t *outp, post_filter_t *post_filtp, int *jp);
  * main - the main routine of cfgadm, processes the command line
  * and dispatches functions off to libraries.
  */
-void
+int
 main(
 	int argc,
 	char *argv[])
@@ -481,13 +482,19 @@ main(
 	    break;
 
 	case CFGA_OP_LIST: {
+		/*
+		 * Note that we leak the strdup strings below (we never free
+		 * them). This is ok in this context since cfgadm is
+		 * a short lived process that will exit shortly freeing
+		 * the memory.
+		 */
 		cfga_list_data_t *list_array = NULL;
 		int nlist = 0;
-		char *sort_fields = DEF_SORT_FIELDS;
-		char *cols = DEF_COLS;
-		char *cols2 = DEF_COLS2;
+		char *sort_fields = s_strdup(DEF_SORT_FIELDS);
+		char *cols = s_strdup(DEF_COLS);
+		char *cols2 = s_strdup(DEF_COLS2);
 		int noheadings = 0;
-		char *delim = DEF_DELIM;
+		char *delim = s_strdup(DEF_DELIM);
 		int exitcode = EXIT_OK;
 		int i;
 		int type = 0;
@@ -501,8 +508,8 @@ main(
 		}
 
 		if (flags & CFGA_FLAG_VERBOSE) {
-			cols = DEF_COLS_VERBOSE;
-			cols2 = DEF_COLS2_VERBOSE;
+			cols = s_strdup(DEF_COLS_VERBOSE);
+			cols2 = s_strdup(DEF_COLS2_VERBOSE);
 		}
 
 		if (list_opts != NULL && !extract_list_suboptions(list_opts,
@@ -609,11 +616,11 @@ main(
 	}
 
 	if (ret == CFGA_NOTSUPP) {
-		exit(EXIT_NOTSUPP);
+		return (EXIT_NOTSUPP);
 	} else if (ret != CFGA_OK) {
-		exit(EXIT_OPFAILED);
+		return (EXIT_OPFAILED);
 	} else {
-		exit(EXIT_OK);
+		return (EXIT_OK);
 	}
 	/*NOTREACHED*/
 }
@@ -2387,4 +2394,28 @@ remove_dyn(char *ap_id)
 	if (cp != NULL) {
 		*cp = '\0';
 	}
+}
+
+
+static char *
+s_strdup(char *str)
+{
+	char *dup;
+
+	/*
+	 * sometimes NULL strings may be passed in (see DEF_COLS2). This
+	 * is not an error.
+	 */
+	if (str == NULL) {
+		return (NULL);
+	}
+
+	dup = strdup(str);
+	if (dup == NULL) {
+		(void) fprintf(stderr,
+		    "%s \"%s\"\n", gettext("Cannot copy string"), str);
+		return (NULL);
+	}
+
+	return (dup);
 }
