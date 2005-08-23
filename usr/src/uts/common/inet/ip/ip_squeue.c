@@ -211,7 +211,7 @@ ip_squeue_set_create(cpu_t *cp, boolean_t reuse)
 			ip_squeue_create_callback(sqp);
 	}
 
-	if (ip_squeue_bind)
+	if (ip_squeue_bind && cpu_is_online(cp))
 		ip_squeue_set_bind(sqs);
 
 	sqset_global_list[sqset_global_size++] = sqs;
@@ -595,11 +595,18 @@ ip_squeue_cpu_setup(cpu_setup_t what, int id, void *arg)
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	switch (what) {
+	case CPU_CONFIG:
+		/*
+		 * A new CPU is added. Create an squeue for it but do not bind
+		 * it yet.
+		 */
+		if (cp->cpu_squeue_set == NULL)
+			cp->cpu_squeue_set = ip_squeue_set_create(cp, B_TRUE);
+		break;
 	case CPU_ON:
 	case CPU_INIT:
 	case CPU_CPUPART_IN:
 		if (cp->cpu_squeue_set == NULL) {
-			/* New CPU! */
 			cp->cpu_squeue_set = ip_squeue_set_create(cp, B_TRUE);
 		}
 		if (ip_squeue_bind)
