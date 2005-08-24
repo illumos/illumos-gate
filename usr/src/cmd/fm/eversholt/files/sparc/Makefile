@@ -20,12 +20,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS=sun4u SUNW,Sun-Fire-15000
+SUBDIRS=sun4u sun4v SUNW,Sun-Fire-15000
 EFT_COMMON_FILES= pci.eft
 
 include ../../../Makefile.subdirs

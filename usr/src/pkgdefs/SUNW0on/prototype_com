@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,6 +46,7 @@ d none usr/lib/locale/C/LC_MESSAGES 755 root bin
 d none usr/lib/locale/C/LC_TIME     755 root bin
 f none usr/lib/locale/C/LC_MESSAGES/FMD.po               644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SMF.po               644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SUN4.po              644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4U.po             644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUNOS.po             644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/PCI.po               644 root bin

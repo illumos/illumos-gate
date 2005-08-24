@@ -19,13 +19,14 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-EFT_PLAT= sun4u
-EFT_PLAT_FILES= fire.eft schizo.eft psycho.eft tomatillo.eft xmits.eft
+TOPOSUBDIR = SUNW,Sun-Fire-T200
+TOPOFILES = platform.topo
 
 include ../../Makefile.com

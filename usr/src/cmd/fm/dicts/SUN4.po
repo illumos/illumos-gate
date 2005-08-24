@@ -1,0 +1,219 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#
+#
+# code: SUN4-8000-0Y
+# keys: fault.io.fire.asic
+#
+msgid "SUN4-8000-0Y.type"
+msgstr "Fault"
+msgid "SUN4-8000-0Y.severity"
+msgstr "Critical"
+msgid "SUN4-8000-0Y.description"
+msgstr "\nA problem was detected in the PCI-Express subsystem.\n  Refer to %s for more information."
+msgid "SUN4-8000-0Y.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-0Y.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUN4-8000-0Y.action"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+#
+# code: SUN4-8000-13
+# keys: fault.io.ebus
+#
+msgid "SUN4-8000-13.type"
+msgstr "Fault"
+msgid "SUN4-8000-13.severity"
+msgstr "Critical"
+msgid "SUN4-8000-13.description"
+msgstr "\nA problem was detected in the system core bus.\n  Refer to %s for more information."
+msgid "SUN4-8000-13.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-13.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUN4-8000-13.action"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+#
+# code: SUN4-8000-2H
+# keys: fault.io.datapath
+#
+msgid "SUN4-8000-2H.type"
+msgstr "Fault"
+msgid "SUN4-8000-2H.severity"
+msgstr "Critical"
+msgid "SUN4-8000-2H.description"
+msgstr "\nA problem was detected in the system core bus.\n  Refer to %s for more information."
+msgid "SUN4-8000-2H.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-2H.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUN4-8000-2H.action"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+#
+# code: SUN4-8000-3D
+# keys: fault.io.hbus
+#
+msgid "SUN4-8000-3D.type"
+msgstr "Fault"
+msgid "SUN4-8000-3D.severity"
+msgstr "Critical"
+msgid "SUN4-8000-3D.description"
+msgstr "\nA problem was detected in the system core bus.\n  Refer to %s for more information."
+msgid "SUN4-8000-3D.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-3D.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUN4-8000-3D.action"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+#
+# code: SUN4-8000-4P
+# keys: fault.io.fire.pciex.device
+#
+msgid "SUN4-8000-4P.type"
+msgstr "Fault"
+msgid "SUN4-8000-4P.severity"
+msgstr "Critical"
+msgid "SUN4-8000-4P.description"
+msgstr "\nA problem was detected in the PCI-Express subsystem.\n  Refer to %s for more information."
+msgid "SUN4-8000-4P.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-4P.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUN4-8000-4P.action"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+#
+# code: SUN4-8000-5A
+# keys: defect.io.fire.pciex.driver
+#
+msgid "SUN4-8000-5A.type"
+msgstr "Defect"
+msgid "SUN4-8000-5A.severity"
+msgstr "Critical"
+msgid "SUN4-8000-5A.description"
+msgstr "\nA problem was detected in the PCI-Express subsystem software.\n  Refer to %s for more information."
+msgid "SUN4-8000-5A.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-5A.impact"
+msgstr "Loss of services provided by the device instances associated with\nthis problem"
+msgid "SUN4-8000-5A.action"
+msgstr "Ensure latest driver and patch are installed.  Use fmdump -v -u  to identify the module/package, or contact Sun for support."
+#
+# code: SUN4-8000-6S
+# keys: fault.io.datapath fault.io.fire.asic
+#
+msgid "SUN4-8000-6S.type"
+msgstr "Fault"
+msgid "SUN4-8000-6S.severity"
+msgstr "Critical"
+msgid "SUN4-8000-6S.description"
+msgstr "\nA problem was detected in the system core bus.\n  Refer to %s for more information."
+msgid "SUN4-8000-6S.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-6S.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUN4-8000-6S.action"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+#
+# code: SUN4-8000-75
+# keys: fault.io.fire.asic fault.io.fire.pciex.device
+#
+msgid "SUN4-8000-75.type"
+msgstr "Fault"
+msgid "SUN4-8000-75.severity"
+msgstr "Critical"
+msgid "SUN4-8000-75.description"
+msgstr "\nA problem was detected in the PCI-Express subsystem.\n  Refer to %s for more information."
+msgid "SUN4-8000-75.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-75.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUN4-8000-75.action"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+#
+# code: SUN4-8000-8E
+# keys: defect.io.fire.pci.driver defect.io.fire.pciex.driver
+#
+msgid "SUN4-8000-8E.type"
+msgstr "Defect"
+msgid "SUN4-8000-8E.severity"
+msgstr "Critical"
+msgid "SUN4-8000-8E.description"
+msgstr "\nA problem was detected in the PCI-Express subsystem software.\n  Refer to %s for more information."
+msgid "SUN4-8000-8E.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-8E.impact"
+msgstr "Loss of services provided by the device instances associated with this problem"
+msgid "SUN4-8000-8E.action"
+msgstr "Ensure latest driver and patch are installed.  Use fmdump -v -u  to identify the module/package, or contact Sun for support."
+#
+# code: SUN4-8000-9J
+# keys: fault.io.fire.pci.device fault.io.fire.pciex.device
+#
+msgid "SUN4-8000-9J.type"
+msgstr "Fault"
+msgid "SUN4-8000-9J.severity"
+msgstr "Critical"
+msgid "SUN4-8000-9J.description"
+msgstr "A problem has been detected in the PCI/PCI-Express subsystem.  Refer to %s for more information."
+msgid "SUN4-8000-9J.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-9J.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUN4-8000-9J.action"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+#
+# code: SUN4-8000-A2
+# keys: fault.io.fire.pci.device
+#
+msgid "SUN4-8000-A2.type"
+msgstr "Fault"
+msgid "SUN4-8000-A2.severity"
+msgstr "Critical"
+msgid "SUN4-8000-A2.description"
+msgstr "\nA problem was detected in the PCI subsystem.\n  Refer to %s for more information."
+msgid "SUN4-8000-A2.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-A2.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUN4-8000-A2.action"
+msgstr "\nSchedule a repair procedure to replace the affected device.  Use\nfmdump -v -u EVENT_ID to identify the device or contact\nSun for support.\n"
+#
+# code: SUN4-8000-CX
+# keys: defect.io.fire.pciex.driver fault.io.datapath fault.io.fire.asic
+#
+msgid "SUN4-8000-CX.type"
+msgstr "Fault"
+msgid "SUN4-8000-CX.severity"
+msgstr "Critical"
+msgid "SUN4-8000-CX.description"
+msgstr "\nA problem was detected in the PCI-Express subsystem or controlling software.\n  Refer to %s for more information."
+msgid "SUN4-8000-CX.response"
+msgstr "One or more device instances may be disabled"
+msgid "SUN4-8000-CX.impact"
+msgstr "Loss of services provided by the device instances associated with this fault"
+msgid "SUN4-8000-CX.action"
+msgstr "\nEnsure latest drivers and patches are installed, schedule a repair\nprocedure to replace the affected device if necessary,\nor contact Sun for support.\n"

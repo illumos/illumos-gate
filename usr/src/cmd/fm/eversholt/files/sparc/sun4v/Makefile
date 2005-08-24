@@ -23,9 +23,15 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-EFT_PLAT= sun4u
-EFT_PLAT_FILES= fire.eft schizo.eft psycho.eft tomatillo.eft xmits.eft
+EFT_PLAT= sun4v
+
+#
+# Link fire.eft to sun4u
+#
+EFT_PLAT_SRC= sun4u
+EFT_PLAT_FILE= fire.eft
 
 include ../../Makefile.com

@@ -36,7 +36,8 @@ SUBDIRS= \
 	SUNW,Ultra-80 SUNW,UltraAX-i2 SUNW,Netra-210 \
 	SUNW,Netra-T4 SUNW,Sun-Blade-2000 SUNW,Sun-Fire-280R \
 	SUNW,Sun-Fire-V890 SUNW,Sun-Fire-V490 SUNW,Sun-Fire-V250 \
-	SUNW,Sun-Fire-V210 SUNW,Netra-240 SUNW,Netra-440
+	SUNW,Sun-Fire-V210 SUNW,Netra-240 SUNW,Netra-440 \
+	SUNW,Sun-Fire-T200
 
 include ../../../Makefile.subdirs
 

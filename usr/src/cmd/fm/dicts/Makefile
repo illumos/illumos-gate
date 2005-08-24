@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,7 +34,8 @@ common_DCNAMES = \
 	PCI
 
 sparc_DCNAMES = \
-	SUN4U
+	SUN4U \
+	SUN4
 
 DCNAMES = \
 	$(common_DCNAMES) \
