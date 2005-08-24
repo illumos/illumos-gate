@@ -2177,8 +2177,9 @@ snf_smap_desbfree(snf_smap_desbinfo *snfi)
 		 * segmap_unlock()
 		 */
 		(void) segmap_fault(kas.a_hat, segkmap,
-		    (caddr_t)(((uintptr_t)snfi->snfi_base + snfi->snfi_mapoff)
-		    & PAGEMASK), snfi->snfi_len, F_SOFTUNLOCK, S_OTHER);
+		    (caddr_t)(uintptr_t)(((uintptr_t)snfi->snfi_base +
+		    snfi->snfi_mapoff) & PAGEMASK), snfi->snfi_len,
+		    F_SOFTUNLOCK, S_OTHER);
 	}
 	(void) segmap_release(segkmap, snfi->snfi_base, SM_DONTNEED);
 	VN_RELE(snfi->snfi_vp);
@@ -2246,8 +2247,9 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 			 * does.)
 			 */
 			if (segmap_fault(kas.a_hat, segkmap,
-			    (caddr_t)(((uintptr_t)base + mapoff) & PAGEMASK),
-			    snfi->snfi_len, F_SOFTLOCK, S_READ) != 0) {
+			    (caddr_t)(uintptr_t)(((uintptr_t)base + mapoff) &
+			    PAGEMASK), snfi->snfi_len, F_SOFTLOCK,
+			    S_READ) != 0) {
 				(void) segmap_release(segkmap, base, 0);
 				kmem_free(snfi, sizeof (*snfi));
 				freemsg(mp);
@@ -2263,8 +2265,8 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 
 			if (mp1 == NULL) {
 				(void) segmap_fault(kas.a_hat, segkmap,
-				    (caddr_t)(((uintptr_t)base + mapoff) &
-				    PAGEMASK), snfi->snfi_len,
+				    (caddr_t)(uintptr_t)(((uintptr_t)base +
+				    mapoff) & PAGEMASK), snfi->snfi_len,
 				    F_SOFTUNLOCK, S_OTHER);
 				(void) segmap_release(segkmap, base, 0);
 				kmem_free(snfi, sizeof (*snfi));

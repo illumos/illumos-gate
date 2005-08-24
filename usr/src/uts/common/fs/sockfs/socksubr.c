@@ -1467,8 +1467,8 @@ so_getfdopt(void *control, t_uscalar_t controllen, int oldflg,
 				return (EINVAL);
 			fds = CMSG_CONTENT(cmsg);
 			fdlen = (int)CMSG_CONTENTLEN(cmsg);
-			dprint(1, ("so_getfdopt: new %ld\n",
-				CMSG_CONTENTLEN(cmsg)));
+			dprint(1, ("so_getfdopt: new %lu\n",
+				(size_t)CMSG_CONTENTLEN(cmsg)));
 		}
 	}
 	if (fds == NULL) {
