@@ -809,7 +809,7 @@ ipcl_sctp_hash_insert(conn_t *connp, in_port_t lport)
 	/* Check for existing raw socket already bound to the port. */
 	mutex_enter(&connfp->connf_lock);
 	for (oconnp = connfp->connf_head; oconnp != NULL;
-	    oconnp = connp->conn_next) {
+	    oconnp = oconnp->conn_next) {
 		if (oconnp->conn_lport == lport &&
 		    oconnp->conn_zoneid == connp->conn_zoneid &&
 		    oconnp->conn_af_isv6 == connp->conn_af_isv6 &&
@@ -1043,7 +1043,12 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 		break;
 
 	case IPPROTO_SCTP:
-		lport = (uint16_t)(ntohl(ports) & 0xFFFF);
+		/*
+		 * The raw socket may have already been bound, remove it
+		 * from the hash first.
+		 */
+		IPCL_HASH_REMOVE(connp);
+		lport = htons((uint16_t)(ntohl(ports) & 0xFFFF));
 		ret = ipcl_sctp_hash_insert(connp, lport);
 		break;
 
@@ -1115,7 +1120,8 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 		break;
 
 	case IPPROTO_SCTP:
-		lport = (uint16_t)(ntohl(ports) & 0xFFFF);
+		IPCL_HASH_REMOVE(connp);
+		lport = htons((uint16_t)(ntohl(ports) & 0xFFFF));
 		ret = ipcl_sctp_hash_insert(connp, lport);
 		break;
 
@@ -1422,13 +1428,43 @@ ipcl_classify_raw(uint8_t protocol, zoneid_t zoneid, uint32_t ports,
 			}
 		}
 	}
-	if (connp != NULL) {
-		CONN_INC_REF(connp);
-		mutex_exit(&connfp->connf_lock);
-		return (connp);
+
+	if (connp != NULL)
+		goto found;
+	mutex_exit(&connfp->connf_lock);
+
+	/* Try to look for a wildcard match. */
+	connfp = &ipcl_raw_fanout[IPCL_RAW_HASH(0)];
+	mutex_enter(&connfp->connf_lock);
+	for (connp = connfp->connf_head; connp != NULL;
+	    connp = connp->conn_next) {
+		/* We don't allow v4 fallback for v6 raw socket. */
+		if ((af == (connp->conn_af_isv6 ? IPV4_VERSION :
+		    IPV6_VERSION)) || (connp->conn_zoneid != zoneid)) {
+			continue;
+		}
+		if (af == IPV4_VERSION) {
+			if (IPCL_RAW_MATCH(connp, protocol, hdr->ipha_dst))
+				break;
+		} else {
+			if (IPCL_RAW_MATCH_V6(connp, protocol,
+			    ((ip6_t *)hdr)->ip6_dst)) {
+				break;
+			}
+		}
 	}
+
+	if (connp != NULL)
+		goto found;
+
 	mutex_exit(&connfp->connf_lock);
 	return (NULL);
+
+found:
+	ASSERT(connp != NULL);
+	CONN_INC_REF(connp);
+	mutex_exit(&connfp->connf_lock);
+	return (connp);
 }
 
 /* ARGSUSED */

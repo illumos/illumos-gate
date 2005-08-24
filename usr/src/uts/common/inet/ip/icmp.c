@@ -1905,6 +1905,14 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				return (error);
 			}
 
+			/*
+			 * For SCTP, we don't use icmp_bind_proto() for
+			 * raw socket binding.  Note that we do not need
+			 * to set *outlenp.
+			 */
+			if (icmp->icmp_proto == IPPROTO_SCTP)
+				return (0);
+
 			icmp_bind_proto(q);
 			*outlenp = sizeof (int);
 			*(int *)outvalp = *i1 & 0xFF;

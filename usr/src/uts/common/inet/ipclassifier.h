@@ -434,6 +434,22 @@ struct connf_s {
 /* Raw socket hash function. */
 #define	IPCL_RAW_HASH(lport) (((lport) * 31) & (ipcl_raw_fanout_size - 1))
 
+/*
+ * This is similar to IPCL_BIND_MATCH except that the local port check
+ * is changed to a wildcard port check.
+ */
+#define	IPCL_RAW_MATCH(connp, proto, laddr)			\
+	((connp)->conn_ulp == (proto) &&			\
+	(connp)->conn_lport == 0 &&				\
+	(_IPCL_V4_MATCH_ANY((connp)->conn_srcv6) ||		\
+	_IPCL_V4_MATCH((connp)->conn_srcv6, (laddr))))
+
+#define	IPCL_RAW_MATCH_V6(connp, proto, laddr)			\
+	((connp)->conn_ulp == (proto) &&			\
+	(connp)->conn_lport == 0 &&				\
+	(IN6_IS_ADDR_UNSPECIFIED(&(connp)->conn_srcv6) ||	\
+	IN6_ARE_ADDR_EQUAL(&(connp)->conn_srcv6, &(laddr))))
+
 /* hash tables */
 extern connf_t	rts_clients;
 extern connf_t	*ipcl_conn_fanout;
