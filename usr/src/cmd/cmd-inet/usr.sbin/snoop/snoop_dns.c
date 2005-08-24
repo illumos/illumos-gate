@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -600,7 +600,7 @@ print_ip(int af, char *line, const uchar_t *data, uint16_t len)
 static const uchar_t *
 get_char_string(const uchar_t *data, char *charbuf, uint16_t datalen)
 {
-	uint8_t len;
+	int len;
 	char *name = charbuf;
 	int i = 0;
 

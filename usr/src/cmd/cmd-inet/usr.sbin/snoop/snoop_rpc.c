@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-1998,2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,13 +59,17 @@ void print_rpcsec_gss_cred(int xid, int authlen);
 char *nameof_prog();
 char *nameof_astat();
 char *nameof_why();
+static void rpc_detail_call(int, int, int, int, int, int, char *, int);
+static void rpc_detail_reply(int, int, struct cache_struct *, char *, int len);
+static void print_creds(int);
+static void print_verif(int);
+static void stash_xid(ulong_t, int, int, int, int);
+int valid_rpc(char *, int);
 
 #define	LAST_FRAG ((ulong_t)1 << 31)
 
-interpret_rpc(flags, rpc, fraglen, type)
-	int flags;
-	char *rpc;
-	int fraglen, type;
+int
+interpret_rpc(int flags, char *rpc, int fraglen, int type)
 {
 	ulong_t xid;
 	int direction;
@@ -236,10 +240,9 @@ interpret_rpc(flags, rpc, fraglen, type)
 	return (fraglen);
 }
 
-rpc_detail_call(flags, xid, rpcvers, prog, vers, proc, data, len)
-	int flags, xid, rpcvers, prog, vers, proc;
-	char *data;
-	int len;
+static void
+rpc_detail_call(int flags, int xid, int rpcvers, int prog, int vers, int proc,
+    char *data, int len)
 {
 	char *nameof_flavor();
 	char *nameof_prog();
@@ -298,6 +301,7 @@ tohex(char *p, int len)
 	return (hbuff);
 }
 
+static void
 print_creds(int xid)
 {
 	int pos, flavor, authlen;
@@ -373,8 +377,8 @@ print_creds(int xid)
 	}
 }
 
-print_verif(direction)
-	int direction;
+static void
+print_verif(int direction)
 {
 	int pos, flavor, verlen;
 
@@ -545,6 +549,7 @@ struct rpcnames {
 500021, "ZNS",			/* Zeus Network Service */
 };
 
+int
 compare(a, b)
 	register struct rpcnames *a, *b;
 {
@@ -607,11 +612,9 @@ nameof_why(why)
 	}
 }
 
-rpc_detail_reply(flags, xid, x, data, len)
-	int flags, xid;
-	struct cache_struct *x;
-	char *data;
-	int len;
+static void
+rpc_detail_reply(int flags, int xid, struct cache_struct *x, char *data,
+    int len)
 {
 	int status;
 	int astat, rstat, why;
@@ -689,9 +692,8 @@ rpc_detail_reply(flags, xid, x, data, len)
 /*
  * Return true if this is a valid RPC packet
  */
-valid_rpc(rpc, rpclen)
-	char *rpc;
-	int rpclen;
+int
+valid_rpc(char *rpc, int rpclen)
 {
 	XDR	xdrm;
 	struct rpc_msg msg;
@@ -740,9 +742,8 @@ find_xid(xid)
 	return (NULL);
 }
 
-stash_xid(xid, frame, prog, vers, proc)
-	ulong_t xid;
-	int frame, prog, vers, proc;
+static void
+stash_xid(ulong_t xid, int frame, int prog, int vers, int proc)
 {
 	struct cache_struct *x;
 

@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,7 +46,7 @@
 extern char *dlc_header;
 extern char *addrtoname();
 
-static enum EXT_TYPE { ADV, REG };
+enum EXT_TYPE { ADV, REG };
 
 /*
  * This defines the interface for all extention interpreter

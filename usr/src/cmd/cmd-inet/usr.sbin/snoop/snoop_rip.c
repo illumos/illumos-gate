@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,11 +121,12 @@ interpret_rip(int flags, struct rip *rip, int fraglen)
 		len = fraglen - 4;
 		show_header("RIP:  ", "Routing Information Protocol", fraglen);
 		show_space();
-		(void) snprintf(get_line((char *)rip->rip_cmd - dlc_header, 1),
-		    get_line_remain(), "Opcode = %d (%s)", rip->rip_cmd,
-		    show_cmd(rip->rip_cmd));
-		(void) snprintf(get_line((char *)rip->rip_vers - dlc_header, 1),
-		    get_line_remain(), "Version = %d", rip->rip_vers);
+		(void) snprintf(get_line((char *)(uintptr_t)rip->rip_cmd -
+		    dlc_header, 1), get_line_remain(), "Opcode = %d (%s)",
+		    rip->rip_cmd, show_cmd(rip->rip_cmd));
+		(void) snprintf(get_line((char *)(uintptr_t)rip->rip_vers -
+		    dlc_header, 1), get_line_remain(), "Version = %d",
+		    rip->rip_vers);
 
 		switch (rip->rip_cmd) {
 		case RIPCMD_REQUEST:

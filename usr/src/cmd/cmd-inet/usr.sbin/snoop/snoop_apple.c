@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,7 +34,7 @@
 
 extern char *src_name, *dst_name;
 
-static struct socktable {
+struct socktable {
 	int	pt_num;
 	char	*pt_short;
 };

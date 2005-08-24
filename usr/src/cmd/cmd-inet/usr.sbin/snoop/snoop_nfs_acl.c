@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991,2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,9 @@ static void detail_aclent();
 static char *detail_uname();
 static char *detail_gname();
 static char *detail_perm(ushort_t);
+static void interpret_nfs_acl2(int, int, int, int, int, char *, int);
+static void interpret_nfs_acl3(int, int, int, int, int, char *, int);
+static void interpret_nfs_acl4(int, int, int, int, int, char *, int);
 
 #define	ACLPROC2_NULL		((unsigned long)(0))
 #define	ACLPROC2_GETACL		((unsigned long)(1))
@@ -187,10 +190,9 @@ interpret_nfs_acl(flags, type, xid, vers, proc, data, len)
 	}
 }
 
-interpret_nfs_acl2(flags, type, xid, vers, proc, data, len)
-	int flags, type, xid, vers, proc;
-	char *data;
-	int len;
+static void
+interpret_nfs_acl2(int flags, int type, int xid, int vers, int proc,
+    char *data, int len)
 {
 	char *line;
 	char buff[2048];
@@ -282,10 +284,9 @@ interpret_nfs_acl2(flags, type, xid, vers, proc, data, len)
 	}
 }
 
-interpret_nfs_acl3(flags, type, xid, vers, proc, data, len)
-	int flags, type, xid, vers, proc;
-	char *data;
-	int len;
+static void
+interpret_nfs_acl3(int flags, int type, int xid, int vers, int proc,
+    char *data, int len)
 {
 	char *line;
 	char buff[2048];
@@ -358,10 +359,9 @@ interpret_nfs_acl3(flags, type, xid, vers, proc, data, len)
 	}
 }
 
-interpret_nfs_acl4(flags, type, xid, vers, proc, data, len)
-	int flags, type, xid, vers, proc;
-	char *data;
-	int len;
+static void
+interpret_nfs_acl4(int flags, int type, int xid, int vers, int proc,
+    char *data, int len)
 {
 	char *line;
 	char buff[2048];

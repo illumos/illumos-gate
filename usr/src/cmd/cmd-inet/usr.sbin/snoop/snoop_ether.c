@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1118,8 +1118,7 @@ interpret_fddi(flags, e, elen, origlen)
 }
 
 uint_t
-fddi_header_len(e)
-char	*e;
+fddi_header_len(char *e)
 {
 	struct fddi_header fhdr, *f = &fhdr;
 
@@ -1140,6 +1139,8 @@ char	*e;
 			return (13);
 		}
 	}
+	/* Return the default FDDI header length. */
+	return (13);
 }
 
 /*

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ interpret_esp(int flags, uint8_t *hdr, int iplen, int fraglen)
 	char *line;
 
 	if (fraglen < sizeof (esph_t))
-		return;	/* incomplete header */
+		return (fraglen);	/* incomplete header */
 
 	if (!IS_P2ALIGNED(hdr, 4)) {
 		aligned_esph = &storage;
@@ -114,7 +114,7 @@ interpret_ah(int flags, uint8_t *hdr, int iplen, int fraglen)
 	uint8_t proto;
 
 	if (fraglen < sizeof (ah_t))
-		return;		/* incomplete header */
+		return (fraglen);		/* incomplete header */
 
 	if (!IS_P2ALIGNED(hdr, 4)) {
 		aligned_ah = (ah_t *)&storage;
@@ -134,7 +134,7 @@ interpret_ah(int flags, uint8_t *hdr, int iplen, int fraglen)
 	ahlen = (aligned_ah->ah_length << 2) + 8;
 	fraglen -= ahlen;
 	if (fraglen < 0)
-		return;		/* incomplete header */
+		return (fraglen + ahlen);	/* incomplete header */
 
 	auth_data_len = ahlen - sizeof (ah_t);
 	auth_data = (uint8_t *)(ah + 1);

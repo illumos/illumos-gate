@@ -69,6 +69,8 @@ char *bufp;	/* pointer to read buffer */
 
 extern unsigned int encap_levels;
 
+static int strioctl(int, int, int, int, char *);
+
 /*
  * Convert a device id to a ppa value
  * e.g. "le0" -> 0
@@ -123,10 +125,8 @@ device_path(device)
  * especially stuff about the data link headers.  We need that information
  * to build the proper packet filters.
  */
-int
-check_device(devicep, ppap)
-	char **devicep;
-	int *ppap;
+boolean_t
+check_device(char **devicep, int *ppap)
 {
 	char *devname;
 	/*
@@ -151,7 +151,7 @@ check_device(devicep, ppap)
 			pr_err("check_device: ioctl SIOCGIFNUM");
 			(void) close(s);
 			s = -1;
-			return;
+			return (B_FALSE);
 		}
 
 		bufsize = numifs * sizeof (struct ifreq);
@@ -160,7 +160,7 @@ check_device(devicep, ppap)
 			pr_err("out of memory\n");
 			(void) close(s);
 			s = -1;
-			return;
+			return (B_FALSE);
 		}
 		ifc.ifc_len = bufsize;
 		ifc.ifc_buf = cbuf;
@@ -169,7 +169,7 @@ check_device(devicep, ppap)
 			(void) close(s);
 			s = -1;
 			(void) free(cbuf);
-			return;
+			return (B_FALSE);
 		}
 		n = ifc.ifc_len / sizeof (struct ifreq);
 		ifr = ifc.ifc_req;
@@ -232,9 +232,9 @@ check_device(devicep, ppap)
 		netdl.info_ack.dl_max_sdu = (t_scalar_t)interface->mtu_size;
 
 	if (interface->mac_hdr_fixed_size == IF_HDR_FIXED)
-		return (1);
+		return (B_TRUE);
 
-	return (0);
+	return (B_FALSE);
 }
 
 /*
@@ -295,7 +295,8 @@ initdevice(device, snaplen, chunksize, timeout, fp, ppa)
 			    device_path(device));
 		}
 
-		if (strioctl(netfd, PFIOCSETF, -1, sizeof (*fp), fp) < 0) {
+		if (strioctl(netfd, PFIOCSETF, -1, sizeof (*fp),
+		    (char *)fp) < 0) {
 			close(netfd);
 			pr_err("PFIOCSETF: %s: %m", device_path(device));
 		}
@@ -307,19 +308,19 @@ initdevice(device, snaplen, chunksize, timeout, fp, ppa)
 	}
 
 	if (strioctl(netfd, SBIOCSTIME, -1, sizeof (struct timeval),
-		timeout) < 0) {
+	    (char *)timeout) < 0) {
 		close(netfd);
 		pr_err("SBIOCSTIME: %s: %m", device_path(device));
 	}
 
 	if (strioctl(netfd, SBIOCSCHUNK, -1, sizeof (uint_t),
-		&chunksize) < 0) {
+	    (char *)&chunksize) < 0) {
 		close(netfd);
 		pr_err("SBIOCGCHUNK: %s: %m", device_path(device));
 	}
 
 	if (strioctl(netfd, SBIOCSSNAP, -1, sizeof (uint_t),
-		&snaplen) < 0) {
+	    (char *)&snaplen) < 0) {
 		close(netfd);
 		pr_err("SBIOCSSNAP: %s: %m", device_path(device));
 	}
@@ -889,12 +890,8 @@ convert_old(ohdrp)
 	*(struct sb_hdr *)ohdrp = nhdr;
 }
 
-strioctl(fd, cmd, timout, len, dp)
-int	fd;
-int	cmd;
-int	timout;
-int	len;
-char	*dp;
+static int
+strioctl(int fd, int cmd, int timout, int len, char *dp)
 {
 	struct	strioctl	sioc;
 	int	rc;

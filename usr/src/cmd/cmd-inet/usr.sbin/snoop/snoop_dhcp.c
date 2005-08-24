@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,18 +160,24 @@ interpret_dhcp(int flags, PKT *dp, int len)
 		show_header("DHCP: ", "Dynamic Host Configuration Protocol",
 		    len);
 		show_space();
-		(void) sprintf(get_line((char *)dp->htype - dlc_header, 1),
+		(void) sprintf(get_line((char *)(uintptr_t)dp->htype -
+		    dlc_header, 1),
 		    "Hardware address type (htype) =  %d (%s)", dp->htype,
 		    show_htype(dp->htype));
-		(void) sprintf(get_line((char *)dp->hlen - dlc_header, 1),
+		(void) sprintf(get_line((char *)(uintptr_t)dp->hlen -
+		    dlc_header, 1),
 		    "Hardware address length (hlen) = %d octets", dp->hlen);
-		(void) sprintf(get_line((char *)dp->hops - dlc_header, 1),
+		(void) sprintf(get_line((char *)(uintptr_t)dp->hops -
+		    dlc_header, 1),
 		    "Relay agent hops = %d", dp->hops);
-		(void) sprintf(get_line((char *)dp->xid - dlc_header, 4),
+		(void) sprintf(get_line((char *)(uintptr_t)dp->xid -
+		    dlc_header, 4),
 		    "Transaction ID = 0x%x", ntohl(dp->xid));
-		(void) sprintf(get_line((char *)dp->secs - dlc_header, 2),
+		(void) sprintf(get_line((char *)(uintptr_t)dp->secs -
+		    dlc_header, 2),
 		    "Time since boot = %d seconds", ntohs(dp->secs));
-		(void) sprintf(get_line((char *)dp->flags - dlc_header, 2),
+		(void) sprintf(get_line((char *)(uintptr_t)dp->flags -
+		    dlc_header, 2),
 		    "Flags = 0x%.4x", ntohs(dp->flags));
 		(void) sprintf(get_line((char *)&dp->ciaddr - dlc_header, 4),
 		    "Client address (ciaddr) = %s", inet_ntoa(dp->ciaddr));
@@ -334,7 +340,8 @@ show_options(unsigned char  *cp, int len)
 				    "Error: Bad %s address",
 				    option_types[save]);
 			} else {
-				display_ip((*start++ / 4), "%s at = %s",
+				*start++;
+				display_ip((*start / 4), "%s at = %s",
 				    option_types[save], &start);
 			}
 			break;
@@ -681,7 +688,7 @@ static void
 display_ascii(char *fmt, char *msg, unsigned char **opt)
 {
 	static unsigned char buf[256];
-	unsigned char len = **opt;
+	int len = **opt;
 	unsigned char slen = len;
 
 	if (len >= sizeof (buf))

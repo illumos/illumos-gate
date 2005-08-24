@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,7 @@ extern char *dst_name;
 #define	MAX_CTX  (10)
 #define	LINE_LEN (255)
 #define	BUF_SIZE (16000)
-static int ldap = 0;	/* flag to control initialization */
+static int ldap = 0;		/* flag to control initialization */
 struct ctx {
 	int src;
 	int dst;
@@ -86,14 +86,12 @@ typedef	X * A;
 #define	INT(a) ((int)(a))
 #define	SCRUB (void) strcat(scrbuffer, bb);
 
-static X	hex;	/* input hex octet */
+static X	hex;		/* input hex octet */
 static A	*PTRaclass;	/* application tag table pointer */
 
 /*
-**----------------------------------------------**
-**		ASN.1 Message Printing Macros			**
-**----------------------------------------------**
-*/
+ * ASN.1 Message Printing Macros
+ */
 
 #define	asnshw1(a)				{(void)sprintf(bb, a); SCRUB }
 #define	asnshw2(a, b)			{(void)sprintf(bb, a, b); SCRUB }
@@ -102,26 +100,22 @@ static A	*PTRaclass;	/* application tag table pointer */
 #define	asnshw5(a, b, c, d, e)	{(void)sprintf(bb, a, b, c, d, e); SCRUB }
 
 /*
-**--------------------------------------**
-**		Local Types And Variables		**
-**--------------------------------------**
-*/
+ * Local Types And Variables
+ */
 
 /*
-** object identifier oid to name mapping description type
-*/
+ * Object identifier oid to name mapping description type
+ */
 
 typedef struct {
-	A	oidname;		/* object identifier string name */
+	A	oidname;	/* object identifier string name */
 	X	oidcode[16];	/* object identifier hexa code */
 }	oidelmT;
 typedef oidelmT *oidelmTp;
 
 /*
-**------------------------------------------**
-**	snoop's entry point to ldap decoding	**
-**------------------------------------------**
-*/
+ * Snoop's entry point to ldap decoding
+ */
 
 void
 interpret_ldap(flags, data, fraglen, src, dst)
@@ -177,15 +171,13 @@ int dst;
 }
 
 /*
-**--------------------------------------------------------------**
-**	known object identifiers: customize to add your own oids	**
-**--------------------------------------------------------------**
-*/
+ * Known object identifiers: customize to add your own oids
+ */
 
 static oidelmT OidTab[] = {
 /*
-**	X.500 Standardized Attribute Types
-*/
+ *	X.500 Standardized Attribute Types
+ */
 {(A)"ObjectClass",				{ 0x03, 0x55, 0x04, 0x00 }},
 {(A)"AliasObjectName",			{ 0x03, 0x55, 0x04, 0x01 }},
 {(A)"KnowledgeInfo",			{ 0x03, 0x55, 0x04, 0x02 }},
@@ -229,8 +221,8 @@ static oidelmT OidTab[] = {
 {(A)"CrossCertificatePair",		{ 0x03, 0x55, 0x04, 0x28 }},
 
 /*
-**	X.500 Standardized Object Classes
-*/
+ *	X.500 Standardized Object Classes
+ */
 {(A)"Top",					{ 0x03, 0x55, 0x06, 0x00 }},
 {(A)"Alias",				{ 0x03, 0x55, 0x06, 0x01 }},
 {(A)"Country",				{ 0x03, 0x55, 0x06, 0x02 }},
@@ -250,15 +242,15 @@ static oidelmT OidTab[] = {
 {(A)"CaAuthority",			{ 0x03, 0x55, 0x06, 0x10 }},
 
 /*
-**	ACSE Protocol Object Identifiers
-*/
+ *	ACSE Protocol Object Identifiers
+ */
 {(A)"Asn1BER-TS",		{ 0x02, 0x51, 0x01 }},
 {(A)"Private-TS",		{ 0x06, 0x2b, 0xce, 0x06, 0x01, 0x04, 0x06 }},
 {(A)"ACSE-AS",			{ 0x04, 0x52, 0x01, 0x00, 0x01 }},
 
 /*
-**	Directory Protocol Oids
-*/
+ *	Directory Protocol Oids
+ */
 {(A)"DirAccess-AC",			{ 0x03, 0x55, 0x03, 0x01 }},
 {(A)"DirSystem-AC",			{ 0x03, 0x55, 0x03, 0x02 }},
 
@@ -266,15 +258,15 @@ static oidelmT OidTab[] = {
 {(A)"DirSystem-AS",			{ 0x03, 0x55, 0x09, 0x02 }},
 
 /*
-**	and add your private object identifiers here ...
-*/
+ *	and add your private object identifiers here ...
+ */
 };
 
 #define	OIDNB (sizeof (OidTab) / sizeof (oidelmT))	/* total oid nb */
 
 /*
-**	asn.1 tag class definition
-*/
+ *	asn.1 tag class definition
+ */
 
 static A class[] = {	/* tag class */
 	(A)"UNIV ",
@@ -284,8 +276,8 @@ static A class[] = {	/* tag class */
 };
 
 /*
-**	universal tag definition
-*/
+ *	universal tag definition
+ */
 
 static A uclass[] = {	/* universal tag assignment */
 (A)"EndOfContents",			/* 0  */
@@ -293,11 +285,11 @@ static A uclass[] = {	/* universal tag assignment */
 (A)"Integer",				/* 2  */
 (A)"BitString",				/* 3  */
 (A)"OctetString",			/* 4  */
-(A)"Null",					/* 5  */
-(A)"Oid",					/* 6  */
+(A)"Null",				/* 5  */
+(A)"Oid",				/* 6  */
 (A)"ObjDescriptor",			/* 7  */
 (A)"External",				/* 8  */
-(A)"Real",					/* 9  */
+(A)"Real",				/* 9  */
 (A)"Enumerated",			/* 10 */
 (A)"Reserved",				/* 11 */
 (A)"Reserved",				/* 12 */
@@ -305,14 +297,14 @@ static A uclass[] = {	/* universal tag assignment */
 (A)"Reserved",				/* 14 */
 (A)"Reserved",				/* 15 */
 (A)"Sequence",				/* 16 */
-(A)"Set",					/* 17 */
+(A)"Set",				/* 17 */
 (A)"NumericString",			/* 18 */
-(A)"PrintableString",		/* 19 */
+(A)"PrintableString",			/* 19 */
 (A)"T.61String",			/* 20 */
-(A)"VideotexString",		/* 21 */
+(A)"VideotexString",			/* 21 */
 (A)"IA5String",				/* 22 */
 (A)"UTCTime",				/* 23 */
-(A)"GeneralizedTime",		/* 24 */
+(A)"GeneralizedTime",			/* 24 */
 (A)"GraphicString",			/* 25 */
 (A)"VisibleString",			/* 26 */
 (A)"GeneralString",			/* 27 */
@@ -323,26 +315,26 @@ static A uclass[] = {	/* universal tag assignment */
 };
 
 static A MHSaclass[] = {	/* mhs application tag assignment */
-(A)"Bind Request",		/* 0 */
+(A)"Bind Request",			/* 0 */
 (A)"Bind Response",
 (A)"Unbind Request",
 (A)"Search Request",
 (A)"Search ResEntry",
-(A)"Search ResDone",	/* 5 */
+(A)"Search ResDone",			/* 5 */
 (A)"Modify Request",
 (A)"Modify Response",
 (A)"Add Request",
-(A)"Add Response",		/* 9 */
+(A)"Add Response",			/* 9 */
 (A)"Del Request",
 (A)"Del Response",
 (A)"ModDN Request",
 (A)"ModDN Response",
-(A)"Compare Request",	/* 14 */
+(A)"Compare Request",			/* 14 */
 (A)"Compare Response",
 (A)"Abandon Request",
 (A)"",					/* 17 */
 (A)"",					/* 18 */
-(A)"Search ResRef",		/* 19 */
+(A)"Search ResRef",			/* 19 */
 (A)"",					/* 20 */
 (A)"",					/* 21 */
 (A)"",					/* 22 */
@@ -753,13 +745,12 @@ SET,		/* Set				*/
 };
 
 /*
-**----------------------------------------------**
-**	find object identifier in known oid table	**
-**----------------------------------------------**
-*/
-static oidmap(oid, olg)
-A	oid;	/* oid hexa string */
-int	olg;	/* oid length */
+ * Find object identifier in known oid table
+ * A	oid - oid hexa string
+ * int	olg - oid length
+ */
+static int
+oidmap(A oid, int olg)
 {
 	register int ix, goon;
 	register A oidptr, tabptr, tabend;
@@ -769,11 +760,13 @@ int	olg;	/* oid length */
 	for (ix = 0; ix < OIDNB; ix++) {
 		oidptr = oid; tabptr = (&(OidTab[ix].oidcode[0]));
 		if (olg == INT(*tabptr++)) {
-			for (tabend = tabptr + olg, goon = 1;
-				(goon) && (tabptr < tabend); ) {
-				if (*tabptr++ != *oidptr++) goon = 0;
+			tabend = tabptr + olg;
+			goon = 1;
+			while (goon != 0 && tabptr < tabend) {
+				if (*tabptr++ != *oidptr++)
+					goon = 0;
 			}
-			if (goon)
+			if (goon != 0)
 				return (ix);
 		}
 	}
@@ -781,11 +774,8 @@ int	olg;	/* oid length */
 }
 
 /*
-**------------------------------------------------------**
-**read an hexacode and convert it into ascii		**
-**------------------------------------------------------**
-*/
-
+ * Read an hexacode and convert it into ASCII
+ */
 static int getnext(int ctxnum)
 {
 	static X c[3]; /* c[0-3] will contain ascii values on exit */
@@ -798,10 +788,8 @@ static int getnext(int ctxnum)
 }
 
 /*
-**------------------------------------------------------**
-** Skip everything that is not an LDAPMessage		**
-**------------------------------------------------------**
-*/
+ * Skip everything that is not an LDAPMessage
+ */
 static char *skipjunk(len, pdu)
 int len;
 char *pdu;
@@ -837,16 +825,17 @@ char *pdu;
 	}
 	return (buf);
 }
-/*
-**----------------------------------------------------------**
-**	main routine: decode a TLV; to be called recursively	**
-**----------------------------------------------------------**
-*/
+
+
 #define	GETNEXT(a) (void)getnext(a);
-static int decpdu(pdulen, ASNDESC, ctxnum)
-int	pdulen;	/* current pdu's length */
-asndefTp ASNDESC;
-int ctxnum;
+
+/*
+ * main routine: decode a TLV; to be called recursively
+ *
+ * pdulen: current pdu's length
+ */
+static int
+decpdu(int pdulen, asndefTp ASNDESC, int ctxnum)
 {
 	X		scrlin[99];	/* screen line */
 	X		oidstr[80];	/* oid hexa string */
@@ -869,8 +858,8 @@ int ctxnum;
 	effnb = 0;
 
 	/*
-	** Decode the current TLV segment
-	*/
+	 * Decode the current TLV segment
+	 */
 	while (pdulen > 1) {
 
 		if (getnext(ctxnum)) {
@@ -893,13 +882,15 @@ int ctxnum;
 
 		/* Continuing decoding of current TLV... */
 		/*
-		** Snoop's lower layers do not allow us
-		** to know the true length for
-		** datastream protocols like LDAP.
-		*/
+		 * Snoop's lower layers do not allow us
+		 * to know the true length for
+		 * datastream protocols like LDAP.
+		 */
 
-		/* if length is less than 128, we */
-		/* already have the real TLV length. */
+		/*
+		 * if length is less than 128, we
+		 * already have the real TLV length.
+		 */
 		if (olen[ctxnum] < 128) {	/* short length form */
 			rlen = olen[ctxnum];
 		} else {		/* long and any form length */
@@ -916,8 +907,8 @@ int ctxnum;
 		}
 
 		/*
-		** print the tag class and number
-		*/
+		 * print the tag class and number
+		 */
 		i = otyp[ctxnum]&0x1F;
 		switch (otyp[ctxnum] >> 6) {	/* class */
 		case 0:	/* universal */
@@ -932,45 +923,44 @@ int ctxnum;
 						ai < ASNDESC->nbson && i < 32 &&
 						ASNDESC->son[ai].sondef &&
 					/*
-					** For this test SEQUENCE & SEQUENCE OF
-					** are same, so suppress the last bit
-					*/
+					 * For this test SEQUENCE & SEQUENCE OF
+					 * are same, so suppress the last bit
+					 */
 						(ASNDESC->son[ai].sondef
 							->type&0xFE)
 						!= mytype[i]; ++ai);
 					if (ai < ASNDESC->nbson) {
 						SASNDESC =
-							ASNDESC->son[ai].sondef;
-						if (ASNDESC->son[ai].sonname) {
-							if (ASNDESC-> \
-				son[ai].sondef && ASNDESC->son[ai].sondef->name)
-							{
-							asnshw2 \
-				("%s	", "LDAP:");
-								asnshw4 \
-				(" %c[%s %s]",
-				((otyp[ctxnum]&0x20)?'*':' '), \
-				ASNDESC->son[ai].sonname, \
-				ASNDESC->son[ai].sondef->name);
-							} else {
-								asnshw2 \
-							("%s	", "");
-								asnshw3 \
-							(" %c[%s]", \
-				((otyp[ctxnum]&0x20)?'*':' '),
-				ASNDESC->son[ai].sonname);
-							} /* end if */
-							dobreak = 1;
-						} else if
-				(ASNDESC->son[ai].sondef &&
-				ASNDESC->son[ai].sondef->name) {
-							asnshw2 \
-					("%s	", "LDAP:");
-							asnshw3 \
-				(" %c[%s]", ((otyp[ctxnum]&0x20)?'*':' '),
-				ASNDESC->son[ai].sondef->name);
-							dobreak = 1;
-						} /* end if */
+						    ASNDESC->son[ai].sondef;
+					if (ASNDESC->son[ai].sonname != NULL) {
+
+					if (ASNDESC->son[ai].sondef != NULL &&
+					    ASNDESC->son[ai].sondef->name !=
+					    NULL) {
+						asnshw2("%s	", "LDAP:");
+						asnshw4(" %c[%s %s]",
+						((otyp[ctxnum]&0x20)?'*':' '),
+						ASNDESC->son[ai].sonname,
+						ASNDESC->son[ai].sondef->name);
+					} else {
+						asnshw2("%s	", "");
+						asnshw3(" %c[%s]",
+						((otyp[ctxnum]&0x20)?'*':' '),
+						ASNDESC->son[ai].sonname);
+					} /* end if */
+
+					dobreak = 1;
+
+					} else if (ASNDESC->son[ai].sondef !=
+					    NULL &&
+					    ASNDESC->son[ai].sondef->name !=
+					    NULL) {
+						asnshw2("%s	", "LDAP:");
+						asnshw3(" %c[%s]",
+						((otyp[ctxnum]&0x20)?'*':' '),
+						ASNDESC->son[ai].sondef->name);
+						dobreak = 1;
+					} /* end if */
 					} /* end if */
 						break;
 				case CHOICE:
@@ -1002,9 +992,9 @@ int ctxnum;
 			(ai < ASNDESC->nbson && i < 32 && mytype[i] && \
 			ASNDESC->son[ai].sondef &&
 					/*
-					** For this test SEQUENCE & SEQUENCE OF
-					** are the same, so suppress last bit
-					*/
+					 * For this test SEQUENCE & SEQUENCE OF
+					 * are the same, so suppress last bit
+					 */
 			(ASNDESC->son[ai].sondef->type&0xFE) != mytype[i]);
 					} /* end if */
 					if (ai < ASNDESC->nbson) {
@@ -1217,8 +1207,8 @@ int ctxnum;
 		} /* esac: tag */
 
 		/*
-		** print the length - as a debug tool only.
-		*/
+		 * print the length - as a debug tool only.
+		 */
 		/* asnshw2(" Length=%d ",rlen); */
 		asnshw1("\n");
 		if (rlen > pdulen) {
@@ -1228,8 +1218,8 @@ int ctxnum;
 		}
 
 		/*
-		** recursive interpretation of the value if constructor
-		*/
+		 * recursive interpretation of the value if constructor
+		 */
 		if (otyp[ctxnum]&0x20) {		/* constructor */
 
 			stlv = decpdu((rlen?rlen:pdulen), \
@@ -1240,8 +1230,8 @@ int ctxnum;
 			effnb += stlv;
 		} else if (otyp[ctxnum] == 0x06) {
 			/*
-			** interpretation of the object identifier
-			*/
+			 * interpretation of the object identifier
+			 */
 			for (j = 0; (rlen) && (pdulen > 0); \
 			--rlen, --pdulen, ++effnb) {
 				GETNEXT(ctxnum);
@@ -1259,8 +1249,8 @@ int ctxnum;
 			}
 		} else {
 			/*
-			** interpretation of other primitive tags
-			*/
+			 * interpretation of other primitive tags
+			 */
 			if (!otyp[ctxnum] && !rlen) {
 			/* end of contents: any form length */
 				pdulen = 0;
@@ -1276,8 +1266,7 @@ int ctxnum;
 					if (rlen < 200) {
 					for (j = 0, slen = 0; \
 			(rlen) && (pdulen > 0);
-					--rlen, --pdulen, ++effnb)
-					{
+					--rlen, --pdulen, ++effnb) {
 						if (!slen) {
 						    (void) \
 			strcpy((char *)scrlin, "LDAP:  "); j += 7;

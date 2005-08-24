@@ -177,7 +177,7 @@ extern void cap_open_read(char *);
 extern void cap_open_write(char *);
 extern void cap_read(int, int, int, void (*)(), int);
 extern void cap_close(void);
-extern int check_device(char **, int *);
+extern boolean_t check_device(char **, int *);
 extern void initdevice(char *, ulong_t, ulong_t, struct timeval *,
     struct Pf_ext_packetfilt *, int);
 extern void net_read(int, int, void (*)(), int);
@@ -267,7 +267,6 @@ void snoop_recover(void);
  * Global alarm handler structure for managing multiple alarms within
  * snoop.
  */
-static struct snoop_handler;
 typedef struct snoop_handler {
 	struct snoop_handler *s_next;		/* next alarm handler */
 	time_t s_time;				/* time to fire */

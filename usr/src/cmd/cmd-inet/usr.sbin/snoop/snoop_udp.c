@@ -20,11 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -46,10 +46,8 @@
 
 extern char *dlc_header;
 
-interpret_udp(flags, udp, iplen, fraglen)
-	int flags;
-	struct udphdr *udp;
-	int iplen, fraglen;
+int
+interpret_udp(int flags, struct udphdr *udp, int iplen, int fraglen)
 {
 	char *data;
 	int udplen;
@@ -61,7 +59,7 @@ interpret_udp(flags, udp, iplen, fraglen)
 		return (fraglen);	/* incomplete header */
 
 	data = (char *)udp + sizeof (struct udphdr);
-	udplen = ntohs((u_short)udp->uh_ulen) - sizeof (struct udphdr);
+	udplen = ntohs((ushort_t)udp->uh_ulen) - sizeof (struct udphdr);
 	fraglen -= sizeof (struct udphdr);
 	if (fraglen > udplen)
 		fraglen = udplen;
@@ -71,7 +69,7 @@ interpret_udp(flags, udp, iplen, fraglen)
 			"UDP D=%d S=%d LEN=%d",
 			ntohs(udp->uh_dport),
 			ntohs(udp->uh_sport),
-			ntohs((u_short)udp->uh_ulen));
+			ntohs((ushort_t)udp->uh_ulen));
 	}
 
 	sunrpc = !reservedport(IPPROTO_UDP, ntohs(udp->uh_dport)) &&
@@ -81,9 +79,8 @@ interpret_udp(flags, udp, iplen, fraglen)
 	if (flags & F_DTAIL) {
 		show_header("UDP:  ", "UDP Header", udplen);
 		show_space();
-		(void) sprintf(get_line((char *)udp->uh_sport - dlc_header, 1),
-			"Source port = %d",
-			ntohs(udp->uh_sport));
+		(void) sprintf(get_line((char *)(uintptr_t)udp->uh_sport -
+		    dlc_header, 1), "Source port = %d", ntohs(udp->uh_sport));
 
 		if (sunrpc) {
 			pname = "(Sun RPC)";
@@ -96,20 +93,19 @@ interpret_udp(flags, udp, iplen, fraglen)
 				pname = buff;
 			}
 		}
-		(void) sprintf(get_line((char *)udp->uh_dport - dlc_header, 1),
-			"Destination port = %d %s",
-			ntohs(udp->uh_dport), pname);
-		(void) sprintf(get_line((char *)udp->uh_ulen - dlc_header, 1),
-			"Length = %d %s",
-			ntohs((u_short)udp->uh_ulen),
-			udplen > fraglen ?
-				"(Not all data contained in this fragment)"
-				: "");
-			(void) sprintf(
-				get_line((char *)udp->uh_sum - dlc_header, 1),
-				"Checksum = %04X %s",
-				ntohs(udp->uh_sum),
-				udp->uh_sum == 0 ? "(no checksum)" : "");
+		(void) sprintf(get_line((char *)(uintptr_t)udp->uh_dport -
+		    dlc_header, 1), "Destination port = %d %s",
+		    ntohs(udp->uh_dport), pname);
+		(void) sprintf(get_line((char *)(uintptr_t)udp->uh_ulen -
+		    dlc_header, 1), "Length = %d %s",
+		    ntohs((ushort_t)udp->uh_ulen),
+		    udplen > fraglen ?
+			"(Not all data contained in this fragment)"
+			: "");
+		    (void) sprintf(get_line((char *)(uintptr_t)udp->uh_sum -
+			dlc_header, 1),	"Checksum = %04X %s",
+			ntohs(udp->uh_sum),
+			udp->uh_sum == 0 ? "(no checksum)" : "");
 		show_space();
 	}
 

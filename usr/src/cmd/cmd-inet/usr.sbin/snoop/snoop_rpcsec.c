@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,6 +44,8 @@ extern jmp_buf xdr_err;
 
 struct cache_struct *find_xid();
 char *nameof_prog(int prog);
+static void print_rpc_gss_init_arg(int, struct cache_struct *);
+static void print_rpc_gss_init_res(int);
 
 char *
 rpcsec_gss_proc_to_string(unsigned int proc)
@@ -289,6 +291,7 @@ rpcsec_gss_control_proc(int type, int flags, int xid)
  *  Skip the header RPCSEC_GSS cred data and
  *  put service and control type in the xid cache.
  */
+void
 extract_rpcsec_gss_cred_info(int xid)
 {
 	unsigned int seq_num;
@@ -321,9 +324,8 @@ extract_rpcsec_gss_cred_info(int xid)
 /*
  *  Print the argument data for the RPCSEC_GSS_INIT control procedure.
  */
-print_rpc_gss_init_arg(flags, x)
-	int flags;
-	struct cache_struct *x;
+static void
+print_rpc_gss_init_arg(int flags, struct cache_struct *x)
 {
 
 	char *token, *line;
@@ -358,6 +360,7 @@ print_rpc_gss_init_arg(flags, x)
 /*
  *  Print the results data for the RPCSEC_GSS_INIT control procedure.
  */
+void
 print_rpc_gss_init_res(int flags)
 {
 

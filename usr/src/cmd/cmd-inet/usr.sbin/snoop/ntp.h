@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991, 2000, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,7 +135,7 @@ extern int nintf;
 /*
  *  Definitions for the masses
  */
-#define	JAN_1970	2208988800	/* 1970 - 1900 in seconds */
+#define	JAN_1970	2208988800U	/* 1970 - 1900 in seconds */
 
 /*
  *  Daemon specific (ntpd.c)
@@ -236,13 +236,13 @@ struct list {
  *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  */
 struct l_fixedpt {
-	u_long int_part;
-	u_long fraction;
+	ulong_t int_part;
+	ulong_t fraction;
 };
 
 struct s_fixedpt {
-	u_short int_part;
-	u_short fraction;
+	ushort_t int_part;
+	ushort_t fraction;
 };
 
 /*
@@ -289,19 +289,19 @@ struct s_fixedpt {
 #define	AUTH_OCTETS_V3	(MAC_OCTETS_MAX + sizeof (uint32_t))
 
 struct ntpdata {
-	u_char  li_vn_mode;	/* contains leap indicator, version and mode */
-	u_char stratum; 	/* Stratum level */
-	u_char ppoll;		/* poll value */
+	uchar_t li_vn_mode;	/* contains leap indicator, version and mode */
+	uchar_t stratum; 	/* Stratum level */
+	uchar_t ppoll;		/* poll value */
 	int precision:8;
 	struct s_fixedpt distance;
 	struct s_fixedpt dispersion;
-	u_long refid;
+	ulong_t refid;
 	struct l_fixedpt reftime;
 	struct l_fixedpt org;
 	struct l_fixedpt rec;
 	struct l_fixedpt xmt;
 	uint32_t keyid;
-	u_char mac[MAC_OCTETS_MAX];
+	uchar_t mac[MAC_OCTETS_MAX];
 };
 
 #define	LEN_PKT_NOMAC	(sizeof (struct ntpdata) - AUTH_OCTETS_V3)
@@ -356,22 +356,22 @@ struct ntp_peer {
 
 	int	sock;			/* index into sockets to derive */
 					/*   peer.dstadr and peer.dstport */
-	u_char	leap;			/* receive */
-	u_char	hmode;			/* receive */
-	u_char	stratum;		/* receive */
-	u_char	ppoll;			/* receive */
-	u_char	hpoll;			/* poll update */
+	uchar_t	leap;			/* receive */
+	uchar_t	hmode;			/* receive */
+	uchar_t	stratum;		/* receive */
+	uchar_t	ppoll;			/* receive */
+	uchar_t	hpoll;			/* poll update */
 	short	precision;		/* receive */
 	struct	s_fixedpt distance;	/* receive */
 	struct	s_fixedpt dispersion;	/* receive */
-	u_long	refid;			/* receive */
+	ulong_t	refid;			/* receive */
 	struct	l_fixedpt reftime;	/* receive */
 	struct	l_fixedpt org;		/* receive, clear */
 	struct	l_fixedpt rec;		/* receive, clear */
 	struct	l_fixedpt xmt;		/* transmit, clear */
-	u_long	reach;			/* receive, transmit, clear */
-	u_long	valid;			/* packet, transmit, clear */
-	u_long	timer;			/* receive, transmit, poll update */
+	ulong_t	reach;			/* receive, transmit, clear */
+	ulong_t	valid;			/* packet, transmit, clear */
+	ulong_t	timer;			/* receive, transmit, poll update */
 	long	stopwatch;		/* <<local>> for timing */
 	/*
 	 * first order offsets
@@ -386,25 +386,25 @@ struct ntp_peer {
 	double	estoffset;		/* filter */
 	double	estdisp;		/* filter */
 
-	u_long	pkt_sent;		/* <<local>> */
-	u_long 	pkt_rcvd;		/* <<local>> */
-	u_long	pkt_dropped;		/* <<local>> */
+	ulong_t	pkt_sent;		/* <<local>> */
+	ulong_t pkt_rcvd;		/* <<local>> */
+	ulong_t	pkt_dropped;		/* <<local>> */
 };
 
 /* ================= table 3.1:  System Variables ================= */
 
 struct sysdata {			/* procedure */
-	u_char leap;			/* clock update */
-	u_char stratum;			/* clock update */
+	uchar_t leap;			/* clock update */
+	uchar_t stratum;		/* clock update */
 	short precision;		/* system */
 	struct s_fixedpt distance;	/* clock update */
 	struct s_fixedpt dispersion;	/* clock update */
-	u_long refid;			/* clock update */
+	ulong_t refid;			/* clock update */
 	struct l_fixedpt reftime;	/* clock update */
 	int hold;			/* clock update */
 	struct ntp_peer *peer;		/* selection */
 	int maxpeers;			/* <<local>> */
-	u_char filler;		/* put here for %&*%$$ SUNs */
+	uchar_t filler;			/* put here for %&*%$$ SUNs */
 };
 
 #define	NTPDC_VERSION	2
@@ -415,27 +415,27 @@ struct sysdata {			/* procedure */
  *  NTP specification.
  */
 struct clockinfo {
-	u_long net_address;
-	u_long my_address;
-	u_short port;
-	u_short flags;
-	u_long pkt_sent;
-	u_long pkt_rcvd;
-	u_long pkt_dropped;
-	u_long timer;
-	u_char leap;
-	u_char stratum;
-	u_char ppoll;
+	ulong_t net_address;
+	ulong_t my_address;
+	ushort_t port;
+	ushort_t flags;
+	ulong_t pkt_sent;
+	ulong_t pkt_rcvd;
+	ulong_t pkt_dropped;
+	ulong_t timer;
+	uchar_t leap;
+	uchar_t stratum;
+	uchar_t ppoll;
 	int precision:8;
 
-	u_char hpoll;
-	u_char filler1;
-	u_short reach;
+	uchar_t hpoll;
+	uchar_t filler1;
+	ushort_t reach;
 
 	long	estdisp;			/* scaled by 1000 */
 	long	estdelay;			/* in milliseconds */
 	long	estoffset;			/* in milliseconds */
-	u_long refid;
+	ulong_t refid;
 	struct l_fixedpt reftime;
 	struct info_filter {
 		short index;
@@ -446,15 +446,15 @@ struct clockinfo {
 };
 
 struct ntpinfo {
-	u_char version;
-	u_char type;		/* request type (stratum in ntp packets) */
-	u_char count;		/* number of entries in this packet */
-	u_char seq;		/* sequence number of this packet */
+	uchar_t version;
+	uchar_t type;		/* request type (stratum in ntp packets) */
+	uchar_t count;		/* number of entries in this packet */
+	uchar_t seq;		/* sequence number of this packet */
 
-	u_char npkts;		/* total number of packets */
-	u_char peers;
-	u_char fill3;
-	u_char fill4;
+	uchar_t npkts;		/* total number of packets */
+	uchar_t peers;
+	uchar_t fill3;
+	uchar_t fill4;
 };
 
 /*
@@ -462,14 +462,14 @@ struct ntpinfo {
  * Definition of a mode 6 packet.
  */
 struct ntp_control {
-	u_char li_vn_mode;		/* leap, version, mode */
-	u_char r_m_e_op;		/* response, more, error, opcode */
-	u_short sequence;		/* sequence number of request */
-	u_short status;			/* status word for association */
-	u_short associd;		/* association ID */
-	u_short offset;			/* offset of this batch of data */
-	u_short count;			/* count of data in this packet */
-	u_char data[1];			/* data + auth */
+	uchar_t li_vn_mode;		/* leap, version, mode */
+	uchar_t r_m_e_op;		/* response, more, error, opcode */
+	ushort_t sequence;		/* sequence number of request */
+	ushort_t status;		/* status word for association */
+	ushort_t associd;		/* association ID */
+	ushort_t offset;		/* offset of this batch of data */
+	ushort_t count;			/* count of data in this packet */
+	uchar_t data[1];		/* data + auth */
 };
 
 #define	NTPC_DATA_MAXLEN	(480 + AUTH_OCTETS_V3)
@@ -504,25 +504,25 @@ struct ntp_control {
  */
 
 struct ntp_private {
-	u_char rm_vn_mode;		/* response, more, version, mode */
-	u_char auth_seq;		/* key, sequence number */
-	u_char implementation;		/* implementation number */
-	u_char request;			/* request number */
-	u_short err_nitems;		/* error code/number of data items */
-	u_short mbz_itemsize;		/* item size */
+	uchar_t rm_vn_mode;		/* response, more, version, mode */
+	uchar_t auth_seq;		/* key, sequence number */
+	uchar_t implementation;		/* implementation number */
+	uchar_t request;		/* request number */
+	ushort_t err_nitems;		/* error code/number of data items */
+	ushort_t mbz_itemsize;		/* item size */
 	char data[1];			/* data area */
 };
 
 #define	RESP_BIT		0x80
 #define	MORE_BIT		0x40
-#define	INFO_VERSION(rm_vn_mode) ((u_char)(((rm_vn_mode)>>3) & 0x7))
+#define	INFO_VERSION(rm_vn_mode) ((uchar_t)(((rm_vn_mode)>>3) & 0x7))
 #define	INFO_MODE(rm_vn_mode)	((rm_vn_mode) & 0x7)
 
 #define	AUTH_BIT		0x80
 #define	INFO_SEQ(auth_seq)	((auth_seq) & 0x7f)
 
-#define	INFO_ERR(err_nitems)	((u_short)((ntohs(err_nitems) >> 12) & 0xf))
-#define	INFO_NITEMS(err_nitems)	((u_short)(ntohs(err_nitems) & 0xfff))
+#define	INFO_ERR(err_nitems)	((ushort_t)((ntohs(err_nitems) >> 12) & 0xf))
+#define	INFO_NITEMS(err_nitems)	((ushort_t)(ntohs(err_nitems) & 0xfff))
 
 #define	INFO_ITEMSIZE(mbz_itemsize) (ntohs(mbz_itemsize) & 0xfff)
 

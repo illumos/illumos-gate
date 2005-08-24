@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@ struct hostdata6 {
 	struct in6_addr	h6_addr;
 };
 
-struct hostdata *addhost();
+static struct hostdata *addhost(int, void *, char *, char **);
 
 struct hostdata4 *h_table4[MAXHASH];
 struct hostdata6 *h_table6[MAXHASH];
@@ -135,14 +135,13 @@ iplookup(struct in_addr ipaddr)
 }
 
 static struct hostdata *
-ip6lookup(ip6addr)
-	struct in6_addr *ip6addr;
+ip6lookup(struct in6_addr *ip6addr)
 {
 	struct hostdata6 *h;
 	struct hostent *hp = NULL;
 	int error_num;
 	char addrstr[INET6_ADDRSTRLEN];
-	const char *addname;
+	char *addname;
 	struct hostdata *retval;
 
 	for (h = h_table6[iphash(((uint32_t *)ip6addr)[3])]; h;
@@ -183,11 +182,7 @@ ip6lookup(ip6addr)
 }
 
 static struct hostdata *
-addhost(family, ipaddr, name, aliases)
-	int family;
-	void *ipaddr;
-	char *name;
-	char **aliases;
+addhost(int family, void *ipaddr, char *name, char **aliases)
 {
 	register struct hostdata **hp, *n = NULL;
 	extern FILE *namefile;
@@ -299,6 +294,8 @@ addrtoname(family, ipaddr)
 		    family);
 		exit(1);
 	}
+	/* Never reached... */
+	return (NULL);
 }
 
 void

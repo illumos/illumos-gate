@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS */
@@ -49,10 +49,8 @@ static struct in6_addr all_zeroes_addr = { {	0x0, 0x0, 0x0, 0x0,
 						0x0, 0x0, 0x0, 0x0,
 						0x0, 0x0, 0x0, 0x0 } };
 
-interpret_rip6(flags, rip6, fraglen)
-	int flags;
-	struct rip6 *rip6;
-	int fraglen;
+int
+interpret_rip6(int flags, struct rip6 *rip6, int fraglen)
 {
 	char *p;
 	struct netinfo6 *n;
@@ -92,13 +90,11 @@ interpret_rip6(flags, rip6, fraglen)
 		show_header("RIPng:  ", "Routing Information Protocol for IPv6",
 		    fraglen);
 		show_space();
-		(void) sprintf(get_line((char *)rip6->rip6_cmd - dlc_header, 1),
-		    "Opcode = %d (%s)",
-		    rip6->rip6_cmd,
+		(void) sprintf(get_line((char *)(uintptr_t)rip6->rip6_cmd -
+		    dlc_header, 1), "Opcode = %d (%s)", rip6->rip6_cmd,
 		    show_cmd6(rip6->rip6_cmd));
-		(void) sprintf(get_line((char *)rip6->rip6_vers -
-		    dlc_header, 1), "Version = %d",
-		    rip6->rip6_vers);
+		(void) sprintf(get_line((char *)(uintptr_t)rip6->rip6_vers -
+		    dlc_header, 1), "Version = %d", rip6->rip6_vers);
 
 		switch (rip6->rip6_cmd) {
 		case RIPCMD6_REQUEST:

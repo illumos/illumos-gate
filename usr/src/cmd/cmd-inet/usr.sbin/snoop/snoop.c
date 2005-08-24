@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,8 +97,8 @@ void snoop_sigrecover(int sig, siginfo_t *info, void *p);
 static char *protmalloc(size_t);
 static void resetperm(void);
 
-main(argc, argv)
-	int argc; char **argv;
+int
+main(int argc, char **argv)
 {
 	extern char *optarg;
 	extern int optind;

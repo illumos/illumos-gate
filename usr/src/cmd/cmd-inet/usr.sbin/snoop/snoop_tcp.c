@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2001,2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,7 @@ interpret_tcp(int flags, struct tcphdr *tcp, int iplen, int fraglen)
 	tcplen = iplen - hdrlen;
 	fraglen -= hdrlen;
 	if (fraglen < 0)
-		return;		/* incomplete header */
+		return (fraglen + hdrlen);	/* incomplete header */
 	if (fraglen > tcplen)
 		fraglen = tcplen;
 
@@ -138,9 +138,8 @@ interpret_tcp(int flags, struct tcphdr *tcp, int iplen, int fraglen)
 
 	show_header("TCP:  ", "TCP Header", tcplen);
 	show_space();
-	(void) sprintf(get_line((char *)tcp->th_sport - dlc_header, 2),
-		"Source port = %d",
-		ntohs(tcp->th_sport));
+	(void) sprintf(get_line((char *)(uintptr_t)tcp->th_sport -
+		dlc_header, 2),	"Source port = %d", ntohs(tcp->th_sport));
 
 	if (sunrpc) {
 		pname = "(Sun RPC)";
@@ -153,64 +152,52 @@ interpret_tcp(int flags, struct tcphdr *tcp, int iplen, int fraglen)
 			pname = buff;
 		}
 	}
-	(void) sprintf(get_line((char *)tcp->th_dport - dlc_header, 2),
-		"Destination port = %d %s",
+	(void) sprintf(get_line((char *)(uintptr_t)tcp->th_dport -
+		dlc_header, 2), "Destination port = %d %s",
 		ntohs(tcp->th_dport), pname);
-	(void) sprintf(get_line((char *)tcp->th_seq - dlc_header, 4),
-		"Sequence number = %u",
+	(void) sprintf(get_line((char *)(uintptr_t)tcp->th_seq -
+		dlc_header, 4),	"Sequence number = %u",
 		ntohl(tcp->th_seq));
-	(void) sprintf(get_line((char *)tcp->th_ack - dlc_header, 4),
+	(void) sprintf(get_line((char *)(uintptr_t)tcp->th_ack - dlc_header, 4),
 		"Acknowledgement number = %u",
 		ntohl(tcp->th_ack));
-	(void) sprintf(get_line(((char *)tcp->th_ack - dlc_header) + 4, 1),
-		"Data offset = %d bytes",
-		tcp->th_off * 4);
-	(void) sprintf(get_line(((char *)tcp->th_flags - dlc_header) + 4, 1),
-		"Flags = 0x%02x",
-		tcp->th_flags);
-	(void) sprintf(get_line(((char *)tcp->th_flags - dlc_header) + 4, 1),
-		"      %s",
-		getflag(tcp->th_flags, TH_CWR,
-			"ECN congestion window reduced",
-			"No ECN congestion window reduced"));
-	(void) sprintf(get_line(((char *)tcp->th_flags - dlc_header) + 4, 1),
-		"      %s",
-		getflag(tcp->th_flags, TH_ECE,
-			"ECN echo", "No ECN echo"));
-	(void) sprintf(get_line(((char *)tcp->th_flags - dlc_header) + 4, 1),
-		"      %s",
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_ack - dlc_header) +
+		4, 1), "Data offset = %d bytes", tcp->th_off * 4);
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
+		dlc_header) + 4, 1), "Flags = 0x%02x", tcp->th_flags);
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
+		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_CWR,
+		"ECN congestion window reduced",
+		"No ECN congestion window reduced"));
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
+		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_ECE,
+		"ECN echo", "No ECN echo"));
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
+		dlc_header) + 4, 1), "      %s",
 		getflag(tcp->th_flags, TH_URG,
-			"Urgent pointer", "No urgent pointer"));
-	(void) sprintf(get_line(((char *)tcp->th_flags - dlc_header) + 4, 1),
-		"      %s",
-		getflag(tcp->th_flags, TH_ACK,
-			"Acknowledgement", "No acknowledgement"));
-	(void) sprintf(get_line(((char *)tcp->th_flags - dlc_header) + 4, 1),
-		"      %s",
-		getflag(tcp->th_flags, TH_PUSH,
-			"Push", "No push"));
-	(void) sprintf(get_line(((char *)tcp->th_flags - dlc_header) + 4, 1),
-		"      %s",
-		getflag(tcp->th_flags, TH_RST,
-			"Reset", "No reset"));
-	(void) sprintf(get_line(((char *)tcp->th_flags - dlc_header) + 4, 1),
-		"      %s",
-		getflag(tcp->th_flags, TH_SYN,
-			"Syn", "No Syn"));
-	(void) sprintf(get_line(((char *)tcp->th_flags - dlc_header) + 4, 1),
-		"      %s",
-		getflag(tcp->th_flags, TH_FIN,
-			"Fin", "No Fin"));
-	(void) sprintf(get_line(((char *)tcp->th_win - dlc_header) + 4, 1),
-		"Window = %d",
-		ntohs(tcp->th_win));
+		"Urgent pointer", "No urgent pointer"));
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
+		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_ACK,
+		"Acknowledgement", "No acknowledgement"));
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
+		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_PUSH,
+		"Push", "No push"));
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
+		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_RST,
+		"Reset", "No reset"));
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
+		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_SYN,
+		"Syn", "No Syn"));
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_flags -
+		dlc_header) + 4, 1), "      %s", getflag(tcp->th_flags, TH_FIN,
+		"Fin", "No Fin"));
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_win - dlc_header) +
+		4, 1), "Window = %d", ntohs(tcp->th_win));
 	/* XXX need to compute checksum and print whether correct */
-	(void) sprintf(get_line(((char *)tcp->th_sum - dlc_header) + 4, 1),
-		"Checksum = 0x%04x",
-		ntohs(tcp->th_sum));
-	(void) sprintf(get_line(((char *)tcp->th_urp - dlc_header) + 4, 1),
-		"Urgent pointer = %d",
-		ntohs(tcp->th_urp));
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_sum - dlc_header) +
+		4, 1), "Checksum = 0x%04x", ntohs(tcp->th_sum));
+	(void) sprintf(get_line(((char *)(uintptr_t)tcp->th_urp - dlc_header) +
+		4, 1), "Urgent pointer = %d", ntohs(tcp->th_urp));
 
 	/* Print TCP options - if any */
 

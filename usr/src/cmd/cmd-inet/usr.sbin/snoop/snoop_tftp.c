@@ -20,10 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991 by Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <arpa/tftp.h>
@@ -33,10 +34,8 @@ extern char *dlc_header;
 char *tftperror();
 char *show_type();
 
-interpret_tftp(flags, tftp, fraglen)
-	int flags;
-	struct tftphdr *tftp;
-	int fraglen;
+int
+interpret_tftp(int flags, struct tftphdr *tftp, int fraglen)
 {
 	char *name, *mode;
 	extern int src_port, dst_port;
@@ -55,13 +54,13 @@ interpret_tftp(flags, tftp, fraglen)
 	if (flags & F_SUM) {
 		switch (ntohs(tftp->th_opcode)) {
 		case RRQ:
-			name = (char *) &tftp->th_stuff;
+			name = (char *)&tftp->th_stuff;
 			mode = name + (strlen(name) + 1);
 			(void) sprintf(get_sum_line(),
 				"TFTP Read \"%s\" (%s)", name, mode);
 			break;
 		case WRQ:
-			name = (char *) &tftp->th_stuff;
+			name = (char *)&tftp->th_stuff;
 			mode = name + (strlen(name) + 1);
 			(void) sprintf(get_sum_line(),
 				"TFTP Write \"%s\" (%s)", name, mode);
@@ -90,7 +89,8 @@ interpret_tftp(flags, tftp, fraglen)
 
 	show_header("TFTP:  ", "Trivial File Transfer Protocol", fraglen);
 	show_space();
-	(void) sprintf(get_line((char *)tftp->th_opcode - dlc_header, 2),
+	(void) sprintf(get_line((char *)(uintptr_t)tftp->th_opcode -
+		dlc_header, 2),
 		"Opcode = %d (%s)",
 		ntohs(tftp->th_opcode),
 		show_type(ntohs(tftp->th_opcode)));
@@ -98,7 +98,7 @@ interpret_tftp(flags, tftp, fraglen)
 	switch (ntohs(tftp->th_opcode)) {
 	case RRQ:
 	case WRQ:
-		name = (char *) &tftp->th_stuff;
+		name = (char *)&tftp->th_stuff;
 		mode = name + (strlen(name) + 1);
 		(void) sprintf(
 			get_line(name - dlc_header, strlen(name) + 1),
@@ -112,34 +112,30 @@ interpret_tftp(flags, tftp, fraglen)
 
 	case DATA:
 		(void) sprintf(
-			get_line((char *)tftp->th_block - dlc_header, 2),
-			"Data block = %d%s",
+			get_line((char *)(uintptr_t)tftp->th_block -
+			dlc_header, 2),	"Data block = %d%s",
 			ntohs(tftp->th_block),
 			blocksize < 512 ? " (last block)":"");
-		(void) sprintf(
-			get_line((char *)tftp->th_data - dlc_header, blocksize),
+		(void) sprintf(get_line((char *)(uintptr_t)tftp->th_data -
+			dlc_header, blocksize),
 			"[ %d bytes of data ]",
 			blocksize);
 		break;
 
 	case ACK:
-		(void) sprintf(
-			get_line((char *)tftp->th_block - dlc_header, 2),
-			"Acknowledge block = %d",
+		(void) sprintf(get_line((char *)(uintptr_t)tftp->th_block -
+			dlc_header, 2),	"Acknowledge block = %d",
 			ntohs(tftp->th_block));
 		break;
 
 	case ERROR:
-		(void) sprintf(
-			get_line((char *)tftp->th_code - dlc_header, 2),
-			"Error = %d (%s)",
+		(void) sprintf(get_line((char *)(uintptr_t)tftp->th_code -
+			dlc_header, 2),	"Error = %d (%s)",
 			ntohs(tftp->th_code),
 			tftperror(ntohs(tftp->th_code)));
-		(void) sprintf(
-			get_line((char *)tftp->th_data - dlc_header,
-				strlen(tftp->th_data) + 1),
-			"Error string = \"%s\"",
-				tftp->th_data);
+		(void) sprintf(get_line((char *)(uintptr_t)tftp->th_data -
+			dlc_header, strlen(tftp->th_data) + 1),
+			"Error string = \"%s\"", tftp->th_data);
 	}
 	}
 
