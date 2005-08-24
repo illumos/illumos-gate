@@ -26,6 +26,9 @@ int	sp;
 char	ibuf[PUSHBACK+SSIZE];	/* pushback buffer for definitions, etc. */
 char	*ip	= ibuf;
 
+extern tbl *keytbl[];
+extern tbl *deftbl[];
+
 void define(int);
 void delim(void);
 void getstr(char *, int);
@@ -90,7 +93,6 @@ yylex(void)
 {
 	int c;
 	tbl *tp, *lookup();
-	extern tbl **keytbl, **deftbl;
 
 beg:
 	while ((c = gtc()) == ' ' || c == '\n')
@@ -226,7 +228,6 @@ define(int type)
 {
 	char *strsave(), *p1, *p2;
 	tbl *lookup();
-	extern tbl **deftbl;
 
 	getstr(token, SSIZE);	/* get name */
 	if (type != DEFINE) {

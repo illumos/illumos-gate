@@ -200,7 +200,7 @@ struct {
 
 /* find name in tbl. if defn non-null, install */
 tbl *
-lookup(tbl **tblp, char *name, char *defn)
+lookup(tbl *tblp[], char *name, char *defn)
 {
 	tbl *p;
 	int h;

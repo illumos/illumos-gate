@@ -36,7 +36,7 @@ text(int t, char *p1)
 	int c;
 	char *p;
 	tbl *tp, *lookup();
-	extern tbl *restbl;
+	extern tbl *restbl[];
 
 	yyval = oalloc();
 	ebase[yyval] = 0;
@@ -54,7 +54,7 @@ text(int t, char *p1)
 		p = "\\|";
 	else if (t == TAB)
 		p = "\\t";
-	else if ((tp = lookup(&restbl, p1, NULL)) != NULL)
+	else if ((tp = lookup(restbl, p1, NULL)) != NULL)
 		p = tp->defn;
 	else {
 		lf = rf = 0;
