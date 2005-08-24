@@ -26,6 +26,8 @@
 
 #pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/asm_linkage.h>
+
 /*
  * biosint.s - installed by kernel to make bios calls
  * 
@@ -97,26 +99,26 @@ qflush1:
 	/ Having stray high bits on causes strange
 	/ and unpredictable failures to occur in real mode.
 	/
-	data16;		xorl %eax, %eax
-		addr16; movw ic_ds, %eax
+	D16		xorl %eax, %eax
+		A16	movw ic_ds, %ax
 			push %eax		/ save for later
-	data16;	addr16; movw ic_ax, %ax
-	data16;		xorl %ebx, %ebx
-		addr16; mov ic_bx, %ebx
-	data16;		xorl %ecx, %ecx
-		addr16; mov ic_cx, %ecx
-	data16;		xorl %edx, %edx
-		addr16; mov ic_dx, %edx
-	data16;		xorl %ebp, %ebp
-		addr16; mov ic_bp, %ebp
-	data16;		xorl %edi,%edi
-		addr16; mov ic_di, %edi
-	data16;		xorl %esi,%esi
-		addr16; mov ic_si, %esi
-		addr16; movw ic_es, %es
+	D16	A16	movw ic_ax, %ax
+	D16		xorl %ebx, %ebx
+		A16	mov ic_bx, %ebx
+	D16		xorl %ecx, %ecx
+		A16	mov ic_cx, %ecx
+	D16		xorl %edx, %edx
+		A16	mov ic_dx, %edx
+	D16		xorl %ebp, %ebp
+		A16	mov ic_bp, %ebp
+	D16		xorl %edi,%edi
+		A16	mov ic_di, %edi
+	D16		xorl %esi,%esi
+		A16	mov ic_si, %esi
+		A16	movw ic_es, %es
 
 			sti
-		addr16;	pop %ds			/ set effective ds
+		A16	pop %ds			/ set effective ds
 newintcode:
  			int	$0x10		/ do BIOS call
 			cli
@@ -124,21 +126,21 @@ newintcode:
 
 	/ save results of the BIOS call
 	/
-	addr16;		movw %ax, ic_ax
-	addr16;		movw %bx, ic_bx
-	addr16;		movw %cx, ic_cx
-	addr16;		movw %dx, ic_dx
-	addr16;		movw %bp, ic_bp
-	addr16;		movw %si, ic_si
-	addr16;		movw %di, ic_di
-	addr16;		movw %ds, ic_ds		/ real mode - stack 2-bytes word
-	addr16;		movw %es, ic_es
+	A16		movw %ax, ic_ax
+	A16		movw %bx, ic_bx
+	A16		movw %cx, ic_cx
+	A16		movw %dx, ic_dx
+	A16		movw %bp, ic_bp
+	A16		movw %si, ic_si
+	A16		movw %di, ic_di
+	A16		movw %ds, ic_ds		/ real mode - stack 2-bytes word
+	A16		movw %es, ic_es
 
-	data16;		movw    %cs, %eax
-			movw    %eax, %ds       / restore entry ds, es
-			movw    %eax, %es
+	D16		movw    %cs, %ax
+			movw    %ax, %ds       / restore entry ds, es
+			movw    %ax, %es
 
-	data16;	 call    goprot	  / protect mode
+	D16	 call    goprot	  / protect mode
 
 /
 / NOW back in PROTECTED MODE.
@@ -184,7 +186,7 @@ set16cs:
 
 	/ need to have all segment regs sane
 	/ before we can enter real mode
-	data16;		movl	$0x20, %eax
+	D16		movl	$0x20, %eax
 			movw	%ax, %es
 			movw	%ax, %ds
 			movw	%ax, %fs
@@ -193,7 +195,7 @@ set16cs:
 	/ clear the protection and paging bits
 	/ jump should clear prefetch q
 			mov     %cr0, %eax
-	data16;		and	$0x7ffffffe, %eax
+	D16		and	$0x7ffffffe, %eax
 			mov	%eax, %cr0
 
 	/ Do a long jump here to establish %cs in real mode.
@@ -214,7 +216,7 @@ restorecs:
 			movw    %ax, %es
 			movw    %ax, %fs
 			movw    %ax, %gs
-	data16;	 	ret
+	D16	 	ret
 
 / ----------------------------------------------------
 / Enter protected mode.
@@ -225,13 +227,13 @@ goprot:
 	/ Workaround for BIOSes that mess with GDT during INT call without
 	/ restoring original value on the way back. Hence restore it here.
 
-	data16; addr16; lgdt    kernGDTptr
+	D16 A16		lgdt    kernGDTptr
 
-	data16;		popl	%ebx	/ get return %eip, for later use
+	D16		popl	%ebx	/ get return %eip, for later use
 
 	/ set protect mode and page mode
 			mov	%cr0, %eax
-	data16;	addr16;	orl	$0x80000001, %eax
+	D16	A16	orl	$0x80000001, %eax
 			mov	%eax, %cr0
 
 			jmp	qflush2	  / flush the prefetch queue
@@ -239,18 +241,18 @@ qflush2:
 
 	/ Restore caller's segment registers.
 	/ Still in 16-bit mode till %cs is restored
-		addr16;	movw	call_ds, %ds
-		addr16;	movw	call_es, %es
-		addr16;	movw	call_fs, %fs
-		addr16;	movw	call_gs, %gs
-		addr16;	movw	call_ss, %ss
+		A16	movw	call_ds, %ds
+		A16	movw	call_es, %es
+		A16	movw	call_fs, %fs
+		A16	movw	call_gs, %gs
+		A16	movw	call_ss, %ss
 
 	/ Now, set up %cs by fiddling with the return stack and doing an lret
 
-	data16;	addr16;	movw	call_cs, %eax	/ push %cs
-	data16;		pushl	%eax
-	data16;		pushl	%ebx		/ push %eip
-	data16;		lret
+	D16	A16	movw	call_cs, %ax	/ push %cs
+	D16		pushl	%eax
+	D16		pushl	%ebx		/ push %eip
+	D16		lret
 
 / Data definitions
 	.align 4
