@@ -457,6 +457,7 @@ build() {
 			| egrep -v '^Note \(probably harmless\):' \
 			| egrep -v '::' \
 			| egrep -v -- '-xcache' \
+			| egrep -v '^\+' \
 			| sort | uniq >$SRC/${NOISE}.out
 		if [ ! -f $SRC/${NOISE}.ref ]; then
 			cp $SRC/${NOISE}.out $SRC/${NOISE}.ref

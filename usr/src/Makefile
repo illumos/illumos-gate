@@ -320,14 +320,16 @@ ONC_PLUS:
 
 cc-version:
 	@if [ -x "$($(MACH)_CC)" ]; then			\
+		$(ECHO) 32-bit compiler;			\
 		$(ECHO) $($(MACH)_CC);				\
 		$($(MACH)_CC) -V 2>&1 | head -1;		\
 	else							\
 		__COMPILER=`$($(MACH)_CC) -_compiler 2>/dev/null || $(TRUE)`;\
 		if [ -z "$$__COMPILER" ]; then			\
-			$(ECHO) No compiler found;		\
+			$(ECHO) No 32-bit compiler found;	\
 			exit 1;					\
 		else						\
+			$(ECHO) 32-bit compiler;		\
 			$(ECHO) $($(MACH)_CC);			\
 			$(ECHO) $$__COMPILER;			\
 			$($(MACH)_CC) -V 2>&1 | head -1;	\
@@ -336,6 +338,7 @@ cc-version:
 
 cc64-version:
 	@if [ -x "$($(MACH64)_CC)" ]; then			\
+		$(ECHO) 64-bit compiler;			\
 		$(ECHO) $($(MACH64)_CC);			\
 		$($(MACH64)_CC) -V 2>&1 | head -1;		\
 	else							\
@@ -344,6 +347,7 @@ cc64-version:
 			$(ECHO) No 64-bit compiler found;	\
 			exit 1;					\
 		else						\
+			$(ECHO) 64-bit compiler;		\
 			$(ECHO) $($(MACH64)_CC);		\
 			$(ECHO) $$__COMPILER;			\
 			$($(MACH64)_CC) -V 2>&1 | head -1;	\
