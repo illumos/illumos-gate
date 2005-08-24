@@ -34,6 +34,7 @@
 #include <sys/memlist.h>
 #include <sys/memnode.h>
 #include <sys/platform_module.h>
+#include <vm/vm_dep.h>
 
 int	max_mem_nodes = 1;
 
@@ -102,7 +103,6 @@ mem_node_add_slice(pfn_t start, pfn_t end)
 	} else {
 		mem_node_config[mnode].physbase = start;
 		mem_node_config[mnode].physmax = end;
-		mem_node_config[mnode].cursize = 0;
 		atomic_add_16(&num_memnodes, 1);
 		do {
 			oldmask = memnodes_mask;
@@ -174,7 +174,7 @@ mem_node_post_del_slice(pfn_t start, pfn_t end, int cancelled)
 			/*
 			 * Delete the whole node.
 			 */
-			ASSERT(mem_node_config[mnode].cursize == 0);
+			ASSERT(MNODE_PGCNT(mnode) == 0);
 			do {
 				omask = memnodes_mask;
 				nmask = omask & ~(1ull << mnode);
@@ -240,7 +240,6 @@ mem_node_alloc()
 
 	mem_node_config[mnode].physbase = (pfn_t)-1l;
 	mem_node_config[mnode].physmax = 0;
-	mem_node_config[mnode].cursize = 0;
 	atomic_add_16(&num_memnodes, 1);
 	do {
 		oldmask = memnodes_mask;

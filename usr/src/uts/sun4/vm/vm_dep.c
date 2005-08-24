@@ -82,9 +82,7 @@ uint_t vac_colors_mask = 0;
  */
 #define	CPUSETSIZE()	(cpunodes[CPU->cpu_id].ecache_setsize)
 
-#ifdef DEBUG
 plcnt_t		plcnt;		/* page list count */
-#endif
 
 /*
  * This variable is set by the cpu module to contain the lowest

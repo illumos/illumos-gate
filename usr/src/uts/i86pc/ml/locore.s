@@ -375,7 +375,7 @@ enable_big_page_support_done:
 	movl	%cr0, %eax
 	orl	$CR0_PG, %eax
 	movl	%eax, %cr0
-	jmp	enable_pae_done		/* jmp is required after enabling paging */
+	jmp	enable_pae_done		/ jmp required after enabling paging
 enable_pae_done:
 	/*
 	 * flush TLBs just in case and return
@@ -390,7 +390,7 @@ __start:
 	/*
 	 *	%ecx = boot services (should die someday)
 	 *	%ebx = bootops
-	 *	
+	 */	
 	mov	$edata, %ebp		/ edata needs to be defined for ksyms
 	movl	$0, (%ebp)		/ limit stack back trace
 

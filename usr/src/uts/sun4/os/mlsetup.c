@@ -203,6 +203,8 @@ mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
 	 */
 	cpu_list_init(CPU);
 
+	cpu_vm_data_init(CPU);
+
 	prom_init("kernel", cif);
 	(void) prom_set_preprom(kern_splr_preprom);
 	(void) prom_set_postprom(kern_splx_postprom);

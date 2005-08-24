@@ -2489,7 +2489,7 @@ segvn_relocate_pages(page_t **targ, page_t *replacement)
 		ASSERT(!PP_ISFREE(repl));
 		targ[i] = repl;
 		page_downgrade(targ[i]);
-		repl = page_next(repl);
+		repl++;
 	}
 }
 
@@ -2910,7 +2910,7 @@ segvn_fill_vp_pages(struct segvn_data *svd, vnode_t *vp, u_offset_t off,
 			ASSERT(pgidx ==
 			    ((pp->p_offset - start_off) >> PAGESHIFT));
 			ppa[pgidx++] = pp;
-			pp = page_next(pp);
+			pp++;
 		}
 	}
 
@@ -2992,7 +2992,7 @@ out:
 		page_list_concat(&tmp_pplist, &pp);
 		while (--ppages != 0) {
 			VM_STAT_ADD(segvnvmstats.fill_vp_pages[22]);
-			pp = page_next(pp);
+			pp++;
 			ASSERT(PAGE_EXCL(pp));
 			ASSERT(pp->p_szc == szc);
 			page_list_concat(&tmp_pplist, &pp);

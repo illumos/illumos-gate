@@ -707,6 +707,7 @@ void	page_boot_demote(page_t *);
 void	page_promote_size(page_t *, uint_t);
 void	page_list_add_pages(page_t *, int);
 void	page_list_sub(page_t *, int);
+void	page_list_xfer(page_t *, int, int);
 void	page_list_break(page_t **, page_t **, size_t);
 void	page_list_concat(page_t **, page_t **);
 void	page_vpadd(page_t **, page_t *);
@@ -736,8 +737,6 @@ page_t	*page_numtopp_nolock(pfn_t);
 page_t	*page_numtopp_nowait(pfn_t, se_t);
 page_t  *page_first();
 page_t  *page_next(page_t *);
-page_t  *page_nextn_raw(page_t *, ulong_t);	/* pp += n */
-#define	page_next_raw(PP)	page_nextn_raw((PP), 1)
 page_t  *page_list_next(page_t *);
 page_t	*page_nextn(page_t *, ulong_t);
 page_t	*page_next_scan_init(void **);

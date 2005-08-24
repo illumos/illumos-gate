@@ -55,12 +55,6 @@ extern "C" {
 #define	MTYPE_INIT(mtype, vp, vaddr, flags)				\
 	mtype = (flags & PG_NORELOC) ? MTYPE_NORELOC : MTYPE_RELOC;
 
-/*
- * macros to loop through the mtype range - noops for sparc
- */
-#define	MTYPE_START(mnode, mtype, flags)
-#define	MTYPE_NEXT(mnode, mtype, flags)		(-1)
-
 /* mtype init for page_get_replacement_page */
 
 #define	MTYPE_PGR_INIT(mtype, flags, pp, mnode)				\
@@ -133,25 +127,24 @@ extern void	chk_lpg(page_t *, uchar_t);
 #define	CHK_LPG(pp, szc)
 #endif
 
-#ifdef DEBUG
-
-/* page list count */
+/*
+ * page list count per mnode and type.
+ */
 typedef	struct {
-	pgcnt_t	plc_m_pgmax;
-	pgcnt_t	plc_m_pgcnt;
-	pgcnt_t	plc_m_clpgcnt;		/* cache list cnt */
+	pgcnt_t	plc_mt_pgmax;		/* max page cnt */
+	pgcnt_t plc_mt_clpgcnt;		/* cache list cnt */
+	pgcnt_t plc_mt_flpgcnt;		/* free list cnt - small pages */
+	pgcnt_t plc_mt_lgpgcnt;		/* free list cnt - large pages */
+#ifdef DEBUG
 	struct {
-		pgcnt_t	plc_mt_pgmax;
-		pgcnt_t plc_mt_pgcnt;
-		struct {
-			pgcnt_t plc_mts_pgcnt;
-			int	plc_mts_colors;
-			pgcnt_t	*plc_mtsc_pgcnt;
-		} plc_mts[MMU_PAGE_SIZES];
-	} plc_mt[MAX_MEM_TYPES];
-} plcnt_t[MAX_MEM_NODES];
+		pgcnt_t plc_mts_pgcnt;	/* per page size count */
+		int	plc_mts_colors;
+		pgcnt_t	*plc_mtsc_pgcnt; /* per color bin count */
+	} plc_mts[MMU_PAGE_SIZES];
+#endif
+} plcnt_t[MAX_MEM_NODES][MAX_MEM_TYPES];
 
-extern plcnt_t	plcnt;
+#ifdef DEBUG
 
 #define	PLCNT_SZ(ctrs_sz) {						\
 	int	szc;							\
@@ -168,9 +161,9 @@ extern plcnt_t	plcnt;
 		colors = page_get_pagecolors(szc);			\
 		for (mn = 0; mn < max_mem_nodes; mn++) {		\
 			for (mt = 0; mt < MAX_MEM_TYPES; mt++) {	\
-				plcnt[mn].plc_mt[mt].plc_mts[szc].	\
+				plcnt[mn][mt].plc_mts[szc].	\
 				    plc_mts_colors = colors;		\
-				plcnt[mn].plc_mt[mt].plc_mts[szc].	\
+				plcnt[mn][mt].plc_mts[szc].	\
 				    plc_mtsc_pgcnt = (pgcnt_t *)base;	\
 				base += (colors * sizeof (pgcnt_t));	\
 			}						\
@@ -178,33 +171,21 @@ extern plcnt_t	plcnt;
 	}								\
 }
 
-#define	PLCNT_DO(pp, mn, szc, cnt, flags) {				\
-	int	mtype = PP_2_MTYPE(pp);					\
+#define	PLCNT_DO(pp, mn, mtype, szc, cnt, flags) {			\
 	int	bin = PP_2_BIN(pp);					\
 	if (flags & (PG_LIST_ISINIT | PG_LIST_ISCAGE))			\
-		atomic_add_long(&plcnt[mn].plc_mt[mtype].plc_mt_pgmax,	\
+		atomic_add_long(&plcnt[mn][mtype].plc_mt_pgmax,	\
 		    cnt);						\
-	atomic_add_long(&mem_node_config[mn].cursize, cnt);		\
 	if (flags & PG_CACHE_LIST)					\
-		atomic_add_long(&plcnt[mn].plc_m_clpgcnt, cnt);		\
-	atomic_add_long(&plcnt[mn].plc_m_pgcnt, cnt);			\
-	atomic_add_long(&plcnt[mn].plc_mt[mtype].plc_mt_pgcnt, cnt);	\
-	atomic_add_long(&plcnt[mn].plc_mt[mtype].plc_mts[szc].		\
-	    plc_mts_pgcnt, cnt);					\
-	atomic_add_long(&plcnt[mn].plc_mt[mtype].plc_mts[szc].		\
+		atomic_add_long(&plcnt[mn][mtype].plc_mt_clpgcnt, cnt);	\
+	else if (szc)							\
+		atomic_add_long(&plcnt[mn][mtype].plc_mt_lgpgcnt, cnt);	\
+	else								\
+		atomic_add_long(&plcnt[mn][mtype].plc_mt_flpgcnt, cnt);	\
+	atomic_add_long(&plcnt[mn][mtype].plc_mts[szc].plc_mts_pgcnt,	\
+	    cnt);							\
+	atomic_add_long(&plcnt[mn][mtype].plc_mts[szc].			\
 	    plc_mtsc_pgcnt[bin], cnt);					\
-}
-
-#define	PLCNT_INCR(pp, mn, szc, flags) {				\
-	long	cnt = (1 << PAGE_BSZS_SHIFT(szc));			\
-	if (flags & PG_LIST_ISINIT)					\
-		plcnt[mn].plc_m_pgmax += cnt;				\
-	PLCNT_DO(pp, mn, szc, cnt, flags);				\
-}
-
-#define	PLCNT_DECR(pp, mn, szc, flags) {				\
-	long	cnt = ((-1) << PAGE_BSZS_SHIFT(szc));			\
-	PLCNT_DO(pp, mn, szc, cnt, flags);				\
 }
 
 #else
@@ -213,23 +194,97 @@ extern plcnt_t	plcnt;
 
 #define	PLCNT_INIT(base)
 
-#define	PLCNT_INCR(pp, mnode, szc, flags) {				\
-	long	cnt = (1 << PAGE_BSZS_SHIFT(szc));			\
-	atomic_add_long(&mem_node_config[mnode].cursize, cnt);		\
-}
+/* PG_FREE_LIST may not be explicitly set in flags for large pages */
 
-#define	PLCNT_DECR(pp, mnode, szc, flags) {				\
-	long	cnt = ((-1) << PAGE_BSZS_SHIFT(szc));			\
-	atomic_add_long(&mem_node_config[mnode].cursize, cnt);		\
+#define	PLCNT_DO(pp, mn, mtype, szc, cnt, flags) {			\
+	if (flags & (PG_LIST_ISINIT | PG_LIST_ISCAGE))			\
+		atomic_add_long(&plcnt[mn][mtype].plc_mt_pgmax, cnt);	\
+	if (flags & PG_CACHE_LIST)					\
+		atomic_add_long(&plcnt[mn][mtype].plc_mt_clpgcnt, cnt);	\
+	else if (szc)							\
+		atomic_add_long(&plcnt[mn][mtype].plc_mt_lgpgcnt, cnt);	\
+	else								\
+		atomic_add_long(&plcnt[mn][mtype].plc_mt_flpgcnt, cnt);	\
 }
 
 #endif
+
+#define	PLCNT_INCR(pp, mn, mtype, szc, flags) {				\
+	long	cnt = (1 << PAGE_BSZS_SHIFT(szc));			\
+	PLCNT_DO(pp, mn, mtype, szc, cnt, flags);			\
+}
+
+#define	PLCNT_DECR(pp, mn, mtype, szc, flags) {				\
+	long	cnt = ((-1) << PAGE_BSZS_SHIFT(szc));			\
+	PLCNT_DO(pp, mn, mtype, szc, cnt, flags);			\
+}
+
+/*
+ * macros to update page list max counts - done when pages transferred
+ * between mtypes (as in kcage_assimilate_page).
+ */
+#define	PLCNT_MAX_INCR(pp, mn, mtype, szc) {				\
+	long	cnt = (1 << PAGE_BSZS_SHIFT(szc));			\
+	atomic_add_long(&plcnt[mn][mtype].plc_mt_pgmax, cnt);		\
+}
+
+#define	PLCNT_MAX_DECR(pp, mn, mtype, szc) {				\
+	long	cnt = ((-1) << PAGE_BSZS_SHIFT(szc));			\
+	atomic_add_long(&plcnt[mn][mtype].plc_mt_pgmax, cnt);		\
+}
+
+extern plcnt_t	plcnt;
+
+#define	MNODE_PGCNT(mn)							\
+	(plcnt[mn][MTYPE_RELOC].plc_mt_clpgcnt +			\
+	    plcnt[mn][MTYPE_NORELOC].plc_mt_clpgcnt +			\
+	    plcnt[mn][MTYPE_RELOC].plc_mt_flpgcnt +			\
+	    plcnt[mn][MTYPE_NORELOC].plc_mt_flpgcnt +			\
+	    plcnt[mn][MTYPE_RELOC].plc_mt_lgpgcnt +			\
+	    plcnt[mn][MTYPE_NORELOC].plc_mt_lgpgcnt)
+
+#define	MNODETYPE_PGCNT(mn, mtype)					\
+	(plcnt[mn][mtype].plc_mt_clpgcnt +				\
+	    plcnt[mn][mtype].plc_mt_flpgcnt +				\
+	    plcnt[mn][mtype].plc_mt_lgpgcnt)
+
+/*
+ * macros to loop through the mtype range - MTYPE_START returns -1 in
+ * mtype if no pages in mnode/mtype and possibly NEXT mtype.
+ */
+#define	MTYPE_START(mnode, mtype, flags) {				\
+	if (plcnt[mnode][mtype].plc_mt_pgmax == 0) {			\
+		ASSERT(MNODETYPE_PGCNT(mnode, mtype) == 0);		\
+		MTYPE_NEXT(mnode, mtype, flags);			\
+	}								\
+}
+
+/*
+ * if allocation from the RELOC pool failed and there is sufficient cage
+ * memory, attempt to allocate from the NORELOC pool.
+ */
+#define	MTYPE_NEXT(mnode, mtype, flags) { 				\
+	if (!(flags & (PG_NORELOC | PGI_NOCAGE | PGI_RELOCONLY)) &&	\
+	    (kcage_freemem >= kcage_lotsfree)) {			\
+		if (plcnt[mnode][mtype].plc_mt_pgmax == 0) {		\
+			ASSERT(MNODETYPE_PGCNT(mnode, mtype) == 0);	\
+			mtype = -1;					\
+		} else {						\
+			mtype = MTYPE_NORELOC;				\
+			flags |= PG_NORELOC;				\
+		}							\
+	} else {							\
+		mtype = -1;						\
+	}								\
+}
 
 /*
  * get the ecache setsize for the current cpu.
  */
 #define	CPUSETSIZE()	(cpunodes[CPU->cpu_id].ecache_setsize)
 
+extern struct cpu	cpu0;
+#define	CPU0		&cpu0
 
 #define	PAGE_BSZS_SHIFT(szc)	TTE_BSZS_SHIFT(szc)
 /*
@@ -252,6 +307,7 @@ extern plcnt_t	plcnt;
 
 extern int ecache_alignsize;
 #define	L2CACHE_ALIGN		ecache_alignsize
+#define	L2CACHE_ALIGN_MAX	64
 
 extern int consistent_coloring;
 extern uint_t vac_colors_mask;
@@ -323,6 +379,26 @@ switch (consistent_coloring) {						\
 	ASSERT(bin <= page_colors_mask);
 
 /*
+ * cpu private vm data - accessed thru CPU->cpu_vm_data
+ *	vc_pnum_memseg: tracks last memseg visited in page_numtopp_nolock()
+ *	vc_pnext_memseg: tracks last memseg visited in page_nextn()
+ *	vc_kmptr: unaligned kmem pointer for this vm_cpu_data_t
+ */
+
+typedef struct {
+	struct memseg	*vc_pnum_memseg;
+	struct memseg	*vc_pnext_memseg;
+	void		*vc_kmptr;
+} vm_cpu_data_t;
+
+/* allocation size to ensure vm_cpu_data_t resides in its own cache line */
+#define	VM_CPU_DATA_PADSIZE						\
+	(P2ROUNDUP(sizeof (vm_cpu_data_t), L2CACHE_ALIGN_MAX))
+
+/* for boot cpu before kmem is initialized */
+extern char	vm_cpu_data0[];
+
+/*
  * Function to get an ecache color bin: F(as, cnt, vcolor).
  * the goal of this function is to:
  * - to spread a processes' physical pages across the entire ecache to
@@ -371,40 +447,45 @@ switch (consistent_coloring) {						\
 
 #ifdef VM_STATS
 struct vmm_vmstats_str {
-	ulong_t pc_list_add_pages[MMU_PAGE_SIZES];
-	ulong_t pc_list_sub_pages1[MMU_PAGE_SIZES];
-	ulong_t pc_list_sub_pages2[MMU_PAGE_SIZES];
-	ulong_t pc_list_sub_pages3[MMU_PAGE_SIZES];
-	ulong_t pgf_alloc[MMU_PAGE_SIZES];
+	ulong_t pgf_alloc[MMU_PAGE_SIZES];	/* page_get_freelist */
 	ulong_t pgf_allocok[MMU_PAGE_SIZES];
 	ulong_t pgf_allocokrem[MMU_PAGE_SIZES];
 	ulong_t pgf_allocfailed[MMU_PAGE_SIZES];
 	ulong_t pgf_allocdeferred;
 	ulong_t	pgf_allocretry[MMU_PAGE_SIZES];
-	ulong_t pgc_alloc;
+	ulong_t pgc_alloc;			/* page_get_cachelist */
 	ulong_t pgc_allocok;
 	ulong_t pgc_allocokrem;
 	ulong_t	pgc_allocokdeferred;
 	ulong_t pgc_allocfailed;
-	ulong_t	pgcp_alloc[MMU_PAGE_SIZES];
+	ulong_t	pgcp_alloc[MMU_PAGE_SIZES];	/* page_get_contig_pages */
 	ulong_t	pgcp_allocfailed[MMU_PAGE_SIZES];
 	ulong_t	pgcp_allocempty[MMU_PAGE_SIZES];
 	ulong_t	pgcp_allocok[MMU_PAGE_SIZES];
-	ulong_t	ptcp[MMU_PAGE_SIZES];
+	ulong_t	ptcp[MMU_PAGE_SIZES];		/* page_trylock_contig_pages */
 	ulong_t	ptcpfreethresh[MMU_PAGE_SIZES];
 	ulong_t	ptcpfailexcl[MMU_PAGE_SIZES];
 	ulong_t	ptcpfailszc[MMU_PAGE_SIZES];
 	ulong_t	ptcpfailcage[MMU_PAGE_SIZES];
 	ulong_t	ptcpok[MMU_PAGE_SIZES];
-	ulong_t	pgmf_alloc[MMU_PAGE_SIZES];
+	ulong_t	pgmf_alloc[MMU_PAGE_SIZES];	/* page_get_mnode_freelist */
 	ulong_t	pgmf_allocfailed[MMU_PAGE_SIZES];
 	ulong_t	pgmf_allocempty[MMU_PAGE_SIZES];
 	ulong_t	pgmf_allocok[MMU_PAGE_SIZES];
-	ulong_t	pgmc_alloc;
+	ulong_t	pgmc_alloc;			/* page_get_mnode_cachelist */
 	ulong_t	pgmc_allocfailed;
 	ulong_t	pgmc_allocempty;
 	ulong_t	pgmc_allocok;
-	ulong_t ppr_reloc[MMU_PAGE_SIZES];
+	ulong_t	pladd_free[MMU_PAGE_SIZES];	/* page_list_add/sub */
+	ulong_t	plsub_free[MMU_PAGE_SIZES];
+	ulong_t	pladd_cache;
+	ulong_t	plsub_cache;
+	ulong_t	plsubpages_szcbig;
+	ulong_t	plsubpages_szc0;
+	ulong_t	pff_req[MMU_PAGE_SIZES];	/* page_freelist_fill */
+	ulong_t	pff_demote[MMU_PAGE_SIZES];
+	ulong_t	pff_coalok[MMU_PAGE_SIZES];
+	ulong_t ppr_reloc[MMU_PAGE_SIZES];	/* page_relocate */
 	ulong_t ppr_relocok[MMU_PAGE_SIZES];
 	ulong_t ppr_relocnoroot[MMU_PAGE_SIZES];
 	ulong_t ppr_reloc_replnoroot[MMU_PAGE_SIZES];

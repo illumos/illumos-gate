@@ -46,6 +46,7 @@
 #include <sys/x86_archext.h>	/* for x86_feature and X86_AMD */
 #include <vm/hat_i86.h>
 #include <vm/seg_kmem.h>
+#include <vm/vm_dep.h>
 
 
 
@@ -1441,7 +1442,7 @@ lgrp_plat_mem_size(lgrp_handle_t plathand, lgrp_mem_query_t query)
 		if (mnode >= 0 && mem_node_config[mnode].exists) {
 			switch (query) {
 			case LGRP_MEM_SIZE_FREE:
-				npgs = mem_node_config[mnode].cursize;
+				npgs = MNODE_PGCNT(mnode);
 				break;
 			case LGRP_MEM_SIZE_AVAIL:
 				npgs = mem_node_memlist_pages(mnode,

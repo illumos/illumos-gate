@@ -1631,7 +1631,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, int flags)
 		 * try to lock remaining pages
 		 */
 		for (idx = 1; idx < pgcnt; idx++) {
-			pp = page_next(pp);
+			pp++;
 			if (!page_trylock(pp, SE_EXCL))
 				break;
 			if (pp->p_lckcnt != 0 || pp->p_cowcnt != 0) {
@@ -1673,7 +1673,7 @@ anon_disclaim(struct anon_map *amp, ulong_t index, size_t size, int flags)
 		}
 skiplp:
 		segadvstat.MADV_FREE_miss.value.ul += pgcnt;
-		for (i = 0, pp = root_pp; i < idx; pp = page_next(pp), i++)
+		for (i = 0, pp = root_pp; i < idx; pp++, i++)
 			page_unlock(pp);
 		anon_array_exit(&cookie);
 	}

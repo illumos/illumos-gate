@@ -263,6 +263,8 @@ extern void *long_mode_64(void);
 	disp_cpu_init(cp);
 	mutex_exit(&cpu_lock);
 
+	cpu_vm_data_init(cp);
+
 	/*
 	 * Allocate and initialize the startup thread for this CPU.
 	 * Interrupt and process switch stacks get allocated later
@@ -913,6 +915,7 @@ start_other_cpus(int cprboot)
 
 				mutex_enter(&cpu_lock);
 				cpu[who]->cpu_flags = 0;
+				cpu_vm_data_destroy(cpu[who]);
 				cpu_del_unit(who);
 				mutex_exit(&cpu_lock);
 

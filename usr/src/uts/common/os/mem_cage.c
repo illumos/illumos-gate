@@ -45,6 +45,7 @@
 #include <vm/seg_kmem.h>
 #include <vm/page.h>
 #include <vm/hat.h>
+#include <vm/vm_dep.h>
 #include <sys/mem_config.h>
 #include <sys/lgrp.h>
 
@@ -1154,7 +1155,7 @@ kcage_setnoreloc_pages(page_t *rootpp, se_t se)
 	npgs = page_get_pagecnt(szc);
 	ASSERT(IS_P2ALIGNED(rootpfn, npgs));
 	pp = rootpp;
-	for (i = 0; i < npgs; i++, pp = page_next(pp)) {
+	for (i = 0; i < npgs; i++, pp++) {
 		ASSERT(PAGE_LOCKED_SE(pp, se));
 		ASSERT(!PP_ISFREE(pp));
 		ASSERT(pp->p_szc == szc);
@@ -1249,6 +1250,7 @@ check_free_and_return:
 		} else {
 			PP_SETNORELOC(pp);
 		}
+		page_list_xfer(pp, MTYPE_NORELOC, MTYPE_RELOC);
 		return (kcage_invalidate_page(pp, nfreedp));
 	}
 	/*NOTREACHED*/

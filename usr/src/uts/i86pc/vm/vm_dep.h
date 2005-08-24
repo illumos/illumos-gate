@@ -63,11 +63,12 @@ typedef struct {
 	pfn_t	mnr_pfnhi;
 	int	mnr_mnode;
 	int	mnr_memrange;		/* index into memranges[] */
-#ifdef DEBUG
 	/* maintain page list stats */
 	pgcnt_t	mnr_mt_pgmax;		/* mnode/mtype max page cnt */
-	pgcnt_t	mnr_mt_pgcnt;		/* free cnt */
-	pgcnt_t	mnr_mt_clpgcnt;		/* cache list free cnt */
+	pgcnt_t	mnr_mt_clpgcnt;		/* cache list cnt */
+	pgcnt_t	mnr_mt_flpgcnt;		/* free list cnt - small pages */
+	pgcnt_t	mnr_mt_lgpgcnt;		/* free list cnt - large pages */
+#ifdef DEBUG
 	struct mnr_mts {		/* mnode/mtype szc stats */
 		pgcnt_t	mnr_mts_pgcnt;
 		int	mnr_mts_colors;
@@ -106,10 +107,16 @@ typedef struct {
 	int	bin = PP_2_BIN(pp);					\
 	if (flags & PG_LIST_ISINIT)					\
 		mnoderanges[mtype].mnr_mt_pgmax += cnt;			\
-	atomic_add_long(&mnoderanges[mtype].mnr_mt_pgcnt, cnt);		\
+	ASSERT((flags & PG_LIST_ISCAGE) == 0);				\
 	if (flags & PG_CACHE_LIST)					\
-		atomic_add_long(&mnoderanges[mtype].mnr_mt_clpgcnt,	\
-		    cnt);						\
+		atomic_add_long(&mnoderanges[mtype].			\
+		    mnr_mt_clpgcnt, cnt);				\
+	else if (szc)							\
+		atomic_add_long(&mnoderanges[mtype].			\
+		    mnr_mt_lgpgcnt, cnt);				\
+	else								\
+		atomic_add_long(&mnoderanges[mtype].			\
+		    mnr_mt_flpgcnt, cnt);				\
 	atomic_add_long(&mnoderanges[mtype].mnr_mts[szc].		\
 	    mnr_mts_pgcnt, cnt);					\
 	atomic_add_long(&mnoderanges[mtype].mnr_mts[szc].		\
@@ -118,13 +125,24 @@ typedef struct {
 #else
 #define	PLCNT_SZ(ctrs_sz)
 #define	PLCNT_INIT(base)
-#define	PLCNT_DO(pp, mtype, szc, cnt, flags)
+#define	PLCNT_DO(pp, mtype, szc, cnt, flags) {				\
+	if (flags & PG_LIST_ISINIT)					\
+		mnoderanges[mtype].mnr_mt_pgmax += cnt;			\
+	if (flags & PG_CACHE_LIST)					\
+		atomic_add_long(&mnoderanges[mtype].			\
+		    mnr_mt_clpgcnt, cnt);				\
+	else if (szc)							\
+		atomic_add_long(&mnoderanges[mtype].			\
+		    mnr_mt_lgpgcnt, cnt);				\
+	else								\
+		atomic_add_long(&mnoderanges[mtype].			\
+		    mnr_mt_flpgcnt, cnt);				\
+}
 #endif
 
-#define	PLCNT_INCR(pp, mnode, szc, flags) {				\
+#define	PLCNT_INCR(pp, mnode, mtype, szc, flags) {			\
 	long	cnt = (1 << PAGE_BSZS_SHIFT(szc));			\
-	int	mtype = PP_2_MTYPE(pp);					\
-	atomic_add_long(&mem_node_config[mnode].cursize, cnt);		\
+	ASSERT(mtype == PP_2_MTYPE(pp));				\
 	if (physmax4g && mtype <= mtype4g)				\
 		atomic_add_long(&freemem4g, cnt);			\
 	if (flags & PG_LIST_ISINIT) {					\
@@ -134,14 +152,19 @@ typedef struct {
 	PLCNT_DO(pp, mtype, szc, cnt, flags);				\
 }
 
-#define	PLCNT_DECR(pp, mnode, szc, flags) {				\
+#define	PLCNT_DECR(pp, mnode, mtype, szc, flags) {			\
 	long	cnt = ((-1) << PAGE_BSZS_SHIFT(szc));			\
-	int	mtype = PP_2_MTYPE(pp);					\
-	atomic_add_long(&mem_node_config[mnode].cursize, cnt);		\
+	ASSERT(mtype == PP_2_MTYPE(pp));				\
 	if (physmax4g && mtype <= mtype4g)				\
 		atomic_add_long(&freemem4g, cnt);			\
 	PLCNT_DO(pp, mtype, szc, cnt, flags);				\
 }
+
+/*
+ * macros to update page list max counts.  no-op on x86.
+ */
+#define	PLCNT_MAX_INCR(pp, mnode, mtype, szc)
+#define	PLCNT_MAX_DECR(pp, mnode, mtype, szc)
 
 extern mnoderange_t	*mnoderanges;
 extern int		mnoderangecnt;
@@ -190,6 +213,7 @@ extern int		restricted_kmemalloc;
 extern int		memrange_num(pfn_t);
 extern int		pfn_2_mtype(pfn_t);
 extern int		mtype_func(int, int, uint_t);
+extern int		mnode_pgcnt(int);
 
 #define	NUM_MEM_RANGES	4		/* memory range types */
 
@@ -244,6 +268,9 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 
 #define	SZCPAGES(szc)		(1 << PAGE_BSZS_SHIFT(szc))
 #define	PFN_BASE(pfnum, szc)	(pfnum & ~(SZCPAGES(szc) - 1))
+
+extern struct cpu	cpus[];
+#define	CPU0		cpus
 
 #if defined(__amd64)
 
@@ -310,8 +337,13 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 #define	MTYPE_START(mnode, mtype, flags)				\
 	(mtype = mtype_func(mnode, mtype, flags))
 
-#define	MTYPE_NEXT(mnode, mtype, flags)					\
-	(mtype = mtype_func(mnode, mtype, flags | PGI_MT_NEXT))
+#define	MTYPE_NEXT(mnode, mtype, flags) {				\
+	if (flags & PGI_MT_RANGE) {					\
+		mtype = mtype_func(mnode, mtype, flags | PGI_MT_NEXT);	\
+	} else {							\
+		mtype = -1;						\
+	}								\
+}
 
 /* mtype init for page_get_replacement_page */
 
@@ -319,6 +351,8 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
 	mtype = mnoderangecnt - 1;					\
 	flags |= PGI_MT_RANGE0;						\
 }
+
+#define	MNODE_PGCNT(mnode)		mnode_pgcnt(mnode)
 
 #define	MNODETYPE_2_PFN(mnode, mtype, pfnlo, pfnhi)			\
 	ASSERT(mnoderanges[mtype].mnr_mnode == mnode);			\
@@ -385,6 +419,7 @@ typedef	short	hpmctr_t;
 extern int	l2cache_sz, l2cache_linesz, l2cache_assoc;
 
 #define	L2CACHE_ALIGN		l2cache_linesz
+#define	L2CACHE_ALIGN_MAX	64
 #define	CPUSETSIZE()		\
 	(l2cache_assoc ? (l2cache_sz / l2cache_assoc) : MMU_PAGESIZE)
 
@@ -419,6 +454,26 @@ extern int	l2cache_sz, l2cache_linesz, l2cache_assoc;
 	    & page_colors_mask)
 
 /*
+ * cpu private vm data - accessed thru CPU->cpu_vm_data
+ *	vc_pnum_memseg: tracks last memseg visited in page_numtopp_nolock()
+ *	vc_pnext_memseg: tracks last memseg visited in page_nextn()
+ *	vc_kmptr: orignal unaligned kmem pointer for this vm_cpu_data_t
+ */
+
+typedef struct {
+	struct memseg	*vc_pnum_memseg;
+	struct memseg	*vc_pnext_memseg;
+	void		*vc_kmptr;
+} vm_cpu_data_t;
+
+/* allocation size to ensure vm_cpu_data_t resides in its own cache line */
+#define	VM_CPU_DATA_PADSIZE						\
+	(P2ROUNDUP(sizeof (vm_cpu_data_t), L2CACHE_ALIGN_MAX))
+
+/* for boot cpu before kmem is initialized */
+extern char	vm_cpu_data0[];
+
+/*
  * When a bin is empty, and we can't satisfy a color request correctly,
  * we scan.  If we assume that the programs have reasonable spatial
  * behavior, then it will not be a good idea to use the adjacent color.
@@ -438,40 +493,45 @@ extern int	l2cache_sz, l2cache_linesz, l2cache_assoc;
 
 #ifdef VM_STATS
 struct vmm_vmstats_str {
-	ulong_t pc_list_add_pages[MMU_PAGE_SIZES];
-	ulong_t pc_list_sub_pages1[MMU_PAGE_SIZES];
-	ulong_t pc_list_sub_pages2[MMU_PAGE_SIZES];
-	ulong_t pc_list_sub_pages3[MMU_PAGE_SIZES];
-	ulong_t pgf_alloc[MMU_PAGE_SIZES];
+	ulong_t pgf_alloc[MMU_PAGE_SIZES];	/* page_get_freelist */
 	ulong_t pgf_allocok[MMU_PAGE_SIZES];
 	ulong_t pgf_allocokrem[MMU_PAGE_SIZES];
 	ulong_t pgf_allocfailed[MMU_PAGE_SIZES];
 	ulong_t	pgf_allocdeferred;
 	ulong_t	pgf_allocretry[MMU_PAGE_SIZES];
-	ulong_t pgc_alloc;
+	ulong_t pgc_alloc;			/* page_get_cachelist */
 	ulong_t pgc_allocok;
 	ulong_t pgc_allocokrem;
 	ulong_t pgc_allocokdeferred;
 	ulong_t pgc_allocfailed;
-	ulong_t	pgcp_alloc[MMU_PAGE_SIZES];
+	ulong_t	pgcp_alloc[MMU_PAGE_SIZES];	/* page_get_contig_pages */
 	ulong_t	pgcp_allocfailed[MMU_PAGE_SIZES];
 	ulong_t	pgcp_allocempty[MMU_PAGE_SIZES];
 	ulong_t	pgcp_allocok[MMU_PAGE_SIZES];
-	ulong_t	ptcp[MMU_PAGE_SIZES];
+	ulong_t	ptcp[MMU_PAGE_SIZES];		/* page_trylock_contig_pages */
 	ulong_t	ptcpfreethresh[MMU_PAGE_SIZES];
 	ulong_t	ptcpfailexcl[MMU_PAGE_SIZES];
 	ulong_t	ptcpfailszc[MMU_PAGE_SIZES];
 	ulong_t	ptcpfailcage[MMU_PAGE_SIZES];
 	ulong_t	ptcpok[MMU_PAGE_SIZES];
-	ulong_t	pgmf_alloc[MMU_PAGE_SIZES];
+	ulong_t	pgmf_alloc[MMU_PAGE_SIZES];	/* page_get_mnode_freelist */
 	ulong_t	pgmf_allocfailed[MMU_PAGE_SIZES];
 	ulong_t	pgmf_allocempty[MMU_PAGE_SIZES];
 	ulong_t	pgmf_allocok[MMU_PAGE_SIZES];
-	ulong_t	pgmc_alloc;
+	ulong_t	pgmc_alloc;			/* page_get_mnode_cachelist */
 	ulong_t	pgmc_allocfailed;
 	ulong_t	pgmc_allocempty;
 	ulong_t	pgmc_allocok;
-	ulong_t	ppr_reloc[MMU_PAGE_SIZES];
+	ulong_t	pladd_free[MMU_PAGE_SIZES];	/* page_list_add/sub */
+	ulong_t	plsub_free[MMU_PAGE_SIZES];
+	ulong_t	pladd_cache;
+	ulong_t	plsub_cache;
+	ulong_t	plsubpages_szcbig;
+	ulong_t	plsubpages_szc0;
+	ulong_t	pff_req[MMU_PAGE_SIZES];	/* page_freelist_fill */
+	ulong_t	pff_demote[MMU_PAGE_SIZES];
+	ulong_t	pff_coalok[MMU_PAGE_SIZES];
+	ulong_t	ppr_reloc[MMU_PAGE_SIZES];	/* page_relocate */
 	ulong_t ppr_relocnoroot[MMU_PAGE_SIZES];
 	ulong_t ppr_reloc_replnoroot[MMU_PAGE_SIZES];
 	ulong_t ppr_relocnolock[MMU_PAGE_SIZES];
@@ -490,7 +550,7 @@ extern struct vmm_vmstats_str vmm_vmstats;
 
 extern size_t page_ctrs_sz(void);
 extern caddr_t page_ctrs_alloc(caddr_t);
-extern void page_ctr_sub(page_t *, int);
+extern void page_ctr_sub(int, int, page_t *, int);
 extern page_t *page_freelist_fill(uchar_t, int, int, int, pfn_t);
 extern uint_t page_get_pagecolors(uint_t);
 

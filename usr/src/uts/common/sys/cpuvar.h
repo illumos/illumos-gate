@@ -200,6 +200,7 @@ typedef struct cpu {
 	 * this cpu. Cleared at start of interrupt redistribution.
 	 */
 	int32_t		cpu_intr_weight;
+	void		*cpu_vm_data;
 
 #if (defined(_KERNEL) || defined(_KMEMUSER)) && defined(_MACHDEP)
 	/*
@@ -658,6 +659,8 @@ extern void cpu_state_change_notify(int, cpu_setup_t);
 #define	CPU_IDSTRLEN	100
 
 extern void init_cpu_info(struct cpu *);
+extern void cpu_vm_data_init(struct cpu *);
+extern void cpu_vm_data_destroy(struct cpu *);
 
 #endif	/* _KERNEL */
 

@@ -1018,6 +1018,27 @@ mtype_func(int mnode, int mtype, uint_t flags)
 }
 
 /*
+ * Returns the free page count for mnode
+ */
+int
+mnode_pgcnt(int mnode)
+{
+	int	mtype = mnoderangecnt - 1;
+	int	flags = PGI_MT_RANGE0;
+	pgcnt_t	pgcnt = 0;
+
+	mtype = mtype_func(mnode, mtype, flags);
+
+	while (mtype != -1) {
+		pgcnt += (mnoderanges[mtype].mnr_mt_flpgcnt +
+		    mnoderanges[mtype].mnr_mt_lgpgcnt +
+		    mnoderanges[mtype].mnr_mt_clpgcnt);
+		mtype = mtype_func(mnode, mtype, flags | PGI_MT_NEXT);
+	}
+	return (pgcnt);
+}
+
+/*
  * Initialize page coloring variables based on the l2 cache parameters.
  * Calculate and return memory needed for page coloring data structures.
  */
@@ -1248,7 +1269,7 @@ page_get_mnode_anylist(ulong_t origbin, uchar_t szc, uint_t flags,
 				/* found a page with specified DMA attributes */
 				page_sub(&PAGE_FREELISTS(mnode, szc, bin,
 				    mtype), pp);
-				page_ctr_sub(pp, PG_FREE_LIST);
+				page_ctr_sub(mnode, mtype, pp, PG_FREE_LIST);
 
 				if ((PP_ISFREE(pp) == 0) ||
 				    (PP_ISAGED(pp) == 0)) {
@@ -1273,8 +1294,8 @@ nextfreebin:
 			bin &= page_colors_mask;
 			i++;
 		}
-	} while ((flags & PGI_MT_RANGE) &&
-	    (MTYPE_NEXT(mnode, mtype, flags) >= 0));
+		MTYPE_NEXT(mnode, mtype, flags);
+	} while (mtype >= 0);
 
 	/* failed to find a page in the freelist; try it in the cachelist */
 
@@ -1329,7 +1350,7 @@ nextfreebin:
 				/* found a page with specified DMA attributes */
 				page_sub(&PAGE_CACHELISTS(mnode, bin,
 				    mtype), pp);
-				page_ctr_sub(pp, PG_CACHE_LIST);
+				page_ctr_sub(mnode, mtype, pp, PG_CACHE_LIST);
 
 				mutex_exit(pcm);
 				ASSERT(pp->p_vnode);
@@ -1343,8 +1364,8 @@ nextcachebin:
 			bin += (i == 0) ? BIN_STEP : 1;
 			bin &= page_colors_mask;
 		}
-	} while ((flags & PGI_MT_RANGE) &&
-	    (MTYPE_NEXT(mnode, mtype, flags) >= 0));
+		MTYPE_NEXT(mnode, mtype, flags);
+	} while (mtype >= 0);
 
 	VM_STAT_ADD(pga_vmstats.pgma_allocfailed);
 	return (NULL);

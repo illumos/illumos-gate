@@ -641,7 +641,7 @@ add_physmem(
 	 * in the page structure, and put each on
 	 * the free list
 	 */
-	for (; num; pp = page_next_raw(pp), pnum++, num--) {
+	for (; num; pp++, pnum++, num--) {
 
 		/*
 		 * this needs to fill in the page number
@@ -3101,7 +3101,7 @@ page_free_pages(page_t *pp)
 		/*NOTREACHED*/
 	}
 
-	for (i = 0, tpp = pp; i < pgcnt; i++, tpp = page_next(tpp)) {
+	for (i = 0, tpp = pp; i < pgcnt; i++, tpp++) {
 		ASSERT((PAGE_EXCL(tpp) &&
 		    !page_iolock_assert(tpp)) || panicstr);
 		if (PP_ISFREE(tpp)) {
@@ -3454,7 +3454,7 @@ page_destroy_pages(page_t *pp)
 		/*NOTREACHED*/
 	}
 
-	for (i = 0, tpp = pp; i < pgcnt; i++, tpp = page_next(tpp)) {
+	for (i = 0, tpp = pp; i < pgcnt; i++, tpp++) {
 		ASSERT((PAGE_EXCL(tpp) &&
 		    !page_iolock_assert(tpp)) || panicstr);
 		(void) hat_pageunload(tpp, HAT_FORCE_PGUNLOAD);
@@ -5445,7 +5445,7 @@ page_try_demote_pages(page_t *pp)
 	 * Attempt to lock all constituent pages except the page passed
 	 * in since it's already locked.
 	 */
-	for (tpp = rootpp, i = 0; i < npgs; i++, tpp = page_next(tpp)) {
+	for (tpp = rootpp, i = 0; i < npgs; i++, tpp++) {
 		ASSERT(!PP_ISFREE(tpp));
 		ASSERT(tpp->p_vnode != NULL);
 
@@ -5465,7 +5465,7 @@ page_try_demote_pages(page_t *pp)
 		while (i-- > 0) {
 			if (tpp != pp)
 				page_unlock(tpp);
-			tpp = page_next(tpp);
+			tpp++;
 		}
 		VM_STAT_ADD(pagecnt.pc_try_demote_pages[4]);
 		return (0);
@@ -5475,7 +5475,7 @@ page_try_demote_pages(page_t *pp)
 	 * XXX probably p_szc clearing and page unlocking can be done within
 	 * one loop but since this is rare code we can play very safe.
 	 */
-	for (tpp = rootpp, i = 0; i < npgs; i++, tpp = page_next(tpp)) {
+	for (tpp = rootpp, i = 0; i < npgs; i++, tpp++) {
 		ASSERT(PAGE_EXCL(tpp));
 		tpp->p_szc = 0;
 	}
@@ -5483,7 +5483,7 @@ page_try_demote_pages(page_t *pp)
 	/*
 	 * Unlock all pages except the page passed in.
 	 */
-	for (tpp = rootpp, i = 0; i < npgs; i++, tpp = page_next(tpp)) {
+	for (tpp = rootpp, i = 0; i < npgs; i++, tpp++) {
 		ASSERT(!hat_page_is_mapped(tpp));
 		if (tpp != pp)
 			page_unlock(tpp);
@@ -5930,7 +5930,7 @@ page_mark_migrate(struct seg *seg, caddr_t addr, size_t len,
 			 * should be locked already.
 			 */
 			for (i = 1; i < pages; i++) {
-				pp = page_next(pp);
+				pp++;
 				if (!page_trylock(pp, SE_EXCL)) {
 					break;
 				}
@@ -6349,24 +6349,16 @@ struct memseg *memseg_hash[N_MEM_SLOTS];
 page_t *
 page_numtopp_nolock(pfn_t pfnum)
 {
-	static struct memseg *last_memseg_by_pfnum = NULL;
 	struct memseg *seg;
 	page_t *pp;
+	vm_cpu_data_t *vc = CPU->cpu_vm_data;
 
-	/*
-	 *	XXX - Since page_numtopp_nolock is called in many places where
-	 *	the search fails more than it succeeds. It maybe worthwhile
-	 *	to put a check for pf_is_memory or a pfnum <= max_pfn (set at
-	 *	boot time).
-	 *
-	 *	if (!pf_is_memory(pfnum) || (pfnum > max_pfn))
-	 *		return (NULL);
-	 */
+	ASSERT(vc != NULL);
 
 	MEMSEG_STAT_INCR(nsearch);
 
 	/* Try last winner first */
-	if (((seg = last_memseg_by_pfnum) != NULL) &&
+	if (((seg = vc->vc_pnum_memseg) != NULL) &&
 		(pfnum >= seg->pages_base) && (pfnum < seg->pages_end)) {
 		MEMSEG_STAT_INCR(nlastwon);
 		pp = seg->pages + (pfnum - seg->pages_base);
@@ -6378,7 +6370,7 @@ page_numtopp_nolock(pfn_t pfnum)
 	if (((seg = memseg_hash[MEMSEG_PFN_HASH(pfnum)]) != NULL) &&
 		(pfnum >= seg->pages_base) && (pfnum < seg->pages_end)) {
 		MEMSEG_STAT_INCR(nhashwon);
-		last_memseg_by_pfnum = seg;
+		vc->vc_pnum_memseg = seg;
 		pp = seg->pages + (pfnum - seg->pages_base);
 		if (pp->p_pagenum == pfnum)
 			return ((page_t *)pp);
@@ -6387,12 +6379,12 @@ page_numtopp_nolock(pfn_t pfnum)
 	/* Else Brute force */
 	for (seg = memsegs; seg != NULL; seg = seg->next) {
 		if (pfnum >= seg->pages_base && pfnum < seg->pages_end) {
-			last_memseg_by_pfnum = seg;
+			vc->vc_pnum_memseg = seg;
 			pp = seg->pages + (pfnum - seg->pages_base);
 			return ((page_t *)pp);
 		}
 	}
-	last_memseg_by_pfnum = NULL;
+	vc->vc_pnum_memseg = NULL;
 	MEMSEG_STAT_INCR(nnotfound);
 	return ((page_t *)NULL);
 
@@ -6432,11 +6424,13 @@ page_numtomemseg_nolock(pfn_t pfnum)
 page_t *
 page_nextn(page_t *pp, ulong_t n)
 {
-	static struct memseg *last_page_next_memseg = NULL;
 	struct memseg *seg;
 	page_t *ppn;
+	vm_cpu_data_t *vc = (vm_cpu_data_t *)CPU->cpu_vm_data;
 
-	if (((seg = last_page_next_memseg) == NULL) ||
+	ASSERT(vc != NULL);
+
+	if (((seg = vc->vc_pnext_memseg) == NULL) ||
 	    (seg->pages_base == seg->pages_end) ||
 	    !(pp >= seg->pages && pp < seg->epages)) {
 
@@ -6461,7 +6455,7 @@ page_nextn(page_t *pp, ulong_t n)
 			seg = memsegs;
 		pp = seg->pages;
 	}
-	last_page_next_memseg = seg;
+	vc->vc_pnext_memseg = seg;
 	return (ppn);
 }
 
@@ -6538,15 +6532,6 @@ page_t *
 page_next(page_t *pp)
 {
 	return (page_nextn(pp, 1));
-}
-
-/*
- * Special for routines processing an array of page_t.
- */
-page_t *
-page_nextn_raw(page_t *pp, ulong_t n)
-{
-	return (pp+n);
 }
 
 page_t *

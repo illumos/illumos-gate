@@ -316,6 +316,8 @@ mlsetup(struct regs *rp)
 	 */
 	cpu_list_init(CPU);
 
+	cpu_vm_data_init(CPU);
+
 	/*
 	 * Initialize the lgrp framework
 	 */

@@ -381,6 +381,8 @@ setup_cpu_common(int cpuid)
 	 */
 	disp_cpu_init(cp);
 
+	cpu_vm_data_init(cp);
+
 	/*
 	 * Now, initialize per-CPU idle thread for this CPU.
 	 */
@@ -452,6 +454,8 @@ cleanup_cpu_common(int cpuid)
 
 	/* Free cpu module private data structures, including scrubber. */
 	cpu_uninit_private(cp);
+
+	cpu_vm_data_destroy(cp);
 
 	/*
 	 * Remove CPU from list of available CPUs.

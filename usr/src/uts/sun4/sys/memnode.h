@@ -101,7 +101,6 @@ struct	mem_node_conf {
 	int	exists;		/* only try if set, list may still be empty */
 	pfn_t	physbase;	/* lowest PFN in this memnode */
 	pfn_t	physmax;	/* highest PFN in this memnode */
-	size_t	cursize;	/* current number of PAGESIZE pages on lists */
 };
 
 struct memlist;
