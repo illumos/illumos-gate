@@ -294,6 +294,11 @@ size_t auto_lpg_heap_default = MMU_PAGESIZE64K;
 size_t auto_lpg_stack_default = MMU_PAGESIZE64K;
 size_t auto_lpg_va_default = MMU_PAGESIZE64K;
 size_t auto_lpg_remap_threshold = 0; /* always remap */
+/*
+ * Number of pages in 1 GB.  Don't enable automatic large pages if we have
+ * fewer than this many pages.
+ */
+pgcnt_t auto_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
 
 size_t
 map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int *remap)

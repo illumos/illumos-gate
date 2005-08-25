@@ -121,6 +121,11 @@ uint_t mmu_page_sizes;
 uint_t mmu_exported_page_sizes;
 
 size_t auto_lpg_va_default = MMU_PAGESIZE; /* used by zmap() */
+/*
+ * Number of pages in 1 GB.  Don't enable automatic large pages if we have
+ * fewer than this many pages.
+ */
+pgcnt_t auto_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
 
 /*
  * Return the optimum page size for a given mapping

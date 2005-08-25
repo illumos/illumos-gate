@@ -326,6 +326,7 @@ extern size_t auto_lpg_heap_default;
 extern size_t auto_lpg_stack_default;
 extern size_t auto_lpg_va_default;
 extern size_t auto_lpg_remap_threshold;
+extern pgcnt_t auto_lpg_min_physmem;
 
 /*
  * AS_2_BIN macro controls the page coloring policy.

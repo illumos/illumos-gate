@@ -1431,6 +1431,9 @@ startup_vm(void)
 	extern void hat_kern_setup(void);
 	pgcnt_t pages_left;
 
+	extern int exec_lpg_disable, use_brk_lpg, use_stk_lpg, use_zmap_lpg;
+	extern pgcnt_t auto_lpg_min_physmem;
+
 	PRM_POINT("startup_vm() starting...");
 
 	/*
@@ -1715,6 +1718,14 @@ startup_vm(void)
 
 	cmn_err(CE_CONT, "?mem = %luK (0x%lx)\n",
 	    physinstalled << (MMU_PAGESHIFT - 10), ptob(physinstalled));
+
+	/* For small memory systems disable automatic large pages. */
+	if (physmem < auto_lpg_min_physmem) {
+		exec_lpg_disable = 1;
+		use_brk_lpg = 0;
+		use_stk_lpg = 0;
+		use_zmap_lpg = 0;
+	}
 
 	PRM_POINT("Calling hat_init_finish()...");
 	hat_init_finish();

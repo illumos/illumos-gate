@@ -293,6 +293,11 @@ size_t auto_lpg_heap_default = MMU_PAGESIZE;
 size_t auto_lpg_stack_default = MMU_PAGESIZE;
 size_t auto_lpg_va_default = MMU_PAGESIZE;
 size_t auto_lpg_remap_threshold = 0;
+/*
+ * Number of pages in 1 GB.  Don't enable automatic large pages if we have
+ * fewer than this many pages.
+ */
+pgcnt_t auto_lpg_min_physmem = 1 << (30 - MMU_PAGESHIFT);
 
 /*
  * Suggest a page size to be used to map a segment of type maptype and length
