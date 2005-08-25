@@ -64,7 +64,7 @@
 
 #define	CDROM_NAMEPROTO_DEFD	"%sd0s%d"
 #define	CDROM_PBASEPART		0
-#define	CDROM_SBASEPART		DEFAULT_PARTITION
+#define	CDROM_SBASEPART		2
 
 #define	CDROM_NAMEPROTO_P	"%sp%d"
 #define	CDROM_NAMEPROTO_S	"%ss%d"
@@ -135,6 +135,8 @@ static void	cdrom_poll(dev_t);
 static bool_t	cdrom_remount(vol_t *);
 static bool_t	cdrom_testpath(char *);
 static bool_t	cdrom_use(char *, char *);
+
+extern bool_t	support_nomedia;
 
 static struct devsw cdromdevsw = {
 	cdrom_use,		/* d_use */
@@ -268,6 +270,20 @@ cdrom_use(char *path, char *symname)
 	 */
 	if ((dp = dev_getdp(statbuf.st_rdev)) != NULL) {
 		if (dp->dp_dsw == &cdromdevsw) {
+			/*
+			 * Remove "nomedia" node if support has changed.
+			 * By sending a HUP signal to vold, dev_use()
+			 * will call here.
+			 */
+			if (!support_nomedia && dp->dp_cvn) {
+				dev_remove_ctldev(dp);
+			}
+			/*
+			 * Create "nomedia" node if support has changed.
+			 */
+			if (support_nomedia && !dp->dp_cvn && !dp->dp_vol) {
+				dev_create_ctldev(dp);
+			}
 			debug(1, "cdrom %s already in use\n", path);
 			return (TRUE);
 		} else {
@@ -1070,7 +1086,6 @@ cdrom_thread_wait(struct devs *dp)
 		 * We have media in the drive
 		 */
 		if (cd_state == DKIO_INSERTED) {
-
 			/*
 			 * If we already know about the media in the
 			 * device, just ignore the information.
@@ -1134,6 +1149,13 @@ cdrom_thread_wait(struct devs *dp)
 			 * just continue in our happy loop.
 			 */
 			if ((v = dp->dp_vol) == NULL) {
+				/*
+				 * Create "nomedia" device node for empty
+				 * removable media device.
+				 */
+				if (support_nomedia && !dp->dp_cvn) {
+					dev_create_ctldev(dp);
+				}
 				(void) mutex_unlock(&vold_main_mutex);
 				(void) mutex_unlock(&cdp->cd_killmutex);
 				continue;

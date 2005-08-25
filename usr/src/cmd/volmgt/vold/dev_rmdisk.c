@@ -61,6 +61,7 @@ static const int	S_TYPE = 0;
 static const int	S_DEFAULT_PARTITION = 2;
 static const char	*S_PATH_FORMAT = "%ss%d";
 static const int	THREAD_STACK_SIZE = (64 * 1024);
+extern bool_t		support_nomedia;
 
 struct rmdisk_priv {
 	mutex_t	rmd_killmutex;
@@ -181,6 +182,21 @@ rmdisk_use(char *pathname, char *symname)
 	}
 	if ((devicep = dev_search_dp(statbuf.st_rdev)) != NULL) {
 		if (devicep->dp_dsw == &rmdiskdevsw) {
+			/*
+			 * Remove "nomedia" node if support has changed.
+			 * By sending a HUP signal to vold, dev_use()
+			 * will call here.
+			 */
+			if (!support_nomedia && devicep->dp_cvn) {
+				dev_remove_ctldev(devicep);
+			}
+			/*
+			 * Create "nomedia" node if support has changed.
+			 */
+			if (support_nomedia && !devicep->dp_cvn &&
+			    !devicep->dp_vol) {
+				dev_create_ctldev(devicep);
+			}
 			debug(1, "rmdisk_use: %s already in use\n", pathname);
 			return (TRUE);
 		} else {
@@ -1003,7 +1019,6 @@ rmdisk_thread_wait(struct devs *dp)
 		(void) mutex_lock(&rmdp->rmd_killmutex);
 
 		if (rmdisk_state == DKIO_INSERTED) {
-
 			/*
 			 * If vold already knows there's a medium
 			 * in the device, do nothing.
@@ -1054,8 +1069,16 @@ rmdisk_thread_wait(struct devs *dp)
 		}
 
 		if (rmdisk_state == DKIO_EJECTED) {
+
 			(void) mutex_lock(&vold_main_mutex);
 			if (dp->dp_vol == NULL) {
+				/*
+				 * Create "nomedia" device node for empty
+				 * removable media device.
+				 */
+				if (support_nomedia && !dp->dp_cvn) {
+					dev_create_ctldev(dp);
+				}
 				(void) mutex_unlock(&vold_main_mutex);
 				(void) mutex_unlock(&rmdp->rmd_killmutex);
 				continue;

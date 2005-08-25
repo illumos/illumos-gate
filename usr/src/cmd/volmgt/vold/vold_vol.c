@@ -65,6 +65,8 @@
 int	vol_fd = -1;
 major_t	vol_major = 0;				/* used in minor_alloc() */
 
+extern bool_t	support_nomedia;
+
 struct volins {
 	dev_t		vi_dev;		/* device action occured on */
 	void		*vi_stk;	/* stack for the thread */
@@ -375,6 +377,13 @@ vol_event_unlocked(struct vioc_event *vie)
 		if ((dp = dev_getdp(dev)) != NULL) {
 			dp->dp_asynctask++;
 			dp->dp_flags |= DP_SCANNING;
+			/*
+			 * If the node is a "nomedia" node, then
+			 * remove it.
+			 */
+			if (support_nomedia && dp->dp_cvn) {
+				dev_remove_ctldev(dp);
+			}
 		}
 		if (thr_create(0, VOL_STKSIZE,
 		    (void *(*)(void *))insert_medium,
@@ -657,6 +666,13 @@ vol_event_unlocked(struct vioc_event *vie)
 		if (dp != NULL) {
 			dp->dp_asynctask++;
 			dp->dp_flags |= DP_SCANNING;
+			/*
+			 * If the node is a "nomedia" node, then
+			 * remove it.
+			 */
+			if (support_nomedia && dp->dp_cvn) {
+				dev_remove_ctldev(dp);
+			}
 		}
 		if (thr_create(0, VOL_STKSIZE,
 		    (void *(*)(void *))remount_medium,
@@ -720,6 +736,13 @@ vol_missing(struct ve_missing *miss)
 
 	if (dev_map_missing(v, miss->viem_unit, miss->viem_ndelay) != FALSE) {
 		/* it's no longer missing */
+		return;
+	}
+
+	/* ctl volume never missing. cancel it */
+	if (v->v_flags & V_CTLVOL) {
+		minor_t minor = v->v_devmap[0].dm_voldev;
+		(void) ioctl(vol_fd, VOLIOCCANCEL, &minor);
 		return;
 	}
 
@@ -1164,7 +1187,6 @@ vol_newlabel(vol_t *v, dev_t dev, label *la)
 	uid_t		c_uid;
 	dev_t		c_tty;
 	devmap_t	*dm;
-
 	debug(11, "vol_newlabel: entered for \"%s\"\n", v->v_obj.o_name);
 
 	/*

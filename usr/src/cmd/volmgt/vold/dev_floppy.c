@@ -55,6 +55,8 @@ static int	floppy_check(struct devs *);
 static bool_t	floppy_testpath(char *);
 static bool_t	floppy_remount(vol_t *);
 
+extern bool_t	support_nomedia;
+
 #define	FLOPPY_MAX	10
 
 
@@ -162,6 +164,20 @@ floppy_use(char *path, char *symname)
 	 */
 	if ((dp = dev_getdp(statbuf.st_rdev)) != NULL) {
 		if (dp->dp_dsw == &floppydevsw) {
+			/*
+			 * Remove "nomedia" node if support has changed.
+			 * By sending a HUP signal to vold, dev_use()
+			 * will call here.
+			 */
+			if (!support_nomedia && dp->dp_cvn) {
+				dev_remove_ctldev(dp);
+			}
+			/*
+			 * Create "nomedia" node if support has changed.
+			 */
+			if (support_nomedia && !dp->dp_cvn && !dp->dp_vol) {
+				dev_create_ctldev(dp);
+			}
 			debug(1, "floppy %s already in use\n", path);
 			return (TRUE);
 		} else {
@@ -247,6 +263,14 @@ floppy_use(char *path, char *symname)
 	dp->dp_symname = strdup(symname);
 	dp->dp_rvn = rvn;
 	dp->dp_bvn = bvn;
+
+	/*
+	 * By default, there will be a "nomedia" node when vold starts
+	 * until volcheck is run.
+	 */
+	if (support_nomedia) {
+		dev_create_ctldev(dp);
+	}
 
 	if (thr_create(0, FLOPPY_STKSIZE,
 		(void *(*)(void *))floppy_thread, (void *)dp, THR_BOUND,

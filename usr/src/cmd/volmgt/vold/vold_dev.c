@@ -32,6 +32,7 @@
 #include	<errno.h>
 #include	<stdlib.h>
 #include	<string.h>
+#include	<strings.h>
 #include	<synch.h>
 #include	<sys/dkio.h>
 #include	<sys/mkdev.h>
@@ -57,6 +58,7 @@
 #include	"name_factory.h"
 
 extern int	vol_fd;
+extern bool_t	support_nomedia;
 extern void	obj_free(obj_t *obj);
 
 #define	DEV_HASH_SIZE		64
@@ -86,6 +88,7 @@ struct devpathl {
 
 static void	close_dev(struct devsw *, struct devpathl *);
 static bool_t	dev_unmap(vol_t *);
+void		dev_remove_ctldev(struct devs *);
 
 /*
  * Driver calls this to add his dsw into the chain.  Called at
@@ -281,6 +284,13 @@ dev_use(char *mtype, char *dtype, char *path,
 				break;
 			}
 
+			dsw->d_uid = network_uid(user);
+			dsw->d_gid = network_gid(group);
+			dsw->d_mode = strtol(mode, NULL, 0);
+			if (temp_flag) {
+				dsw->d_flags |= D_RMONEJECT;
+			}
+
 			/* for each match in the list call its driver */
 			for (j = 0; pl[j] != NULL; j++) {
 
@@ -292,12 +302,6 @@ dev_use(char *mtype, char *dtype, char *path,
 				if ((*dsw->d_use)(pl[j], symbuf) != FALSE) {
 					match_found++;
 					dev_usepath(dsw, pl[j], symname, idx);
-					dsw->d_uid = network_uid(user);
-					dsw->d_gid = network_gid(group);
-					dsw->d_mode = strtol(mode, NULL, 0);
-					if (temp_flag) {
-						dsw->d_flags |= D_RMONEJECT;
-					}
 				}
 			}
 			for (j = 0; pl[j] != NULL; j++) {
@@ -854,6 +858,11 @@ dev_makedp(struct devsw *dsw, char *path)
 void
 dev_freedp(struct devs *dp)
 {
+	/* remove "nomedia" device node */
+	if (support_nomedia && dp->dp_cvn) {
+		dev_remove_ctldev(dp);
+	}
+
 	REMQUE(dev_q_hash[dp->dp_dev % DEV_HASH_SIZE], dp);
 	free(dp->dp_path);
 	free(dp->dp_lock);
@@ -876,6 +885,8 @@ dev_eject(vol_t *v, bool_t ans)
 	struct vioc_eject	viej;
 	dev_t			voldev;
 	bool_t			force;
+	struct dk_minfo		media;
+	int			fd;
 
 #ifdef	DEBUG
 	debug(11, "dev_eject: ans = %s for %s\n", ans ? "TRUE" : "FALSE",
@@ -974,6 +985,23 @@ dev_eject(vol_t *v, bool_t ans)
 #endif
 	(void) cond_broadcast(&dp->dp_lock->dp_vol_vg_cv);
 	(void) mutex_unlock(&dp->dp_lock->dp_vol_vg_mutex);
+
+	/*
+	 * For diskette, create the "nomedia" node after eject(1).
+	 */
+	if (support_nomedia && strstr(dp->dp_path, "rdiskette")) {
+		dev_create_ctldev(dp);
+		return;
+	}
+
+	/* Create the "nomedia" node for empty removable media device. */
+	if (support_nomedia) {
+		if (fd = dev_getfd(dp->dp_dev)) {
+			if (ioctl(fd, DKIOCGMEDIAINFO, &media) < 0) {
+				dev_create_ctldev(dp);
+			}
+		}
+	}
 }
 
 /*
@@ -1049,8 +1077,9 @@ dev_devmap(vol_t *v)
 	struct stat	sb;
 
 	dsw = dev_getdsw(v->v_basedev);
-	if (dsw == NULL || dsw->d_devmap == NULL)
+	if (dsw == NULL || dsw->d_devmap == NULL) {
 		return;
+	}
 
 	fpart = v->v_parts;
 
@@ -1949,4 +1978,114 @@ dev_reset_symname(struct devs *dp,
 		(void) smedia_free_device_info(handle, &device_info);
 	(void) smedia_release_handle(handle);
 	return (reset_result);
+}
+
+/*
+ * create "nomedia" device node
+ */
+void
+dev_create_ctldev(struct devs *dp)
+{
+	char		path[MAXPATHLEN];
+	char		pathtmp[MAXPATHLEN];
+	char		*s, *nm;
+	vvnode_t	*dvn;
+	vol_t		*v;
+	uint_t		error;
+
+	debug(11, "dev_create_ctldev: entering\n");
+
+	if (dp->dp_ctlvol != NULL) {
+		debug(11, "dev_create_ctldev: dp->dp_ctlvol != NULL\n");
+		return;
+	}
+
+	/*
+	 * first try to create the default device node.
+	 */
+	(void) strcpy(path, dp->dp_path);
+
+	/* remove slice info if device is not floppy */
+	if (!strstr(dp->dp_path, "rdiskette")) {
+		path[(strlen(path) - (2 * (sizeof (char))))] = '\0';
+	}
+
+	(void) strcat(path, "/nomedia");
+	(void) strcpy(pathtmp, path);
+
+	if ((s = strrchr(path, '/')) == NULL) {
+		debug(11, "dev_create_ctldev: strrchr failed\n");
+		return;
+	}
+	*s = '\0';
+	nm = s + 1;
+	if ((dvn = dev_dirpath(path)) == NULL) {
+		debug(11, "dev_create_ctldev: dvn NULL\n");
+		return;
+	}
+	v = vold_calloc(1, sizeof (vol_t));
+	v->v_obj.o_name = vold_strdup(nm);
+	v->v_obj.o_dir = vold_strdup(path);
+	v->v_obj.o_type = VV_CHR;
+	/* device owned by root */
+	v->v_obj.o_uid = dp->dp_dsw->d_uid;
+	v->v_obj.o_gid = dp->dp_dsw->d_gid;
+	v->v_obj.o_mode = DEFAULT_MODE;
+	v->v_obj.o_atime = current_time;
+	v->v_obj.o_ctime = current_time;
+	v->v_obj.o_mtime = current_time;
+	v->v_mtype = vold_strdup(dp->dp_dsw->d_mtype);
+	v->v_flags |= V_UNLAB|V_CTLVOL;
+	if (dp->dp_flags & DP_MEJECTABLE) {
+		v->v_flags |= V_MEJECTABLE;
+	}
+	dp->dp_cvn = node_mkobj(dvn, (obj_t *)v, NODE_TMPID|NODE_CHR, &error);
+	dp->dp_ctlvol = v;
+	change_location((obj_t *)v, dp->dp_path);
+	v->v_confirmed = TRUE;
+	v->v_fstype = V_UNKNOWN;
+	v->v_parts = (1<<DEFAULT_PARTITION);
+	v->v_ndev = 1;
+	v->v_device = dp->dp_dev;
+	/*
+	 * create device mapping.
+	 */
+	dev_devmap(v);
+	(void) dev_map_dropin(v);
+
+	/*
+	 * create symbolic link from aliases.
+	 */
+	if ((dvn = dev_dirpath(DEFAULT_ALIAS_DIR_NAME)) == NULL) {
+		debug(11, "dev_create_ctldev: dvn NULL\n");
+		return;
+	}
+	(void) strcpy(path, vold_root);
+	(void) strlcat(path, pathtmp, sizeof (path));
+	dp->dp_csymvn = node_symlink(dvn, dp->dp_symname,
+		path, NODE_TMPID, NULL);
+	/* cleanup */
+	if (dp->dp_csymvn == NULL) {
+		dev_remove_ctldev(dp);
+	}
+
+	debug(11, "dev_create_ctldev: returning\n");
+}
+
+void
+dev_remove_ctldev(struct devs *dp)
+{
+	debug(11, "dev_remove_ctldev: entering\n");
+
+	if (dp->dp_csymvn != NULL) {
+		node_unlink(dp->dp_csymvn);
+	}
+	if (dp->dp_cvn != NULL) {
+		node_unlink(dp->dp_cvn);
+	}
+	dp->dp_cvn = NULL;
+	destroy_volume(dp->dp_ctlvol);
+	dp->dp_ctlvol = NULL;
+
+	debug(11, "dev_remove_ctldev: returning\n");
 }

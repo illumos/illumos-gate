@@ -108,10 +108,13 @@ struct devs {
 	void		*dp_priv;	/* driver private info */
 	struct vvnode	*dp_rvn;	/* pointer to the char vn */
 	struct vvnode	*dp_bvn;	/* pointer to the block vn */
+	struct vvnode	*dp_cvn;	/* pointer to the ctl dev vn */
 	struct vol	*dp_vol;	/* vol_t that's in this device */
+	struct vol	*dp_ctlvol;	/* vol_t for nomedia device */
 	bool_t		dp_writeprot;	/* dev is write protected */
 	char		*dp_symname;	/* symbolic name for this dev */
 	struct vvnode	*dp_symvn;	/* pointer to alias vn */
+	struct vvnode	*dp_csymvn;	/* pointer to nomedia alias vn */
 	int		dp_ndgrp;	/* number of devices in group */
 	struct devs	**dp_dgrp;	/* pointers to dp's in group */
 	bool_t		dp_checkresp;	/* respond to checker */
@@ -175,6 +178,8 @@ extern bool_t		dev_remount(struct vol *);
 extern int		dev_reset_symname(struct devs *dp, int fd);
 extern void		dev_hard_eject(struct devs *dp);
 extern void		dev_new(struct devsw *dsw);
+extern void		dev_create_ctldev(struct devs *);
+extern void		dev_remove_ctldev(struct devs *);
 
 #define	DEV_SYM		"dev_init"
 

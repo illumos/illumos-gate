@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,8 @@
  */
 
 #include "medium_private.h"
+
+extern bool_t	support_nomedia;
 
 /*
  * IMPORTANT NOTE:
@@ -457,8 +459,17 @@ create_medium(dev_t in_device, medium_handle_t *mediumpp)
 		 * cannot do anything against the inserted medium since
 		 * vold does not create a device node for it.
 		 */
-		if (devicep != NULL)
+		if (devicep != NULL) {
 			dev_hard_eject(devicep);
+			/*
+			 * Create "nomedia" device node.
+			 */
+			if (support_nomedia) {
+				(void) mutex_lock(&vold_main_mutex);
+				dev_create_ctldev(devicep);
+				(void) mutex_unlock(&vold_main_mutex);
+			}
+		}
 	}
 
 	debug(2, "leaving create_medium(), result code = %s\n",

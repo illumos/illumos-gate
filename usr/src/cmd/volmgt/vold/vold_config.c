@@ -47,12 +47,21 @@
 
 #include	"vold.h"
 
+/*
+ * The support_nomedia variable is determined by the support field
+ * of vold.conf for no media support.  This support will determines
+ * if volfs will support the new "nomedia" devices or revert to
+ * the default behavior of supporting only devices with media.
+ * PSARC/2005/395 volfs(7D) no media support
+ */
+bool_t		support_nomedia = FALSE;
 
 static bool_t	conf_use(int, char **, uint_t);
 static bool_t	conf_unsafe(int, char **, uint_t);
 static bool_t	conf_db(int, char **, uint_t);
 static bool_t	conf_action(int, char **, uint_t);
 static bool_t	conf_label(int, char **, uint_t);
+static bool_t	conf_support(int, char **, uint_t);
 /*
  * the "present" field below is set to true (if not already true)
  * when a particular command is seen
@@ -67,6 +76,7 @@ static struct cmds {
 	bool_t	present;		/* must be TRUE when done scanning */
 	char	*emsg_fmt;		/* error msg if not TRUE when done */
 } cmd_list[] = {
+	{ "support", conf_support, TRUE, NULL },
 	{"use", conf_use, FALSE,
 "Need at least one matching \"%s\" directive in config file \"%s\"\n" },
 	{ "eject", conf_action, TRUE, NULL },
@@ -158,7 +168,6 @@ config_read(void)
 	uint_t		lineno = 0;
 	size_t		len, linelen = 0;
 	bool_t		rval;
-
 
 	debug(1, "reading config file: %s\n", vold_config);
 	if ((cfp = fopen(vold_config, "r")) == NULL) {
@@ -573,6 +582,28 @@ conf_action(int argc, char **argv, uint_t ln)
 	return (TRUE);
 }
 
+/*
+ *	argv[0] = "support"
+ *      argv[1] = "nomedia" or "media"
+ */
+static bool_t
+conf_support(int argc, char **argv, uint_t ln)
+{
+	/* ensure we have enough args */
+	if (argc < 2) {
+		warning(gettext(
+		    "config file (%s) line %d: insufficient arguments\n"),
+		    vold_config, ln);
+		return (FALSE);
+	}
+	if (strcmp(argv[1], "nomedia") == 0) {
+		support_nomedia = TRUE;
+	} else if (strcmp(argv[1], "media") == 0) {
+		support_nomedia = FALSE;
+	}
+
+	return (TRUE);
+}
 
 /*
  * search the flag list "flagp" for the tag "tag", returning the string

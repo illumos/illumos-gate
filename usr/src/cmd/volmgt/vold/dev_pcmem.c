@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,7 +96,7 @@ extern void		vol_event(struct vioc_event *, struct devs *);
 #define	PCMEM_DEVICES_DIR	"/devices/pcmcia"
 
 #define	PCMEM_NAMEPROTO_DEFD	"%sd0s%d"
-#define	PCMEM_BASEPART		DEFAULT_PARTITION
+#define	PCMEM_BASEPART		2
 
 #define	PCMEM_NAMEPROTO		"%ss%d"
 
@@ -117,6 +117,7 @@ static int	pcmem_check(struct devs *);
 static void	pcmem_eject(struct devs *);
 static bool_t	pcmem_remount(vol_t *);
 
+extern bool_t	support_nomedia;
 
 static struct devsw pcmemdevsw = {
 	pcmem_use,		/* d_use -- use a device */
@@ -601,6 +602,20 @@ pcmem_use(char *path, char *symname)
 	/* check to see if this guy is already configured */
 	if ((dp = dev_getdp(statbuf.st_rdev)) != NULL) {
 		if (dp->dp_dsw == &pcmemdevsw) {
+			/*
+			 * Remove "nomedia" node if support has changed.
+			 * By sending a HUP signal to vold, dev_use()
+			 * will call here.
+			 */
+			if (!support_nomedia && dp->dp_cvn) {
+				dev_remove_ctldev(dp);
+			}
+			/*
+			 * Create "nomedia" node if support has changed.
+			 */
+			if (support_nomedia && !dp->dp_cvn && !dp->dp_vol) {
+				dev_create_ctldev(dp);
+			}
 			debug(1, "pcmem_use: %s already in use\n", full_path);
 			return (TRUE);
 		} else {
@@ -1216,6 +1231,13 @@ pcmem_thread(struct devs *dp)
 				}
 
 			} else {
+				/*
+				 * Create "nomedia" device node for empty
+				 * removable media device.
+				 */
+				if (support_nomedia && !dp->dp_cvn) {
+					dev_create_ctldev(dp);
+				}
 				(void) mutex_unlock(&vold_main_mutex);
 				debug(2,
 				"pcmem_thread: EJECT but vol already gone\n");

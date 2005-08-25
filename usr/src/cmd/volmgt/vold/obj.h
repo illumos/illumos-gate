@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,6 +148,7 @@ typedef struct vol {
 #define	V_MEJECTABLE	0x100	/* can be easily manually ejected */
 #define	V_MISSING	0x200	/* missing event has been seen */
 #define	V_UNMAPPED	0x400	/* unmapping worked, so can free the unit */
+#define	V_CTLVOL	0x800	/* volume for the "nomedia" device node */
 
 /*
  * Defs to identify partitions

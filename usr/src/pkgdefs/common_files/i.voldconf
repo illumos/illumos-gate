@@ -23,8 +23,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1996-1999 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -201,6 +201,38 @@ update_unsafe_udfs_line()
 	cp /tmp/tmp.$$ $d
 }
 
+add_support_nomedia_lines()
+{
+
+        # add the new support nomedia lines after the db line
+
+        source_file="$1"
+        dest_file="$2"
+
+        if grep "^support" $dest_file > /dev/null 2>&1; then
+                :
+        else
+                line_number=`grep -n "^db db_mem.so" $dest_file | \
+                        tail -1 | awk -F: '{print $1}'`
+                if [ -n "$line_number" ] ; then
+			line_number=`expr $line_number + 1`
+                        sed -e "$line_number a\\
+# Volfs support of removable media devices" $dest_file > /tmp/tmp.$$ 
+			cp /tmp/tmp.$$ $dest_file
+			line_number=`expr $line_number + 1`
+			sed -e "$line_number a\\
+support nomedia" $dest_file > /tmp/tmp.$$
+			cp /tmp/tmp.$$ $dest_file
+			line_number=`expr $line_number + 1`
+			sed -e "$line_number a\\
+" $dest_file > /tmp/tmp.$$
+			cp /tmp/tmp.$$ $dest_file
+                fi
+
+                rm -f /tmp/tmp.$$
+        fi
+}
+
 while read src dest
 do
 	if [ ! -f $dest ] ; then
@@ -263,6 +295,8 @@ do
 		# add the new "remount" lines
 
 		add_remount_lines $src $dest
+
+		add_support_nomedia_lines $src $dest
 
 		# restore permissions if they changed
 		chmod 0444 $dest

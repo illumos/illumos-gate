@@ -136,9 +136,14 @@ extern char	*vold_root;
 #define	DEFAULT_SERVICE		"vold"
 #define	DEFAULT_NISPLUS_GROUP	"volmgt"
 #define	DEFAULT_POLLTIME	(-1)
+#define	DEFAULT_ALIAS_DIR_NAME	"/dev/aliases"
 
 /* default slice to use when none present */
+#ifdef _FIRMWARE_NEEDS_FDISK
+#define	DEFAULT_PARTITION	0
+#else
 #define	DEFAULT_PARTITION	2
+#endif
 
 /* size of ctime_r buffers */
 #define	CTBSIZE			26
