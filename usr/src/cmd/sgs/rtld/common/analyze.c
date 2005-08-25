@@ -184,12 +184,16 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
 		 * that this rescan preserves the breadth first loading of
 		 * dependencies.
 		 */
+		/* LINTED */
+		nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
 		if (nlmc->lc_flags & LMC_FLG_REANALYZE) {
 			nlmc->lc_flags &= ~LMC_FLG_REANALYZE;
 			lmp = nlmc->lc_head;
 		}
 	}
 
+	/* LINTED */
+	nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
 	nlmc->lc_flags &= ~LMC_FLG_ANALYZING;
 
 	return (ret);
@@ -475,6 +479,8 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
 	/*
 	 * Determine the new, and previous link-map control lists.
 	 */
+	/* LINTED */
+	nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
 	if (nlmco == ALO_DATA)
 		plmc = nlmc;
 	else {
@@ -551,12 +557,20 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
 		 * dependencies were added, and if so move them to the previous
 		 * link-map control list.
 		 */
+		/* LINTED */
+		nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
+		/* LINTED */
+		plmc = (Lm_cntl *)((char *)lml->lm_lists + plmco);
 		if ((nlmco != ALO_DATA) && nlmc->lc_head)
 			lm_move(lml, nlmco, plmco, nlmc, plmc);
-
 		(void) free(alp);
 	}
 
+	/*
+	 * Indicate that relocations are no longer active for this control list.
+	 */
+	/* LINTED */
+	nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
 	nlmc->lc_flags &= ~LMC_FLG_RELOCATING;
 
 	if (lret && pret)
@@ -1174,8 +1188,8 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 			path[size] = '\0';
 
 			if (strcmp(nname, path)) {
-				if ((nlmp = fpavl_loaded(lml, path,
-				    &(fdesc->fd_avlwhere))) != NULL) {
+				if ((nlmp =
+				    fpavl_loaded(lml, path, 0)) != NULL) {
 					added = 0;
 
 					if (append_alias(nlmp, nname,

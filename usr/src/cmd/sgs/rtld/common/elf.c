@@ -1440,21 +1440,19 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 		/*
 		 * Process any hardware capability directory.  Establish a new
 		 * link-map control list from which to analyze any newly added
-		 * objects.  Note that an lmc may already be allocated from a
-		 * previous filtee dlopen() that failed.
+		 * objects.
 		 */
 		if ((pnp->p_info == 0) && (pnp->p_orig & PN_TKN_HWCAP)) {
-			if ((lmc == 0) &&
-			    (FLAGS(lml->lm_head) & FLG_RT_RELOCED) &&
-			    ((lmc = alist_append(&(lml->lm_lists), 0,
-			    sizeof (Lm_cntl), AL_CNT_LMLISTS)) == 0))
-				return ((Sym *)0);
-
-			if (lmc)
+			if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
+				if ((lmc = alist_append(&(lml->lm_lists), 0,
+				    sizeof (Lm_cntl), AL_CNT_LMLISTS)) == 0)
+					return ((Sym *)0);
 				lmco = (Aliste)((char *)lmc -
 				    (char *)lml->lm_lists);
-			else
+			} else {
+				lmc = 0;
 				lmco = ALO_DATA;
+			}
 
 			pnp = hwcap_filtees(pnpp, lmco, dip, ilmp, filtees,
 			    mode, (FLG_RT_HANDLE | FLG_RT_HWCAP));
@@ -1518,20 +1516,19 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				/*
 				 * Establish a new link-map control list from
 				 * which to analyze any newly added objects.
-				 * Note that an lmc may already be allocated
-				 * from a previous filtee dlopen() that failed.
 				 */
-				if ((lmc == 0) &&
-				    (FLAGS(lml->lm_head) & FLG_RT_RELOCED) &&
-				    ((lmc = alist_append(&(lml->lm_lists),
-				    0, sizeof (Lm_cntl), AL_CNT_LMLISTS)) == 0))
-					return ((Sym *)0);
-
-				if (lmc)
+				if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
+					if ((lmc =
+					    alist_append(&(lml->lm_lists), 0,
+					    sizeof (Lm_cntl),
+					    AL_CNT_LMLISTS)) == 0)
+						return ((Sym *)0);
 					lmco = (Aliste)((char *)lmc -
 					    (char *)lml->lm_lists);
-				else
+				} else {
+					lmc = 0;
 					lmco = ALO_DATA;
+				}
 
 				/*
 				 * Load the filtee.
@@ -1608,7 +1605,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 
 				if (lmc) {
 					(void) lm_salvage(lml, 0, lmco);
-					lmc->lc_head = lmc->lc_tail = 0;
+					remove_cntl(lml, lmco);
+					lmc = 0;
 				}
 				pnp->p_len = 0;
 				continue;

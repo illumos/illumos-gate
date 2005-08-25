@@ -384,7 +384,7 @@ fpavl_compare(const void * n1, const void * n2)
 
 
 /*
- * Determine if a given pathname is already been loaded in the AVL tree.
+ * Determine if a given pathname has already been loaded in the AVL tree.
  * If the pathname does not exist in the AVL tree, the next insertion point
  * is deposited in "where".  This value can be used by fpavl_insert() to
  * expedite the insertion.
@@ -417,9 +417,9 @@ fpavl_loaded(Lm_list *lml, const char *name, avl_index_t *where)
 
 
 /*
- * Insert a the name into the FullpathNode AVL tree for the link-map list.
- * The objects NAME() is the path that would have been searched for, and is
- * therefore the name to associate with any "where" value.  If the object has
+ * Insert a name into the FullpathNode AVL tree for the link-map list.  The
+ * objects NAME() is the path that would have originally been searched for, and
+ * is therefore the name to associate with any "where" value.  If the object has
  * a different PATHNAME(), perhaps because it has resolved to a different file
  * (see fullpath), then this name is recorded also.  See load_file().
  */
@@ -461,7 +461,7 @@ fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 }
 
 /*
- * Remove a object from the Fullpath AVL tree.  Note, this is called *before*
+ * Remove an object from the Fullpath AVL tree.  Note, this is called *before*
  * the objects link-map is torn down (remove_so), which is where any NAME() and
  * PATHNAME() strings will be deallocated.
  */
