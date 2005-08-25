@@ -233,8 +233,7 @@ extern "C" {
 #define	BYTES2MB(m)		((m) >> 20)
 #define	GIGA_MASK		0xC0000000
 #define	UI32_MASK		0xffffffffU
-#define	MAXPHYSMEM		0x400000000LL
-#define	MAXAPERMEGAS		0x100000L
+#define	MAXAPERMEGAS		0x1000 /* Aper size no more than 4G */
 
 #endif /* _KERNEL */
 

@@ -1167,11 +1167,7 @@ get_max_pages(uint32_t aper_size)
 {
 	uint32_t i, j;
 
-	/*
-	 * Total system pages is expected below MAXPHYSMEM.
-	 */
-	ASSERT(physmem < MAXPHYSMEM);
-	ASSERT(aper_size < MAXAPERMEGAS);
+	ASSERT(aper_size <= MAXAPERMEGAS);
 
 	i = AGP_MB2PAGES(aper_size);
 	j = (physmem >> 2);

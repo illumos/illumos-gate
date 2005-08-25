@@ -352,7 +352,7 @@ devmap_pmem_alloc(size_t size, uint_t flags, devmap_pmem_cookie_t *cookiep)
 	/* Allocate small pages if lpp+tlist cannot satisfy the request. */
 	i =  rpages - lpages;
 	if ((pp = page_create_va(pcp->dp_vnp, pmem_off, ptob(i),
-	    pflags, &pmem_seg, (caddr_t)pmem_off)) == NULL)
+	    pflags, &pmem_seg, (caddr_t)(uintptr_t)pmem_off)) == NULL)
 		goto alloc_fail;
 
 done:
@@ -756,7 +756,7 @@ lpp_create(page_t **lppp, pgcnt_t n, pgcnt_t *lpages, pmem_lpg_t **plpp,
 	for (i = 0, *lpages = 0; i < n; i++) {
 		/* Allocte one large page each time. */
 		pp = page_create_va_large(vnp, *offp, pmem_lpgsize,
-		    PG_EXCL, &pmem_seg, (caddr_t)*offp, NULL);
+		    PG_EXCL, &pmem_seg, (caddr_t)(uintptr_t)*offp, NULL);
 		if (pp == NULL)
 			break;
 		*offp += pmem_lpgsize;
