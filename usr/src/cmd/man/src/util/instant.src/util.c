@@ -83,7 +83,7 @@
 
 #ifndef lint
 static char *RCSid =
-"$Header: /usr/local/src/docbook-to-man/ \
+"$Header: /usr/local/src/docbook-to-man/\
 Instant/RCS/util.c,v 1.7 1998/12/14 05:06:24 fld Exp $";
 #endif
 
@@ -171,8 +171,7 @@ Split(
 		 *  set to more than there will possibly ever be
 		 */
 		if (!ntok || !(*ntok)) maxnt = 10000;
-	} else
-		tokens = local_tokens;
+	} else tokens = local_tokens;
 
 	i = 0;			/* index into vector */
 	tokens[0] = s;		/* s already points to 1st token */
@@ -289,7 +288,7 @@ FindMappingVal(
 
 	if ((strcmp(name, "each_A") == 0) ||
 		(strcmp(name, "each_C") == 0)) {
-	return (Get_A_C_value(name));
+		return (Get_A_C_value(name));
 	}
 
 	/*
@@ -367,35 +366,37 @@ SetMappingNV(
 	}
 
 	if (value) {
-	/*
-	 * See if the value is a command to run.  If so, run the command
-	 * and replace the value with the output.
-	 */
-	s = value;
-	if (*s == '!') {
-	    s++;				/* point to command */
-	    if ((pp = popen(s, "r"))) {		/* run cmd, read its output */
-		i = 0;
-		cp = buf;
-		while (fgets(cp, LINESIZE-i, pp)) {
-		    i += strlen(cp);
-		    cp = &buf[i];
-		    if (i >= LINESIZE) {
-			fprintf(stderr,
-			    "Prog execution of variable '%s' too long.\n",
-			    m->name);
-			break;
-		    }
+		/*
+		 * See if the value is a command to run.  If so, run the command
+		 * and replace the value with the output.
+		 */
+		s = value;
+		if (*s == '!') {
+			s++;				/* point to command */
+			if ((pp = popen(s, "r"))) {
+				/* run cmd, read its output */
+				i = 0;
+				cp = buf;
+				while (fgets(cp, LINESIZE-i, pp)) {
+					i += strlen(cp);
+					cp = &buf[i];
+					if (i >= LINESIZE) {
+						fprintf(stderr,
+							"Prog execution of "
+							"variable '%s' too "
+							"long.\n", m->name);
+						break;
+					}
+				}
+				free(m->sval);
+				stripNL(buf);
+				m->sval = strdup(buf);
+				pclose(pp);
+			} else {
+				sprintf(buf, "Could not start program '%s'", s);
+				perror(buf);
+			}
 		}
-		free(m->sval);
-		stripNL(buf);
-		m->sval = strdup(buf);
-		pclose(pp);
-	    } else {
-		sprintf(buf, "Could not start program '%s'", s);
-		perror(buf);
-	    }
-	}
 	}
 }
 
@@ -468,9 +469,9 @@ OpenFile(
 		nlibdirs = 0;
 	}
 	for (i = 0; i < nlibdirs; i++) {
-	sprintf(buf, "%s/%s", libdirs[i], filename);
-	if ((fp = fopen(buf, "r")))
-		return (fp);
+		sprintf(buf, "%s/%s", libdirs[i], filename);
+		if ((fp = fopen(buf, "r")))
+			return (fp);
 	}
 	return (NULL);
 }
@@ -501,12 +502,12 @@ FindElementPath(
 
 	/* Move up the tree, noting "birth order" of each element encountered */
 	for (ep = e; ep; ep = ep->parent)
-	e_path[ep->depth-1] = ep->my_eorder;
+		e_path[ep->depth-1] = ep->my_eorder;
 	/* Move down the tree, printing the element names to the string. */
 	for (cp = s, i = 0, ep = DocTree; i < e->depth;
 		ep = ep->econt[e_path[i]], i++) {
-	sprintf(cp, "%s(%d) ", ep->gi, e_path[i]);
-	cp += strlen(cp);
+		sprintf(cp, "%s(%d) ", ep->gi, e_path[i]);
+		cp += strlen(cp);
 	}
 	sprintf(cp, "%s", e->gi);
 	return (s);
@@ -533,16 +534,17 @@ PrintLocation(
 		return;
 	fprintf(fp, "  Path: %s\n", FindElementPath(e, buf));
 	if ((s = NearestOlderElem(e, "TITLE")))
-	fprintf(fp, "  Position hint: TITLE='%s'\n", s);
+		fprintf(fp, "  Position hint: TITLE='%s'\n", s);
 	if (e->lineno) {
-	if (e->infile)
-	    fprintf(fp, "  At or near instance file: %s, line: %d\n",
-			e->infile, e->lineno);
-	else
-	    fprintf(fp, "  At or near instance line: %d\n", e->lineno);
+		if (e->infile)
+			fprintf(fp, "  At or near instance file: %s, "
+				"line: %d\n", e->infile, e->lineno);
+		else
+			fprintf(fp, "  At or near instance line: "
+				"%d\n", e->lineno);
 	}
 	if (e->id)
-	fprintf(fp, "  ID: %s\n", e->id);
+		fprintf(fp, "  ID: %s\n", e->id);
 }
 
 /* ______________________________________________________________________ */
@@ -570,12 +572,13 @@ NearestOlderElem(
 	if (!name) name = "TITLE";			/* useful default */
 
 	for (; e->parent; e = e->parent)		/* move up tree */
-	for (i = 0; i <= e->my_eorder; i++) {	/* check preceding sibs */
-	    ep = e->parent;
-	    if (strcmp(name, ep->econt[i]->gi) == 0)
-		return ep->econt[i]->ndcont ?
+		for (i = 0; i <= e->my_eorder; i++) {
+			/* check preceding sibs */
+			ep = e->parent;
+			if (strcmp(name, ep->econt[i]->gi) == 0)
+				return ep->econt[i]->ndcont ?
 			ep->econt[i]->dcont[0] : "-empty-";
-	}
+		}
 
 	return (NULL);
 }
@@ -611,79 +614,84 @@ OutputString(
 	if (!s) s = "";		/* no string - go to start of line */
 
 	for (; *s; s++) {
-	if (*s == '\\') {
-	    s++;
-	    if (track_pos) char_pos++;
-	    switch (*s) {
-		default:	c = *s;		break;
+		if (*s == '\\') {
+			s++;
+			if (track_pos) char_pos++;
+			switch (*s) {
+				default:	c = *s; break;
 
-		case 's':	c = ' ';	break;
+				case 's':	c = ' '; break;
 
-		case 't':	c = TAB;	break;
+				case 't':	c = TAB; break;
 
-		case 'n':	c = NL;		char_pos = 0;	break;
+				case 'n':	c = NL;
+					char_pos = 0; break;
 
-		case 'r':	c = CR;		char_pos = 0;	break;
+				case 'r':	c = CR;
+					char_pos = 0; break;
 
-		case '0': case '1': case '2': case '3':
-		case '4': case '5': case '6': case '7':
-		    /* for octal numbers (C style) of the form \012 */
-		    c = *s - '0';
-			for (i = 1, s++; ((*s >= '0') && (*s <= '7') &&
-				(i <= 2)); s++, i++)
-			c = (c << 3) + (*s - '0');
-		    s--;
-		    break;
+				case '0': case '1': case '2': case '3':
+				case '4': case '5': case '6': case '7':
+					/* for octal numbers (C style) */
+					/* of the form \012 */
+					c = *s - '0';
+					for (i = 1, s++; ((*s >= '0') &&
+						(*s <= '7') &&
+						(i <= 2)); s++, i++)
+						c = (c << 3) + (*s - '0');
+					s--;
+					break;
 
-		case '|':		/* SDATA */
-		    s++;		/* point past \| */
-		    sdata = s;
-		    /* find matching/closing \| */
-		    cp = s;
-		    while (*cp && *cp != '\\' && cp[1] != '|') cp++;
-		    if (!*cp) break;
+				case '|':		/* SDATA */
+					s++;		/* point past \| */
+					sdata = s;
+					/* find matching/closing \| */
+					cp = s;
+					while (*cp && *cp != '\\' &&
+						cp[1] != '|') cp++;
+					if (!*cp) break;
 
-		    saved_cp = cp;
-		    saved_c = *saved_cp;
-		    *cp = EOS;		/* terminate sdata string */
-		    cp++;
-		    s = cp;		/* s now points to | */
+					saved_cp = cp;
+					saved_c = *saved_cp;
+					*cp = EOS; /* terminate sdata string */
+					cp++;
+					s = cp;	/* s now points to | */
 
-		    cp = LookupSDATA(sdata);
-		    if (cp) OutputString(cp, fp, track_pos);
-		    else {
-			/* not found - output sdata thing in brackets */
-			putc('[', fp);
-			fputs(sdata, fp);
-			putc(']', fp);
-		    }
+					cp = LookupSDATA(sdata);
+					if (cp) OutputString(cp, fp, track_pos);
+					else {
+						/* not found - output sdata */
+						/* thing in brackets */
+						putc('[', fp);
+						fputs(sdata, fp);
+						putc(']', fp);
+					}
 
-		    *saved_cp = saved_c;
+					*saved_cp = saved_c;
 
-		    c = 0;
-		    break;
-	    }
-	} else {		/* not escaped - just pass the character */
+					c = 0;
+					break;
+			}
+		} else { /* not escaped - just pass the character */
 	    c = *s;
 		/*
 		 * If caller wants us to track position, see if it's an anchor
 		 * (ie, align at a newline).
 		 */
-	    if (track_pos) {
-		if (c == ANCHOR) {
-			/*
-			 * If we're already at the start of a line, don't do
-			 * another newline.
-			 */
-		    if (char_pos != 0) c = NL;
-		    else c = 0;
-		} else
-			char_pos++;
-		if (c == NL) char_pos = 0;
-	    } else
-			if (c == ANCHOR) c = NL;
-	}
-	if (c) putc(c, fp);
+			if (track_pos) {
+				if (c == ANCHOR) {
+					/*
+					 * If we're already at the start of
+					 * a line, don't do another newline.
+					 */
+					if (char_pos != 0) c = NL;
+					else c = 0;
+				} else
+					char_pos++;
+				if (c == NL) char_pos = 0;
+			} else if (c == ANCHOR) c = NL;
+		}
+		if (c) putc(c, fp);
 	}
 }
 
@@ -748,21 +756,20 @@ AddElemName(
 
 	/* See if it's already in the list. */
 	for (i = 0; i < nUsedElem; i++)
-	if (UsedElem[i][0] == name[0] &&
-		(strcmp(UsedElem[i], name) == 0))
-	    return (UsedElem[i]);
+		if (UsedElem[i][0] == name[0] &&
+			(strcmp(UsedElem[i], name) == 0))
+			return (UsedElem[i]);
 
 	/*
 	 * Allocate slots in blocks of N, so we don't have to call malloc
 	 * so many times.
 	 */
 	if (n_alloc == 0) {
-	n_alloc = IMS_elemnames;
-	Calloc(n_alloc, UsedElem, char *);
-	} else
-		if (nUsedElem >= n_alloc) {
-	n_alloc += IMS_elemnames;
-	Realloc(n_alloc, UsedElem, char *);
+		n_alloc = IMS_elemnames;
+		Calloc(n_alloc, UsedElem, char *);
+	} else if (nUsedElem >= n_alloc) {
+		n_alloc += IMS_elemnames;
+		Realloc(n_alloc, UsedElem, char *);
 	}
 	UsedElem[nUsedElem] = strdup(name);
 	return (UsedElem[nUsedElem++]);
@@ -1013,33 +1020,32 @@ FindRelByName(
 )
 {
 	if (strcmp(relname, "?") == 0) {
-	fprintf(stderr, "Supported query/relationships %s\n%s.\n",
-	    "child, parent, ancestor, descendant,",
-	    "sibling, sibling+, sibling+1, sibling-, sibling-1");
-	return (REL_None);
-	} else
-		if (StrEq(relname, "child"))
+		fprintf(stderr, "Supported query/relationships %s\n%s.\n",
+			"child, parent, ancestor, descendant,",
+			"sibling, sibling+, sibling+1, sibling-, sibling-1");
+		return (REL_None);
+	} else if (StrEq(relname, "child"))
 			return (REL_Child);
 	else if (StrEq(relname, "parent"))
-			return (REL_Parent);
+		return (REL_Parent);
 	else if (StrEq(relname, "ancestor"))
-			return (REL_Ancestor);
+		return (REL_Ancestor);
 	else if (StrEq(relname, "descendant"))
-			return (REL_Descendant);
+		return (REL_Descendant);
 	else if (StrEq(relname, "sibling"))
-			return (REL_Sibling);
+		return (REL_Sibling);
 	else if (StrEq(relname, "sibling-"))
-			return (REL_Preceding);
+		return (REL_Preceding);
 	else if (StrEq(relname, "sibling-1"))
-			return (REL_ImmPreceding);
+		return (REL_ImmPreceding);
 	else if (StrEq(relname, "sibling+"))
-			return (REL_Following);
+		return (REL_Following);
 	else if (StrEq(relname, "sibling+1"))
-			return (REL_ImmFollowing);
+		return (REL_ImmFollowing);
 	else if (StrEq(relname, "cousin"))
-			return (REL_Cousin);
+		return (REL_Cousin);
 	else fprintf(stderr, "Unknown relationship: %s\n", relname);
-	return (REL_Unknown);
+		return (REL_Unknown);
 }
 
 /* ______________________________________________________________________ */

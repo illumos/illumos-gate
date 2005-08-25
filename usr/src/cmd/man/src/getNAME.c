@@ -223,7 +223,7 @@ section(char *name, char *buf)
 	if (dp != NULL) {
 		dp = dp+plen+1;
 	} else {
-		dir+plen;
+		dp = dir+plen;
 	}
 	np = strrchr(fname, '.');
 	if (np != NULL) {

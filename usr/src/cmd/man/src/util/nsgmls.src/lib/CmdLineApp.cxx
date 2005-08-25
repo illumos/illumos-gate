@@ -394,8 +394,8 @@ CmdLineApp::lookupCodingSystem(const AppChar *codingName)
 		for (i = 0; codingName[i] != SP_T('\0'); i++) {
 			SP_TUCHAR c = codingName[i];
 #ifdef SP_WIDE_SYSTEM
-	if (c > (unsigned char)-1)
-	return (0);
+			if (c > (unsigned char)-1)
+				return (0);
 #endif
 			buf[i] = char(c);
 		}

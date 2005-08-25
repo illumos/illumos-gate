@@ -58,8 +58,6 @@ LIBOBJS=#strerror.o memmove.o
 # -lnsl on SunOS 4.1.3
 XLIBS=-lsocket -lnsl
 # -L/usr/local/lib may be needed on the RS/6000
-# Link time macros for g++ compiler
-$(__GNUC)CCNEEDED=-lstdc++
 LIBS += $(ENVLDLIBS1) $(ENVLDLIBS2) $(XLIBS) $(CCNEEDED) -lc
 # If you're building in another directory, copy or link this Makefile
 # to the build directory, and set srcdir to point to the source directory.

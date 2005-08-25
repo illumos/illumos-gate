@@ -84,7 +84,7 @@
 
 #ifndef lint
 static char *RCSid =
-	"$Header: /usr/src/docbook-to-man/Instant/ \
+	"$Header: /usr/src/docbook-to-man/Instant/\
 RCS/tables.c,v 1.14 1998/06/28 19:50:54 fld Exp $";
 #endif
 
@@ -387,9 +387,9 @@ CALStable(
 
 	if (strcmp(av[1], "tbl") == 0) {
 
-	if (ac > 2) {
-		if (strcmp(av[2], "tablestart") == 0)
-			TblTStart(e, fp);
+		if (ac > 2) {
+			if (strcmp(av[2], "tablestart") == 0)
+				TblTStart(e, fp);
 			else if (strcmp(av[2], "tableend") == 0)
 				TblTEnd(e, fp);
 			else if (strcmp(av[2], "tablegroup") == 0)
@@ -406,11 +406,11 @@ CALStable(
 				TblTCellStart(e, fp);
 			else if (strcmp(av[2], "entryend") == 0)
 				TblTCellEnd(e, fp);
-			else fprintf(stderr, "Unknown %s table ",
+			else fprintf(stderr, "Unknown %s table "
 				"instruction: %s\n", av[1], av[2]);
-	} else {
+		} else {
 			fprintf(stderr, "Incomplete %s table instruction\n");
-	}
+		}
 	}
 
 	else if (strcmp(av[1], "tex") == 0) {
@@ -429,7 +429,7 @@ CALStable(
 	    else if (strcmp(av[2], "top") == 0) TexTableTop(e, fp);
 	    else if (strcmp(av[2], "bottom") == 0) TexTableBottom(e, fp);
 	    else fprintf(stderr, "Unknown %s table instruction: %s\n",
-		av[1], av[2]);
+			av[1], av[2]);
 	} else
 		TexTable(e, fp);
 	}
@@ -506,7 +506,7 @@ SetTabAtts(
 	if (t->colwidth) {
 		char *cp;
 		for (cp = t->colwidth; *cp; cp++)
-		if (isupper(*cp)) *cp = tolower(*cp);
+			if (isupper(*cp)) *cp = tolower(*cp);
 	}
 
 	/*
@@ -518,7 +518,7 @@ SetTabAtts(
 	t->colsep_v	= Split(t->colsep, &t->n_colsep, S_STRDUP|S_ALVEC);
 
 	/*
-	 * Determin the _numeric_ number of columns, "nc".  MUST be specified
+	 * Determine the _numeric_ number of columns, "nc".  MUST be specified
 	 * in Cols attribute of TGroup element.
 	 */
 	if (t->cols) t->nc = atoi(t->cols);
@@ -582,14 +582,14 @@ CheckTable(
 	/* NCOLS attribute set? */
 	if (!TheTab.ncols) {
 		pr_loc++;
-		fprintf(stderr, "%s: NCOLS attribute missing. ",
+		fprintf(stderr, "%s: NCOLS attribute missing. "
 			"Inferred as %d.\n", tpref, TheTab.nc);
 	}
 
 	/* ALIGN attribute set? */
 	if (!TheTab.align) {
 		pr_loc++;
-		fprintf(stderr, "%s: ALIGN attribute ",
+		fprintf(stderr, "%s: ALIGN attribute "
 			"missing.\n", tpref);
 	}
 
@@ -607,9 +607,9 @@ CheckTable(
 			for (c = 0;  c < ep2->necont;  c++)	{
 				if (ep2->econt[c]->necont != TheTab.nc) {
 					pr_loc++;
-					fprintf(stderr, "%s: COLS (%d)",
-						" differs from actual number ",
-						"of cells (%d) in row %d.\n",
+					fprintf(stderr, "%s: COLS (%d)"
+						"differs from actual number of "
+						"cells (%d) in row %d.\n",
 						tpref, TheTab.nc,
 						ep2->econt[c]->necont, c);
 				}
@@ -632,7 +632,7 @@ CheckTable(
 					*TheTab.align_v[i] != 'L' &&
 					*TheTab.align_v[i] != 'R') {
 					pr_loc++;
-					fprintf(stderr, "%s: ALIGN (%d) ",
+					fprintf(stderr, "%s: ALIGN (%d) "
 						"value wrong: %s\n",
 						tpref, i, TheTab.align_v[i]);
 				}
@@ -645,15 +645,15 @@ CheckTable(
 		if (TheTab.nc != TheTab.n_colwidth) {
 			/* number of tokens OK? */
 			pr_loc++;
-	    fprintf(stderr, ncolchk, "COLWIDTH", TheTab.colwidth, TheTab.nc);
-	} else {				/* values OK? */
-	    for (i = 0; i < TheTab.nc; i++) {
-
-		/*
-		 * check that the units after the numbers are OK
-		 *  we want "in", "cm".
-		 */
-	    }
+			fprintf(stderr, ncolchk, "COLWIDTH",
+				TheTab.colwidth, TheTab.nc);
+		} else {				/* values OK? */
+			for (i = 0; i < TheTab.nc; i++) {
+				/*
+				 * check that the units after the numbers are OK
+				 *  we want "in", "cm".
+				 */
+			}
 		}
 	}
 
@@ -1228,8 +1228,7 @@ TblTFoot(Element_t *ep,
 
 	TblBuildFormat(ep, &tfp, TFoot);	/* gen format for the foot */
 
-	for (tfp2 = formP;  tfp2 && tfp2->next;  tfp2 = tfp2->next)
-		;
+	for (tfp2 = formP;  tfp2 && tfp2->next;  tfp2 = tfp2->next);
 
 	if (tfp->next || !TblFormatMatch(tfp, tfp2))	{
 
@@ -1264,8 +1263,9 @@ TblBuildFormat(Element_t *ep,		/* parent of rows.. */
 	register struct tblformat *nfp; /* the next format */
 
 
-	for (lfp = *fp;  lfp && lfp->next;  lfp = lfp->next)
+	for (lfp = *fp;  lfp && lfp->next;  lfp = lfp->next) {
 		/* find end of format list */
+	}
 
 		for (i = 0;  i < ep->necont;  i++)
 		if (strcmp(ep->econt[i]->gi, "ROW") == 0)
