@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_STRINGS_H
-#define	_STRINGS_H
+#ifndef	_UTIL_H
+#define	_UTIL_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -70,4 +70,4 @@ extern void panic(const char *fmt, ...) __NORETURN;
 }
 #endif
 
-#endif	/* _STRINGS_H */
+#endif	/* _UTIL_H */

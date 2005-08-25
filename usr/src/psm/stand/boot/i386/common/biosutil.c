@@ -32,14 +32,10 @@
  * The rest are for debugging via a serial line.
  */
 
-#include <sys/types.h>
-#include <sys/varargs.h>
-#include "../common/biosint.h"
-#include "../common/chario.h"
-#include "../common/serial.h"
-
-extern uchar_t inb(int);
-extern void outb(int, uchar_t);
+#include "util.h"
+#include "biosint.h"
+#include "chario.h"
+#include "serial.h"
 
 /* Forward declarations. */
 static void putchar(int c);
