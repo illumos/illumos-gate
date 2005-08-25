@@ -1,5 +1,5 @@
 /*
- * Copyright 1998, 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -227,7 +227,7 @@ If set, the envar TMPDIR selects where temporary files are kept\n"),
 			break;
 		case 'l':
 			autoload++;
-			/*FALLTHROUGH*/
+			break;
 		case 'o':
 			offline++;
 			break;

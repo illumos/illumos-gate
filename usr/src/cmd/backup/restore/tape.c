@@ -8,7 +8,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 1994, 1996, 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -556,7 +556,7 @@ with the last volume and work towards the first.\n"));
 		tapesread[volno-1]++;
 		return;
 	}
-	closemt();
+	closemt(ALLOW_OFFLINE);
 	/*
 	 * XXX: if we are switching devices, we should probably try
 	 * the device once without prompting to enable unattended
@@ -1748,19 +1748,26 @@ flsht()
 
 void
 #ifdef __STDC__
-closemt(void)
+closemt(int mode)
 #else
-closemt()
+closemt(mode)
+	int mode;
 #endif
 {
+	/*
+	 * If mode == FORCE_OFFLINE then we're not done but
+	 * we need to change tape. So, rewind and unload current
+	 * tape before loading the new one.
+	 */
+
 	static struct mtop mtop = { MTOFFL, 0 };
 
 	if (mt < 0)
 		return;
-	if (offline)
+	if (offline || mode == FORCE_OFFLINE)
 		(void) fprintf(stderr, gettext("Rewinding tape\n"));
 	if (host) {
-		if (offline)
+		if (offline || mode == FORCE_OFFLINE)
 			(void) rmtioctl(MTOFFL, 1);
 		rmtclose();
 	} else if (pipein) {
@@ -1776,7 +1783,7 @@ closemt()
 		 * Only way to tell if this is a floppy is to issue an ioctl
 		 * but why waste one - if the eject fails, tough!
 		 */
-		if (offline)
+		if (offline || mode == FORCE_OFFLINE)
 			(void) ioctl(mt, MTIOCTOP, &mtop);
 		(void) ioctl(mt, FDEJECT, 0);
 		(void) close(mt);
@@ -2146,7 +2153,9 @@ autoload_tape()
 		 * for the open to fail (measured at 21 seconds for an
 		 * Exabyte 8200 under 2.7 on an Ultra 2).
 		 */
-		closemt();
+
+		/* rewind tape and offline drive before loading new tape */
+		closemt(FORCE_OFFLINE);
 		(void) fprintf(stderr,
 		    gettext("Attempting to autoload next volume\n"));
 		for (tries = 0; tries < autoload_tries; tries++) {

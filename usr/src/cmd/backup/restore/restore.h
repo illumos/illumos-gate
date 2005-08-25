@@ -8,7 +8,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 1994, 1996, 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -274,7 +274,7 @@ extern void getfile(void (*)(char *, size_t), void (*)(char *, size_t));
 extern void null(char *, size_t);
 extern void findtapeblksize(int);
 extern void flsht(void);
-extern void closemt(void);
+extern void closemt(int);
 extern int readhdr(struct s_spcl *);
 extern int gethead(struct s_spcl *);
 extern int volnumber(ino_t);
@@ -413,6 +413,9 @@ extern int complexcopy();
 
 #define	GOOD 1
 #define	FAIL 0
+
+#define	ALLOW_OFFLINE	0
+#define	FORCE_OFFLINE	1		/* offline drive for autoload */
 
 #define	DEF_PAGER	"/usr/bin/more"
 
