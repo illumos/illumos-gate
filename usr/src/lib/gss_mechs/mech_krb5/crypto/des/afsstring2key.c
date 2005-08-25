@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +78,7 @@ mit_afs_string_to_key (context, keyblock, data, salt)
       memcpy (tkey, ikey, sizeof(tkey));
       mit_des_fixup_key_parity (tkey);
 
+      usekey.enctype = ENCTYPE_DES_CBC_CRC;
       usekey.contents = tkey;
       usekey.length = 8;
 
@@ -87,15 +88,23 @@ mit_afs_string_to_key (context, keyblock, data, salt)
       memcpy (ikey, tkey, sizeof(ikey));
       mit_des_fixup_key_parity (tkey);
 
+      if (usekey.hKey != CK_INVALID_HANDLE) {
+         (void) C_DestroyObject(krb_ctx_hSession(context), usekey.hKey);
+         usekey.hKey = CK_INVALID_HANDLE;
+      }
       usekey.contents = tkey;
       usekey.length = 8;
-	
+
       retval = mit_des_cbc_cksum (context, (unsigned char *) password,
 		key, i, &usekey, ikey);
 	
       /* now fix up key parity again */
       mit_des_fixup_key_parity(key);
 
+      if (usekey.hKey != CK_INVALID_HANDLE) {
+         (void) C_DestroyObject(krb_ctx_hSession(context), usekey.hKey);
+         usekey.hKey = CK_INVALID_HANDLE;
+      }
       /* clean & free the input string */
       memset(password, 0, (size_t) pw_len);
       krb5_xfree(password);
