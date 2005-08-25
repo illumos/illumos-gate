@@ -81,13 +81,14 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 #ifdef	sun4u
 	int index;
 
-	index = (((uint64_t)in) & 0x7);
+	index = (((uint64_t)(uintptr_t)in) & 0x7);
 
 	/* Get the 'in' on an 8-byte alignment */
 	if (index > 0) {
 		i = key->i;
 		j = key->j;
-		for (index = 8 - (uint64_t)in & 0x7; (index-- > 0) && len > 0;
+		for (index = 8 - (uint64_t)(uintptr_t)in & 0x7;
+		    (index-- > 0) && len > 0;
 		    len--, in++, out++) {
 			i = i + 1;
 			j = j + key->arr[i];
@@ -106,7 +107,7 @@ arcfour_crypt(ARCFour_key *key, uchar_t *in, uchar_t *out, size_t len)
 
 	/* See if we're fortunate and 'out' got aligned as well */
 
-	if ((((uint64_t)out) & 7) != 0) {
+	if ((((uint64_t)(uintptr_t)out) & 7) != 0) {
 #endif	/* sun4u */
 		i = key->i;
 		j = key->j;

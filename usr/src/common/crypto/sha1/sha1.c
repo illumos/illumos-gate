@@ -429,11 +429,11 @@ havevis()
  * VIS SHA-1 consts.
  */
 static uint64_t VIS[] = {
-	0x8000000080000000,
-	0x0002000200020002,
-	0x5a8279996ed9eba1,
-	0x8f1bbcdcca62c1d6,
-	0x012389ab456789ab};
+	0x8000000080000000ULL,
+	0x0002000200020002ULL,
+	0x5a8279996ed9eba1ULL,
+	0x8f1bbcdcca62c1d6ULL,
+	0x012389ab456789abULL};
 
 extern void SHA1TransformVIS(uint64_t *, uint64_t *, uint32_t *, uint64_t *);
 
@@ -542,7 +542,7 @@ SHA1Update(SHA1_CTX *ctx, const uint8_t *input, uint32_t input_len)
 		 * for alignments other than 4-bytes.
 		 */
 		if (usevis) {
-			if (((uint64_t)(&input[i]) & 0x3)) {
+			if (((uint64_t)(uintptr_t)(&input[i]) & 0x3)) {
 				/*
 				 * Main processing loop - input misaligned
 				 */
