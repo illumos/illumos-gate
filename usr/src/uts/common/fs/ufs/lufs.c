@@ -964,14 +964,6 @@ recheck:
 	}
 
 	/*
-	 * Grab appropriate locks to synchronize with the rest
-	 * of the system
-	 */
-	vfs_lock_wait(vfsp);
-	ulp = &ufsvfsp->vfs_ulockfs;
-	mutex_enter(&ulp->ul_lock);
-
-	/*
 	 * File system must be fairly consistent to enable logging
 	 */
 	if (fs->fs_clean != FSLOG &&
@@ -1002,9 +994,6 @@ recheck:
 		 * this point.  Disabling sets fs->fs_logbno to 0, so this
 		 * will not put us into an infinite loop.
 		 */
-		mutex_exit(&ulp->ul_lock);
-		vfs_unlock(vfsp);
-
 		lf.lf_lock = LOCKFS_ULOCK;
 		lf.lf_flags = 0;
 		error = ufs_fiolfs(vp, &lf, 1);
@@ -1035,12 +1024,19 @@ recheck:
 
 	/*
 	 * Pretend we were just mounted with logging enabled
+	 *	freeze and drain the file system of readers
 	 *		Get the ops vector
 	 *		If debug, record metadata locations with log subsystem
 	 *		Start the delete thread
 	 *		Start the reclaim thread, if necessary
+	 *	Thaw readers
 	 */
+	vfs_lock_wait(vfsp);
 	vfs_setmntopt(vfsp, MNTOPT_LOGGING, NULL, 0);
+	ulp = &ufsvfsp->vfs_ulockfs;
+	mutex_enter(&ulp->ul_lock);
+	atomic_add_long(&ufs_quiesce_pend, 1);
+	(void) ufs_quiesce(ulp);
 
 	TRANS_DOMATAMAP(ufsvfsp);
 	TRANS_MATA_MOUNT(ufsvfsp);
@@ -1054,6 +1050,7 @@ recheck:
 	} else
 		fs->fs_reclaim |= reclaim;
 
+	atomic_add_long(&ufs_quiesce_pend, -1);
 	mutex_exit(&ulp->ul_lock);
 	vfs_unlock(vfsp);
 
@@ -1086,9 +1083,6 @@ errout:
 	(void) lufs_unsnarf(ufsvfsp);
 	(void) lufs_free(ufsvfsp);
 unlockout:
-	mutex_exit(&ulp->ul_lock);
-	vfs_unlock(vfsp);
-
 	lf.lf_lock = LOCKFS_ULOCK;
 	lf.lf_flags = 0;
 	(void) ufs_fiolfs(vp, &lf, 1);

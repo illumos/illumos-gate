@@ -618,11 +618,23 @@ remountfs(struct vfs *vfsp, dev_t dev, void *raw_argsp, int args_len)
 		goto remounterr;
 
 	/*
-	 * quiesce the file system
+	 * Lock the file system and flush stuff from memory
 	 */
 	error = ufs_quiesce(ulp);
 	if (error)
 		goto remounterr;
+
+	/*
+	 * We don't need to call the expensive ufs_flush when going from
+	 * read only to read/write, except if the root fs didn't come
+	 * down cleanly.
+	 */
+	if ((ufsvfsp->vfs_devvp == rootvp) && !ufs_clean_root) {
+		error = ufs_flush(vfsp);
+		if (error) {
+			goto remounterr;
+		}
+	}
 
 	tpt = UFS_BREAD(ufsvfsp, ufsvfsp->vfs_dev, SBLOCK, SBSIZE);
 	if (tpt->b_flags & B_ERROR) {
@@ -2192,16 +2204,15 @@ ufs_remountroot(struct vfs *vfsp)
 
 		/*
 		 * Clear the noroll bit which indicates that logging
-		 * can't roll the log yet and start the logmap roll thread
-		 * unless the filesystem is still read-only in which case
-		 * remountfs() will do it when going to read-write.
+		 * can't roll the log yet.
 		 */
 		ASSERT(ul->un_flags & LDL_NOROLL);
+		ul->un_flags &= ~LDL_NOROLL;
 
-		if (!fsp->fs_ronly) {
-			ul->un_flags &= ~LDL_NOROLL;
-			logmap_start_roll(ul);
-		}
+		/*
+		 * Start the logmap roll thread.
+		 */
+		logmap_start_roll(ul);
 
 		/*
 		 * Start the reclaim thread if needed.
