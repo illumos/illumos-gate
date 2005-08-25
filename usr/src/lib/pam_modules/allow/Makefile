@@ -25,44 +25,34 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/pam_modules/Makefile
-#
 
-SUBDIRS = \
-	allow	\
-	authtok_get	\
-	authtok_check	\
-	authtok_store	\
-	deny		\
-	dhkeys		\
-	dial_auth	\
-	krb5		\
-	krb5_migrate	\
-	ldap		\
-	passwd_auth	\
-	projects	\
-	rhosts_auth	\
-	roles		\
-	sample		\
-	smartcard	\
-	unix_auth	\
-	unix_account	\
-	unix_cred	\
-	unix_session
+include		../../Makefile.lib
+
+TEXT_DOMAIN=	SUNW_OST_SYSOSPAM
+POFILE=		allow.po
+MSGFILES=	allow.c
+
+SUBDIRS=	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET= all
-catalog :=	TARGET= _msg
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
 lint :=		TARGET= lint
-_msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber install lint _msg: $(SUBDIRS)
+all clean clobber install: spec .WAIT $(SUBDIRS)
 
-$(SUBDIRS): FRC
+lint:		$(SUBDIRS)
+
+_msg:		$(MSGDOMAINPOFILE)
+
+$(SUBDIRS) spec:	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include		$(SRC)/Makefile.msg.targ
+include		../../Makefile.targ

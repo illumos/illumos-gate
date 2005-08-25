@@ -90,6 +90,8 @@ f none usr/lib/security/sparcv9/crypt_sunmd5.so.1 755 root bin
 s none usr/lib/security/sparcv9/crypt_sunmd5.so=./crypt_sunmd5.so.1
 f none usr/lib/security/sparcv9/pam_ldap.so.1 755 root bin
 s none usr/lib/security/sparcv9/pam_ldap.so=./pam_ldap.so.1
+f none usr/lib/security/sparcv9/pam_allow.so.1 755 root bin
+s none usr/lib/security/sparcv9/pam_allow.so=./pam_allow.so.1
 f none usr/lib/security/sparcv9/pam_authtok_get.so.1 755 root bin
 s none usr/lib/security/sparcv9/pam_authtok_get.so=./pam_authtok_get.so.1
 f none usr/lib/security/sparcv9/pam_authtok_check.so.1 755 root bin

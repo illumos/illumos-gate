@@ -19,50 +19,16 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/pam_modules/Makefile
-#
 
-SUBDIRS = \
-	allow	\
-	authtok_get	\
-	authtok_check	\
-	authtok_store	\
-	deny		\
-	dhkeys		\
-	dial_auth	\
-	krb5		\
-	krb5_migrate	\
-	ldap		\
-	passwd_auth	\
-	projects	\
-	rhosts_auth	\
-	roles		\
-	sample		\
-	smartcard	\
-	unix_auth	\
-	unix_account	\
-	unix_cred	\
-	unix_session
+# To enable apptrace, comment out the next line
+DISABLE_APPTRACE=	$(POUND_SIGN)
 
-all :=		TARGET= all
-catalog :=	TARGET= _msg
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-install :=	TARGET= install
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+include ../Makefile.targ
+include $(SRC)/lib/Makefile.lib
+include $(SRC)/lib/Makefile.spec
 
-.KEEP_STATE:
-
-all clean clobber install lint _msg: $(SUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+$(DISABLE_APPTRACE)install:	$(ROOTABILIB)

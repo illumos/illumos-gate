@@ -24,45 +24,17 @@
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/pam_modules/Makefile
-#
 
-SUBDIRS = \
-	allow	\
-	authtok_get	\
-	authtok_check	\
-	authtok_store	\
-	deny		\
-	dhkeys		\
-	dial_auth	\
-	krb5		\
-	krb5_migrate	\
-	ldap		\
-	passwd_auth	\
-	projects	\
-	rhosts_auth	\
-	roles		\
-	sample		\
-	smartcard	\
-	unix_auth	\
-	unix_account	\
-	unix_cred	\
-	unix_session
+LIBRARY=	pam_allow.a
+VERS=		.1
+OBJECTS= 	allow.o
 
-all :=		TARGET= all
-catalog :=	TARGET= _msg
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-install :=	TARGET= install
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+include		../../Makefile.pam_modules
 
-.KEEP_STATE:
+LDLIBS +=	-lpam -lc
 
-all clean clobber install lint _msg: $(SUBDIRS)
+all: $(LIBS)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+lint: lintcheck
 
-FRC:
+include $(SRC)/lib/Makefile.targ
