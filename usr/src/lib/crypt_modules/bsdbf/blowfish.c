@@ -1,24 +1,16 @@
 /*
- * CDDL HEADER START
- *
- * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
- *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
- * See the License for the specific language governing permissions
- * and limitations under the License.
- *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the
- * fields enclosed by brackets "[]" replaced with your own identifying
- * information: Portions Copyright [yyyy] [name of copyright owner]
- *
- * CDDL HEADER END
+ * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+/*
+ * The above Sun copyright is included due to changes made to this code
+ * for US export control.  No changes to the algorithm implementations have
+ * been made.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /* $OpenBSD: blowfish.c,v 1.16 2002/02/19 19:39:36 millert Exp $ */
 /*
  * Blowfish block cipher for OpenBSD
@@ -52,19 +44,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-/*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
- * The above Sun copyright is included due to changes made to this code
- * for US export control.  No changes to the algorithm implementations have
- * been made.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This code is derived from section 14.3 and the given source

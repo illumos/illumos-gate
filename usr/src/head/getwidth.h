@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright (c) 1989 by Sun Microsystems, Inc.
- * Copyright (c) 1989 by Nihon Sun Microsystems K.K.
+ * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #ifndef	_GETWIDTH_H
 #define	_GETWIDTH_H

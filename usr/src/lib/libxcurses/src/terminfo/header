@@ -19,14 +19,14 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 1996 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 # ------------------------
 #
-#	Terminfo source file %W% (CBOSGD) %G%
+#	Terminfo source file
 #	Mark Horton, U.C. Berkeley, Bell Telephone Laboratories
 #
 # This file describes capabilities of various terminals, as needed by

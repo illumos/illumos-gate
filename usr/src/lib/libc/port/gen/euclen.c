@@ -20,9 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1988-1996 by Sun Microsystems, Inc.
- * Copyright (c) 1988 by Nihon Sun Microsystems K.K.
- * All rights reserved.
+ * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"   /* Nihon Sun Micro JLE */
