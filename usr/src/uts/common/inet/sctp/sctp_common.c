@@ -138,6 +138,8 @@ sctp_ire2faddr(sctp_t *sctp, sctp_faddr_t *fp)
 		/* make sure the laddr is part of this association */
 		if ((sp = sctp_ipif_lookup(sctp, ipif_seqid)) !=
 		    NULL && !sp->saddr_ipif_dontsrc) {
+			if (sp->saddr_ipif_unconfirmed == 1)
+				sp->saddr_ipif_unconfirmed = 0;
 			fp->saddr = laddr;
 		} else {
 			ip2dbg(("ire2faddr: src addr is not part of assc\n"));
@@ -162,6 +164,8 @@ sctp_ire2faddr(sctp_t *sctp, sctp_faddr_t *fp)
 
 		if ((sp = sctp_ipif_lookup(sctp, ipif_seqid)) !=
 		    NULL && !sp->saddr_ipif_dontsrc) {
+			if (sp->saddr_ipif_unconfirmed == 1)
+				sp->saddr_ipif_unconfirmed = 0;
 			fp->saddr = laddr;
 		} else {
 			dprint(2, ("ire2faddr: src addr is not part "
@@ -1155,6 +1159,37 @@ sctp_next_parm(sctp_parm_hdr_t *current, ssize_t *remaining)
  * in this new info, get rid of them, and clean the pointers if there's
  * messages which have this as their target address.
  *
+ * We also re-adjust the source address list here since the list may
+ * contain more than what is actually part of the association. If
+ * we get here from sctp_send_cookie_echo(), we are on the active
+ * side and psctp will be NULL and ich will be the INIT-ACK chunk.
+ * If we get here from sctp_accept_comm(), ich will be the INIT chunk
+ * and psctp will the listening endpoint.
+ *
+ * INIT processing: When processing the INIT we inherit the src address
+ * list from the listener. For a loopback or linklocal association, we
+ * delete the list and just take the address from the IP header (since
+ * that's how we created the INIT-ACK). Additionally, for loopback we
+ * ignore the address params in the INIT. For determining which address
+ * types were sent in the INIT-ACK we follow the same logic as in
+ * creating the INIT-ACK. We delete addresses of the type that are not
+ * supported by the peer.
+ *
+ * INIT-ACK processing: When processing the INIT-ACK since we had not
+ * included addr params for loopback or linklocal addresses when creating
+ * the INIT, we just use the address from the IP header. Further, for
+ * loopback we ignore the addr param list. We mark addresses of the
+ * type not supported by the peer as unconfirmed.
+ *
+ * In case of INIT processing we look for supported address types in the
+ * supported address param, if present. In both cases the address type in
+ * the IP header is supported as well as types for addresses in the param
+ * list, if any.
+ *
+ * Once we have the supported address types sctp_check_saddr() runs through
+ * the source address list and deletes or marks as unconfirmed address of
+ * types not supported by the peer.
+ *
  * Returns 0 on success, sys errno on failure
  */
 int
@@ -1164,17 +1199,41 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 	sctp_init_chunk_t	*init;
 	ipha_t			*iph;
 	ip6_t			*ip6h;
-	in6_addr_t		hdraddr[1];
+	in6_addr_t		hdrsaddr[1];
+	in6_addr_t		hdrdaddr[1];
 	sctp_parm_hdr_t		*ph;
 	ssize_t			remaining;
 	int			isv4;
 	int			err;
 	sctp_faddr_t		*fp;
+	int			supp_af = 0;
+	boolean_t		check_saddr = B_TRUE;
 
 	if (sctp_options != NULL)
 		*sctp_options = 0;
 
-	/* inherit laddrs, if given */
+	/* extract the address from the IP header */
+	isv4 = (IPH_HDR_VERSION(pkt->b_rptr) == IPV4_VERSION);
+	if (isv4) {
+		iph = (ipha_t *)pkt->b_rptr;
+		IN6_IPADDR_TO_V4MAPPED(iph->ipha_src, hdrsaddr);
+		IN6_IPADDR_TO_V4MAPPED(iph->ipha_dst, hdrdaddr);
+		supp_af |= PARM_SUPP_V4;
+	} else {
+		ip6h = (ip6_t *)pkt->b_rptr;
+		hdrsaddr[0] = ip6h->ip6_src;
+		hdrdaddr[0] = ip6h->ip6_dst;
+		supp_af |= PARM_SUPP_V6;
+	}
+
+	/*
+	 * Unfortunately, we can't delay this because adding an faddr
+	 * looks for the presence of the source address (from the ire
+	 * for the faddr) in the source address list. We could have
+	 * delayed this if, say, this was a loopback/linklocal connection.
+	 * Now, we just end up nuking this list and taking the addr from
+	 * the IP header for loopback/linklocal.
+	 */
 	if (psctp != NULL && psctp->sctp_nsaddrs > 0) {
 		ASSERT(sctp->sctp_nsaddrs == 0);
 
@@ -1182,38 +1241,85 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 		if (err != 0)
 			return (err);
 	}
+	/*
+	 * We will add the faddr before parsing the address list as this
+	 * might be a loopback connection and we would not have to
+	 * go through the list.
+	 *
+	 * Make sure the header's addr is in the list
+	 */
+	fp = sctp_lookup_faddr(sctp, hdrsaddr);
+	if (fp == NULL) {
+		/* not included; add it now */
+		if (sctp_add_faddr_first(sctp, hdrsaddr, KM_NOSLEEP) == -1)
+			return (ENOMEM);
 
-	/* extract the address from the IP header */
-	isv4 = (IPH_HDR_VERSION(pkt->b_rptr) == IPV4_VERSION);
-	if (isv4) {
-		iph = (ipha_t *)pkt->b_rptr;
-		IN6_IPADDR_TO_V4MAPPED(iph->ipha_src, hdraddr);
-	} else {
-		ip6h = (ip6_t *)pkt->b_rptr;
-		hdraddr[0] = ip6h->ip6_src;
+		/* sctp_faddrs will be the hdr addr */
+		fp = sctp->sctp_faddrs;
 	}
+	/* make the header addr the primary */
+	sctp->sctp_primary = fp;
+	sctp->sctp_current = fp;
+	sctp->sctp_mss = fp->sfa_pmss;
 
-	/* For loopback connections ignore address list */
-	if (sctp->sctp_loopback)
-		goto get_from_iphdr;
+	/* For loopback connections & linklocal get address from the header */
+	if (sctp->sctp_loopback || sctp->sctp_linklocal) {
+		if (sctp->sctp_nsaddrs != 0)
+			sctp_free_saddrs(sctp);
+		if ((err = sctp_saddr_add_addr(sctp, hdrdaddr)) != 0)
+			return (err);
+		/* For loopback ignore address list */
+		if (sctp->sctp_loopback)
+			return (0);
+		check_saddr = B_FALSE;
+	}
 
 	/* Walk the params in the INIT [ACK], pulling out addr params */
 	remaining = ntohs(ich->sch_len) - sizeof (*ich) -
 	    sizeof (sctp_init_chunk_t);
 	if (remaining < sizeof (*ph)) {
-		/* no parameters */
-		goto get_from_iphdr;
+		if (check_saddr) {
+			sctp_check_saddr(sctp, supp_af, psctp == NULL ?
+			    B_FALSE : B_TRUE);
+		}
+		ASSERT(sctp_saddr_lookup(sctp, hdrdaddr) != NULL);
+		return (0);
 	}
+
 	init = (sctp_init_chunk_t *)(ich + 1);
 	ph = (sctp_parm_hdr_t *)(init + 1);
 
+	/* params will have already been byteordered when validating */
 	while (ph != NULL) {
-		/* params will have already been byteordered when validating */
-		if (ph->sph_type == htons(PARM_ADDR4)) {
+		if (ph->sph_type == htons(PARM_SUPP_ADDRS)) {
+			int		plen;
+			uint16_t	*p;
+			uint16_t	addrtype;
+
+			ASSERT(psctp != NULL);
+			plen = ntohs(ph->sph_len);
+			p = (uint16_t *)(ph + 1);
+			while (plen > 0) {
+				addrtype = ntohs(*p);
+				switch (addrtype) {
+					case PARM_ADDR6:
+						supp_af |= PARM_SUPP_V6;
+						break;
+					case PARM_ADDR4:
+						supp_af |= PARM_SUPP_V4;
+						break;
+					default:
+						break;
+				}
+				p++;
+				plen -= sizeof (*p);
+			}
+		} else if (ph->sph_type == htons(PARM_ADDR4)) {
 			if (remaining >= PARM_ADDR4_LEN) {
 				in6_addr_t addr;
 				ipaddr_t ta;
 
+				supp_af |= PARM_SUPP_V4;
 				/*
 				 * Screen out broad/multicasts & loopback.
 				 * If the endpoint only accepts v6 address,
@@ -1252,6 +1358,7 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 			if (remaining >= PARM_ADDR6_LEN) {
 				in6_addr_t *addr6;
 
+				supp_af |= PARM_SUPP_V6;
 				addr6 = (in6_addr_t *)(ph + 1);
 				/*
 				 * Screen out link locals, mcast, loopback
@@ -1280,23 +1387,11 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 next:
 		ph = sctp_next_parm(ph, &remaining);
 	}
-
-get_from_iphdr:
-	/* Make sure the header's addr is in the list */
-	fp = sctp_lookup_faddr(sctp, hdraddr);
-	if (fp == NULL) {
-		/* not included; add it now */
-		if (sctp_add_faddr_first(sctp, hdraddr, KM_NOSLEEP) == -1)
-			return (ENOMEM);
-
-		/* sctp_faddrs will be the hdr addr */
-		fp = sctp->sctp_faddrs;
+	if (check_saddr) {
+		sctp_check_saddr(sctp, supp_af, psctp == NULL ? B_FALSE :
+		    B_TRUE);
 	}
-	/* make the header addr the primary */
-	sctp->sctp_primary = fp;
-	sctp->sctp_current = fp;
-	sctp->sctp_mss = fp->sfa_pmss;
-
+	ASSERT(sctp_saddr_lookup(sctp, hdrdaddr) != NULL);
 	return (0);
 }
 

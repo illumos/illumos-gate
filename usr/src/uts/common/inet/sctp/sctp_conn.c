@@ -172,6 +172,8 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 
 	if (ipvers != IPV4_VERSION) {
 		ip6h = (ip6_t *)mp->b_rptr;
+		if (IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_src))
+			eager->sctp_linklocal = 1;
 		/*
 		 * Record ifindex (might be zero) to tie this connection to
 		 * that interface if either the listener was bound or
@@ -350,6 +352,8 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 			dstaddr = ipv6_loopback;
 		} else {
 			dstaddr = sin6->sin6_addr;
+			if (IN6_IS_ADDR_LINKLOCAL(&dstaddr))
+				sctp->sctp_linklocal = 1;
 		}
 		dstport = sin6->sin6_port;
 		hdrlen = sctp->sctp_hdr6_len;
@@ -482,12 +486,19 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 
 		/* Send the INIT to the peer */
 		SCTP_FADDR_TIMER_RESTART(sctp, cur_fp, cur_fp->rto);
+		/*
+		 * sctp_init_mp() could result in modifying the source
+		 * address list, so take the hash lock.
+		 */
+		mutex_enter(&tbf->tf_lock);
 		initmp = sctp_init_mp(sctp);
 		if (initmp == NULL) {
+			mutex_exit(&tbf->tf_lock);
 			WAKE_SCTP(sctp);
 			/* let timer retry */
 			return (0);
 		}
+		mutex_exit(&tbf->tf_lock);
 		sctp->sctp_state = SCTPS_COOKIE_WAIT;
 		WAKE_SCTP(sctp);
 		/* OK to call IP_PUT() here instead of sctp_add_sendq(). */

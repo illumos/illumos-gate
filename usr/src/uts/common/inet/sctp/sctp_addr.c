@@ -55,7 +55,8 @@ static sctp_ipif_t	*sctp_lookup_ipif_addr(in6_addr_t *, boolean_t,
 static int		sctp_get_all_ipifs(sctp_t *, int);
 int			sctp_valid_addr_list(sctp_t *, const void *, uint32_t);
 sctp_saddr_ipif_t	*sctp_ipif_lookup(sctp_t *, uint_t);
-static int		sctp_ipif_hash_insert(sctp_t *, sctp_ipif_t *, int);
+static int		sctp_ipif_hash_insert(sctp_t *, sctp_ipif_t *, int,
+			    boolean_t dontsrc);
 static void		sctp_ipif_hash_remove(sctp_t *, sctp_ipif_t *);
 static int		sctp_compare_ipif_list(sctp_ipif_hash_t *,
 			    sctp_ipif_hash_t *);
@@ -74,9 +75,23 @@ in6_addr_t		sctp_get_valid_addr(sctp_t *, boolean_t);
 int			sctp_getmyaddrs(void *, void *, int *);
 void			sctp_saddr_init();
 void			sctp_saddr_fini();
+
 #define	SCTP_IPIF_USABLE(sctp_ipif_state)	\
 	((sctp_ipif_state) == SCTP_IPIFS_UP ||	\
-	((sctp_ipif_state) ==  SCTP_IPIFS_DOWN))
+	(sctp_ipif_state) ==  SCTP_IPIFS_DOWN)
+
+#define	SCTP_IPIF_DISCARD(sctp_ipif_flags)	\
+	((sctp_ipif_flags) & (IPIF_PRIVATE | IPIF_DEPRECATED))
+
+/* True if this is a loopback ILL or a LINKLOCAL addr */
+#define	SCTP_IS_LL_LB(ill, ipif)	\
+	(((ill)->sctp_ill_flags & PHYI_LOOPBACK) ||	\
+	((ipif)->sctp_ipif_isv6 && 			\
+	IN6_IS_ADDR_LINKLOCAL(&(ipif)->sctp_ipif_saddr)))
+
+#define	SCTP_UNSUPP_AF(ipif, supp_af)	\
+	((!(ipif)->sctp_ipif_isv6 && !((supp_af) & PARM_SUPP_V4)) ||	\
+	((ipif)->sctp_ipif_isv6 && !((supp_af) & PARM_SUPP_V6)))
 
 #define	SCTP_ILL_HASH_FN(index)		((index) % SCTP_ILL_HASH)
 #define	SCTP_IPIF_HASH_FN(seqid)	((seqid) % SCTP_IPIF_HASH)
@@ -204,14 +219,13 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 		sctp_ipif = list_head(&sctp_g_ipifs[i].sctp_ipif_list);
 		for (j = 0; j < sctp_g_ipifs[i].ipif_count; j++) {
 			rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
-			if (sctp_ipif->sctp_ipif_zoneid != sctp->sctp_zoneid ||
+			if (SCTP_IPIF_DISCARD(sctp_ipif->sctp_ipif_flags) ||
 			    !SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state) ||
+			    sctp_ipif->sctp_ipif_zoneid != sctp->sctp_zoneid ||
 			    (sctp->sctp_ipversion == IPV4_VERSION &&
-			    !IN6_IS_ADDR_V4MAPPED(
-			    &sctp_ipif->sctp_ipif_saddr)) ||
+			    sctp_ipif->sctp_ipif_isv6) ||
 			    (sctp->sctp_connp->conn_ipv6_v6only &&
-			    IN6_IS_ADDR_V4MAPPED(
-			    &sctp_ipif->sctp_ipif_saddr))) {
+			    !sctp_ipif->sctp_ipif_isv6)) {
 				rw_exit(&sctp_ipif->sctp_ipif_lock);
 				sctp_ipif = list_next(
 				    &sctp_g_ipifs[i].sctp_ipif_list, sctp_ipif);
@@ -219,7 +233,8 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 			}
 			rw_exit(&sctp_ipif->sctp_ipif_lock);
 			SCTP_IPIF_REFHOLD(sctp_ipif);
-			error = sctp_ipif_hash_insert(sctp, sctp_ipif, sleep);
+			error = sctp_ipif_hash_insert(sctp, sctp_ipif, sleep,
+			    B_FALSE);
 			if (error != 0)
 				goto free_stuff;
 			sctp_ipif = list_next(&sctp_g_ipifs[i].sctp_ipif_list,
@@ -343,7 +358,15 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt)
 			}
 		}
 		if (!bind_to_all) {
-			err = sctp_ipif_hash_insert(sctp, ipif, KM_SLEEP);
+			/*
+			 * If an address is added after association setup,
+			 * we need to wait for the peer to send us an ASCONF
+			 * ACK before we can start using it.
+			 * saddr_ipif_dontsrc will be reset (to 0) when we
+			 * get the ASCONF ACK for this address.
+			 */
+			err = sctp_ipif_hash_insert(sctp, ipif, KM_SLEEP,
+			    check_addrs ? B_TRUE : B_FALSE);
 			if (err != 0) {
 				SCTP_IPIF_REFRELE(ipif);
 				if (check_addrs && err == EALREADY)
@@ -403,7 +426,8 @@ sctp_ipif_lookup(sctp_t *sctp, uint_t ipif_index)
 }
 
 static int
-sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep)
+sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep,
+    boolean_t dontsrc)
 {
 	int			cnt;
 	sctp_saddr_ipif_t	*ipif_obj;
@@ -422,14 +446,7 @@ sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep)
 		return (ENOMEM);
 	}
 	ipif_obj->saddr_ipifp = ipif;
-	/*
-	 * If an address is added after association setup, we need to wait
-	 * for the peer to send us an ASCONF ACK before we can start using it.
-	 * saddr_ipif_dontsrc will be reset (to 0) when we get the ASCONF
-	 * ACK for this address.
-	 */
-	if (sctp->sctp_state > SCTP_LISTEN)
-		ipif_obj->saddr_ipif_dontsrc = 1;
+	ipif_obj->saddr_ipif_dontsrc = dontsrc ? 1 : 0;
 	list_insert_tail(&sctp->sctp_saddrs[seqid].sctp_ipif_list, ipif_obj);
 	sctp->sctp_saddrs[seqid].ipif_count++;
 	sctp->sctp_nsaddrs++;
@@ -520,7 +537,8 @@ sctp_copy_ipifs(sctp_ipif_hash_t *list1, sctp_t *sctp2, int sleep)
 	obj = list_head(&list1->sctp_ipif_list);
 	for (i = 0; i < list1->ipif_count; i++) {
 		SCTP_IPIF_REFHOLD(obj->saddr_ipifp);
-		error = sctp_ipif_hash_insert(sctp2, obj->saddr_ipifp, sleep);
+		error = sctp_ipif_hash_insert(sctp2, obj->saddr_ipifp, sleep,
+		    B_FALSE);
 		if (error != 0)
 			return (error);
 		obj = list_next(&list1->sctp_ipif_list, obj);
@@ -534,7 +552,7 @@ sctp_dup_saddrs(sctp_t *sctp1, sctp_t *sctp2, int sleep)
 	int	error = 0;
 	int	i;
 
-	if (sctp1 == NULL || sctp1->sctp_bound_to_all)
+	if (sctp1 == NULL || sctp1->sctp_bound_to_all == 1)
 		return (sctp_get_all_ipifs(sctp2, sleep));
 
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
@@ -571,6 +589,8 @@ sctp_free_saddrs(sctp_t *sctp)
 		}
 		sctp->sctp_saddrs[i].ipif_count = 0;
 	}
+	if (sctp->sctp_bound_to_all == 1)
+		sctp->sctp_bound_to_all = 0;
 	ASSERT(sctp->sctp_nsaddrs == 0);
 }
 
@@ -785,6 +805,7 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
 		sctp_ipif->sctp_ipif_zoneid = ipif->ipif_zoneid;
 		sctp_ipif->sctp_ipif_isv6 = ill->ill_isv6;
+		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
 		rw_init(&sctp_ipif->sctp_ipif_lock, NULL, RW_DEFAULT, NULL);
 		list_insert_tail(&sctp_g_ipifs[ipif_index].sctp_ipif_list,
 		    (void *)sctp_ipif);
@@ -834,6 +855,8 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
 		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_UP;
 		sctp_ipif->sctp_ipif_saddr = ipif->ipif_v6lcl_addr;
+		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
+		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
 		rw_exit(&sctp_ipif->sctp_ipif_lock);
 
 		break;
@@ -845,6 +868,7 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
 		sctp_ipif->sctp_ipif_saddr = ipif->ipif_v6lcl_addr;
 		sctp_ipif->sctp_ipif_zoneid = ipif->ipif_zoneid;
+		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
 		rw_exit(&sctp_ipif->sctp_ipif_lock);
 
 		break;
@@ -883,7 +907,7 @@ sctp_del_saddr(sctp_t *sctp, sctp_saddr_ipif_t *sp)
 
 	sctp_ipif_hash_remove(sctp, sp->saddr_ipifp);
 
-	if (sctp->sctp_bound_to_all)
+	if (sctp->sctp_bound_to_all == 1)
 		sctp->sctp_bound_to_all = 0;
 
 	if (sctp->sctp_conn_tfp != NULL)
@@ -933,7 +957,7 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
 		ASSERT(sctp_ipif != NULL);
 		sctp_ipif_hash_remove(sctp, sctp_ipif);
 	}
-	if (sctp->sctp_bound_to_all)
+	if (sctp->sctp_bound_to_all == 1)
 		sctp->sctp_bound_to_all = 0;
 
 	if (!fanout_locked) {
@@ -962,6 +986,91 @@ sctp_saddr_lookup(sctp_t *sctp, in6_addr_t *addr)
 	return (saddr_ipifs);
 }
 
+/* Given an address, add it to the source address list */
+int
+sctp_saddr_add_addr(sctp_t *sctp, in6_addr_t *addr)
+{
+	sctp_ipif_t		*sctp_ipif;
+
+	sctp_ipif = sctp_lookup_ipif_addr(addr, B_TRUE, sctp->sctp_zoneid);
+	if (sctp_ipif == NULL)
+		return (EINVAL);
+
+	if (sctp_ipif_hash_insert(sctp, sctp_ipif, KM_NOSLEEP, B_FALSE) != 0) {
+		SCTP_IPIF_REFRELE(sctp_ipif);
+		return (EINVAL);
+	}
+	return (0);
+}
+
+/*
+ * Remove or mark as dontsrc addresses that are currently not part of the
+ * association. One would delete addresses when processing an INIT and
+ * mark as dontsrc when processing an INIT-ACK.
+ */
+void
+sctp_check_saddr(sctp_t *sctp, int supp_af, boolean_t delete)
+{
+	int			i;
+	int			l;
+	sctp_saddr_ipif_t	*obj;
+	int			scanned = 0;
+	int			naddr;
+	int			nsaddr;
+
+	ASSERT(!sctp->sctp_loopback && !sctp->sctp_linklocal && supp_af != 0);
+
+	/*
+	 * Irregardless of the supported address in the INIT, v4
+	 * must be supported.
+	 */
+	if (sctp->sctp_family == AF_INET)
+		supp_af = PARM_SUPP_V4;
+
+	nsaddr = sctp->sctp_nsaddrs;
+	for (i = 0; i < SCTP_IPIF_HASH; i++) {
+		if (sctp->sctp_saddrs[i].ipif_count == 0)
+			continue;
+		obj = list_head(&sctp->sctp_saddrs[i].sctp_ipif_list);
+		naddr = sctp->sctp_saddrs[i].ipif_count;
+		for (l = 0; l < naddr; l++) {
+			sctp_ipif_t	*ipif;
+			sctp_ill_t	*ill;
+
+			ipif = obj->saddr_ipifp;
+			ill = ipif->sctp_ipif_ill;
+			scanned++;
+
+			/*
+			 * Delete/mark dontsrc loopback/linklocal addresses and
+			 * unsupported address.
+			 */
+			if (SCTP_IS_LL_LB(ill, ipif) ||
+			    SCTP_UNSUPP_AF(ipif, supp_af)) {
+				if (!delete) {
+					obj->saddr_ipif_unconfirmed = 1;
+					goto next_obj;
+				}
+				if (sctp->sctp_bound_to_all == 1)
+					sctp->sctp_bound_to_all = 0;
+				if (scanned < nsaddr) {
+					obj = list_next(&sctp->sctp_saddrs[i].
+					    sctp_ipif_list, obj);
+					sctp_ipif_hash_remove(sctp, ipif);
+					continue;
+				}
+				sctp_ipif_hash_remove(sctp, ipif);
+			}
+	next_obj:
+			if (scanned >= nsaddr)
+				return;
+			obj = list_next(&sctp->sctp_saddrs[i].sctp_ipif_list,
+			    obj);
+		}
+	}
+}
+
+
 /* Get the first valid address from the list. Called with no locks held */
 in6_addr_t
 sctp_get_valid_addr(sctp_t *sctp, boolean_t isv6)
@@ -978,16 +1087,11 @@ sctp_get_valid_addr(sctp_t *sctp, boolean_t isv6)
 		obj = list_head(&sctp->sctp_saddrs[i].sctp_ipif_list);
 		for (l = 0; l < sctp->sctp_saddrs[i].ipif_count; l++) {
 			sctp_ipif_t	*ipif;
-			sctp_ill_t	*ill;
 
 			ipif = obj->saddr_ipifp;
-			ill = ipif->sctp_ipif_ill;
-			if (!obj->saddr_ipif_dontsrc &&
+			if (!SCTP_DONT_SRC(obj) &&
 			    ipif->sctp_ipif_isv6 == isv6 &&
-			    ipif->sctp_ipif_state == SCTP_IPIFS_UP &&
-			    !(ill->sctp_ill_flags & PHYI_LOOPBACK) &&
-			    (!ipif->sctp_ipif_isv6 ||
-			    !IN6_IS_ADDR_LINKLOCAL(&ipif->sctp_ipif_saddr))) {
+			    ipif->sctp_ipif_state == SCTP_IPIFS_UP) {
 				return (ipif->sctp_ipif_saddr);
 			}
 			scanned++;
@@ -1044,7 +1148,7 @@ sctp_getmyaddrs(void *conn, void *myaddrs, int *addrcnt)
 
 			scanned++;
 			if ((ipif->sctp_ipif_state == SCTP_IPIFS_CONDEMNED) ||
-			    obj->saddr_ipif_dontsrc ||
+			    SCTP_DONT_SRC(obj) ||
 			    ((ill->sctp_ill_flags & PHYI_LOOPBACK) &&
 			    skip_lback)) {
 				if (scanned >= sctp->sctp_nsaddrs)
@@ -1084,9 +1188,13 @@ done:
  * Given the supported address family, walk through the source address list
  * and return the total length of the available addresses. If 'p' is not
  * null, construct the parameter list for the addresses in 'p'.
+ * 'modify' will only be set when we want the source address list to
+ * be modified. The source address list will be modified only when
+ * generating an INIT chunk. For generating an INIT-ACK 'modify' will
+ * be false since the 'sctp' will be that of the listener.
  */
 size_t
-sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p)
+sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p, boolean_t modify)
 {
 	int			i;
 	int			l;
@@ -1094,32 +1202,58 @@ sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p)
 	size_t			paramlen = 0;
 	sctp_parm_hdr_t		*hdr;
 	int			scanned = 0;
+	int			naddr;
+	int			nsaddr;
+	boolean_t		del_ll_lb = B_FALSE;
 
+	if (modify && !sctp->sctp_loopback && !sctp->sctp_linklocal)
+		del_ll_lb = B_TRUE;
+
+	nsaddr = sctp->sctp_nsaddrs;
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
 		if (sctp->sctp_saddrs[i].ipif_count == 0)
 			continue;
 		obj = list_head(&sctp->sctp_saddrs[i].sctp_ipif_list);
-		for (l = 0; l < sctp->sctp_saddrs[i].ipif_count; l++) {
+		naddr = sctp->sctp_saddrs[i].ipif_count;
+		for (l = 0; l < naddr; l++) {
 			in6_addr_t	addr;
 			sctp_ipif_t	*ipif;
 			sctp_ill_t	*ill;
+			boolean_t	ll_lb;
+			boolean_t	unsupp_af;
 
 			ipif = obj->saddr_ipifp;
 			ill = ipif->sctp_ipif_ill;
 			scanned++;
-			if (!SCTP_IPIF_USABLE(ipif->sctp_ipif_state) ||
-			    (ill->sctp_ill_flags & PHYI_LOOPBACK)) {
+
+			ll_lb = SCTP_IS_LL_LB(ill, ipif);
+			unsupp_af = SCTP_UNSUPP_AF(ipif, supp_af);
+			/*
+			 * We need to either delete or skip loopback/linklocal
+			 * or unsupported addresses.
+			 */
+			if ((ll_lb && del_ll_lb) || (unsupp_af && modify)) {
+				if (sctp->sctp_bound_to_all == 1)
+					sctp->sctp_bound_to_all = 0;
+				if (scanned < nsaddr) {
+					obj = list_next(&sctp->sctp_saddrs[i].
+					    sctp_ipif_list, obj);
+					sctp_ipif_hash_remove(sctp, ipif);
+					continue;
+				}
+				sctp_ipif_hash_remove(sctp, ipif);
+				goto next_addr;
+			} else if (ll_lb || unsupp_af) {
 				goto next_addr;
 			}
+
+			if (!SCTP_IPIF_USABLE(ipif->sctp_ipif_state))
+				goto next_addr;
 			if (p != NULL)
 				hdr = (sctp_parm_hdr_t *)(p + paramlen);
 			addr = ipif->sctp_ipif_saddr;
-			if (IN6_IS_ADDR_V4MAPPED(&addr)) {
+			if (!ipif->sctp_ipif_isv6) {
 				struct in_addr	*v4;
-
-				/* The other side does not support v4 */
-				if (!(supp_af & PARM_SUPP_V4))
-					goto next_addr;
 
 				if (p != NULL) {
 					hdr->sph_type = htons(PARM_ADDR4);
@@ -1128,8 +1262,7 @@ sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p)
 					IN6_V4MAPPED_TO_INADDR(&addr, v4);
 				}
 				paramlen += PARM_ADDR4_LEN;
-			} else if (!IN6_IS_ADDR_LINKLOCAL(&addr) &&
-			    (supp_af & PARM_SUPP_V6)) {
+			} else {
 				if (p != NULL) {
 					hdr->sph_type = htons(PARM_ADDR6);
 					hdr->sph_len = htons(PARM_ADDR6_LEN);
@@ -1138,7 +1271,7 @@ sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p)
 				paramlen += PARM_ADDR6_LEN;
 			}
 next_addr:
-			if (scanned >= sctp->sctp_nsaddrs)
+			if (scanned >= nsaddr)
 				return (paramlen);
 			obj = list_next(&sctp->sctp_saddrs[i].sctp_ipif_list,
 			    obj);

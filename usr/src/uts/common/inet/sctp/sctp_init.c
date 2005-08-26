@@ -190,7 +190,7 @@ sctp_init_mp(sctp_t *sctp)
 		initlen += (sizeof (sctp_parm_hdr_t) + sizeof (uint32_t));
 	}
 	initlen += sctp_supaddr_param_len(sctp);
-	initlen += sctp_addr_params_len(sctp, supp_af);
+	initlen += sctp_addr_params_len(sctp, supp_af, B_TRUE);
 	if (sctp->sctp_prsctp_aware && sctp_prsctp_enabled)
 		initlen += sctp_options_param_len(sctp, SCTP_PRSCTP_OPTION);
 
@@ -257,25 +257,32 @@ sctp_init2vtag(sctp_chunk_hdr_t *initch)
 }
 
 size_t
-sctp_addr_params_len(sctp_t *sctp, int af)
+sctp_addr_params_len(sctp_t *sctp, int af, boolean_t modify)
 {
 	ASSERT(sctp->sctp_nsaddrs > 0);
 
 	/*
-	 * If we have only one local address, we can send less on the
-	 * wire by not including the address parameter and letting the peer
-	 * pull it from the IP header.
+	 * If we have only one local address or it is a loopback or linklocal
+	 * association, we let the peer pull the address from the IP header.
 	 */
-	if (sctp->sctp_nsaddrs == 1 || sctp->sctp_loopback)
+	if (sctp->sctp_nsaddrs == 1 || sctp->sctp_loopback ||
+	    sctp->sctp_linklocal) {
 		return (0);
-	return (sctp_saddr_info(sctp, af, NULL));
+	}
+
+	return (sctp_saddr_info(sctp, af, NULL, modify));
 }
 
 size_t
 sctp_addr_params(sctp_t *sctp, int af, uchar_t *p)
 {
-	if (sctp->sctp_nsaddrs == 1 || sctp->sctp_loopback)
+	/*
+	 * If we have only one local address or it is a loopback or linklocal
+	 * association, we let the peer pull the address from the IP header.
+	 */
+	if (sctp->sctp_nsaddrs == 1 || sctp->sctp_loopback ||
+	    sctp->sctp_linklocal) {
 		return (0);
-
-	return (sctp_saddr_info(sctp, af, p));
+	}
+	return (sctp_saddr_info(sctp, af, p, B_FALSE));
 }

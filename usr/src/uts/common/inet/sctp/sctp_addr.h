@@ -63,6 +63,7 @@ typedef struct sctp_ipif_s {
 	zoneid_t		sctp_ipif_zoneid;
 	krwlock_t		sctp_ipif_lock;
 	boolean_t		sctp_ipif_isv6;
+	uint64_t		sctp_ipif_flags;
 } sctp_ipif_t;
 
 /* ipif_state */
@@ -85,8 +86,14 @@ typedef struct sctp_saddrs_ipif_s {
 	sctp_ipif_t 	*saddr_ipifp;
 	uint32_t	saddr_ipif_dontsrc : 1,
 			saddr_ipif_delete_pending : 1,
-			pad : 30;
+			saddr_ipif_unconfirmed : 1,
+			pad : 29;
 } sctp_saddr_ipif_t;
+
+#define	SCTP_DONT_SRC(sctp_saddr)	\
+	((sctp_saddr)->saddr_ipif_dontsrc ||	\
+	(sctp_saddr)->saddr_ipif_unconfirmed)
+
 
 /*
  * SCTP ILL structure - only relevant fields from ill_t retained.
@@ -153,7 +160,7 @@ extern int		sctp_dup_saddrs(sctp_t *, sctp_t *, int);
 extern int		sctp_compare_saddrs(sctp_t *, sctp_t *);
 extern sctp_saddr_ipif_t	*sctp_saddr_lookup(sctp_t *, in6_addr_t *);
 extern in6_addr_t	sctp_get_valid_addr(sctp_t *, boolean_t isv6);
-extern size_t		sctp_saddr_info(sctp_t *, int, uchar_t *);
+extern size_t		sctp_saddr_info(sctp_t *, int, uchar_t *, boolean_t);
 extern void		sctp_del_saddr_list(sctp_t *, const void *, int,
 			    boolean_t);
 extern void		sctp_del_saddr(sctp_t *, sctp_saddr_ipif_t *);
@@ -162,6 +169,8 @@ extern void		sctp_saddr_init();
 extern void		sctp_saddr_fini();
 extern sctp_saddr_ipif_t	*sctp_ipif_lookup(sctp_t *, uint_t);
 extern int		sctp_getmyaddrs(void *, void *, int *);
+extern int		sctp_saddr_add_addr(sctp_t *, in6_addr_t *);
+extern void		sctp_check_saddr(sctp_t *, int, boolean_t);
 
 #ifdef	__cplusplus
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -603,6 +603,11 @@ sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 		BUMP_LOCAL(sctp->sctp_T1expire);
 rxmit_init:
 		/* retransmit init */
+		/*
+		 * We don't take the conn hash lock here since the source
+		 * address list won't be modified (it would have been done
+		 * the first time around).
+		 */
 		mp = sctp_init_mp(sctp);
 		if (mp != NULL) {
 			BUMP_MIB(&sctp_mib, sctpTimRetrans);

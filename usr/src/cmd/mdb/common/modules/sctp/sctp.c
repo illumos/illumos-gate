@@ -82,6 +82,31 @@ static sctp_ipif_hash_t local_g_ipifs[SCTP_IPIF_HASH];
  */
 #define	list_object(a, node) ((void *)(((char *)node) - (a)->list_offset))
 
+static char *
+sctp_faddr_state(int state)
+{
+	char *statestr;
+
+	switch (state) {
+	case SCTP_FADDRS_UNREACH:
+		statestr = "Unreachable";
+		break;
+	case SCTP_FADDRS_DOWN:
+		statestr = "Down";
+		break;
+	case SCTP_FADDRS_ALIVE:
+		statestr = "Alive";
+		break;
+	case SCTP_FADDRS_UNCONFIRMED:
+		statestr = "Unconfirmed";
+		break;
+	default:
+		statestr = "Unknown";
+		break;
+	}
+	return (statestr);
+}
+
 /* ARGSUSED */
 static int
 sctp_faddr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -97,24 +122,7 @@ sctp_faddr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	switch (fa->state) {
-	case SCTP_FADDRS_UNREACH:
-		statestr = "SCTP_FADDRS_UNREACH";
-		break;
-	case SCTP_FADDRS_DOWN:
-		statestr = "SCTP_FADDRS_DOWN";
-		break;
-	case SCTP_FADDRS_ALIVE:
-		statestr = "SCTP_FADDRS_ALIVE";
-		break;
-	case SCTP_FADDRS_UNCONFIRMED:
-		statestr = "SCTP_FADDRS_UNCONFIRMED";
-		break;
-	default:
-		statestr = "UNKNOWN STATE";
-		break;
-	}
-
+	statestr = sctp_faddr_state(fa->state);
 	mdb_printf("%<u>%p\t%<b>%N%</b>\t%s%</u>\n", addr, &fa->faddr,
 	    statestr);
 	mdb_printf("next\t\t%?p\tsaddr\t%N\n", fa->next, &fa->saddr);
@@ -562,6 +570,7 @@ show_sctp_flags(sctp_t *sctp)
 	mdb_printf("\tcondemned\t\t%d\n", sctp->sctp_condemned);
 	mdb_printf("\tchk_fast_rexmit\t\t%d\n", sctp->sctp_chk_fast_rexmit);
 	mdb_printf("\tprsctp_aware\t\t%d\n", sctp->sctp_prsctp_aware);
+	mdb_printf("\tlinklocal\t\t%d\n", sctp->sctp_linklocal);
 
 	mdb_printf("\trecvsndrcvinfo\t\t%d\n", sctp->sctp_recvsndrcvinfo);
 	mdb_printf("\trecvassocevnt\t\t%d\n", sctp->sctp_recvassocevnt);
@@ -596,25 +605,33 @@ print_saddr(uintptr_t ptr, const void *addr, void *cbdata)
 
 	switch (ipif.sctp_ipif_state) {
 	case SCTP_IPIFS_CONDEMNED:
-		statestr = "SCTP_IPIFS_CONDEMNED";
+		statestr = "Condemned";
 		break;
 	case SCTP_IPIFS_INVALID:
-		statestr = "SCTP_IPIFS_INVALID";
+		statestr = "Invalid";
 		break;
 	case SCTP_IPIFS_DOWN:
-		statestr = "SCTP_IPIFS_DOWN";
+		statestr = "Down";
 		break;
 	case SCTP_IPIFS_UP:
-		statestr = "SCTP_IPIFS_UP";
+		statestr = "Up";
 		break;
 	default:
-		statestr = "Unknown state";
+		statestr = "Unknown";
 		break;
 	}
-	mdb_printf("\t%N\tmtu %d id %d %d %s\n", &ipif.sctp_ipif_saddr,
+	mdb_printf("\t%p\t%N% (%s", saddr->saddr_ipifp, &ipif.sctp_ipif_saddr,
+	    statestr);
+	if (saddr->saddr_ipif_dontsrc == 1)
+		mdb_printf("/Dontsrc");
+	if (saddr->saddr_ipif_unconfirmed == 1)
+		mdb_printf("/Unconfirmed");
+	if (saddr->saddr_ipif_delete_pending == 1)
+		mdb_printf("/DeletePending");
+	mdb_printf(")\n");
+	mdb_printf("\t\t\tMTU %d id %d zoneid %d IPIF flags %x\n",
 	    ipif.sctp_ipif_mtu, ipif.sctp_ipif_id,
-	    ipif.sctp_ipif_zoneid, statestr);
-
+	    ipif.sctp_ipif_zoneid, ipif.sctp_ipif_flags);
 	return (WALK_NEXT);
 }
 
@@ -626,10 +643,14 @@ print_saddr(uintptr_t ptr, const void *addr, void *cbdata)
 static int
 print_faddr(uintptr_t ptr, const void *addr, void *cbdata)
 {
+	char	*statestr;
 	sctp_faddr_t *faddr = (sctp_faddr_t *)addr;
 	int *i = cbdata;
 
-	mdb_printf("\t%d:\t%N\t%?p\n", (*i)++, &faddr->faddr, ptr);
+	statestr = sctp_faddr_state(faddr->state);
+
+	mdb_printf("\t%d:\t%N\t%?p (%s)\n", (*i)++, &faddr->faddr, ptr,
+	    statestr);
 	return (WALK_NEXT);
 }
 

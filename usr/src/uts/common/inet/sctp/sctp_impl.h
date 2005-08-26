@@ -742,7 +742,9 @@ typedef struct sctp_s {
 		sctp_ndelay : 1,	/* turn off Nagle */
 		sctp_condemned : 1,	/* this sctp is about to disappear */
 		sctp_chk_fast_rexmit : 1, /* check for fast rexmit message */
-		sctp_prsctp_aware : 1;	/* is peer PR-SCTP aware? */
+
+		sctp_prsctp_aware : 1,	/* is peer PR-SCTP aware? */
+		sctp_linklocal : 1;	/* is linklocal assoc. */
 	} sctp_bits;
 	struct {
 		uint32_t
@@ -783,6 +785,7 @@ typedef struct sctp_s {
 #define	sctp_condemned sctp_bits.sctp_condemned
 #define	sctp_chk_fast_rexmit sctp_bits.sctp_chk_fast_rexmit
 #define	sctp_prsctp_aware sctp_bits.sctp_prsctp_aware
+#define	sctp_linklocal sctp_bits.sctp_linklocal
 
 #define	sctp_recvsndrcvinfo sctp_events.sctp_recvsndrcvinfo
 #define	sctp_recvassocevnt sctp_events.sctp_recvassocevnt
@@ -920,7 +923,7 @@ extern boolean_t sctp_add_recvq(sctp_t *, mblk_t *, boolean_t);
 extern void	sctp_add_sendq(sctp_t *, mblk_t *);
 extern void	sctp_add_unrec_parm(sctp_parm_hdr_t *, mblk_t **);
 extern size_t	sctp_addr_params(sctp_t *, int, uchar_t *);
-extern size_t	sctp_addr_params_len(sctp_t *, int);
+extern size_t	sctp_addr_params_len(sctp_t *, int, boolean_t);
 extern mblk_t	*sctp_add_proto_hdr(sctp_t *, sctp_faddr_t *, mblk_t *, int,
 		    int *);
 extern void	sctp_addr_req(sctp_t *, mblk_t *);

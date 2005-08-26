@@ -143,8 +143,6 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 	boolean_t		got_cookie = B_FALSE;
 	uint16_t		ptype;
 
-	*supp_af = 0;
-
 	if (sctp_options != NULL)
 		*sctp_options = 0;
 
@@ -193,7 +191,11 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 			}
 			break;
 		case PARM_ADDR4:
+			*supp_af |= PARM_SUPP_V4;
+			break;
 		case PARM_ADDR6:
+			*supp_af |= PARM_SUPP_V6;
+			break;
 		case PARM_COOKIE_PRESERVE:
 		case PARM_ADAPT_LAYER_IND:
 			/* These are OK */
@@ -230,29 +232,6 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 				}
 				p++;
 				plen -= sizeof (*p);
-			}
-			/*
-			 * Some sanity checks.  The following should not
-			 * fail unless the other side is broken.
-			 *
-			 * 1. If there is no supported address type yet the
-			 * supported address parameter is present, abort.
-			 * 2. If this is a V4 endpoint but V4 address is not
-			 * supported, abort.
-			 * 3. If this is a V6 only endpoint but V6 address is
-			 * not supported, abort.  This assumes that a V6
-			 * endpoint can use both V4 and V6 addresses.
-			 */
-			if (*supp_af == 0 ||
-			    (sctp->sctp_family == AF_INET &&
-			    !(*supp_af & PARM_SUPP_V4)) ||
-			    (sctp->sctp_family == AF_INET6 &&
-			    !(*supp_af & PARM_SUPP_V6) &&
-			    sctp->sctp_connp->conn_ipv6_v6only)) {
-				dprint(1,
-				("sctp:validate_init_params: no supp addr\n"));
-				serror = SCTP_ERR_BAD_ADDR;
-				goto abort;
 			}
 			break;
 		}
@@ -298,6 +277,26 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 		}
 
 		cph = sctp_next_parm(cph, &remaining);
+	}
+	/*
+	 * Some sanity checks.  The following should not fail unless the
+	 * other side is broken.
+	 *
+	 * 1. If this is a V4 endpoint but V4 address is not
+	 * supported, abort.
+	 * 2. If this is a V6 only endpoint but V6 address is
+	 * not supported, abort.  This assumes that a V6
+	 * endpoint can use both V4 and V6 addresses.
+	 * We only care about supp_af when processing INIT, i.e want_cookie
+	 * is NULL.
+	 */
+	if (want_cookie == NULL &&
+	    ((sctp->sctp_family == AF_INET && !(*supp_af & PARM_SUPP_V4)) ||
+	    (sctp->sctp_family == AF_INET6 && !(*supp_af & PARM_SUPP_V6) &&
+	    sctp->sctp_connp->conn_ipv6_v6only))) {
+		dprint(1, ("sctp:validate_init_params: supp addr\n"));
+		serror = SCTP_ERR_BAD_ADDR;
+		goto abort;
 	}
 
 	if (want_cookie != NULL && !got_cookie) {
@@ -403,12 +402,13 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 	uint32_t		*lifetime;
 	char			*p;
 	boolean_t		 isv4;
-	int			supp_af;
+	int			supp_af = 0;
 	uint_t			sctp_options;
 	uint32_t		*ttag;
 	int			pad;
 	mblk_t			*errmp = NULL;
 	boolean_t		initcollision = B_FALSE;
+	boolean_t		linklocal = B_FALSE;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 	isv4 = (IPH_HDR_VERSION(initmp->b_rptr) == IPV4_VERSION);
@@ -419,10 +419,14 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 		initsh = (sctp_hdr_t *)((char *)initiph +
 		    IPH_HDR_LENGTH(initmp->b_rptr));
 		ipsctplen = sctp->sctp_ip_hdr_len;
+		supp_af |= PARM_SUPP_V4;
 	} else {
 		initip6h = (ip6_t *)initmp->b_rptr;
 		initsh = (sctp_hdr_t *)(initip6h + 1);
 		ipsctplen = sctp->sctp_ip_hdr6_len;
+		if (IN6_IS_ADDR_LINKLOCAL(&initip6h->ip6_src))
+			linklocal = B_TRUE;
+		supp_af |= PARM_SUPP_V6;
 	}
 	ASSERT(OK_32PTR(initsh));
 	init = (sctp_init_chunk_t *)((char *)(initsh + 1) + sizeof (*iack_ch));
@@ -440,14 +444,6 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 		 * must be supported.
 		 */
 		supp_af = PARM_SUPP_V4;
-	} else {
-		/*
-		 * No supported addresses parameter in INIT.  Assume
-		 * both v4 and v6 are supported.
-		 */
-		if (supp_af == 0) {
-			supp_af = PARM_SUPP_V6 | PARM_SUPP_V4;
-		}
 	}
 	if (sctp->sctp_state <= SCTPS_LISTEN) {
 		/* normal, expected INIT: generate new vtag and itsn */
@@ -467,6 +463,12 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 		 * address params that we need to add.
 		 */
 		initcollision = B_TRUE;
+		/*
+		 * When we sent the INIT, we should have set linklocal in
+		 * the sctp which should be good enough.
+		 */
+		if (linklocal)
+			linklocal = B_FALSE;
 	} else {
 		/* peer restart; generate new vtag but keep everything else */
 		(void) random_get_pseudo_bytes((uint8_t *)&itag, sizeof (itag));
@@ -491,7 +493,8 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 	}
 	if (initcollision)
 		iacklen += sctp_supaddr_param_len(sctp);
-	iacklen += sctp_addr_params_len(sctp, supp_af);
+	if (!linklocal)
+		iacklen += sctp_addr_params_len(sctp, supp_af, B_FALSE);
 	ipsctplen += sizeof (*iacksh) + iacklen;
 	iacklen += errlen;
 	if ((pad = ipsctplen % 4) != 0) {
@@ -556,7 +559,8 @@ sctp_send_initack(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *initmp)
 	p += sctp_adaption_code_param(sctp, (uchar_t *)p);
 	if (initcollision)
 		p += sctp_supaddr_param(sctp, (uchar_t *)p);
-	p += sctp_addr_params(sctp, supp_af, (uchar_t *)p);
+	if (!linklocal)
+		p += sctp_addr_params(sctp, supp_af, (uchar_t *)p);
 	if (((sctp_options & SCTP_PRSCTP_OPTION) || initcollision) &&
 	    sctp->sctp_prsctp_aware && sctp_prsctp_enabled) {
 		p += sctp_options_param(sctp, p, SCTP_PRSCTP_OPTION);
@@ -728,7 +732,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 	sctp_parm_hdr_t		*cph;
 	sctp_data_hdr_t		*sdc;
 	sctp_tf_t		*tf;
-	int			pad;
+	int			pad = 0;
 	int			hdrlen;
 	mblk_t			*errmp = NULL;
 	uint_t			sctp_options;
