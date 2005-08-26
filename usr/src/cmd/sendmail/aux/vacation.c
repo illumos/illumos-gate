@@ -471,8 +471,10 @@ filter_ok(from, filter_file)
 {
 	char file[MAXLINE];
 	char line[MAXLINE];
+	char *match_start;
 	size_t line_len, from_len;
 	bool result = FALSE;
+	bool negated = FALSE;
 	FILE *f;
 
 	from_len = strlen(from);
@@ -502,9 +504,17 @@ filter_ok(from, filter_file)
 		/* skip comment lines */
 		if (line[0] == '#')
 			continue;
+		if (line[0] == '!') {
+			negated = TRUE;
+			match_start = &line[1];
+			line_len--;
+		} else {
+			negated = FALSE;
+			match_start = &line[0];
+		}
 		if (strchr(line, '@') != NULL) {
 			/* @ => full address */
-			if (strcasecmp(line, from) == 0) {
+			if (strcasecmp(match_start, from) == 0) {
 				result = TRUE;
 				if (Debug)
 					(void) printf("filter match on %s\n",
@@ -521,8 +531,8 @@ filter_ok(from, filter_file)
 			 * '@' or a '.', otherwise we could get false positives
 			 * from e.g. twinsun.com for sun.com .
 			 */
-			if (strncasecmp(&from[from_len - line_len], line,
-			    line_len) == 0 &&
+			if (strncasecmp(&from[from_len - line_len],
+			    match_start, line_len) == 0 &&
 			    (from[from_len - line_len -1] == '@' ||
 			    from[from_len - line_len -1] == '.')) {
 				result = TRUE;
@@ -536,7 +546,7 @@ filter_ok(from, filter_file)
 	(void) fclose(f);
 	if (Debug && !result)
 		(void) printf("no filter match\n");
-	return (result);
+	return (!negated && result);
 }
 
 /*
