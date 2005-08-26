@@ -186,6 +186,7 @@ COMMON_SUBDIRS= \
 	SUNWiotu  \
 	SUNWioth  \
 	SUNWipc  \
+	SUNWipfh  \
 	SUNWipfr  \
 	SUNWipfu  \
 	SUNWipoib \

@@ -1274,6 +1274,7 @@ caddr_t data;
 	ap_session_t *aps;
 	nat_t *n, *nat;
 	frentry_t *fr;
+	fr_info_t fin;
 	ipnat_t *in;
 	int error;
 
@@ -1340,6 +1341,34 @@ caddr_t data;
 		in->in_pmnext = NULL;
 
 		nat_resolverule(in);
+	}
+
+	/*
+	 * Check that the NAT entry doesn't already exist in the kernel.
+	 */
+	bzero((char *)&fin, sizeof(fin));
+	fin.fin_p = nat->nat_p;
+	if (nat->nat_dir == NAT_OUTBOUND) {
+		fin.fin_data[0] = ntohs(nat->nat_oport);
+		fin.fin_data[1] = ntohs(nat->nat_outport);
+		fin.fin_ifp = nat->nat_ifps[1];
+		if (nat_inlookup(&fin, 0, fin.fin_p, nat->nat_oip,
+				  nat->nat_inip) != NULL) {
+			error = EEXIST;
+			goto junkput;
+		}
+	} else if (nat->nat_dir == NAT_INBOUND) {
+		fin.fin_data[0] = ntohs(nat->nat_outport);
+		fin.fin_data[1] = ntohs(nat->nat_oport);
+		fin.fin_ifp = nat->nat_ifps[0];
+		if (nat_outlookup(&fin, 0, fin.fin_p, nat->nat_outip,
+				 nat->nat_oip) != NULL) {
+			error = EEXIST;
+			goto junkput;
+		}
+	} else {
+		error = EINVAL;
+		goto junkput;
 	}
 
 	/*
@@ -3360,16 +3389,37 @@ natlookup_t *np;
 	bzero((char *)&fi, sizeof(fi));
 	fi.fin_data[0] = ntohs(np->nl_inport);
 	fi.fin_data[1] = ntohs(np->nl_outport);
+	if (np->nl_flags & IPN_TCP)
+		fi.fin_p = IPPROTO_TCP;
+	else if (np->nl_flags & IPN_UDP)
+		fi.fin_p = IPPROTO_UDP;
+	else if (np->nl_flags & (IPN_ICMPERR|IPN_ICMPQUERY))
+		fi.fin_p = IPPROTO_ICMP;
 
 	/*
 	 * If nl_inip is non null, this is a lookup based on the real
 	 * ip address. Else, we use the fake.
 	 */
-	if ((nat = nat_outlookup(&fi, np->nl_flags, 0, np->nl_inip,
-				 np->nl_outip))) {
+	if ((nat = nat_outlookup(&fi, np->nl_flags, fi.fin_p,
+				 np->nl_inip, np->nl_outip))) {
+
+		if ((np->nl_flags & IPN_FINDFORWARD) != 0) {
+			fr_info_t fin;
+			bzero((char *)&fin, sizeof(fin));
+			fin.fin_p = nat->nat_p;
+			fin.fin_data[0] = ntohs(nat->nat_outport);
+			fin.fin_data[1] = ntohs(nat->nat_oport);
+			if (nat_inlookup(&fin, np->nl_flags, fin.fin_p,
+					 nat->nat_outip,
+					 nat->nat_oip) != NULL) {
+				np->nl_flags &= ~IPN_FINDFORWARD;
+			}
+		}
+
 		np->nl_realip = nat->nat_outip;
 		np->nl_realport = nat->nat_outport;
 	}
+
 	return nat;
 }
 

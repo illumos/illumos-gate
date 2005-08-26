@@ -120,12 +120,13 @@ rootlibs: sgs
 $(SUBDIRS) head ucbhead pkgdefs: FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
-.PARALLEL:	sysheaders userheaders libheaders ucbheaders cmdheaders
+.PARALLEL:	sysheaders userheaders libheaders ucbheaders cmdheaders \
+		commonheaders
 
 # librpcsvc has a dependency on headers installed by
 # userheaders, hence the .WAIT before libheaders.
 sgs: rootdirs .WAIT sysheaders userheaders .WAIT \
-	libheaders ucbheaders cmdheaders
+	libheaders ucbheaders cmdheaders commonheaders
 
 #
 # top-level setup target (headers/tools)
@@ -162,6 +163,9 @@ ucbheaders: FRC
 cmdheaders: FRC
 	@cd cmd/fm; pwd; $(MAKE) install_h
 	@cd cmd/mdb; pwd; $(MAKE) install_h
+
+commonheaders: FRC
+	@cd common/ipf; pwd; $(MAKE) install_h
 
 # each xmod target depends on a corresponding MACH-specific pseudotarget
 # before doing common xmod work

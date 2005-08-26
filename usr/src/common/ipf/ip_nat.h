@@ -5,7 +5,11 @@
  *
  * @(#)ip_nat.h	1.5 2/4/96
  * $Id: ip_nat.h,v 2.83 2003/08/14 15:22:58 darrenr Exp $
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	__IP_NAT_H__
 #define	__IP_NAT_H__
@@ -233,6 +237,7 @@ typedef	struct	ipnat	{
 #define	IPN_DELETE	0x40000
 #define	IPN_STICKY	0x80000
 #define	IPN_FRAG	0x100000
+#define	IPN_FINDFORWARD	0x400000
 #define	IPN_USERFLAGS	(IPN_TCPUDP|IPN_AUTOPORTMAP|IPN_IPRANGE|IPN_SPLIT|\
 			 IPN_ROUNDR|IPN_FILTER|IPN_NOTSRC|IPN_NOTDST|\
 			 IPN_FRAG|IPN_STICKY)
