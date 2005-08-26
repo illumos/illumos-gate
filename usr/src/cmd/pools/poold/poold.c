@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,6 +106,8 @@ static int instance_running;
 static pthread_mutex_t instance_running_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static sigset_t hdl_set;
+
+static void pu_die(const char *fmt, ...) __NORETURN;
 
 static void
 usage(void)

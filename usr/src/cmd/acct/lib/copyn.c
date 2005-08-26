@@ -22,8 +22,11 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
 /*
  * Copy n bytes from s2 to s1
  * return s1
@@ -33,7 +36,7 @@ char *
 copyn(s1, s2, n)
 register char *s1, *s2;
 {
-	register i;
+	int i;
 	register char *os1;
 
 	os1 = s1;

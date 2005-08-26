@@ -22,8 +22,11 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	acctdisk <dtmp >dtacct
  *	reads std.input & converts to tacct.h format, writes to output
@@ -34,13 +37,13 @@
 #include <sys/types.h>
 #include "acctdef.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 struct	tacct	tb;
 char	ntmp[NSZ+1];
 
 int
-main(argc, argv)
-char **argv;
+main(int argc, char **argv)
 {
 	int rc;
 

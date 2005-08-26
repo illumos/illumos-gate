@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,7 +68,7 @@ public class PoolInternal {
 	public final static native String pool_strerror_sys();
 	public final static native int pool_resource_type_list(long types,
 	    long numtypes);
-	public final static native int pool_get_status(long state);
+	public final static native int pool_get_status();
 	public final static native int pool_set_status(int state);
 	final static native long pool_conf_alloc();
 	final static native void pool_conf_free(long conf);

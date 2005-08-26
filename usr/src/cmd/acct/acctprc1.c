@@ -24,10 +24,10 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.11	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	acctprc1 [ctmpfile]
@@ -43,6 +43,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/acct.h>
+#include <stdlib.h>
+
 #define MYKIND(flag)	((flag & ACCTF) == 0)
 
 struct	acct	ab;
@@ -109,7 +111,7 @@ main(int argc, char **argv)
 
 
 	if (fread((char *)&ab, sizeof(struct acct), 1, stdin) != 1)
-		return;
+		exit(1);
 	else if (ab.ac_flag & AEXPND)
 		ver = 2;	/* 4.0 acct structure */
 	else 

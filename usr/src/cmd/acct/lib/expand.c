@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,7 @@ ulong_t
 #endif
 expand(comp_t ct)
 {
-	register e;
+	int e;
 #ifdef uts
 	float f;
 #else

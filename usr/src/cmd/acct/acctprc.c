@@ -24,10 +24,10 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *      acctprc
@@ -44,6 +44,7 @@
 #include <sys/acct.h>
 #include <string.h>
 #include <search.h>
+#include <stdlib.h>
 
 struct  acct    ab;
 struct  ptmp    pb;
@@ -56,11 +57,14 @@ struct  utab    {
         float   ut_kcore[2];    /* kcore-mins */
         long    ut_pc;          /* # processes */
 } * ub; 
-static  usize;
-char	*strncpy();
+static int usize;
 void **root = NULL;
 
-main()
+void output(void);
+void enter(struct ptmp *);
+
+int
+main(int argc, char **argv)
 {
 	long		elaps[2];
 	ulong_t		etime, stime;
@@ -112,8 +116,8 @@ int node_compare(const void *node1, const void *node2)
 	else	return(0);
 }
 
-enter(p) 
-register struct ptmp *p; 
+void
+enter(struct ptmp *p)
 {
         double memk;
         struct utab **pt;
@@ -162,7 +166,8 @@ void print_node(const void *node, VISIT order, int level) {
 	}
 }
  
-output()
+void
+output(void)
 {
                 twalk((struct utab *)root, print_node);
 }

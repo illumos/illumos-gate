@@ -22,8 +22,11 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	acctprc2 <ptmp1 >ptacct
  *	reads std. input (in ptmp.h/ascii format)
@@ -37,6 +40,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <search.h>
+#include <stdlib.h>
 
 struct	ptmp	pb;
 struct	tacct	tb;
@@ -48,12 +52,15 @@ struct	utab	{
 	float	ut_kcore[2];	/* kcore-mins */
 	long	ut_pc;		/* # processes */
 } * ub;
-static	usize;
-int	ucmp();
+
+static	int usize;
 void **root = NULL;
 
-main(argc, argv)
-char **argv;
+void output(void);
+void enter(struct ptmp *);
+
+int
+main(int argc, char **argv)
 {
 
 	while (scanf("%ld\t%s\t%lu\t%lu\t%u",
@@ -79,10 +86,10 @@ int node_compare(const void *node1, const void *node2)
 	
 }
 
-enter(p)
-register struct ptmp *p;
+void
+enter(struct ptmp *p)
 {
-	register unsigned i;
+	unsigned int i;
 	double memk;
 	struct utab **pt;
  
@@ -132,7 +139,8 @@ void print_node(const void *node, VISIT order, int level) {
         }
 }
 
-output()
+void
+output(void)
 {
                 twalk((struct utab *)root, print_node);
 }

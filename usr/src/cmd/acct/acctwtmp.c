@@ -21,11 +21,12 @@
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-/*	Copyright (c) 1999 by Sun Microsystems, Inc. */
-/*	All rights reserved. */
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	acctwtmp reason /var/adm/wtmpx
  *	writes utmpx.h record (with current time) to specific file
@@ -37,6 +38,7 @@
 #include "acctdef.h"
 #include <utmpx.h>
 #include <strings.h>
+#include <stdlib.h>
 
 struct	utmpx	wb;
 

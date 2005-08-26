@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,10 +48,11 @@
 #include <locale.h>
 #include <string.h>
 #include <search.h>
+#include <stdlib.h>
 
 int   a_tsize = A_TSIZE;
 int	tsize	= -1;	/* highest index of used slot in tbuf table */
-static	csize;
+static	int csize;
 struct  utmpx	wb;	/* record structure read into */
 struct	ctmp	cb;	/* record structure written out of */
 struct	tacct	tb;
@@ -419,7 +420,8 @@ printlin()
 	timet = MINS(lastime-firstime);
 	printf("TOTAL DURATION IS %.0f MINUTES\n", timet);
 	printf("LINE         MINUTES  PERCENT  # SESS  # ON  # OFF\n");
-	qsort((char *)tbuf, tsize + 1, sizeof (tbuf[0]), tcmp);
+	qsort((char *)tbuf, tsize + 1, sizeof (tbuf[0]),
+	    (int (*)(const void *, const void *))tcmp);
 	for (tp = tbuf; tp <= &tbuf[tsize]; tp++) {
 		timei = MINS(tp->ttotal);
 		ttime += timei;

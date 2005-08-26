@@ -53,7 +53,9 @@
 #include <sys/param.h>
 #include "acctdef.h"
 #include <ctype.h>
+#include <string.h>
 #include <sys/acct.h>
+#include <stdlib.h>
 
 int	csize = CSIZE;
 
@@ -95,15 +97,35 @@ int	oflg;
 int	tflg;
 int	errflg;
 
-int	ccmp(), kcmp(), ncmp();
-int	tccmp(), tkcmp(), tncmp();
 #ifdef uts
 float   expand();
 #else
 ulong_t	expand();
 #endif
 
-char	*strncpy();
+void outputc(void);
+void totprnt(struct pcms *);
+void pprint(struct pcms *);
+void prnt(struct pcms *, int);
+void print(struct pcms *);
+void outputa(void);
+void toutptc(void);
+void tprint(struct tcms *);
+void toutpta(void);
+int ncmp(struct pcms *, struct pcms *);
+int tncmp(struct tcms *, struct tcms *);
+int tccmp(struct tcms *, struct tcms *);
+int tkcmp(struct tcms *, struct tcms *);
+int ccmp(struct pcms *, struct pcms *);
+int kcmp(struct pcms *, struct pcms *);
+void tdofile(char *);
+void dofile(char *);
+void tfixjunk(void);
+void fixjunk(void);
+void tcmadd(struct tcms *, struct tcms *);
+void pcmadd(struct pcms *, struct pcms *);
+void tsqueeze(void);
+void squeeze(void);
 
 /*  Format specification for ASCII printing */
 
@@ -118,12 +140,10 @@ char	*fmtcmd =	"%-8.8s",
 	*fmtcharx =	" %12.0f",
 	*fmtblkx =	" %10.0f" ;
 
-main(argc, argv)
-char **argv;
+int
+main(int argc, char **argv)
 {
 	int	c;
-	extern	int	optind;
-	extern	char	*optarg;
 
 	while((c = getopt(argc, argv, "acjnspot")) != EOF)
 	switch(c) {
@@ -169,7 +189,9 @@ char **argv;
 		if (jflg)
 			tfixjunk();
 		tsqueeze();
-		qsort(tcm, csize, sizeof(tcm[0]), nflg? tncmp: (cflg? tccmp: tkcmp));
+		qsort(tcm, csize, sizeof(tcm[0]),
+		    (int (*)(const void *, const void *))
+		     ( nflg ? tncmp: (cflg? tccmp: tkcmp)));
 		if (aflg)
 			toutpta();
 		else
@@ -184,7 +206,9 @@ char **argv;
 		if (jflg)
 			fixjunk();
 		squeeze();
-		qsort(pcm, csize, sizeof(pcm[0]), nflg? ncmp: (cflg? ccmp: kcmp));
+		qsort(pcm, csize, sizeof(pcm[0]),
+		    (int (*)(const void *, const void *))
+		    (nflg? ncmp: (cflg? ccmp: kcmp)));
 		if (aflg)
 			outputa();
 		else
@@ -194,8 +218,8 @@ char **argv;
 
 }
 
-tdofile(fname)
-char *fname;
+void
+tdofile(char *fname)
 {
 	struct tcms cmt;
 	union {
@@ -268,8 +292,8 @@ char *fname;
 	}
 }
 
-dofile(fname)
-char *fname;
+void
+dofile(char *fname)
 {
 	union {
 		struct acct ab;
@@ -415,12 +439,12 @@ char *fname;
 	}
 }
 
-tenter(p)
-register struct tcms *p;
+int
+tenter(struct tcms *p)
 {
-	register i;
-	register j;
-	register struct tcms *ntcm;
+	int i;
+	int j;
+	struct tcms *ntcm;
 	for (i = j = 0; j < sizeof(p->tcm_comm); j++) {
 		if (p->tcm_comm[j] && p->tcm_comm[j] <= 037)
 			p->tcm_comm[j] = '?';
@@ -450,12 +474,13 @@ register struct tcms *p;
 	tcmadd(&tcm[i], p);
 	return(i);
 }
-enter(p)
-register struct pcms *p;
+
+int
+enter(struct pcms *p)
 {
-	register i;
-	register j;
-	register struct pcms *npcm;
+	int i;
+	int j;
+	struct pcms *npcm;
 	for (i = j = 0; j < sizeof(p->pcm_comm); j++) {
 		if (p->pcm_comm[j] && p->pcm_comm[j] <= 037)
 			p->pcm_comm[j] = '?';
@@ -485,19 +510,23 @@ register struct pcms *p;
 	pcmadd(&pcm[i], p);
 	return(i);
 }
-tfixjunk()	/* combine commands used only once */
+
+void
+tfixjunk(void)	/* combine commands used only once */
 {
-	register i, j;
-	j = enter(&tcmtmp);
+	int i, j;
+	j = tenter(&tcmtmp);
 	for (i = 0; i < csize; i++)
 		if (i != j && tcm[i].tcm_comm[0] && tcm[i].tcm_pc <= 1) {
 			tcmadd(&tcm[j], &tcm[i]);
 			tcm[i].tcm_comm[0] = 0;
 		}
 }
-fixjunk()	/* combine commands used only once */
+
+void
+fixjunk(void)	/* combine commands used only once */
 {
-	register i, j;
+	int i, j;
 	j = enter(&pcmtmp);
 	for (i = 0; i < csize; i++)
 		if (i != j && pcm[i].pcm_comm[0] && (pcm[i].pcm_pc[PRIME] + pcm[i].pcm_pc[NONPRIME]) <= 1) {
@@ -506,8 +535,8 @@ fixjunk()	/* combine commands used only once */
 		}
 }
 
-tcmadd(p1, p2)
-register struct tcms *p1, *p2;
+void
+tcmadd(struct tcms *p1, struct tcms *p2)
 {
 	p1->tcm_pc += p2->tcm_pc;
 	p1->tcm_cpu = p1->tcm_cpu + p2->tcm_cpu;
@@ -516,8 +545,9 @@ register struct tcms *p1, *p2;
 	p1->tcm_io += p2->tcm_io;
 	p1->tcm_rw += p2->tcm_rw;
 }
-pcmadd(p1, p2)
-register struct pcms *p1, *p2;
+
+void
+pcmadd(struct pcms *p1, struct pcms *p2)
 {
 	p1->pcm_pc[PRIME] += p2->pcm_pc[PRIME];
 	p1->pcm_pc[NONPRIME] += p2->pcm_pc[NONPRIME];
@@ -533,9 +563,10 @@ register struct pcms *p1, *p2;
 	p1->pcm_rw[NONPRIME] += p2->pcm_rw[NONPRIME];
 }
 
-tsqueeze()	/* get rid of holes in hash table */
+void
+tsqueeze(void)	/* get rid of holes in hash table */
 {
-	register i, k;
+	int i, k;
 
 	for (i = k = 0; i < csize; i++)
 		if (tcm[i].tcm_comm[0]) {
@@ -550,9 +581,11 @@ tsqueeze()	/* get rid of holes in hash table */
 		}
 	csize = k;
 }
-squeeze()	/* get rid of holes in hash table */
+
+void
+squeeze(void)	/* get rid of holes in hash table */
 {
-	register i, k;
+	int i, k;
 
 	for (i = k = 0; i < csize; i++)
 		if (pcm[i].pcm_comm[0]) {
@@ -574,18 +607,18 @@ squeeze()	/* get rid of holes in hash table */
 	csize = k;
 }
 
-tccmp(p1, p2)
-register struct tcms *p1, *p2;
+int
+tccmp(struct tcms *p1, struct tcms *p2)
 {
 	if (p1->tcm_cpu == p2->tcm_cpu)
 		return(0);
 	return ((p2->tcm_cpu > p1->tcm_cpu)? 1 : -1);
 }
 
-ccmp(p1, p2)
-register struct pcms *p1, *p2;
+int
+ccmp(struct pcms *p1, struct pcms *p2)
 {
-	register int	index;
+	int	index;
 
 	if( (pflg && oflg) || (!pflg && !oflg) ) {
 		if (p1->pcm_cpu[PRIME] + p1->pcm_cpu[NONPRIME] == p2->pcm_cpu[PRIME] + p2->pcm_cpu[NONPRIME])
@@ -598,18 +631,18 @@ register struct pcms *p1, *p2;
 	return ((p2->pcm_cpu[index] > p1->pcm_cpu[index])? 1 : -1);
 }
 
-tkcmp(p1, p2)
-register struct tcms *p1, *p2;
+int
+tkcmp(struct tcms *p1, struct tcms *p2)
 {
 	if (p1->tcm_kcore == p2->tcm_kcore)
 		return(0);
 	return ((p2->tcm_kcore > p1->tcm_kcore)? 1 : -1);
 }
 
-kcmp(p1, p2)
-register struct pcms *p1, *p2;
+int
+kcmp(struct pcms *p1, struct pcms *p2)
 {
-	register int	index;
+	int	index;
 
 	if( (pflg && oflg) || (!pflg && !pflg) ){
 		if (p1->pcm_kcore[PRIME] + p1->pcm_kcore[NONPRIME] == p2->pcm_kcore[PRIME] + p2->pcm_kcore[NONPRIME])
@@ -622,18 +655,18 @@ register struct pcms *p1, *p2;
 	return ((p2->pcm_kcore[index] > p1->pcm_kcore[index])? 1 : -1);
 }
 
-tncmp(p1, p2)
-register struct tcms *p1, *p2;
+int
+tncmp(struct tcms *p1, struct tcms *p2)
 {
 	if (p1->tcm_pc == p2->tcm_pc)
 		return(0);
 	return ((p2->tcm_pc > p1->tcm_pc)? 1 : -1);
 }
 
-ncmp(p1, p2)
-register struct pcms *p1, *p2;
+int
+ncmp(struct pcms *p1, struct pcms *p2)
 {
-	register int	index;
+	int	index;
 
 	if( (pflg && oflg) || (!pflg && !oflg) ) {
 		if (p1->pcm_pc[PRIME] + p1->pcm_pc[NONPRIME] == p2->pcm_pc[PRIME] + p2->pcm_pc[NONPRIME])
@@ -650,9 +683,11 @@ char	thd1[] =
 "COMMAND   NUMBER      TOTAL       TOTAL       TOTAL   MEAN     MEAN     HOG      CHARS        BLOCKS\n";
 char	thd2[] =
 "NAME        CMDS    KCOREMIN     CPU-MIN     REAL-MIN SIZE-K  CPU-MIN  FACTOR   TRNSFD         READ\n";
-toutpta()
+
+void
+toutpta(void)
 {
-	register i;
+	int i;
 
 	printf(thd1);
 	printf(thd2);
@@ -666,8 +701,8 @@ toutpta()
 		tprint(&tcm[i]);
 }
 
-tprint(p)
-register struct tcms *p;
+void
+tprint(struct tcms *p)
 {
 	printf("%-8.8s", p->tcm_comm);
 	printf(" %7ld", p->tcm_pc);
@@ -685,9 +720,10 @@ register struct tcms *p;
 	printf(" %11lu\n", p->tcm_rw);
 }
 
-toutptc()
+void
+toutptc(void)
 {
-	register i;
+	int i;
 
 	for (i = 0; i < csize; i++)
 		fwrite(&tcm[i], sizeof(tcm[i]), 1, stdout);
@@ -710,9 +746,10 @@ char	hdtot[] =
 char	hdp[] =
 "                                PRIME/NON-PRIME TIME COMMAND SUMMARY\n";
 
-outputa()
+void
+outputa(void)
 {
-	register i;
+	int i;
 
 	if( pflg && oflg ) printf(hdp);
 	else if(pflg) printf(hdprime);
@@ -736,17 +773,16 @@ outputa()
 		print(&pcm[i]);
 }
 
-print(p)
-register struct pcms *p;
+void
+print(struct pcms *p)
 {
 	if(pflg && oflg) pprint(p);
 	else if(pflg || oflg) prnt(p, pflg ? PRIME : NONPRIME);
 	else totprnt(p);
 }
 
-prnt(p, hr)
-register struct pcms *p;
-register int	hr;
+void
+prnt(struct pcms *p, int hr)
 {
 	if(p->pcm_pc[hr] == 0) return;
 	printf(fmtcmd, p->pcm_comm);
@@ -766,8 +802,8 @@ register int	hr;
 	printf("\n");
 }
 
-pprint(p)
-register struct pcms *p;
+void
+pprint(struct pcms *p)
 {
 	printf(fmtcmd, p->pcm_comm);
 	printf(fmtcnt, p->pcm_pc[PRIME]);
@@ -789,8 +825,8 @@ register struct pcms *p;
 	printf("\n");
 }
 
-totprnt(p)
-register struct pcms *p;
+void
+totprnt(struct pcms *p)
 {
 	printf(fmtcmd, p->pcm_comm);
 	printf(fmtcnt, TOTAL(p->pcm_pc));
@@ -808,9 +844,11 @@ register struct pcms *p;
 	printf(fmtblkx,TOTAL(p->pcm_rw));
 	printf("\n");
 }
-outputc()
+
+void
+outputc(void)
 {
-	register i;
+	int i;
 
 	for (i = 0; i < csize; i++)
 		fwrite(&pcm[i], sizeof(pcm[i]), 1, stdout);

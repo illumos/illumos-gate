@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +99,7 @@ extern "C" {
 extern const char *get_errstr(void);
 extern const char *get_errstr_err(int, int);
 extern void warn(const char *, ...);
-extern void die(const char *, ...);
+extern void die(const char *, ...) __NORETURN;
 extern const char *getpname(const char *);
 
 #ifdef	__cplusplus

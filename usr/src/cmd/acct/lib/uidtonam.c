@@ -22,8 +22,11 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
 /*
  * convert uid to login name; interface to getpwuid that keeps up to USIZE1
  * names to avoid unnecessary accesses to passwd file
@@ -37,7 +40,7 @@
 #include "acctdef.h"
 #include <pwd.h>
 
-static	usize1;
+static int usize1;
 static struct ulist {
 	char	uname[NSZ];
 	uid_t	uuid;

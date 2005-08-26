@@ -22,8 +22,11 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
 /*
  *	namtouid converts login names to uids
  *	maintains ulist for speed only
@@ -32,8 +35,8 @@
 #include <sys/types.h>
 #include "acctdef.h"
 #include <pwd.h>
-static	usize;
-static	struct ulist {
+static int	usize;
+static struct ulist {
 	char	uname[NSZ];
 	uid_t	uuid;
 } ul[A_USIZE];

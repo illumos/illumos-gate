@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,7 @@ long	tmsecs();
  * values, return as result
  * input values in seconds
  */
+int
 pnpsplit(start, etime, result)
 long start, result[2];
 ulong_t etime;
@@ -82,7 +83,7 @@ ulong_t etime;
 	struct tm cur, end;
 	time_t tcur, tend;
 	long tmp;
-	register sameday;
+	int sameday;
 	register struct hours *hp;
 	char *memcpy();
 
@@ -135,6 +136,7 @@ ulong_t etime;
  *	Starting day after Christmas, complain if holidays not yet updated.
  *	This code is only executed once per program invocation.
  */
+int
 checkhol()
 {
 	register struct tm *tp;
@@ -160,10 +162,11 @@ checkhol()
 /*
  * ssh returns 1 if Sat, Sun, or Holiday
  */
+int
 ssh(ltp)
 register struct tm *ltp;
 {
-	register i;
+	int i;
 
 	if (ltp->tm_wday == 0 || ltp->tm_wday == 6)
 		return(1);
@@ -178,6 +181,7 @@ register struct tm *ltp;
  * variable, the times that prime and non-prime start, and the
  * holidays array.
  */
+int
 inithol()
 {
 	FILE		*fopen(), *holptr;
@@ -306,6 +310,7 @@ register struct tm *t1, *t2;
  *	assumed that t1 and t2 are in same day
  */
 
+int
 tmless(t1, t2)
 register struct tm *t1, *t2;
 {
@@ -318,6 +323,7 @@ register struct tm *t1, *t2;
 
 /* set day of year from month and day */
 
+int
 day_of_year(year, month, day)
 {
 	int i, leap;

@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*
- * Copyright 1993-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
@@ -83,7 +83,7 @@ static void mkdtab(off_t);
 static void setdtab(off_t, struct utmpx *, struct utmpx *);
 static void adjust(off_t, struct utmpx *);
 static int invalid(char *);
-static void intr(int);
+static void intr(int) __NORETURN;
 static void scanfile(void);
 static int inrange(void);
 static void wabort(int);

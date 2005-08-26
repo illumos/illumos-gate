@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,7 +246,8 @@ next:
 		return (NULL);
 	pcp->pr_map++;
 	if (pcp->pr_pgoff < pcp->pr_npage) {
-		pcp->pr_pdaddr = (caddr_t)((uintptr_t)pcp->pr_pdaddr +
+		pcp->pr_pdaddr = (caddr_t)(uintptr_t)
+		    ((uintptr_t)pcp->pr_pdaddr +
 		    (pcp->pr_npage - pcp->pr_pgoff));
 		pcp->pr_pgoff = pcp->pr_npage;
 	}

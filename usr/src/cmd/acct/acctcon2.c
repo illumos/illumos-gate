@@ -24,10 +24,10 @@
 
 
 /*
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9   */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	acctcon2 <ctmp >ctacct
  *	reads std. input (ctmp.h/ascii format)
@@ -37,12 +37,13 @@
 #include <sys/types.h>
 #include "acctdef.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 struct	ctmp	cb;
 struct	tacct	tb;
 
-main(argc, argv)
-char **argv;
+int
+main(int argc, char **argv)
 {
 	tb.ta_sc = 1;
 	while (scanf("%lu\t%ld\t%s\t%lu\t%lu\t%lu\t%*[^\n]",

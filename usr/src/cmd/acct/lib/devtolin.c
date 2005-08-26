@@ -22,8 +22,11 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
 
 /*
  *	convert device to linename (as in /dev/linename)
@@ -40,7 +43,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-static	tsize1;
+static int tsize1;
 static struct tlist {
 	char	tname[LSZ];	/* linename */
 	dev_t	tdev;		/* device */
@@ -55,6 +58,8 @@ static char *def_srch_dirs[] = { "/dev/term",
 				 "/dev/xt",
 				 NULL };
 char file_name[MAX_DEV_PATH];	/* name being returned */
+
+static int srch_dir();
 
 char *
 devtolin(device)

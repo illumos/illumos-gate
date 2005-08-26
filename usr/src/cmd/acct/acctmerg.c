@@ -21,11 +21,12 @@
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-/*	Copyright (c) 1999 by Sun Microsystems, Inc. */
-/*	All rights reserved. */
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	acctmerg [-a] [-i] [-p] [-t] [-u] [-v] [file...]
@@ -47,6 +48,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include "acctdef.h"
+#include <stdlib.h>
 
 int	nfile;			/* index of last used in fl */
 FILE	*fl[NFILE]	= {stdin};
@@ -62,16 +64,20 @@ int	printonly;
 int	totalonly;
 int	uidsum;
 int	verbose;
-struct tacct	*getleast();
 
 int 	exitcode = 0;
 
-main(argc, argv)
-int argc;
-char **argv;
+void prtacct(struct tacct *);
+struct tacct *getleast(void);
+void output(struct tacct *);
+void tacctadd(struct tacct *, struct tacct *);
+void sumcurr(struct tacct *);
+
+int
+main(int argc, char **argv)
 {
-	register i;
-	register struct tacct *tp;
+	int i;
+	struct tacct *tp;
 
 	while (--argc > 0) {
 		if (**++argv == '-')
@@ -135,9 +141,10 @@ char **argv;
  *	getleast returns ptr to least (lowest uid)  element of current 
  *	avail, NULL if none left; always returns 1st of equals
  */
-struct tacct *getleast()
+struct tacct *
+getleast(void)
 {
-	register struct tacct *tp, *least;
+	struct tacct *tp, *least;
 
 	least = NULL;
 	for (tp = tb; tp <= &tb[nfile]; tp++) {
@@ -157,8 +164,8 @@ struct tacct *getleast()
  *	sumcurr sums all entries with same uid/name (into tp->tacct record)
  *	writes it out, gets new entry
  */
-sumcurr(tp)
-register struct tacct *tp;
+void
+sumcurr(struct tacct *tp)
 {
 	struct tacct tc;
 	char *memcpy();
@@ -179,8 +186,8 @@ register struct tacct *tp;
 		output(&tc);
 }
 
-tacctadd(t1, t2)
-register struct tacct *t1, *t2;
+void
+tacctadd(struct tacct *t1, struct tacct *t2)
 {
 	t1->ta_cpu[0] = t1->ta_cpu[0] + t2->ta_cpu[0];
 	t1->ta_cpu[1] = t1->ta_cpu[1] + t2->ta_cpu[1];
@@ -195,21 +202,22 @@ register struct tacct *t1, *t2;
 	t1->ta_fee += t2->ta_fee;
 }
 
-output(tp)
-register struct tacct *tp;
+void
+output(struct tacct *tp)
 {
 	if (asciiout)
 		prtacct(tp);
 	else
 		fwrite(tp, sizeof(*tp), 1, stdout);
 }
+
 /*
  *	getnext reads next record from stream i, returns 1 if one existed
  */
-getnext(i)
-register i;
+int
+getnext(int i)
 {
-	register struct tacct *tp;
+	struct tacct *tp;
 
 	tp = &tb[i];
 	tp->ta_name[0] = '\0';
@@ -241,8 +249,8 @@ register i;
 char fmt[] = "%ld\t%.*s\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%lu\t%hu\t%hu\t%hu\n";
 char fmtv[] = "%ld\t%.*s\t%e %e %e %e %e %e %e %lu %hu\t%hu\t%hu\n";
 
-prtacct(tp)
-register struct tacct *tp;
+void
+prtacct(struct tacct *tp)
 {
 	printf(verbose ? fmtv : fmt,
 	    tp->ta_uid,

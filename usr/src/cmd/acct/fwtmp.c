@@ -34,6 +34,7 @@
 #include "acctdef.h"
 #include <utmpx.h>
 #include <locale.h>
+#include <stdlib.h>
 
 struct	utmpx	Ut;
 static char time_buf[50];

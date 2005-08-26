@@ -24,10 +24,10 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.18	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	acctcon1 [-p] [-t] [-l file] [-o file] <wtmpx-file >ctmp-file
  *	-p	print input only, no processing
@@ -48,6 +48,7 @@
 #include <time.h>
 #include <utmpx.h>
 #include <locale.h>
+#include <stdlib.h>
 
 int	a_tsize	= A_TSIZE;
 int	tsize	= -1;	/* used slots in tbuf table */

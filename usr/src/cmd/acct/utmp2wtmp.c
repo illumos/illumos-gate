@@ -21,11 +21,12 @@
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-/*	Copyright (c) 1999 by Sun Microsystems, Inc. */
-/*	All rights reserved. */
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	create entries for users who are still logged on when accounting
  *	is being run. Look at utmpx, and update the time stamp. New info
@@ -38,6 +39,7 @@
 #include <time.h>
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
 
 int
 main(int argc, char **argv)
@@ -59,5 +61,5 @@ main(int argc, char **argv)
 		}
 	}
 	fclose(fp);
-	return;
+	exit(0);
 }

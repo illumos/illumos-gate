@@ -28,7 +28,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.37 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <time.h>
 #include <string.h>
@@ -41,6 +41,8 @@
 #include <pwd.h>
 #include <sys/stat.h>
 #include <locale.h>
+#include <stdlib.h>
+#include <libgen.h>
 
 struct	acct ab;
 char	command_name[16];
@@ -116,14 +118,21 @@ char	*ofile,
 	*devtolin(),
 	*uidtonam();
 dev_t	lintodev();
+
+void dofile(char *);
+void doexit(int) __NORETURN;
+void usage(void);
+void fatal(char *, char *);
+void println(void);
+void printhd(void);
+char *cmset(char *);
+
 FILE	*ostrm;
 
-main(argc, argv)
-char **argv;
+int
+main(int argc, char **argv)
 {
-	register int	c;
-	extern int	optind;
-	extern char	*optarg;
+	int	c;
 
 	(void)setlocale(LC_ALL, "");
 	setbuf(stdout,obuf);
@@ -171,7 +180,7 @@ char **argv;
 			option |= MEANSIZE;
 			continue;
 		case 'n':
-			cname=(char *)cmset(optarg);
+			cname=cmset(optarg);
 			continue;
 		case 't':
 			option |= SEPTIME;
@@ -273,12 +282,13 @@ char **argv;
 		}
 	}
 	doexit(0);
+	/* NOTREACHED */
 }
 
-dofile(fname)
-char *fname;
+void
+dofile(char *fname)
 {
-	register struct acct *a = &ab;
+	struct acct *a = &ab;
 	struct tm *t;
 	time_t curtime;
 	time_t	ts_a = 0,
@@ -435,10 +445,10 @@ char *fname;
 	}
 }
 
-aread(ver)
-int ver;
+int
+aread(int ver)
 {
-	static	 ok = 1;
+	static int ok = 1;
 	struct o_acct oab;
 	int ret;
 
@@ -477,7 +487,8 @@ int ver;
 	return(ret != 1 ? 0 : 1);
 }
 
-printhd()
+void
+printhd(void)
 {
 	fprintf(stdout, "COMMAND                           START    END          REAL");
 	ps("CPU");
@@ -520,10 +531,11 @@ printhd()
 	fflush(stdout);
 }
 
-println()
+void
+println(void)
 {
 	char name[32];
-	register struct acct *a = &ab;
+	struct acct *a = &ab;
 	time_t t;
 
 	if(quiet)
@@ -597,12 +609,12 @@ char *str;
 	return(sec + timezone);
 }
 
-cmatch(comm, cstr)
-register char	*comm, *cstr;
+int
+cmatch(char *comm, char *cstr)
 {
 
 	char	xcomm[9];
-	register i;
+	int i;
 
 	for(i=0;i<8;i++){
 		if(comm[i]==' '||comm[i]=='\0')
@@ -610,22 +622,23 @@ register char	*comm, *cstr;
 		xcomm[i] = comm[i];
 	}
 	xcomm[i] = '\0';
-
-	return(regex(cstr,xcomm));
+	
+	return (regex(cstr,xcomm) ? 1 : 0);
 }
 
-cmset(pattern)
-register char	*pattern;
+char *
+cmset(char *pattern)
 {
 
 	if((pattern=(char *)regcmp(pattern,(char *)0))==NULL){
 		fatal("pattern syntax", NULL);
 	}
 
-	return((unsigned)pattern);
+	return (pattern);
 }
 
-doexit(status)
+void
+doexit(int status)
 {
 	if(!average)
 		exit(status);
@@ -646,32 +659,37 @@ doexit(status)
 		fprintf(stdout, "\nNo commands matched\n");
 	exit(status);
 }
-isdevnull()
+
+int
+isdevnull(void)
 {
 	struct stat	filearg;
 	struct stat	devnull;
 
 	if(fstat(0,&filearg) == -1) {
 		fprintf(stderr,"acctcom: cannot stat stdin\n");
-		return(NULL);
+		return (0);
 	}
 	if(stat("/dev/null",&devnull) == -1) {
 		fprintf(stderr,"acctcom: cannot stat /dev/null\n");
-		return(NULL);
+		return (0);
 	}
 
-	if(filearg.st_rdev == devnull.st_rdev) return(1);
-	else return(NULL);
+	if (filearg.st_rdev == devnull.st_rdev)
+		return (1);
+	else
+		return (0);
 }
 
-fatal(s1, s2)
-char *s1, *s2;
+void
+fatal(char *s1, char *s2)
 {
 	fprintf(stderr,"acctcom: %s %s\n", s1, (s2 ? s2 : ""));
 	exit(1);
 }
 
-usage()
+void
+usage(void)
 {
 	fprintf(stderr, "Usage: acctcom [options] [files]\n");
 	fprintf(stderr, "\nWhere options can be:\n");

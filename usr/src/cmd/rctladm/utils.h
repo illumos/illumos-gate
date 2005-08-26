@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_UTILS_H
@@ -44,7 +44,7 @@ extern "C" {
 #define	E_USAGE		2		/* Exit status for usage error */
 
 extern void warn(char *, ...);
-extern void die(char *, ...);
+extern void die(char *, ...) __NORETURN;
 extern char *setprogname(char *);
 
 #ifdef	__cplusplus

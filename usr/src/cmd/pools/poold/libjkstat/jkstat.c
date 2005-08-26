@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,7 +146,7 @@ Java_com_sun_solaris_service_kstat_KstatCtl_close(JNIEnv *env, jobject obj,
     jlong kctl)
 {
 	if (kctl)
-		return (kstat_close((kstat_ctl_t *)kctl));
+		return (kstat_close((kstat_ctl_t *)(uintptr_t)kctl));
 	else
 		return (0);
 }
@@ -157,9 +157,10 @@ Java_com_sun_solaris_service_kstat_KstatCtl_close(JNIEnv *env, jobject obj,
 JNIEXPORT void JNICALL Java_com_sun_solaris_service_kstat_Kstat_read(
     JNIEnv *env, jobject obj)
 {
-	kstat_ctl_t *kctl = ((kstat_ctl_t *)(*env)->GetLongField(env, obj,
+	kstat_ctl_t *kctl =
+	    ((kstat_ctl_t *)(uintptr_t)(*env)->GetLongField(env, obj,
 	    kstat_kctl_fieldid));
-	kstat_t *ksp = ((kstat_t *)(*env)->GetLongField(env, obj,
+	kstat_t *ksp = ((kstat_t *)(uintptr_t)(*env)->GetLongField(env, obj,
 	    kstat_ksp_fieldid));
 	kid_t kid;
 
@@ -200,7 +201,7 @@ Java_com_sun_solaris_service_kstat_KstatCtl_lookup(JNIEnv *env, jobject obj,
 	if (!(name = (*env)->GetStringUTFChars(env, nameObj, NULL)))
 		goto done; /* exception thrown */
 
-	kctl = (kstat_ctl_t *)(*env)->GetLongField(env, obj,
+	kctl = (kstat_ctl_t *)(uintptr_t)(*env)->GetLongField(env, obj,
 	    kstatctl_kctl_fieldid);
 	ksp = kstat_lookup(kctl, (char *)module, instance, (char *)name);
 	if (ksp)
@@ -228,7 +229,7 @@ JNIEXPORT jobject JNICALL
 Java_com_sun_solaris_service_kstat_Kstat_getValue(JNIEnv *env, jobject obj,
     jstring nameObj)
 {
-	kstat_t *ksp = ((kstat_t *)(*env)->GetLongField(env, obj,
+	kstat_t *ksp = ((kstat_t *)(uintptr_t)(*env)->GetLongField(env, obj,
 	    kstat_ksp_fieldid));
 	jobject valueObj = NULL;
 	kstat_named_t *ksnp;
@@ -305,7 +306,7 @@ fail:
 static jobject
 ksobj_get_hrtime(JNIEnv *env, jobject obj, offset_t ksfieldoff)
 {
-	kstat_t *ksp = ((kstat_t *)(*env)->GetLongField(env, obj,
+	kstat_t *ksp = ((kstat_t *)(uintptr_t)(*env)->GetLongField(env, obj,
 	    kstat_ksp_fieldid));
 
 	if (!ksp)
@@ -347,7 +348,7 @@ Java_com_sun_solaris_service_kstat_KstatCtl_chainUpdate(JNIEnv *env,
 {
 	kstat_ctl_t *kctl;
 
-	kctl = (kstat_ctl_t *)(*env)->GetLongField(env, obj,
+	kctl = (kstat_ctl_t *)(uintptr_t)(*env)->GetLongField(env, obj,
 	    kstatctl_kctl_fieldid);
 
 	(void) kstat_chain_update(kctl);

@@ -22,12 +22,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1984-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -37,20 +35,22 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/param.h>
-#include	"acctdef.h"
-#include	<errno.h>
-#include	<sys/stat.h>
-#include	<pwd.h>
-#include	<fcntl.h>
+#include "acctdef.h"
+#include <errno.h>
+#include <sys/stat.h>
+#include <pwd.h>
+#include <fcntl.h>
+#include <stdlib.h>
 
 uid_t	admuid;
-struct	passwd *pwd, *getpwnam();
+struct	passwd *pwd;
 
-main(argc, argv)
-int argc;
-char **argv;
+void ckfile(char *);
+
+int
+main(int argc, char **argv)
 {
-	register uid_t	uid;
+	uid_t	uid;
 
 	uid = getuid();
 	if ((pwd = getpwnam("adm")) == NULL) {
@@ -74,11 +74,11 @@ char **argv;
 	exit(1);
 }
 
-ckfile(admfile)
-register char	*admfile;
+void
+ckfile(char *admfile)
 {
 	struct stat		stbuf;
-	register struct stat	*s = &stbuf;
+	struct stat	*s = &stbuf;
 	int fd;
 
 	if ((fd = open(admfile, O_RDONLY|O_CREAT, 0644)) == ERR) {

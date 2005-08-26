@@ -22,14 +22,18 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
 /*
  *	return 1 if t1 earlier than t2 (times in localtime format)
  *	assumed that t1 and t2 are in same day
  */
 #include <time.h>
 
+int
 tmless(t1, t2)
 register struct tm *t1, *t2;
 {
