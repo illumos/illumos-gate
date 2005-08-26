@@ -57,6 +57,9 @@ int	pciide_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 
 #define	PCI_IDE_IF_BM_CAP_MASK	0x80
 
+#define	PCIIDE_PDSIZE	(sizeof (struct ddi_parent_private_data) + \
+	sizeof (struct intrspec))
+
 #ifdef DEBUG
 static int pci_ide_debug = 0;
 #define	PDBG(fmt)				\
@@ -243,28 +246,33 @@ static int
 pciide_ddi_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
     void *arg, void *result)
 {
-	off_t	tmp;
+	dev_info_t *cdip;
+	int controller;
+	void *pdptr;
+	int rnumber;
+	off_t tmp;
+	int rc;
 
 	PDBG(("pciide_bus_ctl\n"));
 
 	switch (ctlop) {
 	case DDI_CTLOPS_INITCHILD:
-		return (pciide_initchild(dip, (dev_info_t *)arg));
+		cdip = (dev_info_t *)arg;
+		return (pciide_initchild(dip, cdip));
 
 	case DDI_CTLOPS_UNINITCHILD:
-		return (ddi_ctlops(dip, rdip, DDI_CTLOPS_UNINITCHILD,
-			(dev_info_t *)arg, &tmp));
+		cdip = (dev_info_t *)arg;
+		pdptr = ddi_get_parent_data(cdip);
+		ddi_set_parent_data(cdip, NULL);
+		ddi_set_name_addr(cdip, NULL);
+		kmem_free(pdptr, PCIIDE_PDSIZE);
+		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_NREGS:
 		*(int *)result = 3;
 		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_REGSIZE:
-	{
-		int	controller;
-		int	rnumber;
-		int	rc;
-
 		/*
 		 * Adjust the rnumbers based on which controller instance
 		 * is requested; adjust for the 2 tuples per controller.
@@ -337,7 +345,6 @@ pciide_ddi_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		*(off_t *)result = tmp;
 
 		return (rc);
-	}
 
 	default:
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
@@ -469,8 +476,7 @@ pciide_initchild(dev_info_t *mydip, dev_info_t *cdip)
 		}
 	}
 
-	pdptr = kmem_zalloc((sizeof (struct ddi_parent_private_data) +
-	    sizeof (struct intrspec)), KM_SLEEP);
+	pdptr = kmem_zalloc(PCIIDE_PDSIZE, KM_SLEEP);
 	ispecp = (struct intrspec *)(pdptr + 1);
 	pdptr->par_nintr = 1;
 	pdptr->par_intr = ispecp;
