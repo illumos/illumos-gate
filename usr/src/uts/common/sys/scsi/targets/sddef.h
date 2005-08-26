@@ -127,8 +127,8 @@ struct ocinfo {
 	 * Types BLK, MNT, CHR, SWP,
 	 * assumed to be types 0-3.
 	 */
-	uint_t	lyr_open[NSDMAP];
-	uint_t  reg_open[OTYPCNT - 1];
+	uint64_t  lyr_open[NSDMAP];
+	uint64_t  reg_open[OTYPCNT - 1];
 };
 
 #define	OCSIZE  sizeof (struct ocinfo)
@@ -366,7 +366,7 @@ struct sd_lun {
 	struct	dk_geom un_g;			/* disk geometry */
 	struct	kstat	*un_stats;		/* disk statistics */
 	kstat_t		*un_errstats;		/* for error statistics */
-	uint_t		un_exclopen;		/* exclusive open bitmask */
+	uint64_t	un_exclopen;		/* exclusive open bitmask */
 	ddi_devid_t	un_devid;		/* device id */
 	uint_t		un_vpd_page_mask;	/* Supported VPD pages */
 	uchar_t		un_asciilabel[LEN_DKL_ASCII];	/* Disk ASCII label */

@@ -9947,7 +9947,7 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 	struct sd_lun	*un;
 	int		nodelay;
 	int		part;
-	int		partmask;
+	uint64_t	partmask;
 	int		instance;
 	dev_t		dev;
 	int		rval = EIO;
