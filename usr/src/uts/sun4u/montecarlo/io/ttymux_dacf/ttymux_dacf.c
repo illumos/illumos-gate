@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -450,8 +450,9 @@ add_aconsole(sm_mux_state_t *ms, char *path, void *arg)
 		cpath = p;
 	}
 	if ((cn = get_aconsole(ms, cpath)) != NULL) {
-		cn->sm_obp_con = ((uint_t)arg & OBPDEV) ? B_TRUE : B_FALSE;
-		cn->sm_mode |= (io_mode_t)((uint_t)arg & FORIO);
+		cn->sm_obp_con = ((uint_t)(uintptr_t)arg & OBPDEV) ?
+		    B_TRUE : B_FALSE;
+		cn->sm_mode |= (io_mode_t)((uint_t)(uintptr_t)arg & FORIO);
 		if (cn->sm_path != NULL)
 			kmem_free(cn->sm_path, strlen(cn->sm_path) + 1);
 		cn->sm_path = cpath;
@@ -764,8 +765,8 @@ find_consoles(sm_mux_state_t *ms, dev_info_t *dip, dev_t dev)
 	 * Assume that they are OBP consoles and used for both input and output.
 	 */
 	flags = (uint_t)FORIO | OBPDEV;
-	if ((propval = platform_consoles(ms, dip, dev, flags)) != (char *)0) {
-		parse(ms, propval, add_aconsole, (void *)flags);
+	if ((propval = platform_consoles(ms, dip, dev, flags)) != NULL) {
+		parse(ms, propval, add_aconsole, (void *)(uintptr_t)flags);
 		kmem_free(propval, strlen(propval) + 1);
 	}
 

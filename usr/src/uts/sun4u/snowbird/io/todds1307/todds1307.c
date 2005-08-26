@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -646,7 +646,7 @@ todds1307_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		return (DDI_SUCCESS);
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		return (DDI_SUCCESS);
 
 	default:

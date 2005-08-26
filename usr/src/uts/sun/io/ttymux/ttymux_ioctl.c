@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -892,9 +892,9 @@ sm_iocresp(mblk_t *mp)
 
 		sm_dbg('M', ("M_IOCDATA: result is %d\n", csp->cp_rval));
 		DB_TYPE(mp) = M_IOCNAK;
-		iobp->ioc_error = (int)csp->cp_rval;
+		iobp->ioc_error = (int)(uintptr_t)csp->cp_rval;
 		iobp->ioc_rval = 0;
-		return ((int)csp->cp_rval);
+		return (iobp->ioc_error);
 	}
 
 	pmp = (mblk_t *)csp->cp_private;
@@ -980,7 +980,8 @@ ttymux_query_links_ioctl(mblk_t *mp)
 	if ((iobp->ioc_flag & IOC_MODELS) != IOC_NATIVE) {
 		cnt = ((ttymux_assocs32_t *)asl)->ttymux32_nlinks;
 		sz = cnt * sizeof (ttymux_assoc32_t);
-		uaddr = (void *)((ttymux_assocs32_t *)asl)->ttymux32_assocs;
+		uaddr = (void *)(uintptr_t)
+		    ((ttymux_assocs32_t *)asl)->ttymux32_assocs;
 	} else
 #endif
 	{
