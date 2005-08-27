@@ -63,6 +63,7 @@ static int px_goto_l0(px_t *px_p);
 static int px_pre_pwron_check(px_t *px_p);
 static uint32_t px_identity_chip(px_t *px_p);
 static void px_lib_clr_errs(px_t *px_p, px_pec_t *pec_p);
+static boolean_t px_cpr_callb(void *arg, int code);
 
 /*
  * px_lib_map_registers
@@ -2005,4 +2006,125 @@ px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
 	base_addr = range_prop + PX_BDF_TO_CFGADDR(bdf, offset);
 
 	stphysio(base_addr, LE_32(val));
+}
+
+/*
+ * cpr callback
+ *
+ * disable fabric error msg interrupt prior to suspending
+ * all device drivers; re-enable fabric error msg interrupt
+ * after all devices are resumed.
+ */
+static boolean_t
+px_cpr_callb(void *arg, int code)
+{
+	px_t		*px_p = (px_t *)arg;
+	px_ib_t		*ib_p = px_p->px_ib_p;
+	px_pec_t	*pec_p = px_p->px_pec_p;
+	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
+	caddr_t		csr_base;
+	devino_t	ce_ino, nf_ino, f_ino;
+	px_ib_ino_info_t	*ce_ino_p, *nf_ino_p, *f_ino_p;
+	uint64_t	imu_log_enable, imu_intr_enable;
+	uint64_t	imu_log_mask, imu_intr_mask;
+
+	ce_ino = px_msiqid_to_devino(px_p, pec_p->pec_corr_msg_msiq_id);
+	nf_ino = px_msiqid_to_devino(px_p, pec_p->pec_non_fatal_msg_msiq_id);
+	f_ino = px_msiqid_to_devino(px_p, pec_p->pec_fatal_msg_msiq_id);
+	csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
+
+	imu_log_enable = CSR_XR(csr_base, IMU_ERROR_LOG_ENABLE);
+	imu_intr_enable = CSR_XR(csr_base, IMU_INTERRUPT_ENABLE);
+
+	imu_log_mask = BITMASK(IMU_ERROR_LOG_ENABLE_FATAL_MES_NOT_EN_LOG_EN) |
+	    BITMASK(IMU_ERROR_LOG_ENABLE_NONFATAL_MES_NOT_EN_LOG_EN) |
+	    BITMASK(IMU_ERROR_LOG_ENABLE_COR_MES_NOT_EN_LOG_EN);
+
+	imu_intr_mask =
+	    BITMASK(IMU_INTERRUPT_ENABLE_FATAL_MES_NOT_EN_S_INT_EN) |
+	    BITMASK(IMU_INTERRUPT_ENABLE_NONFATAL_MES_NOT_EN_S_INT_EN) |
+	    BITMASK(IMU_INTERRUPT_ENABLE_COR_MES_NOT_EN_S_INT_EN) |
+	    BITMASK(IMU_INTERRUPT_ENABLE_FATAL_MES_NOT_EN_P_INT_EN) |
+	    BITMASK(IMU_INTERRUPT_ENABLE_NONFATAL_MES_NOT_EN_P_INT_EN) |
+	    BITMASK(IMU_INTERRUPT_ENABLE_COR_MES_NOT_EN_P_INT_EN);
+
+	switch (code) {
+	case CB_CODE_CPR_CHKPT:
+		/* disable imu rbne on corr/nonfatal/fatal errors */
+		CSR_XS(csr_base, IMU_ERROR_LOG_ENABLE,
+		    imu_log_enable & (~imu_log_mask));
+
+		CSR_XS(csr_base, IMU_INTERRUPT_ENABLE,
+		    imu_intr_enable & (~imu_intr_mask));
+
+		/* disable CORR intr mapping */
+		px_ib_intr_disable(ib_p, ce_ino, IB_INTR_NOWAIT);
+
+		/* disable NON FATAL intr mapping */
+		px_ib_intr_disable(ib_p, nf_ino, IB_INTR_NOWAIT);
+
+		/* disable FATAL intr mapping */
+		px_ib_intr_disable(ib_p, f_ino, IB_INTR_NOWAIT);
+
+		break;
+
+	case CB_CODE_CPR_RESUME:
+		mutex_enter(&ib_p->ib_ino_lst_mutex);
+
+		ce_ino_p = px_ib_locate_ino(ib_p, ce_ino);
+		nf_ino_p = px_ib_locate_ino(ib_p, nf_ino);
+		f_ino_p = px_ib_locate_ino(ib_p, f_ino);
+
+		/* enable CORR intr mapping */
+		if (ce_ino_p)
+			px_ib_intr_enable(px_p, ce_ino_p->ino_cpuid, ce_ino);
+		else
+			cmn_err(CE_WARN, "px_cpr_callb: RESUME unable to "
+			    "reenable PCIe Correctable msg intr.\n");
+
+		/* enable NON FATAL intr mapping */
+		if (nf_ino_p)
+			px_ib_intr_enable(px_p, nf_ino_p->ino_cpuid, nf_ino);
+		else
+			cmn_err(CE_WARN, "px_cpr_callb: RESUME unable to "
+			    "reenable PCIe Non Fatal msg intr.\n");
+
+		/* enable FATAL intr mapping */
+		if (f_ino_p)
+			px_ib_intr_enable(px_p, f_ino_p->ino_cpuid, f_ino);
+		else
+			cmn_err(CE_WARN, "px_cpr_callb: RESUME unable to "
+			    "reenable PCIe Fatal msg intr.\n");
+
+		mutex_exit(&ib_p->ib_ino_lst_mutex);
+
+		/* enable corr/nonfatal/fatal not enable error */
+		CSR_XS(csr_base, IMU_ERROR_LOG_ENABLE, (imu_log_enable |
+		    (imu_log_mask & px_imu_log_mask)));
+		CSR_XS(csr_base, IMU_INTERRUPT_ENABLE, (imu_intr_enable |
+		    (imu_intr_mask & px_imu_intr_mask)));
+
+		break;
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * add cpr callback
+ */
+void
+px_cpr_add_callb(px_t *px_p)
+{
+	px_p->px_cprcb_id = callb_add(px_cpr_callb, (void *)px_p,
+	CB_CL_CPR_POST_USER, "px_cpr");
+}
+
+/*
+ * remove cpr callback
+ */
+void
+px_cpr_rem_callb(px_t *px_p)
+{
+	(void) callb_delete(px_p->px_cprcb_id);
 }

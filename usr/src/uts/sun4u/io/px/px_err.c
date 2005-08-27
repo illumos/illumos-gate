@@ -426,12 +426,12 @@ px_err_bit_desc_t px_err_lpug_tbl[] = {
  */
 px_err_reg_desc_t px_err_reg_tbl[] = {
 	{ MnT6(cb),	R4(JBC),		  "JBC Error"},
-	{ MnT6(mmu),	R4(MMU),		  "IMU Error"},
-	{ MnT6(imu),	R4(IMU),		  "ILU Error"},
+	{ MnT6(mmu),	R4(MMU),		  "MMU Error"},
+	{ MnT6(imu),	R4(IMU),		  "IMU Error"},
 	{ MnT6(tlu_ue),	TR4(UNCORRECTABLE_ERROR), "TLU UE"},
 	{ MnT6(tlu_ce), TR4(CORRECTABLE_ERROR),	  "TLU CE"},
 	{ MnT6(tlu_oe), TR4(OTHER_EVENT),	  "TLU OE"},
-	{ MnT6(ilu),	R4(ILU),		  "MMU Error"},
+	{ MnT6(ilu),	R4(ILU),		  "ILU Error"},
 	{ MnT6(lpul),	LR4(LINK_LAYER),	  "LPU Link Layer"},
 	{ MnT6(lpup),	LR4_FIXME(PHY),		  "LPU Phy Layer"},
 	{ MnT6(lpur),	LR4(RECEIVE_PHY),	  "LPU RX Phy Layer"},
@@ -1314,18 +1314,17 @@ px_err_imu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 	imu_log_enable = CSR_XR(csr_base, err_reg_descr->log_addr);
 	imu_intr_enable = CSR_XR(csr_base, err_reg_descr->enable_addr);
 
-	if (imu_log_enable & imu_intr_enable & mask) {
+	/*
+	 * If matching bit is not set, meaning corresponding rbne not
+	 * enabled, then receiving it indicates some sort of malfunction
+	 * possibly in hardware.
+	 *
+	 * Other wise, software may have intentionally disabled certain
+	 * errors for a period of time within which the occuring of the
+	 * disabled errors become rbne, that is non fatal.
+	 */
+	if (!(imu_log_enable & imu_intr_enable & mask))
 		err = PX_FATAL_SW;
-	} else {
-		/*
-		 * S/W bug - this error should always be enabled
-		 */
-
-		/* enable error & intr reporting for this bit */
-		CSR_XS(csr_base, IMU_ERROR_LOG_ENABLE, imu_log_enable | mask);
-		CSR_XS(csr_base, IMU_INTERRUPT_ENABLE, imu_intr_enable | mask);
-		err = PX_NONFATAL;
-	}
 
 	return (err);
 }

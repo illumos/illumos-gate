@@ -204,6 +204,12 @@ extern uint32_t px_fab_get(px_t *px_p, pcie_req_id_t bdf,
 extern void px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
     uint32_t val);
 
+/*
+ * CPR callback
+ */
+extern void px_cpr_add_callb(px_t *);
+extern void px_cpr_rem_callb(px_t *);
+
 #ifdef	__cplusplus
 }
 #endif

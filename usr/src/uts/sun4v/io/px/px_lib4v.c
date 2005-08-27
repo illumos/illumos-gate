@@ -1840,3 +1840,17 @@ px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
 	(void) hvio_config_put(px_p->px_dev_hdl,
 	    (bdf << PX_RA_BDF_SHIFT), offset, 4, wdata);
 }
+
+/* Dummy cpr add callback */
+/*ARGSUSED*/
+void
+px_cpr_add_callb(px_t *px_p)
+{
+}
+
+/* Dummy cpr rem callback */
+/*ARGSUSED*/
+void
+px_cpr_rem_callb(px_t *px_p)
+{
+}

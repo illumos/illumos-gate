@@ -270,7 +270,14 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			ddi_get_soft_state(pxb_state, instance);
 		(void) pcie_pwr_resume(devi);
 
+		DEVI_SET_ATTACHING(devi);
+		if (pxb_fm_init(pxb) != DDI_SUCCESS)
+			cmn_err(CE_WARN, "px_pci: dip0x%p failed pxb_fm_init "
+			    "at resume\n", devi);
+		DEVI_CLR_ATTACHING(devi);
+
 		return (DDI_SUCCESS);
+
 	case DDI_ATTACH:
 		DBG(DBG_ATTACH, devi, "DDI_ATTACH\n");
 
@@ -459,6 +466,10 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND:
 		pxb = (pxb_devstate_t *)
 			ddi_get_soft_state(pxb_state, ddi_get_instance(devi));
+
+		DEVI_SET_DETACHING(devi);
+		pxb_fm_fini(pxb);
+		DEVI_CLR_DETACHING(devi);
 
 		error = pcie_pwr_suspend(devi);
 

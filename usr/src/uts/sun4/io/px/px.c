@@ -314,6 +314,11 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			pwr_common_teardown(dip);
 		}
 
+		/*
+		 * add cpr callback
+		 */
+		px_cpr_add_callb(px_p);
+
 		ddi_report_dev(dip);
 
 		px_p->px_state = PX_ATTACHED;
@@ -402,6 +407,11 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_DETACH:
 		DBG(DBG_DETACH, dip, "DDI_DETACH\n");
+
+		/*
+		 * remove cpr callback
+		 */
+		px_cpr_rem_callb(px_p);
 
 #ifdef	HOTPLUG
 		/*

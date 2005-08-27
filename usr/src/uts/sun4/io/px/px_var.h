@@ -29,6 +29,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/callb.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -149,6 +151,8 @@ struct px {
 	uint32_t	px_pme_ignored; /* count of PME ignored */
 	uint32_t	px_lup_ignored; /* count of link up events ignored */
 
+	/* CPR callback id */
+	callb_id_t	px_cprcb_id;
 };
 
 /* px soft state flag */
