@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,9 +282,9 @@ cmd_getsetdot(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc != 0)
 		return (DCMD_USAGE);
 
-	mdb_set_dot(0x12345678feedbeef);
+	mdb_set_dot(0x12345678feedbeefULL);
 
-	if (mdb_get_dot() != 0x12345678feedbeef) {
+	if (mdb_get_dot() != 0x12345678feedbeefULL) {
 		mdb_warn("mdb_get_dot() returned wrong value!\n");
 		return (DCMD_ERR);
 	}

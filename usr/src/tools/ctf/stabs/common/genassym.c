@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -317,10 +317,21 @@ ga_process_line(char *line)
 			(void) fprintf(out, "%s\n", line + 1);
 		}
 		return (1);
+
 	} else if (line[0] == '#') {
+		/*
+		 * This is a comment of some sort; is it a line number
+		 * comment?  Those look like '# 53 "filename.c"'.  GCC
+		 * sometimes inserts them and removes all other vertical
+		 * whitespace, so they should be treated as a "type
+		 * terminator" like a blank line is.
+		 */
+		if (isdigit(line[2])) {
+			/* line number, terminate type */
+			curtype = -1;
+		}
 		return (1);
 	}
-
 	if (curtype == -1)
 		return ((curtype = ga_process_name(line)));
 	else

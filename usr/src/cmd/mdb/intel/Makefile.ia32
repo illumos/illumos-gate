@@ -39,7 +39,7 @@ LINTFLAGS += -u -erroff=$(LINTTAGS)
 KMDBDIR = $(SRC)/cmd/mdb/intel/ia32/kmdb
 
 MAPFILE_SOURCES_i386 = \
-	../libstand/sys/archsalib.h
+	$(SRC)/common/util/i386/muldiv.h
 
 LFLAGS = -t -v
 YFLAGS = -d -v

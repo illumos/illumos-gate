@@ -629,7 +629,7 @@ lg_walk_init(mdb_walk_state_t *wsp)
 	}
 
 	wsp->walk_addr = (uintptr_t)sym.st_value;
-	wsp->walk_data = (void *)(sym.st_value + sym.st_size);
+	wsp->walk_data = (void *)(uintptr_t)(sym.st_value + sym.st_size);
 
 	return (WALK_NEXT);
 }

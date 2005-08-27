@@ -1062,7 +1062,7 @@ fanout_walk_init(mdb_walk_state_t *wsp)
 	lw->index = 0;
 	lw->size = fi->getsize();
 	lw->sctp = NULL;
-	lw->fanout = (sctp_tf_t *)sym.st_value;
+	lw->fanout = (sctp_tf_t *)(uintptr_t)sym.st_value;
 	lw->getnext = fi->getnext;
 
 	if ((wsp->walk_addr = find_next_hash_item(lw)) == NULL) {

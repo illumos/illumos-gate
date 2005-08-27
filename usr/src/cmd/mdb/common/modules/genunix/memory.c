@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -322,7 +322,7 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	unused_stats.ms_kvp = (struct vnode *)sym.st_value;
+	unused_stats.ms_kvp = (struct vnode *)(uintptr_t)sym.st_value;
 
 	/* Find unused pages */
 	if (mdb_walk("page", (mdb_walk_cb_t)memstat_callback,

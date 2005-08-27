@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +157,8 @@ void
 exit(int status)
 {
 #ifdef __sparc
+	extern void kmdb_prom_exit_to_mon(void) __NORETURN;
+
 	kmdb_prom_exit_to_mon();
 #else
 	extern void kmdb_dpi_reboot(void) __NORETURN;

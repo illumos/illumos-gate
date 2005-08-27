@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3115,7 +3115,7 @@ dtrace_disx86_str(dis86_t *dis, uint_t mode, uintptr_t pc, char *buf,
 				mask = 0xffffffff;
 				break;
 			case 8:
-				mask = 0xffffffffffffffff;
+				mask = 0xffffffffffffffffULL;
 				break;
 			}
 

@@ -4378,8 +4378,9 @@ pt_getareg(mdb_tgt_t *t, mdb_tgt_tid_t tid,
 			 * If we are debugging on 32-bit SPARC, the globals and
 			 * outs can have 32 upper bits hiding in the xregs.
 			 */
-			/* LINTED */
-			int is_g = (rd_num >= R_G0 && rd_num <= R_G7);
+			/* gcc doesn't like >= R_G0 because R_G0 == 0 */
+			int is_g = (rd_num == R_G0 ||
+			    rd_num >= R_G1 && rd_num <= R_G7);
 			int is_o = (rd_num >= R_O0 && rd_num <= R_O7);
 			prxregset_t xrs;
 
@@ -4434,8 +4435,8 @@ pt_putareg(mdb_tgt_t *t, mdb_tgt_tid_t tid, const char *rname, mdb_tgt_reg_t r)
 			 * If we are debugging on 32-bit SPARC, the globals and
 			 * outs can have 32 upper bits stored in the xregs.
 			 */
-			/* LINTED */
-			int is_g = (rd_num >= R_G0 && rd_num <= R_G7);
+			int is_g = (rd_num == R_G0 ||
+			    rd_num >= R_G1 && rd_num <= R_G7);
 			int is_o = (rd_num >= R_O0 && rd_num <= R_O7);
 			prxregset_t xrs;
 

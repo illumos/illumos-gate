@@ -131,7 +131,7 @@ kt_stack_common(uintptr_t addr, uint_t flags, int argc,
     const mdb_arg_t *argv, mdb_tgt_stack_f *func, kreg_t saved_pc)
 {
 	kt_data_t *kt = mdb.m_target->t_data;
-	void *arg = (void *)mdb.m_nargs;
+	void *arg = (void *)(uintptr_t)mdb.m_nargs;
 	mdb_tgt_gregset_t gregs, *grp;
 
 	if (flags & DCMD_ADDRSPEC) {
@@ -147,9 +147,10 @@ kt_stack_common(uintptr_t addr, uint_t flags, int argc,
 			return (DCMD_USAGE);
 
 		if (argv->a_type == MDB_TYPE_STRING)
-			arg = (void *)(uint_t)mdb_strtoull(argv->a_un.a_str);
+			arg = (void *)(uintptr_t)(uint_t)
+			    mdb_strtoull(argv->a_un.a_str);
 		else
-			arg = (void *)(uint_t)argv->a_un.a_val;
+			arg = (void *)(uintptr_t)(uint_t)argv->a_un.a_val;
 	}
 
 	(void) mdb_kvm_v9stack_iter(mdb.m_target, grp, func, arg);
@@ -347,7 +348,7 @@ kt_sparcv9_init(mdb_tgt_t *t)
 	} else if (kregs[KREG_SP] != 0) {
 		warn("failed to read rwindow at %p -- current "
 		    "frame inputs will be unavailable\n",
-		    (void *)(kregs[KREG_SP] + STACK_BIAS));
+		    (void *)(uintptr_t)(kregs[KREG_SP] + STACK_BIAS));
 	}
 
 	/*

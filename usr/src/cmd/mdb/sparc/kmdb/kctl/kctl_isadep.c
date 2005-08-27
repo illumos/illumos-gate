@@ -71,8 +71,8 @@ kctl_ktrap_install(int tl, void (*handler)(void))
 	extern uint32_t kmdb_trap, kmdb_trap_tl1;
 	uint32_t *entryp = tl ? &kmdb_trap_tl1 : &kmdb_trap;
 	uint32_t *savp = tl ? &kctl_trap_brsav : &kctl_trap_tl1_brsav;
-	uint32_t hi = (uint32_t)handler >> 10;
-	uint32_t lo = (uint32_t)handler & 0x3ff;
+	uint32_t hi = (uint32_t)(uintptr_t)handler >> 10;
+	uint32_t lo = (uint32_t)(uintptr_t)handler & 0x3ff;
 	uint32_t inst;
 
 	*savp = *entryp;

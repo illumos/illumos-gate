@@ -109,6 +109,9 @@ lint: $(LINTFILES)
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
+%.o: $(SRC)/common/util/i386/%.s
+	$(COMPILE.s) $<
+
 %.o: ../../libstand/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -125,6 +128,9 @@ lint: $(LINTFILES)
 
 %.ln: $(SRC)/common/util/%.c
 	$(LINT.c) -c $<
+
+%.ln: $(SRC)/common/util/i386/%.s
+	$(LINT.s) -c $<
 
 %.ln: ../../libstand/%.c
 	$(LINT.c) -c $<

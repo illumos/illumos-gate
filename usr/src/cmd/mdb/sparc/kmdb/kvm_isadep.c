@@ -167,7 +167,7 @@ kmt_stack_common(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 {
 	mdb_tgt_gregset_t *grp = NULL;
 	mdb_tgt_gregset_t gregs;
-	void *arg = (void *)mdb.m_nargs;
+	void *arg = (void *)(uintptr_t)mdb.m_nargs;
 
 	if (flags & DCMD_ADDRSPEC) {
 		bzero(&gregs, sizeof (gregs));
@@ -181,9 +181,10 @@ kmt_stack_common(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 			return (DCMD_USAGE);
 
 		if (argv->a_type == MDB_TYPE_STRING)
-			arg = (void *)(uint_t)mdb_strtoull(argv->a_un.a_str);
+			arg = (void *)(uintptr_t)(uint_t)
+			    mdb_strtoull(argv->a_un.a_str);
 		else
-			arg = (void *)(uint_t)argv->a_un.a_val;
+			arg = (void *)(uintptr_t)(uint_t)argv->a_un.a_val;
 	}
 
 	(void) kmt_stack_iter(mdb.m_target, grp, func, arg, cpuid);

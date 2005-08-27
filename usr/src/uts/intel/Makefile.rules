@@ -44,9 +44,8 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/fs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(SRC)/common/util/ia32/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
+$(OBJS_DIR)/%.o:		$(SRC)/common/util/i386/%.s
+	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/dtrace/%.c
 	$(COMPILE.c) -o $@ $<
@@ -149,8 +148,8 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/os/%.c
 $(LINTS_DIR)/%.ln:		$(SRC)/common/fs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(SRC)/common/util/ia32/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+$(LINTS_DIR)/%.ln:		$(SRC)/common/util/i386/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/dtrace/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

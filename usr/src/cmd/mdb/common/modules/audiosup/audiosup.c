@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,7 @@ audiotrace_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	buffer = (audio_trace_buf_t *)sym.st_value;
+	buffer = (audio_trace_buf_t *)(uintptr_t)sym.st_value;
 
 	if (mdb_readvar(&seq, "audio_tb_seq") == -1) {
 		mdb_warn("failed to read 'audio_tb_seq'");

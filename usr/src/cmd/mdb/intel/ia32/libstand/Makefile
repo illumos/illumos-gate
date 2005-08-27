@@ -20,21 +20,22 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 SRCS += \
-	muldiv.s \
-	setjmp.s
-
+	setjmp.s \
+	muldiv.s
+	
 include ../../../../Makefile.cmd
 include ../../Makefile.ia32
 include ../../../Makefile.libstand
 
-CPPFLAGS += -I.
+CPPFLAGS += -I. -I$(SRC)/uts/i86pc
+AS_CPPFLAGS += -I$(SRC)/uts/i86pc
 
 %.o: %.c
 	$(COMPILE.c) $<
