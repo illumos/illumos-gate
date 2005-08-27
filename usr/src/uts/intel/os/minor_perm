@@ -112,3 +112,4 @@ cpuid:self 0644 root sys
 bmc:bmc 0666 root sys
 dld:* 0666 root sys
 aggr:* 0666 root sys
+smbios:smbios 0444 root sys

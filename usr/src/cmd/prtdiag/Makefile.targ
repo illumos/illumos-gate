@@ -19,14 +19,12 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/prtdiag/Makefile.targ
-#
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 install: all $(USR_PSM_SBIN_PROG) $(USR_PSM_SBIN_PROG_LINKS)
 
@@ -35,11 +33,10 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS)
 
 clean:
-	-$(RM) $(OBJS)
-	-$(RM) $(LINT_OBJS)
+	-$(RM) $(OBJS) $(LINTFILES)
 
-lint: $(LINT_OBJS)
-	$(LINT.c) $(LINT_OBJS) $(LDLIBS.cmd)
+lint: $(LINTFILES)
+	$(LINT) $(LINTFILES) $(LDLIBS)
 
 $(POFILE):	$(POFILES)
 	$(RM)	$@

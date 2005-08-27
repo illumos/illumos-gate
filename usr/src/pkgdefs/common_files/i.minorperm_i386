@@ -219,6 +219,7 @@ bge:*
 bmc:bmc
 dld:*
 aggr:*
+smbios:smbios
 EOF
 }
 

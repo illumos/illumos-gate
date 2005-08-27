@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -122,6 +122,7 @@ s none usr/lib/sparcv9/llib-lsec.ln=../../../lib/sparcv9/llib-lsec.ln
 s none usr/lib/sparcv9/llib-lsecdb.ln=../../../lib/sparcv9/llib-lsecdb.ln
 s none usr/lib/sparcv9/llib-lsendfile.ln=../../../lib/sparcv9/llib-lsendfile.ln
 f none usr/lib/sparcv9/llib-lsldap.ln 644 root bin
+f none usr/lib/sparcv9/llib-lsmbios.ln 644 root bin
 s none usr/lib/sparcv9/llib-lsocket.ln=../../../lib/sparcv9/llib-lsocket.ln
 f none usr/lib/sparcv9/llib-lssagent.ln 644 root bin
 f none usr/lib/sparcv9/llib-lssasnmp.ln 644 root bin

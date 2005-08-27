@@ -104,6 +104,7 @@ SUBDIRS= \
 	libmalloc	\
 	libmtmalloc	\
 	libnls		\
+	libsmbios	\
 	libtecla	\
 	libumem		\
 	libnvpair	.WAIT	\
@@ -308,6 +309,7 @@ HDRSUBDIRS= libaio	\
 	libproc		\
 	librcm		\
 	libscf		\
+	libsmbios	\
 	librestart	\
 	librpcsvc	\
 	librsm		\

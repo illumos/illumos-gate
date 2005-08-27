@@ -174,6 +174,8 @@ s none usr/lib/llib-lsendfile=../../lib/llib-lsendfile
 s none usr/lib/llib-lsendfile.ln=../../lib/llib-lsendfile.ln
 f none usr/lib/llib-lsldap.ln 644 root bin
 f none usr/lib/llib-lsldap 644 root bin
+f none usr/lib/llib-lsmbios 644 root bin
+f none usr/lib/llib-lsmbios.ln 644 root bin
 s none usr/lib/llib-lsocket=../../lib/llib-lsocket
 s none usr/lib/llib-lsocket.ln=../../lib/llib-lsocket.ln
 f none usr/lib/llib-lssagent 644 root bin

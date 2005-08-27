@@ -229,6 +229,7 @@ COMMON_SUBDIRS = \
 	cmd/runat \
 	cmd/sed_xpg4 \
 	cmd/smartcard \
+	cmd/smbios \
 	cmd/smserverd \
 	cmd/sort \
 	cmd/split \
@@ -332,6 +333,7 @@ COMMON_SUBDIRS = \
 	lib/libsendfile \
 	lib/libsldap \
 	lib/libslp \
+	lib/libsmbios \
 	lib/libsmedia \
 	lib/libthread \
 	lib/libumem \

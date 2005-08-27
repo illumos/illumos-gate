@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,47 +30,48 @@
  * All rights reserved.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7 */
+#include <stdio.h>
+#include <locale.h>
+#include <stdlib.h>
+#include <libintl.h>
+#include <string.h>
+#include <unistd.h>
+#include <zone.h>
 
-#include	<stdio.h>
-#include	<locale.h>
-#include	<stdlib.h>
-#include	<libintl.h>
-#include 	<string.h>
-#include	<unistd.h>
-#include	<zone.h>
-#include 	<sys/openpromio.h>
+extern int do_prominfo(int, char *, int, int);
 
-/*
- * function prototypes
- */
-extern int	do_prominfo(int syserrlog, char *progname,
-		    int logging, int print_flag);
-static char	*setprogname(char *name);
+static char *
+setprogname(char *name)
+{
+	char	*p;
 
-void
+	if (p = strrchr(name, '/'))
+		return (p + 1);
+	else
+		return (name);
+}
+
+int
 main(int argc, char *argv[])
 {
 	int	c;
 	int	syserrlog = 0;
-	char	*usage = "%s [ -v ] [ -l ]\n";
-	char	*progname;
+	char	*progname = setprogname(argv[0]);
 	int	print_flag = 1;
 	int	logging = 0;
 
-	/* set up for internationalization */
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	progname = setprogname(argv[0]);
 	if (getzoneid() != GLOBAL_ZONEID) {
 		(void) fprintf(stderr,
 		    gettext("%s can only be run in the global zone\n"),
 		    progname);
-		exit(1);
-		/*NOTREACHED*/
+		return (1);
 	}
+
 	while ((c = getopt(argc, argv, "vl")) != -1)  {
 		switch (c)  {
 		case 'v':
@@ -81,25 +83,10 @@ main(int argc, char *argv[])
 			break;
 
 		default:
-			(void) fprintf(stderr, usage, progname);
-			exit(1);
-			/*NOTREACHED*/
+			(void) fprintf(stderr, "Usage: %s [-lv]\n", progname);
+			return (1);
 		}
 	}
 
-	/*
-	 * for sun4u do_prominfo() is in libprtdiag
-	 */
-	exit(do_prominfo(syserrlog, progname, logging, print_flag));
-}
-
-static char *
-setprogname(char *name)
-{
-	char	*p;
-
-	if (p = strrchr(name, '/'))
-		return (p + 1);
-	else
-		return (name);
+	return (do_prominfo(syserrlog, progname, logging, print_flag));
 }

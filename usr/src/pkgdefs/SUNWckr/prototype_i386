@@ -108,6 +108,8 @@ f none kernel/drv/scsi_vhci 755 root sys
 f none kernel/drv/sctp 755 root sys
 f none kernel/drv/sctp6 755 root sys
 f none kernel/drv/sgen 755 root sys
+f none kernel/drv/smbios 755 root sys
+f none kernel/drv/smbios.conf 644 root sys
 f none kernel/drv/spdsock 755 root sys
 f none kernel/drv/st 755 root sys
 f none kernel/drv/sy 755 root sys
@@ -271,6 +273,7 @@ f none kernel/drv/amd64/sctp 755 root sys
 f none kernel/drv/amd64/sctp6 755 root sys
 f none kernel/drv/amd64/sd 755 root sys
 f none kernel/drv/amd64/sgen 755 root sys
+f none kernel/drv/amd64/smbios 755 root sys
 f none kernel/drv/amd64/spdsock 755 root sys
 f none kernel/drv/amd64/st 755 root sys
 f none kernel/drv/amd64/sy 755 root sys

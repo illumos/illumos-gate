@@ -418,6 +418,8 @@ CHKHDRS=			\
 	siginfo.h		\
 	signal.h		\
 	sleepq.h		\
+	smbios.h		\
+	smbios_impl.h		\
 	sobject.h		\
 	socket.h		\
 	socket_impl.h		\

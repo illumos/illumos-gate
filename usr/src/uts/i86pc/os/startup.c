@@ -123,8 +123,8 @@
 #include <sys/cpc_impl.h>
 #include <sys/chip.h>
 #include <sys/x86_archext.h>
+#include <sys/smbios.h>
 
-extern void debug_enter(char *);
 extern void progressbar_init(void);
 extern void progressbar_start(void);
 
@@ -1870,8 +1870,6 @@ ulong_t  _bdhs34;
 void
 post_startup(void)
 {
-	extern void memscrub_init(void);
-
 	/*
 	 * Set the system wide, processor-specific flags to be passed
 	 * to userland via the aux vector for performance hints and
@@ -1880,20 +1878,20 @@ post_startup(void)
 	bind_hwcap();
 
 	/*
+	 * Load the System Management BIOS into the global ksmbios handle,
+	 * if an SMBIOS is present on this system.
+	 */
+	ksmbios = smbios_open(NULL, SMB_VERSION, ksmbios_flags, NULL);
+
+	/*
 	 * Startup memory scrubber.
 	 */
-	(void) memscrub_init();
+	memscrub_init();
 
 	/*
 	 * Perform forceloading tasks for /etc/system.
 	 */
 	(void) mod_sysctl(SYS_FORCELOAD, NULL);
-
-	/*
-	 * complete mmu initialization, now that kernel and critical
-	 * modules have been loaded.
-	 */
-	(void) post_startup_mmu_initialization();
 
 	/*
 	 * ON4.0: Force /proc module in until clock interrupt handle fixed

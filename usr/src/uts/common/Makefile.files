@@ -1186,6 +1186,8 @@ CTF_OBJS += ctf_create.o ctf_decl.o ctf_error.o ctf_hash.o ctf_labels.o \
 ZMOD_OBJS += adler32.o infblock.o infcodes.o inffast.o inflate.o inftrees.o \
 		infutil.o zutil.o zmod.o
 
+SMBIOS_OBJS += smb_error.o smb_info.o smb_open.o smb_subr.o smb_dev.o
+
 RPCIB_OBJS += rpcib.o
 
 KMDB_OBJS += kdrv.o

@@ -273,6 +273,7 @@ DRV_KMODS	+= sctp
 DRV_KMODS	+= sctp6
 DRV_KMODS	+= sd
 DRV_KMODS	+= sgen
+DRV_KMODS	+= smbios
 DRV_KMODS	+= spdsock
 DRV_KMODS	+= sppp
 DRV_KMODS	+= sppptun

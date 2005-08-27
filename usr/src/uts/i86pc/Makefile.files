@@ -75,6 +75,12 @@ CORE_OBJS +=			\
 	x_call.o
 
 #
+#	Add the SMBIOS subsystem object files directly to the list of objects
+#	built into unix itself; this is all common code except for smb_dev.c.
+#
+CORE_OBJS += $(SMBIOS_OBJS)
+
+#
 #	locore.o is special. It must be the first file relocated so that it
 #	it is relocated just where its name implies.
 #

@@ -346,6 +346,7 @@ COMMON_SUBDIRS=		\
 	sh		\
 	sleep		\
 	smartcard	\
+	smbios		\
 	smserverd	\
 	soelim		\
 	sort		\

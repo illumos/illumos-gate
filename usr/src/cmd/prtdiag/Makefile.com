@@ -19,63 +19,49 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1992, 1999 by Sun Microsystems, Inc.
-# All rights reserved.
-#
-# cmd/prtdiag/Makefile.com
-#
 
 #
-#	Create default so empty rules don't
-#	confuse make
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-CLASS		= 32
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 include $(SRCDIR)/../Makefile.cmd
 include $(SRCDIR)/../../Makefile.psm
 
 PROG		= prtdiag
+OBJS		= main.o
+CLASS		= 32
 
 FILEMODE	= 2755
 DIRMODE		= 755
 OWNER		= root
 GROUP		= sys
 
-OBJS=	main.o
-
-# allow additional kernel-architecture dependent objects to be specified.
-
-OBJS		+= $(KARCHOBJS)
-
-SRCS		= $(OBJS:%.o=%.c)
-
-LINT_OBJS	= $(OBJS:%.o=%.ln)
-
-
+LINTFILES	= $(OBJS:%.o=%.ln)
 POFILE		= prtdiag_$(PLATFORM).po
 POFILES		= $(OBJS:%.o=%.po)
 
+.PARALLEL: $(OBJS) $(LINTFILES)
 
-# These names describe the layout on the target machine
-
-IFLAGS = -I$(SRCDIR) -I$(USR_PSM_INCL_DIR) -I./
-
-CPPFLAGS = $(IFLAGS) $(CPPFLAGS.master) -D_SYSCALL32
-
-.PARALLEL: $(OBJS)
-
-# build rules
+%.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 %.o: $(SRCDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
+%.po: %.c
+	$(COMPILE.cpp) $<  > $<.i
+	$(BUILD.po)
+
 %.po: $(SRCDIR)/%.c
 	$(COMPILE.cpp) $<  > $<.i
 	$(BUILD.po)
 
+%.ln: %.c
+	$(LINT.c) -c $<
+
 %.ln: $(SRCDIR)/%.c
-	$(LINT) -u -c $(CPPFLAGS) $<
+	$(LINT.c) -c $<

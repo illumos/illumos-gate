@@ -48,6 +48,7 @@ d none usr/platform 755 root sys
 d none usr/platform/i86pc 755 root sys
 d none usr/platform/i86pc/sbin 755 root bin
 f none usr/platform/i86pc/sbin/eeprom 2555 root sys
+f none usr/platform/i86pc/sbin/prtdiag 555 root sys
 d none usr/platform/i86pc/lib 755 root bin
 #
 # make the links to other machine types

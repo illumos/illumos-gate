@@ -114,4 +114,5 @@ cpuid 176
 bmc 177
 dld 178
 aggr 179
+smbios 180
 did 239

@@ -87,9 +87,9 @@ struct system_hardware {
 extern struct system_hardware system_hardware;
 extern void get_system_configuration(void);
 extern void mmu_init(void);
-extern void post_startup_mmu_initialization(void);
 extern int cpuid2nodeid(int);
 extern void map_kaddr(caddr_t, pfn_t, int, int);
+extern void memscrub_init(void);
 
 extern unsigned int microdata;
 extern int use_mp;

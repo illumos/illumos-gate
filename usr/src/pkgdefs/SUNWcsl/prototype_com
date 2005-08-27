@@ -224,10 +224,12 @@ s none usr/lib/libsec.so=../../lib/libsec.so.1
 s none usr/lib/libsec.so.1=../../lib/libsec.so.1
 s none usr/lib/libsecdb.so=../../lib/libsecdb.so.1
 s none usr/lib/libsecdb.so.1=../../lib/libsecdb.so.1
-s none usr/lib/libsldap.so=libsldap.so.1
-f none usr/lib/libsldap.so.1 755 root bin
 s none usr/lib/libsendfile.so=../../lib/libsendfile.so.1
 s none usr/lib/libsendfile.so.1=../../lib/libsendfile.so.1
+s none usr/lib/libsldap.so=libsldap.so.1
+f none usr/lib/libsldap.so.1 755 root bin
+s none usr/lib/libsmbios.so=libsmbios.so.1
+f none usr/lib/libsmbios.so.1 755 root bin
 s none usr/lib/libsocket.so=../../lib/libsocket.so.1
 s none usr/lib/libsocket.so.1=../../lib/libsocket.so.1
 s none usr/lib/libsys.so=./libsys.so.1

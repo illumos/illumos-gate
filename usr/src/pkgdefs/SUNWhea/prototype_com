@@ -464,6 +464,7 @@ f none usr/include/sgtty.h 644 root bin
 f none usr/include/shadow.h 644 root bin
 f none usr/include/siginfo.h 644 root bin
 f none usr/include/signal.h 644 root bin
+f none usr/include/smbios.h 644 root bin
 f none usr/include/spawn.h 644 root bin
 f none usr/include/stdarg.h 644 root bin
 f none usr/include/stdbool.h 644 root bin
@@ -1010,6 +1011,8 @@ f none usr/include/sys/shm_impl.h 644 root bin
 f none usr/include/sys/siginfo.h 644 root bin
 f none usr/include/sys/signal.h 644 root bin
 f none usr/include/sys/sleepq.h 644 root bin
+f none usr/include/sys/smbios.h 644 root bin
+f none usr/include/sys/smbios_impl.h 644 root bin
 f none usr/include/sys/smedia.h 644 root bin
 f none usr/include/sys/sobject.h 644 root bin
 f none usr/include/sys/socket.h 644 root bin

@@ -539,3 +539,6 @@
 >6	ushort		x		rev %u,
 >8	ushort		x		from esc v%u
 >10	ushort		x		rev %u
+0	string		_SM_		DMTF SMBIOS image
+>6	byte		x		version %u
+>7	byte		x		.%u

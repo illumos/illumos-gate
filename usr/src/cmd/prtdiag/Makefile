@@ -19,40 +19,30 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 2001 by Sun Microsystems, Inc.
-# All rights reserved.
-#
-# src/cmd/prtdiag/Makefile
-#
-# builds occur in kernel-architecture subdirectories using Makefile.com
-# in this directory.
-#
 
 include ../Makefile.cmd
 
-PROG		= prtdiag
+PROG = prtdiag
+SUBDIRS = $(MACH)
 
-sparc_SUBDIRS =	sparc
-i386_SUBDIRS =
-
-SUBDIRS = $($(MACH)_SUBDIRS)
-
-# conditional assignments
-all:=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+all := TARGET = all
+install := TARGET = install
+clean := TARGET = clean
+clobber := TARGET = clobber
+lint := TARGET = lint
+_msg := TARGET = _msg
 
 .KEEP_STATE:
 
 all install clean clobber lint _msg: $(SUBDIRS)
 
-install:	$(SUBDIRS)
+install: $(SUBDIRS)
 	$(RM) $(ROOTUSRSBINPROG)
 	$(LN) $(PLATEXEC) $(ROOTUSRSBINPROG)
 

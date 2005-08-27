@@ -1948,13 +1948,6 @@ pageout_init(void (*procedure)(), proc_t *pp, pri_t pri)
 }
 
 /*
- * any use for this?
- */
-void
-post_startup_mmu_initialization(void)
-{}
-
-/*
  * Function for flushing D-cache when performing module relocations
  * to an alternate mapping.  Unnecessary on Intel / AMD platforms.
  */

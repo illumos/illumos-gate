@@ -41,6 +41,7 @@ static int diskette(di_minor_t minor, di_node_t node);
 static int vt00(di_minor_t minor, di_node_t node);
 static int kdmouse(di_minor_t minor, di_node_t node);
 static int bmc(di_minor_t minor, di_node_t node);
+static int smbios(di_minor_t minor, di_node_t node);
 static int agp_process(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
@@ -52,6 +53,9 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "pseudo", "ddi_pseudo", "bmc",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, bmc,
+	},
+	{ "pseudo", "ddi_pseudo", "smbios",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, smbios,
 	},
 	{ "disk",  "ddi_block:diskette", NULL,
 	    TYPE_EXACT, ILEVEL_1, diskette
@@ -295,6 +299,14 @@ bmc(di_minor_t minor, di_node_t node)
 	(void) devfsadm_mklink("bmc", node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }
+
+static int
+smbios(di_minor_t minor, di_node_t node)
+{
+	(void) devfsadm_mklink("smbios", node, minor, 0);
+	return (DEVFSADM_CONTINUE);
+}
+
 static int
 agp_process(di_minor_t minor, di_node_t node)
 {

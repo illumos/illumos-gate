@@ -807,6 +807,7 @@ f none usr/sbin/setmnt 555 root bin
 f none usr/sbin/share 555 root bin
 f none usr/sbin/shareall 555 root bin
 f none usr/sbin/shutdown 755 root sys
+f none usr/sbin/smbios 555 root bin
 f none usr/sbin/strace 555 root sys
 f none usr/sbin/strclean 555 root sys
 f none usr/sbin/strerr 555 root sys
