@@ -1015,10 +1015,16 @@ attach_node(dev_info_t *dip)
 	DEVI_CLR_ATTACHING(dip);
 
 	if (rv != DDI_SUCCESS) {
+		/* ensure that devids are unregistered */
+		mutex_enter(&DEVI(dip)->devi_lock);
 		if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
-			e_devid_cache_unregister(dip);
 			DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
-		}
+			mutex_exit(&DEVI(dip)->devi_lock);
+
+			e_devid_cache_unregister(dip);
+		} else
+			mutex_exit(&DEVI(dip)->devi_lock);
+
 		/*
 		 * Cleanup dacf reservations
 		 */
@@ -1100,11 +1106,15 @@ detach_node(dev_info_t *dip, uint_t flag)
 	/* a detached node can't have attached or .conf children */
 	mutex_enter(&DEVI(dip)->devi_lock);
 	DEVI(dip)->devi_flags &= ~(DEVI_MADE_CHILDREN|DEVI_ATTACHED_CHILDREN);
+
+	/* ensure that devids registered during attach are unregistered */
 	if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
-		e_devid_cache_unregister(dip);
 		DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
-	}
-	mutex_exit(&DEVI(dip)->devi_lock);
+		mutex_exit(&DEVI(dip)->devi_lock);
+
+		e_devid_cache_unregister(dip);
+	} else
+		mutex_exit(&DEVI(dip)->devi_lock);
 
 	/*
 	 * If the instance has successfully detached in detach_driver() context,
