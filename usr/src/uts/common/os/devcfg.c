@@ -340,8 +340,9 @@ i_ddi_free_node(dev_info_t *dip)
 	if (devi->devi_intr_p)
 		i_ddi_intr_devi_fini((dev_info_t *)devi);
 
-	/* free devi_addr */
-	ddi_set_name_addr(dip, NULL);
+	/* free devi_addr_buf allocated by ddi_set_name_addr() */
+	if (devi->devi_addr_buf)
+		kmem_free(devi->devi_addr_buf, 2 * MAXNAMELEN);
 
 	if (i_ndi_dev_is_auto_assigned_node(dip))
 		impl_ddi_free_nodeid(DEVI(dip)->devi_nodeid);

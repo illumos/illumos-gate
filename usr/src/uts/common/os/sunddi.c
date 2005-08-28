@@ -6267,20 +6267,33 @@ ddi_soft_state_fini(void **state_p)
 	*state_p = NULL;
 }
 
-
 /*
- * This sets the devi_addr entry in the dev_info structure 'dip' to 'name'
- * If name is NULL, this frees the devi_addr entry, if any.
+ * This sets the devi_addr entry in the dev_info structure 'dip' to 'name'.
+ * Storage is double buffered to prevent updates during devi_addr use -
+ * double buffering is adaquate for reliable ddi_deviname() consumption.
+ * The double buffer is not freed until dev_info structure destruction
+ * (by i_ddi_free_node).
  */
 void
 ddi_set_name_addr(dev_info_t *dip, char *name)
 {
-	char *oldname = DEVI(dip)->devi_addr;
+	char	*buf = DEVI(dip)->devi_addr_buf;
+	char	*newaddr;
 
-	DEVI(dip)->devi_addr = i_ddi_strdup(name, KM_SLEEP);
-	if (oldname) {
-		kmem_free(oldname, strlen(oldname) + 1);
+	if (buf == NULL) {
+		buf = kmem_zalloc(2 * MAXNAMELEN, KM_SLEEP);
+		DEVI(dip)->devi_addr_buf = buf;
 	}
+
+	if (name) {
+		ASSERT(strlen(name) < MAXNAMELEN);
+		newaddr = (DEVI(dip)->devi_addr == buf) ?
+		    (buf + MAXNAMELEN) : buf;
+		(void) strlcpy(newaddr, name, MAXNAMELEN);
+	} else
+		newaddr = NULL;
+
+	DEVI(dip)->devi_addr = newaddr;
 }
 
 char *

@@ -188,6 +188,8 @@ struct dev_info  {
 	devinfo_intr_t		*devi_intr_p;
 
 	void		*devi_nex_pm;		/* nexus PM private */
+
+	char		*devi_addr_buf;		/* buffer for devi_addr */
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))
