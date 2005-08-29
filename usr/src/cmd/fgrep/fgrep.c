@@ -49,6 +49,8 @@
 #include <locale.h>
 #include <libintl.h>
 #include <euc.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <getwidth.h>
 
@@ -105,7 +107,6 @@ wchar_t letter();
 	(a == b || iflag && (!MULTI_BYTE || ISASCII(a)) && (a ^ b) == ' ' && \
 	letter(a) == letter(b))
 
-#define	MAXSIZ 6000
 
 #define	QSIZE 400
 struct words {
@@ -114,7 +115,7 @@ struct words {
 	struct	words *nst;
 	struct	words *link;
 	struct	words *fail;
-} w[MAXSIZ], *smax, *q;
+} *w = NULL, *smax, *q;
 
 FILE *fptr;
 long long lnum;
@@ -127,6 +128,7 @@ int	nsucc;
 long long tln;
 FILE	*wordf;
 char	*argptr;
+off_t input_size = 0;
 
 void	execute(char *);
 void	cgotofn(void);
@@ -140,6 +142,7 @@ main(int argc, char **argv)
 {
 	int c;
 	int errflg = 0;
+	struct stat file_stat;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -172,6 +175,7 @@ main(int argc, char **argv)
 		case 'e':
 			eflag++;
 			argptr = optarg;
+			input_size = strlen(argptr);
 			continue;
 
 		case 'f':
@@ -183,6 +187,16 @@ main(int argc, char **argv)
 					optarg);
 				exit(2);
 			}
+
+			if (fstat(fileno(wordf), &file_stat) == 0) {
+			    input_size = file_stat.st_size;
+			} else {
+				(void) fprintf(stderr,
+					gettext("fgrep: can't fstat %s\n"),
+					optarg);
+				exit(2);
+			}
+
 			continue;
 
 		case 'l':
@@ -213,8 +227,32 @@ main(int argc, char **argv)
 	}
 	if (!eflag && !fflag) {
 		argptr = argv[optind];
+		input_size = strlen(argptr);
+		input_size++;
 		optind++;
 		argc--;
+	}
+
+/*
+ * Normally we need one struct words for each letter in the pattern
+ * plus one terminating struct words with outp = 1, but when -x option
+ * is specified we require one more struct words for `\n` character so we
+ * calculate the input_size as below. We add extra 1 because
+ * (input_size/2) rounds off odd numbers
+ */
+
+	if (xflag) {
+		input_size = input_size + (input_size/2) + 1;
+	}
+
+	input_size++;
+
+	w = (struct words *)calloc(input_size, sizeof (struct words));
+	if (w == NULL) {
+		(void) fprintf(stderr,
+			gettext("fgrep: could not allocate "
+				"memory for wordlist\n"));
+		exit(2);
 	}
 
 	getwidth(&WW);
@@ -240,6 +278,11 @@ main(int argc, char **argv)
 			execute(*argv);
 			argv++;
 		}
+
+	if (w != NULL) {
+		free(w);
+	}
+
 	return (retcode != 0 ? retcode : nsucc == 0);
 }
 
@@ -490,7 +533,7 @@ nword:
 					if (s->inp == 0)
 						goto nenter;
 					if (s->link == 0) {
-						if (smax >= &w[MAXSIZ -1])
+						if (smax >= &w[input_size -1])
 							overflo();
 						s->link = ++smax;
 						s = smax;
@@ -510,7 +553,7 @@ loop:
 			if (s->inp == 0)
 				goto enter;
 			if (s->link == 0) {
-				if (smax >= &w[MAXSIZ - 1])
+				if (smax >= &w[input_size -1])
 					overflo();
 				s->link = ++smax;
 				s = smax;
@@ -524,7 +567,7 @@ loop:
 enter:
 	do {
 		s->inp = c;
-		if (smax >= &w[MAXSIZ - 1])
+		if (smax >= &w[input_size -1])
 			overflo();
 		s->nst = ++smax;
 		s = smax;
@@ -532,7 +575,7 @@ enter:
 	if (xflag) {
 nenter:
 		s->inp = '\n';
-		if (smax >= &w[MAXSIZ -1])
+		if (smax >= &w[input_size -1])
 			overflo();
 		s->nst = ++smax;
 	}
@@ -542,10 +585,15 @@ nenter:
 		goto nword;
 }
 
+/*
+ * This function is an unexpected condition, since input_size should have been
+ * calculated correctly before hand.
+ */
+
 void
 overflo(void)
 {
-	(void) fprintf(stderr, gettext("wordlist too large\n"));
+	(void) fprintf(stderr, gettext("fgrep: wordlist too large\n"));
 	exit(2);
 }
 
