@@ -292,8 +292,6 @@ kcf_create_mech_entry(kcf_ops_class_t class, char *mechname)
 			break;
 		}
 		mutex_exit(&(me_tab[i].me_mutex));
-		/* Pointer increment */
-		me_tab++;
 		i++;
 	}
 

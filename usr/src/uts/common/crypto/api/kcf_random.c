@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -704,9 +704,9 @@ static uint32_t	random_max_ncpus = 0;
 /*
  * Boot-time tunables, for experimentation.
  */
-size_t	rndmag_threshold = 32;
-size_t	rndbuf_len = 64;
-size_t	rndmag_size = 64;
+size_t	rndmag_threshold = 64;
+size_t	rndbuf_len = 1280;
+size_t	rndmag_size = 1280;
 
 
 int
