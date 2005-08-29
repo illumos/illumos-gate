@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,8 @@ extern "C" {
 /*
  * Default path to statistics file
  */
-#define	STAT_FILE_DEFAULT	"/var/run/daemon/rcap.stat"
+#define	STAT_FILE_DIR	"/var/run/daemon"
+#define	STAT_FILE_DEFAULT	STAT_FILE_DIR	"/rcap.stat"
 
 /*
  * Statistics file header.
