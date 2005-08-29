@@ -204,7 +204,6 @@ static void get_hostinfo(char *, int, struct addrinfo **);
 char *inet_name(union any_in_addr *, int);
 ushort_t in_cksum(ushort_t *, int);
 extern int ip_hdr_length_v6(ip6_t *, int, uint8_t *);
-void main(int, char **);
 extern char *pr_type(uchar_t);
 extern char *pr_type6(uchar_t);
 extern void print_addr(uchar_t *, int, struct sockaddr *);
@@ -244,7 +243,7 @@ static double xsqrt(double);
 /*
  * main
  */
-void
+int
 main(int argc, char **argv)
 {
 	struct addrinfo *ai_dst = NULL;		/* destination host */
@@ -628,9 +627,9 @@ main(int argc, char **argv)
 	 * this was a successful operation
 	 */
 	if (probing_successful)
-		exit(EXIT_SUCCESS);
+		return (EXIT_SUCCESS);
 	else
-		exit(EXIT_FAILURE);
+		return (EXIT_FAILURE);
 }
 
 /*

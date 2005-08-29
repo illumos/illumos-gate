@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,7 @@
 static char *getfs(FILE *);
 static int invalid(const char *, FILE *);
 
+int
 main(int argc, char **argv)
 {
 	FILE *dfp;		/* fp for dfs list */

@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,7 @@ static void list_res(char *fsname);
 static void get_data(char *s);
 void perror();
 
+int
 main(argc, argv)
 int argc;
 char **argv;

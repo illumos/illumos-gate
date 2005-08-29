@@ -227,7 +227,7 @@ static void usage(char *);
 /*
  * main()
  */
-void
+int
 main(int argc, char *argv[])
 {
 	struct addrinfo	*ai_dst = NULL;		/* addrinfo host list */
@@ -676,7 +676,7 @@ main(int argc, char *argv[])
 	recv_icmp_packet(ai_dst, recv_sock6, recv_sock, udp_src_port6,
 	    udp_src_port);
 
-	exit(EXIT_SUCCESS);	/* should never come here */
+	return (EXIT_SUCCESS);	/* should never come here */
 }
 
 /*

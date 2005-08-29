@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1996, 1999 by Sun Microsystems, Inc.
- * All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -282,8 +282,10 @@ trak_receive(rbufp)
 		    pp->lastrec.l_i + 1) {
 			pp->lastrec = trtmp;
 			dpt += 9;
-			while (dpt < dpend)
-				*(dpt - 8) = *dpt++;
+			while (dpt < dpend) {
+				*(dpt - 8) = *dpt;
+				dpt++;
+			}
 		}
 	}
 	if (up->polled == 0) return;

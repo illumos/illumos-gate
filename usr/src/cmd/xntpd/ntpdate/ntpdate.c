@@ -1500,7 +1500,7 @@ timer()
   current_time++;
 
   if (debug) {
-    static ix = 0;
+    static int ix = 0;
     char twirl[] = {'|', '/', '-', '\\', '|', '/', '-', '\\'};
 
     fprintf(stderr, "%c\b", twirl[ix]);
