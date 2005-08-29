@@ -1289,8 +1289,11 @@ display_attr(char *usrname, attrlist *attributes)
 			else if (strncmp(passwd, NOLOGINSTRING,
 			    sizeof (NOLOGINSTRING)-1) == 0)
 				status = "NL  ";
-			else
+			else if ((strlen(passwd) == 13 && passwd[0] != '$') ||
+			    passwd[0] == '$')
 				status = "PS  ";
+			else
+				status = "UN  ";
 			break;
 		case ATTR_LSTCHG:
 			lstchg = attributes->data.val_i * DAY;

@@ -111,7 +111,6 @@
 struct	reqgrp {
 	char		*groupname;	/* Requested group name */
 	struct reqgrp	*next;		/* Next item in the list */
-	int		found;		/* TRUE if group in /etc/group */
 	gid_t		groupID;	/* Group's ID */
 };
 
@@ -248,132 +247,11 @@ wrtmsg(int severity, char *action, char *tag, char *text, ...)
 	}
 }
 
-
-/*
- *  These functions allocate space for the information we gather.
- *  It works by having a memory heap with strings allocated from
- *  the end of the heap and structures (aligned data) allocated
- *  from the beginning of the heap.  It begins with a 4k block of
- *  memory then allocates memory in 4k chunks.  These functions
- *  should never fail.  If they do, they report the problem and
- *  exit with an exit code of 101.
- *
- *  Functions contained:
- *	allocblk	Allocates a block of memory, aligned on a
- *			4-byte (double-word) boundary.
- *	allocstr	Allocates a block of memory with no
- *			particular alignment
- *
- *  Constant definitions:
- *	ALLOCBLKSZ	Size of a chunk of main memory allocated
- *			using malloc()
- *
- *  Static data:
- *	nextblkaddr	Address of the next available chunk of
- *			aligned space in the heap
- *	laststraddr	Address of the last chunk of unaligned space
- *			allocated from the heap
- *	toomuchspace	Message to write if someone attempts to allocate
- *			too much space (>ALLOCBLKSZ bytes)
- *	memallocdif	Message to write if there is a problem
- *			allocating main menory.
- */
-
-#define	ALLOCBLKSZ	4096
-
-static	char   *nextblkaddr = NULL;
-static	char   *laststraddr = NULL;
-#define	MEMALLOCDIF	"Memory allocation difficulty.  Command terminates"
-#define	TOOMUCHSPACE	"Internal space allocation error.  Command terminates"
-
-
-/*
- *  void *allocblk(size)
- *	unsigned int	size
- *
- *	This function allocates a block of aligned (4-byte or
- *	double-word boundary) memory from the program's heap.
- *	It returns a pointer to that block of allocated memory.
- *
- *  Arguments:
- *	size		Minimum number of bytes to allocate (will
- *			round up to multiple of 4)
- *
- *  Returns:  void *
- *	Pointer to the allocated block of memory
- */
-
-static void *
-allocblk(unsigned int size)
-{
-	char   *rtnval;
-
-	/* Make sure the sizes are aligned correctly */
-	if ((size = size + (4 - (size % 4))) > ALLOCBLKSZ) {
-		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, gettext(TOOMUCHSPACE));
-		exit(101);
-	}
-
-	/* Set up the value we're going to return */
-	rtnval = nextblkaddr;
-
-	/* Get the space we need off of the heap */
-	if ((nextblkaddr += size) >= laststraddr) {
-		if (!(rtnval = (char *)malloc(ALLOCBLKSZ))) {
-			wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG,
-			    gettext(MEMALLOCDIF));
-			exit(101);
-		}
-		laststraddr = rtnval + ALLOCBLKSZ;
-		nextblkaddr = rtnval + size;
-	}
-
-	/* We're through */
-	return ((void *)rtnval);
-}
-
-
-/*
- *  char *allocstr(nbytes)
- *	unsigned int	nbytes
- *
- *	This function allocates a block of unaligned memory from the
- *	program's heap.  It returns a pointer to that block of allocated
- *	memory.
- *
- *  Arguments:
- *	nbytes		Number of bytes to allocate
- *
- *  Returns:  char *
- *	Pointer to the allocated block of memory
- */
-
-static char *
-allocstr(unsigned int nchars)
-{
-	if (nchars > ALLOCBLKSZ) {
-		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, gettext(TOOMUCHSPACE));
-		exit(101);
-	}
-	if (laststraddr == NULL ||
-	    (laststraddr -= nchars) < nextblkaddr) {
-		if (!(nextblkaddr = (char *)malloc(ALLOCBLKSZ))) {
-			wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG,
-			    gettext(MEMALLOCDIF));
-			exit(101);
-		}
-		laststraddr = nextblkaddr + ALLOCBLKSZ - nchars;
-	}
-	return (laststraddr);
-}
-
-
 /*
  *  These functions control the group membership list, as found in
  *  the /etc/group file.
  *
  *  Functions included:
- *	initmembers		Initialize the membership list (to NULL)
  *	addmember		Adds a member to the membership list
  *	isamember		Looks for a particular login-ID in the
  *				list of members
@@ -392,25 +270,6 @@ struct	grpmember {
 };
 
 static	struct grpmember	*membershead;
-
-
-/*
- *  void initmembers()
- *
- *	This function initializes the list of members of specified groups.
- *
- *  Arguments:  None
- *
- *  Returns:  Void
- */
-
-static void
-initmembers(void)
-{
-	/* Set up the members list to be a null member's list */
-	membershead = NULL;
-}
-
 
 /*
  *  void addmember(p)
@@ -432,8 +291,8 @@ addmember(char *p)
 {
 	struct grpmember	*new;	/* Member being added */
 
-	new = (struct grpmember *)allocblk(sizeof (struct grpmember));
-	new->membername = strcpy(allocstr((unsigned int)strlen(p)+1), p);
+	new = malloc(sizeof (struct grpmember));
+	new->membername = strdup(p);
 	new->next = membershead;
 	membershead = new;
 }
@@ -536,7 +395,7 @@ static	struct display	*displayhead;
 static void
 initdisp(void)
 {
-	displayhead = (struct display *)allocblk(sizeof (struct display));
+	displayhead = malloc(sizeof (struct display));
 	displayhead->nextlogin = NULL;
 	displayhead->nextuid = NULL;
 	displayhead->loginID = "";
@@ -588,27 +447,19 @@ adddisp(struct passwd *pwent)
 	}
 	/* Insert this value in the list, only if it is unique though */
 	if (compare != 0) {
-		new = (struct display *)allocblk(sizeof (struct display));
-		new->loginID = strcpy(allocstr(
-		    (unsigned int)strlen(pwent->pw_name)+1), pwent->pw_name);
+		new = malloc(sizeof (struct display));
+		new->loginID = strdup(pwent->pw_name);
 		if (pwent->pw_comment && pwent->pw_comment[0] != '\0') {
-			new->freefield = strcpy(allocstr(
-			    (unsigned int)strlen(pwent->pw_comment)+1),
-			    pwent->pw_comment);
+			new->freefield = strdup(pwent->pw_comment);
 		} else {
-		    new->freefield = strcpy(allocstr(
-			(unsigned int)strlen(pwent->pw_gecos)+1),
-			pwent->pw_gecos);
+		    new->freefield = strdup(pwent->pw_gecos);
 		}
 		if (!pwent->pw_shell || !(*pwent->pw_shell)) {
 			new->shell = "/sbin/sh";
 		} else {
-			new->shell = strcpy(allocstr(
-			    (unsigned int)strlen(pwent->pw_shell)+1),
-			    pwent->pw_shell);
+			new->shell = strdup(pwent->pw_shell);
 		}
-		new->iwd = strcpy(allocstr(
-		    (unsigned int)strlen(pwent->pw_dir)+1), pwent->pw_dir);
+		new->iwd = strdup(pwent->pw_dir);
 		new->userID = pwent->pw_uid;
 		new->groupID = pwent->pw_gid;
 		new->secgrplist = NULL;
@@ -714,6 +565,15 @@ applygroup(int allgroups)
 	struct secgrp	*psecgrp;	/* Block allocated for this info */
 	struct secgrp	*psrch;		/* Secondary group -- for searching */
 
+	if (!allgroups) {
+		/* short circute getting all the groups */
+		for (dp = displayhead->nextuid; dp; dp = dp->nextuid) {
+			if ((grent = getgrgid(dp->groupID)) != NULL) {
+				dp->groupname = strdup(grent->gr_name);
+			}
+		}
+		return;
+	}
 
 	/* For each group-ID in the /etc/group file ... */
 	while (grent = getgrent()) {
@@ -727,17 +587,12 @@ applygroup(int allgroups)
 		for (dp = displayhead->nextuid; dp; dp = dp->nextuid) {
 			if ((dp->groupID == grent->gr_gid) && !dp->groupname) {
 				if (!p) {
-					p = strcpy(allocstr(
-					    (unsigned int)strlen(
-					    grent->gr_name)+1), grent->gr_name);
+					p = strdup(grent->gr_name);
 				}
 				dp->groupname = p;
 			}
 		}
 
-		if (!allgroups) {
-			continue;
-		}
 		/*
 		 *  If we're to be displaying secondary group membership,
 		 *  leaf through the list of group members.  Then, attempt
@@ -753,12 +608,9 @@ applygroup(int allgroups)
 				    *pp)) == 0) &&
 				    !(grent->gr_gid == dp->groupID)) {
 					if (!p) {
-						p = strcpy(allocstr(
-						    (unsigned int)strlen(
-						    grent->gr_name)+1),
-						    grent->gr_name);
+						p = strdup(grent->gr_name);
 					}
-					psecgrp = (struct secgrp *)allocblk(
+					psecgrp = malloc(
 					    sizeof (struct secgrp));
 					psecgrp->groupID = grent->gr_gid;
 					psecgrp->groupname = p;
@@ -806,7 +658,6 @@ applypasswd(void)
 	struct display	*dp;		/* Ptr to current element */
 	struct spwd	*psp;		/* Pointer to a shadow-file entry */
 	struct tm	*ptm;		/* Pointer to a time-of-day structure */
-	char		*p;		/* Running character pointer */
 	time_t		pwchg;		/* System-time of last pwd chg */
 	time_t		pwexp;		/* System-time of password expiration */
 
@@ -822,7 +673,7 @@ applypasswd(void)
 	for (dp = displayhead->nextuid; dp; dp = dp->nextuid) {
 
 		/* Allocate structure space for the password description */
-		ppasswd = (struct pwdinfo *)allocblk(sizeof (struct pwdinfo));
+		ppasswd = malloc(sizeof (struct pwdinfo));
 		dp->passwdinfo = ppasswd;
 
 		/*
@@ -830,7 +681,7 @@ applypasswd(void)
 		 * that the login is locked
 		 */
 
-		if (!(psp = getspnam(dp->loginID))) {
+		if ((psp = getspnam(dp->loginID)) == NULL) {
 			pwchg = 0L;			/* Epoch */
 			ppasswd->passwdstatus = "LK";	/* LK, Locked */
 			ppasswd->mindaystilchg = 0L;
@@ -841,33 +692,22 @@ applypasswd(void)
 		} else {
 			/*
 			 * Otherwise, fill in the password information from the
-			 * info in the shadow file entry
+			 * info in the shadow entry
 			 */
-			/*  See if the login has no password  */
-			if (!psp->sp_pwdp || !(*psp->sp_pwdp)) {
+			if (psp->sp_pwdp == NULL || (*psp->sp_pwdp) == '\0')
 				ppasswd->passwdstatus = "NP";
-			} else if (strlen(psp->sp_pwdp) != 13) {
-				/*
-				 * See if the login is explicitly locked
-				 * (encrypted password is <13 characters)
-				 */
+			else if (strncmp(psp->sp_pwdp, LOCKSTRING,
+			    sizeof (LOCKSTRING)-1) == 0)
 				ppasswd->passwdstatus = "LK";
-			} else {
-				/*
-				 * If it's a valid encrypted password,
-				 * the login is password protected
-				 */
+			else if (strncmp(psp->sp_pwdp, NOLOGINSTRING,
+			    sizeof (NOLOGINSTRING)-1) == 0)
+				ppasswd->passwdstatus = "NL";
+			else if ((strlen(psp->sp_pwdp) == 13 &&
+			    psp->sp_pwdp[0] != '$') ||
+			    psp->sp_pwdp[0] == '$')
 				ppasswd->passwdstatus = "PS";
-				for (p = psp->sp_pwdp; *p; p++) {
-					if (!isalnum(*p) &&
-					    (*p != '.') &&
-					    (*p != '/')) {
-						ppasswd->passwdstatus = "LK";
-						break;
-					}
-				}
-			}
-
+			else
+				ppasswd->passwdstatus = "UN";
 			/*
 			 * Set up the last-changed date,
 			 * the minimum days between changes,
@@ -1251,16 +1091,6 @@ genlogreport(int pipeflag, int xtndflag, int expflag)
 	}
 }
 
-
-char *
-strcpmalloc(char *str)
-{
-	if (str == NULL)
-		return (NULL);
-
-	return (strcpy(allocstr((unsigned int)strlen(str)+1), str));
-}
-
 struct localpw {
 	struct localpw *next;
 	struct passwd pw;
@@ -1273,45 +1103,68 @@ struct localpw *pwptr;
 
 int in_localgetpwent = 0;	/* Set if in local_getpwent */
 
+static struct localpw *
+fill_localpw(struct localpw *lpw, struct passwd *pw) {
+	struct localpw *cur;
+
+	/*
+	 * Copy the data -- we have to alloc areas for it all
+	 */
+	lpw->pw.pw_name = strdup(pw->pw_name);
+	lpw->pw.pw_passwd = strdup(pw->pw_passwd);
+	lpw->pw.pw_uid = pw->pw_uid;
+	lpw->pw.pw_gid = pw->pw_gid;
+	lpw->pw.pw_age = strdup(pw->pw_age);
+	lpw->pw.pw_comment = strdup(pw->pw_comment);
+	lpw->pw.pw_gecos  = strdup(pw->pw_gecos);
+	lpw->pw.pw_dir = strdup(pw->pw_dir);
+	lpw->pw.pw_shell = strdup(pw->pw_shell);
+
+	cur = lpw;
+	lpw->next = malloc(sizeof (struct localpw));
+	return (cur);
+}
+
 void
-build_localpw(void)
+build_localpw(struct reqlogin *req_head)
 {
 	struct localpw *next, *cur;
 	struct passwd *pw;
+	struct reqlogin *req_next;
 
-	next = (struct localpw *)allocblk(sizeof (struct localpw));
+	next = malloc(sizeof (struct localpw));
 
 	pwtable = next;
 
-	while ((pw = getpwent()) != NULL) {
-		/*
-		 * Copy the data -- we have to alloc areas for it all
-		 */
-		next->pw.pw_name = strcpmalloc(pw->pw_name);
-		next->pw.pw_passwd = strcpmalloc(pw->pw_passwd);
-		next->pw.pw_uid = pw->pw_uid;
-		next->pw.pw_gid = pw->pw_gid;
-		next->pw.pw_age = strcpmalloc(pw->pw_age);
-		next->pw.pw_comment = strcpmalloc(pw->pw_comment);
-		next->pw.pw_gecos  = strcpmalloc(pw->pw_gecos);
-		next->pw.pw_dir = strcpmalloc(pw->pw_dir);
-		next->pw.pw_shell = strcpmalloc(pw->pw_shell);
+	req_next = req_head;
 
-		next->next = (struct localpw *)allocblk(
-		    sizeof (struct localpw));
+	while (req_next != NULL) {
+		if ((pw = getpwnam(req_next->loginname)) != NULL) {
+			/*
+			 * Copy the data -- we have to alloc areas for it all
+			 */
+			cur = fill_localpw(next, pw);
+			req_next->found = TRUE;
+			next = cur->next;
+		}
 
-		cur = next;
-		next = next->next;
+		req_next = req_next->next;
 	}
 
-	/*
-	 * At this point we have one extra (struct localpw) allocated;
-	 * sine alloclbk doesn't have a freeblk, we just leave it unreferenced.
-	 */
+	if (req_head == NULL) {
+		while ((pw = getpwent()) != NULL) {
+			/*
+			 * Copy the data -- we have to alloc areas for it all
+			 */
+			cur = fill_localpw(next, pw);
+			next = cur->next;
+		}
+	}
 
 	if (pwtable == next) {
 		pwtable = NULL;
 	} else {
+		free(next);
 		cur->next = NULL;
 	}
 
@@ -1605,51 +1458,10 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-
-
 	/*
 	 *  The following section does preparation work, setting up for
 	 *  building the list of logins to display
 	 */
-
-	/*
-	 * Very first thing, build an in-core structure of passwd file entries.
-	 * This is important since we have to assume that getpwent() is going
-	 * out to one or more network name services that could be changing
-	 * on the fly.  This will limit us to one pass through the network data.
-	 */
-	build_localpw();
-
-
-	/*
-	 *  If the -g groups option was on the command line, build a
-	 *  list containing groups we're to list logins for.
-	 */
-
-	if (g_seen) {
-		groupcount = 0;
-		reqgrphead = NULL;
-		if (token = strtok(g_arg, ",")) {
-			pgrp = (struct reqgrp *)allocblk(
-			    sizeof (struct reqgrp));
-			pgrp->groupname = token;
-			pgrp->found = FALSE;
-			pgrp->next = NULL;
-			groupcount++;
-			reqgrphead = pgrp;
-			qgrp = pgrp;
-			while (token = strtok(NULL, ",")) {
-				pgrp = (struct reqgrp *)allocblk(
-				    sizeof (struct reqgrp));
-				pgrp->groupname = token;
-				pgrp->found = FALSE;
-				pgrp->next = NULL;
-				groupcount++;
-				qgrp->next = pgrp;
-				qgrp = pgrp;
-			}
-		}
-	}
 
 
 	/*
@@ -1660,16 +1472,14 @@ main(int argc, char *argv[])
 	if (l_seen) {
 		reqloginhead = NULL;
 		if (token = strtok(l_arg, ",")) {
-			plogin = (struct reqlogin *)allocblk(
-			    sizeof (struct reqlogin));
+			plogin = malloc(sizeof (struct reqlogin));
 			plogin->loginname = token;
 			plogin->found = FALSE;
 			plogin->next = NULL;
 			reqloginhead = plogin;
 			qlogin = plogin;
 			while (token = strtok(NULL, ",")) {
-				plogin = (struct reqlogin *)allocblk(
-				    sizeof (struct reqlogin));
+				plogin = malloc(sizeof (struct reqlogin));
 				plogin->loginname = token;
 				plogin->found = FALSE;
 				plogin->next = NULL;
@@ -1677,26 +1487,56 @@ main(int argc, char *argv[])
 				qlogin = plogin;
 			}
 		}
-		while (pwent = local_getpwent()) {
-			done = FALSE;
-			for (plogin = reqloginhead; !done && plogin;
-			    plogin = plogin->next) {
-				if (strcmp(pwent->pw_name,
-				    plogin->loginname) == 0) {
-					plogin->found = TRUE;
-					done = TRUE;
-				}
+		/*
+		 * Build an in-core structure of just the passwd database
+		 * entries requested.  This greatly reduces the time
+		 * to get all entries and filter later.
+		 */
+		build_localpw(reqloginhead);
+	} else {
+		/*
+		 * Build an in-core structure of all passwd database
+		 * entries.  This is important since we have to assume that
+		 * getpwent() is going out to one or more network name
+		 * services that could be changing on the fly.  This will
+		 * limit us to one pass through the network data.
+		 */
+		build_localpw(NULL);
+	}
+
+	/*
+	 *  If the -g groups option was on the command line, build a
+	 *  list containing groups we're to list logins for.
+	 */
+
+	if (g_seen) {
+		groupcount = 0;
+		reqgrphead = NULL;
+		if (token = strtok(g_arg, ",")) {
+			pgrp = malloc(sizeof (struct reqgrp));
+			pgrp->groupname = token;
+			pgrp->next = NULL;
+			groupcount++;
+			reqgrphead = pgrp;
+			qgrp = pgrp;
+			while (token = strtok(NULL, ",")) {
+				pgrp = malloc(sizeof (struct reqgrp));
+				pgrp->groupname = token;
+				pgrp->next = NULL;
+				groupcount++;
+				qgrp->next = pgrp;
+				qgrp = pgrp;
 			}
 		}
-		local_endpwent();
 	}
+
 
 	/*
 	 *  Generate the list of login information to display
 	 */
 
 	/* Initialize the login list */
-	initmembers();
+	membershead = NULL;
 
 
 	/*
@@ -1705,62 +1545,25 @@ main(int argc, char *argv[])
 	 */
 
 	if (g_seen) {
+		/* For each group mentioned with the -g option ... */
+		for (pgrp = reqgrphead; (groupcount > 0) && pgrp;
+		    pgrp = pgrp->next) {
+			if ((grent = getgrnam(pgrp->groupname)) != NULL) {
+				/*
+				 * Remembering the group-ID for later
+				 */
 
-		/* For each group in the /etc/group file ... */
-		while (grent = getgrent()) {
-
-			/* For each group mentioned with the -g option ... */
-			for (pgrp = reqgrphead; (groupcount > 0) && pgrp;
-			    pgrp = pgrp->next) {
-
-				if (!pgrp->found) {
-
-					/*
-					 *  If the mentioned group is found
-					 * in the  /etc/group file ...
-					 */
-					if (strcmp(grent->gr_name,
-					    pgrp->groupname) == 0) {
-
-						/*
-						 * Mark the entry is found,
-						 * remembering the group-ID
-						 * for later
-						 */
-
-						pgrp->found = TRUE;
-						groupcount--;
-						pgrp->groupID = grent->gr_gid;
-						for (pp = grent->gr_mem; *pp;
-						    pp++) {
-							addmember(*pp);
-						}
-					}
+				groupcount--;
+				pgrp->groupID = grent->gr_gid;
+				for (pp = grent->gr_mem; *pp; pp++) {
+					addmember(*pp);
 				}
-			}
-		}
-
-		/*
-		 * If any groups weren't found, write a message indicating
-		 * such, then continue
-		 */
-
-		qgrp = NULL;
-		for (pgrp = reqgrphead; pgrp; pgrp = pgrp->next) {
-			if (!pgrp->found) {
+			} else {
 				wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG,
 				    gettext("%s was not found"),
 				    pgrp->groupname);
-				if (!qgrp) {
-					reqgrphead = pgrp->next;
-				} else {
-				qgrp->next = pgrp->next;
-				}
-			} else {
-				qgrp = pgrp;
 			}
 		}
-		endgrent();
 	}
 
 
