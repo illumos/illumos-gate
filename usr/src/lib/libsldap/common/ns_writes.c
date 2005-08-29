@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -669,20 +669,29 @@ write_state_machine(
 	int		Errno;
 	int		always = 1;
 	char		*err, *errmsg = NULL;
+	/* referrals returned by the LDAP operation */
 	char		**referrals = NULL;
-	ns_referral_info_t *ref = NULL;
+	/*
+	 * list of referrals used by the state machine, built from
+	 * the referrals variable above
+	 */
+	ns_referral_info_t *ref_list = NULL;
+	/* current referral */
+	ns_referral_info_t *current_ref = NULL;
 	ns_write_state_t state = W_INIT, new_state, err_state = W_INIT;
 	int		do_not_fail_if_new_pwd_reqd = 0;
 	ns_ldap_passwd_status_t	pwd_status = NS_PASSWD_GOOD;
 	int		passwd_mgmt = 0;
+	int		i = 0;
+	int		ldap_error;
 
 	while (always) {
 		switch (state) {
 		case W_EXIT:
 			if (connectionId > -1)
 				DropConnection(connectionId, 0);
-			if (ref)
-				__s_api_deleteRefInfo(ref);
+			if (ref_list)
+				__s_api_deleteRefInfo(ref_list);
 			if (target_dn && target_dn_allocated)
 				free(target_dn);
 			return (return_rc);
@@ -845,21 +854,39 @@ write_state_machine(
 				ldap_memfree(errmsg);
 				errmsg = NULL;
 			}
-			if (Errno == LDAP_REFERRAL) {
-				/* only follow one referral */
-				if (referrals[0]) {
-					rc = __s_api_addRefInfo(&ref,
-						referrals[0],
+			/*
+			 * If we received referral data, process
+			 * it if:
+			 * - we are configured to follow referrals
+			 * - and not already in referral mode (to keep
+			 *   consistency with search_state_machine()
+			 *   which follows 1 level of referrals only;
+			 *   see proc_result_referrals() and
+			 *   proc_search_references().
+			 */
+			if (Errno == LDAP_REFERRAL && followRef && !ref_list) {
+				for (i = 0; referrals[i] != NULL; i++) {
+					/* add to referral list */
+					rc = __s_api_addRefInfo(&ref_list,
+						referrals[i],
 						NULL, NULL, NULL,
 						conp->ld);
+					if (rc != NS_LDAP_SUCCESS) {
+						__s_api_deleteRefInfo(ref_list);
+						ref_list = NULL;
+						break;
+					}
 				}
 				ldap_value_free(referrals);
-				if (ref == NULL) {
+				if (ref_list == NULL) {
 					if (rc != NS_LDAP_MEMORY)
 						rc = NS_LDAP_INTERNAL;
+					return_rc = rc;
 					new_state = W_ERROR;
-				} else
+				} else {
 					new_state = GET_REFERRAL_CONNECTION;
+					current_ref = ref_list;
+				}
 				if (errmsg) {
 					ldap_memfree(errmsg);
 					errmsg = NULL;
@@ -874,9 +901,16 @@ write_state_machine(
 			}
 			break;
 		case GET_REFERRAL_CONNECTION:
+			/*
+			 * since we are starting over,
+			 * discard the old error info
+			 */
+			return_rc = NS_LDAP_SUCCESS;
+			if (*errorp)
+				(void) __ns_ldap_freeError(errorp);
 			if (connectionId > -1)
 				DropConnection(connectionId, 0);
-			rc = __s_api_getConnection(ref->refHost,
+			rc = __s_api_getConnection(current_ref->refHost,
 				0,
 				cred,
 				&connectionId,
@@ -900,20 +934,59 @@ write_state_machine(
 			}
 
 			if (rc != NS_LDAP_SUCCESS) {
-				__s_api_deleteRefInfo(ref);
-				ref = NULL;
 				return_rc = rc;
+				/*
+				 * If current referral is not
+				 * available for some reason,
+				 * try next referral in the list.
+				 * Get LDAP error code from errorp.
+				 */
+				if (*errorp != NULL) {
+					ldap_error = (*errorp)->status;
+					if (ldap_error == LDAP_BUSY ||
+					    ldap_error == LDAP_UNAVAILABLE ||
+					    ldap_error ==
+						LDAP_UNWILLING_TO_PERFORM ||
+					    ldap_error == LDAP_CONNECT_ERROR ||
+					    ldap_error == LDAP_SERVER_DOWN) {
+						current_ref = current_ref->next;
+						if (current_ref == NULL) {
+						    /* no more referral */
+						    /* to follow */
+						    new_state = W_ERROR;
+						} else {
+						    new_state =
+							GET_REFERRAL_CONNECTION;
+						}
+						/*
+						 * free errorp before going to
+						 * next referral
+						 */
+						(void) __ns_ldap_freeError(
+							errorp);
+						*errorp = NULL;
+						break;
+					}
+					/*
+					 * free errorp before going to W_ERROR
+					 */
+					(void) __ns_ldap_freeError(errorp);
+					*errorp = NULL;
+				}
+				/* else, exit */
+				__s_api_deleteRefInfo(ref_list);
+				ref_list = NULL;
 				new_state = W_ERROR;
 				break;
 			}
 			/* target DN may changed due to referrals */
-			if (ref->refDN) {
+			if (current_ref->refDN) {
 				if (target_dn && target_dn_allocated) {
 					free(target_dn);
 					target_dn = NULL;
 					target_dn_allocated = FALSE;
 				}
-				target_dn = ref->refDN;
+				target_dn = current_ref->refDN;
 			}
 			new_state = SELECT_OPERATION_SYNC;
 			break;

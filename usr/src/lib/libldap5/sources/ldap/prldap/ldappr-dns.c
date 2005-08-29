@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -302,17 +302,18 @@ prldap_initf_hosts(nss_db_params_t *p)
  * prldap_gethostbyname1() and prldap_x_install_dns_skipdb().
  *
  * Returns:
- *      Valid pointer to hostent      if success
+ *      PR_SUCCESS                    if success
  *      PR_FAILURE                    if failure
  */
 
-static struct hostent *
+static int
 prldap_switch_gethostbyname_r(const char *name,
         struct hostent *result, char *buffer, int buflen,
         int *h_errnop)
 {
         nss_XbyY_args_t arg;
         nss_status_t    res;
+	struct hostent	*resp;
 
 	/*
 	 * Log the information indicating that we are trying to
@@ -329,7 +330,9 @@ prldap_switch_gethostbyname_r(const char *name,
             NSS_DBOP_HOSTS_BYNAME, &arg);
         arg.status = res;
         *h_errnop = arg.h_errno;
-        return (struct hostent *)NSS_XbyY_FINI(&arg);
+	resp = (struct hostent *)NSS_XbyY_FINI(&arg);
+
+	return (resp != NULL ? PR_SUCCESS : PR_FAILURE);
 }
 
 /*
@@ -348,6 +351,7 @@ prldap_gethostbyname1(const char *name, LDAPHostEnt *result,
         int         h_errno;
 	LDAPHostEnt prhent;
 
+	memset(&prhent, '\0', sizeof (prhent));
         if (!statusp || ( *statusp = prldap_switch_gethostbyname_r(name,
                         &prhent, buffer, buflen, &h_errno )) == PR_FAILURE) {
 		/*
