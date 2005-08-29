@@ -76,6 +76,8 @@ typedef struct vnex_id {
 /* vnex interrupt descriptor list */
 static vnex_id_t *vnex_id_list;
 
+hrtime_t vnex_pending_timeout = 2ull * NANOSEC; /* 2 seconds in nanoseconds */
+
 /*
  * vnex interrupt descriptor list manipulation functions
  */
@@ -143,8 +145,8 @@ static struct bus_ops vnex_bus_ops = {
 	vnex_intr_ops	/* (*bus_intr_op)();	*/
 };
 
-static int vnex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd);
-static int vnex_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
+static int vnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
+static int vnex_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 
 static struct dev_ops pseudo_ops = {
 	DEVO_REV,		/* devo_rev, */
@@ -193,8 +195,54 @@ _info(struct modinfo *modinfop)
 }
 
 /*ARGSUSED*/
+void
+vnex_intr_dist(void *arg)
+{
+	vnex_id_t *vid_p;
+	uint32_t cpuid;
+	int	intr_state;
+	hrtime_t start;
+
+	mutex_enter(&vnex_id_lock);
+
+	for (vid_p = vnex_id_list; vid_p != NULL;
+	    vid_p = vid_p->vid_next) {
+		/*
+		 * Don't do anything for disabled interrupts.
+		 * vnex_enable_intr takes care of redistributing interrupts.
+		 */
+		if ((hvio_intr_getvalid(vid_p->vid_ihdl,
+		    &intr_state) == H_EOK) && (intr_state == HV_INTR_NOTVALID))
+				continue;
+
+		cpuid = intr_dist_cpuid();
+
+		(void) hvio_intr_setvalid(vid_p->vid_ihdl, HV_INTR_NOTVALID);
+		/*
+		 * Make a best effort to wait for pending interrupts to finish.
+		 * There is not much we can do if we timeout.
+		 */
+		start = gethrtime();
+		while (!panicstr &&
+		    (hvio_intr_getstate(vid_p->vid_ihdl, &intr_state) ==
+		    H_EOK) && (intr_state == HV_INTR_DELIVERED_STATE)) {
+			if (gethrtime() - start > vnex_pending_timeout) {
+				cmn_err(CE_WARN, "vnex_intr_dist: %s%d "
+				    "ino 0x%x pending: timedout\n",
+				    ddi_driver_name(vid_p->vid_dip),
+				    ddi_get_instance(vid_p->vid_dip),
+				    vid_p->vid_ino);
+				break;
+			}
+		}
+		(void) hvio_intr_settarget(vid_p->vid_ihdl, cpuid);
+		(void) hvio_intr_setvalid(vid_p->vid_ihdl, HV_INTR_VALID);
+	}
+	mutex_exit(&vnex_id_lock);
+}
+
 static int
-vnex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
+vnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -204,6 +252,10 @@ vnex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		 */
 		vnex_id_list = NULL;
 		mutex_init(&vnex_id_lock, NULL, MUTEX_DRIVER, NULL);
+		/*
+		 * Add interrupt redistribution callback.
+		 */
+		intr_dist_add(vnex_intr_dist, dip);
 		return (DDI_SUCCESS);
 
 	case DDI_RESUME:
@@ -216,7 +268,7 @@ vnex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 /*ARGSUSED*/
 static int
-vnex_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
+vnex_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	switch (cmd) {
 	case DDI_DETACH:
