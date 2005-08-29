@@ -289,6 +289,11 @@ extern "C" {
 /*	SCMD_SET_LIMITS		0x33	*/
 
 /*
+ * Group 3 Commands
+ */
+#define	SCMD_VAR_LEN		0x7f
+
+/*
  * Group 4 Commands, All Devices
  */
 #define	SCMD_GROUP4		0x80
