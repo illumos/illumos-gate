@@ -31,7 +31,7 @@ EXIT=0
 # check if user has disabled vold through commenting out
 # vold actions
 if [ -f $BASEDIR/etc/vold.conf ]; then
-	egrep "^(eject|insert|notify|remount)" $BASEDIR/etc/vold.conf
+	egrep "^(eject|insert|notify|remount)" $BASEDIR/etc/vold.conf > /dev/null 2>&1
 	if [ $? != '0' ]; then
 		exit $EXIT
 	fi
