@@ -313,6 +313,7 @@ extern uint64_t hv_service_recv(uint64_t s_id, uint64_t buf_pa,
 extern uint64_t hv_service_send(uint64_t s_id, uint64_t buf_pa,
     uint64_t size, uint64_t *send_bytes);
 extern uint64_t hv_service_getstatus(uint64_t s_id, uint64_t *vreg);
+extern uint64_t hv_service_setstatus(uint64_t s_id, uint64_t bits);
 extern uint64_t hv_service_clrstatus(uint64_t s_id, uint64_t bits);
 
 extern uint64_t hv_mach_desc(uint64_t buffer_ra, uint64_t *buffer_sizep);

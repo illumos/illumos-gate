@@ -317,6 +317,11 @@ hv_service_getstatus(uint64_t s_id, uint64_t *vreg)
 
 /*ARGSUSED*/
 uint64_t
+hv_service_setstatus(uint64_t s_id, uint64_t bits)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
 hv_service_clrstatus(uint64_t s_id, uint64_t bits)
 { return (0); }
 
@@ -1145,6 +1150,16 @@ hv_ncs_request(int cmd, uint64_t realaddr, size_t sz)
 	nop
 	SET_SIZE(hv_service_getstatus)
 	
+	/*
+	 * hv_service_setstatus(uint64_t s_id, uint64_t bits);
+	 */
+	ENTRY(hv_service_setstatus)
+	mov	SVC_SETSTATUS, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(hv_service_setstatus)
+
 	/*
 	 * hv_service_clrstatus(uint64_t s_id, uint64_t bits);
 	 */

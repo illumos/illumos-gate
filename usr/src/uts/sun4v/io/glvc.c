@@ -77,7 +77,7 @@
  * For timeout polling, in microsecond.
  */
 #define	GLVC_TIMEOUT_POLL	5000000		/* Timeout in intr mode */
-#define	GLVC_POLLMODE_POLL	1000000		/* Interval in polling mode */
+#define	GLVC_POLLMODE_POLL	500000		/* Interval in polling mode */
 
 /*
  * For debug printing
@@ -153,9 +153,8 @@ typedef struct glvc_soft_state {
 	uint64_t mtu;		/* max transmit unit size */
 	uint64_t flag;		/* flag register */
 	kmutex_t open_mutex;	/* protect open_state flag */
-	uint8_t open_state;	/* no-open, open or open exlusively */
+	uint8_t open_state;	/* no-open, open or open exclusively */
 	kmutex_t recv_mutex;
-	uint8_t	recv_flag;	/* 1 = new data arrive, 0 = no data to read */
 	kmutex_t send_complete_mutex;
 	uint8_t send_complete_flag;	/* 1 = send completed */
 	uint8_t intr_mode;	/* 1 = polling mode, 2 = interrupt mode */
@@ -252,7 +251,6 @@ glvc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		softsp->dip = dip;
 
 		softsp->open_state = GLVC_NO_OPEN;
-		softsp->recv_flag = 0;
 		softsp->send_complete_flag = 1;
 
 		glvc_debug = (uint64_t)ddi_getprop(DDI_DEV_T_ANY,
@@ -405,13 +403,22 @@ glvc_add_intr_handlers(dev_info_t *dip)
 {
 	int	instance;
 	glvc_soft_state_t	*softsp;
-	int	err = DDI_SUCCESS;
+	int	err = DDI_FAILURE;
 	uint64_t polling_interval;
 
 	instance = ddi_get_instance(dip);
 	softsp = ddi_get_soft_state(glvc_ssp, instance);
 
-	err = ddi_add_intr(dip, 0, NULL, NULL, glvc_intr, (caddr_t)softsp);
+	if ((uint64_t)ddi_getprop(DDI_DEV_T_ANY, softsp->dip,
+	    DDI_PROP_DONTPASS, "flags", -1) != -1) {
+		err = ddi_add_intr(dip, 0, NULL, NULL, glvc_intr,
+		    (caddr_t)softsp);
+		if (err != DDI_SUCCESS)
+			cmn_err(CE_NOTE, "glvc, instance %d"
+			    " ddi_add_intr() failed, using"
+			    " polling mode", instance);
+	}
+
 	if (err == DDI_SUCCESS) {
 		softsp->intr_mode = GLVC_INTR_MODE;
 		polling_interval = (uint64_t)ddi_getprop(DDI_DEV_T_ANY,
@@ -433,6 +440,19 @@ glvc_add_intr_handlers(dev_info_t *dip)
 		softsp->polling_interval =
 		    drv_usectohz(polling_interval);
 	}
+
+	/* Now enable interrupt bits in the status register */
+	if (softsp->intr_mode == GLVC_INTR_MODE) {
+		err = hv_service_setstatus(softsp->s_id,
+		    GLVC_REG_RECV_ENA|GLVC_REG_SEND_ENA);
+		if (err != H_EOK) {
+			cmn_err(CE_NOTE, "glvc instance %d"
+			    " cannot enable receive interrupt",
+			    instance);
+			return (DDI_FAILURE);
+		}
+	}
+
 
 	err = ddi_add_softintr(dip, DDI_SOFTINT_LOW,
 	    &softsp->poll_mode_softint_id, NULL, NULL,
@@ -550,6 +570,7 @@ glvc_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	int instance;
 	int rv, error = DDI_SUCCESS;
 	uint64_t hverr, recv_count = 0;
+	uint64_t status_reg;
 	clock_t	tick;
 
 	instance = getminor(dev);
@@ -558,12 +579,18 @@ glvc_read(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	mutex_enter(&softsp->recv_mutex);
 
+	hverr = hv_service_getstatus(softsp->s_id, &status_reg);
+	DPRINTF(("glvc_read: err = %ld, getstatus = 0x%lx",
+	    hverr, status_reg));
+
+
 	/*
 	 * If no data available, we wait till we get some.
 	 * Notice we still holding the recv_mutex lock at this
 	 * point.
 	 */
-	while (softsp->recv_flag == 0) {
+	while (hverr == H_EOK && (status_reg & GLVC_REG_RECV) !=
+	    GLVC_REG_RECV) {
 		tick = ddi_get_lbolt() + softsp->polling_interval;
 		rv =  cv_timedwait_sig(&softsp->recv_cv,
 		    &softsp->recv_mutex, tick);
@@ -581,9 +608,10 @@ glvc_read(dev_t dev, struct uio *uiop, cred_t *credp)
 			 */
 			ddi_trigger_softintr(softsp->poll_mode_softint_id);
 		}
+		hverr = hv_service_getstatus(softsp->s_id, &status_reg);
+		DPRINTF(("glvc_read: err = %ld, getstatus = 0x%lx",
+		    hverr, status_reg));
 	}
-
-	mutex_enter(&softsp->statusreg_mutex);
 
 	/* Read data into kernel buffer */
 	hverr = hv_service_recv(softsp->s_id, softsp->mb_recv_buf_pa,
@@ -598,7 +626,6 @@ glvc_read(dev_t dev, struct uio *uiop, cred_t *credp)
 			    "size(%lu) smaller than number of bytes "
 			    "received(%lu).", instance, uiop->uio_resid,
 			    recv_count));
-			mutex_exit(&softsp->statusreg_mutex);
 			mutex_exit(&softsp->recv_mutex);
 			return (EINVAL);
 		}
@@ -614,9 +641,13 @@ glvc_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		cmn_err(CE_WARN, "glvc_read clear status reg failed");
 	}
 
-	softsp->recv_flag = 0;
+	/* Set RECV interrupt enable bit so we can receive interrupt */
+	if (softsp->intr_mode == GLVC_INTR_MODE)
+		if (hv_service_setstatus(softsp->s_id, GLVC_REG_RECV_ENA)
+		    != H_EOK) {
+			cmn_err(CE_WARN, "glvc_read set status reg failed");
+		}
 
-	mutex_exit(&softsp->statusreg_mutex);
 	mutex_exit(&softsp->recv_mutex);
 
 	return (error);
@@ -636,13 +667,12 @@ glvc_write(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	softsp = ddi_get_soft_state(glvc_ssp, instance);
 
-	if (uiop->uio_resid > softsp->mtu) {
+	if (uiop->uio_resid > softsp->mtu)
 		return (EINVAL);
-	} else {
-		send_count = uiop->uio_resid;
-		DPRINTF(("instance %d glvc_write: request to send %lu bytes",
-		    instance, send_count));
-	}
+
+	send_count = uiop->uio_resid;
+	DPRINTF(("instance %d glvc_write: request to send %lu bytes",
+	    instance, send_count));
 
 	mutex_enter(&softsp->send_complete_mutex);
 	while (softsp->send_complete_flag == 0) {
@@ -665,15 +695,6 @@ glvc_write(dev_t dev, struct uio *uiop, cred_t *credp)
 		}
 	}
 
-	mutex_enter(&softsp->statusreg_mutex);
-
-	/* Clear the SEND_COMPLETE interrupt bit on device register */
-	if ((hverr = hv_service_clrstatus(softsp->s_id, GLVC_REG_SEND))
-	    != H_EOK) {
-		cmn_err(CE_WARN, "glvc_write clear status reg failed"
-		    "error = %ld", hverr);
-	}
-
 	/* move data from to user to kernel space */
 	error = uiomove(softsp->mb_send_buf, send_count,
 	    UIO_WRITE, uiop);
@@ -689,7 +710,6 @@ glvc_write(dev_t dev, struct uio *uiop, cred_t *credp)
 
 	softsp->send_complete_flag = 0;
 
-	mutex_exit(&softsp->statusreg_mutex);
 	mutex_exit(&softsp->send_complete_mutex);
 
 	return (error);
@@ -705,45 +725,47 @@ glvc_intr(caddr_t arg)
 	uint64_t status_reg;
 	int error = DDI_INTR_UNCLAIMED;
 	uint64_t hverr = H_EOK;
+	uint64_t clr_bits = 0;
 
-	mutex_enter(&softsp->statusreg_mutex);
+	mutex_enter(&softsp->recv_mutex);
+	mutex_enter(&softsp->send_complete_mutex);
 	hverr = hv_service_getstatus(softsp->s_id, &status_reg);
 	DPRINTF(("glvc_intr: err = %ld, getstatus = 0x%lx",
 	    hverr, status_reg));
-	mutex_exit(&softsp->statusreg_mutex);
 
-	if (hverr != H_EOK)
+	/*
+	 * Clear SEND_COMPLETE bit and disable RECV interrupt
+	 */
+	if (status_reg & GLVC_REG_SEND)
+		clr_bits |= GLVC_REG_SEND;
+	if ((softsp->intr_mode == GLVC_INTR_MODE) &&
+	    (status_reg & GLVC_REG_RECV))
+		clr_bits |= GLVC_REG_RECV_ENA;
+
+	if ((hverr = hv_service_clrstatus(softsp->s_id, clr_bits))
+	    != H_EOK) {
+		cmn_err(CE_WARN, "glvc_intr clear status reg failed"
+		    "error = %ld", hverr);
+		mutex_exit(&softsp->send_complete_mutex);
+		mutex_exit(&softsp->recv_mutex);
 		return (DDI_INTR_UNCLAIMED);
+	}
 
 	if (status_reg & GLVC_REG_RECV) {
-		mutex_enter(&softsp->recv_mutex);
-		/*
-		 * If recv_flag has already been set to 1, it means
-		 * this is not a recv data interrupt, it is a
-		 * send complete interrupt. If recv_flag is 0, then
-		 * it is recv data interrupt. We claim the interrupt.
-		 */
-		if (softsp->recv_flag == 0) {
-			softsp->recv_flag = 1;
-			cv_broadcast(&softsp->recv_cv);
-			error = DDI_INTR_CLAIMED;
-		}
-		mutex_exit(&softsp->recv_mutex);
+		cv_broadcast(&softsp->recv_cv);
+		error = DDI_INTR_CLAIMED;
 	}
-	if (error == DDI_INTR_CLAIMED)
-		return (error);
 
 	if (status_reg & GLVC_REG_SEND) {
-		mutex_enter(&softsp->send_complete_mutex);
-		if (softsp->send_complete_flag == 0) {
-			softsp->send_complete_flag = 1;
-			cv_broadcast(&softsp->send_complete_cv);
-			error = DDI_INTR_CLAIMED;
-		}
-		mutex_exit(&softsp->send_complete_mutex);
+		softsp->send_complete_flag = 1;
+		cv_broadcast(&softsp->send_complete_cv);
+		error = DDI_INTR_CLAIMED;
 	}
 
-	return (DDI_INTR_CLAIMED);
+	mutex_exit(&softsp->send_complete_mutex);
+	mutex_exit(&softsp->recv_mutex);
+
+	return (error);
 }
 
 /*
@@ -757,16 +779,22 @@ glvc_peek(glvc_soft_state_t *softsp, glvc_xport_msg_peek_t *msg_peek)
 	int rv, error = 0;
 	uint64_t hverr = H_EOK;
 	uint64_t recv_count = 0;
+	uint64_t status_reg;
 	clock_t tick;
 
 	mutex_enter(&softsp->recv_mutex);
+
+	hverr = hv_service_getstatus(softsp->s_id, &status_reg);
+	DPRINTF(("glvc_peek: err = %ld, getstatus = 0x%lx",
+	    hverr, status_reg));
 
 	/*
 	 * If no data available, we wait till we get some.
 	 * Notice we still holding the recv_mutex lock at
 	 * this point.
 	 */
-	while (softsp->recv_flag == 0) {
+	while (hverr == H_EOK && (status_reg & GLVC_REG_RECV) !=
+	    GLVC_REG_RECV) {
 		tick = ddi_get_lbolt() + softsp->polling_interval;
 		rv = cv_timedwait_sig(&softsp->recv_cv,
 		    &softsp->recv_mutex, tick);
@@ -784,9 +812,10 @@ glvc_peek(glvc_soft_state_t *softsp, glvc_xport_msg_peek_t *msg_peek)
 			 */
 			ddi_trigger_softintr(softsp->poll_mode_softint_id);
 		}
+		hverr = hv_service_getstatus(softsp->s_id, &status_reg);
+		DPRINTF(("glvc_peek: err = %ld, getstatus = 0x%lx",
+		    hverr, status_reg));
 	}
-
-	mutex_enter(&softsp->statusreg_mutex);
 
 	/* Read data into kernel buffer */
 	hverr = hv_service_recv(softsp->s_id, softsp->mb_recv_buf_pa,
@@ -802,7 +831,6 @@ glvc_peek(glvc_soft_state_t *softsp, glvc_xport_msg_peek_t *msg_peek)
 		error = glvc_emap_h2s(hverr);
 	}
 
-	mutex_exit(&softsp->statusreg_mutex);
 	mutex_exit(&softsp->recv_mutex);
 
 	return (error);
