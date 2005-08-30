@@ -1534,7 +1534,7 @@ conn_kstat_update(kstat_t *ksp, int rw)
 	cm_ksp_data->x_state.value.ui32 = cm_entry->x_state_flags;
 
 	if (cm_entry->x_server.buf) {
-		fbuf = cm_ksp_data->x_server.value.string.addr.ptr;
+		fbuf = cm_ksp_data->x_server.value.str.addr.ptr;
 		if (cm_entry->x_family == AF_INET &&
 		    cm_entry->x_server.len ==
 		    sizeof (struct sockaddr_in)) {
@@ -2360,9 +2360,9 @@ connmgr_close(struct cm_xprt *cm_entry)
 		 * server address in the update function
 		 */
 		if (((struct cm_kstat_xprt *)(cm_entry->x_ksp->ks_data))->
-		    x_server.value.string.addr.ptr != NULL)
+		    x_server.value.str.addr.ptr != NULL)
 			kmem_free(((struct cm_kstat_xprt *)(cm_entry->x_ksp->
-			    ks_data))->x_server.value.string.addr.ptr,
+			    ks_data))->x_server.value.str.addr.ptr,
 				    INET6_ADDRSTRLEN);
 		kmem_free(cm_entry->x_ksp->ks_data,
 			    cm_entry->x_ksp->ks_data_size);
@@ -2582,7 +2582,7 @@ connmgr_connect(
 	bcopy(&cm_kstat_template, cm_entry->x_ksp->ks_data,
 	    cm_entry->x_ksp->ks_data_size);
 	((struct cm_kstat_xprt *)(cm_entry->x_ksp->ks_data))->
-		    x_server.value.string.addr.ptr =
+		    x_server.value.str.addr.ptr =
 		    kmem_alloc(INET6_ADDRSTRLEN, KM_SLEEP);
 
 	cm_entry->x_ksp->ks_update = conn_kstat_update;

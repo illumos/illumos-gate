@@ -171,13 +171,13 @@ print_header()
 
 /*ARGSUSED*/
 static int
-walk(dtrace_aggdata_t *data, void *arg)
+walk(const dtrace_aggdata_t *data, void *arg)
 {
 	dtrace_aggdesc_t *aggdesc = data->dtada_desc;
 	dtrace_recdesc_t *nrec, *irec;
 	char *name, c[256];
 	int32_t *instance;
-	static dtrace_aggdata_t *count;
+	static const dtrace_aggdata_t *count;
 	int i, j;
 
 	if (count == NULL) {

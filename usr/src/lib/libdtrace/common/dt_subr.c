@@ -39,6 +39,7 @@
 #include <alloca.h>
 #include <assert.h>
 #include <libgen.h>
+#include <limits.h>
 
 #include <dt_impl.h>
 
@@ -655,7 +656,7 @@ dt_printf(dtrace_hdl_t *dtp, FILE *fp, const char *format, ...)
 
 int
 dt_buffered_flush(dtrace_hdl_t *dtp, dtrace_probedata_t *pdata,
-    dtrace_recdesc_t *rec, dtrace_aggdata_t *agg)
+    const dtrace_recdesc_t *rec, const dtrace_aggdata_t *agg)
 {
 	dtrace_bufdata_t data;
 
@@ -823,4 +824,112 @@ dt_mutex_held(pthread_mutex_t *lock)
 {
 	extern int _mutex_held(struct _lwp_mutex *);
 	return (_mutex_held((struct _lwp_mutex *)lock));
+}
+
+static int
+dt_string2str(char *s, char *str, int nbytes)
+{
+	int len = strlen(s);
+
+	if (nbytes == 0) {
+		/*
+		 * Like snprintf(3C), we don't check the value of str if the
+		 * number of bytes is 0.
+		 */
+		return (len);
+	}
+
+	if (nbytes <= len) {
+		(void) strncpy(str, s, nbytes - 1);
+		/*
+		 * Like snprintf(3C) (and unlike strncpy(3C)), we guarantee
+		 * that the string is null-terminated.
+		 */
+		str[nbytes - 1] = '\0';
+	} else {
+		(void) strcpy(str, s);
+	}
+
+	return (len);
+}
+
+int
+dtrace_addr2str(dtrace_hdl_t *dtp, uint64_t addr, char *str, int nbytes)
+{
+	dtrace_syminfo_t dts;
+	GElf_Sym sym;
+
+	size_t n = 20; /* for 0x%llx\0 */
+	char *s;
+	int err;
+
+	if ((err = dtrace_lookup_by_addr(dtp, addr, &sym, &dts)) == 0)
+		n += strlen(dts.dts_object) + strlen(dts.dts_name) + 2; /* +` */
+
+	s = alloca(n);
+
+	if (err == 0 && addr != sym.st_value) {
+		(void) snprintf(s, n, "%s`%s+0x%llx", dts.dts_object,
+		    dts.dts_name, (u_longlong_t)addr - sym.st_value);
+	} else if (err == 0) {
+		(void) snprintf(s, n, "%s`%s",
+		    dts.dts_object, dts.dts_name);
+	} else {
+		/*
+		 * We'll repeat the lookup, but this time we'll specify a NULL
+		 * GElf_Sym -- indicating that we're only interested in the
+		 * containing module.
+		 */
+		if (dtrace_lookup_by_addr(dtp, addr, NULL, &dts) == 0) {
+			(void) snprintf(s, n, "%s`0x%llx", dts.dts_object,
+			    (u_longlong_t)addr);
+		} else {
+			(void) snprintf(s, n, "0x%llx", (u_longlong_t)addr);
+		}
+	}
+
+	return (dt_string2str(s, str, nbytes));
+}
+
+int
+dtrace_uaddr2str(dtrace_hdl_t *dtp, pid_t pid,
+    uint64_t addr, char *str, int nbytes)
+{
+	char name[PATH_MAX], objname[PATH_MAX], c[PATH_MAX * 2];
+	struct ps_prochandle *P = NULL;
+	GElf_Sym sym;
+	char *obj;
+
+	if (pid != 0)
+		P = dt_proc_grab(dtp, pid, PGRAB_RDONLY | PGRAB_FORCE, 0);
+
+	if (P == NULL) {
+		(void) snprintf(c, sizeof (c), "0x%llx", addr);
+		return (dt_string2str(c, str, nbytes));
+	}
+
+	dt_proc_lock(dtp, P);
+
+	if (Plookup_by_addr(P, addr, name, sizeof (name), &sym) == 0) {
+		(void) Pobjname(P, addr, objname, sizeof (objname));
+
+		obj = dt_basename(objname);
+
+		if (addr > sym.st_value) {
+			(void) snprintf(c, sizeof (c), "%s`%s+0x%llx", obj,
+			    name, (u_longlong_t)(addr - sym.st_value));
+		} else {
+			(void) snprintf(c, sizeof (c), "%s`%s", obj, name);
+		}
+	} else if (Pobjname(P, addr, objname, sizeof (objname)) != NULL) {
+		(void) snprintf(c, sizeof (c), "%s`0x%llx",
+		    dt_basename(objname), addr);
+	} else {
+		(void) snprintf(c, sizeof (c), "0x%llx", addr);
+	}
+
+	dt_proc_unlock(dtp, P);
+	dt_proc_release(dtp, P);
+
+	return (dt_string2str(c, str, nbytes));
 }

@@ -238,8 +238,9 @@ typedef struct dtrace_aggregation {
 	dtrace_ecb_t *dtag_ecb;			/* corresponding ECB */
 	dtrace_action_t *dtag_first;		/* first action in tuple */
 	uint32_t dtag_base;			/* base of aggregation */
+	uint8_t dtag_hasarg;			/* boolean:  has argument */
 	uint64_t dtag_initial;			/* initial value */
-	void (*dtag_aggregate)(uint64_t *, uint64_t);
+	void (*dtag_aggregate)(uint64_t *, uint64_t, uint64_t);
 } dtrace_aggregation_t;
 
 /*
@@ -890,6 +891,7 @@ typedef struct dtrace_vstate {
 #define	DTRACE_MSTATE_FLTOFFS		0x00000080
 #define	DTRACE_MSTATE_WALLTIMESTAMP	0x00000100
 #define	DTRACE_MSTATE_USTACKDEPTH	0x00000200
+#define	DTRACE_MSTATE_UCALLER		0x00000400
 
 typedef struct dtrace_mstate {
 	uintptr_t dtms_scratch_base;		/* base of scratch space */
@@ -904,6 +906,7 @@ typedef struct dtrace_mstate {
 	int dtms_ustackdepth;			/* cached ustackdepth */
 	struct dtrace_probe *dtms_probe;	/* current probe */
 	uintptr_t dtms_caller;			/* cached caller */
+	uint64_t dtms_ucaller;			/* cached user-level caller */
 	int dtms_ipl;				/* cached interrupt pri lev */
 	int dtms_fltoffs;			/* faulting DIFO offset */
 	uintptr_t dtms_strtok;			/* saved strtok() pointer */
@@ -1088,9 +1091,11 @@ struct dtrace_state {
 	int dts_naggregations;			/* number of aggregations */
 	dtrace_aggregation_t **dts_aggregations; /* aggregation array */
 	vmem_t *dts_aggid_arena;		/* arena for aggregation IDs */
+	uint64_t dts_errors;			/* total number of errors */
 	uint32_t dts_speculations_busy;		/* number of spec. busy */
 	uint32_t dts_speculations_unavail;	/* number of spec unavail */
-	uint64_t dts_errors;			/* total number of errors */
+	uint32_t dts_stkstroverflows;		/* stack string tab overflows */
+	uint32_t dts_dblerrors;			/* errors in ERROR probes */
 	uint32_t dts_reserve;			/* space reserved for END */
 	hrtime_t dts_laststatus;		/* time of last status */
 	cyclic_id_t dts_cleaner;		/* cleaning cyclic */

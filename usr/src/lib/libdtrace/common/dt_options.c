@@ -197,6 +197,14 @@ dt_opt_ctypes(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 
 /*ARGSUSED*/
 static int
+dt_opt_droptags(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
+{
+	dtp->dt_droptags = 1;
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
 dt_opt_dtypes(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 {
 	int fd;
@@ -507,8 +515,39 @@ dt_opt_runtime(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 {
 	char *end;
 	dtrace_optval_t val = 0;
+	int i;
+
+	const struct {
+		char *positive;
+		char *negative;
+	} couples[] = {
+		{ "yes",	"no" },
+		{ "enable",	"disable" },
+		{ "enabled",	"disabled" },
+		{ "true",	"false" },
+		{ "on",		"off" },
+		{ "set",	"unset" },
+		{ NULL }
+	};
 
 	if (arg != NULL) {
+		if (arg[0] == '\0') {
+			val = DTRACEOPT_UNSET;
+			goto out;
+		}
+
+		for (i = 0; couples[i].positive != NULL; i++) {
+			if (strcasecmp(couples[i].positive, arg) == 0) {
+				val = 1;
+				goto out;
+			}
+
+			if (strcasecmp(couples[i].negative, arg) == 0) {
+				val = DTRACEOPT_UNSET;
+				goto out;
+			}
+		}
+
 		errno = 0;
 		val = strtoull(arg, &end, 0);
 
@@ -516,6 +555,7 @@ dt_opt_runtime(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 			return (dt_set_errno(dtp, EDT_BADOPTVAL));
 	}
 
+out:
 	dtp->dt_options[option] = val;
 	return (0);
 }
@@ -810,6 +850,7 @@ static const dt_option_t _dtrace_ctoptions[] = {
 	{ "dtypes", dt_opt_dtypes },
 	{ "debug", dt_opt_debug },
 	{ "define", dt_opt_cpp_opts, (uintptr_t)"-D" },
+	{ "droptags", dt_opt_droptags },
 	{ "empty", dt_opt_cflags, DTRACE_C_EMPTY },
 	{ "errtags", dt_opt_cflags, DTRACE_C_ETAGS },
 	{ "evaltime", dt_opt_evaltime },
@@ -844,7 +885,6 @@ static const dt_option_t _dtrace_ctoptions[] = {
  * Run-time options.
  */
 static const dt_option_t _dtrace_rtoptions[] = {
-	{ "aggrate", dt_opt_rate, DTRACEOPT_AGGRATE },
 	{ "aggsize", dt_opt_size, DTRACEOPT_AGGSIZE },
 	{ "bufsize", dt_opt_size, DTRACEOPT_BUFSIZE },
 	{ "bufpolicy", dt_opt_bufpolicy, DTRACEOPT_BUFPOLICY },
@@ -853,21 +893,28 @@ static const dt_option_t _dtrace_rtoptions[] = {
 	{ "cpu", dt_opt_runtime, DTRACEOPT_CPU },
 	{ "destructive", dt_opt_runtime, DTRACEOPT_DESTRUCTIVE },
 	{ "dynvarsize", dt_opt_size, DTRACEOPT_DYNVARSIZE },
-	{ "flowindent", dt_opt_runtime, DTRACEOPT_FLOWINDENT },
 	{ "grabanon", dt_opt_runtime, DTRACEOPT_GRABANON },
 	{ "jstackframes", dt_opt_runtime, DTRACEOPT_JSTACKFRAMES },
-	{ "jstackstrsize", dt_opt_runtime, DTRACEOPT_JSTACKSTRSIZE },
+	{ "jstackstrsize", dt_opt_size, DTRACEOPT_JSTACKSTRSIZE },
 	{ "nspec", dt_opt_runtime, DTRACEOPT_NSPEC },
-	{ "quiet", dt_opt_runtime, DTRACEOPT_QUIET },
-	{ "rawbytes", dt_opt_runtime, DTRACEOPT_RAWBYTES },
 	{ "specsize", dt_opt_size, DTRACEOPT_SPECSIZE },
 	{ "stackframes", dt_opt_runtime, DTRACEOPT_STACKFRAMES },
-	{ "stackindent", dt_opt_runtime, DTRACEOPT_STACKINDENT },
 	{ "statusrate", dt_opt_rate, DTRACEOPT_STATUSRATE },
 	{ "strsize", dt_opt_strsize, DTRACEOPT_STRSIZE },
-	{ "switchrate", dt_opt_rate, DTRACEOPT_SWITCHRATE },
 	{ "ustackframes", dt_opt_runtime, DTRACEOPT_USTACKFRAMES },
 	{ NULL }
+};
+
+/*
+ * Dynamic run-time options.
+ */
+static const dt_option_t _dtrace_drtoptions[] = {
+	{ "aggrate", dt_opt_rate, DTRACEOPT_AGGRATE },
+	{ "flowindent", dt_opt_runtime, DTRACEOPT_FLOWINDENT },
+	{ "quiet", dt_opt_runtime, DTRACEOPT_QUIET },
+	{ "rawbytes", dt_opt_runtime, DTRACEOPT_RAWBYTES },
+	{ "stackindent", dt_opt_runtime, DTRACEOPT_STACKINDENT },
+	{ "switchrate", dt_opt_rate, DTRACEOPT_SWITCHRATE },
 };
 
 int
@@ -883,6 +930,13 @@ dtrace_getopt(dtrace_hdl_t *dtp, const char *opt, dtrace_optval_t *val)
 	 * to get the values of compile-time options.
 	 */
 	for (op = _dtrace_rtoptions; op->o_name != NULL; op++) {
+		if (strcmp(op->o_name, opt) == 0) {
+			*val = dtp->dt_options[op->o_option];
+			return (0);
+		}
+	}
+
+	for (op = _dtrace_drtoptions; op->o_name != NULL; op++) {
 		if (strcmp(op->o_name, opt) == 0) {
 			*val = dtp->dt_options[op->o_option];
 			return (0);
@@ -905,10 +959,15 @@ dtrace_setopt(dtrace_hdl_t *dtp, const char *opt, const char *val)
 			return (op->o_func(dtp, val, op->o_option));
 	}
 
+	for (op = _dtrace_drtoptions; op->o_name != NULL; op++) {
+		if (strcmp(op->o_name, opt) == 0)
+			return (op->o_func(dtp, val, op->o_option));
+	}
+
 	for (op = _dtrace_rtoptions; op->o_name != NULL; op++) {
 		if (strcmp(op->o_name, opt) == 0) {
 			/*
-			 * Currently, no run-time option may be set while
+			 * Only dynamic run-time options may be set while
 			 * tracing is active.
 			 */
 			if (dtp->dt_active)

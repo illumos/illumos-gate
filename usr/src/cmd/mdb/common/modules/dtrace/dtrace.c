@@ -942,7 +942,7 @@ dtrace_dcmdprobe(const dtrace_probedata_t *data, void *arg)
 
 /*ARGSUSED*/
 static int
-dtrace_dcmderr(dtrace_errdata_t *data, void *arg)
+dtrace_dcmderr(const dtrace_errdata_t *data, void *arg)
 {
 	mdb_warn(data->dteda_msg);
 	return (DTRACE_HANDLE_OK);
@@ -950,7 +950,7 @@ dtrace_dcmderr(dtrace_errdata_t *data, void *arg)
 
 /*ARGSUSED*/
 static int
-dtrace_dcmddrop(dtrace_dropdata_t *data, void *arg)
+dtrace_dcmddrop(const dtrace_dropdata_t *data, void *arg)
 {
 	mdb_warn(data->dtdda_msg);
 	return (DTRACE_HANDLE_OK);
@@ -958,7 +958,7 @@ dtrace_dcmddrop(dtrace_dropdata_t *data, void *arg)
 
 /*ARGSUSED*/
 static int
-dtrace_dcmdbuffered(dtrace_bufdata_t *bufdata, void *arg)
+dtrace_dcmdbuffered(const dtrace_bufdata_t *bufdata, void *arg)
 {
 	mdb_printf("%s", bufdata->dtbda_buffered);
 	return (DTRACE_HANDLE_OK);

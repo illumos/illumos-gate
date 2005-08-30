@@ -230,6 +230,7 @@ typedef enum dtrace_probespec {
 #define	DIF_VAR_ZONENAME	0x0119	/* zone name associated with process */
 #define	DIF_VAR_WALLTIMESTAMP	0x011a	/* wall-clock timestamp */
 #define	DIF_VAR_USTACKDEPTH	0x011b	/* user-land stack depth */
+#define	DIF_VAR_UCALLER		0x011c	/* user-level caller */
 
 #define	DIF_SUBR_RAND			0
 #define	DIF_SUBR_MUTEX_OWNED		1
@@ -380,6 +381,9 @@ typedef struct dtrace_difv {
 #define	DTRACEACT_PROC			0x0100
 #define	DTRACEACT_USTACK		(DTRACEACT_PROC + 1)
 #define	DTRACEACT_JSTACK		(DTRACEACT_PROC + 2)
+#define	DTRACEACT_USYM			(DTRACEACT_PROC + 3)
+#define	DTRACEACT_UMOD			(DTRACEACT_PROC + 4)
+#define	DTRACEACT_UADDR			(DTRACEACT_PROC + 5)
 
 #define	DTRACEACT_PROC_DESTRUCTIVE	0x0200
 #define	DTRACEACT_STOP			(DTRACEACT_PROC_DESTRUCTIVE + 1)
@@ -391,6 +395,8 @@ typedef struct dtrace_difv {
 
 #define	DTRACEACT_KERNEL		0x0400
 #define	DTRACEACT_STACK			(DTRACEACT_KERNEL + 1)
+#define	DTRACEACT_SYM			(DTRACEACT_KERNEL + 2)
+#define	DTRACEACT_MOD			(DTRACEACT_KERNEL + 3)
 
 #define	DTRACEACT_KERNEL_DESTRUCTIVE	0x0500
 #define	DTRACEACT_BREAKPOINT		(DTRACEACT_KERNEL_DESTRUCTIVE + 1)
@@ -998,6 +1004,8 @@ typedef struct dtrace_status {
 	uint64_t dtst_specdrops_unavail;	/* spec drops due to unavail */
 	uint64_t dtst_errors;			/* total errors */
 	uint64_t dtst_filled;			/* number of filled bufs */
+	uint64_t dtst_stkstroverflows;		/* stack string tab overflows */
+	uint64_t dtst_dblerrors;		/* errors in ERROR probes */
 	char dtst_killed;			/* non-zero if killed */
 	char dtst_exiting;			/* non-zero if exit() called */
 	char dtst_pad[6];			/* pad out to 64-bit align */

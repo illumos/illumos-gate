@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -240,7 +240,7 @@ read_kstat_data(int *rvalp, void *user_ksp, int flag)
 						/*
 						 * Cast 64-bit ptr to 32-bit.
 						 */
-						kn->value.string.addr.ptr32 =
+						kn->value.str.addr.ptr32 =
 						    (caddr32_t)(uintptr_t)
 						    KSTAT_NAMED_STR_PTR(kn);
 						break;
@@ -554,7 +554,7 @@ write_kstat_data(int *rvalp, void *user_ksp, int flag, cred_t *cred)
 				if (model == DDI_MODEL_ILP32)
 					KSTAT_NAMED_STR_PTR(knew) =
 					    (char *)(uintptr_t)
-					    knew->value.string.addr.ptr32;
+					    knew->value.str.addr.ptr32;
 #endif
 				/*
 				 * Nothing special for NULL

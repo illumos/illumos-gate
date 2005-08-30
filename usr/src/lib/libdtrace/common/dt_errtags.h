@@ -201,6 +201,7 @@ typedef enum {
 	D_LQUANT_STEPVAL,		/* lquantize() bad step value */
 	D_LQUANT_STEPLARGE,		/* lquantize() step too large */
 	D_LQUANT_STEPSMALL,		/* lquantize() step too small */
+	D_QUANT_PROTO,			/* quantize() prototype mismatch */
 	D_PROC_OFF,			/* byte offset exceeds function size */
 	D_PROC_ALIGN,			/* byte offset has invalid alignment */
 	D_PROC_NAME,			/* invalid process probe name */

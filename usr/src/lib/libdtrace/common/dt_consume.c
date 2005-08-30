@@ -34,8 +34,20 @@
 #include <assert.h>
 #include <ctype.h>
 #include <alloca.h>
-
 #include <dt_impl.h>
+
+/*
+ * We declare this here because (1) we need it and (2) we want to avoid a
+ * dependency on libm in libdtrace.
+ */
+static long double
+dt_fabsl(long double x)
+{
+	if (x < 0)
+		return (-x);
+
+	return (x);
+}
 
 static int
 dt_flowindent(dtrace_hdl_t *dtp, dtrace_probedata_t *data, dtrace_epid_t last,
@@ -43,19 +55,36 @@ dt_flowindent(dtrace_hdl_t *dtp, dtrace_probedata_t *data, dtrace_epid_t last,
 {
 	dtrace_probedesc_t *pd = data->dtpda_pdesc, *npd;
 	dtrace_eprobedesc_t *epd = data->dtpda_edesc, *nepd;
-	char *p = pd->dtpd_provider, *n = pd->dtpd_name;
+	char *p = pd->dtpd_provider, *n = pd->dtpd_name, *sub;
 	dtrace_flowkind_t flow = DTRACEFLOW_NONE;
 	const char *str = NULL;
 	static const char *e_str[2] = { " -> ", " => " };
 	static const char *r_str[2] = { " <- ", " <= " };
+	static const char *ent = "entry", *ret = "return";
+	static int entlen = 0, retlen = 0;
 	dtrace_epid_t next, id = epd->dtepd_epid;
 	int rval;
 
-	if (strcmp(n, "entry") == 0) {
+	if (entlen == 0) {
+		assert(retlen == 0);
+		entlen = strlen(ent);
+		retlen = strlen(ret);
+	}
+
+	/*
+	 * If the name of the probe is "entry" or ends with "-entry", we
+	 * treat it as an entry; if it is "return" or ends with "-return",
+	 * we treat it as a return.  (This allows application-provided probes
+	 * like "method-entry" or "function-entry" to participate in flow
+	 * indentation -- without accidentally misinterpreting popular probe
+	 * names like "carpentry", "gentry" or "Coventry".)
+	 */
+	if ((sub = strstr(n, ent)) != NULL && sub[entlen] == '\0' &&
+	    (sub == n || sub[-1] == '-')) {
 		flow = DTRACEFLOW_ENTRY;
 		str = e_str[strcmp(p, "syscall") == 0];
-	} else if (strcmp(n, "return") == 0 ||
-	    strcmp(n, "exit") == 0) {
+	} else if ((sub = strstr(n, ret)) != NULL && sub[retlen] == '\0' &&
+	    (sub == n || sub[-1] == '-')) {
 		flow = DTRACEFLOW_RETURN;
 		str = r_str[strcmp(p, "syscall") == 0];
 	}
@@ -134,12 +163,73 @@ dt_nullrec()
 }
 
 int
+dt_print_quantline(dtrace_hdl_t *dtp, FILE *fp, int64_t val,
+    uint64_t normal, long double total, char positives, char negatives)
+{
+	long double f;
+	uint_t depth, len = 40;
+
+	const char *ats = "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@";
+	const char *spaces = "                                        ";
+
+	assert(strlen(ats) == len && strlen(spaces) == len);
+	assert(!(total == 0 && (positives || negatives)));
+	assert(!(val < 0 && !negatives));
+	assert(!(val > 0 && !positives));
+	assert(!(val != 0 && total == 0));
+
+	if (!negatives) {
+		if (positives) {
+			f = (dt_fabsl((long double)val) * len) / total;
+			depth = (uint_t)(f + 0.5);
+		} else {
+			depth = 0;
+		}
+
+		return (dt_printf(dtp, fp, "|%s%s %-9lld\n", ats + len - depth,
+		    spaces + depth, (long long)val / normal));
+	}
+
+	if (!positives) {
+		f = (dt_fabsl((long double)val) * len) / total;
+		depth = (uint_t)(f + 0.5);
+
+		return (dt_printf(dtp, fp, "%s%s| %-9lld\n", spaces + depth,
+		    ats + len - depth, (long long)val / normal));
+	}
+
+	/*
+	 * If we're here, we have both positive and negative bucket values.
+	 * To express this graphically, we're going to generate both positive
+	 * and negative bars separated by a centerline.  These bars are half
+	 * the size of normal quantize()/lquantize() bars, so we divide the
+	 * length in half before calculating the bar length.
+	 */
+	len /= 2;
+	ats = &ats[len];
+	spaces = &spaces[len];
+
+	f = (dt_fabsl((long double)val) * len) / total;
+	depth = (uint_t)(f + 0.5);
+
+	if (val <= 0) {
+		return (dt_printf(dtp, fp, "%s%s|%*s %-9lld\n", spaces + depth,
+		    ats + len - depth, len, "", (long long)val / normal));
+	} else {
+		return (dt_printf(dtp, fp, "%20s|%s%s %-9lld\n", "",
+		    ats + len - depth, spaces + depth,
+		    (long long)val / normal));
+	}
+}
+
+int
 dt_print_quantize(dtrace_hdl_t *dtp, FILE *fp, const void *addr,
     size_t size, uint64_t normal)
 {
-	const uint64_t *data = addr;
+	const int64_t *data = addr;
 	int i, first_bin = 0, last_bin = DTRACE_QUANTIZE_NBUCKETS - 1;
-	uint64_t total_bin_count = 0;
+	long double total = 0;
+	char positives = 0, negatives = 0;
 
 	if (size != DTRACE_QUANTIZE_NBUCKETS * sizeof (uint64_t))
 		return (dt_set_errno(dtp, EDT_DMISMATCH));
@@ -147,31 +237,42 @@ dt_print_quantize(dtrace_hdl_t *dtp, FILE *fp, const void *addr,
 	while (first_bin < DTRACE_QUANTIZE_NBUCKETS - 1 && data[first_bin] == 0)
 		first_bin++;
 
-	if (first_bin > 0)
-		first_bin--;
+	if (first_bin == DTRACE_QUANTIZE_NBUCKETS - 1) {
+		/*
+		 * There isn't any data.  This is possible if (and only if)
+		 * negative increment values have been used.  In this case,
+		 * we'll print the buckets around 0.
+		 */
+		first_bin = DTRACE_QUANTIZE_ZEROBUCKET - 1;
+		last_bin = DTRACE_QUANTIZE_ZEROBUCKET + 1;
+	} else {
+		if (first_bin > 0)
+			first_bin--;
 
-	while (last_bin > 0 && data[last_bin] == 0)
-		last_bin--;
+		while (last_bin > 0 && data[last_bin] == 0)
+			last_bin--;
 
-	if (last_bin < DTRACE_QUANTIZE_NBUCKETS - 1)
-		last_bin++;
+		if (last_bin < DTRACE_QUANTIZE_NBUCKETS - 1)
+			last_bin++;
+	}
 
-	for (i = first_bin; i <= last_bin; i++)
-		total_bin_count += data[i];
+	for (i = first_bin; i <= last_bin; i++) {
+		positives |= (data[i] > 0);
+		negatives |= (data[i] < 0);
+		total += dt_fabsl((long double)data[i]);
+	}
 
 	if (dt_printf(dtp, fp, "\n%16s %41s %-9s\n", "value",
 	    "------------- Distribution -------------", "count") < 0)
 		return (-1);
 
 	for (i = first_bin; i <= last_bin; i++) {
-		float f = ((float)data[i] * 40.0) / (float)total_bin_count;
-		uint_t depth = (uint_t)(f + 0.5);
+		if (dt_printf(dtp, fp, "%16lld ",
+		    (long long)DTRACE_QUANTIZE_BUCKETVAL(i)) < 0)
+			return (-1);
 
-		if (dt_printf(dtp, fp, "%16lld |%s%s %-9llu\n",
-		    (long long)DTRACE_QUANTIZE_BUCKETVAL(i),
-		    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" + 40 - depth,
-		    "                                        " + depth,
-		    (u_longlong_t)data[i] / normal) < 0)
+		if (dt_print_quantline(dtp, fp, data[i], normal, total,
+		    positives, negatives) < 0)
 			return (-1);
 	}
 
@@ -182,10 +283,12 @@ int
 dt_print_lquantize(dtrace_hdl_t *dtp, FILE *fp, const void *addr,
     size_t size, uint64_t normal)
 {
-	const uint64_t *data = addr;
+	const int64_t *data = addr;
 	int i, first_bin, last_bin, base;
-	uint64_t arg, total_bin_count = 0;
+	uint64_t arg;
+	long double total = 0;
 	uint16_t step, levels;
+	char positives = 0, negatives = 0;
 
 	if (size < sizeof (uint64_t))
 		return (dt_set_errno(dtp, EDT_DMISMATCH));
@@ -206,25 +309,31 @@ dt_print_lquantize(dtrace_hdl_t *dtp, FILE *fp, const void *addr,
 	while (first_bin < levels + 1 && data[first_bin] == 0)
 		first_bin++;
 
-	if (first_bin > 0)
-		first_bin--;
+	if (first_bin == levels + 1) {
+		first_bin = 0;
+		last_bin = 2;
+	} else {
+		if (first_bin > 0)
+			first_bin--;
 
-	while (last_bin > 0 && data[last_bin] == 0)
-		last_bin--;
+		while (last_bin > 0 && data[last_bin] == 0)
+			last_bin--;
 
-	if (last_bin < levels + 1)
-		last_bin++;
+		if (last_bin < levels + 1)
+			last_bin++;
+	}
 
-	for (i = first_bin; i <= last_bin; i++)
-		total_bin_count += data[i];
+	for (i = first_bin; i <= last_bin; i++) {
+		positives |= (data[i] > 0);
+		negatives |= (data[i] < 0);
+		total += dt_fabsl((long double)data[i]);
+	}
 
 	if (dt_printf(dtp, fp, "\n%16s %41s %-9s\n", "value",
 	    "------------- Distribution -------------", "count") < 0)
 		return (-1);
 
 	for (i = first_bin; i <= last_bin; i++) {
-		float f = ((float)data[i] * 40.0) / (float)total_bin_count;
-		uint_t depth = (uint_t)(f + 0.5);
 		char c[32];
 		int err;
 
@@ -241,10 +350,8 @@ dt_print_lquantize(dtrace_hdl_t *dtp, FILE *fp, const void *addr,
 			    base + (i - 1) * step);
 		}
 
-		if (err < 0 || dt_printf(dtp, fp, "|%s%s %-9llu\n",
-		    "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" + 40 - depth,
-		    "                                        " + depth,
-		    (u_longlong_t)data[i] / normal) < 0)
+		if (err < 0 || dt_print_quantline(dtp, fp, data[i], normal,
+		    total, positives, negatives) < 0)
 			return (-1);
 	}
 
@@ -379,13 +486,13 @@ raw:
 
 int
 dt_print_stack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
-    caddr_t addr, int depth)
+    caddr_t addr, int depth, int size)
 {
-	pc_t *pc = (pc_t *)(uintptr_t)addr;
 	dtrace_syminfo_t dts;
 	GElf_Sym sym;
 	int i, indent;
 	char c[PATH_MAX * 2];
+	uint64_t pc;
 
 	if (dt_printf(dtp, fp, "\n") < 0)
 		return (-1);
@@ -398,15 +505,35 @@ dt_print_stack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 	else
 		indent = _dtrace_stkindent;
 
-	for (i = 0; i < depth && pc[i] != NULL; i++) {
+	for (i = 0; i < depth; i++) {
+		switch (size) {
+		case sizeof (uint32_t):
+			/* LINTED - alignment */
+			pc = *((uint32_t *)addr);
+			break;
+
+		case sizeof (uint64_t):
+			/* LINTED - alignment */
+			pc = *((uint64_t *)addr);
+			break;
+
+		default:
+			return (dt_set_errno(dtp, EDT_BADSTACKPC));
+		}
+
+		if (pc == NULL)
+			break;
+
+		addr += size;
+
 		if (dt_printf(dtp, fp, "%*s", indent, "") < 0)
 			return (-1);
 
-		if (dtrace_lookup_by_addr(dtp, pc[i], &sym, &dts) == 0) {
-			if (pc[i] > sym.st_value) {
+		if (dtrace_lookup_by_addr(dtp, pc, &sym, &dts) == 0) {
+			if (pc > sym.st_value) {
 				(void) snprintf(c, sizeof (c), "%s`%s+0x%llx",
 				    dts.dts_object, dts.dts_name,
-				    (u_longlong_t)pc[i] - sym.st_value);
+				    pc - sym.st_value);
 			} else {
 				(void) snprintf(c, sizeof (c), "%s`%s",
 				    dts.dts_object, dts.dts_name);
@@ -417,13 +544,11 @@ dt_print_stack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 			 * a NULL GElf_Sym -- indicating that we're only
 			 * interested in the containing module.
 			 */
-			if (dtrace_lookup_by_addr(dtp, pc[i],
-			    NULL, &dts) == 0) {
+			if (dtrace_lookup_by_addr(dtp, pc, NULL, &dts) == 0) {
 				(void) snprintf(c, sizeof (c), "%s`0x%llx",
-				    dts.dts_object, (u_longlong_t)pc[i]);
+				    dts.dts_object, pc);
 			} else {
-				(void) snprintf(c, sizeof (c), "0x%llx",
-				    (u_longlong_t)pc[i]);
+				(void) snprintf(c, sizeof (c), "0x%llx", pc);
 			}
 		}
 
@@ -441,7 +566,8 @@ int
 dt_print_ustack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
     caddr_t addr, uint64_t arg)
 {
-	uint64_t *pc = (uint64_t *)(uintptr_t)addr;
+	/* LINTED - alignment */
+	uint64_t *pc = (uint64_t *)addr;
 	uint32_t depth = DTRACE_USTACK_NFRAMES(arg);
 	uint32_t strsize = DTRACE_USTACK_STRSIZE(arg);
 	const char *strbase = addr + (depth + 1) * sizeof (uint64_t);
@@ -484,6 +610,8 @@ dt_print_ustack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 		dt_proc_lock(dtp, P); /* lock handle while we perform lookups */
 
 	for (i = 0; i < depth && pc[i] != NULL; i++) {
+		const prmap_t *map;
+
 		if ((err = dt_printf(dtp, fp, "%*s", indent, "")) < 0)
 			break;
 
@@ -499,7 +627,22 @@ dt_print_ustack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 				(void) snprintf(c, sizeof (c),
 				    "%s`%s", dt_basename(objname), name);
 			}
-		} else if (str != NULL && str[0] != '\0') {
+		} else if (str != NULL && str[0] != '\0' &&
+		    (P != NULL && ((map = Paddr_to_map(P, pc[i])) == NULL ||
+		    (map->pr_mflags & MA_WRITE)))) {
+			/*
+			 * If the current string pointer in the string table
+			 * does not point to an empty string _and_ the program
+			 * counter falls in a writable region, we'll use the
+			 * string from the string table instead of the raw
+			 * address.  This last condition is necessary because
+			 * some (broken) ustack helpers will return a string
+			 * even for a program counter that they can't
+			 * identify.  If we have a string for a program
+			 * counter that falls in a segment that isn't
+			 * writable, we assume that we have fallen into this
+			 * case and we refuse to use the string.
+			 */
 			(void) snprintf(c, sizeof (c), "%s", str);
 		} else {
 			if (P != NULL && Pobjname(P, pc[i], objname,
@@ -533,13 +676,151 @@ dt_print_ustack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 	return (err);
 }
 
+static int
+dt_print_usym(dtrace_hdl_t *dtp, FILE *fp, caddr_t addr, dtrace_actkind_t act)
+{
+	/* LINTED - alignment */
+	uint64_t pid = ((uint64_t *)addr)[0];
+	/* LINTED - alignment */
+	uint64_t pc = ((uint64_t *)addr)[1];
+	const char *format = "  %-50s";
+	char *s;
+	int n, len = 256;
+
+	if (act == DTRACEACT_USYM && dtp->dt_vector == NULL) {
+		struct ps_prochandle *P;
+
+		if ((P = dt_proc_grab(dtp, pid,
+		    PGRAB_RDONLY | PGRAB_FORCE, 0)) != NULL) {
+			GElf_Sym sym;
+
+			dt_proc_lock(dtp, P);
+
+			if (Plookup_by_addr(P, pc, NULL, 0, &sym) == 0)
+				pc = sym.st_value;
+
+			dt_proc_unlock(dtp, P);
+			dt_proc_release(dtp, P);
+		}
+	}
+
+	do {
+		n = len;
+		s = alloca(n);
+	} while ((len = dtrace_uaddr2str(dtp, pid, pc, s, n)) >= n);
+
+	return (dt_printf(dtp, fp, format, s));
+}
+
+int
+dt_print_umod(dtrace_hdl_t *dtp, FILE *fp, const char *format, caddr_t addr)
+{
+	/* LINTED - alignment */
+	uint64_t pid = ((uint64_t *)addr)[0];
+	/* LINTED - alignment */
+	uint64_t pc = ((uint64_t *)addr)[1];
+	int err = 0;
+
+	char objname[PATH_MAX], c[PATH_MAX * 2];
+	struct ps_prochandle *P;
+
+	if (format == NULL)
+		format = "  %-50s";
+
+	/*
+	 * See the comment in dt_print_ustack() for the rationale for
+	 * printing raw addresses in the vectored case.
+	 */
+	if (dtp->dt_vector == NULL)
+		P = dt_proc_grab(dtp, pid, PGRAB_RDONLY | PGRAB_FORCE, 0);
+	else
+		P = NULL;
+
+	if (P != NULL)
+		dt_proc_lock(dtp, P); /* lock handle while we perform lookups */
+
+	if (P != NULL && Pobjname(P, pc, objname, sizeof (objname)) != NULL) {
+		(void) snprintf(c, sizeof (c), "%s", dt_basename(objname));
+	} else {
+		(void) snprintf(c, sizeof (c), "0x%llx", (u_longlong_t)pc);
+	}
+
+	err = dt_printf(dtp, fp, format, c);
+
+	if (P != NULL) {
+		dt_proc_unlock(dtp, P);
+		dt_proc_release(dtp, P);
+	}
+
+	return (err);
+}
+
+static int
+dt_print_sym(dtrace_hdl_t *dtp, FILE *fp, const char *format, caddr_t addr)
+{
+	/* LINTED - alignment */
+	uint64_t pc = *((uint64_t *)addr);
+	dtrace_syminfo_t dts;
+	GElf_Sym sym;
+	char c[PATH_MAX * 2];
+
+	if (format == NULL)
+		format = "  %-50s";
+
+	if (dtrace_lookup_by_addr(dtp, pc, &sym, &dts) == 0) {
+		(void) snprintf(c, sizeof (c), "%s`%s",
+		    dts.dts_object, dts.dts_name);
+	} else {
+		/*
+		 * We'll repeat the lookup, but this time we'll specify a
+		 * NULL GElf_Sym -- indicating that we're only interested in
+		 * the containing module.
+		 */
+		if (dtrace_lookup_by_addr(dtp, pc, NULL, &dts) == 0) {
+			(void) snprintf(c, sizeof (c), "%s`0x%llx",
+			    dts.dts_object, (u_longlong_t)pc);
+		} else {
+			(void) snprintf(c, sizeof (c), "0x%llx",
+			    (u_longlong_t)pc);
+		}
+	}
+
+	if (dt_printf(dtp, fp, format, c) < 0)
+		return (-1);
+
+	return (0);
+}
+
+int
+dt_print_mod(dtrace_hdl_t *dtp, FILE *fp, const char *format, caddr_t addr)
+{
+	/* LINTED - alignment */
+	uint64_t pc = *((uint64_t *)addr);
+	dtrace_syminfo_t dts;
+	char c[PATH_MAX * 2];
+
+	if (format == NULL)
+		format = "  %-50s";
+
+	if (dtrace_lookup_by_addr(dtp, pc, NULL, &dts) == 0) {
+		(void) snprintf(c, sizeof (c), "%s", dts.dts_object);
+	} else {
+		(void) snprintf(c, sizeof (c), "0x%llx", (u_longlong_t)pc);
+	}
+
+	if (dt_printf(dtp, fp, format, c) < 0)
+		return (-1);
+
+	return (0);
+}
+
 typedef struct dt_normal {
 	dtrace_aggvarid_t dtnd_id;
 	uint64_t dtnd_normal;
 } dt_normal_t;
 
 static int
-dt_normalize_agg(dtrace_aggdata_t *aggdata, void *arg)
+dt_normalize_agg(const dtrace_aggdata_t *aggdata, void *arg)
 {
 	dt_normal_t *normal = arg;
 	dtrace_aggdesc_t *agg = aggdata->dtada_desc;
@@ -552,7 +833,7 @@ dt_normalize_agg(dtrace_aggdata_t *aggdata, void *arg)
 	if (id != *(dtrace_aggvarid_t *)(data + agg->dtagd_rec[0].dtrd_offset))
 		return (DTRACE_AGGWALK_NEXT);
 
-	aggdata->dtada_normal = normal->dtnd_normal;
+	((dtrace_aggdata_t *)aggdata)->dtada_normal = normal->dtnd_normal;
 	return (DTRACE_AGGWALK_NORMALIZE);
 }
 
@@ -609,7 +890,7 @@ dt_normalize(dtrace_hdl_t *dtp, caddr_t base, dtrace_recdesc_t *rec)
 }
 
 static int
-dt_denormalize_agg(dtrace_aggdata_t *aggdata, void *arg)
+dt_denormalize_agg(const dtrace_aggdata_t *aggdata, void *arg)
 {
 	dtrace_aggdesc_t *agg = aggdata->dtada_desc;
 	dtrace_aggvarid_t id = *((dtrace_aggvarid_t *)arg);
@@ -625,7 +906,7 @@ dt_denormalize_agg(dtrace_aggdata_t *aggdata, void *arg)
 }
 
 static int
-dt_clear_agg(dtrace_aggdata_t *aggdata, void *arg)
+dt_clear_agg(const dtrace_aggdata_t *aggdata, void *arg)
 {
 	dtrace_aggdesc_t *agg = aggdata->dtada_desc;
 	dtrace_aggvarid_t id = *((dtrace_aggvarid_t *)arg);
@@ -646,7 +927,7 @@ typedef struct dt_trunc {
 } dt_trunc_t;
 
 static int
-dt_trunc_agg(dtrace_aggdata_t *aggdata, void *arg)
+dt_trunc_agg(const dtrace_aggdata_t *aggdata, void *arg)
 {
 	dt_trunc_t *trunc = arg;
 	dtrace_aggdesc_t *agg = aggdata->dtada_desc;
@@ -732,7 +1013,7 @@ dt_trunc(dtrace_hdl_t *dtp, caddr_t base, dtrace_recdesc_t *rec)
 }
 
 int
-dt_print_agg(dtrace_aggdata_t *aggdata, void *arg)
+dt_print_agg(const dtrace_aggdata_t *aggdata, void *arg)
 {
 	int i, err = 0;
 	dt_print_aggdata_t *pd = arg;
@@ -774,14 +1055,34 @@ dt_print_agg(dtrace_aggdata_t *aggdata, void *arg)
 		normal = DTRACEACT_ISAGG(act) ? aggdata->dtada_normal : 1;
 
 		if (act == DTRACEACT_STACK) {
-			int depth = rec->dtrd_size / sizeof (pc_t);
-			err = dt_print_stack(dtp, fp, NULL, addr, depth);
+			err = dt_print_stack(dtp, fp, NULL, addr,
+			    rec->dtrd_arg, rec->dtrd_size / rec->dtrd_arg);
 			goto nextrec;
 		}
 
 		if (act == DTRACEACT_USTACK || act == DTRACEACT_JSTACK) {
 			err = dt_print_ustack(dtp, fp, NULL, addr,
 			    rec->dtrd_arg);
+			goto nextrec;
+		}
+
+		if (act == DTRACEACT_USYM || act == DTRACEACT_UADDR) {
+			err = dt_print_usym(dtp, fp, addr, act);
+			goto nextrec;
+		}
+
+		if (act == DTRACEACT_UMOD) {
+			err = dt_print_umod(dtp, fp, NULL, addr);
+			goto nextrec;
+		}
+
+		if (act == DTRACEACT_SYM) {
+			err = dt_print_sym(dtp, fp, NULL, addr);
+			goto nextrec;
+		}
+
+		if (act == DTRACEACT_MOD) {
+			err = dt_print_mod(dtp, fp, NULL, addr);
 			goto nextrec;
 		}
 
@@ -840,6 +1141,44 @@ nextrec:
 		agg->dtagd_flags |= DTRACE_AGD_PRINTED;
 
 	return (err < 0 ? -1 : 0);
+}
+
+
+int
+dt_setopt(dtrace_hdl_t *dtp, const dtrace_probedata_t *data,
+    const char *option, const char *value)
+{
+	int len, rval;
+	char *msg;
+	const char *errstr;
+	dtrace_setoptdata_t optdata;
+
+	bzero(&optdata, sizeof (optdata));
+	(void) dtrace_getopt(dtp, option, &optdata.dtsda_oldval);
+
+	if (dtrace_setopt(dtp, option, value) == 0) {
+		(void) dtrace_getopt(dtp, option, &optdata.dtsda_newval);
+		optdata.dtsda_probe = data;
+		optdata.dtsda_option = option;
+		optdata.dtsda_handle = dtp;
+
+		if ((rval = dt_handle_setopt(dtp, &optdata)) != 0)
+			return (rval);
+
+		return (0);
+	}
+
+	errstr = dtrace_errmsg(dtp, dtrace_errno(dtp));
+	len = strlen(option) + strlen(value) + strlen(errstr) + 80;
+	msg = alloca(len);
+
+	(void) snprintf(msg, len, "couldn't set option \"%s\" to \"%s\": %s\n",
+	    option, value, errstr);
+
+	if ((rval = dt_handle_liberr(dtp, data, msg)) == 0)
+		return (0);
+
+	return (rval);
 }
 
 static int
@@ -923,27 +1262,34 @@ again:
 			addr = data.dtpda_data;
 
 			if (act == DTRACEACT_LIBACT) {
-				if (rec->dtrd_arg == DT_ACT_CLEAR) {
-					dtrace_aggvarid_t id;
+				uint64_t arg = rec->dtrd_arg;
+				dtrace_aggvarid_t id;
 
+				switch (arg) {
+				case DT_ACT_CLEAR:
 					/* LINTED - alignment */
 					id = *((dtrace_aggvarid_t *)addr);
 					(void) dtrace_aggregate_walk(dtp,
 					    dt_clear_agg, &id);
 					continue;
-				}
 
-				if (rec->dtrd_arg == DT_ACT_DENORMALIZE) {
-					dtrace_aggvarid_t id;
-
+				case DT_ACT_DENORMALIZE:
 					/* LINTED - alignment */
 					id = *((dtrace_aggvarid_t *)addr);
 					(void) dtrace_aggregate_walk(dtp,
 					    dt_denormalize_agg, &id);
 					continue;
-				}
 
-				if (rec->dtrd_arg == DT_ACT_NORMALIZE) {
+				case DT_ACT_FTRUNCATE:
+					if (fp == NULL)
+						continue;
+
+					(void) fflush(fp);
+					(void) ftruncate(fileno(fp), 0);
+					(void) fseeko(fp, 0, SEEK_SET);
+					continue;
+
+				case DT_ACT_NORMALIZE:
 					if (i == epd->dtepd_nrecs - 1)
 						return (dt_set_errno(dtp,
 						    EDT_BADNORMAL));
@@ -954,9 +1300,49 @@ again:
 
 					i++;
 					continue;
+
+				case DT_ACT_SETOPT: {
+					uint64_t *opts = dtp->dt_options;
+					dtrace_recdesc_t *valrec;
+					uint32_t valsize;
+					caddr_t val;
+					int rv;
+
+					if (i == epd->dtepd_nrecs - 1) {
+						return (dt_set_errno(dtp,
+						    EDT_BADSETOPT));
+					}
+
+					valrec = &epd->dtepd_rec[++i];
+					valsize = valrec->dtrd_size;
+
+					if (valrec->dtrd_action != act ||
+					    valrec->dtrd_arg != arg) {
+						return (dt_set_errno(dtp,
+						    EDT_BADSETOPT));
+					}
+
+					if (valsize > sizeof (uint64_t)) {
+						val = buf->dtbd_data + offs +
+						    valrec->dtrd_offset;
+					} else {
+						val = "1";
+					}
+
+					rv = dt_setopt(dtp, &data, addr, val);
+
+					if (rv != 0)
+						return (-1);
+
+					flow = (opts[DTRACEOPT_FLOWINDENT] !=
+					    DTRACEOPT_UNSET);
+					quiet = (opts[DTRACEOPT_QUIET] !=
+					    DTRACEOPT_UNSET);
+
+					continue;
 				}
 
-				if (rec->dtrd_arg == DT_ACT_TRUNC) {
+				case DT_ACT_TRUNC:
 					if (i == epd->dtepd_nrecs - 1)
 						return (dt_set_errno(dtp,
 						    EDT_BADTRUNC));
@@ -967,15 +1353,8 @@ again:
 
 					i++;
 					continue;
-				}
 
-				if (rec->dtrd_arg == DT_ACT_FTRUNCATE) {
-					if (fp == NULL)
-						continue;
-
-					(void) fflush(fp);
-					(void) ftruncate(fileno(fp), 0);
-					(void) fseeko(fp, 0, SEEK_SET);
+				default:
 					continue;
 				}
 			}
@@ -992,9 +1371,10 @@ again:
 				return (dt_set_errno(dtp, EDT_BADRVAL));
 
 			if (act == DTRACEACT_STACK) {
-				int depth = rec->dtrd_size / sizeof (pc_t);
-				if (dt_print_stack(dtp, fp, NULL,
-				    addr, depth) < 0)
+				int depth = rec->dtrd_arg;
+
+				if (dt_print_stack(dtp, fp, NULL, addr, depth,
+				    rec->dtrd_size / depth) < 0)
 					return (-1);
 				goto nextrec;
 			}
@@ -1003,6 +1383,30 @@ again:
 			    act == DTRACEACT_JSTACK) {
 				if (dt_print_ustack(dtp, fp, NULL,
 				    addr, rec->dtrd_arg) < 0)
+					return (-1);
+				goto nextrec;
+			}
+
+			if (act == DTRACEACT_SYM) {
+				if (dt_print_sym(dtp, fp, NULL, addr) < 0)
+					return (-1);
+				goto nextrec;
+			}
+
+			if (act == DTRACEACT_MOD) {
+				if (dt_print_mod(dtp, fp, NULL, addr) < 0)
+					return (-1);
+				goto nextrec;
+			}
+
+			if (act == DTRACEACT_USYM || act == DTRACEACT_UADDR) {
+				if (dt_print_usym(dtp, fp, addr, act) < 0)
+					return (-1);
+				goto nextrec;
+			}
+
+			if (act == DTRACEACT_UMOD) {
+				if (dt_print_umod(dtp, fp, NULL, addr) < 0)
 					return (-1);
 				goto nextrec;
 			}
@@ -1169,7 +1573,7 @@ dt_consume_begin_record(const dtrace_probedata_t *data,
 }
 
 static int
-dt_consume_begin_error(dtrace_errdata_t *data, void *arg)
+dt_consume_begin_error(const dtrace_errdata_t *data, void *arg)
 {
 	dt_begin_t *begin = (dt_begin_t *)arg;
 	dtrace_probedesc_t *pd = data->dteda_pdesc;

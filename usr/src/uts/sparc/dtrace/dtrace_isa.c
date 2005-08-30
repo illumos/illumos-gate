@@ -40,6 +40,7 @@
 #define	DTRACE_FMT3OP3		0x80000000
 #define	DTRACE_FMT3RS1_SHIFT	14
 #define	DTRACE_FMT3RD_SHIFT	25
+#define	DTRACE_DISP22_SHIFT	10
 #define	DTRACE_RMASK		0x1f
 #define	DTRACE_REG_L0		16
 #define	DTRACE_REG_O7		15
@@ -54,6 +55,9 @@
 #define	DTRACE_CALL		0x40000000
 #define	DTRACE_JMPL_MASK	0x81f10000
 #define	DTRACE_JMPL		0x81c00000
+#define	DTRACE_BA_MASK		0xdfc00000
+#define	DTRACE_BA		0x10800000
+#define	DTRACE_BA_MAX		10
 
 extern int dtrace_getupcstack_top(uint64_t *, int, uintptr_t *);
 extern int dtrace_getustackdepth_top(uintptr_t *);
@@ -134,10 +138,21 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes, uint32_t *pc)
 		 * has a whopping 455 straight instructions that manipulate
 		 * only %g's and %o's.)
 		 */
-		int delay = 0;
+		int delay = 0, branches = 0, taken = 0;
 
 		if (depth < pcstack_limit)
 			pcstack[depth++] = (pc_t)pc;
+
+		/*
+		 * Our heuristic is exactly that -- a heuristic -- and there
+		 * exists a possibility that we could be either be vectored
+		 * off into the weeds (by following a bogus branch) or could
+		 * wander off the end of the function and off the end of a
+		 * text mapping (by not following a conditional branch at the
+		 * end of the function that is effectively always taken).  So
+		 * as a precautionary measure, we set the NOFAULT flag.
+		 */
+		DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 
 		for (;;) {
 			i = pc[j++];
@@ -202,6 +217,38 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes, uint32_t *pc)
 					goto leaf;
 
 				/*
+				 * If this is a ba (annulled or not), then we
+				 * need to actually follow the branch.  No, we
+				 * don't look at the delay slot -- hopefully
+				 * anything that can be gleaned from the delay
+				 * slot can also be gleaned from the branch
+				 * target.  To prevent ourselves from iterating
+				 * infinitely, we clamp the number of branches
+				 * that we'll follow, and we refuse to follow
+				 * the same branch twice consecutively.  In
+				 * both cases, we abort by deciding that we're
+				 * looking at a leaf.  While in theory this
+				 * could be wrong (we could be in the middle of
+				 * a loop in a non-leaf that ends with a ba and
+				 * only manipulates outputs and globals in the
+				 * body of the loop -- therefore leading us to
+				 * the wrong conclusion), this doesn't seem to
+				 * crop up in practice.  (Or rather, this
+				 * condition could not be deliberately induced,
+				 * despite concerted effort.)
+				 */
+				if ((i & DTRACE_BA_MASK) == DTRACE_BA) {
+					if (++branches == DTRACE_BA_MAX ||
+					    taken == j)
+						goto nonleaf;
+
+					taken = j;
+					j += ((int)(i << DTRACE_DISP22_SHIFT) >>
+					    DTRACE_DISP22_SHIFT) - 1;
+					continue;
+				}
+
+				/*
 				 * Finally, if it's a save, it should be
 				 * treated as a leaf; if it's a restore it
 				 * should not be treated as a leaf.
@@ -225,7 +272,7 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes, uint32_t *pc)
 nonleaf:
 		aframes++;
 leaf:
-		;
+		DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 	}
 
 	if ((on_intr = CPU_ON_INTR(CPU)) != 0)

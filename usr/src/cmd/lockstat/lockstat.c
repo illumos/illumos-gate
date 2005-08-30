@@ -834,7 +834,7 @@ status_check(void)
 }
 
 static void
-lsrec_fill(lsrec_t *lsrec, dtrace_recdesc_t *rec, int nrecs, caddr_t data)
+lsrec_fill(lsrec_t *lsrec, const dtrace_recdesc_t *rec, int nrecs, caddr_t data)
 {
 	bzero(lsrec, g_recsize);
 	lsrec->ls_count = 1;
@@ -878,7 +878,7 @@ lsrec_fill(lsrec_t *lsrec, dtrace_recdesc_t *rec, int nrecs, caddr_t data)
 
 /*ARGSUSED*/
 static int
-count_aggregate(dtrace_aggdata_t *agg, void *arg)
+count_aggregate(const dtrace_aggdata_t *agg, void *arg)
 {
 	*((size_t *)arg) += 1;
 
@@ -886,13 +886,13 @@ count_aggregate(dtrace_aggdata_t *agg, void *arg)
 }
 
 static int
-process_aggregate(dtrace_aggdata_t *agg, void *arg)
+process_aggregate(const dtrace_aggdata_t *agg, void *arg)
 {
-	dtrace_aggdesc_t *aggdesc = agg->dtada_desc;
+	const dtrace_aggdesc_t *aggdesc = agg->dtada_desc;
 	caddr_t data = agg->dtada_data;
 	lsdata_t *lsdata = arg;
 	lsrec_t *lsrec = lsdata->lsd_next;
-	dtrace_recdesc_t *rec;
+	const dtrace_recdesc_t *rec;
 	uint64_t *avg, *quantized;
 	int i, j;
 
@@ -994,7 +994,7 @@ process_data(FILE *out, char *data)
 
 /*ARGSUSED*/
 static int
-drophandler(dtrace_dropdata_t *data, void *arg)
+drophandler(const dtrace_dropdata_t *data, void *arg)
 {
 	g_dropped++;
 	(void) fprintf(stderr, "lockstat: warning: %s", data->dtdda_msg);

@@ -32,6 +32,10 @@ data		_dtrace_version
 version		SUNWprivate_1.1
 end
 
+function	dtrace_addr2str
+version		SUNWprivate_1.1
+end
+
 function	dtrace_aggregate_clear
 version		SUNWprivate_1.1
 end
@@ -161,6 +165,10 @@ version		SUNWprivate_1.1
 end
 
 function	dtrace_handle_proc
+version		SUNWprivate_1.1
+end
+
+function	dtrace_handle_setopt
 version		SUNWprivate_1.1
 end
 
@@ -317,6 +325,10 @@ version		SUNWprivate_1.1
 end
 
 function	dtrace_type_fcompile
+version		SUNWprivate_1.1
+end
+
+function	dtrace_uaddr2str
 version		SUNWprivate_1.1
 end
 

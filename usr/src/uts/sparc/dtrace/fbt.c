@@ -1121,9 +1121,11 @@ forreal:
 			continue;
 		}
 
-		if (strstr(name, "kdi_") == name) {
+		if (strstr(name, "kdi_") == name ||
+		    strstr(name, "_kdi_") != NULL) {
 			/*
-			 * Anything beginning with "kdi_" is a part of the
+			 * Any function name beginning with "kdi_" or
+			 * containing the string "_kdi_" is a part of the
 			 * kernel debugger interface and may be called in
 			 * arbitrary context -- including probe context.
 			 */

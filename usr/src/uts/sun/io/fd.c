@@ -241,7 +241,6 @@ static void release_sb_dma(struct fdctlr *fdc);
  * External functions
  */
 extern uint_t fd_intr(caddr_t);	/* defined in fd_asm.s */
-extern uint_t fd_fastintr(void); /* defined in fd_asm.s */
 extern void set_auxioreg();
 extern void call_debug();
 

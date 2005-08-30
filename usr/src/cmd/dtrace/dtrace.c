@@ -766,7 +766,7 @@ prochandler(struct ps_prochandle *P, void *arg)
 
 /*ARGSUSED*/
 static int
-errhandler(dtrace_errdata_t *data, void *arg)
+errhandler(const dtrace_errdata_t *data, void *arg)
 {
 	error(data->dteda_msg);
 	return (DTRACE_HANDLE_OK);
@@ -774,9 +774,22 @@ errhandler(dtrace_errdata_t *data, void *arg)
 
 /*ARGSUSED*/
 static int
-drophandler(dtrace_dropdata_t *data, void *arg)
+drophandler(const dtrace_dropdata_t *data, void *arg)
 {
 	error(data->dtdda_msg);
+	return (DTRACE_HANDLE_OK);
+}
+
+/*ARGSUSED*/
+static int
+setopthandler(const dtrace_setoptdata_t *data, void *arg)
+{
+	if (strcmp(data->dtsda_option, "quiet") == 0)
+		g_quiet = data->dtsda_newval != DTRACEOPT_UNSET;
+
+	if (strcmp(data->dtsda_option, "flowindent") == 0)
+		g_flowindent = data->dtsda_newval != DTRACEOPT_UNSET;
+
 	return (DTRACE_HANDLE_OK);
 }
 
@@ -1321,6 +1334,9 @@ main(int argc, char *argv[])
 
 		if (dtrace_handle_proc(g_dtp, &prochandler, NULL) == -1)
 			dfatal("failed to establish proc handler");
+
+		if (dtrace_handle_setopt(g_dtp, &setopthandler, NULL) == -1)
+			dfatal("failed to establish setopt handler");
 	}
 
 	(void) dtrace_getopt(g_dtp, "flowindent", &opt);

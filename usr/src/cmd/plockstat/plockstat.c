@@ -429,13 +429,13 @@ getsym(struct ps_prochandle *P, uintptr_t addr, char *buf, size_t size,
 
 /*ARGSUSED*/
 static int
-process_aggregate(dtrace_aggdata_t *agg, void *arg)
+process_aggregate(const dtrace_aggdata_t *agg, void *arg)
 {
 	static dtrace_aggid_t last = DTRACE_AGGIDNONE;
 	static uint_t nent;
-	dtrace_aggdesc_t *aggdesc = agg->dtada_desc;
+	const dtrace_aggdesc_t *aggdesc = agg->dtada_desc;
 	caddr_t data = agg->dtada_data;
-	dtrace_recdesc_t *rec;
+	const dtrace_recdesc_t *rec;
 	uint64_t *a, count, avg;
 	char buf[256];
 	uintptr_t lock;

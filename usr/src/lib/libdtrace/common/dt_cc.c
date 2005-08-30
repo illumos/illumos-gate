@@ -786,6 +786,61 @@ dt_action_ustack(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 	dt_action_ustack_args(dtp, ap, dnp);
 }
 
+static void
+dt_action_setopt(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
+{
+	dtrace_actdesc_t *ap;
+	dt_node_t *arg0, *arg1;
+
+	/*
+	 * The prototype guarantees that we are called with either one or
+	 * two arguments, and that any arguments that are present are strings.
+	 */
+	arg0 = dnp->dn_args;
+	arg1 = arg0->dn_list;
+
+	ap = dt_stmt_action(dtp, sdp);
+	dt_cg(yypcb, arg0);
+	ap->dtad_difo = dt_as(yypcb);
+	ap->dtad_kind = DTRACEACT_LIBACT;
+	ap->dtad_arg = DT_ACT_SETOPT;
+
+	ap = dt_stmt_action(dtp, sdp);
+
+	if (arg1 == NULL) {
+		dt_action_difconst(ap, 0, DTRACEACT_LIBACT);
+	} else {
+		dt_cg(yypcb, arg1);
+		ap->dtad_difo = dt_as(yypcb);
+		ap->dtad_kind = DTRACEACT_LIBACT;
+	}
+
+	ap->dtad_arg = DT_ACT_SETOPT;
+}
+
+/*ARGSUSED*/
+static void
+dt_action_symmod_args(dtrace_hdl_t *dtp, dtrace_actdesc_t *ap,
+    dt_node_t *dnp, dtrace_actkind_t kind)
+{
+	assert(kind == DTRACEACT_SYM || kind == DTRACEACT_MOD ||
+	    kind == DTRACEACT_USYM || kind == DTRACEACT_UMOD ||
+	    kind == DTRACEACT_UADDR);
+
+	dt_cg(yypcb, dnp);
+	ap->dtad_difo = dt_as(yypcb);
+	ap->dtad_kind = kind;
+	ap->dtad_difo->dtdo_rtype.dtdt_size = sizeof (uint64_t);
+}
+
+static void
+dt_action_symmod(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp,
+    dtrace_actkind_t kind)
+{
+	dtrace_actdesc_t *ap = dt_stmt_action(dtp, sdp);
+	dt_action_symmod_args(dtp, ap, dnp->dn_args, kind);
+}
+
 /*ARGSUSED*/
 static void
 dt_action_ftruncate(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
@@ -924,6 +979,9 @@ dt_compile_fun(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 	case DT_ACT_FTRUNCATE:
 		dt_action_ftruncate(dtp, dnp->dn_expr, sdp);
 		break;
+	case DT_ACT_MOD:
+		dt_action_symmod(dtp, dnp->dn_expr, sdp, DTRACEACT_MOD);
+		break;
 	case DT_ACT_NORMALIZE:
 		dt_action_normalize(dtp, dnp->dn_expr, sdp);
 		break;
@@ -939,6 +997,9 @@ dt_compile_fun(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 	case DT_ACT_RAISE:
 		dt_action_raise(dtp, dnp->dn_expr, sdp);
 		break;
+	case DT_ACT_SETOPT:
+		dt_action_setopt(dtp, dnp->dn_expr, sdp);
+		break;
 	case DT_ACT_SPECULATE:
 		dt_action_speculate(dtp, dnp->dn_expr, sdp);
 		break;
@@ -947,6 +1008,9 @@ dt_compile_fun(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 		break;
 	case DT_ACT_STOP:
 		dt_action_stop(dtp, dnp->dn_expr, sdp);
+		break;
+	case DT_ACT_SYM:
+		dt_action_symmod(dtp, dnp->dn_expr, sdp, DTRACEACT_SYM);
 		break;
 	case DT_ACT_SYSTEM:
 		dt_action_printflike(dtp, dnp->dn_expr, sdp, DTRACEACT_SYSTEM);
@@ -959,6 +1023,15 @@ dt_compile_fun(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 		break;
 	case DT_ACT_TRUNC:
 		dt_action_trunc(dtp, dnp->dn_expr, sdp);
+		break;
+	case DT_ACT_UADDR:
+		dt_action_symmod(dtp, dnp->dn_expr, sdp, DTRACEACT_UADDR);
+		break;
+	case DT_ACT_UMOD:
+		dt_action_symmod(dtp, dnp->dn_expr, sdp, DTRACEACT_UMOD);
+		break;
+	case DT_ACT_USYM:
+		dt_action_symmod(dtp, dnp->dn_expr, sdp, DTRACEACT_USYM);
 		break;
 	case DT_ACT_USTACK:
 	case DT_ACT_JSTACK:
@@ -985,9 +1058,10 @@ static void
 dt_compile_agg(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 {
 	dt_ident_t *aid, *fid;
-	dt_node_t *anp;
+	dt_node_t *anp, *incr = NULL;
 	dtrace_actdesc_t *ap;
-	uint_t n = 1;
+	uint_t n = 1, argmax;
+	uint64_t arg = 0;
 
 	/*
 	 * If the aggregation has no aggregating function applied to it, then
@@ -1029,6 +1103,36 @@ dt_compile_agg(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 				dt_action_ustack_args(dtp, ap, anp);
 				continue;
 			}
+
+			switch (anp->dn_ident->di_id) {
+			case DT_ACT_UADDR:
+				dt_action_symmod_args(dtp, ap,
+				    anp->dn_args, DTRACEACT_UADDR);
+				continue;
+
+			case DT_ACT_USYM:
+				dt_action_symmod_args(dtp, ap,
+				    anp->dn_args, DTRACEACT_USYM);
+				continue;
+
+			case DT_ACT_UMOD:
+				dt_action_symmod_args(dtp, ap,
+				    anp->dn_args, DTRACEACT_UMOD);
+				continue;
+
+			case DT_ACT_SYM:
+				dt_action_symmod_args(dtp, ap,
+				    anp->dn_args, DTRACEACT_SYM);
+				continue;
+
+			case DT_ACT_MOD:
+				dt_action_symmod_args(dtp, ap,
+				    anp->dn_args, DTRACEACT_MOD);
+				continue;
+
+			default:
+				break;
+			}
 		}
 
 		dt_cg(yypcb, anp);
@@ -1036,28 +1140,15 @@ dt_compile_agg(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 		ap->dtad_kind = DTRACEACT_DIFEXPR;
 	}
 
-	assert(sdp->dtsd_aggdata == NULL);
-	sdp->dtsd_aggdata = aid;
-
-	ap = dt_stmt_action(dtp, sdp);
-	assert(fid->di_kind == DT_IDENT_AGGFUNC);
-	assert(DTRACEACT_ISAGG(fid->di_id));
-	ap->dtad_kind = fid->di_id;
-	ap->dtad_ntuple = n;
-
-	if (dnp->dn_aggfun->dn_args != NULL) {
-		dt_cg(yypcb, dnp->dn_aggfun->dn_args);
-		ap->dtad_difo = dt_as(yypcb);
-	}
-
 	if (fid->di_id == DTRACEAGG_LQUANTIZE) {
 		/*
-		 * For linear quantization, we have between two and three
-		 * arguments:
+		 * For linear quantization, we have between two and four
+		 * arguments in addition to the expression:
 		 *
 		 *    arg1 => Base value
 		 *    arg2 => Limit value
 		 *    arg3 => Quantization level step size (defaults to 1)
+		 *    arg4 => Quantization increment value (defaults to 1)
 		 */
 		dt_node_t *arg1 = dnp->dn_aggfun->dn_args->dn_list;
 		dt_node_t *arg2 = arg1->dn_list;
@@ -1122,10 +1213,60 @@ dt_compile_agg(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 			    "levels must be a 16-bit quantity\n");
 		}
 
-		ap->dtad_arg = (step << DTRACE_LQUANTIZE_STEPSHIFT) |
+		arg = (step << DTRACE_LQUANTIZE_STEPSHIFT) |
 		    (nlevels << DTRACE_LQUANTIZE_LEVELSHIFT) |
 		    ((baseval << DTRACE_LQUANTIZE_BASESHIFT) &
 		    DTRACE_LQUANTIZE_BASEMASK);
+
+		incr = arg3 != NULL ? arg3->dn_list : NULL;
+		argmax = 5;
+	}
+
+	if (fid->di_id == DTRACEAGG_QUANTIZE) {
+		incr = dnp->dn_aggfun->dn_args->dn_list;
+		argmax = 2;
+	}
+
+	if (incr != NULL) {
+		if (!dt_node_is_scalar(incr)) {
+			dnerror(dnp, D_PROTO_ARG, "%s( ) increment value "
+			    "(argument #%d) must be of scalar type\n",
+			    fid->di_name, argmax);
+		}
+
+		if ((anp = incr->dn_list) != NULL) {
+			int argc = argmax;
+
+			for (; anp != NULL; anp = anp->dn_list)
+				argc++;
+
+			dnerror(incr, D_PROTO_LEN, "%s( ) prototype "
+			    "mismatch: %d args passed, at most %d expected",
+			    fid->di_name, argc, argmax);
+		}
+
+		ap = dt_stmt_action(dtp, sdp);
+		n++;
+
+		dt_cg(yypcb, incr);
+		ap->dtad_difo = dt_as(yypcb);
+		ap->dtad_difo->dtdo_rtype = dt_void_rtype;
+		ap->dtad_kind = DTRACEACT_DIFEXPR;
+	}
+
+	assert(sdp->dtsd_aggdata == NULL);
+	sdp->dtsd_aggdata = aid;
+
+	ap = dt_stmt_action(dtp, sdp);
+	assert(fid->di_kind == DT_IDENT_AGGFUNC);
+	assert(DTRACEACT_ISAGG(fid->di_id));
+	ap->dtad_kind = fid->di_id;
+	ap->dtad_ntuple = n;
+	ap->dtad_arg = arg;
+
+	if (dnp->dn_aggfun->dn_args != NULL) {
+		dt_cg(yypcb, dnp->dn_aggfun->dn_args);
+		ap->dtad_difo = dt_as(yypcb);
 	}
 }
 

@@ -916,6 +916,20 @@ dt_node_is_stack(const dt_node_t *dnp)
 }
 
 int
+dt_node_is_symaddr(const dt_node_t *dnp)
+{
+	return (dnp->dn_ctfp == DT_SYMADDR_CTFP(yypcb->pcb_hdl) &&
+	    dnp->dn_type == DT_SYMADDR_TYPE(yypcb->pcb_hdl));
+}
+
+int
+dt_node_is_usymaddr(const dt_node_t *dnp)
+{
+	return (dnp->dn_ctfp == DT_USYMADDR_CTFP(yypcb->pcb_hdl) &&
+	    dnp->dn_type == DT_USYMADDR_TYPE(yypcb->pcb_hdl));
+}
+
+int
 dt_node_is_strcompat(const dt_node_t *dnp)
 {
 	ctf_file_t *fp = dnp->dn_ctfp;
@@ -969,6 +983,9 @@ dt_node_is_void(const dt_node_t *dnp)
 		return (0); /* <DYN> is an alias for void but not the same */
 
 	if (dt_node_is_stack(dnp))
+		return (0);
+
+	if (dt_node_is_symaddr(dnp) || dt_node_is_usymaddr(dnp))
 		return (0);
 
 	type = ctf_type_resolve(fp, dnp->dn_type);
@@ -1106,6 +1123,12 @@ dt_node_is_argcompat(const dt_node_t *lp, const dt_node_t *rp)
 
 	if (dt_node_is_stack(lp) && dt_node_is_stack(rp))
 		return (1); /* stack types are compatible */
+
+	if (dt_node_is_symaddr(lp) && dt_node_is_symaddr(rp))
+		return (1); /* symaddr types are compatible */
+
+	if (dt_node_is_usymaddr(lp) && dt_node_is_usymaddr(rp))
+		return (1); /* usymaddr types are compatible */
 
 	switch (ctf_type_kind(lfp, ctf_type_resolve(lfp, lp->dn_type))) {
 	case CTF_K_FUNCTION:

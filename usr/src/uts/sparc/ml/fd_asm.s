@@ -20,7 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1989-1991, by Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,8 +69,6 @@ fd_intr(caddr_t arg)
 #define	TRIGGER	0x33
 	ENTRY(fd_intr)		! fd standard interrupt handler
 	save	%sp, -SA(MINFRAME), %sp
-	clr	%l1		! came from standard interrupt handler
-	ENTRY_NP(fd_fastintr)	! fd fast trap entry point
 	!
 	! Traverse the list of controllers until we find the first
 	! controller expecting an interrupt. Unfortunately, the
@@ -323,9 +322,6 @@ fd_intr(caddr_t arg)
 	sethi	%hi(asm_mutex_spin_exit), %l7
 	jmpl	%l7 + %lo(asm_mutex_spin_exit), %l7
 	add	Fdc, FD_HILOCK, %l6
-	tst	%l1		! %l1 != 0 fast trap handler
-	bnz	1f
-	nop
 
 	!
 	! schedule the soft interrupt if needed 
@@ -346,18 +342,9 @@ fd_intr(caddr_t arg)
 	call	ddi_trigger_softintr
 	ldn	[Fdc + FD_SOFTID], %o0
 
-
-	! standard interrupt epilogue
 .end:	mov	1, %i0
 	ret
 	restore
-1:
-	! fast trap epilogue
-	mov	%l0, %psr	! restore psr - and user's ccodes
-	nop
-	nop
-	jmp	%l1	! return from interrupt
-	rett	%l2
 	SET_SIZE(fd_intr)
 
 .panic:

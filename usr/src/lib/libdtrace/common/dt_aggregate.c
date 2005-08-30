@@ -102,26 +102,27 @@ dt_aggregate_lquantize(uint64_t *existing, uint64_t *new, size_t size)
 		existing[i] = existing[i] + new[i + 1];
 }
 
-static int64_t
+static long double
 dt_aggregate_lquantizedsum(uint64_t *lquanta)
 {
 	uint64_t arg = *lquanta++;
 	int32_t base = DTRACE_LQUANTIZE_BASE(arg);
 	uint16_t step = DTRACE_LQUANTIZE_STEP(arg);
 	uint16_t levels = DTRACE_LQUANTIZE_LEVELS(arg), i;
-	int64_t total = lquanta[0] * (base - 1);
+	long double total = (long double)lquanta[0] * (long double)(base - 1);
 
 	for (i = 0; i < levels; base += step, i++)
-		total += lquanta[i + 1] * base;
+		total += (long double)lquanta[i + 1] * (long double)base;
 
-	return (total + lquanta[levels + 1] * (base + 1));
+	return (total + (long double)lquanta[levels + 1] *
+	    (long double)(base + 1));
 }
 
 static int
 dt_aggregate_lquantizedcmp(uint64_t *lhs, uint64_t *rhs)
 {
-	int64_t lsum = dt_aggregate_lquantizedsum(lhs);
-	int64_t rsum = dt_aggregate_lquantizedsum(rhs);
+	long double lsum = dt_aggregate_lquantizedsum(lhs);
+	long double rsum = dt_aggregate_lquantizedsum(rhs);
 
 	if (lsum > rsum)
 		return (1);
@@ -136,13 +137,13 @@ static int
 dt_aggregate_quantizedcmp(uint64_t *lhs, uint64_t *rhs)
 {
 	int nbuckets = DTRACE_QUANTIZE_NBUCKETS, i;
-	int64_t ltotal = 0, rtotal = 0;
+	long double ltotal = 0, rtotal = 0;
 
 	for (i = 0; i < nbuckets; i++) {
 		int64_t bucketval = DTRACE_QUANTIZE_BUCKETVAL(i);
 
-		ltotal += bucketval * lhs[i];
-		rtotal += bucketval * rhs[i];
+		ltotal += (long double)bucketval * (long double)lhs[i];
+		rtotal += (long double)bucketval * (long double)rhs[i];
 	}
 
 	if (ltotal > rtotal)
@@ -152,6 +153,89 @@ dt_aggregate_quantizedcmp(uint64_t *lhs, uint64_t *rhs)
 		return (-1);
 
 	return (0);
+}
+
+static void
+dt_aggregate_usym(dtrace_hdl_t *dtp, uint64_t *data)
+{
+	uint64_t pid = data[0];
+	uint64_t *pc = &data[1];
+	struct ps_prochandle *P;
+	GElf_Sym sym;
+
+	if (dtp->dt_vector != NULL)
+		return;
+
+	if ((P = dt_proc_grab(dtp, pid, PGRAB_RDONLY | PGRAB_FORCE, 0)) == NULL)
+		return;
+
+	dt_proc_lock(dtp, P);
+
+	if (Plookup_by_addr(P, *pc, NULL, 0, &sym) == 0)
+		*pc = sym.st_value;
+
+	dt_proc_unlock(dtp, P);
+	dt_proc_release(dtp, P);
+}
+
+static void
+dt_aggregate_umod(dtrace_hdl_t *dtp, uint64_t *data)
+{
+	uint64_t pid = data[0];
+	uint64_t *pc = &data[1];
+	struct ps_prochandle *P;
+	const prmap_t *map;
+
+	if (dtp->dt_vector != NULL)
+		return;
+
+	if ((P = dt_proc_grab(dtp, pid, PGRAB_RDONLY | PGRAB_FORCE, 0)) == NULL)
+		return;
+
+	dt_proc_lock(dtp, P);
+
+	if ((map = Paddr_to_map(P, *pc)) != NULL)
+		*pc = map->pr_vaddr;
+
+	dt_proc_unlock(dtp, P);
+	dt_proc_release(dtp, P);
+}
+
+static void
+dt_aggregate_sym(dtrace_hdl_t *dtp, uint64_t *data)
+{
+	GElf_Sym sym;
+	uint64_t *pc = data;
+
+	if (dtrace_lookup_by_addr(dtp, *pc, &sym, NULL) == 0)
+		*pc = sym.st_value;
+}
+
+static void
+dt_aggregate_mod(dtrace_hdl_t *dtp, uint64_t *data)
+{
+	uint64_t *pc = data;
+	dt_module_t *dmp;
+
+	if (dtp->dt_vector != NULL) {
+		/*
+		 * We don't have a way of just getting the module for a
+		 * vectored open, and it doesn't seem to be worth defining
+		 * one.  This means that use of mod() won't get true
+		 * aggregation in the postmortem case (some modules may
+		 * appear more than once in aggregation output).  It seems
+		 * unlikely that anyone will ever notice or care...
+		 */
+		return;
+	}
+
+	for (dmp = dt_list_next(&dtp->dt_modlist); dmp != NULL;
+	    dmp = dt_list_next(dmp)) {
+		if (*pc - dmp->dm_text_va < dmp->dm_text_size) {
+			*pc = dmp->dm_text_va;
+			return;
+		}
+	}
 }
 
 static int
@@ -233,6 +317,33 @@ dt_aggregate_snap_cpu(dtrace_hdl_t *dtp, processorid_t cpu)
 		for (j = 0; j < agg->dtagd_nrecs - 1; j++) {
 			rec = &agg->dtagd_rec[j];
 			roffs = rec->dtrd_offset;
+
+			switch (rec->dtrd_action) {
+			case DTRACEACT_USYM:
+				dt_aggregate_usym(dtp,
+				    /* LINTED - alignment */
+				    (uint64_t *)&addr[roffs]);
+				break;
+
+			case DTRACEACT_UMOD:
+				dt_aggregate_umod(dtp,
+				    /* LINTED - alignment */
+				    (uint64_t *)&addr[roffs]);
+				break;
+
+			case DTRACEACT_SYM:
+				/* LINTED - alignment */
+				dt_aggregate_sym(dtp, (uint64_t *)&addr[roffs]);
+				break;
+
+			case DTRACEACT_MOD:
+				/* LINTED - alignment */
+				dt_aggregate_mod(dtp, (uint64_t *)&addr[roffs]);
+				break;
+
+			default:
+				break;
+			}
 
 			for (i = 0; i < rec->dtrd_size; i++)
 				hashval += addr[roffs + i];

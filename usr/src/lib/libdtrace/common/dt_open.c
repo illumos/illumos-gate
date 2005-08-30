@@ -187,6 +187,8 @@ static const dt_ident_t _dtrace_globals[] = {
 	DT_VERS_1_1, &dt_idops_func, "void(@, ...)" },
 { "ftruncate", DT_IDENT_ACTFUNC, 0, DT_ACT_FTRUNCATE, DT_ATTR_STABCMN,
 	DT_VERS_1_0, &dt_idops_func, "void()" },
+{ "func", DT_IDENT_ACTFUNC, 0, DT_ACT_SYM, DT_ATTR_STABCMN,
+	DT_VERS_1_2, &dt_idops_func, "_symaddr(uintptr_t)" },
 { "getmajor", DT_IDENT_FUNC, 0, DIF_SUBR_GETMAJOR,
 	DT_ATTR_EVOLCMN, DT_VERS_1_0,
 	&dt_idops_func, "genunix`major_t(genunix`dev_t)" },
@@ -210,6 +212,8 @@ static const dt_ident_t _dtrace_globals[] = {
 	&dt_idops_func, "void(@)" },
 { "min", DT_IDENT_AGGFUNC, 0, DTRACEAGG_MIN, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "void(@)" },
+{ "mod", DT_IDENT_ACTFUNC, 0, DT_ACT_MOD, DT_ATTR_STABCMN,
+	DT_VERS_1_2, &dt_idops_func, "_symaddr(uintptr_t)" },
 { "msgdsize", DT_IDENT_FUNC, 0, DIF_SUBR_MSGDSIZE,
 	DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "size_t(mblk_t *)" },
@@ -251,7 +255,7 @@ static const dt_ident_t _dtrace_globals[] = {
 	&dt_idops_func, "int(pid_t)" },
 { "quantize", DT_IDENT_AGGFUNC, 0, DTRACEAGG_QUANTIZE,
 	DT_ATTR_STABCMN, DT_VERS_1_0,
-	&dt_idops_func, "void(@)" },
+	&dt_idops_func, "void(@, ...)" },
 { "raise", DT_IDENT_ACTFUNC, 0, DT_ACT_RAISE, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "void(int)" },
 { "rand", DT_IDENT_FUNC, 0, DIF_SUBR_RAND, DT_ATTR_STABCMN, DT_VERS_1_0,
@@ -269,6 +273,8 @@ static const dt_ident_t _dtrace_globals[] = {
 	&dt_idops_func, "int(genunix`krwlock_t *)" },
 { "self", DT_IDENT_PTR, 0, 0, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "void" },
+{ "setopt", DT_IDENT_ACTFUNC, 0, DT_ACT_SETOPT, DT_ATTR_STABCMN,
+	DT_VERS_1_2, &dt_idops_func, "void(const char *, [const char *])" },
 { "speculate", DT_IDENT_ACTFUNC, 0, DT_ACT_SPECULATE,
 	DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "void(int)" },
@@ -298,6 +304,8 @@ static const dt_ident_t _dtrace_globals[] = {
 	&dt_idops_func, "string(const char *, int, [int])" },
 { "sum", DT_IDENT_AGGFUNC, 0, DTRACEAGG_SUM, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "void(@)" },
+{ "sym", DT_IDENT_ACTFUNC, 0, DT_ACT_SYM, DT_ATTR_STABCMN,
+	DT_VERS_1_2, &dt_idops_func, "_symaddr(uintptr_t)" },
 { "system", DT_IDENT_ACTFUNC, 0, DT_ACT_SYSTEM, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "void(@, ...)" },
 { "this", DT_IDENT_PTR, 0, 0, DT_ATTR_STABCMN, DT_VERS_1_0,
@@ -314,6 +322,14 @@ static const dt_ident_t _dtrace_globals[] = {
 	&dt_idops_func, "void(@, size_t)" },
 { "trunc", DT_IDENT_ACTFUNC, 0, DT_ACT_TRUNC, DT_ATTR_STABCMN,
 	DT_VERS_1_0, &dt_idops_func, "void(...)" },
+{ "uaddr", DT_IDENT_ACTFUNC, 0, DT_ACT_UADDR, DT_ATTR_STABCMN,
+	DT_VERS_1_2, &dt_idops_func, "_usymaddr(uintptr_t)" },
+{ "ucaller", DT_IDENT_SCALAR, 0, DIF_VAR_UCALLER, DT_ATTR_STABCMN,
+	DT_VERS_1_2, &dt_idops_type, "uint64_t" },
+{ "ufunc", DT_IDENT_ACTFUNC, 0, DT_ACT_USYM, DT_ATTR_STABCMN,
+	DT_VERS_1_2, &dt_idops_func, "_usymaddr(uintptr_t)" },
+{ "umod", DT_IDENT_ACTFUNC, 0, DT_ACT_UMOD, DT_ATTR_STABCMN,
+	DT_VERS_1_2, &dt_idops_func, "_usymaddr(uintptr_t)" },
 { "uregs", DT_IDENT_ARRAY, 0, DIF_VAR_UREGS, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_regs, NULL },
 { "ustack", DT_IDENT_ACTFUNC, 0, DT_ACT_USTACK, DT_ATTR_STABCMN, DT_VERS_1_0,
@@ -321,6 +337,8 @@ static const dt_ident_t _dtrace_globals[] = {
 { "ustackdepth", DT_IDENT_SCALAR, 0, DIF_VAR_USTACKDEPTH,
 	DT_ATTR_STABCMN, DT_VERS_1_2,
 	&dt_idops_type, "uint32_t" },
+{ "usym", DT_IDENT_ACTFUNC, 0, DT_ACT_USYM, DT_ATTR_STABCMN,
+	DT_VERS_1_2, &dt_idops_func, "_usymaddr(uintptr_t)" },
 { "vtimestamp", DT_IDENT_SCALAR, 0, DIF_VAR_VTIMESTAMP,
 	DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "uint64_t" },
@@ -1114,9 +1132,16 @@ alloc:
 	dtp->dt_type_stack = ctf_add_typedef(dmp->dm_ctfp, CTF_ADD_ROOT,
 	    "stack", ctf_lookup_by_name(dmp->dm_ctfp, "void"));
 
+	dtp->dt_type_symaddr = ctf_add_typedef(dmp->dm_ctfp, CTF_ADD_ROOT,
+	    "_symaddr", ctf_lookup_by_name(dmp->dm_ctfp, "void"));
+
+	dtp->dt_type_usymaddr = ctf_add_typedef(dmp->dm_ctfp, CTF_ADD_ROOT,
+	    "_usymaddr", ctf_lookup_by_name(dmp->dm_ctfp, "void"));
+
 	if (dtp->dt_type_func == CTF_ERR || dtp->dt_type_fptr == CTF_ERR ||
 	    dtp->dt_type_str == CTF_ERR || dtp->dt_type_dyn == CTF_ERR ||
-	    dtp->dt_type_stack == CTF_ERR) {
+	    dtp->dt_type_stack == CTF_ERR || dtp->dt_type_symaddr == CTF_ERR ||
+	    dtp->dt_type_usymaddr == CTF_ERR) {
 		dt_dprintf("failed to add intrinsic to D container: %s\n",
 		    ctf_errmsg(ctf_errno(dmp->dm_ctfp)));
 		return (set_open_errno(dtp, errp, EDT_CTF));
@@ -1285,77 +1310,6 @@ dtrace_close(dtrace_hdl_t *dtp)
 	free(dtp->dt_mods);
 	free(dtp->dt_provs);
 	free(dtp);
-}
-
-int
-dtrace_go(dtrace_hdl_t *dtp)
-{
-	void *dof;
-	int err;
-
-	if (dtp->dt_active)
-		return (dt_set_errno(dtp, EINVAL));
-
-	/*
-	 * If a dtrace:::ERROR program and callback are registered, enable the
-	 * program before we start tracing.  If this fails for a vector open
-	 * with ENOTTY, we permit dtrace_go() to succeed so that vector clients
-	 * such as mdb's dtrace module can execute the rest of dtrace_go() even
-	 * though they do not provide support for the DTRACEIOC_ENABLE ioctl.
-	 */
-	if (dtp->dt_errprog != NULL &&
-	    dtrace_program_exec(dtp, dtp->dt_errprog, NULL) == -1 && (
-	    dtp->dt_errno != ENOTTY || dtp->dt_vector == NULL))
-		return (-1); /* dt_errno has been set for us */
-
-	if ((dof = dtrace_getopt_dof(dtp)) == NULL)
-		return (-1); /* dt_errno has been set for us */
-
-	err = dt_ioctl(dtp, DTRACEIOC_ENABLE, dof);
-	dtrace_dof_destroy(dtp, dof);
-
-	if (err == -1 && (errno != ENOTTY || dtp->dt_vector == NULL))
-		return (dt_set_errno(dtp, errno));
-
-	if (dt_ioctl(dtp, DTRACEIOC_GO, &dtp->dt_beganon) == -1) {
-		if (errno == EACCES)
-			return (dt_set_errno(dtp, EDT_DESTRUCTIVE));
-
-		if (errno == EALREADY)
-			return (dt_set_errno(dtp, EDT_ISANON));
-
-		if (errno == ENOENT)
-			return (dt_set_errno(dtp, EDT_NOANON));
-
-		if (errno == E2BIG)
-			return (dt_set_errno(dtp, EDT_ENDTOOBIG));
-
-		if (errno == ENOSPC)
-			return (dt_set_errno(dtp, EDT_BUFTOOSMALL));
-
-		return (dt_set_errno(dtp, errno));
-	}
-
-	dtp->dt_active = 1;
-
-	if (dt_options_load(dtp) == -1)
-		return (dt_set_errno(dtp, errno));
-
-	return (dt_aggregate_go(dtp));
-}
-
-int
-dtrace_stop(dtrace_hdl_t *dtp)
-{
-	if (dtp->dt_stopped)
-		return (0);
-
-	if (dt_ioctl(dtp, DTRACEIOC_STOP, &dtp->dt_endedon) == -1)
-		return (dt_set_errno(dtp, errno));
-
-	dtp->dt_stopped = 1;
-
-	return (0);
 }
 
 int

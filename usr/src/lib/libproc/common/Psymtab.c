@@ -392,7 +392,7 @@ Pupdate_maps(struct ps_prochandle *P)
 	map_info_t *newmap, *newp;
 	map_info_t *mptr;
 
-	if (P->info_valid)
+	if (P->info_valid || P->state == PS_UNDEAD)
 		return;
 
 	Preadauxvec(P);

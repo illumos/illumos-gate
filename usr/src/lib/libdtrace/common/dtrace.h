@@ -267,7 +267,7 @@ typedef struct dtrace_errdata {
 	const char *dteda_msg;			/* preconstructed message */
 } dtrace_errdata_t;
 
-typedef int dtrace_handle_err_f(dtrace_errdata_t *, void *);
+typedef int dtrace_handle_err_f(const dtrace_errdata_t *, void *);
 extern int dtrace_handle_err(dtrace_hdl_t *, dtrace_handle_err_f *, void *);
 
 typedef enum {
@@ -278,7 +278,9 @@ typedef enum {
 	DTRACEDROP_DYNDIRTY,			/* dyn drop due to dirty */
 	DTRACEDROP_SPEC,			/* speculative drop */
 	DTRACEDROP_SPECBUSY,			/* spec drop due to busy */
-	DTRACEDROP_SPECUNAVAIL			/* spec drop due to unavail */
+	DTRACEDROP_SPECUNAVAIL,			/* spec drop due to unavail */
+	DTRACEDROP_STKSTROVERFLOW,		/* stack string tab overflow */
+	DTRACEDROP_DBLERROR			/* error in ERROR probe */
 } dtrace_dropkind_t;
 
 typedef struct dtrace_dropdata {
@@ -290,7 +292,7 @@ typedef struct dtrace_dropdata {
 	const char *dtdda_msg;			/* preconstructed message */
 } dtrace_dropdata_t;
 
-typedef int dtrace_handle_drop_f(dtrace_dropdata_t *, void *);
+typedef int dtrace_handle_drop_f(const dtrace_dropdata_t *, void *);
 extern int dtrace_handle_drop(dtrace_hdl_t *, dtrace_handle_drop_f *, void *);
 
 typedef void dtrace_handle_proc_f(struct ps_prochandle *, void *);
@@ -300,13 +302,25 @@ typedef struct dtrace_bufdata {
 	dtrace_hdl_t *dtbda_handle;		/* handle to DTrace library */
 	const char *dtbda_buffered;		/* buffered output */
 	dtrace_probedata_t *dtbda_probe;	/* probe data */
-	dtrace_recdesc_t *dtbda_recdesc;	/* record description */
-	dtrace_aggdata_t *dtbda_aggdata;	/* aggregation data, if agg. */
+	const dtrace_recdesc_t *dtbda_recdesc;	/* record description */
+	const dtrace_aggdata_t *dtbda_aggdata;	/* aggregation data, if agg. */
 } dtrace_bufdata_t;
 
-typedef int dtrace_handle_buffered_f(dtrace_bufdata_t *, void *);
+typedef int dtrace_handle_buffered_f(const dtrace_bufdata_t *, void *);
 extern int dtrace_handle_buffered(dtrace_hdl_t *,
     dtrace_handle_buffered_f *, void *);
+
+typedef struct dtrace_setoptdata {
+	dtrace_hdl_t *dtsda_handle;		/* handle to DTrace library */
+	const dtrace_probedata_t *dtsda_probe;	/* probe data */
+	const char *dtsda_option;		/* option that was set */
+	dtrace_optval_t dtsda_oldval;		/* old value */
+	dtrace_optval_t dtsda_newval;		/* new value */
+} dtrace_setoptdata_t;
+
+typedef int dtrace_handle_setopt_f(const dtrace_setoptdata_t *, void *);
+extern int dtrace_handle_setopt(dtrace_hdl_t *,
+    dtrace_handle_setopt_f *, void *);
 
 /*
  * DTrace Aggregate Interface
@@ -337,7 +351,7 @@ struct dtrace_aggdata {
 	caddr_t *dtada_percpu_delta;		/* per CPU delta, if avail */
 };
 
-typedef int dtrace_aggregate_f(dtrace_aggdata_t *, void *);
+typedef int dtrace_aggregate_f(const dtrace_aggdata_t *, void *);
 typedef int dtrace_aggregate_walk_f(dtrace_hdl_t *,
     dtrace_aggregate_f *, void *);
 
@@ -501,10 +515,14 @@ struct dtrace_vector {
 /*
  * DTrace Utility Functions
  *
- * Library clients can use these functions to convert between string and
- * integer probe descriptions and the dtrace_probedesc_t representation
- * and to perform similar conversions on stability attributes.
+ * Library clients can use these functions to convert addresses strings, to
+ * convert between string and integer probe descriptions and the
+ * dtrace_probedesc_t representation, and to perform similar conversions on
+ * stability attributes.
  */
+extern int dtrace_addr2str(dtrace_hdl_t *, uint64_t, char *, int);
+extern int dtrace_uaddr2str(dtrace_hdl_t *, pid_t, uint64_t, char *, int);
+
 extern int dtrace_xstr2desc(dtrace_hdl_t *, dtrace_probespec_t,
     const char *, int, char *const [], dtrace_probedesc_t *);
 

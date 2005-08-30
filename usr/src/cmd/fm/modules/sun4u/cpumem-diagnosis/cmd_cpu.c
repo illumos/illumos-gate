@@ -696,7 +696,7 @@ cpu_getfrustr(fmd_hdl_t *hdl, uint32_t cpuid)
 	for (kn = ksp->ks_data, i = 0; i < ksp->ks_ndata; i++, kn++) {
 		if (strcmp(kn->name, "cpu_fru") == 0) {
 			char *str = fmd_hdl_strdup(hdl,
-			    kn->value.string.addr.ptr, FMD_SLEEP);
+			    KSTAT_NAMED_STR_PTR(kn), FMD_SLEEP);
 			(void) kstat_close(kc);
 			return (str);
 		}
@@ -1281,9 +1281,9 @@ cmd_cpu_check_support(void)
 			if (strcmp(kn->name, "implementation") != 0)
 				continue;
 
-			if (strncmp(kn->value.string.addr.ptr, "UltraSPARC-III",
+			if (strncmp(KSTAT_NAMED_STR_PTR(kn), "UltraSPARC-III",
 			    sizeof ("UltraSPARC-III") - 1) != 0 &&
-			    strncmp(kn->value.string.addr.ptr, "UltraSPARC-IV",
+			    strncmp(KSTAT_NAMED_STR_PTR(kn), "UltraSPARC-IV",
 			    sizeof ("UltraSPARC-IV") - 1) != 0) {
 				(void) kstat_close(kc);
 				return (0);

@@ -154,6 +154,90 @@ dtrace_status(dtrace_hdl_t *dtp)
 	return (DTRACE_STATUS_FILLED);
 }
 
+int
+dtrace_go(dtrace_hdl_t *dtp)
+{
+	void *dof;
+	int err;
+
+	if (dtp->dt_active)
+		return (dt_set_errno(dtp, EINVAL));
+
+	/*
+	 * If a dtrace:::ERROR program and callback are registered, enable the
+	 * program before we start tracing.  If this fails for a vector open
+	 * with ENOTTY, we permit dtrace_go() to succeed so that vector clients
+	 * such as mdb's dtrace module can execute the rest of dtrace_go() even
+	 * though they do not provide support for the DTRACEIOC_ENABLE ioctl.
+	 */
+	if (dtp->dt_errprog != NULL &&
+	    dtrace_program_exec(dtp, dtp->dt_errprog, NULL) == -1 && (
+	    dtp->dt_errno != ENOTTY || dtp->dt_vector == NULL))
+		return (-1); /* dt_errno has been set for us */
+
+	if ((dof = dtrace_getopt_dof(dtp)) == NULL)
+		return (-1); /* dt_errno has been set for us */
+
+	err = dt_ioctl(dtp, DTRACEIOC_ENABLE, dof);
+	dtrace_dof_destroy(dtp, dof);
+
+	if (err == -1 && (errno != ENOTTY || dtp->dt_vector == NULL))
+		return (dt_set_errno(dtp, errno));
+
+	if (dt_ioctl(dtp, DTRACEIOC_GO, &dtp->dt_beganon) == -1) {
+		if (errno == EACCES)
+			return (dt_set_errno(dtp, EDT_DESTRUCTIVE));
+
+		if (errno == EALREADY)
+			return (dt_set_errno(dtp, EDT_ISANON));
+
+		if (errno == ENOENT)
+			return (dt_set_errno(dtp, EDT_NOANON));
+
+		if (errno == E2BIG)
+			return (dt_set_errno(dtp, EDT_ENDTOOBIG));
+
+		if (errno == ENOSPC)
+			return (dt_set_errno(dtp, EDT_BUFTOOSMALL));
+
+		return (dt_set_errno(dtp, errno));
+	}
+
+	dtp->dt_active = 1;
+
+	if (dt_options_load(dtp) == -1)
+		return (dt_set_errno(dtp, errno));
+
+	return (dt_aggregate_go(dtp));
+}
+
+int
+dtrace_stop(dtrace_hdl_t *dtp)
+{
+	int gen = dtp->dt_statusgen;
+
+	if (dtp->dt_stopped)
+		return (0);
+
+	if (dt_ioctl(dtp, DTRACEIOC_STOP, &dtp->dt_endedon) == -1)
+		return (dt_set_errno(dtp, errno));
+
+	dtp->dt_stopped = 1;
+
+	/*
+	 * Now that we're stopped, we're going to get status one final time.
+	 */
+	if (dt_ioctl(dtp, DTRACEIOC_STATUS, &dtp->dt_status[gen]) == -1)
+		return (dt_set_errno(dtp, errno));
+
+	if (dt_handle_status(dtp, &dtp->dt_status[gen ^ 1],
+	    &dtp->dt_status[gen]) == -1)
+		return (-1);
+
+	return (0);
+}
+
+
 dtrace_workstatus_t
 dtrace_work(dtrace_hdl_t *dtp, FILE *fp,
     dtrace_consume_probe_f *pfunc, dtrace_consume_rec_f *rfunc, void *arg)

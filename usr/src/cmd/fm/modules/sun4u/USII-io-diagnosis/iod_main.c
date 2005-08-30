@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,9 +127,9 @@ iod_cpu_check_support(void)
 			if (strcmp(kn->name, "implementation") != 0)
 				continue;
 
-			if (strncmp(kn->value.string.addr.ptr, "UltraSPARC-II",
+			if (strncmp(KSTAT_NAMED_STR_PTR(kn), "UltraSPARC-II",
 			    sizeof ("UltraSPARC-II") - 1) == 0 &&
-			    strncmp(kn->value.string.addr.ptr, "UltraSPARC-III",
+			    strncmp(KSTAT_NAMED_STR_PTR(kn), "UltraSPARC-III",
 			    sizeof ("UltraSPARC-III") - 1) != 0) {
 				(void) kstat_close(kc);
 				return (1);

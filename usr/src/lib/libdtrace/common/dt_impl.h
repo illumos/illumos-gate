@@ -217,6 +217,8 @@ struct dtrace_hdl {
 	ctf_id_t dt_type_str;	/* cached CTF identifier for string type */
 	ctf_id_t dt_type_dyn;	/* cached CTF identifier for <DYN> type */
 	ctf_id_t dt_type_stack;	/* cached CTF identifier for stack type */
+	ctf_id_t dt_type_symaddr; /* cached CTF identifier for _symaddr type */
+	ctf_id_t dt_type_usymaddr; /* cached CTF ident. for _usymaddr type */
 	size_t dt_maxprobe;	/* max enabled probe ID */
 	dtrace_eprobedesc_t **dt_edesc; /* enabled probe descriptions */
 	dtrace_probedesc_t **dt_pdesc; /* probe descriptions for enabled prbs */
@@ -236,6 +238,7 @@ struct dtrace_hdl {
 	char *dt_ld_path;	/* pathname of ld(1) to invoke if needed */
 	dt_list_t dt_lib_path;	/* linked-list forming library search path */
 	uint_t dt_lazyload;	/* boolean:  set via -xlazyload */
+	uint_t dt_droptags;	/* boolean:  set via -xdroptags */
 	uint_t dt_active;	/* boolean:  set once tracing is active */
 	uint_t dt_stopped;	/* boolean:  set once tracing is stopped */
 	processorid_t dt_beganon; /* CPU that executed BEGIN probe (if any) */
@@ -266,6 +269,8 @@ struct dtrace_hdl {
 	void *dt_droparg;	/* drop handler argument */
 	dtrace_handle_proc_f *dt_prochdlr; /* proc handler, if any */
 	void *dt_procarg;	/* proc handler argument */
+	dtrace_handle_setopt_f *dt_setopthdlr; /* setopt handler, if any */
+	void *dt_setoptarg;	/* setopt handler argument */
 	dtrace_status_t dt_status[2]; /* status cache */
 	int dt_statusgen;	/* current status generation */
 	hrtime_t dt_laststatus;	/* last status */
@@ -352,29 +357,50 @@ struct dtrace_hdl {
 #define	DT_STACK_CTFP(dtp)	((dtp)->dt_ddefs->dm_ctfp)
 #define	DT_STACK_TYPE(dtp)	((dtp)->dt_type_stack)
 
-#define	DT_ACT_PRINTF		0	/* printf() action */
-#define	DT_ACT_TRACE		1	/* trace() action */
-#define	DT_ACT_TRACEMEM		2	/* tracemem() action */
-#define	DT_ACT_STACK		3	/* stack() action */
-#define	DT_ACT_STOP		4	/* stop() action */
-#define	DT_ACT_BREAKPOINT	5	/* breakpoint() action */
-#define	DT_ACT_PANIC		6	/* panic() action */
-#define	DT_ACT_SPECULATE	7	/* speculate() action */
-#define	DT_ACT_COMMIT		8	/* commit() action */
-#define	DT_ACT_DISCARD		9	/* discard() action */
-#define	DT_ACT_CHILL		10	/* chill() action */
-#define	DT_ACT_EXIT		11	/* exit() action */
-#define	DT_ACT_USTACK		12	/* ustack() action */
-#define	DT_ACT_PRINTA		13	/* printa() action */
-#define	DT_ACT_RAISE		14	/* raise() action */
-#define	DT_ACT_CLEAR		15	/* clear() action */
-#define	DT_ACT_NORMALIZE	16	/* normalize() action */
-#define	DT_ACT_DENORMALIZE	17	/* denormalize() action */
-#define	DT_ACT_TRUNC		18	/* trunc() action */
-#define	DT_ACT_SYSTEM		19	/* system() action */
-#define	DT_ACT_JSTACK		20	/* jstack() action */
-#define	DT_ACT_FTRUNCATE	21	/* ftruncate() action */
-#define	DT_ACT_FREOPEN		22	/* freopen() action */
+#define	DT_SYMADDR_CTFP(dtp)	((dtp)->dt_ddefs->dm_ctfp)
+#define	DT_SYMADDR_TYPE(dtp)	((dtp)->dt_type_symaddr)
+
+#define	DT_USYMADDR_CTFP(dtp)	((dtp)->dt_ddefs->dm_ctfp)
+#define	DT_USYMADDR_TYPE(dtp)	((dtp)->dt_type_usymaddr)
+
+/*
+ * Actions and subroutines are both DT_NODE_FUNC nodes; to avoid confusing
+ * an action for a subroutine (or vice versa), we assure that the DT_ACT_*
+ * constants and the DIF_SUBR_* constants occupy non-overlapping ranges by
+ * starting the DT_ACT_* constants at DIF_SUBR_MAX + 1.
+ */
+#define	DT_ACT_BASE		DIF_SUBR_MAX + 1
+#define	DT_ACT(n)		(DT_ACT_BASE + (n))
+
+#define	DT_ACT_PRINTF		DT_ACT(0)	/* printf() action */
+#define	DT_ACT_TRACE		DT_ACT(1)	/* trace() action */
+#define	DT_ACT_TRACEMEM		DT_ACT(2)	/* tracemem() action */
+#define	DT_ACT_STACK		DT_ACT(3)	/* stack() action */
+#define	DT_ACT_STOP		DT_ACT(4)	/* stop() action */
+#define	DT_ACT_BREAKPOINT	DT_ACT(5)	/* breakpoint() action */
+#define	DT_ACT_PANIC		DT_ACT(6)	/* panic() action */
+#define	DT_ACT_SPECULATE	DT_ACT(7)	/* speculate() action */
+#define	DT_ACT_COMMIT		DT_ACT(8)	/* commit() action */
+#define	DT_ACT_DISCARD		DT_ACT(9)	/* discard() action */
+#define	DT_ACT_CHILL		DT_ACT(10)	/* chill() action */
+#define	DT_ACT_EXIT		DT_ACT(11)	/* exit() action */
+#define	DT_ACT_USTACK		DT_ACT(12)	/* ustack() action */
+#define	DT_ACT_PRINTA		DT_ACT(13)	/* printa() action */
+#define	DT_ACT_RAISE		DT_ACT(14)	/* raise() action */
+#define	DT_ACT_CLEAR		DT_ACT(15)	/* clear() action */
+#define	DT_ACT_NORMALIZE	DT_ACT(16)	/* normalize() action */
+#define	DT_ACT_DENORMALIZE	DT_ACT(17)	/* denormalize() action */
+#define	DT_ACT_TRUNC		DT_ACT(18)	/* trunc() action */
+#define	DT_ACT_SYSTEM		DT_ACT(19)	/* system() action */
+#define	DT_ACT_JSTACK		DT_ACT(20)	/* jstack() action */
+#define	DT_ACT_FTRUNCATE	DT_ACT(21)	/* ftruncate() action */
+#define	DT_ACT_FREOPEN		DT_ACT(22)	/* freopen() action */
+#define	DT_ACT_SYM		DT_ACT(23)	/* sym()/func() actions */
+#define	DT_ACT_MOD		DT_ACT(24)	/* mod() action */
+#define	DT_ACT_USYM		DT_ACT(25)	/* usym()/ufunc() actions */
+#define	DT_ACT_UMOD		DT_ACT(26)	/* umod() action */
+#define	DT_ACT_UADDR		DT_ACT(27)	/* uaddr() action */
+#define	DT_ACT_SETOPT		DT_ACT(28)	/* setopt() action */
 
 /*
  * Sentinel to tell freopen() to restore the saved stdout.  This must not
@@ -456,7 +482,9 @@ enum {
 	EDT_HARDWIRE,		/* failed to load hard-wired definitions */
 	EDT_ELFVERSION,		/* libelf is out-of-date w.r.t libdtrace */
 	EDT_NOBUFFERED,		/* attempt to buffer output without handler */
-	EDT_UNSTABLE		/* description matched unstable set of probes */
+	EDT_UNSTABLE,		/* description matched unstable set of probes */
+	EDT_BADSETOPT,		/* invalid setopt library action */
+	EDT_BADSTACKPC		/* invalid stack program counter size */
 };
 
 /*
@@ -522,7 +550,7 @@ extern ulong_t dt_popcb(const ulong_t *, ulong_t);
 
 extern int dt_buffered_enable(dtrace_hdl_t *);
 extern int dt_buffered_flush(dtrace_hdl_t *, dtrace_probedata_t *,
-    dtrace_recdesc_t *, dtrace_aggdata_t *);
+    const dtrace_recdesc_t *, const dtrace_aggdata_t *);
 extern void dt_buffered_disable(dtrace_hdl_t *);
 extern void dt_buffered_destroy(dtrace_hdl_t *);
 
@@ -565,7 +593,7 @@ extern int dt_print_quantize(dtrace_hdl_t *, FILE *,
     const void *, size_t, uint64_t);
 extern int dt_print_lquantize(dtrace_hdl_t *, FILE *,
     const void *, size_t, uint64_t);
-extern int dt_print_agg(dtrace_aggdata_t *, void *);
+extern int dt_print_agg(const dtrace_aggdata_t *, void *);
 
 extern int dt_handle(dtrace_hdl_t *, dtrace_probedata_t *);
 extern int dt_handle_liberr(dtrace_hdl_t *,
@@ -574,6 +602,7 @@ extern int dt_handle_cpudrop(dtrace_hdl_t *, processorid_t,
     dtrace_dropkind_t, uint64_t);
 extern int dt_handle_status(dtrace_hdl_t *,
     dtrace_status_t *, dtrace_status_t *);
+extern int dt_handle_setopt(dtrace_hdl_t *, dtrace_setoptdata_t *);
 
 extern dt_pcb_t *yypcb;		/* pointer to current parser control block */
 extern char yyintprefix;	/* int token prefix for macros (+/-) */

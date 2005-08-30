@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -457,7 +457,7 @@ typedef struct kstat_named {
 				char 		__pad[8]; /* 64-bit padding */
 			} addr;
 			uint32_t	len;	/* # bytes for strlen + '\0' */
-		} string;
+		} str;
 /*
  * The int64_t and uint64_t types are not valid for a maximally conformant
  * 32-bit compilation environment (cc -Xc) using compilers prior to the
@@ -533,13 +533,13 @@ typedef struct kstat_named {
 /*
  * Retrieve the pointer of the string contained in the given named kstat.
  */
-#define	KSTAT_NAMED_STR_PTR(knptr) ((knptr)->value.string.addr.ptr)
+#define	KSTAT_NAMED_STR_PTR(knptr) ((knptr)->value.str.addr.ptr)
 
 /*
  * Retrieve the length of the buffer required to store the string in the given
  * named kstat.
  */
-#define	KSTAT_NAMED_STR_BUFLEN(knptr) ((knptr)->value.string.len)
+#define	KSTAT_NAMED_STR_BUFLEN(knptr) ((knptr)->value.str.len)
 
 /*
  * Interrupt statistics.
