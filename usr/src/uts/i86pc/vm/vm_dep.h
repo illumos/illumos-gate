@@ -458,12 +458,14 @@ extern int	l2cache_sz, l2cache_linesz, l2cache_assoc;
  *	vc_pnum_memseg: tracks last memseg visited in page_numtopp_nolock()
  *	vc_pnext_memseg: tracks last memseg visited in page_nextn()
  *	vc_kmptr: orignal unaligned kmem pointer for this vm_cpu_data_t
+ *	vc_kmsize: orignal kmem size for this vm_cpu_data_t
  */
 
 typedef struct {
 	struct memseg	*vc_pnum_memseg;
 	struct memseg	*vc_pnext_memseg;
 	void		*vc_kmptr;
+	size_t		vc_kmsize;
 } vm_cpu_data_t;
 
 /* allocation size to ensure vm_cpu_data_t resides in its own cache line */

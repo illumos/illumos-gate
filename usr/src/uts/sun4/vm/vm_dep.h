@@ -307,7 +307,7 @@ extern struct cpu	cpu0;
 
 extern int ecache_alignsize;
 #define	L2CACHE_ALIGN		ecache_alignsize
-#define	L2CACHE_ALIGN_MAX	64
+#define	L2CACHE_ALIGN_MAX	512
 
 extern int consistent_coloring;
 extern uint_t vac_colors_mask;
@@ -384,12 +384,14 @@ switch (consistent_coloring) {						\
  *	vc_pnum_memseg: tracks last memseg visited in page_numtopp_nolock()
  *	vc_pnext_memseg: tracks last memseg visited in page_nextn()
  *	vc_kmptr: unaligned kmem pointer for this vm_cpu_data_t
+ *	vc_kmsize: orignal kmem size for this vm_cpu_data_t
  */
 
 typedef struct {
 	struct memseg	*vc_pnum_memseg;
 	struct memseg	*vc_pnext_memseg;
 	void		*vc_kmptr;
+	size_t		vc_kmsize;
 } vm_cpu_data_t;
 
 /* allocation size to ensure vm_cpu_data_t resides in its own cache line */

@@ -63,8 +63,15 @@
 
 extern uint_t	vac_colors;
 
-/* vm_cpu_data for the boot cpu before kmem is initialized */
+#define	MAX_PRAGMA_ALIGN	128
+
+/* vm_cpu_data0 for the boot cpu before kmem is initialized */
+
+#if L2CACHE_ALIGN_MAX <= MAX_PRAGMA_ALIGN
 #pragma align	L2CACHE_ALIGN_MAX(vm_cpu_data0)
+#else
+#pragma align	MAX_PRAGMA_ALIGN(vm_cpu_data0)
+#endif
 char		vm_cpu_data0[VM_CPU_DATA_PADSIZE];
 
 /*
@@ -328,18 +335,19 @@ krwlock_t page_ctrs_rwlock[MAX_MEM_NODES];
 void
 cpu_vm_data_init(struct cpu *cp)
 {
-	int	align = (L2CACHE_ALIGN) ? L2CACHE_ALIGN : L2CACHE_ALIGN_MAX;
-
-	ASSERT(L2CACHE_ALIGN <= L2CACHE_ALIGN_MAX);
-
 	if (cp == CPU0) {
 		cp->cpu_vm_data = (void *)&vm_cpu_data0;
 	} else {
 		void	*kmptr;
+		int	align;
+		size_t	sz;
 
-		kmptr = kmem_zalloc(VM_CPU_DATA_PADSIZE + align, KM_SLEEP);
+		align = (L2CACHE_ALIGN) ? L2CACHE_ALIGN : L2CACHE_ALIGN_MAX;
+		sz = P2ROUNDUP(sizeof (vm_cpu_data_t), align) + align;
+		kmptr = kmem_zalloc(sz, KM_SLEEP);
 		cp->cpu_vm_data = (void *) P2ROUNDUP((uintptr_t)kmptr, align);
 		((vm_cpu_data_t *)cp->cpu_vm_data)->vc_kmptr = kmptr;
+		((vm_cpu_data_t *)cp->cpu_vm_data)->vc_kmsize = sz;
 	}
 }
 
@@ -352,7 +360,7 @@ cpu_vm_data_destroy(struct cpu *cp)
 	if (cp->cpu_seqid && cp->cpu_vm_data) {
 		ASSERT(cp != CPU0);
 		kmem_free(((vm_cpu_data_t *)cp->cpu_vm_data)->vc_kmptr,
-		    VM_CPU_DATA_PADSIZE);
+		    ((vm_cpu_data_t *)cp->cpu_vm_data)->vc_kmsize);
 	}
 	cp->cpu_vm_data = NULL;
 }
