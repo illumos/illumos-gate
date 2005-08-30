@@ -156,7 +156,7 @@ struct dev_ops pxb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"PCIe/PCI nexus driver 1.5",
+	"PCIe/PCI nexus driver %I%",
 	&pxb_ops,   /* driver ops */
 };
 
@@ -273,7 +273,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		DEVI_SET_ATTACHING(devi);
 		if (pxb_fm_init(pxb) != DDI_SUCCESS)
 			cmn_err(CE_WARN, "px_pci: dip0x%p failed pxb_fm_init "
-			    "at resume\n", devi);
+			    "at resume\n", (void *) devi);
 		DEVI_CLR_ATTACHING(devi);
 
 		return (DDI_SUCCESS);
