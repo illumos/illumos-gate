@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1658,8 +1658,8 @@ meta_default_stripe_interlace(void)
 {
 	diskaddr_t		interlace;
 
-	/* default to 16k, round up if necessary */
-	interlace = btodb(16 * 1024);
+	/* default to 512k, round up if necessary */
+	interlace = btodb(512 * 1024);
 	if (interlace < btodb(MININTERLACE))
 		interlace = roundup(MININTERLACE, interlace);
 	return (interlace);

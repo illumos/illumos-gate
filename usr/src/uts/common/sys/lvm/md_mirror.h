@@ -449,7 +449,7 @@ extern	int	md_def_num_rr;
 #define	MD_MAX_NUM_RR		(4192*NBBY - sizeof (struct optim_resync))
 
 /* default resync buffer size */
-#define	MD_DEF_RESYNC_BUF_SIZE	(128)
+#define	MD_DEF_RESYNC_BUF_SIZE	(1024)
 
 /* Structure for optimized resync records */
 #define	OR_MAGIC	0xFECA	/* Only missing the L */
