@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -545,6 +545,7 @@ umem_setup_envvars(int invalid)
 	static volatile enum {
 		STATE_START,
 		STATE_GETENV,
+		STATE_DLOPEN,
 		STATE_DLSYM,
 		STATE_FUNC,
 		STATE_DONE
@@ -568,6 +569,10 @@ umem_setup_envvars(int invalid)
 		case STATE_GETENV:
 			where = "during getenv(3C) calls -- "
 			    "getenv(3C) results ignored.";
+			break;
+		case STATE_DLOPEN:
+			where = "during dlopen(3C) call -- "
+			    "_umem_*() results ignored.";
 			break;
 		case STATE_DLSYM:
 			where = "during dlsym(3C) call -- "
@@ -609,6 +614,8 @@ umem_setup_envvars(int invalid)
 	}
 
 #ifndef UMEM_STANDALONE
+	state = STATE_DLOPEN;
+
 	/* get a handle to the "a.out" object */
 	if ((h = dlopen(0, RTLD_FIRST | RTLD_LAZY)) != NULL) {
 		for (cur_env = umem_envvars; cur_env->env_name != NULL;
