@@ -1237,6 +1237,12 @@ laadm_str_to_mac_addr(const char *str, boolean_t *mac_fixed, uchar_t *mac_addr)
 		return (B_FALSE);
 	}
 
+	if ((bcmp(zero_mac, conv_str, ETHERADDRL) == 0) ||
+	    (conv_str[0] & 0x01)) {
+		free(conv_str);
+		return (B_FALSE);
+	}
+
 	bcopy(conv_str, mac_addr, ETHERADDRL);
 	free(conv_str);
 

@@ -2813,8 +2813,8 @@ ill_capability_poll_capable(ill_t *ill, dl_capab_poll_t *ipoll,
 	/* Copy locally to get the members aligned */
 	bcopy((void *)ipoll, (void *)&poll, sizeof (dl_capab_poll_t));
 
-	/* Get the tx function and handle from the driver */
-	ill_poll->ill_tx = (ip_mac_tx_t)poll.poll_tx;
+	/* Get the tx function and handle from dld */
+	ill_poll->ill_tx = (ip_dld_tx_t)poll.poll_tx;
 	ill_poll->ill_tx_handle = (void *)poll.poll_tx_handle;
 
 	size = sizeof (dl_capability_req_t) + sizeof (dl_capability_sub_t) +

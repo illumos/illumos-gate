@@ -285,6 +285,7 @@ aggr_port_notify_unicst(aggr_grp_t *grp, aggr_port_t *port)
 	if (port->lp_set_grpmac)
 		return (B_FALSE);
 
+	AGGR_LACP_LOCK(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 	rw_enter(&port->lp_lock, RW_WRITER);
 
@@ -297,6 +298,7 @@ aggr_port_notify_unicst(aggr_grp_t *grp, aggr_port_t *port)
 
 	if (grp->lg_closing) {
 		rw_exit(&grp->lg_lock);
+		AGGR_LACP_UNLOCK(grp);
 		return (B_FALSE);
 	}
 
@@ -309,6 +311,7 @@ aggr_port_notify_unicst(aggr_grp_t *grp, aggr_port_t *port)
 		aggr_grp_update_ports_mac(grp);
 
 	rw_exit(&grp->lg_lock);
+	AGGR_LACP_UNLOCK(grp);
 
 	return (grp_mac_changed);
 }

@@ -37,7 +37,7 @@ UTSBASE = ..
 include Makefile.sparc
 
 LINT_LIBS	 = $(LINT_LIB) $(GEN_LINT_LIB) \
-		   $(LINT_KMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+		   $(LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 # EXPORT DELETE START
 LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)

@@ -788,7 +788,8 @@ dls_tx(dls_channel_t dc, mblk_t *mp)
 	}
 
 boolean_t
-dls_accept(dls_impl_t *dip, const uint8_t *daddr)
+dls_accept(dls_impl_t *dip, const uint8_t *daddr, dls_rx_t *di_rx,
+    void **di_rx_arg)
 {
 	boolean_t		match;
 	dls_multicst_addr_t	*dmap;
@@ -852,13 +853,20 @@ refuse:
 	return (B_FALSE);
 
 accept:
+	/*
+	 * Since we hold di_lock here, the returned di_rx and di_rx_arg will
+	 * always be in sync.
+	 */
+	*di_rx = dip->di_rx;
+	*di_rx_arg = dip->di_rx_arg;
 	rw_exit(&(dip->di_lock));
 	return (B_TRUE);
 }
 
 /*ARGSUSED*/
 boolean_t
-dls_accept_loopback(dls_impl_t *dip, const uint8_t *daddr)
+dls_accept_loopback(dls_impl_t *dip, const uint8_t *daddr, dls_rx_t *di_rx,
+    void **di_rx_arg)
 {
 	/*
 	 * We must not accept packets if the dls_impl_t is not marked as bound
@@ -880,6 +888,12 @@ refuse:
 	return (B_FALSE);
 
 accept:
+	/*
+	 * Since we hold di_lock here, the returned di_rx and di_rx_arg will
+	 * always be in sync.
+	 */
+	*di_rx = dip->di_rx;
+	*di_rx_arg = dip->di_rx_arg;
 	rw_exit(&(dip->di_lock));
 	return (B_TRUE);
 }

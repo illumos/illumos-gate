@@ -693,11 +693,17 @@ typedef struct {
 					/* capability */
 #ifdef _KERNEL
 
+/*
+ * This defines the DL_CAPAB_POLL capability. Currently it provides a
+ * mechanism for IP to exchange function pointers with a gldv3-based driver
+ * to enable streams-bypassing data-paths and interrupt blanking. True polling
+ * support will be added in the future.
+ */
 typedef struct dl_capab_poll_s {
 	t_uscalar_t		poll_version;
 	t_uscalar_t		poll_flags;
 
-	/* NIC provided information */
+	/* DLD provided information */
 	uintptr_t		poll_tx_handle;
 	uintptr_t		poll_tx;
 

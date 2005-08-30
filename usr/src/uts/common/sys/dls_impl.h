@@ -137,8 +137,10 @@ extern int		dls_vlan_walk(int (*)(dls_vlan_t *, void *), void *);
 
 extern void		dls_init(void);
 extern int		dls_fini(void);
-extern boolean_t	dls_accept(dls_impl_t *, const uint8_t *);
-extern boolean_t	dls_accept_loopback(dls_impl_t *, const uint8_t *);
+extern boolean_t	dls_accept(dls_impl_t *, const uint8_t *,
+    dls_rx_t *, void **);
+extern boolean_t	dls_accept_loopback(dls_impl_t *, const uint8_t *,
+    dls_rx_t *, void **);
 
 #ifdef	__cplusplus
 }

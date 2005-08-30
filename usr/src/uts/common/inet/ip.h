@@ -2954,12 +2954,11 @@ struct ill_zerocopy_capab_s {
 #define	ILL_POLLING		0x01	/* Polling in use */
 
 /*
- * these two functions pointer types are exported by the mac layer.
- * we need to duplicate the definitions here because we cannot
+ * This function pointer type is exported by the mac layer.
+ * we need to duplicate the definition here because we cannot
  * include mac.h in this file.
  */
 typedef void	(*ip_mac_blank_t)(void *, time_t, uint_t);
-typedef void	(*ip_mac_tx_t)(void *, mblk_t *);
 
 struct ill_rx_ring {
 	ip_mac_blank_t		rr_blank; /* Driver interrupt blanking func */
@@ -2977,9 +2976,14 @@ struct ill_rx_ring {
 	uint32_t		rr_ring_state; /* State of this ring */
 };
 
+/*
+ * This is exported by dld and is meant to be invoked from a ULP.
+ */
+typedef void	(*ip_dld_tx_t)(void *, mblk_t *);
+
 struct ill_poll_capab_s {
-	ip_mac_tx_t		ill_tx;		/* Driver Tx routine */
-	void			*ill_tx_handle;	/* Driver Tx handle */
+	ip_dld_tx_t		ill_tx;		/* dld-supplied tx routine */
+	void			*ill_tx_handle;	/* dld-supplied tx handle */
 	ill_rx_ring_t		*ill_ring_tbl; /* Ring to Sqp mapping table */
 	conn_t			*ill_unbind_conn; /* Conn used during unplumb */
 };

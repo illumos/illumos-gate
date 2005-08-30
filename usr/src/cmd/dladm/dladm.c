@@ -38,13 +38,13 @@
 #include <strings.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <priv.h>
 #include <libintl.h>
 #include <libdlpi.h>
 #include <libdladm.h>
 #include <liblaadm.h>
 #include <libmacadm.h>
 
-#define	AGGR_DRIVER	"aggr"
 #define	AGGR_DEV	"aggr0"
 #define	MAXPORT		256
 #define	DUMP_LACP_FORMAT	"    %-9s %-8s %-7s %-12s "	\
@@ -197,6 +197,13 @@ main(int argc, char *argv[])
 
 	if (argc < 2)
 		usage();
+
+	if (!priv_ineffect(PRIV_SYS_NET_CONFIG) ||
+	    !priv_ineffect(PRIV_NET_RAWACCESS)) {
+		(void) fprintf(stderr,
+		    gettext("%s: insufficient privileges\n"), progname);
+		exit(1);
+	}
 
 	for (i = 0; i < sizeof (cmds) / sizeof (cmds[0]); i++) {
 		cmdp = &cmds[i];
@@ -1207,10 +1214,6 @@ show_dev(void *arg, const char *dev)
 {
 	show_mac_state_t *state = (show_mac_state_t *)arg;
 
-	/* aggregations are already managed by a set of subcommands */
-	if (strcmp(dev, AGGR_DEV) == 0)
-		return;
-
 	(void) printf("%s", dev);
 
 	if (!state->ms_parseable) {
@@ -1234,10 +1237,6 @@ show_dev_stats(void *arg, const char *dev)
 {
 	show_mac_state_t *state = (show_mac_state_t *)arg;
 	pktsum_t stats, diff_stats;
-
-	/* aggregations are already managed by a set of subcommands */
-	if (strcmp(dev, AGGR_DEV) == 0)
-		return;
 
 	if (state->ms_firstonly) {
 		if (state->ms_donefirst)
@@ -1568,12 +1567,25 @@ do_show_dev(int argc, char *argv[])
 	else if (optind != argc)
 		usage();
 
-	if ((dev != NULL) && (strcmp(dev, AGGR_DEV) == 0)) {
-		/* aggregations are already managed by a set of subcommands */
-		(void) fprintf(stderr,
-		    gettext("%s: non-existant device '%s'\n"),
-		    progname, dev);
-		exit(1);
+	if (dev != NULL) {
+		int		index;
+		char		drv[LIFNAMSIZ];
+		dladm_attr_t	dlattr;
+		boolean_t	legacy;
+
+		/*
+		 * Check for invalid devices.
+		 * aggregations and vlans are not considered devices.
+		 */
+		if (strncmp(dev, "aggr", 4) == 0 ||
+		    dlpi_if_parse(dev, drv, &index) < 0 ||
+		    index >= 1000 ||
+		    get_if_info(dev, &dlattr, &legacy) < 0) {
+			(void) fprintf(stderr,
+			    gettext("%s: invalid device '%s'\n"),
+			    progname, dev);
+			exit(1);
+		}
 	}
 
 	if (s_arg) {
@@ -1714,6 +1726,16 @@ stats_diff(pktsum_t *s1, pktsum_t *s2, pktsum_t *s3)
 	s1->oerrors = s2->oerrors - s3->oerrors;
 }
 
+/*
+ * In the following routines, we do the first kstat_lookup()
+ * assuming that the device is gldv3-based and that the kstat
+ * name is of the format <driver_name><instance>/<port>. If the
+ * lookup fails, we redo the kstat_lookup() using the kstat name
+ * <driver_name><instance>. This second lookup is needed for
+ * getting kstats from legacy devices. This can fail too if the
+ * device is not attached or the device is legacy and doesn't
+ * export the kstats we need.
+ */
 static void
 get_stats(char *module, int instance, char *name, pktsum_t *stats)
 {
@@ -1727,7 +1749,9 @@ get_stats(char *module, int instance, char *name, pktsum_t *stats)
 		return;
 	}
 
-	if ((ksp = kstat_lookup(kcp, module, instance, name)) == NULL) {
+	if ((ksp = kstat_lookup(kcp, module, instance, name)) == NULL &&
+	    (module == NULL ||
+	    (ksp = kstat_lookup(kcp, NULL, -1, module)) == NULL)) {
 		/*
 		 * The kstat query could fail if the underlying MAC
 		 * driver was already detached.
@@ -1807,7 +1831,9 @@ mac_ifspeed(const char *dev, uint_t port)
 	}
 
 	(void) snprintf(name, MAXNAMELEN - 1, "%s/%u", dev, port);
-	if ((ksp = kstat_lookup(kcp, (char *)dev, 0, name)) == NULL) {
+	if ((ksp = kstat_lookup(kcp, (char *)dev, -1, name)) == NULL &&
+	    (ksp = kstat_lookup(kcp, NULL, -1, (char *)dev)) == NULL) {
+
 		/*
 		 * The kstat query could fail if the underlying MAC
 		 * driver was already detached.
@@ -1851,7 +1877,9 @@ mac_link_state(const char *dev, uint_t port)
 	}
 
 	(void) snprintf(name, MAXNAMELEN - 1, "%s/%u", dev, port);
-	if ((ksp = kstat_lookup(kcp, (char *)dev, 0, name)) == NULL) {
+
+	if ((ksp = kstat_lookup(kcp, (char *)dev, -1, name)) == NULL &&
+	    (ksp = kstat_lookup(kcp, NULL, -1, (char *)dev)) == NULL) {
 		/*
 		 * The kstat query could fail if the underlying MAC
 		 * driver was already detached.
@@ -1905,7 +1933,9 @@ mac_link_duplex(const char *dev, uint_t port)
 	}
 
 	(void) snprintf(name, MAXNAMELEN - 1, "%s/%u", dev, port);
-	if ((ksp = kstat_lookup(kcp, (char *)dev, 0, name)) == NULL) {
+
+	if ((ksp = kstat_lookup(kcp, (char *)dev, -1, name)) == NULL &&
+	    (ksp = kstat_lookup(kcp, NULL, -1, (char *)dev)) == NULL) {
 		/*
 		 * The kstat query could fail if the underlying MAC
 		 * driver was already detached.

@@ -267,6 +267,8 @@ i_dls_link_ether_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 	mod_hash_key_t			key;
 	uint_t				npacket;
 	boolean_t			accepted;
+	dls_rx_t			di_rx, ndi_rx;
+	void				*di_rx_arg, *ndi_rx_arg;
 
 	/*
 	 * Walk the packet chain.
@@ -314,7 +316,7 @@ i_dls_link_ether_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 		 * Find the first dls_impl_t that will accept the sub-chain.
 		 */
 		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp)
-			if (dls_accept(dip, daddr))
+			if (dls_accept(dip, daddr, &di_rx, &di_rx_arg))
 				break;
 
 		/*
@@ -338,7 +340,8 @@ i_dls_link_ether_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 			 */
 			for (ndip = dip->di_nextp; ndip != NULL;
 			    ndip = ndip->di_nextp)
-				if (dls_accept(ndip, daddr))
+				if (dls_accept(ndip, daddr, &ndi_rx,
+				    &ndi_rx_arg))
 					break;
 
 			/*
@@ -347,8 +350,7 @@ i_dls_link_ether_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 			 * it before handing it to the current one.
 			 */
 			if (ndip == NULL) {
-				dip->di_rx(dip->di_rx_arg, mrh, mp,
-				    header_length);
+				di_rx(di_rx_arg, mrh, mp, header_length);
 
 				/*
 				 * Since there are no more dls_impl_t, we're
@@ -361,10 +363,11 @@ i_dls_link_ether_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 			 * There are more dls_impl_t so dup the sub-chain.
 			 */
 			if ((nmp = copymsgchain(mp)) != NULL)
-				dip->di_rx(dip->di_rx_arg, mrh, nmp,
-				    header_length);
+				di_rx(di_rx_arg, mrh, nmp, header_length);
 
 			dip = ndip;
+			di_rx = ndi_rx;
+			di_rx_arg = ndi_rx_arg;
 		}
 
 		/*
@@ -407,6 +410,8 @@ i_dls_link_ether_rx_promisc(void *arg, mac_resource_handle_t mrh,
 	mod_hash_key_t			key;
 	uint_t				npacket;
 	boolean_t			accepted;
+	dls_rx_t			di_rx, ndi_rx;
+	void				*di_rx_arg, *ndi_rx_arg;
 
 	/*
 	 * Walk the packet chain.
@@ -446,7 +451,7 @@ i_dls_link_ether_rx_promisc(void *arg, mac_resource_handle_t mrh,
 		 * Find dls_impl_t that will accept the sub-chain.
 		 */
 		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp) {
-			if (!dls_accept(dip, daddr))
+			if (!dls_accept(dip, daddr, &di_rx, &di_rx_arg))
 				continue;
 
 			/*
@@ -460,8 +465,7 @@ i_dls_link_ether_rx_promisc(void *arg, mac_resource_handle_t mrh,
 			 * dls_impl_t) so dup the sub-chain.
 			 */
 			if ((nmp = copymsgchain(mp)) != NULL)
-				dip->di_rx(dip->di_rx_arg, mrh, nmp,
-				    header_length);
+				di_rx(di_rx_arg, mrh, nmp, header_length);
 		}
 
 		/*
@@ -501,7 +505,7 @@ non_promisc:
 		 * Find the first dls_impl_t that will accept the sub-chain.
 		 */
 		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp)
-			if (dls_accept(dip, daddr))
+			if (dls_accept(dip, daddr, &di_rx, &di_rx_arg))
 				break;
 
 		/*
@@ -525,7 +529,8 @@ non_promisc:
 			 */
 			for (ndip = dip->di_nextp; ndip != NULL;
 			    ndip = ndip->di_nextp)
-				if (dls_accept(ndip, daddr))
+				if (dls_accept(ndip, daddr, &ndi_rx,
+				    &ndi_rx_arg))
 					break;
 
 			/*
@@ -534,8 +539,7 @@ non_promisc:
 			 * it before handing it to the current one.
 			 */
 			if (ndip == NULL) {
-				dip->di_rx(dip->di_rx_arg, mrh, mp,
-				    header_length);
+				di_rx(di_rx_arg, mrh, mp, header_length);
 
 				/*
 				 * Since there are no more dls_impl_t, we're
@@ -548,10 +552,11 @@ non_promisc:
 			 * There are more dls_impl_t so dup the sub-chain.
 			 */
 			if ((nmp = copymsgchain(mp)) != NULL)
-				dip->di_rx(dip->di_rx_arg, mrh, nmp,
-				    header_length);
+				di_rx(di_rx_arg, mrh, nmp, header_length);
 
 			dip = ndip;
+			di_rx = ndi_rx;
+			di_rx_arg = ndi_rx_arg;
 		}
 
 		/*
@@ -592,6 +597,8 @@ i_dls_link_ether_loopback(void *arg, mblk_t *mp)
 	mblk_t				*nmp;
 	mod_hash_key_t			key;
 	uint_t				npacket;
+	dls_rx_t			di_rx, ndi_rx;
+	void				*di_rx_arg, *ndi_rx_arg;
 
 	/*
 	 * Walk the packet chain.
@@ -633,7 +640,8 @@ i_dls_link_ether_loopback(void *arg, mblk_t *mp)
 		 * Find dls_impl_t that will accept the sub-chain.
 		 */
 		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp) {
-			if (!dls_accept_loopback(dip, daddr))
+			if (!dls_accept_loopback(dip, daddr, &di_rx,
+			    &di_rx_arg))
 				continue;
 
 			/*
@@ -642,8 +650,7 @@ i_dls_link_ether_loopback(void *arg, mblk_t *mp)
 			 * mode) so dup the sub-chain.
 			 */
 			if ((nmp = copymsgchain(mp)) != NULL)
-				dip->di_rx(dip->di_rx_arg, NULL, nmp,
-				    header_length);
+				di_rx(di_rx_arg, NULL, nmp, header_length);
 		}
 
 		/*
@@ -676,7 +683,7 @@ promisc:
 		 * Find the first dls_impl_t that will accept the sub-chain.
 		 */
 		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp)
-			if (dls_accept_loopback(dip, daddr))
+			if (dls_accept_loopback(dip, daddr, &di_rx, &di_rx_arg))
 				break;
 
 		/*
@@ -696,7 +703,8 @@ promisc:
 			 */
 			for (ndip = dip->di_nextp; ndip != NULL;
 			    ndip = ndip->di_nextp)
-				if (dls_accept_loopback(ndip, daddr))
+				if (dls_accept_loopback(ndip, daddr,
+				    &ndi_rx, &ndi_rx_arg))
 					break;
 
 			/*
@@ -705,8 +713,7 @@ promisc:
 			 * it before handing it to the current one.
 			 */
 			if (ndip == NULL) {
-				dip->di_rx(dip->di_rx_arg, NULL, mp,
-				    header_length);
+				di_rx(di_rx_arg, NULL, mp, header_length);
 
 				/*
 				 * Since there are no more dls_impl_t, we're
@@ -719,10 +726,11 @@ promisc:
 			 * There are more dls_impl_t so dup the sub-chain.
 			 */
 			if ((nmp = copymsgchain(mp)) != NULL)
-				dip->di_rx(dip->di_rx_arg, NULL, nmp,
-				    header_length);
+				di_rx(di_rx_arg, NULL, nmp, header_length);
 
 			dip = ndip;
+			di_rx = ndi_rx;
+			di_rx_arg = ndi_rx_arg;
 		}
 
 		/*

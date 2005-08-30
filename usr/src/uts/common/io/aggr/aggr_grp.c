@@ -322,6 +322,7 @@ aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port)
 {
 	boolean_t grp_addr_changed = B_FALSE;
 
+	ASSERT(AGGR_LACP_LOCK_HELD(grp));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 	ASSERT(RW_WRITE_HELD(&port->lp_lock));
 
@@ -1191,6 +1192,7 @@ aggr_m_promisc(void *arg, boolean_t on)
 	aggr_grp_t *grp = arg;
 	aggr_port_t *port;
 
+	AGGR_LACP_LOCK(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 	AGGR_GRP_REFHOLD(grp);
 
@@ -1214,6 +1216,7 @@ aggr_m_promisc(void *arg, boolean_t on)
 
 bail:
 	rw_exit(&grp->lg_lock);
+	AGGR_LACP_UNLOCK(grp);
 	AGGR_GRP_REFRELE(grp);
 
 	return (0);

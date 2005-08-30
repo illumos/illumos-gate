@@ -231,6 +231,8 @@ dld_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 		if ((err = dld_str_attach(dsp, (t_uscalar_t)minor - 1)) != 0)
 			goto failed;
 		ASSERT(dsp->ds_dlstate == DL_UNBOUND);
+	} else {
+		(void) qassociate(rq, -1);
 	}
 
 	/*
@@ -696,8 +698,8 @@ void
 str_mdata_fastpath_put(dld_str_t *dsp, mblk_t *mp)
 {
 	/*
-	 * We get here either as a result of putnext() from above or
-	 * because IP has called us directly.  If we are in the busy
+	 * This function can be called from within dld or from an upper
+	 * layer protocol (currently only tcp). If we are in the busy
 	 * mode enqueue the packet(s) and return.  Otherwise hand them
 	 * over to the MAC driver for transmission; any remaining one(s)
 	 * which didn't get sent will be queued.
