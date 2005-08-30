@@ -264,7 +264,7 @@ typedef union {
 		(ttep)->tte_bit.sz = 3;		\
 		(ttep)->tte_bit.nfo = 1;	\
 		(ttep)->tte_bit.ie = 1;		\
-		(ttep)->tte_bit.pahi = 0x3ff;	\
+		(ttep)->tte_bit.pahi = 0x7ff;	\
 		(ttep)->tte_bit.palo = 0x7ffff;	\
 		(ttep)->tte_bit.l = 1;		\
 		(ttep)->tte_bit.cp = 1;		\
