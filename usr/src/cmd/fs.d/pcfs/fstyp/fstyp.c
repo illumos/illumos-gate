@@ -94,15 +94,16 @@ extern offset_t llseek();
 
 int	vflag = 0;		/* verbose output */
 int	errflag = 0;
-extern	int	optind;
 char	*cbasename;
 char	*special;
 char	*fstype;
 
+static void usage(void);
+static void dumpfs(char *name);
+static int valid_media(unsigned char media_type);
+
 int
-main(argc, argv)
-	int argc;
-	char *argv[];
+main(int argc, char *argv[])
 {
 	int	c;
 
@@ -131,18 +132,18 @@ main(argc, argv)
 	special = argv[optind];
 	dumpfs(special);
 
-	/* NOTREACHED */
+	return (0);
 }
 
 
-usage()
+static void
+usage(void)
 {
 	(void) fprintf(stderr, gettext("pcfs usage: fstyp [-v] special\n"));
 }
 
-
-dumpfs(name)
-	char *name;
+static void
+dumpfs(char *name)
 {
 	unsigned char	buf[DEV_BSIZE];
 	char	label[LABEL_SIZE+1];
@@ -224,8 +225,8 @@ dumpfs(name)
 	exit(0);
 }
 
-valid_media(media_type)
-unsigned char media_type;
+static int
+valid_media(unsigned char media_type)
 {
 	switch (media_type) {
 
@@ -242,6 +243,7 @@ unsigned char media_type;
 	}
 }
 
+int
 well_formed(unsigned char bs[])
 {
 	int fatmatch;

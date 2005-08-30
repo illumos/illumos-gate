@@ -20,11 +20,11 @@
  * CDDL HEADER END
  */
 /*
- *  Copyright (c) 1989, 1990 Sun Microsystems, Inc.
- *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -36,16 +36,19 @@
 #include <dirent.h>
 #include "iso_spec.h"
 #include "iso_impl.h"
-/* 
+/*
  * crdlist_dno_iso: walk the iso dlist in breadth first order
  * chain all directories together, and assinged directory
  * record number in ascending order start with 1
  * return the total number of directories in iso directory tree
  */
 
-extern *myname;
+extern char *myname;
 
-static dno_iso = 1;
+static int dno_iso = 1;
+
+static void prntupath(struct dlist *startdp);
+
 int
 crdlist_dno_iso(rootdp)
 struct dlist *rootdp;
@@ -54,27 +57,27 @@ struct dlist *dp;
 struct dlist *dp1;
 struct dlist *prevdp;
 
-	for (dp=rootdp, prevdp=rootdp, rootdp->idno=dno_iso++; 
-		dp != NULL; dp=dp->idirnext) { 
-		for (dp1=dp->icdp; dp1 != NULL; dp1=dp1->inext) {
+	for (dp = rootdp, prevdp = rootdp, rootdp->idno = dno_iso++;
+	    dp != NULL; dp = dp->idirnext) {
+		for (dp1 = dp->icdp; dp1 != NULL; dp1 = dp1->inext) {
 			if ((dp1->dmode & S_IFMT) == S_IFDIR) {
-				dp1->idno=dno_iso++;
+				dp1->idno = dno_iso++;
 				prevdp->idirnext = dp1;
 				prevdp = dp1;
 			}
 		}
 	}
-	return(dno_iso-1);
+	return (dno_iso-1);
 }
 
 
-/* 
+/*
  * crdlist_dno_unix: walk the unix dlist in breadth first order
  * chain all directories together, and assinged directory
  * record number in ascending order start with 1
  * return the total number of directories in iso directory tree
  */
-static dno_unix = 1;
+static int dno_unix = 1;
 int
 crdlist_dno_unix(rootdp)
 struct dlist *rootdp;
@@ -83,17 +86,17 @@ struct dlist *dp;
 struct dlist *dp1;
 struct dlist *prevdp;
 
-	for (dp=rootdp, prevdp=rootdp, rootdp->udno=dno_unix++; 
-		dp != NULL; dp=dp->udirnext) { 
-		for (dp1=dp->ucdp; dp1 != NULL; dp1=dp1->unext) {
+	for (dp = rootdp, prevdp = rootdp, rootdp->udno = dno_unix++;
+		dp != NULL; dp = dp->udirnext) {
+		for (dp1 = dp->ucdp; dp1 != NULL; dp1 = dp1->unext) {
 			if ((dp1->dmode & S_IFMT) == S_IFDIR) {
-				dp1->udno=dno_unix++;
+				dp1->udno = dno_unix++;
 				prevdp->udirnext = dp1;
 				prevdp = dp1;
 			}
 		}
 	}
-	return(dno_unix-1);
+	return (dno_unix-1);
 }
 
 /* mkdlist - creates a sorted list of all directories */
@@ -112,30 +115,34 @@ struct dlist *rootdp;
 	(void) crdlist_dno_iso(rootdp);
 	if (extension)
 		(void) crdlist_dno_unix(rootdp);
-	return(rootdp);
+	return (rootdp);
 }
 
-/* compare two dlist elements according to UNIX file name*/
-/* returns < == > if first element is < == > the second */
+/*
+ * compare two dlist elements according to UNIX file name
+ * returns < == > if first element is < == > the second
+ */
 int
 dpcompunix(dpp1, dpp2)
 struct dlist **dpp1;
 struct dlist **dpp2;
 {
-	return(strcmp((*dpp1)->unixfname, (*dpp2)->unixfname));
+	return (strcmp((*dpp1)->unixfname, (*dpp2)->unixfname));
 
 }
 
 
-/* compare two dlist elements according to ISO file name*/
-/* returns < == > if first element is < == > the second */
+/*
+ * compare two dlist elements according to ISO file name
+ * returns < == > if first element is < == > the second
+ */
 int
 dpcompiso(dpp1, dpp2)
 struct dlist **dpp1;
 struct dlist **dpp2;
 {
 
-	return(strcmp((*dpp1)->isofname, (*dpp2)->isofname));
+	return (strcmp((*dpp1)->isofname, (*dpp2)->isofname));
 }
 
 void
@@ -149,11 +156,12 @@ struct dlist *dp;
 int	i;
 int	nodp;
 
-	for (dp = rootdp->cdp, nodp = 0; dp!= NULL; dp=dp->dnext) 
+	for (dp = rootdp->cdp, nodp = 0; dp != NULL; dp = dp->dnext)
 		nodp++;
 
 	/* no need to do sorting if number of dlist is less than 2 */
-	if (nodp < 1 ) return;
+	if (nodp < 1)
+		return;
 	else if (nodp == 1) {
 		rootdp->ucdp = rootdp->cdp;
 		rootdp->icdp = rootdp->cdp;
@@ -161,26 +169,27 @@ int	nodp;
 	}
 
 	/* set up the list for sorting */
-	pp = (struct dlist **) malloc(nodp * sizeof(struct dlist *));
-	for (p=pp,dp=rootdp->cdp;dp != NULL; dp=dp->dnext) 
-		*p++=(struct dlist *)dp;
+	pp = (struct dlist **)malloc(nodp * sizeof (struct dlist *));
+	for (p = pp, dp = rootdp->cdp; dp != NULL; dp = dp->dnext)
+		*p++ = (struct dlist *)dp;
 
 	if (extension) {
 		/* do the UNIX sort */
-		(void) qsort((char *)pp, nodp, sizeof(struct dlist *), dpcompunix); 
+		(void) qsort((char *)pp, nodp, sizeof (struct dlist *),
+		    dpcompunix);
 
-		for (i=0;i< nodp-1;i++) 
-			pp[i]->unext=pp[i+1];
-	 
+		for (i = 0; i < nodp - 1; i++)
+			pp[i]->unext = pp[i+1];
+
 		rootdp->ucdp = pp[0];
 	}
 
 	/* do the ISO sort */
-	(void) qsort((char *)pp, nodp, sizeof(struct dlist *), dpcompiso); 
+	(void) qsort((char *)pp, nodp, sizeof (struct dlist *), dpcompiso);
 
-	for (i=0;i< nodp-1;i++) 
-		pp[i]->inext=pp[i+1];
-	 
+	for (i = 0; i < nodp-1; i++)
+		pp[i]->inext = pp[i+1];
+
 	rootdp->icdp = pp[0];
 
 	(void) cfree(pp);
@@ -194,14 +203,16 @@ int extension;
 {
 struct dlist *dp;
 
-	if (rootdp == NULL) return;
+	if (rootdp == NULL)
+		return;
 
 	(void) sortchild(rootdp, extension);
 
-	for (dp=rootdp->cdp; dp != NULL; dp=dp->dnext)
-		if (dp->cdp != NULL) sortdlist(dp, extension); 
+	for (dp = rootdp->cdp; dp != NULL; dp = dp->dnext)
+		if (dp->cdp != NULL) sortdlist(dp, extension);
 }
 
+void
 getpath(startdp, path)
 struct dlist *startdp;
 char *path;
@@ -209,9 +220,9 @@ char *path;
 struct dlist *dp;
 char s[1024];
 
-	path[0]='\0';
+	path[0] = '\0';
 
-	for (dp=startdp; dp!=NULL; dp = dp->pdp) {
+	for (dp = startdp; dp != NULL; dp = dp->pdp) {
 		strcpy(s, path);
 		strcpy(path, dp->unixfname);
 		strcat(path, "/");
@@ -232,9 +243,9 @@ int	count;
 	if ((count = readlink(fp->ufnp->fname, buf, 1024)) < 0) {
 		fprintf(stderr, "%s: cannot readlink", myname);
 		perror(fp->ufnp->fname);
-		*fsize= 0;
-		return(lbn);
-	} 
+		*fsize = 0;
+		return (lbn);
+	}
 
 	if (lseek(cdout, LBN_TO_BYTE(lbn), L_SET) < 0) {
 		fprintf(stderr, "%s: ", myname);
@@ -244,11 +255,11 @@ int	count;
 
 	if (write(cdout, buf, count) != count) {
 		fprintf(stderr, "%s: ", myname);
-		perror("bad write during creation of symbolic link");	
+		perror("bad write during creation of symbolic link");
 		cleanup();
 	}
-	*fsize=count;
-	return(fillblkzero(lbn, count));
+	*fsize = count;
+	return (fillblkzero(lbn, count));
 }
 
 int
@@ -263,87 +274,87 @@ int i, bsize;
 int rsize;
 char *buf;
 
-	fd=open(fp->ufnp->fname, 0);
+	fd = open(fp->ufnp->fname, 0);
 	if (fd < 0) {
 		fprintf(stderr, "%s: cannot open: ", myname);
 		perror(fp->ufnp->fname);
-		*fsize= 0;
-		return(lbn);
+		*fsize = 0;
+		return (lbn);
 	}
 	if (fstat(fd, &stb) < 0) {
 		fprintf(stderr, "%s: cannot stat: ", myname);
 		perror(fp->ufnp->fname);
 		(void) close(fd);
-		*fsize= 0;
-		return(lbn);
+		*fsize = 0;
+		return (lbn);
 	}
 	/* do the copy */
 	bsize = stb.st_blksize;
-	buf= (char *) malloc(bsize);
+	buf = (char *)malloc(bsize);
 	if (lseek(cdout, LBN_TO_BYTE(lbn), L_SET) < 0) {
 		fprintf(stderr, "%s: ", myname);
 		perror("bad lseek");
 		cleanup();
 	}
-	for(i=0;;i++) {
-		if ((rsize=read(fd, buf, bsize)) == 0)
+	for (i = 0; ; i++) {
+		if ((rsize = read(fd, buf, bsize)) == 0)
 			break;
 		if (write(cdout, buf, rsize) != rsize) {
 			fprintf(stderr, "%s: ", myname);
-			perror("bad write");	
+			perror("bad write");
 			cleanup();
 		}
 		if (rsize != bsize) break;
 	}
 	(void) cfree(buf);
 	close(fd);
-	*fsize=i*bsize+rsize;
-	return(fillblkzero(lbn, i*bsize+rsize));
+	*fsize = i*bsize+rsize;
+	return (fillblkzero(lbn, i*bsize+rsize));
 }
 
-prntdlist(dp)
-struct dlist *dp;
+static void
+prntdlist(struct dlist *dp)
 {
 	printf("%s\t", dp->pdp->unixfname);
 	printf("%s\t", dp->unixfname);
 	printf("%s\n", dp->isofname);
 }
 
-prntnchild(startdp)
-struct dlist *startdp;
+static void
+prntnchild(struct dlist *startdp)
 {
 struct dlist *dp;
 
-	for (dp = startdp->cdp; dp != NULL; dp=dp->dnext) 
+	for (dp = startdp->cdp; dp != NULL; dp = dp->dnext)
 		prntdlist(dp);
-	for (dp = startdp->cdp; dp != NULL; dp=dp->dnext)
+	for (dp = startdp->cdp; dp != NULL; dp = dp->dnext)
 		prntnchild(dp);
 }
 
-prntuchild(startdp)
-struct dlist *startdp;
+static void
+prntuchild(struct dlist *startdp)
 {
 struct dlist *dp;
 
-	for (dp = startdp->ucdp; dp != NULL; dp=dp->unext) 
+	for (dp = startdp->ucdp; dp != NULL; dp = dp->unext)
 		prntdlist(dp);
-	for (dp = startdp->ucdp; dp != NULL; dp=dp->unext)
+	for (dp = startdp->ucdp; dp != NULL; dp = dp->unext)
 		prntuchild(dp);
 }
 
-prntichild(startdp)
-struct dlist *startdp;
+static void
+prntichild(struct dlist *startdp)
 {
 struct dlist *dp;
 
-	for (dp = startdp->icdp; dp != NULL; dp=dp->inext) 
+	for (dp = startdp->icdp; dp != NULL; dp = dp->inext)
 		prntdlist(dp);
-	for (dp = startdp->icdp; dp != NULL; dp=dp->inext)
+	for (dp = startdp->icdp; dp != NULL; dp = dp->inext)
 		prntichild(dp);
 }
 
-prnttree(startdp)
-struct dlist *startdp;
+static void
+prnttree(struct dlist *startdp)
 {
 	prntdlist(startdp);
 	prntnchild(startdp);
@@ -353,24 +364,24 @@ struct dlist *startdp;
 	prntichild(startdp);
 }
 
-prntipath(startdp)
-struct dlist *startdp;
+static void
+prntipath(struct dlist *startdp)
 {
 struct dlist *dp;
-	for (dp=startdp; dp!=NULL; dp=dp->idirnext) 
+	for (dp = startdp; dp != NULL; dp = dp->idirnext)
 		printf("\t%d\t%s\n", dp->idno, dp->isofname);
 }
 
-prntupath(startdp)
-struct dlist *startdp;
+static void
+prntupath(struct dlist *startdp)
 {
 struct dlist *dp;
-	for (dp=startdp; dp!=NULL; dp=dp->udirnext) 
+	for (dp = startdp; dp != NULL; dp = dp->udirnext)
 		printf("\t%d\t%s\n", dp->udno, dp->unixfname);
 }
 
-prntpath(startdp)
-struct dlist *startdp;
+static void
+prntpath(struct dlist *startdp)
 {
 	printf("\tdno\tname\n");
 	prntipath(startdp);

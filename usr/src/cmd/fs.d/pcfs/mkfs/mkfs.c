@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996, 1998-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -89,7 +89,7 @@ static ushort_t	SecPerTrk;	/* # of sectors per track */
 static int	GetTPC = 1;	/* Unless we're given as arg, must look it up */
 static ushort_t	TrkPerCyl;	/* # of tracks per cylinder */
 static int	GetResrvd = 1;	/* Unless we're given as arg, must calculate */
-static ushort_t	Resrvd;		/* Number of reserved sectors */
+static int	Resrvd;		/* Number of reserved sectors */
 static int	GetBPF = 1;	/* Unless we're given as arg, must calculate */
 static int	BitsPerFAT;	/* Total size of FS in # of sectors */
 
@@ -3371,7 +3371,7 @@ sanity_check_options(int argc, int optind)
 	}
 }
 
-void
+int
 main(int argc, char **argv)
 {
 	off64_t AbsBootSect = 0;
@@ -3437,5 +3437,5 @@ main(int argc, char **argv)
 			    FirstFn, &dskparamblk);
 	}
 	(void) close(fd);
-	exit(0);
+	return (0);
 }

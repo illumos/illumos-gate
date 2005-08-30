@@ -20,21 +20,22 @@
  * CDDL HEADER END
  */
 /*
- * Copyright cw1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-/*      @(#)dlist_proto.c 1.1 90/01/22 SMI      */
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 char token[BUFSIZ];
 
+struct dlist *
 mkdlist_proto()
 {
+	return (NULL);
 }
 
 #ifdef notskip
@@ -126,7 +127,7 @@ descend()
 		}
 		for (;;) {
 			getstr();
-			if (token[0]=='$' && token[1]=='\0')
+			if (token[0] == '$' && token[1] == '\0')
 				break;
 			entry(&in, (ino_t)(ino+1), token, buf);
 			descend(&in);
@@ -148,10 +149,10 @@ gmode(c, s, m0, m1, m2, m3)
 
 	for (i = 0; s[i]; i++)
 		if (c == s[i])
-			return((&m0)[i]);
+			return ((&m0)[i]);
 	printf("%c/%s: bad mode\n", c, token);
 	errs++;
-	return(0);
+	return (0);
 }
 
 long
@@ -163,15 +164,15 @@ getnum()
 	getstr();
 	n = 0;
 	i = 0;
-	for (i = 0; c=token[i]; i++) {
-		if (c<'0' || c>'9') {
+	for (i = 0; c = token[i]; i++) {
+		if (c < '0' || c > '9') {
 			printf("%s: bad number\n", token);
 			errs++;
-			return((long)0);
+			return ((long)0);
 		}
 		n = n*10 + (c-'0');
 	}
-	return(n);
+	return (n);
 }
 
 getstr()

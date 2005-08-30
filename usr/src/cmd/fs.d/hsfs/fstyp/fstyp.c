@@ -20,12 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1989, 1990 by Sun Microsystems, Inc.
- *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-#ifndef lint
-#ident	"%Z%%M%	%I%	%E% SMI"
-#endif  lint
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -40,7 +39,7 @@
 #include "iso_spec.h"
 #include "iso_impl.h"
 
-#define GETCDSECTOR(buf, secno, nosec) (getdisk(buf, \
+#define	GETCDSECTOR(buf, secno, nosec) (getdisk(buf, \
 	((secno)+cdroff)*ISO_SECTOR_SIZE, \
 	(nosec)*ISO_SECTOR_SIZE))
 char hs_buf[ISO_SECTOR_SIZE];
@@ -52,21 +51,24 @@ int  unix_pvd_sec_no;
 
 int vflag;
 int  cdfd;
-extern int optind;
 
 int cdroff = 0;
 
 static int rdev_is_a_cd(int rdevfd);
+static void getdisk(char *buf, int daddr, int size);
+static void prntstring(char *heading, char *s, int maxlen);
+static void prntlabel(int cd_type);
+static void dumpfs(char *special);
+static void usage(void);
 
-main(argc, argv)
-int	argc;
-char	**argv;
+int
+main(int argc, char **argv)
 {
-	register c;
+	int c;
 	char *special;
 	int errflag = 0;
 
-	while ((c=getopt(argc, argv, "v")) != EOF) {
+	while ((c = getopt(argc, argv, "v")) != EOF) {
 		switch (c) {
 			case 'v':
 				vflag++;
@@ -86,10 +88,11 @@ char	**argv;
 
 	dumpfs(special);
 
-	/* NOTREACHED */
+	return (0);
 }
 
-usage()
+static void
+usage(void)
 {
 	fprintf(stderr, "Usage: fstyp -v special\n");
 }
@@ -134,7 +137,7 @@ cantfind:
  *	      if found, volp will point to the descriptor
  *
  */
-int 
+int
 findisovol(volp)
 char *volp;
 {
@@ -168,9 +171,8 @@ cantfind:
  *	      if found, volp will point to the descriptor
  *
  */
-int 
-findunixvol(volp)
-char *volp;
+int
+findunixvol(char *volp)
 {
 int secno;
 int i;
@@ -196,25 +198,27 @@ cantfind:
 	return (0);
 }
 
-ckvoldesc()
+int
+ckvoldesc(void)
 {
 	int cd_type;
 
-	if (findhsvol(hs_buf)) 
+	if (findhsvol(hs_buf))
 		cd_type = 0;
 	else if (findisovol(iso_buf)) {
-		if (findunixvol(unix_buf)) 
+		if (findunixvol(unix_buf))
 			cd_type = 2;
 		else cd_type = 1;
+	} else {
+		cd_type = -1;
 	}
-	else cd_type = -1;
 
-	return(cd_type);
+	return (cd_type);
 
 }
 
-dumpfs(special)
-	char *special;
+static void
+dumpfs(char *special)
 {
 	int err;
 	int cd_type;
@@ -249,8 +253,8 @@ dumpfs(special)
 	exit(0);
 }
 
-prntlabel(cd_type)
-	int cd_type;
+static void
+prntlabel(int cd_type)
 {
 	char *vdp;
 	char *sysid;
@@ -271,51 +275,52 @@ prntlabel(cd_type)
 	switch (cd_type) {
 	case 0:
 		fprintf(stdout, "CD-ROM is in High Sierra format\n");
-		sysid=(char *)HSV_sys_id(hs_buf);
-		volid=(char *)HSV_vol_id(hs_buf);
-		volsetid=(char *)HSV_vol_set_id(hs_buf);
-		pubid=(char *)HSV_pub_id(hs_buf);
-		prepid=(char *)HSV_prep_id(hs_buf);
-		applid=(char *)HSV_appl_id(hs_buf);
-		copyfile=(char *)HSV_copyr_id(hs_buf);
-		absfile=(char *)HSV_abstr_id(hs_buf);
-		bibfile=NULL;
-		volsetsize= HSV_SET_SIZE(hs_buf);
-		volsetseq= HSV_SET_SEQ(hs_buf);
-		blksize= HSV_BLK_SIZE(hs_buf);
-		volsize= HSV_VOL_SIZE(hs_buf);
+		sysid = (char *)HSV_sys_id(hs_buf);
+		volid = (char *)HSV_vol_id(hs_buf);
+		volsetid = (char *)HSV_vol_set_id(hs_buf);
+		pubid = (char *)HSV_pub_id(hs_buf);
+		prepid = (char *)HSV_prep_id(hs_buf);
+		applid = (char *)HSV_appl_id(hs_buf);
+		copyfile = (char *)HSV_copyr_id(hs_buf);
+		absfile = (char *)HSV_abstr_id(hs_buf);
+		bibfile = NULL;
+		volsetsize = HSV_SET_SIZE(hs_buf);
+		volsetseq = HSV_SET_SEQ(hs_buf);
+		blksize = HSV_BLK_SIZE(hs_buf);
+		volsize = HSV_VOL_SIZE(hs_buf);
 		break;
 	case 1:
 		fprintf(stdout, "CD-ROM is in ISO 9660 format\n");
-		sysid=(char *) ISO_sys_id(iso_buf);
-		volid=(char *)ISO_vol_id(iso_buf);
-		volsetid=(char *)ISO_vol_set_id(iso_buf);
-		pubid=(char *)ISO_pub_id(iso_buf);
-		prepid=(char *)ISO_prep_id(iso_buf);
-		applid=(char *)ISO_appl_id(iso_buf);
-		copyfile=(char *)ISO_copyr_id(iso_buf);
-		absfile=(char *)ISO_abstr_id(iso_buf);
-		bibfile=(char *)ISO_bibli_id(iso_buf);
-		volsetsize=ISO_SET_SIZE(iso_buf);
-		volsetseq=ISO_SET_SEQ(iso_buf);
-		blksize=ISO_BLK_SIZE(iso_buf);
-		volsize=ISO_VOL_SIZE(iso_buf);
+		sysid = (char *)ISO_sys_id(iso_buf);
+		volid = (char *)ISO_vol_id(iso_buf);
+		volsetid = (char *)ISO_vol_set_id(iso_buf);
+		pubid = (char *)ISO_pub_id(iso_buf);
+		prepid = (char *)ISO_prep_id(iso_buf);
+		applid = (char *)ISO_appl_id(iso_buf);
+		copyfile = (char *)ISO_copyr_id(iso_buf);
+		absfile = (char *)ISO_abstr_id(iso_buf);
+		bibfile = (char *)ISO_bibli_id(iso_buf);
+		volsetsize = ISO_SET_SIZE(iso_buf);
+		volsetseq = ISO_SET_SEQ(iso_buf);
+		blksize = ISO_BLK_SIZE(iso_buf);
+		volsize = ISO_VOL_SIZE(iso_buf);
 		break;
 	case 2:
-		fprintf(stdout, "CD-ROM is in ISO 9660 format with UNIX extension\n");
-		sysid=(char *)ISO_sys_id(unix_buf);
-		volid=(char *)ISO_vol_id(unix_buf);
-		volsetid=(char *)ISO_vol_set_id(unix_buf);
-		pubid=(char *)ISO_pub_id(unix_buf);
-		prepid=(char *)ISO_prep_id(unix_buf);
-		applid=(char *)ISO_appl_id(unix_buf);
-		copyfile=(char *)ISO_copyr_id(unix_buf);
-		absfile=(char *)ISO_abstr_id(unix_buf);
-		bibfile=(char *)ISO_bibli_id(unix_buf);
-		volsetsize=ISO_SET_SIZE(unix_buf);
-		volsetseq=ISO_SET_SEQ(unix_buf);
-		blksize=ISO_BLK_SIZE(unix_buf);
-		volsize=ISO_VOL_SIZE(unix_buf);
+		fprintf(stdout, "CD-ROM is in ISO 9660 format with"
+		    " UNIX extension\n");
+		sysid = (char *)ISO_sys_id(unix_buf);
+		volid = (char *)ISO_vol_id(unix_buf);
+		volsetid = (char *)ISO_vol_set_id(unix_buf);
+		pubid = (char *)ISO_pub_id(unix_buf);
+		prepid = (char *)ISO_prep_id(unix_buf);
+		applid = (char *)ISO_appl_id(unix_buf);
+		copyfile = (char *)ISO_copyr_id(unix_buf);
+		absfile = (char *)ISO_abstr_id(unix_buf);
+		bibfile = (char *)ISO_bibli_id(unix_buf);
+		volsetsize = ISO_SET_SIZE(unix_buf);
+		volsetseq = ISO_SET_SEQ(unix_buf);
+		blksize = ISO_BLK_SIZE(unix_buf);
+		volsize = ISO_VOL_SIZE(unix_buf);
 		break;
 	default:
 		return;
@@ -348,46 +353,44 @@ prntlabel(cd_type)
 	fprintf(stdout, "Volume size is %d\n", volsize);
 }
 
-prntstring(heading, s, maxlen)
-char * heading;
-char *s;
-int maxlen;
+static void
+prntstring(char *heading, char *s, int maxlen)
 {
-int i;
-	if (maxlen < 1) return;
-	if (heading == NULL || s == NULL) return;
+	int i;
+	if (maxlen < 1)
+		return;
+	if (heading == NULL || s == NULL)
+		return;
 	/* print heading */
 	fprintf(stdout, "%s: ", heading);
 
 	/* strip off trailing zeros */
-	for (i=maxlen-1;i >= 0; i--)
+	for (i = maxlen-1; i >= 0; i--)
 		if (s[i] != ' ') break;
 
 	maxlen = i+1;
-	for (i=0;i<maxlen;i++) fprintf(stdout, "%c", s[i]);
+	for (i = 0; i < maxlen; i++)
+		fprintf(stdout, "%c", s[i]);
 	fprintf(stdout, "\n");
 }
 
-/*readdisk - read from cdrom image file */
-getdisk(buf, daddr, size)
-char *buf; /* buffer area */
-int daddr; /* disk addr */
-int size; /* no. of byte */
+/* readdisk - read from cdrom image file */
+static void
+getdisk(char *buf, int daddr, int size)
 {
-        if (lseek(cdfd, daddr, L_SET) == -1) {
-                perror("getdisk/lseek");
-                exit(1);
-        }
-        if (read(cdfd, buf, size) != size) {
-                perror("getdisk/read");
-                exit(1);
-        }
- 
+	if (lseek(cdfd, daddr, L_SET) == -1) {
+		perror("getdisk/lseek");
+		exit(1);
+	}
+	if (read(cdfd, buf, size) != size) {
+		perror("getdisk/read");
+		exit(1);
+	}
 }
 
 /*
  * rdev_is_a_cd  - return TRUE if the raw device identified by
- *  		      a file descriptor is a CDROM device.
+ *		      a file descriptor is a CDROM device.
  *
  *		      return FALSE if the device can't be accessed
  *		      or is not a CDROM.
@@ -397,10 +400,10 @@ rdev_is_a_cd(int rdevfd)
 {
 	struct dk_cinfo dkc;
 
-        if (ioctl(rdevfd, DKIOCINFO, &dkc) < 0)
-                return (0);
-        if (dkc.dki_ctype == DKC_CDROM)
-                return (1);
+	if (ioctl(rdevfd, DKIOCINFO, &dkc) < 0)
+		return (0);
+	if (dkc.dki_ctype == DKC_CDROM)
+		return (1);
 	else
 		return (0);
 }
