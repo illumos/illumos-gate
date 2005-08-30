@@ -206,3 +206,8 @@ UT_NO_USAGE_TRACKING="1"; export UT_NO_USAGE_TRACKING
 # output of elfsign.  Doing so requires that 't' be set in NIGHTLY_OPTIONS.
 # The default is to not verify them.
 #VERIFY_ELFSIGN=n
+
+# BRINGOVER_FILES is the list of files nightly passes to bringover.
+# If not set the default is "usr/src", but it can be used for bringing
+# over deleted_files or other nifty directories.
+#BRINGOVER_FILES="usr/src deleted_files"

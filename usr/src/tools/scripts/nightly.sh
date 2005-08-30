@@ -1013,6 +1013,13 @@ if [ "$BRINGOVER_WS" = "" ]; then
 fi
 
 #
+# If BRINGOVER_FILES was not specified, default to usr/src
+#
+if [ "$BRINGOVER_FILES" = "" ]; then
+	BRINGOVER_FILES="usr/src"
+fi
+
+#
 # Note: changes to the option letters here should also be applied to the
 #	bldenv script.
 #
@@ -1757,7 +1764,7 @@ if [ "$n_FLAG" = "n" ]; then
 
 	echo "\n==== BRINGOVER LOG ====\n" >> $mail_msg_file
 	staffer $TEAMWARE/bin/bringover -c "nightly update" -p $BRINGOVER_WS \
-	    -w $CODEMGR_WS usr/src < /dev/null 2>&1 | \
+	    -w $CODEMGR_WS $BRINGOVER_FILES < /dev/null 2>&1 | \
 		tee -a  $mail_msg_file >> $LOGFILE
 	if [ $? -eq 1 ]
 	then
