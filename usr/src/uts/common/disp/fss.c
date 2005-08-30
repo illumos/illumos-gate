@@ -887,7 +887,9 @@ fss_decay_usage()
 			 * Calculate fssp_shusage value to be used
 			 * for fsspri increments for the next second.
 			 */
-			if (FSSPROJ2KPROJ(fssproj) == proj0p) {
+			if (kpj_shares == 0 || zone_ext_shares == 0) {
+				fssproj->fssp_shusage = 0;
+			} else if (FSSPROJ2KPROJ(fssproj) == proj0p) {
 				/*
 				 * Project 0 in the global zone has 50%
 				 * of its zone.
@@ -895,8 +897,6 @@ fss_decay_usage()
 				fssproj->fssp_shusage = (fssproj->fssp_usage *
 				    zone_int_shares * zone_int_shares) /
 				    (zone_ext_shares * zone_ext_shares);
-			} else if (kpj_shares == 0 || zone_ext_shares == 0) {
-				fssproj->fssp_shusage = 0;
 			} else {
 				/*
 				 * Thread's priority is based on its project's
