@@ -1756,7 +1756,6 @@ dnet_getp(gld_mac_info_t *macinfo)
 	mblk_t	*mp;
 	caddr_t 	virtual_address;
 	struct	rx_desc_type *desc = dnetp->rx_desc;
-	extern mblk_t *desballoc(unsigned char *, size_t, uint_t, frtn_t *);
 	int marker = dnetp->rx_current_desc;
 	int misses;
 
@@ -1893,7 +1892,6 @@ dnet_getp(gld_mac_info_t *macinfo)
 		 *	   an mblk using desballoc().
 		 *	3. Otherwise use the mblk from allocb() and do
 		 *	   the bcopy.
-		 * XXX_NOTE: desballoc() is not a DDI function?
 		 */
 		frp = NULL;
 		rp = NULL;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1045,10 +1045,6 @@ UM_Receive_Packet(char *plkahead, unsigned short length,
 	mblk_t				*mp;
 	smcg_t				*smcg = (smcg_t *)pAd->sm_private;
 	struct smcg_rx_buffer_desc	*bdesc;
-
-	/* XXX desballoc is not in the DDI */
-	extern mblk_t *desballoc(unsigned char *, size_t, unsigned int,
-	    frtn_t *);
 
 	ASSERT(mutex_owned(&smcg->rbuf_lock));
 	/*

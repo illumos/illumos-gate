@@ -3424,17 +3424,15 @@ sosend_dgramcmsg(struct sonode *so,
 		if (error)
 			return (error);
 		mp = fdbuf_allocmsg(size, fdbuf);
-		if (mp == NULL)
-			fdbuf_free(fdbuf);
 	} else {
 		mp = soallocproto(size, _ALLOC_INTR);
-	}
-	if (mp == NULL) {
-		/*
-		 * Caught a signal waiting for memory.
-		 * Let send* return EINTR.
-		 */
-		return (EINTR);
+		if (mp == NULL) {
+			/*
+			 * Caught a signal waiting for memory.
+			 * Let send* return EINTR.
+			 */
+			return (EINTR);
+		}
 	}
 	soappendmsg(mp, &tudr, sizeof (tudr));
 	soappendmsg(mp, addr, addrlen);
@@ -3565,21 +3563,15 @@ sosend_svccmsg(struct sonode *so,
 			if (error)
 				return (error);
 			mp = fdbuf_allocmsg(size, fdbuf);
-			if (mp == NULL)
-				fdbuf_free(fdbuf);
 		} else {
 			mp = soallocproto(size, _ALLOC_INTR);
-		}
-
-		if (mp == NULL) {
-			/*
-			 * Caught a signal waiting for memory.
-			 * Let send* return EINTR.
-			 */
-			if (first)
-				return (EINTR);
-			else
-				return (0);
+			if (mp == NULL) {
+				/*
+				 * Caught a signal waiting for memory.
+				 * Let send* return EINTR.
+				 */
+				return (first ? EINTR : 0);
+			}
 		}
 		soappendmsg(mp, &tdr, sizeof (tdr));
 

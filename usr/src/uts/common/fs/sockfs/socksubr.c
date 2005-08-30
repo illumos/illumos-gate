@@ -1143,13 +1143,13 @@ fdbuf_free(struct fdbuf *fdbuf)
 }
 
 /*
- * Allocate an esballoc'ed message for use for AF_UNIX file descriptor
- * passing. Sleep waiting for memory unless catching a signal in strwaitbuf.
+ * Allocate an esballoc'ed message for AF_UNIX file descriptor passing.
+ * Waits if memory is not available.
  */
 mblk_t *
 fdbuf_allocmsg(int size, struct fdbuf *fdbuf)
 {
-	void	*buf;
+	uchar_t	*buf;
 	mblk_t	*mp;
 
 	dprint(1, ("fdbuf_allocmsg: size %d, %d fds\n", size, fdbuf->fd_numfd));
@@ -1159,20 +1159,7 @@ fdbuf_allocmsg(int size, struct fdbuf *fdbuf)
 	fdbuf->fd_frtn.free_func = fdbuf_free;
 	fdbuf->fd_frtn.free_arg = (caddr_t)fdbuf;
 
-	while ((mp = esballoc((unsigned char *)buf, size, BPRI_MED,
-	    &fdbuf->fd_frtn)) == NULL) {
-		if (strwaitbuf(sizeof (mblk_t), BPRI_MED) != 0) {
-			/*
-			 * Got EINTR - pass out NULL. Caller will
-			 * return something like ENOBUFS.
-			 * XXX could use an esballoc_wait() type function.
-			 */
-			eprintline(ENOBUFS);
-			return (NULL);
-		}
-	}
-	if (mp == NULL)
-		return (NULL);
+	mp = esballoc_wait(buf, size, BPRI_MED, &fdbuf->fd_frtn);
 	mp->b_datap->db_type = M_PROTO;
 	return (mp);
 }

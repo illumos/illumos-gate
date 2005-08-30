@@ -1160,7 +1160,7 @@ extern void callbparams_free(syncq_t *, callbparams_t *);
 extern void callbparams_free_id(syncq_t *, callbparams_id_t, int32_t);
 extern void qcallbwrapper(void *);
 
-extern mblk_t *desballoc(unsigned char *, size_t, uint_t, frtn_t *);
+extern mblk_t *esballoc_wait(unsigned char *, size_t, uint_t, frtn_t *);
 extern mblk_t *esballoca(unsigned char *, size_t, uint_t, frtn_t *);
 extern mblk_t *desballoca(unsigned char *, size_t, uint_t, frtn_t *);
 extern int do_sendfp(struct stdata *, struct file *, struct cred *);

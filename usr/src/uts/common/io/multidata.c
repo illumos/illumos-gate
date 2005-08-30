@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,8 +59,6 @@
 
 #include <sys/multidata.h>
 #include <sys/multidata_impl.h>
-
-extern mblk_t *desballoc(unsigned char *, size_t, uint_t, frtn_t *);
 
 static int mmd_constructor(void *, void *, int);
 static void mmd_destructor(void *, void *);

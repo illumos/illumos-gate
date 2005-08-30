@@ -737,8 +737,8 @@ typedef struct infod {
  */
 
 extern mblk_t *allocb(size_t, uint_t);
+extern mblk_t *desballoc(unsigned char *, size_t, uint_t, frtn_t *);
 extern mblk_t *esballoc(unsigned char *, size_t, uint_t, frtn_t *);
-extern mblk_t *esballoc_wait(unsigned char *, size_t, uint_t, frtn_t *);
 extern bcache_t *bcache_create(char *, size_t, uint_t);
 extern void bcache_destroy(bcache_t *);
 extern mblk_t *bcache_allocb(bcache_t *, uint_t);
