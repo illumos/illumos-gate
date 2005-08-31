@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,6 @@ int dr_pt_test_suspend(dr_handle_t *hp);
 typedef enum dr_suspend_state {
 	DR_SRSTATE_BEGIN = 0,
 	DR_SRSTATE_USER,
-	DR_SRSTATE_DAEMON,
 	DR_SRSTATE_DRIVER,
 	DR_SRSTATE_FULL
 } suspend_state_t;
@@ -116,7 +115,6 @@ static char *dr_bypass_list[] = {
 };
 
 
-static int	dr_skip_kernel_threads = 1;	/* "TRUE" */
 #define		SKIP_SYNC	/* bypass sync ops in dr_suspend */
 
 /*
@@ -654,52 +652,6 @@ dr_stop_user_threads(dr_sr_handle_t *srh)
 	return (DDI_SUCCESS);
 }
 
-static int
-dr_stop_kernel_threads(dr_handle_t *handle)
-{
-	caddr_t		name;
-	kthread_id_t	tp;
-
-	if (dr_skip_kernel_threads) {
-		return (DDI_SUCCESS);
-	}
-
-	/*
-	 * Note: we unlock the table in resume.
-	 * We need to lock the callback table only if we are actually
-	 * suspending kernel threads.
-	 */
-	callb_lock_table();
-	name = callb_execute_class(CB_CL_CPR_DAEMON, CB_CODE_CPR_CHKPT);
-	if (name != NULL) {
-		dr_op_err(CE_IGNORE, handle, ESBD_KTHREAD, name);
-		return (EBUSY);
-	}
-
-	/*
-	 * Verify that all threads are accounted for
-	 */
-	mutex_enter(&pidlock);
-	for (tp = curthread->t_next; tp != curthread; tp = tp->t_next) {
-		proc_t	*p = ttoproc(tp);
-
-		if (p->p_as != &kas)
-			continue;
-
-		if (tp->t_flag & T_INTR_THREAD)
-			continue;
-
-		if (!callb_is_stopped(tp, &name)) {
-			mutex_exit(&pidlock);
-			dr_op_err(CE_IGNORE, handle, ESBD_KTHREAD, name);
-			return (EBUSY);
-		}
-	}
-
-	mutex_exit(&pidlock);
-	return (DDI_SUCCESS);
-}
-
 static void
 dr_start_user_threads(void)
 {
@@ -835,19 +787,6 @@ dr_resume(dr_sr_handle_t *srh)
 
 		/* FALLTHROUGH */
 
-	case DR_SRSTATE_DAEMON:
-		/*
-		 * resume kernel daemons
-		 */
-		if (!dr_skip_kernel_threads) {
-			prom_printf("DR: resuming kernel daemons...\n");
-			(void) callb_execute_class(CB_CL_CPR_DAEMON,
-				CB_CODE_CPR_RESUME);
-			callb_unlock_table();
-		}
-
-		/* FALLTHROUGH */
-
 	case DR_SRSTATE_USER:
 		/*
 		 * finally, resume user threads
@@ -931,16 +870,6 @@ dr_suspend(dr_sr_handle_t *srh)
 		PR_QR("done\n");
 	} else {
 		prom_printf("\nDR: dr_suspend invoked with force flag\n");
-	}
-
-	/*
-	 * now stop daemon activities
-	 */
-	prom_printf("DR: suspending kernel daemons...\n");
-	srh->sr_suspend_state = DR_SRSTATE_DAEMON;
-	if ((rc = dr_stop_kernel_threads(handle)) != DDI_SUCCESS) {
-		dr_resume(srh);
-		return (rc);
 	}
 
 #ifndef	SKIP_SYNC
