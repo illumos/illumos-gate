@@ -92,6 +92,7 @@ version 1.0
 # ISA/EISA devices
 # id is the config file name (without leading "!" and trailing ".cfg")
 #
+SVI0101 SVI0101 oth all none "Sun Fire B100x BSC"
 ACPI0001 acpi oth all none "ACPI SMBus 1.0 Host Controller"
 ACPI0002 acpi oth all none "ACPI Smart Battery Subsystem"
 ACPI0003 acpi oth all none "ACPI AC Device"
