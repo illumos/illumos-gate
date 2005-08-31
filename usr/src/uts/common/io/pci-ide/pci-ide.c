@@ -201,8 +201,6 @@ pciide_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	uint16_t cmdreg;
 	ddi_acc_handle_t conf_hdl = NULL;
-	caddr_t	mp_addr;
-	ddi_device_acc_attr_t dev_attr;
 	int rc;
 
 
@@ -212,13 +210,7 @@ pciide_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * Make sure bus-mastering is enabled, even if
 		 * BIOS didn't.
 		 */
-
-		dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
-		dev_attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
-		dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
-
-		rc = ddi_regs_map_setup(dip, 0, &mp_addr, 0, 0,
-			&dev_attr, &conf_hdl);
+		rc = pci_config_setup(dip, &conf_hdl);
 
 		/*
 		 * In case of error, return SUCCESS. This is because
@@ -227,12 +219,12 @@ pciide_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (rc != DDI_SUCCESS)
 			return (DDI_SUCCESS);
 
-		cmdreg = ddi_get16(conf_hdl, (uint16_t *)PCI_CONF_COMM);
+		cmdreg = pci_config_get16(conf_hdl, PCI_CONF_COMM);
 		if ((cmdreg & PCI_COMM_ME) == 0) {
-			ddi_put16(conf_hdl, (uint16_t *)PCI_CONF_COMM,
+			pci_config_put16(conf_hdl, PCI_CONF_COMM,
 			    cmdreg | PCI_COMM_ME);
 		}
-		ddi_regs_map_free(&conf_hdl);
+		pci_config_teardown(&conf_hdl);
 
 		return (DDI_SUCCESS);
 	} else {
