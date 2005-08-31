@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -727,6 +727,31 @@ enum dp_set_alarm_status {
 	DP_SET_ALARM_ERROR
 };
 
+
+#define	DP_SET_USER_WATCHDOG	0x60
+#define	DP_SET_USER_WATCHDOG_R	0x6F
+#define	DP_GET_USER_WATCHDOG	0x70
+#define	DP_GET_USER_WATCHDOG_R	0x71
+
+#define	DP_USER_WATCHDOG_ENABLE		0x01
+#define	DP_USER_WATCHDOG_DISABLE	0x00
+
+enum dp_user_watchdog_status {
+	DP_USER_WDT_OK = 0,
+	DP_USER_WDT_ERROR
+};
+
+typedef struct dp_set_user_watchdog {
+	rsci8 enable;	/* enable = 1 */
+} dp_set_user_watchdog_t;
+
+typedef struct dp_set_user_watchdog_r {
+	rsci8 status;
+} dp_set_user_watchdog_r_t;
+
+typedef struct dp_get_user_watchdog_r {
+	rsci8 enable;
+} dp_get_user_watchdog_r_t;
 
 #define	DP_GET_VOLTS		0x42
 

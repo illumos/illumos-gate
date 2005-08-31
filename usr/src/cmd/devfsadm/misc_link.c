@@ -52,6 +52,7 @@ static int ppm(di_minor_t minor, di_node_t node);
 static int gpio(di_minor_t minor, di_node_t node);
 static int av_create(di_minor_t minor, di_node_t node);
 static int tsalarm_create(di_minor_t minor, di_node_t node);
+static int ntwdt_create(di_minor_t minor, di_node_t node);
 static int zcons_create(di_minor_t minor, di_node_t node);
 static int cpuid(di_minor_t minor, di_node_t node);
 static int glvc(di_minor_t minor, di_node_t node);
@@ -148,6 +149,9 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "pseudo", "ddi_pseudo", "tsalarm",
 	    TYPE_EXACT | DRV_RE, ILEVEL_0, tsalarm_create,
+	},
+	{ "pseudo", "ddi_pseudo", "ntwdt",
+	    TYPE_EXACT | DRV_RE, ILEVEL_0, ntwdt_create,
 	},
 	{ "pseudo", "ddi_pseudo", "daplt",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
@@ -575,6 +579,16 @@ tsalarm_create(di_minor_t minor, di_node_t node)
 	(void) devfsadm_mklink(mn, node, minor, 0);
 	(void) devfsadm_mklink(buf, node, minor, 0);
 
+	return (DEVFSADM_CONTINUE);
+}
+
+/*
+ * Creates /dev/ntwdt for ntwdt node
+ */
+static int
+ntwdt_create(di_minor_t minor, di_node_t node)
+{
+	(void) devfsadm_mklink("ntwdt", node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }
 

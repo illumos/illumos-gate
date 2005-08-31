@@ -68,7 +68,7 @@ MPXU_LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/mpxu/lint-libs/$(OBJS_DIR)
 #
 #	Define modules.
 #
-MPXU_KMODS	= platmod tsalarm
+MPXU_KMODS	= platmod tsalarm ntwdt
 
 #
 # Links to UltraSparc III crypto modules

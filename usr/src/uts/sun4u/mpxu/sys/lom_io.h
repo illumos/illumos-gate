@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,14 @@ extern "C" {
 
 #define	TSIOCALSTATE	_IOWR('a', 1, ts_aldata_t)
 #define	TSIOCALCTL	_IOW('a',  2, ts_aldata_t)
+
+/* ioctls for watchdog */
+
+#define	TSIOCDOGSTATE	_IOR('a', 6, ts_dogstate_t)
+#define	TSIOCDOGCTL	_IOW('a', 7, ts_dogctl_t)
+#define	TSIOCDOGTIME	_IOW('a', 8, uint_t)
+#define	TSIOCDOGPAT	_IO('a', 9)
+
 
 /*
  * Defines for identifying the four alarms
@@ -67,6 +75,19 @@ struct {
 		int alarm_state;
 } ts_aldata_t;
 
+typedef
+struct {
+	int reset_enable;
+	int dog_enable;
+} ts_dogctl_t;
+
+typedef
+struct {
+	int reset_enable;
+	int dog_enable;
+	uint_t dog_timeout;
+} ts_dogstate_t;
+
 /*
  * Values for alarm_state
  */
@@ -89,6 +110,24 @@ struct {
 	int alarm_no;
 	int state;
 } lom_aldata_t;
+
+#define	LOMIOCDOGSTATE	TSIOCDOGSTATE
+#define	LOMIOCDOGCTL	TSIOCDOGCTL
+#define	LOMIOCDOGTIME	TSIOCDOGTIME
+#define	LOMIOCDOGPAT	TSIOCDOGPAT
+
+typedef
+struct {
+	int reset_enable;
+	int dog_enable;
+} lom_dogctl_t;
+
+typedef
+struct {
+	int reset_enable;
+	int dog_enable;
+	uint_t dog_timeout;
+} lom_dogstate_t;
 
 #ifdef __cplusplus
 }

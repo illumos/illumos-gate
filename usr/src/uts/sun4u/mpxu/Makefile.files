@@ -36,6 +36,7 @@
 #
 MPXU_PLATMOD_OBJS	= mpxu.o
 MPXU_TSALARM_OBJS	= tsalarm.o
+NTWDT_OBJS		= ntwdt.o
 
 #
 #	include mpxu header files

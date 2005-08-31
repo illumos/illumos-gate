@@ -222,7 +222,9 @@ s none platform/SUNW,Sun-Fire-V240/kernel/crypto/sparcv9/aes=../../../../sun4u-u
 d none platform/SUNW,Sun-Fire-V240/kernel/drv 755 root sys
 d none platform/SUNW,Sun-Fire-V240/kernel/drv/sparcv9 755 root sys
 f none platform/SUNW,Sun-Fire-V240/kernel/drv/sparcv9/tsalarm 755 root sys
+f none platform/SUNW,Sun-Fire-V240/kernel/drv/sparcv9/ntwdt 755 root sys
 f none platform/SUNW,Sun-Fire-V240/kernel/drv/tsalarm.conf 644 root sys
+f none platform/SUNW,Sun-Fire-V240/kernel/drv/ntwdt.conf 644 root sys
 d none platform/SUNW,Sun-Fire-V240/kernel/misc 755 root sys
 d none platform/SUNW,Sun-Fire-V240/kernel/misc/sparcv9 755 root sys
 f none platform/SUNW,Sun-Fire-V240/kernel/misc/sparcv9/platmod 755 root sys
@@ -242,7 +244,9 @@ s none platform/SUNW,Sun-Fire-V440/kernel/crypto/sparcv9/aes=../../../../sun4u-u
 d none platform/SUNW,Sun-Fire-V440/kernel/drv 755 root sys
 d none platform/SUNW,Sun-Fire-V440/kernel/drv/sparcv9 755 root sys
 s none platform/SUNW,Sun-Fire-V440/kernel/drv/sparcv9/tsalarm=../../../../SUNW,Sun-Fire-V240/kernel/drv/sparcv9/tsalarm
+s none platform/SUNW,Sun-Fire-V440/kernel/drv/sparcv9/ntwdt=../../../../SUNW,Sun-Fire-V240/kernel/drv/sparcv9/ntwdt
 s none platform/SUNW,Sun-Fire-V440/kernel/drv/tsalarm.conf=../../../SUNW,Sun-Fire-V240/kernel/drv/tsalarm.conf
+s none platform/SUNW,Sun-Fire-V440/kernel/drv/ntwdt.conf=../../../SUNW,Sun-Fire-V240/kernel/drv/ntwdt.conf
 d none platform/SUNW,Sun-Fire-V440/kernel/misc 755 root sys
 d none platform/SUNW,Sun-Fire-V440/kernel/misc/sparcv9 755 root sys
 f none platform/SUNW,Sun-Fire-V440/kernel/misc/sparcv9/platmod 755 root sys
