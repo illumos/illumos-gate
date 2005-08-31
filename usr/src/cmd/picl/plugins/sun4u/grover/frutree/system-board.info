@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * #ident	"%Z%%M%	%I%	%E% SMI"
  *
@@ -75,51 +75,78 @@ PROP SlotType string r 0 "cpu"
 
 /*
  * Create fru node for memory module
+ * Use both OBP 4.10.6 (dimm-spd) and older (dimm) device names.
+ * Config file parser will ignore REFNODE with invalid device name.
  */
 name:/frutree/chassis/system-board/mem-slot?Label=DIMM0
 REFNODE mem-module fru WITH /platform/pci/pmu/i2c/dimm?UnitAddress=0,a0
+REFNODE mem-module fru WITH /platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a0
 
 name:/frutree/chassis/system-board/mem-slot?Label=DIMM1
 REFNODE mem-module fru WITH /platform/pci/pmu/i2c/dimm?UnitAddress=0,a2
+REFNODE mem-module fru WITH /platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a2
 
 name:/frutree/chassis/system-board/mem-slot?Label=DIMM2
 REFNODE mem-module fru WITH /platform/pci/pmu/i2c/dimm?UnitAddress=0,a4
+REFNODE mem-module fru WITH /platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a4
 
 name:/frutree/chassis/system-board/mem-slot?Label=DIMM3
 REFNODE mem-module fru WITH /platform/pci/pmu/i2c/dimm?UnitAddress=0,a6
+REFNODE mem-module fru WITH /platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a6
 
 /*
  * For memory module FRUs that are present, create _seeprom_source
+ * Use both OBP 4.10.6 (dimm-spd) and older (dimm) device names.
+ * Config file parser will ignore REFPROP with invalid device name.
  */
 name:/frutree/chassis/system-board/mem-slot?Label=DIMM0/mem-module
 PROP FRUDataAvailable void r
 REFPROP _seeprom_source /platform/pci/pmu/i2c/dimm?UnitAddress=0,a0
+REFPROP _seeprom_source /platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a0
 
 name:/frutree/chassis/system-board/mem-slot?Label=DIMM1/mem-module
 PROP FRUDataAvailable void r
 REFPROP _seeprom_source /platform/pci/pmu/i2c/dimm?UnitAddress=0,a2
+REFPROP _seeprom_source /platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a2
 
 name:/frutree/chassis/system-board/mem-slot?Label=DIMM2/mem-module
 PROP FRUDataAvailable void r
 REFPROP _seeprom_source /platform/pci/pmu/i2c/dimm?UnitAddress=0,a4
+REFPROP _seeprom_source /platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a4
 
 name:/frutree/chassis/system-board/mem-slot?Label=DIMM3/mem-module
 PROP FRUDataAvailable void r
 REFPROP _seeprom_source /platform/pci/pmu/i2c/dimm?UnitAddress=0,a6
+REFPROP _seeprom_source /platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a6
 
 /*
  * Set _fru_parent for memory seeprom devices
+ * Use both OBP 4.10.6 (dimm-spd) and older (dimm) device names.
+ * Config file parser will skip to next name entry if the device name is 
+ * invalid.
  */
 name:/platform/pci/pmu/i2c/dimm?UnitAddress=0,a0
+REFPROP _fru_parent /frutree/chassis/system-board/mem-slot?Label=DIMM0/mem-module
+
+name:/platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a0
 REFPROP _fru_parent /frutree/chassis/system-board/mem-slot?Label=DIMM0/mem-module
 
 name:/platform/pci/pmu/i2c/dimm?UnitAddress=0,a2
 REFPROP _fru_parent /frutree/chassis/system-board/mem-slot?Label=DIMM1/mem-module
 
+name:/platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a2
+REFPROP _fru_parent /frutree/chassis/system-board/mem-slot?Label=DIMM1/mem-module
+
 name:/platform/pci/pmu/i2c/dimm?UnitAddress=0,a4
 REFPROP _fru_parent /frutree/chassis/system-board/mem-slot?Label=DIMM2/mem-module
 
+name:/platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a4
+REFPROP _fru_parent /frutree/chassis/system-board/mem-slot?Label=DIMM2/mem-module
+
 name:/platform/pci/pmu/i2c/dimm?UnitAddress=0,a6
+REFPROP _fru_parent /frutree/chassis/system-board/mem-slot?Label=DIMM3/mem-module
+
+name:/platform/pci/pmu/i2c/dimm-spd?UnitAddress=0,a6
 REFPROP _fru_parent /frutree/chassis/system-board/mem-slot?Label=DIMM3/mem-module
 
 /*
