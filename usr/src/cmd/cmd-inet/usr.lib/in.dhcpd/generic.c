@@ -347,8 +347,10 @@ load_options(int flags, PKT_LIST *c_plp, PKT *r_pktp, int replen, uchar_t *optp,
 					break;
 				}
 		}
-	} else
-		overload = ~DHCP_OVRLD_MASK;	/* No overload for BOOTP */
+	} else {
+		/* BOOTP uses these fields for fixed parameters, no overload */
+		overload = DHCP_OVRLD_ALL;
+	}
 
 	if (c_pktp->file[0] != '\0' && !clnt_ovrld_file && !srv_using_file) {
 		/*
@@ -458,7 +460,7 @@ load_options(int flags, PKT_LIST *c_plp, PKT *r_pktp, int replen, uchar_t *optp,
 				 * that will fit in the remaining space,
 				 * rather than just give up.
 				 */
-				if (overload != (uchar_t)~DHCP_OVRLD_MASK) {
+				if (overload != DHCP_OVRLD_ALL) {
 					if (using_overload == DHCP_OVRLD_CLR) {
 						*optp++ = CD_OPTION_OVERLOAD;
 						*optp++ = 1;

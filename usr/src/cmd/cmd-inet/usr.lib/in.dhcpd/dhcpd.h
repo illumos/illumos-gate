@@ -124,7 +124,7 @@ typedef enum {
 #define	DHCP_OVRLD_CLR		((uchar_t)0x00)	/* SNAME/FILE clear */
 #define	DHCP_OVRLD_FILE		((uchar_t)0x01)	/* FILE in use */
 #define	DHCP_OVRLD_SNAME	((uchar_t)0x02)	/* SNAME in use */
-#define	DHCP_OVRLD_MASK		((uchar_t)0xfc)	/* Only last two bits */
+#define	DHCP_OVRLD_ALL		((uchar_t)0x03)	/* All overload space in use */
 
 /* dhcp_lookup_dd_classify search flags */
 #define	S_CID		0x01		/* find a client match */

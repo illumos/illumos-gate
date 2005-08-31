@@ -1081,8 +1081,8 @@ dhcp_req_ack(dsvc_clnt_t *pcd, PKT_LIST *plp)
 				struct in_addr	ia, *iap = &ia;
 
 				/* turn hostname option into a string */
-				hlen = MIN(plp->opts[CD_HOSTNAME]->len,
-				    MAXHOSTNAMELEN);
+				hlen = plp->opts[CD_HOSTNAME]->len;
+				hlen = MIN(hlen, MAXHOSTNAMELEN);
 				(void) memcpy(hname,
 				    plp->opts[CD_HOSTNAME]->value, hlen);
 				hname[hlen] = '\0';
@@ -2106,7 +2106,8 @@ select_offer(dsvc_dnet_t *pnd, PKT_LIST *plp, dsvc_clnt_t *pcd,
 			int		hlen;
 
 			/* turn hostname option into a string */
-			hlen = MIN(plp->opts[CD_HOSTNAME]->len, MAXHOSTNAMELEN);
+			hlen = plp->opts[CD_HOSTNAME]->len;
+			hlen = MIN(hlen, MAXHOSTNAMELEN);
 			(void) memcpy(hname, plp->opts[CD_HOSTNAME]->value,
 			    hlen);
 			hname[hlen] = '\0';
