@@ -1189,16 +1189,6 @@ SCOPED_SYMBOL|SunOS_5.6|libpthread.so.1|_init
 SCOPED_SYMBOL|SunOS_5.6|libpthread.so.1|_lib_version
 SCOPED_SYMBOL|SunOS_5.6|libpthread.so.1|_sema_wait_cancel
 SCOPED_SYMBOL|SunOS_5.6|libpthread.so.1|_thr_errnop
-SCOPED_SYMBOL|SunOS_5.6|librac.so.1|__rpcb_findaddr
-SCOPED_SYMBOL|SunOS_5.6|librac.so.1|_fini
-SCOPED_SYMBOL|SunOS_5.6|librac.so.1|_init
-SCOPED_SYMBOL|SunOS_5.6|librac.so.1|_lib_version
-SCOPED_SYMBOL|SunOS_5.6|librac.so.1|free_pkt
-SCOPED_SYMBOL|SunOS_5.6|librac.so.1|free_pollinfo
-SCOPED_SYMBOL|SunOS_5.6|librac.so.1|pkt_vc_poll
-SCOPED_SYMBOL|SunOS_5.6|librac.so.1|pkt_vc_read
-SCOPED_SYMBOL|SunOS_5.6|librac.so.1|ri_to_xid
-SCOPED_SYMBOL|SunOS_5.6|librac.so.1|xdrrec_resetinput
 SCOPED_SYMBOL|SunOS_5.6|libresolv.so.1|_fini
 SCOPED_SYMBOL|SunOS_5.6|libresolv.so.1|_init
 SCOPED_SYMBOL|SunOS_5.6|libresolv.so.1|_lib_version

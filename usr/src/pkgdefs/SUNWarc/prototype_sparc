@@ -108,7 +108,6 @@ f none usr/lib/sparcv9/llib-l300s.ln 644 root bin
 f none usr/lib/sparcv9/llib-l4014.ln 644 root bin
 f none usr/lib/sparcv9/llib-l450.ln 644 root bin
 s none usr/lib/sparcv9/llib-lpthread.ln=../../../lib/sparcv9/llib-lpthread.ln
-f none usr/lib/sparcv9/llib-lrac.ln 644 root bin
 s none usr/lib/sparcv9/llib-lresolv.ln=../../../lib/sparcv9/llib-lresolv.ln
 s none usr/lib/sparcv9/llib-lrt.ln=../../../lib/sparcv9/llib-lrt.ln
 s none usr/lib/sparcv9/llib-lrtld_db.ln=../../../lib/sparcv9/llib-lrtld_db.ln

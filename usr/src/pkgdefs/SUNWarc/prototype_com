@@ -148,8 +148,6 @@ s none usr/lib/llib-lposix4=../../lib/llib-lrt
 s none usr/lib/llib-lposix4.ln=../../lib/llib-lrt.ln
 f none usr/lib/llib-lproject 644 root bin
 f none usr/lib/llib-lproject.ln 644 root bin
-f none usr/lib/llib-lrac 644 root bin
-f none usr/lib/llib-lrac.ln 644 root bin
 f none usr/lib/llib-lrcm 644 root bin
 f none usr/lib/llib-lrcm.ln 644 root bin
 s none usr/lib/llib-lresolv=../../lib/llib-lresolv

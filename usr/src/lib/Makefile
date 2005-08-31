@@ -124,7 +124,6 @@ SUBDIRS= \
 	libsendfile	\
 	nametoaddr	\
 	ncad_addr	\
-	librac		\
 	gss_mechs/mech_krb5	.WAIT	\
 	krb5	.WAIT	\
 	smartcard	\

@@ -253,8 +253,6 @@ s none usr/lib/amd64/libproc.so.1=../../../lib/amd64/libproc.so.1
 s none usr/lib/amd64/libproc.so=../../../lib/amd64/libproc.so.1
 s none usr/lib/amd64/libpthread.so.1=../../../lib/amd64/libpthread.so.1
 s none usr/lib/amd64/libpthread.so=../../../lib/amd64/libpthread.so.1
-f none usr/lib/amd64/librac.so.1 755 root bin
-s none usr/lib/amd64/librac.so=librac.so.1
 f none usr/lib/amd64/librcm.so.1 755 root bin
 s none usr/lib/amd64/librcm.so=librcm.so.1
 s none usr/lib/amd64/libresolv.so.2=../../../lib/amd64/libresolv.so.2

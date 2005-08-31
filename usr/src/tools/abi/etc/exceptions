@@ -529,9 +529,6 @@ PSARC 2004/619: RULE W5: lib/amd64/libnsl.so.1: SUNW_1.5
 4480868: RULE W5: lib/sparcv9/libthread.so.1: SUNW_1.3
 PSARC 2004/619: RULE W5: lib/amd64/libthread.so.1: SUNW_1.2
 PSARC 2004/619: RULE W5: lib/amd64/libthread.so.1: SUNW_1.3
-4480868: RULE W5: usr/lib/librac.so.1: SUNW_1.1
-4480868: RULE W5: usr/lib/sparcv9/librac.so.1: SUNW_1.1
-PSARC 2004/619: RULE W5: usr/lib/amd64/librac.so.1: SUNW_1.1
 4480868: RULE W5: lib/libresolv.so.1: SUNW_1.1
 4480868: RULE W5: lib/libsec.so.1: SUNW_1.1
 4480868: RULE W5: lib/sparcv9/libsec.so.1: SUNW_1.1

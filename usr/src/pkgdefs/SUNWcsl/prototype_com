@@ -197,8 +197,6 @@ s none usr/lib/libproc.so.1=../../lib/libproc.so.1
 s none usr/lib/libproc.so=../../lib/libproc.so.1
 s none usr/lib/libpthread.so=../../lib/libpthread.so.1
 s none usr/lib/libpthread.so.1=../../lib/libpthread.so.1
-s none usr/lib/librac.so=./librac.so.1
-f none usr/lib/librac.so.1 755 root bin
 s none usr/lib/librcm.so=./librcm.so.1
 f none usr/lib/librcm.so.1 755 root bin
 s none usr/lib/libresolv.so=../../lib/libresolv.so.2

@@ -5532,6 +5532,21 @@ mondo_loop() {
 		rm -f $root/kernel/misc/amd64/acpi_intp
 	fi
 
+	#
+	# Remove obsolete librac
+	#
+	rm -f $usr/include/rpc/rac.h
+	rm -f $usr/lib/llib-lrac
+	rm -f $usr/lib/llib-lrac.ln
+	rm -f $usr/lib/amd64/llib-lrac.ln
+	rm -f $usr/lib/sparcv9/llib-lrac.ln
+	rm -f $usr/lib/librac.so
+	rm -f $usr/lib/librac.so.1
+	rm -f $usr/lib/amd64/librac.so
+	rm -f $usr/lib/amd64/librac.so.1
+	rm -f $usr/lib/sparcv9/librac.so
+	rm -f $usr/lib/sparcv9/librac.so.1
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then
