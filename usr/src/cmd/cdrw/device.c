@@ -181,6 +181,19 @@ get_device(char *user_supplied, char *node)
 		use_cd_speed = 1;
 	}
 
+	/*
+	 * a workaround for the firmware problem in LITE-ON COMBO drives.
+	 * streaming for these drives sets it only to max speed regardless
+	 * of requested speed. cd_speed_ctrl allow speeds less than max
+	 * to be set but not max thus the code below. (x48 is max speed
+	 * for these drives).
+	 */
+	if ((strncmp("LITE-ON", (const char *)&dev->d_inq[8], 7) == 0) &&
+	    (strncmp("COMBO SOHC-4836VS",
+	    (const char *)&dev->d_inq[16], 17) == 0))
+		if (requested_speed < 48)
+			use_cd_speed = 1;
+
 	cap = (uchar_t *)my_zalloc(8);
 	if (is_old_sun_drive(dev)) {
 		dev->d_read_audio = toshiba_read_audio;
