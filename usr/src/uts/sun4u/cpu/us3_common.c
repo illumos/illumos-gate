@@ -5474,7 +5474,6 @@ scrub_dcache_line_intr(caddr_t arg1, caddr_t arg2)
 
 	do {
 		outstanding = *countp;
-		ASSERT(outstanding > 0);
 		for (i = 0; i < outstanding; i++) {
 			scrub_dcache(how_many);
 		}
@@ -5550,7 +5549,6 @@ scrub_icache_line_intr(caddr_t arg1, caddr_t arg2)
 
 	do {
 		outstanding = *countp;
-		ASSERT(outstanding > 0);
 		for (i = 0; i < outstanding; i++) {
 			scrub_icache(how_many);
 		}
@@ -5601,6 +5599,11 @@ scrub_ecache(int how_many)
 /*
  * Handler for E$ scrub inum softint. Call the E$ scrubber until
  * we decrement the outstanding request count to zero.
+ *
+ * Due to interactions with cpu_scrub_cpu_setup(), the outstanding count may
+ * become negative after the atomic_add_32_nv().  This is not a problem, as
+ * the next trip around the loop won't scrub anything, and the next add will
+ * reset the count back to zero.
  */
 /*ARGSUSED*/
 static uint_t
@@ -5625,7 +5628,6 @@ scrub_ecache_line_intr(caddr_t arg1, caddr_t arg2)
 
 	do {
 		outstanding = *countp;
-		ASSERT(outstanding > 0);
 		for (i = 0; i < outstanding; i++) {
 			scrub_ecache(how_many);
 		}
