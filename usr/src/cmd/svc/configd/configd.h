@@ -691,7 +691,7 @@ rep_protocol_responseid_t backend_create_backup(const char *);
  * call on any database inconsistency -- cleans up state as best it can,
  * and exits with a "Database Bad" error code.
  */
-void backend_panic(const char *, ...);
+void backend_panic(const char *, ...) __NORETURN;
 #pragma rarely_called(backend_panic)
 
 backend_query_t *backend_query_alloc(void);

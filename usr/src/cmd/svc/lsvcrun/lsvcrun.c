@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -636,7 +636,7 @@ add_new_property(scf_handle_t *h, scf_transaction_t *tx, const char *name,
 
 	switch (ty) {
 	case SCF_TYPE_COUNT:
-		scf_value_set_count(v, (uint64_t)val);
+		scf_value_set_count(v, (uint64_t)(uintptr_t)val);
 		break;
 
 	case SCF_TYPE_TIME:

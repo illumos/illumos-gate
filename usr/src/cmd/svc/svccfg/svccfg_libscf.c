@@ -211,6 +211,9 @@ static scf_iter_t *exp_inst_iter, *exp_pg_iter, *exp_prop_iter, *exp_val_iter;
 static char *exp_str;
 static size_t exp_str_sz;
 
+static void scfdie(void) __NORETURN;
+static void scfdie_lineno(int lineno) __NORETURN;
+
 static char *start_method_names[] = {
 	"start",
 	"inetd_start",

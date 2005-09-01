@@ -294,7 +294,7 @@ rc_node_hash(rc_node_lookup_t *lp)
 {
 	uint32_t type = lp->rl_type;
 	uint32_t backend = lp->rl_backend;
-	uint32_t main = lp->rl_main_id;
+	uint32_t mainid = lp->rl_main_id;
 	uint32_t *ids = lp->rl_ids;
 
 	rc_type_info_t *tp = &rc_types[type];
@@ -311,7 +311,7 @@ rc_node_hash(rc_node_lookup_t *lp)
 	left = MAX_IDS - num_ids;
 	assert(num_ids <= MAX_IDS);
 
-	hash = type * 7 + main * 5 + backend;
+	hash = type * 7 + mainid * 5 + backend;
 
 	while (num_ids-- > 0)
 		hash = hash * 11 + *ids++ * 7;

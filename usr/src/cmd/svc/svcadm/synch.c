@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +51,7 @@
 extern scf_handle_t *h;
 extern ssize_t max_scf_fmri_sz;
 
-extern void do_scfdie(int);
+extern void do_scfdie(int) __NORETURN;
 extern int inst_get_state(scf_instance_t *, char *, const char *,
     scf_propertygroup_t **);
 extern ssize_t get_astring_prop(const scf_propertygroup_t *, const char *,

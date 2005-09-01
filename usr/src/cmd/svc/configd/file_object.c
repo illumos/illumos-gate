@@ -143,7 +143,7 @@ delete_stack_pop(delete_info_t *dip, delete_ent_t *out)
 	delete_ent_t *ent;
 
 	if (cur == NULL)
-		return (NULL);
+		return (0);
 	assert(cur->ds_cur > 0 && cur->ds_cur <= cur->ds_size);
 	ent = &cur->ds_buf[--cur->ds_cur];
 	if (cur->ds_cur == 0) {

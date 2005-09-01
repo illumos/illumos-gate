@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,9 @@ static const char PNAME_FMT[] = "%s: ";
 static const char ERRNO_FMT[] = ": %s\n";
 
 static const char *pname;
+
+static void
+uu_die_internal(int status, const char *format, va_list alist) __NORETURN;
 
 int uu_exit_ok_value = EXIT_SUCCESS;
 int uu_exit_fatal_value = EXIT_FAILURE;

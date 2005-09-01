@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,6 +94,9 @@ static int verbose = 0;
 static char *scratch_fmri;
 
 static struct ht_elt **visited;
+
+void do_scfdie(int lineno) __NORETURN;
+static void usage_milestone(void) __NORETURN;
 
 /*
  * Visitors from synch.c, needed for enable -s and disable -s.
@@ -2005,7 +2008,7 @@ static char const *milestones[] = {
 };
 
 static void
-usage_milestone()
+usage_milestone(void)
 {
 	const char **ms;
 
