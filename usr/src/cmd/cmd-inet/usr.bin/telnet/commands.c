@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -262,7 +262,7 @@ makeargv()
  * Todo:  1.  Could take random integers (12, 0x12, 012, 0b1).
  */
 
-	static
+	static int
 special(s)
 	register char *s;
 {
@@ -1668,7 +1668,7 @@ getslc(name)
 	    genget(name, (char **)SlcList, sizeof (struct slclist)));
 }
 
-static
+static int
 slccmd(argc, argv)
 	int  argc;
 	char *argv[];
@@ -2233,6 +2233,7 @@ forw_status(void)
 	return (0);
 }
 
+static int
 forw_set(int f_flags)
 {
 	forward_flags = f_flags;
@@ -2408,7 +2409,7 @@ encrypt_cmd(int  argc, char *argv[])
 /*
  * Print status about the connection.
  */
-static
+static int
 status(int argc, char *argv[])
 {
 	if (connected) {
@@ -3437,7 +3438,7 @@ call(int n_ptrs, ...)
 
 	if (n_ptrs > MAXVARGS)
 		n_ptrs = MAXVARGS;
-	va_start(ap, MAXVARGS);
+	va_start(ap, n_ptrs);
 
 	routine = (va_arg(ap, intrtn_t)); /* extract the routine's name */
 	n_ptrs--;
@@ -3541,7 +3542,7 @@ command_exit:
 /*
  * Help command.
  */
-	static
+	static int
 help(argc, argv)
 	int argc;
 	char *argv[];

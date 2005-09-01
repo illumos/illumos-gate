@@ -1,5 +1,5 @@
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,6 @@ int	debug = 0;
 #define	dsyslog	if (debug) syslog
 
 struct	sockaddr_in sin = { AF_INET };
-extern	errno;
 
 char	hostname[MAXHOSTNAMELEN];
 struct	utmpx *utmp = NULL;
@@ -73,7 +72,6 @@ int	nutmp;
 int	uf;
 unsigned utmpmtime = 0;			/* last modification time for utmp */
 unsigned utmpsize = 0;			/* last malloced size for utmp */
-int	onalrm();
 time_t	lastmsgtime;
 
 #ifndef SYSV
@@ -92,7 +90,8 @@ int	reapchildren();
 #define	mask2set(mask, setp) \
 	((mask) == -1 ? sigfillset(setp) : (((setp)->__sigbits[0]) = (mask)))
 
-static sigsetmask(mask)
+static int
+sigsetmask(mask)
 int mask;
 {
 	sigset_t oset;
@@ -104,7 +103,8 @@ int mask;
 	return (set2mask(&oset));
 }
 
-static sigblock(mask)
+static int
+sigblock(mask)
 int mask;
 {
 	sigset_t oset;
@@ -122,6 +122,12 @@ int mask;
 #define	MAXIDLE	120
 #define	NAMLEN (sizeof (uts[0].ut_name) + 1)
 
+void jkfprintf(FILE *tp, char *name, int mbox, int offset);
+void mailfor(char *name);
+void notify(struct utmpx *utp, int offset);
+void onalrm(int sig);
+
+int
 main(argc, argv)
 int argc;
 char *argv[];
@@ -169,8 +175,8 @@ char *argv[];
 	}
 	(void) time(&lastmsgtime);
 	(void) gethostname(hostname, sizeof (hostname));
-	onalrm();
-	(void) signal(SIGALRM, (void (*)())onalrm);
+	onalrm(0);
+	(void) signal(SIGALRM, onalrm);
 	(void) signal(SIGTTOU, SIG_IGN);
 #ifndef SYSV
 	(void) signal(SIGCHLD, reapchildren);
@@ -204,7 +210,9 @@ reapchildren()
 }
 #endif /* SYSV */
 
-onalrm()
+/* ARGSUSED */
+void
+onalrm(int sig)
 {
 	struct stat statbf;
 	time_t now;
@@ -235,6 +243,7 @@ onalrm()
 		dsyslog(LOG_DEBUG, " ok\n");
 }
 
+void
 mailfor(name)
 char *name;
 {
@@ -267,6 +276,7 @@ char *name;
 
 char	*cr;
 
+void
 notify(utp, offset)
 struct utmpx *utp;
 {
@@ -391,6 +401,7 @@ struct utmpx *utp;
 	exit(0);
 }
 
+void
 jkfprintf(tp, name, mbox, offset)
 register FILE *tp;
 char *name;

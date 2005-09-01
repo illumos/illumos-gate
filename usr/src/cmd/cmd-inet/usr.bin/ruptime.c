@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,7 @@ static int	rflg = 1;
 #define	down(h)		(now - (h)->hs_wd->wd_recvtime > 11 * 60)
 
 /* ARGSUSED */
+int
 main(int argc, char **argv)
 {
 	struct dirent *dp;

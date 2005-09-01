@@ -20,7 +20,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 %}
@@ -103,6 +103,7 @@ NAMECHR	[0-9A-Za-z./-]
 
 %%
 
+int
 yywrap()
 {
 	return (1);

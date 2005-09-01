@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,11 @@
 
 #define	MAXARGS 10
 
+void fatal(char *prog, char *s);
+
+int
 main(argc, argv)
+	int argc;
 	char *argv[];
 {
 	register char *sp;
@@ -137,6 +141,7 @@ main(argc, argv)
 	return (0);
 }
 
+void
 fatal(prog, s)
 	char *prog, *s;
 {

@@ -24,6 +24,10 @@ struct	cmd *last_cmd;
 struct	namelist *last_n;
 struct	subcmd *last_sc;
 
+static void append(char *label, struct namelist *files, char *stamp,
+    struct subcmd *subcmds);
+void yyerror(char *s);
+
 %}
 
 %term EQUAL	1
@@ -183,6 +187,7 @@ opt_namelist:	  /* VOID */ = {
 int	yylineno = 1;
 extern	FILE *fin;
 
+int
 yylex()
 {
 	static char yytext[INMAX];
@@ -333,6 +338,7 @@ again:
 	return(c);
 }
 
+int
 any(c, str)
 	register int c;
 	register char *str;
@@ -346,6 +352,7 @@ any(c, str)
 /*
  * Insert or append ARROW command to list of hosts to be updated.
  */
+void
 insert(label, files, hosts, subcmds)
 	char *label;
 	struct namelist *files, *hosts;
@@ -406,6 +413,7 @@ if (debug) {
  * Append DCOLON command to the end of the command list since these are always
  * executed in the order they appear in the distfile.
  */
+static void
 append(label, files, stamp, subcmds)
 	char *label;
 	struct namelist *files;
@@ -434,6 +442,7 @@ append(label, files, stamp, subcmds)
 /*
  * Error printing routine in parser.
  */
+void
 yyerror(s)
 	char *s;
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,17 @@ void	lostconn();
 static int	init_service(int);
 static struct servent *sp;
 
+static void notify(char *file, char *rhost, struct namelist *to, time_t lmod);
+static void rcmptime(struct stat *st);
+static void cmptime(char *name);
+static void dodcolon(char **filev, struct namelist *files, char *stamp,
+    struct subcmd *cmds);
+static void closeconn(void);
+static void doarrow(char **filev, struct namelist *files, char *rhost,
+    struct subcmd *cmds);
+static int makeconn(char *rhost);
+static int okname(register char *name);
+
 #ifdef SYSV
 #include <libgen.h>
 
@@ -71,6 +82,7 @@ char *s;
 }
 
 
+static int
 re_exec(s)
 char *s;
 {
@@ -86,6 +98,7 @@ char *s;
 /*
  * Do the commands in cmds (initialized by yyparse).
  */
+void
 docmds(dhosts, argc, argv)
 	char **dhosts;
 	int argc;
@@ -155,6 +168,7 @@ if (debug)
 /*
  * Process commands for sending files to other machines.
  */
+static void
 doarrow(filev, files, rhost, cmds)
 	char **filev;
 	struct namelist *files;
@@ -257,6 +271,7 @@ init_service(int krb5flag)
 /*
  * Create a connection to the rdist server on the machine rhost.
  */
+static int
 makeconn(rhost)
 	char *rhost;
 {
@@ -446,7 +461,8 @@ do_rcmd:
 /*
  * Signal end of previous connection.
  */
-closeconn()
+static void
+closeconn(void)
 {
 	if (debug)
 		printf("closeconn()\n");
@@ -467,6 +483,7 @@ lostconn()
 	longjmp(env, 1);
 }
 
+static int
 okname(name)
 	register char *name;
 {
@@ -494,6 +511,7 @@ extern	char target[], *tp;
 /*
  * Process commands for comparing files to time stamp files.
  */
+static void
 dodcolon(filev, files, stamp, cmds)
 	char **filev;
 	struct namelist *files;
@@ -558,6 +576,7 @@ dodcolon(filev, files, stamp, cmds)
 /*
  * Compare the mtime of file to the list of time stamps.
  */
+static void
 cmptime(name)
 	char *name;
 {
@@ -606,6 +625,7 @@ cmptime(name)
 		log(tfp, "new: %s\n", name);
 }
 
+static void
 rcmptime(st)
 	struct stat *st;
 {
@@ -650,6 +670,7 @@ rcmptime(st)
  * rhost == NULL if we are mailing a list of changes compared to at time
  * stamp file.
  */
+static void
 notify(file, rhost, to, lmod)
 	char *file, *rhost;
 	register struct namelist *to;
@@ -726,6 +747,7 @@ notify(file, rhost, to, lmod)
 /*
  * Return true if name is in the list.
  */
+int
 inlist(list, file)
 	struct namelist *list;
 	char *file;
@@ -741,6 +763,7 @@ inlist(list, file)
 /*
  * Return TRUE if file is in the exception list.
  */
+int
 except(file)
 	char *file;
 {

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@
 
 #define	NICHOST	"whois.internic.net"
 
+int
 main(argc, argv)
 	int argc;
 	char *argv[];
@@ -117,6 +118,5 @@ main(argc, argv)
 	fflush(sfo);
 	while ((c = getc(sfi)) != EOF)
 		putchar(c);
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }

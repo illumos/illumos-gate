@@ -107,7 +107,7 @@ static struct pam_conv conv = {
  * need to limit any privileges.
  */
 /*ARGSUSED*/
-void
+int
 main(int argc, char **argv)
 {
 	struct sockaddr_storage from;
@@ -128,7 +128,7 @@ main(int argc, char **argv)
 	}
 
 	doit(0, &from);
-	/* NOTREACHED */
+	return (0);
 }
 
 static char	username[20] = "USER=";

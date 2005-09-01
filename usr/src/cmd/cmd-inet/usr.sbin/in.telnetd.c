@@ -2380,7 +2380,6 @@ main(int argc, char *argv[])
 	(void) strcpy(pam_svc_name, "telnet");
 
 	doit(0, &from);
-	/* NOTREACHED */
 	return (EXIT_SUCCESS);
 }
 
@@ -4568,7 +4567,7 @@ readstream(int fd, char *buf, int offset)
 	if ((tpi.type == T_ORDREL_IND) || (tpi.type == T_DISCON_IND))
 		cleanup(0);
 	fatal(fd, "no data or protocol element recognized");
-	/*NOTREACHED*/
+	return (0);
 }
 
 static void

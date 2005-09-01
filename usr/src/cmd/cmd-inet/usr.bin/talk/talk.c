@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,12 +51,12 @@
  *
  */
 
-void
+int
 main(argc, argv)
 int argc;
 char *argv[];
 {
-	register	c;
+	register int	c;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -89,6 +89,5 @@ char *argv[];
 	set_edit_chars();
 
 	talk();
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }

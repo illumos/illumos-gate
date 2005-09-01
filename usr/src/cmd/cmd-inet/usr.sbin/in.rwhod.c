@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,7 +144,7 @@ static void		getkmem(void);
 static boolean_t	configure(int);
 static int		verify(const struct whod *);
 
-void
+int
 main(int argc, char *argv[])
 {
 	struct sockaddr_in from;
@@ -322,7 +322,7 @@ main(int argc, char *argv[])
 	/* NOTREACHED */
 usage:
 	(void) fprintf(stderr, "usage: in.rwhod [ -m [ ttl ] ]\n");
-	exit(1);
+	return (1);
 }
 
 /*

@@ -1,5 +1,5 @@
 /*
- * Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,13 @@ profile_option_strings rcmdversion[] = {
 
 char *realmdef[] = { "realms", NULL, "rdist", NULL };
 char *appdef[] = { "appdefaults", "rdist", NULL };
+
+static void usage(void);
+static char *prtype(int t);
+static void prsubcmd(struct subcmd *s);
+static void docmdargs(int nargs, char *args[]);
+void prnames();
+void prcmd();
 
 int
 main(argc, argv)
@@ -351,10 +358,10 @@ main(argc, argv)
 			docmds(dhosts, argc, argv);
 	}
 
-	exit(nerrs != 0);
-	/* NOTREACHED */
+	return (nerrs != 0);
 }
 
+static void
 usage()
 {
 	printf(gettext("Usage: rdist [-nqbhirvwyDax] [-PN / -PO] "
@@ -370,6 +377,7 @@ usage()
 /*
  * rcp like interface for distributing files.
  */
+static void
 docmdargs(nargs, args)
 	int nargs;
 	char *args[];
@@ -425,6 +433,7 @@ docmdargs(nargs, args)
 /*
  * Print a list of NAME blocks (mostly for debugging).
  */
+void
 prnames(nl)
 	register struct namelist *nl;
 {
@@ -436,6 +445,7 @@ prnames(nl)
 	printf(")\n");
 }
 
+void
 prcmd(c)
 	struct cmd *c;
 {
@@ -451,6 +461,7 @@ prcmd(c)
 	}
 }
 
+static void
 prsubcmd(s)
 	struct subcmd *s;
 {
@@ -503,6 +514,7 @@ prtype(t)
 		case OPTION:
 			return ("OPTION");
 	}
+	return (NULL);
 }
 
 char *
@@ -541,15 +553,4 @@ printb(v, bits)
 
 	*p = '\0';
 	return (buf);
-}
-
-/*VARARGS*/
-warn(fmt, a1, a2, a3)
-	char *fmt;
-{
-	extern int yylineno;
-
-	fprintf(stderr, "rdist: line %d: Warning: ", yylineno);
-	fprintf(stderr, fmt, a1, a2, a3);
-	fputc('\n', stderr);
 }

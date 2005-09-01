@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -283,7 +283,7 @@ static int secure_putbuf(int fd, uchar_t *buf, uint_t nbyte)
 	return (0);
 }
 
-static
+static int
 secure_getbyte(int fd)
 {
 	/* number of chars in ucbuf, pointer into ucbuf */

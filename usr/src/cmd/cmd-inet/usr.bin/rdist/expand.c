@@ -11,8 +11,8 @@
  * University may not be used to endorse or promote products derived
  * from this software without specific prior written permission.
  *
- * Copyright (c) 1998, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -40,7 +40,14 @@ char	*entp;
 char	**sortbase;
 
 char	*index();
-int	argcmp();
+
+static int argcmp(const void *arg1, const void *arg2);
+static void addpath(char c);
+static void Cat(char *s1, char *s2);
+static void matchdir(char *pattern);
+static void expsh(char *s);
+static void expstr(char *s);
+static int execbrc(char *p, char *s);
 
 #define	sort()	qsort((char *)sortbase, &eargv[eargc] - sortbase, \
 		sizeof (*sortbase), argcmp), sortbase = &eargv[eargc]
@@ -115,6 +122,7 @@ expand(list, wh)
 	return (list);
 }
 
+static void
 expstr(s)
 	char *s;
 {
@@ -226,18 +234,20 @@ expstr(s)
 	sort();
 }
 
-static
-argcmp(a1, a2)
-	char **a1, **a2;
+static int
+argcmp(const void *arg1, const void *arg2)
 {
+	char *a1 = *(char **)arg1;
+	char *a2 = *(char **)arg2;
 
-	return (strcmp(*a1, *a2));
+	return (strcmp(a1, a2));
 }
 
 /*
  * If there are any Shell meta characters in the name,
  * expand into a list, after searching directory
  */
+static void
 expsh(s)
 	char *s;
 {
@@ -275,6 +285,7 @@ endit:
 	*pathp = '\0';
 }
 
+static void
 matchdir(pattern)
 	char *pattern;
 {
@@ -327,6 +338,7 @@ patherr2:
 	yyerror(path);
 }
 
+static int
 execbrc(p, s)
 	char *p, *s;
 {
@@ -415,6 +427,7 @@ doit:
 	return (0);
 }
 
+int
 match(s, p)
 	char *s, *p;
 {
@@ -432,6 +445,7 @@ match(s, p)
 	return (c);
 }
 
+int
 amatch(s, p)
 	register char *s, *p;
 {
@@ -520,6 +534,7 @@ slash:
 	}
 }
 
+int
 smatch(s, p)
 	register char *s, *p;
 {
@@ -578,6 +593,7 @@ smatch(s, p)
 	}
 }
 
+static void
 Cat(s1, s2)
 	register char *s1, *s2;
 {
@@ -598,8 +614,8 @@ Cat(s1, s2)
 		;
 }
 
-addpath(c)
-	char c;
+static void
+addpath(char c)
 {
 
 	if (pathp > lastpathp)

@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,8 +73,9 @@
 #define	NOTFOUNDERROR	1
 #define	SYNTAXERROR	2
 #define	BUFLEN 2000
-static int handler();
+static void handler(int sig);
 
+int
 main(argc, argv)
 	int argc;
 	char **argv;
@@ -125,7 +126,7 @@ main(argc, argv)
 		/* daemon forked by inetd and is short lived */
 		struct itimerval value, ovalue;
 
-		signal(SIGALRM, (void (*)())handler);
+		signal(SIGALRM, handler);
 		value.it_value.tv_sec = 5 * 60;
 		value.it_value.tv_usec = value.it_interval.tv_usec = 0;
 		setitimer(ITIMER_REAL, &value, &ovalue);
@@ -224,9 +225,9 @@ main(argc, argv)
 	}
 }
 
-static int
-handler()
+/* ARGSUSED */
+static void
+handler(int sig)
 {
-
 	exit(0);
 }

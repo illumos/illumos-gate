@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +100,7 @@ ulong_t ring_clock = 0;
 
 /* Buffer state transition routines */
 
+int
     ring_init(ring, buffer, count)
 Ring *ring;
     unsigned char *buffer;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,23 @@ int local_nets[MAXNETS];
 int nlocal;
 char *myname;
 
+static void dogateways(void);
+static void freeaddrs(struct addr *list);
+static void freenames(struct name *list);
+static void putaddr(FILE *f, struct in_addr v);
+static void putnet(FILE *f, int v);
+static void copycomments(FILE *in, FILE *out, int ccount);
+static void copygateways(char *filename);
+static void copylocal(FILE *f, char *filename);
+static void printgateway(int net, char *name, int metric);
+static void usage(void);
+static int addlocal(char *arg, int *nets);
+static int getnetaddr(char *name, int *addr);
+static int gethostaddr(char *name, u_long *addr);
+static int connectedto(int net);
+static int local(int net);
+
+int
 main(argc, argv)
 	int argc;
 	char *argv[];
@@ -119,10 +136,10 @@ main(argc, argv)
 	copycomments(stdin, hf, DATELINES);
 	errs = yyparse();
 	dogateways();
-	exit(errs);
-	/* NOTREACHED */
+	return (errs);
 }
 
+static void
 usage()
 {
 	fprintf(stderr,
@@ -135,6 +152,7 @@ usage()
  *  Turn a comma-separated list of network names or numbers in dot notation
  *  (e.g.  "arpanet, 128.32") into an array of net numbers.
  */
+static int
 addlocal(arg, nets)
 	char *arg;
 	int *nets;
@@ -198,6 +216,7 @@ lower(str)
 	return (str);
 }
 
+void
 do_entry(keyword, addrlist, namelist, cputype, opsys, protos)
 	int keyword;
 	struct addr *addrlist;
@@ -316,6 +335,7 @@ dontfree:
 	freenames(protos);
 }
 
+static void
 printgateway(net, name, metric)
 	int net;
 	char *name;
@@ -333,12 +353,13 @@ printgateway(net, name, metric)
 		lower(name), metric);
 }
 
+static void
 copylocal(f, filename)
 	FILE *f;
 	char *filename;
 {
 	register FILE *lhf;
-	register cc;
+	register int cc;
 	char buf[BUFSIZ];
 	extern int errno;
 
@@ -356,6 +377,7 @@ copylocal(f, filename)
 	fclose(lhf);
 }
 
+static void
 copygateways(filename)
 	char *filename;
 {
@@ -393,7 +415,7 @@ copygateways(filename)
 			continue;
 		if (!getnetaddr(dname, &net))
 			continue;
-		if (!gethostaddr(gname, &addr.s_addr))
+		if (!gethostaddr(gname, (u_long * )&addr.s_addr))
 			continue;
 		nl = newname(gname);
 		(void) savegateway(nl, net, addr, metric);
@@ -401,6 +423,7 @@ copygateways(filename)
 	fclose(lhf);
 }
 
+static int
 getnetaddr(name, addr)
 	char *name;
 	int *addr;
@@ -418,6 +441,7 @@ getnetaddr(name, addr)
 	}
 }
 
+static int
 gethostaddr(name, addr)
 	char *name;
 	u_long *addr;
@@ -433,6 +457,7 @@ gethostaddr(name, addr)
 	return (*addr != -1);
 }
 
+static void
 copycomments(in, out, ccount)
 	FILE *in, *out;
 	int ccount;
@@ -447,7 +472,6 @@ copycomments(in, out, ccount)
 		buf[0] = '#';
 		fputs(buf, out);
 	}
-	return;
 }
 #define	UC(b)	(((int)(b))&0xff)
 
@@ -455,6 +479,7 @@ copycomments(in, out, ccount)
  * Print network number in internet-standard dot notation;
  * v is in host byte order.
  */
+static void
 putnet(f, v)
 	FILE *f;
 	register int v;
@@ -467,6 +492,7 @@ putnet(f, v)
 		fprintf(f, "%d.%d.%d", UC(v >> 16), UC(v >> 8), UC(v));
 }
 
+static void
 putaddr(f, v)
 	FILE *f;
 	struct in_addr v;
@@ -474,6 +500,7 @@ putaddr(f, v)
 	fprintf(f, "%-16.16s", inet_ntoa(v));
 }
 
+static void
 freenames(list)
 	struct name *list;
 {
@@ -487,6 +514,7 @@ freenames(list)
 	}
 }
 
+static void
 freeaddrs(list)
 	struct addr *list;
 {
@@ -540,10 +568,11 @@ savegateway(namelist, net, addr, metric)
 	return (gp);
 }
 
+static int
 connectedto(net)
 	int net;
 {
-	register i;
+	register int i;
 
 	for (i = 0; i < nconnected; i++)
 		if (connected_nets[i] == net)
@@ -551,10 +580,11 @@ connectedto(net)
 	return(0);
 }
 
+static int
 local(net)
 	int net;
 {
-	register i;
+	register int i;
 
 	for (i = 0; i < nlocal; i++)
 		if (local_nets[i] == net)
@@ -568,7 +598,8 @@ local(net)
  * Go through list of gateways, finding connections for gateways
  * that are not yet connected.
  */
-dogateways()
+static void
+dogateways(void)
 {
 	register struct gateway *gp, *gw, *ggp;
 	register int hops, changed = 1;

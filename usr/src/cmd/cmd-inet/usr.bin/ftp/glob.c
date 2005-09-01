@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -753,6 +753,7 @@ strend(char *cp)
  * user whose home directory is sought is currently.
  * We write the home directory of the user back there.
  */
+static int
 gethdir(char *home)
 {
 	register struct passwd *pp = getpwnam(home);

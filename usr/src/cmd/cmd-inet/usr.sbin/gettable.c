@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,12 +58,13 @@ struct	sockaddr_in sintmp;
 char	buf[BUFSIZ];
 char	*outfile = OUTFILE;
 
+int
 main(argc, argv)
 	int argc;
 	char *argv[];
 {
 	int s;
-	register len;
+	register int len;
 	register FILE *sfi, *sfo, *hf;
 	char *host;
 	register struct hostent *hp;
@@ -184,6 +185,5 @@ main(argc, argv)
 		fprintf(stderr, "Version number received.\n");
 	close(s);
 	fprintf(stderr, "Connection to %s closed\n", host);
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }

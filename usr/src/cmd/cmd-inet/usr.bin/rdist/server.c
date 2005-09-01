@@ -1,5 +1,5 @@
 /*
- * Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,19 @@ void	cleanup();
 struct	linkbuf *savelink();
 char	*strsub();
 
+static void comment(char *s);
+static void note();
+static void hardlink(char *cmd);
+void error();
+void log();
+static void recursive_remove(struct stat *stp);
+static void recvf(char *cmd, int type);
+static void query(char *name);
+static void sendf(char *rname, int opts);
+static void rmchk(int opts);
+static void dospecial(char *cmd);
+static void clean(char *cp);
+
 /*
  * Server routine to read requests and process them.
  * Commands are:
@@ -65,6 +78,7 @@ char	*strsub();
  *	Vname	- Verify if file out of date or not
  *	Qname	- Query if file exists. Return mtime & size if it does.
  */
+void
 server()
 {
 	char cmdbuf[RDIST_BUFSIZ];
@@ -216,6 +230,7 @@ server()
  * destdir = 1 if destination should be a directory
  * (i.e., more than one source is being copied to the same destination).
  */
+void
 install(src, dest, destdir, opts)
 	char *src, *dest;
 	int destdir, opts;
@@ -295,6 +310,7 @@ install(src, dest, destdir, opts)
  * Transfer the file or directory in target[].
  * rname is the name of the file on the remote host.
  */
+void
 sendf(rname, opts)
 	char *rname;
 	int opts;
@@ -577,6 +593,7 @@ savelink(stp, opts)
  * Returns 0 if no update, 1 if remote doesn't exist, 2 if out of date
  * and 3 if comparing binaries to determine if out of date.
  */
+int
 update(rname, opts, stp)
 	char *rname;
 	int opts;
@@ -707,6 +724,7 @@ more:
  *	Y\n		- exists and its a directory or symbolic link
  *	^Aerror message\n
  */
+static void
 query(name)
 	char *name;
 {
@@ -749,6 +767,7 @@ query(name)
 	*tp = '\0';
 }
 
+static void
 recvf(cmd, type)
 	char *cmd;
 	int type;
@@ -1020,6 +1039,7 @@ badt:
 /*
  * Creat a hard link to existing file.
  */
+static void
 hardlink(cmd)
 	char *cmd;
 {
@@ -1100,6 +1120,7 @@ hardlink(cmd)
 /*
  * Check to see if parent directory exists and create one if not.
  */
+int
 chkparent(name)
 	char *name;
 {
@@ -1127,6 +1148,7 @@ chkparent(name)
 /*
  * Change owner, group and mode of file.
  */
+int
 chog(file, owner, group, mode)
 	char *file, *owner, *group;
 	int mode;
@@ -1195,6 +1217,7 @@ ok:
  * Check for files on the machine being updated that are not on the master
  * machine and remove them.
  */
+static void
 rmchk(opts)
 	int opts;
 {
@@ -1276,6 +1299,7 @@ rmchk(opts)
  * Check the current directory (initialized by the 'T' command to server())
  * for extraneous files and remove them.
  */
+static void
 clean(cp)
 	register char *cp;
 {
@@ -1347,7 +1371,7 @@ clean(cp)
  * Remove a file or directory (recursively) and send back an acknowledge
  * or an error message.
  */
-static
+static void
 recursive_remove(stp)
 	struct stat *stp;
 {
@@ -1415,6 +1439,7 @@ removed:
 /*
  * Execute a shell command to handle special cases.
  */
+static void
 dospecial(cmd)
 	char *cmd;
 {
@@ -1480,6 +1505,7 @@ dospecial(cmd)
 }
 
 /*VARARGS2*/
+void
 log(fp, fmt, a1, a2, a3)
 	FILE *fp;
 	char *fmt;
@@ -1495,6 +1521,7 @@ log(fp, fmt, a1, a2, a3)
 }
 
 /*VARARGS1*/
+void
 error(fmt, a1, a2, a3)
 	char *fmt;
 	int a1, a2, a3;
@@ -1522,6 +1549,7 @@ error(fmt, a1, a2, a3)
 }
 
 /*VARARGS1*/
+void
 fatal(fmt, a1, a2, a3)
 	char *fmt;
 	int a1, a2, a3;
@@ -1549,6 +1577,7 @@ fatal(fmt, a1, a2, a3)
 	cleanup();
 }
 
+int
 response()
 {
 	char *cp, *s;
@@ -1613,6 +1642,7 @@ cleanup()
 	exit(1);
 }
 
+static void
 note(fmt, a1, a2, a3)
 char *fmt;
 int a1, a2, a3;
@@ -1622,6 +1652,7 @@ int a1, a2, a3;
 	comment(buf);
 }
 
+static void
 comment(s)
 char *s;
 {

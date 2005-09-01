@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,7 +177,7 @@ audit_rlogin_settid(int fd) {
 
 
 /* ARGSUSED */
-void
+int
 main(int argc, char *argv[])
 {
 	int on = 1;
@@ -340,7 +340,7 @@ main(int argc, char *argv[])
 		syslog(LOG_ERR, "setsockopt(IP_TOS %d): %m", tos);
 	}
 	doit(fd, &from, krb_context, encr_flag, keytab);
-	/*NOTREACHED*/
+	return (0);
 }
 
 static void	cleanup(int);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,7 +173,7 @@ static void usage(void);
 static krb5_error_code recvauth(int, int *);
 
 /*ARGSUSED*/
-void
+int
 main(int argc, char **argv, char **renvp)
 {
 	struct linger linger;
@@ -371,7 +371,7 @@ main(int argc, char **argv, char **renvp)
 	}
 
 	doit(dup(fd), &from, renvp);
-	/* NOTREACHED */
+	return (0);
 }
 
 /*

@@ -22,7 +22,7 @@
  */
 %}
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +157,7 @@ Proto	:	NAME
 
 extern int yylineno;
 
+void
 yyerror(msg)
 	char *msg;
 {
