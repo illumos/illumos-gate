@@ -33,6 +33,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <libintl.h>
+#include <string.h>
 
 #include "main.h"
 #include "util.h"
@@ -298,10 +299,11 @@ copy_cd(void)
 	    end_tno, (audio_cd == 1) ? gettext("audio") : gettext("data"),
 	    (end_tno > 1) ? "s" : "", (long)((total_nblks*blksize)/1024));
 
-	if (!check_avail_temp_space(total_nblks*blksize)) {
-		err_msg(gettext("Not enough space in temporary directory\n"));
-		err_msg(
-		gettext("Use -m to specify alternate temporary directory\n"));
+	if ((ret = check_avail_temp_space(total_nblks*blksize)) != 0) {
+		err_msg(gettext("Cannot use temporary directory : %s\n"),
+		    strerror(ret));
+		err_msg(gettext("Use -m to specify alternate"
+		    " temporary directory\n"));
 		exit(1);
 	}
 

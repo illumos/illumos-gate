@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,7 @@ bstreamhandle open_file_write_stream(char *fname);
 bstreamhandle open_temp_file_stream(void);
 
 char *str_errno_to_string(int serrno);
-int check_avail_temp_space(off_t req_size);
+int check_avail_temp_space(size_t req_size);
 char *get_tmp_name(void);
 
 #ifdef	__cplusplus

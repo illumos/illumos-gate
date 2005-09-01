@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -595,27 +595,27 @@ open_temp_file_stream(void)
 	return (h);
 }
 
+/*
+ * check_avail_temp_space returns 0 if there is adequate space
+ * in the temporary directory, or a non-zero error code if
+ * something goes wrong
+ */
 int
-check_avail_temp_space(off_t req_size)
+check_avail_temp_space(size_t req_size)
 {
-	char *t;
 	struct statvfs buf;
-	uint64_t free_size;
+	size_t free_size = 0;
 
+	if (statvfs(get_tmp_name(), &buf) < 0) {
+		return (errno);
+	}
 
-	t = get_tmp_name();
+	free_size = buf.f_bfree * buf.f_frsize;
 
-	if (statvfs(t, &buf) < 0)
-		return (0);
+	if (free_size <= req_size)
+		return (ENOMEM);
 
-	free_size = (uint64_t)buf.f_bfree;
-	free_size *= (uint64_t)buf.f_frsize;
-
-	if (free_size <= ((uint64_t)req_size))
-		return (0);
-
-	/* path directory and there is enough free space */
-	return (1);
+	return (0);
 }
 
 
