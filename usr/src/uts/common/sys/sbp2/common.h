@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,8 +96,9 @@ typedef uint32_t sbp2_orbp_t[2];
 #define	SBP2_ORBP_OFFSET		0x0000FFFFFFFFFFFCULL
 #define	SBP2_ORBP_MASK			(SBP2_ORBP_NULL | SBP2_ORBP_OFFSET)
 
-#define	SBP2_ORBP_HI(orbp)		(((orbp) & SBP2_ORBP_MASK) >> 32)
-#define	SBP2_ORBP_LO(orbp)		((orbp) & SBP2_ORBP_MASK)
+#define	SBP2_ORBP_HI(orbp)		\
+		((uint32_t)(((orbp) & SBP2_ORBP_MASK) >> 32))
+#define	SBP2_ORBP_LO(orbp)		((uint32_t)((orbp) & SBP2_ORBP_MASK))
 
 #define	SBP2_ORBP_SET(var, orbp) { \
 		((uint32_t *)(var))[0] = SBP2_SWAP32(SBP2_ORBP_HI(orbp)); \
