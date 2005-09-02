@@ -132,7 +132,6 @@ id_t	defaultcid;	/* system "default" class; see dispadmin(1M) */
 
 disp_lock_t	transition_lock;	/* lock on transitioning threads */
 disp_lock_t	stop_lock;		/* lock on stopped threads */
-disp_lock_t	shuttle_lock;		/* lock on shuttle objects */
 
 static void		cpu_dispqalloc(int numpris);
 
@@ -202,7 +201,6 @@ dispinit(void)
 	DISP_LOCK_INIT(&transition_lock);
 	disp_lock_enter_high(&transition_lock);
 	DISP_LOCK_INIT(&stop_lock);
-	DISP_LOCK_INIT(&shuttle_lock);
 
 	mutex_enter(&cpu_lock);
 	CPU->cpu_disp->disp_maxrunpri = -1;

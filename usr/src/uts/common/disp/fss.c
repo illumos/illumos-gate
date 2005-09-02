@@ -2167,7 +2167,8 @@ fss_tick(kthread_t *t)
 				fssproc->fss_flags |= FSSBACKQ;
 				cpu_surrender(t);
 			}
-		} else if (t->t_pri < t->t_disp_queue->disp_maxrunpri) {
+		} else if (t->t_state == TS_ONPROC &&
+			    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
 			/*
 			 * If there is a higher-priority thread which is
 			 * waiting for a processor, then thread surrenders

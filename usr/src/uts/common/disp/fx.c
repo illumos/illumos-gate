@@ -1382,7 +1382,8 @@ fx_tick(kthread_t *t)
 			fxpp->fx_flags |= FXBACKQ;
 			cpu_surrender(t);
 		}
-	} else if (t->t_pri < t->t_disp_queue->disp_maxrunpri) {
+	} else if (t->t_state == TS_ONPROC &&
+		    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
 		fxpp->fx_flags |= FXBACKQ;
 		cpu_surrender(t);
 	}

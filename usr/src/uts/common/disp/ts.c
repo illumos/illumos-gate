@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1701,7 +1701,8 @@ ts_tick(kthread_t *t)
 			}
 			TRACE_2(TR_FAC_DISP, TR_TICK,
 			    "tick:tid %p old pri %d", t, oldpri);
-		} else if (t->t_pri < t->t_disp_queue->disp_maxrunpri) {
+		} else if (t->t_state == TS_ONPROC &&
+			    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
 			tspp->ts_flags |= TSBACKQ;
 			cpu_surrender(t);
 		}

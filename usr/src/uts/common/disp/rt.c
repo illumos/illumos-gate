@@ -994,7 +994,7 @@ rt_tick(kthread_t *t)
 
 	thread_lock(t);
 	if ((rtpp->rt_pquantum != RT_TQINF && --rtpp->rt_timeleft == 0) ||
-	    (DISP_MUST_SURRENDER(t))) {
+	    (t->t_state == TS_ONPROC && DISP_MUST_SURRENDER(t))) {
 		if (rtpp->rt_timeleft == 0 && rtpp->rt_tqsignal) {
 			thread_unlock(t);
 			sigtoproc(ttoproc(t), t, rtpp->rt_tqsignal);

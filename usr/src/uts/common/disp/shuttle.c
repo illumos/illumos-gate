@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #include <sys/cpuvar.h>
 #include <sys/sdt.h>
 
+static	disp_lock_t	shuttle_lock;	/* lock on shuttle objects */
 
 /*
  * Place the thread in question on the run q.
@@ -86,7 +87,7 @@ shuttle_resume(kthread_t *t, kmutex_t *l)
 {
 	klwp_t	*lwp = ttolwp(curthread);
 	cpu_t	*cp;
-	extern disp_lock_t	shuttle_lock;
+	disp_lock_t *oldtlp;
 
 	thread_lock(curthread);
 	disp_lock_enter_high(&shuttle_lock);
@@ -115,14 +116,29 @@ shuttle_resume(kthread_t *t, kmutex_t *l)
 	DTRACE_SCHED1(wakeup, kthread_t *, t);
 	DTRACE_SCHED(sleep);
 	THREAD_SLEEP(curthread, &shuttle_lock);
+	disp_lock_exit_high(&shuttle_lock);
 
-	/* Update ustate records (there is no waitrq obviously) */
-
+	/*
+	 * Update ustate records (there is no waitrq obviously)
+	 */
 	(void) new_mstate(curthread, LMS_SLEEP);
+
+	thread_lock_high(t);
+	oldtlp = t->t_lockp;
+
 	restore_mstate(t);
 	t->t_flag &= ~T_WAKEABLE;
 	t->t_wchan0 = NULL;
 	t->t_sobj_ops = NULL;
+
+	/*
+	 * Make sure we end up on the right CPU if we are dealing with bound
+	 * CPU's or processor partitions.
+	 */
+	if (t->t_bound_cpu != NULL || t->t_cpupart != cp->cpu_part) {
+		aston(t);
+		cp->cpu_runrun = 1;
+	}
 
 	/*
 	 * We re-assign t_disp_queue and t_lockp of 't' here because
@@ -134,15 +150,12 @@ shuttle_resume(kthread_t *t, kmutex_t *l)
 	}
 
 	/*
-	 * Make sure we end up on the right CPU if we are dealing with bound
-	 * CPU's or processor partitions.
+	 * We can't call thread_unlock_high() here because t's thread lock
+	 * could have changed by thread_onproc() call above to point to
+	 * CPU->cpu_thread_lock.
 	 */
-	if (t->t_bound_cpu != NULL || t->t_cpupart != cp->cpu_part) {
-		aston(t);
-		cp->cpu_runrun = 1;
-	}
+	disp_lock_exit_high(oldtlp);
 
-	disp_lock_exit_high(&shuttle_lock);
 	mutex_exit(l);
 	/*
 	 * Make sure we didn't receive any important events while
@@ -151,6 +164,7 @@ shuttle_resume(kthread_t *t, kmutex_t *l)
 	if (lwp &&
 	    (ISSIG(curthread, JUSTLOOKING) || MUSTRETURN(curproc, curthread)))
 		setrun(curthread);
+
 	swtch_to(t);
 	/*
 	 * Caller must check for ISSIG/lwp_sysabort conditions
@@ -167,7 +181,6 @@ void
 shuttle_swtch(kmutex_t *l)
 {
 	klwp_t	*lwp = ttolwp(curthread);
-	extern disp_lock_t	shuttle_lock;
 
 	thread_lock(curthread);
 	disp_lock_enter_high(&shuttle_lock);
@@ -204,8 +217,6 @@ shuttle_sleep(kthread_t *t)
 {
 	klwp_t	*lwp = ttolwp(t);
 	proc_t	*p = ttoproc(t);
-
-	extern disp_lock_t	shuttle_lock;
 
 	thread_lock(t);
 	disp_lock_enter_high(&shuttle_lock);

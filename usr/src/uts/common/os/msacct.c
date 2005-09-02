@@ -534,7 +534,6 @@ restore_mstate(kthread_t *t)
 	hrtime_t waitrq;
 	hrtime_t newtime;
 	hrtime_t oldtime;
-	struct cpu *cpup;
 
 	if ((lwp = ttolwp(t)) == NULL)
 		return;
@@ -601,11 +600,8 @@ restore_mstate(kthread_t *t)
 	/*
 	 * Update the WAIT_CPU timer and per-cpu waitrq total.
 	 */
-	cpup = t->t_disp_queue->disp_cpu;
-	if (cpup == NULL)
-		cpup = t->t_cpu;
 	ms->ms_acct[LMS_WAIT_CPU] += (curtime - waitrq);
-	cpup->cpu_waitrq += (curtime - waitrq);
+	CPU->cpu_waitrq += (curtime - waitrq);
 	ms->ms_state_start = curtime;
 }
 
