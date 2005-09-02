@@ -354,28 +354,6 @@ backend_is_readonly(struct sqlite *db, const char *path)
 	return (r);
 }
 
-/*
- * Check to see if the administrator has removed the writable bits on the
- * repository file.  If they have, we don't allow modifications.
- *
- * Since we normally run with PRIV_FILE_DAC_WRITE, we have to use a separate
- * check.
- */
-static int
-backend_check_perm(const char *path)
-{
-	struct stat64 stat;
-
-	if (access(path, W_OK) < 0)
-		return (SQLITE_READONLY);
-
-	if (stat64(path, &stat) == 0 &&
-	    !(stat.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)))
-		return (SQLITE_READONLY);
-
-	return (SQLITE_OK);
-}
-
 static void
 backend_trace_sql(void *arg, const char *sql)
 {
@@ -1032,13 +1010,6 @@ backend_lock(backend_type_t t, int writing, sqlite_backend_t **bep)
 			(void) pthread_mutex_unlock(&be->be_lock);
 			return (r);
 		}
-	}
-
-	if (writing && t == BACKEND_TYPE_NORMAL &&
-	    backend_check_perm(be->be_path) != SQLITE_OK) {
-		be->be_thread = 0;
-		(void) pthread_mutex_unlock(&be->be_lock);
-		return (REP_PROTOCOL_FAIL_BACKEND_READONLY);
 	}
 
 	if (backend_do_trace)
