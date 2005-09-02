@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,7 +150,7 @@ displayBinary(unsigned char *data, size_t length, fru_elemdef_t *def)
 	switch (def->disp_type) {
 		case FDISP_Binary:
 		{
-			mask = 0x8000000000000000;
+			mask = 0x8000000000000000ULL;
 			for (i = 0; i < (sizeof (uint64_t) *8); i++) {
 				if (lldata & (mask >> i)) {
 					(void) printf("1");
@@ -430,7 +430,8 @@ convert_update(fru_nodehdl_t nodehdl, char *segment, char *field_name,
 			for (i = 0; i < def.enum_count; i++) {
 				if (strcmp(def.enum_table[i].text,
 							field_value) == 0) {
-					data = (void *)def.enum_table[i].value;
+					data = (void *)(uintptr_t)
+							def.enum_table[i].value;
 					dataLen = sizeof (uint64_t);
 					break;
 				}

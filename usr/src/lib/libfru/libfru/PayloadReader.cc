@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,7 +56,7 @@ writeBits(uint64_t bitData, size_t bitLength,
 	}
 	mask = (mask << (64-bitLength));
 	mask = (mask >> bitOffset);
-	mask = (mask ^ 0xFFFFFFFFFFFFFFFF);
+	mask = (mask ^ 0xFFFFFFFFFFFFFFFFULL);
 
 	// get the data out of the byte array.
 	uint64_t rd = 0;

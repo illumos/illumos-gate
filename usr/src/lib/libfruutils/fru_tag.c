@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -79,7 +79,7 @@ int
 mk_tag(fru_tagtype_t type, uint32_t dense, size_t pl_len,
 	fru_tag_t *tag)
 {
-	static fru_tag_t max = { 0xFFFFFFFFFFFFFFFF };
+	static fru_tag_t max = { 0xFFFFFFFFFFFFFFFFULL };
 	/* make sure the tag is clear. */
 	tag->raw_data = 0;
 
