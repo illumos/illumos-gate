@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,46 +39,45 @@
 
 extern struct dl_descriptor *_getdesc();
 
+int
 #if defined(DLPI_1)
-dl_snd(fd, buff, bufflen, addr)
-     char *buff;
-     struct dl_address *addr;
+dl_snd(int fd, char *buff, int bufflen, struct dl_address *addr)
 #else
-dl_snd(fd, buff, bufflen, addr, priority)
-     char *buff;
-     struct dl_address *addr;
-     dl_priority_t *priority;
+dl_snd(int fd, char *buff, int bufflen, struct dl_address *addr,
+    dl_priority_t *priority)
 #endif
 {
-   struct dl_descriptor *dl;
-   struct strbuf ctl, data;
+	struct dl_descriptor *dl;
+	struct strbuf ctl, data;
 
-   if ((dl = _getdesc(fd)) != NULL){
-      union DL_primitives prim;
+	if ((dl = _getdesc(fd)) != NULL) {
+		union DL_primitives prim;
 
-      if (dl->info.state != DLSTATE_IDLE){
-         dl->error = DLUNBOUND;
-         return -1;
-      }
-      memset(&prim, '\0', sizeof prim);
-      prim.unitdata_req.dl_primitive = DL_UNITDATA_REQ;
+		if (dl->info.state != DLSTATE_IDLE) {
+			dl->error = DLUNBOUND;
+			return (-1);
+		}
+		memset(&prim, '\0', sizeof (prim));
+		prim.unitdata_req.dl_primitive = DL_UNITDATA_REQ;
 #if !defined(DLPI_1)
-      if (priority != NULL)
-	prim.unitdata_req.dl_priority = *priority;
+		if (priority != NULL)
+			prim.unitdata_req.dl_priority = *priority;
 #endif
-      prim.unitdata_req.dl_dest_addr_length = addr->dla_dlen;
-      prim.unitdata_req.dl_dest_addr_offset = sizeof(dl_unitdata_req_t);
-      memcpy(((unsigned char *)&prim)+sizeof(dl_unitdata_req_t),
-	     addr->dla_daddr, addr->dla_dlen);
-      ctl.maxlen = ctl.len = sizeof(dl_unitdata_req_t) + addr->dla_dlen;
-      ctl.buf = (char *)&prim;
-      data.maxlen = data.len = bufflen;
-      data.buf = buff;
-      if (putmsg(fd, &ctl, &data, 0)<0){
-	 dl->error = DLSYSERR;
-	 return -1;
-      }
-      return 0;
-   }
-   return -1;
+		prim.unitdata_req.dl_dest_addr_length = addr->dla_dlen;
+		prim.unitdata_req.dl_dest_addr_offset =
+		    sizeof (dl_unitdata_req_t);
+		memcpy(((unsigned char *)&prim)+sizeof (dl_unitdata_req_t),
+		    addr->dla_daddr, addr->dla_dlen);
+		ctl.maxlen = ctl.len =
+		    sizeof (dl_unitdata_req_t) + addr->dla_dlen;
+		ctl.buf = (char *)&prim;
+		data.maxlen = data.len = bufflen;
+		data.buf = buff;
+		if (putmsg(fd, &ctl, &data, 0) < 0) {
+			dl->error = DLSYSERR;
+			return (-1);
+		}
+		return (0);
+	}
+	return (-1);
 }

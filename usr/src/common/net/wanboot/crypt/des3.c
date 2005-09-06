@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,29 +122,29 @@ des3_keycheck(const uint8_t *key)
 	 */
 	static uint64_t des_weak_keys[] = {
 		/* Really weak keys.  Byte-order independent values. */
-		0x0101010101010101,
-		0x1f1f1f1f0e0e0e0e,
-		0xe0e0e0e0f1f1f1f1,
-		0xfefefefefefefefe,
+		0x0101010101010101ULL,
+		0x1f1f1f1f0e0e0e0eULL,
+		0xe0e0e0e0f1f1f1f1ULL,
+		0xfefefefefefefefeULL,
 
 		/* Semi-weak (and a few possibly-weak) keys. */
 
 		/* Byte-order independent semi-weak keys. */
-		0x01fe01fe01fe01fe,	0xfe01fe01fe01fe01,
+		0x01fe01fe01fe01feULL,	0xfe01fe01fe01fe01ULL,
 
 		/* Byte-order dependent semi-weak keys. */
 #ifdef _LITTLE_ENDIAN
-		0xf10ef10ee01fe01f,	0x0ef10ef11fe01fe0,
-		0x01f101f101e001e0,	0xf101f101e001e001,
-		0x0efe0efe1ffe1ffe,	0xfe0efe0efe1ffe1f,
-		0x010e010e011f011f,	0x0e010e011f011f01,
-		0xf1fef1fee0fee0fe,	0xfef1fef1fee0fee0,
+		0xf10ef10ee01fe01fULL,	0x0ef10ef11fe01fe0ULL,
+		0x01f101f101e001e0ULL,	0xf101f101e001e001ULL,
+		0x0efe0efe1ffe1ffeULL,	0xfe0efe0efe1ffe1fULL,
+		0x010e010e011f011fULL,	0x0e010e011f011f01ULL,
+		0xf1fef1fee0fee0feULL,	0xfef1fef1fee0fee0ULL,
 #else	/* Big endian */
-		0x1fe01fe00ef10ef1,	0xe01fe01ff10ef10e,
-		0x01e001e001f101f1,	0xe001e001f101f101,
-		0x1ffe1ffe0efe0efe,	0xfe1ffe1ffe0efe0e,
-		0x011f011f010e010e,	0x1f011f010e010e01,
-		0xe0fee0fef1fef1fe,	0xfee0fee0fef1fef1,
+		0x1fe01fe00ef10ef1ULL,	0xe01fe01ff10ef10eULL,
+		0x01e001e001f101f1ULL,	0xe001e001f101f101ULL,
+		0x1ffe1ffe0efe0efeULL,	0xfe1ffe1ffe0efe0eULL,
+		0x011f011f010e010eULL,	0x1f011f010e010e01ULL,
+		0xe0fee0fef1fef1feULL,	0xfee0fee0fef1fef1ULL,
 #endif
 
 		/* We'll save the other possibly-weak keys for the future. */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,8 @@ extern	void	dumpdata();
 extern  void	sighuphdr();
 extern  void	sigusr1hdr();
 
+int goaround(void);
+
 int	if_fd;		/* file descriptor for network interface name */
 struct	pollfd llc_fd;	/* file descriptor for llc device */
 FILE   *log_str = NULL;	/* file stream for log file */
@@ -68,11 +70,10 @@ client_t *clntp = NULL;	/* pointer to the current client being served */
 int	totclnt = 0;	/* total clients being served right now */
 int	outblocked = 0;
 
-main(argc, argv, envp)
-int	argc;
-char	*argv[], *envp[];
+int
+main(int argc, char *argv[], char *envp[])
 {
-time_t	t;
+	time_t	t;
 
 	/* program initialize */
 	if (initialize(argc, argv, envp) < 0)
@@ -94,21 +95,21 @@ time_t	t;
 }
 
 int
-service()
+service(void)
 {
-int	flags;
-int	rc;
-int	n;
+	int	flags;
+	int	rc;
+	int	n;
 
 	if (outblocked)
 		llc_fd.events = POLLIN | POLLOUT;
 	else
 		llc_fd.events = POLLIN;
 
-	if (totclnt > 0 ) 	
-	    n = poll(&llc_fd, 1, 1);	/* 1 ms timeout */
+	if (totclnt > 0)
+		n = poll(&llc_fd, 1, 1);	/* 1 ms timeout */
 	else
-	    n = poll(&llc_fd, 1, -1);       /* blocking poll */
+		n = poll(&llc_fd, 1, -1);	/* blocking poll */
 
 	if (llc_fd.revents & POLLIN) {
 		rc = incoming(llc_fd.fd);
@@ -131,10 +132,10 @@ int	n;
  * this step or not.
  */
 int
-goaround()
+goaround(void)
 {
 	if (totclnt == 0 || clntp == NULL)
-		return;
+		return (0);
 
 	switch (clntp->status) {
 	case ST_FIND_RCVD:
@@ -161,15 +162,12 @@ goaround()
 	return (0);
 }
 
-
 int
-initialize(argc, argv, envp)
-int	argc;
-char	*argv[], *envp[];
+initialize(int argc, char *argv[], char *envp[])
 {
-char	*cp;
-union	DL_primitives dl;
-struct sigaction sa;
+	char	*cp;
+	union	DL_primitives dl;
+	struct sigaction sa;
 
 	/*
 	 * Parse command line, read appropriate config file and set up

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,10 +50,10 @@ extern char	debugmsg[];
  * Add the new client between the current clntp and its next in the
  * circular linked list.
  */
-clientadd(addp)
-client_t *addp;
+void
+clientadd(client_t *addp)
 {
-client_t *cp;
+	client_t *cp;
 
 	totclnt++;
 	if (totclnt == 1 && clntp == NULL) {
@@ -73,10 +73,10 @@ client_t *cp;
 /*
  * Remove the indicated client from the circular linked list.
  */
-clientremove(rmp)
-client_t *rmp;
+void
+clientremove(client_t *rmp)
 {
-client_t *cp;
+	client_t *cp;
 
 	if (debugLevel >= MSG_INFO_1) {
 		sprintf(debugmsg, "removing client %0X %0X %0X %0X %0X %0X\n",
@@ -97,17 +97,17 @@ client_t *cp;
 	cp->next = rmp->next;
 }
 
-
 client_t *
-clientlookup(addr)
-unsigned char	addr[];
+clientlookup(unsigned char addr[])
 {
-int	i;
-int	found = 0;
-client_t *cp = clntp;
+	int	i;
+	int	found = 0;
+	client_t *cp = clntp;
 
 	if (debugLevel >= MSG_INFO_2) {
-		sprintf(debugmsg, "Entered clientlookup(), number of clients = %d\n", totclnt);
+		sprintf(debugmsg,
+		    "Entered clientlookup(), number of clients = %d\n",
+		    totclnt);
 		senddebug(MSG_INFO_2);
 	}
 
@@ -116,20 +116,20 @@ client_t *cp = clntp;
 			sprintf(debugmsg, "No clients yet, returning\n");
 			senddebug(MSG_INFO_2);
 		}
-		return(NULL);
+		return (NULL);
 	}
 
 	if (debugLevel >= MSG_INFO_1) {
-		sprintf(debugmsg,"Looking for client %0X %0X %0X %0X %0X %0X\n",
-			addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+		sprintf(debugmsg,
+		    "Looking for client %0X %0X %0X %0X %0X %0X\n",
+		    addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 		senddebug(MSG_INFO_1);
 	}
 
-	for (i=0; i<totclnt; i++) {
+	for (i = 0; i < totclnt; i++) {
 		if (cp->addr[0] == addr[0] && cp->addr[1] == addr[1] &&
-		cp->addr[2] == addr[2] && cp->addr[3] == addr[3] &&
-		cp->addr[4] == addr[4] && cp->addr[5] == addr[5])
-		{
+		    cp->addr[2] == addr[2] && cp->addr[3] == addr[3] &&
+		    cp->addr[4] == addr[4] && cp->addr[5] == addr[5]) {
 			if (debugLevel >= MSG_INFO_1) {
 				sprintf(debugmsg, "Client found\n");
 				senddebug(MSG_INFO_1);
@@ -140,31 +140,32 @@ client_t *cp = clntp;
 		cp = cp->next;
 	}
 	if (found)
-		return(cp);
+		return (cp);
 	else
-		return(NULL);
+		return (NULL);
 }
 
 
 int
-clientvalidate()
-{ 
-struct ether_addr *addrp;
-client_t *cp;
-bootfile_t  *bp, *bp1;
-int	done = 0;
-int	i, j;
-int	bootparamslen;
-int	numfiles = -1;
-char	hostname[100];
-char	bootparams[1000];
+clientvalidate(void)
+{
+	struct ether_addr *addrp;
+	client_t *cp;
+	bootfile_t  *bp, *bp1;
+	int	done = 0;
+	int	i, j;
+	int	bootparamslen;
+	int	numfiles = -1;
+	char	hostname[100];
+	char	bootparams[1000];
 
 	if (maxClients >= 0 && totclnt >= maxClients) {
 		if (debugLevel >= MSG_WARN_2) {
-			sprintf(debugmsg, "Already serving maximum number of clients (= %d), request ignored\n", maxClients);
+			sprintf(debugmsg, "Already serving maximum number of "
+			    "clients (= %d), request ignored\n", maxClients);
 			senddebug(MSG_WARN_2);
 		}
-		return(-1);
+		return (-1);
 	}
 
 	/*
@@ -172,25 +173,28 @@ char	bootparams[1000];
 	 * it up in the ethers database.
 	 */
 	addrp = (struct ether_addr *)&databuf[32];
-        if (ether_ntohost(hostname, addrp) != 0) {
+	if (ether_ntohost(hostname, addrp) != 0) {
 		if (debugLevel >= MSG_WARN_1) {
-                	sprintf(debugmsg, "ether_ntohost() failed, errno = %d\n", errno);
+			sprintf(debugmsg,
+			    "ether_ntohost() failed, errno = %d\n", errno);
 			senddebug(MSG_WARN_1);
 		}
-		return(-1);
-        } else {
+		return (-1);
+	} else {
 		if (debugLevel >= MSG_INFO_1) {
-                	sprintf(debugmsg, "host is %s\n", hostname);
+			sprintf(debugmsg, "host is %s\n", hostname);
 			senddebug(MSG_INFO_1);
 		}
 	}
 
 	/* See if we are already serving this client */
-	if ((cp = clientlookup(&databuf[32])) != NULL) {
+	if ((cp = clientlookup((unsigned char *)&databuf[32])) != NULL) {
 		if (debugLevel >= MSG_INFO_2) {
-			sprintf(debugmsg, "Requesting client is already being serviced.\n");
+			sprintf(debugmsg,
+			    "Requesting client is already being serviced.\n");
 			senddebug(MSG_INFO_2);
-			sprintf(debugmsg, "Updating its record to ST_FIND_RCVD and start over\n");
+			sprintf(debugmsg, "Updating its record to "
+			    "ST_FIND_RCVD and start over\n");
 			senddebug(MSG_INFO_2);
 		}
 
@@ -202,20 +206,21 @@ char	bootparams[1000];
 		cp->seqnum = 0;
 		cp->maxdelay = startDelay;
 		cp->timeo = 10*startDelay;
-		return(0);
+		return (0);
 	}
 
 	/*
 	 * Now lookup the bootparams database and retrieve the whole
 	 * client record in ASCII.
 	 */
-        if (bootparams_getbyname(hostname, bootparams,
-                        sizeof(bootparams)) != 0) {
+	if (bootparams_getbyname(hostname, bootparams,
+	    sizeof (bootparams)) != 0) {
 		if (debugLevel >= MSG_ERROR_1) {
-			sprintf(debugmsg, "Failed to retrieve bootparams for this client\n");
+			sprintf(debugmsg,
+			    "Failed to retrieve bootparams for this client\n");
 			senddebug(MSG_ERROR_1);
 		}
-		return(-1);
+		return (-1);
 	}
 	bootparamslen = strlen(bootparams);
 	if (debugLevel >= MSG_ALWAYS) {
@@ -226,8 +231,8 @@ char	bootparams[1000];
 	}
 
 	/* The TAB char will be a problem, so replace them with '\0' */
-	for (i=0; i<bootparamslen; i++) {
-		if (bootparams[i] == TAB || bootparams[i] == ' ' )
+	for (i = 0; i < bootparamslen; i++) {
+		if (bootparams[i] == TAB || bootparams[i] == ' ')
 			bootparams[i] = '\0';
 	}
 	if (debugLevel >= MSG_ALWAYS) {
@@ -240,12 +245,13 @@ char	bootparams[1000];
 	/*
 	 * Try to allocate a client_t structure to serve this client.
 	 */
-	if ((cp = (client_t *)malloc(sizeof(client_t))) == NULL) {
+	if ((cp = (client_t *)malloc(sizeof (client_t))) == NULL) {
 		if (debugLevel >= MSG_WARN_1) {
-			sprintf(debugmsg, "malloc() failed in adding a new client_t structure\n");
+			sprintf(debugmsg, "malloc() failed in adding a new "
+			    "client_t structure\n");
 			senddebug(MSG_WARN_1);
 		}
-		return(-1);
+		return (-1);
 	}
 
 	/* Fill this structure with config info */
@@ -261,36 +267,38 @@ char	bootparams[1000];
 	cp->delay = cp->resetdflt = startDelay;
 
 	/* Get the number of boot files for this client */
-	for (i=0; i<bootparamslen-13; i++) {
+	for (i = 0; i < bootparamslen - 13; i++) {
 		if (bootparams[i] == 'n' &&
-		bootparams[i+1] == 'u' && bootparams[i+2] == 'm' &&
-		bootparams[i+3] == 'b' && bootparams[i+4] == 'o' &&
-		bootparams[i+5] == 'o' && bootparams[i+6] == 't' &&
-		bootparams[i+7] == 'f' && bootparams[i+8] == 'i' &&
-		bootparams[i+9] == 'l' && bootparams[i+10] == 'e' &&
-		bootparams[i+11] == 's' && bootparams[i+12] == '=')
-		{
+		    bootparams[i+1] == 'u' && bootparams[i+2] == 'm' &&
+		    bootparams[i+3] == 'b' && bootparams[i+4] == 'o' &&
+		    bootparams[i+5] == 'o' && bootparams[i+6] == 't' &&
+		    bootparams[i+7] == 'f' && bootparams[i+8] == 'i' &&
+		    bootparams[i+9] == 'l' && bootparams[i+10] == 'e' &&
+		    bootparams[i+11] == 's' && bootparams[i+12] == '=') {
 			sscanf(&bootparams[i+13], "%d", &numfiles);
 		}
 	}
 	if (numfiles < 0) {
 		if (debugLevel >= MSG_ERROR_1) {
-			sprintf(debugmsg, "Must have at least 1 bootfile for this client\n");
+			sprintf(debugmsg,
+			    "Must have at least 1 bootfile for this client\n");
 			senddebug(MSG_ERROR_1);
 		}
 		free(cp);
-		return(-1);
+		return (-1);
 	}
 	if (debugLevel >= MSG_INFO_2) {
-		sprintf(debugmsg, "There are %d bootfiles for this client\n", numfiles);
+		sprintf(debugmsg,
+		    "There are %d bootfiles for this client\n", numfiles);
 		senddebug(MSG_INFO_2);
 	}
 
 	/* Create the bootfile list and fill in the info from bootparams */
-	for (j=0; j<numfiles; j++) {
-		if ((bp1 = (bootfile_t *)malloc(sizeof(bootfile_t))) == NULL) {
+	for (j = 0; j < numfiles; j++) {
+		if ((bp1 = (bootfile_t *)malloc(sizeof (bootfile_t))) == NULL) {
 			if (debugLevel >= MSG_WARN_1) {
-				sprintf(debugmsg, "Cound not malloc() bootfile_t for bootfile %d\n", j);
+				sprintf(debugmsg, "Cound not malloc() "
+				    "bootfile_t for bootfile %d\n", j);
 				senddebug(MSG_WARN_1);
 			}
 			goto cleanup;
@@ -305,20 +313,19 @@ char	bootparams[1000];
 		bp = bp1;
 	}
 	bp = cp->bootfp;
-	for (i=0; i<bootparamslen-9; i++) {
+	for (i = 0; i < bootparamslen - 9; i++) {
 		if (bootparams[i] == 'b' &&
-		bootparams[i+1] == 'o' && bootparams[i+2] == 'o' &&
-		bootparams[i+3] == 't' && bootparams[i+4] == 'f' &&
-		bootparams[i+5] == 'i' && bootparams[i+6] == 'l' &&
-		bootparams[i+7] == 'e' && bootparams[i+8] == '=')
-		{
+		    bootparams[i+1] == 'o' && bootparams[i+2] == 'o' &&
+		    bootparams[i+3] == 't' && bootparams[i+4] == 'f' &&
+		    bootparams[i+5] == 'i' && bootparams[i+6] == 'l' &&
+		    bootparams[i+7] == 'e' && bootparams[i+8] == '=') {
 			if (debugLevel >= MSG_ALWAYS) {
 				sprintf(debugmsg, "found boot file");
 				senddebug(MSG_ALWAYS);
 			}
 			(void) strlcpy(bp->filename,
 				&bootparams[i+9], sizeof (bp->filename));
-			for (j=strlen(bp->filename); j>=0; j--)
+			for (j = strlen(bp->filename); j >= 0; j--)
 				if (bp->filename[j] == ':')
 					break;
 			bp->filename[j] = '\0';
@@ -346,13 +353,12 @@ char	bootparams[1000];
 	}
 
 	/* Finally the transfer address */
-	for (i=0; i<bootparamslen-9; i++) {
+	for (i = 0; i < bootparamslen - 9; i++) {
 		if (bootparams[i] == 'b' &&
-		bootparams[i+1] == 'o' && bootparams[i+2] == 'o' &&
-		bootparams[i+3] == 't' && bootparams[i+4] == 'a' &&
-		bootparams[i+5] == 'd' && bootparams[i+6] == 'd' &&
-		bootparams[i+7] == 'r' && bootparams[i+8] == '=')
-		{
+		    bootparams[i+1] == 'o' && bootparams[i+2] == 'o' &&
+		    bootparams[i+3] == 't' && bootparams[i+4] == 'a' &&
+		    bootparams[i+5] == 'd' && bootparams[i+6] == 'd' &&
+		    bootparams[i+7] == 'r' && bootparams[i+8] == '=') {
 			if (debugLevel >= MSG_ALWAYS) {
 				sprintf(debugmsg, "found xfer addr");
 				senddebug(MSG_ALWAYS);
@@ -365,7 +371,7 @@ char	bootparams[1000];
 		}
 	}
 	clientadd(cp);
-	return(0);
+	return (0);
 
 cleanup:
 	/* clean up any allocated structures and return */
@@ -376,6 +382,5 @@ cleanup:
 		bp = bp1;
 	}
 	free(cp);
-	return(-1);
+	return (-1);
 }
-

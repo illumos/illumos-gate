@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,12 +34,12 @@
 #include <sys/stat.h>
 #include "rpld.h"
 
-#define LLC_OVERHEAD		3
-#define RPL_OVERHEAD		29
-#define PROTOCOL_OVERHEAD	(LLC_OVERHEAD + RPL_OVERHEAD)
+#define	LLC_OVERHEAD		3
+#define	RPL_OVERHEAD		29
+#define	PROTOCOL_OVERHEAD	(LLC_OVERHEAD + RPL_OVERHEAD)
 
 extern	int	totclnt;
-extern	client_t* clntp;
+extern	client_t *clntp;
 extern	struct pollfd llc_fd;
 extern	long	delayGran;
 extern	int	debugLevel;
@@ -78,15 +78,14 @@ char	outFILE[1600] = {
 	0x00, 0x00, 0x7C, 0x00,			/* load address */
 	0x00, 0x00, 0x7C, 0x00,			/* transfer address */
 	LOCATE_ENABLE,				/* flags */
-	0x00, 0x44, 0x40, 0x18	 		/* data header */
+	0x00, 0x44, 0x40, 0x18			/* data header */
 };
 
-sendFOUND(fd, cp)
-int	fd;
-client_t *cp;
+int
+sendFOUND(int fd, client_t *cp)
 {
-struct		dl_address *addr;
-dl_priority_t	priority;
+	struct		dl_address *addr;
+	dl_priority_t	priority;
 
 	if (debugLevel >= MSG_INFO_1) {
 		sprintf(debugmsg, "Sending out FOUND Frame\n");
@@ -103,24 +102,25 @@ dl_priority_t	priority;
 		cp->status = ST_FOUND_SENT;
 	else
 		outblocked = 1;
-	return(0);
+	return (0);
 }
 
-sendFILE(fd, cp)
-int	fd;
-client_t *cp;
+void
+sendFILE(int fd, client_t *cp)
 {
-char		ch;
-long		loadaddr;
-int		ncount;
-struct		dl_address *addr;
-dl_priority_t	priority;
-struct		stat statbuf;
-char		b[20];
+	char		ch;
+	long		loadaddr;
+	int		ncount;
+	struct		dl_address *addr;
+	dl_priority_t	priority;
+	struct		stat statbuf;
+	char		b[20];
 
 	if (cp->delay > 0) {
 		if (debugLevel >= MSG_ALWAYS) {
-			sprintf(debugmsg, "Delay = %d, not allowed to send yet\n", cp->delay);
+			sprintf(debugmsg,
+			    "Delay = %d, not allowed to send yet\n",
+			    cp->delay);
 			senddebug(MSG_ALWAYS);
 		}
 		cp->delay--;
@@ -138,7 +138,8 @@ char		b[20];
 				sprintf(debugmsg, "Can't open bootfile %s\n",
 						cp->bootfp->filename);
 				senddebug(MSG_ERROR_1);
-				sprintf(debugmsg, "Terminating servicing this client\n");
+				sprintf(debugmsg,
+				    "Terminating servicing this client\n");
 				senddebug(MSG_ERROR_1);
 			}
 			cp->status = ST_FINISH;
@@ -160,8 +161,8 @@ char		b[20];
 	}
 
 	fseek(cp->fstr, cp->seekp, SEEK_SET);
-	ncount = fread(&outFILE[29], sizeof(char),
-			(cp->framesz)-PROTOCOL_OVERHEAD, cp->fstr);
+	ncount = fread(&outFILE[29], sizeof (char),
+	    (cp->framesz)-PROTOCOL_OVERHEAD, cp->fstr);
 	if (ncount > 0) {
 		if (debugLevel >= MSG_ALWAYS) {
 			sprintf(debugmsg, "%d bytes read from file\n", ncount);
@@ -191,11 +192,12 @@ char		b[20];
 		outFILE[1] = ((ncount + 0x19) & 0x00ff);
 
 		if (debugLevel >= MSG_ALWAYS) {
-			sprintf(debugmsg, "%02X %02X: %d bytes, loading to %02X %02X %02X %02X\n",
-				outFILE[10], outFILE[11],
-				ncount,
-				outFILE[16], outFILE[17],
-				outFILE[18], outFILE[19]);
+			sprintf(debugmsg, "%02X %02X: %d bytes, loading to "
+			    "%02X %02X %02X %02X\n",
+			    outFILE[10], outFILE[11],
+			    ncount,
+			    outFILE[16], outFILE[17],
+			    outFILE[18], outFILE[19]);
 			senddebug(MSG_ALWAYS);
 		}
 
@@ -221,7 +223,8 @@ char		b[20];
 
 	if (cp->seekp >= cp->currfp->size) {
 		if (debugLevel >= MSG_INFO_2) {
-			sprintf(debugmsg,"Current file reaches eof, closing\n");
+			sprintf(debugmsg,
+			    "Current file reaches eof, closing\n");
 			senddebug(MSG_INFO_2);
 		}
 
@@ -231,9 +234,12 @@ char		b[20];
 			if ((cp->fstr = fopen(cp->currfp->filename, "r"))
 						== NULL) {
 				if (debugLevel >= MSG_ERROR_1) {
-					sprintf(debugmsg, "Can't open bootfile %s\n", cp->currfp->filename);
+					sprintf(debugmsg,
+					    "Can't open bootfile %s\n",
+					    cp->currfp->filename);
 					senddebug(MSG_ERROR_1);
-					sprintf(debugmsg, "Terminating servicing this client\n");
+					sprintf(debugmsg, "Terminating "
+					    "servicing this client\n");
 					senddebug(MSG_ERROR_1);
 				}
 				cp->status = ST_FINISH;
@@ -248,7 +254,8 @@ char		b[20];
 
 		} else {
 			if (debugLevel >= MSG_INFO_2) {
-				sprintf(debugmsg, "All files downloaded, update state to ST_SEND_FINAL\n");
+				sprintf(debugmsg, "All files downloaded, "
+				    "update state to ST_SEND_FINAL\n");
 				senddebug(MSG_INFO_2);
 			}
 			cp->status = ST_SEND_FINAL;
@@ -256,16 +263,17 @@ char		b[20];
 	}
 }
 
-sendFINAL(fd, cp)
-int	fd;
-client_t *cp;
+void
+sendFINAL(int fd, client_t *cp)
 {
-struct		dl_address *addr;
-dl_priority_t	priority;
+	struct		dl_address *addr;
+	dl_priority_t	priority;
 
 	if (cp->delay > 0) {
 		if (debugLevel >= MSG_ALWAYS) {
-			sprintf(debugmsg, "Delay = %d, not allowed to send yet\n", cp->delay);
+			sprintf(debugmsg,
+			    "Delay = %d, not allowed to send yet\n",
+			    cp->delay);
 			senddebug(MSG_ALWAYS);
 		}
 		cp->delay--;
@@ -306,10 +314,11 @@ dl_priority_t	priority;
 	outFILE[1] = 0x19;
 
 	if (debugLevel >= MSG_ALWAYS) {
-		sprintf(debugmsg,"%02X %02X: transfer to %02X %02X %02X %02X\n",
-			outFILE[10], outFILE[11],
-			outFILE[20], outFILE[21],
-			outFILE[22], outFILE[23]);
+		sprintf(debugmsg,
+		    "%02X %02X: transfer to %02X %02X %02X %02X\n",
+		    outFILE[10], outFILE[11],
+		    outFILE[20], outFILE[21],
+		    outFILE[22], outFILE[23]);
 		senddebug(MSG_ALWAYS);
 	}
 
@@ -322,4 +331,3 @@ dl_priority_t	priority;
 	cp->delay = cp->maxdelay;
 	cp->currfp = cp->bootfp;
 }
-

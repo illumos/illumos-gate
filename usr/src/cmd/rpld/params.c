@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,34 +57,34 @@ extern int	ifUnit;
 extern int	ppanum;
 extern int	need_llc;
 
-int
-parseargs(argc, argv, envp)
-int	argc;
-char	*argv[];
-char	*envp[];
-{
-int	c;
-int	err = 0;
-int	ip_fd;
-int	numifs;
-struct 	ifreq	*reqbuf;
-struct	ifreq	*ifr;
-char	*device;
-int	unit;
-struct	ifconf	ifconf;
-unsigned	bufsize;
-char	devbuf[MAXPATHLEN];
-int	aflag = 0;
-int	curr_ppa = 0;
-extern	char *optarg;
-extern	int   optind;
-extern	int   opterr;
+void usage(void);
+void getdevice(uchar_t *, uchar_t *);
 
-int	n;
-int	more = 0;
-char	_ifName[MAXPATHLEN] = "";
-int	_ifUnit = 0;
-int	_need_llc;
+int
+parseargs(int argc, char *argv[], char *envp[])
+{
+	int	c;
+	int	err = 0;
+	int	ip_fd;
+	int	numifs;
+	struct 	ifreq	*reqbuf;
+	struct	ifreq	*ifr;
+	char	*device;
+	int	unit;
+	struct	ifconf	ifconf;
+	unsigned	bufsize;
+	char	devbuf[MAXPATHLEN];
+	int	aflag = 0;
+	int	curr_ppa = 0;
+	extern	char *optarg;
+	extern	int   optind;
+	extern	int   opterr;
+	int	n;
+	int	more = 0;
+	char	_ifName[MAXPATHLEN] = "";
+	int	_ifUnit = 0;
+	int	_need_llc;
+
 	opterr = 0;
 
 	/*
@@ -340,7 +340,8 @@ int	_need_llc;
 			 * only llc1 is used.
 			 */
 			(void) strlcpy(devbuf, "/dev/", MAXPATHLEN);
-			getdevice(ifr->ifr_name, &devbuf[5]);
+			getdevice((uchar_t *)ifr->ifr_name,
+			    (uchar_t *)&devbuf[5]);
 			(void) strlcpy(ifName, devbuf, MAXPATHLEN);
 			ifUnit = unit = getunit(ifr->ifr_name);
 			if (debugLevel >= MSG_INFO_1) {
@@ -519,18 +520,18 @@ llc_is_needed(char *devname, int ifUnit)
  * Read the configuration parameters in the config file.
  * Different actions are required if the server is already running or not
  */
-readconfig(running)
-int	running;
+int
+readconfig(int running)
 {
-FILE	*fstr;
-int	i, n;
-char	line[80];
-int	lineno = 0;
-int	done = 0;
-int	debugDestChange;
-unsigned int newDebugDest;
-int	logFileChange;
-char	newLogFile[MAXPATHLEN];
+	FILE	*fstr;
+	int	i, n;
+	char	line[80];
+	int	lineno = 0;
+	int	done = 0;
+	int	debugDestChange;
+	unsigned int newDebugDest;
+	int	logFileChange;
+	char	newLogFile[MAXPATHLEN];
 
 	if ((fstr = fopen(configFile, "r")) == NULL) {
 		if (running) {
@@ -548,7 +549,7 @@ char	newLogFile[MAXPATHLEN];
 		 * config file.
 		 */
 		if (running)
-			return;
+			return (0);
 
 		/* Try to use default config file if not already done so */
 		if (strcmp(configFile, DFT_CONFIGFILE) != 0) {
@@ -565,10 +566,11 @@ char	newLogFile[MAXPATHLEN];
 					printf("Cannot open default config "
 					    "file. Using default values.\n");
 				}
-				return;
+				return (0);
 			}
-		} else
-			return;
+		} else {
+			return (0);
+		}
 	}
 
 	if (running && (debugLevel >= MSG_INFO_1)) {
@@ -712,16 +714,12 @@ char	newLogFile[MAXPATHLEN];
 	return (0);
 }
 
-
 int
-readline(str, buf, count)
-FILE	*str;
-char	*buf;
-int	count;
+readline(FILE *str, char *buf, int count)
 {
-int	i = 0;
-int	done = 0;
-int	ch;
+	int	i = 0;
+	int	done = 0;
+	int	ch;
 
 	while (!done && i < count) {
 		ch = getc(str);
@@ -735,9 +733,8 @@ int	ch;
 	return (i);
 }
 
-
 int
-open_debug_dest()
+open_debug_dest(void)
 {
 	if (debugDest == DEST_LOGFILE) {
 		if (log_str != NULL)
@@ -761,8 +758,8 @@ open_debug_dest()
 	return (0);
 }
 
-
-usage()
+void
+usage(void)
 {
 	printf("\n");
 	printf("Usage:	 rpld [options] <network_interface_name>\n");
@@ -785,9 +782,8 @@ usage()
 /*
  * Pick out leading alphabetic part of string 's'.
  */
-getdevice(s, dev)
-u_char	*s;
-u_char	*dev;
+void
+getdevice(uchar_t *s, uchar_t *dev)
 {
 	while (isalpha(*s))
 		*dev++ = *s++;
@@ -797,11 +793,11 @@ u_char	*dev;
 /*
  * Pick out trailing numeric part of string 's' and return int.
  */
-getunit(s)
-char	*s;
+int
+getunit(char *s)
 {
-char	intbuf[128];
-char	*p = intbuf;
+	char	intbuf[128];
+	char	*p = intbuf;
 
 	while (isalpha(*s))
 		s++;

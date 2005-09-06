@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@ static const struct keylist	*knownkeytype(char *);
 static char			*getkey(const struct keylist *);
 static void			deletekey(const struct keylist *);
 static void			installkey(const struct keylist *);
-static void			usage(const char *);
+static void			usage(const char *) __NORETURN;
 
 static boolean_t	delete = B_FALSE;
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,13 +39,14 @@
 
 extern struct dl_descriptor *_getdesc();
 
-dl_errno(fd)
+int
+dl_errno(int fd)
 {
-   struct dl_descriptor *dl;
+	struct dl_descriptor *dl;
 
-   dl = _getdesc(fd);
-   if (dl != NULL){
-	return dl->error;
-   }
-   return  -1;
+	dl = _getdesc(fd);
+	if (dl != NULL) {
+		return (dl->error);
+	}
+	return (-1);
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,10 +49,10 @@ extern FILE    *log_str;
  * This is the routine to send the debug messages to the specified
  * location.
  */
-senddebug(pri)
-int	pri;
+void
+senddebug(int pri)
 {
-int	logpri;
+	int	logpri;
 
 	switch (debugDest) {
 	case DEST_CONSOLE:
@@ -98,10 +98,10 @@ int	logpri;
 	}
 }
 
-dumpctl(ctl)
-struct strbuf *ctl;
+void
+dumpctl(struct strbuf *ctl)
 {
-int	i, j, k, n;
+	int	i, j, k, n;
 
 	if (debugLevel >= MSG_ALWAYS) {
 		sprintf(debugmsg, "\nControl part of RPL packet = %d bytes:\n",
@@ -131,10 +131,10 @@ int	i, j, k, n;
 	}
 }
 
-dumpdata(data)
-struct strbuf *data;
+void
+dumpdata(struct strbuf *data)
 {
-int	i, j, k, n;
+	int	i, j, k, n;
 
 	if (debugLevel >= MSG_ALWAYS) {
 		sprintf(debugmsg, "\nData part of RPL packet = %d bytes:\n",
@@ -164,9 +164,10 @@ int	i, j, k, n;
 	}
 }
 
-dumpparams()
+void
+dumpparams(void)
 {
-char	dbDest[20];
+	char	dbDest[20];
 
 	sprintf(debugmsg, "ConfigFile = %s\n", configFile);
 	senddebug(MSG_ALWAYS);

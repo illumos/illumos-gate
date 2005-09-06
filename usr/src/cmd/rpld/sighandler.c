@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,27 +33,31 @@ extern	int	totclnt;
 extern	client_t *clntp;
 extern  char	debugmsg[];
 
+void dumpclients(void);
 
 /* Re-read config file */
-sighuphdr()
+void
+sighuphdr(void)
 {
-#define RUNNING		1
+#define	RUNNING		1
 	readconfig(RUNNING);
 }
 
 /* Dump internal variables to aid debugging or check status */
-sigusr1hdr()
+void
+sigusr1hdr(void)
 {
 	dumpparams();
 	dumpclients();
 }
 
-dumpclients()
+void
+dumpclients(void)
 {
-int	i;
-client_t *cp;
-bootfile_t *bp;
-char	line[80];
+	int	i;
+	client_t *cp;
+	bootfile_t *bp;
+	char	line[80];
 
 	sprintf(debugmsg, "Number of active clients is %d\n", totclnt);
 	senddebug(MSG_ALWAYS);
@@ -61,8 +65,9 @@ char	line[80];
 		return;
 
 	cp = clntp;
-	for (i=0; i<totclnt; i++) {
-		sprintf(debugmsg, "\n----------- Client %d Information ----------\n",i+1);
+	for (i = 0; i < totclnt; i++) {
+		sprintf(debugmsg,
+		    "\n----------- Client %d Information ----------\n", i+1);
 		senddebug(MSG_ALWAYS);
 		sprintf(debugmsg, "Client structure pointer: 0x%lX\n", cp);
 		senddebug(MSG_ALWAYS);
@@ -70,9 +75,10 @@ char	line[80];
 		senddebug(MSG_ALWAYS);
 		sprintf(debugmsg, "Prev pointer: 0x%lX\n", cp->prev);
 		senddebug(MSG_ALWAYS);
-		sprintf(debugmsg, "Client physical address: 0x%0X 0x%0X 0x%0X 0x%0X 0x%0X 0x%0X\n",
-			cp->addr[0], cp->addr[1], cp->addr[2],
-			cp->addr[3], cp->addr[4], cp->addr[5]);
+		sprintf(debugmsg, "Client physical address: 0x%0X 0x%0X 0x%0X "
+		    "0x%0X 0x%0X 0x%0X\n",
+		    cp->addr[0], cp->addr[1], cp->addr[2],
+		    cp->addr[3], cp->addr[4], cp->addr[5]);
 		senddebug(MSG_ALWAYS);
 		switch (cp->status) {
 		case ST_FIND_RCVD:
@@ -95,29 +101,45 @@ char	line[80];
 		}
 		sprintf(debugmsg, "Client status: %s\n", line);
 		senddebug(MSG_ALWAYS);
-		sprintf(debugmsg, "The list of boot files for this client is:\n");
+		sprintf(debugmsg,
+		    "The list of boot files for this client is:\n");
 		bp = cp->bootfp;
 		senddebug(MSG_ALWAYS);
 		while (bp) {
-			sprintf(debugmsg, "\tPointer to current boot file record: 0x%lX\n", bp);
+			sprintf(debugmsg,
+			    "\tPointer to current boot file record: 0x%lX\n",
+			    bp);
 			senddebug(MSG_ALWAYS);
-			sprintf(debugmsg, "\tPointer to next boot file record: 0x%lX\n", bp->next);
+			sprintf(debugmsg,
+			    "\tPointer to next boot file record: 0x%lX\n",
+			    bp->next);
 			senddebug(MSG_ALWAYS);
-			sprintf(debugmsg, "\tBoot file name: %s\n", bp->filename);
+			sprintf(debugmsg, "\tBoot file name: %s\n",
+			    bp->filename);
 			senddebug(MSG_ALWAYS);
-			sprintf(debugmsg, "\tBoot file load address: 0x%lX\n", bp->loadaddr);
+			sprintf(debugmsg, "\tBoot file load address: 0x%lX\n",
+			    bp->loadaddr);
 			senddebug(MSG_ALWAYS);
-			sprintf(debugmsg, "\tStart sequence number for this file: 0x%lX\n", bp->seqnum);
+			sprintf(debugmsg,
+			    "\tStart sequence number for this file: 0x%lX\n",
+			    bp->seqnum);
 			senddebug(MSG_ALWAYS);
 			bp = bp->next;
 		}
-		sprintf(debugmsg, "Currently active boot file structure pointer: 0x%lX\n", cp->currfp);
+		sprintf(debugmsg,
+		    "Currently active boot file structure pointer: 0x%lX\n",
+		    cp->currfp);
 		senddebug(MSG_ALWAYS);
-		sprintf(debugmsg, "File stream pointer for this active boot file: 0x%lX\n", cp->fstr);
+		sprintf(debugmsg,
+		    "File stream pointer for this active boot file: 0x%lX\n",
+		    cp->fstr);
 		senddebug(MSG_ALWAYS);
-		sprintf(debugmsg, "Lseek pointer to this active boot file: 0x%lX\n", cp->seekp);
+		sprintf(debugmsg,
+		    "Lseek pointer to this active boot file: 0x%lX\n",
+		    cp->seekp);
 		senddebug(MSG_ALWAYS);
-		sprintf(debugmsg, "Next sequence number to use: 0x%lX\n", cp->seqnum);
+		sprintf(debugmsg,
+		    "Next sequence number to use: 0x%lX\n", cp->seqnum);
 		senddebug(MSG_ALWAYS);
 		sprintf(debugmsg, "Final xfer address: 0x%lX\n", cp->xferaddr);
 		senddebug(MSG_ALWAYS);
