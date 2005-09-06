@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -75,7 +75,7 @@
 
 #define	MAXHOSTLEN	256
 #define	MIN_VERS	((ulong_t)0)
-#define	MAX_VERS	((ulong_t)4294967295L)
+#define	MAX_VERS	(4294967295UL)
 #define	UNKNOWN		"unknown"
 
 #define	MAX(a, b) (((a) > (b)) ? (a) : (b))
