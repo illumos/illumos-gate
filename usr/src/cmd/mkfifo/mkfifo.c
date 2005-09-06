@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
 /*	  All Rights Reserved					*/
 /*								*/
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -53,7 +53,7 @@ errmsg(int severity, int code, char *format, ...);
 extern mode_t
 newmode(char *modestr, mode_t basemode, mode_t umask, char *file, char *path);
 
-void
+int
 main(int argc, char *argv[])
 {
 	char *path;
@@ -101,7 +101,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	exit(exitval);
+	return (exitval);
 
 }
 

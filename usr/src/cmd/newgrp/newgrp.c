@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -71,12 +71,16 @@ char *supath = SUPATH;
 
 extern void audit_newgrp_login(char *, int);
 
-main(argc, argv)
-char *argv[];
+void error(char *s) __NORETURN;
+void warn(char *s);
+void usage(void);
+char *rname(char *);
+
+int
+main(int argc, char *argv[])
 {
-	register char *s;
-	register struct passwd *p;
-	char *rname();
+	char *s;
+	struct passwd *p;
 	gid_t chkgrp();
 	int eflag = 0;
 	int flag;
@@ -184,16 +188,17 @@ char *argv[];
 
 	execl(p->pw_shell, shell, NULL);
 	error(NS);
+	/* NOTREACHED */
 }
 
-warn(s)
-char *s;
+void
+warn(char *s)
 {
 	fprintf(stderr, "%s\n", gettext(s));
 }
 
-error(s)
-char *s;
+void
+error(char *s)
 {
 	warn(s);
 	exit(1);
@@ -204,8 +209,8 @@ chkgrp(gname, p)
 char	*gname;
 struct	passwd *p;
 {
-	register char **t;
-	register struct group *g;
+	char **t;
+	struct group *g;
 
 	g = getgrnam(gname);
 	endgrent();
@@ -238,10 +243,9 @@ struct	passwd *p;
  * return pointer to rightmost component of pathname
  */
 char *
-rname(pn)
-char *pn;
+rname(char *pn)
 {
-	register char *q;
+	char *q;
 
 	q = pn;
 	while (*pn)
@@ -250,7 +254,8 @@ char *pn;
 	return (q);
 }
 
-usage()
+void
+usage(void)
 {
 	fprintf(stderr, gettext(
 		"usage: newgrp [-l | -] [group]\n"));
