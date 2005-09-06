@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -118,7 +118,7 @@ extern void rpcbs_rmtcall();
 extern rpcb_stat_byvers *rpcbproc_getstat();
 
 extern struct netconfig *rpcbind_get_conf();
-extern void rpcbind_abort();
+extern void rpcbind_abort() __NORETURN;
 
 /* Common functions shared between versions */
 extern void rpcbproc_callit_com();

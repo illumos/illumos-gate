@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -245,7 +245,7 @@ rpcb_service_4(rqstp, transp)
  * address of the caller.
  */
 /* ARGSUSED */
-static char **
+char **
 rpcbproc_getaddr_4(regp, rqstp, transp, rpcbversnum)
 	rpcb *regp;
 	struct svc_req *rqstp;	/* Not used here */
@@ -274,7 +274,7 @@ rpcbproc_getaddr_4(regp, rqstp, transp, rpcbversnum)
  * address of the caller.
  */
 /* ARGSUSED */
-static char **
+char **
 rpcbproc_getversaddr_4(regp, rqstp, transp)
 	rpcb *regp;
 	struct svc_req *rqstp;	/* Not used here */
@@ -299,7 +299,7 @@ rpcbproc_getversaddr_4(regp, rqstp, transp)
  * We return a merged address.
  */
 /* ARGSUSED */
-static rpcb_entry_list_ptr *
+rpcb_entry_list_ptr *
 rpcbproc_getaddrlist_4(regp, rqstp, transp)
 	rpcb *regp;
 	struct svc_req *rqstp;	/* Not used here */
@@ -423,7 +423,7 @@ fail:	free_rpcb_entry_list(&rlist);
  * Free only the allocated structure, rest is all a pointer to some
  * other data somewhere else.
  */
-static void
+void
 free_rpcb_entry_list(rlistp)
 	rpcb_entry_list_ptr *rlistp;
 {
@@ -439,7 +439,7 @@ free_rpcb_entry_list(rlistp)
 }
 
 /* VARARGS */
-static rpcblist_ptr *
+rpcblist_ptr *
 rpcbproc_dump_4()
 {
 	return ((rpcblist_ptr *)&list_rbl);

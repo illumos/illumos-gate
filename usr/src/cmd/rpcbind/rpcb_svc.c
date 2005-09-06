@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -226,7 +226,7 @@ rpcb_service_3(rqstp, transp)
  * address of the caller.
  */
 /* ARGSUSED */
-static char **
+char **
 rpcbproc_getaddr_3(regp, rqstp, transp)
 	RPCB *regp;
 	struct svc_req *rqstp;	/* Not used here */
@@ -246,7 +246,7 @@ rpcbproc_getaddr_3(regp, rqstp, transp)
 }
 
 /* ARGSUSED */
-static rpcblist_ptr *
+rpcblist_ptr *
 rpcbproc_dump_3()
 {
 	return ((rpcblist_ptr *)&list_rbl);
