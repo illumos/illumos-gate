@@ -2532,7 +2532,6 @@ tcp_cleanup(tcp_t *tcp)
 	conn_t		*connp = tcp->tcp_connp;
 
 	tcp_bind_hash_remove(tcp);
-	CL_INET_DISCONNECT(tcp);
 	tcp_free(tcp);
 
 	conn_delete_ire(connp, NULL);
@@ -2636,14 +2635,19 @@ tcp_time_wait_collector(void *arg)
 		ASSERT(connp->conn_fanout != NULL);
 		lock = &connp->conn_fanout->connf_lock;
 		/*
-		 * This is essentially a TW reclaim fastpath where timewait
-		 * collector checks under fanout lock (so no one else can
-		 * get access to the conn_t) that refcnt is 2 i.e. one for
-		 * TCP and one for the classifier hash list. If ref count
-		 * is indeed 2, we can just remove the conn under lock and
-		 * avoid cleaning up the conn under squeue. This gives us
-		 * improved performance. Also please see the comments in
-		 * tcp_closei_local regarding the refcnt logic.
+		 * This is essentially a TW reclaim fast path optimization for
+		 * performance where the timewait collector checks under the
+		 * fanout lock (so that no one else can get access to the
+		 * conn_t) that the refcnt is 2 i.e. one for TCP and one for
+		 * the classifier hash list. If ref count is indeed 2, we can
+		 * just remove the conn under the fanout lock and avoid
+		 * cleaning up the conn under the squeue, provided that
+		 * clustering callbacks are not enabled. If clustering is
+		 * enabled, we need to make the clustering callback before
+		 * setting the CONDEMNED flag and after dropping all locks and
+		 * so we forego this optimization and fall back to the slow
+		 * path. Also please see the comments in tcp_closei_local
+		 * regarding the refcnt logic.
 		 *
 		 * Since we are holding the tcp_time_wait_lock, its better
 		 * not to block on the fanout_lock because other connections
@@ -2652,7 +2656,8 @@ tcp_time_wait_collector(void *arg)
 		 */
 		if (mutex_tryenter(lock)) {
 			mutex_enter(&connp->conn_lock);
-			if (connp->conn_ref == 2) {
+			if ((connp->conn_ref == 2) &&
+			    (cl_inet_disconnect == NULL)) {
 				ipcl_hash_remove_locked(connp,
 				    connp->conn_fanout);
 				/*
@@ -15634,6 +15639,7 @@ tcp_bind_failed(tcp_t *tcp, mblk_t *mp, int error)
 	if (tcp->tcp_conn.tcp_opts_conn_req != NULL)
 		tcp_close_mpp(&tcp->tcp_conn.tcp_opts_conn_req);
 
+	conn_delete_ire(tcp->tcp_connp, NULL);
 	putnext(q, mp);
 }
 
