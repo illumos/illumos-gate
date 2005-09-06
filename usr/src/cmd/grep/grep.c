@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,7 @@
 #include <string.h>
 #include <unistd.h>
 
-static const char * const errstr[] = {
+static const char *errstr[] = {
 	"Range endpoint too large.",
 	"Bad number.",
 	"``\\digit'' out of range.",
@@ -101,9 +101,7 @@ static void	regerr(int);
 static int	succeed(char *);
 
 int
-main(
-    int		argc,
-    char 	**argv)
+main(int argc, char **argv)
 {
 	int	c;
 	char	*arg;
@@ -151,7 +149,7 @@ main(
 
 	if (errflg || (optind >= argc)) {
 		errmsg("Usage: grep -hblcnsviw pattern file . . .\n",
-			(char *)NULL);
+		    (char *)NULL);
 		exit(2);
 	}
 
@@ -171,7 +169,7 @@ main(
 		unsigned int	wordlen;
 		char		*wordbuf;
 
-		wordlen = strlen(*argv) + 4;
+		wordlen = strlen(*argv) + 5; /* '\\' '<' *argv '\\' '>' '\0' */
 		if ((wordbuf = malloc(wordlen)) == NULL) {
 			errmsg("grep: Out of memory for word\n", (char *)NULL);
 			exit(2);
@@ -197,8 +195,7 @@ main(
 }
 
 static void
-execute(
-    char	*file)
+execute(char *file)
 {
 	char	*lbuf, *p;
 	long	count;
@@ -335,8 +332,7 @@ execute(
 }
 
 static int
-succeed(
-    char	*f)
+succeed(char *f)
 {
 	int nchars;
 	nsucc = (nsucc == 2) ? 2 : 1;
@@ -361,7 +357,7 @@ succeed(
 	if (bflag)
 		/* print block number */
 		(void) fprintf(stdout, "%lld:", (offset_t)
-			((lseek(temp, (off_t)0, SEEK_CUR) - 1) / BLKSIZE));
+		    ((lseek(temp, (off_t)0, SEEK_CUR) - 1) / BLKSIZE));
 
 	if (nflag)
 		/* print line number */
@@ -381,8 +377,7 @@ succeed(
 }
 
 static void
-regerr(
-    int	err)
+regerr(int err)
 {
 	errmsg("grep: RE error %d: ", err);
 	switch (err) {
