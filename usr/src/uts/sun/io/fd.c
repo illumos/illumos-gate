@@ -1238,8 +1238,8 @@ fd_cleanup(dev_info_t *dip, struct fdctlr *fdc, int hard, int locks)
 
 
 	FDERRPRINT(FDEP_L1, FDEM_ATTA,
-		(C, "fd_cleanup instance: %d ctlr: 0x%x\n",
-		ddi_get_instance(dip), (int)fdc));
+		(C, "fd_cleanup instance: %d ctlr: 0x%p\n",
+		ddi_get_instance(dip), (void *)fdc));
 
 
 	if (fdc == NULL) {
@@ -2432,7 +2432,7 @@ change failed. \n"));
 			fc.fdc_flags	= fc32.fdc_flags;
 			fc.fdc_blkno	= (daddr_t)fc32.fdc_blkno;
 			fc.fdc_secnt	= fc32.fdc_secnt;
-			fc.fdc_bufaddr	= (caddr_t)fc32.fdc_bufaddr;
+			fc.fdc_bufaddr	= (caddr_t)(uintptr_t)fc32.fdc_bufaddr;
 			fc.fdc_buflen	= fc32.fdc_buflen;
 			fc.fdc_cmd	= fc32.fdc_cmd;
 
@@ -2606,7 +2606,7 @@ fdrawioctl(struct fdctlr *fdc, int unit, intptr_t arg, int mode)
 		bcopy(fdr32.fdr_result, fdr.fdr_result,
 		    sizeof (fdr.fdr_result));
 		fdr.fdr_nbytes = fdr32.fdr_nbytes;
-		fdr.fdr_addr = (caddr_t)fdr32.fdr_addr;
+		fdr.fdr_addr = (caddr_t)(uintptr_t)fdr32.fdr_addr;
 		break;
 #endif
 	default:
@@ -2912,7 +2912,7 @@ failed. \n"));
 		bcopy(fdr.fdr_result, fdr32.fdr_result,
 		    sizeof (fdr32.fdr_result));
 		fdr32.fdr_nbytes = fdr.fdr_nbytes;
-		fdr32.fdr_addr = (caddr32_t)fdr.fdr_addr;
+		fdr32.fdr_addr = (caddr32_t)(uintptr_t)fdr.fdr_addr;
 		if (ddi_copyout(&fdr32, (caddr_t)arg, sizeof (fdr32), mode)) {
 			FDERRPRINT(FDEP_L1, FDEM_RAWI,
 			(C, "fdrawioctl: can't copy results32\n"));
@@ -3323,8 +3323,9 @@ fdstart(struct fdctlr *fdc)
 			/* If platform supports DMA, set up DMA resources */
 			if (fdc->c_fdtype & FDCTYPE_DMA) {
 				if ((fdc->c_fdtype & FDCTYPE_SB) &&
-				    (((uint32_t)addr & 0xFFFF0000) !=
-				    (((uint32_t)addr + tlen) & 0xFFFF0000))) {
+				    (((uint32_t)(uintptr_t)addr & 0xFFFF0000) !=
+				    (((uint32_t)(uintptr_t)addr + tlen) &
+				    0xFFFF0000))) {
 					csb->csb_addr = fdc->dma_buf;
 					sb_temp_buf_used = 1;
 					if (csb->csb_read != CSB_READ) {
@@ -5903,18 +5904,8 @@ fd_getauxiova(dev_info_t *dip)
 	if (auxdip == NULL)
 		return (NULL);
 
-	addr = (caddr_t)(caddr32_t)ddi_getprop(DDI_DEV_T_ANY,
+	addr = (caddr_t)(uintptr_t)(caddr32_t)ddi_getprop(DDI_DEV_T_ANY,
 		auxdip, DDI_PROP_DONTPASS, "address", 0);
-
-	/*
-	 * The device tree on some sun4c machines (SS1+) incorrectly
-	 * reports the "auxiliary-io" as being word wide at an
-	 * aligned address rather than byte wide at an offset of 3.
-	 * Here we correct for this ..
-	 */
-	if (strcmp(ddi_get_name(auxdip), "auxiliary-io") == 0 &&
-	    (((int)addr & 3) == 0))
-		addr += 3;
 
 	return (addr);
 }
