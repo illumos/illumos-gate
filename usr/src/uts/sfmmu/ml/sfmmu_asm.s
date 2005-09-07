@@ -279,6 +279,83 @@ label:
 	TSB_INSERT_UNLOCK_ENTRY(tsbep, tte, tagtarget, tmp1)		;\
 label:
 
+/*
+ * Load a 32M/256M Panther TSB entry into the TSB at TL > 0,
+ *   for ITLB synthesis.
+ *
+ * tsbep = pointer to the TSBE to load as va (ro)
+ * tte = 4M pfn offset (in), value of the TTE retrieved and loaded (out)
+ *   with exec_perm turned off and exec_synth turned on
+ * tagtarget = tag target register.  To get TSBE tag to load,
+ *   we need to mask off the context and leave only the va (clobbered)
+ * ttepa = pointer to the TTE to retrieve/load as pa (ro)
+ * tmp1, tmp2 = scratch registers
+ * label = label to use for branch (text)
+ * %asi = ASI to use for TSB access
+ */
+
+#define	TSB_UPDATE_TL_PN(tsbep, tte, tagtarget, ttepa, tmp1, tmp2, label) \
+	TSB_LOCK_ENTRY(tsbep, tmp1, tmp2, label)			;\
+	/*								;\
+	 * I don't need to update the TSB then check for the valid tte.	;\
+	 * TSB invalidate will spin till the entry is unlocked.	Note,	;\
+	 * we always invalidate the hash table before we unload the TSB.;\
+	 * Or in 4M pfn offset to TTE and set the exec_perm bit to 0	;\
+	 * and exec_synth bit to 1.					;\
+	 */								;\
+	sllx	tagtarget, TTARGET_VA_SHIFT, tagtarget			;\
+	mov	tte, tmp1						;\
+	ldxa	[ttepa]ASI_MEM, tte					;\
+	srlx	tagtarget, TTARGET_VA_SHIFT, tagtarget			;\
+	sethi	%hi(TSBTAG_INVALID), tmp2				;\
+	brgez,a,pn tte, label/**/f					;\
+	 sta	tmp2, [tsbep + TSBE_TAG]%asi		/* unlock */	;\
+	or	tte, tmp1, tte						;\
+	andn	tte, TTE_EXECPRM_INT, tte				;\
+	or	tte, TTE_E_SYNTH_INT, tte				;\
+	TSB_INSERT_UNLOCK_ENTRY(tsbep, tte, tagtarget, tmp1)		;\
+label:
+
+/*
+ * Build a 4M pfn offset for a Panther 32M/256M page, for ITLB synthesis.
+ *
+ * tte = value of the TTE, used to get tte_size bits (ro)
+ * tagaccess = tag access register, used to get 4M pfn bits (ro)
+ * pfn = 4M pfn bits shifted to offset for tte (out)
+ * tmp1 = scratch register
+ * label = label to use for branch (text)
+ */
+
+#define	GET_4M_PFN_OFF(tte, tagaccess, pfn, tmp, label)			\
+	/*								;\
+	 * Get 4M bits from tagaccess for 32M, 256M pagesizes.		;\
+	 * Return them, shifted, in pfn.				;\
+	 */								;\
+	srlx	tagaccess, MMU_PAGESHIFT4M, tagaccess			;\
+	srlx	tte, TTE_SZ_SHFT, tmp		/* isolate the */	;\
+	andcc	tmp, TTE_SZ_BITS, %g0		/* tte_size bits */	;\
+	bz,a,pt %icc, label/**/f		/* if 0, is */		;\
+	  and	tagaccess, 0x7, tagaccess	/* 32M page size */	;\
+	and	tagaccess, 0x3f, tagaccess /* else 256M page size */	;\
+label:									;\
+	sllx	tagaccess, MMU_PAGESHIFT4M, pfn
+
+/*
+ * Add 4M TTE size code to a tte for a Panther 32M/256M page,
+ * for ITLB synthesis.
+ *
+ * tte = value of the TTE, used to get tte_size bits (rw)
+ * tmp1 = scratch register
+ */
+
+#define	SET_TTE4M_PN(tte, tmp)						\
+	/*								;\
+	 * Set 4M pagesize tte bits. 					;\
+	 */								;\
+	set	TTE4M, tmp						;\
+	sllx	tmp, TTE_SZ_SHFT, tmp					;\
+	or	tte, tmp, tte
+
 #endif /* UTSB_PHYS */
 
 /*
@@ -2366,7 +2443,7 @@ dktsb4m_kpmcheck:
 	GET_2ND_TSBE_PTR(%g6, %g7, %g3, %g4, %g5, sfmmu_uitlb)
 	/* g1 = first TSB pointer, g3 = second TSB pointer */
 	srlx	%g2, TAG_VALO_SHIFT, %g7
-	PROBE_2ND_ITSB(%g3, %g7)
+	PROBE_2ND_ITSB(%g3, %g7, isynth)
 	/* NOT REACHED */
 #endif /* sun4v */
 
@@ -2725,8 +2802,8 @@ tsb_user:
 	be,pn	%icc, tsb_user4m
 	  srlx	%g3, TTE_SZ2_SHFT, %g7
 	andcc	%g7, TTE_SZ2_BITS, %g7		! check 32/256MB
-	bnz,a,pn %icc, tsb_user4m
-	  nop
+	bnz,a,pn %icc, tsb_user_pn_synth
+	  cmp	%g5, FAST_IMMU_MISS_TT
 #endif
 
 tsb_user8k:
@@ -2758,33 +2835,89 @@ tsb_user8k:
 
 tsb_user4m:
 	ldn	[%g6 + TSBMISS_TSBPTR4M], %g1		/* g1 = tsbp */
+4:
 	brz,pn	%g1, 5f	/* Check to see if we have 2nd TSB programmed */
 	  nop
 
 #ifndef sun4v
-	mov	ASI_N, %g7	! user TSBs always accessed by VA
-	mov	%g7, %asi
+        mov     ASI_N, %g7      ! user TSBs always accessed by VA
+        mov     %g7, %asi
 #endif
 
-	TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, 6)
+        TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, 6)
 
 5:
 #ifdef sun4v
-	cmp	%g5, T_INSTR_MMU_MISS
-	be,a,pn	%xcc, 9f
-	  mov	%g3, %g5
+        cmp     %g5, T_INSTR_MMU_MISS
+        be,a,pn %xcc, 9f
+          mov   %g3, %g5
 #endif /* sun4v */
-	cmp	%g5, FAST_IMMU_MISS_TT
-	be,pn	%xcc, 9f
-	mov	%g3, %g5
+        cmp     %g5, FAST_IMMU_MISS_TT
+        be,pn   %xcc, 9f
+        mov     %g3, %g5
 
-	DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)
-	! trapstat wants TTE in %g5
-	retry
+        DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)
+        ! trapstat wants TTE in %g5
+        retry
 9:
-	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)
-	! trapstat wants TTE in %g5
-	retry
+        ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)
+        ! trapstat wants TTE in %g5
+        retry
+
+#ifndef sun4v
+	/*
+	 * Panther ITLB synthesis.
+	 * The Panther 32M and 256M ITLB code simulates these two large page
+	 * sizes with 4M pages, to provide support for programs, for example
+	 * Java, that may copy instructions into a 32M or 256M data page and
+	 * then execute them. The code below generates the 4M pfn bits and
+	 * saves them in the modified 32M/256M ttes in the TSB. If the tte is
+	 * stored in the DTLB to map a 32M/256M page, the 4M pfn offset bits
+	 * are ignored by the hardware.
+	 * 
+	 * Now, load into TSB/TLB.  At this point:
+	 * g2 = tagtarget
+	 * g3 = tte
+	 * g4 = patte
+	 * g5 = tt
+	 * g6 = tsbmiss area
+	 */
+tsb_user_pn_synth:
+	be,pt	%xcc, tsb_user_itlb_synth	/* ITLB miss */
+	  andcc %g3, TTE_EXECPRM_INT, %g0	/* is execprm bit set */
+	bz,pn %icc, 4b				/* if not, been here before */
+	  ldn	[%g6 + TSBMISS_TSBPTR4M], %g1	/* g1 = tsbp */
+	brz,a,pn %g1, 5f			/* no 2nd tsb */
+	  mov	%g3, %g5
+
+	mov	MMU_TAG_ACCESS, %g7
+	ldxa	[%g7]ASI_DMMU, %g6		/* get tag access va */
+	GET_4M_PFN_OFF(%g3, %g6, %g5, %g7, 1)	/* make 4M pfn offset */
+
+	mov	ASI_N, %g7	/* user TSBs always accessed by VA */
+	mov	%g7, %asi
+	TSB_UPDATE_TL_PN(%g1, %g5, %g2, %g4, %g7, %g3, 4) /* update TSB */
+5:
+        DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)
+        retry
+
+tsb_user_itlb_synth:
+	ldn	[%g6 + TSBMISS_TSBPTR4M], %g1		/* g1 = tsbp */
+
+	mov	MMU_TAG_ACCESS, %g7
+	ldxa	[%g7]ASI_IMMU, %g6		/* get tag access va */
+	GET_4M_PFN_OFF(%g3, %g6, %g5, %g7, 2)	/* make 4M pfn offset */
+	brz,a,pn %g1, 7f	/* Check to see if we have 2nd TSB programmed */
+	  or	%g5, %g3, %g5			/* add 4M bits to TTE */
+
+	mov	ASI_N, %g7	/* user TSBs always accessed by VA */
+	mov	%g7, %asi
+	TSB_UPDATE_TL_PN(%g1, %g5, %g2, %g4, %g7, %g3, 6) /* update TSB */
+7:
+	SET_TTE4M_PN(%g5, %g7)			/* add TTE4M pagesize to TTE */
+        ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)
+        retry
+#endif
 
 tsb_kernel:					! no 32M or 256M support
 #ifdef sun4v

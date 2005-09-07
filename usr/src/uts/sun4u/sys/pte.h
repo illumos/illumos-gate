@@ -54,18 +54,17 @@ typedef union {
 		uint32_t	ie:1;		/* 1=invert endianness */
 		uint32_t	hmenum:3;	/* sw - # of hment in hme_blk */
 
-		uint32_t	lckcnt:6;	/* sw - tte lock ref cnt */
-		uint32_t	rsv:1;		/* */
+		uint32_t	rsv:7;		/* former rsv:1 lockcnt:6 */
 		uint32_t	sz2:1;		/* Panther sz2[48] */
 		uint32_t	diag:5;		/* See USII Note above. */
 		uint32_t	pahi:11;	/* pa[42:32] */
 		uint32_t	palo:19;	/* pa[31:13] */
-		uint32_t	soft1:1;	/* sw bits - unused */
+		uint32_t	no_sync:1;	/* sw - ghost unload */
 
 		uint32_t	suspend:1;	/* sw bits - suspended */
 		uint32_t	ref:1;		/* sw - reference */
 		uint32_t	wr_perm:1;	/* sw - write permission */
-		uint32_t	no_sync:1;	/* sw - ghost unload */
+		uint32_t	exec_synth:1;	/* sw bits - itlb synthesis */
 
 		uint32_t	exec_perm:1;	/* sw - execute permission */
 		uint32_t	l:1;		/* 1=lock in tlb */
@@ -90,13 +89,13 @@ typedef union {
 #define	tte_nfo		tte_bit.nfo
 #define	tte_ie		tte_bit.ie		/* XXX? */
 #define	tte_hmenum	tte_bit.hmenum
-#define	tte_lckcnt	tte_bit.lckcnt
 #define	tte_pahi	tte_bit.pahi
 #define	tte_palo	tte_bit.palo
+#define	tte_no_sync	tte_bit.no_sync
 #define	tte_suspend	tte_bit.suspend
 #define	tte_ref		tte_bit.ref
 #define	tte_wr_perm	tte_bit.wr_perm
-#define	tte_no_sync	tte_bit.no_sync
+#define	tte_exec_synth	tte_bit.exec_synth
 #define	tte_exec_perm	tte_bit.exec_perm
 #define	tte_lock	tte_bit.l
 #define	tte_cp		tte_bit.cp
@@ -182,10 +181,11 @@ typedef union {
 
 /* Defines for tte using intlo */
 #define	TTE_SUSPEND_SHIFT		0
+#define	TTE_NOSYNC_INT			0x00001000
 #define	TTE_SUSPEND			0x00000800
 #define	TTE_REF_INT			0x00000400
 #define	TTE_WRPRM_INT			0x00000200
-#define	TTE_NOSYNC_INT			0x00000100
+#define	TTE_E_SYNTH_INT			0x00000100
 #define	TTE_EXECPRM_INT			0x00000080
 #define	TTE_LCK_INT			0x00000040
 #define	TTE_CP_INT			0x00000020
@@ -264,8 +264,10 @@ typedef union {
 		(ttep)->tte_bit.sz = 3;		\
 		(ttep)->tte_bit.nfo = 1;	\
 		(ttep)->tte_bit.ie = 1;		\
+		(ttep)->tte_bit.sz2 = 1;	\
 		(ttep)->tte_bit.pahi = 0x7ff;	\
 		(ttep)->tte_bit.palo = 0x7ffff;	\
+		(ttep)->tte_bit.exec_perm = 1;	\
 		(ttep)->tte_bit.l = 1;		\
 		(ttep)->tte_bit.cp = 1;		\
 		(ttep)->tte_bit.cv = 1;		\

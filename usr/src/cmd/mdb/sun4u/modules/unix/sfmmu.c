@@ -593,6 +593,8 @@ tsbinfo_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		{ "64K", TSB64K, TSB64K },
 		{ "512K", TSB512K, TSB512K },
 		{ "4M", TSB4M, TSB4M },
+		{ "32M", TSB32M, TSB32M },
+		{ "256M", TSB256M, TSB256M },
 		{ NULL, 0, 0 }
 	};
 
@@ -682,15 +684,15 @@ tsbinfo_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf(
 				"TSB @ %lx (%d entries)\n"
 				    "%-?s %-17s %s\n"
-				    "%<u>%-?s %1s %1s %-11s %1s %1s %1s "
-				    "%1s %1s %2s %8s %1s %1s %1s %1s %1s %1s "
-				    "%1s %1s %1s %1s %1s%</u>\n",
-				    tsbinfo.tsb_va, entries,
-				    "", "TAG", "TTE",
-				    "ADDR", "I", "L", "VA 63:22", "V",
-				    "S", "N", "I", "H", "LC", "PA 42:13", "R",
-				    "W", "N", "X", "L", "P", "V", "E", "P",
-				    "W", "G");
+				    "%<u>%-?s %1s %1s %-11s "
+				    "%1s %1s %1s %1s %1s %1s %8s "
+				    "%1s %1s %1s %1s %1s %1s %1s "
+				    "%1s %1s %1s %1s %1s %1s%</u>\n",
+				    tsbinfo.tsb_va, entries, "", "TAG", "TTE",
+				    "ADDR", "I", "L", "VA 63:22",
+				    "V", "S", "N", "I", "H", "S", "PA 42:13",
+				    "N", "U", "R", "W", "E", "X", "L",
+				    "P", "V", "E", "P", "W", "G");
 
 			tsbend = tsbp + entries;
 			for (tsbstart = tsbp; tsbp < tsbend; tsbp++) {
@@ -703,9 +705,9 @@ tsbinfo_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 						tsbp->tte_tag.tag_valo);
 					pa = (tsbp->tte_data.tte_pahi << 19) +
 					    tsbp->tte_data.tte_palo;
-					mdb_printf("%0?lx %-1u %-1u "
-					    "%011lx %1u %-1u %-1u %-1u %-1u "
-					    "%-2u %08x %1u %1u %1u %1u %1u "
+					mdb_printf("%0?lx %-1u %-1u %011lx "
+					    "%1u %-1u %-1u %-1u %-1u %1u %08x "
+					    "%1u %1u %1u %1u %1u %1u %1u "
 					    "%1u %1u %1u %1u %1u %1u\n",
 					    tsbinfo.tsb_va + (tsbp - tsbstart)
 					    * sizeof (struct tsbe),
@@ -719,12 +721,18 @@ tsbinfo_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 #ifdef sun4v
 					    0,
 #else
-					    tsbp->tte_data.tte_lckcnt,
+					    tsbp->tte_data.tte_size2,
 #endif
 					    pa,
+					    tsbp->tte_data.tte_no_sync,
+					    tsbp->tte_data.tte_suspend,
 					    tsbp->tte_data.tte_ref,
 					    tsbp->tte_data.tte_wr_perm,
-					    tsbp->tte_data.tte_no_sync,
+#ifdef sun4v
+					    0,
+#else
+					    tsbp->tte_data.tte_exec_synth,
+#endif
 					    tsbp->tte_data.tte_exec_perm,
 					    tsbp->tte_data.tte_lock,
 					    tsbp->tte_data.tte_cp,

@@ -3374,13 +3374,13 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				}
 				if (btopr(va.va_size) >= btopr(off + pgsz)) {
 					SEGVN_VMSTAT_FLTVNPAGES(21);
-					err = FC_MAKE_ERR(EIO);
+					err = FC_MAKE_ERR(ierr);
 					goto out;
 				}
 				if (btopr(va.va_size) <
 				    btopr(off + (eaddr - a))) {
 					SEGVN_VMSTAT_FLTVNPAGES(22);
-					err = FC_MAKE_ERR(EIO);
+					err = FC_MAKE_ERR(ierr);
 					goto out;
 				}
 				if (brkcow || type == F_SOFTLOCK) {

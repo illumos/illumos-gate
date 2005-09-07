@@ -1507,7 +1507,6 @@ etrap_table:
  * g3 - g4 = scratch (clobbered)
  * g5 = tsbe data (in)
  * g6 = scratch (clobbered)
- * g7 = pc we jumped here from (in)
  */
 	ALTENTRY(exec_fault)
 	TRACE_TSBHIT(0x200)

@@ -932,13 +932,13 @@ trapstat_snapshot()
 #ifndef	sun4v
 #define	TSTAT_RETENT_STATHI	1
 #define	TSTAT_RETENT_STATLO	2
-#define	TSTAT_RETENT_SHIFT	8
-#define	TSTAT_RETENT_COUNT_LD	10
-#define	TSTAT_RETENT_COUNT_ST	12
-#define	TSTAT_RETENT_TMPTSHI	13
-#define	TSTAT_RETENT_TMPTSLO	14
-#define	TSTAT_RETENT_TIME_LD	16
-#define	TSTAT_RETENT_TIME_ST	18
+#define	TSTAT_RETENT_SHIFT	11
+#define	TSTAT_RETENT_COUNT_LD	13
+#define	TSTAT_RETENT_COUNT_ST	15
+#define	TSTAT_RETENT_TMPTSHI	16
+#define	TSTAT_RETENT_TMPTSLO	17
+#define	TSTAT_RETENT_TIME_LD	19
+#define	TSTAT_RETENT_TIME_ST	21
 #else /* sun4v */
 #define	TSTAT_RETENT_STATHI	1
 #define	TSTAT_RETENT_STATLO	2
@@ -979,6 +979,9 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 	    0x8531702e,		/* srlx  %g5, 46, %g2			*/
 	    0x8408a004,		/* and   %g2, 4, %g2			*/
 	    0x88110002,		/* or    %g4, %g2, %g4			*/
+	    0x80a12005,		/* cmp   %g4, 5				*/
+	    0x34400002,		/* bg,a,pn %icc, +8			*/
+	    0x88102004,		/* mov   4, %g4				*/
 	    0x89292000,		/* sll   %g4, shift, %g4		*/
 	    0x82004004,		/* add   %g1, %g4, %g1			*/
 	    0xc4586000,		/* ldx   [%g1 + tmiss_count], %g2	*/

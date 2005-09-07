@@ -590,26 +590,59 @@ label/**/_get_2nd_tsb_base:						;\
 label/**/1:								\
 	/* END CSTYLED */
 
-
+#ifndef TRAPTRACE
 /*
  * Same as above, with the following additions:
  * If the TTE found is not executable, branch directly
- * to exec_fault.  If a TSB miss, branch to TSB miss handler.
+ * to exec_fault after checking for ITLB synthesis.
+ * If a TSB miss, branch to TSB miss handler.
  */
-#define	PROBE_2ND_ITSB(tsbe_ptr, vpg_4m)				\
+#define	PROBE_2ND_ITSB(tsbe_ptr, vpg_4m, label)				\
 	/* BEGIN CSTYLED */						\
 	ldda	[tsbe_ptr]%asi, %g4	/* g4 = tag, g5 = data */	;\
 	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
 	bne,pn	%xcc, sfmmu_tsb_miss_tt	/* branch if !match */		;\
-	  nop								;\
+	  or	%g0, TTE4M, %g6						;\
 	andcc	%g5, TTE_EXECPRM_INT, %g0  /* check execute bit */	;\
+	bz,a,pn	%icc, label/**/1					;\
+	  sllx	%g6, TTE_SZ_SHFT, %g6					;\
+	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
+	retry				/* retry faulted instruction */ ;\
+label/**/1:								;\
+	andcc %g5, TTE_E_SYNTH_INT, %g0					;\
+	bz,pn	%icc, exec_fault					;\
+	  or	%g5, %g6, %g5						;\
+	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
+	retry				/* retry faulted instruction */	\
+	/* END CSTYLED */
+#else /* TRAPTRACE */
+/*
+ * Same as above, with the TT_TRACE and mov tsbe_ptr, %g1 additions.
+ */
+#define	PROBE_2ND_ITSB(tsbe_ptr, vpg_4m, label)				\
+	/* BEGIN CSTYLED */						\
+	ldda	[tsbe_ptr]%asi, %g4	/* g4 = tag, g5 = data */	;\
+	cmp	%g4, vpg_4m		/* compare tag w/ TSB */	;\
+	bne,pn	%xcc, sfmmu_tsb_miss_tt	/* branch if !match */		;\
+	  or	%g0, TTE4M, %g6						;\
+	andcc	%g5, TTE_EXECPRM_INT, %g0  /* check execute bit */	;\
+	bz,a,pn	%icc, label/**/1					;\
+	  sllx	%g6, TTE_SZ_SHFT, %g6					;\
+	mov	tsbe_ptr, %g1		/* trap trace wants ptr in %g1 */ ;\
+	TT_TRACE(trace_tsbhit)						;\
+	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
+	retry				/* retry faulted instruction */ ;\
+label/**/1:								;\
+	andcc %g5, TTE_E_SYNTH_INT, %g0				;\
 	bz,pn	%icc, exec_fault					;\
 	  mov	tsbe_ptr, %g1		/* trap trace wants ptr in %g1 */ ;\
+	or	%g5, %g6, %g5						;\
 	TT_TRACE(trace_tsbhit)						;\
 	ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)				;\
 	retry				/* retry faulted instruction */	\
 	/* END CSTYLED */
 
+#endif /* TRAPTRACE */
 #endif /* _ASM */
 
 #ifdef	__cplusplus
