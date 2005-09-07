@@ -103,11 +103,13 @@ DEF_STRIPFLAG=
 STRIPFLAG=$(DEF_STRIPFLAG)
 
 # set __GNUC= in the environment to build 32-bit with the gcc compiler.
+# The default is to use the Sun Studio 10 compiler for all processor types.
 __GNUC=		$(POUND_SIGN)
 
-# set __GNUC64 to '#' in the environment to build 64-bit with the Studio
-# compiler.  The default is to use gcc for amd64 but not sparcv9.
-__GNUC64=	$(INTEL_BLD)
+# set __GNUC64= in the environment to build 64-bit with the gcc compiler.
+# The default is to use the Sun Studio 10 compiler by using the __GNUC
+# setting.
+__GNUC64=	$(__GNUC)
 
 # BUILD_TOOLS is the root of all tools including compilers.
 # ONBLD_TOOLS is the root of all the tools that are part of SUNWonbld.
@@ -564,7 +566,7 @@ NATIVE_MACH=	$(MACH:amd64=i386)
 # Defined here so it can be overridden by developer.
 #
 SPRO_ROOT=		$(BUILD_TOOLS)/SUNWspro
-SPRO_VROOT=		$(SPRO_ROOT)/SOS8
+SPRO_VROOT=		$(SPRO_ROOT)/SOS10
 GNU_ROOT=		$(SFW_ROOT)
 
 # Specify platform compiler versions for languages
@@ -607,7 +609,7 @@ $(__GNUC64)amd64_CCC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_g++
 amd64_CPP=		/usr/ccs/lib/cpp
 amd64_AS=		$(ONBLD_TOOLS)/bin/$(MACH)/aw
 amd64_LD=		/usr/ccs/bin/ld
-amd64_LINT=		$(SPRO_ROOT)/SOS10-EA/bin/lint
+amd64_LINT=		$(SPRO_VROOT)/bin/lint
 
 NATIVECC=		$($(NATIVE_MACH)_CC)
 NATIVECCC=		$($(NATIVE_MACH)_CCC)

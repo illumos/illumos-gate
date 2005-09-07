@@ -1267,10 +1267,10 @@ main(int argc, char **argv)
 	if ((dir = getenv("SPRO_VROOT")) != NULL) {
 		(void) snprintf(cc_buf, MAXPATHLEN, "%s/bin", dir);
 	} else if ((dir = getenv("SPRO_ROOT")) != NULL) {
-		(void) snprintf(cc_buf, MAXPATHLEN, "%s/SOS8/bin", dir);
+		(void) snprintf(cc_buf, MAXPATHLEN, "%s/SOS10/bin", dir);
 	} else if ((dir = getenv("BUILD_TOOLS")) != NULL) {
 		(void) snprintf(cc_buf, MAXPATHLEN,
-		    "%s/SUNWspro/SOS8/bin", dir);
+		    "%s/SUNWspro/SOS10/bin", dir);
 	}
 	if (dir != NULL)
 		default_cc_dir = (char *)cc_buf;
