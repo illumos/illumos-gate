@@ -979,10 +979,10 @@ dt_printf_validate(dt_pfargv_t *pfv, uint_t flags,
 
 	/*
 	 * We fake up a parse node representing the type that can be used with
-	 * an aggregation result conversion.  For now we hardcode the signed
-	 * aggregations; this will be fixed later when sign issues are fixed.
+	 * an aggregation result conversion, which -- for all but count() --
+	 * is a signed quantity.
 	 */
-	if (kind == DTRACEAGG_QUANTIZE || kind == DTRACEAGG_LQUANTIZE)
+	if (kind != DTRACEAGG_COUNT)
 		aggtype = "int64_t";
 	else
 		aggtype = "uint64_t";

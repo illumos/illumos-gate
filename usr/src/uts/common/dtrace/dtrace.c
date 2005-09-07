@@ -396,6 +396,17 @@ dtrace_load##bits(uintptr_t addr)					\
 #define	DTRACE_ANCHORED(probe)	((probe)->dtpr_func[0] != '\0')
 #define	DTRACE_STATE_ALIGN	64
 
+#define	DTRACE_FLAGS2FLT(flags)						\
+	(((flags) & CPU_DTRACE_BADADDR) ? DTRACEFLT_BADADDR :		\
+	((flags) & CPU_DTRACE_ILLOP) ? DTRACEFLT_ILLOP :		\
+	((flags) & CPU_DTRACE_DIVZERO) ? DTRACEFLT_DIVZERO :		\
+	((flags) & CPU_DTRACE_KPRIV) ? DTRACEFLT_KPRIV :		\
+	((flags) & CPU_DTRACE_UPRIV) ? DTRACEFLT_UPRIV :		\
+	((flags) & CPU_DTRACE_TUPOFLOW) ?  DTRACEFLT_TUPOFLOW :		\
+	((flags) & CPU_DTRACE_BADALIGN) ?  DTRACEFLT_BADALIGN :		\
+	((flags) & CPU_DTRACE_NOSCRATCH) ?  DTRACEFLT_NOSCRATCH :	\
+	DTRACEFLT_UNKNOWN)
+
 static dtrace_probe_t *dtrace_probe_lookup_id(dtrace_id_t id);
 static void dtrace_enabling_provide(dtrace_provider_t *);
 static int dtrace_enabling_match(dtrace_enabling_t *, int *);
@@ -5044,18 +5055,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 
 			dtrace_probe_error(state, ecb->dte_epid, ndx,
 			    (mstate.dtms_present & DTRACE_MSTATE_FLTOFFS) ?
-			    mstate.dtms_fltoffs : -1,
-			    (*flags & CPU_DTRACE_BADADDR) ? DTRACEFLT_BADADDR :
-			    (*flags & CPU_DTRACE_ILLOP) ? DTRACEFLT_ILLOP :
-			    (*flags & CPU_DTRACE_DIVZERO) ? DTRACEFLT_DIVZERO :
-			    (*flags & CPU_DTRACE_KPRIV) ? DTRACEFLT_KPRIV :
-			    (*flags & CPU_DTRACE_UPRIV) ? DTRACEFLT_UPRIV :
-			    (*flags & CPU_DTRACE_TUPOFLOW) ?
-			    DTRACEFLT_TUPOFLOW :
-			    (*flags & CPU_DTRACE_BADALIGN) ?
-			    DTRACEFLT_BADALIGN :
-			    (*flags & CPU_DTRACE_NOSCRATCH) ?
-			    DTRACEFLT_NOSCRATCH : DTRACEFLT_UNKNOWN,
+			    mstate.dtms_fltoffs : -1, DTRACE_FLAGS2FLT(*flags),
 			    cpu_core[cpuid].cpuc_dtrace_illval);
 
 			continue;
@@ -7138,7 +7138,8 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
  * are much more constrained than normal DIFOs.  Specifically, they may
  * not:
  *
- * 1. Make calls to subroutines other than copyin() or copyinstr().
+ * 1. Make calls to subroutines other than copyin(), copyinstr() or
+ *    miscellaneous string routines
  * 2. Access DTrace variables other than the args[] array, and the
  *    curthread, pid, tid and execname variables.
  * 3. Have thread-local variables.
@@ -7255,7 +7256,14 @@ dtrace_difo_validate_helper(dtrace_difo_t *dp)
 			    subr == DIF_SUBR_BCOPY ||
 			    subr == DIF_SUBR_COPYIN ||
 			    subr == DIF_SUBR_COPYINTO ||
-			    subr == DIF_SUBR_COPYINSTR)
+			    subr == DIF_SUBR_COPYINSTR ||
+			    subr == DIF_SUBR_INDEX ||
+			    subr == DIF_SUBR_LLTOSTR ||
+			    subr == DIF_SUBR_RINDEX ||
+			    subr == DIF_SUBR_STRCHR ||
+			    subr == DIF_SUBR_STRJOIN ||
+			    subr == DIF_SUBR_STRRCHR ||
+			    subr == DIF_SUBR_STRSTR)
 				break;
 
 			err += efunc(pc, "invalid subr %u\n", subr);
@@ -11731,11 +11739,12 @@ dtrace_anon_property(void)
  * DTrace Helper Functions
  */
 static void
-dtrace_helper_trace(dtrace_helper_action_t *helper, dtrace_vstate_t *vstate,
-    int where)
+dtrace_helper_trace(dtrace_helper_action_t *helper,
+    dtrace_mstate_t *mstate, dtrace_vstate_t *vstate, int where)
 {
 	uint32_t size, next, nnext, i;
 	dtrace_helptrace_t *ent;
+	uint16_t flags = cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
 
 	if (!dtrace_helptrace_enabled)
 		return;
@@ -11772,6 +11781,11 @@ dtrace_helper_trace(dtrace_helper_action_t *helper, dtrace_vstate_t *vstate,
 	ent->dtht_helper = helper;
 	ent->dtht_where = where;
 	ent->dtht_nlocals = vstate->dtvs_nlocals;
+
+	ent->dtht_fltoffs = (mstate->dtms_present & DTRACE_MSTATE_FLTOFFS) ?
+	    mstate->dtms_fltoffs : -1;
+	ent->dtht_fault = DTRACE_FLAGS2FLT(flags);
+	ent->dtht_illval = cpu_core[CPU->cpu_id].cpuc_dtrace_illval;
 
 	for (i = 0; i < vstate->dtvs_nlocals; i++) {
 		dtrace_statvar_t *svar;
@@ -11823,7 +11837,7 @@ dtrace_helper(int which, dtrace_mstate_t *mstate,
 	for (; helper != NULL; helper = helper->dthp_next) {
 		if ((pred = helper->dthp_predicate) != NULL) {
 			if (trace)
-				dtrace_helper_trace(helper, vstate, 0);
+				dtrace_helper_trace(helper, mstate, vstate, 0);
 
 			if (!dtrace_dif_emulate(pred, mstate, vstate, state))
 				goto next;
@@ -11834,7 +11848,8 @@ dtrace_helper(int which, dtrace_mstate_t *mstate,
 
 		for (i = 0; i < helper->dthp_nactions; i++) {
 			if (trace)
-				dtrace_helper_trace(helper, vstate, i + 1);
+				dtrace_helper_trace(helper,
+				    mstate, vstate, i + 1);
 
 			rval = dtrace_dif_emulate(helper->dthp_actions[i],
 			    mstate, vstate, state);
@@ -11845,12 +11860,13 @@ dtrace_helper(int which, dtrace_mstate_t *mstate,
 
 next:
 		if (trace)
-			dtrace_helper_trace(helper, vstate,
+			dtrace_helper_trace(helper, mstate, vstate,
 			    DTRACE_HELPTRACE_NEXT);
 	}
 
 	if (trace)
-		dtrace_helper_trace(helper, vstate, DTRACE_HELPTRACE_DONE);
+		dtrace_helper_trace(helper, mstate, vstate,
+		    DTRACE_HELPTRACE_DONE);
 
 	/*
 	 * Restore the arg0 that we saved upon entry.
@@ -11862,7 +11878,8 @@ next:
 
 err:
 	if (trace)
-		dtrace_helper_trace(helper, vstate, DTRACE_HELPTRACE_ERR);
+		dtrace_helper_trace(helper, mstate, vstate,
+		    DTRACE_HELPTRACE_ERR);
 
 	/*
 	 * Restore the arg0 that we saved upon entry.

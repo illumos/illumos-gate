@@ -306,10 +306,10 @@ dt_print_lquantize(dtrace_hdl_t *dtp, FILE *fp, const void *addr,
 	if (size != sizeof (uint64_t) * (levels + 2))
 		return (dt_set_errno(dtp, EDT_DMISMATCH));
 
-	while (first_bin < levels + 1 && data[first_bin] == 0)
+	while (first_bin <= levels + 1 && data[first_bin] == 0)
 		first_bin++;
 
-	if (first_bin == levels + 1) {
+	if (first_bin > levels + 1) {
 		first_bin = 0;
 		last_bin = 2;
 	} else {
@@ -627,7 +627,7 @@ dt_print_ustack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 				(void) snprintf(c, sizeof (c),
 				    "%s`%s", dt_basename(objname), name);
 			}
-		} else if (str != NULL && str[0] != '\0' &&
+		} else if (str != NULL && str[0] != '\0' && str[0] != '@' &&
 		    (P != NULL && ((map = Paddr_to_map(P, pc[i])) == NULL ||
 		    (map->pr_mflags & MA_WRITE)))) {
 			/*
@@ -660,6 +660,25 @@ dt_print_ustack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 
 		if ((err = dt_printf(dtp, fp, "\n")) < 0)
 			break;
+
+		if (str != NULL && str[0] == '@') {
+			/*
+			 * If the first character of the string is an "at" sign,
+			 * then the string is inferred to be an annotation --
+			 * and it is printed out beneath the frame and offset
+			 * with brackets.
+			 */
+			if ((err = dt_printf(dtp, fp, "%*s", indent, "")) < 0)
+				break;
+
+			(void) snprintf(c, sizeof (c), "  [ %s ]", &str[1]);
+
+			if ((err = dt_printf(dtp, fp, format, c)) < 0)
+				break;
+
+			if ((err = dt_printf(dtp, fp, "\n")) < 0)
+				break;
+		}
 
 		if (str != NULL) {
 			str += strlen(str) + 1;

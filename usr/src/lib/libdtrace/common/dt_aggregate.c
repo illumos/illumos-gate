@@ -36,19 +36,19 @@
 #define	DTRACE_AHASHSIZE	32779		/* big 'ol prime */
 
 static void
-dt_aggregate_count(uint64_t *existing, uint64_t *new, size_t size)
+dt_aggregate_count(int64_t *existing, int64_t *new, size_t size)
 {
 	int i;
 
-	for (i = 0; i < size / sizeof (uint64_t); i++)
+	for (i = 0; i < size / sizeof (int64_t); i++)
 		existing[i] = existing[i] + new[i];
 }
 
 static int
-dt_aggregate_countcmp(uint64_t *lhs, uint64_t *rhs)
+dt_aggregate_countcmp(int64_t *lhs, int64_t *rhs)
 {
-	uint64_t lvar = *lhs;
-	uint64_t rvar = *rhs;
+	int64_t lvar = *lhs;
+	int64_t rvar = *rhs;
 
 	if (lvar > rvar)
 		return (1);
@@ -61,7 +61,7 @@ dt_aggregate_countcmp(uint64_t *lhs, uint64_t *rhs)
 
 /*ARGSUSED*/
 static void
-dt_aggregate_min(uint64_t *existing, uint64_t *new, size_t size)
+dt_aggregate_min(int64_t *existing, int64_t *new, size_t size)
 {
 	if (*new < *existing)
 		*existing = *new;
@@ -69,17 +69,17 @@ dt_aggregate_min(uint64_t *existing, uint64_t *new, size_t size)
 
 /*ARGSUSED*/
 static void
-dt_aggregate_max(uint64_t *existing, uint64_t *new, size_t size)
+dt_aggregate_max(int64_t *existing, int64_t *new, size_t size)
 {
 	if (*new > *existing)
 		*existing = *new;
 }
 
 static int
-dt_aggregate_averagecmp(uint64_t *lhs, uint64_t *rhs)
+dt_aggregate_averagecmp(int64_t *lhs, int64_t *rhs)
 {
-	uint64_t lavg = lhs[0] ? (lhs[1] / lhs[0]) : 0;
-	uint64_t ravg = rhs[0] ? (rhs[1] / rhs[0]) : 0;
+	int64_t lavg = lhs[0] ? (lhs[1] / lhs[0]) : 0;
+	int64_t ravg = rhs[0] ? (rhs[1] / rhs[0]) : 0;
 
 	if (lavg > ravg)
 		return (1);
@@ -92,9 +92,9 @@ dt_aggregate_averagecmp(uint64_t *lhs, uint64_t *rhs)
 
 /*ARGSUSED*/
 static void
-dt_aggregate_lquantize(uint64_t *existing, uint64_t *new, size_t size)
+dt_aggregate_lquantize(int64_t *existing, int64_t *new, size_t size)
 {
-	uint64_t arg = *existing++;
+	int64_t arg = *existing++;
 	uint16_t levels = DTRACE_LQUANTIZE_LEVELS(arg);
 	int i;
 
@@ -103,9 +103,9 @@ dt_aggregate_lquantize(uint64_t *existing, uint64_t *new, size_t size)
 }
 
 static long double
-dt_aggregate_lquantizedsum(uint64_t *lquanta)
+dt_aggregate_lquantizedsum(int64_t *lquanta)
 {
-	uint64_t arg = *lquanta++;
+	int64_t arg = *lquanta++;
 	int32_t base = DTRACE_LQUANTIZE_BASE(arg);
 	uint16_t step = DTRACE_LQUANTIZE_STEP(arg);
 	uint16_t levels = DTRACE_LQUANTIZE_LEVELS(arg), i;
@@ -118,11 +118,36 @@ dt_aggregate_lquantizedsum(uint64_t *lquanta)
 	    (long double)(base + 1));
 }
 
+static int64_t
+dt_aggregate_lquantizedzero(int64_t *lquanta)
+{
+	int64_t arg = *lquanta++;
+	int32_t base = DTRACE_LQUANTIZE_BASE(arg);
+	uint16_t step = DTRACE_LQUANTIZE_STEP(arg);
+	uint16_t levels = DTRACE_LQUANTIZE_LEVELS(arg), i;
+
+	if (base - 1 == 0)
+		return (lquanta[0]);
+
+	for (i = 0; i < levels; base += step, i++) {
+		if (base != 0)
+			continue;
+
+		return (lquanta[i + 1]);
+	}
+
+	if (base + 1 == 0)
+		return (lquanta[levels + 1]);
+
+	return (0);
+}
+
 static int
-dt_aggregate_lquantizedcmp(uint64_t *lhs, uint64_t *rhs)
+dt_aggregate_lquantizedcmp(int64_t *lhs, int64_t *rhs)
 {
 	long double lsum = dt_aggregate_lquantizedsum(lhs);
 	long double rsum = dt_aggregate_lquantizedsum(rhs);
+	int64_t lzero, rzero;
 
 	if (lsum > rsum)
 		return (1);
@@ -130,17 +155,38 @@ dt_aggregate_lquantizedcmp(uint64_t *lhs, uint64_t *rhs)
 	if (lsum < rsum)
 		return (-1);
 
+	/*
+	 * If they're both equal, then we will compare based on the weights at
+	 * zero.  If the weights at zero are equal (or if zero is not within
+	 * the range of the linear quantization), then this will be judged a
+	 * tie and will be resolved based on the key comparison.
+	 */
+	lzero = dt_aggregate_lquantizedzero(lhs);
+	rzero = dt_aggregate_lquantizedzero(rhs);
+
+	if (lzero > rzero)
+		return (1);
+
+	if (lzero < rzero)
+		return (-1);
+
 	return (0);
 }
 
 static int
-dt_aggregate_quantizedcmp(uint64_t *lhs, uint64_t *rhs)
+dt_aggregate_quantizedcmp(int64_t *lhs, int64_t *rhs)
 {
 	int nbuckets = DTRACE_QUANTIZE_NBUCKETS, i;
 	long double ltotal = 0, rtotal = 0;
+	int64_t lzero, rzero;
 
 	for (i = 0; i < nbuckets; i++) {
 		int64_t bucketval = DTRACE_QUANTIZE_BUCKETVAL(i);
+
+		if (bucketval == 0) {
+			lzero = lhs[i];
+			rzero = rhs[i];
+		}
 
 		ltotal += (long double)bucketval * (long double)lhs[i];
 		rtotal += (long double)bucketval * (long double)rhs[i];
@@ -150,6 +196,17 @@ dt_aggregate_quantizedcmp(uint64_t *lhs, uint64_t *rhs)
 		return (1);
 
 	if (ltotal < rtotal)
+		return (-1);
+
+	/*
+	 * If they're both equal, then we will compare based on the weights at
+	 * zero.  If the weights at zero are equal, then this will be judged a
+	 * tie and will be resolved based on the key comparison.
+	 */
+	if (lzero > rzero)
+		return (1);
+
+	if (lzero < rzero)
 		return (-1);
 
 	return (0);
@@ -377,9 +434,9 @@ dt_aggregate_snap_cpu(dtrace_hdl_t *dtp, processorid_t cpu)
 			rec = &agg->dtagd_rec[agg->dtagd_nrecs - 1];
 			roffs = rec->dtrd_offset;
 			/* LINTED - alignment */
-			h->dtahe_aggregate((uint64_t *)&data[roffs],
+			h->dtahe_aggregate((int64_t *)&data[roffs],
 			    /* LINTED - alignment */
-			    (uint64_t *)&addr[roffs], rec->dtrd_size);
+			    (int64_t *)&addr[roffs], rec->dtrd_size);
 
 			/*
 			 * If we're keeping per CPU data, apply the aggregating
@@ -389,9 +446,9 @@ dt_aggregate_snap_cpu(dtrace_hdl_t *dtp, processorid_t cpu)
 				data = aggdata->dtada_percpu[cpu];
 
 				/* LINTED - alignment */
-				h->dtahe_aggregate((uint64_t *)data,
+				h->dtahe_aggregate((int64_t *)data,
 				    /* LINTED - alignment */
-				    (uint64_t *)&addr[roffs], rec->dtrd_size);
+				    (int64_t *)&addr[roffs], rec->dtrd_size);
 			}
 
 			goto bufnext;
@@ -669,7 +726,7 @@ dt_aggregate_valcmp(const void *lhs, const void *rhs)
 	caddr_t ldata = lh->dtahe_data.dtada_data;
 	caddr_t rdata = rh->dtahe_data.dtada_data;
 	dtrace_recdesc_t *lrec, *rrec;
-	uint64_t *laddr, *raddr;
+	int64_t *laddr, *raddr;
 	int rval, i;
 
 	if ((rval = dt_aggregate_hashcmp(lhs, rhs)) != 0)
@@ -698,8 +755,8 @@ dt_aggregate_valcmp(const void *lhs, const void *rhs)
 			return (1);
 	}
 
-	laddr = (uint64_t *)(uintptr_t)(ldata + lrec->dtrd_offset);
-	raddr = (uint64_t *)(uintptr_t)(rdata + rrec->dtrd_offset);
+	laddr = (int64_t *)(uintptr_t)(ldata + lrec->dtrd_offset);
+	raddr = (int64_t *)(uintptr_t)(rdata + rrec->dtrd_offset);
 
 	switch (lrec->dtrd_action) {
 	case DTRACEAGG_AVG:

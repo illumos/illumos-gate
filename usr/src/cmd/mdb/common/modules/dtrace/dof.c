@@ -29,12 +29,6 @@
 #include <mdb/mdb_modapi.h>
 #include <dtrace.h>
 
-#ifdef _LP64
-#define	DIFO_ADDRWIDTH		11
-#else
-#define	DIFO_ADDRWIDTH		8
-#endif
-
 extern int dof_sec(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern const char *dof_sec_name(uint32_t);
 
@@ -259,7 +253,7 @@ dis_pushts(const dtrace_difo_t *dp, const char *name, dif_instr_t instr)
 	    name, type, DIF_INSTR_R2(instr), DIF_INSTR_RS(instr));
 
 	if (type < sizeof (tnames) / sizeof (tnames[0]))
-		mdb_printf("\t! %s", tnames[type]);
+		mdb_printf("\t\t! %s", tnames[type]);
 }
 
 /*ARGSUSED*/
@@ -402,7 +396,7 @@ dis(uintptr_t addr, dtrace_difo_t *dp)
 		opcode = 0; /* force invalid opcode message */
 
 	op = &optab[opcode];
-	mdb_printf("%0*p %08x ", DIFO_ADDRWIDTH, addr, instr);
+	mdb_printf("%0?p %08x ", addr, instr);
 	op->op_func(dp, op->op_name, instr);
 	mdb_printf("\n");
 	mdb_set_dot(addr + sizeof (dif_instr_t));
@@ -432,8 +426,7 @@ difo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("%<u>DIF Object 0x%p%</u> (refcnt=%d)\n\n",
 	    addr, dp->dtdo_refcnt);
-	mdb_printf("%<b>%-*s %-8s %s%</b>\n", DIFO_ADDRWIDTH, "ADDR",
-	    "OPCODE", "INSTRUCTION");
+	mdb_printf("%<b>%-?s %-8s %s%</b>\n", "ADDR", "OPCODE", "INSTRUCTION");
 
 	mdb_set_dot((uintmax_t)(uintptr_t)dp->dtdo_buf);
 	limit = (uintptr_t)dp->dtdo_buf + dp->dtdo_len * sizeof (dif_instr_t);

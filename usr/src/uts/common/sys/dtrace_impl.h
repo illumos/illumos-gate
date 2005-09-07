@@ -1029,6 +1029,9 @@ typedef struct dtrace_helptrace {
 	dtrace_helper_action_t	*dtht_helper;	/* helper action */
 	int dtht_where;				/* where in helper action */
 	int dtht_nlocals;			/* number of locals */
+	int dtht_fault;				/* type of fault (if any) */
+	int dtht_fltoffs;			/* DIF offset */
+	uint64_t dtht_illval;			/* faulting value */
 	uint64_t dtht_locals[1];		/* local variables */
 } dtrace_helptrace_t;
 

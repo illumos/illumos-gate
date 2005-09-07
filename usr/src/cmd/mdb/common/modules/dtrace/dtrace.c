@@ -1385,6 +1385,26 @@ dtrace_helptrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (opt_v) {
 		int i;
 
+		if (help.dtht_where == DTRACE_HELPTRACE_ERR) {
+			int f = help.dtht_fault;
+
+			mdb_printf("%?s| %?s %10s |\n", "", "", "");
+			mdb_printf("%?s| %?s %10s +->  fault: %s\n", "", "", "",
+			    f == DTRACEFLT_BADADDR ? "BADADDR" :
+			    f == DTRACEFLT_BADALIGN ? "BADALIGN" :
+			    f == DTRACEFLT_ILLOP ? "ILLOP" :
+			    f == DTRACEFLT_DIVZERO ? "DIVZERO" :
+			    f == DTRACEFLT_NOSCRATCH ? "NOSCRATCH" :
+			    f == DTRACEFLT_KPRIV ? "KPRIV" :
+			    f == DTRACEFLT_UPRIV ? "UPRIV" :
+			    f == DTRACEFLT_TUPOFLOW ? "TUPOFLOW" :
+			    "DTRACEFLT_UNKNOWN");
+			mdb_printf("%?s| %?s %12s     addr: 0x%x\n", "", "", "",
+			    help.dtht_illval);
+			mdb_printf("%?s| %?s %12s   offset: %d\n", "", "", "",
+			    help.dtht_fltoffs);
+		}
+
 		mdb_printf("%?s|\n%?s+--> %?s %4s %s\n", "", "",
 		    "ADDR", "NDX", "VALUE");
 		addr += sizeof (help) - sizeof (uint64_t);
