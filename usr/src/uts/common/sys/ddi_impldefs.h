@@ -66,7 +66,7 @@ typedef enum {
 } ddi_node_class_t;
 
 /*
- * dev_info: 	The main device information structure this is intended to be
+ * dev_info:	The main device information structure this is intended to be
  *		opaque to drivers and drivers should use ddi functions to
  *		access *all* driver accessible fields.
  *
@@ -221,7 +221,7 @@ struct dev_info  {
 #define	DDI_DRV_UNLOADED(devi)	(DEVI(devi)->devi_ops == &mod_nodev_ops)
 
 /*
- * The device node state (devi_state) contains information regarding
+ * The device state flags (devi_state) contains information regarding
  * the state of the device (Online/Offline/Down).  For bus nexus
  * devices, the device state also contains state information regarding
  * the state of the bus represented by this nexus node.
@@ -229,11 +229,13 @@ struct dev_info  {
  * Device state information is stored in bits [0-7], bus state in bits
  * [8-15].
  *
+ * NOTE: all devi_state updates shoule be protected by devi_lock.
  */
 #define	DEVI_DEVICE_OFFLINE	0x00000001
 #define	DEVI_DEVICE_DOWN	0x00000002
 #define	DEVI_DEVICE_DEGRADED	0x00000004
 #define	DEVI_DEVICE_REMOVED	0x00000008 /* hardware removed */
+
 #define	DEVI_BUS_QUIESCED	0x00000100
 #define	DEVI_BUS_DOWN		0x00000200
 #define	DEVI_NDI_CONFIG		0x00000400 /* perform config when attaching */
@@ -253,188 +255,255 @@ struct dev_info  {
 #define	DEVI_S_EVREMOVE		0x20000000 /* state of devfs event */
 #define	DEVI_S_NEED_RESET	0x40000000 /* devo_reset should be called */
 
-#define	DEVI_BUSY		0x1	/* busy configuring children */
-#define	DEVI_MADE_CHILDREN	0x2	/* children made from specs */
-#define	DEVI_ATTACHED_CHILDREN	0x4	/* attached all existing children */
-#define	DEVI_BRANCH_HELD	0x8	/* branch rooted at this dip held */
-#define	DEVI_NO_BIND		0x10	/* prevent driver binding */
-#define	DEVI_REGISTERED_DEVID	0x20	/* device registered a devid */
+/*
+ * Device state macros.
+ * o All SET/CLR/DONE users must protect context with devi_lock.
+ * o DEVI_SET_DEVICE_ONLINE users must do his own DEVI_SET_REPORT.
+ * o DEVI_SET_DEVICE_{DOWN|DEGRADED|UP} should only be used when !OFFLINE.
+ * o DEVI_SET_DEVICE_UP clears DOWN and DEGRADED.
+ */
+#define	DEVI_IS_DEVICE_OFFLINE(dip)					\
+	((DEVI(dip)->devi_state & DEVI_DEVICE_OFFLINE) == DEVI_DEVICE_OFFLINE)
 
-#define	DEVI_VHCI_NODE(dip)	\
-	(DEVI(dip)->devi_node_attributes & DDI_VHCI_NODE)
+#define	DEVI_SET_DEVICE_ONLINE(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	/* setting ONLINE clears DOWN, DEGRADED, OFFLINE */		\
+	DEVI(dip)->devi_state &= ~(DEVI_DEVICE_DOWN |			\
+	    DEVI_DEVICE_DEGRADED | DEVI_DEVICE_OFFLINE);		\
+	}
+
+#define	DEVI_SET_DEVICE_OFFLINE(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= (DEVI_DEVICE_OFFLINE | DEVI_S_REPORT);	\
+	}
+
+#define	DEVI_IS_DEVICE_DOWN(dip)					\
+	((DEVI(dip)->devi_state & DEVI_DEVICE_DOWN) == DEVI_DEVICE_DOWN)
+
+#define	DEVI_SET_DEVICE_DOWN(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	ASSERT(!DEVI_IS_DEVICE_OFFLINE(dip));				\
+	DEVI(dip)->devi_state |= (DEVI_DEVICE_DOWN | DEVI_S_REPORT);	\
+	}
+
+#define	DEVI_IS_DEVICE_DEGRADED(dip)					\
+	((DEVI(dip)->devi_state &					\
+	    (DEVI_DEVICE_DEGRADED|DEVI_DEVICE_DOWN)) == DEVI_DEVICE_DEGRADED)
+
+#define	DEVI_SET_DEVICE_DEGRADED(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	ASSERT(!DEVI_IS_DEVICE_OFFLINE(dip));				\
+	DEVI(dip)->devi_state |= (DEVI_DEVICE_DEGRADED | DEVI_S_REPORT); \
+	}
+
+#define	DEVI_SET_DEVICE_UP(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	ASSERT(!DEVI_IS_DEVICE_OFFLINE(dip));				\
+	DEVI(dip)->devi_state &= ~(DEVI_DEVICE_DEGRADED | DEVI_DEVICE_DOWN); \
+	DEVI(dip)->devi_state |= DEVI_S_REPORT;				\
+	}
+
+/* Device removal and insertion */
+#define	DEVI_IS_DEVICE_REMOVED(dip)					\
+	((DEVI(dip)->devi_state & DEVI_DEVICE_REMOVED) == DEVI_DEVICE_REMOVED)
+
+#define	DEVI_SET_DEVICE_REMOVED(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= DEVI_DEVICE_REMOVED;			\
+	}
+
+#define	DEVI_SET_DEVICE_REINSERTED(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_DEVICE_REMOVED;			\
+	}
+
+/* Bus state change macros */
+#define	DEVI_IS_BUS_QUIESCED(dip)					\
+	((DEVI(dip)->devi_state & DEVI_BUS_QUIESCED) == DEVI_BUS_QUIESCED)
+
+#define	DEVI_SET_BUS_ACTIVE(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_BUS_QUIESCED;			\
+	DEVI(dip)->devi_state |= DEVI_S_REPORT;				\
+	}
+
+#define	DEVI_SET_BUS_QUIESCE(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= (DEVI_BUS_QUIESCED | DEVI_S_REPORT);	\
+	}
+
+#define	DEVI_IS_BUS_DOWN(dip)						\
+	((DEVI(dip)->devi_state & DEVI_BUS_DOWN) == DEVI_BUS_DOWN)
+
+#define	DEVI_SET_BUS_UP(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_BUS_DOWN;			\
+	DEVI(dip)->devi_state |= DEVI_S_REPORT;				\
+	}
+
+#define	DEVI_SET_BUS_DOWN(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= (DEVI_BUS_DOWN | DEVI_S_REPORT);	\
+	}
+
+/* Status change report needed */
+#define	DEVI_NEED_REPORT(dip)						\
+	((DEVI(dip)->devi_state & DEVI_S_REPORT) == DEVI_S_REPORT)
+
+#define	DEVI_SET_REPORT(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= DEVI_S_REPORT;				\
+	}
+
+#define	DEVI_REPORT_DONE(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_S_REPORT;			\
+	}
+
+/* Do an NDI_CONFIG for its children */
+#define	DEVI_NEED_NDI_CONFIG(dip)					\
+	((DEVI(dip)->devi_state & DEVI_NDI_CONFIG) == DEVI_NDI_CONFIG)
+
+#define	DEVI_SET_NDI_CONFIG(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= DEVI_NDI_CONFIG;			\
+	}
+
+#define	DEVI_CLR_NDI_CONFIG(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_NDI_CONFIG;			\
+	}
+
+/* Attaching or detaching state */
+#define	DEVI_IS_ATTACHING(dip)						\
+	((DEVI(dip)->devi_state & DEVI_S_ATTACHING) == DEVI_S_ATTACHING)
+
+#define	DEVI_SET_ATTACHING(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= DEVI_S_ATTACHING;			\
+	}
+
+#define	DEVI_CLR_ATTACHING(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_S_ATTACHING;			\
+	}
+
+#define	DEVI_IS_DETACHING(dip)						\
+	((DEVI(dip)->devi_state & DEVI_S_DETACHING) == DEVI_S_DETACHING)
+
+#define	DEVI_SET_DETACHING(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= DEVI_S_DETACHING;			\
+	}
+
+#define	DEVI_CLR_DETACHING(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_S_DETACHING;			\
+	}
+
+/* Onlining or offlining state */
+#define	DEVI_IS_ONLINING(dip)						\
+	((DEVI(dip)->devi_state & DEVI_S_ONLINING) == DEVI_S_ONLINING)
+
+#define	DEVI_SET_ONLINING(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= DEVI_S_ONLINING;			\
+	}
+
+#define	DEVI_CLR_ONLINING(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_S_ONLINING;			\
+	}
+
+#define	DEVI_IS_OFFLINING(dip)						\
+	((DEVI(dip)->devi_state & DEVI_S_OFFLINING) == DEVI_S_OFFLINING)
+
+#define	DEVI_SET_OFFLINING(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= DEVI_S_OFFLINING;			\
+	}
+
+#define	DEVI_CLR_OFFLINING(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_S_OFFLINING;			\
+	}
+
+#define	DEVI_IS_IN_RECONFIG(dip)					\
+	(DEVI(dip)->devi_state & (DEVI_S_OFFLINING | DEVI_S_ONLINING))
+
+/* Busy invoking a dacf task against this node */
+#define	DEVI_IS_INVOKING_DACF(dip)					\
+	((DEVI(dip)->devi_state & DEVI_S_INVOKING_DACF) == DEVI_S_INVOKING_DACF)
+
+#define	DEVI_SET_INVOKING_DACF(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= DEVI_S_INVOKING_DACF;			\
+	}
+
+#define	DEVI_CLR_INVOKING_DACF(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_S_INVOKING_DACF;			\
+	}
+
+/* Events for add/remove */
+#define	DEVI_EVADD(dip)							\
+	((DEVI(dip)->devi_state & DEVI_S_EVADD) == DEVI_S_EVADD)
+
+#define	DEVI_SET_EVADD(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_S_EVREMOVE;			\
+	DEVI(dip)->devi_state |= DEVI_S_EVADD;				\
+	}
+
+#define	DEVI_EVREMOVE(dip)						\
+	((DEVI(dip)->devi_state & DEVI_S_EVREMOVE) == DEVI_S_EVREMOVE)
+
+#define	DEVI_SET_EVREMOVE(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_S_EVADD;				\
+	DEVI(dip)->devi_state |= DEVI_S_EVREMOVE;			\
+	}
+
+#define	DEVI_SET_EVUNINIT(dip)		{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~(DEVI_S_EVADD | DEVI_S_EVREMOVE);	\
+	}
+
+/* Need to call the devo_reset entry point for this device at shutdown */
+#define	DEVI_NEED_RESET(dip)						\
+	((DEVI(dip)->devi_state & DEVI_S_NEED_RESET) == DEVI_S_NEED_RESET)
+
+#define	DEVI_SET_NEED_RESET(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state |= DEVI_S_NEED_RESET;			\
+	}
+
+#define	DEVI_CLR_NEED_RESET(dip)	{				\
+	ASSERT(mutex_owned(&DEVI(dip)->devi_lock));			\
+	DEVI(dip)->devi_state &= ~DEVI_S_NEED_RESET;			\
+	}
+
+void	i_devi_enter(dev_info_t *, uint_t s_mask, uint_t w_mask, int has_lock);
+void	i_devi_exit(dev_info_t *, uint_t c_mask, int has_lock);
+
+/*
+ * devi_flags bits
+ *
+ * NOTE: all devi_state updates shoule be protected by devi_lock.
+ */
+#define	DEVI_BUSY		0x00000001 /* busy configuring children */
+#define	DEVI_MADE_CHILDREN	0x00000002 /* children made from specs */
+#define	DEVI_ATTACHED_CHILDREN	0x00000004 /* attached all existing children */
+#define	DEVI_BRANCH_HELD	0x00000008 /* branch rooted at this dip held */
+#define	DEVI_NO_BIND		0x00000010 /* prevent driver binding */
+#define	DEVI_REGISTERED_DEVID	0x00000020 /* device registered a devid */
 
 #define	DEVI_BUSY_CHANGING(dip)	(DEVI(dip)->devi_flags & DEVI_BUSY)
-
-#define	DEVI_BUSY_OWNED(dip)	\
-	(((DEVI(dip))->devi_flags & DEVI_BUSY) && \
+#define	DEVI_BUSY_OWNED(dip)	(DEVI_BUSY_CHANGING(dip) &&	\
 	((DEVI(dip))->devi_busy_thread == curthread))
 
-#define	DEVI_IS_DEVICE_OFFLINE(dip) \
-	((DEVI((dip))->devi_state & DEVI_DEVICE_OFFLINE) == DEVI_DEVICE_OFFLINE)
-
-#define	DEVI_SET_DEVICE_ONLINE(dip) \
-	{ if (i_ddi_node_state(dip) != DS_READY) \
-		(DEVI((dip))->devi_state |= DEVI_S_REPORT); \
-	(DEVI((dip))->devi_state &= \
-	~(DEVI_DEVICE_OFFLINE | DEVI_DEVICE_DEGRADED | DEVI_DEVICE_DOWN)); }
-
-#define	DEVI_SET_DEVICE_OFFLINE(dip) \
-	{ (DEVI((dip))->devi_state |= DEVI_S_REPORT); \
-	(DEVI((dip))->devi_state |= DEVI_DEVICE_OFFLINE); }
-
-#define	DEVI_IS_DEVICE_DOWN(dip) \
-	((DEVI((dip))->devi_state & DEVI_DEVICE_DOWN) == DEVI_DEVICE_DOWN)
-
-#define	DEVI_SET_DEVICE_DOWN(dip) \
-	{ (DEVI((dip))->devi_state |= DEVI_S_REPORT); \
-	(DEVI((dip))->devi_state |= DEVI_DEVICE_DOWN); }
-
-#define	DEVI_IS_DEVICE_DEGRADED(dip) \
-	((DEVI((dip))->devi_state & (DEVI_DEVICE_DEGRADED|DEVI_DEVICE_DOWN)) \
-		== DEVI_DEVICE_DEGRADED)
-
-#define	DEVI_SET_DEVICE_DEGRADED(dip) \
-	{ (DEVI((dip))->devi_state |= DEVI_S_REPORT); \
-	(DEVI((dip))->devi_state |= DEVI_DEVICE_DEGRADED); }
-
-#define	DEVI_SET_DEVICE_UP(dip) \
-	{ (DEVI((dip))->devi_state |= DEVI_S_REPORT); \
-	(DEVI((dip))->devi_state &= ~(DEVI_DEVICE_DEGRADED|DEVI_DEVICE_DOWN)); }
-
-#define	DEVI_IS_DEVICE_REMOVED(dip) \
-	((DEVI((dip))->devi_state & DEVI_DEVICE_REMOVED) == DEVI_DEVICE_REMOVED)
-
-#define	DEVI_SET_DEVICE_REMOVED(dip) \
-	{ (DEVI((dip))->devi_state |= DEVI_DEVICE_REMOVED); }
-
-#define	DEVI_SET_DEVICE_REINSERTED(dip) \
-	{ (DEVI((dip))->devi_state &= ~DEVI_DEVICE_REMOVED); }
-
-#define	DEVI_IS_BUS_QUIESCED(dip) \
-	((DEVI((dip))->devi_state & DEVI_BUS_QUIESCED) == DEVI_BUS_QUIESCED)
-
-#define	DEVI_SET_BUS_ACTIVE(dip) \
-	{ (DEVI((dip))->devi_state |= DEVI_S_REPORT); \
-	(DEVI((dip))->devi_state &= ~DEVI_BUS_QUIESCED); }
-
-#define	DEVI_SET_BUS_QUIESCE(dip) \
-	{ (DEVI((dip))->devi_state |= DEVI_S_REPORT); \
-	(DEVI((dip))->devi_state |= DEVI_BUS_QUIESCED); }
-
-#define	DEVI_IS_BUS_DOWN(dip) \
-	((DEVI((dip))->devi_state & DEVI_BUS_DOWN) == DEVI_BUS_DOWN)
-
-#define	DEVI_SET_BUS_UP(dip) \
-	{ (DEVI((dip))->devi_state |= DEVI_S_REPORT); \
-	(DEVI((dip))->devi_state &= ~DEVI_BUS_DOWN); }
-
-#define	DEVI_SET_BUS_DOWN(dip) \
-	{ (DEVI((dip))->devi_state |= DEVI_S_REPORT); \
-	(DEVI((dip))->devi_state |= DEVI_BUS_DOWN); }
-
-/* node needs status change report */
-#define	DEVI_NEED_REPORT(dip) \
-	((DEVI((dip))->devi_state & DEVI_S_REPORT) == DEVI_S_REPORT)
-
-#define	DEVI_REPORT_DONE(dip) \
-	(DEVI((dip))->devi_state &= ~DEVI_S_REPORT)
-
-/* do an NDI_CONFIG for its children */
-#define	DEVI_NEED_NDI_CONFIG(dip) \
-	((DEVI((dip))->devi_state & DEVI_NDI_CONFIG) == DEVI_NDI_CONFIG)
-
-#define	DEVI_SET_NDI_CONFIG(dip) \
-	(DEVI((dip))->devi_state |= DEVI_NDI_CONFIG)
-
-#define	DEVI_CLR_NDI_CONFIG(dip) \
-	(DEVI((dip))->devi_state &= ~DEVI_NDI_CONFIG)
-
-/* attaching or detaching state */
-#define	DEVI_SET_ATTACHING(dip) \
-	(DEVI((dip))->devi_state |= DEVI_S_ATTACHING)
-
-#define	DEVI_CLR_ATTACHING(dip) \
-	(DEVI((dip))->devi_state &= ~DEVI_S_ATTACHING)
-
-#define	DEVI_IS_ATTACHING(dip) \
-	((DEVI((dip))->devi_state & DEVI_S_ATTACHING) == DEVI_S_ATTACHING)
-
-#define	DEVI_SET_DETACHING(dip) \
-	(DEVI((dip))->devi_state |= DEVI_S_DETACHING)
-
-#define	DEVI_CLR_DETACHING(dip) \
-	(DEVI((dip))->devi_state &= ~DEVI_S_DETACHING)
-
-#define	DEVI_IS_DETACHING(dip) \
-	((DEVI((dip))->devi_state & DEVI_S_DETACHING) == DEVI_S_DETACHING)
-
-/* onlining or offlining state */
-#define	DEVI_SET_ONLINING(dip) \
-	(DEVI((dip))->devi_state |= DEVI_S_ONLINING)
-
-#define	DEVI_CLR_ONLINING(dip) \
-	(DEVI((dip))->devi_state &= ~DEVI_S_ONLINING)
-
-#define	DEVI_IS_ONLINING(dip) \
-	((DEVI((dip))->devi_state & DEVI_S_ONLINING) == DEVI_S_ONLINING)
-
-#define	DEVI_SET_OFFLINING(dip) \
-	(DEVI((dip))->devi_state |= DEVI_S_OFFLINING)
-
-#define	DEVI_CLR_OFFLINING(dip) \
-	(DEVI((dip))->devi_state &= ~DEVI_S_OFFLINING)
-
-#define	DEVI_IS_OFFLINING(dip) \
-	((DEVI((dip))->devi_state & DEVI_S_OFFLINING) == DEVI_S_OFFLINING)
-
-#define	DEVI_IS_IN_RECONFIG(dip) \
-	(DEVI((dip))->devi_state & (DEVI_S_OFFLINING | DEVI_S_ONLINING))
-
-/* busy invoking a dacf task against this node */
-#define	DEVI_IS_INVOKING_DACF(dip) \
-	((DEVI((dip))->devi_state & DEVI_S_INVOKING_DACF) \
-		== DEVI_S_INVOKING_DACF)
-
-#define	DEVI_SET_INVOKING_DACF(dip) \
-	(DEVI((dip))->devi_state |= DEVI_S_INVOKING_DACF)
-
-#define	DEVI_CLR_INVOKING_DACF(dip) \
-	(DEVI((dip))->devi_state &= ~DEVI_S_INVOKING_DACF)
-
-#define	DEVI_SET_EVADD(dip) \
-	(DEVI((dip))->devi_state &= ~DEVI_S_EVREMOVE); \
-	(DEVI((dip))->devi_state |= DEVI_S_EVADD);
-
-#define	DEVI_SET_EVREMOVE(dip) \
-	(DEVI((dip))->devi_state &= ~DEVI_S_EVADD); \
-	(DEVI((dip))->devi_state |= DEVI_S_EVREMOVE);
-
-#define	DEVI_SET_EVUNINIT(dip) \
-	(DEVI((dip))->devi_state &= ~(DEVI_S_EVADD | DEVI_S_EVREMOVE))
-
-#define	DEVI_EVADD(dip) \
-	(DEVI((dip))->devi_state & DEVI_S_EVADD)
-
-#define	DEVI_EVREMOVE(dip) \
-	(DEVI((dip))->devi_state & DEVI_S_EVREMOVE)
-
-/* need to call the devo_reset entry point for this device at shutdown */
-#define	DEVI_NEED_RESET(dip) \
-	((DEVI((dip))->devi_state & DEVI_S_NEED_RESET) \
-		== DEVI_S_NEED_RESET)
-
-#define	DEVI_SET_NEED_RESET(dip) \
-	(DEVI((dip))->devi_state |= DEVI_S_NEED_RESET)
-
-#define	DEVI_CLR_NEED_RESET(dip) \
-	(DEVI((dip))->devi_state &= ~DEVI_S_NEED_RESET)
-
-
-void i_devi_enter(dev_info_t *, uint_t s_mask, uint_t w_mask, int has_lock);
-void i_devi_exit(dev_info_t *, uint_t c_mask, int has_lock);
-
-char *i_ddi_devi_class(dev_info_t *);
-int i_ddi_set_devi_class(dev_info_t *, char *, int);
+char	*i_ddi_devi_class(dev_info_t *);
+int	i_ddi_set_devi_class(dev_info_t *, char *, int);
 
 /*
  * This structure represents one piece of bus space occupied by a given
@@ -533,6 +602,9 @@ struct ddi_minor {
 #define	DDI_PERSISTENT			0x01
 #define	DDI_AUTO_ASSIGNED_NODEID	0x02
 #define	DDI_VHCI_NODE			0x04
+
+#define	DEVI_VHCI_NODE(dip)						\
+	(DEVI(dip)->devi_node_attributes & DDI_VHCI_NODE)
 
 /*
  * The ddi_minor_data structure gets filled in by ddi_create_minor_node.
@@ -794,8 +866,8 @@ typedef struct impl_dma_segment {
 		page_t		*_dmais_pp;	/* page pointer */
 	} _vdmu;
 	union {
-		uint64_t 	_dmais_lpd;	/* 64-bit physical address */
-		uint32_t 	_dmais_pd;	/* 32-bit physical address */
+		uint64_t	_dmais_lpd;	/* 64-bit physical address */
+		uint32_t	_dmais_pd;	/* 32-bit physical address */
 		ushort_t	_dmais_pw[2];   /* 2x16-bit address */
 		caddr_t		_dmais_kva;	/* pio kernel virtual address */
 	} _pdmu;
@@ -823,8 +895,8 @@ typedef struct impl_dma_segment {
  * Callback definitions
  */
 struct ddi_callback {
-	struct ddi_callback 	*c_nfree;
-	struct ddi_callback 	*c_nlist;
+	struct ddi_callback	*c_nfree;
+	struct ddi_callback	*c_nlist;
 	int			(*c_call)();
 	int			c_count;
 	caddr_t			c_arg;
@@ -905,10 +977,10 @@ typedef struct impl_devid {
  *			'A' |	// DEVID_ATA_SERIAL	<ascii_id>
  *			'u' |	// unknown		<hex_id>
  *			'U'	// unknown		<ascii_id>
- *                		// NOTE: lower case -> <hex_id>
+ *              		// NOTE: lower case -> <hex_id>
  *				//       upper case -> <ascii_id>
  *				// NOTE: this covers all types currently
- *				// 	defined for <revision> 1.
+ *				//	defined for <revision> 1.
  *				// NOTE: a <type> can be added
  *				//	without changing the <revision>.
  *

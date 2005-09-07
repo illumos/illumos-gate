@@ -1008,16 +1008,20 @@ attach_node(dev_info_t *dip)
 		    "nexus_enum_tq", 1,
 		    TASKQ_DEFAULTPRI, 0);
 
+	mutex_enter(&(DEVI(dip)->devi_lock));
 	DEVI_SET_ATTACHING(dip);
 	DEVI_SET_NEED_RESET(dip);
+	mutex_exit(&(DEVI(dip)->devi_lock));
+
 	rv = devi_attach(dip, DDI_ATTACH);
+
+	mutex_enter(&(DEVI(dip)->devi_lock));
 	if (rv != DDI_SUCCESS)
 		DEVI_CLR_NEED_RESET(dip);
 	DEVI_CLR_ATTACHING(dip);
 
 	if (rv != DDI_SUCCESS) {
 		/* ensure that devids are unregistered */
-		mutex_enter(&DEVI(dip)->devi_lock);
 		if (DEVI(dip)->devi_flags & DEVI_REGISTERED_DEVID) {
 			DEVI(dip)->devi_flags &= ~DEVI_REGISTERED_DEVID;
 			mutex_exit(&DEVI(dip)->devi_lock);
@@ -1043,9 +1047,11 @@ attach_node(dev_info_t *dip)
 		NDI_CONFIG_DEBUG((CE_CONT, "attach_node: 0x%p(%s%d) failed\n",
 		    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
 		return (DDI_FAILURE);
-	}
+	} else
+		mutex_exit(&DEVI(dip)->devi_lock);
 
 	/* successful attach, return with driver held */
+
 	return (DDI_SUCCESS);
 }
 
@@ -1078,8 +1084,11 @@ detach_node(dev_info_t *dip, uint_t flag)
 		ddi_taskq_wait(DEVI(dip)->devi_taskq);
 
 	rv = devi_detach(dip, DDI_DETACH);
-	if (rv == DDI_SUCCESS)
+	if (rv == DDI_SUCCESS) {
+		mutex_enter(&(DEVI(dip)->devi_lock));
 		DEVI_CLR_NEED_RESET(dip);
+		mutex_exit(&(DEVI(dip)->devi_lock));
+	}
 
 	if (rv != DDI_SUCCESS) {
 		NDI_CONFIG_DEBUG((CE_CONT,
@@ -1350,12 +1359,20 @@ i_ndi_unconfig_node(dev_info_t *dip, ddi_node_state_t state, uint_t flag)
 			break;
 		case DS_ATTACHED:
 			atomic_add_long(&devinfo_attach_detach, 1);
+
+			mutex_enter(&(DEVI(dip)->devi_lock));
 			DEVI_SET_DETACHING(dip);
+			mutex_exit(&(DEVI(dip)->devi_lock));
+
 			membar_enter();	/* ensure visibility for hold_devi */
 
 			if ((rv = detach_node(dip, flag)) == DDI_SUCCESS)
 				i_ddi_set_node_state(dip, DS_PROBED);
+
+			mutex_enter(&(DEVI(dip)->devi_lock));
 			DEVI_CLR_DETACHING(dip);
+			mutex_exit(&(DEVI(dip)->devi_lock));
+
 			atomic_add_long(&devinfo_attach_detach, -1);
 			break;
 		case DS_READY:
@@ -3744,7 +3761,9 @@ i_ndi_devi_report_status_change(dev_info_t *dip, char *path)
 			ddi_get_instance(dip), status);
 	}
 
+	mutex_enter(&(DEVI(dip)->devi_lock));
 	DEVI_REPORT_DONE(dip);
+	mutex_exit(&(DEVI(dip)->devi_lock));
 }
 
 /*
@@ -4256,16 +4275,23 @@ init_bound_node_ev(dev_info_t *pdip, dev_info_t *dip, int flags)
 static int
 devi_attach_node(dev_info_t *dip, uint_t flags)
 {
+	mutex_enter(&(DEVI(dip)->devi_lock));
 	if (flags & NDI_DEVI_ONLINE) {
+		if (i_ddi_node_state(dip) != DS_READY)
+			DEVI_SET_REPORT(dip);
 		DEVI_SET_DEVICE_ONLINE(dip);
 	}
-
 	if (DEVI_IS_DEVICE_OFFLINE(dip)) {
+		mutex_exit(&(DEVI(dip)->devi_lock));
 		return (NDI_FAILURE);
 	}
+	mutex_exit(&(DEVI(dip)->devi_lock));
 
 	if (i_ddi_attachchild(dip) != DDI_SUCCESS) {
+		mutex_enter(&(DEVI(dip)->devi_lock));
 		DEVI_SET_EVUNINIT(dip);
+		mutex_exit(&(DEVI(dip)->devi_lock));
+
 		if (ndi_dev_is_persistent_node(dip))
 			(void) ddi_uninitchild(dip);
 		else {
@@ -4286,9 +4312,15 @@ devi_attach_node(dev_info_t *dip, uint_t flags)
 	 */
 	if ((flags & NDI_NO_EVENT) == 0 && !(DEVI_EVADD(dip))) {
 		(void) i_log_devfs_add_devinfo(dip, flags);
+
+		mutex_enter(&(DEVI(dip)->devi_lock));
 		DEVI_SET_EVADD(dip);
-	} else if (!(flags & NDI_NO_EVENT_STATE_CHNG))
+		mutex_exit(&(DEVI(dip)->devi_lock));
+	} else if (!(flags & NDI_NO_EVENT_STATE_CHNG)) {
+		mutex_enter(&(DEVI(dip)->devi_lock));
 		DEVI_SET_EVADD(dip);
+		mutex_exit(&(DEVI(dip)->devi_lock));
+	}
 
 	return (NDI_SUCCESS);
 }
@@ -4682,7 +4714,9 @@ devi_detach_node(dev_info_t *dip, uint_t flags)
 	 * flag set.
 	 */
 	if (flags & NDI_DEVI_OFFLINE) {
+		mutex_enter(&(DEVI(dip)->devi_lock));
 		DEVI_SET_DEVICE_OFFLINE(dip);
+		mutex_exit(&(DEVI(dip)->devi_lock));
 	}
 
 	if (i_ddi_node_state(dip) == DS_INITIALIZED) {
@@ -4697,7 +4731,9 @@ devi_detach_node(dev_info_t *dip, uint_t flags)
 			    (char *)ddi_driver_name(dip),
 			    ddi_get_instance(dip),
 			    flags);
+			mutex_enter(&(DEVI(dip)->devi_lock));
 			DEVI_SET_EVREMOVE(dip);
+			mutex_exit(&(DEVI(dip)->devi_lock));
 		}
 		kmem_free(path, MAXPATHLEN);
 	}
@@ -5161,8 +5197,11 @@ int
 ndi_devi_online_async(dev_info_t *dip, uint_t flags)
 {
 	/* mark child as need config if requested. */
-	if (flags & NDI_CONFIG)
+	if (flags & NDI_CONFIG) {
+		mutex_enter(&(DEVI(dip)->devi_lock));
 		DEVI_SET_NDI_CONFIG(dip);
+		mutex_exit(&(DEVI(dip)->devi_lock));
+	}
 
 	return (i_ndi_devi_async_common(dip, flags,
 	    (void (*)())i_ndi_devi_online_cb));
@@ -6583,7 +6622,10 @@ ndi_devi_config_vhci(char *drvname, int flags)
 		return (NULL);
 	}
 
+	mutex_enter(&(DEVI(dip)->devi_lock));
 	DEVI_SET_ATTACHING(dip);
+	mutex_exit(&(DEVI(dip)->devi_lock));
+
 	if (devi_attach(dip, DDI_ATTACH) != DDI_SUCCESS) {
 		cmn_err(CE_CONT, "Could not attach %s driver", drvname);
 		e_ddi_free_instance(dip, vhci_node_addr);
@@ -6592,7 +6634,9 @@ ndi_devi_config_vhci(char *drvname, int flags)
 		(void) ndi_devi_free(dip);
 		return (NULL);
 	}
+	mutex_enter(&(DEVI(dip)->devi_lock));
 	DEVI_CLR_ATTACHING(dip);
+	mutex_exit(&(DEVI(dip)->devi_lock));
 
 	i_link_vhci_node(dip);
 	i_ddi_set_node_state(dip, DS_READY);

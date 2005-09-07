@@ -2425,8 +2425,10 @@ hubd_restore_device_state(dev_info_t *dip, hubd_t *hubd)
 					 * mark it reinserted to prevent
 					 * cleanup thread from stepping in.
 					 */
-					DEVI_SET_DEVICE_REINSERTED(ch_dip);
 					mutex_exit(HUBD_MUTEX(hubd));
+					mutex_enter(&(DEVI(ch_dip)->devi_lock));
+					DEVI_SET_DEVICE_REINSERTED(ch_dip);
+					mutex_exit(&(DEVI(ch_dip)->devi_lock));
 
 					/*
 					 * reopen pipes for children for
@@ -2450,7 +2452,9 @@ hubd_restore_device_state(dev_info_t *dip, hubd_t *hubd)
 				    "hubd_restore_device_state: "
 				    "dip=%p on port=%d marked for cleanup",
 				    ch_dip, port);
+				mutex_enter(&(DEVI(ch_dip)->devi_lock));
 				DEVI_SET_DEVICE_REMOVED(ch_dip);
+				mutex_exit(&(DEVI(ch_dip)->devi_lock));
 
 				mutex_enter(HUBD_MUTEX(hubd));
 			}
@@ -6134,7 +6138,9 @@ hubd_post_event(hubd_t *hubd, usb_port_t port, usba_event_t type)
 		 * seen the disconnect event to prevent cleanup thread
 		 * from stepping in between.
 		 */
+		mutex_enter(&(DEVI(dip)->devi_lock));
 		DEVI_SET_DEVICE_REMOVED(dip);
+		mutex_exit(&(DEVI(dip)->devi_lock));
 
 		break;
 	case USBA_EVENT_TAG_PRE_SUSPEND:
@@ -6170,7 +6176,9 @@ hubd_post_event(hubd_t *hubd, usb_port_t port, usba_event_t type)
 		 * Mark the dip as reinserted to prevent cleanup thread
 		 * from stepping in.
 		 */
+		mutex_enter(&(DEVI(dip)->devi_lock));
 		DEVI_SET_DEVICE_REINSERTED(dip);
+		mutex_exit(&(DEVI(dip)->devi_lock));
 
 		rval = usba_persistent_pipe_open(usba_device);
 		if (rval != USB_SUCCESS) {

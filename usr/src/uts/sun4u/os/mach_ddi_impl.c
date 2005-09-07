@@ -487,8 +487,10 @@ set_dip_offline(dev_info_t *dip, void *arg)
 {
 	ASSERT(dip);
 
+	mutex_enter(&(DEVI(dip)->devi_lock));
 	if (!DEVI_IS_DEVICE_OFFLINE(dip))
 		DEVI_SET_DEVICE_OFFLINE(dip);
+	mutex_exit(&(DEVI(dip)->devi_lock));
 
 	return (DDI_WALK_CONTINUE);
 }

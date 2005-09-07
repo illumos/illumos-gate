@@ -412,10 +412,16 @@ i_ddi_init_root()
 	ASSERT(DEV_OPS_HELD(DEVI(top_devinfo)->devi_ops));
 	DEVI(top_devinfo)->devi_instance = e_ddi_assign_instance(top_devinfo);
 
+	mutex_enter(&(DEVI(top_devinfo)->devi_lock));
 	DEVI_SET_ATTACHING(top_devinfo);
+	mutex_exit(&(DEVI(top_devinfo)->devi_lock));
+
 	if (devi_attach(top_devinfo, DDI_ATTACH) != DDI_SUCCESS)
 		panic("Could not attach root nexus");
+
+	mutex_enter(&(DEVI(top_devinfo)->devi_lock));
 	DEVI_CLR_ATTACHING(top_devinfo);
+	mutex_exit(&(DEVI(top_devinfo)->devi_lock));
 
 	mutex_init(&global_vhci_lock, NULL, MUTEX_DEFAULT, NULL);
 

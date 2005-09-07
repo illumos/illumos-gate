@@ -861,7 +861,10 @@ ndi_dc_devi_create(struct devctl_iocdata *dcp, dev_info_t *pdip, int flags,
 		 * hand set the OFFLINE flag to prevent any asynchronous
 		 * autoconfiguration operations from attaching this node.
 		 */
-		DEVI(cdip)->devi_state |= DEVI_DEVICE_OFFLINE;
+		mutex_enter(&(DEVI(cdip)->devi_lock));
+		DEVI_SET_DEVICE_OFFLINE(cdip);
+		mutex_exit(&(DEVI(cdip)->devi_lock));
+
 		rv = ndi_devi_bind_driver(cdip, flags);
 		if (rv != NDI_SUCCESS) {
 			(void) ndi_devi_offline(cdip, NDI_DEVI_REMOVE);
