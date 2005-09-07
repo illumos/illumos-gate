@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,7 @@ typedef enum
 
 /* Fru Display Types */
 typedef enum { FDISP_Binary = 0, FDISP_Octal, FDISP_Hex, FDISP_Decimal,
-	FDISP_String, FDISP_Time, FDISP_UNDEFINED
+	FDISP_String, FDISP_Time, FDISP_MSGID, FDISP_UUID, FDISP_UNDEFINED
 } fru_displaytype_t;
 
 /* Fru Data Types */
