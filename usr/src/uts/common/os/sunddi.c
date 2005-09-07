@@ -1554,7 +1554,8 @@ i_ddi_prop_search_global(dev_t dev, uint_t flags, char *name,
 	if (propp->prop_flags & DDI_PROP_UNDEF_IT)
 		return (DDI_PROP_UNDEFINED);
 
-	if ((buffer = kmem_alloc(propp->prop_len, KM_NOSLEEP)) == NULL) {
+	if ((buffer = kmem_alloc(propp->prop_len,
+	    (flags & DDI_PROP_CANSLEEP) ? KM_SLEEP : KM_NOSLEEP)) == NULL) {
 		cmn_err(CE_CONT, prop_no_mem_msg, name);
 		return (DDI_PROP_NO_MEMORY);
 	}
