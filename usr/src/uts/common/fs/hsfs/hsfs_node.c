@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@
 #include <sys/fbuf.h>
 #include <sys/kmem.h>
 #include <sys/policy.h>
+#include <sys/sunddi.h>
 #include <vm/hat.h>
 #include <vm/as.h>
 #include <vm/pvn.h>
@@ -744,7 +745,7 @@ hs_dirlook(
 	 * fold it to upper case.
 	 */
 	if (is_rrip) {
-		(void) strcpy(cmpname, name);
+		(void) strlcpy(cmpname, name, cmpname_size);
 		cmpnamelen = namlen;
 	} else {
 		/*
@@ -776,25 +777,18 @@ hs_dirlook(
 tryagain:
 
 	while (offset < end) {
-
-		if ((offset & MAXBMASK) + MAXBSIZE > dirsiz)
-			bytes_wanted = dirsiz - (offset & MAXBMASK);
-		else
-			bytes_wanted = MAXBSIZE;
+		bytes_wanted = MIN(MAXBSIZE, dirsiz - (offset & MAXBMASK));
 
 		error = fbread(dvp, (offset_t)(offset & MAXBMASK),
 			(unsigned int)bytes_wanted, S_READ, &fbp);
 		if (error)
 			goto done;
 
-		last_offset = (offset & MAXBMASK) + fbp->fb_count - 1;
+		last_offset = (offset & MAXBMASK) + fbp->fb_count;
 
-#define	rel_offset(offset) ((offset) & MAXBOFFSET)  /* index into cur blk */
-
-		switch (process_dirblock(fbp, &offset,
-					last_offset, cmpname,
-					cmpnamelen, fsp, dhp, dvp,
-					vpp, &error, is_rrip)) {
+		switch (process_dirblock(fbp, &offset, last_offset,
+		    cmpname, cmpnamelen, fsp, dhp, dvp, vpp, &error,
+		    is_rrip)) {
 		case FOUND_ENTRY:
 			/* found an entry, either correct or not */
 			goto done;
@@ -896,7 +890,7 @@ hs_parsedir(
 			hdp->nlink = 2;
 		} else {
 			hs_log_bogus_disk_warning(fsp,
-				HSFS_ERR_UNSUP_TYPE, flags);
+			    HSFS_ERR_UNSUP_TYPE, flags);
 			return (EINVAL);
 		}
 		hdp->uid = fsp -> hsfs_vol.vol_uid;
@@ -923,7 +917,7 @@ hs_parsedir(
 			hdp->nlink = 2;
 		} else {
 			hs_log_bogus_disk_warning(fsp,
-				HSFS_ERR_UNSUP_TYPE, flags);
+			    HSFS_ERR_UNSUP_TYPE, flags);
 			return (EINVAL);
 		}
 		hdp->uid = fsp -> hsfs_vol.vol_uid;
@@ -987,14 +981,18 @@ hs_parsedir(
 	if (NAME_HAS_CHANGED(name_change_flag))
 		return (0);
 
-	/* return the pointer to the directory name and its length */
+	/*
+	 * Fall back to the ISO name. Note that as in process_dirblock,
+	 * the on-disk filename length must be validated against ISO
+	 * limits - which, in case of RR present but no RR name found,
+	 * are NOT identical to fsp->hsfs_namemax on this filesystem.
+	 */
 	on_disk_name = (char *)HDE_name(dirp);
 	on_disk_namelen = (int)HDE_NAME_LEN(dirp);
 
-	if (((int)(fsp->hsfs_namemax) > 0) &&
-			(on_disk_namelen > (int)(fsp->hsfs_namemax))) {
+	if (on_disk_namelen > ISO_FILE_NAMELEN) {
 		hs_log_bogus_disk_warning(fsp, HSFS_ERR_BAD_FILE_LEN, 0);
-		on_disk_namelen = fsp->hsfs_namemax;
+		on_disk_namelen = ISO_FILE_NAMELEN;
 	}
 	if (dnp != NULL) {
 		namelen = hs_namecopy(on_disk_name, dnp, on_disk_namelen,
@@ -1180,15 +1178,17 @@ process_dirblock(
 	int		res;
 	int		parsedir_res;
 	size_t		rrip_name_size;
-	int		rr_namelen;
+	int		rr_namelen = 0;
 	char		*rrip_name_str = NULL;
 	char		*rrip_tmp_name = NULL;
 	enum dirblock_result err = 0;
 	int 		did_fbrelse = 0;
 	char		uppercase_name[ISO_FILE_NAMELEN];
 
-	/* return after performing cleanup-on-exit */
-#define	PD_return(retval)	{ err = retval; goto do_ret; }
+#define	PD_return(retval)	\
+	{ err = retval; goto do_ret; }		/* return after cleanup */
+#define	rel_offset(offset)	\
+	((offset) & MAXBOFFSET)			/* index into cur blk */
 
 	if (is_rrip) {
 		rrip_name_size = RRIP_FILE_NAMELEN + 1;
@@ -1202,39 +1202,61 @@ process_dirblock(
 
 		/*
 		 * Directory Entries cannot span sectors.
-		 * Unused bytes at the end of each sector are zeroed.
-		 * Therefore, detect this condition when the size
-		 * field of the directory entry is zero.
+		 *
+		 * Unused bytes at the end of each sector are zeroed
+		 * according to ISO9660, but we cannot rely on this
+		 * since both media failures and maliciously corrupted
+		 * media may return arbitrary values.
+		 * We therefore have to check for consistency:
+		 * The size of a directory entry must be at least
+		 * 34 bytes (the size of the directory entry metadata),
+		 * or zero (indicating the end-of-sector condition).
+		 * For a non-zero directory entry size of less than
+		 * 34 Bytes, log a warning.
+		 * In any case, skip the rest of this sector and
+		 * continue with the next.
 		 */
 		hdlen = (int)((uchar_t)
-				HDE_DIR_LEN(&blkp[rel_offset(*offset)]));
-		if (hdlen == 0) {
-			/* advance to next sector boundary */
-			*offset = (*offset & MAXHSMASK) + HS_SECTOR_SIZE;
+		    HDE_DIR_LEN(&blkp[rel_offset(*offset)]));
 
-			if (*offset > last_offset) {
-				/* end of block */
-				PD_return(HIT_END)
-			} else
-				continue;
+		if (hdlen < HDE_ROOT_DIR_REC_SIZE ||
+		    *offset + hdlen > last_offset) {
+			/*
+			 * Advance to the next sector boundary
+			 */
+			*offset = roundup(*offset + 1, HS_SECTOR_SIZE);
+			if (hdlen)
+				hs_log_bogus_disk_warning(fsp,
+				    HSFS_ERR_TRAILING_JUNK, 0);
+			continue;
 		}
 
-		/*
-		 * Zero out the hd to read new directory
-		 */
 		bzero(&hd, sizeof (hd));
 
 		/*
-		 * Just ignore invalid directory entries.
-		 * XXX - maybe hs_parsedir() will detect EXISTENCE bit
+		 * Check the filename length in the ISO record for
+		 * plausibility and reset it to a safe value, in case
+		 * the name length byte is out of range. Since the ISO
+		 * name will be used as fallback if the rockridge name
+		 * is invalid/nonexistant, we must make sure not to
+		 * blow the bounds and initialize dnamelen to a sensible
+		 * value within the limits of ISO9660.
+		 * In addition to that, the ISO filename is part of the
+		 * directory entry. If the filename length is too large
+		 * to fit, the record is invalid and we'll advance to
+		 * the next.
 		 */
 		dirp = &blkp[rel_offset(*offset)];
 		dname = (char *)HDE_name(dirp);
 		dnamelen = (int)((uchar_t)HDE_NAME_LEN(dirp));
-		if (dnamelen > (int)(fsp->hsfs_namemax)) {
+		if (dnamelen > hdlen - HDE_FDESIZE) {
 			hs_log_bogus_disk_warning(fsp,
-				HSFS_ERR_BAD_FILE_LEN, 0);
-			dnamelen = fsp->hsfs_namemax;
+			    HSFS_ERR_BAD_FILE_LEN, 0);
+			goto skip_rec;
+		} else if (dnamelen > ISO_FILE_NAMELEN) {
+			hs_log_bogus_disk_warning(fsp,
+			    HSFS_ERR_BAD_FILE_LEN, 0);
+			dnamelen = ISO_FILE_NAMELEN;
 		}
 
 		/*
@@ -1280,15 +1302,17 @@ process_dirblock(
 			else
 				dnamelen = strip_trailing(fsp, dname, dnamelen);
 
+			ASSERT(dnamelen <= ISO_FILE_NAMELEN);
+
 			if (uppercase_cp(dname, uppercase_name, dnamelen))
 				hs_log_bogus_disk_warning(fsp,
-					HSFS_ERR_LOWER_CASE_NM, 0);
+				    HSFS_ERR_LOWER_CASE_NM, 0);
 			dname = uppercase_name;
-			if (! is_rrip &&
-				(fsp->hsfs_flags & HSFSMNT_NOTRAILDOT) &&
-					dname[ dnamelen-1 ] == '.' &&
-					CAN_TRUNCATE_DOT(dname, dnamelen))
-				dname[ --dnamelen ] = '\0';
+			if (!is_rrip &&
+			    (fsp->hsfs_flags & HSFSMNT_NOTRAILDOT) &&
+			    dname[dnamelen - 1] == '.' &&
+			    CAN_TRUNCATE_DOT(dname, dnamelen))
+				dname[--dnamelen] = '\0';
 		}
 
 		/*
@@ -1298,28 +1322,23 @@ process_dirblock(
 
 		/* if we saw a lower case name we can't do this test either */
 		if (strict_iso9660_ordering && !is_rrip &&
-			!HSFS_HAVE_LOWER_CASE(fsp) && *nm < *dname) {
+		    !HSFS_HAVE_LOWER_CASE(fsp) && *nm < *dname) {
 			RESTORE_NM(rrip_tmp_name, nm);
 			PD_return(WENT_PAST)
 		}
 
-		if (*nm != *dname || nmlen != dnamelen) {
-			/* look at next dir entry */
-			RESTORE_NM(rrip_tmp_name, nm);
-			*offset += hdlen;
-			continue;
-		}
+		if (*nm != *dname || nmlen != dnamelen)
+			goto skip_rec;
 
 		if ((res = nmcmp(dname, nm, nmlen, is_rrip)) == 0) {
 			/* name matches */
-			parsedir_res =
-				hs_parsedir(fsp, dirp, &hd, (char *)NULL,
-					    (int *)NULL);
+			parsedir_res = hs_parsedir(fsp, dirp, &hd,
+			    (char *)NULL, (int *)NULL);
 			if (!parsedir_res) {
 				uint_t lbn;	/* logical block number */
 
 				lbn = dhp->hs_dirent.ext_lbn +
-					dhp->hs_dirent.xar_len;
+				    dhp->hs_dirent.xar_len;
 				/*
 				 * Need to do an fbrelse() on the buffer,
 				 * as hs_makenode() may try to acquire
@@ -1328,8 +1347,8 @@ process_dirblock(
 				 */
 				fbrelse(fbp, S_READ);
 				did_fbrelse = 1;
-				*vpp = hs_makenode(&hd, lbn,
-						*offset, dvp->v_vfsp);
+				*vpp = hs_makenode(&hd, lbn, *offset,
+				    dvp->v_vfsp);
 				if (*vpp == NULL) {
 					*error = ENFILE;
 					RESTORE_NM(rrip_tmp_name, nm);
@@ -1355,6 +1374,7 @@ process_dirblock(
 		 * name > dir entry,
 		 * look at next one.
 		 */
+skip_rec:
 		*offset += hdlen;
 		RESTORE_NM(rrip_tmp_name, nm);
 	}
@@ -1365,7 +1385,7 @@ do_ret:
 		kmem_free(rrip_name_str, rrip_name_size);
 	if (rrip_tmp_name)
 		kmem_free(rrip_tmp_name, rrip_name_size);
-	if (! did_fbrelse)
+	if (!did_fbrelse)
 		fbrelse(fbp, S_READ);
 	return (err);
 #undef PD_return

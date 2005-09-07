@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1990,1997,2000,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,6 +51,7 @@
 #include <sys/mode.h>
 #include <sys/mkdev.h>
 #include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 #include <vm/page.h>
 
@@ -206,18 +207,14 @@ name_parse(
 	int		rrip_flags,	/* component/name flag */
 	uchar_t		*SUA_string,	/* string from SUA */
 	size_t		SUA_string_len, /* length of SUA string */
-	uchar_t		*to_string,	/* string to copy to */
-	int		*to_string_len_p, /* ptr to cur. str len */
+	uchar_t		*dst,		/* string to copy to */
+	int		*dst_lenp,	/* ptr to cur. str len */
 	ulong_t		*name_flags_p,	/* internal name flags */
-	int		max_name_len)	/* limit dest string to */
+	int		dst_size)	/* limit dest string to */
 						/* this value */
 {
-	size_t	tmp_name_len;
-
-	if (IS_NAME_BIT_SET(rrip_flags, RRIP_NAME_ROOT)) {
-		(void) strcpy((char *)to_string, "/");
-		*to_string_len_p = 1;
-	}
+	if (IS_NAME_BIT_SET(rrip_flags, RRIP_NAME_ROOT))
+		(void) strcpy((char *)dst, "/");
 
 	if (IS_NAME_BIT_SET(rrip_flags, RRIP_NAME_CURRENT)) {
 		SUA_string = (uchar_t *)".";
@@ -243,21 +240,22 @@ name_parse(
 	}
 
 	/*
-	 * Remember we must strncpy to the end of the curent string
-	 * name because there might be something there.  Also, don't
-	 * go past the max_name_len system boundry.
+	 * Since SUA_string isn't NULL terminated, we use strlcat()
+	 * to add the trailing NULL byte. Defensive programming, don't
+	 * ever overwrite beyond the end of the destination buffer,
+	 * and neither attempt to read beyond the end of SUA_string.
+	 * We assume the caller properly validates SUA_string_len as
+	 * we have no way of doing so.
+	 * Note for corrupted filesystems, SUA_string may contain
+	 * NULL bytes. If that happens, the destination string length
+	 * returned will be larger than the "actual" length, since
+	 * strlcat() terminates when encountering the NULL byte.
+	 * This causes no harm (apart from filenames not being reported
+	 * 'correctly', but then what is correct on a corrupted fs ?)
+	 * so we don't bother assigning strlen(dst) to *dst_lenp.
 	 */
-	tmp_name_len = strlen((char *)to_string);
-
-	SUA_string_len = (tmp_name_len + SUA_string_len) > max_name_len ?
-		(max_name_len - tmp_name_len) : (SUA_string_len);
-
-	(void) strncpy((char *)(to_string + tmp_name_len),
-		(char *)SUA_string, SUA_string_len);
-
-	/* NULL terminate string */
-	*(to_string + tmp_name_len + SUA_string_len) = '\0';
-	*(to_string_len_p) += (int)SUA_string_len;
+	*dst_lenp = MIN(dst_size, strlen((char *)dst) + SUA_string_len + 1);
+	(void) strlcat((char *)dst, (char *)SUA_string, (*dst_lenp)--);
 
 	if (IS_NAME_BIT_SET(rrip_flags, RRIP_NAME_CONTINUE))
 		SET_NAME_BIT(*(name_flags_p), RRIP_NAME_CONTINUE);

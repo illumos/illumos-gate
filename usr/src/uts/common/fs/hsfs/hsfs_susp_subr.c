@@ -22,8 +22,8 @@
 /*
  * System Use Sharing protocol subroutines for High Sierra filesystem
  *
- * Copyright (c) 1990,2000,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -183,8 +183,8 @@ clean_up:
 /*
  * parse_signatures()
  *
- * for the signature string that is passed to this function, find the
- * correct handling function.
+ * Find the correct handling function for the signature string that is
+ * passed to this function.
  *
  * signature searching:
  *
@@ -302,39 +302,25 @@ parse_signatures(
 		} /* for extnp	(extension parsing) */
 
 		/*
-		 * Opps, did not find this signature, so we must
-		 * advance on the the next signature in the SUA and
-		 * hope to god that it is in the susp format, or we get
-		 * hosed.
+		 * Opps, did not find this signature. We must
+		 * advance on the the next signature in the SUA
+		 * and pray to persumedly omniscient, omnipresent,
+		 * almighty transcendental being(s) that the next
+		 * record is in the susp format, or we get hosed.
 		 */
 		if (SUA_rem < SUF_MIN_LEN)
 			return (END_OF_SUA);
 
-
 		SUA_rem -= SUF_LEN(sig_string);
 		sig_string += SUF_LEN(sig_string);
 
+next_signature:
 		/*
 		 * Failsafe
 		 */
 		if (SUA_rem < SUF_MIN_LEN || SUF_LEN(sig_string) <= 0) {
 			return (END_OF_SUA);
 		}
-
-		continue;
-
-next_signature:
-
-		/*
-		 * we just want to continue in this for loop, not
-		 * the innermost one.  Unfortunately, goto is
-		 * the only way, until we get a break that
-		 * takes an argument.
-		 *
-		 * This continue statement is not really needed, but
-		 * the compiler barfs if it is not here.
-		 */
-		continue;
 
 	} /* while */
 
@@ -450,6 +436,17 @@ get_cont_area(struct hsfs *fsp, uchar_t **buf_pp, cont_info_t *cont_info_p)
 	struct buf	*secbp;
 	int		error;
 	uint_t		secno;
+
+	/*
+	 * Guard against invalid continuation area records.
+	 * Both cont_offset and cont_len must be no longer than
+	 * HS_SECTOR_SIZE. If they are, return an error.
+	 */
+	if (cont_info_p->cont_offset > HS_SECTOR_SIZE ||
+	    cont_info_p->cont_len > HS_SECTOR_SIZE) {
+		cmn_err(CE_NOTE, "get_cont_area: invalid offset/length");
+		return (1);
+	}
 
 	if (*buf_pp == (uchar_t *)NULL)
 		*buf_pp = kmem_alloc((size_t)HS_SECTOR_SIZE, KM_SLEEP);

@@ -402,10 +402,7 @@ hsfs_readdir(
 	nd = (struct dirent64 *)outbuf;
 
 	while (offset < dirsiz) {
-		if ((offset & MAXBMASK) + MAXBSIZE > dirsiz)
-			bytes_wanted = dirsiz - (offset & MAXBMASK);
-		else
-			bytes_wanted = MAXBSIZE;
+		bytes_wanted = MIN(MAXBSIZE, dirsiz - (offset & MAXBMASK));
 
 		error = fbread(vp, (offset_t)(offset & MAXBMASK),
 			(unsigned int)bytes_wanted, S_READ, &fbp);
@@ -413,33 +410,35 @@ hsfs_readdir(
 			goto done;
 
 		blkp = (uchar_t *)fbp->fb_addr;
-		last_offset = (offset & MAXBMASK) + fbp->fb_count - 1;
+		last_offset = (offset & MAXBMASK) + fbp->fb_count;
 
 #define	rel_offset(offset) ((offset) & MAXBOFFSET)	/* index into blkp */
 
 		while (offset < last_offset) {
 			/*
-			 * Directory Entries cannot span sectors.
-			 * Unused bytes at the end of each sector are zeroed.
-			 * Therefore, detect this condition when the size
-			 * field of the directory entry is zero.
+			 * Very similar validation code is found in
+			 * process_dirblock(), hsfs_node.c.
+			 * For an explanation, see there.
+			 * It may make sense for the future to
+			 * "consolidate" the code in hs_parsedir(),
+			 * process_dirblock() and hsfs_readdir() into
+			 * a single utility function.
 			 */
 			hdlen = (int)((uchar_t)
 				HDE_DIR_LEN(&blkp[rel_offset(offset)]));
-			if (hdlen == 0) {
-				/* advance to next sector boundary */
-				offset = (offset & MAXHSMASK) + HS_SECTOR_SIZE;
-
+			if (hdlen < HDE_ROOT_DIR_REC_SIZE ||
+			    offset + hdlen > last_offset) {
 				/*
-				 * Have we reached the end of current block?
+				 * advance to next sector boundary
 				 */
-				if (offset > last_offset)
-					break;
-				else
-					continue;
+				offset = roundup(offset + 1, HS_SECTOR_SIZE);
+				if (hdlen)
+					hs_log_bogus_disk_warning(fsp,
+					    HSFS_ERR_TRAILING_JUNK, 0);
+
+				continue;
 			}
 
-			/* make sure this is nullified before  reading it */
 			bzero(&hd, sizeof (hd));
 
 			/*
@@ -509,7 +508,6 @@ hsfs_readdir(
 					hd.sym_link = (char *)NULL;
 				}
 			}
-
 			offset += hdlen;
 		}
 		fbrelse(fbp, S_READ);

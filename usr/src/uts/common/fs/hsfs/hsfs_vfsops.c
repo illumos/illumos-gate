@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -466,22 +466,31 @@ compute_cdrom_id(struct hsfs *fsp, vnode_t *devvp)
 	struct buf	*bp;
 	int		error;
 	int		fsid;
-	int		size = CHECKSUM_SIZE;
 
 	secno = hsvp->root_dir.ext_lbn >> hsvp->lbn_secshift;
-	bp = bread(devvp->v_rdev, secno * 4, size);
+	bp = bread(devvp->v_rdev, secno * 4, CHECKSUM_SIZE);
 	error = geterror(bp);
-	if (!error) {
+
+	/*
+	 * An error on read or a partial read means we asked
+	 * for a nonexistant/corrupted piece of the device
+	 * (including past-the-end of the media). Don't
+	 * try to use the checksumming method then.
+	 */
+	if (!error && bp->b_bcount == CHECKSUM_SIZE) {
 		int *ibuf = (int *)bp->b_un.b_addr;
-		int isize = size / sizeof (int);
 		int i;
 
 		fsid = 0;
 
-		for (i = 0; i < isize; i++)
+		for (i = 0; i < CHECKSUM_SIZE / sizeof (int); i++)
 			fsid ^= ibuf[ i ];
-	} else	/* use creation date */
+	} else {
+		/*
+		 * Fallback - use creation date
+		 */
 		fsid = hsvp->cre_date.tv_sec;
+	}
 
 	brelse(bp);
 
@@ -626,6 +635,7 @@ hs_mountfs(
 		if (hs_remakenode(fsp->hsfs_vol.root_dir.ext_lbn,
 			    (uint_t)0, vfsp, &fsp->hsfs_rootvp)) {
 			error = EINVAL;
+			mutex_exit(&hs_mounttab_lock);
 			goto cleanup;
 		}
 	} else {
