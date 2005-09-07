@@ -714,8 +714,17 @@ makeConnection(Connection **conp, const char *serverAddr,
 		 */
 		if (rc == NS_LDAP_INTERNAL && *errorp != NULL) {
 			if ((*errorp)->status == LDAP_CONNECT_ERROR ||
-				(*errorp)->status == LDAP_SERVER_DOWN)
-				__s_api_removeServer(host);
+				(*errorp)->status == LDAP_SERVER_DOWN) {
+				if (__s_api_removeServer(host) < 0) {
+					/*
+					 * Couldn't remove server from
+					 * server list. Log a warning.
+					 */
+					syslog(LOG_WARNING, "libsldap: could "
+					    "not remove %s from servers list",
+					    host);
+				}
+			}
 		}
 
 		/* else, cleanup and go for the next server */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -618,6 +618,7 @@ typedef struct ns_ldap_cookie {
 	ns_state_t		next_state;
 
 	Connection		*conn;
+#define	conn_auth_type	conn->auth->auth.type
 	ConnectionID		connectionId;
 
 	/* paging VLV/SIMPLEPAGE data */
@@ -765,7 +766,7 @@ int		__s_api_append_default_basedn(
 			char **new_dn,
 			int *allocated,
 			ns_ldap_error_t ** errorp);
-void		__s_api_removeServer(const char *server);
+int		__s_api_removeServer(const char *server);
 
 /* internal referrals APIs */
 int 		__s_api_toFollowReferrals(const int flags,

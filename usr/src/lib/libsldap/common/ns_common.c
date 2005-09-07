@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2145,9 +2145,10 @@ cleanup:
  * This function requests a server to be removed from
  * the cache manager maintained server list. This is
  * done via the door functionality.
+ * Returns 0 if OK, else a negative value.
  */
 
-void
+int
 __s_api_removeServer(const char *server)
 {
 	union {
@@ -2161,9 +2162,10 @@ __s_api_removeServer(const char *server)
 	int			ndata;
 	int			adata;
 	int			len;
+	int			rc;
 
 	if (server == NULL)
-		return;
+		return (-1);
 
 	ireq = NS_CACHE_NORESP;
 
@@ -2183,10 +2185,12 @@ __s_api_removeServer(const char *server)
 	sptr = &space.s_d;
 
 	/* try to remove the server via the door interface */
-	(void) __ns_ldap_trydoorcall(&sptr, &ndata, &adata);
+	rc = __ns_ldap_trydoorcall(&sptr, &ndata, &adata);
 
 	/* clean up the door call */
 	if (sptr != &space.s_d) {
 		(void) munmap((char *)sptr, ndata);
 	}
+
+	return (rc);
 }

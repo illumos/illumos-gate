@@ -2017,7 +2017,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 {
 	char		errstr[MAXERROR];
 	char		*err;
-	int		rc;
+	int		rc, ret;
 	ns_ldap_entry_t	*nextEntry;
 	ns_ldap_error_t *error = NULL;
 	ns_ldap_error_t **errorp;
@@ -2178,8 +2178,23 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 					 */
 					if (rc == LDAP_CONNECT_ERROR ||
 						rc == LDAP_SERVER_DOWN) {
-						__s_api_removeServer(
+						ret = __s_api_removeServer(
 						    cookie->conn->serverAddr);
+						if (ret == NOSERVER &&
+						    cookie->conn_auth_type
+							== NS_LDAP_AUTH_NONE) {
+							/*
+							 * Couldn't remove
+							 * server from server
+							 * list.
+							 * Exit to avoid
+							 * potential infinite
+							 * loop.
+							 */
+							cookie->err_rc = rc;
+							cookie->new_state =
+							    LDAP_ERROR;
+						}
 						if (cookie->connectionId > -1) {
 						    DropConnection(
 							cookie->connectionId,
