@@ -221,7 +221,7 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		    "pam_unix_cred: state = %d, auid = %d", auditstate,
 		    auid);
 	}
-	if (getpwnam_r(user, &pwd, pwbuf, sizeof (buf)) == NULL) {
+	if (getpwnam_r(user, &pwd, pwbuf, sizeof (pwbuf)) == NULL) {
 		syslog(LOG_AUTH | LOG_ERR,
 		    "pam_unix_cred: cannot get passwd entry for user = %s",
 		    user);
@@ -249,7 +249,8 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 			}
 		}
 		if ((ruser != NULL) && (*ruser != '\0') &&
-		    (getpwnam_r(ruser, &rpwd, rpwbuf, sizeof (buf)) != NULL)) {
+		    (getpwnam_r(ruser, &rpwd, rpwbuf,
+		    sizeof (rpwbuf)) != NULL)) {
 			/*
 			 * set up the initial audit for user coming
 			 * from another user
