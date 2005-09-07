@@ -248,6 +248,41 @@ ioctlfunc_t	iocfunc;
 					printf(" not");
 				printf(" nat");
 			}
+			if (fp->fr_mflx & FI_MULTICAST) {
+				if (!(fp->fr_flx & FI_MULTICAST))
+					printf(" not");
+				printf(" multicast");
+			}
+			if (fp->fr_mflx & FI_BROADCAST) {
+				if (!(fp->fr_flx & FI_BROADCAST))
+					printf(" not");
+				printf(" bcast");
+			}
+			if (fp->fr_mflx & FI_MBCAST) {
+				if (!(fp->fr_flx & FI_MBCAST))
+					printf(" not");
+				printf(" mbcast");
+			}
+			if (fp->fr_mflx & FI_STATE) {
+				if (!(fp->fr_flx & FI_STATE))
+					printf(" not");
+				printf(" state");
+			}
+			if (fp->fr_mflx & FI_BADNAT) {
+				if (!(fp->fr_flx & FI_BADNAT))
+					printf(" not");
+				printf(" bad-nat");
+			}
+			if (fp->fr_mflx & FI_BAD) {
+				if (!(fp->fr_flx & FI_BAD))
+					printf(" not");
+				printf(" bad");
+			}
+			if (fp->fr_mflx & FI_OOW) {
+				if (!(fp->fr_flx & FI_OOW))
+					printf(" not");
+				printf(" oow");
+			}
 			if (fp->fr_mflx & FI_LOWTTL) {
 				if (!(fp->fr_flx & FI_LOWTTL))
 					printf(" not");
