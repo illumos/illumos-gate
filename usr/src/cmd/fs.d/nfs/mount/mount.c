@@ -139,7 +139,7 @@ static int get_fh(struct nfs_args *, char *, char *, int *, bool_t,
 	struct netconfig **, ushort_t);
 static int make_secure(struct nfs_args *, char *, struct netconfig *,
 	bool_t, rpcvers_t);
-static int mount_nfs(struct mnttab *, int);
+static int mount_nfs(struct mnttab *, int, err_ret_t *);
 static int getaddr_nfs(struct nfs_args *, char *, struct netconfig **,
 		    bool_t, char *, ushort_t, err_ret_t *, bool_t);
 static void pr_err(const char *fmt, ...);
@@ -194,9 +194,17 @@ static char	*service_list_v4[] = { STATD, LOCKD, NFS4CBD, NFSMAPID, NULL };
  * nfsvers_to_use is the actual version number found to use.  It
  * is determined in get_fh by pinging the various versions of the
  * NFS service on the server to see which responds positively.
+ *
+ * nfsretry_vers is the version number set when we retry the mount
+ * command with the version decremented from nfsvers_to_use.
+ * nfsretry_vers is set from nfsvers_to_use when we retry the mount
+ * for errors other than RPC errors; it helps un know why we are
+ * retrying. It is an indication that the retry is due to
+ * non-RPC errors.
  */
 static rpcvers_t nfsvers = 0;
 static rpcvers_t nfsvers_to_use = 0;
+static rpcvers_t nfsretry_vers = 0;
 
 /*
  * There are the defaults (range) for the client when determining
@@ -223,6 +231,7 @@ main(int argc, char *argv[])
 	int r;
 	int c;
 	char *myname;
+	err_ret_t retry_error;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -312,10 +321,28 @@ main(int argc, char *argv[])
 			gettext("is either out of range or overlaps."));
 	}
 
-	r = mount_nfs(&mnt, ro);
-	if (r == RET_RETRY && retries)
-		r = retry(&mnt, ro);
+	SET_ERR_RET(&retry_error, ERR_PROTO_NONE, 0);
+	r = mount_nfs(&mnt, ro, &retry_error);
+	if (r == RET_RETRY && retries) {
+		/*
+		 * Check the error code from the last mount attempt if it was
+		 * an RPC error, then retry as is. Otherwise we retry with the
+		 * nfsretry_vers set. It is set by decrementing nfsvers_to_use.
+		 * If we are retrying with nfsretry_vers then we don't print any
+		 * retry messages, since we are not retrying due to an RPC
+		 * error.
+		 */
+		if (retry_error.error_type) {
+			if (retry_error.error_type != ERR_RPCERROR) {
+				nfsretry_vers = nfsvers_to_use =
+				    nfsvers_to_use - 1;
+				if (nfsretry_vers < NFS_VERSMIN)
+					return (r);
+			}
+		}
 
+		r = retry(&mnt, ro);
+	}
 	/*
 	 * exit(r);
 	 */
@@ -347,7 +374,7 @@ usage()
 }
 
 static int
-mount_nfs(struct mnttab *mntp, int ro)
+mount_nfs(struct mnttab *mntp, int ro, err_ret_t *retry_error)
 {
 	struct nfs_args *args = NULL, *argp = NULL, *prev_argp = NULL;
 	struct netconfig *nconf = NULL;
@@ -649,9 +676,10 @@ mount_nfs(struct mnttab *mntp, int ro)
 			if (!(argp->flags & NFSMNT_KNCONF)) {
 				nconf = NULL;
 				if (r = getaddr_nfs(argp, host, &nconf,
-					    FALSE, path, port, NULL, TRUE)) {
-					last_error = r;
-					goto out;
+					FALSE, path, port, retry_error,
+					TRUE)) {
+						last_error = r;
+						goto out;
 				}
 			}
 		}
@@ -1976,8 +2004,18 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		vers_min = NFS_V4;
 		break;
 	default: /* no version specified, start with default */
-		vers_to_try = vers_max_default;
-		vers_min = vers_min_default;
+		/*
+		 * If the retry version is set, use that. This will
+		 * be set if the last mount attempt returned any other
+		 * besides an RPC error.
+		 */
+		if (nfsretry_vers)
+			vers_to_try = nfsretry_vers;
+		else {
+			vers_to_try = vers_max_default;
+			vers_min = vers_min_default;
+		}
+
 		break;
 	}
 
@@ -2335,6 +2373,7 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 		if (!printed) {
 			switch (addr_error.error_type) {
 			case 0:
+				printed = 1;
 				break;
 			case ERR_RPCERROR:
 				if (!print_rpcerror)
@@ -2343,23 +2382,36 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 				pr_err(gettext("%s NFS service not"
 					    " available %s\n"), fshost,
 				    clnt_sperrno(addr_error.error_value));
+				printed = 1;
 				break;
 			case ERR_NETPATH:
 				pr_err(gettext("%s: Error in NETPATH.\n"),
 					fshost);
+				printed = 1;
 				break;
 			case ERR_PROTO_INVALID:
 				pr_err(gettext("%s: NFS service does not"
 					" recognize protocol: %s.\n"), fshost,
 					nfs_proto);
+				printed = 1;
 				break;
 			case ERR_PROTO_UNSUPP:
-				if (nfsvers_to_use == NFS_VERSMIN) {
+				if (nfsvers || nfsvers_to_use == NFS_VERSMIN) {
 					/*
-					 * Print this message after we have
-					 * tried all versions of NFS and none
-					 * support the asked transport.
-					 * Otherwise we depricate the version
+					 * Don't set "printed" here. Since we
+					 * have to keep checking here till we
+					 * exhaust transport errors on all vers.
+					 *
+					 * Print this message if:
+					 * 1. After we have tried all versions
+					 *    of NFS and none support the asked
+					 *    transport.
+					 *
+					 * 2. If a version is specified and it
+					 *    does'nt support the asked
+					 *    transport.
+					 *
+					 * Otherwise we decrement the version
 					 * and retry below.
 					 */
 					pr_err(gettext("%s: NFS service does"
@@ -2369,14 +2421,15 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 				break;
 			case ERR_NOHOST:
 				pr_err("%s: %s\n", fshost, "Unknown host");
+				printed = 1;
 				break;
 			default:
 				/* case ERR_PROTO_NONE falls through */
 				pr_err(gettext("%s: NFS service not responding"
 					"\n"), fshost);
+				printed = 1;
 				break;
 			}
-			printed = 1;
 		}
 		SET_ERR_RET(error,
 			addr_error.error_type, addr_error.error_value);
@@ -2389,7 +2442,7 @@ getaddr_nfs(struct nfs_args *args, char *fshost, struct netconfig **nconfp,
 			ERR_PROTO_UNSUPP && nfsvers_to_use != NFS_VERSMIN) {
 			/*
 			 * If no version is specified, and the error is due
-			 * to an unsupported transport, then depricate the
+			 * to an unsupported transport, then decrement the
 			 * version and retry.
 			 */
 			return (RET_RETRY);
@@ -2435,16 +2488,23 @@ retry(struct mnttab *mntp, int ro)
 	int count = retries;
 	int r;
 
+	/*
+	 * Please see comments on nfsretry_vers in the beginning of this file
+	 * and in main() routine.
+	 */
+
 	if (bg) {
 		if (fork() > 0)
 			return (RET_OK);
 		pr_err(gettext("backgrounding: %s\n"), mntp->mnt_mountp);
 		backgrounded = 1;
-	} else
-		pr_err(gettext("retrying: %s\n"), mntp->mnt_mountp);
+	} else {
+		if (!nfsretry_vers)
+			pr_err(gettext("retrying: %s\n"), mntp->mnt_mountp);
+	}
 
 	while (count--) {
-		if ((r = mount_nfs(mntp, ro)) == RET_OK) {
+		if ((r = mount_nfs(mntp, ro, NULL)) == RET_OK) {
 			pr_err(gettext("%s: mounted OK\n"), mntp->mnt_mountp);
 			return (RET_OK);
 		}
@@ -2458,7 +2518,10 @@ retry(struct mnttab *mntp, int ro)
 			    delay = 120;
 		}
 	}
-	pr_err(gettext("giving up on: %s\n"), mntp->mnt_mountp);
+
+	if (!nfsretry_vers)
+		pr_err(gettext("giving up on: %s\n"), mntp->mnt_mountp);
+
 	return (RET_ERR);
 }
 
