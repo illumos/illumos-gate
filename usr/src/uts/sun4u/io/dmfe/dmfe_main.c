@@ -437,8 +437,8 @@ dmfe_init_rings(dmfe_t *dmfep)
 	/*
 	 * Set the base address of the RX descriptor list in CSR3
 	 */
-	DMFE_DEBUG(("RX descriptor VA: $%p (DVMA $%p)",
-		    (void *)descp->mem_va, (void *)descp->mem_dvma));
+	DMFE_DEBUG(("RX descriptor VA: $%p (DVMA $%x)",
+		    descp->mem_va, descp->mem_dvma));
 	dmfe_chip_put32(dmfep, RX_BASE_ADDR_REG, descp->mem_dvma);
 
 	/*
@@ -471,8 +471,8 @@ dmfe_init_rings(dmfe_t *dmfep)
 	/*
 	 * Set the base address of the TX descrptor list in CSR4
 	 */
-	DMFE_DEBUG(("TX descriptor VA: $%p (DVMA $%p)",
-		    (void *)descp->mem_va, (void *)descp->mem_dvma));
+	DMFE_DEBUG(("TX descriptor VA: $%p (DVMA $%x)",
+		    descp->mem_va, descp->mem_dvma));
 	dmfe_chip_put32(dmfep, TX_BASE_ADDR_REG, descp->mem_dvma);
 }
 
