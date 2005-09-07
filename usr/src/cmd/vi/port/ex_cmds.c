@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -720,7 +720,7 @@ quit:
 			if (peekchar() == '!') {
 				setdot();
 				ignchar();
-				unix0(0);
+				unix0(0, 1);
 				vi_filter(0);
 				continue;
 			}
@@ -900,7 +900,7 @@ wq:
 				pofix();
 				ignchar();
 				setall();
-				unix0(0);
+				unix0(0, 1);
 				vi_filter(1);
 			} else {
 				setall();
@@ -1037,11 +1037,11 @@ numberit:
 		case '!':
 			if (addr2 != 0) {
 				vmacchng(0);
-				unix0(0);
+				unix0(0, 1);
 				setdot();
 				vi_filter(2);
 			} else {
-				unix0(1);
+				unix0(1, 1);
 				pofix();
 				putpad(exit_ca_mode);
 				flush();

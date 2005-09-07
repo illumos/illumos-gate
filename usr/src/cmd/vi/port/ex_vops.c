@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -795,7 +795,7 @@ vfilter()
 	d = peekc; ungetchar(0);
 	CATCH
 		fixech();
-		unix0(0);
+		unix0(0, 0);
 	ONERR
 		splitw = 0;
 		ungetchar(d);

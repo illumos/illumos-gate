@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,15 +46,17 @@ extern char	getchar();
  * First part of a shell escape,
  * parse the line, expanding # and % and ! and printing if implied.
  */
-unix0(warn)
-	bool warn;
+void
+unix0(bool warn, int contcmd)
 {
-	register unsigned char *up, *fp;
-	register short c;
+	unsigned char *up, *fp;
+	short c;
 	char	multic[MB_LEN_MAX + 1];
 	int	len;
+	int	contread = 0;
 	wchar_t	wc;
 	unsigned char printub, puxb[UXBSIZE + sizeof (int)];
+	const char	*specialchars = (contcmd ? "%#!\n" : "%#!");
 
 	printub = 0;
 	CP(puxb, uxb);
@@ -86,8 +88,18 @@ gettext("Incomplete shell escape command - use 'shell' to get a shell"));
 		switch (c) {
 
 		case '\\':
-			if (any(peekchar(), "%#!"))
+			if (any(peekchar(), specialchars)) {
 				c = getchar();
+				/*
+				 * If we encountered a backslash-escaped
+				 * newline, and we're processing a continuation
+				 * command, then continue processing until
+				 * non-backslash-escaped newline is reached.
+				 */
+				if (contcmd && (c == '\n')) {
+					contread = 1;
+				}
+			}
 		default:
 			if (up >= (unsigned char *)&uxb[UXBSIZE]) {
 tunix:
@@ -180,7 +192,15 @@ uexp:
 
 loop_check:
 		c = peekchar();
-		if (c == '"' || c == '|' || !endcmd(c)) {
+		if (c == '"' || c == '|' || (contread > 0) || !endcmd(c)) {
+			/*
+			 * If contread was set, then the newline just
+			 * processed was preceeded by a backslash, and
+			 * not considered the end of the command. Reset
+			 * it here in case another backslash-escaped
+			 * newline is processed.
+			 */
+			contread = 0;
 			continue;
 		} else {
 			(void) getchar();
