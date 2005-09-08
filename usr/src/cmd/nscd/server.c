@@ -459,7 +459,7 @@ save_execname()
 	strlcat(saved_execname, name, MAXPATHLEN);
 }
 
-void
+int
 main(int argc, char ** argv)
 {
 	int did;
@@ -968,7 +968,7 @@ main(int argc, char ** argv)
 
 	if (thr_sigsetmask(SIG_UNBLOCK, &myset, NULL) < 0) {
 		perror("thr_sigsetmask");
-		exit(1);
+		return (1);
 	}
 
 	for (;;) {

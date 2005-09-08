@@ -335,9 +335,9 @@ fill_address(dnode_t curnode, char *namep)
 			}
 
 			/* make into a native pointer */
-			*wkp->wk_vaddrp = (caddr_t)vaddr;
+			*wkp->wk_vaddrp = (caddr_t)(uintptr_t)vaddr;
 #ifdef VPRINTF
-			VPRINTF("fill_address: %s mapped to %x\n", namep,
+			VPRINTF("fill_address: %s mapped to %p\n", namep,
 			    *wkp->wk_vaddrp);
 #endif /* VPRINTF */
 		}
@@ -1064,11 +1064,11 @@ have_eeprom(dnode_t node)
 	 * If we have a chosen eeprom and it is not this node, keep looking.
 	 */
 	if (chosen_eeprom != NULL && chosen_eeprom != node) {
-		v_timecheck_addr = (caddr_t)eaddr;
+		v_timecheck_addr = (caddr_t)(uintptr_t)eaddr;
 		return;
 	}
 
-	v_eeprom_addr = (caddr_t)eaddr;
+	v_eeprom_addr = (caddr_t)(uintptr_t)eaddr;
 
 	/*
 	 * If we don't find an I/O board to use to check the clock,
@@ -1117,8 +1117,8 @@ have_rtc(dnode_t node)
 	if (GETPROP(node, OBP_ADDRESS, (caddr_t)&eaddr) == -1)
 		cmn_err(CE_PANIC, "rtc addr");
 
-	v_rtc_addr_reg = (caddr_t)eaddr;
-	v_rtc_data_reg = (volatile unsigned char *)eaddr + 1;
+	v_rtc_addr_reg = (caddr_t)(uintptr_t)eaddr;
+	v_rtc_data_reg = (volatile unsigned char *)(uintptr_t)eaddr + 1;
 
 	/*
 	 * Does this rtc have watchdog support?
@@ -1148,8 +1148,8 @@ have_pmc(dnode_t node)
 			watchdog_available = 0;
 			return;
 		}
-		v_pmc_addr_reg = (volatile uint8_t *)vaddr;
-		v_pmc_data_reg = (volatile uint8_t *)vaddr + 1;
+		v_pmc_addr_reg = (volatile uint8_t *)(uintptr_t)vaddr;
+		v_pmc_data_reg = (volatile uint8_t *)(uintptr_t)vaddr + 1;
 		watchdog_available = 1;
 	}
 }
@@ -1185,7 +1185,7 @@ have_auxio(dnode_t node)
 	if (GETPROP(node, OBP_ADDRESS, (caddr_t)addr) == -1)
 		cmn_err(CE_PANIC, "auxio addr");
 
-	v_auxio_addr = (caddr_t)addr[0];	/* make into a C pointer */
+	v_auxio_addr = (caddr_t)(uintptr_t)(addr[0]); /* make into pointer */
 }
 
 static void

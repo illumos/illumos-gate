@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +61,7 @@ static hash_t *nam_hash;
 static mutex_t  db_lock = DEFAULTMUTEX;
 static waiter_t db_wait;
 
-static getexec_namekeepalive(int keep, int interval);
+static int getexec_namekeepalive(int keep, int interval);
 static int update_exec_bucket(nsc_bucket_t **old, nsc_bucket_t *new,
     int callnumber);
 static nsc_bucket_t *fixbuffer(nsc_return_t *in, int maxlen);
@@ -125,7 +125,7 @@ getexec_revalidate(void)
 	}
 }
 
-static
+static int
 getexec_namekeepalive(int keep, int interval)
 {
 	int *table;

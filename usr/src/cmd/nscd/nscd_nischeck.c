@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1994 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,8 +41,9 @@
 #include <rpc/rpc.h>
 #include <rpcsvc/nis.h>
 #include <unistd.h>
-extern int 	optind;
-extern char	*optarg;
+
+void
+leave(int n);
 
 int
 check_col(struct nis_object *table, int col)
@@ -84,8 +85,10 @@ main(int argc, char **argv)
 	}
 
 	leave(0);
+	return (0);
 }
 
+void
 leave(int n)
 {
 	if(getenv("NSCD_DEBUG"))

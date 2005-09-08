@@ -119,6 +119,7 @@ extern void getuser_invalidate(void);
 extern void getuser_lookup(nsc_return_t *out, int maxsize, nsc_call_t *in,
     time_t now);
 
+extern void leave(int n);
 #ifdef	__cplusplus
 }
 #endif

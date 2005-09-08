@@ -281,9 +281,9 @@ fill_address(dnode_t curnode, char *namep)
 			}
 
 			/* make into a native pointer */
-			*wkp->wk_vaddrp = (caddr_t)vaddr;
+			*wkp->wk_vaddrp = (caddr_t)(uintptr_t)vaddr;
 #ifdef VPRINTF
-			VPRINTF("fill_address: %s mapped to %x\n", namep,
+			VPRINTF("fill_address: %s mapped to %p\n", namep,
 			    *wkp->wk_vaddrp);
 #endif /* VPRINTF */
 		}
