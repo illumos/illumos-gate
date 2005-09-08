@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1756,7 +1756,7 @@ pfc_update_assigned_prop(dev_info_t *dip, pci_regspec_t *newone)
 	caddr_t		newreg;
 	uint_t		status;
 
-	status = ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	status = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		"assigned-addresses", (caddr_t)&assigned, &alen);
 	switch (status) {
 		case DDI_PROP_SUCCESS:
@@ -1799,7 +1799,7 @@ pfc_remove_assigned_prop(dev_info_t *dip, pci_regspec_t *oldone)
 	pci_regspec_t	*assigned;
 	uint_t		status;
 
-	status = ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	status = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		"assigned-addresses", (caddr_t)&assigned, &alen);
 	switch (status) {
 		case DDI_PROP_SUCCESS:

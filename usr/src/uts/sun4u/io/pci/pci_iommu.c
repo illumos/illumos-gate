@@ -247,7 +247,7 @@ iommu_configure(iommu_t *iommu_p)
 	for (; cdip; cdip = ddi_get_next_sibling(cdip)) {
 		uint32_t *reg_p;
 		int reg_len;
-		if (ddi_getlongprop(DDI_DEV_T_NONE, cdip, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
 			"reg", (caddr_t)&reg_p, &reg_len) != DDI_PROP_SUCCESS)
 			continue;
 		cfgpa += (*reg_p) & (PCI_CONF_ADDR_MASK ^ PCI_REG_REG_M);

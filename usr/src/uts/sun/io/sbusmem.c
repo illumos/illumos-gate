@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -186,7 +186,7 @@ sbmem_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		}
 #endif /* SBUSMEM_DEBUG */
 
-		if (ddi_getlongprop(DDI_DEV_T_NONE, devi,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, devi,
 		    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "ident",
 		    (caddr_t)&ident, &ilen) != DDI_PROP_SUCCESS) {
 #ifdef SBUSMEM_DEBUG

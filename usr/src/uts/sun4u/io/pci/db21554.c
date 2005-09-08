@@ -647,7 +647,7 @@ db_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		db_enable_io(dbp);
 
 		range_size = sizeof (dbp->range);
-		if (ddi_getlongprop_buf(DDI_DEV_T_NONE, dip,
+		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip,
 			DDI_PROP_DONTPASS, "bus-range", (caddr_t)&dbp->range,
 				&range_size) != DDI_SUCCESS) {
 
@@ -2171,7 +2171,7 @@ db_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	 * Use the devices reg property to determine it's
 	 * PCI bus number and device number.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, cdip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
 	    "reg", (caddr_t)&pci_rp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -2407,7 +2407,7 @@ db_create_pci_prop(dev_info_t *child)
 	int	value;
 
 	/* get child "reg" property */
-	value = ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_CANSLEEP,
+	value = ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_CANSLEEP,
 		"reg", (caddr_t)&pci_rp, &length);
 	if (value != DDI_SUCCESS)
 		return (value);

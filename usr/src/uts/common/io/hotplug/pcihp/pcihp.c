@@ -3552,7 +3552,7 @@ pcihp_config_setup(dev_info_t **dip, ddi_acc_handle_t *handle,
 	 * adapter has just been hot plugged.
 	 */
 	len = sizeof (struct bus_range);
-	if (ddi_getlongprop_buf(DDI_DEV_T_NONE, pdip,
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, pdip,
 	    0, "bus-range",
 	    (caddr_t)&pci_bus_range, &len) != DDI_SUCCESS) {
 

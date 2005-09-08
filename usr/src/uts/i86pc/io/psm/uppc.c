@@ -742,7 +742,7 @@ uppc_translate_irq(dev_info_t *dip, int irqno)
 	}
 
 	dev_len = sizeof (dev_type);
-	if (ddi_getlongprop_buf(DDI_DEV_T_NONE, ddi_get_parent(dip),
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, ddi_get_parent(dip),
 	    DDI_PROP_DONTPASS, "device_type", (caddr_t)dev_type,
 	    &dev_len) != DDI_PROP_SUCCESS) {
 		UPPC_VERBOSE_IRQ((CE_CONT, "!uppc: irqno %d"

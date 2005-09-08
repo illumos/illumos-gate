@@ -59,7 +59,7 @@
 
 
 #define	getprop(dip, name, addr, intp)		\
-		ddi_getlongprop(DDI_DEV_T_NONE, (dip), DDI_PROP_DONTPASS, \
+		ddi_getlongprop(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS, \
 				(name), (caddr_t)(addr), (intp))
 
 /* driver entry point fn definitions */
@@ -561,7 +561,7 @@ sbbc_busmap(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		rnumber = mp->map_obj.rnumber;
 
 		/* get the requester's reg property */
-		if (ddi_getlongprop(DDI_DEV_T_NONE, rdip, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 		    "reg", (caddr_t)&child_regs, &i) != DDI_SUCCESS) {
 			cmn_err(CE_WARN,
 			    "SBBC: couldn't get %s ranges property %d",
@@ -955,7 +955,7 @@ sbbc_get_ranges(struct sbbcsoft *sbbcsoftp)
 	struct sbbc_pci_rangespec *rangep;
 	int range_len, nrange;
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, sbbcsoftp->dip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, sbbcsoftp->dip, DDI_PROP_DONTPASS,
 	    "ranges", (caddr_t)&rangep, &range_len) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "SBBC: couldn't get %s ranges property %d",
 		    ddi_get_name(sbbcsoftp->dip), sbbcsoftp->instance);
@@ -1268,7 +1268,7 @@ sbbc_initchild(dev_info_t *dip, dev_info_t *rdip, dev_info_t *child)
 	 * Set the address portion of the node name based on the
 	 * address/offset.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
 	    "reg", (caddr_t)&child_rp, &reglen) != DDI_SUCCESS) {
 		if (strcmp(ddi_node_name(child), "hotplug-controller") == 0) {
 			slot = 1;

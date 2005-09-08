@@ -570,7 +570,7 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 	 * "bus" specified.
 	 */
 	len = sizeof (pcicfg_bus_range_t);
-	if (ddi_getlongprop_buf(DDI_DEV_T_NONE, devi, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
 		"bus-range", (caddr_t)&pci_bus_range, &len) != DDI_SUCCESS) {
 		DEBUG0("no bus-range property\n");
 		return (PCICFG_FAILURE);
@@ -997,7 +997,7 @@ pcicfg_ntbridge_configure_done(dev_info_t *dip)
 	range[0].child_lo = range[0].parent_lo = (uint32_t)entry->io_base;
 
 	len = sizeof (pcicfg_bus_range_t);
-	if (ddi_getlongprop_buf(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		"bus-range", (caddr_t)&bus_range, (int *)&len) != DDI_SUCCESS) {
 		DEBUG0("no bus-range property\n");
 		return (PCICFG_FAILURE);
@@ -1073,7 +1073,7 @@ pcicfg_ntbridge_unconfigure_child(dev_info_t *new_device, uint_t devno)
 	pcicfg_bus_range_t pci_bus_range;
 
 	len = sizeof (pcicfg_bus_range_t);
-	if (ddi_getlongprop_buf(DDI_DEV_T_NONE, new_device, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, new_device, DDI_PROP_DONTPASS,
 		"bus-range", (caddr_t)&pci_bus_range, &len) != DDI_SUCCESS) {
 		DEBUG0("no bus-range property\n");
 		return (PCICFG_FAILURE);
@@ -2580,7 +2580,7 @@ pcicfg_update_assigned_prop(dev_info_t *dip, pci_regspec_t *newone)
 	uint_t		status;
 
 	DEBUG0("pcicfg_update_assigned_prop()\n");
-	status = ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	status = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		"assigned-addresses", (caddr_t)&assigned, &alen);
 	switch (status) {
 		case DDI_PROP_SUCCESS:
@@ -2635,7 +2635,7 @@ pcicfg_update_ranges_prop(dev_info_t *dip, pcicfg_range_t *addition)
 	caddr_t		newreg;
 	uint_t		status;
 
-	status = ddi_getlongprop(DDI_DEV_T_NONE,
+	status = ddi_getlongprop(DDI_DEV_T_ANY,
 		dip, DDI_PROP_DONTPASS, "ranges", (caddr_t)&ranges, &rlen);
 
 
@@ -2691,7 +2691,7 @@ pcicfg_update_reg_prop(dev_info_t *dip, uint32_t regvalue, uint_t reg_offset)
 	uint32_t	size;
 	uint_t		status;
 
-	status = ddi_getlongprop(DDI_DEV_T_NONE,
+	status = ddi_getlongprop(DDI_DEV_T_ANY,
 		dip, DDI_PROP_DONTPASS, "reg", (caddr_t)&reg, &rlen);
 
 	switch (status) {
@@ -4384,7 +4384,7 @@ pcicfg_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
 	/*
 	 * Get the pci register spec from the node
 	 */
-	status = ddi_getlongprop(DDI_DEV_T_NONE,
+	status = ddi_getlongprop(DDI_DEV_T_ANY,
 		dip, DDI_PROP_DONTPASS, "reg", (caddr_t)&reg, &rlen);
 
 	switch (status) {
@@ -5423,7 +5423,7 @@ pcicfg_remove_assigned_prop(dev_info_t *dip, pci_regspec_t *oldone)
 	pci_regspec_t	*assigned, *assigned_copy;
 	uint_t		status;
 
-	status = ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	status = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		"assigned-addresses", (caddr_t)&assigned, &alen);
 	switch (status) {
 		case DDI_PROP_SUCCESS:

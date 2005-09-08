@@ -1115,7 +1115,7 @@ pcmcia_cons_regspec(dev_info_t *dip, int type, uchar_t *buff, ra_return_t *ret)
 	switch (ptype) {
 	case PTYPE_PCI:
 		/* XXX need to look at carefully */
-		if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 			"reg", (caddr_t)&pcireg, &len) == DDI_SUCCESS) {
 			bus = PCI_REG_BUS_G(pcireg->pci_phys_hi);
 			kmem_free(pcireg, len);
@@ -4565,7 +4565,7 @@ pcmcia_free_resources(dev_info_t *self)
 	    dip != NULL;
 	    dip = (dev_info_t *)DEVI(dip)->devi_sibling) {
 		len = 0;
-		if (ddi_getlongprop(DDI_DEV_T_NONE, dip,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
 		    DDI_PROP_DONTPASS|DDI_PROP_CANSLEEP,
 		    "assigned-addresses",
 		    (caddr_t)&assigned,

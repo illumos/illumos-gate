@@ -1421,14 +1421,14 @@ px_lib_bdf_from_dip(dev_info_t *rdip, uint32_t *bdf)
 	boolean_t kmalloced = B_FALSE;
 	int status;
 
-	status = ddi_getlongprop_buf(DDI_DEV_T_NONE, rdip,
+	status = ddi_getlongprop_buf(DDI_DEV_T_ANY, rdip,
 	    DDI_PROP_DONTPASS, "reg", (caddr_t)regspec, &buflen);
 
 	/* If need more space, fallback to kmem_alloc. */
 	if (status == DDI_PROP_BUF_TOO_SMALL) {
 		regspec = kmem_alloc(buflen, KM_SLEEP);
 
-		status = ddi_getlongprop_buf(DDI_DEV_T_NONE, rdip,
+		status = ddi_getlongprop_buf(DDI_DEV_T_ANY, rdip,
 		    DDI_PROP_DONTPASS, "reg", (caddr_t)regspec, &buflen);
 
 		kmalloced = B_TRUE;

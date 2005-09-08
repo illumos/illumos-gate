@@ -630,7 +630,7 @@ i_ddi_alloc_ispec(dev_info_t *dip, uint_t inumber, ddi_intrspec_t *intrspecp)
 	ddi_ispec_t **ispecp = (ddi_ispec_t **)intrspecp;
 
 	*ispecp = NULL;
-	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS |
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS |
 	    DDI_PROP_CANSLEEP,
 	    "interrupts", (caddr_t)&ip, &intrlen) == DDI_SUCCESS) {
 
@@ -1492,7 +1492,7 @@ get_intr_parent(dev_info_t *pdip, dev_info_t *dip,
 	 * and apply the imap mask.  match_req will hold this when we're
 	 * through.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS, "reg",
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
 	    (caddr_t)&reg_p, &reg_len) != DDI_SUCCESS) {
 		ASSERT(intr_parent_dip == NULL);
 		goto exit3;
@@ -1678,7 +1678,7 @@ i_ddi_get_nintrs(dev_info_t *dip)
 	prop_1275_cell_t *ip;
 	int32_t ret = 0;
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS |
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS |
 	    DDI_PROP_CANSLEEP,
 	    "interrupts", (caddr_t)&ip, &intrlen) == DDI_SUCCESS) {
 

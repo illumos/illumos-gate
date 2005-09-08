@@ -302,7 +302,7 @@ vnex_ctl(dev_info_t *dip, dev_info_t *rdip,
 	{
 		dev_info_t *child = (dev_info_t *)arg;
 
-		if (ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
 		    "reg", (caddr_t)&vnex_regspec, &reglen) != DDI_SUCCESS)
 			return (DDI_FAILURE);
 
@@ -337,7 +337,7 @@ vnex_ctl(dev_info_t *dip, dev_info_t *rdip,
 	case DDI_CTLOPS_NREGS:
 	{
 		dev_info_t *child = (dev_info_t *)arg;
-		if (ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
 		    "reg", (caddr_t)&vnex_regspec, &reglen) != DDI_SUCCESS)
 			return (DDI_FAILURE);
 		*((uint_t *)result) = reglen / sizeof (uint32_t);
@@ -439,7 +439,7 @@ vnex_add_intr(dev_info_t *dip, dev_info_t *rdip,
 	uint64_t ihdl;
 	vnex_regspec_t *reg_p;
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, dip,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "reg", (caddr_t)&reg_p,
 	    &reglen) != DDI_SUCCESS) {
 		return (DDI_FAILURE);

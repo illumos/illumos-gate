@@ -203,7 +203,7 @@ struct dev_ops ppb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"Standard PCI to PCI bridge nexus driver 1.74",
+	"Standard PCI to PCI bridge nexus driver %I%",
 	&ppb_ops,	/* driver ops */
 };
 
@@ -591,7 +591,7 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	}
 
 	*(int *)result = 0;
-	if (ddi_getlongprop(DDI_DEV_T_NONE, rdip,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip,
 		DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
 		(caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
@@ -655,7 +655,7 @@ ppb_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	 * Use the devices reg property to determine its
 	 * PCI bus number and device number.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, cdip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
 	    "reg", (caddr_t)&pci_rp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 

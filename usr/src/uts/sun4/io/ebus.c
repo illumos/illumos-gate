@@ -90,7 +90,7 @@ static int febus_apply_range(ebus_devstate_t *ebus_p, dev_info_t *rdip,
 int get_ranges_prop(ebus_devstate_t *ebus_p);
 
 #define	getprop(dip, name, addr, intp)		\
-		ddi_getlongprop(DDI_DEV_T_NONE, (dip), DDI_PROP_DONTPASS, \
+		ddi_getlongprop(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS, \
 				(name), (caddr_t)(addr), (intp))
 
 static int ebus_open(dev_t *devp, int flags, int otyp, cred_t *credp);
@@ -784,7 +784,7 @@ ebus_name_child(dev_info_t *child, char *name, int namelen)
 	 * Get the address portion of the node name based on the
 	 * address/offset.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
 	    "reg", (caddr_t)&ebus_rp, &reglen) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
@@ -970,7 +970,7 @@ ebus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		}
 	}
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, rdip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 	    "device_type", (caddr_t)&device_type_p, &len) == DDI_SUCCESS) {
 
 		max_device_types = sizeof (ebus_device_type_to_pil) /

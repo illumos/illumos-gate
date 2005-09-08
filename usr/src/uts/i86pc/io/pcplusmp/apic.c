@@ -3119,7 +3119,7 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 		goto nonpci;
 
 	dev_len = sizeof (dev_type);
-	if (ddi_getlongprop_buf(DDI_DEV_T_NONE, ddi_get_parent(dip),
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, ddi_get_parent(dip),
 	    DDI_PROP_DONTPASS, "device_type", (caddr_t)dev_type,
 	    &dev_len) != DDI_PROP_SUCCESS) {
 		goto nonpci;

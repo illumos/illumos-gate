@@ -774,7 +774,7 @@ isa_resource_setup()
 
 	(void) ndi_ra_free(usedpdip, 0, 0xffff + 1,  NDI_RA_TYPE_IO, 0);
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, used, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, used, DDI_PROP_DONTPASS,
 	    "io-space", (caddr_t)&iorange, &proplen) == DDI_SUCCESS) {
 		maxrange = proplen / sizeof (struct iorange);
 		/* remove the "used" I/O resources */
@@ -798,7 +798,7 @@ isa_resource_setup()
 	(void) ndi_ra_free(usedpdip, 0, ((uint64_t)((uint32_t)~0)) + 1,
 	    NDI_RA_TYPE_MEM, 0);
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, used, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, used, DDI_PROP_DONTPASS,
 	    "device-memory", (caddr_t)&memrange, &proplen) == DDI_SUCCESS) {
 		maxrange = proplen / sizeof (struct memrange);
 		/* remove the "used" memory resources */
@@ -830,7 +830,7 @@ isa_resource_setup()
 	    NDI_RA_TYPE_INTR, 0);
 #endif
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, used, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, used, DDI_PROP_DONTPASS,
 	    "interrupts", (caddr_t)&irq, &proplen) == DDI_SUCCESS) {
 		/* Initialize available interrupts by negating the used */
 		len = (proplen / sizeof (uint32_t));
@@ -936,7 +936,7 @@ pci_resource_setup(dev_info_t *dip)
 		return (NDI_FAILURE);
 
 	/* read the "available" property if it is available */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "available", (caddr_t)&regs, &rlen) != DDI_SUCCESS)
 		return (NDI_FAILURE);
 
@@ -1022,7 +1022,7 @@ pci_resource_setup(dev_info_t *dip)
 	 * has available-bus-range or bus-range property.
 	 */
 	len = sizeof (struct bus_range);
-	if (ddi_getlongprop_buf(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "available-bus-range", (caddr_t)&pci_bus_range, &len) ==
 	    DDI_SUCCESS) {
 		/*
@@ -1041,7 +1041,7 @@ pci_resource_setup(dev_info_t *dip)
 		 * reclaim them.
 		 */
 		len = sizeof (struct bus_range);
-		if (ddi_getlongprop_buf(DDI_DEV_T_NONE, dip,
+		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip,
 		    DDI_PROP_DONTPASS, "bus-range", (caddr_t)&pci_bus_range,
 		    &len) == DDI_SUCCESS) {
 			if (pci_bus_range.lo != pci_bus_range.hi) {
@@ -1113,7 +1113,7 @@ claim_pci_busnum(dev_info_t *dip, void *arg)
 
 	/* look for the bus-range property */
 	len = sizeof (struct bus_range);
-	if (ddi_getlongprop_buf(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "bus-range", (caddr_t)&pci_bus_range, &len) == DDI_SUCCESS) {
 		if ((pci_bus_range.lo >= ctrl->range->lo) &&
 		    (pci_bus_range.hi <= ctrl->range->hi)) {

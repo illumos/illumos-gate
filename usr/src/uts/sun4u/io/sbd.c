@@ -5131,7 +5131,7 @@ sbd_get_comp_cond(dev_info_t *dip)
 	}
 
 	status_buf = kmem_zalloc(sizeof (char) * OBP_MAXPROPNAME, KM_SLEEP);
-	if (ddi_getlongprop_buf(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    (char *)status, status_buf, &len) != DDI_PROP_SUCCESS) {
 		PR_CPU("status in sbd is unknown\n");
 		return (SBD_COND_UNKNOWN);

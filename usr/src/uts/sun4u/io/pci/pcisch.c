@@ -262,7 +262,7 @@ pci_intr_setup(pci_t *pci_p)
 	uint32_t *intr_buf, *new_intr_buf;
 	int intr_len, intr_cnt, ret;
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		"interrupts", (caddr_t)&intr_buf, &intr_len) != DDI_SUCCESS)
 		cmn_err(CE_PANIC, "%s%d: no interrupts property\n",
 			ddi_driver_name(dip), ddi_get_instance(dip));
@@ -501,7 +501,7 @@ map_pci_registers(pci_t *pci_p, dev_info_t *dip)
 		goto fail;
 	}
 
-	if (ddi_getproplen(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	if (ddi_getproplen(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "reg", &len) || (len / sizeof (pci_nexus_regspec_t) < 4))
 		goto done;
 
@@ -3241,7 +3241,7 @@ pci_setup_cfgpa(pci_t *pci_p)
 
 	for (cdip = ddi_get_child(dip); cdip != NULL;
 	    cdip = ddi_get_next_sibling(cdip)) {
-		if (ddi_getlongprop(DDI_DEV_T_NONE, cdip, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
 		    "reg", (caddr_t)&reg_p, &reg_len) != DDI_PROP_SUCCESS)
 			continue;
 		cfgpa += (*reg_p) & (PCI_CONF_ADDR_MASK ^ PCI_REG_REG_M);

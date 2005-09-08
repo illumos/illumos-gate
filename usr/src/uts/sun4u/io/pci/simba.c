@@ -633,7 +633,7 @@ simba_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 	}
 
 	*(int *)result = 0;
-	if (ddi_getlongprop(DDI_DEV_T_NONE, rdip,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip,
 		DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
 		(caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);

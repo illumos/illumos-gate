@@ -239,7 +239,7 @@ pmubus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		pmubusp->pmubus_dip = dip;
 
 		/* Cache our register property */
-		if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		    "reg", (caddr_t)&pmubusp->pmubus_regp,
 		    &pmubusp->pmubus_reglen) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "pmubus_attach: Can't acquire reg "
@@ -248,7 +248,7 @@ pmubus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		/* Cache our ranges property */
-		if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		    "ranges", (caddr_t)&pmubusp->pmubus_rangep,
 		    &pmubusp->pmubus_rnglen) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "pmubus_attach: Can't acquire the "
@@ -687,7 +687,7 @@ pmubus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		    "handlep=%x\n", ddi_get_name(rdip), ddi_get_instance(rdip),
 		    rnumber, mp->map_handlep));
 
-		if (ddi_getlongprop(DDI_DEV_T_NONE, rdip, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 		    "reg", (caddr_t)&pmubus_regs, &pmubus_regs_size) !=
 		    DDI_SUCCESS) {
 			DPRINTF(PMUBUS_MAP_DEBUG, ("can't get reg "
@@ -708,7 +708,7 @@ pmubus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		    (uint64_t)pmubus_regs[rnumber].reg_addr_lo;
 		pmubus_rp.reg_size = pmubus_regs[rnumber].reg_size;
 
-		(void) ddi_getlongprop(DDI_DEV_T_NONE, rdip, DDI_PROP_DONTPASS,
+		(void) ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 		    "register-mask", (caddr_t)&pmubus_regmask,
 		    &pmubus_regmask_size);
 
@@ -857,7 +857,7 @@ pmubus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	switch (op) {
 	case DDI_CTLOPS_INITCHILD:
 
-		if (ddi_getlongprop(DDI_DEV_T_NONE, child,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, child,
 		    DDI_PROP_DONTPASS, "reg", (caddr_t)&pmubus_rp,
 		    &reglen) != DDI_SUCCESS) {
 

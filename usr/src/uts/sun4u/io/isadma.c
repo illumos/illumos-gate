@@ -239,7 +239,7 @@ isadma_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		isadmap->isadma_dip = dip;
 
 		/* Cache our register property */
-		if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		    "reg", (caddr_t)&isadmap->isadma_regp,
 		    &isadmap->isadma_reglen) != DDI_SUCCESS) {
 			ret = DDI_FAILURE;
@@ -630,7 +630,7 @@ isadma_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	/*
 	 * Get child regspec since the mapping struct may not have it yet
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, rdip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 	    "reg", (caddr_t)&regp, &reglen) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}

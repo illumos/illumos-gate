@@ -352,7 +352,7 @@ pci_check_regs(dev_info_t *dip, void *arg)
 	pci_regspec_t *drv_regp;
 	pci_target_err_t *tgt_err = (pci_target_err_t *)arg;
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "assigned-addresses", (caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
 		return (DDI_WALK_CONTINUE);
 

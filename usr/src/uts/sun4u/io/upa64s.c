@@ -947,7 +947,7 @@ get_reg_set(dev_info_t *dip, dev_info_t *child, int rnumber,
 	/*
 	 * Get child device "reg" property
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS, "reg",
+	if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS, "reg",
 	    (caddr_t)&upa64s_rp, &i) != DDI_SUCCESS)
 		return (DDI_ME_RNUMBER_RANGE);
 
@@ -1010,7 +1010,7 @@ xlate_reg_prop(dev_info_t *dip, upa64s_regspec_t *child_rp, off_t off,
 	if (child_rp->upa64s_size >= (1ull << 32))
 		panic("upa64s: reg size must be less than 4 Gb");
 
-	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "ranges", (caddr_t)&range_p, &ranges_len) != DDI_SUCCESS) {
 		ranges_len = 0;
 		cmn_err(CE_WARN, "%s%d: no ranges property",
@@ -1095,7 +1095,7 @@ init_child(dev_info_t *child)
 	 * Set the address portion of the node name based on
 	 * the function and device number.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS, "reg",
+	if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS, "reg",
 	    (caddr_t)&child_rp, &i) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
@@ -1132,7 +1132,7 @@ get_reg_set_size(dev_info_t *child, int rnumber)
 	/*
 	 * Get the reg property for the device.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS, "reg",
+	if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS, "reg",
 	    (caddr_t)&upa64s_rp, &i) != DDI_SUCCESS)
 		return (-1);
 
@@ -1167,7 +1167,7 @@ get_nreg_set(dev_info_t *child)
 	/*
 	 * Get the reg property for the device.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS, "reg",
+	if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS, "reg",
 	    (caddr_t)&upa64s_rp, &i) != DDI_SUCCESS)
 		return (0);
 

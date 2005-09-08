@@ -513,7 +513,7 @@ pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		r_no = mp->map_obj.rnumber;
 		DEBUG1(DBG_MAP | DBG_CONT, dip, " r#=%x", r_no);
 
-		if (ddi_getlongprop(DDI_DEV_T_NONE, rdip, DDI_PROP_DONTPASS,
+		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 			"reg", (caddr_t)&rp, &reglen) != DDI_SUCCESS)
 				return (DDI_ME_RNUMBER_RANGE);
 

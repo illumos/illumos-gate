@@ -248,7 +248,7 @@ pci_intr_setup(pci_t *pci_p)
 	/*
 	 * Get the interrupts property.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		"interrupts", (caddr_t)&pci_p->pci_inos,
 		&pci_p->pci_inos_len) != DDI_SUCCESS)
 		cmn_err(CE_PANIC, "%s%d: no interrupts property\n",

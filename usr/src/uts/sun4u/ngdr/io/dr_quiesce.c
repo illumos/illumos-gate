@@ -189,7 +189,7 @@ dr_is_real_device(dev_info_t *dip)
 	/*
 	 * now the general case
 	 */
-	rc = ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS, "reg",
+	rc = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
 		(caddr_t)&regbuf, &length);
 	ASSERT(rc != DDI_PROP_NO_MEMORY);
 	if (rc != DDI_PROP_SUCCESS) {

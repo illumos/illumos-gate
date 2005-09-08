@@ -155,7 +155,7 @@ struct febus_rangespec {
 
 
 #define	getprop(dip, name, addr, intp)		\
-		ddi_getlongprop(DDI_DEV_T_NONE, (dip), DDI_PROP_DONTPASS, \
+		ddi_getlongprop(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS, \
 				(name), (caddr_t)(addr), (intp))
 
 #define	IS_RIO(dip) \
