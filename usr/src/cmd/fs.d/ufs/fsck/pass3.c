@@ -197,7 +197,7 @@ pass3a(void)
 		/*
 		 * Theoretically, this lookup via ckinode can't fail
 		 * (if orphan doesn't exist in i_parent, then i_parent
-		 * would not have been filled in by pass2bcheck()).
+		 * would not have been filled in by pass2check()).
 		 * However, if we're interactive, we want to at least
 		 * attempt to continue.  The worst case is that it
 		 * gets reconnected as #nnn into lost+found instead of

@@ -1226,11 +1226,11 @@ allocdir(fsck_ino_t parent, fsck_ino_t request, int mode, int update_parent)
 	 * parent.  On the other hand, if the parent's already been
 	 * looked at (statemap[ino] == DFOUND), the discrepancy
 	 * between lncntp[] and di_nlink will be noted later, with
-	 * appropriate reporting and propagation, in pass2b.
+	 * appropriate reporting and propagation, in pass2.
 	 *
 	 * We're explicitly skipping where the parent was DZLINK or
 	 * DFOUND.  If it has zero links, it can't be gotten to, so
-	 * we want a discrepancy set up that will be caught in pass2b.
+	 * we want a discrepancy set up that will be caught in pass2.
 	 * DFOUND was discussed above.
 	 *
 	 * Regarding the claim of a link from the parent: we've not

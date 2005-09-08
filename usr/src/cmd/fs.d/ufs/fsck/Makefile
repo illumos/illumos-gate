@@ -35,7 +35,7 @@ include		../../Makefile.fstype
 include		../Makefile.roll
 
 FSCKOBJS=	main.o dir.o dup_avl.o inode.o pass1.o pass1b.o \
-		pass2b.o \
+		pass2.o \
 		pass3.o pass3b.o pass4.o pass5.o setup.o \
 		utilities.o
 FSCKSRCS=	$(FSCKOBJS:%.o=%.c)

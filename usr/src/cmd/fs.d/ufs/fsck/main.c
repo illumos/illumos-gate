@@ -172,7 +172,6 @@ char *magic_fs[] = {
 	"",			/* MAGIC_NONE, for normal filesystems */
 	"/",			/* MAGIC_ROOT */
 	"/usr",			/* MAGIC_USR */
-	"/var",			/* MAGIC_VAR */
 	NULL			/* MAGIC_LIMIT */
 };
 
@@ -431,24 +430,11 @@ checkfilesys(char *filesys)
 	}
 
 	/*
-	 * 2a: check for duplicate name entries inside each directory.
-	 */
-#if 0
-	/*
-	 * XXX This is disabled for performance reasons.  It should become
-	 * an optional test.  Don't forget to update the printed label for
-	 * pass2b() when this is re-enabled.
-	 */
-	if (!preen)
-		(void) printf("** Phase 2a - Check Duplicated Names\n");
-	pass2a();
-#endif
-	/*
-	 * 2b: traverse directories from root to mark all connected directories
+	 * 2: traverse directories from root to mark all connected directories
 	 */
 	if (!preen)
 		(void) printf("** Phase 2 - Check Pathnames\n");
-	pass2b();
+	pass2();
 
 	/*
 	 * 3a: scan inodes looking for disconnected directories.

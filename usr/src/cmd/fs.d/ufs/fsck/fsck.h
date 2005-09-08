@@ -506,8 +506,7 @@ enum magic {
 	MAGIC_NONE = 0,
 	MAGIC_ROOT = 1,
 	MAGIC_USR = 2,
-	MAGIC_VAR = 3,
-	MAGIC_LIMIT = 4
+	MAGIC_LIMIT = 3
 };
 extern char *magic_fs[];
 
@@ -592,8 +591,7 @@ int		mounted(caddr_t, caddr_t, size_t);
 void		pass1(void);
 void		pass1b(void);
 int		pass1check(struct inodesc *);
-void		pass2a(void);
-void		pass2b(void);
+void		pass2(void);
 void		pass3a(void);
 void		pass3b(void);
 int		pass3bcheck(struct inodesc *);

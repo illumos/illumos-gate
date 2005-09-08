@@ -45,10 +45,10 @@
 #define	MINDIRSIZE	(sizeof (struct dirtemplate))
 
 static int blksort(const void *, const void *);
-static int pass2bcheck(struct inodesc *);
+static int pass2check(struct inodesc *);
 
 void
-pass2b(void)
+pass2(void)
 {
 	struct dinode 		*dp, *dp2, *dpattr;
 	struct inoinfo 		**inpp, *inp;
@@ -200,7 +200,7 @@ pass2b(void)
 			inp->i_blkssize);
 		init_inodesc(&curino);
 		curino.id_type = DATA;
-		curino.id_func = pass2bcheck;
+		curino.id_func = pass2check;
 		curino.id_number = inp->i_number;
 		curino.id_parent = inp->i_parent;
 		curino.id_fix = DONTKNOW;
@@ -392,7 +392,7 @@ pass2b(void)
 #define	PASS2B_PROMPT	"REMOVE DIRECTORY ENTRY FROM I=%d"
 
 static int
-pass2bcheck(struct inodesc *idesc)
+pass2check(struct inodesc *idesc)
 {
 	struct direct *dirp = idesc->id_dirp;
 	struct inodesc ldesc;
@@ -548,7 +548,7 @@ chk1:
 		 * This is a can't-happen, since inodes get cached before
 		 * we get called on them.
 		 */
-		errexit("pass2bcheck got NULL from getinoinfo at chk1 I=%d\n",
+		errexit("pass2check got NULL from getinoinfo at chk1 I=%d\n",
 			idesc->id_number);
 	}
 	proto.d_ino = inp->i_parent;
@@ -782,7 +782,7 @@ again:
 					 * above, and so it is a can't-happen
 					 * at this point.
 					 */
-					errexit("pass2bcheck found a zero-len "
+					errexit("pass2check found a zero-len "
 						"reference to bad I=%d\n",
 						dirp->d_ino);
 				}
@@ -841,7 +841,7 @@ again:
 				 * Same can't-happen argument as in the
 				 * zero-len case above.
 				 */
-				errexit("pass2bcheck found bad reference to "
+				errexit("pass2check found bad reference to "
 					"hard-linked directory I=%d\n",
 					dirp->d_ino);
 			}
