@@ -1421,7 +1421,7 @@ nfs3_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 	int douprintf;
 	uint32 acc;
 	rnode_t *rp;
-	cred_t *cred;
+	cred_t *cred, *ncr;
 	failinfo_t fi;
 	nfs_access_type_t cacc;
 	hrtime_t t;
@@ -1446,14 +1446,6 @@ nfs3_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 	}
 
 	rp = VTOR(vp);
-	if (rp->r_acache != NULL) {
-		cacc = nfs_access_check(rp, acc, cr);
-		if (cacc == NFS_ACCESS_ALLOWED)
-			return (0);
-		if (cacc == NFS_ACCESS_DENIED)
-			return (EACCES);
-	}
-
 	args.object = *VTOFH3(vp);
 	if (vp->v_type == VDIR) {
 		args.access = ACCESS3_READ | ACCESS3_DELETE | ACCESS3_MODIFY |
@@ -1469,7 +1461,26 @@ nfs3_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 	fi.xattrdirproc = acl_getxattrdir3;
 
 	cred = cr;
+	ncr = crnetadjust(cred);
 tryagain:
+	if (rp->r_acache != NULL) {
+		cacc = nfs_access_check(rp, acc, cred);
+		if (cacc == NFS_ACCESS_ALLOWED)
+			return (0);
+		if (cacc == NFS_ACCESS_DENIED) {
+			/*
+			 * If the cred can be adjusted, try again
+			 * with the new cred.
+			 */
+			if (ncr != NULL) {
+				cred = ncr;
+				ncr = NULL;
+				goto tryagain;
+			}
+			return (EACCES);
+		}
+	}
+
 	douprintf = 1;
 
 	t = gethrtime();
@@ -1488,16 +1499,19 @@ tryagain:
 	error = geterrno3(res.status);
 	if (!error) {
 		nfs3_cache_post_op_attr(vp, &res.resok.obj_attributes, t, cr);
+		nfs_access_cache(rp, args.access, res.resok.access, cred);
 		if ((acc & res.resok.access) != acc) {
-			cred_t *ncr = crnetadjust(cred);
-
+			/*
+			 * If the cred can be adjusted, try again
+			 * with the new cred.
+			 */
 			if (ncr != NULL) {
 				cred = ncr;
+				ncr = NULL;
 				goto tryagain;
 			}
 			error = EACCES;
 		}
-		nfs_access_cache(rp, args.access, res.resok.access, cr);
 	} else {
 		nfs3_cache_post_op_attr(vp, &res.resfail.obj_attributes, t, cr);
 		PURGE_STALE_FH(error, vp, cr);

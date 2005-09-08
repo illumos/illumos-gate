@@ -4092,7 +4092,7 @@ nfs4_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 	int doqueue;
 	uint32_t acc, resacc, argacc;
 	rnode4_t *rp;
-	cred_t *cred;
+	cred_t *cred, *ncr;
 	nfs4_access_type_t cacc;
 	int num_ops;
 	nfs_argop4 argop[3];
@@ -4131,11 +4131,6 @@ nfs4_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 	}
 
 	rp = VTOR4(vp);
-	cacc = nfs4_access_check(rp, acc, cr);
-	if (cacc == NFS4_ACCESS_ALLOWED)
-		return (0);
-	if (cacc == NFS4_ACCESS_DENIED)
-		return (EACCES);
 	if (vp->v_type == VDIR) {
 		argacc = ACCESS4_READ | ACCESS4_DELETE | ACCESS4_MODIFY |
 			ACCESS4_EXTEND | ACCESS4_LOOKUP;
@@ -4147,8 +4142,25 @@ nfs4_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 	recov_state.rs_num_retry_despite_err = 0;
 
 	cred = cr;
+	ncr = crnetadjust(cred);
 
 tryagain:
+	cacc = nfs4_access_check(rp, acc, cred);
+	if (cacc == NFS4_ACCESS_ALLOWED)
+		return (0);
+	if (cacc == NFS4_ACCESS_DENIED) {
+		/*
+		 * If the cred can be adjusted, try again
+		 * with the new cred.
+		 */
+		if (ncr != NULL) {
+			cred = ncr;
+			ncr = NULL;
+			goto tryagain;
+		}
+		return (EACCES);
+	}
+
 recov_retry:
 	/*
 	 * Don't take with r_statev4_lock here. r_deleg_type could
@@ -4233,6 +4245,7 @@ recov_retry:
 	}
 
 	if (!e.error) {
+		nfs4_access_cache(rp, argacc, resacc, cred);
 		/* XXX check the supported bits too? */
 		if ((acc & resacc) != acc) {
 			/*
@@ -4243,19 +4256,15 @@ recov_retry:
 			 * of the implementation of this functionality.
 			 */
 			/* XXX-LP */
-			if (crgetuid(cred) == 0 && crgetruid(cred) != 0) {
-				cred_t *ncr = crnetadjust(cred);
-
-				if (ncr != NULL) {
-					(void) xdr_free(xdr_COMPOUND4res_clnt,
-							(caddr_t)&res);
-					cred = ncr;
-					goto tryagain;
-				}
+			if (ncr != NULL) {
+				(void) xdr_free(xdr_COMPOUND4res_clnt,
+						(caddr_t)&res);
+				cred = ncr;
+				ncr = NULL;
+				goto tryagain;
 			}
 			e.error = EACCES;
 		}
-		nfs4_access_cache(rp, argacc, resacc, cr);
 	}
 
 out:

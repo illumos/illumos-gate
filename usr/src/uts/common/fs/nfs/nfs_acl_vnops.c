@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -283,7 +283,7 @@ acl_access2(vnode_t *vp, int mode, int flags, cred_t *cr)
 	int doqueue;
 	uint32 acc;
 	rnode_t *rp;
-	cred_t *cred;
+	cred_t *cred, *ncr;
 	vattr_t va;
 	failinfo_t fi;
 	nfs_access_type_t cacc;
@@ -307,14 +307,6 @@ acl_access2(vnode_t *vp, int mode, int flags, cred_t *cr)
 	}
 
 	rp = VTOR(vp);
-	if (rp->r_acache != NULL) {
-		cacc = nfs_access_check(rp, acc, cr);
-		if (cacc == NFS_ACCESS_ALLOWED)
-			return (0);
-		if (cacc == NFS_ACCESS_DENIED)
-			return (EACCES);
-	}
-
 	if (vp->v_type == VDIR) {
 		args.access = ACCESS2_READ | ACCESS2_DELETE | ACCESS2_MODIFY |
 		    ACCESS2_EXTEND | ACCESS2_LOOKUP;
@@ -330,8 +322,27 @@ acl_access2(vnode_t *vp, int mode, int flags, cred_t *cr)
 	fi.xattrdirproc = acl_getxattrdir2;
 
 	cred = cr;
+	ncr = crnetadjust(cred);
 
 tryagain:
+	if (rp->r_acache != NULL) {
+		cacc = nfs_access_check(rp, acc, cr);
+		if (cacc == NFS_ACCESS_ALLOWED)
+			return (0);
+		if (cacc == NFS_ACCESS_DENIED) {
+			/*
+			 * If the cred can be adjusted, try again
+			 * with the new cred.
+			 */
+			if (ncr != NULL) {
+				cred = ncr;
+				ncr = NULL;
+				goto tryagain;
+			}
+			return (EACCES);
+		}
+	}
+
 	doqueue = 1;
 
 	t = gethrtime();
@@ -350,15 +361,19 @@ tryagain:
 	error = geterrno(res.status);
 	if (!error) {
 		(void) nfs_cache_fattr(vp, &res.resok.attr, &va, t, cr);
+		nfs_access_cache(rp, args.access, res.resok.access, cred);
 		if ((acc & res.resok.access) != acc) {
-			cred_t *ncr = crnetadjust(cred);
+			/*
+			 * If the cred can be adjusted, try again
+			 * with the new cred.
+			 */
 			if (ncr != NULL) {
 				cred = ncr;
+				ncr = NULL;
 				goto tryagain;
 			}
 			error = EACCES;
 		}
-		nfs_access_cache(rp, args.access, res.resok.access, cr);
 	} else {
 		PURGE_STALE_FH(error, vp, cr);
 	}
