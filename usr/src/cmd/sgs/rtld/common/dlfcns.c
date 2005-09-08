@@ -1052,6 +1052,7 @@ void *
 dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 {
 	Sym		*sym;
+	Syminfo		*sip;
 	Slookup		sl;
 	uint_t		binfo;
 
@@ -1060,8 +1061,51 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	sl.sl_hash = 0;
 	sl.sl_rsymndx = 0;
 
+	/*
+	 * Standard relocations are evaluated using the symbol index of the
+	 * associated relocation symbol.  This index provides for loading
+	 * any lazy dependency and establishing a direct binding if necessary.
+	 * If a dlsym() operation originates from an object that contains a
+	 * symbol table entry for the same name, then establish the symbol
+	 * index so that any dependency requirements can be triggered.
+	 */
+	if (((intptr_t)handle < 0) && (sip = SYMINFO(clmp)) != 0) {
+		sl.sl_imap = clmp;
+		sl.sl_flags = LKUP_SYMNDX;
+		sl.sl_hash = elf_hash(name);
+
+		if ((sym = SYMINTP(clmp)(&sl, 0, 0)) != NULL) {
+			sl.sl_rsymndx = (((ulong_t)sym -
+			    (ulong_t)SYMTAB(clmp)) / SYMENT(clmp));
+		}
+	}
+
 	if (handle == RTLD_NEXT) {
 		Rt_map	*nlmp;
+
+		/*
+		 * If this handle is RTLD_NEXT determine whether a lazy load
+		 * from the caller might provide the next object.  This mimics
+		 * the lazy loading initialization normally carried out by
+		 * lookup_sym(), however here, we must do this up-front, as
+		 * lookup_sym() will be used to inspect the next object.
+		 */
+		if (sl.sl_rsymndx) {
+			/* LINTED */
+			sip = (Syminfo *)((char *)sip +
+			    (sl.sl_rsymndx * SYMINENT(clmp)));
+
+			if ((sip->si_flags & SYMINFO_FLG_DIRECT) &&
+			    (sip->si_boundto < SYMINFO_BT_LOWRESERVE))
+				(void) elf_lazy_load(clmp,
+				    sip->si_boundto, name);
+
+			/*
+			 * Clear the symbol index, so as not to confuse
+			 * lookup_sym() of the next object.
+			 */
+			sl.sl_rsymndx = 0;
+		}
 
 		/*
 		 * If the handle is RTLD_NEXT start searching in the next link
@@ -1092,54 +1136,38 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		sl.sl_flags = LKUP_SPEC;
 		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
 
-	} else if ((handle == RTLD_DEFAULT) || (handle == RTLD_PROBE)) {
+	} else if (handle == RTLD_DEFAULT) {
 		Rt_map	*hlmp = LIST(clmp)->lm_head;
 
 		/*
-		 * If the handle is RTLD_DEFAULT or RTLD_PROBE, mimic the
-		 * symbol lookup that would be triggered by a relocation.
-		 * Determine if a specific object is registered to offer this
-		 * symbol from any Syminfo information.  If a registered object
-		 * is defined, it will be loaded, and directly bound to if
-		 * necessary via LM_LOOKUP_SYM().  Otherwise a serial symbol
-		 * search is carried out where permissions are determined from
-		 * the callers link map.
-		 * RTLD_PROBE is more optimal than RTLD_DEFAULT, as no fall back
-		 * loading of pending lazy dependencies occurs.
+		 * If the handle is RTLD_DEFAULT mimic the standard symbol
+		 * lookup as would be triggered by a relocation.
 		 */
 		DBG_CALL(Dbg_syms_dlsym(name, NAME(clmp), 0,
-		    ((handle == RTLD_DEFAULT) ? DBG_DLSYM_DEFAULT :
-		    DBG_DLSYM_PROBE)));
+		    DBG_DLSYM_DEFAULT));
 
-		if (SYMINFO(clmp) == 0)
-			sym = 0;
-		else {
-			sl.sl_imap = clmp;
-			sl.sl_flags = (LKUP_FIRST | LKUP_SELF);
+		sl.sl_imap = hlmp;
+		sl.sl_flags = LKUP_SPEC;
+		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
 
-			/*
-			 * If the symbol is defined within the caller as an
-			 * UNDEF (DBG_BINFO_FOUND isn't set), then determine
-			 * the associated syminfo index and continue the search.
-			 */
-			if (((sym =
-			    LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo)) != 0) &&
-			    (FCT(clmp) == &elf_fct) &&
-			    ((binfo & DBG_BINFO_FOUND) == 0)) {
-				sl.sl_rsymndx =
-				    (((ulong_t)sym - (ulong_t)SYMTAB(clmp)) /
-				    SYMENT(clmp));
-				sym = 0;
-			}
-		}
+	} else if (handle == RTLD_PROBE) {
+		Rt_map	*hlmp = LIST(clmp)->lm_head;
 
-		if (sym == 0) {
-			sl.sl_imap = hlmp;
-			sl.sl_flags = LKUP_SPEC;
-			if (handle == RTLD_PROBE)
-				sl.sl_flags |= LKUP_NOFALBACK;
-			sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
-		}
+		/*
+		 * If the handle is RTLD_PROBE, mimic the standard symbol
+		 * lookup as would be triggered by a relocation, however do
+		 * not fall back to a lazy loading rescan if the symbol can't be
+		 * found within the currently loaded objects.  Note, a lazy
+		 * loaded dependency required by the caller might still get
+		 * loaded to satisfy this request, but no exhaustive lazy load
+		 * rescan is carried out.
+		 */
+		DBG_CALL(Dbg_syms_dlsym(name, NAME(clmp), 0, DBG_DLSYM_PROBE));
+
+		sl.sl_imap = hlmp;
+		sl.sl_flags = (LKUP_SPEC | LKUP_NOFALBACK);
+		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
+
 	} else {
 		Grp_hdl *ghp = (Grp_hdl *)handle;
 

@@ -1820,7 +1820,14 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	uint_t		flags1;
 	Syminfo		*sip;
 
-	DBG_CALL(Dbg_syms_lookup(name, NAME(ilmp), MSG_ORIG(MSG_STR_ELF)));
+	/*
+	 * If we're only here to establish a symbols index, skip the diagnostic
+	 * used to trace a symbol search.
+	 */
+	if ((slp->sl_flags & LKUP_SYMNDX) == 0) {
+		DBG_CALL(Dbg_syms_lookup(name, NAME(ilmp),
+		    MSG_ORIG(MSG_STR_ELF)));
+	}
 
 	if (HASH(ilmp) == 0)
 		return ((Sym *)0);
@@ -1855,6 +1862,12 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		}
 
 		/*
+		 * If we're only here to establish a symbols index, we're done.
+		 */
+		if (slp->sl_flags & LKUP_SYMNDX)
+			return (sym);
+
+		/*
 		 * If we find a match and the symbol is defined, return the
 		 * symbol pointer and the link map in which it was found.
 		 */
@@ -1863,8 +1876,6 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 			*binfo |= DBG_BINFO_FOUND;
 			if (FLAGS(ilmp) & FLG_RT_INTRPOSE)
 				*binfo |= DBG_BINFO_INTERPOSE;
-			if (slp->sl_flags & LKUP_SELF)
-				return (sym);
 			break;
 
 		/*
@@ -1875,7 +1886,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		 * See SPARC ABI, Dynamic Linking, Function Addresses for
 		 * more details.
 		 */
-		} else if ((slp->sl_flags & (LKUP_SPEC | LKUP_SELF)) &&
+		} else if ((slp->sl_flags & LKUP_SPEC) &&
 		    (FLAGS(ilmp) & FLG_RT_ISMAIN) && (sym->st_value != 0) &&
 		    (ELF_ST_TYPE(sym->st_info) == STT_FUNC)) {
 			*dlmp = ilmp;
@@ -1888,9 +1899,6 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		/*
 		 * Undefined symbol.
 		 */
-		if (slp->sl_flags & LKUP_SELF)
-			return (sym);
-
 		return ((Sym *)0);
 	}
 

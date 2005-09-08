@@ -767,6 +767,7 @@ typedef struct rt_map32 {
 #define	LKUP_NOFALBACK	0x0200		/* don't fall back to loading */
 					/*	pending lazy dependencies */
 #define	LKUP_DIRECT	0x0400		/* direct binding request */
+#define	LKUP_SYMNDX	0x0800		/* establish symbol index */
 
 /*
  * Data structure for calling lookup_sym()
