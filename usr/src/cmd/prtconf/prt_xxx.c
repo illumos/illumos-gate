@@ -65,9 +65,7 @@ static struct di_priv_format ppd_format[] = {
 		 * of nexus drivers. Note that obio driver
 		 * went away with sun4m.
 		 */
-		"central dma ebus eisa esp fas fhc glm iommu isa"
-		" isp mc pci pci_pci pln rootnex"
-		" sf socal",
+		"central dma ebus fhc isa pci pci_pci rootnex",
 		sizeof (struct ddi_parent_private_data),
 
 		sizeof (struct regspec),		/* first pointer */
