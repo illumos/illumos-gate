@@ -1155,6 +1155,7 @@ hati_sync_pte_to_page(page_t *pp, x86pte_t pte, level_t level)
 	(PT_PADDR | PT_NX | PT_WRITABLE | PT_WRITETHRU |		\
 	PT_NOCACHE | PT_PAT_4K | PT_PAT_LARGE)
 
+#define	REMAPASSERT(EX)	if (!(EX)) panic("hati_pte_map: " #EX)
 /*
  * Do the low-level work to get a mapping entered into a HAT's pagetables
  * and in the mapping list of the associated page_t.
@@ -1237,12 +1238,12 @@ hati_pte_map(
 		panic("non-null/page mapping pte=" FMT_PTE, old_pte);
 
 	if (PTE2PFN(old_pte, l) != PTE2PFN(pte, l)) {
-		ASSERT(flags & HAT_LOAD_REMAP);
-		ASSERT(flags & HAT_LOAD_NOCONSIST);
-		ASSERT(PTE_GET(old_pte, PT_NOCONSIST));
-		ASSERT(pf_is_memory(PTE2PFN(old_pte, l)) ==
+		REMAPASSERT(flags & HAT_LOAD_REMAP);
+		REMAPASSERT(flags & HAT_LOAD_NOCONSIST);
+		REMAPASSERT(PTE_GET(old_pte, PT_NOCONSIST));
+		REMAPASSERT(pf_is_memory(PTE2PFN(old_pte, l)) ==
 		    pf_is_memory(PTE2PFN(pte, l)));
-		ASSERT(!is_consist);
+		REMAPASSERT(!is_consist);
 	}
 
 	/*

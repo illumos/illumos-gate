@@ -1733,7 +1733,6 @@ x86pte_get(htable_t *ht, uint_t entry)
 	return (pte);
 }
 
-
 /*
  * Atomic unconditional set of a page table entry, it returns the previous
  * value.
@@ -1742,7 +1741,7 @@ x86pte_t
 x86pte_set(htable_t *ht, uint_t entry, x86pte_t new, void *ptr)
 {
 	x86pte_t	old;
-	x86pte_t	prev;
+	x86pte_t	prev, n;
 	x86pte_t	*ptep;
 	x86pte32_t	*pte32p;
 	x86pte32_t	n32, p32;
@@ -1758,19 +1757,34 @@ x86pte_set(htable_t *ht, uint_t entry, x86pte_t new, void *ptr)
 	if (mmu.pae_hat) {
 		for (;;) {
 			prev = *ptep;
-			if (prev == new) {
+			n = new;
+			/*
+			 * prevent potential data loss by preserving the MOD
+			 * bit if set in the current PTE and the pfns are the
+			 * same. For example, segmap can reissue a read-only
+			 * hat_memload on top of a dirty page.
+			 */
+			if (PTE_ISVALID(prev) && PTE2PFN(prev, ht->ht_level) ==
+			    PTE2PFN(n, ht->ht_level)) {
+				n |= prev & (PT_REF | PT_MOD);
+			}
+			if (prev == n) {
 				old = new;
 				break;
 			}
-			old = cas64(ptep, prev, new);
+			old = cas64(ptep, prev, n);
 			if (old == prev)
 				break;
 		}
 	} else {
 		pte32p = (x86pte32_t *)ptep;
-		n32 = new;
 		for (;;) {
 			p32 = *pte32p;
+			n32 = new;
+			if (PTE_ISVALID(p32) && PTE2PFN(p32, ht->ht_level) ==
+			    PTE2PFN(n32, ht->ht_level)) {
+				n32 |= p32 & (PT_REF | PT_MOD);
+			}
 			if (p32 == n32) {
 				old = new;
 				break;
