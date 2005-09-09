@@ -91,28 +91,9 @@ LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN -v
 
 .KEEP_STATE:
 
-SUBDIRS=
-
-POFILE=	mdescplugin.po
-POFILE_RENAME=	mdescplugin_sun4v.po
-
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
-
 all: $(LIBS) $(LIBLINKS)
 
 install:	all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)
-
-_msg:	$(MSGDOMAIN) $(POFILE)
-	$(RM) $(MSGDOMAIN)/$(POFILE)
-	$(CP) $(POFILE) $(MSGDOMAIN)/$(POFILE_RENAME)
-
-$(MSGDOMAIN):
-	$(INS.dir)
 
 $(LIBLINKS):	FRC
 	$(RM) $(LIBLINKS); $(SYMLINK) $(DYNLIB) $(LIBLINKS)
@@ -123,8 +104,5 @@ include $(SRC)/lib/Makefile.targ
 
 lint :
 	$(LINT.c) $(LINT_SRC)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

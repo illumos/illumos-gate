@@ -30,20 +30,15 @@
 
 SUBDIRS=	piclsbl	
 
-MSGSUBDIRS=	piclsbl
-
 all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 lint :=		TARGET= lint
-_msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
 all install clean clobber lint: $(SUBDIRS)
-
-_msg:	$(MSGSUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -31,9 +31,15 @@ COMMON_SUBDIRS=	lib .WAIT common .WAIT
 
 sparc_SUBDIRS=	sun4u sun4v .WAIT
 
+sparc_MSGSUBDIRS=	sun4u .WAIT
+
 i86_SUBDIRS=
 
+i86_MSGSUBDIRS=
+
 SUBDIRS=	$(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
+
+MSGSUBDIRS=	$(COMMON_SUBDIRS) $($(MACH)_MSGSUBDIRS) 
 
 all :=		TARGET= all
 install :=	TARGET= install
@@ -46,7 +52,7 @@ _msg :=		TARGET= _msg
 
 all clean clobber lint : $(SUBDIRS)
 
-_msg:	$(SUBDIRS)
+_msg:	$(MSGSUBDIRS)
 
 install:	$(SUBDIRS)
 

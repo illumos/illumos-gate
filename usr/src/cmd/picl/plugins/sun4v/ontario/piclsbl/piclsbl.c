@@ -207,10 +207,8 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 		req_ptr->sbl_id = PCP_SBL_HDD2;
 	else if (strcmp(hdd_location, HDD3) == 0)
 		req_ptr->sbl_id = PCP_SBL_HDD3;
-	else {
-		syslog(LOG_ERR, "piclsbl: hdd location does not match any hdd");
+	else
 		goto sbl_return;
-	}
 
 	/*
 	 * we have the information we need, init the platform channel.
