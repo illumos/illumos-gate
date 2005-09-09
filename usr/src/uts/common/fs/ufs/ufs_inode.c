@@ -670,7 +670,8 @@ ufs_iinactive(struct inode *ip)
 	struct inode	*hip;
 	struct ufs_q	*uq;
 	struct vnode	*vp = ITOV(ip);
-
+	struct ufsvfs   *ufsvfsp = ip->i_ufsvfs;
+	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
 
 	/*
 	 * Because the vnode type might have been changed,
@@ -772,6 +773,9 @@ ufs_iinactive(struct inode *ip)
 			ip->i_freef = ip;
 			ip->i_freeb = ip;
 		}
+
+		delq_info->delq_unreclaimed_files += 1;
+		delq_info->delq_unreclaimed_blocks += ip->i_blocks;
 	} else {
 		/*
 		 * queue to idle thread

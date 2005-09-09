@@ -392,6 +392,7 @@ struct dinode {
 #define	I_SHAD	0x00000010		/* inode is a shadow inode */
 #define	I_QUOTA	0x00000020		/* quota file */
 #define	I_NOCANCEL	0x40		/* Don't cancel these fragments */
+#define	I_ACCT	0x00000080		/* Update ufsvfs' unreclaimed_blocks */
 /*
  * Statistics on inodes
  * Not protected by locks
@@ -564,6 +565,18 @@ struct ufs_q {
 #define	UQ_WAIT		(0x0002)	/* thread is waiting on q server */
 #define	UQ_SUSPEND	(0x0004)	/* request for suspension */
 #define	UQ_SUSPENDED	(0x0008)	/* thread has suspended itself */
+#define	UQ_FASTCLIENTS	(0x0010)	/* fast clients in ufs_delq_info */
+
+/*
+ * When logging is enabled, statvfs must account for blocks and files that
+ * may be on the delete queue.  Protected by ufsvfsp->vfs_delete.uq_mutex
+ */
+struct ufs_delq_info {
+	kcondvar_t	delq_fast_cv;	/* for fast-operating clients */
+	u_offset_t	delq_unreclaimed_blocks;
+	ulong_t		delq_unreclaimed_files;
+};
+
 
 /*
  * global idle queues
@@ -643,6 +656,7 @@ typedef struct ufsvfs {
 	 */
 	struct ufs_q	vfs_delete;	/* delayed inode delete */
 	struct ufs_q	vfs_reclaim;	/* reclaim open, deleted files */
+
 	/*
 	 * This is copied from the super block at mount time.
 	 */
@@ -706,6 +720,11 @@ typedef struct ufsvfs {
 
 	int 		vfs_nolog_si;	/* not logging summary info */
 	int		vfs_validfs;	/* indicates mounted fs */
+
+	/*
+	 * Additional information about vfs_delete above
+	 */
+	struct ufs_delq_info vfs_delete_info; /* what's on the delete queue */
 } ufsvfs_t;
 
 #define	vfs_fs	vfs_bufp->b_un.b_fs
@@ -851,6 +870,7 @@ extern	void	ufs_thread_exit(struct ufs_q *);
 extern	void	ufs_thread_suspend(struct ufs_q *);
 extern	void	ufs_thread_continue(struct ufs_q *);
 extern	void	ufs_thread_hlock(void *);
+extern	void	ufs_delete_init(struct ufsvfs *, int);
 extern	void	ufs_delete_adjust_stats(struct ufsvfs *, struct statvfs64 *);
 extern	void	ufs_delete_drain_wait(struct ufsvfs *, int);
 

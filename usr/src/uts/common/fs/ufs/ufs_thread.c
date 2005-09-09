@@ -134,10 +134,21 @@ ufs_thread_suspend(struct ufs_q *uq)
 		/*
 		 * wait while another thread is suspending this thread.
 		 * no need to do a cv_broadcast(), as whoever suspended
-		 * the thread must continue at some point.
+		 * the thread must continue it at some point.
 		 */
 		while ((uq->uq_flags & UQ_SUSPEND) &&
 		    (uq->uq_threadp != NULL)) {
+			/*
+			 * We can't use cv_signal() because if our
+			 * signal doesn't happen to hit the desired
+			 * thread but instead some other waiter like
+			 * ourselves, we'll wait forever for a
+			 * response.  Well, at least an indeterminate
+			 * amount of time until we just happen to get
+			 * lucky from whomever did get signalled doing
+			 * a cv_signal() of their own.  This is an
+			 * unfortunate performance lossage.
+			 */
 			uq->uq_flags |= UQ_WAIT;
 			cv_wait(&uq->uq_cv, &uq->uq_mutex);
 		}
@@ -198,8 +209,9 @@ again:
 		if (uq->uq_ne)
 			return (uq->uq_ne);
 		uq->uq_threadp = NULL;
-		if (uq->uq_flags & UQ_WAIT)
+		if (uq->uq_flags & UQ_WAIT) {
 			cv_broadcast(&uq->uq_cv);
+		}
 		uq->uq_flags &= ~(UQ_EXIT | UQ_WAIT);
 		CALLB_CPR_EXIT(cprinfop);
 		thread_exit();
@@ -208,6 +220,11 @@ again:
 		 * process a block of entries until below high water mark
 		 */
 		return (uq->uq_ne - (uq->uq_lowat >> 1));
+	} else if (uq->uq_flags & UQ_FASTCLIENTS) {
+		/*
+		 * Let the fast acting clients through
+		 */
+		return (0);
 	}
 	if (uq->uq_flags & UQ_WAIT) {
 		uq->uq_flags &= ~UQ_WAIT;
@@ -235,6 +252,8 @@ ufs_delete(struct ufsvfs *ufsvfsp, struct inode *ip, int dolockfs)
 	int		issync;
 	int		err;
 	struct inode	*dp;
+	struct ufs_q    *delq = &ufsvfsp->vfs_delete;
+	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
 
 	/*
 	 * not on a trans device or not part of a transaction
@@ -332,7 +351,7 @@ ufs_delete(struct ufsvfs *ufsvfsp, struct inode *ip, int dolockfs)
 		ufs_attr_purge(ip);
 	}
 
-	(void) TRANS_ITRUNC(ip, (u_offset_t)0, I_FREE, CRED());
+	(void) TRANS_ITRUNC(ip, (u_offset_t)0, I_FREE | I_ACCT, CRED());
 
 	/*
 	 * the inode's space has been freed; now free the inode
@@ -380,6 +399,10 @@ ufs_delete(struct ufsvfs *ufsvfsp, struct inode *ip, int dolockfs)
 	ip->i_cflags = 0;
 	if (!TRANS_ISTRANS(ufsvfsp)) {
 		ufs_iupdat(ip, I_SYNC);
+	} else {
+		mutex_enter(&delq->uq_mutex);
+		delq_info->delq_unreclaimed_files--;
+		mutex_exit(&delq->uq_mutex);
 	}
 	rw_exit(&ip->i_contents);
 	rw_exit(&ufsvfsp->vfs_dqrwlock);
@@ -400,13 +423,27 @@ ufs_delete(struct ufsvfs *ufsvfsp, struct inode *ip, int dolockfs)
 }
 
 /*
+ * Create the delete thread and init the delq_info for this fs
+ */
+void
+ufs_delete_init(struct ufsvfs *ufsvfsp, int lowat)
+{
+	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
+
+	ufs_thread_init(&ufsvfsp->vfs_delete, lowat);
+	memset((void *)delq_info, 0, sizeof (*delq_info));
+	cv_init(&delq_info->delq_fast_cv, NULL, CV_DEFAULT, NULL);
+}
+
+/*
  * thread that frees up deleted inodes
  */
 void
 ufs_thread_delete(struct vfs *vfsp)
 {
 	struct ufsvfs	*ufsvfsp = (struct ufsvfs *)vfsp->vfs_data;
-	struct ufs_q	*uq	= &ufsvfsp->vfs_delete;
+	struct ufs_q	*uq = &ufsvfsp->vfs_delete;
+	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
 	struct inode	*ip;
 	long		ne;
 	callb_cpr_t	cprinfo;
@@ -417,13 +454,16 @@ ufs_thread_delete(struct vfs *vfsp)
 	mutex_enter(&uq->uq_mutex);
 again:
 	/*
-	 * sleep until there is work to do
+	 * Sleep until there is work to do.  Only do one entry at
+	 * a time, to reduce the wait time for checking for a suspend
+	 * or fast-client request.  The ?: is for pedantic portability.
 	 */
-	ne = ufs_thread_run(uq, &cprinfo);
+	ne = ufs_thread_run(uq, &cprinfo) ? 1 : 0;
+
 	/*
-	 * process up to ne entries
+	 * process an entry, if there are any
 	 */
-	while (ne-- && (ip = uq->uq_ihead)) {
+	if (ne && (ip = uq->uq_ihead)) {
 		/*
 		 * process first entry on queue.  Assumed conditions are:
 		 *	ip is held (v_count >= 1)
@@ -439,6 +479,23 @@ again:
 		uq->uq_ne--;
 		mutex_exit(&uq->uq_mutex);
 		ufs_delete(ufsvfsp, ip, 1);
+		mutex_enter(&uq->uq_mutex);
+	}
+
+	/*
+	 * If there are any fast clients, let all of them through.
+	 * Mainly intended for statvfs(), which doesn't need to do
+	 * anything except look at the number of bytes/inodes that
+	 * are in the queue.
+	 */
+	if (uq->uq_flags & UQ_FASTCLIENTS) {
+		uq->uq_flags &= ~UQ_FASTCLIENTS;
+		/*
+		 * Give clients a chance.  The lock exit/entry
+		 * allows waiting statvfs threads through.
+		 */
+		cv_broadcast(&delq_info->delq_fast_cv);
+		mutex_exit(&uq->uq_mutex);
 		mutex_enter(&uq->uq_mutex);
 	}
 	goto again;
@@ -548,8 +605,7 @@ ufs_delete_drain_wait(struct ufsvfs *ufsvfsp, int dolockfs)
 
 /*
  * Adjust the resource usage in a struct statvfs based on
- * what's in the delete queue.  Assumes that the delete
- * thread has been suspended.
+ * what's in the delete queue.
  *
  * We do not consider the impact of ACLs or extended attributes
  * that may be deleted as a side-effect of deleting a file.
@@ -559,27 +615,24 @@ ufs_delete_drain_wait(struct ufsvfs *ufsvfsp, int dolockfs)
 void
 ufs_delete_adjust_stats(struct ufsvfs *ufsvfsp, struct statvfs64 *sp)
 {
-	struct inode *ip;
-	struct fs *fs = ufsvfsp->vfs_fs;
 	struct ufs_q *uq = &ufsvfsp->vfs_delete;
+	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
 
 	/*
-	 * To be self-consistent with the existing contents of
-	 * *sp, we have to keep the queue stable during our
-	 * traversal.  mainly, this keeps anyone from doing a
-	 * ufs_delete_drain() on top of us.
+	 * We'll get signalled when it's our turn.  However, if there's
+	 * nothing going on, there's no point in waking up the delete
+	 * thread and waiting for it to tell us to continue.
 	 */
 	mutex_enter(&uq->uq_mutex);
 
-	ip = uq->uq_ihead;
-	if (ip != NULL) {
-		do {
-			sp->f_bfree += dbtofsb(fs, ip->i_blocks);
-			sp->f_ffree += 1;
-			ip = ip->i_freef;
-		} while (ip != uq->uq_ihead);
+	if ((uq->uq_flags & UQ_FASTCLIENTS) || (uq->uq_ne != 0)) {
+		uq->uq_flags |= UQ_FASTCLIENTS;
+		cv_broadcast(&uq->uq_cv);
+		cv_wait(&delq_info->delq_fast_cv, &uq->uq_mutex);
 	}
 
+	sp->f_bfree += delq_info->delq_unreclaimed_blocks;
+	sp->f_ffree += delq_info->delq_unreclaimed_files;
 	mutex_exit(&uq->uq_mutex);
 }
 

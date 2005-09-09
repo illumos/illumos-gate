@@ -610,6 +610,8 @@ free(struct inode *ip, daddr_t bno, off_t size, int flags)
 {
 	struct fs *fs = ip->i_fs;
 	struct ufsvfs *ufsvfsp = ip->i_ufsvfs;
+	struct ufs_q *delq = &ufsvfsp->vfs_delete;
+	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
 	struct cg *cgp;
 	struct buf *bp;
 	int cg, bmap, bbase;
@@ -665,6 +667,12 @@ free(struct inode *ip, daddr_t bno, off_t size, int flags)
 		cgp->cg_cs.cs_nbfree++;		/* Log below */
 		fs->fs_cstotal.cs_nbfree++;
 		fs->fs_cs(fs, cg).cs_nbfree++;
+		if (TRANS_ISTRANS(ufsvfsp) && (flags & I_ACCT)) {
+			mutex_enter(&delq->uq_mutex);
+			delq_info->delq_unreclaimed_blocks -=
+			    btodb(fs->fs_bsize);
+			mutex_exit(&delq->uq_mutex);
+		}
 	} else {
 		bbase = bno - fragnum(fs, bno);
 		/*
@@ -695,6 +703,12 @@ free(struct inode *ip, daddr_t bno, off_t size, int flags)
 		cgp->cg_cs.cs_nffree += i;
 		fs->fs_cstotal.cs_nffree += i;
 		fs->fs_cs(fs, cg).cs_nffree += i;
+		if (TRANS_ISTRANS(ufsvfsp) && (flags & I_ACCT)) {
+			mutex_enter(&delq->uq_mutex);
+			delq_info->delq_unreclaimed_blocks -=
+			    btodb(i * fs->fs_fsize);
+			mutex_exit(&delq->uq_mutex);
+		}
 		/*
 		 * Add back in counts associated with the new frags
 		 */

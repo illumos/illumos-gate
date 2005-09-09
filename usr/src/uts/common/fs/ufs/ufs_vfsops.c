@@ -939,7 +939,7 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 	/*
 	 * Initialize threads
 	 */
-	ufs_thread_init(&ufsvfsp->vfs_delete, 1);
+	ufs_delete_init(ufsvfsp, 1);
 	ufs_thread_init(&ufsvfsp->vfs_reclaim, 0);
 
 	/*
@@ -1741,7 +1741,6 @@ ufs_statvfs(struct vfs *vfsp, struct statvfs64 *sp)
 	int blk, i;
 	long max_avail, used;
 	dev32_t d32;
-	struct ufs_q *delq;
 
 	if (vfsp->vfs_flag & VFS_UNMOUNTED)
 		return (EIO);
@@ -1754,14 +1753,6 @@ ufs_statvfs(struct vfs *vfsp, struct statvfs64 *sp)
 	    (fsp->fs_version > MTB_UFS_VERSION_1 ||
 	    fsp->fs_version < MTB_UFS_VERSION_MIN))
 		return (EINVAL);
-
-	/*
-	 * Can't get a self-consistent result with the delete thread running
-	 * or if others come in and jumble the queue up for us.  This is
-	 * a no-op if there is no delete thread.
-	 */
-	delq = &ufsvfsp->vfs_delete;
-	ufs_thread_suspend(delq);
 
 	/*
 	 * get the basic numbers
@@ -1783,10 +1774,11 @@ ufs_statvfs(struct vfs *vfsp, struct statvfs64 *sp)
 	 * come up with will be self-consistent.  By definition, this
 	 * is a point-in-time snapshot, so the fact that the delete
 	 * thread's probably already invalidated the results is not a
-	 * problem.
+	 * problem.  Note that if the delete thread is ever extended to
+	 * non-logging ufs, this adjustment must always be made.
 	 */
-	ufs_delete_adjust_stats(ufsvfsp, sp);
-	ufs_thread_continue(delq);
+	if (TRANS_ISTRANS(ufsvfsp))
+		ufs_delete_adjust_stats(ufsvfsp, sp);
 
 	/*
 	 * avail = MAX(max_avail - used, 0)
