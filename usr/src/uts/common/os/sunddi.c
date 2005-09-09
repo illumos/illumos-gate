@@ -909,53 +909,21 @@ ddi_dma_curwin(ddi_dma_handle_t h, off_t *o, size_t *l)
 	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_REPWIN, o, l, 0, 0));
 }
 
-/*
- * Note:  The astute might notice that in the next two routines
- * the SPARC case passes a pointer to a ddi_dma_win_t as the 5th
- * argument while the x86 case passes the ddi_dma_win_t directly.
- *
- * While it would be nice if the "correct" behavior was
- * platform independent and specified someplace, it isn't.
- * Until that point, what's required is that this call and
- * the relevant bus nexus drivers agree, and in this case they
- * do, at least for the cases I've looked at.
- */
 int
 ddi_dma_nextwin(ddi_dma_handle_t h, ddi_dma_win_t win,
     ddi_dma_win_t *nwin)
 {
-#if defined(__sparc)
 	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_NEXTWIN, (off_t *)&win, 0,
 	    (caddr_t *)nwin, 0));
-#elif defined(__x86)
-	return (((ddi_dma_impl_t *)h)->dmai_mctl(HD, HD, h, DDI_DMA_NEXTWIN,
-		(off_t *)win, 0, (caddr_t *)nwin, 0));
-#else
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_NEXTWIN,
-		(off_t *)win, 0, (caddr_t *)nwin, 0));
-#endif
 }
 
 int
 ddi_dma_nextseg(ddi_dma_win_t win, ddi_dma_seg_t seg, ddi_dma_seg_t *nseg)
 {
-#if defined(__sparc)
 	ddi_dma_handle_t h = (ddi_dma_handle_t)win;
 
 	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_NEXTSEG, (off_t *)&win,
 	    (size_t *)&seg, (caddr_t *)nseg, 0));
-#else
-	ddi_dma_handle_t h = (ddi_dma_handle_t)
-	    ((impl_dma_segment_t *)win)->dmais_hndl;
-
-#if defined(__x86)
-	return (((ddi_dma_impl_t *)h)->dmai_mctl(HD, HD, h, DDI_DMA_NEXTSEG,
-		(off_t *)win, (size_t *)seg, (caddr_t *)nseg, 0));
-#else
-	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_NEXTSEG,
-		(off_t *)win, (size_t *)seg, (caddr_t *)nseg, 0));
-#endif
-#endif
 }
 
 #if (defined(__i386) && !defined(__amd64)) || defined(__sparc)
@@ -965,27 +933,19 @@ ddi_dma_nextseg(ddi_dma_win_t win, ddi_dma_seg_t seg, ddi_dma_seg_t *nseg)
  *
  * It is deliberately NOT ported to amd64; please fix the code that
  * depends on this routine to use ddi_dma_nextcookie(9F).
+ *
+ * NOTE: even though we fixed the pointer through a 32-bit param issue (the fix
+ * is a side effect to some other cleanup), we're still not going to support
+ * this interface on x64.
  */
 int
 ddi_dma_segtocookie(ddi_dma_seg_t seg, off_t *o, off_t *l,
     ddi_dma_cookie_t *cookiep)
 {
-#if defined(__sparc)
 	ddi_dma_handle_t h = (ddi_dma_handle_t)seg;
 
 	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_SEGTOC, o, (size_t *)l,
 	    (caddr_t *)cookiep, 0));
-#elif defined(__i386) && !defined(__amd64)
-	ddi_dma_handle_t h = (ddi_dma_handle_t)
-	    ((impl_dma_segment_t *)seg)->dmais_hndl;
-
-	/*
-	 * The hack used for i386 won't work here; we can't squeeze a
-	 * pointer through the 'cache_flags' field.
-	 */
-	return (((ddi_dma_impl_t *)h)->dmai_mctl(HD, HD, h, DDI_DMA_SEGTOC,
-		o, (size_t *)l, (caddr_t *)cookiep, (uint_t)seg));
-#endif
 }
 #endif	/* (__i386 && !__amd64) || __sparc */
 
@@ -1137,12 +1097,7 @@ ddi_dma_unbind_handle(ddi_dma_handle_t h)
 int
 ddi_dma_free(ddi_dma_handle_t h)
 {
-#if !defined(__x86)
 	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_FREE, 0, 0, 0, 0));
-#else
-	return (((ddi_dma_impl_t *)h)->dmai_mctl(HD, HD, h, DDI_DMA_FREE,
-		0, 0, 0, 0));
-#endif
 }
 
 int
@@ -1155,13 +1110,8 @@ ddi_iopb_alloc(dev_info_t *dip, ddi_dma_lim_t *limp, uint_t len, caddr_t *iopbp)
 		defalt = standard_limits;
 		limp = &defalt;
 	}
-#if defined(__sparc)
 	return (i_ddi_mem_alloc_lim(dip, limp, size, 0, 0, 0,
 	    iopbp, NULL, NULL));
-#else
-	return (ddi_dma_mctl(dip, dip, 0, DDI_DMA_IOPB_ALLOC, (off_t *)limp,
-	    &size, iopbp, 0));
-#endif
 }
 
 void
@@ -1181,14 +1131,8 @@ ddi_mem_alloc(dev_info_t *dip, ddi_dma_lim_t *limits, uint_t length,
 		defalt = standard_limits;
 		limits = &defalt;
 	}
-#if defined(__sparc)
 	return (i_ddi_mem_alloc_lim(dip, limits, size, flags & 0x1,
 	    1, 0, kaddrp, real_length, NULL));
-#else
-	return (ddi_dma_mctl(dip, dip, (ddi_dma_handle_t)real_length,
-	    DDI_DMA_SMEM_ALLOC, (off_t *)limits, &size,
-	    kaddrp, (flags & 0x1)));
-#endif
 }
 
 void

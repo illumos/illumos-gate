@@ -27,8 +27,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Intel PC root nexus driver
- *	based on sun4c root nexus driver 1.30
+ * x86 root nexus driver
  */
 
 #include <sys/sysmacros.h>
@@ -58,110 +57,140 @@
 #include <sys/sunndi.h>
 #include <sys/psm.h>
 #include <sys/ontrap.h>
+#include <sys/atomic.h>
+#include <sys/sdt.h>
+#include <sys/rootnex.h>
+#include <vm/hat_i86.h>
 
-#define	ptob64(x)		(((uint64_t)(x)) << PAGESHIFT)
 
-extern void	i86_pp_map(page_t *, caddr_t);
-extern void	i86_va_map(caddr_t, struct as *, caddr_t);
-extern int	(*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
-		    psm_intr_op_t, int *);
-extern int	isa_resource_setup(void);
+/*
+ * enable/disable extra checking of function parameters. Useful for debugging
+ * drivers.
+ */
+#ifdef	DEBUG
+int rootnex_alloc_check_parms = 1;
+int rootnex_bind_check_parms = 1;
+int rootnex_bind_check_inuse = 1;
+int rootnex_unbind_verify_buffer = 0;
+int rootnex_sync_check_parms = 1;
+#else
+int rootnex_alloc_check_parms = 0;
+int rootnex_bind_check_parms = 0;
+int rootnex_bind_check_inuse = 0;
+int rootnex_unbind_verify_buffer = 0;
+int rootnex_sync_check_parms = 0;
+#endif
 
-/* Semi-temporary patchables to phase in bug fixes */
+/* Semi-temporary patchables to phase in bug fixes, test drivers, etc. */
 int rootnex_bind_fail = 1;
 int rootnex_bind_warn = 1;
 uint8_t *rootnex_warn_list;
-
 /* bitmasks for rootnex_warn_list. Up to 8 different warnings with uint8_t */
 #define	ROOTNEX_BIND_WARNING	(0x1 << 0)
 
 /*
- * DMA related static data
+ * revert back to old broken behavior of always sync'ing entire copy buffer.
+ * This is useful if be have a buggy driver which doesn't correctly pass in
+ * the offset and size into ddi_dma_sync().
  */
-static uintptr_t dvma_call_list_id = 0;
+int rootnex_sync_ignore_params = 0;
 
 /*
- * Use device arena to use for device control register mappings.
- * Various kernel memory walkers (debugger, dtrace) need to know
- * to avoid this address range to prevent undesired device activity.
+ * maximum size that we will allow for a copy buffer. Can be patched on the
+ * fly
  */
-extern void *device_arena_alloc(size_t size, int vm_flag);
-extern void device_arena_free(void * vaddr, size_t size);
-
+size_t rootnex_max_copybuf_size = 0x100000;
 
 /*
- * Hack to handle poke faults on Calvin-class machines
+ * For the 64-bit kernel, pre-alloc enough cookies for a 256K buffer plus 1
+ * page for alignment. For the 32-bit kernel, pre-alloc enough cookies for a
+ * 64K buffer plus 1 page for alignment (we have less kernel space in a 32-bit
+ * kernel). Allocate enough windows to handle a 256K buffer w/ at least 65
+ * sgllen DMA engine, and enough copybuf buffer state pages to handle 2 pages
+ * (< 8K). We will still need to allocate the copy buffer during bind though
+ * (if we need one). These can only be modified in /etc/system before rootnex
+ * attach.
  */
-extern int pokefault;
-static kmutex_t pokefault_mutex;
+#if defined(__amd64)
+int rootnex_prealloc_cookies = 65;
+int rootnex_prealloc_windows = 4;
+int rootnex_prealloc_copybuf = 2;
+#else
+int rootnex_prealloc_cookies = 33;
+int rootnex_prealloc_windows = 4;
+int rootnex_prealloc_copybuf = 2;
+#endif
 
+/* driver global state */
+static rootnex_state_t *rootnex_state;
+
+/* shortcut to rootnex counters */
+static uint64_t *rootnex_cnt;
 
 /*
- * Internal functions
+ * XXX - does x86 even need these or are they left over from the SPARC days?
  */
-static int
-rootnex_ctl_children(dev_info_t *dip, dev_info_t *rdip,
-    ddi_ctl_enum_t ctlop, dev_info_t *child);
+/* statically defined integer/boolean properties for the root node */
+static rootnex_intprop_t rootnex_intprp[] = {
+	{ "PAGESIZE",			PAGESIZE },
+	{ "MMU_PAGESIZE",		MMU_PAGESIZE },
+	{ "MMU_PAGEOFFSET",		MMU_PAGEOFFSET },
+	{ DDI_RELATIVE_ADDRESSING,	1 },
+};
+#define	NROOT_INTPROPS	(sizeof (rootnex_intprp) / sizeof (rootnex_intprop_t))
 
-static int
-rootnex_ctlops_poke(peekpoke_ctlops_t *in_args);
 
-static int
-rootnex_ctlops_peek(peekpoke_ctlops_t *in_args, void *result);
+static struct cb_ops rootnex_cb_ops = {
+	nodev,		/* open */
+	nodev,		/* close */
+	nodev,		/* strategy */
+	nodev,		/* print */
+	nodev,		/* dump */
+	nodev,		/* read */
+	nodev,		/* write */
+	nodev,		/* ioctl */
+	nodev,		/* devmap */
+	nodev,		/* mmap */
+	nodev,		/* segmap */
+	nochpoll,	/* chpoll */
+	ddi_prop_op,	/* cb_prop_op */
+	NULL,		/* struct streamtab */
+	D_NEW | D_MP | D_HOTPLUG, /* compatibility flags */
+	CB_REV,		/* Rev */
+	nodev,		/* cb_aread */
+	nodev		/* cb_awrite */
+};
 
-/*
- * config information
- */
-
-static int
-rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
+static int rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
     off_t offset, off_t len, caddr_t *vaddrp);
-
-static int
-rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip,
+static int rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip,
     struct hat *hat, struct seg *seg, caddr_t addr,
     struct devpage *dp, pfn_t pfn, uint_t prot, uint_t lock);
-
-static int
-rootnex_dma_allochdl(dev_info_t *, dev_info_t *, ddi_dma_attr_t *,
-    int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *);
-
-static int
-rootnex_dma_freehdl(dev_info_t *, dev_info_t *, ddi_dma_handle_t);
-
-static int
-rootnex_dma_bindhdl(dev_info_t *, dev_info_t *, ddi_dma_handle_t,
-    struct ddi_dma_req *, ddi_dma_cookie_t *, uint_t *);
-
-static int
-rootnex_dma_unbindhdl(dev_info_t *, dev_info_t *, ddi_dma_handle_t);
-
-static int
-rootnex_dma_flush(dev_info_t *, dev_info_t *, ddi_dma_handle_t,
-    off_t, size_t, uint_t);
-
-static int
-rootnex_dma_win(dev_info_t *, dev_info_t *, ddi_dma_handle_t,
-    uint_t, off_t *, size_t *, ddi_dma_cookie_t *, uint_t *);
-
-static int
-rootnex_dma_map(dev_info_t *dip, dev_info_t *rdip,
+static int rootnex_dma_map(dev_info_t *dip, dev_info_t *rdip,
     struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep);
-
-static int
-rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
+static int rootnex_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_attr_t *attr, int (*waitfp)(caddr_t), caddr_t arg,
+    ddi_dma_handle_t *handlep);
+static int rootnex_dma_freehdl(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle);
+static int rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle, struct ddi_dma_req *dmareq,
+    ddi_dma_cookie_t *cookiep, uint_t *ccountp);
+static int rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle);
+static int rootnex_dma_sync(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle, off_t off, size_t len, uint_t cache_flags);
+static int rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle, uint_t win, off_t *offp, size_t *lenp,
+    ddi_dma_cookie_t *cookiep, uint_t *ccountp);
+static int rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, enum ddi_dma_ctlops request,
     off_t *offp, size_t *lenp, caddr_t *objp, uint_t cache_flags);
+static int rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip,
+    ddi_ctl_enum_t ctlop, void *arg, void *result);
+static int rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip,
+    ddi_intr_op_t intr_op, ddi_intr_handle_impl_t *hdlp, void *result);
 
-static int
-rootnex_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *, void *);
-
-static struct intrspec *
-rootnex_get_ispec(dev_info_t *rdip, int inum);
-
-static int
-rootnex_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
-    ddi_intr_handle_impl_t *, void *);
 
 static struct bus_ops rootnex_bus_ops = {
 	BUSO_REV,
@@ -175,7 +204,7 @@ static struct bus_ops rootnex_bus_ops = {
 	rootnex_dma_freehdl,
 	rootnex_dma_bindhdl,
 	rootnex_dma_unbindhdl,
-	rootnex_dma_flush,
+	rootnex_dma_sync,
 	rootnex_dma_win,
 	rootnex_dma_mctl,
 	rootnex_ctlops,
@@ -195,91 +224,247 @@ static struct bus_ops rootnex_bus_ops = {
 	rootnex_intr_ops	/* bus_intr_op */
 };
 
-struct priv_handle {
-	caddr_t	ph_vaddr;
-	union {
-		page_t *pp;
-		struct as *asp;
-	}ph_u;
-	uint_t  ph_mapinfo;
-	uint64_t ph_padr;
-};
-static uint64_t rootnex_get_phyaddr();
-static int rootnex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd);
-static int rootnex_io_rdsync(ddi_dma_impl_t *hp);
-static int rootnex_io_wtsync(ddi_dma_impl_t *hp, int);
-static int rootnex_io_brkup_attr(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t handle,
-    struct priv_handle *php);
-static int rootnex_io_brkup_lim(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep,
-    ddi_dma_lim_t *dma_lim, struct priv_handle *php);
+static int rootnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
+static int rootnex_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 
 static struct dev_ops rootnex_ops = {
 	DEVO_REV,
-	0,		/* refcnt */
-	ddi_no_info,	/* info */
+	0,
+	ddi_no_info,
 	nulldev,
-	nulldev,	/* probe */
+	nulldev,
 	rootnex_attach,
-	nulldev,	/* detach */
-	nulldev,	/* reset */
-	0,		/* cb_ops */
+	rootnex_detach,
+	nulldev,
+	&rootnex_cb_ops,
 	&rootnex_bus_ops
 };
 
-/*
- * Module linkage information for the kernel.
- */
-
-static struct modldrv modldrv = {
-	&mod_driverops, /* Type of module.  This one is a nexus driver */
+static struct modldrv rootnex_modldrv = {
+	&mod_driverops,
 	"i86pc root nexus %I%",
-	&rootnex_ops,	/* Driver ops */
+	&rootnex_ops
 };
 
-static struct modlinkage modlinkage = {
-	MODREV_1, (void *)&modldrv, NULL
+static struct modlinkage rootnex_modlinkage = {
+	MODREV_1,
+	(void *)&rootnex_modldrv,
+	NULL
 };
 
 
+/*
+ *  extern hacks
+ */
+extern struct seg_ops segdev_ops;
+extern int ignore_hardware_nodes;	/* force flag from ddi_impl.c */
+#ifdef	DDI_MAP_DEBUG
+extern int ddi_map_debug_flag;
+#define	ddi_map_debug	if (ddi_map_debug_flag) prom_printf
+#endif
+#define	ptob64(x)	(((uint64_t)(x)) << MMU_PAGESHIFT)
+extern void i86_pp_map(page_t *pp, caddr_t kaddr);
+extern void i86_va_map(caddr_t vaddr, struct as *asp, caddr_t kaddr);
+extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
+    psm_intr_op_t, int *);
+extern int impl_ddi_sunbus_initchild(dev_info_t *dip);
+extern void impl_ddi_sunbus_removechild(dev_info_t *dip);
+/*
+ * Use device arena to use for device control register mappings.
+ * Various kernel memory walkers (debugger, dtrace) need to know
+ * to avoid this address range to prevent undesired device activity.
+ */
+extern void *device_arena_alloc(size_t size, int vm_flag);
+extern void device_arena_free(void * vaddr, size_t size);
+
+
+/*
+ *  Internal functions
+ */
+static int rootnex_dma_init();
+static void rootnex_add_props(dev_info_t *);
+static int rootnex_ctl_reportdev(dev_info_t *dip);
+static struct intrspec *rootnex_get_ispec(dev_info_t *rdip, int inum);
+static int rootnex_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, int *in,
+    struct ddi_parent_private_data *pdptr);
+static int rootnex_ctlops_poke(peekpoke_ctlops_t *in_args);
+static int rootnex_ctlops_peek(peekpoke_ctlops_t *in_args, void *result);
+static int rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp);
+static int rootnex_unmap_regspec(ddi_map_req_t *mp, caddr_t *vaddrp);
+static int rootnex_map_handle(ddi_map_req_t *mp);
+static void rootnex_clean_dmahdl(ddi_dma_impl_t *hp);
+static int rootnex_valid_alloc_parms(ddi_dma_attr_t *attr, uint_t maxsegsize);
+static int rootnex_valid_bind_parms(ddi_dma_req_t *dmareq,
+    ddi_dma_attr_t *attr);
+static void rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
+    rootnex_sglinfo_t *sglinfo);
+static int rootnex_bind_slowpath(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
+    rootnex_dma_t *dma, ddi_dma_attr_t *attr, int kmflag);
+static int rootnex_setup_copybuf(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
+    rootnex_dma_t *dma, ddi_dma_attr_t *attr);
+static void rootnex_teardown_copybuf(rootnex_dma_t *dma);
+static int rootnex_setup_windows(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
+    ddi_dma_attr_t *attr, int kmflag);
+static void rootnex_teardown_windows(rootnex_dma_t *dma);
+static void rootnex_init_win(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
+    rootnex_window_t *window, ddi_dma_cookie_t *cookie, off_t cur_offset);
+static void rootnex_setup_cookie(ddi_dma_obj_t *dmar_object,
+    rootnex_dma_t *dma, ddi_dma_cookie_t *cookie, off_t cur_offset,
+    size_t *copybuf_used, page_t **cur_pp);
+static int rootnex_sgllen_window_boundary(ddi_dma_impl_t *hp,
+    rootnex_dma_t *dma, rootnex_window_t **windowp, ddi_dma_cookie_t *cookie,
+    ddi_dma_attr_t *attr, off_t cur_offset);
+static int rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp,
+    rootnex_dma_t *dma, rootnex_window_t **windowp,
+    ddi_dma_cookie_t *cookie, off_t cur_offset, size_t *copybuf_used);
+static int rootnex_maxxfer_window_boundary(ddi_dma_impl_t *hp,
+    rootnex_dma_t *dma, rootnex_window_t **windowp, ddi_dma_cookie_t *cookie);
+static int rootnex_valid_sync_parms(ddi_dma_impl_t *hp, rootnex_window_t *win,
+    off_t offset, size_t size, uint_t cache_flags);
+static int rootnex_verify_buffer(rootnex_dma_t *dma);
+
+
+/*
+ * _init()
+ *
+ */
 int
 _init(void)
 {
-	return (mod_install(&modlinkage));
+
+	rootnex_state = NULL;
+	return (mod_install(&rootnex_modlinkage));
 }
 
+
+/*
+ * _info()
+ *
+ */
+int
+_info(struct modinfo *modinfop)
+{
+	return (mod_info(&rootnex_modlinkage, modinfop));
+}
+
+
+/*
+ * _fini()
+ *
+ */
 int
 _fini(void)
 {
 	return (EBUSY);
 }
 
-int
-_info(struct modinfo *modinfop)
-{
-	return (mod_info(&modlinkage, modinfop));
-}
 
 /*
- * rootnex_attach:
+ * rootnex_attach()
  *
- *	attach the root nexus.
  */
+static int
+rootnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+	int e;
 
-static void add_root_props(dev_info_t *);
 
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		return (DDI_SUCCESS);
+	default:
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * We should only have one instance of rootnex. Save it away since we
+	 * don't have an easy way to get it back later.
+	 */
+	ASSERT(rootnex_state == NULL);
+	rootnex_state = kmem_zalloc(sizeof (rootnex_state_t), KM_SLEEP);
+
+	rootnex_state->r_dip = dip;
+	rootnex_state->r_reserved_msg_printed = B_FALSE;
+	rootnex_cnt = &rootnex_state->r_counters[0];
+
+	mutex_init(&rootnex_state->r_peekpoke_mutex, NULL, MUTEX_SPIN,
+	    (void *)ipltospl(15));
+
+	/* initialize DMA related state */
+	e = rootnex_dma_init();
+	if (e != DDI_SUCCESS) {
+		mutex_destroy(&rootnex_state->r_peekpoke_mutex);
+		kmem_free(rootnex_state, sizeof (rootnex_state_t));
+		return (DDI_FAILURE);
+	}
+
+	/* Add static root node properties */
+	rootnex_add_props(dip);
+
+	/* since we can't call ddi_report_dev() */
+	cmn_err(CE_CONT, "?root nexus = %s\n", ddi_get_name(dip));
+
+	/* Initialize rootnex event handle */
+	i_ddi_rootnex_init_events(dip);
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_detach()
+ *
+ */
 /*ARGSUSED*/
 static int
-rootnex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
+rootnex_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	mutex_init(&pokefault_mutex, NULL, MUTEX_SPIN, (void *)ipltospl(15));
+	switch (cmd) {
+	case DDI_SUSPEND:
+		break;
+	default:
+		return (DDI_FAILURE);
+	}
 
-	add_root_props(devi);
+	return (DDI_SUCCESS);
+}
 
-	cmn_err(CE_CONT, "?root nexus = %s\n", ddi_get_name(devi));
 
-	i_ddi_rootnex_init_events(devi);
+/*
+ * rootnex_dma_init()
+ *
+ */
+/*ARGSUSED*/
+static int
+rootnex_dma_init()
+{
+	size_t bufsize;
+
+
+	/*
+	 * size of our cookie/window/copybuf state needed in dma bind that we
+	 * pre-alloc in dma_alloc_handle
+	 */
+	rootnex_state->r_prealloc_cookies = rootnex_prealloc_cookies;
+	rootnex_state->r_prealloc_size =
+	    (rootnex_state->r_prealloc_cookies * sizeof (ddi_dma_cookie_t)) +
+	    (rootnex_prealloc_windows * sizeof (rootnex_window_t)) +
+	    (rootnex_prealloc_copybuf * sizeof (rootnex_pgmap_t));
+
+	/*
+	 * setup DDI DMA handle kmem cache, align each handle on 64 bytes,
+	 * allocate 16 extra bytes for struct pointer alignment
+	 * (p->dmai_private & dma->dp_prealloc_buffer)
+	 */
+	bufsize = sizeof (ddi_dma_impl_t) + sizeof (rootnex_dma_t) +
+	    rootnex_state->r_prealloc_size + 0x10;
+	rootnex_state->r_dmahdl_cache = kmem_cache_create("rootnex_dmahdl",
+	    bufsize, 64, NULL, NULL, NULL, NULL, NULL, 0);
+	if (rootnex_state->r_dmahdl_cache == NULL) {
+		return (DDI_FAILURE);
+	}
 
 	/*
 	 * allocate array to track which major numbers we have printed warnings
@@ -293,347 +478,359 @@ rootnex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 
 /*
- * Add statically defined root properties to this list...
+ * rootnex_add_props()
+ *
  */
-
-static const int pagesize = PAGESIZE;
-static const int mmu_pagesize = MMU_PAGESIZE;
-static const int mmu_pageoffset = MMU_PAGEOFFSET;
-
-struct prop_def {
-	char *prop_name;
-	caddr_t prop_value;
-};
-
-static struct prop_def root_props[] = {
-	{ "PAGESIZE",		(caddr_t)&pagesize },
-	{ "MMU_PAGESIZE",	(caddr_t)&mmu_pagesize},
-	{ "MMU_PAGEOFFSET",	(caddr_t)&mmu_pageoffset},
-};
-
-#define	NROOT_PROPS	(sizeof (root_props) / sizeof (struct prop_def))
-
 static void
-add_root_props(dev_info_t *devi)
+rootnex_add_props(dev_info_t *dip)
 {
+	rootnex_intprop_t *rpp;
 	int i;
-	struct prop_def *rpp;
 
-	/*
-	 * Note this for loop works because all of the root_prop
-	 * properties are integers - if this changes, the for
-	 * loop will have to change.
-	 */
-	for (i = 0, rpp = root_props; i < NROOT_PROPS; ++i, ++rpp) {
-		(void) e_ddi_prop_update_int(DDI_DEV_T_NONE, devi,
-		    rpp->prop_name, *((int *)rpp->prop_value));
+	/* Add static integer/boolean properties to the root node */
+	rpp = rootnex_intprp;
+	for (i = 0; i < NROOT_INTPROPS; i++) {
+		(void) e_ddi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    rpp[i].prop_name, rpp[i].prop_value);
 	}
-
-	/*
-	 * Create the root node "boolean" property
-	 * corresponding to addressing type supported in the root node:
-	 *
-	 * Choices are:
-	 *	"relative-addressing" (OBP PROMS)
-	 *	"generic-addressing"  (Sun4 -- pseudo OBP/DDI)
-	 */
-
-	(void) e_ddi_prop_update_int(DDI_DEV_T_NONE, devi,
-	    DDI_RELATIVE_ADDRESSING, 1);
-
 }
 
+
+
 /*
- * #define	DDI_MAP_DEBUG (c.f. ddi_impl.c)
+ * *************************
+ *  ctlops related routines
+ * *************************
  */
-#ifdef	DDI_MAP_DEBUG
-extern int ddi_map_debug_flag;
-#define	ddi_map_debug	if (ddi_map_debug_flag) prom_printf
-#endif	/* DDI_MAP_DEBUG */
-
 
 /*
- * we don't support mapping of I/O cards above 4Gb
+ * rootnex_ctlops()
+ *
  */
 static int
-rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
+rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
+    void *arg, void *result)
 {
-	ulong_t base;
-	void *cvaddr;
-	uint_t npages, pgoffset;
-	struct regspec *rp;
-	ddi_acc_hdl_t *hp;
-	ddi_acc_impl_t *ap;
-	uint_t	hat_acc_flags;
+	int n, *ptr;
+	struct ddi_parent_private_data *pdp;
 
-	rp = mp->map_obj.rp;
-	hp = mp->map_handlep;
 
-#ifdef	DDI_MAP_DEBUG
-	ddi_map_debug(
-	    "rootnex_map_regspec: <0x%x 0x%x 0x%x> handle 0x%x\n",
-	    rp->regspec_bustype, rp->regspec_addr,
-	    rp->regspec_size, mp->map_handlep);
-#endif	/* DDI_MAP_DEBUG */
+	switch (ctlop) {
+	case DDI_CTLOPS_DMAPMAPC:
+		/*
+		 * Return 'partial' to indicate that dma mapping
+		 * has to be done in the main MMU.
+		 */
+		return (DDI_DMA_PARTIAL);
 
-	/*
-	 * I/O or memory mapping
-	 *
-	 *	<bustype=0, addr=x, len=x>: memory
-	 *	<bustype=1, addr=x, len=x>: i/o
-	 *	<bustype>1, addr=0, len=x>: x86-compatibility i/o
-	 */
+	case DDI_CTLOPS_BTOP:
+		/*
+		 * Convert byte count input to physical page units.
+		 * (byte counts that are not a page-size multiple
+		 * are rounded down)
+		 */
+		*(ulong_t *)result = btop(*(ulong_t *)arg);
+		return (DDI_SUCCESS);
 
-	if (rp->regspec_bustype > 1 && rp->regspec_addr != 0) {
-		cmn_err(CE_WARN, "rootnex: invalid register spec"
-		    " <0x%x, 0x%x, 0x%x>", rp->regspec_bustype,
-		    rp->regspec_addr, rp->regspec_size);
+	case DDI_CTLOPS_PTOB:
+		/*
+		 * Convert size in physical pages to bytes
+		 */
+		*(ulong_t *)result = ptob(*(ulong_t *)arg);
+		return (DDI_SUCCESS);
+
+	case DDI_CTLOPS_BTOPR:
+		/*
+		 * Convert byte count input to physical page units
+		 * (byte counts that are not a page-size multiple
+		 * are rounded up)
+		 */
+		*(ulong_t *)result = btopr(*(ulong_t *)arg);
+		return (DDI_SUCCESS);
+
+	case DDI_CTLOPS_POKE:
+		return (rootnex_ctlops_poke((peekpoke_ctlops_t *)arg));
+
+	case DDI_CTLOPS_PEEK:
+		return (rootnex_ctlops_peek((peekpoke_ctlops_t *)arg, result));
+
+	case DDI_CTLOPS_INITCHILD:
+		return (impl_ddi_sunbus_initchild(arg));
+
+	case DDI_CTLOPS_UNINITCHILD:
+		impl_ddi_sunbus_removechild(arg);
+		return (DDI_SUCCESS);
+
+	case DDI_CTLOPS_REPORTDEV:
+		return (rootnex_ctl_reportdev(rdip));
+
+	case DDI_CTLOPS_IOMIN:
+		/*
+		 * Nothing to do here but reflect back..
+		 */
+		return (DDI_SUCCESS);
+
+	case DDI_CTLOPS_REGSIZE:
+	case DDI_CTLOPS_NREGS:
+	case DDI_CTLOPS_NINTRS:
+		break;
+
+	case DDI_CTLOPS_SIDDEV:
+		if (ndi_dev_is_prom_node(rdip))
+			return (DDI_SUCCESS);
+		if (ndi_dev_is_persistent_node(rdip))
+			return (DDI_SUCCESS);
+		return (DDI_FAILURE);
+
+	case DDI_CTLOPS_INTR_HILEVEL:
+		/*
+		 * Indicate whether the interrupt specified is to be handled
+		 * above lock level.  In other words, above the level that
+		 * cv_signal and default type mutexes can be used.
+		 */
+		*(int *)result =
+		    (INT_IPL(((struct intrspec *)arg)->intrspec_pri)
+		    > LOCK_LEVEL);
+		return (DDI_SUCCESS);
+
+	case DDI_CTLOPS_XLATE_INTRS:
+		return (rootnex_xlate_intrs(dip, rdip, arg, result));
+
+	case DDI_CTLOPS_POWER:
+		return ((*pm_platform_power)((power_req_t *)arg));
+
+	case DDI_CTLOPS_RESERVED1: /* Was DDI_CTLOPS_POKE_INIT, obsolete */
+	case DDI_CTLOPS_RESERVED2: /* Was DDI_CTLOPS_POKE_FLUSH, obsolete */
+	case DDI_CTLOPS_RESERVED3: /* Was DDI_CTLOPS_POKE_FINI, obsolete */
+		if (!rootnex_state->r_reserved_msg_printed) {
+			rootnex_state->r_reserved_msg_printed = B_TRUE;
+			cmn_err(CE_WARN, "Failing ddi_ctlops call(s) for "
+			    "1 or more reserved/obsolete operations.");
+		}
+		return (DDI_FAILURE);
+
+	default:
 		return (DDI_FAILURE);
 	}
+	/*
+	 * The rest are for "hardware" properties
+	 */
+	if ((pdp = ddi_get_parent_data(rdip)) == NULL)
+		return (DDI_FAILURE);
 
-	if (rp->regspec_bustype != 0) {
-		/*
-		 * I/O space - needs a handle.
-		 */
-		if (hp == NULL) {
+	if (ctlop == DDI_CTLOPS_NREGS) {
+		ptr = (int *)result;
+		*ptr = pdp->par_nreg;
+	} else if (ctlop == DDI_CTLOPS_NINTRS) {
+		ptr = (int *)result;
+		*ptr = pdp->par_nintr;
+	} else {
+		off_t *size = (off_t *)result;
+
+		ptr = (int *)arg;
+		n = *ptr;
+		if (n >= pdp->par_nreg) {
 			return (DDI_FAILURE);
 		}
-		ap = (ddi_acc_impl_t *)hp->ah_platform_private;
-		ap->ahi_acc_attr |= DDI_ACCATTR_IO_SPACE;
-		impl_acc_hdl_init(hp);
-
-		if (mp->map_flags & DDI_MF_DEVICE_MAPPING) {
-#ifdef  DDI_MAP_DEBUG
-			ddi_map_debug("rootnex_map_regspec: mmap() \
-to I/O space is not supported.\n");
-#endif  /* DDI_MAP_DEBUG */
-			return (DDI_ME_INVAL);
-		} else {
-			/*
-			 * 1275-compliant vs. compatibility i/o mapping
-			 */
-			*vaddrp =
-			    (rp->regspec_bustype > 1 && rp->regspec_addr == 0) ?
-				((caddr_t)(uintptr_t)rp->regspec_bustype) :
-				((caddr_t)(uintptr_t)rp->regspec_addr);
-		}
-
-#ifdef	DDI_MAP_DEBUG
-		ddi_map_debug(
-	    "rootnex_map_regspec: \"Mapping\" %d bytes I/O space at 0x%x\n",
-		    rp->regspec_size, *vaddrp);
-#endif	/* DDI_MAP_DEBUG */
-		return (DDI_SUCCESS);
+		*size = (off_t)pdp->par_reg[n].regspec_size;
 	}
+	return (DDI_SUCCESS);
+}
 
-	/*
-	 * Memory space
-	 */
 
-	if (hp != NULL) {
-		/*
-		 * hat layer ignores
-		 * hp->ah_acc.devacc_attr_endian_flags.
-		 */
-		switch (hp->ah_acc.devacc_attr_dataorder) {
-		case DDI_STRICTORDER_ACC:
-			hat_acc_flags = HAT_STRICTORDER;
+/*
+ * rootnex_ctl_reportdev()
+ *
+ */
+static int
+rootnex_ctl_reportdev(dev_info_t *dev)
+{
+	int i, n, len, f_len = 0;
+	char *buf;
+
+	buf = kmem_alloc(REPORTDEV_BUFSIZE, KM_SLEEP);
+	f_len += snprintf(buf, REPORTDEV_BUFSIZE,
+	    "%s%d at root", ddi_driver_name(dev), ddi_get_instance(dev));
+	len = strlen(buf);
+
+	for (i = 0; i < sparc_pd_getnreg(dev); i++) {
+
+		struct regspec *rp = sparc_pd_getreg(dev, i);
+
+		if (i == 0)
+			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
+			    ": ");
+		else
+			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
+			    " and ");
+		len = strlen(buf);
+
+		switch (rp->regspec_bustype) {
+
+		case BTEISA:
+			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
+			    "%s 0x%x", DEVI_EISA_NEXNAME, rp->regspec_addr);
 			break;
-		case DDI_UNORDERED_OK_ACC:
-			hat_acc_flags = HAT_UNORDERED_OK;
+
+		case BTISA:
+			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
+			    "%s 0x%x", DEVI_ISA_NEXNAME, rp->regspec_addr);
 			break;
-		case DDI_MERGING_OK_ACC:
-			hat_acc_flags = HAT_MERGING_OK;
-			break;
-		case DDI_LOADCACHING_OK_ACC:
-			hat_acc_flags = HAT_LOADCACHING_OK;
-			break;
-		case DDI_STORECACHING_OK_ACC:
-			hat_acc_flags = HAT_STORECACHING_OK;
+
+		default:
+			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
+			    "space %x offset %x",
+			    rp->regspec_bustype, rp->regspec_addr);
 			break;
 		}
-		ap = (ddi_acc_impl_t *)hp->ah_platform_private;
-		ap->ahi_acc_attr |= DDI_ACCATTR_CPU_VADDR;
-		impl_acc_hdl_init(hp);
-		hp->ah_hat_flags = hat_acc_flags;
-	} else {
-		hat_acc_flags = HAT_STRICTORDER;
+		len = strlen(buf);
 	}
+	for (i = 0, n = sparc_pd_getnintr(dev); i < n; i++) {
+		int pri;
 
-	base = (ulong_t)rp->regspec_addr & (~MMU_PAGEOFFSET); /* base addr */
-	pgoffset = (ulong_t)rp->regspec_addr & MMU_PAGEOFFSET; /* offset */
-
-	if (rp->regspec_size == 0) {
-#ifdef  DDI_MAP_DEBUG
-		ddi_map_debug("rootnex_map_regspec: zero regspec_size\n");
-#endif  /* DDI_MAP_DEBUG */
-		return (DDI_ME_INVAL);
+		if (i != 0) {
+			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
+			    ",");
+			len = strlen(buf);
+		}
+		pri = INT_IPL(sparc_pd_getintr(dev, i)->intrspec_pri);
+		f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
+		    " sparc ipl %d", pri);
+		len = strlen(buf);
 	}
-
-	if (mp->map_flags & DDI_MF_DEVICE_MAPPING) {
-		*vaddrp = (caddr_t)mmu_btop(base);
-	} else {
-		npages = mmu_btopr(rp->regspec_size + pgoffset);
-
-#ifdef	DDI_MAP_DEBUG
-		ddi_map_debug("rootnex_map_regspec: Mapping %d pages \
-physical %x ",
-		    npages, base);
-#endif	/* DDI_MAP_DEBUG */
-
-		cvaddr = device_arena_alloc(ptob(npages), VM_NOSLEEP);
-		if (cvaddr == NULL)
-			return (DDI_ME_NORESOURCES);
-
-		/*
-		 * Now map in the pages we've allocated...
-		 */
-		hat_devload(kas.a_hat, cvaddr, mmu_ptob(npages), mmu_btop(base),
-		    mp->map_prot | hat_acc_flags, HAT_LOAD_LOCK);
-		*vaddrp = (caddr_t)cvaddr + pgoffset;
+#ifdef DEBUG
+	if (f_len + 1 >= REPORTDEV_BUFSIZE) {
+		cmn_err(CE_NOTE, "next message is truncated: "
+		    "printed length 1024, real length %d", f_len);
 	}
-
-#ifdef	DDI_MAP_DEBUG
-	ddi_map_debug("at virtual 0x%x\n", *vaddrp);
-#endif	/* DDI_MAP_DEBUG */
+#endif /* DEBUG */
+	cmn_err(CE_CONT, "?%s\n", buf);
+	kmem_free(buf, REPORTDEV_BUFSIZE);
 	return (DDI_SUCCESS);
 }
 
+
+/*
+ * rootnex_ctlops_poke()
+ *
+ */
 static int
-rootnex_unmap_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
+rootnex_ctlops_poke(peekpoke_ctlops_t *in_args)
 {
-	caddr_t addr = (caddr_t)*vaddrp;
-	uint_t npages, pgoffset;
-	struct regspec *rp;
+	int err = DDI_SUCCESS;
+	on_trap_data_t otd;
 
-	if (mp->map_flags & DDI_MF_DEVICE_MAPPING)
-		return (0);
+	/* Cautious access not supported. */
+	if (in_args->handle != NULL)
+		return (DDI_FAILURE);
 
-	rp = mp->map_obj.rp;
+	mutex_enter(&rootnex_state->r_peekpoke_mutex);
 
-	if (rp->regspec_size == 0) {
-#ifdef  DDI_MAP_DEBUG
-		ddi_map_debug("rootnex_unmap_regspec: zero regspec_size\n");
-#endif  /* DDI_MAP_DEBUG */
-		return (DDI_ME_INVAL);
-	}
+	/* Set up protected environment. */
+	if (!on_trap(&otd, OT_DATA_ACCESS)) {
+		switch (in_args->size) {
+		case sizeof (uint8_t):
+			*(uint8_t *)in_args->dev_addr = *(uint8_t *)
+			    in_args->host_addr;
+			break;
 
-	/*
-	 * I/O or memory mapping:
-	 *
-	 *	<bustype=0, addr=x, len=x>: memory
-	 *	<bustype=1, addr=x, len=x>: i/o
-	 *	<bustype>1, addr=0, len=x>: x86-compatibility i/o
-	 */
-	if (rp->regspec_bustype != 0) {
-		/*
-		 * This is I/O space, which requires no particular
-		 * processing on unmap since it isn't mapped in the
-		 * first place.
-		 */
-		return (DDI_SUCCESS);
-	}
+		case sizeof (uint16_t):
+			*(uint16_t *)in_args->dev_addr =
+			    *(uint16_t *)in_args->host_addr;
+			break;
 
-	/*
-	 * Memory space
-	 */
-	pgoffset = (uintptr_t)addr & MMU_PAGEOFFSET;
-	npages = mmu_btopr(rp->regspec_size + pgoffset);
-	hat_unload(kas.a_hat, addr - pgoffset, ptob(npages), HAT_UNLOAD_UNLOCK);
-	device_arena_free(addr - pgoffset, ptob(npages));
+		case sizeof (uint32_t):
+			*(uint32_t *)in_args->dev_addr =
+			    *(uint32_t *)in_args->host_addr;
+			break;
 
-	/*
-	 * Destroy the pointer - the mapping has logically gone
-	 */
-	*vaddrp = NULL;
+		case sizeof (uint64_t):
+			*(uint64_t *)in_args->dev_addr =
+			    *(uint64_t *)in_args->host_addr;
+			break;
 
-	return (DDI_SUCCESS);
+		default:
+			err = DDI_FAILURE;
+			break;
+		}
+	} else
+		err = DDI_FAILURE;
+
+	/* Take down protected environment. */
+	no_trap();
+	mutex_exit(&rootnex_state->r_peekpoke_mutex);
+
+	return (err);
 }
 
+
+/*
+ * rootnex_ctlops_peek()
+ *
+ */
 static int
-rootnex_map_handle(ddi_map_req_t *mp)
+rootnex_ctlops_peek(peekpoke_ctlops_t *in_args, void *result)
 {
-	ddi_acc_hdl_t *hp;
-	ulong_t base;
-	uint_t pgoffset;
-	struct regspec *rp;
+	int err = DDI_SUCCESS;
+	on_trap_data_t otd;
 
-	rp = mp->map_obj.rp;
-
-#ifdef	DDI_MAP_DEBUG
-	ddi_map_debug(
-	    "rootnex_map_handle: <0x%x 0x%x 0x%x> handle 0x%x\n",
-	    rp->regspec_bustype, rp->regspec_addr,
-	    rp->regspec_size, mp->map_handlep);
-#endif	/* DDI_MAP_DEBUG */
-
-	/*
-	 * I/O or memory mapping:
-	 *
-	 *	<bustype=0, addr=x, len=x>: memory
-	 *	<bustype=1, addr=x, len=x>: i/o
-	 *	<bustype>1, addr=0, len=x>: x86-compatibility i/o
-	 */
-	if (rp->regspec_bustype != 0) {
-		/*
-		 * This refers to I/O space, and we don't support "mapping"
-		 * I/O space to a user.
-		 */
+	/* Cautious access not supported. */
+	if (in_args->handle != NULL)
 		return (DDI_FAILURE);
-	}
 
-	/*
-	 * Set up the hat_flags for the mapping.
-	 */
-	hp = mp->map_handlep;
+	mutex_enter(&rootnex_state->r_peekpoke_mutex);
 
-	switch (hp->ah_acc.devacc_attr_endian_flags) {
-	case DDI_NEVERSWAP_ACC:
-		hp->ah_hat_flags = HAT_NEVERSWAP | HAT_STRICTORDER;
-		break;
-	case DDI_STRUCTURE_LE_ACC:
-		hp->ah_hat_flags = HAT_STRUCTURE_LE;
-		break;
-	case DDI_STRUCTURE_BE_ACC:
-		return (DDI_FAILURE);
-	default:
-		return (DDI_REGS_ACC_CONFLICT);
-	}
+	if (!on_trap(&otd, OT_DATA_ACCESS)) {
+		switch (in_args->size) {
+		case sizeof (uint8_t):
+			*(uint8_t *)in_args->host_addr =
+			    *(uint8_t *)in_args->dev_addr;
+			break;
 
-	switch (hp->ah_acc.devacc_attr_dataorder) {
-	case DDI_STRICTORDER_ACC:
-		break;
-	case DDI_UNORDERED_OK_ACC:
-		hp->ah_hat_flags |= HAT_UNORDERED_OK;
-		break;
-	case DDI_MERGING_OK_ACC:
-		hp->ah_hat_flags |= HAT_MERGING_OK;
-		break;
-	case DDI_LOADCACHING_OK_ACC:
-		hp->ah_hat_flags |= HAT_LOADCACHING_OK;
-		break;
-	case DDI_STORECACHING_OK_ACC:
-		hp->ah_hat_flags |= HAT_STORECACHING_OK;
-		break;
-	default:
-		return (DDI_FAILURE);
-	}
+		case sizeof (uint16_t):
+			*(uint16_t *)in_args->host_addr =
+			    *(uint16_t *)in_args->dev_addr;
+			break;
 
-	base = (ulong_t)rp->regspec_addr & (~MMU_PAGEOFFSET); /* base addr */
-	pgoffset = (ulong_t)rp->regspec_addr & MMU_PAGEOFFSET; /* offset */
+		case sizeof (uint32_t):
+			*(uint32_t *)in_args->host_addr =
+			    *(uint32_t *)in_args->dev_addr;
+			break;
 
-	if (rp->regspec_size == 0)
-		return (DDI_ME_INVAL);
+		case sizeof (uint64_t):
+			*(uint64_t *)in_args->host_addr =
+			    *(uint64_t *)in_args->dev_addr;
+			break;
 
-	hp->ah_pfn = mmu_btop(base);
-	hp->ah_pnum = mmu_btopr(rp->regspec_size + pgoffset);
+		default:
+			err = DDI_FAILURE;
+			break;
+		}
+		result = (void *)in_args->host_addr;
+	} else
+		err = DDI_FAILURE;
 
-	return (DDI_SUCCESS);
+	no_trap();
+	mutex_exit(&rootnex_state->r_peekpoke_mutex);
+
+	return (err);
 }
 
+
+
+/*
+ * ******************
+ *  map related code
+ * ******************
+ */
+
+/*
+ * rootnex_map()
+ *
+ */
 static int
-rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
-	off_t offset, off_t len, caddr_t *vaddrp)
+rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
+    off_t len, caddr_t *vaddrp)
 {
 	struct regspec *rp, tmp_reg;
 	ddi_map_req_t mr = *mp;		/* Get private copy of request */
@@ -792,17 +989,16 @@ rootnex_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 
 
 /*
- * rootnex_map_fault:
+ * rootnex_map_fault()
  *
  *	fault in mappings for requestors
  */
 /*ARGSUSED*/
 static int
-rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip,
-	struct hat *hat, struct seg *seg, caddr_t addr,
-	struct devpage *dp, pfn_t pfn, uint_t prot, uint_t lock)
+rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip, struct hat *hat,
+    struct seg *seg, caddr_t addr, struct devpage *dp, pfn_t pfn, uint_t prot,
+    uint_t lock)
 {
-	extern struct seg_ops segdev_ops;
 
 #ifdef	DDI_MAP_DEBUG
 	ddi_map_debug("rootnex_map_fault: address <%x> pfn <%x>", addr, pfn);
@@ -846,2194 +1042,305 @@ rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip,
 
 
 /*
- * DMA routines- for all 80x86 machines.
- */
-
-/*
- * Shorthand defines
- */
-
-#define	MAP	0
-#define	BIND	1
-#define	MAX_INT_BUF	(16*MMU_PAGESIZE)
-#define	AHI_LIM		dma_lim->dlim_addr_hi
-#define	AHI_ATTR	dma_attr->dma_attr_addr_hi
-#define	OBJSIZE		dmareq->dmar_object.dmao_size
-#define	OBJTYPE		dmareq->dmar_object.dmao_type
-#define	FOURG		0x100000000ULL
-#define	SIXTEEN_MB	0x1000000
-
-/* #define	DMADEBUG */
-#if defined(DEBUG) || defined(lint)
-#define	DMADEBUG
-static int dmadebug = 0;
-#define	DMAPRINT(a)	if (dmadebug) prom_printf a
-#else
-#define	DMAPRINT(a)	{ }
-#endif	/* DEBUG */
-
-
-
-/*
- * allocate DMA handle
+ * rootnex_map_regspec()
+ *     we don't support mapping of I/O cards above 4Gb
  */
 static int
-rootnex_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
-    int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
+rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
 {
-	ddi_dma_impl_t *hp;
-	uint64_t maxsegmentsize_ll;
-	uint_t maxsegmentsize;
+	ulong_t base;
+	void *cvaddr;
+	uint_t npages, pgoffset;
+	struct regspec *rp;
+	ddi_acc_hdl_t *hp;
+	ddi_acc_impl_t *ap;
+	uint_t	hat_acc_flags;
 
-#ifdef lint
-	dip = dip;
-#endif
+	rp = mp->map_obj.rp;
+	hp = mp->map_handlep;
 
-	/*
-	 * Validate the dma request.
-	 */
-#ifdef DMADEBUG
-	if (attr->dma_attr_seg < MMU_PAGEOFFSET ||
-	    attr->dma_attr_count_max < MMU_PAGEOFFSET ||
-	    attr->dma_attr_granular > MMU_PAGESIZE ||
-	    attr->dma_attr_maxxfer < MMU_PAGESIZE) {
-		DMAPRINT((" bad_limits\n"));
-		return (DDI_DMA_BADLIMITS);
-	}
-#endif
-	/*
-	 * validate the attribute structure. For now we do not support
-	 * negative sgllen.
-	 */
-	if ((attr->dma_attr_addr_hi <= attr->dma_attr_addr_lo) ||
-	    (attr->dma_attr_sgllen <= 0)) {
-		return (DDI_DMA_BADATTR);
-	}
-	if ((attr->dma_attr_seg & MMU_PAGEOFFSET) != MMU_PAGEOFFSET ||
-	    MMU_PAGESIZE & (attr->dma_attr_granular - 1) ||
-	    attr->dma_attr_sgllen < 0) {
-		return (DDI_DMA_BADATTR);
-	}
-
-
-	maxsegmentsize_ll = MIN(attr->dma_attr_seg,
-	    MIN((attr->dma_attr_count_max + 1) *
-	    attr->dma_attr_minxfer,
-	    attr->dma_attr_maxxfer) - 1) + 1;
-	/*
-	 * We will calculate a 64 bit segment size, if the segment size
-	 * is greater that 4G, we will limit it to (4G - 1).
-	 * The size of dma object (ddi_dma_obj_t.dmao_size)
-	 * is 32 bits.
-	 */
-	if (maxsegmentsize_ll == 0 || (maxsegmentsize_ll > FOURG))
-		maxsegmentsize = FOURG - 1;
-	else
-		maxsegmentsize = maxsegmentsize_ll;
+#ifdef	DDI_MAP_DEBUG
+	ddi_map_debug(
+	    "rootnex_map_regspec: <0x%x 0x%x 0x%x> handle 0x%x\n",
+	    rp->regspec_bustype, rp->regspec_addr,
+	    rp->regspec_size, mp->map_handlep);
+#endif	/* DDI_MAP_DEBUG */
 
 	/*
-	 * We should be able to DMA into every byte offset in a page.
-	 */
-	if (maxsegmentsize < MMU_PAGESIZE) {
-		DMAPRINT((" bad_limits, maxsegmentsize\n"));
-		return (DDI_DMA_BADLIMITS);
-	}
-
-
-	hp = kmem_zalloc(sizeof (*hp),
-	    (waitfp == DDI_DMA_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (hp == NULL) {
-		if (waitfp != DDI_DMA_DONTWAIT) {
-			ddi_set_callback(waitfp, arg, &dvma_call_list_id);
-		}
-		return (DDI_DMA_NORESOURCES);
-	}
-	/*
-	 * Preallocate space for cookie structures. We will use this when
-	 * the request does not span more than (DMAI_SOMEMORE_COOKIES - 1)
-	 * pages.
-	 */
-	hp->dmai_additionalcookiep =
-	    kmem_zalloc(sizeof (ddi_dma_cookie_t) * DMAI_SOMEMORE_COOKIES,
-		(waitfp == DDI_DMA_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-
-	/*
-	 * Save requestor's information
-	 */
-	hp->dmai_wins = NULL;
-	hp->dmai_kaddr =
-	hp->dmai_ibufp = NULL;
-	hp->dmai_inuse = 0;
-	hp->dmai_minxfer = attr->dma_attr_minxfer;
-	hp->dmai_burstsizes = attr->dma_attr_burstsizes;
-	hp->dmai_minfo = NULL;
-	hp->dmai_rdip = rdip;
-	hp->dmai_attr = *attr;
-	hp->dmai_mctl = rootnex_dma_mctl;
-	hp->dmai_segmentsize = maxsegmentsize;
-	*handlep = (ddi_dma_handle_t)hp;
-
-	return (DDI_SUCCESS);
-}
-
-/*ARGSUSED*/
-static int
-rootnex_dma_freehdl(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t handle)
-{
-	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
-
-	/*
-	 * free the additional cookie space.
-	 */
-	if (hp->dmai_additionalcookiep)
-	    kmem_free(hp->dmai_additionalcookiep,
-		sizeof (ddi_dma_cookie_t) * DMAI_SOMEMORE_COOKIES);
-
-	kmem_free(hp, sizeof (*hp));
-	if (dvma_call_list_id)
-		ddi_run_callback(&dvma_call_list_id);
-	return (DDI_SUCCESS);
-}
-
-static int
-rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t handle, struct ddi_dma_req *dmareq,
-    ddi_dma_cookie_t *cookiep, uint_t *ccountp)
-{
-	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
-	ddi_dma_attr_t *dma_attr = &hp->dmai_attr;
-	ddi_dma_cookie_t *cp;
-	impl_dma_segment_t *segp;
-	uint_t segcount = 1;
-	int rval;
-	struct priv_handle php;
-	uint_t	size, offset;
-	uint64_t padr;
-	major_t mnum;
-
-	/*
-	 * no mutex for speed
-	 */
-	if (hp->dmai_inuse) {
-		return (DDI_DMA_INUSE);
-	}
-	hp->dmai_inuse = 1;
-
-	size = OBJSIZE;
-	/*
-	 * get the physical address of the first page of an object
-	 * defined through 'dmareq' structure.
-	 */
-	padr = rootnex_get_phyaddr(dmareq, 0, &php);
-	offset = padr & MMU_PAGEOFFSET;
-	if (offset & (dma_attr->dma_attr_minxfer - 1)) {
-		DMAPRINT((" bad_limits/mapping\n"));
-		return (DDI_DMA_NOMAPPING);
-	} else if ((dma_attr->dma_attr_sgllen > 1) &&
-	    (size <= MMU_PAGESIZE) && (padr < AHI_ATTR)) {
-		/*
-		 * The object is not more than a PAGESIZE and we could DMA into
-		 * the physical page.
-		 * The cache is completely coherent, set the NOSYNC flag.
-		 */
-		hp->dmai_rflags = (dmareq->dmar_flags & DMP_DDIFLAGS) |
-			DMP_NOSYNC;
-		/*
-		 * Fill in the physical address in the cookie pointer.
-		 */
-		cookiep->dmac_type = php.ph_mapinfo;
-		cookiep->dmac_laddress = padr;
-		if ((offset + size) <= MMU_PAGESIZE) {
-		    cookiep->dmac_size = size;
-		    hp->dmai_cookie = NULL;
-		    *ccountp = 1;
-		} else if (hp->dmai_additionalcookiep) {
-		/*
-		 * The object spans a page boundary. We will use the space
-		 * that we preallocated to store the additional cookie.
-		 */
-		    cookiep->dmac_size = MMU_PAGESIZE - offset;
-		    hp->dmai_cookie = hp->dmai_additionalcookiep;
-		    padr = rootnex_get_phyaddr(dmareq,
-			(uint_t)cookiep->dmac_size, &php);
-		    if (padr > AHI_ATTR) {
-			/*
-			 * We can not DMA into this physical page. We will
-			 * need intermediate buffers. Reset the state in
-			 * the php structure.
-			 */
-			padr = rootnex_get_phyaddr(dmareq, 0, &php);
-			goto io_brkup_attr;
-		    }
-		    hp->dmai_additionalcookiep->dmac_type = php.ph_mapinfo;
-		    hp->dmai_additionalcookiep->dmac_laddress = padr;
-		    hp->dmai_additionalcookiep->dmac_size =
-			size - cookiep->dmac_size;
-		    *ccountp = 2;
-		} else {
-			goto io_brkup_attr;
-		}
-		hp->dmai_kaddr = NULL;
-		hp->dmai_segp = NULL;
-		hp->dmai_ibufp = NULL;
-		return (DDI_DMA_MAPPED);
-	}
-io_brkup_attr:
-	/*
-	 * The function rootnex_get_phyaddr() does not save the physical
-	 * address in the php structure. Save it here for
-	 * rootnext_io_brkup_attr().
-	 */
-	php.ph_padr = padr;
-	rval =  rootnex_io_brkup_attr(dip, rdip, dmareq, handle, &php);
-	if (rval && (rval != DDI_DMA_PARTIAL_MAP)) {
-		hp->dmai_inuse = 0;
-		return (rval);
-	}
-	hp->dmai_wins = segp = hp->dmai_hds;
-	if (hp->dmai_ibufp) {
-		(void) rootnex_io_wtsync(hp, BIND);
-	}
-
-	while ((segp->dmais_flags & DMAIS_WINEND) == 0) {
-		segp = segp->dmais_link;
-		segcount++;
-	}
-	*ccountp = segcount;
-	cp = hp->dmai_cookie;
-	ASSERT(cp);
-	cookiep->dmac_type = cp->dmac_type;
-	cookiep->dmac_laddress = cp->dmac_laddress;
-	cookiep->dmac_size = cp->dmac_size;
-	hp->dmai_cookie++;
-
-	/*
-	 * If we ended up with more cookies that the caller specified as
-	 * the maximum that it can handle (sgllen), and they didn't specify
-	 * DDI_DMA_PARTIAL, cleanup and return failure.
+	 * I/O or memory mapping
 	 *
-	 * Not the cleanest fix, but lowest risk. The DMA code in
-	 * this file should get a good cleaning for some performance
-	 * improvement. This should be cleaned up also during that work.
+	 *	<bustype=0, addr=x, len=x>: memory
+	 *	<bustype=1, addr=x, len=x>: i/o
+	 *	<bustype>1, addr=0, len=x>: x86-compatibility i/o
 	 */
-	if ((dma_attr->dma_attr_sgllen < *ccountp) &&
-	    ((dmareq->dmar_flags & DDI_DMA_PARTIAL) == 0)) {
 
-		mnum = ddi_driver_major(rdip);
-
-		/*
-		 * patchable which allows us to print one warning per major
-		 * number.
-		 */
-		if ((rootnex_bind_warn) &&
-		    ((rootnex_warn_list[mnum] & ROOTNEX_BIND_WARNING) == 0)) {
-			rootnex_warn_list[mnum] |= ROOTNEX_BIND_WARNING;
-			cmn_err(CE_WARN, "!%s: coding error detected, the "
-			    "driver is using ddi_dma_attr(9S) incorrectly. "
-			    "There is a small risk of data corruption in "
-			    "particular with large I/Os. The driver should be "
-			    "replaced with a corrected version for proper "
-			    "system operation. To disable this warning, add "
-			    "'set rootnex:rootnex_bind_warn=0' to "
-			    "/etc/system(4).", ddi_driver_name(rdip));
-		}
-
-		/*
-		 * Patchable which allows us to fail or pass the bind. The
-		 * correct behavior should be to fail the bind. To be safe for
-		 * now, the patchable allows the previous behavior to be set
-		 * via /etc/system
-		 */
-		if (rootnex_bind_fail) {
-			if (hp->dmai_ibufp)
-				ddi_mem_free(hp->dmai_ibufp);
-			if (hp->dmai_kaddr)
-				vmem_free(heap_arena, hp->dmai_kaddr, PAGESIZE);
-			if (hp->dmai_segp)
-				kmem_free(hp->dmai_segp, hp->dmai_kmsize);
-			hp->dmai_inuse = 0;
-			*ccountp = 0;
-
-			return (DDI_DMA_TOOBIG);
-		}
-	}
-
-	return (rval);
-}
-
-/*ARGSUSED*/
-static int
-rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t handle)
-{
-	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
-	int rval = DDI_SUCCESS;
-
-	if (hp->dmai_ibufp) {
-		rval = rootnex_io_rdsync(hp);
-		ddi_mem_free(hp->dmai_ibufp);
-	}
-	if (hp->dmai_kaddr)
-		vmem_free(heap_arena, hp->dmai_kaddr, PAGESIZE);
-	if (hp->dmai_segp)
-		kmem_free(hp->dmai_segp, hp->dmai_kmsize);
-	if (dvma_call_list_id)
-		ddi_run_callback(&dvma_call_list_id);
-	hp->dmai_inuse = 0;
-	return (rval);
-}
-
-/*ARGSUSED*/
-static int
-rootnex_dma_flush(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t handle, off_t off, size_t len,
-    uint_t cache_flags)
-{
-	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
-	int rval = DDI_SUCCESS;
-
-	if (hp->dmai_ibufp) {
-		if (cache_flags == DDI_DMA_SYNC_FORDEV) {
-			rval = rootnex_io_wtsync(hp, MAP);
-		} else {
-			rval =  rootnex_io_rdsync(hp);
-		}
-	}
-	return (rval);
-}
-
-/*ARGSUSED*/
-static int
-rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t handle, uint_t win, off_t *offp,
-    size_t *lenp, ddi_dma_cookie_t *cookiep, uint_t *ccountp)
-{
-	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
-	impl_dma_segment_t *segp, *winp = hp->dmai_hds;
-	uint_t len, segcount = 1;
-	ddi_dma_cookie_t *cp;
-	int i;
-
-	/*
-	 * win is in the range [0 .. dmai_nwin-1]
-	 */
-	if (win >= hp->dmai_nwin) {
+	if (rp->regspec_bustype > 1 && rp->regspec_addr != 0) {
+		cmn_err(CE_WARN, "rootnex: invalid register spec"
+		    " <0x%x, 0x%x, 0x%x>", rp->regspec_bustype,
+		    rp->regspec_addr, rp->regspec_size);
 		return (DDI_FAILURE);
 	}
-	if (hp->dmai_wins && hp->dmai_ibufp) {
-		(void) rootnex_io_rdsync(hp);
-	}
-	ASSERT(winp->dmais_flags & DMAIS_WINSTRT);
-	for (i = 0; i < win; i++) {
-		winp = winp->_win._dmais_nex;
-		ASSERT(winp);
-		ASSERT(winp->dmais_flags & DMAIS_WINSTRT);
-	}
 
-	hp->dmai_wins = (impl_dma_segment_t *)winp;
-	if (hp->dmai_ibufp)
-		(void) rootnex_io_wtsync(hp, BIND);
-	segp = winp;
-	len = segp->dmais_size;
-	*offp = segp->dmais_ofst;
-	while ((segp->dmais_flags & DMAIS_WINEND) == 0) {
-		segp = segp->dmais_link;
-		len += segp->dmais_size;
-		segcount++;
-	}
-
-	*lenp = len;
-	*ccountp = segcount;
-	cp = hp->dmai_cookie = winp->dmais_cookie;
-	ASSERT(cp);
-	cookiep->dmac_type = cp->dmac_type;
-	cookiep->dmac_laddress = cp->dmac_laddress;
-	cookiep->dmac_size = cp->dmac_size;
-	hp->dmai_cookie++;
-	DMAPRINT(("getwin win %p mapping %llx size %lx\n",
-	    (void *)winp, (unsigned long long)cp->dmac_laddress,
-	    cp->dmac_size));
-
-	return (DDI_SUCCESS);
-}
-
-static int
-rootnex_dma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep)
-{
-	ddi_dma_lim_t *dma_lim = dmareq->dmar_limits;
-	impl_dma_segment_t *segmentp;
-	ddi_dma_impl_t *hp;
-	struct priv_handle php;
-	uint64_t padr;
-	uint_t offset, size;
-	int sizehandle;
-	int mapinfo;
-
-#ifdef lint
-	dip = dip;
-#endif
-
-	DMAPRINT(("dma_map: %s (%s) reqp %p ", (handlep)? "alloc" : "advisory",
-	    ddi_get_name(rdip), (void *)dmareq));
-
-#ifdef	DMADEBUG
-	/*
-	 * Validate range checks on DMA limits
-	 */
-	if ((dma_lim->dlim_adreg_max & MMU_PAGEOFFSET) != MMU_PAGEOFFSET ||
-	    dma_lim->dlim_granular > MMU_PAGESIZE ||
-	    dma_lim->dlim_sgllen <= 0) {
-		DMAPRINT((" bad_limits\n"));
-		return (DDI_DMA_BADLIMITS);
-	}
-#endif
-	size = OBJSIZE;
-	/*
-	 * get the physical address of the first page of an object
-	 * defined through 'dmareq' structure.
-	 */
-	padr = rootnex_get_phyaddr(dmareq, 0, &php);
-	mapinfo = php.ph_mapinfo;
-	offset = padr & MMU_PAGEOFFSET;
-	if (offset & (dma_lim->dlim_minxfer - 1)) {
-		DMAPRINT((" bad_limits/mapping\n"));
-		return (DDI_DMA_NOMAPPING);
-	} else if (((offset + size) < MMU_PAGESIZE) && (padr < AHI_LIM)) {
+	if (rp->regspec_bustype != 0) {
 		/*
-		 * The object is less than a PAGESIZE and we could DMA into
-		 * the physical page.
+		 * I/O space - needs a handle.
 		 */
-		if (!handlep)
-			return (DDI_DMA_MAPOK);
-		sizehandle = sizeof (ddi_dma_impl_t) +
-		    sizeof (impl_dma_segment_t);
-
-		hp = kmem_alloc(sizehandle, (dmareq->dmar_fp == DDI_DMA_SLEEP) ?
-		    KM_SLEEP : KM_NOSLEEP);
-		if (!hp) {
-			/* let other routine do callback */
-			goto breakup_req;
+		if (hp == NULL) {
+			return (DDI_FAILURE);
 		}
-		hp->dmai_kmsize = sizehandle;
+		ap = (ddi_acc_impl_t *)hp->ah_platform_private;
+		ap->ahi_acc_attr |= DDI_ACCATTR_IO_SPACE;
+		impl_acc_hdl_init(hp);
 
-		/*
-		 * locate segments after dma_impl handle structure
-		 */
-		segmentp = (impl_dma_segment_t *)(hp + 1);
-
-		/* FMA related initialization */
-		hp->dmai_fault = 0;
-		hp->dmai_fault_check = NULL;
-		hp->dmai_fault_notify = NULL;
-		hp->dmai_error.err_ena = 0;
-		hp->dmai_error.err_status = DDI_FM_OK;
-		hp->dmai_error.err_expected = DDI_FM_ERR_UNEXPECTED;
-		hp->dmai_error.err_ontrap = NULL;
-		hp->dmai_error.err_fep = NULL;
-
-		/*
-		 * Save requestor's information
-		 */
-		hp->dmai_minxfer = dma_lim->dlim_minxfer;
-		hp->dmai_burstsizes = dma_lim->dlim_burstsizes;
-		hp->dmai_rdip = rdip;
-		hp->dmai_mctl = rootnex_dma_mctl;
-		hp->dmai_wins = NULL;
-		hp->dmai_kaddr = hp->dmai_ibufp = NULL;
-		hp->dmai_hds = segmentp;
-		hp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS;
-		hp->dmai_minfo = (void *)(uintptr_t)mapinfo;
-		hp->dmai_object = dmareq->dmar_object;
-		if (mapinfo == DMAMI_PAGES) {
-			segmentp->_vdmu._dmais_pp = php.ph_u.pp;
-			segmentp->dmais_ofst = (uint_t)offset;
+		if (mp->map_flags & DDI_MF_DEVICE_MAPPING) {
+#ifdef  DDI_MAP_DEBUG
+			ddi_map_debug("rootnex_map_regspec: mmap() \
+to I/O space is not supported.\n");
+#endif  /* DDI_MAP_DEBUG */
+			return (DDI_ME_INVAL);
 		} else {
-			segmentp->_vdmu._dmais_va = php.ph_vaddr;
-			segmentp->dmais_ofst = 0;
+			/*
+			 * 1275-compliant vs. compatibility i/o mapping
+			 */
+			*vaddrp =
+			    (rp->regspec_bustype > 1 && rp->regspec_addr == 0) ?
+				((caddr_t)(uintptr_t)rp->regspec_bustype) :
+				((caddr_t)(uintptr_t)rp->regspec_addr);
 		}
-		segmentp->_win._dmais_nex = NULL;
-		segmentp->dmais_link = NULL;
-		segmentp->_pdmu._dmais_lpd = padr;
-		segmentp->dmais_size = size;
-		segmentp->dmais_flags = DMAIS_WINSTRT | DMAIS_WINEND;
-		segmentp->dmais_hndl = hp;
-		*handlep = (ddi_dma_handle_t)hp;
-		DMAPRINT(("	QUICKIE handle %p\n", (void *)hp));
-		return (DDI_DMA_MAPPED);
-	} else if (!handlep) {
-		return (DDI_DMA_NOMAPPING);
+
+#ifdef	DDI_MAP_DEBUG
+		ddi_map_debug(
+	    "rootnex_map_regspec: \"Mapping\" %d bytes I/O space at 0x%x\n",
+		    rp->regspec_size, *vaddrp);
+#endif	/* DDI_MAP_DEBUG */
+		return (DDI_SUCCESS);
 	}
-breakup_req:
-	/*
-	 * The function rootnex_get_phyaddr() does not save the physical
-	 * address in the php structure. Save it here for
-	 * rootnext_io_brkup_attr().
-	 */
-	php.ph_padr = padr;
-	return (rootnex_io_brkup_lim(dip, rdip,  dmareq, handlep,
-		dma_lim, &php));
-}
-
-/* CSTYLED */
-#define	CAN_COMBINE(psegp, paddr, segsize, sgsize,  mxsegsize, attr, flg) \
-((psegp)								&& \
-((psegp)->_pdmu._dmais_lpd + (psegp)->dmais_size) == (paddr)	&& \
-(((psegp)->dmais_flags & (DMAIS_NEEDINTBUF | DMAIS_COMPLEMENT)) == 0) && \
-(((flg) & DMAIS_NEEDINTBUF) == 0)					&& \
-(((psegp)->dmais_size + (segsize)) <= (mxsegsize))			&& \
-((paddr) & (attr)->dma_attr_seg))
-
-/* CSTYLED */
-#define	MARK_WIN_END(segp, prvwinp, cwinp) \
-(segp)->dmais_flags |= DMAIS_WINEND;	\
-(prvwinp) = (cwinp);			\
-(cwinp)->dmais_flags |= DMAIS_WINUIB;	\
-(cwinp) = NULL;
-
-/*
- * This function works with the ddi_dma_attr structure.
- * Bugs fixed
- * 1. The old code would ignore the size of the first segment when
- *	computing the total size of the reuqest (sglistsize) for sgllen == 1
- */
-
-/*ARGSUSED*/
-int
-rootnex_io_brkup_attr(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t handle,
-    struct priv_handle *php)
-{
-	impl_dma_segment_t *segmentp;
-	impl_dma_segment_t *curwinp;
-	impl_dma_segment_t *previousp;
-	impl_dma_segment_t *prewinp;
-	ddi_dma_cookie_t *cookiep;
-	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
-	caddr_t basevadr;
-	caddr_t segmentvadr;
-	uint64_t segmentpadr;
-	uint_t maxsegmentsize, sizesegment, residual_size;
-	uint_t offset, needintbuf, sglistsize, trim;
-	int nsegments;
-	int mapinfo;
-	int reqneedintbuf;
-	int rval;
-	int segment_flags, win_flags;
-	int sgcount;
-	int wcount;
-	ddi_dma_attr_t *dma_attr = &hp->dmai_attr;
-	int sizehandle;
-
-#ifdef lint
-	dip = dip;
-#endif
 
 	/*
-	 * Initialize our local variables from the php structure.
-	 * rootnex_get_phyaddr() has populated php structure on its
-	 * previous invocation in rootnex_dma_bindhdl().
+	 * Memory space
 	 */
-	residual_size = OBJSIZE;
-	mapinfo = php->ph_mapinfo;
-	segmentpadr = php->ph_padr;
-	segmentvadr =  php->ph_vaddr;
-	basevadr = (mapinfo == DMAMI_PAGES) ? 0 : segmentvadr;
-	offset = segmentpadr & MMU_PAGEOFFSET;
-	/*
-	 * maxsegmentsize was computed and saved in rootnex_dma_allochdl().
-	 */
-	maxsegmentsize = hp->dmai_segmentsize;
 
-	/*
-	 * The number of segments is the number of 4k pages that the
-	 * object spans.
-	 * Each 4k segment may need another segment to satisfy
-	 * device granularity reqirements.
-	 * We will never need more than two segments per page.
-	 * This may be an overestimate in some cases but it avoids
-	 * 64 bit divide operations.
-	 */
-	nsegments = (offset + residual_size + MMU_PAGEOFFSET) >>
-	    (MMU_PAGESHIFT - 1);
-
-
-
-	sizehandle = nsegments * (sizeof (impl_dma_segment_t) +
-		    sizeof (ddi_dma_cookie_t));
-
-	hp->dmai_segp = kmem_zalloc(sizehandle,
-	    (dmareq->dmar_fp == DDI_DMA_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (!hp->dmai_segp) {
-		rval = DDI_DMA_NORESOURCES;
-		goto bad;
-	}
-	hp->dmai_kmsize = sizehandle;
-	segmentp = (impl_dma_segment_t *)hp->dmai_segp;
-	cookiep = (ddi_dma_cookie_t *)(segmentp + nsegments);
-	hp->dmai_cookie = cookiep;
-	hp->dmai_wins = NULL;
-	hp->dmai_kaddr = hp->dmai_ibufp = NULL;
-	hp->dmai_hds = prewinp = segmentp;
-	hp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS;
-	hp->dmai_minfo = (void *)(uintptr_t)mapinfo;
-	hp->dmai_object = dmareq->dmar_object;
-
-	/*
-	 * Breakup the memory object
-	 * and build an i/o segment at each boundary condition
-	 */
-	curwinp = 0;
-	needintbuf = 0;
-	previousp = 0;
-	reqneedintbuf = 0;
-	sglistsize = 0;
-	wcount = 0;
-	sgcount = 1;
-	do {
-		sizesegment = MIN((MMU_PAGESIZE - offset), residual_size);
-		segment_flags = (segmentpadr > AHI_ATTR) ? DMAIS_NEEDINTBUF : 0;
-		sglistsize += sizesegment;
-		if (sglistsize >= dma_attr->dma_attr_maxxfer) {
-			/*
-			 * limit the number of bytes to dma_attr_maxxfer
-			 */
-			sizesegment -=
-			    (sglistsize - dma_attr->dma_attr_maxxfer);
-			sglistsize = dma_attr->dma_attr_maxxfer;
-			sgcount = dma_attr->dma_attr_sgllen + 1;
-		}
-		if ((dma_attr->dma_attr_sgllen == 1) &&
-		    (segmentpadr & (dma_attr->dma_attr_granular - 1)) &&
-		    (residual_size != sizesegment)) {
-			/*
-			 * _no_ scatter/gather capability,
-			 * so ensure that size of each segment is a
-			 * multiple of dma_attr_granular (== sector size)
-			 */
-			sizesegment = MIN((uint_t)MMU_PAGESIZE, residual_size);
-			segment_flags |= DMAIS_NEEDINTBUF;
-			sglistsize = sizesegment;
-		}
-		if (CAN_COMBINE(previousp, segmentpadr, sizesegment,
-		    sglistsize, maxsegmentsize, dma_attr, segment_flags)) {
-		    previousp->dmais_flags |= segment_flags;
-		    previousp->dmais_size += sizesegment;
-		    previousp->dmais_cookie->dmac_size += sizesegment;
-		} else {
-		    if (dma_attr->dma_attr_sgllen == 1)
-			/*
-			 * If we can not combine this segment with the
-			 * previous segment or if there are no previous
-			 * segments, sglistsize should be set to
-			 * segmentsize.
-			 */
-			sglistsize = sizesegment;
-
-		    if (previousp) {
-			previousp->dmais_link = segmentp;
-		    }
-		    segmentp->dmais_cookie = cookiep;
-		    segmentp->dmais_hndl = hp;
-		    if (curwinp == 0) {
-			prewinp->_win._dmais_nex = curwinp = segmentp;
-			segment_flags |= DMAIS_WINSTRT;
-			win_flags = segment_flags;
-			wcount++;
-		    } else {
-			segmentp->_win._dmais_cur = curwinp;
-			win_flags |= segment_flags;
-		    }
-		    segmentp->dmais_ofst = segmentvadr - basevadr;
-		    if (mapinfo == DMAMI_PAGES)
-			segmentp->_vdmu._dmais_pp = php->ph_u.pp;
-		    else
-			segmentp->_vdmu._dmais_va = (caddr_t)segmentvadr;
-		    segmentp->_pdmu._dmais_lpd = segmentpadr;
-		    segmentp->dmais_flags = (ushort_t)segment_flags;
-		    segmentp->dmais_size = sizesegment;
-		    cookiep->dmac_laddress = segmentpadr;
-		    cookiep->dmac_type = (ulong_t)segmentp;
-		    cookiep->dmac_size = sizesegment;
-		    cookiep++;
-		    --nsegments;
-		    if (dma_attr->dma_attr_sgllen > 1)
-			sgcount++;
-		    if (segment_flags & DMAIS_NEEDINTBUF) {
-			if ((dma_attr->dma_attr_sgllen > 1) &&
-			    (needintbuf += ptob(btopr(sizesegment)))
-				== MAX_INT_BUF) {
-				/*
-				 * Intermediate buffers need not be contiguous.
-				 * we allocate a page of intermediate buffer
-				 * for every segment.
-				 */
-			    reqneedintbuf = needintbuf;
-			    needintbuf = 0;
-			    sgcount = dma_attr->dma_attr_sgllen + 1;
-			    MARK_WIN_END(segmentp, prewinp, curwinp);
-			} else if (dma_attr->dma_attr_sgllen == 1) {
-			    needintbuf = MMU_PAGESIZE;
-			    MARK_WIN_END(segmentp, prewinp, curwinp);
-			}
-		    }
-		    previousp = segmentp++;
-		}
-
-		if (sgcount > dma_attr->dma_attr_sgllen) {
-		    previousp->dmais_flags |= DMAIS_COMPLEMENT;
-		    sgcount = 1;
-		    trim = sglistsize & (dma_attr->dma_attr_granular - 1);
-
-		    if ((sizesegment != residual_size) &&
-			(trim == sizesegment)) {
-
-			/*
-			 * Normally we would trim the buffer to make it a
-			 * multiple of the granularity. But in this case,
-			 * the size is < the granularity so we'll roll back
-			 * this segment and pick this up the next time around.
-			 *
-			 * This case occurs when sgcount naturally (i.e. not
-			 * forced) is greater than > dma_attr_sgllen. In this
-			 * case, if the very next segment fills up the
-			 * intermediate buffer, and the amount required to fill
-			 * the intermediate buffer < granularity, we would end
-			 * up with a zero sized cookie if we didn't roll back
-			 * the segment.
-			 */
-
-			/*
-			 * Make sure we really understand the code path here,
-			 * we should only get here if we are at an end of a
-			 * window which is a single page long < granularity
-			 */
-			ASSERT(previousp->dmais_flags & DMAIS_WINEND);
-			ASSERT(sizesegment == sglistsize);
-
-			/* Zero out this segment and add it back to the count */
-			sizesegment = 0;
-			sglistsize = 0;
-			nsegments++;
-
-			/* fix the segment and cookie pointers */
-			segmentp = previousp;
-			bzero(previousp, sizeof (impl_dma_segment_t));
-			previousp--;
-			bzero(cookiep, sizeof (ddi_dma_cookie_t));
-			cookiep--;
-
-			/*
-			 * cleanup the new previous pointer. Make sure we
-			 * carry over the WINEND maker.
-			 */
-			previousp->dmais_link = NULL;
-			previousp->dmais_flags |= DMAIS_WINEND;
-
-		    } else if ((sizesegment != residual_size) && trim) {
-			/*
-			 * end of a scatter/gather list!
-			 * ensure that total length of list is a
-			 * multiple of granular (sector size)
-			 */
-			previousp->dmais_size -= trim;
-			previousp->dmais_cookie->dmac_size -= trim;
-			sizesegment -= trim;
-		    }
-		    sglistsize = 0;
-		}
-		if (sizesegment && (residual_size -= sizesegment)) {
-			/*
-			 * Get the physical address of the next page in the
-			 * dma object.
-			 */
-			segmentpadr =
-			    rootnex_get_phyaddr(dmareq, sizesegment, php);
-			offset = segmentpadr & MMU_PAGEOFFSET;
-			segmentvadr += sizesegment;
-		}
-	} while (residual_size && nsegments);
-	ASSERT(residual_size == 0);
-
-	previousp->dmais_link = NULL;
-	previousp->dmais_flags |= DMAIS_WINEND;
-	if (curwinp) {
-		if (win_flags & DMAIS_NEEDINTBUF)
-			curwinp->dmais_flags |= DMAIS_WINUIB;
-		curwinp->_win._dmais_nex = NULL;
-	} else
-		prewinp->_win._dmais_nex = NULL;
-
-	if ((needintbuf = MAX(needintbuf, reqneedintbuf)) != 0) {
-		uint64_t	saved_align;
-
-		saved_align = dma_attr->dma_attr_align;
+	if (hp != NULL) {
 		/*
-		 * Allocate intermediate buffer. To start with we request
-		 * for a page aligned area. This request is satisfied from
-		 * the system page free list pool.
+		 * hat layer ignores
+		 * hp->ah_acc.devacc_attr_endian_flags.
 		 */
-		dma_attr->dma_attr_align = MMU_PAGESIZE;
-		if (i_ddi_mem_alloc(dip, dma_attr, needintbuf,
-		    (dmareq->dmar_fp == DDI_DMA_SLEEP) ? 0x1 : 0, 1, 0,
-		    &hp->dmai_ibufp, (ulong_t *)&hp->dmai_ibfsz,
-		    NULL) != DDI_SUCCESS) {
-			dma_attr->dma_attr_align = saved_align;
-			rval = DDI_DMA_NORESOURCES;
-			goto bad;
+		switch (hp->ah_acc.devacc_attr_dataorder) {
+		case DDI_STRICTORDER_ACC:
+			hat_acc_flags = HAT_STRICTORDER;
+			break;
+		case DDI_UNORDERED_OK_ACC:
+			hat_acc_flags = HAT_UNORDERED_OK;
+			break;
+		case DDI_MERGING_OK_ACC:
+			hat_acc_flags = HAT_MERGING_OK;
+			break;
+		case DDI_LOADCACHING_OK_ACC:
+			hat_acc_flags = HAT_LOADCACHING_OK;
+			break;
+		case DDI_STORECACHING_OK_ACC:
+			hat_acc_flags = HAT_STORECACHING_OK;
+			break;
 		}
-		if (mapinfo != DMAMI_KVADR) {
-			hp->dmai_kaddr = vmem_alloc(heap_arena, PAGESIZE,
-			    VM_SLEEP);
-		}
-		dma_attr->dma_attr_align = saved_align;
-	}
-
-	/*
-	 * return success
-	 */
-	ASSERT(wcount > 0);
-	if (wcount == 1) {
-		hp->dmai_rflags &= ~DDI_DMA_PARTIAL;
-		rval = DDI_DMA_MAPPED;
-	} else if (hp->dmai_rflags & DDI_DMA_PARTIAL) {
-		rval = DDI_DMA_PARTIAL_MAP;
+		ap = (ddi_acc_impl_t *)hp->ah_platform_private;
+		ap->ahi_acc_attr |= DDI_ACCATTR_CPU_VADDR;
+		impl_acc_hdl_init(hp);
+		hp->ah_hat_flags = hat_acc_flags;
 	} else {
-		if (hp->dmai_segp)
-			kmem_free(hp->dmai_segp, hp->dmai_kmsize);
-		return (DDI_DMA_TOOBIG);
-	}
-	hp->dmai_nwin = wcount;
-	return (rval);
-bad:
-	hp->dmai_cookie = NULL;
-	if (hp->dmai_segp)
-		kmem_free(hp->dmai_segp, hp->dmai_kmsize);
-	if (rval == DDI_DMA_NORESOURCES 	&&
-	    dmareq->dmar_fp != DDI_DMA_DONTWAIT &&
-	    dmareq->dmar_fp != DDI_DMA_SLEEP)
-		ddi_set_callback(dmareq->dmar_fp, dmareq->dmar_arg,
-		    &dvma_call_list_id);
-	return (rval);
-}
-
-/*
- * This function works with the limit structure and does 32 bit arithmetic.
- */
-int
-rootnex_io_brkup_lim(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep,
-    ddi_dma_lim_t *dma_lim, struct priv_handle *php)
-{
-	impl_dma_segment_t *segmentp;
-	impl_dma_segment_t *curwinp;
-	impl_dma_segment_t *previousp;
-	impl_dma_segment_t *prewinp;
-	ddi_dma_impl_t *hp = 0;
-	caddr_t basevadr;
-	caddr_t segmentvadr;
-	uint64_t segmentpadr;
-	uint_t maxsegmentsize, sizesegment;
-	uint_t needintbuf;
-	uint_t offset;
-	uint_t residual_size;
-	uint_t sglistsize;
-	int nsegments;
-	int mapinfo;
-	int reqneedintbuf;
-	int rval;
-	int segment_flags, win_flags;
-	int sgcount;
-	int wcount;
-#ifdef DMADEBUG
-	int numsegments;
-#endif
-	int sizehandle;
-
-#ifdef lint
-	dip = dip;
-#endif
-
-	/*
-	 * Validate the dma request.
-	 */
-#ifdef DMADEBUG
-	if (dma_lim->dlim_adreg_max < MMU_PAGEOFFSET ||
-	    dma_lim->dlim_ctreg_max < MMU_PAGEOFFSET ||
-	    dma_lim->dlim_granular > MMU_PAGESIZE ||
-	    dma_lim->dlim_reqsize < MMU_PAGESIZE) {
-		DMAPRINT((" bad_limits\n"));
-		return (DDI_DMA_BADLIMITS);
-	}
-#endif
-
-	/*
-	 * Initialize our local variables from the php structure.
-	 * rootnex_get_phyaddr() has populated php structure on its
-	 * previous invocation in rootnex_dma_map().
-	 */
-	residual_size = OBJSIZE;
-	mapinfo = php->ph_mapinfo;
-	segmentpadr = php->ph_padr;
-	segmentvadr =  php->ph_vaddr;
-	basevadr = (mapinfo == DMAMI_PAGES) ? 0 : segmentvadr;
-	offset = segmentpadr & MMU_PAGEOFFSET;
-	if (dma_lim->dlim_sgllen <= 0 ||
-	    (offset & (dma_lim->dlim_minxfer - 1))) {
-		DMAPRINT((" bad_limits/mapping\n"));
-		rval = DDI_DMA_NOMAPPING;
-		goto bad;
+		hat_acc_flags = HAT_STRICTORDER;
 	}
 
-	maxsegmentsize = MIN(dma_lim->dlim_adreg_max,
-	    MIN((dma_lim->dlim_ctreg_max + 1) * dma_lim->dlim_minxfer,
-	    dma_lim->dlim_reqsize) - 1) + 1;
-	if (maxsegmentsize == 0)
-		maxsegmentsize = FOURG - 1;
-	if (maxsegmentsize < MMU_PAGESIZE) {
-		DMAPRINT((" bad_limits, maxsegmentsize\n"));
-		rval = DDI_DMA_BADLIMITS;
-		goto bad;
+	base = (ulong_t)rp->regspec_addr & (~MMU_PAGEOFFSET); /* base addr */
+	pgoffset = (ulong_t)rp->regspec_addr & MMU_PAGEOFFSET; /* offset */
+
+	if (rp->regspec_size == 0) {
+#ifdef  DDI_MAP_DEBUG
+		ddi_map_debug("rootnex_map_regspec: zero regspec_size\n");
+#endif  /* DDI_MAP_DEBUG */
+		return (DDI_ME_INVAL);
 	}
 
-
-	/*
-	 * The number of segments is the number of 4k pages that the
-	 * object spans.
-	 * Each 4k segment may need another segment to satisfy
-	 * device granularity reqirements.
-	 * We will never need more than two segments per page.
-	 * This may be an overestimate in some cases but it avoids
-	 * 64 bit divide operations.
-	 */
-	nsegments = (offset + residual_size + MMU_PAGEOFFSET) >>
-	    (MMU_PAGESHIFT - 1);
-
-#ifdef DMADEBUG
-	numsegments = nsegments;
-#endif
-	ASSERT(nsegments > 0);
-
-
-	sizehandle = sizeof (ddi_dma_impl_t) +
-		(nsegments * sizeof (impl_dma_segment_t));
-
-	hp = kmem_alloc(sizehandle,
-	    (dmareq->dmar_fp == DDI_DMA_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (!hp) {
-		rval = DDI_DMA_NORESOURCES;
-		goto bad;
-	}
-	hp->dmai_kmsize = sizehandle;
-
-	/*
-	 * locate segments after dma_impl handle structure
-	 */
-	segmentp = (impl_dma_segment_t *)(hp + 1);
-
-	/* FMA related initialization */
-	hp->dmai_fault = 0;
-	hp->dmai_fault_check = NULL;
-	hp->dmai_fault_notify = NULL;
-	hp->dmai_error.err_ena = 0;
-	hp->dmai_error.err_status = DDI_FM_OK;
-	hp->dmai_error.err_expected = DDI_FM_ERR_UNEXPECTED;
-	hp->dmai_error.err_ontrap = NULL;
-	hp->dmai_error.err_fep = NULL;
-
-	/*
-	 * Save requestor's information
-	 */
-	hp->dmai_minxfer = dma_lim->dlim_minxfer;
-	hp->dmai_burstsizes = dma_lim->dlim_burstsizes;
-	hp->dmai_rdip = rdip;
-	hp->dmai_mctl = rootnex_dma_mctl;
-	hp->dmai_wins = NULL;
-	hp->dmai_kaddr = hp->dmai_ibufp = NULL;
-	hp->dmai_hds = prewinp = segmentp;
-	hp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS;
-	hp->dmai_minfo = (void *)(uintptr_t)mapinfo;
-	hp->dmai_object = dmareq->dmar_object;
-
-	/*
-	 * Breakup the memory object
-	 * and build an i/o segment at each boundary condition
-	 */
-	curwinp = 0;
-	needintbuf = 0;
-	previousp = 0;
-	reqneedintbuf = 0;
-	sglistsize = 0;
-	wcount = 0;
-	sgcount = 1;
-	do {
-		sizesegment =
-		    MIN(((uint_t)MMU_PAGESIZE - offset), residual_size);
-		segment_flags = (segmentpadr > AHI_LIM) ? DMAIS_NEEDINTBUF : 0;
-
-		if (dma_lim->dlim_sgllen == 1) {
-			/*
-			 * _no_ scatter/gather capability,
-			 * so ensure that size of each segment is a
-			 * multiple of dlim_granular (== sector size)
-			 */
-			if ((segmentpadr & (dma_lim->dlim_granular - 1)) &&
-			    residual_size != sizesegment) {
-				/*
-				 * this segment needs an intermediate buffer
-				 */
-				sizesegment =
-				    MIN((uint_t)MMU_PAGESIZE, residual_size);
-				segment_flags |= DMAIS_NEEDINTBUF;
-			}
-		}
-
-		if (previousp &&
-		    (previousp->_pdmu._dmais_lpd + previousp->dmais_size) ==
-		    segmentpadr &&
-		    (previousp->dmais_flags &
-		    (DMAIS_NEEDINTBUF | DMAIS_COMPLEMENT)) == 0 &&
-		    (segment_flags & DMAIS_NEEDINTBUF) == 0 &&
-		    (previousp->dmais_size + sizesegment) <= maxsegmentsize &&
-		    (segmentpadr & dma_lim->dlim_adreg_max) &&
-		    (sglistsize + sizesegment) <= dma_lim->dlim_reqsize) {
-			/*
-			 * combine new segment with previous segment
-			 */
-			previousp->dmais_flags |= segment_flags;
-			previousp->dmais_size += sizesegment;
-			if ((sglistsize += sizesegment) ==
-			    dma_lim->dlim_reqsize)
-				/*
-				 * force end of scatter/gather list
-				 */
-				sgcount = dma_lim->dlim_sgllen + 1;
-		} else {
-			/*
-			 * add new segment to linked list
-			 */
-			if (previousp) {
-				previousp->dmais_link = segmentp;
-			}
-			segmentp->dmais_hndl = hp;
-			if (curwinp == 0) {
-				prewinp->_win._dmais_nex =
-				    curwinp = segmentp;
-				segment_flags |= DMAIS_WINSTRT;
-				win_flags = segment_flags;
-				wcount++;
-			} else {
-				segmentp->_win._dmais_cur = curwinp;
-				win_flags |= segment_flags;
-			}
-			segmentp->dmais_ofst = segmentvadr - basevadr;
-			if (mapinfo == DMAMI_PAGES) {
-				segmentp->_vdmu._dmais_pp = php->ph_u.pp;
-			} else {
-				segmentp->_vdmu._dmais_va = segmentvadr;
-			}
-			segmentp->_pdmu._dmais_lpd = segmentpadr;
-			segmentp->dmais_flags = (ushort_t)segment_flags;
-
-			if (dma_lim->dlim_sgllen > 1) {
-				if (segment_flags & DMAIS_NEEDINTBUF) {
-					needintbuf += ptob(btopr(sizesegment));
-					if (needintbuf >= MAX_INT_BUF) {
-						/*
-						 * limit size of intermediate
-						 * buffer
-						 */
-						reqneedintbuf = MAX_INT_BUF;
-						needintbuf = 0;
-						/*
-						 * end of current window
-						 */
-						segmentp->dmais_flags |=
-						    DMAIS_WINEND;
-						prewinp = curwinp;
-						curwinp->dmais_flags |=
-						    DMAIS_WINUIB;
-						curwinp = NULL;
-						/*
-						 * force end of scatter/gather
-						 * list
-						 */
-						sgcount = dma_lim->dlim_sgllen;
-					}
-				}
-				sglistsize += sizesegment;
-				if (sglistsize >= dma_lim->dlim_reqsize) {
-					/*
-					 * limit size of xfer
-					 */
-					sizesegment -= (sglistsize -
-					    dma_lim->dlim_reqsize);
-					sglistsize = dma_lim->dlim_reqsize;
-					sgcount = dma_lim->dlim_sgllen;
-				}
-				sgcount++;
-			} else {
-				/*
-				 * _no_ scatter/gather capability,
-				 */
-				if (segment_flags & DMAIS_NEEDINTBUF) {
-					/*
-					 * end of window
-					 */
-					needintbuf = MMU_PAGESIZE;
-					segmentp->dmais_flags |= DMAIS_WINEND;
-					prewinp = curwinp;
-					curwinp->dmais_flags |= DMAIS_WINUIB;
-					curwinp = NULL;
-				}
-			}
-			segmentp->dmais_size = sizesegment;
-			previousp = segmentp++;
-			--nsegments;
-		}
-
-		if (sgcount > dma_lim->dlim_sgllen) {
-			/*
-			 * end of a scatter/gather list!
-			 * ensure that total length of list is a
-			 * multiple of granular (sector size)
-			 */
-			if (sizesegment != residual_size) {
-				uint_t trim;
-
-				trim = sglistsize &
-				    (dma_lim->dlim_granular - 1);
-				if (trim >= sizesegment) {
-					cmn_err(CE_WARN,
-					    "unable to reduce segment size");
-					rval = DDI_DMA_NOMAPPING;
-					goto bad;
-				}
-				previousp->dmais_size -= trim;
-				sizesegment -= trim;
-				/* start new scatter/gather list */
-				sgcount = 1;
-				sglistsize = 0;
-			}
-			previousp->dmais_flags |= DMAIS_COMPLEMENT;
-		}
-		if (sizesegment && (residual_size -= sizesegment)) {
-			segmentpadr =
-			    rootnex_get_phyaddr(dmareq, sizesegment, php);
-			offset = segmentpadr & MMU_PAGEOFFSET;
-			segmentvadr += sizesegment;
-		}
-	} while (residual_size && nsegments);
-	ASSERT(residual_size == 0);
-
-	previousp->dmais_link = NULL;
-	previousp->dmais_flags |= DMAIS_WINEND;
-	if (curwinp) {
-		if (win_flags & DMAIS_NEEDINTBUF)
-			curwinp->dmais_flags |= DMAIS_WINUIB;
-		curwinp->_win._dmais_nex = NULL;
-	} else
-		prewinp->_win._dmais_nex = NULL;
-
-	if ((needintbuf = MAX(needintbuf, reqneedintbuf)) != 0) {
-		ddi_dma_attr_t dma_attr;
-
-
-		dma_attr.dma_attr_version = DMA_ATTR_V0;
-		dma_attr.dma_attr_addr_lo = dma_lim->dlim_addr_lo;
-		dma_attr.dma_attr_addr_hi = dma_lim->dlim_addr_hi;
-		dma_attr.dma_attr_minxfer = dma_lim->dlim_minxfer;
-		dma_attr.dma_attr_seg = dma_lim->dlim_adreg_max;
-		dma_attr.dma_attr_count_max = dma_lim->dlim_ctreg_max;
-		dma_attr.dma_attr_granular = dma_lim->dlim_granular;
-		dma_attr.dma_attr_sgllen = dma_lim->dlim_sgllen;
-		dma_attr.dma_attr_maxxfer = dma_lim->dlim_reqsize;
-		dma_attr.dma_attr_burstsizes = dma_lim->dlim_burstsizes;
-		dma_attr.dma_attr_align = MMU_PAGESIZE;
-		dma_attr.dma_attr_flags = 0;
-
-		/*
-		 * Allocate intermediate buffer.
-		 */
-		if (i_ddi_mem_alloc(dip, &dma_attr, needintbuf,
-		    (dmareq->dmar_fp == DDI_DMA_SLEEP) ? 0x1 : 0, 1, 0,
-		    &hp->dmai_ibufp, (ulong_t *)&hp->dmai_ibfsz,
-		    NULL) != DDI_SUCCESS) {
-			rval = DDI_DMA_NORESOURCES;
-			goto bad;
-		}
-		if (mapinfo != DMAMI_KVADR) {
-			hp->dmai_kaddr = vmem_alloc(heap_arena, PAGESIZE,
-			    VM_SLEEP);
-		}
-	}
-
-	/*
-	 * return success
-	 */
-#ifdef DMADEBUG
-	DMAPRINT(("dma_brkup: handle %p nsegments %x \n",
-	    (void *)hp, numsegments - nsegments));
-#endif
-	hp->dmai_cookie = NULL;
-	*handlep = (ddi_dma_handle_t)hp;
-	return (DDI_DMA_MAPPED);
-bad:
-	if (hp)
-		kmem_free(hp, hp->dmai_kmsize);
-	if (rval == DDI_DMA_NORESOURCES 	&&
-	    dmareq->dmar_fp != DDI_DMA_DONTWAIT &&
-	    dmareq->dmar_fp != DDI_DMA_SLEEP)
-		ddi_set_callback(dmareq->dmar_fp, dmareq->dmar_arg,
-		    &dvma_call_list_id);
-	return (rval);
-}
-
-int
-rootnex_io_wtsync(ddi_dma_impl_t *hp, int type)
-{
-	impl_dma_segment_t *sp = hp->dmai_wins;
-	caddr_t	kviradr, addr;
-	caddr_t vsrc;
-	ulong_t segoffset, vsoffset;
-	int cpycnt;
-
-	addr = hp->dmai_ibufp;
-	if ((uintptr_t)addr & MMU_PAGEOFFSET) {
-		addr = (caddr_t)(((uintptr_t)addr + MMU_PAGEOFFSET) &
-		    ~MMU_PAGEOFFSET);
-	}
-	if ((sp->dmais_flags & DMAIS_WINUIB) == 0)
-		return (DDI_SUCCESS);
-
-	switch ((intptr_t)hp->dmai_minfo) {
-
-	case DMAMI_KVADR:
-		do if (sp->dmais_flags & DMAIS_NEEDINTBUF) {
-
-			if (hp->dmai_rflags & DDI_DMA_WRITE)
-				/*
-				 *  copy from segment to buffer
-				 */
-				bcopy(sp->_vdmu._dmais_va, addr,
-				    sp->dmais_size);
-			/*
-			 * save phys addr of intermediate buffer
-			 */
-			sp->_pdmu._dmais_lpd =
-				ptob64(hat_getpfnum(kas.a_hat, addr));
-			if (type == BIND) {
-				sp->dmais_cookie->dmac_laddress =
-					sp->_pdmu._dmais_lpd;
-			}
-			addr += MMU_PAGESIZE;
-		} while (!(sp->dmais_flags & DMAIS_WINEND) &&
-		    (sp = sp->dmais_link));
-		break;
-
-	case DMAMI_PAGES:
-		do if (sp->dmais_flags & DMAIS_NEEDINTBUF) {
-
-			if (hp->dmai_rflags & DDI_DMA_WRITE) {
-				/*
-				 * need to mapin page so we can have a
-				 * virtual address to do copying
-				 */
-				i86_pp_map(sp->_vdmu._dmais_pp, hp->dmai_kaddr);
-				/*
-				 *  copy from segment to buffer
-				 */
-				bcopy(hp->dmai_kaddr +
-				    (sp->dmais_ofst & MMU_PAGEOFFSET),
-				    addr, sp->dmais_size);
-				/*
-				 *  need to mapout page
-				 */
-				hat_unload(kas.a_hat, hp->dmai_kaddr,
-				    MMU_PAGESIZE, HAT_UNLOAD);
-			}
-			/*
-			 * save phys addr of intemediate buffer
-			 */
-			sp->_pdmu._dmais_lpd =
-				ptob64(hat_getpfnum(kas.a_hat, addr));
-			if (type == BIND) {
-				sp->dmais_cookie->dmac_laddress =
-					sp->_pdmu._dmais_lpd;
-			}
-			addr += MMU_PAGESIZE;
-		} while (!(sp->dmais_flags & DMAIS_WINEND) &&
-		    (sp = sp->dmais_link));
-		break;
-
-	case DMAMI_UVADR:
-		do if (sp->dmais_flags & DMAIS_NEEDINTBUF) {
-
-			if (hp->dmai_rflags & DDI_DMA_WRITE) {
-				struct page **pplist;
-				segoffset = 0;
-				do {
-					/*
-					 * need to mapin page so we can have a
-					 * virtual address to do copying
-					 */
-					vsrc = sp->_vdmu._dmais_va + segoffset;
-					vsoffset =
-					    (ulong_t)vsrc & MMU_PAGEOFFSET;
-					pplist = hp->dmai_object.dmao_obj.
-							virt_obj.v_priv;
-					/*
-					 * check if we have to use the
-					 * shadow list or the CPU mapping.
-					 */
-					if (pplist != NULL) {
-						ulong_t base, off;
-
-						base = (ulong_t)hp->dmai_object.
-						    dmao_obj.virt_obj.v_addr;
-						off = (base & MMU_PAGEOFFSET) +
-							(ulong_t)vsrc - base;
-						i86_pp_map(pplist[btop(off)],
-							hp->dmai_kaddr);
-					} else {
-						i86_va_map(vsrc,
-						    hp->dmai_object.dmao_obj.
-							virt_obj.v_as,
-						    hp->dmai_kaddr);
-					}
-					kviradr = hp->dmai_kaddr + vsoffset;
-					cpycnt = sp->dmais_size - segoffset;
-					if (vsoffset + cpycnt > MMU_PAGESIZE)
-						cpycnt = MMU_PAGESIZE -
-						    vsoffset;
-					/*
-					 *  copy from segment to buffer
-					 */
-					bcopy(kviradr, addr + segoffset,
-					    cpycnt);
-					/*
-					 *  need to mapout page
-					 */
-					hat_unload(kas.a_hat, hp->dmai_kaddr,
-					    MMU_PAGESIZE, HAT_UNLOAD);
-					segoffset += cpycnt;
-				} while (segoffset < sp->dmais_size);
-			}
-			/*
-			 * save phys addr of intermediate buffer
-			 */
-			sp->_pdmu._dmais_lpd =
-				ptob64(hat_getpfnum(kas.a_hat, addr));
-			if (type == BIND) {
-				sp->dmais_cookie->dmac_laddress =
-					sp->_pdmu._dmais_lpd;
-			}
-			addr += MMU_PAGESIZE;
-		} while (!(sp->dmais_flags & DMAIS_WINEND) &&
-		    (sp = sp->dmais_link));
-		break;
-
-	default:
-		cmn_err(CE_WARN, "Invalid dma handle/map info");
-	}
-	return (DDI_SUCCESS);
-}
-
-int
-rootnex_io_rdsync(ddi_dma_impl_t *hp)
-{
-	impl_dma_segment_t *sp = hp->dmai_wins;
-	caddr_t	kviradr;
-	caddr_t vdest, addr;
-	ulong_t segoffset, vdoffset;
-	int cpycnt;
-
-	addr = hp->dmai_ibufp;
-	if ((uintptr_t)addr & MMU_PAGEOFFSET) {
-	    addr = (caddr_t)
-		(((uintptr_t)addr + MMU_PAGEOFFSET) & ~MMU_PAGEOFFSET);
-	}
-	if (!(sp->dmais_flags & DMAIS_WINUIB) ||
-			!(hp->dmai_rflags & DDI_DMA_READ))
-		return (DDI_SUCCESS);
-
-	switch ((intptr_t)hp->dmai_minfo) {
-
-	case DMAMI_KVADR:
-		do if (sp->dmais_flags & DMAIS_NEEDINTBUF) {
-			/*
-			 *  copy from buffer to segment
-			 */
-			bcopy(addr, sp->_vdmu._dmais_va, sp->dmais_size);
-			addr += MMU_PAGESIZE;
-		} while (!(sp->dmais_flags & DMAIS_WINEND) &&
-		    (sp = sp->dmais_link));
-		break;
-
-	case DMAMI_PAGES:
-		do if (sp->dmais_flags & DMAIS_NEEDINTBUF) {
-			/*
-			 * need to mapin page
-			 */
-			i86_pp_map(sp->_vdmu._dmais_pp, hp->dmai_kaddr);
-			/*
-			 *  copy from buffer to segment
-			 */
-			bcopy(addr,
-			    (hp->dmai_kaddr +
-				(sp->dmais_ofst & MMU_PAGEOFFSET)),
-			    sp->dmais_size);
-
-			/*
-			 *  need to mapout page
-			 */
-			hat_unload(kas.a_hat, hp->dmai_kaddr,
-			    MMU_PAGESIZE, HAT_UNLOAD);
-			addr += MMU_PAGESIZE;
-		} while (!(sp->dmais_flags & DMAIS_WINEND) &&
-		    (sp = sp->dmais_link));
-		break;
-
-	case DMAMI_UVADR:
-		do if (sp->dmais_flags & DMAIS_NEEDINTBUF) {
-			struct page **pplist;
-			segoffset = 0;
-			do {
-				/*
-				 * need to map_in user virtual address
-				 */
-				vdest = sp->_vdmu._dmais_va + segoffset;
-				vdoffset = (ulong_t)vdest & MMU_PAGEOFFSET;
-				pplist = hp->dmai_object.dmao_obj.
-						virt_obj.v_priv;
-				/*
-				 * check if we have to use the
-				 * shadow list or the CPU mapping.
-				 */
-				if (pplist != NULL) {
-					ulong_t base, off;
-
-					base = (ulong_t)hp->dmai_object.
-						dmao_obj.virt_obj.v_addr;
-					off = (base & MMU_PAGEOFFSET) +
-						(ulong_t)vdest - base;
-					i86_pp_map(pplist[btop(off)],
-						hp->dmai_kaddr);
-				} else {
-					i86_va_map(vdest,
-					    hp->dmai_object.dmao_obj.
-						virt_obj.v_as,
-					    hp->dmai_kaddr);
-				}
-				kviradr = hp->dmai_kaddr + vdoffset;
-				cpycnt = sp->dmais_size - segoffset;
-				if (vdoffset + cpycnt > MMU_PAGESIZE)
-					cpycnt = MMU_PAGESIZE - vdoffset;
-				/*
-				 *  copy from buffer to segment
-				 */
-				bcopy(addr + segoffset, kviradr, cpycnt);
-				/*
-				 *  need to map_out page
-				 */
-				hat_unload(kas.a_hat, hp->dmai_kaddr,
-				    MMU_PAGESIZE, HAT_UNLOAD);
-				segoffset += cpycnt;
-			} while (segoffset < sp->dmais_size);
-			addr += MMU_PAGESIZE;
-		} while (!(sp->dmais_flags & DMAIS_WINEND) &&
-		    (sp = sp->dmais_link));
-		break;
-
-	default:
-		cmn_err(CE_WARN, "Invalid dma handle/map info");
-	}
-	return (DDI_SUCCESS);
-}
-
-static int
-rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t handle, enum ddi_dma_ctlops request,
-    off_t *offp, size_t *lenp,
-    caddr_t *objpp, uint_t cache_flags)
-{
-	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
-	impl_dma_segment_t *sp = (impl_dma_segment_t *)lenp;
-	impl_dma_segment_t *wp = (impl_dma_segment_t *)offp;
-#if !defined(__amd64)
-	ddi_dma_cookie_t *cp;
-#endif
-	int rval = DDI_SUCCESS;
-
-#ifdef lint
-	dip = dip;
-	rdip = rdip;
-#endif
-
-	DMAPRINT(("io_mctl: handle %p ", (void *)hp));
-
-	switch (request) {
-
-	case DDI_DMA_SEGTOC:
-#if defined(__amd64)
-		/*
-		 * ddi_dma_segtocookie(9F) is Obsolete, and the whole
-		 * passing-the-pointer-through-the-cache-flags thing just
-		 * doesn't work when pointers are 64-bit and cache_flags
-		 * are 32-bit.
-		 */
-		DMAPRINT(("stoc invoked but not implemented.\n"));
-		return (DDI_FAILURE);
-#else
-		/* return device specific dma cookie for segment */
-		sp = (impl_dma_segment_t *)(uintptr_t)cache_flags;
-		if (!sp) {
-			DMAPRINT(("stoc segment %p end\n", (void *)sp));
-			return (DDI_FAILURE);
-		}
-		cp = (ddi_dma_cookie_t *)objpp;
-
-		/*
-		 * use phys addr of actual buffer or intermediate buffer
-		 */
-		cp->dmac_laddress = sp->_pdmu._dmais_lpd;
-
-		DMAPRINT(("stoc segment %p mapping %lx size %lx\n",
-		    (void *)sp, (ulong_t)sp->_vdmu._dmais_va, sp->dmais_size));
-
-		cp->dmac_type = (ulong_t)sp;
-		*lenp = cp->dmac_size = sp->dmais_size;
-		*offp = sp->dmais_ofst;
-		return (DDI_SUCCESS);
-#endif
-
-	case DDI_DMA_NEXTSEG:	/* get next DMA segment	*/
-		ASSERT(wp->dmais_flags & DMAIS_WINSTRT);
-		if (wp != hp->dmai_wins) {
-			DMAPRINT(("nxseg: not current window %p\n",
-			    (void *)wp));
-			return (DDI_DMA_STALE);
-		}
-		if (!sp) {
-			/*
-			 * reset to first segment in current window
-			 */
-			*objpp = (caddr_t)wp;
-		} else {
-			if (sp->dmais_flags & DMAIS_WINEND) {
-				DMAPRINT(("nxseg: seg %p eow\n", (void *)sp));
-				return (DDI_DMA_DONE);
-			}
-			/* check if segment is really in window */
-			ASSERT((sp->dmais_flags & DMAIS_WINSTRT) && sp == wp ||
-			    !(sp->dmais_flags & DMAIS_WINSTRT) &&
-			    sp->_win._dmais_cur == wp);
-			*objpp = (caddr_t)sp->dmais_link;
-		}
-		DMAPRINT(("nxseg: new seg %p\n", (void *)*objpp));
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_NEXTWIN:	/* get next DMA window	*/
-		if (hp->dmai_wins && hp->dmai_ibufp)
-			/*
-			 * do implied sync on current window
-			 */
-			(void) rootnex_io_rdsync(hp);
-		if (!wp) {
-			/*
-			 * reset to (first segment of) first window
-			 */
-			*objpp = (caddr_t)hp->dmai_hds;
-			DMAPRINT(("nxwin: first win %p\n", (void *)*objpp));
-		} else {
-			ASSERT(wp->dmais_flags & DMAIS_WINSTRT);
-			if (wp != hp->dmai_wins) {
-				DMAPRINT(("nxwin: win %p not current\n",
-				    (void *)wp));
-				return (DDI_DMA_STALE);
-			}
-			if (wp->_win._dmais_nex == 0) {
-				DMAPRINT(("nxwin: win %p end\n", (void *)wp));
-				return (DDI_DMA_DONE);
-			}
-			*objpp = (caddr_t)wp->_win._dmais_nex;
-			DMAPRINT(("nxwin: new win %p\n", (void *)*objpp));
-		}
-		hp->dmai_wins = (impl_dma_segment_t *)*objpp;
-		if (hp->dmai_ibufp)
-			return (rootnex_io_wtsync(hp, MAP));
-		return (DDI_SUCCESS);
-
-	case DDI_DMA_FREE:
-		DMAPRINT(("free handle\n"));
-		if (hp->dmai_ibufp) {
-			rval = rootnex_io_rdsync(hp);
-			ddi_mem_free(hp->dmai_ibufp);
-		}
-		if (hp->dmai_kaddr)
-			vmem_free(heap_arena, hp->dmai_kaddr, PAGESIZE);
-		kmem_free(hp, hp->dmai_kmsize);
-		if (dvma_call_list_id)
-			ddi_run_callback(&dvma_call_list_id);
-		break;
-
-	case DDI_DMA_IOPB_ALLOC:	/* get contiguous DMA-able memory */
-		DMAPRINT(("iopb alloc\n"));
-		rval = i_ddi_mem_alloc_lim(rdip, (ddi_dma_lim_t *)offp,
-		    *lenp, 0, 0, 0, objpp, NULL, NULL);
-		break;
-
-	case DDI_DMA_SMEM_ALLOC:	/* get contiguous DMA-able memory */
-		DMAPRINT(("mem alloc\n"));
-		rval = i_ddi_mem_alloc_lim(rdip, (ddi_dma_lim_t *)offp,
-		    *lenp, cache_flags, 1, 0, objpp, (uint_t *)handle, NULL);
-		break;
-
-	case DDI_DMA_KVADDR:
-		DMAPRINT(("kvaddr of phys mapping\n"));
-		return (DDI_FAILURE);
-
-	case DDI_DMA_GETERR:
-		DMAPRINT(("geterr\n"));
-		rval = DDI_FAILURE;
-		break;
-
-	case DDI_DMA_COFF:
-		DMAPRINT(("coff off %p mapping %llx size %lx\n",
-		    (void *)*objpp,
-		    (unsigned long long)hp->dmai_wins->_pdmu._dmais_lpd,
-		    hp->dmai_wins->dmais_size));
-		rval = DDI_FAILURE;
-		break;
-
-	default:
-		DMAPRINT(("unknown 0x%x\n", request));
-		return (DDI_FAILURE);
-	}
-	return (rval);
-}
-
-/*
- * Root nexus ctl functions
- */
-#define	REPORTDEV_BUFSIZE	1024
-
-static int
-rootnex_ctl_reportdev(dev_info_t *dev)
-{
-	int i, n, len, f_len = 0;
-	char *buf;
-
-	buf = kmem_alloc(REPORTDEV_BUFSIZE, KM_SLEEP);
-	f_len += snprintf(buf, REPORTDEV_BUFSIZE,
-	    "%s%d at root", ddi_driver_name(dev), ddi_get_instance(dev));
-	len = strlen(buf);
-
-	for (i = 0; i < sparc_pd_getnreg(dev); i++) {
-
-		struct regspec *rp = sparc_pd_getreg(dev, i);
-
-		if (i == 0)
-			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
-			    ": ");
-		else
-			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
-			    " and ");
-		len = strlen(buf);
-
-		switch (rp->regspec_bustype) {
-
-		case BTEISA:
-			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
-			    "%s 0x%x", DEVI_EISA_NEXNAME, rp->regspec_addr);
-			break;
-
-		case BTISA:
-			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
-			    "%s 0x%x", DEVI_ISA_NEXNAME, rp->regspec_addr);
-			break;
-
-		default:
-			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
-			    "space %x offset %x",
-			    rp->regspec_bustype, rp->regspec_addr);
-			break;
-		}
-		len = strlen(buf);
-	}
-	for (i = 0, n = sparc_pd_getnintr(dev); i < n; i++) {
-		int pri;
-
-		if (i != 0) {
-			f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
-			    ",");
-			len = strlen(buf);
-		}
-		pri = INT_IPL(sparc_pd_getintr(dev, i)->intrspec_pri);
-		f_len += snprintf(buf + len, REPORTDEV_BUFSIZE - len,
-		    " sparc ipl %d", pri);
-		len = strlen(buf);
-	}
-#ifdef DEBUG
-	if (f_len + 1 >= REPORTDEV_BUFSIZE) {
-		cmn_err(CE_NOTE, "next message is truncated: "
-		    "printed length 1024, real length %d", f_len);
-	}
-#endif /* DEBUG */
-	cmn_err(CE_CONT, "?%s\n", buf);
-	kmem_free(buf, REPORTDEV_BUFSIZE);
-	return (DDI_SUCCESS);
-}
-
-/*
- * For the x86 rootnexus, we're prepared to claim that the interrupt string
- * is in the form of a list of <ipl,vec> specifications.
- */
-
-#define	VEC_MIN	1
-#define	VEC_MAX	255
-static int
-rootnex_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, int *in,
-	struct ddi_parent_private_data *pdptr)
-{
-	size_t size;
-	int n;
-	struct intrspec *new;
-	caddr_t got_prop;
-	int *inpri;
-	int got_len;
-	extern int ignore_hardware_nodes;	/* force flag from ddi_impl.c */
-
-	static char bad_intr_fmt[] =
-	    "rootnex: bad interrupt spec from %s%d - ipl %d, irq %d\n";
-
-#ifdef	lint
-	dip = dip;
-#endif
-	/*
-	 * determine if the driver is expecting the new style "interrupts"
-	 * property which just contains the IRQ, or the old style which
-	 * contains pairs of <IPL,IRQ>.  if it is the new style, we always
-	 * assign IPL 5 unless an "interrupt-priorities" property exists.
-	 * in that case, the "interrupt-priorities" property contains the
-	 * IPL values that match, one for one, the IRQ values in the
-	 * "interrupts" property.
-	 */
-	inpri = NULL;
-	if ((ddi_getprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-	    "ignore-hardware-nodes", -1) != -1) ||
-	    ignore_hardware_nodes) {
-		/* the old style "interrupts" property... */
-
-		/*
-		 * The list consists of <ipl,vec> elements
-		 */
-		if ((n = (*in++ >> 1)) < 1)
-			return (DDI_FAILURE);
-
-		pdptr->par_nintr = n;
-		size = n * sizeof (struct intrspec);
-		new = pdptr->par_intr = kmem_zalloc(size, KM_SLEEP);
-
-		while (n--) {
-			int level = *in++;
-			int vec = *in++;
-
-			if (level < 1 || level > MAXIPL ||
-			    vec < VEC_MIN || vec > VEC_MAX) {
-				cmn_err(CE_CONT, bad_intr_fmt,
-				    DEVI(rdip)->devi_name,
-				    DEVI(rdip)->devi_instance, level, vec);
-				goto broken;
-			}
-			new->intrspec_pri = level;
-			if (vec != 2)
-				new->intrspec_vec = vec;
-			else
-				/*
-				 * irq 2 on the PC bus is tied to irq 9
-				 * on ISA, EISA and MicroChannel
-				 */
-				new->intrspec_vec = 9;
-			new++;
-		}
-
-		return (DDI_SUCCESS);
+	if (mp->map_flags & DDI_MF_DEVICE_MAPPING) {
+		*vaddrp = (caddr_t)mmu_btop(base);
 	} else {
-		/* the new style "interrupts" property... */
+		npages = mmu_btopr(rp->regspec_size + pgoffset);
+
+#ifdef	DDI_MAP_DEBUG
+		ddi_map_debug("rootnex_map_regspec: Mapping %d pages \
+physical %x ",
+		    npages, base);
+#endif	/* DDI_MAP_DEBUG */
+
+		cvaddr = device_arena_alloc(ptob(npages), VM_NOSLEEP);
+		if (cvaddr == NULL)
+			return (DDI_ME_NORESOURCES);
 
 		/*
-		 * The list consists of <vec> elements
+		 * Now map in the pages we've allocated...
 		 */
-		if ((n = (*in++)) < 1)
-			return (DDI_FAILURE);
-
-		pdptr->par_nintr = n;
-		size = n * sizeof (struct intrspec);
-		new = pdptr->par_intr = kmem_zalloc(size, KM_SLEEP);
-
-		/* XXX check for "interrupt-priorities" property... */
-		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-		    "interrupt-priorities", (caddr_t)&got_prop, &got_len)
-		    == DDI_PROP_SUCCESS) {
-			if (n != (got_len / sizeof (int))) {
-				cmn_err(CE_CONT,
-				    "rootnex: bad interrupt-priorities length"
-				    " from %s%d: expected %d, got %d\n",
-				    DEVI(rdip)->devi_name,
-				    DEVI(rdip)->devi_instance, n,
-				    (int)(got_len / sizeof (int)));
-				goto broken;
-			}
-			inpri = (int *)got_prop;
-		}
-
-		while (n--) {
-			int level;
-			int vec = *in++;
-
-			if (inpri == NULL)
-				level = 5;
-			else
-				level = *inpri++;
-
-			if (level < 1 || level > MAXIPL ||
-			    vec < VEC_MIN || vec > VEC_MAX) {
-				cmn_err(CE_CONT, bad_intr_fmt,
-				    DEVI(rdip)->devi_name,
-				    DEVI(rdip)->devi_instance, level, vec);
-				goto broken;
-			}
-			new->intrspec_pri = level;
-			if (vec != 2)
-				new->intrspec_vec = vec;
-			else
-				/*
-				 * irq 2 on the PC bus is tied to irq 9
-				 * on ISA, EISA and MicroChannel
-				 */
-				new->intrspec_vec = 9;
-			new++;
-		}
-
-		if (inpri != NULL)
-			kmem_free(got_prop, got_len);
-		return (DDI_SUCCESS);
+		hat_devload(kas.a_hat, cvaddr, mmu_ptob(npages), mmu_btop(base),
+		    mp->map_prot | hat_acc_flags, HAT_LOAD_LOCK);
+		*vaddrp = (caddr_t)cvaddr + pgoffset;
 	}
 
-broken:
-	kmem_free(pdptr->par_intr, size);
-	pdptr->par_intr = NULL;
-	pdptr->par_nintr = 0;
-	if (inpri != NULL)
-		kmem_free(got_prop, got_len);
-	return (DDI_FAILURE);
-}
-
-/*ARGSUSED*/
-static int
-rootnex_ctl_children(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
-    dev_info_t *child)
-{
-	extern int impl_ddi_sunbus_initchild(dev_info_t *);
-	extern void impl_ddi_sunbus_removechild(dev_info_t *);
-
-	switch (ctlop)  {
-	case DDI_CTLOPS_INITCHILD:
-		return (impl_ddi_sunbus_initchild(child));
-
-	case DDI_CTLOPS_UNINITCHILD:
-		impl_ddi_sunbus_removechild(child);
-		return (DDI_SUCCESS);
-	default:
-		return (DDI_FAILURE);
-	}
-}
-
-
-static int
-rootnex_ctlops_poke(peekpoke_ctlops_t *in_args)
-{
-	int err = DDI_SUCCESS;
-	on_trap_data_t otd;
-
-	/* Cautious access not supported. */
-	if (in_args->handle != NULL)
-		return (DDI_FAILURE);
-
-	mutex_enter(&pokefault_mutex);
-	pokefault = -1;
-
-	/* Set up protected environment. */
-	if (!on_trap(&otd, OT_DATA_ACCESS)) {
-		switch (in_args->size) {
-		case sizeof (uint8_t):
-			*(uint8_t *)in_args->dev_addr =
-			    *(uint8_t *)in_args->host_addr;
-			break;
-
-		case sizeof (uint16_t):
-			*(uint16_t *)in_args->dev_addr =
-			    *(uint16_t *)in_args->host_addr;
-			break;
-
-		case sizeof (uint32_t):
-			*(uint32_t *)in_args->dev_addr =
-			    *(uint32_t *)in_args->host_addr;
-			break;
-
-		case sizeof (uint64_t):
-			*(uint64_t *)in_args->dev_addr =
-			    *(uint64_t *)in_args->host_addr;
-			break;
-
-		default:
-			err = DDI_FAILURE;
-			break;
-		}
-	} else
-		err = DDI_FAILURE;
-
-	/* Take down protected environment. */
-	no_trap();
-
-	pokefault = 0;
-	mutex_exit(&pokefault_mutex);
-
-	return (err);
-}
-
-
-static int
-rootnex_ctlops_peek(peekpoke_ctlops_t *in_args, void *result)
-{
-	int err = DDI_SUCCESS;
-	on_trap_data_t otd;
-
-	/* Cautious access not supported. */
-	if (in_args->handle != NULL)
-		return (DDI_FAILURE);
-
-	if (!on_trap(&otd, OT_DATA_ACCESS)) {
-		switch (in_args->size) {
-		case sizeof (uint8_t):
-			*(uint8_t *)in_args->host_addr =
-			    *(uint8_t *)in_args->dev_addr;
-			break;
-
-		case sizeof (uint16_t):
-			*(uint16_t *)in_args->host_addr =
-			    *(uint16_t *)in_args->dev_addr;
-			break;
-
-		case sizeof (uint32_t):
-			*(uint32_t *)in_args->host_addr =
-			    *(uint32_t *)in_args->dev_addr;
-			break;
-
-		case sizeof (uint64_t):
-			*(uint64_t *)in_args->host_addr =
-			    *(uint64_t *)in_args->dev_addr;
-			break;
-
-		default:
-			err = DDI_FAILURE;
-			break;
-		}
-		result = (void *)in_args->host_addr;
-	} else
-		err = DDI_FAILURE;
-
-	no_trap();
-	return (err);
-}
-
-static int
-rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip,
-    ddi_ctl_enum_t ctlop, void *arg, void *result)
-{
-	int n, *ptr;
-	struct ddi_parent_private_data *pdp;
-
-	static boolean_t reserved_msg_printed = B_FALSE;
-
-	switch (ctlop) {
-	case DDI_CTLOPS_DMAPMAPC:
-		/*
-		 * Return 'partial' to indicate that dma mapping
-		 * has to be done in the main MMU.
-		 */
-		return (DDI_DMA_PARTIAL);
-
-	case DDI_CTLOPS_BTOP:
-		/*
-		 * Convert byte count input to physical page units.
-		 * (byte counts that are not a page-size multiple
-		 * are rounded down)
-		 */
-		*(ulong_t *)result = btop(*(ulong_t *)arg);
-		return (DDI_SUCCESS);
-
-	case DDI_CTLOPS_PTOB:
-		/*
-		 * Convert size in physical pages to bytes
-		 */
-		*(ulong_t *)result = ptob(*(ulong_t *)arg);
-		return (DDI_SUCCESS);
-
-	case DDI_CTLOPS_BTOPR:
-		/*
-		 * Convert byte count input to physical page units
-		 * (byte counts that are not a page-size multiple
-		 * are rounded up)
-		 */
-		*(ulong_t *)result = btopr(*(ulong_t *)arg);
-		return (DDI_SUCCESS);
-
-	case DDI_CTLOPS_POKE:
-		return (rootnex_ctlops_poke((peekpoke_ctlops_t *)arg));
-
-	case DDI_CTLOPS_PEEK:
-		return (rootnex_ctlops_peek((peekpoke_ctlops_t *)arg, result));
-
-	case DDI_CTLOPS_INITCHILD:
-	case DDI_CTLOPS_UNINITCHILD:
-		return (rootnex_ctl_children(dip, rdip, ctlop, arg));
-
-	case DDI_CTLOPS_REPORTDEV:
-		return (rootnex_ctl_reportdev(rdip));
-
-	case DDI_CTLOPS_IOMIN:
-		/*
-		 * Nothing to do here but reflect back..
-		 */
-		return (DDI_SUCCESS);
-
-	case DDI_CTLOPS_REGSIZE:
-	case DDI_CTLOPS_NREGS:
-	case DDI_CTLOPS_NINTRS:
-		break;
-
-	case DDI_CTLOPS_SIDDEV:
-		if (ndi_dev_is_prom_node(rdip))
-			return (DDI_SUCCESS);
-		if (ndi_dev_is_persistent_node(rdip))
-			return (DDI_SUCCESS);
-		return (DDI_FAILURE);
-
-	case DDI_CTLOPS_INTR_HILEVEL:
-		/*
-		 * Indicate whether the interrupt specified is to be handled
-		 * above lock level.  In other words, above the level that
-		 * cv_signal and default type mutexes can be used.
-		 */
-		*(int *)result =
-		    (INT_IPL(((struct intrspec *)arg)->intrspec_pri)
-		    > LOCK_LEVEL);
-		return (DDI_SUCCESS);
-
-	case DDI_CTLOPS_XLATE_INTRS:
-		return (rootnex_xlate_intrs(dip, rdip, arg, result));
-
-	case DDI_CTLOPS_POWER:
-		return ((*pm_platform_power)((power_req_t *)arg));
-
-	case DDI_CTLOPS_RESERVED1: /* Was DDI_CTLOPS_POKE_INIT, obsolete */
-	case DDI_CTLOPS_RESERVED2: /* Was DDI_CTLOPS_POKE_FLUSH, obsolete */
-	case DDI_CTLOPS_RESERVED3: /* Was DDI_CTLOPS_POKE_FINI, obsolete */
-		if (!reserved_msg_printed) {
-			reserved_msg_printed = B_TRUE;
-			cmn_err(CE_WARN, "Failing ddi_ctlops call(s) for "
-			    "1 or more reserved/obsolete operations.");
-		}
-		return (DDI_FAILURE);
-
-	default:
-		return (DDI_FAILURE);
-	}
-	/*
-	 * The rest are for "hardware" properties
-	 */
-	if ((pdp = ddi_get_parent_data(rdip)) == NULL)
-		return (DDI_FAILURE);
-
-	if (ctlop == DDI_CTLOPS_NREGS) {
-		ptr = (int *)result;
-		*ptr = pdp->par_nreg;
-	} else if (ctlop == DDI_CTLOPS_NINTRS) {
-		ptr = (int *)result;
-		*ptr = pdp->par_nintr;
-	} else {
-		off_t *size = (off_t *)result;
-
-		ptr = (int *)arg;
-		n = *ptr;
-		if (n >= pdp->par_nreg) {
-			return (DDI_FAILURE);
-		}
-		*size = (off_t)pdp->par_reg[n].regspec_size;
-	}
+#ifdef	DDI_MAP_DEBUG
+	ddi_map_debug("at virtual 0x%x\n", *vaddrp);
+#endif	/* DDI_MAP_DEBUG */
 	return (DDI_SUCCESS);
 }
 
-/*
- * rootnex_get_ispec:
- *	convert an interrupt number to an interrupt specification.
- *	The interrupt number determines which interrupt spec will be
- *	returned if more than one exists.
- *
- *	Look into the parent private data area of the 'rdip' to find out
- *	the interrupt specification.  First check to make sure there is
- *	one that matchs "inumber" and then return a pointer to it.
- *
- *	Return NULL if one could not be found.
- *
- *	NOTE: This is needed for rootnex_intr_ops()
- */
-static struct intrspec *
-rootnex_get_ispec(dev_info_t *rdip, int inum)
-{
-	struct ddi_parent_private_data *pdp = ddi_get_parent_data(rdip);
 
-	/*
-	 * Special case handling for drivers that provide their own
-	 * intrspec structures instead of relying on the DDI framework.
-	 *
-	 * A broken hardware driver in ON could potentially provide its
-	 * own intrspec structure, instead of relying on the hardware.
-	 * If these drivers are children of 'rootnex' then we need to
-	 * continue to provide backward compatibility to them here.
-	 *
-	 * Following check is a special case for 'pcic' driver which
-	 * was found to have broken hardwre andby provides its own intrspec.
-	 *
-	 * Verbatim comments from this driver are shown here:
-	 * "Don't use the ddi_add_intr since we don't have a
-	 * default intrspec in all cases."
-	 *
-	 * Since an 'ispec' may not be always created for it,
-	 * check for that and create one if so.
-	 *
-	 * NOTE: Currently 'pcic' is the only driver found to do this.
-	 */
-	if (!pdp->par_intr && strcmp(ddi_get_name(rdip), "pcic") == 0) {
-		pdp->par_nintr = 1;
-		pdp->par_intr = kmem_zalloc(sizeof (struct intrspec) *
-		    pdp->par_nintr, KM_SLEEP);
+/*
+ * rootnex_unmap_regspec()
+ *
+ */
+static int
+rootnex_unmap_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
+{
+	caddr_t addr = (caddr_t)*vaddrp;
+	uint_t npages, pgoffset;
+	struct regspec *rp;
+
+	if (mp->map_flags & DDI_MF_DEVICE_MAPPING)
+		return (0);
+
+	rp = mp->map_obj.rp;
+
+	if (rp->regspec_size == 0) {
+#ifdef  DDI_MAP_DEBUG
+		ddi_map_debug("rootnex_unmap_regspec: zero regspec_size\n");
+#endif  /* DDI_MAP_DEBUG */
+		return (DDI_ME_INVAL);
 	}
 
-	/* Validate the interrupt number */
-	if (inum >= pdp->par_nintr)
-		return (NULL);
+	/*
+	 * I/O or memory mapping:
+	 *
+	 *	<bustype=0, addr=x, len=x>: memory
+	 *	<bustype=1, addr=x, len=x>: i/o
+	 *	<bustype>1, addr=0, len=x>: x86-compatibility i/o
+	 */
+	if (rp->regspec_bustype != 0) {
+		/*
+		 * This is I/O space, which requires no particular
+		 * processing on unmap since it isn't mapped in the
+		 * first place.
+		 */
+		return (DDI_SUCCESS);
+	}
 
-	/* Get the interrupt structure pointer and return that */
-	return ((struct intrspec *)&pdp->par_intr[inum]);
+	/*
+	 * Memory space
+	 */
+	pgoffset = (uintptr_t)addr & MMU_PAGEOFFSET;
+	npages = mmu_btopr(rp->regspec_size + pgoffset);
+	hat_unload(kas.a_hat, addr - pgoffset, ptob(npages), HAT_UNLOAD_UNLOCK);
+	device_arena_free(addr - pgoffset, ptob(npages));
+
+	/*
+	 * Destroy the pointer - the mapping has logically gone
+	 */
+	*vaddrp = NULL;
+
+	return (DDI_SUCCESS);
 }
 
 
 /*
- * rootnex_intr_ops:
+ * rootnex_map_handle()
+ *
+ */
+static int
+rootnex_map_handle(ddi_map_req_t *mp)
+{
+	ddi_acc_hdl_t *hp;
+	ulong_t base;
+	uint_t pgoffset;
+	struct regspec *rp;
+
+	rp = mp->map_obj.rp;
+
+#ifdef	DDI_MAP_DEBUG
+	ddi_map_debug(
+	    "rootnex_map_handle: <0x%x 0x%x 0x%x> handle 0x%x\n",
+	    rp->regspec_bustype, rp->regspec_addr,
+	    rp->regspec_size, mp->map_handlep);
+#endif	/* DDI_MAP_DEBUG */
+
+	/*
+	 * I/O or memory mapping:
+	 *
+	 *	<bustype=0, addr=x, len=x>: memory
+	 *	<bustype=1, addr=x, len=x>: i/o
+	 *	<bustype>1, addr=0, len=x>: x86-compatibility i/o
+	 */
+	if (rp->regspec_bustype != 0) {
+		/*
+		 * This refers to I/O space, and we don't support "mapping"
+		 * I/O space to a user.
+		 */
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Set up the hat_flags for the mapping.
+	 */
+	hp = mp->map_handlep;
+
+	switch (hp->ah_acc.devacc_attr_endian_flags) {
+	case DDI_NEVERSWAP_ACC:
+		hp->ah_hat_flags = HAT_NEVERSWAP | HAT_STRICTORDER;
+		break;
+	case DDI_STRUCTURE_LE_ACC:
+		hp->ah_hat_flags = HAT_STRUCTURE_LE;
+		break;
+	case DDI_STRUCTURE_BE_ACC:
+		return (DDI_FAILURE);
+	default:
+		return (DDI_REGS_ACC_CONFLICT);
+	}
+
+	switch (hp->ah_acc.devacc_attr_dataorder) {
+	case DDI_STRICTORDER_ACC:
+		break;
+	case DDI_UNORDERED_OK_ACC:
+		hp->ah_hat_flags |= HAT_UNORDERED_OK;
+		break;
+	case DDI_MERGING_OK_ACC:
+		hp->ah_hat_flags |= HAT_MERGING_OK;
+		break;
+	case DDI_LOADCACHING_OK_ACC:
+		hp->ah_hat_flags |= HAT_LOADCACHING_OK;
+		break;
+	case DDI_STORECACHING_OK_ACC:
+		hp->ah_hat_flags |= HAT_STORECACHING_OK;
+		break;
+	default:
+		return (DDI_FAILURE);
+	}
+
+	base = (ulong_t)rp->regspec_addr & (~MMU_PAGEOFFSET); /* base addr */
+	pgoffset = (ulong_t)rp->regspec_addr & MMU_PAGEOFFSET; /* offset */
+
+	if (rp->regspec_size == 0)
+		return (DDI_ME_INVAL);
+
+	hp->ah_pfn = mmu_btop(base);
+	hp->ah_pnum = mmu_btopr(rp->regspec_size + pgoffset);
+
+	return (DDI_SUCCESS);
+}
+
+
+
+/*
+ * ************************
+ *  interrupt related code
+ * ************************
+ */
+
+/*
+ * rootnex_intr_ops()
  *	bus_intr_op() function for interrupt support
  */
 /* ARGSUSED */
@@ -3231,87 +1538,3033 @@ rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 
 /*
- * Get the physical address of an object described by "dmareq".
- * A "segsize" of zero is used to initialize the priv_handle *php.
- * Subsequent calls with a non zero "segsize" would get the corresponding
- * physical address of the dma object.
- * The function returns a 64 bit physical address.
+ * rootnex_get_ispec()
+ *	convert an interrupt number to an interrupt specification.
+ *	The interrupt number determines which interrupt spec will be
+ *	returned if more than one exists.
+ *
+ *	Look into the parent private data area of the 'rdip' to find out
+ *	the interrupt specification.  First check to make sure there is
+ *	one that matchs "inumber" and then return a pointer to it.
+ *
+ *	Return NULL if one could not be found.
+ *
+ *	NOTE: This is needed for rootnex_intr_ops()
  */
-uint64_t
-rootnex_get_phyaddr(struct ddi_dma_req *dmareq, uint_t segsize,
-    struct priv_handle *php)
+static struct intrspec *
+rootnex_get_ispec(dev_info_t *rdip, int inum)
 {
-	size_t	offset;
-	page_t	*pp, **pplist;
-	caddr_t  vaddr, bvaddr;
-	struct as *asp;
-	int	index;
-	uint64_t segmentpadr;
+	struct ddi_parent_private_data *pdp = ddi_get_parent_data(rdip);
 
-	switch (dmareq->dmar_object.dmao_type) {
-	case DMA_OTYP_PAGES:
-		if (segsize) {
-			pp = php->ph_u.pp;
-			vaddr = php->ph_vaddr;
-			offset = (uintptr_t)vaddr & MMU_PAGEOFFSET;
-			vaddr += segsize;
-			if ((offset += segsize) >= MMU_PAGESIZE) {
-				/*
-				 * crossed page boundary, get to the next page.
-				 */
-				offset &= MMU_PAGEOFFSET;
-				pp = pp->p_next;
+	/*
+	 * Special case handling for drivers that provide their own
+	 * intrspec structures instead of relying on the DDI framework.
+	 *
+	 * A broken hardware driver in ON could potentially provide its
+	 * own intrspec structure, instead of relying on the hardware.
+	 * If these drivers are children of 'rootnex' then we need to
+	 * continue to provide backward compatibility to them here.
+	 *
+	 * Following check is a special case for 'pcic' driver which
+	 * was found to have broken hardwre andby provides its own intrspec.
+	 *
+	 * Verbatim comments from this driver are shown here:
+	 * "Don't use the ddi_add_intr since we don't have a
+	 * default intrspec in all cases."
+	 *
+	 * Since an 'ispec' may not be always created for it,
+	 * check for that and create one if so.
+	 *
+	 * NOTE: Currently 'pcic' is the only driver found to do this.
+	 */
+	if (!pdp->par_intr && strcmp(ddi_get_name(rdip), "pcic") == 0) {
+		pdp->par_nintr = 1;
+		pdp->par_intr = kmem_zalloc(sizeof (struct intrspec) *
+		    pdp->par_nintr, KM_SLEEP);
+	}
+
+	/* Validate the interrupt number */
+	if (inum >= pdp->par_nintr)
+		return (NULL);
+
+	/* Get the interrupt structure pointer and return that */
+	return ((struct intrspec *)&pdp->par_intr[inum]);
+}
+
+
+/*
+ * rootnex_xlate_intrs()
+ *     For the x86 rootnexus, we're prepared to claim that the interrupt string
+ *     is in the form of a list of <ipl,vec> specifications.
+ */
+static int
+rootnex_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, int *in,
+    struct ddi_parent_private_data *pdptr)
+{
+	size_t size;
+	int n;
+	struct intrspec *new;
+	caddr_t got_prop;
+	int *inpri;
+	int got_len;
+
+	static char bad_intr_fmt[] =
+	    "rootnex: bad interrupt spec from %s%d - ipl %d, irq %d\n";
+
+#ifdef	lint
+	dip = dip;
+#endif
+	/*
+	 * determine if the driver is expecting the new style "interrupts"
+	 * property which just contains the IRQ, or the old style which
+	 * contains pairs of <IPL,IRQ>.  if it is the new style, we always
+	 * assign IPL 5 unless an "interrupt-priorities" property exists.
+	 * in that case, the "interrupt-priorities" property contains the
+	 * IPL values that match, one for one, the IRQ values in the
+	 * "interrupts" property.
+	 */
+	inpri = NULL;
+	if ((ddi_getprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
+	    "ignore-hardware-nodes", -1) != -1) ||
+	    ignore_hardware_nodes) {
+		/* the old style "interrupts" property... */
+
+		/*
+		 * The list consists of <ipl,vec> elements
+		 */
+		if ((n = (*in++ >> 1)) < 1)
+			return (DDI_FAILURE);
+
+		pdptr->par_nintr = n;
+		size = n * sizeof (struct intrspec);
+		new = pdptr->par_intr = kmem_zalloc(size, KM_SLEEP);
+
+		while (n--) {
+			int level = *in++;
+			int vec = *in++;
+
+			if (level < 1 || level > MAXIPL ||
+			    vec < VEC_MIN || vec > VEC_MAX) {
+				cmn_err(CE_CONT, bad_intr_fmt,
+				    DEVI(rdip)->devi_name,
+				    DEVI(rdip)->devi_instance, level, vec);
+				goto broken;
 			}
-		} else {
-			/*
-			 * Initialize the priv_handle structure.
-			 */
-			pp = dmareq->dmar_object.dmao_obj.pp_obj.pp_pp;
-			offset = dmareq->dmar_object.dmao_obj.pp_obj.pp_offset;
-			vaddr = (caddr_t)offset;
-			php->ph_mapinfo = DMAMI_PAGES;
+			new->intrspec_pri = level;
+			if (vec != 2)
+				new->intrspec_vec = vec;
+			else
+				/*
+				 * irq 2 on the PC bus is tied to irq 9
+				 * on ISA, EISA and MicroChannel
+				 */
+				new->intrspec_vec = 9;
+			new++;
 		}
-		php->ph_u.pp = pp;
-		php->ph_vaddr = vaddr;
-		segmentpadr = (uint64_t)offset + ptob64(page_pptonum(pp));
+
+		return (DDI_SUCCESS);
+	} else {
+		/* the new style "interrupts" property... */
+
+		/*
+		 * The list consists of <vec> elements
+		 */
+		if ((n = (*in++)) < 1)
+			return (DDI_FAILURE);
+
+		pdptr->par_nintr = n;
+		size = n * sizeof (struct intrspec);
+		new = pdptr->par_intr = kmem_zalloc(size, KM_SLEEP);
+
+		/* XXX check for "interrupt-priorities" property... */
+		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
+		    "interrupt-priorities", (caddr_t)&got_prop, &got_len)
+		    == DDI_PROP_SUCCESS) {
+			if (n != (got_len / sizeof (int))) {
+				cmn_err(CE_CONT,
+				    "rootnex: bad interrupt-priorities length"
+				    " from %s%d: expected %d, got %d\n",
+				    DEVI(rdip)->devi_name,
+				    DEVI(rdip)->devi_instance, n,
+				    (int)(got_len / sizeof (int)));
+				goto broken;
+			}
+			inpri = (int *)got_prop;
+		}
+
+		while (n--) {
+			int level;
+			int vec = *in++;
+
+			if (inpri == NULL)
+				level = 5;
+			else
+				level = *inpri++;
+
+			if (level < 1 || level > MAXIPL ||
+			    vec < VEC_MIN || vec > VEC_MAX) {
+				cmn_err(CE_CONT, bad_intr_fmt,
+				    DEVI(rdip)->devi_name,
+				    DEVI(rdip)->devi_instance, level, vec);
+				goto broken;
+			}
+			new->intrspec_pri = level;
+			if (vec != 2)
+				new->intrspec_vec = vec;
+			else
+				/*
+				 * irq 2 on the PC bus is tied to irq 9
+				 * on ISA, EISA and MicroChannel
+				 */
+				new->intrspec_vec = 9;
+			new++;
+		}
+
+		if (inpri != NULL)
+			kmem_free(got_prop, got_len);
+		return (DDI_SUCCESS);
+	}
+
+broken:
+	kmem_free(pdptr->par_intr, size);
+	pdptr->par_intr = NULL;
+	pdptr->par_nintr = 0;
+	if (inpri != NULL)
+		kmem_free(got_prop, got_len);
+	return (DDI_FAILURE);
+}
+
+
+/*
+ * ******************
+ *  dma related code
+ * ******************
+ */
+
+/*
+ * rootnex_dma_allochdl()
+ *    called from ddi_dma_alloc_handle().
+ */
+/*ARGSUSED*/
+static int
+rootnex_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
+    int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
+{
+	uint64_t maxsegmentsize_ll;
+	uint_t maxsegmentsize;
+	ddi_dma_impl_t *hp;
+	rootnex_dma_t *dma;
+	uint64_t count_max;
+	uint64_t seg;
+	int kmflag;
+	int e;
+
+
+	/* convert our sleep flags */
+	if (waitfp == DDI_DMA_SLEEP) {
+		kmflag = KM_SLEEP;
+	} else {
+		kmflag = KM_NOSLEEP;
+	}
+
+	/*
+	 * We try to do only one memory allocation here. We'll do a little
+	 * pointer manipulation later. If the bind ends up taking more than
+	 * our prealloc's space, we'll have to allocate more memory in the
+	 * bind operation. Not great, but much better than before and the
+	 * best we can do with the current bind interfaces.
+	 */
+	hp = kmem_cache_alloc(rootnex_state->r_dmahdl_cache, kmflag);
+	if (hp == NULL) {
+		if (waitfp != DDI_DMA_DONTWAIT) {
+			ddi_set_callback(waitfp, arg,
+			    &rootnex_state->r_dvma_call_list_id);
+		}
+		return (DDI_DMA_NORESOURCES);
+	}
+
+	/* Do our pointer manipulation now, align the structures */
+	hp->dmai_private = (void *)(((uintptr_t)hp +
+	    (uintptr_t)sizeof (ddi_dma_impl_t) + 0x7) & ~0x7);
+	dma = (rootnex_dma_t *)hp->dmai_private;
+	dma->dp_prealloc_buffer = (uchar_t *)(((uintptr_t)dma +
+	    sizeof (rootnex_dma_t) + 0x7) & ~0x7);
+
+	/* setup the handle */
+	rootnex_clean_dmahdl(hp);
+	dma->dp_dip = rdip;
+	dma->dp_sglinfo.si_min_addr = attr->dma_attr_addr_lo;
+	dma->dp_sglinfo.si_max_addr = attr->dma_attr_addr_hi;
+	hp->dmai_minxfer = attr->dma_attr_minxfer;
+	hp->dmai_burstsizes = attr->dma_attr_burstsizes;
+	hp->dmai_rdip = rdip;
+	hp->dmai_attr = *attr;
+
+	/* we don't need to worry about the SPL since we do a tryenter */
+	mutex_init(&dma->dp_mutex, NULL, MUTEX_DRIVER, NULL);
+
+	/*
+	 * Figure out our maximum segment size. If the segment size is greater
+	 * than 4G, we will limit it to (4G - 1) since the max size of a dma
+	 * object (ddi_dma_obj_t.dmao_size) is 32 bits. dma_attr_seg and
+	 * dma_attr_count_max are size-1 type values.
+	 *
+	 * Maximum segment size is the largest physically contiguous chunk of
+	 * memory that we can return from a bind (i.e. the maximum size of a
+	 * single cookie).
+	 */
+
+	/* handle the rollover cases */
+	seg = attr->dma_attr_seg + 1;
+	if (seg < attr->dma_attr_seg) {
+		seg = attr->dma_attr_seg;
+	}
+	count_max = attr->dma_attr_count_max + 1;
+	if (count_max < attr->dma_attr_count_max) {
+		count_max = attr->dma_attr_count_max;
+	}
+
+	/*
+	 * granularity may or may not be a power of two. If it isn't, we can't
+	 * use a simple mask.
+	 */
+	if (attr->dma_attr_granular & (attr->dma_attr_granular - 1)) {
+		dma->dp_granularity_power_2 = B_FALSE;
+	} else {
+		dma->dp_granularity_power_2 = B_TRUE;
+	}
+
+	/*
+	 * maxxfer should be a whole multiple of granularity. If we're going to
+	 * break up a window because we're greater than maxxfer, we might as
+	 * well make sure it's maxxfer is a whole multiple so we don't have to
+	 * worry about triming the window later on for this case.
+	 */
+	if (attr->dma_attr_granular > 1) {
+		if (dma->dp_granularity_power_2) {
+			dma->dp_maxxfer = attr->dma_attr_maxxfer -
+			    (attr->dma_attr_maxxfer &
+			    (attr->dma_attr_granular - 1));
+		} else {
+			dma->dp_maxxfer = attr->dma_attr_maxxfer -
+			    (attr->dma_attr_maxxfer % attr->dma_attr_granular);
+		}
+	} else {
+		dma->dp_maxxfer = attr->dma_attr_maxxfer;
+	}
+
+	maxsegmentsize_ll = MIN(seg, dma->dp_maxxfer);
+	maxsegmentsize_ll = MIN(maxsegmentsize_ll, count_max);
+	if (maxsegmentsize_ll == 0 || (maxsegmentsize_ll > 0xFFFFFFFF)) {
+		maxsegmentsize = 0xFFFFFFFF;
+	} else {
+		maxsegmentsize = maxsegmentsize_ll;
+	}
+	dma->dp_sglinfo.si_max_cookie_size = maxsegmentsize;
+	dma->dp_sglinfo.si_segmask = attr->dma_attr_seg;
+
+	/* check the ddi_dma_attr arg to make sure it makes a little sense */
+	if (rootnex_alloc_check_parms) {
+		e = rootnex_valid_alloc_parms(attr, maxsegmentsize);
+		if (e != DDI_SUCCESS) {
+			ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_ALLOC_FAIL]);
+			(void) rootnex_dma_freehdl(dip, rdip,
+			    (ddi_dma_handle_t)hp);
+			return (e);
+		}
+	}
+
+	*handlep = (ddi_dma_handle_t)hp;
+
+	ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_HDLS]);
+	DTRACE_PROBE1(rootnex__alloc__handle, uint64_t,
+	    rootnex_cnt[ROOTNEX_CNT_ACTIVE_HDLS]);
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_dma_freehdl()
+ *    called from ddi_dma_free_handle().
+ */
+/*ARGSUSED*/
+static int
+rootnex_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
+{
+	ddi_dma_impl_t *hp;
+	rootnex_dma_t *dma;
+
+
+	hp = (ddi_dma_impl_t *)handle;
+	dma = (rootnex_dma_t *)hp->dmai_private;
+
+	/* unbind should have been called first */
+	ASSERT(!dma->dp_inuse);
+
+	mutex_destroy(&dma->dp_mutex);
+	kmem_cache_free(rootnex_state->r_dmahdl_cache, hp);
+
+	ROOTNEX_PROF_DEC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_HDLS]);
+	DTRACE_PROBE1(rootnex__free__handle, uint64_t,
+	    rootnex_cnt[ROOTNEX_CNT_ACTIVE_HDLS]);
+
+	if (rootnex_state->r_dvma_call_list_id)
+		ddi_run_callback(&rootnex_state->r_dvma_call_list_id);
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_dma_bindhdl()
+ *    called from ddi_dma_addr_bind_handle() and ddi_dma_buf_bind_handle().
+ */
+/*ARGSUSED*/
+static int
+rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
+    struct ddi_dma_req *dmareq, ddi_dma_cookie_t *cookiep, uint_t *ccountp)
+{
+	rootnex_sglinfo_t *sinfo;
+	ddi_dma_attr_t *attr;
+	ddi_dma_impl_t *hp;
+	rootnex_dma_t *dma;
+	int kmflag;
+	int e;
+
+
+	hp = (ddi_dma_impl_t *)handle;
+	dma = (rootnex_dma_t *)hp->dmai_private;
+	sinfo = &dma->dp_sglinfo;
+	attr = &hp->dmai_attr;
+
+	hp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS;
+
+	/*
+	 * This is useful for debugging a driver. Not as useful in a production
+	 * system. The only time this will fail is if you have a driver bug.
+	 */
+	if (rootnex_bind_check_inuse) {
+		/*
+		 * No one else should ever have this lock unless someone else
+		 * is trying to use this handle. So contention on the lock
+		 * is the same as inuse being set.
+		 */
+		e = mutex_tryenter(&dma->dp_mutex);
+		if (e == 0) {
+			ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_BIND_FAIL]);
+			return (DDI_DMA_INUSE);
+		}
+		if (dma->dp_inuse) {
+			mutex_exit(&dma->dp_mutex);
+			ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_BIND_FAIL]);
+			return (DDI_DMA_INUSE);
+		}
+		dma->dp_inuse = B_TRUE;
+		mutex_exit(&dma->dp_mutex);
+	}
+
+	/* check the ddi_dma_attr arg to make sure it makes a little sense */
+	if (rootnex_bind_check_parms) {
+		e = rootnex_valid_bind_parms(dmareq, attr);
+		if (e != DDI_SUCCESS) {
+			ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_BIND_FAIL]);
+			rootnex_clean_dmahdl(hp);
+			return (e);
+		}
+	}
+
+	/* save away the original bind info */
+	dma->dp_dma = dmareq->dmar_object;
+
+	/*
+	 * Figure out a rough estimate of what maximum number of pages this
+	 * buffer could use (a high estimate of course).
+	 */
+	sinfo->si_max_pages = mmu_btopr(dma->dp_dma.dmao_size) + 1;
+
+	/*
+	 * We'll use the pre-allocated cookies for any bind that will *always*
+	 * fit (more important to be consistent, we don't want to create
+	 * additional degenerate cases).
+	 */
+	if (sinfo->si_max_pages <= rootnex_state->r_prealloc_cookies) {
+		dma->dp_cookies = (ddi_dma_cookie_t *)dma->dp_prealloc_buffer;
+		dma->dp_need_to_free_cookie = B_FALSE;
+		DTRACE_PROBE2(rootnex__bind__prealloc, dev_info_t *, rdip,
+		    uint_t, sinfo->si_max_pages);
+
+	/*
+	 * For anything larger than that, we'll go ahead and allocate the
+	 * maximum number of pages we expect to see. Hopefuly, we won't be
+	 * seeing this path in the fast path for high performance devices very
+	 * frequently.
+	 *
+	 * a ddi bind interface that allowed the driver to provide storage to
+	 * the bind interface would speed this case up.
+	 */
+	} else {
+		/* convert the sleep flags */
+		if (dmareq->dmar_fp == DDI_DMA_SLEEP) {
+			kmflag =  KM_SLEEP;
+		} else {
+			kmflag =  KM_NOSLEEP;
+		}
+
+		/*
+		 * Save away how much memory we allocated. If we're doing a
+		 * nosleep, the alloc could fail...
+		 */
+		dma->dp_cookie_size = sinfo->si_max_pages *
+		    sizeof (ddi_dma_cookie_t);
+		dma->dp_cookies = kmem_alloc(dma->dp_cookie_size, kmflag);
+		if (dma->dp_cookies == NULL) {
+			ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_BIND_FAIL]);
+			rootnex_clean_dmahdl(hp);
+			return (DDI_DMA_NORESOURCES);
+		}
+		dma->dp_need_to_free_cookie = B_TRUE;
+		DTRACE_PROBE2(rootnex__bind__alloc, dev_info_t *, rdip, uint_t,
+		    sinfo->si_max_pages);
+	}
+	hp->dmai_cookie = dma->dp_cookies;
+
+	/*
+	 * Get the real sgl. rootnex_get_sgl will fill in cookie array while
+	 * looking at the contraints in the dma structure. It will then put some
+	 * additional state about the sgl in the dma struct (i.e. is the sgl
+	 * clean, or do we need to do some munging; how many pages need to be
+	 * copied, etc.)
+	 */
+	rootnex_get_sgl(&dmareq->dmar_object, dma->dp_cookies,
+	    &dma->dp_sglinfo);
+	ASSERT(sinfo->si_sgl_size <= sinfo->si_max_pages);
+
+	/* if we don't need a copy buffer, we don't need to sync */
+	if (sinfo->si_copybuf_req == 0) {
+		hp->dmai_rflags |= DMP_NOSYNC;
+	}
+
+	/*
+	 * if we don't need the copybuf and we don't need to do a partial,  we
+	 * hit the fast path. All the high performance devices should be trying
+	 * to hit this path. To hit this path, a device should be able to reach
+	 * all of memory, shouldn't try to bind more than it can transfer, and
+	 * the buffer shouldn't require more cookies than the driver/device can
+	 * handle [sgllen]).
+	 */
+	if ((sinfo->si_copybuf_req == 0) &&
+	    (sinfo->si_sgl_size <= attr->dma_attr_sgllen) &&
+	    (dma->dp_dma.dmao_size < dma->dp_maxxfer)) {
+		/*
+		 * copy out the first cookie and ccountp, set the cookie
+		 * pointer to the second cookie. The first cookie is passed
+		 * back on the stack. Additional cookies are accessed via
+		 * ddi_dma_nextcookie()
+		 */
+		*cookiep = dma->dp_cookies[0];
+		*ccountp = sinfo->si_sgl_size;
+		hp->dmai_cookie++;
+		hp->dmai_rflags &= ~DDI_DMA_PARTIAL;
+		hp->dmai_nwin = 1;
+		ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
+		DTRACE_PROBE3(rootnex__bind__fast, dev_info_t *, rdip, uint64_t,
+		    rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS], uint_t,
+		    dma->dp_dma.dmao_size);
+		return (DDI_DMA_MAPPED);
+	}
+
+	/*
+	 * go to the slow path, we may need to alloc more memory, create
+	 * multiple windows, and munge up a sgl to make the device happy.
+	 */
+	e = rootnex_bind_slowpath(hp, dmareq, dma, attr, kmflag);
+	if ((e != DDI_DMA_MAPPED) && (e != DDI_DMA_PARTIAL_MAP)) {
+		if (dma->dp_need_to_free_cookie) {
+			kmem_free(dma->dp_cookies, dma->dp_cookie_size);
+		}
+		ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_BIND_FAIL]);
+		rootnex_clean_dmahdl(hp); /* must be after free cookie */
+		return (e);
+	}
+
+	/* if the first window uses the copy buffer, sync it for the device */
+	if ((dma->dp_window[dma->dp_current_win].wd_dosync) &&
+	    (hp->dmai_rflags & DDI_DMA_WRITE)) {
+		(void) rootnex_dma_sync(dip, rdip, handle, 0, 0,
+		    DDI_DMA_SYNC_FORDEV);
+	}
+
+	/*
+	 * copy out the first cookie and ccountp, set the cookie pointer to the
+	 * second cookie. Make sure the partial flag is set/cleared correctly.
+	 * If we have a partial map (i.e. multiple windows), the number of
+	 * cookies we return is the number of cookies in the first window.
+	 */
+	if (e == DDI_DMA_MAPPED) {
+		hp->dmai_rflags &= ~DDI_DMA_PARTIAL;
+		*ccountp = sinfo->si_sgl_size;
+	} else {
+		hp->dmai_rflags |= DDI_DMA_PARTIAL;
+		*ccountp = dma->dp_window[dma->dp_current_win].wd_cookie_cnt;
+		ASSERT(hp->dmai_nwin <= dma->dp_max_win);
+	}
+	*cookiep = dma->dp_cookies[0];
+	hp->dmai_cookie++;
+
+	ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
+	DTRACE_PROBE3(rootnex__bind__slow, dev_info_t *, rdip, uint64_t,
+	    rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS], uint_t,
+	    dma->dp_dma.dmao_size);
+	return (e);
+}
+
+
+/*
+ * rootnex_dma_unbindhdl()
+ *    called from ddi_dma_unbind_handle()
+ */
+/*ARGSUSED*/
+static int
+rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
+    ddi_dma_handle_t handle)
+{
+	ddi_dma_impl_t *hp;
+	rootnex_dma_t *dma;
+	int e;
+
+
+	hp = (ddi_dma_impl_t *)handle;
+	dma = (rootnex_dma_t *)hp->dmai_private;
+
+	/* make sure the buffer wasn't free'd before calling unbind */
+	if (rootnex_unbind_verify_buffer) {
+		e = rootnex_verify_buffer(dma);
+		if (e != DDI_SUCCESS) {
+			ASSERT(0);
+			return (DDI_FAILURE);
+		}
+	}
+
+	/* sync the current window before unbinding the buffer */
+	if (dma->dp_window && dma->dp_window[dma->dp_current_win].wd_dosync &&
+	    (hp->dmai_rflags & DDI_DMA_READ)) {
+		(void) rootnex_dma_sync(dip, rdip, handle, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
+	}
+
+	/*
+	 * cleanup and copy buffer or window state. if we didn't use the copy
+	 * buffer or windows, there won't be much to do :-)
+	 */
+	rootnex_teardown_copybuf(dma);
+	rootnex_teardown_windows(dma);
+
+	/*
+	 * If we had to allocate space to for the worse case sgl (it didn't
+	 * fit into our pre-allocate buffer), free that up now
+	 */
+	if (dma->dp_need_to_free_cookie) {
+		kmem_free(dma->dp_cookies, dma->dp_cookie_size);
+	}
+
+	/*
+	 * clean up the handle so it's ready for the next bind (i.e. if the
+	 * handle is reused).
+	 */
+	rootnex_clean_dmahdl(hp);
+
+	if (rootnex_state->r_dvma_call_list_id)
+		ddi_run_callback(&rootnex_state->r_dvma_call_list_id);
+
+	ROOTNEX_PROF_DEC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
+	DTRACE_PROBE1(rootnex__unbind, uint64_t,
+	    rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_verify_buffer()
+ *   verify buffer wasn't free'd
+ */
+static int
+rootnex_verify_buffer(rootnex_dma_t *dma)
+{
+	peekpoke_ctlops_t peek;
+	page_t **pplist;
+	caddr_t vaddr;
+	uint_t pcnt;
+	uint_t poff;
+	page_t *pp;
+	uint8_t b;
+	int i;
+	int e;
+
+
+	/* Figure out how many pages this buffer occupies */
+	if (dma->dp_dma.dmao_type == DMA_OTYP_PAGES) {
+		poff = dma->dp_dma.dmao_obj.pp_obj.pp_offset & MMU_PAGEOFFSET;
+	} else {
+		vaddr = dma->dp_dma.dmao_obj.virt_obj.v_addr;
+		poff = (uintptr_t)vaddr & MMU_PAGEOFFSET;
+	}
+	pcnt = mmu_btopr(dma->dp_dma.dmao_size + poff);
+
+	switch (dma->dp_dma.dmao_type) {
+	case DMA_OTYP_PAGES:
+		/*
+		 * for a linked list of pp's walk through them to make sure
+		 * they're locked and not free.
+		 */
+		pp = dma->dp_dma.dmao_obj.pp_obj.pp_pp;
+		for (i = 0; i < pcnt; i++) {
+			if (PP_ISFREE(pp) || !PAGE_LOCKED(pp)) {
+				return (DDI_FAILURE);
+			}
+			pp = pp->p_next;
+		}
 		break;
+
 	case DMA_OTYP_VADDR:
 	case DMA_OTYP_BUFVADDR:
-		if (segsize) {
-			asp = php->ph_u.asp;
-			vaddr = php->ph_vaddr;
-			vaddr += segsize;
-		} else {
-			/*
-			 * Initialize the priv_handle structure.
-			 */
-			vaddr = dmareq->dmar_object.dmao_obj.virt_obj.v_addr;
-			asp = dmareq->dmar_object.dmao_obj.virt_obj.v_as;
-			if (asp == NULL) {
-				php->ph_mapinfo = DMAMI_KVADR;
-				asp = &kas;
-			} else {
-				php->ph_mapinfo = DMAMI_UVADR;
+		pplist = dma->dp_dma.dmao_obj.virt_obj.v_priv;
+		/*
+		 * for an array of pp's walk through them to make sure they're
+		 * not free. It's possible that they may not be locked.
+		 */
+		if (pplist) {
+			for (i = 0; i < pcnt; i++) {
+				if (PP_ISFREE(pplist[i])) {
+					return (DDI_FAILURE);
+				}
 			}
-			php->ph_u.asp = asp;
-		}
-		pplist = dmareq->dmar_object.dmao_obj.virt_obj.v_priv;
-		offset = (uintptr_t)vaddr & MMU_PAGEOFFSET;
-		if (pplist == NULL) {
-			segmentpadr = (uint64_t)offset +
-				ptob64(hat_getpfnum(asp->a_hat, vaddr));
+
+		/* For a virtual address, try to peek at each page */
 		} else {
-		    bvaddr = dmareq->dmar_object.dmao_obj.virt_obj.v_addr;
-		    index = btop(((ulong_t)bvaddr & MMU_PAGEOFFSET) +
-			vaddr - bvaddr);
-		    segmentpadr = (uint64_t)offset +
-			ptob64(page_pptonum(pplist[index]));
+			if (dma->dp_sglinfo.si_asp == &kas) {
+				bzero(&peek, sizeof (peekpoke_ctlops_t));
+				peek.host_addr = (uintptr_t)&b;
+				peek.size = sizeof (uint8_t);
+				peek.dev_addr = (uintptr_t)vaddr;
+				for (i = 0; i < pcnt; i++) {
+					e = rootnex_ctlops_peek(&peek, &b);
+					if (e != DDI_SUCCESS) {
+						return (DDI_FAILURE);
+					}
+					peek.dev_addr += MMU_PAGESIZE;
+				}
+			}
 		}
-		php->ph_vaddr = vaddr;
 		break;
+
 	default:
-		panic("rootnex_get_phyaddr");
-		/*NOTREACHED*/
+		ASSERT(0);
+		break;
 	}
-	return (segmentpadr);
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_clean_dmahdl()
+ *    Clean the dma handle. This should be called on a handle alloc and an
+ *    unbind handle. Set the handle state to the default settings.
+ */
+static void
+rootnex_clean_dmahdl(ddi_dma_impl_t *hp)
+{
+	rootnex_dma_t *dma;
+
+
+	dma = (rootnex_dma_t *)hp->dmai_private;
+
+	hp->dmai_nwin = 0;
+	dma->dp_current_cookie = 0;
+	dma->dp_copybuf_size = 0;
+	dma->dp_window = NULL;
+	dma->dp_cbaddr = NULL;
+	dma->dp_inuse = B_FALSE;
+	dma->dp_need_to_free_cookie = B_FALSE;
+	dma->dp_need_to_free_window = B_FALSE;
+	dma->dp_partial_required = B_FALSE;
+	dma->dp_trim_required = B_FALSE;
+	dma->dp_sglinfo.si_copybuf_req = 0;
+#if !defined(__amd64)
+	dma->dp_cb_remaping = B_FALSE;
+	dma->dp_kva = NULL;
+#endif
+
+	/* FMA related initialization */
+	hp->dmai_fault = 0;
+	hp->dmai_fault_check = NULL;
+	hp->dmai_fault_notify = NULL;
+	hp->dmai_error.err_ena = 0;
+	hp->dmai_error.err_status = DDI_FM_OK;
+	hp->dmai_error.err_expected = DDI_FM_ERR_UNEXPECTED;
+	hp->dmai_error.err_ontrap = NULL;
+	hp->dmai_error.err_fep = NULL;
+}
+
+
+/*
+ * rootnex_valid_alloc_parms()
+ *    Called in ddi_dma_alloc_handle path to validate its parameters.
+ */
+static int
+rootnex_valid_alloc_parms(ddi_dma_attr_t *attr, uint_t maxsegmentsize)
+{
+	if ((attr->dma_attr_seg < MMU_PAGEOFFSET) ||
+	    (attr->dma_attr_count_max < MMU_PAGEOFFSET) ||
+	    (attr->dma_attr_granular > MMU_PAGESIZE) ||
+	    (attr->dma_attr_maxxfer < MMU_PAGESIZE)) {
+		return (DDI_DMA_BADATTR);
+	}
+
+	if (attr->dma_attr_addr_hi <= attr->dma_attr_addr_lo) {
+		return (DDI_DMA_BADATTR);
+	}
+
+	if ((attr->dma_attr_seg & MMU_PAGEOFFSET) != MMU_PAGEOFFSET ||
+	    MMU_PAGESIZE & (attr->dma_attr_granular - 1) ||
+	    attr->dma_attr_sgllen <= 0) {
+		return (DDI_DMA_BADATTR);
+	}
+
+	/* We should be able to DMA into every byte offset in a page */
+	if (maxsegmentsize < MMU_PAGESIZE) {
+		return (DDI_DMA_BADATTR);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_valid_bind_parms()
+ *    Called in ddi_dma_*_bind_handle path to validate its parameters.
+ */
+/* ARGSUSED */
+static int
+rootnex_valid_bind_parms(ddi_dma_req_t *dmareq, ddi_dma_attr_t *attr)
+{
+#if !defined(__amd64)
+	/*
+	 * we only support up to a 2G-1 transfer size on 32-bit kernels so
+	 * we can track the offset for the obsoleted interfaces.
+	 */
+	if (dmareq->dmar_object.dmao_size > 0x7FFFFFFF) {
+		return (DDI_DMA_TOOBIG);
+	}
+#endif
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_get_sgl()
+ *    Called in bind fastpath to get the sgl. Most of this will be replaced
+ *    with a call to the vm layer when vm2.0 comes around...
+ */
+static void
+rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
+    rootnex_sglinfo_t *sglinfo)
+{
+	ddi_dma_atyp_t buftype;
+	uint64_t last_page;
+	uint64_t offset;
+	uint64_t addrhi;
+	uint64_t addrlo;
+	uint64_t maxseg;
+	page_t **pplist;
+	uint64_t paddr;
+	uint32_t psize;
+	uint32_t size;
+	caddr_t vaddr;
+	uint_t pcnt;
+	page_t *pp;
+	uint_t cnt;
+
+
+	/* shortcuts */
+	pplist = dmar_object->dmao_obj.virt_obj.v_priv;
+	vaddr = dmar_object->dmao_obj.virt_obj.v_addr;
+	maxseg = sglinfo->si_max_cookie_size;
+	buftype = dmar_object->dmao_type;
+	addrhi = sglinfo->si_max_addr;
+	addrlo = sglinfo->si_min_addr;
+	size = dmar_object->dmao_size;
+
+	pcnt = 0;
+	cnt = 0;
+
+	/*
+	 * if we were passed down a linked list of pages, i.e. pointer to
+	 * page_t, use this to get our physical address and buf offset.
+	 */
+	if (buftype == DMA_OTYP_PAGES) {
+		pp = dmar_object->dmao_obj.pp_obj.pp_pp;
+		ASSERT(!PP_ISFREE(pp) && PAGE_LOCKED(pp));
+		offset =  dmar_object->dmao_obj.pp_obj.pp_offset &
+		    MMU_PAGEOFFSET;
+		paddr = ptob64(pp->p_pagenum) + offset;
+		psize = MIN(size, (MMU_PAGESIZE - offset));
+		pp = pp->p_next;
+		sglinfo->si_asp = NULL;
+
+	/*
+	 * We weren't passed down a linked list of pages, but if we were passed
+	 * down an array of pages, use this to get our physical address and buf
+	 * offset.
+	 */
+	} else if (pplist != NULL) {
+		ASSERT((buftype == DMA_OTYP_VADDR) ||
+		    (buftype == DMA_OTYP_BUFVADDR));
+
+		offset = (uintptr_t)vaddr & MMU_PAGEOFFSET;
+		sglinfo->si_asp = dmar_object->dmao_obj.virt_obj.v_as;
+		if (sglinfo->si_asp == NULL) {
+			sglinfo->si_asp = &kas;
+		}
+
+		ASSERT(!PP_ISFREE(pplist[pcnt]));
+		paddr = ptob64(pplist[pcnt]->p_pagenum);
+		paddr += offset;
+		psize = MIN(size, (MMU_PAGESIZE - offset));
+		pcnt++;
+
+	/*
+	 * All we have is a virtual address, we'll need to call into the VM
+	 * to get the physical address.
+	 */
+	} else {
+		ASSERT((buftype == DMA_OTYP_VADDR) ||
+		    (buftype == DMA_OTYP_BUFVADDR));
+
+		offset = (uintptr_t)vaddr & MMU_PAGEOFFSET;
+		sglinfo->si_asp = dmar_object->dmao_obj.virt_obj.v_as;
+		if (sglinfo->si_asp == NULL) {
+			sglinfo->si_asp = &kas;
+		}
+
+		paddr = ptob64(hat_getpfnum(sglinfo->si_asp->a_hat, vaddr));
+		paddr += offset;
+		psize = MIN(size, (MMU_PAGESIZE - offset));
+		vaddr += psize;
+	}
+
+	/*
+	 * Setup the first cookie with the physical address of the page and the
+	 * size of the page (which takes into account the initial offset into
+	 * the page.
+	 */
+	sgl[cnt].dmac_laddress = paddr;
+	sgl[cnt].dmac_size = psize;
+	sgl[cnt].dmac_type = 0;
+
+	/*
+	 * Save away the buffer offset into the page. We'll need this later in
+	 * the copy buffer code to help figure out the page index within the
+	 * buffer and the offset into the current page.
+	 */
+	sglinfo->si_buf_offset = offset;
+
+	/*
+	 * If the DMA engine can't reach the physical address, increase how
+	 * much copy buffer we need. We always increase by pagesize so we don't
+	 * have to worry about converting offsets. Set a flag in the cookies
+	 * dmac_type to indicate that it uses the copy buffer. If this isn't the
+	 * last cookie, go to the next cookie (since we separate each page which
+	 * uses the copy buffer in case the copy buffer is not physically
+	 * contiguous.
+	 */
+	if ((paddr < addrlo) || ((paddr + psize) > addrhi)) {
+		sglinfo->si_copybuf_req += MMU_PAGESIZE;
+		sgl[cnt].dmac_type = ROOTNEX_USES_COPYBUF;
+		if ((cnt + 1) < sglinfo->si_max_pages) {
+			cnt++;
+			sgl[cnt].dmac_laddress = 0;
+			sgl[cnt].dmac_size = 0;
+			sgl[cnt].dmac_type = 0;
+		}
+	}
+
+	/*
+	 * save this page's physical address so we can figure out if the next
+	 * page is physically contiguous. Keep decrementing size until we are
+	 * done with the buffer.
+	 */
+	last_page = paddr & MMU_PAGEMASK;
+	size -= psize;
+
+	while (size > 0) {
+		/* Get the size for this page (i.e. partial or full page) */
+		psize = MIN(size, MMU_PAGESIZE);
+
+		if (buftype == DMA_OTYP_PAGES) {
+			/* get the paddr from the page_t */
+			ASSERT(!PP_ISFREE(pp) && PAGE_LOCKED(pp));
+			paddr = ptob64(pp->p_pagenum);
+			pp = pp->p_next;
+		} else if (pplist != NULL) {
+			/* index into the array of page_t's to get the paddr */
+			ASSERT(!PP_ISFREE(pplist[pcnt]));
+			paddr = ptob64(pplist[pcnt]->p_pagenum);
+			pcnt++;
+		} else {
+			/* call into the VM to get the paddr */
+			paddr =  ptob64(hat_getpfnum(sglinfo->si_asp->a_hat,
+			    vaddr));
+			vaddr += psize;
+		}
+
+		/* check to see if this page needs the copy buffer */
+		if ((paddr < addrlo) || ((paddr + psize) > addrhi)) {
+			sglinfo->si_copybuf_req += MMU_PAGESIZE;
+
+			/*
+			 * if there is something in the current cookie, go to
+			 * the next one. We only want one page in a cookie which
+			 * uses the copybuf since the copybuf doesn't have to
+			 * be physically contiguous.
+			 */
+			if (sgl[cnt].dmac_size != 0) {
+				cnt++;
+			}
+			sgl[cnt].dmac_laddress = paddr;
+			sgl[cnt].dmac_size = psize;
+#if defined(__amd64)
+			sgl[cnt].dmac_type = ROOTNEX_USES_COPYBUF;
+#else
+			/*
+			 * save the buf offset for 32-bit kernel. used in the
+			 * obsoleted interfaces.
+			 */
+			sgl[cnt].dmac_type = ROOTNEX_USES_COPYBUF |
+			    (dmar_object->dmao_size - size);
+#endif
+			/* if this isn't the last cookie, go to the next one */
+			if ((cnt + 1) < sglinfo->si_max_pages) {
+				cnt++;
+				sgl[cnt].dmac_laddress = 0;
+				sgl[cnt].dmac_size = 0;
+				sgl[cnt].dmac_type = 0;
+			}
+
+		/*
+		 * this page didn't need the copy buffer, if it's not physically
+		 * contiguous, or it would put us over a segment boundary, or it
+		 * puts us over the max cookie size, or the current sgl doesn't
+		 * have anything in it.
+		 */
+		} else if (((last_page + MMU_PAGESIZE) != paddr) ||
+		    !(paddr & sglinfo->si_segmask) ||
+		    ((sgl[cnt].dmac_size + psize) > maxseg) ||
+		    (sgl[cnt].dmac_size == 0)) {
+			/*
+			 * if we're not already in a new cookie, go to the next
+			 * cookie.
+			 */
+			if (sgl[cnt].dmac_size != 0) {
+				cnt++;
+			}
+
+			/* save the cookie information */
+			sgl[cnt].dmac_laddress = paddr;
+			sgl[cnt].dmac_size = psize;
+#if defined(__amd64)
+			sgl[cnt].dmac_type = 0;
+#else
+			/*
+			 * save the buf offset for 32-bit kernel. used in the
+			 * obsoleted interfaces.
+			 */
+			sgl[cnt].dmac_type = dmar_object->dmao_size - size;
+#endif
+
+		/*
+		 * this page didn't need the copy buffer, it is physically
+		 * contiguous with the last page, and it's <= the max cookie
+		 * size.
+		 */
+		} else {
+			sgl[cnt].dmac_size += psize;
+
+			/*
+			 * if this exactly ==  the maximum cookie size, and
+			 * it isn't the last cookie, go to the next cookie.
+			 */
+			if (((sgl[cnt].dmac_size + psize) == maxseg) &&
+			    ((cnt + 1) < sglinfo->si_max_pages)) {
+				cnt++;
+				sgl[cnt].dmac_laddress = 0;
+				sgl[cnt].dmac_size = 0;
+				sgl[cnt].dmac_type = 0;
+			}
+		}
+
+		/*
+		 * save this page's physical address so we can figure out if the
+		 * next page is physically contiguous. Keep decrementing size
+		 * until we are done with the buffer.
+		 */
+		last_page = paddr;
+		size -= psize;
+	}
+
+	/* we're done, save away how many cookies the sgl has */
+	if (sgl[cnt].dmac_size == 0) {
+		ASSERT(cnt < sglinfo->si_max_pages);
+		sglinfo->si_sgl_size = cnt;
+	} else {
+		sglinfo->si_sgl_size = cnt + 1;
+	}
+}
+
+
+/*
+ * rootnex_bind_slowpath()
+ *    Call in the bind path if the calling driver can't use the sgl without
+ *    modifying it. We either need to use the copy buffer and/or we will end up
+ *    with a partial bind.
+ */
+static int
+rootnex_bind_slowpath(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
+    rootnex_dma_t *dma, ddi_dma_attr_t *attr, int kmflag)
+{
+	rootnex_sglinfo_t *sinfo;
+	rootnex_window_t *window;
+	ddi_dma_cookie_t *cookie;
+	size_t copybuf_used;
+	size_t dmac_size;
+	boolean_t partial;
+	off_t cur_offset;
+	page_t *cur_pp;
+	major_t mnum;
+	int e;
+	int i;
+
+
+	sinfo = &dma->dp_sglinfo;
+	copybuf_used = 0;
+	partial = B_FALSE;
+
+	/*
+	 * If we're using the copybuf, set the copybuf state in dma struct.
+	 * Needs to be first since it sets the copy buffer size.
+	 */
+	if (sinfo->si_copybuf_req != 0) {
+		e = rootnex_setup_copybuf(hp, dmareq, dma, attr);
+		if (e != DDI_SUCCESS) {
+			return (e);
+		}
+	} else {
+		dma->dp_copybuf_size = 0;
+	}
+
+	/*
+	 * Figure out if we need to do a partial mapping. If so, figure out
+	 * if we need to trim the buffers when we munge the sgl.
+	 */
+	if ((dma->dp_copybuf_size < sinfo->si_copybuf_req) ||
+	    (dma->dp_dma.dmao_size > dma->dp_maxxfer) ||
+	    (attr->dma_attr_sgllen < sinfo->si_sgl_size)) {
+		dma->dp_partial_required = B_TRUE;
+		if (attr->dma_attr_granular != 1) {
+			dma->dp_trim_required = B_TRUE;
+		}
+	} else {
+		dma->dp_partial_required = B_FALSE;
+		dma->dp_trim_required = B_FALSE;
+	}
+
+	/* If we need to do a partial bind, make sure the driver supports it */
+	if (dma->dp_partial_required &&
+	    !(dmareq->dmar_flags & DDI_DMA_PARTIAL)) {
+
+		mnum = ddi_driver_major(dma->dp_dip);
+		/*
+		 * patchable which allows us to print one warning per major
+		 * number.
+		 */
+		if ((rootnex_bind_warn) &&
+		    ((rootnex_warn_list[mnum] & ROOTNEX_BIND_WARNING) == 0)) {
+			rootnex_warn_list[mnum] |= ROOTNEX_BIND_WARNING;
+			cmn_err(CE_WARN, "!%s: coding error detected, the "
+			    "driver is using ddi_dma_attr(9S) incorrectly. "
+			    "There is a small risk of data corruption in "
+			    "particular with large I/Os. The driver should be "
+			    "replaced with a corrected version for proper "
+			    "system operation. To disable this warning, add "
+			    "'set rootnex:rootnex_bind_warn=0' to "
+			    "/etc/system(4).", ddi_driver_name(dma->dp_dip));
+		}
+		return (DDI_DMA_TOOBIG);
+	}
+
+	/*
+	 * we might need multiple windows, setup state to handle them. In this
+	 * code path, we will have at least one window.
+	 */
+	e = rootnex_setup_windows(hp, dma, attr, kmflag);
+	if (e != DDI_SUCCESS) {
+		rootnex_teardown_copybuf(dma);
+		return (e);
+	}
+
+	window = &dma->dp_window[0];
+	cookie = &dma->dp_cookies[0];
+	cur_offset = 0;
+	rootnex_init_win(hp, dma, window, cookie, cur_offset);
+	if (dmareq->dmar_object.dmao_type == DMA_OTYP_PAGES) {
+		cur_pp = dmareq->dmar_object.dmao_obj.pp_obj.pp_pp;
+	}
+
+	/* loop though all the cookies we got back from get_sgl() */
+	for (i = 0; i < sinfo->si_sgl_size; i++) {
+		/*
+		 * If we're using the copy buffer, check this cookie and setup
+		 * its associated copy buffer state. If this cookie uses the
+		 * copy buffer, make sure we sync this window during dma_sync.
+		 */
+		if (dma->dp_copybuf_size > 0) {
+			rootnex_setup_cookie(&dmareq->dmar_object, dma, cookie,
+			    cur_offset, &copybuf_used, &cur_pp);
+			if (cookie->dmac_type & ROOTNEX_USES_COPYBUF) {
+				window->wd_dosync = B_TRUE;
+			}
+		}
+
+		/*
+		 * save away the cookie size, since it could be modified in
+		 * the windowing code.
+		 */
+		dmac_size = cookie->dmac_size;
+
+		/* if we went over max copybuf size */
+		if (dma->dp_copybuf_size &&
+		    (copybuf_used > dma->dp_copybuf_size)) {
+			partial = B_TRUE;
+			e = rootnex_copybuf_window_boundary(hp, dma, &window,
+			    cookie, cur_offset, &copybuf_used);
+			if (e != DDI_SUCCESS) {
+				rootnex_teardown_copybuf(dma);
+				rootnex_teardown_windows(dma);
+				return (e);
+			}
+
+			/*
+			 * if the coookie uses the copy buffer, make sure the
+			 * new window we just moved to is set to sync.
+			 */
+			if (cookie->dmac_type & ROOTNEX_USES_COPYBUF) {
+				window->wd_dosync = B_TRUE;
+			}
+			DTRACE_PROBE1(rootnex__copybuf__window, dev_info_t *,
+			    dma->dp_dip);
+
+		/* if the cookie cnt == max sgllen, move to the next window */
+		} else if (window->wd_cookie_cnt >= attr->dma_attr_sgllen) {
+			partial = B_TRUE;
+			ASSERT(window->wd_cookie_cnt == attr->dma_attr_sgllen);
+			e = rootnex_sgllen_window_boundary(hp, dma, &window,
+			    cookie, attr, cur_offset);
+			if (e != DDI_SUCCESS) {
+				rootnex_teardown_copybuf(dma);
+				rootnex_teardown_windows(dma);
+				return (e);
+			}
+
+			/*
+			 * if the coookie uses the copy buffer, make sure the
+			 * new window we just moved to is set to sync.
+			 */
+			if (cookie->dmac_type & ROOTNEX_USES_COPYBUF) {
+				window->wd_dosync = B_TRUE;
+			}
+			DTRACE_PROBE1(rootnex__sgllen__window, dev_info_t *,
+			    dma->dp_dip);
+
+		/* else if we will be over maxxfer */
+		} else if ((window->wd_size + dmac_size) >
+		    dma->dp_maxxfer) {
+			partial = B_TRUE;
+			e = rootnex_maxxfer_window_boundary(hp, dma, &window,
+			    cookie);
+			if (e != DDI_SUCCESS) {
+				rootnex_teardown_copybuf(dma);
+				rootnex_teardown_windows(dma);
+				return (e);
+			}
+
+			/*
+			 * if the coookie uses the copy buffer, make sure the
+			 * new window we just moved to is set to sync.
+			 */
+			if (cookie->dmac_type & ROOTNEX_USES_COPYBUF) {
+				window->wd_dosync = B_TRUE;
+			}
+			DTRACE_PROBE1(rootnex__maxxfer__window, dev_info_t *,
+			    dma->dp_dip);
+
+		/* else this cookie fits in the current window */
+		} else {
+			window->wd_cookie_cnt++;
+			window->wd_size += dmac_size;
+		}
+
+		/* track our offset into the buffer, go to the next cookie */
+		ASSERT(dmac_size <= dma->dp_dma.dmao_size);
+		ASSERT(cookie->dmac_size <= dmac_size);
+		cur_offset += dmac_size;
+		cookie++;
+	}
+
+	/* if we ended up with a zero sized window in the end, clean it up */
+	if (window->wd_size == 0) {
+		hp->dmai_nwin--;
+		window--;
+	}
+
+	ASSERT(window->wd_trim.tr_trim_last == B_FALSE);
+
+	if (!partial) {
+		return (DDI_DMA_MAPPED);
+	}
+
+	ASSERT(dma->dp_partial_required);
+	return (DDI_DMA_PARTIAL_MAP);
+}
+
+
+/*
+ * rootnex_setup_copybuf()
+ *    Called in bind slowpath. Figures out if we're going to use the copy
+ *    buffer, and if we do, sets up the basic state to handle it.
+ */
+static int
+rootnex_setup_copybuf(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
+    rootnex_dma_t *dma, ddi_dma_attr_t *attr)
+{
+	rootnex_sglinfo_t *sinfo;
+	ddi_dma_attr_t lattr;
+	size_t max_copybuf;
+	int cansleep;
+	int e;
+#if !defined(__amd64)
+	int vmflag;
+#endif
+
+
+	sinfo = &dma->dp_sglinfo;
+
+	/*
+	 * read this first so it's consistent through the routine so we can
+	 * patch it on the fly.
+	 */
+	max_copybuf = rootnex_max_copybuf_size & MMU_PAGEMASK;
+
+	/* We need to call into the rootnex on ddi_dma_sync() */
+	hp->dmai_rflags &= ~DMP_NOSYNC;
+
+	/* make sure the copybuf size <= the max size */
+	dma->dp_copybuf_size = MIN(sinfo->si_copybuf_req, max_copybuf);
+	ASSERT((dma->dp_copybuf_size & MMU_PAGEOFFSET) == 0);
+
+#if !defined(__amd64)
+	/*
+	 * if we don't have kva space to copy to/from, allocate the KVA space
+	 * now. We only do this for the 32-bit kernel. We use seg kpm space for
+	 * the 64-bit kernel.
+	 */
+	if ((dmareq->dmar_object.dmao_type == DMA_OTYP_PAGES) ||
+	    (dmareq->dmar_object.dmao_obj.virt_obj.v_as != NULL)) {
+
+		/* convert the sleep flags */
+		if (dmareq->dmar_fp == DDI_DMA_SLEEP) {
+			vmflag = VM_SLEEP;
+		} else {
+			vmflag = VM_NOSLEEP;
+		}
+
+		/* allocate Kernel VA space that we can bcopy to/from */
+		dma->dp_kva = vmem_alloc(heap_arena, dma->dp_copybuf_size,
+		    vmflag);
+		if (dma->dp_kva == NULL) {
+			return (DDI_DMA_NORESOURCES);
+		}
+	}
+#endif
+
+	/* convert the sleep flags */
+	if (dmareq->dmar_fp == DDI_DMA_SLEEP) {
+		cansleep = 1;
+	} else {
+		cansleep = 0;
+	}
+
+	/*
+	 * Allocated the actual copy buffer. This needs to fit within the DMA
+	 * engines limits, so we can't use kmem_alloc...
+	 */
+	lattr = *attr;
+	lattr.dma_attr_align = MMU_PAGESIZE;
+	e = i_ddi_mem_alloc(dma->dp_dip, &lattr, dma->dp_copybuf_size, cansleep,
+	    0, NULL, &dma->dp_cbaddr, &dma->dp_cbsize, NULL);
+	if (e != DDI_SUCCESS) {
+#if !defined(__amd64)
+		if (dma->dp_kva != NULL) {
+			vmem_free(heap_arena, dma->dp_kva,
+			    dma->dp_copybuf_size);
+		}
+#endif
+		return (DDI_DMA_NORESOURCES);
+	}
+
+	DTRACE_PROBE2(rootnex__alloc__copybuf, dev_info_t *, dma->dp_dip,
+	    size_t, dma->dp_copybuf_size);
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_setup_windows()
+ *    Called in bind slowpath to setup the window state. We always have windows
+ *    in the slowpath. Even if the window count = 1.
+ */
+static int
+rootnex_setup_windows(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
+    ddi_dma_attr_t *attr, int kmflag)
+{
+	rootnex_window_t *windowp;
+	rootnex_sglinfo_t *sinfo;
+	size_t copy_state_size;
+	size_t win_state_size;
+	size_t state_available;
+	size_t space_needed;
+	uint_t copybuf_win;
+	uint_t maxxfer_win;
+	size_t space_used;
+	uint_t sglwin;
+
+
+	sinfo = &dma->dp_sglinfo;
+
+	dma->dp_current_win = 0;
+	hp->dmai_nwin = 0;
+
+	/* If we don't need to do a partial, we only have one window */
+	if (!dma->dp_partial_required) {
+		dma->dp_max_win = 1;
+
+	/*
+	 * we need multiple windows, need to figure out the worse case number
+	 * of windows.
+	 */
+	} else {
+		/*
+		 * if we need windows because we need more copy buffer that
+		 * we allow, the worse case number of windows we could need
+		 * here would be (copybuf space required / copybuf space that
+		 * we have) plus one for remainder, and plus 2 to handle the
+		 * extra pages on the trim for the first and last pages of the
+		 * buffer (a page is the minimum window size so under the right
+		 * attr settings, you could have a window for each page).
+		 * The last page will only be hit here if the size is not a
+		 * multiple of the granularity (which theoretically shouldn't
+		 * be the case but never has been enforced, so we could have
+		 * broken things without it).
+		 */
+		if (sinfo->si_copybuf_req > dma->dp_copybuf_size) {
+			ASSERT(dma->dp_copybuf_size > 0);
+			copybuf_win = (sinfo->si_copybuf_req /
+			    dma->dp_copybuf_size) + 1 + 2;
+		} else {
+			copybuf_win = 0;
+		}
+
+		/*
+		 * if we need windows because we have more cookies than the H/W
+		 * can handle, the number of windows we would need here would
+		 * be (cookie count / cookies count H/W supports) plus one for
+		 * remainder, and plus 2 to handle the extra pages on the trim
+		 * (see above comment about trim)
+		 */
+		if (attr->dma_attr_sgllen < sinfo->si_sgl_size) {
+			sglwin = ((sinfo->si_sgl_size / attr->dma_attr_sgllen)
+			    + 1) + 2;
+		} else {
+			sglwin = 0;
+		}
+
+		/*
+		 * if we need windows because we're binding more memory than the
+		 * H/W can transfer at once, the number of windows we would need
+		 * here would be (xfer count / max xfer H/W supports) plus one
+		 * for remainder, and plus 2 to handle the extra pages on the
+		 * trim (see above comment about trim)
+		 */
+		if (dma->dp_dma.dmao_size > dma->dp_maxxfer) {
+			maxxfer_win = (dma->dp_dma.dmao_size /
+			    dma->dp_maxxfer) + 1 + 2;
+		} else {
+			maxxfer_win = 0;
+		}
+		dma->dp_max_win =  copybuf_win + sglwin + maxxfer_win;
+		ASSERT(dma->dp_max_win > 0);
+	}
+	win_state_size = dma->dp_max_win * sizeof (rootnex_window_t);
+
+	/*
+	 * Get space for window and potential copy buffer state. Before we
+	 * go and allocate memory, see if we can get away with using what's
+	 * left in the pre-allocted state or the dynamically allocated sgl.
+	 */
+	space_used = (uintptr_t)(sinfo->si_sgl_size *
+	    sizeof (ddi_dma_cookie_t));
+
+	/* if we dynamically allocated space for the cookies */
+	if (dma->dp_need_to_free_cookie) {
+		/* if we have more space in the pre-allocted buffer, use it */
+		ASSERT(space_used <= dma->dp_cookie_size);
+		if ((dma->dp_cookie_size - space_used) <=
+		    rootnex_state->r_prealloc_size) {
+			state_available = rootnex_state->r_prealloc_size;
+			windowp = (rootnex_window_t *)dma->dp_prealloc_buffer;
+
+		/*
+		 * else, we have more free space in the dynamically allocated
+		 * buffer, i.e. the buffer wasn't worse case fragmented so we
+		 * didn't need a lot of cookies.
+		 */
+		} else {
+			state_available = dma->dp_cookie_size - space_used;
+			windowp = (rootnex_window_t *)
+			    &dma->dp_cookies[sinfo->si_sgl_size];
+		}
+
+	/* we used the pre-alloced buffer */
+	} else {
+		ASSERT(space_used <= rootnex_state->r_prealloc_size);
+		state_available = rootnex_state->r_prealloc_size - space_used;
+		windowp = (rootnex_window_t *)
+		    &dma->dp_cookies[sinfo->si_sgl_size];
+	}
+
+	/*
+	 * figure out how much state we need to track the copy buffer. Add an
+	 * addition 8 bytes for pointer alignemnt later.
+	 */
+	if (dma->dp_copybuf_size > 0) {
+		copy_state_size = sinfo->si_max_pages *
+		    sizeof (rootnex_pgmap_t);
+	} else {
+		copy_state_size = 0;
+	}
+	/* add an additional 8 bytes for pointer alignment */
+	space_needed = win_state_size + copy_state_size + 0x8;
+
+	/* if we have enough space already, use it */
+	if (state_available >= space_needed) {
+		dma->dp_window = windowp;
+		dma->dp_need_to_free_window = B_FALSE;
+
+	/* not enough space, need to allocate more. */
+	} else {
+		dma->dp_window = kmem_alloc(space_needed, kmflag);
+		if (dma->dp_window == NULL) {
+			return (DDI_DMA_NORESOURCES);
+		}
+		dma->dp_need_to_free_window = B_TRUE;
+		dma->dp_window_size = space_needed;
+		DTRACE_PROBE2(rootnex__bind__sp__alloc, dev_info_t *,
+		    dma->dp_dip, size_t, space_needed);
+	}
+
+	/*
+	 * we allocate copy buffer state and window state at the same time.
+	 * setup our copy buffer state pointers. Make sure it's aligned.
+	 */
+	if (dma->dp_copybuf_size > 0) {
+		dma->dp_pgmap = (rootnex_pgmap_t *)(((uintptr_t)
+		    &dma->dp_window[dma->dp_max_win] + 0x7) & ~0x7);
+
+#if !defined(__amd64)
+		/*
+		 * make sure all pm_mapped, pm_vaddr, and pm_pp are set to
+		 * false/NULL. Should be quicker to bzero vs loop and set.
+		 */
+		bzero(dma->dp_pgmap, copy_state_size);
+#endif
+	} else {
+		dma->dp_pgmap = NULL;
+	}
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_teardown_copybuf()
+ *    cleans up after rootnex_setup_copybuf()
+ */
+static void
+rootnex_teardown_copybuf(rootnex_dma_t *dma)
+{
+#if !defined(__amd64)
+	int i;
+
+	/*
+	 * if we allocated kernel heap VMEM space, go through all the pages and
+	 * map out any of the ones that we're mapped into the kernel heap VMEM
+	 * arena. Then free the VMEM space.
+	 */
+	if (dma->dp_kva != NULL) {
+		for (i = 0; i < dma->dp_sglinfo.si_max_pages; i++) {
+			if (dma->dp_pgmap[i].pm_mapped) {
+				hat_unload(kas.a_hat, dma->dp_pgmap[i].pm_kaddr,
+				    MMU_PAGESIZE, HAT_UNLOAD);
+				dma->dp_pgmap[i].pm_mapped = B_FALSE;
+			}
+		}
+
+		vmem_free(heap_arena, dma->dp_kva, dma->dp_copybuf_size);
+	}
+
+#endif
+
+	/* if we allocated a copy buffer, free it */
+	if (dma->dp_cbaddr != NULL) {
+		i_ddi_mem_free(dma->dp_cbaddr, 0);
+	}
+}
+
+
+/*
+ * rootnex_teardown_windows()
+ *    cleans up after rootnex_setup_windows()
+ */
+static void
+rootnex_teardown_windows(rootnex_dma_t *dma)
+{
+	/*
+	 * if we had to allocate window state on the last bind (because we
+	 * didn't have enough pre-allocated space in the handle), free it.
+	 */
+	if (dma->dp_need_to_free_window) {
+		kmem_free(dma->dp_window, dma->dp_window_size);
+	}
+}
+
+
+/*
+ * rootnex_init_win()
+ *    Called in bind slow path during creation of a new window. Initializes
+ *    window state to default values.
+ */
+/*ARGSUSED*/
+static void
+rootnex_init_win(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
+    rootnex_window_t *window, ddi_dma_cookie_t *cookie, off_t cur_offset)
+{
+	hp->dmai_nwin++;
+	window->wd_dosync = B_FALSE;
+	window->wd_offset = cur_offset;
+	window->wd_size = 0;
+	window->wd_first_cookie = cookie;
+	window->wd_cookie_cnt = 0;
+	window->wd_trim.tr_trim_first = B_FALSE;
+	window->wd_trim.tr_trim_last = B_FALSE;
+	window->wd_trim.tr_first_copybuf_win = B_FALSE;
+	window->wd_trim.tr_last_copybuf_win = B_FALSE;
+#if !defined(__amd64)
+	window->wd_remap_copybuf = dma->dp_cb_remaping;
+#endif
+}
+
+
+/*
+ * rootnex_setup_cookie()
+ *    Called in the bind slow path when the sgl uses the copy buffer. If any of
+ *    the sgl uses the copy buffer, we need to go through each cookie, figure
+ *    out if it uses the copy buffer, and if it does, save away everything we'll
+ *    need during sync.
+ */
+static void
+rootnex_setup_cookie(ddi_dma_obj_t *dmar_object, rootnex_dma_t *dma,
+    ddi_dma_cookie_t *cookie, off_t cur_offset, size_t *copybuf_used,
+    page_t **cur_pp)
+{
+	boolean_t copybuf_sz_power_2;
+	rootnex_sglinfo_t *sinfo;
+	uint_t pidx;
+	uint_t pcnt;
+	off_t poff;
+#if defined(__amd64)
+	pfn_t pfn;
+#else
+	page_t **pplist;
+#endif
+
+	sinfo = &dma->dp_sglinfo;
+
+	/*
+	 * Calculate the page index relative to the start of the buffer. The
+	 * index to the current page for our buffer is the offset into the
+	 * first page of the buffer plus our current offset into the buffer
+	 * itself, shifted of course...
+	 */
+	pidx = (sinfo->si_buf_offset + cur_offset) >> MMU_PAGESHIFT;
+	ASSERT(pidx < sinfo->si_max_pages);
+
+	/* if this cookie uses the copy buffer */
+	if (cookie->dmac_type & ROOTNEX_USES_COPYBUF) {
+		/*
+		 * NOTE: we know that since this cookie uses the copy buffer, it
+		 * is <= MMU_PAGESIZE.
+		 */
+
+		/*
+		 * get the offset into the page. For the 64-bit kernel, get the
+		 * pfn which we'll use with seg kpm.
+		 */
+		poff = cookie->_dmu._dmac_ll & MMU_PAGEOFFSET;
+#if defined(__amd64)
+		pfn = cookie->_dmu._dmac_ll >> MMU_PAGESHIFT;
+#endif
+
+		/* figure out if the copybuf size is a power of 2 */
+		if (dma->dp_copybuf_size & (dma->dp_copybuf_size - 1)) {
+			copybuf_sz_power_2 = B_FALSE;
+		} else {
+			copybuf_sz_power_2 = B_TRUE;
+		}
+
+		/* This page uses the copy buffer */
+		dma->dp_pgmap[pidx].pm_uses_copybuf = B_TRUE;
+
+		/*
+		 * save the copy buffer KVA that we'll use with this page.
+		 * if we still fit within the copybuf, it's a simple add.
+		 * otherwise, we need to wrap over using & or % accordingly.
+		 */
+		if ((*copybuf_used + MMU_PAGESIZE) <= dma->dp_copybuf_size) {
+			dma->dp_pgmap[pidx].pm_cbaddr = dma->dp_cbaddr +
+			    *copybuf_used;
+		} else {
+			if (copybuf_sz_power_2) {
+				dma->dp_pgmap[pidx].pm_cbaddr = (caddr_t)(
+				    (uintptr_t)dma->dp_cbaddr +
+				    (*copybuf_used &
+				    (dma->dp_copybuf_size - 1)));
+			} else {
+				dma->dp_pgmap[pidx].pm_cbaddr = (caddr_t)(
+				    (uintptr_t)dma->dp_cbaddr +
+				    (*copybuf_used % dma->dp_copybuf_size));
+			}
+		}
+
+		/*
+		 * over write the cookie physical address with the address of
+		 * the physical address of the copy buffer page that we will
+		 * use.
+		 */
+		cookie->_dmu._dmac_ll = ptob64(hat_getpfnum(kas.a_hat,
+		    dma->dp_pgmap[pidx].pm_cbaddr)) + poff;
+
+		/* if we have a kernel VA, it's easy, just save that address */
+		if ((dmar_object->dmao_type != DMA_OTYP_PAGES) &&
+		    (sinfo->si_asp == &kas)) {
+			/*
+			 * save away the page aligned virtual address of the
+			 * driver buffer. Offsets are handled in the sync code.
+			 */
+			dma->dp_pgmap[pidx].pm_kaddr = (caddr_t)(((uintptr_t)
+			    dmar_object->dmao_obj.virt_obj.v_addr + cur_offset)
+			    & MMU_PAGEMASK);
+#if !defined(__amd64)
+			/*
+			 * we didn't need to, and will never need to map this
+			 * page.
+			 */
+			dma->dp_pgmap[pidx].pm_mapped = B_FALSE;
+#endif
+
+		/* we don't have a kernel VA. We need one for the bcopy. */
+		} else {
+#if defined(__amd64)
+			/*
+			 * for the 64-bit kernel, it's easy. We use seg kpm to
+			 * get a Kernel VA for the corresponding pfn.
+			 */
+			dma->dp_pgmap[pidx].pm_kaddr = hat_kpm_pfn2va(pfn);
+#else
+			/*
+			 * for the 32-bit kernel, this is a pain. First we'll
+			 * save away the page_t or user VA for this page. This
+			 * is needed in rootnex_dma_win() when we switch to a
+			 * new window which requires us to re-map the copy
+			 * buffer.
+			 */
+			pplist = dmar_object->dmao_obj.virt_obj.v_priv;
+			if (dmar_object->dmao_type == DMA_OTYP_PAGES) {
+				dma->dp_pgmap[pidx].pm_pp = *cur_pp;
+				dma->dp_pgmap[pidx].pm_vaddr = NULL;
+			} else if (pplist != NULL) {
+				dma->dp_pgmap[pidx].pm_pp = pplist[pidx];
+				dma->dp_pgmap[pidx].pm_vaddr = NULL;
+			} else {
+				dma->dp_pgmap[pidx].pm_pp = NULL;
+				dma->dp_pgmap[pidx].pm_vaddr = (caddr_t)
+				    (((uintptr_t)
+				    dmar_object->dmao_obj.virt_obj.v_addr +
+				    cur_offset) & MMU_PAGEMASK);
+			}
+
+			/*
+			 * save away the page aligned virtual address which was
+			 * allocated from the kernel heap arena (taking into
+			 * account if we need more copy buffer than we alloced
+			 * and use multiple windows to handle this, i.e. &,%).
+			 * NOTE: there isn't and physical memory backing up this
+			 * virtual address space currently.
+			 */
+			if ((*copybuf_used + MMU_PAGESIZE) <=
+			    dma->dp_copybuf_size) {
+				dma->dp_pgmap[pidx].pm_kaddr = (caddr_t)
+				    (((uintptr_t)dma->dp_kva + *copybuf_used) &
+				    MMU_PAGEMASK);
+			} else {
+				if (copybuf_sz_power_2) {
+					dma->dp_pgmap[pidx].pm_kaddr = (caddr_t)
+					    (((uintptr_t)dma->dp_kva +
+					    (*copybuf_used &
+					    (dma->dp_copybuf_size - 1))) &
+					    MMU_PAGEMASK);
+				} else {
+					dma->dp_pgmap[pidx].pm_kaddr = (caddr_t)
+					    (((uintptr_t)dma->dp_kva +
+					    (*copybuf_used %
+					    dma->dp_copybuf_size)) &
+					    MMU_PAGEMASK);
+				}
+			}
+
+			/*
+			 * if we haven't used up the available copy buffer yet,
+			 * map the kva to the physical page.
+			 */
+			if (!dma->dp_cb_remaping && ((*copybuf_used +
+			    MMU_PAGESIZE) <= dma->dp_copybuf_size)) {
+				dma->dp_pgmap[pidx].pm_mapped = B_TRUE;
+				if (dma->dp_pgmap[pidx].pm_pp != NULL) {
+					i86_pp_map(dma->dp_pgmap[pidx].pm_pp,
+					    dma->dp_pgmap[pidx].pm_kaddr);
+				} else {
+					i86_va_map(dma->dp_pgmap[pidx].pm_vaddr,
+					    sinfo->si_asp,
+					    dma->dp_pgmap[pidx].pm_kaddr);
+				}
+
+			/*
+			 * we've used up the available copy buffer, this page
+			 * will have to be mapped during rootnex_dma_win() when
+			 * we switch to a new window which requires a re-map
+			 * the copy buffer. (32-bit kernel only)
+			 */
+			} else {
+				dma->dp_pgmap[pidx].pm_mapped = B_FALSE;
+			}
+#endif
+			/* go to the next page_t */
+			if (dmar_object->dmao_type == DMA_OTYP_PAGES) {
+				*cur_pp = (*cur_pp)->p_next;
+			}
+		}
+
+		/* add to the copy buffer count */
+		*copybuf_used += MMU_PAGESIZE;
+
+	/*
+	 * This cookie doesn't use the copy buffer. Walk through the pages this
+	 * cookie occupies to reflect this.
+	 */
+	} else {
+		/*
+		 * figure out how many pages the cookie occupies. We need to
+		 * use the original page offset of the buffer and the cookies
+		 * offset in the buffer to do this.
+		 */
+		poff = (sinfo->si_buf_offset + cur_offset) & MMU_PAGEOFFSET;
+		pcnt = mmu_btopr(cookie->dmac_size + poff);
+
+		while (pcnt > 0) {
+#if !defined(__amd64)
+			/*
+			 * the 32-bit kernel doesn't have seg kpm, so we need
+			 * to map in the driver buffer (if it didn't come down
+			 * with a kernel VA) on the fly. Since this page doesn't
+			 * use the copy buffer, it's not, or will it ever, have
+			 * to be mapped in.
+			 */
+			dma->dp_pgmap[pidx].pm_mapped = B_FALSE;
+#endif
+			dma->dp_pgmap[pidx].pm_uses_copybuf = B_FALSE;
+
+			/*
+			 * we need to update pidx and cur_pp or we'll loose
+			 * track of where we are.
+			 */
+			if (dmar_object->dmao_type == DMA_OTYP_PAGES) {
+				*cur_pp = (*cur_pp)->p_next;
+			}
+			pidx++;
+			pcnt--;
+		}
+	}
+}
+
+
+/*
+ * rootnex_sgllen_window_boundary()
+ *    Called in the bind slow path when the next cookie causes us to exceed (in
+ *    this case == since we start at 0 and sgllen starts at 1) the maximum sgl
+ *    length supported by the DMA H/W.
+ */
+static int
+rootnex_sgllen_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
+    rootnex_window_t **windowp, ddi_dma_cookie_t *cookie, ddi_dma_attr_t *attr,
+    off_t cur_offset)
+{
+	off_t new_offset;
+	size_t trim_sz;
+	off_t coffset;
+
+
+	/*
+	 * if we know we'll never have to trim, it's pretty easy. Just move to
+	 * the next window and init it. We're done.
+	 */
+	if (!dma->dp_trim_required) {
+		(*windowp)++;
+		rootnex_init_win(hp, dma, *windowp, cookie, cur_offset);
+		(*windowp)->wd_cookie_cnt++;
+		(*windowp)->wd_size = cookie->dmac_size;
+		return (DDI_SUCCESS);
+	}
+
+	/* figure out how much we need to trim from the window */
+	ASSERT(attr->dma_attr_granular != 0);
+	if (dma->dp_granularity_power_2) {
+		trim_sz = (*windowp)->wd_size & (attr->dma_attr_granular - 1);
+	} else {
+		trim_sz = (*windowp)->wd_size % attr->dma_attr_granular;
+	}
+
+	/* The window's a whole multiple of granularity. We're done */
+	if (trim_sz == 0) {
+		(*windowp)++;
+		rootnex_init_win(hp, dma, *windowp, cookie, cur_offset);
+		(*windowp)->wd_cookie_cnt++;
+		(*windowp)->wd_size = cookie->dmac_size;
+		return (DDI_SUCCESS);
+	}
+
+	/*
+	 * The window's not a whole multiple of granularity, since we know this
+	 * is due to the sgllen, we need to go back to the last cookie and trim
+	 * that one, add the left over part of the old cookie into the new
+	 * window, and then add in the new cookie into the new window.
+	 */
+
+	/*
+	 * make sure the driver isn't making us do something bad... Trimming and
+	 * sgllen == 1 don't go together.
+	 */
+	if (attr->dma_attr_sgllen == 1) {
+		return (DDI_DMA_NOMAPPING);
+	}
+
+	/*
+	 * first, setup the current window to account for the trim. Need to go
+	 * back to the last cookie for this.
+	 */
+	cookie--;
+	(*windowp)->wd_trim.tr_trim_last = B_TRUE;
+	(*windowp)->wd_trim.tr_last_cookie = cookie;
+	(*windowp)->wd_trim.tr_last_paddr = cookie->_dmu._dmac_ll;
+	ASSERT(cookie->dmac_size > trim_sz);
+	(*windowp)->wd_trim.tr_last_size = cookie->dmac_size - trim_sz;
+	(*windowp)->wd_size -= trim_sz;
+
+	/* save the buffer offsets for the next window */
+	coffset = cookie->dmac_size - trim_sz;
+	new_offset = (*windowp)->wd_offset + (*windowp)->wd_size;
+
+	/*
+	 * set this now in case this is the first window. all other cases are
+	 * set in dma_win()
+	 */
+	cookie->dmac_size = (*windowp)->wd_trim.tr_last_size;
+
+	/*
+	 * initialize the next window using what's left over in the previous
+	 * cookie.
+	 */
+	(*windowp)++;
+	rootnex_init_win(hp, dma, *windowp, cookie, new_offset);
+	(*windowp)->wd_cookie_cnt++;
+	(*windowp)->wd_trim.tr_trim_first = B_TRUE;
+	(*windowp)->wd_trim.tr_first_paddr = cookie->_dmu._dmac_ll + coffset;
+	(*windowp)->wd_trim.tr_first_size = trim_sz;
+	if (cookie->dmac_type & ROOTNEX_USES_COPYBUF) {
+		(*windowp)->wd_dosync = B_TRUE;
+	}
+
+	/*
+	 * now go back to the current cookie and add it to the new window. set
+	 * the new window size to the what was left over from the previous
+	 * cookie and what's in the current cookie.
+	 */
+	cookie++;
+	(*windowp)->wd_cookie_cnt++;
+	(*windowp)->wd_size = trim_sz + cookie->dmac_size;
+
+	/*
+	 * trim plus the next cookie could put us over maxxfer (a cookie can be
+	 * a max size of maxxfer). Handle that case.
+	 */
+	if ((*windowp)->wd_size > dma->dp_maxxfer) {
+		/*
+		 * maxxfer is already a whole multiple of granularity, and this
+		 * trim will be <= the previous trim (since a cookie can't be
+		 * larger than maxxfer). Make things simple here.
+		 */
+		trim_sz = (*windowp)->wd_size - dma->dp_maxxfer;
+		(*windowp)->wd_trim.tr_trim_last = B_TRUE;
+		(*windowp)->wd_trim.tr_last_cookie = cookie;
+		(*windowp)->wd_trim.tr_last_paddr = cookie->_dmu._dmac_ll;
+		(*windowp)->wd_trim.tr_last_size = cookie->dmac_size - trim_sz;
+		(*windowp)->wd_size -= trim_sz;
+		ASSERT((*windowp)->wd_size == dma->dp_maxxfer);
+
+		/* save the buffer offsets for the next window */
+		coffset = cookie->dmac_size - trim_sz;
+		new_offset = (*windowp)->wd_offset + (*windowp)->wd_size;
+
+		/* setup the next window */
+		(*windowp)++;
+		rootnex_init_win(hp, dma, *windowp, cookie, new_offset);
+		(*windowp)->wd_cookie_cnt++;
+		(*windowp)->wd_trim.tr_trim_first = B_TRUE;
+		(*windowp)->wd_trim.tr_first_paddr = cookie->_dmu._dmac_ll +
+		    coffset;
+		(*windowp)->wd_trim.tr_first_size = trim_sz;
+	}
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_copybuf_window_boundary()
+ *    Called in bind slowpath when we get to a window boundary because we used
+ *    up all the copy buffer that we have.
+ */
+static int
+rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
+    rootnex_window_t **windowp, ddi_dma_cookie_t *cookie, off_t cur_offset,
+    size_t *copybuf_used)
+{
+	rootnex_sglinfo_t *sinfo;
+	off_t new_offset;
+	size_t trim_sz;
+	off_t coffset;
+	uint_t pidx;
+	off_t poff;
+
+
+	sinfo = &dma->dp_sglinfo;
+
+	/*
+	 * the copy buffer should be a whole multiple of page size. We know that
+	 * this cookie is <= MMU_PAGESIZE.
+	 */
+	ASSERT(cookie->dmac_size <= MMU_PAGESIZE);
+
+	/*
+	 * from now on, all new windows in this bind need to be re-mapped during
+	 * ddi_dma_getwin() (32-bit kernel only). i.e. we ran out out copybuf
+	 * space...
+	 */
+#if !defined(__amd64)
+	dma->dp_cb_remaping = B_TRUE;
+#endif
+
+	/* reset copybuf used */
+	*copybuf_used = 0;
+
+	/*
+	 * if we don't have to trim (since granularity is set to 1), go to the
+	 * next window and add the current cookie to it. We know the current
+	 * cookie uses the copy buffer since we're in this code path.
+	 */
+	if (!dma->dp_trim_required) {
+		(*windowp)++;
+		rootnex_init_win(hp, dma, *windowp, cookie, cur_offset);
+
+		/* Add this cookie to the new window */
+		(*windowp)->wd_cookie_cnt++;
+		(*windowp)->wd_size += cookie->dmac_size;
+		*copybuf_used += MMU_PAGESIZE;
+		return (DDI_SUCCESS);
+	}
+
+	/*
+	 * *** may need to trim, figure it out.
+	 */
+
+	/* figure out how much we need to trim from the window */
+	if (dma->dp_granularity_power_2) {
+		trim_sz = (*windowp)->wd_size &
+		    (hp->dmai_attr.dma_attr_granular - 1);
+	} else {
+		trim_sz = (*windowp)->wd_size % hp->dmai_attr.dma_attr_granular;
+	}
+
+	/*
+	 * if the window's a whole multiple of granularity, go to the next
+	 * window, init it, then add in the current cookie. We know the current
+	 * cookie uses the copy buffer since we're in this code path.
+	 */
+	if (trim_sz == 0) {
+		(*windowp)++;
+		rootnex_init_win(hp, dma, *windowp, cookie, cur_offset);
+
+		/* Add this cookie to the new window */
+		(*windowp)->wd_cookie_cnt++;
+		(*windowp)->wd_size += cookie->dmac_size;
+		*copybuf_used += MMU_PAGESIZE;
+		return (DDI_SUCCESS);
+	}
+
+	/*
+	 * *** We figured it out, we definitly need to trim
+	 */
+
+	/*
+	 * make sure the driver isn't making us do something bad...
+	 * Trimming and sgllen == 1 don't go together.
+	 */
+	if (hp->dmai_attr.dma_attr_sgllen == 1) {
+		return (DDI_DMA_NOMAPPING);
+	}
+
+	/*
+	 * first, setup the current window to account for the trim. Need to go
+	 * back to the last cookie for this. Some of the last cookie will be in
+	 * the current window, and some of the last cookie will be in the new
+	 * window. All of the current cookie will be in the new window.
+	 */
+	cookie--;
+	(*windowp)->wd_trim.tr_trim_last = B_TRUE;
+	(*windowp)->wd_trim.tr_last_cookie = cookie;
+	(*windowp)->wd_trim.tr_last_paddr = cookie->_dmu._dmac_ll;
+	ASSERT(cookie->dmac_size > trim_sz);
+	(*windowp)->wd_trim.tr_last_size = cookie->dmac_size - trim_sz;
+	(*windowp)->wd_size -= trim_sz;
+
+	/*
+	 * we're trimming the last cookie (not the current cookie). So that
+	 * last cookie may have or may not have been using the copy buffer (
+	 * we know the cookie passed in uses the copy buffer since we're in
+	 * this code path).
+	 *
+	 * If the last cookie doesn't use the copy buffer, nothing special to
+	 * do. However, if it does uses the copy buffer, it will be both the
+	 * last page in the current window and the first page in the next
+	 * window. Since we are reusing the copy buffer (and KVA space on the
+	 * 32-bit kernel), this page will use the end of the copy buffer in the
+	 * current window, and the start of the copy buffer in the next window.
+	 * Track that info... The cookie physical address was already set to
+	 * the copy buffer physical address in setup_cookie..
+	 */
+	if (cookie->dmac_type & ROOTNEX_USES_COPYBUF) {
+		pidx = (sinfo->si_buf_offset + (*windowp)->wd_offset +
+		    (*windowp)->wd_size) >> MMU_PAGESHIFT;
+		(*windowp)->wd_trim.tr_last_copybuf_win = B_TRUE;
+		(*windowp)->wd_trim.tr_last_pidx = pidx;
+		(*windowp)->wd_trim.tr_last_cbaddr =
+		    dma->dp_pgmap[pidx].pm_cbaddr;
+#if !defined(__amd64)
+		(*windowp)->wd_trim.tr_last_kaddr =
+		    dma->dp_pgmap[pidx].pm_kaddr;
+#endif
+	}
+
+	/* save the buffer offsets for the next window */
+	coffset = cookie->dmac_size - trim_sz;
+	new_offset = (*windowp)->wd_offset + (*windowp)->wd_size;
+
+	/*
+	 * set this now in case this is the first window. all other cases are
+	 * set in dma_win()
+	 */
+	cookie->dmac_size = (*windowp)->wd_trim.tr_last_size;
+
+	/*
+	 * initialize the next window using what's left over in the previous
+	 * cookie.
+	 */
+	(*windowp)++;
+	rootnex_init_win(hp, dma, *windowp, cookie, new_offset);
+	(*windowp)->wd_cookie_cnt++;
+	(*windowp)->wd_trim.tr_trim_first = B_TRUE;
+	(*windowp)->wd_trim.tr_first_paddr = cookie->_dmu._dmac_ll + coffset;
+	(*windowp)->wd_trim.tr_first_size = trim_sz;
+
+	/*
+	 * again, we're tracking if the last cookie uses the copy buffer.
+	 * read the comment above for more info on why we need to track
+	 * additional state.
+	 *
+	 * For the first cookie in the new window, we need reset the physical
+	 * address to DMA into to the start of the copy buffer plus any
+	 * initial page offset which may be present.
+	 */
+	if (cookie->dmac_type & ROOTNEX_USES_COPYBUF) {
+		(*windowp)->wd_dosync = B_TRUE;
+		(*windowp)->wd_trim.tr_first_copybuf_win = B_TRUE;
+		(*windowp)->wd_trim.tr_first_pidx = pidx;
+		(*windowp)->wd_trim.tr_first_cbaddr = dma->dp_cbaddr;
+		poff = (*windowp)->wd_trim.tr_first_paddr & MMU_PAGEOFFSET;
+		(*windowp)->wd_trim.tr_first_paddr = ptob64(hat_getpfnum(
+		    kas.a_hat, dma->dp_cbaddr)) + poff;
+#if !defined(__amd64)
+		(*windowp)->wd_trim.tr_first_kaddr = dma->dp_kva;
+#endif
+		/* account for the cookie copybuf usage in the new window */
+		*copybuf_used += MMU_PAGESIZE;
+
+		/*
+		 * every piece of code has to have a hack, and here is this
+		 * ones :-)
+		 *
+		 * There is a complex interaction between setup_cookie and the
+		 * copybuf window boundary. The complexity had to be in either
+		 * the maxxfer window, or the copybuf window, and I chose the
+		 * copybuf code.
+		 *
+		 * So in this code path, we have taken the last cookie,
+		 * virtually broken it in half due to the trim, and it happens
+		 * to use the copybuf which further complicates life. At the
+		 * same time, we have already setup the current cookie, which
+		 * is now wrong. More background info: the current cookie uses
+		 * the copybuf, so it is only a page long max. So we need to
+		 * fix the current cookies copy buffer address, physical
+		 * address, and kva for the 32-bit kernel. We due this by
+		 * bumping them by page size (of course, we can't due this on
+		 * the physical address since the copy buffer may not be
+		 * physically contiguous).
+		 */
+		cookie++;
+		dma->dp_pgmap[pidx + 1].pm_cbaddr += MMU_PAGESIZE;
+		poff = cookie->_dmu._dmac_ll & MMU_PAGEOFFSET;
+		cookie->_dmu._dmac_ll = ptob64(hat_getpfnum(kas.a_hat,
+		    dma->dp_pgmap[pidx + 1].pm_cbaddr)) + poff;
+#if !defined(__amd64)
+		ASSERT(dma->dp_pgmap[pidx + 1].pm_mapped == B_FALSE);
+		dma->dp_pgmap[pidx + 1].pm_kaddr += MMU_PAGESIZE;
+#endif
+	} else {
+		/* go back to the current cookie */
+		cookie++;
+	}
+
+	/*
+	 * add the current cookie to the new window. set the new window size to
+	 * the what was left over from the previous cookie and what's in the
+	 * current cookie.
+	 */
+	(*windowp)->wd_cookie_cnt++;
+	(*windowp)->wd_size = trim_sz + cookie->dmac_size;
+	ASSERT((*windowp)->wd_size < dma->dp_maxxfer);
+
+	/*
+	 * we know that the cookie passed in always uses the copy buffer. We
+	 * wouldn't be here if it didn't.
+	 */
+	*copybuf_used += MMU_PAGESIZE;
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_maxxfer_window_boundary()
+ *    Called in bind slowpath when we get to a window boundary because we will
+ *    go over maxxfer.
+ */
+static int
+rootnex_maxxfer_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
+    rootnex_window_t **windowp, ddi_dma_cookie_t *cookie)
+{
+	size_t dmac_size;
+	off_t new_offset;
+	size_t trim_sz;
+	off_t coffset;
+
+
+	/*
+	 * calculate how much we have to trim off of the current cookie to equal
+	 * maxxfer. We don't have to account for granularity here since our
+	 * maxxfer already takes that into account.
+	 */
+	trim_sz = ((*windowp)->wd_size + cookie->dmac_size) - dma->dp_maxxfer;
+	ASSERT(trim_sz <= cookie->dmac_size);
+	ASSERT(trim_sz <= dma->dp_maxxfer);
+
+	/* save cookie size since we need it later and we might change it */
+	dmac_size = cookie->dmac_size;
+
+	/*
+	 * if we're not trimming the entire cookie, setup the current window to
+	 * account for the trim.
+	 */
+	if (trim_sz < cookie->dmac_size) {
+		(*windowp)->wd_cookie_cnt++;
+		(*windowp)->wd_trim.tr_trim_last = B_TRUE;
+		(*windowp)->wd_trim.tr_last_cookie = cookie;
+		(*windowp)->wd_trim.tr_last_paddr = cookie->_dmu._dmac_ll;
+		(*windowp)->wd_trim.tr_last_size = cookie->dmac_size - trim_sz;
+		(*windowp)->wd_size = dma->dp_maxxfer;
+
+		/*
+		 * set the adjusted cookie size now in case this is the first
+		 * window. All other windows are taken care of in get win
+		 */
+		cookie->dmac_size = (*windowp)->wd_trim.tr_last_size;
+	}
+
+	/*
+	 * coffset is the current offset within the cookie, new_offset is the
+	 * current offset with the entire buffer.
+	 */
+	coffset = dmac_size - trim_sz;
+	new_offset = (*windowp)->wd_offset + (*windowp)->wd_size;
+
+	/* initialize the next window */
+	(*windowp)++;
+	rootnex_init_win(hp, dma, *windowp, cookie, new_offset);
+	(*windowp)->wd_cookie_cnt++;
+	(*windowp)->wd_size = trim_sz;
+	if (trim_sz < dmac_size) {
+		(*windowp)->wd_trim.tr_trim_first = B_TRUE;
+		(*windowp)->wd_trim.tr_first_paddr = cookie->_dmu._dmac_ll +
+		    coffset;
+		(*windowp)->wd_trim.tr_first_size = trim_sz;
+	}
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_dma_sync()
+ *    called from ddi_dma_sync() if DMP_NOSYNC is not set in hp->dmai_rflags.
+ *    We set DMP_NOSYNC if we're not using the copy buffer. If DMP_NOSYNC
+ *    is set, ddi_dma_sync() returns immediately passing back success.
+ */
+/*ARGSUSED*/
+static int
+rootnex_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
+    off_t off, size_t len, uint_t cache_flags)
+{
+	rootnex_sglinfo_t *sinfo;
+	rootnex_pgmap_t *cbpage;
+	rootnex_window_t *win;
+	ddi_dma_impl_t *hp;
+	rootnex_dma_t *dma;
+	caddr_t fromaddr;
+	caddr_t toaddr;
+	uint_t psize;
+	off_t offset;
+	uint_t pidx;
+	size_t size;
+	off_t poff;
+	int e;
+
+
+	hp = (ddi_dma_impl_t *)handle;
+	dma = (rootnex_dma_t *)hp->dmai_private;
+	sinfo = &dma->dp_sglinfo;
+
+	/*
+	 * if we don't have any windows, we don't need to sync. A copybuf
+	 * will cause us to have at least one window.
+	 */
+	if (dma->dp_window == NULL) {
+		return (DDI_SUCCESS);
+	}
+
+	/* This window may not need to be sync'd */
+	win = &dma->dp_window[dma->dp_current_win];
+	if (!win->wd_dosync) {
+		return (DDI_SUCCESS);
+	}
+
+	/* handle off and len special cases */
+	if ((off == 0) || (rootnex_sync_ignore_params)) {
+		offset = win->wd_offset;
+	} else {
+		offset = off;
+	}
+	if ((len == 0) || (rootnex_sync_ignore_params)) {
+		size = win->wd_size;
+	} else {
+		size = len;
+	}
+
+	/* check the sync args to make sure they make a little sense */
+	if (rootnex_sync_check_parms) {
+		e = rootnex_valid_sync_parms(hp, win, offset, size,
+		    cache_flags);
+		if (e != DDI_SUCCESS) {
+			ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_SYNC_FAIL]);
+			return (DDI_FAILURE);
+		}
+	}
+
+	/*
+	 * special case the first page to handle the offset into the page. The
+	 * offset to the current page for our buffer is the offset into the
+	 * first page of the buffer plus our current offset into the buffer
+	 * itself, masked of course.
+	 */
+	poff = (sinfo->si_buf_offset + offset) & MMU_PAGEOFFSET;
+	psize = MIN((MMU_PAGESIZE - poff), size);
+
+	/* go through all the pages that we want to sync */
+	while (size > 0) {
+		/*
+		 * Calculate the page index relative to the start of the buffer.
+		 * The index to the current page for our buffer is the offset
+		 * into the first page of the buffer plus our current offset
+		 * into the buffer itself, shifted of course...
+		 */
+		pidx = (sinfo->si_buf_offset + offset) >> MMU_PAGESHIFT;
+		ASSERT(pidx < sinfo->si_max_pages);
+
+		/*
+		 * if this page uses the copy buffer, we need to sync it,
+		 * otherwise, go on to the next page.
+		 */
+		cbpage = &dma->dp_pgmap[pidx];
+		ASSERT((cbpage->pm_uses_copybuf == B_TRUE) ||
+		    (cbpage->pm_uses_copybuf == B_FALSE));
+		if (cbpage->pm_uses_copybuf) {
+			/* cbaddr and kaddr should be page aligned */
+			ASSERT(((uintptr_t)cbpage->pm_cbaddr &
+			    MMU_PAGEOFFSET) == 0);
+			ASSERT(((uintptr_t)cbpage->pm_kaddr &
+			    MMU_PAGEOFFSET) == 0);
+
+			/*
+			 * if we're copying for the device, we are going to
+			 * copy from the drivers buffer and to the rootnex
+			 * allocated copy buffer.
+			 */
+			if (cache_flags == DDI_DMA_SYNC_FORDEV) {
+				fromaddr = cbpage->pm_kaddr + poff;
+				toaddr = cbpage->pm_cbaddr + poff;
+				DTRACE_PROBE2(rootnex__sync__dev,
+				    dev_info_t *, dma->dp_dip, size_t, psize);
+
+			/*
+			 * if we're copying for the cpu/kernel, we are going to
+			 * copy from the rootnex allocated copy buffer to the
+			 * drivers buffer.
+			 */
+			} else {
+				fromaddr = cbpage->pm_cbaddr + poff;
+				toaddr = cbpage->pm_kaddr + poff;
+				DTRACE_PROBE2(rootnex__sync__cpu,
+				    dev_info_t *, dma->dp_dip, size_t, psize);
+			}
+
+			bcopy(fromaddr, toaddr, psize);
+		}
+
+		/*
+		 * decrement size until we're done, update our offset into the
+		 * buffer, and get the next page size.
+		 */
+		size -= psize;
+		offset += psize;
+		psize = MIN(MMU_PAGESIZE, size);
+
+		/* page offset is zero for the rest of this loop */
+		poff = 0;
+	}
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * rootnex_valid_sync_parms()
+ *    checks the parameters passed to sync to verify they are correct.
+ */
+static int
+rootnex_valid_sync_parms(ddi_dma_impl_t *hp, rootnex_window_t *win,
+    off_t offset, size_t size, uint_t cache_flags)
+{
+	off_t woffset;
+
+
+	/*
+	 * the first part of the test to make sure the offset passed in is
+	 * within the window.
+	 */
+	if (offset < win->wd_offset) {
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * second and last part of the test to make sure the offset and length
+	 * passed in is within the window.
+	 */
+	woffset = offset - win->wd_offset;
+	if ((woffset + size) > win->wd_size) {
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * if we are sync'ing for the device, the DDI_DMA_WRITE flag should
+	 * be set too.
+	 */
+	if ((cache_flags == DDI_DMA_SYNC_FORDEV) &&
+	    (hp->dmai_rflags & DDI_DMA_WRITE)) {
+		return (DDI_SUCCESS);
+	}
+
+	/*
+	 * at this point, either DDI_DMA_SYNC_FORCPU or DDI_DMA_SYNC_FORKERNEL
+	 * should be set. Also DDI_DMA_READ should be set in the flags.
+	 */
+	if (((cache_flags == DDI_DMA_SYNC_FORCPU) ||
+	    (cache_flags == DDI_DMA_SYNC_FORKERNEL)) &&
+	    (hp->dmai_rflags & DDI_DMA_READ)) {
+		return (DDI_SUCCESS);
+	}
+
+	return (DDI_FAILURE);
+}
+
+
+/*
+ * rootnex_dma_win()
+ *    called from ddi_dma_getwin()
+ */
+/*ARGSUSED*/
+static int
+rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
+    uint_t win, off_t *offp, size_t *lenp, ddi_dma_cookie_t *cookiep,
+    uint_t *ccountp)
+{
+	rootnex_window_t *window;
+	rootnex_trim_t *trim;
+	ddi_dma_impl_t *hp;
+	rootnex_dma_t *dma;
+#if !defined(__amd64)
+	rootnex_sglinfo_t *sinfo;
+	rootnex_pgmap_t *pmap;
+	uint_t pidx;
+	uint_t pcnt;
+	off_t poff;
+	int i;
+#endif
+
+
+	hp = (ddi_dma_impl_t *)handle;
+	dma = (rootnex_dma_t *)hp->dmai_private;
+#if !defined(__amd64)
+	sinfo = &dma->dp_sglinfo;
+#endif
+
+	/* If we try and get a window which doesn't exist, return failure */
+	if (win >= hp->dmai_nwin) {
+		ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_GETWIN_FAIL]);
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * if we don't have any windows, and they're asking for the first
+	 * window, setup the cookie pointer to the first cookie in the bind.
+	 * setup our return values, then increment the cookie since we return
+	 * the first cookie on the stack.
+	 */
+	if (dma->dp_window == NULL) {
+		if (win != 0) {
+			ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_GETWIN_FAIL]);
+			return (DDI_FAILURE);
+		}
+		hp->dmai_cookie = dma->dp_cookies;
+		*offp = 0;
+		*lenp = dma->dp_dma.dmao_size;
+		*ccountp = dma->dp_sglinfo.si_sgl_size;
+		*cookiep = hp->dmai_cookie[0];
+		hp->dmai_cookie++;
+		return (DDI_SUCCESS);
+	}
+
+	/* sync the old window before moving on to the new one */
+	window = &dma->dp_window[dma->dp_current_win];
+	if ((window->wd_dosync) && (hp->dmai_rflags & DDI_DMA_READ)) {
+		(void) rootnex_dma_sync(dip, rdip, handle, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
+	}
+
+#if !defined(__amd64)
+	/*
+	 * before we move to the next window, if we need to re-map, unmap all
+	 * the pages in this window.
+	 */
+	if (dma->dp_cb_remaping) {
+		/*
+		 * If we switch to this window again, we'll need to map in
+		 * on the fly next time.
+		 */
+		window->wd_remap_copybuf = B_TRUE;
+
+		/*
+		 * calculate the page index into the buffer where this window
+		 * starts, and the number of pages this window takes up.
+		 */
+		pidx = (sinfo->si_buf_offset + window->wd_offset) >>
+		    MMU_PAGESHIFT;
+		poff = (sinfo->si_buf_offset + window->wd_offset) &
+		    MMU_PAGEOFFSET;
+		pcnt = mmu_btopr(window->wd_size + poff);
+		ASSERT((pidx + pcnt) <= sinfo->si_max_pages);
+
+		/* unmap pages which are currently mapped in this window */
+		for (i = 0; i < pcnt; i++) {
+			if (dma->dp_pgmap[pidx].pm_mapped) {
+				hat_unload(kas.a_hat,
+				    dma->dp_pgmap[pidx].pm_kaddr, MMU_PAGESIZE,
+				    HAT_UNLOAD);
+				dma->dp_pgmap[pidx].pm_mapped = B_FALSE;
+			}
+			pidx++;
+		}
+	}
+#endif
+
+	/*
+	 * Move to the new window.
+	 * NOTE: current_win must be set for sync to work right
+	 */
+	dma->dp_current_win = win;
+	window = &dma->dp_window[win];
+
+	/* if needed, adjust the first and/or last cookies for trim */
+	trim = &window->wd_trim;
+	if (trim->tr_trim_first) {
+		window->wd_first_cookie->_dmu._dmac_ll = trim->tr_first_paddr;
+		window->wd_first_cookie->dmac_size = trim->tr_first_size;
+#if !defined(__amd64)
+		window->wd_first_cookie->dmac_type =
+		    (window->wd_first_cookie->dmac_type &
+		    ROOTNEX_USES_COPYBUF) + window->wd_offset;
+#endif
+		if (trim->tr_first_copybuf_win) {
+			dma->dp_pgmap[trim->tr_first_pidx].pm_cbaddr =
+			    trim->tr_first_cbaddr;
+#if !defined(__amd64)
+			dma->dp_pgmap[trim->tr_first_pidx].pm_kaddr =
+			    trim->tr_first_kaddr;
+#endif
+		}
+	}
+	if (trim->tr_trim_last) {
+		trim->tr_last_cookie->_dmu._dmac_ll = trim->tr_last_paddr;
+		trim->tr_last_cookie->dmac_size = trim->tr_last_size;
+		if (trim->tr_last_copybuf_win) {
+			dma->dp_pgmap[trim->tr_last_pidx].pm_cbaddr =
+			    trim->tr_last_cbaddr;
+#if !defined(__amd64)
+			dma->dp_pgmap[trim->tr_last_pidx].pm_kaddr =
+			    trim->tr_last_kaddr;
+#endif
+		}
+	}
+
+	/*
+	 * setup the cookie pointer to the first cookie in the window. setup
+	 * our return values, then increment the cookie since we return the
+	 * first cookie on the stack.
+	 */
+	hp->dmai_cookie = window->wd_first_cookie;
+	*offp = window->wd_offset;
+	*lenp = window->wd_size;
+	*ccountp = window->wd_cookie_cnt;
+	*cookiep = hp->dmai_cookie[0];
+	hp->dmai_cookie++;
+
+#if !defined(__amd64)
+	/* re-map copybuf if required for this window */
+	if (dma->dp_cb_remaping) {
+		/*
+		 * calculate the page index into the buffer where this
+		 * window starts.
+		 */
+		pidx = (sinfo->si_buf_offset + window->wd_offset) >>
+		    MMU_PAGESHIFT;
+		ASSERT(pidx < sinfo->si_max_pages);
+
+		/*
+		 * the first page can get unmapped if it's shared with the
+		 * previous window. Even if the rest of this window is already
+		 * mapped in, we need to still check this one.
+		 */
+		pmap = &dma->dp_pgmap[pidx];
+		if ((pmap->pm_uses_copybuf) && (pmap->pm_mapped == B_FALSE)) {
+			if (pmap->pm_pp != NULL) {
+				pmap->pm_mapped = B_TRUE;
+				i86_pp_map(pmap->pm_pp, pmap->pm_kaddr);
+			} else if (pmap->pm_vaddr != NULL) {
+				pmap->pm_mapped = B_TRUE;
+				i86_va_map(pmap->pm_vaddr, sinfo->si_asp,
+				    pmap->pm_kaddr);
+			}
+		}
+		pidx++;
+
+		/* map in the rest of the pages if required */
+		if (window->wd_remap_copybuf) {
+			window->wd_remap_copybuf = B_FALSE;
+
+			/* figure out many pages this window takes up */
+			poff = (sinfo->si_buf_offset + window->wd_offset) &
+			    MMU_PAGEOFFSET;
+			pcnt = mmu_btopr(window->wd_size + poff);
+			ASSERT(((pidx - 1) + pcnt) <= sinfo->si_max_pages);
+
+			/* map pages which require it */
+			for (i = 1; i < pcnt; i++) {
+				pmap = &dma->dp_pgmap[pidx];
+				if (pmap->pm_uses_copybuf) {
+					ASSERT(pmap->pm_mapped == B_FALSE);
+					if (pmap->pm_pp != NULL) {
+						pmap->pm_mapped = B_TRUE;
+						i86_pp_map(pmap->pm_pp,
+						    pmap->pm_kaddr);
+					} else if (pmap->pm_vaddr != NULL) {
+						pmap->pm_mapped = B_TRUE;
+						i86_va_map(pmap->pm_vaddr,
+						    sinfo->si_asp,
+						    pmap->pm_kaddr);
+					}
+				}
+				pidx++;
+			}
+		}
+	}
+#endif
+
+	/* if the new window uses the copy buffer, sync it for the device */
+	if ((window->wd_dosync) && (hp->dmai_rflags & DDI_DMA_WRITE)) {
+		(void) rootnex_dma_sync(dip, rdip, handle, 0, 0,
+		    DDI_DMA_SYNC_FORDEV);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+
+
+/*
+ * ************************
+ *  obsoleted dma routines
+ * ************************
+ */
+
+/*
+ * rootnex_dma_map()
+ *    called from ddi_dma_setup()
+ */
+/* ARGSUSED */
+static int
+rootnex_dma_map(dev_info_t *dip, dev_info_t *rdip, struct ddi_dma_req *dmareq,
+    ddi_dma_handle_t *handlep)
+{
+#if defined(__amd64)
+	/*
+	 * this interface is not supported in 64-bit x86 kernel. See comment in
+	 * rootnex_dma_mctl()
+	 */
+	ASSERT(0);
+	return (DDI_DMA_NORESOURCES);
+
+#else /* 32-bit x86 kernel */
+	ddi_dma_handle_t *lhandlep;
+	ddi_dma_handle_t lhandle;
+	ddi_dma_cookie_t cookie;
+	ddi_dma_attr_t dma_attr;
+	ddi_dma_lim_t *dma_lim;
+	uint_t ccnt;
+	int e;
+
+
+	/*
+	 * if the driver is just testing to see if it's possible to do the bind,
+	 * we'll use local state. Otherwise, use the handle pointer passed in.
+	 */
+	if (handlep == NULL) {
+		lhandlep = &lhandle;
+	} else {
+		lhandlep = handlep;
+	}
+
+	/* convert the limit structure to a dma_attr one */
+	dma_lim = dmareq->dmar_limits;
+	dma_attr.dma_attr_version = DMA_ATTR_V0;
+	dma_attr.dma_attr_addr_lo = dma_lim->dlim_addr_lo;
+	dma_attr.dma_attr_addr_hi = dma_lim->dlim_addr_hi;
+	dma_attr.dma_attr_minxfer = dma_lim->dlim_minxfer;
+	dma_attr.dma_attr_seg = dma_lim->dlim_adreg_max;
+	dma_attr.dma_attr_count_max = dma_lim->dlim_ctreg_max;
+	dma_attr.dma_attr_granular = dma_lim->dlim_granular;
+	dma_attr.dma_attr_sgllen = dma_lim->dlim_sgllen;
+	dma_attr.dma_attr_maxxfer = dma_lim->dlim_reqsize;
+	dma_attr.dma_attr_burstsizes = dma_lim->dlim_burstsizes;
+	dma_attr.dma_attr_align = MMU_PAGESIZE;
+	dma_attr.dma_attr_flags = 0;
+
+	e = rootnex_dma_allochdl(dip, rdip, &dma_attr, dmareq->dmar_fp,
+	    dmareq->dmar_arg, lhandlep);
+	if (e != DDI_SUCCESS) {
+		return (e);
+	}
+
+	e = rootnex_dma_bindhdl(dip, rdip, *lhandlep, dmareq, &cookie, &ccnt);
+	if ((e != DDI_DMA_MAPPED) && (e != DDI_DMA_PARTIAL_MAP)) {
+		(void) rootnex_dma_freehdl(dip, rdip, *lhandlep);
+		return (e);
+	}
+
+	/*
+	 * if the driver is just testing to see if it's possible to do the bind,
+	 * free up the local state and return the result.
+	 */
+	if (handlep == NULL) {
+		(void) rootnex_dma_unbindhdl(dip, rdip, *lhandlep);
+		(void) rootnex_dma_freehdl(dip, rdip, *lhandlep);
+		if (e == DDI_DMA_MAPPED) {
+			return (DDI_DMA_MAPOK);
+		} else {
+			return (DDI_DMA_NOMAPPING);
+		}
+	}
+
+	return (e);
+#endif /* defined(__amd64) */
+}
+
+
+/*
+ * rootnex_dma_mctl()
+ *
+ */
+/* ARGSUSED */
+static int
+rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
+    enum ddi_dma_ctlops request, off_t *offp, size_t *lenp, caddr_t *objpp,
+    uint_t cache_flags)
+{
+#if defined(__amd64)
+	/*
+	 * DDI_DMA_SMEM_ALLOC & DDI_DMA_IOPB_ALLOC we're changed to have a
+	 * common implementation in genunix, so they no longer have x86
+	 * specific functionality which called into dma_ctl.
+	 *
+	 * The rest of the obsoleted interfaces were never supported in the
+	 * 64-bit x86 kernel. For s10, the obsoleted DDI_DMA_SEGTOC interface
+	 * was not ported to the x86 64-bit kernel do to serious x86 rootnex
+	 * implementation issues.
+	 *
+	 * If you can't use DDI_DMA_SEGTOC; DDI_DMA_NEXTSEG, DDI_DMA_FREE, and
+	 * DDI_DMA_NEXTWIN are useless since you can get to the cookie, so we
+	 * reflect that now too...
+	 *
+	 * Even though we fixed the pointer problem in DDI_DMA_SEGTOC, we are
+	 * not going to put this functionality into the 64-bit x86 kernel now.
+	 * It wasn't ported to the 64-bit kernel for s10, no reason to change
+	 * that in a future release.
+	 */
+	ASSERT(0);
+	return (DDI_FAILURE);
+
+#else /* 32-bit x86 kernel */
+	ddi_dma_cookie_t lcookie;
+	ddi_dma_cookie_t *cookie;
+	rootnex_window_t *window;
+	ddi_dma_impl_t *hp;
+	rootnex_dma_t *dma;
+	uint_t nwin;
+	uint_t ccnt;
+	size_t len;
+	off_t off;
+	int e;
+
+
+	/*
+	 * DDI_DMA_SEGTOC, DDI_DMA_NEXTSEG, and DDI_DMA_NEXTWIN are a little
+	 * hacky since were optimizing for the current interfaces and so we can
+	 * cleanup the mess in genunix. Hopefully we will remove the this
+	 * obsoleted routines someday soon.
+	 */
+
+	switch (request) {
+
+	case DDI_DMA_SEGTOC: /* ddi_dma_segtocookie() */
+		hp = (ddi_dma_impl_t *)handle;
+		cookie = (ddi_dma_cookie_t *)objpp;
+
+		/*
+		 * convert segment to cookie. We don't distinguish between the
+		 * two :-)
+		 */
+		*cookie = *hp->dmai_cookie;
+		*lenp = cookie->dmac_size;
+		*offp = cookie->dmac_type & ~ROOTNEX_USES_COPYBUF;
+		return (DDI_SUCCESS);
+
+	case DDI_DMA_NEXTSEG: /* ddi_dma_nextseg() */
+		hp = (ddi_dma_impl_t *)handle;
+		dma = (rootnex_dma_t *)hp->dmai_private;
+
+		if ((*lenp != NULL) && ((uintptr_t)*lenp != (uintptr_t)hp)) {
+			return (DDI_DMA_STALE);
+		}
+
+		/* handle the case where we don't have any windows */
+		if (dma->dp_window == NULL) {
+			/*
+			 * if seg == NULL, and we don't have any windows,
+			 * return the first cookie in the sgl.
+			 */
+			if (*lenp == NULL) {
+				dma->dp_current_cookie = 0;
+				hp->dmai_cookie = dma->dp_cookies;
+				*objpp = (caddr_t)handle;
+				return (DDI_SUCCESS);
+
+			/* if we have more cookies, go to the next cookie */
+			} else {
+				if ((dma->dp_current_cookie + 1) >=
+				    dma->dp_sglinfo.si_sgl_size) {
+					return (DDI_DMA_DONE);
+				}
+				dma->dp_current_cookie++;
+				hp->dmai_cookie++;
+				return (DDI_SUCCESS);
+			}
+		}
+
+		/* We have one or more windows */
+		window = &dma->dp_window[dma->dp_current_win];
+
+		/*
+		 * if seg == NULL, return the first cookie in the current
+		 * window
+		 */
+		if (*lenp == NULL) {
+			dma->dp_current_cookie = 0;
+			hp->dmai_cookie = dma->dp_cookies;
+
+		/*
+		 * go to the next cookie in the window then see if we done with
+		 * this window.
+		 */
+		} else {
+			if ((dma->dp_current_cookie + 1) >=
+			    window->wd_cookie_cnt) {
+				return (DDI_DMA_DONE);
+			}
+			dma->dp_current_cookie++;
+			hp->dmai_cookie++;
+		}
+		*objpp = (caddr_t)handle;
+		return (DDI_SUCCESS);
+
+	case DDI_DMA_NEXTWIN: /* ddi_dma_nextwin() */
+		hp = (ddi_dma_impl_t *)handle;
+		dma = (rootnex_dma_t *)hp->dmai_private;
+
+		if ((*offp != NULL) && ((uintptr_t)*offp != (uintptr_t)hp)) {
+			return (DDI_DMA_STALE);
+		}
+
+		/* if win == NULL, return the first window in the bind */
+		if (*offp == NULL) {
+			nwin = 0;
+
+		/*
+		 * else, go to the next window then see if we're done with all
+		 * the windows.
+		 */
+		} else {
+			nwin = dma->dp_current_win + 1;
+			if (nwin >= hp->dmai_nwin) {
+				return (DDI_DMA_DONE);
+			}
+		}
+
+		/* switch to the next window */
+		e = rootnex_dma_win(dip, rdip, handle, nwin, &off, &len,
+		    &lcookie, &ccnt);
+		ASSERT(e == DDI_SUCCESS);
+		if (e != DDI_SUCCESS) {
+			return (DDI_DMA_STALE);
+		}
+
+		/* reset the cookie back to the first cookie in the window */
+		if (dma->dp_window != NULL) {
+			window = &dma->dp_window[dma->dp_current_win];
+			hp->dmai_cookie = window->wd_first_cookie;
+		} else {
+			hp->dmai_cookie = dma->dp_cookies;
+		}
+
+		*objpp = (caddr_t)handle;
+		return (DDI_SUCCESS);
+
+	case DDI_DMA_FREE: /* ddi_dma_free() */
+		(void) rootnex_dma_unbindhdl(dip, rdip, handle);
+		(void) rootnex_dma_freehdl(dip, rdip, handle);
+		if (rootnex_state->r_dvma_call_list_id) {
+			ddi_run_callback(&rootnex_state->r_dvma_call_list_id);
+		}
+		return (DDI_SUCCESS);
+
+	case DDI_DMA_IOPB_ALLOC:	/* get contiguous DMA-able memory */
+	case DDI_DMA_SMEM_ALLOC:	/* get contiguous DMA-able memory */
+		/* should never get here, handled in genunix */
+		ASSERT(0);
+		return (DDI_FAILURE);
+
+	case DDI_DMA_KVADDR:
+	case DDI_DMA_GETERR:
+	case DDI_DMA_COFF:
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_FAILURE);
+#endif /* defined(__amd64) */
 }

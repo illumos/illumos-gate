@@ -736,27 +736,13 @@ typedef struct ddi_dma_impl {
 
 #elif defined(__x86)
 
-#define	DMAMI_KVADR		0x05
-#define	DMAMI_UVADR		0x09
-#define	DMAMI_PAGES		0x0b
-#define	DMAI_SOMEMORE_COOKIES	4
-
+/*
+ * ddi_dma_impl portion that genunix (sunddi.c) depends on. x86 rootnex
+ * implementation specific state is in dmai_private.
+ */
 typedef struct ddi_dma_impl {
-
-	ulong_t	dmai_kmsize;
-
-	ddi_dma_cookie_t *dmai_additionalcookiep;
-
-	struct impl_dma_segment *dmai_hds;	/* head of list of segments */
-
-	struct impl_dma_segment *dmai_wins;	/* ptr to first segment of */
-						/* current window */
-
-	caddr_t		dmai_ibufp;	/* intermediate buffer address */
-	uint64_t	dmai_segmentsize;
-	ulong_t		dmai_ibfsz;	/* intermediate buffer size */
-
-	caddr_t		dmai_kaddr;	/* kernel addr for page mapping */
+	ddi_dma_cookie_t *dmai_cookie; /* array of DMA cookies */
+	void		*dmai_private;
 
 	/*
 	 * Information gathered from the original dma mapping
@@ -765,28 +751,15 @@ typedef struct ddi_dma_impl {
 	uint_t		dmai_minxfer;
 	uint_t		dmai_burstsizes;
 	uint_t		dmai_rflags;	/* requester's flags + ours */
-	uint_t		dmai_inuse;
 	int		dmai_nwin;
-	void		*dmai_segp;
-	void		*dmai_minfo;	/* random mapping information */
 	dev_info_t	*dmai_rdip;	/* original requester's dev_info_t */
-	ddi_dma_obj_t	dmai_object;	/* requester's object */
-
-	/*
-	 * mctl function addr for express processing
-	 */
-	int		(*dmai_mctl)(dev_info_t *, dev_info_t *,
-	    ddi_dma_handle_t, enum ddi_dma_ctlops, off_t *, size_t *,
-	    caddr_t *, uint_t);
 
 	ddi_dma_attr_t	dmai_attr;	/* DMA attributes */
-	ddi_dma_cookie_t *dmai_cookie;
 
 	int		(*dmai_fault_check)(struct ddi_dma_impl *handle);
 	void		(*dmai_fault_notify)(struct ddi_dma_impl *handle);
 	int		dmai_fault;
 	ndi_err_t	dmai_error;
-
 } ddi_dma_impl_t;
 
 #else
@@ -841,53 +814,6 @@ struct dma_phys_mapc {
 	int nptes;			/* number of ptes */
 	void *ptes;			/* ptes already read */
 };
-
-/*
- * Implementation DMA segment structure.
- *
- * This is a superset of the ddi_dma_cookie structure that describes
- * one of the physical memory segments into which the memory object
- * was broken up.
- */
-#if defined(__x86)
-typedef struct impl_dma_segment {
-	struct impl_dma_segment	*dmais_link;	/* to next segment */
-	struct ddi_dma_impl	*dmais_hndl;	/* to dma handle */
-	ddi_dma_cookie_t	*dmais_cookie;
-	union {
-		struct impl_dma_segment	*_dmais_nex;	/* to 1st seg of */
-							/* next window */
-		struct impl_dma_segment	*_dmais_cur;	/* to 1st seg of */
-							/* this window */
-	} _win;
-	ulong_t		dmais_ofst;		/* 32-bit offset */
-	union {
-		caddr_t		_dmais_va;	/* 32-bit virtual address */
-		page_t		*_dmais_pp;	/* page pointer */
-	} _vdmu;
-	union {
-		uint64_t	_dmais_lpd;	/* 64-bit physical address */
-		uint32_t	_dmais_pd;	/* 32-bit physical address */
-		ushort_t	_dmais_pw[2];   /* 2x16-bit address */
-		caddr_t		_dmais_kva;	/* pio kernel virtual address */
-	} _pdmu;
-	ulong_t		dmais_size;		/* size of cookie in bytes */
-	ushort_t	dmais_flags;		/* bus specific flag bits */
-	ushort_t	dmais_xxx;		/* unused filler */
-} impl_dma_segment_t;
-#endif	/* __x86 */
-
-/*
- * flags
- */
-#define	DMAIS_NEEDINTBUF	0x0100
-#define	DMAIS_COMPLEMENT	0x0200
-#define	DMAIS_NOMERGE		DMAIS_NEEDINTBUF | DMAIS_COMPLEMENT
-#define	DMAIS_MAPPAGE		0x0400
-#define	DMAIS_PAGEPTR		0x0800
-#define	DMAIS_WINSTRT		0x1000	/* this segment is window start */
-#define	DMAIS_WINUIB		0x2000	/* window uses intermediate buffers */
-#define	DMAIS_WINEND		0x8000	/* this segment is window end */
 
 #define	MAXCALLBACK		20
 

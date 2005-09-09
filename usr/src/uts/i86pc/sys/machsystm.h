@@ -64,8 +64,6 @@ extern void siron(void);
 
 extern void return_instr(void);
 
-extern int pokefault;
-
 extern int kcpc_hw_load_pcbe(void);
 extern void kcpc_hw_init(cpu_t *cp);
 extern int kcpc_hw_overflow_intr_installed;

@@ -139,7 +139,6 @@ int maxphys = 56 * 1024;    /* XXX See vm_subr.c - max b_count in physio */
 int klustsize = 56 * 1024;
 
 caddr_t	p0_va;		/* Virtual address for accessing physical page 0 */
-int	pokefault = 0;
 
 /*
  * defined here, though unused on x86,
