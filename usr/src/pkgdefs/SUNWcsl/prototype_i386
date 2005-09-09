@@ -147,7 +147,7 @@ f none usr/lib/amd64/libcrle.so.1 755 root bin
 f none usr/lib/amd64/libcryptoutil.so.1 755 root bin
 s none usr/lib/amd64/libcryptoutil.so=libcryptoutil.so.1
 f none usr/lib/amd64/libcrypt.so.1 755 root bin
-s none usr/lib/amd64/libcrypt.so=./libcrypto.so.1
+s none usr/lib/amd64/libcrypt.so=./libcrypt.so.1
 s none usr/lib/amd64/libcrypt_i.so=./libcrypt.so
 s none usr/lib/amd64/libcrypt_i.so.1=./libcrypt.so.1
 s none usr/lib/amd64/libcrypt_d.so=./libcrypt.so

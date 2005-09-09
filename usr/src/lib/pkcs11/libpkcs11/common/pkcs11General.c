@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,6 +121,37 @@ static pthread_mutex_t globalmutex = PTHREAD_MUTEX_INITIALIZER;
 
 static CK_RV finalize_common(CK_VOID_PTR pReserved);
 static void pkcs11_fini();
+
+/*
+ * Ensure that before a fork, globalmutex is taken.
+ */
+static void
+pkcs11_fork_prepare(void)
+{
+	(void) pthread_mutex_lock(&globalmutex);
+}
+
+
+/*
+ * Ensure that after a fork, in the parent, globalmutex is released.
+ */
+static void
+pkcs11_fork_parent(void)
+{
+	(void) pthread_mutex_unlock(&globalmutex);
+}
+
+
+/*
+ * Ensure that after a fork, in the child, globalmutex is released
+ * and cleanup is done.
+ */
+static void
+pkcs11_fork_child(void)
+{
+	(void) pthread_mutex_unlock(&globalmutex);
+	pkcs11_fini();
+}
 
 CK_RV
 C_Initialize(CK_VOID_PTR pInitArgs)
@@ -225,7 +256,8 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 
 	pkcs11_initialized = B_TRUE;
 	pkcs11_pid = initialize_pid;
-	(void) pthread_atfork(NULL, NULL, pkcs11_fini);
+	(void) pthread_atfork(pkcs11_fork_prepare,
+	    pkcs11_fork_parent, pkcs11_fork_child);
 	(void) pthread_mutex_unlock(&globalmutex);
 
 	/* Cleanup data structures no longer needed */

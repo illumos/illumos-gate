@@ -20,13 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(__GNUC_AS__)
 
 #include <sys/asm_linkage.h>
 #include <sys/x86_archext.h>
@@ -135,13 +133,13 @@ big_mul_add_vec_umul(uint32_t *r, uint32_t *a, int len, uint32_t digit)
 #define	MMX_ALIGN 8
 
 #define	SAVE_MMX_PROLOG(sreg, nreg)			\
-	subl	$[MMX_SIZE \* nreg + MMX_ALIGN], %esp;	\
+	subl	$_MUL(MMX_SIZE, nreg + MMX_ALIGN), %esp;	\
 	movl	%esp, sreg;				\
 	addl	$MMX_ALIGN, sreg;			\
 	andl	$-1![MMX_ALIGN-1], sreg;
 
 #define	RSTOR_MMX_EPILOG(nreg)				\
-	addl	$[MMX_SIZE \* nreg + MMX_ALIGN], %esp;
+	addl	$_MUL(MMX_SIZE, nreg + MMX_ALIGN), %esp;
 
 #define	SAVE_MMX_0TO4(sreg)			\
 	SAVE_MMX_PROLOG(sreg, 5);		\
@@ -799,7 +797,7 @@ big_mul_add_vec_umul(uint32_t *r, uint32_t *a, int len, uint32_t digit)
 	jle	.mulvec_rtn
 	movl	$0x1, %ebp
 
-	.zalign 16,8
+	.align 16
 .mulvec_add:
 	movl	20(%esp), %eax
 	pushl	(%eax,%ebp,4)
@@ -1215,5 +1213,3 @@ big_mul_add_vec_umul(uint32_t *r, uint32_t *a, int len, uint32_t digit)
 	SET_SIZE(big_mul_add_vec_umul)
 
 #endif	/* __lint */
-
-#endif	/* !__GNUC_AS__ */
