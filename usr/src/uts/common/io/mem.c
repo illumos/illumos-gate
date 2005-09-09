@@ -327,7 +327,8 @@ mmrw(dev_t dev, struct uio *uio, enum uio_rw rw, cred_t *cred)
 				locked = (as_pagelock(&kas, &ppp, vaddr,
 				    PAGESIZE, S_WRITE) == 0);
 
-			v = hat_getpfnum(kas.a_hat, (caddr_t)uio->uio_loffset);
+			v = hat_getpfnum(kas.a_hat,
+			    (caddr_t)(uintptr_t)uio->uio_loffset);
 			if (v == PFN_INVALID) {
 				if (locked)
 					as_pageunlock(&kas, ppp, vaddr,
@@ -524,7 +525,7 @@ mmioctl_get_mem_name(intptr_t data)
 		mem_name.m_synd = mem_name32.m_synd;
 		mem_name.m_type[0] = mem_name32.m_type[0];
 		mem_name.m_type[1] = mem_name32.m_type[1];
-		mem_name.m_name = (caddr_t)mem_name32.m_name;
+		mem_name.m_name = (caddr_t)(uintptr_t)mem_name32.m_name;
 		mem_name.m_namelen = (size_t)mem_name32.m_namelen;
 	}
 #endif	/* _SYSCALL32 */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,7 +181,7 @@ static struct cmds bus_cmds[] = {
 
 
 
-void
+int
 main(int argc, char *argv[])
 {
 	int	c;
@@ -334,7 +334,7 @@ main(int argc, char *argv[])
 		perror("devctl");
 		exit(-1);
 	}
-	exit(0);
+	return (0);
 } /* main */
 
 static int
