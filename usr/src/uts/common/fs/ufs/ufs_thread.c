@@ -431,7 +431,7 @@ ufs_delete_init(struct ufsvfs *ufsvfsp, int lowat)
 	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
 
 	ufs_thread_init(&ufsvfsp->vfs_delete, lowat);
-	memset((void *)delq_info, 0, sizeof (*delq_info));
+	(void) memset((void *)delq_info, 0, sizeof (*delq_info));
 	cv_init(&delq_info->delq_fast_cv, NULL, CV_DEFAULT, NULL);
 }
 
