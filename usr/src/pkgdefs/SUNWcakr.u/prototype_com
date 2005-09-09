@@ -451,6 +451,7 @@ f none platform/sun4u/kernel/strmod/sparcv9/kb 755 root sys
 d none platform/sun4u/kernel/tod 755 root sys
 d none platform/sun4u/kernel/tod/sparcv9 755 root sys
 f none platform/sun4u/kernel/tod/sparcv9/todblade 755 root sys
+f none platform/sun4u/kernel/tod/sparcv9/todbq4802 755 root sys
 f none platform/sun4u/kernel/tod/sparcv9/todds1287 755 root sys
 f none platform/sun4u/kernel/tod/sparcv9/todds1337 755 root sys
 f none platform/sun4u/kernel/tod/sparcv9/todm5819 755 root sys

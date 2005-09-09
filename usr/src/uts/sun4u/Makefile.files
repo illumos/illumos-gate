@@ -205,6 +205,7 @@ TODBLADE_OBJS += todblade.o
 TODSG_OBJS += todsg.o
 TODSTARCAT_OBJS += todstarcat.o
 TODM5819_OBJS	+= todm5819.o
+TODBQ4802_OBJS	+= todbq4802.o
 
 #
 #			Misc modules

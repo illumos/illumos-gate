@@ -37,11 +37,19 @@
 #include <sys/memnode.h>
 #include <sys/promif.h>
 
+#define	EBUS_NAME	"ebus"
+#define	RTC_NAME	"rtc"
 #define	SHARED_MI2CV_PATH "/i2c@1f,520000"
 static dev_info_t *shared_mi2cv_dip;
 static kmutex_t chicago_mi2cv_mutex;
 
+/*
+ * External variables
+ */
+extern	volatile uint8_t *v_rtc_addr_reg;
+
 int (*p2get_mem_unum)(int, uint64_t, char *, int, int *);
+static void get_ebus_rtc_vaddr(void);
 
 void
 startup_platform(void)
@@ -59,9 +67,17 @@ void
 set_platform_defaults(void)
 {
 	extern char *tod_module_name;
-	/* Set appropriate tod module for Chicago */
-	if (tod_module_name == NULL)
-		tod_module_name = "todm5823";
+
+	/*
+	 * We need to set tod_module_name explicitly because there is a
+	 * well known South bridge RTC node on chicago and tod_module_name
+	 * gets set to that.
+	 */
+	tod_module_name = "todbq4802";
+
+	/* Work-around for Chicago platform */
+	get_ebus_rtc_vaddr();
+
 }
 
 /*
@@ -364,4 +380,46 @@ plat_shared_i2c_exit(dev_info_t *i2cnexus_dip)
 	if (i2cnexus_dip == shared_mi2cv_dip) {
 		plat_setprop_exit();
 	}
+}
+
+/*
+ * Work-around for the Chicago platform.
+ * There are two RTCs in the Chicago platform, one on the Southbridge
+ * and one on the EBUS.
+ * In the current Solaris implementation, have_rtc in sun4u/os/fillsysinfo.c
+ * returns address of the first rtc it sees. In this case, it's the SB RTC.
+ *
+ * get_ebus_rtc_vaddr() looks for the EBUS RTC and setup the right address.
+ * If there is no EBUS RTC node or the RTC node does not have the valid
+ * address property, get_ebus_rtc_vaddr() will fail.
+ */
+static void
+get_ebus_rtc_vaddr()
+{
+	dnode_t node;
+	int size;
+	uint32_t eaddr;
+
+	/* Find ebus RTC node */
+	if ((node = prom_findnode_byname(prom_rootnode(),
+	    EBUS_NAME)) == OBP_NONODE)
+		cmn_err(CE_PANIC, "ebus node not present\n");
+	if ((node = prom_findnode_byname(node, RTC_NAME)) == OBP_NONODE)
+		cmn_err(CE_PANIC, "ebus RTC node not found\n");
+
+	/* Make sure the ebus RTC address property is valid */
+	if ((size = prom_getproplen(node, "address")) == -1)
+		cmn_err(CE_PANIC, "ebus RTC addr prop. length not found\n");
+	if (size != sizeof (eaddr))
+		cmn_err(CE_PANIC, "ebus RTC addr length not OK."
+		    " expected = %d found =0xd\n", sizeof (eaddr), size);
+	if (prom_getprop(node, "address", (caddr_t)&eaddr) == -1)
+		cmn_err(CE_PANIC, "ebus RTC addr propery not found\n");
+	v_rtc_addr_reg = (volatile unsigned char *)eaddr;
+
+	/*
+	 * Does this rtc have watchdog support?
+	 */
+	if (prom_getproplen(node, "watchdog-enable") != -1)
+		watchdog_available = 1;
 }
