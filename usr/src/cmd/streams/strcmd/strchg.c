@@ -19,13 +19,18 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
-
-/* 
+/*
  * Streams Command strchg:	change the configuration of the
  *				stream associated with stdin.
  *
@@ -54,24 +59,28 @@
  */
 
 
-#include	<stdio.h>
-#include	<sys/stropts.h>
-#include	<sys/termio.h>
-#include	<sys/types.h>
-#include	<sys/stat.h>
+#include <stdio.h>
+#include <sys/stropts.h>
+#include <sys/termio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-#define FALSE		0
+#define	FALSE		0
 #define	TRUE		1
 
-#define SUCCESS		0
-#define FAILURE		1
+#define	SUCCESS		0
+#define	FAILURE		1
 
 #define	NMODULES	16	/* "reasonable" # of modules to push	  */
 				/* 	(can push more if you like)	  */
 #define	MAXMODULES	2048	/* max # of modules to push		  */
 
 #define	OPTLIST		"af:h:pu:"
-#define	USAGE		"Usage:\t%s -h module1[,module2 ... ]\n\t%s -f file\n\t%s -p [-a | -u module ]\n"
+#define	USAGE		"Usage:\t%s -h module1[,module2 ... ]\n\t%s -f file"\
+			"\n\t%s -p [-a | -u module ]\n"
 
 #define	ERR_USAGE	1	/* bad invocation			  */
 #define	ERR_MODULE	2	/* bad module name(s) or too many modules */
@@ -81,29 +90,18 @@
 #define	ERR_PERM	6	/* not owner or superuser		  */
 
 #define	STDIN		0
-#define	CNULL		(char *)NULL
-#define	SAME		0	/* return from str[n]cmp if match	*/
 
-static char		 *Cmd_namep;		/* how was it invoked?	*/
+static char		*Cmd_namep;		/* how was it invoked?	*/
 static struct str_mlist	Oldmods[NMODULES];	/* modlist for Oldlist	*/
 static struct str_list	Oldlist;		/* original modules	*/
 
-extern char		*strncpy();
-extern char		*strtok();
-extern int		getopt();
-extern unsigned short	geteuid();
-extern int		ioctl();
-extern int		strncmp();
-extern void		perror();
+static int	pop_modules(int);
+static int	push_module(const char *);
+static int	more_modules(struct str_list *, int);
+static void	restore(int, int);
 
-static int	pop_modules();	/* pop 'n' modules		*/
-static int	push_module();	/* push a module		*/
-static int	more_modules();	/* increase size of mod lists	*/
-static void	restore();	/* restore state of stdin	*/
-
-main( argc, argv)
-int	argc;
-char	*argv[];
+int
+main(int argc, char **argv)
 {
 	char		buf[BUFSIZ];	/* input buffer			*/
 	char 		*file_namep;	/* file from -f opt		*/
@@ -112,8 +110,8 @@ char	*argv[];
 
 	FILE		*fp;		/* file pointer for -f file	*/
 
-	register int	i;		/* loop index and junk var	*/
-	register int	j;		/* loop index and junk var	*/
+	int		i;		/* loop index and junk var	*/
+	int		j;		/* loop index and junk var	*/
 	int		euid;		/* effective uid		*/
 
 	short		error;		/* TRUE if usage error		*/
@@ -124,14 +122,10 @@ char	*argv[];
 	short		popupto;	/* TRUE if -p -u module		*/
 	short		push;		/* TRUE if -h mod1[,mod2 ...]	*/
 
-	struct str_mlist
-			newmods[NMODULES];/* mod list for new list	*/
+	struct str_mlist newmods[NMODULES]; /* mod list for new list	*/
 	struct stat	stats;		/* stream stats			*/
 	struct str_list	newlist;	/* modules to be pushed		*/
 	struct termio	termio;		/* save state of tty		*/
-
-	extern char	*optarg;	/* for getopt()			*/
-	extern int	optind;		/* for getopt()			*/
 
 	/*
 	 *	init
@@ -147,17 +141,17 @@ char	*argv[];
 	/*
 	 *	only owner and root can change stream configuration
 	 */
-	if ( (euid = geteuid()) != 0 ) {
-		if ( fstat(0, &stats) < 0 ) {
+	if ((euid = geteuid()) != 0) {
+		if (fstat(0, &stats) < 0) {
 			perror("fstat");
 			(void) fprintf(stderr, "%s: fstat of stdin failed\n",
 				Cmd_namep);
-			return(ERR_STDIN);
+			return (ERR_STDIN);
 		}
-		if ( euid != stats.st_uid ) {
+		if (euid != stats.st_uid) {
 			(void) fprintf(stderr,
 				"%s: not owner of stdin\n", Cmd_namep);
-			return(ERR_PERM);
+			return (ERR_PERM);
 		}
 	}
 
@@ -166,24 +160,24 @@ char	*argv[];
 	 *	parse args
 	 */
 
-	if ( argc == 1 ) {
+	if (argc == 1) {
 		(void) fprintf(stderr, USAGE, Cmd_namep, Cmd_namep, Cmd_namep);
-		return(ERR_USAGE);
+		return (ERR_USAGE);
 	}
 
-	while ( !error && (i = getopt( argc, argv, OPTLIST)) != -1 ) {
+	while (!error && (i = getopt(argc, argv, OPTLIST)) != -1) {
 
 		switch (i) {
 
 		case 'a':				/* pop All	*/
-			if ( fromfile || popupto || push )
+			if (fromfile || popupto || push)
 				error = TRUE;
 			else
 				popall = TRUE;
 			break;
 
-		case 'f':				/* read from File*/
-			if ( pop || push )
+		case 'f':				/* read from File */
+			if (pop || push)
 				error = TRUE;
 			else {
 				fromfile = TRUE;
@@ -192,7 +186,7 @@ char	*argv[];
 			break;
 
 		case 'h':				/* pusH		*/
-			if ( fromfile || pop )
+			if (fromfile || pop)
 				error = TRUE;
 			else {
 				push = TRUE;
@@ -201,14 +195,14 @@ char	*argv[];
 			break;
 
 		case 'p':				/* poP		*/
-			if ( fromfile || push )
+			if (fromfile || push)
 				error = TRUE;
 			else
 				pop = TRUE;
 			break;
 
 		case 'u':				/* pop Upto	*/
-			if ( fromfile || popall || push )
+			if (fromfile || popall || push)
 				error = TRUE;
 			else {
 				popupto = TRUE;
@@ -219,56 +213,55 @@ char	*argv[];
 		default:
 			(void) fprintf(stderr,
 				USAGE, Cmd_namep, Cmd_namep, Cmd_namep);
-			return(ERR_USAGE);
+			return (ERR_USAGE);
 			/*NOTREACHED*/
 		}
 	}
 
-	if ( error || optind < argc )  {
+	if (error || optind < argc)  {
 		(void) fprintf(stderr, USAGE, Cmd_namep, Cmd_namep, Cmd_namep);
-		return(ERR_USAGE);
+		return (ERR_USAGE);
 	}
 
-	if ( !pop && ( popall || popupto ) ) {
+	if (!pop && (popall || popupto)) {
 		(void) fprintf(stderr,
-			"%s: -p option must be used with -a or -u to pop modules\n",
-			Cmd_namep);
+		    "%s: -p option must be used with -a or -u to pop modules\n",
+		    Cmd_namep);
 		(void) fprintf(stderr, USAGE, Cmd_namep, Cmd_namep, Cmd_namep);
-		return(ERR_USAGE);
+		return (ERR_USAGE);
 	}
 
 
 	/*
 	 * Save state so can restore if something goes wrong
-	 * (If are only going to push modules, don't need to 
+	 * (If are only going to push modules, don't need to
 	 * save original module list for restore.)
 	 */
-	if ( fromfile || pop ) {
+	if (fromfile || pop) {
 
 		/*
 		 * get number of modules on stream
 		 * allocate more room if needed
 		 */
-		if ( (i =  ioctl(STDIN, I_LIST, (struct str_list *)NULL))
-		 < 0 ) {
+		if ((i =  ioctl(STDIN, I_LIST, NULL)) < 0) {
 			perror("I_LIST");
 			(void) fprintf(stderr,
 				"%s: I_LIST ioctl failed\n", Cmd_namep);
-			return(ERR_STDIN);
+			return (ERR_STDIN);
 		}
-		if ( i > Oldlist.sl_nmods )
-			if ( more_modules(&Oldlist, i) != SUCCESS )
-				return(ERR_MEM);
+		if (i > Oldlist.sl_nmods &&
+		    more_modules(&Oldlist, i) != SUCCESS)
+				return (ERR_MEM);
 
 		/*
 		 * get list of modules on stream
 		 */
 		Oldlist.sl_nmods = i;
-		if ( ioctl(STDIN, I_LIST, &Oldlist) < 0 ) {
+		if (ioctl(STDIN, I_LIST, &Oldlist) < 0) {
 			perror("I_LIST");
 			(void) fprintf(stderr,
 				"%s: I_LIST ioctl failed\n", Cmd_namep);
-			return(ERR_STDIN);
+			return (ERR_STDIN);
 		}
 
 		/*
@@ -277,7 +270,7 @@ char	*argv[];
 		 * if the strchg -h or -f options failed due to
 		 * specifying invalid module names for pushing
 		 */
-		if (ioctl(STDIN, TCGETA, &termio) >= 0 )
+		if (ioctl(STDIN, TCGETA, &termio) >= 0)
 			is_a_tty = TRUE;
 	}
 
@@ -285,195 +278,192 @@ char	*argv[];
 	/*
 	 *	push modules on stream
 	 */
-	if ( push ) {
+	if (push) {
 		/*
 		 * pull mod names out of comma-separated list
 		 */
-		for ( i = 0, modp = strtok(modnamep, ",");
-		modp != CNULL; ++i, modp = strtok(CNULL, ",") ) {
-			if ( push_module(modp) == FAILURE) {
+		for (i = 0, modp = strtok(modnamep, ",");
+		    modp != NULL; ++i, modp = strtok(NULL, ",")) {
+			if (push_module(modp) == FAILURE) {
 				/* pop the 'i' modules we just added */
 				restore(i, 0);
-				return(ERR_STDIN);
+				return (ERR_STDIN);
 			}
 		}
-		return(SUCCESS);
+		return (SUCCESS);
 	}
 
 	/*
 	 *	read configuration from a file
 	 */
-	if ( fromfile ) {
+	if (fromfile) {
 
-		if ( (fp = fopen(file_namep, "r")) == (FILE *)NULL ) {
+		if ((fp = fopen(file_namep, "r")) == NULL) {
 			perror("fopen");
 			(void) fprintf(stderr,
 				"%s: could not open file '%s'\n",
 				Cmd_namep, file_namep);
-			return(ERR_OPEN);
+			return (ERR_OPEN);
 		}
 
 		/*
 		 * read file and construct a new strlist
 		 */
 		i = 0;
-		while ( fgets(buf, BUFSIZ, fp) != CNULL ) {
+		while (fgets(buf, BUFSIZ, fp) != NULL) {
 
-			if ( buf[0] == '#' )
+			if (buf[0] == '#')
 				continue;	/* skip comments */
 
 			/*
 			 * skip trailing newline, trailing and leading
 			 * whitespace
 			 */
-			if ( (modp = strtok(buf, " \t\n")) == CNULL )
+			if ((modp = strtok(buf, " \t\n")) == NULL)
 				continue;	/* blank line */
 
-			(void)strncpy(newlist.sl_modlist[i].l_name,
-							modp, FMNAMESZ);
+			(void) strncpy(newlist.sl_modlist[i].l_name,
+			    modp, FMNAMESZ);
 			++i;
-			if ( (modp = strtok(CNULL, " \t\n")) != CNULL ) {
+			if ((modp = strtok(NULL, " \t\n")) != NULL) {
 				/*
-				 * bad format 
+				 * bad format
 				 * should only be one name per line
 				 */
 				(void) fprintf(stderr,
-				"%s: error on line %d in file %s: multiple module names??\n",
-				Cmd_namep, i, file_namep);
-				return(ERR_MODULE);
+				    "%s: error on line %d in file %s: "
+				    "multiple module names??\n",
+				    Cmd_namep, i, file_namep);
+				return (ERR_MODULE);
 			}
-			if ( i > newlist.sl_nmods )
-				if ( more_modules(&newlist, i) != SUCCESS )
-					return(ERR_MEM);
+			if (i > newlist.sl_nmods)
+				if (more_modules(&newlist, i) != SUCCESS)
+					return (ERR_MEM);
 		}
 		newlist.sl_nmods = i;
 
 		/*
 		 * If an empty file, exit silently
 		 */
-		if ( i == 0 )
-			return(SUCCESS);
+		if (i == 0)
+			return (SUCCESS);
 
-		/* 
+		/*
 		 * Pop all modules currently on the stream.
 		 */
-		
-		if ( (i = pop_modules(Oldlist.sl_nmods - 1))
-		!= (Oldlist.sl_nmods - 1) ) {
+		if ((i = pop_modules(Oldlist.sl_nmods - 1))
+		    != (Oldlist.sl_nmods - 1)) {
 			/* put back whatever we've popped */
 			restore(0, i);
-			return(ERR_STDIN);
+			return (ERR_STDIN);
 		}
 
 		/*
 		 * Push new modules
 		 */
-		for ( i = newlist.sl_nmods - 1; i >= 0; --i ) {
-
-			if ( push_module(newlist.sl_modlist[i].l_name)
-			== FAILURE ) {
+		for (i = newlist.sl_nmods - 1; i >= 0; --i) {
+			if (push_module(newlist.sl_modlist[i].l_name) ==
+			    FAILURE) {
 
 				/*
 				 * pop whatever new modules we've pushed
 				 * then push old module list back on
 				 */
 				restore((newlist.sl_nmods - 1 - i),
-						(Oldlist.sl_nmods - 1));
+				    (Oldlist.sl_nmods - 1));
 
 				/*
 				 * If the stream is a tty line, at least try
 				 * to set the state to what it was before.
 				 */
-				if ( is_a_tty ) {
-					if ( ioctl(STDIN, TCSETA, &termio) < 0 ) {
-						perror("TCSETA");
-						(void) fprintf(stderr,
-						"%s: WARNING: Could not restore the states of the terminal line discipline\n",
-						Cmd_namep);
-					}
+				if (is_a_tty &&
+				    ioctl(STDIN, TCSETA, &termio) < 0) {
+					perror("TCSETA");
+					(void) fprintf(stderr,
+					    "%s: WARNING: Could not restore "
+					    "the states of the terminal line "
+					    "discipline\n", Cmd_namep);
 				}
-				return(ERR_STDIN);
+				return (ERR_STDIN);
 			}
-		} 
-		return(SUCCESS);
+		}
+		return (SUCCESS);
 	}	/* end if-fromfile */
 
 
 	/*
 	 *	pop all modules (except driver)
 	 */
-	if ( popall ) {
-		if ( Oldlist.sl_nmods > 1 ) {
-			if ( (i = pop_modules(Oldlist.sl_nmods - 1))
-			!= (Oldlist.sl_nmods - 1) ) {
+	if (popall) {
+		if (Oldlist.sl_nmods > 1) {
+			if ((i = pop_modules(Oldlist.sl_nmods - 1)) !=
+			    (Oldlist.sl_nmods - 1)) {
 				restore(0, i);
-				return(ERR_STDIN);
+				return (ERR_STDIN);
 			}
 		}
-		return(SUCCESS);
+		return (SUCCESS);
 	}
 
 	/*
 	 *	pop up to (but not including) a module
 	 */
-	if ( popupto ) {
+	if (popupto) {
 		/*
 		 * check that the module is in fact on the stream
 		 */
-		for ( i = 0; i < Oldlist.sl_nmods; ++i )
-			if ( strncmp(Oldlist.sl_modlist[i].l_name, modnamep,
-							FMNAMESZ) == SAME )
+		for (i = 0; i < Oldlist.sl_nmods; ++i)
+			if (strncmp(Oldlist.sl_modlist[i].l_name, modnamep,
+			    FMNAMESZ) == 0)
 				break;
-		if ( i == Oldlist.sl_nmods ) {
+		if (i == Oldlist.sl_nmods) {
 			/* no match found */
 			(void) fprintf(stderr, "%s: %s not found on stream\n",
 							Cmd_namep, modnamep);
-			return(ERR_MODULE);
+			return (ERR_MODULE);
 		}
 
-		if ( (j = pop_modules(i)) != i ) {
+		if ((j = pop_modules(i)) != i) {
 			/* put back whatever we've popped */
 			restore(0, j);
-			return(ERR_STDIN);
+			return (ERR_STDIN);
 		}
-		return(SUCCESS);
+		return (SUCCESS);
 	}
 
 	/*
 	 *	pop the topmost module
 	 */
-	if ( pop ) {
-		if ( Oldlist.sl_nmods > 1 )
-			if ( pop_modules(1) != 1 )
+	if (pop) {
+		if (Oldlist.sl_nmods > 1)
+			if (pop_modules(1) != 1)
 				/* no need to restore */
-				return(ERR_STDIN);
-		return(SUCCESS);
+				return (ERR_STDIN);
+		return (SUCCESS);
 	}
 
-	/*NOTREACHED*/
+	return (SUCCESS);
 }
 
-/* 
+/*
  * pop_module(n)		pop 'n' modules from stream
  *
  * returns # of modules popped
  */
 static int
-pop_modules(num_modules)
-int num_modules;
+pop_modules(int num_modules)
 {
+	int i;
 
-	register short i;	/* the ubiquitous loop variable */
-
-	for ( i = 0; i < num_modules; i++ ) {
-		if ( ioctl(STDIN, I_POP, 0) < 0 ) {
+	for (i = 0; i < num_modules; i++) {
+		if (ioctl(STDIN, I_POP, 0) < 0) {
 			perror("I_POP");
 			(void) fprintf(stderr,
-				"%s: I_POP ioctl failed\n", Cmd_namep);
-			return(i);
+			    "%s: I_POP ioctl failed\n", Cmd_namep);
+			return (i);
 		}
 	}
-	return(i);
+	return (i);
 }
 
 /*
@@ -482,14 +472,13 @@ int num_modules;
  * returns SUCCESS or FAILURE
  */
 static int
-push_module(modnamep)
-char *modnamep;
+push_module(const char *modnamep)
 {
-	if ( ioctl(STDIN, I_PUSH, modnamep) < 0 ) {
+	if (ioctl(STDIN, I_PUSH, modnamep) < 0) {
 		perror("I_PUSH");
 		(void) fprintf(stderr,
-			"%s: I_PUSH ioctl of %s failed\n", Cmd_namep, modnamep);
-		return(FAILURE);
+		    "%s: I_PUSH ioctl of %s failed\n", Cmd_namep, modnamep);
+		return (FAILURE);
 	}
 	return (SUCCESS);
 }
@@ -503,33 +492,34 @@ char *modnamep;
  *
  */
 static void
-restore(npop, npush)
-int	npop;
-int	npush;
+restore(int npop, int npush)
 {
-	register int	i;
+	int	i;
 
-	if ( (i = pop_modules(npop)) != npop ) {
+	if ((i = pop_modules(npop)) != npop) {
 		(void) fprintf(stderr,
-		"%s: WARNING: could not restore state of stream\n", Cmd_namep);
+		    "%s: WARNING: could not restore state of stream\n",
+		    Cmd_namep);
 		return;
 	}
-	if ( npush >= Oldlist.sl_nmods ) {	/* "cannot" happen */
+
+	if (npush >= Oldlist.sl_nmods) {	/* "cannot" happen */
 		(void) fprintf(stderr,
-		"%s: internal logic error in restore\n", Cmd_namep);
+		    "%s: internal logic error in restore\n", Cmd_namep);
 		(void) fprintf(stderr,
-		"%s: WARNING: could not restore state of stream\n", Cmd_namep);
+		    "%s: WARNING: could not restore state of stream\n",
+		    Cmd_namep);
 		return;
 	}
-	for ( i = npush - 1; i >= 0; --i ) {
-		if ( push_module(Oldlist.sl_modlist[i].l_name) == FAILURE ) {
+
+	for (i = npush - 1; i >= 0; --i) {
+		if (push_module(Oldlist.sl_modlist[i].l_name) == FAILURE) {
 			(void) fprintf(stderr,
-			"%s: WARNING: could not restore state of stream\n",
-			Cmd_namep);
+			    "%s: WARNING: could not restore state of stream\n",
+			    Cmd_namep);
 			return;
 		}
 	}
-	return;
 }
 
 /*
@@ -539,35 +529,30 @@ int	npush;
  */
 
 static int
-more_modules(listp, n)
-struct str_list	*listp;		/* streams module list	*/
-int		n;		/* # of modules		*/
+more_modules(struct str_list *listp, int n)
 {
-	register int			i;
-	register struct str_mlist	*modp;
+	int			i;
+	struct str_mlist	*modp;
 
-	extern char	*calloc();
-
-	if ( n > MAXMODULES ) {
+	if (n > MAXMODULES) {
 		(void) fprintf(stderr,
-			"%s: too many modules (%d) -- max is %d\n",
-			Cmd_namep, n, MAXMODULES);
-		return(FAILURE);
+		    "%s: too many modules (%d) -- max is %d\n",
+		    Cmd_namep, n, MAXMODULES);
+		return (FAILURE);
 	}
 
-	if ( (modp = (struct str_mlist *)calloc((unsigned)n,
-	(unsigned)sizeof(struct str_mlist))) == (struct str_mlist *)NULL ) {
+	if ((modp = calloc(n, sizeof (struct str_mlist))) == NULL) {
 		perror("calloc");
 		(void) fprintf(stderr,
-			"%s: failed to allocate space for module list\n",
-			Cmd_namep);
-		return(FAILURE);
+		    "%s: failed to allocate space for module list\n",
+		    Cmd_namep);
+		return (FAILURE);
 	}
 
-	for ( i = 0; i < listp->sl_nmods; ++i )
+	for (i = 0; i < listp->sl_nmods; ++i)
 		(void) strncpy(modp[i].l_name, listp->sl_modlist[i].l_name,
-			FMNAMESZ);
+		    FMNAMESZ);
 	listp->sl_nmods = n;
 	listp->sl_modlist = modp;
-	return(SUCCESS);
+	return (SUCCESS);
 }

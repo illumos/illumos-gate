@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,7 @@ static boolean_t	offline_set(char *ifname);
 static void
 usage()
 {
-	fprintf(stderr, "Usage : if_mpadm [-d | -r] <interface_name>\n");
+	(void) fprintf(stderr, "Usage : if_mpadm [-d | -r] <interface_name>\n");
 }
 
 static void
@@ -88,6 +88,7 @@ print_mpathd_error_msg(uint32_t error)
 	}
 }
 
+int
 main(int argc, char **argv)
 {
 	char *ifname;
@@ -105,8 +106,8 @@ main(int argc, char **argv)
 			ifname = optarg;
 			cmd = MI_OFFLINE;
 			if (offline_set(ifname)) {
-				fprintf(stderr, gettext("Interface already "
-				    "offlined\n"));
+				(void) fprintf(stderr, gettext("Interface "
+				    "already offlined\n"));
 				exit(1);
 			}
 			break;
@@ -114,7 +115,7 @@ main(int argc, char **argv)
 			ifname = optarg;
 			cmd = MI_UNDO_OFFLINE;
 			if (!offline_set(ifname)) {
-				fprintf(stderr, gettext("Interface not "
+				(void) fprintf(stderr, gettext("Interface not "
 				    "offlined\n"));
 				exit(1);
 			}
@@ -208,8 +209,9 @@ send_cmd(int cmd, char *ifname)
 		if (s == -1) {
 			s = connect_to_mpathd(AF_INET6);
 			if (s == -1) {
-				fprintf(stderr, gettext("Cannot establish "
-				    "communication with in.mpathd.\n"));
+				(void) fprintf(stderr, gettext("Cannot "
+				    "establish communication with "
+				    "in.mpathd.\n"));
 				exit(1);
 			}
 		}
@@ -225,7 +227,7 @@ send_cmd(int cmd, char *ifname)
 				/* errno is set only when ret is -1 */
 				if (ret == -1)
 					perror("write");
-				fprintf(stderr, gettext("Failed to "
+				(void) fprintf(stderr, gettext("Failed to "
 				    "successfully send command to "
 				    "in.mpathd.\n"));
 				exit(1);
@@ -241,14 +243,14 @@ send_cmd(int cmd, char *ifname)
 				/* errno is set only when ret is -1 */
 				if (ret == -1)
 					perror("write");
-				fprintf(stderr, gettext("Failed to "
+				(void) fprintf(stderr, gettext("Failed to "
 				    "successfully send command to "
 				    "in.mpathd.\n"));
 				exit(1);
 			}
 			break;
 		default :
-			fprintf(stderr, "Unknown command \n");
+			(void) fprintf(stderr, "Unknown command \n");
 			exit(1);
 		}
 
@@ -258,8 +260,8 @@ send_cmd(int cmd, char *ifname)
 			/* errno is set only when ret is -1 */
 			if (ret == -1)
 				perror("read");
-			fprintf(stderr, gettext("Failed to successfully read "
-			    "result from in.mpathd.\n"));
+			(void) fprintf(stderr, gettext("Failed to successfully "
+			    "read result from in.mpathd.\n"));
 			exit(1);
 		}
 		if (me.me_mpathd_error == 0) {
@@ -268,7 +270,8 @@ send_cmd(int cmd, char *ifname)
 				 * We retried at least once. Tell the user
 				 * that things succeeded now.
 				 */
-				fprintf(stderr, gettext("Retry Successful.\n"));
+				(void) fprintf(stderr,
+				    gettext("Retry Successful.\n"));
 			}
 			return;			/* Successful */
 		}
@@ -277,7 +280,8 @@ send_cmd(int cmd, char *ifname)
 			if (me.me_sys_error == EAGAIN) {
 				(void) close(s);
 				(void) sleep(1);
-				fprintf(stderr, gettext("Retrying ...\n"));
+				(void) fprintf(stderr,
+				    gettext("Retrying ...\n"));
 				continue;		/* Retry */
 			}
 			errno = me.me_sys_error;
@@ -292,7 +296,8 @@ send_cmd(int cmd, char *ifname)
 	 * times and did not succeed. Let the user try it again
 	 * later.
 	 */
-	fprintf(stderr, gettext("Device busy. Retry the operation later.\n"));
+	(void) fprintf(stderr,
+	    gettext("Device busy. Retry the operation later.\n"));
 	exit(1);
 }
 
@@ -317,8 +322,8 @@ do_offline(char *ifname)
 	 * Verify whether IFF_OFFLINE is not set as a sanity check.
 	 */
 	if (!offline_set(ifname)) {
-		fprintf(stderr, gettext("Operation failed : in.mpathd has "
-		    "not set IFF_OFFLINE on %s\n"), ifname);
+		(void) fprintf(stderr, gettext("Operation failed : in.mpathd "
+		    "has not set IFF_OFFLINE on %s\n"), ifname);
 		exit(1);
 	}
 	/*
@@ -349,7 +354,7 @@ do_offline(char *ifname)
 	}
 	numifs = lifn.lifn_count;
 
-	buf = (char *)calloc(numifs, sizeof (struct lifreq));
+	buf = calloc(numifs, sizeof (struct lifreq));
 	if (buf == NULL) {
 		perror("calloc");
 		exit(1);
@@ -382,8 +387,8 @@ do_offline(char *ifname)
 			else
 				ret = if_down(ifsock_v6, &lifr);
 			if (ret != 0) {
-				fprintf(stderr, gettext("Bringing down the "
-				    "interfaces failed.\n"));
+				(void) fprintf(stderr, gettext("Bringing down "
+				    "the interfaces failed.\n"));
 				exit(1);
 			}
 		}
@@ -411,8 +416,8 @@ undo_offline(char *ifname)
 	 * Verify whether IFF_OFFLINE is set as a sanity check.
 	 */
 	if (offline_set(ifname)) {
-		fprintf(stderr, gettext("Operation failed : in.mpathd has "
-		    "not cleared IFF_OFFLINE on %s\n"), ifname);
+		(void) fprintf(stderr, gettext("Operation failed : in.mpathd "
+		    "has not cleared IFF_OFFLINE on %s\n"), ifname);
 		exit(1);
 	}
 	/*
@@ -443,7 +448,7 @@ undo_offline(char *ifname)
 	}
 	numifs = lifn.lifn_count;
 
-	buf = (char *)calloc(numifs, sizeof (struct lifreq));
+	buf = calloc(numifs, sizeof (struct lifreq));
 	if (buf == NULL) {
 		perror("calloc");
 		exit(1);
@@ -477,8 +482,8 @@ undo_offline(char *ifname)
 			else
 				ret = if_up(ifsock_v6, &lifr);
 			if (ret != 0) {
-				fprintf(stderr, gettext("Bringing up the "
-				    "interfaces failed.\n"));
+				(void) fprintf(stderr, gettext("Bringing up "
+				    "the interfaces failed.\n"));
 				exit(1);
 			}
 		}
@@ -577,8 +582,8 @@ if_down(int ifsock, struct lifreq *lifr)
 
 	/* IFF_OFFLINE was set to start with. Is it still there ? */
 	if (!(lifr->lifr_flags & (IFF_OFFLINE))) {
-		fprintf(stderr, gettext("IFF_OFFLINE disappeared on %s\n"),
-		    lifr->lifr_name);
+		(void) fprintf(stderr, gettext("IFF_OFFLINE disappeared on "
+		    "%s\n"), lifr->lifr_name);
 		return (-1);
 	}
 	lifr->lifr_flags &= ~IFF_UP;
@@ -649,7 +654,7 @@ if_up(int ifsock, struct lifreq *lifr)
 	 * When a data address associated with the physical interface itself
 	 * is failed over (e.g., qfe0, rather than qfe0:1), the kernel must
 	 * fill the ipif data structure for qfe0 with a placeholder entry (the
-	 * "replacement ipif").  Replacement ipif's cannot be brought IFF_UP
+	 * "replacement ipif").	 Replacement ipif's cannot be brought IFF_UP
 	 * (nor would it make any sense to do so), so we must be careful to
 	 * skip them; thankfully they can be easily identified since they
 	 * all have a zeroed address.
@@ -659,7 +664,8 @@ if_up(int ifsock, struct lifreq *lifr)
 
 	/* IFF_OFFLINE was not set to start with. Is it there ? */
 	if (lifr->lifr_flags & IFF_OFFLINE) {
-		fprintf(stderr, gettext("IFF_OFFLINE set wrongly on %s\n"),
+		(void) fprintf(stderr,
+		    gettext("IFF_OFFLINE set wrongly on %s\n"),
 		    lifr->lifr_name);
 		return (-1);
 	}

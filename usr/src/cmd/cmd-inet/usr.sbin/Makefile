@@ -80,7 +80,7 @@ MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd \
 # lint-clean.
 LINTCLEAN=	6to4relay arp ikeadm in.rlogind in.rshd in.telnetd in.tftpd \
 		ipaddrsel ipsecalgs ipseckey ipsecconf route routeadm \
-		in.rarpd  $(SYNCPROG)
+		in.rarpd if_mpadm $(SYNCPROG)
 # Likewise, as subdirs get lint-clean, add them here.  Once
 # they're all clean, replace the dependency of the lint target
 # with SUBDIRS.  Also (sigh) deal with the commented-out build lines
@@ -239,6 +239,7 @@ lint: $(LINTSUBDIRS)
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include \
 		-I$(SRC)/lib/pam_modules/krb5 \
 		in.telnetd.c $(LDLIBS) -lbsm -lpam -lsocket -lnsl
+	$(LINT.c) if_mpadm.c $(LDLIBS) -lsocket -lnsl -lipmp
 	$(LINT.c) ipaddrsel.c $(LDLIBS) -lsocket -lnsl
 	$(LINT.c) ipsecalgs.c $(LDLIBS) -lsocket -lnsl -lipsecutil
 	$(LINT.c) ipsecconf.c $(LDLIBS) -lsocket -lnsl -lipsecutil

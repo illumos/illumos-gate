@@ -19,14 +19,13 @@
 #
 # CDDL HEADER END
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1989 by Sun Microsystems, Inc.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PROG= strchg strconf
-SRCS= $(PROG:%=%.c)
 
 include ../../Makefile.cmd
 
@@ -41,6 +40,8 @@ install: all $(ROOTPROG)
 
 clean:
 
-lint: lint_SRCS
+lint:
+	$(LINT.c) strchg.c
+	$(LINT.c) strconf.c
 
 include ../../Makefile.targ

@@ -19,12 +19,18 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
-/* 
+/*
  * Streams Command strconf:	display the configuration of the
  *				stream associated with stdin.
  *
@@ -48,15 +54,15 @@
 
 #include	<stdio.h>
 #include	<sys/stropts.h>
-
-#define	TRUE		 1
-#define FALSE		 0
+#include	<string.h>
+#include	<stdlib.h>
+#include	<unistd.h>
 
 #define	OPTLIST		"m:t"
-#define USAGE		"USAGE: %s [ -m module | -t ]\n"
+#define	USAGE		"USAGE: %s [ -m module | -t ]\n"
 
-#define SUCCESS		0
-#define FAILURE		1
+#define	SUCCESS		0
+#define	FAILURE		1
 
 #define	ERR_USAGE	1	/* bad invocation			*/
 #define	ERR_MODULE	2	/* module not there			*/
@@ -67,134 +73,118 @@
 				/* 	(there can be more)		  */
 #define	MAXMODULES	2048	/* max # of modules			  */
 
-#define	STDIN		0
-#define	SAME		0	/* return from str[n]cmp if match	*/
+static char	*Cmd_namep;		/* how was it invoked?	*/
+static int	more_modules(struct str_list *, int);
 
-
-static char		 *Cmd_namep;		/* how was it invoked?	*/
-
-
-extern char	*strcpy();
-extern int	getopt();
-extern int	ioctl();
-extern int	strncmp();
-
-static int	more_modules();	/* increase size of mod list		*/
-
-main( argc, argv)
-int	argc;
-char	*argv[];
+int
+main(int argc, char **argv)
 {
 	char		*modp;		/* ptr to module name		*/
-	register int	i;		/* loop var & junk (what else?)	*/
-	short		mod_present;	/* TRUE if -m module		*/
-	short		topmost;	/* TRUE if -t			*/
-	struct str_mlist
-			mlist[NMODULES];/* modlist for strlist		*/
+	int		i;		/* loop var & junk (what else?)	*/
+	boolean_t	mod_present;	/* B_TRUE if -m module		*/
+	boolean_t	topmost;	/* B_TRUE if -t			*/
+	struct str_mlist mlist[NMODULES]; /* modlist for strlist	*/
 	struct str_list	strlist;	/* mods on stream		*/
-
-	extern char	*optarg;	/* for getopt()			*/
-	extern int	optind;		/* for getopt()			*/
 
 	/*
 	 *	init
 	 */
 	Cmd_namep = argv[0];
-	mod_present = topmost = FALSE;
+	mod_present = topmost = B_FALSE;
 	strlist.sl_nmods = NMODULES;
 	strlist.sl_modlist = mlist;
 
 	/*
 	 *	parse args
 	 */
-	if ( argc > 1) {
-		while ( (i = getopt( argc, argv, OPTLIST)) != -1 ) {
-			switch( i) {
-				case 'm':	/* module present ? */
-					modp = optarg;
-					mod_present = TRUE;
-					break;
+	if (argc > 1) {
+		while ((i = getopt(argc, argv, OPTLIST)) != -1) {
+			switch (i) {
+			case 'm':	/* module present ? */
+				modp = optarg;
+				mod_present = B_TRUE;
+				break;
 
-				case 't':	/* list topmost	*/
-					topmost = TRUE;
-					break;
+			case 't':	/* list topmost	*/
+				topmost = B_TRUE;
+				break;
 
-				default:
-					(void) fprintf(stderr, USAGE, Cmd_namep);
-					return(ERR_USAGE);
+			default:
+				(void) fprintf(stderr, USAGE, Cmd_namep);
+				return (ERR_USAGE);
 			}
 		}
 
-		if ( optind < argc ) {
+		if (optind < argc) {
 			(void) fprintf(stderr, USAGE, Cmd_namep);
-			return(ERR_USAGE);
+			return (ERR_USAGE);
 		}
 	}
 
 	if (topmost && mod_present) {
 		(void) fprintf(stderr,
-		"%s: [-t] and [-m] options cannot be used together\n", Cmd_namep);
+		    "%s: [-t] and [-m] options cannot be used together\n",
+		    Cmd_namep);
 		(void) fprintf(stderr, USAGE, Cmd_namep);
-		return(ERR_USAGE);
+		return (ERR_USAGE);
 	}
 
 	/*
 	 * get number of modules on stream
 	 * allocate more room if needed
 	 */
-	if ( (i =  ioctl(STDIN, I_LIST, (struct str_list *)NULL))
-	 < 0 ) {
+	if ((i = ioctl(STDIN_FILENO, I_LIST, NULL)) < 0) {
 		perror("I_LIST");
 		(void) fprintf(stderr,
 			"%s: I_LIST ioctl failed\n", Cmd_namep);
-		return(ERR_STDIN);
+		return (ERR_STDIN);
 	}
-	if ( i > strlist.sl_nmods )
-		if ( more_modules(&strlist, i) != SUCCESS )
-			return(ERR_MEM);
+	if (i > strlist.sl_nmods)
+		if (more_modules(&strlist, i) != SUCCESS)
+			return (ERR_MEM);
 
 	/*
 	 *	get list of modules on stream
 	 */
 	strlist.sl_nmods = i;
-	if ( ioctl (0, I_LIST, &strlist) < 0) {
+	if (ioctl(STDIN_FILENO, I_LIST, &strlist) < 0) {
 		perror("I_LIST");
-		(void) fprintf (stderr, "%s: I_LIST ioctl failed\n", Cmd_namep);
-		return(ERR_STDIN);
+		(void) fprintf(stderr, "%s: I_LIST ioctl failed\n", Cmd_namep);
+		return (ERR_STDIN);
 	}
 
 	/*
 	 *	list topmost module
 	 */
-	if ( topmost ) {
-		if ( strlist.sl_nmods >= 2 ) {
-			(void) printf("%s\n", strlist.sl_modlist[0].l_name);
-			return(SUCCESS);
+	if (topmost) {
+		if (strlist.sl_nmods >= 2) {
+			(void) puts(strlist.sl_modlist[0].l_name);
+			return (SUCCESS);
 		}
-		return(ERR_MODULE);
+		return (ERR_MODULE);
 	}
 
 	/*
 	 *	check if module is present
 	 */
-	if ( mod_present ) {
-		for ( i = 0; i < strlist.sl_nmods; i++ ) {
-			if ( strncmp(modp, strlist.sl_modlist[i].l_name,
-							FMNAMESZ) == SAME ) {
-				(void) printf("yes\n");
-				return(SUCCESS);
+	if (mod_present) {
+		for (i = 0; i < strlist.sl_nmods; i++) {
+			if (strncmp(modp, strlist.sl_modlist[i].l_name,
+			    FMNAMESZ) == 0) {
+				(void) puts("yes");
+				return (SUCCESS);
 			}
 		}
-		(void) printf("no\n");
-		return(ERR_MODULE);
+		(void) puts("no");
+		return (ERR_MODULE);
 	}
 
 	/*
 	 *	print names of all modules and topmost driver on stream
 	 */
-	for ( i = 0; i < strlist.sl_nmods; i++ ) 
-		(void) printf("%s\n", strlist.sl_modlist[i].l_name);
-	return(SUCCESS);
+	for (i = 0; i < strlist.sl_nmods; i++)
+		(void) puts(strlist.sl_modlist[i].l_name);
+	return (SUCCESS);
 }
 
 /*
@@ -204,35 +194,30 @@ char	*argv[];
  */
 
 static int
-more_modules(listp, n)
-struct str_list	*listp;		/* streams module list	*/
-int		n;		/* # of modules		*/
+more_modules(struct str_list *listp, int n)
 {
-	register int			i;
-	register struct str_mlist	*modp;
+	int			i;
+	struct str_mlist	*modp;
 
-	extern char	*calloc();
-
-	if ( n > MAXMODULES ) {
+	if (n > MAXMODULES) {
 		(void) fprintf(stderr,
-			"%s: too many modules (%d) -- max is %d\n",
-			Cmd_namep, n, MAXMODULES);
-		return(FAILURE);
+		    "%s: too many modules (%d) -- max is %d\n",
+		    Cmd_namep, n, MAXMODULES);
+		return (FAILURE);
 	}
 
-	if ( (modp = (struct str_mlist *)calloc((unsigned)n,
-	(unsigned)sizeof(struct str_mlist))) == (struct str_mlist *)NULL ) {
+	if ((modp = calloc(n, sizeof (struct str_mlist))) == NULL) {
 		perror("calloc");
 		(void) fprintf(stderr,
-			"%s: failed to allocate space for module list\n",
-			Cmd_namep);
-		return(FAILURE);
+		    "%s: failed to allocate space for module list\n",
+		    Cmd_namep);
+		return (FAILURE);
 	}
 
-	for ( i = 0; i < listp->sl_nmods; ++i )
+	for (i = 0; i < listp->sl_nmods; ++i)
 		(void) strncpy(modp[i].l_name, listp->sl_modlist[i].l_name,
-			FMNAMESZ);
+		    FMNAMESZ);
 	listp->sl_nmods = n;
 	listp->sl_modlist = modp;
-	return(SUCCESS);
+	return (SUCCESS);
 }
