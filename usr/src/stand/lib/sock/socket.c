@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * socket.c, Code implementing a simple socket interface.
@@ -526,14 +526,18 @@ socket_read(int s, void *buf, size_t nbyte, int read_timeout)
 	 * or an error occurs
 	 */
 	start = prom_gettime();
-	while ((n = recvfrom(s, buf, nbyte, 0, &from, &fromlen)) == 0) {
-		diff = (uint_t)((prom_gettime() - start) + 500) / 1000;
-		if (read_timeout != 0 && diff > read_timeout) {
-			errno = EINTR;
-			return (-1);
+	for (;;) {
+		n = recvfrom(s, buf, nbyte, MSG_DONTWAIT, NULL, NULL);
+		if (n == -1 && errno == EWOULDBLOCK) {
+			diff = (uint_t)((prom_gettime() - start) + 500) / 1000;
+			if (read_timeout != 0 && diff > read_timeout) {
+				errno = EINTR;
+				return (-1);
+			}
+		} else {
+			return (n);
 		}
 	}
-	return (n);
 }
 
 /*
