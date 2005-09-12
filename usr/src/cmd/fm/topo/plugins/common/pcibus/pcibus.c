@@ -1082,6 +1082,29 @@ pciex_di_match(const char *devproppath)
 }
 
 /*
+ * Check to see if "node" is the descendant of a topo node that's not
+ * enumerated, but whose instance number is unambiguous.  If it is,
+ * we can enumerate that puppy because we now know that the ancestor
+ * is for real.
+ */
+static void
+confirm_ancestors(tnode_t *node)
+{
+	tnode_t *parent;
+	int min, max;
+
+	parent = topo_parent(node);
+	while (parent != NULL) {
+		if (topo_get_instance_num(parent) < 0) {
+			topo_get_instance_range(parent, &min, &max);
+			if (min == max && min >= 0)
+				(void) topo_set_instance_num(parent, min);
+		}
+		parent = topo_parent(parent);
+	}
+}
+
+/*
  *  The enum_pci_bus() routine gets called by topo to set instance
  *  numbers for all the PCI bus nodes.  The enumerator takes care of
  *  all devices, functions, bridges, and sub-buses beneath the bus
@@ -1092,7 +1115,6 @@ enum_pci_bus(tnode_t *node)
 {
 	const char *dev, *scan;
 	di_node_t selfdn;
-	tnode_t *parent;
 	tnode_t *self;
 	int express;
 	int min, max;
@@ -1186,22 +1208,134 @@ enum_pci_bus(tnode_t *node)
 		}
 	}
 	instantiate_children(self, selfdn, Promtree);
+	confirm_ancestors(self);
+}
+
+/*
+ * find_devinfo_childdev()
+ *
+ * Search through pci/pci-express devinfo nodes that are a child of
+ * the parent, looking for ones whose device # matches devno.  The
+ * function is recallable because a device can have multiple
+ * functions.
+ */
+di_node_t
+find_devinfo_childdev(di_node_t parent, di_node_t child, int devno, int *fnno)
+{
+	di_node_t cn;
+	uint_t reg, cc;
+	int cdevno;
+
+	if (child != DI_NODE_NIL)
+		cn = di_sibling_node(child);
+	else
+		cn = di_child_node(parent);
+	while (cn != DI_NODE_NIL) {
+		if (get_class_code_and_reg(&cc, &reg, cn, Promtree) < 0)
+			continue;
+		cdevno = PCI_REG_DEV_G(reg);
+		*fnno = PCI_REG_FUNC_G(reg);
+		if (cdevno == devno)
+			break;
+		cn = di_sibling_node(cn);
+	}
+	return (cn);
+}
+
+/*
+ *  The enum_pci_dev() routine gets called by topo to explicitly set
+ *  instance numbers for specific PCI or PCI-Express device nodes.
+ */
+void
+enum_pci_dev(tnode_t *node)
+{
+	const char *dev;
+	di_node_t ancdn, selfdn;
+	tnode_t *fn = DI_NODE_NIL;
+	tnode_t *pn;
+	const char *topof;
+	int fno;
+	int excap;
+	int min, max;
 
 	/*
-	 * Check to see if we're the descendant of a topo node that's
-	 * not enumerated, but whose instance number is unambiguous.
-	 * If we are, we can enumerate that puppy because we now know that
-	 * the ancestor is for real.
+	 * Our parent's parent node should have a DEV property.  From
+	 * this we should be able to orient ourselves in the devinfo
+	 * tree.
 	 */
-	parent = topo_parent(self);
-	while (parent != NULL) {
-		if (topo_get_instance_num(parent) < 0) {
-			topo_get_instance_range(parent, &min, &max);
-			if (min == max && min >= 0)
-				(void) topo_set_instance_num(parent, min);
-		}
-		parent = topo_parent(parent);
+	if (((pn = topo_parent(node)) == NULL) ||
+	    ((pn = topo_parent(pn)) == NULL) ||
+	    ((dev = topo_get_prop(pn, DEV)) == NULL))
+			return;
+
+	if ((ancdn = di_init(dev, DINFOCPYALL)) == DI_NODE_NIL) {
+		topo_out(TOPO_ERR,
+		    "PCI enumerator: "
+		    "di_init failed for device ancestor failed.\n");
+		return;
 	}
+	/*
+	 * We've found ourselves in the devtree.  A correctly written
+	 * .topo file will have left the instance number unambiguous
+	 * (a range of exactly one number) and so we'll know and can
+	 * officially establish the instance number of the device.
+	 * This creates a new topo node returned to us, with children
+	 * for which we must set instance numbers...
+	 */
+	topo_get_instance_range(node, &min, &max);
+	if (min < 0 || max < 0 || min != max) {
+		topo_out(TOPO_DEBUG,
+		    "Unexpected device instance min %d != max %d.\n",
+		    min, max);
+		di_fini(ancdn);
+		return;
+	}
+	selfdn = find_devinfo_childdev(ancdn, DI_NODE_NIL, min, &fno);
+	if (selfdn == DI_NODE_NIL) {
+		topo_out(TOPO_DEBUG, "No device # %d found.\n", min);
+		di_fini(ancdn);
+		return;
+	}
+	node = topo_set_instance_num(node, min);
+	topo_out(TOPO_DEBUG, "Set device instance #%d.\n", min);
+	set_std_properties(node, selfdn, Promtree);
+	do {
+		excap = get_excap(selfdn, Promtree);
+		if (strcmp(PCI_DEVICE, topo_name(node)) == 0 &&
+		    (fn = expected_child(node, PCI_FUNCTION, fno)) == NULL) {
+			topo_out(TOPO_DEBUG,
+			    PCI_DEVICE "node lacks a " PCI_FUNCTION
+			    "child node.\n");
+			di_fini(ancdn);
+			return;
+		}
+		if (strcmp(PCIEX_DEVICE, topo_name(node)) == 0 &&
+		    (fn = expected_child(node, PCIEX_FUNCTION, fno)) == NULL) {
+			topo_out(TOPO_DEBUG,
+			    PCIEX_DEVICE "node lacks a " PCIEX_FUNCTION
+			    "child node.\n");
+			di_fini(ancdn);
+			return;
+		}
+		fn = topo_set_instance_num(fn, fno);
+		topo_out(TOPO_DEBUG, "Set function instance #%d.\n", fno);
+		set_excap_prop(fn, excap);
+		set_std_properties(fn, selfdn, Promtree);
+		fix_dev_prop(fn, min, fno);
+		topof = set_pci_properties(fn, selfdn, Promtree);
+		if (topof != NULL) {
+			/*
+			 * Look for topology information specific to this
+			 * vendor-id & device-id, if any.
+			 */
+			(void) topo_load(topof, fn);
+		}
+		selfdn = find_devinfo_childdev(DI_NODE_NIL, selfdn, min, &fno);
+	} while (selfdn != DI_NODE_NIL);
+
+	if (fn != DI_NODE_NIL)
+		confirm_ancestors(fn);
+	di_fini(ancdn);
 }
 
 void
@@ -1212,8 +1346,11 @@ topo_pci_enum(tnode_t *node)
 	 * happened at the time the bus was enumerated, so we can just
 	 * return.
 	 */
-	if (strcmp(PCI_BUS, topo_name(node)) != 0 &&
-	    strcmp(PCIEX_ROOT, topo_name(node)) != 0)
-		return;
-	enum_pci_bus(node);
+	if (strcmp(PCI_BUS, topo_name(node)) == 0 ||
+	    strcmp(PCIEX_ROOT, topo_name(node)) == 0) {
+		enum_pci_bus(node);
+	} else if (strcmp(PCI_DEVICE, topo_name(node)) == 0 ||
+	    strcmp(PCIEX_DEVICE, topo_name(node)) == 0) {
+		enum_pci_dev(node);
+	}
 }
