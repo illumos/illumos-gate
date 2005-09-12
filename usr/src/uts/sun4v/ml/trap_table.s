@@ -1118,8 +1118,8 @@ trap_table0:
 	NOT; NOT4;			/* 00B - 00F reserved */
 	ILLTRAP_INSTR;			/* 010	illegal instruction */
 	TRAP(T_PRIV_INSTR);		/* 011	privileged opcode */
-	NOT;				/* 012	unimplemented LDD */
-	NOT;				/* 013	unimplemented STD */
+	TRAP(T_UNIMP_LDD);		/* 012	unimplemented LDD */
+	TRAP(T_UNIMP_STD);		/* 013	unimplemented STD */
 	NOT4; NOT4; NOT4;		/* 014 - 01F reserved */
 	FP_DISABLED_TRAP;		/* 020	fp disabled */
 	FP_IEEE_TRAP;			/* 021	fp exception ieee 754 */

@@ -53,6 +53,7 @@
 #include <vm/page.h>
 #include <sys/model.h>
 #include <vm/seg_vn.h>
+#include <sys/byteorder.h>
 
 #define	IS_IBIT_SET(x)	(x & 0x2000)
 #define	IS_VIS1(op, op3)(op == 2 && op3 == 0x36)
@@ -301,13 +302,24 @@ do_unaligned(struct regs *rp, caddr_t *badaddr)
 				}
 			}
 		} else {
-			if (lddstdflg) {
+			if (lddstdflg) {		/* combine the data */
 				if (getreg(rp, rd, &data.l[0], badaddr))
 					return (SIMU_FAULT);
 				if (getreg(rp, rd+1, &data.l[1], badaddr))
 					return (SIMU_FAULT);
-				data.i[0] = data.i[1];	/* combine the data */
-				data.i[1] = data.i[3];
+				if (ltlend) {
+					/*
+					 * For STD, each 32-bit word is byte-
+					 * swapped individually.  For
+					 * simplicity we don't want to do that
+					 * below, so we swap the words now to
+					 * get the desired result in the end.
+					 */
+					data.i[0] = data.i[3];
+				} else {
+					data.i[0] = data.i[1];
+					data.i[1] = data.i[3];
+				}
 			} else {
 				if (getreg(rp, rd, &data.l[0], badaddr))
 					return (SIMU_FAULT);
@@ -507,10 +519,20 @@ do_unaligned(struct regs *rp, caddr_t *badaddr)
 			}
 		} else {
 			if (lddstdflg) {		/* split the data */
-				data.i[2] = 0;
-				data.i[3] = data.i[1];
-				data.i[1] = data.i[0];
+				if (ltlend) {
+					/*
+					 * For LDD, each 32-bit word is byte-
+					 * swapped individually.  We didn't
+					 * do that above, but this will give
+					 * us the desired result.
+					 */
+					data.i[3] = data.i[0];
+				} else {
+					data.i[3] = data.i[1];
+					data.i[1] = data.i[0];
+				}
 				data.i[0] = 0;
+				data.i[2] = 0;
 				if (putreg(&data.l[0], rp, rd, badaddr) == -1)
 					goto badret;
 				if (putreg(&data.l[1], rp, rd+1, badaddr) == -1)
@@ -525,6 +547,156 @@ do_unaligned(struct regs *rp, caddr_t *badaddr)
 badret:
 	return (SIMU_FAULT);
 }
+
+
+int
+simulate_lddstd(struct regs *rp, caddr_t *badaddr)
+{
+	uint_t	inst, op3, asi = 0;
+	uint_t	rd, rs1, rs2;
+	int	rv = 0;
+	int	nf = 0, ltlend = 0, usermode;
+	int	immflg;
+	uint64_t reven;
+	uint64_t rodd;
+	caddr_t	addr;
+	uint64_t val;
+	uint64_t data;
+
+	usermode = USERMODE(rp->r_tstate);
+
+	if (usermode)
+		inst = fetch_user_instr((caddr_t)rp->r_pc);
+	else
+		inst = *(uint_t *)rp->r_pc;
+
+	op3 = (inst >> 19) & 0x3f;
+	rd = (inst >> 25) & 0x1f;
+	rs1 = (inst >> 14) & 0x1f;
+	rs2 = inst & 0x1f;
+	immflg = (inst >> 13) & 1;
+
+	if (USERMODE(rp->r_tstate))
+		(void) flush_user_windows_to_stack(NULL);
+	else
+		flush_windows();
+
+	if ((op3 >> 4) & 1) {		/* is this LDDA/STDA? */
+		if (immflg) {
+			asi = (uint_t)(rp->r_tstate >> TSTATE_ASI_SHIFT) &
+					TSTATE_ASI_MASK;
+		} else {
+			asi = (inst >> 5) & 0xff;
+		}
+		switch (asi) {
+		case ASI_P:
+		case ASI_S:
+			break;
+		case ASI_PNF:
+		case ASI_SNF:
+			nf = 1;
+			break;
+		case ASI_PL:
+		case ASI_SL:
+			ltlend = 1;
+			break;
+		case ASI_PNFL:
+		case ASI_SNFL:
+			ltlend = 1;
+			nf = 1;
+			break;
+		case ASI_AIUP:
+		case ASI_AIUS:
+			usermode = 1;
+			break;
+		case ASI_AIUPL:
+		case ASI_AIUSL:
+			usermode = 1;
+			ltlend = 1;
+			break;
+		default:
+			return (SIMU_ILLEGAL);
+		}
+	}
+
+	if (getreg(rp, rs1, &val, badaddr))
+		return (SIMU_FAULT);
+	addr = (caddr_t)val;		/* convert to 32/64 bit address */
+
+	/* check immediate bit and use immediate field or reg (rs2) */
+	if (immflg) {
+		int imm;
+		imm  = inst & 0x1fff;		/* mask out immediate field */
+		imm <<= 19;			/* sign extend it */
+		imm >>= 19;
+		addr += imm;			/* compute address */
+	} else {
+		if (getreg(rp, rs2, &val, badaddr))
+			return (SIMU_FAULT);
+		addr += val;
+	}
+
+	/*
+	 * T_UNIMP_LDD and T_UNIMP_STD are higher priority than
+	 * T_ALIGNMENT.  So we have to make sure that the address is
+	 * kosher before trying to use it, because the hardware hasn't
+	 * checked it for us yet.
+	 */
+	if (((uintptr_t)addr & 0x7) != 0) {
+		if (curproc->p_fixalignment)
+			return (do_unaligned(rp, badaddr));
+		else
+			return (SIMU_UNALIGN);
+	}
+
+	/*
+	 * If this is a 32-bit program, chop the address accordingly.
+	 */
+	if (curproc->p_model == DATAMODEL_ILP32 && usermode)
+		addr = (caddr_t)(caddr32_t)addr;
+
+	if ((inst >> 21) & 1) {			/* store */
+		if (getreg(rp, rd, &reven, badaddr))
+			return (SIMU_FAULT);
+		if (getreg(rp, rd+1, &rodd, badaddr))
+			return (SIMU_FAULT);
+		if (ltlend) {
+			reven = BSWAP_32(reven);
+			rodd  = BSWAP_32(rodd);
+		}
+		data = (reven << 32) | rodd;
+		if (usermode) {
+			if (suword64_nowatch(addr, data) == -1)
+				return (SIMU_FAULT);
+		} else {
+			*(uint64_t *)addr = data;
+		}
+	} else {				/* load */
+		if (usermode) {
+			if (fuword64_nowatch(addr, &data)) {
+				if (nf)
+					data = 0;
+				else
+					return (SIMU_FAULT);
+			}
+		} else
+			data = *(uint64_t *)addr;
+
+		reven = (data >> 32);
+		rodd  = (uint64_t)(uint32_t)data;
+		if (ltlend) {
+			reven = BSWAP_32(reven);
+			rodd  = BSWAP_32(rodd);
+		}
+
+		if (putreg(&reven, rp, rd, badaddr) == -1)
+			return (SIMU_FAULT);
+		if (putreg(&rodd, rp, rd+1, badaddr) == -1)
+			return (SIMU_FAULT);
+	}
+	return (SIMU_SUCCESS);
+}
+
 
 /*
  * simulate popc

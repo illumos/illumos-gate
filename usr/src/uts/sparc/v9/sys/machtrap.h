@@ -53,6 +53,8 @@ extern "C" {
 #define	T_INSTR_ERROR		0x00A
 #define	T_UNIMP_INSTR		0x010
 #define	T_PRIV_INSTR		0x011
+#define	T_UNIMP_LDD		0x012
+#define	T_UNIMP_STD		0x013
 #define	T_FP_DISABLED		0x020
 #define	T_FP_EXCEPTION_IEEE	0x021
 #define	T_FP_EXCEPTION_OTHER	0x022

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-1998,2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,6 +145,7 @@ extern "C" {
 
 extern int32_t fetch_user_instr(caddr_t);
 extern int simulate_unimp(struct regs *, caddr_t *);
+extern int simulate_lddstd(struct regs *, caddr_t *);
 extern int do_unaligned(struct regs *, caddr_t *);
 extern int calc_memaddr(struct regs *, caddr_t *);
 extern int is_atomic(struct regs *);

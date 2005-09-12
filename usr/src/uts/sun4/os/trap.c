@@ -958,6 +958,75 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 		}
 		break;
 
+	case T_UNIMP_LDD + T_USER:
+	case T_UNIMP_STD + T_USER:
+		if (tudebug)
+			showregs(type, rp, (caddr_t)0, 0);
+		switch (simulate_lddstd(rp, &badaddr)) {
+		case SIMU_SUCCESS:
+			/* skip the successfully simulated instruction */
+			rp->r_pc = rp->r_npc;
+			rp->r_npc += 4;
+			goto out;
+			/*NOTREACHED*/
+
+		case SIMU_FAULT:
+			if (nfload(rp, NULL))
+				goto out;
+			siginfo.si_signo = SIGSEGV;
+			siginfo.si_code = SEGV_MAPERR;
+			siginfo.si_addr = badaddr;
+			fault = FLTBOUNDS;
+			break;
+
+		case SIMU_UNALIGN:
+			if (nfload(rp, NULL))
+				goto out;
+			siginfo.si_signo = SIGBUS;
+			siginfo.si_code = BUS_ADRALN;
+			siginfo.si_addr = badaddr;
+			fault = FLTACCESS;
+			break;
+
+		case SIMU_ILLEGAL:
+		default:
+			siginfo.si_signo = SIGILL;
+			siginfo.si_code = ILL_ILLOPC;
+			siginfo.si_addr = (caddr_t)rp->r_pc;
+			fault = FLTILL;
+			break;
+		}
+		break;
+
+	case T_UNIMP_LDD:
+	case T_UNIMP_STD:
+		if (simulate_lddstd(rp, &badaddr) == SIMU_SUCCESS) {
+			/* skip the successfully simulated instruction */
+			rp->r_pc = rp->r_npc;
+			rp->r_npc += 4;
+			goto cleanup;
+			/*NOTREACHED*/
+		}
+		/*
+		 * A third party driver executed an {LDD,STD,LDDA,STDA}
+		 * that we couldn't simulate.
+		 */
+		if (nfload(rp, NULL))
+			goto cleanup;
+
+		if (curthread->t_lofault) {
+			if (lodebug) {
+				showregs(type, rp, addr, 0);
+				traceback((caddr_t)rp->r_sp);
+			}
+			rp->r_g1 = EFAULT;
+			rp->r_pc = curthread->t_lofault;
+			rp->r_npc = rp->r_pc + 4;
+			goto cleanup;
+		}
+		(void) die(type, rp, addr, 0);
+		/*NOTREACHED*/
+
 	case T_IDIV0 + T_USER:		/* integer divide by zero */
 	case T_DIV0 + T_USER:		/* integer divide by zero */
 		if (tudebug && tudebugfpe)
