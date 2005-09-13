@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	npd_svc.c
@@ -503,6 +503,8 @@ struct svc_req	*rqstp;
 	char *old_pass;
 	entry_col *	eobj_col;
 	uint_t		eobj_col_len;
+	int pwflag = FALSE;
+	int chg_passwd = TRUE;
 
 	/* set to success, and reset to error when warranted */
 	res->status = NPD_SUCCESS;
@@ -565,14 +567,6 @@ struct svc_req	*rqstp;
 	/* create passwd struct with this pass & gecos/shell */
 	pass_res = nis_getpwdent(entry->ul_user, entry->ul_domain);
 
-	/* encrypt new passwd */
-	if (!(newpass = __npd_encryptpass(pass, NIS_RES_OBJECT(pass_res)))) {
-		syslog(LOG_ERR, "password encryption failed");
-		res->status = NPD_FAILED;
-		res->nispasswd_updresult_u.npd_err = NPD_ENCRYPTFAIL;
-		return (TRUE);
-	}
-
 	if (pass_res == NULL) {
 		syslog(LOG_ERR, "invalid args %s and %s",
 			entry->ul_user, entry->ul_domain);
@@ -608,15 +602,13 @@ struct svc_req	*rqstp;
 
 	/* can change passwd, shell or gecos */
 	(void) memset(ecol, 0, sizeof (ecol));
-	ecol[1].ec_value.ec_value_val = newpass;
-	ecol[1].ec_value.ec_value_len = strlen(newpass) + 1;
-	ecol[1].ec_flags = EN_CRYPT|EN_MODIFIED;
 
 	/* clear out the error list */
 	(void) memset(errlist, 0, sizeof (errlist));
 
 	/* if a gecos field is provided... */
 	if (*updreq->pass_info.pw_gecos != '\0') {
+		chg_passwd = FALSE;
 		if (__npd_can_do(NIS_MODIFY_ACC, pobj,
 			entry->ul_item.name, 4) == FALSE) {
 			syslog(LOG_NOTICE,
@@ -636,9 +628,9 @@ struct svc_req	*rqstp;
 			ecol[4].ec_flags = EN_MODIFIED;
 		}
 	}
-
-	/* if a shell field is provided... */
+		/* if a shell field is provided... */
 	if (*updreq->pass_info.pw_shell != '\0') {
+		chg_passwd = FALSE;
 		if (__npd_can_do(NIS_MODIFY_ACC, pobj,
 			entry->ul_item.name, 6) == FALSE) {
 			syslog(LOG_NOTICE,
@@ -670,10 +662,25 @@ struct svc_req	*rqstp;
 			ecol[6].ec_flags = EN_MODIFIED;
 		}
 	}
+	/* otherwise password */
+	if (chg_passwd == TRUE) {
+		/* encrypt new passwd */
+		if (!(newpass = __npd_encryptpass(pass,
+			NIS_RES_OBJECT(pass_res)))) {
+			syslog(LOG_ERR, "password encryption failed");
+			res->status = NPD_FAILED;
+			res->nispasswd_updresult_u.npd_err = NPD_ENCRYPTFAIL;
+			goto end;
+		}
+		ecol[1].ec_value.ec_value_val = newpass;
+		ecol[1].ec_value.ec_value_len = strlen(newpass) + 1;
+		ecol[1].ec_flags = EN_CRYPT|EN_MODIFIED;
+		pwflag = TRUE;
+	}
 
 	/* update lstchg field in the shadow area */
 	sp = ENTRY_VAL(pobj, 7);
-	if (sp != NULL) {
+	if (pwflag && sp != NULL) {
 		if ((sp = strchr(ENTRY_VAL(pobj, 7), ':')) == NULL) {
 			syslog(LOG_ERR, "shadow column corrupted: user %s",
 				entry->ul_user);
@@ -734,7 +741,7 @@ struct svc_req	*rqstp;
 	}
 
 	/* NIS+ master updated; if YP-forwarding turned on, do YP */
-	if (ypfwd) {
+	if (pwflag && ypfwd) {
 
 		int try = 0;	/* retry counter for YP & NIS+ updates */
 
@@ -807,7 +814,7 @@ passwd update; maybe out-of-sync with YP map -- verify by hand");
 	 * YP updating was on and then, only in a failure scenario.
 	 * In all other situations, update the credential!
 	 */
-	if (error == NPD_SUCCESS) {
+	if (error == NPD_SUCCESS && pwflag) {
 
 	    /* attempt to update PK cred(s) */
 	    (void) __npd_upd_all_pk_creds(entry->ul_user, entry->ul_domain,
