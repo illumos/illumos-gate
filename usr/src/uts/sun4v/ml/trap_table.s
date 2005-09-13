@@ -827,8 +827,10 @@ tt_pil/**/level:			;\
 /*
  * MMU Trap Handlers.
  */
-#define	SFSR_CTX_SHIFT	16
 
+/*
+ * synthesize for trap(): SFSR in %g3
+ */
 #define	IMMU_EXCEPTION							\
 	MMU_FAULT_STATUS_AREA(%g3)					;\
 	rdpr	%tpc, %g2						;\
@@ -840,17 +842,16 @@ tt_pil/**/level:			;\
 	mov	T_INSTR_EXCEPTION, %g1					;\
 	.align	32
 
+/*
+ * synthesize for trap(): TAG_ACCESS in %g2, SFSR in %g3
+ */
 #define	DMMU_EXCEPTION							\
-	MMU_FAULT_STATUS_AREA(%g3)					;\
-	ldx	[%g3 + MMFSA_D_ADDR], %g2				;\
-	ldx	[%g3 + MMFSA_D_TYPE], %g1				;\
-	ldx	[%g3 + MMFSA_D_CTX], %g3				;\
-	sllx	%g3, SFSR_CTX_SHIFT, %g3				;\
-	or	%g3, %g1, %g3						;\
-	ba,pt	%xcc, .mmu_exception_end				;\
-	mov	T_DATA_EXCEPTION, %g1					;\
+	ba,a,pt	%xcc, .dmmu_exception					;\
 	.align	32
 
+/*
+ * synthesize for trap(): SFAR in %g2, SFSR in %g3
+ */
 #define	DMMU_EXC_AG_PRIV						\
 	MMU_FAULT_STATUS_AREA(%g3)					;\
 	ldx	[%g3 + MMFSA_D_ADDR], %g2				;\
@@ -862,6 +863,9 @@ tt_pil/**/level:			;\
 	or	%g3, %g1, %g3						;\
 	.align	32
 
+/*
+ * synthesize for trap(): SFAR in %g2, SFSR in %g3
+ */
 #define	DMMU_EXC_AG_NOT_ALIGNED						\
 	MMU_FAULT_STATUS_AREA(%g3)					;\
 	ldx	[%g3 + MMFSA_D_ADDR], %g2				;\
@@ -870,15 +874,21 @@ tt_pil/**/level:			;\
 	ldx	[%g3 + MMFSA_D_CTX], %g3				;\
 	sllx	%g3, SFSR_CTX_SHIFT, %g3				;\
 	ba,pt	%xcc, .mmu_exception_not_aligned			;\
-	or	%g3, %g1, %g3						;\
+	or	%g3, %g1, %g3			/* SFSR */		;\
 	.align	32
 /*
  * SPARC V9 IMPL. DEP. #109(1) and (2) and #110(1) and (2)
  */	 
 
+/*
+ * synthesize for trap(): SFAR in %g2, SFSR in %g3
+ */
 #define	DMMU_EXC_LDDF_NOT_ALIGNED					\
 	ba,a,pt	%xcc, .dmmu_exc_lddf_not_aligned			;\
 	.align	32
+/*
+ * synthesize for trap(): SFAR in %g2, SFSR in %g3
+ */
 #define	DMMU_EXC_STDF_NOT_ALIGNED					\
 	ba,a,pt	%xcc, .dmmu_exc_stdf_not_aligned			;\
 	.align	32
@@ -914,6 +924,9 @@ tt1_dtlbmiss:
  * second TSB) is indicated by a negative value (-1) in that register.
  */
 
+/*
+ * synthesize for miss handler: TAG_ACCESS in %g2
+ */
 #define	DTLB_MISS(table_name)						;\
 	.global	table_name/**/_dtlbmiss					;\
 table_name/**/_dtlbmiss:						;\
@@ -921,7 +934,7 @@ table_name/**/_dtlbmiss:						;\
 	MMU_FAULT_STATUS_AREA(%g7)					;\
 	ldx	[%g7 + MMFSA_D_ADDR], %g2	/* address */		;\
 	ldx	[%g7 + MMFSA_D_CTX], %g3	/* g3 = ctx */		;\
-	or	%g2, %g3, %g2			/* XXXQ temp */		;\
+	or	%g2, %g3, %g2			/* TAG_ACCESS */	;\
 	cmp	%g3, INVALID_CONTEXT					;\
 	ble,pn	%xcc, sfmmu_kdtlb_miss					;\
 	  srlx	%g2, TAG_VALO_SHIFT, %g7	/* g7 = tsb tag */	;\
@@ -958,6 +971,9 @@ tt1_itlbmiss:
  * MUST be EXACTLY 32 instructions or we'll break.
  */
 
+/*
+ * synthesize for miss handler: TAG_ACCESS in %g2
+ */
 #define	ITLB_MISS(table_name)						 \
 	.global	table_name/**/_itlbmiss					;\
 table_name/**/_itlbmiss:						;\
@@ -965,7 +981,7 @@ table_name/**/_itlbmiss:						;\
 	MMU_FAULT_STATUS_AREA(%g7)					;\
 	ldx	[%g7 + MMFSA_I_ADDR], %g2	/* g2 = address */	;\
 	ldx	[%g7 + MMFSA_I_CTX], %g3	/* g3 = ctx */		;\
-	or	%g2, %g3, %g2			/* XXXQ temp */		;\
+	or	%g2, %g3, %g2			/* TAG_ACCESS */	;\
 	cmp	%g3, INVALID_CONTEXT					;\
 	ble,pn	%xcc, sfmmu_kitlb_miss					;\
 	  srlx	%g2, TAG_VALO_SHIFT, %g7	/* g7 = tsb tag */	;\
@@ -990,11 +1006,14 @@ table_name/**/_itlbmiss:						;\
  * attempts to set the modify bit on the hash.  It needs to be
  * exactly 32 instructions.
  */
+/*
+ * synthesize for miss handler: TAG_ACCESS in %g2
+ */
 #define	DTLB_PROT							 \
 	MMU_FAULT_STATUS_AREA(%g7)					;\
 	ldx	[%g7 + MMFSA_D_ADDR], %g2	/* address */		;\
 	ldx	[%g7 + MMFSA_D_CTX], %g3	/* %g3 = ctx */		;\
-	or	%g2, %g3, %g2			/* XXXQ temp */		;\
+	or	%g2, %g3, %g2			/* TAG_ACCESS */	;\
 	/*								;\
 	 *   g2 = tag access register					;\
 	 *   g3 = ctx number						;\
@@ -1045,21 +1064,20 @@ table_name/**/_itlbmiss:						;\
 	or	%g6, (ttextra), %g1					;\
 	stha	%g1, [%g3 + TRAP_ENT_TT]%asi				;\
 	MMU_FAULT_STATUS_AREA(%g4)					;\
-	ldx	[%g4 + MMFSA_I_ADDR], %g1				;\
-	ldx	[%g4 + MMFSA_D_ADDR], %g4				;\
+	mov	MMFSA_D_ADDR, %g1					;\
 	cmp	%g6, FAST_IMMU_MISS_TT					;\
-	move	%icc, %g1, %g4						;\
+	move	%xcc, MMFSA_I_ADDR, %g1					;\
 	cmp	%g6, T_INSTR_MMU_MISS					;\
-	move	%icc, %g1, %g4						;\
-	stxa	%g4, [%g3 + TRAP_ENT_TSTATE]%asi /* fault addr */	;\
-	MMU_FAULT_STATUS_AREA(%g4)					;\
-	ldx	[%g4 + MMFSA_I_CTX], %g1				;\
-	ldx	[%g4 + MMFSA_D_CTX], %g4				;\
+	move	%xcc, MMFSA_I_ADDR, %g1					;\
+	ldx	[%g4 + %g1], %g1					;\
+	stxa	%g1, [%g3 + TRAP_ENT_TSTATE]%asi /* fault addr */	;\
+	mov	MMFSA_D_CTX, %g1					;\
 	cmp	%g6, FAST_IMMU_MISS_TT					;\
-	move	%icc, %g1, %g4						;\
+	move	%xcc, MMFSA_I_CTX, %g1					;\
 	cmp	%g6, T_INSTR_MMU_MISS					;\
-	move	%icc, %g1, %g4						;\
-	stna	%g4, [%g3 + TRAP_ENT_TR]%asi				;\
+	move	%xcc, MMFSA_I_CTX, %g1					;\
+	ldx	[%g4 + %g1], %g1					;\
+	stna	%g1, [%g3 + TRAP_ENT_TR]%asi				;\
 	TRACE_NEXT(%g3, %g4, %g6)
 #else
 #define TRACE_TSBHIT(ttextra)
@@ -1365,6 +1383,9 @@ etrap_table:
  * g6 = scratch (clobbered)
  * g7 = pc we jumped here from (in)
  */
+/*
+ * synthesize for trap(): TAG_ACCESS in %g2
+ */
 	ALTENTRY(exec_fault)
 	TRACE_TSBHIT(TT_MMU_EXEC)
 	MMU_FAULT_STATUS_AREA(%g4)
@@ -1372,7 +1393,7 @@ etrap_table:
 	ldx	[%g4 + MMFSA_I_CTX], %g3	/* g3 = ctx */
 	srlx	%g2, MMU_PAGESHIFT, %g2		! align address to page boundry
 	sllx	%g2, MMU_PAGESHIFT, %g2
-	or	%g2, %g3, %g2			/* XXXQ temp */
+	or	%g2, %g3, %g2			/* TAG_ACCESS */
 	mov	T_INSTR_MMU_MISS, %g3		! arg2 = traptype
 	set	trap, %g1
 	ba,pt	%xcc, sys_trap
@@ -2527,9 +2548,15 @@ mmu_trap_tl1:
 	wrpr	%g0, %g7, %tnpc
 	wrpr	%g0, 1, %gl
 	rdpr	%tt, %g5
+	MMU_FAULT_STATUS_AREA(%g7)
 	cmp	%g5, T_ALIGNMENT
-	MMU_FAULT_STATUS_AREA(%g4)
-	ldx	[%g4 + MMFSA_D_ADDR], %g6
+	be,pn	%xcc, 1f
+	ldx	[%g7 + MMFSA_D_ADDR], %g6
+	ldx	[%g7 + MMFSA_D_CTX], %g7
+	srlx	%g6, MMU_PAGESHIFT, %g6		/* align address */
+	sllx	%g6, MMU_PAGESHIFT, %g6
+	or	%g6, %g7, %g6			/* TAG_ACCESS */
+1:
 	done
 	SET_SIZE(mmu_trap_tl1)
 
@@ -2696,15 +2723,14 @@ trace_tsbmiss:
 	rdpr	%tt, %g6
 	or	%g6, TT_MMU_MISS, %g4
 	stha	%g4, [%g5 + TRAP_ENT_TT]%asi
-	MMU_FAULT_STATUS_AREA(%g4)
+	mov	MMFSA_D_ADDR, %g4
 	cmp	%g6, FAST_IMMU_MISS_TT
-	be,a	%icc, 1f
-	  ldx	[%g4 + MMFSA_I_ADDR], %g6
+	move	%xcc, MMFSA_I_ADDR, %g4
 	cmp	%g6, T_INSTR_MMU_MISS
-	be,a	%icc, 1f
-	  ldx	[%g4 + MMFSA_I_ADDR], %g6
-	ldx	[%g4 + MMFSA_D_ADDR], %g6
-1:	stxa	%g6, [%g5 + TRAP_ENT_TSTATE]%asi	! tag target
+	move	%xcc, MMFSA_I_ADDR, %g4
+	MMU_FAULT_STATUS_AREA(%g6)
+	ldx	[%g6 + %g4], %g6
+	stxa	%g6, [%g5 + TRAP_ENT_TSTATE]%asi	! tag target
 	stna	%g3, [%g5 + TRAP_ENT_TR]%asi		! tsb4m pointer
 	TRACE_NEXT(%g5, %g4, %g6)
 	jmp	%g7 + 4
@@ -2740,6 +2766,10 @@ trace_dataprot:
 
 #endif /* TRAPTRACE */
 
+/*
+ * synthesize for trap(): SFAR in %g2, SFSR in %g3
+ */
+	.type	.dmmu_exc_lddf_not_aligned, #function
 .dmmu_exc_lddf_not_aligned:
 	MMU_FAULT_STATUS_AREA(%g3)
 	ldx	[%g3 + MMFSA_D_ADDR], %g2
@@ -2749,9 +2779,14 @@ trace_dataprot:
 	sllx	%g3, SFSR_CTX_SHIFT, %g3
 	btst	1, %sp
 	bnz,pt	%xcc, .lddf_exception_not_aligned
-	or	%g3, %g1, %g3
+	or	%g3, %g1, %g3			/* SFSR */
 	ba,a,pt	%xcc, .mmu_exception_not_aligned
+	SET_SIZE(.dmmu_exc_lddf_not_aligned)
 
+/*
+ * synthesize for trap(): SFAR in %g2, SFSR in %g3
+ */
+	.type	.dmmu_exc_stdf_not_aligned, #function
 .dmmu_exc_stdf_not_aligned:
 	MMU_FAULT_STATUS_AREA(%g3)
 	ldx	[%g3 + MMFSA_D_ADDR], %g2
@@ -2761,9 +2796,24 @@ trace_dataprot:
 	sllx	%g3, SFSR_CTX_SHIFT, %g3
 	btst	1, %sp
 	bnz,pt	%xcc, .stdf_exception_not_aligned
-	or	%g3, %g1, %g3
+	or	%g3, %g1, %g3			/* SFSR */
 	ba,a,pt	%xcc, .mmu_exception_not_aligned
+	SET_SIZE(.dmmu_exc_stdf_not_aligned)
 
+	.type	.dmmu_exception, #function
+.dmmu_exception:
+	MMU_FAULT_STATUS_AREA(%g3)
+	ldx	[%g3 + MMFSA_D_ADDR], %g2
+	ldx	[%g3 + MMFSA_D_TYPE], %g1
+	ldx	[%g3 + MMFSA_D_CTX], %g3
+	srlx	%g2, MMU_PAGESHIFT, %g2		/* align address */
+	sllx	%g2, MMU_PAGESHIFT, %g2
+	or	%g2, %g3, %g2			/* TAG_ACCESS */
+	sllx	%g3, SFSR_CTX_SHIFT, %g3
+	or	%g3, %g1, %g3			/* SFSR */
+	ba,pt	%xcc, .mmu_exception_end
+	mov	T_DATA_EXCEPTION, %g1
+	SET_SIZE(.dmmu_exception)
 /*
  * expects offset into tsbmiss area in %g1 and return pc in %g7
  */

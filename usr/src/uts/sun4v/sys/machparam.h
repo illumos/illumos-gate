@@ -296,6 +296,7 @@ extern "C" {
 #define	PTL1_BAD_CTX_STEAL	12
 #define	PTL1_BAD_ECC		13
 #define	PTL1_BAD_HCALL		14
+#define	PTL1_BAD_GL		15
 
 /*
  * Defines used for ptl1 related data structs.

@@ -292,7 +292,8 @@ vis1_partial_support(struct regs *rp, k_siginfo_t *siginfo, uint_t *fault)
 	uint_t	optype, op3, asi;
 	uint_t	rd, ignor;
 
-	ASSERT(USERMODE(rp->r_tstate));
+	if (!USERMODE(rp->r_tstate))
+		return (-1);
 
 	instr = fetch_user_instr((caddr_t)rp->r_pc);
 

@@ -293,6 +293,18 @@ panic_stopcpus(cpu_t *cp, kthread_t *t, int spl)
 void
 panic_enter_hw(int spl)
 {
+#ifdef TRAPTRACE
+	if (!panic_tick) {
+		uint64_t prev_freeze;
+
+		panic_tick = gettick();
+		/*  there are no possible error codes for this hcall */
+		(void) hv_ttrace_freeze((uint64_t)TRAP_TFREEZE_ALL,
+			&prev_freeze);
+		TRAPTRACE_FREEZE;
+	}
+#endif
+
 	if (spl == ipltospl(PIL_14)) {
 		uint_t opstate = disable_vec_intr();
 
@@ -436,6 +448,7 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 		"attempt to steal locked ctx",  /* PTL1_BAD_CTX_STEAL */
 		"CPU ECC error loop",		/* PTL1_BAD_ECC */
 		"unexpected error from hypervisor call", /* PTL1_BAD_HCALL */
+		"unexpected global level(%gl)", /* PTL1_BAD_GL */
 	};
 
 	uint_t reason = pstate->ptl1_regs.ptl1_gregs[0].ptl1_g1;

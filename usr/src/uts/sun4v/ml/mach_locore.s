@@ -373,7 +373,7 @@ afsrbuf:
  *
  * Entry Conditions:
  * 	%pstate		am:0 priv:1 ie:0
- * 			globals are either ag or ig (not mg!)
+ * 	%gl		global level  1
  *
  * Register Inputs:
  * 	%g1		pc of trap handler
@@ -407,9 +407,18 @@ sys_trap(void)
 #else	/* lint */
 
 	ENTRY_NP(sys_trap)
+#ifdef DEBUG
+	! Assert gl == 1
+	rdpr	%gl, %g5
+	cmp	%g5, 1
+	bne,a,pn %xcc, ptl1_panic
+	  mov	PTL1_BAD_GL, %g1
+#endif
+
 	!
 	! force tl=1, update %cwp, branch to correct handler
 	!
+
 	wrpr	%g0, 1, %tl
 	rdpr	%tstate, %g5
 	btst	TSTATE_PRIV, %g5
@@ -424,6 +433,13 @@ sys_trap(void)
 	! make all windows clean for kernel
 	! buy a window using the current thread's stack
 	!
+#ifdef DEBUG
+	! Assert gl == 1
+	rdpr	%gl, %g5
+	cmp	%g5, 1
+	bne,a,pn %xcc, ptl1_panic
+	  mov	PTL1_BAD_GL, %g1
+#endif
 	sethi	%hi(nwin_minus_one), %g5
 	ld	[%g5 + %lo(nwin_minus_one)], %g5
 	wrpr	%g0, %g5, %cleanwin
@@ -716,8 +732,7 @@ have_win:
 	!	%l7 - regs
 	!
 	! disable interrupts and check for ASTs and wbuf restores
-	! keep cpu_base_spl in %l4 and THREAD_REG in %l6 (needed
-	! in wbuf.s when globals have already been restored).
+	! keep cpu_base_spl in %l4
 	!
 	wrpr	%g0, PIL_MAX, %pil
 	ldn	[THREAD_REG + T_CPU], %l0

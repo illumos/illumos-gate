@@ -1588,6 +1588,7 @@ test_ptl1_panic:
 
 
 	ENTRY_NP(sfmmu_pagefault)
+	SET_GL_REG(1)
 	USE_ALTERNATE_GLOBALS(%g5)
 	GET_MMU_BOTH_TAGACC(%g5 /*dtag*/, %g2 /*itag*/, %g6, %g4)
 	rdpr	%tt, %g6
@@ -1628,6 +1629,7 @@ test_ptl1_panic:
 	SET_SIZE(sfmmu_pagefault)
 
 	ENTRY_NP(sfmmu_mmu_trap)
+	SET_GL_REG(1)
 	USE_ALTERNATE_GLOBALS(%g5)
 	GET_MMU_BOTH_TAGACC(%g5 /*dtag*/, %g2 /*itag*/, %g4, %g6)
 	rdpr	%tt, %g6
@@ -1656,6 +1658,7 @@ test_ptl1_panic:
 	SET_SIZE(sfmmu_mmu_trap)
 
 	ENTRY_NP(sfmmu_suspend_tl)
+	SET_GL_REG(1)
 	USE_ALTERNATE_GLOBALS(%g5)
 	GET_MMU_BOTH_TAGACC(%g5 /*dtag*/, %g2 /*itag*/, %g4, %g3)
 	rdpr	%tt, %g6
@@ -1807,6 +1810,7 @@ test_ptl1_panic:
 0:
 	TSTAT_CHECK_TL1(1f, %g1, %g2)
 1:
+	SET_GL_REG(1)
 	USE_ALTERNATE_GLOBALS(%g5)
 	GET_MMU_D_TAGACC(%g2 /* tagacc */, %g4 /*scratch*/)
 	mov	T_DATA_MMU_MISS, %g3	/* arg2 = traptype */
