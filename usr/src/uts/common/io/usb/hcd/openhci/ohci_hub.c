@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1422,7 +1422,7 @@ ohci_handle_root_hub_status_change(void *arg)
 {
 	ohci_state_t		*ohcip = (ohci_state_t *)arg;
 	usb_intr_req_t		*curr_intr_reqp;
-	uchar_t			all_ports_status = 0;
+	usb_port_mask_t		all_ports_status = 0;
 	uint_t			new_root_hub_status;
 	uint_t			new_port_status;
 	uint_t			change_status;
@@ -1509,14 +1509,14 @@ ohci_handle_root_hub_status_change(void *arg)
 
 					USB_DPRINTF_L3(PRINT_MASK_ROOT_HUB,
 					    ohcip->ohci_log_hdl,
-					    "Port %d connected", i);
+					    "Port %d connected", i+1);
 				} else {
 					ohcip->ohci_root_hub.
 					    rh_port_state[i] = DISCONNECTED;
 
 					USB_DPRINTF_L3(PRINT_MASK_ROOT_HUB,
 					    ohcip->ohci_log_hdl,
-					    "Port %d disconnected", i);
+					    "Port %d disconnected", i+1);
 				}
 			}
 
@@ -1532,14 +1532,14 @@ ohci_handle_root_hub_status_change(void *arg)
 
 					USB_DPRINTF_L3(PRINT_MASK_ROOT_HUB,
 					    ohcip->ohci_log_hdl,
-					    "Port %d enabled", i);
+					    "Port %d enabled", i+1);
 				} else {
 					ohcip->ohci_root_hub.
 					    rh_port_state[i] = DISABLED;
 
 					USB_DPRINTF_L3(PRINT_MASK_ROOT_HUB,
 					    ohcip->ohci_log_hdl,
-					    "Port %d disabled", i);
+					    "Port %d disabled", i+1);
 				}
 			}
 
@@ -1562,7 +1562,24 @@ ohci_handle_root_hub_status_change(void *arg)
 
 		ASSERT(message != NULL);
 
-		*message->b_wptr++ = all_ports_status;
+		do {
+			/*
+			 * check that mblk is big enough when we
+			 * are writing bytes into it
+			 */
+			if (message->b_wptr >= message->b_datap->db_lim) {
+
+				USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB,
+				    ohcip->ohci_log_hdl,
+				    "ohci_handle_root_hub_status_change: "
+				    "mblk data overflow.");
+
+				break;
+			}
+
+			*message->b_wptr++ = (uchar_t)all_ports_status;
+			all_ports_status >>= 8;
+		} while (all_ports_status != 0);
 
 		ohci_root_hub_hcdi_callback(ph, USB_CR_OK);
 	}

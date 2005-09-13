@@ -1843,14 +1843,14 @@ ehci_handle_root_hub_status_change(void *arg)
 
 					USB_DPRINTF_L3(PRINT_MASK_ROOT_HUB,
 					    ehcip->ehci_log_hdl,
-					    "Port %d connected", i);
+					    "Port %d connected", i+1);
 				} else {
 					ehcip->ehci_root_hub.
 					    rh_port_state[i] = DISCONNECTED;
 
 					USB_DPRINTF_L3(PRINT_MASK_ROOT_HUB,
 					    ehcip->ehci_log_hdl,
-					    "Port %d disconnected", i);
+					    "Port %d disconnected", i+1);
 				}
 			}
 
@@ -1866,14 +1866,14 @@ ehci_handle_root_hub_status_change(void *arg)
 
 					USB_DPRINTF_L3(PRINT_MASK_ROOT_HUB,
 					    ehcip->ehci_log_hdl,
-					    "Port %d enabled", i);
+					    "Port %d enabled", i+1);
 				} else {
 					ehcip->ehci_root_hub.
 					    rh_port_state[i] = DISABLED;
 
 					USB_DPRINTF_L3(PRINT_MASK_ROOT_HUB,
 					    ehcip->ehci_log_hdl,
-					    "Port %d disabled", i);
+					    "Port %d disabled", i+1);
 				}
 			}
 
@@ -1896,6 +1896,19 @@ ehci_handle_root_hub_status_change(void *arg)
 		ASSERT(message != NULL);
 
 		do {
+			/*
+			 * check that the mblk is big enough when we
+			 * are writing bytes into it
+			 */
+			if (message->b_wptr >= message->b_datap->db_lim) {
+
+				USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB,
+				    ehcip->ehci_log_hdl,
+				    "ehci_handle_root_hub_status_change"
+				    "mblk data overflow.");
+
+				break;
+			}
 			*message->b_wptr++ = (uchar_t)port_mask;
 			port_mask >>= 8;
 		} while (port_mask != 0);
