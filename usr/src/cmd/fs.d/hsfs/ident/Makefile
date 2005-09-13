@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Makefile for HSFS ident function.
@@ -48,7 +48,6 @@ include ../../Makefile.fstype
 
 SRCS=	${LIBPROG:%.so.$(IDENT_VERS)=%.c}
 
-STRIPFLAG =
 CPPFLAGS += 	-DIDENT_VERS=${IDENT_VERS}
 LDFLAGS +=	$(ZTEXT) $(ZDEFS) $(ZCOMBRELOC)
 LIBS=		-lc

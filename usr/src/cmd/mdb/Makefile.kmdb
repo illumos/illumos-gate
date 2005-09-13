@@ -83,12 +83,6 @@ SUPPORTED_TERMS	= \
 	xterm \
 	xterms
 
-#
-# Reset STRIPFLAG to the empty string.  MDB is intentionally installed
-# with a symbol table in order to help module developers.
-#
-STRIPFLAG =
-
 LINTFLAGS += -n -errtags=yes
 
 # The prom interfaces (the prom_* files) are compiled with -D_KERNEL, which

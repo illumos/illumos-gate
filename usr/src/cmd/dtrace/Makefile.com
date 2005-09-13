@@ -36,7 +36,6 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 LDLIBS += -ldtrace -lproc -lctf
 
-STRIPFLAG =
 FILEMODE = 0555
 GROUP = bin
 

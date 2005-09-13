@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,6 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 LDLIBS += -ldtrace -lrt
 
-STRIPFLAG =
 FILEMODE = 0555
 GROUP = bin
 

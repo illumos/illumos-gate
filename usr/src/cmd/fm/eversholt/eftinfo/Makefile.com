@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,11 +32,6 @@ LOCALOBJS = eftinfo.o
 OBJS = $(LOCALOBJS) $(COMMONOBJS)
 SRCS = $(LOCALOBJS:.o=.c) $(COMMONSRCS)
 
-#
-# Reset STRIPFLAG to the empty string.  rdasim is intentionally
-# installed with symbol tables to aid debugging.
-#
-STRIPFLAG=
 CPPFLAGS += -I../common
 CFLAGS += $(CTF_FLAGS)
 LDLIBS += -lumem

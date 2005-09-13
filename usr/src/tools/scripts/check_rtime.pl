@@ -59,7 +59,7 @@
 # Define all global variables (required for strict)
 use vars  qw($SkipDirs $SkipFiles $SkipTextrelFiles);
 use vars  qw($SkipUndefDirs $SkipUndefFiles $SkipUnusedDirs $SkipUnusedFiles);
-use vars  qw($SkipStripDirs $SkipNoStripFiles $SkipStabFiles $SkipNoExStkFiles);
+use vars  qw($SkipStabFiles $SkipNoExStkFiles);
 use vars  qw($UnusedNoise $Prog $Mach $Isalist $Env $Ena64 $Tmpdir $Error);
 use vars  qw($UnusedFiles $UnusedPaths $LddNoU $Crle32 $Crle64 $Conf32 $Conf64);
 use vars  qw($SkipInterps $OldDeps %opt);
@@ -163,19 +163,6 @@ $SkipUnusedFiles = qr{ ^(?:
 	poold |				#	see 4952319. 
 	libc\.so\.1\.9 |		# 4lib/libc versions have private
 	libc\.so\.2\.9			#	copies of stuff from libc.
-	)$
-}x;
-
-# Define any files that can be stripped.
-$SkipStripDirs = qr{
-	/abi/
-}x;
-
-# Define any files that must not be stripped.
-$SkipNoStripFiles = qr{ ^(?:
-	adb |
-	mdb |
-	unix
 	)$
 }x;
 
@@ -847,36 +834,17 @@ ELF:	foreach my $Line (@Elf) {
 			}
 		}
 		OutMsg($Ttl++, $RelPath,
-		    "\tdebugging sections should be deleted\t<no -s or strip -x?>");
+		    "\tdebugging sections should be deleted\t<no strip -x?>");
 	}
 
 DONESTAB:
 
-	# Shared objects should have a full symbol table to provide complete
+	# All objects should have a full symbol table to provide complete
 	# debugging stack traces.
-	if ($opt{s} && $Dll && $Strip) {
-		if (!$opt{a}) {
-			if ($RelPath =~ $SkipStripDirs) {
-				goto DONESTRIP;
-			}
-		}
+	if ($Strip) {
 		OutMsg($Ttl++, $RelPath,
 		    "\tsymbol table should not be stripped\t<remove -s?>");
 	}
-
-	# No other dynamic object should have a .symtab symbol table.
-	if ($opt{s} && ($Dll == 0) && ($Strip == 0)) {
-		if (!$opt{a}) {
-			if ($File =~ $SkipNoStripFiles) {
-				goto DONESTRIP;
-			}
-		}
-		OutMsg($Ttl++, $RelPath,
-		    "\tsymbol table should be stripped\t<no -s?>");
-	}
-
-DONESTRIP:
-
 }
 
 

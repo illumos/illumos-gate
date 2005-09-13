@@ -131,12 +131,6 @@ fmd_svc_adm.ln fmd_svc_api.ln fmd_xdr_adm.ln fmd_xdr_api.ln := LINTFLAGS += \
 
 lint_prog := LINTFLAGS += -xerroff=E_FUNC_RET_ALWAYS_IGNOR2
 
-#
-# Reset STRIPFLAG to the empty string.  FMD is intentionally installed with
-# a symbol table in order to help agent and diagnosis engine developers.
-#
-STRIPFLAG =
-
 .NO_PARALLEL:
 .PARALLEL: $(OBJS) $(LINTFILES)
 

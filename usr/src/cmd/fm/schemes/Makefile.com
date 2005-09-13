@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,9 +51,3 @@ CFLAGS += -G $(XREGSFLAG)
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT -I.
 LDFLAGS += $(ZTEXT) $(ZCOMBRELOC) $(ZDEFS) $(ZIGNORE) -M$(MAPFILE)
 LDLIBS += -lnvpair -lc
-
-#
-# Reset STRIPFLAG to the empty string.  FMA modules are intentionally installed
-# with symbol tables in order to help module developers.
-#
-STRIPFLAG =

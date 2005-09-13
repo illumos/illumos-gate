@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,7 +41,6 @@ CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
 LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_log -lnvpair
 LDFLAGS += -R/usr/lib/fm
 LINTFLAGS += -mnu
-STRIPFLAG =
 
 .NO_PARALLEL:
 .PARALLEL: $(OBJS) $(LINTFILES)

@@ -69,12 +69,6 @@ CFLAGS64 += $(STAND_FLAGS_64)
 
 ASFLAGS += -P -D_ASM
 
-#
-# Reset STRIPFLAG to the empty string.  MDB is intentionally installed
-# with a symbol table in order to help module developers.
-#
-STRIPFLAG =
-
 LINTFLAGS += -n -errtags=yes
 CLINTFILES = $(SRCS:%.c=%.ln)
 LINTFILES = $(CLINTFILES:%.s=%.ln)

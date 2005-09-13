@@ -22,7 +22,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH check_rtime 1 "8 May 2001"
+.TH check_rtime 1 "30 Aug 2005"
 .SH NAME
 .I check_rtime
 \- check ELF runtime attributes
@@ -37,8 +37,8 @@ attempts to check a number of ELF runtime attributes
 for consistency with common build rules.
 These checks involve running \fBldd(1)\fP and
 \fBelfdump(1)\fP against a family of dynamic objects.
-Dynamic objects can be defined explicitly as a \fIfile\fP
-or will be located under the directory \fIdir\fP.
+A dynamic object can be defined explicitly as a \fIfile\fP
+or multiple dynamic objects can be located under the directory \fIdir\fP.
 .LP
 .I check_rtime
 is typically called from \fBnightly(1)\fP when the \fB-r\fP
@@ -182,38 +182,21 @@ information.  Note, removal of debugging information is only enabled
 for release builds. The existence of debugging information is displayed as:
 .sp
 .RS 6
-foo: debugging sections should be deleted \\
-.br
-	<no -s or strip -x?>
+foo: debugging sections should be deleted  <no strip -x?>
 .RE
 .TP
 \(bu
-Shared objects should retain their full \fI.symtab\fP symbol table.
+All objects should retain their full \fI.symtab\fP symbol table.
 Although this consumes disk space, it provides for more extensive stack
 tracing when debugging user applications.
-Any shared object a user application may use,
-which includes private shared objects that provide the implementation
-backend to public shared objects, should retain their symbol table.
 .sp
-Hard coding a \fI-s\fP flag with \fB$(DYNFLAGS)\fP is the typical
+Hard coding a \fI-s\fP flag with \fB$(LDFLAGS)\fP or
+\fB$(DYNFLAGS)\fP is the typical
 reason for symbol tables being removed.
-Shared objects that do not contain a symbol table are displayed as:
+Objects that do not contain a symbol table are displayed as:
 .sp
 .RS 6
 foo.so.1: symbol table should not be stripped  <remove -s?>
-.RE
-.TP
-\(bu
-Dynamic executables should not retain their full \fI.symtab\fP symbol table.
-Doing so requires too much disk space, and provides little value.
-.sp
-Not inheriting the correct \fB$(LDFLAGS)\fP from \fIcmd/Makefile.cmd\fP
-is the typical reason for not removing full symbol tables.  Note, removal
-of full symbol tables is only enabled for release builds.
-Dynamic executables that contain a symbol table are displayed as:
-.sp
-.RS 6
-foo: symbol table should be stripped  <-s?>
 .RE
 .TP
 \(bu
@@ -332,8 +315,7 @@ by the objects name.  This output style is more terse, but is
 more appropriate for sorting and diffing with previous build results.
 .TP
 .B \-s
-Determine whether \fI.stabs\fP sections and/or \fI.symtab\fP
-symbol tables exist.
+Determine whether \fI.stabs\fP sections exist.
 .LP
 .SH ALTERNATIVE DEPENDENCY MAPPING
 As

@@ -1158,13 +1158,10 @@ else
 	PROTOCMPTERSE="protocmp.terse -gu"
 fi
 POUND_SIGN="#"
-DEF_STRIPFLAG="-s"
 
 # we export POUND_SIGN to speed up the build process -- prevents evaluation of
 # the Makefile.master definitions.
-# we export DEF_STRIPFLAG to strip debug data from nightly builds; the default
-# behavior is to include all debug data.
-export o_FLAG POUND_SIGN DEF_STRIPFLAG
+export o_FLAG POUND_SIGN
 
 if [ "$d_FLAG" = "y" ]; then
 	maketype="distributed"

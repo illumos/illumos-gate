@@ -55,9 +55,6 @@ ROOT=		/proto
 # STRIP_COMMENTS toggles comment section striping. Generally the same setting
 # as INTERNAL_RELEASE_BUILD.
 #
-# STRIPFLAG is similar.  It is set here for use in lower level Makefiles to
-# allow a single point change to affect the entire build.
-#
 # __GNUC toggles the building of ON components using gcc and related tools.
 # Normally set to `#', set it to `' to do gcc build.
 #
@@ -87,20 +84,6 @@ INTEL_BLD_1=    $(MACH:sparc=$(POUND_SIGN))
 INTEL_BLD=      $(INTEL_BLD_1:i386=)
 
 STRIP_COMMENTS=	$(INTERNAL_RELEASE_BUILD)
-
-# Historical notes: at one point, STRIPFLAG was set to '-s' for root builds,
-# and empty for non-root.  It's now set empty all the time, so that builds
-# using manual invocation of "make install" will have debug data (as they did
-# when run as non-root before).  The 'nightly' script overrides DEF_STRIPFLAG
-# with '-s' so that nightly builds are stripped -- since nightlies were once
-# done only as root, that preserves the known nightly behavior.  The
-# non-nightly behavior can always be overridden by putting "STRIPFLAG=" in the
-# environment, on the 'make' command line, or by overriding STRIPFLAG in the
-# subsystem Makefile itself.  STRIP_COMMENTS, although similar in nature, has
-# always been controlled by INTERNAL_RELEASE_BUILD (always set by nightly).
-
-DEF_STRIPFLAG=
-STRIPFLAG=$(DEF_STRIPFLAG)
 
 # set __GNUC= in the environment to build 32-bit with the gcc compiler.
 # The default is to use the Sun Studio 10 compiler for all processor types.
@@ -784,7 +767,8 @@ POST_PROCESS_O=		$(PROCESS_COMMENT) $@
 POST_PROCESS_A=
 POST_PROCESS_SO=	$(PROCESS_COMMENT) $@ ; $(STRIP_STABS) ; \
 			$(ELFSIGN_OBJECT)
-POST_PROCESS=		$(PROCESS_COMMENT) $@ ; $(ELFSIGN_OBJECT)
+POST_PROCESS=		$(PROCESS_COMMENT) $@ ; $(STRIP_STABS) ; \
+			$(ELFSIGN_OBJECT)
 
 #
 # The PKGDEFS macro points to the source directory containing the majority

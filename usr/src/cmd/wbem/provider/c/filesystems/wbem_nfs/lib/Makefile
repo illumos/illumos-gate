@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -109,8 +109,6 @@ CFLAGS		+= $(XREGSFLAG) $(C_PICFLAGS)
 
 LINTFLAGS	+= -um
 LINTLIBS	= $(LDLIBS.cmd)
-
-STRIPFLAG	=
 
 LDFLAGS		+= -Mmapfile $(GSHARED) -R/usr/sadm/lib/wbem \
 		    $(ZCOMBRELOC) $(ZTEXT) $(ZDEFS) $(SOFLAGS)

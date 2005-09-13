@@ -34,11 +34,6 @@ SRCS = $(OBJS:.o=.c)
 LINTSRCS = $(OBJS:%.o=../common/%.c)
 LINTFLAGS = -mnux
 
-#
-# Reset STRIPFLAG to the empty string.  esc is intentionally
-# installed with symbol tables to aid compiler debugging.
-#
-STRIPFLAG=
 CPPFLAGS += -I../common
 CFLAGS += $(CTF_FLAGS)
 

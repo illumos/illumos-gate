@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,7 +52,7 @@ NES_MAPFILE=		$(SRC)/cmd/mapfile_noexstk $(NX_MAP)
 CPPFLAGS=		-D_TS_ERRNO
 ELFSIGN_O=		$(TRUE)
 LDLIBS=
-LDFLAGS=		$(STRIPFLAG) $(NES_MAPFILE:%=-M%)
+LDFLAGS=		$(NES_MAPFILE:%=-M%)
 
 ROOTONBLDPROG=		$(PROG:%=$(ROOTONBLDBIN)/%)
 ROOTONBLDMACHPROG=	$(PROG:%=$(ROOTONBLDBINMACH)/%)

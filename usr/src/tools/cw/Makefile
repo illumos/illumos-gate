@@ -44,7 +44,7 @@ $(__GNUC)CFLAGS=	-O -D__sun -Wall -Wno-unknown-pragmas -Werror \
 			-std=gnu89 -nodefaultlibs
 
 $(__GNUC)LDLIBS +=	-lc
-$(__GNUC)LDFLAGS= 	$(STRIPFLAG) $(NES_MAPFILE:%=-Wl,-M%)
+$(__GNUC)LDFLAGS= 	$(NES_MAPFILE:%=-Wl,-M%)
 
 CPPFLAGS += -DDEFAULT_CC_DIR='"$(SPRO_VROOT)/bin"'
 CPPFLAGS += -DDEFAULT_GCC_DIR='"$(GNU_ROOT)/bin"'

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -87,12 +87,6 @@ CPPFLAGS += -D_MDB -I. -I../.. -I../../../common
 
 LDLIBS += -ltermcap -lkvm -lproc -lrtld_db -lctf -lumem \
 	$(ZLAZYLOAD) -lscf $(ZNOLAZYLOAD)
-
-#
-# Reset STRIPFLAG to the empty string.  MDB is intentionally installed
-# with a symbol table in order to help module developers.
-#
-STRIPFLAG =
 
 LINTFLAGS += -n -errtags=yes
 LINTFILES = $(SRCS:%.c=%.ln)

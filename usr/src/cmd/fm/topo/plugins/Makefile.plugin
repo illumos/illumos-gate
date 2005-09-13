@@ -58,12 +58,6 @@ CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
 LDFLAGS += -z text -z combreloc -z defs -z ignore -R/usr/lib/fm
 LDLIBS += -L$(ROOTLIB)/fm -ltopo -lc
 
-#
-# Reset STRIPFLAG to the empty string.  FMA modules are intentionally installed
-# with symbol tables in order to help module developers.
-#
-STRIPFLAG =
-
 all: $(PROG)
 
 .NO_PARALLEL:

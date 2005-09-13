@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,5 +31,3 @@ CTFCONVERT_HOOK = && $(CTFCONVERT_O)
 CFLAGS += $(CTF_FLAGS)
 CFLAGS64 += $(CTF_FLAGS)
 NATIVE_CFLAGS += $(CTF_FLAGS)
-STRIPFLAG =				# CTF requires the symbol table
-

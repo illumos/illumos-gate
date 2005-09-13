@@ -132,11 +132,6 @@ $(KMODOBJS) := CFLAGS64 += $(STAND_FLAGS_64)
 #
 MODSRCS_DIR = ../../../common/modules/genunix
 
-#
-# Reset STRIPFLAG to the empty string.  MDB modules are intentionally installed
-# with symbol tables in order to help module developers.
-#
-STRIPFLAG =
 GROUP = sys
 
 all: $$(TARGETS)

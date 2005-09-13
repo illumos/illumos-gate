@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,12 +39,6 @@ CPPFLAGS +=	-I$(SRC)/lib/libcpc/common
 
 LINTFLAGS +=	-u
 LINTFLAGS64 +=	-u
-
-#
-# CPC commands include CTF data so they must not be stripped with '-s'. This
-# overrides the "-s" switch in the default link flags.
-#
-STRIPFLAG=
 
 .KEEP_STATE:
 
