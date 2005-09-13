@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.11.2.2	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -42,12 +42,12 @@ static int	readb(struct fileblk *, int, int);
 
 /* ========	character handling for command lines	======== */
 
-
-word()
+int
+word(void)
 {
-	register unsigned int	c, d, cc;
+	unsigned int	c, d, cc;
 	struct argnod	*arg = (struct argnod *)locstak();
-	register unsigned char	*argp = arg->argval;
+	unsigned char	*argp = arg->argval;
 	unsigned char	*oldargp;
 	int		alpha = 1;
 	unsigned char *pc;
@@ -239,7 +239,7 @@ word()
 
 unsigned int skipwc()
 {
-	register unsigned int c;
+	unsigned int c;
 
 	while (c = nextwc(), space(c))
 		;
@@ -248,7 +248,7 @@ unsigned int skipwc()
 
 unsigned int nextwc()
 {
-	register unsigned int	c, d;
+	unsigned int	c, d;
 
 retry:
 	if ((d = readwc()) == ESCAPE) {

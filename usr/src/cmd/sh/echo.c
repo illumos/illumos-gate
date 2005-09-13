@@ -19,12 +19,15 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*	Portions Copyright (c) 1988, Sun Microsystems, Inc.	*/
-/*	All Rights Reserved.					*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -37,11 +40,11 @@
 
 extern int exitval;
 
-echo(argc, argv)
-unsigned char **argv;
+int
+echo(int argc, unsigned char **argv)
 {
-	register unsigned char	*cp;
-	register int	i, wd;
+	unsigned char	*cp;
+	int	i, wd;
 	int	nflg = 0;
 	int	j;
 	int	len;
@@ -99,8 +102,7 @@ unsigned char **argv;
 		}
 #endif /* _iBCS2 */
 
-		for (i = 1; i <= argc; i++)
-		{
+		for (i = 1; i <= argc; i++) {
 			sigchk();
 			for (cp = argv[i]; *cp; cp++) {
 				if ((len = mbtowc(&wc, (char *)cp,

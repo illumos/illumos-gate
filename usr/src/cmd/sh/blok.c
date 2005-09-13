@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
@@ -51,6 +51,8 @@ struct blk *bloktop;		/* top of arena (last blok) */
 unsigned char		*brkbegin;
 unsigned char		*setbrk();
 
+void addblok(unsigned int);
+
 #ifdef __STDC__
 void *
 #else
@@ -59,7 +61,7 @@ char *
 alloc(nbytes)
 	size_t nbytes;
 {
-	register unsigned rbytes = round(nbytes+BYTESPERWORD, BYTESPERWORD);
+	unsigned rbytes = round(nbytes+BYTESPERWORD, BYTESPERWORD);
 
 	if (stakbot == 0) {
 		addblok((unsigned)0);
@@ -68,8 +70,8 @@ alloc(nbytes)
 	for (;;)
 	{
 		int	c = 0;
-		register struct blk *p = blokp;
-		register struct blk *q;
+		struct blk *p = blokp;
+		struct blk *q;
 
 		do
 		{
@@ -95,8 +97,8 @@ alloc(nbytes)
 	}
 }
 
-addblok(reqd)
-	unsigned reqd;
+void
+addblok(unsigned int reqd)
 {
 	if (stakbot == 0)
 	{
@@ -106,8 +108,8 @@ addblok(reqd)
 
 	if (stakbas != staktop)
 	{
-		register unsigned char *rndstak;
-		register struct blk *blokstak;
+		unsigned char *rndstak;
+		struct blk *blokstak;
 
 		if (staktop >= brkend)
 			growstak(staktop);
@@ -143,9 +145,9 @@ addblok(reqd)
 	}
 	bloktop->word = (struct blk *)(brkbegin + 1);
 	{
-		register unsigned char *stakadr = (unsigned char *)
+		unsigned char *stakadr = (unsigned char *)
 							(bloktop + 2);
-		register unsigned char *sp = stakadr;
+		unsigned char *sp = stakadr;
 		if (reqd = (staktop-stakbot))
 		{
 			if (stakadr + reqd >= brkend)
@@ -165,7 +167,7 @@ void
 free(ap)
 	void *ap;
 {
-	register struct blk *p;
+	struct blk *p;
 
 	if ((p = (struct blk *)ap) && p < bloktop && p > (struct blk *)brkbegin)
 	{
@@ -186,8 +188,8 @@ chkbptr(ptr)
 	struct blk *ptr;
 {
 	int	exf = 0;
-	register struct blk *p = (struct blk *)brkbegin;
-	register struct blk *q;
+	struct blk *p = (struct blk *)brkbegin;
+	struct blk *q;
 	int	us = 0, un = 0;
 
 	for (;;)
@@ -220,8 +222,8 @@ chkbptr(ptr)
 
 chkmem()
 {
-	register struct blk *p = (struct blk *)brkbegin;
-	register struct blk *q;
+	struct blk *p = (struct blk *)brkbegin;
+	struct blk *q;
 	int	us = 0, un = 0;
 
 	for (;;) {
@@ -260,8 +262,8 @@ size_t
 blklen(q)
 char *q;
 {
-	register struct blk *pp = (struct blk *)q;
-	register struct blk *p;
+	struct blk *pp = (struct blk *)q;
+	struct blk *p;
 
 	--pp;
 	p = (struct blk *)(Rcheat(pp->word) & ~BUSY);

@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.14.6.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* 
  *	UNIX shell
  */
@@ -51,11 +57,11 @@ unsigned char cwdname[PATH_MAX+1];
 
 static int 	didpwd = FALSE;
 
-cwd(dir)
-	register unsigned char *dir;
+void
+cwd(unsigned char *dir)
 {
-	register unsigned char *pcwd;
-	register unsigned char *pdir;
+	unsigned char *pcwd;
+	unsigned char *pdir;
 
 	/* First remove extra /'s */
 
@@ -242,9 +248,10 @@ cwdget()
  *	Print the current working directory.
  */
 
-cwdprint()
+void
+cwdprint(void)
 {
-	register unsigned char *cp;
+	unsigned char *cp;
 
 	cwd2();
 	if (didpwd == FALSE) {
@@ -273,7 +280,7 @@ static void
 rmslash(string)
 	unsigned char *string;
 {
-	register unsigned char *pstring;
+	unsigned char *pstring;
 
 	pstring = string;
 	while(*pstring)

@@ -19,35 +19,41 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4.1.3	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
 
 #include	"defs.h"
 
-freefunc(n)
-	struct namnod 	*n;
+static void freetree(struct trenod *);
+static void free_arg(struct argnod *);
+static void freeio(struct ionod *);
+static void freereg(struct regnod *);
+static void prarg(struct argnod *argp);
+static void prio(struct ionod *iop);
+
+void
+freefunc(struct namnod 	*n)
 {
 	freetree((struct trenod *)(n->namenv));
 }
 
-
-freetree(t)
-	register struct trenod *t;
+static void
+freetree(struct trenod *t)
 {
 	if (t)
 	{
-		register int type;
+		int type;
 
 		if (t->tretyp & CNTMSK)
 		{
@@ -124,10 +130,10 @@ freetree(t)
 	}
 }
 
-free_arg(argp)
-	register struct argnod 	*argp;
+static void
+free_arg(struct argnod *argp)
 {
-	register struct argnod 	*sav;
+	struct argnod 	*sav;
 
 	while (argp)
 	{
@@ -137,11 +143,10 @@ free_arg(argp)
 	}
 }
 
-
-freeio(iop)
-	register struct ionod *iop;
+void
+freeio(struct ionod *iop)
 {
-	register struct ionod *sav;
+	struct ionod *sav;
 
 	while (iop)
 	{
@@ -176,11 +181,10 @@ freeio(iop)
 	}
 }
 
-
-freereg(regp)
-	register struct regnod 	*regp;
+static void
+freereg(struct regnod *regp)
 {
-	register struct regnod 	*sav;
+	struct regnod 	*sav;
 
 	while (regp)
 	{
@@ -193,9 +197,10 @@ freereg(regp)
 }
 
 
-static nonl = 0;
+static int nonl = 0;
 
-prbgnlst()
+void
+prbgnlst(void)
 {
 	if (nonl)
 		prc_buff(SPACE);
@@ -203,7 +208,8 @@ prbgnlst()
 		prc_buff(NL);
 }
 
-prendlst()
+void
+prendlst(void)
 {
 	if (nonl) {
 		prc_buff(';');
@@ -213,21 +219,22 @@ prendlst()
 		prc_buff(NL);
 }
 
-prcmd(t)
+void
+prcmd(struct trenod *t)
 {
 	nonl++;
 	prf(t);
 	nonl = 0;
 }
 
-prf(t)
-	register struct trenod	*t;
+void
+prf(struct trenod *t)
 {
 	sigchk();
 
 	if (t)
 	{
-		register int	type;
+		int	type;
 
 		type = t->tretyp & COMMSK;
 
@@ -235,7 +242,7 @@ prf(t)
 		{
 			case TFND:
 			{
-				register struct fndnod *f = (struct fndnod *)t;
+				struct fndnod *f = (struct fndnod *)t;
 
 				prs_buff(f->fndnam);
 				prs_buff("(){");
@@ -294,8 +301,8 @@ prf(t)
 
 			case TFOR:
 				{
-					register struct argnod	*arg;
-					register struct fornod 	*f = (struct fornod *)t;
+					struct argnod	*arg;
+					struct fornod 	*f = (struct fornod *)t;
 
 					prs_buff("for ");
 					prs_buff(f->fornam);
@@ -363,7 +370,7 @@ prf(t)
 
 			case TSW:
 				{
-					register struct regnod 	*swl;
+					struct regnod 	*swl;
 
 					prs_buff("case ");
 					prs_buff(swptr(t)->swarg);
@@ -399,8 +406,8 @@ prf(t)
 	sigchk();
 }
 
-prarg(argp)
-	register struct argnod	*argp;
+static void
+prarg(struct argnod *argp)
 {
 	while (argp)
 	{
@@ -411,12 +418,11 @@ prarg(argp)
 	}
 }
 
-
-prio(iop)
-	register struct ionod	*iop;
+static void
+prio(struct ionod *iop)
 {
-	register int	iof;
-	register unsigned char	*ion;
+	int	iof;
+	unsigned char	*ion;
 
 	while (iop)
 	{

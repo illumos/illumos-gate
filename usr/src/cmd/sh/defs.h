@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #ifndef	_DEFS_H
 #define	_DEFS_H
@@ -142,7 +141,7 @@ extern "C" {
 #define		ENDARGS		0
 
 #include	<unistd.h>
-#include	"mac.h"
+#include 	"mac.h"
 #include	"mode.h"
 #include	"name.h"
 #include	<signal.h>
@@ -169,7 +168,8 @@ extern char 		*optarg;
 
 extern int handle();
 extern void chktrap();
-extern void done();
+extern void done(int)
+	__NORETURN;
 extern void sh_free();
 extern unsigned char *make();
 extern unsigned char *movstr();
@@ -187,15 +187,25 @@ extern unsigned char *nextpath();
 extern unsigned char **scan();
 extern unsigned char *mactrim();
 extern unsigned char *macro();
-extern int exname();
-extern int printnam();
-extern int printro();
-extern int printexp();
+extern void exname(struct namnod *);
+extern void printnam(struct namnod *);
+extern void printro(struct namnod *);
+extern void printexp(struct namnod *);
 extern unsigned int readwc();
 extern unsigned int nextwc();
 extern unsigned char skipc();
 extern unsigned char **local_setenv();
 extern time_t time();
+extern void exitsh(int)
+	__NORETURN;
+extern void failed(unsigned char *, const char *) __NORETURN;
+extern void prf();
+extern void assign(struct namnod *, unsigned char *);
+extern void setmode(int);
+extern void trim(unsigned char *);
+extern void preacct(unsigned char *);
+
+
 
 #define		attrib(n, f)		(n->namflg |= f)
 #define		round(a, b)		(((int)(((char *)(a)+b)-1))&~((b)-1))
@@ -299,10 +309,14 @@ extern const char				mailpname[];
 
 /* transput */
 extern unsigned char				tmpout[];
-extern unsigned char				*tmpname;
-extern int				serial;
+extern int 					tmpout_offset;
+extern unsigned int				serial;
 
-#define			TMPNAM 		7
+/*
+ * allow plenty of room for size for temp file name:
+ * "/tmp/sh"(7) + <pid> (<=6) + <unsigned int #> (<=10) + \0 (1)
+ */
+#define			TMPOUTSZ 		32
 
 extern struct fileblk	*standin;
 

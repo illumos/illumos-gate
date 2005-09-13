@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8.2.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -35,18 +41,16 @@
 
 
 unsigned char *
-movstr(a, b)
-register unsigned char	*a, *b;
+movstr(unsigned char *a, unsigned char *b)
 {
 	while (*b++ = *a++);
 	return(--b);
 }
 
-any(c, s)
-wchar_t		c;
-unsigned char	*s;
+int
+any(wchar_t c, unsigned char *s)
 {
-	register unsigned int d;
+	unsigned int d;
 
 	while (d = *s++)
 	{
@@ -60,8 +64,8 @@ int anys(c, s)
 unsigned char *c, *s;
 {
 	wchar_t f, e;
-	register wchar_t d;
-	register int n;
+	wchar_t d;
+	int n;
 	if((n = mbtowc(&f, (char *)c, MULTI_BYTE_MAX)) <= 0)
 		return(FALSE);
 	d = f;
@@ -74,8 +78,8 @@ unsigned char *c, *s;
 	}
 }
 
-int cf(s1, s2)
-register unsigned char *s1, *s2;
+int
+cf(unsigned char *s1, unsigned char *s2)
 {
 	while (*s1++ == *s2)
 		if (*s2++ == 0)
@@ -86,7 +90,7 @@ register unsigned char *s1, *s2;
 int length(as)
 unsigned char	*as;
 {
-	register unsigned char	*s;
+	unsigned char	*s;
 
 	if (s = as)
 		while (*s++);
@@ -94,9 +98,7 @@ unsigned char	*as;
 }
 
 unsigned char *
-movstrn(a, b, n)
-	register unsigned char *a, *b;
-	register int n;
+movstrn(unsigned char *a, unsigned char *b, int n)
 {
 	while ((n-- > 0) && *a)
 		*b++ = *a++;

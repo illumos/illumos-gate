@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3.2.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"hash.h"
 #include	"defs.h"
@@ -56,7 +62,8 @@ static unsigned int	shift;
 
 static unsigned int crunch();
 
-hcreate()
+void
+hcreate(void)
 {
 	unsigned char c = (unsigned char)~0;			/* A byte full of 1's */
 	int j;

@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10.4.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	UNIX shell
@@ -32,7 +37,7 @@
 #include	"defs.h"
 
 static struct dolnod *copyargs();
-static struct dolnod *freedolh();
+static void freedolh(void);
 extern struct dolnod *freeargs();
 static struct dolnod *dolh;
 
@@ -86,13 +91,12 @@ long	flagval[]  =
 /* ========	option handling	======== */
 
 
-options(argc,argv)
-	unsigned char	**argv;
-	int	argc;
+int
+options(int argc, unsigned char **argv)
 {
-	register unsigned char *cp;
-	register unsigned char **argp = argv;
-	register unsigned char *flagc;
+	unsigned char *cp;
+	unsigned char **argp = argv;
+	unsigned char *flagc;
 	unsigned char	*flagp;
 	int		len;
 	wchar_t		wc;
@@ -203,11 +207,11 @@ options(argc,argv)
 /*
  * sets up positional parameters
  */
-setargs(argi)
-	unsigned char	*argi[];
+void
+setargs(unsigned char *argi[])
 {
-	register unsigned char **argp = argi;	/* count args */
-	register int argn = 0;
+	unsigned char **argp = argi;	/* count args */
+	int argn = 0;
 
 	while (*argp++ != (unsigned char *)ENDARGS)
 		argn++;
@@ -220,11 +224,11 @@ setargs(argi)
 }
 
 
-static struct dolnod *
-freedolh()
+static void
+freedolh(void)
 {
-	register unsigned char **argp;
-	register struct dolnod *argblk;
+	unsigned char **argp;
+	struct dolnod *argblk;
 
 	if (argblk = dolh)
 	{
@@ -242,9 +246,9 @@ struct dolnod *
 freeargs(blk)
 	struct dolnod *blk;
 {
-	register unsigned char **argp;
-	register struct dolnod *argr = 0;
-	register struct dolnod *argblk;
+	unsigned char **argp;
+	struct dolnod *argr = 0;
+	struct dolnod *argblk;
 	int cnt;
 
 	if (argblk = blk)
@@ -277,9 +281,9 @@ static struct dolnod *
 copyargs(from, n)
 	unsigned char	*from[];
 {
-	register struct dolnod *np = (struct dolnod *)alloc(sizeof(struct dolnod));
-	register unsigned char **fp = from;
-	register unsigned char **pp;
+	struct dolnod *np = (struct dolnod *)alloc(sizeof (struct dolnod));
+	unsigned char **fp = from;
+	unsigned char **pp;
 
 	np -> dolnxt = 0;
 	np->doluse = 1;	/* use count */
@@ -297,9 +301,9 @@ struct dolnod *
 clean_args(blk)
 	struct dolnod *blk;
 {
-	register unsigned char **argp;
-	register struct dolnod *argr = 0;
-	register struct dolnod *argblk;
+	unsigned char **argp;
+	struct dolnod *argr = 0;
+	struct dolnod *argblk;
 
 	if (argblk = blk)
 	{
@@ -318,7 +322,8 @@ clean_args(blk)
 	return(argr);
 }
 
-clearup()
+void
+clearup(void)
 {
 	/*
 	 * force `for' $* lists to go away

@@ -20,10 +20,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
@@ -70,8 +69,8 @@ unsigned char			*pidadr;
 unsigned char			*cmdadr;
 
 /* transput */
-unsigned char 			*tmpname;
-int 			serial;
+int 			tmpout_offset;
+unsigned int 		serial;
 unsigned 		peekc;
 unsigned		peekn;
 unsigned char 			*comdiv;

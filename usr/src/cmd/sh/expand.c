@@ -49,17 +49,19 @@
  * "[...a-z...]" in params matches a through z.
  *
  */
-static int	addg();
+static void addg(unsigned char *, unsigned char *, unsigned char *,
+    unsigned char *);
+void makearg(struct argnod *);
 
-expand(as, rcnt)
-	unsigned char	*as;
+int
+expand(unsigned char	*as, int rcnt)
 {
 	int	count;
 	DIR	*dirf;
 	BOOL	dir = 0;
 	unsigned char	*rescan = 0;
 	unsigned char 	*slashsav = 0;
-	register unsigned char	*s, *cs;
+	unsigned char	*s, *cs;
 	unsigned char *s2 = 0;
 	struct argnod	*schain = gchain;
 	BOOL	slash;
@@ -73,7 +75,7 @@ expand(as, rcnt)
 	 * check for meta chars
 	 */
 	{
-		register BOOL open;
+		BOOL open;
 
 		slash = 0;
 		open = 0;
@@ -159,7 +161,7 @@ expand(as, rcnt)
 	/* check for rescan */
 	if (dir)
 	{
-		register unsigned char *rs;
+		unsigned char *rs;
 		struct dirent *e;
 
 		rs = cs;
@@ -180,7 +182,8 @@ expand(as, rcnt)
 
 			if (gmatch(e->d_name, cs))
 			{
-				addg(s, e->d_name, rescan, slashsav);
+				addg(s, (unsigned char *)e->d_name, rescan,
+				    slashsav);
 				count++;
 			}
 		}
@@ -188,7 +191,7 @@ expand(as, rcnt)
 
 		if (rescan)
 		{
-			register struct argnod	*rchain;
+			struct argnod	*rchain;
 
 			rchain = gchain;
 			gchain = schain;
@@ -211,12 +214,12 @@ expand(as, rcnt)
 	return (count);
 }
 
-static int
-addg(as1, as2, as3, as4)
-unsigned char	*as1, *as2, *as3, *as4;
+static void
+addg(unsigned char *as1, unsigned char *as2, unsigned char *as3,
+    unsigned char *as4)
 {
-	register unsigned char	*s1, *s2;
-	register int	c;
+	unsigned char	*s1, *s2;
+	int	c;
 	int		len;
 	wchar_t		wc;
 
@@ -281,11 +284,11 @@ unsigned char	*as1, *as2, *as3, *as4;
 		}
 		while (*s2++ = *++s1);
 	}
-	makearg(endstak(s2));
+	makearg((struct argnod *)endstak(s2));
 }
 
-makearg(args)
-	register struct argnod *args;
+void
+makearg(struct argnod *args)
 {
 	args->argnxt = gchain;
 	gchain = args;

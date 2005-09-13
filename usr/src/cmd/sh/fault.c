@@ -19,16 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.13.17.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -129,8 +130,7 @@ sigval[MAXTRAP]))() =
 };
 
 static int
-ignoring(i)
-register int i;
+ignoring(int i)
 {
 	struct sigaction act;
 	if (trapflg[i] & SIGIGN)
@@ -172,7 +172,7 @@ int	i;
 void
 done(sig)
 {
-	register unsigned char	*t;
+	unsigned char	*t;
 	int	savxit;
 
 	if (t = trapcom[0])
@@ -211,10 +211,9 @@ done(sig)
 }
 
 static void
-fault(sig)
-register int	sig;
+fault(int sig)
 {
-	register int flag;
+	int flag;
 
 	switch (sig) {
 		case SIGALRM:
@@ -280,7 +279,7 @@ handle(sig, func)
 void
 stdsigs()
 {
-	register int	i;
+	int	i;
 	stack_t	ss;
 	int	err = 0;
 	int rtmin = (int)SIGRTMIN;
@@ -319,8 +318,8 @@ stdsigs()
 void
 oldsigs()
 {
-	register int	i;
-	register unsigned char	*t;
+	int	i;
+	unsigned char	*t;
 
 	i = MAXTRAP;
 	while (i--)
@@ -340,8 +339,8 @@ oldsigs()
 void
 chktrap()
 {
-	register int	i = MAXTRAP;
-	register unsigned char	*t;
+	int	i = MAXTRAP;
+	unsigned char	*t;
 
 	trapnote &= ~TRAPSET;
 	while (--i)
@@ -360,9 +359,8 @@ chktrap()
 	}
 }
 
-systrap(argc, argv)
-int argc;
-char **argv;
+void
+systrap(int argc, char **argv)
 {
 	int sig;
 
@@ -427,9 +425,8 @@ char **argv;
 	}
 }
 
-unsigned int
-sleep(ticks)
-unsigned int ticks;
+void
+sh_sleep(unsigned int ticks)
 {
 	sigset_t set, oset;
 	struct sigaction act, oact;

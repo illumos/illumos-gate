@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 1996,2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
@@ -45,17 +45,21 @@
 
 pid_t parent;
 
+void execprint(unsigned char **);
+
 /* ========	command execution	======== */
 
-
+/*VARARGS3*/
+int
 execute(argt, xflags, errorflg, pf1, pf2)
-struct trenod	*argt;
-int	*pf1, *pf2;
+struct trenod *argt;
+int xflags, errorflg;
+int *pf1, *pf2;
 {
 	/*
 	 * `stakbot' is preserved by this routine
 	 */
-	register struct trenod	*t;
+	struct trenod	*t;
 	unsigned char		*sav = savstak();
 
 	sigchk();
@@ -63,8 +67,8 @@ int	*pf1, *pf2;
 		flags &= ~errflg;
 
 	if ((t = argt) && execbrk == 0) {
-		register int treeflgs;
-		register unsigned char **com;
+		int treeflgs;
+		unsigned char **com;
 		int type;
 		short pos;
 
@@ -258,7 +262,7 @@ int	*pf1, *pf2;
 					break;
 				}
 				sigchk();
-				sleep(forkcnt);
+				sh_sleep(forkcnt);
 				}
 
 				if (parent) {
@@ -363,7 +367,7 @@ int	*pf1, *pf2;
 		case TAND:
 		case TORF:
 		{
-			register xval;
+			int xval;
 			xval = execute(lstptr(t)->lstlef, XEC_NOSTOP, 0);
 			if ((xval == 0) == (type == TAND))
 				execute(lstptr(t)->lstrit, xflags|XEC_NOSTOP, errorflg);
@@ -439,8 +443,8 @@ int	*pf1, *pf2;
 
 		case TSW:
 			{
-				register unsigned char	*r = mactrim(swptr(t)->swarg);
-				register struct regnod *regp;
+				unsigned char	*r = mactrim(swptr(t)->swarg);
+				struct regnod *regp;
 
 				regp = swptr(t)->swlst;
 				while (regp)
@@ -449,7 +453,7 @@ int	*pf1, *pf2;
 
 					while (rex)
 					{
-						register unsigned char	*s;
+						unsigned char	*s;
 
 						if (gmatch(r, s = macro(rex->argval)) || (trim(s), eq(r, s)))
 						{
@@ -474,9 +478,8 @@ int	*pf1, *pf2;
 	return(exitval);
 }
 
-execexp(s, f)
-unsigned char	*s;
-int	f;
+void
+execexp(unsigned char *s, int f)
 {
 	struct fileblk	fb;
 
@@ -492,10 +495,10 @@ int	f;
 	pop();
 }
 
-execprint(com)
-	unsigned char **com;
+void
+execprint(unsigned char **com)
 {
-	register int 	argn = 0;
+	int 	argn = 0;
 	unsigned char	*s;
 
 	prs(execpmsg);

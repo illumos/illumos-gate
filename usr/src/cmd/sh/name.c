@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
@@ -39,11 +39,12 @@
 extern BOOL	chkid();
 extern unsigned char	*simple();
 extern int	mailchk;
-static void	namwalk();
 
+static void	setname(unsigned char *, int);
 static void	set_builtins_path();
 static int	patheq();
-static void dolocale();
+static void	namwalk(struct namnod *);
+static void	dolocale();
 
 struct namnod ps2nod =
 {
@@ -111,15 +112,13 @@ struct namnod *namep = &mchknod;
 
 /* ========	variable and string handling	======== */
 
-syslook(w, syswds, n)
-	register unsigned char *w;
-	register struct sysnod syswds[];
-	int n;
+int
+syslook(unsigned char *w, struct sysnod syswds[], int n)
 {
 	int	low;
 	int	high;
 	int	mid;
-	register int cond;
+	int	cond;
 
 	if (w == 0 || *w == 0)
 		return(0);
@@ -141,16 +140,15 @@ syslook(w, syswds, n)
 	return(0);
 }
 
-setlist(arg, xp)
-register struct argnod *arg;
-int	xp;
+void
+setlist(struct argnod *arg, int xp)
 {
 	if (flags & exportflg)
 		xp |= N_EXPORT;
 
 	while (arg)
 	{
-		register unsigned char *s = mactrim(arg->argval);
+		unsigned char *s = mactrim(arg->argval);
 		setname(s, xp);
 		arg = arg->argnxt;
 		if (flags & execpr)
@@ -164,13 +162,11 @@ int	xp;
 	}
 }
 
-
-setname(argi, xp)	/* does parameter assignments */
-unsigned char	*argi;
-int	xp;
+static void
+setname(unsigned char *argi, int xp)	/* does parameter assignments */
 {
-	register unsigned char *argscan = argi;
-	register struct namnod *n;
+	unsigned char *argscan = argi;
+	struct namnod *n;
 
 	if (letter(*argscan))
 	{
@@ -199,25 +195,22 @@ int	xp;
 	}
 }
 
-replace(a, v)
-register unsigned char	**a;
-unsigned char	*v;
+void
+replace(unsigned char **a, unsigned char *v)
 {
 	free(*a);
 	*a = make(v);
 }
 
-dfault(n, v)
-struct namnod *n;
-unsigned char	*v;
+void
+dfault(struct namnod *n, unsigned char	*v)
 {
 	if (n->namval == 0)
 		assign(n, v);
 }
 
-assign(n, v)
-struct namnod *n;
-unsigned char	*v;
+void
+assign(struct namnod *n, unsigned char *v)
 {
 	if (n->namflg & N_RDONLY)
 		failed(n->namid, wtfailed);
@@ -266,7 +259,7 @@ unsigned char	*v;
 static void
 set_builtins_path()
 {
-        register unsigned char *path;
+	unsigned char *path;
 
         ucb_builtins = 0;
         path = getpath("");
@@ -288,35 +281,33 @@ set_builtins_path()
 }
 
 static int
-patheq(component, dir)
-register unsigned char   *component;
-register char   *dir;
+patheq(unsigned char *component, char *dir)
 {
-        register unsigned char   c;
+	unsigned char   c;
 
         for (;;)
         {
                 c = *component++;
                 if (c == COLON)
                         c = '\0';       /* end of component of path */
-                if (c != *dir++)
-                        return(0);
+		if (c != *dir++)
+			return (0);
                 if (c == '\0')
                         return(1);
         }
 }
 
-readvar(names)
-unsigned char	**names;
+int
+readvar(unsigned char **names)
 {
 	struct fileblk	fb;
-	register struct fileblk *f = &fb;
+	struct fileblk *f = &fb;
 	unsigned char	c[MULTI_BYTE_MAX+1];
-	register int	rc = 0;
+	int	rc = 0;
 	struct namnod *n = lookup(*names++);	/* done now to avoid storage mess */
 	unsigned char	*rel = (unsigned char *)relstak();
 	unsigned char *oldstak;
-	register unsigned char *pc, *rest;
+	unsigned char *pc, *rest;
 	int		d;
 
 	push(f);
@@ -424,7 +415,7 @@ unsigned char	**names;
 	}
 	while (n)
 	{
-		assign(n, nullstr);
+		assign(n, (unsigned char *)nullstr);
 		if (*names)
 			n = lookup(*names++);
 		else
@@ -449,9 +440,8 @@ unsigned char	**names;
 	return(rc);
 }
 
-assnum(p, i)
-unsigned char	**p;
-long	i;
+void
+assnum(unsigned char **p, long i)
 {
 	int j = ltos(i);
 	replace(p, &numbuf[j]);
@@ -461,7 +451,7 @@ unsigned char *
 make(v)
 unsigned char	*v;
 {
-	register unsigned char	*p;
+	unsigned char	*p;
 
 	if (v)
 	{
@@ -474,11 +464,10 @@ unsigned char	*v;
 
 
 struct namnod *
-lookup(nam)
-	register unsigned char	*nam;
+lookup(unsigned char *nam)
 {
-	register struct namnod *nscan = namep;
-	register struct namnod **prev;
+	struct namnod *nscan = namep;
+	struct namnod **prev;
 	int		LR;
 
 	if (!chkid(nam))
@@ -512,7 +501,7 @@ BOOL
 chkid(nam)
 unsigned char	*nam;
 {
-	register unsigned char *cp = nam;
+	unsigned char *cp = nam;
 
 	if (!letter(*cp))
 		return(FALSE);
@@ -527,17 +516,17 @@ unsigned char	*nam;
 	return(TRUE);
 }
 
-static int (*namfn)();
-namscan(fn)
-	int	(*fn)();
+static void (*namfn)();
+
+void
+namscan(void (*fn)())
 {
 	namfn = fn;
 	namwalk(namep);
 }
 
 static void
-namwalk(np)
-register struct namnod *np;
+namwalk(struct namnod *np)
 {
 	if (np)
 	{
@@ -547,10 +536,10 @@ register struct namnod *np;
 	}
 }
 
-printnam(n)
-struct namnod *n;
+void
+printnam(struct namnod *n)
 {
-	register unsigned char	*s;
+	unsigned char	*s;
 
 	sigchk();
 
@@ -571,10 +560,9 @@ struct namnod *n;
 }
 
 static unsigned char *
-staknam(n)
-register struct namnod *n;
+staknam(struct namnod *n)
 {
-	register unsigned char	*p;
+	unsigned char	*p;
 
 	p = movstrstak(n->namid, staktop);
 	p = movstrstak("=", p);
@@ -584,10 +572,10 @@ register struct namnod *n;
 
 static int namec;
 
-exname(n)
-	register struct namnod *n;
+void
+exname(struct namnod *n)
 {
-	register int 	flg = n->namflg;
+	int 	flg = n->namflg;
 
 	if (flg & N_ENVCHG)
 	{
@@ -613,8 +601,8 @@ exname(n)
 
 }
 
-printro(n)
-register struct namnod *n;
+void
+printro(struct namnod *n)
 {
 	if (n->namflg & N_RDONLY)
 	{
@@ -625,8 +613,8 @@ register struct namnod *n;
 	}
 }
 
-printexp(n)
-register struct namnod *n;
+void
+printexp(struct namnod *n)
 {
 	if (n->namflg & N_EXPORT)
 	{
@@ -637,9 +625,10 @@ register struct namnod *n;
 	}
 }
 
-setup_env()
+void
+setup_env(void)
 {
-	register unsigned char **e = environ;
+	unsigned char **e = environ;
 
 	while (*e)
 		setname(*e++, N_ENVNAM);
@@ -648,21 +637,19 @@ setup_env()
 
 static unsigned char **argnam;
 
-static
-countnam(n)
-struct namnod *n;
+static void
+countnam(struct namnod *n)
 {
 	if (n->namval)
 		namec++;
 }
 
-static
-pushnam(n)
-	register struct namnod *n;
+static void
+pushnam(struct namnod *n)
 {
-	register int 	flg = n->namflg;
-	register unsigned char	*p;
-	register unsigned char	*namval;
+	int 	flg = n->namflg;
+	unsigned char	*p;
+	unsigned char	*namval;
 
 	if (((flg & N_ENVCHG) && (flg & N_EXPORT)) || (flg & N_FUNCTN))
 		namval = n->namval;
@@ -692,7 +679,7 @@ pushnam(n)
 unsigned char **
 local_setenv()
 {
-	register unsigned char	**er;
+	unsigned char	**er;
 
 	namec = 0;
 	namscan(countnam);
@@ -711,9 +698,9 @@ setvars()
 
 struct namnod *
 findnam(nam)
-	register unsigned char	*nam;
+	unsigned char	*nam;
 {
-	register struct namnod *nscan = namep;
+	struct namnod	*nscan = namep;
 	int		LR;
 
 	if (!chkid(nam))
@@ -730,12 +717,11 @@ findnam(nam)
 	return(0); 
 }
 
-
-unset_name(name)
-	register unsigned char 	*name;
+void
+unset_name(unsigned char 	*name)
 {
-	register struct namnod	*n;
-	register unsigned char 	call_dolocale = 0;
+	struct namnod	*n;
+	unsigned char 	call_dolocale = 0;
 
 	if (n = findnam(name))
 	{
@@ -849,7 +835,7 @@ dolocale(nm)
 	 */
 	for (lv = 0, fe = 0; localevar[lv]; lv++) {
 		if ((n = findnam(localevar[lv]))) {
-			register char *p, *q;
+			char *p, *q;
 
 			if (!n->namval)
 				continue;

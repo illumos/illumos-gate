@@ -19,22 +19,23 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright (c) 1996, 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10.2.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
 
 #include	"defs.h"
 #include	"dup.h"
+#include	<stdio.h>
 #include	<fcntl.h>
 #include	<sys/types.h>
 #include	<sys/stat.h>
@@ -44,10 +45,10 @@ short topfd;
 
 /* ========	input output and file copying ======== */
 
-initf(fd)
-int	fd;
+void
+initf(int fd)
 {
-	register struct fileblk *f = standin;
+	struct fileblk *f = standin;
 
 	f->fdes = fd;
 	f->fsiz = ((flags & oneflg) == 0 ? BUFFERSIZE : 1);
@@ -58,10 +59,10 @@ int	fd;
 	f->feof = FALSE;
 }
 
-estabf(s)
-register unsigned char *s;
+int
+estabf(unsigned char *s)
 {
-	register struct fileblk *f;
+	struct fileblk *f;
 
 	(f = standin)->fdes = -1;
 	f->fend = length(s) + (f->fnxt = s);
@@ -71,10 +72,10 @@ register unsigned char *s;
 	return (f->feof = (s == 0));
 }
 
-push(af)
-struct fileblk *af;
+void
+push(struct fileblk *af)
 {
-	register struct fileblk *f;
+	struct fileblk *f;
 
 	(f = af)->fstak = standin;
 	f->feof = 0;
@@ -82,9 +83,10 @@ struct fileblk *af;
 	standin = f;
 }
 
-pop()
+int
+pop(void)
 {
-	register struct fileblk *f;
+	struct fileblk *f;
 
 	if ((f = standin)->fstak)
 	{
@@ -98,16 +100,16 @@ pop()
 
 struct tempblk *tmpfptr;
 
-pushtemp(fd, tb)
-	int fd;
-	struct tempblk *tb;
+void
+pushtemp(int fd, struct tempblk *tb)
 {
 	tb->fdes = fd;
 	tb->fstak = tmpfptr;
 	tmpfptr = tb;
 }
 
-poptemp()
+int
+poptemp(void)
 {
 	if (tmpfptr){
 		close(tmpfptr->fdes);
@@ -117,18 +119,17 @@ poptemp()
 		return (FALSE);
 }
 
-chkpipe(pv)
-int	*pv;
+void
+chkpipe(int *pv)
 {
 	if (pipe(pv) < 0 || pv[INPIPE] < 0 || pv[OTPIPE] < 0)
 		error(piperr);
 }
 
-chkopen(idf, mode)
-unsigned char *idf;
-int mode;
+int
+chkopen(unsigned char *idf, int mode)
 {
-	register int	rc;
+	int	rc;
 
 	if ((rc = open((char *)idf, mode, 0666)) < 0)
 		failed(idf, badopen);
@@ -141,8 +142,8 @@ int mode;
  * then closed.  If f2 is descriptor 0, modify the global ioset variable
  * accordingly.
  */
-renamef(f1, f2)
-register int	f1, f2;
+void
+renamef(int f1, int f2)
 {
 #ifdef RES
 	if (f1 != f2)
@@ -169,10 +170,10 @@ register int	f1, f2;
 #endif
 }
 
-create(s)
-unsigned char *s;
+int
+create(unsigned char *s)
 {
-	register int	rc;
+	int	rc;
 
 	if ((rc = creat((char *)s, 0666)) < 0)
 		failed(s, badcreate);
@@ -181,16 +182,29 @@ unsigned char *s;
 }
 
 
-tmpfil(tb)
-	struct tempblk *tb;
+int
+tmpfil(struct tempblk *tb)
 {
 	int fd;
+	int len;
+	size_t size_left = TMPOUTSZ - tmpout_offset;
 
 	/* make sure tmp file does not already exist. */
 	do {
-		itos(serial++);
-		movstr(numbuf, tmpname);
-		fd = open((char *)tmpout, O_RDWR|O_CREAT|O_EXCL, 0666);
+		len = snprintf((char *)&tmpout[tmpout_offset], size_left,
+		    "%u", serial);
+		fd = open((char *)tmpout, O_RDWR|O_CREAT|O_EXCL, 0600);
+		serial++;
+		if ((serial >= UINT_MAX) || (len >= size_left)) {
+			/*
+			 * We've already cycled through all the possible
+			 * numbers or the tmp file name is being
+			 * truncated anyway (although TMPOUTSZ should be
+			 * big enough), so start over.
+			 */
+			serial = 0;
+			break;
+		}
 	} while ((fd == -1) && (errno == EEXIST));
 	if (fd != -1) {
 		pushtemp(fd, tb);
@@ -198,7 +212,6 @@ tmpfil(tb)
 	}
 	else
 		failed(tmpout, badcreate);
-
 }
 
 /*
@@ -207,12 +220,12 @@ tmpfil(tb)
 extern BOOL		nosubst;
 #define			CPYSIZ		512
 
-copy(ioparg)
-struct ionod	*ioparg;
+void
+copy(struct ionod	*ioparg)
 {
-	register unsigned char	*cline;
-	register unsigned char	*clinep;
-	register struct ionod	*iop;
+	unsigned char	*cline;
+	unsigned char	*clinep;
+	struct ionod	*iop;
 	unsigned int	c;
 	unsigned char	*ends;
 	unsigned char	*start;
@@ -331,21 +344,31 @@ struct ionod	*ioparg;
 	}
 }
 
-
-link_iodocs(i)
-	struct ionod	*i;
+void
+link_iodocs(struct ionod *i)
 {
 	int r;
+	int len;
+	size_t size_left = TMPOUTSZ - tmpout_offset;
 
-	while (i)
-	{
+	while (i) {
 		free(i->iolink);
 
 		/* make sure tmp file does not already exist. */
 		do {
-			itos(serial++);
-			movstr(numbuf, tmpname);
+			len = snprintf((char *)&tmpout[tmpout_offset],
+			    size_left, "%u", serial);
+			serial++;
 			r = link(i->ioname, (char *)tmpout);
+			if ((serial >= UINT_MAX) || (len >= size_left)) {
+			/*
+			 * We've already cycled through all the possible
+			 * numbers or the tmp file name is being
+			 * truncated anyway, so start over. 
+			 */
+				serial = 0;
+				break;
+			}
 		} while (r == -1 && errno == EEXIST);
 
 		if (r != -1) {
@@ -357,9 +380,8 @@ link_iodocs(i)
 	}
 }
 
-
-swap_iodoc_nm(i)
-	struct ionod	*i;
+void
+swap_iodoc_nm(struct ionod *i)
 {
 	while (i)
 	{
@@ -371,22 +393,20 @@ swap_iodoc_nm(i)
 	}
 }
 
-
-savefd(fd)
-	int fd;
+int
+savefd(int fd)
 {
-	register int	f;
+	int	f;
 
 	f = fcntl(fd, F_DUPFD, 10);
 	return (f);
 }
 
-
-restore(last)
-	register int	last;
+void
+restore(int last)
 {
-	register int 	i;
-	register int	dupfd;
+	int 	i;
+	int	dupfd;
 
 	for (i = topfd - 1; i >= last; i--)
 	{

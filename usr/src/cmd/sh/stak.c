@@ -41,8 +41,8 @@ unsigned char *
 getstak(asize)			/* allocate requested stack */
 int	asize;
 {
-	register unsigned char	*oldstak;
-	register int	size;
+	unsigned char	*oldstak;
+	int		size;
 
 	size = round(asize, BYTESPERWORD);
 	oldstak = stakbot;
@@ -73,7 +73,7 @@ void
 growstak(newtop)
 unsigned char	*newtop;
 {
-	register unsigned	incr;
+	unsigned	incr;
 
 	incr = (unsigned)round(newtop - brkend + 1, BYTESPERWORD);
 	if (brkincr > incr)
@@ -90,10 +90,9 @@ savstak()
 }
 
 unsigned char *
-endstak(argp)		/* tidy up after `locstak' */
-register unsigned char	*argp;
+endstak(unsigned char *argp)		/* tidy up after `locstak' */
 {
-	register unsigned char	*oldstak;
+	unsigned char	*oldstak;
 
 	if (argp >= brkend)
 		growstak(argp);
@@ -105,8 +104,8 @@ register unsigned char	*argp;
 	return(oldstak);
 }
 
-tdystak(x)		/* try to bring stack back to x */
-register unsigned char	*x;
+void
+tdystak(unsigned char	*x)		/* try to bring stack back to x */
 {
 	while ((unsigned char *)stakbsy > x)
 	{
@@ -117,7 +116,8 @@ register unsigned char	*x;
 	rmtemp(x);
 }
 
-stakchk()
+void
+stakchk(void)
 {
 	if ((brkend - stakbas) > BRKINCR + BRKINCR)
 		setbrk(-BRKINCR);
@@ -131,8 +131,7 @@ unsigned char	*x;
 }
 
 unsigned char *
-movstrstak(a, b)
-register unsigned char	*a, *b;
+movstrstak(unsigned char *a, unsigned char *b)
 {
 	do
 	{
@@ -148,11 +147,9 @@ register unsigned char	*a, *b;
  * Return s1
  */
 unsigned char *
-memcpystak(s1, s2, n)
-register unsigned char *s1, *s2;
-register int n;
+memcpystak(unsigned char *s1, unsigned char *s2, int n)
 {
-	register unsigned char *os1 = s1;
+	unsigned char *os1 = s1;
 
 	while (--n >= 0) {
 		if (s1 >= brkend)

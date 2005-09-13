@@ -19,14 +19,25 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#ifndef	_HASH_H
+#define	_HASH_H
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4.1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	UNIX shell
  */
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 #define		HASHZAP		0x03FF
 #define		CDMARK		0x8000
@@ -37,7 +48,7 @@
 #define		COMMAND			0x0400
 #define		REL_COMMAND		0x0800
 #define		PATH_COMMAND	0x1000
-#define		DOT_COMMAND		0x8800		/* CDMARK | REL_COMMAND */
+#define		DOT_COMMAND		0x8800	/* CDMARK | REL_COMMAND */
 
 #define		hashtype(x)	(x & 0x1F00)
 #define		hashdata(x)	(x & 0x00FF)
@@ -54,4 +65,10 @@ typedef struct entry
 
 extern ENTRY	*hfind();
 extern ENTRY	*henter();
-extern int		hcreate();
+extern void	hcreate(void);
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif /* !_HASH_H */

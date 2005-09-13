@@ -39,15 +39,16 @@
 static unsigned char	quote;	/* used locally */
 static unsigned char	quoted;	/* used locally */
 static int getch();
+static void comsubst(int);
+static void flush(int);
 
 static void
-copyto(endch, trimflag)
-int trimflag;  /* flag to check if argument will be trimmed */
-register unsigned char	endch;
+copyto(unsigned char endch, int trimflag)
+/* trimflag - flag to check if argument will be trimmed */
 {
-	register unsigned int	c;
-	register unsigned int 	d;
-	register unsigned char *pc;
+	unsigned int	c;
+	unsigned int 	d;
+	unsigned char *pc;
 
 	while ((c = getch(endch, trimflag)) != endch && c)
 		if (quote) {
@@ -133,14 +134,13 @@ register unsigned char	endch;
 		error(badsub);
 }
 
-static
-skipto(endch)
-register unsigned char	endch;
+static void
+skipto(unsigned char endch)
 {
 	/*
 	 * skip chars up to }
 	 */
-	register unsigned int	c;
+	unsigned int	c;
 
 	while ((c = readwc()) && c != endch)
 	{
@@ -170,7 +170,7 @@ int trimflag; /* flag to check if an argument is going to be trimmed, here docum
 		 output is never trimmed
 	 */
 {
-	register unsigned int	d;
+	unsigned int	d;
 	int atflag;  /* flag to check if $@ has already been seen within double 
 		        quotes */
 retry:
@@ -188,7 +188,7 @@ retry:
 			int		dolg = 0;
 			BOOL		bra;
 			BOOL		nulflg;
-			register unsigned char	*argp, *v;
+			unsigned char	*argp, *v;
 			unsigned char		idb[2];
 			unsigned char		*id = idb;
 
@@ -296,7 +296,7 @@ retry:
 						} else {
 							while (c = *v) {
 								wchar_t 	wc;
-								register int 	length;
+								int 	length;
 								if ((length = mbtowc(&wc, (char *)v, MB_LEN_MAX)) <= 0)
 									length = 1;
 
@@ -336,7 +336,8 @@ retry:
 				if (c == '?') {
 					if(trimflag)
 						trim(argp);
-					failed(id, *argp ? argp : (unsigned char *)badparam);
+					failed(id, *argp ? (const char *)argp :
+					    badparam);
 				}
 				else if (c == '=')
 				{
@@ -352,7 +353,7 @@ retry:
 						usestak();
 						while(c = *argp) {
 							wchar_t 	wc;
-							register int 	len;
+							int 		len;
 
 							if ((len = mbtowc(&wc, (char *)argp, MB_LEN_MAX)) <= 0)
 								len = 1;
@@ -416,8 +417,8 @@ unsigned char	*as;
 	 * Strip "" and do $ substitution
 	 * Leaves result on top of stack
 	 */
-	register BOOL	savqu = quoted;
-	register unsigned char	savq = quote;
+	BOOL	savqu = quoted;
+	unsigned char	savq = quote;
 	struct filehdr	fb;
 
 	push(&fb);
@@ -445,16 +446,17 @@ unsigned char	*as;
 /* Save file descriptor for command substitution */
 int savpipe = -1;
 
-comsubst(trimflag)
-int trimflag; /* used to determine if argument will later be trimmed */
+static void
+comsubst(int trimflag)
+/* trimflag - used to determine if argument will later be trimmed */
 {
 	/*
 	 * command substn
 	 */
 	struct fileblk	cb;
-	register unsigned int	d;
+	unsigned int	d;
 	int strlngth = staktop - stakbot;
-	register unsigned char *oldstaktop;
+	unsigned char *oldstaktop;
 	unsigned char *savptr = fixstak();
 	unsigned char	*pc;
 
@@ -485,14 +487,14 @@ int trimflag; /* used to determine if argument will later be trimmed */
 		}
 	}
 	{
-		register unsigned char	*argc;
+		unsigned char	*argc;
 
 		argc = fixstak(); 
 		push(&cb);
 		estabf(argc);  /* read from string */
 	}
 	{
-		register struct trenod *t;
+		struct trenod	*t;
 		int		pv[2];
 
 		/*
@@ -512,7 +514,7 @@ int trimflag; /* used to determine if argument will later be trimmed */
 	oldstaktop = staktop = stakbot + strlngth;
 	while (d = readwc()) {
 		if(quote || (d == '\\' && trimflag)) {
-			register unsigned char *rest;
+			unsigned char *rest;
 			/* quote output from command subst. if within double 
 			   quotes or backslash part of output */
 			rest = readw(d);
@@ -538,7 +540,7 @@ int trimflag; /* used to determine if argument will later be trimmed */
 	{
 		extern pid_t parent;
 		int stat;
-		register rc;
+		int rc;
 		int	ret = 0;
 
 		while ((ret = waitpid(parent,&stat,0)) != parent) {
@@ -570,12 +572,12 @@ int trimflag; /* used to determine if argument will later be trimmed */
 
 #define CPYSIZ	512
 
-subst(in, ot)
-int	in, ot;
+void
+subst(int in, int ot)
 {
-	register unsigned int	c;
+	unsigned int	c;
 	struct fileblk	fb;
-	register int	count = CPYSIZ;
+	int	count = CPYSIZ;
 	unsigned char	*pc;
 
 	push(&fb);
@@ -618,7 +620,8 @@ int	in, ot;
 	pop();
 }
 
-flush(ot)
+static void
+flush(int ot)
 {
 	write(ot, stakbot, staktop - stakbot);
 	if (flags & execpr)

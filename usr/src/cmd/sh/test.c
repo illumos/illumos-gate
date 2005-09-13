@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -39,12 +39,12 @@
 #include <sys/stat.h>
 
 extern	int lstat();
+void bfailed(unsigned char *, unsigned char *, unsigned char *) __NORETURN;
 int	ap, ac;
 unsigned char **av;
 
-test(argn, com)
-unsigned char *com[];
-int	argn;
+int
+test(int argn, unsigned char *com[])
 {
 	ac = argn;
 	av = com;
@@ -52,7 +52,7 @@ int	argn;
 	if (eq(com[0],"["))
 	{
 		if (!eq(com[--ac], "]"))
-			failed("test", "] missing");
+			failed((unsigned char *)"test", "] missing");
 	}
 	com[ac] = 0;
 	if (ac <= 1)
@@ -70,12 +70,13 @@ nxtarg(mt)
 			ap++;
 			return(0);
 		}
-		failed("test", "argument expected");
+		failed((unsigned char *)"test", "argument expected");
 	}
 	return(av[ap++]);
 }
 
-exp()
+int
+exp(void)
 {
 	int	p1;
 	unsigned char	*p2;
@@ -88,13 +89,14 @@ exp()
 			return(p1 | exp());
 
 		/* if (!eq(p2, ")"))
-			failed("test", synmsg); */
+			failed((unsigned char *)"test", synmsg); */
 	}
 	ap--;
 	return(p1);
 }
 
-e1()
+int
+e1(void)
 {
 	int	p1;
 	unsigned char	*p2;
@@ -108,7 +110,8 @@ e1()
 	return(p1);
 }
 
-e2()
+int
+e2(void)
 {
 	if (eq(nxtarg(0), "!"))
 		return(!e3());
@@ -116,10 +119,11 @@ e2()
 	return(e3());
 }
 
-e3()
+int
+e3(void)
 {
 	int	p1;
-	register unsigned char	*a;
+	unsigned char	*a;
 	unsigned char	*p2;
 	longlong_t	ll_1, ll_2;
 
@@ -128,7 +132,7 @@ e3()
 	{
 		p1 = exp();
 		if (!eq(nxtarg(0), ")"))
-			failed("test",") expected");
+			failed((unsigned char *)"test", ") expected");
 		return(p1);
 	}
 	p2 = nxtarg(1);
@@ -213,14 +217,12 @@ e3()
 	if (eq(p2, "-le"))
 		return (ll_1 <= ll_2);
 
-	bfailed(btest, badop, p2);
+	bfailed((unsigned char *)btest, (unsigned char *)badop, p2);
 /* NOTREACHED */
 }
 
-
-ftype(f, field)
-unsigned char	*f;
-int	field;
+int
+ftype(unsigned char *f, int field)
 {
 	struct stat statb;
 
@@ -231,9 +233,8 @@ int	field;
 	return(0);
 }
 
-filtyp(f,field)
-unsigned char	*f;
-int field;
+int
+filtyp(unsigned char *f, int field)
 {
 	struct stat statb;
 	int (*statf)() = (field == S_IFLNK) ? lstat : stat;
@@ -247,9 +248,8 @@ int field;
 }
 
 
-
-fsizep(f)
-unsigned char *f;
+int
+fsizep(unsigned char *f)
 {
 	struct stat statb;
 
@@ -262,10 +262,8 @@ unsigned char *f;
  * fake diagnostics to continue to look like original
  * test(1) diagnostics
  */
-bfailed(s1, s2, s3) 
-unsigned char *s1;
-unsigned char *s2;
-unsigned char *s3;
+void
+bfailed(unsigned char *s1, unsigned char *s2, unsigned char *s3)
 {
 	prp();
 	prs(s1);

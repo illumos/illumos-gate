@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3.8.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *
  * UNIX shell
@@ -43,10 +43,8 @@
 #include	<sys/types.h>
 #include	<sys/times.h>
 
-builtin(type, argc, argv, t)
-int type, argc;
-unsigned char **argv;
-struct trenod	*t;
+void
+builtin(int type, int argc, unsigned char **argv, struct trenod *t)
 {
 	short index = initio(t->treio, (type != SYSEXEC));
 	unsigned char *a1 = argv[1];
@@ -77,7 +75,7 @@ struct trenod	*t;
 	case SYSDOT:
 		if (a1)
 		{
-			register int	f;
+			int	f;
 
 			if ((f = pathopen(getpath(a1), a1)) < 0)
 				failed(a1, notfound);
@@ -453,7 +451,7 @@ struct trenod	*t;
 			itos(optind);
 			assign(n, numbuf);
 			n = lookup(varnam);
-			assign(n, nullstr);
+			assign(n, (unsigned char *)nullstr);
 			exitval = 1;
 			break;
 		}
@@ -465,7 +463,7 @@ struct trenod	*t;
 		n = lookup(varnam);
 		assign(n, c);
 		n = lookup("OPTARG");
-		assign(n, optarg);
+		assign(n, (unsigned char *)optarg);
 		}
 		break;
 

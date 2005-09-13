@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include	"defs.h"
 #include	"sym.h"
 #include	"timeout.h"
+#include	<stdio.h>
 #include	<sys/types.h>
 #include	<sys/stat.h>
 #include	<sys/wait.h>
@@ -51,7 +52,7 @@
 pid_t mypid, mypgid, mysid;
 
 static BOOL	beenhere = FALSE;
-unsigned char		tmpout[20] = "/tmp/sh-";
+unsigned char	tmpout[TMPOUTSZ];
 struct fileblk	stdfile;
 struct fileblk *standin = &stdfile;
 int mailchk = 0;
@@ -69,18 +70,19 @@ char **execargs = (char **)(-2);
 #endif
 
 
-static int	exfile();
+static void	exfile();
 extern unsigned char 	*simple();
+static void Ldup(int, int);
+void settmp(void);
+void chkmail(void);
+void setmail(unsigned char *);
 
-
-main(c, v, e)
-int	c;
-char	*v[];
-char	*e[];
+int
+main(int c, char *v[], char *e[])
 {
-	register int	rflag = ttyflg;
+	int		rflag = ttyflg;
 	int		rsflag = 1;	/* local restricted flag */
-	register unsigned char *flagc = flagadr;
+	unsigned char	*flagc = flagadr;
 	struct namnod	*n;
 
 	mypid = getpid();
@@ -202,10 +204,10 @@ char	*e[];
 		dolc--;
 
 	if ((flags & privflg) == 0) {
-		register uid_t euid;
-		register gid_t egid;
-		register uid_t ruid;
-		register gid_t rgid;
+		uid_t euid;
+		gid_t egid;
+		uid_t ruid;
+		gid_t rgid;
 
 		/*
 		 * Determine all of the user's id #'s for this process and
@@ -258,7 +260,7 @@ char	*e[];
 	 * setup_env() may have set anything from parent shell to IFS.
 	 * Always set the default ifs to IFS.
 	 */
-	assign(&ifsnod, sptbnl);
+	assign(&ifsnod, (unsigned char *)sptbnl);
 
 	dfault(&mchknod, MAILCHECK);
 	mailchk = stoi(mchknod.namval);
@@ -266,7 +268,7 @@ char	*e[];
 	/* initialize OPTIND for getopt */
 
 	n = lookup("OPTIND");
-	assign(n, "1");
+	assign(n, (unsigned char *)"1");
 	/*
 	 * make sure that option parsing starts
 	 * at first character
@@ -360,9 +362,8 @@ char	*e[];
 	done(0);
 }
 
-static int
-exfile(prof)
-BOOL	prof;
+static void
+exfile(int prof)
 {
 	time_t	mailtime = 0;	/* Must not be a register variable */
 	time_t 	curtime = 0;
@@ -444,7 +445,7 @@ BOOL	prof;
 #endif
 
 		{
-			register struct trenod *t;
+			struct trenod *t;
 			t = cmd(NL, MTFLG);
 			if (t == NULL && flags & ttyflg)
 				freejobs();
@@ -457,22 +458,33 @@ BOOL	prof;
 	}
 }
 
-chkpr()
+void
+chkpr(void)
 {
 	if ((flags & prompt) && standin->fstak == 0)
 		prs(ps2nod.namval);
 }
 
-settmp()
+void
+settmp(void)
 {
-	int i;
-	i = ltos(mypid);
+	int len;
 	serial = 0;
-	tmpname = movstr(numbuf + i, &tmpout[TMPNAM]);
+	if ((len = snprintf((char *)tmpout, TMPOUTSZ, "/tmp/sh%u", mypid)) >=
+	    TMPOUTSZ) {
+		/*
+		 * TMPOUTSZ should be big enough, but if it isn't,
+		 * we'll at least try to create tmp files with
+		 * a truncated tmpfile name at tmpout.
+		 */
+		tmpout_offset = TMPOUTSZ - 1;
+	} else {
+		tmpout_offset = len;
+	}
 }
 
-Ldup(fa, fb)
-register int	fa, fb;
+static void
+Ldup(int fa, int fb)
 {
 #ifdef RES
 
@@ -495,11 +507,11 @@ register int	fa, fb;
 #endif
 }
 
-
-chkmail()
+void
+chkmail(void)
 {
-	register unsigned char 	*s = mailp;
-	register unsigned char	*save;
+	unsigned char 	*s = mailp;
+	unsigned char	*save;
 
 	long	*ptr = mod_time;
 	unsigned char	*start;
@@ -550,12 +562,11 @@ chkmail()
 	}
 }
 
-
-setmail(mailpath)
-	unsigned char *mailpath;
+void
+setmail(unsigned char *mailpath)
 {
-	register unsigned char	*s = mailpath;
-	register int 	cnt = 1;
+	unsigned char	*s = mailpath;
+	int 		cnt = 1;
 
 	long	*ptr;
 
@@ -598,7 +609,8 @@ setwidth()
 	}
 }
 
-setmode(prof)
+void
+setmode(int prof)
 {
 	/*
 	 * decide whether interactive

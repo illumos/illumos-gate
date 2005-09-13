@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9.5.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * UNIX shell
  */
@@ -33,30 +39,27 @@
 
 /* ========	error handling	======== */
 
-extern void done();
-
-failed(s1, s2)
-unsigned char	*s1, *s2;
+void
+failed(unsigned char *s1, const char *s2)
 {
 	prp();
 	prs_cntl(s1);
-	if (s2)
-	{
+	if (s2) {
 		prs(colon);
-		prs(s2);
+		prs((unsigned char *)s2);
 	}
 	newline();
 	exitsh(ERROR);
 }
 
-error(s)
-unsigned char	*s;
+void
+error(unsigned char *s)
 {
-	failed(s, NIL);
+	failed(s, (const char *)NIL);
 }
 
-exitsh(xno)
-int	xno;
+void
+exitsh(int xno)
 {
 	/*
 	 * Arrive here from `FATAL' errors
@@ -74,44 +77,42 @@ int	xno;
 	{
 		clearup();
 		restore(0);
-		(void)setb(1);
+		(void) setb(1);
 		execbrk = breakcnt = funcnt = 0;
 		longjmp(errshell, 1);
 	}
 }
 
-rmtemp(base)
-struct ionod	*base;
+void
+rmtemp(struct ionod *base)
 {
-	while (iotemp > base)
-	{
+	while (iotemp > base) {
 		unlink(iotemp->ioname);
 		free(iotemp->iolink);
 		iotemp = iotemp->iolst;
 	}
 }
 
-rmfunctmp()
+void
+rmfunctmp(void)
 {
-	while (fiotemp)
-	{
+	while (fiotemp) {
 		unlink(fiotemp->ioname);
 		fiotemp = fiotemp->iolst;
 	}
 }
 
-failure(s1, s2)
-unsigned char	*s1, *s2;
+void
+failure(unsigned char *s1, unsigned char *s2)
 {
 	prp();
 	prs_cntl(s1);
-	if (s2)
-	{
+	if (s2) {
 		prs(colon);
 		prs(s2);
 	}
 	newline();
-	
+
 	if (flags & errflg)
 		exitsh(ERROR);
 

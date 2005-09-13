@@ -19,14 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*      Portions Copyright(c) 1988, Sun Microsystems, Inc.      */
-/*      All Rights Reserved.                                    */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10.5.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	UNIX shell
  */
@@ -45,15 +47,16 @@ static int	multrel;
 static struct entry	relcmd;
 
 static int	argpath();
+static void pr_path(unsigned char *, int);
 
 short
 pathlook(com, flg, arg)
 	unsigned char	*com;
 	int		flg;
-	register struct argnod	*arg;
+	struct argnod	*arg;
 {
-	register unsigned char	*name = com;
-	register ENTRY	*h;
+	unsigned char	*name = com;
+	ENTRY		*h;
 
 	ENTRY		hentry;
 	int		count = 0;
@@ -213,11 +216,11 @@ hashpr()
 	hscan(hashout);
 }
 
-
-set_dotpath()
+void
+set_dotpath(void)
 {
-	register unsigned char	*path;
-	register int	cnt = 1;
+	unsigned char	*path;
+	int		cnt = 1;
 
 	dotpath = 10000;
 	path = getpath("");
@@ -243,9 +246,8 @@ set_dotpath()
 	multrel = 0;
 }
 
-
-hash_func(name)
-	unsigned char *name;
+void
+hash_func(unsigned char *name)
 {
 	ENTRY	*h;
 	ENTRY	hentry;
@@ -264,8 +266,8 @@ hash_func(name)
 	}
 }
 
-func_unhash(name)
-	unsigned char *name;
+void
+func_unhash(unsigned char *name)
 {
 	ENTRY 	*h;
 	int i;
@@ -313,11 +315,11 @@ hash_cmd(name)
 /*
  * Return 0 if found, 1 if not.
  */
-what_is_path(name)
-	register unsigned char *name;
+int
+what_is_path(unsigned char *name)
 {
-	register ENTRY	*h;
-	int		cnt;
+	ENTRY	*h;
+	int	cnt;
 	short	hashval;
 
 	h = hfind(name);
@@ -390,13 +392,11 @@ what_is_path(name)
 	}
 }
 
-
-findpath(name, oldpath)
-	register unsigned char *name;
-	int oldpath;
+int
+findpath(unsigned char *name, int oldpath)
 {
-	register unsigned char 	*path;
-	register int	count = 1;
+	unsigned char 	*path;
+	int	count = 1;
 
 	unsigned char	*p;
 	int	ok = 1;
@@ -450,10 +450,8 @@ findpath(name, oldpath)
  * a non-regular file as executable. 
  */
 
-chk_access(name, mode, regflag)
-register unsigned char	*name;
-mode_t mode; 
-int regflag;
+int
+chk_access(unsigned char *name, mode_t mode, int regflag)
 {	
 	static int flag;
 	static uid_t euid; 
@@ -485,12 +483,10 @@ int regflag;
 	return(errno == EACCES ? 3 : 1);
 }
 
-
-pr_path(name, count)
-	register unsigned char	*name;
-	int count;
+static void
+pr_path(unsigned char *name, int count)
 {
-	register unsigned char	*path;
+	unsigned char	*path;
 
 	path = getpath(name);
 
@@ -502,12 +498,11 @@ pr_path(name, count)
 }
 
 
-static
-argpath(arg)
-	register struct argnod	*arg;
+static int
+argpath(struct argnod *arg)
 {
-	register unsigned char 	*s;
-	register unsigned char	*start;
+	unsigned char 	*s;
+	unsigned char	*start;
 
 	while (arg)
 	{
