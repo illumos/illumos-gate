@@ -60,6 +60,25 @@ uint_t swinum_base;
 uint_t maxswinum;
 uint_t siron_inum;
 uint_t poke_cpu_inum;
+/*
+ * Note:-
+ * siron_pending was originally created to prevent a resource over consumption
+ * bug in setsoftint(exhaustion of interrupt pool free list).
+ * It's original intention is obsolete with the use of iv_pending in
+ * setsoftint. However, siron_pending stayed around, acting as a second
+ * gatekeeper preventing soft interrupts from being queued. In this capacity,
+ * it can lead to hangs on MP systems, where due to global visibility issues
+ * it can end up set while iv_pending is reset, preventing soft interrupts from
+ * ever being processed. In addition to its gatekeeper role, init_intr also
+ * uses it to flag the situation where siron() was called before siron_inum has
+ * been defined.
+ *
+ * siron() does not need an extra gatekeeper; any cpu that wishes should be
+ * allowed to queue a soft interrupt. It is softint()'s job to ensure
+ * correct handling of the queues. Therefore, siron_pending has been
+ * stripped of its gatekeeper task, retaining only its intr_init job, where
+ * it indicates that there is a pending need to call siron().
+ */
 int siron_pending;
 
 int intr_policy = INTR_WEIGHTED_DIST;	/* interrupt distribution policy */
@@ -92,8 +111,10 @@ intr_init(cpu_t *cp)
 	 * init_intr_pool, so we have to wait until now before we can dispatch
 	 * the pending soft interrupt (if any).
 	 */
-	if (siron_pending)
-		setsoftint(siron_inum);
+	if (siron_pending) {
+		siron_pending = 0;
+		siron();
+	}
 }
 
 /*
@@ -233,11 +254,10 @@ init_intr_pool(cpu_t *cp)
 void
 siron(void)
 {
-	if (!siron_pending) {
+	if (siron_inum != 0)
+		setsoftint(siron_inum);
+	else
 		siron_pending = 1;
-		if (siron_inum != 0)
-			setsoftint(siron_inum);
-	}
 }
 
 /*

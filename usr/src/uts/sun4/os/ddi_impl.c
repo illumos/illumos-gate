@@ -1699,9 +1699,6 @@ i_ddi_get_nintrs(dev_info_t *dip)
 uint_t
 softlevel1(caddr_t arg)
 {
-	extern int siron_pending;
-
-	siron_pending = 0;
 	softint();
 	return (1);
 }

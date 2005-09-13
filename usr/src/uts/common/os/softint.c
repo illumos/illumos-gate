@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,9 +37,33 @@
 
 /*
  * Handle software interrupts through 'softcall' mechanism
+ *
+ * At present softcall mechanism uses a global list headed by softhead.
+ * Entries are added to tail and removed from head so as to preserve FIFO
+ * nature of entries in the softcall list. softcall() takes care of adding
+ * entries to the softtail.
+ *
+ * softint must take care of executing the entries in the FIFO
+ * order. It could be called simultaneously from multiple cpus, however only
+ * one instance of softint should process the softcall list, this is
+ * ensured by
+ * - the state the variable softcall_state will be at time to time.
+ *   (IDLE->PEND->DRAIN->IDLE)
+ *
+ * These states are needed for softcall mechanism since  Solaris has only
+ * one interface(ie. siron ) as of now for
+ * - raising a soft interrupt architecture independently(ie not through
+ *   setsoftint(..) )
+ * - to process the softcall queue.
  */
 
 #define	NSOFTCALLS	200
+/*
+ * Defined states for softcall processing.
+ */
+#define	SOFT_IDLE		0x01	/* no processing is needed */
+#define	SOFT_PEND		0x02	/* softcall list needs processing */
+#define	SOFT_DRAIN		0x04	/* the list is being processed */
 
 typedef struct softcall {
 	void (*sc_func)(void *);	/* function to call */
@@ -48,8 +72,12 @@ typedef struct softcall {
 } softcall_t;
 
 static softcall_t softcalls[NSOFTCALLS], *softhead, *softtail, *softfree;
+static uint_t	softcall_state;
 
-static kmutex_t	softcall_lock;		/* protects softcall lists */
+/*
+ * protects softcall lists and control variable softcall_state.
+ */
+static kmutex_t	softcall_lock;
 
 static void (*kdi_softcall_func)(void);
 
@@ -101,8 +129,20 @@ softcall(void (*func)(void *), void *arg)
 		mutex_exit(&softcall_lock);
 	} else {
 		softhead = softtail = sc;
-		mutex_exit(&softcall_lock);
-		siron();
+		if (softcall_state == SOFT_DRAIN)
+			/*
+			 * softint is already running; no need to
+			 * raise a siron. Due to lock protection of
+			 * softhead / softcall state, we know
+			 * that softint() will see the new addition to
+			 * the softhead queue.
+			 */
+			mutex_exit(&softcall_lock);
+		else {
+			softcall_state = SOFT_PEND;
+			mutex_exit(&softcall_lock);
+			siron();
+		}
 	}
 }
 
@@ -116,10 +156,17 @@ kdi_softcall(void (*func)(void))
 }
 
 /*
- * Called to process software interrupts
- * take one off queue, call it, repeat
- * Note queue may change during call
+ * Called to process software interrupts take one off queue, call it,
+ * repeat.
+ *
+ * Note queue may change during call; softcall_lock and state variables
+ * softcall_state ensures that
+ * -we don't have multiple cpus pulling from the list (thus causing
+ *  a violation of FIFO order).
+ * -we don't miss a new entry having been added to the head.
+ * -we don't miss a wakeup.
  */
+
 void
 softint(void)
 {
@@ -127,8 +174,17 @@ softint(void)
 	void (*func)();
 	caddr_t arg;
 
+	/*
+	 * Check if we are asked to process the softcall list.
+	 */
+	mutex_enter(&softcall_lock);
+	if (softcall_state != SOFT_PEND) {
+		mutex_exit(&softcall_lock);
+		goto out;
+	}
+	softcall_state = SOFT_DRAIN;
+
 	for (;;) {
-		mutex_enter(&softcall_lock);
 		if ((sc = softhead) != NULL) {
 			func = sc->sc_func;
 			arg = sc->sc_arg;
@@ -136,12 +192,16 @@ softint(void)
 			sc->sc_next = softfree;
 			softfree = sc;
 		}
-		mutex_exit(&softcall_lock);
-		if (sc == NULL)
+		if (sc == NULL) {
+			softcall_state = SOFT_IDLE;
+			mutex_exit(&softcall_lock);
 			break;
+		}
+		mutex_exit(&softcall_lock);
 		func(arg);
+		mutex_enter(&softcall_lock);
 	}
-
+out:
 	if ((func = kdi_softcall_func) != NULL) {
 		kdi_softcall_func = NULL;
 		func();
