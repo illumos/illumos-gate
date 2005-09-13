@@ -1889,7 +1889,7 @@ print_help(void)
 	    "-h         print holes in structures\n"
 	    "-l limit   limit the length of standard arrays\n"
 	    "-L         unlimit the length of standard arrays\n"
-	    "-n		don't print pointers as symbol offsets\n"
+	    "-n         don't print pointers as symbol offsets\n"
 	    "-p         interpret address as a physical memory address\n"
 	    "-t         show type of object\n"
 	    "-i         interpret address as data of the given type\n"

@@ -104,56 +104,11 @@ extern int dns_puthostent(struct hostent *, time_t);
  */
 
 /*
- * Print the DHCP packet type.
- */
-static void
-dhcpmsgtype(uchar_t pkt, char *buf)
-{
-	char	*p;
-
-	switch (pkt) {
-	case DISCOVER:
-		p = "DISCOVER";
-		break;
-	case OFFER:
-		p = "OFFER";
-		break;
-	case REQUEST:
-		p = "REQUEST";
-		break;
-	case DECLINE:
-		p = "DECLINE";
-		break;
-	case ACK:
-		p = "ACK";
-		break;
-	case NAK:
-		p = "NAK";
-		break;
-	case RELEASE:
-		p = "RELEASE";
-		break;
-	case INFORM:
-		p = "INFORM";
-		break;
-	default:
-		p = "UNKNOWN";
-		break;
-	}
-
-	(void) strcpy(buf, p);
-}
-
-/*
  * Dispatch the DHCP packet based on its type.
  */
 void
 dhcp(dsvc_clnt_t *pcd, PKT_LIST *plp)
 {
-	char buf[32];
-
-	dhcpmsgtype(*plp->opts[CD_DHCP_TYPE]->value, buf);
-
 	if (plp->opts[CD_DHCP_TYPE]->len != 1) {
 		dhcpmsg(LOG_ERR,
 		    "Garbled DHCP Message type option from client: %s\n",
