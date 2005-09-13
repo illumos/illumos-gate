@@ -90,9 +90,6 @@ struct hostlist {
 char	hostname[MAXHOSTNAMELEN];
 char	mbuf[BUFSIZ];
 
-void	timeout();
-time_t	getsdt();
-
 extern	char *malloc();
 
 extern	char *ctime();
@@ -166,9 +163,18 @@ char	*msg20 = "Can't get PID for init\n";
 
 char *shutter, *getlogin();
 
+static void timeout(void);
+static void gethostlist(void);
+static void finish(char *, char *, int);
+static void nolog(time_t);
+static void rprintf(char *, char *);
+static void rwarn(char *, time_t, time_t, char *, int);
+static void doitfast(void);
+static void warn(FILE *, time_t, time_t, char *, int);
+static time_t getsdt(char *);
 
 pid_t
-get_initpid()
+get_initpid(void)
 {
 	pid_t init_pid;
 
@@ -293,7 +299,7 @@ main(int argc, char **argv)
 #endif
 	(void) signal(SIGTTOU, SIG_IGN);
 	(void) signal(SIGINT, finish_sig);
-	(void) signal(SIGALRM, timeout);
+	(void) signal(SIGALRM, (void(*)())timeout);
 	(void) setpriority(PRIO_PROCESS, 0, PRIO_MIN);
 	(void) fflush(stdout);
 #ifndef DEBUG
@@ -460,9 +466,8 @@ main(int argc, char **argv)
 	/* NOTREACHED */
 }
 
-time_t
-getsdt(s)
-	char *s;
+static time_t
+getsdt(char *s)
 {
 	time_t t, t1, tim;
 	char c;
@@ -518,14 +523,12 @@ getsdt(s)
 badform:
 	(void) printf(gettext("Bad time format\n"));
 	finish(gettext("Bad time format"), "", 0);
-	/*NOTREACHED*/
+	return (0);
+	/* NOTREACHED */
 }
 
-warn(termf, sdt, now, type, first)
-	FILE *termf;
-	time_t sdt, now;
-	char *type;
-	int first;
+static void
+warn(FILE *termf, time_t sdt, time_t now, char *type, int first)
 {
 	char *ts;
 	time_t delay = sdt - now;
@@ -554,7 +557,8 @@ warn(termf, sdt, now, type, first)
 	}
 }
 
-doitfast()
+static void
+doitfast(void)
 {
 	FILE *fastd;
 
@@ -564,11 +568,8 @@ doitfast()
 	}
 }
 
-rwarn(host, sdt, now, type, first)
-	char *host;
-	time_t sdt, now;
-	char *type;
-	int first;
+static void
+rwarn(char *host, time_t sdt, time_t now, char *type, int first)
 {
 	char *ts;
 	time_t delay = sdt - now;
@@ -604,8 +605,8 @@ rwarn(host, sdt, now, type, first)
 	rprintf(host, mbuf);
 }
 
-rprintf(host, bufp)
-	char *host, *bufp;
+static void
+rprintf(char *host, char *bufp)
 {
 	int err;
 
@@ -623,8 +624,8 @@ rprintf(host, bufp)
 	    }
 }
 
-nolog(sdt)
-	time_t sdt;
+static void
+nolog(time_t sdt)
 {
 	FILE *nologf;
 
@@ -638,27 +639,27 @@ nolog(sdt)
 }
 
 void
-finish_sig()
+finish_sig(void)
 {
 	finish("SIGINT", "", 1);
 }
 
-finish(s1, s2, exitcode)
-	char *s1;
-	char *s2;
+static void
+finish(char *s1, char *s2, int exitcode)
 {
 	(void) signal(SIGINT, SIG_IGN);
 	exit(exitcode);
 }
 
-void
-timeout()
+static void
+timeout(void)
 {
 	(void) signal(SIGALRM, (void(*)())timeout);
 	longjmp(alarmbuf, 1);
 }
 
-gethostlist()
+static void
+gethostlist(void)
 {
 	int s;
 	struct mountbody *ml;
@@ -720,13 +721,10 @@ gethostlist()
  * callrpc or clnt_call, so use rmtcall instead.  Use timeout
  * of 8 secs, based on the per try timeout of 3 secs for rmtcall
  */
-callrpcfast(host, prognum, versnum, procnum, inproc, in, outproc, out)
-	char *host;
-	rpcprog_t prognum;
-	rpcvers_t versnum;
-	rpcproc_t procnum;
-	xdrproc_t inproc, outproc;
-	char *in, *out;
+int
+callrpcfast(char *host, rpcprog_t prognum, rpcprog_t versnum,
+    rpcprog_t procnum, xdrproc_t inproc, xdrproc_t outproc,
+    char *in, char *out)
 {
 	struct sockaddr_in server_addr;
 	struct hostent *hp;

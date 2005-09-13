@@ -1,5 +1,5 @@
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -22,15 +22,14 @@
 
 static int match(char *, char *);
 
-main(argc, argv)
-	int argc;
-	register char **argv;
+int
+main(int argc, char **argv)
 {
 	char lbuf[BUFSIZ];
 	char lbuf2[BUFSIZ];
-	register struct passwd *pp;
+	struct passwd *pp;
 	int stashed = 0;
-	register char *name;
+	char *name;
 	char *sender = NULL;
 	char mailbox[MAXPATHLEN];
 	char *tmp_mailbox;
@@ -93,14 +92,13 @@ main(argc, argv)
 		}
 	if (stashed)
 		(void) printf("%s", lbuf2);
-	return(0);
+	return (0);
 }
 
 static int
-match(line, str)
-	register char *line, *str;
+match(char *line, char *str)
 {
-	register char ch;
+	char ch;
 
 	while (*line == ' ' || *line == '\t')
 		++line;

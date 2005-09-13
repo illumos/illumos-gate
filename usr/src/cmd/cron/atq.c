@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -8,12 +13,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright 1984-1988, 2002-2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -56,23 +56,29 @@ struct dirent **queue;			/* the queue itself */
 #define	INVALIDUSER	"you are not a valid user (no entry in /etc/passwd)"
 #define	NOTALLOWED	"you are not authorized to use at.  Sorry."
 
+static void atabortperror(char *msg);
+static void atabort(char *msg);
+static void aterror(char *msg);
+static void atperror(char *msg);
+static void usage(void);
+static void printjobname(char *file);
+static void printdate(char *filename);
+static void printrank(int n);
+static void printqueue(uid_t *uidlist, int nuids);
 
-main(argc, argv)
-int argc;
-char **argv;
+int
+main(int argc, char **argv)
 {
 
-	register struct passwd *pp;	/* password file entry pointer */
+	struct passwd *pp;	/* password file entry pointer */
 	struct passwd pr;
-	register int i;
+	int i;
 	int cflag = 0;			/* print in order of creation time */
 	int nflag = 0;			/* just print the number of jobs in */
 					/* queue */
-	int usage();			/* print usage info and exit */
 	extern int creation();		/* sort jobs by date of creation */
 	extern int execution();		/* sort jobs by date of execution */
 	int filewanted();		/* should file be included in queue? */
-	int printqueue();		/* print the queue */
 	int countfiles();		/* count the number of files in queue */
 					/* for a given person */
 	uid_t *uidlist = NULL;		/* array of spec. owner ID(s) requ. */
@@ -202,21 +208,20 @@ char **argv;
 		exit(0);
 	}
 	printqueue(uidlist, argnum);
-	exit(0);
+	return (0);
 }
 
 /*
  * Count the number of jobs in the spooling area owned by a certain person(s).
  */
-countfiles(uidlist, nuids)
-uid_t *uidlist;
-int nuids;
+int
+countfiles(uid_t *uidlist, int nuids)
 {
-	register int i, j;			/* for loop indices */
+	int i, j;			/* for loop indices */
 	int entryfound;				/* found file owned by users */
 	int numfiles = 0;			/* number of files owned by a */
 						/* certain person(s) */
-	register uid_t *ptr;			/* scratch pointer */
+	uid_t *ptr;			/* scratch pointer */
 	struct stat stbuf;			/* buffer for file stats */
 
 
@@ -248,16 +253,14 @@ int nuids;
  * Print the queue. If only jobs belonging to a certain person(s) are requested,
  * only print jobs that belong to that person(s).
  */
-printqueue(uidlist, nuids)
-uid_t *uidlist;
-int nuids;
+static void
+printqueue(uid_t *uidlist, int nuids)
 {
-	register int i, j;			/* for loop indices */
+	int i, j;			/* for loop indices */
 	int rank;				/* rank of a job */
 	int entryfound;				/* found file owned by users */
-	int printrank();			/* print the rank of a job */
 	char *getname();
-	register uid_t *ptr;			/* scratch pointer */
+	uid_t *ptr;			/* scratch pointer */
 	struct stat stbuf;			/* buffer for file stats */
 	char curqueue;				/* queue of current job */
 	char lastqueue;				/* queue of previous job */
@@ -317,8 +320,7 @@ int nuids;
  * such account name exists.
  */
 uid_t
-getid(name)
-char *name;
+getid(char *name)
 {
 
 	struct passwd *pwdinfo;			/* password info structure */
@@ -334,10 +336,9 @@ char *name;
  * Get the full login name of a person using his/her user id.
  */
 char *
-getname(uid)
-uid_t uid;
+getname(uid_t uid)
 {
-	register struct passwd *pwdinfo;	/* password info structure */
+	struct passwd *pwdinfo;	/* password info structure */
 
 
 	if ((pwdinfo = getpwuid(uid)) == 0)
@@ -348,8 +349,8 @@ uid_t uid;
 /*
  * Print the rank of a job. (I've got to admit it, I stole it from "lpq")
  */
-static
-printrank(n)
+static void
+printrank(int n)
 {
 	static char *r[] = {
 		"th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th"
@@ -365,12 +366,12 @@ printrank(n)
  * Print the date that a job is to be executed. This takes some manipulation
  * of the file name.
  */
-printdate(filename)
-char *filename;
+static void
+printdate(char *filename)
 {
 	time_t	jobdate;
 	extern time_t num();
-	register struct tm *unpackeddate;
+	struct tm *unpackeddate;
 	char date[18];				/* reformatted execution date */
 
 	/*
@@ -399,8 +400,8 @@ char *filename;
  * the three line header that the new version of "at" puts in the spoolfile.
  * Thus, we just print "???".
  */
-printjobname(file)
-char *file;
+static void
+printjobname(char *file)
 {
 	char *ptr;				/* scratch pointer */
 	char jobname[28];			/* the job name */
@@ -453,13 +454,13 @@ char *file;
 /*
  * Sort files by queue, time of creation, and sequence. (used by "ascandir")
  */
-creation(d1, d2)
-struct dirent **d1, **d2;
+int
+creation(struct dirent **d1, struct dirent **d2)
 {
-	register char *p1, *p2;
-	register int i;
+	char *p1, *p2;
+	int i;
 	struct stat stbuf1, stbuf2;
-	register int seq1, seq2;
+	int seq1, seq2;
 
 	if ((p1 = strchr((*d1)->d_name, '.')) == NULL)
 		return (0);
@@ -490,14 +491,14 @@ struct dirent **d1, **d2;
 /*
  * Sort files by queue, time of execution, and sequence. (used by "ascandir")
  */
-execution(d1, d2)
-struct dirent **d1, **d2;
+int
+execution(struct dirent **d1, struct dirent **d2)
 {
-	register char *p1, *p2;
-	register int i;
+	char *p1, *p2;
+	int i;
 	char *name1, *name2;
-	register time_t time1, time2;
-	register int seq1, seq2;
+	time_t time1, time2;
+	int seq1, seq2;
 	extern time_t num();
 
 	name1 = (*d1)->d_name;
@@ -529,33 +530,34 @@ struct dirent **d1, **d2;
 /*
  * Print usage info and exit.
  */
-usage()
+static void
+usage(void)
 {
 	fprintf(stderr, "usage:	atq [-c] [-n] [name ...]\n");
 	exit(1);
 }
 
-aterror(msg)
-	char *msg;
+static void
+aterror(char *msg)
 {
 	fprintf(stderr, "atq: %s\n", msg);
 }
 
-atperror(msg)
-	char *msg;
+static void
+atperror(char *msg)
 {
 	fprintf(stderr, "atq: %s: %s\n", msg, errmsg(errno));
 }
 
-atabort(msg)
-	char *msg;
+static void
+atabort(char *msg)
 {
 	aterror(msg);
 	exit(1);
 }
 
-atabortperror(msg)
-	char *msg;
+static void
+atabortperror(char *msg)
 {
 	atperror(msg);
 	exit(1);

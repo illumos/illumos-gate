@@ -384,7 +384,7 @@ static	void	check_for_console(void);
 static	void	check_for_dueling_unix(char *);
 static	void	get_user_name(void);
 static	uint_t	get_audit_id(void);
-static	void	login_exit(int);
+static	void	login_exit(int)__NORETURN;
 static	int	logins_disabled(char *);
 static	void	log_bad_attempts(void);
 static	int	is_number(char *);
@@ -401,7 +401,7 @@ static	int	is_number(char *);
  *
  */
 
-void
+int
 main(int argc, char *argv[], char **renvp)
 {
 /* ONC_PLUS EXTRACT END */
@@ -661,7 +661,7 @@ main(int argc, char *argv[], char **renvp)
 	 * All done
 	 */
 	login_exit(1);
-	/* NOTREACHED */
+	return (0);
 }
 
 
@@ -940,7 +940,7 @@ login_conv(int num_msg, struct pam_message **msg,
  */
 
 static int
-verify_passwd()
+verify_passwd(void)
 {
 	int error;
 	char *user;
@@ -1102,7 +1102,7 @@ getargs(char *input_line)
  */
 
 static void
-get_user_name()
+get_user_name(void)
 {
 	FILE	*fp;
 
@@ -1762,7 +1762,7 @@ chdir_to_dir_user(void)
  */
 
 static void
-login_authenticate()
+login_authenticate(void)
 {
 	char *user;
 	int err;
@@ -1939,7 +1939,8 @@ setup_credentials(void)
 /* ONC_PLUS EXTRACT END */
 
 static uint_t
-get_audit_id() {
+get_audit_id(void)
+{
 	if (rflag)
 		return (ADT_rlogin);
 	else if (hflag)

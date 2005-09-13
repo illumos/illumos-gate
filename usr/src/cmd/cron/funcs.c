@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 1988-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.4	*/
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -63,6 +63,7 @@ num(char **ptr)
 
 static int dom[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
+int
 days_btwn(int m1, int d1, int y1, int m2, int d2, int y2)
 {
 	/*
@@ -177,7 +178,7 @@ int
 filewanted(struct dirent *direntry)
 {
 	char		*p;
-	register char	c;
+	char		c;
 
 	p = direntry->d_name;
 	(void) num(&p);
@@ -215,9 +216,9 @@ ascandir(dirname, namelist, select, dcomp)
 	int		(*select)();
 	int		(*dcomp)();
 {
-	register struct dirent *d, *p, **names;
-	register int nitems;
-	register char *cp1, *cp2;
+	struct dirent *d, *p, **names;
+	int nitems;
+	char *cp1, *cp2;
 	struct stat stb;
 	long arraysz;
 	DIR *dirp;

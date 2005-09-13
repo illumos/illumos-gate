@@ -101,9 +101,8 @@ static void crabort(char *);
 static void cerror(char *);
 static void copycron(FILE *);
 
-main(argc, argv)
-int	argc;
-char	**argv;
+int
+main(int argc, char **argv)
 {
 	int	c, r;
 	int	rflag	= 0;

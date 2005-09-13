@@ -19,11 +19,13 @@
  *
  * CDDL HEADER END
  */
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rusage
@@ -43,17 +45,16 @@ fprintt(s, tv)
 	struct timeval *tv;
 {
 
-	(void) fprintf(stderr, gettext("%d.%02d %s "), 
+	(void) fprintf(stderr, gettext("%d.%02d %s "),
 		tv->tv_sec, tv->tv_usec/10000, s);
 }
 
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char **argv)
 {
 	union wait status;
-	int options=0;
-	register int p;
+	int options = 0;
+	int p;
 	struct timeval before, after;
 	struct rusage ru;
 	struct timezone tz;
@@ -61,11 +62,11 @@ main(argc, argv)
 	(void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)
-#define TEXT_DOMAIN "SYS_TEST"
+#define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	if (argc<=1)
+	if (argc <= 1)
 		exit(0);
 	(void) gettimeofday(&before, &tz);
 
@@ -88,8 +89,8 @@ main(argc, argv)
 
 	/* parent code - wait for command to complete */
 
-	(void)signal(SIGINT, SIG_IGN);
-	(void)signal(SIGQUIT, SIG_IGN);
+	(void) signal(SIGINT, SIG_IGN);
+	(void) signal(SIGQUIT, SIG_IGN);
 	while (wait3(&status.w_status, options, &ru) != p)
 		;
 
@@ -99,7 +100,8 @@ main(argc, argv)
 	/* check for exit status of command */
 
 	if ((status.w_termsig) != 0)
-		(void) fprintf(stderr, gettext("Command terminated abnormally.\n"));
+		(void) fprintf(stderr,
+		    gettext("Command terminated abnormally.\n"));
 
 	/* print an accounting summary line */
 
@@ -128,7 +130,5 @@ main(argc, argv)
 		ru.ru_isrss);
 
 	(void) fprintf(stderr, "\n");
-	exit((int)status.w_retcode);
-	/*NOTREACHED*/
+	return ((int)status.w_retcode);
 }
-

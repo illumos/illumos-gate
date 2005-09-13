@@ -21,6 +21,11 @@
  * CDDL HEADER END
  */
 %}
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
@@ -85,21 +90,21 @@ expr:	'(' expr ')' = { $$ = $2; }
 #define ESIZE	256
 #define EQL(x,y) !strcmp(x,y)
 
-#define INIT	register char *sp = instring;
+#define INIT	char *sp = instring;
 #define GETC()		(*sp++)
 #define PEEKC()		(*sp)
 #define UNGETC(c)	(--sp)
-#define RETURN(c)	return
+#define RETURN(c)	return(c)
 #define ERROR(c)	errxx(c)
 #include  <regexp.h>
 #include  <malloc.h>
+#include  <stdlib.h>
 
-long atol();
-char *ltoa(), *strcpy(), *strncpy();
-void exit();
 char	**Av;
 int	Ac;
 int	Argi;
+
+char *ltoa(long l);
 
 char Mstring[1][128];
 
@@ -112,9 +117,11 @@ int op[] = {
 	OR, AND, ADD,  SUBT, MULT, DIV, REM, MCH,
 	EQ, EQ, LT, LEQ, GT, GEQ, NEQ,
 	MATCH, SUBSTR, LENGTH, INDEX };
-yylex() {
-	register char *p;
-	register i;
+int
+yylex(void)
+{
+	char *p;
+	int i;
 
 	if(Argi >= Ac) return NOARG;
 
@@ -130,9 +137,10 @@ yylex() {
 	return A_STRING;
 }
 
-char *rel(oper, r1, r2) register char *r1, *r2;
+char *
+rel(int oper, char *r1, char *r2)
 {
-	register long i;
+	long i;
 
 	if(ematch(r1, "-\\{0,1\\}[0-9]*$") && ematch(r2, "-\\{0,1\\}[0-9]*$"))
 		i = atol(r1) - atol(r2);
@@ -164,7 +172,7 @@ char *rel(oper, r1, r2) register char *r1, *r2;
 char *arith(oper, r1, r2) char *r1, *r2;
 {
 	long i1, i2;
-	register char *rv;
+	char *rv;
 
 	if(!(ematch(r1, "-\\{0,1\\}[0-9]*$") && ematch(r2, "-\\{0,1\\}[0-9]*$")))
 		yyerror("non-numeric argument");
@@ -198,7 +206,7 @@ char *arith(oper, r1, r2) char *r1, *r2;
 }
 char *conj(oper, r1, r2) char *r1, *r2;
 {
-	register char *rv;
+	char *rv;
 
 	switch(oper) {
 
@@ -227,9 +235,11 @@ char *conj(oper, r1, r2) char *r1, *r2;
 	return rv;
 }
 
-char *substr(v, s, w) char *v, *s, *w; {
-register si, wi;
-register char *res;
+char *
+substr(char *v, char *s, char *w)
+{
+	int si, wi;
+	char *res;
 
 	si = atol(s);
 	wi = atol(w);
@@ -243,9 +253,11 @@ register char *res;
 	return res;
 }
 
-char *index(s, t) char *s, *t; {
-	register long i, j;
-	register char *rv;
+char *
+index(char *s, char *t)
+{
+	long i, j;
+	char *rv;
 
 	for(i = 0; s[i] ; ++i)
 		for(j = 0; t[j] ; ++j)
@@ -256,9 +268,11 @@ char *index(s, t) char *s, *t; {
 	return "0";
 }
 
-char *length(s) register char *s; {
-	register long i = 0;
-	register char *rv;
+char *
+length(char *s)
+{
+	long i = 0;
+	char *rv;
 
 	while(*s++) ++i;
 
@@ -267,10 +281,10 @@ char *length(s) register char *s; {
 	return rv;
 }
 
-char *match(s, p)
-char *s, *p;
+char *
+match(char *s, char *p)
 {
-	register char *rv;
+	char *rv;
 
 	(void) strcpy(rv=malloc(8), ltoa((long)ematch(s, p)));
 	if(nbra) {
@@ -280,13 +294,12 @@ char *s, *p;
 	return rv;
 }
 
-ematch(s, p)
-char *s;
-register char *p;
+int
+ematch(char *s, char *p)
 {
 	static char expbuf[ESIZE];
 	char *compile();
-	register num;
+	int num;
 	extern char *braslist[], *braelist[], *loc2;
 
 	compile(p, expbuf, &expbuf[ESIZE], 0);
@@ -305,10 +318,10 @@ register char *p;
 	return(0);
 }
 
-errxx(err)
-register err;
+int
+errxx(int err)
 {
-	register char *message;
+	char *message;
 
 	switch(err) {
 		case 11:
@@ -352,24 +365,28 @@ register err;
 			break;
 	}
 	yyerror(message);
+	/* NOTREACHED */
+	return (0);
 }
 
-yyerror(s)
-char *s;
+int
+yyerror(char *s)
 {
 	(void) write(2, "expr: ", 6);
 	(void) write(2, s, (unsigned) strlen(s));
 	(void) write(2, "\n", 1);
 	exit(2);
+	/* NOTREACHED */
+	return (0);
 }
 
-char *ltoa(l)
-long l;
+char *
+ltoa(long l)
 {
 	static char str[20];
-	register char *sp;
-	register i;
-	register neg;
+	char *sp;
+	int i;
+	int neg;
 
 	if(l == 0x80000000L)
 		return "-2147483648";
@@ -389,10 +406,12 @@ long l;
 	return sp;
 }
 
-main(argc, argv) char **argv;
+int
+main(int argc, char **argv)
 {
 	Ac = argc;
 	Argi = 1;
 	Av = argv;
 	yyparse();
+	return (0);
 }

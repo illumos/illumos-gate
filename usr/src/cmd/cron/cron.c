@@ -316,8 +316,8 @@ static void process_msg(struct message *, time_t);
 static void reap_child(void);
 static void miscpid_insert(pid_t);
 static int miscpid_delete(pid_t);
-static int contract_set_template(void);
-static int contract_clear_template(void);
+static void contract_set_template(void);
+static void contract_clear_template(void);
 static void contract_abandon_latest(pid_t);
 
 static void cte_init(void);
@@ -3236,8 +3236,8 @@ miscpid_delete(pid_t pid)
  * Establish contract terms such that all children are in abandoned
  * process contracts.
  */
-static int
-contract_set_template()
+static void
+contract_set_template(void)
 {
 	int fd;
 
@@ -3261,8 +3261,8 @@ contract_set_template()
 /*
  * Clear active process contract template.
  */
-static int
-contract_clear_template()
+static void
+contract_clear_template(void)
 {
 	int fd;
 

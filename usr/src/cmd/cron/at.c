@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -104,7 +104,7 @@ static int not_this_project(char *);
 static char *mkjobname(time_t);
 static time_t parse_time(char *);
 static time_t gtime(struct tm *);
-void atabort(char *);
+void atabort(char *)__NORETURN;
 void yyerror(void);
 extern int yyparse(void);
 
@@ -146,9 +146,8 @@ extern char	*argp;
 extern int	per_errno;
 static projid_t	project;
 
-main(argc, argv)
-int argc;
-char **argv;
+int
+main(int argc, char **argv)
 {
 	FILE		*inputfile;
 	int		i, fd;
@@ -439,6 +438,7 @@ time_t t;
 		t += 1;
 	}
 	atabort("queue full");
+	/* NOTREACHED */
 }
 
 
@@ -459,6 +459,7 @@ char *msg;
 	exit(1);
 }
 
+int
 yywrap(void)
 {
 	return (1);
@@ -518,7 +519,7 @@ static time_t
 gtime(tptr)
 struct	tm *tptr;
 {
-	register i;
+	int i;
 	long	tv;
 	int	dmsize[12] =
 	    {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -553,13 +554,13 @@ struct	tm *tptr;
 static void
 copy(char *jobfile, FILE *inputfile, int when)
 {
-	register c;
-	register FILE *pfp;
-	register FILE *xfp;
+	int c;
+	FILE *pfp;
+	FILE *xfp;
 	char *shell;
 	char	dirbuf[PATH_MAX + 1];
 	char	line[LINE_MAX];
-	register char **ep;
+	char **ep;
 	mode_t um;
 	char *val;
 	extern char **environ;
