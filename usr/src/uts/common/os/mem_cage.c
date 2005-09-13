@@ -971,12 +971,9 @@ void
 kcage_cageout_init()
 {
 	if (kcage_on) {
-		mutex_enter(&kcage_cageout_mutex);
 
-		kcage_cageout_thread = thread_create(NULL, 0, kcage_cageout,
+		(void) thread_create(NULL, 0, kcage_cageout,
 		    NULL, 0, proc_pageout, TS_RUN, maxclsyspri - 1);
-
-		mutex_exit(&kcage_cageout_mutex);
 	}
 }
 
@@ -1515,6 +1512,7 @@ kcage_cageout()
 		callb_generic_cpr, "cageout");
 
 	mutex_enter(&kcage_cageout_mutex);
+	kcage_cageout_thread = curthread;
 
 	pfn = PFN_INVALID;		/* force scan reset */
 	start_pfn = PFN_INVALID;	/* force init with 1st cage pfn */
