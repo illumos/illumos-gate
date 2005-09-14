@@ -518,8 +518,6 @@ socket_read(int s, void *buf, size_t nbyte, int read_timeout)
 {
 	ssize_t	n;
 	uint_t	start, diff;
-	struct sockaddr from;
-	uint_t fromlen = sizeof (from);
 
 	/*
 	 * keep calling non-blocking recvfrom until something received
