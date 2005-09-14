@@ -757,7 +757,7 @@ gss_setpbsz(char *pbszstr)
 {
 	unsigned int newsz = 0;
 	char *endp;
-#define	MAX_PBSZ 4294967295
+#define	MAX_PBSZ 4294967295U
 
 	errno = 0;
 	newsz = (unsigned int)strtol(pbszstr, &endp, 10);
