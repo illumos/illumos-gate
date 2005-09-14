@@ -185,14 +185,12 @@ catpath(unsigned char *path, unsigned char *name)
 	unsigned char	*scanp = path;
 	unsigned char	*argp = locstak();
 
-	while (*scanp && *scanp != COLON)
-	{
+	while (*scanp && *scanp != COLON) {
 		if (argp >= brkend)
 			growstak(argp);
 		*argp++ = *scanp++;
 	}
-	if (scanp != path)
-	{
+	if (scanp != path) {
 		if (argp >= brkend)
 			growstak(argp);
 		*argp++ = '/';
@@ -234,17 +232,14 @@ execa(unsigned char *at[], short pos)
 	unsigned char	**t = at;
 	int		cnt;
 
-	if ((flags & noexec) == 0)
-	{
+	if ((flags & noexec) == 0) {
 		xecmsg = notfound;
 		path = getpath(*t);
 		xecenv = local_setenv();
 
-		if (pos > 0)
-		{
+		if (pos > 0) {
 			cnt = 1;
-			while (cnt != pos)
-			{
+			while (cnt != pos) {
 				++cnt;
 				path = nextpath(path);
 			}
@@ -291,8 +286,7 @@ execs(unsigned char *ap, unsigned char *t[])
 		    (char *const *)xecenv);
 	}
 
-	switch (errno)
-	{
+	switch (errno) {
 	case ENOEXEC:		/* could be a shell script */
 		funcnt = 0;
 		flags = 0;
@@ -355,8 +349,7 @@ trim(unsigned char *at)
 	wchar_t	wc;
 
 	nosubst = 0;
-	if (current = at)
-	{
+	if (current = at) {
 		last = at;
 		while (c = *current) {
 			if ((len = mbtowc(&wc, (char *)current,
@@ -662,8 +655,7 @@ preacct(unsigned char *cmdadr)
 {
 	unsigned char *simple();
 
-	if (acctnod.namval && *acctnod.namval)
-	{
+	if (acctnod.namval && *acctnod.namval) {
 		sabuf.ac_btime = time((time_t *)0);
 		before = times(&buffer);
 		sabuf.ac_uid = getuid();
@@ -704,18 +696,15 @@ compress(clock_t t)
 	int exp = 0;
 	int rund = 0;
 
-	while (t >= 8192)
-	{
+	while (t >= 8192) {
 		exp++;
 		rund = t & 04;
 		t >>= 3;
 	}
 
-	if (rund)
-	{
+	if (rund) {
 		t++;
-		if (t >= 8192)
-		{
+		if (t >= 8192) {
 			t >>= 3;
 			exp++;
 		}

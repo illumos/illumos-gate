@@ -158,8 +158,7 @@ main(int c, char *v[], char *e[])
 	 *  the simple file part of the value.
 	 *  is rsh
 	 */
-	if (n = findnam("SHELL"))
-	{
+	if (n = findnam("SHELL")) {
 		if (eq("rsh", simple(n->namval)))
 			rsflag = 0;
 	}
@@ -189,8 +188,7 @@ main(int c, char *v[], char *e[])
 	 */
 	dolc = options(c, v);
 
-	if (dolc < 2)
-	{
+	if (dolc < 2) {
 		flags |= stdflg;
 		{
 
@@ -292,8 +290,7 @@ main(int c, char *v[], char *e[])
 #endif
 			/* user profile */
 
-			if ((input = pathopen(homenod.namval, profile)) >= 0)
-			{
+			if ((input = pathopen(homenod.namval, profile)) >= 0) {
 				exfile(rflag);
 				flags &= ~ttyflg;
 			}
@@ -311,8 +308,7 @@ main(int c, char *v[], char *e[])
 		/*
 		 * open input file if specified
 		 */
-		if (comdiv)
-		{
+		if (comdiv) {
 			estabf(comdiv);
 			input = -1;
 		}
@@ -371,8 +367,7 @@ exfile(int prof)
 	/*
 	 * move input
 	 */
-	if (input > 0)
-	{
+	if (input > 0) {
 		Ldup(input, INIO);
 		input = INIO;
 	}
@@ -380,8 +375,7 @@ exfile(int prof)
 
 	setmode(prof);
 
-	if (setjmp(errshell) && prof)
-	{
+	if (setjmp(errshell) && prof) {
 		close(input);
 		(void) endjobs(0);
 		return;
@@ -400,21 +394,17 @@ exfile(int prof)
 	/*
 	 * command loop
 	 */
-	for (;;)
-	{
+	for (;;) {
 		tdystak(0);
 		stakchk();	/* may reduce sbrk */
 		exitset();
 
-		if ((flags & prompt) && standin->fstak == 0 && !eof)
-		{
+		if ((flags & prompt) && standin->fstak == 0 && !eof) {
 
-			if (mailp)
-			{
+			if (mailp) {
 				time(&curtime);
 
-				if ((curtime - mailtime) >= mailchk)
-				{
+				if ((curtime - mailtime) >= mailchk) {
 					chkmail();
 					mailtime = curtime;
 				}
@@ -495,8 +485,7 @@ Ldup(int fa, int fb)
 #else
 
 	if (fa >= 0) {
-		if (fa != fb)
-		{
+		if (fa != fb) {
 			close(fb);
 			fcntl(fa, 0, fb); /* normal dup */
 			close(fa);
@@ -571,10 +560,8 @@ setmail(unsigned char *mailpath)
 	long	*ptr;
 
 	free(mod_time);
-	if (mailp = mailpath)
-	{
-		while (*s)
-		{
+	if (mailp = mailpath) {
+		while (*s) {
 			if (*s == COLON)
 				cnt += 1;
 
@@ -583,8 +570,7 @@ setmail(unsigned char *mailpath)
 
 		ptr = mod_time = (long *)alloc(sizeof (long) * cnt);
 
-		while (cnt)
-		{
+		while (cnt) {
 			*ptr = 0;
 			ptr++;
 			cnt--;

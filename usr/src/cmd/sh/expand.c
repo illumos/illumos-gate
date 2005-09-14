@@ -124,14 +124,11 @@ expand(unsigned char	*as, int rcnt)
 		} while (TRUE);
 	}
 
-	for (;;)
-	{
-		if (cs == s)
-		{
+	for (;;) {
+		if (cs == s) {
 			s = (unsigned char *)nullstr;
 			break;
-		} else if (*--cs == '/')
-		{
+		} else if (*--cs == '/') {
 			*cs = 0;
 			if (s == cs)
 				s = (unsigned char *)"/";
@@ -159,29 +156,25 @@ expand(unsigned char	*as, int rcnt)
 		slashsav = cs++; /* remember where first slash in as is */
 
 	/* check for rescan */
-	if (dir)
-	{
+	if (dir) {
 		unsigned char *rs;
 		struct dirent *e;
 
 		rs = cs;
 		do /* find next / in as */
 		{
-			if (*rs == '/')
-			{
+			if (*rs == '/') {
 				rescan = rs;
 				*rs = 0;
 				gchain = 0;
 			}
 		} while (*rs++);
 
-		while ((e = readdir(dirf)) && (trapnote & SIGSET) == 0)
-		{
+		while ((e = readdir(dirf)) && (trapnote & SIGSET) == 0) {
 			if (e->d_name[0] == '.' && *cs != '.')
 				continue;
 
-			if (gmatch(e->d_name, cs))
-			{
+			if (gmatch(e->d_name, cs)) {
 				addg(s, (unsigned char *)e->d_name, rescan,
 				    slashsav);
 				count++;
@@ -189,17 +182,14 @@ expand(unsigned char	*as, int rcnt)
 		}
 		(void) closedir(dirf);
 
-		if (rescan)
-		{
+		if (rescan) {
 			struct argnod	*rchain;
 
 			rchain = gchain;
 			gchain = schain;
-			if (count)
-			{
+			if (count) {
 				count = 0;
-				while (rchain)
-				{
+				while (rchain) {
 					count += expand(rchain->argval,
 							slash + 1);
 					rchain = rchain->argnxt;
@@ -226,8 +216,7 @@ addg(unsigned char *as1, unsigned char *as2, unsigned char *as3,
 	s2 = locstak() + BYTESPERWORD;
 	s1 = as1;
 	if (as4) {
-		while (c = *s1++)
-		{
+		while (c = *s1++) {
 			if (s2 >= brkend)
 				growstak(s2);
 			*s2++ = c;
@@ -244,8 +233,7 @@ addg(unsigned char *as1, unsigned char *as2, unsigned char *as3,
 	}
 /* add matched entries, plus extra \\ to escape \\'s */
 	s1 = as2;
-	for (;;)
-	{
+	for (;;) {
 		if ((len = mbtowc(&wc, (char *)s1, MB_LEN_MAX)) <= 0) {
 			len = 1;
 			wc = (unsigned char)*s1;
@@ -272,8 +260,7 @@ addg(unsigned char *as1, unsigned char *as2, unsigned char *as3,
 		s2 += len;
 		s1 += len;
 	}
-	if (s1 = as3)
-	{
+	if (s1 = as3) {
 		if (s2 >= brkend)
 			growstak(s2);
 		*s2++ = '/';

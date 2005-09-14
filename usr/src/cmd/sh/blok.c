@@ -100,14 +100,12 @@ alloc(nbytes)
 void
 addblok(unsigned int reqd)
 {
-	if (stakbot == 0)
-	{
+	if (stakbot == 0) {
 		brkbegin = setbrk(3 * BRKINCR);
 		bloktop = (struct blk *)brkbegin;
 	}
 
-	if (stakbas != staktop)
-	{
+	if (stakbas != staktop) {
 		unsigned char *rndstak;
 		struct blk *blokstak;
 
@@ -128,16 +126,14 @@ addblok(unsigned int reqd)
 	 * brkend points to the first invalid address.
 	 * make sure bloktop is valid.
 	 */
-	if ((unsigned char *)&bloktop->word >= brkend)
-	{
+	if ((unsigned char *)&bloktop->word >= brkend) {
 		if (setbrk((unsigned)((unsigned char *)
 		    (&bloktop->word) - brkend + sizeof (struct blk))) ==
 		    (unsigned char *)-1)
 			error(nospace);
 	}
 	bloktop = bloktop->word = (struct blk *)(Rcheat(bloktop) + reqd);
-	if ((unsigned char *)&bloktop->word >= brkend)
-	{
+	if ((unsigned char *)&bloktop->word >= brkend) {
 		if (setbrk((unsigned)((unsigned char *)
 		    (&bloktop->word) - brkend + sizeof (struct blk))) ==
 		    (unsigned char *)-1)
@@ -148,8 +144,7 @@ addblok(unsigned int reqd)
 		unsigned char *stakadr = (unsigned char *)
 							(bloktop + 2);
 		unsigned char *sp = stakadr;
-		if (reqd = (staktop-stakbot))
-		{
+		if (reqd = (staktop-stakbot)) {
 			if (stakadr + reqd >= brkend)
 				growstak(stakadr + reqd);
 			while (reqd-- > 0)
