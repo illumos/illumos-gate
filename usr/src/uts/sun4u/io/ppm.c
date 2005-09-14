@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,7 +97,7 @@ ppm_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 		return (rval);
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*resultp = (void *)ppm_inst;
+		*resultp = (void *)(uintptr_t)ppm_inst;
 		return (DDI_SUCCESS);
 
 	default:
@@ -436,7 +436,7 @@ ppm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	ppmreq_t req;
 	uint8_t level;
 
-	DPRINTF(D_IOCTL, ("%s: dev 0x%lx, cmd 0x%x, arg 0x%p, mode 0x%x\n",
+	DPRINTF(D_IOCTL, ("%s: dev 0x%lx, cmd 0x%x, arg 0x%lx, mode 0x%x\n",
 	    str, dev, cmd, arg, mode));
 
 	if (ddi_copyin((caddr_t)arg, &req, sizeof (req), mode)) {

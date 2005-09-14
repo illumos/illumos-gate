@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,7 @@ static void power_log_message(void);
 /*
  * Structure used in the driver
  */
-static struct power_soft_state {
+struct power_soft_state {
 	dev_info_t	*dip;		/* device info pointer */
 	kmutex_t	power_mutex;	/* mutex lock */
 	kmutex_t	power_intr_mutex; /* interrupt mutex lock */
@@ -242,7 +242,7 @@ power_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		return (DDI_SUCCESS);
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)power_inst;
+		*result = (void *)(uintptr_t)power_inst;
 		return (DDI_SUCCESS);
 
 	default:

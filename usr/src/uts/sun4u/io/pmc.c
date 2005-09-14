@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -217,7 +217,7 @@ pmc_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 		return (DDI_SUCCESS);
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)getminor((dev_t)arg);
+		*result = (void *)(uintptr_t)getminor((dev_t)arg);
 		return (DDI_SUCCESS);
 
 	default:

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,7 @@ static int spm_detach(dev_info_t *, ddi_detach_cmd_t);
 /*
  * Private data for schizo_pm driver
  */
-static struct spm_soft_state {
+struct spm_soft_state {
 	dev_info_t		*dip;
 };
 
