@@ -554,7 +554,6 @@ simulate_lddstd(struct regs *rp, caddr_t *badaddr)
 {
 	uint_t	inst, op3, asi = 0;
 	uint_t	rd, rs1, rs2;
-	int	rv = 0;
 	int	nf = 0, ltlend = 0, usermode;
 	int	immflg;
 	uint64_t reven;
