@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 
 #include "lpsched.h"
 #include <syslog.h>
+#include <strings.h>
 
 static char time_buf[50];
 #ifdef LP_USE_PAPI_ATTR
@@ -207,9 +208,12 @@ void rmfiles ( RSTATUS * rp, int log_it )	/* funcdef */
 		/*
 		 * The copies of user files.
 		 */
-		if (STRNEQU(Lp_Temp, *file, strlen(Lp_Temp)) ||
-		    STRNEQU(Lp_Tmp, *file, strlen(Lp_Tmp)))
+		if ((STRNEQU(Lp_Temp, *file, strlen(Lp_Temp)) ||
+		    STRNEQU(Lp_Tmp, *file, strlen(Lp_Tmp))) &&
+		    (! strstr(*file, "../")))
+
 		    (void) Unlink(*file);
+
 		count++;
 		file++;
 	}
