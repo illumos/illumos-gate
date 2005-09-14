@@ -341,11 +341,10 @@ sub dumpdelta($)
 		# iterate over ivecs on this cpu
 
 		while (my ($ivec, $ivst) = each %{$cpst->{ivecs}}) {
-			syslog('debug', "    %15s:%5d: %7.3f%%  %d",
-			       ($ivst->{ihs} > 1 ?
-				"$ivst->{name}($ivst->{ihs})" :
-				$ivst->{name}),
-			       $ivec, $ivst->{time}*100 / $tot, $ivst->{time});
+			syslog('debug', "    %15s:\"%s\": %7.3f%%  %d",
+			    ($ivst->{ihs} > 1 ? "$ivst->{name}($ivst->{ihs})" :
+			    $ivst->{name}), $ivec,
+			    $ivst->{time}*100 / $tot, $ivst->{time});
 		}
 	}
 }
@@ -1062,8 +1061,8 @@ sub find_goal($$)		# private function
 			$tot -= $ivec->{time};
 		}
 		($load, @goals) = do_find_goal($ivecs, \@loads, $goal, 0);
+		VERIFY($load >= $goal, "find_goal didn't meet goals");
 	}
-	VERIFY($load >= $goal, "find_goal didn't meet goals");
 	syslog('debug', "goals found: %s", ivecs_to_string(@goals));
 
 	# Set or clear $ivec->{goal} for each ivec, based on returned @goals
