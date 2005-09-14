@@ -635,7 +635,7 @@ fasttrap_return_common(struct regs *rp, uintptr_t pc, pid_t pid,
 
 	for (tp = bucket->ftb_data; tp != NULL; tp = tp->ftt_next) {
 		if (pid == tp->ftt_pid && pc == tp->ftt_pc &&
-		    !tp->ftt_prov->ftp_defunct)
+		    !tp->ftt_proc->ftpc_defunct)
 			break;
 	}
 
@@ -781,7 +781,7 @@ fasttrap_pid_probe(struct regs *rp)
 	 */
 	for (tp = bucket->ftb_data; tp != NULL; tp = tp->ftt_next) {
 		if (pid == tp->ftt_pid && pc == tp->ftt_pc &&
-		    !tp->ftt_prov->ftp_defunct)
+		    !tp->ftt_proc->ftpc_defunct)
 			break;
 	}
 

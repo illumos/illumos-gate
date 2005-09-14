@@ -137,11 +137,13 @@ static uint32_t fasttrap_total;
 
 #define	FASTTRAP_TPOINTS_DEFAULT_SIZE	0x4000
 #define	FASTTRAP_PROVIDERS_DEFAULT_SIZE	0x100
+#define	FASTTRAP_PROCS_DEFAULT_SIZE	0x100
 
 #define	FASTTRAP_PID_NAME		"pid"
 
 fasttrap_hash_t			fasttrap_tpoints;
 static fasttrap_hash_t		fasttrap_provs;
+static fasttrap_hash_t		fasttrap_procs;
 
 dtrace_id_t			fasttrap_probe_id;
 static int			fasttrap_count;		/* ref count */
@@ -159,8 +161,13 @@ static fasttrap_provider_t *fasttrap_provider_lookup(pid_t, const char *,
 static void fasttrap_provider_free(fasttrap_provider_t *);
 static void fasttrap_provider_retire(fasttrap_provider_t *);
 
+static fasttrap_proc_t *fasttrap_proc_lookup(pid_t);
+static void fasttrap_proc_release(fasttrap_proc_t *);
+
 #define	FASTTRAP_PROVS_INDEX(pid, name) \
 	((fasttrap_hash_str(name) + (pid)) & fasttrap_provs.fth_mask)
+
+#define	FASTTRAP_PROCS_INDEX(pid) ((pid) & fasttrap_procs.fth_mask)
 
 static int
 fasttrap_highbit(ulong_t i)
@@ -270,7 +277,7 @@ fasttrap_pid_cleanup_cb(void *data)
 
 		/*
 		 * Iterate over all the providers trying to remove the marked
-		 * ones.  If a provider is marked, but not defunct, we just
+		 * ones. If a provider is marked but not retired, we just
 		 * have to take a crack at removing it -- it's no big deal if
 		 * we can't.
 		 */
@@ -299,7 +306,7 @@ fasttrap_pid_cleanup_cb(void *data)
 					continue;
 				}
 
-				if (!fp->ftp_defunct || fp->ftp_rcount != 0)
+				if (!fp->ftp_retired || fp->ftp_rcount != 0)
 					fp->ftp_marked = 0;
 
 				mutex_exit(&fp->ftp_mtx);
@@ -308,7 +315,7 @@ fasttrap_pid_cleanup_cb(void *data)
 				 * If we successfully unregister this
 				 * provider we can remove it from the hash
 				 * chain and free the memory. If our attempt
-				 * to unregister fails and this is a defunct
+				 * to unregister fails and this is a retired
 				 * provider, increment our flag to try again
 				 * pretty soon. If we've consumed more than
 				 * half of our total permitted number of
@@ -335,7 +342,7 @@ fasttrap_pid_cleanup_cb(void *data)
 	ASSERT(fasttrap_timeout != 0);
 
 	/*
-	 * If we were unable to remove a defunct provider, try again after
+	 * If we were unable to remove a retired provider, try again after
 	 * a second. This situation can occur in certain circumstances where
 	 * providers cannot be unregistered even though they have no probes
 	 * enabled because of an execution of dtrace -l or something similar.
@@ -413,7 +420,8 @@ fasttrap_fork(proc_t *p, proc_t *cp)
 
 		mutex_enter(&bucket->ftb_mtx);
 		for (tp = bucket->ftb_data; tp != NULL; tp = tp->ftt_next) {
-			if (tp->ftt_pid == ppid && !tp->ftt_prov->ftp_defunct) {
+			if (tp->ftt_pid == ppid &&
+			    !tp->ftt_proc->ftpc_defunct) {
 				int ret = fasttrap_tracepoint_remove(cp, tp);
 				ASSERT(ret == 0);
 			}
@@ -504,14 +512,13 @@ fasttrap_tracepoint_enable(proc_t *p, fasttrap_probe_t *probe, uint_t index)
 	 * like to install. If we can't find a match, and have an allocated
 	 * tracepoint ready to go, enable that one now.
 	 *
-	 * Tracepoints whose provider is now defunct are also considered
-	 * defunct.
+	 * A tracepoint whose proc is defunct is also considered defunct.
 	 */
 again:
 	mutex_enter(&bucket->ftb_mtx);
 	for (tp = bucket->ftb_data; tp != NULL; tp = tp->ftt_next) {
 		if (tp->ftt_pid != pid || tp->ftt_pc != pc ||
-		    tp->ftt_prov->ftp_defunct)
+		    tp->ftt_proc->ftpc_defunct)
 			continue;
 
 		/*
@@ -594,7 +601,7 @@ again:
 
 	ASSERT(new_tp->ftt_pid == pid);
 	ASSERT(new_tp->ftt_pc == pc);
-	ASSERT(new_tp->ftt_prov == probe->ftp_prov);
+	ASSERT(new_tp->ftt_proc == probe->ftp_prov->ftp_proc);
 	ASSERT(new_tp->ftt_ids == NULL);
 	ASSERT(new_tp->ftt_retids == NULL);
 
@@ -645,7 +652,7 @@ fasttrap_tracepoint_disable(proc_t *p, fasttrap_probe_t *probe, uint_t index)
 	mutex_enter(&bucket->ftb_mtx);
 	for (tp = bucket->ftb_data; tp != NULL; tp = tp->ftt_next) {
 		if (tp->ftt_pid == pid && tp->ftt_pc == pc &&
-		    tp->ftt_prov == provider)
+		    tp->ftt_proc == provider->ftp_proc)
 			break;
 	}
 
@@ -871,11 +878,11 @@ fasttrap_pid_enable(void *arg, dtrace_id_t id, void *parg)
 
 	/*
 	 * Bail out if we can't find the process for this probe or its
-	 * provider is defunct (meaning it was valid in a previously exec'ed
+	 * provider is retired (meaning it was valid in a previously exec'ed
 	 * incarnation of this address space). The provider can't go away
 	 * while we're in this code path.
 	 */
-	if (probe->ftp_prov->ftp_defunct ||
+	if (probe->ftp_prov->ftp_retired ||
 	    (p = sprlock(probe->ftp_pid)) == NULL)
 		return;
 
@@ -995,10 +1002,10 @@ fasttrap_pid_disable(void *arg, dtrace_id_t id, void *parg)
 	if (p != NULL) {
 		/*
 		 * Even though we may not be able to remove it entirely, we
-		 * mark this defunct provider to get a chance to remove some
+		 * mark this retired provider to get a chance to remove some
 		 * of the associated probes.
 		 */
-		if (provider->ftp_defunct && !provider->ftp_marked)
+		if (provider->ftp_retired && !provider->ftp_marked)
 			whack = provider->ftp_marked = 1;
 		mutex_exit(&provider->ftp_mtx);
 
@@ -1036,7 +1043,7 @@ fasttrap_pid_getargdesc(void *arg, dtrace_id_t id, void *parg,
 	desc->dtargd_native[0] = '\0';
 	desc->dtargd_xlate[0] = '\0';
 
-	if (probe->ftp_prov->ftp_defunct != 0 ||
+	if (probe->ftp_prov->ftp_retired != 0 ||
 	    desc->dtargd_ndx >= probe->ftp_nargs) {
 		desc->dtargd_ndx = DTRACE_ARGNONE;
 		return;
@@ -1159,6 +1166,104 @@ static dtrace_pops_t usdt_pops = {
 	fasttrap_pid_destroy
 };
 
+static fasttrap_proc_t *
+fasttrap_proc_lookup(pid_t pid)
+{
+	fasttrap_bucket_t *bucket;
+	fasttrap_proc_t *fprc, *new_fprc;
+
+	bucket = &fasttrap_procs.fth_table[FASTTRAP_PROCS_INDEX(pid)];
+	mutex_enter(&bucket->ftb_mtx);
+
+	for (fprc = bucket->ftb_data; fprc != NULL; fprc = fprc->ftpc_next) {
+		if (fprc->ftpc_pid == pid && !fprc->ftpc_defunct) {
+			mutex_enter(&fprc->ftpc_mtx);
+			mutex_exit(&bucket->ftb_mtx);
+			fprc->ftpc_count++;
+			mutex_exit(&fprc->ftpc_mtx);
+
+			return (fprc);
+		}
+	}
+
+	/*
+	 * Drop the bucket lock so we don't try to perform a sleeping
+	 * allocation under it.
+	 */
+	mutex_exit(&bucket->ftb_mtx);
+
+	new_fprc = kmem_zalloc(sizeof (fasttrap_proc_t), KM_SLEEP);
+	new_fprc->ftpc_pid = pid;
+	new_fprc->ftpc_count = 1;
+
+	mutex_enter(&bucket->ftb_mtx);
+
+	/*
+	 * Take another lap through the list to make sure a proc hasn't
+	 * been created for this pid while we weren't under the bucket lock.
+	 */
+	for (fprc = bucket->ftb_data; fprc != NULL; fprc = fprc->ftpc_next) {
+		if (fprc->ftpc_pid == pid && !fprc->ftpc_defunct) {
+			mutex_enter(&fprc->ftpc_mtx);
+			mutex_exit(&bucket->ftb_mtx);
+			fprc->ftpc_count++;
+			mutex_exit(&fprc->ftpc_mtx);
+
+			kmem_free(new_fprc, sizeof (fasttrap_proc_t));
+
+			return (fprc);
+		}
+	}
+
+	new_fprc->ftpc_next = bucket->ftb_data;
+	bucket->ftb_data = new_fprc;
+
+	mutex_exit(&bucket->ftb_mtx);
+
+	return (new_fprc);
+}
+
+static void
+fasttrap_proc_release(fasttrap_proc_t *proc)
+{
+	fasttrap_bucket_t *bucket;
+	fasttrap_proc_t *fprc, **fprcp;
+	pid_t pid = proc->ftpc_pid;
+
+	mutex_enter(&proc->ftpc_mtx);
+
+	ASSERT(proc->ftpc_count != 0);
+
+	if (--proc->ftpc_count != 0) {
+		mutex_exit(&proc->ftpc_mtx);
+		return;
+	}
+
+	mutex_exit(&proc->ftpc_mtx);
+
+	bucket = &fasttrap_procs.fth_table[FASTTRAP_PROCS_INDEX(pid)];
+	mutex_enter(&bucket->ftb_mtx);
+
+	fprcp = (fasttrap_proc_t **)&bucket->ftb_data;
+	while ((fprc = *fprcp) != NULL) {
+		if (fprc == proc)
+			break;
+
+		fprcp = &fprc->ftpc_next;
+	}
+
+	/*
+	 * Something strange has happened if we can't find the proc.
+	 */
+	ASSERT(fprc != NULL);
+
+	*fprcp = fprc->ftpc_next;
+
+	mutex_exit(&bucket->ftb_mtx);
+
+	kmem_free(fprc, sizeof (fasttrap_proc_t));
+}
+
 /*
  * Lookup a fasttrap-managed provider based on its name and associated pid.
  * If the pattr argument is non-NULL, this function instantiates the provider
@@ -1185,7 +1290,7 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	 */
 	for (fp = bucket->ftb_data; fp != NULL; fp = fp->ftp_next) {
 		if (fp->ftp_pid == pid && strcmp(fp->ftp_name, name) == 0 &&
-		    !fp->ftp_defunct) {
+		    !fp->ftp_retired) {
 			mutex_enter(&fp->ftp_mtx);
 			mutex_exit(&bucket->ftb_mtx);
 			return (fp);
@@ -1198,6 +1303,9 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	 */
 	mutex_exit(&bucket->ftb_mtx);
 
+	/*
+	 * If we didn't want to create a new provider, just return failure.
+	 */
 	if (pattr == NULL)
 		return (NULL);
 
@@ -1231,6 +1339,10 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	mutex_exit(&p->p_lock);
 
 	new_fp = kmem_zalloc(sizeof (fasttrap_provider_t), KM_SLEEP);
+	new_fp->ftp_pid = pid;
+	new_fp->ftp_proc = fasttrap_proc_lookup(pid);
+
+	ASSERT(new_fp->ftp_proc != NULL);
 
 	mutex_enter(&bucket->ftb_mtx);
 
@@ -1240,7 +1352,7 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	 */
 	for (fp = bucket->ftb_data; fp != NULL; fp = fp->ftp_next) {
 		if (fp->ftp_pid == pid && strcmp(fp->ftp_name, name) == 0 &&
-		    !fp->ftp_defunct) {
+		    !fp->ftp_retired) {
 			mutex_enter(&fp->ftp_mtx);
 			mutex_exit(&bucket->ftb_mtx);
 			fasttrap_provider_free(new_fp);
@@ -1248,7 +1360,6 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 		}
 	}
 
-	new_fp->ftp_pid = pid;
 	(void) strcpy(new_fp->ftp_name, name);
 
 	/*
@@ -1291,6 +1402,8 @@ fasttrap_provider_free(fasttrap_provider_t *provider)
 	ASSERT(provider->ftp_ccount == 0);
 	ASSERT(provider->ftp_rcount == 0);
 
+	fasttrap_proc_release(provider->ftp_proc);
+
 	kmem_free(provider, sizeof (fasttrap_provider_t));
 
 	/*
@@ -1319,20 +1432,23 @@ fasttrap_provider_retire(fasttrap_provider_t *provider)
 	dtrace_provider_id_t provid = provider->ftp_provid;
 
 	/*
-	 * Mark the provider to be removed in our post-processing step
-	 * and mark it as defunct. The former indicates that we should try
-	 * to remove it, the latter indicates that even if we were unable
-	 * to remove it, this provider shouldn't be used to create probes
-	 * in the future.
+	 * Mark the provider to be removed in our post-processing step,
+	 * mark it retired, and mark its proc as defunct (though it may
+	 * already be marked defunct by another provider that shares the
+	 * same proc). Marking it indicates that we should try to remove it;
+	 * setting the retired flag indicates that we're done with this
+	 * provider; setting the proc to be defunct indicates that all
+	 * tracepoints associated with the traced process should be ignored.
 	 */
-	provider->ftp_defunct = 1;
+	provider->ftp_proc->ftpc_defunct = 1;
+	provider->ftp_retired = 1;
 	provider->ftp_marked = 1;
 	mutex_exit(&provider->ftp_mtx);
 
 	/*
 	 * We don't have to worry about invalidating the same provider twice
 	 * since fasttrap_provider_lookup() will ignore provider that have
-	 * been marked as defunct.
+	 * been marked as retired.
 	 */
 	dtrace_invalidate(provid);
 
@@ -1405,7 +1521,7 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 			tp = kmem_zalloc(sizeof (fasttrap_tracepoint_t),
 			    KM_SLEEP);
 
-			tp->ftt_prov = provider;
+			tp->ftt_proc = provider->ftp_proc;
 			tp->ftt_pc = pdata->ftps_offs[i] + pdata->ftps_pc;
 			tp->ftt_pid = pdata->ftps_pid;
 
@@ -1445,7 +1561,7 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 			tp = kmem_zalloc(sizeof (fasttrap_tracepoint_t),
 			    KM_SLEEP);
 
-			tp->ftt_prov = provider;
+			tp->ftt_proc = provider->ftp_proc;
 			tp->ftt_pc = pdata->ftps_offs[i] + pdata->ftps_pc;
 			tp->ftt_pid = pdata->ftps_pid;
 
@@ -1467,7 +1583,7 @@ done:
 	 */
 	mutex_enter(&provider->ftp_mtx);
 	provider->ftp_ccount--;
-	whack = provider->ftp_defunct;
+	whack = provider->ftp_retired;
 	mutex_exit(&provider->ftp_mtx);
 
 	if (whack)
@@ -1600,7 +1716,7 @@ fasttrap_meta_create_probe(void *arg, void *parg,
 	for (i = 0; i < pp->ftp_ntps; i++) {
 		tp = kmem_zalloc(sizeof (fasttrap_tracepoint_t), KM_SLEEP);
 
-		tp->ftt_prov = provider;
+		tp->ftt_proc = provider->ftp_proc;
 		tp->ftt_pc = dhpb->dthpb_base + dhpb->dthpb_offs[i];
 		tp->ftt_pid = provider->ftp_pid;
 
@@ -1789,7 +1905,7 @@ err:
 		while (tp != NULL) {
 			if (instr.ftiq_pid == tp->ftt_pid &&
 			    instr.ftiq_pc == tp->ftt_pc &&
-			    !tp->ftt_prov->ftp_defunct)
+			    !tp->ftt_proc->ftpc_defunct)
 				break;
 
 			tp = tp->ftt_next;
@@ -1907,7 +2023,7 @@ fasttrap_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    sizeof (fasttrap_bucket_t), KM_SLEEP);
 
 	/*
-	 * ... and the providers hash table.
+	 * ... and the providers hash table...
 	 */
 	nent = FASTTRAP_PROVIDERS_DEFAULT_SIZE;
 	if ((nent & (nent - 1)) == 0)
@@ -1916,8 +2032,20 @@ fasttrap_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		fasttrap_provs.fth_nent = 1 << fasttrap_highbit(nent);
 	ASSERT(fasttrap_provs.fth_nent > 0);
 	fasttrap_provs.fth_mask = fasttrap_provs.fth_nent - 1;
-
 	fasttrap_provs.fth_table = kmem_zalloc(fasttrap_provs.fth_nent *
+	    sizeof (fasttrap_bucket_t), KM_SLEEP);
+
+	/*
+	 * ... and the procs hash table.
+	 */
+	nent = FASTTRAP_PROCS_DEFAULT_SIZE;
+	if ((nent & (nent - 1)) == 0)
+		fasttrap_procs.fth_nent = nent;
+	else
+		fasttrap_procs.fth_nent = 1 << fasttrap_highbit(nent);
+	ASSERT(fasttrap_procs.fth_nent > 0);
+	fasttrap_procs.fth_mask = fasttrap_procs.fth_nent - 1;
+	fasttrap_procs.fth_table = kmem_zalloc(fasttrap_procs.fth_nent *
 	    sizeof (fasttrap_bucket_t), KM_SLEEP);
 
 	(void) dtrace_meta_register("fasttrap", &fasttrap_mops, NULL,
@@ -2040,6 +2168,10 @@ fasttrap_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	kmem_free(fasttrap_provs.fth_table,
 	    fasttrap_provs.fth_nent * sizeof (fasttrap_bucket_t));
 	fasttrap_provs.fth_nent = 0;
+
+	kmem_free(fasttrap_procs.fth_table,
+	    fasttrap_procs.fth_nent * sizeof (fasttrap_bucket_t));
+	fasttrap_procs.fth_nent = 0;
 
 	/*
 	 * We know there are no tracepoints in any process anywhere in

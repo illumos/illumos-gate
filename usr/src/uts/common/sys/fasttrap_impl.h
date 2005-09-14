@@ -40,21 +40,54 @@ extern "C" {
 #endif
 
 /*
- * Interfaces for fasttrap_isa.c to consume.
+ * Fasttrap Providers, Probes and Tracepoints
+ *
+ * Each Solaris process can have multiple providers -- the pid provider as
+ * well as any number of user-level statically defined tracing (USDT)
+ * providers. Those providers are each represented by a fasttrap_provider_t.
+ * All providers for a given process have a pointer to a shared
+ * fasttrap_proc_t. The fasttrap_proc_t has two states: active or defunct.
+ * It becomes defunct when the process performs an exit or an exec.
+ *
+ * Each probe is represented by a fasttrap_probe_t which has a pointer to
+ * its associated provider as well as a list of fasttrap_id_tp_t structures
+ * which are tuples combining a fasttrap_id_t and a fasttrap_tracepoint_t.
+ * A fasttrap_tracepoint_t represents the actual point of instrumentation
+ * and it contains two lists of fasttrap_id_t structures (to be fired pre-
+ * and post-instruction emulation) that identify the probes attached to the
+ * tracepoint. Tracepoints also have a pointer to the fasttrap_proc_t for the
+ * process they trace which is used when looking up a tracepoint both at
+ * probe fire time and when enabling and disabling probes.
+ *
+ * It's important to note that probes are preallocated with the necessary
+ * number of tracepoints, but that tracepoints can be shared by probes and
+ * swapped between probes. If a probe's preallocated tracepoint is enabled
+ * (and, therefore, the associated probe is enabled), and that probe is
+ * then disabled, ownership of that tracepoint may be exchanged for an
+ * unused tracepoint belonging to another probe that was attached to the
+ * enabled tracepoint.
  */
-typedef struct fasttrap_provider fasttrap_provider_t;
 
-struct fasttrap_provider {
-	pid_t ftp_pid;				/* process ID for this prov. */
-	char ftp_name[DTRACE_PROVNAMELEN];	/* prov. name (w/o the pid) */
+typedef struct fasttrap_proc {
+	pid_t ftpc_pid;				/* process ID for this proc */
+	uint_t ftpc_defunct;			/* denotes a lame duck proc */
+	uint64_t ftpc_count;			/* reference count */
+	kmutex_t ftpc_mtx;			/* proc lock */
+	struct fasttrap_proc *ftpc_next;	/* next proc in hash chain */
+} fasttrap_proc_t;
+
+typedef struct fasttrap_provider {
+	pid_t ftp_pid;				/* process ID for this prov */
+	char ftp_name[DTRACE_PROVNAMELEN];	/* prov name (w/o the pid) */
 	dtrace_provider_id_t ftp_provid;	/* DTrace provider handle */
 	uint_t ftp_marked;			/* mark for possible removal */
-	uint_t ftp_defunct;			/* denotes a lame duck prov. */
+	uint_t ftp_retired;			/* mark when retired */
 	kmutex_t ftp_mtx;			/* provider lock */
 	uint64_t ftp_rcount;			/* enabled probes ref count */
 	uint64_t ftp_ccount;			/* consumers creating probes */
-	fasttrap_provider_t *ftp_next;		/* next prov. in hash chain */
-};
+	fasttrap_proc_t *ftp_proc;		/* shared proc for all provs */
+	struct fasttrap_provider *ftp_next;	/* next prov in hash chain */
+} fasttrap_provider_t;
 
 typedef struct fasttrap_id fasttrap_id_t;
 typedef struct fasttrap_probe fasttrap_probe_t;
@@ -92,7 +125,7 @@ struct fasttrap_probe {
 &(id)->fti_probe->ftp_tps[0])
 
 struct fasttrap_tracepoint {
-	fasttrap_provider_t	*ftt_prov;	/* tracepoint's provider */
+	fasttrap_proc_t		*ftt_proc;	/* associated process struct */
 	uintptr_t		ftt_pc;		/* address of tracepoint */
 	pid_t			ftt_pid;	/* pid of tracepoint */
 	fasttrap_machtp_t	ftt_mtp;	/* ISA-specific portion */
