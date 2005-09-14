@@ -2181,6 +2181,7 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 	mntinfo4_t *mi;
 	bool_t recov;
 	struct nfs4_callback_globals *ncg;
+	open_delegation_type4 odt;
 
 	ncg = zone_getspecific(nfs4_callback_zone_key, curproc->p_zone);
 	ASSERT(ncg != NULL);
@@ -2191,19 +2192,26 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 	    rp->r_deleg_type == OPEN_DELEGATE_WRITE)
 		already = TRUE;
 
-	if (res->delegation.delegation_type == OPEN_DELEGATE_READ) {
+	odt = res->delegation.delegation_type;
+	mutex_exit(&rp->r_statev4_lock);
 
+	if (odt == OPEN_DELEGATE_READ) {
+
+		mutex_enter(&rp->r_statev4_lock);
 		rp->r_deleg_type = res->delegation.delegation_type;
 		orp = &res->delegation.open_delegation4_u.read;
 		rp->r_deleg_stateid = orp->stateid;
 		rp->r_deleg_perms = orp->permissions;
 		recall = orp->recall;
+		mutex_exit(&rp->r_statev4_lock);
 
 		ncg->nfs4_callback_stats.delegations.value.ui64++;
 		ncg->nfs4_callback_stats.delegaccept_r.value.ui64++;
 
-	} else if (res->delegation.delegation_type == OPEN_DELEGATE_WRITE) {
+	} else if (odt == OPEN_DELEGATE_WRITE) {
 
+		mutex_enter(&rp->r_statelock);
+		mutex_enter(&rp->r_statev4_lock);
 		rp->r_deleg_type = res->delegation.delegation_type;
 		owp = &res->delegation.open_delegation4_u.write;
 		rp->r_deleg_stateid = owp->stateid;
@@ -2219,12 +2227,8 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 			rp->r_deleg_change = garp->n4g_change;
 			rp->r_deleg_change_grant = garp->n4g_change;
 		}
-
-
-		mutex_enter(&rp->r_statelock);
 		mapcnt = rp->r_mapcnt;
 		rflag = rp->r_flags;
-		mutex_exit(&rp->r_statelock);
 
 		/*
 		 * Update the delegation change attribute if
@@ -2232,7 +2236,6 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 		 * might be the case during recovery after server
 		 * reboot.
 		 */
-
 		if (mapcnt > 0 || rflag & R4DIRTY)
 			rp->r_deleg_change++;
 
@@ -2243,9 +2246,6 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 			"nfs4_delegation_accept: r_delg_change_grant: 0x%x\n",
 			(int)(rp->r_deleg_change_grant >> 32)));
 
-		ncg->nfs4_callback_stats.delegations.value.ui64++;
-		ncg->nfs4_callback_stats.delegaccept_rw.value.ui64++;
-
 #ifdef	DEBUG
 		if (nfs4_use_phony_limit == 1)
 			rp->r_deleg_limit = nfs4_deleg_space_phony;
@@ -2255,29 +2255,37 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 				nfs4_deleg_space_phonyl;
 		}
 #endif
+		mutex_exit(&rp->r_statev4_lock);
+		mutex_exit(&rp->r_statelock);
+
+		ncg->nfs4_callback_stats.delegations.value.ui64++;
+		ncg->nfs4_callback_stats.delegaccept_rw.value.ui64++;
 
 #ifdef	DEBUG
 
 	} else if (nfs4_deleg_accept_phony == OPEN_DELEGATE_READ) {
 
+		mutex_enter(&rp->r_statev4_lock);
 		rp->r_deleg_type = OPEN_DELEGATE_READ;
 		rp->r_deleg_stateid = nfs4_deleg_any;
 		rp->r_deleg_perms = nfs4_deleg_ace_phony;
 		rp->r_deleg_change = nfs4_deleg_change_phony;
 		rp->r_deleg_change_grant = rp->r_deleg_change;
+		mutex_exit(&rp->r_statev4_lock);
 
 	} else if (nfs4_deleg_accept_phony == OPEN_DELEGATE_WRITE) {
 
+		mutex_enter(&rp->r_statev4_lock);
 		rp->r_deleg_type = OPEN_DELEGATE_WRITE;
 		rp->r_deleg_stateid = nfs4_deleg_any;
 		rp->r_deleg_perms = nfs4_deleg_ace_phony;
 		rp->r_deleg_limit = nfs4_deleg_space_phony;
 		rp->r_deleg_change = nfs4_deleg_change_phony;
 		rp->r_deleg_change_grant = rp->r_deleg_change;
+		mutex_exit(&rp->r_statev4_lock);
 
 #endif
 	} else {
-		mutex_exit(&rp->r_statev4_lock);
 
 		if (already) {
 			switch (claim) {
@@ -2348,6 +2356,7 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 		return;
 	}
 
+	mutex_enter(&rp->r_statev4_lock);
 	rp->r_deleg_return_pending = FALSE;
 	rp->r_deleg_needs_recovery = OPEN_DELEGATE_NONE;
 	if (claim == CLAIM_PREVIOUS)
@@ -2373,7 +2382,6 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 		rp->r_deleg_cred = cr;
 		crhold(cr);
 	}
-
 	mutex_exit(&rp->r_statev4_lock);
 
 	if (already == FALSE) {

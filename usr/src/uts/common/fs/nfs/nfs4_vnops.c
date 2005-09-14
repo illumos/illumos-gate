@@ -621,13 +621,15 @@ nfs4_open(vnode_t **vpp, int flag, cred_t *cr)
 	mutex_enter(&rp->r_statev4_lock);
 	if (rp->created_v4) {
 		rp->created_v4 = 0;
+		mutex_exit(&rp->r_statev4_lock);
+
 		dnlc_update(dvp, fn, *vpp);
 		/* This is needed so we don't bump the open ref count */
 		just_been_created = 1;
 	} else {
+		mutex_exit(&rp->r_statev4_lock);
 		just_been_created = 0;
 	}
-	mutex_exit(&rp->r_statev4_lock);
 
 	/*
 	 * If caller specified O_TRUNC/FTRUNC, then be sure to set
@@ -5376,9 +5378,11 @@ recov_retry:
 
 		nrp = VTOR4(nvp);
 		mutex_enter(&nrp->r_statev4_lock);
-		if (!nrp->created_v4)
+		if (!nrp->created_v4) {
+			mutex_exit(&nrp->r_statev4_lock);
 			dnlc_update(dvp, nm, nvp);
-		mutex_exit(&nrp->r_statev4_lock);
+		} else
+			mutex_exit(&nrp->r_statev4_lock);
 
 		VN_RELE(*vpp);
 		*vpp = nvp;
@@ -5816,9 +5820,11 @@ recov_retry:
 
 	nrp = VTOR4(nvp);
 	mutex_enter(&nrp->r_statev4_lock);
-	if (!nrp->created_v4)
+	if (!nrp->created_v4) {
+		mutex_exit(&nrp->r_statev4_lock);
 		dnlc_update(dvp, nm, nvp);
-	mutex_exit(&nrp->r_statev4_lock);
+	} else
+		mutex_exit(&nrp->r_statev4_lock);
 
 	*vpp = nvp;
 
@@ -10318,13 +10324,15 @@ open_and_get_osp(vnode_t *map_vp, cred_t *cr, mntinfo4_t *mi)
 	mutex_enter(&rp->r_statev4_lock);
 	if (rp->created_v4) {
 		rp->created_v4 = 0;
+		mutex_exit(&rp->r_statev4_lock);
+
 		dnlc_update(dvp, file_name, open_vp);
 		/* This is needed so we don't bump the open ref count */
 		just_created = 1;
 	} else {
+		mutex_exit(&rp->r_statev4_lock);
 		just_created = 0;
 	}
-	mutex_exit(&rp->r_statev4_lock);
 
 	VN_HOLD(map_vp);
 
@@ -12274,17 +12282,18 @@ nfs4_update_dircaches(change_info4 *cinfo, vnode_t *dvp, vnode_t *vp, char *nm,
 		if (vp != NULL) {
 			mutex_enter(&VTOR4(vp)->r_statev4_lock);
 			if (!VTOR4(vp)->created_v4) {
+				mutex_exit(&VTOR4(vp)->r_statev4_lock);
 				dnlc_update(dvp, nm, vp);
 			} else {
 				/*
 				 * XXX don't update if the created_v4 flag is
 				 * set
 				 */
+				mutex_exit(&VTOR4(vp)->r_statev4_lock);
 				NFS4_DEBUG(nfs4_client_state_debug,
 					(CE_NOTE, "nfs4_update_dircaches: "
 					"don't update dnlc: created_v4 flag"));
 			}
-			mutex_exit(&VTOR4(vp)->r_statev4_lock);
 		}
 
 		nfs4_attr_cache(dvp, dinfo->di_garp, dinfo->di_time_call,
@@ -12314,18 +12323,18 @@ nfs4_update_dircaches(change_info4 *cinfo, vnode_t *dvp, vnode_t *vp, char *nm,
 		if (vp != NULL) {
 			mutex_enter(&VTOR4(vp)->r_statev4_lock);
 			if (!VTOR4(vp)->created_v4) {
+				mutex_exit(&VTOR4(vp)->r_statev4_lock);
 				dnlc_update(dvp, nm, vp);
 			} else {
 				/*
 				 * XXX dont' update if the created_v4 flag
 				 * is set
 				 */
-
+				mutex_exit(&VTOR4(vp)->r_statev4_lock);
 				NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
 					"nfs4_update_dircaches: don't"
 					" update dnlc: created_v4 flag"));
 			}
-			mutex_exit(&VTOR4(vp)->r_statev4_lock);
 		}
 	} else {
 		/* Another client modified directory - purge its dnlc cache */
