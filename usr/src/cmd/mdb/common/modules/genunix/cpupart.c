@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,74 @@ cpupart_cpulist_callback(uintptr_t addr, const void *arg, void *cb_data)
 	return (WALK_NEXT);
 }
 
+#define	CPUPART_IDWIDTH		3
+
+#ifdef _LP64
+#define	CPUPART_CPUWIDTH	21
+#if defined(__amd64)
+#define	CPUPART_TWIDTH		16
+#else
+#define	CPUPART_TWIDTH		11
+#endif
+#else
+#define	CPUPART_CPUWIDTH	13
+#define	CPUPART_TWIDTH		8
+#endif
+
+
+#define	CPUPART_THRDELT		(CPUPART_IDWIDTH + CPUPART_CPUWIDTH)
+#define	CPUPART_INDENT		mdb_printf("%*s", CPUPART_THRDELT, "")
+
+int
+cpupart_disp_threads(disp_t *disp)
+{
+	dispq_t	*dq;
+	int i, npri = disp->disp_npri;
+	proc_t p;
+	kthread_t t;
+
+	dq = mdb_alloc(sizeof (dispq_t) * npri, UM_SLEEP | UM_GC);
+
+	if (mdb_vread(dq, sizeof (dispq_t) * npri,
+	    (uintptr_t)disp->disp_q) == -1) {
+		mdb_warn("failed to read dispq_t at %p", disp->disp_q);
+		return (DCMD_ERR);
+	}
+
+	CPUPART_INDENT;
+	mdb_printf("|\n");
+	CPUPART_INDENT;
+	mdb_printf("+-->  %3s %-*s %s\n", "PRI", CPUPART_TWIDTH, "THREAD",
+	    "PROC");
+
+	for (i = npri - 1; i >= 0; i--) {
+		uintptr_t taddr = (uintptr_t)dq[i].dq_first;
+
+		while (taddr != NULL) {
+			if (mdb_vread(&t, sizeof (t), taddr) == -1) {
+				mdb_warn("failed to read kthread_t at %p",
+				    taddr);
+				return (DCMD_ERR);
+			}
+
+			if (mdb_vread(&p, sizeof (p),
+			    (uintptr_t)t.t_procp) == -1) {
+				mdb_warn("failed to read proc_t at %p",
+				    t.t_procp);
+				return (DCMD_ERR);
+			}
+
+			CPUPART_INDENT;
+			mdb_printf("%9d %0*p %s\n", t.t_pri, CPUPART_TWIDTH,
+			    taddr, p.p_user.u_comm);
+
+			taddr = (uintptr_t)t.t_link;
+		}
+	}
+
+	return (DCMD_OK);
+}
+
 /* ARGSUSED */
 int
 cpupart(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -58,8 +126,10 @@ cpupart(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int cpusetsize;
 	int _ncpu;
 	ulong_t *cpuset;
+	uint_t verbose = FALSE;
 
-	if (argc != 0)
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose, NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (!(flags & DCMD_ADDRSPEC)) {
@@ -71,11 +141,11 @@ cpupart(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-
 	if (DCMD_HDRSPEC(flags)) {
-		mdb_printf("%3s %?s %4s %4s\n",
+		mdb_printf("%3s %?s %4s %4s %4s\n",
 		    "ID",
 		    "ADDR",
+		    "NRUN",
 		    "#CPU",
 		    "CPUS");
 	}
@@ -85,9 +155,10 @@ cpupart(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	mdb_printf("%3d %?p %4d ",
+	mdb_printf("%3d %?p %4d %4d ",
 	    cpupart.cp_id,
 	    addr,
+	    cpupart.cp_kp_queue.disp_nrunnable,
 	    cpupart.cp_ncpus);
 
 	if (cpupart.cp_ncpus == 0) {
@@ -98,8 +169,6 @@ cpupart(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/*
 	 * figure out what cpus we've got
 	 */
-
-
 	if (mdb_readsym(&_ncpu, sizeof (int), "_ncpu") == -1) {
 		mdb_warn("symbol '_ncpu' not found");
 		return (DCMD_ERR);
@@ -121,6 +190,13 @@ cpupart(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	print_cpuset_range(cpuset, cpusetsize/sizeof (ulong_t), 0);
 
 	mdb_printf("\n");
+	/*
+	 * If there are any threads on kp queue and -v is specified
+	 */
+	if (verbose && cpupart.cp_kp_queue.disp_nrunnable) {
+		if (cpupart_disp_threads(&cpupart.cp_kp_queue) != DCMD_OK)
+			return (DCMD_ERR);
+	}
 
 	return (DCMD_OK);
 }

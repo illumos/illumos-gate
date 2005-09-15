@@ -50,6 +50,7 @@ HDRS=  \
 	machparam.h	\
 	machsystm.h	\
 	machthread.h	\
+	memnode.h	\
 	pmem.h		\
 	psm.h		\
 	psm_defs.h	\

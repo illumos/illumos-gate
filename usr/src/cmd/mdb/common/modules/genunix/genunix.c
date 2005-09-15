@@ -2236,8 +2236,13 @@ cpuinfo_walk_ithread(uintptr_t addr, const kthread_t *thr, cpuinfo_data_t *cid)
 #define	CPUINFO_FLAGWIDTH	9
 
 #ifdef _LP64
+#if defined(__amd64)
+#define	CPUINFO_TWIDTH		16
+#define	CPUINFO_CPUWIDTH	16
+#else
 #define	CPUINFO_CPUWIDTH	11
 #define	CPUINFO_TWIDTH		11
+#endif
 #else
 #define	CPUINFO_CPUWIDTH	8
 #define	CPUINFO_TWIDTH		8
@@ -3435,7 +3440,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "ctid", ":", "convert id to a contract pointer", cmd_ctid },
 
 	/* from cpupart.c */
-	{ "cpupart", "?", "print cpu partition info", cpupart },
+	{ "cpupart", "?[-v]", "print cpu partition info", cpupart },
 
 	/* from cyclic.c */
 	{ "cyccover", NULL, "dump cyclic coverage information", cyccover },
