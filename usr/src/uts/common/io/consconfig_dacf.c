@@ -619,7 +619,7 @@ consconfig_state_init(void)
 	}
 
 	if (plat_stdin_is_keyboard() &&
-	    usb_kb_path != NULL)  {
+	    (usb_kb_path != NULL || consconfig_usb_kb_path != NULL))  {
 		sp->cons_stdin_path = sp->cons_keyboard_path;
 	} else {
 		/*
