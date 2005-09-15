@@ -39,6 +39,7 @@
 #include <sys/x_call.h>
 #include <sys/error.h>
 #include <sys/fm/util.h>
+#include <sys/ivintr.h>
 
 #define	MAX_CE_FLTS		10
 #define	MAX_ASYNC_FLTS		6
@@ -70,6 +71,12 @@ int	reset_debug = 0;
 int	aft_verbose = 0;	/* log AFT messages > 1 to log only */
 int	aft_panic = 0;		/* panic (not reboot) on fatal usermode AFLT */
 int	aft_testfatal = 0;	/* force all AFTs to panic immediately */
+
+/*
+ * Used for vbsc hostshutdown (power-off buton)
+ */
+int	err_shutdown_triggered = 0;	/* only once */
+uint_t	err_shutdown_inum = 0;		/* used to pull the trigger */
 
 /*
  * Defined in bus_func.c but initialised in error_init
@@ -119,6 +126,16 @@ process_resumable_error(struct regs *rp, uint32_t head_offset,
 		switch (errh_flt.errh_er.desc) {
 		case ERRH_DESC_UCOR_RE:
 			break;
+
+		case ERRH_DESC_WARN_RE:
+			/*
+			 * Power-off requested, but handle it one time only.
+			 */
+			if (!err_shutdown_triggered) {
+				setsoftint(err_shutdown_inum);
+				++err_shutdown_triggered;
+			}
+			continue;
 
 		default:
 			cmn_err(CE_WARN, "Error Descriptor 0x%llx "
@@ -659,6 +676,22 @@ ce_drain(void *ignored, struct async_flt *aflt, errorq_elem_t *eqep)
 }
 
 /*
+ * Handler to process vbsc hostshutdown (power-off button).
+ */
+static int
+err_shutdown_softintr()
+{
+	cmn_err(CE_WARN, "Power-off requested, system will now shutdown.");
+	do_shutdown();
+
+	/*
+	 * just in case do_shutdown() fails
+	 */
+	(void) timeout((void(*)(void *))power_down, NULL, 100 * hz);
+	return (DDI_INTR_CLAIMED);
+}
+
+/*
  * Allocate error queue sizes based on max_ncpus.  max_ncpus is set just
  * after ncpunode has been determined.  ncpus is set in start_other_cpus
  * which is called after error_init() but may change dynamically.
@@ -681,6 +714,12 @@ error_init(void)
 
 	if (ue_queue == NULL || ce_queue == NULL)
 		panic("failed to create required system error queue");
+
+	/*
+	 * Setup interrupt handler for power-off button.
+	 */
+	err_shutdown_inum = add_softintr(PIL_9,
+	    (softintrfunc)err_shutdown_softintr, NULL);
 
 	/*
 	 * Initialize the busfunc list mutex.  This must be a PIL_15 spin lock
