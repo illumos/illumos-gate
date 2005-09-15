@@ -132,6 +132,7 @@ f none usr/platform/i86pc/include/sys/machcpuvar.h 644 root bin
 f none usr/platform/i86pc/include/sys/machparam.h 644 root bin
 f none usr/platform/i86pc/include/sys/machsystm.h 644 root bin
 f none usr/platform/i86pc/include/sys/machthread.h 644 root bin
+f none usr/platform/i86pc/include/sys/memnode.h 644 root bin
 f none usr/platform/i86pc/include/sys/pmem.h 644 root bin
 f none usr/platform/i86pc/include/sys/psm.h 644 root bin
 f none usr/platform/i86pc/include/sys/psm_defs.h 644 root bin
