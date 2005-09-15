@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -242,13 +242,13 @@ create_outfile(Ofl_desc * ofl)
 	Os_desc *	osp;
 	Is_desc *	isp;
 	Elf_Scn	*	scn;
+	Elf_Data *	tlsdata = 0;
 	Shdr *		shdr;
-	Word		ptype, flags = ofl->ofl_flags;
+	Word		flags = ofl->ofl_flags;
 	size_t		ndx = 0, fndx = 0;
 	Elf_Cmd		cmd;
 	Boolean		fixalign = FALSE;
-	int		fd, nseg = 0, shidx = 0, dataidx = 0, ptloadidx = 0,
-			tlsidx = 0;
+	int		fd, nseg = 0, shidx = 0, dataidx = 0, ptloadidx = 0;
 
 	/*
 	 * If FLG_OF1_NOHDR was set in map_parse() or FLG_OF1_VADDR was set,
@@ -291,15 +291,14 @@ create_outfile(Ofl_desc * ofl)
 
 	DBG_CALL(Dbg_util_nl());
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+		int	frst = 0;
+		Phdr	*phdr = &(sgp->sg_phdr);
+		Word	ptype = phdr->p_type;
+
 		/*
 		 * Count the number of segments that will go in the program
 		 * header table. If a segment is empty, ignore it.
 		 */
-		int	frst = 0;
-		Phdr *	phdr = &(sgp->sg_phdr);
-
-		ptype = phdr->p_type;
-
 		if (!(flags & FLG_OF_RELOBJ)) {
 			if (ptype == PT_PHDR) {
 				/*
@@ -324,7 +323,7 @@ create_outfile(Ofl_desc * ofl)
 				if (flags & FLG_OF_DYNAMIC)
 					nseg++;
 			} else if (ptype == PT_TLS) {
-				if (ofl->ofl_ostlsseg.head)
+				if (flags & FLG_OF_TLSPHDR)
 					nseg++;
 #if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
 			} else if (ptype == PT_SUNW_UNWIND) {
@@ -406,6 +405,19 @@ create_outfile(Ofl_desc * ofl)
 			if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
 				osp->os_shdr->sh_flags &= ~SHF_GROUP;
 
+			/*
+			 * If this is a TLS section, save it so that the PT_TLS
+			 * program header information can be established after
+			 * the output image has been initialy created.  At this
+			 * point, all TLS input sections are ordered as they
+			 * will appear in the output image.
+			 */
+			if ((ofl->ofl_flags & FLG_OF_TLSPHDR) &&
+			    (osp->os_shdr->sh_flags & SHF_TLS)) {
+				if (list_appendc(&ofl->ofl_ostlsseg, osp) == 0)
+					return (S_ERROR);
+			}
+
 			dataidx = 0;
 			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp3, isp)) {
 				Elf_Data *	data;
@@ -476,15 +488,17 @@ create_outfile(Ofl_desc * ofl)
 				isp->is_indata = data;
 
 				/*
-				 * Make sure that the first tls section is
-				 * aligned on pointer size alignment.
+				 * Save the first TLS data buffer, as this is
+				 * the start of the TLS segment. Realign this
+				 * buffer based on the alignment requirements
+				 * of all the TLS input sections.
 				 */
-				if ((tlsidx == 0) &&
-				    ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
+				if ((ofl->ofl_flags & FLG_OF_TLSPHDR) &&
 				    (isp->is_shdr->sh_flags & SHF_TLS)) {
-					data->d_align = lcm(M_WORD_ALIGN,
-						isp->is_shdr->sh_addralign);
-					tlsidx = 1;
+					if (tlsdata == 0)
+						tlsdata = data;
+					tlsdata->d_align = lcm(tlsdata->d_align,
+					    isp->is_shdr->sh_addralign);
 				}
 
 #if	defined(_ELF64) && defined(_ILP32)

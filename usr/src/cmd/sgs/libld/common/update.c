@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -780,8 +780,7 @@ update_osym(Ofl_desc *ofl)
 				sdp->sd_isc = ofl->ofl_istlsbss;
 				sdp->sd_flags |= FLG_SY_COMMEXP;
 				/*
-				 * TLS symbols are relative to
-				 * the TLS segment.
+				 * TLS symbols are relative to the TLS segment.
 				 */
 				symptr->st_value -= ofl->ofl_tlsphdr->p_vaddr;
 			}
@@ -2759,46 +2758,40 @@ update_outfile(Ofl_desc *ofl)
 			continue;
 		}
 #endif
-
 		if (phdr->p_type == PT_TLS) {
-			Os_desc	*_osp;
-			Shdr	*firstshdr;
-			Shdr	*fshdr;
-			Shdr	*bssshdr;
+			Os_desc	*tlsosp;
+			Shdr	*firstshdr = 0, *lastfilshdr, *lastmemshdr;
 
-			if ((ofl->ofl_ostlsseg.head == NULL) ||
-			    (flags & FLG_OF_RELOBJ))
+			if (ofl->ofl_ostlsseg.head == NULL)
 				continue;
-			_osp = (Os_desc *)
-				(ofl->ofl_ostlsseg.head->data);
-			firstshdr = fshdr = bssshdr = _osp->os_shdr;
-			phdr->p_flags = PF_R | PF_W;
-			phdr->p_memsz = 0;
-			phdr->p_filesz = 0;
-			for (LIST_TRAVERSE(&ofl->ofl_ostlsseg,
-			    lnp2, _osp)) {
-				Shdr	*_shdr;
-				_shdr = _osp->os_shdr;
-				if (_shdr->sh_addr < firstshdr->sh_addr)
-					firstshdr = _shdr;
-				if ((_shdr->sh_addr + _shdr->sh_size) >
-				    (bssshdr->sh_addr + bssshdr->sh_size))
-					bssshdr = _shdr;
-				if (_shdr->sh_type != SHT_NOBITS) {
-					if ((_shdr->sh_addr + _shdr->sh_size) >
-					    (fshdr->sh_addr +
-					    fshdr->sh_size))
-						fshdr = _shdr;
+
+			for (LIST_TRAVERSE(&ofl->ofl_ostlsseg, lnp2, tlsosp)) {
+				Shdr	*tlsshdr = tlsosp->os_shdr;
+
+				if (firstshdr == 0) {
+					firstshdr = lastfilshdr = lastmemshdr =
+					    tlsosp->os_shdr;
+					continue;
 				}
+
+				if (tlsshdr->sh_type == SHT_NOBITS)
+					lastmemshdr = tlsshdr;
+				else
+					lastfilshdr = tlsshdr;
 			}
+
+			phdr->p_flags = PF_R | PF_W;
 			phdr->p_vaddr = firstshdr->sh_addr;
 			phdr->p_offset = firstshdr->sh_offset;
-			phdr->p_filesz = fshdr->sh_offset +
-				fshdr->sh_size - phdr->p_offset;
-			phdr->p_memsz = bssshdr->sh_offset +
-				bssshdr->sh_size - phdr->p_offset;
+			phdr->p_align = firstshdr->sh_addralign;
+			phdr->p_filesz = lastfilshdr->sh_offset +
+			    lastfilshdr->sh_size - phdr->p_offset;
+			phdr->p_memsz = lastmemshdr->sh_offset +
+			    lastmemshdr->sh_size - phdr->p_offset;
+
 			DBG_CALL(Dbg_seg_entry(ofl->ofl_e_machine,
-				segndx, sgp));
+			    segndx, sgp));
+
 			ofl->ofl_tlsphdr = phdr;
 			ofl->ofl_phdr[phdrndx++] = *phdr;
 			continue;

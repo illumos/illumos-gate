@@ -266,7 +266,7 @@ struct ofl_desc {
 #define	FLG_OF_SEGSORT	0x00020000	/* segment sorting is required */
 #define	FLG_OF_TEXTREL	0x00040000	/* text relocations have been found */
 #define	FLG_OF_MULDEFS	0x00080000	/* multiple symbols are allowed */
-#define	FLG_OF_OUTMMAP	0x00100000	/* output image is mmaped to file */
+#define	FLG_OF_TLSPHDR	0x00100000	/* a TLS program header is required */
 #define	FLG_OF_BLDGOT	0x00200000	/* build GOT table */
 #define	FLG_OF_VERDEF	0x00400000	/* record version definitions */
 #define	FLG_OF_VERNEED	0x00800000	/* record version dependencies */
@@ -317,7 +317,7 @@ struct ofl_desc {
 #define	FLG_OF1_TLSOREL	0x00100000	/* output relocation against .tlsbss */
 					/*	section */
 #define	FLG_OF1_DEMANGL	0x00200000	/* demangle C++ sym name diagnostics */
-#define	FLG_OF1_GRPSECT	0x00400000	/* GROUP sections are present */
+
 #define	FLG_OF1_NOHDR	0x00800000	/* no elf header/phdr alignment */
 					/*	needed */
 #define	FLG_OF1_VADDR	0x01000000	/* vaddr was explicitly set */
@@ -526,8 +526,7 @@ struct os_desc {			/* Output section descriptor */
 
 #define	FLG_OS_ORDER_KEY	0x01	/* include a sort key section */
 #define	FLG_OS_OUTREL		0x02	/* output rel against this section */
-#define	FLG_OS_TLSNONEMPTY	0x04	/* non empty TLS sections */
-#define	FLG_OS_SECTREF		0x08	/* isps are not affected by -zignore */
+#define	FLG_OS_SECTREF		0x04	/* isps are not affected by -zignore */
 
 /*
  * For sorting sections.

@@ -492,7 +492,7 @@ sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl, Ofl_desc *ofl,
  * and without underscores.  This routine is called, after all other symbol
  * resolution has completed, to generate a reserved absolute symbol (the
  * underscore version).  Special symbols are updated with the appropriate
- * values in sym_update().  If the user has already defined this symbol
+ * values in update_osym().  If the user has already defined this symbol
  * issue a warning and leave the symbol as is.  If the non-underscore symbol
  * is referenced then turn it into a weak alias of the underscored symbol.
  *
@@ -1201,7 +1201,7 @@ sym_validate(Ofl_desc *ofl)
 					align = &tlsalign;
 				}
 				*size = (Xword)S_ROUND(*size, sym->st_value) +
-					sym->st_size;
+				    sym->st_size;
 				if (sym->st_value > *align)
 					*align = sym->st_value;
 			}

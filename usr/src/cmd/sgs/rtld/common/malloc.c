@@ -68,7 +68,7 @@ struct page {
 
 #define	HDR_BLOCK	(sizeof (struct block) - sizeof (void *))
 #define	HDR_PAGE	(sizeof (struct page) - sizeof (void *))
-#define	MINSZ		sizeof (void *)
+#define	MINSZ		8
 
 static struct page	*memstart;
 

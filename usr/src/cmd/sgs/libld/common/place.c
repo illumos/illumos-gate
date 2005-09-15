@@ -117,7 +117,6 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 				isp->is_flags |= FLG_IS_DISCARD;
 				return ((Os_desc *)0);
 			}
-			ofl->ofl_flags1 |= FLG_OF1_GRPSECT;
 		}
 	}
 
@@ -335,16 +334,12 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 			set_addralign(ofl, osp, isp);
 
 			/*
-			 * If this section is a non-empty TLS section and
-			 * if the osp is not yet recorded in ofl_osttlsseg,
-			 * record it.
+			 * If this section is a non-empty TLS section indicate
+			 * that a PT_TLS program header is required.
 			 */
-			if ((shflags & SHF_TLS) && (shdr->sh_size != 0) &&
-			    ((osp->os_flags & FLG_OS_TLSNONEMPTY) == 0)) {
-				osp->os_flags |= FLG_OS_TLSNONEMPTY;
-				if (list_appendc(&ofl->ofl_ostlsseg, osp) == 0)
-					return ((Os_desc *)S_ERROR);
-			}
+			if ((shflags & SHF_TLS) && shdr->sh_size &&
+			    ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0))
+				ofl->ofl_flags |= FLG_OF_TLSPHDR;
 
 			/*
 			 * If is_txtndx is 0 then this section was not
@@ -515,14 +510,12 @@ place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	}
 
 	/*
-	 * If this section is a TLS section - keep track of it
-	 * for the latter building of the PT_TLS segment.
+	 * If this section is a non-empty TLS section indicate that a PT_TLS
+	 * program header is required.
 	 */
-	if ((shflags & SHF_TLS) && (shdr->sh_size != 0)) {
-		osp->os_flags |= FLG_OS_TLSNONEMPTY;
-		if (list_appendc(&ofl->ofl_ostlsseg, osp) == 0)
-			return ((Os_desc *)S_ERROR);
-	}
+	if ((shflags & SHF_TLS) && shdr->sh_size &&
+	    ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0))
+		ofl->ofl_flags |= FLG_OF_TLSPHDR;
 
 	/*
 	 * If a non-allocatable section is going to be put into a loadable

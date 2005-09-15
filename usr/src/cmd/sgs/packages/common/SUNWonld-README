@@ -1509,4 +1509,13 @@ All the above change is incorporated in the following patches:
 --------------------------------------------------------------------------------
 6314115 Checkpoint refuses to start, crashes on start, after application of
 	linker patch 112963-22
+--------------------------------------------------------------------------------
+All the above change is incorporated in the following patches:
+    Solaris/SunOS 5.9_sparc	patch T112963-24
+    Solaris/SunOS 5.9_x86	patch T113986-20
+    Solaris/SunOS 5.8_sparc	patch T109147-39
+    Solaris/SunOS 5.8_x86	patch T109148-39
+--------------------------------------------------------------------------------
 6318306 a dlsym() from a filter should be redirected to an associated filtee
+6318401 mis-aligned TLS variable
+6324019 ld.so.1: malloc alignment is insufficient for new compilers
