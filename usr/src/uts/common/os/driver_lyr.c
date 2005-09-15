@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -506,7 +506,20 @@ ldi_vp_from_name(char *path, vnode_t **vpp)
 
 		/* we don't want lookupname to fail because of credentials */
 		curthread->t_cred = kcred;
-		ret = lookupname(path, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
+
+		/*
+		 * all lookups should be done in the global zone.  but
+		 * lookupnameat() won't actually do this if an absolute
+		 * path is passed in.  since the ldi interfaces require an
+		 * absolute path we pass lookupnameat() a pointer to
+		 * the character after the leading '/' and tell it to
+		 * start searching at the current system root directory.
+		 */
+		ASSERT(*path == '/');
+		ret = lookupnameat(path + 1, UIO_SYSSPACE, FOLLOW, NULLVPP,
+		    &vp, rootdir);
+
+		/* restore this threads credentials */
 		curthread->t_cred = saved_cred;
 
 		if (ret == 0) {
