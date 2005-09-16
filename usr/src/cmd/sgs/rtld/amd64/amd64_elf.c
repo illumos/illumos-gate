@@ -512,7 +512,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		sl.sl_name = MSG_ORIG(MSG_SYM_PLT);
 		sl.sl_cmap = lmp;
 		sl.sl_imap = lmp;
-		sl.sl_hash = 0;
+		sl.sl_hash = elf_hash(MSG_ORIG(MSG_SYM_PLT));
 		sl.sl_rsymndx = 0;
 		sl.sl_flags = LKUP_DEFT;
 

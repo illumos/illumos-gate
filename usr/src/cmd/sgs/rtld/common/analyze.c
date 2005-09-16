@@ -481,9 +481,10 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
 	 */
 	/* LINTED */
 	nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
-	if (nlmco == ALO_DATA)
+	if (nlmco == ALO_DATA) {
+		plmco = nlmco;
 		plmc = nlmc;
-	else {
+	} else {
 		plmco = nlmco - lml->lm_lists->al_size;
 		/* LINTED */
 		plmc = (Lm_cntl *)((char *)lml->lm_lists + plmco);
