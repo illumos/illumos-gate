@@ -403,6 +403,8 @@ typedef struct ibcm_state_data_s {
 	uint8_t			remaining_retry_cnt;
 	uint8_t			max_cm_retries;
 
+	uint8_t			drep_in_progress;
+
 	/* some cep stuff, stored here temporarily during connection est  */
 	uint8_t			cep_retry_cnt:3;
 	ibt_srate_t		local_srate;
@@ -2110,6 +2112,10 @@ ibt_status_t ibcm_ibmf_analyze_error(int ibmf_status);
 
 ibt_status_t ibcm_contact_sa_access(ibmf_saa_handle_t saa_handle,
     ibmf_saa_access_args_t *access_args, size_t *length, void **results_p);
+
+void ibcm_path_cache_init(void);
+void ibcm_path_cache_fini(void);
+void ibcm_path_cache_purge(void);
 
 #ifdef	__cplusplus
 }

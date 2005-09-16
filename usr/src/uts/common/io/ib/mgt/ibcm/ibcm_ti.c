@@ -1520,6 +1520,8 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 			statep->state = IBCM_STATE_ESTABLISHED;
 			IBCM_REF_CNT_DECR(statep);
 			cv_broadcast(&statep->block_mad_cv);
+			statep->close_flow = 0;
+			ibcm_close_flow_control_exit();
 			mutex_exit(&statep->state_mutex);
 			return (status);
 		}
@@ -1549,6 +1551,8 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 			statep->state = IBCM_STATE_ESTABLISHED;
 			IBCM_REF_CNT_DECR(statep);
 			cv_broadcast(&statep->block_mad_cv);
+			statep->close_flow = 0;
+			ibcm_close_flow_control_exit();
 			mutex_exit(&statep->state_mutex);
 			return (IBT_INSUFF_KERNEL_RESOURCE);
 		}
@@ -2353,7 +2357,8 @@ ibt_cm_delay(ibt_cmdelay_flags_t flags, void *cm_session_id,
 		return (IBT_CHAN_STATE_INVALID);
 	}
 	/* service time is usecs, stale_clock is nsecs */
-	statep->stale_clock += (hrtime_t)service_time * (1000 *
+	statep->stale_clock = gethrtime() +
+	    (hrtime_t)ibt_ib2usec(ibt_usec2ib(service_time)) * (1000 *
 	    statep->max_cm_retries);
 
 	statep->send_mad_flags |= IBCM_MRA_POST_BUSY;

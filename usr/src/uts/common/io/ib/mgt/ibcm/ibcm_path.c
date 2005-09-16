@@ -150,6 +150,226 @@ ibt_aget_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
 
 
 /*
+ * ibt_get_paths() cache consists of one or more of:
+ *
+ *	ib_gid_t dgid (attrp->pa_dgids[0])
+ *	ibt_path_attr_t attr
+ *	ibt_path_flags_t flags
+ *	ibt_path_info_t path
+ *
+ * If the first 3 match, max_paths is 1, sname is NULL, and sid is 0,
+ * then the path is returned immediately.
+ *
+ * Note that a compare of "attr" is non-trivial.  Only accept ones
+ * that memcmp() succeeds, i.e., basically assume a bzero was done.
+ *
+ * Cache must be invalidated if PORT_DOWN event or GID_UNAVAIL occurs.
+ * Cache must be freed as part of _fini.
+ */
+
+#define	IBCM_PATH_CACHE_SIZE	16	/* keep small for linear search */
+#define	IBCM_PATH_CACHE_TIMEOUT	60	/* purge cache after 60 seconds */
+
+typedef struct ibcm_path_cache_s {
+	ib_gid_t		dgid;
+	ibt_path_attr_t		attr;
+	ibt_path_flags_t	flags;
+	ibt_path_info_t		path;
+} ibcm_path_cache_t;
+
+kmutex_t ibcm_path_cache_mutex;
+int ibcm_path_cache_invalidate;	/* invalidate cache on next ibt_get_paths */
+clock_t ibcm_path_cache_timeout = IBCM_PATH_CACHE_TIMEOUT; /* tunable */
+timeout_id_t ibcm_path_cache_timeout_id;
+int ibcm_path_cache_size_init = IBCM_PATH_CACHE_SIZE;	/* tunable */
+int ibcm_path_cache_size;
+ibcm_path_cache_t *ibcm_path_cachep;
+
+struct ibcm_path_cache_stat_s {
+	int hits;
+	int misses;
+	int adds;
+	int already_in_cache;
+	int bad_path_for_cache;
+	int purges;
+	int timeouts;
+} ibcm_path_cache_stats;
+
+/*ARGSUSED*/
+static void
+ibcm_path_cache_timeout_cb(void *arg)
+{
+	clock_t timeout_in_hz;
+
+	timeout_in_hz = drv_usectohz(ibcm_path_cache_timeout * 1000000);
+	mutex_enter(&ibcm_path_cache_mutex);
+	ibcm_path_cache_invalidate = 1;	/* invalidate cache on next check */
+	if (ibcm_path_cache_timeout_id)
+		ibcm_path_cache_timeout_id = timeout(ibcm_path_cache_timeout_cb,
+		    NULL, timeout_in_hz);
+	/* else we're in _fini */
+	mutex_exit(&ibcm_path_cache_mutex);
+}
+
+void
+ibcm_path_cache_init(void)
+{
+	clock_t timeout_in_hz;
+	int cache_size = ibcm_path_cache_size_init;
+	ibcm_path_cache_t *path_cachep;
+
+	timeout_in_hz = drv_usectohz(ibcm_path_cache_timeout * 1000000);
+	path_cachep = kmem_zalloc(cache_size * sizeof (*path_cachep), KM_SLEEP);
+	mutex_init(&ibcm_path_cache_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_enter(&ibcm_path_cache_mutex);
+	ibcm_path_cache_size = cache_size;
+	ibcm_path_cachep = path_cachep;
+	ibcm_path_cache_timeout_id = timeout(ibcm_path_cache_timeout_cb,
+	    NULL, timeout_in_hz);
+	mutex_exit(&ibcm_path_cache_mutex);
+}
+
+void
+ibcm_path_cache_fini(void)
+{
+	timeout_id_t tmp_timeout_id;
+	int cache_size;
+	ibcm_path_cache_t *path_cachep;
+
+	mutex_enter(&ibcm_path_cache_mutex);
+	if (ibcm_path_cache_timeout_id) {
+		tmp_timeout_id = ibcm_path_cache_timeout_id;
+		ibcm_path_cache_timeout_id = 0;	/* no more timeouts */
+	}
+	cache_size = ibcm_path_cache_size;
+	path_cachep = ibcm_path_cachep;
+	mutex_exit(&ibcm_path_cache_mutex);
+	if (tmp_timeout_id)
+		(void) untimeout(tmp_timeout_id);
+	mutex_destroy(&ibcm_path_cache_mutex);
+	kmem_free(path_cachep, cache_size * sizeof (*path_cachep));
+}
+
+static ibcm_status_t
+ibcm_path_cache_check(ibt_path_flags_t flags, ibt_path_attr_t *attrp,
+    uint8_t max_paths, ibt_path_info_t *path, uint8_t *num_paths_p)
+{
+	int i;
+	ib_gid_t dgid;
+	ibcm_path_cache_t *path_cachep;
+
+	if (max_paths != 1 || attrp->pa_num_dgids != 1 ||
+	    attrp->pa_sname != NULL || attrp->pa_sid != 0) {
+		mutex_enter(&ibcm_path_cache_mutex);
+		ibcm_path_cache_stats.bad_path_for_cache++;
+		mutex_exit(&ibcm_path_cache_mutex);
+		return (IBCM_FAILURE);
+	}
+
+	dgid = attrp->pa_dgids[0];
+	if ((dgid.gid_guid | dgid.gid_prefix) == 0ULL)
+		return (IBCM_FAILURE);
+
+	mutex_enter(&ibcm_path_cache_mutex);
+	if (ibcm_path_cache_invalidate) {	/* invalidate all entries */
+		ibcm_path_cache_stats.timeouts++;
+		ibcm_path_cache_invalidate = 0;
+		path_cachep = ibcm_path_cachep;
+		for (i = 0; i < ibcm_path_cache_size; i++, path_cachep++) {
+			path_cachep->dgid.gid_guid = 0ULL;
+			path_cachep->dgid.gid_prefix = 0ULL;
+		}
+		mutex_exit(&ibcm_path_cache_mutex);
+		return (IBCM_FAILURE);
+	}
+
+	path_cachep = ibcm_path_cachep;
+	for (i = 0; i < ibcm_path_cache_size; i++, path_cachep++) {
+		if (path_cachep->dgid.gid_guid == 0ULL)
+			break;	/* end of search, no more valid cache entries */
+
+		/* make pa_dgids pointers match, so we can use memcmp */
+		path_cachep->attr.pa_dgids = attrp->pa_dgids;
+		if (path_cachep->flags != flags ||
+		    path_cachep->dgid.gid_guid != dgid.gid_guid ||
+		    path_cachep->dgid.gid_prefix != dgid.gid_prefix ||
+		    memcmp(&(path_cachep->attr), attrp, sizeof (*attrp)) != 0) {
+			/* make pa_dgids NULL again */
+			path_cachep->attr.pa_dgids = NULL;
+			continue;
+		}
+		/* else we have a match */
+		/* make pa_dgids NULL again */
+		path_cachep->attr.pa_dgids = NULL;
+		*path = path_cachep->path;	/* retval */
+		if (num_paths_p)
+			*num_paths_p = 1;	/* retval */
+		ibcm_path_cache_stats.hits++;
+		mutex_exit(&ibcm_path_cache_mutex);
+		return (IBCM_SUCCESS);
+	}
+	ibcm_path_cache_stats.misses++;
+	mutex_exit(&ibcm_path_cache_mutex);
+	return (IBCM_FAILURE);
+}
+
+static void
+ibcm_path_cache_add(ibt_path_flags_t flags,
+    ibt_path_attr_t *attrp, uint8_t max_paths, ibt_path_info_t *path)
+{
+	int i;
+	ib_gid_t dgid;
+	ibcm_path_cache_t *path_cachep;
+
+	if (max_paths != 1 || attrp->pa_num_dgids != 1 ||
+	    attrp->pa_sname != NULL || attrp->pa_sid != 0)
+		return;
+
+	dgid = attrp->pa_dgids[0];
+	if ((dgid.gid_guid | dgid.gid_prefix) == 0ULL)
+		return;
+
+	mutex_enter(&ibcm_path_cache_mutex);
+	path_cachep = ibcm_path_cachep;
+	for (i = 0; i < ibcm_path_cache_size; i++, path_cachep++) {
+		path_cachep->attr.pa_dgids = attrp->pa_dgids;
+		if (path_cachep->flags == flags &&
+		    path_cachep->dgid.gid_guid == dgid.gid_guid &&
+		    path_cachep->dgid.gid_prefix == dgid.gid_prefix &&
+		    memcmp(&(path_cachep->attr), attrp, sizeof (*attrp)) == 0) {
+			/* already in cache */
+			ibcm_path_cache_stats.already_in_cache++;
+			path_cachep->attr.pa_dgids = NULL;
+			mutex_exit(&ibcm_path_cache_mutex);
+			return;
+		}
+		if (path_cachep->dgid.gid_guid != 0ULL) {
+			path_cachep->attr.pa_dgids = NULL;
+			continue;
+		}
+		/* else the rest of the entries are free, so use this one */
+		ibcm_path_cache_stats.adds++;
+		path_cachep->flags = flags;
+		path_cachep->attr = *attrp;
+		path_cachep->attr.pa_dgids = NULL;
+		path_cachep->dgid = attrp->pa_dgids[0];
+		path_cachep->path = *path;
+		mutex_exit(&ibcm_path_cache_mutex);
+		return;
+	}
+	mutex_exit(&ibcm_path_cache_mutex);
+}
+
+void
+ibcm_path_cache_purge(void)
+{
+	mutex_enter(&ibcm_path_cache_mutex);
+	ibcm_path_cache_invalidate = 1;	/* invalidate cache on next check */
+	ibcm_path_cache_stats.purges++;
+	mutex_exit(&ibcm_path_cache_mutex);
+}
+
+/*
  * Function:
  *	ibt_get_paths
  * Input:
@@ -183,6 +403,8 @@ ibt_get_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
     ibt_path_attr_t *attrp, uint8_t max_paths, ibt_path_info_t *paths,
     uint8_t *num_paths_p)
 {
+	ibt_status_t	retval;
+
 	ASSERT(paths != NULL);
 
 	IBTF_DPRINTF_L3(cmlog, "ibt_get_paths(%p, 0x%lX, %p, %d)",
@@ -197,8 +419,16 @@ ibt_get_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
 	if (num_paths_p != NULL)
 		*num_paths_p = 0;
 
-	return (ibcm_handle_get_path(attrp, flags, max_paths, paths,
-	    num_paths_p, NULL, NULL));
+	if (ibcm_path_cache_check(flags, attrp, max_paths, paths,
+	    num_paths_p) == IBCM_SUCCESS)
+		return (IBT_SUCCESS);
+
+	retval = ibcm_handle_get_path(attrp, flags, max_paths, paths,
+	    num_paths_p, NULL, NULL);
+
+	if (retval == IBT_SUCCESS)
+		ibcm_path_cache_add(flags, attrp, max_paths, paths);
+	return (retval);
 }
 
 

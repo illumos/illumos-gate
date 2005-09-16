@@ -104,6 +104,7 @@ root	ibcm_service_record_rewrite_task
 
 # kernel callbacks to ibcm
 
+root	ibcm_path_cache_timeout_cb
 root	ibcm_timeout_cb
 root	ibcm_recv_timeout_cb
 root	ibcm_sidr_timeout_cb

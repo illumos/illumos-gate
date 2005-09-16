@@ -64,6 +64,9 @@ static ibt_status_t	ibcm_hca_init_port(ibcm_hca_info_t *hcap,
 static ibcm_status_t	ibcm_hca_fini_port(ibcm_hca_info_t *hcap,
 			    uint8_t port_index);
 
+static void ibcm_rc_flow_control_init(void);
+static void ibcm_rc_flow_control_fini(void);
+
 /*
  * Routines that check if hca's avl trees and sidr lists are free of any
  * active client resources ie., RC or UD state structures in certain states
@@ -120,28 +123,7 @@ kcondvar_t		ibcm_global_hca_cv;
 /* mutex and cv to sa session open */
 kmutex_t		ibcm_sa_open_lock;
 kcondvar_t		ibcm_sa_open_cv;
-
-/* Deal with poor SA timeout behavior during stress */
-kmutex_t		ibcm_sa_timeout_lock;
-kcondvar_t		ibcm_sa_timeout_cv;
 int			ibcm_sa_timeout_delay = 1;		/* in ticks */
-int			ibcm_sa_timeout_simul;
-int			ibcm_sa_timeout_simul_max;
-int			ibcm_sa_timeout_simul_init = 8;		/* tunable */
-
-/* Control the number of RC connection requests get started simultaneously */
-kcondvar_t		ibcm_rc_flow_control_cv;
-int			ibcm_rc_flow_control_simul;
-int			ibcm_rc_flow_control_simul_max;
-int			ibcm_rc_flow_control_simul_init = 8;	/* tunable */
-int			ibcm_rc_flow_control_simul_stalls;
-
-/* Control the number of disconnection requests get started simultaneously */
-kcondvar_t		ibcm_close_flow_control_cv;
-int			ibcm_close_flow_control_simul;
-int			ibcm_close_flow_control_simul_max;
-int			ibcm_close_flow_control_simul_init = 8;	/* tunable */
-
 _NOTE(MUTEX_PROTECTS_DATA(ibcm_sa_open_lock,
     ibcm_port_info_s::{port_ibmf_saa_hdl port_saa_open_in_progress}))
 
@@ -580,21 +562,12 @@ ibcm_init(void)
 	ibcm_init_hcas();
 	ibcm_finit_state = IBCM_FINIT_IDLE;
 
+	ibcm_path_cache_init();
+
 	/* Unblock any waiting HCA DR asyncs in CM */
 	mutex_exit(&ibcm_global_hca_lock);
 
-	mutex_init(&ibcm_sa_timeout_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&ibcm_sa_timeout_cv, NULL, CV_DRIVER, NULL);
-	cv_init(&ibcm_rc_flow_control_cv, NULL, CV_DRIVER, NULL);
-	cv_init(&ibcm_close_flow_control_cv, NULL, CV_DRIVER, NULL);
-	mutex_enter(&ibcm_sa_timeout_lock);
-	ibcm_sa_timeout_simul_max = ibcm_sa_timeout_simul_init;
-	ibcm_sa_timeout_simul = 0;
-	ibcm_rc_flow_control_simul_max = ibcm_rc_flow_control_simul_init;
-	ibcm_rc_flow_control_simul = 0;
-	ibcm_close_flow_control_simul_max = ibcm_close_flow_control_simul_init;
-	ibcm_close_flow_control_simul = 0;
-	mutex_exit(&ibcm_sa_timeout_lock);
+	ibcm_rc_flow_control_init();
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_init: done");
 	return (IBCM_SUCCESS);
@@ -711,10 +684,9 @@ ibcm_fini(void)
 	if (status != IBT_SUCCESS)
 	    IBTF_DPRINTF_L1(cmlog, "ibcm_fini: ibt_detach failed %d", status);
 
-	mutex_destroy(&ibcm_sa_timeout_lock);
-	cv_destroy(&ibcm_sa_timeout_cv);
-	cv_destroy(&ibcm_rc_flow_control_cv);
-	cv_destroy(&ibcm_close_flow_control_cv);
+	ibcm_rc_flow_control_fini();
+
+	ibcm_path_cache_fini();
 
 	ibcm_fini_ids();
 	ibcm_fini_locks();
@@ -1376,136 +1348,205 @@ ibcm_dec_hca_svc_cnt(ibcm_hca_info_t *hcap)
 	mutex_exit(&ibcm_global_hca_lock);
 }
 
-void
-ibcm_rc_flow_control_enter()
+/*
+ * Flow control logic for open_rc_channel and close_rc_channel follows.
+ * We use one instance of the same data structure to control each of
+ * "open" and "close".  We allow up to IBCM_FLOW_SIMUL_MAX requests to be
+ * initiated at one time.  We initiate the next group any time there are
+ * less than IBCM_FLOW_LOW_WATER.
+ */
+
+/* These variables are for both open_rc_channel and close_rc_channel */
+#define	IBCM_FLOW_SIMUL_MAX	32
+int ibcm_flow_simul_max = IBCM_FLOW_SIMUL_MAX;
+#define	IBCM_SAA_SIMUL_MAX	8
+int ibcm_saa_simul_max = IBCM_SAA_SIMUL_MAX;
+
+typedef struct ibcm_flow1_s {
+	struct ibcm_flow1_s	*link;
+	kcondvar_t		cv;
+	uint8_t			waiters;	/* 1 to IBCM_FLOW_SIMUL_MAX */
+} ibcm_flow1_t;
+
+typedef struct ibcm_flow_s {
+	ibcm_flow1_t	*list;
+	uint_t		simul;		/* #requests currently outstanding */
+	uint_t		simul_max;
+	uint_t		waiters_per_chunk;
+	uint_t		lowat;
+	uint_t		lowat_default;
+	/* statistics */
+	uint_t		total;
+	uint_t		enable_queuing;
+} ibcm_flow_t;
+
+kmutex_t ibcm_rc_flow_mutex;
+ibcm_flow_t ibcm_open_flow;
+ibcm_flow_t ibcm_close_flow;
+ibcm_flow_t ibcm_saa_flow;
+
+static void
+ibcm_flow_init(ibcm_flow_t *flow, uint_t simul_max)
 {
-	mutex_enter(&ibcm_sa_timeout_lock);
-	if (ibcm_rc_flow_control_simul_max != ibcm_rc_flow_control_simul_init) {
-		if (ibcm_rc_flow_control_simul_max <
-		    ibcm_rc_flow_control_simul_init) {
-			/* letting more flow should be gradual */
-			ibcm_rc_flow_control_simul_max++;
-			if (ibcm_rc_flow_control_simul <
-			    ibcm_rc_flow_control_simul_max - 1)
-				cv_signal(&ibcm_rc_flow_control_cv);
-		} else {
-			ibcm_rc_flow_control_simul_max =
-			    ibcm_rc_flow_control_simul_init;
+	flow->list = NULL;
+	flow->simul = 0;
+	flow->waiters_per_chunk = 4;
+	flow->simul_max = simul_max;
+	flow->lowat = flow->simul_max - flow->waiters_per_chunk;
+	flow->lowat_default = flow->lowat;
+	/* stats */
+	flow->total = 0;
+	flow->enable_queuing = 0;
+}
+
+static void
+ibcm_rc_flow_control_init(void)
+{
+	mutex_init(&ibcm_rc_flow_mutex, NULL, MUTEX_DEFAULT, NULL);
+	mutex_enter(&ibcm_rc_flow_mutex);
+	ibcm_flow_init(&ibcm_open_flow, ibcm_flow_simul_max);
+	ibcm_flow_init(&ibcm_close_flow, ibcm_flow_simul_max);
+	ibcm_flow_init(&ibcm_saa_flow, ibcm_saa_simul_max);
+	mutex_exit(&ibcm_rc_flow_mutex);
+}
+
+static void
+ibcm_rc_flow_control_fini(void)
+{
+	mutex_destroy(&ibcm_rc_flow_mutex);
+}
+
+static ibcm_flow1_t *
+ibcm_flow_find(ibcm_flow_t *flow)
+{
+	ibcm_flow1_t *flow1;
+	ibcm_flow1_t *f;
+
+	f = flow->list;
+	if (f) {	/* most likely code path */
+		while (f->link != NULL)
+			f = f->link;
+		if (f->waiters < flow->waiters_per_chunk)
+			return (f);
+	}
+
+	/* There was no flow1 list element ready for another waiter */
+	mutex_exit(&ibcm_rc_flow_mutex);
+	flow1 = kmem_alloc(sizeof (*flow1), KM_SLEEP);
+	mutex_enter(&ibcm_rc_flow_mutex);
+
+	f = flow->list;
+	if (f) {
+		while (f->link != NULL)
+			f = f->link;
+		if (f->waiters < flow->waiters_per_chunk) {
+			kmem_free(flow1, sizeof (*flow1));
+			return (f);
+		}
+		f->link = flow1;
+	} else {
+		flow->list = flow1;
+	}
+	cv_init(&flow1->cv, NULL, CV_DRIVER, NULL);
+	flow1->waiters = 0;
+	flow1->link = NULL;
+	return (flow1);
+}
+
+static void
+ibcm_flow_enter(ibcm_flow_t *flow)
+{
+	mutex_enter(&ibcm_rc_flow_mutex);
+	if (flow->list == NULL && flow->simul < flow->simul_max) {
+		flow->simul++;
+		flow->total++;
+	} else {
+		ibcm_flow1_t *flow1;
+
+		flow1 = ibcm_flow_find(flow);
+		flow1->waiters++;
+		cv_wait(&flow1->cv, &ibcm_rc_flow_mutex);
+		if (--flow1->waiters == 0) {
+			cv_destroy(&flow1->cv);
+			kmem_free(flow1, sizeof (*flow1));
 		}
 	}
-	while (ibcm_rc_flow_control_simul >= ibcm_rc_flow_control_simul_max) {
-		cv_wait(&ibcm_rc_flow_control_cv, &ibcm_sa_timeout_lock);
+	mutex_exit(&ibcm_rc_flow_mutex);
+}
+
+static void
+ibcm_flow_exit(ibcm_flow_t *flow)
+{
+	mutex_enter(&ibcm_rc_flow_mutex);
+	if (--flow->simul < flow->lowat) {
+		flow->lowat += flow->waiters_per_chunk;
+		if (flow->lowat > flow->lowat_default)
+			flow->lowat = flow->lowat_default;
+		if (flow->list) {
+			ibcm_flow1_t *flow1;
+
+			flow1 = flow->list;
+			flow->list = flow1->link;	/* unlink */
+			flow1->link = NULL;		/* be clean */
+			flow->total += flow1->waiters;
+			flow->simul += flow1->waiters;
+			cv_broadcast(&flow1->cv);
+		}
 	}
-	ibcm_rc_flow_control_simul++;
-	mutex_exit(&ibcm_sa_timeout_lock);
+	mutex_exit(&ibcm_rc_flow_mutex);
+}
+
+static void
+ibcm_flow_stall(ibcm_flow_t *flow)
+{
+	mutex_enter(&ibcm_rc_flow_mutex);
+	if (flow->lowat > 1) {
+		flow->lowat >>= 1;
+		IBTF_DPRINTF_L2(cmlog, "stall - lowat = %d", flow->lowat);
+	}
+	mutex_exit(&ibcm_rc_flow_mutex);
 }
 
 void
-ibcm_rc_flow_control_exit()
+ibcm_rc_flow_control_enter(void)
 {
-	mutex_enter(&ibcm_sa_timeout_lock);
-	if (ibcm_rc_flow_control_simul_max != ibcm_rc_flow_control_simul_init) {
-		if (ibcm_rc_flow_control_simul_max <
-		    ibcm_rc_flow_control_simul_init) {
-			/* letting more flow should be gradual */
-			ibcm_rc_flow_control_simul_max++;
-			if (ibcm_rc_flow_control_simul <
-			    ibcm_rc_flow_control_simul_max)
-				cv_signal(&ibcm_rc_flow_control_cv);
-		} else {
-			ibcm_rc_flow_control_simul_max =
-			    ibcm_rc_flow_control_simul_init;
-		}
-	}
-	if (--ibcm_rc_flow_control_simul < ibcm_rc_flow_control_simul_max)
-		cv_signal(&ibcm_rc_flow_control_cv);
-	mutex_exit(&ibcm_sa_timeout_lock);
+	ibcm_flow_enter(&ibcm_open_flow);
+}
+
+void
+ibcm_rc_flow_control_exit(void)
+{
+	ibcm_flow_exit(&ibcm_open_flow);
 }
 
 void
 ibcm_close_flow_control_enter()
 {
-	mutex_enter(&ibcm_sa_timeout_lock);
-	if (ibcm_close_flow_control_simul_max !=
-	    ibcm_close_flow_control_simul_init) {
-		if (ibcm_close_flow_control_simul_max <
-		    ibcm_close_flow_control_simul_init) {
-			/* letting more flow should be gradual */
-			ibcm_close_flow_control_simul_max++;
-			if (ibcm_close_flow_control_simul <
-			    ibcm_close_flow_control_simul_max - 1)
-				cv_signal(&ibcm_close_flow_control_cv);
-		} else {
-			ibcm_close_flow_control_simul_max =
-			    ibcm_close_flow_control_simul_init;
-		}
-	}
-	while (ibcm_close_flow_control_simul >=
-	    ibcm_close_flow_control_simul_max) {
-		cv_wait(&ibcm_close_flow_control_cv, &ibcm_sa_timeout_lock);
-	}
-	ibcm_close_flow_control_simul++;
-	mutex_exit(&ibcm_sa_timeout_lock);
+	ibcm_flow_enter(&ibcm_close_flow);
 }
 
 void
 ibcm_close_flow_control_exit()
 {
-	mutex_enter(&ibcm_sa_timeout_lock);
-	if (ibcm_close_flow_control_simul_max !=
-	    ibcm_close_flow_control_simul_init) {
-		if (ibcm_close_flow_control_simul_max <
-		    ibcm_close_flow_control_simul_init) {
-			/* letting more flow should be gradual */
-			ibcm_close_flow_control_simul_max++;
-			if (ibcm_close_flow_control_simul <
-			    ibcm_close_flow_control_simul_max)
-				cv_signal(&ibcm_close_flow_control_cv);
-		} else {
-			ibcm_close_flow_control_simul_max =
-			    ibcm_close_flow_control_simul_init;
-		}
-	}
-	if (--ibcm_close_flow_control_simul < ibcm_close_flow_control_simul_max)
-		cv_signal(&ibcm_close_flow_control_cv);
-	mutex_exit(&ibcm_sa_timeout_lock);
+	ibcm_flow_exit(&ibcm_close_flow);
 }
 
-/*
- * This function is called when we hit any timeout, and have to retry.
- * The logic here is that the timeout may have been because the other
- * side of this connection is too busy to respond in time.  We provide
- * relief here by temporarily reducing the number of connections we
- * allow to be initiated.  As pending ones complete, we let new ones start.
- */
 void
 ibcm_rc_flow_control_stall()
 {
-	mutex_enter(&ibcm_sa_timeout_lock);
-	ibcm_rc_flow_control_simul_stalls++;
-	if (ibcm_rc_flow_control_simul_max)
-		ibcm_rc_flow_control_simul_max--;
-	mutex_exit(&ibcm_sa_timeout_lock);
+	ibcm_flow_stall(&ibcm_open_flow);
 }
 
 void
 ibcm_sa_access_enter()
 {
-	mutex_enter(&ibcm_sa_timeout_lock);
-	while (ibcm_sa_timeout_simul == ibcm_sa_timeout_simul_max) {
-		cv_wait(&ibcm_sa_timeout_cv, &ibcm_sa_timeout_lock);
-	}
-	ibcm_sa_timeout_simul++;
-	mutex_exit(&ibcm_sa_timeout_lock);
+	ibcm_flow_enter(&ibcm_saa_flow);
 }
 
 void
 ibcm_sa_access_exit()
 {
-	mutex_enter(&ibcm_sa_timeout_lock);
-	cv_signal(&ibcm_sa_timeout_cv);
-	ibcm_sa_timeout_simul--;
-	mutex_exit(&ibcm_sa_timeout_lock);
+	ibcm_flow_exit(&ibcm_saa_flow);
 }
 
 static void
@@ -1533,9 +1574,11 @@ ibcm_sm_notice_handler(ibmf_saa_handle_t saa_handle,
 		break;
 	case IBMF_SAA_EVENT_GID_AVAILABLE:
 		code = IBT_SM_EVENT_GID_AVAIL;
+		ibcm_path_cache_purge();
 		break;
 	case IBMF_SAA_EVENT_GID_UNAVAILABLE:
 		code = IBT_SM_EVENT_GID_UNAVAIL;
+		ibcm_path_cache_purge();
 		break;
 	case IBMF_SAA_EVENT_SUBSCRIBER_STATUS_CHG:
 		event_status =
@@ -2010,7 +2053,8 @@ ibcm_comm_est_handler(ibt_async_event_t *eventp)
 		ibcm_cep_state_rtu(statep, NULL);
 
 	} else {
-		if (statep->state == IBCM_STATE_ESTABLISHED) {
+		if (statep->state == IBCM_STATE_ESTABLISHED ||
+		    statep->state == IBCM_STATE_TRANSIENT_ESTABLISHED) {
 			IBTF_DPRINTF_L4(cmlog, "ibcm_comm_est_handler: "
 			    "Channel already in ESTABLISHED state");
 		} else {
@@ -2085,6 +2129,7 @@ ibcm_async_handler(void *clnt_hdl, ibt_hca_hdl_t hca_hdl,
 		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*pup))
 		(void) taskq_dispatch(ibcm_taskq,
 		    ibcm_service_record_rewrite_task, pup, TQ_SLEEP);
+		ibcm_path_cache_purge();
 		return;
 
 	case IBT_HCA_ATTACH_EVENT:
