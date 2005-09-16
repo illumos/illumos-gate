@@ -38,6 +38,7 @@
 #include <ctype.h>
 #include <sys/mntio.h>
 #include <sys/mnttab.h>
+#include <sys/types.h>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -99,6 +100,9 @@ struct zone_dochandle {
 	xmlDocPtr	zone_dh_doc;
 	xmlNodePtr	zone_dh_cur;
 	xmlNodePtr	zone_dh_top;
+	boolean_t	zone_dh_newzone;
+	boolean_t	zone_dh_snapshot;
+	char		zone_dh_delete_name[ZONENAME_MAX];
 };
 
 /*
@@ -140,14 +144,11 @@ zonecfg_error_func(void *ctx, const char *msg, ...)
 zone_dochandle_t
 zonecfg_init_handle(void)
 {
-	zone_dochandle_t handle = malloc(sizeof (struct zone_dochandle));
+	zone_dochandle_t handle = calloc(1, sizeof (struct zone_dochandle));
 	if (handle == NULL) {
 		errno = Z_NOMEM;
 		return (NULL);
 	}
-	handle->zone_dh_doc = NULL;
-	handle->zone_dh_cur = NULL;
-	handle->zone_dh_top = NULL;
 
 	/* generic libxml initialization */
 	xmlLineNumbersDefault(1);
@@ -191,12 +192,62 @@ zonecfg_destroy_impl(char *filename)
 }
 
 int
-zonecfg_destroy(const char *zonename)
+zonecfg_destroy(const char *zonename, boolean_t force)
 {
 	char path[MAXPATHLEN];
+	struct zoneent ze;
+	int err, state_err;
+	zone_state_t state;
 
 	config_file_path(zonename, path);
-	return (zonecfg_destroy_impl(path));
+
+	state_err = zone_get_state((char *)zonename, &state);
+	err = access(path, W_OK);
+
+	/*
+	 * If there is no file, and no index entry, reliably indicate that no
+	 * such zone exists.
+	 */
+	if ((state_err == Z_NO_ZONE) && (err == -1) && (errno == ENOENT))
+		return (Z_NO_ZONE);
+
+	/*
+	 * Handle any other filesystem related errors (except if the XML
+	 * file is missing, which we treat silently), unless we're forcing,
+	 * in which case we plow on.
+	 */
+	if (err == -1 && errno != ENOENT) {
+		if (errno == EACCES)
+			return (Z_ACCES);
+		else if (!force)
+			return (Z_MISC_FS);
+	}
+
+	if (state > ZONE_STATE_INSTALLED)
+		return (Z_BAD_ZONE_STATE);
+
+	if (!force && state > ZONE_STATE_CONFIGURED)
+		return (Z_BAD_ZONE_STATE);
+
+	/*
+	 * Index deletion succeeds even if the entry doesn't exist.  So this
+	 * will fail only if we've had some more severe problem.
+	 */
+	bzero(&ze, sizeof (ze));
+	(void) strlcpy(ze.zone_name, zonename, sizeof (ze.zone_name));
+	if ((err = putzoneent(&ze, PZE_REMOVE)) != Z_OK)
+		if (!force)
+			return (err);
+
+	err = zonecfg_destroy_impl(path);
+
+	/*
+	 * Treat failure to find the XML file silently, since, well, it's
+	 * gone, and with the index file cleaned up, we're done.
+	 */
+	if (err == Z_OK || err == Z_NO_ZONE)
+		return (Z_OK);
+	return (err);
 }
 
 int
@@ -277,12 +328,39 @@ setrootattr(zone_dochandle_t handle, const xmlChar *propname, char *propval)
 	return (Z_OK);
 }
 
+static void
+addcomment(zone_dochandle_t handle, const char *comment)
+{
+	xmlNodePtr node;
+	node = xmlNewComment((xmlChar *) comment);
+
+	if (node != NULL)
+		(void) xmlAddPrevSibling(handle->zone_dh_top, node);
+}
+
+static void
+stripcomments(zone_dochandle_t handle)
+{
+	xmlDocPtr top;
+	xmlNodePtr child, next;
+
+	top = handle->zone_dh_doc;
+	for (child = top->xmlChildrenNode; child != NULL; child = next) {
+		next = child->next;
+		if (child->name == NULL)
+			continue;
+		if (xmlStrcmp(child->name, DTD_ELEM_COMMENT) == 0) {
+			next = child->next;
+			xmlUnlinkNode(child);
+			xmlFreeNode(child);
+		}
+	}
+}
+
 static int
 zonecfg_get_handle_impl(char *zonename, char *filename, zone_dochandle_t handle)
 {
 	xmlValidCtxtPtr cvp;
-	xmlDocPtr top;
-	xmlNodePtr child, next;
 	struct stat statbuf;
 	int valid;
 
@@ -302,18 +380,9 @@ zonecfg_get_handle_impl(char *zonename, char *filename, zone_dochandle_t handle)
 	xmlFreeValidCtxt(cvp);
 	if (valid == 0)
 		return (Z_INVALID_DOCUMENT);
+
 	/* delete any comments such as inherited Sun copyright / ident str */
-	top = handle->zone_dh_doc;
-	for (child = top->xmlChildrenNode; child != NULL; child = next) {
-		next = child->next;
-		if (child->name == NULL)
-			continue;
-		if (xmlStrcmp(child->name, DTD_ELEM_COMMENT) == 0) {
-			next = child->next;
-			xmlUnlinkNode(child);
-			xmlFreeNode(child);
-		}
-	}
+	stripcomments(handle);
 	return (Z_OK);
 }
 
@@ -323,6 +392,8 @@ zonecfg_get_handle(char *zonename, zone_dochandle_t handle)
 	char path[MAXPATHLEN];
 
 	config_file_path(zonename, path);
+	handle->zone_dh_newzone = B_FALSE;
+
 	return (zonecfg_get_handle_impl(zonename, path, handle));
 }
 
@@ -332,9 +403,83 @@ zonecfg_get_snapshot_handle(char *zonename, zone_dochandle_t handle)
 	char path[MAXPATHLEN];
 
 	snap_file_path(zonename, path);
+	handle->zone_dh_newzone = B_FALSE;
 	return (zonecfg_get_handle_impl(zonename, path, handle));
 }
 
+int
+zonecfg_get_template_handle(char *template, char *zonename,
+    zone_dochandle_t handle)
+{
+	char path[MAXPATHLEN];
+	int err;
+
+	config_file_path(template, path);
+
+	if ((err = zonecfg_get_handle_impl(template, path, handle)) != Z_OK)
+		return (err);
+	handle->zone_dh_newzone = B_TRUE;
+	return (setrootattr(handle, DTD_ATTR_NAME, zonename));
+}
+
+static boolean_t
+is_renaming(zone_dochandle_t handle)
+{
+	if (handle->zone_dh_newzone)
+		return (B_FALSE);
+	if (strlen(handle->zone_dh_delete_name) > 0)
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
+static boolean_t
+is_new(zone_dochandle_t handle)
+{
+	return (handle->zone_dh_newzone || handle->zone_dh_snapshot);
+}
+
+static boolean_t
+is_snapshot(zone_dochandle_t handle)
+{
+	return (handle->zone_dh_snapshot);
+}
+
+/*
+ * It would be great to be able to use libc's ctype(3c) macros, but we
+ * can't, as they are locale sensitive, and it would break our limited thread
+ * safety if this routine had to change the app locale on the fly.
+ */
+int
+zonecfg_validate_zonename(char *zone)
+{
+	int i;
+
+	if (strcmp(zone, GLOBAL_ZONENAME) == 0)
+		return (Z_BOGUS_ZONE_NAME);
+
+	if (strlen(zone) >= ZONENAME_MAX)
+		return (Z_BOGUS_ZONE_NAME);
+
+	if (!((zone[0] >= 'a' && zone[0] <= 'z') ||
+	    (zone[0] >= 'A' && zone[0] <= 'Z') ||
+	    (zone[0] >= '0' && zone[0] <= '9')))
+		return (Z_BOGUS_ZONE_NAME);
+
+	for (i = 1; zone[i] != '\0'; i++) {
+		if (!((zone[i] >= 'a' && zone[i] <= 'z') ||
+		    (zone[i] >= 'A' && zone[i] <= 'Z') ||
+		    (zone[i] >= '0' && zone[i] <= '9') ||
+		    (zone[i] == '-') || (zone[i] == '_') || (zone[i] == '.')))
+			return (Z_BOGUS_ZONE_NAME);
+	}
+
+	return (Z_OK);
+}
+
+/*
+ * Changing the zone name requires us to track both the old and new
+ * name of the zone until commit time.
+ */
 int
 zonecfg_get_name(zone_dochandle_t handle, char *name, size_t namesize)
 {
@@ -344,7 +489,85 @@ zonecfg_get_name(zone_dochandle_t handle, char *name, size_t namesize)
 int
 zonecfg_set_name(zone_dochandle_t handle, char *name)
 {
-	return (setrootattr(handle, DTD_ATTR_NAME, name));
+	zone_state_t state;
+	char curname[ZONENAME_MAX], old_delname[ZONENAME_MAX];
+	int err;
+
+	if ((err = getrootattr(handle, DTD_ATTR_NAME, curname,
+	    sizeof (curname))) != Z_OK)
+		return (err);
+
+	if (strcmp(name, curname) == 0)
+		return (Z_OK);
+
+	/*
+	 * Switching zone names to one beginning with SUNW is not permitted.
+	 */
+	if (strncmp(name, "SUNW", 4) == 0)
+		return (Z_BOGUS_ZONE_NAME);
+
+	if ((err = zonecfg_validate_zonename(name)) != Z_OK)
+		return (err);
+
+	/*
+	 * Setting the name back to the original name (effectively a revert of
+	 * the name) is fine.  But if we carry on, we'll falsely identify the
+	 * name as "in use," so special case here.
+	 */
+	if (strcmp(name, handle->zone_dh_delete_name) == 0) {
+		err = setrootattr(handle, DTD_ATTR_NAME, name);
+		handle->zone_dh_delete_name[0] = '\0';
+		return (err);
+	}
+
+	/* Check to see if new name chosen is already in use */
+	if (zone_get_state(name, &state) != Z_NO_ZONE)
+		return (Z_NAME_IN_USE);
+
+	/*
+	 * If this isn't already "new" or in a renaming transition, then
+	 * we're initiating a rename here; so stash the "delete name"
+	 * (i.e. the name of the zone we'll be removing) for the rename.
+	 */
+	(void) strlcpy(old_delname, handle->zone_dh_delete_name,
+	    sizeof (old_delname));
+	if (!is_new(handle) && !is_renaming(handle)) {
+		/*
+		 * Name change is allowed only when the zone we're altering
+		 * is not ready or running.
+		 */
+		err = zone_get_state(curname, &state);
+		if (err == Z_OK) {
+			if (state > ZONE_STATE_INSTALLED)
+				return (Z_BAD_ZONE_STATE);
+		} else if (err != Z_NO_ZONE) {
+			return (err);
+		}
+
+		(void) strlcpy(handle->zone_dh_delete_name, curname,
+		    sizeof (handle->zone_dh_delete_name));
+		assert(is_renaming(handle));
+	} else if (is_renaming(handle)) {
+		err = zone_get_state(handle->zone_dh_delete_name, &state);
+		if (err == Z_OK) {
+			if (state > ZONE_STATE_INSTALLED)
+				return (Z_BAD_ZONE_STATE);
+		} else if (err != Z_NO_ZONE) {
+			return (err);
+		}
+	}
+
+	if ((err = setrootattr(handle, DTD_ATTR_NAME, name)) != Z_OK) {
+		/*
+		 * Restore the deletename to whatever it was at the
+		 * top of the routine, since we've had a failure.
+		 */
+		(void) strlcpy(handle->zone_dh_delete_name, old_delname,
+		    sizeof (handle->zone_dh_delete_name));
+		return (err);
+	}
+
+	return (Z_OK);
 }
 
 int
@@ -402,6 +625,11 @@ zonecfg_set_pool(zone_dochandle_t handle, char *pool)
  * in the <zonename>.xml file: the path to the zone.  This is for performance,
  * since we need to walk all zonepath's in order to be able to detect conflicts
  * (see crosscheck_zonepaths() in the zoneadm command).
+ *
+ * An additional complexity is that when doing a rename, we'd like the entire
+ * index update operation (rename, and potential state changes) to be atomic.
+ * In general, the operation of this function should succeed or fail as
+ * a unit.
  */
 int
 zonecfg_refresh_index_file(zone_dochandle_t handle)
@@ -409,25 +637,94 @@ zonecfg_refresh_index_file(zone_dochandle_t handle)
 	char name[ZONENAME_MAX], zonepath[MAXPATHLEN];
 	struct zoneent ze;
 	int err;
+	int opcode;
+	char *zn;
+
+	bzero(&ze, sizeof (ze));
+	ze.zone_state = -1;	/* Preserve existing state in index */
 
 	if ((err = zonecfg_get_name(handle, name, sizeof (name))) != Z_OK)
 		return (err);
+	(void) strlcpy(ze.zone_name, name, sizeof (ze.zone_name));
+
 	if ((err = zonecfg_get_zonepath(handle, zonepath,
 	    sizeof (zonepath))) != Z_OK)
 		return (err);
-	(void) strlcpy(ze.zone_name, name, sizeof (ze.zone_name));
-	ze.zone_state = -1;
 	(void) strlcpy(ze.zone_path, zonepath, sizeof (ze.zone_path));
-	return (putzoneent(&ze, PZE_MODIFY));
+
+	if (is_renaming(handle)) {
+		opcode = PZE_MODIFY;
+		(void) strlcpy(ze.zone_name, handle->zone_dh_delete_name,
+		    sizeof (ze.zone_name));
+		(void) strlcpy(ze.zone_newname, name, sizeof (ze.zone_newname));
+	} else if (is_new(handle)) {
+		FILE *cookie;
+		/*
+		 * Be tolerant of the zone already existing in the index file,
+		 * since we might be forcibly overwriting an existing
+		 * configuration with a new one (for example 'create -F'
+		 * in zonecfg).
+		 */
+		opcode = PZE_ADD;
+		cookie = setzoneent();
+		while ((zn = getzoneent(cookie)) != NULL) {
+			if (strcmp(zn, name) == 0) {
+				opcode = PZE_MODIFY;
+				free(zn);
+				break;
+			}
+			free(zn);
+		}
+		endzoneent(cookie);
+		ze.zone_state = ZONE_STATE_CONFIGURED;
+	} else {
+		opcode = PZE_MODIFY;
+	}
+
+	if ((err = putzoneent(&ze, opcode)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
 }
 
+/*
+ * The goal of this routine is to cause the index file update and the
+ * document save to happen as an atomic operation.  We do the document
+ * first, saving a backup copy using a hard link; if that succeeds, we go
+ * on to the index.  If that fails, we roll the document back into place.
+ *
+ * Strategy:
+ *
+ * New zone 'foo' configuration:
+ * 	Create tmpfile (zonecfg.xxxxxx)
+ * 	Write XML to tmpfile
+ * 	Rename tmpfile to xmlfile (zonecfg.xxxxxx -> foo.xml)
+ * 	Add entry to index file
+ * 	If it fails, delete foo.xml, leaving nothing behind.
+ *
+ * Save existing zone 'foo':
+ * 	Make backup of foo.xml -> .backup
+ * 	Create tmpfile (zonecfg.xxxxxx)
+ * 	Write XML to tmpfile
+ * 	Rename tmpfile to xmlfile (zonecfg.xxxxxx -> foo.xml)
+ * 	Modify index file as needed
+ * 	If it fails, recover from .backup -> foo.xml
+ *
+ * Rename 'foo' to 'bar':
+ * 	Create tmpfile (zonecfg.xxxxxx)
+ * 	Write XML to tmpfile
+ * 	Rename tmpfile to xmlfile (zonecfg.xxxxxx -> bar.xml)
+ * 	Add entry for 'bar' to index file, Remove entry for 'foo' (refresh)
+ * 	If it fails, delete bar.xml; foo.xml is left behind.
+ */
 static int
 zonecfg_save_impl(zone_dochandle_t handle, char *filename)
 {
 	char tmpfile[MAXPATHLEN];
-	int tmpfd;
+	char bakdir[MAXPATHLEN], bakbase[MAXPATHLEN], bakfile[MAXPATHLEN];
+	int tmpfd, err;
 	xmlValidCtxt cvp = { NULL };
-	xmlNodePtr comment;
+	boolean_t backup;
 
 	(void) strlcpy(tmpfile, filename, sizeof (tmpfile));
 	(void) dirname(tmpfile);
@@ -443,28 +740,82 @@ zonecfg_save_impl(zone_dochandle_t handle, char *filename)
 	cvp.error = zonecfg_error_func;
 	cvp.warning = zonecfg_error_func;
 
-	if ((comment = xmlNewComment((xmlChar *) "\n    DO NOT EDIT THIS "
-	    "FILE.  Use zonecfg(1M) instead.\n")) == NULL)
-		goto err;
-	if (xmlAddPrevSibling(handle->zone_dh_top, comment) == 0)
-		goto err;
-
-	if (xmlValidateDocument(&cvp, handle->zone_dh_doc) == 0)
-		goto err;
+	/*
+	 * We do a final validation of the document-- but the library has
+	 * malfunctioned if it fails to validate, so it's an assert.
+	 */
+	assert(xmlValidateDocument(&cvp, handle->zone_dh_doc) != 0);
 
 	if (xmlSaveFormatFile(tmpfile, handle->zone_dh_doc, 1) <= 0)
 		goto err;
+
 	(void) chmod(tmpfile, 0644);
 
+	/*
+	 * In the event we are doing a standard save, hard link a copy of the
+	 * original file in .backup.<pid>.filename so we can restore it if
+	 * something goes wrong.
+	 */
+	if (!is_new(handle) && !is_renaming(handle)) {
+		backup = B_TRUE;
+
+		(void) strlcpy(bakdir, filename, sizeof (bakdir));
+		(void) strlcpy(bakbase, filename, sizeof (bakbase));
+		(void) snprintf(bakfile, sizeof (bakfile), "%s/.backup.%d.%s",
+		    dirname(bakdir), getpid(), basename(bakbase));
+
+		if (link(filename, bakfile) == -1) {
+			err = errno;
+			(void) unlink(tmpfile);
+			if (errno == EACCES)
+				return (Z_ACCES);
+			return (Z_MISC_FS);
+		}
+	}
+
+	/*
+	 * Move the new document over top of the old.
+	 * i.e.:   zonecfg.XXXXXX  ->  myzone.xml
+	 */
 	if (rename(tmpfile, filename) == -1) {
+		err = errno;
 		(void) unlink(tmpfile);
-		if (errno == EACCES)
+		if (backup)
+			(void) unlink(bakfile);
+		if (err == EACCES)
 			return (Z_ACCES);
 		return (Z_MISC_FS);
 	}
 
-	/* now update the cached copy of the zone path in the index file */
-	return (zonecfg_refresh_index_file(handle));
+	/*
+	 * If this is a snapshot, we're done-- don't add an index entry.
+	 */
+	if (is_snapshot(handle))
+		return (Z_OK);
+
+	/* now update the index file to reflect whatever we just did */
+	if ((err = zonecfg_refresh_index_file(handle)) != Z_OK) {
+		if (backup) {
+			/*
+			 * Try to restore from our backup.
+			 */
+			(void) unlink(filename);
+			(void) rename(bakfile, filename);
+		} else {
+			/*
+			 * Either the zone is new, in which case we can delete
+			 * new.xml, or we're doing a rename, so ditto.
+			 */
+			assert(is_new(handle) || is_renaming(handle));
+			(void) unlink(filename);
+		}
+		return (Z_UPDATING_INDEX);
+	}
+
+	if (backup)
+		(void) unlink(bakfile);
+
+	return (Z_OK);
 
 err:
 	(void) unlink(tmpfile);
@@ -474,14 +825,43 @@ err:
 int
 zonecfg_save(zone_dochandle_t handle)
 {
-	char zname[MAXPATHLEN], path[MAXPATHLEN];
-	int err;
+	char zname[ZONENAME_MAX], path[MAXPATHLEN];
+	char delpath[MAXPATHLEN];
+	int err = Z_SAVING_FILE;
 
-	if ((err = zonecfg_get_name(handle, zname, sizeof (zname))) != Z_OK) {
+	if (zonecfg_check_handle(handle) != Z_OK)
+		return (Z_BAD_HANDLE);
+
+	/*
+	 * We don't support saving snapshots at this time.
+	 */
+	if (handle->zone_dh_snapshot)
+		return (Z_INVAL);
+
+	if ((err = zonecfg_get_name(handle, zname, sizeof (zname))) != Z_OK)
 		return (err);
-	}
+
 	config_file_path(zname, path);
-	return (zonecfg_save_impl(handle, path));
+
+	addcomment(handle, "\n    DO NOT EDIT THIS "
+	    "FILE.  Use zonecfg(1M) instead.\n");
+
+	err = zonecfg_save_impl(handle, path);
+
+	stripcomments(handle);
+
+	if (err != Z_OK)
+		return (err);
+
+	handle->zone_dh_newzone = B_FALSE;
+
+	if (is_renaming(handle)) {
+		config_file_path(handle->zone_dh_delete_name, delpath);
+		(void) unlink(delpath);
+		handle->zone_dh_delete_name[0] = '\0';
+	}
+
+	return (Z_OK);
 }
 
 /*
@@ -519,6 +899,9 @@ zonecfg_create_snapshot(char *zonename)
 		return (Z_NOMEM);
 	}
 
+	handle->zone_dh_newzone = B_TRUE;
+	handle->zone_dh_snapshot = B_TRUE;
+
 	if ((error = zonecfg_get_handle(zonename, handle)) != Z_OK)
 		goto out;
 	if ((error = operation_prep(handle)) != Z_OK)
@@ -548,7 +931,13 @@ zonecfg_create_snapshot(char *zonename)
 	}
 
 	snap_file_path(zonename, path);
+
+	addcomment(handle, "\n    DO NOT EDIT THIS FILE.  "
+	    "It is a snapshot of running zone state.\n");
+
 	error = zonecfg_save_impl(handle, path);
+
+	stripcomments(handle);
 
 out:
 	zonecfg_fini_handle(handle);
@@ -2142,13 +2531,13 @@ zonecfg_strerror(int errnum)
 		return (dgettext(TEXT_DOMAIN, "No such property type"));
 	case Z_NO_PROPERTY_ID:
 		return (dgettext(TEXT_DOMAIN, "No such property with that id"));
-	case Z_RESOURCE_EXISTS:
+	case Z_BAD_ZONE_STATE:
 		return (dgettext(TEXT_DOMAIN,
-		    "Resource already exists with that id"));
+		    "Zone state is invalid for the requested operation"));
 	case Z_INVALID_DOCUMENT:
 		return (dgettext(TEXT_DOMAIN, "Invalid document"));
-	case Z_ID_IN_USE:
-		return (dgettext(TEXT_DOMAIN, "Zone ID in use"));
+	case Z_NAME_IN_USE:
+		return (dgettext(TEXT_DOMAIN, "Zone name already in use"));
 	case Z_NO_SUCH_ID:
 		return (dgettext(TEXT_DOMAIN, "No such zone ID"));
 	case Z_UPDATING_INDEX:
@@ -2578,26 +2967,6 @@ zonecfg_get_privset(priv_set_t *privs)
 }
 
 int
-zonecfg_add_index(char *zone, char *path)
-{
-	struct zoneent ze;
-
-	(void) strlcpy(ze.zone_name, zone, sizeof (ze.zone_name));
-	ze.zone_state = ZONE_STATE_CONFIGURED;
-	(void) strlcpy(ze.zone_path, path, sizeof (ze.zone_path));
-	return (putzoneent(&ze, PZE_ADD));
-}
-
-int
-zonecfg_delete_index(char *zone)
-{
-	struct zoneent ze;
-
-	(void) strlcpy(ze.zone_name, zone, sizeof (ze.zone_name));
-	return (putzoneent(&ze, PZE_REMOVE));
-}
-
-int
 zone_get_zonepath(char *zone_name, char *zonepath, size_t rp_sz)
 {
 	zone_dochandle_t handle;
@@ -2733,6 +3102,7 @@ zone_set_state(char *zone, zone_state_t state)
 	    state != ZONE_STATE_INCOMPLETE)
 		return (Z_INVAL);
 
+	bzero(&ze, sizeof (ze));
 	(void) strlcpy(ze.zone_name, zone, sizeof (ze.zone_name));
 	ze.zone_state = state;
 	(void) strlcpy(ze.zone_path, "", sizeof (ze.zone_path));

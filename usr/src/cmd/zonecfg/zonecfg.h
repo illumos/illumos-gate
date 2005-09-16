@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,37 +69,39 @@ typedef int bool;
 
 /* resource types: increment RT_MAX when expanding this list */
 #define	RT_UNKNOWN	0
-#define	RT_ZONEPATH	1	/* really a property, but for info ... */
-#define	RT_AUTOBOOT	2	/* really a property, but for info ... */
-#define	RT_POOL		3	/* really a property, but for info ... */
-#define	RT_FS		4
-#define	RT_IPD		5
-#define	RT_NET		6
-#define	RT_DEVICE	7
-#define	RT_RCTL		8
-#define	RT_ATTR		9
+#define	RT_ZONENAME	1	/* really a property, but for info ... */
+#define	RT_ZONEPATH	2	/* really a property, but for info ... */
+#define	RT_AUTOBOOT	3	/* really a property, but for info ... */
+#define	RT_POOL		4	/* really a property, but for info ... */
+#define	RT_FS		5
+#define	RT_IPD		6
+#define	RT_NET		7
+#define	RT_DEVICE	8
+#define	RT_RCTL		9
+#define	RT_ATTR		10
 
 #define	RT_MIN		RT_UNKNOWN
 #define	RT_MAX		RT_ATTR
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0
-#define	PT_ZONEPATH	1
-#define	PT_AUTOBOOT	2
-#define	PT_POOL		3
-#define	PT_DIR		4
-#define	PT_SPECIAL	5
-#define	PT_TYPE		6
-#define	PT_OPTIONS	7
-#define	PT_ADDRESS	8
-#define	PT_PHYSICAL	9
-#define	PT_NAME		10
-#define	PT_VALUE	11
-#define	PT_MATCH	12
-#define	PT_PRIV		13
-#define	PT_LIMIT	14
-#define	PT_ACTION	15
-#define	PT_RAW		16
+#define	PT_ZONENAME	1
+#define	PT_ZONEPATH	2
+#define	PT_AUTOBOOT	3
+#define	PT_POOL		4
+#define	PT_DIR		5
+#define	PT_SPECIAL	6
+#define	PT_TYPE		7
+#define	PT_OPTIONS	8
+#define	PT_ADDRESS	9
+#define	PT_PHYSICAL	10
+#define	PT_NAME		11
+#define	PT_VALUE	12
+#define	PT_MATCH	13
+#define	PT_PRIV		14
+#define	PT_LIMIT	15
+#define	PT_ACTION	16
+#define	PT_RAW		17
 
 #define	PT_MIN		PT_UNKNOWN
 #define	PT_MAX		PT_RAW

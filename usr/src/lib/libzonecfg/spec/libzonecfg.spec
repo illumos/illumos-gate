@@ -44,6 +44,12 @@ declaration	int zonecfg_get_snapshot_handle(char *, zone_dochandle_t)
 version		SUNWprivate_1.1
 end		
 
+function	zonecfg_get_template_handle
+include		<libzonecfg.h>
+declaration	int zonecfg_get_template_handle(char *, char *, zone_dochandle_t)
+version		SUNWprivate_1.1
+end		
+
 function	zonecfg_check_handle
 include		<libzonecfg.h>
 declaration	int zonecfg_check_handle(zone_dochandle_t)
@@ -67,6 +73,12 @@ include		<libzonecfg.h>
 declaration	int zonecfg_set_name(zone_dochandle_t, char *)
 version		SUNWprivate_1.1
 end		
+
+function	zonecfg_validate_zonename
+include		<libzonecfg.h>
+declaration	int zonecfg_validate_zonename(char *)
+version		SUNWprivate_1.1
+end
 
 function	zonecfg_get_zonepath
 include		<libzonecfg.h>
@@ -430,7 +442,7 @@ end
 
 function	zonecfg_destroy
 include		<libzonecfg.h>
-declaration	int zonecfg_destroy(const char *)
+declaration	int zonecfg_destroy(const char *, boolean_t)
 version		SUNWprivate_1.1
 end		
 
@@ -494,18 +506,6 @@ include		<libzonecfg.h>
 declaration	void putzoneent(struct zoneent *, int)
 version		SUNWprivate_1.1
 end
-
-function	zonecfg_add_index
-include		<libzonecfg.h>
-declaration	int zonecfg_add_index(char *, char *)
-version		SUNWprivate_1.1
-end		
-
-function	zonecfg_delete_index
-include		<libzonecfg.h>
-declaration	int zonecfg_delete_index(char *)
-version		SUNWprivate_1.1
-end		
 
 function	zone_get_id
 include		<libzonecfg.h>

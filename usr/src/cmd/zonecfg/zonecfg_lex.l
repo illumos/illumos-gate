@@ -20,7 +20,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,6 +155,9 @@ char *safe_strdup(char *s);
 <TSTATE>rctl	{ return RCTL; }
 
 <TSTATE>attr	{ return ATTR; }
+
+<TSTATE>zonename	{ return ZONENAME; }
+<CSTATE>zonename	{ return ZONENAME; }
 
 <TSTATE>zonepath	{ return ZONEPATH; }
 <CSTATE>zonepath	{ return ZONEPATH; }

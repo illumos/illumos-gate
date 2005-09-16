@@ -58,9 +58,9 @@ extern void yyerror(char *s);
 %start commands
 
 %token HELP CREATE EXPORT ADD DELETE REMOVE SELECT SET INFO CANCEL END VERIFY
-%token COMMIT REVERT EXIT SEMICOLON TOKEN ZONEPATH AUTOBOOT POOL NET FS IPD ATTR
-%token DEVICE RCTL SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
-%token MATCH PRIV LIMIT ACTION VALUE EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
+%token COMMIT REVERT EXIT SEMICOLON TOKEN ZONENAME ZONEPATH AUTOBOOT POOL NET
+%token FS IPD ATTR DEVICE RCTL SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL
+%token NAME MATCH PRIV LIMIT ACTION VALUE EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
 %token OPEN_PAREN CLOSE_PAREN COMMA
 
 %type <strval> TOKEN EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
@@ -68,7 +68,7 @@ extern void yyerror(char *s);
 %type <complex> complex_piece complex_prop_val
 %type <ival> resource_type NET FS IPD DEVICE RCTL ATTR
 %type <ival> property_name SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
-    MATCH ZONEPATH AUTOBOOT POOL VALUE PRIV LIMIT ACTION
+    MATCH ZONENAME ZONEPATH AUTOBOOT POOL VALUE PRIV LIMIT ACTION
 %type <cmd> command
 %type <cmd> add_command ADD
 %type <cmd> cancel_command CANCEL
@@ -402,6 +402,15 @@ info_command:	INFO
 		$$->cmd_res_type = $2;
 		$$->cmd_prop_nv_pairs = 0;
 	}
+	|	INFO ZONENAME
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_ZONENAME;
+		$$->cmd_prop_nv_pairs = 0;
+	}
 	|	INFO ZONEPATH
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -665,6 +674,7 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| DIR		{ $$ = PT_DIR; }
 	| TYPE		{ $$ = PT_TYPE; }
 	| OPTIONS	{ $$ = PT_OPTIONS; }
+	| ZONENAME	{ $$ = PT_ZONENAME; }
 	| ZONEPATH	{ $$ = PT_ZONEPATH; }
 	| AUTOBOOT	{ $$ = PT_AUTOBOOT; }
 	| POOL		{ $$ = PT_POOL; }

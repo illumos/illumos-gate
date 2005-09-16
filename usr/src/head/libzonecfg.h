@@ -72,9 +72,9 @@ extern "C" {
 #define	Z_NO_RESOURCE_ID	18	/* no/wrong resource id */
 #define	Z_NO_PROPERTY_TYPE	19	/* no/wrong property type */
 #define	Z_NO_PROPERTY_ID	20	/* no/wrong property id */
-#define	Z_RESOURCE_EXISTS	21	/* resource already exists */
+#define	Z_BAD_ZONE_STATE	21	/* zone state invalid for given task */
 #define	Z_INVALID_DOCUMENT	22	/* libxml can't validate against DTD */
-#define	Z_ID_IN_USE		23	/* add_index conflict */
+#define	Z_NAME_IN_USE		23	/* zone name already in use (rename) */
 #define	Z_NO_SUCH_ID		24	/* delete_index: no old ID */
 #define	Z_UPDATING_INDEX	25	/* add/modify/delete_index problem */
 #define	Z_LOCKING_FILE		26	/* problem locking index file */
@@ -108,6 +108,7 @@ struct zoneent {
 	char	zone_name[ZONENAME_MAX];	/* name of the zone */
 	int	zone_state;	/* configured | incomplete | installed */
 	char	zone_path[MAXPATHLEN];
+	char	zone_newname[ZONENAME_MAX];	/* for doing renames */
 };
 
 typedef struct zone_dochandle *zone_dochandle_t;	/* opaque handle */
@@ -160,9 +161,10 @@ struct zone_attrtab {
 extern	zone_dochandle_t	zonecfg_init_handle(void);
 extern	int	zonecfg_get_handle(char *, zone_dochandle_t);
 extern	int	zonecfg_get_snapshot_handle(char *, zone_dochandle_t);
+extern	int	zonecfg_get_template_handle(char *, char *, zone_dochandle_t);
 extern	int	zonecfg_check_handle(zone_dochandle_t);
 extern	void	zonecfg_fini_handle(zone_dochandle_t);
-extern	int	zonecfg_destroy(const char *);
+extern	int	zonecfg_destroy(const char *, boolean_t);
 extern	int	zonecfg_destroy_snapshot(char *);
 extern	int	zonecfg_save(zone_dochandle_t);
 extern	int	zonecfg_create_snapshot(char *);
@@ -172,6 +174,7 @@ extern	int	zonecfg_access(const char *, int);
 /*
  * Zone name, path to zone directory, autoboot setting and pool.
  */
+extern	int	zonecfg_validate_zonename(char *);
 extern	int	zonecfg_get_name(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_name(zone_dochandle_t, char *);
 extern	int	zonecfg_get_zonepath(zone_dochandle_t, char *, size_t);
@@ -277,12 +280,6 @@ extern	int	zonecfg_endrctlent(zone_dochandle_t);
  * Privilege-related functions.
  */
 extern	int	zonecfg_get_privset(priv_set_t *);
-
-/*
- * Index update routines.
- */
-extern	int	zonecfg_add_index(char *, char *);
-extern	int	zonecfg_delete_index(char *);
 
 /*
  * Higher-level routines.

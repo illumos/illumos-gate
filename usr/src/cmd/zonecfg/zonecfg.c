@@ -143,6 +143,7 @@ static struct help helptab[] = {
 /* These *must* match the order of the RT_ define's from zonecfg.h */
 static char *res_types[] = {
 	"unknown",
+	"zonename",
 	"zonepath",
 	"autoboot",
 	"pool",
@@ -158,6 +159,7 @@ static char *res_types[] = {
 /* These *must* match the order of the PT_ define's from zonecfg.h */
 static char *prop_types[] = {
 	"unknown",
+	"zonename",
 	"zonepath",
 	"autoboot",
 	"pool",
@@ -221,19 +223,20 @@ static const char *add_cmds[] = {
 };
 
 static const char *select_cmds[] = {
-	"select fs",
-	"select inherit-pkg-dir",
-	"select net",
-	"select device",
-	"select rctl",
-	"select attr",
+	"select fs ",
+	"select inherit-pkg-dir ",
+	"select net ",
+	"select device ",
+	"select rctl ",
+	"select attr ",
 	NULL
 };
 
 static const char *set_cmds[] = {
-	"set zonepath",
-	"set autoboot",
-	"set pool",
+	"set zonename=",
+	"set zonepath=",
+	"set autoboot=",
+	"set pool=",
 	NULL
 };
 
@@ -314,7 +317,8 @@ static char *execname;
 static zone_dochandle_t handle;
 
 /* used all over the place */
-static char *zone;
+static char zone[ZONENAME_MAX];
+static char revert_zone[ZONENAME_MAX];
 
 /* set in modifying functions, checked in read_input() */
 static bool need_to_commit = FALSE;
@@ -343,9 +347,6 @@ static bool interactive_mode;
 
 /* set in main(), checked in multiple places */
 static bool read_only_mode;
-
-/* set in check_if_zone_already_exists(), checked in save_it() */
-static bool new_zone = FALSE;
 
 static bool global_scope = TRUE; /* scope is outer/global or inner/resource */
 static int resource_scope;	/* should be in the RT_ list from zonecfg.h */
@@ -849,6 +850,8 @@ usage(bool verbose, uint_t flags)
 		(void) fprintf(fp, gettext("For resource type ... there are "
 		    "property types ...:\n"));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_ZONENAME));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_ZONEPATH));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_AUTOBOOT));
@@ -942,6 +945,23 @@ initialize(bool handle_expected)
 	return (Z_OK);
 }
 
+static bool
+state_atleast(zone_state_t state)
+{
+	zone_state_t state_num;
+	int err;
+
+	if ((err = zone_get_state(zone, &state_num)) != Z_OK) {
+		/* all states are greater than "non-existent" */
+		if (err == Z_NO_ZONE)
+			return (B_FALSE);
+		zerr(gettext("Unexpectedly failed to determine state "
+		    "of zone %s: %s"), zone, zonecfg_strerror(err));
+		exit(Z_ERR);
+	}
+	return (state_num >= state);
+}
+
 /*
  * short_usage() is for bad syntax: getopt() issues, too many arguments, etc.
  */
@@ -1023,10 +1043,13 @@ ask_yesno(bool default_answer, const char *question)
 		return (-1);
 	}
 	for (;;) {
-		(void) printf("%s (%s)? ", question,
-		    default_answer ? "[y]/n" : "y/[n]");
-		if (fgets(line, sizeof (line), stdin) == NULL ||
-		    line[0] == '\n')
+		if (printf("%s (%s)? ", question,
+		    default_answer ? "[y]/n" : "y/[n]") < 0)
+			return (-1);
+		if (fgets(line, sizeof (line), stdin) == NULL)
+			return (-1);
+
+		if (line[0] == '\n')
 			return (default_answer ? 1 : 0);
 		if (tolower(line[0]) == 'y')
 			return (1);
@@ -1048,7 +1071,6 @@ static int
 check_if_zone_already_exists(bool force)
 {
 	char line[ZONENAME_MAX + 128];	/* enough to ask a question */
-	zone_state_t state_num;
 	zone_dochandle_t tmphandle;
 	int res, answer;
 
@@ -1058,12 +1080,10 @@ check_if_zone_already_exists(bool force)
 	}
 	res = zonecfg_get_handle(zone, tmphandle);
 	zonecfg_fini_handle(tmphandle);
-	if (res != Z_OK) {
-		new_zone = TRUE;
+	if (res != Z_OK)
 		return (Z_OK);
-	}
-	if (zone_get_state(zone, &state_num) == Z_OK &&
-	    state_num >= ZONE_STATE_INSTALLED) {
+
+	if (state_atleast(ZONE_STATE_INSTALLED)) {
 		zerr(gettext("Zone %s already installed; %s not allowed."),
 		    zone, cmd_to_str(CMD_CREATE));
 		return (Z_ERR);
@@ -1167,17 +1187,17 @@ create_func(cmd_t *cmd)
 		zone_perror(execname, Z_NOMEM, TRUE);
 		exit(Z_ERR);
 	}
-	if ((err = zonecfg_get_handle(zone_template, tmphandle)) != Z_OK) {
+	if ((err = zonecfg_get_template_handle(zone_template, zone,
+	    tmphandle)) != Z_OK) {
 		zonecfg_fini_handle(tmphandle);
 		zone_perror(zone_template, err, TRUE);
 		return;
 	}
+
+	need_to_commit = TRUE;
 	zonecfg_fini_handle(handle);
 	handle = tmphandle;
-	if ((err = zonecfg_set_name(handle, zone)) == Z_OK)
-		need_to_commit = TRUE;
-	else
-		zone_perror(zone, err, TRUE);
+	got_handle = TRUE;
 }
 
 /*
@@ -1456,7 +1476,6 @@ static void
 add_resource(cmd_t *cmd)
 {
 	int type;
-	zone_state_t state_num;
 
 	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
 		long_usage(CMD_ADD, TRUE);
@@ -1468,8 +1487,7 @@ add_resource(cmd_t *cmd)
 		bzero(&in_progress_fstab, sizeof (in_progress_fstab));
 		return;
 	case RT_IPD:
-		if (zone_get_state(zone, &state_num) == Z_OK &&
-		    state_num >= ZONE_STATE_INSTALLED) {
+		if (state_atleast(ZONE_STATE_INSTALLED)) {
 			zerr(gettext("Zone %s already installed; %s %s not "
 			    "allowed."), zone, cmd_to_str(CMD_ADD),
 			    rt_to_str(RT_IPD));
@@ -1722,13 +1740,20 @@ add_func(cmd_t *cmd)
 		add_property(cmd);
 }
 
+/*
+ * This routine has an unusual implementation, because it tries very
+ * hard to succeed in the face of a variety of failure modes.
+ * The most common and most vexing occurs when the index file and
+ * the /etc/zones/<zonename.xml> file are not both present.  In
+ * this case, delete must eradicate as much of the zone state as is left
+ * so that the user can later create a new zone with the same name.
+ */
 void
 delete_func(cmd_t *cmd)
 {
 	int err, arg, answer;
 	char line[ZONENAME_MAX + 128];	/* enough to ask a question */
 	bool force = FALSE;
-	zone_state_t state_num;
 
 	optind = 0;
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?F")) != EOF) {
@@ -1752,54 +1777,70 @@ delete_func(cmd_t *cmd)
 	if (zone_is_read_only(CMD_DELETE))
 		return;
 
-	if (zone_get_state(zone, &state_num) == Z_OK &&
-	    state_num >= ZONE_STATE_INCOMPLETE) {
-		zerr(gettext("Zone %s not in %s state; %s not allowed."),
-		    zone, zone_state_str(ZONE_STATE_CONFIGURED),
-		    cmd_to_str(CMD_DELETE));
-		saw_error = TRUE;
-		return;
-	}
-
-	if (initialize(TRUE) != Z_OK)
-		return;
-
 	if (!force) {
+		/*
+		 * Initialize sets up the global called "handle" and warns the
+		 * user if the zone is not configured.  In force mode, we don't
+		 * trust that evaluation, and hence skip it.  (We don't need the
+		 * handle to be loaded anyway, since zonecfg_destroy is done by
+		 * zonename).  However, we also have to take care to emulate the
+		 * messages spit out by initialize; see below.
+		 */
+		if (initialize(TRUE) != Z_OK)
+			return;
+
 		(void) snprintf(line, sizeof (line),
 		    gettext("Are you sure you want to delete zone %s"), zone);
 		if ((answer = ask_yesno(FALSE, line)) == -1) {
-			zerr(gettext("Input not from "
-			    "terminal and -F not specified:\n%s command "
-			    "ignored, exiting."), cmd_to_str(CMD_DELETE));
+			zerr(gettext("Input not from terminal and -F not "
+			    "specified:\n%s command ignored, exiting."),
+			    cmd_to_str(CMD_DELETE));
 			exit(Z_ERR);
 		}
 		if (answer != 1)
 			return;
 	}
 
-	if ((err = zonecfg_delete_index(zone)) != Z_OK) {
-		zone_perror(zone, err, TRUE);
-		return;
+	if ((err = zonecfg_destroy(zone, force)) != Z_OK) {
+		if ((err == Z_BAD_ZONE_STATE) && !force) {
+			zerr(gettext("Zone %s not in %s state; %s not "
+			    "allowed.  Use -F to force %s."),
+			    zone, zone_state_str(ZONE_STATE_CONFIGURED),
+			    cmd_to_str(CMD_DELETE), cmd_to_str(CMD_DELETE));
+		} else {
+			zone_perror(zone, err, TRUE);
+		}
 	}
-
 	need_to_commit = FALSE;
-	if ((err = zonecfg_destroy(zone)) != Z_OK)
-		zone_perror(zone, err, TRUE);
+
+	/*
+	 * Emulate initialize's messaging; if there wasn't a valid handle to
+	 * begin with, then user had typed delete (or delete -F) multiple
+	 * times.  So we emit a message.
+	 *
+	 * We only do this in the 'force' case because normally, initialize()
+	 * takes care of this for us.
+	 */
+	if (force && zonecfg_check_handle(handle) != Z_OK && interactive_mode)
+		(void) printf(gettext("Use '%s' to begin "
+		    "configuring a new zone.\n"), cmd_to_str(CMD_CREATE));
 
 	/*
 	 * Time for a new handle: finish the old one off first
 	 * then get a new one properly to avoid leaks.
 	 */
-	zonecfg_fini_handle(handle);
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zone_perror(execname, Z_NOMEM, TRUE);
-		exit(Z_ERR);
-	}
-	if ((err = zonecfg_get_handle(zone, handle)) != Z_OK) {
-		/* If there was no zone before, that's OK */
-		if (err != Z_NO_ZONE)
-			zone_perror(zone, err, TRUE);
-		got_handle = FALSE;
+	if (got_handle) {
+		zonecfg_fini_handle(handle);
+		if ((handle = zonecfg_init_handle()) == NULL) {
+			zone_perror(execname, Z_NOMEM, TRUE);
+			exit(Z_ERR);
+		}
+		if ((err = zonecfg_get_handle(zone, handle)) != Z_OK) {
+			/* If there was no zone before, that's OK */
+			if (err != Z_NO_ZONE)
+				zone_perror(zone, err, TRUE);
+			got_handle = FALSE;
+		}
 	}
 }
 
@@ -2045,7 +2086,6 @@ remove_resource(cmd_t *cmd)
 	struct zone_devtab devtab;
 	struct zone_attrtab attrtab;
 	struct zone_rctltab rctltab;
-	zone_state_t state_num;
 
 	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
 		long_usage(CMD_REMOVE, TRUE);
@@ -2068,8 +2108,7 @@ remove_resource(cmd_t *cmd)
 		zonecfg_free_fs_option_list(fstab.zone_fs_options);
 		return;
 	case RT_IPD:
-		if (zone_get_state(zone, &state_num) == Z_OK &&
-		    state_num >= ZONE_STATE_INSTALLED) {
+		if (state_atleast(ZONE_STATE_INSTALLED)) {
 			zerr(gettext("Zone %s already installed; %s %s not "
 			    "allowed."), zone, cmd_to_str(CMD_REMOVE),
 			    rt_to_str(RT_IPD));
@@ -2278,7 +2317,6 @@ void
 select_func(cmd_t *cmd)
 {
 	int type, err;
-	zone_state_t state_num;
 
 	if (zone_is_read_only(CMD_SELECT))
 		return;
@@ -2312,8 +2350,7 @@ select_func(cmd_t *cmd)
 		    sizeof (struct zone_fstab));
 		return;
 	case RT_IPD:
-		if (zone_get_state(zone, &state_num) == Z_OK &&
-		    state_num >= ZONE_STATE_INCOMPLETE) {
+		if (state_atleast(ZONE_STATE_INCOMPLETE)) {
 			zerr(gettext("Zone %s not in %s state; %s %s not "
 			    "allowed."), zone,
 			    zone_state_str(ZONE_STATE_CONFIGURED),
@@ -2473,7 +2510,7 @@ valid_fs_type(const char *type)
 	 */
 	if (strchr(type, '/') != NULL || type[0] == '\0' ||
 	    strcmp(type, ".") == 0 || strcmp(type, "..") == 0)
-	    return (B_FALSE);
+		return (B_FALSE);
 	/*
 	 * More detailed verification happens later by zoneadm(1m).
 	 */
@@ -2486,7 +2523,6 @@ set_func(cmd_t *cmd)
 	char *prop_id;
 	int err, res_type, prop_type;
 	property_value_ptr_t pp;
-	zone_state_t state_num;
 	boolean_t autoboot;
 
 	if (zone_is_read_only(CMD_SET))
@@ -2496,7 +2532,9 @@ set_func(cmd_t *cmd)
 
 	prop_type = cmd->cmd_prop_name[0];
 	if (global_scope) {
-		if (prop_type == PT_ZONEPATH) {
+		if (prop_type == PT_ZONENAME) {
+			res_type = RT_ZONENAME;
+		} else if (prop_type == PT_ZONEPATH) {
 			res_type = RT_ZONEPATH;
 		} else if (prop_type == PT_AUTOBOOT) {
 			res_type = RT_AUTOBOOT;
@@ -2533,13 +2571,35 @@ set_func(cmd_t *cmd)
 		return;
 	}
 
+	/*
+	 * Special case: the user can change the zone name prior to 'create';
+	 * if the zone already exists, we fall through letting initialize()
+	 * and the rest of the logic run.
+	 */
+	if (res_type == RT_ZONENAME && got_handle == FALSE &&
+	    !state_atleast(ZONE_STATE_CONFIGURED)) {
+		(void) strlcpy(zone, prop_id, sizeof (zone));
+		return;
+	}
+
 	if (initialize(TRUE) != Z_OK)
 		return;
 
 	switch (res_type) {
+	case RT_ZONENAME:
+		if ((err = zonecfg_set_name(handle, prop_id)) != Z_OK) {
+			/*
+			 * Use prop_id instead of 'zone' here, since we're
+			 * reporting a problem about the *new* zonename.
+			 */
+			zone_perror(prop_id, err, TRUE);
+		} else {
+			need_to_commit = TRUE;
+			(void) strlcpy(zone, prop_id, sizeof (zone));
+		}
+		return;
 	case RT_ZONEPATH:
-		if (zone_get_state(zone, &state_num) == Z_OK &&
-		    state_num >= ZONE_STATE_INSTALLED) {
+		if (state_atleast(ZONE_STATE_INSTALLED)) {
 			zerr(gettext("Zone %s already installed; %s %s not "
 			    "allowed."), zone, cmd_to_str(CMD_SET),
 			    rt_to_str(RT_ZONEPATH));
@@ -2759,8 +2819,21 @@ output_prop(FILE *fp, int pnum, char *pval, bool print_notspec)
 		(void) fprintf(fp, "\t%s: %s\n", pt_to_str(pnum), qstr);
 		free(qstr);
 	} else if (print_notspec)
-		(void) fprintf(fp, "\t%s %s\n", pt_to_str(pnum),
-		    gettext("not specified"));
+		(void) fprintf(fp, gettext("\t%s not specified\n"),
+		    pt_to_str(pnum));
+}
+
+static void
+info_zonename(zone_dochandle_t handle, FILE *fp)
+{
+	char zonename[ZONENAME_MAX];
+
+	if (zonecfg_get_name(handle, zonename, sizeof (zonename)) == Z_OK)
+		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_ZONENAME),
+		    zonename);
+	else
+		(void) fprintf(fp, gettext("%s not specified\n"),
+		    pt_to_str(PT_ZONENAME));
 }
 
 static void
@@ -2771,9 +2844,10 @@ info_zonepath(zone_dochandle_t handle, FILE *fp)
 	if (zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath)) == Z_OK)
 		(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_ZONEPATH),
 		    zonepath);
-	else
-		(void) fprintf(fp, "%s %s\n", pt_to_str(PT_ZONEPATH),
-		    gettext("not specified"));
+	else {
+		(void) fprintf(fp, gettext("%s not specified\n"),
+		    pt_to_str(PT_ZONEPATH));
+	}
 }
 
 static void
@@ -3124,6 +3198,7 @@ info_func(cmd_t *cmd)
 
 	switch (cmd->cmd_res_type) {
 	case RT_UNKNOWN:
+		info_zonename(handle, fp);
 		info_zonepath(handle, fp);
 		info_autoboot(handle, fp);
 		info_pool(handle, fp);
@@ -3133,6 +3208,9 @@ info_func(cmd_t *cmd)
 		info_dev(handle, fp, cmd);
 		info_rctl(handle, fp, cmd);
 		info_attr(handle, fp, cmd);
+		break;
+	case RT_ZONENAME:
+		info_zonename(handle, fp);
 		break;
 	case RT_ZONEPATH:
 		info_zonepath(handle, fp);
@@ -3171,22 +3249,20 @@ cleanup:
 		(void) pclose(fp);
 }
 
-static int
-save_it(char *zonepath)
+/*
+ * Helper function for verify-- checks that a required string property
+ * exists.
+ */
+static void
+check_reqd_prop(char *attr, int rt, int pt, int *ret_val)
 {
-	int err;
-
-	if (new_zone) {
-		err = zonecfg_add_index(zone, zonepath);
-		if (err != Z_OK) {
-			zone_perror(zone, err, TRUE);
-			return (err);
-		}
-		new_zone = FALSE;
+	if (strlen(attr) == 0) {
+		zerr(gettext("%s: %s not specified"), rt_to_str(rt),
+		    pt_to_str(pt));
+		saw_error = TRUE;
+		if (*ret_val == Z_OK)
+			*ret_val = Z_REQD_PROPERTY_MISSING;
 	}
-	if ((err = zonecfg_save(handle)) == Z_OK)
-		need_to_commit = FALSE;
-	return (err);
 }
 
 /*
@@ -3236,13 +3312,12 @@ verify_func(cmd_t *cmd)
 		return;
 
 	if (zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath)) != Z_OK) {
-		zerr("%s %s", pt_to_str(PT_ZONEPATH), gettext("not specified"));
+		zerr(gettext("%s not specified"), pt_to_str(PT_ZONEPATH));
 		ret_val = Z_REQD_RESOURCE_MISSING;
 		saw_error = TRUE;
 	}
 	if (strlen(zonepath) == 0) {
-		zerr("%s %s", pt_to_str(PT_ZONEPATH),
-		    gettext("cannot be empty."));
+		zerr(gettext("%s cannot be empty."), pt_to_str(PT_ZONEPATH));
 		ret_val = Z_REQD_RESOURCE_MISSING;
 		saw_error = TRUE;
 	}
@@ -3252,13 +3327,7 @@ verify_func(cmd_t *cmd)
 		return;
 	}
 	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
-		if (strlen(fstab.zone_fs_dir) == 0) {
-			zerr("%s: %s %s", rt_to_str(RT_IPD), pt_to_str(PT_DIR),
-			    gettext("not specified"));
-			saw_error = TRUE;
-			if (ret_val == Z_OK)
-				ret_val = Z_REQD_PROPERTY_MISSING;
-		}
+		check_reqd_prop(fstab.zone_fs_dir, RT_IPD, PT_DIR, &ret_val);
 	}
 	(void) zonecfg_endipdent(handle);
 
@@ -3267,27 +3336,11 @@ verify_func(cmd_t *cmd)
 		return;
 	}
 	while (zonecfg_getfsent(handle, &fstab) == Z_OK) {
-		if (strlen(fstab.zone_fs_dir) == 0) {
-			zerr("%s: %s %s", rt_to_str(RT_FS), pt_to_str(PT_DIR),
-			    gettext("not specified"));
-			saw_error = TRUE;
-			if (ret_val == Z_OK)
-				ret_val = Z_REQD_PROPERTY_MISSING;
-		}
-		if (strlen(fstab.zone_fs_special) == 0) {
-			zerr("%s: %s %s", rt_to_str(RT_FS),
-			    pt_to_str(PT_SPECIAL), gettext("not specified"));
-			saw_error = TRUE;
-			if (ret_val == Z_OK)
-				ret_val = Z_REQD_PROPERTY_MISSING;
-		}
-		if (strlen(fstab.zone_fs_type) == 0) {
-			zerr("%s: %s %s", rt_to_str(RT_FS), pt_to_str(PT_TYPE),
-			    gettext("not specified"));
-			saw_error = TRUE;
-			if (ret_val == Z_OK)
-				ret_val = Z_REQD_PROPERTY_MISSING;
-		}
+		check_reqd_prop(fstab.zone_fs_dir, RT_FS, PT_DIR, &ret_val);
+		check_reqd_prop(fstab.zone_fs_special, RT_FS, PT_SPECIAL,
+		    &ret_val);
+		check_reqd_prop(fstab.zone_fs_type, RT_FS, PT_TYPE, &ret_val);
+
 		zonecfg_free_fs_option_list(fstab.zone_fs_options);
 	}
 	(void) zonecfg_endfsent(handle);
@@ -3297,20 +3350,10 @@ verify_func(cmd_t *cmd)
 		return;
 	}
 	while (zonecfg_getnwifent(handle, &nwiftab) == Z_OK) {
-		if (strlen(nwiftab.zone_nwif_address) == 0) {
-			zerr("%s: %s %s", rt_to_str(RT_NET),
-			    pt_to_str(PT_ADDRESS), gettext("not specified"));
-			saw_error = TRUE;
-			if (ret_val == Z_OK)
-				ret_val = Z_REQD_PROPERTY_MISSING;
-		}
-		if (strlen(nwiftab.zone_nwif_physical) == 0) {
-			zerr("%s: %s %s", rt_to_str(RT_NET),
-			    pt_to_str(PT_PHYSICAL), gettext("not specified"));
-			saw_error = TRUE;
-			if (ret_val == Z_OK)
-				ret_val = Z_REQD_PROPERTY_MISSING;
-		}
+		check_reqd_prop(nwiftab.zone_nwif_address, RT_NET,
+		    PT_ADDRESS, &ret_val);
+		check_reqd_prop(nwiftab.zone_nwif_physical, RT_NET,
+		    PT_PHYSICAL, &ret_val);
 	}
 	(void) zonecfg_endnwifent(handle);
 
@@ -3319,13 +3362,9 @@ verify_func(cmd_t *cmd)
 		return;
 	}
 	while (zonecfg_getrctlent(handle, &rctltab) == Z_OK) {
-		if (strlen(rctltab.zone_rctl_name) == 0) {
-			zerr("%s: %s %s", rt_to_str(RT_RCTL),
-			    pt_to_str(PT_NAME), gettext("not specified"));
-			saw_error = TRUE;
-			if (ret_val == Z_OK)
-				ret_val = Z_REQD_PROPERTY_MISSING;
-		}
+		check_reqd_prop(rctltab.zone_rctl_name, RT_RCTL, PT_NAME,
+		    &ret_val);
+
 		if (rctltab.zone_rctl_valptr == NULL) {
 			zerr(gettext("%s: no %s specified"),
 			    rt_to_str(RT_RCTL), pt_to_str(PT_VALUE));
@@ -3343,27 +3382,12 @@ verify_func(cmd_t *cmd)
 		return;
 	}
 	while (zonecfg_getattrent(handle, &attrtab) == Z_OK) {
-		if (strlen(attrtab.zone_attr_name) == 0) {
-			zerr("%s: %s %s", rt_to_str(RT_ATTR),
-			    pt_to_str(PT_NAME), gettext("not specified"));
-			saw_error = TRUE;
-			if (ret_val == Z_OK)
-				ret_val = Z_REQD_PROPERTY_MISSING;
-		}
-		if (strlen(attrtab.zone_attr_type) == 0) {
-			zerr("%s: %s %s", rt_to_str(RT_ATTR),
-			    pt_to_str(PT_TYPE), gettext("not specified"));
-			saw_error = TRUE;
-			if (ret_val == Z_OK)
-				ret_val = Z_REQD_PROPERTY_MISSING;
-		}
-		if (strlen(attrtab.zone_attr_value) == 0) {
-			zerr("%s: %s %s", rt_to_str(RT_ATTR),
-			    pt_to_str(PT_VALUE), gettext("not specified"));
-			saw_error = TRUE;
-			if (ret_val == Z_OK)
-				ret_val = Z_REQD_PROPERTY_MISSING;
-		}
+		check_reqd_prop(attrtab.zone_attr_name, RT_ATTR, PT_NAME,
+		    &ret_val);
+		check_reqd_prop(attrtab.zone_attr_type, RT_ATTR, PT_TYPE,
+		    &ret_val);
+		check_reqd_prop(attrtab.zone_attr_value, RT_ATTR, PT_VALUE,
+		    &ret_val);
 	}
 	(void) zonecfg_endattrent(handle);
 
@@ -3375,10 +3399,15 @@ verify_func(cmd_t *cmd)
 	}
 
 	if (save) {
-		if (ret_val == Z_OK)
-			ret_val = save_it(zonepath);
-		else
-			zerr("zone %s %s", zone, gettext("failed to verify"));
+		if (ret_val == Z_OK) {
+			if ((ret_val = zonecfg_save(handle)) == Z_OK) {
+				need_to_commit = FALSE;
+				(void) strlcpy(revert_zone, zone,
+				    sizeof (revert_zone));
+			}
+		} else {
+			zerr(gettext("Zone %s failed to verify"), zone);
+		}
 	}
 	if (ret_val != Z_OK)
 		zone_perror(zone, ret_val, TRUE);
@@ -3486,6 +3515,21 @@ validate_attr_type_val(struct zone_attrtab *attrtab)
 	return (Z_ERR);
 }
 
+/*
+ * Helper function for end_func-- checks the existence of a given property
+ * and emits a message if not specified.
+ */
+static int
+end_check_reqd(char *attr, int pt, bool *validation_failed)
+{
+	if (strlen(attr) == 0) {
+		*validation_failed = TRUE;
+		zerr(gettext("%s not specified"), pt_to_str(pt));
+		return (Z_ERR);
+	}
+	return (Z_OK);
+}
+
 void
 end_func(cmd_t *cmd)
 {
@@ -3525,36 +3569,35 @@ end_func(cmd_t *cmd)
 	switch (resource_scope) {
 	case RT_FS:
 		/* First make sure everything was filled in. */
-		if (strlen(in_progress_fstab.zone_fs_dir) == 0) {
-			zerr("dir %s", gettext("not specified"));
-			saw_error = TRUE;
-			validation_failed = TRUE;
-		} else if (in_progress_fstab.zone_fs_dir[0] != '/') {
-			zerr("dir %s %s", in_progress_fstab.zone_fs_dir,
-			    gettext("is not an absolute path."));
-			saw_error = TRUE;
-			validation_failed = TRUE;
+		if (end_check_reqd(in_progress_fstab.zone_fs_dir,
+		    PT_DIR, &validation_failed) == Z_OK) {
+			if (in_progress_fstab.zone_fs_dir[0] != '/') {
+				zerr(gettext("%s %s is not an absolute path."),
+				    pt_to_str(PT_DIR),
+				    in_progress_fstab.zone_fs_dir);
+				validation_failed = TRUE;
+			}
 		}
-		if (strlen(in_progress_fstab.zone_fs_special) == 0) {
-			zerr("special %s", gettext("not specified"));
-			saw_error = TRUE;
-			validation_failed = TRUE;
-		}
+
+		(void) end_check_reqd(in_progress_fstab.zone_fs_special,
+		    PT_SPECIAL, &validation_failed);
+
 		if (in_progress_fstab.zone_fs_raw[0] != '\0' &&
 		    in_progress_fstab.zone_fs_raw[0] != '/') {
-			zerr("raw device %s %s",
-			    in_progress_fstab.zone_fs_raw,
-			    gettext("is not an absolute path."));
-			saw_error = TRUE;
+			zerr(gettext("%s %s is not an absolute path."),
+			    pt_to_str(PT_RAW),
+			    in_progress_fstab.zone_fs_raw);
 			validation_failed = TRUE;
 		}
-		if (strlen(in_progress_fstab.zone_fs_type) == 0) {
-			zerr("type %s", gettext("not specified"));
+
+		(void) end_check_reqd(in_progress_fstab.zone_fs_type, PT_TYPE,
+		    &validation_failed);
+
+		if (validation_failed) {
 			saw_error = TRUE;
-			validation_failed = TRUE;
-		}
-		if (validation_failed)
 			return;
+		}
+
 		if (end_op == CMD_ADD) {
 			/* Make sure there isn't already one like this. */
 			bzero(&tmp_fstab, sizeof (tmp_fstab));
@@ -3580,20 +3623,23 @@ end_func(cmd_t *cmd)
 		zonecfg_free_fs_option_list(in_progress_fstab.zone_fs_options);
 		in_progress_fstab.zone_fs_options = NULL;
 		break;
+
 	case RT_IPD:
 		/* First make sure everything was filled in. */
-		if (strlen(in_progress_ipdtab.zone_fs_dir) == 0) {
-			zerr("dir %s", gettext("not specified"));
-			saw_error = TRUE;
-			validation_failed = TRUE;
-		} else if (in_progress_ipdtab.zone_fs_dir[0] != '/') {
-			zerr("dir %s %s", in_progress_ipdtab.zone_fs_dir,
-			    gettext("is not an absolute path."));
-			saw_error = TRUE;
-			validation_failed = TRUE;
+		if (end_check_reqd(in_progress_ipdtab.zone_fs_dir, PT_DIR,
+		    &validation_failed) == Z_OK) {
+			if (in_progress_ipdtab.zone_fs_dir[0] != '/') {
+				zerr(gettext("%s %s is not an absolute path."),
+				    pt_to_str(PT_DIR),
+				    in_progress_ipdtab.zone_fs_dir);
+				validation_failed = TRUE;
+			}
 		}
-		if (validation_failed)
+		if (validation_failed) {
+			saw_error = TRUE;
 			return;
+		}
+
 		if (end_op == CMD_ADD) {
 			/* Make sure there isn't already one like this. */
 			bzero(&tmp_fstab, sizeof (tmp_fstab));
@@ -3617,18 +3663,16 @@ end_func(cmd_t *cmd)
 		break;
 	case RT_NET:
 		/* First make sure everything was filled in. */
-		if (strlen(in_progress_nwiftab.zone_nwif_physical) == 0) {
-			zerr("physical %s", gettext("not specified"));
+		(void) end_check_reqd(in_progress_nwiftab.zone_nwif_physical,
+		    PT_PHYSICAL, &validation_failed);
+		(void) end_check_reqd(in_progress_nwiftab.zone_nwif_address,
+		    PT_ADDRESS, &validation_failed);
+
+		if (validation_failed) {
 			saw_error = TRUE;
-			validation_failed = TRUE;
-		}
-		if (strlen(in_progress_nwiftab.zone_nwif_address) == 0) {
-			zerr("address %s", gettext("not specified"));
-			saw_error = TRUE;
-			validation_failed = TRUE;
-		}
-		if (validation_failed)
 			return;
+		}
+
 		if (end_op == CMD_ADD) {
 			/* Make sure there isn't already one like this. */
 			bzero(&tmp_nwiftab, sizeof (tmp_nwiftab));
@@ -3649,15 +3693,17 @@ end_func(cmd_t *cmd)
 			    &in_progress_nwiftab);
 		}
 		break;
+
 	case RT_DEVICE:
 		/* First make sure everything was filled in. */
-		if (strlen(in_progress_devtab.zone_dev_match) == 0) {
-			zerr("match %s", gettext("not specified"));
+		(void) end_check_reqd(in_progress_devtab.zone_dev_match,
+		    PT_MATCH, &validation_failed);
+
+		if (validation_failed) {
 			saw_error = TRUE;
-			validation_failed = TRUE;
-		}
-		if (validation_failed)
 			return;
+		}
+
 		if (end_op == CMD_ADD) {
 			/* Make sure there isn't already one like this. */
 			(void) strlcpy(tmp_devtab.zone_dev_match,
@@ -3677,20 +3723,22 @@ end_func(cmd_t *cmd)
 			    &in_progress_devtab);
 		}
 		break;
+
 	case RT_RCTL:
 		/* First make sure everything was filled in. */
-		if (strlen(in_progress_rctltab.zone_rctl_name) == 0) {
-			zerr("name %s", gettext("not specified"));
-			saw_error = TRUE;
-			validation_failed = TRUE;
-		}
+		(void) end_check_reqd(in_progress_rctltab.zone_rctl_name,
+		    PT_NAME, &validation_failed);
+
 		if (in_progress_rctltab.zone_rctl_valptr == NULL) {
 			zerr(gettext("no %s specified"), pt_to_str(PT_VALUE));
-			saw_error = TRUE;
 			validation_failed = TRUE;
 		}
-		if (validation_failed)
+
+		if (validation_failed) {
+			saw_error = TRUE;
 			return;
+		}
+
 		if (end_op == CMD_ADD) {
 			/* Make sure there isn't already one like this. */
 			(void) strlcpy(tmp_rctltab.zone_rctl_name,
@@ -3719,34 +3767,27 @@ end_func(cmd_t *cmd)
 			in_progress_rctltab.zone_rctl_valptr = NULL;
 		}
 		break;
+
 	case RT_ATTR:
 		/* First make sure everything was filled in. */
-		if (strlen(in_progress_attrtab.zone_attr_name) == 0) {
-			zerr("name %s", gettext("not specified"));
-			saw_error = TRUE;
-			validation_failed = TRUE;
-		}
-		if (strlen(in_progress_attrtab.zone_attr_type) == 0) {
-			zerr("type %s", gettext("not specified"));
-			saw_error = TRUE;
-			validation_failed = TRUE;
-		}
-		if (strlen(in_progress_attrtab.zone_attr_value) == 0) {
-			zerr("value %s", gettext("not specified"));
-			saw_error = TRUE;
-			validation_failed = TRUE;
-		}
+		(void) end_check_reqd(in_progress_attrtab.zone_attr_name,
+		    PT_NAME, &validation_failed);
+		(void) end_check_reqd(in_progress_attrtab.zone_attr_type,
+		    PT_TYPE, &validation_failed);
+		(void) end_check_reqd(in_progress_attrtab.zone_attr_value,
+		    PT_VALUE, &validation_failed);
+
 		if (validate_attr_name(in_progress_attrtab.zone_attr_name) !=
-		    Z_OK) {
-			saw_error = TRUE;
+		    Z_OK)
 			validation_failed = TRUE;
-		}
-		if (validate_attr_type_val(&in_progress_attrtab) != Z_OK) {
-			saw_error = TRUE;
+
+		if (validate_attr_type_val(&in_progress_attrtab) != Z_OK)
 			validation_failed = TRUE;
-		}
-		if (validation_failed)
+
+		if (validation_failed) {
+			saw_error = TRUE;
 			return;
+		}
 		if (end_op == CMD_ADD) {
 			/* Make sure there isn't already one like this. */
 			bzero(&tmp_attrtab, sizeof (tmp_attrtab));
@@ -3882,15 +3923,16 @@ revert_func(cmd_t *cmd)
 		zone_perror(execname, Z_NOMEM, TRUE);
 		exit(Z_ERR);
 	}
-	if ((err = zonecfg_get_handle(zone, handle)) != Z_OK) {
+	if ((err = zonecfg_get_handle(revert_zone, handle)) != Z_OK) {
 		saw_error = TRUE;
 		got_handle = FALSE;
 		if (err == Z_NO_ZONE)
 			zerr(gettext("%s: no such saved zone to revert to."),
-			    zone);
+			    revert_zone);
 		else
 			zone_perror(zone, err, TRUE);
 	}
+	(void) strlcpy(zone, revert_zone, sizeof (zone));
 }
 
 void
@@ -4109,9 +4151,9 @@ do_interactive(void)
 		 */
 		(void) initialize(FALSE);
 	}
-	do
+	do {
 		err = read_input();
-	while (err == Z_REPEAT);
+	} while (err == Z_REPEAT);
 	return (err);
 }
 
@@ -4231,42 +4273,6 @@ get_execbasename(char *execfullname)
 	return (execbasename);
 }
 
-static void
-validate_zone_name()
-{
-	regex_t reg;
-	char *locale = NULL, locale_buf[MAXPATHLEN];
-
-	if (strcmp(zone, GLOBAL_ZONENAME) == 0)
-		goto err;
-
-	/*
-	 * The regex(5) functions below are locale-sensitive, so save the
-	 * user's locale, then set it to "C" for the regex's, and restore
-	 * it afterwards.
-	 */
-	if ((locale = setlocale(LC_ALL, NULL)) != NULL) {
-		(void) strlcpy(locale_buf, locale, sizeof (locale_buf));
-		locale = locale_buf;
-	}
-	(void) setlocale(LC_ALL, "C");
-	if (regcomp(&reg, "^" ZONENAME_REGEXP "$", REG_EXTENDED|REG_NOSUB) != 0)
-		goto err;
-
-	if (regexec(&reg, zone, (size_t)0, NULL, 0) != 0)
-		goto err;
-
-	regfree(&reg);
-	(void) setlocale(LC_ALL, locale);
-	return;
-
-err:
-	(void) setlocale(LC_ALL, locale);
-	zone_perror(zone, Z_BOGUS_ZONE_NAME, TRUE);
-	usage(FALSE, HELP_SYNTAX);
-	exit(Z_USAGE);
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -4297,7 +4303,6 @@ main(int argc, char *argv[])
 		exit(Z_OK);
 	}
 
-	zone = NULL;
 	while ((arg = getopt(argc, argv, "?f:z:")) != EOF) {
 		switch (arg) {
 		case '?':
@@ -4312,7 +4317,13 @@ main(int argc, char *argv[])
 			cmd_file_mode = TRUE;
 			break;
 		case 'z':
-			zone = optarg;
+			if (zonecfg_validate_zonename(optarg) != Z_OK) {
+				zone_perror(optarg, Z_BOGUS_ZONE_NAME, TRUE);
+				usage(FALSE, HELP_SYNTAX);
+				exit(Z_USAGE);
+			}
+			(void) strlcpy(zone, optarg, sizeof (zone));
+			(void) strlcpy(revert_zone, optarg, sizeof (zone));
 			break;
 		default:
 			usage(FALSE, HELP_USAGE);
@@ -4320,21 +4331,24 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (optind > argc || zone == NULL) {
+	if (optind > argc || strcmp(zone, "") == 0) {
 		usage(FALSE, HELP_USAGE);
 		exit(Z_USAGE);
 	}
 
-	validate_zone_name();
-	if (zonecfg_access(zone, W_OK) == Z_OK) {
+	if ((err = zonecfg_access(zone, W_OK)) == Z_OK) {
 		read_only_mode = FALSE;
-	} else {
+	} else if (err == Z_ACCES) {
 		read_only_mode = TRUE;
 		/* skip this message in one-off from command line mode */
 		if (optind == argc)
 			(void) fprintf(stderr, gettext("WARNING: you do not "
 			    "have write access to this zone's configuration "
 			    "file;\ngoing into read-only mode.\n"));
+	} else {
+		fprintf(stderr, "%s: Could not access zone configuration "
+		    "store: %s\n", execname, zonecfg_strerror(err));
+		exit(Z_ERR);
 	}
 
 	if ((handle = zonecfg_init_handle()) == NULL) {

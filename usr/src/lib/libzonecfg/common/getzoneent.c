@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,17 +228,20 @@ unlock_index_file(int lock_fd)
  *
  * If ze->zone_state is < 0, it means leave the
  * existing value unchanged; this is only meaningful when operation ==
- * PZE_MODIFY (i.e., it's bad on PZE_ADD and a no-op on PZE_DELETE).
+ * PZE_MODIFY (i.e., it's bad on PZE_ADD and a no-op on PZE_REMOVE).
  *
- * Likewise, a zero-length ze->zone_path means leave the existing value
+ * A zero-length ze->zone_path means leave the existing value
  * unchanged; this is only meaningful when operation == PZE_MODIFY
- * (i.e., it's bad on PZE_ADD and a no-op on PZE_DELETE).
+ * (i.e., it's bad on PZE_ADD and a no-op on PZE_REMOVE).
+ *
+ * A zero-length ze->zone_newname means leave the existing name
+ * unchanged; otherwise the zone is renamed to zone_newname.  This is
+ * only meaningful when operation == PZE_MODIFY.
  *
  * Locking and unlocking is done via the functions above.
  * The file itself is not modified in place; rather, a copy is made which
  * is modified, then the copy is atomically renamed back to the main file.
  */
-
 int
 putzoneent(struct zoneent *ze, zoneent_op_t operation)
 {
@@ -254,6 +257,10 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 	if (operation == PZE_ADD &&
 	    (ze->zone_state < 0 || strlen(ze->zone_path) == 0))
 		return (Z_INVAL);
+
+	if (operation != PZE_MODIFY && strlen(ze->zone_newname) != 0)
+		return (Z_INVAL);
+
 	if ((err = lock_index_file(&lock_fd)) != Z_OK)
 		return (err);
 	tmp_file_name = strdup(_PATH_TMPFILE);
@@ -331,6 +338,7 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 				goto error;
 			} else if (operation == PZE_MODIFY) {
 				char tmp_state[ZONE_STATE_MAXSTRLEN + 1];
+				char *tmp_name;
 
 				if (ze->zone_state >= 0 &&
 				    strlen(ze->zone_path) > 0) {
@@ -351,12 +359,21 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 
 				p = gettok(&cp);
 
+				/*
+				 * If a new name is supplied, use it.
+				 */
+				if (strlen(ze->zone_newname) != 0)
+					tmp_name = ze->zone_newname;
+				else
+					tmp_name = ze->zone_name;
+
 				(void) fprintf(tmp_file, "%s:%s:%s%s%s\n",
-				    ze->zone_name, tmp_state,
+				    tmp_name, tmp_state,
 				    need_quotes ? "\"" : "",
 				    (strlen(ze->zone_path) == 0) ? p :
 				    ze->zone_path, need_quotes ? "\"" : "");
 			}
+			/* else if (operation == PZE_REMOVE) { no-op } */
 		} else {
 			(void) fputs(orig_buf, tmp_file);
 		}
