@@ -789,7 +789,8 @@ is486:
 	cmpl	$0x400, %ebx
 	je	isa486
 
-	ret
+	rep;	ret	/* use 2 byte return instruction */
+			/* AMD Software Optimization Guide - Section 6.2 */
 isa486:
 	/*
 	 * lose the return address

@@ -488,7 +488,8 @@ fpxsave_begin(void *arg)
 #endif
 	fxsave	(%rdi)
 	fnclex				/* clear pending x87 exceptions */
-1:	ret
+1:	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(fpxsave_begin)
 
 #elif defined(__i386)
@@ -502,7 +503,8 @@ fpxsave_begin(void *arg)
 	addl	FPU_CTX_FPU_REGS, %eax
 #endif
 	fnsave	(%eax)
-1:	ret
+1:	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(fpnsave_begin)
 
 	ENTRY_NP(fpxsave_begin)
@@ -515,7 +517,8 @@ fpxsave_begin(void *arg)
 #endif
 	fxsave	(%eax)
 	fnclex				/ Clear pending x87 exceptions
-1:	ret
+1:	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(fpxsave_begin)
 
 #endif	/* __i386 */

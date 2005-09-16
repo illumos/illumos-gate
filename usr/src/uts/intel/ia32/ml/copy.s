@@ -910,7 +910,8 @@ _xcopyin_err:
 	movl	T_COPYOPS(%edx), %eax
 	jmp	*CP_XCOPYIN(%eax)
 
-2:	ret
+2:	rep; 	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(xcopyin_nta)
 
 #undef	ARG_UADDR
@@ -1173,7 +1174,8 @@ _xcopyout_err:
 	movl	T_COPYOPS(%edx), %eax
 	jmp	*CP_XCOPYOUT(%eax)
 
-2:	ret
+2:	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(xcopyout_nta)
 
 #undef	ARG_UADDR

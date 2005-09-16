@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 	
@@ -762,7 +762,8 @@ send_dirint(int cpuix, int int_level)
 	 * Same for amd64 and i386.
 	 */
 	ENTRY_NP(return_instr)
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(return_instr)
 
 #if defined(__amd64)

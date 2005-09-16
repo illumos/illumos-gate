@@ -1902,7 +1902,8 @@ int20(void)
 
 	int	$20
 1:
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(int20)
 
 #endif	/* __lint */
@@ -2239,11 +2240,13 @@ dtrace_membar_consumer(void)
 #else	/* __lint */
 
 	ENTRY(dtrace_membar_producer)
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(dtrace_membar_producer)
 
 	ENTRY(dtrace_membar_consumer)
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(dtrace_membar_consumer)
 
 #endif	/* __lint */
@@ -2618,7 +2621,8 @@ scan_memory(caddr_t addr, size_t size)
 	movq	%rdi, %rsi	/* move addr into lodsq control reg. */
 	rep lodsq		/* scan the memory range */
 .scanm_done:
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(scan_memory)
 
 #elif defined(__i386)
@@ -2835,7 +2839,8 @@ void getcregs(struct cregs *crp)
 .nocr4:
 	movl	$0, CREG_CR4(%edx)
 .skip:
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(getcregs)
 
 #endif	/* __i386 */
@@ -3553,7 +3558,8 @@ void prefetch_smap_w(void *smp)
 #else	/* __lint */
 
 	ENTRY(prefetch_smap_w)
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(prefetch_smap_w)
 
 #endif	/* __lint */
@@ -3572,7 +3578,8 @@ prefetch_page_r(void *pp)
 #else	/* __lint */
 
 	ENTRY(prefetch_page_r)
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(prefetch_page_r)
 
 #endif	/* __lint */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1589,7 +1589,8 @@ gb_ioadv2:
 	jg	gb_ioadv2
 
 gb_ioadv_done:
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 
 	SET_SIZE(i_ddi_io_rep_get8)
 
@@ -1652,7 +1653,8 @@ gw_ioadv2:
 	jg	gw_ioadv2
 
 gw_ioadv_done:
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(i_ddi_io_rep_get16)
 
 #elif defined(__i386)
@@ -1713,7 +1715,8 @@ gl_ioadv2:
 	jg	gl_ioadv2
 
 gl_ioadv_done:
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 
 	SET_SIZE(i_ddi_io_rep_get32)
 
@@ -1812,7 +1815,8 @@ pb_ioadv2:
 	jg	pb_ioadv2
 
 pb_ioadv_done:
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(i_ddi_io_rep_put8)
 
 #elif defined(__i386)
@@ -1873,7 +1877,8 @@ pw_ioadv2:
 	jg	pw_ioadv2
 
 pw_ioadv_done:
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(i_ddi_io_rep_put16)
 
 #elif defined(__i386)
@@ -1934,7 +1939,8 @@ pl_ioadv2:
 	jg	pl_ioadv2
 
 pl_ioadv_done:
-	ret
+	rep;	ret	/* use 2 byte return instruction when branch target */
+			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(i_ddi_io_rep_put32)
 
 #elif defined(__i386)
