@@ -2,15 +2,17 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from UCB 5.1 4/30/85 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tip.h"
+
 /*
  * tip
  *
@@ -25,11 +27,11 @@ static	sigjmp_buf sigbuf;
  *   sent by TIPIN when it wants to posses the remote host
  */
 void
-intIOT()
+intIOT(void)
 {
 
-	write(repdes[1], &ccc, 1);
-	read(fildes[0], &ccc, 1);
+	(void) write(repdes[1], &ccc, 1);
+	(void) read(fildes[0], &ccc, 1);
 	siglongjmp(sigbuf, 1);
 }
 
@@ -38,20 +40,20 @@ intIOT()
  *  accepts script file name over the pipe and acts accordingly
  */
 void
-intEMT()
+intEMT(void)
 {
 	char c, line[256];
-	register char *pline = line;
+	char *pline = line;
 	char reply;
 
-	read(fildes[0], &c, 1);
+	(void) read(fildes[0], &c, 1);
 	while (c != '\n') {
 		*pline++ = c;
-		read(fildes[0], &c, 1);
+		(void) read(fildes[0], &c, 1);
 	}
 	*pline = '\0';
 	if (boolean(value(SCRIPT)) && fscript != NULL)
-		fclose(fscript);
+		(void) fclose(fscript);
 	if (pline == line) {
 		boolean(value(SCRIPT)) = FALSE;
 		reply = 'y';
@@ -63,21 +65,21 @@ intEMT()
 			boolean(value(SCRIPT)) = TRUE;
 		}
 	}
-	write(repdes[1], &reply, 1);
+	(void) write(repdes[1], &reply, 1);
 	siglongjmp(sigbuf, 1);
 }
 
 void
-intTERM()
+intTERM(void)
 {
 
 	if (boolean(value(SCRIPT)) && fscript != NULL)
-		fclose(fscript);
+		(void) fclose(fscript);
 	exit(0);
 }
 
 void
-intSYS()
+intSYS(void)
 {
 
 	boolean(value(BEAUTIFY)) = !boolean(value(BEAUTIFY));
@@ -87,31 +89,36 @@ intSYS()
 /*
  * ****TIPOUT   TIPOUT****
  */
-tipout()
+void
+tipout(void)
 {
 	char buf[BUFSIZ];
-	register char *cp;
-	register int cnt;
-	extern int errno;
+	char *cp;
+	int cnt;
 	sigset_t omask, bmask, tmask;
 
-	signal(SIGINT, SIG_IGN);
-	signal(SIGQUIT, SIG_IGN);
-	signal(SIGEMT, (sig_handler_t)intEMT);	/* attention from TIPIN */
-	signal(SIGTERM, (sig_handler_t)intTERM); /* time to go signal */
-	signal(SIGIOT, (sig_handler_t)intIOT);	/* scripting going on signal */
-	signal(SIGHUP, (sig_handler_t)intTERM);	/* for dial-ups */
-	signal(SIGSYS, (sig_handler_t)intSYS);	/* beautify toggle */
+	(void) signal(SIGINT, SIG_IGN);
+	(void) signal(SIGQUIT, SIG_IGN);
+	/* attention from TIPIN */
+	(void) signal(SIGEMT, (sig_handler_t)intEMT);
+	/* time to go signal */
+	(void) signal(SIGTERM, (sig_handler_t)intTERM);
+	/* scripting going on signal */
+	(void) signal(SIGIOT, (sig_handler_t)intIOT);
+	/* for dial-ups */
+	(void) signal(SIGHUP, (sig_handler_t)intTERM);
+	/* beautify toggle */
+	(void) signal(SIGSYS, (sig_handler_t)intSYS);
 	(void) sigsetjmp(sigbuf, 1);
 
-	sigemptyset(&omask);
-	sigemptyset(&bmask);
-	sigaddset(&bmask, SIGEMT);
-	sigaddset(&bmask, SIGTERM);
-	sigaddset(&bmask, SIGIOT);
-	sigaddset(&bmask, SIGSYS);
-	sigemptyset(&tmask);
-	sigaddset(&tmask, SIGTERM);
+	(void) sigemptyset(&omask);
+	(void) sigemptyset(&bmask);
+	(void) sigaddset(&bmask, SIGEMT);
+	(void) sigaddset(&bmask, SIGTERM);
+	(void) sigaddset(&bmask, SIGIOT);
+	(void) sigaddset(&bmask, SIGSYS);
+	(void) sigemptyset(&tmask);
+	(void) sigaddset(&tmask, SIGTERM);
 	for (;;) {
 		cnt = read(FD, buf, BUFSIZ);
 		if (cnt <= 0) {
@@ -125,7 +132,7 @@ tipout()
 				DB = 0;
 				if ((fd = open(DV, O_RDWR)) >= 0) {
 					if (fd != FD)
-						close(fd);
+						(void) close(fd);
 				}
 				continue;
 			}
@@ -142,15 +149,16 @@ tipout()
 				for (cp = buf; cp < buf + cnt; cp++)
 					*cp &= 0177;
 
-			write(1, buf, cnt);
+			(void) write(1, buf, cnt);
 			if (boolean(value(SCRIPT)) && fscript != NULL) {
 				if (!boolean(value(BEAUTIFY))) {
-					fwrite(buf, 1, cnt, fscript);
+					(void) fwrite(buf, 1, cnt, fscript);
 				} else {
 					for (cp = buf; cp < buf + cnt; cp++)
 						if ((*cp >= ' ' && *cp <= '~')||
 						    any(*cp, value(EXCEPTIONS)))
-							putc(*cp, fscript);
+							(void) putc(*cp,
+							    fscript);
 				}
 			}
 		}

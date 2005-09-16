@@ -2,12 +2,14 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from UCB 4.5 6/25/83 */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Routines for dialing up on Vadic 831
@@ -16,47 +18,47 @@
 
 #include "tip.h"
 
-int	v831_abort();
-static	void alarmtr();
-extern	errno;
+static char	dialit(char *, char *);
+static char	*sanitize(char *);
+static void	alarmtr(void);
 
-static sigjmp_buf jmpbuf;
-static int child = -1;
+static sigjmp_buf	jmpbuf;
+static int	child = -1;
 
-v831_dialer(num, acu)
-	char *num, *acu;
+int
+v831_dialer(char *num, char *acu)
 {
-	int status, pid, connected = 1;
-	register int timelim;
+	int status, pid;
+	int timelim;
 
 	if (boolean(value(VERBOSE)))
-		printf("\nstarting call...");
+		(void) printf("\nstarting call...");
 #ifdef DEBUG
-	printf("(acu=%s)\n", acu);
+	(void) printf("(acu=%s)\n", acu);
 #endif
 	if ((AC = open(acu, O_RDWR)) < 0) {
 		if (errno == EBUSY)
-			printf("line busy...");
+			(void) printf("line busy...");
 		else
-			printf("acu open error...");
+			(void) printf("acu open error...");
 		return (0);
 	}
 	if (sigsetjmp(jmpbuf, 1)) {
-		kill(child, SIGKILL);
-		close(AC);
+		(void) kill(child, SIGKILL);
+		(void) close(AC);
 		return (0);
 	}
-	signal(SIGALRM, alarmtr);
+	(void) signal(SIGALRM, (sig_handler_t)alarmtr);
 	timelim = 5 * strlen(num);
-	alarm(timelim < 30 ? 30 : timelim);
+	(void) alarm(timelim < 30 ? 30 : timelim);
 	if ((child = fork()) == 0) {
 		/*
 		 * ignore this stuff for aborts
 		 */
-		signal(SIGALRM, SIG_IGN);
-		signal(SIGINT, SIG_IGN);
-		signal(SIGQUIT, SIG_IGN);
-		sleep(2);
+		(void) signal(SIGALRM, SIG_IGN);
+		(void) signal(SIGINT, SIG_IGN);
+		(void) signal(SIGQUIT, SIG_IGN);
+		(void) sleep(2);
 		exit(dialit(num, acu) != 'A');
 	}
 	/*
@@ -64,33 +66,33 @@ v831_dialer(num, acu)
 	 */
 	if ((FD = open(DV, O_RDWR)) < 0) {
 #ifdef DEBUG
-		printf("(after open, errno=%d)\n", errno);
+		(void) printf("(after open, errno=%d)\n", errno);
 #endif
 		if (errno == EIO)
-			printf("lost carrier...");
+			(void) printf("lost carrier...");
 		else
-			printf("dialup line open failed...");
-		alarm(0);
-		kill(child, SIGKILL);
-		close(AC);
+			(void) printf("dialup line open failed...");
+		(void) alarm(0);
+		(void) kill(child, SIGKILL);
+		(void) close(AC);
 		return (0);
 	}
-	alarm(0);
-	signal(SIGALRM, SIG_DFL);
+	(void) alarm(0);
+	(void) signal(SIGALRM, SIG_DFL);
 	while ((pid = wait(&status)) != child && pid != -1)
 		;
 	if (status) {
-		close(AC);
+		(void) close(AC);
 		return (0);
 	}
 	return (1);
 }
 
 static void
-alarmtr()
+alarmtr(void)
 {
 
-	alarm(0);
+	(void) alarm(0);
 	siglongjmp(jmpbuf, 1);
 }
 
@@ -98,45 +100,47 @@ alarmtr()
  * Insurance, for some reason we don't seem to be
  *  hanging up...
  */
-v831_disconnect()
+void
+v831_disconnect(void)
 {
 	struct termios cntrl;
 	int dtr = TIOCM_DTR;
 
-	sleep(2);
+	(void) sleep(2);
 #ifdef DEBUG
 	printf("[disconnect: FD=%d]\n", FD);
 #endif
 	if (FD > 0) {
-		ioctl(FD, TIOCMBIC, &dtr);
-		ioctl(FD, TCGETS, &cntrl);
-		cfsetospeed(&cntrl, B0);
+		(void) ioctl(FD, TIOCMBIC, &dtr);
+		(void) ioctl(FD, TCGETS, &cntrl);
+		(void) cfsetospeed(&cntrl, B0);
 		cntrl.c_cflag &= ~XCLUDE;
-		ioctl(FD, TCSETSF, &cntrl);
+		(void) ioctl(FD, TCSETSF, &cntrl);
 	}
-	close(FD);
+	(void) close(FD);
 }
 
-v831_abort()
+void
+v831_abort(void)
 {
 	int dtr = TIOCM_DTR;
 	struct termios buf;
 
 #ifdef DEBUG
-	printf("[abort: AC=%d]\n", AC);
+	(void) printf("[abort: AC=%d]\n", AC);
 #endif
-	sleep(2);
+	(void) sleep(2);
 	if (child > 0)
-		kill(child, SIGKILL);
+		(void) kill(child, SIGKILL);
 	if (AC > 0) {
-		ioctl(FD, TCGETS, &buf);
+		(void) ioctl(FD, TCGETS, &buf);
 		buf.c_cflag &= ~XCLUDE;
-		ioctl(FD, TCSETSF, &buf);
-		close(AC);
+		(void) ioctl(FD, TCSETSF, &buf);
+		(void) close(AC);
 	}
 	if (FD > 0)
-		ioctl(FD, TIOCMBIC, &dtr);
-	close(FD);
+		(void) ioctl(FD, TIOCMBIC, &dtr);
+	(void) close(FD);
 }
 
 /*
@@ -152,25 +156,23 @@ struct vaconfig {
 	{ 0 }
 };
 
-#define	pc(x)	(c = x, write(AC, &c, 1))
+#define	pc(x)	(c = x, (void) write(AC, &c, 1))
 #define	ABORT	01
 #define	SI	017
 #define	STX	02
 #define	ETX	03
 
-static
-dialit(phonenum, acu)
-	register char *phonenum;
-	char *acu;
+static char
+dialit(char *phonenum, char *acu)
 {
-	register struct vaconfig *vp;
+	struct vaconfig *vp;
 	struct termios cntrl;
-	char c, *sanitize();
+	char c;
 	int i;
 
 	phonenum = sanitize(phonenum);
 #ifdef DEBUG
-	printf("(dial phonenum=%s)\n", phonenum);
+	(void) printf("(dial phonenum=%s)\n", phonenum);
 #endif
 	if (*phonenum == '<' && phonenum[1] == 0)
 		return ('Z');
@@ -178,21 +180,21 @@ dialit(phonenum, acu)
 		if (strcmp(vp->vc_name, acu) == 0)
 			break;
 	if (vp->vc_name == 0) {
-		printf("Unable to locate dialer (%s)\n", acu);
+		(void) printf("Unable to locate dialer (%s)\n", acu);
 		return ('K');
 	}
-	ioctl(AC, TCGETS, &cntrl);
-	cfsetospeed(&cntrl, B0);
-	cfsetispeed(&cntrl, B0);
+	(void) ioctl(AC, TCGETS, &cntrl);
+	(void) cfsetospeed(&cntrl, B0);
+	(void) cfsetispeed(&cntrl, B0);
 	cntrl.c_cflag &= ~(CSIZE|PARENB|PARODD);
-	cfsetospeed(&cntrl, B2400);
+	(void) cfsetospeed(&cntrl, B2400);
 	cntrl.c_cflag |= CS8;
 	cntrl.c_iflag &= IXOFF|IXANY;
 	cntrl.c_lflag &= ~(ICANON|ISIG);
 	cntrl.c_oflag = 0;
 	cntrl.c_cc[VMIN] = cntrl.c_cc[VTIME] = 0;
-	ioctl(AC, TCSETSF, &cntrl);
-	ioctl(AC, TCFLSH, TCOFLUSH);
+	(void) ioctl(AC, TCSETSF, &cntrl);
+	(void) ioctl(AC, TCFLSH, TCOFLUSH);
 	pc(STX);
 	pc(vp->vc_rack);
 	pc(vp->vc_modem);
@@ -200,7 +202,7 @@ dialit(phonenum, acu)
 		pc(*phonenum++);
 	pc(SI);
 	pc(ETX);
-	sleep(1);
+	(void) sleep(1);
 	i = read(AC, &c, 1);
 #ifdef DEBUG
 	printf("read %d chars, char=%c, errno %d\n", i, c, errno);
@@ -211,26 +213,25 @@ dialit(phonenum, acu)
 		char cc, oc = c;
 
 		pc(ABORT);
-		read(AC, &cc, 1);
+		(void) read(AC, &cc, 1);
 #ifdef DEBUG
-		printf("abort response=%c\n", cc);
+		(void) printf("abort response=%c\n", cc);
 #endif
 		c = oc;
 		v831_disconnect();
 	}
-	close(AC);
+	(void) close(AC);
 #ifdef DEBUG
-	printf("dialit: returns %c\n", c);
+	(void) printf("dialit: returns %c\n", c);
 #endif
 	return (c);
 }
 
 static char *
-sanitize(s)
-	register char *s;
+sanitize(char *s)
 {
 	static char buf[128];
-	register char *cp;
+	char *cp;
 
 	for (cp = buf; *s; s++) {
 		if (!isdigit(*s) && *s == '<' && *s != '_')

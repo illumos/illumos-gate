@@ -2,13 +2,14 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from UCB 5.3 4/30/86 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tip.h"
 
@@ -26,17 +27,16 @@ static char *capstrings[] = {
 	"di", "es", "ex", "fo", "rc", "re", "pa", 0
 };
 
-char *rgetstr();
+extern char *rgetstr(char *, char **);
 
-static
-getremcap(host)
-	register char *host;
+static void
+getremcap(char *host)
 {
 	int stat;
 	char tbuf[BUFSIZ];
 	static char buf[BUFSIZ/2];
 	char *bp = buf;
-	register char **p, ***q;
+	char **p, ***q;
 
 	if ((stat = rgetent(tbuf, host, sizeof (tbuf))) <= 0) {
 		if (DV ||
@@ -61,9 +61,9 @@ getremcap(host)
 			ET = 10;
 			return;
 		}
-		fprintf(stderr, stat == 0 ?
-			"tip: unknown host %s\n" :
-			"tip: can't open host description file\n", host);
+		(void) fprintf(stderr, stat == 0 ?
+		    "tip: unknown host %s\n" :
+		    "tip: can't open host description file\n", host);
 		exit(3);
 	}
 
@@ -79,13 +79,13 @@ getremcap(host)
 	else
 		DU = rgetflag("du");
 	if (DV == NOSTR) {
-		fprintf(stderr, "%s: missing device spec\n", host);
+		(void) fprintf(stderr, "%s: missing device spec\n", host);
 		exit(3);
 	}
 	if (DU && CU == NOSTR)
 		CU = DV;
 	if (DU && PN == NOSTR) {
-		fprintf(stderr, "%s: missing phone number\n", host);
+		(void) fprintf(stderr, "%s: missing phone number\n", host);
 		exit(3);
 	}
 	DB = rgetflag("db");
@@ -131,13 +131,13 @@ getremcap(host)
 	if (EX == NULL)
 		EX = (char *)"\t\n\b\f";
 	if (ES != NOSTR)
-		vstring("es", ES);
+		(void) vstring("es", ES);
 	if (FO != NOSTR)
-		vstring("fo", FO);
+		(void) vstring("fo", FO);
 	if (PR != NOSTR)
-		vstring("pr", PR);
+		(void) vstring("pr", PR);
 	if (RC != NOSTR)
-		vstring("rc", RC);
+		(void) vstring("rc", RC);
 	if ((DL = rgetnum("dl")) < 0)
 		DL = 0;
 	if ((CL = rgetnum("cl")) < 0)
@@ -147,16 +147,15 @@ getremcap(host)
 }
 
 char *
-getremote(host)
-	char *host;
+getremote(char *host)
 {
-	register char *cp;
+	char *cp;
 	static char *next;
 	static int lookedup = 0;
 
 	if (!lookedup) {
 		if (host == NOSTR && (host = getenv("HOST")) == NOSTR) {
-			fprintf(stderr, "tip: no host specified\n");
+			(void) fprintf(stderr, "tip: no host specified\n");
 			exit(3);
 		}
 		getremcap(host);

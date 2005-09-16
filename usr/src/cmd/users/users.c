@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -51,14 +51,14 @@
  *			facility
  */
 
-#include	<sys/types.h>
-#include	<stdio.h>
-#include	<string.h>
-#include	<string.h>
-#include	<grp.h>
-#include	<pwd.h>
-#include	<stdarg.h>
-#include	<fmtmsg.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <string.h>
+#include <grp.h>
+#include <pwd.h>
+#include <stdarg.h>
+#include <fmtmsg.h>
+#include <stdlib.h>
 
 
 /*
@@ -78,17 +78,6 @@
  *	exit		Exit the program
  */
 
-extern	void	       *malloc();
-extern	int		getopt();
-extern	char	       *optarg;
-extern	int		optind;
-extern	int		opterr;
-extern	struct passwd  *getpwent();
-extern	struct group   *getgrent();
-extern	int		fmtmsg();
-extern	int		putenv();
-extern	void		exit();
-
 /*
  *  Local constant definitions
  */
@@ -106,10 +95,10 @@ extern	void		exit();
 #define	LOGINFIELDSZ		MAXLOGINSIZE+2
 
 #define	isauserlogin(uid)	(uid >= 100)
-#define isasystemlogin(uid)	(uid < 100)
+#define	isasystemlogin(uid)	(uid < 100)
 #define	isausergroup(gid)	(gid >= 100)
 #define	isasystemgroup(gid)	(gid < 100)
-
+
 /*
  *  Local datatype definitions
  */
@@ -120,8 +109,8 @@ extern	void		exit();
  */
 
 struct	reqgrp {
-	char	       *groupname;
-	struct reqgrp  *next;
+	char		*groupname;
+	struct reqgrp	*next;
 	int		found;
 	gid_t		groupID;
 };
@@ -132,11 +121,11 @@ struct	reqgrp {
  */
 
 struct	reqlogin {
-	char	        *loginname;
-	struct reqlogin *next;
-	int	 	 found;
+	char		*loginname;
+	struct reqlogin	*next;
+	int		found;
 };
-
+
 /*
  *  These functions handle error and warning message writing.
  *  (This deals with UNIX(r) standard message generation, so
@@ -154,7 +143,7 @@ struct	reqlogin {
 
 static	char	fcnlbl[MM_MXLABELLN+1];	/* Buffer for message label */
 static	char	msgbuf[MM_MXTXTLN+1];	/* Buffer for message text */
-
+
 /*
  * void initmsg(p)
  *
@@ -171,15 +160,16 @@ static	char	msgbuf[MM_MXTXTLN+1];	/* Buffer for message text */
  */
 
 static void
-initmsg(p)
-	char   *p;		/* Ptr to command name */
+initmsg(char *p)	/* Ptr to command name */
 {
 	/* Automatic data */
 	char   *q;		/* Local multi-use pointer */
 
 	/* Use only the simple filename if there is a slash in the name */
-	if ((q = strrchr(p, '/')) == (char *) NULL) q = p;
-	else q++;
+	if ((q = strrchr(p, '/')) == NULL)
+		q = p;
+	else
+		q++;
 
 	/* Build the label for messages */
 	(void) snprintf(fcnlbl, sizeof (fcnlbl), "UX:%s", q);
@@ -191,7 +181,7 @@ initmsg(p)
 	 */
 	(void) putenv("MSGVERB=text");
 }
-
+
 /*
  *  void wrtmsg(severity, action, tag, text[, txtarg1[, txtarg2[, ...]]])
  *
@@ -224,14 +214,14 @@ wrtmsg(int severity, char *action, char *tag, char *text, ...)
 
 	/* Generate the error message */
 	va_start(argp, text);
-	if (text != MM_NULLTXT)
-	{
+	if (text != MM_NULLTXT) {
+		/* LINTED */
 		errorflg = vsnprintf(msgbuf, sizeof (msgbuf), text, argp) >
-			 MM_MXTXTLN;
+		    MM_MXTXTLN;
 	}
 	(void) fmtmsg(MM_PRINT, fcnlbl, severity,
-		      (text == MM_NULLTXT) ? MM_NULLTXT : msgbuf,
-		      action, tag);
+	    (text == MM_NULLTXT) ? MM_NULLTXT : msgbuf,
+	    action, tag);
 	va_end(argp);
 
 	/*
@@ -240,14 +230,13 @@ wrtmsg(int severity, char *action, char *tag, char *text, ...)
 	 */
 
 	if (errorflg) {
-	    (void) fmtmsg(MM_PRINT, fcnlbl, MM_WARNING,
-			  "Internal message buffer overflow",
-			  MM_NULLACT, MM_NULLTAG);
-	    exit(100);
+		(void) fmtmsg(MM_PRINT, fcnlbl, MM_WARNING,
+		    "Internal message buffer overflow",
+		    MM_NULLACT, MM_NULLTAG);
+		exit(100);
 	}
 }
-/* ARGSUSED */
-
+
 /*
  *  These functions allocate space for the information we gather.
  *  It works by having a memory heap with strings allocated from
@@ -280,11 +269,13 @@ wrtmsg(int severity, char *action, char *tag, char *text, ...)
 
 #define	ALLOCBLKSZ	4096
 
-static	char   *nextblkaddr = (char *) NULL;
-static	char   *laststraddr = (char *) NULL;
-static  char   *memallocdif = "Memory allocation difficulty.  Command terminates";
-static	char   *toomuchspace = "Internal space allocation error.  Command terminates";
-
+static char	*nextblkaddr = NULL;
+static char	*laststraddr = NULL;
+static char	*memallocdif =
+	"Memory allocation difficulty.  Command terminates";
+static char	*toomuchspace =
+	"Internal space allocation error.  Command terminates";
+
 /*
  *  void *allocblk(size)
  *	unsigned int	size
@@ -302,8 +293,7 @@ static	char   *toomuchspace = "Internal space allocation error.  Command termina
  */
 
 static void *
-allocblk(size)
-	unsigned int	size;
+allocblk(unsigned int size)
 {
 	/* Automatic data */
 	char   *rtnval;
@@ -311,8 +301,8 @@ allocblk(size)
 
 	/* Make sure the sizes are aligned correctly */
 	if ((size = size + (4 - (size % 4))) > ALLOCBLKSZ) {
-	    wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, toomuchspace);
-	    exit(101);
+		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, toomuchspace);
+		exit(101);
 	}
 
 	/* Set up the value we're going to return */
@@ -320,18 +310,18 @@ allocblk(size)
 
 	/* Get the space we need off of the heap */
 	if ((nextblkaddr += size) >= laststraddr) {
-	    if ((rtnval = (char *) malloc(ALLOCBLKSZ)) == (char *) NULL) {
-		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, memallocdif);
-		exit(101);
-	    }
-	    laststraddr = rtnval + ALLOCBLKSZ;
-	    nextblkaddr = rtnval + size;
+		if ((rtnval = malloc(ALLOCBLKSZ)) == NULL) {
+			wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, memallocdif);
+			exit(101);
+		}
+		laststraddr = rtnval + ALLOCBLKSZ;
+		nextblkaddr = rtnval + size;
 	}
 
 	/* We're through */
-	return((void *) rtnval);
+	return ((void *)rtnval);
 }
-
+
 /*
  *  char *allocstr(nbytes)
  *	unsigned int	nbytes
@@ -348,23 +338,22 @@ allocblk(size)
  */
 
 static char *
-allocstr(nchars)
-	unsigned int	nchars;
+allocstr(unsigned int nchars)
 {
 	if (nchars > ALLOCBLKSZ) {
-	    wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, toomuchspace);
-	    exit(101);
+		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, toomuchspace);
+		exit(101);
 	}
 	if ((laststraddr -= nchars) < nextblkaddr) {
-	    if ((nextblkaddr = (char *) malloc(ALLOCBLKSZ)) == (char *) NULL) {
-		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, memallocdif);
-		exit(101);
-	    }
-	    laststraddr = nextblkaddr + ALLOCBLKSZ - nchars;
+		if ((nextblkaddr = malloc(ALLOCBLKSZ)) == NULL) {
+			wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, memallocdif);
+			exit(101);
+		}
+		laststraddr = nextblkaddr + ALLOCBLKSZ - nchars;
 	}
-	return(laststraddr);
+	return (laststraddr);
 }
-
+
 /*
  *  These functions control the group membership list, as found in the
  *  /etc/group file.
@@ -383,12 +372,12 @@ allocstr(nchars)
  */
 
 struct	grpmember {
-	char	               *membername;
-	struct grpmember       *next;
+	char			*membername;
+	struct grpmember	*next;
 };
 
-static	struct grpmember       *membershead;
-
+static	struct grpmember	*membershead;
+
 /*
  *  void initmembers()
  *
@@ -400,12 +389,12 @@ static	struct grpmember       *membershead;
  */
 
 static void
-initmembers()
+initmembers(void)
 {
 	/* Set up the members list to be a null member's list */
-	membershead = (struct grpmember *) NULL;
+	membershead = NULL;
 }
-
+
 /*
  *  void addmember(p)
  *	char   *p
@@ -422,18 +411,17 @@ initmembers()
  */
 
 static void
-addmember(p)
-	char   *p;
+addmember(char *p)
 {
 	/* Automatic data */
-	struct grpmember       *new;	/* Member being added */
+	struct grpmember	*new;	/* Member being added */
 
-	new = (struct grpmember *) allocblk(sizeof(struct grpmember));
-	new->membername = strcpy(allocstr((unsigned int) strlen(p)+1), p);
+	new = (struct grpmember *)allocblk(sizeof (struct grpmember));
+	new->membername = strcpy(allocstr((unsigned int)strlen(p)+1), p);
 	new->next = membershead;
 	membershead = new;
 }
-
+
 /*
  *  init isamember(p)
  *	char   *p
@@ -451,23 +439,22 @@ addmember(p)
  */
 
 static int
-isamember(p)
-	char   *p;
+isamember(char *p)
 {
 	/* Automatic Data */
 	int			found;	/* FLAG:  TRUE if login found */
-	struct grpmember       *pmem;	/* Pointer to group member */
+	struct grpmember	*pmem;	/* Pointer to group member */
 
 
 	/* Search the membership list for the 'p' */
 	found = FALSE;
-	for (pmem = membershead ; !found && pmem ; pmem = pmem->next) {
-	    if (strcmp(p, pmem->membername) == 0) found = TRUE;
+	for (pmem = membershead; !found && pmem; pmem = pmem->next) {
+		if (strcmp(p, pmem->membername) == 0) found = TRUE;
 	}
 
 	return (found);
 }
-
+
 /*
  *  These functions handle the display list.  The display list contains
  *  all of the information we're to display.  The list contains a pointer
@@ -494,13 +481,13 @@ isamember(p)
  */
 
 struct	display {
-	char	       *loginID;
-	char	       *freefield;
-	struct display *next;
+	char		*loginID;
+	char		*freefield;
+	struct display	*next;
 };
 
 static	struct display *displayhead;
-
+
 /*
  *  void initdisp()
  *
@@ -513,14 +500,14 @@ static	struct display *displayhead;
  */
 
 static void
-initdisp()
+initdisp(void)
 {
-	displayhead = (struct display *) allocblk(sizeof(struct display));
-	displayhead->next = (struct display *) NULL;
+	displayhead = (struct display *)allocblk(sizeof (struct display));
+	displayhead->next = NULL;
 	displayhead->loginID = "";
 	displayhead->freefield = "";
 }
-
+
 /*
  *  void adddisp(pwent)
  *	struct passwd  *pwent
@@ -544,15 +531,14 @@ initdisp()
  */
 
 static void
-adddisp(pwent)
-	struct passwd  *pwent;
+adddisp(struct passwd *pwent)
 {
 	/* Automatic data */
-	struct display	       *new;		/* Display item being added */
-	struct display	       *prev;		/* Previous display item */
-	struct display	       *current;	/* Next display item */
-	int			found;		/* FLAG, insertion point found */
-	int			compare = 1;	/* strcmp() compare value */
+	struct display	*new;		/* Display item being added */
+	struct display	*prev;		/* Previous display item */
+	struct display	*current;	/* Next display item */
+	int	found;			/* FLAG, insertion point found */
+	int	compare = 1;		/* strcmp() compare value */
 
 
 	/* Find where this value belongs in the list */
@@ -560,34 +546,39 @@ adddisp(pwent)
 	current = displayhead->next;
 	found = FALSE;
 	while (!found && current) {
-	    if ((compare = strcmp(current->loginID, pwent->pw_name)) >= 0)
-		found = TRUE;
-	    else {
-		prev = current;
-		current = current->next;
-	    }
+		if ((compare = strcmp(current->loginID, pwent->pw_name)) >= 0)
+			found = TRUE;
+		else {
+			prev = current;
+			current = current->next;
+		}
 	}
 
 	/* Insert this value in the list, only if it is unique though */
 	if (compare != 0) {
-	    /* Build a display structure containing the value to add to the list, and add to the list */
-	    new = (struct display *) allocblk(sizeof(struct display));
-	    new->loginID = strcpy(allocstr((unsigned int) strlen(pwent->pw_name)+1), pwent->pw_name);
-	    if (pwent->pw_comment && pwent->pw_comment[0] != '\0')
-		    new->freefield =
-			    strcpy(allocstr((unsigned int)
-					    strlen(pwent->pw_comment)+1),
-				   pwent->pw_comment);
-	    else
-		    new->freefield =
-			    strcpy(allocstr((unsigned int)
-					    strlen(pwent->pw_gecos)+1),
-				   pwent->pw_gecos);
-	    new->next = current;
-	    prev->next = new;
+		/*
+		 * Build a display structure containing the value to add to
+		 * the list, and add to the list
+		 */
+		new = (struct display *)allocblk(sizeof (struct display));
+		new->loginID =
+		    strcpy(allocstr((unsigned int)strlen(pwent->pw_name)+1),
+		    pwent->pw_name);
+		if (pwent->pw_comment && pwent->pw_comment[0] != '\0')
+			new->freefield =
+			    strcpy(allocstr(
+			    (unsigned int)strlen(pwent->pw_comment)+1),
+			    pwent->pw_comment);
+		else
+			new->freefield =
+			    strcpy(allocstr(
+			    (unsigned int)strlen(pwent->pw_gecos)+1),
+			    pwent->pw_gecos);
+		new->next = current;
+		prev->next = new;
 	}
 }
-
+
 /*
  *  void genreport()
  *
@@ -601,11 +592,11 @@ adddisp(pwent)
  */
 
 static void
-genreport()
+genreport(void)
 {
 
 	/* Automatic data */
-	struct display	       *current;	/* Value to display */
+	struct display		*current;	/* Value to display */
 	int			i;		/* Counter of characters */
 
 	/*
@@ -618,14 +609,16 @@ genreport()
 	/*
 	 *  Display elements in the list
 	 */
-	for (current = displayhead->next ; current ; current = current->next) {
-	    (void) fputs(current->loginID, stdout);
-	    for (i = LOGINFIELDSZ - strlen(current->loginID) ; --i >= 0 ; (void) putc(' ', stdout)) ;
-	    (void) fputs(current->freefield, stdout);
-	    (void) putc('\n', stdout);
+	for (current = displayhead->next; current; current = current->next) {
+		(void) fputs(current->loginID, stdout);
+		for (i = LOGINFIELDSZ - strlen(current->loginID); --i >= 0;
+		    (void) putc(' ', stdout))
+			;
+		(void) fputs(current->freefield, stdout);
+		(void) putc('\n', stdout);
 	}
 }
-
+
 /*
  * listusers [-l logins] [-g groups]
  *
@@ -642,34 +635,33 @@ genreport()
  *	1	Usage error
  */
 
-main(argc, argv)
-	int	argc;
-	char   *argv[];
+int
+main(int argc, char **argv)
 {
 
 	/* Automatic data */
 
-	struct reqgrp	       *reqgrphead;	/* Head of the req'd group list */
-	struct reqgrp	       *pgrp;		/* Current item in the req'd group list */
-	struct reqgrp	       *qgrp;		/* Prev item in the req'd group list */
-	struct reqgrp	       *rgrp;		/* Running ptr for scanning group list */
-	struct reqlogin	       *reqloginhead;	/* Head of req'd login list */
-	struct reqlogin	       *plogin;		/* Current item in the req'd login list */
-	struct reqlogin	       *qlogin;		/* Previous item in the req'd login list */
-	struct reqlogin	       *rlogin;		/* Running ptr for scanning login list */
-	struct passwd	       *pwent;		/* Ptr to an /etc/passwd entry */
-	struct group	       *grent;		/* Ptr to an /etc/group entry */
-	char		       *token;		/* Ptr to a token extracted by strtok() */
-	char		      **pp;		/* Ptr to a member of a group */
-	char		       *g_arg;		/* Ptr to the -g option's argument */
-	char		       *l_arg;		/* Ptr to the -l option's argument */
-	int	 	 	g_seen;		/* FLAG, true if -g on cmd */
-	int			l_seen;		/* FLAG, TRUE if -l is on the command line */
-	int			errflg;		/* FLAG, TRUE if there is a command-line problem */
-	int			done;		/* FLAG, TRUE if the process (?) is complete */
-	int			groupcount;	/* Number of groups specified by the user */
-	int			rc;		/* Return code from strcmp() */
-	int			c;		/* Character returned from getopt() */
+	struct reqgrp	*reqgrphead;	/* Head of the req'd group list */
+	struct reqgrp	*pgrp;	/* Current item in the req'd group list */
+	struct reqgrp	*qgrp;		/* Prev item in the req'd group list */
+	struct reqgrp	*rgrp;	/* Running ptr for scanning group list */
+	struct reqlogin	*reqloginhead;	/* Head of req'd login list */
+	struct reqlogin	*plogin; /* Current item in the req'd login list */
+	struct reqlogin	*qlogin; /* Previous item in the req'd login list */
+	struct reqlogin	*rlogin; /* Running ptr for scanning login list */
+	struct passwd	*pwent;		/* Ptr to an /etc/passwd entry */
+	struct group	*grent;		/* Ptr to an /etc/group entry */
+	char	*token;		/* Ptr to a token extracted by strtok() */
+	char	**pp;		/* Ptr to a member of a group */
+	char	*g_arg;		/* Ptr to the -g option's argument */
+	char	*l_arg;		/* Ptr to the -l option's argument */
+	int	g_seen;		/* FLAG, true if -g on cmd */
+	int	l_seen;		/* FLAG, TRUE if -l is on the command line */
+	int	errflg;	/* FLAG, TRUE if there is a command-line problem */
+	int	done;		/* FLAG, TRUE if the process (?) is complete */
+	int	groupcount;	/* Number of groups specified by the user */
+	int	rc;		/* Return code from strcmp() */
+	int	c;		/* Character returned from getopt() */
 
 
 	/* Initializations */
@@ -682,34 +674,36 @@ main(argc, argv)
 	opterr = 0;
 	while (!errflg && ((c = getopt(argc, argv, "g:l:")) != EOF)) {
 
-	    /* Case on the option character */
-	    switch(c) {
+		/* Case on the option character */
+		switch (c) {
 
-	    case 'g':
-		if (g_seen) errflg = TRUE;
-		else {
-		    g_seen = TRUE;
-		    g_arg = optarg;
+		case 'g':
+			if (g_seen)
+				errflg = TRUE;
+			else {
+				g_seen = TRUE;
+				g_arg = optarg;
+			}
+			break;
+
+		case 'l':
+			if (l_seen)
+				errflg = TRUE;
+			else {
+				l_seen = TRUE;
+				l_arg = optarg;
+			}
+			break;
+
+		default:
+			errflg = TRUE;
 		}
-		break;
-
-	    case 'l':
-		if (l_seen) errflg = TRUE;
-		else {
-		    l_seen = TRUE;
-		    l_arg = optarg;
-		}
-		break;
-
-	    default:
-		errflg = TRUE;
-	    }
 	}
 
 	/* Write out a usage message if necessary and quit */
 	if (errflg || (optind != argc)) {
-	    wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, USAGE_MSG);
-	    exit(1);
+		wrtmsg(MM_ERROR, MM_NULLACT, MM_NULLTAG, USAGE_MSG);
+		exit(1);
 	}
 
 
@@ -719,42 +713,46 @@ main(argc, argv)
 	 */
 	if (g_seen) {
 
-	    /* Begin with an empty list */
-	    groupcount = 0;
-	    reqgrphead = (struct reqgrp *) NULL;
+		/* Begin with an empty list */
+		groupcount = 0;
+		reqgrphead = NULL;
 
-	    /* Extract the first token putting an element on the list */
-	    if ((token = strtok(g_arg, ",")) != (char *) NULL) {
-		pgrp = (struct reqgrp *) allocblk(sizeof(struct reqgrp));
-		pgrp->groupname = token;
-		pgrp->found = FALSE;
-		pgrp->next = (struct reqgrp *) NULL;
-		groupcount++;
-		reqgrphead = pgrp;
-		qgrp = pgrp;
-
-		/*
-		 * Extract subsequent tokens (group names), avoiding duplicate
-		 * names (note, list is NOT empty)
-		 */
-		while (token = strtok((char *) NULL, ",")) {
-
-		    /* Check for duplication */
-		    rgrp = reqgrphead;
-		    while (rgrp && (rc = strcmp(token, rgrp->groupname))) rgrp = rgrp->next;
-		    if (rc != 0) {
-
-			/* Not a duplicate.  Add on the list */
-			pgrp = (struct reqgrp *) allocblk(sizeof(struct reqgrp));
+		/* Extract the first token putting an element on the list */
+		if ((token = strtok(g_arg, ",")) != NULL) {
+			pgrp = (struct reqgrp *)
+			    allocblk(sizeof (struct reqgrp));
 			pgrp->groupname = token;
 			pgrp->found = FALSE;
-			pgrp->next = (struct reqgrp *) NULL;
+			pgrp->next = NULL;
 			groupcount++;
-			qgrp->next = pgrp;
+			reqgrphead = pgrp;
 			qgrp = pgrp;
-		    }
+
+			/*
+			 * Extract subsequent tokens (group names), avoiding
+			 * duplicate names (note, list is NOT empty)
+			 */
+			while (token = strtok(NULL, ",")) {
+
+				/* Check for duplication */
+				rgrp = reqgrphead;
+				while (rgrp &&
+				    (rc = strcmp(token, rgrp->groupname)))
+					rgrp = rgrp->next;
+				if (rc != 0) {
+
+					/* Not a duplicate.  Add on the list */
+					pgrp = (struct reqgrp *)
+					    allocblk(sizeof (struct reqgrp));
+					pgrp->groupname = token;
+					pgrp->found = FALSE;
+					pgrp->next = NULL;
+					groupcount++;
+					qgrp->next = pgrp;
+					qgrp = pgrp;
+				}
+			}
 		}
-	    }
 	}
 
 	/*
@@ -763,43 +761,49 @@ main(argc, argv)
 	 */
 	if (l_seen) {
 
-	    /* Begin with a null list */
-	    reqloginhead = (struct reqlogin *) NULL;
+		/* Begin with a null list */
+		reqloginhead = NULL;
 
-	    /* Extract the first token from the argument to the -l option */
-	    if (token = strtok(l_arg, ",")) {
+		/* Extract the first token from the argument to the -l option */
+		if (token = strtok(l_arg, ",")) {
 
-		/* Put the first element in the list */
-		plogin = (struct reqlogin *) allocblk(sizeof(struct reqlogin));
-		plogin->loginname = token;
-		plogin->found = FALSE;
-		plogin->next = (struct reqlogin *) NULL;
-		reqloginhead = plogin;
-		qlogin = plogin;
-
-		/*
-		 * For each subsequent token in the -l argument's
-		 * comma list ...
-		 */
-
-		while (token = strtok((char *) NULL, ",")) {
-
-		    /* Check for duplication (list is not empty) */
-		    rlogin = reqloginhead;
-		    while (rlogin && (rc = strcmp(token, rlogin->loginname)))
-			rlogin = rlogin->next;
-
-		    /* If it's not a duplicate, add it to the list */
-		    if (rc != 0) {
-			plogin = (struct reqlogin *) allocblk(sizeof(struct reqlogin));
+			/* Put the first element in the list */
+			plogin = (struct reqlogin *)
+			    allocblk(sizeof (struct reqlogin));
 			plogin->loginname = token;
 			plogin->found = FALSE;
-			plogin->next = (struct reqlogin *) NULL;
-			qlogin->next = plogin;
+			plogin->next = NULL;
+			reqloginhead = plogin;
 			qlogin = plogin;
-		    }
+
+			/*
+			 * For each subsequent token in the -l argument's
+			 * comma list ...
+			 */
+
+			while (token = strtok(NULL, ",")) {
+
+				/* Check for duplication (list is not empty) */
+				rlogin = reqloginhead;
+				while (rlogin &&
+				    (rc = strcmp(token, rlogin->loginname)))
+					rlogin = rlogin->next;
+
+				/*
+				 * If it's not a duplicate,
+				 * add it to the list
+				 */
+				if (rc != 0) {
+					plogin = (struct reqlogin *)
+					    allocblk(sizeof (struct reqlogin));
+					plogin->loginname = token;
+					plogin->found = FALSE;
+					plogin->next = NULL;
+					qlogin->next = plogin;
+					qlogin = plogin;
+				}
+			}
 		}
-	    }
 	}
 
 
@@ -814,48 +818,62 @@ main(argc, argv)
 	initmembers();
 	if (g_seen) {
 
-	    /* For each group in the /etc/group file ... */
-	    while (grent = getgrent()) {
+		/* For each group in the /etc/group file ... */
+		while (grent = getgrent()) {
 
-		/* For each group mentioned with the -g option ... */
-		for (pgrp = reqgrphead ; (groupcount > 0) && pgrp ; pgrp = pgrp->next) {
+			/* For each group mentioned with the -g option ... */
+			for (pgrp = reqgrphead; (groupcount > 0) && pgrp;
+			    pgrp = pgrp->next) {
 
-		    if (pgrp->found == FALSE) {
+				if (pgrp->found == FALSE) {
 
-			/*
-			 * If the mentioned group is found in the
-			 * /etc/group file ...
-			 */
-			if (strcmp(grent->gr_name, pgrp->groupname) == 0) {
+					/*
+					 * If the mentioned group is found in
+					 * the /etc/group file ...
+					 */
+					if (strcmp(grent->gr_name,
+					    pgrp->groupname) == 0) {
 
-			    /* Mark the entry is found, remembering the
-			     * group-ID for later */
-			    pgrp->found = TRUE;
-			    groupcount--;
-			    pgrp->groupID = grent->gr_gid;
-			    if (isausergroup(pgrp->groupID))
-				for (pp = grent->gr_mem ; *pp ; pp++) addmember(*pp);
+						/*
+						 * Mark the entry is found,
+						 * remembering the group-ID
+						 * for later
+						 */
+						pgrp->found = TRUE;
+						groupcount--;
+						pgrp->groupID = grent->gr_gid;
+						if (isausergroup(pgrp->groupID))
+							for (pp = grent->gr_mem;
+							    *pp; pp++)
+								addmember(*pp);
+					}
+				}
 			}
-		    }
 		}
-	    }
 
-	    /* If any groups weren't found, write a message
-	     * indicating such, then continue */
-	    qgrp = (struct reqgrp *) NULL;
-	    for (pgrp = reqgrphead ; pgrp ; pgrp = pgrp->next) {
-		if (!pgrp->found) {
-		    wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG, "%s was not found", pgrp->groupname);
-		    if (!qgrp) reqgrphead = pgrp->next;
-		    else qgrp->next = pgrp->next;
+		/*
+		 * If any groups weren't found, write a message
+		 * indicating such, then continue
+		 */
+		qgrp = NULL;
+		for (pgrp = reqgrphead; pgrp; pgrp = pgrp->next) {
+			if (!pgrp->found) {
+				wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG,
+				    "%s was not found", pgrp->groupname);
+				if (!qgrp)
+					reqgrphead = pgrp->next;
+				else
+					qgrp->next = pgrp->next;
+			} else if (isasystemgroup(pgrp->groupID)) {
+				wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG,
+				    "%s is not a user group", pgrp->groupname);
+				if (!qgrp)
+					reqgrphead = pgrp->next;
+				else
+					qgrp->next = pgrp->next;
+			} else
+				qgrp = pgrp;
 		}
-		else if (isasystemgroup(pgrp->groupID)) {
-		    wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG, "%s is not a user group", pgrp->groupname);
-		    if (!qgrp) reqgrphead = pgrp->next;
-		    else qgrp->next = pgrp->next;
-		}
-		else qgrp = pgrp;
-	    }
 	}
 
 
@@ -869,65 +887,77 @@ main(argc, argv)
 	 */
 	while (pwent = getpwent()) {
 
-	    /* The login from /etc/passwd hasn't been included in
-	     * the display yet */
-	    done = FALSE;
+		/*
+		 * The login from /etc/passwd hasn't been included in
+		 * the display yet
+		 */
+		done = FALSE;
 
 
-	    /*
-	     * If the login was explicitly requested, include it in
-	     * the display if it is a user login
-	     */
+		/*
+		 * If the login was explicitly requested, include it in
+		 * the display if it is a user login
+		 */
 
-	    if (l_seen) {
-		for (plogin = reqloginhead ; !done && plogin ; plogin = plogin->next) {
-		    if (strcmp(pwent->pw_name, plogin->loginname) == 0) {
-			plogin->found = TRUE;
-			if (isauserlogin(pwent->pw_uid)) adddisp(pwent);
-			else 
-			    wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG, 
-				   "%s is not a user login", plogin->loginname);
-			done = TRUE;
-		    }
-		}
-	    }
-
-
-	    /*
-	     *  If the login-ID isn't already on the list, if its primary
-	     *  group-ID is one of those groups requested, or it is a member
-	     *  of the groups requested, include it in the display if it is
-	     *  a user login (uid >= 100).
-	     */
-
-	    if (isauserlogin(pwent->pw_uid)) {
-
-		if (!done && g_seen) {
-		    for (pgrp = reqgrphead ; !done && pgrp ; pgrp = pgrp->next)
-			if (pwent->pw_gid == pgrp->groupID) {
-			    adddisp(pwent);
-			    done = TRUE;
-		    }
-		    if (!done && isamember(pwent->pw_name)) {
-			adddisp(pwent);
-			done = TRUE;
-		    }
+		if (l_seen) {
+			for (plogin = reqloginhead; !done && plogin;
+			    plogin = plogin->next) {
+				if (strcmp(pwent->pw_name,
+				    plogin->loginname) == 0) {
+					plogin->found = TRUE;
+					if (isauserlogin(pwent->pw_uid))
+						adddisp(pwent);
+					else
+						wrtmsg(MM_WARNING, MM_NULLACT,
+						    MM_NULLTAG,
+						    "%s is not a user login",
+						    plogin->loginname);
+					done = TRUE;
+				}
+			}
 		}
 
 
 		/*
-		 *  If neither -l nor -g is on the command-line and the login-ID
-		 *  is a user login, include it in the display.
+		 *  If the login-ID isn't already on the list, if its primary
+		 *  group-ID is one of those groups requested, or it is a member
+		 *  of the groups requested, include it in the display if it is
+		 *  a user login (uid >= 100).
 		 */
 
-		if (!l_seen && !g_seen) adddisp(pwent);
-	    }
+		if (isauserlogin(pwent->pw_uid)) {
+
+			if (!done && g_seen) {
+				for (pgrp = reqgrphead; !done && pgrp;
+				    pgrp = pgrp->next)
+					if (pwent->pw_gid == pgrp->groupID) {
+						adddisp(pwent);
+						done = TRUE;
+					}
+				if (!done && isamember(pwent->pw_name)) {
+					adddisp(pwent);
+					done = TRUE;
+				}
+			}
+
+
+			/*
+			 * If neither -l nor -g is on the command-line and
+			 * the login-ID is a user login, include it in
+			 * the display.
+			 */
+
+			if (!l_seen && !g_seen)
+				adddisp(pwent);
+		}
 	}
 
 	/* Let the user know about logins they requested that don't exist */
-	if (l_seen) for (plogin = reqloginhead ; plogin ; plogin = plogin->next)
-	    if (!plogin->found)
-		wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG, "%s was not found", plogin->loginname);
+	if (l_seen)
+		for (plogin = reqloginhead; plogin; plogin = plogin->next)
+			if (!plogin->found)
+				wrtmsg(MM_WARNING, MM_NULLACT, MM_NULLTAG,
+				    "%s was not found", plogin->loginname);
 
 
 	/*
@@ -938,9 +968,5 @@ main(argc, argv)
 	/*
 	 *  We're through!
 	 */
-	exit(0);
-
-#ifdef	lint
-	return(0);
-#endif
+	return (0);
 }

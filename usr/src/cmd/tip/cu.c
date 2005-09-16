@@ -2,32 +2,33 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from UCB 5.2 1/13/86 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tip.h"
 
-void	cleanup();
-void	timeout();
+void	cleanup(void);
+void	timeout(void);
 
 /*
  * Botch the interface to look like cu's
  */
-cumain(argc, argv)
-	char *argv[];
+void
+cumain(int argc, char *argv[])
 {
-	register int i;
+	int i;
 	static char sbuf[12];
 
 	if (argc < 2) {
 usage:
-		fprintf(stderr,
-		"usage: cu telno [-t] [-s speed] [-a acu] [-l line] [-#]\n");
+		(void) fprintf(stderr,
+	"usage: cu telno [-t] [-s speed] [-a acu] [-l line] [-#]\n");
 		exit(8);
 	}
 	CU = DV = NOSTR;
@@ -35,8 +36,9 @@ usage:
 		if (argv[1][0] != '-')
 			PN = argv[1];
 		else if (argv[1][1] != '\0' && argv[1][2] != '\0') {
-			fprintf(stderr, "cu: extra characters after flag: %s\n",
-				argv[1]);
+			(void) fprintf(stderr,
+			    "cu: extra characters after flag: %s\n",
+			    argv[1]);
 			goto usage;
 		} else switch (argv[1][1]) {
 
@@ -53,8 +55,9 @@ usage:
 			if (argc < 3)
 				goto usage;
 			if (speed(atoi(argv[2])) == 0) {
-				fprintf(stderr, "cu: unsupported speed %s\n",
-					argv[2]);
+				(void) fprintf(stderr,
+				    "cu: unsupported speed %s\n",
+				    argv[2]);
 				exit(3);
 			}
 			BR = atoi(argv[2]); ++argv; --argc;
@@ -73,26 +76,26 @@ usage:
 			break;
 
 		default:
-			fprintf(stderr, "cu: bad flag %s\n", argv[1]);
+			(void) fprintf(stderr, "cu: bad flag %s\n", argv[1]);
 			goto usage;
 		}
 	}
-	signal(SIGINT, cleanup);
-	signal(SIGQUIT, cleanup);
-	signal(SIGHUP, cleanup);
-	signal(SIGTERM, cleanup);
+	(void) signal(SIGINT, (sig_handler_t)cleanup);
+	(void) signal(SIGQUIT, (sig_handler_t)cleanup);
+	(void) signal(SIGHUP, (sig_handler_t)cleanup);
+	(void) signal(SIGTERM, (sig_handler_t)cleanup);
 
 	/*
 	 * The "cu" host name is used to define the
 	 * attributes of the generic dialer.
 	 */
-	sprintf(sbuf, "cu%d", BR);
+	(void) sprintf(sbuf, "cu%d", BR);
 	if ((i = hunt(sbuf)) == 0) {
-		printf("all ports busy\n");
+		(void) printf("all ports busy\n");
 		exit(3);
 	}
 	if (i == -1) {
-		printf("link down\n");
+		(void) printf("link down\n");
 		delock(uucplock);
 		exit(3);
 	}
@@ -109,7 +112,7 @@ usage:
 	if (HW)
 		ttysetup(speed(BR));
 	if (connect()) {
-		printf("Connect failed\n");
+		(void) printf("Connect failed\n");
 		myperm();
 		delock(uucplock);
 		exit(1);

@@ -1,5 +1,5 @@
 #
-# Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,6 +62,7 @@ $(ROOTETCREMOTE) :=	FILEMODE =	644
 $(ROOTACULOG) :=	FILEMODE =	600
 $(ROOTACULOG) :=	OWNER =		uucp
 
+LINTFLAGS +=	-u
 CPPFLAGS +=	-DDEFBR=300 -DDEFFS=BUFSIZ -DACULOG -DUSG
 CONFIG=	-DV831 -DVENTEL -DV3451 -DDF02 -DDF03 -DBIZ1031 -DBIZ1022 -DHAYES
 ACULIB=	aculib/aculib.a
@@ -110,7 +111,9 @@ clean:	FRC
 	$(RM) $(OBJS)
 
 lint:
-	-lint -hbacvx $(CFLAGS) $(SOURCES)
+	cd aculib; $(MAKE) lint
+	$(LINT.c) $(SRCS) $(LDLIBS.cmd)
+
 
 include ../Makefile.targ
 

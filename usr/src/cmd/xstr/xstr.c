@@ -12,13 +12,15 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
 #include <sys/types.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 /*
  * xstr - extract and hash strings in a C program
@@ -27,16 +29,23 @@
  * November, 1978
  */
 
-#define	ignore(a)	((void) a)
-
 off_t	tellpt;
-off_t	hashit();
-void	onintr();
-char	*savestr();
-char	*strcat();
-char	*strcpy();
-off_t	yankstr();
-void	cleanup();
+off_t	hashit(char *, int);
+void	onintr(void);
+char	*savestr(char *);
+off_t	yankstr(char **);
+void	cleanup(void);
+void	process(char *);
+int	octdigit(char);
+void	inithash(void);
+void	flushsh(void);
+void	found(int, off_t, char *);
+void	prstr(char *);
+void	xsdotc(void);
+int	fgetNUL(char *, int, FILE *);
+int	xgetc(FILE *);
+int	lastchr(char *);
+int	istail(char *, char *);
 
 off_t	mesgpt;
 char	*strings =	"strings";
@@ -47,15 +56,12 @@ char	*xname = "xstr";
 int	readstd;
 int	tmpfd;
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char **argv)
 {
-
-
 	argc--, argv++;
 	while (argc > 0 && argv[0][0] == '-') {
-		register char *cp = &(*argv++)[1];
+		char *cp = &(*argv++)[1];
 
 		argc--;
 		if (*cp == 0) {
@@ -78,12 +84,12 @@ main(argc, argv)
 			continue;
 
 		default:
-			fprintf(stderr,
+			(void) fprintf(stderr,
 		"usage: xstr [ -v ] [ -c ] [ -l label ] [ - ] [ name ... ]\n");
 		} while (*cp);
 	}
 	if (signal(SIGINT, SIG_IGN) == SIG_DFL)
-		signal(SIGINT, onintr);
+		(void) signal(SIGINT, (void (*)(int))onintr);
 	if (cflg || argc == 0 && !readstd)
 		inithash();
 	else {
@@ -106,26 +112,25 @@ main(argc, argv)
 			argc--, argv++;
 		else
 			readstd = 0;
-	};
+	}
 	flushsh();
 	if (cflg == 0)
 		xsdotc();
 	(void) cleanup();
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
 char linebuf[BUFSIZ];
 
-process(name)
-	char *name;
+void
+process(char *name)
 {
 	char *cp;
-	register int c;
-	register int incomm = 0;
+	int c;
+	int incomm = 0;
 	int ret;
 
-	printf("extern char\t%s[];\n", xname);
+	(void) printf("extern char\t%s[];\n", xname);
 	for (;;) {
 		if (fgets(linebuf, sizeof (linebuf), stdin) == NULL) {
 			if (ferror(stdin)) {
@@ -137,27 +142,27 @@ process(name)
 		}
 		if (linebuf[0] == '#') {
 			if (linebuf[1] == ' ' && isdigit(linebuf[2]))
-				printf("#line%s", &linebuf[1]);
+				(void) printf("#line%s", &linebuf[1]);
 			else
-				printf("%s", linebuf);
+				(void) printf("%s", linebuf);
 			continue;
 		}
-		for (cp = linebuf; c = *cp++; ) {
+		for (cp = linebuf; (c = *cp++) != 0; ) {
 			switch (c) {
 				case '"':
 					if (incomm)
 						goto def;
-					if ((ret = (int) yankstr(&cp)) == -1)
+					if ((ret = (int)yankstr(&cp)) == -1)
 						goto out;
-					printf("(&%s[%d])", xname, ret);
+					(void) printf("(&%s[%d])", xname, ret);
 					break;
 
 				case '\'':
 					if (incomm)
 						goto def;
-					putchar(c);
+					(void) putchar(c);
 					if (*cp)
-						putchar(*cp++);
+						(void) putchar(*cp++);
 					break;
 
 				case '/':
@@ -165,20 +170,20 @@ process(name)
 						goto def;
 					incomm = 1;
 					cp++;
-					printf("/*");
+					(void) printf("/*");
 					continue;
 
 				case '*':
 					if (incomm && *cp == '/') {
 						incomm = 0;
 						cp++;
-						printf("*/");
+						(void) printf("*/");
 						continue;
 					}
 					goto def;
 def:
 				default:
-					putchar(c);
+					(void) putchar(c);
 					break;
 			}
 		}
@@ -189,16 +194,15 @@ out:
 }
 
 off_t
-yankstr(cpp)
-	register char **cpp;
+yankstr(char **cpp)
 {
-	register char *cp = *cpp;
-	register int c, ch;
+	char *cp = *cpp;
+	int c, ch;
 	char dbuf[BUFSIZ];
-	register char *dp = dbuf;
-	register char *tp;
+	char *dp = dbuf;
+	char *tp;
 
-	while (c = *cp++) {
+	while ((c = *cp++) != 0) {
 		switch (c) {
 
 		case '"':
@@ -223,7 +227,8 @@ yankstr(cpp)
 				cp = linebuf;
 				continue;
 			}
-			for (tp = "b\bt\tr\rn\nf\f\\\\\"\""; ch = *tp++; tp++)
+			for (tp = "b\bt\tr\rn\nf\f\\\\\"\""; (ch = *tp++) != 0;
+			    tp++)
 				if (c == ch) {
 					c = *tp;
 					goto gotc;
@@ -250,17 +255,18 @@ out:
 	return (hashit(dbuf, 1));
 }
 
-octdigit(c)
-	char c;
+int
+octdigit(char c)
 {
 
 	return (isdigit(c) && c != '8' && c != '9');
 }
 
-inithash()
+void
+inithash(void)
 {
 	char buf[BUFSIZ];
-	register FILE *mesgread = fopen(strings, "r");
+	FILE *mesgread = fopen(strings, "r");
 
 	if (mesgread == NULL)
 		return;
@@ -268,18 +274,16 @@ inithash()
 		mesgpt = tellpt;
 		if (fgetNUL(buf, sizeof (buf), mesgread) == NULL)
 			break;
-		ignore(hashit(buf, 0));
+		(void) hashit(buf, 0);
 	}
-	ignore(fclose(mesgread));
+	(void) fclose(mesgread);
 }
 
-fgetNUL(obuf, rmdr, file)
-	char *obuf;
-	register int rmdr;
-	FILE *file;
+int
+fgetNUL(char *obuf, int rmdr, FILE *file)
 {
-	register c;
-	register char *buf = obuf;
+	int c;
+	char *buf = obuf;
 
 	while (--rmdr > 0 && (c = xgetc(file)) != 0 && c != EOF)
 		*buf++ = c;
@@ -287,8 +291,8 @@ fgetNUL(obuf, rmdr, file)
 	return ((feof(file) || ferror(file)) ? NULL : 1);
 }
 
-xgetc(file)
-	FILE *file;
+int
+xgetc(FILE *file)
 {
 
 	tellpt++;
@@ -305,12 +309,10 @@ struct	hash {
 } bucket[BUCKETS];
 
 off_t
-hashit(str, new)
-	char *str;
-	int new;
+hashit(char *str, int new)
 {
 	int i;
-	register struct hash *hp, *hp0;
+	struct hash *hp, *hp0;
 
 	hp = hp0 = &bucket[lastchr(str) & 0177];
 	while (hp->hnext) {
@@ -319,7 +321,7 @@ hashit(str, new)
 		if (i >= 0)
 			return (hp->hpt + i);
 	}
-	if ((hp = (struct hash *) calloc(1, sizeof (*hp))) == NULL) {
+	if ((hp = calloc(1, sizeof (*hp))) == NULL) {
 		perror("xstr");
 		(void) cleanup();
 		exit(8);
@@ -333,12 +335,13 @@ hashit(str, new)
 	return (hp->hpt);
 }
 
-flushsh()
+void
+flushsh(void)
 {
-	register int i;
-	register struct hash *hp;
-	register FILE *mesgwrit;
-	register int old = 0, new = 0;
+	int i;
+	struct hash *hp;
+	FILE *mesgwrit;
+	int old = 0, new = 0;
 
 	for (i = 0; i < BUCKETS; i++)
 		for (hp = bucket[i].hnext; hp != NULL; hp = hp->hnext)
@@ -355,9 +358,9 @@ flushsh()
 		for (hp = bucket[i].hnext; hp != NULL; hp = hp->hnext) {
 			found(hp->hnew, hp->hpt, hp->hstr);
 			if (hp->hnew) {
-				fseek(mesgwrit, hp->hpt, 0);
-				ignore(fwrite(hp->hstr,
-				    strlen(hp->hstr) + 1, 1, mesgwrit));
+				(void) fseek(mesgwrit, hp->hpt, 0);
+				(void) fwrite(hp->hstr,
+				    strlen(hp->hstr) + 1, 1, mesgwrit);
 				if (ferror(mesgwrit)) {
 					perror(strings);
 					(void) cleanup();
@@ -369,50 +372,49 @@ flushsh()
 		perror(strings), (void) cleanup(), exit(4);
 }
 
-found(new, off, str)
-	int new;
-	off_t off;
-	char *str;
+void
+found(int new, off_t off, char *str)
 {
 	if (vflg == 0)
 		return;
 	if (!new)
-		fprintf(stderr, "found at %d:", (int) off);
+		(void) fprintf(stderr, "found at %d:", (int)off);
 	else
-		fprintf(stderr, "new at %d:", (int) off);
+		(void) fprintf(stderr, "new at %d:", (int)off);
 	prstr(str);
-	fprintf(stderr, "\n");
+	(void) fprintf(stderr, "\n");
 }
 
-prstr(cp)
-	register char *cp;
+void
+prstr(char *cp)
 {
-	register int c;
+	int c;
 
-	while (c = (*cp++ & 0377))
+	while ((c = (*cp++ & 0377)) != 0)
 		if (c < ' ')
-			fprintf(stderr, "^%c", c + '`');
+			(void) fprintf(stderr, "^%c", c + '`');
 		else if (c == 0177)
-			fprintf(stderr, "^?");
+			(void) fprintf(stderr, "^?");
 		else if (c > 0200)
-			fprintf(stderr, "\\%03o", c);
+			(void) fprintf(stderr, "\\%03o", c);
 		else
-			fprintf(stderr, "%c", c);
+			(void) fprintf(stderr, "%c", c);
 }
 
-xsdotc()
+void
+xsdotc(void)
 {
-	register FILE *strf = fopen(strings, "r");
-	register FILE *xdotcf;
+	FILE *strf = fopen(strings, "r");
+	FILE *xdotcf;
 
 	if (strf == NULL)
 		perror(strings), exit(5);
 	xdotcf = fopen("xs.c", "w");
 	if (xdotcf == NULL)
 		perror("xs.c"), exit(6);
-	fprintf(xdotcf, "char\t%s[] = {\n", xname);
+	(void) fprintf(xdotcf, "char\t%s[] = {\n", xname);
 	for (;;) {
-		register int i, c;
+		int i, c;
 
 		for (i = 0; i < 8; i++) {
 			c = getc(strf);
@@ -421,45 +423,44 @@ xsdotc()
 				onintr();
 			}
 			if (feof(strf)) {
-				fprintf(xdotcf, "\n");
+				(void) fprintf(xdotcf, "\n");
 				goto out;
 			}
-			fprintf(xdotcf, "0x%02x,", c);
+			(void) fprintf(xdotcf, "0x%02x,", c);
 		}
-		fprintf(xdotcf, "\n");
+		(void) fprintf(xdotcf, "\n");
 	}
 out:
-	fprintf(xdotcf, "};\n");
-	ignore(fclose(xdotcf));
-	ignore(fclose(strf));
+	(void) fprintf(xdotcf, "};\n");
+	(void) fclose(xdotcf);
+	(void) fclose(strf);
 }
 
 char *
-savestr(cp)
-	register char *cp;
+savestr(char *cp)
 {
-	register char *dp;
+	char *dp;
 
-	if ((dp = (char *) calloc(1, strlen(cp) + 1)) == NULL) {
+	if ((dp = calloc(1, strlen(cp) + 1)) == NULL) {
 		perror("xstr");
 		exit(8);
 	}
 	return (strcpy(dp, cp));
 }
 
-lastchr(cp)
-	register char *cp;
+int
+lastchr(char *cp)
 {
 
 	while (cp[0] && cp[1])
 		cp++;
-	return (*cp);
+	return ((int)*cp);
 }
 
-istail(str, of)
-	register char *str, *of;
+int
+istail(char *str, char *of)
 {
-	register int d = strlen(of) - strlen(str);
+	int d = strlen(of) - strlen(str);
 
 	if (d < 0 || strcmp(&of[d], str) != 0)
 		return (-1);
@@ -467,19 +468,20 @@ istail(str, of)
 }
 
 void
-onintr()
+onintr(void)
 {
 
-	ignore(signal(SIGINT, SIG_IGN));
+	(void) signal(SIGINT, SIG_IGN);
 	(void) cleanup();
-	ignore(unlink("x.c"));
-	ignore(unlink("xs.c"));
+	(void) unlink("x.c");
+	(void) unlink("xs.c");
 	exit(7);
 }
+
 void
 cleanup(void)
 {
 	if (strings[0] == '/') {
-		ignore(unlink(strings));
+		(void) unlink(strings);
 	}
 }

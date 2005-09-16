@@ -26,6 +26,7 @@ OBJS=	biz22.o biz31.o df.o dn11.o hayes.o ventel.o v831.o v3451.o
 
 include ../../Makefile.cmd
 
+LINTFLAGS +=	-u
 CPPFLAGS=	-I../ -DUSG $(CPPFLAGS.master)
 
 .KEEP_STATE:
@@ -39,3 +40,6 @@ $(ACULIB): $(OBJS)
 
 clean:
 	$(RM) $(ACULIB) $(OBJS) core errs
+
+lint:
+	$(LINT.c) $(OBJS:%.o=%.c)

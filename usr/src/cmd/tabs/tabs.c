@@ -48,6 +48,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <limits.h>
+#include <signal.h>
 
 #define	EQ(a, b)	(strcmp(a, b) == 0)
 /*	max # columns used (needed for GSI) */
@@ -134,7 +135,7 @@ static int stdtab(char option[], int tabvect[]);
 static void usage();
 static int chk_codes(char *codes);
 
-void
+int
 main(int argc, char **argv)
 {
 	int tabvect[NTABS];	/* build tab list here */
@@ -149,7 +150,7 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	signal(SIGINT, endup);
+	(void) signal(SIGINT, endup);
 	if (ioctl(1, TCGETA, &ttyold) == 0) {
 		ttyisave = ttyold.c_iflag;
 		ttyosave = ttyold.c_oflag;
@@ -199,10 +200,11 @@ main(int argc, char **argv)
 						option_end = 1;
 					else
 						tabspec = scan; /* --file */
-				else if (strcmp(scan+1, "code") == 0);
+				else if (strcmp(scan+1, "code") == 0) {
+					/* EMPTY */
 					/* skip to next argument */
-				else if (chk_codes(scan+1) ||
-				(isdigit(*(scan+1)) && *(scan+2) == '\0')) {
+				} else if (chk_codes(scan+1) ||
+				    (isdigit(*(scan+1)) && *(scan+2) == '\0')) {
 					/*
 					 * valid code or single digit decimal
 					 * number
@@ -240,7 +242,7 @@ main(int argc, char **argv)
 				} else {
 					(void) fprintf(stderr, gettext(
 		"tabs: %s: tab stop values must be positive integers\n"),
-					*argv);
+					    *argv);
 					usage();
 				}
 			}
@@ -249,7 +251,7 @@ main(int argc, char **argv)
 	}
 	if (*terminal == '\0') {
 		if ((terminal = getenv("TERM")) == (char *)NULL ||
-						*terminal == '\0') {
+		    *terminal == '\0') {
 			/*
 			 * Use tab setting and clearing sequences specified
 			 * by the ANSI standard.
@@ -284,7 +286,7 @@ main(int argc, char **argv)
 		repetab("8", tabvect);
 	settabs(tabvect);
 	endup();
-	exit(0);
+	return (0);
 }
 
 /*
@@ -294,10 +296,10 @@ int
 chk_codes(char *code)
 {
 	if (*(code+1) == '\0' && (*code == 'a' || *code == 'c' ||
-		*code == 'f' || *code == 'p' || *code == 's' || *code == 'u'))
+	    *code == 'f' || *code == 'p' || *code == 's' || *code == 'u'))
 			return (1);
 	else if (*(code+1) == '2' && *(code+2) == '\0' &&
-		(*code == 'a' || *code == 'c'))
+	    (*code == 'a' || *code == 'c'))
 			return (1);
 	else if (*code == 'c' && *(code+1) == '3' && *(code+2) == '\0')
 		return (1);
@@ -308,8 +310,8 @@ chk_codes(char *code)
 void
 scantab(char *scan, int tabvect[NTABS], int level)
 {
-	register char c;
-	if (*scan == '-')
+	char c;
+	if (*scan == '-') {
 		if ((c = *++scan) == '-')
 			filetab(++scan, tabvect, level);
 		else if (c >= '0' && c <= '9')
@@ -319,9 +321,10 @@ scantab(char *scan, int tabvect[NTABS], int level)
 			(void) fprintf(stderr, gettext(
 			"tabs: %s: unknown tab code\n"), scan);
 			usage();
-		} else;
-	else
+		}
+	} else {
 		arbitab(scan, tabvect);
+	}
 }
 
 /*	repetab: scan and set repetitve tabs, 1+n, 1+2*n, etc */
@@ -329,7 +332,7 @@ scantab(char *scan, int tabvect[NTABS], int level)
 void
 repetab(char *scan, int tabvect[NTABS])
 {
-	register incr, i, tabn;
+	int incr, i, tabn;
 	int limit;
 	incr = getnum(&scan);
 	tabn = 1;
@@ -347,7 +350,7 @@ void
 arbitab(char *scan, int tabvect[NTABS])
 {
 	char *scan_save;
-	register i, t, last;
+	int i, t, last;
 
 	scan_save = scan;
 	last = 0;
@@ -378,7 +381,7 @@ arbitab(char *scan, int tabvect[NTABS])
 		endup();
 		(void) fprintf(stderr, gettext(
 	"tabs: %s: last tab stop would be set at a column greater than %d\n"),
-		scan_save, NCOLS);
+		    scan_save, NCOLS);
 		usage();
 	}
 	tabvect[i] = 0;
@@ -390,8 +393,8 @@ arbitab(char *scan, int tabvect[NTABS])
 void
 filetab(char *scan, int tabvect[NTABS], int level)
 {
-	register length, i;
-	register char c;
+	int length, i;
+	char c;
 	int fildes;
 	char card[CARDSIZ];	/* buffer area for 1st card in file */
 	char state, found;
@@ -400,7 +403,7 @@ filetab(char *scan, int tabvect[NTABS], int level)
 		endup();
 		(void) fprintf(stderr, gettext(
 		"tabs: %s points to another file: invalid file indirection\n"),
-		scan);
+		    scan);
 		exit(1);
 	}
 	if ((fildes = open(scan, O_RDONLY)) < 0) {
@@ -462,7 +465,8 @@ done:
 	if (found && scan != 0) {
 		scantab(scan, tabvect, 1);
 		temp = scan;
-		while (*++temp);
+		while (*++temp)
+			;
 		*temp = '\n';
 	}
 	else
@@ -473,7 +477,7 @@ int
 getmarg(char *term)
 {
 	if (strncmp(term, "1620", 4) == 0 ||
-		strncmp(term, "1700", 4) == 0 || strncmp(term, "450", 3) == 0)
+	    strncmp(term, "1700", 4) == 0 || strncmp(term, "450", 3) == 0)
 		return (DMG);
 	else if (strncmp(term, "300s", 4) == 0)
 		return (GMG);
@@ -490,15 +494,15 @@ getmarg(char *term)
 
 
 struct ttab *
-termadj()
+termadj(void)
 {
-	register struct ttab *t;
+	struct ttab *t;
 
 	if (strncmp(terminal, "40-2", 4) == 0 || strncmp(terminal,
-			"40/2", 4) == 0 || strncmp(terminal, "4420", 4) == 0)
+	    "40/2", 4) == 0 || strncmp(terminal, "4420", 4) == 0)
 		(void) strcpy(terminal, "4424");
 	else if (strncmp(terminal, "ibm", 3) == 0 || strcmp(terminal,
-			"3101") == 0 || strcmp(terminal, "system1") == 0)
+	    "3101") == 0 || strcmp(terminal, "system1") == 0)
 		(void) strcpy(terminal, "ibm");
 
 	for (t = termtab; t->ttype; t++) {
@@ -520,8 +524,8 @@ void
 settabs(int tabvect[NTABS])
 {
 	char setbuf[512];	/* 2+3*NTABS+2+NCOLS+NTABS (+ some extra) */
-	register char *p;		/* ptr for assembly in setbuf */
-	register *curtab;		/* ptr to tabvect item */
+	char *p;		/* ptr for assembly in setbuf */
+	int *curtab;		/* ptr to tabvect item */
 	int i, previous, nblanks;
 	if (istty) {
 		ttyold.c_iflag &= ~ICRNL;
@@ -599,7 +603,7 @@ settabs(int tabvect[NTABS])
  */
 	previous = 1; curtab = tabvect;
 	while ((nblanks = *curtab-previous) >= 0 &&
-		previous + nblanks <= maxtab) {
+	    previous + nblanks <= maxtab) {
 		for (i = 1; i <= nblanks; i++) *p++ = ' ';
 		previous = *curtab++;
 		(void) strcpy(p, settab);
@@ -622,8 +626,8 @@ settabs(int tabvect[NTABS])
 char *
 cleartabs(register char *p, char *qq)
 {
-	register i;
-	register char *q;
+	int i;
+	char *q;
 	q = qq;
 	if (clear_tabs == 0) {		/* if repetitive sequence */
 		*p++ = CR;
@@ -634,7 +638,8 @@ cleartabs(register char *p, char *qq)
 		}
 		*p++ = CR;
 	} else {
-		while (*p++ = *q++);	/* copy table sequence */
+		while (*p++ = *q++)	/* copy table sequence */
+			;
 		p--;			/* adjust for null */
 		if (EQ(terminal, "4424")) {	/* TTY40 extra delays needed */
 			*p++ = '\0';
@@ -650,8 +655,8 @@ cleartabs(register char *p, char *qq)
 int
 getnum(char **scan1)
 {
-	register n;
-	register char c, *scan;
+	int n;
+	char c, *scan;
 	n = 0;
 	scan = *scan1;
 	while ((c = *scan++) >= '0' && c <= '9') n = n * 10 + c -'0';
@@ -661,7 +666,7 @@ getnum(char **scan1)
 
 /*	usage: terminate processing with usage message */
 void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr, gettext(
 "usage: tabs [ -n| --file| [[-code] -a| -a2| -c| -c2| -c3| -f| -p| -s| -u]] \
@@ -676,7 +681,7 @@ usage()
 
 /*	endup: make sure tty mode reset & exit */
 void
-endup()
+endup(void)
 {
 
 	if (istty) {
@@ -719,17 +724,21 @@ static char stdtabs[] = {
 int
 stdtab(char option[], int tabvect[])
 {
-	register char *sp;
+	char *sp;
 	tabvect[0] = 0;
 	sp = stdtabs;
 	while (*sp) {
 		if (EQ(option, sp)) {
-			while (*sp++);		/* skip to 1st tab value */
-			while (*tabvect++ = *sp++);	/* copy, make int */
+			while (*sp++)		/* skip to 1st tab value */
+				;
+			while (*tabvect++ = *sp++)	/* copy, make int */
+				;
 			return (0);
 		}
-		while (*sp++);	/* skip to 1st tab value */
-		while (*sp++);		/* skip over tab list */
+		while (*sp++)	/* skip to 1st tab value */
+			;
+		while (*sp++)		/* skip over tab list */
+			;
 	}
 	return (-1);
 }

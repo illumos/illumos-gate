@@ -2,21 +2,29 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from UCB 4.7 6/25/83 */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tip.h"
 
 #define	MAXRETRY	3		/* sync up retry count */
 #define	DISCONNECT_CMD	"\21\25\11\24"	/* disconnection string */
 
-static	void sigALRM();
-static	int timeout = 0;
-static	sigjmp_buf timeoutbuf;
+static int	detect(char *);
+static int	bizsync(int);
+static void	echo(char *);
+static void	flush(char *);
+static void	sigALRM(void);
+static int	timeout = 0;
+static sigjmp_buf	timeoutbuf;
+
+void	biz31_disconnect(void);
 
 /*
  * Dial up on a BIZCOMP Model 1031 with either
@@ -24,19 +32,18 @@ static	sigjmp_buf timeoutbuf;
  *	pulse dialing (mod = "w")
  */
 static int
-biz_dialer(num, mod)
-	char *num, *mod;
+biz_dialer(char *num, char *mod)
 {
-	register int connected = 0;
+	int connected = 0;
 
 	if (!bizsync(FD)) {
 		logent(value(HOST), "", "biz", "out of sync");
-		printf("bizcomp out of sync\n");
+		(void) printf("bizcomp out of sync\n");
 		delock(uucplock);
 		exit(0);
 	}
 	if (boolean(value(VERBOSE)))
-		printf("\nstarting call...");
+		(void) printf("\nstarting call...");
 	echo("#\rk$\r$\n");			/* disable auto-answer */
 	echo("$>$.$ #\r");			/* tone/pulse dialing */
 	echo(mod);
@@ -48,7 +55,7 @@ biz_dialer(num, mod)
 	echo(num);
 	echo("\r$\n");
 	if (boolean(value(VERBOSE)))
-		printf("ringing...");
+		(void) printf("ringing...");
 	/*
 	 * The reply from the BIZCOMP should be:
 	 *	`^G NO CONNECTION\r\n^G\r\n'	failure
@@ -59,8 +66,8 @@ biz_dialer(num, mod)
 	if (timeout) {
 		char line[80];
 
-		sprintf(line, "%d second dial timeout",
-			number(value(DIALTIMEOUT)));
+		(void) sprintf(line, "%d second dial timeout",
+		    number(value(DIALTIMEOUT)));
 		logent(value(HOST), num, "biz", line);
 	}
 #endif
@@ -73,61 +80,64 @@ biz_dialer(num, mod)
 	return (connected);
 }
 
-biz31w_dialer(num, acu)
-	char *num, *acu;
+/* ARGSUSED */
+int
+biz31w_dialer(char *num, char *acu)
 {
 
 	return (biz_dialer(num, "w"));
 }
 
-biz31f_dialer(num, acu)
-	char *num, *acu;
+/* ARGSUSED */
+int
+biz31f_dialer(char *num, char *acu)
 {
 
 	return (biz_dialer(num, "f"));
 }
 
-biz31_disconnect()
+void
+biz31_disconnect(void)
 {
 
-	write(FD, DISCONNECT_CMD, 4);
-	sleep(2);
-	ioctl(FD, TCFLSH, TCOFLUSH);
+	(void) write(FD, DISCONNECT_CMD, 4);
+	(void) sleep(2);
+	(void) ioctl(FD, TCFLSH, TCOFLUSH);
 }
 
-biz31_abort()
+void
+biz31_abort(void)
 {
 
-	write(FD, "\33", 1);
+	(void) write(FD, "\33", 1);
 }
 
-static int
-echo(s)
-	register char *s;
+static void
+echo(char *s)
 {
 	char c;
 
 	while (c = *s++) {
 		switch (c) {
 		case '$':
-			read(FD, &c, 1);
+			(void) read(FD, &c, 1);
 			s++;
 			break;
 
 		case '#':
 			c = *s++;
-			write(FD, &c, 1);
+			(void) write(FD, &c, 1);
 			break;
 
 		default:
-			write(FD, &c, 1);
-			read(FD, &c, 1);
+			(void) write(FD, &c, 1);
+			(void) read(FD, &c, 1);
 		}
 	}
 }
 
 static void
-sigALRM()
+sigALRM(void)
 {
 
 	timeout = 1;
@@ -135,8 +145,7 @@ sigALRM()
 }
 
 static int
-detect(s)
-	register char *s;
+detect(char *s)
 {
 	char c;
 	sig_handler_t f;
@@ -145,23 +154,22 @@ detect(s)
 	timeout = 0;
 	while (*s) {
 		if (sigsetjmp(timeoutbuf, 1)) {
-			printf("\07timeout waiting for reply\n");
+			(void) printf("\07timeout waiting for reply\n");
 			biz31_abort();
 			break;
 		}
-		alarm(number(value(DIALTIMEOUT)));
-		read(FD, &c, 1);
-		alarm(0);
+		(void) alarm(number(value(DIALTIMEOUT)));
+		(void) read(FD, &c, 1);
+		(void) alarm(0);
 		if (c != *s++)
 			break;
 	}
-	signal(SIGALRM, f);
+	(void) signal(SIGALRM, f);
 	return (timeout == 0);
 }
 
-static int
-flush(s)
-	register char *s;
+static void
+flush(char *s)
 {
 	char c;
 	sig_handler_t f;
@@ -170,11 +178,11 @@ flush(s)
 	while (*s++) {
 		if (sigsetjmp(timeoutbuf, 1))
 			break;
-		alarm(10);
-		read(FD, &c, 1);
-		alarm(0);
+		(void) alarm(10);
+		(void) read(FD, &c, 1);
+		(void) alarm(0);
 	}
-	signal(SIGALRM, f);
+	(void) signal(SIGALRM, f);
 	timeout = 0;			/* guard against disconnection */
 }
 
@@ -184,7 +192,7 @@ flush(s)
  *  call there are gory ways to simulate this.
  */
 static int
-bizsync(fd)
+bizsync(int fd)
 {
 #ifdef FIOCAPACITY
 	struct capacity b;
@@ -196,25 +204,25 @@ bizsync(fd)
 #define	chars(b)	(b)
 #define	IOCTL	FIONREAD
 #endif
-	register int already = 0;
+	int already = 0;
 	char buf[10];
 
 retry:
 	if (ioctl(fd, IOCTL, (caddr_t)&b) >= 0 && chars(b) > 0)
-		ioctl(fd, TCFLSH, TCIOFLUSH);
-	write(fd, "\rp>\r", 4);
-	sleep(1);
+		(void) ioctl(fd, TCFLSH, TCIOFLUSH);
+	(void) write(fd, "\rp>\r", 4);
+	(void) sleep(1);
 	if (ioctl(fd, IOCTL, (caddr_t)&b) >= 0) {
 		if (chars(b) != 10) {
 	nono:
 			if (already > MAXRETRY)
 				return (0);
-			write(fd, DISCONNECT_CMD, 4);
-			sleep(2);
+			(void) write(fd, DISCONNECT_CMD, 4);
+			(void) sleep(2);
 			already++;
 			goto retry;
 		} else {
-			read(fd, buf, 10);
+			(void) read(fd, buf, 10);
 			if (strncmp(buf, "p >\r\n\r\n>", 8))
 				goto nono;
 		}

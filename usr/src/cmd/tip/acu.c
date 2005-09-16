@@ -2,21 +2,25 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from UCB 5.3 4/3/86 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tip.h"
 
+extern acu_t	acutable[];
+
 static acu_t *acu = NOACU;
 static int conflag;
-static void acuabort();
-static acu_t *acutype();
+static void acuabort(int);
+static acu_t *acutype(char *);
 static sigjmp_buf jmpbuf;
+
 /*
  * Establish connection for tip
  *
@@ -34,9 +38,9 @@ static sigjmp_buf jmpbuf;
  *   found in the file).
  */
 char *
-connect()
+connect(void)
 {
-	register char *cp = PN;
+	char *cp = PN;
 	char *phnum, string[256];
 	int tried = 0;
 
@@ -47,9 +51,9 @@ connect()
 	 *	  otherwise, use /etc/phones
 	 */
 	if (sigsetjmp(jmpbuf, 1)) {
-		signal(SIGINT, SIG_IGN);
-		signal(SIGQUIT, SIG_IGN);
-		printf("\ncall aborted\n");
+		(void) signal(SIGINT, SIG_IGN);
+		(void) signal(SIGQUIT, SIG_IGN);
+		(void) printf("\ncall aborted\n");
 		logent(value(HOST), "", "", "call aborted");
 		if (acu != NOACU) {
 			boolean(value(VERBOSE)) = FALSE;
@@ -62,8 +66,8 @@ connect()
 		delock(uucplock);
 		exit(1);
 	}
-	signal(SIGINT, acuabort);
-	signal(SIGQUIT, acuabort);
+	(void) signal(SIGINT, acuabort);
+	(void) signal(SIGQUIT, acuabort);
 	if ((acu = acutype(AT)) == NOACU)
 		return ("unknown ACU type");
 	if (*cp != '@') {
@@ -75,16 +79,16 @@ connect()
 
 			if (conflag = (*acu->acu_dialer)(phnum, CU)) {
 				logent(value(HOST), phnum, acu->acu_name,
-					"call completed");
+				    "call completed");
 				return (NOSTR);
 			} else
 				logent(value(HOST), phnum, acu->acu_name,
-					"call failed");
+				    "call failed");
 			tried++;
 		}
 	} else {
 		if (phfd == NOFILE) {
-			printf("%s: ", PH);
+			(void) printf("%s: ", PH);
 			return ("can't open phone number file");
 		}
 		rewind(phfd);
@@ -108,11 +112,11 @@ connect()
 
 			if (conflag = (*acu->acu_dialer)(phnum, CU)) {
 				logent(value(HOST), phnum, acu->acu_name,
-					"call completed");
+				    "call completed");
 				return (NOSTR);
 			} else
 				logent(value(HOST), phnum, acu->acu_name,
-					"call failed");
+				    "call failed");
 			tried++;
 		}
 	}
@@ -123,33 +127,31 @@ connect()
 	return (tried ? "call failed" : "missing phone number");
 }
 
-disconnect(reason)
-	char *reason;
+void
+disconnect(char *reason)
 {
 	if (!conflag)
 		return;
 	if (reason == NOSTR) {
 		logent(value(HOST), "", acu->acu_name, "call terminated");
 		if (boolean(value(VERBOSE)))
-			printf("\r\ndisconnecting...");
+			(void) printf("\r\ndisconnecting...");
 	} else
 		logent(value(HOST), "", acu->acu_name, reason);
 	(*acu->acu_disconnect)();
 }
 
 static void
-acuabort(s)
+acuabort(int s)
 {
-	signal(s, SIG_IGN);
+	(void) signal(s, SIG_IGN);
 	siglongjmp(jmpbuf, 1);
 }
 
 static acu_t *
-acutype(s)
-	register char *s;
+acutype(char *s)
 {
-	register acu_t *p;
-	extern acu_t acutable[];
+	acu_t *p;
 
 	if (s != NOSTR)
 		for (p = acutable; p->acu_name != '\0'; p++)

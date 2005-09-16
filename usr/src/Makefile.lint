@@ -245,14 +245,17 @@ COMMON_SUBDIRS = \
 	cmd/sync \
 	cmd/syseventadm \
 	cmd/syseventd \
+	cmd/tabs \
 	cmd/tail \
 	cmd/tee \
 	cmd/th_tools \
+	cmd/tip \
 	cmd/touch \
 	cmd/tr \
 	cmd/truss \
 	cmd/tty \
 	cmd/uadmin \
+	cmd/users \
 	cmd/utmp_update \
 	cmd/utmpd \
 	cmd/valtools \
@@ -263,6 +266,7 @@ COMMON_SUBDIRS = \
 	cmd/whodo \
 	cmd/wracct \
 	cmd/xargs \
+	cmd/xstr \
 	cmd/yes \
 	cmd/yppasswd \
 	cmd/zdump \

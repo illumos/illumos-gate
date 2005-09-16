@@ -2,40 +2,39 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from UCB 4.7 6/25/83 */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tip.h"
-
-extern char *getremote();
-extern int errno;
 
 static	sigjmp_buf deadline;
 static	int deadfl;
 
 void
-dead()
+dead(void)
 {
 
 	deadfl = 1;
 	siglongjmp(deadline, 1);
 }
 
-hunt(name)
-	char *name;
+int
+hunt(char *name)
 {
-	register char *cp;
-	void (*f)();
+	char *cp;
+	sig_handler_t	f;
 
 	f = signal(SIGALRM, (sig_handler_t)dead);
 	while (cp = getremote(name)) {
 		deadfl = 0;
 		uucplock = cp;
-		if (mlock(uucplock) < 0) {
+		if (tip_mlock(uucplock) < 0) {
 			delock(uucplock);
 			continue;
 		}
@@ -49,34 +48,35 @@ hunt(name)
 		if (!HW)
 			break;
 		if (sigsetjmp(deadline, 1) == 0) {
-			alarm(10);
+			(void) alarm(10);
 			if (!trusted_device)
 				userperm();
 			errno = 0;
 			if ((FD = open(cp, O_RDWR)) < 0 && errno != EBUSY) {
-				fprintf(stderr, "tip: ");
+				(void) fprintf(stderr, "tip: ");
 				perror(cp);
 			}
 			if (!trusted_device)
 				myperm();
 			if (FD >= 0 && !isatty(FD)) {
-				fprintf(stderr, "tip: %s: not a tty\n", cp);
-				close(FD);
+				(void) fprintf(stderr, "tip: %s: not a tty\n",
+				    cp);
+				(void) close(FD);
 				FD = -1;
 			}
 		}
-		alarm(0);
+		(void) alarm(0);
 		if (!deadfl && FD >= 0) {
 			struct termios t;
 
-			ioctl(FD, TCGETS, &t);
+			(void) ioctl(FD, TCGETS, &t);
 			t.c_cflag |= XCLUDE|HUPCL;
-			ioctl(FD, TCSETSF, &t);
-			signal(SIGALRM, f);
+			(void) ioctl(FD, TCSETSF, &t);
+			(void) signal(SIGALRM, f);
 			return ((int)cp);
 		}
 		delock(uucplock);
 	}
-	signal(SIGALRM, f);
+	(void) signal(SIGALRM, f);
 	return (deadfl ? -1 : (int)cp);
 }

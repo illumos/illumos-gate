@@ -8,6 +8,9 @@
  * specifies the terms and conditions for redistribution.
  */
 
+#ifndef	_TIP_H
+#define	_TIP_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -33,13 +36,15 @@
 #include <string.h>
 #include <time.h>
 #include <sys/isa_defs.h>	/* for ENDIAN defines */
+#include <stdlib.h>
+#include <sys/wait.h>
 
 #define	_CTRL(c)	(c&037)
 
 #ifdef USG
 #define	signal(_sig_, _hdlr_)	sigset((_sig_), (_hdlr_))
 #endif
-typedef	void (*sig_handler_t)();	/* works on BSD and SV */
+typedef	void (*sig_handler_t)(int);	/* works on BSD and SV */
 
 /*
  * Remote host attributes
@@ -115,9 +120,9 @@ typedef
 typedef
 	struct {
 		char	*acu_name;
-		int	(*acu_dialer)();
-		int	(*acu_disconnect)();
-		int	(*acu_abort)();
+		int	(*acu_dialer)(char *, char *);
+		void	(*acu_disconnect)(void);
+		void	(*acu_abort)(void);
 	}
 	acu_t;
 
@@ -162,7 +167,7 @@ typedef
 		char	e_char;		/* char to match on */
 		char	e_flags;	/* experimental, priviledged */
 		char	*e_help;	/* help string */
-		int 	(*e_func)();	/* command */
+		void 	(*e_func)(int);	/* command */
 	}
 	esctable_t;
 
@@ -178,6 +183,9 @@ extern int	noparity;
 #ifndef ACULOG
 #define	logent(a, b, c, d)
 #define	loginit()
+#else
+extern void	logent(char *, char *, char *, char *);
+extern void	loginit(void);
 #endif
 
 /*
@@ -252,11 +260,35 @@ char	ch;			/* for tipout */
 char	*uucplock;		/* name of lock file for uucp's */
 extern int trusted_device;
 
-extern	char *ctrl();
-extern	char *ctime();
-extern	struct passwd *getpwuid();
-extern	char *getlogin();
-extern	char *vinterp();
-extern	char *getenv();
-extern	char *malloc();
-extern	char *connect();
+
+extern char	*connect(void);
+extern char	*ctrl(char);
+extern char	*getremote(char *);
+extern char	*expand(char []);
+extern char	*vinterp(char *, char);
+extern void	cumain(int, char *[]);
+extern void	delock(char *);
+extern void	disconnect(char *);
+extern void	myperm(void);
+extern void	parwrite(int, unsigned char *, int);
+extern void	raw(void);
+extern void	setparity(char *);
+extern void	setscript(void);
+extern void	tandem(char *);
+extern void	tip_abort(char *);
+extern void	ttysetup(int);
+extern void	unraw(void);
+extern void	userperm(void);
+extern void	vinit(void);
+extern void	vlex(char *);
+extern int	any(char, char *);
+extern int	hunt(char *);
+extern int	prompt(char *, char *, size_t);
+extern int	rgetent(char *, char *, int);
+extern int	rgetflag(char *);
+extern int	rgetnum(char *);
+extern int	speed(int);
+extern int	tip_mlock(char *);
+extern int	vstring(char *, char *);
+
+#endif /* _TIP_H */

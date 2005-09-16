@@ -87,10 +87,11 @@ static struct commands {
 static struct mt_tape_info tapes[] = MT_TAPE_INFO;
 #endif /* sun */
 
+int
 main(int argc, char **argv)
 {
-	register char *cp;
-	register struct commands *comp;
+	char *cp;
+	struct commands *comp;
 
 	if (argc > 2 && (equal(argv[1], "-t") || equal(argv[1], "-f"))) {
 		argc -= 2;
@@ -122,10 +123,10 @@ main(int argc, char **argv)
 		if (errno == EIO) {
 			(void) fprintf(stderr,
 			    "%s: no tape loaded or drive offline\n",
-				tape);
+			    tape);
 		} else if (errno == EACCES) {
 			(void) fprintf(stderr,
-				"%s: write protected or reserved.\n", tape);
+			    "%s: write protected or reserved.\n", tape);
 		} else {
 			perror(tape);
 		}
@@ -133,8 +134,8 @@ main(int argc, char **argv)
 	}
 
 	if (comp->c_code == MTIOCFORCERESERVE ||
-			comp->c_code == MTIOCRESERVE ||
-				comp->c_code == MTIOCRELEASE)  {
+	    comp->c_code == MTIOCRESERVE ||
+	    comp->c_code == MTIOCRELEASE)  {
 		/*
 		 * Handle all MTIOC ioctls used in
 		 * reservation/release/takeownership.
@@ -177,7 +178,7 @@ main(int argc, char **argv)
 			mt_com.mt_op = MTREW;
 			if (ioctl(mtfd, MTIOCTOP, &mt_com) < 0) {
 				(void) fprintf(stderr, "%s %s %d ",
-					tape, comp->c_name, mt_fileno);
+				    tape, comp->c_name, mt_fileno);
 				perror("mt");
 				exit(2);
 			}
@@ -193,7 +194,7 @@ main(int argc, char **argv)
 		}
 		if (ioctl(mtfd, MTIOCTOP, &mt_com) < 0) {
 			(void) fprintf(stderr, "%s %s %d ", tape, comp->c_name,
-				mt_fileno);
+			    mt_fileno);
 			perror("failed");
 			exit(2);
 		}
@@ -213,7 +214,7 @@ main(int argc, char **argv)
 		}
 		if (ioctl(mtfd, MTIOCTOP, &mt_com) < 0) {
 			(void) fprintf(stderr, "%s %s %ld ", tape, comp->c_name,
-				mt_com.mt_count);
+			    mt_com.mt_count);
 			perror("failed");
 			exit(2);
 		}
@@ -311,10 +312,9 @@ print_config(void)
  * Interpret the status buffer returned
  */
 static void
-status(bp)
-	register struct mtget *bp;
+status(struct mtget *bp)
 {
-	register struct mt_tape_info *mt = NULL;
+	struct mt_tape_info *mt = NULL;
 	struct mtdrivetype mdt;
 	struct mtdrivetype_request mdt_req;
 	char *name = (char *)NULL;
@@ -353,10 +353,10 @@ status(bp)
 		(void) printf("%s tape drive:\n", name);
 
 		(void) printf("   sense key(0x%x)= %s   residual= %ld   ",
-			bp->mt_erreg, print_key(bp->mt_erreg), bp->mt_resid);
+		    bp->mt_erreg, print_key(bp->mt_erreg), bp->mt_resid);
 		(void) printf("retries= %d\n", bp->mt_dsreg);
 		(void) printf("   file no= %ld   block no= %ld\n",
-			bp->mt_fileno, bp->mt_blkno);
+		    bp->mt_fileno, bp->mt_blkno);
 	} else {
 		/* Handle non-SCSI drives here. */
 		if (mt->t_type == 0) {

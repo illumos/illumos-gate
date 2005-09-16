@@ -2,24 +2,26 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from UCB 5.3 5/5/86 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tip.h"
 
-extern	int shell(), getfl(), sendfile(), chdirectory();
-extern	int finish(), help(), pipefile(), pipeout(), consh(), variable();
-extern	int cu_take(), cu_put(), dollar(), genbrk(), suspend();
+extern void	shell(int), getfl(int), tip_sendfile(int), chdirectory(int);
+extern void	finish(int), help(int), pipefile(int), pipeout(int);
+extern void	consh(int), variable(int), cu_take(int), cu_put(int);
+extern void	genbrk(int), suspend(int);
 
 esctable_t etable[] = {
 	{ '!',	NORM,	"shell",			 shell },
 	{ '<',	NORM,	"receive file from remote host", getfl },
-	{ '>',	NORM,	"send file to remote host",	 sendfile },
+	{ '>',	NORM,	"send file to remote host",	 tip_sendfile },
 	{ 't',	NORM,	"take file from remote UNIX",	 cu_take },
 	{ 'p',	NORM,	"put file to remote UNIX",	 cu_put },
 	{ '|',	NORM,	"pipe remote file",		 pipefile },

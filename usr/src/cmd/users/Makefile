@@ -22,7 +22,9 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989 by Sun Microsystems, Inc.
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PROG= listusers
@@ -33,7 +35,7 @@ include ../Makefile.cmd
 
 .KEEP_STATE:
 
-all: $(PROG) pkginfo
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

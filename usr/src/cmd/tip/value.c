@@ -1,30 +1,37 @@
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-/* from UCB 4.5 6/25/83 */
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "tip.h"
 
 #define	MIDDLE	35
 
-static value_t *vlookup();
+static value_t *vlookup(char *);
 static int col = 0;
+
+extern char	*interp(char *);
+
+static void	vtoken(char *);
+static void	vprint(value_t *);
+static int	vaccess(unsigned, unsigned);
 
 /*
  * Variable manipulation
  */
-vinit()
+void
+vinit(void)
 {
-	register value_t *p;
-	register char *cp;
+	value_t *p;
+	char *cp;
 	FILE *f;
 	char file[1024];
 
@@ -41,21 +48,21 @@ vinit()
 	 */
 	if ((cp = value(HOME)) == NULL)
 		cp = "";
-	strlcpy(file, cp, sizeof (file));
-	strlcat(file, "/.tiprc", sizeof (file));
+	(void) strlcpy(file, cp, sizeof (file));
+	(void) strlcat(file, "/.tiprc", sizeof (file));
 	if ((f = fopen(file, "r")) != NULL) {
-		register char *tp;
+		char *tp;
 
 		while (fgets(file, sizeof (file)-1, f) != NULL) {
 			if (file[0] == '#')
 				continue;
 			if (vflag)
-				printf("set %s", file);
+				(void) printf("set %s", file);
 			if (tp = strrchr(file, '\n'))
 				*tp = '\0';
 			vlex(file);
 		}
-		fclose(f);
+		(void) fclose(f);
 	}
 	/*
 	 * To allow definition of exception prior to fork
@@ -64,13 +71,12 @@ vinit()
 }
 
 /*VARARGS1*/
-vassign(p, v)
-	register value_t *p;
-	char *v;
+void
+vassign(value_t *p, char *v)
 {
 
 	if (!vaccess(p->v_access, WRITE)) {
-		printf("access denied\r\n");
+		(void) printf("access denied\r\n");
 		return;
 	}
 	switch (p->v_type&TMASK) {
@@ -83,11 +89,11 @@ vassign(p, v)
 				free(p->v_value);
 		}
 		if ((p->v_value = malloc(strlen(v)+1)) == NOSTR) {
-			printf("out of core\r\n");
+			(void) printf("out of core\r\n");
 			return;
 		}
 		p->v_type &= ~(ENVIRON|INIT);
-		strcpy(p->v_value, v);
+		(void) strcpy(p->v_value, v);
 		break;
 
 	case NUMBER:
@@ -110,17 +116,17 @@ vassign(p, v)
 	p->v_access |= CHANGED;
 }
 
-vlex(s)
-	register char *s;
+void
+vlex(char *s)
 {
-	register value_t *p;
+	value_t *p;
 
 	if (equal(s, "all")) {
 		for (p = vtable; p->v_name; p++)
 			if (vaccess(p->v_access, READ))
 				vprint(p);
 	} else {
-		register char *cp;
+		char *cp;
 
 		do {
 			if (cp = vinterp(s, ' '))
@@ -130,25 +136,23 @@ vlex(s)
 		} while (s);
 	}
 	if (col > 0) {
-		printf("\r\n");
+		(void) printf("\r\n");
 		col = 0;
 	}
 }
 
-static int
-vtoken(s)
-	register char *s;
+static void
+vtoken(char *s)
 {
-	register value_t *p;
-	register char *cp, *cp2;
-	char *expand();
+	value_t *p;
+	char *cp, *cp2;
 
 	if (cp = strchr(s, '=')) {
 		*cp = '\0';
 		if (p = vlookup(s)) {
 			cp++;
 			if (p->v_type&NUMBER)
-				vassign(p, atoi(cp));
+				vassign(p, (char *)atoi(cp));
 			else {
 				if (strcmp(s, "record") == 0)
 					if ((cp2 = expand(cp)) != NOSTR)
@@ -159,7 +163,7 @@ vtoken(s)
 		}
 	} else if (cp = strchr(s, '?')) {
 		*cp = '\0';
-		if ((p = vlookup(s)) && vaccess(p->v_access, READ)) {
+		if ((p = vlookup(s)) != NULL && vaccess(p->v_access, READ)) {
 			vprint(p);
 			return;
 		}
@@ -172,70 +176,67 @@ vtoken(s)
 			if (p->v_type&BOOL)
 				vassign(p, s);
 			else
-				printf("%s: no value specified\r\n", s);
+				(void) printf("%s: no value specified\r\n", s);
 			return;
 		}
 	}
-	printf("%s: unknown variable\r\n", s);
+	(void) printf("%s: unknown variable\r\n", s);
 }
 
-static int
-vprint(p)
-	register value_t *p;
+static void
+vprint(value_t *p)
 {
-	register char *cp;
-	extern char *interp(), *ctrl();
+	char *cp;
 
 	if (col > 0 && col < MIDDLE)
 		while (col++ < MIDDLE)
-			putchar(' ');
+			(void) putchar(' ');
 	col += strlen(p->v_name);
 	switch (p->v_type&TMASK) {
 
 	case BOOL:
 		if (boolean(p->v_value) == FALSE) {
 			col++;
-			putchar('!');
+			(void) putchar('!');
 		}
-		printf("%s", p->v_name);
+		(void) printf("%s", p->v_name);
 		break;
 
 	case STRING:
-		printf("%s=", p->v_name);
+		(void) printf("%s=", p->v_name);
 		col++;
 		if (p->v_value) {
-			cp = interp(p->v_value, NULL);
+			cp = interp(p->v_value);
 			col += strlen(cp);
-			printf("%s", cp);
+			(void) printf("%s", cp);
 		}
 		break;
 
 	case NUMBER:
 		col += 6;
-		printf("%s=%-5d", p->v_name, number(p->v_value));
+		(void) printf("%s=%-5d", p->v_name, number(p->v_value));
 		break;
 
 	case CHAR:
-		printf("%s=", p->v_name);
+		(void) printf("%s=", p->v_name);
 		col++;
 		if (p->v_value) {
 			cp = ctrl(character(p->v_value));
 			col += strlen(cp);
-			printf("%s", cp);
+			(void) printf("%s", cp);
 		}
 		break;
 	}
 	if (col >= MIDDLE) {
 		col = 0;
-		printf("\r\n");
+		(void) printf("\r\n");
 		return;
 	}
 }
 
 
 static int
-vaccess(mode, rw)
-	register unsigned mode, rw;
+vaccess(unsigned mode, unsigned rw)
 {
 	if (mode & (rw<<PUBLIC))
 		return (1);
@@ -245,10 +246,9 @@ vaccess(mode, rw)
 }
 
 static value_t *
-vlookup(s)
-	register char *s;
+vlookup(char *s)
 {
-	register value_t *p;
+	value_t *p;
 
 	for (p = vtable; p->v_name; p++)
 		if (equal(p->v_name, s) || (p->v_abrev && equal(p->v_abrev, s)))
@@ -257,14 +257,12 @@ vlookup(s)
 }
 
 char *
-vinterp(s, stop)
-	register char *s;
-	char stop;
+vinterp(char *s, char stop)
 {
-	register char *p = s, c;
+	char *p = s, c;
 	int num;
 
-	while ((c = *s++) && c != stop)
+	while ((c = *s++) != 0 && c != stop)
 		switch (c) {
 
 		case '^':
@@ -280,7 +278,7 @@ vinterp(s, stop)
 			if (c >= '0' && c <= '7')
 				num = (num<<3)+(c-'0');
 			else {
-				register char *q = "n\nr\rt\tb\bf\f";
+				char *q = "n\nr\rt\tb\bf\f";
 
 				for (; *q; q++)
 					if (c == *q++) {
@@ -312,20 +310,17 @@ vinterp(s, stop)
 /*
  * assign variable s with value v (for NUMBER or STRING or CHAR types)
  */
-
-vstring(s, v)
-	register char *s;
-	register char *v;
+int
+vstring(char *s, char *v)
 {
-	register value_t *p;
+	value_t *p;
 	char *v2;
-	char *expand();
 
 	p = vlookup(s);
 	if (p == 0)
 		return (1);
 	if (p->v_type&NUMBER)
-		vassign(p, atoi(v));
+		vassign(p, (char *)atoi(v));
 	else {
 		if (strcmp(s, "record") == 0)
 			if ((v2 = expand(v)) != NOSTR)
