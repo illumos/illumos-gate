@@ -2569,10 +2569,12 @@ walk_bad(struct radix_node *rn,
 
 	/* Bad routes for other than interfaces are easy. */
 	if (!(RT->rt_state & (RS_IF | RS_NET_SYN | RS_LOCAL))) {
-		if (j > 0)
+		if (j > 0) {
+			RT->rt_spares[0].rts_metric = HOPCNT_INFINITY;
 			rtswitch(RT, NULL);
-		else
+		} else {
 			rtbad(RT, (struct interface *)argp);
+		}
 		return (0);
 	}
 

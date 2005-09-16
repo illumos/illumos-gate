@@ -1060,6 +1060,7 @@ walk_trace(struct radix_node *rn,
 	    RT->rt_poison_metric < RT->rt_metric)
 		(void) fprintf(ftrace, "pm=%d@%s",
 		    RT->rt_poison_metric, ts(RT->rt_poison_time));
+	(void) fprintf(ftrace, "%d spare slots", RT->rt_num_spares);
 
 	rts = &RT->rt_spares[1];
 	for (i = 1; i < RT->rt_num_spares; i++, rts++) {

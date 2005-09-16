@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1995
@@ -567,7 +567,8 @@ rdisc_sort(void)
 		spares_avail = _B_FALSE;
 		for (j = 0; j < rt->rt_num_spares; j++)  {
 			rts = &rt->rt_spares[j];
-			if (rts->rts_gate == 0 || rts->rts_origin != RO_RIP) {
+			if (rts->rts_gate == 0 || rts->rts_origin != RO_RIP ||
+			    rts->rts_ifp == &dummy_ifp) {
 				spares_avail = _B_TRUE;
 				break;
 			}
@@ -650,7 +651,9 @@ rdisc_sort(void)
 			int i;
 			for (i = 0; i < rt->rt_num_spares; i++)  {
 				rts = &rt->rt_spares[i];
-				if (rts->rts_gate == 0 && first_rdisc_slot == 0)
+				if ((rts->rts_gate == 0 ||
+				    rts->rts_ifp == &dummy_ifp) &&
+				    first_rdisc_slot == 0)
 					first_rdisc_slot = i;
 				if (rts->rts_origin == RO_RDISC) {
 					rts_delete(rt, rts);
@@ -789,7 +792,7 @@ rdisc_sort(void)
 				continue;
 			}
 
-			if (slot < 0)  {
+			if (slot < 0 && !dr_done)  {
 				ptrsize = (rt->rt_num_spares + SPARE_INC) *
 				    sizeof (struct rt_spare);
 				ptr = realloc(rt->rt_spares, ptrsize);
