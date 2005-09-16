@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.18 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<ctype.h>
 #include	<stdio.h>
@@ -116,6 +118,7 @@ IOSTRUCT *errstr;
 	return(SUCCESS);
 }
 
+int
 findtab(str)
 char *str;
 {
@@ -129,22 +132,23 @@ char *str;
 	return(-1);
 }
 
+int
 make_cur(i)
 int i;
 {
 	if (Cur_corec == i)
-		return;
+		return (0);
 	if (Cur_corec != -1)
 		fclose(Readfp);
 	Cur_corec = i;
 	if (i == -1)
-		return;
+		return (0);
 	if (!(Cotable[Cur_corec].writefp) && ((Cotable[Cur_corec].writefp = fopen(Cotable[Cur_corec].w_path, "w")) == NULL))
 		warn(NOPEN, "the write pipe");
 	Writefp = Cotable[Cur_corec].writefp;
 	if ((Readfp = fopen(Cotable[Cur_corec].r_path, "r")) == NULL)
 		warn(NOPEN, "the read pipe");
-	return;
+	return (0);
 }
 
 int

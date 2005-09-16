@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -43,6 +49,8 @@
 
 extern	menu_id folder_make();
 extern	char	*path_to_title();
+static int dir_mv_cp();
+static int dir_init();
 
 #define MAX_DIRS	(16)
 
@@ -60,7 +68,7 @@ static int Dirs_open = 0;	/* count how many open */
 
 #define MYODPTR(X)	((struct myodptr *)(X->odptr))
 
-static struct myodptr {
+struct myodptr {
 	struct ott_tab *ott;
 	time_t dir_mtime;		/* EFT abs k16 */
 	time_t ott_mtime;		/* EFT abs k16 */
@@ -401,6 +409,7 @@ char *argv[];
     return(SUCCESS);
 }
 
+int
 dir_create(ott, a, cover)
 struct ott_tab *ott;
 struct actrec *a;
@@ -459,11 +468,13 @@ bool cover;
 int
 IF_dsh()
 {
+	return (0);
 }
 
 int
 IF_dvi()
 {
+	return (0);
 }
 
 int

@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.5 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>	/* make: cc cut.c */
 #include <ctype.h>
@@ -47,6 +53,7 @@ char *getastr();	/* rjk */
 static char usage[] = "Usage: fmlcut [-s] [-d<char>] {-c<list> | -f<list>} file ...";
 static char cflist[] = "bad list for c/f option";
 
+int
 cmd_cut(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -220,6 +227,7 @@ IOSTRUCT	*errstr;
 }
 
 
+int
 diag(s)
 char	*s;
 {

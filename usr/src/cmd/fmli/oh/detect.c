@@ -19,16 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.8 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -72,6 +73,10 @@ int Pathlen;
 #ifndef WISH
 void det_mail_in(), det_mail_out();
 #endif
+static int look_at_bytes();
+static int magic_heuristics();
+static int external_heuristics();
+static int oeu_heuristics();
 struct opt_entry *obj_to_parts();
 static bool exist_heuristics();
 static bool part_heuristics();
@@ -495,13 +500,13 @@ char *path, *file;
 	register int	fd;
 
 	if (Already_looked & LOOKED_AT_BYTES)
-		return;
+		return (0);
 
 	Already_looked |= LOOKED_AT_BYTES;
 	Seen_eighth_bit = Seen_non_printable = FALSE;
 	sprintf(buf, "%s/%s", path, file);
 	if ((fd = open(buf, O_RDONLY)) < 0)
-		return;
+		return (0);
 	numread = read(fd, buf, sizeof(buf));
 	close(fd);
 
@@ -511,6 +516,7 @@ char *path, *file;
 			if (!isascii(*p))
 				Seen_eighth_bit = TRUE;
 		}
+	return (0);
 }
 
 static int

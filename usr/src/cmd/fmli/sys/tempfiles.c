@@ -19,20 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-/*
- *	Copyright (c) 1999 by Sun Microsystems, Inc.
- *	All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<stdlib.h>
@@ -52,6 +49,9 @@
  * globals used throughout the Telesystem
  */
 extern char	**Remove;
+
+static void putdec(pid_t n, int fd);
+static int getdec(int fd);
 
 /*
  * make an entry in the Remove table and return its index
@@ -139,10 +139,8 @@ char	path[];
 	return (success);
 }
 
-static
-putdec(n, fd)
-pid_t	n;			/* EFT abs k16 */
-int	fd;
+static void
+putdec(pid_t n, int fd)
 {
 	char	buf[16];
 
@@ -150,9 +148,8 @@ int	fd;
 	write(fd, buf, strlen(buf));
 }
 
-static
-getdec(fd)
-int	fd;
+static int
+getdec(int fd)
 {
 	char	buf[16];
 	register int	n;

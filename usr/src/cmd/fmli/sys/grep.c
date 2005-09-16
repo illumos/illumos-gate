@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,7 +82,7 @@ static	char	tmpbuf[BUFSIZ];		/* for formatting purposes */
 #define ESIZE	256
 #define	BLKSIZE	512
 
-static int execute();
+static void execute();
 static int succeed();
 static int fgetl();
 
@@ -110,6 +110,7 @@ static	int	nlflag;
 static IOSTRUCT *Instr;
 static IOSTRUCT *Outstr;
 
+int
 cmd_grep(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -117,8 +118,8 @@ IOSTRUCT	*instr;
 IOSTRUCT	*outstr;
 IOSTRUCT	*errstr;
 {
-	register	c;
-	register char	*arg;
+	int	c;
+	char	*arg;
 	extern int	optind;
 	void		regerr();
 
@@ -190,12 +191,12 @@ IOSTRUCT	*errstr;
 	return((nsucc == 2 || nsucc == 0) ? FAIL : SUCCESS);
 }
 
-static int
+static void
 execute(file)
-register char *file;
+char *file;
 {
-	register char *lbuf;
-	register i, fromfile;
+	char *lbuf;
+	int i, fromfile;
 	char *getastr();	/* rjk */
 
 	fromfile = 0;
@@ -251,7 +252,7 @@ register char *file;
 
 static int
 succeed(f)
-register char *f;
+char *f;
 {
 	nsucc = (nsucc == 2) ? 2 : 1;
 	if (cflag) {
@@ -282,7 +283,7 @@ register char *f;
 
 void
 regerr(err)
-register err;
+int err;
 {
 	errmsg("fmlgrep: RE error %d: ", err);
 	switch(err) {
@@ -348,11 +349,11 @@ extern char *memccpy();
 static int
 fgetl(ptr, size, iop)
 char *ptr;
-register int size;
-register FILE *iop;
+int size;
+FILE *iop;
 {
 	char *p, *ptr0 = ptr;
-	register int n;
+	int n;
 
 	for (size--; size > 0; size -= n) {
 		if (iop->_cnt <= 0) { /* empty buffer */

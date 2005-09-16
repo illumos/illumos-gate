@@ -19,19 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-/*
- *	Copyright (c) 1999 by Sun Microsystems, Inc.
- *	All rights reserved.
- */
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.12 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <curses.h>
 #define	_SYS_TERMIO_H		/* sys/termio.h is included by curses.h */
@@ -65,10 +63,17 @@ static char Srcfile[PATHSIZ];
 static int cryptit(), mkencrypart();
 static char	scram_string[] = "scramble";
 static char	uscram_string[] = "unscramble";
+static int check_key();
+static int crypt_file();
+static int pack();
+static int unpack();
+static int keysave();
+static int keyvalid(); 
 
 /*
  *	scram -- Scramble an object and pack all its parts into an OEU package
  */
+int
 scram(file)
 register char *file;
 {
@@ -78,11 +83,13 @@ register char *file;
 	strcpy(Srcfile, file);
 	get_string(regetkey, Keyprompt, "",
 	    I_INVISIBLE, FALSE, scram_string, scram_string);
+	return (0);
 }
 
 /*
  * unscram -- Unscramble an object which was packed into an OEU package before
  */
+int
 unscram(file)
 register char *file;
 {
@@ -92,6 +99,7 @@ register char *file;
 	strcpy(Srcfile, file);
 	get_string(keysave, Keyprompt, "",
 	    I_INVISIBLE, FALSE, uscram_string, uscram_string);
+	return (0);
 }
 
 static void
@@ -119,7 +127,7 @@ token t;
 	static void regetkey();
 
 	if (t == TOK_CANCEL)
-		return;
+		return (SUCCESS);
 
 	if (strcmp(Passwd, s) != 0) {
 		mess_temp("The two scramble keys are different.");
@@ -384,6 +392,7 @@ mkencrypart()
 		Keycheck[n+1] = hex[buf[m] & 0xf];
 	}
 	Keycheck[KEYSIZE - 1] = '\0';
+	return (SUCCESS);
 }
 
 static int

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -229,6 +230,7 @@ static struct fm_mn Inits;
 /*
 ** Front-end to parser(), which sets up defaults.
 */
+int
 read_inits(initfile)
 char *initfile;
 {
@@ -249,7 +251,7 @@ char *initfile;
 	    mess_temp("error: initialization file missing or not readable");
 	    mess_flash("error: initialization file missing or not readable");
 	    doupdate();
-	    return;
+	    return (0);
 	}
 
 	if (free_inits == TRUE)
@@ -344,6 +346,7 @@ char *initfile;
 /*	set_default(INIT_INTR);
 	set_default(INIT_ONINTR);
 */
+	return (0);
 }
 
 /*
@@ -363,6 +366,7 @@ int index;
 	return(Init_single_tab[index].def);
 }
 
+int
 read_cmds(cmdfile)
 char *cmdfile;
 {
@@ -373,7 +377,8 @@ char *cmdfile;
 	char *get_def();
 
 /*	if (access(cmdfile, 04) < 0)
-**		return;              abs k15 */
+ *		return (0);
+ */
 
 	/* make sure file exists and is readable  abs k15 */ 
 
@@ -382,7 +387,7 @@ char *cmdfile;
 	    mess_temp("error: commands file missing or not readable");
 	    mess_flash("error: commands file missing or not readable");
 	    doupdate();
-	    return;
+	    return (0);
 	}
 
 	/*
@@ -416,6 +421,7 @@ char *cmdfile;
 				get_def(&cmds, i, CMD_INTR),
 				get_def(&cmds, i, CMD_ONINTR));
 	}
+	return (0);
 }
 
 /*
@@ -444,12 +450,13 @@ char *str;
 /*
  * SET_DEF_COLORS initializes the color attributes 
  */
+int
 set_def_colors()
 {
 	static int refresh_scr = TRUE;
 
 	if (!Color_terminal)
-		return;
+		return (0);
 	MAKEpair(WINDOW_PAIR, Col_window_text, Col_screen);
 	MAKEpair(ACTIVE_TITLE_PAIR, Col_active_title, Col_active_title_bar);
 	MAKEpair(INACTIVE_TITLE_PAIR, Col_inactive_title, Col_inactive_title_bar);
@@ -470,12 +477,14 @@ set_def_colors()
 	if (strcmp(Col_active_bord, Col_inactive_bord) == 0)
 		Border_colors_differ = FALSE;
 	else
-		Border_colors_differ = TRUE; 
+		Border_colors_differ = TRUE;
+	return (0);
 }
 
 /*
  * SET_DEF_STATUS initializes the status (banner) line
  */
+int
 set_def_status()
 {
 	int r, c, bancol;
@@ -504,6 +513,7 @@ set_def_status()
 		winprintf(Banner);
 		vt_current(oldvid);
 	}
+	return (0);
 }
 
 /*

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 
 
 /* only called once in evstr.c */
+int
 io_size(iop, size)
 IOSTRUCT	*iop;
 int size;
@@ -52,6 +53,7 @@ int size;
 	*/
 	if ((iop->mu.str.val = malloc(size)) == NULL)
 	    fatal(NOMEM, "");	/* abs k17 */
+	return (0);
 }
 
 IOSTRUCT *
@@ -87,6 +89,7 @@ char	*ptr;
 	return iop;
 }
 
+int
 io_clear(iop)
 IOSTRUCT	*iop;
 {
@@ -96,6 +99,7 @@ IOSTRUCT	*iop;
 	return SUCCESS;
 }
 
+int
 io_seek(iop, pos)
 IOSTRUCT	*iop;
 unsigned	pos;
@@ -164,6 +168,7 @@ IOSTRUCT	*iop;
 		return nil;
 }
 
+int
 io_close(iop)
 IOSTRUCT	*iop;
 {
@@ -179,6 +184,7 @@ IOSTRUCT	*iop;
 	return SUCCESS;
 }
 
+int
 getac(iop)
 IOSTRUCT	*iop;
 {
@@ -199,6 +205,7 @@ IOSTRUCT	*iop;
 	return '\0';
 }
 
+int
 ungetac(c, iop)
 int	c;
 IOSTRUCT	*iop;
@@ -212,6 +219,7 @@ IOSTRUCT	*iop;
 	return c;
 }
 
+int
 putac(c, iop)
 int	c;
 IOSTRUCT *iop;
@@ -252,6 +260,7 @@ IOSTRUCT *iop;
     return c;
 }
 
+int
 unputac(iop)
 IOSTRUCT	*iop;
 {
@@ -295,6 +304,7 @@ IOSTRUCT	*stack;
 	return stack;
 }
 
+int
 io_flags(iop, flags)
 IOSTRUCT	*iop;
 int	flags;
@@ -329,6 +339,7 @@ IOSTRUCT	*iop;
 	return (p == s) ? NULL : s;
 }
 
+int
 putastr(s, iop)
 char	*s;
 IOSTRUCT	*iop;
@@ -358,18 +369,20 @@ IOSTRUCT	*iop;
 		 * reallocate (needed blocks * BLOCKSIZE)
 		 */
 		if ((iop->mu.str.val = realloc(iop->mu.str.val,
-					       (++newinc) * INCREMENT)) == NULL)
-		    fatal(NOMEM, "");
+		    (++newinc) * INCREMENT)) == NULL)
+			fatal(NOMEM, "");
 	    }
 	}
-	strcpy( iop->mu.str.val + iop->mu.str.pos, s );
+	strcpy(iop->mu.str.val + iop->mu.str.pos, s);
 	iop->mu.str.count = iop->mu.str.pos += len;
     }
     else
 	fputs(s, iop->mu.fp);
 
-    /* original body of putastr
-       while (*s)
-       putac(*s++, iop);
-       */
+	/*
+	 * original body of putastr
+	 * while (*s)
+	 * putac(*s++, iop);
+	 */
+	return (0);
 }

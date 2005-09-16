@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,9 @@ static struct	pathalias {
 	char	*alias;
 	char	*path;
 } Alias[MAX_ALIAS];
+
+static void get_one(char *path);
+static void get_aliases(void);
 
 char *
 path_to_full(s)
@@ -104,8 +107,8 @@ char	*s;
 	return(strsave(buf));
 }
 
-static
-get_aliases()
+static void
+get_aliases(void)
 {
 	char	path[PATHSIZ];
 	extern char	*Home;
@@ -118,9 +121,8 @@ get_aliases()
 	get_one(path);
 }
 
-static
-get_one(path)
-char	*path;
+static void
+get_one(char *path)
 {
 	FILE	*fp;
 	char	buf[BUFSIZ];

@@ -19,21 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-
-/*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.79 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<ctype.h>
 #include	<stdio.h>
@@ -193,7 +189,9 @@ static int objform_current();
 static int objform_noncur();
 static int objform_ctl();
 static int objform_stream();
-struct fm_mn parse_form();
+static int fld_ck();
+static int is_valid();
+static struct fm_mn parse_form();
 
 static struct actrec *Cur_rec;		/* current activation record */
 static char *Equal = "=";
@@ -213,6 +211,7 @@ static char *Field_str = "F000";
  * (i.e., the subset of ACTUAL fields that contains only those fields
  * that appear on the "current page" or whose "show" descriptor = "true").
  */
+int
 virt(i)
 register int i;
 {
@@ -233,6 +232,7 @@ register int i;
 ** a control sequence and then substituting the real value for
 ** the control sequence
 */
+int
 redo_vals(start)
 int start;
 {
@@ -333,6 +333,7 @@ int start;
 		free(envbuf);
 	}
     }
+    return (0);
 }
 
 /*
@@ -406,6 +407,7 @@ forminfo *ptr;
 	    }
 	}
     }
+    return (0);
 }
 
 
@@ -927,6 +929,7 @@ register char **args;
 /*
 ** Set the value of the current field.
 */
+int
 set_curval(str)
 char *str;
 {
@@ -1072,6 +1075,7 @@ int page;
 ** all the new values).  If the value is valid, it returns SUCCESS,
 ** so that the function calling it can navigate or close.
 */
+int
 fld_get_ck(form_field)
 formfield *form_field;
 {
@@ -1178,6 +1182,7 @@ int virtnum;
 ** decides whether the current field should be eliminated from the
 ** choices for nextfield().
 */
+int
 nextfield(currow, curcol, mode, flags)
 int currow;
 int curcol;
@@ -1311,11 +1316,11 @@ int flags;
 		    form_ctl(Cur_rec->id, CTSETPAGE, TRUE, oldpage, LASTpage());
 		    mess_temp("Cannot display the previous page: page may be too large");
 		    mess_lock();
-		    return;
+		    return (0);
 		}
 		CURfield() = -1;	/* abs */
 		nextfield(1000, 1000, -1, NX_ANY);
-		return;
+		return (0);
 	    }
 	    else  			/* next field */
 	    {   /* find the next page  with visible fields abs k17 */
@@ -1345,11 +1350,11 @@ int flags;
 		    form_ctl(Cur_rec->id, CTSETPAGE, TRUE, oldpage, LASTpage());
 		    mess_temp("Cannot display the next page: page may be too large");
 		    mess_lock();
-		    return;
+		    return (0);
 		}
 		CURfield() = -1;	/* abs */
 		nextfield(0, 0, 1, NX_ANY);
-		return;
+		return (0);
 	    }
 	}
 	else
@@ -1364,6 +1369,7 @@ int flags;
 	curi = virt(CURfield());	/*  zero or one active field */
 
     chg_curfield(curi);
+    return (0);
 }
 
 token
@@ -1411,6 +1417,7 @@ int row, col;
 ** Checks an "rmenu" to see if it is a small list (toggle choices 
 ** if less than "threshold" members), a large list or a command. 
 */
+int
 testlist(list)
 char **list;
 {
@@ -1811,6 +1818,7 @@ token t;
     return(t);
 }
 
+int
 set_form_field(id, field_num)
 int id, field_num;
 {
@@ -1847,4 +1855,5 @@ int id, field_num;
     if ((str = multi_eval(CURform(), field_num, FM_FIELDMSG)) && *str)
 	mess_temp(str);
     form_ctl(id, CTSETPOS, virt(field_num), 0, 0);
+    return (0);
 }

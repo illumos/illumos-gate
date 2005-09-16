@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright  (c) 1986 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.15 */
-static char sccsid[] = "@(#)vflush.c	1.3 = R1.0 1.12";
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<curses.h>
 #include	"wish.h"
@@ -40,11 +40,14 @@ static char sccsid[] = "@(#)vflush.c	1.3 = R1.0 1.12";
 extern int Refresh_slks;
 
 extern int Color_terminal;
+static void vt_title();
+static void vt_scroll_arrow();
+static void vt_page_arrow();
+static void vt_display(void);
 
 void
 vt_flush()
 {
-	void	vt_display();
 /*
 	_debug3(stderr, "\t--==[ FLUSHING ]==--\n");
 */
@@ -62,14 +65,11 @@ vt_flush()
 }
 
 static void
-vt_display()
+vt_display(void)
 {
 	register struct vt	*v;
 	int colattr;
 	vt_id	vid;
-	void	vt_title();
-	void	vt_scroll_arrow();
-	void	vt_page_arrow();
 
 	for ( vid = VT_back; vid != VT_UNDEFINED; vid = v->prev )
 	{

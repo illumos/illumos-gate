@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,10 +66,16 @@ static char Text[] = "TEXT";
 static char Any[]  = "Any";
 static char Extra_args[] = "Extra arguments ignored";
 
-char *path_to_full(), *cur_path();
+char *path_to_full();
 struct actrec *window_arg(), *wdw_to_ar();
 extern time_t	  time();	/* EFT abs k16 */
 extern struct tm *localtime();  /* abs k16 */
+
+static char *cur_path(void);
+static token gotoarg(char *s, token t);
+static void glob_time(void);
+static char *path_arg(void);
+static int objop_args(token t);
 
 token
 global_stream(t)
@@ -82,8 +88,7 @@ token t;
     char *tok_to_cmd();
     char	*bsd_path_to_title();
     struct actrec *path_to_ar();
-    char *expand(), *path_arg();
-    token gotoarg();
+    char *expand();
 
 #ifdef _DEBUG5
     _debug5(stderr, "global_stream(%o)\n", t);
@@ -465,7 +470,7 @@ int	maxargs;
  * a path inside a window by default, or a full path.
  */
 static char *
-path_arg()
+path_arg(void)
 {
     char	*p;
     extern char	*Filecabinet;
@@ -483,8 +488,8 @@ path_arg()
  * These should really go in separate source files when they are 
  * finally finished.
  */
-static
-glob_time()
+static void
+glob_time(void)
 {
     char	buf[12];
     time_t	t;		/* EFT abs k16 */
@@ -501,8 +506,7 @@ glob_time()
 /* prepare the argument array for an impending object operation */
 
 static int
-objop_args(t)
-token t;
+objop_args(token t)
 {
     char *p;
     register int i;
@@ -548,9 +552,7 @@ token t;
 }
 
 static token
-gotoarg(s, t)
-char *s;
-token t;
+gotoarg(char *s, token t)
 {
     struct actrec *a;
 
@@ -611,7 +613,7 @@ char **name, **folder;
 }
 
 static char *
-cur_path()
+cur_path(void)
 {
     bool arg;
     char *path;

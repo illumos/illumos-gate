@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,12 +53,14 @@ extern char *tok_to_cmd();	/* abs k16 */
 char *Pending_op, *Pending_objtype, *Pending_argv[MAX_ARGS+2];
 struct slk *Pending_slks;
 int Pending_type;
-
+static void save_browse();
+static token namevalid(char *s, token t);
 static char	name_string[] = "Enter the new object name: ";
 static char	desc_string[] = "Enter the new description: ";
 
 int Browse_mode = 0;
 
+int
 enter_browse(op, objtype, argv)
 char *op, *objtype, *argv[];
 {
@@ -69,22 +71,21 @@ char *op, *objtype, *argv[];
 	setslks(NULL, 0);
 	mess_temp("Open or navigate to the destination folder and press SELECT");
 	Pending_type = BROWSE;
+	return (0);
 }
 
+int
 enter_getname(op, objtype, argv)
 char *op, *objtype, *argv[];
 {
-	token namevalid();
-
 	save_browse(op, objtype, argv);
 	Pending_type = PROMPT;
 	get_string(namevalid, strCcmp(Pending_op, "redescribe") ? name_string : desc_string, "", 0, FALSE, Pending_op, Pending_op);
+	return (0);
 }
 
 static token
-namevalid(s, t)
-char *s;
-token t;
+namevalid(char *s, token t)
 {
 	register int i;
 	char *errstr;
@@ -123,7 +124,8 @@ token t;
 	return(TOK_NOP);
 }
 
-glob_select()
+int
+glob_select(void)
 {
 	register int i, prevtype = Pending_type;
 	bool canselect;
@@ -131,7 +133,7 @@ glob_select()
 	if (Pending_type == BROWSE) {
 		if (ar_ctl(ar_get_current(), CTISDEST, &canselect, NULL, NULL, NULL, NULL, NULL) == FAIL || !canselect) {
 			mess_temp("This frame can not be used as a destination");
-			return;
+			return (0);
 		}
 		for (i = 0; Pending_argv[i]; i++)
 			;
@@ -155,6 +157,7 @@ glob_select()
 	if (Pending_type == prevtype)
 		glob_browse_cancel();
 	ar_checkworld(TRUE);
+	return (0);
 }
 
 int
@@ -176,6 +179,7 @@ glob_browse_cancel()
 			Pending_argv[i] = NULL;
 		}
 	}
+	return (0);
 }
 
 token
@@ -191,7 +195,7 @@ token t;
     return(t);
 }
 
-static
+static void
 save_browse(op, objtype, argv)
 char *op, *objtype, *argv[];
 {

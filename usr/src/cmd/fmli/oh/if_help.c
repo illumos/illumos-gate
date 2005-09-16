@@ -19,21 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-
-/*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.42 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<string.h>
@@ -129,7 +125,9 @@ extern int    Vflag;		/* abs k15 */
 extern char  *strnsave();
 extern char  *shrink_str();
 static struct actrec *Cur_rec;
-struct fm_mn parse_help();
+static struct fm_mn parse_help();
+static int objhelp_reread();
+static int objhelp_noncur();
 
 static token bighelp_stream();
 
@@ -382,6 +380,7 @@ struct actrec *a;
 /*
 ** Sets up SLK array, based on show functions.
 */
+int
 hl_vislist(hi)
 helpinfo *hi;
 {
@@ -399,10 +398,12 @@ helpinfo *hi;
     for (i = 0; i < lcv; i++)
 	if (multi_eval(ptr, i, HL_SHOW))
 	    hi->slks = (int *) array_append(hi->slks, (char *) &i);
+    return (0);
 }
 #define MIN_ROWS_TEXT 4	  /* includes 2 rows of margin along frame border */
 
 /* Size a text header by counting the newlines */
+int
 header_size(m)
 formfield m;
 {

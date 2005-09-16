@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.6 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<string.h>
@@ -59,6 +61,7 @@ static int  Bufcnt;
 					growbuf(q, num); \
 					p = Destbuf + Bufcnt - num; \
 				}
+static char *pexpand(char *buf, char *name, char eos);
 
 /*
  * GROWBUF will allocate/grow Destbuf by BUFSIZ
@@ -90,7 +93,6 @@ char *src;
 {
 	char	buf[BUFSIZ];
 	char	*ret;
-	char	*pexpand();
 
 	/*
 	 * Use a static 1K buffer by default ....
@@ -110,10 +112,7 @@ char *src;
 }
 
 static char *
-pexpand(buf, name, eos)
-char	*buf;
-char	*name;
-char	eos;
+pexpand(char *buf, char *name, char eos)
 {
     register char	delim;
     register char	*src;

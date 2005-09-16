@@ -19,21 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.46 */
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <signal.h>
@@ -114,10 +110,11 @@ static void vm_setup();
 static void on_suspend();
 static void sig_catch();
 /* static int sig_catch();   abs */
+static void vinterupt(int sig);
+static void susp_res(int sig);
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
 	register int	i, c;
 	static	char mail_template[256] = "/usr/mail/";
@@ -393,7 +390,7 @@ char *argv[];
 
 	while ((t = stream(TOK_NOP, Defstream)) != TOK_LOGOUT)
 		;
-	exit(0);  /* fmli's exit not the C library call */
+	return (0);
 }
 
 static bool Suspend_allowed = TRUE;
@@ -411,8 +408,7 @@ bool b;
 long Interupt_pending = 0;
 
 static void
-vinterupt(sig)
-int sig;
+vinterupt(int sig)
 {
 	(void) sigset(sig, vinterupt); /* changed from signal() abs */
 	Interupt_pending++;
@@ -420,8 +416,7 @@ int sig;
 }
  
 static void
-susp_res(sig)
-int sig;
+susp_res(int sig)
 {
 	char buf[BUFSIZ];
 	pid_t  respid;		/* EFT abs k16 */

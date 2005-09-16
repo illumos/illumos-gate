@@ -19,15 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright  (c) 1986 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.5 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<curses.h>
 #include	<term.h>
@@ -50,7 +51,8 @@ chtype Attr_mark;	/* attribute of "marked" items */
 
 
 
-setvt_attrs()
+int
+setvt_attrs(void)
 {
 	static chtype	modes;
 
@@ -90,6 +92,7 @@ setvt_attrs()
 	Attr_mark = Attr_select;
 	if (modes & A_UNDERLINE)
 		Attr_mark = A_UNDERLINE;
+	return (0);
 }
 
 /*
@@ -97,10 +100,12 @@ setvt_attrs()
  * "colpair" IF the terminal supports color BUT the terminal CAN NOT
  * support color attributes with underlining. 
  */
+int
 set_underline_attr(colpair)
 int colpair;
 {
 	if (Color_terminal == TRUE && no_color_video >= 0 &&
 	   (no_color_video & UNDERLINE))
 		Attr_underline = COL_ATTR(A_REVERSE, colpair);
+	return (0);
 }

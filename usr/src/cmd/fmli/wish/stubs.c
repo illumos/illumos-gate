@@ -19,65 +19,81 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.2 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include "wish.h"
 #include "token.h"
 
-stubs()
+int
+stubs(void)
 {
+	return (0);
 }
 
 int
 (*ignoresigs())()
 {
+	return (NULL);
 }
 
 int
 restoresigs()
 {
+	return (0);
 }
 
-osystem()
+int
+osystem(void)
 {
 #ifdef _DEBUG
 	_debug(stderr, "SYSTEM NOT IMPLEMENTED\n");
 #endif
+	return (0);
 }
 
-prompt()
+int
+prompt(void)
 {
 #ifdef _DEBUG
 	_debug(stderr, "PROMPT NOT WORKING\n");
 #endif
+	return (0);
 }
 
-suspend()
+int
+suspend(void)
 {
 #ifdef _DEBUG
 	_debug(stderr, "SUSPEND NOT IMPLEMENTED\n");
 #endif
+	return (0);
 }
 
-change_owns()
+int
+change_owns(void)
 {
 #ifdef _DEBUG
 	_debug(stderr, "CHANGE_OWNS STUBBED OUT\n");
 #endif
+	return (0);
 }
 
-edit()
+int
+edit(void)
 {
 #ifdef _DEBUG
 	_debug(stderr, "EDIT STUBBED OUT\n");
 #endif
+	return (0);
 }

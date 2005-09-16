@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,9 @@ static int Creation_size = OTT_ENTRIES;	/* number of entrys to create */
 static char Ott_version[] = "OTT V1.1\n"; /* file sys independent abs. */
 static char Ott_name[] = "/.ott";
 static int Ott_len = 5;	/* strlen of above string */
-
+static int ott_use();
+static int ott_write();
+static int qhash();
 clock_t times();	/* EFT abs k16 */
 extern long a64l();	/* abs k16 */
 char *estrtok();
@@ -472,6 +474,7 @@ bool readall;		/* read the .ott as well as cross indexing directory */
     return(O_OK);
 }
 
+int
 ott_del_old(age)
 long age;
 {
@@ -481,7 +484,7 @@ long age;
 	int	lcv;
 
 	if (age < 1 || age > 365)
-		return;
+		return (0);
 	thetime = time(NULL) - 24 * 60 * 60 * age;
 #ifdef _DEBUG
 	_debug(stderr, "ctime(&thetime) = %s\n", ctime(&thetime));
@@ -501,6 +504,7 @@ long age;
 				} while (ent);
 			}
 	}
+	return (0);
 }
 
 /* simple multiplicative hash function.  This hashing algorithm is
@@ -648,9 +652,11 @@ int *el1, *el2;
 	return(reverse * (time2 - time1));
 }
 
+int
 ott_dirty()
 {
 	Cur_ott->modes |= OTT_DIRTY;
+	return (0);
 }
 
 /*
@@ -890,6 +896,7 @@ struct ott_tab *optr;
 		Cur_ott->modes |= OTT_LOCKED;
 	else
 		optr->modes |= OTT_LOCKED;
+	return (0);
 }
 
 int
@@ -903,6 +910,7 @@ struct ott_tab *optr;
 		Cur_ott->modes &= ~OTT_LOCKED;
 	else
 		optr->modes &= ~OTT_LOCKED;
+	return (0);
 }
 
 int
@@ -1116,6 +1124,7 @@ ott_init()
 	Cur_ott->curpage = Cur_ott->numpages = 0;
 	Cur_ott->ott_mtime = (time_t)0;	 /* EFT abs k16 */
 	Cur_ott->modes = 0L;
+	return (0);
 }
 
 static int

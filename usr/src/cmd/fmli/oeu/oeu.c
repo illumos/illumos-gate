@@ -19,16 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.5 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -57,7 +58,7 @@ extern int skip();       /* >>>> CHANGED FROM "static" <<<< */
 static int obj_num();
 static int obj_name();
 static int obj_type();
-static int encrytest();
+static void encrytest();
 static int par_count();
 static struct parsetab {
 	char *testring;
@@ -92,7 +93,9 @@ FILE *fp;
 struct oeh *p;
 {
 	look_ahead = TRUE;
+	return (0);
 }
+int
 #ifndef JUSTCHECK
 oeuparse(from, p, unpack) 
 #else
@@ -248,7 +251,7 @@ int unpack;
     fclose(fp);
     return(0);
 }
-static int
+static void
 encrytest(fp, p)
 FILE *fp;
 struct oeh *p;

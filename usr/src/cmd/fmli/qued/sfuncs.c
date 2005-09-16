@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.7 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <curses.h>
@@ -40,6 +42,7 @@
 
 extern void acswinschar();
 
+int
 fdelchar()
 {
 	int saverow, savecol;
@@ -53,8 +56,10 @@ fdelchar()
 	fgo(saverow, LASTCOL);
 	winschar(' ', Fieldattr);
 	fgo(saverow, savecol);
+	return (0);
 }
 
+int
 finsstr(buff)
 char *buff;
 {
@@ -65,8 +70,10 @@ char *buff;
 	bptr--;
 	while (bptr >= buff)
 		finschar(*bptr--);
+	return (0);
 }
 
+int
 finschar(c)
 char c;
 {
@@ -82,4 +89,5 @@ char c;
 	wdelchar();
 	fgo(saverow, savecol);
 	winschar(c, Fieldattr);
+	return (0);
 }

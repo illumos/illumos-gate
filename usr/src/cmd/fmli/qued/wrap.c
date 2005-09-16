@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.4 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <curses.h>
@@ -39,12 +41,13 @@
 
 #define MAXBOUND	3
 
-extern         acsinsstr();
+extern int acsinsstr();
 
 /*
  * PREV_BNDRY returns the position within the line of the previous blank
  * (or nonblank) starting from the last column of the current row
  */
+int
 prev_bndry(row, ch, val)
 int row;
 char ch;
@@ -62,7 +65,8 @@ int val;
  * WRAP returns TRUE if there is a character in the last line of the current
  * row and FALSE otherwise.
  */
-wrap()
+int
+wrap(void)
 {
 	if (freadchar(Cfld->currow, LASTCOL) != ' ')
 		return(TRUE);
@@ -74,7 +78,8 @@ wrap()
  * DO_WRAP performs the word wrap ... It returns the number of characters
  * that were wrapped to the next line.
  */
-do_wrap()
+int
+do_wrap(void)
 {
 	register int i, need, pos, row;
 	register chtype *bptr;
@@ -132,6 +137,7 @@ do_wrap()
 	return(totallength - numblanks);
 }
 
+int
 padding(lastchar)
 int lastchar;
 {

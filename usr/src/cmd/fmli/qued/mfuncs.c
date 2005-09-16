@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.8 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <curses.h>
 /*#include "curses.h"*/
@@ -38,6 +40,9 @@
 #include "winp.h"
 #include "vt.h"
 
+static void fcopyline(int src, int dest);
+
+int
 fdelline(num)
 int num;
 {
@@ -72,8 +77,10 @@ int num;
 		}
 	}
 	fgo(saverow, 0);
+	return (0);
 }
 
+int
 finsline(num, after)
 int num, after;
 {
@@ -108,13 +115,13 @@ int num, after;
 		}
 	}
 	fgo(start, 0);
+	return (0);
 }
 
 #define STR_SIZE	256
 
-static
-fcopyline(src, dest)
-int src, dest;
+static void
+fcopyline(int src, int dest)
 {
 	register struct vt      *v = &VT_array[VT_curid];
 	register int len;

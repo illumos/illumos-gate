@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.4 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <curses.h>
 #include "wish.h"
@@ -88,6 +90,7 @@ chtype ch;
 /* this routine is the same as finschar except it deals with
  * a chtype instead of a char
  */
+int
 acsinschar(ch)
 chtype ch;
 {
@@ -103,11 +106,13 @@ chtype ch;
 	wdelchar();
 	fgo(saverow, savecol);
 	acswinschar(ch);
+	return (0);
 }
 
 /* this routine is the same as finsstr except it deals with
  * chtype's instead of a char's
  */
+int
 acsinsstr(buff)
 chtype *buff;
 {
@@ -118,6 +123,7 @@ chtype *buff;
 	bptr--;
 	while (bptr >= buff)
 		acsinschar(*bptr--);
+	return (0);
 }
 
 /* this routine is the same as wreadchar except it does NOT

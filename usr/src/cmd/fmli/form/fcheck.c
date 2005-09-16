@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@
  * CHECKFFIELD will handle setting/resetting field values depending
  * on the current/previous state of the field value
  */ 
+int
 checkffield(fptr, pffld)
 struct form *fptr;		/* pointer to the form structure */ 
 register formfield *pffld;	/* how the field "should" be displayed */ 
@@ -78,7 +79,7 @@ register formfield *pffld;	/* how the field "should" be displayed */
 			if (HAS_FIELD(pffld))
 				putfield((ifield *) *(pffld->ptr), pffld->value);
 		}
-		return;
+		return (0);
 	}
 	else if (pffld->flags & I_NOSHOW) {
 		/*
@@ -148,4 +149,5 @@ register formfield *pffld;	/* how the field "should" be displayed */
 	 */ 
 	if (((ifield *) *(pffld->ptr))->flags != pffld->flags)
 		setfieldflags(*(pffld->ptr), pffld->flags);
+	return (0);
 }

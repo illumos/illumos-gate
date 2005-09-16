@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.10 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <curses.h>
@@ -41,6 +43,7 @@
 
 extern void acsputstring();
 
+int
 scroll_up(num)
 int num;
 {
@@ -99,6 +102,7 @@ int num;
 	return(TRUE);
 }
 
+int
 scroll_down(num)
 int num;
 {
@@ -170,6 +174,7 @@ int num;
 	return(TRUE);
 }
 
+int
 scroll_left(num)
 int num;
 {
@@ -216,6 +221,7 @@ int num;
 	return(TRUE);
 }
 
+int
 scroll_right(num, just_synced)
 int num;
 bool just_synced;		/* for performance.  abs f15 */

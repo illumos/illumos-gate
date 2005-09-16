@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,6 +126,7 @@ register char	*s;
 /*
  * Flush either the temporary or the permanent message
  */
+int
 mess_flush(permanent)
 bool	permanent;
 {

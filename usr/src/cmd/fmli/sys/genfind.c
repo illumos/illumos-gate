@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.8 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<pwd.h>
 #include	<stdio.h>
@@ -63,8 +65,12 @@ extern char *Oasys;
 
 static char	any[] = "any";
 static char path_buf[PATHSIZ];
+static void traverse();
+static char *myregcmp(char *s);
+static int range(char *s, int origin, int *mindays, int *maxdays);
 
 #ifdef TEST
+int
 main(argc, argv)
 int	argc;
 char	*argv[];
@@ -72,13 +78,14 @@ char	*argv[];
 	wish_init(argc, argv);
 	odftread();
 	genfind(argc, argv, stdin, stdout);
-	exit(0);
+	return (0);
 }
 #endif /* TEST */
 
 /*
  * usage: genfind path filename type owner age
  */
+int
 genfind(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -103,7 +110,6 @@ IOSTRUCT *errstr;
 	register int i;
 	register char	*pattern;
 	register struct	passwd *passwdptr;
-	char	*myregcmp();
 	struct	passwd *getpwnam();
 
 	if (argc < 6 && argc > 8) {
@@ -175,7 +181,7 @@ IOSTRUCT *errstr;
 	return SUCCESS;
 }
 
-static
+static void
 traverse(path, pattern, uid, objtype, min_days, max_days, prefix, do_traverse, outstr, type)
 char	*path;
 char	*pattern;
@@ -278,11 +284,7 @@ char	*type;
 }
 
 static int
-range(s, origin, mindays, maxdays)
-char	*s;
-int	origin;
-int	*mindays;
-int	*maxdays;
+range(char *s, int origin, int *mindays, int *maxdays)
 {
 	char	*s1;
 	long	strtol();
@@ -316,8 +318,7 @@ int	*maxdays;
 }
 
 static char *
-myregcmp(s)
-char	*s;
+myregcmp(char *s)
 {
 	register char	*p;
 	register char	*q;

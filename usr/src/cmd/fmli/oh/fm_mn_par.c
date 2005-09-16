@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,10 +143,12 @@ int no;
 ** Boosts a the sequence number for the whole object.  This will
 ** force every variable field to be evaluated.
 */
+int
 upseqno(fm_mn)
 struct fm_mn *fm_mn;
 {
     fm_mn->seqno++;
+    return (0);
 }
 
 /*
@@ -156,6 +158,7 @@ struct fm_mn *fm_mn;
 ** single and multi are the addresses of pointers to store the
 ** information in.
 */
+int
 parser(flags, info_or_file, sdfl, sdflsize, single, mdfl, mdflsize, multi, fp)
 int flags;
 char *info_or_file;
@@ -252,6 +255,7 @@ FILE *fp;
     *multi = multiptr;
     io_close(out);
     io_close(in);
+    return (0);
 }
 
 /*

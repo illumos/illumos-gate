@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.8 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <curses.h>
@@ -38,21 +40,22 @@
 #include "terror.h"
 #include "attrs.h"
 
-#define FSIZE(x)	(x->rows * (x->cols + 1))
+#define	FSIZE(x)	(x->rows * (x->cols + 1))
 
+int
 setfieldflags(fld, flags)
 register ifield *fld;
 register int flags;
 {
-    fld->flags = (flags & I_CHANGEABLE) | (fld->flags & ~(I_CHANGEABLE));
-    if (fld->flags & I_INVISIBLE)
-    {
-	if (fld->value)
-	    free(fld->value);	/* abs */
-	if ((fld->value = (char *) malloc(FSIZE(fld))) == NULL)
-	    fatal(NOMEM, "");
-	fld->valptr = fld->value;
-    }
-    fld->fieldattr = (fld->flags & I_FILL ? Attr_underline: Attr_normal);
+	fld->flags = (flags & I_CHANGEABLE) | (fld->flags & ~(I_CHANGEABLE));
+	if (fld->flags & I_INVISIBLE)
+	{
+		if (fld->value)
+		free(fld->value);	/* abs */
+		if ((fld->value = (char *)malloc(FSIZE(fld))) == NULL)
+			fatal(NOMEM, "");
+		fld->valptr = fld->value;
+	}
+	fld->fieldattr = (fld->flags & I_FILL ? Attr_underline: Attr_normal);
+	return (0);
 }
-

@@ -19,19 +19,15 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -49,6 +45,7 @@
 struct actrec *Proc_list = NULL;
 extern struct proc_rec PR_all[];
 
+int
 proc_open(int flags, char *title, char *path, ...)
 {
 	char *argv[MAX_ARGS+2];

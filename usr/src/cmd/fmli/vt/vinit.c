@@ -19,21 +19,16 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright  (c) 1986 AT&T
- *	All Rights Reserved
- */
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.24 */
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<curses.h>
 #include	<signal.h>
@@ -107,6 +102,7 @@ int labfmt;		/* format for the SLKS (3-2-3 or 4-4) */
 
 #define control(X)	((X) & ' ' - 1)
 
+int
 set_mouse_info()
 {
 /* #ifdef i386 abs k18 */
@@ -121,6 +117,7 @@ set_mouse_info()
 #endif
  * abs k18
  */
+	return (0);
 }
 
 token *
@@ -143,6 +140,7 @@ token	*toks;
 	return toks;
 }
 
+int
 set_term_ioctl()
 {
 	register int	fd;
@@ -175,4 +173,5 @@ set_term_ioctl()
 		ioctl(fd, TCSETAW, &tbuf);
 		def_prog_mode();
 	}
+	return (0);
 }

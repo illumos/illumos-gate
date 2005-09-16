@@ -19,17 +19,16 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
 
 /*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.9 */
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <stdio.h>
@@ -44,7 +43,8 @@
  * SETARROWS is used to set/clear scroll indicators for both
  * single-line and multi-line scrollable fields
  */
-setarrows()
+int
+setarrows(void)
 {
     register unsigned line;
     register int ch, savecol;
@@ -90,4 +90,5 @@ setarrows()
 	vt_ctl(VT_UNDEFINED, (Flags & (I_FULLWIN | I_TEXT)) ?
 	       CTSETPARROWS : CTSETSARROWS, line);
     }
-}	
+	return (0);
+}

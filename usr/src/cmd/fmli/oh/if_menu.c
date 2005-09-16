@@ -19,21 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+ 
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+ 
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-
-/*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.39 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -133,7 +129,9 @@ static struct attribute Mn_fld_tab[MN_FLD_KEYS] = {
 #define ARGS() (((menuinfo *) Cur_rec->odptr)->args)
 static struct menu_line objmenu_disp();
 static struct actrec *Cur_rec;
-struct fm_mn parse_menu();
+static int objmenu_noncur();
+static int objmenu_reread();
+static struct fm_mn parse_menu();
 
 static token if_omsh();
 extern	menu_id menu_make();
@@ -393,6 +391,7 @@ struct actrec *a;
 ** Calculates the show functions to decide which menu lines and SLKs
 ** should be shown.
 */
+int
 mn_vislist(mi)
 menuinfo *mi;
 {
@@ -424,25 +423,29 @@ menuinfo *mi;
 		if (!multi_eval(ptr, i, MN_INACTIVE))
 			NUMactive()++;
 	}
+	return (0);
 }
 
 /*
  * TOGGLE MARK will toggle the "mark" flag for a given menu
  * item indexed by i (Multiple Selection Menus).
  */
+int
 toggle_mark(ptr, i)
 struct fm_mn *ptr;
 int i;
 {
-    struct attribute *att;
+	struct attribute *att;
 
-    att = (ptr->multi + i)->attrs[MN_SELECTED];
-    att->flags ^= MENU_MARKED;	/* toggle flag */
+	att = (ptr->multi + i)->attrs[MN_SELECTED];
+	att->flags ^= MENU_MARKED;	/* toggle flag */
+	return (0);
 }
 
 /*
  * ISMARKED will check for the "mark" flag
  */
+int
 ismarked(ptr, i)
 struct fm_mn *ptr;
 int i;

@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.7 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <curses.h>
@@ -112,6 +114,7 @@ int flags;
 	return(newfld);
 }
 
+int
 gotofield(fld, row, col)
 ifield *fld;
 int row;
@@ -120,14 +123,16 @@ int col;
 	if (fld != NULL)
 		Cfld = fld;
 	else if (!Cfld)
-		return;
+		return (0);
 	if (row < 0 || col < 0)
 		fgo(Cfld->currow, Cfld->curcol);
 	else
 		fgo(row, col);
 	setarrows();
+	return (0);
 }
 
+int
 endfield(fld)
 ifield *fld;
 {
@@ -146,4 +151,5 @@ ifield *fld;
 	}
 	if (fld == Cfld)
 		Cfld = NULL;	/* terminating current field */
+	return (0);
 }

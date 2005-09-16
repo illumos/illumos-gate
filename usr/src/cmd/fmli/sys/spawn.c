@@ -19,19 +19,15 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -84,6 +80,7 @@ char	*arglist[];
 	return pid;
 }
 
+int
 spawn(char *file, ...)
 {
 	char	*arglist[20];
@@ -98,6 +95,7 @@ spawn(char *file, ...)
 	return	spawnv(file, arglist);
 }
 
+int
 sysspawn(s)
 char	*s;
 {
@@ -110,6 +108,7 @@ char	*s;
 	return spawnv("/bin/sh", arglist);
 }
 
+int
 waitspawn(pid)			/* see also waitspn below! for comments */
 register pid_t	pid;		/* EFT abs k16 */
 {

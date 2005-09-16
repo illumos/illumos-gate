@@ -19,19 +19,15 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -53,6 +49,7 @@ static struct actrec *AR_head;
 static int AR_serial = 0;
 
 void ar_dump();
+static void	ar_cur_end();
 
 /* LES: becoming a MACRO
 
@@ -193,7 +190,6 @@ bool logout;
     else if (new_cur)
     {
 	register struct actrec	*old_AR_cur;
-	void	ar_cur_end();
 
 	if (new_cur->lifetime == AR_CLOSING) 	/* abs k17 */
 	    AR_cur = new_cur;			/* abs k17 */
@@ -403,6 +399,7 @@ register struct actrec *rec;
 }
 
 
+int
 ar_setslks(s, flags)
 struct slk	*s;
 int flags;
@@ -514,6 +511,7 @@ register int life;
     return(AR_cur);
 }
 
+int
 ar_help(rec)	/* do help on current actrec */
 struct actrec *rec;
 {
@@ -555,6 +553,7 @@ bool force;	/* if TRUE, forced check */
     (void) ar_ctl(AR_cur, CTSETMSG, FALSE, NULL, NULL, NULL, NULL, NULL);
 }
 
+int
 ar_isfirst(ar1, ar2)
 struct actrec *ar1, *ar2;
 {

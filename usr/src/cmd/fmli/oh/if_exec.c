@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -34,4 +40,5 @@ IF_exec_open(argv)
 char *argv[];
 {
 	(void) proc_openv(0, NULL, NULL, argv);
+	return (0);
 }

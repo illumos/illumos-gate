@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.3 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <curses.h>
@@ -39,7 +41,8 @@
  * FCLEAR will clear the field from the current cursor position to
  * the end of the field
  */
-fclear()
+int
+fclear(void)
 {
 	register int row, col;
 	register int saverow, savecol;
@@ -52,9 +55,11 @@ fclear()
 			fputchar(' ');
 	}
 	fgo(saverow, savecol);
+	return (0);
 }
 
-fclearline()
+int
+fclearline(void)
 {
 	register int col, savecol;
 
@@ -62,4 +67,5 @@ fclearline()
 	for (col = savecol; col <= LASTCOL; col++)
 		fputchar(' ');
 	fgo(Cfld->currow, savecol);
+	return (0);
 }

@@ -19,12 +19,18 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.6 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 /*
@@ -62,7 +68,7 @@ static jmp_buf Jumpenv;
 #define EQL(x,y) !strcmp(x,y)
 
 long atol();
-char *ltoa(), *strcpy(), *strncpy();
+char *strcpy(), *strncpy();
 static char	**Av;
 static char *buf;
 static int	Ac;
@@ -71,6 +77,10 @@ static int noarg;
 static int paren;
 
 static char Mstring[1][128];
+
+static char *ltoa(long l);
+static int ematch(char *s, char *p);
+static int yyerror(char *s);
 
 extern int nbra;
 
@@ -85,9 +95,10 @@ static int op[] = {
 static int pri[] = {
 	1,2,3,3,3,3,3,3,4,4,5,5,5,6,7};
 
+int
 yylex() {
-	register char *p;
-	register i;
+	char *p;
+	int i;
 
 	if(Argi >= Ac) return NOARG;
 
@@ -105,7 +116,7 @@ yylex() {
 
 static char *
 rel(oper, r1, r2)
-register char *r1, *r2; 
+char *r1, *r2; 
 {
 	long i;
 
@@ -141,7 +152,7 @@ arith(oper, r1, r2)
 char *r1, *r2; 
 {
 	long i1, i2;
-	register char *rv;
+	char *rv;
 
 	if(!(ematch(r1, "-\\{0,1\\}[0-9]*$") && ematch(r2, "-\\{0,1\\}[0-9]*$")))
 		yyerror("non-numeric argument");
@@ -176,7 +187,7 @@ char *r1, *r2;
 static char *
 conj(oper, r1, r2) char *r1, *r2; 
 {
-	register char *rv;
+	char *rv;
 
 	switch(oper) {
 
@@ -209,7 +220,7 @@ static char *
 match(s, p)
 char *s, *p;
 {
-	register char *rv;
+	char *rv;
 
 	(void) strcpy(rv=malloc(8), ltoa((long)ematch(s, p)));
 	if(nbra) {
@@ -220,13 +231,11 @@ char *s, *p;
 }
 
 static int
-ematch(s, p)
-char *s;
-register char *p;
+ematch(char *s, char *p)
 {
 	static char expbuf[ESIZE];
 	void errxx();
-	register num;
+	int num;
 	extern char *braslist[], *braelist[], *loc2;
 
 	compile(p, expbuf, &expbuf[512], 0, errxx);
@@ -252,8 +261,7 @@ errxx()
 }
 
 static int
-yyerror(s)
-char *s;
+yyerror(char *s)
 {
 	char tmpbuf[BUFSIZ];
 
@@ -269,13 +277,12 @@ char *s;
 }
 
 static char *
-ltoa(l)
-long l;
+ltoa(long l)
 {
-	static str[20];
-	register char *sp = (char *) &str[18];	/*u370*/
-	register i;
-	register neg = 0;
+	static int str[20];
+	char *sp = (char *) &str[18];	/*u370*/
+	int i;
+	int neg = 0;
 
 	if(l == 0x80000000L)
 		return "-2147483648";
@@ -395,6 +402,7 @@ lop:
 	return r1;
 }
 
+int
 cmd_expr(argc, argv, instr, outstr)
 int argc;
 char **argv; 

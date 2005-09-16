@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.11 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <memory.h>
@@ -46,6 +48,7 @@ extern void   acsputstring();
  * COPYFIELD will copy a field form one part of the screen to another
  * (including all of the field status information)
  */
+int
 copyfield(srcfld, destfld) 
 ifield *srcfld, *destfld;
 {
@@ -98,6 +101,7 @@ ifield *srcfld, *destfld;
  * HIDEFIELD will remove the field from screen WITHOUT destroying the
  * ifield structure.
  */
+int
 hidefield(fld)
 ifield *fld;
 {
@@ -113,4 +117,5 @@ ifield *fld;
 	fclear();
 	setfieldflags(fld, flags);
 	Cfld = savefield;
+	return (0);
 }

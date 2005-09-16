@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright  (c) 1986 AT&T
- *	All Rights Reserved
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.14 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<ctype.h>
@@ -45,7 +45,7 @@
 #define myisprint(C)	((C) >= ' ' && (C) <= '~')
 
 static char	*curstring;
-static          menu_match();
+static int      menu_match();
 /* mouse coordinates */
 extern int Mouse_row;
 extern int Mouse_col;
@@ -529,7 +529,7 @@ _menu_cleanup()
 	curstring = NULL;
 }
 
-static
+static int
 menu_match(m, s, n, t)
 register struct menu	*m;
 char	*s;

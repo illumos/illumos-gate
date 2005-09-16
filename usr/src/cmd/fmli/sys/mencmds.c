@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.26 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<ctype.h>
@@ -520,6 +522,7 @@ IOSTRUCT *errstr;
  * 
  * The -e option causes the resulting template to be evaluated
  */
+int
 cmd_regex(argc, argv, instr, outstr, errstr)
 int argc;
 char *argv[];
@@ -763,6 +766,7 @@ IOSTRUCT *instr, *outstr, *errstr;
 
 
 
+int
 cmd_setcolor(argc, argv, instr, outstr, errstr)
 int argc;
 char *argv[];

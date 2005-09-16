@@ -19,16 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.5 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/types.h>	/* EFT abs k16 */
@@ -42,6 +43,7 @@
 
 struct proc_rec PR_all[MAX_PROCS];
 static int pflag=1;
+static int find_freeproc(void);
 
 /* make a default process, i.e. one that takes over the full screen */
 
@@ -89,7 +91,7 @@ char *argv[];
 }
 
 static int
-find_freeproc()
+find_freeproc(void)
 {
 	register int i;
 
@@ -99,6 +101,7 @@ find_freeproc()
 	return(FAIL);
 }
 
+int
 proc_init()
 {
 	register int i, j;
@@ -108,5 +111,6 @@ proc_init()
 		for (j=0; j < MAX_ARGS +2; j++)
 			PR_all[i].argv[j] = NULL;
 	}
-}	
+	return (0);
+}
 

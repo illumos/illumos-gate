@@ -19,15 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright  (c) 1986 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.9 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <curses.h>
 #include <term.h>
@@ -39,6 +40,8 @@
 
 static int Numcolors = NUMDEFCOLORS; 
 int Pair_set[MAXCOLPAIRS];
+static int add_color(char *colorstr);
+static int lookup_color(char *colorstr);
 
 /*
  * Table of known colors
@@ -62,6 +65,7 @@ struct ctab {
  * SET_SCR_COLOR sets the screen background color and refreshes
  * the screen
  */
+int
 set_scr_color(colpair, dorefresh)
 int colpair;
 int dorefresh;
@@ -91,19 +95,23 @@ int dorefresh;
 		if (orig_pair)
 			putp(orig_pair);
 	}
+	return (0);
 }
 
 /*
  * SET_SLK_COLOR simply sets the slk color pair
  */ 
+int
 set_slk_color(colpair)
 {
 	slk_attrset(COL_ATTR(A_REVERSE | A_DIM, colpair));
+	return (0);
 }
 	
 /*
  * SETPAIR creates new color pair combinations
  */
+int
 setpair(pairnum, foreground, background)
 int pairnum, foreground, background;
 {
@@ -120,6 +128,7 @@ int pairnum, foreground, background;
  * SETCOLOR creates new color specifications or "tweeks" old ones.
  * (returns 1 on success and 0 on failure)
  */
+int
 setcolor(colorstr, r, g, b)
 char *colorstr;
 int r, g, b;
@@ -167,6 +176,7 @@ int r, g, b;
 /*
  * GETCOLOR_ID returns the color identifier of the passed color string
  */
+int
 getcolor_id(colorstr)
 char *colorstr;
 {
@@ -184,8 +194,7 @@ char *colorstr;
  * color table (or "-1" if the color is not in the table).
  */ 
 static int
-lookup_color(colorstr)
-char *colorstr;
+lookup_color(char *colorstr)
 {
 	register int i;
 
@@ -203,8 +212,7 @@ char *colorstr;
  * can support) and less than MAXCOLORS (color table size)
  */
 static int 
-add_color(colorstr)
-char *colorstr;
+add_color(char *colorstr)
 {
 	if (Numcolors < COLORS && Numcolors < MAXCOLORS) {
 		Color_tab[Numcolors].colorstr = strsave(colorstr);

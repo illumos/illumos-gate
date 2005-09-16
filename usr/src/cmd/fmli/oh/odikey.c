@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,12 +40,15 @@
 #define ODISIZ (2*PATHSIZ)
 #define NULLSTR	""
 
+static char *copy_to_key();
+static char *skip_to_key();
+
 int
 odi_putkey(entry, key, value)
 struct ott_entry *entry;
 char *key, *value;
 {
-	register length;
+	int length;
 	register char *p, *q;
 	char valbuf[PATHSIZ], odibuf[ODISIZ];
 	char *copy_to_key(), *skip_to_key();

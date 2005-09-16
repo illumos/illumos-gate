@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -27,7 +33,7 @@
  * Copyright  (c) 1986 AT&T
  *	All Rights Reserved
  */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.5 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<curses.h>
 #include	"wish.h"
@@ -41,6 +47,8 @@
 #define TR	3
 
 static vt_id	side[4] = { -1, -1, -1, -1 };
+static bool corner(int which, int row, int col, chtype ch, int flag);
+static void remove_box(void);
 
 bool
 make_box(flag, srow, scol, rows, cols)
@@ -50,9 +58,6 @@ register int	scol;
 register int	rows;
 register int	cols;
 {
-	void	remove_box();
-	bool	corner();
-
 	if (srow < 0 || scol < 0 || cols < 1 || rows < 1) {
 		remove_box();
 		return FALSE;
@@ -78,16 +83,10 @@ register int	cols;
 }
 
 static bool
-corner(which, row, col, ch, flag)
-int	which;
-int	row;
-int	col;
-chtype	ch;
-int	flag;
+corner(int which, int row, int col, chtype ch, int flag)
 {
 	register vt_id	vid;
 	register struct vt	*v;
-	static  void remove_box();
 
 	if ((vid = side[which] = vt_create(NULL, VT_NONUMBER | VT_NOBORDER, row, col, 1, 1)) < 0) {
 		remove_box();
@@ -105,7 +104,7 @@ int	flag;
 }
 
 static void
-remove_box()
+remove_box(void)
 {
 	register int	i;
 

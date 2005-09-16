@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright  (c) 1986 AT&T
- *	All Rights Reserved
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.3 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>		/* EFT abs k16 */
 #include	"test.h"
@@ -57,6 +57,7 @@ typedef struct io_struct {
 int	ap, ac;
 char	**av;
 
+int
 cmd_test(argn, com, in, out, err)
 char	*com[];
 int	argn;
@@ -85,6 +86,7 @@ IOSTRUCT	*err;
 /*
  * CF is a "strcmp" function referenced in test.h .... 
  */ 
+int
 cf(s1, s2)
 register char *s1, *s2;
 {
@@ -108,7 +110,8 @@ nxtarg(mt)
 	return(av[ap++]);
 }
 
-exp()
+int
+exp(void)
 {
 	int	p1;
 	char	*p2;
@@ -127,7 +130,8 @@ exp()
 	return(p1);
 }
 
-e1()
+int
+e1(void)
 {
 	int	p1;
 	char	*p2;
@@ -141,7 +145,8 @@ e1()
 	return(p1);
 }
 
-e2()
+int
+e2(void)
 {
 	if (eq(nxtarg(0), "!"))
 		return(!e3());
@@ -149,7 +154,8 @@ e2()
 	return(e3());
 }
 
-e3()
+int
+e3(void)
 {
 	int	p1;
 	register char	*a;
@@ -240,8 +246,10 @@ e3()
 
 	failed("test", "test - unknown operator");
 /* NOTREACHED */
+	return (0);
 }
 
+int
 tio(a, f)
 char	*a;
 int	f;
@@ -252,6 +260,7 @@ int	f;
 		return(0);
 }
 
+int
 ftype(f, field)
 char	*f;
 int	field;
@@ -265,6 +274,7 @@ int	field;
 	return(0);
 }
 
+int
 filtyp(f,field)
 char	*f;
 int field;
@@ -281,6 +291,7 @@ int field;
 
 
 
+int
 fsizep(f)
 char	*f;
 {

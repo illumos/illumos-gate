@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright  (c) 1986 AT&T
- *	All Rights Reserved
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.1 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	"wish.h"
@@ -40,6 +40,7 @@
 
 struct menu	*MNU_array;
 
+int
 _menu_reshape(m, srow, scol, rows, cols)
 register struct menu	*m;
 register int	srow;

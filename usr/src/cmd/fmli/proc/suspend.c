@@ -19,20 +19,23 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.5 */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <signal.h>
 #include <sys/types.h>	/* EFT abs k16 */
 #include "wish.h"
+
+static void sig_nothing(int sig);
 
 int
 suspend(cmd)
@@ -41,7 +44,6 @@ char *cmd;
     char suspath[40];
     pid_t vpid;			/* EFT abs k16 */
     FILE *fp;
-    void sig_nothing();
 	
     sigset(SIGUSR1, sig_nothing);
 
@@ -75,8 +77,7 @@ char *cmd;
 
 
 static void
-sig_nothing(sig)
-int sig;
+sig_nothing(int sig)
 {
 	/* do nothing, just catch the signal and return */
 	return;

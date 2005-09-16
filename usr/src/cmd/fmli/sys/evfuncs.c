@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,6 +109,7 @@ char	*s;
 int	cmd_if();
 int	cmd_elif();
 
+int
 cmd_fi(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -143,6 +144,7 @@ IOSTRUCT	*errstr;
 	return(Lastret);
 }
 
+int
 cmd_then(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -194,6 +196,7 @@ IOSTRUCT	*errstr;
 	return SUCCESS;
 }
 
+int
 cmd_else(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -228,6 +231,8 @@ IOSTRUCT	*errstr;
 
 	return SUCCESS;
 }
+
+int
 shell(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -258,6 +263,7 @@ IOSTRUCT	*errstr;
 	return i;
 }
 
+int
 execute(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -405,8 +411,10 @@ abs */
      * reach here because of the exit(), so this is not a return
      * without an expression
      */
+    return (0);
 }
 
+int
 get_wdw(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -421,6 +429,7 @@ IOSTRUCT	*errstr;
 	return SUCCESS;
 }
 
+int
 getmod(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -461,6 +470,7 @@ IOSTRUCT	*errstr;
     return SUCCESS;
 }
 
+int
 setmod(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -497,6 +507,7 @@ IOSTRUCT	*errstr;
 
 int Long_line = -1;
 
+int
 long_line(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -525,6 +536,7 @@ IOSTRUCT	*errstr;
 	return SUCCESS;
 }
 
+int
 read_file(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -558,6 +570,7 @@ IOSTRUCT	*errstr;
 	return SUCCESS;
 }
 
+int
 cmd_echo(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -661,6 +674,7 @@ static struct {
 #endif 
 };
 
+int
 evalargv(argc, argv, instr, outstr, errstr)
 int	argc;
 char	*argv[];
@@ -775,6 +789,7 @@ IOSTRUCT	*errstr;
 	else return (*func[n].function)(argc, argv, instr, outstr, errstr);
 }
 
+int
 cmd_if(argc, argv, in, out, err)
 int	argc;
 char	*argv[];
@@ -798,6 +813,7 @@ IOSTRUCT	*err;
 	return SUCCESS;
 }
 
+int
 cmd_elif(argc, argv, in, out, err)
 int	argc;
 char	*argv[];

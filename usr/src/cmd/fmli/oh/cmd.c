@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,7 @@ extern char *Args[];
 extern char nil[];
 extern int Arg_count;
 
-static struct cmdspec {
+struct cmdspec {
 	char *name;
 	token tok;
 	int  helpindex;
@@ -157,7 +157,9 @@ static int Cmd_index;
 
 extern int Vflag;	/* is this the User Interface ?? */
 extern char *init_ctl();	/* in if_init.c */
+static struct cmdspec *get_cmd();
 
+int
 cmd_table_init()
 {
 	register int i, j;
@@ -167,6 +169,7 @@ cmd_table_init()
 			Commands[j++] = Defaults[i];
 	}
 	Commands[j].name = NULL;
+	return (0);
 }
 
 static struct menu_line
@@ -215,7 +218,8 @@ token t;
 			intr = init_ctl(CTGETINTR);
 		    flags = RET_BOOL;
 		    Cur_intr.interrupt = FALSE;	/* dont intrupt eval of intr */
-		    Cur_intr.interrupt = (bool)eval_string(intr, &flags);
+		    Cur_intr.interrupt =
+		      (bool)(uintptr_t)eval_string(intr, &flags);
 
 		    if ((onintr = Commands[line].onintr) == NULL)
 			onintr = init_ctl(CTGETONINTR);
@@ -245,6 +249,7 @@ struct actrec *a;
     return(AR_MEN_CLOSE(a));
 }
 
+int
 cmd_help(cmd)
 char *cmd;
 {
@@ -540,6 +545,7 @@ cur_cmd()
  * ADD_CMD will add a command to the command list preserving
  * alphabetical ordering
  */
+int
 add_cmd(name, tokstr, help, intr, onintr)
 char *name;
 char *tokstr;
@@ -551,7 +557,7 @@ char *onintr;
 
 	for (i = 0; Interncmd[i].name; i++) {
 		if (strcmp(Interncmd[i].name, name) == 0)
-			return;		/* internal command conflict */
+			return (0);	    /* internal command conflict */
 	}
 	for (i = 0; Commands[i].name; i++) {
 		comp = strcmp(name, Commands[i].name);
@@ -600,6 +606,7 @@ char *onintr;
 			break;
 		}
 	}
+	return (0);
 }
 
 
@@ -607,6 +614,7 @@ char *onintr;
  * DEL_CMD will remove a command from the command menu
  * (shifting the command menu accordingly)
  */
+int
 del_cmd(name)
 char *name;
 {
@@ -622,6 +630,7 @@ char *name;
 			break;
 		}
 	}
+	return (0);
 }
 
 static struct cmdspec *
@@ -657,7 +666,8 @@ do_app_cmd()
 		    intr = init_ctl(CTGETINTR);
 		flags = RET_BOOL;
 		Cur_intr.interrupt = FALSE;	/* dont intrupt eval of intr */
-		Cur_intr.interrupt = (bool)eval_string(intr, &flags);
+		Cur_intr.interrupt =
+		  (bool)(uintptr_t)eval_string(intr, &flags);
 		
 		if ((onintr = Commands[Cmd_index].onintr) == NULL)
 		    onintr = init_ctl(CTGETONINTR);
@@ -669,10 +679,12 @@ do_app_cmd()
 	}
 	else
 	    t = TOK_NOP;
+	return (t);
 }
 
 
 
+int
 cmd_reinit(argc, argv, instr, outstr, errstr)
 int argc;
 char *argv[];

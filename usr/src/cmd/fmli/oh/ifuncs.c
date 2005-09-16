@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,11 @@ extern char nil[];
 int (*Function[MAX_IFUNCS])();
 void docv();
 char *getepenv();
+static token confirmW();
+static token confirm();
+static int mv_or_cp();
 
+int
 IF_badfunc()
 {
 	mess_temp("That operation is not available in FACE");
@@ -67,7 +71,9 @@ IF_badfunc()
 
 int
 IF_sh()
-{ }
+{
+	return (0);
+}
 
 int
 IF_rn(argv)
@@ -217,7 +223,6 @@ int
 IF_rm(argv)
 char *argv[];
 {
-	token confirmW(), confirm();
 	struct ott_entry *ott;
 	struct ott_entry *path_to_ott();
 	struct ott_tab *paths_ott;
@@ -284,6 +289,7 @@ struct ott_entry *ott;
 	while (ott = ott_next_part(ott))
 		len += sprintf(command+len, "%s ", ott_to_path(ott));
 	(void) system(command);
+	return (0);
 }
 
 int
@@ -315,6 +321,7 @@ int
 IF_vi(argv)
 char *argv[];
 {
+	return (0);
 }
 
 #define MAX_DESCRIP	24

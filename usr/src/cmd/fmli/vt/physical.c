@@ -19,15 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright  (c) 1986 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.25 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<curses.h>
 #include	<fcntl.h>
@@ -90,7 +91,7 @@ extern time_t	time();	        /* EFT abs k16 */
 
 static token page_tok();
 static token do_mouse(), do_open_mouse();
-
+static int on_top();
 /* #endif abs k18 */
 
 int Mouse_row;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -202,7 +202,7 @@ extern int Vflag;
  *             terminals like the dmd 5620 which do not have pad characters
  */
 
-
+int
 init_sfk(do_prompt)
 bool do_prompt;				/* abs k18 */
 {
@@ -225,7 +225,7 @@ bool do_prompt;				/* abs k18 */
     /* if we already prompted user and they said no then don't do anything */
 
     if (Said_no == TRUE)		/* abs k18 */
-	return;				/* abs k18 */
+	return (0);			/* abs k18 */
 
     /* if LOADPFK is set in the environment, don't download function keys,
      * unless it is set to yes, true, or the null string. abs k18
@@ -233,13 +233,13 @@ bool do_prompt;				/* abs k18 */
 
     if ( (load = getenv("LOADPFK")) && *load &&
          strCcmp(load, "yes") && strCcmp(load, "true"))	/* abs k18 */
-	   return; 	     /* user says don't mess with my keys! */
+	   return (0); 	     /* user says don't mess with my keys! */
 
     if (load)
 	do_prompt = FALSE;	/* don't prompt if LOADPFK is set. abs k18 */
 
     if (!pkey_xmit || pkey_xmit == NULL)   /* term can't transmit fn keys */
-	   return;
+	   return (0);
 #ifndef DO_NOT_DELAY
     if (First_time == TRUE)	/* this block added k18 abs. */
     {
@@ -280,7 +280,7 @@ bool do_prompt;				/* abs k18 */
 				     * keys 2 - 8 not pre-defined either */
     {
 	if (do_prompt == TRUE && (Said_no = sfk_prompt()) == TRUE)  /* abs k18 */
-	    return;						/* abs k18 */
+	    return (0);						/* abs k18 */
 
 /*      The following line was moved from below.  This is where it belongs,
 **      unfortunately the doupdate() to make the indicator visible
@@ -307,7 +307,7 @@ bool do_prompt;				/* abs k18 */
 	if (!key_f2 || *key_f2 == NULL)
 	{
 	    if (do_prompt == TRUE && (Said_no = sfk_prompt()) == TRUE)   /* abs k18 */
-		return;						/* abs k18 */
+		return (0);					/* abs k18 */
 	    else						/* abs k18 */
 		do_prompt = FALSE;				/* abs k18 */
 	    sequence[1] = '2';
@@ -324,7 +324,7 @@ bool do_prompt;				/* abs k18 */
 	if (!key_f3 || *key_f3 == NULL)
 	{
 	    if (do_prompt == TRUE && (Said_no = sfk_prompt()) == TRUE)   /* abs k18 */
-		return;						/* abs k18 */
+		return (0);					/* abs k18 */
 	    else						/* abs k18 */
 		do_prompt = FALSE;				/* abs k18 */
 	    sequence[1] = '3';
@@ -341,7 +341,7 @@ bool do_prompt;				/* abs k18 */
 	if (!key_f4 || *key_f4 == NULL)
 	{
 	    if (do_prompt == TRUE && (Said_no = sfk_prompt()) == TRUE)   /* abs k18 */
-		return;						/* abs k18 */
+		return (0);					/* abs k18 */
 	    else						/* abs k18 */
 		do_prompt = FALSE;				/* abs k18 */
 	    sequence[1] = '4';
@@ -358,7 +358,7 @@ bool do_prompt;				/* abs k18 */
 	if (!key_f5 || *key_f5 == NULL)
 	{
 	    if (do_prompt == TRUE && (Said_no = sfk_prompt()) == TRUE)   /* abs k18 */
-		return;						/* abs k18 */
+		return (0);					/* abs k18 */
 	    else						/* abs k18 */
 		do_prompt = FALSE;				/* abs k18 */
 	    sequence[1] = '5';
@@ -375,7 +375,7 @@ bool do_prompt;				/* abs k18 */
 	if (!key_f6 || *key_f6 == NULL)
 	{
 	    if (do_prompt == TRUE && (Said_no = sfk_prompt()) == TRUE)   /* abs k18 */
-		return;						/* abs k18 */
+		return (0);					/* abs k18 */
 	    else						/* abs k18 */
 		do_prompt = FALSE;				/* abs k18 */
 	    sequence[1] = '6';
@@ -392,7 +392,7 @@ bool do_prompt;				/* abs k18 */
 	if (!key_f7 || *key_f7 == NULL)
 	{
 	    if (do_prompt == TRUE && (Said_no = sfk_prompt()) == TRUE)   /* abs k18 */
-		return;						/* abs k18 */
+		return (0);					/* abs k18 */
 	    else						/* abs k18 */
 		do_prompt = FALSE;				/* abs k18 */
 	    sequence[1] = '7';
@@ -409,7 +409,7 @@ bool do_prompt;				/* abs k18 */
 	if (!key_f8 || *key_f8 == NULL)
 	{
 	    if (do_prompt == TRUE && (Said_no = sfk_prompt()) == TRUE)   /* abs k18 */
-		return;						/* abs k18 */
+		return (0);					/* abs k18 */
 	    else						/* abs k18 */
 		do_prompt = FALSE;				/* abs k18 */
 	    sequence[1] = '8';
@@ -428,6 +428,7 @@ bool do_prompt;				/* abs k18 */
 #ifndef DO_NOT_DELAY
     alarm(time_left);		/* reset alarm. abs k18 */
 #endif
+    return (0);
 }
 
 
@@ -483,6 +484,7 @@ sfk_prompt()
 /*
  * SETUP_SLK_ARRAY will initialize defaults for the SLKS
  */
+int
 setup_slk_array()
 {
 	register int i, j;
@@ -497,6 +499,7 @@ setup_slk_array()
 		Defslk[i].intr   = NULL;
 		Defslk[i].onintr = NULL;
 	}
+	return (0);
 }
 
 #define REDEFINED(x)	 ((x).label && (*((x).label) != '\0' || (x).tok < 0))
@@ -614,7 +617,7 @@ token	t;
 		intr = (char *)ar_ctl(AR_cur, CTGETINTR, NULL, NULL, NULL, NULL, NULL, NULL);
 	    flags = RET_BOOL;
 	    Cur_intr.interrupt = FALSE;	/* dont intrupt eval of intr */
-	    Cur_intr.interrupt = (bool)eval_string(intr, &flags);
+	    Cur_intr.interrupt = (bool)(uintptr_t)eval_string(intr, &flags);
 
 	    if ((onintr = SLK_array[n].onintr) == NULL)
 		onintr = (char *)ar_ctl(AR_cur, CTGETONINTR, NULL, NULL, NULL, NULL, NULL, NULL);
@@ -628,6 +631,7 @@ token	t;
 	return TOK_BADCHAR;
 }
 
+int
 set_top_slks(slks)
 struct slk slks[];
 {
@@ -635,6 +639,7 @@ struct slk slks[];
 
 	for (i = 0; i < SECOND_LEVEL; i++)
 		Defslk[i] = slks[i];
+	return (0);
 }
 
 /*
@@ -644,6 +649,7 @@ struct slk slks[];
  * If a token in this range is "caught" by the object,
  * the object itself will determine the appropriate action.
  */ 
+int
 set_obj_slk(slk, label, slktok, intr, onintr)
 struct slk *slk;
 char *label;
@@ -692,12 +698,14 @@ char *intr, *onintr;
 			slk->tokstr = Defslk[slknum].onintr;
 		}
 	}
+	return (0);
 }
 
 
 /*
  * SET_DEF_SLK will over-write the GLOBAL default SLKS 
  */
+int
 set_def_slk(slknum, label, action, intr, onintr)
 int slknum;
 char *label;
@@ -730,16 +738,20 @@ char *intr, *onintr;
 		Textslk[slknum] = Defslk[slknum];
 		Menuslk[slknum] = Defslk[slknum];
 	}
+	return (0);
 }
 
 /*
  * SLK_TOGGLE will toggle the currently displayed SLKS
  */
-slk_toggle()
+int
+slk_toggle(void)
 {
 	showslks(!SLK_level);
+	return (0);
 }
 
+int
 set_slk_mark(flag)
 int flag;
 {
@@ -748,4 +760,5 @@ int flag;
 	else
 		Menuslk[MARK] = Blankslk;
 	Defslk[MARK] = Menuslk[MARK];
+	return (0);
 }

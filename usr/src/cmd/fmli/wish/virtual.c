@@ -19,15 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright  (c) 1986 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.14 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<ctype.h>
@@ -49,6 +50,7 @@ extern int	Arg_count;
 extern bool	Nobang;
 
 static bool	Command_mode = FALSE;		/* abs k17 */
+static token done_cmd(char *s, token t);
 
 token
 virtual_stream(t)
@@ -68,7 +70,6 @@ register token	t;
 	/* single equals sign is correct, here */
 	if (Command_mode = !Command_mode)
 	{
-	    token	done_cmd();
 	    char	*cur_cmd();
 
 	    get_string(done_cmd, "--> ", cur_cmd(), 0, TRUE,
@@ -87,9 +88,7 @@ register token	t;
 }
 
 static token
-done_cmd(s, t)
-char	*s;
-token	t;
+done_cmd(char *s, token t)
 {
     char *strchr();
 
@@ -195,6 +194,7 @@ token	t;
     return t;
 }
 
+int
 set_Args(s)
 char *s;
 {
@@ -224,4 +224,5 @@ char *s;
 		free(Args[Arg_count]); /* les */
 
 	Args[Arg_count] = NULL;
+	return (0);
 }

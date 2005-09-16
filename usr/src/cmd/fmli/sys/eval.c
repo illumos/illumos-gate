@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,8 @@ int	Lasttok;
 
 extern int in_an_if;	/* (in an if statement) see evfuncs.c */
 
+static int eval_dollar();
+static void eval_backquote();
 
 char *
 special_char(c, instr)
@@ -111,6 +113,7 @@ IOSTRUCT *instr;
 }
     
 
+int
 eval(instr, outstr, flags)
 IOSTRUCT	*instr;
 IOSTRUCT	*outstr;
@@ -332,7 +335,7 @@ abs */
  *
  */
 /*ARGSUSED*/
-static
+static int
 eval_dollar(instr, outstr, flags)
 IOSTRUCT	*instr;
 IOSTRUCT	*outstr;
@@ -420,7 +423,7 @@ int	flags;
 	return p;
 }
 
-static
+static void
 eval_backquote(instr, outstr, flags)
 IOSTRUCT	*instr;
 IOSTRUCT	*outstr;
@@ -708,10 +711,3 @@ int	flags;
     io_flags(mystdout, io_flags(mystdout, 0) | FROM_BQ);
     io_push(instr, mystdout);
 }
-
-
-
-
-
-
-

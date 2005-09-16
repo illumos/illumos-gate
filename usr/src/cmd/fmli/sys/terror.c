@@ -19,6 +19,12 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -27,7 +33,7 @@
  * Copyright  (c) 1986 AT&T
  *	All Rights Reserved
  */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.9 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<errno.h>
@@ -43,6 +49,9 @@ extern char	*Errlist[];
 extern char	*What[];
 extern int	Vflag;
 extern void	exit();		/* fmli's exit not the C lib call */
+static void log();
+static void notify();
+
 void
 _terror(sev, what, name, file, line, child)
 int	sev;	/* flags to see if we should log or exit */
@@ -62,7 +71,7 @@ bool 	child;	/* TRUE if called by a child of fmli. abs k15 */
 	errno = 0;
 }
 
-static
+static void
 notify(what, child)
 int	what;
 bool 	child;	 /* TRUE if called by a child of fmli. abs k15 */
@@ -113,7 +122,7 @@ bool 	child;	 /* TRUE if called by a child of fmli. abs k15 */
  * FACE application ONLY ....  log problems in the TERRLOG file
  * and/or send mail
  */
-static
+static void
 log(sev, what, name, file, line)
 int	sev;
 int	what;

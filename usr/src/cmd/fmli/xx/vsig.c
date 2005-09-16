@@ -19,15 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.5 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* 
  * This short program is called by a co-process if it wishes to 
@@ -44,9 +46,8 @@
 
 char Semaphore[PATHSIZ] = "/tmp/FMLIsem.";
 
-main(argc, argv)
-int argc;
-char *argv[];
+int
+main(int argc, char *argv[])
 {
 	char *vpid;
 	char *getenv();
@@ -65,5 +66,5 @@ char *argv[];
 	 */
 	close(open(Semaphore, O_WRONLY));
 	kill(strtol(vpid, (char **)NULL, 0), SIGUSR2); /* EFT abs k16 */
-	exit(0);
+	return (0);
 }

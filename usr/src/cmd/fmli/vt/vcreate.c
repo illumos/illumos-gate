@@ -19,15 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright  (c) 1986 AT&T
- *	All Rights Reserved
- */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.12 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<curses.h>
 #include	<term.h>
@@ -47,6 +48,12 @@ static int	Nextrow;
 static int	Nextcol;
 
 extern int 	Color_terminal;
+static int best_place(int flags, int *startrow, int *startcol,
+    unsigned int rows, unsigned int cols);
+static int bestcol(int sofar, int *sr, int *sc, unsigned int r,
+    unsigned int c);
+static int cover(unsigned int sr, unsigned int sc, unsigned int r,
+    unsigned int c);
 
 /*
  * only way to create a VT
@@ -200,12 +207,7 @@ unsigned	c;
  * do nothing if all columns have a cost higher than sofar
  */
 static int
-bestcol(sofar, sr, sc, r, c)
-int	sofar;
-register int	*sr;
-register int	*sc;
-unsigned	r;
-unsigned	c;
+bestcol(int sofar, int *sr, int *sc, unsigned int r, unsigned int c)
 {
 	register int	best;
 	int	col;
@@ -243,11 +245,7 @@ unsigned	c;
  * compute sum of overlapping areas of given window with all other windows
  */
 static int
-cover(sr, sc, r, c)
-unsigned	sr;
-unsigned	sc;
-unsigned	r;
-unsigned	c;
+cover(unsigned int sr, unsigned int sc, unsigned int r, unsigned int c)
 {
 	register int	n;
 	register int	sofar;
@@ -353,12 +351,8 @@ unsigned	c;
  * find best place to put window
  */
 static int
-best_place(flags, startrow, startcol, rows, cols)
-int	flags;
-register int	*startrow;
-register int	*startcol;
-register unsigned	rows;
-register unsigned	cols;
+best_place(int flags, int *startrow, int *startcol,
+    unsigned int rows, unsigned int cols)
 {
 	int	(*cfunc)();		/* cost function to use */
 	unsigned	cost;
@@ -385,11 +379,12 @@ register unsigned	cols;
  * compute linear overlap between line starting at s1 and going for n1 units
  * and line starting at s2 and going for n2 units
  */
+int
 _vt_overlap(s1, n1, s2, n2)
-register int	s1;
-register int	n1;
-register int	s2;
-register int	n2;
+int	s1;
+int	n1;
+int	s2;
+int	n2;
 {
 	if (s2 < s1)
 		return _vt_overlap(s2, n2, s1, n1);

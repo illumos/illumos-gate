@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,17 +69,19 @@ static int	size;
  * 128 cannot be represented in a char (it becomes -127) - thus
  * decl changed to unsigned char.
  */
+static void getrnge(char *str);
+
 static unsigned char	bittab[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
 char *
 compile(instring, ep, endbuf, seof, errfunc)
-register char *ep;
+char *ep;
 char *instring, *endbuf;
 void (*errfunc)();
 {
-	register char *sp = instring;
-	register c;
-	register eof = seof;
+	char *sp = instring;
+	int c;
+	int eof = seof;
 	char *lastep = instring;
 	int cclcnt;
 	char bracket[NBRA], *bracketp;
@@ -307,9 +309,9 @@ void (*errfunc)();
 }
 
 int step(p1, p2)
-register char *p1, *p2; 
+char *p1, *p2; 
 {
-	register c;
+	int c;
 
 
 	if(circf) {
@@ -339,13 +341,14 @@ register char *p1, *p2;
 	return(0);
 }
 
+int
 advance(lp, ep)
-register char *lp, *ep;
+char *lp, *ep;
 {
-	register char *curlp;
+	char *curlp;
 	int c;
 	char *bbeg; 
-	register char neg;
+	char neg;
 	int ct;
 
 	while(1) {
@@ -533,9 +536,8 @@ register char *lp, *ep;
 	}
 }
 
-static
-getrnge(str)
-register char *str;
+static void
+getrnge(char *str)
 {
 	low = *str++ & 0377;
 	size = ((*str & 0377) == 255)? 20000: (*str &0377) - low;

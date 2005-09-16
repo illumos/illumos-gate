@@ -19,15 +19,16 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright  (c) 1985 AT&T
- *	All Rights Reserved
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.1 */
+
+/*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *  ``atob'' - Convert an ASCII "btoa" file to binary.
  *
@@ -105,11 +106,14 @@ char *filenm;
 	return(0);
 }
 
-fatal()
+int
+fatal(void)
 {
 	fclose(xtmpfile);
+	return (0);
 }
 
+int
 decode(c)
 register long c;
 {
@@ -142,8 +146,10 @@ register long c;
 	} else {
 		fatal();
 	}
+	return (0);
 }
 
+int
 byteout(c)
 register long c;
 {
@@ -159,7 +165,9 @@ register long c;
 	}
 	Crot += c;
 	myputc(c, xtmpfile);
+	return (0);
 }
+
 static void
 myputc(c, fp)
 int c;
