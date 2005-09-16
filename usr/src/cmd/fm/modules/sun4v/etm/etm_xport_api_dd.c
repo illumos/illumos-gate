@@ -837,11 +837,15 @@ etm_xport_accept(fmd_hdl_t *hdl, etm_xport_addr_t *addrp)
 	_etm_xport_conn_t	*rv;	/* ret val */
 	uint8_t			buf[4];	/* buffer for peeking */
 	int			n;	/* byte cnt */
+	struct timespec		tms;	/* for nanosleep() */
 
 	rv = NULL;	/* default is failure */
 
 	_conn = NULL;
 	_addrv = NULL;
+
+	tms.tv_sec = ETM_SLEEP_QUIK;
+	tms.tv_nsec = 0;
 
 	/*
 	 * get the default dst transport address and open a connection to it;
@@ -883,6 +887,7 @@ etm_xport_accept(fmd_hdl_t *hdl, etm_xport_addr_t *addrp)
 	etm_xport_ser_conn = _conn;
 
 	if (etm_xport_should_fake_dd) {
+		(void) nanosleep(&tms, NULL);	/* delay [for resp capture] */
 		(void) ftruncate(_conn->fd, 0); /* act like socket/queue/pipe */
 	}
 

@@ -59,17 +59,30 @@ extern "C" {
 /* protocol version numbers 1, 2, ... */
 
 #define	ETM_PROTO_V1 (1)
+#define	ETM_PROTO_V2 (2)
 
 /*
- * Design_Note:	Care should be taken for any future V2 protocol, particularly
- *		if the size of the message headers shrinks vs the V1 sizes,
- *		so that if ETM receives each message header in a single
- *		read() call, that it won't pend indefinitely when sent a
- *		V2 header.
+ * Design_Note:	Protocol V2 uses the same headers and constants as V1.
+ *		The V1 and V2 protocols differ from each other only in the
+ *		support of response messages for FMA event messages with
+ *		non-NONE timeout fields. In V1 it is invalid to supply a
+ *		timeout value that is non-NONE when sending an ETM message
+ *		containing an FMA event; in V2 it is valid. In both V1 and
+ *		V2 it is valid to supply a non-NONE timeout when sending an
+ *		ETM control message. V1 is the initial bootup protocol version;
+ *		from there version is negotiated upward.
  */
 
 /*
- * -------------------------- etm protocol version 1 -------------------------
+ * Design_Note:	Care should be taken for any future V3 protocol, particularly
+ *		if the size of the protocol preamble shrinks vs the V1/V2 size,
+ *		so that if ETM is implemented to receive each message header
+ *		as a whole, it won't pend indefinitely when sent a [tiny] V3
+ *		message.
+ */
+
+/*
+ * ------------------------ etm protocol versions 1,2 ----------------------
  */
 
 typedef enum {
@@ -110,7 +123,7 @@ typedef enum {
 
 	ETM_CTL_SEL_TOO_LOW = 16,	/* range check place holder */
 	ETM_CTL_SEL_PING_REQ,		/* ping request */
-	ETM_CTL_SEL_VER_SET_REQ,	/* set proto version request */
+	ETM_CTL_SEL_VER_NEGOT_REQ,	/* negotiate proto version request */
 	ETM_CTL_SEL_TOO_BIG		/* range check place holder */
 
 } etm_proto_v1_ctl_sel_t;	/* 8-bit pp_sub_type control selectors */
