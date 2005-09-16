@@ -811,7 +811,6 @@ end
 function	__div64
 arch		i386 sparc
 version		i386=SUNW_0.7 sparc=SISCD_2.3
-auxiliary	sparc=/platform/$PLATFORM/lib/libc_psr.so.1
 end
 
 function	__dtoll
@@ -864,7 +863,6 @@ end
 function	__mul64
 arch		i386 sparc
 version		i386=SUNW_0.7 sparc=SISCD_2.3
-auxiliary	sparc=/platform/$PLATFORM/lib/libc_psr.so.1
 end
 
 function	__nsw_extended_action
@@ -931,24 +929,20 @@ end
 function	__rem64
 arch		i386 sparc
 version		i386=SUNW_0.7 sparc=SISCD_2.3
-auxiliary	sparc=/platform/$PLATFORM/lib/libc_psr.so.1
 end
 
 function	__udiv64
 arch		i386 sparc
 version		i386=SUNW_0.7 sparc=SISCD_2.3
-auxiliary	sparc=/platform/$PLATFORM/lib/libc_psr.so.1
 end
 
 function	__umul64
 version		SISCD_2.3
-auxiliary	sparc=/platform/$PLATFORM/lib/libc_psr.so.1
 end
 
 function	__urem64
 arch		i386 sparc
 version		i386=SUNW_0.7 sparc=SISCD_2.3
-auxiliary	sparc=/platform/$PLATFORM/lib/libc_psr.so.1
 end
 
 function	__xpg4_putmsg

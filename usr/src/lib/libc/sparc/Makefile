@@ -48,9 +48,7 @@ CRTOBJS=			\
 	_ftou.o			\
 	cerror.o		\
 	cerror64.o		\
-	divrem64.o		\
-	hwmuldiv.o		\
-	mul64.o
+	hwmuldiv.o
 
 DYNOBJS=
 
@@ -1006,8 +1004,6 @@ SRCS=							\
 	$(UNWINDMACHOBJS:%.o=../port/unwind/%.c)	\
 	$(FPOBJS:%.o=../$(MACH)/fp/%.c)			\
 	$(LIBCBASE)/crt/_ftou.c				\
-	$(LIBCBASE)/crt/divrem64.c			\
-	$(LIBCBASE)/crt/mul64.c				\
 	$(LIBCBASE)/gen/_xregs_clrptr.c			\
 	$(LIBCBASE)/gen/ecvt.c				\
 	$(LIBCBASE)/gen/getctxt.c			\
@@ -1095,10 +1091,6 @@ $(QIL:%=pics/%) := CFLAGS += ../$(MACH)/fp/__quad.il
 pics/_Q%.o := sparc_COPTFLAG = -xO4 -dalign
 pics/__quad%.o := sparc_COPTFLAG = -xO4 -dalign
 
-# Files in crt subdirectory which need muldiv64.il inline template
-CIL=	mul64.o divrem64.o
-$(CIL:%=pics/%) := CFLAGS += $(LIBCBASE)/crt/muldiv64.il
-
 # large-file-aware components that should be built large
 
 $(COMSYSOBJS64:%=pics/%) := \
@@ -1159,7 +1151,6 @@ $(LINTLIB):= LINTFLAGS=-nvx
 $(TIL:%=pics/%): $(LIBCBASE)/threads/sparc.il
 $(IL:%=pics/%): $(LIBCBASE)/fp/base.il
 $(QIL:%=pics/%): ../$(MACH)/fp/__quad.il
-$(CIL:%=pics/%): $(LIBCBASE)/crt/muldiv64.il
 
 # include common libc targets
 include ../Makefile.targ

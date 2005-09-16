@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,7 @@
 CLASS		= 32
 PLATFORM	= sun4u
 
-OBJECTS		= memcpy.o memset.o memcmp.o hwmuldiv.o
+OBJECTS		= memcpy.o memset.o memcmp.o
 
 include ../Makefile.com
 

@@ -65,33 +65,3 @@ function	_memset extends libc/spec/private.spec
 arch		sparc
 version		SUNWprivate_1.1
 end		
-
-function	__umul64 extends libc/spec/sys.spec
-arch		sparc
-version		SUNWprivate_1.1
-end		
-
-function	__mul64 extends libc/spec/sys.spec
-arch		sparc
-version		SUNWprivate_1.1
-end		
-
-function	__rem64 extends libc/spec/sys.spec
-arch		sparc
-version		SUNWprivate_1.1
-end		
-
-function	__urem64 extends libc/spec/sys.spec
-arch		sparc
-version		SUNWprivate_1.1
-end		
-
-function	__div64 extends libc/spec/sys.spec
-arch		sparc
-version		SUNWprivate_1.1
-end		
-
-function	__udiv64 extends libc/spec/sys.spec
-arch		sparc
-version		SUNWprivate_1.1
-end		
