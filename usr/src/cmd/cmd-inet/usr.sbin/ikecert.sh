@@ -23,7 +23,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2001, 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -46,7 +46,7 @@ case "$1" in
 	;;
 'tokens')
 	# Execute the special options of certlocal.
-	exec /usr/lib/inet/certlocal -L
+	exec /usr/lib/inet/certlocal -X
 	;;
 
 *)
