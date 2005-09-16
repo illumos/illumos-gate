@@ -60,6 +60,22 @@ is_printer_uri(char *value)
 	return (0);
 }
 
+/*
+ * To avoid a race condition, chown() should always be called before
+ * chmod().
+ */
+int
+chownmod(char *path, uid_t owner, gid_t group, mode_t mode)
+{
+	int rc;
+
+	if ((rc = Chown(path, owner, group)) == 0)
+		rc = Chmod(path, mode);
+
+	return (rc);
+}
+
+
 int
 fdprintf(int fd, char *fmt, ...)
 {

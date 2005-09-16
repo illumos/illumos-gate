@@ -117,8 +117,7 @@ void s_print_request ( char * m, MESG * md )
     {
 	req_file = reqpath(file, &idno);
 	path = makepath(Lp_Tmp, req_file, (char *)0);
-	(void) Chmod(path, 0600);
-	(void) Chown(path, Lp_Uid, Lp_Gid);
+	(void) chownmod(path, Lp_Uid, Lp_Gid, 0600);
 	Free (path);
     
 	if (!(r = Getrequest(req_file)))
@@ -301,8 +300,7 @@ void s_print_request ( char * m, MESG * md )
 			 * IPP job attribute file exists for this job so
 			 * change permissions and ownership of the file
 			 */
-			(void) Chmod(path, 0600);
-			(void) Chown(path, Lp_Uid, Lp_Gid);
+			(void) chownmod(path, Lp_Uid, Lp_Gid, 0600);
 			Free(path);
 		}
 		else
@@ -444,8 +442,7 @@ void s_end_change_request(char *m, MESG *md)
 	status = MNOSTART;
     else {
 	path = makepath(Lp_Tmp, rp->req_file, (char *)0);
-	(void) Chmod(path, 0600);
-	(void) Chown(path, Lp_Uid, Lp_Gid);
+	(void) chownmod(path, Lp_Uid, Lp_Gid, 0600);
 	Free (path);
 
 	rp->request->outcome &= ~(RS_CHANGING);

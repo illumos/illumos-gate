@@ -322,8 +322,7 @@ proto(int type, int rm_ok, ...)
 	mode = va_arg(ap, mode_t);
 	uid = va_arg(ap, uid_t);
 	gid = va_arg(ap, gid_t);
-	Chmod (path, mode);
-	Chown (path, uid, gid);
+	(void) chownmod(path, uid, gid, mode);
 
 	Free (path);
 	return;

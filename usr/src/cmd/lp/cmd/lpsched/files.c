@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -75,8 +75,7 @@ off_t chfiles ( char * * list, uid_t uid, gid_t gid )	/* funcdef */
 		list[-1] = file = newfile;
 	    }
 	    
-	    (void) Chmod(file, 0600);
-	    (void) Chown(file, uid, gid);
+	    (void) chownmod(file, uid, gid, 0600);
 	}
 
 	if (Stat(file, &stbuf) == -1)
@@ -395,7 +394,7 @@ _alloc_files (
 			return (0);
 		} else {
 			Close (fd);
-			Chown (file, uid, gid);
+			(void) chownmod(file, uid, gid, 0600);
 		}
 	}
 
@@ -423,7 +422,7 @@ _alloc_files (
 			else
 			{
 				Close(fd);
-				Chown(file, uid, gid);
+				(void) chownmod(file, uid, gid, 0600);
 			}
 
 			Free(file);

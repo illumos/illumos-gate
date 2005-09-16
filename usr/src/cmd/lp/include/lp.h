@@ -595,6 +595,9 @@ void		(*lp_alloc_fail_handler)( void );
 #define	next_dir(base, ptr)	next_x(base, ptr, S_IFDIR)
 #define	next_file(base, ptr)	next_x(base, ptr, S_IFREG)
 
+extern int chownmod(char *path, uid_t owner, gid_t group, mode_t mode);
+
+
 char *		next_x  ( char * , long * , unsigned int );
 
 #endif
