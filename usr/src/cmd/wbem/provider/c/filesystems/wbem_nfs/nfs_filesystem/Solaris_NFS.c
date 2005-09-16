@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -723,7 +723,7 @@ populate_property_values(nfs_mntlist_t *nfs_mount,
 	unsigned long long	usedsize;
 	unsigned long		maxfilenamelen;
 	unsigned long		fragsize;
-	unsigned int		codeSet[1] = { {0} };
+	unsigned int		codeSet[1] = { 0 };
 	boolean_t		readonly;
 	boolean_t		optHasEquals;
 	cimchar			*codeSetValue;

@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -409,9 +409,9 @@ echo "" >> $HEADER
 echo "static char *classNameTable [] = {" >> $HEADER
 for x in `cat $CLASSFILE`
 do
-        echo "{\"$x\"}," >> $HEADER
+        echo "\"$x\"," >> $HEADER
 done
-echo "{\"$LIBNAME\"}};" >> $HEADER
+echo "\"$LIBNAME\"};" >> $HEADER
 
 ##############################################################
 #
@@ -421,6 +421,6 @@ echo "" >> $HEADER
 echo "static char *assocclassNameTable [] = {" >> $HEADER
 for x in `cat $ASSOCCLASSFILE`
 do
-        echo "{\"$x\"}," >> $HEADER
+        echo "\"$x\"," >> $HEADER
 done
-echo "{\"$LIBNAME\"}};" >> $HEADER
+echo "\"$LIBNAME\"};" >> $HEADER

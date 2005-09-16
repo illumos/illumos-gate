@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@ dm_free_descriptor(dm_descriptor_t desc)
 	if (desc == NULL) {
 	    return;
 	}
-	dp = (descriptor_t *)desc;
+	dp = (descriptor_t *)(uintptr_t)desc;
 
 	cache_wlock();
 	cache_free_descriptor(dp);
@@ -102,7 +102,7 @@ dm_get_associated_descriptors(dm_descriptor_t desc, dm_desc_type_t type,
 	descriptor_t  *dp;
 
 
-	dp = (descriptor_t *)desc;
+	dp = (descriptor_t *)(uintptr_t)desc;
 
 	cache_wlock();
 
@@ -186,7 +186,7 @@ dm_get_attributes(dm_descriptor_t desc, int *errp)
 	nvlist_t	*attrs = NULL;
 
 
-	dp = (descriptor_t *)desc;
+	dp = (descriptor_t *)(uintptr_t)desc;
 
 	cache_rlock();
 
@@ -333,7 +333,7 @@ dm_get_name(dm_descriptor_t desc, int *errp)
 	char		*nm = NULL;
 	char		*name = NULL;
 
-	dp = (descriptor_t *)desc;
+	dp = (descriptor_t *)(uintptr_t)desc;
 
 	cache_rlock();
 
@@ -398,7 +398,7 @@ dm_get_stats(dm_descriptor_t desc, int stat_type, int *errp)
 	nvlist_t	*stats = NULL;
 
 
-	dp = (descriptor_t *)desc;
+	dp = (descriptor_t *)(uintptr_t)desc;
 
 	cache_rlock();
 
@@ -455,7 +455,7 @@ dm_get_type(dm_descriptor_t desc)
 {
 	descriptor_t  *dp;
 
-	dp = (descriptor_t *)desc;
+	dp = (descriptor_t *)(uintptr_t)desc;
 
 	cache_rlock();
 
@@ -555,7 +555,7 @@ desc_array_to_ptr_array(dm_descriptor_t *descs, int *errp)
 	}
 
 	for (i = 0; descs[i]; i++) {
-	    da[i] = (descriptor_t *)descs[i];
+	    da[i] = (descriptor_t *)(uintptr_t)descs[i];
 	}
 	*errp = 0;
 	free(descs);
