@@ -1437,7 +1437,8 @@ sync_kern(void)
 			 * before trying to match ifp by name.
 			 */
 			if ((ifp = gwkludge_iflookup(rp->ipRouteDest,
-			    rp->ipRouteNextHop, rp->ipRouteMask)) == NULL)
+			    rp->ipRouteNextHop,
+			    ntohl(rp->ipRouteMask))) == NULL)
 				ifp = ifwithname(ifname);
 
 			info.rti_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
