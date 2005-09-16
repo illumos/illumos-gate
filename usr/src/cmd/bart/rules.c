@@ -20,13 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <dirent.h>
 #include <fnmatch.h>
+#include <string.h>
 #include "bart.h"
 
 static int count_slashes(const char *);
@@ -982,29 +983,55 @@ check_rules(const char *fname, char type)
 }
 
 /*
- * Function to match a filename against a subtree.  Break both paths into
- * their components and do the comparison.  Comparison is OK when all the
- * components match until the subtree is exhausted.  For example, a
- * subtree of "/home/nickiso" should match against "/home/nickiso/src/foo.c"
+ * Function to determine if an entry in a rules file (see bart_rules(4)) applies
+ * to a filename. We truncate "fname" such that it has the same number of
+ * components as "rule" and let fnmatch(3C) do the rest. A "component" is one
+ * part of an fname as delimited by slashes ('/'). So "/A/B/C/D" has four
+ * components: "A", "B", "C" and "D".
+ *
+ * For example:
+ *
+ * 1. the rule "/home/nickiso" applies to fname "/home/nickiso/src/foo.c" so
+ * should match.
+ *
+ * 2. the rule "/home/nickiso/temp/src" does not apply to fname
+ * "/home/nickiso/foo.c" so should not match.
  */
 static int
 match_subtree(const char *fname, char *rule)
 {
-	int	match;
+	int	match, num_rule_slash;
+	char	*ptr, fname_cp[PATH_MAX];
 
-	/* Trivial case, always match against '/' */
-	if (strcmp(rule, "/") == 0)
-		return (1);
+	/* If rule has more components than fname, it cannot match. */
+	if ((num_rule_slash = count_slashes(rule)) > count_slashes(fname))
+		return (0);
+
+	/* Create a copy of fname that we can truncate. */
+	(void) strlcpy(fname_cp, fname, sizeof (fname_cp));
 
 	/*
-	 * Walk through the rule and fname to see if they match, or not.
+	 * Truncate fname_cp such that it has the same number of components
+	 * as rule. If rule ends with '/', so should fname_cp. ie:
 	 *
-	 * A "component" is one part of a fname, e.g., assuming an fname
-	 * of "/A/B/C/D", it has four components: "A", "B", "C", "D".
+	 * rule		fname			fname_cp	matches
+	 * ----		-----			--------	-------
+	 * /home/dir*	/home/dir0/dir1/fileA	/home/dir0	yes
+	 * /home/dir/	/home/dir0/dir1/fileA	/home/dir0/	no
 	 */
+	for (ptr = fname_cp; num_rule_slash > 0; num_rule_slash--, ptr++)
+		ptr = strchr(ptr, '/');
+	if (*(rule + strlen(rule) - 1) != '/') {
+		while (*ptr != '\0') {
+			if (*ptr == '/')
+				break;
+			ptr++;
+		}
+	}
+	*ptr = '\0';
 
-	/* OK, now see if the match */
-	match = fnmatch(rule, fname, FNM_PATHNAME);
+	/* OK, now see if they match. */
+	match = fnmatch(rule, fname_cp, FNM_PATHNAME);
 
 	/* No match, return failure */
 	if (match != 0)
