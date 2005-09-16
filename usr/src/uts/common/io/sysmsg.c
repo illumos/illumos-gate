@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include <sys/uio.h>
 #include <sys/stat.h>
 #include <sys/file.h>
+#include <sys/session.h>
 #include <sys/stream.h>
 #include <sys/strsubr.h>
 #include <sys/poll.h>

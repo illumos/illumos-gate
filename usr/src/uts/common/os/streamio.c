@@ -395,7 +395,7 @@ ckreturn:
 		    SQ_CI|SQ_CO, B_FALSE);
 
 		set_qend(qp);
-		stp->sd_strtab = (struct streamtab *)fifo_getinfo();
+		stp->sd_strtab = fifo_getinfo();
 		_WR(qp)->q_nfsrv = _WR(qp);
 		qp->q_nfsrv = qp;
 		/*
@@ -3761,7 +3761,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 				/*
 				 * try to allocate it as a controlling terminal
 				 */
-				strctty(stp);
+				stralloctty(stp);
 			}
 		}
 

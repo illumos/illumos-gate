@@ -42,13 +42,9 @@
  */
 #include <sys/stream.h>
 #include <sys/stropts.h>
-#include <sys/session.h>
 #include <sys/kstat.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
-#include <vm/as.h>
-#include <vm/page.h>
-#include <vm/anon.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -768,6 +764,17 @@ typedef struct cdevsw_impl {
 } cdevsw_impl_t;
 
 /*
+ * Enumeration of the types of access that can be requested for a
+ * controlling terminal under job control.
+ */
+enum jcaccess {
+	JCREAD,			/* read data on a ctty */
+	JCWRITE,		/* write data to a ctty */
+	JCSETP,			/* set ctty parameters */
+	JCGETP			/* get ctty parameters */
+};
+
+/*
  * Finding related queues
  */
 #define	STREAM(q)	((q)->q_stream)
@@ -1082,7 +1089,6 @@ extern int strputmsg(vnode_t *, struct strbuf *, struct strbuf *, uchar_t,
     int flag, int fmode);
 extern int strstartplumb(struct stdata *, int, int);
 extern void strendplumb(struct stdata *);
-extern struct streamtab *fifo_getinfo(void);
 extern int stropen(struct vnode *, dev_t *, int, cred_t *);
 extern int strclose(struct vnode *, int, cred_t *);
 extern int strpoll(register struct stdata *, short, int, short *,
@@ -1101,8 +1107,7 @@ extern mblk_t *strrput_misc(vnode_t *, mblk_t *,
 extern int getiocseqno(void);
 extern int strwaitbuf(size_t, int);
 extern int strwaitq(stdata_t *, int, ssize_t, int, clock_t, int *);
-extern void strctty(struct stdata *);
-extern void stralloctty(sess_t *, struct stdata *);
+extern void stralloctty(struct stdata *);
 extern void strfreectty(struct stdata *);
 extern struct stdata *shalloc(queue_t *);
 extern void shfree(struct stdata *s);
@@ -1116,13 +1121,11 @@ extern int strcopyin(void *, void *, size_t, int);
 extern int strcopyout(void *, void *, size_t, int);
 extern void strsignal(struct stdata *, int, int32_t);
 extern clock_t str_cv_wait(kcondvar_t *, kmutex_t *, clock_t, int);
-extern void runbuffcalls(void);
 extern void disable_svc(queue_t *);
 extern void remove_runlist(queue_t *);
 extern void wait_svc(queue_t *);
 extern void backenable(queue_t *, uchar_t);
 extern void set_qend(queue_t *);
-extern void set_qnexthot(queue_t *);
 extern int strgeterr(stdata_t *, int32_t, int);
 extern void qenable_locked(queue_t *);
 extern mblk_t *getq_noenab(queue_t *);
@@ -1142,7 +1145,6 @@ extern void claimstr(queue_t *);
 extern void releasestr(queue_t *);
 extern void removeq(queue_t *);
 extern void insertq(struct stdata *, queue_t *);
-extern void fill_syncq(syncq_t *, queue_t *, mblk_t *, void (*)());
 extern void drain_syncq(syncq_t *);
 extern void qfill_syncq(syncq_t *, queue_t *, mblk_t *);
 extern void qdrain_syncq(syncq_t *, queue_t *);
@@ -1179,22 +1181,22 @@ extern mblk_t *allocb_cred(size_t, cred_t *);
 extern mblk_t *allocb_cred_wait(size_t, uint_t, int *, cred_t *);
 extern mblk_t *allocb_tmpl(size_t, const mblk_t *);
 extern void mblk_setcred(mblk_t *, cred_t *);
-void strpollwakeup(vnode_t *, short);
+extern void strpollwakeup(vnode_t *, short);
 extern int putnextctl_wait(queue_t *, int);
 
-int kstrputmsg(struct vnode *, mblk_t *, struct uio *, ssize_t,
+extern int kstrputmsg(struct vnode *, mblk_t *, struct uio *, ssize_t,
     unsigned char, int, int);
-int kstrgetmsg(struct vnode *, mblk_t **, struct uio *,
+extern int kstrgetmsg(struct vnode *, mblk_t **, struct uio *,
     unsigned char *, int *, clock_t, rval_t *);
 extern int kstrwritemp(struct vnode *, mblk_t *, ushort_t);
 
-void strsetrerror(vnode_t *, int, int, errfunc_t);
-void strsetwerror(vnode_t *, int, int, errfunc_t);
-void strseteof(vnode_t *, int);
-void strflushrq(vnode_t *, int);
-void strsetrputhooks(vnode_t *, uint_t, msgfunc_t, msgfunc_t);
-void strsetwputhooks(vnode_t *, uint_t, clock_t);
-int strwaitmark(vnode_t *);
+extern void strsetrerror(vnode_t *, int, int, errfunc_t);
+extern void strsetwerror(vnode_t *, int, int, errfunc_t);
+extern void strseteof(vnode_t *, int);
+extern void strflushrq(vnode_t *, int);
+extern void strsetrputhooks(vnode_t *, uint_t, msgfunc_t, msgfunc_t);
+extern void strsetwputhooks(vnode_t *, uint_t, clock_t);
+extern int strwaitmark(vnode_t *);
 extern void strsignal_nolock(stdata_t *, int, int32_t);
 
 struct multidata_s;

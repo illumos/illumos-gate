@@ -76,6 +76,7 @@
 #include <sys/multidata.h>
 #include <sys/pattr.h>
 #include <sys/strft.h>
+#include <sys/fs/snode.h>
 #include <sys/zone.h>
 
 #define	O_SAMESTR(q)	(((q)->q_next) && \
@@ -3977,15 +3978,33 @@ strhup(stdata_t *stp)
 }
 
 void
-stralloctty(sess_t *sp, stdata_t *stp)
+stralloctty(stdata_t *stp)
 {
+	proc_t *p = curproc;
+	sess_t *sp = p->p_sessp;
+
 	mutex_enter(&stp->sd_lock);
-	mutex_enter(&pidlock);
-	stp->sd_sidp = sp->s_sidp;
-	stp->sd_pgidp = sp->s_sidp;
-	PID_HOLD(stp->sd_pgidp);
-	PID_HOLD(stp->sd_sidp);
-	mutex_exit(&pidlock);
+	/*
+	 * No need to hold the session lock or do a TTY_HOLD() because
+	 * this is the only thread that can be the session leader and not
+	 * have a controlling tty.
+	 */
+	if ((stp->sd_flag &
+	    (STRHUP|STRDERR|STWRERR|STPLEX|STRISTTY)) == STRISTTY &&
+	    stp->sd_sidp == NULL &&		/* not allocated as ctty */
+	    sp->s_sidp == p->p_pidp &&		/* session leader */
+	    sp->s_flag != SESS_CLOSE &&		/* session is not closing */
+	    sp->s_vp == NULL) {			/* without ctty */
+		ASSERT(stp->sd_pgidp == NULL);
+		alloctty(p, makectty(stp->sd_vnode));
+
+		mutex_enter(&pidlock);
+		stp->sd_sidp = sp->s_sidp;
+		stp->sd_pgidp = sp->s_sidp;
+		PID_HOLD(stp->sd_pgidp);
+		PID_HOLD(stp->sd_sidp);
+		mutex_exit(&pidlock);
+	}
 	mutex_exit(&stp->sd_lock);
 }
 
@@ -4004,38 +4023,8 @@ strfreectty(stdata_t *stp)
 	if (!(stp->sd_flag & STRHUP))
 		strhup(stp);
 }
-
-void
-strctty(stdata_t *stp)
-{
-	extern vnode_t *makectty();
-	proc_t *p = curproc;
-	sess_t *sp = p->p_sessp;
-
-	mutex_enter(&stp->sd_lock);
-	/*
-	 * No need to hold the session lock or do a TTYHOLD,
-	 * because this is the only thread that can be the
-	 * session leader and not have a controlling tty.
-	 */
-	if ((stp->sd_flag & (STRHUP|STRDERR|STWRERR|STPLEX)) == 0 &&
-	    stp->sd_sidp == NULL &&		/* not allocated as ctty */
-	    sp->s_sidp == p->p_pidp &&		/* session leader */
-	    sp->s_flag != SESS_CLOSE &&		/* session is not closing */
-	    sp->s_vp == NULL) {			/* without ctty */
-		mutex_exit(&stp->sd_lock);
-		ASSERT(stp->sd_pgidp == NULL);
-		alloctty(p, makectty(stp->sd_vnode));
-		stralloctty(sp, stp);
-		mutex_enter(&stp->sd_lock);
-		stp->sd_flag |= STRISTTY;	/* just to be sure */
-	}
-	mutex_exit(&stp->sd_lock);
-}
-
 /*
- * enable first back queue with svc procedure.
- * Use pri == -1 to avoid the setqback
+ * Backenable the first queue upstream from `q' with a service procedure.
  */
 void
 backenable(queue_t *q, uchar_t pri)

@@ -685,9 +685,9 @@ streams_open:
 		/*
 		 * try to allocate it as a controlling terminal
 		 */
-		if ((stp->sd_flag & STRISTTY) && !(flag & FNOCTTY)) {
-			strctty(stp);
-		}
+		if ((stp->sd_flag & STRISTTY) && !(flag & FNOCTTY))
+			stralloctty(stp);
+
 		return (0);
 	}
 

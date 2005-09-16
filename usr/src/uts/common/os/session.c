@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,16 +35,11 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/file.h>
-#include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/errno.h>
 #include <sys/signal.h>
-#include <sys/pcb.h>
 #include <sys/cred.h>
 #include <sys/policy.h>
-#include <sys/user.h>
-#include <sys/buf.h>
-#include <sys/var.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
 #include <sys/proc.h>
@@ -55,10 +50,6 @@
 
 sess_t session0 = {
 	1,	/* s_ref   */
-	0555,	/* s_mode  */
-	0,	/* s_uid   */
-	0,	/* s_gid   */
-	0,	/* s_ctime */
 	NODEV,	/* s_dev   */
 	NULL,	/* s_vp    */
 	&pid0,	/* s_sidp  */
@@ -120,10 +111,8 @@ sess_create(void)
 void
 freectty(sess_t *sp)
 {
-	vnode_t *vp;
-	cred_t *cred;
-
-	vp = sp->s_vp;
+	vnode_t *vp = sp->s_vp;
+	cred_t *cred = sp->s_cred;
 
 	strfreectty(vp->v_stream);
 
@@ -134,16 +123,15 @@ freectty(sess_t *sp)
 	ASSERT(sp->s_cnt == 0);
 	ASSERT(vp->v_count >= 1);
 	sp->s_vp = NULL;
-	cred = sp->s_cred;
+	sp->s_cred = NULL;
 
 	/*
-	 * It is possible for the VOP_CLOSE below to call strctty
+	 * It is possible for the VOP_CLOSE below to call stralloctty()
 	 * and reallocate a new tty vnode.  To prevent that the
 	 * session is marked as closing here.
 	 */
 
 	sp->s_flag = SESS_CLOSE;
-	sp->s_cred = NULL;
 	mutex_exit(&sp->s_lock);
 
 	/*
@@ -166,14 +154,14 @@ freectty(sess_t *sp)
  * Used by privileged users to give a "clean" terminal at login
  */
 int
-vhangup()
+vhangup(void)
 {
 	if (secpolicy_sys_config(CRED(), B_FALSE) != 0)
 		return (set_errno(EPERM));
 	/*
 	 * This routine used to call freectty() under a condition that
 	 * could never happen.  So this code has never actually done
-	 * anything, and evidently nobody has ever noticed.  4098399.
+	 * anything, and evidently nobody has ever noticed.
 	 */
 	return (0);
 }
@@ -200,30 +188,4 @@ alloctty(proc_t *pp, vnode_t *vp)
 	crhold(crp = pp->p_cred);
 	mutex_exit(&pp->p_crlock);
 	sp->s_cred = crp;
-	sp->s_uid = crgetuid(crp);
-	sp->s_ctime = gethrestime_sec();
-	if (session0.s_mode & VSGID)
-		sp->s_gid = session0.s_gid;
-	else
-		sp->s_gid = crgetgid(crp);
-	sp->s_mode = (0666 & ~(PTOU(pp)->u_cmask));
-}
-
-int
-hascttyperm(sess_t *sp, cred_t *cr, mode_t mode)
-{
-	int shift = 0;
-
-	if (crgetuid(cr) != sp->s_uid) {
-		shift += 3;
-		if (!groupmember(sp->s_gid, cr))
-			shift += 3;
-	}
-
-	mode &= ~(sp->s_mode << shift);
-
-	if (mode == 0)
-		return (1);
-
-	return (secpolicy_vnode_access(cr, sp->s_vp, sp->s_uid, mode) == 0);
 }
