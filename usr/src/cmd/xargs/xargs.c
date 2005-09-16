@@ -212,8 +212,8 @@ main(int argc, char **argv)
 #else
 			if ((LEOF == NULL) || (*LEOF == NULL)) {
 #endif
-				ermsg(gettext("Must specify subargment to -E "
-					" flag\n"));
+				ermsg(gettext(
+				    "Option requires an argument: -%c\n"), c);
 			}
 			break;
 
@@ -221,11 +221,11 @@ main(int argc, char **argv)
 			/* -I replstr: Insert mode. replstr *is* required. */
 			INSERT = PER_LINE = LEGAL = TRUE;
 			N_ARGS = 0;
-			if (*optarg) {
+			if ((optarg != NULL) && (*optarg != '\0')) {
 				INSPAT = optarg;
 			} else {
-				ermsg(gettext("Must specify subargment "
-				    "for -I\n"));
+				ermsg(gettext(
+				    "Option requires an argument: -%c\n"), c);
 			}
 			break;
 
@@ -243,7 +243,7 @@ main(int argc, char **argv)
 
 			INSERT = PER_LINE = LEGAL = TRUE;
 			N_ARGS = 0;
-			if (optarg[0] != NULL) {
+			if ((optarg != NULL) && (*optarg != '\0')) {
 				INSPAT = optarg;
 			} else {
 				/*
@@ -266,7 +266,10 @@ main(int argc, char **argv)
 			PER_LINE = TRUE;
 			N_ARGS = 0;
 			INSERT = FALSE;
-			if (optarg && (PER_LINE = atoi(optarg)) <= 0) {
+			if ((optarg == NULL) || (*optarg == '\0')) {
+				ermsg(gettext(
+				    "Option requires an argument: -%c\n"), c);
+			} else if ((PER_LINE = atoi(optarg)) <= 0) {
 				ermsg(gettext("#lines must be positive "
 				    "int: %s\n"), optarg);
 			}
@@ -285,7 +288,7 @@ main(int argc, char **argv)
 			N_ARGS = 0;
 			INSERT = FALSE;
 
-			if (optarg[0] != NULL) {
+			if ((optarg != NULL) && (*optarg != '\0')) {
 				if ((PER_LINE = atoi(optarg)) <= 0)
 					PER_LINE = 1;
 			}
@@ -296,7 +299,10 @@ main(int argc, char **argv)
 			 * -n number: # stdin args.
 			 * number *is* required here:
 			 */
-			if ((N_ARGS = atoi(optarg)) <= 0) {
+			if ((optarg == NULL) || (*optarg == '\0')) {
+				ermsg(gettext(
+				    "Option requires an argument: -%c\n"), c);
+			} else if ((N_ARGS = atoi(optarg)) <= 0) {
 				ermsg(gettext("#args must be positive "
 				    "int: %s\n"), optarg);
 			} else {
@@ -306,10 +312,16 @@ main(int argc, char **argv)
 			break;
 
 		case 's':	/* -s size: set max size of each arg list */
-			BUFLIM = atoi(optarg);
-			if (BUFLIM > BUFSIZE || BUFLIM <= 0) {
-				ermsg(gettext("0 < max-cmd-line-size <= %d: "
-				    "%s\n"), BUFSIZE, optarg);
+			if ((optarg == NULL) || (*optarg == '\0')) {
+				ermsg(gettext(
+				    "Option requires an argument: -%c\n"), c);
+			} else {
+				BUFLIM = atoi(optarg);
+				if (BUFLIM > BUFSIZE || BUFLIM <= 0) {
+					ermsg(gettext(
+					    "0 < max-cmd-line-size <= %d: "
+					    "%s\n"), BUFSIZE, optarg);
+				}
 			}
 			break;
 
@@ -965,7 +977,7 @@ addibuf(struct inserts	*p)
 	linesize -= strlen(skel) + 1;
 	newarg = insert(skel, sub);
 	if (ERR)
-	    return;
+		return;
 
 	if (checklen(newarg)) {
 		if ((ibufsize += (l = strlen(newarg) + 1)) > MAXIBUF) {
@@ -1290,7 +1302,7 @@ process_special:
 #ifdef XPG6
 				if (av[i] != NULL) {
 					if ((mav[mac] = strdup(av[i]))
-						== NULL) {
+					    == NULL) {
 						perror(gettext("xargs: Memory"
 						    " allocation failure"));
 						exit(1);
@@ -1308,7 +1320,7 @@ process_special:
 				}
 				if ((mav[mac] = strdup(av[i])) == NULL) {
 					perror(gettext("xargs: Memory"
-						" allocation failure"));
+					    " allocation failure"));
 					exit(1);
 				}
 
