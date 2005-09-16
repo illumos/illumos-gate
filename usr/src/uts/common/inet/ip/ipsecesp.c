@@ -208,6 +208,7 @@ typedef struct {
 	kstat_named_t esp_stat_bad_decrypt;
 } esp_kstats_t;
 
+uint32_t esp_hash_size = IPSEC_DEFAULT_HASH_SIZE;
 #define	ESP_BUMP_STAT(x) (esp_kstats->esp_stat_ ## x).value.ui64++
 #define	ESP_DEBUMP_STAT(x) (esp_kstats->esp_stat_ ## x).value.ui64--
 
@@ -454,7 +455,7 @@ ipsecesp_ddi_init(void)
 
 	esp_sadb.s_acquire_timeout = &ipsecesp_acquire_timeout;
 	esp_sadb.s_acqfn = esp_send_acquire;
-	sadbp_init(&esp_sadb, SADB_SATYPE_ESP);
+	sadbp_init("ESP", &esp_sadb, SADB_SATYPE_ESP, esp_hash_size);
 
 	esp_taskq = taskq_create("esp_taskq", 1, minclsyspri,
 	    IPSEC_TASKQ_MIN, IPSEC_TASKQ_MAX, 0);
@@ -660,10 +661,10 @@ esp_age_bytes(ipsa_t *assoc, uint64_t bytes, boolean_t inbound)
 	if (inbound) {
 		inassoc = assoc;
 		if (isv6) {
-			outhash = OUTBOUND_HASH_V6(*((in6_addr_t *)
+			outhash = OUTBOUND_HASH_V6(sp, *((in6_addr_t *)
 			    &inassoc->ipsa_dstaddr));
 		} else {
-			outhash = OUTBOUND_HASH_V4(*((ipaddr_t *)
+			outhash = OUTBOUND_HASH_V4(sp, *((ipaddr_t *)
 				&inassoc->ipsa_dstaddr));
 		}
 		bucket = &sp->sdb_of[outhash];
@@ -681,7 +682,7 @@ esp_age_bytes(ipsa_t *assoc, uint64_t bytes, boolean_t inbound)
 		}
 	} else {
 		outassoc = assoc;
-		bucket = &sp->sdb_if[INBOUND_HASH(outassoc->ipsa_spi)];
+		bucket = INBOUND_BUCKET(sp, outassoc->ipsa_spi);
 		mutex_enter(&bucket->isaf_lock);
 		inassoc = ipsec_getassocbyspi(bucket, outassoc->ipsa_spi,
 		    outassoc->ipsa_srcaddr, outassoc->ipsa_dstaddr,
@@ -1019,10 +1020,10 @@ esp_set_usetime(ipsa_t *assoc, boolean_t inbound)
 	if (inbound) {
 		inassoc = assoc;
 		if (isv6) {
-			outhash = OUTBOUND_HASH_V6(*((in6_addr_t *)
+			outhash = OUTBOUND_HASH_V6(sp, *((in6_addr_t *)
 			    &inassoc->ipsa_dstaddr));
 		} else {
-			outhash = OUTBOUND_HASH_V4(*((ipaddr_t *)
+			outhash = OUTBOUND_HASH_V4(sp, *((ipaddr_t *)
 				&inassoc->ipsa_dstaddr));
 		}
 		bucket = &sp->sdb_of[outhash];
@@ -1040,7 +1041,7 @@ esp_set_usetime(ipsa_t *assoc, boolean_t inbound)
 		}
 	} else {
 		outassoc = assoc;
-		bucket = &sp->sdb_if[INBOUND_HASH(outassoc->ipsa_spi)];
+		bucket = INBOUND_BUCKET(sp, outassoc->ipsa_spi);
 		mutex_enter(&bucket->isaf_lock);
 		inassoc = ipsec_getassocbyspi(bucket, outassoc->ipsa_spi,
 		    outassoc->ipsa_srcaddr, outassoc->ipsa_dstaddr,
@@ -1397,14 +1398,14 @@ esp_getspi(mblk_t *mp, keysock_in_t *ksi)
 	 */
 
 	if (newbie->ipsa_addrfam == AF_INET6) {
-		outbound = &esp_sadb.s_v6.sdb_of[
-		    OUTBOUND_HASH_V6(*(uint32_t *)(newbie->ipsa_dstaddr))];
-		inbound = &esp_sadb.s_v6.sdb_if[INBOUND_HASH(newbie->ipsa_spi)];
+		outbound = OUTBOUND_BUCKET_V6(&esp_sadb.s_v6,
+		    *(uint32_t *)(newbie->ipsa_dstaddr));
+		inbound = INBOUND_BUCKET(&esp_sadb.s_v6, newbie->ipsa_spi);
 	} else {
 		ASSERT(newbie->ipsa_addrfam == AF_INET);
-		outbound = &esp_sadb.s_v4.sdb_of[
-		    OUTBOUND_HASH_V4(*(uint32_t *)(newbie->ipsa_dstaddr))];
-		inbound = &esp_sadb.s_v4.sdb_if[INBOUND_HASH(newbie->ipsa_spi)];
+		outbound = OUTBOUND_BUCKET_V4(&esp_sadb.s_v4,
+		    *(uint32_t *)(newbie->ipsa_dstaddr));
+		inbound = INBOUND_BUCKET(&esp_sadb.s_v4, newbie->ipsa_spi);
 	}
 
 	mutex_enter(&outbound->isaf_lock);
@@ -2821,13 +2822,13 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 	if (is_ipv4) {
 		sp = &esp_sadb.s_v4;
 		dstaddr = (uint32_t *)(&dst->sin_addr);
-		outhash = OUTBOUND_HASH_V4(*(ipaddr_t *)dstaddr);
+		outhash = OUTBOUND_HASH_V4(sp, *(ipaddr_t *)dstaddr);
 	} else {
 		sp = &esp_sadb.s_v6;
 		dstaddr = (uint32_t *)(&dst6->sin6_addr);
-		outhash = OUTBOUND_HASH_V6(*(in6_addr_t *)dstaddr);
+		outhash = OUTBOUND_HASH_V6(sp, *(in6_addr_t *)dstaddr);
 	}
-	inbound = &sp->sdb_if[INBOUND_HASH(assoc->sadb_sa_spi)];
+	inbound = INBOUND_BUCKET(sp, assoc->sadb_sa_spi);
 	switch (ksi->ks_in_dsttype) {
 	case KS_IN_ADDR_MBCAST:
 		clone = B_TRUE;	/* All mcast SAs can be bidirectional */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -529,6 +529,7 @@ ipsec_outbound_sa(mblk_t *mp, uint_t proto)
 	in6_addr_t dst6;
 	ipsa_t **sa;
 	sadbp_t *sadbp;
+	sadb_t *sp;
 	sa_family_t af;
 
 	data_mp = mp->b_cont;
@@ -550,6 +551,7 @@ ipsec_outbound_sa(mblk_t *mp, uint_t proto)
 
 		ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
 		dst = ip_get_dst(ipha);
+		sp = &sadbp->s_v4;
 		af = AF_INET;
 
 		/*
@@ -557,7 +559,7 @@ ipsec_outbound_sa(mblk_t *mp, uint_t proto)
 		 *	painful.  ipsec_getassocbyconn() will require more
 		 *	parameters as policy implementations mature.
 		 */
-		bucket = &sadbp->s_v4.sdb_of[OUTBOUND_HASH_V4(dst)];
+		bucket = OUTBOUND_BUCKET_V4(sp, dst);
 		src_ptr = (uint32_t *)&ipha->ipha_src;
 		dst_ptr = (uint32_t *)&dst;
 	} else {
@@ -568,9 +570,10 @@ ipsec_outbound_sa(mblk_t *mp, uint_t proto)
 		af = AF_INET6;
 
 		bzero(&ipp, sizeof (ipp));
+		sp = &sadbp->s_v6;
 
 		/* Same NOTE: applies here! */
-		bucket = &sadbp->s_v6.sdb_of[OUTBOUND_HASH_V6(dst6)];
+		bucket = OUTBOUND_BUCKET_V6(sp, dst6);
 		src_ptr = (uint32_t *)&ip6h->ip6_src;
 		dst_ptr = (uint32_t *)&dst6;
 	}
@@ -611,6 +614,7 @@ ipsec_inbound_ah_sa(mblk_t *mp)
 	int ah_offset;
 	uint32_t *src_ptr, *dst_ptr;
 	int pullup_len;
+	sadb_t *sp;
 	sa_family_t af;
 
 	IP_AH_BUMP_STAT(in_requests);
@@ -661,16 +665,16 @@ ipsec_inbound_ah_sa(mblk_t *mp)
 	if (isv6) {
 		src_ptr = (uint32_t *)&ip6h->ip6_src;
 		dst_ptr = (uint32_t *)&ip6h->ip6_dst;
-		hptr = ah_sadb.s_v6.sdb_if;
+		sp = &ah_sadb.s_v6;
 		af = AF_INET6;
 	} else {
 		src_ptr = (uint32_t *)&ipha->ipha_src;
 		dst_ptr = (uint32_t *)&ipha->ipha_dst;
-		hptr = ah_sadb.s_v4.sdb_if;
+		sp = &ah_sadb.s_v4;
 		af = AF_INET;
 	}
 
-	hptr += INBOUND_HASH(ah->ah_spi);
+	hptr = INBOUND_BUCKET(sp, ah->ah_spi);
 	mutex_enter(&hptr->isaf_lock);
 	assoc = ipsec_getassocbyspi(hptr, ah->ah_spi, src_ptr, dst_ptr, af);
 	mutex_exit(&hptr->isaf_lock);
@@ -724,6 +728,7 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp)
 	uint_t preamble;
 	sa_family_t af;
 	boolean_t isv6;
+	sadb_t *sp;
 
 	IP_ESP_BUMP_STAT(in_requests);
 	ASSERT(ipsec_in_mp->b_datap->db_type == M_CTL);
@@ -788,7 +793,7 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp)
 			preamble = sizeof (ip6_t);
 		}
 
-		bucket = esp_sadb.s_v6.sdb_if;
+		sp = &esp_sadb.s_v6;
 		af = AF_INET6;
 	} else {
 		ipha = (ipha_t *)data_mp->b_rptr;
@@ -796,14 +801,14 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp)
 		dst_ptr = (uint32_t *)&ipha->ipha_dst;
 		preamble = IPH_HDR_LENGTH(ipha);
 
-		bucket = esp_sadb.s_v4.sdb_if;
+		sp = &esp_sadb.s_v4;
 		af = AF_INET;
 	}
 
 	esph = (esph_t *)(data_mp->b_rptr + preamble);
 
 	/* Since hash is common on inbound (SPI value), hash here. */
-	bucket += INBOUND_HASH(esph->esph_spi);
+	bucket = INBOUND_BUCKET(sp, esph->esph_spi);
 	mutex_enter(&bucket->isaf_lock);
 	ipsa = ipsec_getassocbyspi(bucket, esph->esph_spi, src_ptr, dst_ptr,
 	    af);

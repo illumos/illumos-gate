@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -423,6 +423,7 @@ natty_rput_pkt(queue_t *q, mblk_t *mp)
 	uint16_t tmp_len;
 	int ntries = 0;
 	nattyinfo_t *ni = q->q_ptr;
+	sadb_t *sp;
 
 	if (!ni->ni_rh_set) {
 #ifdef DEBUG
@@ -536,7 +537,8 @@ natty_rput_pkt(queue_t *q, mblk_t *mp)
 		iph_mp->b_wptr -= UDPH_SIZE;
 
 		/* we are v4 only */
-		bucket = &(esp_sadb.s_v4.sdb_if[INBOUND_HASH(spi)]);
+		sp = &esp_sadb.s_v4;
+		bucket = INBOUND_BUCKET(sp, spi);
 
 		mutex_enter(&bucket->isaf_lock);
 		ipsa = ipsec_getassocbyspi(bucket, spi,

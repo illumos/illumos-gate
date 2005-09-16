@@ -78,6 +78,8 @@ static mblk_t *sadb_extended_acquire(ipsec_selector_t *, ipsec_policy_t *,
 static void sadb_ill_df(ill_t *, mblk_t *, isaf_t *, int, boolean_t);
 static ipsa_t *sadb_torch_assoc(isaf_t *, ipsa_t *, boolean_t, mblk_t **);
 static void sadb_drain_torchq(queue_t *q, mblk_t *);
+static void sadb_destroy_acqlist(iacqf_t **, uint_t, boolean_t);
+static void sadb_destroy(sadb_t *sp);
 
 static time_t sadb_add_time(time_t base, uint64_t delta);
 
@@ -362,57 +364,107 @@ sadb_makelarvalassoc(uint32_t spi, uint32_t *src, uint32_t *dst, int addrfam)
 /*
  * Call me to initialize a security association fanout.
  */
-static void
-sadb_init_fanout(isaf_t **tablep, uint_t numentries)
+static int
+sadb_init_fanout(isaf_t **tablep, uint_t size, int kmflag)
 {
 	isaf_t *table;
 	int i;
 
-	table = (isaf_t *)kmem_alloc(numentries * sizeof (*table), KM_SLEEP);
+	table = (isaf_t *)kmem_alloc(size * sizeof (*table), kmflag);
 	*tablep = table;
 
-	for (i = 0; i < numentries; i++) {
+	if (table == NULL)
+		return (ENOMEM);
+
+	for (i = 0; i < size; i++) {
 		mutex_init(&(table[i].isaf_lock), NULL, MUTEX_DEFAULT, NULL);
 		table[i].isaf_ipsa = NULL;
 		table[i].isaf_gen = 0;
 	}
+
+	return (0);
 }
 
-static void
-sadb_init_acfanout(iacqf_t **tablep, uint_t numentries)
+/*
+ * Call me to initialize an acquire fanout
+ */
+static int
+sadb_init_acfanout(iacqf_t **tablep, uint_t size, int kmflag)
 {
 	iacqf_t *table;
 	int i;
 
-	table = (iacqf_t *)kmem_alloc(numentries * sizeof (*table), KM_SLEEP);
+	table = (iacqf_t *)kmem_alloc(size * sizeof (*table), kmflag);
 	*tablep = table;
 
-	for (i = 0; i < numentries; i++) {
+	if (table == NULL)
+		return (ENOMEM);
+
+	for (i = 0; i < size; i++) {
 		mutex_init(&(table[i].iacqf_lock), NULL, MUTEX_DEFAULT, NULL);
 		table[i].iacqf_ipsacq = NULL;
 	}
+
+	return (0);
 }
 
 /*
- * call me to initialize an SADB instance.
+ * Attempt to initialize an SADB instance.  On failure, return ENOMEM;
+ * caller must clean up partial allocations.
  */
-
-static void
-sadb_init(sadb_t *sp)
+static int
+sadb_init_trial(sadb_t *sp, uint_t size, int kmflag)
 {
-	sadb_init_fanout(&sp->sdb_of, OUTBOUND_BUCKETS);
-	sadb_init_fanout(&sp->sdb_if, INBOUND_BUCKETS);
-	sadb_init_acfanout(&sp->sdb_acq, OUTBOUND_BUCKETS);
+	ASSERT(sp->sdb_of == NULL);
+	ASSERT(sp->sdb_if == NULL);
+	ASSERT(sp->sdb_acq == NULL);
+
+	sp->sdb_hashsize = size;
+	if (sadb_init_fanout(&sp->sdb_of, size, kmflag) != 0)
+		return (ENOMEM);
+	if (sadb_init_fanout(&sp->sdb_if, size, kmflag) != 0)
+		return (ENOMEM);
+	if (sadb_init_acfanout(&sp->sdb_acq, size, kmflag) != 0)
+		return (ENOMEM);
+
+	return (0);
 }
+
+/*
+ * Call me to initialize an SADB instance; fall back to default size on failure.
+ */
+static void
+sadb_init(const char *name, sadb_t *sp, uint_t size, uint_t ver)
+{
+	ASSERT(sp->sdb_of == NULL);
+	ASSERT(sp->sdb_if == NULL);
+	ASSERT(sp->sdb_acq == NULL);
+
+	if (size < IPSEC_DEFAULT_HASH_SIZE)
+		size = IPSEC_DEFAULT_HASH_SIZE;
+
+	if (sadb_init_trial(sp, size, KM_NOSLEEP) != 0) {
+
+		cmn_err(CE_WARN,
+		    "Unable to allocate %u entry IPv%u %s SADB hash table",
+		    size, ver, name);
+
+		sadb_destroy(sp);
+		size = IPSEC_DEFAULT_HASH_SIZE;
+		cmn_err(CE_WARN, "Falling back to %d entries", size);
+		(void) sadb_init_trial(sp, size, KM_SLEEP);
+	}
+}
+
 
 /*
  * Initialize an SADB-pair.
  */
 void
-sadbp_init(sadbp_t *sp, int type)
+sadbp_init(const char *name, sadbp_t *sp, int type, int size)
 {
-	sadb_init(&sp->s_v4);
-	sadb_init(&sp->s_v6);
+	sadb_init(name, &sp->s_v4, size, 4);
+	sadb_init(name, &sp->s_v6, size, 6);
 
 	sp->s_satype = type;
 
@@ -542,13 +594,13 @@ sadb_dump(queue_t *pfkey_q, mblk_t *mp, minor_t serial, sadb_t *sp)
 
 	/* Dump outbound */
 	error = sadb_dump_fanout(pfkey_q, mp, serial, sp->sdb_of,
-	    OUTBOUND_BUCKETS, B_TRUE);
+	    sp->sdb_hashsize, B_TRUE);
 	if (error)
 		return (error);
 
 	/* Dump inbound */
 	return sadb_dump_fanout(pfkey_q, mp, serial, sp->sdb_if,
-	    INBOUND_BUCKETS, B_FALSE);
+	    sp->sdb_hashsize, B_FALSE);
 }
 
 /*
@@ -896,8 +948,8 @@ sadb_ill_download(ill_t *ill, uint_t sa_type)
 	 * and dl_ct_ipsec_t
 	 */
 	sp = ill->ill_isv6 ? &(spp->s_v6) : &(spp->s_v4);
-	sadb_ill_df(ill, protomp, sp->sdb_of, OUTBOUND_BUCKETS, B_FALSE);
-	sadb_ill_df(ill, protomp, sp->sdb_if, INBOUND_BUCKETS, B_TRUE);
+	sadb_ill_df(ill, protomp, sp->sdb_of, sp->sdb_hashsize, B_FALSE);
+	sadb_ill_df(ill, protomp, sp->sdb_if, sp->sdb_hashsize, B_TRUE);
 	freemsg(protomp);
 }
 
@@ -908,9 +960,13 @@ sadb_ill_download(ill_t *ill, uint_t sa_type)
  * when a module is unloaded).
  */
 static void
-sadb_destroyer(isaf_t *table, uint_t numentries, boolean_t forever)
+sadb_destroyer(isaf_t **tablep, uint_t numentries, boolean_t forever)
 {
 	int i;
+	isaf_t *table = *tablep;
+
+	if (table == NULL)
+		return;
 
 	for (i = 0; i < numentries; i++) {
 		mutex_enter(&table[i].isaf_lock);
@@ -922,8 +978,10 @@ sadb_destroyer(isaf_t *table, uint_t numentries, boolean_t forever)
 			mutex_destroy(&(table[i].isaf_lock));
 	}
 
-	if (forever)
+	if (forever) {
+		*tablep = NULL;
 		kmem_free(table, numentries * sizeof (*table));
+	}
 }
 
 /*
@@ -938,21 +996,25 @@ sadb_flush(sadb_t *sp)
 	 * heels of a flush.  With keysock's enforcement, however, this
 	 * makes ESP's job easy.
 	 */
-	sadb_destroyer(sp->sdb_of, OUTBOUND_BUCKETS, B_FALSE);
-	sadb_destroyer(sp->sdb_if, INBOUND_BUCKETS, B_FALSE);
+	sadb_destroyer(&sp->sdb_of, sp->sdb_hashsize, B_FALSE);
+	sadb_destroyer(&sp->sdb_if, sp->sdb_hashsize, B_FALSE);
 
 	/* For each acquire, destroy it; leave the bucket mutex alone. */
-	sadb_destroy_acqlist(sp->sdb_acq, OUTBOUND_BUCKETS, B_FALSE);
+	sadb_destroy_acqlist(&sp->sdb_acq, sp->sdb_hashsize, B_FALSE);
 }
 
 static void
 sadb_destroy(sadb_t *sp)
 {
-	sadb_destroyer(sp->sdb_of, OUTBOUND_BUCKETS, B_TRUE);
-	sadb_destroyer(sp->sdb_if, INBOUND_BUCKETS, B_TRUE);
+	sadb_destroyer(&sp->sdb_of, sp->sdb_hashsize, B_TRUE);
+	sadb_destroyer(&sp->sdb_if, sp->sdb_hashsize, B_TRUE);
 
 	/* For each acquire, destroy it, including the bucket mutex. */
-	sadb_destroy_acqlist(sp->sdb_acq, OUTBOUND_BUCKETS, B_TRUE);
+	sadb_destroy_acqlist(&sp->sdb_acq, sp->sdb_hashsize, B_TRUE);
+
+	ASSERT(sp->sdb_of == NULL);
+	ASSERT(sp->sdb_if == NULL);
+	ASSERT(sp->sdb_acq == NULL);
 }
 
 static void
@@ -2199,9 +2261,9 @@ sadb_purge_sa(mblk_t *mp, keysock_in_t *ksi, sadb_t *sp,
 	 * the correct bucket in the outbound table.
 	 */
 	ps.inbnd = B_TRUE;
-	sadb_walker(sp->sdb_if, INBOUND_BUCKETS, sadb_purge_cb, &ps);
+	sadb_walker(sp->sdb_if, sp->sdb_hashsize, sadb_purge_cb, &ps);
 	ps.inbnd = B_FALSE;
-	sadb_walker(sp->sdb_of, OUTBOUND_BUCKETS, sadb_purge_cb, &ps);
+	sadb_walker(sp->sdb_of, sp->sdb_hashsize, sadb_purge_cb, &ps);
 
 	if (ps.mq != NULL)
 		sadb_drain_torchq(ip_q, ps.mq);
@@ -2264,7 +2326,7 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 			srcaddr = ALL_ZEROES_PTR;
 		}
 
-		outbound = &sp->sdb_of[OUTBOUND_HASH_V6(*(uint32_t *)dstaddr)];
+		outbound = OUTBOUND_BUCKET_V6(sp, *(uint32_t *)dstaddr);
 	} else {
 		sp = &spp->s_v4;
 		dstaddr = (uint32_t *)&dst->sin_addr;
@@ -2278,10 +2340,10 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 		} else {
 			srcaddr = ALL_ZEROES_PTR;
 		}
-		outbound = &sp->sdb_of[OUTBOUND_HASH_V4(*(uint32_t *)dstaddr)];
+		outbound = OUTBOUND_BUCKET_V4(sp, *(uint32_t *)dstaddr);
 	}
 
-	inbound = &sp->sdb_if[INBOUND_HASH(assoc->sadb_sa_spi)];
+	inbound = INBOUND_BUCKET(sp, assoc->sadb_sa_spi);
 
 	/* Lock down both buckets. */
 	mutex_enter(&outbound->isaf_lock);
@@ -3313,7 +3375,7 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay)
 
 	/* Age acquires. */
 
-	for (i = 0; i < OUTBOUND_BUCKETS; i++) {
+	for (i = 0; i < sp->sdb_hashsize; i++) {
 		acqlist = &sp->sdb_acq[i];
 		mutex_enter(&acqlist->iacqf_lock);
 		for (acqrec = acqlist->iacqf_ipsacq; acqrec != NULL;
@@ -3326,7 +3388,7 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay)
 	}
 
 	/* Age inbound associations. */
-	for (i = 0; i < INBOUND_BUCKETS; i++) {
+	for (i = 0; i < sp->sdb_hashsize; i++) {
 		bucket = &(sp->sdb_if[i]);
 		mutex_enter(&bucket->isaf_lock);
 		for (assoc = bucket->isaf_ipsa; assoc != NULL;
@@ -3373,11 +3435,11 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay)
 		 * Pick peer bucket based on addrfam.
 		 */
 		if (spare->ipsa_addrfam == AF_INET6) {
-			outhash = OUTBOUND_HASH_V6(*((in6_addr_t *)
-			    &spare->ipsa_dstaddr));
+			outhash = OUTBOUND_HASH_V6(sp,
+			    *((in6_addr_t *)&spare->ipsa_dstaddr));
 		} else {
-			outhash = OUTBOUND_HASH_V4(*((ipaddr_t *)
-			    &spare->ipsa_dstaddr));
+			outhash = OUTBOUND_HASH_V4(sp,
+			    *((ipaddr_t *)&spare->ipsa_dstaddr));
 		}
 		bucket = &(sp->sdb_of[outhash]);
 
@@ -3400,7 +3462,7 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay)
 	}
 
 	/* Age outbound associations. */
-	for (i = 0; i < OUTBOUND_BUCKETS; i++) {
+	for (i = 0; i < sp->sdb_hashsize; i++) {
 		bucket = &(sp->sdb_of[i]);
 		mutex_enter(&bucket->isaf_lock);
 		for (assoc = bucket->isaf_ipsa; assoc != NULL;
@@ -3445,7 +3507,7 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay)
 		/*
 		 * Pick peer bucket based on addrfam.
 		 */
-		bucket = &(sp->sdb_if[INBOUND_HASH(spare->ipsa_spi)]);
+		bucket = INBOUND_BUCKET(sp, spare->ipsa_spi);
 		mutex_enter(&bucket->isaf_lock);
 		assoc = ipsec_getassocbyspi(bucket, spare->ipsa_spi,
 		    spare->ipsa_srcaddr, spare->ipsa_dstaddr,
@@ -3644,9 +3706,10 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 	if (af == AF_INET6) {
 		dst6 = (struct sockaddr_in6 *)dst;
 		src6 = (struct sockaddr_in6 *)src;
+
 		srcaddr = (uint32_t *)&src6->sin6_addr;
 		dstaddr = (uint32_t *)&dst6->sin6_addr;
-		outbound = &sp->sdb_of[OUTBOUND_HASH_V6(*(uint32_t *)dstaddr)];
+		outbound = OUTBOUND_BUCKET_V6(sp, *(uint32_t *)dstaddr);
 #if 0
 		/* Not used for now... */
 		if (proxyext != NULL)
@@ -3655,9 +3718,9 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 	} else {
 		srcaddr = (uint32_t *)&src->sin_addr;
 		dstaddr = (uint32_t *)&dst->sin_addr;
-		outbound = &sp->sdb_of[OUTBOUND_HASH_V4(*(uint32_t *)dstaddr)];
+		outbound = OUTBOUND_BUCKET_V4(sp, *(uint32_t *)dstaddr);
 	}
-	inbound = &sp->sdb_if[INBOUND_HASH(assoc->sadb_sa_spi)];
+	inbound = INBOUND_BUCKET(sp, assoc->sadb_sa_spi);
 
 	/* Lock down both buckets. */
 	mutex_enter(&outbound->isaf_lock);
@@ -3928,7 +3991,7 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 		sel.ips_local_addr_v4 = ipha->ipha_src;
 		sel.ips_remote_addr_v4 = ipha->ipha_dst;
 		af = AF_INET;
-		hashoffset = OUTBOUND_HASH_V4(ipha->ipha_dst);
+		hashoffset = OUTBOUND_HASH_V4(sp, ipha->ipha_dst);
 		ASSERT(io->ipsec_out_v4 == B_TRUE);
 	} else {
 		ASSERT(IPH_HDR_VERSION(ipha) == IPV6_VERSION);
@@ -3937,7 +4000,7 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 		sel.ips_local_addr_v6 = ip6h->ip6_src;
 		sel.ips_remote_addr_v6 = ip6h->ip6_dst;
 		af = AF_INET6;
-		hashoffset = OUTBOUND_HASH_V6(ip6h->ip6_dst);
+		hashoffset = OUTBOUND_HASH_V6(sp, ip6h->ip6_dst);
 		ASSERT(io->ipsec_out_v4 == B_FALSE);
 	}
 
@@ -4113,10 +4176,14 @@ sadb_destroy_acquire(ipsacq_t *acqrec)
 /*
  * Destroy an acquire list fanout.
  */
-void
-sadb_destroy_acqlist(iacqf_t *list, uint_t numentries, boolean_t forever)
+static void
+sadb_destroy_acqlist(iacqf_t **listp, uint_t numentries, boolean_t forever)
 {
 	int i;
+	iacqf_t *list = *listp;
+
+	if (list == NULL)
+		return;
 
 	for (i = 0; i < numentries; i++) {
 		mutex_enter(&(list[i].iacqf_lock));
@@ -4127,8 +4194,10 @@ sadb_destroy_acqlist(iacqf_t *list, uint_t numentries, boolean_t forever)
 			mutex_destroy(&(list[i].iacqf_lock));
 	}
 
-	if (forever)
+	if (forever) {
+		*listp = NULL;
 		kmem_free(list, numentries * sizeof (*list));
+	}
 }
 
 static uint8_t *
@@ -4592,7 +4661,7 @@ sadb_in_acquire(sadb_msg_t *samsg, sadbp_t *sp, queue_t *ip_q)
 	 * Q: Do I want to reject if pid != 0?
 	 */
 
-	for (i = 0; i < OUTBOUND_BUCKETS; i++) {
+	for (i = 0; i < sp->s_v4.sdb_hashsize; i++) {
 		bucket = &sp->s_v4.sdb_acq[i];
 		mutex_enter(&bucket->iacqf_lock);
 		for (acqrec = bucket->iacqf_ipsacq; acqrec != NULL;
@@ -4604,20 +4673,24 @@ sadb_in_acquire(sadb_msg_t *samsg, sadbp_t *sp, queue_t *ip_q)
 			break;	/* for i = 0... loop. */
 
 		mutex_exit(&bucket->iacqf_lock);
-
-		/* And then check the corresponding v6 bucket. */
-		bucket = &sp->s_v6.sdb_acq[i];
-		mutex_enter(&bucket->iacqf_lock);
-		for (acqrec = bucket->iacqf_ipsacq; acqrec != NULL;
-		    acqrec = acqrec->ipsacq_next) {
-			if (samsg->sadb_msg_seq == acqrec->ipsacq_seq)
-				break;	/* for acqrec... loop. */
-		}
-		if (acqrec != NULL)
-			break;	/* for i = 0... loop. */
-
-		mutex_exit(&bucket->iacqf_lock);
 	}
+
+	if (acqrec == NULL) {
+		for (i = 0; i < sp->s_v6.sdb_hashsize; i++) {
+			bucket = &sp->s_v6.sdb_acq[i];
+			mutex_enter(&bucket->iacqf_lock);
+			for (acqrec = bucket->iacqf_ipsacq; acqrec != NULL;
+			    acqrec = acqrec->ipsacq_next) {
+				if (samsg->sadb_msg_seq == acqrec->ipsacq_seq)
+					break;	/* for acqrec... loop. */
+			}
+			if (acqrec != NULL)
+				break;	/* for i = 0... loop. */
+
+			mutex_exit(&bucket->iacqf_lock);
+		}
+	}
+
 
 	if (acqrec == NULL)
 		return;
@@ -5423,8 +5496,9 @@ sadb_alg_update_cb(isaf_t *head, ipsa_t *entry, void *cookie)
  * context templates associated with SAs if needed.
  */
 
-#define	SADB_ALG_UPDATE_WALK(table, numentries) \
-    sadb_walker(table, numentries, sadb_alg_update_cb, &update_state);
+#define	SADB_ALG_UPDATE_WALK(sadb, table) \
+    sadb_walker((sadb).table, (sadb).sdb_hashsize, sadb_alg_update_cb, \
+	&update_state)
 
 void
 sadb_alg_update(ipsec_algtype_t alg_type, uint8_t alg_id, boolean_t is_added)
@@ -5437,17 +5511,17 @@ sadb_alg_update(ipsec_algtype_t alg_type, uint8_t alg_id, boolean_t is_added)
 
 	if (alg_type == IPSEC_ALG_AUTH) {
 		/* walk the AH tables only for auth. algorithm changes */
-		SADB_ALG_UPDATE_WALK(ah_sadb.s_v4.sdb_of, OUTBOUND_BUCKETS);
-		SADB_ALG_UPDATE_WALK(ah_sadb.s_v4.sdb_if, INBOUND_BUCKETS);
-		SADB_ALG_UPDATE_WALK(ah_sadb.s_v6.sdb_of, OUTBOUND_BUCKETS);
-		SADB_ALG_UPDATE_WALK(ah_sadb.s_v6.sdb_if, INBOUND_BUCKETS);
+		SADB_ALG_UPDATE_WALK(ah_sadb.s_v4, sdb_of);
+		SADB_ALG_UPDATE_WALK(ah_sadb.s_v4, sdb_if);
+		SADB_ALG_UPDATE_WALK(ah_sadb.s_v6, sdb_of);
+		SADB_ALG_UPDATE_WALK(ah_sadb.s_v6, sdb_if);
 	}
 
 	/* walk the ESP tables */
-	SADB_ALG_UPDATE_WALK(esp_sadb.s_v4.sdb_of, OUTBOUND_BUCKETS);
-	SADB_ALG_UPDATE_WALK(esp_sadb.s_v4.sdb_if, INBOUND_BUCKETS);
-	SADB_ALG_UPDATE_WALK(esp_sadb.s_v6.sdb_of, OUTBOUND_BUCKETS);
-	SADB_ALG_UPDATE_WALK(esp_sadb.s_v6.sdb_if, INBOUND_BUCKETS);
+	SADB_ALG_UPDATE_WALK(esp_sadb.s_v4, sdb_of);
+	SADB_ALG_UPDATE_WALK(esp_sadb.s_v4, sdb_if);
+	SADB_ALG_UPDATE_WALK(esp_sadb.s_v6, sdb_of);
+	SADB_ALG_UPDATE_WALK(esp_sadb.s_v6, sdb_if);
 }
 
 /*
@@ -5611,6 +5685,8 @@ sadb_clear_timeouts_walker(isaf_t *head, ipsa_t *ipsa, void *q)
 void
 sadb_clear_timeouts(queue_t *q)
 {
-	sadb_walker(esp_sadb.s_v4.sdb_if, INBOUND_BUCKETS,
+	sadb_t *sp = &esp_sadb.s_v4;
+
+	sadb_walker(sp->sdb_if, sp->sdb_hashsize,
 	    sadb_clear_timeouts_walker, q);
 }

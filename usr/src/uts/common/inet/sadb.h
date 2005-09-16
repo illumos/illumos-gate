@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -289,22 +289,25 @@ typedef struct ipsa_s {
  * Security association hash macros and definitions.  For now, assume the
  * IPsec model, and hash outbounds on destination address, and inbounds on
  * SPI.
- *
- * Also assume a 256 bucket hash.
  */
-#define	OUTBOUND_BUCKETS 256
-/* Outbound hash treats v4addr like a 32-bit quantity */
-#define	OUTBOUND_HASH_V4(v4addr) (((uint32_t)(v4addr) ^ \
-	(((uint32_t)v4addr) >> 8) ^ (((uint32_t)v4addr) >> 16) ^ \
-	(((uint32_t)v4addr) >> 24)) & 0xff)
-/* Its v6 counterpart treats v6addr like something I can take the address of. */
-#define	OUTBOUND_HASH_V6(v6addr) OUTBOUND_HASH_V4((*(uint32_t *)&(v6addr)) ^ \
-	(*((uint32_t *)&(v6addr)) + 1) ^ (*((uint32_t *)&(v6addr)) + 2) ^ \
-	(*((uint32_t *)&(v6addr)) + 3))
 
-/* No v4/v6 distinction needed for inbound. */
-#define	INBOUND_BUCKETS 256
-#define	INBOUND_HASH(spi) OUTBOUND_HASH_V4(spi)
+#define	IPSEC_DEFAULT_HASH_SIZE 256
+
+#define	INBOUND_HASH(sadb, spi) ((spi) % ((sadb)->sdb_hashsize))
+#define	OUTBOUND_HASH_V4(sadb, v4addr) ((v4addr) % ((sadb)->sdb_hashsize))
+#define	OUTBOUND_HASH_V6(sadb, v6addr) OUTBOUND_HASH_V4((sadb), \
+	(*(uint32_t *)&(v6addr)) ^ (*((uint32_t *)&(v6addr)) + 1) ^ \
+	(*((uint32_t *)&(v6addr)) + 2) ^ (*((uint32_t *)&(v6addr)) + 3))
+
+/*
+ * Syntactic sugar to find the appropriate hash bucket directly.
+ */
+
+#define	INBOUND_BUCKET(sadb, spi) &(((sadb)->sdb_if)[INBOUND_HASH(sadb, spi)])
+#define	OUTBOUND_BUCKET_V4(sadb, v4addr) \
+	&(((sadb)->sdb_of)[OUTBOUND_HASH_V4(sadb, v4addr)])
+#define	OUTBOUND_BUCKET_V6(sadb, v6addr) \
+	&(((sadb)->sdb_of)[OUTBOUND_HASH_V6(sadb, v6addr)])
 
 #define	IPSA_F_PFS	SADB_SAFLAGS_PFS	/* PFS in use for this SA? */
 #define	IPSA_F_NOREPFLD	SADB_SAFLAGS_NOREPLAY	/* No replay field, for */
@@ -428,6 +431,7 @@ typedef struct sadb_s
 	isaf_t	*sdb_of;
 	isaf_t	*sdb_if;
 	iacqf_t	*sdb_acq;
+	int	sdb_hashsize;
 } sadb_t;
 
 /*
@@ -503,7 +507,7 @@ ipsa_t *ipsec_getassocbyconn(isaf_t *, ipsec_out_t *, uint32_t *, uint32_t *,
 int sadb_insertassoc(ipsa_t *, isaf_t *);
 
 /* SA table construction and destruction. */
-void sadbp_init(sadbp_t *, int);
+void sadbp_init(const char *name, sadbp_t *, int, int);
 void sadbp_flush(sadbp_t *);
 void sadbp_destroy(sadbp_t *);
 
@@ -538,7 +542,6 @@ int sadb_update_sa(mblk_t *, keysock_in_t *, sadb_t *,
 void sadb_acquire(mblk_t *, ipsec_out_t *, boolean_t, boolean_t);
 
 void sadb_destroy_acquire(ipsacq_t *);
-void sadb_destroy_acqlist(iacqf_t *, uint_t, boolean_t);
 uint8_t *sadb_setup_acquire(uint8_t *, uint8_t *, ipsacq_t *);
 ipsa_t *sadb_getspi(keysock_in_t *, uint32_t, int *);
 void sadb_in_acquire(sadb_msg_t *, sadbp_t *, queue_t *);

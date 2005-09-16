@@ -209,6 +209,7 @@ typedef struct
 #define	AH_BUMP_STAT(x) (ah_kstats->ah_stat_ ## x).value.ui64++
 #define	AH_DEBUMP_STAT(x) (ah_kstats->ah_stat_ ## x).value.ui64--
 
+uint32_t ah_hash_size = IPSEC_DEFAULT_HASH_SIZE;
 static kstat_t *ah_ksp;
 static ah_kstats_t *ah_kstats;
 
@@ -399,7 +400,8 @@ ipsecah_ddi_init(void)
 
 	ah_sadb.s_acquire_timeout = &ipsecah_acquire_timeout;
 	ah_sadb.s_acqfn = ah_send_acquire;
-	sadbp_init(&ah_sadb, SADB_SATYPE_AH);
+
+	sadbp_init("AH", &ah_sadb, SADB_SATYPE_AH, ah_hash_size);
 
 	mutex_init(&ipsecah_param_lock, NULL, MUTEX_DEFAULT, 0);
 
@@ -865,15 +867,15 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 	if (is_ipv4) {
 		sp = &ah_sadb.s_v4;
 		dstaddr = (uint32_t *)(&dst->sin_addr);
-		outhash = OUTBOUND_HASH_V4(*(ipaddr_t *)dstaddr);
+		outhash = OUTBOUND_HASH_V4(sp, *(ipaddr_t *)dstaddr);
 	} else {
 		ASSERT(dst->sin_family == AF_INET6);
 		sp = &ah_sadb.s_v6;
 		dstaddr = (uint32_t *)(&dst6->sin6_addr);
-		outhash = OUTBOUND_HASH_V6(*(in6_addr_t *)dstaddr);
+		outhash = OUTBOUND_HASH_V6(sp, *(in6_addr_t *)dstaddr);
 	}
 
-	inbound = &sp->sdb_if[INBOUND_HASH(assoc->sadb_sa_spi)];
+	inbound = INBOUND_BUCKET(sp, assoc->sadb_sa_spi);
 
 	switch (ksi->ks_in_dsttype) {
 	case KS_IN_ADDR_MBCAST:
@@ -896,7 +898,7 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 		break;
 	case KS_IN_ADDR_NOTME:
 		primary = &sp->sdb_of[outhash];
-		secondary = &sp->sdb_if[INBOUND_HASH(assoc->sadb_sa_spi)];
+		secondary = inbound;
 		/*
 		 * If the source address literally not mine (either
 		 * unspecified or not mine), then this SA may have an
@@ -1579,10 +1581,10 @@ ah_set_usetime(ipsa_t *assoc, boolean_t inbound)
 	if (inbound) {
 		inassoc = assoc;
 		if (isv6)
-			outhash = OUTBOUND_HASH_V6(*((in6_addr_t *)
+			outhash = OUTBOUND_HASH_V6(sp, *((in6_addr_t *)
 			    &inassoc->ipsa_dstaddr));
 		else
-			outhash = OUTBOUND_HASH_V4(*((ipaddr_t *)
+			outhash = OUTBOUND_HASH_V4(sp, *((ipaddr_t *)
 				&inassoc->ipsa_dstaddr));
 		bucket = &sp->sdb_of[outhash];
 
@@ -1600,7 +1602,7 @@ ah_set_usetime(ipsa_t *assoc, boolean_t inbound)
 		}
 	} else {
 		outassoc = assoc;
-		bucket = &sp->sdb_if[INBOUND_HASH(outassoc->ipsa_spi)];
+		bucket = INBOUND_BUCKET(sp, outassoc->ipsa_spi);
 		mutex_enter(&bucket->isaf_lock);
 		inassoc = ipsec_getassocbyspi(bucket, outassoc->ipsa_spi,
 		    outassoc->ipsa_srcaddr, outassoc->ipsa_dstaddr,
@@ -1676,10 +1678,10 @@ ah_age_bytes(ipsa_t *assoc, uint64_t bytes, boolean_t inbound)
 	if (inbound) {
 		inassoc = assoc;
 		if (isv6)
-			outhash = OUTBOUND_HASH_V6(*((in6_addr_t *)
+			outhash = OUTBOUND_HASH_V6(sp, *((in6_addr_t *)
 			    &inassoc->ipsa_dstaddr));
 		else
-			outhash = OUTBOUND_HASH_V4(*((ipaddr_t *)
+			outhash = OUTBOUND_HASH_V4(sp, *((ipaddr_t *)
 				&inassoc->ipsa_dstaddr));
 		bucket = &sp->sdb_of[outhash];
 		mutex_enter(&bucket->isaf_lock);
@@ -1696,7 +1698,7 @@ ah_age_bytes(ipsa_t *assoc, uint64_t bytes, boolean_t inbound)
 		}
 	} else {
 		outassoc = assoc;
-		bucket = &sp->sdb_if[INBOUND_HASH(outassoc->ipsa_spi)];
+		bucket = INBOUND_BUCKET(sp, outassoc->ipsa_spi);
 		mutex_enter(&bucket->isaf_lock);
 		inassoc = ipsec_getassocbyspi(bucket, outassoc->ipsa_spi,
 		    outassoc->ipsa_srcaddr, outassoc->ipsa_dstaddr,
@@ -1968,13 +1970,13 @@ ah_getspi(mblk_t *mp, keysock_in_t *ksi)
 	 */
 
 	if (newbie->ipsa_addrfam == AF_INET6) {
-		outbound = &ah_sadb.s_v6.sdb_of[
-		    OUTBOUND_HASH_V6(*(uint32_t *)(newbie->ipsa_dstaddr))];
-		inbound = &ah_sadb.s_v6.sdb_if[INBOUND_HASH(newbie->ipsa_spi)];
+		outbound = OUTBOUND_BUCKET_V6(&ah_sadb.s_v6,
+		    *(uint32_t *)(newbie->ipsa_dstaddr));
+		inbound = INBOUND_BUCKET(&ah_sadb.s_v6, newbie->ipsa_spi);
 	} else {
-		outbound = &ah_sadb.s_v4.sdb_of[
-		    OUTBOUND_HASH_V4(*(uint32_t *)(newbie->ipsa_dstaddr))];
-		inbound = &ah_sadb.s_v4.sdb_if[INBOUND_HASH(newbie->ipsa_spi)];
+		outbound = OUTBOUND_BUCKET_V4(&ah_sadb.s_v4,
+		    *(uint32_t *)(newbie->ipsa_dstaddr));
+		inbound = INBOUND_BUCKET(&ah_sadb.s_v4, newbie->ipsa_spi);
 	}
 
 	mutex_enter(&outbound->isaf_lock);
@@ -2106,7 +2108,7 @@ ah_icmp_error_v6(mblk_t *ipsec_mp)
 	}
 	ah = (ah_t *)((uint8_t *)ip6h + hdr_length);
 
-	isaf = &ah_sadb.s_v6.sdb_of[OUTBOUND_HASH_V6(ip6h->ip6_dst)];
+	isaf = OUTBOUND_BUCKET_V6(&ah_sadb.s_v6, ip6h->ip6_dst);
 	mutex_enter(&isaf->isaf_lock);
 	assoc = ipsec_getassocbyspi(isaf, ah->ah_spi,
 	    (uint32_t *)&ip6h->ip6_src, (uint32_t *)&ip6h->ip6_dst, AF_INET6);
@@ -2218,7 +2220,7 @@ ah_icmp_error_v4(mblk_t *ipsec_mp)
 	ah = (ah_t *)((uint8_t *)ipha + hdr_length);
 	nexthdr = ah->ah_nexthdr;
 
-	hptr = &ah_sadb.s_v4.sdb_of[OUTBOUND_HASH_V4(ipha->ipha_dst)];
+	hptr = OUTBOUND_BUCKET_V4(&ah_sadb.s_v4, ipha->ipha_dst);
 	mutex_enter(&hptr->isaf_lock);
 	assoc = ipsec_getassocbyspi(hptr, ah->ah_spi,
 	    (uint32_t *)&ipha->ipha_src, (uint32_t *)&ipha->ipha_dst, AF_INET);
