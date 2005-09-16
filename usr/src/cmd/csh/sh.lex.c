@@ -19,7 +19,7 @@
 #include "sh.tconst.h"
 #include <sys/filio.h>
 #include <sys/ttold.h>
-#define RAW 	O_RAW
+#define	RAW 	O_RAW
 /*
  * C shell
  */
@@ -80,7 +80,7 @@ tchar *alvecp;		/* "Globp" for alias resubstitution */
 bool	hadhist;
 
 tchar getCtmp;
-#define getC(f)		((getCtmp = peekc) ? (peekc = 0, getCtmp) : getC1(f))
+#define	getC(f)		((getCtmp = peekc) ? (peekc = 0, getCtmp) : getC1(f))
 #define	ungetC(c)	peekc = c
 #define	ungetD(c)	peekd = c
 
@@ -95,7 +95,7 @@ lex(struct wordent *hp)
 #endif
 	lineloc = btell();
 	hp->next = hp->prev = hp;
-	hp->word = S_ /*""*/;
+	hp->word = S_ /* "" */;
 	alvecp = 0, hadhist = 0;
 	do
 		c = readc(0);
@@ -113,7 +113,7 @@ lex(struct wordent *hp)
 	 * interrupted.
 	 */
 	do {
-		struct wordent *new = (struct wordent *) xalloc(sizeof *wdp);
+		struct wordent *new = (struct wordent *)xalloc(sizeof *wdp);
 
 		new->word = 0;
 		new->prev = wdp;
@@ -158,7 +158,7 @@ copylex(struct wordent *hp, struct wordent *fp)
 	wdp = hp;
 	fp = fp->next;
 	do {
-		struct wordent *new = (struct wordent *) xalloc(sizeof *wdp);
+		struct wordent *new = (struct wordent *)xalloc(sizeof *wdp);
 
 		new->prev = wdp;
 		new->next = hp;
@@ -181,8 +181,8 @@ freelex(struct wordent *vp)
 	while (vp->next != vp) {
 		fp = vp->next;
 		vp->next = fp->next;
-		XFREE(fp->word)
-		XFREE( (char *)fp)
+		xfree(fp->word);
+		xfree(fp);
 	}
 	vp->prev = vp;
 }
@@ -261,11 +261,11 @@ loop:
 					c |= QUOTE;
 				else {
 					if (c == '\n')
-						/*
+#if 0
 						if (c1 == '`')
 							c = ' ';
 						else
-						*/
+#endif
 							c |= QUOTE;
 					ungetC(c);
 					c = '\\';
@@ -326,9 +326,9 @@ top:
 			lap = 0;
 		else {
 			/*
-			 *	don't quote things if there was an error (err!=0)
-			 * 	the input is original, not from a substitution and
-			 *	therefore should not be quoted
+			 * don't quote things if there was an error (err!=0)
+			 * the input is original, not from a substitution and
+			 * therefore should not be quoted
 			 */
 			if (!err && cmap(c, _META|_Q|_Q1)||isauxsp(c))
 				c |= QUOTE;
@@ -395,7 +395,7 @@ getdol(void)
 		special++, *np++ = c, c = getC(DOEXCL);
 	*np++ = c;
 	switch (c) {
-	
+
 	case '<':
 	case '$':
 	case '*':
@@ -412,19 +412,19 @@ getdol(void)
 		p = np;
 		if (digit(c)) {
 			/* make sure the variable names are MAX_VAR_LEN chars or less */
-			while (digit(c = getC(DOEXCL)) && (np-p) < MAX_VAR_LEN) {
+			while (digit(c = getC(DOEXCL)) && (np - p) < MAX_VAR_LEN) {
 				*np++ = c;
 			}
 		} else if (letter(c)) {
 			while ((letter(c = getC(DOEXCL)) || digit(c)) &&
-				(np-p) < MAX_VAR_LEN ) {
+				(np - p) < MAX_VAR_LEN) {
 				*np++ = c;
 			}
 		}
 		else
 			goto vsyn;
 
-		if( (np - p) > MAX_VAR_LEN )
+		if ((np - p) > MAX_VAR_LEN)
 		{
 			seterr("Variable name too long");
 			goto ret;
@@ -497,7 +497,7 @@ addla(tchar *cp)
 	(void) strcpy_(labuf, cp);
 	if (lap) {
 		(void) strcat_(labuf, buf);
-		free(buf);
+		xfree(buf);
 	}
 	lap = labuf;
 }
@@ -543,9 +543,9 @@ getexcl(tchar sc)
 		goto subst;
 	}
 	c = getC(0);
-	/* if (!any(c, ":^$*-%")) */		/* change needed for char -> tchar */
+	/* if (!any(c, ":^$*-%")) */	/* change needed for char -> tchar */
 	if (! (c == ':' || c == '^' || c == '$' || c == '*' ||
-	       c == '-' || c == '%' ))
+	    c == '-' || c == '%'))
 		goto subst;
 	left = right = -1;
 	if (c == ':') {
@@ -629,16 +629,16 @@ getsub(struct wordent *en)
 		(void) strcpy_(lhsb, slhs);
 		break;
 
-/*
+#if 0
 	case '~':
 		if (lhsb[0] == 0)
 			goto badlhs;
 		break;
-*/
+#endif
 
 	case 's':
 		delim = getC(0);
-		if (alnum(delim) || isspnl(delim)){
+		if (alnum(delim) || isspnl(delim)) {
 			unreadc(delim);
 bads:
 			lhsb[0] = 0;
@@ -666,7 +666,7 @@ bads:
 		if (cp != lhsb)
 			*cp++ = 0;
 		else if (lhsb[0] == 0) {
-/*badlhs:*/
+/* badlhs: */
 			seterr("No prev lhs");
 			goto ret;
 		}
@@ -680,18 +680,18 @@ bads:
 			}
 			if (c == delim)
 				break;
-/*
+#if 0
 			if (c == '~') {
-				if (&cp[strlen_(orhsb)] 
+				if (&cp[strlen_(orhsb)]
 				> &rhsb[(sizeof rhsb)/(sizeof rhsb[0]) - 2])
 					goto toorhs;
 				(void) strcpy_(cp, orhsb);
 				cp = strend(cp);
 				continue;
 			}
-*/
+#endif
 			if (cp > &rhsb[(sizeof rhsb)/(sizeof rhsb[0]) - 2]) {
-/*toorhs:*/
+/* toorhs: */
 				seterr("Rhs too long");
 				goto ret;
 			}
@@ -732,7 +732,7 @@ dosub(int sc, struct wordent *en, bool global)
 #endif
 	wdp = hp;
 	while (--i >= 0) {
-		struct wordent *new = (struct wordent *) calloc(1, sizeof *wdp);
+		struct wordent *new = (struct wordent *)xcalloc(1, sizeof *wdp);
 
 		new->prev = wdp;
 		new->next = hp;
@@ -777,7 +777,7 @@ subword(tchar *cp, int type, bool *adid)
 		i = BUFSIZ - 4;
 		for (mp = cp; *mp; mp++)
 			if (matchs(mp, lhsb)) {
-				for (np = cp; np < mp;)
+				for (np = cp; np < mp; )
 					*wp++ = *np++, --i;
 				for (np = rhsb; *np; np++) switch (*np) {
 
@@ -806,7 +806,7 @@ subword(tchar *cp, int type, bool *adid)
 				if (i < 0) {
 ovflo:
 					seterr("Subst buf ovflo");
-					return (S_ /*""*/);
+					return (S_ /* "" */);
 				}
 				*wp = 0;
 				(void) strcat_(wp, mp);
@@ -860,7 +860,7 @@ domod(tchar *cp, int type)
 					xp = savestr(cp), xp[wp - cp] = 0;
 				return (xp);
 			}
-		return (savestr(type == 'e' ? S_ /*""*/ : cp));
+		return (savestr(type == 'e' ? S_ /* "" */ : cp));
 	}
 	return (0);
 }
@@ -1002,10 +1002,10 @@ gethent(int sc)
 		goto number;
 
 	case '#':			/* !# is command being typed in (mrh) */
-		return(&paraml);
+		return (&paraml);
 
 	default:
-		/*if (any(c, "(=~")) {*/
+		/* if (any(c, "(=~")) { */
 		if (c == '(' || c == '=' || c == '~') {
 			unreadc(c);
 			ungetC(HIST);
@@ -1229,19 +1229,19 @@ reread:
 				if (++sincereal > 25)
 					goto oops;
 				if (tpgrp != -1 &&
-				    ioctl(FSHTTY, TIOCGPGRP,  (char *)&ctpgrp) == 0 &&
+				    ioctl(FSHTTY, TIOCGPGRP, (char *)&ctpgrp) == 0 &&
 				    tpgrp != ctpgrp) {
 					(void) ioctl(FSHTTY, TIOCSPGRP,
-						 (char *)&tpgrp);
+						(char *)&tpgrp);
 					(void) killpg(ctpgrp, SIGHUP);
 printf("Reset tty pgrp from %d to %d\n", ctpgrp, tpgrp);
 					goto reread;
 				}
-				if (adrof(S_ignoreeof/*"ignoreeof"*/)) {
+				if (adrof(S_ignoreeof /* "ignoreeof" */)) {
 					if (loginsh)
-						printf("\nUse \"logout\" to logout.\n");
+				printf("\nUse \"logout\" to logout.\n");
 					else
-						printf("\nUse \"exit\" to leave csh.\n");
+				printf("\nUse \"exit\" to leave csh.\n");
 					reset();
 				}
 				if (chkstop == 0) {
@@ -1259,13 +1259,29 @@ oops:
 	return (c);
 }
 
+static void
+expand_fbuf(void)
+{
+	tchar **nfbuf =
+	    (tchar **)xcalloc((unsigned)(fblocks + 2), sizeof (tchar **));
+
+	if (fbuf) {
+		(void) blkcpy(nfbuf, fbuf);
+		xfree((char *)fbuf);
+	}
+	fbuf = nfbuf;
+	fbuf[fblocks] = (tchar *)xcalloc(BUFSIZ + MB_LEN_MAX,
+		sizeof (tchar));
+	fblocks++;
+}
+
 int
 bgetc(void)
 {
 	int buf, off, c;
 #ifdef FILEC
-	tchar ttyline[BUFSIZ];
-	int numleft = 0, roomleft;
+	tchar ttyline[BUFSIZ + MB_LEN_MAX]; /* read_() can return extra bytes */
+	int roomleft;
 #endif
 
 #ifdef TELL
@@ -1289,24 +1305,14 @@ bgetc(void)
 	}
 #endif
 again:
-	buf = (int) fseekp / BUFSIZ;
+	buf = (int)fseekp / BUFSIZ;
 	if (buf >= fblocks) {
-		tchar **nfbuf =
-			 (tchar **) calloc((unsigned) (fblocks + 2),
-				sizeof  (tchar **));
-
-		if (fbuf) {
-			(void) blkcpy(nfbuf, fbuf);
-			xfree( (char *)fbuf);
-		}
-		fbuf = nfbuf;
-		fbuf[fblocks] = (tchar *)calloc(BUFSIZ, sizeof (tchar));
-		fblocks++;
+		expand_fbuf();
 		goto again;
 	}
 	if (fseekp >= feobp) {
-		buf = (int) feobp / BUFSIZ;
-		off = (int) feobp % BUFSIZ;
+		buf = (int)feobp / BUFSIZ;
+		off = (int)feobp % BUFSIZ;
 #ifndef FILEC
 		for (;;) {
 			c = read_(SHIN, fbuf[buf] + off, BUFSIZ - off);
@@ -1314,18 +1320,26 @@ again:
 		roomleft = BUFSIZ - off;
 		for (;;) {
 			if (filec && intty) {
-				c = numleft ? numleft : tenex(ttyline, BUFSIZ);
+				c = tenex(ttyline, BUFSIZ);
 				if (c > roomleft) {
-					/* start with fresh buffer */
-					feobp = fseekp = fblocks * BUFSIZ;
-					numleft = c;
-					goto again;
+					expand_fbuf();
+					copy(fbuf[buf] + off, ttyline,
+					    roomleft * sizeof (tchar));
+					copy(fbuf[buf + 1], ttyline + roomleft,
+					    (c - roomleft) * sizeof (tchar));
+				} else if (c > 0) {
+					copy(fbuf[buf] + off, ttyline,
+						c * sizeof (tchar));
 				}
-				if (c > 0)
-					copy(fbuf[buf] + off, ttyline, c*sizeof(tchar));
-				numleft = 0;
-			} else
+			} else {
 				c = read_(SHIN, fbuf[buf] + off, roomleft);
+				if (c > roomleft) {
+					expand_fbuf();
+					copy(fbuf[buf + 1],
+					    fbuf[buf] + off + roomleft,
+					    (c - roomleft) * sizeof (tchar));
+				}
+			}
 #endif
 			if (c >= 0)
 				break;
@@ -1346,12 +1360,12 @@ again:
 			goto again;
 #endif
 	}
-	c = fbuf[buf][(int) fseekp % BUFSIZ];
+	c = fbuf[buf][(int)fseekp % BUFSIZ];
 	fseekp++;
 	return (c);
 }
 
-void	
+void
 bfree(void)
 {
 	int sb, i;
@@ -1362,7 +1376,7 @@ bfree(void)
 #endif
 	if (whyles)
 		return;
-	sb = (int) (fseekp - 1) / BUFSIZ;
+	sb = (int)(fseekp - 1) / BUFSIZ;
 	if (sb > 0) {
 		for (i = 0; i < sb; i++)
 			xfree(fbuf[i]);
@@ -1423,11 +1437,10 @@ settell(void)
 		return;
 	if (lseek(SHIN, (off_t)0, 1) < 0 || errno == ESPIPE)
 		return;
-	fbuf =  (tchar **) calloc(2, sizeof  (tchar **));
+	fbuf = (tchar **)xcalloc(2, sizeof (tchar **));
 	fblocks = 1;
-	fbuf[0] = (tchar *)calloc(BUFSIZ, sizeof (tchar));
+	fbuf[0] = (tchar *)xcalloc(BUFSIZ + MB_LEN_MAX, sizeof (tchar));
 	fseekp = fbobp = feobp = lseek(SHIN, (off_t)0, 1);
 	cantell = 1;
 }
 #endif
-

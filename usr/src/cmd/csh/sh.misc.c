@@ -43,26 +43,6 @@ onlyread(tchar *cp)
 	return ((char *)cp < end);
 }
 
-
-/*
- * WARNING: changes here also need to occur in the XFREE macro in sh.h.
- */
-void
-xfree(char *cp)
-{
-	extern char end[];
-
-#if defined(sparc)
-	if ((char *)cp >= end && (char *)cp <  (char *)&cp)
-		free(cp);
-#elif defined(i386)
-	if ((char *)cp >= end)
-		free(cp);
-#else
-#error xfree function is machine dependent and no machine type is recognized
-#endif
-}
-
 tchar *
 savestr(tchar *s)
 {
@@ -74,7 +54,7 @@ savestr(tchar *s)
 #ifndef m32
 	for (p = s; *p++; )
 		;
-	n = p = (tchar *)xalloc((unsigned) (p - s)*sizeof (tchar));
+	n = p = (tchar *)xalloc((unsigned)(p - s)*sizeof (tchar));
 	while (*p++ = *s++)
 		;
 	return (n);
@@ -85,19 +65,8 @@ savestr(tchar *s)
 #endif
 }
 
-void *
-calloc(size_t i, size_t j)
-{
-	char *cp;
-
-	i *= j;
-	cp = (char *)xalloc(i);
-	bzero(cp, (int)i);
-	return (cp);
-}
-
-int
-nomem(unsigned i)
+static void *
+nomem(size_t i)
 {
 #ifdef debug
 	static tchar *av[2] = {0, 0};
@@ -172,15 +141,15 @@ blkfree(tchar **av0)
 	tchar **av = av0;
 
 	for (; *av; av++)
-		XFREE(*av)
-	XFREE((tchar *)av0)
+		xfree(*av);
+	xfree(av0);
 }
 
 tchar **
 saveblk(tchar **v)
 {
 	tchar **newv =
-		(tchar **) calloc((unsigned) (blklen(v) + 1),
+		(tchar **)xcalloc((unsigned)(blklen(v) + 1),
 				sizeof (tchar **));
 	tchar **onewv = newv;
 
@@ -200,7 +169,7 @@ strspl(tchar *cp, tchar *dp)
 		;
 	for (q = dp; *q++; )
 		;
-	ep = (tchar *) xalloc((unsigned) (((p - cp) +
+	ep = (tchar *) xalloc((unsigned)(((p - cp) +
 			(q - dp) - 1))*sizeof (tchar));
 	for (p = ep, q = cp; *p++ = *q++; )
 		;
@@ -210,7 +179,7 @@ strspl(tchar *cp, tchar *dp)
 	int	len1 = strlen_(cp);
 	int	len2 = strlen_(dp);
 
-	ep = (tchar *)xalloc((unsigned) (len1 + len2 + 1)*sizeof (tchar));
+	ep = (tchar *)xalloc((unsigned)(len1 + len2 + 1)*sizeof (tchar));
 	strcpy_(ep, cp);
 	strcat_(ep, dp);
 #endif
@@ -221,7 +190,7 @@ tchar **
 blkspl(tchar **up, tchar **vp)
 {
 	tchar **wp =
-		(tchar **) calloc((unsigned) (blklen(up) + blklen(vp) + 1),
+		(tchar **)xcalloc((unsigned)(blklen(up) + blklen(vp) + 1),
 			sizeof (tchar **));
 
 	(void) blkcpy(wp, up);
@@ -363,7 +332,7 @@ tchar **
 copyblk(tchar **v)
 {
 	tchar **nv =
-		(tchar **) calloc((unsigned) (blklen(v) + 1),
+		(tchar **)xcalloc((unsigned)(blklen(v) + 1),
 				sizeof (tchar **));
 
 	return (blkcpy(nv, v));
@@ -455,9 +424,115 @@ char **
 blkspl_(char **up, char **vp)
 {
 	char **wp =
-		(char **) calloc((unsigned) (blklen_(up) + blklen_(vp) + 1),
+		(char **)xcalloc((unsigned)(blklen_(up) + blklen_(vp) + 1),
 			sizeof (char **));
 
 	(void) blkcpy_(wp, up);
 	return (blkcat_(wp, vp));
+}
+
+/*
+ * If stack address was passed to free(), we have no good way to see if
+ * they are really in the stack. Therefore, we record the bottom of heap,
+ * and filter out the address not within heap's top(end) and bottom
+ * (xalloc_bottom).
+ */
+extern char	end[];
+static char	*xalloc_bottom;
+
+void *
+xalloc(size_t size)
+{
+	char	*rptr, *bp;
+
+	if ((rptr = malloc(size)) == NULL)
+		return (nomem(size));
+	bp = rptr + size;
+	if (bp > xalloc_bottom)
+		xalloc_bottom = bp;
+	return (rptr);
+}
+
+void *
+xrealloc(void *ptr, size_t size)
+{
+	char	*rptr = ptr, *bp;
+
+	if (ptr == NULL)
+		return (xalloc(size));
+	if (rptr < end) {
+		/* data area, but not in heap area. don't touch it */
+oob:
+		if (size == 0)
+			return (NULL);
+		rptr = xalloc(size);
+		/* copy max size */
+		(void) memcpy(rptr, ptr, size);
+		return (rptr);
+	}
+	if (rptr < xalloc_bottom) {
+		/* address in the heap */
+inb:
+		if (size == 0) {
+			free(ptr);
+			return (NULL);
+		}
+		if ((rptr = realloc(ptr, size)) == NULL)
+			return (nomem(size));
+		bp = rptr + size;
+		if (bp > xalloc_bottom)
+			xalloc_bottom = bp;
+		return (rptr);
+	}
+#if defined(__sparc)
+	if (rptr > (char *)&rptr) {
+		/* in the stack frame */
+		goto oob;
+	}
+#endif
+	/*
+	 * can be a memory block returned indirectly from
+	 * library functions. update bottom, and check it again.
+	 */
+	xalloc_bottom = sbrk(0);
+	if (rptr <= xalloc_bottom)
+		goto inb;
+	else
+		goto oob;
+	/*NOTREACHED*/
+}
+
+void
+xfree(void *ptr)
+{
+	char	*rptr = ptr;
+
+	if (rptr < end) {
+		return;
+	}
+	if (rptr < xalloc_bottom) {
+		free(ptr);
+		return;
+	}
+#if defined(__sparc)
+	if (rptr > (char *)&rptr) {
+		/* in the stack frame */
+		return;
+	}
+#endif
+	xalloc_bottom = sbrk(0);
+	if (rptr <= xalloc_bottom) {
+		free(ptr);
+	}
+}
+
+void *
+xcalloc(size_t i, size_t j)
+{
+	char *cp;
+
+	i *= j;
+	cp = xalloc(i);
+	(void) memset(cp, '\0', i);
+	return (cp);
 }

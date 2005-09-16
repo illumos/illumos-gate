@@ -32,7 +32,7 @@
  * If there is no search path then we execute only full path names.
  */
 
-/* 
+/*
  * As we search for the command we note the first non-trivial error
  * message for presentation to the user.  This allows us often
  * to show that a file has the wrong mode/no access when the file
@@ -75,7 +75,7 @@ doexec(struct command *t)
 	exerr = 0; t->t_dcom[0] = dp;
 	setname(dp);
 	xfree(sav);
-	v = adrof(S_path /*"path"*/);
+	v = adrof(S_path /* "path" */);
 	if (v == 0 && dp[0] != '/') {
 		pexerr();
 	}
@@ -123,7 +123,7 @@ doexec(struct command *t)
 		pv = justabs;
 	else
 		pv = v->vec;
-	sav = strspl(S_SLASH /* "/" */, *av);		/* / command name for postpending */
+	sav = strspl(S_SLASH /* "/" */, *av); /* / command name for postpending */
 #ifdef VFORK
 	Vsav = sav;
 #endif
@@ -140,7 +140,7 @@ doexec(struct command *t)
 				goto cont;
 		}
 
-		if (pv[0][0] == 0 || eq(pv[0], S_DOT/*"."*/)) {	/* don't make ./xxx */
+		if (pv[0][0] == 0 || eq(pv[0], S_DOT /* "." */)) { /* don't make ./xxx */
 			texec(t, *av, av);
 		} else {
 			dp = strspl(*pv, sav);
@@ -168,7 +168,7 @@ cont:
 	Vav = 0;
 #endif
 	xfree(sav);
-	xfree( (char *)av);
+	xfree((char *)av);
 	pexerr();
 }
 
@@ -197,7 +197,7 @@ texec(struct command *cmd, tchar *f, tchar **t)
 	struct	varent *v;
 	tchar	**vp;
 	tchar		*lastsh[2];
-	
+
 #ifdef TRACE
 	tprintf("TRACE- texec()\n");
 #endif
@@ -222,46 +222,46 @@ texec(struct command *cmd, tchar *f, tchar **t)
 	 */
 	xfree(cmd->cfname);
 	chr_blkfree(cmd->cargs);
-	cmd->cfname = (char *) 0;
-	cmd->cargs = (char **) 0;
+	cmd->cfname = (char *)0;
+	cmd->cargs = (char **)0;
 
 	switch (errno) {
 	case ENOEXEC:
 		/* check that this is not a binary file */
-		{       
+		{
 			int ff = open_(f, 0);
-			tchar ch;
+			tchar ch[MB_LEN_MAX];
 
-			if (ff != -1 && read_(ff, &ch, 1) == 1 && !isprint(ch)
-			       && !isspace(ch)) {
+			if (ff != -1 && read_(ff, ch, 1) == 1 &&
+			    !isprint(ch[0]) && !isspace(ch[0])) {
 				printf("Cannot execute binary file.\n");
 				Perror(f);
 				(void) close(ff);
 				unsetfd(ff);
 				return;
-			} 
+			}
 			(void) close(ff);
 			unsetfd(ff);
-		} 
+		}
 		/*
 		 * If there is an alias for shell, then
 		 * put the words of the alias in front of the
 		 * argument list replacing the command name.
 		 * Note no interpretation of the words at this point.
 		 */
-		v = adrof1(S_shell /*"shell"*/, &aliases);
+		v = adrof1(S_shell /* "shell" */, &aliases);
 		if (v == 0) {
 #ifdef OTHERSH
 			int ff = open_(f, 0);
-			tchar ch;
+			tchar ch[MB_LEN_MAX];
 #endif
 
 			vp = lastsh;
-			vp[0] = adrof(S_shell /*"shell"*/) ? value(S_shell /*"shell"*/) : S_SHELLPATH/*SHELLPATH*/;
+			vp[0] = adrof(S_shell /* "shell" */) ? value(S_shell /* "shell" */) : S_SHELLPATH /* SHELLPATH */;
 			vp[1] =  (tchar *) NULL;
 #ifdef OTHERSH
-			if (ff != -1 && read_(ff, &ch, 1) == 1 && ch != '#')
-				vp[0] = S_OTHERSH/*OTHERSH*/;
+			if (ff != -1 && read_(ff, ch, 1) == 1 && ch[0] != '#')
+				vp[0] = S_OTHERSH /* OTHERSH */;
 			(void) close(ff);
 			unsetfd(ff);
 #endif
@@ -277,15 +277,15 @@ texec(struct command *cmd, tchar *f, tchar **t)
 		 * now done with tchar arg list t,
 		 * free the space calloc'd by above blkspl()
 		 */
-		xfree((char *) t);
+		xfree((char *)t);
 
 		execv(cmd->cfname, cmd->cargs);	/* exec the command */
 
 		/* exec returned, same free'ing as above */
 		xfree(cmd->cfname);
 		chr_blkfree(cmd->cargs);
-		cmd->cfname = (char *) 0;
-		cmd->cargs = (char **) 0;
+		cmd->cfname = (char *)0;
+		cmd->cargs = (char **)0;
 
 		/* The sky is falling, the sky is falling! */
 
@@ -314,7 +314,7 @@ tconvert(struct command *cmd, tchar *fname, tchar **list)
 
 	len = blklen(list);
 	rc = cmd->cargs = (char **)
-		calloc((u_int) (len + 1), sizeof(char **));
+		xcalloc((uint_t)(len + 1), sizeof (char **));
 	while (len--)
 		*rc++ = tstostr(NULL, *list++);
 	*rc = NULL;
@@ -346,7 +346,7 @@ xechoit(tchar **t)
 	tprintf("TRACE- xechoit()\n");
 #endif
 
-	if (adrof(S_echo /*"echo"*/)) {
+	if (adrof(S_echo /* "echo" */)) {
 		flush();
 		haderr = 1;
 		blkpr(t), Putchar('\n');
@@ -354,7 +354,7 @@ xechoit(tchar **t)
 	}
 }
 
-/* 
+/*
  * This routine called when user enters "rehash".
  * Both the path and cdpath caching arrays will
  * be rehashed, via calling dohash.  If either
@@ -388,15 +388,15 @@ dohash(char cachearray[])
 	tprintf("TRACE- dohash()\n");
 #endif
 	/* Caching $path */
-	if ( cachearray == xhash ) {
+	if (cachearray == xhash) {
 		havhash = 1;
-		v = adrof(S_path /*"path"*/);
-	}else {    /* Caching $cdpath */
+		v = adrof(S_path /* "path" */);
+	} else {    /* Caching $cdpath */
 		havhash2 = 1;
-		v = adrof(S_cdpath /*"cdpath"*/);
+		v = adrof(S_cdpath /* "cdpath" */);
 	}
 
-	for (cnt = 0; cnt < ( HSHSIZ / 8 ); cnt++)
+	for (cnt = 0; cnt < (HSHSIZ / 8); cnt++)
 		cachearray[cnt] = 0;
 	if (v == 0)
 		{
@@ -418,9 +418,9 @@ dohash(char cachearray[])
 				continue;
 			if (dp->d_name[0] == '.' &&
 			    (dp->d_name[1] == '\0' ||
-			     dp->d_name[1] == '.' && dp->d_name[2] == '\0'))
+			    dp->d_name[1] == '.' && dp->d_name[2] == '\0'))
 				continue;
-			hashval = hash(hashname(strtots(curdir_,dp->d_name)), i);
+			hashval = hash(hashname(strtots(curdir_, dp->d_name)), i);
 			bis(cachearray, hashval);
 		}
 		unsetfd(dirp->dd_fd);
@@ -466,5 +466,5 @@ hashname(tchar *cp)
 #endif
 	while (*cp)
 		h = hash(h, *cp++);
-	return ((int) h);
+	return ((int)h);
 }

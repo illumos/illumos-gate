@@ -31,14 +31,14 @@
  * We use these csh(1) private versions of the select macros, (see select(3C))
  * so as not to be limited by the size of struct fd_set (ie 1024).
  */
-#define CSH_FD_SET(n, p)    ((*((p) + ((n)/NFDBITS))) |= (1 << ((n) % NFDBITS)))
-#define CSH_FD_CLR(n, p)    ((*((p) + ((n)/NFDBITS))) &= ~(1 << ((n) % NFDBITS)))
-#define CSH_FD_ISSET(n, p)  ((*((p) + ((n)/NFDBITS))) & (1 << ((n) % NFDBITS)))
-#define CSH_FD_ZERO(p, n)      memset((void *)(p), 0,  (n))
+#define	CSH_FD_SET(n, p)   ((*((p) + ((n)/NFDBITS))) |= (1 << ((n) % NFDBITS)))
+#define	CSH_FD_CLR(n, p)   ((*((p) + ((n)/NFDBITS))) &= ~(1 << ((n) % NFDBITS)))
+#define	CSH_FD_ISSET(n, p) ((*((p) + ((n)/NFDBITS))) & (1 << ((n) % NFDBITS)))
+#define	CSH_FD_ZERO(p, n)  memset((void *)(p), 0,  (n))
 
-tchar *pathlist[] =	{ S_usrbin/*"/usr/bin"*/, S_DOT /*"."*/, 0 };
-tchar *dumphist[] =	{ S_history /*"history"*/, S_h /*"-h"*/, 0, 0 };
-tchar *loadhist[] =	{ S_source /*"source"*/, S_h /*"-h"*/, S_NDOThistory /*"~/.history"*/, 0 };
+tchar *pathlist[] =	{ S_usrbin /* "/usr/bin" */, S_DOT /* "." */, 0 };
+tchar *dumphist[] =	{ S_history /* "history" */, S_h /* "-h" */, 0, 0 };
+tchar *loadhist[] =	{ S_source /* "source" */, S_h /* "-h" */, S_NDOThistory /* "~/.history" */, 0 };
 tchar HIST = '!';
 tchar HISTSUB = '^';
 int	nofile;
@@ -130,7 +130,7 @@ main(int c, char **av)
 	 */
 	haderr = 0;
 	setexit();
-	if ( haderr ) {
+	if (haderr) {
 		/*
 		 *  if were here, there was an error in the csh
 		 *  startup so just punt
@@ -141,9 +141,9 @@ main(int c, char **av)
 	}
 
 
-	(void) setlocale(LC_ALL, "");	
+	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
-#define TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
+#define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -158,13 +158,13 @@ main(int c, char **av)
 		if (c > 0 && (eq(p, simple(q)) || eq(r, simple(q)))) {
 			pfcshflag = 1;
 		}
-		XFREE(q);
+		xfree(q);
 	}
 
 	if (p != NOSTR)
-		XFREE(p);
+		xfree(p);
 	if (r != NOSTR)
-		XFREE(r);
+		xfree(r);
 
 	if (pfcshflag == 1) {
 		secpolicy_init();
@@ -179,8 +179,8 @@ main(int c, char **av)
 	paraml.next = paraml.prev = &paraml;
 
 	settimes();			/* Immed. estab. timing base */
-	 
-	if (eq(v[0], S_aout/*"a.out"*/))	/* A.out's are quittable */
+
+	if (eq(v[0], S_aout /* "a.out" */))	/* A.out's are quittable */
 		quitit = 1;
 	uid = getuid();
 	loginsh = **v == '-';
@@ -226,7 +226,7 @@ main(int c, char **av)
 	 * Should we grab everything??
 	 */
 	if ((cp = getenvs_("USER")) != NOSTR)
-		set(S_user/*"user"*/, savestr(cp));
+		set(S_user /* "user" */, savestr(cp));
 	else {
 		/*
 		 * If USER is not defined, set it here.
@@ -235,23 +235,23 @@ main(int c, char **av)
 		pw = getpwuid(getuid());
 
 		if (pw != NULL) {
-			set(S_user, strtots((tchar *)0, pw->pw_name ));
+			set(S_user, strtots((tchar *)0, pw->pw_name));
 			local_setenv(S_USER, strtots((tchar *)0, pw->pw_name));
 		}
 		else if (loginsh) { /* Give up setting USER variable. */
-			printf("Warning: USER environment variable could not be set.\n");
+	printf("Warning: USER environment variable could not be set.\n");
 		}
 	}
 	if ((cp = getenvs_("TERM")) != NOSTR)
-		set(S_term/*"term"*/, savestr(cp));
+		set(S_term /* "term" */, savestr(cp));
 	/*
 	 * Re-initialize path if set in environment
 	 */
 	if ((cp = getenvs_("PATH")) == NOSTR)
-		set1(S_path/*"path"*/, saveblk(pathlist), &shvhed);
+		set1(S_path /* "path" */, saveblk(pathlist), &shvhed);
 	else
 		importpath(cp);
-	set(S_shell/*"shell"*/, S_SHELLPATH);
+	set(S_shell /* "shell" */, S_SHELLPATH);
 
 	doldol = putn(getpid());		/* For $$ */
 
@@ -349,11 +349,11 @@ main(int c, char **av)
 			break;
 
 		case 'V':		/* -V	Echo hist expanded input */
-			setNS(S_verbose/*"verbose"*/);		/* NOW! */
+			setNS(S_verbose /* "verbose" */);	/* NOW! */
 			break;
 
 		case 'X':		/* -X	Echo just before execution */
-			setNS(S_echo/*"echo"*/);			/* NOW! */
+			setNS(S_echo /* "echo" */);		/* NOW! */
 			break;
 
 		} while (*cp);
@@ -371,7 +371,7 @@ main(int c, char **av)
 	if (!batch && (uid != geteuid() || getgid() != getegid())) {
 		errno = EACCES;
 		child++;			/* So this ... */
-		Perror(S_csh/*"csh"*/);		/* ... doesn't return */
+		Perror(S_csh /* "csh" */);	/* ... doesn't return */
 	}
 
 	if (nofile == 0 && c > 0) {
@@ -408,15 +408,15 @@ main(int c, char **av)
 	/*
 	 * Save the remaining arguments in argv.
 	 */
-	setq(S_argv/*"argv"*/, v, &shvhed);
+	setq(S_argv /* "argv" */, v, &shvhed);
 
 	/*
 	 * Set up the prompt.
 	 */
 	if (prompt) {
 		gethostname_(s_prompt, MAXHOSTNAMELEN);
-		strcat_(s_prompt, uid == 0 ? S_SHARPSP/*"# "*/ : S_PERSENTSP/*"% "*/);
-		set(S_prompt/*"prompt"*/, s_prompt);
+		strcat_(s_prompt, uid == 0 ? S_SHARPSP /* "# " */ : S_PERSENTSP /* "% " */);
+		set(S_prompt /* "prompt" */, s_prompt);
 	}
 
 	/*
@@ -467,7 +467,7 @@ retry:
 				(void) fcntl(dcopy(f, FSHTTY), F_SETFD, 1);
 			} else {
 notty:
-  printf("Warning: no access to tty; thus no job control in this shell...\n");
+printf("Warning: no access to tty; thus no job control in this shell...\n");
 				tpgrp = -1;
 			}
 		}
@@ -481,7 +481,7 @@ notty:
 	sigemptyset(&sa.sa_mask);
 	sa.sa_handler = pchild;
 	sa.sa_flags = SA_RESTART;
-	(void) sigaction(SIGCHLD, &sa, (struct sigaction *) NULL);
+	(void) sigaction(SIGCHLD, &sa, (struct sigaction *)NULL);
 
 	/*
 	 * Set an exit here in case of an interrupt or error reading
@@ -492,26 +492,26 @@ notty:
 	if (!fast && reenter == 0) {
 		reenter++;
 
-                /*
-                 * If this is a login csh, and /etc/.login exists,
-                 * source /etc/.login first.
-                 */
-                if (loginsh) {
-			tchar tmp_etc[4+1];	/*strlen("/etc")+1 */
-			tchar tmp_login[7+1];	/*strlen("/.login")+1*/
+		/*
+		 * If this is a login csh, and /etc/.login exists,
+		 * source /etc/.login first.
+		 */
+		if (loginsh) {
+			tchar tmp_etc[4+1];	/* strlen("/etc")+1 */
+			tchar tmp_login[7+1];	/* strlen("/.login")+1 */
 
 			strtots(tmp_etc, "/etc");
 			strtots(tmp_login, "/.login");
-                        srccat_inlogin(tmp_etc, tmp_login);
-                }
+			srccat_inlogin(tmp_etc, tmp_login);
+		}
 
 		/* Will have value("home") here because set fast if don't */
-		srccat(value(S_home/*"home"*/), S_SLADOTcshrc/*"/.cshrc"*/);
+		srccat(value(S_home /* "home" */), S_SLADOTcshrc /* "/.cshrc" */);
 
-		/*Hash path*/
+		/* Hash path */
 		if (!fast && !arginp && !onelflg && !havhash)
 			dohash(xhash);
- 
+
 
 		/*
 		 * Reconstruct the history list now, so that it's
@@ -519,7 +519,7 @@ notty:
 		 */
 		dosource(loadhist);
 		if (loginsh) {
-			srccat_inlogin(value(S_home/*"home"*/), S_SLADOTlogin/*"/.login"*/);
+			srccat_inlogin(value(S_home /* "home" */), S_SLADOTlogin /* "/.login" */);
 		}
 
 		/*
@@ -530,7 +530,7 @@ notty:
 		 * cache $cdpath paths. xhash2 is global array
 		 * for $cdpath caching.
 		 */
-		if (!fast && !arginp && !onelflg && !havhash2 )
+		if (!fast && !arginp && !onelflg && !havhash2)
 				dohash(xhash2);
 	}
 
@@ -538,9 +538,9 @@ notty:
 	 * Now are ready for the -v and -x flags
 	 */
 	if (nverbose)
-		setNS(S_verbose/*"verbose"*/);
+		setNS(S_verbose /* "verbose" */);
 	if (nexececho)
-		setNS(S_echo/*"echo"*/);
+		setNS(S_echo /* "echo" */);
 
 	/*
 	 * All the rest of the world is inside this call.
@@ -590,7 +590,7 @@ importpath(tchar *cp)
 	 * There are i+1 directories in the path plus we need
 	 * room for a zero terminator.
 	 */
-	pv =  (tchar **) calloc((unsigned) (i + 2), sizeof  (tchar **));
+	pv =  (tchar **)xcalloc((unsigned)(i + 2), sizeof (tchar **));
 	dp = cp;
 	i = 0;
 	if (*dp)
@@ -607,7 +607,7 @@ importpath(tchar *cp)
 		dp++;
 	}
 	pv[i] = 0;
-	set1(S_path /*"path"*/, pv, &shvhed);
+	set1(S_path /* "path" */, pv, &shvhed);
 }
 
 /*
@@ -702,7 +702,7 @@ srcunit(int unit, bool onlyown, bool hflg)
 	reenter++;
 	if (reenter == 1) {
 		/* Setup the new values of the state stuff saved above */
-		copy( (char *)&saveB,  (char *)&B, sizeof saveB);
+		copy((char *)&saveB, (char *)&B, sizeof saveB);
 		fbuf =  (tchar **) 0;
 		fseekp = feobp = fblocks = 0;
 		oSHIN = SHIN, SHIN = unit, arginp = 0, onelflg = 0;
@@ -731,10 +731,10 @@ srcunit(int unit, bool onlyown, bool hflg)
 		/* This code could get run twice but xfree doesn't care */
 		for (i = 0; i < fblocks; i++)
 			xfree(fbuf[i]);
-		xfree( (char *)fbuf);
+		xfree((char *)fbuf);
 
 		/* Reset input arena */
-		copy( (char *)&B,  (char *)&saveB, sizeof B);
+		copy((char *)&B, (char *)&saveB, sizeof B);
 
 		(void) close(SHIN), SHIN = oSHIN;
 		unsetfd(SHIN);
@@ -765,10 +765,10 @@ rechist(void)
 	int fp, ftmp, oldidfds;
 
 	if (!fast) {
-		if (value(S_savehist/*"savehist"*/)[0] == '\0')
+		if (value(S_savehist /* "savehist" */)[0] == '\0')
 			return;
-		(void) strcpy_(buf, value(S_home/*"home"*/));
-		(void) strcat_(buf, S_SLADOThistory/*"/.history"*/);
+		(void) strcpy_(buf, value(S_home /* "home" */));
+		(void) strcat_(buf, S_SLADOThistory /* "/.history" */);
 		fp = creat_(buf, 0666);
 		if (fp == -1)
 			return;
@@ -776,7 +776,7 @@ rechist(void)
 		didfds = 0;
 		ftmp = SHOUT;
 		SHOUT = fp;
-		(void) strcpy_(buf, value(S_savehist/*"savehist"*/));
+		(void) strcpy_(buf, value(S_savehist /* "savehist" */));
 		dumphist[2] = buf;
 		dohist(dumphist);
 		(void) close(fp);
@@ -794,8 +794,8 @@ goodbye(void)
 		(void) signal(SIGINT, SIG_IGN);
 		(void) signal(SIGTERM, SIG_IGN);
 		setintr = 0;		/* No interrupts after "logout" */
-		if (adrof(S_home/*"home"*/))
-			srccat(value(S_home/*"home"*/), S_SLADOTlogout/*"/.logout"*/);
+		if (adrof(S_home /* "home" */))
+			srccat(value(S_home /* "home" */), S_SLADOTlogout /* "/.logout" */);
 	}
 	rechist();
 	exitstat();
@@ -815,7 +815,7 @@ exitstat(void)
 	 */
 	child++;
 	untty();
-	exit(getn(value(S_status/*"status"*/)));
+	exit(getn(value(S_status /* "status" */)));
 }
 
 /*
@@ -828,7 +828,7 @@ phup(void)
 	exit(1);
 }
 
-tchar *jobargv[2] = { S_jobs/*"jobs"*/, 0 };
+tchar *jobargv[2] = { S_jobs /* "jobs" */, 0 };
 /*
  * Catch an interrupt, e.g. during lexical input.
  * If we are an interactive shell, we reset the interrupt catch
@@ -902,8 +902,9 @@ process(bool catch)
 	getexit(osetexit);
 	for (;;) {
 		pendjob();
+		freelex(&paraml);
 		paraml.next = paraml.prev = &paraml;
-		paraml.word = S_ /*""*/;
+		paraml.word = S_ /* "" */;
 		t = 0;
 		setexit();
 		justpr = enterhist;	/* execute if not entering history */
@@ -964,7 +965,7 @@ process(bool catch)
 		 * Echo not only on VERBOSE, but also with history expansion.
 		 */
 		if (lex(&paraml) && intty ||
-		    adrof(S_verbose /*"verbose"*/)) {
+		    adrof(S_verbose /* "verbose" */)) {
 			haderr = 1;
 			prlex(&paraml);
 			haderr = 0;
@@ -977,7 +978,7 @@ process(bool catch)
 			(void) sigblock(sigmask(SIGINT));
 
 		/*
-		 * Save input text on the history list if 
+		 * Save input text on the history list if
 		 * reading in old history, or it
 		 * is from the terminal at the top level and not
 		 * in a loop.
@@ -1022,7 +1023,7 @@ process(bool catch)
 
 			omask = sigblock(sigmask(SIGCHLD));
 			execute(t, tpgrp);
-			(void)sigsetmask(omask &~ sigmask(SIGCHLD));
+			(void) sigsetmask(omask &~ sigmask(SIGCHLD));
 		}
 
 		if (err)
@@ -1044,7 +1045,7 @@ dosource(tchar **t)
 	tchar buf[BUFSIZ];
 
 	t++;
-	if (*t && eq(*t, S_h /*"-h"*/)) {
+	if (*t && eq(*t, S_h /* "-h" */)) {
 		if (*++t == NOSTR)
 			bferr("Too few arguments.");
 		hflg++;
@@ -1079,7 +1080,7 @@ mailchk(void)
 	struct stat stb;
 	bool new;
 
-	v = adrof(S_mail /*"mail"*/);
+	v = adrof(S_mail /* "mail" */);
 	if (v == 0)
 		return;
 	(void) time(&t);
@@ -1118,7 +1119,7 @@ gethdir(tchar *home)
 	/* getpwname will not be modified, so we need temp. buffer */
 	char home_str[BUFSIZ];
 	tchar home_ts[BUFSIZ];
-	struct passwd *pp /*= getpwnam(home)*/;
+	struct passwd *pp /* = getpwnam(home) */;
 
 	pp = getpwnam(tstostr(home_str, home));
 	if (pp == 0)
@@ -1128,7 +1129,7 @@ gethdir(tchar *home)
 }
 
 
-/*
+#if 0
 void
 #ifdef PROF
 done(int i)
@@ -1140,7 +1141,7 @@ exit(int i)
 	untty();
 	_exit(i);
 }
-*/
+#endif
 
 void
 printprompt(void)
@@ -1151,7 +1152,7 @@ printprompt(void)
 		/*
 		 * Print the prompt string
 		 */
-		for (cp = value(S_prompt /*"prompt"*/); *cp; cp++)
+		for (cp = value(S_prompt /* "prompt" */); *cp; cp++)
 			if (*cp == HIST)
 				printf("%d", eventno + 1);
 			else {
@@ -1160,7 +1161,7 @@ printprompt(void)
 				Putchar(*cp | QUOTE);
 			}
 	} else
-		/* 
+		/*
 		 * Prompt for forward reading loop
 		 * body content.
 		 */
@@ -1175,11 +1176,11 @@ tchar **
 strblktotsblk(char **v, int num)
 {
 	tchar **newv =
-		 (tchar **) calloc((unsigned) (num+ 1), sizeof  (tchar **));
+		(tchar **)xcalloc((unsigned)(num+ 1), sizeof (tchar **));
 	tchar **onewv = newv;
 
 	while (*v && num--)
-		*newv++ = strtots(NOSTR,*v++);
+		*newv++ = strtots(NOSTR, *v++);
 	*newv = 0;
 	return (onewv);
 }
@@ -1193,7 +1194,7 @@ sigwaiting(void)
 void
 siglwp(void)
 {
-	_signal(SIGLWP, siglwp); 
+	_signal(SIGLWP, siglwp);
 }
 
 
@@ -1218,8 +1219,8 @@ static int NoFile = NOFILE;	/* The number of files I can use. */
  * hold of them. And initialize fdinuse list and set
  * the current process id.
  *
- * If this csh was invoked from setuid'ed script file, 
- * do not close the third argument passed. The file 
+ * If this csh was invoked from setuid'ed script file,
+ * do not close the third argument passed. The file
  * must be one of /dev/fd/0,1,2,,,
  *	(execv() always passes three arguments when it execs a script
  *	 file in a form of #! /bin/csh -b.)
@@ -1273,20 +1274,20 @@ initdesc_x(int argc, char *argv[], int is_reinit)
 	struct stat buf;
 	struct rlimit rlp;
 
-	 /*
-	  * Get pid of this shell
-	  */
+	/*
+	 * Get pid of this shell
+	 */
 	my_pid = getpid();
 
 	/*
 	 * Get the hard limit numbers of descriptors
 	 * this csh can use.
 	 */
-	if (getrlimit(RLIMIT_NOFILE, &rlp) == 0) 
+	if (getrlimit(RLIMIT_NOFILE, &rlp) == 0)
 		NoFile = rlp.rlim_cur;
-		
+
 	/*
-	 * If this csh was invoked for executing setuid script file, 
+	 * If this csh was invoked for executing setuid script file,
 	 * the third argument passed is the special file name
 	 * which should not be closed.  This special file name is
 	 * in the form /dev/fd/X.
@@ -1300,8 +1301,8 @@ initdesc_x(int argc, char *argv[], int is_reinit)
 						 */
 
 	if (fdinuse == NULL) {
-		nbytesused = sizeof(int) * howmany(NoFile, sizeof(int) * NBBY);
-		fdinuse = (int *) xalloc(nbytesused);
+		nbytesused = sizeof (int) * howmany(NoFile, sizeof (int) * NBBY);
+		fdinuse = (int *)xalloc(nbytesused);
 	}
 
 	/*
@@ -1314,7 +1315,7 @@ initdesc_x(int argc, char *argv[], int is_reinit)
 		(void) fdwalk(close_inuse, &script_fd);
 
 	didfds = 0;			/* 0, 1, 2 aren't set up */
-	
+
 	if (fstat(0, &buf) < 0)
 		open("/dev/null", 0);
 
@@ -1323,7 +1324,7 @@ initdesc_x(int argc, char *argv[], int is_reinit)
 	(void) fcntl(SHDIAG = dcopy(2, FSHDIAG), F_SETFD,  1);
 	(void) fcntl(OLDSTD = dcopy(SHIN, FOLDSTD), F_SETFD,  1);
 
-	/* 
+	/*
 	 * Open 0/1/2 to avoid Nis+ functions to pick them up.
 	 *	Now, 0/1/2 are saved, close them and open them.
 	 */
@@ -1335,7 +1336,7 @@ initdesc_x(int argc, char *argv[], int is_reinit)
 	/*
 	 * Clear fd_set mask
 	 */
-	if ( ! is_reinit)
+	if (!is_reinit)
 		CSH_FD_ZERO(fdinuse, nbytesused);
 }
 
@@ -1354,7 +1355,7 @@ closem(void)
 
 	for (f = 3; f <= max_fd; f++) {
 		if (CSH_FD_ISSET(f, fdinuse) &&
-		    f != SHIN && f != SHOUT && f != SHDIAG && 
+		    f != SHIN && f != SHOUT && f != SHDIAG &&
 		    f != OLDSTD && f != FSHTTY)
 			close(f);
 	}
@@ -1376,18 +1377,18 @@ new_process(void)
 
 /*
  * Whenever Csh open/create/dup/pipe a file or files,
- * Csh keeps track of its open files. The open files 
+ * Csh keeps track of its open files. The open files
  * are kept in "fdinuse, Fd In Use" list.
  *
  * When a file descriptor is newly allocated, setfd() is
  * used to mark the fact in "fdinuse" list.
- *	For example, 
+ *	For example,
  *		fd = open("newfile", 0);
  *		setfd(fd);
  *
  * When a file is freed by close() function, unsetfd() is
  * used to remove the fd from "fdinuse" list.
- *	For example, 
+ *	For example,
  *		close(fd);
  *		unsetfd(fd);
  */
@@ -1426,7 +1427,7 @@ unsetfd(int fd)
 
 	CSH_FD_CLR(fd, fdinuse);
 	if (fd == max_fd) {
-		for (i = max_fd-1; i >= 3; i--) 
+		for (i = max_fd-1; i >= 3; i--)
 			if (CSH_FD_ISSET(i, fdinuse)) {
 				max_fd = i;
 				return;

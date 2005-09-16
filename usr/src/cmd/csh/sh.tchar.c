@@ -57,7 +57,7 @@
  *	'to' is assumed to have the enough size to hold the conversion result.
  *	When 'to' is NOSTR(=(tchar *)0), strtots() attempts to allocate a space
  *	automatically using xalloc().  It is caller's responsibility to
- *	free the space allocated in this way, by calling XFREE(ptr).
+ *	free the space allocated in this way, by calling xfree(ptr).
  *	In either case, strtots() returns the pointer to the conversion
  *	result (i.e. 'to', if 'to' wasn't NOSTR, or the allocated space.).
  *	When a conversion or allocateion failed,  NOSTR is returned.
@@ -344,7 +344,7 @@ getenvs_(char *name)
 	char	*val;
 
 	if (pbuf) {
-		XFREE((void *)pbuf);
+		xfree(pbuf);
 		pbuf = NOSTR;
 	}
 	val = getenv(name);
@@ -437,6 +437,7 @@ read_(int d, tchar *buf, int nchreq)
 	/* # of bytes needed to complete the last char just read. */
 	int		delta;
 	unsigned char	*q;	/* q points to the first invalid byte. */
+	int		mb_cur_max = MB_CUR_MAX;
 #ifdef DBG
 	tprintf("Entering read_(d=%d, buf=0x%x, nchreq=%d);\n",
 	    d, buf, nchreq);
@@ -521,11 +522,11 @@ retry:
 				continue;
 			}
 
-			if ((b_len = q - s) > (int)MB_CUR_MAX) {
-				b_len = MB_CUR_MAX;
+			if ((b_len = q - s) > mb_cur_max) {
+				b_len = mb_cur_max;
 			}
 			if ((j = mbtowc(&wc, (char *)s, b_len)) <=  0) {
-				if (b_len < (unsigned int)MB_CUR_MAX) {
+				if (mb_cur_max > 1 && b_len < mb_cur_max) {
 					/*
 					 * Needs more byte to complete this char
 					 * In order to read() more than delta
@@ -533,7 +534,6 @@ retry:
 					 */
 					break;
 				}
-
 				wc = (unsigned char)*s;
 				j = 1;
 			}
@@ -546,8 +546,8 @@ retry:
 		if (k < m) {
 			/* We've read as many bytes as possible. */
 			while (s < q) {
-				if ((b_len = q - s) > (int)MB_CUR_MAX) {
-					b_len = MB_CUR_MAX;
+				if ((b_len = q - s) > mb_cur_max) {
+					b_len = mb_cur_max;
 				}
 				if ((j = mbtowc(&wc, (char *)s, b_len)) <=  0) {
 					wc = (unsigned char)*s;
@@ -563,44 +563,55 @@ retry:
 		p = q;
 	}
 
-	if ((delta = q - s) == 0) {
+	if (mb_cur_max == 1 || (delta = q - s) == 0) {
 		return (nchread);
 	}
 
-	if (*(s + delta - 1) == '\n') {
-		while (s < q) {
-			if ((b_len = q - s) > (int)MB_CUR_MAX) {
-				b_len = MB_CUR_MAX;
-			}
-			if ((j = mbtowc(&wc, (char *)s, b_len)) <=  0) {
-				wc = (unsigned char)*s;
-				j = 1;
-			}
-			*t++ = wc;
-			nchread++;
-			s += j;
-		}
-		return (nchread);
-	}
+	/*
+	 * We may have (MB_CUR_MAX - 1) unread data in the buffer.
+	 * Here, the last converted data was an illegal character which was
+	 * treated as one byte character. We don't know at this point
+	 * whether or not the remaining data is in legal sequence.
+	 * We first attempt to convert the remaining data.
+	 */
+	do {
+		if ((j = mbtowc(&wc, (char *)s, delta)) <= 0)
+			break;
+		*t++ = wc;
+		nchread++;
+		s += j;
+		delta -= j;
+	} while (delta > 0);
 
-	for (; delta < (int)MB_CUR_MAX; delta++, q++) {
+	if (delta == 0)
+		return (nchread);
+
+	/*
+	 * There seem to be ugly sequence in the buffer. Fill up till
+	 * mb_cur_max and see if we can get a right sequence.
+	 */
+	while (delta < mb_cur_max) {
 		assert((q + 1) < (chbuf + sizeof (chbuf)));
-		if (read(d, q, 1) != 1) {
+		if (read(d, q, 1) != 1)
 			break;
-		}
-		if (*q == '\n') {
-			break;
-		}
+		delta++;
+		q++;
 		if (mbtowc(&wc, (char *)s, delta) > 0) {
 			*t = wc;
 			return (nchread + 1);
 		}
 	}
 
+	/*
+	 * no luck. we have filled MB_CUR_MAX bytes in the buffer.
+	 * Ideally we should return with leaving such data off and
+	 * put them into a local buffer for next read, but we don't
+	 * have such.
+	 * So, stop reading further, and treat them as all single
+	 * byte characters.
+	 */
 	while (s < q) {
-		if ((b_len = q - s) > (int)MB_CUR_MAX) {
-			b_len = MB_CUR_MAX;
-		}
+		b_len = q - s;
 		if ((j = mbtowc(&wc, (char *)s, b_len)) <=  0) {
 			wc = (unsigned char)*s;
 			j = 1;
@@ -610,6 +621,7 @@ retry:
 		s += j;
 	}
 	return (nchread);
+
 #else /* !MBCHAR */
 	/* One byte always represents one tchar.  Easy! */
 	int		i;

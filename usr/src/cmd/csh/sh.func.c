@@ -522,7 +522,7 @@ doforeach(tchar **v)
 	if (v == 0) {
 		bferr("No match");
 	}
-	nwp = (struct whyle *)calloc(1, sizeof (*nwp));
+	nwp = (struct whyle *)xcalloc(1, sizeof (*nwp));
 	nwp->w_fe = nwp->w_fe0 = v; gargv = 0;
 	nwp->w_start = btell();
 	nwp->w_fename = savestr(cp);
@@ -563,7 +563,7 @@ dowhile(tchar **v)
 		bferr("Expression syntax");
 	}
 	if (!again) {
-		struct whyle *nwp = (struct whyle *)calloc(1, sizeof (*nwp));
+		struct whyle *nwp = (struct whyle *)xcalloc(1, sizeof (*nwp));
 
 		nwp->w_start = lineloc;
 		nwp->w_end = 0;

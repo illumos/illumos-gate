@@ -28,12 +28,12 @@
 #include <pwd.h>
 #include "sh.tconst.h"
 
-#define TRUE	1
-#define FALSE	0
-#define ON	1
-#define OFF	0
+#define	TRUE	1
+#define	FALSE	0
+#define	ON	1
+#define	OFF	0
 
-#define ESC	'\033'
+#define	ESC	'\033'
 
 extern DIR *opendir_(tchar *);
 
@@ -156,7 +156,7 @@ pushback(tchar *string, int echoflag)
 {
 	tchar *p;
 	struct termios tty;
-	int omask;
+	int omask, retry = 0;
 
 #ifdef TRACE
 	tprintf("TRACE- pushback()\n");
@@ -165,19 +165,25 @@ pushback(tchar *string, int echoflag)
 	tty = tty_new;
 	if (!echoflag)
 		tty.c_lflag &= ~ECHO;
+
+again:
 	(void) ioctl(SHIN, TCSETSF, (char *)&tty);
 
-	for (p = string; *p; p++){
+	for (p = string; *p; p++) {
 		char	mbc[MB_LEN_MAX];
 		int	i, j = wctomb(mbc, (wchar_t)*p);
-		
+
 		if (j < 0) {
 			/* Error! But else what can we do? */
 			continue;
 		}
 		for (i = 0; i < j; ++i) {
-			/* XXX: no error recovery provision. */
-			(void) ioctl(SHIN, TIOCSTI, mbc + i);
+			if (ioctl(SHIN, TIOCSTI, mbc + i) != 0 &&
+			    errno == EAGAIN) {
+				if (retry++ < 5)
+					goto again;
+				/* probably no worth retrying any more */
+			}
 		}
 	}
 
@@ -342,9 +348,9 @@ tilde(tchar *new, tchar *old)
 		;
 	*p = '\0';
 	if (person[0] == '\0')
-		(void) strcpy_(new, value(S_home /*"home"*/));
+		(void) strcpy_(new, value(S_home /* "home" */));
 	else {
-		pw = getpwnam(tstostr(person_,person));
+		pw = getpwnam(tstostr(person_, person));
 		if (pw == NULL)
 			return (NULL);
 		pw_dir = strtots((tchar *)NULL, pw->pw_dir);	/* allocate */
@@ -363,7 +369,7 @@ sim_retype(void)
 {
 #ifdef notdef
 	struct termios tty_pending;
-	
+
 #ifdef TRACE
 	tprintf("TRACE- sim_retypr()\n");
 #endif
@@ -387,7 +393,7 @@ beep_outc(int c)
 
 	buf[0] = c;
 
-	(void) write (SHOUT, buf, 1);
+	(void) write(SHOUT, buf, 1);
 
 	return 0;
 }
@@ -399,8 +405,8 @@ beep(void)
 #ifdef TRACE
 	tprintf("TRACE- beep()\n");
 #endif
-	if (adrof(S_nobeep /*"nobeep" */) == 0)
-		(void) tputs (BELL, 0, beep_outc);
+	if (adrof(S_nobeep /* "nobeep" */) == 0)
+		(void) tputs(BELL, 0, beep_outc);
 }
 
 /*
@@ -422,7 +428,7 @@ print_recognized_stuff(tchar *recognized_part)
 	 * isn't necessary, but it turns out that the visual difference is
 	 * quite noticeable.
 	 */
-	flush();	
+	flush();
 	switch (tswidth(recognized_part)) {
 	case 0:
 		/* erase two characters: ^[ */
@@ -481,12 +487,12 @@ getentry(DIR *dir_fd, int looking_for_lognames)
 	tprintf("TRACE- getentry()\n");
 #endif
 	if (looking_for_lognames) {
-		if ((pw = getpwent ()) == NULL)
+		if ((pw = getpwent()) == NULL)
 			return (NULL);
-		return (strtots(strbuf,pw->pw_name));
+		return (strtots(strbuf, pw->pw_name));
 	}
 	if (dirp = readdir(dir_fd))
-		return (strtots(strbuf,dirp->d_name));
+		return (strtots(strbuf, dirp->d_name));
 	return (NULL);
 }
 
@@ -499,11 +505,11 @@ free_items(tchar **items)
 	tprintf("TRACE- free_items()\n");
 #endif
 	for (i = 0; items[i]; i++)
-		free(items[i]);
-	free( (char *)items);
+		xfree(items[i]);
+	xfree((char *)items);
 }
 
-#define FREE_ITEMS(items) { \
+#define	FREE_ITEMS(items) { \
 	int omask;\
 \
 	omask = sigblock(sigmask(SIGINT));\
@@ -525,7 +531,7 @@ search2(tchar *word, COMMAND command, int max_word_length)
 	tchar tilded_dir[MAXPATHLEN + 1], dir[MAXPATHLEN + 1];
 	tchar name[MAXNAMLEN + 1], extended_name[MAXNAMLEN+1];
 	tchar *entry;
-#define MAXITEMS 1024
+#define	MAXITEMS 1024
 #ifdef TRACE
 	tprintf("TRACE- search2()\n");
 #endif
@@ -541,7 +547,7 @@ search2(tchar *word, COMMAND command, int max_word_length)
 		extract_dir_and_name(word, dir, name);
 		if (tilde(tilded_dir, dir) == 0)
 			return (0);
-		dir_fd = opendir_(*tilded_dir ? tilded_dir : S_DOT /*"."*/);
+		dir_fd = opendir_(*tilded_dir ? tilded_dir : S_DOT /* "." */);
 		if (dir_fd == NULL)
 			return (0);
 	}
@@ -557,15 +563,15 @@ again:	/* search for matches */
 			continue;
 		if (command == LIST) {
 			if (numitems >= MAXITEMS) {
-				printf ("\nYikes!! Too many %s!!\n",
+				printf("\nYikes!! Too many %s!!\n",
 				    looking_for_lognames ?
 					"names in password file":"files");
 				break;
 			}
 			if (items == NULL)
-				items =  (tchar **) calloc(sizeof (items[1]),
+				items =  (tchar **)xcalloc(sizeof (items[1]),
 				    MAXITEMS+1);
-			items[numitems] = (tchar *)xalloc((unsigned)(strlen_(entry) + 1)*sizeof(tchar));
+			items[numitems] = (tchar *)xalloc((unsigned)(strlen_(entry) + 1) * sizeof (tchar));
 			copyn(items[numitems], entry, MAXNAMLEN);
 			numitems++;
 		} else {			/* RECOGNIZE command */
@@ -580,7 +586,7 @@ again:	/* search for matches */
 		ignoring = FALSE;
 		nignored = 0;
 		if (looking_for_lognames)
-			(void)setpwent();
+			(void) setpwent();
 		else
 			rewinddir(dir_fd);
 		goto again;
@@ -594,7 +600,7 @@ again:	/* search for matches */
 	}
 	if (command == RECOGNIZE && numitems > 0) {
 		if (looking_for_lognames)
-			 copyn(word, S_TIL /*"~" */, 1);
+			copyn(word, S_TIL /* "~" */, 1);
 		else
 			/* put back dir part */
 			copyn(word, dir, max_word_length);
@@ -603,8 +609,8 @@ again:	/* search for matches */
 		return (numitems);
 	}
 	if (command == LIST) {
-		qsort( (char *)items, numitems, sizeof(items[1]), 
-		      (int (*)(const void *, const void *))fcompare);
+		qsort((char *)items, numitems, sizeof (items[1]),
+		    (int (*)(const void *, const void *))fcompare);
 		/*
 		 * Never looking for commands in this version, so final
 		 * argument forced to 0.  If command name completion is
@@ -621,7 +627,7 @@ again:	/* search for matches */
 /*
  * Object: extend what user typed up to an ambiguity.
  * Algorithm:
- * On first match, copy full entry (assume it'll be the only match) 
+ * On first match, copy full entry (assume it'll be the only match)
  * On subsequent matches, shorten extended_name to the first
  * character mismatch between extended_name and entry.
  * If we shorten it back to the prefix length, stop searching.
@@ -680,9 +686,9 @@ is_suffix(tchar *check, tchar *template)
 #ifdef TRACE
 	tprintf("TRACE- is_suffix()\n");
 #endif
-	for (c = check; *c++;)
+	for (c = check; *c++; )
 		;
-	for (t = template; *t++;)
+	for (t = template; *t++; )
 		;
 	for (;;) {
 		if (t == template)
@@ -707,7 +713,7 @@ tenex(tchar *inputline, int inputline_size)
 	should_retype = FALSE;
 	while ((i = read_(SHIN, inputline+num_read, inputline_size-num_read))
 	    > 0) {
-		static tchar *delims = S_DELIM /*" '\"\t;&<>()|`"*/;
+		static tchar *delims = S_DELIM /* " '\"\t;&<>()|`" */;
 		tchar *str_end, *word_start, last_char;
 		int space_left;
 		struct termios tty;
@@ -717,7 +723,11 @@ tenex(tchar *inputline, int inputline_size)
 		inputline[num_read] = '\0';
 		last_char = inputline[num_read - 1] & TRIM;
 
-		if ((num_read == inputline_size) || (last_char == '\n'))
+		/*
+		 * read_() can return more than requested size if there
+		 * is multibyte character at the end.
+		 */
+		if ((num_read >= inputline_size) || (last_char == '\n'))
 			break;
 
 		str_end = &inputline[num_read];
@@ -794,7 +804,7 @@ ignored(tchar *entry)
 #ifdef TRACE
 	tprintf("TRACE- ignored()\n");
 #endif
-	if ((vp = adrof(S_fignore /*"fignore"*/)) == NULL ||
+	if ((vp = adrof(S_fignore /* "fignore" */)) == NULL ||
 	    (cp = vp->vec) == NULL)
 		return (FALSE);
 	for (; *cp != NULL; cp++)

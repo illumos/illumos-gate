@@ -38,24 +38,24 @@
 #define	MAXHOSTNAMELEN	64
 
 #ifdef MBCHAR
-# if !defined(MB_LEN_MAX) || !defined(MB_CUR_MAX)
+#if !defined(MB_LEN_MAX) || !defined(MB_CUR_MAX)
 	Error: I need both ANSI macros!
-# endif
+#endif
 #else
-# if !defined(MB_LEN_MAX)
-#  define MB_LEN_MAX	1
-# endif
-# if !defined(MB_CUR_MAX)
-#  define MB_CUR_MAX	1
-# endif
+#if !defined(MB_LEN_MAX)
+#define	MB_LEN_MAX	1
+#endif
+#if !defined(MB_CUR_MAX)
+#define	MB_CUR_MAX	1
+#endif
 #endif
 
 #ifndef MBCHAR /* Let's replace the ANSI functions with our own macro
 		* for efficiency!
 		*/
-#define	mbtowc(pwc, pmb, n_is_ignored)	((*(pwc)=*(pmb)), 1)
-#define	wctomb(pmb, wc)			((*(pmb)=((char)wc)), 1)
-#endif/*!MBCHAR*/
+#define	mbtowc(pwc, pmb, n_is_ignored)	((*(pwc) = *(pmb)), 1)
+#define	wctomb(pmb, wc)			((*(pmb) = ((char)wc)), 1)
+#endif /* !MBCHAR */
 
 /*
  * C shell
@@ -67,11 +67,12 @@
  * April, 1980
  */
 
-/*If we are setting the $cwd variable becuz we did a
-  cd, chdir, pushd, popd command, then set didchdir to
-  1.  This prevents globbing down when setting $cwd.  
-  However, if the user set $cwd, we want the globbing
-  done; so, didchdir would be equal to 0 in that case.
+/*
+ * If we are setting the $cwd variable becuz we did a
+ * cd, chdir, pushd, popd command, then set didchdir to
+ * 1.  This prevents globbing down when setting $cwd.
+ * However, if the user set $cwd, we want the globbing
+ * done; so, didchdir would be equal to 0 in that case.
  */
 int didchdir;
 
@@ -79,26 +80,27 @@ int didchdir;
 
 typedef	char	bool;
 
-/* tchar (Tagged CHARacter) is a place holder to keep a QUOTE bit and 
+/*
+ * tchar (Tagged CHARacter) is a place holder to keep a QUOTE bit and
  * a character.
  * For European language handling, lower 8 bits of tchar is used
  * to store a character.  For other languages, especially Asian, 16 bits
  * are used to store a character.
  * Following typedef's assume short int is a 16-bit entity and long int is
  * a 32-bit entity.
- * The QUOTE bit tells whether the character is subject to further 
- * interpretation such as history substitution, file mathing, command 
+ * The QUOTE bit tells whether the character is subject to further
+ * interpretation such as history substitution, file mathing, command
  * subsitution.  TRIM is a mask to strip off the QUOTE bit.
  */
 #ifdef MBCHAR		/* For multibyte character handling. */
 typedef long int	tchar;
-#define QUOTE	0x80000000
+#define	QUOTE	0x80000000
 #define	TRIM	0x7fffffff
-#else/*!MBCHAR*/	/* European language requires only 8 bits. */
+#else /* !MBCHAR */	/* European language requires only 8 bits. */
 typedef unsigned short int	tchar;
 #define	QUOTE	0x8000
 #define	TRIM	0x00ff
-#endif/*!MBCHAR*/
+#endif /* !MBCHAR */
 #define	eq(a, b)	(strcmp_(a, b) == 0)
 
 
@@ -224,7 +226,7 @@ struct	Bin {
 #define	fblocks	B.Bfblocks
 #define	fbuf	B.Bfbuf
 
-#define btell()	fseekp
+#define	btell()	fseekp
 
 #ifndef btell
 off_t	btell(void);
@@ -375,24 +377,24 @@ struct	varent {
 	struct	varent *v_link[3];	/* The links, see below */
 	int	v_bal;		/* Balance factor */
 } shvhed, aliases;
-#define v_left		v_link[0]
-#define v_right		v_link[1]
-#define v_parent	v_link[2]
+#define	v_left		v_link[0]
+#define	v_right		v_link[1]
+#define	v_parent	v_link[2]
 
 struct varent *adrof1();
-#define adrof(v)	adrof1(v, &shvhed)
-#define value(v)	value1(v, &shvhed)
+#define	adrof(v)	adrof1(v, &shvhed)
+#define	value(v)	value1(v, &shvhed)
 
 /*
  * MAX_VAR_LEN - maximum variable name defined by csh man page to be 20
  */
-#define MAX_VAR_LEN           20
+#define	MAX_VAR_LEN	20
 
 /*
  * MAX_VREF_LEN - maximum variable reference $name[...]
  * it can be as big as a csh word, which is 1024
  */
-#define MAX_VREF_LEN  1024
+#define	MAX_VREF_LEN	1024
 
 
 /*
@@ -466,32 +468,11 @@ int	lastev;				/* Last event reference (default) */
 tchar	HIST;				/* history invocation character */
 tchar	HISTSUB;			/* auto-substitute character */
 
-/*
- * In lines for frequently called functions
- *
- * WARNING: changes here also need to occur in the xfree() function in
- *	    sh.misc.c.
- */
-#if defined(sparc)
-#define XFREE(cp) { \
-	extern char end[]; \
-	char stack; \
-/*??*/	if (((char *)(cp)) >= end && ((char *)(cp)) < &stack) \
-/*??*/		free((void *)(cp)); \
-}
-#elif defined(i386)	
-#define XFREE(cp) { \
-	extern char end[]; \
-	if (((char *)(cp)) >= end) \
-		free((void *)(cp)); \
-}
-#else
-#error XFREE macro is machine dependant and no machine type is recognized
-#endif
-void	*alloctmp;
-#define xalloc(i) ((alloctmp = (void *)malloc(i)) ? alloctmp : (void *)nomem(i))/*??*/
-#define	xrealloc(buf, i) ((alloctmp = (void *)realloc(buf, i)) ? alloctmp : \
-				(void *)nomem(i))
+extern void	*xalloc(size_t);
+extern void	*xcalloc(size_t, size_t);
+extern void	*xrealloc(void *, size_t);
+extern void	xfree(void *);
+
 extern void	Putchar(tchar);
 extern void	bferr(char *)	__NORETURN;
 extern void	error()	__NORETURN;
@@ -571,9 +552,9 @@ char	*tstostr(/* char *  , tchar * */);
  * times (once for each path component checked).
  * Byte size is assumed to be 8.
  */
-#define HSHSIZ          (32*1024)       /* 4k bytes */
-#define HSHMASK         (HSHSIZ - 1)
-#define HSHMUL          243
+#define	HSHSIZ		(32*1024)	/* 4k bytes */
+#define	HSHMASK		(HSHSIZ - 1)
+#define	HSHMUL		243
 
 /*
  * The following two arrays are used for caching.  xhash
@@ -583,11 +564,9 @@ char	*tstostr(/* char *  , tchar * */);
 
 char xhash[HSHSIZ / 8];
 char xhash2[HSHSIZ / 8];
-#define hash(a, b)      ((a) * HSHMUL + (b) & HSHMASK)
-#define bit(h, b)       ((h)[(b) >> 3] & 1 << ((b) & 7))        /* bit test */
-#define bis(h, b)       ((h)[(b) >> 3] |= 1 << ((b) & 7))       /* bit set */
+#define	hash(a, b)	((a) * HSHMUL + (b) & HSHMASK)
+#define	bit(h, b)	((h)[(b) >> 3] & 1 << ((b) & 7))	/* bit test */
+#define	bis(h, b)	((h)[(b) >> 3] |= 1 << ((b) & 7))	/* bit set */
 #ifdef VFORK
-int     hits, misses;
+int	hits, misses;
 #endif
-
-

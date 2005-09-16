@@ -21,8 +21,8 @@
  * C shell
  */
 
-#define IGNORE	1	/* in ignore, it means to ignore value, just parse */
-#define NOGLOB	2	/* in ignore, it means not to globone */
+#define	IGNORE	1	/* in ignore, it means to ignore value, just parse */
+#define	NOGLOB	2	/* in ignore, it means not to globone */
 
 #define	ADDOP	1
 #define	MULOP	2
@@ -35,8 +35,8 @@
 #define	GTR	2
 #define	LSS	4
 #define	NOTEQ	6
-#define EQMATCH 7
-#define NOTEQMATCH 8
+#define	EQMATCH 7
+#define	NOTEQMATCH 8
 
 int	exp0(tchar ***, bool);
 int	exp1(tchar ***, bool);
@@ -64,36 +64,36 @@ void	evalav(tchar **);
 
 int
 chk_access(tchar *path, mode_t mode)
-{	
+{
 	static int flag;
-	static uid_t euid; 
+	static uid_t euid;
 	struct stat statb;
 	mode_t ftype;
 	unsigned char name[MAXPATHLEN*MB_LEN_MAX]; /* General use buffer. */
 
 	/* convert tchar * to char * */
 	tstostr(name, path);
-	
-	if(flag == 0) {
+
+	if (flag == 0) {
 		euid = geteuid();
 		flag = 1;
 	}
 	if (stat((char *)name, &statb) == 0) {
 		ftype = statb.st_mode & S_IFMT;
-		if(access((char *)name, 010|(mode>>6)) == 0) {
-			if(euid == 0) {
+		if (access((char *)name, 010|(mode>>6)) == 0) {
+			if (euid == 0) {
 				if (ftype != S_IFREG || mode != S_IEXEC)
-					return(0);
-		    		/* root can execute file as long as it has execute 
-			   	permission for someone */
+					return (0);
+				/* root can execute file as long as it has execute
+				permission for someone */
 				if (statb.st_mode & (S_IEXEC|(S_IEXEC>>3)|(S_IEXEC>>6)))
-					return(0);
-				return(-1);
+					return (0);
+				return (-1);
 			}
-			return(0);
+			return (0);
 		}
 	}
-	return(-1);
+	return (-1);
 }
 
 int
@@ -113,11 +113,11 @@ exp0(tchar ***vp, bool ignore)
 #ifdef TRACE
 	tprintf("TRACE- exp0()\n");
 #endif
-	
+
 #ifdef EDEBUG
 	etraci("exp0 p1", p1, vp);
 #endif
-	if (**vp && eq(**vp, S_BARBAR /*"||"*/)) {
+	if (**vp && eq(**vp, S_BARBAR /* "||" */)) {
 		int p2;
 
 		(*vp)++;
@@ -141,7 +141,7 @@ exp1(tchar ***vp, bool ignore)
 #ifdef EDEBUG
 	etraci("exp1 p1", p1, vp);
 #endif
-	if (**vp && eq(**vp, S_ANDAND /*"&&" */)) {
+	if (**vp && eq(**vp, S_ANDAND /* "&&" */)) {
 		int p2;
 
 		(*vp)++;
@@ -165,7 +165,7 @@ exp2(tchar ***vp, bool ignore)
 #ifdef EDEBUG
 	etraci("exp3 p1", p1, vp);
 #endif
-	if (**vp && eq(**vp, S_BAR /*"|" */)) {
+	if (**vp && eq(**vp, S_BAR /* "|" */)) {
 		int p2;
 
 		(*vp)++;
@@ -189,7 +189,7 @@ exp2a(tchar ***vp, bool ignore)
 #ifdef EDEBUG
 	etraci("exp2a p1", p1, vp);
 #endif
-	if (**vp && eq(**vp, S_HAT /*"^" */)) {
+	if (**vp && eq(**vp, S_HAT /* "^" */)) {
 		int p2;
 
 		(*vp)++;
@@ -213,8 +213,8 @@ exp2b(tchar ***vp, bool ignore)
 #ifdef EDEBUG
 	etraci("exp2b p1", p1, vp);
 #endif
-	if (**vp && eq(**vp, S_AND /*"&"*/)) {
-		 int p2;
+	if (**vp && eq(**vp, S_AND /* "&" */)) {
+		int p2;
 
 		(*vp)++;
 		p2 = exp2b(vp, ignore);
@@ -288,7 +288,7 @@ exp3(tchar ***vp, bool ignore)
 #endif
 	if (i = isa(**vp, RELOP)) {
 		(*vp)++;
-		if (**vp && eq(**vp, S_EQ /*"=" */))
+		if (**vp && eq(**vp, S_EQ /* "=" */))
 			i |= 1, (*vp)++;
 		p2 = exp3(vp, ignore);
 #ifdef EDEBUG
@@ -452,7 +452,7 @@ exp6(tchar ***vp, bool ignore)
 		xfree(cp);
 		return (putn(!i));
 	}
-	if (eq(**vp, S_TIL /*"~" */)) {
+	if (eq(**vp, S_TIL /* "~" */)) {
 		(*vp)++;
 		cp = exp6(vp, ignore);
 #ifdef EDEBUG
@@ -462,7 +462,7 @@ exp6(tchar ***vp, bool ignore)
 		xfree(cp);
 		return (putn(~i));
 	}
-	if (eq(**vp, S_LPAR /*"(" */)) {
+	if (eq(**vp, S_LPAR /* "(" */)) {
 		(*vp)++;
 		ccode = exp0(vp, ignore);
 #ifdef EDEBUG
@@ -482,18 +482,18 @@ exp6(tchar ***vp, bool ignore)
 		faket.t_dflg = 0;
 		faket.t_dcar = faket.t_dcdr = faket.t_dspr = (struct command *)0;
 		faket.t_dcom = fakecom;
-		fakecom[0] = S_BRAPPPBRA /*"{ ... }" */;
+		fakecom[0] = S_BRAPPPBRA /* "{ ... }" */;
 		fakecom[1] = NOSTR;
 		(*vp)++;
 		v = *vp;
 		for (;;) {
 			if (!**vp)
 				bferr("Missing }");
-			if (eq(*(*vp)++, S_RBRA /*"}" */))
+			if (eq(*(*vp)++, S_RBRA /* "}" */))
 				break;
 		}
 		if (ignore&IGNORE)
-			return (S_ /*""*/);
+			return (S_ /* "" */);
 		psavejob();
 		if (pfork(&faket, -1) == 0) {
 			*--(*vp) = 0;
@@ -505,12 +505,12 @@ exp6(tchar ***vp, bool ignore)
 #ifdef EDEBUG
 		etraci("exp6 {} status", egetn(value("status")), vp);
 #endif
-		return (putn(egetn(value(S_status /*"status" */)) == 0));
+		return (putn(egetn(value(S_status /* "status" */)) == 0));
 	}
 	if (isa(**vp, ANYOP))
-		return (S_ /*""*/);
+		return (S_ /* "" */);
 	cp = *(*vp)++;
-	if (*cp == '-' && any(cp[1], S_erwxfdzo /*"erwxfdzo" */)) {
+	if (*cp == '-' && any(cp[1], S_erwxfdzo /* "erwxfdzo" */)) {
 		struct stat stb;
 
 		if (cp[2] != '\0')
@@ -529,7 +529,7 @@ exp6(tchar ***vp, bool ignore)
 		dp = *(*vp)++;
 
 		if (ignore&IGNORE)
-			return (S_ /*""*/);
+			return (S_ /* "" */);
 		ep = globone(dp);
 		switch (cp[1]) {
 
@@ -548,7 +548,7 @@ exp6(tchar ***vp, bool ignore)
 		default:
 			if (stat_(ep, &stb)) {
 				xfree(ep);
-				return (S_0 /*"0"*/);
+				return (S_0 /* "0" */);
 			}
 			switch (cp[1]) {
 
@@ -592,15 +592,15 @@ evalav(tchar **v)
 	struct wordent *hp = &paraml;
 	struct command *t;
 	struct wordent *wdp = hp;
-	
+
 #ifdef TRACE
 	tprintf("TRACE- evalav()\n");
 #endif
-	set(S_status /*"status" */, S_0 /*"0"*/);
+	set(S_status /* "status" */, S_0 /* "0" */);
 	hp->prev = hp->next = hp;
-	hp->word = S_ /*""*/;
+	hp->word = S_ /* "" */;
 	while (*v) {
-		struct wordent *new = (struct wordent *) calloc(1, sizeof *wdp);
+		struct wordent *new = (struct wordent *)xcalloc(1, sizeof *wdp);
 
 		new->prev = wdp;
 		new->next = hp;
@@ -632,7 +632,7 @@ isa(tchar *cp, int what)
 		if (what & MULOP && (*cp == '*' || *cp == '/' || *cp == '%'))
 			return (1);
 		if (what & RESTOP && (*cp == '(' || *cp == ')' || *cp == '!' ||
-				      *cp == '~' || *cp == '^' || *cp == '"'))
+					*cp == '~' || *cp == '^' || *cp == '"'))
 			return (1);
 	} else if (cp[2] == 0) {
 		if (what & RESTOP) {

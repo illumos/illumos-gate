@@ -157,8 +157,8 @@ asyn3(struct wordent *p1, struct wordent *p2)
 	if (p1->word[0] && eq(p1->word, alout.next->word)) {
 		tchar *cp = alout.next->word;
 
-		alout.next->word = strspl(S_TOPBIT /*"\200"*/, cp);
-		XFREE(cp)
+		alout.next->word = strspl(S_TOPBIT /* "\200" */, cp);
+		xfree(cp);
 	}
 	p1 = freenod(p1, redid ? p2 : p1->next);
 	if (alout.next != &alout) {
@@ -166,8 +166,8 @@ asyn3(struct wordent *p1, struct wordent *p2)
 		alout.prev->prev->next = p1->next;
 		alout.next->prev = p1;
 		p1->next = alout.next;
-		XFREE(alout.prev->word)
-		XFREE( (tchar *)alout.prev)
+		xfree(alout.prev->word);
+		xfree(alout.prev);
 	}
 	reset();		/* throw! */
 }
@@ -181,9 +181,9 @@ freenod(struct wordent *p1, struct wordent *p2)
 	tprintf("TRACE- freenod()\n");
 #endif
 	while (p1 != p2) {
-		XFREE(p1->word)
+		xfree(p1->word);
 		p1 = p1->next;
-		XFREE( (tchar *)p1->prev)
+		xfree(p1->prev);
 	}
 	retp->next = p2;
 	p2->prev = retp;
@@ -253,7 +253,7 @@ syn0(struct wordent *p1, struct wordent *p2, int flags)
 			/* fall into ... */
 
 		case '>':
-			if (p->next != p2 && eq(p->next->word, S_AND /*"&"*/))
+			if (p->next != p2 && eq(p->next->word, S_AND /* "&" */))
 				p = p->next;
 			continue;
 
@@ -264,21 +264,21 @@ syn0(struct wordent *p1, struct wordent *p2, int flags)
 				continue;
 			t1 = syn1(p1, p, flags);
 			if (t1->t_dtyp == TLST ||
-    			    t1->t_dtyp == TAND ||
-    			    t1->t_dtyp == TOR) {
-				t = (struct command *) calloc(1, sizeof (*t));
+			    t1->t_dtyp == TAND ||
+			    t1->t_dtyp == TOR) {
+				t = (struct command *)xcalloc(1, sizeof (*t));
 				t->t_dtyp = TPAR;
 				t->t_dflg = FAND|FINT;
 				t->t_dspr = t1;
 				t1 = t;
 			} else
 				t1->t_dflg |= FAND|FINT;
-			t = (struct command *) calloc(1, sizeof (*t));
+			t = (struct command *)xcalloc(1, sizeof (*t));
 			t->t_dtyp = TLST;
 			t->t_dflg = 0;
 			t->t_dcar = t1;
 			t->t_dcdr = syntax(p, p2, flags);
-			return(t);
+			return (t);
 		}
 	if (l == 0)
 		return (syn1(p1, p2, flags));
@@ -317,7 +317,7 @@ syn1(struct wordent *p1, struct wordent *p2, int flags)
 		case '\n':
 			if (l != 0)
 				break;
-			t = (struct command *) calloc(1, sizeof (*t));
+			t = (struct command *)xcalloc(1, sizeof (*t));
 			t->t_dtyp = TLST;
 			t->t_dcar = syn1a(p1, p, flags);
 			t->t_dcdr = syntax(p->next, p2, flags);
@@ -358,7 +358,7 @@ syn1a(struct wordent *p1, struct wordent *p2, int flags)
 			if (p->word[1] != '|')
 				continue;
 			if (l == 0) {
-				t = (struct command *) calloc(1, sizeof (*t));
+				t = (struct command *)xcalloc(1, sizeof (*t));
 				t->t_dtyp = TOR;
 				t->t_dcar = syn1b(p1, p, flags);
 				t->t_dcdr = syn1a(p->next, p2, flags);
@@ -399,7 +399,7 @@ syn1b(struct wordent *p1, struct wordent *p2, int flags)
 
 		case '&':
 			if (p->word[1] == '&' && l == 0) {
-				t = (struct command *) calloc(1, sizeof (*t));
+				t = (struct command *)xcalloc(1, sizeof (*t));
 				t->t_dtyp = TAND;
 				t->t_dcar = syn2(p1, p, flags);
 				t->t_dcdr = syn1b(p->next, p2, flags);
@@ -442,7 +442,7 @@ syn2(struct wordent *p1, struct wordent *p2, int flags)
 		case '|':
 			if (l != 0)
 				continue;
-			t = (struct command *) calloc(1, sizeof (*t));
+			t = (struct command *)xcalloc(1, sizeof (*t));
 			f = flags | POUT;
 			pn = p->next;
 			if (pn != p2 && pn->word[0] == '&') {
@@ -544,8 +544,8 @@ again:
 		}
 	if (n < 0)
 		n = 0;
-	t = (struct command *) calloc(1, sizeof (*t));
-	av =  (tchar **) calloc((unsigned) (n + 1), sizeof  (tchar **));
+	t = (struct command *)xcalloc(1, sizeof (*t));
+	av =  (tchar **)xcalloc((unsigned)(n + 1), sizeof (tchar **));
 	t->t_dcom = av;
 	n = 0;
 	if (p2->word[0] == ')')
@@ -577,12 +577,12 @@ again:
 				goto savep;
 			if (p->word[1] == '>')
 				t->t_dflg |= FCAT;
-			if (p->next != p2 && eq(p->next->word, S_AND /*"&"*/)) {
+			if (p->next != p2 && eq(p->next->word, S_AND /* "&" */)) {
 				t->t_dflg |= FDIAG, p = p->next;
 				if (flags & (POUT|PDIAG))
 					goto badout;
 			}
-			if (p->next != p2 && eq(p->next->word, S_EXAS /*"!"*/))
+			if (p->next != p2 && eq(p->next->word, S_EXAS /* "!" */))
 				t->t_dflg |= FANY, p = p->next;
 			if (p->next == p2) {
 missfile:
@@ -665,8 +665,8 @@ freesyn(struct command *t)
 		/* fall into ... */
 
 lr:
-		XFREE(t->t_dlef)
-		XFREE(t->t_drit)
+		xfree(t->t_dlef);
+		xfree(t->t_drit);
 		break;
 
 	case TAND:
@@ -676,7 +676,7 @@ lr:
 		freesyn(t->t_dcar), freesyn(t->t_dcdr);
 		break;
 	}
-	XFREE( (tchar *)t)
+	xfree(t);
 }
 
 

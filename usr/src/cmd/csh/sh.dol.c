@@ -38,7 +38,7 @@ tchar	*Dcp, **Dvp;			/* Input vector for Dreadc */
 
 #define	unDgetC(c)	Dpeekc = c
 
-#define QUOTES		(_Q|_Q1|_ESC)	/* \ ' " ` */
+#define	QUOTES		(_Q|_Q1|_ESC)	/* \ ' " ` */
 
 /*
  * The following variables give the information about the current
@@ -73,7 +73,7 @@ Dfix(struct command *t)
 	if (noexec)
 		return;
 	/* Note that t_dcom isn't trimmed thus !...:q's aren't lost */
-	for (pp = t->t_dcom; p = *pp++;)
+	for (pp = t->t_dcom; p = *pp++; )
 		while (*p)
 			if (cmap(*p++, _DOL|QUOTES)) {	/* $, \, ', ", ` */
 				Dfix2(t->t_dcom);	/* found one */
@@ -120,7 +120,7 @@ Dfix2(tchar **v)
 	tprintf("TRACE- Dfix2()\n");
 #endif
 	ginit(agargv);			/* Initialize glob's area pointers */
-	Dvp = v; Dcp = S_ /* "" */;/* Setup input vector for Dreadc */
+	Dvp = v; Dcp = S_ /* "" */;	/* Setup input vector for Dreadc */
 	unDgetC(0); unDredc(0);		/* Clear out any old peeks (at error) */
 	dolp = 0; dolcnt = 0;		/* Clear out residual $ expands (...) */
 	while (Dword())
@@ -340,7 +340,7 @@ Dgetdol(void)
 	int c, sc;
 	int subscr = 0, lwb = 1, upb = 0;
 	bool dimen = 0, bitset = 0;
-	tchar wbuf[BUFSIZ];
+	tchar wbuf[BUFSIZ + MB_LEN_MAX]; /* read_ may return extra bytes */
 
 #ifdef TRACE
 	tprintf("TRACE- Dgetdol()\n");
@@ -354,7 +354,7 @@ Dgetdol(void)
 	else if (c == '?')
 		bitset++, c = DgetC(0);		/* $? tests existence */
 	switch (c) {
-	
+
 	case '$':
 		if (dimen || bitset)
 syntax:
@@ -410,7 +410,7 @@ syntax:
 				error("Subscript out of range");
 			if (subscr == 0) {
 				if (bitset) {
-					dolp = file ? S_1/*"1"*/ : S_0/*"0"*/;
+					dolp = file ? S_1 /* "1" */ : S_0 /* "0" */;
 					goto eatbrac;
 				}
 				if (file == 0)
@@ -444,14 +444,18 @@ syntax:
 		vp = adrof(name);
 	}
 	if (bitset) {
-		/* getenv() to getenv_(), because 'name''s type is now tchar * */
-		/* no need to xalloc */
-		dolp = (vp || getenv_(name)) ? S_1 /*"1"*/ : S_0/*"0"*/;
+		/*
+		 * getenv() to getenv_(), because 'name''s type is now tchar *
+		 * no need to xalloc
+		 */
+		dolp = (vp || getenv_(name)) ? S_1 /* "1" */ : S_0 /* "0" */;
 		goto eatbrac;
 	}
 	if (vp == 0) {
-		/* getenv() to getenv_(), because 'name''s type is now tchar * */
-		/* no need to xalloc */
+		/*
+		 * getenv() to getenv_(), because 'name''s type is now tchar *
+		 * no need to xalloc
+		 */
 		np = getenv_(name);
 		if (np) {
 			addla(np);
@@ -484,15 +488,15 @@ syntax:
 
 			while (digit(*np))
 				i = i * 10 + *np++ - '0';
-/*			if ((i < 0 || i > upb) && !any(*np, "-*")) {*/
-			if ((i < 0 || i > upb) && (*np!='-') && (*np!='*')) {
+/*			if ((i < 0 || i > upb) && !any(*np, "-*")) { */
+			if ((i < 0 || i > upb) && (*np != '-') && (*np != '*')) {
 oob:
 				setname(vp->v_name);
 				error("Subscript out of range");
 			}
 			lwb = i;
 			if (!*np)
-				upb = lwb, np = S_AST/*"*"*/;
+				upb = lwb, np = S_AST /* "*" */;
 		}
 		if (*np == '*')
 			np++;
@@ -578,7 +582,7 @@ setDolp(tchar *cp)
 		xfree(dp);
 	} else
 		addla(cp);
-	dolp = S_/*""*/;
+	dolp = S_ /* "" */;
 }
 
 void
@@ -660,9 +664,9 @@ heredoc(tchar *term)
 			if (c &= TRIM) {
 				*lbp++ = c;
 				if (--lcnt < 0) {
-					setname(S_LESLES/*"<<"*/);
+					setname(S_LESLES /* "<<" */);
 					error("Line overflow");
-				} 
+				}
 			}
 		}
 		*lbp = 0;
@@ -681,7 +685,7 @@ heredoc(tchar *term)
 		 */
 		if (quoted || noexec) {
 			*lbp++ = '\n'; *lbp = 0;
-			for (lbp = lbuf; c = *lbp++;) {
+			for (lbp = lbuf; c = *lbp++; ) {
 				*obp++ = c;
 				if (--ocnt == 0) {
 					(void) write_(0, obuf, BUFSIZ);
@@ -703,17 +707,17 @@ heredoc(tchar *term)
 			if ((c &= TRIM) == 0)
 				continue;
 			/* \ quotes \ $ ` here */
-			if (c =='\\') {
+			if (c == '\\') {
 				c = DgetC(0);
-/*				if (!any(c, "$\\`"))*/
-				if ((c!='$')&&(c!='\\')&&(c!='`'))
+/*				if (!any(c, "$\\`")) */
+				if ((c != '$') && (c != '\\') && (c != '`'))
 					unDgetC(c | QUOTE), c = '\\';
 				else
 					c |= QUOTE;
 			}
 			*mbp++ = c;
 			if (--mcnt == 0) {
-				setname(S_LESLES/*"<<"*/);
+				setname(S_LESLES /* "<<" */);
 				bferr("Line overflow");
 			}
 		}

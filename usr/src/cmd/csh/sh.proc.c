@@ -24,7 +24,7 @@
  * C Shell - functions that manage processes, handling hanging, termination
  */
 
-#define BIGINDEX	9	/* largest desirable job index */
+#define	BIGINDEX	9	/* largest desirable job index */
 
 void	pjwait(struct process *);
 void	pflush(struct process *);
@@ -60,12 +60,12 @@ pchild(void)
 #endif
 loop:
 	pid = csh_wait3(&w, (setintr ? WNOHANG|WUNTRACED:WNOHANG), &ru);
-        /*
-         * SysV sends a SIGCHLD when the child process
-         * receives a SIGCONT, and result of that action is ignored here
-         */
-        if ( w.w_status == WCONTFLG )
-                return;
+	/*
+	 * SysV sends a SIGCHLD when the child process
+	 * receives a SIGCONT, and result of that action is ignored here
+	 */
+	if (w.w_status == WCONTFLG)
+		return;
 	if (pid <= 0) {
 		if (errno == EINTR) {
 			errno = 0;
@@ -79,14 +79,14 @@ loop:
 			goto found;
 	goto loop;
 found:
-	if (pid == atoi_(value(S_child /*"child"*/)))
-		unsetv(S_child /*"child"*/);
+	if (pid == atoi_(value(S_child /* "child" */)))
+		unsetv(S_child /* "child" */);
 	pp->p_flags &= ~(PRUNNING|PSTOPPED|PREPORTED);
 	if (WIFSTOPPED(w)) {
 		pp->p_flags |= PSTOPPED;
 		pp->p_reason = w.w_stopsig;
 	} else {
-		if (pp->p_flags & (PTIME|PPTIME) || adrof(S_time /*"time"*/))
+		if (pp->p_flags & (PTIME|PPTIME) || adrof(S_time /* "time" */))
 			(void) gettimeofday(&pp->p_etime, (struct timezone *)0);
 		pp->p_rusage = ru;
 		if (WIFSIGNALED(w)) {
@@ -109,9 +109,9 @@ found:
 	fp = pp;
 	do {
 		if ((fp->p_flags & (PPTIME|PRUNNING|PSTOPPED)) == 0 &&
-		    !child && adrof(S_time /*"time"*/) &&
+		    !child && adrof(S_time /* "time" */) &&
 		    fp->p_rusage.ru_utime.tv_sec+fp->p_rusage.ru_stime.tv_sec >=
-		     atoi_(value(S_time /*"time"*/)))
+		    atoi_(value(S_time /* "time" */)))
 			fp->p_flags |= PTIME;
 		jobflags |= fp->p_flags;
 	} while ((fp = fp->p_friends) != pp);
@@ -125,8 +125,8 @@ found:
 		do {
 			if (fp->p_flags&PSTOPPED)
 				fp->p_flags |= PREPORTED;
-		} while((fp = fp->p_friends) != pp);
-		while(fp->p_pid != fp->p_jobid)
+		} while ((fp = fp->p_friends) != pp);
+		while (fp->p_pid != fp->p_jobid)
 			fp = fp->p_friends;
 		if (jobflags&PSTOPPED) {
 			if (pcurrent && pcurrent != fp)
@@ -143,7 +143,7 @@ found:
 				;	/* print in pjwait */
 			}
 		} else {
-			if (jobflags&PNOTIFY || adrof(S_notify /*"notify"*/)) {
+			if (jobflags&PNOTIFY || adrof(S_notify /* "notify" */)) {
 				write_string("\015\n");
 				flush();
 				(void) pprint(pp, NUMBER|NAME|REASON);
@@ -204,7 +204,7 @@ pwait(void)
 			if (pp->p_cwd && --pp->p_cwd->di_count == 0)
 				if (pp->p_cwd->di_next == 0)
 					dfree(pp->p_cwd);
-			xfree( (tchar *)pp);
+			xfree((tchar *)pp);
 			pp = fp;
 		}
 	(void) sigsetmask(omask);
@@ -272,13 +272,13 @@ pjwait(struct process *pp)
 	if (tpgrp > 0)			/* get tty back */
 		(void) ioctl(FSHTTY, TIOCSPGRP,  (char *)&tpgrp);
 	if ((jobflags&(PSIGNALED|PSTOPPED|PTIME)) ||
-	     !eq(dcwd->di_name, fp->p_cwd->di_name)) {
+	    !eq(dcwd->di_name, fp->p_cwd->di_name)) {
 		if (jobflags&PSTOPPED)
 			printf("\n");
 		(void) pprint(pp, AREASON|SHELLDIR);
 	}
 	if ((jobflags&(PINTERRUPTED|PSTOPPED)) && setintr &&
-	    (!gointr || !eq(gointr, S_MINUS /*"-"*/))) {
+	    (!gointr || !eq(gointr, S_MINUS /* "-" */))) {
 		if ((jobflags & PSTOPPED) == 0)
 			pflush(pp);
 		pintr1(0);
@@ -291,7 +291,7 @@ pjwait(struct process *pp)
 			reason = fp->p_flags & (PSIGNALED|PINTERRUPTED) ?
 				fp->p_reason | ABN_TERM : fp->p_reason;
 	} while ((fp = fp->p_friends) != pp);
-	set(S_status/*"status"*/, putn(reason));
+	set(S_status /* "status" */, putn(reason));
 	if (reason && exiterr)
 		exitstat();
 	pflush(pp);
@@ -415,7 +415,7 @@ palloc(int pid, struct command *t)
 #ifdef TRACE
 	tprintf("TRACE- palloc()\n");
 #endif
-	pp = (struct process *)calloc(1, sizeof(struct process));
+	pp = (struct process *)xcalloc(1, sizeof (struct process));
 	pp->p_pid = pid;
 	pp->p_flags = t->t_dflg & FAND ? PRUNNING : PRUNNING|PFOREGND;
 	if (t->t_dflg & FTIME)
@@ -458,7 +458,7 @@ palloc(int pid, struct command *t)
 				pp->p_index = i;
 				if (i > pmaxindex)
 					pmaxindex = i;
-				break;			
+				break;
 			tryagain:;
 			}
 		}
@@ -483,16 +483,16 @@ padd(struct command *t)
 	switch (t->t_dtyp) {
 
 	case TPAR:
-		pads(S_LBRASP /*"( "*/);
+		pads(S_LBRASP /* "( " */);
 		padd(t->t_dspr);
-		pads(S_SPRBRA /*" )"*/);
+		pads(S_SPRBRA /* " )" */);
 		break;
 
 	case TCOM:
 		for (argp = t->t_dcom; *argp; argp++) {
 			pads(*argp);
 			if (argp[1])
-				pads(S_SP /*" "*/);
+				pads(S_SP /* " " */);
 		}
 		break;
 
@@ -503,30 +503,30 @@ padd(struct command *t)
 		padd(t->t_dcar);
 		switch (t->t_dtyp) {
 		case TOR:
-			pads(S_SPBARBARSP /*" || " */);
+			pads(S_SPBARBARSP /* " || " */);
 			break;
 		case TAND:
-			pads(S_SPANDANDSP /*" && "*/);
+			pads(S_SPANDANDSP /* " && " */);
 			break;
 		case TFIL:
-			pads(S_SPBARSP /*" | "*/);
+			pads(S_SPBARSP /* " | " */);
 			break;
 		case TLST:
-			pads(S_SEMICOLONSP /*"; "*/);
+			pads(S_SEMICOLONSP /* "; " */);
 			break;
 		}
 		padd(t->t_dcdr);
 		return;
 	}
 	if ((t->t_dflg & FPIN) == 0 && t->t_dlef) {
-		pads((t->t_dflg & FHERE) ? S_SPLESLESSP /*" << " */ : S_SPLESSP /*" < "*/);
+		pads((t->t_dflg & FHERE) ? S_SPLESLESSP /* " << " */ : S_SPLESSP /* " < " */);
 		pads(t->t_dlef);
 	}
 	if ((t->t_dflg & FPOU) == 0 && t->t_drit) {
-		pads((t->t_dflg & FCAT) ? S_SPGTRGTRSP /*" >>" */ : S_SPGTR /*" >"*/);
+		pads((t->t_dflg & FCAT) ? S_SPGTRGTRSP /* " >>" */ : S_SPGTR /* " >" */);
 		if (t->t_dflg & FDIAG)
-			pads(S_AND /*"&"*/);
-		pads(S_SP /*" "*/);
+			pads(S_AND /* "&" */);
+		pads(S_SP /* " " */);
 		pads(t->t_drit);
 	}
 }
@@ -542,7 +542,7 @@ pads(tchar *cp)
 	if (cmdlen >= PMAXLEN)
 		return;
 	if (cmdlen + i >= PMAXLEN) {
-		(void) strcpy_(cmdp, S_SPPPP /*" ..."*/);
+		(void) strcpy_(cmdp, S_SPPPP /* " ..." */);
 		cmdlen = PMAXLEN;
 		cmdp += 4;
 		return;
@@ -632,23 +632,23 @@ pprint(struct process *pp, int flag)
 		pp->p_flags |= PTIME;
 	}
 	tp = pp;
-	status = reason = -1; 
+	status = reason = -1;
 	jobflags = 0;
 	do {
 		jobflags |= pp->p_flags;
 		pstatus = pp->p_flags & PALLSTATES;
 		if (tp != pp && linp != linbuf && !(flag&FANCY) &&
 		    (pstatus == status && pp->p_reason == reason ||
-		     !(flag&REASON)))
+		    !(flag&REASON)))
 			printf(" ");
 		else {
 			if (tp != pp && linp != linbuf)
 				printf("\n");
-			if(flag&NUMBER)
+			if (flag&NUMBER)
 				if (pp == tp)
 					printf("[%d]%s %c ", pp->p_index,
 					    pp->p_index < 10 ? " " : "",
-					    pp==pcurrent ? '+' :
+					    pp == pcurrent ? '+' :
 						(pp == pprevious ? (tchar) '-'
 							: (tchar) ' '));
 				else
@@ -716,7 +716,7 @@ prcomd:
 			if (flag&JOBDIR &&
 			    !eq(tp->p_cwd->di_name, dcwd->di_name)) {
 				printf(" (wd: ");
-				dtildepr(value(S_home /*"home"*/), tp->p_cwd->di_name);
+				dtildepr(value(S_home /* "home" */), tp->p_cwd->di_name);
 				printf(")");
 			}
 		}
@@ -724,7 +724,7 @@ prcomd:
 			if (linp != linbuf)
 				printf("\n\t");
 			{ static struct rusage zru;
-			  prusage(&zru, &pp->p_rusage, &pp->p_etime,
+			    prusage(&zru, &pp->p_rusage, &pp->p_etime,
 			    &pp->p_btime);
 			}
 		}
@@ -785,7 +785,7 @@ dojobs(tchar **v)
 	if (chkstop)
 		chkstop = 2;
 	if (*++v) {
-		if (v[1] || !eq(*v, S_DASHl /*"-l"*/))
+		if (v[1] || !eq(*v, S_DASHl /* "-l" */))
 			error("Usage: jobs [ -l ]");
 		flag |= FANCY|JOBDIR;
 	}
@@ -921,7 +921,7 @@ dokill(tchar **v)
 				signum = signo;
 				goto gotsig;
 			}
-			if (eq(name, S_IOT /*"IOT"*/)) {
+			if (eq(name, S_IOT /* "IOT" */)) {
 				signum = SIGABRT;
 				goto gotsig;
 			}
@@ -1024,21 +1024,21 @@ pstart(struct process *pp, int foregnd)
 			else
 				np->p_flags &= ~PFOREGND;
 		}
-	} while((np = np->p_friends) != pp);
+	} while ((np = np->p_friends) != pp);
 
 	if (foregnd)
 		pclrcurr(pp);
 	else
 	{
-		if ( pprevious && (pprevious->p_flags & PSTOPPED) )
+		if (pprevious && (pprevious->p_flags & PSTOPPED))
 		{
 			pcurrent = pprevious;
 			pprevious = pgetcurr(PNULL);
 		}
 		else
-		{	
+		{
 			pcurrent = pgetcurr(pp);
-			if ( !pcurrent || (pcurrent->p_flags & PRUNNING) )
+			if (!pcurrent || (pcurrent->p_flags & PRUNNING))
 				pcurrent = pp;
 			else
 				pprevious = pp;
@@ -1074,15 +1074,15 @@ pfind(tchar *cp)
 #ifdef TRACE
 	tprintf("TRACE- pfind()\n");
 #endif
-	if (cp == 0 || cp[1] == 0 || eq(cp, S_PARCENTPARCENT /*"%%"*/) ||
-				     eq(cp, S_PARCENTPLUS /*"%+"*/)) {
+	if (cp == 0 || cp[1] == 0 || eq(cp, S_PARCENTPARCENT /* "%%" */) ||
+					eq(cp, S_PARCENTPLUS /* "%+" */)) {
 		if (pcurrent == PNULL)
-			if ( (pcurrent = pgetcurr(PNULL)) == PNULL )
+			if ((pcurrent = pgetcurr(PNULL)) == PNULL)
 				bferr("No current job");
 		return (pcurrent);
 	}
-	if (eq(cp, S_PARCENTMINUS /*"%-"*/) ||
-	    eq(cp, S_PARCENTSHARP /*"%#"*/)) {
+	if (eq(cp, S_PARCENTMINUS /* "%-" */) ||
+	    eq(cp, S_PARCENTSHARP /* "%#" */)) {
 		if (pprevious == PNULL)
 			bferr("No previous job");
 		return (pprevious);
@@ -1195,7 +1195,7 @@ pfork(struct command *t, int wanttty)
 	 */
 	if (setintr)
 		ignint = (tpgrp == -1 && (t->t_dflg&FINT))
-		    || (gointr && eq(gointr, S_MINUS /*"-"*/));
+		    || (gointr && eq(gointr, S_MINUS /* "-" */));
 	/*
 	 * Hold SIGCHLD until we have the process installed in our table.
 	 */
@@ -1245,11 +1245,11 @@ pfork(struct command *t, int wanttty)
 		if (wanttty >= 0 && tpgrp >= 0)
 			(void) setpgid(0, pgrp);
 		if (wanttty > 0) {
-			sigttou = sigblock (sigmask(SIGTTOU)|
-					    sigmask(SIGTTIN)|
+			sigttou = sigblock(sigmask(SIGTTOU) |
+					    sigmask(SIGTTIN) |
 					    sigmask(SIGTSTP));
 			(void) ioctl(FSHTTY, TIOCSPGRP,  (char *)&pgrp);
-			sigsetmask (sigttou);
+			sigsetmask(sigttou);
 		}
 		if (tpgrp > 0)
 			tpgrp = 0;		/* gave tty away */
@@ -1284,4 +1284,3 @@ okpcntl(void)
 	if (tpgrp == 0)
 		error("No job control in subshells");
 }
-

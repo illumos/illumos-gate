@@ -66,7 +66,7 @@ doset(tchar **v)
 			continue;
 		if (vp == p || !letter(*vp))
 			goto setsyn;
-		if ( (p - vp) > MAX_VAR_LEN )
+		if ((p - vp) > MAX_VAR_LEN)
 			bferr("Variable name too long");
 		if (*p == '[') {
 			hadsub++;
@@ -76,7 +76,7 @@ doset(tchar **v)
 			*p++ = 0;
 			if (*p == 0 && *v && **v == '(')
 				p = *v++;
-		} else if (*v && eq(*v, S_EQ/*"="*/)) {
+		} else if (*v && eq(*v, S_EQ /* "=" */)) {
 			op = '=', v++;
 			if (*v)
 				p = *v++;
@@ -84,7 +84,7 @@ doset(tchar **v)
 		if (op && op != '=')
 setsyn:
 			bferr("Syntax error");
-		if (eq(p, S_LPAR/*"("*/)) {
+		if (eq(p, S_LPAR /* "(" */)) {
 			tchar **e = v;
 
 			if (hadsub)
@@ -109,23 +109,23 @@ setsyn:
 			retp = 0;
 		} else
 			set(vp, savestr(p));
-		if (eq(vp, S_path/*"path"*/)) {
-			exportpath(adrof(S_path/*"path"*/)->vec);
+		if (eq(vp, S_path /* "path" */)) {
+			exportpath(adrof(S_path /* "path" */)->vec);
 			dohash(xhash);
-		} else if (eq(vp, S_histchars/*"histchars"*/)) {
-			tchar *p = value(S_histchars/*"histchars"*/);
+		} else if (eq(vp, S_histchars /* "histchars" */)) {
+			tchar *p = value(S_histchars /* "histchars" */);
 			HIST = *p++;
 			HISTSUB = *p;
-		} else if (eq(vp, S_user/*"user"*/))
-			local_setenv(S_USER/*"USER"*/, value(vp));
-		else if (eq(vp, S_term/*"term"*/))
-			local_setenv(S_TERM/*"TERM"*/, value(vp));
-		else if (eq(vp, S_home/*"home"*/))
-			local_setenv(S_HOME/*"HOME"*/, value(vp));
+		} else if (eq(vp, S_user /* "user" */))
+			local_setenv(S_USER /* "USER" */, value(vp));
+		else if (eq(vp, S_term /* "term" */))
+			local_setenv(S_TERM /* "TERM" */, value(vp));
+		else if (eq(vp, S_home /* "home" */))
+			local_setenv(S_HOME /* "HOME" */, value(vp));
 #ifdef FILEC
-		else if (eq(vp, S_filec/*"filec"*/))
+		else if (eq(vp, S_filec /* "filec" */))
 			filec = 1;
-		else if (eq(vp, S_cdpath/*"cdpath"*/))
+		else if (eq(vp, S_cdpath /* "cdpath" */))
 			dohash(xhash2);
 #endif
 	} while (p = *v++);
@@ -218,7 +218,7 @@ dolet(tchar **v)
 					goto letsyn;
 				p = plusplus;
 			} else {
-				/*if (any(op, "<>")) {*/
+				/* if (any(op, "<>")) { */
 				if (op == '<' || op == '>') {
 					if (c != op)
 						goto letsyn;
@@ -250,17 +250,17 @@ letsyn:
 #endif
 			else
 				set(vp, operate(op, value(vp), p));
-		if (eq(vp, S_path/*"path"*/)) {
-			exportpath(adrof(S_path/*"path"*/)->vec);
+		if (eq(vp, S_path /* "path" */)) {
+			exportpath(adrof(S_path /* "path" */)->vec);
 			dohash(xhash);
 		}
 
-		if (eq(vp, S_cdpath/*"cdpath"*/))
+		if (eq(vp, S_cdpath /* "cdpath" */))
 			dohash(xhash2);
 
-		XFREE(vp)
+		xfree(vp);
 		if (c != '=')
-			XFREE(p)
+			xfree(p);
 	} while (p = *v++);
 }
 
@@ -308,7 +308,7 @@ operate(tchar op, tchar *vp, tchar *p)
 }
 
 static tchar *putp;
- 
+
 tchar *
 putn(int n)
 {
@@ -387,7 +387,7 @@ value1(tchar *var, struct varent *head)
 	tprintf("TRACE- value1()\n");
 #endif
 	vp = adrof1(var, head);
-	return (vp == 0 || vp->vec[0] == 0 ? S_/*""*/ : vp->vec[0]);
+	return (vp == 0 || vp->vec[0] == 0 ? S_ /* "" */ : vp->vec[0]);
 }
 
 struct varent *
@@ -417,7 +417,7 @@ adrof1(tchar *name, struct varent *v)
 #endif
 	v = v->v_left;
 	while (v && ((cmp = *name - *v->v_name) ||
-		     (cmp = strcmp_(name, v->v_name))))
+	    (cmp = strcmp_(name, v->v_name))))
 		if (cmp < 0)
 			v = v->v_left;
 		else
@@ -431,7 +431,7 @@ adrof1(tchar *name, struct varent *v)
 void
 set(tchar *var, tchar *val)
 {
-	tchar **vec =  (tchar **) xalloc(2 * sizeof  (tchar **));
+	tchar **vec =  (tchar **)xalloc(2 * sizeof (tchar **));
 
 #ifdef TRACE
 	tprintf("TRACE- set()\n");
@@ -450,13 +450,14 @@ set1(tchar *var, tchar **vec, struct varent *head)
 	tprintf("TRACE- set1()\n");
 #endif
 	gflag = 0;
-	/* If setting cwd variable via "set cwd=/tmp/something"
+	/*
+	 * If setting cwd variable via "set cwd=/tmp/something"
 	 * then do globbing.  But if we are setting the cwd
- 	 * becuz of a cd, chdir, pushd, popd, do not do globbing.
+	 * becuz of a cd, chdir, pushd, popd, do not do globbing.
 	 */
-	if ( (!(eq(var,S_cwd))) || (eq(var,S_cwd) && (didchdir == 0)) )
+	if ((!(eq(var, S_cwd))) || (eq(var, S_cwd) && (didchdir == 0)))
 		{
-        	tglob(oldv);
+		tglob(oldv);
 		}
 	if (gflag) {
 		vec = glob(oldv);
@@ -508,12 +509,12 @@ unset(tchar *v[])
 	tprintf("TRACE- unset()\n");
 #endif
 	unset1(v, &shvhed);
-	if (adrof(S_histchars/*"histchars"*/) == 0) {
+	if (adrof(S_histchars /* "histchars" */) == 0) {
 		HIST = '!';
 		HISTSUB = '^';
 	}
 #ifdef FILEC
-	if (adrof(S_filec/*"filec"*/) == 0)
+	if (adrof(S_filec /* "filec" */) == 0)
 		filec = 0;
 #endif
 }
@@ -562,7 +563,7 @@ unsetv1(struct varent *p)
 	 * Free associated memory first to avoid complications.
 	 */
 	blkfree(p->vec);
-	XFREE(p->v_name);
+	xfree(p->v_name);
 	/*
 	 * If p is missing one child, then we can move the other
 	 * into where p is.  Otherwise, we find the predecessor
@@ -591,7 +592,7 @@ unsetv1(struct varent *p)
 	/*
 	 * Free the deleted node, and rebalance.
 	 */
-	XFREE( (tchar *)p);
+	xfree(p);
 	balance(pp, f, 1);
 }
 
@@ -602,7 +603,7 @@ setNS(tchar *cp)
 	tprintf("TRACE- setNS()\n");
 #endif
 
-	set(cp, S_/*""*/);
+	set(cp, S_ /* "" */);
 }
 
 void
@@ -617,7 +618,7 @@ shift(tchar **v)
 	v++;
 	name = *v;
 	if (name == 0)
-		name = S_argv/*"argv"*/;
+		name = S_argv /* "argv" */;
 	else
 		(void) strip(name);
 	argv = adrof(name);
@@ -644,21 +645,21 @@ exportpath(tchar **val)
 				break;
 			}
 			(void) strcat_(exppath, *val++);
-			if (*val == 0 || eq(*val, S_RPAR/*")"*/))
+			if (*val == 0 || eq(*val, S_RPAR /* ")" */))
 				break;
-			(void) strcat_(exppath, S_COLON/*":"*/);
+			(void) strcat_(exppath, S_COLON /* ":" */);
 		}
-	local_setenv(S_PATH/*"PATH"*/, exppath);
+	local_setenv(S_PATH /* "PATH" */, exppath);
 }
 
 	/* macros to do single rotations on node p */
-#define rright(p) (\
+#define	rright(p) (\
 	t = (p)->v_left,\
 	(t)->v_parent = (p)->v_parent,\
 	((p)->v_left = t->v_right) ? (t->v_right->v_parent = (p)) : 0,\
 	(t->v_right = (p))->v_parent = t,\
 	(p) = t)
-#define rleft(p) (\
+#define	rleft(p) (\
 	t = (p)->v_right,\
 	(t)->v_parent = (p)->v_parent,\
 	((p)->v_right = t->v_left) ? (t->v_left->v_parent = (p)) : 0,\

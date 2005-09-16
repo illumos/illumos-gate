@@ -115,7 +115,7 @@ collect(tchar *as)
 		 * dobackp has the side effect of messing with
 		 * gflag, since it does more globbing, so check
 		 * if the results is still globbable
-		*/
+		 */
 		tglob(pargv);
 
 		for (i = 0; i < pargc; i++)
@@ -239,7 +239,7 @@ matchdir_(tchar *pattern)
 #endif
 	/*
 	 * BSD's opendir would open "." if argument is NULL, but not S5
- */
+	 */
 
 	if (*gpath == NULL)
 		dirp = opendir_(S_DOT /* "." */);
@@ -422,7 +422,7 @@ amatch(tchar *s, tchar *p, int *slproc)
 					if (sh_bracket_exp(scc, lc, rc))
 						ok++;
 #else /* !MBCHAR */
-					if (lc <= scc && scc <= (int) *p++)
+					if (lc <= scc && scc <= (int)*p++)
 						ok++;
 #endif /* !MBCHAR */
 				} else
@@ -523,7 +523,7 @@ Gmatch(tchar *s, tchar *p)
 					if (sh_bracket_exp(scc, lc, rc))
 						ok++;
 #else /* !MBCHAR */
-					if (lc <= scc && scc <= (int) *p++)
+					if (lc <= scc && scc <= (int)*p++)
 						ok++;
 #endif /* !MBCHAR */
 				} else
@@ -671,12 +671,12 @@ globone(tchar *str)
 			bferr("Ambiguous");
 		} else
 			cp = strip(cp);
-/*
+#if 0
 		if (cp == 0 || *gvp) {
 			setname(str);
 			bferr(cp ? "Ambiguous" : "No output");
 		}
-*/
+#endif
 		xfree((char *)gargv); gargv = 0;
 	} else {
 		trim(gv);
@@ -746,7 +746,7 @@ backeval(tchar *cp, bool literal)
 {
 	int pvec[2];
 	int quoted = (literal || (cp[0] & QUOTE)) ? QUOTE : 0;
-	tchar ibuf[BUFSIZ];
+	tchar ibuf[BUFSIZ + MB_LEN_MAX]; /* read_ can return extra bytes */
 	int icnt = 0, c;
 	tchar *ip;
 	bool hadnl = 0;
@@ -951,25 +951,25 @@ sh_bracket_exp(tchar t_ch, tchar t_fch, tchar t_lch)
 	int	i;
 
 	if ((t_ch == t_fch) || (t_ch == t_lch))
-		return(1);
-		
+		return (1);
+
 	p = t_patan;
 	if ((i = wctomb(t_char, (wchar_t)t_ch)) <= 0)
-		return(0);
+		return (0);
 	t_char[i] = 0;
 
 	*p++ = '[';
 	if ((i = wctomb(p, (wchar_t)t_fch)) <= 0)
-		return(0);
+		return (0);
 	p += i;
 	*p++ = '-';
 	if ((i = wctomb(p, (wchar_t)t_lch)) <= 0)
-		return(0);
+		return (0);
 	p += i;
 	*p++ = ']';
 	*p = 0;
 
 	if (fnmatch(t_patan, t_char, FNM_NOESCAPE))
-		return(0);
-	return(1);
+		return (0);
+	return (1);
 }

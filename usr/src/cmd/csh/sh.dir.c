@@ -58,11 +58,11 @@ dinit(tchar *hp)
 	else {
 		cp = getwd_(path);
 		if (cp == NULL) {
-			printf ("Warning: cannot determine current directory\n");
+			printf("Warning: cannot determine current directory\n");
 			cp = S_DOT;
 		}
 	}
-	dp = (struct directory *)calloc(sizeof (struct directory), 1);
+	dp = (struct directory *)xcalloc(sizeof (struct directory), 1);
 	dp->di_name = savestr(cp);
 	dp->di_count = 0;
 	dhead.di_next = dhead.di_prev = dp;
@@ -147,7 +147,7 @@ dochngd(tchar **v)
 		goto flushcwd;
 	} else
 		cp = dfollow(*v);
-	dp = (struct directory *)calloc(sizeof (struct directory), 1);
+	dp = (struct directory *)xcalloc(sizeof (struct directory), 1);
 	dp->di_name = cp;
 	dp->di_count = 0;
 	dp->di_next = dcwd->di_next;
@@ -169,9 +169,9 @@ dfollow(tchar *cp)
 	struct varent *c;
 	int cdhashval, cdhashval1;
 	int index;
-	int slash; /*slashes in the argument*/
+	int slash; /* slashes in the argument */
 	tchar *fullpath;
-	tchar *slashcp; /*cp string prepended with a slash*/
+	tchar *slashcp; /* cp string prepended with a slash */
 
 #ifdef TRACE
 	tprintf("TRACE- dfollow()\n");
@@ -183,7 +183,7 @@ dfollow(tchar *cp)
 	/*
 	 * If the directory argument has a slash in it,
 	 * for example, directory/directory, then can't
-	 * find that in the cache table.  
+	 * find that in the cache table.
 	 */
 	slash = any('/', cp);
 
@@ -192,20 +192,20 @@ dfollow(tchar *cp)
 	 * cdpath caching is turned off or directory argument
 	 * has a slash in it.
 	 */
-	if (cp[0] != '/' 
-	    && !prefix(S_DOTSLA /* "./" */, cp) 
+	if (cp[0] != '/'
+	    && !prefix(S_DOTSLA /* "./" */, cp)
 	    && !prefix(S_DOTDOTSLA /* "../" */, cp)
 	    && (c = adrof(S_cdpath))
-            && ( !havhash2 || slash) ) {
+	    && (!havhash2 || slash)) {
 		tchar **cdp;
 		tchar *p;
 		tchar buf[MAXPATHLEN];
 
 		for (cdp = c->vec; *cdp; cdp++) {
-			for (dp = buf, p = *cdp; *dp++ = *p++;)
+			for (dp = buf, p = *cdp; *dp++ = *p++; )
 				;
 			dp[-1] = '/';
-			for (p = cp; *dp++ = *p++;)
+			for (p = cp; *dp++ = *p++; )
 				;
 			if (chdir_(buf) >= 0) {
 				printd = 1;
@@ -215,17 +215,17 @@ dfollow(tchar *cp)
 			}
 		}
 	}
-	
+
 	/* cdpath caching turned on */
-	if (cp[0] != '/' 
-	    && !prefix(S_DOTSLA /* "./" */, cp) 
+	if (cp[0] != '/'
+	    && !prefix(S_DOTSLA /* "./" */, cp)
 	    && !prefix(S_DOTDOTSLA /* "../" */, cp)
 	    && (c = adrof(S_cdpath))
-	    && havhash2 && !slash ) {
+	    && havhash2 && !slash) {
 		tchar **pv;
 
 		/* If no cdpath or no paths in cdpath, leave */
-		if ( c == 0 || c->vec[0]== 0 )
+		if (c == 0 || c->vec[0] == 0)
 			pv = justabs;
 		else
 			pv = c->vec;
@@ -234,8 +234,8 @@ dfollow(tchar *cp)
 
 		cdhashval = hashname(cp);
 
-		/*index points to next path component to test*/
-		index=0;
+		/* index points to next path component to test */
+		index = 0;
 
 		/*
 		 * Look at each path in cdpath until get a match.
@@ -243,7 +243,7 @@ dfollow(tchar *cp)
 		 */
 		do {
 			/* only check cache for absolute pathnames */
-			if ( pv[0][0] == '/' ) {
+			if (pv[0][0] == '/') {
 				cdhashval1 = hash(cdhashval, index);
 				if (bit(xhash2, cdhashval1)) {
 					/*
@@ -286,7 +286,7 @@ dfollow(tchar *cp)
 			index++;
 		} while (*pv);
 	}
-      
+
 	/*
 	 * Try dereferencing the variable named by the argument.
 	 */
@@ -310,13 +310,13 @@ gotcha:
 		 * All in the name of efficiency?
 		 */
 
-		if ( ( cwdlen = (strlen_(dcwd->di_name) ) ) == 1 ){
-			if ( *dcwd->di_name == '/' ) /* root */
+		if ((cwdlen = (strlen_(dcwd->di_name))) == 1) {
+			if (*dcwd->di_name == '/') /* root */
 				cwdlen = 0;
 			else
 			{
 				/*
-				 * if we are here, when the shell started 
+				 * if we are here, when the shell started
 				 * it was unable to getwd(), lets try it again
 				 */
 				tchar path[MAXPATHLEN];
@@ -342,14 +342,14 @@ gotcha:
 		 * dp = (tchar *)xalloc((unsigned) (cwdlen + (p - cp) + 1)*sizeof (tchar))
 		 */
 		len = strlen_(cp);
-		dp = (tchar *)xalloc((unsigned) (cwdlen + len + 2)*sizeof(tchar));
-		for (p = dp, q = dcwd->di_name; *p++ = *q++;)
+		dp = (tchar *)xalloc((unsigned)(cwdlen + len + 2) * sizeof (tchar));
+		for (p = dp, q = dcwd->di_name; *p++ = *q++; )
 			;
 		if (cwdlen)
 			p[-1] = '/';
 		else
 			p--;			/* don't add a / after root */
-		for (q = cp; *p++ = *q++;)
+		for (q = cp; *p++ = *q++; )
 			;
 		xfree(cp);
 		cp = dp;
@@ -393,7 +393,7 @@ dopushd(tchar **v)
 		tchar *cp;
 
 		cp = dfollow(*v);
-		dp = (struct directory *)calloc(sizeof (struct directory), 1);
+		dp = (struct directory *)xcalloc(sizeof (struct directory), 1);
 		dp->di_name = cp;
 		dp->di_count = 0;
 		dp->di_prev = dcwd;
@@ -482,7 +482,7 @@ dfree(struct directory *dp)
 	if (dp->di_count != 0)
 		dp->di_next = dp->di_prev = 0;
 	else
-		xfree(dp->di_name), xfree( (tchar *)dp);
+		xfree(dp->di_name), xfree((tchar *)dp);
 }
 
 /*
@@ -497,7 +497,7 @@ tchar *
 dcanon(tchar *cp, tchar *p)
 {
 	tchar *sp;	/* rightmost component currently under
-				   consideration */
+				consideration */
 	tchar *p1,	/* general purpose */
 	    *p2;
 	bool slash, dotdot, hardpaths;
@@ -527,7 +527,7 @@ dcanon(tchar *cp, tchar *p)
 		while (*++p == '/')	/* flush extra slashes */
 			;
 		if (p != ++sp)
-			for (p1 = sp, p2 = p; *p1++ = *p2++;)
+			for (p1 = sp, p2 = p; *p1++ = *p2++; )
 				;
 
 		p = sp;			/* save start of component */
@@ -552,7 +552,7 @@ dcanon(tchar *cp, tchar *p)
 		if (sp[0] == '.' && sp[1] == '\0') {
 			/* Squeeze out component consisting of "." */
 			if (slash) {
-				for (p1 = sp, p2 = p + 1; *p1++ = *p2++;)
+				for (p1 = sp, p2 = p + 1; *p1++ = *p2++; )
 					;
 				p = --sp;
 			} else if (--sp != cp)
@@ -623,7 +623,7 @@ dcanon(tchar *cp, tchar *p)
 				/*
 				 * Find length of p.
 				 */
-				for (p1 = p; *p1++;)
+				for (p1 = p; *p1++; )
 					;
 
 				if (*link != '/') {
@@ -650,15 +650,15 @@ dcanon(tchar *cp, tchar *p)
 					 * New length is: "x/" + link + "z"
 					 */
 					p1 = newcp = (tchar *)xalloc((unsigned)
-						((sp - cp) + cc + (p1 - p))*sizeof (tchar));
+						((sp - cp) + cc + (p1 - p)) * sizeof (tchar));
 					/*
 					 * Copy new path into newcp
 					 */
-					for (p2 = cp; *p1++ = *p2++;)
+					for (p2 = cp; *p1++ = *p2++; )
 						;
-					for (p1--, p2 = link; *p1++ = *p2++;)
+					for (p1--, p2 = link; *p1++ = *p2++; )
 						;
-					for (p1--, p2 = p; *p1++ = *p2++;)
+					for (p1--, p2 = p; *p1++ = *p2++; )
 						;
 					/*
 					 * Restart canonicalization at
@@ -674,9 +674,9 @@ dcanon(tchar *cp, tchar *p)
 					/*
 					 * Copy new path into newcp
 					 */
-					for (p2 = link; *p1++ = *p2++;)
+					for (p2 = link; *p1++ = *p2++; )
 						;
-					for (p1--, p2 = p; *p1++ = *p2++;)
+					for (p1--, p2 = p; *p1++ = *p2++; )
 						;
 					/*
 					 * Restart canonicalization at beginning
@@ -698,7 +698,7 @@ dcanon(tchar *cp, tchar *p)
 				while (*--sp != '/')
 					;
 			if (slash) {
-				for (p1 = sp + 1, p2 = p + 1; *p1++ = *p2++;)
+				for (p1 = sp + 1, p2 = p + 1; *p1++ = *p2++; )
 					;
 				p = sp;
 			} else if (cp == sp)
@@ -713,7 +713,7 @@ dcanon(tchar *cp, tchar *p)
 	}
 	return cp;
 }
- 
+
 /*
  * dnewcwd - make a new directory in the loop the current one
  *	and export its name to the PWD environment variable.
@@ -735,9 +735,9 @@ dnewcwd(struct directory *dp)
 	 */
 #endif /* notdef */
 
-	didchdir=1;
+	didchdir = 1;
 	set(S_cwd, savestr(dcwd->di_name));
-	didchdir=0;
+	didchdir = 0;
 	local_setenv(S_PWD, dcwd->di_name);
 	if (printd)
 		dodirs(fakev);
