@@ -68,7 +68,7 @@ static int crypt_file();
 static int pack();
 static int unpack();
 static int keysave();
-static int keyvalid(); 
+static int keyvalid();
 
 /*
  *	scram -- Scramble an object and pack all its parts into an OEU package
