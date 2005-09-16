@@ -17,6 +17,7 @@ ssd SUNW,ssd
 fas SUNW,fas
 hme SUNW,hme
 ebus SUNW,ebus
+ebus SUNW,sun4v-ebus
 fd fdthree
 glm "pci1000,f"
 pci_pci "pci1011,21"

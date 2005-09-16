@@ -84,10 +84,10 @@ static int ebus_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
  */
 static int ebus_config(ebus_devstate_t *ebus_p);
 static int ebus_apply_range(ebus_devstate_t *ebus_p, dev_info_t *rdip,
-    ebus_regspec_t *ebus_rp, pci_regspec_t *rp);
-static int febus_apply_range(ebus_devstate_t *ebus_p, dev_info_t *rdip,
-    ebus_regspec_t *ebus_rp, struct regspec *rp);
-int get_ranges_prop(ebus_devstate_t *ebus_p);
+    ebus_regspec_t *ebus_rp, vregspec_t *rp);
+int ebus_get_ranges_prop(ebus_devstate_t *ebus_p);
+static void ebus_get_cells_prop(ebus_devstate_t *ebus_p);
+static void ebus_vreg_dump(ebus_devstate_t *ebus_p, vregspec_t *rp);
 
 #define	getprop(dip, name, addr, intp)		\
 		ddi_getlongprop(DDI_DEV_T_ANY, (dip), DDI_PROP_DONTPASS, \
@@ -247,19 +247,19 @@ ebus_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	ebus_p = get_ebus_soft_state(instance);
 
 	switch (infocmd) {
-	default:
-		return (DDI_FAILURE);
-
 	case DDI_INFO_DEVT2INSTANCE:
 		*result = (void *)instance;
-		return (DDI_SUCCESS);
-
+		break;
 	case DDI_INFO_DEVT2DEVINFO:
 		if (ebus_p == NULL)
 			return (DDI_FAILURE);
 		*result = (void *)ebus_p->dip;
-		return (DDI_SUCCESS);
+		break;
+	default:
+		return (DDI_FAILURE);
 	}
+
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -288,7 +288,7 @@ ebus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		instance = ddi_get_instance(dip);
 		if (ddi_soft_state_zalloc(per_ebus_state, instance)
-				!= DDI_SUCCESS) {
+		    != DDI_SUCCESS) {
 			DBG(D_ATTACH, NULL, "failed to alloc soft state\n");
 			return (DDI_FAILURE);
 		}
@@ -297,42 +297,26 @@ ebus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_init(&ebus_p->ebus_mutex, NULL, MUTEX_DRIVER, NULL);
 		ebus_p->ebus_soft_state = EBUS_SOFT_STATE_CLOSED;
 
-		/* Set ebus type field based on ddi name info */
-		if (strcmp(ddi_get_name(dip), "jbus-ebus") == 0) {
-			ebus_p->type = FEBUS_TYPE;
-		} else {
-			ebus_p->type = EBUS_TYPE;
-		}
+		ebus_get_cells_prop(ebus_p);
 
 		(void) ddi_prop_create(DDI_DEV_T_NONE, dip,
-			DDI_PROP_CANSLEEP, "no-dma-interrupt-sync", NULL, 0);
+		    DDI_PROP_CANSLEEP, "no-dma-interrupt-sync", NULL, 0);
 		/* Get our ranges property for mapping child registers. */
-		if (get_ranges_prop(ebus_p) != DDI_SUCCESS) {
-			mutex_destroy(&ebus_p->ebus_mutex);
-			free_ebus_soft_state(instance);
-			return (DDI_FAILURE);
+		if (ebus_get_ranges_prop(ebus_p) != DDI_SUCCESS) {
+			goto attach_fail;
 		}
 
 		/*
 		 * create minor node for devctl interfaces
 		 */
 		if (ddi_create_minor_node(dip, "devctl", S_IFCHR, instance,
-		    DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
-			mutex_destroy(&ebus_p->ebus_mutex);
-			free_ebus_soft_state(instance);
-			return (DDI_FAILURE);
+			DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
+			goto attach_fail;
 		}
-		/*
-		 * Make sure the master enable and memory access enable
-		 * bits are set in the config command register.
-		 */
-		if (ebus_p->type == EBUS_TYPE) {
-			if (!ebus_config(ebus_p)) {
-				ddi_remove_minor_node(dip, "devctl");
-				mutex_destroy(&ebus_p->ebus_mutex);
-				free_ebus_soft_state(instance);
-				return (DDI_FAILURE);
-			}
+
+		if (ebus_config(ebus_p) != DDI_SUCCESS) {
+			ddi_remove_minor_node(dip, "devctl");
+			goto attach_fail;
 		}
 
 		/*
@@ -350,28 +334,24 @@ ebus_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ebus_p->state = ATTACHED;
 		ddi_report_dev(dip);
 		DBG(D_ATTACH, ebus_p, "returning\n");
-
-		return (DDI_SUCCESS);
+		break;
 
 	case DDI_RESUME:
 
 		instance = ddi_get_instance(dip);
 		ebus_p = get_ebus_soft_state(instance);
 
-		/*
-		 * Make sure the master enable and memory access enable
-		 * bits are set in the config command register.
-		 */
-		if (ebus_p->type == EBUS_TYPE) {
-			if (!ebus_config(ebus_p)) {
-				free_ebus_soft_state(instance);
-				return (DDI_FAILURE);
-			}
-		}
+		(void) ebus_config(ebus_p);
 
 		ebus_p->state = RESUMED;
-		return (DDI_SUCCESS);
+		break;
 	}
+
+	return (DDI_SUCCESS);
+
+attach_fail:
+	mutex_destroy(&ebus_p->ebus_mutex);
+	free_ebus_soft_state(instance);
 	return (DDI_FAILURE);
 }
 
@@ -388,127 +368,77 @@ ebus_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_DETACH:
 		DBG1(D_DETACH, ebus_p, "DDI_DETACH dip=%p\n", dip);
 
-		switch (ebus_p->type) {
-		case EBUS_TYPE:
-			kmem_free(ebus_p->rangespec.rangep, ebus_p->range_cnt *
-				sizeof (struct ebus_pci_rangespec));
-			break;
-		case FEBUS_TYPE:
-			kmem_free(ebus_p->rangespec.ferangep,
-				ebus_p->range_cnt *
-				sizeof (struct febus_rangespec));
-			break;
-		default:
-			DBG(D_ATTACH, NULL, "failed to recognize ebus type\n");
-			return (DDI_FAILURE);
-		}
+		kmem_free(ebus_p->vrangep, ebus_p->vrange_len);
 
 		ddi_remove_minor_node(dip, "devctl");
 		mutex_destroy(&ebus_p->ebus_mutex);
 		free_ebus_soft_state(instance);
-		return (DDI_SUCCESS);
-
+		break;
 	case DDI_SUSPEND:
 		DBG1(D_DETACH, ebus_p, "DDI_SUSPEND dip=%p\n", dip);
 		ebus_p->state = SUSPENDED;
-		return (DDI_SUCCESS);
+		break;
+	default:
+		DBG(D_ATTACH, NULL,
+		    "failed to recognize ebus detach command\n");
+		return (DDI_FAILURE);
 	}
-	DBG(D_ATTACH, NULL, "failed to recognize ebus detach command\n");
-	return (DDI_FAILURE);
+	return (DDI_SUCCESS);
 }
 
 
 int
-get_ranges_prop(ebus_devstate_t *ebus_p)
+ebus_get_ranges_prop(ebus_devstate_t *ebus_p)
 {
-	int nrange, range_len;
-	struct ebus_pci_rangespec *rangep;
-	struct febus_rangespec *ferangep;
+	if (ddi_getlongprop(DDI_DEV_T_ANY, ebus_p->dip, DDI_PROP_DONTPASS,
+		"ranges", (caddr_t)&ebus_p->vrangep, &ebus_p->vrange_len)
+	    != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "Can't get %s ranges property",
+		    ddi_get_name(ebus_p->dip));
+		return (DDI_ME_REGSPEC_RANGE);
+	}
 
-	switch (ebus_p->type) {
-	case EBUS_TYPE:
-		if (ddi_getlongprop(DDI_DEV_T_ANY,
-			ebus_p->dip, DDI_PROP_DONTPASS,
-			"ranges", (caddr_t)&rangep,
-			&range_len) != DDI_SUCCESS) {
-				cmn_err(CE_WARN, "Can't get %s ranges property",
-					ddi_get_name(ebus_p->dip));
-				return (DDI_ME_REGSPEC_RANGE);
-		}
+	ebus_p->vrange_cnt = ebus_p->vrange_len /
+	    (ebus_p->ebus_paddr_cells + ebus_p->ebus_addr_cells +
+		ebus_p->ebus_psz_cells);
 
-		nrange = range_len / sizeof (struct ebus_pci_rangespec);
-
-		if (nrange == 0)  {
-			kmem_free(rangep, range_len);
-			DBG(D_ATTACH, NULL, "range is equal to zero\n");
-			return (DDI_FAILURE);
-		}
-
-#ifdef DEBUG
-		{
-			int i;
-
-			for (i = 0; i < nrange; i++) {
-				DBG5(D_MAP, ebus_p,
-					"ebus range addr 0x%x.0x%x PCI range "
-					"addr 0x%x.0x%x.0x%x ",
-					rangep[i].ebus_phys_hi,
-					rangep[i].ebus_phys_low,
-					rangep[i].pci_phys_hi,
-					rangep[i].pci_phys_mid,
-					rangep[i].pci_phys_low);
-				DBG1(D_MAP, ebus_p,
-					"Size 0x%x\n", rangep[i].rng_size);
-			}
-		}
-#endif /* DEBUG */
-
-		ebus_p->rangespec.rangep = rangep;
-		ebus_p->range_cnt = nrange;
-		return (DDI_SUCCESS);
-
-	case FEBUS_TYPE:
-		if (ddi_getlongprop(DDI_DEV_T_ANY, ebus_p->dip,
-			DDI_PROP_DONTPASS, "ranges",
-			(caddr_t)&ferangep, &range_len) != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "Can't get %s ranges property",
-				ddi_get_name(ebus_p->dip));
-				return (DDI_ME_REGSPEC_RANGE);
-		}
-
-		nrange = range_len / sizeof (struct febus_rangespec);
-
-		if (nrange == 0)  {
-			kmem_free(ferangep, range_len);
-			return (DDI_FAILURE);
-		}
-
-#ifdef	DEBUG
-		{
-			int i;
-
-			for (i = 0; i < nrange; i++) {
-				DBG4(D_MAP, ebus_p,
-					"ebus range addr 0x%x.0x%x"
-					" Parent range "
-					"addr 0x%x.0x%x ",
-					ferangep[i].febus_phys_hi,
-					ferangep[i].febus_phys_low,
-					ferangep[i].parent_phys_hi,
-					ferangep[i].parent_phys_low);
-				DBG1(D_MAP, ebus_p, "Size 0x%x\n",
-					ferangep[i].rng_size);
-			}
-		}
-#endif /* DEBUG */
-		ebus_p->rangespec.ferangep = ferangep;
-		ebus_p->range_cnt = nrange;
-		return (DDI_SUCCESS);
-
-	default:
-		DBG(D_MAP, NULL, "failed to recognize ebus type\n");
+	if (ebus_p->vrange_cnt == 0) {
+		kmem_free(ebus_p->vrangep, ebus_p->vrange_len);
+		DBG(D_ATTACH, NULL, "range is equal to zero\n");
 		return (DDI_FAILURE);
 	}
+
+	return (DDI_SUCCESS);
+}
+
+static void
+ebus_get_cells_prop(ebus_devstate_t *ebus_p)
+{
+	dev_info_t *dip = ebus_p->dip;
+	dev_info_t *pdip;
+
+	ebus_p->ebus_addr_cells = ddi_getprop(DDI_DEV_T_ANY,
+	    dip, DDI_PROP_DONTPASS, "#address-cells", 2);
+
+	pdip = ddi_get_parent(dip);
+	ebus_p->ebus_paddr_cells = ddi_getprop(DDI_DEV_T_ANY,
+	    pdip, DDI_PROP_DONTPASS, "#address-cells", 2);
+
+	ASSERT((ebus_p->ebus_paddr_cells == 3) ||
+	    (ebus_p->ebus_paddr_cells == 2));
+
+	ebus_p->ebus_sz_cells = ddi_getprop(DDI_DEV_T_ANY,
+	    dip, DDI_PROP_DONTPASS, "#size-cells", 2);
+	ebus_p->ebus_psz_cells = ddi_getprop(DDI_DEV_T_ANY,
+	    pdip, DDI_PROP_DONTPASS, "#size-cells", 1);
+
+	/* XXX rootnex assumes 1 cell and does not respect #size-cells */
+	if (ddi_root_node() == pdip)
+		ebus_p->ebus_psz_cells = 1;
+
+	ASSERT((ebus_p->ebus_psz_cells == 2) ||
+	    (ebus_p->ebus_psz_cells == 1));
+
 }
 
 /* bus driver entry points */
@@ -528,8 +458,7 @@ ebus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 {
 	ebus_devstate_t *ebus_p = get_ebus_soft_state(ddi_get_instance(dip));
 	ebus_regspec_t *ebus_rp, *ebus_regs;
-	struct regspec reg;
-	pci_regspec_t pci_reg;
+	vregspec_t vreg;
 	ddi_map_req_t p_map_request;
 	int rnumber, i, n;
 	int rval = DDI_SUCCESS;
@@ -568,6 +497,7 @@ ebus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			DBG(D_MAP, ebus_p, "can't get reg property\n");
 			return (DDI_ME_RNUMBER_RANGE);
 		}
+
 		n = i / sizeof (ebus_regspec_t);
 
 		if (rnumber < 0 || rnumber >= n) {
@@ -587,22 +517,7 @@ ebus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	if (len)
 		ebus_rp->size = len;
 
-	/*
-	 * Now we have a copy the "reg" entry we're attempting to map.
-	 * Translate this into our parents PCI address using the ranges
-	 * property.
-	 */
-	switch (ebus_p->type) {
-	case EBUS_TYPE:
-		rval = ebus_apply_range(ebus_p, rdip, ebus_rp, &pci_reg);
-		break;
-	case FEBUS_TYPE:
-		rval = febus_apply_range(ebus_p, rdip, ebus_rp, &reg);
-		break;
-	default:
-		DBG(D_MAP, NULL, "failed to recognize ebus type\n");
-		rval = DDI_FAILURE;
-	}
+	rval = ebus_apply_range(ebus_p, rdip, ebus_rp, &vreg);
 
 	if (mp->map_type == DDI_MT_RNUMBER)
 		kmem_free(ebus_regs, i);
@@ -610,100 +525,86 @@ ebus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	if (rval != DDI_SUCCESS)
 		return (rval);
 
-#ifdef DEBUG
-	switch (ebus_p->type) {
-	case EBUS_TYPE:
-		DBG5(D_MAP, ebus_p, "(%x,%x,%x)(%x,%x)\n",
-			pci_reg.pci_phys_hi,
-			pci_reg.pci_phys_mid,
-			pci_reg.pci_phys_low,
-			pci_reg.pci_size_hi,
-			pci_reg.pci_size_low);
-		break;
-
-	case FEBUS_TYPE:
-		DBG3(D_MAP, ebus_p, "%x,%x,%x\n",
-			reg.regspec_bustype,
-			reg.regspec_addr,
-			reg.regspec_size);
-		break;
-	}
-#endif
-
 	p_map_request = *mp;
 	p_map_request.map_type = DDI_MT_REGSPEC;
 
-	switch (ebus_p->type) {
-	case EBUS_TYPE:
-		p_map_request.map_obj.rp = (struct regspec *)&pci_reg;
-		break;
-	case FEBUS_TYPE:
-		p_map_request.map_obj.rp = &reg;
-		break;
-	default:
-		DBG(D_MAP, NULL, "failed to recognize ebus type\n");
-		return (DDI_FAILURE);
-	}
+	p_map_request.map_obj.rp = (struct regspec *)&vreg;
 
 	rval = ddi_map(dip, &p_map_request, 0, 0, addrp);
 	DBG1(D_MAP, ebus_p, "parent returned %x\n", rval);
 	return (rval);
 }
 
-
+/*
+ * ebus_apply_range generically relocates child's regspec to
+ * parent's format according to ebus' range spec
+ *
+ * Assumptions:
+ * - rng_caddr_hi is the space type
+ * - rng_caddr_low is the base address
+ * - ebus address is 32 bit and ebus entirely lives between 0-4G of
+ *   parent space, so maths on preg/rng_cell_p[ebus_p->ebus_paddr_cells - 1],
+ *   preg_cell_p[i], rng_caddr_low and ebus_rp->size are sufficient.
+ */
 static int
 ebus_apply_range(ebus_devstate_t *ebus_p, dev_info_t *rdip,
-    ebus_regspec_t *ebus_rp, pci_regspec_t *rp)
-{
-	int b;
-	int rval = DDI_SUCCESS;
-	struct ebus_pci_rangespec *rangep = ebus_p->rangespec.rangep;
-	int nrange = ebus_p->range_cnt;
+    ebus_regspec_t *ebus_rp, vregspec_t *rp) {
+	int b, i;
+	int nrange = ebus_p->vrange_cnt;
+	uint32_t addr_offset, rng_caddr_hi, rng_caddr_low, rng_sz;
+	uint32_t req_addr = ebus_rp->addr_low;
+
+	uint32_t *rng_cell_p = (uint32_t *)ebus_p->vrangep;
+	int rng_rec_sz = ebus_p->ebus_paddr_cells + ebus_p->ebus_addr_cells +
+	    ebus_p->ebus_sz_cells;
+	uint32_t *preg_cell_p = (uint32_t *)rp;
+	int preg_rec_sz = ebus_p->ebus_paddr_cells + ebus_p->ebus_psz_cells;
+
 	static char out_of_range[] =
 	    "Out of range register specification from device node <%s>";
 
 	DBG3(D_MAP, ebus_p, "Range Matching Addr 0x%x.%x size 0x%x\n",
-	    ebus_rp->addr_hi, ebus_rp->addr_low, ebus_rp->size);
+	    ebus_rp->addr_hi, req_addr, ebus_rp->size);
 
-	for (b = 0; b < nrange; ++b, ++rangep) {
+	for (b = 0; b < nrange; b++, rng_cell_p += rng_rec_sz) {
 
-		/* Check for the correct space */
-		if (ebus_rp->addr_hi == rangep->ebus_phys_hi)
-			/* See if we fit in this range */
-			if ((ebus_rp->addr_low >=
-			    rangep->ebus_phys_low) &&
-			    ((ebus_rp->addr_low + ebus_rp->size - 1)
-				<= (rangep->ebus_phys_low +
-				    rangep->rng_size - 1))) {
-				uint_t addr_offset = ebus_rp->addr_low -
-				    rangep->ebus_phys_low;
-				/*
-				 * Use the range entry to translate
-				 * the EBUS physical address into the
-				 * parents PCI space.
-				 */
-				rp->pci_phys_hi =
-				rangep->pci_phys_hi;
-				rp->pci_phys_mid = rangep->pci_phys_mid;
-				rp->pci_phys_low =
-					rangep->pci_phys_low + addr_offset;
-				rp->pci_size_hi = 0;
-				rp->pci_size_low =
-					min(ebus_rp->size, (rangep->rng_size -
-					addr_offset));
+		rng_caddr_hi = rng_cell_p[0];
+		rng_caddr_low = rng_cell_p[1];
+		rng_sz = rng_cell_p[rng_rec_sz-1];
 
-				DBG2(D_MAP, ebus_p, "Child hi0x%x lo0x%x ",
-					rangep->ebus_phys_hi,
-					rangep->ebus_phys_low);
-				DBG4(D_MAP, ebus_p, "Parent hi0x%x "
-					"mid0x%x lo0x%x size 0x%x\n",
-					rangep->pci_phys_hi,
-					rangep->pci_phys_mid,
-					rangep->pci_phys_low,
-					rangep->rng_size);
+		/* Check for correct space */
+		if (ebus_rp->addr_hi != rng_caddr_hi)
+			continue;
 
-				break;
-			}
+		/* Detect whether request entirely fits within a range */
+		if (req_addr < rng_caddr_low)
+			continue;
+
+		if ((req_addr + ebus_rp->size - 1)
+		    > (rng_caddr_low + rng_sz - 1))
+			continue;
+
+		addr_offset = req_addr - rng_caddr_low;
+
+		/* parent addr = child addr + offset from ranges */
+		for (i = 0; i < preg_rec_sz; i++)
+			preg_cell_p[i] = 0;
+
+		/* Copy the physical address */
+		for (i = 0; i < ebus_p->ebus_paddr_cells; i++)
+			preg_cell_p[i] = rng_cell_p[ebus_p->ebus_addr_cells+i];
+
+		preg_cell_p[ebus_p->ebus_paddr_cells-1] += addr_offset;
+
+		/* Copy the size */
+		preg_cell_p[preg_rec_sz-1] = min(ebus_rp->size,
+		    rng_sz - addr_offset);
+
+#ifdef DEBUG
+		ebus_vreg_dump(ebus_p, (vregspec_t *)preg_cell_p);
+#endif /* DEBUG */
+
+		break;
 	}
 
 	if (b == nrange)  {
@@ -711,68 +612,8 @@ ebus_apply_range(ebus_devstate_t *ebus_p, dev_info_t *rdip,
 		return (DDI_ME_REGSPEC_RANGE);
 	}
 
-	return (rval);
+	return (DDI_SUCCESS);
 }
-
-static int
-febus_apply_range(ebus_devstate_t *ebus_p, dev_info_t *rdip,
-		ebus_regspec_t *ebus_rp, struct regspec *rp) {
-	int b;
-	int rval = DDI_SUCCESS;
-	struct febus_rangespec *rangep = ebus_p->rangespec.ferangep;
-	int nrange = ebus_p->range_cnt;
-	static char out_of_range[] =
-		"Out of range register specification from device node <%s>";
-
-	DBG3(D_MAP, ebus_p, "Range Matching Addr 0x%x.%x size 0x%x\n",
-	ebus_rp->addr_hi, ebus_rp->addr_low, ebus_rp->size);
-
-	for (b = 0; b < nrange; ++b, ++rangep) {
-		/* Check for the correct space */
-		if (ebus_rp->addr_hi == rangep->febus_phys_hi)
-			/* See if we fit in this range */
-			if ((ebus_rp->addr_low >=
-				rangep->febus_phys_low) &&
-				((ebus_rp->addr_low + ebus_rp->size - 1)
-				<= (rangep->febus_phys_low +
-				rangep->rng_size - 1))) {
-					uint_t addr_offset = ebus_rp->addr_low -
-					rangep->febus_phys_low;
-
-				/*
-				 * Use the range entry to translate
-				 * the FEBUS physical address into the
-				 * parents space.
-				 */
-				rp->regspec_bustype =
-					rangep->parent_phys_hi;
-				rp->regspec_addr =
-				rangep->parent_phys_low + addr_offset;
-				rp->regspec_size =
-					min(ebus_rp->size, (rangep->rng_size -
-					addr_offset));
-
-				DBG2(D_MAP, ebus_p, "Child hi0x%x lo0x%x ",
-					rangep->febus_phys_hi,
-					rangep->febus_phys_low);
-				DBG3(D_MAP, ebus_p, "Parent hi0x%x "
-					"lo0x%x size 0x%x\n",
-					rangep->parent_phys_hi,
-					rangep->parent_phys_low,
-					rangep->rng_size);
-
-				break;
-			}
-	}
-
-	if (b == nrange)  {
-		cmn_err(CE_WARN, out_of_range, ddi_get_name(rdip));
-		return (DDI_ME_REGSPEC_RANGE);
-	}
-
-	return (rval);
-}
-
 
 static int
 ebus_name_child(dev_info_t *child, char *name, int namelen)
@@ -1008,19 +849,40 @@ done:
 	return (i_ddi_intr_ops(dip, rdip, intr_op, hdlp, result));
 }
 
-
+/*
+ * ebus_config: setup pci config space registers:
+ *     enable bus mastering, memory access and error reporting
+ */
 static int
 ebus_config(ebus_devstate_t *ebus_p)
 {
 	ddi_acc_handle_t conf_handle;
 	uint16_t comm;
+	dev_info_t *dip = ebus_p->dip;
+	char *devtype_str;
+	int devtype_len;
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, ddi_get_parent(dip),
+		DDI_PROP_DONTPASS, "device_type", (caddr_t)&devtype_str,
+		&devtype_len) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "Can't get %s device_type property",
+		    ddi_get_name(ddi_get_parent(dip)));
+
+		return (DDI_FAILURE);
+	}
+
+	comm = strcmp(devtype_str, "pci");
+	kmem_free(devtype_str, devtype_len);
+
+	if (comm)
+		return (DDI_SUCCESS);
 
 	/*
 	 * Make sure the master enable and memory access enable
 	 * bits are set in the config command register.
 	 */
 	if (pci_config_setup(ebus_p->dip, &conf_handle) != DDI_SUCCESS)
-		return (0);
+		return (DDI_FAILURE);
 
 	comm = pci_config_get16(conf_handle, PCI_CONF_COMM),
 #ifdef DEBUG
@@ -1037,7 +899,7 @@ ebus_config(ebus_devstate_t *ebus_p)
 	pci_config_put8(conf_handle, PCI_CONF_LATENCY_TIMER,
 	    (uchar_t)ebus_latency_timer);
 	pci_config_teardown(&conf_handle);
-	return (1);
+	return (DDI_SUCCESS);
 }
 
 #ifdef DEBUG
@@ -1071,7 +933,25 @@ ebus_debug(uint_t flag, ebus_devstate_t *ebus_p, char *fmt,
 		cmn_err(CE_CONT, fmt, a1, a2, a3, a4, a5);
 	}
 }
-#endif
+
+static void
+ebus_vreg_dump(ebus_devstate_t *ebus_p, vregspec_t *rp)
+{
+	if (ebus_p->ebus_paddr_cells == 3) {
+		DBG5(D_MAP, ebus_p, "(%x,%x,%x)(%x,%x)\n",
+		    rp->pci_regspec.pci_phys_hi,
+		    rp->pci_regspec.pci_phys_mid,
+		    rp->pci_regspec.pci_phys_low,
+		    rp->pci_regspec.pci_size_hi,
+		    rp->pci_regspec.pci_size_low);
+	} else if (ebus_p->ebus_paddr_cells == 2) {
+		DBG3(D_MAP, ebus_p, "%x,%x,%x\n",
+		    rp->jbus_regspec.regspec_bustype,
+		    rp->jbus_regspec.regspec_addr,
+		    rp->jbus_regspec.regspec_size);
+	}
+}
+#endif /* DEBUG */
 
 /* ARGSUSED3 */
 static int

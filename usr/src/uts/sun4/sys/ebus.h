@@ -76,6 +76,44 @@ struct ebus_intr_map_mask {
 };
 
 /*
+ * definition of ebus reg spec entry:
+ */
+typedef struct {
+	uint32_t addr_hi;
+	uint32_t addr_low;
+	uint32_t size;
+} ebus_regspec_t;
+
+/* Range entry for 3-cell parent address */
+struct ebus_pci_rangespec {
+	uint32_t phys_hi;			/* Child hi range address */
+	uint32_t phys_low;			/* Child low range address */
+	uint32_t par_phys_hi;			/* Parent hi rng addr */
+	uint32_t par_phys_mid;			/* Parent mid rng addr */
+	uint32_t par_phys_low;			/* Parent low rng addr */
+	uint32_t rng_size;			/* Range size */
+};
+
+/* Range entry for 2-cell parent address */
+struct ebus_jbus_rangespec {
+	uint32_t phys_hi;			/* Child hi range address */
+	uint32_t phys_low;			/* Child low range address */
+	uint32_t par_phys_hi;			/* Parent hi rng addr */
+	uint32_t par_phys_low;			/* Parent low rng addr */
+	uint32_t rng_size;			/* Range size */
+};
+
+typedef union vrangespec {
+	struct ebus_pci_rangespec	pci_rangespec;
+	struct ebus_jbus_rangespec	jbus_rangespec;
+} vrangespec_t;
+
+typedef union vregspec {
+	struct pci_phys_spec	pci_regspec;
+	struct regspec		jbus_regspec;
+} vregspec_t;
+
+/*
  * driver soft state structure:
  */
 typedef struct {
@@ -84,12 +122,10 @@ typedef struct {
 	pci_regspec_t *reg;
 	int nreg;
 
-	union {
-		struct ebus_pci_rangespec *rangep;
-		struct febus_rangespec    *ferangep;
-	} rangespec;
+	vrangespec_t *vrangep;
+	int vrange_len;
+	int vrange_cnt;
 
-	int range_cnt;
 	kmutex_t ebus_mutex;
 	uint_t ebus_soft_state;
 #define	EBUS_SOFT_STATE_CLOSED		0x00
@@ -107,39 +143,12 @@ typedef struct {
 	struct ebus_intr_map *intr_map;
 	struct ebus_intr_map_mask *intr_map_mask;
 #endif
-
-	uint_t type;
-#define	EBUS_TYPE			0x00
-#define	FEBUS_TYPE			0x01
+	int ebus_addr_cells;
+	int ebus_paddr_cells;
+	int ebus_psz_cells;
+	int ebus_sz_cells;
 } ebus_devstate_t;
 
-/*
- * definition of ebus reg spec entry:
- */
-typedef struct {
-	uint32_t addr_hi;
-	uint32_t addr_low;
-	uint32_t size;
-} ebus_regspec_t;
-
-/* EBUS range entry */
-struct ebus_pci_rangespec {
-	uint32_t ebus_phys_hi;			/* Child hi range address */
-	uint32_t ebus_phys_low;			/* Child low range address */
-	uint32_t pci_phys_hi;			/* Parent hi rng addr */
-	uint32_t pci_phys_mid;			/* Parent mid rng addr */
-	uint32_t pci_phys_low;			/* Parent low rng addr */
-	uint32_t rng_size;			/* Range size */
-};
-
-/* FEBUS range entry */
-struct febus_rangespec {
-	uint32_t febus_phys_hi;			/* Child hi range address */
-	uint32_t febus_phys_low;		/* Child low range address */
-	uint32_t parent_phys_hi;		/* Parent hi rng addr */
-	uint32_t parent_phys_low;		/* Parent low rng addr */
-	uint32_t rng_size;			/* Range size */
-};
 
 /*
  * use macros for soft state and driver properties:
