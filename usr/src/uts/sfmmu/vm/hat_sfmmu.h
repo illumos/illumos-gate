@@ -27,9 +27,9 @@
 /*
  * VM - Hardware Address Translation management.
  *
- * This file describes the contents of the sun referernce mmu (sfmmu)
- * specific hat data structures and the sfmmu specific hat procedures.
- * The machine independent interface is described in <vm/hat.h>.
+ * This file describes the contents of the sun-reference-mmu(sfmmu)-
+ * specific hat data structures and the sfmmu-specific hat procedures.
+ * The machine-independent interface is described in <vm/hat.h>.
  */
 
 #ifndef	_VM_HAT_SFMMU_H
@@ -145,7 +145,7 @@ typedef struct hat sfmmu_t;
 
 /*
  * All shared memory segments attached with the SHM_SHARE_MMU flag (ISM)
- * will be constrained to a 4M, 32M or 256M alignment. Also since every newly
+ * will be constrained to a 4M, 32M or 256M alignment. Also since every newly-
  * created ISM segment is created out of a new address space at base va
  * of 0 we don't need to store it.
  */
@@ -1426,7 +1426,7 @@ label3:;
 #define	NO_VCOLOR	(-1)
 
 #define	addr_to_vcolor(addr) \
-	(((uint_t)(addr) >> MMU_PAGESHIFT) & vac_colors_mask)
+	(((uint_t)(uintptr_t)(addr) >> MMU_PAGESHIFT) & vac_colors_mask)
 
 /*
  * The field p_index in the psm page structure is for large pages support.

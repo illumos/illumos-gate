@@ -669,7 +669,7 @@ kphysm_allocate_mem_handle()
 	mutex_enter(&mem_handle_list_mutex);
 	mutex_enter(&mhp->mh_mutex);
 	/* handle_gen is protected by list mutex. */
-	mhp->mh_exthandle = (memhandle_t)(++handle_gen);
+	mhp->mh_exthandle = (memhandle_t)(uintptr_t)(++handle_gen);
 	mhp->mh_next = mem_handle_head;
 	mem_handle_head = mhp;
 	mutex_exit(&mem_handle_list_mutex);

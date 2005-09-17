@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +35,7 @@
 #include <sys/memlist_impl.h>
 
 static struct memlist *memlist_freelist;
-static u_int memlist_freelist_count;
+static uint_t memlist_freelist_count;
 static kmutex_t memlist_freelist_mutex;
 
 /*
@@ -73,7 +73,7 @@ void
 memlist_free_list(struct memlist *mlp)
 {
 	struct memlist *mlendp;
-	u_int count;
+	uint_t count;
 
 	if (mlp == NULL) {
 		return;
@@ -93,7 +93,7 @@ void
 memlist_free_block(caddr_t base, size_t bytes)
 {
 	struct memlist *mlp, *mlendp;
-	u_int count;
+	uint_t count;
 
 	count = bytes / sizeof (struct memlist);
 	if (count == 0)
@@ -141,7 +141,7 @@ memlist_insert(
 			return;
 		}
 		if (cur->address + cur->size > start)
-			panic("munged memory list = 0x%x\n", curmemlistp);
+			panic("munged memory list = 0x%p\n", curmemlistp);
 	}
 	new->next = NULL;
 	new->prev = last;

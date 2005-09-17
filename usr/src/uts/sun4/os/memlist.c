@@ -468,7 +468,7 @@ tryagain:
 		tmp->bufsize = len;
 		tmp->ptr = (void *)BOP_ALLOC(bootops, 0, tmp->bufsize, align);
 		if (tmp->ptr == NULL)
-			panic("cannot allocate %d bytes for \"%s\" property",
+			panic("cannot allocate %lu bytes for \"%s\" property",
 			    tmp->bufsize, tmp->name);
 
 	}

@@ -1317,9 +1317,9 @@ trapstat_make_traptab(tstat_percpu_t *tcpu)
 	for (nent = 0; nent < TSTAT_TOTAL_NENT; nent++) {
 		if (tstat_enabled[nent]) {
 			bcopy(enabled, ent, sizeof (enabled));
-			ent[TSTAT_ENABLED_STATHI] |= HI22(stat);
-			ent[TSTAT_ENABLED_STATLO_LD] |= LO10(stat);
-			ent[TSTAT_ENABLED_STATLO_ST] |= LO10(stat);
+			ent[TSTAT_ENABLED_STATHI] |= HI22((uintptr_t)stat);
+			ent[TSTAT_ENABLED_STATLO_LD] |= LO10((uintptr_t)stat);
+			ent[TSTAT_ENABLED_STATLO_ST] |= LO10((uintptr_t)stat);
 			ent[TSTAT_ENABLED_BA] |= DISP22(va + en_baoffs, orig);
 		} else {
 			bcopy(disabled, ent, sizeof (disabled));
