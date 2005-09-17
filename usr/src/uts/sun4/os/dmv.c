@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -343,7 +343,8 @@ ndata_alloc_dmv(struct memlist *ndata)
 			return (-1);
 
 		bzero(dmv_dispatch_table, alloc_sz);
-		PRM_DEBUG(dmv_dispatch_table);
+		/* use uintptr_t to suppress the gcc warning */
+		PRM_DEBUG((uintptr_t)dmv_dispatch_table);
 	}
 
 	return (0);

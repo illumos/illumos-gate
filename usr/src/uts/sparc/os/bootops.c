@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -453,8 +453,9 @@ bop_puts(struct bootops *bop, char *string)
 
 	/* so new kernel, old boot can print a message before dying */
 	if (!BOOTOPS_ARE_1275(bop)) {
+		/* use uintptr_t to suppress the gcc warning */
 		bsys_printf = (void (*)(struct bootops *, char *, ...))
-		    (bop->bsys_printf);
+		    (uintptr_t)bop->bsys_printf;
 		(*bsys_printf)(bop, string);
 		return;
 	}
@@ -539,8 +540,9 @@ bop_putsarg(struct bootops *bop, const char *string, ...)
 
 	/* so new kernel, old boot can print a message before dying */
 	if (!BOOTOPS_ARE_1275(bop)) {
+		/* use uintptr_t to suppress the gcc warning */
 		bsys_printf = (void (*)(struct bootops *, char *, ...))
-		    (bop->bsys_printf);
+		    (uintptr_t)bop->bsys_printf;
 		(*bsys_printf)(bop, (char *)string, arg);
 		return;
 	}

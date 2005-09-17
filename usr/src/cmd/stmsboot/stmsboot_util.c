@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +100,11 @@ static void logdmsg(char *, ...);
 static void *s_malloc(const size_t);
 static char *s_strdup(const char *);
 static void s_strlcpy(char *, const char *, size_t);
-static void clean_exit(int);
+/*
+ * Using an exit function not marked __NORETURN causes a warning with gcc.
+ * To suppress the warning, use __NORETURN attribute.
+ */
+static void clean_exit(int)__NORETURN;
 
 /*
  * Print usage and exit.

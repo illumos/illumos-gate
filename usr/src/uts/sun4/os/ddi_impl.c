@@ -555,13 +555,14 @@ i_ddi_add_softint(ddi_softint_hdl_impl_t *hdlp)
 {
 	uint_t		rval;
 
-	if ((rval = (uint_t)add_softintr(hdlp->ih_pri,
-	    hdlp->ih_cb_func, hdlp->ih_cb_arg1)) == 0) {
+	if ((rval = add_softintr(hdlp->ih_pri, hdlp->ih_cb_func,
+	    hdlp->ih_cb_arg1)) == 0) {
 
 		return (DDI_FAILURE);
 	}
 
-	hdlp->ih_private = (void *)rval;
+	/* use uintptr_t to suppress the gcc warning */
+	hdlp->ih_private = (void *)(uintptr_t)rval;
 
 	return (DDI_SUCCESS);
 }
@@ -573,7 +574,8 @@ i_ddi_remove_softint(ddi_softint_hdl_impl_t *hdlp)
 
 	/* disable */
 	ASSERT(hdlp->ih_private != NULL);
-	intr_id = (uint_t)hdlp->ih_private;
+	/* use uintptr_t to suppress the gcc warning */
+	intr_id = (uint_t)(uintptr_t)hdlp->ih_private;
 	rem_softintr(intr_id);
 	hdlp->ih_private = NULL;
 }
@@ -1513,7 +1515,7 @@ get_intr_parent(dev_info_t *pdip, dev_info_t *dip,
 #ifdef DEBUG
 	if (debug)
 		prom_printf("reg cell size 0x%x, intr cell size 0x%x, "
-		    "match_request 0x%x, imap 0x%x\n", addr_cells, intr_cells,
+		    "match_request 0x%p, imap 0x%p\n", addr_cells, intr_cells,
 		    match_req, imap);
 #endif
 
@@ -1539,7 +1541,7 @@ get_intr_parent(dev_info_t *pdip, dev_info_t *dip,
 		ASSERT(intr_parent_dip != 0);
 #ifdef DEBUG
 		if (debug)
-			prom_printf("scan 0x%x\n", scan);
+			prom_printf("scan 0x%p\n", scan);
 #endif
 		/*
 		 * The tmp_dip describes the new domain, get it's interrupt
@@ -1597,7 +1599,7 @@ get_intr_parent(dev_info_t *pdip, dev_info_t *dip,
 
 #ifdef DEBUG
 			if (debug)
-				prom_printf("dip 0x%x, intr info 0x%x\n",
+				prom_printf("dip 0x%p, intr info 0x%p\n",
 				    intr_parent_dip, ispecp);
 #endif
 
@@ -1605,7 +1607,7 @@ get_intr_parent(dev_info_t *pdip, dev_info_t *dip,
 		} else {
 #ifdef DEBUG
 			if (debug)
-				prom_printf("dip 0x%x\n", intr_parent_dip);
+				prom_printf("dip 0x%p\n", intr_parent_dip);
 #endif
 			ndi_rele_devi(intr_parent_dip);
 			intr_parent_dip = NULL;
