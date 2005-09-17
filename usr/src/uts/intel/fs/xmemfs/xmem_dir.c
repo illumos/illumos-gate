@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -726,10 +726,10 @@ xdirrename(
 			goto out;
 		}
 		/*
-		 * vn_vfslock will prevent mounts from using the directory
+		 * vn_vfswlock will prevent mounts from using the directory
 		 * until we are done.
 		 */
-		if (vn_vfslock(XNTOV(to))) {
+		if (vn_vfswlock(XNTOV(to))) {
 			error = EBUSY;
 			goto out;
 		}

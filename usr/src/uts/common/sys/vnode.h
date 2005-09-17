@@ -840,7 +840,6 @@ int	vn_remove(char *fnamep, enum uio_seg seg, enum rm dirflag);
 int	vn_removeat(vnode_t *startvp, char *fnamep, enum uio_seg seg,
 		enum rm dirflag);
 int	vn_compare(vnode_t *vp1, vnode_t *vp2);
-int	vn_vfslock(struct vnode *vp);
 int	vn_vfswlock(struct vnode *vp);
 int	vn_vfswlock_wait(struct vnode *vp);
 int	vn_vfsrlock(struct vnode *vp);

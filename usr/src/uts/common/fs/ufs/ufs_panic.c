@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1832,7 +1832,7 @@ sf_found_umount(ufs_failure_t *f)
 	}
 
 	/* The vn_vfsunlock will be done in dounmount() [.../common/fs/vfs.c] */
-	if (vn_vfslock(vfsp->vfs_vnodecovered)) {
+	if (vn_vfswlock(vfsp->vfs_vnodecovered)) {
 		TRIVIA((": couldn't lock coveredvp"));
 		err = EBUSY;
 		goto out;

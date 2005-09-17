@@ -1471,17 +1471,6 @@ vn_vfsrlock(vnode_t *vp)
 	return (EBUSY);
 }
 
-
-/*
- * For compatibility with old (deprecated) interface, continue
- * to support vanilla mutex.
- */
-int
-vn_vfslock(vnode_t *vp)
-{
-	return (vn_vfswlock(vp));
-}
-
 void
 vn_vfsunlock(vnode_t *vp)
 {

@@ -1100,7 +1100,7 @@ xmem_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred)
 	}
 	mutex_exit(&self->xn_tlock);
 
-	if (vn_vfslock(vp)) {
+	if (vn_vfswlock(vp)) {
 		error = EBUSY;
 		goto done1;
 	}

@@ -4389,7 +4389,7 @@ cachefs_remove(vnode_t *dvp, char *nm, cred_t *cr)
 				break;
 
 			/* see ufs_dirremove for why this is done, mount race */
-			if (vn_vfslock(vp)) {
+			if (vn_vfswlock(vp)) {
 				error = EBUSY;
 				break;
 			}
@@ -5248,7 +5248,7 @@ cachefs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp,
 
 		if (delvp && delvp->v_type == VDIR) {
 			/* see ufs_dirremove for why this is done, mount race */
-			if (vn_vfslock(delvp)) {
+			if (vn_vfswlock(delvp)) {
 				error = EBUSY;
 				break;
 			}
@@ -6275,7 +6275,7 @@ cachefs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
 		}
 
 		/* see ufs_dirremove for why this is done, mount race */
-		if (vn_vfslock(vp)) {
+		if (vn_vfswlock(vp)) {
 			error = EBUSY;
 			break;
 		}

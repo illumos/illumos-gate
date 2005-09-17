@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,10 +223,10 @@ nm_umountall(vnode_t *vp, cred_t *crp)
 		    (vfsp = NMTOV(nodep)->v_vfsp) != NULL && vfsp != &namevfs) {
 
 			/*
-			 * If the vn_vfslock fails, skip the vfs since
+			 * If the vn_vfswlock fails, skip the vfs since
 			 * somebody else may be unmounting it.
 			 */
-			if (vn_vfslock(vfsp->vfs_vnodecovered)) {
+			if (vn_vfswlock(vfsp->vfs_vnodecovered)) {
 				realerr = EBUSY;
 				nodep = nodep->nm_nextp;
 				continue;

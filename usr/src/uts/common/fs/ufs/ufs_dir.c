@@ -1517,10 +1517,10 @@ retry:
 			goto out;
 		}
 		/*
-		 * vn_vfslock will prevent mounts from using the directory until
-		 * we are done.
+		 * vn_vfswlock will prevent mounts from using the directory
+		 * until we are done.
 		 */
-		if (vn_vfslock(ITOV(tip))) {
+		if (vn_vfswlock(ITOV(tip))) {
 			err = EBUSY;
 			goto out;
 		}
@@ -2469,9 +2469,9 @@ retry:
 	if (mode == IFDIR || mode == IFATTRDIR) {
 
 		/*
-		 * vn_vfslock() prevents races between mount and rmdir.
+		 * vn_vfswlock() prevents races between mount and rmdir.
 		 */
-		if (vn_vfslock(vp)) {
+		if (vn_vfswlock(vp)) {
 			err = EBUSY;
 			goto out_novfs;
 		}

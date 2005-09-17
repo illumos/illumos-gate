@@ -1257,7 +1257,7 @@ tmp_rmdir(
 	}
 	mutex_exit(&self->tn_tlock);
 
-	if (vn_vfslock(vp)) {
+	if (vn_vfswlock(vp)) {
 		error = EBUSY;
 		goto done1;
 	}

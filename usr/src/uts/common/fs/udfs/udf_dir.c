@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -670,9 +670,9 @@ ud_dirremove(struct ud_inode *dp,
 
 	if ((mode = ip->i_type) == VDIR) {
 		/*
-		 * vn_vfslock() prevents races between mount and rmdir.
+		 * vn_vfswlock() prevents races between mount and rmdir.
 		 */
-		if (vn_vfslock(ITOV(ip))) {
+		if (vn_vfswlock(ITOV(ip))) {
 			err = EBUSY;
 			goto out_novfs;
 		}
@@ -1489,10 +1489,10 @@ ud_dirrename(struct ud_inode *sdp, struct ud_inode *sip,
 			goto out;
 		}
 		/*
-		 * vn_vfslock will prevent mounts from using the directory until
-		 * we are done.
+		 * vn_vfswlock will prevent mounts from using the directory
+		 * until we are done.
 		 */
-		if (vn_vfslock(ITOV(tip))) {
+		if (vn_vfswlock(ITOV(tip))) {
 			error = EBUSY;
 			goto out;
 		}
