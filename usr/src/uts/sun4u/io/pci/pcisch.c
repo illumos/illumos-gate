@@ -1172,6 +1172,7 @@ pci_iommu_setup(iommu_t *iommu_p)
 	pci_t *pci_p = iommu_p->iommu_pci_p;
 	dev_info_t *dip = pci_p->pci_dip;
 	uint_t tsb_size = iommu_tsb_cookie_to_size(pci_p->pci_tsb_cookie);
+	uint_t tsb_size_prop;
 
 	/*
 	 * Initializations for Tomatillo's micro TLB bug. errata #82
@@ -1198,6 +1199,8 @@ pci_iommu_setup(iommu_t *iommu_p)
 	}
 	iommu_p->iommu_dvma_end = dvma_prop->dvma_base +
 		(dvma_prop->dvma_len - 1);
+	tsb_size_prop = IOMMU_BTOP(dvma_prop->dvma_len) * sizeof (uint64_t);
+	tsb_size = MIN(tsb_size_prop, tsb_size);
 tsb_end:
 	kmem_free(dvma_prop, dvma_prop_len);
 tsb_done:
