@@ -2065,7 +2065,7 @@ void *ptr;
 
 	if ((opts & OPT_ZERORULEST) != 0) {
 		if ((*ioctlfunc)(fd, add, (void *)&obj) == -1) {
-			if ((opts & OPT_DONOTHING) != 0) {
+			if ((opts & OPT_DONOTHING) == 0) {
 				fprintf(stderr, "%d:", yylineNum);
 				perror("ioctl(SIOCZRLST)");
 			}
@@ -2082,7 +2082,7 @@ void *ptr;
 		}
 	} else if ((opts & OPT_REMOVE) != 0) {
 		if ((*ioctlfunc)(fd, del, (void *)&obj) == -1) {
-			if ((opts & OPT_DONOTHING) != 0) {
+			if ((opts & OPT_DONOTHING) == 0) {
 				fprintf(stderr, "%d:", yylineNum);
 				perror("ioctl(delete rule)");
 			}

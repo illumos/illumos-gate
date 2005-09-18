@@ -1057,6 +1057,7 @@ int topclosed;
 				tp->st_pkts = ips.is_pkts[0] + ips.is_pkts[1];
 				tp->st_bytes = ips.is_bytes[0] +
 					       ips.is_bytes[1];
+				tp->st_age = ips.is_die - ipsstp->iss_ticks;
 				if ((ips.is_p == IPPROTO_TCP) ||
 				    (ips.is_p == IPPROTO_UDP)) {
 					tp->st_sport = ips.is_sport;

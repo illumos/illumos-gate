@@ -1,4 +1,15 @@
 %{
+/*
+ * Copyright (C) 2003 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #ifdef  __FreeBSD__
 # ifndef __FreeBSD_cc_version
 #  include <osreldate.h>
@@ -289,6 +300,11 @@ rhaddr:	addr				{ $$.a = $1.a; $$.m = $1.m; }
 dip:
 	ipv4				{ nat->in_inip = $1.s_addr;
 					  nat->in_inmsk = 0xffffffff; }
+	| ipv4 '/' YY_NUMBER		{ nat->in_inip = $1.s_addr;
+					  if (nat->in_inip != 0 ||
+					      ($3 != 0 && $3 != 32))
+						yyerror("Invalid mask for dip");
+					  ntomask(4, $3, &nat->in_inmsk); }
 	| ipv4 ',' ipv4			{ nat->in_flags |= IPN_SPLIT;
 					  nat->in_inip = $1.s_addr;
 					  nat->in_inmsk = $3.s_addr; }
