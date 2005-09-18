@@ -1279,10 +1279,10 @@ read_again:
 			 * Reply is good, check auth.
 			 */
 			if (!AUTH_VALIDATE(h->cl_auth,
-			    &reply_msg.acpted_rply.ar_verf)) {
+					&reply_msg.acpted_rply.ar_verf)) {
 				COTSRCSTAT_INCR(p->cku_stats, rcbadverfs);
 				RPCLOG0(1, "clnt_cots_kcallit: validation "
-				    "failure\n");
+					"failure\n");
 				freemsg(mp);
 				(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
 				mutex_enter(&call->call_lock);
@@ -1291,9 +1291,9 @@ read_again:
 				mutex_exit(&call->call_lock);
 				goto read_again;
 			} else if (!AUTH_UNWRAP(h->cl_auth, xdrs,
-			    xdr_results, resultsp)) {
+						xdr_results, resultsp)) {
 				RPCLOG0(1, "clnt_cots_kcallit: validation "
-				    "failure (unwrap)\n");
+					"failure (unwrap)\n");
 				p->cku_err.re_status = RPC_CANTDECODERES;
 				p->cku_err.re_errno = EIO;
 			}
@@ -1309,30 +1309,46 @@ read_again:
 				 * Maybe our credential need to be
 				 * refreshed
 				 */
-			    if ((refreshes > 0) &&
-				AUTH_REFRESH(h->cl_auth, &reply_msg,
+				if (cm_entry) {
+					/*
+					 * There is the potential that the
+					 * cm_entry has/will be marked dead,
+					 * so drop our ref to it, force REFRESH
+					 * to establish new connection.
+					 */
+					connmgr_release(cm_entry);
+					cm_entry = NULL;
+				}
+
+				if ((refreshes > 0) &&
+				    AUTH_REFRESH(h->cl_auth, &reply_msg,
 						p->cku_cred)) {
-				refreshes--;
-				(void) xdr_rpc_free_verifier(xdrs, &reply_msg);
-				freemsg(mp);
-				mp = NULL;
+					refreshes--;
+					(void) xdr_rpc_free_verifier(xdrs,
+								&reply_msg);
+					freemsg(mp);
+					mp = NULL;
 
-				if (p->cku_flags & CKU_ONQUEUE) {
-					call_table_remove(call);
-					p->cku_flags &= ~CKU_ONQUEUE;
-				}
+					if (p->cku_flags & CKU_ONQUEUE) {
+						call_table_remove(call);
+						p->cku_flags &= ~CKU_ONQUEUE;
+					}
 
-				RPCLOG(64, "clnt_cots_kcallit: AUTH_ERROR, so "
-				    "xid 0x%x taken off dispatch list\n",
-				    p->cku_xid);
-				if (call->call_reply) {
-					freemsg(call->call_reply);
-					call->call_reply = NULL;
-				}
-				COTSRCSTAT_INCR(p->cku_stats, rcbadcalls);
-				COTSRCSTAT_INCR(p->cku_stats, rcnewcreds);
-				goto call_again;
-			    } else {
+					RPCLOG(64,
+					    "clnt_cots_kcallit: AUTH_ERROR, xid"
+					    " 0x%x removed off dispatch list\n",
+					    p->cku_xid);
+					if (call->call_reply) {
+						freemsg(call->call_reply);
+						call->call_reply = NULL;
+					}
+
+					COTSRCSTAT_INCR(p->cku_stats,
+							rcbadcalls);
+					COTSRCSTAT_INCR(p->cku_stats,
+							rcnewcreds);
+					goto call_again;
+				} else {
 				/*
 				 * We have used the client handle to
 				 * do an AUTH_REFRESH and the RPC status may
@@ -1347,8 +1363,12 @@ read_again:
 				switch (p->cku_err.re_why) {
 				case AUTH_TOOWEAK:
 					/*
-					 * Could be an nfsportmon failure, set
-					 * useresvport and try again
+					 * This could be a failure where the
+					 * server requires use of a reserved
+					 * port,  check and optionally set the
+					 * client handle useresvport trying
+					 * one more time. Next go round we
+					 * fall out with the tooweak error.
 					 */
 					if (p->cku_useresvport != 1) {
 						p->cku_useresvport = 1;
@@ -1356,8 +1376,18 @@ read_again:
 						(void) xdr_rpc_free_verifier
 							    (xdrs, &reply_msg);
 						freemsg(mp);
-						connmgr_cancelconn(cm_entry);
-						cm_entry = NULL;
+						/*
+						 * If we got this far the
+						 * connection we are using is
+						 * connected but not valid,
+						 * (not a resv port) drop it
+						 * and force a connection.
+						 */
+						if (cm_entry) {
+							connmgr_cancelconn
+								(cm_entry);
+							cm_entry = NULL;
+						}
 						goto call_again;
 					}
 					/* FALLTHRU */
