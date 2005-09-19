@@ -215,7 +215,6 @@ pad_outfile(Ofl_desc * ofl)
 	return (1);
 }
 
-
 /*
  * Create the elf structures that allow the input data to be associated with the
  * new image:
@@ -343,7 +342,15 @@ create_outfile(Ofl_desc * ofl)
 					nseg++;
 			} else if ((sgp->sg_osdescs.head) ||
 			    (sgp->sg_flags & FLG_SG_EMPTY)) {
-				if (ptype != PT_NULL)
+				if (((sgp->sg_flags & FLG_SG_EMPTY) == 0) &&
+				    ((sgp->sg_flags & FLG_SG_PHREQ) == 0)) {
+					/*
+					 * If this is a segment for which
+					 * we are not making a program header,
+					 * don't increment nseg
+					 */
+					ptype = (sgp->sg_phdr).p_type = PT_NULL;
+				} else if (ptype != PT_NULL)
 					nseg++;
 			}
 		}

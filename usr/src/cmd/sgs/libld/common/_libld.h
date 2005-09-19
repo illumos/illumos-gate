@@ -50,14 +50,27 @@ extern "C" {
  */
 typedef enum {
 	LD_PHDR,	LD_INTERP,	LD_SUNWCAP,	LD_TEXT,
-	LD_DATA,	LD_BSS,		LD_DYN,		LD_DTRACE,
-	LD_NOTE,	LD_SUNWBSS,	LD_TLS,
+	LD_DATA,	LD_BSS,
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+	LD_LRODATA,	LD_LDATA,
+#endif
+	LD_DYN,		LD_DTRACE,	 LD_NOTE,	LD_SUNWBSS,
+	LD_TLS,
 #if defined(__x86) && defined(_ELF64)
 	LD_UNWIND,
 #endif
 	LD_EXTRA,
 	LD_NUM
 } Segment_ndx;
+
+/*
+ * Types of bss sections
+ */
+typedef enum {
+	MAKE_BSS,
+	MAKE_LBSS,
+	MAKE_TLS
+} Bss_Type;
 
 /*
  * Structure to manage the update of weak symbols from their associated alias.
@@ -226,7 +239,7 @@ extern void		mach_make_dynamic(Ofl_desc *, size_t *);
 extern void		mach_update_odynamic(Ofl_desc *, Dyn **);
 extern int		mach_sym_typecheck(Sym_desc *, Sym *, Ifl_desc *,
 			    Ofl_desc *);
-extern uintptr_t	make_bss(Ofl_desc *, Xword, Xword, uint_t);
+extern uintptr_t	make_bss(Ofl_desc *, Xword, Xword, Bss_Type);
 extern uintptr_t	make_got(Ofl_desc *);
 extern uintptr_t	make_reloc(Ofl_desc *, Os_desc *);
 extern uintptr_t	make_sunwbss(Ofl_desc *, size_t, Xword);

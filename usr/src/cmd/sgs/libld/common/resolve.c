@@ -650,6 +650,28 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	size_t		size = 0;
 	Xword		value = 0;
 
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+	/*
+	 * If original and new are both COMMON but
+	 * different size model, take the small one.
+	 */
+	if ((sdp->sd_shndx == SHN_COMMON) &&
+	    (nshndx == SHN_X86_64_LCOMMON)) {
+		/*
+		 * Take the original one.
+		 */
+		return;
+	} else if ((sdp->sd_shndx == SHN_X86_64_LCOMMON) &&
+	    (nshndx == SHN_COMMON)) {
+		/*
+		 * Take the new symbol.
+		 */
+		sym_override(sdp, nsym, ifl, ofl, ndx,
+		    nshndx, nsymflags);
+		return;
+	}
+#endif
+
 	/*
 	 * Check the alignment of the symbols.  This can only be tested for if
 	 * the symbols are not real definitions to a SHT_NOBITS section (ie.
@@ -659,9 +681,17 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 */
 	if ((osym->st_value != nsym->st_value) &&
 	    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
-	    (sdp->sd_shndx == SHN_COMMON)) &&
-	    ((nsymflags & FLG_SY_SPECSEC) &&
+	    (sdp->sd_shndx == SHN_COMMON) &&
+	    (nsymflags & FLG_SY_SPECSEC) &&
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+	    (nshndx == SHN_COMMON)) ||
+	    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
+	    (sdp->sd_shndx == SHN_X86_64_LCOMMON) &&
+	    (nsymflags & FLG_SY_SPECSEC) &&
+	    (nshndx == SHN_X86_64_LCOMMON))) {
+#else
 	    (nshndx == SHN_COMMON))) {
+#endif
 		const char	*emsg = MSG_INTL(MSG_SYM_DEFTAKEN);
 		const char	*file;
 		Xword		salign;
@@ -898,6 +928,12 @@ sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	    (nshndx == SHN_COMMON)) {
 		column = SYM_TENTATIVE;
 		nsymflags |= FLG_SY_TENTSYM;
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+	} else if ((nsymflags & FLG_SY_SPECSEC) &&
+	    (nshndx == SHN_X86_64_LCOMMON)) {
+		column = SYM_TENTATIVE;
+		nsymflags |= FLG_SY_TENTSYM;
+#endif
 	} else if ((nshndx == SHN_UNDEF) || (nshndx == SHN_SUNW_IGNORE)) {
 		column = SYM_UNDEFINED;
 		nshndx = SHN_UNDEF;

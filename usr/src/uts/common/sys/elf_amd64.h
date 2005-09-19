@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,11 +110,16 @@ extern "C" {
  *	 to conform with the amd64 psABI.
  */
 
-#define	SHF_ORDERED	0x40000000
-#define	SHF_EXCLUDE	0x80000000
+#define	SHF_AMD64_LARGE		0x10000000
+#define	SHF_X86_64_LARGE	SHF_AMD64_LARGE
+#define	SHF_ORDERED		0x40000000
+#define	SHF_EXCLUDE		0x80000000
 
-#define	SHN_BEFORE	0xff00
-#define	SHN_AFTER	0xff01
+#define	SHN_BEFORE		0xff00
+#define	SHN_AFTER		0xff01
+#define	SHN_AMD64_LCOMMON	0xff02
+#define	SHN_X86_64_LCOMMON	SHN_AMD64_LCOMMON
+
 
 #ifdef	__cplusplus
 }

@@ -176,6 +176,7 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	isp->is_file = ifl;
 	isp->is_name = name;
 	isp->is_scnndx = ndx;
+	isp->is_flags = FLG_IS_EXTERNAL;
 	/* LINTED */
 	isp->is_key = (Half)ident;
 	if ((isp->is_indata = elf_getdata(scn, NULL)) == NULL) {
@@ -571,6 +572,10 @@ process_nobits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	if (ident) {
 		if (shdr->sh_flags & SHF_TLS)
 			ident = M_ID_TLSBSS;
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+		else if (shdr->sh_flags & SHF_AMD64_LARGE)
+			ident = M_ID_LBSS;
+#endif
 		else
 			ident = M_ID_BSS;
 	}

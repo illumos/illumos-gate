@@ -39,17 +39,36 @@
 #include	"_libld.h"
 
 /*
- * Compute LCM
+ * Each time a section is placed, the function set_addralign()
+ * is called. This function performs:
+ * 	*) if the section is from an external file,
+ *	   check if this is empty or not. If not,
+ *	   we know the segment this section will belong
+ *	   needs a program header. (Of course, the program
+ *	   needed only if this section falls into a
+ *	   loadable segment.)
+ * 	*) compute the Least Common Multiplier for setting
+ *	   the segment alignment.
  */
 static void
 set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 {
+	Shdr *		shdr = isp->is_shdr;
+
+	/*
+	 * If this section has data or will be assigned data
+	 * later, mark this segment not-empty.
+	 */
+	if ((shdr->sh_size != 0) ||
+	    ((isp->is_flags & FLG_IS_EXTERNAL) == 0))
+		osp->os_sgdesc->sg_flags |= FLG_SG_PHREQ;
+
 	if ((ofl->ofl_flags1 & FLG_OF1_NOHDR) &&
 	    (osp->os_sgdesc->sg_phdr).p_type != PT_LOAD)
 		return;
 
 	osp->os_sgdesc->sg_addralign = lcm(osp->os_sgdesc->sg_addralign,
-		isp->is_shdr->sh_addralign);
+		shdr->sh_addralign);
 }
 
 /*

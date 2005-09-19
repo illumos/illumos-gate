@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -95,6 +95,7 @@ conv_sectyp_str(ushort_t mach, uint_t sec)
 		MSG_SHF_TLS_SIZE + \
 		MSG_SHF_EXCLUDE_SIZE + \
 		MSG_SHF_ORDERED_SIZE + \
+		MSG_SHF_AMD64_LARGE + \
 		MSG_GBL_CSQBRKT_SIZE
 
 const char *
@@ -157,6 +158,10 @@ conv_secflg_str(ushort_t mach, uint_t flags)
 		if (flags & SHF_ORDERED) {
 			(void) strcat(string, MSG_ORIG(MSG_SHF_ORDERED));
 			flags_handled |= SHF_ORDERED;
+		}
+		if (flags & SHF_AMD64_LARGE) {
+			(void) strcat(string, MSG_ORIG(MSG_SHF_AMD64_LARGE));
+			flags_handled |= SHF_AMD64_LARGE;
 		}
 
 		/*

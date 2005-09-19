@@ -231,7 +231,7 @@ ignore_section_processing(Ofl_desc *ofl)
  * section required to represent them.
  */
 uintptr_t
-make_bss(Ofl_desc *ofl, Xword size, Xword align, uint_t tls)
+make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 {
 	Shdr		*shdr;
 	Elf_Data	*data;
@@ -257,8 +257,6 @@ make_bss(Ofl_desc *ofl, Xword size, Xword align, uint_t tls)
 		return (S_ERROR);
 	shdr->sh_type = SHT_NOBITS;
 	shdr->sh_flags = SHF_ALLOC | SHF_WRITE;
-	if (tls)
-		shdr->sh_flags |= SHF_TLS;
 	shdr->sh_size = size;
 	shdr->sh_addralign = align;
 
@@ -271,15 +269,25 @@ make_bss(Ofl_desc *ofl, Xword size, Xword align, uint_t tls)
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
-	if (tls) {
+	if (which == MAKE_TLS) {
 		isec->is_name = MSG_ORIG(MSG_SCN_TBSS);
 		ident = M_ID_TLSBSS;
 		ofl->ofl_istlsbss = isec;
-	} else {
+		shdr->sh_flags |= SHF_TLS;
+	} else if (which == MAKE_BSS) {
 		isec->is_name = MSG_ORIG(MSG_SCN_BSS);
-		ident = M_ID_BSS;
 		ofl->ofl_isbss = isec;
+		ident = M_ID_BSS;
+
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+	} else if (which == MAKE_LBSS) {
+		isec->is_name = MSG_ORIG(MSG_SCN_LBSS);
+		ofl->ofl_islbss = isec;
+		ident = M_ID_LBSS;
+		shdr->sh_flags |= SHF_AMD64_LARGE;
+#endif
 	}
+
 	/*
 	 * Retain this .bss input section as this will be where global
 	 * symbol references are added.
@@ -294,7 +302,7 @@ make_bss(Ofl_desc *ofl, Xword size, Xword align, uint_t tls)
 	 */
 	if (!(osp->os_flags & FLG_OS_OUTREL)) {
 		Word	flagtotest;
-		if (tls)
+		if (which == MAKE_TLS)
 			flagtotest = FLG_OF1_TLSOREL;
 		else
 			flagtotest = FLG_OF1_BSSOREL;

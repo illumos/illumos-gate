@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,6 +33,7 @@
 #include	"_conv.h"
 #include	"symbols_msg.h"
 #include	<sys/elf_SPARC.h>
+#include	<sys/elf_amd64.h>
 
 static const char vis_types[4] = {
 	'D',	/* STV_DEFAULT */
@@ -109,6 +110,8 @@ conv_shndx_str(ushort_t shndx)
 		return (MSG_ORIG(MSG_SHN_ABS));
 	else if (shndx == SHN_COMMON)
 		return (MSG_ORIG(MSG_SHN_COMMON));
+	else if (shndx == SHN_X86_64_LCOMMON)
+		return (MSG_ORIG(MSG_SHN_X86_64_LCOMMON));
 	else if (shndx == SHN_AFTER)
 		return (MSG_ORIG(MSG_SHN_AFTER));
 	else if (shndx == SHN_BEFORE)

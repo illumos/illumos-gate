@@ -328,11 +328,12 @@ extern "C" {
 #define	M_ID_DYNAMIC	0x05
 #define	M_ID_ARRAY	0x06
 
-#define	M_ID_UNKNOWN	0xfc			/* just before TLS */
+#define	M_ID_UNKNOWN	0xfb			/* just before TLS */
 
-#define	M_ID_TLS	0xfd			/* just before bss */
-#define	M_ID_TLSBSS	0xfe
-#define	M_ID_BSS	0xff
+#define	M_ID_TLS	0xfc			/* just before bss */
+#define	M_ID_TLSBSS	0xfd
+#define	M_ID_BSS	0xfe
+#define	M_ID_LBSS	0xff
 
 #define	M_ID_SYMTAB_NDX	0x02			/* ! SHF_ALLOC */
 #define	M_ID_SYMTAB	0x03

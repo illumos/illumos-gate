@@ -69,6 +69,10 @@ update_osym(Ofl_desc *ofl)
 	Word		bssndx, etext_ndx, edata_ndx = 0, end_ndx, start_ndx;
 	Word		end_abs = 0, etext_abs = 0, edata_abs;
 	Word		tlsbssndx = 0, sunwbssndx = 0, sunwdata1ndx;
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+	Word		lbssndx = 0;
+	Addr		lbssaddr = 0;
+#endif
 	Addr		bssaddr, etext = 0, edata = 0, end = 0, start = 0;
 	Addr		tlsbssaddr = 0;
 	Addr 		sunwbssaddr = 0, sunwdata1addr;
@@ -207,13 +211,20 @@ update_osym(Ofl_desc *ofl)
 
 		if (phd->p_type == PT_LOAD) {
 			if (sgp->sg_osdescs.head != NULL) {
-				Word	_flags = phd->p_flags & (PF_W | PF_R);
-				if (_flags == PF_R)
-					tsgp = sgp;
-				else if (_flags == (PF_W | PF_R))
-					dsgp = sgp;
+			    Word _flags = phd->p_flags & (PF_W | PF_R);
+			    if (_flags == PF_R) {
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+				Os_desc * osp = sgp->sg_osdescs.head->data;
+				Shdr * shdr = osp->os_shdr;
+				if (((shdr->sh_flags & SHF_AMD64_LARGE)) == 0)
+				    tsgp = sgp;
+#else
+				tsgp = sgp;
+#endif
+			    } else if (_flags == (PF_W | PF_R))
+				dsgp = sgp;
 			} else if (sgp->sg_flags & FLG_SG_EMPTY)
-				esgp = sgp;
+			    esgp = sgp;
 		}
 
 		/*
@@ -627,6 +638,20 @@ update_osym(Ofl_desc *ofl)
 		bssndx = elf_ndxscn(osp->os_scn);
 	}
 
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+	/*
+	 * Assign .lbss information for use with updating LCOMMON symbols.
+	 */
+	if (ofl->ofl_islbss) {
+		osp = ofl->ofl_islbss->is_osdesc;
+
+		lbssaddr = osp->os_shdr->sh_addr +
+			(Off)_elf_getxoff(ofl->ofl_islbss->is_indata);
+		/* LINTED */
+		lbssndx = elf_ndxscn(osp->os_scn);
+	}
+#endif
+
 	/*
 	 * Assign .tlsbss information for use with updating COMMON symbols.
 	 */
@@ -665,6 +690,7 @@ update_osym(Ofl_desc *ofl)
 	    sav = AVL_NEXT(&ofl->ofl_symavl, sav)) {
 		Sym *	symptr;
 		int	local;
+		int	restore;
 
 		sdp = sav->sav_symdesc;
 
@@ -717,10 +743,10 @@ update_osym(Ofl_desc *ofl)
 		 * table still occurs below in hashbucket order.
 		 */
 		symptr = sdp->sd_sym;
+		restore = 0;
 		if ((sdp->sd_flags & FLG_SY_PAREXPN) ||
 		    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
 		    (sdp->sd_shndx = symptr->st_shndx) == SHN_COMMON)) {
-			int	restore;
 
 			/*
 			 * If this this is an expanded symbol,
@@ -735,7 +761,6 @@ update_osym(Ofl_desc *ofl)
 			 *
 			 * Otherwise leave it as is.
 			 */
-			restore = 0;
 			if (sdp->sd_flags & FLG_SY_PAREXPN) {
 				restore = 1;
 				sdp->sd_shndx = sunwdata1ndx;
@@ -784,24 +809,38 @@ update_osym(Ofl_desc *ofl)
 				 */
 				symptr->st_value -= ofl->ofl_tlsphdr->p_vaddr;
 			}
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+		} else if ((sdp->sd_flags & FLG_SY_SPECSEC) &&
+		    ((sdp->sd_shndx = symptr->st_shndx) ==
+		    SHN_X86_64_LCOMMON) &&
+		    ((local || !(flags & FLG_OF_RELOBJ)))) {
+			restore = 1;
+			sdp->sd_shndx = lbssndx;
+			sdp->sd_flags &= ~FLG_SY_SPECSEC;
+			symptr->st_value = (Xword) S_ROUND(lbssaddr,
+				symptr->st_value);
+			lbssaddr = symptr->st_value + symptr->st_size;
+			sdp->sd_isc = ofl->ofl_islbss;
+			sdp->sd_flags |= FLG_SY_COMMEXP;
+#endif
+		}
 
-			if (restore != 0) {
-				unsigned char type, bind;
-				/*
-				 * Make sure this COMMON
-				 * symbol is returned to the
-				 * same binding as was defined
-				 * in the original relocatable
-				 * object reference.
-				 */
-				type = ELF_ST_TYPE(symptr->st_info);
-				if (sdp->sd_flags & FLG_SY_GLOBREF)
-					bind = STB_GLOBAL;
-				else
-					bind = STB_WEAK;
+		if (restore != 0) {
+			unsigned char type, bind;
+			/*
+			 * Make sure this COMMON
+			 * symbol is returned to the
+			 * same binding as was defined
+			 * in the original relocatable
+			 * object reference.
+			 */
+			type = ELF_ST_TYPE(symptr->st_info);
+			if (sdp->sd_flags & FLG_SY_GLOBREF)
+				bind = STB_GLOBAL;
+			else
+				bind = STB_WEAK;
 
-				symptr->st_info = ELF_ST_INFO(bind, type);
-			}
+			symptr->st_info = ELF_ST_INFO(bind, type);
 		}
 	}
 
@@ -2857,12 +2896,14 @@ update_outfile(Ofl_desc *ofl)
 		 * information provided from elf_update().
 		 * Allow for multiple NOBITS sections.
 		 */
-		hshdr = ((Os_desc *)osecs.head->data)->os_shdr;
+		osp = (Os_desc *)osecs.head->data;
+		hshdr = osp->os_shdr;
 
 		phdr->p_filesz = 0;
 		phdr->p_memsz = 0;
 		phdr->p_offset = offset = hshdr->sh_offset;
-		nobits = (hshdr->sh_type == SHT_NOBITS);
+		nobits = ((hshdr->sh_type == SHT_NOBITS) &&
+			((sgp->sg_flags & FLG_SG_PHREQ) == 0));
 		for (LIST_TRAVERSE(&osecs, lnp2, osp)) {
 			Shdr *	shdr = osp->os_shdr;
 
@@ -2878,7 +2919,7 @@ update_outfile(Ofl_desc *ofl)
 					return (S_ERROR);
 				}
 				phdr->p_filesz = offset - phdr->p_offset;
-			} else
+			} else if ((sgp->sg_flags & FLG_SG_PHREQ) == 0)
 				nobits = TRUE;
 		}
 		phdr->p_memsz = offset - hshdr->sh_offset;

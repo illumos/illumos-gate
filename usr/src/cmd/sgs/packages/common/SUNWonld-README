@@ -1520,3 +1520,7 @@ All the above change is incorporated in the following patches:
 6318401 mis-aligned TLS variable
 6324019 ld.so.1: malloc alignment is insufficient for new compilers
 6324589 psh coredumps on x86 machines on snv_23
+6236594 AMD64: Linker needs to handle the new .lbss section (D)
+PSARC 2005/514 - AMD64 - large section support
+6314743 Linker: incorrect resolution for R_AMD64_GOTPC32
+6311865 Linker: x86 medium model; invalid ELF program header

@@ -205,6 +205,7 @@ struct ofl_desc {
 	Word		ofl_pltpad;	/* no. of .plt padd entries */
 	Word		ofl_hashbkts;	/* no. of hash buckets required */
 	Is_desc		*ofl_isbss;	/* .bss input section (globals) */
+	Is_desc		*ofl_islbss;	/* .lbss input section (globals) */
 	Is_desc		*ofl_istlsbss;	/* .tlsbss input section (globals) */
 	Is_desc		*ofl_issunwdata1; /* .data input section */
 					/* 	partially expanded. */
@@ -496,6 +497,7 @@ struct is_desc {			/* input section descriptor */
 #define	FLG_IS_RELUPD	0x0008		/* symbol defined here may have moved */
 #define	FLG_IS_SECTREF	0x0010		/* section has been referenced */
 #define	FLG_IS_GDATADEF	0x0020		/* section contains global data sym */
+#define	FLG_IS_EXTERNAL	0x0040		/* isp from an user file */
 
 
 /*
@@ -574,6 +576,8 @@ struct sg_desc {			/* output segment descriptor */
 					/*	associated to this section */
 #define	FLG_SG_KEY	0x0400		/* include a key section */
 #define	FLG_SG_DISABLED	0x0800		/* this segment is disabled */
+#define	FLG_SG_PHREQ	0x1000		/* this segment requires a program */
+					/* header */
 
 struct sec_order {
 	const char	*sco_secname;	/* section name to be ordered */
@@ -588,8 +592,8 @@ struct ent_desc {			/* input section entrance criteria */
 					/*	sections */
 	const char	*ec_name;	/* name to match (NULL if none) */
 	Word		ec_type;	/* section type */
-	Half		ec_attrmask;	/* section attribute mask (AWX) */
-	Half		ec_attrbits;	/* sections attribute bits */
+	Word		ec_attrmask;	/* section attribute mask (AWX) */
+	Word		ec_attrbits;	/* sections attribute bits */
 	Sg_desc		*ec_segment;	/* output segment to enter if matched */
 	Word		ec_ndx;		/* index to determine where section */
 					/*	meeting this criteria should */

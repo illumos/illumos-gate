@@ -834,7 +834,7 @@ do_activerelocs(Ofl_desc *ofl)
 				    refaddr;
 			} else if (IS_GOT_PC(arsp->rel_rtype)) {
 				value = (Xword) (ofl->ofl_osgot->os_shdr->
-				    sh_addr) - refaddr;
+				    sh_addr) - refaddr + arsp->rel_raddend;
 			} else if ((IS_PC_RELATIVE(arsp->rel_rtype)) &&
 			    (!(ofl->ofl_flags & FLG_OF_RELOBJ) ||
 			    (arsp->rel_osdesc == sdp->sd_isc->is_osdesc))) {

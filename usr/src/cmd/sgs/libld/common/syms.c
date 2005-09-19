@@ -350,8 +350,14 @@ sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl, Ofl_desc *ofl,
 	/*
 	 * Mark any COMMON symbols as 'tentative'.
 	 */
-	if ((sdflags & FLG_SY_SPECSEC) && (shndx == SHN_COMMON))
-		sdp->sd_flags |= FLG_SY_TENTSYM;
+	if (sdflags & FLG_SY_SPECSEC) {
+		if (shndx == SHN_COMMON)
+			sdp->sd_flags |= FLG_SY_TENTSYM;
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+		else if (shndx == SHN_X86_64_LCOMMON)
+			sdp->sd_flags |= FLG_SY_TENTSYM;
+#endif
+	}
 
 	/*
 	 * Establish the symbols reference & visibility.
@@ -414,9 +420,14 @@ sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl, Ofl_desc *ofl,
 	 * determine whether it is a global or weak reference (see build_osym(),
 	 * where REF_DYN_NEED definitions are returned back to undefines).
 	 */
-	if ((etype == ET_REL) && ((shndx == SHN_UNDEF) ||
-	    ((sdflags & FLG_SY_SPECSEC) && (shndx == SHN_COMMON))) &&
-	    (ELF_ST_BIND(nsym->st_info) == STB_GLOBAL))
+	if ((etype == ET_REL) &&
+	    (ELF_ST_BIND(nsym->st_info) == STB_GLOBAL) &&
+	    ((shndx == SHN_UNDEF) || ((sdflags & FLG_SY_SPECSEC) &&
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+	    ((shndx == SHN_COMMON) || (shndx == SHN_X86_64_LCOMMON)))))
+#else
+	    (shndx == SHN_COMMON))))
+#endif
 		sdp->sd_flags |= FLG_SY_GLOBREF;
 
 	/*
@@ -893,6 +904,9 @@ sym_validate(Ofl_desc *ofl)
 	Word		undef = 0, needed = 0, verdesc = 0;
 	Xword		bssalign = 0, tlsalign = 0;
 	Xword		bsssize = 0, tlssize = 0;
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+	Xword		lbssalign = 0, lbsssize = 0;
+#endif
 
 	/*
 	 * If a symbol is undefined and this link-edit calls for no undefined
@@ -1207,6 +1221,20 @@ sym_validate(Ofl_desc *ofl)
 			}
 		}
 
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+		/*
+		 * Calculate the size and alignment requirement for the global
+		 * .lbss. TLS or partially initialized symbols do not need to be
+		 * considered yet.
+		 */
+		if (shndx == SHN_X86_64_LCOMMON) {
+			lbsssize = (Xword)S_ROUND(lbsssize, sym->st_value) +
+				sym->st_size;
+			if (sym->st_value > lbssalign)
+				lbssalign = sym->st_value;
+		}
+#endif
+
 		/*
 		 * If a symbol was referenced via the command line
 		 * (ld -u <>, ...), then this counts as a reference against the
@@ -1318,13 +1346,19 @@ sym_validate(Ofl_desc *ofl)
 	 * Generate the .bss section now that we know its size and alignment.
 	 */
 	if (bsssize || !(oflags & FLG_OF_RELOBJ)) {
-		if (make_bss(ofl, bsssize, bssalign, 0) == S_ERROR)
+		if (make_bss(ofl, bsssize, bssalign, MAKE_BSS) == S_ERROR)
 			return (S_ERROR);
 	}
 	if (tlssize) {
-		if (make_bss(ofl, tlssize, tlsalign, 1) == S_ERROR)
+		if (make_bss(ofl, tlssize, tlsalign, MAKE_TLS) == S_ERROR)
 			return (S_ERROR);
 	}
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+	if (lbsssize && !(oflags & FLG_OF_RELOBJ)) {
+		if (make_bss(ofl, lbsssize, lbssalign, MAKE_LBSS) == S_ERROR)
+			return (S_ERROR);
+	}
+#endif
 
 	/*
 	 * Determine what entry point symbol we need, and if found save its
