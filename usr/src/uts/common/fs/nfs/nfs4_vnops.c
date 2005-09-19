@@ -4094,7 +4094,7 @@ nfs4_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 	int doqueue;
 	uint32_t acc, resacc, argacc;
 	rnode4_t *rp;
-	cred_t *cred, *ncr;
+	cred_t *cred, *ncr, *ncrfree = NULL;
 	nfs4_access_type_t cacc;
 	int num_ops;
 	nfs_argop4 argop[3];
@@ -4144,12 +4144,23 @@ nfs4_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 	recov_state.rs_num_retry_despite_err = 0;
 
 	cred = cr;
+	/*
+	 * ncr and ncrfree both initially
+	 * point to the memory area returned
+	 * by crnetadjust();
+	 * ncrfree not NULL when exiting means
+	 * that we need to release it
+	 */
 	ncr = crnetadjust(cred);
+	ncrfree = ncr;
 
 tryagain:
 	cacc = nfs4_access_check(rp, acc, cred);
-	if (cacc == NFS4_ACCESS_ALLOWED)
+	if (cacc == NFS4_ACCESS_ALLOWED) {
+		if (ncrfree != NULL)
+			crfree(ncrfree);
 		return (0);
+	}
 	if (cacc == NFS4_ACCESS_DENIED) {
 		/*
 		 * If the cred can be adjusted, try again
@@ -4160,6 +4171,8 @@ tryagain:
 			ncr = NULL;
 			goto tryagain;
 		}
+		if (ncrfree != NULL)
+			crfree(ncrfree);
 		return (EACCES);
 	}
 
@@ -4179,6 +4192,8 @@ recov_retry:
 
 	if (e.error = nfs4_start_fop(mi, vp, NULL, OH_ACCESS,
 					&recov_state, NULL)) {
+		if (ncrfree != NULL)
+			crfree(ncrfree);
 		return (e.error);
 	}
 
@@ -4248,6 +4263,14 @@ recov_retry:
 
 	if (!e.error) {
 		nfs4_access_cache(rp, argacc, resacc, cred);
+		/*
+		 * we just cached results with cred; if cred is the
+		 * adjusted credentials from crnetadjust, we do not want
+		 * to release them before exiting: hence setting ncrfree
+		 * to NULL
+		 */
+		if (cred != cr)
+			ncrfree = NULL;
 		/* XXX check the supported bits too? */
 		if ((acc & resacc) != acc) {
 			/*
@@ -4273,8 +4296,8 @@ out:
 	if (!rpc_error)
 		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 
-	if (cred != cr)
-		crfree(cred);
+	if (ncrfree != NULL)
+		crfree(ncrfree);
 
 	return (e.error);
 }

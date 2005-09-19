@@ -283,7 +283,7 @@ acl_access2(vnode_t *vp, int mode, int flags, cred_t *cr)
 	int doqueue;
 	uint32 acc;
 	rnode_t *rp;
-	cred_t *cred, *ncr;
+	cred_t *cred, *ncr, *ncrfree = NULL;
 	vattr_t va;
 	failinfo_t fi;
 	nfs_access_type_t cacc;
@@ -322,13 +322,24 @@ acl_access2(vnode_t *vp, int mode, int flags, cred_t *cr)
 	fi.xattrdirproc = acl_getxattrdir2;
 
 	cred = cr;
+	/*
+	 * ncr and ncrfree both initially
+	 * point to the memory area returned
+	 * by crnetadjust();
+	 * ncrfree not NULL when exiting means
+	 * that we need to release it
+	 */
 	ncr = crnetadjust(cred);
+	ncrfree = ncr;
 
 tryagain:
 	if (rp->r_acache != NULL) {
 		cacc = nfs_access_check(rp, acc, cr);
-		if (cacc == NFS_ACCESS_ALLOWED)
+		if (cacc == NFS_ACCESS_ALLOWED) {
+			if (ncrfree != NULL)
+				crfree(ncrfree);
 			return (0);
+		}
 		if (cacc == NFS_ACCESS_DENIED) {
 			/*
 			 * If the cred can be adjusted, try again
@@ -339,6 +350,8 @@ tryagain:
 				ncr = NULL;
 				goto tryagain;
 			}
+			if (ncrfree != NULL)
+				crfree(ncrfree);
 			return (EACCES);
 		}
 	}
@@ -353,8 +366,8 @@ tryagain:
 	    &doqueue, &res.status, 0, &fi);
 
 	if (error) {
-		if (cred != cr)
-			crfree(cred);
+		if (ncrfree != NULL)
+			crfree(ncrfree);
 		return (error);
 	}
 
@@ -362,6 +375,14 @@ tryagain:
 	if (!error) {
 		(void) nfs_cache_fattr(vp, &res.resok.attr, &va, t, cr);
 		nfs_access_cache(rp, args.access, res.resok.access, cred);
+		/*
+		 * we just cached results with cred; if cred is the
+		 * adjusted credentials from crnetadjust, we do not want
+		 * to release them before exiting: hence setting ncrfree
+		 * to NULL
+		 */
+		if (cred != cr)
+			ncrfree = NULL;
 		if ((acc & res.resok.access) != acc) {
 			/*
 			 * If the cred can be adjusted, try again
@@ -378,8 +399,8 @@ tryagain:
 		PURGE_STALE_FH(error, vp, cr);
 	}
 
-	if (cred != cr)
-		crfree(cred);
+	if (ncrfree != NULL)
+		crfree(ncrfree);
 
 	return (error);
 }
