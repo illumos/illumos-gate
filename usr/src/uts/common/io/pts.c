@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -321,6 +321,8 @@ ptsopen(
 	 * Allow reopen of this device.
 	 */
 	if (rqp->q_ptr != NULL) {
+		ASSERT(rqp->q_ptr == ptsp);
+		ASSERT(ptsp->pts_rdq == rqp);
 		mutex_exit(&ptsp->pt_lock);
 		mutex_exit(&ptms_lock);
 		return (0);
@@ -342,6 +344,8 @@ ptsopen(
 	 * if already, open simply return...
 	 */
 	if (ptsp->pt_state & PTSOPEN) {
+		ASSERT(rqp->q_ptr == ptsp);
+		ASSERT(ptsp->pts_rdq == rqp);
 		mutex_exit(&ptsp->pt_lock);
 		mutex_exit(&ptms_lock);
 		return (0);

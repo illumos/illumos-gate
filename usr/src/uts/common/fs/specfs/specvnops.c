@@ -148,6 +148,7 @@ static int spec_pathconf(struct	vnode *, int, ulong_t *, struct cred *);
 #define	SN_RELE(csp)	{ \
 	mutex_enter(&csp->s_lock); \
 	csp->s_count--; \
+	ASSERT((csp->s_count > 0) || (csp->s_vnode->v_stream == NULL)); \
 	mutex_exit(&csp->s_lock); \
 }
 
@@ -558,11 +559,11 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 	if ((error = secpolicy_spec_open(cr, cvp, flag)) != 0)
 		return (error);
 
-	SN_HOLD(csp);			/* increment open count */
-
 	maj = getmajor(dev);
 	if (STREAMSTAB(maj))
 		goto streams_open;
+
+	SN_HOLD(csp);			/* increment open count */
 
 	/* non streams open */
 	type = (vp->v_type == VBLK ? OTYP_BLK : OTYP_CHR);
@@ -636,10 +637,8 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 	return (error);
 
 streams_open:
-	if (vp->v_type != VCHR) {
-		SN_RELE(csp);
+	if (vp->v_type != VCHR)
 		return (ENXIO);
-	}
 
 	/*
 	 * Lock common snode to prevent any new clone opens
@@ -652,10 +651,10 @@ streams_open:
 	 *
 	 * If we fail, it's because of an interrupt.
 	 */
-	if (LOCK_CSP_SIG(csp) == 0) {
-		SN_RELE(csp);
+	if (LOCK_CSP_SIG(csp) == 0)
 		return (EINTR);
-	}
+
+	SN_HOLD(csp);			/* increment open count */
 
 	error = stropen(cvp, &newdev, flag, cr);
 	stp = cvp->v_stream;
@@ -1379,8 +1378,18 @@ spec_inactive(struct vnode *vp, struct cred *cr)
 		VN_RELE(rvp);
 
 	/* if we have a common, release the common */
-	if (cvp && (cvp != vp))
+	if (cvp && (cvp != vp)) {
 		VN_RELE(cvp);
+#ifdef DEBUG
+	} else if (cvp) {
+		/*
+		 * if this is the last reference to a common vnode, any
+		 * associated stream had better have been closed
+		 */
+		ASSERT(cvp == vp);
+		ASSERT(cvp->v_stream == NULL);
+#endif /* DEBUG */
+	}
 
 	/*
 	 * if we have a hold on a devinfo node (established by
