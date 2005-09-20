@@ -1823,8 +1823,11 @@ event_handler(sysevent_t *ev)
 		else
 			dev_ev_subclass = ESC_DEV_BRANCH_REMOVE;
 
+		lock_dev();
 		build_and_log_event(EC_DEV_BRANCH, dev_ev_subclass, path,
 		    DI_NODE_NIL);
+		unlock_dev(CACHE_STATE);
+		startup_cache_sync_thread();
 
 	} else
 		err_print(UNKNOWN_EVENT, subclass);
