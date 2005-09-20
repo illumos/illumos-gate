@@ -206,6 +206,9 @@ fbt_provide_module(void *arg, struct modctl *ctl)
 	for (i = 1; i < nsyms; i++) {
 		uint8_t *instr, *limit;
 		Sym *sym = (Sym *)(symhdr->sh_addr + i * symsize);
+#ifdef __amd64
+		int j;
+#endif
 
 		if (ELF_ST_TYPE(sym->st_info) != STT_FUNC)
 			continue;
@@ -354,6 +357,34 @@ again:
 		if (*instr != FBT_RET) {
 			instr += size;
 			goto again;
+		}
+
+		/*
+		 * Because we are only looking for a one-byte marker here,
+		 * there is an increased likelihood of erroneously interpreting
+		 * a jump table to be an instrumentable instruction.  We
+		 * obviously want to avoid that, so we resort to some heuristic
+		 * sleeze:  we'll treat this instruction as being contained
+		 * within a pointer, and see if that pointer points to within
+		 * the body of the function.  If it does, we refuse to
+		 * instrument it.
+		 */
+		for (j = 0; j < sizeof (uintptr_t); j++) {
+			uintptr_t check = (uintptr_t)instr - j;
+			uint8_t *ptr;
+
+			if (check < sym->st_value)
+				break;
+
+			if (check + sizeof (uintptr_t) > (uintptr_t)limit)
+				continue;
+
+			ptr = *(uint8_t **)check;
+
+			if (ptr >= (uint8_t *)sym->st_value && ptr < limit) {
+				instr += size;
+				goto again;
+			}
 		}
 #else
 		if (!(size == 1 &&

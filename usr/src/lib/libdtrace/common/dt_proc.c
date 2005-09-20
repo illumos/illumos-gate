@@ -659,7 +659,7 @@ dt_proc_lookup(dtrace_hdl_t *dtp, struct ps_prochandle *P, int remove)
 static void
 dt_proc_destroy(dtrace_hdl_t *dtp, struct ps_prochandle *P)
 {
-	dt_proc_t *dpr = dt_proc_lookup(dtp, P, B_TRUE);
+	dt_proc_t *dpr = dt_proc_lookup(dtp, P, B_FALSE);
 	dt_proc_hash_t *dph = dtp->dt_procs;
 	dt_proc_t *npr, **npp;
 	int rflag;
@@ -715,10 +715,12 @@ dt_proc_destroy(dtrace_hdl_t *dtp, struct ps_prochandle *P)
 	}
 
 	/*
-	 * Before we free the process structure, walk the dt_proc_hash_t's
-	 * notification list and remove this dt_proc_t if it is enqueued.
+	 * Before we free the process structure, remove this dt_proc_t from the
+	 * lookup hash, and then walk the dt_proc_hash_t's notification list
+	 * and remove this dt_proc_t if it is enqueued.
 	 */
 	(void) pthread_mutex_lock(&dph->dph_lock);
+	(void) dt_proc_lookup(dtp, P, B_TRUE);
 	npp = &dph->dph_notify;
 
 	for (npr = *npp; npr != NULL; npr = npr->dpr_notify) {
