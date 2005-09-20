@@ -1,10 +1,12 @@
 #!/bin/ksh -p
 
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 #
 # This script extracts values from the passed config.sh file and prints them to
 # stdout in a form that is suitable for including in a Makefile.  This removes
@@ -29,9 +31,8 @@ printf '# This file was automatically generated from %s by %s\n\n' \
 
 #
 # ON Makefile macro adjustments.  Perl needs to build/ship with a consistent
-# set of flags, and needs to build with the Forte compilers.
+# set of flags, and needs to build with the selected compilers.
 #
-printf 'CC = $(SPRO_VROOT)/bin/cc\n'
 printf 'C99MODE = $(C99_DISABLE)\n'
 printf 'COPTFLAG = %s\n' "$optimize"
 printf 'SPACEFLAG =\n'

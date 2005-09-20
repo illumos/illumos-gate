@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,14 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 #
 # Makefile.master, global definitions for system source
 #
@@ -295,13 +297,12 @@ amd64_AS_XARCH=		-xarch=amd64 -P -Ui386 -U__i386
 #
 # XX64	future versions of gcc will make -mcmodel=kernel imply -mno-red-zone
 #
-sparc_STAND_FLAGS=
-sparcv9_STAND_FLAGS=
+sparc_STAND_FLAGS=	-_gcc=-ffreestanding
+sparcv9_STAND_FLAGS=	-_gcc=-ffreestanding
 i386_STAND_FLAGS=	-_gcc=-ffreestanding
 amd64_STAND_FLAGS=	-Wu,-xmodel=kernel
 
 SAVEARGS=		-Wu,-save_args
-$(__GNUC64)SAVEARGS=
 amd64_STAND_FLAGS	+= $(SAVEARGS)
 
 STAND_FLAGS_32 = $($(MACH)_STAND_FLAGS)
@@ -357,20 +358,28 @@ COPTFLAG64= $($(MACH64)_COPTFLAG)
 # (gives them a unique prefix). Disable that.
 CNOGLOBAL= -W0,-noglobal
 
+# Normally, gcc uses indirect DWARF strings to save space.  However,
+# this causes relocations that ctfconvert cannot handle.  Disable this.
+CDWARFSTR=	-_gcc=-fno-dwarf2-indirect-strings
+
+# Sometimes we want all symbols and types in debugging information even
+# if they aren't used.
+CALLSYMS=	-W0,-xdbggen=no%usedonly
+
 #
 # Flags used to build in debug mode for ctf generation.  Bugs in the Devpro
 # compilers currently prevent us from building with cc-emitted DWARF.
 #
-CTF_FLAGS_sparc	= -g -Wc,-Qiselect-T1 $(C99MODE) $(CNOGLOBAL)
-CTF_FLAGS_i386	= -g $(C99MODE) $(CNOGLOBAL)
+CTF_FLAGS_sparc	= -g -Wc,-Qiselect-T1 $(C99MODE) $(CNOGLOBAL) $(CDWARFSTR)
+CTF_FLAGS_i386	= -g $(C99MODE) $(CNOGLOBAL) $(CDWARFSTR)
 CTF_FLAGS	= $(CTF_FLAGS_$(MACH))
 
 #
 # Flags used with genoffsets
 #
 GOFLAGS = -_noecho \
-	-_gcc=-fno-eliminate-unused-debug-symbols \
-	-_gcc=-fno-eliminate-unused-debug-types	
+	$(CALLSYMS) \
+	$(CDWARFSTR)
 
 OFFSETS_CREATE = $(GENOFFSETS) -s $(CTFSTABS) -r $(CTFCONVERT) \
 	$(CC) $(GOFLAGS) $(CFLAGS) $(CPPFLAGS)
@@ -611,6 +620,12 @@ AS=			$(NATIVEAS)
 LD=			$(NATIVELD)
 LINT=			$(NATIVELINT)
 
+# The real compilers used for this build
+CW_CC_CMD=		$(CC) -_compiler
+CW_CCC_CMD=		$(CCC) -_compiler
+REAL_CC=		$(CW_CC_CMD:sh)
+REAL_CCC=		$(CW_CCC_CMD:sh)
+
 # Pass -Y flag to cpp (method of which is release-dependent)
 CCYFLAG=		-Y I,
 
@@ -635,6 +650,7 @@ ZNODELETE=	-znodelete
 ZNODLOPEN=	-znodlopen
 ZNODUMP=	-znodump
 ZNOLAZYLOAD=	-znolazyload
+ZNORELOC=	-znoreloc
 ZNOVERSION=	-znoversion
 ZREDLOCSYM=	-zredlocsym
 ZTEXT=		-ztext

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -234,7 +234,7 @@
  * -x386			-march=i386 (x86 only)
  * -x486			-march=i486 (x86 only)
  * -xarch=<a>			table
- * -xbuiltin[=<b>]		error
+ * -xbuiltin[=<b>]		-fbuiltin (-fno-builtin otherwise)
  * -xCC				ignore
  * -xchar_byte_order=<o>	error
  * -xchip=<c>			table
@@ -519,6 +519,17 @@ do_gcc(const char *dir, const char *cmd, int argc, char **argv,
 	newae(h, "-fno-builtin");
 	newae(h, "-fno-asm");
 	newae(h, "-nodefaultlibs");
+
+#if defined(__sparc)
+	/*
+	 * The SPARC ldd and std instructions require 8-byte alignment of
+	 * their address operand.  gcc correctly uses them only when the
+	 * ABI requires 8-byte alignment; unfortunately we have a number of
+	 * pieces of buggy code that doesn't conform to the ABI.  This
+	 * flag makes gcc work more like Studio with -xmemalign=4.
+	 */
+	newae(h, "-mno-integer-ldd-std");
+#endif
 
 	/*
 	 * This is needed because 'u' is defined
@@ -929,11 +940,8 @@ do_gcc(const char *dir, const char *cmd, int argc, char **argv,
 			}
 #if defined(__x86)
 			if (strcmp(arg, "-Wu,-no_got_reloc") == 0) {
-				/*
-				 * Don't create any GOT relocations?
-				 * Well, gcc doesn't have this degree
-				 * of control over its pic code ...
-				 */
+				newae(h, "-fno-jump-tables");
+				newae(h, "-fno-constant-pools");
 				break;
 			}
 			if (strcmp(arg, "-Wu,-xmodel=kernel") == 0) {
@@ -989,6 +997,14 @@ do_gcc(const char *dir, const char *cmd, int argc, char **argv,
 			case 'a':
 				if (strncmp(arg, "-xarch=", 7) == 0) {
 					xlate(h, arg + 7, xarch_tbl);
+					break;
+				}
+				error(arg);
+				break;
+			case 'b':
+				if (strncmp(arg, "-xbuiltin=", 10) == 0) {
+					if (strcmp(arg + 10, "%all"))
+						newae(h, "-fbuiltin");
 					break;
 				}
 				error(arg);
@@ -1141,7 +1157,6 @@ do_gcc(const char *dir, const char *cmd, int argc, char **argv,
 				}
 				error(arg);
 				break;
-			case 'b':
 			case 'e':
 			case 'h':
 			case 'l':

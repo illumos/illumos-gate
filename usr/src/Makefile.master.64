@@ -71,6 +71,9 @@ AS=		$($(MACH64)_AS)
 LD=		$($(MACH64)_LD)
 LINT=		$($(MACH64)_LINT)
 
+REAL_CC=	$(CW_CC_CMD:sh)
+REAL_CCC=	$(CW_CCC_CMD:sh)
+
 BUILD.SO=	$(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
 		$(PICS) -L $(ROOTLIBDIR64) $(LDLIBS)
 

@@ -188,7 +188,7 @@ $(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)
 	    $$1, $$1, $$1); }' > $(OBJS_DIR)/dtracestubs.s
 
 $(DTRACESTUBS):	$(DTRACESTUBS_O)
-	$(LD) -o $@ -G -h dtracestubs $(DTRACESTUBS_O)
+	$(BUILD.SO) $(DTRACESTUBS_O)
 
 #
 #	Section 1b: Lint `object' build rules
