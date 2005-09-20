@@ -563,7 +563,7 @@ anon_copy_ptr(struct anon_hdr *sahp, ulong_t s_idx,
 /*
  * anon_grow() is used to efficiently extend an existing anon array.
  * startidx_p points to the index into the anon array of the first page
- * that is in use. curpages is the number of pages in use, starting at
+ * that is in use. oldseg_pgs is the number of pages in use, starting at
  * *startidx_p. newpages is the number of additional pages desired.
  *
  * If startidx_p == NULL, startidx is taken to be 0 and cannot be changed.
@@ -575,13 +575,12 @@ anon_copy_ptr(struct anon_hdr *sahp, ulong_t s_idx,
  *
  * Returns the new number of pages in the anon array.
  */
-
 pgcnt_t
-anon_grow(struct anon_hdr *ahp, ulong_t *startidx_p, pgcnt_t curpages,
-    pgcnt_t newpages, int flags)
+anon_grow(struct anon_hdr *ahp, ulong_t *startidx_p, pgcnt_t oldseg_pgs,
+    pgcnt_t newseg_pgs, int flags)
 {
 	ulong_t startidx = startidx_p ? *startidx_p : 0;
-	pgcnt_t osz = ahp->size, nsz;
+	pgcnt_t oldamp_pgs = ahp->size, newamp_pgs;
 	pgcnt_t oelems, nelems, totpages;
 	void **level1;
 	int kmemflags = (flags & ANON_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP;
@@ -590,43 +589,43 @@ anon_grow(struct anon_hdr *ahp, ulong_t *startidx_p, pgcnt_t curpages,
 	void *level2;
 
 	ASSERT(!(startidx_p == NULL && growdown));
-	ASSERT(startidx + curpages <= ahp->size);
+	ASSERT(startidx + oldseg_pgs <= ahp->size);
 
 	/*
 	 * Determine the total number of pages needed in the new
 	 * anon array. If growing down, totpages is all pages from
-	 * startidx through the end of the array, plus <newpages>
+	 * startidx through the end of the array, plus <newseg_pgs>
 	 * pages. If growing up, keep all pages from page 0 through
-	 * the last page currently in use, plus <newpages> pages.
+	 * the last page currently in use, plus <newseg_pgs> pages.
 	 */
-
 	if (growdown)
-		totpages = osz - startidx + newpages;
+		totpages = oldamp_pgs - startidx + newseg_pgs;
 	else
-		totpages = startidx + curpages + newpages;
+		totpages = startidx + oldseg_pgs + newseg_pgs;
 
 	/* If the array is already large enough, just return. */
 
-	if (osz >= totpages) {
-		nsz = osz;
-		goto out;
+	if (oldamp_pgs >= totpages) {
+		if (growdown)
+			*startidx_p = oldamp_pgs - totpages;
+		return (oldamp_pgs);
 	}
 
 	/*
-	 * osz/nsz are the total numbers of pages represented by the array.
-	 * oelems/nelems are the number of pointers in the top level array.
-	 *
+	 * oldamp_pgs/newamp_pgs are the total numbers of pages represented
+	 * by the corresponding arrays.
+	 * oelems/nelems are the number of pointers in the top level arrays
+	 * which may be either level 1 or level 2.
 	 * Will the new anon array be one level or two levels?
 	 */
-
 	if (totpages <= ANON_CHUNK_SIZE || (ahp->flags & ANON_ALLOC_FORCE)) {
-		nsz = P2ROUNDUP(totpages, ANON_1_LEVEL_INC);
-		oelems = osz;
-		nelems = nsz;
+		newamp_pgs = P2ROUNDUP(totpages, ANON_1_LEVEL_INC);
+		oelems = oldamp_pgs;
+		nelems = newamp_pgs;
 	} else {
-		nsz = P2ROUNDUP(totpages, ANON_2_LEVEL_INC);
-		oelems = (osz + ANON_CHUNK_OFF) >> ANON_CHUNK_SHIFT;
-		nelems = nsz >> ANON_CHUNK_SHIFT;
+		newamp_pgs = P2ROUNDUP(totpages, ANON_2_LEVEL_INC);
+		oelems = (oldamp_pgs + ANON_CHUNK_OFF) >> ANON_CHUNK_SHIFT;
+		nelems = newamp_pgs >> ANON_CHUNK_SHIFT;
 	}
 
 	newarrsz = nelems * sizeof (void *);
@@ -636,15 +635,15 @@ anon_grow(struct anon_hdr *ahp, ulong_t *startidx_p, pgcnt_t curpages,
 
 	/* Are we converting from a one level to a two level anon array? */
 
-	if (nsz > ANON_CHUNK_SIZE && osz <= ANON_CHUNK_SIZE &&
+	if (newamp_pgs > ANON_CHUNK_SIZE && oldamp_pgs <= ANON_CHUNK_SIZE &&
 	    !(ahp->flags & ANON_ALLOC_FORCE)) {
+
 		/*
 		 * Yes, we're converting to a two level. Reuse old level 1
 		 * as new level 2 if it is exactly PAGESIZE. Otherwise
 		 * alloc a new level 2 and copy the old level 1 data into it.
 		 */
-
-		if (osz == ANON_CHUNK_SIZE) {
+		if (oldamp_pgs == ANON_CHUNK_SIZE) {
 			level2 = (void *)ahp->array_chunk;
 		} else {
 			level2 = kmem_alloc(PAGESIZE, kmemflags);
@@ -652,7 +651,7 @@ anon_grow(struct anon_hdr *ahp, ulong_t *startidx_p, pgcnt_t curpages,
 				kmem_free(level1, newarrsz);
 				return (0);
 			}
-			oldarrsz = osz * sizeof (void *);
+			oldarrsz = oldamp_pgs * sizeof (void *);
 
 			ANON_INITBUF(ahp->array_chunk, oldarrsz,
 			    level2, PAGESIZE, growdown);
@@ -672,12 +671,15 @@ anon_grow(struct anon_hdr *ahp, ulong_t *startidx_p, pgcnt_t curpages,
 	}
 
 	ahp->array_chunk = level1;
-	ahp->size = nsz;
-out:
-	if (growdown)
-		*startidx_p = nsz - totpages;
-	return (nsz);
+	ahp->size = newamp_pgs;
+	if (growdown) {
+		*startidx_p = newamp_pgs - totpages;
+		if (oldamp_pgs > ANON_CHUNK_SIZE)
+			*startidx_p -= P2NPHASE(oldseg_pgs, ANON_CHUNK_SIZE);
+	}
+	return (newamp_pgs);
 }
+
 
 /*
  * Called from clock handler to sync ani_free value.
