@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -284,21 +284,6 @@ main(int argc, char *argv[])
 		}
 
 		if (i_flag) {
-			/* check if the alias is unique */
-			if ((error = aliases_unique(aliases)) == ERROR) {
-				exit_unlock();
-
-				return (error);
-			}
-
-			/* update the file */
-			if ((error = update_driver_aliases(driver_name,
-			    aliases)) == ERROR) {
-				exit_unlock();
-
-				return (error);
-			}
-
 			found = get_major_no(driver_name, name_to_major);
 			if (found == ERROR) {
 				(void) fprintf(stderr, gettext(ERR_MAX_MAJOR),
@@ -313,6 +298,21 @@ main(int argc, char *argv[])
 			}
 
 			major_num = (major_t)found;
+
+			/* check if the alias is unique */
+			if ((error = aliases_unique(aliases)) == ERROR) {
+				exit_unlock();
+
+				return (error);
+			}
+
+			/* update the file */
+			if ((error = update_driver_aliases(driver_name,
+			    aliases)) == ERROR) {
+				exit_unlock();
+
+				return (error);
+			}
 
 			/* paranoia - if we crash whilst configuring */
 			sync();
