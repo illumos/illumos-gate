@@ -7663,6 +7663,8 @@ kstrputmsg(
 	if (audit_active)
 		audit_strputmsg(vp, NULL, NULL, pri, flag, fmode);
 #endif
+	if (mctl == NULL)
+		return (EINVAL);
 
 	if (stp->sd_sidp != NULL && stp->sd_vnode->v_type != VFIFO) {
 		if (error = straccess(stp, JCWRITE)) {
@@ -7688,14 +7690,13 @@ kstrputmsg(
 	 */
 	switch (flag & (MSG_HIPRI|MSG_BAND|MSG_ANY)) {
 	case MSG_HIPRI:
-		if ((mctl == NULL) || (pri != 0)) {
+		if (pri != 0) {
 			freemsg(mctl);
 			return (EINVAL);
 		}
 		break;
 	case MSG_BAND:
 		break;
-
 	default:
 		freemsg(mctl);
 		return (EINVAL);
@@ -7793,7 +7794,7 @@ kstrputmsg(
 				else
 					mp = copymsg(mctl);
 
-				if (mp != NULL || mctl == NULL)
+				if (mp != NULL)
 					break;
 
 				error = strwaitbuf(msgdsize(mctl), BPRI_MED);
@@ -7807,8 +7808,7 @@ kstrputmsg(
 		 * Verify that all of msgsize can be transferred by
 		 * strput.
 		 */
-		ASSERT(stp->sd_maxblk == INFPSZ ||
-			stp->sd_maxblk >= msgsize);
+		ASSERT(stp->sd_maxblk == INFPSZ || stp->sd_maxblk >= msgsize);
 		error = strput(stp, mp, uiop, &msgsize, 0, pri, flag);
 		if (error == 0)
 			break;

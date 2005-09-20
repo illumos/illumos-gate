@@ -7700,14 +7700,12 @@ link_rempassthru(queue_t *passq)
 }
 
 /*
- * wait for an event with optional timeout and optional return if
- * a signal is sent to the thread
- * tim:  -1 : no timeout
- *       otherwise the value is relative time in milliseconds to wait
- * nosig:  if 0 then signals will be ignored, otherwise signals
- *       will terminate wait
- * returns >0 on success, 0 if signal was encountered, -1 if timeout
- * was reached.
+ * Wait for the condition variable pointed to by `cvp' to be signaled,
+ * or for `tim' milliseconds to elapse, whichever comes first.  If `tim'
+ * is negative, then there is no time limit.  If `nosigs' is non-zero,
+ * then the wait will be non-interruptible.
+ *
+ * Returns >0 if signaled, 0 if interrupted, or -1 upon timeout.
  */
 clock_t
 str_cv_wait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int nosigs)

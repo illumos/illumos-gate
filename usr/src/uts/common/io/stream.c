@@ -196,7 +196,7 @@ dblk_constructor(void *buf, void *cdrarg, int kmflags)
 
 	index = (msg_size - 1) >> DBLK_SIZE_SHIFT;
 
-	ASSERT(index <= (DBLK_MAX_CACHE >> DBLK_SIZE_SHIFT));
+	ASSERT(index < (DBLK_MAX_CACHE >> DBLK_SIZE_SHIFT));
 
 	if ((dbp->db_mblk = kmem_cache_alloc(mblk_cache, kmflags)) == NULL)
 		return (-1);

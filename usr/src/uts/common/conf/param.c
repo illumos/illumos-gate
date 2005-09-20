@@ -379,19 +379,15 @@ uint_t rlim_fd_max = RLIM_FD_MAX;
  */
 
 /*
- * Streams tunables
+ * STREAMS tunables
  */
-int	nstrpush = 9;
-int	maxsepgcnt = 1;
-
+int	nstrpush = 9;		/* maximum # of modules/drivers on a stream */
+ssize_t	strctlsz = 1024;	/* maximum size of user-generated M_PROTO */
+ssize_t	strmsgsz = 0x10000;	/* maximum size of user-generated M_DATA */
+				/* for `strmsgsz', zero means unlimited */
 /*
- * strmsgsz is the size for the maximum streams message a user can create.
- * for Release 4.0, a value of zero will indicate no upper bound.  This
- * parameter will disappear entirely in the next release.
+ * Filesystem tunables
  */
-
-ssize_t	strmsgsz = 0x10000;
-ssize_t	strctlsz = 1024;
 int	rstchown = 1;		/* POSIX_CHOWN_RESTRICTED is enabled */
 int	ngroups_max = NGROUPS_MAX_DEFAULT;
 
