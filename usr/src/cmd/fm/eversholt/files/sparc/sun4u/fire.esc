@@ -34,12 +34,14 @@
  
 #define HB_FIT			1000 
 #define HBUS_FIT		1000 
+#define PCI_DEV_FIT		1000 
 #define PCIEX_DEV_FIT		1000 
-#define CPU_FIT			500
 #define EBUS_FIT		1000 
 #define LINK_EVENTS_COUNT	10
 #define LINK_EVENTS_TIME	1h
  
+#define PROP_PLAT_FRU		"PLAT-FRU"
+
 /*
  * Test for primary or secondary ereports
  */
@@ -86,9 +88,6 @@
 	)
 
 
-event error.io.fire.jbc.consist-ab@hostbridge/pciexrc;
-event error.io.fire.jbc.consist-no-ab@hostbridge/pciexrc;
-
 event error.io.fire.dmc.bad_op@hostbridge/pciexrc; 
 event error.io.fire.dmc.bad_parity@hostbridge/pciexrc; 
 event error.io.fire.pec.i-e-buffer-parity@hostbridge/pciexrc;
@@ -106,6 +105,20 @@ event error.io.fire.pec.fabric_error@hostbridge/pciexrc ;
  *   The fmri is ioboard0/hostbridge0/pciexrc[0-1]
  *
  */
+event ereport.io.fire.jbc.ill_acc@hostbridge/pciexrc{within(5s)};
+event ereport.io.fire.jbc.ill_acc_rd@hostbridge/pciexrc{within(5s)};
+
+event ereport.io.fire.jbc.mb_pea@hostbridge{within(5s)};
+event ereport.io.fire.jbc.mb_per@hostbridge/pciexrc{within(5s)}; 
+event ereport.io.fire.jbc.mb_pew@hostbridge/pciexrc{within(5s)}; 
+event ereport.io.fire.jbc.ebus_to@hostbridge{within(5s)};
+
+
+/*
+ * Do not diagnose or silently consume the next 15 ereports.
+ * There will be a no-subscriber fmd message.
+ */
+ /*
 event ereport.io.fire.jbc.jue@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.jbc.pio_unmap@hostbridge/pciexrc{within(5s)};  
 event ereport.io.fire.jbc.pio_unmap_rd@hostbridge/pciexrc{within(5s)};  
@@ -118,16 +131,10 @@ event ereport.io.fire.jbc.icise@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.jbc.ijp@hostbridge/pciexrc{within(5s)}; 
 event ereport.io.fire.jbc.ill_bmw@hostbridge/pciexrc{within(5s)} ; 
 event ereport.io.fire.jbc.ill_bmr@hostbridge/pciexrc{within(5s)} ; 
-event ereport.io.fire.jbc.ill_acc@hostbridge/pciexrc{within(5s)};
-event ereport.io.fire.jbc.ill_acc_rd@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.jbc.unsol_rd@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.jbc.unsol_intr@hostbridge/pciexrc{within(5s)};
-
 event ereport.io.fire.jbc.bjc@hostbridge/pciexrc{within(5s)}; 
-event ereport.io.fire.jbc.mb_pea@hostbridge{within(5s)};
-event ereport.io.fire.jbc.mb_per@hostbridge/pciexrc{within(5s)}; 
-event ereport.io.fire.jbc.mb_pew@hostbridge/pciexrc{within(5s)}; 
-event ereport.io.fire.jbc.ebus_to@hostbridge{within(5s)};
+ */
 
 /*
  * DMC ereports
@@ -192,21 +199,12 @@ event ereport.io.fire.fabric@hostbridge/pciexrc {within(5s)};
 /* 
  * A faulty Fire hostbridge may cause (* may cause PCI-E abort): 
  * 
- *  - the following Jbus consistency errors :
- *  - :  jbus unmapped address errors. jue*, pio_unmap, pio_unmap_rd 
- *  - :  jbus timeout.  jte*      
- *  - :  scoreboard timeout errors  jtceew,i,r 
- *  - :  jbus bus error.  jbe*:       
- *  - :  illegal coherency install state error. icise*
- *  - :  bad jbus port  ijp
- *  - :  bad jbus command bjc
- *  - :  illegal byte enables ill_bmw, ill_bmr*
- *  - :  unsolicited read or intr unsol_rd, insol_intr 
  *  - merge buffer errors mb_pea,w,r 
  *  - mmu data parity errors ttc_dpe*, tbw_dpe*
  *  - ingress/egress buffer parity errors ihb_pe, iip, edp, ehp
  *  - misc egress eru, ero, emp, epe, erp, eip
  *  - too many link up/down/reset etc. events
+ *  - EQ overflow
  */ 
 
 fru hostbridge/pciexrc; 
@@ -216,35 +214,14 @@ event fault.io.fire.asic@hostbridge/pciexrc,
     FITrate=HB_FIT, FRU=hostbridge/pciexrc, ASRU=hostbridge/pciexrc; 
  
 prop fault.io.fire.asic@hostbridge/pciexrc (0)-> 
-    error.io.fire.jbc.consist-ab@hostbridge/pciexrc, 
-    error.io.fire.jbc.consist-no-ab@hostbridge/pciexrc, 
     ereport.io.fire.jbc.mb_pea@hostbridge,
     ereport.io.fire.jbc.mb_per@hostbridge/pciexrc,
     ereport.io.fire.jbc.mb_pew@hostbridge/pciexrc,
+    ereport.io.fire.dmc.eq_over@hostbridge/pciexrc,
     error.io.fire.dmc.bad_parity@hostbridge/pciexrc,
     error.io.fire.pec.i-e-buffer-parity@hostbridge/pciexrc,
     error.io.fire.pec.misc-egress@hostbridge/pciexrc,
     error.io.fire.pec.adjacentnode@hostbridge/pciexrc; 
-
-prop error.io.fire.jbc.consist-ab@hostbridge/pciexrc (1)-> 
-    ereport.io.fire.jbc.jte@hostbridge/pciexrc,
-    ereport.io.fire.jbc.jbe@hostbridge/pciexrc, 
-    ereport.io.fire.jbc.jue@hostbridge/pciexrc, 
-    ereport.io.fire.jbc.icise@hostbridge/pciexrc, 
-    ereport.io.fire.jbc.ill_bmr@hostbridge/pciexrc; 
- 
-prop error.io.fire.jbc.consist-no-ab@hostbridge/pciexrc (1)-> 
-    ereport.io.fire.jbc.ijp@hostbridge/pciexrc, 
-    ereport.io.fire.jbc.ill_bmw@hostbridge/pciexrc, 
-    ereport.io.fire.jbc.bjc@hostbridge/pciexrc, 
-    ereport.io.fire.jbc.pio_unmap@hostbridge/pciexrc,
-    ereport.io.fire.jbc.pio_unmap_rd@hostbridge/pciexrc, 
-    ereport.io.fire.jbc.unsol_rd@hostbridge/pciexrc, 
-    ereport.io.fire.jbc.unsol_intr@hostbridge/pciexrc, 
-    ereport.io.fire.jbc.jtceew@hostbridge, 
-    ereport.io.fire.jbc.jtceei@hostbridge, 
-    ereport.io.fire.jbc.jtceer@hostbridge; 
- 
 
 prop error.io.fire.dmc.bad_parity@hostbridge/pciexrc (1)-> 
     ereport.io.fire.dmc.ttc_dpe@hostbridge/pciexrc,
@@ -278,29 +255,12 @@ prop fault.io.ebus@hostbridge/pciexrc (0)->
     ereport.io.fire.jbc.ebus_to@hostbridge;
 
 
-fru cpu; 
-asru cpu; 
-event fault.io.datapath@cpu, FITrate=CPU_FIT, FRU=cpu, ASRU=cpu; 
- 
-/* 
- * A faulty CPU (datapath) may cause: 
- * 
- *  - same jbus consistency as fire
- *  note: we're going to ignore memory async errors, as they should
- *  always be accompanied by CPU/mem errors diagnosed by CPU diagnosis
- *       
- */ 
-prop fault.io.datapath@cpu (0)-> 
-    error.io.fire.jbc.consist-ab@hostbridge/pciexrc, 
-    error.io.fire.jbc.consist-no-ab@hostbridge/pciexrc; 
- 
-
 /*
  * hostbus
  */
 fru hostbridge;
 asru hostbridge;
-event fault.io.hbus@hostbridge, 
+event fault.io.hbus@hostbridge/pciexrc, 
     FITrate=HBUS_FIT, FRU=hostbridge, ASRU=hostbridge; 
  
 event error.io.fire.jbc.pio_dpe@hostbridge/pciexrc;
@@ -321,7 +281,7 @@ event ereport.io.fire.jbc.pio_cpe@hostbridge{within(5s)};
  *  - cpe:      jbus control parity error. 
  *  - pio_cpe:  jbus PIO control parity error. 
  */ 
-prop fault.io.hbus@hostbridge (0)-> 
+prop fault.io.hbus@hostbridge/pciexrc (0)-> 
     ereport.io.fire.jbc.ape@hostbridge, 
     error.io.fire.jbc.pio_dpe@hostbridge/pciexrc, 
     ereport.io.fire.jbc.rd_dpe@hostbridge/pciexrc, 
@@ -350,8 +310,7 @@ event fault.io.fire.pciex.device@pciexbus/pciexdev/pciexfn,
 /*
  * A faulty PCI-E device can cause (chip specific ereports):
  *
- *    malformed or parity error MSI
- *    eq overflow
+ *    MSI malformed or parity error
  *
  * Extract the request id in the RDS/SCS log register. It 's the BDF
  * value of the device.
@@ -366,14 +325,23 @@ prop fault.io.fire.pciex.device@pciexbus[b]/pciexdev[d]/pciexfn[f] (0) ->
         { 
             IMU_MATCH_BDF(payloadprop("imu-rds"), b, d, f) &&
             is_under(hostbridge/pciexrc, pciexbus[b]/pciexdev[d]/pciexfn[f])
-        },
+        };
+ 
+/*
+ *  Event queue overflow
+ */
+prop fault.io.fire.pciex.device@pciexbus[b]/pciexdev[d]/pciexfn[0] (0) ->
     ereport.io.fire.dmc.eq_over@hostbridge/pciexrc
         {  
             /*
-             * The hw does not capture header log, so indict 
-             * all PCI-E devices under this sub-domain
+             * Indict PCI-E FRU(s) under this root complex excluding the 
+             * one that the Fire ASIC resides on. 
              */
-            is_under(hostbridge/pciexrc, pciexbus[b]/pciexdev[d]/pciexfn[f])
+            is_under(hostbridge/pciexrc, pciexbus[b]/pciexdev[d]/pciexfn[0])
+	    &&
+	    (confprop(asru(pciexbus[b]/pciexdev[d]/pciexfn[0]), PROP_PLAT_FRU)
+	        != 
+	     confprop(asru(hostbridge/pciexrc), PROP_PLAT_FRU))
         };
 
 
@@ -385,7 +353,7 @@ prop fault.io.fire.pciex.device@pciexbus[b]/pciexdev[d]/pciexfn[f] (0) ->
 fru pcibus/pcidev;
 asru pcibus/pcidev/pcifn;
 event fault.io.fire.pci.device@pcibus/pcidev/pcifn,
-    FITrate=HB_FIT,
+    FITrate=PCI_DEV_FIT,
     FRU=pcibus/pcidev,
     ASRU=pcibus/pcidev/pcifn;
 
@@ -393,17 +361,26 @@ prop fault.io.fire.pci.device@pcibus[b]/pcidev[d]/pcifn[f] (0) ->
     ereport.io.fire.dmc.msi_mal_err@hostbridge/pciexrc
         { 
             IMU_MATCH_BDF(payloadprop("imu-rds"), b, d, f) &&
-            is_under(hostbridge/pciexrc, pciexbus[b]/pciexdev[d]/pciexfn[f])
+            is_under(hostbridge/pciexrc, pcibus[b]/pcidev[d]/pcifn[f])
         },
     ereport.io.fire.dmc.msi_par_err@hostbridge/pciexrc
         { 
             IMU_MATCH_BDF(payloadprop("imu-rds"), b, d, f) &&
-            is_under(hostbridge/pciexrc, pciexbus[b]/pciexdev[d]/pciexfn[f])
-        },
+            is_under(hostbridge/pciexrc, pcibus[b]/pcidev[d]/pcifn[f])
+        };
+
+prop fault.io.fire.pci.device@pcibus[b]/pcidev[d]/pcifn[0] (0) ->
     ereport.io.fire.dmc.eq_over@hostbridge/pciexrc
         {  
-            /* All PCI devices under this sub-domain */
-            is_under(hostbridge/pciexrc, pciexbus[b]/pciexdev[d]/pciexfn[f])
+            /*
+             * Indict PCI FRU(s) under this root complex excluding the 
+             * one that the Fire ASIC resides on. 
+             */
+            is_under(hostbridge/pciexrc, pcibus[b]/pcidev[d]/pcifn[0])
+	    &&
+	    (confprop(asru(pcibus[b]/pcidev[d]/pcifn[0]), PROP_PLAT_FRU)
+	        != 
+	     confprop(asru(hostbridge/pciexrc), PROP_PLAT_FRU))
         };
 
 
@@ -415,7 +392,6 @@ event ereport.io.fire.dmc.pmpme_not_en@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.dmc.pmeack_not_en@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.dmc.eq_not_en@hostbridge/pciexrc{within(5s)};
 
-event error.io.fire.jbc.unsol_retr@hostbridge/pciexrc;
 event error.io.fire.dmc.msg_not_en@hostbridge/pciexrc ;
 
 event defect.io.fire.pci.driver@pcibus/pcidev/pcifn;
@@ -425,7 +401,6 @@ event defect.io.fire.pciex.driver@pciexbus/pciexdev/pciexfn;
  * A faulty bridge or leaf device driver can cause
  * - mmu invalid, out of range, protection etc. all except data parity
  * - invalid pio r/w
- * - unsolicited read or interrupt return
  * - msg received to unenabled queue
  * - unsupported request
  *
@@ -614,13 +589,11 @@ event defect.io.fire.pciex.driver@hostbridge/pciexrc;
  * - Jbus unmapped error
  * - mmu invalid, out of range, protection etc. all except data parity
  * - invalid pio r/w
- * - unsolicited read or interrupt return
  * - msg received to unenabled queue
  */
  
 prop defect.io.fire.pciex.driver@hostbridge/pciexrc (0)-> 
     error.io.fire.dmc.bad_op@hostbridge/pciexrc,
-    error.io.fire.jbc.unsol_retr@hostbridge/pciexrc,
     error.io.fire.dmc.msg_not_en@hostbridge/pciexrc; 
  
 prop error.io.fire.dmc.bad_op@hostbridge/pciexrc (1)-> 
@@ -634,10 +607,6 @@ prop error.io.fire.dmc.bad_op@hostbridge/pciexrc (1)->
     ereport.io.fire.dmc.tbw_ude@hostbridge/pciexrc,
     ereport.io.fire.dmc.tbw_err@hostbridge/pciexrc;
  
-prop error.io.fire.jbc.unsol_retr@hostbridge/pciexrc (1)->
-    ereport.io.fire.jbc.unsol_rd@hostbridge/pciexrc,
-    ereport.io.fire.jbc.unsol_intr@hostbridge/pciexrc;
-
 prop error.io.fire.dmc.msg_not_en@hostbridge/pciexrc (1)->
     ereport.io.fire.dmc.msi_not_en@hostbridge/pciexrc,
     ereport.io.fire.dmc.cor_not_en@hostbridge/pciexrc,

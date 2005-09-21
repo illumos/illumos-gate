@@ -38,3 +38,5 @@ defect.io.fire.pci.driver defect.io.fire.pciex.driver=8
 fault.io.fire.pci.device fault.io.fire.pciex.device=9
 fault.io.fire.pci.device=10
 defect.io.fire.pciex.driver fault.io.datapath fault.io.fire.asic=11
+fault.io.fire.asic fault.io.fire.pci.device fault.io.fire.pciex.device=12
+fault.io.fire.asic fault.io.fire.pci.device=13
