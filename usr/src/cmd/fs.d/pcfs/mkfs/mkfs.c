@@ -2180,6 +2180,7 @@ int
 open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 {
 	struct fd_char fdchar;
+	struct dk_geom dg;
 	struct stat di;
 	char *actualdisk = NULL;
 	char *suffix = NULL;
@@ -2276,10 +2277,33 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 			}
 			find_fixed_details(fd, wbpb);
 		} else if (ioctl(fd, FDIOGCHAR, &fdchar) == -1) {
+			/*
+			 * It is possible that we are trying to use floppy
+			 * specific FDIOGCHAR ioctl on USB floppy. Since sd
+			 * driver, by which USB floppy is handled, doesn't
+			 * support it, we can try to use disk DKIOCGGEOM ioctl
+			 * to retrieve data we need. sd driver itself
+			 * determines floppy disk by number of blocks
+			 * (<=0x1000), then it sets geometry to 80 cylinders,
+			 * 2 heads.
+			 *
+			 * Note that DKIOCGGEOM cannot supply us with type
+			 * of media (e.g. 3.5" or 5.25"). We will set it to
+			 * 3 (3.5") which is most probable value.
+			 */
 			if (errno == ENOTTY) {
-				partn_lecture(actualdisk);
-				(void) close(fd);
-				exit(2);
+				if (ioctl(fd, DKIOCGGEOM, &dg) != -1 &&
+				    dg.dkg_ncyl == 80 && dg.dkg_nhead == 2) {
+					fdchar.fdc_ncyl = dg.dkg_ncyl;
+					fdchar.fdc_medium = 3;
+					fdchar.fdc_secptrack = dg.dkg_nsect;
+					fdchar.fdc_nhead = dg.dkg_nhead;
+					lookup_floppy(&fdchar, wbpb);
+				} else {
+					partn_lecture(actualdisk);
+					(void) close(fd);
+					exit(2);
+				}
 			}
 		} else {
 #ifdef sparc
