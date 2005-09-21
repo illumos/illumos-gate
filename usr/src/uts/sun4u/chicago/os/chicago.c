@@ -197,7 +197,7 @@ plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 void *
 plat_lgrp_cpu_to_hand(processorid_t id)
 {
-	return ((void *) CPUID_TO_LGRP(id));
+	return ((void *)(uintptr_t)CPUID_TO_LGRP(id));
 }
 
 /*
@@ -412,10 +412,10 @@ get_ebus_rtc_vaddr()
 		cmn_err(CE_PANIC, "ebus RTC addr prop. length not found\n");
 	if (size != sizeof (eaddr))
 		cmn_err(CE_PANIC, "ebus RTC addr length not OK."
-		    " expected = %d found =0xd\n", sizeof (eaddr), size);
+		    " expected = %lu found =%d\n", sizeof (eaddr), size);
 	if (prom_getprop(node, "address", (caddr_t)&eaddr) == -1)
 		cmn_err(CE_PANIC, "ebus RTC addr propery not found\n");
-	v_rtc_addr_reg = (volatile unsigned char *)eaddr;
+	v_rtc_addr_reg = (volatile unsigned char *)(uintptr_t)eaddr;
 
 	/*
 	 * Does this rtc have watchdog support?
