@@ -1982,16 +1982,16 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 			free(timebuf);
 		}
 
+		if (pg_get_single_val(rpg, SCF_PROPERTY_ALT_LOGFILE,
+		    SCF_TYPE_ASTRING, buf, max_scf_fmri_length + 1, 0) == 0)
+			(void) printf(fmt, DETAILED_WIDTH,
+			    gettext("alt_logfile"), buf);
+
+		if (pg_get_single_val(rpg, SCF_PROPERTY_LOGFILE,
+		    SCF_TYPE_ASTRING, buf, max_scf_fmri_length + 1, 0) == 0)
+			(void) printf(fmt, DETAILED_WIDTH, gettext("logfile"),
+			    buf);
 	}
-
-	if (pg_get_single_val(rpg, SCF_PROPERTY_ALT_LOGFILE,
-	    SCF_TYPE_ASTRING, buf, max_scf_fmri_length + 1, 0) == 0)
-		(void) printf(fmt, DETAILED_WIDTH, gettext("alt_logfile"),
-		    buf);
-
-	if (pg_get_single_val(rpg, SCF_PROPERTY_LOGFILE,
-	    SCF_TYPE_ASTRING, buf, max_scf_fmri_length + 1, 0) == 0)
-		(void) printf(fmt, DETAILED_WIDTH, gettext("logfile"), buf);
 
 	if (inst_get_single_val(wip->inst, SCF_PG_GENERAL,
 	    SCF_PROPERTY_RESTARTER, SCF_TYPE_ASTRING, buf,
