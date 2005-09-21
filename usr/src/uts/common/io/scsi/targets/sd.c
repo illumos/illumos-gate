@@ -8576,6 +8576,33 @@ spinup_failed:
 		mutex_enter(SD_MUTEX(un));
 	}
 
+	/* Cancel any pending reset-throttle timeouts */
+	if (un->un_reset_throttle_timeid != NULL) {
+		timeout_id_t temp_id = un->un_reset_throttle_timeid;
+		un->un_reset_throttle_timeid = NULL;
+		mutex_exit(SD_MUTEX(un));
+		(void) untimeout(temp_id);
+		mutex_enter(SD_MUTEX(un));
+	}
+
+	/* Cancel any pending retry timeouts */
+	if (un->un_retry_timeid != NULL) {
+		timeout_id_t temp_id = un->un_retry_timeid;
+		un->un_retry_timeid = NULL;
+		mutex_exit(SD_MUTEX(un));
+		(void) untimeout(temp_id);
+		mutex_enter(SD_MUTEX(un));
+	}
+
+	/* Cancel any pending delayed cv broadcast timeouts */
+	if (un->un_dcvb_timeid != NULL) {
+		timeout_id_t temp_id = un->un_dcvb_timeid;
+		un->un_dcvb_timeid = NULL;
+		mutex_exit(SD_MUTEX(un));
+		(void) untimeout(temp_id);
+		mutex_enter(SD_MUTEX(un));
+	}
+
 	mutex_exit(SD_MUTEX(un));
 
 	/* There should not be any in-progress I/O so ASSERT this check */
