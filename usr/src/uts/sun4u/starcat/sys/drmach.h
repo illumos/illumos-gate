@@ -59,6 +59,7 @@ extern int	plat_max_io_units_per_board();
 #define	DRMACH_DEVI_REMOVE	2
 
 /* returned with drmach_board_find_devices callback */
+#define	DRMACH_DEVTYPE_CMP	"cmp"
 #define	DRMACH_DEVTYPE_CPU	"cpu"
 #define	DRMACH_DEVTYPE_MEM	"memory"
 #define	DRMACH_DEVTYPE_PCI	"pci"
