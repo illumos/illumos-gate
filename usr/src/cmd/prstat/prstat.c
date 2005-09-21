@@ -1074,16 +1074,16 @@ set_signals()
 }
 
 static void
-fill_table(table_t *table, char *arg)
+fill_table(table_t *table, char *arg, char option)
 {
 	char *p = strtok(arg, ", ");
-	long l = Atoi(p);
 
-	add_element(table, l);
-	while (p = strtok(NULL, ", ")) {
-		l = Atoi(p);
-		add_element(table, l);
-	}
+	if (p == NULL)
+		Die(gettext("invalid argument for -%c\n"), option);
+
+	add_element(table, (long)Atoi(p));
+	while (p = strtok(NULL, ", "))
+		add_element(table, (long)Atoi(p));
 }
 
 static void
@@ -1091,6 +1091,9 @@ fill_prj_table(char *arg)
 {
 	projid_t projid;
 	char *p = strtok(arg, ", ");
+
+	if (p == NULL)
+		Die(gettext("invalid argument for -j\n"));
 
 	if ((projid = getprojidbyname(p)) == -1)
 		projid = Atoi(p);
@@ -1108,6 +1111,9 @@ fill_set_table(char *arg)
 {
 	char *p = strtok(arg, ", ");
 	psetid_t id;
+
+	if (p == NULL)
+		Die(gettext("invalid argument for -C\n"));
 
 	if ((id = Atoi(p)) == 0)
 		id = PS_NONE;
@@ -1178,7 +1184,8 @@ main(int argc, char **argv)
 			opts.o_outpmode |= OPT_SPLIT | OPT_PROJECTS;
 			break;
 		case 'n':
-			p = strtok(optarg, ",");
+			if ((p = strtok(optarg, ",")) == NULL)
+				Die(gettext("invalid argument for -n\n"));
 			opts.o_ntop = Atoi(p);
 			if (p = strtok(NULL, ","))
 				opts.o_nbottom = Atoi(p);
@@ -1193,29 +1200,31 @@ main(int argc, char **argv)
 			sortk = optarg;
 			break;
 		case 'u':
-			p = strtok(optarg, ", ");
+			if ((p = strtok(optarg, ", ")) == NULL)
+				Die(gettext("invalid argument for -u\n"));
 			add_uid(&euid_tbl, p);
 			while (p = strtok(NULL, ", "))
 				add_uid(&euid_tbl, p);
 			break;
 		case 'U':
-			p = strtok(optarg, ", ");
+			if ((p = strtok(optarg, ", ")) == NULL)
+				Die(gettext("invalid argument for -U\n"));
 			add_uid(&ruid_tbl, p);
 			while (p = strtok(NULL, ", "))
 				add_uid(&ruid_tbl, p);
 			break;
 		case 'p':
-			fill_table(&pid_tbl, optarg);
+			fill_table(&pid_tbl, optarg, 'p');
 			break;
 		case 'C':
 			fill_set_table(optarg);
 			opts.o_outpmode |= OPT_PSETS;
 			break;
 		case 'P':
-			fill_table(&cpu_tbl, optarg);
+			fill_table(&cpu_tbl, optarg, 'P');
 			break;
 		case 'k':
-			fill_table(&tsk_tbl, optarg);
+			fill_table(&tsk_tbl, optarg, 'k');
 			break;
 		case 'j':
 			fill_prj_table(optarg);
@@ -1224,7 +1233,8 @@ main(int argc, char **argv)
 			opts.o_outpmode |= OPT_LWPS;
 			break;
 		case 'z':
-			p = strtok(optarg, ", ");
+			if ((p = strtok(optarg, ", ")) == NULL)
+				Die(gettext("invalid argument for -z\n"));
 			add_zone(&zone_tbl, p);
 			while (p = strtok(NULL, ", "))
 				add_zone(&zone_tbl, p);
