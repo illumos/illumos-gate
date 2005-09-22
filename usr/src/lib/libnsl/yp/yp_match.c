@@ -89,10 +89,17 @@ freenode(struct cache *n)
 	free(n);
 }
 
+/*
+ * Attempt to Add item to cache
+ */
 static struct cache *
 makenode(char *domain, char *map, int keylen, int vallen)
 {
 	struct cache *n;
+
+	/* Do not cache 'passwd' values i.e. passwd.byname or passwd.byuid. */
+	if (strncmp(map, "passwd", 6) == 0)
+		return (0);
 
 	if ((n = calloc(1, sizeof (*n))) == 0)
 		return (0);
@@ -106,6 +113,11 @@ makenode(char *domain, char *map, int keylen, int vallen)
 	return (n);
 }
 
+/*
+ * Look for a matching result in the per-process cache.
+ * Upon finding a match set the passed in 'val' and 'vallen'
+ * parameters and return 1.  Otherwise return 0.
+ */
 static int
 in_cache(char *domain, char *map, char *key, int keylen, char **val,
 								int *vallen)
@@ -114,6 +126,10 @@ in_cache(char *domain, char *map, char *key, int keylen, char **val,
 	int cnt;
 	struct timeval now;
 	struct timezone tz;
+
+	/* The 'passwd' data is not cached. */
+	if (strncmp(map, "passwd", 6) == 0)
+		return (0);
 
 	/*
 	 * Assumes that caller (yp_match) has locked the cache
