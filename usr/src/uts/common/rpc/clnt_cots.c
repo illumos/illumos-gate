@@ -1306,17 +1306,17 @@ read_again:
 
 			if (re_status == RPC_AUTHERROR) {
 				/*
-				 * Maybe our credential need to be
-				 * refreshed
+				 * Maybe our credential need to be refreshed
 				 */
 				if (cm_entry) {
 					/*
 					 * There is the potential that the
 					 * cm_entry has/will be marked dead,
-					 * so drop our ref to it, force REFRESH
-					 * to establish new connection.
+					 * so drop the connection altogether,
+					 * force REFRESH to establish new
+					 * connection.
 					 */
-					connmgr_release(cm_entry);
+					connmgr_cancelconn(cm_entry);
 					cm_entry = NULL;
 				}
 
@@ -1348,7 +1348,8 @@ read_again:
 					COTSRCSTAT_INCR(p->cku_stats,
 							rcnewcreds);
 					goto call_again;
-				} else {
+				}
+
 				/*
 				 * We have used the client handle to
 				 * do an AUTH_REFRESH and the RPC status may
@@ -1356,6 +1357,7 @@ read_again:
 				 * set it to RPC_AUTHERROR.
 				 */
 				p->cku_err.re_status = RPC_AUTHERROR;
+
 				/*
 				 * Map recoverable and unrecoverable
 				 * authentication errors to appropriate errno
@@ -1376,18 +1378,6 @@ read_again:
 						(void) xdr_rpc_free_verifier
 							    (xdrs, &reply_msg);
 						freemsg(mp);
-						/*
-						 * If we got this far the
-						 * connection we are using is
-						 * connected but not valid,
-						 * (not a resv port) drop it
-						 * and force a connection.
-						 */
-						if (cm_entry) {
-							connmgr_cancelconn
-								(cm_entry);
-							cm_entry = NULL;
-						}
 						goto call_again;
 					}
 					/* FALLTHRU */
@@ -1407,7 +1397,6 @@ read_again:
 				RPCLOG(1, "clnt_cots_kcallit : authentication"
 				    " failed with RPC_AUTHERROR of type %d\n",
 				    (int)p->cku_err.re_why);
-			    }
 			}
 		}
 	} else {
