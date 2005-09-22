@@ -255,7 +255,7 @@ main(int ac, unsigned char *av[])
 		    EOF)
 #else
 		while ((c = getopt(ac, (char **)av,
-			    "VLc:vt:rlw:xRCsS")) != EOF)
+		    "VLc:vt:rlw:xRCsS")) != EOF)
 #endif
 			switch (c) {
 			case 's':
@@ -305,8 +305,8 @@ main(int ac, unsigned char *av[])
 					if ((strlen(av[optind])) >=
 					    sizeof (savedfile)) {
 						(void) fprintf(stderr, gettext(
-							"Recovered file name"
-							" too long\n"));
+						    "Recovered file name"
+						    " too long\n"));
 						exit(1);
 					}
 
@@ -384,14 +384,26 @@ main(int ac, unsigned char *av[])
 		break;
 	}
 
-	/*
-	 * If -V option is set and input is coming in via
-	 * stdin then vi behavior should be ignored. The vi
-	 * command should act like ex and only process ex commands
-	 * and echo the input ex commands to stderr
-	 */
-	if (verbose == 1 && isatty(0) == 0) {
-		ivis = 0;
+	if (isatty(0) == 0) {
+		/*
+		 * If -V option is set and input is coming in via
+		 * stdin then vi behavior should be ignored. The vi
+		 * command should act like ex and only process ex commands
+		 * and echo the input ex commands to stderr
+		 */
+		if (verbose == 1) {
+			ivis = 0;
+		}
+
+		/*
+		 * If the standard input is not a terminal device,
+		 * it is as if the -s option has been specified.
+		 */
+		if (ivis == 0) {
+			hush = 1;
+			value(vi_AUTOPRINT) = 0;
+			fast++;
+		}
 	}
 
 	ac -= optind;
@@ -400,7 +412,7 @@ main(int ac, unsigned char *av[])
 	for (argcounter = 0; argcounter < ac; argcounter++) {
 		if ((strlen(av[argcounter])) >= sizeof (savedfile)) {
 			(void) fprintf(stderr, gettext("File argument"
-				" too long\n"));
+			    " too long\n"));
 			exit(1);
 		}
 	}
@@ -520,7 +532,7 @@ main(int ac, unsigned char *av[])
 
 	if (setexit() == 0 && !fast) {
 		if ((globp =
-			(unsigned char *) getenv("EXINIT")) && *globp) {
+		    (unsigned char *) getenv("EXINIT")) && *globp) {
 			if (ivis)
 				inexrc = 1;
 			commands(1, 1);
@@ -533,7 +545,7 @@ main(int ac, unsigned char *av[])
 				strncat(scratch, "/.exrc",
 				    sizeof (scratch) - 1 - strlen(scratch));
 				if (ivis)
-				    inexrc = 1;
+					inexrc = 1;
 				if ((vret = validate_exrc(scratch)) == 0) {
 					source(scratch, 1);
 				} else {
@@ -752,14 +764,14 @@ usage(unsigned char *name)
 
 #ifdef TRACE
 	(void) snprintf(buf, sizeof (buf), gettext(
-		    "Usage: %s [- | -s] [-l] [-L] [-wn] "
-		    "[-R] [-S] [-r [file]] [-t tag] [-T] [-U tracefile]\n"
-		    "[-v] [-V] [-x] [-C] [+cmd | -c cmd] file...\n"), name);
+	    "Usage: %s [- | -s] [-l] [-L] [-wn] "
+	    "[-R] [-S] [-r [file]] [-t tag] [-T] [-U tracefile]\n"
+	    "[-v] [-V] [-x] [-C] [+cmd | -c cmd] file...\n"), name);
 #else
 	(void) snprintf(buf, sizeof (buf), gettext(
-		    "Usage: %s [- | -s] [-l] [-L] [-wn] "
-		    "[-R] [-S] [-r [file]] [-t tag]\n"
-		    "[-v] [-V] [-x] [-C] [+cmd | -c cmd] file...\n"), name);
+	    "Usage: %s [- | -s] [-l] [-L] [-wn] "
+	    "[-R] [-S] [-r [file]] [-t tag]\n"
+	    "[-v] [-V] [-x] [-C] [+cmd | -c cmd] file...\n"), name);
 #endif
 	(void) write(2, buf, strlen(buf));
 }

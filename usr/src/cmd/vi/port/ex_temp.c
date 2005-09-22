@@ -19,18 +19,19 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-/*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include "ex.h"
 #include "ex_temp.h"
 #include "ex_vis.h"
@@ -49,6 +50,9 @@ static unsigned char	tempname[PATH_MAX+1];
 int	havetmp;
 short	tfile = -1;
 static short	rfile = -1;
+
+extern int junk();
+extern int checkjunk();
 
 fileinit()
 {
@@ -168,10 +172,12 @@ getline(tl)
 		}
 }
 
-putline()
+int
+putline(void)
 {
-	register unsigned char *bp, *lp;
-	register int nl;
+	unsigned char *bp, *lp;
+	unsigned char tmpbp;
+	int nl;
 	line tl;
 
 	dirtcnt++;
@@ -182,10 +188,14 @@ putline()
 	nl = nleft;
 	tl &= ~OFFMSK;
 	while (*bp = *lp++) {
-		if (*bp++ == '\n') {
-			*--bp = 0;
+		tmpbp = *bp;
+		if (tmpbp == '\n') {
+			*bp = 0;
 			linebp = lp;
 			break;
+		} else if (junk(*bp++)) {
+			(void) checkjunk(tmpbp);
+			*--bp;
 		}
 		if (--nl == 0) {
 			bp = getblock(tl += INCRMT, WRITE);
@@ -399,10 +409,10 @@ synctmp()
 		H.encrypted = 0;
 	*zero = (line) H.Time;
 	for (a = zero, bp = blocks; a <= dol;
-					a += BUFSIZE / sizeof (*a), bp++) {
+	    a += BUFSIZE / sizeof (*a), bp++) {
 		if (bp >= &H.Blocks[LBLKS-1])
 			error(gettext(
-				"file too large to recover with -r option"));
+			    "file too large to recover with -r option"));
 		if (*bp < 0) {
 			tline = (tline + OFFMSK) &~ OFFMSK;
 			*bp = ((tline >> OFFBTS) & BLKMSK);
@@ -558,7 +568,7 @@ shread()
 	struct front { short a; short b; };
 
 	if (read(rfile, (char *)rbuf, sizeof (struct front)) ==
-							sizeof (struct front))
+	    sizeof (struct front))
 		return (sizeof (struct rbuf));
 	return (0);
 }
