@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -71,7 +72,7 @@ static struct {
 	{"get_handles", BOFI_GET_HANDLES, -1}
 };
 
-void
+int
 main(int argc, char **argv)
 {
 	struct bofi_errctl errctl;
@@ -259,7 +260,7 @@ main(int argc, char **argv)
 			exit(1);
 		}
 	}
-	exit(0);
+	return (0);
 }
 
 

@@ -20,8 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1998,2000,2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -32,6 +32,8 @@ include ../Makefile.cmd
 
 CFLAGS += -I$(SRC)/uts/common
 LINTFLAGS += -I$(SRC)/uts/common
+C99MODE= $(C99_ENABLE)
+CFLAGS += $(CCVERBOSE)
 
 SRCS = $(PROG:%=%.c)
 OBJECTS = $(SRCS:%.c=%.o)
