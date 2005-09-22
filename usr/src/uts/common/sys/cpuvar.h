@@ -185,10 +185,11 @@ typedef struct cpu {
 	uintptr_t	cpu_dtrace_caller;	/* DTrace: caller, if any */
 	hrtime_t	cpu_dtrace_chillmark;	/* DTrace: chill mark time */
 	hrtime_t	cpu_dtrace_chilled;	/* DTrace: total chill time */
-
 	uint16_t	cpu_mstate;		/* cpu microstate */
+	uint16_t	cpu_mstate_gen;		/* generation counter */
 	hrtime_t	cpu_mstate_start;	/* cpu microstate start time */
 	hrtime_t	cpu_acct[NCMSTATES];	/* cpu microstate data */
+	hrtime_t	cpu_intracct[NCMSTATES]; /* interrupt mstate data */
 	hrtime_t	cpu_waitrq;		/* cpu run-queue wait time */
 	struct loadavg_s cpu_loadavg;		/* loadavg info for this cpu */
 
@@ -610,7 +611,8 @@ extern void affinity_set(int cpu_id);
 extern void affinity_clear(void);
 extern void init_cpu_mstate(struct cpu *, int);
 extern void term_cpu_mstate(struct cpu *);
-extern void new_cpu_mstate(struct cpu *, int);
+extern void new_cpu_mstate(int, hrtime_t);
+extern void get_cpu_mstate(struct cpu *, hrtime_t *);
 extern void thread_nomigrate(void);
 extern void thread_allowmigrate(void);
 extern void weakbinding_stop(void);

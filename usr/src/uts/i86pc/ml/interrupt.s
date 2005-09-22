@@ -417,6 +417,13 @@ _interrupt(void)
 	PILBASE(basereg, pilreg)
 
 /*
+ * Returns (cpu + cpu_mstate * 8) in tgt
+ */
+#define	INTRACCTBASE(cpureg, tgtreg)		\
+	movzwl	CPU_MSTATE(cpureg), tgtreg;	\
+	lea	(cpureg, tgtreg, 8), tgtreg
+
+/*
  * cpu_stats.sys.intr[PIL]++
  */
 #define	INC_CPU_STATS_INTR(pilreg, tmpreg, tmpreg_32, basereg)	\
@@ -622,6 +629,8 @@ _tsc_patch1:
 	TSC_SUB_FROM(%ecx, CPU_PIL_HIGH_START)
 	addl	$CPU_INTRSTAT_LOW_PIL_OFFSET, %ecx	/* offset PILs 0-10 */
 	TSC_ADD_TO(%ecx, CPU_INTRSTAT)
+	INTRACCTBASE(%ebx, %ecx)
+	TSC_ADD_TO(%ecx, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
 	/
 	/ Another high-level interrupt is active below this one, so
 	/ there is no need to check for an interrupt thread. That will be
@@ -651,6 +660,8 @@ _tsc_patch2:
 	TSC_SUB_FROM(%esi, T_INTR_START)
 	TSC_CLR(%esi, T_INTR_START)
 	TSC_ADD_TO(%ecx, CPU_INTRSTAT)
+	INTRACCTBASE(%ebx, %ecx)
+	TSC_ADD_TO(%ecx, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
 1:
 	/ Store starting timestamp in CPU structure for this PIL.
 	popl	%ecx			/* restore new PIL */
@@ -766,6 +777,8 @@ _tsc_patch4:
 	TSC_SUB_FROM(%esi, CPU_PIL_HIGH_START)
 	addl	$CPU_INTRSTAT_LOW_PIL_OFFSET, %esi	/* offset PILs 0-10 */
 	TSC_ADD_TO(%esi, CPU_INTRSTAT)
+	INTRACCTBASE(%ebx, %esi)
+	TSC_ADD_TO(%esi, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
 	/
 	/ Check for lower-PIL nested high-level interrupt beneath current one
 	/ If so, place a starting timestamp in its pil_high_start entry.
@@ -876,6 +889,8 @@ _tsc_patch7:
 	movzbl	T_PIL(%esi), %ecx
 	PILBASE(%ebx, %ecx)
 	TSC_ADD_TO(%ecx, CPU_INTRSTAT)
+	INTRACCTBASE(%ebx, %ecx)
+	TSC_ADD_TO(%ecx, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
 	movl	%esi, %edx
 	popl	%eax
 	popl	%ecx
@@ -1009,6 +1024,8 @@ _tsc_patch9:
 	TSC_SUB_FROM(%esi, T_INTR_START)
 	PILBASE(%ebx, %edi)
 	TSC_ADD_TO(%edi, CPU_INTRSTAT)
+	INTRACCTBASE(%ebx, %edi)
+	TSC_ADD_TO(%edi, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
 	popl	%edi
 	popl	%edx
 	popl	%eax
@@ -1295,6 +1312,8 @@ _tsc_patch11:
 	PILBASE(%ebx, %ebp)
 	TSC_SUB_FROM(%ecx, T_INTR_START)
 	TSC_ADD_TO(%ebp, CPU_INTRSTAT)
+	INTRACCTBASE(%ebx, %ebp)
+	TSC_ADD_TO(%ebp, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
 	popl	%eax
 0:
 	movl	T_LWP(%ecx), %ebp
@@ -1385,6 +1404,8 @@ _tsc_patch13:
 	nop; nop		/* patched to rdtsc if available */
 	TSC_SUB_FROM(%esi, T_INTR_START)
 	TSC_ADD_TO(%ecx, CPU_INTRSTAT)
+	INTRACCTBASE(%ebx, %ecx)
+	TSC_ADD_TO(%ecx, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
 
 	/ if there is still an interrupt thread underneath this one
 	/ then the interrupt was never blocked and the return is fairly

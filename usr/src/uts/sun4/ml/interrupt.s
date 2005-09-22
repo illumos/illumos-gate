@@ -486,6 +486,19 @@ intr_thread(struct regs *regs, uint_t inumber, uint_t pil)
 	add	%o5, %o4, %o5		! new counter in o5
 	stx	%o5, [%o2 + %l3]	! store new counter
 
+	! Also update intracct[]
+	lduh	[%o2 + CPU_MSTATE], %l3
+	sllx	%l3, 3, %l3
+	add	%l3, CPU_INTRACCT, %l3
+	add	%l3, %o2, %l3
+0:
+	ldx	[%l3], %o5
+	add	%o5, %o4, %o3
+	casx	[%l3], %o5, %o3
+	cmp	%o5, %o3
+	bne,pn	%xcc, 0b
+	nop
+
 1:
 	!
 	! Get set to run interrupt thread.
@@ -676,6 +689,20 @@ intr_thread(struct regs *regs, uint_t inumber, uint_t pil)
 	cmp	%o5, %o0
 	bne,pn	%xcc, 1b
 	nop
+
+	! Also update intracct[]
+	lduh	[%o2 + CPU_MSTATE], %o1
+	sllx	%o1, 3, %o1
+	add	%o1, CPU_INTRACCT, %o1
+	add	%o1, %o2, %o1
+1:
+	ldx	[%o1], %o5
+	add	%o5, %l2, %o0
+	casx	[%o1], %o5, %o0
+	cmp	%o5, %o0
+	bne,pn	%xcc, 1b
+	nop
+	
 	!
 	! Don't keep a pinned process pinned indefinitely. Bump cpu_intrcnt
 	! for each interrupt handler we invoke. If we hit INTRCNT_LIMIT, then
@@ -1080,6 +1107,14 @@ current_thread(struct regs *regs, uint_t inumber, uint_t pil)
 	add	%o4, CPU_INTRSTAT_LOW_PIL_OFFSET, %o4
 	ldx	[%o3 + %o4], %l1		! old counter in l1
 	add	%l1, %l3, %l1			! new counter in l1
+	stx	%l1, [%o3 + %o4]		! store new counter
+
+	! Also update intracct[]
+	lduh	[%o3 + CPU_MSTATE], %o4
+	sllx	%o4, 3, %o4
+	add	%o4, CPU_INTRACCT, %o4
+	ldx	[%o3 + %o4], %l1
+	add	%l1, %l3, %l1
 	! Another high-level interrupt is active below this one, so
 	! there is no need to check for an interrupt thread. That will be
 	! done by the lowest priority high-level interrupt active.
@@ -1123,7 +1158,14 @@ current_thread(struct regs *regs, uint_t inumber, uint_t pil)
 	ldx	[%o3 + %o4], %l2		! old counter in l2
 	add	%l2, %o5, %l2			! new counter in l2
 	stx	%l2, [%o3 + %o4]		! store new counter
-	
+
+	! Also update intracct[]
+	lduh	[%o3 + CPU_MSTATE], %o4
+	sllx	%o4, 3, %o4
+	add	%o4, CPU_INTRACCT, %o4
+	ldx	[%o3 + %o4], %l2
+	add	%l2, %o5, %l2
+	stx	%l2, [%o3 + %o4]
 4:
 	!
 	! Handle high-level interrupts on separate interrupt stack.
@@ -1278,6 +1320,14 @@ current_thread_complete:
 	ldx	[%o3 + %o4], %o0		! old counter in o0
 	add	%o0, %o5, %o0			! new counter in o0
 	stx	%o0, [%o3 + %o4]		! store new counter
+
+	! Also update intracct[]
+	lduh	[%o3 + CPU_MSTATE], %o4
+	sllx	%o4, 3, %o4
+	add	%o4, CPU_INTRACCT, %o4
+	ldx	[%o3 + %o4], %o0
+	add	%o0, %o5, %o0
+	stx	%o0, [%o3 + %o4]
 	
 	!
 	! get back on current thread's stack
@@ -2075,6 +2125,14 @@ intr_get_time(void)
 	bg,a,pn	%xcc, 1f
 	mulx	%o0, %o4, %o0	! multiply interval by clock divisor iff > 1
 1:
+	! Update intracct[]
+	lduh	[%o5 + CPU_MSTATE], %o4
+	sllx	%o4, 3, %o4
+	add	%o4, CPU_INTRACCT, %o4
+	ldx	[%o5 + %o4], %o2
+	add	%o2, %o0, %o2
+	stx	%o2, [%o5 + %o4]
+
 	!
 	! Increment cpu_m.intrstat[pil][0]. Calculate elapsed time since
 	! cpu_m.intrstat[pil][1], which is either when the interrupt was

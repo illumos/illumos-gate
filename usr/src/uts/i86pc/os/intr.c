@@ -109,6 +109,7 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 {
 	struct machcpu *mcpu = &cpu->cpu_m;
 	uint_t mask;
+	hrtime_t intrtime;
 
 	ASSERT(pil > LOCK_LEVEL);
 
@@ -134,8 +135,10 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 		 */
 		nestpil = bsrw_insn((uint16_t)mask);
 		ASSERT(nestpil < pil);
-		mcpu->intrstat[nestpil] += tsc_read() -
+		intrtime = tsc_read() -
 		    mcpu->pil_high_start[nestpil - (LOCK_LEVEL + 1)];
+		mcpu->intrstat[nestpil] += intrtime;
+		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 		/*
 		 * Another high-level interrupt is active below this one, so
 		 * there is no need to check for an interrupt thread.  That
@@ -151,8 +154,9 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 		 * is non-zero.
 		 */
 		if ((t->t_flag & T_INTR_THREAD) != 0 && t->t_intr_start != 0) {
-			mcpu->intrstat[t->t_pil] +=
-			    tsc_read() - t->t_intr_start;
+			intrtime = tsc_read() - t->t_intr_start;
+			mcpu->intrstat[t->t_pil] += intrtime;
+			cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 			t->t_intr_start = 0;
 		}
 	}
@@ -196,6 +200,7 @@ hilevel_intr_epilog(struct cpu *cpu, uint_t pil, uint_t oldpil, uint_t vecnum)
 {
 	struct machcpu *mcpu = &cpu->cpu_m;
 	uint_t mask;
+	hrtime_t intrtime;
 
 	ASSERT(mcpu->mcpu_pri == pil);
 
@@ -222,8 +227,9 @@ hilevel_intr_epilog(struct cpu *cpu, uint_t pil, uint_t oldpil, uint_t vecnum)
 
 	ASSERT(mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)] != 0);
 
-	mcpu->intrstat[pil] +=
-	    tsc_read() - mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)];
+	intrtime = tsc_read() - mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)];
+	mcpu->intrstat[pil] += intrtime;
+	cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 
 	/*
 	 * Check for lower-pil nested high-level interrupt beneath
@@ -291,7 +297,9 @@ intr_thread_prolog(struct cpu *cpu, caddr_t stackptr, uint_t pil)
 	 */
 	t = cpu->cpu_thread;
 	if (t->t_flag & T_INTR_THREAD) {
-		mcpu->intrstat[t->t_pil] += t->t_intr_start - tsc_read();
+		hrtime_t intrtime = tsc_read() - t->t_intr_start;
+		mcpu->intrstat[t->t_pil] += intrtime;
+		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 		t->t_intr_start = 0;
 	}
 
@@ -337,12 +345,15 @@ intr_thread_epilog(struct cpu *cpu, uint_t vec, uint_t oldpil)
 	kthread_t *t;
 	kthread_t *it = cpu->cpu_thread;	/* curthread */
 	uint_t pil, basespl;
+	hrtime_t intrtime;
 
 	pil = it->t_pil;
 	cpu->cpu_stats.sys.intr[pil - 1]++;
 
 	ASSERT(it->t_intr_start != 0);
-	mcpu->intrstat[pil] += tsc_read() - it->t_intr_start;
+	intrtime = tsc_read() - it->t_intr_start;
+	mcpu->intrstat[pil] += intrtime;
+	cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 
 	ASSERT(cpu->cpu_intr_actv & (1 << pil));
 	cpu->cpu_intr_actv &= ~(1 << pil);
@@ -470,8 +481,11 @@ top:
 	 * curthread is changed
 	 */
 	t = cpu->cpu_thread;
-	if (t->t_flag & T_INTR_THREAD)
-		mcpu->intrstat[pil] += tsc_read() - t->t_intr_start;
+	if (t->t_flag & T_INTR_THREAD) {
+		hrtime_t intrtime = tsc_read() - t->t_intr_start;
+		mcpu->intrstat[pil] += intrtime;
+		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
+	}
 	it->t_lwp = t->t_lwp;
 	it->t_state = TS_ONPROC;
 
@@ -510,6 +524,7 @@ dosoftint_epilog(struct cpu *cpu, uint_t oldpil)
 	struct machcpu *mcpu = &cpu->cpu_m;
 	kthread_t *t, *it;
 	uint_t pil, basespl;
+	hrtime_t intrtime;
 
 	it = cpu->cpu_thread;
 	pil = it->t_pil;
@@ -518,7 +533,9 @@ dosoftint_epilog(struct cpu *cpu, uint_t oldpil)
 
 	ASSERT(cpu->cpu_intr_actv & (1 << pil));
 	cpu->cpu_intr_actv &= ~(1 << pil);
-	mcpu->intrstat[pil] += tsc_read() - it->t_intr_start;
+	intrtime = tsc_read() - it->t_intr_start;
+	mcpu->intrstat[pil] += intrtime;
+	cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 
 	/*
 	 * If there is still an interrupted thread underneath this one
@@ -677,6 +694,7 @@ cpu_intr_swtch_enter(kthread_id_t t)
 {
 	uint64_t	interval;
 	uint64_t	start;
+	cpu_t		*cpu;
 
 	ASSERT((t->t_flag & T_INTR_THREAD) != 0);
 	ASSERT(t->t_pil > 0 && t->t_pil <= LOCK_LEVEL);
@@ -688,13 +706,21 @@ cpu_intr_swtch_enter(kthread_id_t t)
 	 * its handler. intr_thread() updated the interrupt statistic for its
 	 * PIL and zeroed its timestamp. Since there was no pinned thread to
 	 * return to, swtch() gets called and we end up here.
+	 *
+	 * Note that we use atomic ops below (cas64 and atomic_add_64), which
+	 * we don't use in the functions above, because we're not called
+	 * with interrupts blocked, but the epilog/prolog functions are.
 	 */
 	if (t->t_intr_start) {
 		do {
 			start = t->t_intr_start;
 			interval = tsc_read() - start;
 		} while (cas64(&t->t_intr_start, start, 0) != start);
-		CPU->cpu_m.intrstat[t->t_pil] += interval;
+		cpu = CPU;
+		cpu->cpu_m.intrstat[t->t_pil] += interval;
+
+		atomic_add_64((uint64_t *)&cpu->cpu_intracct[cpu->cpu_mstate],
+		    interval);
 	} else
 		ASSERT(t->t_intr == NULL);
 }

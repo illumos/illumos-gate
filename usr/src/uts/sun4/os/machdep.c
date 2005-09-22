@@ -498,6 +498,7 @@ cpu_intr_swtch_enter(kthread_id_t t)
 {
 	uint64_t	interval;
 	uint64_t	start;
+	cpu_t		*cpu;
 
 	ASSERT((t->t_flag & T_INTR_THREAD) != 0);
 	ASSERT(t->t_pil > 0 && t->t_pil <= LOCK_LEVEL);
@@ -519,9 +520,13 @@ cpu_intr_swtch_enter(kthread_id_t t)
 			start = t->t_intr_start;
 			interval = gettick_counter() - start;
 		} while (cas64(&t->t_intr_start, start, 0) != start);
-		if (CPU->cpu_m.divisor > 1)
-			interval *= CPU->cpu_m.divisor;
-		CPU->cpu_m.intrstat[t->t_pil][0] += interval;
+		cpu = CPU;
+		if (cpu->cpu_m.divisor > 1)
+			interval *= cpu->cpu_m.divisor;
+		cpu->cpu_m.intrstat[t->t_pil][0] += interval;
+
+		atomic_add_64((uint64_t *)&cpu->cpu_intracct[cpu->cpu_mstate],
+		    interval);
 	} else
 		ASSERT(t->t_intr == NULL || t->t_state == TS_RUN);
 }
@@ -652,4 +657,98 @@ mach_kdi_init(kdi_t *kdi)
 	kdi->mkdi_cpu_index = kdi_cpu_index;
 	kdi->mkdi_trap_vatotte = kdi_trap_vatotte;
 	kdi->mkdi_kernpanic = kdi_kernpanic;
+}
+
+
+/*
+ * get_cpu_mstate() is passed an array of timestamps, NCMSTATES
+ * long, and it fills in the array with the time spent on cpu in
+ * each of the mstates, where time is returned in nsec.
+ *
+ * No guarantee is made that the returned values in times[] will
+ * monotonically increase on sequential calls, although this will
+ * be true in the long run. Any such guarantee must be handled by
+ * the caller, if needed. This can happen if we fail to account
+ * for elapsed time due to a generation counter conflict, yet we
+ * did account for it on a prior call (see below).
+ *
+ * The complication is that the cpu in question may be updating
+ * its microstate at the same time that we are reading it.
+ * Because the microstate is only updated when the CPU's state
+ * changes, the values in cpu_intracct[] can be indefinitely out
+ * of date. To determine true current values, it is necessary to
+ * compare the current time with cpu_mstate_start, and add the
+ * difference to times[cpu_mstate].
+ *
+ * This can be a problem if those values are changing out from
+ * under us. Because the code path in new_cpu_mstate() is
+ * performance critical, we have not added a lock to it. Instead,
+ * we have added a generation counter. Before beginning
+ * modifications, the counter is set to 0. After modifications,
+ * it is set to the old value plus one.
+ *
+ * get_cpu_mstate() will not consider the values of cpu_mstate
+ * and cpu_mstate_start to be usable unless the value of
+ * cpu_mstate_gen is both non-zero and unchanged, both before and
+ * after reading the mstate information. Note that we must
+ * protect against out-of-order loads around accesses to the
+ * generation counter. Also, this is a best effort approach in
+ * that we do not retry should the counter be found to have
+ * changed.
+ *
+ * cpu_intracct[] is used to identify time spent in each CPU
+ * mstate while handling interrupts. Such time should be reported
+ * against system time, and so is subtracted out from its
+ * corresponding cpu_acct[] time and added to
+ * cpu_acct[CMS_SYSTEM]. Additionally, intracct time is stored in
+ * %ticks, but acct time may be stored as %sticks, thus requiring
+ * different conversions before they can be compared.
+ */
+
+void
+get_cpu_mstate(cpu_t *cpu, hrtime_t *times)
+{
+	int i;
+	hrtime_t now, start;
+	uint16_t gen;
+	uint16_t state;
+	hrtime_t intracct[NCMSTATES];
+
+	/*
+	 * Load all volatile state under the protection of membar.
+	 * cpu_acct[cpu_mstate] must be loaded to avoid double counting
+	 * of (now - cpu_mstate_start) by a change in CPU mstate that
+	 * arrives after we make our last check of cpu_mstate_gen.
+	 */
+
+	now = gethrtime_unscaled();
+	gen = cpu->cpu_mstate_gen;
+
+	membar_consumer();	/* guarantee load ordering */
+	start = cpu->cpu_mstate_start;
+	state = cpu->cpu_mstate;
+	for (i = 0; i < NCMSTATES; i++) {
+		intracct[i] = cpu->cpu_intracct[i];
+		times[i] = cpu->cpu_acct[i];
+	}
+	membar_consumer();	/* guarantee load ordering */
+
+	if (gen != 0 && gen == cpu->cpu_mstate_gen && now > start)
+		times[state] += now - start;
+
+	for (i = 0; i < NCMSTATES; i++) {
+		scalehrtime(&times[i]);
+		intracct[i] = tick2ns((hrtime_t)intracct[i], cpu->cpu_id);
+	}
+
+	for (i = 0; i < NCMSTATES; i++) {
+		if (i == CMS_SYSTEM)
+			continue;
+		times[i] -= intracct[i];
+		if (times[i] < 0) {
+			intracct[i] += times[i];
+			times[i] = 0;
+		}
+		times[CMS_SYSTEM] += intracct[i];
+	}
 }

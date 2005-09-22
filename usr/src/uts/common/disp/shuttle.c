@@ -229,7 +229,7 @@ shuttle_sleep(kthread_t *t)
 	t->t_sobj_ops = &shuttle_sobj_ops;
 	t->t_wchan0 = (caddr_t)1;
 	CL_INACTIVE(t);
-	(void) new_mstate(t, LMS_SLEEP);
+	ASSERT(t->t_mstate == LMS_SLEEP);
 	THREAD_SLEEP(t, &shuttle_lock);
 	disp_lock_exit_high(&shuttle_lock);
 	if (lwp && (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t)))

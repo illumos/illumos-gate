@@ -351,6 +351,8 @@ cpu	CPUSIZE
 	cpu_profile_upc
 	cpu_profile_pil
 	cpu_ftrace.ftd_state		CPU_FTRACE_STATE
+	cpu_mstate
+	cpu_intracct
 	cpu_m				CPU_MCPU
 	cpu_m.divisor			CPU_DIVISOR
 	cpu_m.intrstat			CPU_INTRSTAT

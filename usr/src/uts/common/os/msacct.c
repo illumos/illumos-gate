@@ -151,33 +151,63 @@ term_cpu_mstate(struct cpu *cpu)
 }
 
 void
-new_cpu_mstate(cpu_t *cpu, int cmstate)
+new_cpu_mstate(int cmstate, hrtime_t curtime)
 {
-	hrtime_t curtime;
-	hrtime_t newtime;
-	hrtime_t oldtime;
-	hrtime_t *mstimep;
+	cpu_t *cpu = CPU;
+	uint16_t gen;
 
 	ASSERT(cpu->cpu_mstate != CMS_DISABLED);
 	ASSERT(cmstate < NCMSTATES);
 	ASSERT(cmstate != CMS_DISABLED);
+
+	/*
+	 * This function cannot be re-entrant on a given CPU. As such,
+	 * we ASSERT and panic if we are called on behalf of an interrupt.
+	 * The one exception is for an interrupt which has previously
+	 * blocked. Such an interrupt is being scheduled by the dispatcher
+	 * just like a normal thread, and as such cannot arrive here
+	 * in a re-entrant manner.
+	 */
+
+	ASSERT(!CPU_ON_INTR(cpu) && curthread->t_intr == NULL);
 	ASSERT(curthread->t_preempt > 0 || curthread == cpu->cpu_idle_thread);
 
-	curtime = gethrtime_unscaled();
-	mstimep = &cpu->cpu_acct[cpu->cpu_mstate];
-	do {
-		newtime = curtime - cpu->cpu_mstate_start;
-		if (newtime < 0) {
-			/* force CAS to fail */
-			curtime = gethrtime_unscaled();
-			oldtime = *mstimep - 1;
-			continue;
-		}
-		oldtime = *mstimep;
-		newtime += oldtime;
-		cpu->cpu_mstate = cmstate;
-		cpu->cpu_mstate_start = curtime;
-	} while (cas64((uint64_t *)mstimep, oldtime, newtime) != oldtime);
+	/*
+	 * LOCKING, or lack thereof:
+	 *
+	 * Updates to CPU mstate can only be made by the CPU
+	 * itself, and the above check to ignore interrupts
+	 * should prevent recursion into this function on a given
+	 * processor. i.e. no possible write contention.
+	 *
+	 * However, reads of CPU mstate can occur at any time
+	 * from any CPU. Any locking added to this code path
+	 * would seriously impact syscall performance. So,
+	 * instead we have a best-effort protection for readers.
+	 * The reader will want to account for any time between
+	 * cpu_mstate_start and the present time. This requires
+	 * some guarantees that the reader is getting coherent
+	 * information.
+	 *
+	 * We use a generation counter, which is set to 0 before
+	 * we start making changes, and is set to a new value
+	 * after we're done. Someone reading the CPU mstate
+	 * should check for the same non-zero value of this
+	 * counter both before and after reading all state. The
+	 * important point is that the reader is not a
+	 * performance-critical path, but this function is.
+	 */
+
+	gen = cpu->cpu_mstate_gen;
+	cpu->cpu_mstate_gen = 0;
+
+	membar_producer();
+	cpu->cpu_acct[cpu->cpu_mstate] += curtime - cpu->cpu_mstate_start;
+	cpu->cpu_mstate = cmstate;
+	cpu->cpu_mstate_start = curtime;
+	membar_producer();
+
+	cpu->cpu_mstate_gen = (++gen == 0) ? 1 : gen;
 }
 
 /*
@@ -232,7 +262,6 @@ syscall_mstate(int fromms, int toms)
 	hrtime_t *mstimep;
 	hrtime_t curtime;
 	klwp_t *lwp;
-	struct cpu *cpup;
 	hrtime_t newtime;
 
 	if ((lwp = ttolwp(t)) == NULL)
@@ -253,35 +282,12 @@ syscall_mstate(int fromms, int toms)
 	t->t_mstate = toms;
 	ms->ms_state_start = curtime;
 	ms->ms_prev = fromms;
-	/*
-	 * Here, you could call new_cpu_mstate() to switch the cpu
-	 * microstate.  However, in the interest of making things
-	 * as expeditious as possible, the relevant work has been inlined.
-	 */
-	kpreempt_disable(); /* MUST disable kpreempt before touching t->cpu */
-	cpup = t->t_cpu;
-	ASSERT(cpup->cpu_mstate != CMS_DISABLED);
-	if ((toms != LMS_USER) && (cpup->cpu_mstate != CMS_SYSTEM)) {
-		mstimep = &cpup->cpu_acct[CMS_USER];
-		newtime = curtime - cpup->cpu_mstate_start;
-		while (newtime < 0) {
-			curtime = gethrtime_unscaled();
-			newtime = curtime - cpup->cpu_mstate_start;
-		}
-		*mstimep += newtime;
-		cpup->cpu_mstate = CMS_SYSTEM;
-		cpup->cpu_mstate_start = curtime;
-	} else if ((toms == LMS_USER) && (cpup->cpu_mstate != CMS_USER)) {
-		mstimep = &cpup->cpu_acct[CMS_SYSTEM];
-		newtime = curtime - cpup->cpu_mstate_start;
-		while (newtime < 0) {
-			curtime = gethrtime_unscaled();
-			newtime = curtime - cpup->cpu_mstate_start;
-		}
-		*mstimep += newtime;
-		cpup->cpu_mstate = CMS_USER;
-		cpup->cpu_mstate_start = curtime;
-	}
+	kpreempt_disable(); /* don't change CPU while changing CPU's state */
+	ASSERT(CPU == t->t_cpu);
+	if ((toms != LMS_USER) && (t->t_cpu->cpu_mstate != CMS_SYSTEM))
+		new_cpu_mstate(CMS_SYSTEM, curtime);
+	else if ((toms == LMS_USER) && (t->t_cpu->cpu_mstate != CMS_USER))
+		new_cpu_mstate(CMS_USER, curtime);
 	kpreempt_enable();
 }
 
@@ -506,12 +512,15 @@ new_mstate(kthread_t *t, int new_state)
 	/*
 	 * Switch CPU microstate if appropriate
 	 */
+
 	kpreempt_disable(); /* MUST disable kpreempt before touching t->cpu */
-	if (new_state == LMS_USER && t->t_cpu->cpu_mstate != CMS_USER) {
-		new_cpu_mstate(t->t_cpu, CMS_USER);
-	} else if (new_state != LMS_USER &&
-	    t->t_cpu->cpu_mstate != CMS_SYSTEM) {
-		new_cpu_mstate(t->t_cpu, CMS_SYSTEM);
+	ASSERT(t->t_cpu == CPU);
+	if (!CPU_ON_INTR(t->t_cpu) && curthread->t_intr == NULL) {
+		if (new_state == LMS_USER && t->t_cpu->cpu_mstate != CMS_USER)
+			new_cpu_mstate(CMS_USER, curtime);
+		else if (new_state != LMS_USER &&
+		    t->t_cpu->cpu_mstate != CMS_SYSTEM)
+			new_cpu_mstate(CMS_SYSTEM, curtime);
 	}
 	kpreempt_enable();
 

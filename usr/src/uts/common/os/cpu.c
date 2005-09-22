@@ -2829,8 +2829,7 @@ cpu_sys_stats_ks_update(kstat_t *ksp, int rw)
 	cpu_t *cp = (cpu_t *)ksp->ks_private;
 	struct cpu_sys_stats_ks_data *csskd;
 	cpu_sys_stats_t *css;
-	hrtime_t *cmstimep;
-	hrtime_t newtime;
+	hrtime_t msnsecs[NCMSTATES];
 	int	i;
 
 	if (rw == KSTAT_WRITE)
@@ -2839,49 +2838,29 @@ cpu_sys_stats_ks_update(kstat_t *ksp, int rw)
 	csskd = ksp->ks_data;
 	css = &cp->cpu_stats.sys;
 
+	/*
+	 * Read CPU mstate, but compare with the last values we
+	 * received to make sure that the returned kstats never
+	 * decrease.
+	 */
+
+	get_cpu_mstate(cp, msnsecs);
+	if (csskd->cpu_nsec_idle.value.ui64 > msnsecs[CMS_IDLE])
+		msnsecs[CMS_IDLE] = csskd->cpu_nsec_idle.value.ui64;
+	if (csskd->cpu_nsec_user.value.ui64 > msnsecs[CMS_USER])
+		msnsecs[CMS_USER] = csskd->cpu_nsec_user.value.ui64;
+	if (csskd->cpu_nsec_kernel.value.ui64 > msnsecs[CMS_SYSTEM])
+		msnsecs[CMS_SYSTEM] = csskd->cpu_nsec_kernel.value.ui64;
+
 	bcopy(&cpu_sys_stats_ks_data_template, ksp->ks_data,
 	    sizeof (cpu_sys_stats_ks_data_template));
+
 	csskd->cpu_ticks_wait.value.ui64 = 0;
 	csskd->wait_ticks_io.value.ui64 = 0;
-	csskd->cpu_nsec_idle.value.ui64 = cp->cpu_acct[CMS_IDLE];
-	csskd->cpu_nsec_user.value.ui64 = cp->cpu_acct[CMS_USER];
-	csskd->cpu_nsec_kernel.value.ui64 = cp->cpu_acct[CMS_SYSTEM];
 
-	/*
-	 * update kstats to include time spent in current state
-	 */
-	i = 0;	/* set counter to 0 */
-	do {
-		switch (cp->cpu_mstate) {
-		case CMS_USER:
-			cmstimep = (hrtime_t *)&csskd->cpu_nsec_user.value.ui64;
-			break;
-		case CMS_SYSTEM:
-			cmstimep =
-			    (hrtime_t *)&csskd->cpu_nsec_kernel.value.ui64;
-			break;
-		case CMS_IDLE:
-			cmstimep = (hrtime_t *)&csskd->cpu_nsec_idle.value.ui64;
-			break;
-		case CMS_DISABLED:
-			panic("cpu_sys_stats_ks_update: disabled state"
-			    " reported!");
-			break;
-		default:
-			panic("cpu_sys_stats_ks_update: unknown microstate!");
-		}
-		newtime = gethrtime_unscaled() - cp->cpu_mstate_start;
-		if (newtime < 0) {
-			newtime = 0;
-			i++;
-		}
-	} while (newtime <= 0 && i < 5);
-
-	*cmstimep += newtime;
-
-	scalehrtime((hrtime_t *)&csskd->cpu_nsec_idle.value.ui64);
-	scalehrtime((hrtime_t *)&csskd->cpu_nsec_user.value.ui64);
-	scalehrtime((hrtime_t *)&csskd->cpu_nsec_kernel.value.ui64);
+	csskd->cpu_nsec_idle.value.ui64 = msnsecs[CMS_IDLE];
+	csskd->cpu_nsec_user.value.ui64 = msnsecs[CMS_USER];
+	csskd->cpu_nsec_kernel.value.ui64 = msnsecs[CMS_SYSTEM];
 	csskd->cpu_ticks_idle.value.ui64 =
 	    NSEC_TO_TICK(csskd->cpu_nsec_idle.value.ui64);
 	csskd->cpu_ticks_user.value.ui64 =
@@ -2998,11 +2977,7 @@ cpu_stat_ks_update(kstat_t *ksp, int rw)
 	cpu_stat_t *cso;
 	cpu_t *cp;
 	int i;
-	hrtime_t newtime;
-	hrtime_t cphrt_i;
-	hrtime_t cphrt_u;
-	hrtime_t cphrt_s;
-	hrtime_t *cmstimep;
+	hrtime_t msnsecs[NCMSTATES];
 
 	cso = (cpu_stat_t *)ksp->ks_data;
 	cp = (cpu_t *)ksp->ks_private;
@@ -3010,49 +2985,22 @@ cpu_stat_ks_update(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	cphrt_i = cp->cpu_acct[CMS_IDLE];
-	cphrt_u = cp->cpu_acct[CMS_USER];
-	cphrt_s = cp->cpu_acct[CMS_SYSTEM];
-
 	/*
-	 * update kstats to include time spent in current state
+	 * Read CPU mstate, but compare with the last values we
+	 * received to make sure that the returned kstats never
+	 * decrease.
 	 */
-	i = 0;	/* set counter to 0 */
-	do {
-		switch (cp->cpu_mstate) {
-		case CMS_USER:
-			cmstimep = &cphrt_u;
-			break;
-		case CMS_SYSTEM:
-			cmstimep = &cphrt_s;
-			break;
-		case CMS_IDLE:
-			cmstimep = &cphrt_i;
-			break;
-		case CMS_DISABLED:
-			panic("cpu_stat_ks_update: disabled state reported!");
-			break;
-		default:
-			panic("cpu_stat_ks_update: unknown microstate!");
-		}
-		newtime = gethrtime_unscaled() - cp->cpu_mstate_start;
-		if (newtime < 0) {
-			newtime = 0;
-			i++;
-		}
-	} while (newtime <= 0 && i < 5);
 
-	*cmstimep += newtime;
-
-	scalehrtime((hrtime_t *)&cphrt_i);
-	cso->cpu_sysinfo.cpu[CPU_IDLE] = NSEC_TO_TICK(cphrt_i);
-
-	scalehrtime((hrtime_t *)&cphrt_u);
-	cso->cpu_sysinfo.cpu[CPU_USER] = NSEC_TO_TICK(cphrt_u);
-
-	scalehrtime((hrtime_t *)&cphrt_s);
-	cso->cpu_sysinfo.cpu[CPU_KERNEL] = NSEC_TO_TICK(cphrt_s);
-
+	get_cpu_mstate(cp, msnsecs);
+	msnsecs[CMS_IDLE] = NSEC_TO_TICK(msnsecs[CMS_IDLE]);
+	msnsecs[CMS_USER] = NSEC_TO_TICK(msnsecs[CMS_USER]);
+	msnsecs[CMS_SYSTEM] = NSEC_TO_TICK(msnsecs[CMS_SYSTEM]);
+	if (cso->cpu_sysinfo.cpu[CPU_IDLE] < msnsecs[CMS_IDLE])
+		cso->cpu_sysinfo.cpu[CPU_IDLE] = msnsecs[CMS_IDLE];
+	if (cso->cpu_sysinfo.cpu[CPU_USER] < msnsecs[CMS_USER])
+		cso->cpu_sysinfo.cpu[CPU_USER] = msnsecs[CMS_USER];
+	if (cso->cpu_sysinfo.cpu[CPU_KERNEL] < msnsecs[CMS_SYSTEM])
+		cso->cpu_sysinfo.cpu[CPU_KERNEL] = msnsecs[CMS_SYSTEM];
 	cso->cpu_sysinfo.cpu[CPU_WAIT] 	= 0;
 	cso->cpu_sysinfo.wait[W_IO] 	= 0;
 	cso->cpu_sysinfo.wait[W_SWAP]	= 0;

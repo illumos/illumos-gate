@@ -200,6 +200,8 @@ cpu
 	cpu_profile_upc
 	cpu_profile_pil
 	cpu_ftrace.ftd_state		CPU_FTRACE_STATE
+	cpu_mstate
+	cpu_intracct
 
 \#define	CPU_INTR_ACTV_REF	_CONST(CPU_INTR_ACTV + 2)
 

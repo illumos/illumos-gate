@@ -521,7 +521,7 @@ idle_enter()
 {
 	cpu_t		*cp = CPU;
 
-	new_cpu_mstate(cp, CMS_IDLE);
+	new_cpu_mstate(CMS_IDLE, gethrtime_unscaled());
 	CPU_STATS_ADDQ(cp, sys, idlethread, 1);
 	set_idle_cpu(cp->cpu_id);	/* arch-dependent hook */
 }
@@ -534,7 +534,7 @@ idle_exit()
 {
 	cpu_t		*cp = CPU;
 
-	new_cpu_mstate(cp, CMS_SYSTEM);
+	new_cpu_mstate(CMS_SYSTEM, gethrtime_unscaled());
 	unset_idle_cpu(cp->cpu_id);	/* arch-dependent hook */
 }
 
