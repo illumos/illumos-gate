@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,10 +63,31 @@ void
 __nis_init_hash_table(__nis_hash_table_mt *table,
 			void (*itemDestructor)(void *)) {
 
+	int	errorcode;
+
 	if (table != 0) {
-		(void) pthread_mutex_init(&table->lock, 0);
-		(void) pthread_cond_init(&table->cond, 0);
-		(void) pthread_mutex_init(&table->traverser_id_lock, 0);
+		errorcode = pthread_mutex_init(&table->lock, 0);
+		if (errorcode != 0) {
+			syslog(LOG_WARNING, "__nis_init_hash_table: "
+			    "(table->lock) pthread_mutex_init returned %d (%s)",
+			    errorcode, strerror(errorcode));
+		}
+
+		errorcode = pthread_cond_init(&table->cond, 0);
+		if (errorcode != 0) {
+			syslog(LOG_WARNING, "__nis_init_hash_table: "
+			    "(table->cond) pthread_cond_init returned %d (%s)",
+			    errorcode, strerror(errorcode));
+		}
+
+		errorcode = pthread_mutex_init(&table->traverser_id_lock, 0);
+		if (errorcode != 0) {
+			syslog(LOG_WARNING, "__nis_init_hash_table: "
+			    "(table->traverser_id_lock) "
+			    "pthread_mutex_init returned %d (%s)",
+			    errorcode, strerror(errorcode));
+		}
+
 		table->traversed = 0;
 		table->locked_items = 0;
 		(void) memset(table->keys, 0, sizeof (table->keys));

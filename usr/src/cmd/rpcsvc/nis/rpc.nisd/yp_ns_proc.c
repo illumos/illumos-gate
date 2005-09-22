@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1249,7 +1249,6 @@ ypproc_all_svc(req, rqstp)
 			resp.status = err_conv_nistoyp(NIS_NOSUCHTABLE);
 		else
 			resp.status = err_conv_nistoyp(dbres->status);
-		XFREE(full_tblnm);
 		return (&resp);
 	}
 	if ((__type_of(dbres->obj) != NIS_TABLE_OBJ) ||
@@ -1258,7 +1257,6 @@ ypproc_all_svc(req, rqstp)
 			(!((dbres->obj->TA_data.ta_cols.ta_cols_val +
 			resp.key_column_ndx)->tc_flags & TA_SEARCHABLE))))) {
 		resp.status = err_conv_nistoyp(NIS_NOSUCHTABLE);
-		XFREE(full_tblnm);
 		return (&resp);
 	}
 
