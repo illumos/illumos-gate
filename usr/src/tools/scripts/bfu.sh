@@ -2255,6 +2255,14 @@ bfulib="
 	/usr/lib/nss_*
 "
 
+# add libc_psr.so.1, if available and not empty
+if [ -s /platform/`uname -i`/lib/libc_psr.so.1 ]; then
+	bfulib="
+		$bfulib
+		/platform/`uname -i`/lib/libc_psr.so.1
+	"
+fi
+
 rm -rf /tmp/bfulib /tmp/bl
 mkdir /tmp/bfulib /tmp/bl
 
@@ -3551,6 +3559,22 @@ if [ -h /tmp/bfulib/64 ]
 then
 	ldlib64="LD_LIBRARY_PATH_64=/tmp/bfulib/64"
 	export LD_LIBRARY_PATH_64=/tmp/bfulib/64
+fi
+
+# turn off auxiliary filters, since they can cause objects to be loaded
+# from outside of the protected environment.
+export LD_NOAUXFLTR=1
+
+#
+# Since we've turned off auxiliary filters, libc_psr will normally not
+# be loaded at all.  But libc_psr was overriding broken code in libc
+# for over a week before the fix for 6324631, so we need to explicitly
+# LD_PRELOAD it to allow users to bfu from the broken libc.  This can be
+# removed once there are no sun4u machines bfued to Nevada bits between
+# 9/7/2005 and 9/15/2005.
+#
+if [ -f /tmp/bfulib/libc_psr.so.1 ]; then
+	export LD_PRELOAD_32=/tmp/bfulib/libc_psr.so.1
 fi
 
 print "Turning on delayed i/o ..."
@@ -5979,7 +6003,8 @@ if [ -t 0 -a -t 1 -a -t 2 ]; then
 fi
 
 print "Exiting post-bfu protected environment.  To reenter, type:"
-print LD_LIBRARY_PATH=/tmp/bfulib $ldlib64 PATH=/tmp/bfubin /tmp/bfubin/ksh
+print LD_NOAUXFLTR=1 LD_LIBRARY_PATH=/tmp/bfulib $ldlib64 PATH=/tmp/bfubin \
+    /tmp/bfubin/ksh
 
 # Allow init(1M) to continue, if we're leaving.
 print "Reactivating init ..."
