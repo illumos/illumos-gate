@@ -668,7 +668,8 @@ FMHDRS=				\
 
 sparc_FMCPUHDRS=		\
 	UltraSPARC-II.h		\
-	UltraSPARC-III.h
+	UltraSPARC-III.h	\
+	UltraSPARC-T1.h
 FMCPUHDRS=$($(MACH)_FMCPUHDRS)
 
 FMIOHDRS=			\

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,8 +31,21 @@
 #include <fm/fmd_fmri.h>
 
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <kstat.h>
+#ifdef	sparc
+#include <sys/mdesc.h>
+#include <cpu.h>
+#endif	/* sparc */
+
+/*
+ * The scheme plugin for cpu FMRIs.
+ */
+
+#ifdef	sparc
+cpu_t cpu;
+#endif	/* sparc */
 
 ssize_t
 fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
@@ -52,7 +65,7 @@ fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 }
 
 static int
-cpu_get_serialid(uint32_t cpuid, uint64_t *serialidp)
+cpu_get_serialid_kstat(uint32_t cpuid, uint64_t *serialidp)
 {
 	kstat_named_t *kn;
 	kstat_ctl_t *kc;
@@ -84,6 +97,17 @@ cpu_get_serialid(uint32_t cpuid, uint64_t *serialidp)
 	(void) kstat_close(kc);
 
 	return (fmd_fmri_set_errno(ENOENT));
+}
+
+static int
+cpu_get_serialid(uint32_t cpuid, uint64_t *serialidp)
+{
+#ifdef	sparc
+	if (cpu.cpu_mdesc_cpus != NULL)
+	    return (cpu_get_serialid_mdesc(cpuid, serialidp));
+	else
+#endif	/* sparc */
+	    return (cpu_get_serialid_kstat(cpuid, serialidp));
 }
 
 int
@@ -146,3 +170,18 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	else
 		return (p_online(cpuid, P_STATUS) == P_FAULTED);
 }
+
+#ifdef	sparc
+int
+fmd_fmri_init(void)
+{
+	bzero(&cpu, sizeof (cpu_t));
+	return (cpu_mdesc_init());
+}
+
+void
+fmd_fmri_fini(void)
+{
+	cpu_mdesc_fini();
+}
+#endif	/* sparc */

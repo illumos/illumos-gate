@@ -20,18 +20,49 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.com
 
+SCHEME_COMMON = ../common
+MDESC_COMMON = $(SRC)/common/mdesc
+
 SRCS = \
+	mdesc_devinit.c \
+	mdesc_fini.c \
+	mdesc_findname.c \
+	mdesc_findnodeprop.c \
+	mdesc_getpropstr.c \
+	mdesc_getpropval.c \
+	mdesc_init_intern.c \
+	mdesc_nodecount.c \
+	mdesc_scandag.c \
 	mem.c \
 	mem_disc.c \
 	mem_read.c \
 	mem_unum.c \
 	mem_util.c
 
+# These LINTFLAGS are provided for benefit of mdesc routines
+
+LINTFLAGS +=    -erroff=E_BAD_PTR_CAST_ALIGN -v
+
 include ../Makefile.targ
+
+%.o: $(SCHEME_COMMON)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: $(MDESC_COMMON)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.ln: $(SCHEME_COMMON)/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(MDESC_COMMON)/%.c
+	$(LINT.c) -c $<
+

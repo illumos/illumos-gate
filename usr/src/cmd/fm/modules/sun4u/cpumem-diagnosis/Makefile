@@ -25,35 +25,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-MODULE = cpumem-diagnosis
-CLASS = arch
 ARCH = sun4u
-SRCS = \
-	cmd_bank.c \
-	cmd_cpu.c \
-	cmd_cpuerr.c \
-	cmd_dimm.c \
-	cmd_ecache.c \
-	cmd_fmri.c \
-	cmd_list.c \
-	cmd_main.c \
-	cmd_mem.c \
-	cmd_memerr.c \
-	cmd_page.c \
-	cmd_pageerr.c \
-	cmd_state.c \
-	cmd_util.c
 
-include ../../Makefile.plugin
+INCDIRS = $(SRC)/uts/sun4u
 
-CMD_VERSION = "1.4"
-
-INCDIRS = \
-	. \
-	$(SRC)/uts/sun4 \
-	$(SRC)/uts/sun4u \
-	$(SRC)/uts/sparc/v9
-
-CPPFLAGS += $(INCDIRS:%=-I%) -DCMD_VERSION='$(CMD_VERSION)'
-
-LDFLAGS += -lkstat
+include ../../sun4/cpumem-diagnosis/Makefile.cpumem

@@ -27,8 +27,8 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * CPU/Memory error diagnosis engine for the UltraSPARC III and IV families of
- * processors.
+ * CPU/Memory error diagnosis engine for the UltraSPARC III, IV and T1
+ * families of processors.
  */
 
 #include <cmd_state.h>
@@ -103,6 +103,10 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.fpu.hwcopy",	cmd_fpu },
 	{ "ereport.cpu.*.eti",		cmd_txce },
 	{ "ereport.cpu.*.etc",		cmd_txce },
+	{ "ereport.cpu.*.dac",		cmd_ce,		CMD_ERRCL_DAC },
+	{ "ereport.cpu.*.dsc",		cmd_ce,		CMD_ERRCL_DSC },
+	{ "ereport.cpu.*.dau",		cmd_ue,		CMD_ERRCL_DAU },
+	{ "ereport.cpu.*.dsu",		cmd_ue,		CMD_ERRCL_DSU },
 	{ "ereport.io.*.ecc.drce",	cmd_ioxe,	CMD_ERRCL_IOCE },
 	{ "ereport.io.*.ecc.dwce",	cmd_ioxe,	CMD_ERRCL_IOCE },
 	{ "ereport.io.*.ecc.drue",	cmd_ioxe,	CMD_ERRCL_IOUE },
@@ -239,7 +243,12 @@ static const fmd_hdl_ops_t fmd_ops = {
 };
 
 static const fmd_hdl_info_t fmd_info = {
-	"UltraSPARC-III CPU/Memory Diagnosis", CMD_VERSION, &fmd_ops, fmd_props
+#ifdef sun4u
+	"UltraSPARC-III/IV CPU/Memory Diagnosis",
+#else
+	"UltraSPARC-T1 Memory Diagnosis",
+#endif
+	CMD_VERSION, &fmd_ops, fmd_props
 };
 
 static const struct cmd_evdisp_name {
@@ -267,11 +276,14 @@ void
 _fmd_init(fmd_hdl_t *hdl)
 {
 	cmd_subscriber_t *sp;
+	cpu_family_t cpu_family;
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)
 		return; /* error in configuration file or fmd_info */
 
-	if (!cmd_cpu_check_support()) {
+	cpu_family = cmd_cpu_check_support();
+
+	if (cpu_family == CMD_CPU_FAM_UNSUPPORTED) {
 		fmd_hdl_debug(hdl, "no supported CPUs found");
 		fmd_hdl_unregister(hdl);
 		return;
@@ -283,6 +295,10 @@ _fmd_init(fmd_hdl_t *hdl)
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-IIIiplus.*");
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-IV.*");
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-IVplus.*");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dac");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dsc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dau");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dsu");
 
 	fmd_hdl_subscribe(hdl, "ereport.io.tom.ecc.drce");
 	fmd_hdl_subscribe(hdl, "ereport.io.tom.ecc.dwce");
@@ -346,10 +362,12 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	cmd.cmd_iorxefrx_window = fmd_prop_get_int64(hdl, "iorxefrx_window");
 
+#ifdef sun4u
 	if (cmd_ecache_init() < 0) {
 		_fmd_fini(hdl);
 		fmd_hdl_abort(hdl, "failed to find device for E-cache flush");
 	}
+#endif /* sun4u */
 
 	if ((cmd.cmd_thresh_tpct_sysmem = fmd_prop_get_int64(hdl,
 	    "thresh_tpct_sysmem")) > 100000) {

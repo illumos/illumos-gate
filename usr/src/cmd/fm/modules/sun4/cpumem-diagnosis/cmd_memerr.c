@@ -65,8 +65,8 @@ struct ce_name2type {
 	ce_dispact_t type;
 };
 
-static ce_dispact_t
-mem_name2type(const char *name, int minorvers)
+ce_dispact_t
+cmd_mem_name2type(const char *name, int minorvers)
 {
 	static const struct ce_name2type old[] = {
 		{ ERR_TYPE_DESC_INTERMITTENT,	CE_DISP_INTERMITTENT },
@@ -179,10 +179,10 @@ ce_thresh_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 }
 
 /*ARGSUSED*/
-static cmd_evdisp_t
-ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
-    uint64_t afar, uint8_t afar_status, uint16_t synd, uint8_t synd_status,
-    ce_dispact_t type, uint64_t disp, nvlist_t *asru)
+cmd_evdisp_t
+cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
+    const char *class, uint64_t afar, uint8_t afar_status, uint16_t synd,
+    uint8_t synd_status, ce_dispact_t type, uint64_t disp, nvlist_t *asru)
 {
 	cmd_dimm_t *dimm;
 	cmd_page_t *page;
@@ -221,7 +221,36 @@ ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 	case CE_DISP_LEAKY:
 		CMD_STAT_BUMP(ce_leaky);
 		break;
-	case CE_DISP_POSS_STICKY: {
+	case CE_DISP_POSS_STICKY:
+
+	/*
+	 * The following code is a workaround for a misfix of 6316055
+	 * error-type member of DAC ereports is often intermittent .
+	 * The bug number for the workaround is 6326938.
+	 *
+	 * In sun4u, a memory CE ereport classified as PS (Possibly
+	 * Sticky) is ignored, because it means that the ereport itself
+	 * is possibly corrupted.
+	 *
+	 * In sun4v when this hv bug is present, a Possibly Sticky CE could be
+	 * either Sticky or Persistent in reality.  In this portion of the
+	 * workaround, we first prevent the e-report from being discarded.
+	 * In the second part of the workaround (subsequent #ifdef sun4v)
+	 * we cause a Possibly Sticky ereport to be treated in the same way
+	 * as a Persistent or Possibly Persistent ereport.
+	 * If we are being too cautious (these ereports denote a truly stuck
+	 * bit in memory), then page retirements will still happen, albeit
+	 * more slowly than if we had treated these PS ereports as Sticky.
+	 *
+	 * After the hv bug is fixed, we should no longer receive any PS
+	 * ereports, and this workaround is safe.
+	 */
+
+#ifdef sun4v
+		CMD_STAT_BUMP(ce_psticky_noptnr);
+		break;
+#else
+	{
 		uchar_t ptnrinfo = CE_XDIAG_PTNRINFO(disp);
 
 		if (CE_XDIAG_TESTVALID(ptnrinfo)) {
@@ -243,6 +272,7 @@ ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 		}
 		return (CMD_EVD_UNUSED);
 	}
+#endif  /* sun4v */
 	case CE_DISP_STICKY:
 		CMD_STAT_BUMP(ce_sticky);
 		break;
@@ -258,6 +288,9 @@ ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 	switch (type) {
 	case CE_DISP_POSS_PERS:
 	case CE_DISP_PERS:
+#ifdef sun4v
+	case CE_DISP_POSS_STICKY:
+#endif /* sun4v */
 		fmd_hdl_debug(hdl, "adding %sPersistent event to CE serd "
 		    "engine\n", type == CE_DISP_POSS_PERS ? "Possible-" : "");
 
@@ -316,10 +349,10 @@ cmd_bank_fault(fmd_hdl_t *hdl, cmd_bank_t *bank)
 }
 
 /*ARGSUSED*/
-static cmd_evdisp_t
-ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
-    uint64_t afar, uint8_t afar_status, uint16_t synd, uint8_t synd_status,
-    ce_dispact_t type, uint64_t disp, nvlist_t *asru)
+cmd_evdisp_t
+cmd_ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
+    const char *class, uint64_t afar, uint8_t afar_status, uint16_t synd,
+    uint8_t synd_status, ce_dispact_t type, uint64_t disp, nvlist_t *asru)
 {
 	cmd_page_t *page;
 	cmd_bank_t *bank;
@@ -327,32 +360,43 @@ ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 
 	cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class);
 
-	if (synd_status == AFLT_STAT_VALID &&
-	    (synd == CH_POISON_SYND_FROM_XXU_WRITE || (cpu != NULL &&
-	    cpu->cpu_type == CPU_ULTRASPARC_IIIi && synd ==
-	    CH_POISON_SYND_FROM_XXU_WRMERGE))) {
-		fmd_hdl_debug(hdl, "discarding UE due to magic syndrome %x\n",
-		    synd);
+	if (cpu == NULL) {
+		fmd_hdl_debug(hdl, "cmd_ue_common: cpu not found\n");
 		return (CMD_EVD_UNUSED);
 	}
 
-	if (cpu != NULL) {
-		if (afar_status != AFLT_STAT_VALID) {
-			/*
-			 * Had this report's AFAR been valid, it would have
-			 * contributed an address to the UE cache.  We don't
-			 * know what the AFAR would have been, and thus we can't
-			 * add anything to the cache.  If a xxU is caused by
-			 * this UE, we won't be able to detect it, and will thus
-			 * erroneously offline the CPU.  To prevent this
-			 * situation, we need to assume that all xxUs generated
-			 * through the next E$ flush are attributable to the UE.
-			 */
-			cmd_cpu_uec_set_allmatch(hdl, cpu);
-		} else {
-			cmd_cpu_uec_add(hdl, cpu, afar);
-		}
+	if (synd_status != AFLT_STAT_VALID) {
+	    fmd_hdl_debug(hdl, "cmd_ue_common: syndrome not valid\n");
+	    return (CMD_EVD_UNUSED);
 	}
+
+	if (cmd_mem_synd_check(hdl, afar, afar_status, synd, synd_status,
+	    cpu) == CMD_EVD_UNUSED)
+		return (CMD_EVD_UNUSED);
+
+	/*
+	 * The following code applies only to sun4u, because sun4u does
+	 * not poison data in L2 cache resulting from the fetch of a
+	 * memory UE.
+	 */
+
+#ifdef sun4u
+	if (afar_status != AFLT_STAT_VALID) {
+		/*
+		 * Had this report's AFAR been valid, it would have
+		 * contributed an address to the UE cache.  We don't
+		 * know what the AFAR would have been, and thus we can't
+		 * add anything to the cache.  If a xxU is caused by
+		 * this UE, we won't be able to detect it, and will thus
+		 * erroneously offline the CPU.  To prevent this
+		 * situation, we need to assume that all xxUs generated
+		 * through the next E$ flush are attributable to the UE.
+		 */
+		cmd_cpu_uec_set_allmatch(hdl, cpu);
+	} else {
+		cmd_cpu_uec_add(hdl, cpu, afar);
+	}
+#endif /* sun4u */
 
 	if (afar_status != AFLT_STAT_VALID)
 		return (CMD_EVD_UNUSED);
@@ -386,52 +430,6 @@ ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 	cmd_bank_fault(hdl, bank);
 
 	return (CMD_EVD_OK);
-}
-
-static cmd_evdisp_t
-xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
-    xe_handler_f *hdlr)
-{
-	uint64_t afar;
-	uint16_t synd;
-	uint8_t afar_status, synd_status;
-	nvlist_t *rsrc;
-	char *typenm;
-	uint64_t disp;
-	int minorvers = 1;
-
-	if (nvlist_lookup_pairs(nvl, 0,
-	    FM_EREPORT_PAYLOAD_NAME_AFAR, DATA_TYPE_UINT64, &afar,
-	    FM_EREPORT_PAYLOAD_NAME_AFAR_STATUS, DATA_TYPE_UINT8, &afar_status,
-	    FM_EREPORT_PAYLOAD_NAME_SYND, DATA_TYPE_UINT16, &synd,
-	    FM_EREPORT_PAYLOAD_NAME_SYND_STATUS, DATA_TYPE_UINT8, &synd_status,
-	    FM_EREPORT_PAYLOAD_NAME_ERR_TYPE, DATA_TYPE_STRING, &typenm,
-	    FM_EREPORT_PAYLOAD_NAME_RESOURCE, DATA_TYPE_NVLIST, &rsrc,
-	    NULL) != 0)
-		return (CMD_EVD_BAD);
-
-	if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_ERR_DISP,
-	    &disp) != 0)
-		minorvers = 0;
-
-	return (hdlr(hdl, ep, nvl, class, afar, afar_status, synd,
-	    synd_status, mem_name2type(typenm, minorvers), disp, rsrc));
-}
-
-/*ARGSUSED*/
-cmd_evdisp_t
-cmd_ce(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
-    cmd_errcl_t clcode)
-{
-	return (xe_common(hdl, ep, nvl, class, ce_common));
-}
-
-/*ARGSUSED*/
-cmd_evdisp_t
-cmd_ue(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
-    cmd_errcl_t clcode)
-{
-	return (xe_common(hdl, ep, nvl, class, ue_common));
 }
 
 void
@@ -554,7 +552,7 @@ cmd_rxefrx_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	    &rferr->rf_disp) != 0)
 		minorvers = 0;
 
-	rferr->rf_type = mem_name2type(typenm, minorvers);
+	rferr->rf_type = cmd_mem_name2type(typenm, minorvers);
 
 	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class)) == NULL) {
 		fmd_hdl_free(hdl, rferr, sizeof (cmd_iorxefrx_t));
@@ -590,7 +588,7 @@ cmd_rxefrx_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	fmd_hdl_debug(hdl, "matched %cE %llx with %llx", "UC"[isce],
 	    rferr->rf_errcl, rfmatch->rf_errcl);
 
-	hdlr = (isce ? ce_common : ue_common);
+	hdlr = (isce ? cmd_ce_common : cmd_ue_common);
 	if (isrxe) {
 		rc = iorxefrx_synthesize(hdl, ep, nvl, class, rferr->rf_afar,
 		    rferr->rf_afar_status, rfmatch->rf_afsr, rfmatch->rf_synd,
@@ -639,7 +637,7 @@ cmd_ioxefrx_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	if (nvlist_lookup_uint64(nvl, PCI_ECC_DISP, &rferr->rf_disp) != 0)
 		minorvers = 0;
 
-	rferr->rf_type = mem_name2type(typenm, minorvers);
+	rferr->rf_type = cmd_mem_name2type(typenm, minorvers);
 	rferr->rf_errcl = errcl;
 
 	/*
@@ -683,7 +681,7 @@ cmd_ioxefrx_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	fmd_hdl_debug(hdl, "matched %cE %llx with %llx\n", "UC"[isce],
 	    rferr->rf_errcl, rfmatch->rf_errcl);
 
-	hdlr = (isce ? ce_common : ue_common);
+	hdlr = (isce ? cmd_ce_common : cmd_ue_common);
 	rc = iorxefrx_synthesize(hdl, ep, nvl, class, rferr->rf_afar,
 	    rferr->rf_afar_status, rfmatch->rf_afsr, rfmatch->rf_synd,
 	    rfmatch->rf_synd_status, rferr->rf_type, rferr->rf_disp, hdlr);
@@ -700,7 +698,7 @@ ioxe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
 	int isce = CMD_ERRCL_MATCH(clcode, CMD_ERRCL_IOCE);
-	xe_handler_f *hdlr = isce ? ce_common : ue_common;
+	xe_handler_f *hdlr = isce ? cmd_ce_common : cmd_ue_common;
 	uint64_t afar;
 	uint16_t synd;
 	nvlist_t *rsrc;
@@ -720,7 +718,7 @@ ioxe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 		minorvers = 0;
 
 	return (hdlr(hdl, ep, nvl, class, afar, AFLT_STAT_VALID, synd,
-	    AFLT_STAT_VALID, mem_name2type(typenm, minorvers), disp,
+	    AFLT_STAT_VALID, cmd_mem_name2type(typenm, minorvers), disp,
 	    rsrc));
 }
 

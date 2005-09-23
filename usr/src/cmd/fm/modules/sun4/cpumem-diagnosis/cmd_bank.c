@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,6 +136,7 @@ bank_free(fmd_hdl_t *hdl, cmd_bank_t *bank, int destroy)
 void
 cmd_bank_destroy(fmd_hdl_t *hdl, cmd_bank_t *bank)
 {
+	fmd_stat_destroy(hdl, 1, &(bank->bank_retstat));
 	bank_free(hdl, bank, FMD_B_TRUE);
 }
 

@@ -218,6 +218,7 @@ fmd_fmri_present(nvlist_t *nvl)
 {
 	char *unum, **nvlserids, **serids;
 	uint_t nnvlserids, nserids;
+	uint64_t memconfig;
 	int rc;
 
 	if (mem.mem_dm == NULL)
@@ -229,6 +230,17 @@ fmd_fmri_present(nvlist_t *nvl)
 	if (nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, &nvlserids,
 	    &nnvlserids) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
+
+	/*
+	 * Hypervisor will change the memconfig value when the mapping of
+	 * pages to DIMMs changes, e.g. for change in DIMM size or interleave.
+	 * If we detect such a change, we discard ereports associated with a
+	 * previous memconfig value as invalid.
+	 */
+
+	if ((nvlist_lookup_uint64(nvl, FM_FMRI_MEM_MEMCONFIG,
+	    &memconfig) == 0) && memconfig != mem.mem_memconfig)
+		return (0);
 
 	if (mem_get_serids_by_unum(unum, &serids, &nserids) < 0) {
 		if (errno != ENOENT) {

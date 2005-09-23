@@ -80,6 +80,7 @@ f none usr/include/sys/fdreg.h 644 root bin
 f none usr/include/sys/fdvar.h 644 root bin
 f none usr/include/sys/fm/cpu/UltraSPARC-II.h 644 root bin
 f none usr/include/sys/fm/cpu/UltraSPARC-III.h 644 root bin
+f none usr/include/sys/fm/cpu/UltraSPARC-T1.h 644 root bin
 d none usr/include/sys/fpu 755 root bin
 f none usr/include/sys/fpu/fpu_simulator.h 644 root bin
 f none usr/include/sys/fpu/fpusystm.h 644 root bin

@@ -224,6 +224,7 @@ extern "C" {
 #define	FM_FMRI_MEM_UNUM		"unum"
 #define	FM_FMRI_MEM_SERIAL_ID		"serial"
 #define	FM_FMRI_MEM_PHYSADDR		"physaddr"
+#define	FM_FMRI_MEM_MEMCONFIG		"memconfig"
 
 /* mod scheme member names */
 #define	FM_FMRI_MOD_PKG			"mod-pkg"

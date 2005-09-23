@@ -44,6 +44,7 @@
 #include <cmd_state.h>
 #include <cmd_fmri.h>
 #include <sys/errclassify.h>
+#include <cmd_cpu.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -107,10 +108,24 @@ typedef struct cmd_bank cmd_bank_t;
  * generated.
  *
  */
+
+typedef cmd_evdisp_t cmd_xe_handler_f(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, uint64_t, uint8_t, uint16_t, uint8_t, ce_dispact_t, uint64_t,
+    nvlist_t *);
+
+extern ce_dispact_t cmd_mem_name2type(const char *, int);
 extern cmd_evdisp_t cmd_ce(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 extern cmd_evdisp_t cmd_ue(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_ce_common(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, uint64_t, uint8_t, uint16_t, uint8_t,
+    ce_dispact_t, uint64_t, nvlist_t *);
+extern cmd_evdisp_t cmd_ue_common(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, uint64_t, uint8_t, uint16_t, uint8_t,
+    ce_dispact_t, uint64_t, nvlist_t *);
+extern cmd_evdisp_t cmd_mem_synd_check(fmd_hdl_t *, uint64_t, uint8_t,
+    uint16_t, uint8_t, cmd_cpu_t *);
 extern void cmd_dimm_close(fmd_hdl_t *, void *);
 extern void cmd_bank_close(fmd_hdl_t *, void *);
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,11 @@
  * without PICL configuration files are acceptable (some platforms, like
  * Serengeti and Starcat, don't have configuration files as of this writing),
  * platforms with only one or the other aren't.
+ */
+/*
+ * On Sun4v platforms, we read the 'mdesc' machine description file in order
+ * to obtain the mapping between dimm unum+jnum strings (which denote slot
+ * names) and the serial numbers of the dimms occupying those slots.
  */
 
 #include <mem.h>
@@ -333,6 +338,55 @@ path_map_destroy(mem_path_map_t *pm)
 	}
 }
 
+int
+mem_discover_mdesc(void)
+{
+	mde_cookie_t *listp;
+	int num_nodes, idx, mdesc_dimm_count;
+	mem_dimm_map_t *dm;
+	md_t *mdp = mem.mem_mdp;
+
+	num_nodes = md_node_count(mdp);
+
+	listp = (mde_cookie_t *)fmd_fmri_alloc(sizeof (mde_cookie_t)*num_nodes);
+
+	/*
+	 * Find first 'memory' node -- there should only be one.  Extract
+	 * 'memory-generation-id#' value from it.
+	 */
+
+	mdesc_dimm_count = md_scan_dag(mdp,
+	    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "memory"),
+	    md_find_name(mdp, "fwd"), listp);
+
+	if (md_get_prop_val(mdp, listp[0], "memory-generation-id#",
+	    &mem.mem_memconfig))
+		mem.mem_memconfig = 0;
+
+	mdesc_dimm_count = md_scan_dag(mdp,
+	    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "dimm_data"),
+	    md_find_name(mdp, "fwd"), listp);
+
+	for (idx = 0; idx < mdesc_dimm_count; idx++) {
+		char *unum, *serial;
+
+		if (md_get_prop_str(mdp, listp[idx], "nac", &unum)) unum = "";
+		if (md_get_prop_str(mdp, listp[idx], "serial#", &serial))
+			serial = "";
+
+		dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));
+		dm->dm_label = fmd_fmri_strdup(unum);
+		(void) strncpy(dm->dm_serid, serial, MEM_SERID_MAXLEN-1);
+
+		dm->dm_next = mem.mem_dm;
+		mem.mem_dm = dm;
+	}
+	fmd_fmri_free(listp, sizeof (mde_cookie_t)*num_nodes);
+	fmd_fmri_free(*mdp, mem.mem_mdbufsz);
+	(void) md_fini(mdp);
+	return (0);
+}
+
 void
 mem_destroy(void)
 {
@@ -348,7 +402,7 @@ mem_destroy(void)
 }
 
 int
-mem_discover(void)
+mem_discover_picl(void)
 {
 	mem_path_map_t *path_map = NULL;
 	dimm_map_arg_t dma;
@@ -386,4 +440,20 @@ mem_discover(void)
 	mem.mem_dm = dma.dma_dm;
 
 	return (0);
+}
+
+/*
+ * Sun4v: if a valid 'mdesc' machine description file exists,
+ * read the mapping of dimm unum+jnum to serial number from it.
+ */
+
+int
+mem_discover(void)
+{
+	mem.mem_mdp = mdesc_devinit(&mem.mem_mdbufsz);
+
+	if (mem.mem_mdp == NULL)
+		return (mem_discover_picl());
+	else
+		return (mem_discover_mdesc());
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,11 +52,26 @@
  * repetitive part.
  *
  * sscanf is your disturbingly powerful friend.
+ *
+ * The "bd_subst" element of the bank_dimm structure was added for Ontario
+ * in order to accommodate its bank string names.  Previously, to convert
+ * from a bank representation <common piece> <dimm1> <dimm2> ...
+ * we concatenated the common piece with each dimm-specific piece in turn,
+ * possibly deleting some characters in between.  Ontario is the first
+ * platform which requires that characters be substituted (like a vi s/1/2/)
+ * in place of characters deleted.  "bd_subst" represents the character(s)
+ * to be substituted between the common piece and each dimm-specific piece
+ * as part of the bursting.  For prior platforms, this value is skipped.
+ *
+ * Example:
+ * input: "MB/CMP0/CH3: R1/D0/J1901 R1/D1/J2001"
+ * outputs: "MB/CMP0/CH3/R1/D0/J1901", "MB/CMP0/CH3/R1/D1/J2001"
  */
 
 typedef struct bank_dimm {
 	const char *bd_pat;
 	const char *bd_reppat;
+	const char *bd_subst;
 } bank_dimm_t;
 
 static const bank_dimm_t bank_dimm[] = {
@@ -69,6 +84,8 @@ static const bank_dimm_t bank_dimm[] = {
 	{ "%n%nDIMM%*d%n",			" DIMM%*d%n" },
 	{ "MB/%nDIMM%*d MB/DIMM%*d: %n%n",	" DIMM%*d%n" },
 	{ "MB/%nDIMM%*d:%n%n",			" DIMM%*d%n" },
+	{ "MB/CMP%*d/CH%*d%n:%n%n",		" R%*d/D%*d/J%*4d%n",	"/" },
+	{ "MB/CMP%*d/CH%*d%n%n%n",		"/R%*d/D%*d/J%*4d%n" },
 	{ NULL }
 };
 
@@ -94,6 +111,11 @@ mem_unum_burst(const char *pat, char ***dimmsp, size_t *ndimmsp)
 			continue;
 
 		(void) strlcpy(dimmname, pat, sizeof (dimmname));
+		if (bd->bd_subst != NULL) {
+			(void) strlcpy(dimmname+replace, bd->bd_subst,
+			    sizeof (dimmname) - strlen(bd->bd_subst));
+			replace += strlen(bd->bd_subst);
+		}
 
 		c = pat + start;
 		while (*c != '\0') {

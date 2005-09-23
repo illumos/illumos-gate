@@ -91,7 +91,8 @@ typedef enum cmd_cpu_type {
 	CPU_ULTRASPARC_IIIi,
 	CPU_ULTRASPARC_IV,
 	CPU_ULTRASPARC_IVplus,
-	CPU_ULTRASPARC_IIIiplus
+	CPU_ULTRASPARC_IIIiplus,
+	CPU_ULTRASPARC_T1
 } cmd_cpu_type_t;
 
 typedef struct cmd_cpu_cases {
@@ -484,7 +485,13 @@ extern void cmd_cpu_gc(fmd_hdl_t *);
 extern void cmd_cpu_fini(fmd_hdl_t *hdl);
 extern char *cmd_cpu_serdnm_create(fmd_hdl_t *, cmd_cpu_t *, const char *);
 
-extern int cmd_cpu_check_support(void);
+typedef enum {
+    CMD_CPU_FAM_UNSUPPORTED,
+    CMD_CPU_FAM_CHEETAH,
+    CMD_CPU_FAM_NIAGARA
+} cpu_family_t;
+
+extern cpu_family_t cmd_cpu_check_support(void);
 
 #ifdef __cplusplus
 }

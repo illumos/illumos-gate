@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,6 +112,7 @@ cmd_dimm_free(fmd_hdl_t *hdl, cmd_dimm_t *dimm, int destroy)
 void
 cmd_dimm_destroy(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 {
+	fmd_stat_destroy(hdl, 1, &(dimm->dimm_retstat));
 	cmd_dimm_free(hdl, dimm, FMD_B_TRUE);
 }
 

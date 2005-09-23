@@ -25,6 +25,12 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = etm cpumem-diagnosis
+ARCH = sun4v
 
-include ../../Makefile.subdirs
+# A sun4v-specific build should not be #include 'ing files from a sun4u
+# directory, but this is necessary until the files can be reorganized
+# properly.
+
+INCDIRS = $(SRC)/uts/sun4u
+
+include ../../sun4/cpumem-diagnosis/Makefile.cpumem
