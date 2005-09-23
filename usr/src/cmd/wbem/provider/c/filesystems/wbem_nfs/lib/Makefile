@@ -136,8 +136,8 @@ $(LIBRARY): $(OBJECTS)
 	$(POST_PROCESS_SO)
 
 master.h:	Makefile header.sh
-		@echo ${WBEM_NFS_CLASSES} >> ${TMPFILE}
-		@echo ${WBEM_NFS_ASSOC_CLASSES} >> ${TMPFILE1}
+		@echo ${WBEM_NFS_CLASSES} > ${TMPFILE}
+		@echo ${WBEM_NFS_ASSOC_CLASSES} > ${TMPFILE1}
 		sh header.sh
 
 install:	all $(ROOTWBEMPROG)
