@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1334,6 +1334,10 @@ subject32_token(adr_t *adr)
 		if (m_groupe == egid)
 			checkflags |= M_GROUPE;
 	}
+	if (flags & M_SID) {
+		if (m_sid == sid)
+			checkflags |= M_SID;
+	}
 	return (-1);
 }
 
@@ -1391,6 +1395,10 @@ subject32_ex_token(adr_t *adr)
 	if (flags & M_GROUPE) {
 		if (m_groupe == egid)
 			checkflags = checkflags | M_GROUPE;
+	}
+	if (flags & M_SID) {
+		if (m_sid == sid)
+			checkflags = checkflags | M_SID;
 	}
 	return (-1);
 }
@@ -1450,6 +1458,10 @@ subject64_token(adr_t *adr)
 		if (m_groupe == egid)
 			checkflags |= M_GROUPE;
 	}
+	if (flags & M_SID) {
+		if (m_sid == sid)
+			checkflags |= M_SID;
+	}
 	return (-1);
 }
 
@@ -1508,6 +1520,10 @@ subject64_ex_token(adr_t *adr)
 	if (flags & M_GROUPE) {
 		if (m_groupe == egid)
 			checkflags = checkflags | M_GROUPE;
+	}
+	if (flags & M_SID) {
+		if (m_sid == sid)
+			checkflags = checkflags | M_SID;
 	}
 	return (-1);
 }

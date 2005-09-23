@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,7 @@ static void	proc_pcb(audit_pcb_t *, char *, int);
 static int	proc_slabel(char *);
 #endif	/* TSOL */
 static int	proc_subject(char *);
+static int	proc_sid(char *);
 static int	proc_type(char *);
 static int	proc_user(char *, uid_t *);
 static int	proc_zonename(char *);
@@ -125,7 +126,8 @@ process_options(int argc, char **argv)
 	extern int	optind;		/* in getopt() */
 	extern char	*optarg;	/* in getopt() - holds arg to flag */
 
-	static char	*options = "ACD:M:NQR:S:VO:a:b:c:d:e:g:j:m:o:r:s:u:z:";
+	static char	*options = "ACD:M:NQR:S:VO:"
+	    "a:b:c:d:e:g:j:l:m:o:r:s:t:u:z:";
 
 	error_str = gettext("general error");
 
@@ -202,15 +204,20 @@ start_over:
 				error = TRUE;
 			break;
 #ifdef	TSOL
-		case 's':		/* sensitivity label range */
+		case 'l':		/* label range -- reserved for TX */
 			if (proc_slabel(optarg))
 				error = TRUE;
 			break;
 #endif	/* TSOL */
+		case 's':		/* session ID */
+			if (proc_sid(optarg))
+				error = TRUE;
+			break;
 		case 'z':		/* zone name */
 			if (proc_zonename(optarg))
 				error = TRUE;
 			break;
+		case 't':		/* termial ID reserved for later */
 		default:
 			return (-1);
 		}
@@ -291,6 +298,17 @@ proc_subject(char *optarg)
 	return (0);
 }
 
+int
+proc_sid(char *optarg)
+{
+	if (flags & M_SID) {
+		error_str = gettext("'s' option specified multiple times");
+		return (-1);
+	}
+	flags |= M_SID;
+	m_sid = atol(optarg);
+	return (0);
+}
 
 int
 proc_object(char *optarg)
@@ -1135,12 +1153,12 @@ proc_slabel(char *optstr)
 	char	*p;
 	int	error;
 
-	if (flags & M_SLABEL) {
-		error_str = gettext("'s' option specified multiple times");
+	if (flags & M_LABEL) {
+		error_str = gettext("'l' option specified multiple times");
 		return (-1);
 	}
 
-	flags |= M_SLABEL;
+	flags |= M_LABEL;
 	p = strchr(optstr, ':');
 	if (p == NULL) {
 		/* exact label match, lower and upper range bounds the same */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,9 +128,11 @@ typedef struct audit_pcb audit_pcb_t;
 #define	M_USERA		0x0100	/* 'u' audit user */
 #define	M_USERE		0x0200	/* 'e' effective user */
 #define	M_USERR		0x0400	/* 'r' real user */
-#define	M_SLABEL	0x0800	/* 's' sensitivity label range */
+#define	M_LABEL		0x0800	/* 'l' mandatory label range */
 #define	M_ZONENAME	0x1000	/* 'z' zone name */
+#define	M_SID		0x2000	/* 's' session ID */
 #define	M_SORF		0x4000	/* success or failure of event */
+#define	M_TID		0x8000	/* 't' terminal ID */
 /*
  * object types
  */
@@ -167,13 +169,14 @@ extern gid_t	m_groupe;	/* 'f' effective group-id */
 extern uid_t	m_usera;	/* 'u' audit user */
 extern uid_t	m_userr;	/* 'r' real user */
 extern uid_t	m_usere;	/* 'f' effective user */
+extern au_asid_t m_sid;		/* 's' session-id */
 extern time_t	m_after;	/* 'a' after a time */
 extern time_t	m_before;	/* 'b' before a time */
 extern audit_state_t mask;	/* used with m_class */
 extern char	*zonename;	/* 'z' zonename */
 
 #ifdef	TSOL
-extern brange_t m_slabel;	/* 's' sensitivity label range */
+extern brange_t m_label;	/* 'l' mandatory label range */
 #endif	/* TSOL */
 extern int	flags;
 extern int	checkflags;
