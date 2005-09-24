@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Interfaces internal to the i86pc PCI nexus driver.
@@ -114,6 +114,53 @@ extern kmutex_t pcicfg_mutex;
  */
 
 extern kmutex_t pcicfg_chipset_mutex;
+
+/*
+ * pci get irq routing information support
+ */
+#define	PCI_GET_IRQ_ROUTING	0x0e
+
+/*
+ * low-mem addresses for irq routing bios operations
+ * We set up the initial request for up to 32 table entries, and will
+ * re-issue for up to 255 entries if the bios indicates it requires
+ * a larger table.  255 entries plus the header would consume the
+ * memory between 0x7000-0x7fff.
+ */
+#define	BIOS_IRQ_ROUTING_HDR	0x7000
+#define	BIOS_IRQ_ROUTING_DATA	0x7010
+
+#define	N_PCI_IRQ_ROUTES	32
+#define	N_PCI_IRQ_ROUTES_MAX	255
+
+#define	FP_OFF(fp)	(((uintptr_t)(fp)) & 0xFFFF)
+#define	FP_SEG(fp)	((((uintptr_t)(fp)) >> 16) & 0xFFFF)
+
+#pragma pack(1)
+typedef struct pci_irq_route {
+	uchar_t		pir_bus;
+	uchar_t		pir_dev;
+	uchar_t		pir_inta_link;
+	uint16_t	pir_inta_irq_map;
+	uchar_t		pir_intb_link;
+	uint16_t	pir_intb_irq_map;
+	uchar_t		pir_intc_link;
+	uint16_t	pir_intc_irq_map;
+	uchar_t		pir_intd_link;
+	uint16_t	pir_intd_irq_map;
+	uchar_t		pir_slot;
+	uchar_t		pir_reserved;
+} pci_irq_route_t;
+#pragma pack()
+
+#pragma pack(1)
+typedef struct pci_irq_route_hdr {
+	uint16_t	pir_size;
+	uint32_t	pir_addr;
+} pci_irq_route_hdr_t;
+#pragma pack()
+
+int pci_slot_names_prop(int, char *, int);
 
 #ifdef	__cplusplus
 }

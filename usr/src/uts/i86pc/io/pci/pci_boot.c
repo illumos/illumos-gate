@@ -35,6 +35,7 @@
 #include <sys/memlist.h>
 #include <sys/bootconf.h>
 #include "mps_table.h"
+#include "pci_autoconfig.h"
 #include "../../../../common/pci/pci_strings.h"
 
 #define	pci_getb	(*pci_getb_func)
@@ -68,6 +69,7 @@ static int add_reg_props(dev_info_t *, uchar_t, uchar_t, uchar_t, int, int);
 static void add_ppb_props(dev_info_t *, uchar_t, uchar_t, uchar_t);
 static void add_model_prop(dev_info_t *, uint_t);
 static void add_bus_range_prop(int);
+static void add_bus_slot_names_prop(int);
 static void add_ppb_ranges_prop(int);
 static void add_bus_available_prop(int);
 static void alloc_res_array();
@@ -110,6 +112,9 @@ pci_setup_tree()
 			pci_bus_res[i].root_addr = root_bus_addr++;
 		}
 		enumerate_bus_devs(i, CONFIG_INFO);
+
+		/* add slot-names property for named pci hot-plug slots */
+		add_bus_slot_names_prop(i);
 	}
 
 	/* add bus-range property for root/peer bus nodes */
@@ -1143,6 +1148,27 @@ add_bus_range_prop(int bus)
 	bus_range[1] = pci_bus_res[bus].sub_bus;
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, pci_bus_res[bus].dip,
 	    "bus-range", (int *)bus_range, 2);
+}
+
+/*
+ * Add slot-names property for any named pci hot-plug slots
+ */
+static void
+add_bus_slot_names_prop(int bus)
+{
+	char slotprop[256];
+	int len;
+
+	len = pci_slot_names_prop(bus, slotprop, sizeof (slotprop));
+	if (len > 0) {
+		if (pci_bus_res[bus].dip == NULL)
+			create_root_bus_dip(bus);
+		ASSERT(pci_bus_res[bus].dip);
+		ASSERT((len % sizeof (int)) == 0);
+		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
+		    pci_bus_res[bus].dip, "slot-names",
+		    (int *)slotprop, len / sizeof (int));
+	}
 }
 
 /* this should be in some header file, shared with pcicfg */
