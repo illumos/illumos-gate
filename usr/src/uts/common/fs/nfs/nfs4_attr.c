@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.
  * All rights reserved.  Use is subject to license terms.
  */
 
@@ -34,8 +34,6 @@
 #include <nfs/rnode4.h>
 #include <nfs/nfs4_clnt.h>
 #include <sys/cmn_err.h>
-
-static void nfs4_vmask_to_nmask_set(uint_t, bitmap4 *);
 
 static int
 timestruc_to_settime4(timestruc_t *tt, settime4 *tt4, int flags)
@@ -497,9 +495,9 @@ nfs4_vmask_to_nmask(uint_t vmask, bitmap4 *bitsval)
 		*bitsval |= FATTR4_SIZE_MASK;
 	if (vmask & AT_ATIME)
 		*bitsval |= FATTR4_TIME_ACCESS_MASK;
-	/* set CHANGE whenever AT_MTIME/AT_CTIME attrs requested */
 	if (vmask & AT_MTIME)
-		*bitsval |= FATTR4_TIME_MODIFY_MASK | FATTR4_CHANGE_MASK;
+		*bitsval |= FATTR4_TIME_MODIFY_MASK;
+	/* also set CHANGE whenever AT_CTIME requested */
 	if (vmask & AT_CTIME)
 		*bitsval |= FATTR4_TIME_METADATA_MASK | FATTR4_CHANGE_MASK;
 	if (vmask & AT_NBLOCKS)
@@ -512,7 +510,7 @@ nfs4_vmask_to_nmask(uint_t vmask, bitmap4 *bitsval)
  * nfs4_vmask_to_nmask_set is used for setattr. A separate function needed
  * because of special treatment to timeset.
  */
-static void
+void
 nfs4_vmask_to_nmask_set(uint_t vmask, bitmap4 *bitsval)
 {
 	vmask &= NFS4_VTON_ATTR_MASK_SET;

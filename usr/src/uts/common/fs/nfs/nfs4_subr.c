@@ -489,6 +489,10 @@ nfs4_time_ntov(nfstime4 *ntime, timestruc_t *vatime)
 	}
 #endif
 
+	/* Invalid to specify 1 billion (or more) nsecs */
+	if (ntime->nseconds >= 1000000000)
+		return (EINVAL);
+
 	if (ntime->seconds < 0) {
 		sec = ntime->seconds + 1;
 		nsec = -1000000000 + ntime->nseconds;

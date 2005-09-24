@@ -4531,7 +4531,6 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 		}
 	}
 
-
 	/* Check stateid only if size has been set */
 	if (sarg.vap->va_mask & AT_SIZE) {
 		trunc = (sarg.vap->va_size == 0);
@@ -4566,6 +4565,16 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 		ssize_t length;
 
 		/*
+		 * ufs_setattr clears AT_SIZE from vap->va_mask, but
+		 * before returning, sarg.vap->va_mask is used to
+		 * generate the setattr reply bitmap.  We also clear
+		 * AT_SIZE below before calling VOP_SPACE.  For both
+		 * of these cases, the va_mask needs to be saved here
+		 * and restored after calling VOP_SETATTR.
+		 */
+		saved_mask = sarg.vap->va_mask;
+
+		/*
 		 * Check any possible conflict due to NBMAND locks.
 		 * Get into critical region before VOP_GETATTR, so the
 		 * size attribute is valid when checking conflicts.
@@ -4596,7 +4605,6 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 		}
 
 		if (crgetuid(cr) == bva.va_uid) {
-			saved_mask = sarg.vap->va_mask;
 			sarg.vap->va_mask &= ~AT_SIZE;
 			bf.l_type = F_WRLCK;
 			bf.l_whence = 0;
@@ -4612,7 +4620,7 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 	if (!error && sarg.vap->va_mask != 0)
 		error = VOP_SETATTR(vp, sarg.vap, sarg.flag, cr, &ct);
 
-	/* restore AT_SIZE */
+	/* restore va_mask -- ufs_setattr clears AT_SIZE */
 	if (saved_mask & AT_SIZE)
 		sarg.vap->va_mask |= AT_SIZE;
 
@@ -4662,11 +4670,21 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 		/*
 		 * Set response bitmap
 		 */
-		nfs4_vmask_to_nmask(sarg.vap->va_mask, resp);
+		nfs4_vmask_to_nmask_set(sarg.vap->va_mask, resp);
 	}
 
 /* Return early and already have a NFSv4 error */
 done:
+	/*
+	 * Except for nfs4_vmask_to_nmask_set(), vattr --> fattr
+	 * conversion sets both readable and writeable NFS4 attrs
+	 * for AT_MTIME and AT_ATIME.  The line below masks out
+	 * unrequested attrs from the setattr result bitmap.  This
+	 * is placed after the done: label to catch the ATTRNOTSUP
+	 * case.
+	 */
+	*resp &= fattrp->attrmask;
+
 	if (in_crit)
 		nbl_end_crit(vp);
 

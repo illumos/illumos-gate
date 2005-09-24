@@ -1246,6 +1246,7 @@ extern int	checkauth4(struct compound_state *, struct svc_req *);
 extern nfsstat4 call_checkauth4(struct compound_state *, struct svc_req *);
 extern int	is_exported_sec(int, struct exportinfo *);
 extern void	nfs4_vmask_to_nmask(uint_t, bitmap4 *);
+extern void	nfs4_vmask_to_nmask_set(uint_t, bitmap4 *);
 extern int	nfs_idmap_str_uid(utf8string *u8s, uid_t *, bool_t);
 extern int	nfs_idmap_str_gid(utf8string *u8s, gid_t *, bool_t);
 extern int	nfs_idmap_uid_str(uid_t, utf8string *u8s, bool_t);
