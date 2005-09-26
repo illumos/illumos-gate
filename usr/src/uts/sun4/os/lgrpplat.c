@@ -171,6 +171,9 @@ lgrp_plat_pfn_to_hand(pfn_t pfn)
 		return (LGRP_NULL_HANDLE);
 
 	mnode = PFN_2_MEM_NODE(pfn);
+	if (mnode < 0)
+		return (LGRP_NULL_HANDLE);
+
 	return (MEM_NODE_2_LGRPHAND(mnode));
 }
 

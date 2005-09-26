@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,9 +43,10 @@ extern "C" {
 #define	CHERRYSTONE_SBD_SLOTS		2
 #define	CHERRYSTONE_CPUS_PER_BOARD	2
 #define	CHERRYSTONE_MAX_CPUS		(CHERRYSTONE_SBD_SLOTS * \
-					CHERRYSTONE_CPUS_PER_BOARD)
+						CHERRYSTONE_CPUS_PER_BOARD)
 #define	CHERRYSTONE_BANKS_PER_MC	4
 #define	CHERRYSTONE_MAX_SLICE		(CHERRYSTONE_MAX_CPUS * \
+						CHERRYSTONE_BANKS_PER_MC)
 
 /*
  *   Slot SlotID   Agent ID
@@ -85,6 +86,20 @@ extern "C" {
 #define	MC_BASE2UM(base)	(((base) & 0x1fffffu) << MC_UM_SHIFT)
 #define	SAF_MASK		0x000007ffff800000ull
 #define	MC_OFFSET_MASK		0xffu
+
+/*
+ * Cherrystone slices are defined by bits 36..39 of the physical address space
+ */
+
+#define	PA_SLICE_SHIFT		(36)
+#define	PFN_SLICE_SHIFT		(PA_SLICE_SHIFT - MMU_PAGESHIFT)
+#define	PA_2_SLICE(pa)		(((pa) >> PA_SLICE_SHIFT) & \
+					CHERRYSTONE_SLICE_MASK)
+#define	PFN_2_SLICE(pfn)	(((pfn) >> PFN_SLICE_SHIFT) & \
+					CHERRYSTONE_SLICE_MASK)
+
+/* Define the number of possible slices for the span of slice bits */
+#define	CHERRYSTONE_SLICE_MASK		(0xf)
 
 extern uint64_t lddsafaddr(uint64_t physaddr);
 extern uint64_t lddmcdecode(uint64_t physaddr);

@@ -59,6 +59,11 @@ static	boolean_t	key_locked_bit;
 static	clock_t		keypoll_timeout_hz;
 
 /*
+ * Table that maps memory slices to a specific memnode.
+ */
+int slice_to_memnode[CHERRYSTONE_MAX_SLICE];
+
+/*
  * For software memory interleaving support.
  */
 static void update_mem_bounds(int, int, int, uint64_t, uint64_t);
@@ -282,225 +287,10 @@ plat_discover_slice(pfn_t pfn, pfn_t *first, pfn_t *last)
 	/* NOTREACHED */
 }
 
-/*
- * This index is used to associate a given pfn to a place on the freelist.
- * This results in dispersing pfn assignment over all the boards in the
- * system.
- * Choose the index randomly to prevent clustering pages of different
- * colors on the same board.
- */
-static uint_t random_idx(int ubound);
-
-/*
- * Theory of operation:
- *	- When the system walks the prom tree, it calls the platform
- *	  function plat_fill_mc() for each memory-controller node found
- *	  in map_wellknown().
- *	- The plat_fill_mc() function interrogates the memory controller
- *	  to find out if it controls memory.  If it does, the physical
- *	  address and span are recorded in a lookup table.
- *	- During VM init, the VM calls plat_freelist_process() to shuffle
- *	  the page freelists.  This is done after the page freelists are
- *	  coalesced, but before the system goes live, since we need to be
- *	  able to get the exclusive lock on all the pages.
- *	- plat_freelist_process() removes all pages from the freelists,
- *	  and sorts them out into per-board freelists.  It does this by
- *	  using the lookup table that was built earlier.  It then
- *	  round-robins across the per-board freelists and frees each page,
- *	  leaving an even distribution of pages across the system.
- */
+/*ARGSUSED*/
 void
 plat_freelist_process(int mnode)
-{
-	page_t		*page, **freelist;
-	page_t		*bdlist[CHERRYSTONE_SBD_SLOTS];
-	page_t		**sortlist[CHERRYSTONE_SBD_SLOTS];
-	uint32_t	idx, idy, size, color, max_color, lbn;
-	uint32_t	bd_flags, bd_cnt, result, bds;
-	pfn_t		slice_start, slice_end, pfn;
-	kmutex_t	*pcm;
-	int		mtype;
-
-	/*
-	 * Sort through freelists one memory type and size at a time.
-	 */
-	for (mtype = 0; mtype < MAX_MEM_TYPES; mtype++) {
-		for (size = 0; size < mmu_page_sizes; size++) {
-			/*
-			 * Compute the maximum # of phys colors based on
-			 * page size.
-			 */
-			max_color = page_get_pagecolors(size);
-
-			/*
-			 * Sort through freelists one color at a time.
-			 */
-			for (color = 0; color < max_color; color++) {
-				bd_cnt = 0;
-				bd_flags = 0;
-				slice_start = (pfn_t)-1;
-				slice_end = (pfn_t)-1;
-
-				for (idx = 0; idx < CHERRYSTONE_SBD_SLOTS;
-					idx++) {
-					bdlist[idx] = NULL;
-					sortlist[idx] = NULL;
-				}
-
-				freelist = &PAGE_FREELISTS(mnode, size,
-				    color, mtype);
-
-				if (*freelist == NULL)
-					continue;
-
-				/*
-				 * Acquire per-color freelist lock.
-				 */
-				pcm = PC_BIN_MUTEX(mnode, color, PG_FREE_LIST);
-				mutex_enter(pcm);
-
-				/*
-				 * Go through freelist, sorting pages out
-				 * into per-board lists.
-				 */
-				while (*freelist) {
-					page = *freelist;
-					result = page_trylock(page, SE_EXCL);
-					ASSERT(result);
-
-					/*
-					 * Delete from freelist.
-					 */
-					if (size != 0) {
-						page_vpsub(freelist, page);
-					} else {
-						mach_page_sub(freelist, page);
-					}
-
-					pfn = page->p_pagenum;
-					if (pfn < slice_start ||
-					    pfn > slice_end)
-						lbn = plat_discover_slice(pfn,
-						    &slice_start, &slice_end);
-
-					/*
-					 * Add to per-board list.
-					 */
-					if (size != 0) {
-						page_vpadd(&bdlist[lbn], page);
-					} else {
-						mach_page_add(&bdlist[lbn],
-						    page);
-					}
-
-					/*
-					 * Seen this board yet?
-					 */
-					if ((bd_flags & (1 << lbn)) == 0) {
-						bd_flags |= (1 << lbn);
-						bd_cnt++;
-					}
-					page_unlock(page);
-				}
-
-				/*
-				 * Make the sortlist so
-				 * bd_cnt choices show up
-				 */
-				bds = 0;
-				for (idx = 0; idx < CHERRYSTONE_SBD_SLOTS;
-					idx++) {
-					if (bdlist[idx])
-						sortlist[bds++] = &bdlist[idx];
-				}
-
-				/*
-				 * Set random start.
-				 */
-				(void) random_idx(-color);
-
-				/*
-				 * now rebuild the freelist by shuffling
-				 * pages from bd lists
-				 */
-				while (bd_cnt) {
-					/*
-					 * get "random" index between 0 &
-					 * bd_cnt
-					 */
-					ASSERT(bd_cnt &&
-					    (bd_cnt < CHERRYSTONE_SBD_SLOTS+1));
-
-					idx = random_idx(bd_cnt);
-
-					page = *sortlist[idx];
-					result = page_trylock(page, SE_EXCL);
-					ASSERT(result);
-
-					/*
-					 * Delete from sort list and add
-					 * to freelist.
-					 */
-					if (size != 0) {
-						page_vpsub(sortlist[idx], page);
-						page_vpadd(freelist, page);
-					} else {
-						mach_page_sub(sortlist[idx],
-						    page);
-						mach_page_add(freelist, page);
-					}
-
-					pfn = page->p_pagenum;
-					if (pfn < slice_start ||
-					    pfn > slice_end)
-						lbn = plat_discover_slice(pfn,
-						    &slice_start, &slice_end);
-
-					/*
-					 * Is this the last page this list?
-					 */
-					if (*sortlist[idx] == NULL) {
-						bd_flags &= ~(1 << lbn);
-						--bd_cnt;
-
-						/*
-						 * redo the sortlist so only
-						 * bd_cnt choices show up
-						 */
-						bds = 0;
-						for (idy = 0;
-						    idy < CHERRYSTONE_SBD_SLOTS;
-						    idy++) {
-							if (bdlist[idy]) {
-							    sortlist[bds++]
-								= &bdlist[idy];
-							}
-						}
-					}
-					page_unlock(page);
-				}
-				mutex_exit(pcm);
-			}
-		}
-	}
-}
-
-/*
- * If ubound > 0, will return an int between 0 & ubound
- * If ubound < 0, will set "random seed"
- */
-static uint_t
-random_idx(int ubound)
-{
-	static int idx = 0;
-
-	if (ubound > 0) {
-		idx = (idx + 1) % ubound;
-		return (idx);
-	}
-	idx = -ubound;
-	return (0);
-}
+{}
 
 /*
  * Called for each board/cpu/PA range detected in plat_fill_mc().
@@ -509,8 +299,36 @@ static void
 update_mem_bounds(int boardid, int cpuid, int bankid,
 	uint64_t base, uint64_t size)
 {
+	uint64_t	end;
+	int		mnode;
+
 	slice_table[boardid][cpuid][bankid][SLICE_PA] = base;
 	slice_table[boardid][cpuid][bankid][SLICE_SPAN] = size;
+
+	end = base + size - 1;
+
+	/*
+	 * First see if this board already has a memnode associated
+	 * with it.  If not, see if this slice has a memnode.  This
+	 * covers the cases where a single slice covers multiple
+	 * boards (cross-board interleaving) and where a single
+	 * board has multiple slices (1+GB DIMMs).
+	 */
+	if ((mnode = plat_lgrphand_to_mem_node(boardid)) == -1) {
+		if ((mnode = slice_to_memnode[PA_2_SLICE(base)]) == -1)
+			mnode = mem_node_alloc();
+
+		ASSERT(mnode >= 0);
+		ASSERT(mnode < MAX_MEM_NODES);
+		plat_assign_lgrphand_to_mem_node(boardid, mnode);
+	}
+
+	base = P2ALIGN(base, (1ul << PA_SLICE_SHIFT));
+
+	while (base < end) {
+		slice_to_memnode[PA_2_SLICE(base)] = mnode;
+		base += (1ul << PA_SLICE_SHIFT);
+	}
 }
 
 /*
@@ -601,6 +419,108 @@ plat_fill_mc(dnode_t nodeid)
 			update_mem_bounds(boardid, cpuid, i, base, size);
 		}
 	}
+}
+
+/*
+ * This routine is run midway through the boot process.  By the time we get
+ * here, we know about all the active CPU boards in the system, and we have
+ * extracted information about each board's memory from the memory
+ * controllers.  We have also figured out which ranges of memory will be
+ * assigned to which memnodes, so we walk the slice table to build the table
+ * of memnodes.
+ */
+/* ARGSUSED */
+void
+plat_build_mem_nodes(u_longlong_t *list, size_t  nelems)
+{
+	int	slice;
+	pfn_t	basepfn;
+	pgcnt_t npgs;
+
+	mem_node_pfn_shift = PFN_SLICE_SHIFT;
+	mem_node_physalign = (1ull << PA_SLICE_SHIFT);
+	npgs = 1ull << PFN_SLICE_SHIFT;
+
+	for (slice = 0; slice < CHERRYSTONE_MAX_SLICE; slice++) {
+		if (slice_to_memnode[slice] == -1)
+			continue;
+		basepfn = (uint64_t)slice << PFN_SLICE_SHIFT;
+		mem_node_add_slice(basepfn, basepfn + npgs - 1);
+	}
+}
+
+
+
+/*
+ * Cherrystone support for lgroups.
+ *
+ * On Cherrystone, an lgroup platform handle == slot number.
+ *
+ * Mappings between lgroup handles and memnodes are managed
+ * in addition to mappings between memory slices and memnodes
+ * to support cross-board interleaving as well as multiple
+ * slices per board (e.g. >1GB DIMMs). The initial mapping
+ * of memnodes to lgroup handles is determined at boot time.
+ */
+
+int
+plat_pfn_to_mem_node(pfn_t pfn)
+{
+	return (slice_to_memnode[PFN_2_SLICE(pfn)]);
+}
+
+/*
+ * Return the platform handle for the lgroup containing the given CPU
+ *
+ * For Cherrystone, lgroup platform handle == slot/board number
+ */
+lgrp_handle_t
+plat_lgrp_cpu_to_hand(processorid_t id)
+{
+	return (CHERRYSTONE_GETSLOT(id));
+}
+
+/*
+ * Platform specific lgroup initialization
+ */
+void
+plat_lgrp_init(void)
+{
+	int i;
+
+	/*
+	 * Initialize lookup tables to invalid values so we catch
+	 * any illegal use of them.
+	 */
+	for (i = 0; i < CHERRYSTONE_MAX_SLICE; i++) {
+		slice_to_memnode[i] = -1;
+	}
+}
+
+/*
+ * Return latency between "from" and "to" lgroups
+ *
+ * This latency number can only be used for relative comparison
+ * between lgroups on the running system, cannot be used across platforms,
+ * and may not reflect the actual latency.  It is platform and implementation
+ * specific, so platform gets to decide its value.  It would be nice if the
+ * number was at least proportional to make comparisons more meaningful though.
+ * NOTE: The numbers below are supposed to be load latencies for uncached
+ * memory divided by 10.
+ */
+int
+plat_lgrp_latency(lgrp_handle_t from, lgrp_handle_t to)
+{
+	/*
+	 * Return min remote latency when there are more than two lgroups
+	 * (root and child) and getting latency between two different lgroups
+	 * or root is involved
+	 */
+	if (lgrp_optimizations() && (from != to ||
+	    from == LGRP_DEFAULT_HANDLE || to == LGRP_DEFAULT_HANDLE))
+		return (21);
+	else
+		return (19);
 }
 
 /*
