@@ -390,6 +390,13 @@ int	ufs_allow_shared_writes = 1;	/* directio shared writes */
 static int
 ufs_check_rewrite(struct inode *ip, struct uio *uiop, int ioflag)
 {
+	int	shared_write;
+
+	/*
+	 * If the FDSYNC flag is set then ignore the global
+	 * ufs_allow_shared_writes in this case.
+	 */
+	shared_write = (ioflag & FDSYNC) | ufs_allow_shared_writes;
 
 	/*
 	 * Filter to determine if this request is suitable as a
@@ -404,7 +411,7 @@ ufs_check_rewrite(struct inode *ip, struct uio *uiop, int ioflag)
 		(uiop->uio_loffset < ip->i_size) && (uiop->uio_resid > 0) &&
 		((ip->i_size - uiop->uio_loffset) >= uiop->uio_resid) &&
 		!(ioflag & FSYNC) && !bmap_has_holes(ip) &&
-		ufs_allow_shared_writes);
+		shared_write);
 }
 
 /*ARGSUSED*/
@@ -419,6 +426,7 @@ ufs_write(struct vnode *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	int error, resv, resid = 0;
 	int directio_status;
 	int exclusive;
+	int rewriteflg;
 	long start_resid = uiop->uio_resid;
 
 	TRACE_3(TR_FAC_UFS, TR_UFS_WRITE_START,
@@ -452,12 +460,13 @@ retry_mandlock:
 
 	/* i_rwlock can change in chklock */
 	exclusive = rw_write_held(&ip->i_rwlock);
+	rewriteflg = ufs_check_rewrite(ip, uiop, ioflag);
 
 	/*
 	 * Check for fast-path special case of directio re-writes.
 	 */
 	if ((ip->i_flag & IDIRECTIO || ufsvfsp->vfs_forcedirectio) &&
-	    !exclusive && ufs_check_rewrite(ip, uiop, ioflag)) {
+	    !exclusive && rewriteflg) {
 
 		error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_WRITE_MASK);
 		if (error)
@@ -517,7 +526,8 @@ retry_mandlock:
 	/*
 	 * Amount of log space needed for this write
 	 */
-	TRANS_WRITE_RESV(ip, uiop, ulp, &resv, &resid);
+	if (!rewriteflg || !(ioflag & FDSYNC))
+		TRANS_WRITE_RESV(ip, uiop, ulp, &resv, &resid);
 
 	/*
 	 * Throttle writes.
@@ -533,12 +543,36 @@ retry_mandlock:
 
 	/*
 	 * Enter Transaction
+	 *
+	 * If the write is a rewrite there is no need to open a transaction
+	 * if the FDSYNC flag is set and not the FSYNC.  In this case just
+	 * set the IMODACC flag to modify do the update at a later time
+	 * thus avoiding the overhead of the logging transaction that is
+	 * not required.
 	 */
 	if (ioflag & (FSYNC|FDSYNC)) {
 		if (ulp) {
-			int terr = 0;
-			TRANS_BEGIN_SYNC(ufsvfsp, TOP_WRITE_SYNC, resv, terr);
-			ASSERT(!terr);
+			if (rewriteflg) {
+				uint_t i_flag_save;
+
+				rw_enter(&ip->i_contents, RW_READER);
+				mutex_enter(&ip->i_tlock);
+				i_flag_save = ip->i_flag;
+				ip->i_flag |= IUPD | ICHG;
+				ip->i_seq++;
+				ITIMES_NOLOCK(ip);
+				if ((i_flag_save & IMOD) == 0) {
+					ip->i_flag &= ~IMOD;
+					ip->i_flag |= IMODACC;
+				}
+				mutex_exit(&ip->i_tlock);
+				rw_exit(&ip->i_contents);
+			} else {
+				int terr = 0;
+				TRANS_BEGIN_SYNC(ufsvfsp, TOP_WRITE_SYNC, resv,
+				    terr);
+				ASSERT(!terr);
+			}
 		}
 	} else {
 		if (ulp)
@@ -578,10 +612,14 @@ retry_mandlock:
 	 */
 	if (ulp) {
 		if (ioflag & (FSYNC|FDSYNC)) {
-			int terr = 0;
-			TRANS_END_SYNC(ufsvfsp, terr, TOP_WRITE_SYNC, resv);
-			if (error == 0)
-				error = terr;
+			if (!rewriteflg) {
+				int terr = 0;
+
+				TRANS_END_SYNC(ufsvfsp, terr, TOP_WRITE_SYNC,
+					resv);
+				if (error == 0)
+					error = terr;
+			}
 		} else {
 			TRANS_END_ASYNC(ufsvfsp, TOP_WRITE, resv);
 		}
@@ -1205,7 +1243,14 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 				ip->i_mode &= ~(ISUID | ISGID);
 			}
 		}
-		TRANS_INODE(ufsvfsp, ip);
+		/*
+		 * In the case the FDSYNC flag is set and this is a
+		 * "rewrite" we won't log a delta.
+		 * The FSYNC flag overrides all cases.
+		 */
+		if (!ufs_check_rewrite(ip, uio, ioflag) || !(ioflag & FDSYNC)) {
+			TRANS_INODE(ufsvfsp, ip);
+		}
 	} while (error == 0 && uio->uio_resid > 0 && n != 0);
 
 out:
