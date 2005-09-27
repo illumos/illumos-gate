@@ -1314,10 +1314,9 @@ static
 void
 compute_cluster_size(bpb_t *wbpb)
 {
-	ulong_t volsize, maxclusters;
-	ulong_t spc, spf;
+	ulong_t volsize;
+	ulong_t spc;
 	ulong_t rds, tmpval1, tmpval2;
-	ulong_t disksz;
 	ulong_t fatsz;
 	volsize = wbpb->bpb.sectors_in_volume ? wbpb->bpb.sectors_in_volume :
 		wbpb->bpb.sectors_in_logical_volume;
@@ -1468,15 +1467,16 @@ compute_cluster_size(bpb_t *wbpb)
 		wbpb->bpb.sectors_per_fat = 0;
 		wbpb->bpb32.big_sectors_per_fat = fatsz;
 		if (Verbose)
-		    printf("compute_cluster_size: Sectors per FAT32 = %d\n",
-				    wbpb->bpb32.big_sectors_per_fat);
+		    (void) printf("compute_cluster_size: Sectors per "
+				"FAT32 = %d\n",
+				wbpb->bpb32.big_sectors_per_fat);
 		break;
 	case 12:
 	default:	/* 16 bit FAT */
 		wbpb->bpb.sectors_per_fat = (ushort_t)(fatsz & 0x0000FFFF);
 		if (Verbose)
-		    printf("compute_cluster_size: Sectors per FAT16 = %d\n",
-			wbpb->bpb.sectors_per_fat);
+		    (void) printf("compute_cluster_size: Sectors per "
+			"FAT16 = %d\n", wbpb->bpb.sectors_per_fat);
 		break;
 	}
 }

@@ -1177,7 +1177,7 @@ bpb_to_numclusters(uchar_t *cp)
 
 	if (pcfsdebuglevel >= 5) {
 		if (ltohs(bpb->f_bs.rdirents[0]) != 0) {
-			memcpy(FileSysType, &cp[54], 8);
+			(void) memcpy(FileSysType, &cp[54], 8);
 			FileSysType[8] = 0;
 			PC_DPRINTF1(5, "debug_bpb: FAT12/FAT16 FileSysType = "
 				"%s", FileSysType);
@@ -1329,7 +1329,6 @@ secondaryBPBChecks(uchar_t *cp)
 static int
 isBPB(uchar_t *cp, int *fattypep)
 {
-	int ret = 1;
 	struct bootsec *bpb = (struct bootsec *)cp;
 
 	uint_t numclusters;		/* number of clusters in file area */
@@ -1511,7 +1510,6 @@ pc_getfat(struct pcfs *fsp)
 	int nfat;
 	int secsize;
 	int fatsec;
-	int fattype;
 
 	PC_DPRINTF0(5, "pc_getfat\n");
 	devvp = fsp->pcfs_devvp;
