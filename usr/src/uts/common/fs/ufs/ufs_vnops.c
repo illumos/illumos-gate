@@ -3208,6 +3208,7 @@ clock_t	 ufs_rename_backoff_delay = 1;
  * the inode on disk, which isn't feasible at this time.  Best we
  * can do is always guarantee that the TARGET exists.
  */
+
 /*ARGSUSED*/
 static int
 ufs_rename(
@@ -3218,12 +3219,15 @@ ufs_rename(
 	struct cred *cr)
 {
 	struct inode *sip = NULL;	/* source inode */
+	struct inode *ip = NULL;	/* check inode */
 	struct inode *sdp;		/* old (source) parent inode */
 	struct inode *tdp;		/* new (target) parent inode */
 	struct vnode *tvp = NULL;	/* target vnode, if it exists */
 	struct vnode *realvp;
 	struct ufsvfs *ufsvfsp;
 	struct ulockfs *ulp;
+	struct slot slot;
+	timestruc_t now;
 	int error;
 	int issync;
 	int trans_size;
@@ -3233,6 +3237,7 @@ ufs_rename(
 
 
 	sdp = VTOI(sdvp);
+	slot.fbp = NULL;
 	ufsvfsp = sdp->i_ufsvfs;
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_RENAME_MASK);
 	if (error)
@@ -3247,6 +3252,7 @@ ufs_rename(
 
 	tdp = VTOI(tdvp);
 
+
 	/*
 	 * We only allow renaming of attributes from ATTRDIR to ATTRDIR.
 	 */
@@ -3258,6 +3264,7 @@ ufs_rename(
 	/*
 	 * Look up inode of file we're supposed to rename.
 	 */
+	gethrestime(&now);
 	if (error = ufs_dirlook(sdp, snm, &sip, cr, 0)) {
 		goto unlock;
 	}
@@ -3413,6 +3420,47 @@ retry:
 			goto retry;
 		}
 	}
+
+	/*
+	 * Now that all the locks are held check to make sure another thread
+	 * didn't slip in and take out the sip.
+	 */
+	slot.status = NONE;
+	if ((sip->i_ctime.tv_usec * 1000) > now.tv_nsec ||
+	    sip->i_ctime.tv_sec > now.tv_sec) {
+		rw_enter(&sdp->i_ufsvfs->vfs_dqrwlock, RW_READER);
+		rw_enter(&sdp->i_contents, RW_WRITER);
+		error = ufs_dircheckforname(sdp, snm, strlen(snm), &slot,
+		    &ip, cr, 0);
+		rw_exit(&sdp->i_contents);
+		rw_exit(&sdp->i_ufsvfs->vfs_dqrwlock);
+		if (error) {
+			goto errout;
+		}
+		if (ip == NULL) {
+			error = ENOENT;
+			goto errout;
+		} else {
+			/*
+			 * If the inode was found need to drop the v_count
+			 * so as not to keep the filesystem from being
+			 * unmounted at a later time.
+			 */
+			VN_RELE(ITOV(ip));
+		}
+
+		/*
+		 * Release the slot.fbp that has the page mapped and
+		 * locked SE_SHARED, and could be used in in
+		 * ufs_direnter_lr() which needs to get the SE_EXCL lock
+		 * on said page.
+		 */
+		if (slot.fbp) {
+			fbrelse(slot.fbp, S_OTHER);
+			slot.fbp = NULL;
+		}
+	}
+
 	/*
 	 * Link source to the target.  If a target exists, return its
 	 * vnode pointer in tvp.  We'll release it after sending the
@@ -3441,6 +3489,9 @@ retry:
 		error = 0;
 
 errout:
+	if (slot.fbp)
+		fbrelse(slot.fbp, S_OTHER);
+
 	rw_exit(&tdp->i_rwlock);
 	if (sdp != tdp) {
 		rw_exit(&sdp->i_rwlock);

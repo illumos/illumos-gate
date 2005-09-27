@@ -393,6 +393,52 @@ struct dinode {
 #define	I_QUOTA	0x00000020		/* quota file */
 #define	I_NOCANCEL	0x40		/* Don't cancel these fragments */
 #define	I_ACCT	0x00000080		/* Update ufsvfs' unreclaimed_blocks */
+
+/*
+ * If ufs_dircheckforname() fails to find an entry with the given name,
+ * this "slot" structure holds state for ufs_direnter_*() as to where
+ * there is space to put an entry with that name.
+ * If ufs_dircheckforname() finds an entry with the given name, this structure
+ * holds state for ufs_dirrename() and ufs_dirremove() as to where the
+ * entry is. "status" indicates what ufs_dircheckforname() found:
+ *      NONE            name not found, large enough free slot not found,
+ *      FOUND           name not found, large enough free slot found
+ *      EXIST           name found
+ * If ufs_dircheckforname() fails due to an error, this structure is not
+ * filled in.
+ *
+ * After ufs_dircheckforname() succeeds the values are:
+ *      status  offset          size            fbp, ep
+ *      ------  ------          ----            -------
+ *      NONE    end of dir      needed          not valid
+ *      FOUND   start of entry  of ent          both valid if fbp != NULL
+ *      EXIST   start of entry  of prev ent     valid
+ *
+ * "endoff" is set to 0 if the an entry with the given name is found, or if no
+ * free slot could be found or made; this means that the directory should not
+ * be truncated.  If the entry was found, the search terminates so
+ * ufs_dircheckforname() didn't find out where the last valid entry in the
+ * directory was, so it doesn't know where to cut the directory off; if no free
+ * slot could be found or made, the directory has to be extended to make room
+ * for the new entry, so there's nothing to cut off.
+ * Otherwise, "endoff" is set to the larger of the offset of the last
+ * non-empty entry in the directory, or the offset at which the new entry will
+ * be placed, whichever is larger.  This is used by ufs_diraddentry(); if a new
+ * entry is to be added to the directory, any complete directory blocks at the
+ * end of the directory that contain no non-empty entries are lopped off the
+ * end, thus shrinking the directory dynamically.
+ */
+typedef enum {NONE, FOUND, EXIST} slotstat_t;
+struct slot {
+	struct	direct *ep;	/* pointer to slot */
+	struct	fbuf *fbp;	/* dir buf where slot is */
+	off_t	offset;		/* offset of area with free space */
+	off_t	endoff;		/* last useful location found in search */
+	slotstat_t status;	/* status of slot */
+	int	size;		/* size of area at slotoffset */
+	int	cached;		/* cached directory */
+};
+
 /*
  * Statistics on inodes
  * Not protected by locks
@@ -786,6 +832,8 @@ extern	int	ufs_dirmakeinode(struct inode *, struct inode **,
     struct vattr *, enum de_op, cred_t *);
 extern	int	ufs_dirremove(struct inode *, char *, struct inode *,
     vnode_t *, enum dr_op, cred_t *, vnode_t **);
+extern  int	ufs_dircheckforname(struct inode *, char *, int, struct slot *,
+    struct inode **, struct cred *, int);
 extern	int	ufs_xattrdirempty(struct inode *, ino_t, cred_t *);
 extern	int	blkatoff(struct inode *, off_t, char **, struct fbuf **);
 

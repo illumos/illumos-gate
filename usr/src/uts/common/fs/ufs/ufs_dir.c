@@ -136,7 +136,6 @@ int ufs_negative_cache = 1;
 uint64_t ufs_dirremove_retry_cnt;
 
 static void dirbad();
-static int ufs_dircheckforname();
 static int ufs_dirrename();
 static int ufs_diraddentry();
 static int ufs_dirempty();
@@ -584,52 +583,6 @@ bad:
 }
 
 /*
- * If ufs_dircheckforname() fails to find an entry with the given name,
- * this "slot" structure holds state for ufs_direnter_*() as to where
- * there is space to put an entry with that name.
- * If ufs_dircheckforname() finds an entry with the given name, this structure
- * holds state for ufs_dirrename() and ufs_dirremove() as to where the
- * entry is. "status" indicates what ufs_dircheckforname() found:
- *	NONE		name not found, large enough free slot not found,
- *	FOUND		name not found, large enough free slot found
- *	EXIST		name found
- * If ufs_dircheckforname() fails due to an error, this structure is not
- * filled in.
- *
- * After ufs_dircheckforname() succeeds the values are:
- *	status	offset		size		fbp, ep
- *	------	------		----		-------
- *	NONE	end of dir	needed		not valid
- *	FOUND	start of entry	of ent		both valid if fbp != NULL
- *	EXIST	start of entry	of prev ent	valid
- *
- * "endoff" is set to 0 if the an entry with the given name is found, or if no
- * free slot could be found or made; this means that the directory should not
- * be truncated.  If the entry was found, the search terminates so
- * ufs_dircheckforname() didn't find out where the last valid entry in the
- * directory was, so it doesn't know where to cut the directory off; if no free
- * slot could be found or made, the directory has to be extended to make room
- * for the new entry, so there's nothing to cut off.
- * Otherwise, "endoff" is set to the larger of the offset of the last
- * non-empty entry in the directory, or the offset at which the new entry will
- * be placed, whichever is larger.  This is used by ufs_diraddentry(); if a new
- * entry is to be added to the directory, any complete directory blocks at the
- * end of the directory that contain no non-empty entries are lopped off the
- * end, thus shrinking the directory dynamically.
- */
-typedef enum {NONE, FOUND, EXIST} slotstat_t;
-struct slot {
-	struct direct *ep;	/* pointer to slot */
-	struct	fbuf *fbp;	/* dir buf where slot is */
-	off_t	offset;		/* offset of area with free space */
-	off_t	endoff;		/* last useful location found in search */
-	slotstat_t status;	/* status of slot */
-	int	size;		/* size of area at slotoffset */
-	int	cached;		/* cached directory */
-};
-
-
-/*
  * Write a new directory entry for DE_CREATE or DE_MKDIR operations.
  */
 int
@@ -1008,7 +961,7 @@ out2:
  *
  * This may not be used on "." or "..", but aliases of "." are ok.
  */
-static int
+int
 ufs_dircheckforname(
 	struct inode *tdp,	/* inode of directory being checked */
 	char *namep,		/* name we're checking for */
