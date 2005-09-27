@@ -194,6 +194,113 @@ create_root_bus_dip(uchar_t bus)
 }
 
 /*
+ * returns: 0 = not configured, 1 = configured, -1 = error
+ */
+static int
+func_configured(uchar_t bus, uchar_t dev, uchar_t func)
+{
+	uint16_t cmdreg;
+	uint32_t bar_low, bar_high, size_low, size_high;
+	uint8_t bar_base, bar_end;
+	int io_enabled, mem_enabled;
+	int configured;
+
+
+	/*
+	 * Determine PCI config space type from header and
+	 * adjust address and count of Base Address Registers
+	 */
+	switch (pci_getb(bus, dev, func, PCI_CONF_HEADER) &
+	    PCI_HEADER_TYPE_M) {
+	case PCI_HEADER_ZERO:
+		bar_base = PCI_CONF_BASE0;
+		bar_end = bar_base + PCI_BASE_NUM * sizeof (uint32_t);
+		break;
+	case PCI_HEADER_PPB:
+		bar_base = PCI_CONF_BASE0;
+		bar_end = bar_base + PCI_BCNF_BASE_NUM * sizeof (uint32_t);
+		break;
+	case PCI_HEADER_CARDBUS:
+		bar_base = PCI_CBUS_SOCK_REG;
+		bar_end = bar_base + PCI_CBUS_BASE_NUM * sizeof (uint32_t);
+		break;
+	default:
+		/* invalid header value - return error */
+		return (-1);
+	}
+
+	cmdreg = pci_getw(bus, dev, func, PCI_CONF_COMM);
+	io_enabled = cmdreg & PCI_COMM_IO;
+	mem_enabled = cmdreg & PCI_COMM_MAE;
+	/*
+	 * If neither I/O or memory-access are enabled, this
+	 * device is not configured
+	 */
+	if (!io_enabled && !mem_enabled)
+		return (0);
+
+	/*
+	 * Start out believing the device is configured and scan
+	 * the base address registers until we find a valid BAR
+	 * that is unprogrammed. If all valid BARs are programmed,
+	 * the device is assumed to be configured.
+	 *
+	 * Valid BARs have a non-zero size and are unprogrammed
+	 * if they have a zero value. Note that the actual value
+	 * of the BAR size doesn't matter and isn't calculated;
+	 * if any bits in the probed size mask are non-zero, that
+	 * indicates a non-zero size.
+	 */
+	configured = 1;
+	while (configured && bar_base < bar_end) {
+		/* disable device decoding while probing base register */
+		pci_putw(bus, dev, func, PCI_CONF_COMM,
+		    cmdreg & ~(PCI_COMM_IO | PCI_COMM_MAE));
+
+		bar_high = 0;	/* default to 32-bit */
+		size_high = 0;	/* default to 32-bit */
+		/* probe the BAR for size */
+		bar_low = pci_getl(bus, dev, func, bar_base);
+		pci_putl(bus, dev, func, bar_base, 0xffffffff);
+		size_low = pci_getl(bus, dev, func, bar_base);
+		pci_putl(bus, dev, func, bar_base, bar_low);
+		bar_base += sizeof (uint32_t);
+
+		if (bar_low & PCI_BASE_SPACE_IO) {
+			bar_low &= PCI_BASE_IO_ADDR_M;
+			size_low &= PCI_BASE_IO_ADDR_M;
+			if (size_low != 0)
+				configured = io_enabled && (bar_low != 0);
+		} else {
+			if ((bar_low & PCI_BASE_TYPE_M) == PCI_BASE_TYPE_ALL) {
+				/* 64-bit case */
+				bar_high = pci_getl(bus, dev, func, bar_base);
+				pci_putl(bus, dev, func, bar_base, 0xffffffff);
+				size_high = pci_getl(bus, dev, func, bar_base);
+				pci_putl(bus, dev, func, bar_base, bar_high);
+				bar_base += sizeof (uint32_t);
+			}
+			bar_low &= PCI_BASE_M_ADDR_M;
+			size_low &= PCI_BASE_M_ADDR_M;
+			/*
+			 * Omit test of size_high; some 64-bit devices
+			 * may not properly implement the top 32-bits
+			 * of the size; if a card appears that requests
+			 * 4GB  or more, this will need to be revisited.
+			 */
+			if (size_low != 0)
+				configured = mem_enabled &&
+				    ((bar_low != 0) || (bar_high != 0));
+		}
+		/* restore the enable bits for this device */
+		pci_putw(bus, dev, func, PCI_CONF_COMM, cmdreg);
+	}
+
+	return (configured);
+}
+
+
+/*
  * For any fixed configuration (often compatability) pci devices
  * and those with their own expansion rom, create device nodes
  * to hold the already configured device details.
@@ -231,12 +338,6 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 				continue;
 			}
 
-			configured = pci_getw(bus, dev, func, PCI_CONF_COMM) &
-			    (PCI_COMM_IO | PCI_COMM_MAE);
-			if ((!configured && config_op != CONFIG_NEW) ||
-			    (configured && config_op != CONFIG_INFO))
-				continue;
-
 			header = pci_getb(bus, dev, func, PCI_CONF_HEADER);
 			if (header == 0xff) {
 				continue; /* illegal value */
@@ -251,6 +352,21 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 			if ((func == 0) && (header & PCI_HEADER_MULTI)) {
 				nfunc = 8;
 			}
+
+			configured = func_configured(bus, dev, func);
+
+			/*
+			 * If the device is not configured and we're in the
+			 * first pass (CONFIG_INFO), skip the device and
+			 * it will be programmed/enumerated on the second pass
+			 * (CONFIG_NEW).  Likewise, if a device is configured,
+			 * skip it on the second pass
+			 */
+			if ((configured < 0) ||
+			    (!configured && config_op != CONFIG_NEW) ||
+			    (configured && config_op != CONFIG_INFO))
+				continue;
+
 			dip = new_func_pci(bus, dev, func, header, venid,
 			    config_op);
 			/*
@@ -695,6 +811,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	int max_basereg, j, reprogram = 0;
 	uint_t phys_hi;
 	struct memlist **io_res, **mres, **mem_res, **pmem_res;
+	uint16_t cmd_reg;
 
 	pci_regspec_t regs[16] = {{0}};
 	pci_regspec_t assigned[15] = {{0}};
@@ -716,8 +833,11 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	subclass = pci_getb(bus, dev, func, PCI_CONF_SUBCLASS);
 	progclass = pci_getb(bus, dev, func, PCI_CONF_PROGCLASS);
 	header = pci_getb(bus, dev, func, PCI_CONF_HEADER) & PCI_HEADER_TYPE_M;
-	configured = pci_getw(bus, dev, func, PCI_CONF_COMM) &
-	    (PCI_COMM_IO | PCI_COMM_MAE);
+	/* Fetch PCI command, disable I/O and memory */
+	cmd_reg = pci_getw(bus, dev, func, PCI_CONF_COMM);
+	configured = cmd_reg & (PCI_COMM_IO | PCI_COMM_MAE);
+	pci_putw(bus, dev, func, PCI_CONF_COMM,
+	    cmd_reg & ~(PCI_COMM_IO | PCI_COMM_MAE));
 	ASSERT(configured || config_op == CONFIG_NEW);
 
 	switch (header) {
@@ -817,7 +937,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 					    " IO space 0x%x for [%d/%d/%d]",
 					    len, bus, dev, func);
 				} else
-					enable = 1;
+					enable |= PCI_COMM_IO;
 			}
 			assigned[nasgn].pci_phys_low = base;
 			nreg++, nasgn++;
@@ -880,7 +1000,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 					    "mem space 0x%x for [%d/%d/%d]",
 					    len, bus, dev, func);
 				} else
-					enable = 1;
+					enable |= PCI_COMM_MAE;
 			}
 			assigned[nasgn].pci_phys_low = base;
 			nreg++, nasgn++;
@@ -986,9 +1106,10 @@ done:
 	if (config_op == CONFIG_NEW && enable) {
 		cmn_err(CE_NOTE,
 		    "!enable PCI device [%d/%d/%d]", bus, dev, func);
-		pci_putw(bus, dev, func, PCI_CONF_COMM,
-		    pci_getw(bus, dev, func, PCI_CONF_COMM) | 0x7);
+		cmd_reg |= (enable | PCI_COMM_ME);
 	}
+	/* restore device enables */
+	pci_putw(bus, dev, func, PCI_CONF_COMM, cmd_reg);
 	return (reprogram);
 }
 
