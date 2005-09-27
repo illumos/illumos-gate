@@ -634,6 +634,10 @@ struct sd_lun {
 _NOTE(MUTEX_PROTECTS_DATA(scsi_device::sd_mutex, sd_lun))
 _NOTE(READ_ONLY_DATA(sd_lun::un_sd))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_reservation_type))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_pm_capable_prop))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_mincdb))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_maxcdb))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_status_len))
 
 
 #if defined(__i386) || defined(__amd64)

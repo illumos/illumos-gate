@@ -1055,7 +1055,9 @@ static void sd_scsi_clear_probe_cache(void);
 static int  sd_scsi_probe_with_cache(struct scsi_device *devp, int (*fn)());
 
 static int	sd_spin_up_unit(struct sd_lun *un);
+#ifdef _LP64
 static void	sd_enable_descr_sense(struct sd_lun *un);
+#endif /* _LP64 */
 static void	sd_set_mmc_caps(struct sd_lun *un);
 
 static void sd_read_unit_properties(struct sd_lun *un);
@@ -1198,8 +1200,10 @@ static int sd_setup_rw_pkt(struct sd_lun *un, struct scsi_pkt **pktpp,
 	struct buf *bp, int flags,
 	int (*callback)(caddr_t), caddr_t callback_arg,
 	diskaddr_t lba, uint32_t blockcount);
+#if defined(__i386) || defined(__amd64)
 static int sd_setup_next_rw_pkt(struct sd_lun *un, struct scsi_pkt *pktp,
 	struct buf *bp, diskaddr_t lba, uint32_t blockcount);
+#endif /* defined(__i386) || defined(__amd64) */
 
 /*
  * Prototypes for functions to support USCSI IO.
@@ -2818,6 +2822,7 @@ sd_spin_up_unit(struct sd_lun *un)
 	return (0);
 }
 
+#ifdef _LP64
 /*
  *    Function: sd_enable_descr_sense
  *
@@ -2891,6 +2896,7 @@ sd_enable_descr_sense(struct sd_lun *un)
 eds_exit:
 	kmem_free(header, buflen);
 }
+#endif /* _LP64 */
 
 
 /*
@@ -13220,6 +13226,7 @@ sd_setup_rw_pkt(struct sd_lun *un,
 	return (SD_PKT_ALLOC_FAILURE_CDB_TOO_SMALL);
 }
 
+#if defined(__i386) || defined(__amd64)
 /*
  *    Function: sd_setup_next_rw_pkt
  *
@@ -13295,6 +13302,7 @@ sd_setup_next_rw_pkt(struct sd_lun *un,
 	 */
 	return (SD_PKT_ALLOC_FAILURE);
 }
+#endif /* defined(__i386) || defined(__amd64) */
 
 /*
  *    Function: sd_initpkt_for_uscsi

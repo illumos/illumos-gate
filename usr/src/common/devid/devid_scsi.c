@@ -952,7 +952,9 @@ encode_serialnum(int version, uchar_t *inq, uchar_t *inq80,
 	 */
 	if (*id_len == (size_t)inq80[3]) {
 		/* empty unit serial number */
-		DEVID_FREE(*id, *id_len);
+		if (*id != NULL) {
+			DEVID_FREE(*id, *id_len);
+		}
 		*id = NULL;
 		*id_len = 0;
 	}
