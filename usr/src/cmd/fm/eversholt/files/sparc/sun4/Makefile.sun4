@@ -23,13 +23,14 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-include ../sun4/Makefile.sun4
+ESC=$(SRC)/cmd/fm/eversholt/esc/$(MACH)/esc
 
-EFT_PLAT= sun4v
-SUN4VEFTFILES= 
-EFT_PLAT_FILES= $(SUN4VEFTFILES) $(SUN4EFTFILES)
+SUN4DIR= ../sun4
 
-include ../../Makefile.com
+SUN4EFTFILES= fire.eft
+
+%.eft: $(SUN4DIR)/%.esc
+	$(ESC) -o $@ $<
+

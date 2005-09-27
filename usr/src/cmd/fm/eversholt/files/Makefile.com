@@ -37,33 +37,22 @@ USR_PLAT_FM_DIR= $(ROOT)/usr/platform/$(EFT_PLAT)/lib/fm
 USR_PLAT_EFT_DIR= $(USR_PLAT_FM_DIR)/eft
 USR_PLAT_EFT_FILES= $(EFT_PLAT_FILES:%=$(USR_PLAT_EFT_DIR)/%)
 
-ROOT_USR_PLAT_EFT_SRCDIR = $(ROOT)/usr/platform/$(EFT_PLAT_SRC)/lib/fm/eft
-ROOT_USR_PLAT_EFT_TARGDIR = $(ROOT)/usr/platform/$(EFT_PLAT)/lib/fm/eft
-ROOT_EFT_FILE_SRC = $(EFT_PLAT_FILE:%=$(ROOT_USR_PLAT_EFT_SRCDIR)/%)
-ROOT_EFT_FILE_TARG = $(EFT_PLAT_FILE:%=$(ROOT_USR_PLAT_EFT_TARGDIR)/%)
-
 include $(SRC)/cmd/fm/eversholt/Makefile.rootdirs
 
 all:= FILEMODE =	0444
 
 install: all
 
-all: $(ROOT_EFT_ROOT) $(USR_PLAT_EFT_FILES) $(ROOT_COMMON_EFT_FILES) \
-	$(ROOT_EFT_FILE_TARG)
+all: $(ROOT_EFT_ROOT) $(USR_PLAT_EFT_FILES) $(ROOT_COMMON_EFT_FILES)
 
 install_h lint _msg:
 
 clean clobber:
 	$(RM) $(EFT_PLAT_FILES) $(EFT_COMMON_FILES) \
-	$(USR_PLAT_EFT_FILES) $(ROOT_COMMON_EFT_FILES) \
-	$(ROOT_EFT_FILE_TARG)
+	$(USR_PLAT_EFT_FILES) $(ROOT_COMMON_EFT_FILES)
 
 %.eft: ../common/%.esc
 	$(ESC) -o $@ $<
 
 %.eft: %.esc
 	$(ESC) -o $@ $<
-
-$(ROOT_EFT_FILE_TARG): $$(@D)
-	$(RM) $@; $(LN) $(ROOT_EFT_FILE_SRC) $(ROOT_EFT_FILE_TARG)
-

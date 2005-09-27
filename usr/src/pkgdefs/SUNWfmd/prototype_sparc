@@ -126,9 +126,9 @@ f none usr/platform/sun4u/lib/fm/fmd/plugins/USII-io-diagnosis.conf 644 root bin
 d none usr/platform/sun4v 755 root sys
 d none usr/platform/sun4v/lib 755 root bin
 d none usr/platform/sun4v/lib/fm 755 root bin
-d none usr/platform/sun4v/lib/fm/fmd 755 root bin
 d none usr/platform/sun4v/lib/fm/eft 755 root bin
-l none usr/platform/sun4v/lib/fm/eft/fire.eft=../../../../../../usr/platform/sun4u/lib/fm/eft/fire.eft
+f none usr/platform/sun4v/lib/fm/eft/fire.eft 444 root bin
+d none usr/platform/sun4v/lib/fm/fmd 755 root bin
 d none usr/platform/sun4v/lib/fm/fmd/plugins 755 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.so 555 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.conf 644 root bin

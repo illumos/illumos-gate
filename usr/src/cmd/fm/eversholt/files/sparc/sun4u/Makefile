@@ -25,7 +25,10 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+include ../sun4/Makefile.sun4
+
 EFT_PLAT= sun4u
-EFT_PLAT_FILES= fire.eft schizo.eft psycho.eft tomatillo.eft xmits.eft
+SUN4UEFTFILES= schizo.eft psycho.eft tomatillo.eft xmits.eft
+EFT_PLAT_FILES= $(SUN4UEFTFILES) $(SUN4EFTFILES)
 
 include ../../Makefile.com
