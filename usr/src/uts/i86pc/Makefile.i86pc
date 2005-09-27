@@ -274,6 +274,8 @@ DRV_KMODS	+= amd64_gart
 
 DRV_KMODS	+= cpc
 
+DRV_KMODS	+= power
+
 #
 #	Exec Class Modules (/kernel/exec):
 #

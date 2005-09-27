@@ -33,6 +33,7 @@
  *	platforms with "power" device node which has "button" property.
  *	Currently, these platforms are:
  *
+ *		ACPI-enabled x86/x64 platforms
  *		Ultra-5_10, Ultra-80, Sun-Blade-100, Sun-Blade-150,
  *		Sun-Blade-1500, Sun-Blade-2500,
  *		Sun-Fire-V210, Sun-Fire-V240, Netra-240
@@ -58,6 +59,10 @@
 #include <sys/stat.h>
 #include <sys/poll.h>
 #include <sys/pbio.h>
+#ifdef	ACPI_POWER_BUTTON
+#include <sys/acpi/acpi.h>
+#include <sys/acpica.h>
+#endif	/* ACPI_POWER_BUTTON */
 
 /*
  * Maximum number of clone minors that is allowed.  This value
@@ -104,7 +109,9 @@ static int power_open(dev_t *, int, int, cred_t *);
 static int power_close(dev_t, int, int, cred_t *);
 static int power_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int power_chpoll(dev_t, short, int, short *, struct pollhead **);
+#ifndef	ACPI_POWER_BUTTON
 static uint_t power_high_intr(caddr_t);
+#endif
 static uint_t power_soft_intr(caddr_t);
 static uint_t power_issue_shutdown(caddr_t);
 static void power_timeout(caddr_t);
@@ -127,15 +134,27 @@ struct power_soft_state {
 	pollhead_t	pollhd;		/* poll head struct */
 	int		events;		/* bit map of occured events */
 	int		shutdown_pending; /* system shutdown in progress */
+#ifdef	ACPI_POWER_BUTTON
+	boolean_t	fixed_attached;	/* true means fixed is attached */
+	boolean_t	gpe_attached;	/* true means GPE is attached */
+	ACPI_HANDLE	button_obj;	/* handle to device power button */
+#else
 	ddi_acc_handle_t power_rhandle; /* power button register handle */
 	uint8_t		*power_btn_reg;	/* power button register address */
 	uint8_t		power_btn_bit;	/* power button register bit */
 	boolean_t	power_regs_mapped; /* flag to tell if regs mapped */
 	boolean_t	power_btn_ioctl; /* flag to specify ioctl request */
+#endif
 };
 
+#ifdef	ACPI_POWER_BUTTON
+static int power_attach_acpi(struct power_soft_state *softsp);
+static void power_detach_acpi(struct power_soft_state *softsp);
+static UINT32 power_acpi_fixed_event(void *ctx);
+#else
 static int power_setup_regs(struct power_soft_state *softsp);
 static void power_free_regs(struct power_soft_state *softsp);
+#endif	/* ACPI_POWER_BUTTON */
 
 /*
  * Configuration data structures
@@ -287,6 +306,9 @@ power_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	softsp = ddi_get_soft_state(power_state, power_inst);
 	softsp->dip = dip;
 
+#ifdef	ACPI_POWER_BUTTON
+	power_attach_acpi(softsp);
+#else
 	if (power_setup_regs(softsp) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "power_attach: failed to setup registers");
 		goto error;
@@ -308,6 +330,7 @@ power_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_destroy(&softsp->power_intr_mutex);
 		goto error;
 	}
+#endif	/* ACPI_POWER_BUTTON */
 
 	if (ddi_get_soft_iblock_cookie(dip, DDI_SOFTINT_LOW,
 	    &softsp->soft_iblock_cookie) != DDI_SUCCESS) {
@@ -336,7 +359,14 @@ power_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 error:
+#ifdef	ACPI_POWER_BUTTON
+	/*
+	 * detach ACPI power button
+	 */
+	power_detach_acpi(softsp);
+#else
 	power_free_regs(softsp);
+#endif	/* ACPI_POWER_BUTTON */
 	ddi_remove_minor_node(dip, "power_button");
 	ddi_soft_state_free(power_state, power_inst);
 	return (DDI_FAILURE);
@@ -360,6 +390,7 @@ power_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	    DDI_FAILURE);
 }
 
+#ifndef	ACPI_POWER_BUTTON
 /*
  * Handler for the high-level interrupt.
  */
@@ -440,6 +471,7 @@ power_high_intr(caddr_t arg)
 
 	return (DDI_INTR_CLAIMED);
 }
+#endif	/* ifndef ACPI_POWER_BUTTON */
 
 /*
  * Handle the softints....
@@ -559,6 +591,30 @@ power_timeout(caddr_t arg)
 		additional_presses = 0;
 	mutex_exit(&softsp->power_intr_mutex);
 }
+
+#ifdef ACPI_POWER_BUTTON
+static void
+do_shutdown(void)
+{
+	proc_t *initpp;
+
+	/*
+	 * If we're still booting and init(1) isn't set up yet, simply halt.
+	 */
+	mutex_enter(&pidlock);
+	initpp = prfind(P_INITPID);
+	mutex_exit(&pidlock);
+	if (initpp == NULL) {
+		extern void halt(char *);
+		halt("Power off the System");   /* just in case */
+	}
+
+	/*
+	 * else, graceful shutdown with inittab and all getting involved
+	 */
+	psignal(initpp, SIGPWR);
+}
+#endif
 
 static uint_t
 power_issue_shutdown(caddr_t arg)
@@ -724,12 +780,16 @@ power_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 	 * This ioctl is used by the test suite.
 	 */
 	case PB_CREATE_BUTTON_EVENT:
+#ifdef	ACPI_POWER_BUTTON
+		(UINT32)power_acpi_fixed_event((void *)softsp);
+#else
 		if (softsp->power_regs_mapped) {
 			mutex_enter(&softsp->power_intr_mutex);
 			softsp->power_btn_ioctl = B_TRUE;
 			mutex_exit(&softsp->power_intr_mutex);
 		}
 		(void) power_high_intr((caddr_t)softsp);
+#endif	/* ACPI_POWER_BUTTON */
 		return (0);
 
 	default:
@@ -776,6 +836,200 @@ power_log_message(void)
 	mutex_exit(&softsp->power_mutex);
 }
 
+#ifdef	ACPI_POWER_BUTTON
+/*
+ * Given a handle to a device object, locate a _PRW object
+ * if present and fetch the GPE info for this device object
+ */
+static ACPI_STATUS
+power_get_prw_gpe(ACPI_HANDLE dev, ACPI_HANDLE *gpe_dev, UINT32 *gpe_num)
+{
+	ACPI_BUFFER buf;
+	ACPI_STATUS status;
+	ACPI_HANDLE prw;
+	ACPI_OBJECT *gpe;
+
+	/*
+	 * Evaluate _PRW if present
+	 */
+	status = AcpiGetHandle(dev, "_PRW", &prw);
+	if (status != AE_OK)
+		return (status);
+	buf.Length = ACPI_ALLOCATE_BUFFER;
+	status = AcpiEvaluateObjectTyped(prw, NULL, NULL, &buf,
+	    ACPI_TYPE_PACKAGE);
+	if (status != AE_OK)
+		return (status);
+
+	/*
+	 * Sanity-check the package; need at least two elements
+	 */
+	status = AE_ERROR;
+	if (((ACPI_OBJECT *)buf.Pointer)->Package.Count < 2)
+		goto done;
+
+	gpe = &((ACPI_OBJECT *)buf.Pointer)->Package.Elements[0];
+	if (gpe->Type == ACPI_TYPE_INTEGER) {
+		*gpe_dev = NULL;
+		*gpe_num = gpe->Integer.Value;
+		status = AE_OK;
+	} else if (gpe->Type == ACPI_TYPE_PACKAGE) {
+		if ((gpe->Package.Count != 2) ||
+		    (gpe->Package.Elements[0].Type != ACPI_TYPE_DEVICE) ||
+		    (gpe->Package.Elements[1].Type != ACPI_TYPE_INTEGER))
+			goto done;
+		*gpe_dev = gpe->Package.Elements[0].Reference.Handle;
+		*gpe_num = gpe->Package.Elements[1].Integer.Value;
+		status = AE_OK;
+	}
+
+done:
+	AcpiOsFree(buf.Pointer);
+	return (status);
+}
+
+
+/*
+ *
+ */
+static ACPI_STATUS
+acpi_device(ACPI_HANDLE obj, UINT32 nesting, void *context, void **rv)
+{
+	*((ACPI_HANDLE *)context) = obj;
+	return (AE_OK);
+}
+
+/*
+ *
+ */
+static ACPI_HANDLE
+probe_acpi_pwrbutton()
+{
+	ACPI_HANDLE obj = NULL;
+
+	AcpiGetDevices("PNP0C0C", acpi_device, (void *)&obj, NULL);
+	return (obj);
+}
+
+static UINT32
+power_acpi_fixed_event(void *ctx)
+{
+
+	mutex_enter(&((struct power_soft_state *)ctx)->power_intr_mutex);
+	power_button_pressed++;
+	mutex_exit(&((struct power_soft_state *)ctx)->power_intr_mutex);
+
+	/* post softint to issue timeout for power button action */
+	if (((struct power_soft_state *)ctx)->softintr_id != NULL)
+		ddi_trigger_softintr(
+		    ((struct power_soft_state *)ctx)->softintr_id);
+
+	return (AE_OK);
+}
+
+static void
+power_acpi_notify_event(ACPI_HANDLE obj, UINT32 val, void *ctx)
+{
+	if (val == 0x80)
+		power_acpi_fixed_event(ctx);
+}
+
+/*
+ *
+ */
+static int
+power_probe_method_button(struct power_soft_state *softsp)
+{
+	ACPI_HANDLE button_obj;
+	UINT32 gpe_num;
+	ACPI_HANDLE gpe_dev;
+	ACPI_STATUS status;
+
+	button_obj = probe_acpi_pwrbutton();
+	softsp->button_obj = button_obj;	/* remember obj */
+	if ((button_obj != NULL) &&
+	    (power_get_prw_gpe(button_obj, &gpe_dev, &gpe_num) == AE_OK) &&
+	    (AcpiSetGpeType(gpe_dev, gpe_num, ACPI_GPE_TYPE_WAKE_RUN) ==
+	    AE_OK) &&
+	    (AcpiEnableGpe(gpe_dev, gpe_num, ACPI_NOT_ISR) == AE_OK) &&
+	    (AcpiInstallNotifyHandler(button_obj, ACPI_DEVICE_NOTIFY,
+	    power_acpi_notify_event, (void*)softsp) == AE_OK))
+		return (1);
+	return (0);
+}
+
+/*
+ *
+ */
+static int
+power_probe_fixed_button(struct power_soft_state *softsp)
+{
+	FADT_DESCRIPTOR *fadt;
+
+	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
+	    (ACPI_TABLE_HEADER **) &fadt) != AE_OK)
+		return (0);
+
+	if (!fadt->PwrButton) {
+		if (AcpiInstallFixedEventHandler(ACPI_EVENT_POWER_BUTTON,
+		    power_acpi_fixed_event, (void *)softsp) == AE_OK)
+			return (1);
+	}
+	return (0);
+}
+
+
+/*
+ *
+ */
+static int
+power_attach_acpi(struct power_soft_state *softsp)
+{
+
+	/*
+	 * If we've attached anything already, return an error
+	 */
+	if ((softsp->gpe_attached) || (softsp->fixed_attached))
+		return (DDI_FAILURE);
+
+	/*
+	 * attempt to attach both a fixed-event handler and a GPE
+	 * handler; remember what we got
+	 */
+	softsp->fixed_attached = (power_probe_fixed_button(softsp) != 0);
+	softsp->gpe_attached = (power_probe_method_button(softsp) != 0);
+
+	/*
+	 * If we've attached anything now, return success
+	 */
+	if ((softsp->gpe_attached) || (softsp->fixed_attached))
+		return (DDI_SUCCESS);
+
+	return (DDI_FAILURE);
+}
+
+/*
+ *
+ */
+static void
+power_detach_acpi(struct power_soft_state *softsp)
+{
+	if (softsp->gpe_attached) {
+		if (AcpiRemoveNotifyHandler(softsp->button_obj,
+		    ACPI_DEVICE_NOTIFY, power_acpi_notify_event) != AE_OK)
+			cmn_err(CE_WARN, "!power: failed to remove Notify"
+			    " handler");
+	}
+
+	if (softsp->fixed_attached) {
+		if (AcpiRemoveFixedEventHandler(ACPI_EVENT_POWER_BUTTON,
+		    power_acpi_fixed_event) != AE_OK)
+			cmn_err(CE_WARN, "!power: failed to remove Power"
+			    " Button handler");
+	}
+}
+
+#else
 /*
  * power button register definitions for acpi register on m1535d
  */
@@ -827,3 +1081,4 @@ power_free_regs(struct power_soft_state *softsp)
 	if (softsp->power_regs_mapped)
 		ddi_regs_map_free(&softsp->power_rhandle);
 }
+#endif	/* ACPI_POWER_BUTTON */

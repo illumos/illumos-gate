@@ -68,6 +68,8 @@ f none platform/i86pc/kernel/drv/bscv.conf 644 root sys
 f none platform/i86pc/kernel/drv/isa 755 root sys
 f none platform/i86pc/kernel/drv/kb8042 755 root sys
 f none platform/i86pc/kernel/drv/pci 755 root sys
+f none platform/i86pc/kernel/drv/power 755 root sys
+f none platform/i86pc/kernel/drv/power.conf 644 root sys
 f none platform/i86pc/kernel/drv/rootnex 755 root sys
 d none platform/i86pc/kernel/mach 755 root sys
 f none platform/i86pc/kernel/mach/uppc 755 root sys
@@ -80,6 +82,7 @@ f none platform/i86pc/kernel/drv/amd64/bmc 755 root sys
 f none platform/i86pc/kernel/drv/amd64/isa 755 root sys
 f none platform/i86pc/kernel/drv/amd64/kb8042 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pci 755 root sys
+f none platform/i86pc/kernel/drv/amd64/power 755 root sys
 f none platform/i86pc/kernel/drv/amd64/rootnex 755 root sys
 d none platform/i86pc/kernel/mach/amd64 755 root sys
 f none platform/i86pc/kernel/mach/amd64/uppc 755 root sys

@@ -181,6 +181,8 @@ ACPICA_OBJS	+= dbcmds.o dbdisply.o \
 		   osl.o osl_ml.o acpica_ec.o utcache.o utmutex.o utstate.o \
 		   psloop.o
 
+POWER_OBJS	+= power.o
+
 #
 #	Build up defines and paths.
 #
