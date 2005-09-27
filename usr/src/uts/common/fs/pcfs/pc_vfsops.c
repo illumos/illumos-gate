@@ -784,8 +784,11 @@ pc_lockfs(struct pcfs *fsp, int diskchanged, int releasing)
 		 * they could grab the lock.  (And in the meantime someone
 		 * had grabbed the lock and set the bit)
 		 */
-		if (!diskchanged && !(fsp->pcfs_flags & PCFS_IRRECOV))
-			(void) pc_getfat(fsp);
+		if (!diskchanged && !(fsp->pcfs_flags & PCFS_IRRECOV)) {
+			int err;
+			if ((err = pc_getfat(fsp)))
+				return (err);
+		}
 		fsp->pcfs_flags |= PCFS_LOCKED;
 		fsp->pcfs_owner = curthread;
 		fsp->pcfs_count++;
@@ -926,6 +929,9 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 	 * be recognized.  Any others will be ignored.
 	 */
 	for (i = 0; i < FD_NUMPART; i++) {
+		PC_DPRINTF1(2, "findTheDrive: found partition type %02x",
+			dosp[i].systid);
+
 		if (isDosDrive(dosp[i].systid)) {
 			if (primaryPart < 0) {
 				logicalDriveCount++;
@@ -1097,16 +1103,315 @@ findTheDrive(dev_t dev, int askedFor, int *error, buf_t **bp,
 }
 
 /*
+ * FAT12/FAT16 specific consistency checks.
+ */
+static int
+check_bpb_fat16(struct bootsec *bpb)
+{
+	if (pcfsdebuglevel >= 5) {
+		PC_DPRINTF1(5, "check_bpb_fat: RootEntCount = %d",
+			ltohs(bpb->rdirents[0]));
+		PC_DPRINTF1(5, "check_bpb_fat16: TotSec16 = %d",
+			ltohs(bpb->numsect[0]));
+		PC_DPRINTF1(5, "check_bpb_fat16: FATSz16 = %d",
+			ltohs(bpb->fatsec));
+		PC_DPRINTF1(5, "check_bpb_fat16: TotSec32 = %d",
+			ltohi(bpb->totalsec));
+	}
+	return (ltohs(bpb->rdirents[0]) > 0 &&	 /* RootEntCnt > 0 */
+		((ltohs(bpb->numsect[0]) == 0 && /* TotSec16 == 0 */
+		ltohi(bpb->totalsec) > 0) ||	 /* TotSec32 > 0 */
+		ltohs(bpb->numsect[0]) > 0) && /* TotSec16 > 0 */
+		ltohs(bpb->fatsec) > 0);	 /* FatSz16 > 0 */
+}
+
+/*
+ * FAT32 specific consistency checks.
+ */
+static int
+check_bpb_fat32(struct fat32_bootsec *bpb)
+{
+	if (pcfsdebuglevel >= 5) {
+		PC_DPRINTF1(5, "check_bpb_fat32: RootEntCount = %d",
+			ltohs(bpb->f_bs.rdirents[0]));
+		PC_DPRINTF1(5, "check_bpb_fat32: TotSec16 = %d",
+			ltohs(bpb->f_bs.numsect[0]));
+		PC_DPRINTF1(5, "check_bpb_fat32: FATSz16 = %d",
+			ltohs(bpb->f_bs.fatsec));
+		PC_DPRINTF1(5, "check_bpb_fat32: TotSec32 = %d",
+			ltohi(bpb->f_bs.totalsec));
+		PC_DPRINTF1(5, "check_bpb_fat32: FATSz32 = %d",
+			ltohi(bpb->f_fatlength));
+	}
+	return (ltohs(bpb->f_bs.rdirents[0]) == 0 &&
+		ltohs(bpb->f_bs.numsect[0]) == 0 &&
+		ltohs(bpb->f_bs.fatsec) == 0 &&
+		ltohi(bpb->f_bs.totalsec) > 0 &&
+		ltohi(bpb->f_fatlength) > 0);
+}
+
+/*
+ * Calculate the number of clusters in order to determine
+ * the type of FAT we are looking at.  This is the only
+ * recommended way of determining FAT type, though there
+ * are other hints in the data, this is the best way.
+ */
+static ulong_t
+bpb_to_numclusters(uchar_t *cp)
+{
+	struct fat32_bootsec *bpb;
+
+	ulong_t rootdirsectors;
+	ulong_t FATsz;
+	ulong_t TotSec;
+	ulong_t DataSec;
+	ulong_t CountOfClusters;
+	char FileSysType[9];
+
+	/*
+	 * Cast it to FAT32 bpb. If it turns out to be FAT12/16, its
+	 * OK, we won't try accessing the data beyond the FAT16 header
+	 * boundary.
+	 */
+	bpb = (struct fat32_bootsec *)cp;
+
+	if (pcfsdebuglevel >= 5) {
+		if (ltohs(bpb->f_bs.rdirents[0]) != 0) {
+			memcpy(FileSysType, &cp[54], 8);
+			FileSysType[8] = 0;
+			PC_DPRINTF1(5, "debug_bpb: FAT12/FAT16 FileSysType = "
+				"%s", FileSysType);
+		}
+	}
+
+	rootdirsectors = ((ltohs(bpb->f_bs.rdirents[0]) * 32) +
+		(ltohs(bpb->f_bs.bps[0]) - 1)) / ltohs(bpb->f_bs.bps[0]);
+
+	if (ltohs(bpb->f_bs.fatsec) != 0)
+		FATsz = ltohs(bpb->f_bs.fatsec);
+	else
+		FATsz = ltohi(bpb->f_fatlength);
+
+	if (ltohs(bpb->f_bs.numsect[0]) != 0)
+		TotSec = ltohs(bpb->f_bs.numsect[0]);
+	else
+		TotSec = ltohi(bpb->f_bs.totalsec);
+
+	DataSec = TotSec - (ltohs(bpb->f_bs.res_sec[0]) +
+			(bpb->f_bs.nfat * FATsz) + rootdirsectors);
+
+	CountOfClusters = DataSec / bpb->f_bs.spcl;
+
+	PC_DPRINTF1(5, "debug_bpb: CountOfClusters = %ld", CountOfClusters);
+
+	return (CountOfClusters);
+
+}
+
+static int
+fattype(ulong_t CountOfClusters)
+{
+	/*
+	 * From Microsoft:
+	 * In the following example, when it says <, it does not mean <=.
+	 * Note also that the numbers are correct.  The first number for
+	 * FAT12 is 4085; the second number for FAT16 is 65525. These numbers
+	 * and the '<' signs are not wrong.
+	 */
+
+	/* Watch for edge cases */
+	if ((CountOfClusters >= 4085 && CountOfClusters <= 4095) ||
+	    (CountOfClusters >= 65525 && CountOfClusters <= 65535)) {
+		PC_DPRINTF1(5, "debug_bpb: Cannot determine FAT yet - %ld",
+			CountOfClusters);
+		return (-1); /* Cannot be determined yet */
+	} else if (CountOfClusters < 4085) {
+		/* Volume is FAT12 */
+		PC_DPRINTF0(5, "debug_bpb: This must be FAT12");
+		return (0);
+	} else if (CountOfClusters < 65525) {
+		/* Volume is FAT16 */
+		PC_DPRINTF0(5, "debug_bpb: This must be FAT16");
+		return (PCFS_FAT16);
+	} else {
+		/* Volume is FAT32 */
+		PC_DPRINTF0(5, "debug_bpb: This must be FAT32");
+		return (PCFS_FAT32);
+	}
+}
+
+#define	VALID_SECSIZE(s) (s == 512 || s == 1024 || s == 2048 || s == 4096)
+
+#define	VALID_SPCL(s) (s == 1 || s == 2 || s == 4 || s == 8 || s == 16 ||\
+	s == 32 || s == 64 || s == 128)
+
+static int
+secondaryBPBChecks(uchar_t *cp)
+{
+	struct bootsec *bpb = (struct bootsec *)cp;
+	struct fat32_bootsec *f32bpb = (struct fat32_bootsec *)cp;
+
+	/*
+	 * Perform secondary checks to try and determine what sort
+	 * of FAT partition we have based on other, less reliable,
+	 * data in the BPB header.
+	 */
+	if (ltohs(bpb->fatsec) != 0) {
+		/*
+		 * Must be FAT12 or FAT16, check the
+		 * FilSysType string (not 100% reliable).
+		 */
+		if (!memcmp((cp + PCFS_TYPESTRING_OFFSET16), "FAT12", 5)) {
+			PC_DPRINTF0(5, "secondaryBPBCheck says: FAT12");
+			return (0); /* FAT12 */
+		} else if (!memcmp((cp + PCFS_TYPESTRING_OFFSET16), "FAT16",
+			5)) {
+			PC_DPRINTF0(5, "secondaryBPBCheck says: FAT16");
+			return (PCFS_FAT16);
+		} else {
+			/*
+			 * Try to use the BPB_Media byte
+			 *
+			 *  If the media byte indicates a floppy we'll
+			 *  assume FAT12, otherwise we'll assume FAT16.
+			 */
+			switch (bpb->mediadesriptor) {
+				case SS8SPT:
+				case DS8SPT:
+				case SS9SPT:
+				case DS9SPT:
+				case DS18SPT:
+				case DS9_15SPT:
+					PC_DPRINTF0(5,
+					"secondaryBPBCheck says: FAT12");
+					return (0); /* FAT12 */
+				case MD_FIXED:
+					PC_DPRINTF0(5,
+					"secondaryBPBCheck says: FAT16");
+					return (PCFS_FAT16);
+				default:
+					cmn_err(CE_NOTE,
+						"!pcfs: unknown FAT type");
+					return (-1);
+			}
+		}
+	} else if (ltohi(f32bpb->f_fatlength) > 0) {
+		PC_DPRINTF0(5, "secondaryBPBCheck says: FAT32");
+		return (PCFS_FAT32);
+	} else {
+		/* We don't know */
+		PC_DPRINTF0(5, "secondaryBPBCheck says: unknown!!");
+		return (-1);
+	}
+}
+
+/*
+ * Check to see if the BPB we found is correct.
+ *
+ * First, look for obvious, tell-tale signs of trouble:
+ * The NumFATs value should always be 2.  Sometimes it can be a '1'
+ * on FLASH memory cards and other non-disk-based media, so we
+ * will allow that as well.
+ *
+ * We also look at the Media byte, the valid range is 0xF0, or
+ * 0xF8 thru 0xFF, anything else means this is probably not a good
+ * BPB.
+ *
+ * Finally, check the BPB Magic number at the end of the 512 byte
+ * block, it must be 0xAA55.
+ *
+ * If that all is good, calculate the number of clusters and
+ * do some final verification steps.
+ *
+ * If all is well, return success (1) and set the fattypep
+ * value to the correct FAT value.
+ */
+static int
+isBPB(uchar_t *cp, int *fattypep)
+{
+	int ret = 1;
+	struct bootsec *bpb = (struct bootsec *)cp;
+
+	uint_t numclusters;		/* number of clusters in file area */
+	ushort_t secsize = (int)ltohs(bpb->bps[0]);
+
+	if (pcfsdebuglevel >= 3) {
+		if (!VALID_SECSIZE(secsize))
+			PC_DPRINTF1(3, "check_bpb: invalid bps value %d",
+				secsize);
+
+		if (!VALID_SPCL(bpb->spcl))
+			PC_DPRINTF1(3, "check_bpb: invalid spcl value %d",
+				bpb->spcl);
+
+		if ((secsize * bpb->spcl) >= (32 * 1024))
+			PC_DPRINTF3(3, "check_bpb: BPC > 32K  %d x %d = %d",
+				secsize,
+				bpb->spcl,
+				secsize * bpb->spcl);
+
+		if (bpb->nfat == 0)
+			PC_DPRINTF1(3, "check_bpb: bad NumFATs value %d",
+				bpb->nfat);
+
+		if (ltohs(bpb->res_sec[0]) == 0)
+			PC_DPRINTF1(3, "check_bpb: bad RsvdSecCnt value %d",
+				ltohs(bpb->res_sec[0]));
+
+		PC_DPRINTF1(5, "check_bpb: Media byte = %02x",
+			bpb->mediadesriptor);
+
+	}
+	if ((bpb->nfat == 0) ||
+		(bpb->mediadesriptor != 0xF0 && bpb->mediadesriptor < 0xF8) ||
+		(ltohs(cp[510]) != MBB_MAGIC) ||
+		!VALID_SECSIZE(secsize) ||
+		!VALID_SPCL(bpb->spcl) ||
+		(secsize * bpb->spcl >= (64 * 1024)) ||
+		!(ltohs(bpb->res_sec[0])))
+		return (0);
+
+	/*
+	 * Basic sanity checks passed so far, now try to determine which
+	 * FAT format to use.
+	 */
+	numclusters = bpb_to_numclusters(cp);
+
+	*fattypep = fattype(numclusters);
+
+	/* Do some final sanity checks for each specific type of FAT */
+	switch (*fattypep) {
+		case 0: /* FAT12 */
+		case PCFS_FAT16:
+			if (!check_bpb_fat16((struct bootsec *)cp))
+				return (0);
+			break;
+		case PCFS_FAT32:
+			if (!check_bpb_fat32((struct fat32_bootsec *)cp))
+				return (0);
+			break;
+		default: /* not sure yet */
+			*fattypep = secondaryBPBChecks(cp);
+			if (*fattypep == -1) {
+				/* Still nothing, give it up. */
+				return (0);
+			}
+			break;
+	}
+	PC_DPRINTF0(5, "isBPB: BPB passes verification tests");
+	return (1);
+}
+
+
+/*
  * Get the FAT type for the DOS medium.
  *
- * We look at sector 0 and determine if we are looking at an FDISK table
- * or a BIOS Parameter Block (BPB).  Most of the time, if its a floppy
- * we'll be looking at a BPB and if we're looking at a hard drive we'll be
- * examining an FDISK table.  Those fun exceptions do happen, though.
+ * -------------------------
+ * According to Microsoft:
+ *   The FAT type one of FAT12, FAT16, or FAT32 is determined by the
+ * count of clusters on the volume and nothing else.
+ * -------------------------
  *
- * If we are looking at a BPB, we can calculate and verify the FAT size.
- * If we are looking at an FDISK partition table, we scan the partition
- * table for the requested logical volume.
  */
 static int
 pc_getfattype(
@@ -1115,13 +1420,7 @@ pc_getfattype(
 	daddr_t *strtsectp,
 	int *fattypep)
 {
-	struct mboot *dosp_ptr;		/* boot structure pointer */
-	struct bootsec *bootp, *bpbp;	/* for detailed sector examination */
 	uchar_t *cp;			/* for searching out FAT string */
-	uint_t overhead;		/* sectors not part of file area */
-	uint_t numclusters;		/* number of clusters in file area */
-	uint_t bytesoffat;		/* computed number of bytes in a FAT */
-	int secsize;			/* Sector size in bytes/sec */
 	buf_t *bp = NULL;		/* Disk buffer pointer */
 	int rval = 0;
 	uchar_t sysid = 0;		/* System ID character */
@@ -1149,195 +1448,20 @@ pc_getfattype(
 		goto out;
 	}
 
-	/*
-	 * If this is a logical volume with a FAT file system,
-	 * then we expect to find a "file system boot sector"
-	 * (also called a BIOS Perameter Block -- or BPB) in
-	 * the first physical sector.
-	 */
-
-	/*
-	 * The word "FAT" is encoded into the BPB beginning at
-	 * PCFS_TYPESTRING_OFFSET16 in 12 and 16 bit FATs.  It is
-	 * encoded at FS_TYPESTRING_OFFSET32 in 32 bit FATs.
-	 */
 	cp = (uchar_t *)bp->b_un.b_addr;
-	if (*(cp + PCFS_TYPESTRING_OFFSET16) == 'F' &&
-	    *(cp + PCFS_TYPESTRING_OFFSET16 + 1) == 'A' &&
-	    *(cp + PCFS_TYPESTRING_OFFSET16 + 2) == 'T') {
-		PC_DPRINTF0(5, "Found the FAT string at 12/16 location\n");
-		/*
-		 * Compute a bits/fat value
-		 */
-		bpbp = (struct bootsec *)bp->b_un.b_addr;
-		secsize = (int)ltohs(bpbp->bps[0]);
-		/*
-		 * Check for bogus sector size -
-		 *	fat should be at least 1 sector
-		 * If anything looks weird, we have to bail and try looking
-		 * for an FDISK table instead.
-		 */
-		if (secsize < 512 || (int)ltohs(bpbp->fatsec) < 1 ||
-		    bpbp->nfat < 1 || bpbp->spcl < 1) {
-			PC_DPRINTF4(5, "One or more BPB fields bad\n"
-			    "bytes/sec = %d, sec/fat = %d, numfats = %d, "
-			    "sec/clust = %d\n", secsize,
-			    (int)ltohs(bpbp->fatsec), bpbp->nfat, bpbp->spcl);
-			goto lookforfdisk;
-		}
-
-		overhead = bpbp->nfat * ltohs(bpbp->fatsec);
-		overhead += ltohs(bpbp->res_sec[0]);
-		overhead += (ltohs(bpbp->rdirents[0]) *
-		    sizeof (struct pcdir)) / secsize;
-
-		numclusters = ((ltohs(bpbp->numsect[0]) ?
-		    ltohs(bpbp->numsect[0]) : ltohi(bpbp->totalsec)) -
-		    overhead) / bpbp->spcl;
-
-		/*
-		 * If the number of clusters looks bad, go look for an
-		 * FDISK table.
-		 */
-		if (numclusters < 1) {
-			PC_DPRINTF1(5, "num clusters is bad ( = %d )\n",
-			    numclusters);
-			goto lookforfdisk;
-		}
-
-		/*
-		 * The number of bytes of FAT determines the maximum number
-		 * of entries of a given size that FAT can contain.
-		 * The FAT can only contain (bytes of FAT)*8/12 12-bit entries
-		 * and (bytes of FAT)*8/16 16-bit entries.
-		 */
-		bytesoffat = ltohs(bpbp->fatsec) * secsize;
-		PC_DPRINTF1(5, "Computed bytes of fat = %u\n", bytesoffat);
-		if ((bytesoffat * 2 / 3) >= numclusters &&
-		    *(cp + PCFS_TYPESTRING_OFFSET16 + 4) == '2') {
-			PC_DPRINTF0(4, "pc_getfattype: 12-bit FAT\n");
-			*fattypep = 0;
-			rval = 0;
-			goto out;
-		} else if (*(cp + PCFS_TYPESTRING_OFFSET16 + 4) == '6') {
-			/*
-			 * this check can result in a false positive, where
-			 * we believe a FAT12 filesystem to be a FAT16 one
-			 * (if the type recorded in the header block lies).
-			 * we recover from being lied to, in 'pc_getfat' by
-			 * Forcing fat12 over fat16, if
-			 *    'pcfs_fatsec <= 12' and
-			 *    '(byteoffat * 2 / 3) >= numclusters'
-			 * the obvious check would have been:
-			 * 	else if ((bytesoffat / 2) >= numclusters &&
-			 * 	*(cp + PCFS_TYPESTRING_OFFSET16 + 4) == '6')
-			 */
-			PC_DPRINTF0(4, "pc_getfattype: 16-bit FAT\n");
-			*fattypep = PCFS_FAT16;
-			rval = 0;
-			goto out;
-		}
-		goto lookforfdisk;
-	} else if (*(cp + PCFS_TYPESTRING_OFFSET32) == 'F' &&
-	    *(cp + PCFS_TYPESTRING_OFFSET32 + 1) == 'A' &&
-	    *(cp + PCFS_TYPESTRING_OFFSET32 + 2) == 'T') {
-		PC_DPRINTF0(5, "Found the FAT string at 32 location\n");
-		bpbp = (struct bootsec *)bp->b_un.b_addr;
-		if ((int)ltohs(bpbp->fatsec) != 0) {
-			/*
-			 * Not a good sign, we expect it to be zero if
-			 * this is really a FAT32 BPB.  All we can do
-			 * is consider the string an anomaly, and go look
-			 * for an FDISK table.
-			 */
-			PC_DPRINTF0(5, "But secs/fat non-zero\n");
-			goto lookforfdisk;
-		}
-		PC_DPRINTF0(4, "pc_getfattype: 32-bit FAT\n");
-		*fattypep = PCFS_FAT32;
-		rval = 0;
-		goto out;
-	} else {
-		/*
-		 *  We've got some legacy cases (like the stuff fdformat
-		 *  produces!).  Basically this is pre-MSDOS4.0 FATs.
-		 *
-		 *  We'll declare a match if:
-		 *	1. Bytes/Sector and other fields seem reasonable
-		 *	2. The media byte matches a known one.
-		 *
-		 *  If the media byte indicates a floppy we'll
-		 *  assume FAT12, otherwise we'll assume FAT16.
-		 */
-		bpbp = (struct bootsec *)bp->b_un.b_addr;
-		secsize = (int)ltohs(bpbp->bps[0]);
-		if (secsize && secsize % 512 == 0 &&
-		    ltohs(bpbp->fatsec) > 0 && bpbp->nfat > 0 &&
-		    bpbp->spcl > 0 && ltohs(bpbp->res_sec[0]) >= 1 &&
-		    ltohs(bpbp->numsect[0]) > 0) {
-			switch (bpbp->mediadesriptor) {
-			case SS8SPT:
-			case DS8SPT:
-			case SS9SPT:
-			case DS9SPT:
-			case DS18SPT:
-			case DS9_15SPT:
-				*fattypep = 0;
-				rval = 0;
-				goto out;
-			case MD_FIXED:
-				*fattypep = PCFS_FAT16;
-				rval = 0;
-				goto out;
-			default:
-				goto lookforfdisk;
-			}
-		}
-	}
-
-lookforfdisk:
-	/*
-	 *  If we got here then we didn't find a BPB.
-	 *  We now assume we are looking at the start of a hard drive,
-	 *  where the first sector will be a Master Boot Record (MBR).
-	 *  The MBR contains a partition table (also called an FDISK
-	 *  table) and should end with a signature word (MBB_MAGIC).
-	 *
-	 *  Check signature at end of boot block for good value.
-	 *  If not then error with invalid request.
-	 */
-	dosp_ptr = (struct mboot *)bp->b_un.b_addr;
-	if (ltohs(dosp_ptr->signature) != MBB_MAGIC) {
-		cmn_err(CE_NOTE, "!pcfs: MBR signature error");
-		rval = EINVAL;
-		goto out;
-	}
-	if (ldrive <= 0) {
-		cmn_err(CE_NOTE, "!pcfs: no logical drive specified");
-		rval = EINVAL;
-		goto out;
-	}
-
-	if (findTheDrive(dev, ldrive, &rval, &bp, strtsectp, &sysid) == 0)
-		goto out;
 
 	/*
-	 * Check the sysid value of the logical drive.
-	 * Return the correct value for the type of FAT found.
-	 * Else return a value of -1 for unknown FAT type.
+	 * If the first block is not a valid BPB, look for the
+	 * through the FDISK table.
 	 */
-	if ((sysid == DOS_FAT32) || (sysid == DOS_FAT32_LBA)) {
-		*fattypep = PCFS_FAT32 | PCFS_NOCHK;
-		PC_DPRINTF0(4, "pc_getfattype: 32-bit FAT\n");
-	} else if ((sysid == DOS_SYSFAT16) || (sysid == DOS_SYSHUGE) ||
-	    (sysid == DIAGPART) ||
-	    (sysid == DOS_FAT16P_LBA) || (sysid == DOS_FAT16_LBA)) {
-		*fattypep = PCFS_FAT16 | PCFS_NOCHK;
-		PC_DPRINTF0(4, "pc_getfattype: 16-bit FAT\n");
-	} else if (sysid == DOS_SYSFAT12) {
-		*fattypep = PCFS_NOCHK;
-		PC_DPRINTF0(4, "pc_getfattype: 12-bit FAT\n");
-	} else if (sysid == X86BOOT) {
+	if (!isBPB(cp, fattypep)) {
+		/* find the partition table and get 512 bytes from it. */
+		PC_DPRINTF0(5, "pc_getfattype: using FDISK table to find BPB");
+
+		if (findTheDrive(dev, ldrive, &rval, &bp,
+			strtsectp, &sysid) == 0)
+			goto out;
+
 		brelse(bp);
 		bp = bread(dev, *strtsectp, PC_SAFESECSIZE);
 		if (bp->b_flags & B_ERROR) {
@@ -1345,46 +1469,19 @@ lookforfdisk:
 			rval = EIO;
 			goto out;
 		}
-		bootp = (struct bootsec *)bp->b_un.b_addr;
+		cp = (uchar_t *)bp->b_un.b_addr;
 
-		/* get the sector size - may be more than 512 bytes */
-		secsize = (int)ltohs(bootp->bps[0]);
-		/*
-		 * Check for bogus sector size -
-		 *	fat should be at least 1 sector
-		 */
-		if (secsize < 512 || (int)ltohs(bootp->fatsec) < 1 ||
-		    bootp->nfat < 1 || bootp->spcl < 1) {
-			cmn_err(CE_NOTE, "!pcfs: FAT size error");
-			rval = EINVAL;
+		/* If this one is still no good, give it up. */
+		if (!isBPB(cp, fattypep)) {
+			rval = EIO;
 			goto out;
 		}
-
-		overhead = bootp->nfat * ltohs(bootp->fatsec);
-		overhead += ltohs(bootp->res_sec[0]);
-		overhead += (ltohs(bootp->rdirents[0]) *
-		    sizeof (struct pcdir)) / secsize;
-
-		numclusters = ((ltohs(bootp->numsect[0]) ?
-		    ltohs(bootp->numsect[0]) : ltohi(bootp->totalsec)) -
-		    overhead) / bootp->spcl;
-
-		if (numclusters > DOS_F12MAXC) {
-			PC_DPRINTF0(4, "pc_getfattype: 16-bit FAT BOOTPART\n");
-			*fattypep = PCFS_FAT16 | PCFS_NOCHK | PCFS_BOOTPART;
-		} else {
-			PC_DPRINTF0(4, "pc_getfattype: 12-bit FAT BOOTPART\n");
-			*fattypep = PCFS_NOCHK | PCFS_BOOTPART;
-		}
-	} else {
-		cmn_err(CE_NOTE, "!pcfs: unknown FAT type");
-		rval = EINVAL;
 	}
 
-/*
- *   Release the buffer used
- */
 out:
+	/*
+	 * Release the buffer used
+	 */
 	if (bp != NULL)
 		brelse(bp);
 	(void) VOP_CLOSE(devvp, FREAD, 1, (offset_t)0, CRED());
@@ -1414,6 +1511,7 @@ pc_getfat(struct pcfs *fsp)
 	int nfat;
 	int secsize;
 	int fatsec;
+	int fattype;
 
 	PC_DPRINTF0(5, "pc_getfat\n");
 	devvp = fsp->pcfs_devvp;
@@ -1459,6 +1557,7 @@ pc_getfat(struct pcfs *fsp)
 	}
 	tp->b_flags |= B_STALE | B_AGE;
 	bootp = (struct bootsec *)tp->b_un.b_addr;
+
 
 	/* get the sector size - may be more than 512 bytes */
 	secsize = (int)ltohs(bootp->bps[0]);
@@ -1534,16 +1633,19 @@ pc_getfat(struct pcfs *fsp)
 	fat_changemapsize = (fatsize / fsp->pcfs_clsize) + 1;
 	fat_changemap = kmem_zalloc(fat_changemapsize, KM_SLEEP);
 
-	if (fatp[0] != bootp->mediadesriptor ||
-	    fatp[1] != 0xFF || fatp[2] != 0xFF) {
+	/*
+	 * The only definite signature check is that the
+	 * media descriptor byte should match the first byte
+	 * of the FAT block.
+	 */
+	if (fatp[0] != bootp->mediadesriptor) {
 		cmn_err(CE_NOTE, "!pcfs: FAT signature error");
 		error = EINVAL;
 		goto out;
 	}
 	/*
 	 * Checking for fatsec and number of supported clusters, should
-	 * actually determine a FAT12/FAT media. See pc_getfattype().
-	 * fatp[3] != 0xFF is necessary for FAT validity.
+	 * actually determine a FAT12/FAT media.
 	 */
 	if (fsp->pcfs_flags & PCFS_FAT16) {
 		if ((fsp->pcfs_fatsec <= 12) &&
@@ -1554,10 +1656,6 @@ pc_getfat(struct pcfs *fsp)
 			 */
 			PC_DPRINTF0(2, "pc_getfattype: forcing 12-bit FAT\n");
 			fsp->pcfs_flags &= ~PCFS_FAT16;
-		} else if (fatp[3] != 0xFF) {
-			cmn_err(CE_NOTE, "!pcfs: FAT signature error");
-			error = EINVAL;
-			goto out;
 		}
 	}
 	/*

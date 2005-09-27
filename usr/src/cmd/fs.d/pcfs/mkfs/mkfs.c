@@ -1316,14 +1316,20 @@ compute_cluster_size(bpb_t *wbpb)
 {
 	ulong_t volsize, maxclusters;
 	ulong_t spc, spf;
-
+	ulong_t rds, tmpval1, tmpval2;
+	ulong_t disksz;
+	ulong_t fatsz;
 	volsize = wbpb->bpb.sectors_in_volume ? wbpb->bpb.sectors_in_volume :
 		wbpb->bpb.sectors_in_logical_volume;
 	volsize -= wbpb->bpb.resv_sectors;
 
 	if (GetSPC) {
 		if (MakeFAT32) {
-			if (volsize <= 0x1000000) {		/* 8G */
+			if (volsize < 0x10428) {
+				spc = 0; /* too small, trigger an error */
+			} else if (volsize <= 0x82000) {	/* 260MB */
+				spc = 1;
+			} else if (volsize <= 0x1000000) {	/* 8G */
 				spc = 8;
 			} else if (volsize <= 0x2000000) {	/* 16G */
 				spc = 16;
@@ -1333,21 +1339,23 @@ compute_cluster_size(bpb_t *wbpb)
 				spc = 64;
 			}
 		} else {
-			if (volsize <= 0x10000) {		/* 32M */
-				spc = 1;
-			} else if (volsize <= 0x20000) {	/* 64M */
+			/* FAT16 Table */
+			if (volsize <= 0x20D0) {		/* 4.1M */
+				spc = 0; /* too small, trigger an error */
+			} else if (volsize <= 0x7FA8) {		/* 16M */
 				spc = 2;
 			} else if (volsize <= 0x40000) {	/* 128M */
 				spc = 4;
-			} else if (volsize <= 0x7f800) {	/* 255M */
+			} else if (volsize <= 0x80000) {	/* 256M */
 				spc = 8;
-			} else if (volsize <= 0xff800) {	/* 511M */
+			} else if (volsize <= 0x100000) {	/* 512M */
 				spc = 16;
-			} else if (volsize <= 0x1ff800) {	/* 1023M */
+			/* Entries beyond here are only if FAT16 is forced */
+			} else if (volsize <= 0x200000) {	/* 1G */
 				spc = 32;
-			} else if (volsize <= 0x3ff800) {	/* 2047M */
+			} else if (volsize <= 0x400000) {	/* 2G */
 				spc = 64;
-			} else if (volsize <= 0x7ff800) {	/* 4095M */
+			} else if (volsize <= 0x800000) {	/* 4G */
 				spc = 128;
 			} else {
 				(void) fprintf(stderr, gettext(
@@ -1359,6 +1367,14 @@ compute_cluster_size(bpb_t *wbpb)
 		spc = SecPerClust;
 	}
 
+	/*
+	 * RootDirSectors = ((BPB_RootEntCnt * 32) +
+	 *	(BPB_BytsPerSec  1)) / BPB_BytsPerSec;
+	 */
+	rds = ((wbpb->bpb.num_root_entries * 32) +
+		(wbpb->bpb.bytes_sector - 1)) /
+		wbpb->bpb.bytes_sector;
+
 	if (GetBPF) {
 		if (MakeFAT32)
 			Fatentsize = 32;
@@ -1366,7 +1382,9 @@ compute_cluster_size(bpb_t *wbpb)
 			Fatentsize = 16;
 	} else {
 		Fatentsize = BitsPerFAT;
-		if (Fatentsize == 12 && volsize > DOS_F12MAXC * spc) {
+
+		if (Fatentsize == 12 &&
+			(volsize - rds) >= DOS_F12MAXC * spc) {
 			/*
 			 * 4228473 No way to non-interactively make a
 			 *	   pcfs filesystem
@@ -1416,39 +1434,49 @@ compute_cluster_size(bpb_t *wbpb)
 		exit(6);
 	}
 	set_fat_string(wbpb, Fatentsize);
+	/*
+	 * Compure the FAT sizes according to algorithm from Microsoft:
+	 *
+	 * RootDirSectors = ((BPB_RootEntCnt * 32) +
+	 *	(BPB_BytsPerSec  1)) / BPB_BytsPerSec;
+	 * TmpVal1 = DskSize - (BPB_ResvdSecCnt + RootDirSectors);
+	 * TmpVal2 = (256 * BPB_SecPerClus) + BPB_NumFATs;
+	 * If (FATType == FAT32)
+	 * 	TmpVal2 = TmpVal2 / 2;
+	 * FATSz = (TMPVal1 + (TmpVal2  1)) / TmpVal2;
+	 * If (FATType == FAT32) {
+	 * 	BPB_FATSz16 = 0;
+	 *	BPB_FATSz32 = FATSz;
+	 * } else {
+	 *	BPB_FATSz16 = LOWORD(FATSz);
+	 * 	// there is no BPB_FATSz32 in a FAT16 BPB
+	 * }
+	 */
+	tmpval1 = volsize - (wbpb->bpb.resv_sectors + rds);
+
+	tmpval2 = (256 * wbpb->bpb.sectors_per_cluster) +
+		wbpb->bpb.num_fats;
+
+	if (Fatentsize == 32)
+		tmpval2 = tmpval2 / 2;
+
+	fatsz = (tmpval1 + (tmpval2 - 1)) / tmpval2;
 
 	/* Compute a sector/fat figure */
 	switch (Fatentsize) {
 	case 32:
-		/*
-		 *  We arrive at a formula for sectors/fat by simultaneously
-		 *  solving two equations:
-		 *
-		 *	F = size of FAT (in sectors)
-		 *	V = volume size (in sectors)
-		 *	X = file area size (in clusters)
-		 *
-		 *	X = (V - 2F)/8 <--- always 8 sectors/cluster for FAT32
-		 *	F = 4(X+2)/512 <--- 4 bytes/cluster-entry,
-		 *			    512 bytes/sector
-		 *	and so,
-		 *		F = 4(((V - 2F)/8)+2)/512
-		 *			...
-		 *		F = V + 16 / 1026
-		 */
-		spf = idivceil(volsize + 16, 1026);
 		wbpb->bpb.sectors_per_fat = 0;
-		wbpb->bpb32.big_sectors_per_fat = spf;
+		wbpb->bpb32.big_sectors_per_fat = fatsz;
+		if (Verbose)
+		    printf("compute_cluster_size: Sectors per FAT32 = %d\n",
+				    wbpb->bpb32.big_sectors_per_fat);
 		break;
 	case 12:
-		maxclusters = idivceil(volsize, spc) + 2;
-		spf = idivceil(maxclusters, FAT12_ENTSPERSECT);
-		wbpb->bpb.sectors_per_fat = (ushort_t)spf;
-		break;
 	default:	/* 16 bit FAT */
-		maxclusters = idivceil(volsize, spc) + 2;
-		spf = idivceil(maxclusters, FAT16_ENTSPERSECT);
-		wbpb->bpb.sectors_per_fat = (ushort_t)spf;
+		wbpb->bpb.sectors_per_fat = (ushort_t)(fatsz & 0x0000FFFF);
+		if (Verbose)
+		    printf("compute_cluster_size: Sectors per FAT16 = %d\n",
+			wbpb->bpb.sectors_per_fat);
 		break;
 	}
 }
@@ -1538,34 +1566,36 @@ static
 void
 compute_file_area_size(bpb_t *wbpb)
 {
-	/*
-	 * First we'll find total number of sectors in the file area...
-	 */
-	if (wbpb->bpb.sectors_in_volume > 0)
-		TotalClusters = wbpb->bpb.sectors_in_volume;
-	else
-		TotalClusters = wbpb->bpb.sectors_in_logical_volume;
-
-	TotalClusters -= wbpb->bpb.resv_sectors;
-	TotalClusters -= wbpb->bpb.num_root_entries * sizeof (struct pcdir) /
-	    BPSEC;
+	int FATSz;
+	int TotSec;
+	int DataSec;
+	int RootDirSectors = ((wbpb->bpb.num_root_entries * 32) +
+			(wbpb->bpb.bytes_sector - 1)) /
+			wbpb->bpb.bytes_sector;
 
 	if (wbpb->bpb.sectors_per_fat) {
 		/*
 		 * Good old FAT12 or FAT16
 		 */
-		TotalClusters -= 2 * wbpb->bpb.sectors_per_fat;
+		FATSz = wbpb->bpb.sectors_per_fat;
+		TotSec = wbpb->bpb.sectors_in_volume;
 	} else {
 		/*
 		 *  FAT32
 		 */
-		TotalClusters -= 2 * wbpb->bpb32.big_sectors_per_fat;
+		FATSz = wbpb->bpb32.big_sectors_per_fat;
+		TotSec = wbpb->bpb.sectors_in_logical_volume;
 	}
+
+	DataSec = TotSec - (wbpb->bpb.resv_sectors +
+			(wbpb->bpb.num_fats * FATSz) +
+			RootDirSectors);
+
 
 	/*
 	 * Now change sectors to clusters
 	 */
-	TotalClusters = TotalClusters / wbpb->bpb.sectors_per_cluster;
+	TotalClusters = DataSec / wbpb->bpb.sectors_per_cluster;
 
 	if (Verbose)
 		(void) printf(gettext("Disk has a file area of %d "
@@ -2594,6 +2624,7 @@ build_fat(bpb_t *wbpb, struct fat32_boot_fsinfo *fsinfop, ulong_t bootblksize,
 	} else {
 		*fatsize = BPSEC * wbpb->bpb.sectors_per_fat;
 	}
+
 	if (!(fatp = (uchar_t *)malloc(*fatsize))) {
 		perror(gettext("FAT table alloc"));
 		exit(4);
