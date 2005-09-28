@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +86,6 @@
  */
 
 #include <sys/usb/usba.h>
-#include <sys/usb/usba/usbai_private.h>
 #include <sys/usb/clients/usbskel/usbskel.h>
 
 static int	usbskel_errlevel = USBSKEL_LOG_LOG;
@@ -182,13 +181,6 @@ static struct modlinkage modlinkage = {
 	MODREV_1,
 	&usbskel_modldrv,
 	NULL
-};
-
-/* event support */
-static usb_event_t usbskel_events = {
-	usbskel_disconnect_callback,
-	usbskel_reconnect_callback,
-	NULL, NULL
 };
 
 /* local variables */
