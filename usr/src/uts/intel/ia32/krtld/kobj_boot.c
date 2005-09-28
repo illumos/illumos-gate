@@ -371,7 +371,7 @@ _kobj_boot(
 			 */
 
 			case R_386_GOTPC:
-#if defined(DEBUG)
+#if defined(DEBUG) && !defined(__GNUC__)
 				BSVC_PUTCHAR(syscallp, 'p');
 #endif
 				break;
