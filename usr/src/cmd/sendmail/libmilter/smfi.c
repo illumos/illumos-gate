@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 1999-2004 Sendmail, Inc. and its suppliers.
+ *  Copyright (c) 1999-2005 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  *
  * By using this file, you agree to the terms and conditions set
@@ -11,7 +11,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: smfi.c,v 8.73 2004/09/20 21:26:57 ca Exp $")
+SM_RCSID("@(#)$Id: smfi.c,v 8.74 2005/03/30 00:44:07 ca Exp $")
 #include <sm/varargs.h>
 #include "libmilter.h"
 
@@ -244,7 +244,7 @@ smfi_replacebody(ctx, bodyp, bodylen)
 
 	/* split body chunk if necessary */
 	off = 0;
-	while (bodylen > 0)
+	do
 	{
 		len = (bodylen >= MILTER_CHUNK_SIZE) ? MILTER_CHUNK_SIZE :
 						       bodylen;
@@ -253,7 +253,7 @@ smfi_replacebody(ctx, bodyp, bodylen)
 			return r;
 		off += len;
 		bodylen -= len;
-	}
+	} while (bodylen > 0);
 	return MI_SUCCESS;
 }
 

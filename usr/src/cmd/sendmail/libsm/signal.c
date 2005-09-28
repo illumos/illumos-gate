@@ -10,10 +10,10 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: signal.c,v 1.13 2001/08/14 16:05:47 ca Exp $")
+SM_RCSID("@(#)$Id: signal.c,v 1.17 2005/06/14 23:07:20 ca Exp $")
 
 #if SM_CONF_SETITIMER
-# include <sys/time.h>
+# include <sm/time.h>
 #endif /* SM_CONF_SETITIMER */
 #include <errno.h>
 #include <stdlib.h>
@@ -27,7 +27,7 @@ SM_RCSID("@(#)$Id: signal.c,v 1.13 2001/08/14 16:05:47 ca Exp $")
 unsigned int	volatile InCriticalSection; /* >0 if inside critical section */
 int		volatile PendingSignal;	/* pending signal to resend */
 
-/*
+/*
 **  SM_SIGNAL -- set a signal handler
 **
 **	This is essentially old BSD "signal(3)".
@@ -91,7 +91,7 @@ sm_signal(sig, handler)
 #  endif /* defined(SYS5SIGNALS) || defined(BSD4_3) */
 # endif /* SA_RESTART */
 }
-/*
+/*
 **  SM_BLOCKSIGNAL -- hold a signal to prevent delivery
 **
 **	Parameters:
@@ -133,7 +133,7 @@ sm_blocksignal(sig)
 #  endif /* ALTOS_SYSTEM_V */
 # endif /* BSD4_3 */
 }
-/*
+/*
 **  SM_RELEASESIGNAL -- release a held signal
 **
 **	Parameters:
@@ -172,7 +172,7 @@ sm_releasesignal(sig)
 #  endif /* ALTOS_SYSTEM_V */
 # endif /* BSD4_3 */
 }
-/*
+/*
 **  PEND_SIGNAL -- Add a signal to the pending signal list
 **
 **	Parameters:
@@ -251,7 +251,7 @@ pend_signal(sig)
 #endif /* SM_CONF_SETITIMER */
 	errno = save_errno;
 }
-/*
+/*
 **  SM_ALLSIGNALS -- act on all signals
 **
 **	Parameters:
@@ -318,7 +318,7 @@ sm_allsignals(block)
 #  endif /* ALTOS_SYSTEM_V */
 # endif /* BSD4_3 */
 }
-/*
+/*
 **  SM_SIGNAL_NOOP -- A signal no-op function
 **
 **	Parameters:

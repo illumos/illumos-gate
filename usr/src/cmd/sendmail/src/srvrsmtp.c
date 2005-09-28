@@ -19,9 +19,9 @@
 # include <libmilter/mfdef.h>
 #endif /* MILTER */
 
-SM_RCSID("@(#)$Id: srvrsmtp.c,v 8.906 2005/03/16 00:36:09 ca Exp $")
+SM_RCSID("@(#)$Id: srvrsmtp.c,v 8.909 2005/06/14 23:33:21 ca Exp $")
 
-#include <sys/time.h>
+#include <sm/time.h>
 #include <sm/fdset.h>
 
 #if SASL || STARTTLS
@@ -302,7 +302,8 @@ static bool	smtp_data __P((SMTP_T *, ENVELOPE *));
 					  str, addr, response);		\
 				LogUsrErrs = false;			\
 			}						\
-			if (strncmp(response, "421 ", 4) == 0)		\
+			if (strncmp(response, "421 ", 4) == 0		\
+			    || strncmp(response, "421-", 4) == 0)	\
 			{						\
 				bool tsave = QuickAbort;		\
 									\
@@ -898,6 +899,9 @@ smtp(nullserver, d_flags, e)
 			int fd;
 			fd_set readfds;
 			struct timeval timeout;
+#if _FFR_LOG_GREET_PAUSE
+			struct timeval bp, ep, tp; /* {begin,end,total}pause */
+#endif /* _FFR_LOG_GREET_PAUSE */
 
 			/* pause for a moment */
 			timeout.tv_sec = msecs / 1000;
@@ -914,16 +918,32 @@ smtp(nullserver, d_flags, e)
 			fd = sm_io_getinfo(InChannel, SM_IO_WHAT_FD, NULL);
 			FD_ZERO(&readfds);
 			SM_FD_SET(fd, &readfds);
+#if _FFR_LOG_GREET_PAUSE
+			gettimeofday(&bp, NULL);
+#endif /* _FFR_LOG_GREET_PAUSE */
 			if (select(fd + 1, FDSET_CAST &readfds,
 			    NULL, NULL, &timeout) > 0 &&
 			    FD_ISSET(fd, &readfds))
 			{
+#if _FFR_LOG_GREET_PAUSE
+				gettimeofday(&ep, NULL);
+				timersub(&ep, &bp, &tp);
+#endif /* _FFR_LOG_GREET_PAUSE */
 				greetcode = "554";
 				nullserver = "Command rejected";
 				sm_syslog(LOG_INFO, e->e_id,
+#if _FFR_LOG_GREET_PAUSE
+					  "rejecting commands from %s [%s] after %d seconds due to pre-greeting traffic",
+#else /* _FFR_LOG_GREET_PAUSE */
 					  "rejecting commands from %s [%s] due to pre-greeting traffic",
+#endif /* _FFR_LOG_GREET_PAUSE */
 					  peerhostname,
-					  anynet_ntoa(&RealHostAddr));
+					  anynet_ntoa(&RealHostAddr)
+#if _FFR_LOG_GREET_PAUSE
+					  , (int) tp.tv_sec +
+						(tp.tv_usec >= 500000 ? 1 : 0)
+#endif /* _FFR_LOG_GREET_PAUSE */
+					 );
 			}
 		}
 	}
@@ -3151,7 +3171,8 @@ smtp_data(smtp, e)
 				LogUsrErrs = false;
 			}
 			usrerr(response);
-			if (strncmp(response, "421 ", 4) == 0)
+			if (strncmp(response, "421 ", 4) == 0
+			    || strncmp(response, "421-", 4) == 0)
 			{
 				e->e_sendqueue = NULL;
 				return false;

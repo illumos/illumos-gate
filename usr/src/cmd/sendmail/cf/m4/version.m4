@@ -12,8 +12,8 @@ divert(-1)
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-VERSIONID(`$Id: version.m4,v 8.132 2005/03/25 18:44:45 ca Exp $')
+VERSIONID(`$Id: version.m4,v 8.138 2005/09/15 21:38:40 ca Exp $')
 #
 divert(0)
 # Configuration version number
-DZ8.13.4`'ifdef(`confCF_VERSION', `/confCF_VERSION')
+DZ8.13.5`'ifdef(`confCF_VERSION', `/confCF_VERSION')

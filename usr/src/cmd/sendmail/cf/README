@@ -74,7 +74,7 @@ Let's examine a typical .mc file:
 
 	divert(-1)
 	#
-	# Copyright (c) 1998-2004 Sendmail, Inc. and its suppliers.
+	# Copyright (c) 1998-2005 Sendmail, Inc. and its suppliers.
 	#	All rights reserved.
 	# Copyright (c) 1983 Eric P. Allman.  All rights reserved.
 	# Copyright (c) 1988, 1993
@@ -393,11 +393,12 @@ confEBINDIR		[/usr/libexec] The directory for executables.
 LOCAL_PROG_QGRP		[undefined] The queue group for the prog mailer.
 
 Note: to tweak Name_MAILER_FLAGS use the macro MODIFY_MAILER_FLAGS:
-MODIFY_MAILER_FLAGS(`Name', `change') where Name is the first part of
-the macro Name_MAILER_FLAGS and change can be: flags that should
-be used directly (thus overriding the default value), or if it
-starts with `+' (`-') then those flags are added to (removed from)
-the default value.  Example:
+MODIFY_MAILER_FLAGS(`Name', `change') where Name is the first part
+of the macro Name_MAILER_FLAGS (note: that means Name is entirely in
+upper case) and change can be: flags that should be used directly
+(thus overriding the default value), or if it starts with `+' (`-')
+then those flags are added to (removed from) the default value.
+Example:
 
 	MODIFY_MAILER_FLAGS(`LOCAL', `+e')
 
@@ -816,7 +817,7 @@ generics_entire_domain
 
 virtusertable	A domain-specific form of aliasing, allowing multiple
 		virtual domains to be hosted on one machine.  For example,
-		if the virtuser table contained:
+		if the virtuser table contains:
 
 			info@foo.com	foo-info
 			info@bar.com	bar-info
@@ -1044,7 +1045,7 @@ accept_unqualified_senders
 		Normally, MAIL FROM: commands in the SMTP session will be
 		refused if the connection is a network connection and the
 		sender address does not include a domain name.  If your
-		setup sends local mail unqualified (i.e., MAIL FROM: <joe>),
+		setup sends local mail unqualified (i.e., MAIL FROM:<joe>),
 		you will need to use this feature to accept unqualified
 		sender addresses.  Setting the DaemonPortOptions modifier
 		'u' overrides the default behavior, i.e., unqualified
@@ -1652,7 +1653,8 @@ sections below).
 See the file cf/sendmail.schema for the actual LDAP schemas.  Note that
 this schema (and therefore the lookups and examples below) is experimental
 at this point as it has had little public review.  Therefore, it may change
-in future versions.  Feedback via sendmail@sendmail.org is encouraged.
+in future versions.  Feedback via sendmail-YYYY@support.sendmail.org is
+encouraged (replace YYYY with the current year, e.g., 2005).
 
 -------
 Aliases
@@ -2116,7 +2118,7 @@ without any prior arrangement).  Along the same lines,
 	FEATURE(`relay_local_from')
 
 will allow relaying if the sender specifies a return path (i.e.
-MAIL FROM: <user@domain>) domain which is a local domain.  This is a
+MAIL FROM:<user@domain>) domain which is a local domain.  This is a
 dangerous feature as it will allow spammers to spam using your mail
 server by simply specifying a return address of user@your.domain.com.
 It should not be used unless absolutely necessary.
@@ -2137,7 +2139,7 @@ allow relaying for roaming users.
 
 
 If source routing is used in the recipient address (e.g.,
-RCPT TO: <user%site.com@othersite.com>), sendmail will check
+RCPT TO:<user%site.com@othersite.com>), sendmail will check
 user@site.com for relaying if othersite.com is an allowed relay host
 in either class {R}, class {m} if FEATURE(`relay_entire_domain') is used,
 or the access database if FEATURE(`access_db') is used.  To prevent
@@ -2576,8 +2578,7 @@ That may cause problems with simple header checks due to the
 tokenization.  It might be simpler to use a regex map and apply it
 to $&{currHeader}.
 2. There are no default rulesets coming with this distribution of
-sendmail.  You can either write your own or you can search the
-WWW for examples, e.g.,  http://www.digitalanswers.org/check_local/
+sendmail.  You can write your own or search the WWW for examples.
 3. When using a default ruleset for headers, the name of the header 
 currently being checked can be found in the $&{hdr_name} macro.
 
@@ -2893,6 +2894,15 @@ LOCAL_RULESETS respectively.  For example:
 	LOCAL_RULESETS
 	Smyruleset
 	...
+
+Local additions for the rulesets srv_features, try_tls, tls_rcpt,
+tls_client, and tls_server can be made using LOCAL_SRV_FEATURES,
+LOCAL_TRY_TLS, LOCAL_TLS_RCPT, LOCAL_TLS_CLIENT, and LOCAL_TLS_SERVER,
+respectively.  For example, to add a local ruleset that decides
+whether to try STARTTLS in a sendmail client, use:
+
+	LOCAL_TRY_TLS
+	R...
 
 Note: you don't need to add a name for the ruleset, it is implicitly
 defined by using the appropriate macro.
@@ -3683,12 +3693,17 @@ confDONT_INIT_GROUPS	DontInitGroups	[False] If set, the initgroups(3)
 					will only have their primary
 					(/etc/passwd) group permissions.
 confUNSAFE_GROUP_WRITES	UnsafeGroupWrites
-					[False] If set, group-writable
+					[True] If set, group-writable
 					:include: and .forward files are
 					considered "unsafe", that is, programs
 					and files cannot be directly referenced
 					from such files.  World-writable files
 					are always considered unsafe.
+					Notice: this option is deprecated and
+					will be removed in future versions;
+					Set GroupWritableForwardFileSafe
+					and GroupWritableIncludeFileSafe in
+					DontBlameSendmail if required.
 confCONNECT_ONLY_TO	ConnectOnlyTo	[undefined] override connection
 					address (for testing).
 confCONTROL_SOCKET_NAME	ControlSocketName
@@ -3815,7 +3830,7 @@ confNICE_QUEUE_RUN	NiceQueueRun	[undefined]  If set, the priority of
 confDIRECT_SUBMISSION_MODIFIERS	DirectSubmissionModifiers
 					[undefined] Defines {daemon_flags}
 					for direct submissions.
-confUSE_MSP		UseMSP		[false] Use as mail submission
+confUSE_MSP		UseMSP		[undefined] Use as mail submission
 					program.
 confDELIVER_BY_MIN	DeliverByMin	[0] Minimum time for Deliver By
 					SMTP Service Extension (RFC 2852).
@@ -4182,5 +4197,5 @@ M4 DIVERSIONS
    8	DNS based blacklists
    9	special local rulesets (1 and 2)
 
-$Revision: 8.694 $, Last updated $Date: 2005/03/23 21:41:09 $
+$Revision: 8.701 $, Last updated $Date: 2005/09/16 20:18:14 $
 ident	"%Z%%M%	%I%	%E% SMI"

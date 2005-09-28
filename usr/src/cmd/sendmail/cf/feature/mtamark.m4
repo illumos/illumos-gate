@@ -1,6 +1,6 @@
 divert(-1)
 #
-# Copyright (c) 2004 Sendmail, Inc. and its suppliers.
+# Copyright (c) 2004, 2005 Sendmail, Inc. and its suppliers.
 #	All rights reserved.
 #
 # By using this file, you agree to the terms and conditions set
@@ -12,7 +12,7 @@ divert(-1)
 
 divert(0)
 ifdef(`_MTAMARK_R',`dnl',`dnl
-VERSIONID(`$Id: mtamark.m4,v 1.1 2004/03/22 19:22:40 ca Exp $')
+VERSIONID(`$Id: mtamark.m4,v 1.2 2005/07/25 20:56:53 ca Exp $')
 LOCAL_CONFIG
 define(`_MTAMARK_R',`')dnl
 # map for MTA mark
@@ -30,5 +30,5 @@ R<?>1.		$: OKSOFAR
 R<?>0.		$#error $@ 5.7.1 $: _MTAMARK_MSG_
 ifelse(len(X`'_ARG2_),`1',
 `R<?>$+<TMP>	$: TMPOK',
-`R<?>$+<TMP>	$#error $@ 4.7.1 $: _MTAMARK_MSG_TMP_')
+`R<?>$+<TMP>	$#error $@ 4.4.3 $: _MTAMARK_MSG_TMP_')
 divert(-1)

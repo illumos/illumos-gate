@@ -11,7 +11,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: sfsasl.c,v 8.101 2004/12/15 22:45:55 ca Exp $")
+SM_RCSID("@(#)$Id: sfsasl.c,v 8.102 2005/04/06 23:39:03 ca Exp $")
 #include <stdlib.h>
 #include <sendmail.h>
 #include <errno.h>
@@ -225,6 +225,9 @@ sasl_read(fp, buf, size)
 				     (unsigned int) len, &outbuf, &outlen);
 		if (result != SASL_OK)
 		{
+			if (LogLevel > 7)
+				sm_syslog(LOG_WARNING, NOQID,
+				  	"AUTH: sasl_decode error=%d", result);
 			outbuf = NULL;
 			offset = 0;
 			outlen = 0;
@@ -314,7 +317,12 @@ sasl_write(fp, buf, size)
 			     (unsigned int) size, &outbuf, &outlen);
 
 	if (result != SASL_OK)
+	{
+		if (LogLevel > 7)
+			sm_syslog(LOG_WARNING, NOQID,
+			  	"AUTH: sasl_encode error=%d", result);
 		return -1;
+	}
 
 	if (outbuf != NULL)
 	{

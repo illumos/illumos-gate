@@ -15,7 +15,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: daemon.c,v 8.658 2005/02/02 18:19:28 ca Exp $")
+SM_RCSID("@(#)$Id: daemon.c,v 8.661 2005/06/17 21:00:19 ca Exp $")
 
 #if defined(SOCK_STREAM) || defined(__GNU_LIBRARY__)
 # define USE_SOCK_STREAM	1
@@ -36,7 +36,7 @@ SM_RCSID("@(#)$Id: daemon.c,v 8.658 2005/02/02 18:19:28 ca Exp $")
 #  include <openssl/rand.h>
 #endif /* STARTTLS */
 
-#include <sys/time.h>
+#include <sm/time.h>
 
 #if IP_SRCROUTE && NETINET
 # include <netinet/in_systm.h>
@@ -91,9 +91,6 @@ typedef struct daemon DAEMON_T;
 
 #define SAFE_NOTSET	(-1)	/* SuperSafe (per daemon) option not set */
 /* see also sendmail.h: SuperSafe values */
-
-#define DM_NOTSET	(-1)	/* DeliveryMode (per daemon) option not set */
-/* see also sendmail.h: values for e_sendmode -- send modes */
 
 static void		connecttimeout __P((int));
 static int		opendaemonsocket __P((DAEMON_T *, bool));
@@ -1457,6 +1454,12 @@ setsockaddroptions(p, d)
 	if (d->d_addr.sa.sa_family == AF_UNSPEC)
 		d->d_addr.sa.sa_family = AF_INET;
 #endif /* NETINET */
+#if _FFR_SS_PER_DAEMON
+	d->d_supersafe = SAFE_NOTSET;
+#endif /* _FFR_SS_PER_DAEMON */
+#if _FFR_DM_PER_DAEMON
+	d->d_dm = DM_NOTSET;
+#endif /* _FFR_DM_PER_DAEMON */
 
 	while (p != NULL)
 	{
@@ -1478,12 +1481,6 @@ setsockaddroptions(p, d)
 			continue;
 		if (isascii(*f) && islower(*f))
 			*f = toupper(*f);
-#if _FFR_SS_PER_DAEMON
-		d->d_supersafe = SAFE_NOTSET;
-#endif /* _FFR_SS_PER_DAEMON */
-#if _FFR_DM_PER_DAEMON
-		d->d_dm = DM_NOTSET;
-#endif /* _FFR_DM_PER_DAEMON */
 
 		switch (*f)
 		{

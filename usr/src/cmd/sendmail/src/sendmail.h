@@ -54,7 +54,7 @@
 
 #ifdef _DEFINE
 # ifndef lint
-SM_UNUSED(static char SmailId[]) = "@(#)$Id: sendmail.h,v 8.993 2005/03/07 18:03:17 ca Exp $";
+SM_UNUSED(static char SmailId[]) = "@(#)$Id: sendmail.h,v 8.995 2005/06/23 23:11:22 ca Exp $";
 # endif /* ! lint */
 #endif /* _DEFINE */
 
@@ -1215,7 +1215,7 @@ MAP
 #define MF_REGEX_NOT	0x00040000	/* regular expression negation */
 #define MF_DEFER	0x00080000	/* don't lookup map in defer mode */
 #define MF_SINGLEMATCH	0x00100000	/* successful only if match one key */
-/*			0x00200000	   available for use */
+#define MF_SINGLEDN	0x00200000	/* only one match, but multi values */
 #define MF_FILECLASS	0x00400000	/* this is a file class map */
 #define MF_OPENBOGUS	0x00800000	/* open failed, don't call map_close */
 #define MF_CLOSING	0x01000000	/* map is being closed */
@@ -1547,6 +1547,7 @@ extern void	stabapply __P((void (*)(STAB *, int), int));
 #define SM_QUEUE	'q'		/* queue, don't deliver */
 #define SM_DEFER	'd'		/* defer map lookups as well as queue */
 #define SM_VERIFY	'v'		/* verify only (used internally) */
+#define DM_NOTSET	(-1)	/* DeliveryMode (per daemon) option not set */
 
 #define WILL_BE_QUEUED(m)	((m) == SM_QUEUE || (m) == SM_DEFER)
 

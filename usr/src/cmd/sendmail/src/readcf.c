@@ -15,7 +15,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: readcf.c,v 8.642 2004/08/04 21:17:57 ca Exp $")
+SM_RCSID("@(#)$Id: readcf.c,v 8.643 2005/09/04 06:15:15 ca Exp $")
 
 #if NETINET || NETINET6
 # include <arpa/inet.h>
@@ -2233,10 +2233,10 @@ setoption(opt, val, safe, sticky, e)
 #if _FFR_ALLOW_SASLINFO
 	extern unsigned int SubmitMode;
 #endif /* _FFR_ALLOW_SASLINFO */
-#if STARTTLS
+#if STARTTLS || (_FFR_SELECT_SHM && SM_CONF_SHM)
 	char *newval;
 	char exbuf[MAXLINE];
-#endif /* STARTTLS */
+#endif /* STARTTLS || (_FFR_SELECT_SHM && SM_CONF_SHM) */
 
 	errno = 0;
 	if (opt == ' ')

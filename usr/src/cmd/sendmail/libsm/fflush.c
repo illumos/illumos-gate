@@ -15,10 +15,10 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: fflush.c,v 1.41 2001/05/15 16:55:27 ca Exp $")
+SM_RCSID("@(#)$Id: fflush.c,v 1.44 2005/06/14 23:07:20 ca Exp $")
 #include <unistd.h>
 #include <errno.h>
-#include <sys/time.h>
+#include <sm/time.h>
 #include <signal.h>
 #include <fcntl.h>
 #include <string.h>

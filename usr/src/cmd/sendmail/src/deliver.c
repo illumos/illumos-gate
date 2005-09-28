@@ -14,9 +14,9 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sendmail.h>
-#include <sys/time.h>
+#include <sm/time.h>
 
-SM_RCSID("@(#)$Id: deliver.c,v 8.986 2005/03/05 02:28:50 ca Exp $")
+SM_RCSID("@(#)$Id: deliver.c,v 8.990 2005/08/24 17:58:33 ca Exp $")
 
 #if HASSETUSERCONTEXT
 # include <login_cap.h>
@@ -1203,13 +1203,13 @@ should_try_fbsh(e, tried_fallbacksmarthost, hostbuf, hbsz, status)
 	int status;
 {
 	/*
-	**  If the host was not found and a FallbackSmartHost is defined
-	**  (and we have not yet tried it), then make one last try with
-	**  it as the host.
+	**  If the host was not found or a temporary failure occurred
+	**  and a FallbackSmartHost is defined (and we have not yet
+	**  tried it), then make one last try with it as the host.
 	*/
 
-	if (status == EX_NOHOST && FallbackSmartHost != NULL &&
-	    !*tried_fallbacksmarthost)
+	if ((status == EX_NOHOST || status == EX_TEMPFAIL) &&
+	    FallbackSmartHost != NULL && !*tried_fallbacksmarthost)
 	{
 		*tried_fallbacksmarthost = true;
 		expand(FallbackSmartHost, hostbuf, hbsz, e);
@@ -4508,9 +4508,9 @@ putfromline(mci, e)
 */
 
 /* values for output state variable */
-#define OS_HEAD		0	/* at beginning of line */
-#define OS_CR		1	/* read a carriage return */
-#define OS_INLINE	2	/* putting rest of line */
+#define OSTATE_HEAD	0	/* at beginning of line */
+#define OSTATE_CR	1	/* read a carriage return */
+#define OSTATE_INLINE	2	/* putting rest of line */
 
 void
 putbody(mci, e, separator)
@@ -4653,7 +4653,7 @@ putbody(mci, e, separator)
 			buflim = &buf[mci->mci_mailer->m_linelimit - 1];
 
 		/* copy temp file to output with mapping */
-		ostate = OS_HEAD;
+		ostate = OSTATE_HEAD;
 		bp = buf;
 		pbp = peekbuf;
 		while (!sm_io_error(mci->mci_out) && !dead)
@@ -4667,7 +4667,7 @@ putbody(mci, e, separator)
 				c &= 0x7f;
 			switch (ostate)
 			{
-			  case OS_HEAD:
+			  case OSTATE_HEAD:
 				if (c == '\0' &&
 				    bitnset(M_NONULLS,
 					    mci->mci_mailer->m_flags))
@@ -4787,14 +4787,14 @@ putbody(mci, e, separator)
 
 				/* determine next state */
 				if (c == '\n')
-					ostate = OS_HEAD;
+					ostate = OSTATE_HEAD;
 				else if (c == '\r')
-					ostate = OS_CR;
+					ostate = OSTATE_CR;
 				else
-					ostate = OS_INLINE;
+					ostate = OSTATE_INLINE;
 				continue;
 
-			  case OS_CR:
+			  case OSTATE_CR:
 				if (c == '\n')
 				{
 					/* got CRLF */
@@ -4815,7 +4815,7 @@ putbody(mci, e, separator)
 								   SM_TIME_DEFAULT,
 								   mci->mci_mailer->m_eol);
 					}
-					ostate = OS_HEAD;
+					ostate = OSTATE_HEAD;
 					continue;
 				}
 
@@ -4823,13 +4823,13 @@ putbody(mci, e, separator)
 				SM_ASSERT(pbp < peekbuf + sizeof(peekbuf));
 				*pbp++ = c;
 				c = '\r';
-				ostate = OS_INLINE;
+				ostate = OSTATE_INLINE;
 				goto putch;
 
-			  case OS_INLINE:
+			  case OSTATE_INLINE:
 				if (c == '\r')
 				{
-					ostate = OS_CR;
+					ostate = OSTATE_CR;
 					continue;
 				}
 				if (c == '\0' &&
@@ -4902,7 +4902,7 @@ putch:
 								     "!%s",
 								     mci->mci_mailer->m_eol);
 					}
-					ostate = OS_HEAD;
+					ostate = OSTATE_HEAD;
 					SM_ASSERT(pbp < peekbuf +
 							sizeof(peekbuf));
 					*pbp++ = c;
@@ -4925,7 +4925,7 @@ putch:
 						DataProgress = true;
 					}
 					pos = 0;
-					ostate = OS_HEAD;
+					ostate = OSTATE_HEAD;
 				}
 				else
 				{
@@ -4947,7 +4947,7 @@ putch:
 						DataProgress = true;
 					}
 					pos++;
-					ostate = OS_INLINE;
+					ostate = OSTATE_INLINE;
 				}
 				break;
 			}
@@ -6081,7 +6081,7 @@ starttls(m, mci, e)
 			XS_STARTTLS);
 
 	/* check return code from server */
-	if (smtpresult == 454)
+	if (smtpresult == 454 || smtpresult == 421)
 		return EX_TEMPFAIL;
 	if (smtpresult == 501)
 		return EX_USAGE;

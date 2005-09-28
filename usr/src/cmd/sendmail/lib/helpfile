@@ -1,22 +1,22 @@
 #vers	2
 cpyr
-cpyr	Copyright (c) 1998-2000, 2002 Sendmail, Inc. and its suppliers.
+cpyr	Copyright (c) 1998-2000, 2002, 2004, 2005 Sendmail, Inc. and its suppliers.
 cpyr	    All rights reserved.
 cpyr	Copyright (c) 1983, 1995-1997 Eric P. Allman.  All rights reserved.
 cpyr	Copyright (c) 1988, 1993
 cpyr	    The Regents of the University of California.  All rights reserved.
-cpyr	Copyright 1994 - 2002 Sun Microsystems, Inc.  All rights reserved.
+cpyr	Copyright 1994-2005 Sun Microsystems, Inc.  All rights reserved.
 cpyr	Use is subject to license terms.
 cpyr
 cpyr
-cpyr	$$Id: helpfile,v 8.40 2002/03/19 00:23:28 gshapiro Exp $$
+cpyr	$$Id: helpfile,v 8.45 2005/09/13 00:05:23 ca Exp $$
 cpyr	ident	"%Z%%M%	%I%	%E% SMI"
 cpyr
 smtp	This is sendmail version $v
 smtp	Topics:
 smtp		HELO	EHLO	MAIL	RCPT	DATA
 smtp		RSET	NOOP	QUIT	HELP	VRFY
-smtp		EXPN	VERB	ETRN	DSN
+smtp		EXPN	VERB	ETRN	DSN	STARTTLS
 smtp	For more info use "HELP <topic>".
 smtp	To report bugs in the implementation contact Sun Microsystems
 smtp	Technical Support.
@@ -42,12 +42,13 @@ ehlo		BINARYMIME	Binary MIME			[RFC1830]
 ehlo		PIPELINING	Command Pipelining		[RFC1854]
 ehlo		DSN		Delivery Status Notification	[RFC1891]
 ehlo		ETRN		Remote Message Queue Starting	[RFC1985]
+ehlo		STARTTLS	Secure SMTP			[RFC2487]
 ehlo		ENHANCEDSTATUSCODES	Enhanced status codes	[RFC2034]
 ehlo		DELIVERBY	Deliver By			[RFC2852]
-mail	MAIL FROM: <sender> [ <parameters> ]
+mail	MAIL From:<sender> [ <parameters> ]
 mail		Specifies the sender.  Parameters are ESMTP extensions.
 mail		See "HELP DSN" for details.
-rcpt	RCPT TO: <recipient> [ <parameters> ]
+rcpt	RCPT To:<recipient> [ <parameters> ]
 rcpt		Specifies the recipient.  Can be used any number of times.
 rcpt		Parameters are ESMTP extensions.  See "HELP DSN" for details.
 data	DATA
@@ -57,6 +58,8 @@ rset	RSET
 rset		Resets the system.
 quit	QUIT
 quit		Exit sendmail (SMTP).
+starttls	STARTTLS
+starttls		Start TLS negotiation.
 verb	VERB
 verb		Go into verbose mode.  This sends 0xy responses that are
 verb		not RFC821 standard (but should be)  They are recognized
@@ -83,7 +86,7 @@ saml		implementation.
 turn	TURN
 turn		Reverses the direction of the connection.  Not currently
 turn		implemented.
-etrn	ETRN [ <hostname> | @<domain> | #<queuename> ]
+etrn	ETRN [ <hostname> | @<domain> | \#<queuename> ]
 etrn		Run the queue for the specified <hostname>, or
 etrn		all hosts within a given <domain>, or a specially-named
 etrn		<queuename> (implementation-specific).

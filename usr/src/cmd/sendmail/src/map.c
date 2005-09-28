@@ -20,7 +20,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: map.c,v 8.669 2005/02/09 01:46:35 ca Exp $")
+SM_RCSID("@(#)$Id: map.c,v 8.670 2005/06/23 23:11:22 ca Exp $")
 SM_IDSTR(i2, "%W% (Sun) %G%")
 
 #if LDAPMAP
@@ -3638,6 +3638,10 @@ ldapmap_lookup(map, name, av, statp)
 		flags |= SM_LDAP_SINGLEMATCH;
 	if (bitset(MF_MATCHONLY, map->map_mflags))
 		flags |= SM_LDAP_MATCHONLY;
+# if _FFR_LDAP_SINGLEDN
+	if (bitset(MF_SINGLEDN, map->map_mflags))
+		flags |= SM_LDAP_SINGLEDN;
+# endif /* _FFR_LDAP_SINGLEDN */
 
 	/* Create an rpool for search related memory usage */
 	rpool = sm_rpool_new_x(NULL);
@@ -3997,6 +4001,12 @@ ldapmap_parseargs(map, args)
 		  case '1':
 			map->map_mflags |= MF_SINGLEMATCH;
 			break;
+
+# if _FFR_LDAP_SINGLEDN
+		  case '2':
+			map->map_mflags |= MF_SINGLEDN;
+			break;
+# endif /* _FFR_LDAP_SINGLEDN */
 
 			/* args stolen from ldapsearch.c */
 		  case 'R':		/* don't auto chase referrals */

@@ -15,13 +15,13 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: refill.c,v 1.49.2.1 2002/09/09 21:38:08 gshapiro Exp $")
+SM_RCSID("@(#)$Id: refill.c,v 1.51 2005/06/14 23:07:20 ca Exp $")
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
 #include <setjmp.h>
 #include <signal.h>
-#include <sys/time.h>
+#include <sm/time.h>
 #include <fcntl.h>
 #include <string.h>
 #include <sm/io.h>

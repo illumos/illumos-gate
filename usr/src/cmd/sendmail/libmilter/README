@@ -13,6 +13,9 @@ This README file describes the steps needed to compile and run a filter,
 through reference to a sample filter which is attached at the end of this
 file.
 
+Note: if you want to write a milter in Java, then see
+http://sendmail-jilter.sourceforge.net/
+
 +----------------+
 | SECURITY HINTS |
 +----------------+
@@ -417,4 +420,4 @@ main(argc, argv)
 
 /* eof */
 
-$Revision: 8.35.2.2 $, Last updated $Date: 2003/05/26 04:10:06 $
+$Revision: 8.41 $, Last updated $Date: 2005/04/27 22:47:42 $
