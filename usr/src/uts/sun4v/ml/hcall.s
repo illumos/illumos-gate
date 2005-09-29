@@ -375,6 +375,16 @@ uint64_t
 hv_ncs_request(int cmd, uint64_t realaddr, size_t sz)
 { return (0); }
 
+/*ARGSUSED*/	
+uint64_t
+hv_ra2pa(uint64_t ra)
+{ return (0); }
+
+/*ARGSUSED*/	
+uint64_t
+hv_hpriv(void *func, uint64_t arg1, uint64_t arg2, uint64_t arg3)
+{ return (0); }
+
 #else	/* lint || __lint */
 
 	/*
@@ -1290,12 +1300,12 @@ hv_ncs_request(int cmd, uint64_t realaddr, size_t sz)
 	SET_SIZE(hv_ttrace_freeze)
 
 	/*
-	* MACH_DESC
-	* arg0 buffer real address
-	* arg1 pointer to uint64_t for size of buffer
-	* ret0 status
-	* ret1 return required size of buffer / returned data size
-	*/
+	 * MACH_DESC
+	 * arg0 buffer real address
+	 * arg1 pointer to uint64_t for size of buffer
+	 * ret0 status
+	 * ret1 return required size of buffer / returned data size
+	 */
 	ENTRY(hv_mach_desc)
 	mov     %o1, %o4                ! save datap
 	ldx     [%o1], %o1
@@ -1314,4 +1324,40 @@ hv_ncs_request(int cmd, uint64_t realaddr, size_t sz)
 	retl
 	nop
 	SET_SIZE(hv_ncs_request)
+
+	/*
+	 * hv_ra2pa(uint64_t ra)
+	 *
+	 * MACH_DESC
+	 * arg0 Real address to convert
+	 * ret0 Returned physical address or -1 on error
+	 */
+	ENTRY(hv_ra2pa)
+	mov	HV_RA2PA, %o5
+	ta	FAST_TRAP
+	cmp	%o0, 0
+	move	%xcc, %o1, %o0
+	movne	%xcc, -1, %o0
+	retl
+	nop
+	SET_SIZE(hv_ra2pa)
+
+	/*
+	 * hv_hpriv(void *func, uint64_t arg1, uint64_t arg2, uint64_t arg3)
+	 *
+	 * MACH_DESC
+	 * arg0 OS function to call
+	 * arg1 First arg to OS function
+	 * arg2 Second arg to OS function
+	 * arg3 Third arg to OS function
+	 * ret0 Returned value from function
+	 */
+	
+	ENTRY(hv_hpriv)
+	mov	HV_HPRIV, %o5
+	ta	FAST_TRAP
+	retl
+	nop
+	SET_SIZE(hv_hpriv)
+
 #endif	/* lint || __lint */

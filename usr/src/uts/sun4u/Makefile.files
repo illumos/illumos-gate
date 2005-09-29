@@ -84,7 +84,7 @@ SPECIAL_OBJS +=	wbuf.o
 ROOTNEX_OBJS	+= mach_rootnex.o
 UPA64S_OBJS	+= upa64s.o
 SYSIO_SBUS_OBJS	+= iommu.o sysioerr.o sysiosbus.o iocache.o
-PX_OBJS		+= px_lib4u.o px_hlib.o px_tools.o px_asm.o px_err.o
+PX_OBJS		+= px_asm_4u.o px_err.o px_hlib.o px_lib4u.o px_tools_4u.o
 PCI_COMMON_OBJS	+= pci.o pci_util.o pci_dma.o pci_devctl.o \
 			pci_fdvma.o pci_iommu.o pci_sc.o pci_debug.o \
 			pci_cb.o pci_ib.o pci_ecc.o pci_pbm.o pci_intr.o \

@@ -976,37 +976,6 @@ px_lib_resume(dev_info_t *dip)
 }
 
 /*
- * PCI tool Functions:
- * Currently unsupported by hypervisor and all functions are noops.
- */
-/*ARGSUSED*/
-int
-px_lib_tools_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
-{
-	DBG(DBG_TOOLS, dip, "px_lib_tools_dev_reg_ops: Not supported\n");
-
-	return (DDI_FAILURE);
-}
-
-/*ARGSUSED*/
-int
-px_lib_tools_bus_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
-{
-	DBG(DBG_TOOLS, dip, "px_lib_tools_bus_reg_ops: Not supported\n");
-
-	return (DDI_FAILURE);
-}
-
-/*ARGSUSED*/
-int
-px_lib_tools_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode)
-{
-	DBG(DBG_TOOLS, dip, "px_lib_tools_intr_admn: Not supported\n");
-
-	return (DDI_FAILURE);
-}
-
-/*
  * Misc Functions:
  * Currently unsupported by hypervisor and all functions are noops.
  */

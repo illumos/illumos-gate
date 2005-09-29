@@ -80,6 +80,13 @@ extern "C" {
 #define	PCITOOL_ROM	7
 
 /*
+ * Pass this through barnum to signal to use a base addr instead.
+ * This is for platforms which do not have a way to automatically map
+ * a selected bank to a base addr.
+ */
+#define	PCITOOL_BASE	0xFF
+
+/*
  * BAR corresponding to space desired.
  */
 typedef enum {

@@ -80,6 +80,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4v/io/px/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4v/io/px/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4v/io/ncp/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -151,6 +154,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4/io/memtest/%.s
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/io/px/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/io/px/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/io/ncp/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

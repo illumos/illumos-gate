@@ -165,18 +165,6 @@ typedef	struct eq_rec {
 #define	INTERRUPT_PENDING_STATE		3
 
 /*
- * Interrupt directives needed for reading proper interrupt diag register for
- * given ino.
- */
-#define	PX_INTR_DIAG_REG(CSRBASE, INO) \
-	(INO <= 32 ? CSRBASE + INTERRUPT_STATE_STATUS_1 : \
-	CSRBASE + INTERRUPT_STATE_STATUS_2)
-
-#define	PX_INTR_STAT_BITMAP(INO)	(0x3 << (INO & 0x1f))
-#define	PX_INTR_STATUS(INTRDIAG_REG, INO) (((*INTRDIAG_REG)	\
-	& PX_INTR_STAT_BITMAP(INO)) >> (INO & 0x1f))
-
-/*
  * Defines for link width and max packet size for ACKBAK Latency Threshold Timer
  * and TxLink Replay Timer Latency Table array sizes
  * Num		Link Width		Packet Size
@@ -353,6 +341,8 @@ extern int px_send_pme_turnoff(caddr_t csr_base);
 extern int px_link_wait4l1idle(caddr_t csr_base);
 extern int px_link_retrain(caddr_t csr_base);
 extern void px_enable_detect_quiet(caddr_t csr_base);
+
+extern void px_lib_clr_errs(px_t *px_p);
 
 #ifdef	__cplusplus
 }

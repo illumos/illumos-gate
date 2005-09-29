@@ -44,9 +44,11 @@
 /*LINTLIBRARY*/
 
 static void px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight);
-static void px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
-    boolean_t wait_flag);
+static void px_ib_cpu_ticks_to_ih_nsec(px_ib_t *ib_p, px_ih_t *ih_p,
+    uint32_t cpu_id);
 static uint_t px_ib_intr_reset(void *arg);
+static void px_fill_in_intr_devs(pcitool_intr_dev_t *dev, char *driver_name,
+    char *path_name, int instance);
 
 int
 px_ib_attach(px_t *px_p)
@@ -163,7 +165,7 @@ px_ib_intr_disable(px_ib_t *ib_p, devino_t ino, int wait)
 }
 
 
-static void
+void
 px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
     boolean_t wait_flag)
 {
@@ -230,6 +232,31 @@ done:
 	PX_INTR_ENABLE(dip, sysino, cpu_id);
 }
 
+static void
+px_ib_cpu_ticks_to_ih_nsec(px_ib_t *ib_p, px_ih_t *ih_p, uint32_t cpu_id)
+{
+	extern kmutex_t pxintr_ks_template_lock;
+	hrtime_t ticks;
+
+	/*
+	 * Because we are updating two fields in ih_t we must lock
+	 * pxintr_ks_template_lock to prevent someone from reading the
+	 * kstats after we set ih_ticks to 0 and before we increment
+	 * ih_nsec to compensate.
+	 *
+	 * We must also protect against the interrupt arriving and incrementing
+	 * ih_ticks between the time we read it and when we reset it to 0.
+	 * To do this we use atomic_swap.
+	 */
+
+	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
+
+	mutex_enter(&pxintr_ks_template_lock);
+	ticks = atomic_swap_64(&ih_p->ih_ticks, 0);
+	ih_p->ih_nsec += (uint64_t)tick2ns(ticks, cpu_id);
+	mutex_exit(&pxintr_ks_template_lock);
+}
+
 
 /*
  * Redistribute interrupts of the specified weight. The first call has a weight
@@ -243,7 +270,6 @@ done:
 static void
 px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 {
-	extern kmutex_t pxintr_ks_template_lock;
 	px_ib_t		*ib_p = (px_ib_t *)arg;
 	px_t		*px_p = ib_p->ib_px_p;
 	dev_info_t	*dip = px_p->px_dip;
@@ -305,14 +331,13 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 			for (i = 0, ih_lst = ino_p->ino_ih_head;
 			    i < ino_p->ino_ih_size;
 			    i++, ih_lst = ih_lst->ih_next) {
-				hrtime_t ticks;
 
 				dweight = i_ddi_get_intr_weight(ih_lst->ih_dip);
 				intr_dist_cpuid_add_device_weight(
 				    ino_p->ino_cpuid, ih_lst->ih_dip, dweight);
 
 				/*
-				 * different cpus may have different clock
+				 * Different cpus may have different clock
 				 * speeds. to account for this, whenever an
 				 * interrupt is moved to a new CPU, we
 				 * convert the accumulated ticks into nsec,
@@ -326,24 +351,9 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 				 * Note that the value in ih_ticks has already
 				 * been corrected for any power savings mode
 				 * which might have been in effect.
-				 *
-				 * because we are updating two fields in
-				 * ih_t we must lock pxintr_ks_template_lock
-				 * to prevent someone from reading the kstats
-				 * after we set ih_ticks to 0 and before we
-				 * increment ih_nsec to compensate.
-				 *
-				 * we must also protect against the interrupt
-				 * arriving and incrementing ih_ticks between
-				 * the time we read it and when we reset it
-				 * to 0. To do this we use atomic_swap.
 				 */
-
-				mutex_enter(&pxintr_ks_template_lock);
-				ticks = atomic_swap_64(&ih_lst->ih_ticks, 0);
-				ih_lst->ih_nsec += (uint64_t)
-				    tick2ns(ticks, orig_cpuid);
-				mutex_exit(&pxintr_ks_template_lock);
+				px_ib_cpu_ticks_to_ih_nsec(ib_p, ih_lst,
+				    orig_cpuid);
 			}
 
 			/* enable interrupt on new targeted cpu */
@@ -721,4 +731,88 @@ px_ib_update_intr_state(px_t *px_p, dev_info_t *rdip,
 
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
 	return (ret);
+}
+
+
+static void
+px_fill_in_intr_devs(pcitool_intr_dev_t *dev, char *driver_name,
+    char *path_name, int instance)
+{
+	(void) strncpy(dev->driver_name, driver_name, MAXMODCONFNAME-1);
+	dev->driver_name[MAXMODCONFNAME] = '\0';
+	(void) strncpy(dev->path, path_name, MAXPATHLEN-1);
+	dev->dev_inst = instance;
+}
+
+
+/*
+ * Return the dips or number of dips associated with a given interrupt block.
+ * Size of dips array arg is passed in as dips_ret arg.
+ * Number of dips returned is returned in dips_ret arg.
+ * Array of dips gets returned in the dips argument.
+ * Function returns number of dips existing for the given interrupt block.
+ *
+ * Note: this function assumes an enabled/valid INO, which is why it returns
+ * the px node and (Internal) when it finds no other devices (and *devs_ret > 0)
+ */
+uint8_t
+pxtool_ib_get_ino_devs(
+    px_t *px_p, uint32_t ino, uint8_t *devs_ret, pcitool_intr_dev_t *devs)
+{
+	px_ib_t *ib_p = px_p->px_ib_p;
+	px_ib_ino_info_t *ino_p;
+	px_ih_t *ih_p;
+	uint32_t num_devs = 0;
+	char pathname[MAXPATHLEN];
+	int i;
+
+	mutex_enter(&ib_p->ib_ino_lst_mutex);
+	ino_p = px_ib_locate_ino(ib_p, ino);
+	if (ino_p != NULL) {
+		num_devs = ino_p->ino_ih_size;
+		for (i = 0, ih_p = ino_p->ino_ih_head;
+		    ((i < ino_p->ino_ih_size) && (i < *devs_ret));
+		    i++, ih_p = ih_p->ih_next) {
+			(void) ddi_pathname(ih_p->ih_dip, pathname);
+			px_fill_in_intr_devs(&devs[i],
+			    (char *)ddi_driver_name(ih_p->ih_dip),  pathname,
+			    ddi_get_instance(ih_p->ih_dip));
+		}
+		*devs_ret = i;
+
+	} else if (*devs_ret > 0) {
+		(void) ddi_pathname(px_p->px_dip, pathname);
+		strcat(pathname, " (Internal)");
+		px_fill_in_intr_devs(&devs[0],
+		    (char *)ddi_driver_name(px_p->px_dip),  pathname,
+		    ddi_get_instance(px_p->px_dip));
+		num_devs = *devs_ret = 1;
+	}
+
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
+
+	return (num_devs);
+}
+
+
+void px_ib_log_new_cpu(px_ib_t *ib_p, uint32_t old_cpu_id, uint32_t new_cpu_id,
+    uint32_t ino)
+{
+	px_ib_ino_info_t *ino_p;
+
+	mutex_enter(&ib_p->ib_ino_lst_mutex);
+
+	/* Log in OS data structures the new CPU. */
+	ino_p = px_ib_locate_ino(ib_p, ino);
+	if (ino_p != NULL) {
+
+		/* Log in OS data structures the new CPU. */
+		ino_p->ino_cpuid = new_cpu_id;
+
+		/* Account for any residual time to be logged for old cpu. */
+		px_ib_cpu_ticks_to_ih_nsec(ib_p, ino_p->ino_ih_head,
+		    old_cpu_id);
+	}
+
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
 }

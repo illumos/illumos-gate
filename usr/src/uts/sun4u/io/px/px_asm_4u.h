@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_PX_TOOLS_VAR_H
-#define	_SYS_PX_TOOLS_VAR_H
+#ifndef	_SYS_PX_ASM_4U_H
+#define	_SYS_PX_ASM_4U_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,23 +33,13 @@
 extern "C" {
 #endif
 
-/*
- * Functions exported from the px_tools.c module.
- */
-int px_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode, px_t *px_p);
-int px_bus_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode);
-int px_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode, px_t *px_p);
-
-/*
- * PCI Space definitions.
- */
-#define	PCI_CONFIG_RANGE_BANK	(PCI_REG_ADDR_G(PCI_ADDR_CONFIG))
-#define	PCI_IO_RANGE_BANK	(PCI_REG_ADDR_G(PCI_ADDR_IO))
-#define	PCI_MEM_RANGE_BANK	(PCI_REG_ADDR_G(PCI_ADDR_MEM32))
-#define	PCI_MEM64_RANGE_BANK	(PCI_REG_ADDR_G(PCI_ADDR_MEM64))
+extern int px_phys_peek_4u(size_t size, uint64_t paddr, uint64_t *value,
+    int type);
+extern int px_phys_poke_4u(size_t size, uint64_t paddr, uint64_t *value,
+    int type);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SYS_PX_TOOLS_VAR_H */
+#endif	/* _SYS_PX_ASM_4U_H */

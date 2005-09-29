@@ -44,7 +44,6 @@
 #include <sys/byteorder.h>
 #include <px_obj.h>
 #include <pcie_pwr.h>
-#include "px_tools_var.h"
 #include <px_regs.h>
 #include <px_csr.h>
 #include <sys/machsystm.h>
@@ -62,7 +61,6 @@ static int px_goto_l23ready(px_t *px_p);
 static int px_goto_l0(px_t *px_p);
 static int px_pre_pwron_check(px_t *px_p);
 static uint32_t px_identity_chip(px_t *px_p);
-static void px_lib_clr_errs(px_t *px_p, px_pec_t *pec_p);
 static boolean_t px_cpr_callb(void *arg, int code);
 
 /*
@@ -1241,44 +1239,6 @@ px_lib_resume(dev_info_t *dip)
 }
 
 /*
- * PCI tool Functions:
- * Currently unsupported by hypervisor
- */
-/*ARGSUSED*/
-int
-px_lib_tools_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
-{
-	px_t *px_p = DIP_TO_STATE(dip);
-
-	DBG(DBG_TOOLS, dip, "px_lib_tools_dev_reg_ops: dip 0x%p arg 0x%p "
-	    "cmd 0x%x mode 0x%x\n", dip, arg, cmd, mode);
-
-	return (px_dev_reg_ops(dip, arg, cmd, mode, px_p));
-}
-
-/*ARGSUSED*/
-int
-px_lib_tools_bus_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
-{
-	DBG(DBG_TOOLS, dip, "px_lib_tools_bus_reg_ops: dip 0x%p arg 0x%p "
-	    "cmd 0x%x mode 0x%x\n", dip, arg, cmd, mode);
-
-	return (px_bus_reg_ops(dip, arg, cmd, mode));
-}
-
-/*ARGSUSED*/
-int
-px_lib_tools_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode)
-{
-	px_t *px_p = DIP_TO_STATE(dip);
-
-	DBG(DBG_TOOLS, dip, "px_lib_tools_intr_admn: dip 0x%p arg 0x%p "
-	    "cmd 0x%x mode 0x%x\n", dip, arg, cmd, mode);
-
-	return (px_intr_admn(dip, arg, cmd, mode, px_p));
-}
-
-/*
  * Misc Functions:
  * Currently unsupported by hypervisor
  */
@@ -1312,9 +1272,10 @@ px_lib_map_vconfig(dev_info_t *dip,
 	return (DDI_FAILURE);
 }
 
-static void
-px_lib_clr_errs(px_t *px_p, px_pec_t *pec_p)
+void
+px_lib_clr_errs(px_t *px_p)
 {
+	px_pec_t	*pec_p = px_p->px_pec_p;
 	dev_info_t	*rpdip = px_p->px_dip;
 	px_cb_t		*cb_p = px_p->px_cb_p;
 	int		err = PX_OK, ret;
@@ -1380,7 +1341,7 @@ px_lib_do_poke(dev_info_t *dip, dev_info_t *rdip,
 	} else
 		err = DDI_FAILURE;
 
-	px_lib_clr_errs(px_p, pec_p);
+	px_lib_clr_errs(px_p);
 
 	if (otd.ot_trap & OT_DATA_ACCESS)
 		err = DDI_FAILURE;
@@ -1455,7 +1416,7 @@ px_lib_do_caut_put(dev_info_t *dip, dev_info_t *rdip,
 			if (flags == DDI_DEV_AUTOINCR)
 				dev_addr += size;
 
-			px_lib_clr_errs(px_p, pec_p);
+			px_lib_clr_errs(px_p);
 
 			if (pec_p->pec_ontrap_data->ot_trap & OT_DATA_ACCESS) {
 				err = DDI_FAILURE;

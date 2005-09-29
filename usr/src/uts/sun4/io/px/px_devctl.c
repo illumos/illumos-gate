@@ -40,8 +40,10 @@
 #include <sys/open.h>
 #include <sys/errno.h>
 #include <sys/file.h>
+#include <sys/policy.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include "px_obj.h"
+#include <sys/pci_tools.h>
 #include "px_tools.h"
 #include "pcie_pwr.h"
 
@@ -150,6 +152,7 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	struct devctl_iocdata *dcp;
 	uint_t bus_state;
 	int rv = DDI_SUCCESS;
+	int minor = getminor(dev);
 
 	px_p = DEV_TO_SOFTSTATE(dev);
 	if (px_p == NULL)
@@ -157,6 +160,7 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 
 	dip = px_p->px_dip;
 	DBG(DBG_IOCTL, dip, "dev=%x: cmd=%x\n", dev, cmd);
+
 #ifdef	PX_DMA_TEST
 	if (IS_DMATEST(cmd)) {
 		*rvalp = px_dma_test(cmd, dip, px_p, arg);
@@ -164,43 +168,82 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	}
 #endif	/* PX_DMA_TEST */
 
+	switch (PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
+
 	/*
 	 * PCI tools.
 	 */
+	case PCI_TOOL_REG_MINOR_NUM:
 
-	if ((cmd & ~IOCPARM_MASK) == PCITOOL_IOC ||
-	    (cmd & ~PPMREQ_MASK) == PPMREQ) {
+		switch (cmd) {
+		case PCITOOL_DEVICE_SET_REG:
+		case PCITOOL_DEVICE_GET_REG:
+
+			/* Require full privileges. */
+			if (secpolicy_kmdb(credp))
+				rv = EPERM;
+			else
+				rv = pxtool_dev_reg_ops(dip,
+				    (void *)arg, cmd, mode);
+			break;
+
+		case PCITOOL_NEXUS_SET_REG:
+		case PCITOOL_NEXUS_GET_REG:
+
+			/* Require full privileges. */
+			if (secpolicy_kmdb(credp))
+				rv = EPERM;
+			else
+				rv = pxtool_bus_reg_ops(dip,
+				    (void *)arg, cmd, mode);
+			break;
+
+		default:
+			rv = ENOTTY;
+		}
+		return (rv);
+
+	case PCI_TOOL_INTR_MINOR_NUM:
+
+		switch (cmd) {
+		case PCITOOL_DEVICE_SET_INTR:
+
+		/*
+		 * Require PRIV_SYS_RES_CONFIG,
+		 * same as psradm
+		 */
+		if (secpolicy_ponline(credp)) {
+			rv = EPERM;
+			break;
+		}
+
+		/*FALLTHRU*/
+		/* These require no special privileges. */
+		case PCITOOL_DEVICE_GET_INTR:
+		case PCITOOL_DEVICE_NUM_INTR:
+			rv = pxtool_intr(dip, (void *)arg, cmd, mode);
+			break;
+
+		default:
+			rv = ENOTTY;
+		}
+		return (rv);
+
+	default:
+		break;
+	}
+
+	if ((cmd & ~PPMREQ_MASK) == PPMREQ) {
 
 		/* Need privileges to use these ioctls. */
 		if (drv_priv(credp)) {
 			DBG(DBG_TOOLS, dip,
 			    "px_tools: Insufficient privileges\n");
 
-		return (EPERM);
+			return (EPERM);
 		}
-	}
-
-	switch (cmd) {
-	case PCITOOL_DEVICE_GET_REG:
-	case PCITOOL_DEVICE_SET_REG:
-		rv = px_lib_tools_dev_reg_ops(dip, (void *)arg, cmd, mode);
-		return (rv);
-	case PCITOOL_NEXUS_SET_REG:
-	case PCITOOL_NEXUS_GET_REG:
-		rv = px_lib_tools_bus_reg_ops(dip, (void *)arg, cmd, mode);
-		return (rv);
-	case PCITOOL_DEVICE_GET_INTR:
-	case PCITOOL_DEVICE_SET_INTR:
-	case PCITOOL_DEVICE_NUM_INTR:
-		rv = px_lib_tools_intr_admn(dip, (void *)arg, cmd, mode);
-		return (rv);
-	default:
-		break;
-
-	}
-
-	if ((cmd & ~PPMREQ_MASK) == PPMREQ)
 		return (px_lib_pmctl(cmd, px_p));
+	}
 
 	/*
 	 * We can use the generic implementation for these ioctls

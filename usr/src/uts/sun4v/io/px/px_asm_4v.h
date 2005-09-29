@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_PX_ASM_H
-#define	_SYS_PX_ASM_H
+#ifndef	_SYS_PX_ASM_4V_H
+#define	_SYS_PX_ASM_4V_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,11 +33,13 @@
 extern "C" {
 #endif
 
-extern int px_phys_peek(size_t size, uint64_t paddr, uint64_t *value, int type);
-extern int px_phys_poke(size_t size, uint64_t paddr, uint64_t *value, int type);
+extern int px_phys_peek_4v(size_t size, uint64_t paddr, uint64_t *value,
+    int type);
+extern int px_phys_poke_4v(size_t size, uint64_t paddr, uint64_t *value,
+    int type);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SYS_PX_ASM_H */
+#endif	/* _SYS_PX_ASM_4V_H */

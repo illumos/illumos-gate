@@ -40,17 +40,17 @@
 
 /*ARGSUSED*/
 int
-px_phys_peek(size_t size, uint64_t paddr, uint64_t *value, int type)
+px_phys_peek_4u(size_t size, uint64_t paddr, uint64_t *value, int type)
 { return (0); }
 
 /*ARGSUSED*/
 int
-px_phys_poke(size_t size, uint64_t paddr, uint64_t *value, int type)
+px_phys_poke_4u(size_t size, uint64_t paddr, uint64_t *value, int type)
 { return (0); }
 
 #else /* lint */
 
-! px_phys_peek: Do physical address read.
+! px_phys_peek_4u: Do physical address read.
 !
 ! %o0 is size in bytes - Must be 8, 4, 2 or 1.  Invalid sizes default to 1.
 ! %o1 is address to read
@@ -62,9 +62,11 @@ px_phys_poke(size_t size, uint64_t paddr, uint64_t *value, int type)
 ! an interrupt from raising the trap level to 1 and then a possible
 ! data access exception being delivered while the trap level > 0.
 !
-! Assumes alignment is correct.
+! Always returns success (0) in %o0
+!
+! Assumes alignment is correct and that on_trap handling has been installed
 
-	ENTRY(px_phys_peek)
+	ENTRY(px_phys_peek_4u)
 
 	rdpr	%pstate, %o4		! Disable interrupts if not already
 	andcc	%o4, PSTATE_IE, %g2	! Save original state first
@@ -113,10 +115,10 @@ px_phys_poke(size_t size, uint64_t paddr, uint64_t *value, int type)
 	mov     %g0, %o0
 	retl
 	nop
-	SET_SIZE(px_phys_peek)
+	SET_SIZE(px_phys_peek_4u)
 
 
-! px_phys_poke: Do physical address write.
+! px_phys_poke_4u: Do physical address write.
 !
 ! %o0 is size in bytes - Must be 8, 4, 2 or 1.  Invalid sizes default to 1.
 ! %o1 is address to write to
@@ -127,13 +129,12 @@ px_phys_poke(size_t size, uint64_t paddr, uint64_t *value, int type)
 !
 ! Assumes alignment is correct and that on_trap handling has been installed
 
-	ENTRY(px_phys_poke)
+	ENTRY(px_phys_poke_4u)
 
 	tst	%o3
-	bz	.poke_asi_set
-	mov	ASI_IOL, %asi
-	mov	ASI_IO, %asi
-.poke_asi_set:
+	movz	%xcc, ASI_IOL, %g1	! Big/little endian physical space
+	movnz	%xcc, ASI_IO, %g1
+	mov	%g1, %asi
 
 	cmp	%o0, 8			! 64 bit?
 	bne	.poke_int
@@ -164,6 +165,6 @@ px_phys_poke(size_t size, uint64_t paddr, uint64_t *value, int type)
 	membar	#Sync
 	retl
 	mov	%g0, %o0
-	SET_SIZE(px_phys_poke)
+	SET_SIZE(px_phys_poke_4u)
  
 #endif

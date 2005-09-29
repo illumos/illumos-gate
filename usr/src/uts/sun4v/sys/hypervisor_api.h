@@ -159,6 +159,9 @@ extern "C" {
 
 #define	HV_NCS_REQUEST		0x110
 
+#define	HV_RA2PA		0x200
+#define	HV_HPRIV		0x201
+
 /*
  * Bits for MMU functions flags argument:
  *	arg3 of MMU_MAP_ADDR

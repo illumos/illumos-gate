@@ -131,6 +131,13 @@ extern uint64_t hvio_peek(devhandle_t dev_hdl, r_addr_t ra, size_t size,
 extern uint64_t hvio_poke(devhandle_t dev_hdl, r_addr_t ra, size_t size,
     uint64_t data, pci_device_t bdf, uint32_t *wrt_stat);
 
+/*
+ * Priviledged physical access:
+ */
+extern uint64_t hv_ra2pa(uint64_t ra);
+extern uint64_t hv_hpriv(void *func, uint64_t arg1, uint64_t arg2,
+    uint64_t arg3);
+
 #ifdef	__cplusplus
 }
 #endif

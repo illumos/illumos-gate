@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include <sys/ddi_subrdefs.h>
+#include <sys/pci_tools.h>
 
 typedef struct px_ib_ino_info	px_ib_ino_info_t;
 
@@ -102,17 +103,19 @@ struct px_ib_ino_info {
 #define	IB_INTR_NOWAIT	0		/* already handling intr, no wait */
 
 #define	PX_INTR_ENABLE(dip, sysino, cpuid) \
-	px_lib_intr_settarget(dip, sysino, cpuid); \
-	px_lib_intr_setstate(dip, sysino, INTR_IDLE_STATE); \
-	px_lib_intr_setvalid(dip, sysino, INTR_VALID);
+	(void) px_lib_intr_settarget(dip, sysino, cpuid); \
+	(void) px_lib_intr_setstate(dip, sysino, INTR_IDLE_STATE); \
+	(void) px_lib_intr_setvalid(dip, sysino, INTR_VALID);
 
 #define	PX_INTR_DISABLE(dip, sysino) \
-	px_lib_intr_setvalid(dip, sysino, INTR_NOTVALID);
+	(void) px_lib_intr_setvalid(dip, sysino, INTR_NOTVALID);
 
 extern int px_ib_attach(px_t *px_p);
 extern void px_ib_detach(px_t *px_p);
 extern void px_ib_intr_enable(px_t *px_p, cpuid_t cpuid, devino_t ino);
 extern void px_ib_intr_disable(px_ib_t *ib_p, devino_t ino, int wait);
+extern void px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
+    boolean_t wait_flag);
 
 extern px_ib_ino_info_t *px_ib_locate_ino(px_ib_t *ib_p, devino_t ino_num);
 extern px_ib_ino_info_t *px_ib_new_ino(px_ib_t *ib_p, devino_t ino_num,
@@ -132,6 +135,11 @@ extern px_ih_t *px_ib_alloc_ih(dev_info_t *rdip, uint32_t inum,
 extern void px_ib_free_ih(px_ih_t *ih_p);
 extern int px_ib_update_intr_state(px_t *px_p, dev_info_t *rdip, uint_t inum,
 	devino_t ino, uint_t new_intr_state);
+extern uint8_t pxtool_ib_get_ino_devs(px_t *px_p, uint32_t ino,
+	uint8_t *devs_ret, pcitool_intr_dev_t *devs);
+extern void px_ib_log_new_cpu(px_ib_t *ib_p, uint32_t old_cpu_id,
+	uint32_t new_cpu_id, uint32_t ino);
+
 
 #ifdef	__cplusplus
 }

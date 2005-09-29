@@ -37,13 +37,14 @@
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/hotplug/pci/pcihp.h>
-#include <sys/ontrap.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_subrdefs.h>
 #include <sys/spl.h>
 #include <sys/epm.h>
 #include <sys/iommutsb.h>
 #include "px_obj.h"
+#include <sys/pci_tools.h>
+#include "px_tools.h"
 #include "pcie_pwr.h"
 
 /*LINTLIBRARY*/
@@ -302,6 +303,10 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
 			goto err_bad_devctl_node;
 		}
+
+		if (pxtool_init(dip) != DDI_SUCCESS)
+			goto err_bad_pcitool_node;
+
 		/*
 		 * power management setup. Even if it fails, attach will
 		 * succeed as this is a optional feature. Since we are
@@ -325,6 +330,8 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		DBG(DBG_ATTACH, dip, "attach success\n");
 		break;
 
+err_bad_pcitool_node:
+		ddi_remove_minor_node(dip, "devctl");
 err_bad_devctl_node:
 		px_err_rem_intr(&px_p->px_fault);
 err_bad_pec_add_intr:
@@ -431,6 +438,8 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 */
 
 		px_p->px_state = PX_DETACHED;
+
+		pxtool_uninit(dip);
 
 		ddi_remove_minor_node(dip, "devctl");
 		px_err_rem_intr(&px_p->px_fault);
@@ -907,8 +916,8 @@ mapped:
 			ddi_driver_name(rdip), ddi_get_instance(rdip), mp);
 		/*NOTREACHED*/
 	}
-	DBG(DBG_DMA_BINDH, dip, "cookie %llx+%x\n", cookiep->dmac_address,
-		cookiep->dmac_size);
+	DBG(DBG_DMA_BINDH, dip, "cookie %" PRIx64 "+%x\n",
+		cookiep->dmac_address, cookiep->dmac_size);
 	px_dump_dma_handle(DBG_DMA_MAP, dip, mp);
 
 	/* insert dma handle into FMA cache */
