@@ -307,7 +307,7 @@ power_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	softsp->dip = dip;
 
 #ifdef	ACPI_POWER_BUTTON
-	power_attach_acpi(softsp);
+	(void) power_attach_acpi(softsp);
 #else
 	if (power_setup_regs(softsp) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "power_attach: failed to setup registers");
@@ -892,9 +892,11 @@ done:
 /*
  *
  */
+/*ARGSUSED*/
 static ACPI_STATUS
 acpi_device(ACPI_HANDLE obj, UINT32 nesting, void *context, void **rv)
 {
+
 	*((ACPI_HANDLE *)context) = obj;
 	return (AE_OK);
 }
@@ -907,7 +909,7 @@ probe_acpi_pwrbutton()
 {
 	ACPI_HANDLE obj = NULL;
 
-	AcpiGetDevices("PNP0C0C", acpi_device, (void *)&obj, NULL);
+	(void) AcpiGetDevices("PNP0C0C", acpi_device, (void *)&obj, NULL);
 	return (obj);
 }
 
@@ -927,11 +929,12 @@ power_acpi_fixed_event(void *ctx)
 	return (AE_OK);
 }
 
+/*ARGSUSED*/
 static void
 power_acpi_notify_event(ACPI_HANDLE obj, UINT32 val, void *ctx)
 {
 	if (val == 0x80)
-		power_acpi_fixed_event(ctx);
+		(void) power_acpi_fixed_event(ctx);
 }
 
 /*
@@ -943,7 +946,6 @@ power_probe_method_button(struct power_soft_state *softsp)
 	ACPI_HANDLE button_obj;
 	UINT32 gpe_num;
 	ACPI_HANDLE gpe_dev;
-	ACPI_STATUS status;
 
 	button_obj = probe_acpi_pwrbutton();
 	softsp->button_obj = button_obj;	/* remember obj */

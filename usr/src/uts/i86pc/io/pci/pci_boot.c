@@ -200,7 +200,7 @@ static int
 func_configured(uchar_t bus, uchar_t dev, uchar_t func)
 {
 	uint16_t cmdreg;
-	uint32_t bar_low, bar_high, size_low, size_high;
+	uint32_t bar_low, bar_high, size_low;
 	uint8_t bar_base, bar_end;
 	int io_enabled, mem_enabled;
 	int configured;
@@ -258,7 +258,6 @@ func_configured(uchar_t bus, uchar_t dev, uchar_t func)
 		    cmdreg & ~(PCI_COMM_IO | PCI_COMM_MAE));
 
 		bar_high = 0;	/* default to 32-bit */
-		size_high = 0;	/* default to 32-bit */
 		/* probe the BAR for size */
 		bar_low = pci_getl(bus, dev, func, bar_base);
 		pci_putl(bus, dev, func, bar_base, 0xffffffff);
@@ -275,18 +274,15 @@ func_configured(uchar_t bus, uchar_t dev, uchar_t func)
 			if ((bar_low & PCI_BASE_TYPE_M) == PCI_BASE_TYPE_ALL) {
 				/* 64-bit case */
 				bar_high = pci_getl(bus, dev, func, bar_base);
-				pci_putl(bus, dev, func, bar_base, 0xffffffff);
-				size_high = pci_getl(bus, dev, func, bar_base);
-				pci_putl(bus, dev, func, bar_base, bar_high);
 				bar_base += sizeof (uint32_t);
 			}
 			bar_low &= PCI_BASE_M_ADDR_M;
 			size_low &= PCI_BASE_M_ADDR_M;
 			/*
-			 * Omit test of size_high; some 64-bit devices
-			 * may not properly implement the top 32-bits
+			 * Omit test of upper 32-bits of size; some 64-bit
+			 * devices may not properly implement the top 32-bits
 			 * of the size; if a card appears that requests
-			 * 4GB  or more, this will need to be revisited.
+			 * 4GB or more, this will need to be revisited.
 			 */
 			if (size_low != 0)
 				configured = mem_enabled &&

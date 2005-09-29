@@ -66,6 +66,7 @@ CFLAGS += $(CCVERBOSE)
 # ACPI power button
 #
 CFLAGS += -DACPI_POWER_BUTTON
+LINTFLAGS += -DACPI_POWER_BUTTON
 
 LDFLAGS += -dy -N misc/acpica
 
