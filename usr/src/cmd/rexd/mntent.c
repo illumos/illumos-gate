@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,10 +93,8 @@ mntdigit(p)
 	return (value);
 }
 
-static
-mnttabscan(mnttabp, mnt)
-	FILE *mnttabp;
-	struct mnttab *mnt;
+static int
+mnttabscan(FILE *mnttabp, struct mnttab *mnt)
 {
 	static	char *line = NULL;
 	char *cp;
@@ -165,71 +163,71 @@ endmntent(mnttabp)
 	return (1);
 }
 
-/* #ifdef	NOWAY
-/* int getmntent (mnttabp, mp)
-/* 	FILE *mnttabp;
-/* 	struct mnttab *mp;
-/* {
-/* 	int nfields;
-/* 
-/* 	if (mnttabp == 0)
-/* 		return (-1);
-/* 
-/* 	if (_mnt() == 0)
-/* 		return (-1);
-/* 
-/* 	nfields = mnttabscan(mnttabp, mntp);
-/* 
-/* 	if (nfields == EOF || nfields != 5)
-/* 		return (-1);
-/* 
-/* 	mp = mntp;
-/* 
-/* 	return ( 0 );
-/* }
-/* #endif
-/* */
+/*
+ * #ifdef	NOWAY
+ * int getmntent (mnttabp, mp)
+ * 	FILE *mnttabp;
+ * 	struct mnttab *mp;
+ * {
+ * 	int nfields;
+ * 
+ * 	if (mnttabp == 0)
+ * 		return (-1);
+ * 
+ * 	if (_mnt() == 0)
+ * 		return (-1);
+ * 
+ * 	nfields = mnttabscan(mnttabp, mntp);
+ * 
+ * 	if (nfields == EOF || nfields != 5)
+ * 		return (-1);
+ * 
+ * 	mp = mntp;
+ * 
+ * 	return ( 0 );
+ * }
+ * #endif
+ *
+ *
+ * #ifdef	NOWAY
+ * struct mnttab *
+ * getmntent(mnttabp)
+ * 	FILE *mnttabp;
+ * {
+ * 	int nfields;
+ * 
+ * 	if (mnttabp == 0)
+ * 		return ((struct mnttab *)0);
+ * 	if (_mnt() == 0)
+ * 		return ((struct mnttab *)0);
+ * 	nfields = mnttabscan(mnttabp, mntp);
+ * 	if (nfields == EOF || nfields != 5)
+ * 		return ((struct mnttab *)0);
+ * 	return (mntp);
+ * }
+ * #endif
+ */
 
-/* #ifdef	NOWAY
-/* struct mnttab *
-/* getmntent(mnttabp)
-/* 	FILE *mnttabp;
-/* {
-/* 	int nfields;
-/* 
-/* 	if (mnttabp == 0)
-/* 		return ((struct mnttab *)0);
-/* 	if (_mnt() == 0)
-/* 		return ((struct mnttab *)0);
-/* 	nfields = mnttabscan(mnttabp, mntp);
-/* 	if (nfields == EOF || nfields != 5)
-/* 		return ((struct mnttab *)0);
-/* 	return (mntp);
-/* }
-/* #endif
-/* */
+/*
+ * addmntent(mnttabp, mnt)
+ * 	FILE *mnttabp;
+ * 	register struct mnttab *mnt;
+ * 
+ * 	if (fseek(mnttabp, 0L, 2) < 0)
+ * 		return (1);
+ * 	if (mnt == (struct mnttab *)0)
+ * 		return (1);
+ * 	if (mnt->mnt_special == NULL || mnt->mnt_mountp  == NULL ||
+ * 	    mnt->mnt_fstype   == NULL || mnt->mnt_mntopts == NULL)
+ * 		return (1);
+ * 
+ * 	mntprtent(mnttabp, mnt);
+ * 	return (0);
+ * }
+ */
 
-/* addmntent(mnttabp, mnt)
-/* 	FILE *mnttabp;
-/* 	register struct mnttab *mnt;
-/* 
-/* 	if (fseek(mnttabp, 0L, 2) < 0)
-/* 		return (1);
-/* 	if (mnt == (struct mnttab *)0)
-/* 		return (1);
-/* 	if (mnt->mnt_special == NULL || mnt->mnt_mountp  == NULL ||
-/* 	    mnt->mnt_fstype   == NULL || mnt->mnt_mntopts == NULL)
-/* 		return (1);
-/* 
-/* 	mntprtent(mnttabp, mnt);
-/* 	return (0);
-/* }
-/* */
-
-static
-mntprtent(mnttabp, mnt)
-	FILE *mnttabp;
-	register struct mnttab *mnt;
+static int
+mntprtent(FILE *mnttabp, struct mnttab *mnt)
 {
 	fprintf(mnttabp, "%s\t%s\t%s\t%s\t%s\n",
 	    mnt->mnt_special,

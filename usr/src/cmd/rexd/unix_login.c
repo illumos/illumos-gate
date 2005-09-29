@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998-1999,2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,6 +112,7 @@ extern void audit_rexd_fail(char *, char *, char *, uid_t, gid_t,
 #define	bzero(s, n)	memset((s), 0, (n))
 #define	bcopy(a, b, c)	memcpy((b), (a), (c))
 
+static void LogoutUser(void);
 
 /*
  * Check for user being able to run on this machine.
@@ -316,8 +317,8 @@ DoHelper(pfd0, pfd1, pfd2)
 /*
  * destroy the helpers when the executing process dies
  */
-KillHelper(grp)
-	int grp;
+void
+KillHelper(int grp)
 {
 	if (Debug)
 		printf("Enter KillHelper\n");
@@ -339,7 +340,8 @@ KillHelper(grp)
  */
 unsigned char	utid[] = {'o', 'n', SC_WILDC, SC_WILDC};
 
-LoginUser()
+void
+LoginUser(void)
 {
 
 	char *user;
@@ -409,8 +411,8 @@ LoginUser()
  * edit the Unix traditional data files that tell who is logged
  * into "the system".
  */
-
-LogoutUser()
+static void
+LogoutUser(void)
 {
 	struct utmpx *up;
 	struct utmpx ut;
@@ -478,6 +480,7 @@ LogoutUser()
 /*
  * set the pty modes to the given values
  */
+void
 SetPtyMode(mode)
 	struct rex_ttymode *mode;
 {
@@ -529,8 +532,8 @@ SetPtyMode(mode)
 /*
  * set the pty window size to the given value
  */
-SetPtySize(sizep)
-	struct rex_ttysize *sizep;
+void
+SetPtySize(struct rex_ttysize *sizep)
 {
 	struct winsize newsize;
 
@@ -551,8 +554,8 @@ SetPtySize(sizep)
 /*
  * send the given signal to the group controlling the terminal
  */
-SendSignal(sig)
-	int sig;
+void
+SendSignal(int sig)
 {
 	pid_t pgrp;
 

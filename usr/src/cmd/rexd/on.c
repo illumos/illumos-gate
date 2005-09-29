@@ -19,13 +19,14 @@
  *
  * CDDL HEADER END
  */
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * on - user interface program for remote execution service
  *
- * Copyright (c) 1985 Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	BSD_COMP
 
@@ -198,7 +199,7 @@ oob(int junk)
 
 
 
-void
+int
 main(int argc, char **argv)
 {
 	struct	winsize	newsize; /* the modern way to get row and col	*/
@@ -637,6 +638,7 @@ try_auth_unix:
 		Die(1);
 	}
 	Die(result.rlt_stat);
+	return (0);	/* Should never get here. */
 }
 
 /*

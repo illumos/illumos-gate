@@ -22,10 +22,11 @@
 /*
  * rex_xdr - remote execution external data representations
  *
- * Copyright (c) 1985 Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* XXX - Bad, Bad, Bad.... Fix this. This isn't allowed in the base */
 #define	BSD_COMP
@@ -44,9 +45,8 @@
 /*
  * xdr_rex_start - process the command start structure
  */
-xdr_rex_start(xdrs, rst)
-	XDR *xdrs;
-	struct rex_start *rst;
+int
+xdr_rex_start(XDR *xdrs,  struct rex_start *rst)
 {
 	return
 		xdr_argv(xdrs, &rst->rst_cmd) &&
@@ -60,9 +60,8 @@ xdr_rex_start(xdrs, rst)
 		xdr_u_long(xdrs, &rst->rst_flags);
 }
 
-xdr_argv(xdrs, argvp)
-	XDR *xdrs;
-	char ***argvp;
+int
+xdr_argv(XDR *xdrs, char ***argvp)
 {
 	register char **argv = *argvp;
 	register char **ap;
@@ -102,9 +101,8 @@ xdr_argv(xdrs, argvp)
 /*
  * xdr_rex_result - process the result of a start or wait operation
  */
-xdr_rex_result(xdrs, result)
-	XDR *xdrs;
-	struct rex_result *result;
+int
+xdr_rex_result(XDR *xdrs, struct rex_result *result)
 {
 	return
 		xdr_int(xdrs, &result->rlt_stat) &&
@@ -115,9 +113,8 @@ xdr_rex_result(xdrs, result)
 /*
  * xdr_rex_ttymode - process the tty mode information
  */
-xdr_rex_ttymode(xdrs, mode)
-	XDR *xdrs;
-	struct rex_ttymode *mode;
+int
+xdr_rex_ttymode(XDR *xdrs, struct rex_ttymode *mode)
 {
 	u_int six = 6;
 	u_int four = 4;
@@ -142,9 +139,8 @@ xdr_rex_ttymode(xdrs, mode)
 /*
  * xdr_rex_ttysize - process the tty size information
  */
-xdr_rex_ttysize(xdrs, size)
-	XDR *xdrs;
-	struct ttysize *size;
+int
+xdr_rex_ttysize(XDR *xdrs, struct ttysize *size)
 {
 	return
 		xdr_int(xdrs, &size->ts_lines) &&

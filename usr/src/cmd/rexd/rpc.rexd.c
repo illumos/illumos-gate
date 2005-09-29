@@ -22,7 +22,7 @@
 /*
  * rexd - a remote execution daemon based on SUN Remote Procedure Calls
  *
- * Copyright 1985-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,10 +121,8 @@ void		sigwinch(int);	/* window change signals -- dummy */
 FILE		*setmntent(char *fname, char *flag);
 extern void	HelperRead(pollfd_t *fdp, int, int *);
 
-void
-main(argc, argv)
-int argc;
-char **argv;
+int
+main(int argc, char **argv)
 {
 	/*
 	 * the server is a typical RPC daemon, except that we only
@@ -356,6 +354,7 @@ char **argv;
 		if (Debug)
 			printf("After switch\n");
 	}
+	return (0);
 }
 
 /*

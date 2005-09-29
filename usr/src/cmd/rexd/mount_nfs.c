@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -58,6 +58,15 @@
 #include	<sys/param.h>
 #include	<sys/socket.h>
 #include	<sys/stat.h>
+
+static struct knetconfig *get_knconf(struct netconfig *nconf);
+static int bindudp_resvport(CLIENT *client);
+static void free_knconf(struct knetconfig *k);
+static void freemnttab(struct mnttab *mnt);
+static enum clnt_stat pingnfs(char *hostname, rpcvers_t *versp);
+static void netbuf_free(struct netbuf *nb);
+static struct netbuf *get_addr(char *hostname, int prog, int vers,
+    struct netconfig **nconfp);
 
 #define	TIME_MAX	16
 
@@ -216,13 +225,13 @@ mount_nfs(fsname, dir, error)
 		clnt_destroy(client);
 		return (1);
 	}
-
-/* #ifdef	NOWAY
-/* 	if (Debug)
-/* 		printf("authsys_create_default called for mountproc\n");
-/* 	client->cl_auth = authsys_create_default();
-/* #endif
-/* */
+/*
+ * #ifdef	NOWAY
+ *	if (Debug)
+ *		printf("authsys_create_default called for mountproc\n");
+ *	client->cl_auth = authsys_create_default();
+ * #endif
+ */
 
 	/* set mount args */
 	memset(&args, 0, sizeof(args));
@@ -438,11 +447,11 @@ char *fsname, *dir;
 		clnt_destroy(client);
 		return (1);
 	}
-
-/* #ifdef		NOWAWY
-/* 	client->cl_auth = authunix_create_default();
-/* #endif	/*	NOWAY		*/
-/* */
+/*
+ * #ifdef		NOWAWY
+ * 	client->cl_auth = authunix_create_default();
+ * #endif
+ */
 
 	timeout.tv_usec = 0;
 	timeout.tv_sec = 25;
