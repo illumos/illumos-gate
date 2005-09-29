@@ -82,7 +82,7 @@ NODE frutree picl
 	    PROP Label string r 0 "FIOB"
 	    NODE system-board fru
 		 PROP FRUDataAvailable void r
-		 REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/front-io-fru-prom
+		 REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/front-io-fru-prom@0,a4
 	    ENDNODE
 	ENDNODE
 
@@ -124,6 +124,8 @@ NODE frutree picl
 	    PROP SlotType string r 0 "power-supply"
 	    PROP Label string r 0 "PS0"
 	    NODE power-supply fru
+		 PROP FRUDataAvailable void r
+		 REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/psu-fru-prom@0,ae
 	    ENDNODE
 	ENDNODE
 
@@ -132,7 +134,7 @@ NODE frutree picl
 	 */
 	NODE SAS-BP fru				
 	    PROP FRUDataAvailable void r
-	    REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/sas-backplane-fru-prom
+	    REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/sas-backplane-fru-prom@0,a6
 	    NODE HDD0 location
 		PROP SlotType string r 0 "disk-slot"
 		PROP Label string r 0 "HDD0"
