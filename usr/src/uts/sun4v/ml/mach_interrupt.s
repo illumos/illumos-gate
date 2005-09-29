@@ -387,12 +387,15 @@ resumable_error(void)
 	stxa	%g6, [%g4]ASI_QUEUE		! update head offset
 	
 	/*
-	 * Call sys_trap. %g2.l is head offset(arg2) and %g3 is tail
+	 * Call sys_trap at PIL 14 unless we're already at PIL 15. %g2.l is
+	 * head offset(arg2) and %g3 is tail
 	 * offset(arg3).
 	 */
 	set	process_resumable_error, %g1
+	rdpr	%pil, %g4
+	cmp	%g4, PIL_14
 	ba	sys_trap
-	mov	PIL_14, %g4
+	  movl	%icc, PIL_14, %g4
 
 	/*
 	 * We are here because the C routine is not able to process
@@ -408,11 +411,14 @@ resumable_error(void)
 	 * Set %g2 to %g6, which is current head offset. %g2 
 	 * is arg2 of the C routine. %g3 is the tail offset,
 	 * which is arg3 of the C routine.
+	 * Call rq_overflow at PIL 14 unless we're already at PIL 15.
 	 */
 	mov	%g6, %g2
 	set	rq_overflow, %g1
+	rdpr	%pil, %g4
+	cmp	%g4, PIL_14
 	ba	sys_trap
-	mov	PIL_14, %g4
+	  movl	%icc, PIL_14, %g4
 
 0:	retry
 
@@ -511,6 +517,8 @@ nonresumable_error(void)
 	 *	|   tail offset      |    head offset     |
 	 *	+--------------------+--------------------+
 	 *	63                 32 31                 0
+	 *
+	 * Run at PIL 14 unless we're already at PIL 15.
 	 */
 	sllx	%g3, 32, %g3			! %g3.h = tail offset
 	or	%g3, %g2, %g3			! %g3.l = head offset
@@ -518,8 +526,10 @@ nonresumable_error(void)
 	sub	%g2, 1, %g2			! %g2 = previous tl, arg2
 
 	set	process_nonresumable_error, %g1
+	rdpr	%pil, %g4
+	cmp	%g4, PIL_14
 	ba	sys_trap
-	mov	PIL_14, %g4
+	  movl	%icc, PIL_14, %g4
 
 	/*
 	 * We are here because the C routine is not able to process
