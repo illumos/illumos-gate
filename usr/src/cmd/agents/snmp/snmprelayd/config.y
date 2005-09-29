@@ -20,7 +20,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -375,7 +375,7 @@ communities_set : communities_set  t_comma community_elem | community_elem
                 DEBUG_YACC("communities_set");
 	}
 
-community_elem : community_elem  t_dot community_item | community_item
+community_elem : community_elem  t_dot community_item | t_dot community_elem | community_item
         {
                DEBUG_YACC("community_elem")
         }
@@ -404,7 +404,7 @@ community_item : ct_identifier
 	             com_string=NULL;	
                      found_comma=FALSE;
                 }
-                if (com_string == NULL)
+                if (com_string == NULL && found_dot == FALSE)
 	        {
                     /* com_string= strdup(save_string);*/
                     /* first part of community string */
@@ -418,14 +418,17 @@ community_item : ct_identifier
                 }
 
                  
-                if (found_dot )
-                {
-                     strcat(com_string,".");           /* allow a dot in community string */
-                     strcat(com_string,save_string);   /* add part after the dot    */
-		     free(save_string);
-                     found_dot=FALSE;
-                }
-		
+		if (found_dot )
+		{
+			if (com_string == NULL)
+				com_string = malloc(50);
+			strcat(com_string,".");
+					/* allow a dot in community string */
+			strcat(com_string,save_string);
+					/* add part after the dot    */
+			free(save_string);
+			found_dot=FALSE;
+		}
 	}
 
 acl_access :	t_access t_equal acl_access_type

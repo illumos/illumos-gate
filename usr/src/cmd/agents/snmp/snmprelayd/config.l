@@ -114,7 +114,7 @@ mib-2					{ DEBUG_LEX return MIB2; }
 sun					{ DEBUG_LEX return SUN; }
 enterprise				{ DEBUG_LEX return ENTERPRISE; }
 
-([a-zA-Z\*]|[\_\.\?\-0-9\*+$#%^@!|~&=`<>\/]*[a-zA-Z])[_0-9a-zA-Z-]*	{ DEBUG_LEX return IDENTIFIER; }
+([a-zA-Z\*]|[\_\?\-0-9\*+$#%^@!|~&=`<>\\']*[a-zA-Z])[_0-9a-zA-Z-]*	{ DEBUG_LEX return IDENTIFIER; }
 
 .					{ error_exit("syntax error in %s at line %d: the token %s is not valid",
 						config_file_4_res, yylineno, yytext);
