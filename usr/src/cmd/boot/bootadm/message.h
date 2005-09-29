@@ -71,6 +71,9 @@ extern "C" {
 
 #define	NEED_ALT_ROOT gettext("an alternate root must be specified\n")
 
+#define	ALT_ROOT_INVALID \
+    gettext("an alternate root (%s) cannot be used with this sub-command\n")
+
 #define	NO_FILE_ENTRY gettext("file not in list: %s\n")
 
 #define	DUP_FILE_ENTRY gettext("file already in list: %s\n")
@@ -82,6 +85,18 @@ extern "C" {
 #define	NO_BOOTADM_MATCH gettext("no matching bootadm entry found\n")
 
 #define	NO_MEM gettext("could not allocate memory: size = %u\n")
+
+#define	CANNOT_LOCATE_GRUB_MENU gettext("cannot find GRUB menu\n")
+
+#define	GRUB_MENU_DEVICE \
+	gettext("The location for the active GRUB menu is: %s (not mounted)\n")
+
+#define	GRUB_MENU_FSTYPE \
+    gettext("The filesystem type of the menu device is <%s>\n")
+
+#define	GRUB_MENU_PATH gettext("The location for the active GRUB menu is: %s\n")
+
+#define	STUBBOOT_DIR_NOT_FOUND gettext("cannot find stubboot directory\n")
 
 #define	NO_CMD gettext("no command at line %d\n")
 
@@ -267,7 +282,9 @@ the failsafe archive unbootable\n")
 
 #define	MKDIR_FAILED gettext("mkdir of %s failed: %s\n")
 
-#define	MOUNT_FAILED gettext("mount of %s (fstype %s) at %s failed\n")
+#define	MOUNT_FAILED gettext("mount of %s (fstype %s) failed\n")
+
+#define	MOUNT_MNTPT_FAILED gettext("mount at %s failed\n")
 
 #define	RMDIR_FAILED gettext("rmdir of %s failed: %s\n")
 
@@ -284,8 +301,6 @@ the failsafe archive unbootable\n")
 #define	MISSING_ROOT_FILE gettext("file missing: %s: %s\n")
 
 #define	BAD_ROOT_FILE gettext("file is invalid: %s\n")
-
-#define	USING_GRUB_SLICE gettext("\nUsing GRUB menu on device %s\n\n")
 
 #define	RESTORING_GRUB \
 	gettext("No GRUB installation found. Restoring GRUB from backup\n")

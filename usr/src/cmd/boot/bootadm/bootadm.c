@@ -135,6 +135,7 @@ typedef struct {
 #define	GRUB_MENU		"/boot/grub/menu.lst"
 #define	MENU_TMP		"/boot/grub/menu.lst.tmp"
 #define	RAMDISK_SPECIAL		"/ramdisk"
+#define	STUBBOOT		"/stubboot"
 
 /* lock related */
 #define	BAM_LOCK_FILE		"/var/run/bootadm.lock"
@@ -153,9 +154,6 @@ typedef struct {
 #define	INSTALLGRUB		"/sbin/installgrub"
 #define	STAGE1			"/boot/grub/stage1"
 #define	STAGE2			"/boot/grub/stage2"
-
-#define	QUIET			1
-
 
 /*
  * Default file attributes
@@ -219,6 +217,7 @@ static subcmd_t bam_cmd;
 static char *bam_root;
 static int bam_rootlen;
 static int bam_root_readonly;
+static int bam_alt_root;
 static char *bam_subcmd;
 static char *bam_opt;
 static int bam_debug;
@@ -537,6 +536,7 @@ parse_args_internal(int argc, char *argv[])
 				    strerror(errno));
 				break;
 			}
+			bam_alt_root = 1;
 			bam_root = rootbuf;
 			if (rootbuf[strlen(rootbuf) - 1] != '/')
 				(void) strcat(rootbuf, "/");
@@ -633,7 +633,7 @@ check_subcmd_and_options(
 
 
 static char *
-mount_grub_slice(int *mnted, char **physlice, int mode)
+mount_grub_slice(int *mnted, char **physlice, char **logslice, char **fs_type)
 {
 	struct extmnttab mnt;
 	struct stat sb;
@@ -647,10 +647,14 @@ mount_grub_slice(int *mnted, char **physlice, int mode)
 	*mnted = 0;
 
 	/*
-	 * physlice arg may be NULL
+	 * physlice, logslice, fs_type  args may be NULL
 	 */
 	if (physlice)
 		*physlice = NULL;
+	if (logslice)
+		*logslice = NULL;
+	if (fs_type)
+		*fs_type = NULL;
 
 	if (stat(GRUB_slice, &sb) != 0) {
 		bam_error(MISSING_SLICE_FILE, GRUB_slice, strerror(errno));
@@ -688,11 +692,14 @@ mount_grub_slice(int *mnted, char **physlice, int mode)
 		return (NULL);
 	}
 
-	if (mode != QUIET)
-		bam_print(USING_GRUB_SLICE, dev);
-
 	if (physlice) {
 		*physlice = s_strdup(phys);
+	}
+	if (logslice) {
+		*logslice = s_strdup(dev);
+	}
+	if (fs_type) {
+		*fs_type = s_strdup(fstype);
 	}
 
 	/*
@@ -701,11 +708,7 @@ mount_grub_slice(int *mnted, char **physlice, int mode)
 	fp = fopen(MNTTAB, "r");
 	if (fp == NULL) {
 		bam_error(OPEN_FAIL, MNTTAB, strerror(errno));
-		if (physlice) {
-			free(*physlice);
-			*physlice = NULL;
-		}
-		return (NULL);
+		goto error;
 	}
 
 	resetmnttab(fp);
@@ -734,35 +737,47 @@ mount_grub_slice(int *mnted, char **physlice, int mode)
 	if (mkdir(mntpt, 0755) == -1 && errno != EEXIST) {
 		bam_error(MKDIR_FAILED, mntpt, strerror(errno));
 		free(mntpt);
-		if (physlice) {
-			free(*physlice);
-			*physlice = NULL;
-		}
-		return (NULL);
+		goto error;
 	}
 
 	(void) snprintf(cmd, sizeof (cmd), "/sbin/mount -F %s %s %s",
 	    fstype, dev, mntpt);
 
 	if (exec_cmd(cmd, NULL, 0) != 0) {
-		bam_error(MOUNT_FAILED, dev, fstype, mntpt);
+		bam_error(MOUNT_FAILED, dev, fstype);
 		if (rmdir(mntpt) != 0) {
 			bam_error(RMDIR_FAILED, mntpt, strerror(errno));
 		}
 		free(mntpt);
-		if (physlice) {
-			free(*physlice);
-			*physlice = NULL;
-		}
-		return (NULL);
+		goto error;
 	}
 
 	*mnted = 1;
 	return (mntpt);
+
+error:
+	if (physlice) {
+		free(*physlice);
+		*physlice = NULL;
+	}
+	if (logslice) {
+		free(*logslice);
+		*logslice = NULL;
+	}
+	if (fs_type) {
+		free(*fs_type);
+		*fs_type = NULL;
+	}
+	return (NULL);
 }
 
 static void
-umount_grub_slice(int mnted, char *mntpt, char *physlice)
+umount_grub_slice(
+	int mnted,
+	char *mntpt,
+	char *physlice,
+	char *logslice,
+	char *fs_type)
 {
 	char cmd[PATH_MAX];
 
@@ -788,9 +803,103 @@ umount_grub_slice(int mnted, char *mntpt, char *physlice)
 			bam_error(RMDIR_FAILED, mntpt, strerror(errno));
 		}
 	}
+
 	if (physlice)
 		free(physlice);
+	if (logslice)
+		free(logslice);
+	if (fs_type)
+		free(fs_type);
+
 	free(mntpt);
+}
+
+static char *
+use_stubboot(void)
+{
+	int mnted;
+	struct stat sb;
+	struct extmnttab mnt;
+	FILE *fp;
+	char cmd[PATH_MAX];
+
+	if (stat(STUBBOOT, &sb) != 0) {
+		bam_error(STUBBOOT_DIR_NOT_FOUND);
+		return (NULL);
+	}
+
+	/*
+	 * Check if stubboot is mounted. If not, mount it
+	 */
+	fp = fopen(MNTTAB, "r");
+	if (fp == NULL) {
+		bam_error(OPEN_FAIL, MNTTAB, strerror(errno));
+		return (NULL);
+	}
+
+	resetmnttab(fp);
+
+	mnted = 0;
+	while (getextmntent(fp, &mnt, sizeof (mnt)) == 0) {
+		if (strcmp(mnt.mnt_mountp, STUBBOOT) == 0) {
+			mnted = 1;
+			break;
+		}
+	}
+
+	(void) fclose(fp);
+
+	if (mnted)
+		return (STUBBOOT);
+
+	/*
+	 * Stubboot is not mounted, mount it now.
+	 * It should exist in /etc/vfstab
+	 */
+	(void) snprintf(cmd, sizeof (cmd), "/sbin/mount %s",
+	    STUBBOOT);
+	if (exec_cmd(cmd, NULL, 0) != 0) {
+		bam_error(MOUNT_MNTPT_FAILED, STUBBOOT);
+		return (NULL);
+	}
+
+	return (STUBBOOT);
+}
+
+static void
+disp_active_menu_locn(char *menu_path, char *logslice, char *fstype, int mnted)
+{
+	/*
+	 * Check if we did a temp mount of an unmounted device.
+	 * If yes, print the block device and fstype for that device
+	 * else it is already mounted, so we print the path to the GRUB menu.
+	 */
+	if (mnted) {
+		bam_print(GRUB_MENU_DEVICE, logslice);
+		bam_print(GRUB_MENU_FSTYPE, fstype);
+	} else {
+		bam_print(GRUB_MENU_PATH, menu_path);
+	}
+}
+
+/*
+ * NOTE: A single "/" is also considered a trailing slash and will
+ * be deleted.
+ */
+static void
+elide_trailing_slash(const char *src, char *dst, size_t dstsize)
+{
+	size_t dstlen;
+
+	assert(src);
+	assert(dst);
+
+	(void) strlcpy(dst, src, dstsize);
+
+	dstlen = strlen(dst);
+	if (dst[dstlen - 1] == '/') {
+		dst[dstlen - 1] = '\0';
+	}
 }
 
 static error_t
@@ -799,10 +908,9 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	error_t ret;
 	char menu_path[PATH_MAX];
 	menu_t *menu;
-	char *mntpt, *menu_root;
+	char *mntpt, *menu_root, *logslice, *fstype;
 	struct stat sb;
 	int mnted;	/* set if we did a mount */
-	int mode;
 	error_t (*f)(menu_t *mp, char *menu_path, char *opt);
 
 	/*
@@ -813,25 +921,43 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 		return (BAM_ERROR);
 	}
 
-	if (strcmp(subcmd, "update_temp") == 0)
-		mode = QUIET;
-	else
-		mode = 0;
-
 	mntpt = NULL;
 	mnted = 0;
-	if (stat(GRUB_slice, &sb) == 0) {
-		mntpt = mount_grub_slice(&mnted, NULL, mode);
-		if (mntpt == NULL) {
-			return (BAM_ERROR);
-		}
+	logslice = fstype = NULL;
+
+	/*
+	 * If the user provides an alternate root, we
+	 * assume they know what they are doing and we
+	 * use it. Else we check if there is an
+	 * alternate location (other than /boot/grub)
+	 * for the GRUB menu
+	 */
+	if (bam_alt_root) {
+		menu_root = bam_root;
+	} else if (stat(GRUB_slice, &sb) == 0) {
+		mntpt = mount_grub_slice(&mnted, NULL, &logslice, &fstype);
 		menu_root = mntpt;
+	} else if (stat(STUBBOOT, &sb) == 0) {
+		menu_root = use_stubboot();
 	} else {
 		menu_root = bam_root;
 	}
 
-	(void) snprintf(menu_path, sizeof (menu_path), "%s%s",
-	    menu_root, GRUB_MENU);
+	if (menu_root == NULL) {
+		bam_error(CANNOT_LOCATE_GRUB_MENU);
+		return (BAM_ERROR);
+	}
+
+	elide_trailing_slash(menu_root, menu_path, sizeof (menu_path));
+	(void) strlcat(menu_path, GRUB_MENU, sizeof (menu_path));
+
+	/*
+	 * If listing the menu, display the active menu
+	 * location
+	 */
+	if (strcmp(subcmd, "list_entry") == 0) {
+		disp_active_menu_locn(menu_path, logslice, fstype, mnted);
+	}
 
 	menu = menu_read(menu_path);
 	assert(menu);
@@ -842,13 +968,15 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	if (strcmp(subcmd, "set_option") == 0) {
 		if (largc != 1 || largv[0] == NULL) {
 			usage();
-			umount_grub_slice(mnted, mntpt, NULL);
+			menu_free(menu);
+			umount_grub_slice(mnted, mntpt, NULL, logslice, fstype);
 			return (BAM_ERROR);
 		}
 		opt = largv[0];
 	} else if (largc != 0) {
 		usage();
-		umount_grub_slice(mnted, mntpt, NULL);
+		menu_free(menu);
+		umount_grub_slice(mnted, mntpt, NULL, logslice, fstype);
 		return (BAM_ERROR);
 	}
 
@@ -866,7 +994,7 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 
 	menu_free(menu);
 
-	umount_grub_slice(mnted, mntpt, NULL);
+	umount_grub_slice(mnted, mntpt, NULL, logslice, fstype);
 
 	return (ret);
 }
@@ -1852,7 +1980,7 @@ restore_grub_slice(void)
 
 	mnted = 0;
 	physlice = NULL;
-	mntpt = mount_grub_slice(&mnted, &physlice, QUIET);
+	mntpt = mount_grub_slice(&mnted, &physlice, NULL, NULL);
 	if (mntpt == NULL) {
 		bam_error(CANNOT_RESTORE_GRUB_SLICE);
 		return;
@@ -1860,7 +1988,7 @@ restore_grub_slice(void)
 
 	(void) snprintf(menupath, sizeof (menupath), "%s%s", mntpt, GRUB_MENU);
 	if (stat(menupath, &sb) == 0) {
-		umount_grub_slice(mnted, mntpt, physlice);
+		umount_grub_slice(mnted, mntpt, physlice, NULL, NULL);
 		return;
 	}
 
@@ -1874,14 +2002,14 @@ restore_grub_slice(void)
 
 	if (exec_cmd(cmd, NULL, 0) != 0) {
 		bam_error(RESTORE_GRUB_FAILED);
-		umount_grub_slice(mnted, mntpt, physlice);
+		umount_grub_slice(mnted, mntpt, physlice, NULL, NULL);
 		return;
 	}
 
 	if (stat(GRUB_backup_menu, &sb) != 0) {
 		bam_error(MISSING_BACKUP_MENU,
 		    GRUB_backup_menu, strerror(errno));
-		umount_grub_slice(mnted, mntpt, physlice);
+		umount_grub_slice(mnted, mntpt, physlice, NULL, NULL);
 		return;
 	}
 
@@ -1890,12 +2018,12 @@ restore_grub_slice(void)
 
 	if (exec_cmd(cmd, NULL, 0) != 0) {
 		bam_error(RESTORE_MENU_FAILED, menupath);
-		umount_grub_slice(mnted, mntpt, physlice);
+		umount_grub_slice(mnted, mntpt, physlice, NULL, NULL);
 		return;
 	}
 
 	/* Success */
-	umount_grub_slice(mnted, mntpt, physlice);
+	umount_grub_slice(mnted, mntpt, physlice, NULL, NULL);
 }
 
 static error_t
@@ -1907,8 +2035,14 @@ update_all(char *root, char *opt)
 	char multibt[PATH_MAX];
 	error_t ret = BAM_SUCCESS;
 
-	assert(bam_rootlen == 1 && root[0] == '/');
+	assert(root);
 	assert(opt == NULL);
+
+	if (bam_rootlen != 1 || *root != '/') {
+		elide_trailing_slash(root, multibt, sizeof (multibt));
+		bam_error(ALT_ROOT_INVALID, multibt);
+		return (BAM_ERROR);
+	}
 
 	/*
 	 * First update archive for current root
@@ -2083,6 +2217,101 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 
 	prev = lp;
 }
+
+static void
+update_numbering(menu_t *mp)
+{
+	int lineNum;
+	int entryNum;
+	int old_default_value;
+	line_t *lp, *prev, *default_lp, *default_entry;
+	char buf[PATH_MAX];
+
+	if (mp->start == NULL) {
+		return;
+	}
+
+	lineNum = LINE_INIT;
+	entryNum = ENTRY_INIT;
+	old_default_value = ENTRY_INIT;
+	lp = default_lp = default_entry = NULL;
+
+	prev = NULL;
+	for (lp = mp->start; lp; prev = lp, lp = lp->next) {
+		lp->lineNum = ++lineNum;
+
+		/*
+		 * Get the value of the default command
+		 */
+		if (lp->entryNum == ENTRY_INIT && lp->cmd &&
+		    strcmp(lp->cmd, menu_cmds[DEFAULT_CMD]) == 0 &&
+		    lp->arg) {
+			old_default_value = atoi(lp->arg);
+			default_lp = lp;
+		}
+
+		/*
+		 * If not boot entry, nothing else to fix for this
+		 * entry
+		 */
+		if (lp->entryNum == ENTRY_INIT)
+			continue;
+
+		/*
+		 * Record the position of the default entry.
+		 * The following works because global
+		 * commands like default and timeout should precede
+		 * actual boot entries, so old_default_value
+		 * is already known (or default cmd is missing).
+		 */
+		if (default_entry == NULL &&
+		    old_default_value != ENTRY_INIT &&
+		    lp->entryNum == old_default_value) {
+			default_entry = lp;
+		}
+
+		/*
+		 * Now fixup the entry number
+		 */
+		if (lp->cmd && strcmp(lp->cmd, menu_cmds[TITLE_CMD]) == 0) {
+			lp->entryNum = ++entryNum;
+			/* fixup the bootadm header */
+			if (prev && prev->flags == BAM_COMMENT &&
+			    prev->arg && strcmp(prev->arg, BAM_HDR) == 0) {
+				prev->entryNum = lp->entryNum;
+			}
+		} else {
+			lp->entryNum = entryNum;
+		}
+	}
+
+	/*
+	 * No default command in menu, simply return
+	 */
+	if (default_lp == NULL) {
+		return;
+	}
+
+	free(default_lp->arg);
+	free(default_lp->line);
+
+	if (default_entry == NULL) {
+		default_lp->arg = s_strdup("0");
+	} else {
+		(void) snprintf(buf, sizeof (buf), "%d",
+		    default_entry->entryNum);
+		default_lp->arg = s_strdup(buf);
+	}
+
+	/*
+	 * The following is required since only the line field gets
+	 * written back to menu.lst
+	 */
+	(void) snprintf(buf, sizeof (buf), "%s%s%s",
+	    menu_cmds[DEFAULT_CMD], menu_cmds[SEP_CMD], default_lp->arg);
+	default_lp->line = s_strdup(buf);
+}
+
 
 static menu_t *
 menu_read(char *menu_path)
@@ -2421,6 +2650,12 @@ do_delete(menu_t *mp, int entryNum)
 		bam_error(NO_BOOTADM_MATCH);
 		return (BAM_ERROR);
 	}
+
+	/*
+	 * Now that we have deleted an entry, update
+	 * the entry numbering and the default cmd.
+	 */
+	update_numbering(mp);
 
 	return (BAM_SUCCESS);
 }

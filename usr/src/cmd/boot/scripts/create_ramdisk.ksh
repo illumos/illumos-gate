@@ -62,6 +62,15 @@ if [ -x /usr/bin/mkisofs -o -x /tmp/bfubin/mkisofs ] ; then
 	format=isofs
 fi
 
+#
+# mkisofs on s8 doesn't support functionality used by GRUB boot.
+# Use ufs format for boot archive instead.
+#
+release=`uname -r`
+if [ "$release" = "5.8" ]; then
+   format=ufs
+fi
+
 shift `expr $OPTIND - 1`
 
 if [ $# -eq 1 ]; then
