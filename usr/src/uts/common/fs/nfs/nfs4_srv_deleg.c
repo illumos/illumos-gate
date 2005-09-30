@@ -243,7 +243,7 @@ rfs4_do_cb_null(rfs4_client_t *cp)
 	 * handles?  If so, this thread must wait before going and
 	 * mucking aroiund with the callback information
 	 */
-	if (cbp->cb_refcnt != 0)
+	while (cbp->cb_refcnt != 0)
 		cv_wait(cbp->cb_cv_nullcaller, cbp->cb_lock);
 
 	/*
@@ -687,7 +687,8 @@ rfs4_client_setcb(rfs4_client_t *cp, cb_client4 *cb, uint32_t cb_ident)
 	size_t len;
 
 	/* Set the call back for the client */
-	if (cb->cb_location.r_addr && cb->cb_location.r_netid) {
+	if (cb->cb_location.r_addr && cb->cb_location.r_addr[0] != '\0' &&
+	    cb->cb_location.r_netid && cb->cb_location.r_netid[0] != '\0') {
 		len = strlen(cb->cb_location.r_addr) + 1;
 		addr = kmem_alloc(len, KM_SLEEP);
 		bcopy(cb->cb_location.r_addr, addr, len);
@@ -699,7 +700,15 @@ rfs4_client_setcb(rfs4_client_t *cp, cb_client4 *cb, uint32_t cb_ident)
 	mutex_enter(cbp->cb_lock);
 
 	cbp->cb_newer.cb_callback.cb_program = cb->cb_program;
+
+	if (cbp->cb_newer.cb_callback.cb_location.r_addr != NULL)
+		kmem_free(cbp->cb_newer.cb_callback.cb_location.r_addr,
+		    strlen(cbp->cb_newer.cb_callback.cb_location.r_addr) + 1);
 	cbp->cb_newer.cb_callback.cb_location.r_addr = addr;
+
+	if (cbp->cb_newer.cb_callback.cb_location.r_netid != NULL)
+		kmem_free(cbp->cb_newer.cb_callback.cb_location.r_netid,
+		    strlen(cbp->cb_newer.cb_callback.cb_location.r_netid) + 1);
 	cbp->cb_newer.cb_callback.cb_location.r_netid = netid;
 
 	cbp->cb_newer.cb_ident = cb_ident;
