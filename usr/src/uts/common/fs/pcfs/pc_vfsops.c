@@ -105,9 +105,9 @@ static mntopt_t mntopts[] = {
  *	option name		cancel option	default arg	flags
  *		opt data
  */
-	{ MNTOPT_PCFS_NOHIDDEN,	nohidden_cancel, NULL,		MO_DEFAULT,
+	{ MNTOPT_PCFS_NOHIDDEN,	nohidden_cancel, NULL,		0,
 		NULL },
-	{ MNTOPT_PCFS_HIDDEN,	hidden_cancel, NULL,		0,
+	{ MNTOPT_PCFS_HIDDEN,	hidden_cancel, NULL,		MO_DEFAULT,
 		NULL },
 	{ MNTOPT_PCFS_NOFOLDCASE, nofoldcase_cancel, NULL,	MO_DEFAULT,
 		NULL },

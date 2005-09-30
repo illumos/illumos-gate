@@ -221,7 +221,7 @@ struct pcfs_args {
 /*
  * flags for the pcfs_args 'flags' field.
  *
- * Note that PCFS_MNT_HIDDEN is private - you should not be using it.
+ * Note that these two macros are obsolete - do not use them.
  */
 #define	PCFS_MNT_HIDDEN		0x01	/* show hidden files */
 #define	PCFS_MNT_FOLDCASE	0x02	/* fold all names from media to */
@@ -229,8 +229,6 @@ struct pcfs_args {
 
 /*
  * pcfs mount options.
- *
- * Note that hidden/nohidden is private - you should not use it.
  */
 #define	MNTOPT_PCFS_HIDDEN	"hidden"
 #define	MNTOPT_PCFS_NOHIDDEN	"nohidden"
