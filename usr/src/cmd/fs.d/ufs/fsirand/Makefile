@@ -22,8 +22,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1992,1996 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/fs.d/ufs/fsirand/Makefile
 
@@ -36,6 +36,9 @@ LINKVALUE=	../lib/fs/$(FSTYPE)/$(LIBPROG)
 include		../../Makefile.fstype
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
+
+lint		:=	PROG= $(LIBPROG)
+
 lint:		lint_PROG
 
 $(ROOTUSRSBIN)/$(LIBPROG):

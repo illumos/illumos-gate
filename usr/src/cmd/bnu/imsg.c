@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,8 +54,6 @@ register int fn;
 	register int i;
 	short fndsync;
 	char *bmsg;
-	extern int	errno, sys_nerr;
-	extern char *sys_errlist[];
 
 	fndsync = 0;
 	bmsg = msg;
@@ -85,11 +83,7 @@ register int fn;
 	}
 	/* have not found sync or end of message */
 	if (i < 0) {
-		if (errno < sys_nerr)
-			CDEBUG(7, "\nimsg read error: %s\n",
-			    sys_errlist[errno]);
-		else
-			CDEBUG(7, "\nimsg read error, errno %d\n", errno);
+		CDEBUG(7, "\nimsg read error: %s\n", strerror(errno));
 	}
 	*msg = '\0';
 	return(EOF);

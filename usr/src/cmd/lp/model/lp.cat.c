@@ -29,14 +29,15 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "stdio.h"
-#include "termio.h"
-#include "sys/types.h"
-#include "errno.h"
-#include "signal.h"
-#include "sys/times.h"
-#include "string.h"
-#include "limits.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <termio.h>
+#include <sys/types.h>
+#include <errno.h>
+#include <signal.h>
+#include <sys/times.h>
+#include <string.h>
+#include <limits.h>
 #include <sys/prnio.h>
 
 #include "lp.h"
@@ -47,7 +48,6 @@
  **	Begin Sun Additions for Parallel ports
  **/
 
-extern char *_sys_errlist[];
 #include <string.h>
 #include <stdarg.h>
 #include <signal.h>
@@ -295,7 +295,7 @@ printer_error(int error)
 {
 	switch (error) {
 		case -1:
-			printer_info("ioctl(): %s", _sys_errlist[errno]);
+			printer_info("ioctl(): %s", strerror(errno));
 			break;
 		case PRINTER_ERROR_PAPER_OUT:
 			printer_info("out of paper");
@@ -363,13 +363,6 @@ wait_state(int fd, int get_state())
 #define SAFETY_FACTOR	2.0
 #define R(F)		(int)((F) + .5)
 #define DELAY(N,D)	R(SAFETY_FACTOR * ((N) / (double)(D)))
-
-extern int		sys_nerr;
-
-extern char		*sys_errlist[],
-			*getenv();
-
-extern int		atoi();
 
 char			buffer[BUFSIZ];
 

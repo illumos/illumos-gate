@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
@@ -253,8 +253,6 @@ extern int yp_getalias(char *key, char *key_alias, int maxlen);
 extern int getdomainname(char *, int);
 
 extern struct rpc_createerr rpc_createerr;
-extern char *sys_errlist[];
-extern int sys_nerr;
 extern CLIENT *__yp_clnt_create_rsvdport();
 
 int

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -320,7 +320,7 @@ char *tempfile, *name;
 	(void) chown(tempfile, UUCPUID, UUCPGID);
 	(void) close(fd);
 	if(link(tempfile,name)<0){
-		DEBUG(4, "%s: ", sys_errlist[errno]);
+		DEBUG(4, "%s: ", strerror(errno));
 		DEBUG(4, "link(%s, ", tempfile);
 		DEBUG(4, "%s)\n", name);
 		if(unlink(tempfile)< 0){

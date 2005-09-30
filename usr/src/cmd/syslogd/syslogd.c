@@ -3357,7 +3357,7 @@ cfline(char *line, int lineno, struct filed *f)
 
 	DPRINT2(1, "cfline(%u): (%s)\n", mythreadno, line);
 
-	errno = 0;	/* keep sys_errlist stuff out of logerror messages */
+	errno = 0;	/* keep errno related stuff out of logerror messages */
 
 	/* clear out file entry */
 	bzero((char *)f, sizeof (*f));

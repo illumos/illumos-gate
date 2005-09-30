@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -389,8 +389,8 @@ char cntl;
 	if (x < 0) {
 		if ((*Write)(pk->p_ofn, p, HDRSIZ) != HDRSIZ) {
 			DEBUG(4, "pkxstart, write failed, %s\n",
-			    sys_errlist[errno]);
-			logent(sys_errlist[errno], "PKXSTART WRITE");
+			    strerror(errno));
+			logent(strerror(errno), "PKXSTART WRITE");
 			pkfail();
 			/* NOT REACHED */
 		}
@@ -402,8 +402,8 @@ char cntl;
 		if ((*Write)(pk->p_ofn, buf, pk->p_xsize + HDRSIZ) !=
 		    pk->p_xsize + HDRSIZ) {
 			DEBUG(4, "pkxstart, write failed, %s\n",
-			    sys_errlist[errno]);
-			logent(sys_errlist[errno], "PKXSTART WRITE");
+			    strerror(errno));
+			logent(strerror(errno), "PKXSTART WRITE");
 			pkfail();
 			/* NOT REACHED */
 		}
@@ -463,8 +463,8 @@ register int fn;
 		}
 		if (ret < 0) {
 			DEBUG(4, "pkcget, read failed, %s\n",
-			    sys_errlist[errno]);
-			logent(sys_errlist[errno], "PKCGET READ");
+			    strerror(errno));
+			logent(strerror(errno), "PKCGET READ");
 			pkfail();
 			/* NOT REACHED */
 		}

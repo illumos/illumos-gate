@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,9 +37,6 @@
 #include "messages.h"
 
 #define 	SBUFSZ	256
-
-extern int rmdir();
-extern char *prerrno();
 
 static char sptr[SBUFSZ];	/* buffer for system call */
 

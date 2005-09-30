@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,12 +35,17 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * fsirand
+ * fsirand installs random inode generation numbers on all the inodes on
+ * device <special>, and also installs a file system ID in the superblock.
+ * This helps increase the security of  file systems exported by NFS.
  */
 
 #include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
+#include <strings.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -48,20 +53,11 @@
 #include <sys/vnode.h>
 #include <sys/fs/ufs_inode.h>
 
-extern offset_t	llseek();
-
-extern long	lrand48();
-extern void	srand48();
-
-char fsbuf[SBSIZE];
+long fsbuf[(SBSIZE / sizeof (long))];
 struct dinode dibuf[8192/sizeof (struct dinode)];
 
-static char	*strerror(/*int errnum*/);
-
-void
-main(argc, argv)
-int	argc;
-char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	struct fs *fs;
 	int fd;
@@ -162,7 +158,7 @@ char	*argv[];
 				    "fsirand: Seek to %ld %ld failed: %s\n",
 				    ((off_t *)&seekaddr)[0],
 				    ((off_t *)&seekaddr)[1],
-				    seekaddr, strerror(errno));
+				    strerror(errno));
 				exit(1);
 			}
 			n = write(fd, (char *)dibuf, bsize);
@@ -222,21 +218,5 @@ char	*argv[];
 			}
 		}
 	}
-	exit(0);
-	/* NOTREACHED */
-}
-
-static char *
-strerror(errnum)
-	int errnum;
-{
-	extern int sys_nerr;
-	extern char *sys_errlist[];
-	static char unknown_error[16+1];	/* "Error NNNNNNNNNN" + '\0' */
-
-	if (errnum < 0 || errnum > sys_nerr) {
-		(void) sprintf(unknown_error, "Error %d", errnum);
-		return (unknown_error);
-	} else
-		return (sys_errlist[errnum]);
+	return (0);
 }

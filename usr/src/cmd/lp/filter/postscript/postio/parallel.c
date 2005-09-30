@@ -20,21 +20,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifndef lint
-static char sccsid[] = "%Z%%M% %I% %E%";
-#endif
-
 extern char *postbegin;
 
 #include <stdio.h>
 #include <errno.h>
-extern char *_sys_errlist[];
 #include <string.h>
 #include <stdarg.h>
 #include <signal.h>
@@ -285,7 +280,7 @@ printer_error(int error)
 {
 	switch (error) {
 		case -1:
-			printer_info("ioctl(): %s", _sys_errlist[errno]);
+			printer_info("ioctl(): %s", strerror(errno));
 			break;
 		case PRINTER_ERROR_PAPER_OUT:
 			printer_info("out of paper");
@@ -379,7 +374,7 @@ parallel_comm(int fd, int get_state())
 
 #if defined(DEBUG) && defined(NOTDEF)
 		logit("Writing (%d) at 0x%x actual: %d, %s\n", count++, head,
-			actual, (actual < 1 ? _sys_errlist[errno] : ""));
+			actual, (actual < 1 ? strerror(errno) : ""));
 #endif
 	}
 

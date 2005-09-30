@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
 */
 
@@ -29,7 +29,7 @@
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.28	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>	/* BUFSIZ: stdio = 1024, VMUNIX = 1024 */
 #ifndef TRACE
@@ -43,6 +43,9 @@
 #include <pwd.h>
 #include <locale.h>
 #include <dirent.h>
+#include <unistd.h>
+#include <errno.h>
+
 #define DIRSIZ	MAXNAMLEN
 
 short tfile = -1;	/* ditto */
@@ -67,7 +70,6 @@ short tfile = -1;	/* ditto */
  * Change both if you change either.
  */
 unsigned char	mydir[PATH_MAX+1];
-struct	passwd *getpwuid();
 
 /*
  * Limit on the number of printed entries
@@ -75,12 +77,11 @@ struct	passwd *getpwuid();
  */
 #define	NENTRY	50
 
-extern void setbuf();
 unsigned char	nb[BUFSIZE];
 int	vercnt;			/* Count number of versions of file found */
-main(argc, argv)
-	int argc;
-	unsigned char *argv[];
+
+int
+main(int argc, unsigned char *argv[])
 {
 	unsigned char string[50];
 	register unsigned char *cp;
@@ -88,7 +89,6 @@ main(argc, argv)
 	register int rflg = 0, errflg = 0;
 	int label;
 	line *tmpadr;
-	extern int optind;
 	extern unsigned char *mypass();
 	struct passwd *pp = getpwuid(getuid());
 	unsigned char rmcmd[PATH_MAX+1];
@@ -247,7 +247,7 @@ main(argc, argv)
 	 * ever edits with temporaries in "." anyways.
 	 */
 	if (nb[0] == '/') {
-		(void)unlink(nb);
+		(void)unlink((const char *)nb);
 		sprintf((char *)rmcmd, "rmdir %s 2> /dev/null", (char *)mydir);
 		system((char *)rmcmd);
 	}
@@ -312,7 +312,7 @@ listfiles(dirname)
 		fprintf(stderr,gettext("No files saved.\n"));
 		return;
 	}
-	if (chdir(dirname) < 0) {
+	if (chdir((const char *)dirname) < 0) {
 		perror((char *)dirname);
 		return;
 	}
@@ -472,7 +472,7 @@ findtmp(dir)
 	 * (actually the user's "directory" option).
 	 */
 	searchdir(dir);
-	if (chdir(mydir) == 0)
+	if (chdir((const char *)mydir) == 0)
 		searchdir(mydir);
 	if (bestfd != -1) {
 		/*
@@ -811,21 +811,15 @@ blkio(b, buf, iofcn)
 
 syserror()
 {
-	extern int sys_nerr;
-	extern unsigned char *sys_errlist[];
+	int save_err = errno;
 
 	dirtcnt = 0;
 	write(2, " ", 1);
-	if (errno >= 0 && errno <= sys_nerr)
-		error(sys_errlist[errno]);
-	else
-		error(gettext("System error %d"), errno);
+	error(strerror(save_err));
 	exit(1);
 }
 
 extern findiop();
-extern int kill(), ioctl(); 
-extern pid_t getpid();
 static int intrupt;
 
 unsigned char *

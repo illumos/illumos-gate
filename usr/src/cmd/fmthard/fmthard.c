@@ -94,14 +94,6 @@ extern	int	read_vtoc(int, struct vtoc *);
 extern	int	write_vtoc(int, struct vtoc *);
 
 /*
- * Externals
- */
-extern	char	*optarg;
-extern	int	optind;
-extern	int	errno;
-extern	char	*sys_errlist[];
-
-/*
  * Internal functions.
  */
 extern	int	main(int, char **);
@@ -233,7 +225,7 @@ main(int argc, char **argv)
 
 	if ((fd = open(argv[optind], O_RDWR|O_NDELAY)) < 0) {
 		(void) fprintf(stderr, "fmthard:  Cannot open device %s - %s\n",
-			argv[optind], sys_errlist[errno]);
+			argv[optind], strerror(errno));
 		exit(1);
 	}
 

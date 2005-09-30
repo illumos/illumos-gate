@@ -404,14 +404,9 @@ static const char *Spool;
 static const char *Pubdir;
 static char Progname[];
 static char *Bnptr;		/* used when BASENAME macro is expanded */
-extern char *sys_errlist[];
 
 static int Uerror;		/* global error code */
 static char *UerrorText[];	/* text for error code */
-
-/*	Some global I need for section 2 and section 3 routines */
-extern char *optarg;	/* for getopt() */
-extern int optind;	/* for getopt() */
 
 #define	UERRORTEXT		UerrorText[Uerror]
 #define	UTEXT(x)		UerrorText[x]

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -346,8 +346,6 @@ static void print_mask();
 static void print_mask1();
 static void print_stats();
 static void print_tid_ex();
-
-extern char *sys_errlist[];
 
 int
 main(argc, argv)

@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -372,8 +372,6 @@ extern "C" {
 #define	symlink		_symlink
 #define	sync		_sync
 #define	sys3b		_sys3b
-#define	sys_errlist	_sys_errlist
-#define	sys_nerr	_sys_nerr
 #define	syscall		_syscall
 #define	sysconf		_sysconf
 #define	sysfs		_sysfs

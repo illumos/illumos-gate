@@ -271,47 +271,9 @@ typedef struct t_surrfile
     int fullyresolved;	/*		translate		    */
 } t_surrfile;
 
-#ifdef __STDC__
-# include <stdlib.h>
-# include <unistd.h>
-#else
-extern	int	chmod();
-extern	int	close();
-extern	char	*ctime();
-extern	int	errno;
-extern	int	execl();
-extern	int	execvp();
-extern	void	exit();
-extern	char	*getenv();
-extern	char	*getlogin();
-extern	long	ftell();
-extern	struct group *getgrnam();
-extern	struct passwd *getpwent();
-extern	struct passwd *getpwnam();
-extern	struct passwd *getpwuid();
-extern	char	*malloc();
-extern	char	*memcpy();
-extern	char	*memmove();
-extern	char	*mktemp();
-extern	char	*realloc();
-extern	void	setpwent();
-extern	unsigned	sleep();
-extern	char	*strchr();
-extern	char	*strcpy();
-extern	char	*strncpy();
-extern	char	*strpbrk();
-extern	char	*strrchr();
-extern	time_t	time();
-extern	char	*tempnam();
-extern	FILE	*tmpfile();
-extern	int	unlink();
-#endif
+#include <stdlib.h>
+#include <unistd.h>
 
-extern	char	*optarg;	/* for getopt */
-extern	int	optind;
-extern	char	*sys_errlist[];
-
-#ifdef __STDC__
 extern	void	Dout(char *subname, int level, char *fmt, ...);
 extern	void	Tout(char *subname, char *msg, ...);
 extern	int	add_recip(reciplist *plist, char *name, int checkdups);
@@ -389,85 +351,6 @@ extern	int	translate(reciplist *plist, char *cmdstr, char *origname);
 extern	void	unlock(void);
 extern	int	validmsg(int);
 extern	int	wtmpf(char *str, int length);
-#else
-extern	void	Dout();
-extern	void	Tout();
-extern	int	add_recip();
-extern	char	*altcompile();
-extern	int	areforwarding();
-extern	void	cat();
-extern	int	ckdlivopts();
-extern	void	cksaved();
-extern	int	cksurg_rc();
-extern	void	clr_hinfo();
-extern	void	clrhdr();
-extern	void	cmdexpand();
-extern	void	copyback();
-extern	int	copylet();
-extern	void	copymt();
-extern	void	createmf();
-extern	void	del_reciplist ();
-extern	void	delete();
-extern	void	doFopt();
-extern	void	done();
-extern	void	sig_done();
-extern	FILE	*doopen();
-extern	int	dowait();
-extern	void	dumpaff();
-extern	void	dumprcv();
-extern	void	errmsg();
-extern	int	findSurg();
-extern	void	gendeliv();
-extern	int	getcomment();
-extern	int	gethead();
-extern	int	getline();
-extern	int	getnumbr();
-extern	int	getsurr();
-extern	void	goback();
-extern	int	init();
-extern	void	initsurrfile();
-extern	int	isheader();
-extern	int	isit();
-extern	int	islocal();
-extern	int	istext();
-extern	int	legal();
-extern	void	lock();
-extern	void	madd_recip();
-extern	char	*mailcompile();
-extern	void	mkdead();
-extern	void	mktmp();
-extern	void	mta_ercode();
-extern	void	new_reciplist ();
-extern	int	notme();
-extern	int	parse();
-extern	int	pckaffspot();
-extern	int	pckrcvspot();
-extern	void	pickFrom ();
-extern	int	pipletr();
-extern	void	poplist ();
-extern	int	printhdr ();
-extern	void	printmail();
-extern	void	pushlist();
-extern	void	savdead();
-extern	void	savehdrs();
-extern	int	sel_disp ();
-extern	int	sendlist();
-extern	void	sendmail();
-extern	int	sendsurg();
-extern	void	setletr();
-extern	void	(*setsig())();
-extern	void	setsurg_bt();
-extern	char	*setsurg_rc();
-extern	char	**setup_exec();
-extern	void	stamp();
-extern	int	systm();
-extern	void	tmperr();
-extern	string	*tokdef();
-extern	int	translate();
-extern	void	unlock();
-extern	int	validmsg();
-extern	int	wtmpf();
-#endif
 
 extern	int	ac;		/* argument list count */
 extern	char	**av;		/* argument list */
@@ -564,11 +447,7 @@ extern	char	Rpath[1024];	/* return path to sender of message */
 extern	char	rtrnmsg[];	/* "UNDELIVERABLE MAIL being returned by %s" */
 extern	int	sav_errno;
 extern	char	savefile[MAXFILENAME];	/* holds filename of save file */
-#ifdef __STDC__
 extern	void	(*saveint)(int);
-#else
-extern	void	(*saveint)();
-#endif
 extern	char	*seldisp[];
 extern	int	sending;	/* TRUE==>sending mail; FALSE==>printing mail */
 extern	char	m_sendto[1024];

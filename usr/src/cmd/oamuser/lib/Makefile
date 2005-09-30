@@ -22,8 +22,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1990-2000 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/oamuser/lib/Makefile
 #
@@ -45,7 +45,6 @@ OBJECTS= 	putgrent.o \
 		vproj.o \
 		dates.o \
 		vexpire.o \
-		prerrno.o \
 		putprojent.o \
 		vprojid.o \
 		vprojname.o

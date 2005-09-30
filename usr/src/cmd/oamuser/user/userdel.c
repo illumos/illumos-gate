@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,8 @@
 #include <userdefs.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <unistd.h>
+#include <strings.h>
 #include "users.h"
 #include "messages.h"
 #include "funcs.h"
@@ -57,12 +59,8 @@
  *	login - a string of printable chars except colon (:)
  ******************************************************************************/
 
-extern char *prerrno();
 extern int check_perm(), isbusy();
 extern int rm_files(), call_passmgmt(), edit_group();
-
-extern char *optarg;		/* used by getopt */
-extern int optind, opterr;	/* used by getopt */
 
 static char *logname;			/* login name to delete */
 static char *nargv[20];		/* arguments for execvp of passmgmt */
@@ -159,8 +157,8 @@ main(int argc, char **argv)
 	if( rflag ) {
 		/* Check Permissions */
 		if( stat( pstruct->pw_dir, &statbuf ) ) {
-			errmsg( M_OOPS, "find status about home directory", 
-				prerrno( errno ) );
+			errmsg(M_OOPS, "find status about home directory", 
+			    strerror(errno));
 			exit( EX_HOMEDIR );
 		}
 			

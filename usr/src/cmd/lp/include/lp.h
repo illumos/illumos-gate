@@ -27,18 +27,21 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#ifndef _LP_LP_H
+#define	_LP_LP_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#if	!defined(_LP_LP_H)
-#define	_LP_LP_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#include "errno.h"
-#include "fcntl.h"
-#include "sys/types.h"
-#include "sys/stat.h"
-#include "stdio.h"
-#include "dirent.h"
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <dirent.h>
 
 /**
  ** Types:
@@ -298,11 +301,7 @@ extern int		lp_errno;
 
 #define	NB(X)		(X? X : "")
 
-extern int	errno;
-extern char *	sys_errlist[];
-extern int	sys_nerr;
-
-#define PERROR		(errno < sys_nerr? sys_errlist[errno] : "unknown")
+#define PERROR		strerror(errno)
 
 /*
  * Largest number we'll ever expect to get from doing %ld in printf,
@@ -600,4 +599,8 @@ extern int chownmod(char *path, uid_t owner, gid_t group, mode_t mode);
 
 char *		next_x  ( char * , long * , unsigned int );
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif	/* _LP_LP_H */

@@ -22,8 +22,12 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7.3.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * error/logging/cleanup functions for the network listener process.
@@ -61,8 +65,8 @@ extern char *Netspec;
 extern FILE *Logfp;
 extern FILE *Debugfp;
 extern char Mytag[];
- 
-static char * stamp(char *);
+
+static char *stamp(char *);
 
 /*
  * error handling and debug routines
@@ -95,23 +99,21 @@ int code, exitflag;
 
 static char *tlirange = "Unknown TLI error (t_errno > t_nerr)";
 
-tli_error(code, exitflag)
-int code, exitflag;
+void
+tli_error(int code, int exitflag)
 {
 	void	t_error();
-	extern char *sys_errlist[];
-	extern int sys_nerr;
-	extern char *range_err();
 	char	scratch[256];
 	const char *p;
+	int	save_errno = errno;
 
-	p = ( t_errno < t_nerr ? t_errlist[t_errno] : tlirange );
+	p = (t_errno < t_nerr ? t_errlist[t_errno] : tlirange);
 
-	sprintf(scratch, "%s: %s", err_list[code].err_msg, p);
+	(void) snprintf(scratch, sizeof (scratch), "%s: %s",
+	    err_list[code].err_msg, p);
 	if (t_errno == TSYSERR)  {
-		p = (errno < sys_nerr ? sys_errlist[errno] : range_err());
-		strcat(scratch, ": ");
-		strcat(scratch, p);
+		(void) strlcat(scratch, ": ", sizeof (scratch));
+		(void) strlcat(scratch, strerror(save_errno), sizeof (scratch));
 	}
 	clean_up(code, exitflag, scratch);
 }
@@ -121,19 +123,13 @@ int code, exitflag;
  * sys_error: error in a system call
  */
 
-sys_error(code, exitflag)
-int code, exitflag;
+void
+sys_error(int code, int exitflag)
 {
-	extern int errno;
-	extern char *sys_errlist[];
-	extern int sys_nerr;
-	register char *p;
 	char scratch[256];
-	extern char *range_err();
 
-	p = (errno < sys_nerr ? sys_errlist[errno] : range_err());
-
-	sprintf(scratch, "%s: %s", err_list[code].err_msg, p);
+	(void) snprintf(scratch, sizeof (scratch), "%s: %s",
+	    err_list[code].err_msg, strerror(errno));
 	clean_up(code, exitflag, scratch);
 }
 
@@ -172,7 +168,7 @@ char *msg;
 		for (i=0;i<Dbf_entries;i++) {
 			t_unbind(dbp->dbf_fd);
 			dbp++;
-		} 
+		}
 	}
 
 #ifdef	COREDUMP
@@ -181,24 +177,6 @@ char *msg;
 #endif	/* COREDUMP */
 
 	logexit(err_list[code].err_code, msg);
-}
-
-
-
-/*
- * range_err:	returns a string to use when errno > sys_nerr
- */
-
-static char *sysrange = "Unknown system error (errno %d > sys_nerr)";
-static char range_buf[128];
-
-char *
-range_err()
-{
-	extern int errno;
-
-	sprintf(range_buf,sysrange,errno);
-	return(range_buf);
 }
 
 
@@ -284,7 +262,7 @@ char *s;
 			rewind(Logfp);
 			DEBUG((1,"errno %d renaming log to old logfile",errno));
 		}
-		else  if (nlogfp = fopen(log, "a+"))  { 
+		else  if (nlogfp = fopen(log, "a+"))  {
 			fclose(Logfp);
 			Logfp = nlogfp;
 			fcntl(fileno(Logfp), F_SETFD, 1); /* reset close-on-exec */
@@ -315,7 +293,7 @@ stamp(char *msg)
 	tm_p = (struct tm *) localtime(&clock);
 	tm_p->tm_mon++;	/* since months are 0-11 */
 	sprintf(Lastmsg, "%2.2d/%2.2d/%2.2d %2.2d:%2.2d:%2.2d; %ld; %s\n",
-		tm_p->tm_mon, tm_p->tm_mday, (tm_p->tm_year % 100), 
+		tm_p->tm_mon, tm_p->tm_mday, (tm_p->tm_year % 100),
 		tm_p->tm_hour, tm_p->tm_min, tm_p->tm_sec, Pid, msg);
 	return(Lastmsg);
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -365,8 +365,6 @@ extern "C" {
 #define	synchutmp	_synchutmp
 #define	sys3b		_sys3b
 #define	sysi86		_sysi86
-#define	sys_errlist	_sys_errlist
-#define	sys_nerr	_sys_nerr
 #define	sysconf		_sysconf
 #define	sysfs		_sysfs
 #define	sysinfo		_sysinfo

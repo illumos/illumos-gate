@@ -21,9 +21,13 @@
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "uucp.h"
 
@@ -315,7 +319,7 @@ char *tempfile, *name;
 	(void) chown(tempfile, UUCPUID, UUCPGID);
 	(void) close(fd);
 	if(link(tempfile,name)<0){
-		DEBUG(4, "%s: ", sys_errlist[errno]);
+		DEBUG(4, "%s: ", strerror(errno));
 		DEBUG(4, "link(%s, ", tempfile);
 		DEBUG(4, "%s)\n", name);
 		if(unlink(tempfile)< 0){

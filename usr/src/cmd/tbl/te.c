@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,37 +15,18 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
  /* te.c: error message control, input line count */
-# include "t..c"
-# include <locale.h>
-# include <errno.h>
+#include "t..c"
+#include <locale.h>
+#include <errno.h>
+#include <unistd.h>
+#include <string.h>
 
 void
 error(char *s)
 {
-fprintf(stderr, gettext("\n%s: line %d: %s\n"), ifile, iline, s);
-# ifdef unix
-fprintf(stderr, gettext("tbl quits\n"));
-exit(1);
-# endif
-# ifdef gcos
-fprintf(stderr, "run terminated due to error condition detected by tbl preprocessor\n");
-exit(0);
-# endif
-}
-
-char *
-errmsg(int errnum)
-{
-extern int sys_nerr;
-extern char *sys_errlist[];
-static char errmsgbuf[18];
-if (errnum > sys_nerr)
-	{
-	sprintf(errmsgbuf, "Error %d", errnum);
-	return (errmsgbuf);
-	}
-else
-	return (sys_errlist[errnum]);
+	(void) fprintf(stderr, gettext("\n%s: line %d: %s\n"), ifile, iline, s);
+	(void) fprintf(stderr, gettext("tbl quits\n"));
+	exit(1);
 }
 
 char *
@@ -64,17 +45,17 @@ while(len > 0)
 
 	while (*s) s++;
 	s--;
-	if (*s == '\n') *s-- =0;
-	else
-		{
-		if (!feof(tabin))
-			{
+	if (*s == '\n') {
+		*s-- = '\0';
+	} else {
+		if (!feof(tabin)) {
 			if (ferror(tabin))
-				error(errmsg(errno));
+				error(strerror(errno));
 			else
 				error(gettext("Line too long"));
-			}
 		}
+	}
+
 	for(nbl=0; *s == '\\' && s>p; s--)
 		nbl++;
 	if (linstart && nbl % 2) /* fold escaped nl if in table */

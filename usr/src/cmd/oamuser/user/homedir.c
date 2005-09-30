@@ -35,12 +35,12 @@
 #include <stdio.h>
 #include <userdefs.h>
 #include <errno.h>
+#include <strings.h>
 #include "messages.h"
 
 #define 	SBUFSZ	256
 
-extern int mkdir(), chown(), rm_homedir();
-extern char *prerrno();
+extern int rm_homedir();
 
 static char cmdbuf[ SBUFSZ ];	/* buffer for system call */
 
@@ -56,13 +56,13 @@ create_home(char *homedir, char *skeldir, uid_t uid, gid_t gid)
 		/* group id of new user */
 {
 	if( mkdir(homedir, 0775) != 0 ) {
-		errmsg( M_OOPS, "create the home directory", prerrno( errno ) );
+		errmsg(M_OOPS, "create the home directory", strerror(errno));
 		return( EX_HOMEDIR );
 	}
 
 	if( chown(homedir, uid, gid) != 0 ) {
-		errmsg( M_OOPS, "change ownership of home directory", 
-			prerrno( errno ) );
+		errmsg(M_OOPS, "change ownership of home directory", 
+		    strerror(errno));
 		return( EX_HOMEDIR );
 	}
 
@@ -72,8 +72,8 @@ create_home(char *homedir, char *skeldir, uid_t uid, gid_t gid)
 			skeldir, homedir);
 
 		if( system( cmdbuf ) != 0 ) {
-			errmsg( M_OOPS, "copy skeleton directory into home directory",
-				prerrno( errno ) );
+			errmsg(M_OOPS, "copy skeleton directory into home "
+			    "directory", strerror(errno));
 			(void) rm_homedir( homedir );
 			return( EX_HOMEDIR );
 		}
@@ -82,8 +82,8 @@ create_home(char *homedir, char *skeldir, uid_t uid, gid_t gid)
 		(void) sprintf( cmdbuf,"cd %s && find . -exec chown %ld {} \\;",
 			homedir, uid );
 		if( system( cmdbuf ) != 0) {
-			errmsg( M_OOPS, "change owner of files home directory",
-				prerrno( errno ) );
+			errmsg(M_OOPS, "change owner of files home directory",
+			    strerror(errno));
 
 			(void) rm_homedir( homedir );
 			return( EX_HOMEDIR );
@@ -93,8 +93,8 @@ create_home(char *homedir, char *skeldir, uid_t uid, gid_t gid)
 		(void) sprintf( cmdbuf, "cd %s && find . -exec chgrp %ld {} \\;",
 			homedir, gid );
 		if( system( cmdbuf ) != 0) {
-			errmsg( M_OOPS, "change group of files home directory",
-				prerrno( errno ) );
+			errmsg(M_OOPS, "change group of files home directory",
+			    strerror(errno));
 			(void) rm_homedir( homedir );
 			return( EX_HOMEDIR );
 		}

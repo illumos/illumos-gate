@@ -573,10 +573,8 @@ pr_msg(const char *fmt, ...)
 
 	for (p1 = nfmt; *p1; p1++) {
 		if (*p1 == '%' && *(p1+1) == 'm') {
-			if (errno < sys_nerr) {
-				(void) strcpy(p2, sys_errlist[errno]);
-				p2 += strlen(p2);
-			}
+			(void) strcpy(p2, strerror(errno));
+			p2 += strlen(p2);
 			p1++;
 		} else {
 			*p2++ = *p1;

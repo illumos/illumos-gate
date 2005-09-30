@@ -228,8 +228,6 @@ extern char self[];
 extern int verbose;
 extern int trace;
 extern int automountd_nobrowse;
-extern int sys_nerr;
-extern char *sys_errlist[];
 extern struct autodir *dir_head;
 extern struct autodir *dir_tail;
 extern struct mntlist *current_mounts;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,9 +30,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "stdio.h"
-#include "errno.h"
-#include "string.h"
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
 #include <locale.h>
 
 #include "lp.h"
@@ -44,11 +44,6 @@
 #include "oam.h"
 
 #define	OPT_LIST	"f:F:ixl"
-
-extern char		*strerror(),
-			*malloc();
-
-extern int		sys_nerr;
 
 int			add_filter(),
 			reload_filter(),
@@ -915,7 +910,7 @@ static void		same_complaints (table, type)
 			ERROR,
 			E_FL_UNKNOWN,
 			getfilterfile(table),
-			(errno < sys_nerr? strerror(errno): "unknown")
+			strerror(errno)
 		);
 		break;
 	}

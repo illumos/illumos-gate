@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,14 +61,12 @@ static char *nsep = "\0\0.\0 \0 \0\0";
 
 static void usage(void);
 static void printt(char *, clock_t);
-extern char *sys_errlist[];
 
 int
 main(int argc, char **argv)
 {
 	struct tms	buffer;
 	pid_t		p;
-	extern int	errno;
 	int		status;
 	int		pflag		= 0;
 	int		c;

@@ -11,10 +11,18 @@
  * University may not be used to endorse or promote products derived
  * from this software without specific prior written permission.
  *
- * Copyright (c) 1998, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#ifndef	_DEFS_H
+#define	_DEFS_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdio.h>
 #include <ctype.h>
@@ -22,74 +30,70 @@
 #include <pwd.h>
 #include <grp.h>
 #include <dirent.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <netinet/in.h>
 
-#ifdef SYSV
-#define rindex  strrchr
-#define index   strchr
-#endif /* SYSV */
-
 /*
  * The version number should be changed whenever the protocol changes.
  */
-#define VERSION	 3
+#define	VERSION	 3
 
 #define	MAILCMD	 "/usr/lib/sendmail -oi -t"
 
 	/* defines for yacc */
-#define EQUAL	1
-#define LP	2
-#define RP	3
-#define SM	4
-#define ARROW	5
-#define COLON	6
-#define DCOLON	7
-#define NAME	8
-#define STRING	9
-#define INSTALL	10
-#define NOTIFY	11
-#define EXCEPT	12
-#define PATTERN	13
-#define SPECIAL	14
-#define OPTION	15
+#define	EQUAL	1
+#define	LP	2
+#define	RP	3
+#define	SM	4
+#define	ARROW	5
+#define	COLON	6
+#define	DCOLON	7
+#define	NAME	8
+#define	STRING	9
+#define	INSTALL	10
+#define	NOTIFY	11
+#define	EXCEPT	12
+#define	PATTERN	13
+#define	SPECIAL	14
+#define	OPTION	15
 
 	/* lexical definitions */
 #define	QUOTE 	0200		/* used internally for quoted characters */
 #define	TRIM	0177		/* Mask to strip quote bit */
 
 	/* table sizes */
-#define HASHSIZE	1021
-#define INMAX	3500
+#define	HASHSIZE	1021
+#define	INMAX	3500
 #define	LINESIZE	BUFSIZ
 
 	/* option flags */
-#define VERIFY	0x1
-#define WHOLE	0x2
-#define YOUNGER	0x4
-#define COMPARE	0x8
-#define REMOVE	0x10
-#define FOLLOW	0x20
-#define IGNLNKS	0x40
+#define	VERIFY	0x1
+#define	WHOLE	0x2
+#define	YOUNGER	0x4
+#define	COMPARE	0x8
+#define	REMOVE	0x10
+#define	FOLLOW	0x20
+#define	IGNLNKS	0x40
 #define	OBITS "\020\1VERIFY\2WHOLE\3YOUNGER\4COMPARE\5REMOVE\6FOLLOW\7IGNLNKS"
 
 	/* expand type definitions */
-#define E_VARS	0x1
-#define E_SHELL	0x2
-#define E_TILDE	0x4
-#define E_ALL	0x7
+#define	E_VARS	0x1
+#define	E_SHELL	0x2
+#define	E_TILDE	0x4
+#define	E_ALL	0x7
 
 	/* actions for lookup() */
-#define LOOKUP	0
-#define INSERT	1
-#define REPLACE	2
+#define	LOOKUP	0
+#define	INSERT	1
+#define	REPLACE	2
 
-#define ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#define	ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
 
-#define ALLOC(x) (struct x *) malloc(sizeof(struct x))
+#define	ALLOC(x) (struct x *)malloc(sizeof (struct x))
 
 struct namelist {	/* for making lists of strings */
 	char	*n_name;
@@ -136,8 +140,6 @@ extern struct passwd *pw;	/* pointer to static area used by getpwent */
 extern struct group *gr;	/* pointer to static area used by getgrent */
 extern char host[];		/* host name of master copy */
 extern char buf[];		/* general purpose buffer */
-extern int errno;		/* system error number */
-extern char *sys_errlist[];
 
 char *makestr();
 struct namelist *makenl();
@@ -145,7 +147,11 @@ struct subcmd *makesubcmd();
 struct namelist *lookup();
 struct namelist *expand();
 char *exptilde();
-char *rindex();
-char *index();
 char *printb();
 void sendrem();
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* _DEFS_H */

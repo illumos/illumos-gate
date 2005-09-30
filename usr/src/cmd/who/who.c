@@ -98,9 +98,6 @@ static void process(void);
 static void ck_file(char *);
 static void dump(void);
 
-extern char *optarg;		/* for getopt()			*/
-extern int optind;		/* for getopt()			*/
-extern char *sys_errlist[];	/* error msgs for errno    */
 static struct	utmpx *utmpp;	/* pointer for getutxent()	*/
 
 /*

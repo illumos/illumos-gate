@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,11 +46,9 @@
 #define	ER_SYSLOG	0x2
 #define	ER_NOSTAMP	0x4
 
-static void	errmsg(int, u_int, char *, const char *, va_list);
+static void	errmsg(int, uint_t, char *, const char *, va_list);
 
 static FILE	*logfile;
-
-extern char	*sys_errlist[];			/* should use strerror(3C) ? */
 
 static mutex_t	err_mutex;
 
@@ -209,7 +207,7 @@ info(const char *fmt, ...)
 
 
 void
-debug(u_int level, const char *fmt, ...)
+debug(uint_t level, const char *fmt, ...)
 {
 	extern int	debug_level;
 	va_list		ap;
@@ -285,7 +283,7 @@ failass(char *a, char *f, int l)
 }
 
 static void
-errmsg(int err, u_int flags, char *tag, const char *fmt, va_list ap)
+errmsg(int err, uint_t flags, char *tag, const char *fmt, va_list ap)
 {
 	const char	*p;
 	char		msg[BUFSIZ];
@@ -303,11 +301,7 @@ errmsg(int err, u_int flags, char *tag, const char *fmt, va_list ap)
 		logfile = stderr;
 	}
 
-	if ((err > ESTALE) || (err < 0)) {
-		errmsg = "Bad errno";
-	} else {
-		errmsg = sys_errlist[err];
-	}
+	errmsg = strerror(err);
 
 	(void) memset(msg, 0, BUFSIZ);
 

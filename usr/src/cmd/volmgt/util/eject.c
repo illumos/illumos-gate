@@ -27,7 +27,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Program to eject oen or more pieces of media.
+ * Program to eject one or more pieces of media.
  */
 
 #include	<stdio.h>
@@ -455,7 +455,7 @@ ejectit(char *name, bool_t volmgt_is_running)
 		absname = path;
 
 	volume_is_not_managed = !volmgt_is_running ||
-		(!volmgt_ownspath(absname) && volmgt_symname(name) == NULL);
+	    (!volmgt_ownspath(absname) && volmgt_symname(name) == NULL);
 
 	/*
 	 * If volume management is either not running or not being managed by
@@ -471,12 +471,12 @@ ejectit(char *name, bool_t volmgt_is_running)
 			if (!force_eject) {
 				(void) fprintf(stderr,
 gettext("WARNING: can not unmount %s, the file system is (probably) busy\n"),
-					name);
+				    name);
 				return (EJECT_PARM_ERR);
 			} else {
 				(void) fprintf(stderr,
 gettext("WARNING: %s has a mounted filesystem, ejecting anyway\n"),
-					name);
+				    name);
 			}
 		}
 	}
@@ -699,7 +699,6 @@ display_busy(char *path, bool_t vm_running)
 {
 	int		errno_save = errno;	/* to save errno */
 	char		*blk;			/* block name */
-	extern char	*sys_errlist[];		/* see perror(3) */
 	FILE		*fp = NULL;		/* for scanning mnttab */
 	struct mnttab	mref;			/* for scanning mnttab */
 	struct mnttab	mp;			/* for scanning mnttab */
@@ -760,7 +759,7 @@ display_busy(char *path, bool_t vm_running)
 		if (strncmp(busy_base, mp.mnt_special, bblen) == 0) {
 			res = TRUE;
 			(void) fprintf(stderr, "%s: %s\n", mp.mnt_special,
-			    sys_errlist[EBUSY]);
+			    strerror(EBUSY));
 		}
 	}
 
@@ -1230,8 +1229,7 @@ eject_getfullblkname(char *path, bool_t vm_running)
 		/* see if we have a raw volmgt pathname (e.g. "/vol/r*") */
 		if (strncmp(path, raw_root, raw_root_len) == 0) {
 			if (snprintf(res_buf, sizeof (res_buf), "%s/%s",
-				vm_root, path + raw_root_len)
-				>= sizeof (res_buf)) {
+			    vm_root, path + raw_root_len) >= sizeof (res_buf)) {
 				return (NULL);
 			}
 			goto dun;		/* found match in /vol */
@@ -1244,8 +1242,7 @@ eject_getfullblkname(char *path, bool_t vm_running)
 		/* see if we have a raw volmgt pathname (e.g. "/vol/dev/r*") */
 		if (strncmp(path, raw_root, raw_root_len) == 0) {
 			if (snprintf(res_buf, sizeof (res_buf), "%s/dev/%s",
-				vm_root, path + raw_root_len)
-				>= sizeof (res_buf)) {
+			    vm_root, path + raw_root_len) >= sizeof (res_buf)) {
 				return (NULL);
 			}
 			goto dun;		/* found match in /vol/dev */

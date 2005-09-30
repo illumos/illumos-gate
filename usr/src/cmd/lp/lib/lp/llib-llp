@@ -23,8 +23,8 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -49,10 +49,6 @@ typedef struct FALERT {
 	int	Q;	/* # requests queued to activate alert */
 	int	W;	/* alert is sent every "W" minutes */
 } FALERT;
-
-extern int	errno;
-extern char *	sys_errlist[];
-extern int	sys_nerr;
 
 extern int	open_locked(char *, char *, mode_t);
 extern char	*fdgets(char *, int, int);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -400,7 +400,6 @@ tfaillog(fd, s)
 int	fd;
 char	*s;
 {
-	extern char	*sys_errlist[];
 	char	fmt[ BUFSIZ ];
 
 	if (0 < t_errno && t_errno < t_nerr) {
@@ -409,7 +408,7 @@ char	*s;
 		logent(s, t_errlist[t_errno]);
 		if ( t_errno == TSYSERR ) {
 			strcpy(fmt, "tlicall: system error: %s\n");
-			DEBUG(5, fmt, sys_errlist[errno]);
+			DEBUG(5, fmt, strerror(errno));
 		} else if ( t_errno == TLOOK ) {
 			show_tlook(fd);
 		}
@@ -419,7 +418,7 @@ char	*s;
 		sprintf(fmt, "%s: unknown tli error %d", s, t_errno);
 		DEBUG(5, fmt, 0);
 		sprintf(fmt, "%s: %%s\n", s);
-		DEBUG(5, fmt, sys_errlist[errno]);
+		DEBUG(5, fmt, strerror(errno));
 	}
 	return;
 }

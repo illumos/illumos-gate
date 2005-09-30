@@ -151,7 +151,6 @@ static char *appdef[] = { "appdefaults", rlogin, NULL };
 static	boolean_t ttcompat;
 static	struct termios savetty;
 
-static	char *errmsg(int);
 static	char *host;
 static	int port_number;
 static	int rem = -1;
@@ -942,7 +941,7 @@ writer(void)
 				continue;
 			else {
 				prf(gettext("Read error from terminal: %s"),
-				    errmsg(errno));
+				    strerror(errno));
 				break;
 			}
 		}
@@ -976,7 +975,7 @@ writer(void)
 				if (deswrite(rem, &cmdchar, 1, 0) < 0) {
 					prf(gettext(
 					    "Write error to network: %s"),
-					    errmsg(errno));
+					    strerror(errno));
 					break;
 				}
 			}
@@ -986,7 +985,7 @@ writer(void)
 				prf(gettext("line gone"));
 			else
 				prf(gettext("Write error to network: %s"),
-				    errmsg(errno));
+				    strerror(errno));
 			break;
 		}
 		bol = c == defkill || c == deftc.t_eofc ||
@@ -1014,7 +1013,7 @@ echo(char c)
 	*p++ = '\r';
 	*p++ = '\n';
 	if (write(STDOUT_FILENO, buf, p - buf) < 0)
-		prf(gettext("Write error to terminal: %s"), errmsg(errno));
+		prf(gettext("Write error to terminal: %s"), strerror(errno));
 }
 
 static void
@@ -1061,7 +1060,7 @@ sendwindow(void)
 	wp->ws_xpixel = htons(winsize.ws_xpixel);
 	wp->ws_ypixel = htons(winsize.ws_ypixel);
 	if (deswrite(rem, obuf, sizeof (obuf), 0) < 0)
-		prf(gettext("Write error to network: %s"), errmsg(errno));
+		prf(gettext("Write error to network: %s"), strerror(errno));
 }
 
 
@@ -1194,7 +1193,7 @@ oob(void)
 				if (n < 0)
 					prf(gettext(
 					    "Read error from network: %s"),
-					    errmsg(errno));
+					    strerror(errno));
 				break;
 			}
 		}
@@ -1253,7 +1252,7 @@ reader(int oldmask)
 				if (errno != EINTR) {
 					prf(gettext(
 					    "Write error to terminal: %s"),
-					    errmsg(errno));
+					    strerror(errno));
 					return (-1);
 				}
 				continue;
@@ -1270,7 +1269,7 @@ reader(int oldmask)
 			if (errno == EINTR)
 				continue;
 			prf(gettext("Read error from network: %s"),
-			    errmsg(errno));
+			    strerror(errno));
 			return (-1);
 		}
 	}
@@ -1345,17 +1344,6 @@ lostpeer(void)
 	(void) sigset(SIGPIPE, SIG_IGN);
 	prf(gettext("\aConnection to %.*s closed."), MAXHOSTNAMELEN, host);
 	done(EXIT_FAILURE);
-}
-
-static char *
-errmsg(int errcode)
-{
-	extern int sys_nerr;
-
-	if (errcode < 0 || errcode > sys_nerr)
-		return (gettext("Unknown error"));
-	else
-		return (strerror(errcode));
 }
 
 static int

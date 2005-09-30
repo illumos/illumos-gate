@@ -20,15 +20,15 @@
  * CDDL HEADER END
  */
 /* 
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI" /* from SVR4 bnu:unknown.c 1.8 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  *	logs attempts by unknown remote machines to run uucico in FOREIGN
  *	("/var/uucp/.Admin/Foreign").  if anything goes wrong,
@@ -96,15 +96,11 @@ char	*errmsg, *logmsg;
 	char		ebuf[BUFSIZ+1];
 	int		fds[2];
 	size_t		sz;
-	extern int	sys_nerr;
-	extern char	*sys_errlist[];
-
 
 	(void) snprintf(ebuf, BUFSIZ,
 		"To: %s\nSubject: %s %s\n\n%s %s:\t%s (%d)\nlog msg:\t%s",
 		MAILTO, errmsg, FOREIGN, errmsg, FOREIGN,
-		(errno < sys_nerr ? sys_errlist[errno] : "Unknown error "),
-		errno, logmsg);
+		strerror(errno), errno, logmsg);
 	sz = strlen(ebuf);
 	if (ebuf[sz-1] != '\n') {
 		ebuf[sz] = '\n';

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -241,8 +241,7 @@ dprintf(const char *fmt, ...)
 	va_list		ap;
 	const char	*p;
 	char		msg[BUFSIZ];
-	extern char	*sys_errlist[];
-	char		*errmsg = sys_errlist[errno];
+	char		*errmsg = strerror(errno);
 	char		*s;
 
 

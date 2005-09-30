@@ -22,8 +22,12 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:dio.c 2.11 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "uucp.h"
 
@@ -179,7 +183,7 @@ FILE *fp1;
 		if (len != XBUFSIZ)
 			break;
 	}
-	ASSERT(len >= 0, "DISK READ ERROR", sys_errlist[errno], len);
+	ASSERT(len >= 0, "DISK READ ERROR", strerror(errno), len);
 #ifndef V8
 	(*Ioctl)(fn, DIOCXCTL, dkeof);
 #endif

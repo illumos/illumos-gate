@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,9 +53,6 @@
 
 #define	A_LONG_TIME 10000000
 #define	STDIN_MASK (1<<fileno(stdin))	/* the bit mask for standard input */
-extern int	errno;
-extern int	sys_nerr;
-
 
 /*
  * The routine to do the actual talking
@@ -64,7 +61,7 @@ extern int	sys_nerr;
 void
 talk()
 {
-	register int read_template, sockt_mask;
+	int read_template, sockt_mask;
 	int read_set, nb;
 	char buf[BUFSIZ];
 	struct timeval wait;
@@ -122,53 +119,45 @@ talk()
 
 		if (read_set & STDIN_MASK) {
 
-		/*
-		 * we can't make the tty non_blocking, because
-		 * curses's output routines would screw up
-		 */
+			/*
+			 * we can't make the tty non_blocking, because
+			 * curses's output routines would screw up
+			 */
 
 			ioctl(0, FIONREAD, (struct sgttyb *)&nb);
 			nb = read(0, buf, nb);
 			display(&my_win, buf, nb);
 			write(sockt, buf, nb);
 
-		/* We might lose data here because sockt is non-blocking */
-
+			/*
+			 * We might lose data here because sockt is
+			 * non-blocking
+			 */
 		}
 	}
 }
 
 
-	/*
-	 * p_error prints the system error message on the standard location
-	 * on the screen and then exits. (i.e. a curses version of perror)
-	 */
+/*
+ * p_error prints the system error message on the standard location
+ * on the screen and then exits. (i.e. a curses version of perror)
+ */
 
 void
-p_error(string)
-char *string;
+p_error(char *string)
 {
-	char *sys;
-
-	if (errno < sys_nerr) {
-		sys = strerror(errno);
-	} else {
-		sys = gettext("Unknown error");
-	}
-
 	wmove(my_win.x_win, current_line%my_win.x_nlines, 0);
-	wprintw(my_win.x_win, "[%s : %s (%d)]\n", string, sys, errno);
+	wprintw(my_win.x_win, "[%s : %s]\n", string, strerror(errno));
 	wrefresh(my_win.x_win);
 	move(LINES-1, 0);
 	refresh();
 	quit();
 }
 
-	/* display string in the standard location */
+/* display string in the standard location */
 
 void
-message(string)
-char *string;
+message(char *string)
 {
 	wmove(my_win.x_win, current_line%my_win.x_nlines, 0);
 	wprintw(my_win.x_win, "[%s]\n", string);

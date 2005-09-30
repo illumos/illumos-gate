@@ -131,6 +131,7 @@ COMMON_SUBDIRS = \
 	cmd/fs.d/tmpfs \
 	cmd/fs.d/udfs/mount \
 	cmd/fs.d/ufs/mount \
+	cmd/fs.d/ufs/fsirand\
 	cmd/fuser \
 	cmd/gcore \
 	cmd/getconf \

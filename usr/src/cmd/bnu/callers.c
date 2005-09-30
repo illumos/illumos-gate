@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -582,8 +582,6 @@ char *flds[], *dev[];
 {
 	int ret;
 	short port;
-	extern int sys_nerr;
-	extern char *sys_errlist[];
 	struct servent *sp;
 	struct hostent *hp;
 	struct sockaddr_in sin;
@@ -635,14 +633,8 @@ char *flds[], *dev[];
 
 	ret = socket(AF_INET, SOCK_STREAM, 0);
 	if (ret < 0) {
-		if (errno < sys_nerr) {
-			DEBUG(5, "no socket: %s\n", sys_errlist[errno]);
-			logent("no socket", sys_errlist[errno]);
-		}
-		else {
-			DEBUG(5, "no socket, errno %d\n", errno);
-			logent("tcpopen", "NO SOCKET");
-		}
+		DEBUG(5, "no socket: %s\n", strerror(errno));
+		logent("no socket", strerror(errno));
 		Uerror = SS_NO_DEVICE;
 		return(FAIL);
 	}
@@ -667,14 +659,8 @@ char *flds[], *dev[];
 	if (connect(ret, (struct sockaddr *)&sin, sizeof (sin)) < 0) {
 		(void) alarm(0);
 		(void) close(ret);
-		if (errno < sys_nerr) {
-			DEBUG(5, "connect failed: %s\n", sys_errlist[errno]);
-			logent("connect failed", sys_errlist[errno]);
-		}
-		else {
-			DEBUG(5, "connect failed, errno %d\n", errno);
-			logent("tcpopen", "CONNECT FAILED");
-		}
+		DEBUG(5, "connect failed: %s\n", strerror(errno));
+		logent("connect failed", strerror(errno));
 		Uerror = SS_NO_DEVICE;
 		return(FAIL);
 	}

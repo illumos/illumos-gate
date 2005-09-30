@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -671,7 +671,7 @@ process:
 				logent(tbuf, "RESTART");
 				errno = 0;
 				if (lseek(fileno(fp), startp, 0) == -1) {
-				    logent(sys_errlist[errno], "FSEEK ERROR");
+				    logent(strerror(errno), "FSEEK ERROR");
 				    (void) fclose(fp);
 				    (*Turnoff)();
 		    		    Seqn++;
@@ -1256,7 +1256,7 @@ process:
 			errno = 0;
 			if (lseek(fileno(fp), startp, 0) == -1) {
 			    WMESG(RCVFILE, EM_SEEK);
-			    logent(sys_errlist[errno], "FSEEK ERROR");
+			    logent(strerror(errno), "FSEEK ERROR");
 			    (void) fclose(fp);
 			    goto top;
 			}

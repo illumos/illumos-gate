@@ -423,8 +423,6 @@ extern "C" {
 #define	sync		_sync
 #define	synchutmp	_synchutmp
 #define	syssun		_syssun
-#define	sys_errlist	_sys_errlist
-#define	sys_nerr	_sys_nerr
 #define	syscall		_syscall
 #define	sysconf		_sysconf
 #define	sysfs		_sysfs

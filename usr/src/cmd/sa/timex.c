@@ -63,8 +63,6 @@ main(int argc, char **argv)
 	time_t	before, after;
 	char	stime[9], etime[9];
 	char	cmd[80];
-	extern	char	*optarg;
-	extern	int	optind;
 	int	pflg = 0, sflg = 0, oflg = 0;
 	char	aopt[25];
 	FILE	*pipin;

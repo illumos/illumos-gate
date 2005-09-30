@@ -36,6 +36,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
+#include	<stdlib.h>
 #include	<errno.h>
 #include	<sys/types.h>
 #include	"wish.h"
@@ -136,9 +137,6 @@ int	line;
 	register FILE	*fp;
 	extern char	*Oasys;
 	extern char	*Progname;
-	extern char	*sys_errlist[];
-	char	*getenv();
-	time_t	time();   /* EFT abs k16 */
 
 	/*
 	 * construct path of error log file
@@ -164,7 +162,7 @@ int	line;
 		getenv("LOGNAME"), Progname, file, line,
 		(sev & TERR_EXIT) ? "(FATAL)" : nil,
 		(sev & TERR_EXIT) ? 17 : 24,
-		What[what], sys_errlist[errno], name);
+		What[what], strerror(errno), name);
 	if (method == LOGFILE)
 		fclose(fp);
 	else if (method == MAILADM)

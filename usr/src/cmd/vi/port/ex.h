@@ -26,11 +26,19 @@
 /* Copyright (c) 1981 Regents of the University of California */
 
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.34	*/
+#ifndef	_EX_H
+#define	_EX_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * This file contains most of the declarations common to a large number
  * of routines.  The file ex_vis.h contains declarations
@@ -50,6 +58,7 @@
  * is much more carefully documented, and still rough in spots.
  *
  */
+
 #ifdef UCBV7
 #include <whoami.h>
 #endif
@@ -107,8 +116,6 @@ var char *exit_bold;		/* string to exit standout mode */
 #ifdef USG
 #define CBREAK xxxxx
 #endif
-
-extern	int errno;
 
 #ifndef VMUNIX
 typedef	short	line;
@@ -396,7 +403,6 @@ int	(*wdbdg)(wchar_t, wchar_t, int);	/* tells word binding force */
 wchar_t	*(*wddlm)(wchar_t, wchar_t, int);	/* tells desired delimiter */
 wchar_t	(*mcfllr)(void);	/* tells multicolumn filler character */
 #endif /* PRESUNEUC */
-char	*sbrk();
 line	*address();
 unsigned char	*cgoto();
 unsigned char	*genindent();
@@ -408,8 +414,6 @@ unsigned char	*place();
 unsigned char	*plural();
 line	*scanfor();
 line	*setin();
-unsigned char	*strcat();
-unsigned char	*strcpy();
 unsigned char	*strend();
 unsigned char	*tailpath();
 char	*tgetstr();
@@ -425,7 +429,6 @@ int	put();
 int	putreg();
 int	YANKreg();
 int	delete();
-int	execlp();
 int	vi_filter();
 int	getfile();
 int	getsub();
@@ -479,3 +482,9 @@ int	yank();
 unsigned char *lastchr();
 unsigned char *nextchr();
 bool putoctal;
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _EX_H */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,10 +28,14 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _UUCP_H
 #define _UUCP_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -42,6 +46,8 @@
 #include <wctype.h>
 #include <ulimit.h>
 #include <values.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include "parms.h"
 
@@ -527,7 +533,6 @@ EXTERN char Progname[];
 EXTERN char RemSpool[];
 EXTERN char *Bnptr;		/* used when BASENAME macro is expanded */
 EXTERN char *Shchar;		/* shell meta-charaters */
-extern char *sys_errlist[];
 EXTERN int SizeCheck;		/* ulimit check supported flag */
 EXTERN long RemUlimit;		/* remote ulimit if supported */
 EXTERN int Restart;		/* checkpoint restart supported flag */
@@ -535,10 +540,6 @@ EXTERN int Restart;		/* checkpoint restart supported flag */
 EXTERN char Jobid[NAMESIZE];	/* Jobid of current C. file */
 EXTERN int Uerror;		/* global error code */
 EXTERN char *UerrorText[];	/* text for error code */
-
-/*	Some globals needed for section 2 and section 3 routines */
-extern char *optarg;	/* for getopt() */
-extern int optind;	/* for getopt() */
 
 #define UERRORTEXT		UerrorText[Uerror]
 #define UTEXT(x)		UerrorText[x]
@@ -570,18 +571,6 @@ EXTERN struct stat __s_;
 #define WRITEANY(f)	((stat((f),&__s_)==0) && ((__s_.st_mode&(0002))!=0) )
 #define DIRECTORY(f)	((stat((f),&__s_)==0) && ((__s_.st_mode&(S_IFMT))==S_IFDIR) )
 #define NOTEMPTY(f)	((stat((f),&__s_)==0) && (__s_.st_size!=0) )
-
-/* standard functions used */
-
-extern char	*strcat(), *strcpy(), *strncpy(), *strrchr();
-extern char	*strchr(), *strpbrk();
-extern char	*index(), *rindex(), *getlogin(), *ttyname(); /*, *malloc();
-extern char	*calloc(); */
-extern long	lseek(), atol();
-extern time_t	time();
-extern int	pipe(), close(), getopt();
-extern struct tm	*localtime();
-extern FILE	*popen();
 
 /* uucp functions and subroutine */
 EXTERN void	(*genbrk)();
@@ -684,4 +673,9 @@ EXTERN char *Ct_CLOSE;
 EXTERN char *Ct_BADOWN;
 EXTERN char *Fl_EXISTS;
 
+
+#ifdef __cplusplus
+}
 #endif
+
+#endif	/* _UUCP_H */

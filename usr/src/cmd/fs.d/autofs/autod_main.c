@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -360,9 +360,9 @@ static void
 usage()
 {
 	(void) fprintf(stderr, "Usage: automountd\n"
-		"\t[-T]\t\t(trace requests)\n"
-		"\t[-v]\t\t(verbose error msgs)\n"
-		"\t[-D n=s]\t(define env variable)\n");
+	    "\t[-T]\t\t(trace requests)\n"
+	    "\t[-v]\t\t(verbose error msgs)\n"
+	    "\t[-D n=s]\t(define env variable)\n");
 	exit(1);
 	/* NOTREACHED */
 }
@@ -492,7 +492,7 @@ dupdonereq_nonidemp(struct svc_req *rqstp, caddr_t res, bool_t (*xdr_result)())
 			memset(resp_buf, 0, resp_bufsz);
 			memset((caddr_t)&xdrs, 0, sizeof (XDR));
 			xdrmem_create(&xdrs, resp_buf, (uint_t)resp_bufsz,
-					XDR_ENCODE);
+			    XDR_ENCODE);
 			if ((*xdr_result)(&xdrs, res) == FALSE) {
 				if (verbose)
 					syslog(LOG_ERR,
@@ -507,7 +507,7 @@ dupdonereq_nonidemp(struct svc_req *rqstp, caddr_t res, bool_t (*xdr_result)())
 	}
 
 	dupstat = __svc_vc_dupdone(rqstp, resp_buf, (uint_t)resp_bufsz,
-				DUP_DONE);
+	    DUP_DONE);
 	if (dupstat == DUP_ERROR) {
 		if (verbose)
 			syslog(LOG_ERR, "dupdonereq_nonidemp: cache error");
@@ -971,15 +971,12 @@ autofs_mount_1_free_r(res)
 }
 
 /*
- * Used for reporting messages from code
- * shared with automount command.
- * Formats message into a buffer and
- * calls syslog.
+ * Used for reporting messages from code shared with automount command.
+ * Formats message into a buffer and calls syslog.
  *
- * Print an error.
- * Works like printf (fmt string and variable args)
- * except that it will subsititute an error message
- * for a "%m" string (like syslog).
+ * Print an error.  Works like printf (fmt string and variable args)
+ * except that it will subsititute an error message for a "%m" string
+ * (like syslog).
  */
 void
 pr_msg(const char *fmt, ...)
@@ -993,11 +990,9 @@ pr_msg(const char *fmt, ...)
 	fmt = gettext(fmt);
 
 	for (p1 = fmt; *p1; p1++) {
-		if (*p1 == '%' && *(p1+1) == 'm') {
-			if (errno < sys_nerr) {
-				(void) strcpy(p2, sys_errlist[errno]);
-				p2 += strlen(p2);
-			}
+		if (*p1 == '%' && *(p1 + 1) == 'm') {
+			(void) strcpy(p2, strerror(errno));
+			p2 += strlen(p2);
 			p1++;
 		} else {
 			*p2++ = *p1;
