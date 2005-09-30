@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,7 +161,7 @@ print_stats(stats_cookie_t *sc, cachefs_kstat_key_t *key, int zero)
 
 	gccount = stats_gc_count(sc);
 
-	printf("\n    %s\n", (char *)key->ks_mountpoint);
+	printf("\n    %s\n", (char *)(uintptr_t)key->ks_mountpoint);
 	printf(gettext(
 		"\t         cache hit rate: %5u%% (%llu hits, %u misses)\n"),
 		hitp, hits, misses);

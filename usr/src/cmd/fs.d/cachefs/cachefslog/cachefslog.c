@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,8 +187,8 @@ main(int argc, char **argv)
 				free(k);
 				continue;
 			}
-			if (strcmp((char *)origk->ks_cachedir,
-				(char *)k->ks_cachedir) != 0) {
+			if (strcmp((char *)(uintptr_t)origk->ks_cachedir,
+				(char *)(uintptr_t)k->ks_cachedir) != 0) {
 				free(k);
 				continue;
 			}
@@ -199,7 +199,7 @@ main(int argc, char **argv)
 			if (! before)
 				printf("\n");
 			before = 1;
-			log_show((char *)k->ks_mountpoint, logfile);
+			log_show((char *)(uintptr_t)k->ks_mountpoint, logfile);
 			free(k);
 		}
 		free(origk);

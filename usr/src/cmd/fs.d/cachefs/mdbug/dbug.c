@@ -20,6 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  *
  *			dbug.c
  *
@@ -30,7 +34,6 @@
  *
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-/* Copyright (c) 1994-1997 by Sun Microsystems, Inc. */
 
 #ifndef DBUG_OFF
 
@@ -61,8 +64,8 @@ static FILE *openfile(char *name);
 static boolean writable(char *pathname);
 static void changeowner(char *pathname);
 static int delayarg(int value);
-static void delay(u_int xx);
-static u_long getclock();
+static void delay(uint_t xx);
+static ulong_t getclock();
 static char *mystrtok(char *s1, char *s2);
 void doabort();
 
@@ -130,7 +133,7 @@ dbug_object_create(int line, const char *file, const char *function)
 {
 	dbug_object_t  *dbug_object_p;
 	dbug_state_object_t *dbug_state_object_p;
-	u_long stacksize;
+	ulong_t stacksize;
 	int created = 0;
 	char *cptr;
 
@@ -209,7 +212,7 @@ dbug_object_create(int line, const char *file, const char *function)
 	 * the start of the routine and specifying that that stack
 	 * values apply upto but not including the current routine.
 	 */
-	stacksize = (u_long)this;
+	stacksize = (ulong_t)this;
 	if (GROWDOWN)
 		stacksize = tdp->td_stackinit - stacksize;
 	else
@@ -883,7 +886,7 @@ db_process(const char *namep)
 
 #ifdef STACKINIT
 	GET_THREAD_DATA_PTR(&tdp);
-	tdp->td_stackinit = (u_long)this;
+	tdp->td_stackinit = (ulong_t)this;
 #endif
 }
 
@@ -1061,11 +1064,13 @@ doprefix(dbug_state_object_t *dbug_state_object_p, int line, long lineno,
 {
 #if DBUG_UNIX
 	if (dbug_state_object_p->sf_pid)
-		fprintf(dbug_state_object_p->s_out_file, "%5d: ", getpid());
+		fprintf(dbug_state_object_p->s_out_file, "%5d: ",
+		    (int)getpid());
 #endif
 
 	if (dbug_state_object_p->sf_thread)
-		fprintf(dbug_state_object_p->s_out_file, "%5ld: ", thr_self());
+		fprintf(dbug_state_object_p->s_out_file, "%5ld: ",
+		    (long)thr_self());
 
 	if (dbug_state_object_p->sf_number)
 		fprintf(dbug_state_object_p->s_out_file, "%5ld: ", lineno);
@@ -1233,7 +1238,7 @@ delayarg(int value)
  */
 
 static void
-delay(u_int xx)
+delay(uint_t xx)
 {
 #if (unix || xenix)
 	sleep(xx);
@@ -1242,7 +1247,7 @@ delay(u_int xx)
 	Delay(xx);
 #endif
 #ifdef __ZTC__
-	msleep((u_long)xx);
+	msleep((ulong_t)xx);
 #endif
 }
 
@@ -1262,7 +1267,7 @@ delay(u_int xx)
 #include <sys/time.h>
 #include <sys/resource.h>
 
-static u_long
+static ulong_t
 getclock()
 {
 #if 0
@@ -1277,7 +1282,7 @@ getclock()
 
 #else
 
-static u_long
+static ulong_t
 getclock()
 {
 	return (0);
@@ -1287,7 +1292,7 @@ getclock()
 #endif	/* unix */
 
 #ifdef MSDOS
-static u_long
+static ulong_t
 getclock()
 {
 	return (clock() * 10);
@@ -1311,7 +1316,7 @@ mystrtok(char *s1, char *s2)
 	if (s2 != NULL) {
 		if (s1 != NULL) {
 			end = s1;
-			rtnval = mystrtok((char *) NULL, s2);
+			rtnval = mystrtok((char *)NULL, s2);
 		} else if (end != NULL) {
 			if (*end != '\0') {
 				rtnval = end;

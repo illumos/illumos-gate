@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1283,7 +1283,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		getpagep = (struct cachefs_log_getpage_record *)recp;
 		*fidp = &getpagep->fid;
 		*filenop = getpagep->fileno;
-		*vfsp = (caddr_t)getpagep->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)getpagep->vfsp;
 		*offp = getpagep->offset;
 		*lenp = (u_offset_t)getpagep->len;
 		rc = (GRI_ADD | GRI_EXPENSIVE);
@@ -1293,7 +1293,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		readdirp = (struct cachefs_log_readdir_record *)recp;
 		*fidp = &readdirp->fid;
 		*filenop = readdirp->fileno;
-		*vfsp = (caddr_t)readdirp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)readdirp->vfsp;
 		*offp = readdirp->offset;
 		*lenp = (u_offset_t)sc->st_loghead.lh_maxbsize;
 		rc = (GRI_ADD | GRI_EXPENSIVE);
@@ -1303,7 +1303,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		readlinkp = (struct cachefs_log_readlink_record *)recp;
 		*fidp = &readlinkp->fid;
 		*filenop = readlinkp->fileno;
-		*vfsp = (caddr_t)readlinkp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)readlinkp->vfsp;
 		*offp = 0LL;
 		*lenp = (u_offset_t)((readlinkp->length > C_FSL_SIZE) ?
 		    readlinkp->length : 0);
@@ -1314,7 +1314,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		removep = (struct cachefs_log_remove_record *)recp;
 		*fidp = &removep->fid;
 		*filenop = removep->fileno;
-		*vfsp = (caddr_t)removep->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)removep->vfsp;
 		*offp = *lenp = 0LL;
 		rc = (GRI_TRUNC | GRI_MODIFY);
 		break;
@@ -1323,7 +1323,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		rmdirp = (struct cachefs_log_rmdir_record *)recp;
 		*fidp = &rmdirp->fid;
 		*filenop = rmdirp->fileno;
-		*vfsp = (caddr_t)rmdirp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)rmdirp->vfsp;
 		*offp = *lenp = 0LL;
 		rc = (GRI_TRUNC | GRI_MODIFY);
 		break;
@@ -1332,7 +1332,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		truncatep = (struct cachefs_log_truncate_record *)recp;
 		*fidp = &truncatep->fid;
 		*filenop = truncatep->fileno;
-		*vfsp = (caddr_t)truncatep->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)truncatep->vfsp;
 		*offp = 0LL;
 		*lenp = truncatep->size;
 		rc = (GRI_TRUNC | GRI_MODIFY);
@@ -1342,7 +1342,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		putpagep = (struct cachefs_log_putpage_record *)recp;
 		*fidp = &putpagep->fid;
 		*filenop = putpagep->fileno;
-		*vfsp = (caddr_t)putpagep->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)putpagep->vfsp;
 		*offp = putpagep->offset;
 		*lenp = (u_offset_t)putpagep->len;
 		rc = (GRI_ADD | GRI_MODIFY);
@@ -1352,7 +1352,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		createp = (struct cachefs_log_create_record *)recp;
 		*fidp = &createp->fid;
 		*filenop = createp->fileno;
-		*vfsp = (caddr_t)createp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)createp->vfsp;
 		*offp = *lenp = 0LL;
 		rc = (GRI_ADD | GRI_MODIFY);
 		break;
@@ -1361,7 +1361,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		mkdirp = (struct cachefs_log_mkdir_record *)recp;
 		*fidp = &mkdirp->fid;
 		*filenop = mkdirp->fileno;
-		*vfsp = (caddr_t)mkdirp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)mkdirp->vfsp;
 		*offp = *lenp = 0LL;
 		rc = (GRI_ADD | GRI_MODIFY);
 		break;
@@ -1370,7 +1370,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		renamep = (struct cachefs_log_rename_record *)recp;
 		*fidp = &renamep->gone;
 		*filenop = renamep->fileno;
-		*vfsp = (caddr_t)renamep->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)renamep->vfsp;
 		*offp = *lenp = 0LL;
 		rc = GRI_MODIFY;
 		if (renamep->removed)
@@ -1381,7 +1381,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		symlinkp = (struct cachefs_log_symlink_record *)recp;
 		*fidp = &symlinkp->fid;
 		*filenop = symlinkp->fileno;
-		*vfsp = (caddr_t)symlinkp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)symlinkp->vfsp;
 		*offp = 0LL;
 		*lenp = (u_offset_t)((symlinkp->size > C_FSL_SIZE) ?
 		    symlinkp->size : 0);
@@ -1392,7 +1392,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		populatep = (struct cachefs_log_populate_record *)recp;
 		*fidp = &populatep->fid;
 		*filenop = populatep->fileno;
-		*vfsp = (caddr_t)populatep->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)populatep->vfsp;
 		*offp = populatep->off;
 		*lenp = (u_offset_t)populatep->size;
 		rc = GRI_ADD;
@@ -1402,7 +1402,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		csymlinkp = (struct cachefs_log_csymlink_record *)recp;
 		*fidp = &csymlinkp->fid;
 		*filenop = csymlinkp->fileno;
-		*vfsp = (caddr_t)csymlinkp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)csymlinkp->vfsp;
 		*offp = 0LL;
 		*lenp = (u_offset_t)((csymlinkp->size > C_FSL_SIZE) ?
 		    csymlinkp->size : 0);
@@ -1413,7 +1413,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		filldirp = (struct cachefs_log_filldir_record *)recp;
 		*fidp = &filldirp->fid;
 		*filenop = filldirp->fileno;
-		*vfsp = (caddr_t)filldirp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)filldirp->vfsp;
 		*offp = 0LL;
 		*lenp = (u_offset_t)(filldirp->size);
 		rc = GRI_ADD;
@@ -1423,7 +1423,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		mdcreatep = (struct cachefs_log_mdcreate_record *)recp;
 		*fidp = &mdcreatep->fid;
 		*filenop = mdcreatep->fileno;
-		*vfsp = (caddr_t)mdcreatep->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)mdcreatep->vfsp;
 		*lenp = (u_offset_t)mdcreatep->count;
 		rc = GRI_METADATA;
 		break;
@@ -1432,7 +1432,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		gpfrontp = (struct cachefs_log_gpfront_record *)recp;
 		*fidp = &gpfrontp->fid;
 		*filenop = gpfrontp->fileno;
-		*vfsp = (caddr_t)gpfrontp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)gpfrontp->vfsp;
 		*offp = gpfrontp->off;
 		*lenp = (u_offset_t)sc->st_loghead.lh_pagesize;
 		rc = (GRI_ADD | GRI_EXPENSIVE);
@@ -1443,7 +1443,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		rfdirp->error = 0;
 		*fidp = &rfdirp->fid;
 		*filenop = rfdirp->fileno;
-		*vfsp = (caddr_t)rfdirp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)rfdirp->vfsp;
 		*offp = 0LL;
 		*lenp = (u_offset_t)sc->st_loghead.lh_maxbsize;
 		rc = (GRI_ADD | GRI_EXPENSIVE);
@@ -1453,7 +1453,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		uallocp = (struct cachefs_log_ualloc_record *)recp;
 		*fidp = &uallocp->fid;
 		*filenop = uallocp->fileno;
-		*vfsp = (caddr_t)uallocp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)uallocp->vfsp;
 		*offp = uallocp->off;
 		*lenp = (u_offset_t)uallocp->len;
 		rc = (GRI_ADD);
@@ -1463,7 +1463,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		callocp = (struct cachefs_log_calloc_record *)recp;
 		*fidp = &callocp->fid;
 		*filenop = callocp->fileno;
-		*vfsp = (caddr_t)callocp->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)callocp->vfsp;
 		*offp = callocp->off;
 		*lenp = (u_offset_t)callocp->len;
 		rc = (GRI_ADD | GRI_EXPENSIVE);
@@ -1473,7 +1473,7 @@ stats_log_get_record_info(stats_cookie_t *sc,
 		nocachep = (struct cachefs_log_nocache_record *)recp;
 		*fidp = &nocachep->fid;
 		*filenop = nocachep->fileno;
-		*vfsp = (caddr_t)nocachep->vfsp;
+		*vfsp = (caddr_t)(uintptr_t)nocachep->vfsp;
 		*offp = *lenp = 0LL;
 		rc = (GRI_TRUNC);
 		break;
@@ -1752,7 +1752,8 @@ stats_log_compute_wssize(stats_cookie_t *st)
 				break;
 			}
 
-			stats_dbm_store_byvfsp(st, (caddr_t)mountp->vfsp, mi);
+			stats_dbm_store_byvfsp(st,
+					(caddr_t)(uintptr_t)mountp->vfsp, mi);
 			break;
 
 		case CACHEFS_LOG_UMOUNT:
@@ -1760,11 +1761,12 @@ stats_log_compute_wssize(stats_cookie_t *st)
 			if (umountp->error != 0)
 				break;
 			mip = stats_dbm_fetch_byvfsp(st,
-					(caddr_t)umountp->vfsp);
+					(caddr_t)(uintptr_t)umountp->vfsp);
 			if (mip == NULL)
 				break;
 			mip->mi_mounted = 0;
-			stats_dbm_store_byvfsp(st, (caddr_t)umountp->vfsp, mip);
+			stats_dbm_store_byvfsp(st,
+					(caddr_t)(uintptr_t)umountp->vfsp, mip);
 			free(mip);
 			break;
 

@@ -20,6 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  *
  *			res.c
  *
@@ -27,11 +31,6 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All rights reserved.
- */
 
 #include <assert.h>
 #include <stdio.h>
@@ -66,7 +65,7 @@ struct res {
 #define	CVBLKS(nbytes) ((nbytes + MAXBSIZE - 1) / MAXBSIZE)
 
 /* forward references */
-void res_rlent_moveto(res *resp, enum cachefs_rl_type type, u_int entno,
+void res_rlent_moveto(res *resp, enum cachefs_rl_type type, uint_t entno,
     long blks);
 void res_reset(res *resp);
 void res_clear(res *resp);
@@ -224,10 +223,10 @@ res_destroy(res *resp)
 }
 
 rl_entry_t *
-res_rlent_get(res *resp, u_int entno)
+res_rlent_get(res *resp, uint_t entno)
 {
 	rl_entry_t *rlentp, *window;
-	u_int whichwindow, winoffset;
+	uint_t whichwindow, winoffset;
 
 	precond((entno >= MININDEX) && (entno < resp->p_totentries));
 
@@ -235,7 +234,7 @@ res_rlent_get(res *resp, u_int entno)
 	winoffset = entno % CACHEFS_RLPMBS;
 
 	window = (rl_entry_t *)
-	    (((caddr_t) resp->p_rlentp) + (MAXBSIZE * whichwindow));
+	    (((caddr_t)resp->p_rlentp) + (MAXBSIZE * whichwindow));
 	rlentp = window + winoffset;
 
 	return (rlentp);
@@ -623,7 +622,7 @@ res_addident(res *resp, int index, rl_entry_t *dp, long nbytes, int file)
  *	precond(ident is in use)
  */
 
-int
+void
 res_clearident(res *resp, int index, int nbytes, int file)
 {
 	rl_entry_t *rlentp;
@@ -654,10 +653,10 @@ res_clearident(res *resp, int index, int nbytes, int file)
  */
 
 void
-res_rlent_moveto(res *resp, enum cachefs_rl_type type, u_int entno, long blks)
+res_rlent_moveto(res *resp, enum cachefs_rl_type type, uint_t entno, long blks)
 {
 	rl_entry_t *rl_ent;
-	u_int prev, next;
+	uint_t prev, next;
 	cachefs_rl_listhead_t *lhp;
 	enum cachefs_rl_type otype;
 

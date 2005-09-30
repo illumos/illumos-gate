@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -495,7 +495,7 @@ out:
  * of the string.
  */
 int
-slash_cnt(char * str)
+slash_cnt(char *str)
 {
 	char *p = str;
 	int len;
@@ -665,6 +665,7 @@ process_symlk(char *lkpath, char *relpath, int rel_lastpos,
 	}
 }
 
+int
 discont_srch(int flags, char *pat)
 {
 	char *wild;
@@ -700,7 +701,7 @@ discont_srch(int flags, char *pat)
 }
 
 #ifdef DEBUG
-prtitem(char * str, struct item *hd)
+prtitem(char *str, struct item *hd)
 {
 	struct item *p = hd->i_next;
 

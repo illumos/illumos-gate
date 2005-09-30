@@ -20,6 +20,10 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  *
  *			res.h
  *
@@ -31,11 +35,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- *	All rights reserved.
- */
-
 #ifndef	cfs_fsck_res_h
 #define	cfs_fsck_res_h
 
@@ -46,7 +45,7 @@ void res_destroy(res *resp);
 int res_done(res *resp);
 void res_addfile(res *resp, long nbytes);
 int res_addident(res *resp, int index, rl_entry_t *dp, long nbytes, int file);
-int res_clearident(res *resp, int index, int nbytes, int file);
+void res_clearident(res *resp, int index, int nbytes, int file);
 
 #endif /* cfs_fsck_res_h */
 

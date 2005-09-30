@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/fs.d/cachefs/umount
@@ -38,7 +38,7 @@ PROGOBJS=	umount.o $(FSLIB)
 
 include		../Makefile.cachefs
 
-CPPFLAGS +=	-I../.. -o $@
+CPPFLAGS +=	-I../..
 LDLIBS +=	-lnsl
 
 $(LIBPROG) :	$(CFSLIB)

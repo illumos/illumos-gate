@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,7 +130,7 @@ stats_create_mountpath(char *mountpath, char *progname)
 		if (! k[i].ks_mounted)
 			continue;
 
-		if ((stat64((char *)k[i].ks_mountpoint, &s) == 0) &&
+		if ((stat64((char *)(uintptr_t)k[i].ks_mountpoint, &s) == 0) &&
 		    (s.st_dev == dev) &&
 		    (s.st_ino == ino))
 			break;
@@ -204,10 +204,10 @@ out:
 		prc->ks_cacheid += (uintptr_t)k;
 
 		size = sizeof (*rc);
-		size += strlen((char *)prc->ks_mountpoint) + 1;
-		size += strlen((char *)prc->ks_backfs) + 1;
-		size += strlen((char *)prc->ks_cachedir) + 1;
-		size += strlen((char *)prc->ks_cacheid) + 1;
+		size += strlen((char *)(uintptr_t)prc->ks_mountpoint) + 1;
+		size += strlen((char *)(uintptr_t)prc->ks_backfs) + 1;
+		size += strlen((char *)(uintptr_t)prc->ks_cachedir) + 1;
+		size += strlen((char *)(uintptr_t)prc->ks_cacheid) + 1;
 
 		if ((rc = (cachefs_kstat_key_t *)
 		    malloc(size)) == NULL) {
@@ -217,16 +217,16 @@ out:
 			memcpy(rc, prc, sizeof (*rc));
 			s = (char *)((uintptr_t)rc + sizeof (*rc));
 
-			(void) strcpy(s, (char *)prc->ks_mountpoint);
+			(void) strcpy(s, (char *)(uintptr_t)prc->ks_mountpoint);
 			rc->ks_mountpoint = (uintptr_t)s;
 			s += strlen(s) + 1;
-			(void) strcpy(s, (char *)prc->ks_backfs);
+			(void) strcpy(s, (char *)(uintptr_t)prc->ks_backfs);
 			rc->ks_backfs = (uintptr_t)s;
 			s += strlen(s) + 1;
-			(void) strcpy(s, (char *)prc->ks_cachedir);
+			(void) strcpy(s, (char *)(uintptr_t)prc->ks_cachedir);
 			rc->ks_cachedir = (uintptr_t)s;
 			s += strlen(s) + 1;
-			(void) strcpy(s, (char *)prc->ks_cacheid);
+			(void) strcpy(s, (char *)(uintptr_t)prc->ks_cacheid);
 			rc->ks_cacheid = (uintptr_t)s;
 		}
 	}
@@ -259,10 +259,10 @@ stats_getkey(stats_cookie_t *st)
 	k->ks_cachedir += (uintptr_t)key;
 	k->ks_cacheid += (uintptr_t)key;
 	size = sizeof (*rc);
-	size += strlen((char *)k->ks_mountpoint) + 1;
-	size += strlen((char *)k->ks_backfs) + 1;
-	size += strlen((char *)k->ks_cachedir) + 1;
-	size += strlen((char *)k->ks_cacheid) + 1;
+	size += strlen((char *)(uintptr_t)k->ks_mountpoint) + 1;
+	size += strlen((char *)(uintptr_t)k->ks_backfs) + 1;
+	size += strlen((char *)(uintptr_t)k->ks_cachedir) + 1;
+	size += strlen((char *)(uintptr_t)k->ks_cacheid) + 1;
 
 	if ((rc = (cachefs_kstat_key_t *)malloc(size)) == NULL)
 		stats_perror(st, SE_NOMEM,
@@ -271,16 +271,16 @@ stats_getkey(stats_cookie_t *st)
 		memcpy(rc, k, sizeof (*rc));
 		s = (char *)((uintptr_t)rc + sizeof (*rc));
 
-		(void) strcpy(s, (char *)k->ks_mountpoint);
+		(void) strcpy(s, (char *)(uintptr_t)k->ks_mountpoint);
 		rc->ks_mountpoint = (uintptr_t)s;
 		s += strlen(s) + 1;
-		(void) strcpy(s, (char *)k->ks_backfs);
+		(void) strcpy(s, (char *)(uintptr_t)k->ks_backfs);
 		rc->ks_backfs = (uintptr_t)s;
 		s += strlen(s) + 1;
-		(void) strcpy(s, (char *)k->ks_cachedir);
+		(void) strcpy(s, (char *)(uintptr_t)k->ks_cachedir);
 		rc->ks_cachedir = (uintptr_t)s;
 		s += strlen(s) + 1;
-		(void) strcpy(s, (char *)k->ks_cacheid);
+		(void) strcpy(s, (char *)(uintptr_t)k->ks_cacheid);
 		rc->ks_cacheid = (uintptr_t)s;
 		s += strlen(s) + 1;
 	}

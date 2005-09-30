@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -544,7 +544,7 @@ cachefs_create_cache(char *dirp, struct cachefs_user_values *uv,
 	snprintf(path, sizeof (path), "%s/%s", dirp, NOBACKUP_NAME);
 	if ((fp = fopen(path, "w")) != NULL) {
 		if (realpath(dirp, path) != NULL) {
-			fprintf(fp, "<< ./ >>\n", path);
+			fprintf(fp, "<< ./ >>\n");
 			fprintf(fp, "+skip: .?* *\n");
 			if (fclose(fp) == 0)
 				xx = 1;

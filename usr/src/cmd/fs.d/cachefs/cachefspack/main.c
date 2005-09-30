@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996-1998, by Sun Microsystems, Inc.
- * All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -194,8 +194,7 @@ main(int argc, char **argv)
 	rewind(rfd);
 	read_rules(rfd, wrkfunc);
 	fclose(rfd);
-	exit(0);
-
+	return (0);
 }
 
 /*

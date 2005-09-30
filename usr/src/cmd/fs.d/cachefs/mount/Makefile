@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/fs.d/cachefs/mount
@@ -38,7 +38,7 @@ PROGOBJS=	mount.o $(FSLIB)
 
 include		../Makefile.cachefs
 
-CPPFLAGS +=	-D_LARGEFILE64_SOURCE -I../.. -o $@
+CPPFLAGS +=	-D_LARGEFILE64_SOURCE -I../..
 LDLIBS +=	-lnsl -lkstat
 
 #

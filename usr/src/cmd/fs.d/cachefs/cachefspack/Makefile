@@ -22,8 +22,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1995,1996 by Sun Microsystems, Inc.
-# All Rights Reserved
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/fs.d/cachefs/cachefspack
 #
@@ -41,7 +41,7 @@ PROGOBJS=	docmds.o elfrd.o funcs.o subr.o rules.o main.o
 
 include		../Makefile.cachefs
 
-CPPFLAGS += -D_LARGEFILE64_SOURCE -I../.. -o $@
+CPPFLAGS += -D_LARGEFILE64_SOURCE -I../..
 LDLIBS += -lelf -lgen
 
 $(LIBPROG) :	$(CFSLIB)

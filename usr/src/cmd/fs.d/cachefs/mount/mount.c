@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,6 +191,7 @@ int quiet;
  * Preconditions:
  */
 
+int
 main(int argc, char **argv)
 {
 	char *myname;
