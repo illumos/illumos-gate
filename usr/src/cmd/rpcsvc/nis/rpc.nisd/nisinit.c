@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nisinit.c
- *
- *	Copyright (c) 1991-1999 by Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -242,10 +240,8 @@ usage(s)
 enum make_op {MAKE_NONE, MAKE_ROOT, MAKE_PARENT, MAKE_CLIENT };
 enum obj_src {SRC_NONE, SRC_BCAST, SRC_MCAST, SRC_CSTART, SRC_HNAME };
 
-void
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	enum clnt_stat	dummy;	/* rc for rpc_broadcast() */
 	int		c;	/* Option character */
@@ -742,5 +738,5 @@ main(argc, argv)
 			usage(argv[0]);
 	}
 	printf("All done.\n");
-	exit(0);
+	return (0);
 }

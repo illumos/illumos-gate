@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1994-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,11 +62,8 @@ static void nispasswd_prog(struct svc_req *rqstp, register SVCXPRT *transp);
 static void yppasswd_prog(struct svc_req *rqstp, register SVCXPRT *transp);
 static void set_rpc_gss_svc_names(void);
 
-
-void
-main(argc, argv)
-int argc;
-char **argv;
+int
+main(int argc, char *argv[])
 {
 	pid_t	pid;
 	int	i;
@@ -240,9 +237,8 @@ char **argv;
 		__msgout("starting rpc.nispasswdd ...");
 	svc_run();
 	__msgout("svc_run returned");
-	exit(1);
 
-	/* NOTREACHED */
+	return (1);
 }
 
 static void

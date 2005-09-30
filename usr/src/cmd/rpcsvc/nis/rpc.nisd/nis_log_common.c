@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,7 @@ static int	pagesize = 0;
 int	in_checkpoint	= FALSE;
 int	need_checkpoint = 0;
 extern	NIS_HASH_TABLE  old_stamp_list;
-extern void add_updatetime();
+static void add_updatetime();
 #define	invalid_directory	(__nis_get_tsd()->invalid_directory)
 
 static log_upd *last_upd_p;	/* tmp ptr used during delta updates */

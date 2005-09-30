@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nisctl.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,6 +43,7 @@ extern char *optarg;
 
 nis_tag	mytags[64];
 
+static void
 usage(s)
 	char	*s;
 {
@@ -61,9 +60,8 @@ usage(s)
 	exit(1);
 }
 
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	int		c;
 	int		i;
@@ -218,5 +216,5 @@ main(argc, argv)
 		nis_freetags(res, i);
 	}
 	nis_freeservlist(srvs);
-	exit(0);
+	return (0);
 }

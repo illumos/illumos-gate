@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@
 #include <rpcsvc/nis.h>
 #include <sys/time.h>
 
-extern void __nis_pingproc(nis_server *, nis_name, u_long);
+extern void __nis_pingproc(nis_server *, nis_name, ulong_t);
 extern bool_t xdr_nis_name();
 extern bool_t xdr_cp_result();
 
@@ -92,8 +92,8 @@ nis_checkpnt(srv, name)
 
 	tv.tv_sec = 10;
 	tv.tv_usec = 0;
-	status = clnt_call(clnt, NIS_CHECKPOINT, xdr_nis_name, (char *) &name,
-				xdr_cp_result, (char *) &res, tv);
+	status = clnt_call(clnt, NIS_CHECKPOINT, xdr_nis_name, (char *)&name,
+				xdr_cp_result, (char *)&res, tv);
 	if (status != RPC_SUCCESS) {
 		printf("nisping: RPC error on server %s, error %s\n",
 					srv->name, clnt_sperrno(status));
@@ -113,7 +113,7 @@ static nis_error
 nis_cptime(srv, name, utime)
 	nis_server	*srv;
 	nis_name	name;
-	u_long		*utime;
+	ulong_t		*utime;
 {
 	CLIENT		*clnt;
 	enum clnt_stat 	status;
@@ -131,8 +131,8 @@ nis_cptime(srv, name, utime)
 	/* Only wait 10 seconds */
 	tv.tv_sec = 10;
 	tv.tv_usec = 0;
-	status = clnt_call(clnt, NIS_CPTIME, xdr_nis_name, (char *) &name,
-					xdr_u_long, (char *) utime, tv);
+	status = clnt_call(clnt, NIS_CPTIME, xdr_nis_name, (char *)&name,
+					xdr_u_long, (char *)utime, tv);
 	res = (status != RPC_SUCCESS) ? NIS_RPCERROR : NIS_SUCCESS;
 	clnt_destroy(clnt);
 	return (res);
@@ -164,10 +164,8 @@ match_host(char *host, char *target)
 extern int optind;
 extern char *optarg;
 
-
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	nis_server 	*srvs;
 	nis_object	*obj;
@@ -175,7 +173,7 @@ main(argc, argv)
 	int		i, ns, force = 0, uponly = 0;
 	int		checkpoint_all = 0;
 	int		chkpnt = 0;
-	u_long		updtm, reptm;
+	ulong_t		updtm, reptm;
 	nis_error	status;
 	nis_name	domain;
 	char		dname[1024], obj_desc[1024];
@@ -351,5 +349,5 @@ main(argc, argv)
 		exit(PING_NONE);
 	if (successes < tries)
 		exit(PING_SOME);
-	exit(PING_SUCCESS);
+	return (PING_SUCCESS);
 }

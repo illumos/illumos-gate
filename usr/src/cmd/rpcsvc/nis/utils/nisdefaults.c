@@ -20,22 +20,15 @@
  * CDDL HEADER END
  */
 /*
- *	nisdefaults.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * nisdefaults.c
- *
  * A simple utility to tell you what the defaults are that will be
  * plugged into object creation.
- *
- *	Copyright (c) 1992 Sun Microsystems Inc.
- *	All rights reserved.
  */
 
 #include <stdio.h>
@@ -44,6 +37,7 @@
 
 extern int key_secretkey_is_set_g();
 
+static void
 usage(cmd)
 	char 	*cmd;
 {
@@ -66,13 +60,12 @@ extern char *optarg;
 
 extern nis_object nis_default_obj;
 
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	nis_name	*result;
 	int	c;
-	u_long	secs, days, hrs, mins;
+	ulong_t	secs, days, hrs, mins;
 	int	i, verbose = 1,
 		pa = 1, /* print everything */
 		ph = 0,	/* print host */
@@ -199,5 +192,5 @@ main(argc, argv)
 		} else
 			printf("**NONE**\n");
 	}
-	exit(0);
+	return (0);
 }

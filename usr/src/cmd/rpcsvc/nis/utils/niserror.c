@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	niserror.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,15 +37,15 @@
 #include <ctype.h>
 #include <rpcsvc/nis.h>
 
+static void
 usage()
 {
 	fprintf(stderr, "usage: niserror error-num\n");
 	exit(1);
 }
 
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	nis_error	err;
 
@@ -59,5 +57,5 @@ main(argc, argv)
 
 	err = (nis_error) atoi(argv[1]);
 	printf("%s\n", nis_sperrno(err));
-	exit(0);
+	return (0);
 }

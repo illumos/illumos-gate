@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1985 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -49,9 +49,11 @@ enum clnt_stat sprayproc_spray_1nd(/*argp, clnt*/);
 #define	MAXPACKETLEN	1514
 #define	SPRAYOVERHEAD	86	/* size of rpc packet when size=0 */
 
-main(argc, argv)
-	int argc;
-	char **argv;
+static void slp(int usecs);
+static void usage(void);
+
+int
+main(int argc, char *argv[])
 {
 	int		c;
 	extern char	*optarg;
@@ -117,7 +119,7 @@ main(argc, argv)
 	if (lnth <= MAXPACKETLEN && lnth % 4 != 2)
 		lnth = ((lnth + 5) / 4) * 4 - 2;
 	arr.sprayarr_len = lnth - SPRAYOVERHEAD;
-	arr.sprayarr_val = (char *) buf;
+	arr.sprayarr_val = (char *)buf;
 	printf("sending %u packets of length %u to %s ...", cnt, lnth, host);
 	fflush(stdout);
 	if (sprayproc_clear_1(NULL, clnt) == NULL) {
@@ -164,6 +166,7 @@ sprayproc_spray_1nd(argp, clnt)
 }
 
 /* A cheap milliseconds sleep call */
+static void
 slp(usecs)
 {
 	static struct pollfd pfds[1] = {
@@ -173,6 +176,7 @@ slp(usecs)
 	poll(pfds, 1, usecs/1000);
 }
 
+static void
 usage()
 {
 	printf("spray host [-t nettype] [-l lnth] [-c cnt] [-d delay]\n");

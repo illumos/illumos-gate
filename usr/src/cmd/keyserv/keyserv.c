@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,9 +156,8 @@ static int default_cache = 1;
 int *cache_size;
 char **cache_options;
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int sflag = 0, s1flag = 0, s2flag = 0, nflag = 0, dflag = 0, eflag = 0;
 	char *options, *value;
@@ -169,7 +168,7 @@ main(argc, argv)
 	int mode = RPC_SVC_MT_AUTO;
 	int maxrecsz = RPC_MAXDATASIZE;
 
-	int detachfromtty();
+	void detachfromtty(void);
 	int setmodulus();
 	int pk_nodefaultkeys();
 	int svc_create_local_service();
@@ -539,7 +538,7 @@ getotherrootkeys(char *name)
  * from standard input.
  * Returns 1 on success.
  */
-static
+static int
 getrootkey(master, prompt)
 	des_block *master;
 	int prompt;

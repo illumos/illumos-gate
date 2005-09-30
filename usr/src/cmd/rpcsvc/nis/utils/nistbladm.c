@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nistbladm.c
- *
- *	Copyright (c) 1988-2000 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -188,9 +186,8 @@ usage()
 	exit(1);
 }
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int c;
 	int len;
@@ -718,5 +715,5 @@ main(argc, argv)
 		break;
 	}
 
-	exit(0);
+	return (0);
 }

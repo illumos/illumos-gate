@@ -232,6 +232,7 @@ no_switch_policy(struct __nsw_switchconfig *conf)
 	return (conf == NULL || conf->lookups == NULL);
 }
 
+int
 is_switch_policy(struct __nsw_switchconfig *conf, char *target)
 {
 	return (conf &&
@@ -413,6 +414,7 @@ keylogin(char *netname, char *secret)
  *
  * write unencrypted secret key into root key file
  */
+void
 write_rootkey(char *secret)
 {
 	char sbuf[HEXKEYBYTES+2];

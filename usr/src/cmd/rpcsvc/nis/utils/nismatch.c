@@ -20,9 +20,7 @@
  * CDDL HEADER END
  */
 /*
- *	nismatch.c
- *
- * Copyright 1988-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,9 +119,8 @@ usage()
 	exit(EXIT_ERROR);
 }
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int 		c;
 	ulong_t		fpath = 0, allres = 0, master = 0;
@@ -328,7 +325,7 @@ main(argc, argv)
 		printf("%d\n", pld.nmatch);
 
 	if (pld.nmatch)
-		exit(EXIT_MATCH);
+		return (EXIT_MATCH);
 	else
-		exit(EXIT_NOMATCH);
+		return (EXIT_NOMATCH);
 }

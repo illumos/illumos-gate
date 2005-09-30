@@ -72,13 +72,12 @@ static mutex_t thr_mtx = DEFAULTMUTEX;
 static int thread_count = 8;	/* fudge factor for system threads/fds */
 static int qflag = 0;		/* quiet: we don't care about errors */
 
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char *argv[])
 {
 	int msize;
 	char buf[BUFSIZ+1];
-	register i;
+	int i;
 	char hostname[256];
 	int hflag;
 	struct rlimit rl;

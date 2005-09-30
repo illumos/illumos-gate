@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1988-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4914,9 +4914,8 @@ cleanup()
 }
 
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	char *defstr = 0, *ttype, *tname = 0, *ypdomain = 0, *ypmap = 0,
 		*etcfile = 0;
@@ -5222,5 +5221,5 @@ main(argc, argv)
 			printf("%d entries removed\n", nent_del);
 	}
 
-	exit(exit_val);
+	return (exit_val);
 }

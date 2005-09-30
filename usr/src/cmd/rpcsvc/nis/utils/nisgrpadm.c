@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nisgrpadm.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,7 +48,7 @@ extern bool_t nis_verifycred();
 
 enum op_types {NONE, DELETE, CREATE, ADD, REMOVE, LIST, TEST};
 
-static u_long master = 0;
+static ulong_t master = 0;
 
 bool_t
 nis_verifydomain(n)
@@ -108,7 +106,7 @@ bool_t
 verify_principal(name)
 	nis_name	name;
 {
-	u_long	flags;
+	ulong_t	flags;
 
 	if (name[0] == '-')
 		name++;
@@ -124,9 +122,9 @@ verify_principal(name)
 	 * Only if a random NIS+ server does not know about this, do we
 	 * force a connection to the Master server to avoid overloading it.
 	 */
-	flags = (u_long)(USE_DGRAM | FOLLOW_LINKS | FOLLOW_PATH);
+	flags = (ulong_t)(USE_DGRAM | FOLLOW_LINKS | FOLLOW_PATH);
 	return (nis_verifycred(name, flags) ? TRUE :
-		nis_verifycred(name, (u_long)(flags | MASTER_ONLY)));
+		nis_verifycred(name, (ulong_t)(flags | MASTER_ONLY)));
 }
 
 void
@@ -141,9 +139,8 @@ usage()
 	exit(1);
 }
 
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	char		*defstr = 0;
 	enum op_types	op = NONE;
@@ -436,7 +433,7 @@ main(argc, argv)
 	}
 
 	if (ostatus == NIS_SUCCESS)
-		exit(pstatus);
+		return (pstatus);
 	else
-		exit(ostatus);
+		return (ostatus);
 }

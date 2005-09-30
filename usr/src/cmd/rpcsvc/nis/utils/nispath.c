@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nispath.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,9 +45,8 @@ usage(cmd)
 	exit(1);
 }
 
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	nis_name	*result;
 	int		i = 0;
@@ -86,5 +83,5 @@ main(argc, argv)
 				printf("\t");
 			printf("\"%s\"\n", result[i++]);
 		}
-	exit(0);
+	return (0);
 }

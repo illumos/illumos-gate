@@ -79,6 +79,10 @@ extern nis_object *nis_return_list(nis_object *,
 extern nis_object *nis_censor_object(nis_object *,
 	table_col *, nis_name);
 
+static void cook_err_resp(struct ypresp_val *resp, long stat);
+static void cook_err_keyresp(struct ypresp_key_val *keyresp, long stat);
+static int get_keyndx(table_obj *t_obj, char *col_val);
+
 extern int resolv_flag;
 extern int resolv_pid;
 extern CLIENT *resolv_client;
@@ -512,7 +516,7 @@ ypproc_match_svc(req, rqstp)
 	 * produced.
 	 */
 	if (strcmp(column, DEFAULTKEY) == 0) {
-		if (get_keyndx(dbres->obj->TA_data, column) < 0) {
+		if (get_keyndx(&(dbres->obj->TA_data), column) < 0) {
 			syslog(LOG_INFO,
 				"%s is not explicitly supported in YP "
 				"compatibility mode. Unsupported NIS+ tables "
@@ -1636,20 +1640,16 @@ upcase(s)
  * Following cook_* routines are very flimsy, and should be kept static.
  */
 
-static
-cook_err_resp(resp, stat)
-	struct ypresp_val *resp;
-	long stat;
+static void
+cook_err_resp(struct ypresp_val *resp, long stat)
 {
 	resp->status = stat;
 	resp->valdat.dptr = NULL;
 	resp->valdat.dsize = 0;
 }
 
-static
-cook_err_keyresp(keyresp, stat)
-	struct ypresp_key_val *keyresp;
-	long stat;
+static void
+cook_err_keyresp(struct ypresp_key_val *keyresp, long stat)
 {
 	keyresp->status = stat;
 	keyresp->keydat.dptr = NULL;
@@ -2041,9 +2041,7 @@ cook_an_ngroup(e, val, vallen)
  * indexing is 0 thro n and returns -1 on failure.
  */
 static int
-get_keyndx(t_obj, col_val)
-	table_obj *t_obj;
-	char *col_val;
+get_keyndx(table_obj *t_obj, char *col_val)
 {
 	int i;
 

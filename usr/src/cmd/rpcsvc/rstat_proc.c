@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,7 +145,7 @@ statsvar stats_s4;
 /* V2 support for backwards compatibility to pre-5.0 systems */
 statsswtch stats_s2;
 
-static stat_is_init = 0;
+static int stat_is_init = 0;
 
 static	void	fail(int, char *, ...);
 static	void	safe_zalloc(void **, int, int);

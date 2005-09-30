@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nisupdkeys.c
- *
- *	Copyright (c) 1988-1995 Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -370,9 +368,8 @@ updaddrdata(h, ns, srvs)
 #define	CLR_KEYS	1
 #define	UPD_ADDR	2
 
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	char		dname[NIS_MAXNAMELEN];
 	char		*server = NULL;

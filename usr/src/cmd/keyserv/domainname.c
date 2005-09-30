@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,9 +47,8 @@
 
 char domainname[256];
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int myerrno = 0;
 	errno = 0;
@@ -69,6 +68,5 @@ main(argc, argv)
 			printf("%s\n", domainname);
 		}
 	}
-	exit(myerrno);
-	/* NOTREACHED */
+	return (myerrno);
 }

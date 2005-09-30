@@ -20,9 +20,7 @@
  * CDDL HEADER END
  */
 /*
- *	nisrm.c
- *
- * Copyright 1988-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,10 +51,8 @@ usage()
 	exit(1);
 }
 
-void
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int		c;
 	char 		ask_remove = 0, force_remove = 0;
@@ -162,5 +158,5 @@ main(argc, argv)
 		nis_freeresult(res);
 	}
 
-	exit(error);
+	return (error);
 }

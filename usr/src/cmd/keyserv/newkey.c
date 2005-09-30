@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,10 +82,10 @@ static	char YPDBPATH[] = "/var/yp";
 static	char PKMAP[] = "publickey.byname";
 static	char UPDATEFILE[] = "updaters";
 static	char PKFILE[] = "/etc/publickey";
+static	void usage(void);
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	char	name[MAXNETNAMELEN + 1];
 	char	public[HEXKEYBYTES + 1];
@@ -259,13 +259,13 @@ main(argc, argv)
 		}
 		exit(1);
 	}
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
 /*
  * Set the entry in the public key file
  */
+int
 setpublicmap(name, public, secret, database, nis_princ, pw)
 	int database;
 	char *name;
@@ -322,7 +322,8 @@ setpublicmap(name, public, secret, database, nis_princ, pw)
 	return (1);
 }
 
-usage()
+void
+usage(void)
 {
 	(void) fprintf(stderr,
 		"usage:\t%s -u username [-s ldap | nisplus | nis | files]\n",

@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nisaddcred.c
- *
- *	Copyright 1988-2003 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -493,10 +491,8 @@ init_entry()
 	return (&obj);
 }
 
-void
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	char	*princ = NULL;
 	char	*nisprinc = NULL;
@@ -660,7 +656,7 @@ main(argc, argv)
 		perform_add(flavor, domain, nisprinc, princ);
 	} else
 		perform_remove(domain, nisprinc);
-	exit(0);
+	return (0);
 }
 
 /*

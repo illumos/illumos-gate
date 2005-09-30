@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -631,6 +631,7 @@ storeotherrootkeys(FILE *fp, char *netname, char *passwd, char *osecret)
 /*
  * prohibit the nobody key on this machine k (the -d flag)
  */
+int
 pk_nodefaultkeys()
 {
 	nodefaultkeys = 1;
@@ -686,6 +687,7 @@ pk_clear3(uid_t uid)
 /*
  * Set the modulus for all our Diffie-Hellman operations
  */
+int
 setmodulus(modx)
 	char *modx;
 {
@@ -1157,7 +1159,7 @@ pk_netget3(uid_t uid, mechtype *net, key_netstarg3 *ret)
 /*
  * Try to find the common key in the cache
  */
-static
+static int
 readcache(pub, sec, deskey, hash)
 	char *pub;
 	char *sec;
@@ -1178,7 +1180,7 @@ readcache(pub, sec, deskey, hash)
 /*
  * cache result of expensive multiple precision exponential operation
  */
-static
+static int
 writecache(pub, sec, deskey, hash)
 	char *pub;
 	char *sec;
@@ -1204,7 +1206,7 @@ writecache(pub, sec, deskey, hash)
  * Choose middle 64 bits of the common key to use as our des key, possibly
  * overwriting the lower order bits by setting parity.
  */
-static
+static int
 extractdeskey(ck, deskey)
 	MINT *ck;
 	des_block *deskey;
@@ -1698,7 +1700,7 @@ pk_get_conv_key(uid, pubkey, result)
 /*
  * Remove common keys from the cache.
  */
-static
+static int
 removecache(sec)
 	char *sec;
 {
@@ -1727,6 +1729,7 @@ removecache(sec)
 /*
  * Store the secretkey for this uid
  */
+int
 storesecretkey(uid, key)
 	uid_t uid;
 	keybuf key;
@@ -1767,13 +1770,14 @@ storesecretkey(uid, key)
 	return (1);
 }
 
-static
+static int
 hexdigit(val)
 	int val;
 {
 	return ("0123456789abcdef"[val]);
 }
 
+int
 bin2hex(bin, hex, size)
 	unsigned char *bin;
 	unsigned char *hex;
@@ -1788,7 +1792,7 @@ bin2hex(bin, hex, size)
 	return (0);
 }
 
-static
+static int
 hexval(dig)
 	char dig;
 {
@@ -1803,6 +1807,7 @@ hexval(dig)
 	}
 }
 
+int
 hex2bin(hex, bin, size)
 	unsigned char *hex;
 	unsigned char *bin;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,7 @@ extern void __nis_destroy_callback();
 extern nis_result *nis_iblist_svc(), *nis_lookup_svc();
 extern CLIENT *__nis_get_server(directory_obj *, int);
 extern fd_result *__fd_res(nis_name, nis_error, directory_obj*);
-extern nis_result *__nis_remote_lookup(ib_request *req, u_long flags,
+extern nis_result *__nis_remote_lookup(ib_request *req, ulong_t flags,
 		int list_op, void *cbdata, int (*cback)());
 extern fd_result *__nis_finddirectory_remote(nis_bound_directory **binding,
 		char *dname);
@@ -87,7 +87,7 @@ extern FILE *cons;
 fd_result *dup_fdres(fd_result *, fd_result *);
 static nis_error	apply_update(log_entry *);
 
-static struct directory_item {
+struct directory_item {
 	NIS_HASH_ITEM	dl_item;	/* Generic ITEM tag 	*/
 	nis_object	*dl_obj;	/* Directory object	*/
 	ulong_t		dl_expires;	/* Expiration time	*/
@@ -385,7 +385,7 @@ void
 add_pingitem_with_name(buf, dir, ptime, tbl)
 	char		*buf;
 	nis_object	*dir;
-	u_long		ptime;
+	ulong_t		ptime;
 	NIS_HASH_TABLE	*tbl;
 {
 	ping_item	*pp;
@@ -462,7 +462,7 @@ add_pingitem_with_name(buf, dir, ptime, tbl)
 void
 add_pingitem(dir, ptime, tbl)
 	nis_object	*dir;
-	u_long		ptime;
+	ulong_t		ptime;
 	NIS_HASH_TABLE	*tbl;
 {
 	char		buf[1024];
@@ -485,7 +485,7 @@ add_pingitem(dir, ptime, tbl)
 
 struct reset_dl_expires_args {
 	nis_name	master;
-	u_long		expiry;
+	ulong_t		expiry;
 };
 
 static bool_t
@@ -2942,7 +2942,7 @@ ping_replicas(pung)
 nis_result *
 __nis_local_lookup(req, flags, list_op, cbdata, cback)
 	ib_request	*req;		/* name parameters		*/
-	u_long		flags;		/* user flags			*/
+	ulong_t		flags;		/* user flags			*/
 	int		list_op;	/* list semantics		*/
 	void		*cbdata;	/* Callback data		*/
 	int		(*cback)();	/* Callback (for list calls)	*/
@@ -3025,7 +3025,7 @@ __nis_local_lookup(req, flags, list_op, cbdata, cback)
 int
 we_serve(srv, flags)
 	directory_obj	*srv;
-	u_long		flags;
+	ulong_t		flags;
 {
 	nis_server	*servers;
 	int		ns, i;
@@ -3061,7 +3061,7 @@ we_serve(srv, flags)
 nis_result *
 __nis_core_lookup(req, flags, list_op, cbdata, cback)
 	ib_request	*req;		/* name parameters		*/
-	u_long		flags;		/* user flags			*/
+	ulong_t		flags;		/* user flags			*/
 	int		list_op;	/* list semantics 		*/
 	void		*cbdata;	/* Callback data		*/
 	int		(*cback)();	/* Callback (for list calls) 	*/

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,10 +50,6 @@ SRCS= \
 
 OBJS= $(SRV_OBJS) $(INIT_OBJS)
 PROG= nisinit rpc.nisd nislog nisldapmaptest
-
-# XX64 rpc.nisd nislog nisldapmaptest all require C++
-__GNUC:sh= echo \\043
-$(__GNUC)PROG= nisinit
 
 DERIVED_FILES= nis_svc.h
 CLEANFILES += $(DERIVED_FILES)

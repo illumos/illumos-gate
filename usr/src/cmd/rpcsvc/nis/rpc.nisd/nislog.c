@@ -18,8 +18,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,8 +134,8 @@ buserr_exit()
 	exit(0);
 }
 
-usage(s)
-	char	*s;
+void
+usage(char *s)
 {
 	if ((strcmp(s, "loghead") == 0) || (strcmp(s, "logtail") == 0))
 		fprintf(stderr, "usage: nislog %s [-v] num\n", s);
@@ -145,9 +146,8 @@ usage(s)
 
 char		*directories[128];
 
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	log_upd		*cur;
 	char		**dir;
@@ -171,7 +171,7 @@ main(argc, argv)
 	 * arguments a bit, any other name and we default to
 	 * "nislog" behaviour.
 	 */
-	cmd = (char *) strrchr(argv[0], '/');
+	cmd = (char *)strrchr(argv[0], '/');
 	if (! cmd)
 		cmd = argv[0];
 	if ((strcmp(cmd, "logtail") == 0) ||
@@ -286,5 +286,5 @@ main(argc, argv)
 		}
 		dir++;
 	} while (*dir != NULL);
-	exit(0);
+	return (0);
 }

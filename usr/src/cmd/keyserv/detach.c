@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,8 @@
 /*
  * detach from tty
  */
-detachfromtty()
+void
+detachfromtty(void)
 {
 	int tt;
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,6 +97,7 @@ static void usage(name)
 	exit(1);
 }
 
+int
 main(int argc, char **argv)
 {
 	int c;
@@ -262,7 +263,7 @@ main(int argc, char **argv)
 	do_timers();
 	my_svc_run();
 	syslog(LOG_ERR, "svc_run() returned");
-	exit(1);
+	return (1);
 }
 
 static void set_file_ownership(char *file)
@@ -418,29 +419,37 @@ create_ti_server()
 void *
 nis_cache_add_entry_2()
 {
+	static void *result;
 	if (mgr_verbose)
 		syslog(LOG_INFO, "nis_cache_add_entry");
+	return (&result);
 }
 
 void *
 nis_cache_remove_entry_2()
 {
+	static void *result;
 	if (mgr_verbose)
 		syslog(LOG_INFO, "nis_cache_remove_entry");
+	return (&result);
 }
 
 void *
 nis_cache_read_coldstart_2()
 {
+	static void *result;
 	if (mgr_verbose)
 		syslog(LOG_INFO, "nis_cache_read_coldstart");
+	return (&result);
 }
 
 void *
 nis_cache_refresh_entry_2()
 {
+	static void *result;
 	if (mgr_verbose)
 		syslog(LOG_INFO, "nis_cache_refresh_entry");
+	return (&result);
 }
 
 nis_error *

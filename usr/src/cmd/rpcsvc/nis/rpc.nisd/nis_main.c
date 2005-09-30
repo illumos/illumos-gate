@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -681,10 +681,8 @@ set_rpc_gss_svc_names()
 	}
 }
 
-void
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	int			status = 0, i, c;
 	nis_object		*rootobj;
@@ -1317,8 +1315,7 @@ main(argc, argv)
 	}
 
 	rpcb_unset(NIS_PROG, NIS_VERSION, NULL);
-	if (emulate_yp)
-	{
+	if (emulate_yp) {
 		rpcb_unset(YPPROG, YPVERS, NULL);
 		rpcb_unset(YPPROG, YPVERS_ORIG, NULL);
 	}
@@ -1376,6 +1373,8 @@ main(argc, argv)
 		svc_run();
 		/* Not reached */
 	}
+
+	return (0);
 }
 
 int

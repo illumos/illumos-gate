@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,9 +53,8 @@ extern int key_removesecret_g();
 /* for revoking kernel NFS credentials */
 struct nfs_revauth_args nra;
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	static char secret[HEXKEYBYTES + 1];
 	int err = 0;
@@ -91,6 +90,5 @@ main(argc, argv)
 		err = 1;
 	}
 
-	exit(err);
-	/* NOTREACHED */
+	return (err);
 }

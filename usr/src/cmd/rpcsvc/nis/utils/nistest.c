@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nistest.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -94,7 +92,7 @@ usage()
 
 unsigned int flags = 0;
 zotypes	otype;
-u_long oaccess;
+ulong_t oaccess;
 int dotest_called = 0;
 
 static
@@ -201,15 +199,15 @@ dotest(tab, obj, udata)
 		exit(EXIT_FALSE);
 
 	dotest_called = 1;
+	return (0); /* Indicates we want any additional objects */
 }
 
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int c;
-	u_long flinks = 0, fpath = 0, allres = 0, master = 0;
+	ulong_t flinks = 0, fpath = 0, allres = 0, master = 0;
 	char *name;
 	nis_result *ores;
 
@@ -316,5 +314,5 @@ main(argc, argv)
 	if (dotest_called)
 		exit(EXIT_TRUE);
 
-	exit(EXIT_FALSE);
+	return (EXIT_FALSE);
 }

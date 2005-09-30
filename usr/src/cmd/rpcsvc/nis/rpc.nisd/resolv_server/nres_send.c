@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1993-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,7 +49,7 @@
 #include "nres.h"
 #include "prnt.h"
 
-
+int
 nres_xmit(struct nres *tnr)
 {
 	char		*buf;

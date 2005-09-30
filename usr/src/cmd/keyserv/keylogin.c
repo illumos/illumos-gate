@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -315,9 +315,8 @@ usage(cmd)
 }
 
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	char		secret[4096];
 	char		fullname[MAXNETNAMELEN + 1];
@@ -401,5 +400,5 @@ main(argc, argv)
 	} else
 		exit(oldkeylogin(fullname, pass));
 
-	exit(0);
+	return (0);
 }

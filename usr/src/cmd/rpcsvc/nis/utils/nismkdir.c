@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1988-1995,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -441,10 +441,8 @@ usage()
 }
 
 
-void
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int c;
 	int i;
@@ -504,5 +502,5 @@ main(argc, argv)
 			make_directory_replica(name, replicas[i]);
 	}
 
-	exit(0);
+	return (0);
 }

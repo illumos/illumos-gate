@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nisadm.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -143,11 +141,10 @@ getname(buf, len)
 /*
  * Convert two hex digits to one unsigned char byte.
  */
-static u_char
-getbyte(bp)
-	u_char	*bp;
+static uchar_t
+getbyte(uchar_t *bp)
 {
-	u_char	nyb, val;
+	uchar_t	nyb, val;
 
 	nyb = LOWER(*bp);
 	if (nyb >= 'a')
@@ -184,13 +181,8 @@ getbyte(bp)
  * in the 'type' variable. All of it's queries go to stdin.
  */
 nis_object *
-nis_get_object(name, group, owner, rights, ttl, type)
-	char	*name;
-	char	*group;
-	char	*owner;
-	u_long	rights;
-	u_long	ttl;
-	zotypes	type;
+nis_get_object(char *name, char *group, char *owner,
+    ulong_t rights, ulong_t ttl, zotypes type)
 {
 	/*
 	 * These variables define a string buffer array that is used
@@ -205,7 +197,7 @@ nis_get_object(name, group, owner, rights, ttl, type)
 	char		*t;	/* temporary */
 	nis_object	*obj, tmp;
 	int		np, i, j;
-	u_long		flags;
+	ulong_t		flags;
 	obj_defaults	*ob_data = __get_obj_defaults();
 	link_obj	*li;
 	directory_obj	*di;
@@ -222,9 +214,9 @@ nis_get_object(name, group, owner, rights, ttl, type)
 		if (!name)
 			return (NULL);
 	}
-	s = (char *) nis_leaf_of(name);
+	s = (char *)nis_leaf_of(name);
 	if (s)
-		strcpy(bp,  s);
+		strcpy(bp, s);
 	else
 		strcpy(bp, "<none>");
 
@@ -475,7 +467,7 @@ nis_get_object(name, group, owner, rights, ttl, type)
 
 			for (i = 0; i < np; i++) {
 				entry_col	*ec;
-				u_char		*val;
+				uchar_t		*val;
 				int		len;
 
 				ec = &(ob_data->ecols[i]);
@@ -498,8 +490,8 @@ nis_get_object(name, group, owner, rights, ttl, type)
 				}
 				ec->ec_flags = flags;
 				printf("\tValue : ");
-				val = (u_char *)ask(&bp, &bl);
-				len = strlen((char *) val)+1;
+				val = (uchar_t *)ask(&bp, &bl);
+				len = strlen((char *)val)+1;
 				if (flags & EN_BINARY) {
 					for (j = 0; j < len; j += 2)
 						*(val + (j>>1)) =
@@ -520,7 +512,7 @@ nis_get_object(name, group, owner, rights, ttl, type)
 			tmp.zo_data.objdata_u.po_data.po_data_val = bp;
 			for (j = 0; j < i; j++) {
 				xask(tmpval);
-				*(bp+j) = getbyte(tmpval);
+				*(bp+j) = getbyte((uchar_t *)tmpval);
 			}
 			break;
 
@@ -655,8 +647,8 @@ get_obj(name, type, f)
  * Attempt to actually create the directories for a particular
  * dir object.
  */
-make_directory(obj)
-	nis_object	*obj;
+static void
+make_directory(nis_object *obj)
 {
 	directory_obj	*da;
 	nis_server	*srvs;
@@ -676,8 +668,8 @@ make_directory(obj)
  * Attempt to actually remove the directories for a particular
  * dir object.
  */
-remove_dir(obj)
-	nis_object	*obj;
+static void
+remove_dir(nis_object *obj)
 {
 	directory_obj	*da;
 	nis_server	*srvs;
@@ -717,15 +709,15 @@ make_name(name, domain)
 /*
  * Main code for the nisadm command
  */
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+
+int
+main(int argc, char *argv[])
 {
 	enum op_todo 	op = PRINT;		/* Operation to perform	*/
 	zotypes		obj_type = 0;		/* Object "type" to use	*/
 	ib_request	req;			/* Request to use	*/
 	int		stats = FALSE;		/* Print statistics	*/
-	u_long		flags = 0, 		/* Lookup flags		*/
+	ulong_t		flags = 0, 		/* Lookup flags		*/
 			err = 0;		/* errors encountered	*/
 	int		interact = FALSE,	/* Interactive input	*/
 			prettyprint = FALSE;	/* Print in ASCII text	*/
@@ -1068,5 +1060,5 @@ main(argc, argv)
 	if (! prettyprint)
 		xdr_destroy(&out_xdrs);
 
-	exit(err);
+	return (err);
 }

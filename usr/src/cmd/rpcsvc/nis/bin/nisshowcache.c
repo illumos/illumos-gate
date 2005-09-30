@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nisshowcache.c
- *
- *	Copyright (c) 1988-1995 Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,7 +48,7 @@
 union semun {
 	int val;
 	struct semid_ds *buf;
-	ushort *array;
+	ushort_t *array;
 };
 #endif /* _sys_sem_h  */
 
@@ -67,7 +65,7 @@ usage(char *name)
 
 
 /* dump the context cache on the system */
-void
+int
 main(int argc, char *argv[])
 {
 	extern int __nis_debuglevel;
@@ -118,7 +116,7 @@ main(int argc, char *argv[])
 
 	__nis_CachePrint();
 
-	exit(0);
+	return (0);
 }
 
 
@@ -148,8 +146,8 @@ static void
 __nis_print_sems(int sem_writer, int sem_reader)
 {
 	int i;
-	ushort w_array[NIS_W_NSEMS];
-	ushort r_array[NIS_R_NSEMS];
+	ushort_t w_array[NIS_W_NSEMS];
+	ushort_t r_array[NIS_R_NSEMS];
 	union semun semarg;
 
 

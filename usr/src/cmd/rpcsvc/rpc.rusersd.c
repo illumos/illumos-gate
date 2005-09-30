@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -75,7 +75,12 @@ utmp_array utmp_array_res;
 int used_array_len = 0;
 struct utmpidlearr utmpidlearr;
 
-main()
+static void free_ua_entry(rusers_utmp *uap);
+static int findidle(char *name, int ln, time_t	now);
+static void usys5to_ru(struct utmpx *s5, struct ru_utmp *bss);
+
+int
+main(int argc, char *argv[])
 {
 	pid_t pid;
 	int i;
@@ -162,8 +167,7 @@ main()
 
 	svc_run();
 	msgout("svc_run returned");
-	exit(1);
-	/* NOTREACHED */
+	return (1);
 }
 
 
@@ -377,8 +381,8 @@ rusers_service(rqstp, transp)
 
 }
 
-free_ua_entry(uap)
-rusers_utmp *uap;
+static void
+free_ua_entry(rusers_utmp *uap)
 {
 	if (uap == NULL)
 		return;
@@ -393,10 +397,8 @@ rusers_utmp *uap;
 
 
 /* find & return number of minutes current tty has been idle */
-findidle(name, ln, now)
-	char *name;
-	int ln;
-	time_t	now;
+static int
+findidle(char *name, int ln, time_t	now)
 {
 	struct stat stbuf;
 	long lastaction, diff;
@@ -413,10 +415,8 @@ findidle(name, ln, now)
 	return (diff);
 }
 
-static
-usys5to_ru(s5, bss)
-	struct utmpx *s5;
-	struct ru_utmp *bss;
+static void
+usys5to_ru(struct utmpx *s5, struct ru_utmp *bss)
 {
 	int i;
 

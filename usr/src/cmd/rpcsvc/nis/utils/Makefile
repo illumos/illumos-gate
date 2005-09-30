@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -71,10 +71,6 @@ RESTORE_SRCS=	nisrestore.cc ../rpc.nisd/nis_log_common.c \
 RESTORE_OBJS=	nisrestore.o nis_log_common.o nis_mt.o nis_cleanup.o
 
 BKRSTPROG=	$(BACKUP_PROG) $(RESTORE_PROG)
-
-# XX64 nisrestore and nisbackup require C++
-__GNUC:sh= echo \\043
-$(__GNUC)BKRSTPROG=
 
 DERIVED_FILES=	../rpc.nisd/nis_svc.h
 

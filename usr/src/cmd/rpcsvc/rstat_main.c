@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -57,7 +57,8 @@ extern void rstatprog_4(/*struct svc_req *rqstp, SVCXPRT *transp*/);
 extern void rstatprog_3(/*struct svc_req *rqstp, SVCXPRT *transp*/);
 extern void rstatprog_2(/*struct svc_req *rqstp, SVCXPRT *transp*/);
 
-main()
+int
+main(int argc, char *argv[])
 {
 	pid_t pid;
 	int i;
@@ -92,24 +93,26 @@ main()
 			freenetconfigent(nconf);
 		if (!svc_reg(transp, RSTATPROG, RSTATVERS_VAR, rstatprog_4,
 		    0)) {
-    _msgout("unable to register (RSTATPROG, RSTATVERS_VAR).");
+			_msgout("unable to register "
+			    "(RSTATPROG, RSTATVERS_VAR).");
 			exit(1);
 		}
 		if (!svc_reg(transp, RSTATPROG, RSTATVERS_TIME, rstatprog_3,
 		    0)) {
-    _msgout("unable to register (RSTATPROG, RSTATVERS_TIME).");
+			_msgout("unable to register "
+			    "(RSTATPROG, RSTATVERS_TIME).");
 			exit(1);
 		}
 		if (!svc_reg(transp, RSTATPROG, RSTATVERS_SWTCH, rstatprog_2,
 		    0)) {
-    _msgout("unable to register (RSTATPROG, RSTATVERS_SWTCH).");
+			_msgout("unable to register "
+			    "(RSTATPROG, RSTATVERS_SWTCH).");
 			exit(1);
 		}
 		svc_run();
 		exit(1);
 		/* NOTREACHED */
-	}
-	else {
+	} else {
 #ifndef RPC_SVC_FG
 		pid = fork();
 		if (pid < 0) {
@@ -127,20 +130,24 @@ main()
 #endif
 	}
 	if (!svc_create(rstatprog_4, RSTATPROG, RSTATVERS_VAR, "datagram_v")) {
-    _msgout("unable to create (RSTATPROG, RSTATVERS_VAR) for datagram_v.");
+		_msgout("unable to create (RSTATPROG, RSTATVERS_VAR) "
+		    "for datagram_v.");
 		exit(1);
 	}
 	if (!svc_create(rstatprog_3, RSTATPROG, RSTATVERS_TIME,
 	    "datagram_v")) {
-    _msgout("unable to create (RSTATPROG, RSTATVERS_TIME) for datagram_v.");
+		_msgout("unable to create (RSTATPROG, RSTATVERS_TIME) "
+		    "for datagram_v.");
 		exit(1);
 	}
 	if (!svc_create(rstatprog_4, RSTATPROG, RSTATVERS_VAR, "circuit_v")) {
-    _msgout("unable to create (RSTATPROG, RSTATVERS_VAR) for circuit_v.");
+		_msgout("unable to create (RSTATPROG, RSTATVERS_VAR) "
+		    "for circuit_v.");
 		exit(1);
 	}
 	if (!svc_create(rstatprog_3, RSTATPROG, RSTATVERS_TIME, "circuit_v")) {
-    _msgout("unable to create (RSTATPROG, RSTATVERS_TIME) for circuit_v.");
+		_msgout("unable to create (RSTATPROG, RSTATVERS_TIME) "
+		    "for circuit_v.");
 		exit(1);
 	}
 
@@ -149,18 +156,18 @@ main()
 	 */
 	if (!svc_create(rstatprog_2, RSTATPROG, RSTATVERS_SWTCH,
 	    "datagram_v")) {
-    _msgout("unable to create (RSTATPROG, RSTATVERS_SWTCH) for datagram_v.");
+		_msgout("unable to create (RSTATPROG, RSTATVERS_SWTCH) "
+		    "for datagram_v.");
 		exit(1);
 	}
 
 	svc_run();
 	_msgout("svc_run returned");
-	exit(1);
-	/* NOTREACHED */
+	return (1);
 }
 
-static
-void _msgout(msg)
+static void
+_msgout(msg)
 	char *msg;
 {
 #ifdef RPC_SVC_FG

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1380,7 +1380,7 @@ addmechtolist(char *mechtype)
 }
 
 
-void
+int
 main(int argc, char **argv)
 {
 	int		c, mcount;
@@ -1595,5 +1595,5 @@ main(int argc, char **argv)
 		} else
 			keylogin_des();
 	}
-	exit(0);
+	return (0);
 }

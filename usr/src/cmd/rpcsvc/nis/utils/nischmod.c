@@ -20,9 +20,7 @@
  * CDDL HEADER END
  */
 /*
- *	nischmod.c
- *
- * Copyright 1988-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,9 +127,8 @@ change_entry(name, ent, udata)
 }
 
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int c;
 	char **plist, **p;
@@ -335,5 +332,5 @@ main(argc, argv)
 		nis_freeresult(ores);
 	}
 
-	exit(error);
+	return (error);
 }

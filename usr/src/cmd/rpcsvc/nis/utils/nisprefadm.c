@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright (c) 1996-1999 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -124,6 +124,7 @@ usage(char *s)
 	exit(1);
 }
 
+int
 main(int argc, char **argv)
 {
 	int c;
@@ -1584,7 +1585,7 @@ convert_old2new(server_list *servers, char *domain)
 void
 print_info(char *client, char *hosts, char *option)
 {
-	static first = 1;
+	static int first = 1;
 
 	if (!(client && *client && hosts && *hosts && option))
 		return;
@@ -1672,7 +1673,7 @@ print_local_servers(server_list *servers, char *target)
 int
 print_line(char *tab, nis_object *ent, void *udata)
 {
-	static first = 1;
+	static int first = 1;
 	char *hosts = NULL, *client = NULL, *options = NULL, *info = NULL;
 	server_list servers;
 

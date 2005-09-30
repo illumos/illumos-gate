@@ -22,7 +22,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,11 +48,13 @@
 int machinecmp();
 int loadcmp();
 int uptimecmp();
-int collectnames();
+static int collectnames();
 int singlehost();		/* returns 1 if rup of given host fails */
 void printsinglehosts();
 void printnames();
-
+static void putline();
+int netbufeq(struct netbuf *ap, struct netbuf *bp);
+void usage(void);
 
 struct entry {
 	struct netconfig *nconf;
@@ -73,8 +75,8 @@ int hflag;			/* host: sort by machine name */
 int dflag;			/* debug: list only first n machines */
 int debug;
 
-main(argc, argv)
-	char **argv;
+int
+main(int argc, char *argv[])
 {
 	statsvar sv;
 	statstime st;
@@ -180,8 +182,7 @@ main(argc, argv)
 
 
 	free(entry);
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
 int
@@ -263,6 +264,7 @@ error:
 	return (1);		/* a failure */
 }
 
+static void
 putline(now, boottime, avenrun)
 	time_t now;
 	struct timeval boottime;
@@ -303,10 +305,11 @@ putline(now, boottime, avenrun)
 	printf("\n");
 }
 
+static int
 collectnames(resultsp, taddr, nconf)
 	char *resultsp;
-	struct t_bind	*taddr;
-	struct netconfig	*nconf;
+	struct t_bind *taddr;
+	struct netconfig *nconf;
 {
 	static int debugcnt;
 	register struct entry *entryp, *lim;
@@ -447,14 +450,14 @@ printnames()
 	printsinglehosts();
 }
 
-machinecmp(a, b)
-	struct entry *a, *b;
+int
+machinecmp(struct entry *a, struct entry *b)
 {
 	return (strcmp(a->machine, b->machine));
 }
 
-uptimecmp(a, b)
-	struct entry *a, *b;
+int
+uptimecmp(struct entry *a, struct entry *b)
 {
 	if (a->boottime.tv_sec != b->boottime.tv_sec)
 		return (a->boottime.tv_sec - b->boottime.tv_sec);
@@ -462,8 +465,8 @@ uptimecmp(a, b)
 		return (a->boottime.tv_usec - b->boottime.tv_usec);
 }
 
-loadcmp(a, b)
-	struct entry *a, *b;
+int
+loadcmp(struct entry *a, struct entry *b)
 {
 	register int i;
 
@@ -523,13 +526,14 @@ netconfigdup(onp)
 	return (nnp);
 }
 
-netbufeq(ap, bp)
-	register struct netbuf *ap, *bp;
+int
+netbufeq(struct netbuf *ap, struct netbuf *bp)
 {
 	return (ap->len == bp->len && !memcmp(ap->buf, bp->buf, ap->len));
 }
 
-usage()
+void
+usage(void)
 {
 	fprintf(stderr, "Usage: rup [-h] [-l] [-t] [host ...]\n");
 	free(entry);

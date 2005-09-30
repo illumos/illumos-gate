@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nisstat.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -143,9 +141,8 @@ match_host(char *host, char *target)
 	return (0);
 }
 
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	nis_server	*servers;
 	nis_error	status;
@@ -254,5 +251,5 @@ main(argc, argv)
 		}
 	}
 	nis_freeresult(lres);
-	exit(0);
+	return (0);
 }

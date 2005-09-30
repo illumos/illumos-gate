@@ -20,10 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	nisgrep.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -57,7 +55,7 @@ extern char	*nisname_index();
 struct pl_data {
 	unsigned flags;
 	char ta_sep;
-	u_long nmatch;
+	ulong_t nmatch;
 	regex_t *re_dfa;
 	int *dfa_set;		/* dfa_set[i] set if re_dfa[i] is valid */
 };
@@ -173,10 +171,8 @@ usage()
 	exit(EXIT_ERROR);
 }
 
-re_error(pattern, code, expr)
-	char *pattern;
-	int code;
-	regex_t *expr;
+static void
+re_error(char *pattern, int code, regex_t *expr)
 {
 	char buf[80];
 
@@ -187,13 +183,12 @@ re_error(pattern, code, expr)
 		pattern, buf);
 }
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int c;
 	int st;
-	u_long allres = 0, master = 0;
+	ulong_t allres = 0, master = 0;
 	unsigned flags = 0;
 	char *p;
 	int npat, ncol, i, j;
@@ -370,7 +365,7 @@ main(argc, argv)
 		printf("%d\n", pld.nmatch);
 
 	if (pld.nmatch)
-		exit(EXIT_MATCH);
+		return (EXIT_MATCH);
 	else
-		exit(EXIT_NOMATCH);
+		return (EXIT_NOMATCH);
 }

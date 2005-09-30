@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1990-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,6 +74,7 @@ int			storeDone(__nisdb_retry_t *storeRetry,
 extern db_result *__db_add_entry_nosync(char *, int, nis_attr *, entry_obj *);
 extern db_result *__db_remove_entry_nosync(char *, int, nis_attr *);
 extern db_result *__db_add_entry_nolog(char *, int, nis_attr *, entry_obj *);
+static int clear_checkpoint_list_nolock(void);
 
 typedef struct table_list_entry {
 	char			*table;
@@ -2929,7 +2930,7 @@ checkpoint_table(char *name)
  * Remove all items from checkpoint list. List must be locked by caller.
  */
 static int
-clear_checkpoint_list_nolock()
+clear_checkpoint_list_nolock(void)
 {
 	ping_item	*cp, *nxt;
 

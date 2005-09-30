@@ -20,15 +20,17 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
  * nisauthconf.c
  *
  * Configure NIS+ to use RPCSEC_GSS
- *
- *	Copyright (c) 1997,1998 Sun Microsystems, Inc.
- *	All Rights Reserved.
- *
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -107,7 +109,7 @@ listmechs()
 	if ((mechlist = __nis_get_mechanisms(FALSE)) == NULL) {
 		mechlist = (mechanism_t **) malloc(sizeof (mechanism_t *) * 2);
 
-		mechlist[0] = (mechanism_t *) malloc(sizeof (mechanism_t));
+		mechlist[0] = malloc(sizeof (mechanism_t));
 		mechlist[1] = NULL;
 
 		mechlist[0]->mechname = NULL;
@@ -153,7 +155,7 @@ usage(char *cmd)
 }
 
 
-void
+int
 main(int argc, char **argv)
 {
 	int c, i, dolistmechs = 0;
@@ -220,4 +222,5 @@ main(int argc, char **argv)
 		}
 	}
 	(void) fclose(f);
+	return (0);
 }

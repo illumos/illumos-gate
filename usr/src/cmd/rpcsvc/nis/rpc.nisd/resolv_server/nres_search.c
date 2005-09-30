@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1993,1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,6 +47,7 @@
 static void nres_querydomain(char *, char *, char *);
 static char *nres_hostalias(char *);
 
+int
 nres_search(struct nres *block)
 {
 	register char	*cp, *domain;
