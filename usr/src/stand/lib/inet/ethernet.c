@@ -540,7 +540,13 @@ ether_output(int index, struct inetgram *ogp)
 		ipv4_getnetmask(&mask);
 		mask.s_addr = htonl(mask.s_addr);
 		netid.s_addr = htonl(netid.s_addr);
+
+		/*
+		 * check for all-hosts directed broadcast for
+		 * to its own subnet.
+		 */
 		if (mask.s_addr != htonl(INADDR_BROADCAST) &&
+		    (ipdst.s_addr & ~mask.s_addr) == 0 &&
 		    (ipdst.s_addr & mask.s_addr) ==  netid.s_addr) {
 			broadcast = TRUE; /* directed broadcast */
 		} else {
