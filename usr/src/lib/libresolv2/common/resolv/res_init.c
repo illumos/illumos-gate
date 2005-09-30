@@ -194,15 +194,15 @@ __res_vinit(res_state statp, int preinit) {
 	int dots;
 	union res_sockaddr_union u[2];
 
+	if (statp->_u._ext.ext != NULL)
+		res_ndestroy(statp);
+
 	if (!preinit) {
 		statp->retrans = RES_TIMEOUT;
 		statp->retry = RES_DFLRETRY;
 		statp->options = RES_DEFAULT;
 		statp->id = res_randomid();
 	}
-
-	if ((statp->options & RES_INIT) != 0)
-		res_ndestroy(statp);
 
 	memset(u, 0, sizeof(u));
 #ifdef USELOOPBACK
@@ -264,13 +264,13 @@ __res_vinit(res_state statp, int preinit) {
 
 		if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 			perror("res_init: socket");
-			return (-1);
+			goto freedata;
 		}
 		lifn.lifn_family = AF_UNSPEC;
 		lifn.lifn_flags = LIFC_EXTERNAL_SOURCE;
 		if (ioctl(s, SIOCGLIFNUM, (char *)&lifn) < 0) {
 			close(s);
-			return (-1);
+			goto freedata;
 		}
 		if (lifn.lifn_count == 0) {
 			/*
@@ -284,14 +284,14 @@ __res_vinit(res_state statp, int preinit) {
 			if ((ioctl(s, SIOCGLIFNUM, (char *)&lifn) < 0) ||
 					(lifn.lifn_count < 1)) {
 				close(s);
-				return (-1);
+				goto freedata;
 			}
 
 			buflen = lifn.lifn_count * sizeof (struct lifreq);
 			buf = (uchar_t *)malloc(buflen);
 			if (buf == NULL) {
 				close(s);
-				return (-1);
+				goto freedata;
 			}
 
 			lifc.lifc_family = AF_UNSPEC;
@@ -301,7 +301,7 @@ __res_vinit(res_state statp, int preinit) {
 			if (ioctl(s, SIOCGLIFCONF, (char *)&lifc) < 0) {
 				close(s);
 				free(buf);
-				return (-1);
+				goto freedata;
 			}
 
 			for (i = 0; i < lifn.lifn_count; ++i) {
@@ -313,7 +313,7 @@ __res_vinit(res_state statp, int preinit) {
 				if (ioctl(s, SIOCGLIFFLAGS, &lreq) < 0) {
 					close(s);
 					free(buf);
-					return (-1);
+					goto freedata;
 				}
 				if ((lreq.lifr_flags & IFF_UP) &&
 					!(lreq.lifr_flags & IFF_NOLOCAL) &&
@@ -327,7 +327,7 @@ __res_vinit(res_state statp, int preinit) {
 
 			if (!int_up) {
 				close(s);
-				return (-1);
+				goto freedata;
 			}
 		}
 		close(s);
@@ -604,6 +604,12 @@ __res_vinit(res_state statp, int preinit) {
 		res_setoptions(statp, cp, "env");
 	statp->options |= RES_INIT;
 	return (0);
+freedata:
+	if (statp->_u._ext.ext != NULL) {
+		free(statp->_u._ext.ext);
+		statp->_u._ext.ext = NULL;
+	}
+	return (-1);
 }
 
 static void
