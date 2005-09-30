@@ -205,14 +205,17 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 	    (volatile uint16_t *)&cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
 	int n;
 
-	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
-		return;
-
 	if (*flags & CPU_DTRACE_FAULT)
 		return;
 
 	if (pcstack_limit <= 0)
 		return;
+
+	/*
+	 * If there's no user context we still need to zero the stack.
+	 */
+	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
+		goto zero;
 
 	*pcstack++ = (uint64_t)p->p_pid;
 	pcstack_limit--;
@@ -242,6 +245,7 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 	pcstack += n;
 	pcstack_limit -= n;
 
+zero:
 	while (pcstack_limit-- > 0)
 		*pcstack++ = NULL;
 }
@@ -278,7 +282,6 @@ dtrace_getustackdepth(void)
 	return (n);
 }
 
-/*ARGSUSED*/
 void
 dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 {
@@ -290,14 +293,17 @@ dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 	    (volatile uint16_t *)&cpu_core[CPU->cpu_id].cpuc_dtrace_flags;
 	size_t s1, s2;
 
-	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
-		return;
-
 	if (*flags & CPU_DTRACE_FAULT)
 		return;
 
 	if (pcstack_limit <= 0)
 		return;
+
+	/*
+	 * If there's no user context we still need to zero the stack.
+	 */
+	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
+		goto zero;
 
 	*pcstack++ = (uint64_t)p->p_pid;
 	pcstack_limit--;
@@ -380,6 +386,7 @@ dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 		}
 	}
 
+zero:
 	while (pcstack_limit-- > 0)
 		*pcstack++ = NULL;
 }

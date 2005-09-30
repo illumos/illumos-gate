@@ -2212,9 +2212,18 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		if (!dtrace_priv_proc(state))
 			return (0);
 		if (!(mstate->dtms_present & DTRACE_MSTATE_USTACKDEPTH)) {
-			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
-			mstate->dtms_ustackdepth = dtrace_getustackdepth();
-			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
+			/*
+			 * See comment in DIF_VAR_PID.
+			 */
+			if (DTRACE_ANCHORED(mstate->dtms_probe) &&
+			    CPU_ON_INTR(CPU)) {
+				mstate->dtms_ustackdepth = 0;
+			} else {
+				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
+				mstate->dtms_ustackdepth =
+				    dtrace_getustackdepth();
+				DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
+			}
 			mstate->dtms_present |= DTRACE_MSTATE_USTACKDEPTH;
 		}
 		return (mstate->dtms_ustackdepth);
@@ -4795,6 +4804,21 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 			case DTRACEACT_USTACK:
 				if (!dtrace_priv_proc(state))
 					continue;
+
+				/*
+				 * See comment in DIF_VAR_PID.
+				 */
+				if (DTRACE_ANCHORED(mstate.dtms_probe) &&
+				    CPU_ON_INTR(CPU)) {
+					int depth = DTRACE_USTACK_NFRAMES(
+					    rec->dtrd_arg) + 1;
+
+					dtrace_bzero((void *)(tomax + valoffs),
+					    DTRACE_USTACK_STRSIZE(rec->dtrd_arg)
+					    + depth * sizeof (uint64_t));
+
+					continue;
+				}
 
 				if (DTRACE_USTACK_STRSIZE(rec->dtrd_arg) != 0 &&
 				    curproc->p_dtrace_helpers != NULL) {

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,7 +140,6 @@ dtrace_return_probe(struct regs *rp)
 {
 	krwlock_t *rwp;
 	uintptr_t npc = curthread->t_dtrace_npc;
-	uint8_t on = curthread->t_dtrace_on;
 	uint8_t step = curthread->t_dtrace_step;
 	uint8_t ret = curthread->t_dtrace_ret;
 
@@ -160,7 +159,6 @@ dtrace_return_probe(struct regs *rp)
 	 * instruction.
 	 */
 	if (step == 0) {
-		ASSERT(on != 0);
 		tsignal(curthread, SIGILL);
 		return;
 	}

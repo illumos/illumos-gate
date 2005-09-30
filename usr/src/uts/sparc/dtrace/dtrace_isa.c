@@ -425,11 +425,14 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 	uintptr_t sp;
 	int n;
 
-	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
-		return;
-
 	if (pcstack_limit <= 0)
 		return;
+
+	/*
+	 * If there's no user context we still need to zero the stack.
+	 */
+	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
+		goto zero;
 
 	*pcstack++ = (uint64_t)p->p_pid;
 	pcstack_limit--;
@@ -468,6 +471,7 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 	pcstack += n;
 	pcstack_limit -= n;
 
+zero:
 	while (pcstack_limit-- > 0)
 		*pcstack++ = NULL;
 }
@@ -487,13 +491,19 @@ dtrace_getustackdepth(void)
 	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_FAULT))
 		return (-1);
 
-	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_ENTRY))
-		n++;
-
 	sp = rp->r_sp;
 
 	n += dtrace_getustackdepth_top(&sp);
 	n += dtrace_getustack_common(NULL, 0, sp);
+
+	/*
+	 * Add one more to the stack depth if we're in an entry probe as long
+	 * as the return address is non-NULL or there are additional frames
+	 * beyond that NULL return address.
+	 */
+	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_ENTRY) &&
+	    (rp->r_o7 != NULL || n != 1))
+		n++;
 
 	return (n);
 }
@@ -506,11 +516,14 @@ dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 	struct regs *rp;
 	uintptr_t sp;
 
-	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
-		return;
-
 	if (pcstack_limit <= 0)
 		return;
+
+	/*
+	 * If there's no user context we still need to zero the stack.
+	 */
+	if (lwp == NULL || p == NULL || (rp = lwp->lwp_regs) == NULL)
+		goto zero;
 
 	*pcstack++ = (uint64_t)p->p_pid;
 	pcstack_limit--;
@@ -583,6 +596,7 @@ dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 		}
 	}
 
+zero:
 	while (pcstack_limit-- > 0)
 		*pcstack++ = NULL;
 }

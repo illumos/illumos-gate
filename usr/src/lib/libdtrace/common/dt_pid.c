@@ -57,6 +57,29 @@ typedef struct dt_pid_probe {
 	uint_t			dpp_last_taken;
 } dt_pid_probe_t;
 
+/*
+ * Compose the lmid and object name into the canonical representation. We
+ * omit the lmid for the default link map for convenience.
+ */
+static void
+dt_pid_objname(char *buf, size_t len, Lmid_t lmid, const char *obj)
+{
+	if (lmid == LM_ID_BASE)
+		(void) strncpy(buf, obj, len);
+	else
+		(void) snprintf(buf, len, "LM%lx`%s", lmid, obj);
+}
+
+static void
+dt_pid_error(dtrace_hdl_t *dtp, dt_errtag_t tag, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	dt_set_errmsg(dtp, dt_errtag(tag), NULL, NULL, 0, fmt, ap);
+	va_end(ap);
+}
+
 static void
 dt_pid_per_sym(dt_pid_probe_t *pp, const GElf_Sym *symp, const char *func)
 {
@@ -88,13 +111,8 @@ dt_pid_per_sym(dt_pid_probe_t *pp, const GElf_Sym *symp, const char *func)
 	ftp->ftps_pid = pid;
 	(void) strncpy(ftp->ftps_func, func, sizeof (ftp->ftps_func));
 
-	if (pp->dpp_lmid == 0) {
-		(void) strncpy(ftp->ftps_mod, pp->dpp_obj,
-		    sizeof (ftp->ftps_mod));
-	} else {
-		(void) snprintf(ftp->ftps_mod, sizeof (ftp->ftps_mod),
-		    "LM%lx`%s", pp->dpp_lmid, pp->dpp_obj);
-	}
+	dt_pid_objname(ftp->ftps_mod, sizeof (ftp->ftps_mod), pp->dpp_lmid,
+	    pp->dpp_obj);
 
 	if (!isdash && gmatch("return", pp->dpp_name)) {
 		if (dt_pid_create_return_probe(pp->dpp_pr, pp->dpp_dtp,
@@ -124,18 +142,10 @@ dt_pid_per_sym(dt_pid_probe_t *pp, const GElf_Sym *symp, const char *func)
 		}
 
 		if (off >= symp->st_size) {
-			char buf[DTRACE_FUNCNAMELEN];
-			/*
-			 * We need to copy the function name to the stack
-			 * because 'func' may be freed by virtue of calling
-			 * dt_proc_release() on the libproc handle.
-			 */
-			(void) strncpy(buf, func, sizeof (buf));
-			if (sz != 0)
-				free(ftp);
-			dt_proc_release(pp->dpp_dtp, pp->dpp_pr);
-			xyerror(D_PROC_OFF, "offset 0x%llx outside of "
-			    "function '%s'\n", (u_longlong_t)off, buf);
+			dt_pid_error(pp->dpp_dtp, D_PROC_OFF, "offset "
+			    "0x%llx outside of function '%s'\n",
+			    (u_longlong_t)off, func);
+			goto out;
 		}
 
 		err = dt_pid_create_offset_probe(pp->dpp_pr, pp->dpp_dtp, ftp,
@@ -144,11 +154,18 @@ dt_pid_per_sym(dt_pid_probe_t *pp, const GElf_Sym *symp, const char *func)
 		if (err == DT_PROC_ERR)
 			goto create_err;
 		if (err == DT_PROC_ALIGN) {
+#ifdef __sparc
 			if (sz != 0)
 				free(ftp);
 			dt_proc_release(pp->dpp_dtp, pp->dpp_pr);
-			xyerror(D_PROC_ALIGN, "offset 0x%llx is not aligned "
-			    "on an instruction\n", (u_longlong_t)off);
+			xyerror(D_PROC_ALIGN, "offset 0x%llx is not properly "
+			    "aligned\n", (u_longlong_t)off);
+#else
+			dt_pid_error(pp->dpp_dtp, D_PROC_ALIGN, "offset "
+			    "0x%llx is not aligned on an instruction\n",
+			    (u_longlong_t)off);
+			goto out;
+#endif
 		}
 
 		nmatches++;
@@ -163,6 +180,7 @@ dt_pid_per_sym(dt_pid_probe_t *pp, const GElf_Sym *symp, const char *func)
 
 	pp->dpp_nmatches += nmatches;
 
+out:
 	if (sz != 0)
 		free(ftp);
 	return;
@@ -172,8 +190,9 @@ create_err:
 		free(ftp);
 
 	dt_proc_release(pp->dpp_dtp, pp->dpp_pr);
-	xyerror(D_PROC_CREATEFAIL, "failed to create probe in process %d: %s\n",
-	    (int)pid, dtrace_errmsg(pp->dpp_dtp, dtrace_errno(pp->dpp_dtp)));
+	dt_pid_error(pp->dpp_dtp, D_PROC_CREATEFAIL, "failed to create "
+	    "probe in process %d: %s", (int)pid,
+	    dtrace_errmsg(pp->dpp_dtp, dtrace_errno(pp->dpp_dtp)));
 }
 
 static int
@@ -284,8 +303,9 @@ dt_pid_per_mod(void *arg, const prmap_t *pmp, const char *obj)
 
 			} else if (!strisglob(pp->dpp_mod)) {
 				dt_proc_release(pp->dpp_dtp, pp->dpp_pr);
-				xyerror(D_PROC_FUNC, "failed to lookup '%s'\n",
-				    pp->dpp_func);
+				xyerror(D_PROC_FUNC, "failed to lookup '%s' "
+				    "in module '%s'\n", pp->dpp_func,
+				    pp->dpp_mod);
 			} else {
 				return;
 			}
@@ -343,8 +363,7 @@ dt_pid_mod_filt(void *arg, const prmap_t *pmp, const char *obj)
 		else
 			pp->dpp_obj++;
 
-		(void) snprintf(name, sizeof (name), "LM%lx`%s",
-		    pp->dpp_lmid, obj);
+		dt_pid_objname(name, sizeof (name), pp->dpp_lmid, obj);
 
 		if (gmatch(name, pp->dpp_mod))
 			dt_pid_per_mod(pp, pmp, obj);
@@ -392,11 +411,7 @@ dt_pid_fix_mod(dtrace_probedesc_t *pdp, struct ps_prochandle *P)
 		obj++;
 
 	(void) Plmid(P, pmp->pr_vaddr, &lmid);
-	if (lmid == LM_ID_BASE)
-		(void) strcpy(pdp->dtpd_mod, obj);
-	else
-		(void) snprintf(pdp->dtpd_mod, sizeof (pdp->dtpd_mod),
-		    "LM%lx`%s", lmid, obj);
+	dt_pid_objname(pdp->dtpd_mod, sizeof (pdp->dtpd_mod), lmid, obj);
 
 	return (pmp);
 }
@@ -518,13 +533,8 @@ dt_pid_usdt_mapping(void *data, const prmap_t *pmp, const char *oname)
 		dh.dofhp_dof = sym.st_value;
 		dh.dofhp_addr = (e_type == ET_EXEC) ? 0 : pmp->pr_vaddr;
 
-		if (sip.prs_lmid == 0) {
-			(void) snprintf(dh.dofhp_mod, sizeof (dh.dofhp_mod),
-			    "%s", mname);
-		} else {
-			(void) snprintf(dh.dofhp_mod, sizeof (dh.dofhp_mod),
-			    "LM%lx`%s", sip.prs_lmid, mname);
-		}
+		dt_pid_objname(dh.dofhp_mod, sizeof (dh.dofhp_mod),
+		    sip.prs_lmid, mname);
 
 		if ((fd = pr_open(P, "/dev/dtrace/helper", O_RDWR, 0)) < 0) {
 			dt_dprintf("pr_open of helper device failed: %s\n",
@@ -640,8 +650,8 @@ dt_pid_create_probes(dtrace_probedesc_t *pdp, dtrace_hdl_t *dtp)
 		dt_proc_release(dtp, P);
 
 		if (err != 0)
-			xyerror(D_PROC_USDT, "failed to instantiate probes "
-			    "for PID %d: %s", (int)pid, strerror(err));
+			dt_pid_error(dtp, D_PROC_USDT, "failed to instantiate "
+			    "probes for PID %d: %s", (int)pid, strerror(err));
 	}
 }
 
