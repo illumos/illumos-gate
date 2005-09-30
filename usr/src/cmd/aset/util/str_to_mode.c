@@ -20,20 +20,22 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990, 1991 Sun Microsystems, Inc.  All Rights Reserved.
- *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
 
-/* Takes a (10 char) permission string (as returned by ls -l) and prints
+/*
+ * Takes a (10 char) permission string (as returned by ls -l) and prints
  * the equivalent octal number.
  * E.g. -rwsr-xr-- => 04754
  */
 
+int
 main(int argc, char **argv)
 {
 	char *perm;
@@ -41,7 +43,7 @@ main(int argc, char **argv)
 
 	if ((argc != 2) || (strlen(argv[1]) != 10)) {
 		printf("-1\n");
-		exit(1);
+		return (1);
 	}
 
 	perm = argv[1];
@@ -83,4 +85,5 @@ main(int argc, char **argv)
 		result = result | 01000;
 
 	printf("%05o\n", result);
+	return (0);
 }

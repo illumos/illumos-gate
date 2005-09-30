@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -324,7 +324,7 @@ main(int argc, char *argv[])
 	if (opterr) {
 		(void) fprintf(stderr, gettext(
 		    "usage: ls -1RaAdCxmnlogrtucpFbqisfL [files]\n"));
-		exit(2);
+		return (2);
 	}
 
 	if (fflg) {
@@ -373,7 +373,7 @@ main(int argc, char *argv[])
 	if (((flist = malloc(maxfils * sizeof (struct lbuf *))) == NULL) ||
 	    ((nxtlbf = malloc(quantn * sizeof (struct lbuf))) == NULL)) {
 		perror("ls");
-		exit(2);
+		return (2);
 	}
 	if ((amino = (argc-optind)) == 0) {
 					/*
@@ -393,7 +393,7 @@ main(int argc, char *argv[])
 		if ((ep = gstat((*argv[optind] ? argv[optind] : dotp), 1))
 		    == NULL) {
 			if (nomocore)
-				exit(2);
+				return (2);
 			err = 2;
 			optind++;
 			continue;
@@ -414,7 +414,7 @@ main(int argc, char *argv[])
 	for (; i < nargs; i++) {
 		pdirectory(flist[i]->ln.namep, Rflg || (amino > 1), nargs);
 		if (nomocore)
-			exit(2);
+			return (2);
 		/* -R: print subdirectories found */
 		while (dfirst || cdfirst) {
 			/* Place direct subdirs on front in right order */
@@ -430,7 +430,7 @@ main(int argc, char *argv[])
 			dfirst = dfirst->dc_next;
 			pdirectory(dtemp->dc_name, 1, nargs);
 			if (nomocore)
-				exit(2);
+				return (2);
 			free(dtemp->dc_name);
 			free(dtemp);
 		}
@@ -551,7 +551,7 @@ pentry(struct lbuf *ap)
 		if (mflg && !lflg)
 			curcol += printf("%llu ", p->lnum);
 		else
-			curcol += printf((p->lnum < 10000000000) ? "%10llu "
+			curcol += printf((p->lnum < 10000000000ULL) ? "%10llu "
 				: "%llu ", p->lnum);
 	if (sflg)
 		curcol += printf((mflg && !lflg) ? "%lld " :

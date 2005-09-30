@@ -20,13 +20,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990, 1991 Sun Microsystems, Inc.  All Rights Reserved.
- *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-char sccsid[] = "@(#) geteuid.c 1.2 1/3/91 09:47:04";
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-main()
+int
+main(int argc, char **argv)
 {
 	printf("%i\n", getuid());
+	return (0);
 }

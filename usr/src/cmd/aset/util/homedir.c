@@ -20,21 +20,23 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990, 1991 Sun Microsystems, Inc.  All Rights Reserved.
- *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pwd.h>
 #include <stdio.h>
 
-/* homedir: returns home directory of a given user.
+/*
+ * homedir: returns home directory of a given user.
  * return status: 0 if successful;
  *		  1 if not.
  */
 
-main()
+int
+main(int argc, char **argv)
 {
 	struct passwd *getpwnam();
 	struct passwd *pwstruct;
@@ -44,8 +46,8 @@ main()
 	pwstruct = getpwnam(username);
 	if (pwstruct == NULL) {
 		printf("NONE\n");
-		exit(1);
+		return (1);
 	}
 	printf("%s\n", pwstruct->pw_dir);
-	exit(0);
+	return (0);
 }

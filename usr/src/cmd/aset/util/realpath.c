@@ -20,14 +20,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990, 1991 Sun Microsystems, Inc.  All Rights Reserved.
- *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
+#include <stdlib.h>
 
+int
 main(int argc, 	char **argv)
 {
 	char *realpath();
@@ -36,6 +38,8 @@ main(int argc, 	char **argv)
 
 	if (realpath(argv[1], resolved_path) == NULL) {
 		printf("\n");
-	} else 
+	} else
 		printf("%s\n", resolved_path);
+
+	return (0);
 }

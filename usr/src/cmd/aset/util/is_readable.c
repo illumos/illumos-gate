@@ -20,47 +20,49 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990, 1991 Sun Microsystems, Inc.  All Rights Reserved.
- *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 
 
-/* Checks group (-g) or world (default) readability.
+/*
+ * Checks group (-g) or world (default) readability.
  * Returns as exit code: 0 = readable
  *			 1 = not readable
  */
 
+int
 main(int argc, char **argv)
 {
 	int group = 0, xmode = 0;
 	struct stat statb;
 
 	if (argc < 2) {
-		printf("Usage: %s [-g] file\n",argv[0]);
-		exit(0);
+		printf("Usage: %s [-g] file\n", argv[0]);
+		return (0);
 	}
 
 	if (argc > 2) {
-		if (!strcmp(argv[1], "-g")) {
+		if (strcmp(argv[1], "-g") == 0) {
 			group = 1;
 			argc--;
 			argv++;
 		}
 	}
 
-	if (stat(*++argv,&statb) < 0) {
-		exit(2);
+	if (stat(*++argv, &statb) < 0) {
+		return (2);
 	}
 
 	if (group)
 		xmode = statb.st_mode & S_IRGRP;
-	else 
+	else
 		xmode = statb.st_mode & S_IROTH;
 
-	exit(!xmode);
+	return (!xmode);
 }
