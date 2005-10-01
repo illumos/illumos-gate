@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -15,5 +15,5 @@ COMMONIPF=	$(SRC)/common/ipf
 KERNELIPF=	$(SRC)/uts/common/inet/ipf
 
 MINOR=		echo $(RELEASE) | cut -d. -f2
-CPPFLAGS	+= -I$(COMMONIPF) -I$(KERNELIPF) -DSUNDDI \
+CPPFLAGS	+= -I$(COMMONIPF) -I$(KERNELIPF) -DSUNDDI -DUSE_INET6 \
 		   -DSOLARIS2=$(MINOR:sh)

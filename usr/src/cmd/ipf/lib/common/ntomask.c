@@ -1,3 +1,14 @@
+/*
+ * Copyright (C) 2002 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include "ipf.h"
 
 int ntomask(v, nbits, ap)
@@ -24,7 +35,7 @@ u_32_t *ap;
 		break;
 
 	case 6 :
-		if ((nbits > 128) || (use_inet6 == 0))
+		if (nbits > 128)
 			return -1;
 		fill6bits(nbits, ap);
 		break;

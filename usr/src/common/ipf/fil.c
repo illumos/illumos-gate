@@ -206,11 +206,14 @@ static	int		frflushlist __P((int, minor_t, int *, frentry_t **));
 static	ipfunc_t	fr_findfunc __P((ipfunc_t));
 static	frentry_t	*fr_firewall __P((fr_info_t *, u_32_t *));
 static	int		fr_funcinit __P((frentry_t *fr));
+static	INLINE void	frpr_esp __P((fr_info_t *));
+static	INLINE void	frpr_gre __P((fr_info_t *));
 static	INLINE void	frpr_udp __P((fr_info_t *));
 static	INLINE void	frpr_tcp __P((fr_info_t *));
 static	INLINE void	frpr_icmp __P((fr_info_t *));
 static	INLINE void	frpr_ipv4hdr __P((fr_info_t *));
-static	INLINE void	frpr_short __P((fr_info_t *, int, int));
+static	INLINE int	frpr_pullup __P((fr_info_t *, int));
+static	INLINE void	frpr_short __P((fr_info_t *, int));
 static	INLINE void	frpr_tcpcommon __P((fr_info_t *));
 static	INLINE void	frpr_udpcommon __P((fr_info_t *));
 static	INLINE int	fr_updateipid __P((fr_info_t *));
@@ -250,13 +253,14 @@ struct	optlist	ipopts[20] = {
 #ifdef USE_INET6
 struct optlist ip6exthdr[] = {
 	{ IPPROTO_HOPOPTS,		0x000001 },
-	{ IPPROTO_DSTOPTS,		0x000002 },
-	{ IPPROTO_ESP,			0x000004 },
-	{ IPPROTO_AH,			0x000008 },
-	{ IPPROTO_ROUTING,		0x000010 },
-	{ IPPROTO_IPV6,			0x000020 },
-	{ IPPROTO_FRAGMENT,		0x000040 },
-	{ IPPROTO_NONE,			0x000080 }
+	{ IPPROTO_IPV6,			0x000002 },
+	{ IPPROTO_ROUTING,		0x000004 },
+	{ IPPROTO_FRAGMENT,		0x000008 },
+	{ IPPROTO_ESP,			0x000010 },
+	{ IPPROTO_AH,			0x000020 },
+	{ IPPROTO_NONE,			0x000040 },
+	{ IPPROTO_DSTOPTS,		0x000080 },
+	{ 0,				0 }
 };
 #endif
 
@@ -310,12 +314,12 @@ static ipfunc_resolve_t fr_availfuncs[] = {
 static	INLINE void	frpr_udp6 __P((fr_info_t *));
 static	INLINE void	frpr_tcp6 __P((fr_info_t *));
 static	INLINE void	frpr_icmp6 __P((fr_info_t *));
-static	INLINE void	frpr_ipv6hdr __P((fr_info_t *));
+static	INLINE int	frpr_ipv6hdr __P((fr_info_t *));
 static	INLINE void	frpr_short6 __P((fr_info_t *, int));
-static	INLINE void     frpr_hopopts6 __P((fr_info_t *));
-static	INLINE void     frpr_routing6 __P((fr_info_t *));
-static	INLINE void     frpr_dstopts6 __P((fr_info_t *));
-static	INLINE void	frpr_fragment6 __P((fr_info_t *));
+static	INLINE int	frpr_hopopts6 __P((fr_info_t *));
+static	INLINE int	frpr_routing6 __P((fr_info_t *));
+static	INLINE int	frpr_dstopts6 __P((fr_info_t *));
+static	INLINE int	frpr_fragment6 __P((fr_info_t *));
 
 
 /* ------------------------------------------------------------------------ */
@@ -325,8 +329,8 @@ static	INLINE void	frpr_fragment6 __P((fr_info_t *));
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* This is function enforces the 'is a packet too short to be legit' rule   */
-/* for IPv6 and marks the packet with FI_SHORT if so.  See function comment */
-/* for frpr_short() for more details.                                       */
+/* for IPv6 and marks the packet with FI_BAD/FI_SHORT if so.                */
+/* See function comment for frpr_short() for more details.                  */
 /* ------------------------------------------------------------------------ */
 static INLINE void frpr_short6(fin, min)
 fr_info_t *fin;
@@ -337,7 +341,18 @@ int min;
 
 	off = fin->fin_off;
 	if (off == 0) {
-		if (fin->fin_plen < fin->fin_hlen + min)
+		if (fin->fin_dlen < min) {
+			if (fin->fin_flx & FI_FRAG) {
+				fin->fin_p = IPPROTO_FRAGMENT;
+				fin->fin_flx |= FI_BAD;
+			} else {
+				fi->fi_flx |= FI_SHORT;
+			}
+		}
+	} else if (off < min) {
+		if (fin->fin_flx & FI_FRAG)
+			fi->fi_flx |= FI_BAD;
+		else
 			fi->fi_flx |= FI_SHORT;
 	}
 }
@@ -345,14 +360,14 @@ int min;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    frpr_ipv6hdr                                                */
-/* Returns:     void                                                        */
+/* Returns:     int                                                         */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* Copy values from the IPv6 header into the fr_info_t struct and call the  */
 /* per-protocol analyzer if it exists.                                      */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_ipv6hdr(fin)
+static INLINE int frpr_ipv6hdr(fin)
 fr_info_t *fin;
 {
 	int p, go = 1, i, hdrcount, coalesced;
@@ -366,100 +381,137 @@ fr_info_t *fin;
 	fi->fi_secmsk = 0;
 	fi->fi_auth = 0;
 
-	coalesced = 0;
+	coalesced = (fin->fin_flx & FI_COALESCE) ? 1 : 0;
 	p = ip6->ip6_nxt;
-	fi->fi_p = p;
 	fi->fi_ttl = ip6->ip6_hlim;
 	fi->fi_src.in6 = ip6->ip6_src;
 	fi->fi_dst.in6 = ip6->ip6_dst;
-	fin->fin_id = (u_short)(ip6->ip6_flow & 0xffff);
+	fin->fin_id = 0;
 
 	hdrcount = 0;
-	while(go && (~fin->fin_flx & FI_SHORT) && (~fin->fin_flx & FI_BAD)) {
+	while (go && !(fin->fin_flx & (FI_BAD|FI_SHORT))) {
 		switch (p)
 		{
 		case IPPROTO_UDP :
 			frpr_udp6(fin);
 			go = 0;
 			break;
+
 		case IPPROTO_TCP :
 			frpr_tcp6(fin);
 			go = 0;
 			break;
+
 		case IPPROTO_ICMPV6 :
 			frpr_icmp6(fin);
 			go = 0;
 			break;
+
+		case IPPROTO_GRE :
+			frpr_gre(fin);
+			go = 0;
+			break;
+
 		case IPPROTO_HOPOPTS :
 			/*
 			 * Actually, hop by hop header is only allowed right
 			 * after IPv6 header!
 			 */
-			if (coalesced == 0) {
-				coalesced = fr_coalesce(fin);
-				if (coalesced == -1)
-					return;
-			}
 			if (hdrcount != 0)
 				fin->fin_flx |= FI_BAD;
-			else
-				frpr_hopopts6(fin);
+
+			if (coalesced == 0) {
+				coalesced = fr_coalesce(fin);
+				if (coalesced != 1)
+					return 0;
+			}
+			p = frpr_hopopts6(fin);
 			break;
+
 		case IPPROTO_DSTOPTS :
 			if (coalesced == 0) {
 				coalesced = fr_coalesce(fin);
-				if (coalesced == -1)
-					return;
+				if (coalesced != 1)
+					return 0;
 			}
-			frpr_dstopts6(fin);
+			p = frpr_dstopts6(fin);
 			break;
+
 		case IPPROTO_ROUTING :
 			if (coalesced == 0) {
 				coalesced = fr_coalesce(fin);
-				if (coalesced == -1)
-					return;
+				if (coalesced != 1)
+					return 0;
 			}
-			frpr_routing6(fin);
+			p = frpr_routing6(fin);
 			break;
+
 		case IPPROTO_ESP :
-		case IPPROTO_AH :
-		case IPPROTO_IPV6 :
-			for(i = 0; ip6exthdr[i].ol_val != IPPROTO_NONE; i++)
-				if(ip6exthdr[i].ol_val == fin->fin_p)
+			frpr_esp(fin);
+			for (i = 0; ip6exthdr[i].ol_bit != 0; i++)
+				if (ip6exthdr[i].ol_val == p) {
+					fin->fin_optmsk |= ip6exthdr[i].ol_bit;
 					break;
-			fin->fin_flx |= ip6exthdr[i].ol_bit;
+				}
 			go = 0;
 			break;
+
+		case IPPROTO_AH :
+			frpr_short6(fin, 16);
+			for (i = 0; ip6exthdr[i].ol_bit != 0; i++)
+				if (ip6exthdr[i].ol_val == p) {
+					fin->fin_optmsk |= ip6exthdr[i].ol_bit;
+					break;
+				}
+			go = 0;
+			break;
+
+		case IPPROTO_IPV6 :
+			frpr_short6(fin, sizeof(ip6_t));
+			for (i = 0; ip6exthdr[i].ol_bit != 0; i++)
+				if (ip6exthdr[i].ol_val == p) {
+					fin->fin_optmsk |= ip6exthdr[i].ol_bit;
+					break;
+				}
+			go = 0;
+			break;
+
+		case IPPROTO_FRAGMENT :
+			p = frpr_fragment6(fin);
+			if (fin->fin_off != 0)	/* Not the first frag */
+				go = 0;
+			break;
+
 		case IPPROTO_NONE :
 			go = 0;
 			break;
-		case IPPROTO_FRAGMENT :
-			if (coalesced == 0) {
-				coalesced = fr_coalesce(fin);
-				if (coalesced == -1)
-					return;
-			}
-			frpr_fragment6(fin);
-			break;
+
 		default :
 			go = 0;
 			break;
 		}
-		p = fi->fi_p;
 		hdrcount++;
 	}
+
+	fi->fi_p = p;
+
+	/* ext hdr error */
+	if ((go && hdrcount && (fin->fin_flx & FI_FRAG)) ||
+	    (fin->fin_flx & FI_BAD))
+		return -1;	
+	return 0;
 }
 
 
 /* ------------------------------------------------------------------------ */
 /* Function:    frpr_hopopts6                                               */
-/* Returns:     void                                                        */
+/* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* This is function checks pending hop by hop options extension header      */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_hopopts6(fin)
+static INLINE int frpr_hopopts6(fin)
 fr_info_t *fin;
 {
 	struct ip6_ext *hdr;
@@ -468,41 +520,43 @@ fr_info_t *fin;
 
 	fin->fin_flx |= FI_V6EXTHDR;
 
-				/* 8 is default length of extension hdr */
-	if ((fin->fin_dlen - 8) < 0) {
-		fin->fin_flx |= FI_SHORT;
-		return;
-	}
+	/* 8 is default length of extension hdr */
+	frpr_short6(fin, 8);
+	if (fin->fin_flx & (FI_BAD|FI_SHORT))
+		return IPPROTO_NONE;
+
+	if (frpr_pullup(fin, 8) == -1)
+		return IPPROTO_NONE;
 
 	hdr = fin->fin_dp;
 	shift = 8 + (hdr->ip6e_len << 3);
 	if (shift > fin->fin_dlen) {	/* Nasty extension header length? */
 		fin->fin_flx |= FI_BAD;
-		return;
+		return IPPROTO_NONE;
 	}
 
-	for (i = 0; ip6exthdr[i].ol_val != IPPROTO_NONE; i++)
-		if(ip6exthdr[i].ol_val == fin->fin_p)
+	for (i = 0; ip6exthdr[i].ol_bit != 0; i++)
+		if (ip6exthdr[i].ol_val == IPPROTO_HOPOPTS) {
+			fin->fin_optmsk |= ip6exthdr[i].ol_bit;
 			break;
+		}
 
-	fin->fin_optmsk |= ip6exthdr[i].ol_bit;
 	fin->fin_dp = (char *)fin->fin_dp + shift;
 	fin->fin_dlen -= shift;
-	fin->fin_p = hdr->ip6e_nxt;
 
-	return;
+	return hdr->ip6e_nxt;
 }
 
 
 /* ------------------------------------------------------------------------ */
 /* Function:    frpr_routing6                                               */
-/* Returns:     void                                                        */
+/* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* This is function checks pending routing extension header                 */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_routing6(fin)
+static INLINE int frpr_routing6(fin)
 fr_info_t *fin;
 {
 	struct ip6_ext *hdr;
@@ -511,130 +565,145 @@ fr_info_t *fin;
 
 	fin->fin_flx |= FI_V6EXTHDR;
 
-				/* 8 is default length of extension hdr */
-	if ((fin->fin_dlen - 8) < 0) {
-		fin->fin_flx |= FI_SHORT;
-		return;
-	}
+	/* 8 is default length of extension hdr */
+	frpr_short6(fin, 8);
+	if (fin->fin_flx & (FI_BAD|FI_SHORT))
+		return IPPROTO_NONE;
 
+	if (frpr_pullup(fin, 8) == -1)
+		return IPPROTO_NONE;
 	hdr = fin->fin_dp;
+
 	shift = 8 + (hdr->ip6e_len << 3);
 	/*
 	 * Nasty extension header length?
 	 */
-	if ((shift > fin->fin_dlen) || (shift < sizeof(struct ip6_hdr)) ||
-	    ((shift - sizeof(struct ip6_hdr)) & 15)) {
+	if ((shift > fin->fin_dlen) || ((hdr->ip6e_len << 3) & 15)) {
 		fin->fin_flx |= FI_BAD;
-		return;
+		return IPPROTO_NONE;
 	}
 
-	for (i = 0; ip6exthdr[i].ol_val != IPPROTO_NONE; i++)
-		if(ip6exthdr[i].ol_val == fin->fin_p)
+	for (i = 0; ip6exthdr[i].ol_bit != 0; i++)
+		if (ip6exthdr[i].ol_val == IPPROTO_ROUTING) {
+			fin->fin_optmsk |= ip6exthdr[i].ol_bit;
 			break;
-	fin->fin_optmsk |= ip6exthdr[i].ol_bit;
+		}
+
 	fin->fin_dp = (char *)fin->fin_dp + shift;
 	fin->fin_dlen -= shift;
-	fin->fin_p = hdr->ip6e_nxt;
 
-	return;
+	return hdr->ip6e_nxt;
 }
 
 
 /* ------------------------------------------------------------------------ */
 /* Function:    frpr_fragment6                                              */
-/* Returns:     void                                                        */
+/* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* Examine the IPv6 fragment header and extract fragment offset information.*/
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_fragment6(fin)
+static INLINE int frpr_fragment6(fin)
 fr_info_t *fin;
 {
 	struct ip6_frag *frag;
-	struct ip6_ext *hdr;
 	int i;
+
+	fin->fin_flx |= (FI_FRAG|FI_V6EXTHDR);
 
 	/*
 	 * Only one frgament header is allowed per IPv6 packet but it need
 	 * not be the first nor last (not possible in some cases.)
 	 */
-	for (i = 0; ip6exthdr[i].ol_val != IPPROTO_NONE; i++)
-		if (ip6exthdr[i].ol_val == fin->fin_p)
+	for (i = 0; ip6exthdr[i].ol_bit != 0; i++)
+		if (ip6exthdr[i].ol_val == IPPROTO_FRAGMENT)
 			break;
 
 	if (fin->fin_optmsk & ip6exthdr[i].ol_bit) {
 		fin->fin_flx |= FI_BAD;
-		return;
+		return IPPROTO_NONE;
 	}
-	fin->fin_flx |= (FI_FRAG|FI_V6EXTHDR);
+
 	fin->fin_optmsk |= ip6exthdr[i].ol_bit;
 
-	hdr = fin->fin_dp;
+	/* 8 is default length of extension hdr */
+	frpr_short6(fin, 8);
+	if (fin->fin_flx & (FI_BAD|FI_SHORT))
+		return IPPROTO_NONE;
 
-	/*
-	 * Length must be zero, i.e. it is no length.
-	 */
-	if (hdr->ip6e_len != 0) {
-		fin->fin_flx |= FI_BAD;
-		return;
-	}
+	if (frpr_pullup(fin, 8) == -1)
+		return IPPROTO_NONE;
 
 	if ((int)(fin->fin_dlen - sizeof(*frag)) < 0) {
 		fin->fin_flx |= FI_SHORT;
-		return;
+		return IPPROTO_NONE;
 	}
 
 	frag = fin->fin_dp;
+	fin->fin_id = frag->ip6f_ident;
 	fin->fin_off = frag->ip6f_offlg & IP6F_OFF_MASK;
-	if (!(frag->ip6f_offlg & IP6F_MORE_FRAG))
+	fin->fin_off = ntohs(fin->fin_off);
+	if (!(frag->ip6f_offlg & IP6F_MORE_FRAG)) {
 		fin->fin_flx |= FI_FRAGTAIL;
+	} else if (fin->fin_dlen % 8) {
+		/*
+		 * If the frag is not the last one and the payload length
+		 * is not multiple of 8, it must be dropped.
+		 */
+		fin->fin_flx |= FI_BAD;
+		return IPPROTO_NONE;
+	}
 
 	fin->fin_dp = (char *)fin->fin_dp + sizeof(*frag);
 	fin->fin_dlen -= sizeof(*frag);
-	fin->fin_p = frag->ip6f_nxt;
 
-	return;
+	/* length of hdrs(after frag hdr) + data */
+	fin->fin_flen = fin->fin_dlen;
+
+	return frag->ip6f_nxt;
 }
 
 
 /* ------------------------------------------------------------------------ */
 /* Function:    frpr_dstopts6                                               */
-/* Returns:     void                                                        */
+/* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nextheader(I) - stores next header value                    */
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* This is function checks pending destination options extension header     */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_dstopts6(fin)
+static INLINE int frpr_dstopts6(fin)
 fr_info_t *fin;
 {
 	struct ip6_ext *hdr;
 	u_short shift;
 	int i;
 
-				/* 8 is default length of extension hdr */
-	if ((fin->fin_dlen - 8) < 0) {
-		fin->fin_flx |= FI_SHORT;
-		return;
-	}
+	/* 8 is default length of extension hdr */
+	frpr_short6(fin, 8);
+	if (fin->fin_flx & (FI_BAD|FI_SHORT))
+		return IPPROTO_NONE;
+
+	if (frpr_pullup(fin, 8) == -1)
+		return IPPROTO_NONE;
 	hdr = fin->fin_dp;
+
 	shift = 8 + (hdr->ip6e_len << 3);
 	if (shift > fin->fin_dlen) {	/* Nasty extension header length? */
 		fin->fin_flx |= FI_BAD;
-		return;
+		return IPPROTO_NONE;
 	}
 
-	for (i = 0; ip6exthdr[i].ol_val != IPPROTO_NONE; i++)
-		if(ip6exthdr[i].ol_val == fin->fin_p)
+	for (i = 0; ip6exthdr[i].ol_bit != 0; i++)
+		if (ip6exthdr[i].ol_val == IPPROTO_DSTOPTS)
 			break;
 	fin->fin_optmsk |= ip6exthdr[i].ol_bit;
 	fin->fin_dp = (char *)fin->fin_dp + shift;
 	fin->fin_dlen -= shift;
-	fin->fin_p = hdr->ip6e_nxt;
 
-	return;
+	return hdr->ip6e_nxt;
 }
 
 
@@ -653,6 +722,9 @@ fr_info_t *fin;
 	int minicmpsz = sizeof(struct icmp6_hdr);
 	struct icmp6_hdr *icmp6;
 
+	if (frpr_pullup(fin, ICMP6ERR_MINPKTLEN + 8 - sizeof(ip6_t)) == -1)
+		return;
+
 	if (fin->fin_dlen > 1) {
 		icmp6 = fin->fin_dp;
 
@@ -670,7 +742,7 @@ fr_info_t *fin;
 		case ICMP6_PARAM_PROB :
 			if ((fin->fin_m != NULL) &&
 			    (M_LEN(fin->fin_m) < fin->fin_plen)) {
-				if (fr_coalesce(fin) == -1)
+				if (fr_coalesce(fin) != 1)
 					return;
 			}
 			fin->fin_flx |= FI_ICMPERR;
@@ -682,6 +754,8 @@ fr_info_t *fin;
 	}
 
 	frpr_short6(fin, minicmpsz);
+
+	fin->fin_flen -= fin->fin_dlen - minicmpsz;
 }
 
 
@@ -700,6 +774,8 @@ fr_info_t *fin;
 	fr_checkv6sum(fin);
 
 	frpr_short6(fin, sizeof(struct udphdr));
+
+	fin->fin_flen -= fin->fin_dlen - sizeof(struct udphdr);
 
 	frpr_udpcommon(fin);
 }
@@ -721,9 +797,41 @@ fr_info_t *fin;
 
 	frpr_short6(fin, sizeof(struct tcphdr));
 
+	fin->fin_flen -= fin->fin_dlen - sizeof(struct tcphdr);
+
 	frpr_tcpcommon(fin);
 }
 #endif	/* USE_INET6 */
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    frpr_pullup                                                 */
+/* Returns:     int     - 0 == pullup succeeded, -1 == failure              */
+/* Parameters:  fin(I)  - pointer to packet information                     */
+/*              plen(I) - length (excluding L3 header) to pullup            */
+/*                                                                          */
+/* Short inline function to cut down on code duplication to perform a call  */
+/* to fr_pullup to ensure there is the required amount of data,             */
+/* consecutively in the packet buffer.                                      */
+/* ------------------------------------------------------------------------ */
+static INLINE int frpr_pullup(fin, plen)
+fr_info_t *fin;
+int plen;
+{
+#if defined(_KERNEL) && !defined(__sgi)
+	if (fin->fin_m != NULL) {
+		if (fin->fin_dp != NULL)
+			plen += (char *)fin->fin_dp -
+				((char *)fin->fin_ip + fin->fin_hlen);
+		plen += fin->fin_hlen;
+		if (M_LEN(fin->fin_m) < plen) {
+			if (fr_pullup(fin->fin_m, fin, plen) == NULL)
+				return -1;
+		}
+	}
+#endif
+	return 0;
+}
 
 
 /* ------------------------------------------------------------------------ */
@@ -731,14 +839,13 @@ fr_info_t *fin;
 /* Returns:     void                                                        */
 /* Parameters:  fin(I)    - pointer to packet information                   */
 /*              min(I)    - minimum size of packet                          */
-/*              hdrmin(I) - minimum header size                             */
 /*                                                                          */
-/* Check if a packet is "short" as defined by min and hdrmin.               */
+/* Check if a packet is "short" as defined by min.                          */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-static INLINE void frpr_short(fin, min, hdrmin)
+static INLINE void frpr_short(fin, min)
 fr_info_t *fin;
-int min, hdrmin;
+int min;
 {
 	fr_ip_t *fi = &fin->fin_fi;
 	int off;
@@ -814,7 +921,7 @@ fr_info_t *fin;
 		case ICMP_PARAMPROB :
 			if ((fin->fin_m != NULL) &&
 			    (M_LEN(fin->fin_m) < fin->fin_plen)) {
-				if (fr_coalesce(fin) == -1)
+				if (fr_coalesce(fin) != 1)
 					return;
 			}
 			fin->fin_flx |= FI_ICMPERR;
@@ -824,7 +931,7 @@ fr_info_t *fin;
 		}
 	}
 
-	frpr_short(fin, minicmpsz, sizeof(struct icmp));
+	frpr_short(fin, minicmpsz);
 }
 
 
@@ -994,7 +1101,7 @@ fr_info_t *fin;
 
 	fr_checkv4sum(fin);
 
-	frpr_short(fin, sizeof(struct tcphdr), sizeof(struct tcphdr));
+	frpr_short(fin, sizeof(struct tcphdr));
 
 	frpr_tcpcommon(fin);
 }
@@ -1014,9 +1121,57 @@ fr_info_t *fin;
 
 	fr_checkv4sum(fin);
 
-	frpr_short(fin, sizeof(struct udphdr), sizeof(struct udphdr));
+	frpr_short(fin, sizeof(struct udphdr));
 
 	frpr_udpcommon(fin);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    frpr_esp                                                    */
+/* Returns:     void                                                        */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*                                                                          */
+/* Analyse the packet for ESP properties.                                   */
+/* The minimum length is taken to be the SPI (32bits) plus a tail (32bits)  */
+/* even though the newer ESP packets must also have a sequence number that  */
+/* is 32bits as well, it is not possible(?) to determine the version from a */
+/* simple packet header.                                                    */
+/* ------------------------------------------------------------------------ */
+static INLINE void frpr_esp(fin)
+fr_info_t *fin;
+{
+	if (frpr_pullup(fin, 8) == -1)
+		return;
+
+	if (fin->fin_v == 4)
+		frpr_short(fin, 8);
+#ifdef USE_INET6
+	else if (fin->fin_v == 6)
+		frpr_short6(fin, sizeof(grehdr_t));
+#endif
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    frpr_gre                                                    */
+/* Returns:     void                                                        */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*                                                                          */
+/* Analyse the packet for GRE properties.                                   */
+/* ------------------------------------------------------------------------ */
+static INLINE void frpr_gre(fin)
+fr_info_t *fin;
+{
+	if (frpr_pullup(fin, sizeof(grehdr_t)) == -1)
+		return;
+
+	if (fin->fin_v == 4)
+		frpr_short(fin, sizeof(grehdr_t));
+#ifdef USE_INET6
+	else if (fin->fin_v == 6)
+		frpr_short6(fin, sizeof(grehdr_t));
+#endif
 }
 
 
@@ -1229,7 +1384,8 @@ fr_info_t *fin;
 		frpr_ipv4hdr(fin);
 #ifdef	USE_INET6
 	else if (v == 6)
-		frpr_ipv6hdr(fin);
+		if (frpr_ipv6hdr(fin) == -1)
+			return -1;
 #endif
 	if (fin->fin_ip == NULL)
 		return -1;
@@ -1979,6 +2135,9 @@ int out;
 	mb_t *mc = NULL;
 	u_32_t pass;
 	mb_t *m;
+#ifdef USE_INET6
+	ip6_t *ip6;
+#endif
 
 	/*
 	 * The first part of fr_check() deals with making sure that what goes
@@ -1995,7 +2154,6 @@ int out;
 	if ((uintptr_t)ip & 0x3)
 		return 2;
 # endif
-
 	READ_ENTER(&ipf_global);
 
 	if (fr_running <= 0) {
@@ -2014,7 +2172,6 @@ int out;
 # else /* MENTAT */
 
 	m = *mp;
-
 #  if defined(M_MCAST)
 	if ((m->m_flags & M_MCAST) != 0)
 		fin->fin_flx |= FI_MBCAST|FI_MULTICAST;
@@ -2041,7 +2198,7 @@ int out;
 	}
 #  endif /* CSUM_DELAY_DATA */
 # endif /* MENTAT */
-#else
+#else /* _KERNEL */
 	READ_ENTER(&ipf_global);
 
 	bzero((char *)fin, sizeof(*fin));
@@ -2110,7 +2267,7 @@ int out;
 				break;
 # endif
 			}
-
+		
 		up = MIN(hlen + plen, len);
 		if (up > M_LEN(m)) {
 # ifdef __sgi
@@ -2162,8 +2319,11 @@ int out;
 	}
 
 	fin->fin_error = fr_unreach;
-	if (fr_makefrip(hlen, ip, fin) == -1)
-		goto finished;
+	if (fr_makefrip(hlen, ip, fin) == -1) {
+		READ_ENTER(&ipf_mutex);
+		pass = FR_BLOCK;
+		goto filtered;
+	}
 	ip = fin->fin_ip;
 
 	if (v == 6) {
@@ -2192,7 +2352,14 @@ int out;
 		}
 #ifdef USE_INET6
 		else  if (v == 6) {
-			if (((ip6_t *)ip)->ip6_hlim < fr_minttl) {
+			ip6 = (ip6_t *)ip;
+#ifdef _KERNEL
+			if (fr_chksrc && !fr_verifysrc(fin)) {
+				ATOMIC_INCL(frstats[0].fr_badsrc);
+				fin->fin_flx |= FI_BADSRC;
+			}
+#endif
+			if (ip6->ip6_hlim < fr_minttl) {
 				ATOMIC_INCL(frstats[0].fr_badttl);
 				fin->fin_flx |= FI_LOWTTL;
 			}
@@ -2557,6 +2724,7 @@ void *l4hdr;
 		sum += *sp++;
 		sum += *sp++;
 		sum += *sp++;	/* ip6_dst */
+		sum += *sp++;
 		sum += *sp++;
 		sum += *sp++;
 		sum += *sp++;
@@ -3121,19 +3289,18 @@ frentry_t **listp;
 /* Function:    frflush                                                     */
 /* Returns:     int - >= 0 - number of flushed rules                        */
 /* Parameters:  unit(I)  - device for which to flush rules                  */
+/*              proto(I) - which proto rules ipv4(4), ipv6(6)               */
+/*                         ipv4 and ipv6(0) to flush                        */
 /*              flags(I) - which set of rules to flush                      */
 /*                                                                          */
 /* Calls flushlist() for all filter rules (accounting, firewall - both IPv4 */
 /* and IPv6) as defined by the value of flags.                              */
 /* ------------------------------------------------------------------------ */
-int frflush(unit, flags)
+int frflush(unit, proto, flags)
 minor_t unit;
-int flags;
+int proto, flags;
 {
 	int flushed = 0, set;
-
-	if (unit != IPL_LOGIPF)
-		return 0;
 
 	WRITE_ENTER(&ipf_mutex);
 	bzero((char *)frcache, sizeof(frcache));
@@ -3143,18 +3310,42 @@ int flags;
 		set = 1 - set;
 
 	if (flags & FR_OUTQUE) {
-		(void) frflushlist(set, unit, &flushed, &ipfilter6[1][set]);
-		(void) frflushlist(set, unit, &flushed, &ipacct6[1][set]);
-		(void) frflushlist(set, unit, &flushed, &ipfilter[1][set]);
-		(void) frflushlist(set, unit, &flushed, &ipacct[1][set]);
+		if (proto == 0 || proto == 6) {
+			(void) frflushlist(set, unit,
+			    &flushed, &ipfilter6[1][set]);
+			(void) frflushlist(set, unit,
+			    &flushed, &ipacct6[1][set]);
+		}
+		if (proto == 0 || proto == 4) {
+			(void) frflushlist(set, unit,
+			    &flushed, &ipfilter[1][set]);
+			(void) frflushlist(set, unit,
+			    &flushed, &ipacct[1][set]);
+		}
 	}
 	if (flags & FR_INQUE) {
-		(void) frflushlist(set, unit, &flushed, &ipfilter6[0][set]);
-		(void) frflushlist(set, unit, &flushed, &ipacct6[0][set]);
-		(void) frflushlist(set, unit, &flushed, &ipfilter[0][set]);
-		(void) frflushlist(set, unit, &flushed, &ipacct[0][set]);
+		if (proto == 0 || proto == 6) {
+			(void) frflushlist(set, unit,
+			    &flushed, &ipfilter6[0][set]);
+			(void) frflushlist(set, unit,
+			    &flushed, &ipacct6[0][set]);
+		}
+		if (proto == 0 || proto == 4) {
+			(void) frflushlist(set, unit,
+			    &flushed, &ipfilter[0][set]);
+			(void) frflushlist(set, unit,
+			    &flushed, &ipacct[0][set]);
+		}
 	}
 	RWLOCK_EXIT(&ipf_mutex);
+
+	if (unit == IPL_LOGIPF) {
+		int tmp;
+
+		tmp = frflush(IPL_LOGCOUNT, proto, flags);
+		if (tmp >= 0)
+			flushed += tmp;
+	}
 	return flushed;
 }
 
@@ -3252,8 +3443,7 @@ u_32_t	ip;
 	return -1;
 }
 
-
-# if 0
+#ifdef USE_INET6
 /* ------------------------------------------------------------------------ */
 /* Function:    count6bits                                                  */
 /* Returns:     int - >= 0 - number of consecutive bits in input            */
@@ -3278,7 +3468,7 @@ u_32_t *msk;
 		}
 	return i;
 }
-# endif
+#endif
 #endif /* _KERNEL */
 
 
@@ -4419,7 +4609,7 @@ u_32_t *passp;
 	frgroup_t *fg;
 	void *rval;
 
-	rval = fr_iphmfindgroup(fin->fin_fr->fr_ptr, &fin->fin_src);
+	rval = fr_iphmfindgroup(fin->fin_fr->fr_ptr, fin->fin_v, &fin->fin_src);
 	if (rval == NULL)
 		return NULL;
 
@@ -4447,7 +4637,7 @@ u_32_t *passp;
 	frgroup_t *fg;
 	void *rval;
 
-	rval = fr_iphmfindgroup(fin->fin_fr->fr_ptr, &fin->fin_dst);
+	rval = fr_iphmfindgroup(fin->fin_fr->fr_ptr, fin->fin_v, &fin->fin_dst);
 	if (rval == NULL)
 		return NULL;
 
@@ -4592,7 +4782,8 @@ ipftqent_t *tqe;
 	ipftq_t *ifq;
 
 	ifq = tqe->tqe_ifq;
-
+	if (ifq == NULL)
+		return;
 	if (ifq->ifq_tail != NULL && *ifq->ifq_tail != tqe) {
 		MUTEX_ENTER(&ifq->ifq_lock);
 		*tqe->tqe_pnext = tqe->tqe_next;
@@ -5133,7 +5324,7 @@ struct in_addr *inp, *inpmask;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_coalesce                                                 */
-/* Returns:     1 == success,  -1 == failure                                */
+/* Returns:     1 == success,  -1 == failure, 0 == no change                */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* Attempt to get all of the packet data into a single, contiguous buffer.  */
@@ -5142,6 +5333,16 @@ struct in_addr *inp, *inpmask;
 int fr_coalesce(fin)
 fr_info_t *fin;
 {
+	if ((fin->fin_flx & FI_COALESCE) != 0)
+		return 1;
+ 
+	/*
+	 * If the mbuf pointers indicate that there is no mbuf to work with,
+	 * return but do not indicate success or failure.
+	 */
+	if (fin->fin_m == NULL || fin->fin_mp == NULL)
+		return 0;
+ 
 #if !defined(__sgi) && defined(_KERNEL)
 	if (fr_pullup(fin->fin_m, fin, fin->fin_plen) == NULL) {
 # ifdef MENTAT

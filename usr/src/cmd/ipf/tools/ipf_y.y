@@ -8,7 +8,7 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
 #include <netinet/ip_icmp.h>
@@ -84,6 +84,7 @@ static	addfunc_t	ipfaddfunc = NULL;
 static	wordtab_t	addrwords[4];
 static	wordtab_t	maskwords[5];
 static	wordtab_t	*savewords;
+static	int		set_ipv6_addr = 0;
 
 %}
 %union	{
@@ -937,11 +938,13 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  $$.a.in4_addr &= $5.s_addr;
 					  yyresetdict();
 					  yyexpectaddr = 0; }
-	| YY_IPV6			{ bcopy(&$1, &$$.a, sizeof($$.a));
+	| YY_IPV6			{ set_ipv6_addr = 1;
+					  bcopy(&$1, &$$.a, sizeof($$.a));
 					  fill6bits(128, (u_32_t *)&$$.m);
 					  yyresetdict();
 					  yyexpectaddr = 0; }
-	| YY_IPV6			{ yyresetdict();
+	| YY_IPV6			{ set_ipv6_addr = 1;
+					  yyresetdict();
 					  bcopy(&$1, &$$.a, sizeof($$.a)); }
 		maskspace		{ yysetdict(maskwords); }
 		ipv6mask		{ bcopy(&$5, &$$.m, sizeof($$.m));
@@ -1026,10 +1029,20 @@ hostname:
 
 addrlist:
 	ipaddr		{ $$ = newalist(NULL);
+			  if (set_ipv6_addr)
+				  $$->al_family = AF_INET6;
+			  else
+				  $$->al_family = AF_INET;
+			  set_ipv6_addr = 0;
 			  bcopy(&($1.a), &($$->al_i6addr), sizeof($1.a));
 			  bcopy(&($1.m), &($$->al_i6mask), sizeof($1.m)); }
 	| addrlist ',' ipaddr
 			{ $$ = newalist($1);
+			  if (set_ipv6_addr)
+				  $$->al_family = AF_INET6;
+			  else
+				  $$->al_family = AF_INET;
+			  set_ipv6_addr = 0;
 			  bcopy(&($3.a), &($$->al_i6addr), sizeof($3.a));
 			  bcopy(&($3.m), &($$->al_i6mask), sizeof($3.m)); }
 	;
@@ -1042,19 +1055,39 @@ hash:	IPFY_HASH	{ yyexpectaddr = 0; yycont = NULL; yyresetdict(); }
 
 poollist:
 	ipaddr		{ $$ = newalist(NULL);
+			  if (set_ipv6_addr)
+				  $$->al_family = AF_INET6;
+			  else
+				  $$->al_family = AF_INET;
+			  set_ipv6_addr = 0;
 			  bcopy(&($1.a), &($$->al_i6addr), sizeof($1.a));
 			  bcopy(&($1.m), &($$->al_i6mask), sizeof($1.m)); }
 	| '!' ipaddr	{ $$ = newalist(NULL);
 			  $$->al_not = 1;
+			  if (set_ipv6_addr)
+				  $$->al_family = AF_INET6;
+			  else
+				  $$->al_family = AF_INET;
+			  set_ipv6_addr = 0;
 			  bcopy(&($2.a), &($$->al_i6addr), sizeof($2.a));
 			  bcopy(&($2.m), &($$->al_i6mask), sizeof($2.m)); }
 	| poollist ',' ipaddr
 			{ $$ = newalist($1);
+			  if (set_ipv6_addr)
+				  $$->al_family = AF_INET6;
+			  else
+				  $$->al_family = AF_INET;
+			  set_ipv6_addr = 0;
 			  bcopy(&($3.a), &($$->al_i6addr), sizeof($3.a));
 			  bcopy(&($3.m), &($$->al_i6mask), sizeof($3.m)); }
 	| poollist ',' '!' ipaddr
 			{ $$ = newalist($1);
 			  $$->al_not = 1;
+			  if (set_ipv6_addr)
+				  $$->al_family = AF_INET6;
+			  else
+				  $$->al_family = AF_INET;
+			  set_ipv6_addr = 0;
 			  bcopy(&($4.a), &($$->al_i6addr), sizeof($4.a));
 			  bcopy(&($4.m), &($$->al_i6mask), sizeof($4.m)); }
 	;
@@ -1952,8 +1985,14 @@ alist_t *list;
 		return 0;
 	
 	for (n = top, a = list; (n != NULL) && (a != NULL); a = a->al_next) {
-		n->ipn_addr.adf_addr.in4.s_addr = a->al_1;
-		n->ipn_mask.adf_addr.in4.s_addr = a->al_2;
+		n->ipn_addr.adf_family = a->al_family;
+		n->ipn_mask.adf_family = a->al_family;
+		(void *)bcopy((void *)&a->al_i6addr,
+			      (void *)&n->ipn_addr.adf_addr,
+			      sizeof(n->ipn_addr.adf_addr));
+		(void *)bcopy((void *)&a->al_i6mask,
+			      (void *)&n->ipn_mask.adf_addr,
+			      sizeof(n->ipn_mask.adf_addr));
 		n->ipn_info = a->al_not;
 		if (a->al_next != NULL) {
 			n->ipn_next = calloc(1, sizeof(*n));
@@ -1989,8 +2028,13 @@ alist_t *list;
 		return 0;
 	
 	for (n = top, a = list; (n != NULL) && (a != NULL); a = a->al_next) {
-		n->ipe_addr.in4_addr = a->al_1;
-		n->ipe_mask.in4_addr = a->al_2;
+		n->ipe_family = a->al_family;
+		(void *)bcopy((void *)&a->al_i6addr,
+			      (void *)&n->ipe_addr,
+			      sizeof(n->ipe_addr));
+		(void *)bcopy((void *)&a->al_i6mask,
+			      (void *)&n->ipe_mask,
+			      sizeof(n->ipe_mask));
 		n->ipe_value = 0;
 		if (a->al_next != NULL) {
 			n->ipe_next = calloc(1, sizeof(*n));

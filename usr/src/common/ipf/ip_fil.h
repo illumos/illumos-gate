@@ -5,7 +5,7 @@
  *
  * $Id: ip_fil.h,v 2.146 2003/07/01 18:30:19 darrenr Exp $
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@
 # define	SIOCIPFGETNEXT	_IOWR('r', 87, struct ipfobj)
 # define	SIOCIPFGET	_IOWR('r', 88, struct ipfobj)
 # define	SIOCIPFSET	_IOWR('r', 89, struct ipfobj)
+# define	SIOCIPFL6	_IOWR('r', 90, int)
 #else
 # define	SIOCADAFR	_IOW(r, 60, struct ipfobj)
 # define	SIOCRMAFR	_IOW(r, 61, struct ipfobj)
@@ -88,6 +89,7 @@
 # define	SIOCIPFGETNEXT	_IOWR(r, 87, struct ipfobj)
 # define	SIOCIPFGET	_IOWR(r, 88, struct ipfobj)
 # define	SIOCIPFSET	_IOWR(r, 89, struct ipfobj)
+# define	SIOCIPFL6	_IOWR(r, 90, int)
 #endif
 #define	SIOCADDFR	SIOCADAFR
 #define	SIOCDELFR	SIOCRMAFR
@@ -112,6 +114,7 @@ typedef	union	i6addr	{
 	void	*vptr[2];
 	lookupfunc_t	lptr[2];
 } i6addr_t;
+#define in6_addr8	in6.s6_addr
 #else
 typedef	union	i6addr	{
 	u_32_t	i6[4];
@@ -289,7 +292,9 @@ typedef	struct	fr_info	{
 	void	*fin_dp;		/* start of data past IP header */
 	int	fin_dlen;		/* length of data portion of packet */
 	int	fin_plen;
-	u_short	fin_id;			/* IP packet id field */
+	int	fin_flen;		/* length of layer 4 hdr and 
+					   ipv6 ext hdr after fragment hdr */
+	u_32_t	fin_id;			/* IP packet id field */
 	u_short	fin_off;
 	int	fin_depth;		/* Group nesting depth */
 	int	fin_error;		/* Error code to return */
@@ -973,6 +978,7 @@ typedef struct  ipftq   {
  */
 typedef	struct	{
 	u_char		adf_len;
+	sa_family_t	adf_family;
 	i6addr_t	adf_addr;
 } addrfamily_t;
 
@@ -1204,6 +1210,9 @@ extern	ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 
 extern	char	*memstr __P((char *, char *, int, int));
 extern	int	count4bits __P((u_32_t));
+#ifdef USE_INET6
+extern	int	count6bits __P((u_32_t *));
+#endif
 extern	char	*getifname __P((struct ifnet *));
 extern	int	iplattach __P((void));
 extern	int	ipldetach __P((void));
@@ -1241,7 +1250,7 @@ extern	int	fr_ifpfillv6addr __P((int, struct sockaddr_in6 *,
 				      struct in_addr *));
 #endif
 
-extern	int	frflush __P((minor_t, int));
+extern	int	frflush __P((minor_t, int, int));
 extern	void	frsync __P((void));
 extern	frgroup_t *fr_addgroup __P((char *, void *, u_32_t, minor_t, int));
 extern	int	fr_derefrule __P((frentry_t **));

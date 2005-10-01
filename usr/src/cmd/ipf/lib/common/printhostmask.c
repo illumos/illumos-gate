@@ -4,7 +4,12 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id: printhostmask.c,v 1.8 2002/04/11 15:01:19 darrenr Exp $
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
 
@@ -14,7 +19,7 @@ int	v;
 u_32_t	*addr, *mask;
 {
 #ifdef  USE_INET6
-	char ipbuf[64];
+	char ipbuf[INET6_ADDRSTRLEN];
 #else
 	struct in_addr ipa;
 #endif
@@ -39,6 +44,6 @@ u_32_t	*addr, *mask;
 		ipa.s_addr = *addr;
 		printf("%s", inet_ntoa(ipa));
 #endif
-		printmask(mask);
+		printmask(v, mask);
 	}
 }

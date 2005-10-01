@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,6 +149,7 @@ static ipfr_t *ipfr_newfrag __P((fr_info_t *, u_32_t, ipfr_t **));
 static ipfr_t *fr_fraglookup __P((fr_info_t *, ipfr_t **));
 static void fr_fragdelete __P((ipfr_t *, ipfr_t ***));
 
+static frentry_t frblock;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_fraginit                                                 */
@@ -175,6 +176,12 @@ int fr_fraginit()
 	bzero((char *)ipfr_ipidtab, ipfr_size * sizeof(ipfr_t *));
 
 	RWLOCK_INIT(&ipf_frag, "ipf fragment rwlock");
+
+	/* Initialise frblock with "block in all" */
+	bzero((char *)&frblock, sizeof(frblock));
+	frblock.fr_flags = FR_BLOCK|FR_INQUE;	/* block in */
+	frblock.fr_ref = 1;
+
 	fr_frag_init = 1;
 
 	return 0;
@@ -243,7 +250,6 @@ ipfr_t *table[];
 {
 	ipfr_t *fra, frag;
 	u_int idx, off;
-	ip_t *ip;
 
 	if (ipfr_inuse >= IPFT_SIZE)
 		return NULL;
@@ -251,21 +257,18 @@ ipfr_t *table[];
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
 		return NULL;
 
-	ip = fin->fin_ip;
-
 	if (pass & FR_FRSTRICT)
-		if ((ip->ip_off & IP_OFFMASK) != 0)
+		if (fin->fin_off != 0)
 			return NULL;
 
-	frag.ipfr_p = ip->ip_p;
-	idx = ip->ip_p;
-	frag.ipfr_id = ip->ip_id;
-	idx += ip->ip_id;
-	frag.ipfr_tos = ip->ip_tos;
-	frag.ipfr_src.s_addr = ip->ip_src.s_addr;
-	idx += ip->ip_src.s_addr;
-	frag.ipfr_dst.s_addr = ip->ip_dst.s_addr;
-	idx += ip->ip_dst.s_addr;
+	frag.ipfr_p = fin->fin_p;
+	idx = fin->fin_p;
+	frag.ipfr_id = fin->fin_id;
+	idx += fin->fin_id;
+	frag.ipfr_source = fin->fin_fi.fi_src;
+	idx += frag.ipfr_src.s_addr;
+	frag.ipfr_dest = fin->fin_fi.fi_dst;
+	idx += frag.ipfr_dst.s_addr;
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
 	idx %= IPFT_SIZE;
@@ -294,8 +297,9 @@ ipfr_t *table[];
 		return NULL;
 	}
 
-	if ((fra->ipfr_rule = fin->fin_fr) != NULL)
-		fin->fin_fr->fr_ref++;
+	if ((fra->ipfr_rule = fin->fin_fr) != NULL) {
+		ATOMIC_INC(fin->fin_fr->fr_ref);
+	}
 
 	/*
 	 * Insert the fragment into the fragment table, copy the struct used
@@ -313,9 +317,14 @@ ipfr_t *table[];
 	/*
 	 * Compute the offset of the expected start of the next packet.
 	 */
-	off = ip->ip_off & IP_OFFMASK;
-	if (off == 0)
+	off = fin->fin_off >> 3;
+	if (off == 0) {
 		fra->ipfr_seen0 = 1;
+		fra->ipfr_firstend = fin->fin_flen;
+	} else {
+		fra->ipfr_seen0 = 0;
+		fra->ipfr_firstend = 0;
+	}
 	fra->ipfr_off = off + (fin->fin_dlen >> 3);
 	fra->ipfr_pass = pass;
 	ipfr_stats.ifs_new++;
@@ -337,7 +346,7 @@ fr_info_t *fin;
 {
 	ipfr_t	*fra;
 
-	if ((fin->fin_v != 4) || (fr_frag_lock != 0))
+	if (fr_frag_lock != 0)
 		return NULL;
 
 	WRITE_ENTER(&ipf_frag);
@@ -404,7 +413,7 @@ u_32_t ipid;
 {
 	ipfr_t	*fra;
 
-	if ((fin->fin_v != 4) || (fr_frag_lock))
+	if (fr_frag_lock)
 		return 0;
 
 	WRITE_ENTER(&ipf_ipidfrag);
@@ -437,7 +446,6 @@ ipfr_t *table[];
 {
 	ipfr_t *f, frag;
 	u_int idx;
-	ip_t *ip;
 
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
 		return NULL;
@@ -448,16 +456,15 @@ ipfr_t *table[];
 	 *
 	 * build up a hash value to index the table with.
 	 */
-	ip = fin->fin_ip;
-	frag.ipfr_p = ip->ip_p;
-	idx = ip->ip_p;
-	frag.ipfr_id = ip->ip_id;
-	idx += ip->ip_id;
-	frag.ipfr_tos = ip->ip_tos;
-	frag.ipfr_src.s_addr = ip->ip_src.s_addr;
-	idx += ip->ip_src.s_addr;
-	frag.ipfr_dst.s_addr = ip->ip_dst.s_addr;
-	idx += ip->ip_dst.s_addr;
+	frag.ipfr_p = fin->fin_p;
+	idx = fin->fin_p;
+	frag.ipfr_id = fin->fin_id;
+	idx += fin->fin_id;
+	frag.ipfr_source = fin->fin_fi.fi_src;
+	idx += frag.ipfr_src.s_addr;
+	frag.ipfr_dest = fin->fin_fi.fi_dst;
+	idx += frag.ipfr_dst.s_addr;
+
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
 	idx %= IPFT_SIZE;
@@ -495,14 +502,16 @@ ipfr_t *table[];
 			 * because a fragmented packet is never resent with
 			 * the same IP ID# (or shouldn't).
 			 */
-			off = ip->ip_off & IP_OFFMASK;
+			off = fin->fin_off >> 3; 
 			if (f->ipfr_seen0) {
 				if (off == 0) {
 					ATOMIC_INCL(ipfr_stats.ifs_retrans0);
 					continue;
 				}
-			} else if (off == 0)
+			} else if (off == 0) {
 				f->ipfr_seen0 = 1;
+				f->ipfr_firstend = fin->fin_flen;
+			}
 
 			if (f != table[idx]) {
 				ipfr_t **fp;
@@ -524,13 +533,18 @@ ipfr_t *table[];
 				table[idx] = f;
 			}
 
+			if (fin->fin_v == 6) {
+				if (f->ipfr_seen0 && (off * 8 < f->ipfr_firstend))
+					fin->fin_flx |= FI_BAD;
+			}
 			/*
 			 * If we've follwed the fragments, and this is the
 			 * last (in order), shrink expiration time.
 			 */
 			if (off == f->ipfr_off) {
-				if (!(ip->ip_off & IP_MF))
+/*				if (!(ip->ip_off & IP_MF))
 					f->ipfr_ttl = fr_ticks + 1;
+*/
 				f->ipfr_off = (fin->fin_dlen >> 3) + off;
 			} else if (f->ipfr_pass & FR_FRSTRICT)
 				continue;
@@ -620,12 +634,13 @@ u_32_t *passp;
 {
 	frentry_t *fr = NULL;
 	ipfr_t	*fra;
-	u_32_t pass;
+	u_32_t pass, oflx;
 
-	if ((fin->fin_v != 4) || (fr_frag_lock) || (ipfr_list == NULL))
+	if ((fr_frag_lock) || (ipfr_list == NULL))
 		return NULL;
 
 	READ_ENTER(&ipf_frag);
+	oflx = fin->fin_flx;
 	fra = fr_fraglookup(fin, ipfr_heads);
 	if (fra != NULL) {
 		fr = fra->ipfr_rule;
@@ -636,6 +651,11 @@ u_32_t *passp;
 				pass &= ~(FR_LOGFIRST|FR_LOG);
 			*passp = pass;
 		}
+	}
+	if (!(oflx & FI_BAD) && (fin->fin_flx & FI_BAD)) {
+		*passp &= ~FR_CMDMASK;
+		*passp |= FR_BLOCK;
+		fr = &frblock;
 	}
 	RWLOCK_EXIT(&ipf_frag);
 	return fr;

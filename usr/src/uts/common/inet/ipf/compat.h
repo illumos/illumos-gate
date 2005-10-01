@@ -1,3 +1,9 @@
+/*
+ * Copyright (C) 2003 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ */
+
 #ifdef DEBUG
 # define	PFILDEBUG
 #endif
@@ -31,3 +37,8 @@
 #ifndef	LIFNAMSIZ
 # define	LIFNAMSIZ	32
 #endif
+
+#ifndef	ASSERT
+# define	ASSERT(x)
+#endif
+

@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -335,6 +335,8 @@ char *argv[];
 	char *kernel, *core, *poolname;
 	int c, role, type, live_kernel;
 	ip_pool_stat_t *plstp, plstat;
+	iphtstat_t *htstp, htstat;
+	iphtable_t *hptr;
 	iplookupop_t op;
 	ip_pool_t *ptr;
 
@@ -381,6 +383,9 @@ char *argv[];
 			break;
 		}
 
+	if (opts & OPT_DEBUG)
+		fprintf(stderr, "poollist: opts = %#x\n", opts);
+
 	if (!(opts & OPT_DONOTHING) && (fd == -1)) {
 		fd = open(IPLOOKUP_NAME, O_RDWR);
 		if (fd == -1) {
@@ -394,31 +399,68 @@ char *argv[];
 		strncpy(op.iplo_name, poolname, sizeof(op.iplo_name));
 		op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 	}
-	op.iplo_type = type;
 	op.iplo_unit = role;
-	op.iplo_size = sizeof(plstat);
-	op.iplo_struct = &plstat;
-	plstp = &plstat;
-
-	c = ioctl(fd, SIOCLOOKUPSTAT, &op);
-	if (c == -1) {
-		perror("ioctl(SIOCLOOKUPSTAT)");
-		return -1;
-	}
 
 	if (openkmem(kernel, core) == -1)
 		exit(-1);
 
-	if (role != IPL_LOGALL) {
-		ptr = plstp->ipls_list[role];
-		while (ptr != NULL) {
-			ptr = printpool(ptr, kmemcpywrap, opts);
+	if (type == IPLT_ALL || type == IPLT_POOL) {
+		plstp = &plstat;
+		op.iplo_type = IPLT_POOL;
+		op.iplo_size = sizeof(plstat);
+		op.iplo_struct = &plstat;
+		c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+		if (c == -1) {
+			perror("ioctl(SIOCLOOKUPSTAT)");
+			return -1;
 		}
-	} else {
-		for (role = 0; role <= IPL_LOGMAX; role++) {
+
+		if (role != IPL_LOGALL) {
 			ptr = plstp->ipls_list[role];
 			while (ptr != NULL) {
 				ptr = printpool(ptr, kmemcpywrap, opts);
+			}
+		} else {
+			for (role = 0; role <= IPL_LOGMAX; role++) {
+				ptr = plstp->ipls_list[role];
+				while (ptr != NULL) {
+					ptr = printpool(ptr, kmemcpywrap,
+							opts);
+				}
+			}
+			role = IPL_LOGALL;
+		}
+	}
+	if (type == IPLT_ALL || type == IPLT_HASH) {
+		htstp = &htstat;
+		op.iplo_type = IPLT_HASH;
+		op.iplo_size = sizeof(htstat);
+		op.iplo_struct = &htstat;
+		c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+		if (c == -1) {
+			perror("ioctl(SIOCLOOKUPSTAT)");
+			return -1;
+		}
+
+		if (role != IPL_LOGALL) {
+			hptr = htstp->iphs_tables;
+			while (hptr != NULL) {
+				hptr = printhash(hptr, kmemcpywrap, opts);
+			}
+		} else {
+			for (role = 0; role <= IPL_LOGMAX; role++) {
+				hptr = htstp->iphs_tables;
+				while (hptr != NULL) {
+					hptr = printhash(hptr, kmemcpywrap,
+							 opts);
+				}
+
+				op.iplo_unit = role;
+				c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+				if (c == -1) {
+					perror("ioctl(SIOCLOOKUPSTAT)");
+					return -1;
+				}
 			}
 		}
 	}
@@ -433,6 +475,7 @@ char *argv[];
 	int c, type, role, live_kernel;
 	ip_pool_stat_t plstat;
 	char *kernel, *core;
+	iphtstat_t htstat;
 	iplookupop_t op;
 
 	core = NULL;
@@ -442,8 +485,6 @@ char *argv[];
 	role = IPL_LOGALL;
 
 	bzero((char *)&op, sizeof(op));
-	op.iplo_struct = &plstat;
-	op.iplo_size = sizeof(plstat);
 
 	while ((c = getopt(argc, argv, "dM:N:o:t:v")) != -1)
 		switch (c)
@@ -479,6 +520,9 @@ char *argv[];
 			break;
 		}
 
+	if (opts & OPT_DEBUG)
+		fprintf(stderr, "poolstats: opts = %#x\n", opts);
+
 	if (!(opts & OPT_DONOTHING) && (fd == -1)) {
 		fd = open(IPLOOKUP_NAME, O_RDWR);
 		if (fd == -1) {
@@ -487,15 +531,35 @@ char *argv[];
 		}
 	}
 
-	if (!(opts & OPT_DONOTHING)) {
-		c = ioctl(fd, SIOCLOOKUPSTAT, &op);
-		if (c == -1) {
-			perror("ioctl(SIOCLOOKUPSTAT)");
-			return -1;
+	if (type == IPLT_ALL || type == IPLT_POOL) {
+		op.iplo_type = IPLT_POOL;
+		op.iplo_struct = &plstat;
+		op.iplo_size = sizeof(plstat);
+		if (!(opts & OPT_DONOTHING)) {
+			c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+			if (c == -1) {
+				perror("ioctl(SIOCLOOKUPSTAT)");
+				return -1;
+			}
+			printf("Pools:\t%lu\n", plstat.ipls_pools);
+			printf("Nodes:\t%lu\n", plstat.ipls_nodes);
 		}
-		printf("Pools:\t%lu\n", plstat.ipls_pools);
-		printf("Hash Tables:\t%lu\n", plstat.ipls_tables);
-		printf("Nodes:\t%lu\n", plstat.ipls_nodes);
+	}
+
+	if (type == IPLT_ALL || type == IPLT_HASH) {
+		op.iplo_type = IPLT_HASH;
+		op.iplo_struct = &htstat;
+		op.iplo_size = sizeof(htstat);
+		if (!(opts & OPT_DONOTHING)) {
+			c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+			if (c == -1) {
+				perror("ioctl(SIOCLOOKUPSTAT)");
+				return -1;
+			}
+			printf("Hash Tables:\t%lu\n", htstat.iphs_numtables);
+			printf("Nodes:\t%lu\n", htstat.iphs_numnodes);
+			printf("Out of Memory:\t%lu\n", htstat.iphs_nomem);
+		}
 	}
 	return 0;
 }

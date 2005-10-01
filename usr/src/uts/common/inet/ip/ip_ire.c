@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -6593,6 +6593,7 @@ ipif_lookup_multi_ire(ipif_t *ipif, ipaddr_t group)
 mblk_t *
 ip_nexthop_route(const struct sockaddr *target, char *ifname)
 {
+	struct nce_s *nce;
 	ire_t *dir, *gw;
 	ill_t *ill;
 	mblk_t *mp;
@@ -6618,6 +6619,10 @@ ip_nexthop_route(const struct sockaddr *target, char *ifname)
 		    NULL,
 		    0, 0, NULL, &gw, ALL_ZONES,
 		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
+		if ((dir != NULL) && (dir->ire_nce == NULL)) {
+			ire_refrele(dir);
+			dir = NULL;
+		}
 		break;
 	default:
 		dir = NULL;
@@ -6637,14 +6642,30 @@ ip_nexthop_route(const struct sockaddr *target, char *ifname)
 	(void) strncpy(ifname, ill->ill_name, LIFNAMSIZ);
 
 	/* Return a copy of the header to the caller. */
-	if (dir->ire_fp_mp != NULL) {
-		if ((mp = dupb(dir->ire_fp_mp)) == NULL)
-			mp = copyb(dir->ire_fp_mp);
-	} else if (dir->ire_dlureq_mp != NULL) {
-		if ((mp = dupb(dir->ire_dlureq_mp)) == NULL)
-			mp = copyb(dir->ire_dlureq_mp);
-	} else {
-		mp = NULL;
+	switch (target->sa_family) {
+	case AF_INET :
+		if (dir->ire_fp_mp != NULL) {
+			if ((mp = dupb(dir->ire_fp_mp)) == NULL)
+				mp = copyb(dir->ire_fp_mp);
+		} else if (dir->ire_dlureq_mp != NULL) {
+			if ((mp = dupb(dir->ire_dlureq_mp)) == NULL)
+				mp = copyb(dir->ire_dlureq_mp);
+		} else {
+			mp = NULL;
+		}
+		break;
+	case AF_INET6 :
+		nce = dir->ire_nce;
+		if (nce->nce_fp_mp != NULL) {
+			if ((mp = dupb(nce->nce_fp_mp)) == NULL)
+				mp = copyb(nce->nce_fp_mp);
+		} else if (nce->nce_res_mp != NULL) {
+			if ((mp = dupb(nce->nce_res_mp)) == NULL)
+				mp = copyb(nce->nce_res_mp);
+		} else {
+			mp = NULL;
+		}
+		break;
 	}
 
 	ire_refrele(dir);
@@ -6666,6 +6687,7 @@ ip_nexthop_route(const struct sockaddr *target, char *ifname)
 mblk_t *
 ip_nexthop(const struct sockaddr *target, const char *ifname)
 {
+	struct nce_s *nce;
 	ill_walk_context_t ctx;
 	t_uscalar_t sap;
 	ire_t *dir, *gw;
@@ -6730,6 +6752,10 @@ ip_nexthop(const struct sockaddr *target, const char *ifname)
 			0, 0, ill->ill_ipif, &gw, ALL_ZONES,
 			MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|
 			MATCH_IRE_RECURSIVE|MATCH_IRE_IPIF);
+		if ((dir != NULL) && (dir->ire_nce == NULL)) {
+			ire_refrele(dir);
+			dir = NULL;
+		}
 		break;
 	default:
 		dir = NULL;
@@ -6742,16 +6768,31 @@ ip_nexthop(const struct sockaddr *target, const char *ifname)
 		return (NULL);
 
 	/* Return a copy of the header to the caller. */
-	if (dir->ire_fp_mp != NULL) {
-		if ((mp = dupb(dir->ire_fp_mp)) == NULL)
-			mp = copyb(dir->ire_fp_mp);
-	} else if (dir->ire_dlureq_mp != NULL) {
-		if ((mp = dupb(dir->ire_dlureq_mp)) == NULL)
-			mp = copyb(dir->ire_dlureq_mp);
-	} else {
-		mp = NULL;
+	switch (target->sa_family) {
+	case AF_INET :
+		if (dir->ire_fp_mp != NULL) {
+			if ((mp = dupb(dir->ire_fp_mp)) == NULL)
+				mp = copyb(dir->ire_fp_mp);
+		} else if (dir->ire_dlureq_mp != NULL) {
+			if ((mp = dupb(dir->ire_dlureq_mp)) == NULL)
+				mp = copyb(dir->ire_dlureq_mp);
+		} else {
+			mp = NULL;
+		}
+		break;
+	case AF_INET6 :
+		nce = dir->ire_nce;
+		if (nce->nce_fp_mp != NULL) {
+			if ((mp = dupb(nce->nce_fp_mp)) == NULL)
+				mp = copyb(nce->nce_fp_mp);
+		} else if (nce->nce_res_mp != NULL) {
+			if ((mp = dupb(nce->nce_res_mp)) == NULL)
+				mp = copyb(nce->nce_res_mp);
+		} else {
+			mp = NULL;
+		}
+		break;
 	}
-
 
 	ire_refrele(dir);
 	return (mp);

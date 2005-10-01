@@ -5,7 +5,7 @@
  *
  * ident "@(#)$Id: pfil.c,v 1.22 2003/08/18 22:13:59 darrenr Exp $"
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,15 +35,24 @@ struct uio;
 #include <sys/lock.h>
 #include <sys/stropts.h>
 #include <net/if.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
 #ifdef sun
 # include <inet/common.h>
 # if SOLARIS2 >= 8
 #  include <netinet/ip6.h>
 # endif
+# undef IPOPT_EOL
+# undef IPOPT_NOP
+# undef IPOPT_LSRR
+# undef IPOPT_SSRR
+# undef IPOPT_RR
 # include <inet/ip.h>
 #endif
 
 #include "compat.h"
+#include "qif.h"
 #include "pfil.h"
 
 

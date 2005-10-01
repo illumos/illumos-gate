@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,6 +165,7 @@ struct file;
 # endif
 # if SOLARIS2 >= 8
 #  include <inet/ip_if.h>
+#  include <inet/ip6.h>
 #  define	ipif_local_addr	ipif_lcl_addr
 /* Only defined in private include file */
 #  ifndef	V4_PART_OF_V6

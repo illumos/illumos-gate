@@ -5,7 +5,7 @@
  *
  * ident "@(#)$Id: pkt.c,v 1.8 2003/07/28 05:13:58 darrenr Exp $"
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -18,7 +18,9 @@
 #include <sys/cmn_err.h>
 #include <sys/ddi.h>
 #include <sys/rwlock.h>
+#include <sys/socket.h>
 
+#include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -33,6 +35,9 @@
 #undef IPOPT_SSRR
 #include <inet/common.h>
 #include <inet/ip.h>
+#if SOLARIS2 >= 8
+#include <inet/ip6.h>
+#endif
 #include <inet/ip_ire.h>
 #include <inet/ip_if.h>
 
@@ -95,13 +100,13 @@ queue_t **output_q;
 	int sap;
 
 	if (ip->ip_v == IPV4_VERSION) {
-		struct sockaddr_in *target_in = (struct sockaddr_in *)&target;
+		struct sockaddr_in *target_in;
+		target_in = (struct sockaddr_in *)&target;
 		sap = IP_DL_SAP;
 		target_in->sin_family = AF_INET;
 		if (dst == NULL)
 			target_in->sin_addr = ip->ip_dst;
-		else
-		{
+		else {
 			target_in->sin_addr.s_addr = *(ipaddr_t *)dst;
 			if (ifname != NULL)
 				ip_inf_bind = 1;
@@ -109,17 +114,26 @@ queue_t **output_q;
 	}
 #ifdef USE_INET6
 	else if (ip->ip_v == IPV6_VERSION) {
+		struct sockaddr_in6 *target_in6;
+		target_in6 = (struct sockaddr_in6 *)&target;
 		sap = IP6_DL_SAP;
-		target.sa_family = AF_INET6;
-		/* To do: add code for IPV6 */
-		return NULL;
+		target_in6->sin6_family = AF_INET6;
+		if (dst == NULL)
+			target_in6->sin6_addr = ((ip6_t *)ip)->ip6_dst;
+		else {
+			bcopy(dst, &target_in6->sin6_addr,
+			      sizeof(struct in6_addr));
+			if (ifname != NULL)
+				ip_inf_bind = 1;
+		}
 	}
 #endif
 
 	if (ip_inf_bind)
 		mp = ip_nexthop((struct sockaddr *)&target, ifname);
 	else {
-		mp = ip_nexthop_route((struct sockaddr *)&target, out_ifname_buf);
+		mp = ip_nexthop_route((struct sockaddr *)&target,
+				      out_ifname_buf);
 		if (ifname == NULL)
 			ifname = out_ifname_buf;
 	}
@@ -237,7 +251,7 @@ mblk_t *m;
 
 		il = ire_to_ill(dir);
 		if (!il)
-			return (2);
+			return 2;
 #if SOLARIS2 < 8
 		mp = dir->ire_ll_hdr_mp;
 		hlen = dir->ire_ll_hdr_length;

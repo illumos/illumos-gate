@@ -360,9 +360,19 @@ char	*arg;
 		rem = fl;
 
 		closedevice();
-		if (opendevice(IPSTATE_NAME, 1) != -2 &&
-		    ioctl(fd, SIOCIPFFL, &fl) == -1)
-			perror("ioctl(SIOCIPFFL)");
+
+		if (opendevice(IPSTATE_NAME, 1) != -2) {
+			if (use_inet6) {
+#ifdef USE_INET6
+				if (ioctl(fd, SIOCIPFL6, &fl) == -1)
+					perror("SIOCIPFL6");
+#endif
+			} else {
+				if (ioctl(fd, SIOCIPFFL, &fl) == -1)
+					perror("SIOCIPFFL");
+			}
+		}
+
 		if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE) {
 			printf("remove flags %s (%d)\n", arg, rem);
 			printf("removed %d filter rules\n", fl);
@@ -398,8 +408,18 @@ char	*arg;
 		fl |= FR_INACTIVE;
 	rem = fl;
 
-	if (opendevice(ipfname, 1) != -2 && ioctl(fd, SIOCIPFFL, &fl) == -1)
-		perror("ioctl(SIOCIPFFL)");
+	if (opendevice(ipfname, 1) != -2) {
+		if (use_inet6) {
+#ifdef USE_INET6
+			if (ioctl(fd, SIOCIPFL6, &fl) == -1)
+				perror("SIOCIPFL6");
+#endif
+		} else {
+			if (ioctl(fd, SIOCIPFFL, &fl) == -1)
+				perror("SIOCIPFFL");
+		}
+	}
+
 	if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE) {
 		printf("remove flags %s%s (%d)\n", (rem & FR_INQUE) ? "I" : "",
 			(rem & FR_OUTQUE) ? "O" : "", rem);

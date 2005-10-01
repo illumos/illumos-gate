@@ -1,5 +1,5 @@
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -15,7 +15,7 @@ include ../../Makefile.cmd
 include ../Makefile.ipf
 
 LDLIBS          += $(LIBBPF) -lsocket -lnsl
-CFLAGS		+= -DNDEBUG
+CFLAGS		+= -DNDEBUG -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
 CPPFLAGS        += -I. -DIPFILTER_LOOKUP -DIPFILTER_LOG
 CLEANFILES	+= $(OBJS)
 

@@ -4,7 +4,12 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id: load_hash.c,v 1.10 2003/04/26 04:55:11 darrenr Exp $
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -73,8 +78,10 @@ ioctlfunc_t iocfunc;
 
 	if (opts & OPT_VERBOSE) {
 		for (a = list; a != NULL; a = a->ipe_next) {
-			a->ipe_addr.in4_addr = ntohl(a->ipe_addr.in4_addr);
-			a->ipe_mask.in4_addr = ntohl(a->ipe_mask.in4_addr);
+			if (a->ipe_family == AF_INET) {
+				a->ipe_addr.in4_addr = ntohl(a->ipe_addr.in4_addr);
+				a->ipe_mask.in4_addr = ntohl(a->ipe_mask.in4_addr);
+			}
 		}
 		iph.iph_table = calloc(size, sizeof(*iph.iph_table));
 		if (iph.iph_table == NULL) {
@@ -86,8 +93,10 @@ ioctlfunc_t iocfunc;
 		free(iph.iph_table);
 
 		for (a = list; a != NULL; a = a->ipe_next) {
-			a->ipe_addr.in4_addr = htonl(a->ipe_addr.in4_addr);
-			a->ipe_mask.in4_addr = htonl(a->ipe_mask.in4_addr);
+			if (a->ipe_family == AF_INET) {
+				a->ipe_addr.in4_addr = htonl(a->ipe_addr.in4_addr);
+				a->ipe_mask.in4_addr = htonl(a->ipe_mask.in4_addr);
+			}
 		}
 	}
 

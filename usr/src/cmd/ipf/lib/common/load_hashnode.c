@@ -4,7 +4,12 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id: load_hashnode.c,v 1.2 2003/04/26 04:55:11 darrenr Exp $
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -43,6 +48,7 @@ ioctlfunc_t iocfunc;
 	strncpy(op.iplo_name, name, sizeof(op.iplo_name));
 
 	bzero((char *)&ipe, sizeof(ipe));
+	ipe.ipe_family = node->ipe_family;
 	bcopy((char *)&node->ipe_addr, (char *)&ipe.ipe_addr,
 	      sizeof(ipe.ipe_addr));
 	bcopy((char *)&node->ipe_mask, (char *)&ipe.ipe_mask,

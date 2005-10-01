@@ -4,7 +4,12 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id: ip_pool.h,v 2.19 2003/11/08 23:01:26 darrenr Exp $
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	__IP_POOL_H__
 #define	__IP_POOL_H__
@@ -52,7 +57,6 @@ typedef	struct ip_pool_s {
 
 typedef	struct	ip_pool_stat	{
 	u_long		ipls_pools;
-	u_long		ipls_tables;
 	u_long		ipls_nodes;
 	ip_pool_t	*ipls_list[IPL_LOGSIZE];
 } ip_pool_stat_t;
@@ -65,13 +69,15 @@ extern	int	ip_pool_search __P((void *, int, void *));
 extern	int	ip_pool_init __P((void));
 extern	void	ip_pool_fini __P((void));
 extern	int	ip_pool_create __P((iplookupop_t *));
-extern	int	ip_pool_insert __P((ip_pool_t *, i6addr_t *, i6addr_t *, int));
+extern	int	ip_pool_insert __P((ip_pool_t *, addrfamily_t *,
+				    addrfamily_t *, int));
 extern	int	ip_pool_remove __P((ip_pool_t *, ip_pool_node_t *));
 extern	int	ip_pool_destroy __P((iplookupop_t *));
 extern	void	ip_pool_free __P((ip_pool_t *));
 extern	void	ip_pool_deref __P((ip_pool_t *));
 extern	void	*ip_pool_find __P((int, char *));
 extern	ip_pool_node_t *ip_pool_findeq __P((ip_pool_t *,
-					  struct in_addr *, struct in_addr *));
+					    addrfamily_t *, addrfamily_t *));
+extern	int	ip_pool_statistics __P((iplookupop_t *));
 
 #endif /* __IP_POOL_H__ */

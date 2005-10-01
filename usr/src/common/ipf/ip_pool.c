@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,33 +128,33 @@ main(argc, argv)
 
 	a.adf_addr.in4.s_addr = 0x0a010203;
 	b.adf_addr.in4.s_addr = 0xffffffff;
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 1);
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 1);
+	ip_pool_insert(ipo, &a, &b, 1);
+	ip_pool_insert(ipo, &a, &b, 1);
 
 	a.adf_addr.in4.s_addr = 0x0a000000;
 	b.adf_addr.in4.s_addr = 0xff000000;
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 0);
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 0);
+	ip_pool_insert(ipo, &a, &b, 0);
+	ip_pool_insert(ipo, &a, &b, 0);
 
 	a.adf_addr.in4.s_addr = 0x0a010100;
 	b.adf_addr.in4.s_addr = 0xffffff00;
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 1);
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 1);
+	ip_pool_insert(ipo, &a, &b, 1);
+	ip_pool_insert(ipo, &a, &b, 1);
 
 	a.adf_addr.in4.s_addr = 0x0a010200;
 	b.adf_addr.in4.s_addr = 0xffffff00;
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 0);
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 0);
+	ip_pool_insert(ipo, &a, &b, 0);
+	ip_pool_insert(ipo, &a, &b, 0);
 
 	a.adf_addr.in4.s_addr = 0x0a010000;
 	b.adf_addr.in4.s_addr = 0xffff0000;
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 1);
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 1);
+	ip_pool_insert(ipo, &a, &b, 1);
+	ip_pool_insert(ipo, &a, &b, 1);
 
 	a.adf_addr.in4.s_addr = 0x0a01020f;
 	b.adf_addr.in4.s_addr = 0xffffffff;
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 1);
-	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 1);
+	ip_pool_insert(ipo, &a, &b, 1);
+	ip_pool_insert(ipo, &a, &b, 1);
 #ifdef	DEBUG_POOL
 treeprint(ipo);
 #endif
@@ -267,6 +267,37 @@ void ip_pool_fini()
 #endif
 }
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ip_pool_statistics                                          */
+/* Returns:     int     - 0 = success, else error                           */
+/* Parameters:  op(I)   - pointer to lookup operation arguments             */
+/*                                                                          */
+/* Copy the current statistics out into user space, collecting pool list    */
+/* pointers as appropriate for later use.                                   */
+/* ------------------------------------------------------------------------ */
+int ip_pool_statistics(op)
+iplookupop_t *op;
+{
+	ip_pool_stat_t stats;
+	int unit, i, err = 0;
+
+	if (op->iplo_size != sizeof(ipoolstat))
+		return EINVAL;
+
+	bcopy((char *)&ipoolstat, (char *)&stats, sizeof(stats));
+	unit = op->iplo_unit;
+	if (unit == IPL_LOGALL) {
+		for (i = 0; i < IPL_LOGSIZE; i++)
+			stats.ipls_list[i] = ip_pool_list[i];
+	} else if (unit >= 0 && unit < IPL_LOGSIZE) {
+		stats.ipls_list[unit] = ip_pool_list[unit];
+	} else
+		err = EINVAL;
+	if (err == 0)
+		err = COPYOUT(&stats, op->iplo_struct, sizeof(stats));
+	return err;
+}
+
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ip_pool_find                                                */
@@ -300,7 +331,7 @@ char *name;
 /* ------------------------------------------------------------------------ */
 ip_pool_node_t *ip_pool_findeq(ipo, addr, mask)
 ip_pool_t *ipo;
-struct in_addr *addr, *mask;
+addrfamily_t *addr, *mask;
 {
 	struct radix_node *n;
 
@@ -370,8 +401,8 @@ void *dptr;
 /* Function:    ip_pool_insert                                              */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  ipo(I)  - pointer to the pool getting the new node.         */
-/*              addr(I) - address being added as a node                     */
-/*              mask(I) - netmask to with the node being added              */
+/*              addr(I) - IPv4/6 address being added as a node              */
+/*              mask(I) - IPv4/6 netmask to with the node being added       */
 /*              info(I) - extra information to store in this node.          */
 /* Locks:       WRITE(ip_poolrw)                                            */
 /*                                                                          */
@@ -380,7 +411,7 @@ void *dptr;
 /* ------------------------------------------------------------------------ */
 int ip_pool_insert(ipo, addr, mask, info)
 ip_pool_t *ipo;
-i6addr_t *addr, *mask;
+addrfamily_t *addr, *mask;
 int info;
 {
 	struct radix_node *rn;
@@ -398,9 +429,9 @@ int info;
 	x->ipn_info = info;
 	(void)strncpy(x->ipn_name, ipo->ipo_name, sizeof(x->ipn_name));
 
-	bcopy(addr, &x->ipn_addr.adf_addr, sizeof(*addr));
+	bcopy(addr, &x->ipn_addr, sizeof(*addr));
 	x->ipn_addr.adf_len = sizeof(x->ipn_addr);
-	bcopy(mask, &x->ipn_mask.adf_addr, sizeof(*mask));
+	bcopy(mask, &x->ipn_mask, sizeof(*mask));
 	x->ipn_mask.adf_len = sizeof(x->ipn_mask);
 
 	rn = ipo->ipo_head->rnh_addaddr(&x->ipn_addr, &x->ipn_mask,

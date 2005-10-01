@@ -1,3 +1,14 @@
+/*
+ * Copyright (C) 2003 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #ifndef __IP_HTABLE_H__
 #define __IP_HTABLE_H__
 
@@ -10,6 +21,7 @@
 typedef	struct	iphtent_s	{
 	struct	iphtent_s	*ipe_next, **ipe_pnext;
 	void		*ipe_ptr;
+	sa_family_t	ipe_family;
 	i6addr_t	ipe_addr;
 	i6addr_t	ipe_mask;
 	int		ipe_ref;
@@ -36,14 +48,25 @@ typedef	struct	iphtable_s	{
 	u_int	iph_unit;		/* IPL_LOG* */
 	u_int	iph_ref;
 	u_int	iph_type;		/* lookup or group map  - IPHASH_* */
-	u_int	iph_masks;		/* IPv4 netmasks in use */
+	u_int	iph_masks[4];		/* IPv4 or IPv6 netmasks in use */
 	char	iph_name[FR_GROUPLEN];	/* hash table number */
 } iphtable_t;
+
 
 /* iph_type */
 #define	IPHASH_LOOKUP	0
 #define	IPHASH_GROUPMAP	1
 #define	IPHASH_ANON	0x80000000
+
+
+typedef	struct	iphtstat_s	{
+	iphtable_t	*iphs_tables;
+	u_long		iphs_numtables;
+	u_long		iphs_numnodes;
+	u_long		iphs_nomem;
+	u_long		iphs_pad[16];
+} iphtstat_t;
+
 
 extern iphtable_t *ipf_htables[IPL_LOGSIZE];
 
@@ -56,7 +79,8 @@ extern int fr_addhtent __P((iphtable_t *, iphtent_t *));
 extern int fr_delhtent __P((iphtable_t *, iphtent_t *));
 extern void fr_derefhtable __P((iphtable_t *));
 extern void fr_delhtable __P((iphtable_t *));
-extern void *fr_iphmfindgroup __P((void *, void *));
+extern void *fr_iphmfindgroup __P((void *, int, void *));
 extern int fr_iphmfindip __P((void *, int, void *));
+extern int fr_gethtablestat __P((iplookupop_t *));
 
 #endif /* __IP_HTABLE_H__ */

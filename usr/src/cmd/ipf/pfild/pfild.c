@@ -24,6 +24,8 @@
 #include <stropts.h>
 #include <stdlib.h>
 #include <netinet/ip.h>
+#include <netinet/ip6.h>
+#include <netinet/icmp6.h>
 #include "pfild.h"
 
 extern int vas(const struct pfil_ifaddrs *, int);
@@ -45,7 +47,7 @@ extern int vas(const struct pfil_ifaddrs *, int);
 
 
 /* file descriptors for talking to pfil, ifnet, routing kernel modules */
-static int pfil_fd, ip_fd, ip6_fd, route_fd;
+static int pfil_fd, ip_fd, icmp6_ip6_fd, tcp_ip6_fd, route_fd;
 
 /*
  * flag indicates that some interface or routing data have changed since
@@ -223,7 +225,7 @@ do_update(void)
 	/* Populate the interface entries in the ifaddrlist. */
 	for (i = 0; i < numifs; i++) {
 		int isv6 = (lifrbuf[i].lifr_addr.ss_family == AF_INET6);
-		int fd = (isv6 ? ip6_fd : ip_fd);
+		int fd = (isv6 ? icmp6_ip6_fd : ip_fd);
 
 		(void) strncpy(ifaddrlist[i].name, lifrbuf[i].lifr_name,
 		    LIFNAMSIZ);
@@ -337,8 +339,65 @@ do_update(void)
 
 
 /*
- * Send an arbitrary IP packet out from the system using sendto on the
- * raw IP socket.  Currently only IPv4 is implemented.
+ * Send an IPv6 packet out from the system using sendmsg on the raw IP socket
+ * through the ancillary data.
+ */
+static int
+send_ip6_pkt(const void *pkt, size_t len)
+{
+	const struct ip6_hdr *iph = pkt;
+
+	struct sockaddr_in6 sin6;
+	struct iovec iovec;
+	struct msghdr msghdr;
+	struct cmsghdr *cmsgp;
+	struct in6_pktinfo *pktinfop;
+	unsigned char ancdatabuf[sizeof (*cmsgp) + sizeof (*pktinfop) + 100];
+	size_t ancdatalen;
+	int fd;
+
+	cmsgp = (struct cmsghdr *)ancdatabuf;
+	pktinfop = (struct in6_pktinfo *)CMSG_DATA(cmsgp);
+	cmsgp->cmsg_len = ((char *)(pktinfop + 1) - (char *)cmsgp);
+	cmsgp->cmsg_level = IPPROTO_IPV6;
+	cmsgp->cmsg_type = IPV6_PKTINFO;
+	memcpy(&pktinfop->ipi6_addr, &iph->ip6_src,
+		sizeof (pktinfop->ipi6_addr));
+	pktinfop->ipi6_ifindex = 0;
+	ancdatalen = ((char *)(pktinfop + 1) - (char *)cmsgp);
+
+	sin6.sin6_family = AF_INET6;
+	memcpy(&sin6.sin6_addr, &iph->ip6_dst, sizeof (sin6.sin6_addr));
+	sin6.sin6_port = 0;
+	sin6.sin6_scope_id = 0;
+	sin6.sin6_flowinfo = iph->ip6_flow & IPV6_FLOWINFO_TCLASS;
+
+	iovec.iov_base = (char *)(iph + 1);
+	iovec.iov_len = len - sizeof (*iph);
+	msghdr.msg_name = &sin6;
+	msghdr.msg_namelen = sizeof (sin6);
+	msghdr.msg_iov = &iovec;
+	msghdr.msg_iovlen = 1;
+	msghdr.msg_control = ancdatabuf;
+	msghdr.msg_controllen = ancdatalen;
+	msghdr.msg_flags = 0;
+
+	if (iph->ip6_nxt == IPPROTO_ICMPV6)
+		fd = icmp6_ip6_fd;
+	else if (iph->ip6_nxt == IPPROTO_TCP)
+		fd = tcp_ip6_fd;
+	else {
+		errno = EPROTONOSUPPORT;
+		return (-1);
+	}
+	return (sendmsg(fd, &msghdr, 0));
+}
+
+
+/*
+ * Send an arbitrary IP packet out from the system using sendto/sendmsg on the
+ * raw IP socket.  Due to the awkwardness of the IPv6 socket API, IPv6 packets
+ * are limited to ICMP and TCP; other protocols are dropped.
  */
 static void
 sendpkt(const void *buf, int len)
@@ -371,6 +430,8 @@ sendpkt(const void *buf, int len)
 		sin.sin_port = 0;
 		sin.sin_addr = iph->ip_dst;
 		n = sendto(ip_fd, buf, len, 0, (void *)&sin, sizeof (sin));
+	} else if (iph->ip_v == 6 && len > 40) {
+		n = send_ip6_pkt(buf, len);
 	} else {
 		n = -1;
 		errno = EINVAL;
@@ -397,6 +458,7 @@ main(int argc, char *argv[])
 	struct pollfd pollfds[2];
 	union { char bytes[1024]; ifa_msghdr_t msg; } buffer;
 	int pid;
+	struct icmp6_filter  filter;
 
 	while ((c = getopt(argc, argv, "d")) != -1) {
 		switch (c) {
@@ -426,9 +488,26 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
-	ip6_fd = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (ip6_fd < 0) {
-		perror("pfild: inet6 socket");
+	icmp6_ip6_fd = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
+	if (icmp6_ip6_fd < 0) {
+		perror("pfild: inet6 ICMP6 socket");
+		return (1);
+	}
+	/*
+	 *  ICMPv6 raw socket by default passes all ICMPv6 message received
+	 *  to the application.  We don't care about them, so simply block them
+	 *  all.
+	 */
+	ICMP6_FILTER_SETBLOCKALL(&filter);
+	if (setsockopt(icmp6_ip6_fd, IPPROTO_ICMPV6, ICMP6_FILTER,
+			&filter, sizeof (filter)) < 0) {
+		perror("pfild: inet6 ICMP6 socket type filtering option");
+		return (1);
+	}
+
+	tcp_ip6_fd = socket(AF_INET6, SOCK_RAW, IPPROTO_TCP);
+	if (tcp_ip6_fd < 0) {
+		perror("pfild: inet6 TCP socket");
 		return (1);
 	}
 

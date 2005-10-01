@@ -25,10 +25,10 @@ frdest_t *fdp;
 	}
 #ifdef	USE_INET6
 	if (use_inet6 && IP6_NOTZERO(&fdp->fd_ip6.in6)) {
-		char ipv6addr[80];
+		char ipv6addr[INET6_ADDRSTRLEN];
 
 		inet_ntop(AF_INET6, &fdp->fd_ip6, ipv6addr,
-			  sizeof(fdp->fd_ip6));
+			  sizeof(ipv6addr));
 		printf(":%s", ipv6addr);
 	} else
 #endif

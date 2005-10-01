@@ -2,7 +2,13 @@
  * Copyright (C) 1993-2001 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include "ipf.h"
 #include "ipt.h"
 #include <sys/ioctl.h>
@@ -302,8 +308,8 @@ char *argv[];
 	fr_natunload();
 	appr_unload();
 
-	i = frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	i += frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	i = frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	i += frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
 
 	ip_lookup_unload();
 
@@ -557,7 +563,7 @@ int n;
 
 	ptr = (char *)pos;
 
-	while ((n > 0) && (*buf++ = *ptr++))
+	while ((n-- > 0) && (*buf++ = *ptr++))
 		;
 	return 0;
 }

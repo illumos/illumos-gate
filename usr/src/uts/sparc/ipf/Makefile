@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,7 +45,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 MINOR=    echo $(RELEASE) | cut -d. -f2
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -DIPFILTER_LKM -DIPFILTER_LOG -DIPFILTER_LOOKUP 
-CPPFLAGS += -DSUNDDI -DSOLARIS2=$(MINOR:sh) -DIRE_ILL_CN
+CPPFLAGS += -DSUNDDI -DSOLARIS2=$(MINOR:sh) -DIRE_ILL_CN -DUSE_INET6
 LDFLAGS += -dy -Ndrv/ip -Ndrv/pfil -Nmisc/md5
 
 #

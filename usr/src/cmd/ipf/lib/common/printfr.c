@@ -183,7 +183,8 @@ ioctlfunc_t	iocfunc;
 				printlookup(&fp->fr_ip.fi_src,
 					    &fp->fr_mip.fi_src);
 			else
-				printmask((u_32_t *)&fp->fr_smsk.s_addr);
+				printmask(fp->fr_v,
+					  (u_32_t *)&fp->fr_smsk.s_addr);
 		} else
 			printhostmask(fp->fr_v, (u_32_t *)&fp->fr_src.s_addr,
 				      (u_32_t *)&fp->fr_smsk.s_addr);
@@ -205,7 +206,8 @@ ioctlfunc_t	iocfunc;
 				printlookup(&fp->fr_ip.fi_dst,
 					    &fp->fr_mip.fi_dst);
 			else
-				printmask((u_32_t *)&fp->fr_dmsk.s_addr);
+				printmask(fp->fr_v,
+					  (u_32_t *)&fp->fr_dmsk.s_addr);
 		} else
 			printhostmask(fp->fr_v, (u_32_t *)&fp->fr_dst.s_addr,
 				      (u_32_t *)&fp->fr_dmsk.s_addr);
@@ -294,14 +296,18 @@ ioctlfunc_t	iocfunc;
 				printf(" bad-src");
 			}
 		}
-		if (fp->fr_proto == IPPROTO_ICMP && fp->fr_icmpm) {
+		if ((fp->fr_proto == IPPROTO_ICMP
+#ifdef	USE_INET6
+		    || fp->fr_proto == IPPROTO_ICMPV6
+#endif
+		    ) && fp->fr_icmpm) {
 			int	type = fp->fr_icmp, code;
 
 			type = ntohs(fp->fr_icmp);
 			code = type & 0xff;
 			type /= 256;
 			if (type < (sizeof(icmptypes) / sizeof(char *) - 1) &&
-			    icmptypes[type])
+			    icmptypes[type] && fp->fr_proto == IPPROTO_ICMP)
 				printf(" icmp-type %s", icmptypes[type]);
 			else
 				printf(" icmp-type %d", type);

@@ -2,7 +2,7 @@
  * Copyright (C) 1993-2001, 2003, 2004  by Darren Reed.
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,6 +136,7 @@ struct	ipopt_names	{
 typedef struct  alist_s {
 	struct	alist_s	*al_next;
 	int		al_not;
+	sa_family_t	al_family;
 	i6addr_t	al_i6addr;
 	i6addr_t	al_i6mask;
 } alist_t;
@@ -195,7 +196,9 @@ extern void binprint __P((void *, size_t));
 extern void initparse __P((void));
 extern u_32_t buildopts __P((char *, char *, int));
 extern int checkrev __P((char *));
+#ifdef	USE_INET6
 extern int count6bits __P((u_32_t *));
+#endif
 extern int count4bits __P((u_32_t));
 extern int extras __P((char ***, struct frentry *, int));
 extern char *fac_toname __P((int));
@@ -266,7 +269,7 @@ extern void printhostmask __P((int, u_32_t *, u_32_t *));
 extern void printip __P((u_32_t *));
 extern void printlog __P((struct frentry *));
 extern void printlookup __P((i6addr_t *addr, i6addr_t *mask));
-extern void printmask __P((u_32_t *));
+extern void printmask __P((int, u_32_t *));
 extern void printpacket __P((struct ip *));
 extern void printpacket6 __P((struct ip *));
 extern struct ip_pool_s *printpool __P((struct ip_pool_s *, copyfunc_t, int));

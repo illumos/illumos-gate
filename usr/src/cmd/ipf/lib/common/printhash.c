@@ -2,21 +2,26 @@
  * Copyright (C) 2002 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+ 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
 
 #define	PRINTF	(void)printf
 #define	FPRINTF	(void)fprintf
 
-
 iphtable_t *printhash(hp, copyfunc, opts)
 iphtable_t *hp;
 copyfunc_t copyfunc;
 int opts;
 {
-	iphtent_t *ipep;
+	iphtent_t *ipep, **table;
 	iphtable_t iph;
+	size_t sz;
 	int i;
 
 	if ((*copyfunc)((char *)hp, (char *)&iph, sizeof(iph)))
@@ -74,8 +79,8 @@ int opts;
 	if ((opts & OPT_DEBUG) == 0) {
 		if ((iph.iph_type & ~IPHASH_ANON) == IPHASH_LOOKUP)
 			PRINTF(" type = hash");
-		PRINTF(" number = %s size = %u",
-			iph.iph_name, iph.iph_size);
+		PRINTF(" number = %s size = %lu",
+			iph.iph_name, (u_long)iph.iph_size);
 		if (iph.iph_seed != 0)
 			PRINTF(" seed = %lu", iph.iph_seed);
 		putchar('\n');
@@ -94,28 +99,41 @@ int opts;
 		}
 
 		putchar('\n');
-		PRINTF("\tSize: %d\tSeed: %lu", iph.iph_size, iph.iph_seed);
-		PRINTF("\tRef. Count: %d\tMasks: %d\n", iph.iph_ref,
-			iph.iph_masks);
+		PRINTF("\t\tSize: %lu\tSeed: %lu",
+			(u_long)iph.iph_size, iph.iph_seed);
+		PRINTF("\tRef. Count: %d\tMasks: %#x\n", iph.iph_ref,
+			iph.iph_masks[3]);
 	}
 
 	if ((opts & OPT_DEBUG) != 0) {
-		u_32_t m;
+		struct in_addr m;
 
-		for (i = 0; i < 33; i++) {
-			ntomask(4, i, &m);
-			if (m & iph.iph_masks)
-				PRINTF("Mask: %#x\n", m);
+		for (i = 0; i < 32; i++) {
+			if ((1 << i) & iph.iph_masks[3]) {
+				ntomask(4, i, &m.s_addr);
+				PRINTF("\t\tMask: %s\n", inet_ntoa(m));
+			}
 		}
 	}
 
-	PRINTF("\t{");
+	if ((opts & OPT_DEBUG) == 0)
+		PRINTF("\t{");
 
-	for (i = 0; i < iph.iph_size; i++)
-		for (ipep = iph.iph_table[i]; ipep != NULL; )
+	sz = iph.iph_size * sizeof(*table);
+	table = malloc(sz);
+	if ((*copyfunc)((char *)iph.iph_table, (char *)table, sz))
+		return NULL;
+
+	for (i = 0; i < iph.iph_size; i++) {
+		for (ipep = table[i]; ipep != NULL; ) {
 			ipep = printhashnode(&iph, ipep, copyfunc, opts);
+		}
+	}
 
-	PRINTF(" };\n");
+	free(table);
+
+	if ((opts & OPT_DEBUG) == 0)
+		PRINTF(" };\n");
 
 	return iph.iph_next;
 }

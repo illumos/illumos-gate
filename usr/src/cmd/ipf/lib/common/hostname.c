@@ -1,3 +1,13 @@
+/*
+ * Copyright (C) 2003 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
 
@@ -6,7 +16,7 @@ int v;
 void *ip;
 {
 #ifdef  USE_INET6
-	static char hostbuf[MAXHOSTNAMELEN+1];
+	static char hostbuf[INET6_ADDRSTRLEN];
 #endif
 	struct in_addr ipa;
 
@@ -15,8 +25,7 @@ void *ip;
 		return inet_ntoa(ipa);
 	}
 #ifdef  USE_INET6
-	(void) inet_ntop(AF_INET6, ip, hostbuf, sizeof(hostbuf) - 1);
-	hostbuf[MAXHOSTNAMELEN] = '\0';
+	(void) inet_ntop(AF_INET6, ip, hostbuf, sizeof(hostbuf));
 	return hostbuf;
 #else
 	return "IPv6";

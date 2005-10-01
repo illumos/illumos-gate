@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,7 +61,7 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 MINOR=       echo $(RELEASE) | cut -d. -f2
-CPPFLAGS +=  -DSUNDDI -DSOLARIS2=$(MINOR:sh) -DIRE_ILL_CN -DSOLARIS
+CPPFLAGS +=  -DSUNDDI -DSOLARIS2=$(MINOR:sh) -DIRE_ILL_CN -DSOLARIS -DUSE_INET6
 LDFLAGS += -dy -Ndrv/ip 
 
 #

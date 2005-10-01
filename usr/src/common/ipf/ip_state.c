@@ -139,7 +139,7 @@ static ipstate_t *fr_checkicmp6matchingstate __P((fr_info_t *));
 static ipstate_t *fr_matchsrcdst __P((fr_info_t *, ipstate_t *, i6addr_t *,
 				      i6addr_t *, tcphdr_t *));
 static ipstate_t *fr_checkicmpmatchingstate __P((fr_info_t *));
-static int fr_state_flush __P((int));
+static int fr_state_flush __P((int, int));
 static ips_stat_t *fr_statetstats __P((void));
 static void fr_delstate __P((ipstate_t *, int));
 static int fr_state_remove __P((caddr_t));
@@ -432,12 +432,24 @@ int mode;
 		(void) BCOPYIN(data, (char *)&arg, sizeof(arg));
 		if (arg == 0 || arg == 1) {
 			WRITE_ENTER(&ipf_state);
-			ret = fr_state_flush(arg);
+			ret = fr_state_flush(arg, 4);
 			RWLOCK_EXIT(&ipf_state);
 			(void) BCOPYOUT((char *)&ret, data, sizeof(ret));
 		} else
 			error = EINVAL;
 		break;
+#ifdef	USE_INET6
+	case SIOCIPFL6 :
+		(void) BCOPYIN(data, (char *)&arg, sizeof(arg));
+		if (arg == 0 || arg == 1) {
+			WRITE_ENTER(&ipf_state);
+			ret = fr_state_flush(arg, 6);
+			RWLOCK_EXIT(&ipf_state);
+			(void) BCOPYOUT((char *)&ret, data, sizeof(ret));
+		} else
+			error = EINVAL;
+		break;
+#endif
 #ifdef	IPFILTER_LOG
 	/*
 	 * Flush the state log.
@@ -828,8 +840,12 @@ u_int flags;
 		    IN6_IS_ADDR_MULTICAST(&is->is_dst.in6)) {
 			/*
 			 * So you can do keep state with neighbour discovery.
+			 *
+			 * Here we could use the address from the neighbour
+			 * solicit message to put in the state structure and
+			 * we could use that without a wildcard flag too...
 			 */
-			flags |= SI_W_DADDR;
+			is->is_flags |= SI_W_DADDR;
 			hv -= is->is_daddr;
 		} else {
 			hv += is->is_dst.i6[1];
@@ -1075,8 +1091,20 @@ u_int flags;
 	 * this may change.
 	 */
 	is->is_v = fin->fin_v;
-	is->is_opt = fin->fin_optmsk;
-	is->is_optmsk = 0xffffffff;
+	if (is->is_v == 6) {	/* Only IPv6 has fragment options */
+		/*
+		 *  XXX - This magic value 0x08 comes from ip6exthdr[]. In time
+		 * the flag values for IPv6 extension headers should be given a
+		 * symbolic name rather than used like this.
+		 */
+		is->is_opt[0] = fin->fin_optmsk & ~(0x08);
+		is->is_optmsk[0] = 0xffffffff & ~(0x08);
+	} else {
+		is->is_opt[0] = fin->fin_optmsk;
+		is->is_optmsk[0] = 0xffffffff;
+	}
+	is->is_opt[1] = 0;
+	is->is_optmsk[1] = 0;
 	is->is_sec = fin->fin_secmsk;
 	is->is_secmsk = 0xffff;
 	is->is_auth = fin->fin_auth;
@@ -1644,22 +1672,62 @@ tcphdr_t *tcp;
 	/*
 	 * Only one of the source or destination address can be flaged as a
 	 * wildcard.  Fill in the missing address, if set.
+	 * For IPv6, if the address being copied in is multicast, then
+	 * don't reset the wild flag - multicast causes it to be set in the
+	 * first place!
 	 */
 	if ((flags & (SI_W_SADDR|SI_W_DADDR))) {
+		fr_ip_t *fi = &fin->fin_fi;
+
 		if ((flags & SI_W_SADDR) != 0) {
 			if (rev == 0) {
-				is->is_src = fin->fin_fi.fi_src;
+#ifdef USE_INET6
+				if (is->is_v == 6 &&
+				    IN6_IS_ADDR_MULTICAST(&fi->fi_src.in6))
+					/*EMPTY*/;
+				else
+#endif
+				{
+					is->is_src = fi->fi_src;
+					is->is_flags &= ~SI_W_SADDR;
+				}
 			} else {
-				is->is_src = fin->fin_fi.fi_dst;
+#ifdef USE_INET6
+				if (is->is_v == 6 &&
+				    IN6_IS_ADDR_MULTICAST(&fi->fi_dst.in6))
+					/*EMPTY*/;
+				else
+#endif
+				{
+					is->is_src = fi->fi_dst;
+					is->is_flags &= ~SI_W_SADDR;
+				}
 			}
 		} else if ((flags & SI_W_DADDR) != 0) {
 			if (rev == 0) {
-				is->is_dst = fin->fin_fi.fi_dst;
+#ifdef USE_INET6
+				if (is->is_v == 6 &&
+				    IN6_IS_ADDR_MULTICAST(&fi->fi_dst.in6))
+					/*EMPTY*/;
+				else
+#endif
+				{
+					is->is_dst = fi->fi_dst;
+					is->is_flags &= ~SI_W_DADDR;
+				}
 			} else {
-				is->is_dst = fin->fin_fi.fi_src;
+#ifdef USE_INET6
+				if (is->is_v == 6 &&
+				    IN6_IS_ADDR_MULTICAST(&fi->fi_src.in6))
+					/*EMPTY*/;
+				else
+#endif
+				{
+					is->is_dst = fi->fi_src;
+					is->is_flags &= ~SI_W_DADDR;
+				}
 			}
 		}
-		is->is_flags &= ~(SI_W_SADDR|SI_W_DADDR);
 		if ((is->is_flags & (SI_WILDA|SI_WILDP)) == 0) {
 			ATOMIC_DECL(ips_stats.iss_wild);
 		}
@@ -1671,7 +1739,7 @@ tcphdr_t *tcp;
 	 * Match up any flags set from IP options.
 	 */
 	if ((is->is_flx[out][rev] && (flx != is->is_flx[out][rev])) ||
-	    ((fin->fin_optmsk & is->is_optmsk) != is->is_opt) ||
+	    ((fin->fin_optmsk & is->is_optmsk[rev]) != is->is_opt[rev]) ||
 	    ((fin->fin_secmsk & is->is_secmsk) != is->is_sec) ||
 	    ((fin->fin_auth & is->is_authmsk) != is->is_auth))
 		return NULL;
@@ -1721,8 +1789,16 @@ tcphdr_t *tcp;
 
 	ret = -1;
 
-	if (is->is_flx[out][rev] == 0)
+	if (is->is_flx[out][rev] == 0) {
 		is->is_flx[out][rev] = flx;
+		if (is->is_v == 6) {	/* Only IPv6 has fragment options */
+			is->is_opt[rev] = fin->fin_optmsk & ~(0x08);
+			is->is_optmsk[rev] = 0xffffffff & ~(0x08);
+		} else {
+			is->is_opt[rev] = fin->fin_optmsk;
+			is->is_optmsk[rev] = 0xffffffff;
+		}
+	}
 
 	/*
 	 * Check if the interface name for this "direction" is set and if not,
@@ -2693,7 +2769,7 @@ void fr_timeoutstate()
 		}
 	}
 	if (fr_state_doflush) {
-		(void) fr_state_flush(2);
+		(void) fr_state_flush(2, 0);
 		fr_state_doflush = 0;
 	}
 	RWLOCK_EXIT(&ipf_state);
@@ -2718,14 +2794,15 @@ void fr_timeoutstate()
 /*            If that too fails, then work backwards in 30 second intervals */
 /*            for the last 30 minutes to at worst 30 seconds idle.          */
 /* ------------------------------------------------------------------------ */
-static int fr_state_flush(which)
-int which;
+static int fr_state_flush(which, proto)
+int which, proto;
 {
-	u_long try, maxtick, interval;
 	ipftq_t *ifq, *ifqnext;
 	ipftqent_t *tqe, *tqn;
 	ipstate_t *is, **isp;
 	int delete, removed;
+	long try, maxtick;
+	u_long interval;
 #if defined(_KERNEL) && !defined(MENTAT) && defined(USE_SPL)
 	int s;
 #endif
@@ -2735,6 +2812,11 @@ int which;
 	SPL_NET(s);
 	for (isp = &ips_list; ((is = *isp) != NULL); ) {
 		delete = 0;
+
+		if ((proto != 0) && (is->is_v != proto)) {
+			isp = &is->is_next;
+			continue;
+		}
 
 		switch (which)
 		{

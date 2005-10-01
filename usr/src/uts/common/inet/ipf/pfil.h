@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -12,9 +12,9 @@
 #ifndef _NET_PFIL_H_
 #define _NET_PFIL_H_
 
-#define	PFIL_RELEASE	"1.61"
-#define	PFIL_VERSION	1610000
-#define	PFIL_INTERFACE	1100000
+#define	PFIL_RELEASE	"2.1.4"
+#define	PFIL_VERSION	2010400
+#define	PFIL_INTERFACE	2000000
 
 #ifndef __P
 # ifdef __STDC__
@@ -23,6 +23,17 @@
 #  define	__P(x)	()
 # endif
 #endif
+
+# include <inet/ip.h>
+# if SOLARIS2 < 9
+#  include <netinet/in_systm.h>
+#  undef IPOPT_EOL
+#  undef IPOPT_NOP
+#  undef IPOPT_RR
+#  undef IPOPT_LSRR
+#  undef IPOPT_SSRR
+#  include <netinet/ip.h>
+# endif
 
 struct qif;
 struct ip;
@@ -60,7 +71,9 @@ typedef struct pfil_head {
 
 #define	PFIL_IN		0x00000001
 #define	PFIL_OUT	0x00000002
+#define	PFIL_INOUT	(PFIL_IN|PFIL_OUT)
 #define	PFIL_WAITOK	0x00000004
+#define	PFIL_GROUP	0x00000008
 #define	PFIL_ALL	(PFIL_IN|PFIL_OUT)
 
 /* HPUX Port Major no. for pfil spinlocks */
@@ -72,7 +85,7 @@ int	pfil_add_hook __P((int (*func) __P((struct ip *, int, void *, int,
 					    struct qif *, mblk_t **)), int,
 			   struct pfil_head *));
 int	pfil_remove_hook __P((int (*func) __P((struct ip *, int, void *, int,
-					    struct qif *, mblk_t **)), int,
+					       struct qif *, mblk_t **)), int,
 			   struct pfil_head *));
 int pfil_sendbuf __P((mblk_t *));
 mblk_t *pfil_make_dl_packet __P((mblk_t *, struct ip *, void *,
@@ -92,6 +105,11 @@ extern	krwlock_t	pfil_rw;
 
 extern u_int pfil_ip_csum_hdr __P((u_char *));
 
+/*
+ * NOTE: On Solaris, even though pfilwput(), etc, are prototyped as returning
+ * an int, the return value is never checked and much code ignores it, anyway,
+ * so for performance reasonsm, various functions return void instead of int.
+ */
 extern void pfilwput __P((queue_t *q, mblk_t *mp));
 extern void pfil_ioctl __P((queue_t *q, mblk_t *mp));
 extern int pfil_ioctl_nd __P((queue_t *q, mblk_t *mp));

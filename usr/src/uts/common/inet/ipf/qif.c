@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <sys/dlpi.h>
 #include <sys/stropts.h>
 #include <sys/sockio.h>
+#include <sys/ethernet.h>
 #include <net/if.h>
 #if SOLARIS2 >= 6
 # include <net/if_types.h>
@@ -42,12 +43,21 @@
 # include <net/if_dl.h>
 #endif
 #include <inet/common.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#undef IPOPT_EOL
+#undef IPOPT_NOP
+#undef IPOPT_LSRR
+#undef IPOPT_SSRR
+#undef IPOPT_RR
 #include <inet/ip.h>
 #include <inet/ip_if.h>
 #include <inet/ip_ire.h>
 
 #include "compat.h"
 #include "qif.h"
+#include "pfil.h"
 
 
 #if SOLARIS2 >= 6
@@ -111,6 +121,13 @@ static	size_t	hdrsizes[57][2] = {
 #endif /* SOLARIS2 >= 6 */
 
 
+#if SOLARIS2 <= 6
+# include <sys/kmem_impl.h>
+#endif
+#if SOLARIS2 >= 10
+extern krwlock_t ill_g_lock;
+#endif
+
 #define	SAPNAME(x)	((x)->qf_sap == 0x0800 ? "IPv4" : \
 			 (x)->qf_sap == 0x86dd ? "IPv6" : "??")
 
@@ -135,8 +152,10 @@ int qif_startup()
 	qif_head = NULL;
 	qif_cache = kmem_cache_create("qif_head_cache", sizeof(qif_t), 8,
 				      NULL, NULL, NULL, NULL, NULL, 0);
-	if (qif_cache == NULL)
+	if (qif_cache == NULL) {
+		cmn_err(CE_NOTE, "qif_startup:kmem_cache_create failed");
 		return -1;
+	}
 	return 0;
 }
 
@@ -282,6 +301,7 @@ qif_attach(rq)
 	ill_t *ill;
 #endif
 
+	WRITE_ENTER(&pfil_rw);
 	/*
 	 * Can we map the queue to a specific ill?  If not, go no futher, we
 	 * are only interested in being associated with queues that we can
@@ -293,6 +313,7 @@ qif_attach(rq)
 			cmn_err(CE_NOTE,
 				"PFIL: cannot find interface for rq %p",
 				(void *)rq);
+		RW_EXIT(&pfil_rw);
 		return -1;
 	}
 
@@ -319,8 +340,10 @@ qif_attach(rq)
 	 * all the information has been set with qf_bound finally set to 1
 	 * after that.
 	 */
-	if (qif->qf_bound == 1)
+	if (qif->qf_bound == 1) {
+		RW_EXIT(&pfil_rw);
 		return 0;
+	}
 
 	qif->qf_sap = ill->ill_sap;
 #ifndef IRE_ILL_CN
@@ -333,6 +356,8 @@ qif_attach(rq)
 	qif->qf_name[sizeof(qif->qf_name) - 1] = '\0';
 	qif->qf_ill = ill;
 	qif->qf_bound = 1;
+	qif_ipmp_syncslave(qif, qif->qf_sap);
+	RW_EXIT(&pfil_rw);
 
 	READ_ENTER(&pfh_sync.ph_lock);
 
@@ -383,6 +408,7 @@ qif_new(q, mflags)
 	bzero((char *)qif, sizeof(*qif));
 	mutex_init(&qif->qf_ptl.pt_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&qif->qf_ptl.pt_cv, NULL, CV_DRIVER, NULL);
+	qif->qf_qifsz = sizeof(*qif);
 	qif->qf_q = q;
 	qif->qf_oq = OTHERQ(q);
 	WRITE_ENTER(&pfil_rw);
@@ -423,6 +449,7 @@ queue_t *q;
 	if (qif == NULL)
 		return;
 
+	WRITE_ENTER(&pfil_rw);
 	PT_ENTER_WRITE(&qif->qf_ptl);
 
 	if (qif->qf_bound == 1 && qif_verbose > 0)
@@ -436,6 +463,7 @@ queue_t *q;
 			break;
 		}
 	PT_EXIT_WRITE(&qif->qf_ptl);
+	RW_EXIT(&pfil_rw);
 
 	if (qif->qf_ill) {
 		READ_ENTER(&pfh_sync.ph_lock);
@@ -452,7 +480,11 @@ queue_t *q;
 			freeb(qif->qf_addrset);
 		mutex_destroy(&qif->qf_ptl.pt_lock);
 		cv_destroy(&qif->qf_ptl.pt_cv);
-		kmem_cache_free(qif_cache, qif);
+		if (qif->qf_qifsz == sizeof(*qif)) {
+			kmem_cache_free(qif_cache, qif);
+		} else {
+			KMFREE(qif, qif->qf_qifsz);
+		}
 	}
 	return;
 }
@@ -571,3 +603,196 @@ qif_t *qif_walk(qif_t **qfp)
 	}
 	return *qfp;
 }
+
+/* ------------------------------------------------------------------------ */
+/* Function:    qif_ipmp_update                                             */
+/* Returns:     void                                                        */
+/* Parameters:  ipmpconf(I) - pointer to an ill to match against            */
+/*                                                                          */
+/* Take an IPMP configuration string passed in to update the pfil config.   */
+/* The string may either indicate that an IPMP interface is to be deleted   */
+/* ("ipmp0=" - no NICs after the right of the '=') or created/changed if    */
+/* there is text after the '='.                                             */
+/* ------------------------------------------------------------------------ */
+void qif_ipmp_update(char *ipmpconf)
+{
+	qif_t *qif, *qf;
+	int len, sap;
+	char *s;
+
+	sap = ETHERTYPE_IP;
+	if (!strncmp(ipmpconf, "v4:", 3)) {
+		ipmpconf += 3;
+	} else if (!strncmp(ipmpconf, "v6:", 3)) {
+#if SOLARIS2 >= 8
+		sap = IP6_DL_SAP;
+		ipmpconf += 3;
+#else
+		return;
+#endif
+	}
+
+	s = strchr(ipmpconf, '=');
+	if (s != NULL) {
+		if (*(s + 1) == '\0')
+			*s = '\0';
+		else
+			*s++ = '\0';
+	}
+	if (s == NULL || *s == NULL) {
+		qif_ipmp_delete(ipmpconf);
+		return;
+	}
+
+	len = sizeof(qif_t) + strlen(s) + 1;
+	KMALLOC(qif, qif_t *, len, KM_NOSLEEP);
+	if (qif == NULL) {
+		cmn_err(CE_NOTE, "PFIL: malloc(%d) for qif_t failed", len);
+		return;
+	}
+
+	WRITE_ENTER(&pfil_rw);
+	for (qf = qif_head; qf; qf = qf->qf_next) 
+		if (strcmp(qf->qf_name, ipmpconf) == 0)
+			break;
+
+	if (qf == NULL) {
+		qf = qif;
+		qif->qf_next = qif_head;
+		qif_head = qif;
+
+		qif->qf_sap = sap;
+		qif->qf_flags |= QF_IPMP;
+		qif->qf_qifsz = len;
+		qif->qf_members = (char *)qif + sizeof(*qif);
+		(void) strcpy(qif->qf_name, ipmpconf);
+	} else {
+		KMFREE(qif, len);
+		qif = qf;
+	}
+
+	(void) strcpy(qif->qf_members, s);
+
+	qif_ipmp_syncmaster(qif, sap);
+
+	RW_EXIT(&pfil_rw);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    qif_ipmp_delete                                             */
+/* Returns:     void                                                        */
+/* Parameters:  qifname(I) - pointer to name of qif to delete               */
+/*                                                                          */
+/* Search for a qif structure that is named to match qifname, remove all    */
+/* references to it by others, delink and free it.                          */
+/* ------------------------------------------------------------------------ */
+void qif_ipmp_delete(char *qifname)
+{
+	packet_filter_hook_t *pfh;
+	qif_t *qf, **qfp, *qif;
+
+	WRITE_ENTER(&pfil_rw);
+	for (qfp = &qif_head; (qif = *qfp) != NULL; qfp = &qif->qf_next) {
+		if ((qif->qf_flags & QF_IPMP) == 0)
+			continue;
+		if (strcmp(qif->qf_name, qifname) == 0) {
+			*qfp = qif->qf_next;
+			for (qf = qif_head; qf != NULL; qf = qf->qf_next)
+				if (qf->qf_ipmp == qif)
+					qf->qf_ipmp = NULL;
+			break;
+		}
+	}
+	RW_EXIT(&pfil_rw);
+
+	if (qif != NULL) {
+		pfh = pfil_hook_get(PFIL_OUT, &pfh_sync);
+		for (; pfh; pfh = pfh->pfil_next)
+			if (pfh->pfil_func)
+				(void) (*pfh->pfil_func)(NULL, 0, qif->qf_ill, 1,
+							 qif, NULL);
+
+		KMFREE(qif, qif->qf_qifsz);
+	}
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    qif_ipmp_syncmaster                                         */
+/* Returns:     void                                                        */
+/* Parameters:  updated(I) - pointer to updated qif structure               */
+/* Locks:       pfil_rw                                                     */
+/*                                                                          */
+/* This function rechecks all the qif structures that aren't defined for    */
+/* IPMP to see if they are indeed members of the group pointed to by        */
+/* updated.  Ones that currently claim to be in updated are reset and       */
+/* rechecked in case they have become excluded. This function should be     */
+/* called for any new IPMP qif's created or when an IPMP qif changes.       */
+/* ------------------------------------------------------------------------ */
+void qif_ipmp_syncmaster(qif_t *updated, const int sap)
+{
+	char *s, *t;
+	qif_t *qf;
+
+	for (qf = qif_head; qf != NULL; qf = qf->qf_next)  {
+		if ((qf->qf_flags & QF_IPMP) != 0)
+			continue;
+		if (qf->qf_sap != sap)
+			continue;
+		if (qf->qf_ipmp == updated)
+			qf->qf_ipmp = NULL;
+		for (s = updated->qf_members; s != NULL; ) {
+			t = strchr(s, ',');
+			if (t != NULL)
+				*t = '\0';
+			if (strcmp(qf->qf_name, s) == 0)
+				qf->qf_ipmp = updated;
+			if (t != NULL)
+				*t++ = ',';
+			s = t;
+		}
+	}
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    qif_ipmp_syncslave                                          */
+/* Returns:     void                                                        */
+/* Parameters:  target(I) - pointer to updated qif structure                */
+/* Locks:       pfil_rw                                                     */
+/*                                                                          */
+/* Check through the list of qif's to see if there is an IPMP with a member */
+/* list that includes the one named by target.                              */
+/* ------------------------------------------------------------------------ */
+void qif_ipmp_syncslave(qif_t *target, const int sap)
+{
+	char *s, *t;
+	qif_t *qf;
+
+	target->qf_ipmp = NULL;
+
+	/*
+	 * Recheck the entire list of qif's for any references to the one
+	 * we have just created/updated (updated).
+	 */
+	for (qf = qif_head; qf != NULL; qf = qf->qf_next)  {
+		if ((qf->qf_flags & QF_IPMP) == 0)
+			continue;
+		if (qf->qf_sap != sap)
+			continue;
+		for (s = qf->qf_members; s != NULL; ) {
+			t = strchr(s, ',');
+			if (t != NULL)
+				*t = '\0';
+			if (strcmp(target->qf_name, s) == 0)
+				target->qf_ipmp = qf;
+			if (t != NULL)
+				*t++ = ',';
+			s = t;
+			if (target->qf_ipmp == qf)
+				break;
+		}
+	}
+}
+

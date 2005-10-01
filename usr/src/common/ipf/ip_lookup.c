@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,12 +214,11 @@ caddr_t data;
 		 * exists remove an entry from a pool - if it exists
 		 * - in both cases, the pool *must* exist!
 		 */
-		m = ip_pool_findeq(p, &node.ipn_addr.adf_addr.in4,
-				   &node.ipn_mask.adf_addr.in4);
+		m = ip_pool_findeq(p, &node.ipn_addr, &node.ipn_mask);
 		if (m)
 			return EEXIST;
-		err = ip_pool_insert(p, &node.ipn_addr.adf_addr,
-				     &node.ipn_mask.adf_addr, node.ipn_info);
+		err = ip_pool_insert(p, &node.ipn_addr,
+				     &node.ipn_mask, node.ipn_info);
 # endif
 		break;
 
@@ -282,8 +281,7 @@ caddr_t data;
 		 * exists remove an entry from a pool - if it exists
 		 * - in both cases, the pool *must* exist!
 		 */
-		m = ip_pool_findeq(p, &node.ipn_addr.adf_addr.in4,
-				   &node.ipn_mask.adf_addr.in4);
+		m = ip_pool_findeq(p, &node.ipn_addr, &node.ipn_mask);
 		if (m == NULL)
 			return ENOENT;
 		err = ip_pool_remove(p, m);
@@ -347,8 +345,6 @@ caddr_t data;
 			err = EEXIST;
 		else
 			err = fr_newhtable(&op);
-		if (err == 0)
-			ippoolstate.ipls_tables++;
 		break;
 
 	default :
@@ -417,30 +413,27 @@ caddr_t data;
 static int iplookup_stats(data)
 caddr_t data;
 {
-# if defined(__osf__) && defined(_KERNEL)
-	return ENOTSUP;
-# else
 	iplookupop_t op;
-	int err, i, unit;
+	int err;
 
-	err = COPYIN(data, &op, sizeof(op));
-	if (err != 0)
-		return EFAULT;
-	if (op.iplo_size != sizeof(ipoolstat))
-		return EINVAL;
+	err = 0;
+	(void)BCOPYIN(data, &op, sizeof(op));
 
-	unit = op.iplo_unit;
-	if (unit == IPL_LOGALL) {
-		for (i = 0; i < IPL_LOGSIZE; i++)
-			ipoolstat.ipls_list[i] = ip_pool_list[i];
-	} else if (unit >= 0 && unit < IPL_LOGSIZE) {
-		ipoolstat.ipls_list[unit] = ip_pool_list[unit];
-	} else
-		return EINVAL;
+	switch (op.iplo_type)
+	{
+	case IPLT_POOL :
+		err = ip_pool_statistics(&op);
+		break;
 
-	err = COPYOUT(&ipoolstat, op.iplo_struct, sizeof(ipoolstat));
+	case IPLT_HASH :
+		err = fr_gethtablestat(&op);
+		break;
+
+	default :
+		err = EINVAL;
+		break;
+	}
 	return err;
-# endif
 }
 
 
@@ -457,7 +450,7 @@ caddr_t data;
 {
 	iphtable_t *iph, *iphn;
 	int err, unit, type, i;
-	iplookupflush_t flush;
+	iplookupflush_t flush, opf;
 	ip_pool_t *p, *q;
 	iplookupop_t op;
 	size_t num;
@@ -514,16 +507,24 @@ caddr_t data;
 
 	if (type == IPLT_HASH  || type == IPLT_ALL) {
 		err = 0;
-		if (flush.iplf_arg != IPLT_ALL)
-			num += fr_flushhtable(&flush);
+		if (flush.iplf_arg != IPLT_ALL) {
+			opf.iplf_unit = unit;
+			(void)strncpy(opf.iplf_name, flush.iplf_name,
+				      sizeof(opf.iplf_name));
+			num += fr_flushhtable(&opf);
+		}
 		else {
 			for (i = 0; i <= IPL_LOGMAX; i++) {
 				if (unit != IPLT_ALL && i != unit)
 					continue;
 				for (iphn = ipf_htables[i];
 				     (iph = iphn) != NULL; ) {
+					opf.iplf_unit = i;
+					(void)strncpy(opf.iplf_name,
+						      iph->iph_name,
+						      sizeof(opf.iplf_name));
 					iphn = iph->iph_next;
-					num += fr_flushhtable(&flush);
+					num += fr_flushhtable(&opf);
 				}
 			}
 		}

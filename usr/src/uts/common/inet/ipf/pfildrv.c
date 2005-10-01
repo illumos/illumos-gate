@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <sys/cmn_err.h>
 #include <sys/dlpi.h>
+#include <sys/kmem.h>
 #include <sys/strsun.h>
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -46,10 +47,9 @@
 #include <inet/ip.h>
 #include <inet/ip_if.h>
 
-#include <inet/ipf/compat.h>
-#include <inet/ipf/pfil.h>
-#include <inet/ipf/qif.h>
-#include <pfild.h>
+#include "compat.h"
+#include "qif.h"
+#include "pfil.h"
 
 
 #undef	USE_SERVICE_ROUTINE
@@ -104,11 +104,9 @@ static int pfil_attach(dev_info_t *,  ddi_attach_cmd_t);
 static int pfil_identify(dev_info_t *);
 #endif
 static int pfil_detach(dev_info_t *,  ddi_detach_cmd_t);
-static void pfil_update_ifaddrs(mblk_t *);
-static void pfil_update_ifaddrset(mblk_t *);
 
 DDI_DEFINE_STREAM_OPS(pfil_devops, nulldev, nulldev, pfil_attach, pfil_detach,
-    nulldev, pfil_info, D_MP, &pfil_dev_strtab);
+		      nulldev, pfil_info, D_MP, &pfil_dev_strtab);
 
 static struct modldrv modldrv = {
 	&mod_driverops, "pfil Streams driver "/**/PFIL_RELEASE, &pfil_devops
@@ -326,11 +324,12 @@ static int pfildevclose(queue_t *q, int flag, cred_t *crp)
 	return 0;
 }
 
+
 /************************************************************************
  * STREAMS module functions
  */
 /* ------------------------------------------------------------------------ */
-/* Function:    pfil_strmodopen                                             */
+/* Function:    pfilmodopen                                                 */
 /* Returns:     int      - 0 == success, else error                         */
 /* Parameters:  q(I)     - pointer to read-side STREAMS queue               */
 /*              devp(I)  - pointer to a device number                       */
@@ -342,7 +341,7 @@ static int pfildevclose(queue_t *q, int flag, cred_t *crp)
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
 static int pfilmodopen(queue_t *q, dev_t *devp, int oflag, int sflag,
-			cred_t *crp)
+		       cred_t *crp)
 {
 
 	/* LINTED: E_CONSTANT_CONDITION */
@@ -363,7 +362,7 @@ static int pfilmodopen(queue_t *q, dev_t *devp, int oflag, int sflag,
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    pfilmodclose                                             */
+/* Function:    pfilmodclose                                                */
 /* Returns:     int     - always returns 0.                                 */
 /* Parameters:  q(I)    - pointer to read-side STREAMS queue                */
 /*              flag(I) - file status flag                                  */
@@ -382,12 +381,10 @@ static int pfilmodclose(queue_t *q, int flag, cred_t *crp)
 
 	qprocsoff(q);
 
-	WRITE_ENTER(&pfil_rw);
 #ifdef IRE_ILL_CN
 	pfil_remif(q);
 #endif
 	qif_delete(q->q_ptr, q);
-	RW_EXIT(&pfil_rw);
 	return 0;
 }
 
@@ -428,7 +425,6 @@ int pfil_precheck(queue_t *q, mblk_t **mp, int flags, qif_t *qif)
 #ifndef	sparc
 	u_short __ipoff, __iplen;
 #endif
-
 	qf = *qif;
 	qp = qif;
 	qif = &qf;
@@ -447,6 +443,9 @@ int pfil_precheck(queue_t *q, mblk_t **mp, int flags, qif_t *qif)
 tryagain:
 	ip = NULL;
 	m = NULL;
+#if SOLARIS2 >= 8
+	ip6 = NULL;
+#endif
 
 	/*
 	 * If the message protocol block indicates that there isn't a data
@@ -529,6 +528,7 @@ tryagain:
 	if ((pfil_delayed_copy == 0) && (m->b_datap->db_ref > 1)) {
 		mblk_t *new;
 
+forced_copy:
 		new = copymsg(m);
 		if (new == NULL) {
 			atomic_add_long(&qp->qf_copyfail, 1);
@@ -598,7 +598,6 @@ tryagain:
 		plen = ntohs(tlen);
 		if (plen == 0)
 			return EMSGSIZE;	/* Jumbo gram */
-		plen += sizeof(*ip6);
 
 		sap = IP6_DL_SAP;
 		ph = &pfh_inet6;
@@ -608,7 +607,7 @@ tryagain:
 		hlen = 0;
 		sap = -1;
 	}
-
+	
 	len = m->b_wptr - m->b_rptr - off;
 #ifdef PFILDEBUG
 	/*LINTED: E_CONSTANT_CONDITION*/
@@ -627,6 +626,8 @@ tryagain:
 		mblk_t *m2, *m1;
 		int off2;
 
+		if (m->b_datap->db_ref > 1)
+			goto forced_copy;
 		/*
 		 * If we have already tried to realign the IP header and we
 		 * are back here, then the attempt has failed, so stop now
@@ -704,7 +705,7 @@ tryagain:
 		off = 0;
 		goto tryagain;
 	}
-
+	
 	if (((sap == 0) && (ip->ip_v != IPVERSION))
 #if SOLARIS2 >= 8
 	    || ((sap == IP6_DL_SAP) && (((ip6->ip6_vfc) & 0xf0) != 0x60))
@@ -727,26 +728,18 @@ tryagain:
 	 * to both be host byte ordered.
 	 */
 #ifndef sparc
-# if SOLARIS2 >= 8
-	if (sap == IP6_DL_SAP) {
-		ip6->ip6_plen = plen;
-	} else {
-# endif
+	if (sap == 0) {
 		__ipoff = (u_short)ip->ip_off;
 		ip->ip_len = plen;
 		ip->ip_off = ntohs(__ipoff);
-# if SOLARIS2 >= 8
 	}
-# endif
 #endif
-
 	if (sap == 0)
 		iphlen = ip->ip_hl << 2;
 #if SOLARIS2 >= 8
 	else if (sap == IP6_DL_SAP)
 		iphlen = sizeof(ip6_t);
 #endif
-
 	if ((
 #if SOLARIS2 >= 8
 	     (sap == IP6_DL_SAP) && (mlen < iphlen + plen)) ||
@@ -757,18 +750,12 @@ tryagain:
 		 * Bad IP packet or not enough data/data length mismatches
 		 */
 #ifndef sparc
-# if SOLARIS2 >= 8
-		if (sap == IP6_DL_SAP) {
-			ip6->ip6_plen = htons(plen);
-		} else {
-# endif
+		if (sap == 0) {
 			__ipoff = (u_short)ip->ip_off;
 
 			ip->ip_len = htons(plen);
 			ip->ip_off = htons(__ipoff);
-# if SOLARIS2 >= 8
 		}
-# endif
 #endif
 		atomic_add_long(&qp->qf_bad, 1);
 		return EINVAL;
@@ -779,6 +766,8 @@ tryagain:
 	 * enough (above), then copy some more.
 	 */
 	if ((iphlen > len)) {
+		if (m->b_datap->db_ref > 1)
+			goto forced_copy;
 		if (!pullupmsg(m, (int)iphlen + off)) {
 			atomic_add_long(&qp->qf_nodata, 1);
 			return -5;
@@ -786,8 +775,13 @@ tryagain:
 		ip = (struct ip *)ALIGN32(m->b_rptr + off);
 	}
 
-	if ((len > plen) && (off == 0))
-		m->b_wptr -= len - plen;
+	if (sap == IP6_DL_SAP) {
+		if ((len > iphlen + plen) && (off == 0))
+			m->b_wptr -= len - (iphlen + plen);
+	} else {
+		if ((len > plen) && (off == 0))
+			m->b_wptr -= len - plen;
+	}
 
 	qif->qf_m = m;
 	qif->qf_q = q;
@@ -795,9 +789,12 @@ tryagain:
 	qif->qf_oq = OTHERQ(q);
 	qif->qf_off = off;
 
+	if (qp->qf_ipmp != NULL)
+		qp = qp->qf_ipmp;
+
 	READ_ENTER(&ph->ph_lock);
 
-	pfh = pfil_hook_get(flags, ph);
+	pfh = pfil_hook_get(flags & PFIL_INOUT, ph);
 	err = 0;
 
 	/*LINTED: E_CONSTANT_CONDITION*/
@@ -822,22 +819,15 @@ tryagain:
 	 */
 #ifndef sparc
 	if (*mp != NULL) {
-# if SOLARIS2 >= 8
-		if (sap == IP6_DL_SAP) {
-			ip6 = (ip6_t *)ip;
-			__iplen = (u_short)ip6->ip6_plen;
-			ip6->ip6_plen = htons(__iplen);
-		} else {
-# endif
+		if (sap == 0) {
 			__iplen = (u_short)ip->ip_len;
 			__ipoff = (u_short)ip->ip_off;
 			ip->ip_len = htons(__iplen);
 			ip->ip_off = htons(__ipoff);
-# if SOLARIS2 >= 8
 		}
-# endif
 	}
-#endif 
+#endif
+
 	return err;
 }
 
@@ -933,6 +923,7 @@ int _info(struct modinfo *modinfop)
 	return result;
 }
 
+
 /************************************************************************
  * Sun Solaris ON build specific routines follow here.
  */
@@ -958,6 +949,7 @@ _dump_s_ill_all(void)
 		cmn_err(CE_NOTE, "s_ill_g_head done\n");
 	}
 }
+
 
 /*
  * Allocate an s_ill_t for this interface (name) if needed.
@@ -990,6 +982,7 @@ void pfil_addif(queue_t *rq, const char *name, int sap)
 		}
 		ill->ill_sap = sap;
 		(void) strncpy(ill->ill_name, name, LIFNAMSIZ);
+		ill->ill_name[sizeof(ill->ill_name) - 1] = '\0';
 		ill->ill_next = s_ill_g_head;
 		s_ill_g_head = ill;
 	}
@@ -1000,6 +993,7 @@ void pfil_addif(queue_t *rq, const char *name, int sap)
 	mutex_exit(&s_ill_g_head_lock);
 }
 
+
 /*
  * Deactivate any s_ill_t for this interface (queue pair).
  * Called when a module is being closed (popped).
@@ -1008,6 +1002,7 @@ static void pfil_remif(queue_t *rq)
 {
 	s_ill_t *ill;
 
+	WRITE_ENTER(&pfil_rw);
 	mutex_enter(&s_ill_g_head_lock);
 
 	for (ill = s_ill_g_head; ill; ill = ill->ill_next)
@@ -1015,9 +1010,10 @@ static void pfil_remif(queue_t *rq)
 			ill->ill_rq = 0;
 	_dump_s_ill_all();
 	mutex_exit(&s_ill_g_head_lock);
+	RW_EXIT(&pfil_rw);
 }
-
 #endif /* IRE_ILL_CN */
+
 
 #ifdef PFILDEBUG
 /* ------------------------------------------------------------------------ */
@@ -1092,3 +1088,14 @@ void pfil_donotip(int out, qif_t *qif, queue_t *q, mblk_t *m, mblk_t *mt, struct
 	PRINT(50,(CE_CONT, "%s", outb));
 }
 #endif
+
+
+#if SOLARIS2 == 8
+int miocpullup(mblk_t *m, size_t len)
+{
+	if (m->b_cont == NULL)
+		return 0;
+	return pullupmsg(m->b_cont, len);
+}
+#endif
+

@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,11 @@ struct uio;
 #ifdef __hpux
 # include <sys/dlpi_ext.h>
 #endif
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
 #include <net/if.h>
+#include <netinet/if_ether.h>
 #ifdef sun
 # include <inet/common.h>
 # if SOLARIS2 >= 8
@@ -37,6 +41,11 @@ struct uio;
 # if SOLARIS2 >= 10
 #  include <sys/policy.h>
 # endif
+# undef IPOPT_EOL
+# undef IPOPT_NOP
+# undef IPOPT_LSRR
+# undef IPOPT_SSRR
+# undef IPOPT_RR
 # include <inet/ip.h>
 # include <inet/ip_if.h>
 #endif
@@ -56,7 +65,6 @@ struct uio;
 #if SOLARIS2 >= 10
 extern queue_t *pfildq;
 #endif
-
 
 #undef	IEEESAP_SNAP
 #define	IEEESAP_SNAP		0xAA	/* SNAP SAP */
@@ -199,14 +207,12 @@ static void pfil_printioctl(mblk_t *mp)
 		 iocp->ioc_rval));
 	pfil_printmchain(mp);
 }
-#endif
-
+#endif	/* PFILDEBUG */
 
 /* ------------------------------------------------------------------------ */
 /* Function:    pfilbind                                                    */
 /* Returns:     int  - 0 == success, else error                             */
 /* Parameters:  q(I) - pointer to queue                                     */
-/* Write Lock:  pfil_rw                                                     */
 /*                                                                          */
 /* Check to see if a queue (or the otherside of it) is missing a qif_t      */
 /* structure.  If neither have one then allocate a new one, else copy the   */
@@ -237,6 +243,7 @@ int pfilbind(queue_t *q)
 void pfilwput_ioctl(queue_t *q, mblk_t *mp)
 {
 	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
+	qif_t *qif;
 
 	/* LINTED: E_CONSTANT_CONDITION */
 	PRINT(3,(CE_CONT,
@@ -255,8 +262,8 @@ void pfilwput_ioctl(queue_t *q, mblk_t *mp)
 
 	switch (iocp->ioc_cmd)
 	{
-	case DL_IOC_HDR_INFO : {
-		qif_t *qif = q->q_ptr;
+	case DL_IOC_HDR_INFO :
+		qif = q->q_ptr;
 
 		/*
 		 * Fastpath information ioctl.  Update the expected size for
@@ -283,26 +290,31 @@ void pfilwput_ioctl(queue_t *q, mblk_t *mp)
 			RW_EXIT(&pfh_sync.ph_lock);
 		}
 		break;
-	}
-#if SOLARIS2 >= 10
-	case SIOCSLIFNAME:
-		if (miocpullup(mp, sizeof(struct lifreq)) == 0) {
-			struct lifreq *lifr = 
-			    (struct lifreq *)mp->b_cont->b_rptr;
-			int sap = (lifr->lifr_flags & ILLF_IPV6) ?
-			    IP6_DL_SAP :IP_DL_SAP;
 
+#if SOLARIS2 >= 10
+#ifdef SIOCSLIFNAME
+	case SIOCSLIFNAME :
+		if (miocpullup(mp, sizeof(struct lifreq)) == 0) {
+			struct lifreq *lifr;
+			int sap;
+
+			lifr = (struct lifreq *)mp->b_cont->b_rptr;
+# ifdef ILLF_IPV6
+			sap = (lifr->lifr_flags & ILLF_IPV6) ? IP6_DL_SAP :
+							       IP_DL_SAP;
+# else
+			sap = IP_DL_SAP;
+# endif
 			pfil_addif(RD(q), lifr->lifr_name, sap);
 			miocack(q, mp, 0, 0);
 			return;
 		}
 		break;
+#endif
 #else /* pre-S10 */
 #ifdef	SIOCGTUNPARAM
 	case SIOCGTUNPARAM :
-		WRITE_ENTER(&pfil_rw);
 		qif_attach(q);
-		RW_EXIT(&pfil_rw);
 		break;
 #endif
 #endif /* pre-S10 */
@@ -362,6 +374,7 @@ pfil_update_ifaddrs(mblk_t *mp)
 	mutex_exit(&s_ill_g_head_lock);
 }
 
+
 /*
  * Update valid address set data from pfild message.
  */
@@ -387,7 +400,6 @@ static void pfil_update_ifaddrset(mblk_t *mp)
 
 	RW_EXIT(&pfil_rw);
 }
-
 #endif /* SOLARIS2 >= 10 */
 
 
@@ -468,11 +480,13 @@ void pfilwput(queue_t *q, mblk_t *mp)
 			break;
 		}
 		return;
+
 	default:
 		break;
 	}
 	freemsg(mp);
 }
+
 
 /************************************************************************
  * STREAMS module functions
@@ -518,7 +532,9 @@ void pfilmodwput(queue_t *q, mblk_t *mp)
 		atomic_add_long(&qif->qf_nw, 1);
 
 		if (qif->qf_ill != NULL) {
-			int i = pfil_precheck(q, &mp, PFIL_OUT, qif);
+			int i;
+
+			i = pfil_precheck(q, &mp, PFIL_OUT, qif);
 			/* LINTED: E_CONSTANT_CONDITION */
 			PRINT(9, (CE_CONT, "!%s: pfil_precheck=%d mp %p\n",
 				  "pfilmodwput", i, (void *)mp));
@@ -544,7 +560,7 @@ void pfilmodwput(queue_t *q, mblk_t *mp)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    pfilmodrput                                              */
+/* Function:    pfilmodrput                                                 */
 /* Returns:     void                                                        */
 /* Parameters:  q(I)  - pointer to queue                                    */
 /*              mp(I) - pointer to STREAMS message                          */
@@ -556,6 +572,7 @@ void pfilmodrput(queue_t *q, mblk_t *mp)
 {
 	union DL_primitives *dl;
 	dl_bind_ack_t *b;
+	int i;
 	qif_t *qif;
 
 	qif = q->q_ptr;
@@ -565,7 +582,6 @@ void pfilmodrput(queue_t *q, mblk_t *mp)
 		 (void *)q, (void *)mp, mp->b_datap->db_type, QTONM(q),
 		 QTONM(OTHERQ(q)), (void *)qif,
 		 (void *)qif->qf_ill));
-
 	switch (MTYPE(mp)) {
 #ifdef	DL_IOC_HDR_INFO
 	case M_IOCACK :
@@ -582,9 +598,10 @@ void pfilmodrput(queue_t *q, mblk_t *mp)
 #endif	/* DL_IOC_HDR_INFO */
 #ifdef	PFILDEBUG
 	case M_IOCNAK :
+	case M_IOCTL :
 		pfil_printioctl(mp);
 #endif
-	break;
+		break;
 	case M_PROTO :
 	case M_PCPROTO :
 
@@ -597,7 +614,8 @@ void pfilmodrput(queue_t *q, mblk_t *mp)
 		switch (dl->dl_primitive)
 		{
 		case DL_UNITDATA_IND :
-			if (dl->unitdata_ind.dl_group_address)
+			if ((MLEN(mp) >= sizeof(dl_unitdata_ind_t)) &&
+			    (dl->unitdata_ind.dl_group_address))
 				qif->qf_flags |= QF_GROUP;
 			break;
 
@@ -637,8 +655,7 @@ void pfilmodrput(queue_t *q, mblk_t *mp)
 				qif->qf_waitack++;
 				break;
 			}
-
-			if (!b->dl_sap || b->dl_sap == IP_DL_SAP)
+			if (!b->dl_sap || b->dl_sap == IP_DL_SAP || b->dl_sap == IP6_DL_SAP)
 				(void) pfilbind(q);
 			break;
 
@@ -655,7 +672,7 @@ void pfilmodrput(queue_t *q, mblk_t *mp)
 		atomic_add_long(&qif->qf_nr, 1);
 
 		if (qif->qf_ill != NULL) {
-			int i = pfil_precheck(q, &mp, PFIL_IN, qif);
+			i = pfil_precheck(q, &mp, PFIL_IN, qif); 
 
 			/* LINTED: E_CONSTANT_CONDITION */
 			PRINT(9, (CE_CONT,
@@ -667,14 +684,14 @@ void pfilmodrput(queue_t *q, mblk_t *mp)
 				freemsg(mp);
 				return;
 			}
-		} else {
-			break;
 		}
+		break;
 	default :
 		break;
 	}
 	putnext(q, mp);
 }
+
 
 /* ------------------------------------------------------------------------ */
 /* Function:    pfil_drv_priv                                               */
@@ -688,7 +705,11 @@ static int pfil_drv_priv(cred_t *cr)
 #if SOLARIS2 >= 10
 	return (secpolicy_net_config(cr, B_TRUE));
 #else
+# ifdef sun
 	return (suser(cr) ? 0 : EPERM);
+# else
+	return (suser() ? 0 : EPERM);
+# endif
 #endif
 }
 
@@ -709,3 +730,4 @@ void pfil_startup()
 	pfil_init(&pfh_inet6);
 	pfil_init(&pfh_sync);
 }
+

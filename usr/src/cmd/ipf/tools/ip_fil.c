@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -379,11 +379,24 @@ int mode;
 		else {
 			error = COPYIN(data, &tmp, sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, tmp);
+				tmp = frflush(unit, 4, tmp);
 				error = COPYOUT(&tmp, data, sizeof(tmp));
 			}
 		}
 		break;
+#ifdef	USE_INET6
+	case	SIOCIPFL6 :
+		if (!(mode & FWRITE))
+			error = EPERM;
+		else {
+			error = COPYIN(data, &tmp, sizeof(tmp));
+			if (!error) {
+				tmp = frflush(unit, 6, tmp);
+				error = COPYOUT(&tmp, data, sizeof(tmp));
+			}
+		}
+		break;
+#endif
 	case SIOCSTLCK :
 		error = COPYIN(data, &tmp, sizeof(tmp));
 		if (error == 0) {

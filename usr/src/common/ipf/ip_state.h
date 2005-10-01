@@ -5,7 +5,13 @@
  *
  * @(#)ip_state.h	1.3 1/12/96 (C) 1995 Darren Reed
  * $Id: ip_state.h,v 2.63 2003/06/28 17:02:00 darrenr Exp $
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #ifndef	__IP_STATE_H__
 #define	__IP_STATE_H__
 
@@ -56,8 +62,10 @@ typedef struct ipstate {
 	u_char	is_v;
 	u_32_t	is_hv;
 	u_32_t	is_tag;
-	u_32_t	is_opt;			/* packet options set */
-	u_32_t	is_optmsk;		/*    "      "    mask */
+	u_32_t	is_opt[2];		/* packet options set */
+					/* in both directions */
+	u_32_t	is_optmsk[2];		/*    "      "    mask */
+					/* in both directions */
 	u_short	is_sec;			/* security options set */
 	u_short	is_secmsk;		/*    "        "    mask */
 	u_short	is_auth;		/* authentication options set */

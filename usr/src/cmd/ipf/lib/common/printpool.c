@@ -2,7 +2,12 @@
  * Copyright (C) 2002 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
 
@@ -14,7 +19,7 @@ ip_pool_t *pp;
 copyfunc_t copyfunc;
 int opts;
 {
-	ip_pool_node_t *ipnp, *ipnpn, ipn;
+	ip_pool_node_t *ipnp, *ipnpn;
 	ip_pool_t ipp;
 
 	if ((*copyfunc)(pp, &ipp, sizeof(ipp)))
@@ -77,7 +82,7 @@ int opts;
 	ipp.ipo_list = NULL;
 	while (ipnpn != NULL) {
 		ipnp = (ip_pool_node_t *)malloc(sizeof(*ipnp));
-		(*copyfunc)(ipnpn, ipnp, sizeof(ipn));
+		(*copyfunc)(ipnpn, ipnp, sizeof(*ipnp));
 		ipnpn = ipnp->ipn_next;
 		ipnp->ipn_next = ipp.ipo_list;
 		ipp.ipo_list = ipnp;
@@ -86,12 +91,8 @@ int opts;
 	for (ipnp = ipp.ipo_list; ipnp != NULL; ) {
 		ipnp = printpoolnode(ipnp, opts);
 
-		if ((opts & OPT_DEBUG) == 0) {
-			if (ipnp == NULL)
-				putchar(';');
-			else
-				putchar(',');
-		}
+		if ((opts & OPT_DEBUG) == 0)
+			putchar(';');
 	}
 
 	if ((opts & OPT_DEBUG) == 0)

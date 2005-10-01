@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,21 +15,30 @@
 #include <sys/errno.h>
 #include <sys/socket.h>
 #include <net/if.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
 
 #include "compat.h"
-#include "pfil.h"
 #include "qif.h"
+#include "pfil.h"
 
 caddr_t	pfil_nd;
 
 #if !defined(sun) || SOLARIS2 <= 8
-static int qif_report(queue_t *q, mblk_t *mp, caddr_t arg);
-extern int pfil_report(queue_t *q, mblk_t *mp, caddr_t arg);
-static int sill_report(queue_t *q, mblk_t *mp, caddr_t arg);
+static int qif_report(queue_t *, mblk_t *, caddr_t);
+static int sill_report(queue_t *, mblk_t *, caddr_t);
+static int qif_ipmp_report(queue_t *, mblk_t *, caddr_t);
+static int qif_ipmp_set(queue_t *, mblk_t *, char *, caddr_t);
+
+extern int pfil_report(queue_t *, mblk_t *, caddr_t);
 #else
-static int qif_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *cred);
-extern int pfil_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *cred);
-static int sill_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *cred);
+static int qif_report(queue_t *, mblk_t *, caddr_t, cred_t *);
+static int sill_report(queue_t *, mblk_t *, caddr_t, cred_t *);
+static int qif_ipmp_report(queue_t *, mblk_t *, caddr_t, cred_t *);
+static int qif_ipmp_set(queue_t *, mblk_t *, char *, caddr_t, cred_t *);
+
+extern int pfil_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 #endif
 
 
@@ -94,7 +103,7 @@ int pfil_nd_set(queue_t *q, mblk_t *mp, char *str, caddr_t ptr, cred_t *cred)
 
 	if (ddi_strtol(str, &end, 10, &i) != 0)
 		return (EINVAL);
-
+	
 	if (ptr == (caddr_t)&pfildebug) {
 #ifdef	PFILDEBUG
 		if ((end == str) || (i < 0) || (i > 100))
@@ -113,7 +122,7 @@ int pfil_nd_set(queue_t *q, mblk_t *mp, char *str, caddr_t ptr, cred_t *cred)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    pfil_ioctl_nd                                               */
-/* Returns:     B_TRUE == success, B_FALSE == getset error                  */
+/* Returns:     int	- B_TRUE == success, B_FALSE == getset error        */
 /* Parameters:  q(I)    - pointer to queue                                  */
 /*              mp(I)   - pointer to mblk                                   */
 /*                                                                          */
@@ -143,12 +152,35 @@ int pfil_nd_init()
 		return -1;
 	}
 
+	if (!nd_load(&pfil_nd, "pfil_delayed_copy", pfil_nd_get, pfil_nd_set,
+		     (caddr_t)&pfil_delayed_copy)) {
+		nd_free(&pfil_nd);
+		return -1;
+	}
+
+	if (!nd_load(&pfil_nd, "pfil_interface", pfil_nd_get, NULL,
+		     (caddr_t)&pfilinterface)) {
+		nd_free(&pfil_nd);
+		return -1;
+	}
+
 	if (!nd_load(&pfil_nd, "qif_status", qif_report, NULL, NULL)) {
 		nd_free(&pfil_nd);
 		return -1;
 	}
 
 	if (!nd_load(&pfil_nd, "sill_status", sill_report, NULL, NULL)) {
+		nd_free(&pfil_nd);
+		return -1;
+	}
+
+	if (!nd_load(&pfil_nd, "qif_ipmp_status", qif_ipmp_report, NULL,
+		     NULL)) {
+		nd_free(&pfil_nd);
+		return -1;
+	}
+
+	if (!nd_load(&pfil_nd, "qif_ipmp_set", NULL, qif_ipmp_set, NULL)) {
 		nd_free(&pfil_nd);
 		return -1;
 	}
@@ -217,14 +249,15 @@ static int qif_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *cred)
 	qif_t *qif;
 
 	(void) mi_mpprintf(mp,
-		   "ifname ill q OTHERQ num sap hl nr nw bad copy copyfail drop notip nodata notdata");
+		   "ifname ill q OTHERQ ipmp num sap hl nr nw bad copy copyfail drop notip nodata notdata");
 	READ_ENTER(&pfil_rw);
 	for (qif = qif_head ; qif; qif = qif->qf_next)
 		(void) mi_mpprintf(mp,
-			"%s %p %p %p %d %x %d %lu %lu %lu %lu %lu %lu %lu %lu %lu",
+			"%s %p %p %p %p %d %x %d %lu %lu %lu %lu %lu %lu %lu %lu %lu",
 				   qif->qf_name, (void *)qif->qf_ill,
 				   (void *)qif->qf_q, (void *)qif->qf_oq,
-				   qif->qf_num, qif->qf_sap, (int)qif->qf_hl,
+				   (void *)qif->qf_ipmp, qif->qf_num,
+				   qif->qf_sap, (int)qif->qf_hl,
 				   qif->qf_nr, qif->qf_nw, qif->qf_bad,
 				   qif->qf_copy, qif->qf_copyfail,
 				   qif->qf_drop, qif->qf_notip,
@@ -269,3 +302,79 @@ static int sill_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *cred)
 	RW_EXIT(&pfil_rw);
 	return 0;
 }
+
+/* ------------------------------------------------------------------------ */
+/* Function:    qif_ipmp_report                                             */
+/* Returns:     int                                                         */
+/* Parameters:  q(I)    - pointer to queue                                  */
+/*              mp(I)   - pointer to mblk                                   */
+/*              ptr(I)  - pointer to value to retrieve                      */
+/*              cred(I) - pointer to credential information                 */
+/*                                                                          */
+/* Fills the mblk with any qif data that happens to be currently available. */
+/* ------------------------------------------------------------------------ */
+#if !defined(sun) || SOLARIS2 <= 8
+/*ARGSUSED*/
+static int qif_ipmp_report(queue_t *q, mblk_t *mp, caddr_t arg)
+#else
+/*ARGSUSED*/
+static int qif_ipmp_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *cred)
+#endif
+{
+	qif_t *qif;
+
+	(void) mi_mpprintf(mp, "ifname members");
+	READ_ENTER(&pfil_rw);
+	for (qif = qif_head ; qif; qif = qif->qf_next) {
+		if ((qif->qf_flags & QF_IPMP) == 0)
+			continue;
+		(void) mi_mpprintf(mp, "%s %s", qif->qf_name, qif->qf_members);
+	}
+	RW_EXIT(&pfil_rw);
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    qif_ipmp_set                                                */
+/* Returns:     int     - 0 == success, > 0 error occurred                  */
+/* Parameters:  q(I)    - pointer to queue                                  */
+/*              mp(I)   - pointer to mblk                                   */
+/*              str(I)  - pointer to new value as a string                  */
+/*              ptr(I)  - pointer to value to be stored                     */
+/*              cred(I) - pointer to credential information                 */
+/*                                                                          */
+/* This function is a wrapper for qif_ipmp_update(), providing a run-time   */
+/* interactive way to configure the IPMP configuration for pfil without     */
+/* needing to load/unload the module to reread the config file (or is there */
+/* a way to do that once loaded, anyway?)                                   */
+/* ------------------------------------------------------------------------ */
+#if !defined(sun) || SOLARIS2 <= 8
+/*ARGSUSED*/
+static int qif_ipmp_set(queue_t *q, mblk_t *mp, char *str, caddr_t ptr)
+#else
+/*ARGSUSED*/
+static int qif_ipmp_set(queue_t *q, mblk_t *mp, char *str, caddr_t ptr,
+			cred_t *cred)
+#endif
+{
+	char *s, *t;
+
+	/* LINTED: E_CONSTANT_CONDITION */
+	PRINT(2, (CE_CONT, "qif_ipmp_set(0x%p,0x%p,0x%s[%p],0x%p)\n",
+		  (void *)q, (void *)mp, str, (void *)str, (void *)ptr));
+
+	t = NULL;
+	s = str;
+	do {
+		if (t != NULL)
+			s = t + 1;
+		t = strchr(s, ';');
+		if (t != NULL)
+			*t = '\0';
+		qif_ipmp_update(s);
+	} while (t != NULL);
+
+	return 0;
+}
+

@@ -1,4 +1,15 @@
 %{
+/*
+ * Copyright (C) 2003 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/param.h>
@@ -48,6 +59,7 @@ static	iphtent_t	iphte;
 static	ip_pool_t	iplo;
 static	ioctlfunc_t	poolioctl = NULL;
 static	char		poolname[FR_GROUPLEN];
+static	int		set_ipv6_addr = 0;
 
 %}
 
@@ -56,7 +68,7 @@ static	char		poolname[FR_GROUPLEN];
 	u_32_t	num;
 	struct	in_addr	addr;
 	struct	alist_s	*alist;
-	struct	in_addr	adrmsk[2];
+	union   i6addr	adrmsk[2];
 	iphtent_t	*ipe;
 	ip_pool_node_t	*ipp;
 	union	i6addr	ip6;
@@ -78,7 +90,7 @@ static	char		poolname[FR_GROUPLEN];
 %type	<adrmsk> addrmask
 %type	<ipe> ipfgroup ipfhash hashlist hashentry
 %type	<ipe> groupentry setgrouplist grouplist
-%type	<addr> ipaddr mask ipv4
+%type	<ip6> ipaddr mask ipv4
 %type	<str> number setgroup
 
 %%
@@ -152,18 +164,20 @@ role:
 	;
 
 ipftree:
-	IPT_TYPE '=' IPT_TREE number '{' addrlist '}'
+	IPT_TYPE '=' IPT_TREE number '{' { yyexpectaddr = 1; }
+	addrlist '}'
 					{ strncpy(iplo.ipo_name, $4,
 						  sizeof(iplo.ipo_name));
-					  $$ = $6;
+					  $$ = $7;
 					}
 	;
 
 ipfhash:
-	IPT_TYPE '=' IPT_HASH number hashopts '{' hashlist '}'
+	IPT_TYPE '=' IPT_HASH number hashopts '{' { yyexpectaddr = 1; }
+	hashlist '}'
 					{ strncpy(ipht.iph_name, $4,
 						  sizeof(ipht.iph_name));
-					  $$ = $7;
+					  $$ = $8;
 					}
 	;
 
@@ -206,88 +220,134 @@ hashopts:
 	;
 
 addrlist:
-	range ',' addrlist		{ $1->ipn_next = $3; $$ = $1; }
-	| range				{ $$ = $1; }
+	range next addrlist		{ $1->ipn_next = $3; $$ = $1; }
+	| range next			{ $$ = $1; }
 	;
 
 grouplist:
-	groupentry ';' grouplist	{ $$ = $1; $1->ipe_next = $3; }
-	| addrmask ';' grouplist	{ $$ = calloc(1, sizeof(iphtent_t));
+	groupentry next grouplist	{ $$ = $1; $1->ipe_next = $3; }
+	| addrmask next grouplist	{ $$ = calloc(1, sizeof(iphtent_t));
+					  if  (set_ipv6_addr)
+					  	$$->ipe_family = AF_INET6;
+					  else
+						$$->ipe_family = AF_INET;
 					  bcopy((char *)&($1[0]),
 						(char *)&($$->ipe_addr),
 						sizeof($$->ipe_addr));
 					  bcopy((char *)&($1[1]),
 						(char *)&($$->ipe_mask),
 						sizeof($$->ipe_mask));
-					  $$->ipe_next = $3;
-					}
-	| groupentry ';'		{ $$ = $1; }
-	| addrmask ';'			{ $$ = calloc(1, sizeof(iphtent_t));
+					  set_ipv6_addr = 0;
+	  				  $$->ipe_next = $3; }
+	| groupentry next		{ $$ = $1; }
+	| addrmask next			{ $$ = calloc(1, sizeof(iphtent_t));
+					  if  (set_ipv6_addr)
+					  	$$->ipe_family = AF_INET6;
+					  else
+						$$->ipe_family = AF_INET;
 					  bcopy((char *)&($1[0]),
 						(char *)&($$->ipe_addr),
 						sizeof($$->ipe_addr));
 					  bcopy((char *)&($1[1]),
 						(char *)&($$->ipe_mask),
 						sizeof($$->ipe_mask));
+					  set_ipv6_addr = 0;
 					}
 	;
 
 setgrouplist:
-	groupentry ';'			{ $$ = $1; }
-	| groupentry ';' setgrouplist	{ $1->ipe_next = $3; $$ = $1; }
+	groupentry next			{ $$ = $1; }
+	| groupentry next setgrouplist	{ $1->ipe_next = $3; $$ = $1; }
 	;
 
 groupentry:
-	addrmask ',' setgroup		{ $$ = calloc(1, sizeof(iphtent_t));
-					  bcopy((char *)&($1[0]),
-						(char *)&($$->ipe_addr),
-						sizeof($$->ipe_addr));
-					  bcopy((char *)&($1[1]),
-						(char *)&($$->ipe_mask),
-						sizeof($$->ipe_mask));
-					  strncpy($$->ipe_group, $3,
-						  FR_GROUPLEN);
-					  free($3);
-					}
+	addrmask ',' setgroup	{ $$ = calloc(1, sizeof(iphtent_t));
+				  if  (set_ipv6_addr)
+				  	$$->ipe_family = AF_INET6;
+				  else
+					$$->ipe_family = AF_INET;
+				  bcopy((char *)&($1[0]),
+					(char *)&($$->ipe_addr),
+					sizeof($$->ipe_addr));
+				  bcopy((char *)&($1[1]),
+					(char *)&($$->ipe_mask),
+					sizeof($$->ipe_mask));
+  				  set_ipv6_addr = 0;
+	 			  strncpy($$->ipe_group, $3,  FR_GROUPLEN);
+				  free($3); }
+
 	;
 
 range:	addrmask	{ $$ = calloc(1, sizeof(*$$));
 			  $$->ipn_info = 0;
-			  $$->ipn_addr.adf_addr.in4.s_addr = $1[0].s_addr;
-			  $$->ipn_mask.adf_addr.in4.s_addr = $1[1].s_addr;
+			  if (set_ipv6_addr) {
+				  $$->ipn_addr.adf_family = AF_INET6;
+				  $$->ipn_addr.adf_addr = $1[0];
+				  $$->ipn_mask.adf_addr = $1[1];
+
+			  } else {
+				  $$->ipn_addr.adf_family = AF_INET;
+				  $$->ipn_addr.adf_addr.in4.s_addr = $1[0].in4.s_addr;
+				  $$->ipn_mask.adf_addr.in4.s_addr = $1[1].in4.s_addr;
+			  }
+			  set_ipv6_addr = 0;
 			}
 	| '!' addrmask	{ $$ = calloc(1, sizeof(*$$));
 			  $$->ipn_info = 1;
-			  $$->ipn_addr.adf_addr.in4.s_addr = $2[0].s_addr;
-			  $$->ipn_mask.adf_addr.in4.s_addr = $2[1].s_addr;
+			  if (set_ipv6_addr) {
+				  $$->ipn_addr.adf_family = AF_INET6;
+				  $$->ipn_addr.adf_addr = $2[0];
+				  $$->ipn_mask.adf_addr = $2[1];
+			  } else {
+				  $$->ipn_addr.adf_family = AF_INET;
+				  $$->ipn_addr.adf_addr.in4.s_addr = $2[0].in4.s_addr;
+				  $$->ipn_mask.adf_addr.in4.s_addr = $2[1].in4.s_addr;
+			  }
+			  set_ipv6_addr = 0;
 			}
 
 hashlist:
-	hashentry ';'			{ $$ = $1; }
-	| hashentry ';' hashlist	{ $1->ipe_next = $3; $$ = $1; }
+	hashentry next			{ $$ = $1; }
+	| hashentry next hashlist	{ $1->ipe_next = $3; $$ = $1; }
 	;
 
 hashentry:
 	addrmask 			{ $$ = calloc(1, sizeof(iphtent_t));
+					  if  (set_ipv6_addr)
+					  	$$->ipe_family = AF_INET6;
+					  else
+						$$->ipe_family = AF_INET;
 					  bcopy((char *)&($1[0]),
 						(char *)&($$->ipe_addr),
 						sizeof($$->ipe_addr));
 					  bcopy((char *)&($1[1]),
 						(char *)&($$->ipe_mask),
 						sizeof($$->ipe_mask));
+					  set_ipv6_addr = 0;
 					}
 	;
 
 addrmask:
-	ipaddr '/' mask		{ $$[0] = $1; $$[1].s_addr = $3.s_addr; }
-	| ipaddr		{ $$[0] = $1; $$[1].s_addr = 0xffffffff; }
+	ipaddr '/' mask		{ $$[0] = $1; $$[1] = $3; }
+	| ipaddr		{ $$[0] = $1;
+				  if (set_ipv6_addr) 
+				  	fill6bits(128, (u_32_t *)$$[1].in6.s6_addr);
+				  else
+				  	$$[1].in4.s_addr = 0xffffffff; }
 	;
 
 ipaddr:	ipv4			{ $$ = $1; }
-	| YY_NUMBER		{ $$.s_addr = htonl($1); }
+	| YY_NUMBER		{ $$.in4.s_addr = htonl($1); }
+	| YY_IPV6 		{ set_ipv6_addr = 1;
+				  bcopy(&$1, &$$, sizeof($$));
+				  yyexpectaddr = 0; }
 	;
 
-mask:	YY_NUMBER		{ ntomask(4, $1, (u_32_t *)&$$.s_addr); }
+mask:	YY_NUMBER		{ if (set_ipv6_addr)
+    					ntomask(6, $1, (u_32_t *)$$.in6.s6_addr);
+				  else
+				  	ntomask(4, $1, (u_32_t *)&$$.in4.s_addr);
+				}
 	| ipv4			{ $$ = $1; }
 	;
 
@@ -302,10 +362,15 @@ ipv4:	YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
 			yyerror("Invalid octet string for IP address");
 			return 0;
 		  }
-		  $$.s_addr = ($1 << 24) | ($3 << 16) | ($5 << 8) | $7;
-		  $$.s_addr = htonl($$.s_addr);
+		  $$.in4.s_addr = ($1 << 24) | ($3 << 16) | ($5 << 8) | $7;
+		  $$.in4.s_addr = htonl($$.in4.s_addr);
 		}
 	;
+
+next:	';'			{ yyexpectaddr = 1; }
+	;
+
+
 %%
 static	wordtab_t	yywords[] = {
 	{ "auth",	IPT_AUTH },

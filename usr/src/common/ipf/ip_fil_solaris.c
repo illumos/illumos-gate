@@ -139,8 +139,8 @@ int ipldetach()
 	ipfrule_remove();
 #endif
 
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
 
 #ifdef	IPFILTER_LOOKUP
 	ip_lookup_unload();
@@ -429,7 +429,7 @@ int *rp;
 			error = COPYIN((caddr_t)data, (caddr_t)&tmp,
 				       sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, tmp);
+				tmp = frflush(unit, 4, tmp);
 				error = COPYOUT((caddr_t)&tmp, (caddr_t)data,
 					       sizeof(tmp));
 				if (error != 0)
@@ -438,6 +438,24 @@ int *rp;
 				error = EFAULT;
 		}
 		break;
+#ifdef USE_INET6
+	case	SIOCIPFL6 :
+		if (!(mode & FWRITE))
+			error = EPERM;
+		else {
+			error = COPYIN((caddr_t)data, (caddr_t)&tmp,
+				       sizeof(tmp));
+			if (!error) {
+				tmp = frflush(unit, 6, tmp);
+				error = COPYOUT((caddr_t)&tmp, (caddr_t)data,
+					       sizeof(tmp));
+				if (error != 0)
+					error = EFAULT;
+			} else
+				error = EFAULT;
+		}
+		break;
+#endif
 	case SIOCSTLCK :
 		error = COPYIN((caddr_t)data, (caddr_t)&tmp, sizeof(tmp));
 		if (error == 0) {
@@ -694,10 +712,12 @@ fr_info_t *fin;
 #ifdef	USE_INET6
 	if (fin->fin_v == 6) {
 		ip6 = (ip6_t *)m->b_rptr;
+		ip6->ip6_flow = ((ip6_t *)fin->fin_ip)->ip6_flow;
 		ip6->ip6_src = fin->fin_dst6;
 		ip6->ip6_dst = fin->fin_src6;
 		ip6->ip6_plen = htons(sizeof(*tcp));
 		ip6->ip6_nxt = IPPROTO_TCP;
+		tcp2->th_sum = fr_cksum(m, (ip_t *)ip6, IPPROTO_TCP, tcp2);
 	} else
 #endif
 	{
@@ -745,7 +765,6 @@ mblk_t *m;
 		ip6_t *ip6;
 
 		ip6 = (ip6_t *)m->b_rptr;
-		ip6->ip6_flow = 0;
 		ip6->ip6_vfc = 0x60;
 		ip6->ip6_hlim = 127;
 	} else
@@ -887,6 +906,7 @@ int dst;
 		csz = sz;
 		sz -= sizeof(ip6_t);
 		ip6 = (ip6_t *)m->b_rptr;
+		ip6->ip6_flow = ((ip6_t *)fin->fin_ip)->ip6_flow;
 		ip6->ip6_plen = htons((u_short)sz);
 		ip6->ip6_nxt = IPPROTO_ICMPV6;
 		ip6->ip6_src = dst6;
@@ -917,6 +937,7 @@ int dst;
 		      sizeof(*fin->fin_ip));
 		bcopy((char *)fin->fin_ip + fin->fin_hlen,
 		      (char *)&icmp->icmp_ip + sizeof(*fin->fin_ip), 8);
+		icmp->icmp_ip.ip_len = htons(icmp->icmp_ip.ip_len);
 		icmp->icmp_cksum = ipf_cksum((u_short *)icmp,
 					     sz - sizeof(ip_t));
 	}
@@ -1023,12 +1044,11 @@ struct in_addr *inp, *inpmask;
 		else
 			sin6.sin6_addr = *inp6;
 #else /* IRE_ILL_CN */
-		if (IN6_IS_ADDR_UNSPECIFIED(ill->netmask.in6) ||
-			IN6_IS_ADDR_UNSPECIFIED(ill->localaddr.in6)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&ill->netmask.in6.sin6_addr) ||
+		    IN6_IS_ADDR_UNSPECIFIED(&ill->localaddr.in6.sin6_addr)) {
 			rate_limit_message(NULLADDR_RATE_LIMIT,
-				"Check pfild is running: "
-				"IP#/netmask is 0 on %s.\n"
-				ill->ill_name);
+			   "Check pfild is running: IP#/netmask is 0 on %s.\n",
+			   ill->ill_name);
 			return -1;
 		}
 		mask6 = ill->netmask.in6;
@@ -1210,6 +1230,7 @@ fr_info_t *fin;
 
 
 #ifdef USE_INET6
+/* ARGSUSED */
 INLINE void fr_checkv6sum(fin)
 fr_info_t *fin;
 {
