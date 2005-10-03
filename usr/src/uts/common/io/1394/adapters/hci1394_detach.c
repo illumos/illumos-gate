@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,9 @@ hci1394_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_DETACH:
 		/* Don't allow the HW to generate any more interrupts */
 		hci1394_ohci_intr_master_disable(soft_state->ohci);
+
+		/* unregister interrupt handler */
+		hci1394_isr_handler_fini(soft_state);
 
 		/* don't accept anymore commands from services layer */
 		(void) hci1394_state_set(&soft_state->drvinfo,

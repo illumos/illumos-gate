@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -156,7 +156,9 @@ hci1394_q_init(hci1394_drvinfo_t *drvinfo,
 	status = hci1394_buf_alloc(drvinfo, &parms, &data->qb_buf,
 	    &data->qb_buf_handle);
 	if (status != DDI_SUCCESS) {
-		hci1394_buf_free(&data->qb_buf_handle);
+		/* Free the allocated Descriptor buffer */
+		hci1394_buf_free(&desc->qb_buf_handle);
+
 		mutex_destroy(&q->q_mutex);
 		kmem_free(q, sizeof (hci1394_q_t));
 		*q_handle = NULL;
