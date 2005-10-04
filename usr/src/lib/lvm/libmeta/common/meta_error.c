@@ -878,6 +878,10 @@ void_to_str(
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
 		    "service(s) not online in SMF"));
 		break;
+	case MDE_ZONE_ADMIN:
+		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
+		"Volume administration unavailable within non-global zones."));
+		break;
 	default:
 		(void) snprintf(p, psize, dgettext(TEXT_DOMAIN,
 		    "unknown void error code %d"), ip->errnum);

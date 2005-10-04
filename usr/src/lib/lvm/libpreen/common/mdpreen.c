@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <zone.h>
 
 #include <sdssc.h>
 
@@ -168,6 +169,17 @@ preen_build_devs(
 	struct stat	statb;
 	static int	md_major = -1;
 	side_t		sideno;
+
+	/*
+	 * The rest of the code in this library can't work within a
+	 * non-global zone so we just return the top level metadevice back
+	 * to be fscked.
+	 */
+	if (getzoneid() != GLOBAL_ZONEID) {
+		preen_addunit(dp, dkiop->dki_dname, NULL, NULL,
+		    dkiop->dki_unit);
+		return;
+	}
 
 	if (stat(uname, &statb) != 0)
 		return;

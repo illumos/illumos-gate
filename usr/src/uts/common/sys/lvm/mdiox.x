@@ -1368,7 +1368,8 @@ enum md_void_errno_t {
 	MDE_STRIPE_TRUNC_SINGLE,	/* single component stripe truncation */
 	MDE_STRIPE_TRUNC_MULTIPLE,	/* multiple component stripe trun */
 	MDE_SMF_FAIL,		/* service management facility error */
-	MDE_SMF_NO_SERVICE	/* service not enabled in SMF */
+	MDE_SMF_NO_SERVICE,	/* service not enabled in SMF */
+	MDE_ZONE_ADMIN		/* in a zone & no admin device */
 };
 
 struct md_void_error_t {

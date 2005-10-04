@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-1994, 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
  */
 
 #include <meta.h>
+#include <zone.h>
 
 static	int	meta_fd = -1;
 static	major_t	meta_major;
@@ -52,6 +53,8 @@ open_admin(
 
 		/* try read/write fall back to readonly */
 		if ((meta_fd = open(ADMSPECIAL, O_RDWR, 0)) < 0) {
+			if (errno == ENOENT && getzoneid() != GLOBAL_ZONEID)
+				return (mderror(ep, MDE_ZONE_ADMIN, NULL));
 			if (errno != EACCES)
 				return (mdsyserror(ep, errno, ADMSPECIAL));
 			if ((meta_fd = open(ADMSPECIAL, O_RDONLY, 0)) < 0)
