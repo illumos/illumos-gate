@@ -19,15 +19,15 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(lint) && defined(SCCSIDS)
-/* from UCB 4.18 84/02/02 */
-static char	*bsm_sccsid = "%Z%%M%	%I%	%E% SMI; SunOS BSM";
+static char	*bsm_sccsid =
+		    "@(#)dminfo.c	1.8	05/06/15 SMI; SunOS BSM";
 #endif
 
 #include <locale.h>
@@ -49,7 +49,7 @@ static char	*bsm_sccsid = "%Z%%M%	%I%	%E% SMI; SunOS BSM";
 #define	EFAIL 1
 
 #if !defined(TEXT_DOMAIN)
-#define TEXT_DOMAIN "SUNW_BSM_DMINFO"
+#define	TEXT_DOMAIN "SUNW_BSM_DMINFO"
 #endif
 
 extern off_t lseek();
@@ -76,10 +76,9 @@ printdmapent(dmapp)
 
 
 /*
- * dmapi_err(exit_code,err_msg) prints message pointed to by err_msg to s
-tderr.
- * Then prints usage message to stderr. Then exits program with exit_code
-.
+ * dmapi_err(exit_code,err_msg) prints message pointed to by err_msg to
+ * stderr. Then prints usage message to stderr. Then exits program with
+ * exit_code.
  *
  */
 static void
@@ -112,9 +111,8 @@ char	*err_msg;
 }
 
 
-main(argc, argv)
-int	argc;
-char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	devmap_t *dmapp;
 	devmap_t dmap;
@@ -229,12 +227,12 @@ char	*argv[];
 			dmapi_err(EINVOKE,
 				gettext("Bad dmap_devname in entry argument"));
 		}
-		if ((dmap.dmap_devtype = getdmapfield((char *) NULL)) ==
+		if ((dmap.dmap_devtype = getdmapfield((char *)NULL)) ==
 			NULL) {
 			dmapi_err(EINVOKE,
 				gettext("Bad dmap_devtype in entry Argument"));
 		}
-		if ((dmap.dmap_devlist = getdmapfield((char *) NULL)) ==
+		if ((dmap.dmap_devlist = getdmapfield((char *)NULL)) ==
 			NULL) {
 			dmapi_err(EINVOKE,
 				gettext("Bad dmap_devlist in entry argument"));
@@ -245,7 +243,7 @@ char	*argv[];
 		 * want to corrupt the existing string.
 		 */
 		cntr = strlen(dmap.dmap_devlist) + 1;
-		mptr = calloc((unsigned) cntr, sizeof (char));
+		mptr = calloc((unsigned)cntr, sizeof (char));
 		if (mptr == NULL) {
 			if (verbose) {
 				(void) fprintf(stderr,
@@ -264,7 +262,8 @@ char	*argv[];
 		if ((des = open(filename, O_RDWR)) < 0) {
 			if (verbose) {
 				(void) fprintf(stderr,
-				gettext("dmapinfo: Cannot open %s\n"), filename);
+				gettext("dmapinfo: Cannot open %s\n"),
+				    filename);
 			}
 			exit(1);
 		}
@@ -334,7 +333,7 @@ char	*argv[];
 (void) fprintf(stderr, gettext("dmapinfo: Device (%s) not found in %s.\n"),
 					nptr, filename);
 			}
-			nptr = getdmapdfield((char *) NULL);
+			nptr = getdmapdfield((char *)NULL);
 		}
 		/*
 		 * Good the entry is uniq. So lets find out how long it is
@@ -350,7 +349,7 @@ char	*argv[];
 		cntr += strlen(dmap.dmap_devtype);
 		cntr += strlen(dmap.dmap_devlist);
 		cntr += 15;
-		tptr = calloc((unsigned) cntr, sizeof (char));
+		tptr = calloc((unsigned)cntr, sizeof (char));
 		if (tptr == NULL) {
 			exit(1);
 		}
@@ -476,5 +475,5 @@ char	*argv[];
 	enddmapent();
 	if (cntr == 0)
 		exit(1);
-	exit(0);
+	return (0);
 }

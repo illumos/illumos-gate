@@ -19,15 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef lint
-static char sccsid[] = "%Z%%M%	%I%	%E% SMI";
+static char sccsid[] = "@(#)setfacl.c	1.10	05/06/16 SMI";
 #endif
-
-/*
- * Copyright (c) 1993, by Sun Microsystems, Inc.
- */
 
 /*
  * setfacl [-r] -f aclfile file ...
@@ -65,6 +66,7 @@ static int parse_entry(char *, aclent_t *, int);
 static void err_handle(int, aclent_t *);
 static int conv_id(char *);
 
+int
 main(int argc, char *argv[])
 {
 	int		c;
@@ -188,7 +190,7 @@ main(int argc, char *argv[])
 				exit(2);
 		}
 	}
-	exit(0);
+	return (0);
 }
 
 /*
@@ -389,6 +391,7 @@ parse_entry_list(aclent_t **aclpp, int *aclcntp, char *listp, int mode)
 		if (convert_to_aclent_t(listp, aclcntp, aclpp, mode) == -1)
 			return (-1);
 	}
+	return (0);
 }
 
 /*

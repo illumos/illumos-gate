@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <errno.h>
 #include <string.h>
@@ -109,10 +110,11 @@ struct	svcfields {
 	char	*comment;
 };
 
+void no_permission(void) __NORETURN;
+void usage(int flag);
 
-main(argc, argv)
-int argc;
-char **argv;
+int
+main(int argc, char **argv)
 {
 	extern	char *optarg;
 	extern	int optind;
@@ -316,6 +318,7 @@ char **argv;
 		case '?':
 			usage(USAGE);
 		}
+		/* NOTREACHED */	
 	}
 
 	if ((optind < argc) && ! netspec)
@@ -461,7 +464,7 @@ char **argv;
 	}
 	if (exitcode == NLS_SYSERR)
 		nlsmesg(MM_ERROR, "System error in SAC command");
-	exit(exitcode);
+	return (exitcode);
 }
 
 
@@ -479,8 +482,8 @@ static char umsg[] = "usage: %s -x\n\
        [[-l addr | -] [-t addr | -]] |\n\
 ";
 
-usage(flag)
-int	flag;
+void
+usage(int flag)
 {
 	switch (flag) {
 	case INCONSISTENT:
@@ -502,7 +505,8 @@ int	flag;
  *                 needs to be root and isn't.
  */
 
-no_permission()
+void
+no_permission(void)
 {
 	nlsmesg(MM_ERROR, "Must be super user");
 	exit(NLS_PERM);
@@ -515,9 +519,7 @@ no_permission()
  */
 
 void
-nlsmesg(severity, text)
-int	severity;
-char	*text;
+nlsmesg(int severity, char *text)
 {
 	int	class;
 
@@ -532,15 +534,16 @@ char	*text;
  * prt_cmd:  print out the listener-dependent string for sacadm.
  */
 
-prt_cmd(path, flags, modules, addr, rpcp)
-char	*path;		/* full path of command or pipe */
-long	flags;		/* listener flags		*/
-			/* PFLAG for pipe		*/
-			/* CFLAG for command		*/
-			/* DFLAG for dynamic addr	*/
-char	*modules; 	/* STREAMS modules to push	*/
-char	*addr;		/* private address		*/
-char	*rpcp;		/* RPC prog and ver #		*/
+int
+prt_cmd(char *path, long flags, char *modules, char *addr, char *rpcp)
+	/* path: full path of command or pipe	*/
+	/* flags: listener flags		*/
+	/* PFLAG for pipe			*/
+	/* CFLAG for command			*/
+	/* DFLAG for dynamic addr		*/
+ 	/* modules: STREAMS modules to push	*/
+	/* addr: private address		*/
+	/* rpcp: RPC prog and ver #		*/
 {
 	struct	stat	sbuf;
 	char	mesgbuf[BUFSIZ];
@@ -576,15 +579,9 @@ char	*rpcp;		/* RPC prog and ver #		*/
  *              not allow specification of a private address -- use pmadm!
  */
 
-old_addsvc(svc, addr, cmd, com, module, id, flags, netspec)
-char	*svc;
-char	*addr;
-char	*cmd;
-char	*com;
-char	*module;
-char	*id;
-char	*flags;
-char	*netspec;
+int
+old_addsvc(char *svc, char *addr, char *cmd, char *com, char *module,
+    char *id, char *flags, char *netspec)
 {
 	char	buf[BUFSIZ];
 	char	mesgbuf[BUFSIZ];
@@ -654,14 +651,15 @@ char	*netspec;
 		no_permission();
 		break;
 	}
+	/* NOTREACHED */
 }
 
 /*
  * prt_nets:  print the status of one network, or all nets if netspec 
  *            is NULL
  */
-prt_nets(netspec)
-char	*netspec;
+int
+prt_nets(char *netspec)
 {
 	char	buf[BUFSIZ];
 	FILE	*fp;
@@ -727,9 +725,8 @@ char	*netspec;
  * if svc is NULL
  */
 
-prt_svcs(svc, netspec)
-char	*svc;
-char	*netspec;
+int
+prt_svcs(char *svc, char *netspec)
 {
 	char	buf[BUFSIZ];
 	char	mesg[BUFSIZ];
@@ -815,9 +812,8 @@ char	*netspec;
  * disable_svc:  use pmadm to disable a service 
  */
 
-disable_svc(svc, netspec)
-char	*svc;
-char	*netspec;
+int
+disable_svc(char *svc, char *netspec)
 {
 	char	buf[BUFSIZ];
 	int	rtn;
@@ -852,12 +848,12 @@ char	*netspec;
 		no_permission();
 		break;
 	}
+	/* NOTREACHED */
 }
 
 
-enable_svc(svc, netspec)
-char	*svc;
-char	*netspec;
+int
+enable_svc(char *svc, char *netspec)
 {
 	char	buf[BUFSIZ];
 	int	rtn;
@@ -892,13 +888,12 @@ char	*netspec;
 		no_permission();
 		break;
 	}
+	/* NOTREACHED */
 }
 
 
-remove_svc(svc, netspec, printerrors)
-char	*svc;
-char	*netspec;
-int	printerrors;
+int
+remove_svc(char *svc, char *netspec, int printerrors)
 {
 	char	buf[BUFSIZ];
 	int	rtn;
@@ -934,11 +929,12 @@ int	printerrors;
 		no_permission();
 		break;
 	}
+	/* NOTREACHED */
 }
 
 
-kill_listener(netspec)
-char	*netspec;
+int
+kill_listener(char *netspec)
 {
 	char	buf[BUFSIZ];
 	char	mesg[BUFSIZ];
@@ -977,6 +973,7 @@ char	*netspec;
 		no_permission();
 		break;
 	}
+	/* NOTREACHED */
 }
 
 
@@ -984,8 +981,8 @@ char	*netspec;
  * add_pm:  add a port monitor (initialize directories) using sacadm
  */
 
-add_pm(netspec)
-char	*netspec;
+int
+add_pm(char *netspec)
 {
 	char	buf[BUFSIZ];
 	char	mesg[BUFSIZ];
@@ -1022,6 +1019,7 @@ char	*netspec;
 		no_permission();
 		break;
 	}
+	/* NOTREACHED */
 }
 
 
@@ -1031,8 +1029,7 @@ char	*netspec;
  */
 
 char *
-gencmdstr(netspec)
-char *netspec;
+gencmdstr(char *netspec)
 {
 	static char buf[BUFSIZ];
 
@@ -1049,8 +1046,8 @@ char *netspec;
  * start_listener: start the listener
  */
 
-start_listener(netspec)
-char	*netspec;
+int
+start_listener(char *netspec)
 {
 	char	buf[BUFSIZ];
 	char	scratch[BUFSIZ];
@@ -1119,6 +1116,7 @@ char	*netspec;
 		no_permission();
 		break;
 	}
+	/* NOTREACHED */
 }
 
 
@@ -1126,10 +1124,8 @@ char	*netspec;
  * setup_addr:  setup the -l and -t addresses.
  */
 
-setup_addr(laddr, taddr, netspec)
-char	*laddr;
-char	*taddr;
-char	*netspec;
+int
+setup_addr(char *laddr, char *taddr, char *netspec)
 {
 	char	buf[BUFSIZ];
 	char	mesg[BUFSIZ];
@@ -1243,9 +1239,8 @@ char	*netspec;
  *                             into the structure.
  */
 
-svc_format(buf, entry)
-char	*buf;
-struct	svcfields *entry;
+int
+svc_format(char *buf, struct svcfields *entry)
 {
 	char	*ptr;		/* temporary pointer into buffer	*/
 	char	*tmp;		/* temporary pointer into buffer	*/
@@ -1327,9 +1322,7 @@ struct	svcfields *entry;
 
 
 char *
-nexttok(str, delim)
-char *str;
-register char *delim;
+nexttok(char *str, char *delim)
 {
 	static char *savep;	/* the remembered string */
 	register char *p;	/* pointer to start of token */
@@ -1356,8 +1349,7 @@ register char *delim;
  */
 
 char *
-pflags(flags)
-long flags;
+pflags(long flags)
 {
 	register int i;			/* scratch counter */
 	static char buf[BUFSIZ];	/* formatted flags */

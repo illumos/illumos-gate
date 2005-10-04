@@ -19,20 +19,21 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from S5R3.1 1.10 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/param.h>
 #include "sed.h"
+
 #define	NWFILES		11	/* 10 plus one for standard output */
 FILE	*fin;
 FILE    *fcode[NWFILES];
@@ -40,7 +41,7 @@ char    *lastre;
 char    sseof;
 union reptr     *ptrend;
 int     eflag;
-extern     nbra;
+extern	int	nbra;
 char    linebuf[LBSIZE+1];
 int     gflag;
 int     nlno;
@@ -70,13 +71,16 @@ char    AD0MES[]	= "No addresses allowed: %s";
 char    AD1MES[]	= "Only one address allowed: %s";
 char	TOOBIG[]	= "Suffix too large - 512 max: %s";
 
-extern	sed;	  /* IMPORTANT flag !!! */
+extern int sed;	  /* IMPORTANT flag !!! */
 extern char *comple();
 
 extern char *malloc();
 
-main(argc, argv)
-char    *argv[];
+static void dechain(void);
+static void fcomp(void);
+
+int
+main(int argc, char *argv[])
 {
 	int flag_found = 0;
 
@@ -167,14 +171,14 @@ char    *argv[];
 		execute(*eargv++);
 	}
 	(void) fclose(stdout);
-	exit(0);
-	/*NOTREACHED*/
+	return (0);
 }
 
-fcomp()
+static void
+fcomp(void)
 {
 
-	register char   *p, *op, *tp;
+	char   *p, *op, *tp;
 	char    *address();
 	union reptr     *pt, *pt1;
 	int     i, ii;
@@ -199,7 +203,7 @@ fcomp()
 		cp = linebuf;
 
 comploop:
-/*      (void) fprintf(stderr, "cp: %s\n", cp);	/*DEBUG*/
+/*		(void) fprintf(stderr, "cp: %s\n", cp); DEBUG */
 		while(*cp == ' ' || *cp == '\t')	cp++;
 		if(*cp == '\0' || *cp == '#')	 continue;
 		if(*cp == ';') {
@@ -572,10 +576,11 @@ done:
 	rep->r1.command = 0;
 	lastre = op;
 }
+
 char    *compsub(rhsbuf)
 char    *rhsbuf;
 {
-	register char   *p, *q;
+	char   *p, *q;
 
 	p = rhsbuf;
 	q = cp;
@@ -603,12 +608,13 @@ char    *rhsbuf;
 	}
 }
 
+int
 rline(lbuf, lbend)
 char    *lbuf;
 char	*lbend;
 {
-	register char   *p, *q;
-	register	t;
+	char   *p, *q;
+	int	t;
 	static char     *saveq;
 
 	p = lbuf;
@@ -696,7 +702,7 @@ char	*lbend;
 char    *address(expbuf)
 char    *expbuf;
 {
-	register char   *rcp;
+	char   *rcp;
 	long long	lno;
 
 	if(*cp == '$') {
@@ -739,7 +745,7 @@ char    *text(textbuf, tbend)
 char    *textbuf;
 char	*tbend;
 {
-	register char   *p, *q;
+	char   *p, *q;
 
 	p = textbuf;
 	q = cp;
@@ -788,7 +794,8 @@ struct label    *ptr;
 }
 
 
-dechain()
+static void
+dechain(void)
 {
 	struct label    *lptr;
 	union reptr     *rptr, *trptr;
@@ -814,9 +821,9 @@ dechain()
 char *ycomp(expbuf)
 char    *expbuf;
 {
-	register char   c; 
-	register char *ep, *tsp;
-	register int i;
+	char	c;
+	char *ep, *tsp;
+	int i;
 	char    *sp;
 
 	ep = expbuf;
@@ -858,8 +865,9 @@ char    *expbuf;
 
 	return(ep + 0400);
 }
-comperr(msg)
-char *msg;
+
+void
+comperr(char *msg)
 {
 	(void) fprintf(stderr, "sed: ");
 	(void) fprintf(stderr, msg, linebuf);

@@ -20,14 +20,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from S5R3.1 1.8	*/
+#ifndef	_SED_H
+#define	_SED_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sed -- stream  editor
@@ -150,3 +153,7 @@ char    *compsub();
 struct label    *search();
 char    *gline();
 char    *place();
+void comperr(char *);
+void execute(char *);
+
+#endif	/* _SED_H */

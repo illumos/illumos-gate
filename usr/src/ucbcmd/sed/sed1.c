@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from S5R3.1 1.7 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -95,11 +95,17 @@ char	rub[] = {"\\177"};
 
 extern char TMMES[];
 
-execute(file)
-char *file;
+static int match(char *expbuf, int gf);
+static int substitute(union reptr *ipc);
+static void dosub(char *rhsbuf, int n);
+static void command(union reptr *ipc);
+static void arout(void);
+
+void
+execute(char *file)
 {
-	register char *p1, *p2;
-	register union reptr	*ipc;
+	char *p1, *p2;
+	union reptr	*ipc;
 	int	c;
 	char	*execp;
 
@@ -218,10 +224,11 @@ char *file;
 
 	}
 }
-match(expbuf, gf)
-char	*expbuf;
+
+static int
+match(char *expbuf, int gf)
 {
-	register char   *p1;
+	char   *p1;
 
 	if(gf) {
 		if(*expbuf)	return(0);
@@ -235,8 +242,8 @@ char	*expbuf;
 	return(step(p1, expbuf));
 }
 
-substitute(ipc)
-union reptr	*ipc;
+static int
+substitute(union reptr *ipc)
 {
 	if(match(ipc->r1.re1, 0) == 0)	return(0);
 
@@ -253,11 +260,10 @@ union reptr	*ipc;
 	return(sflag);
 }
 
-dosub(rhsbuf,n)
-char	*rhsbuf;
-int	n;
+static void
+dosub(char *rhsbuf, int n)
 {
-	register char *lp, *sp, *rp;
+	char *lp, *sp, *rp;
 	int c;
 
 	if(n > 0 && n < 999)
@@ -305,7 +311,7 @@ out:
 char	*place(asp, al1, al2)
 char	*asp, *al1, *al2;
 {
-	register char *sp, *l1, *l2;
+	char *sp, *l1, *l2;
 
 	sp = asp;
 	l1 = al1;
@@ -318,11 +324,11 @@ char	*asp, *al1, *al2;
 	return(sp);
 }
 
-command(ipc)
-union reptr	*ipc;
+static void
+command(union reptr *ipc)
 {
-	register int	i;
-	register char   *p1, *p2, *p3;
+	int	i;
+	char   *p1, *p2, *p3;
 	char	*execp;
 
 
@@ -597,8 +603,8 @@ union reptr	*ipc;
 char	*gline(addr)
 char	*addr;
 {
-	register char   *p1, *p2;
-	register	c;
+	char   *p1, *p2;
+	int	c;
 	sflag = 0;
 	p1 = addr;
 	p2 = cbp;
@@ -650,9 +656,9 @@ char	*addr;
 char *comple(x1, ep, x3, x4)
 char *x1, *x3;
 char x4;
-register char *ep;
+char *ep;
 {
-	register char *p;
+	char *p;
 
 	p = compile(x1, ep + 1, x3, x4);
 	if(p == ep + 1)
@@ -661,8 +667,8 @@ register char *ep;
 	return(p);
 }
 
-regerr(err)
-register err;
+int
+regerr(int err)
 {
 	switch(err) {
 
@@ -720,11 +726,13 @@ register err;
 		exit(2);
 		break;
 	}
+	return (0);
 }
 
-arout()
+static void
+arout(void)
 {
-	register char   *p1;
+	char   *p1;
 	FILE	*fi;
 	char	c;
 	int	t;
@@ -748,4 +756,3 @@ arout()
 	aptr = abuf;
 	*aptr = 0;
 }
-
