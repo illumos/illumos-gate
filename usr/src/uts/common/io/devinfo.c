@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1254,9 +1254,31 @@ di_snapshot(struct di_state *st)
 	struct di_all *all;
 	dev_info_t *rootnode;
 	char buf[80];
+	int plen;
+	char *path;
+	vnode_t *vp;
 
 	all = (struct di_all *)di_mem_addr(st, 0);
 	dcmn_err((CE_CONT, "Taking a snapshot of devinfo tree...\n"));
+
+	/*
+	 * Verify path before entrusting it to e_ddi_hold_devi_by_path because
+	 * some platforms have OBP bugs where executing the NDI_PROMNAME code
+	 * path against an invalid path results in panic.  The lookupnameat
+	 * is done relative to rootdir without a leading '/' on "devices/"
+	 * to force the lookup to occur in the global zone.
+	 */
+	plen = strlen("devices/") + strlen(all->root_path) + 1;
+	path = kmem_alloc(plen, KM_SLEEP);
+	(void) snprintf(path, plen, "devices/%s", all->root_path);
+	if (lookupnameat(path, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp, rootdir)) {
+		dcmn_err((CE_CONT, "Devinfo node %s not found\n",
+		    all->root_path));
+		kmem_free(path, plen);
+		return (0);
+	}
+	kmem_free(path, plen);
+	VN_RELE(vp);
 
 	/*
 	 * Hold the devinfo node referred by the path.
