@@ -899,8 +899,8 @@ static void	tcp_accept_swap(tcp_t *listener, tcp_t *acceptor,
 		    tcp_t *eager);
 static int	tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp);
 static in_port_t tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
-		    int reuseaddr, boolean_t bind_to_req_port_only,
-		    boolean_t user_specified);
+    int reuseaddr, boolean_t quick_connect, boolean_t bind_to_req_port_only,
+    boolean_t user_specified);
 static void	tcp_closei_local(tcp_t *tcp);
 static void	tcp_close_detached(tcp_t *tcp);
 static boolean_t tcp_conn_con(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph,
@@ -3958,7 +3958,7 @@ tcp_bind(tcp_t *tcp, mblk_t *mp)
 	}
 
 	allocated_port = tcp_bindi(tcp, requested_port, &v6addr,
-	    tcp->tcp_reuseaddr, bind_to_req_port_only, user_specified);
+	    tcp->tcp_reuseaddr, B_FALSE, bind_to_req_port_only, user_specified);
 
 	if (allocated_port == 0) {
 		if (bind_to_req_port_only) {
@@ -4084,7 +4084,8 @@ do_bind:
  * can be viewed as two independent transport protocols.
  */
 static in_port_t
-tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr, int reuseaddr,
+tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
+    int reuseaddr, boolean_t quick_connect,
     boolean_t bind_to_req_port_only, boolean_t user_specified)
 {
 	/* number of times we have run around the loop */
@@ -4215,10 +4216,25 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr, int reuseaddr,
 			    bind_to_req_port_only)
 				continue;
 
+			/*
+			 * Ideally, we should make sure that the source
+			 * address, remote address, and remote port in the
+			 * four tuple for this tcp-connection is unique.
+			 * However, trying to find out the local source
+			 * address would require too much code duplication
+			 * with IP, since IP needs needs to have that code
+			 * to support userland TCP implementations.
+			 */
+			if (quick_connect &&
+			    (ltcp->tcp_state > TCPS_LISTEN) &&
+			    ((tcp->tcp_fport != ltcp->tcp_fport) ||
+				!IN6_ARE_ADDR_EQUAL(&tcp->tcp_remote_v6,
+				    &ltcp->tcp_remote_v6)))
+				continue;
+
 			if (!reuseaddr) {
 				/*
 				 * No socket option SO_REUSEADDR.
-				 *
 				 * If existing port is bound to
 				 * a non-wildcard IP address
 				 * and the requesting stream is
@@ -4231,7 +4247,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr, int reuseaddr,
 				    !V6_OR_V4_INADDR_ANY(
 				    ltcp->tcp_bound_source_v6) &&
 				    !IN6_ARE_ADDR_EQUAL(laddr,
-				    &ltcp->tcp_bound_source_v6))
+					&ltcp->tcp_bound_source_v6))
 					continue;
 				if (ltcp->tcp_state >= TCPS_BOUND) {
 					/*
@@ -4259,7 +4275,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr, int reuseaddr,
 				if (IN6_ARE_ADDR_EQUAL(laddr,
 				    &ltcp->tcp_bound_source_v6) &&
 				    (ltcp->tcp_state == TCPS_LISTEN ||
-				    ltcp->tcp_state == TCPS_BOUND))
+					ltcp->tcp_state == TCPS_BOUND))
 					break;
 			}
 		}
@@ -6474,7 +6490,6 @@ tcp_connect(tcp_t *tcp, mblk_t *mp)
 {
 	sin_t		*sin;
 	sin6_t		*sin6;
-	in_port_t	lport;
 	queue_t		*q = tcp->tcp_wq;
 	struct T_conn_req	*tcr;
 	ipaddr_t	*dstaddrp;
@@ -6690,19 +6705,10 @@ tcp_connect(tcp_t *tcp, mblk_t *mp)
 	switch (tcp->tcp_state) {
 	case TCPS_IDLE:
 		/*
-		 * We support a quick connect capability here, allowing
-		 * clients to transition directly from IDLE to SYN_SENT
-		 * tcp_bindi will pick an unused port, insert the connection
-		 * in the bind hash and transition to BOUND state.
+		 * We support quick connect, refer to comments in
+		 * tcp_connect_*()
 		 */
-		lport = tcp_update_next_port(tcp_next_port_to_try, B_TRUE);
-		lport = tcp_bindi(tcp, lport, &ipv6_all_zeros, 0, 0, 0);
-		if (lport == 0) {
-			mp = mi_tpi_err_ack_alloc(mp, TNOADDR, 0);
-			break;
-		}
 		/* FALLTHRU */
-
 	case TCPS_BOUND:
 	case TCPS_LISTEN:
 		if (tcp->tcp_family == AF_INET6) {
@@ -6767,6 +6773,7 @@ tcp_connect_ipv4(tcp_t *tcp, mblk_t *mp, ipaddr_t *dstaddrp, in_port_t dstport,
 	mblk_t	*mp1;
 	ipaddr_t dstaddr = *dstaddrp;
 	int32_t	oldstate;
+	uint16_t lport;
 
 	ASSERT(tcp->tcp_ipversion == IPV4_VERSION);
 
@@ -6836,6 +6843,26 @@ tcp_connect_ipv4(tcp_t *tcp, mblk_t *mp, ipaddr_t *dstaddrp, in_port_t dstport,
 	tcp->tcp_fport = dstport;
 
 	oldstate = tcp->tcp_state;
+	/*
+	 * At this point the remote destination address and remote port fields
+	 * in the tcp-four-tuple have been filled in the tcp structure. Now we
+	 * have to see which state tcp was in so we can take apropriate action.
+	 */
+	if (oldstate == TCPS_IDLE) {
+		/*
+		 * We support a quick connect capability here, allowing
+		 * clients to transition directly from IDLE to SYN_SENT
+		 * tcp_bindi will pick an unused port, insert the connection
+		 * in the bind hash and transition to BOUND state.
+		 */
+		lport = tcp_update_next_port(tcp_next_port_to_try, B_TRUE);
+		lport = tcp_bindi(tcp, lport, &tcp->tcp_ip_src_v6, 0, B_TRUE,
+		    B_FALSE, B_FALSE);
+		if (lport == 0) {
+			mp = mi_tpi_err_ack_alloc(mp, TNOADDR, 0);
+			goto failed;
+		}
+	}
 	tcp->tcp_state = TCPS_SYN_SENT;
 
 	/*
@@ -6906,6 +6933,7 @@ tcp_connect_ipv6(tcp_t *tcp, mblk_t *mp, in6_addr_t *dstaddrp,
 	mblk_t	*mp1;
 	ip6_rthdr_t *rth;
 	int32_t  oldstate;
+	uint16_t lport;
 
 	ASSERT(tcp->tcp_family == AF_INET6);
 
@@ -7012,8 +7040,27 @@ tcp_connect_ipv6(tcp_t *tcp, mblk_t *mp, in6_addr_t *dstaddrp,
 	tcp->tcp_fport = dstport;
 
 	oldstate = tcp->tcp_state;
+	/*
+	 * At this point the remote destination address and remote port fields
+	 * in the tcp-four-tuple have been filled in the tcp structure. Now we
+	 * have to see which state tcp was in so we can take apropriate action.
+	 */
+	if (oldstate == TCPS_IDLE) {
+		/*
+		 * We support a quick connect capability here, allowing
+		 * clients to transition directly from IDLE to SYN_SENT
+		 * tcp_bindi will pick an unused port, insert the connection
+		 * in the bind hash and transition to BOUND state.
+		 */
+		lport = tcp_update_next_port(tcp_next_port_to_try, B_TRUE);
+		lport = tcp_bindi(tcp, lport, &tcp->tcp_ip_src_v6, 0, B_TRUE,
+		    B_FALSE, B_FALSE);
+		if (lport == 0) {
+			mp = mi_tpi_err_ack_alloc(mp, TNOADDR, 0);
+			goto failed;
+		}
+	}
 	tcp->tcp_state = TCPS_SYN_SENT;
-
 	/*
 	 * TODO: allow data with connect requests
 	 * by unlinking M_DATA trailers here and
@@ -12587,6 +12634,7 @@ tcp_process_options(tcp_t *tcp, tcph_t *tcph)
 		 * to be changed once this is clarified.
 		 */
 		if (tcp->tcp_sack_info != NULL) {
+			ASSERT(tcp->tcp_notsack_list == NULL);
 			kmem_cache_free(tcp_sack_info_cache,
 			    tcp->tcp_sack_info);
 			tcp->tcp_sack_info = NULL;
@@ -17264,7 +17312,7 @@ tcp_update_next_port(in_port_t port, boolean_t random)
 		if (port < tcp_smallest_anon_port) {
 			port = tcp_smallest_anon_port +
 			    port % (tcp_largest_anon_port -
-			    tcp_smallest_anon_port);
+				tcp_smallest_anon_port);
 		}
 	}
 
