@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,9 +131,8 @@ static	char	msg[MM_MXTXTLN+1];
  *	EX_NOFREE	3	A requested device couldn't be freed
  */
 
-main(argc, argv)
-	int		argc;		/* Arg count */
-	char	       *argv[];		/* Arg vector */
+int
+main(int argc, char *argv[])
 {
 	/* Automatics */
 	char		      **argp;		/* Ptr to current argument */

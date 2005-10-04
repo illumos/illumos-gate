@@ -19,13 +19,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
 
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -67,6 +68,8 @@ extern FILE *Debugfp;
 extern char Mytag[];
 
 static char *stamp(char *);
+void logmessage(char *s);
+void clean_up(int code, int flag, char *msg);
 
 /*
  * error handling and debug routines
@@ -81,8 +84,8 @@ static char *stamp(char *);
  * error: catastrophic error handler
  */
 
-error(code, exitflag)
-int code, exitflag;
+void
+error(int code, int exitflag)
 {
 	char scratch[BUFSIZ];
 
@@ -141,13 +144,12 @@ sys_error(int code, int exitflag)
  *		is exiting due to an error. (Inherrently machine dependent.)
  */
 
-clean_up(code, flag, msg)
-register code, flag;
-char *msg;
+void
+clean_up(int code, int flag, char *msg)
 {
 	extern int Dbf_entries;
 	extern void logexit();
-	extern NLPS_proc, Nflag;
+	extern int NLPS_proc, Nflag;
 	int i;
 	extern dbf_t Dbfhead;
 	dbf_t	*dbp = &Dbfhead;
@@ -221,8 +223,8 @@ debug(int level, char *format, ...)
  * logmessage:	given a string, write a message to the logfile
  */
 
-log(code)
-int code;
+void
+log(int code)
 {
 	logmessage(err_list[code].err_msg);
 }
@@ -230,13 +232,13 @@ int code;
 
 static int nlogs;		/* maintains size of logfile	*/
 
-logmessage(s)
-char *s;
+void
+logmessage(char *s)
 {
 	char log[BUFSIZ];
 	char olog[BUFSIZ];
-	register err = 0;
-	register FILE *nlogfp;
+	int err = 0;
+	FILE *nlogfp;
 	extern int Logmax;
 	extern int Splflag;
 

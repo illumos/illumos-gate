@@ -19,15 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-/*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.19.9.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Network Listener Process
@@ -173,9 +174,21 @@ extern	int	errno;
 #define FALSE	0
 #endif
 
-main(argc, argv)
-int argc;
-char **argv;
+static void mod_prvaddr(void);
+static void pitchcall(struct call_list *pending, struct t_discon *discon);
+static void clr_call(struct t_call *call);
+static void trycon(struct call_list *phead, int fd);
+static void send_dis(struct call_list *phead, int fd);
+static void doevent(struct call_list *phead, int fd);
+static void listen(void);
+static void rst_signals(void);
+static void catch_signals(void);
+static void net_open(void);
+static void init_files(void);
+static void pid_open(void);
+
+int
+main(int argc, char **argv)
 {
 	struct stat buf;
 	int ret;
@@ -190,7 +203,7 @@ char **argv;
 	int	c;
 	extern	char *optarg;
 	extern	int optind;
-	register int i;
+	int i;
 	char	*Mytag_p = Mytag;
 
 	/* Get my port monitor tag out of the environment		*/
@@ -362,7 +375,7 @@ char **argv;
 	logmessage("Initialization Complete");
 
 	listen();
-	exit(0);
+	return (0);
 }
 
 
@@ -376,10 +389,11 @@ char **argv;
 static char *pidopenmsg ="Can't create process ID file in home directory";
 static char *pidlockmsg ="Can't lock PID file: listener may already be running";
 
-pid_open()
+static void
+pid_open(void)
 {
 	int ret;
-	unsigned i;
+	unsigned int i;
 	char pidstring[20];
 
 	if ((Pidfd = open(PIDNAME, PIDOFLAG, PIDMODE)) == -1)  {
@@ -414,7 +428,8 @@ pid_open()
 static char *pmopenmsg = "Can't open pipe to read SAC messages";
 static char *sacopenmsg = "Can't open pipe to respond to SAC messages";
 
-init_files()
+static void
+init_files(void)
 {
 	close(0);
         if ((Acceptfd = open("/dev/null", O_RDWR)) != 0) {
@@ -451,13 +466,14 @@ init_files()
  *		as a developer debugging aid.
  */
 
-net_open()
+static void
+net_open(void)
 {
 #ifdef	CHARADDR
 	char pbuf[NAMEBUFSZ + 1];
 #endif	/* CHARADDR	*/
-	register int i;
-	register dbf_t *dp;
+	int i;
+	dbf_t *dp;
 	char scratch[BUFSIZ];
 
 	DEBUG((9,"in net_open"));
@@ -520,8 +536,8 @@ net_open()
 
 void
 queue(head, cp)
-register struct call_list *head;
-register struct callsave *cp;
+struct call_list *head;
+struct callsave *cp;
 {
 	DEBUG((9,"in queue"));
 	if (head->cl_tail == (struct callsave *) NULL) {
@@ -544,8 +560,8 @@ register struct callsave *cp;
 
 void
 pqueue(head, cp)
-register struct call_list *head;
-register struct callsave *cp;
+struct call_list *head;
+struct callsave *cp;
 {
 	if (head->cl_head == (struct callsave *) NULL) {
 		cp->c_np = (struct callsave *) NULL;
@@ -567,9 +583,9 @@ register struct callsave *cp;
 
 struct callsave *
 dequeue(head)
-register struct call_list *head;
+struct call_list *head;
 {
-	register struct callsave *ret;
+	struct callsave *ret;
 
 	DEBUG((9,"in dequeue"));
 	if (head->cl_head == (struct callsave *) NULL)  {
@@ -621,7 +637,7 @@ int clen;
 unsigned int *conp;
 char **adrp;
 {
-	register fd;
+	int fd;
 	int ret;
 
 	DEBUG((9,"in open_bind, qlen=%d clen=%d conp=%d",qlen,clen,conp));
@@ -662,15 +678,15 @@ char **adrp;
 
 int
 bind(fd, name, qlen, clen, ap)
-register fd;
+int fd;
 char *name;
 int qlen;
-register int clen;
+int clen;
 char **ap;
 {
-	register struct t_bind *req = (struct t_bind *)0;
-	register struct t_bind *ret = (struct t_bind *)0;
-	register char	*p, *q;
+	struct t_bind *req = (struct t_bind *)0;
+	struct t_bind *ret = (struct t_bind *)0;
+	char	*p, *q;
 	unsigned int	retval;
 	extern void	nlsaddr2c();
 	extern int	memcmp();
@@ -811,7 +827,8 @@ sigset_t Oset;
 struct sigaction Sigterm;
 struct sigaction Sigcld;
 
-catch_signals()
+static void
+catch_signals(void)
 {
 	sigset_t sset;
 	sigset_t eset;
@@ -840,7 +857,8 @@ catch_signals()
  *		reset all signals to original setting.
  */
 
-rst_signals()
+static void
+rst_signals(void)
 {
 	struct sigaction sigact;
 
@@ -870,11 +888,12 @@ sigterm()
 
 static char *dbfnewdmsg = "Using new data base file";
 
-listen()
+static void
+listen(void)
 {
-	register	i;
-	register	dbf_t	*dbp	= Dbfhead;
-	register	struct	pollfd	*sp;
+	int	i;
+	dbf_t	*dbp	= Dbfhead;
+	struct	pollfd	*sp;
 	struct		call_list *phead; /* pending head */
 
 	DEBUG((9,"in listen, tag %s", Pmmsg.pm_tag));
@@ -1046,13 +1065,12 @@ check_sac_mesg()
  * doevent:	handle an asynchronous event
  */
 
-doevent(phead, fd)
-struct call_list *phead;
-int fd;
+static void
+doevent(struct call_list *phead, int fd)
 {
 	static struct t_discon *disc;
-	register struct callsave *current;
-	register struct t_call *call;
+	struct callsave *current;
+	struct t_call *call;
 	char scratch[BUFSIZ];
 
 	DEBUG((9, "in doevent"));
@@ -1107,12 +1125,11 @@ int fd;
  *		called when we are in state PM_DISABLED
  */
 
-send_dis(phead, fd)
-struct call_list *phead;
-int	fd;
+static void
+send_dis(struct call_list *phead, int fd)
 {
-	register struct t_call *call;
-	register struct callsave *current;
+	struct t_call *call;
+	struct callsave *current;
 	char	scratch[BUFSIZ];
 
 	DEBUG((9, "sending disconnect"));
@@ -1141,12 +1158,11 @@ int	fd;
  * trycon:	try to accept a connection
  */
 
-trycon(phead, fd)
-struct call_list *phead;
-int fd;
+static void
+trycon(struct call_list *phead, int fd)
 {
-	register struct callsave *current;
-	register struct t_call *call;
+	struct callsave *current;
+	struct t_call *call;
 	int i;
 	pid_t pid;
 	dbf_t *dbp;
@@ -1300,15 +1316,16 @@ cleanup:
 static char homeenv[BUFSIZ];
 static char pathenv[BUFSIZ];
 
+int
 start_server(netfd, dbp)
 int netfd;
-register dbf_t *dbp;
+dbf_t *dbp;
 {
 	char	*path;
 	char	**argvp;
 	extern	char **environ;
 	extern	char **mkdbfargv();
-	register struct passwd *pwdp;
+	struct passwd *pwdp;
 	struct	group *grpp;
 	char	msgbuf[256];
 	int	i;
@@ -1472,9 +1489,9 @@ static char prefenv[2*PATHSIZE];
 
 int
 senviron(call)
-register struct t_call *call;
+struct t_call *call;
 {
-	register char *p;
+	char *p;
 	extern void nlsaddr2c();
 	extern char *getenv();
 
@@ -1543,8 +1560,8 @@ char *
 parse(s)
 char *s;
 {
-	register char *p;
-	register char *tp;
+	char *p;
+	char *tp;
 	char scratch[BUFSIZ];
 	int delim;
 
@@ -1585,8 +1602,8 @@ char *s;
  * clr_call:	clear out a call structure
  */
 
-clr_call(call)
-struct t_call *call;
+static void
+clr_call(struct t_call *call)
 {
 	call->sequence = 0;
 	call->addr.len = 0;
@@ -1602,11 +1619,10 @@ struct t_call *call;
  * pitchcall: remove call from pending list
  */
 
-pitchcall(pending, discon)
-struct call_list *pending;
-struct t_discon *discon;
+static void
+pitchcall(struct call_list *pending, struct t_discon *discon)
 {
-	register struct callsave *p, *oldp;
+	struct callsave *p, *oldp;
 
 	DEBUG((9, "pitching call, sequence # is %d", discon->sequence));
 	if (EMPTYLIST(pending)) {
@@ -1652,13 +1668,14 @@ struct t_discon *discon;
  *	shouldn't ever change enough for this to matter.
  */
 
+int
 add_prvaddr(dbp)
 dbf_t *dbp;
 {
 	extern	char	*t_alloc();
-	register int	j;
+	int	j;
 	struct	call_list *temp_pend;
-	register struct	callsave *tmp;
+	struct	callsave *tmp;
 	char	scratch[BUFSIZ];
 	int	bindfd;
 	extern	struct	netbuf *stoa();
@@ -1740,7 +1757,8 @@ dbf_t *dbp;
  * mod_prvaddr -- after re-reading the database, take appropriate action for
  *		  new, deleted, or changed addresses.
  */
-mod_prvaddr()
+static void
+mod_prvaddr(void)
 {
 	dbf_t	*entry_p;
 	dbf_t	*oldentry_p;
@@ -1849,6 +1867,7 @@ mod_prvaddr()
  * unbind the address, close the file descriptor, and free call structs
  */
 
+int
 del_prvaddr(dbp)
 dbf_t	*dbp;
 {
@@ -1917,7 +1936,7 @@ char	*new_code;
 
 void
 rpc_register(dbp)
-register dbf_t *dbp;
+dbf_t *dbp;
 {
 	char	str[NAMEBUFSZ];
 	char	scratch[BUFSIZ];
@@ -1958,7 +1977,7 @@ register dbf_t *dbp;
 
 void
 rpc_unregister(dbp)
-register dbf_t *dbp;
+dbf_t *dbp;
 {
 	DEBUG((9, "in rpc_unregister"));
 	if (dbp->dbf_prognum == -1 || dbp->dbf_version == -1)

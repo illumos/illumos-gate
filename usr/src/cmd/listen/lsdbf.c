@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8.5.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * data base routines for the network listener process
@@ -82,6 +88,7 @@ extern char  *New_cmd_lines; /* svc_code, cmd_line, mod_list (on reread)*/
  * data base file after the listener's initialization.
  */
 
+int
 read_dbf(re_read)
 int	re_read;	/* zero means first time	*/
 {
@@ -182,6 +189,7 @@ int	re_read;	/* zero means first time	*/
  *	    checking for duplicate entries as we go
  */
 
+int
 get_dbf(dbf_p, cmd_p)
 register dbf_t *dbf_p;
 register char *cmd_p;
@@ -708,7 +716,8 @@ int mflag;
 
 #define VERSIONSTR	"# VERSION="
 
-check_version()
+int
+check_version(void)
 {
 	FILE *fp;
 	char *line, *p, *tmp;

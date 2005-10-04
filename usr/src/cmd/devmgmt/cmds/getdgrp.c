@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -160,9 +160,8 @@ static	char	txt[MM_MXTXTLN+1];
  *		opened for reading
  */
 
-main(argc, argv)
-	int	argc;		/* Number of items on the command line */
-	char  **argv;		/* List of pointers to the arguments */
+int
+main(int argc, char **argv)
 {
 
 	/* 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,9 +129,8 @@ static	char	msg[MM_MXTXTLN+1];
  *	3	Device group doesn't exist
  */
 
-main(argc, argv)
-	int	argc;			/* Number of items in command */
-	char  **argv;			/* List of pointers to the arguments */
+int
+main(int argc, char **argv)
 {
 
 	/* 

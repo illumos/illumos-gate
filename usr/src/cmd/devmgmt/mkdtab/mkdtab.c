@@ -20,14 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-/*	#ident	"@(#)devintf:mkdtab/mkdtab.c	1.1.3.1"	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -61,7 +58,7 @@
  */
 #define	ORIGLEN	1024
 
-static struct dpart {
+struct dpart {
 	char	alias[20];
 	char	*cdevice;
 	char	*bdevice;
@@ -536,7 +533,7 @@ checkandresize(int size)
 }
 
 /*ARGSUSED*/
-void
+int
 main(int argc, char **argv)
 {
 	(void) strncpy(cmd, argv[0], 80);
@@ -559,6 +556,6 @@ main(int argc, char **argv)
 	 */
 	mkdgroups();
 
-	exit(0);
+	return (0);
 
 }

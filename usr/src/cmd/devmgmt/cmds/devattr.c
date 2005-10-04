@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,9 +157,8 @@ static char	txt[MM_MXTXTLN+1];
  *	4	A requested attribute was not defined for the device
  */
 
-main(argc, argv)
-	int	argc;		/* Number of arguments */
-	char   *argv[];		/* Pointer to arguments */
+int
+main(int argc, char *argv[])
 {
 
 	/* Automatic data */

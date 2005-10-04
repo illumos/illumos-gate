@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,7 @@ prog_name(char *arg0)
 	return (arg0);
 }
 
+int
 main(int argc, char **argv)
 {
 	int c, n;

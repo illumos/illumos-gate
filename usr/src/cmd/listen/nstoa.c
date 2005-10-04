@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 	stoa - convert string to address
@@ -494,6 +500,7 @@ char	*s;
 	Return 0 if anything failed, else 1.
 */
 
+int
 scan(s)
 char	*s;
 {

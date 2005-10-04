@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lssmb.c:	Contains all code specific to the  MS-NET file server.
@@ -54,6 +60,7 @@
 
 extern char *malloc();
 char	*bytes_to_ascii();
+void	getword(char *addr, short *w);
 
 /*
  * In the event of an error, it may be necessary to send a response to
@@ -88,17 +95,18 @@ static unsigned char errbuf[] = {
  * Protocol...the functions gets called after the listener forks.
  */
 
+void
 smbservice(bp, bufsize, argv)
-register char *bp;	/* pointer to message buffer */
+char *bp;		/* pointer to message buffer */
 int bufsize;		/* size of message */
 char **argv;		/* server arguments */
 {
 	char *server = *argv;	/* path of server 		*/
 	char logbuf[256];
-	register char **args;
-	register int i, m_size;
-	register int twos, nulls;
-	register char *p, *q;
+	char **args;
+	int i, m_size;
+	int twos, nulls;
+	char *p, *q;
 	short size;
 
 	/*
@@ -236,11 +244,10 @@ char **argv;		/* server arguments */
 	args[i] = NULL;
 
 	exec_cmd((dbf_t *)0, args);
-	return(-1);			/* error logged in start_server */
+	return;			/* error logged in start_server */
 
 badexit:
 	logmessage(logbuf);
-	return(-1);
 }
 
 
@@ -252,9 +259,8 @@ badexit:
  * (NOTE that word is a 16-bit iapx-286 word).
  */
 
-getword(addr, w)
-register char *addr;
-short *w;
+void
+getword(char *addr, short *w)
 {
 	lobyte(*w) = *addr++;
 	hibyte(*w) = *addr;
@@ -300,14 +306,13 @@ int n;			/* size of input buffer */
 
 #else
 
-
+void
 smbservice(bp, size, argv)
 char *bp;		/* pointer to message buffer */
 int size;		/* size of message */
 char **argv;		/* server arguments */
 {
 	logmessage("SMB service NOT supported");
-	return(-1);
 }
 
 #endif	/* SMBSERVICE */

@@ -19,17 +19,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"
-		/* SVr4.0 1.3.4.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* system include files	*/
 
@@ -97,10 +96,11 @@ char	Altbasedir[BUFSIZ];
 char	Basedir[BUFSIZ];
 extern	char *getenv();
 
-main (path, argv, environ)
-char *path;
-char **argv;
-char **environ;
+static void nls_reply(int code, char *text);
+static void nullfix(void);
+
+int
+main(int argc, char **argv)
 {
 	extern int read_dbf();
 	char *provider;
@@ -139,13 +139,14 @@ char **environ;
  *  nlps_server: 
  */
 
+int
 nlps_server()
 {
-	register size;
+	int size;
 	char buf[RCVBUFSZ];
 	char **argv;
-	register char *bp = buf;
-	register dbf_t *dbp;
+	char *bp = buf;
+	dbf_t *dbp;
 	dbf_t *getdbfentry();
 	extern char **mkdbfargv();
 
@@ -218,10 +219,10 @@ nlps_server()
 
 int
 getrequest(bp)
-register char *bp;
+char *bp;
 {
-	register size;
-	register char *tmp = bp;
+	int size;
+	char *tmp = bp;
 	int flags;
 	extern void timeout();
 	short cnt;
@@ -338,7 +339,8 @@ register char *bp;
  * in the log file.
  */
 
-nullfix()
+static void
+nullfix(void)
 {
 	struct strpeek peek;
 	register struct strpeek *peekp;
@@ -558,6 +560,7 @@ char *bp;
  *			 FALSE== bad format
  */
 
+int
 nls_chkmsg(bp, size, lowp, highp, svc_code_p)
 char *bp, *svc_code_p;
 int size, *lowp, *highp;
@@ -586,9 +589,8 @@ int size, *lowp, *highp;
 
 static char *srrpprot = "%d:%d:%s";
 
-nls_reply(code, text)
-register code;
-register char *text;
+static void
+nls_reply(int code, char *text)
 {
 	char scratch[256];
 
@@ -614,18 +616,17 @@ static char homeenv[BUFSIZ];
 #define NETFD	0
 
 
-exec_cmd(dbp, o_argv)
-register dbf_t *dbp;
-register char **o_argv;
+int
+exec_cmd(dbf_t *dbp, char **o_argv)
 {
 	char *path;
 	char **argvp;
 	extern char **environ;
 	dbf_t *getdbfentry();
 	extern char **mkdbfargv();
-	register struct passwd *pwdp;
+	struct passwd *pwdp;
 	struct group *grpp;
-	register dbf_t *wdbp = dbp;
+	dbf_t *wdbp = dbp;
 	int	i;
 
 	/*

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,9 +193,8 @@ mklbl(cmd)
  *			for the device and therefore wasn't removed
  */
 
-main(argc, argv)
-	int	argc;			/* Argument count */
-	char   *argv[];			/* Argument list */
+int
+main(int argc, char *argv[])
 {
 	/* Automatic data */
 	char	      **plist;		/* Ptr to list of undef'nd attrs */

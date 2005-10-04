@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * nlsaddr.c:
@@ -167,8 +173,8 @@ static char hex_digits[] = "0123456789ABCDEF";
 
 void
 nlsaddr2c(charaddr, addr, len)
-register char *charaddr, *addr;
-register len;
+char *charaddr, *addr;
+int len;
 {
 	register unsigned i;
 
@@ -204,13 +210,13 @@ register len;
 
 int
 nlsc2addr(addr, maxlen, charaddr)
-register char *addr, *charaddr;
-register maxlen;
+char *addr, *charaddr;
+int maxlen;
 {
-	register len;
-	register int i;
-	register char c;
-	register unsigned char val;
+	int len;
+	int i;
+	char c;
+	unsigned char val;
 
 	if (strlen(charaddr) & 1)
 		return(-1);
