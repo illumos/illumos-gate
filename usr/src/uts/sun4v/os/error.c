@@ -459,6 +459,13 @@ cpu_async_log_err(void *flt)
 			 * the page here.
 			 */
 			errh_page_retire(errh_fltp);
+
+			/*
+			 * If we are going to panic, scrub the page first
+			 */
+			if (errh_fltp->cmn_asyncflt.flt_panic)
+				mem_scrub(errh_fltp->errh_er.ra,
+				    errh_fltp->errh_er.sz);
 		}
 		break;
 
@@ -563,18 +570,14 @@ void
 mem_scrub(uint64_t paddr, uint64_t len)
 {
 	uint64_t pa, length, scrubbed_len;
-	uint64_t ret = H_EOK;
 
 	pa = paddr;
 	length = len;
 	scrubbed_len = 0;
 
-	while (ret == H_EOK) {
-		ret = hv_mem_scrub(pa, length, &scrubbed_len);
-
-		if (ret == H_EOK || scrubbed_len >= length) {
+	while (length > 0) {
+		if (hv_mem_scrub(pa, length, &scrubbed_len) != H_EOK)
 			break;
-		}
 
 		pa += scrubbed_len;
 		length -= scrubbed_len;
@@ -585,7 +588,6 @@ void
 mem_sync(caddr_t va, size_t len)
 {
 	uint64_t pa, length, flushed;
-	uint64_t ret = H_EOK;
 
 	pa = va_to_pa((caddr_t)va);
 
@@ -595,12 +597,9 @@ mem_sync(caddr_t va, size_t len)
 	length = len;
 	flushed = 0;
 
-	while (ret == H_EOK) {
-		ret = hv_mem_sync(pa, length, &flushed);
-
-		if (ret == H_EOK || flushed >= length) {
+	while (length > 0) {
+		if (hv_mem_sync(pa, length, &flushed) != H_EOK)
 			break;
-		}
 
 		pa += flushed;
 		length -= flushed;
