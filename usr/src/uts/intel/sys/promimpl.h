@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,11 +42,6 @@
 
 #include <sys/types.h>
 #include <sys/promif.h>
-#ifdef __ia64
-/* XXX Merced -- these includes are for the ia64 simulator */
-#include <sys/types_ia64.h>
-#include <sys/ssc.h>
-#endif
 #include <sys/dditypes.h>
 #include <sys/ddidmareq.h>
 #include <sys/ddi_impldefs.h>

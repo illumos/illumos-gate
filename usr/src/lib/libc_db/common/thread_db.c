@@ -151,9 +151,6 @@ td_read_uberdata(td_thragent_t *ta_p)
 
 	if (ta_p->model == PR_MODEL_NATIVE) {
 		uberdata_t uberdata;
-#ifdef __ia64
-		int i;
-#endif
 
 		if (ps_pdread(ph_p, ta_p->uberdata_addr,
 		    &uberdata, sizeof (uberdata)) != PS_OK)
@@ -168,18 +165,6 @@ td_read_uberdata(td_thragent_t *ta_p)
 		if (ps_pdread(ph_p, (psaddr_t)uberdata.tdb.tdb_events,
 		    ta_p->tdb_events, sizeof (ta_p->tdb_events)) != PS_OK)
 			return (TD_DBERR);
-#ifdef __ia64
-		/*
-		 * Deal with stupid ia64 function descriptors.
-		 * We have to go indirect to get the actual function address.
-		 */
-		for (i = 0; i < TD_MAX_EVENT_NUM - TD_MIN_EVENT_NUM + 1; i++) {
-			psaddr_t addr;
-			if (ps_pdread(ph_p, ta_p->tdb_events[i],
-			    &addr, sizeof (addr)) == PS_OK)
-				ta_p->tdb_events[i] = addr;
-		}
-#endif	/* __ia64 */
 
 	} else {
 #if defined(_LP64) && defined(_SYSCALL32)

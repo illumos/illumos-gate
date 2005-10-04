@@ -134,9 +134,9 @@ typedef struct {
 	} a_un;
 } auxv64_t;
 
-#if defined(__sparcv9) || defined(__ia64)
+#if defined(__sparcv9)
 extern int client_isLP64;
-#endif	/* __sparcv9 || __ia64 */
+#endif	/* __sparcv9 */
 
 static uint64_t read_elf64(int, int, Elf64_Ehdr *);
 static Elf64_Addr iload64(char *, Elf64_Phdr *, Elf64_Phdr *, auxv64_t **);
@@ -749,9 +749,9 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 	/* Initialize pointers so we won't free bogus ones on elf64error */
 	allphdrs = NULL;
 	nhdr = NULL;
-#if defined(__sparcv9) || defined(__ia64)
+#if defined(__sparcv9)
 	client_isLP64 = 1;
-#endif	/* __sparcv9 || __ia64 */
+#endif	/* __sparcv9 */
 
 	if (verbosemode)
 		printf("Elf64 client\n");
@@ -1518,18 +1518,15 @@ char *fname;
 	static char mod_path[MOD_MAXPATH];
 	size_t len;
 	extern char *impl_arch_name;
-#if defined(__sparcv9) || defined(__ia64) || defined(BOOTAMD64)
+#if defined(__sparcv9) || defined(BOOTAMD64)
 #ifdef	__sparcv9
 	char    *isastr = "/sparcv9";
 #endif	/* __sparcv9 */
-#ifdef	__ia64
-	char	*isastr = "/ia64";
-#endif	/* __ia64 */
 #ifdef	BOOTAMD64
 	char	*isastr = "/amd64";
 #endif	/* BOOTAMD64 */
 	size_t	isalen = strlen(isastr);
-#endif	/* __sparcv9 || __ia64 || BOOTAMD64 */
+#endif	/* __sparcv9 || BOOTAMD64 */
 
 	if (p == NULL) {
 		/* strchr could not find a "/" */
@@ -1545,17 +1542,17 @@ char *fname;
 	(void) strncpy(mod_path, fname, len);
 	mod_path[len] = 0;
 
-#if defined(__sparcv9) || defined(__ia64) || defined(BOOTAMD64)
+#if defined(__sparcv9) || defined(BOOTAMD64)
 	len = strlen(mod_path);
 	if ((len > isalen) && (strcmp(&mod_path[len - isalen], isastr) == 0)) {
 		mod_path[len - isalen] = '\0';
-#if defined(__sparcv9) || defined(__ia64)
+#if defined(__sparcv9)
 		if ((client_isLP64 == 0) && verbosemode)
 			printf("Assuming LP64 %s client.\n", isastr);
 		client_isLP64 = 1;
-#endif	/* __sparcv9 || __ia64 */
+#endif	/* __sparcv9 */
 	}
-#endif	/* __sparcv9 || __ia64 || BOOTAMD64 */
+#endif	/* __sparcv9 || BOOTAMD64 */
 	mod_path_uname_m(mod_path, impl_arch_name);
 	(void) strcat(mod_path, " ");
 	(void) strcat(mod_path, MOD_DEFPATH);

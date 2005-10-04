@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI" 
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -81,7 +81,6 @@ echo_file usr/src/uts/common/sys/auxv_SPARC.h
 echo_file usr/src/uts/common/sys/elf.h
 echo_file usr/src/uts/common/sys/elf_386.h
 echo_file usr/src/uts/common/sys/elf_amd64.h
-echo_file usr/src/uts/common/sys/elf_ia64.h
 echo_file usr/src/uts/common/sys/elf_M32.h
 echo_file usr/src/uts/common/sys/elf_SPARC.h
 echo_file usr/src/uts/common/sys/elf_notes.h

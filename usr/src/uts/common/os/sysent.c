@@ -21,7 +21,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -381,7 +381,7 @@ typedef int64_t	(*llfcn_t)();	/* for casting one-word returns */
 #define	IF_i386(true, false)	false
 #endif
 
-#if defined(__i386) || defined(__ia64) || defined(__amd64)
+#if defined(__i386) || defined(__amd64)
 #define	IF_x86(true, false)	true
 #else
 #define	IF_x86(true, false)	false

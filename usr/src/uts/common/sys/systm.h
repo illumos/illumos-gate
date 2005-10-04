@@ -81,10 +81,6 @@ extern caddr_t	s_text;		/* start of kernel text segment */
 extern caddr_t	e_text;		/* end of kernel text segment */
 extern caddr_t	s_data;		/* start of kernel text segment */
 extern caddr_t	e_data;		/* end of kernel text segment */
-#if defined(__ia64)
-extern caddr_t	s_sdata;	/* start of kernel small data segment */
-extern caddr_t	e_sdata;	/* end of kernel small data segment */
-#endif /* __ia64 */
 
 extern pgcnt_t	availrmem;	/* Available resident (not swapable)	*/
 				/* memory in pages.			*/

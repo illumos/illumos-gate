@@ -109,9 +109,7 @@ const unsigned long	_mmu_pagemask	= (unsigned long)MMU_PAGEMASK;
 uintptr_t		_kernelbase	= (uintptr_t)KERNELBASE;
 uintptr_t		_userlimit	= (uintptr_t)USERLIMIT;
 uintptr_t		_userlimit32	= (uintptr_t)USERLIMIT32;
-#if !defined(__ia64)
 const uintptr_t		_argsbase	= (uintptr_t)ARGSBASE;
-#endif
 const unsigned int	_diskrpm	= (unsigned int)DISKRPM;
 const unsigned long	_pgthresh	= (unsigned long)PGTHRESH;
 const unsigned int	_maxslp		= (unsigned int)MAXSLP;
@@ -494,17 +492,6 @@ char hw_provider[] = "Sun_Microsystems";
  * /etc/bootrc at boot time.
  */
 char architecture[] = "i386";
-char architecture_32[] = "i386";
-char hw_serial[11] = "0";
-char hw_provider[SYS_NMLN] = "";
-
-#elif defined(__ia64)
-
-/*
- * On ia64 machines, read hw_serial, hw_provider and srpc_domain from
- * /etc/bootrc at boot time.
- */
-char architecture[] = "ia64";
 char architecture_32[] = "i386";
 char hw_serial[11] = "0";
 char hw_provider[SYS_NMLN] = "";

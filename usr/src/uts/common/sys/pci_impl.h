@@ -52,7 +52,7 @@ extern "C" {
 
 #define	PCI_MECHANISM_UNKNOWN		-1
 #define	PCI_MECHANISM_NONE		0
-#if defined(__i386) || defined(__ia64) || defined(__amd64)
+#if defined(__i386) || defined(__amd64)
 #define	PCI_MECHANISM_1 		1
 #define	PCI_MECHANISM_2			2
 #else

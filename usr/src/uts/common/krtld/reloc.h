@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,7 +139,7 @@ extern	const Rel_entry		reloc_table[];
 /*
  * Functions.
  */
-#if defined(__i386) || defined(__ia64) || defined(__amd64)
+#if defined(__i386) || defined(__amd64)
 extern	int	do_reloc(unsigned char, unsigned char *, Xword *,
 			const char *, const char *);
 #elif defined(__sparc)

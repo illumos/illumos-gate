@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,7 +77,7 @@ typedef	uchar_t instr_t;
  * kernel view of the ia32 register set
  */
 typedef	uchar_t		instr32_t;
-#if defined(__ia64) || defined(__amd64)
+#if defined(__amd64)
 #define	NPRGREG32	_NGREG32
 #define	prgreg32_t	greg32_t
 #define	prgregset32_t	gregset32_t

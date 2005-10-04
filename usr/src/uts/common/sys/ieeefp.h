@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +103,7 @@ enum fp_trap_enable_type {	/* trap enable bits according to bit number */
 	fp_trap_inexact	= 5
 };
 
-#endif	/* __i386 || __ia64 || __amd64 */
+#endif	/* __i386 || __amd64 */
 
 enum fp_class_type {		/* floating-point classes */
 	fp_zero		= 0,

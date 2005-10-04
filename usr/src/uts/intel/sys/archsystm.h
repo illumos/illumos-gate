@@ -129,11 +129,7 @@ extern uint_t cpu_hwcap_flags;
 extern uint_t cpu_freq;
 extern uint64_t cpu_freq_hz;
 
-#ifdef __ia64
-extern caddr_t ia64devmap(pfn_t, pgcnt_t, uint_t);
-#else
 extern caddr_t i86devmap(pfn_t, pgcnt_t, uint_t);
-#endif
 extern page_t *page_numtopp_alloc(pfn_t pfnum);
 
 extern void hwblkclr(void *, size_t);

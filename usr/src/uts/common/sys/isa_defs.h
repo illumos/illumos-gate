@@ -213,64 +213,10 @@ extern "C" {
 #endif
 
 /*
- * The feature test macro __ia64 is generic for all processors implementing
- * the Intel ia64 instruction set.
- */
-#if defined(__ia64) || defined(__ia64__)
-#if !defined(__ia64)
-#define	__ia64
-#endif
-
-/*
- * Define the appropriate "processor characteristics"
- */
-#define	_LITTLE_ENDIAN
-#define	_STACK_GROWS_DOWNWARD		/* sort of */
-#define	_LONG_LONG_LTOH
-#define	_BIT_FIELDS_LTOH
-#define	_IEEE_754
-#define	_CHAR_IS_SIGNED
-#define	_CHAR_ALIGNMENT		1
-#define	_SHORT_ALIGNMENT	2
-#define	_INT_ALIGNMENT		4
-#define	_FLOAT_ALIGNMENT	4
-#define	_LONG_ALIGNMENT		8
-#define	_LONG_LONG_ALIGNMENT	8
-#define	_DOUBLE_ALIGNMENT	8
-#define	_LONG_DOUBLE_ALIGNMENT	16
-#define	_POINTER_ALIGNMENT	8
-#define	_MAX_ALIGNMENT		16
-#define	_ALIGNMENT_REQUIRED	1
-
-/*
- * Different alignment constraints for the i386 ABI in compatibility mode
- */
-#define	_LONG_LONG_ALIGNMENT_32	4
-
-/*
- * Define the appropriate "implementation choices".
- */
-#if !defined(_LP64)
-#define	_LP64
-#endif
-#if !defined(_I32LPx) && defined(_KERNEL)
-#define	_I32LPx
-#endif
-#define	_MULTI_DATAMODEL
-#define	_SUNOS_VTOC_16
-#define	_DMA_USES_PHYSADDR
-#define	_FIRMWARE_NEEDS_FDISK
-#define	_CONSOLE_OUTPUT_VIA_SOFTWARE
-#define	__i386_COMPAT
-#define	_PSM_MODULES
-#define	_RTC_CONFIG
-#define	_HAVE_CPUID_INSN
-
-/*
  * The following set of definitions characterize Solaris on AMD's
  * 64-bit systems.
  */
-#elif defined(__x86_64) || defined(__amd64)
+#if defined(__x86_64) || defined(__amd64)
 
 #if !defined(__amd64)
 #define	__amd64		/* preferred guard */

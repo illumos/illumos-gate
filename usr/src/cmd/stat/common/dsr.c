@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -345,7 +345,7 @@ insert_dlist_ent(disk_list_t *n, disk_list_t **hd)
 			 */
 			if (n->devtype == DISK || n->devtype == OSA_DISK) {
 				n->flags = SLICES_OK;
-#if defined(i386) || defined(__ia64)
+#if defined(__i386)
 				n->flags |= PARTITIONS_OK;
 #endif
 			} else {

@@ -107,9 +107,6 @@ typedef struct _kthread {
 	struct _kthread	*t_link; /* dispq, sleepq, and free queue link */
 
 	caddr_t	t_stk;		/* base of stack (kernel sp value to use) */
-#if defined(__ia64)
-	caddr_t	t_regstk;	/* base of register stack (initial bsp value) */
-#endif
 	void	(*t_startpc)(void);	/* PC where thread started */
 	struct cpu *t_bound_cpu; /* cpu bound to, or NULL if not bound */
 	short	t_affinitycnt;	/* nesting level of kernel affinity-setting */
@@ -277,9 +274,6 @@ typedef struct _kthread {
 	struct copyops	*t_copyops;	/* copy in/out ops vector */
 
 	caddr_t		t_stkbase;	/* base of the the stack */
-#if defined(__ia64)
-	size_t		t_stksize;	/* size of the the stack */
-#endif
 	struct page	*t_red_pp;	/* if non-NULL, redzone is mapped */
 
 	struct _afd	t_activefd;	/* active file descriptor table */

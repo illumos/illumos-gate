@@ -50,33 +50,7 @@ struct module_list {
 typedef unsigned short	symid_t;		/* symbol table index */
 typedef unsigned char	*reloc_dest_t;
 
-#if defined(__ia64)
-typedef	struct kobj_funcdesc {
-	char			*kf_name;	/* function name */
-	Elf64_Addr		kf_faddr;	/* function address */
-	Elf64_Addr		kf_gp;		/* GP for module */
-	struct kobj_funcdesc	*kf_next;	/* next FD in chain */
-} kobj_funcdesc;
-
-typedef struct {
-	char			*m_sdata;	/* address of ia64 small data */
-	char			*m_gotaddr;	/* starting address of */
-						/*	GOT table */
-	char			*m_gotend;	/* tail of filled in */
-						/*	GOT table */
-	unsigned long		m_gotcnt;	/* number of GOT entries */
-	size_t 			m_sdatasize;	/* size of small data + */
-						/*	got table */
-	uint_t			m_fdhsize;	/* # of hash buckets for */
-						/*	FD list */
-	kobj_funcdesc		**m_fdbuckets;	/* head of FD bucket's */
-	kobj_funcdesc		*m_fdchains;	/* head of FD hash list */
-	kobj_funcdesc		*m_fdfree;	/* next free FD bucket */
-	char			*m_fstrtab;	/* strtab for func descs */
-} module_mach;
-#else
 typedef	void	module_mach;
-#endif
 
 struct module {
 	int total_allocated;
@@ -206,8 +180,6 @@ extern int kobj_filbuf(struct _buf *);
 extern void kobj_sync(void);
 #if defined(__i386) || defined(__sparc) || defined(__amd64)
 extern void kobj_vmem_init(vmem_t **, vmem_t **);
-#elif defined(__ia64)
-extern void kobj_vmem_init(vmem_t **, vmem_t **, vmem_t **);
 #else
 #error "ISA not supported"
 #endif

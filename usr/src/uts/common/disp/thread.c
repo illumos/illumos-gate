@@ -282,9 +282,6 @@ thread_create(
 	kthread_t *t;
 	extern struct classfuncs sys_classfuncs;
 	turnstile_t *ts;
-#if defined(__ia64)
-	size_t regstksize;
-#endif
 
 	/*
 	 * Every thread keeps a turnstile around in case it needs to block.
@@ -325,11 +322,6 @@ thread_create(
 			cmn_err(CE_PANIC, "thread_create: proposed stack size"
 			    " too small to hold thread.");
 #ifdef STACK_GROWTH_DOWN
-#if defined(__ia64)
-		/* "stksize / 2" may need to be adjusted */
-		stksize = stksize / 2;	/* needs to match below */
-		regstksize = stksize;
-#endif
 		stksize -= SA(sizeof (kthread_t) + PTR24_ALIGN - 1);
 		stksize &= -PTR24_ALIGN;	/* make thread aligned */
 		t = (kthread_t *)(stk + stksize);
@@ -340,10 +332,6 @@ thread_create(
 #endif
 		t->t_stk = stk + stksize;
 		t->t_stkbase = stk;
-#if defined(__ia64)
-		t->t_regstk = stk + regstksize;
-		t->t_stksize = regstksize * 2;	/* needs to match above */
-#endif
 #else	/* stack grows to larger addresses */
 		stksize -= SA(sizeof (kthread_t));
 		t = (kthread_t *)(stk);
@@ -366,16 +354,8 @@ thread_create(
 		 * upon entry to the kernel
 		 */
 #ifdef STACK_GROWTH_DOWN
-#if defined(__ia64)
-		/* "stksize / 2" may need to be adjusted */
-		t->t_stk = stk + (stksize / 2);	/* grows down */
-		t->t_regstk = t->t_stk;		/* grows up from same place */
-		t->t_stkbase = stk;
-		t->t_stksize = stksize;
-#else
 		t->t_stk = stk + stksize;
 		t->t_stkbase = stk;
-#endif
 #else
 		t->t_stk = stk;			/* 3b2-like */
 		t->t_stkbase = stk + stksize;

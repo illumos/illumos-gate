@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/packages/Makefile
@@ -152,9 +152,7 @@ $(VAR_SPEC_ON)		$(ROOT)/usr/include/apptrace_impl.h
 			$(ROOT)/usr/include/sys/link.h \
 			$(ROOT)/usr/include/sys/note.h \
 			$(ROOT)/usr/include/sys/systeminfo.h
-$(VAR_SPEC_ON)	@ cd $(SRC)/uts/common/sys; pwd; $(MAKE) \
-$(VAR_SPEC_ON)		$(ROOT)/usr/include/sys/elf_ia64.h
-		@ cd $(SRC)/uts/$(M32)/sys; pwd; $(MAKE) \
+$(VAR_SPEC_ON)	@ cd $(SRC)/uts/$(M32)/sys; pwd; $(MAKE) \
 			$(ROOT)/usr/include/sys/machelf.h
 $(VAR_SPEC_ON)	@ cd $(SRC)/lib/abi; pwd; $(MAKE) spec
 		@ cd ../tools/$(MACH); pwd; $(MAKE) sgsmsg piglatin

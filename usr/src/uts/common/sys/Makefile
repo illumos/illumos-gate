@@ -192,7 +192,6 @@ CHKHDRS=			\
 	elf_386.h		\
 	elf_M32.h		\
 	elf_SPARC.h		\
-	elf_ia64.h		\
 	elf_notes.h		\
 	elf_amd64.h		\
 	elftypes.h		\

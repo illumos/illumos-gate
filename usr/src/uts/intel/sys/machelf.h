@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,9 +33,7 @@
 extern "C" {
 #endif
 
-#if defined(__ia64)
-#include <sys/elf_ia64.h>
-#elif defined(__amd64)
+#if defined(__amd64)
 #include <sys/elf_amd64.h>
 #elif defined(__i386)
 #include <sys/elf_386.h>

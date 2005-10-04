@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,10 +32,6 @@
 #if defined(__i386) || defined(__amd64)
 
 #include <ia32/sys/stack.h>	/* XX64 x86/sys/stack.h */
-
-#elif defined(__ia64)
-
-#include <ia64/sys/stack.h>
 
 #endif
 

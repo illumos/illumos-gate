@@ -1509,9 +1509,6 @@ top:
 #if defined(__sparc)
 	ehdr->e_ident[EI_DATA] = ELFDATA2MSB;
 	ehdr->e_machine = EM_SPARCV9;
-#elif defined(__ia64)
-	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
-	ehdr->e_machine = EM_IA_64;
 #elif defined(__amd64)
 	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
 	ehdr->e_machine = EM_AMD64;

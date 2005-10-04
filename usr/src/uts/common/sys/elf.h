@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -734,10 +734,6 @@ int	elfheadcheck(unsigned char, Elf32_Half, Elf32_Word);
 
 #if defined(ELF_TARGET_ALL) || defined(ELF_TARGET_386)
 #include <sys/elf_386.h>
-#endif
-
-#if defined(ELF_TARGET_ALL) || defined(ELF_TARGET_IA64)
-#include <sys/elf_ia64.h>
 #endif
 
 #if defined(ELF_TARGET_ALL) || defined(ELF_TARGET_AMD64)
