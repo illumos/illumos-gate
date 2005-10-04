@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,13 +53,13 @@ typedef struct objinfo {
 	caddr_t			o_lpc;		/* low PC */
 	caddr_t			o_hpc;		/* high PC */
 	int			o_fd;		/* file descriptor */
-	Elf *			o_elf;		/* Elf pointer */
-	Elf_Sym *		o_syms;		/* symbol table */
+	Elf 			*o_elf;		/* Elf pointer */
+	Elf_Sym 		*o_syms;	/* symbol table */
 	uint_t			o_symcnt;	/* # of symbols */
-	const char *		o_strs;		/* symbol string  table */
-	Link_map *		o_lmp;
+	const char 		*o_strs;	/* symbol string  table */
+	Link_map 		*o_lmp;
 	uint_t			o_flags;
-	struct objinfo *	o_next;
+	struct objinfo 		*o_next;
 } Objinfo;
 
 #define	FLG_OB_NOSYMS	0x0001		/* no symbols available for obj */
@@ -67,7 +67,11 @@ typedef struct objinfo {
 
 
 #if defined(__sparc) || defined(__sparcv9)
+#if defined(__GNUC__)
+#define	FLUSHWIN() __asm__("ta 3");
+#else	/* !__GNUC__ */
 #define	FLUSHWIN() asm("ta 3");
+#endif
 #define	FRAME_PTR_INDEX 1
 #define	SKIP_FRAMES 0
 #endif

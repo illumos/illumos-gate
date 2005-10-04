@@ -1500,8 +1500,6 @@ All the above change is incorporated in the following patches:
 6301218 Matlab dumps core on startup when running on 112963-22  (D)
 --------------------------------------------------------------------------------
 All the above change is incorporated in the following patches:
-    Solaris/SunOS 5.10_sparc	patch T117461-06
-    Solaris/SunOS 5.10_x86	patch T118345-08
     Solaris/SunOS 5.9_sparc	patch T112963-23
     Solaris/SunOS 5.9_x86	patch T113986-19
     Solaris/SunOS 5.8_sparc	patch T109147-38
@@ -1524,3 +1522,9 @@ All the above change is incorporated in the following patches:
 PSARC 2005/514 - AMD64 - large section support
 6314743 Linker: incorrect resolution for R_AMD64_GOTPC32
 6311865 Linker: x86 medium model; invalid ELF program header
+--------------------------------------------------------------------------------
+All the above change is incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T117461-XX
+    Solaris/SunOS 5.10_x86	patch T118345-XX
+--------------------------------------------------------------------------------
+6309061 link_audit should use __asm__ with gcc
