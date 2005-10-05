@@ -20,17 +20,21 @@
  * CDDL HEADER END
  */
 /*
- * awk -- process input files, field extraction, output
- *
- * Copyright (c) 1995, 1996-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- *
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * Copyright 1986, 1994 by Mortice Kern Systems Inc.  All rights reserved.
- *
- * Based on MKS awk(1) ported to be /usr/xpg4/bin/awk with POSIX/XCU4 changes
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * awk -- process input files, field extraction, output
+ *
+ * Based on MKS awk(1) ported to be /usr/xpg4/bin/awk with POSIX/XCU4 changes
+ */
 
 #include "awk.h"
 #include "y.tab.h"
@@ -42,7 +46,7 @@ static int	exstat;			/* Exit status */
 static FILE	*openfile(NODE *np, int flag, int fatal);
 static FILE	*newfile(void);
 static NODE	*nextarg(NODE **npp);
-static void	adjust_buf(wchar_t **,int *, wchar_t **, char *, size_t);
+static void	adjust_buf(wchar_t **, int *, wchar_t **, char *, size_t);
 static void	awk_putwc(wchar_t, FILE *);
 
 /*
@@ -69,12 +73,12 @@ nextrecord(wchar_t *cp, FILE *fp)
 	wchar_t *ep = cp;
 
 nextfile:
-	if (fp==FNULL && (fp=newfile())==FNULL)
+	if (fp == FNULL && (fp = newfile()) == FNULL)
 		return (0);
 	if ((*awkrecord)(ep, NLINE, fp) == NULL) {
 		if (fp == awkinfp) {
 			if (fp != stdin)
-				(void)fclose(awkinfp);
+				(void) fclose(awkinfp);
 			awkinfp = fp = FNULL;
 			goto nextfile;
 		}
@@ -84,11 +88,13 @@ nextfile:
 	}
 	if (fp == awkinfp) {
 		if (varNR->n_flags & FINT)
-			++varNR->n_int; else
-			(void)exprreduce(incNR);
+			++varNR->n_int;
+		else
+			(void) exprreduce(incNR);
 		if (varFNR->n_flags & FINT)
-			++varFNR->n_int; else
-			(void)exprreduce(incFNR);
+			++varFNR->n_int;
+		else
+			(void) exprreduce(incFNR);
 	}
 	if (cp == linebuf) {
 		lbuflen = reclen;
@@ -99,10 +105,49 @@ nextfile:
 	/* if record length is too long then bail out */
 	if (reclen > NLINE - 2) {
 		awkerr(gettext("Record too long (LIMIT: %d bytes)"),
-			NLINE - 1);
+		    NLINE - 1);
 		/* Not Reached */
 	}
 	return (1);
+}
+
+/*
+ * isclvar()
+ *
+ * Returns 1 if the input string, arg, is a variable assignment,
+ * otherwise returns 0.
+ *
+ * An argument to awk can be either a pathname of a file, or a variable
+ * assignment.  An operand that begins with an undersore or alphabetic
+ * character from the portable character set, followed by a sequence of
+ * underscores, digits, and alphabetics from the portable character set,
+ * followed by the '=' character, shall specify a variable assignment
+ * rather than a pathname.
+ */
+int
+isclvar(wchar_t *arg)
+{
+	wchar_t	*tmpptr = arg;
+
+	if (tmpptr != NULL) {
+
+		/* Begins with an underscore or alphabetic character */
+		if (iswalpha(*tmpptr) || *tmpptr == '_') {
+
+			/*
+			 * followed by a sequence of underscores, digits,
+			 * and alphabetics
+			 */
+			for (tmpptr++; *tmpptr; tmpptr++) {
+				if (!(isalnum(*tmpptr) || (*tmpptr == '_'))) {
+					break;
+				}
+			}
+			return (*tmpptr == '=');
+		}
+	}
+
+	return (0);
 }
 
 /*
@@ -115,8 +160,8 @@ newfile()
 {
 	static int argindex = 1;
 	static int filedone;
-	register wchar_t *ap;
-	register int argc;
+	wchar_t *ap;
+	int argc;
 	wchar_t *arg;
 	extern void strescape(wchar_t *);
 
@@ -132,24 +177,29 @@ newfile()
 		}
 		constant->n_int = argindex++;
 		arg = (wchar_t *)exprstring(ARGVsubi);
-		if ((ap = wcschr(arg, '=')) != NULL) {
+		/*
+		 * If the argument contains a '=', determine if the
+		 * argument needs to be treated as a variable assignment
+		 * or as the pathname of a file.
+		 */
+		if (((ap = wcschr(arg, '=')) != NULL) && isclvar(arg)) {
 			*ap = '\0';
 			strescape(ap+1);
-			strassign(vlook(arg),linebuf,FALLOC|FSENSE,
-				wcslen(linebuf));
+			strassign(vlook(arg), linebuf, FALLOC|FSENSE,
+			    wcslen(linebuf));
 			*ap = '=';
 			continue;
 		}
 		if (arg[0] == '\0')
 			continue;
 		++filedone;
-		if (arg[0]=='-' && arg[1]=='\0') {
+		if (arg[0] == '-' && arg[1] == '\0') {
 			awkinfp = stdin;
 			break;
 		}
 		if ((awkinfp = fopen(mbunconvert(arg), r)) == FNULL) {
 			(void) fprintf(stderr, gettext("input file \"%s\""),
-				mbunconvert(arg));
+			    mbunconvert(arg));
 			exstat = 1;
 			continue;
 		}
@@ -157,8 +207,9 @@ newfile()
 	}
 	strassign(varFILENAME, arg, FALLOC, wcslen(arg));
 	if (varFNR->n_flags & FINT)
-		varFNR->n_int = 0; else
-		(void)exprreduce(clrFNR);
+		varFNR->n_int = 0;
+	else
+		(void) exprreduce(clrFNR);
 	return (awkinfp);
 }
 
@@ -170,26 +221,27 @@ newfile()
 wchar_t *
 defrecord(wchar_t *bp, int lim, FILE *fp)
 {
-	register wchar_t *endp;
+	wchar_t *endp;
 
 	if (fgetws(bp, lim, fp) == NULL) {
 		*bp = '\0';
 		return (NULL);
 	}
-/* XXXX
-	switch (fgetws(bp, lim, fp)) {
-	case M_FGETS_EOF:
-		*bp = '\0';
-		return (NULL);
-	case M_FGETS_BINARY:
-		awkerr(gettext("file is binary"));
-	case M_FGETS_LONG:
-		awkerr(gettext("line too long: limit %d"),
-			lim);
-	case M_FGETS_ERROR:
-		awkperr(gettext("error reading file"));
-	}
-*/
+/*
+ * XXXX
+ *	switch (fgetws(bp, lim, fp)) {
+ *	case M_FGETS_EOF:
+ *		*bp = '\0';
+ *		return (NULL);
+ *	case M_FGETS_BINARY:
+ *		awkerr(gettext("file is binary"));
+ *	case M_FGETS_LONG:
+ *		awkerr(gettext("line too long: limit %d"),
+ *			lim);
+ *	case M_FGETS_ERROR:
+ *		awkperr(gettext("error reading file"));
+ *	}
+ */
 
 	if (*(endp = (bp + (reclen = wcslen(bp))-1)) == '\n') {
 		*endp = '\0';
@@ -206,18 +258,18 @@ defrecord(wchar_t *bp, int lim, FILE *fp)
 wchar_t *
 charrecord(wchar_t *abp, int alim, FILE *fp)
 {
-	register wchar_t *bp;
-	register wint_t c;
-	register int limit = alim;
-	register wint_t endc;
+	wchar_t *bp;
+	wint_t c;
+	int limit = alim;
+	wint_t endc;
 
 	bp = abp;
 	endc = *(wchar_t *)varRS->n_string;
-	while (--limit>0 && (c = getwc(fp))!=endc && c!=WEOF)
+	while (--limit > 0 && (c = getwc(fp)) != endc && c != WEOF)
 		*bp++ = c;
 	*bp = '\0';
 	reclen = bp-abp;
-	return (c==WEOF && bp==abp ? NULL : abp);
+	return (c == WEOF && bp == abp ? NULL : abp);
 }
 
 /*
@@ -226,8 +278,8 @@ charrecord(wchar_t *abp, int alim, FILE *fp)
 wchar_t *
 multirecord(wchar_t *abp, int limit, FILE *fp)
 {
-	register wchar_t *bp;
-	register int c;
+	wchar_t *bp;
+	int c;
 
 	while ((c = getwc(fp)) == '\n')
 		;
@@ -235,7 +287,7 @@ multirecord(wchar_t *abp, int limit, FILE *fp)
 	if (c != WEOF) do {
 		if (--limit == 0)
 			break;
-		if (c=='\n' && bp[-1]=='\n')
+		if (c == '\n' && bp[-1] == '\n')
 			break;
 
 		*bp++ = c;
@@ -244,7 +296,7 @@ multirecord(wchar_t *abp, int limit, FILE *fp)
 	if (bp > abp)
 		*--bp = '\0';
 	reclen = bp-abp;
-	return (c==WEOF && bp==abp ? NULL : abp);
+	return (c == WEOF && bp == abp ? NULL : abp);
 }
 
 /*
@@ -257,15 +309,16 @@ multirecord(wchar_t *abp, int limit, FILE *fp)
 wchar_t *
 whitefield(wchar_t **endp)
 {
-	register wchar_t *sp;
-	register wchar_t *ep;
+	wchar_t *sp;
+	wchar_t *ep;
 
 	sp = *endp;
-	while (*sp==' ' || *sp=='\t' || *sp=='\n')
+	while (*sp == ' ' || *sp == '\t' || *sp == '\n')
 		++sp;
 	if (*sp == '\0')
 		return (NULL);
-	for (ep = sp; *ep!=' ' && *ep!='\0' && *ep!='\t' && *ep!='\n'; ++ep)
+	for (ep = sp; *ep != ' ' && *ep != '\0' && *ep != '\t' &&
+	    *ep != '\n'; ++ep)
 		;
 	*endp = ep;
 	return (sp);
@@ -278,14 +331,14 @@ whitefield(wchar_t **endp)
 wchar_t *
 blackfield(wchar_t **endp)
 {
-	register wchar_t *cp;
-	register int endc;
+	wchar_t *cp;
+	int endc;
 
 	endc = *(wchar_t *)varFS->n_string;
 	cp = *endp;
 	if (*cp == '\0')
 		return (NULL);
-	if (*cp==endc && fcount!=0)
+	if (*cp == endc && fcount != 0)
 		cp++;
 	if ((*endp = wcschr(cp, endc)) == NULL)
 		*endp = wcschr(cp, '\0');
@@ -300,8 +353,8 @@ blackfield(wchar_t **endp)
 wchar_t *
 refield(wchar_t **endpp)
 {
-	register wchar_t *cp, *start;
-	register int flags;
+	wchar_t *cp, *start;
+	int flags;
 	static	REGWMATCH_T match[10];
 	int result;
 
@@ -336,9 +389,10 @@ again:
 		*endpp = wcschr(cp, '\0');
 		break;
 	default:
-		regerror(result, resep, (char *)linebuf, sizeof(linebuf));
+		(void) regerror(result, resep, (char *)linebuf,
+		    sizeof (linebuf));
 		awkerr(gettext("error splitting record: %s"),
-			(char *)linebuf);
+		    (char *)linebuf);
 	}
 	return (start);
 }
@@ -349,13 +403,13 @@ again:
 void
 dobegin()
 {
-	/*l
+	/*
 	 * Free all keyword nodes to save space.
 	 */
 	{
 		NODE *np;
 		int nbuck;
-		register NODE *knp;
+		NODE *knp;
 
 		np = NNULL;
 		nbuck = 0;
@@ -363,22 +417,22 @@ dobegin()
 			if (knp->n_type == KEYWORD)
 				delsymtab(knp, 1);
 	}
-	/*l
+	/*
 	 * Copy ENVIRON array only if needed.
 	 * Note the convoluted work to assign to an array
 	 * and that the temporary nodes will be freed by
 	 * freetemps() because we are "running".
 	 */
 	if (needenviron) {
-		register char **app;
-		register wchar_t *name, *value;
-		register NODE *namep = stringnode(_null, FSTATIC, 0);
-		register NODE *valuep = stringnode(_null, FSTATIC, 0);
-		register NODE *ENVsubname = node(INDEX, varENVIRON, namep);
+		char **app;
+		wchar_t *name, *value;
+		NODE *namep = stringnode(_null, FSTATIC, 0);
+		NODE *valuep = stringnode(_null, FSTATIC, 0);
+		NODE *ENVsubname = node(INDEX, varENVIRON, namep);
 		extern char **environ;
 
 		/* (void) m_setenv(); XXX what's this do? */
-		for (app = environ; *app != NULL;) {
+		for (app = environ; *app != NULL; /* empty */) {
 			name = mbstowcsdup(*app++);
 
 			if ((value = wcschr(name, '=')) != NULL) {
@@ -390,7 +444,7 @@ dobegin()
 				valuep->n_string = _null;
 			}
 			namep->n_strlen = wcslen(namep->n_string = name);
-			(void)assign(ENVsubname, valuep);
+			(void) assign(ENVsubname, valuep);
 			if (value != NULL)
 				value[-1] = '=';
 		}
@@ -414,7 +468,7 @@ dobegin()
 void
 doend(int s)
 {
-	register OFILE *op;
+	OFILE *op;
 
 	if (phase != END) {
 		phase = END;
@@ -435,36 +489,35 @@ doend(int s)
 void
 s_print(NODE *np)
 {
-	register FILE *fp;
+	FILE *fp;
 	NODE *listp;
-	register char *ofs;
-	register int notfirst = 0;
+	char *ofs;
+	int notfirst = 0;
 
 	fp = openfile(np->n_right, 1, 1);
 	if (np->n_left == NNULL)
-		(void)fputs(mbunconvert(linebuf), fp);
+		(void) fputs(mbunconvert(linebuf), fp);
 	else {
-		ofs =  wcstombsdup((isstring(varOFS->n_flags)) ?
-			(wchar_t *)varOFS->n_string :
-			(wchar_t *)exprstring(varOFS));
+		ofs = wcstombsdup((isstring(varOFS->n_flags)) ?
+		    (wchar_t *)varOFS->n_string :
+		    (wchar_t *)exprstring(varOFS));
 		listp = np->n_left;
 		while ((np = getlist(&listp)) != NNULL) {
 			if (notfirst++)
-				(void)fputs(ofs, fp);
+				(void) fputs(ofs, fp);
 			np = exprreduce(np);
 			if (np->n_flags & FINT)
 				(void) fprintf(fp, "%lld", (INT)np->n_int);
 			else if (isstring(np->n_flags))
-				(void) fprintf(fp, "%S",
-					np->n_string);
+				(void) fprintf(fp, "%S", np->n_string);
 			else
 				(void) fprintf(fp,
-				  mbunconvert((wchar_t *)exprstring(varOFMT)),
+				    mbunconvert((wchar_t *)exprstring(varOFMT)),
 				    (double)np->n_real);
 		}
 		free(ofs);
 	}
-	(void)fputs(mbunconvert(isstring(varORS->n_flags) ?
+	(void) fputs(mbunconvert(isstring(varORS->n_flags) ?
 	    (wchar_t *)varORS->n_string : (wchar_t *)exprstring(varORS)),
 	    fp);
 	if (ferror(fp))
@@ -477,10 +530,10 @@ s_print(NODE *np)
 void
 s_prf(NODE *np)
 {
-	register FILE *fp;
+	FILE *fp;
 
 	fp = openfile(np->n_right, 1, 1);
-	(void)xprintf(np->n_left, fp, (wchar_t **)NULL);
+	(void) xprintf(np->n_left, fp, (wchar_t **)NULL);
 	if (ferror(fp))
 		awkperr("error on printf");
 }
@@ -496,31 +549,32 @@ s_prf(NODE *np)
 NODE *
 f_getline(NODE *np)
 {
-	register wchar_t *cp;
-	register INT ret;
-	register FILE *fp;
-	register size_t len;
+	wchar_t *cp;
+	INT ret;
+	FILE *fp;
+	size_t len;
 
 	if (np->n_right == NULL && phase == END) {
 		/* Pretend we've reached end of (the non-existant) file. */
-		return intnode(0);
-        }
+		return (intnode(0));
+	}
 
 	if ((fp = openfile(np->n_right, 0, 0)) != FNULL) {
 		if (np->n_left == NNULL) {
 			ret = nextrecord(linebuf, fp);
 		} else {
-			cp = emalloc(NLINE * sizeof(wchar_t));
+			cp = emalloc(NLINE * sizeof (wchar_t));
 			ret = nextrecord(cp, fp);
 			np = np->n_left;
 			len = wcslen(cp);
-			cp = erealloc(cp, (len+1)*sizeof(wchar_t));
+			cp = erealloc(cp, (len+1)*sizeof (wchar_t));
 			if (isleaf(np->n_flags)) {
 				if (np->n_type == PARM)
 					np = np->n_next;
 				strassign(np, cp, FNOALLOC, len);
 			} else
-				(void)assign(np, stringnode(cp, FNOALLOC, len));
+				(void) assign(np, stringnode(cp,
+				    FNOALLOC, len));
 		}
 	} else
 		ret = -1;
@@ -533,11 +587,11 @@ f_getline(NODE *np)
 static FILE *
 openfile(NODE *np, int flag, int fatal)
 {
-	register OFILE *op;
-	register char *cp;
-	register FILE *fp;
-	register int type;
-	register OFILE *fop;
+	OFILE *op;
+	char *cp;
+	FILE *fp;
+	int type;
+	OFILE *fop;
 
 	if (np == NNULL) {
 		if (flag)
@@ -556,8 +610,7 @@ openfile(NODE *np, int flag, int fatal)
 				fop = op;
 			continue;
 		}
-		if (op->f_mode == type
-		 && strcmp(op->f_name, cp)==0)
+		if (op->f_mode == type && strcmp(op->f_name, cp) == 0)
 			return (op->f_fp);
 	}
 	if (fop == (OFILE *)NULL)
@@ -565,7 +618,7 @@ openfile(NODE *np, int flag, int fatal)
 		    flag ? "print/printf" : "getline", cp);
 	(void) fflush(stdout);
 	op = fop;
-	if (cp[0]=='-' && cp[1]=='\0') {
+	if (cp[0] == '-' && cp[1] == '\0') {
 		fp = flag ? stdout : stdin;
 	} else {
 		switch (np->n_type) {
@@ -575,24 +628,24 @@ openfile(NODE *np, int flag, int fatal)
 					(void) setvbuf(fp, 0, _IONBF, 0);
 			}
 			break;
-	
+
 		case APPEND:
 			fp = fopen(cp, "a");
 			break;
-	
+
 		case PIPE:
 			fp = popen(cp, w);
-			(void) setvbuf(fp, (char *) 0, _IOLBF, 0);
+			(void) setvbuf(fp, (char *)0, _IOLBF, 0);
 			break;
-	
+
 		case PIPESYM:
 			fp = popen(cp, r);
 			break;
-	
+
 		case LT:
 			fp = fopen(cp, r);
 			break;
-	
+
 		default:
 			awkerr(interr, "openfile");
 		}
@@ -603,7 +656,7 @@ openfile(NODE *np, int flag, int fatal)
 		op->f_mode = type;
 	} else if (fatal) {
 		awkperr(flag ? gettext("output file \"%s\"") :
-			gettext("input file \"%s\""), cp);
+		    gettext("input file \"%s\""), cp);
 	}
 	return (fp);
 }
@@ -614,8 +667,8 @@ openfile(NODE *np, int flag, int fatal)
 void
 awkclose(OFILE *op)
 {
-	if (op->f_mode==PIPE || op->f_mode==PIPESYM)
-		(void)pclose(op->f_fp);
+	if (op->f_mode == PIPE || op->f_mode == PIPESYM)
+		(void) pclose(op->f_fp);
 	else if (fclose(op->f_fp) == EOF)
 		awkperr("error on stream \"%s\"", op->f_name);
 	op->f_fp = FNULL;
@@ -635,19 +688,19 @@ awkclose(OFILE *op)
 size_t
 xprintf(NODE *np, FILE *fp, wchar_t **cp)
 {
-	register wchar_t *fmt;
-	register int c;
+	wchar_t *fmt;
+	int c;
 	wchar_t *bptr = (wchar_t *)NULL;
 	char fmtbuf[40];
-	register size_t length = 0;
-	register char *ofmtp;
-	register NODE *fnp;
-	register wchar_t *fmtsave;
+	size_t length = 0;
+	char *ofmtp;
+	NODE *fnp;
+	wchar_t *fmtsave;
 	int slen;
 	int cplen;
 
 	fnp = getlist(&np);
-	if (isleaf(fnp->n_flags) && fnp->n_type==PARM)
+	if (isleaf(fnp->n_flags) && fnp->n_type == PARM)
 		fnp = fnp->n_next;
 	if (isstring(fnp->n_flags)) {
 		fmt = fnp->n_string;
@@ -662,7 +715,7 @@ xprintf(NODE *np, FILE *fp, wchar_t **cp)
 	 */
 	if (cp != (wchar_t **)NULL) {
 		cplen = LINE_MAX;
-		bptr = *cp = emalloc(sizeof(wchar_t) * (cplen + wcslen(fmt)));
+		bptr = *cp = emalloc(sizeof (wchar_t) * (cplen + wcslen(fmt)));
 	}
 
 	while ((c = *fmt++) != '\0') {
@@ -727,9 +780,9 @@ xprintf(NODE *np, FILE *fp, wchar_t **cp)
 				wchar_t *ts = exprstring(nextarg(&np));
 
 				adjust_buf(cp, &cplen, &bptr, fmtbuf,
-					   wcslen(ts));
+				    wcslen(ts));
 				(void) wsprintf(bptr, (const char *) fmtbuf,
-						ts);
+				    ts);
 				bptr += (slen = wcslen(bptr));
 				length += slen;
 			}
@@ -750,11 +803,11 @@ xprintf(NODE *np, FILE *fp, wchar_t **cp)
 			*ofmtp = '\0';
 			if (bptr == (wchar_t *)NULL)
 				length += fprintf(fp, fmtbuf,
-					exprint(nextarg(&np)));
+				    exprint(nextarg(&np)));
 			else {
 				adjust_buf(cp, &cplen, &bptr, fmtbuf, 0);
 				(void) wsprintf(bptr, (const char *) fmtbuf,
-					 exprint(nextarg(&np)));
+				    exprint(nextarg(&np)));
 				bptr += (slen = wcslen(bptr));
 				length += slen;
 			}
@@ -770,11 +823,11 @@ xprintf(NODE *np, FILE *fp, wchar_t **cp)
 			*ofmtp = '\0';
 			if (bptr == (wchar_t *)NULL)
 				length += fprintf(fp, fmtbuf,
-					exprreal(nextarg(&np)));
+				    exprreal(nextarg(&np)));
 			else {
 				adjust_buf(cp, &cplen, &bptr, fmtbuf, 0);
 				(void) wsprintf(bptr, (const char *) fmtbuf,
-					 exprreal(nextarg(&np)));
+				    exprreal(nextarg(&np)));
 				bptr += (slen = wcslen(bptr));
 				length += slen;
 			}
@@ -789,17 +842,17 @@ xprintf(NODE *np, FILE *fp, wchar_t **cp)
 			sprintf(ofmtp, "%lld", (INT)exprint(nextarg(&np)));
 			ofmtp += strlen(ofmtp);
 #else
-			ofmtp += sprintf(ofmtp, "%lld", (INT)exprint(nextarg(&np)));
+			ofmtp += sprintf(ofmtp, "%lld",
+			    (INT)exprint(nextarg(&np)));
 #endif
 			break;
 
 		default:
-			if(c=='\0') {
+			if (c == '\0') {
 				*ofmtp = (wchar_t)NULL;
-				fprintf(fp,"%s",fmtbuf);
+				(void) fprintf(fp, "%s", fmtbuf);
 				continue;
-			}
-			else {
+			} else {
 				*ofmtp++ = (wchar_t)c;
 				break;
 			}
@@ -814,7 +867,7 @@ xprintf(NODE *np, FILE *fp, wchar_t **cp)
 	 */
 	if (bptr != (wchar_t *)NULL) {
 		*bptr = '\0';
-		*cp = erealloc(*cp, (length+1) * sizeof(wchar_t));
+		*cp = erealloc(*cp, (length+1) * sizeof (wchar_t));
 	}
 	return (length);
 }
@@ -825,11 +878,11 @@ xprintf(NODE *np, FILE *fp, wchar_t **cp)
 static NODE *
 nextarg(NODE **npp)
 {
-	register NODE *np;
+	NODE *np;
 
 	if ((np = getlist(npp)) == NNULL)
 		awkerr(gettext("insufficient arguments to printf or sprintf"));
-	if (isleaf(np->n_flags) && np->n_type==PARM)
+	if (isleaf(np->n_flags) && np->n_type == PARM)
 		return (np->n_next);
 	return (np);
 }
@@ -837,7 +890,7 @@ nextarg(NODE **npp)
 
 /*
  * Check and adjust the length of the buffer that has been passed in
- * to make sure that it has space to accomodate the sequence string 
+ * to make sure that it has space to accomodate the sequence string
  * described in fmtstr. This routine is used by xprintf() to allow
  * for arbitrarily long sprintf() strings.
  *
@@ -856,8 +909,7 @@ adjust_buf(wchar_t **bp, int *len, wchar_t **offset, char *fmtstr, size_t slen)
 
 	do {
 		fmtstr++;
-	} while (strchr("-+ 0", *fmtstr) != (char *)0 ||
-		*fmtstr == ('#'));
+	} while (strchr("-+ 0", *fmtstr) != (char *)0 || *fmtstr == ('#'));
 	if (*fmtstr != '*') {
 		if (isdigit(*fmtstr)) {
 			width = *fmtstr-'0';
@@ -876,8 +928,7 @@ adjust_buf(wchar_t **bp, int *len, wchar_t **offset, char *fmtstr, size_t slen)
 	}
 	if (strchr("Llh", *fmtstr) != (char *)0)
 		fmtstr++;
-	if (*fmtstr == 'S')
-	{
+	if (*fmtstr == 'S') {
 		if (width && slen < width)
 			slen = width;
 		if (prec && slen > prec)
@@ -890,7 +941,7 @@ adjust_buf(wchar_t **bp, int *len, wchar_t **offset, char *fmtstr, size_t slen)
 	if (*offset+ width > *bp+ *len) {
 		ioff = *offset-*bp;
 		*len += width+1;
-		*bp = erealloc(*bp, *len * sizeof(wchar_t));
+		*bp = erealloc(*bp, *len * sizeof (wchar_t));
 		*offset = *bp+ioff;
 	}
 }
@@ -903,8 +954,7 @@ awk_putwc(wchar_t c, FILE *fp)
 
 	if ((mbl = wctomb(mb, c)) > 0) {
 		mb[mbl] = '\0';
-		(void)fputs(mb, fp);
+		(void) fputs(mb, fp);
 	} else
 		awkerr(gettext("invalid wide character %x"), c);
 }
-

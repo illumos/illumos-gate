@@ -19,14 +19,13 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-/*
- * Copyright (c) 1996-1999 by Sun Microsystems, Inc.
- * All rights reserved.
- */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -71,14 +70,13 @@ int	maxfld	= 0;	/* last used field */
 /* pointer to CELL for maximum field assigned to */
 CELL	*maxmfld = &fldtab[0];
 
-
-
+static int isclvar(wchar_t *);
 
 getrec()
 {
-	register wchar_t *rr, *er;
-	register c, sep;
-	register FILE *inf;
+	wchar_t *rr, *er;
+	int c, sep;
+	FILE *inf;
 	extern int svargc;
 	extern wchar_t **svargv;
 
@@ -91,7 +89,12 @@ getrec()
 	while (svargc > 0) {
 		dprintf("svargc=%d, *svargv=%ws\n", svargc, *svargv, NULL);
 		if (infile == NULL) {	/* have to open a new file */
-			if (member('=', *svargv)) {
+			/*
+			 * If the argument contains a '=', determine if the
+			 * argument needs to be treated as a variable assignment
+			 * or as the pathname of a file.
+			 */
+			if (isclvar(*svargv)) {
 				/* it's a var=value argument */
 				setclvar(*svargv);
 				if (svargc > 1) {
@@ -149,6 +152,44 @@ getrec()
 	return (0);	/* true end of file */
 }
 
+/*
+ * isclvar()
+ *
+ * Returns 1 if the input string, arg, is a variable assignment,
+ * otherwise returns 0.
+ *
+ * An argument to awk can be either a pathname of a file, or a variable
+ * assignment.  An operand that begins with an undersore or alphabetic
+ * character from the portable character set, followed by a sequence of
+ * underscores, digits, and alphabetics from the portable character set,
+ * followed by the '=' character, shall specify a variable assignment
+ * rather than a pathname.
+ */
+static int
+isclvar(wchar_t *arg)
+{
+	wchar_t	*tmpptr = arg;
+
+	if (tmpptr != NULL) {
+
+		/* Begins with an underscore or alphabetic character */
+		if (iswalpha(*tmpptr) || *tmpptr == '_') {
+
+			/*
+			 * followed by a sequence of underscores, digits,
+			 * and alphabetics
+			 */
+			for (tmpptr++; *tmpptr; tmpptr++) {
+				if (!(isalnum(*tmpptr) || (*tmpptr == '_'))) {
+					break;
+				}
+			}
+			return (*tmpptr == '=');
+		}
+	}
+
+	return (0);
+}
 
 setclvar(s)	/* set var=value from s */
 wchar_t *s;
@@ -168,7 +209,7 @@ wchar_t *s;
 
 fldbld()
 {
-	register wchar_t *r, *fr, sep, c;
+	wchar_t *r, *fr, sep, c;
 	static wchar_t L_NF[] = L"NF";
 	CELL *p, *q;
 	int i, j;
@@ -196,7 +237,7 @@ fldbld()
 				*fr++ = *r++;
 				c = *r;
 			} while (! iswblank(c) && c != '\t' &&
-				c != '\n' && c != '\0');
+			    c != '\n' && c != '\0');
 
 
 			*fr++ = 0;
@@ -244,7 +285,7 @@ fldbld()
 recbld()
 {
 	int i;
-	register wchar_t *r, *p;
+	wchar_t *r, *p;
 
 
 	if (donefld == 0 || donerec == 1)
@@ -281,7 +322,7 @@ int	errorflag	= 0;
 yyerror(char *s)
 {
 	fprintf(stderr,
-		gettext("awk: %s near line %lld\n"), gettext(s), lineno);
+	    gettext("awk: %s near line %lld\n"), gettext(s), lineno);
 	errorflag = 2;
 }
 
@@ -307,9 +348,9 @@ PUTS(s) char *s; {
 
 
 isanumber(s)
-register wchar_t *s;
+wchar_t *s;
 {
-	register d1, d2;
+	int d1, d2;
 	int point;
 	wchar_t *es;
 	extern wchar_t	radixpoint;

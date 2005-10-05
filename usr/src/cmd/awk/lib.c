@@ -151,7 +151,7 @@ getrec(uchar **bufp, size_t *bufsizep)
 int
 readrec(uchar **bufp, size_t *sizep, FILE *inf)	/* read one record into buf */
 {
-	register int sep, c;
+	int sep, c;
 	uchar	*buf;
 	int	count;
 	size_t	bufsize;
@@ -225,7 +225,7 @@ setclvar(uchar *s)	/* set var=value from s */
 void
 fldbld(void)
 {
-	register uchar *r, *fr, sep;
+	uchar *r, *fr, sep;
 	Cell *p;
 	int i;
 	size_t	len;
@@ -313,7 +313,7 @@ static void
 cleanfld(int n1, int n2)	/* clean out fields n1..n2 inclusive */
 {
 	static uchar *nullstat = (uchar *) "";
-	register Cell *p;
+	Cell *p;
 	int	i;
 
 	for (i = n2; i > n1; i--) {
@@ -464,7 +464,7 @@ void
 recbld(void)
 {
 	int i;
-	register uchar *p;
+	uchar *p;
 	size_t cnt, len, olen;
 	static uchar *rec;
 	size_t osize, nsize;
@@ -673,12 +673,25 @@ PUTS(uchar *s)
 int
 isclvar(uchar *s)	/* is s of form var=something? */
 {
-	uchar *os = s;
+	if (s != NULL) {
 
-	for (; *s; s++)
-		if (!(isalnum(*s) || *s == '_'))
-			break;
-	return (*s == '=' && s > os && *(s + 1) != '=');
+		/* Must begin with an underscore or alphabetic character */
+		if (isalpha(*s) || (*s == '_')) {
+
+			for (s++; *s; s++) {
+				/*
+				 * followed by a sequence of underscores,
+				 * digits, and alphabetics
+				 */
+				if (!(isalnum(*s) || *s == '_')) {
+					break;
+				}
+			}
+			return (*s == '=' && *(s + 1) != '=');
+		}
+	}
+
+	return (0);
 }
 
 #define	MAXEXPON	38	/* maximum exponent for fp number */
@@ -686,7 +699,7 @@ isclvar(uchar *s)	/* is s of form var=something? */
 int
 is_number(uchar *s)
 {
-	register int d1, d2;
+	int d1, d2;
 	int point;
 	uchar *es;
 	extern char	radixpoint;

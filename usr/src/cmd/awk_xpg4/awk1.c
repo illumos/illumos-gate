@@ -25,14 +25,16 @@
  */
 
 /*
- * awk -- mainline, yylex, etc.
- *
  * Copyright 1986, 1994 by Mortice Kern Systems Inc.  All rights reserved.
- *
- * Based on MKS awk(1) ported to be /usr/xpg4/bin/awk with POSIX/XCU4 changes
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * awk -- mainline, yylex, etc.
+ *
+ * Based on MKS awk(1) ported to be /usr/xpg4/bin/awk with POSIX/XCU4 changes
+ */
 
 #include "awk.h"
 #include "y.tab.h"
@@ -47,13 +49,13 @@ static int	proglen;		/* Length of progptr */
 static wchar_t	context[NCONTEXT];	/* Circular buffer of context */
 static wchar_t	*conptr = &context[0];	/* context ptr */
 static FILE	*progfp;		/* Stdio stream for programme */
-static char	*filename;		
+static char	*filename;
 #ifdef	DEBUG
 static int	dflag;
 #endif
 
-#define AWK_EXEC_MAGIC	"<MKS AWKC>"
-#define LEN_EXEC_MAGIC	10
+#define	AWK_EXEC_MAGIC	"<MKS AWKC>"
+#define	LEN_EXEC_MAGIC	10
 
 static char	unbal[] = "unbalanced E char";
 
@@ -61,7 +63,7 @@ static void	awkarginit(int c, char **av);
 static int	lexid(wint_t c);
 static int	lexnumber(wint_t c);
 static int	lexstring(wint_t endc);
-static int	lexregexp(register wint_t endc);
+static int	lexregexp(wint_t endc);
 
 static void	awkvarinit(void);
 static wint_t	lexgetc(void);
@@ -70,10 +72,11 @@ static size_t	lexescape(wint_t endc, int regx, int cmd_line_operand);
 static void	awkierr(int perr, char *fmt, va_list ap);
 static int	usage(void);
 void		strescape(wchar_t *str);
-static const char      *toprint(wint_t);
+static const char	*toprint(wint_t);
 char *_cmdname;
 static wchar_t *mbconvert(char *str);
 
+extern int	isclvar(wchar_t *arg);
 
 /*
  * mainline for awk
@@ -81,28 +84,28 @@ static wchar_t *mbconvert(char *str);
 int
 main(int argc, char *argv[])
 {
-	register wchar_t *ap;
-	register char *cmd;
+	wchar_t *ap;
+	char *cmd;
 
 	cmd = argv[0];
 	_cmdname = cmd;
 
-	linebuf = emalloc(NLINE * sizeof(wchar_t));
+	linebuf = emalloc(NLINE * sizeof (wchar_t));
 
-	/*l
+	/*
 	 * At this point only messaging should be internationalized.
 	 * numbers are still scanned as in the Posix locale.
 	 */
-	(void) setlocale(LC_ALL,"");
-	(void) setlocale(LC_NUMERIC,"C");
+	(void) setlocale(LC_ALL, "");
+	(void) setlocale(LC_NUMERIC, "C");
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-	
+
 	awkvarinit();
-	/*running = 1;*/
-	while (argc>1 && *argv[1]=='-') {
+	/* running = 1; */
+	while (argc > 1 && *argv[1] == '-') {
 		void *save_ptr = NULL;
 		ap = mbstowcsdup(&argv[1][1]);
 		if (ap == NULL)
@@ -114,9 +117,9 @@ main(int argc, char *argv[])
 		save_ptr = (void *) ap;
 		++argv;
 		--argc;
-		if (*ap=='-' && ap[1]=='\0')
+		if (*ap == '-' && ap[1] == '\0')
 			break;
-		for ( ; *ap != '\0'; ++ap) {
+		for (; *ap != '\0'; ++ap) {
 			switch (*ap) {
 #ifdef DEBUG
 			case 'd':
@@ -138,7 +141,7 @@ main(int argc, char *argv[])
 			case 'F':
 				if (ap[1] == '\0') {
 					if (argc < 2) {
-						(void) fprintf(stderr, 
+						(void) fprintf(stderr,
 				gettext("Missing field separator\n"));
 						return (1);
 					}
@@ -149,12 +152,12 @@ main(int argc, char *argv[])
 					++ap;
 				strescape(ap);
 				strassign(varFS, linebuf, FALLOC,
-					wcslen(linebuf));
+				    wcslen(linebuf));
 				break;
 
 			case 'v': {
-				register wchar_t *vp;
-				register wchar_t *arg;
+				wchar_t *vp;
+				wchar_t *arg;
 
 				if (argc < 2) {
 					(void) fprintf(stderr,
@@ -162,12 +165,23 @@ main(int argc, char *argv[])
 					return (1);
 				}
 				arg = mbconvert(argv[1]);
-				if ((vp = wcschr(arg, '=')) != NULL) {
+				/*
+				 * Ensure the variable expression
+				 * is valid (correct form).
+				 */
+				if (((vp = wcschr(arg, '=')) != NULL) &&
+				    isclvar(arg)) {
 					*vp = '\0';
 					strescape(vp+1);
 					strassign(vlook(arg), linebuf,
-					    FALLOC|FSENSE, wcslen(linebuf));
+					    FALLOC|FSENSE,
+					    wcslen(linebuf));
 					*vp = '=';
+				} else {
+					(void) fprintf(stderr, gettext(
+					    "Invalid form for variable "
+					    "assignment: %S\n"), arg);
+					return (1);
 				}
 				--argc;
 				++argv;
@@ -175,7 +189,7 @@ main(int argc, char *argv[])
 			}
 
 			default:
-				(void) fprintf(stderr, 
+				(void) fprintf(stderr,
 				gettext("Unknown option \"-%S\"\n"), ap);
 				return (usage());
 			}
@@ -198,15 +212,15 @@ main(int argc, char *argv[])
 
 	awkarginit(argc, argv);
 
-	/*running = 0;*/
-	(void)yyparse();
+	/* running = 0; */
+	(void) yyparse();
 
 	lineno = 0;
 	/*
 	 * Ok, done parsing, so now activate the rest of the nls stuff, set
 	 * the radix character.
 	 */
-	(void) setlocale(LC_ALL,"");
+	(void) setlocale(LC_ALL, "");
 	radixpoint = *localeconv()->decimal_point;
 	awk();
 	/* NOTREACHED */
@@ -223,7 +237,7 @@ main(int argc, char *argv[])
 static void
 awkvarinit()
 {
-	register NODE *np;
+	NODE *np;
 
 	(void) setvbuf(stderr, NULL, _IONBF, 0);
 
@@ -232,18 +246,18 @@ awkvarinit()
 	gettext("not enough available file descriptors"));
 		exit(1);
 	}
-	ofiles = (OFILE *) emalloc(sizeof(OFILE)*NIOSTREAM);
+	ofiles = (OFILE *)emalloc(sizeof (OFILE)*NIOSTREAM);
 #ifdef A_ZERO_POINTERS
-	(void) memset((wchar_t *) ofiles, 0, sizeof(OFILE) * NIOSTREAM);
+	(void) memset((wchar_t *)ofiles, 0, sizeof (OFILE) * NIOSTREAM);
 #else
 	{
-	    /* initialize file descriptor table */
-	    OFILE *fp;
-	    for (fp = ofiles; fp < &ofiles[NIOSTREAM]; fp += 1) {
-		fp->f_fp = FNULL;
-		fp->f_mode = 0;
-		fp->f_name = (char *)0;
-	    }
+		/* initialize file descriptor table */
+		OFILE *fp;
+		for (fp = ofiles; fp < &ofiles[NIOSTREAM]; fp += 1) {
+			fp->f_fp = FNULL;
+					fp->f_mode = 0;
+					fp->f_name = (char *)0;
+		}
 	}
 #endif
 	constant = intnode((INT)0);
@@ -260,14 +274,14 @@ awkvarinit()
 	field0 = node(FIELD, const0, NNULL);
 
 	{
-		register RESFUNC near*rp;
+		RESFUNC near*rp;
 
 		for (rp = &resfuncs[0]; rp->rf_name != (LOCCHARP)NULL; ++rp) {
 			np = finstall(rp->rf_name, rp->rf_func, rp->rf_type);
 		}
 	}
 	{
-		register RESERVED near*rp;
+		RESERVED near*rp;
 
 		for (rp = &reserved[0]; rp->r_name != (LOCCHARP)NULL; ++rp) {
 			switch (rp->r_type) {
@@ -282,7 +296,7 @@ awkvarinit()
 					    (size_t)rp->r_ivalue);
 				else {
 					constant->n_int = rp->r_ivalue;
-					(void)assign(np, constant);
+					(void) assign(np, constant);
 				}
 				running = 0;
 				break;
@@ -319,13 +333,13 @@ awkvarinit()
 static void
 awkarginit(int ac, char **av)
 {
-	register int i;
-	register wchar_t *cp;
+	int i;
+	wchar_t *cp;
 
 	ARGVsubi = node(INDEX, vlook(s_ARGV), constant);
 	running = 1;
 	constant->n_int = ac;
-	(void)assign(varARGC, constant);
+	(void) assign(varARGC, constant);
 	for (i = 0; i < ac; ++i) {
 		cp = mbstowcsdup(av[i]);
 		constant->n_int = i;
@@ -347,7 +361,7 @@ awkarginit(int ac, char **av)
 void
 uexit(NODE *np)
 {
-	register NODE *formal;
+	NODE *formal;
 
 	while ((formal = getlist(&np)) != NNULL)
 		delsymtab(formal, 0);
@@ -360,7 +374,7 @@ int
 yylex()
 #ifdef	DEBUG
 {
-	register int l;
+	int l;
 
 	l = yyhex();
 	if (dflag)
@@ -370,7 +384,7 @@ yylex()
 yyhex()
 #endif
 {
-	register wint_t c, c1;
+	wint_t c, c1;
 	int i;
 	static int savetoken = 0;
 	static int wasfield;
@@ -379,13 +393,13 @@ yyhex()
 	static struct ctosymstruct {
 		wint_t c, sym;
 	} ctosym[] = {
-		{ '|', BAR },		{ '^', CARAT }, 
-	  	{ '~', TILDE },		{ '<', LANGLE },
-	  	{ '>', RANGLE },	{ '+', PLUSC },
-	  	{ '-', HYPHEN },	{ '*', STAR },
-	  	{ '/', SLASH },		{ '%', PERCENT },
-	  	{ '!', EXCLAMATION },	{ '$', DOLLAR },
-	  	{ '[', LSQUARE },	{ ']', RSQUARE },
+		{ '|', BAR },		{ '^', CARAT },
+		{ '~', TILDE },		{ '<', LANGLE },
+		{ '>', RANGLE },	{ '+', PLUSC },
+		{ '-', HYPHEN },	{ '*', STAR },
+		{ '/', SLASH },		{ '%', PERCENT },
+		{ '!', EXCLAMATION },	{ '$', DOLLAR },
+		{ '[', LSQUARE },	{ ']', RSQUARE },
 		{ '(', LPAREN },	{ ')', RPAREN },
 		{ ';', SEMI },		{ '{', LBRACE },
 		{ '}', RBRACE },	{   0, 0 }
@@ -401,9 +415,9 @@ yyhex()
 		savetoken = c;
 		return (lexlast = lexregexp(c));
 	} else while ((c = lexgetc()) != WEOF) {
-		if (iswalpha(c) || c=='_') {
+		if (iswalpha(c) || c == '_') {
 			c = lexid(c);
-		} else if (iswdigit(c) || c=='.') {
+		} else if (iswdigit(c) || c == '.') {
 			c = lexnumber(c);
 		} else if (isWblank(c)) {
 			continue;
@@ -418,7 +432,7 @@ yyhex()
 			break;
 
 		case '#':
-			while ((c = lexgetc())!='\n' && c!=WEOF)
+			while ((c = lexgetc()) != '\n' && c != WEOF)
 				;
 			lexungetc(c);
 			continue;
@@ -465,10 +479,10 @@ yyhex()
 			break;
 
 		case '/':
-			if ((c1 = lexgetc()) == '='
-			 && lexlast!=RE && lexlast!=NRE
-			 && lexlast!=';' && lexlast!='\n'
-			 && lexlast!=',' && lexlast!='(')
+			if ((c1 = lexgetc()) == '=' &&
+			    lexlast != RE && lexlast != NRE &&
+			    lexlast != ';' && lexlast != '\n' &&
+			    lexlast != ',' && lexlast != '(')
 				c = ADIV;
 			else
 				lexungetc(c1);
@@ -505,7 +519,7 @@ yyhex()
 				c = APPEND;
 			else {
 				lexungetc(c1);
-				if (nparen==0 && inprint)
+				if (nparen == 0 && inprint)
 					c = WRITE;
 			}
 			break;
@@ -632,8 +646,8 @@ yyhex()
 		default:
 			if (!iswprint(c))
 				awkerr(
-				   gettext("invalid character \"%s\""),
-				   toprint(c));
+				    gettext("invalid character \"%s\""),
+				    toprint(c));
 			break;
 		}
 		break;
@@ -650,7 +664,7 @@ yyhex()
 			c = CONCAT;
 			catterm = 0;
 		} else if (!isfuncdef) {
-			if ((c1=lexgetc()) != '(')
+			if ((c1 = lexgetc()) != '(')
 				++catterm;
 			lexungetc(c1);
 		}
@@ -672,7 +686,7 @@ yyhex()
 
 	case INC:
 	case DEC:
-		if (!catterm || lexlast!=CONSTANT || wasfield)
+		if (!catterm || lexlast != CONSTANT || wasfield)
 			break;
 
 	case UFUNC:
@@ -688,7 +702,7 @@ yyhex()
 		}
 		break;
 
-	/*{*/case '}':
+	/* { */ case '}':
 		if (nbrace == 0)
 			savetoken = ';';
 	case ';':
@@ -720,9 +734,9 @@ yyhex()
 static int
 lexnumber(wint_t c)
 {
-	register wchar_t *cp;
-	register int dotfound = 0;
-	register int efound = 0;
+	wchar_t *cp;
+	int dotfound = 0;
+	int efound = 0;
 	INT number;
 
 	cp = linebuf;
@@ -732,8 +746,8 @@ lexnumber(wint_t c)
 		else if (c == '.') {
 			if (dotfound++)
 				break;
-		} else if (c=='e' || c=='E') {
-			if ((c = lexgetc())!='-'  &&  c!='+') {
+		} else if (c == 'e' || c == 'E') {
+			if ((c = lexgetc()) != '-' && c != '+') {
 				lexungetc(c);
 				c = 'e';
 			} else
@@ -745,13 +759,12 @@ lexnumber(wint_t c)
 		*cp++ = c;
 	} while ((c = lexgetc()) != WEOF);
 	*cp = '\0';
-	if (dotfound && cp==linebuf+1)
+	if (dotfound && cp == linebuf+1)
 		return (DOT);
 	lexungetc(c);
 	errno = 0;
-	if (!dotfound
-	 && !efound
-	 && ((number=wcstol(linebuf, (wchar_t **)0, 10)), errno!=ERANGE))
+	if (!dotfound && !efound &&
+	    ((number = wcstol(linebuf, (wchar_t **)0, 10)), errno != ERANGE))
 		yylval.node = intnode(number);
 	else
 		yylval.node = realnode((REAL)wcstod(linebuf, (wchar_t **)0));
@@ -766,20 +779,20 @@ lexnumber(wint_t c)
 static int
 lexid(wint_t c)
 {
-	register wchar_t *cp;
-	register size_t i;
-	register NODE *np;
+	wchar_t *cp;
+	size_t i;
+	NODE *np;
 
 	cp = linebuf;
 	do {
 		*cp++ = c;
 		c = lexgetc();
-	} while (iswalpha(c) || iswdigit(c) || c=='_');
+	} while (iswalpha(c) || iswdigit(c) || c == '_');
 	*cp = '\0';
 	lexungetc(c);
 	yylval.node = np = vlook(linebuf);
 
-	switch(np->n_type) {
+	switch (np->n_type) {
 	case KEYWORD:
 		switch (np->n_keywtype) {
 		case PRINT:
@@ -801,16 +814,16 @@ lexid(wint_t c)
 		 */
 		if (funparm) {
 do_funparm:
-			np = emptynode(PARM, i=(cp-linebuf));
+			np = emptynode(PARM, i = (cp-linebuf));
 			np->n_flags = FSTRING;
 			np->n_string = _null;
 			np->n_strlen = 0;
 			(void) memcpy(np->n_name, linebuf,
-				(i+1) * sizeof(wchar_t));
+			    (i+1) * sizeof (wchar_t));
 			addsymtab(np);
 			yylval.node = np;
 		} else if (np == varNF || (np == varFS &&
-			(!doing_begin || begin_getline))) {
+		    (!doing_begin || begin_getline))) {
 			/*
 			 * If the user program references NF or sets
 			 * FS either outside of a begin block or
@@ -851,7 +864,7 @@ do_funparm:
 static int
 lexstring(wint_t endc)
 {
-	register size_t length = lexescape(endc, 0, 0);
+	size_t length = lexescape(endc, 0, 0);
 
 	yylval.node = stringnode(linebuf, FALLOC, length);
 	return (CONSTANT);
@@ -907,7 +920,7 @@ lexescape(wint_t endc, int regx, int cmd_line_operand)
 		(void) strcpy(eofre, gettext("EOF in regular expression\n"));
 		(void) strcpy(eofstr, gettext("EOF in string\n"));
 		first_time = 0;
-        }
+	}
 
 	cp = linebuf;
 	while ((c = lexgetc()) != endc) {
@@ -949,7 +962,7 @@ lexescape(wint_t endc, int regx, int cmd_line_operand)
 				break;
 
 			case 'a':
-				c = (char) 0x07;
+				c = (char)0x07;
 				break;
 
 			case 'x':
@@ -997,7 +1010,7 @@ lexescape(wint_t endc, int regx, int cmd_line_operand)
 				n = 0;
 				do {
 					n = (n<<3) + c-'0';
-					if ((c = lexgetc())>'7' || c<'0')
+					if ((c = lexgetc()) > '7' || c < '0')
 						break;
 				} while (--max);
 				lexungetc(c);
@@ -1040,12 +1053,12 @@ lexescape(wint_t endc, int regx, int cmd_line_operand)
 NODE *
 renode(wchar_t *s)
 {
-	register NODE *np;
+	NODE *np;
 	int n;
 
 	np = emptynode(RE, 0);
 	np->n_left = np->n_right = NNULL;
-	np->n_regexp = (REGEXP)emalloc(sizeof(regex_t));
+	np->n_regexp = (REGEXP)emalloc(sizeof (regex_t));
 	if ((n = REGWCOMP(np->n_regexp, s, REG_EXTENDED)) != REG_OK) {
 		int m;
 		char *p;
@@ -1063,10 +1076,10 @@ renode(wchar_t *s)
 static wint_t
 lexgetc()
 {
-	register wint_t c;
+	wint_t c;
 	static char **files = &progfiles[0];
 
-	if (progfp!=FNULL && (c = fgetwc(progfp))!=WEOF)
+	if (progfp != FNULL && (c = fgetwc(progfp)) != WEOF)
 		;
 	else {
 		if (progptr != NULL) {
@@ -1077,16 +1090,17 @@ lexgetc()
 		} else {
 			if (progfp != FNULL)
 				if (progfp != stdin)
-					(void)fclose(progfp);
+					(void) fclose(progfp);
 				else
 					clearerr(progfp);
 				progfp = FNULL;
 			if (files < progfilep) {
 				filename = *files++;
 				lineno = 1;
-				if (filename[0]=='-' && filename[1]=='\0')
+				if (filename[0] == '-' && filename[1] == '\0')
 					progfp = stdin;
-				else if ((progfp=fopen(filename, r)) == FNULL) {
+				else if ((progfp = fopen(filename, r))
+				    == FNULL) {
 					(void) fprintf(stderr,
 				gettext("script file \"%s\""), filename);
 					exit(1);
@@ -1119,7 +1133,7 @@ lexungetc(wint_t c)
 		*--conptr = '\0';
 	}
 	if (progfp != FNULL) {
-		(void)ungetwc(c, progfp);
+		(void) ungetwc(c, progfp);
 		return;
 	}
 	if (c == WEOF)
@@ -1134,7 +1148,7 @@ lexungetc(wint_t c)
 void
 yyerror(char *s, ...)
 {
-	if (lexlast==FUNC || lexlast==GETLINE || lexlast==KEYWORD)
+	if (lexlast == FUNC || lexlast == GETLINE || lexlast == KEYWORD)
 		if (lexlast == KEYWORD)
 			awkerr(gettext("inadmissible use of reserved keyword"));
 		else
@@ -1184,12 +1198,13 @@ awkierr(int perr, char *fmt, va_list ap)
 	(void) fprintf(stderr, "%s: ", _cmdname);
 	if (running) {
 		(void) fprintf(stderr, gettext("line %u ("),
-		    curnode==NNULL ? 0 : curnode->n_lineno);
+		    curnode == NNULL ? 0 : curnode->n_lineno);
 		if (phase == 0)
-		      (void) fprintf(stderr, "NR=%lld): ", (INT)exprint(varNR));
+			(void) fprintf(stderr, "NR=%lld): ",
+			    (INT)exprint(varNR));
 		else
-		      (void) fprintf(stderr, "%s): ",
-			    phase==BEGIN ? s_BEGIN : s_END);
+			(void) fprintf(stderr, "%s): ",
+			    phase == BEGIN ? s_BEGIN : s_END);
 	} else if (lineno != 0) {
 		(void) fprintf(stderr, gettext("file \"%s\": "), filename);
 		(void) fprintf(stderr, gettext("line %u: "), lineno);
@@ -1198,9 +1213,9 @@ awkierr(int perr, char *fmt, va_list ap)
 	if (perr == 1)
 		(void) fprintf(stderr, ": %s", strerror(saveerr));
 	if (perr != 2 && !running) {
-		register wchar_t *cp;
-		register int n;
-		register int c;
+		wchar_t *cp;
+		int n;
+		int c;
 
 		(void) fprintf(stderr, gettext("  Context is:%s"), sep1);
 		cp = conptr;
@@ -1209,10 +1224,10 @@ awkierr(int perr, char *fmt, va_list ap)
 			if (cp >= &context[NCONTEXT])
 				cp = &context[0];
 			if ((c = *cp++) != '\0')
-				(void)fputs(c=='\n' ? sep1 : toprint(c),
-					stderr);
+				(void) fputs(c == '\n' ? sep1 : toprint(c),
+				    stderr);
 		} while (--n != 0);
-		(void)fputs(sep2, stderr);
+		(void) fputs(sep2, stderr);
 	}
 	(void) fprintf(stderr, "\n");
 	exit(1);
@@ -1225,7 +1240,7 @@ emalloc(unsigned n)
 
 	if ((cp = malloc(n)) == NULL)
 		awkerr(nomem);
-	return cp;
+	return (cp);
 }
 
 wchar_t *
@@ -1235,7 +1250,7 @@ erealloc(wchar_t *p, unsigned n)
 
 	if ((cp = realloc(p, n)) == NULL)
 		awkerr(nomem);
-	return cp;
+	return (cp);
 }
 
 
@@ -1276,53 +1291,53 @@ mbunconvert(wchar_t *str)
  * Solaris port - following functions are typical MKS functions written
  * to work for Solaris.
  */
- 
+
 wchar_t *
 mbstowcsdup(s)
 char *s;
 {
-        int n;
-        wchar_t *w;
- 
-        n = strlen(s) + 1;
-        if ((w = (wchar_t *)malloc(n * sizeof (wchar_t))) == NULL)
-                return (NULL);
- 
-        if (mbstowcs(w, s, n) == -1)
-                return (NULL);
-        return (w);
- 
+	int n;
+	wchar_t *w;
+
+	n = strlen(s) + 1;
+	if ((w = (wchar_t *)malloc(n * sizeof (wchar_t))) == NULL)
+		return (NULL);
+
+	if (mbstowcs(w, s, n) == -1)
+		return (NULL);
+	return (w);
+
 }
- 
+
 char *
 wcstombsdup(wchar_t *w)
 {
-        int n;
-        char *mb;
- 
-        /* Fetch memory for worst case string length */
-        n = wslen(w) + 1;
-        n *= MB_CUR_MAX;
-        if ((mb = (char *)malloc(n)) == NULL) {
-                return (NULL);
-        }
+	int n;
+	char *mb;
 
-        /* Convert the string */
-        if ((n = wcstombs(mb, w, n)) == -1) {
-                int saverr = errno;
- 
-                free(mb);
-                errno = saverr;
-                return (0);
-        }
- 
-        /* Shrink the string down */
-        if ((mb = (char *)realloc(mb, strlen(mb)+1)) == NULL)  {
-                return (NULL);
-        }
-        return (mb);
+	/* Fetch memory for worst case string length */
+	n = wslen(w) + 1;
+	n *= MB_CUR_MAX;
+	if ((mb = (char *)malloc(n)) == NULL) {
+		return (NULL);
+	}
+
+	/* Convert the string */
+	if ((n = wcstombs(mb, w, n)) == -1) {
+		int saverr = errno;
+
+		free(mb);
+		errno = saverr;
+		return (0);
+	}
+
+	/* Shrink the string down */
+	if ((mb = (char *)realloc(mb, strlen(mb)+1)) == NULL)  {
+		return (NULL);
+	}
+	return (mb);
 }
- 
+
 /*
  * The upe_ctrls[] table contains the printable 'control-sequences' for the
  * character values 0..31 and 127.  The first entry is for value 127, thus the
@@ -1330,11 +1345,11 @@ wcstombsdup(wchar_t *w)
  */
 static const char *const upe_ctrls[] =
 {
-        "^?",
-        "^@",  "^A",  "^B",  "^C",  "^D",  "^E",  "^F",  "^G",
-        "^H",  "^I",  "^J",  "^K",  "^L",  "^M",  "^N",  "^O",
-        "^P",  "^Q",  "^R",  "^S",  "^T",  "^U",  "^V",  "^W",
-        "^X",  "^Y",  "^Z",  "^[",  "^\\", "^]",  "^^",  "^_"
+	"^?",
+	"^@",  "^A",  "^B",  "^C",  "^D",  "^E",  "^F",  "^G",
+	"^H",  "^I",  "^J",  "^K",  "^L",  "^M",  "^N",  "^O",
+	"^P",  "^Q",  "^R",  "^S",  "^T",  "^U",  "^V",  "^W",
+	"^X",  "^Y",  "^Z",  "^[",  "^\\", "^]",  "^^",  "^_"
 };
 
 
@@ -1348,30 +1363,30 @@ static const char *
 toprint(c)
 wchar_t c;
 {
-        int n, len;
-        unsigned char *ptr;
-        static char mbch[MB_LEN_MAX+1];
-        static char buf[5 * MB_LEN_MAX + 1];
- 
-        if ((n = wctomb(mbch, c)) == -1) {
-                /* Should never happen */
-                (void) sprintf(buf, "\\%x", c);
-                return (buf);
-        }
-        mbch[n] = '\0';
-        if (iswprint(c)) {
-                return (mbch);
-        } else if (c == 127) {
-                return (upe_ctrls[0]);
-        } else if (c < 32) {
-                /* Print as in Table 5-101 in the UPE */
-                return (upe_ctrls[c+1]);
-        } else {
-                /* Print as an octal escape sequence */
-                for (len = 0, ptr = (unsigned char *) mbch; 0 < n; --n, ++ptr)
-                        len += sprintf(buf+len, "\\%03o", *ptr);
-        }
-        return (buf);
+	int n, len;
+	unsigned char *ptr;
+	static char mbch[MB_LEN_MAX+1];
+	static char buf[5 * MB_LEN_MAX + 1];
+
+	if ((n = wctomb(mbch, c)) == -1) {
+		/* Should never happen */
+		(void) sprintf(buf, "\\%x", c);
+		return (buf);
+	}
+	mbch[n] = '\0';
+	if (iswprint(c)) {
+		return (mbch);
+	} else if (c == 127) {
+		return (upe_ctrls[0]);
+	} else if (c < 32) {
+		/* Print as in Table 5-101 in the UPE */
+		return (upe_ctrls[c+1]);
+	} else {
+		/* Print as an octal escape sequence */
+		for (len = 0, ptr = (unsigned char *) mbch; 0 < n; --n, ++ptr)
+			len += sprintf(buf+len, "\\%03o", *ptr);
+	}
+	return (buf);
 }
 
 static int
@@ -1395,12 +1410,12 @@ wcoff(const wchar_t *astring, const int off)
 }
 
 int
-int_regwcomp(register regex_t *r, const wchar_t *pattern, int uflags)
+int_regwcomp(regex_t *r, const wchar_t *pattern, int uflags)
 {
 	char *mbpattern;
 	int ret;
 
-	if ((mbpattern = wcstombsdup((wchar_t *) pattern)) == NULL)
+	if ((mbpattern = wcstombsdup((wchar_t *)pattern)) == NULL)
 		return (REG_ESPACE);
 
 	ret = regcomp(r, mbpattern, uflags);
@@ -1419,9 +1434,9 @@ int_regwexec(const regex_t *r,	/* compiled RE */
 {
 	char *mbs;
 	regmatch_t *mbsub = NULL;
-	register int i;
+	int i;
 
-	if ((mbs = wcstombsdup((wchar_t *) astring)) == NULL)
+	if ((mbs = wcstombsdup((wchar_t *)astring)) == NULL)
 		return (REG_ESPACE);
 
 	if (nsub > 0 && sub) {
@@ -1433,7 +1448,7 @@ int_regwexec(const regex_t *r,	/* compiled RE */
 
 	/* Now, adjust the pointers/counts in sub */
 	if (i == REG_OK && nsub > 0 && mbsub) {
-		register int j, k;
+		int j, k;
 
 		for (j = 0; j < nsub; j++) {
 			regmatch_t *ms = &mbsub[j];
@@ -1457,7 +1472,7 @@ int_regwexec(const regex_t *r,	/* compiled RE */
 }
 
 int
-int_regwdosuba(register regex_t *rp,	/* compiled RE: Pattern */
+int_regwdosuba(regex_t *rp,	/* compiled RE: Pattern */
 	const wchar_t *rpl,		/* replacement string: /rpl/ */
 	const wchar_t *src,		/* source string */
 	wchar_t **dstp,			/* destination string */
@@ -1465,10 +1480,10 @@ int_regwdosuba(register regex_t *rp,	/* compiled RE: Pattern */
 	int *globp)	/* IN: occurence, 0 for all; OUT: substitutions */
 {
 	wchar_t *dst, *odst;
-	register const wchar_t *ip, *xp;
-	register wchar_t *op;
-	register int i;
-	register wchar_t c;
+	const wchar_t *ip, *xp;
+	wchar_t *op;
+	int i;
+	wchar_t c;
 	int glob, iglob = *globp, oglob = 0;
 #define	NSUB	10
 	int_regwmatch_t rm[NSUB], *rmp;
@@ -1481,7 +1496,7 @@ int_regwdosuba(register regex_t *rp,	/* compiled RE: Pattern */
 #undef OVERFLOW
 #define	OVERFLOW(i) if (1) { \
 		int pos = op - dst; \
-		dst = (wchar_t *) realloc(odst = dst, \
+		dst = (wchar_t *)realloc(odst = dst, \
 			(len += len + i) * sizeof (wchar_t)); \
 		if (dst == NULL) \
 			goto nospace; \
@@ -1490,7 +1505,7 @@ int_regwdosuba(register regex_t *rp,	/* compiled RE: Pattern */
 	} else
 #endif
 
-	*dstp = dst = (wchar_t *) malloc(len * sizeof (wchar_t));
+	*dstp = dst = (wchar_t *)malloc(len * sizeof (wchar_t));
 	if (dst == NULL)
 		return (REG_ESPACE);
 
@@ -1560,11 +1575,11 @@ int_regwdosuba(register regex_t *rp,	/* compiled RE: Pattern */
 	if (op + (i =  wcslen(ip)) >= end)
 		OVERFLOW(i);
 	while (i--)
-	    *op++ = *ip++;
+		*op++ = *ip++;
 	*op++ = '\0';
 
-	if ((*dstp = dst = (wchar_t *) realloc(odst = dst,
-			sizeof (wchar_t) * (size_t)(op - dst))) == NULL) {
+	if ((*dstp = dst = (wchar_t *)realloc(odst = dst,
+	    sizeof (wchar_t) * (size_t)(op - dst))) == NULL) {
 nospace:
 		free(odst);
 		return (REG_ESPACE);
