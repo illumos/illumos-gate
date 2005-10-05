@@ -2425,8 +2425,15 @@ meta_set_join(
 			goto out;
 		}
 	}
-	/* Causes mddbs to be loaded in kernel */
-	if (setup_db_bydd(sp, dd, 0, ep) == -1) {
+	/*
+	 * Causes mddbs to be loaded into the kernel.
+	 * Set the force flag so that replica locations can be
+	 * loaded into the kernel even if a mediator node was
+	 * unavailable.  This allows a node to join an MO
+	 * diskset when there are sufficient replicas available,
+	 * but a mediator node in unavailable.
+	 */
+	if (setup_db_bydd(sp, dd, TRUE, ep) == -1) {
 		mde_perror(ep, dgettext(TEXT_DOMAIN,
 		    "Host not able to start diskset."));
 		rval = -1;
@@ -3055,7 +3062,15 @@ out:
 
 		/* Join set if halt_set had succeeded */
 		if (set_halted) {
-			if (setup_db_bydd(sp, dd, 0, &xep) == -1) {
+			/*
+			 * Causes mddbs to be loaded into the kernel.
+			 * Set the force flag so that replica locations can be
+			 * loaded into the kernel even if a mediator node was
+			 * unavailable.  This allows a node to join an MO
+			 * diskset when there are sufficient replicas available,
+			 * but a mediator node in unavailable.
+			 */
+			if (setup_db_bydd(sp, dd, TRUE, &xep) == -1) {
 				mdclrerror(&xep);
 			}
 			/* If set previously stale - make it so at re-join */

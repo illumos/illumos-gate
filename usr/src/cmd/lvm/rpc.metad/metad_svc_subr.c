@@ -2886,10 +2886,17 @@ joinset(
 
 	mydd = metaget_drivedesc(local_sp, (MD_BASICNAME_OK | PRINT_FAST), ep);
 	if (mydd) {
-		/* Causes mddbs to be loaded in kernel */
-		if (setup_db_bydd(local_sp, mydd, 0, ep) == -1) {
+		/*
+		 * Causes mddbs to be loaded into the kernel.
+		 * Set the force flag so that replica locations can be loaded
+		 * into the kernel even if a mediator node was unavailable.
+		 * This allows a node to join an MO diskset when there are
+		 * sufficient replicas available, but a mediator node
+		 * in unavailable.
+		 */
+		if (setup_db_bydd(local_sp, mydd, TRUE, ep) == -1) {
 			/* If ep isn't set for some reason, set it */
-			if (! mdisok(ep)) {
+			if (mdisok(ep)) {
 				(void) mdmddberror(ep, MDE_DB_NOTNOW,
 				    (minor_t)NODEV64, sp->setno, 0, NULL);
 			}

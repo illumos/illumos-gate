@@ -5685,10 +5685,14 @@ load_old_replicas(
 		if (rip == NULL) {
 			continue;
 		}
-		if (rip->ri_lbp == (mddb_lb_t *)NULL) {
-			continue;
-		}
-		if (rip->ri_lbp->lb_commitcnt != lbp->lb_commitcnt) {
+
+		/*
+		 * Use the rip commitcnt since the commitcnt in lbp could
+		 * been cleared by selectlocator.  Looking for a replica with
+		 * the same commitcnt as the 'golden' copy in order to
+		 * get the same data.
+		 */
+		if (rip->ri_commitcnt != lbp->lb_commitcnt) {
 			continue;
 		}
 
@@ -5733,10 +5737,14 @@ load_old_replicas(
 		if (rip == NULL) {
 			continue;
 		}
-		if (rip->ri_lbp == (mddb_lb_t *)NULL) {
-			continue;
-		}
-		if (rip->ri_lbp->lb_commitcnt != lbp->lb_commitcnt) {
+
+		/*
+		 * Use the rip commitcnt since the commitcnt in lbp could
+		 * been cleared by selectlocator.  Looking for a replica with
+		 * the same commitcnt as the 'golden' copy in order to
+		 * get the same data.
+		 */
+		if (rip->ri_commitcnt != lbp->lb_commitcnt) {
 			continue;
 		}
 
