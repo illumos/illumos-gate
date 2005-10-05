@@ -939,7 +939,7 @@ gotop_fixups(Rel_desc *arsp)
 			R_SPARC_NONE,
 			arsp->rel_roffset,
 			sdp->sd_name));
-		offset = (uint_t *)(arsp->rel_roffset +
+		offset = (uint_t *)(uintptr_t)(arsp->rel_roffset +
 			_elf_getxoff(arsp->rel_isdesc->is_indata) +
 			(uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
 
@@ -1237,7 +1237,7 @@ do_activerelocs(Ofl_desc *ofl)
 
 			/*LINTED*/
 			DBG_CALL(Dbg_reloc_doact(M_MACH, arsp->rel_rtype,
-			    (Xword)addr, value, arsp->rel_sname,
+			    (Xword)(uintptr_t)addr, value, arsp->rel_sname,
 			    arsp->rel_osdesc));
 			addr += (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf;
 

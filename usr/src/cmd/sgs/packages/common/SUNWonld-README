@@ -1528,3 +1528,4 @@ All the above change is incorporated in the following patches:
     Solaris/SunOS 5.10_x86	patch T118345-XX
 --------------------------------------------------------------------------------
 6309061 link_audit should use __asm__ with gcc
+6310736 gcc and sgs/libld don't get along on SPARC
