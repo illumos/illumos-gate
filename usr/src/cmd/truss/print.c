@@ -1816,6 +1816,11 @@ tcp_optname(private_t *pri, long val)
 	case TCP_RECVDSTADDR:		return ("TCP_RECVDSTADDR");
 	case TCP_ANONPRIVBIND:		return ("TCP_ANONPRIVBIND");
 	case TCP_EXCLBIND:		return ("TCP_EXCLBIND");
+	case TCP_INIT_CWND:		return ("TCP_INIT_CWND");
+	case TCP_KEEPALIVE_THRESHOLD:	return ("TCP_KEEPALIVE_THRESHOLD");
+	case TCP_KEEPALIVE_ABORT_THRESHOLD:
+		return ("TCP_KEEPALIVE_ABORT_THRESHOLD");
+	case TCP_CORK:			return ("TCP_CORK");
 
 	default:			(void) snprintf(pri->code_buf,
 					    sizeof (pri->code_buf),
@@ -1862,11 +1867,17 @@ sctp_optname(private_t *pri, long val)
 const char *
 udp_optname(private_t *pri, long val)
 {
-	if (val == UDP_CHECKSUM)
-		return ("UDP_CHECKSUM");
+	switch (val) {
+	case UDP_CHECKSUM:		return ("UDP_CHECKSUM");
+	case UDP_ANONPRIVBIND:		return ("UDP_ANONPRIVBIND");
+	case UDP_EXCLBIND:		return ("UDP_EXCLBIND");
+	case UDP_RCVHDR:		return ("UDP_RCVHDR");
 
-	(void) snprintf(pri->code_buf, sizeof (pri->code_buf), "0x%lx", val);
-	return (pri->code_buf);
+	default:			(void) snprintf(pri->code_buf,
+					    sizeof (pri->code_buf), "0x%lx",
+					    val);
+					return (pri->code_buf);
+	}
 }
 
 
