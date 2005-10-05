@@ -508,6 +508,38 @@ dv_insert(struct dv_node *ddv, struct dv_node *dv)
 }
 
 /*
+ * Unlink a dv_node from a perent directory
+ */
+void
+dv_unlink(struct dv_node *ddv, struct dv_node *dv, struct dv_node **dv_pprev)
+{
+	/* verify linkage of arguments */
+	ASSERT(ddv && dv && dv_pprev);
+	ASSERT(dv->dv_dotdot == ddv);
+	ASSERT(*dv_pprev == dv);
+	ASSERT(RW_WRITE_HELD(&ddv->dv_contents));
+	ASSERT(DVTOV(ddv)->v_type == VDIR);
+
+	dcmn_err3(("dv_unlink: %s\n", dv->dv_name));
+
+	if (DVTOV(dv)->v_type == VDIR) {
+		ddv->dv_nlink--;	/* .. to containing directory */
+		dv->dv_nlink -= 2;	/* name + . */
+	} else {
+		dv->dv_nlink -= 1;	/* name */
+	}
+	ASSERT(ddv->dv_nlink >= 2);
+	ASSERT(dv->dv_nlink == 0);
+
+	/* update ddv->dv_dot/dv_next */
+	*dv_pprev = dv->dv_next;
+
+	dv->dv_dotdot = NULL;
+	dv->dv_next = NULL;
+	dv->dv_dot = NULL;
+}
+
+/*
  * Merge devfs node specific information into an attribute structure.
  *
  * NOTE: specfs provides ATIME,MTIME,CTIME,SIZE,BLKSIZE,NBLOCKS on leaf node.
@@ -1197,124 +1229,101 @@ dv_filldir(struct dv_node *ddv)
 int
 dv_cleandir(struct dv_node *ddv, char *devnm, uint_t flags)
 {
-	struct dv_node *dv, *prev = NULL, *next = NULL;
+	struct dv_node *dv;
+	struct dv_node **pprev, **npprev;
 	struct vnode *vp;
-	int retval = 0, set_stale = 0;
+	int busy = 0;
 
 	dcmn_err3(("dv_cleandir: %s\n", ddv->dv_name));
 
-	/*
-	 * If devnm is not NULL, we return immediately on busy.
-	 * Otherwise, we try our best to destroy all unused dv_node's
-	 */
-	rw_enter(&ddv->dv_contents, RW_WRITER);
-	for (dv = ddv->dv_dot; dv; prev = dv, dv = next) {
-		int error = 0;
-		next = dv->dv_next;
+	if (!(flags & DV_CLEANDIR_LCK))
+		rw_enter(&ddv->dv_contents, RW_WRITER);
+	for (pprev = &ddv->dv_dot, dv = *pprev; dv;
+	    pprev = npprev, dv = *pprev) {
+		npprev = &dv->dv_next;
 
-		if (devnm && (strncmp(devnm, dv->dv_name, strlen(devnm)) ||
+		/*
+		 * If devnm is specified, the non-minor portion of the
+		 * name must match devnm.
+		 */
+		if (devnm &&
+		    (strncmp(devnm, dv->dv_name, strlen(devnm)) ||
 		    (dv->dv_name[strlen(devnm)] != ':' &&
 		    dv->dv_name[strlen(devnm)] != '\0')))
-			/*
-			 * If devnm is specified, the non-minor
-			 * portion of the name must match devnm
-			 */
 			continue;
 
+		/* check type of what we are cleaning */
 		vp = DVTOV(dv);
 		if (vp->v_type == VDIR) {
-			if ((dv_cleandir(dv, NULL, flags) != 0) ||
-			    (dv->dv_nlink != 2)) {
-				error = EBUSY;
-			} else if (vp->v_count > 0) {
-				/*
-				 * The directory is empty but the directory
-				 * vnode is being held. If DV_CLEAN_FORCE is
-				 * specified, we force the directory to become
-				 * stale so that DR will succeed even if a
-				 * shell has /devices/xxx as current directory.
-				 */
-				rw_enter(&dv->dv_contents, RW_WRITER);
-				if (((flags & DV_CLEAN_FORCE) == 0) ||
-				    (dv->dv_busy != 0)) {
-					error = EBUSY;
-					rw_exit(&dv->dv_contents);
-				} else {
-					/*
-					 * mark the node stale later,
-					 * after unlinking from tree.
-					 * Hold the dv_contents lock
-					 * to prevent further lookup
-					 * before we mark it stale.
-					 */
-					set_stale = 1;
-				}
+			/* recurse on directories */
+			rw_enter(&dv->dv_contents, RW_WRITER);
+			if (dv_cleandir(dv, NULL,
+			    flags | DV_CLEANDIR_LCK) == EBUSY) {
+				rw_exit(&dv->dv_contents);
+				goto set_busy;
 			}
-		} else {
-			ASSERT(vp->v_type == VCHR || vp->v_type == VBLK);
+
+			/* A clean directory is an empty directory... */
+			ASSERT(dv->dv_nlink == 2);
 			mutex_enter(&vp->v_lock);
 			if (vp->v_count > 0) {
-				error = EBUSY;
-			}
-			mutex_exit(&vp->v_lock);
-		}
+				/*
+				 * ... but an empty directory can still have
+				 * references to it. If we have dv_busy or
+				 * DV_CLEAN_FORCE is *not* specified then a
+				 * referenced directory is considered busy.
+				 */
+				if (dv->dv_busy || !(flags & DV_CLEAN_FORCE)) {
+					mutex_exit(&vp->v_lock);
+					rw_exit(&dv->dv_contents);
+					goto set_busy;
+				}
 
-		if (error != 0) {
-			retval = error;
-			if (devnm)
-				break;
-			continue;
+				/*
+				 * Mark referenced directory stale so that DR
+				 * will succeed even if a shell has
+				 * /devices/xxx as current directory (causing
+				 * VN_HOLD reference to an empty directory).
+				 */
+				ASSERT(!DV_STALE(dv));
+				ndi_rele_devi(dv->dv_devi);
+				dv->dv_devi = NULL;	/* mark DV_STALE */
+			}
+		} else {
+			ASSERT((vp->v_type == VCHR) || (vp->v_type == VBLK));
+			ASSERT(dv->dv_nlink == 1);	/* no hard links */
+			mutex_enter(&vp->v_lock);
+			if (vp->v_count > 0) {
+				mutex_exit(&vp->v_lock);
+				goto set_busy;
+			}
 		}
 
 		/* unlink from directory */
-		if (vp->v_type == VDIR) {
-			ddv->dv_nlink--;	/* .. to above */
-			dv->dv_nlink--;		/* . to self */
-		}
-		if (prev)
-			prev->dv_next = dv->dv_next;
-		else
-			ddv->dv_dot = dv->dv_next;
-		dv->dv_next = NULL;
-		dv->dv_nlink--;			/* name, back to zero */
+		dv_unlink(ddv, dv, pprev);
 
-		if (set_stale) {
-			/* only directories can be stale */
-			ASSERT(vp->v_type == VDIR);
+		/* drop locks */
+		mutex_exit(&vp->v_lock);
+		if (vp->v_type == VDIR)
+			rw_exit(&dv->dv_contents);
 
-			/*
-			 * If v_count != 0, someone else has a reference
-			 * to this node. We mark the node stale and let
-			 * devfs_inactive() free the node.
-			 *
-			 * If v_count is already zero, no one else has
-			 * a reference to this node, do nothing and
-			 * dv_destroy() will free the node.
-			 *
-			 * We hold the vp->v_lock to synchronize with
-			 * devfs_inactive() to prevent double free.
-			 */
-			mutex_enter(&vp->v_lock);
-			if (vp->v_count != 0) {
-				ASSERT(!DV_STALE(dv));
-				ndi_rele_devi(dv->dv_devi);
-				dv->dv_devi = NULL;
-				/* release dv_contents held in set_scale */
-				rw_exit(&dv->dv_contents);
-				mutex_exit(&vp->v_lock);
-				/* don't touch dv after setting it stale */
-			} else {
-				/* release dv_contents held in set_scale */
-				rw_exit(&dv->dv_contents);
-				mutex_exit(&vp->v_lock);
-				dv_destroy(dv, flags);
-			}
-			set_stale = 0;
-		} else {
+		/* destroy vnode if ref count is zero */
+		if (vp->v_count == 0)
 			dv_destroy(dv, flags);
-		}
-		dv = prev;	/* reset dv/prev for next loop */
+
+		/* pointer to previous stays unchanged */
+		npprev = pprev;
+		continue;
+
+		/*
+		 * If devnm is not NULL we return immediately on busy,
+		 * otherwise we continue destroying unused dv_node's.
+		 */
+set_busy:	busy++;
+		if (devnm)
+			break;
 	}
+
 	/*
 	 * This code may be invoked to inform devfs that a new node has
 	 * been created in the kernel device tree. So we always set
@@ -1323,9 +1332,10 @@ dv_cleandir(struct dv_node *ddv, char *devnm, uint_t flags)
 	 */
 	ddv->dv_flags |= DV_BUILD;
 
-	rw_exit(&ddv->dv_contents);
+	if (!(flags & DV_CLEANDIR_LCK))
+		rw_exit(&ddv->dv_contents);
 
-	return (retval);
+	return (busy ? EBUSY : 0);
 }
 
 /*
@@ -1711,6 +1721,7 @@ dv_walk(
 	struct vnode	*dvp;
 	struct dv_node	*dv;
 	struct dv_list	*head, *tail, *next;
+	int		len;
 
 	dcmn_err3(("dv_walk: ddv = %s, devnm = %s\n",
 	    ddv->dv_name, devnm ? devnm : "<null>"));
@@ -1721,13 +1732,9 @@ dv_walk(
 
 	head = tail = next = NULL;
 
-	mutex_enter(&dvp->v_lock);
-
 	rw_enter(&ddv->dv_contents, RW_READER);
+	mutex_enter(&dvp->v_lock);
 	for (dv = ddv->dv_dot; dv; dv = dv->dv_next) {
-
-		int len;
-
 		/*
 		 * If devnm is not NULL and is not the empty string,
 		 * select only dv_nodes with matching non-minor name
@@ -1760,6 +1767,5 @@ dv_walk(
 		head = next;
 	}
 	rw_exit(&ddv->dv_contents);
-
 	mutex_exit(&dvp->v_lock);
 }

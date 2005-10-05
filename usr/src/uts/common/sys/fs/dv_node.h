@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,6 +105,7 @@ typedef struct dv_node {
 /* flags for devfs_clean() */
 #define	DV_CLEAN_FORCE	0x01	/* force clean of refed directories */
 #define	DV_RESET_PERM	0x02	/* force resetting of node permission */
+#define	DV_CLEANDIR_LCK	0x04	/* dv_contents already held */
 
 struct devfs_data {
 	struct	dv_node	*devfs_root;
