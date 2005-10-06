@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,6 +41,8 @@
 #	MMX_MANAGE can be defined in userland.
 
 BIGNUM_CFG = -DPSR_MUL -DHWCAP -DMMX_MANAGE
+
+LDFLAGS += -M $(BIGNUMDIR)/i386/cap_mapfile
 
 $(OBJS_DIR)/bignumimpl.o $(LINTS_DIR)/bignumimpl.ln := \
 	CPPFLAGS += $(BIGNUM_CFG)
