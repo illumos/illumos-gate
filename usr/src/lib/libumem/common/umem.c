@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,7 @@
  *
  *	* KM_SLEEP v.s. UMEM_NOFAIL
  *
+ *	* lock ordering
  *
  * 2. Initialization
  * -----------------
@@ -329,6 +330,31 @@
  *	If a constructor callback _does_ do a UMEM_NOFAIL allocation, and
  *	the nofail callback does a non-local exit, we will leak the
  *	partially-constructed buffer.
+ *
+ *
+ * 6. Lock Ordering
+ * ----------------
+ * umem has a few more locks than kmem does, mostly in the update path.  The
+ * overall lock ordering (earlier locks must be acquired first) is:
+ *
+ *	umem_init_lock
+ *
+ *	vmem_list_lock
+ *	vmem_nosleep_lock.vmpl_mutex
+ *	vmem_t's:
+ *		vm_lock
+ *	sbrk_faillock
+ *
+ *	umem_cache_lock
+ *	umem_update_lock
+ *	umem_flags_lock
+ *	umem_cache_t's:
+ *		cache_cpu[*].cc_lock
+ *		cache_depot_lock
+ *		cache_lock
+ *	umem_log_header_t's:
+ *		lh_cpu[*].clh_lock
+ *		lh_lock
  */
 
 #include "mtlib.h"
