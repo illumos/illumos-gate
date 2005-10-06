@@ -2487,8 +2487,7 @@ add_boot_entry(menu_t *mp,
 	assert(mp);
 
 	if (title == NULL) {
-		bam_error(SUBOPT_MISS, menu_cmds[TITLE_CMD]);
-		return (BAM_ERROR);
+		title = "Solaris";	/* default to Solaris */
 	}
 	if (root == NULL) {
 		bam_error(SUBOPT_MISS, menu_cmds[ROOT_CMD]);
@@ -2850,7 +2849,8 @@ get_grubdisk(char *rootdev, FILE *fp, int on_bootdev)
 	return (grubdisk);
 }
 
-static char *get_title(char *rootdir)
+static char *
+get_title(char *rootdir)
 {
 	static char title[80];	/* from /etc/release */
 	char *cp, release[PATH_MAX];
@@ -2861,7 +2861,7 @@ static char *get_title(char *rootdir)
 
 	fp = fopen(release, "r");
 	if (fp == NULL)
-		return ("Solaris");	/* default to Solaris */
+		return (NULL);
 
 	while (s_fgets(title, sizeof (title), fp) != NULL) {
 		cp = strstr(title, "Solaris");
