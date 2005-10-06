@@ -46,8 +46,8 @@
  * Definitions for accessing the pci config space of the isa node
  * of Southbridge.
  */
-#define	ONTARIO_ISA_PATHNAME	"/pci@7c0/pci@0/pci@2/pci@0,2/isa@2"
-#define	ONTARIO_IDE_PATHNAME	"/pci@7c0/pci@0/pci@2/pci@0,2/ide@8"
+#define	ONTARIO_ISA_PATHNAME	"/pci@7c0/pci@0/pci@1/pci@0/isa@2"
+#define	ONTARIO_IDE_PATHNAME	"/pci@7c0/pci@0/pci@1/pci@0/ide@8"
 
 /*
  * Handle for isa pci space
