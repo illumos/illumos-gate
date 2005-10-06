@@ -30,7 +30,7 @@ PROG=	snoop
 OBJS=	dlprims.o nfs4_xdr.o snoop.o snoop_aarp.o snoop_adsp.o snoop_aecho.o \
 	snoop_apple.o snoop_arp.o snoop_atp.o snoop_bparam.o \
 	snoop_capture.o snoop_dhcp.o snoop_display.o snoop_dns.o snoop_ether.o \
-	snoop_filter.o snoop_http.o snoop_icmp.o snoop_igmp.c snoop_ip.o \
+	snoop_filter.o snoop_http.o snoop_icmp.o snoop_igmp.o snoop_ip.o \
 	snoop_ipaddr.o snoop_ipsec.o snoop_ldap.o snoop_mip.o snoop_mount.o \
 	snoop_nbp.o snoop_netbios.o snoop_nfs.o snoop_nfs3.o snoop_nfs4.o \
 	snoop_nfs_acl.o snoop_nis.o snoop_nisplus.o snoop_nlm.o snoop_ntp.o \
