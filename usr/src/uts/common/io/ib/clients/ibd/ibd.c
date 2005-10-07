@@ -2413,6 +2413,22 @@ ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/*
+	 * Setup the handler we will use for regular DLPI stuff. Its important
+	 * to setup the recv handler after registering with gld. Setting it
+	 * before causes at times an incoming packet to be forwarded to gld
+	 * before the gld_register. This will result in gld dropping the packet
+	 * which is ignored by ibd_rcq_handler, thus failing to re-arm the
+	 * tavor events. This will cause tavor_isr on recv path to be not
+	 * invoked any further.
+	 */
+	ibt_set_cq_handler(state->id_rcq_hdl, ibd_rcq_handler, state);
+	if (ibt_enable_cq_notify(state->id_rcq_hdl, IBT_NEXT_COMPLETION) !=
+	    IBT_SUCCESS) {
+		DPRINT(10, "ibd_attach : failed in ibt_enable_cq_notify()\n");
+		goto attach_fail_gld_register;
+	}
+
+	/*
 	 * Setup the subnet notices handler after we initialize the a/mcaches
 	 * and start the async thread, both of which are required for the
 	 * trap handler to function properly. Enable the trap handler to
@@ -3399,14 +3415,6 @@ ibd_drv_init(ibd_state_t *state)
 	if (ibd_init_txlist(state) != DDI_SUCCESS) {
 		DPRINT(10, "ibd_drv_init : failed in ibd_init_txlist()\n");
 		goto drv_init_fail_txlist_init;
-	}
-
-	/* Setup the handler we will use for regular DLPI stuff */
-	ibt_set_cq_handler(state->id_rcq_hdl, ibd_rcq_handler, state);
-	if (ibt_enable_cq_notify(state->id_rcq_hdl, IBT_NEXT_COMPLETION) !=
-	    IBT_SUCCESS) {
-		DPRINT(10, "ibd_drv_init : failed in ibt_enable_cq_notify()\n");
-		goto drv_init_fail_cq_notify;
 	}
 
 	if ((ibd_separate_cqs == 1) && (ibd_txcomp_poll == 0)) {
