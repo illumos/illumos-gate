@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -793,8 +793,9 @@ return_etype_info2(krb5_context context, krb5_pa_data * padata,
     }
     entry[0] = NULL;
     entry[1] = NULL;
+    /* using encrypting_key->enctype as this is specified in rfc4120 */
     retval = _make_etype_info_entry(context, request,
-		client_key, client_key->key_data_type[0],
+		client_key, encrypting_key->enctype,
 		entry, 1);
     if (retval)
 	goto cleanup;
