@@ -812,8 +812,18 @@ prunmark(proc_t *p)
 void
 prunlock(prnode_t *pnp)
 {
-	proc_t *p = pnp->pr_pcommon->prc_proc;
+	prcommon_t *pcp = pnp->pr_common;
+	proc_t *p = pcp->prc_proc;
 
+	/*
+	 * If we (or someone) gave it a SIGKILL, and it is not
+	 * already a zombie, set it running unconditionally.
+	 */
+	if ((p->p_flag & SKILLED) &&
+	    !(p->p_flag & SEXITING) &&
+	    !(pcp->prc_flags & PRC_DESTROY) &&
+	    !((pcp->prc_flags & PRC_LWP) && pcp->prc_tslot == -1))
+		(void) pr_setrun(pnp, 0);
 	prunmark(p);
 	mutex_exit(&p->p_lock);
 }
