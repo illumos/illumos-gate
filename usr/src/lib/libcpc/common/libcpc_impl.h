@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -163,6 +163,7 @@ extern cpc_set_t *__cpc_eventtoset(cpc_t *cpc, cpc_event_t *event, int flags);
 #define	CPC_ULTRA3		1002
 #define	CPC_ULTRA3_PLUS		1003
 #define	CPC_ULTRA3_I		1004
+#define	CPC_ULTRA4_PLUS		1005
 
 #define	CPC_PENTIUM		2000
 #define	CPC_PENTIUM_MMX		2001
@@ -186,7 +187,7 @@ extern cpc_set_t *__cpc_eventtoset(cpc_t *cpc, cpc_event_t *event, int flags);
 #if defined(__sparc)
 
 /*
- * UltraSPARC I, II and III processors
+ * UltraSPARC I, II, III and IV processors
  *
  * The performance counters on these processors allow up to two 32-bit
  * performance events to be captured simultaneously from a selection

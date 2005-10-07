@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,7 @@ cpc_getusage(int cpuver)
 	case CPC_ULTRA3:
 	case CPC_ULTRA3_PLUS:
 	case CPC_ULTRA3_I:
+	case CPC_ULTRA4_PLUS:
 		return ("pic0=<event0>,pic1=<event1> "
 		    "[,sys] "
 		    "[,nouser]");
@@ -230,6 +231,7 @@ cpc_strtoevent(int cpuver, const char *spec, cpc_event_t *event)
 	case CPC_ULTRA3:
 	case CPC_ULTRA3_PLUS:
 	case CPC_ULTRA3_I:
+	case CPC_ULTRA4_PLUS:
 		keyvals = us3_keyvals;
 		ntokens = sizeof (us3_keyvals) / sizeof	(us3_keyvals[0]);
 		bits = &event->ce_pcr;
@@ -366,6 +368,7 @@ unmake_pcr(uint64_t pcr, int cpuver, struct xpcr *xpcr)
 	case CPC_ULTRA3:
 	case CPC_ULTRA3_PLUS:
 	case CPC_ULTRA3_I:
+	case CPC_ULTRA4_PLUS:
 		kv = us3_keyvals;
 		break;
 	}
@@ -392,6 +395,7 @@ cpc_eventtostr(cpc_event_t *event)
 	case CPC_ULTRA3:
 	case CPC_ULTRA3_PLUS:
 	case CPC_ULTRA3_I:
+	case CPC_ULTRA4_PLUS:
 		break;
 	default:
 		return (NULL);
@@ -462,6 +466,7 @@ __cpc_eventtoset(cpc_t *cpc, cpc_event_t *event, int iflags)
 	case CPC_ULTRA3:
 	case CPC_ULTRA3_PLUS:
 	case CPC_ULTRA3_I:
+	case CPC_ULTRA4_PLUS:
 		break;
 	default:
 		return (NULL);
