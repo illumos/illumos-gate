@@ -1509,7 +1509,7 @@ spdsock_dump(queue_t *q, ipsec_policy_head_t *iph,
 	ss->spdsock_dump_gen = iph->iph_gen;
 	ss->spdsock_dump_cur_type = 0;
 	ss->spdsock_dump_cur_af = IPSEC_AF_V4;
-	ss->spdsock_dump_cur_rule = iph->iph_root[0].ipr_nonhash[IPSEC_AF_V4];
+	ss->spdsock_dump_cur_rule = NULL;
 	ss->spdsock_dump_count = 0;
 	ss->spdsock_dump_cur_chain = 0;
 	rw_exit(&iph->iph_lock);
