@@ -308,16 +308,19 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 
 		break;
 
-	case PCIHP_DEVCTL_MINOR:
+	/*
+	 * All non-PCItool ioctls go through here, including:
+	 *   devctl ioctls with minor number PCIHP_DEVCTL_MINOR and
+	 *   those for attachment points with where minor number is the
+	 *   device number.
+	 */
+	default:
 		if (pci_p->hotplug_capable == B_TRUE)
 			rv = pcihp_ops->cb_ioctl(
 			    dev, cmd, arg, mode, credp, rvalp);
 		else
 			rv = pci_devctl_ioctl(
 			    dip, cmd, arg, mode, credp, rvalp);
-		break;
-
-	default:
 		break;
 	}
 

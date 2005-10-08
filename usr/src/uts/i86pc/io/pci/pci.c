@@ -1661,12 +1661,6 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	minor_t minor = getminor(dev);
 
 	switch (PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
-	case PCIHP_DEVCTL_MINOR:
-		if (IS_DEVCTL(cmd))
-			rv = (pcihp_cb_ops.cb_ioctl)(dev, cmd, arg, mode,
-			    credp, rvalp);
-		break;
-
 	case PCI_TOOL_REG_MINOR_NUM:
 
 		switch (cmd) {
@@ -1714,7 +1708,15 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 		break;
 
+	/*
+	 * All non-PCItool ioctls go through here, including:
+	 *   devctl ioctls with minor number PCIHP_DEVCTL_MINOR and
+	 *   those for attachment points with where minor number is the
+	 *   device number.
+	 */
 	default:
+		rv = (pcihp_cb_ops.cb_ioctl)(dev, cmd, arg, mode,
+		    credp, rvalp);
 		break;
 	}
 
