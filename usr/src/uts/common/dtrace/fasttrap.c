@@ -918,8 +918,9 @@ fasttrap_pid_enable(void *arg, dtrace_id_t id, void *parg)
 			 * Back up and pull out all the tracepoints we've
 			 * created so far for this probe.
 			 */
-			while (i-- >= 0) {
+			while (i >= 0) {
 				fasttrap_tracepoint_disable(p, probe, i);
+				i--;
 			}
 
 			mutex_enter(&p->p_lock);
