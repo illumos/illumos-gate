@@ -6267,7 +6267,7 @@ mt_config_children(struct mt_config_handle *hdl)
 		 * Switch a 'driver' operation to an 'all' operation below a
 		 * node bound to the driver.
 		 */
-		if ((major == (major_t)-1) || (major == ddi_driver_major(pdip)))
+		if ((major == (major_t)-1) || (major == ddi_driver_major(dip)))
 			mcd->mtc_major = (major_t)-1;
 		else
 			mcd->mtc_major = major;

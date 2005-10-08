@@ -58,7 +58,7 @@ fi
 #
 # Now check the archive.
 #
-/sbin/bootadm -a update -vn 2> /dev/null
+/sbin/bootadm update-archive -vnC 2> /dev/null
 if [ $? = 0 ]; then
 	exit $SMF_EXIT_OK
 fi
@@ -67,7 +67,7 @@ touch ${ERRORFILE}
 cecho ""
 cecho "WARNING - The following files in / differ from the boot archive:"
 
-/sbin/bootadm -a update -vn > /dev/msglog 2> /dev/null
+/sbin/bootadm update-archive -vnC > /dev/msglog 2> /dev/null
 
 cecho "The recommended action is to reboot and select \"Solaris failsafe\""
 cecho "option from the boot menu. Then follow prompts to update the"

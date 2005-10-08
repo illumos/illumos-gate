@@ -129,7 +129,7 @@ get_bootargs(char *args, int grub)
 		} else {
 			/* copy to buf to avoid being overwritten */
 			(void) strlcpy(bootfile_buf,
-			    bootfile, sizeof (bootprog_buf));
+			    bootfile, sizeof (bootfile_buf));
 			bootfile = bootfile_buf;
 		}
 		/* get the remainder of string */
@@ -263,6 +263,10 @@ done:
 		printf("boot-args = %s\n", bootargs);
 		printf("bootprop = %s\n", bootprop);
 	}
+
+	if (!grub)
+		(void) bsetprop(NULL, "boot-args", bootargs,
+		    strlen(bootargs) + 1);
 }
 
 void

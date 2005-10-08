@@ -97,11 +97,22 @@ typedef struct line {
 	char *line;
 	menu_flag_t flags;
 	struct line *next;
+	struct line *prev;
 } line_t;
+
+typedef struct entry {
+	struct entry *next;
+	struct entry *prev;
+	line_t *start;
+	line_t *end;
+} entry_t;
 
 typedef struct {
 	line_t *start;
 	line_t *end;
+	line_t *curdefault;	/* line containing default */
+	line_t *olddefault;	/* old default line (commented) */
+	entry_t *entries;	/* os entries */
 } menu_t;
 
 typedef enum {
@@ -209,7 +220,7 @@ typedef struct {
 
 #define	BAM_HDR		"---------- ADDED BY BOOTADM - DO NOT EDIT ----------"
 #define	BAM_FTR		"---------------------END BOOTADM--------------------"
-
+#define	BAM_OLDDEF	"BOOTADM SAVED DEFAULT: "
 
 /* Globals */
 static char *prog;
@@ -256,7 +267,6 @@ static void filelist_free(filelist_t *flistp);
 static error_t list2file(char *root, char *tmp,
     char *final, line_t *start);
 static error_t list_entry(menu_t *mp, char *menu_path, char *opt);
-static error_t delete_entry(menu_t *mp, char *menu_path, char *opt);
 static error_t delete_all_entries(menu_t *mp, char *menu_path, char *opt);
 static error_t update_entry(menu_t *mp, char *root, char *opt);
 static error_t update_temp(menu_t *mp, char *root, char *opt);
@@ -471,7 +481,7 @@ parse_args_internal(int argc, char *argv[])
 	opterr = 0;
 
 	error = 0;
-	while ((c = getopt(argc, argv, "a:d:fm:no:vR:")) != -1) {
+	while ((c = getopt(argc, argv, "a:d:fm:no:vCR:")) != -1) {
 		switch (c) {
 		case 'a':
 			if (bam_cmd) {
@@ -509,7 +519,6 @@ parse_args_internal(int argc, char *argv[])
 				bam_error(DUP_OPT, c);
 			}
 			bam_check = 1;
-			bam_smf_check = bam_root_readonly;
 			break;
 		case 'o':
 			if (bam_opt) {
@@ -525,6 +534,9 @@ parse_args_internal(int argc, char *argv[])
 			}
 			bam_verbose = 1;
 			break;
+		case 'C':
+			bam_smf_check = 1;
+			break;
 		case 'R':
 			if (bam_root) {
 				error = 1;
@@ -538,8 +550,6 @@ parse_args_internal(int argc, char *argv[])
 			}
 			bam_alt_root = 1;
 			bam_root = rootbuf;
-			if (rootbuf[strlen(rootbuf) - 1] != '/')
-				(void) strcat(rootbuf, "/");
 			bam_rootlen = strlen(rootbuf);
 			break;
 		case '?':
@@ -1009,6 +1019,13 @@ bam_archive(
 	error_t (*f)(char *root, char *opt);
 
 	/*
+	 * Add trailing / for archive subcommands
+	 */
+	if (rootbuf[strlen(rootbuf) - 1] != '/')
+		(void) strcat(rootbuf, "/");
+	bam_rootlen = strlen(rootbuf);
+
+	/*
 	 * Check arguments
 	 */
 	ret = check_subcmd_and_options(subcmd, opt, arch_subcmds, &f);
@@ -1360,7 +1377,7 @@ cmpstat(
 	 * If we are invoked as part of system/filesyste/boot-archive
 	 * SMF service, ignore amd64 modules unless we are booted amd64.
 	 */
-	if (bam_smf_check && !is_amd64() && strstr(file, "/amd64/") == 0)
+	if (bam_smf_check && !is_amd64() && strstr(file, "/amd64/") != 0)
 		return (0);
 
 	/*
@@ -1918,11 +1935,20 @@ update_archive(char *root, char *opt)
 	}
 
 	/*
-	 * root must be writable
+	 * If smf check is requested when / is writable (can happen
+	 * on first reboot following an upgrade because service
+	 * dependency is messed up), skip the check.
+	 */
+	if (bam_smf_check && !bam_root_readonly)
+		return (BAM_SUCCESS);
+
+	/*
+	 * root must be writable. This check applies to alternate
+	 * root (-R option); bam_root_readonly applies to '/' only.
 	 * Note: statvfs() does not always report the truth
 	 */
-	if (is_readonly(root)) {
-		if (!bam_smf_check && bam_verbose)
+	if (!bam_smf_check && is_readonly(root)) {
+		if (bam_verbose)
 			bam_print(RDONLY_FS, root);
 		return (BAM_SUCCESS);
 	}
@@ -2105,8 +2131,52 @@ append_line(menu_t *mp, line_t *lp)
 		mp->start = lp;
 	} else {
 		mp->end->next = lp;
+		lp->prev = mp->end;
 	}
 	mp->end = lp;
+}
+
+static void
+unlink_line(menu_t *mp, line_t *lp)
+{
+	/* unlink from list */
+	if (lp->prev)
+		lp->prev->next = lp->next;
+	else
+		mp->start = lp->next;
+	if (lp->next)
+		lp->next->prev = lp->prev;
+	else
+		mp->end = lp->prev;
+}
+
+static entry_t *
+boot_entry_new(menu_t *mp, line_t *start, line_t *end)
+{
+	entry_t *ent, *prev;
+
+	ent = s_calloc(1, sizeof (entry_t));
+	ent->start = start;
+	ent->end = end;
+
+	if (mp->entries == NULL) {
+		mp->entries = ent;
+		return (ent);
+	}
+
+	prev = mp->entries;
+	while (prev->next)
+		prev = prev-> next;
+	prev->next = ent;
+	ent->prev = prev;
+	return (ent);
+}
+
+static void
+boot_entry_addline(entry_t *ent, line_t *lp)
+{
+	if (ent)
+		ent->end = lp;
 }
 
 /*
@@ -2121,7 +2191,8 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 	 * header gets the right entry# after title has
 	 * been processed
 	 */
-	static line_t *prev;
+	static line_t *prev = NULL;
+	static entry_t *curr_ent = NULL;
 
 	line_t	*lp;
 	char *cmd, *sep, *arg;
@@ -2199,8 +2270,12 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 		lp->entryNum = ++(*entryNum);
 		lp->flags = BAM_TITLE;
 		if (prev && prev->flags == BAM_COMMENT &&
-		    prev->arg && strcmp(prev->arg, BAM_HDR) == 0)
+		    prev->arg && strcmp(prev->arg, BAM_HDR) == 0) {
 			prev->entryNum = lp->entryNum;
+			curr_ent = boot_entry_new(mp, prev, lp);
+		} else {
+			curr_ent = boot_entry_new(mp, lp, lp);
+		}
 	} else if (flag != BAM_INVALID) {
 		/*
 		 * For header comments, the entry# is "fixed up"
@@ -2213,6 +2288,17 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 		lp->flags = (*entryNum == ENTRY_INIT) ? BAM_GLOBAL : BAM_ENTRY;
 	}
 
+	/* record default, old default, and entry line ranges */
+	if (lp->flags == BAM_GLOBAL &&
+	    strcmp(lp->cmd, menu_cmds[DEFAULT_CMD]) == 0) {
+		mp->curdefault = lp;
+	} else if (lp->flags == BAM_COMMENT &&
+	    strncmp(lp->arg, BAM_OLDDEF, strlen(BAM_OLDDEF)) == 0) {
+		mp->olddefault = lp;
+	} else if (lp->flags == BAM_ENTRY ||
+	    (lp->flags == BAM_COMMENT && strcmp(lp->arg, BAM_FTR) == 0)) {
+		boot_entry_addline(curr_ent, lp);
+	}
 	append_line(mp, lp);
 
 	prev = lp;
@@ -2480,7 +2566,6 @@ add_boot_entry(menu_t *mp,
 	char *kernel,
 	char *module)
 {
-	menu_t dummy;
 	int lineNum, entryNum;
 	char linebuf[BAM_MAXLINE];
 
@@ -2488,10 +2573,6 @@ add_boot_entry(menu_t *mp,
 
 	if (title == NULL) {
 		title = "Solaris";	/* default to Solaris */
-	}
-	if (root == NULL) {
-		bam_error(SUBOPT_MISS, menu_cmds[ROOT_CMD]);
-		return (BAM_ERROR);
 	}
 	if (kernel == NULL) {
 		bam_error(SUBOPT_MISS, menu_cmds[KERNEL_CMD]);
@@ -2516,77 +2597,29 @@ add_boot_entry(menu_t *mp,
 	 */
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s",
 	    menu_cmds[COMMENT_CMD], BAM_HDR);
-	dummy.start = dummy.end = NULL;
-	line_parser(&dummy, linebuf, &lineNum, &entryNum);
-	if (dummy.start == NULL || dummy.start->flags != BAM_COMMENT) {
-		line_free(dummy.start);
-		bam_error(INVALID_HDR, BAM_HDR);
-		return (BAM_ERROR);
-	}
-	assert(dummy.start == dummy.end);
-	append_line(mp, dummy.start);
+	line_parser(mp, linebuf, &lineNum, &entryNum);
 
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
 	    menu_cmds[TITLE_CMD], menu_cmds[SEP_CMD], title);
-	dummy.start = dummy.end = NULL;
-	line_parser(&dummy, linebuf, &lineNum, &entryNum);
-	if (dummy.start == NULL || dummy.start->flags != BAM_TITLE) {
-		line_free(dummy.start);
-		bam_error(INVALID_TITLE, title);
-		return (BAM_ERROR);
+	line_parser(mp, linebuf, &lineNum, &entryNum);
+
+	if (root) {
+		(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
+		    menu_cmds[ROOT_CMD], menu_cmds[SEP_CMD], root);
+		line_parser(mp, linebuf, &lineNum, &entryNum);
 	}
-	assert(dummy.start == dummy.end);
-	append_line(mp, dummy.start);
-
-
-	(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
-	    menu_cmds[ROOT_CMD], menu_cmds[SEP_CMD], root);
-	dummy.start = dummy.end = NULL;
-	line_parser(&dummy, linebuf, &lineNum, &entryNum);
-	if (dummy.start == NULL || dummy.start->flags != BAM_ENTRY) {
-		line_free(dummy.start);
-		bam_error(INVALID_ROOT, root);
-		return (BAM_ERROR);
-	}
-	assert(dummy.start == dummy.end);
-	append_line(mp, dummy.start);
-
 
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
 	    menu_cmds[KERNEL_CMD], menu_cmds[SEP_CMD], kernel);
-	dummy.start = dummy.end = NULL;
-	line_parser(&dummy, linebuf, &lineNum, &entryNum);
-	if (dummy.start == NULL || dummy.start->flags != BAM_ENTRY) {
-		line_free(dummy.start);
-		bam_error(INVALID_KERNEL, kernel);
-		return (BAM_ERROR);
-	}
-	assert(dummy.start == dummy.end);
-	append_line(mp, dummy.start);
+	line_parser(mp, linebuf, &lineNum, &entryNum);
 
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
 	    menu_cmds[MODULE_CMD], menu_cmds[SEP_CMD], module);
-	dummy.start = dummy.end = NULL;
-	line_parser(&dummy, linebuf, &lineNum, &entryNum);
-	if (dummy.start == NULL || dummy.start->flags != BAM_ENTRY) {
-		line_free(dummy.start);
-		bam_error(INVALID_MODULE, module);
-		return (BAM_ERROR);
-	}
-	assert(dummy.start == dummy.end);
-	append_line(mp, dummy.start);
+	line_parser(mp, linebuf, &lineNum, &entryNum);
 
 	(void) snprintf(linebuf, sizeof (linebuf), "%s%s",
 	    menu_cmds[COMMENT_CMD], BAM_FTR);
-	dummy.start = dummy.end = NULL;
-	line_parser(&dummy, linebuf, &lineNum, &entryNum);
-	if (dummy.start == NULL || dummy.start->flags != BAM_COMMENT) {
-		line_free(dummy.start);
-		bam_error(INVALID_FOOTER, BAM_FTR);
-		return (BAM_ERROR);
-	}
-	assert(dummy.start == dummy.end);
-	append_line(mp, dummy.start);
+	line_parser(mp, linebuf, &lineNum, &entryNum);
 
 	return (entryNum);
 }
@@ -2594,54 +2627,40 @@ add_boot_entry(menu_t *mp,
 static error_t
 do_delete(menu_t *mp, int entryNum)
 {
-	int bootadm_entry = 0;
-	line_t *lp, *prev, *save;
+	line_t *lp, *freed;
+	entry_t *ent, *tmp;
 	int deleted;
 
 	assert(entryNum != ENTRY_INIT);
 
-	deleted = 0;
-	prev = NULL;
-	for (lp = mp->start; lp; ) {
-
-		if (lp->entryNum == ENTRY_INIT) {
-			prev = lp;
-			lp = lp->next;
+	ent = mp->entries;
+	while (ent) {
+		lp = ent->start;
+		/* check entry number and make sure it's a bootadm entry */
+		if (lp->flags != BAM_COMMENT ||
+		    strcmp(lp->arg, BAM_HDR) != 0 ||
+		    (entryNum != ALL_ENTRIES && lp->entryNum != entryNum)) {
+			ent = ent->next;
 			continue;
 		}
 
-		if (entryNum != ALL_ENTRIES && lp->entryNum != entryNum) {
-			prev = lp;
-			lp = lp->next;
-			continue;
-		}
+		/* free the entry content */
+		do {
+			freed = lp;
+			lp = lp->next;	/* prev stays the same */
+			unlink_line(mp, freed);
+			line_free(freed);
+		} while (freed != ent->end);
 
-		/*
-		 * can only delete bootadm entries
-		 */
-		if (lp->flags == BAM_COMMENT && strcmp(lp->arg, BAM_HDR) == 0) {
-			bootadm_entry = 1;
-		}
-
-		if (!bootadm_entry) {
-			prev = lp;
-			lp = lp->next;
-			continue;
-		}
-
-		if (lp->flags == BAM_COMMENT && strcmp(lp->arg, BAM_FTR) == 0)
-			bootadm_entry = 0;
-
-		if (prev == NULL)
-			mp->start = lp->next;
+		/* free the entry_t structure */
+		tmp = ent;
+		ent = ent->next;
+		if (tmp->prev)
+			tmp->prev->next = ent;
 		else
-			prev->next = lp->next;
-		if (mp->end == lp)
-			mp->end = prev;
-		save = lp->next;
-		line_free(lp);
-		lp = save;	/* prev stays the same */
-
+			mp->entries = ent;
+		if (ent)
+			ent->prev = tmp->prev;
 		deleted = 1;
 	}
 
@@ -2657,53 +2676,6 @@ do_delete(menu_t *mp, int entryNum)
 	update_numbering(mp);
 
 	return (BAM_SUCCESS);
-}
-
-static error_t
-delete_entry(menu_t *mp, char *menu_path, char *opt)
-{
-	int entry = ENTRY_INIT;
-	char *title = NULL;
-	line_t *lp;
-
-	assert(mp);
-	assert(opt);
-
-	/*
-	 * Do a quick check. If the file is empty
-	 * we have nothing to delete
-	 */
-	if (mp->start == NULL) {
-		bam_print(EMPTY_FILE, menu_path);
-		return (BAM_SUCCESS);
-	}
-
-	if (selector(mp, opt, &entry, &title) != BAM_SUCCESS) {
-		return (BAM_ERROR);
-	}
-	assert((entry != ENTRY_INIT) ^ (title != NULL));
-
-	for (lp = mp->start; lp; lp = lp->next) {
-		if (entry != ENTRY_INIT)
-			break;
-		assert(title);
-		if (lp->flags == BAM_TITLE &&
-		    lp->arg && strcmp(lp->arg, title) == 0) {
-			entry = lp->entryNum;
-			break;
-		}
-	}
-
-	if (entry == ENTRY_INIT) {
-		bam_error(NO_MATCH, title);
-		return (BAM_ERROR);
-	}
-
-	if (do_delete(mp, entry) != BAM_SUCCESS) {
-		return (BAM_ERROR);
-	}
-
-	return (BAM_WRITE);
 }
 
 static error_t
@@ -2725,7 +2697,7 @@ delete_all_entries(menu_t *mp, char *menu_path, char *opt)
 }
 
 static FILE *
-open_diskmap(void)
+open_diskmap(char *root)
 {
 	FILE *fp;
 	char cmd[PATH_MAX];
@@ -2734,7 +2706,7 @@ open_diskmap(void)
 	fp = fopen(GRUBDISK_MAP, "r");
 	if (fp == NULL) {
 		(void) snprintf(cmd, sizeof (cmd),
-		    "%s > /dev/null", CREATE_DISKMAP);
+		    "%s%s > /dev/null", root, CREATE_DISKMAP);
 		(void) system(cmd);
 		fp = fopen(GRUBDISK_MAP, "r");
 	}
@@ -2853,7 +2825,7 @@ static char *
 get_title(char *rootdir)
 {
 	static char title[80];	/* from /etc/release */
-	char *cp, release[PATH_MAX];
+	char *cp = NULL, release[PATH_MAX];
 	FILE *fp;
 
 	/* open the /etc/release file */
@@ -2869,7 +2841,7 @@ get_title(char *rootdir)
 			break;
 	}
 	(void) fclose(fp);
-	return (cp);
+	return (cp == NULL ? "Solaris" : cp);
 }
 
 static char *
@@ -2903,7 +2875,7 @@ os_to_grubdisk(char *osdisk, int on_bootdev)
 	char *grubdisk;
 
 	/* translate /dev/dsk name to grub disk name */
-	fp = open_diskmap();
+	fp = open_diskmap("");
 	if (fp == NULL) {
 		bam_error(DISKMAP_FAIL, osdisk);
 		return (NULL);
@@ -2939,15 +2911,119 @@ menu_on_bootdev(char *menu_root, FILE *fp)
 	return (ret);
 }
 
+/*
+ * look for matching bootadm entry with specified parameters
+ * Here are the rules (based on existing usage):
+ * - If title is specified, match on title only
+ * - Else, match on grubdisk and module (don't care about kernel line).
+ *   note that, if root_opt is non-zero, the absence of root line is
+ *   considered a match.
+ */
+static entry_t *
+find_boot_entry(menu_t *mp, char *title, char *root, char *module,
+    int root_opt, int *entry_num)
+{
+	int i;
+	line_t *lp;
+	entry_t *ent;
+
+	/* find matching entry */
+	for (i = 0, ent = mp->entries; ent; i++, ent = ent->next) {
+		lp = ent->start;
+
+		/* first line of entry must be bootadm comment */
+		lp = ent->start;
+		if (lp->flags != BAM_COMMENT || strcmp(lp->arg, BAM_HDR) != 0) {
+			continue;
+		}
+
+		/* advance to title line */
+		lp = lp->next;
+		if (title) {
+			if (lp->flags == BAM_TITLE && lp->arg &&
+			    strcmp(lp->arg, title) == 0)
+				break;
+			continue;	/* check title only */
+		}
+
+		lp = lp->next;	/* advance to root line */
+		if (lp == NULL || strcmp(lp->cmd, menu_cmds[ROOT_CMD]) == 0) {
+			/* root command found, match grub disk */
+			if (strcmp(lp->arg, root) != 0) {
+				continue;
+			}
+			lp = lp->next;	/* advance to kernel line */
+		} else {
+			/* no root command, see if root is optional */
+			if (root_opt == 0) {
+				continue;
+			}
+		}
+
+		if (lp == NULL || lp->next == NULL) {
+			continue;
+		}
+
+		/* check for matching module entry (failsafe or normal) */
+		lp = lp->next;	/* advance to module line */
+		if (strcmp(lp->cmd, menu_cmds[MODULE_CMD]) != 0 ||
+		    strcmp(lp->arg, module) != 0) {
+			continue;
+		}
+		break;	/* match found */
+	}
+
+	*entry_num = i;
+	return (ent);
+}
+
+static int
+update_boot_entry(menu_t *mp, char *title, char *root, char *kernel,
+    char *module, int root_opt)
+{
+	int i;
+	entry_t *ent;
+	line_t *lp;
+	char linebuf[BAM_MAXLINE];
+
+	/* note: don't match on title, it's updated on upgrade */
+	ent = find_boot_entry(mp, NULL, root, module, root_opt, &i);
+	if (ent == NULL)
+		return (add_boot_entry(mp, title, root_opt ? NULL : root,
+		    kernel, module));
+
+	/* replace title of exiting entry and delete root line */
+	lp = ent->start;
+	lp = lp->next;	/* title line */
+	(void) snprintf(linebuf, sizeof (linebuf), "%s%s%s",
+	    menu_cmds[TITLE_CMD], menu_cmds[SEP_CMD], title);
+	free(lp->arg);
+	free(lp->line);
+	lp->arg = s_strdup(title);
+	lp->line = s_strdup(linebuf);
+
+	lp = lp->next;	/* root line */
+	if (strcmp(lp->cmd, menu_cmds[ROOT_CMD]) == 0) {
+		if (root_opt) {		/* root line not needed */
+			line_t *tmp = lp;
+			lp = lp->next;
+			unlink_line(mp, tmp);
+			line_free(tmp);
+		} else
+			lp = lp->next;
+	}
+	return (i);
+}
+
 /*ARGSUSED*/
 static error_t
 update_entry(menu_t *mp, char *menu_root, char *opt)
 {
 	FILE *fp;
 	int entry;
-	line_t *lp;
 	char *grubdisk, *title, *osdev, *osroot;
-	int bootadm_entry, entry_to_delete;
+	struct stat sbuf;
+	char failsafe[256];
 
 	assert(mp);
 	assert(opt);
@@ -2959,7 +3035,7 @@ update_entry(menu_t *mp, char *menu_root, char *opt)
 	title = get_title(osroot);
 
 	/* translate /dev/dsk name to grub disk name */
-	fp = open_diskmap();
+	fp = open_diskmap(osroot);
 	if (fp == NULL) {
 		bam_error(DISKMAP_FAIL, osdev);
 		return (BAM_ERROR);
@@ -2971,41 +3047,20 @@ update_entry(menu_t *mp, char *menu_root, char *opt)
 		return (BAM_ERROR);
 	}
 
-	/* delete existing entries with matching grub hd name */
-	for (;;) {
-		entry_to_delete = -1;
-		bootadm_entry = 0;
-		for (lp = mp->start; lp; lp = lp->next) {
-			/*
-			 * can only delete bootadm entries
-			 */
-			if (lp->flags == BAM_COMMENT) {
-				if (strcmp(lp->arg, BAM_HDR) == 0)
-					bootadm_entry = 1;
-				else if (strcmp(lp->arg, BAM_FTR) == 0)
-					bootadm_entry = 0;
-			}
-
-			if (bootadm_entry && lp->flags == BAM_ENTRY &&
-			    strcmp(lp->cmd, menu_cmds[ROOT_CMD]) == 0 &&
-			    strcmp(lp->arg, grubdisk) == 0) {
-				entry_to_delete = lp->entryNum;
-			}
-		}
-		if (entry_to_delete == -1)
-			break;
-		(void) do_delete(mp, entry_to_delete);
-	}
-
 	/* add the entry for normal Solaris */
-	entry = add_boot_entry(mp, title, grubdisk,
+	entry = update_boot_entry(mp, title, grubdisk,
 	    "/platform/i86pc/multiboot",
-	    "/platform/i86pc/boot_archive");
+	    "/platform/i86pc/boot_archive",
+	    osroot == menu_root);
 
 	/* add the entry for failsafe archive */
-	(void) add_boot_entry(mp, "Solaris failsafe", grubdisk,
-	    "/boot/multiboot kernel/unix -s",
-	    "/boot/x86.miniroot-safe");
+	(void) snprintf(failsafe, sizeof (failsafe),
+	    "%s/boot/x86.miniroot-safe", osroot);
+	if (stat(failsafe, &sbuf) == 0)
+		(void) update_boot_entry(mp, "Solaris failsafe", grubdisk,
+		    "/boot/multiboot kernel/unix -s",
+		    "/boot/x86.miniroot-safe",
+		    osroot == menu_root);
 	free(grubdisk);
 
 	if (entry == BAM_ERROR) {
@@ -3061,6 +3116,41 @@ read_grub_root(void)
 	return (rootstr);
 }
 
+static void
+save_default_entry(menu_t *mp)
+{
+	int lineNum, entryNum;
+	int entry = 0;	/* default is 0 */
+	char linebuf[BAM_MAXLINE];
+	line_t *lp = mp->curdefault;
+
+	if (lp)
+		entry = s_strtol(lp->arg);
+
+	(void) snprintf(linebuf, sizeof (linebuf), "#%s%d", BAM_OLDDEF, entry);
+	line_parser(mp, linebuf, &lineNum, &entryNum);
+}
+
+static void
+restore_default_entry(menu_t *mp)
+{
+	int entry;
+	char *str;
+	line_t *lp = mp->olddefault;
+
+	if (lp == NULL)
+		return;		/* nothing to restore */
+
+	str = lp->arg + strlen(BAM_OLDDEF);
+	entry = s_strtol(str);
+	(void) set_global(mp, menu_cmds[DEFAULT_CMD], entry);
+
+	/* delete saved old default line */
+	mp->olddefault = NULL;
+	unlink_line(mp, lp);
+	line_free(lp);
+}
+
 /*
  * This function is for supporting reboot with args.
  * The opt value can be:
@@ -3071,6 +3161,7 @@ read_grub_root(void)
  */
 #define	REBOOT_TITLE	"Solaris_reboot_transient"
 
+/*ARGSUSED*/
 static error_t
 update_temp(menu_t *mp, char *menupath, char *opt)
 {
@@ -3081,16 +3172,23 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 
 	assert(mp);
 
-	if (opt != NULL &&
-	    strncmp(opt, "entry=", strlen("entry=")) == 0 &&
+	/* If no option, delete exiting reboot menu entry */
+	if (opt == NULL) {
+		entry_t *ent = find_boot_entry(mp, REBOOT_TITLE, NULL, NULL,
+		    0, &entry);
+		if (ent == NULL)	/* not found is ok */
+			return (BAM_SUCCESS);
+		(void) do_delete(mp, entry);
+		restore_default_entry(mp);
+		return (BAM_WRITE);
+	}
+
+	/* if entry= is specified, set the default entry */
+	if (strncmp(opt, "entry=", strlen("entry=")) == 0 &&
 	    selector(mp, opt, &entry, NULL) == BAM_SUCCESS) {
 		/* this is entry=# option */
 		return (set_global(mp, menu_cmds[DEFAULT_CMD], entry));
 	}
-
-	/* If no option, delete exiting reboot menu entry */
-	if (opt == NULL)
-		return (delete_entry(mp, menupath, "title="REBOOT_TITLE));
 
 	/*
 	 * add a new menu entry base on opt and make it the default
@@ -3130,6 +3228,8 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 		bam_error(REBOOT_WITH_ARGS_FAILED);
 		return (BAM_ERROR);
 	}
+
+	save_default_entry(mp);
 	(void) set_global(mp, menu_cmds[DEFAULT_CMD], entry);
 	return (BAM_WRITE);
 }
@@ -3344,12 +3444,19 @@ filelist_free(filelist_t *flistp)
 static void
 menu_free(menu_t *mp)
 {
+	entry_t *ent, *tmp;
 	assert(mp);
 
 	if (mp->start)
 		linelist_free(mp->start);
-	free(mp);
+	ent = mp->entries;
+	while (ent) {
+		tmp = ent;
+		ent = tmp->next;
+		free(tmp);
+	}
 
+	free(mp);
 }
 
 /*
