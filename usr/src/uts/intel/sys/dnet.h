@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,14 +93,9 @@ enum	{ DEFAULT_TYPE, COGENT_EM_TYPE, ASANTE_TYPE};
 #define	GLD_INTR_WAIT 0x0002	/* waiting for interrupt to do scheduling */
 #endif
 
-#ifndef REALMODE
 #define	MAX_TX_DESC		128	/* Should be a multiple of 4 <= 256 */
 #define	MAX_RX_DESC_21040	16	/* Should be a multiple of 4 <= 256 */
 #define	MAX_RX_DESC_21140	32	/* Should be a multiple of 4 <= 256 */
-#else	/* REALMODE */
-#define	MAX_TX_DESC		4	/* Should be a multiple of 4 <= 256 */
-#define	MAX_RX_DESC		4	/* Should be a multiple of 4 <= 256 */
-#endif	/* REALMODE */
 
 #define	SROM_SIZE		128
 #define	SETUPBUF_SIZE		192	/* Setup buffer size */
@@ -390,7 +385,6 @@ struct dnetinstance {
 	caddr_t			tx_desc_paddr;	/* physical addr of xmit desc */
 	struct rx_desc_type	*rx_desc;	/* virtual addr of recv desc */
 	caddr_t			rx_desc_paddr;	/* physical addr of recv desc */
-#ifndef REALMODE
 	char			multicast_cnt[MCASTBUF_SIZE];
 	ddi_acc_handle_t	io_handle;	/* ddi I/O handle */
 	dev_info_t		*devinfo;
@@ -429,7 +423,6 @@ struct dnetinstance {
 	uint32_t	stat_excoll;
 	uint32_t	stat_underflow;
 	uint32_t	stat_nocarrier;
-#endif
 	int			tx_current_desc; /* Current Tx descriptor */
 	int 			rx_current_desc; /* Current descriptor of Rx  */
 	int			transmitted_desc; /* Descriptor count xmitted */
@@ -470,11 +463,7 @@ struct dnetinstance {
 
 #pragma pack(1)
 
-#ifndef REALMODE
 #define	BCOPY(from, to, len) bcopy(from, to, len)
-#else
-#define	BCOPY(from, to, len) bcopy(to, from, len) /* Bagbiting realmode bcopy */
-#endif
 
 /*
  * Receive descriptor description

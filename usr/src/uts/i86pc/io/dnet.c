@@ -42,8 +42,6 @@
 
 #define	BUG_4010796	/* See 4007871, 4010796 */
 
-#ifndef	REALMODE
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/param.h>
@@ -80,8 +78,6 @@ char _depends_on[] = "misc/gld" MII_DEPEND;
 
 #define	IDENT	"DNET 21x4x"
 
-#endif	/* REALMODE */
-
 /*
  * #define	DNET_NOISY
  * #define	SROMDEBUG
@@ -96,7 +92,6 @@ int	dnetdebug = 0;
 #endif
 #endif
 
-#ifndef REALMODE
 /* used for message allocated using desballoc() */
 struct free_ptr {
 	struct free_rtn	free_rtn;
@@ -120,17 +115,14 @@ static int dnetdetach(dev_info_t *, ddi_detach_cmd_t);
 
 /* Required driver entry points for GLD */
 static int dnet_reset(gld_mac_info_t *);
-#endif	/* REALMODE */
 static int dnet_start_board(gld_mac_info_t *);
 static int dnet_stop_board(gld_mac_info_t *);
 static int dnet_set_mac_addr(gld_mac_info_t *, uchar_t *);
-#ifndef REALMODE
 static int dnet_set_multicast(gld_mac_info_t *, uchar_t *, int);
 static int dnet_set_promiscuous(gld_mac_info_t *, int);
 static int dnet_get_stats(gld_mac_info_t *, struct gld_stats *);
 static int dnet_send(gld_mac_info_t *, mblk_t *);
 static uint_t dnetintr(gld_mac_info_t *);
-#endif	/* REALMODE */
 
 /* Internal functions used by the above entry points */
 static void write_gpr(struct dnetinstance *dnetp, uint32_t val);
@@ -141,18 +133,15 @@ static unsigned int hashindex(uchar_t *);
 static int dnet_start(gld_mac_info_t *);
 static int dnet_set_addr(gld_mac_info_t *, uchar_t *);
 
-#ifndef REALMODE
 static void dnet_getp(gld_mac_info_t *);
 static void update_rx_stats(gld_mac_info_t *, int);
 static void update_tx_stats(gld_mac_info_t *, int);
-#endif	/* REALMODE */
 
 /* Media Selection Setup Routines */
 static void set_gpr(gld_mac_info_t *macinfo);
 static void set_opr(gld_mac_info_t *macinfo);
 static void set_sia(gld_mac_info_t *macinfo);
 
-#ifndef REALMODE
 /* Buffer Management Routines */
 static int dnet_alloc_bufs(gld_mac_info_t *);
 static void dnet_free_bufs(gld_mac_info_t *);
@@ -164,7 +153,6 @@ static int dnet_rbuf_destroy();
 static struct rbuf_list *dnet_rbuf_alloc(dev_info_t *, int);
 static void dnet_rbuf_free(caddr_t);
 static void dnet_freemsg_buf(struct free_ptr *);
-#endif /* REALMODE */
 
 static void setup_block(gld_mac_info_t *macinfo);
 
@@ -230,11 +218,6 @@ static char *media_str[] = {
 	"MII"
 };
 
-#ifdef REALMODE
-static ushort_t *realmode_gprseq = NULL;
-static int realmode_gprseq_len = 0;
-#endif
-
 /* default SROM info for cards with no SROMs */
 static LEAF_FORMAT leaf_default_100;
 static LEAF_FORMAT leaf_asante;
@@ -242,11 +225,6 @@ static LEAF_FORMAT leaf_phylegacy;
 static LEAF_FORMAT leaf_cogent_100;
 static LEAF_FORMAT leaf_21041;
 static LEAF_FORMAT leaf_21040;
-#ifdef REALMODE
-static LEAF_FORMAT realmode_leaf[7];
-#endif
-
-#ifndef	REALMODE
 
 int rx_buf_size = (ETHERMAX + ETHERFCSL + 3) & ~3;	/* roundup to 4 */
 
@@ -977,8 +955,6 @@ dnet_reset(gld_mac_info_t *macinfo)
 	return (0);
 }
 
-#endif	/* REALMODE */
-
 static void
 dnet_reset_board(gld_mac_info_t *macinfo)
 {
@@ -1242,8 +1218,6 @@ dnet_set_mac_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
 	return (0);
 }
 
-#ifndef	REALMODE
-
 /*
  *	dnet_set_multicast() -- set (enable) or disable a multicast address
  *
@@ -1285,8 +1259,6 @@ dnet_set_multicast(gld_mac_info_t *macinfo, uchar_t *mcast, int op)
 	return (retval);
 }
 
-#endif	/* REALMODE */
-
 /*
  * A hashing function used for setting the
  * node address or a multicast address
@@ -1323,8 +1295,6 @@ hashindex(uchar_t *address)
 	}
 	return (index);
 }
-
-#ifndef	REALMODE
 
 /*
  * dnet_set_promiscuous() -- set or reset promiscuous mode on the board
@@ -1783,7 +1753,6 @@ dnet_getp(gld_mac_info_t *macinfo)
 		index = dnetp->rx_current_desc;
 		ASSERT(desc[index].desc0.first_desc != 0);
 
-#ifndef REALMODE
 		/*
 		 * DMA overrun errata from DEC: avoid possible bus hangs
 		 * and data corruption
@@ -1841,7 +1810,6 @@ dnet_getp(gld_mac_info_t *macinfo)
 			 * "marker" were received before a dma overrun occurred
 			 */
 		}
-#endif
 
 		/*
 		 * If we get an oversized packet it could span multiple
@@ -2100,8 +2068,6 @@ update_tx_stats(gld_mac_info_t *macinfo, int index)
 	}
 }
 
-#endif	/* REALMODE */
-
 /*
  *	========== Media Selection Setup Routines ==========
  */
@@ -2160,21 +2126,13 @@ set_gpr(gld_mac_info_t *macinfo)
 	media_block_t *block = dnetp->selected_media_block;
 	int i;
 
-#ifdef REALMODE
-	if (realmode_gprseq) {
-		for (i = 0; i < realmode_gprseq_len; i++)
-			write_gpr(dnetp, realmode_gprseq[i]);
-	}
-#else
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dnetp->devinfo,
 	    DDI_PROP_DONTPASS, "gpr-sequence", (caddr_t)&sequence,
 	    &len) == DDI_PROP_SUCCESS) {
 		for (i = 0; i < len / sizeof (uint32_t); i++)
 			write_gpr(dnetp, sequence[i]);
 		kmem_free(sequence, len);
-	}
-#endif
-	else {
+	} else {
 		/*
 		 * Write the reset sequence if this is the first time this
 		 * block has been selected.
@@ -2334,8 +2292,6 @@ set_sia(gld_mac_info_t *macinfo)
 		    REG32(dnetp->io_reg, SIA_TXRX_REG), 0);
 	}
 }
-
-#ifndef	REALMODE
 
 /*
  *	========== Buffer Management Routines ==========
@@ -3014,8 +2970,6 @@ dnet_freemsg_buf(struct free_ptr *frp)
 	kmem_free(frp, sizeof (*frp)); /* free up the free_rtn structure */
 }
 
-#endif	/* REALMODE */
-
 /*
  *	========== SROM Read Routines ==========
  */
@@ -3183,16 +3137,6 @@ dnet_read21140srom(ddi_acc_handle_t io_handle, int io_reg, uchar_t *addr,
 }
 
 
-#ifdef REALMODE
-static int
-get_alternative_srom_image(dev_info_t *devinfo, uchar_t *vi, int len)
-{}
-
-static void
-set_alternative_srom_image(dev_info_t *devinfo, uchar_t *vi, int len)
-{}
-#else
-
 /*
  * XXX NEEDSWORK
  *
@@ -3293,8 +3237,6 @@ set_alternative_srom_image(dev_info_t *devinfo, uchar_t *vi, int len)
 	}
 }
 #endif
-
-#endif /* REALMODE */
 
 /*
  *	========== SROM Parsing Routines ==========
@@ -3410,7 +3352,6 @@ find_active_media(gld_mac_info_t *macinfo)
 #endif
 	dnetp->selected_media_block = leaf->default_block;
 
-#ifndef REALMODE
 	if (dnetp->phyaddr != -1) {
 		dnetp->selected_media_block = leaf->mii_block;
 		setup_block(macinfo);
@@ -3430,7 +3371,6 @@ find_active_media(gld_mac_info_t *macinfo)
 			}
 		}
 	}
-#endif
 
 	/*
 	 * Media is searched for in order of Precedence. This DEC SROM spec
@@ -3636,11 +3576,7 @@ dnet_link_sense(gld_mac_info_t *macinfo)
 	for (waittime = 0, upsamples = 0;
 	    waittime <= settletime + stabletime && upsamples < 8;
 	    waittime += stabletime/8) {
-#ifdef REALMODE
-		milliseconds(stabletime/8);
-#else
 		delay(drv_usectohz(stabletime*1000 / 8));
-#endif
 		status = read_gpr(dnetp);
 		link = (status^polarity) & mask;
 		if (link)
@@ -3770,8 +3706,6 @@ enable_interrupts(struct dnetinstance *dnetp, int enable_xmit)
 
 }
 
-
-#ifndef REALMODE
 /*
  * Some older multiport cards are non-PCI compliant in their interrupt routing.
  * Second and subsequent devices are incorrectly configured by the BIOS
@@ -4019,7 +3953,7 @@ dnet_detach_hacked_interrupt(dev_info_t *devinfo)
 	kmem_free(hackintr_inf, sizeof (struct hackintr_inf));
 	return (DDI_SUCCESS);
 }
-#endif
+
 /*
  *	========== PHY MII Routines ==========
  */
@@ -4035,11 +3969,7 @@ do_phy(gld_mac_info_t *macinfo)
 	media_block_t *block;
 	int phy;
 
-#ifdef REALMODE
-	dip = (dev_info_t *)dnetp;
-#else
 	dip = dnetp->devinfo;
-#endif
 
 	/*
 	 * Find and configure the PHY media block. If NO PHY blocks are
@@ -4104,12 +4034,8 @@ dnet_mii_read(dev_info_t *dip, int phy_addr, int reg_num)
 	int bits_in_ushort = ((sizeof (ushort_t))*8);
 	int turned_around = 0;
 
-#ifndef REALMODE
 	macinfo = ddi_get_driver_private(dip);
 	dnetp = (struct dnetinstance *)macinfo->gldm_private;
-#else
-	dnetp = (struct dnetinstance *)dip;
-#endif
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
 	/* Write Preamble */
@@ -4155,12 +4081,9 @@ dnet_mii_write(dev_info_t *dip, int phy_addr, int reg_num, int reg_dat)
 	struct dnetinstance *dnetp;
 	uint32_t command_word;
 	int bits_in_ushort = ((sizeof (ushort_t))*8);
-#ifdef REALMODE
-	dnetp = (struct dnetinstance *)dip;
-#else
+
 	macinfo = ddi_get_driver_private(dip);
 	dnetp = (struct dnetinstance *)macinfo->gldm_private;
-#endif
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
 	write_mii(dnetp, MII_PRE, 2*bits_in_ushort);
@@ -4282,12 +4205,9 @@ dnet_parse_srom(struct dnetinstance *dnetp, SROM_FORMAT *sr, uchar_t *vi)
 		p = vi+18;
 		sr->version = *p++;
 		sr->adapters = *p++;
-#ifdef REALMODE
-		sr->leaf = realmode_leaf;
-#else
+
 		sr->leaf =
 		    kmem_zalloc(sr->adapters * sizeof (LEAF_FORMAT), KM_SLEEP);
-#endif
 		for (i = 0; i < 6; i++)
 			sr->netaddr[i] = *p++;
 
@@ -4319,16 +4239,11 @@ dnet_parse_srom(struct dnetinstance *dnetp, SROM_FORMAT *sr, uchar_t *vi)
 					    " Making a guess (821,0)");
 #endif
 
-#ifdef REALMODE
-				realmode_gprseq = cogent_gprseq;
-				realmode_gprseq_len = 2;
-#else
 				/* XXX function return value ignored */
 				(void) ddi_prop_update_byte_array(
 				    DDI_DEV_T_NONE, dnetp->devinfo,
 				    "gpr-sequence", (uchar_t *)cogent_gprseq,
 				    sizeof (cogent_gprseq));
-#endif
 				break;
 			}
 		}
@@ -4933,11 +4848,8 @@ dnet_timestamp(struct dnetinstance *dnetp,  char *buf)
 	*p++ = '-';
 	*p++ = '>';
 	*p++ = 0;
-#ifdef REALMODE
-	putstr(loc);
-#else
+
 	printf(loc);
-#endif
 	dnet_usectimeout(dnetp, 1000000, 0, 0);
 }
 

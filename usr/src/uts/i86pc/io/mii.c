@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
  * different implementations of PHY devices
  */
 
-#ifndef REALMODE
 #include <sys/types.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
@@ -51,18 +50,7 @@
 #include <sys/mii.h>
 #include <sys/miipriv.h>
 #include <sys/miiregs.h>
-#else
-#include "../mii/mii.h"
-#include "../mii/miipriv.h"
-#include "../mii/miiregs.h"
-#ifndef	ddi_getprop
-#define	ddi_getprop(a, b, c, d, def) def
-#define	ddi_getlongprop(a, b, c, d, e, f) DDI_PROP_FAILURE
-#define	DDI_PROP_SUCCESS 0
-#define	DDI_PROP_FAILURE -1
-#define	kmem_free(p, s) ((void)0)
-#endif
-#endif
+
 #ifdef DEBUG
 #define	MIIDEBUG
 int miidebug = 0;
@@ -70,19 +58,6 @@ int miidebug = 0;
 #define	MIIDUMP 2
 #define	MIIPROBE 4
 #define	MIICOMPAT 8
-#endif
-
-
-/* Static storage for realmode drivers, instead of allocated memory  */
-#ifdef REALMODE
-#define	ddi_get_name(a) "Bootconf"
-static mii_info_t realmode_mac = {0};
-#ifndef NULL
-#define	NULL ((void *)0)
-#endif
-#define	MAXPHY 1
-static struct phydata realmode_phys[MAXPHY];
-static int current_phy = 0;
 #endif
 
 /* Local functions */
@@ -149,14 +124,10 @@ mii_create(dev_info_t *dip,		/* Passed to read/write functions */
 {
 	mii_handle_t mac;
 
-#ifdef REALMODE
-	mac = &realmode_mac;
-#else
 	/*  Allocate space for the mii structure */
 	if ((mac = (mii_handle_t)
 	    kmem_zalloc(sizeof (struct mii_info), KM_NOSLEEP)) == NULL)
 		return (MII_NOMEM);
-#endif
 
 	mac->mii_write = writefunc;
 	mac->mii_read = readfunc;
@@ -225,17 +196,13 @@ mii_init_phy(mii_handle_t mac, int phy)
 	/* Create a phydata structure for this new phy */
 	if (mac->phys[phy])
 		return (MII_PHYPRESENT);
-#ifdef REALMODE
-	if (current_phy == MAXPHY)
-		return (MII_NOMEM);
-	mac->phys[phy] = phydata = realmode_phys + current_phy++;
-#else
+
 	mac->phys[phy] = phydata = (struct phydata *)
 			    kmem_zalloc(sizeof (struct phydata), KM_NOSLEEP);
 
 	if (!phydata)
 		return (MII_NOMEM);
-#endif
+
 	phydata->id = (ulong_t)mac->mii_read(dip, phy, MII_PHYIDH) << 16;
 	phydata->id |= (ulong_t)mac->mii_read(dip, phy, MII_PHYIDL);
 	phydata->state = phy_state_unknown;
@@ -270,10 +237,8 @@ mii_init_phy(mii_handle_t mac, int phy)
 			phydata->fix_speed = 10;
 		} else if (phydata->fix_speed == 0) {
 			/* A very stupid PHY would not be supported */
-#ifndef REALMODE
 			kmem_free(mac->phys[phy], sizeof (struct phydata));
 			mac->phys[phy] = NULL;
-#endif
 			return (MII_NOTSUPPORTED);
 		}
 		/* mii_sync will sort out the speed selection on the PHY */
@@ -392,11 +357,7 @@ mii_reset_phy(mii_handle_t mac, int phy, enum mii_wait_type wait)
 			control = mac->mii_read(mac->mii_dip, phy, MII_CONTROL);
 			if (!(control & MII_CONTROL_RESET))
 				break;
-#ifdef REALMODE
-			microseconds(10000);
-#else
 			delay(drv_usectohz(10000));
-#endif
 		}
 		if (i)
 			goto reset_completed;
@@ -729,7 +690,6 @@ mii_dump_phy(mii_handle_t mac, int phy)
 	return (MII_SUCCESS);
 }
 
-#ifndef REALMODE
 /*
  * Start a periodic check to monitor the MII devices attached, and callback
  * to the MAC driver when the state on a device changes
@@ -828,7 +788,6 @@ mii_destroy(mii_handle_t mac)
 	kmem_free(mac, sizeof (*mac));
 }
 
-#endif
 /*
  * Get a PHY data structure from an MII handle, and validate the common
  * parameters to the MII functions. Used to verify parameters in most MII

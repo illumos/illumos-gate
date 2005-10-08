@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,13 +60,6 @@ extern "C" {
 /*
  * MII programming Interface types
  */
-#ifdef REALMODE
-typedef void *dev_info_t;
-#ifndef NULL
-#define	NULL ((void *)0)
-#endif
-#define	ddi_get_name(x) "Bootconf"
-#endif
 
 enum mii_phy_state {phy_state_unknown, phy_state_linkup, phy_state_linkdown};
 enum mii_wait_type {mii_wait_none, mii_wait_user, mii_wait_interrupt};

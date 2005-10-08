@@ -21,28 +21,23 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Checks the list of files to make sure that each given
-# file has a SMI standard ident string.
+# Checks the list of files to make sure that each given file has a SMI
+# standard ident string.
 #
 # It checks that keywords exist, and verifies the string.  By default,
 # all allowable forms of keywords (according to the ON documentation)
 # are acceptable.  The '-p' option (pedantic) allows only the canonical
 # form of keywords. See below for allowable forms.
 #
-# Use as "keywords filelist" where filelist is the list of
-# plain files, which could be the edited output of 'putback -n'.
+# Use as "keywords filelist" where filelist is the list of plain files.
 #
-# The following command will check a reasonable subset of ON source
-# in a teamware workspace.
-#
-#	% cd $CODEMGR_WS/usr/src
-# 	% keywords \
-#	`find . -name SCCS -prune -o -name '*Make*' -print -o '*.csh' -print`
+# However, in general, this utility should not need to be directly
+# invoked, but instead used through wx(1) -- e.g., `wx keywords'.
 #
 # Output consists of filenames with expanded, incorrect or missing
 # sccs keywords and/or filenames that were not SCCS files.
@@ -62,8 +57,6 @@ USAGE="usage: `basename $0` [-p] <filename> ..."
 
 # Canonical form for .c and .h files
 CANON_C_H="^#pragma ident	\"\%\Z\%\%\M\%	\%\I\%	\%\E\% SMI\""
-# Realmode (different compiler) canonical form for .c and .h files
-REALMODE_C_H="^#ident	\"\%\Z\%\%\M\%	\%\I\%	\%\E\% SMI\""
 # Canonical form for other files
 CANON_OTHER="ident	\"\%\Z\%\%\M\%	\%\I\%	\%\E\% SMI\""
 STANDARD="ident	\"(\%\Z\%\%\M\%	+\%\I\%|\%W\%)	+\%\E\% SMI\""
@@ -136,27 +129,22 @@ do
 
     cd $dir
 
-    # We should now be in the directory where the file to check lives.
-    # If this directory has 'realmode' anywhere within its path then
-    # select the realmode canonical string.
-    case `pwd` in
-	*realmode*)
-	    CUR_CANON_C_H="$REALMODE_C_H";;
-	*)
-	    CUR_CANON_C_H="$CANON_C_H";;
-    esac
-
     if [ -f SCCS/s.$file ]; then
 	if [ -f SCCS/p.$file ]; then
 	    case "$file" in
 		*.cxx|*.cc|*.c|*.hh|*.h)
-	    	    canon_str="$CUR_CANON_C_H";;
+	    	    canon_str="$CANON_C_H";;
 		*)
 		    canon_str="$CANON_OTHER";;
 	    esac
 	    check_file $i $file "$canon_str"
 	else
 	    sccs get -p $file > /dev/null 2>/tmp/xxx$$
+	    if [ $? -ne 0 ]; then	   
+		echo "Cannot access SCCS information: $i"
+		exitcode=1
+		continue
+	    fi
 	    egrep -s "cm7" /tmp/xxx$$
 	    if [ $? -eq 0 ]; then
 		egrep -s "$EXPANDED" $file
@@ -170,7 +158,7 @@ do
 	    	sccs get -p -k $file > /tmp/kywrds.$$ 2>/tmp/xxx$$
 		case "$file" in
 		    *.cxx|*.cc|*.c|*.hh|*.h)
-			canon_str="$CUR_CANON_C_H";;
+			canon_str="$CANON_C_H";;
 		    *)
 			canon_str="$CANON_OTHER";;
 		esac
