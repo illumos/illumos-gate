@@ -193,7 +193,7 @@ px_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	/* non-hotplug or not attached */
 	switch (infocmd) {
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(intptr_t)instance;
 		return (DDI_SUCCESS);
 
 	case DDI_INFO_DEVT2DEVINFO:
@@ -528,7 +528,7 @@ px_pwr_setup(dev_info_t *dip)
 	pwr_p->pwr_func_lvl = PM_LEVEL_D0;
 
 	mutex_init(&px_p->px_l23ready_lock, NULL, MUTEX_DRIVER,
-	    (void *)px_pwr_pil);
+	    (void *)(uintptr_t)px_pwr_pil);
 	cv_init(&px_p->px_l23ready_cv, NULL, CV_DRIVER, NULL);
 
 	mutex_init(&px_p->px_lup_lock, NULL, MUTEX_DRIVER,
@@ -1138,6 +1138,7 @@ px_dma_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 			mp->dmai_flags);
 		/*NOTREACHED*/
 	}
+	return (0);
 }
 
 /*

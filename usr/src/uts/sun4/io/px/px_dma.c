@@ -549,7 +549,7 @@ px_dma_pfn(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	for (i = 1; i < npages; i++) {
 		px_iopfn_t pfn = PX_GET_MP_PFN1(mp, i);
 		if (peer ^ TGT_PFN_INBETWEEN(pfn, pfn_base, pfn_last)) {
-			cmn_err(CE_WARN, "%s%d mixed mode DMA %x %x",
+			cmn_err(CE_WARN, "%s%d mixed mode DMA %lx %lx",
 				NAMEINST(mp->dmai_rdip), MP_PFN0(mp), pfn);
 			ret = DDI_DMA_NOMAPPING;	/* mixed mode */
 			goto err;
@@ -1197,7 +1197,7 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 
 		if (px_lib_iommu_getbypass(dip, MMU_PTOB(pfn),
 				attr, &bypass_addr) != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "bypass cookie failure %llx\n", pfn);
+			cmn_err(CE_WARN, "bypass cookie failure %lx\n", pfn);
 			return (DDI_DMA_NOMAPPING);
 		}
 		pfn = MMU_BTOP(bypass_addr);

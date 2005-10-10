@@ -159,6 +159,7 @@ px_mmu_detach(px_t *px_p)
 	px_p->px_mmu_p = NULL;
 }
 
+int
 px_mmu_map_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
     size_t npages, size_t pfn_index)
 {

@@ -214,7 +214,7 @@ px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
 	    (intr_state == INTR_DELIVERED_STATE); /* */) {
 		if (gethrtime() - start_time > px_intrpend_timeout) {
 			cmn_err(CE_WARN,
-			    "%s%d: px_ib_intr_dist_en: sysino 0x%x(ino 0x%x) "
+			    "%s%d: px_ib_intr_dist_en: sysino 0x%lx(ino 0x%x) "
 			    "from cpu id 0x%x to 0x%x timeout",
 			    ddi_driver_name(dip), ddi_get_instance(dip),
 			    sysino, ino, old_cpu_id, cpu_id);
@@ -501,7 +501,7 @@ px_ib_ino_add_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
 	    == DDI_SUCCESS) && (intr_state == INTR_DELIVERED_STATE); /* */) {
 		if (gethrtime() - start_time > px_intrpend_timeout) {
 			cmn_err(CE_WARN, "%s%d: px_ib_ino_add_intr: pending "
-			    "sysino 0x%x(ino 0x%x) timeout",
+			    "sysino 0x%lx(ino 0x%x) timeout",
 			    ddi_driver_name(dip), ddi_get_instance(dip),
 			    sysino, ino);
 
@@ -591,7 +591,7 @@ px_ib_ino_rem_intr(px_t *px_p, px_ib_ino_info_t *ino_p, px_ih_t *ih_p)
 	    == DDI_SUCCESS) && (intr_state == INTR_DELIVERED_STATE); /* */) {
 		if (gethrtime() - start_time > px_intrpend_timeout) {
 			cmn_err(CE_WARN, "%s%d: px_ib_ino_rem_intr: pending "
-			    "sysino 0x%x(ino 0x%x) timeout",
+			    "sysino 0x%lx(ino 0x%x) timeout",
 			    ddi_driver_name(dip), ddi_get_instance(dip),
 			    sysino, ino);
 

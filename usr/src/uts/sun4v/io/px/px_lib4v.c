@@ -1041,7 +1041,7 @@ px_pci_config_get(ddi_acc_impl_t *handle, uint32_t *addr, int size)
 					handle->ahi_common.ah_bus_private;
 	uint32_t pci_dev_addr = px_pvt->raddr;
 	uint32_t vaddr = px_pvt->vaddr;
-	uint16_t off = (uint16_t)(addr - vaddr) & 0xfff;
+	uint16_t off = (uint16_t)(uintptr_t)(addr - vaddr) & 0xfff;
 	uint32_t rdata = 0;
 
 	if (px_lib_config_get(px_pvt->dip, pci_dev_addr, off,
@@ -1059,7 +1059,7 @@ px_pci_config_put(ddi_acc_impl_t *handle, uint32_t *addr,
 					handle->ahi_common.ah_bus_private;
 	uint32_t pci_dev_addr = px_pvt->raddr;
 	uint32_t vaddr = px_pvt->vaddr;
-	uint16_t off = (uint16_t)(addr - vaddr) & 0xfff;
+	uint16_t off = (uint16_t)(uintptr_t)(addr - vaddr) & 0xfff;
 
 	if (px_lib_config_put(px_pvt->dip, pci_dev_addr, off,
 				size, wdata) != DDI_SUCCESS) {
@@ -1343,7 +1343,7 @@ px_lib_map_vconfig(dev_info_t *dip,
 
 	DBG(DBG_LIB_CFG, dip, "px_config_setup: raddr 0x%x, vaddr 0x%x\n",
 				px_pvt->raddr, px_pvt->vaddr);
-	*addrp = (caddr_t)px_pvt->vaddr;
+	*addrp = (caddr_t)(uintptr_t)px_pvt->vaddr;
 	return (DDI_SUCCESS);
 }
 

@@ -641,9 +641,9 @@ px_err_reg_disable(px_t *px_p, px_err_id_t id)
 	caddr_t			csr_base;
 
 	if (id == PX_ERR_JBC)
-		csr_base = (caddr_t)px_p->px_inos[PX_INTR_XBC];
+		csr_base = (caddr_t)(uintptr_t)px_p->px_inos[PX_INTR_XBC];
 	else
-		csr_base = (caddr_t)px_p->px_inos[PX_INTR_PEC];
+		csr_base = (caddr_t)(uintptr_t)px_p->px_inos[PX_INTR_PEC];
 
 	reg_desc->enabled = B_FALSE;
 
@@ -1613,6 +1613,7 @@ PX_ERPT_SEND_DEC(pec_ilu)
 
 /* PCIEX UE Errors */
 /* ARGSUSED */
+int
 px_err_pciex_ue_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr)
@@ -1730,6 +1731,7 @@ PX_ERPT_SEND_DEC(pciex_ue)
 
 /* PCIEX UE Errors */
 /* ARGSUSED */
+int
 px_err_pciex_ce_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr)

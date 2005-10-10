@@ -63,7 +63,7 @@ px_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	size_t npages, pg_index;
 	uint64_t attr;
 
-	offset = (uint32_t)a & MMU_PAGE_OFFSET;
+	offset = (uint32_t)(uintptr_t)a & MMU_PAGE_OFFSET;
 	npages = MMU_BTOPR(len + offset);
 	if (!npages)
 		return;
@@ -72,7 +72,7 @@ px_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	DBG(DBG_FAST_DVMA, dip, "load index=%x: %p+%x ", index, a, len);
 	if (index + npages > mp->dmai_ndvmapages) {
 		cmn_err(px_panic_on_fatal_errors ? CE_PANIC : CE_WARN,
-			"%s%d: kaddr_load index(%x)+pgs(%x) exceeds limit\n",
+			"%s%d: kaddr_load index(%x)+pgs(%lx) exceeds limit\n",
 			ddi_driver_name(dip), ddi_get_instance(dip),
 			index, npages);
 		return;
@@ -93,8 +93,8 @@ px_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	if (px_lib_iommu_map(dip, PCI_TSBID(0, pg_index), npages, attr,
 	    (void *)a, 0, MMU_MAP_BUF) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: kaddr_load can't get "
-		    "page frame for vaddr %x", ddi_driver_name(dip),
-		    ddi_get_instance(dip), (int)a);
+		    "page frame for vaddr %lx", ddi_driver_name(dip),
+		    ddi_get_instance(dip), (uintptr_t)a);
 	}
 }
 

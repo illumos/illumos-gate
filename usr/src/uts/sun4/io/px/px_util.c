@@ -626,8 +626,8 @@ px_get_cfg_pabase(px_t *px_p)
 	}
 
 	if (i >= nrange)
-		cmn_err(CE_PANIC, "no cfg space in px(%x) ranges prop.\n",
-			(void *)px_p);
+		cmn_err(CE_PANIC, "no cfg space in px(%p) ranges prop.\n",
+			px_p);
 
 	return (((uint64_t)rangep->parent_high << 32) | rangep->parent_low);
 }

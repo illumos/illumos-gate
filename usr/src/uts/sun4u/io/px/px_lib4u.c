@@ -935,9 +935,9 @@ px_lib_get_msiq_rec(dev_info_t *dip, px_msiq_t *msiq_p, msiq_rec_t *msiq_rec_p)
 		break;
 	default:
 		cmn_err(CE_WARN, "%s%d: px_lib_get_msiq_rec: "
-		    "0x%lx is an unknown EQ record type",
+		    "0x%x is an unknown EQ record type",
 		    ddi_driver_name(dip), ddi_get_instance(dip),
-		    eq_rec_p->eq_rec_fmt_type);
+		    (int)eq_rec_p->eq_rec_fmt_type);
 		break;
 	}
 

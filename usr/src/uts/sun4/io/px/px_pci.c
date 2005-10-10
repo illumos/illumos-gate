@@ -231,7 +231,7 @@ pxb_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		return (DDI_FAILURE);
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(intptr_t)instance;
 		return (DDI_SUCCESS);
 
 	case DDI_INFO_DEVT2DEVINFO:
