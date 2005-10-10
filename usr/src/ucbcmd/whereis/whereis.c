@@ -116,25 +116,38 @@ int	Bcnt;
 char	**Mflag;
 int	Mcnt;
 char	uflag;
+
+void getlist(int *, char ***, char ***, int *);
+void zerof(void);
+void lookup(char *);
+void looksrc(char *);
+void lookbin(char *);
+void lookman(char *);
+void findv(char **, int, char *);
+void find(char **, char *);
+void findin(char *, char *);
+
 /*
  * whereis name
  * look for source, documentation and binaries
  */
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 
 	argc--, argv++;
 	if (argc == 0) {
 usage:
-		fprintf(stderr, "whereis [ -sbmu ] [ -SBM dir ... -f ] name...\n");
+		fprintf(stderr, "whereis [ -sbmu ] [ -SBM dir ... -f ] "
+		    "name...\n");
 		exit(1);
 	}
 	do
 		if (argv[0][0] == '-') {
-			register char *cp = argv[0] + 1;
-			while (*cp) switch (*cp++) {
+			char *cp = argv[0] + 1;
+			while (*cp) {
+
+				switch (*cp++) {
 
 			case 'f':
 				break;
@@ -172,20 +185,17 @@ usage:
 
 			default:
 				goto usage;
+				}
 			}
 			argv++;
 		} else
 			lookup(*argv++);
 	while (--argc > 0);
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
-getlist(argcp, argvp, flagp, cntp)
-	char ***argvp;
-	int *argcp;
-	char ***flagp;
-	int *cntp;
+void
+getlist(int *argcp, char ***argvp, char ***flagp, int *cntp)
 {
 
 	(*argvp)++;
@@ -197,8 +207,8 @@ getlist(argcp, argvp, flagp, cntp)
 	(*argvp)--;
 }
 
-
-zerof()
+void
+zerof(void)
 {
 
 	if (sflag && bflag && mflag)
@@ -207,11 +217,10 @@ zerof()
 int	count;
 int	print;
 
-
-lookup(cp)
-	register char *cp;
+void
+lookup(char *cp)
 {
-	register char *dp;
+	char *dp;
 
 	for (dp = cp; *dp; dp++)
 		continue;
@@ -259,8 +268,8 @@ again:
 		printf("\n");
 }
 
-looksrc(cp)
-	char *cp;
+void
+looksrc(char *cp)
 {
 	if (Sflag == 0) {
 		find(srcdirs, cp);
@@ -268,8 +277,8 @@ looksrc(cp)
 		findv(Sflag, Scnt, cp);
 }
 
-lookbin(cp)
-	char *cp;
+void
+lookbin(char *cp)
 {
 	if (Bflag == 0)
 		find(bindirs, cp);
@@ -277,8 +286,8 @@ lookbin(cp)
 		findv(Bflag, Bcnt, cp);
 }
 
-lookman(cp)
-	char *cp;
+void
+lookman(char *cp)
 {
 	if (Mflag == 0) {
 		find(mandirs, cp);
@@ -286,27 +295,24 @@ lookman(cp)
 		findv(Mflag, Mcnt, cp);
 }
 
-findv(dirv, dirc, cp)
-	char **dirv;
-	int dirc;
-	char *cp;
+void
+findv(char **dirv, int dirc, char *cp)
 {
 
 	while (dirc > 0)
 		findin(*dirv++, cp), dirc--;
 }
 
-find(dirs, cp)
-	char **dirs;
-	char *cp;
+void
+find(char **dirs, char *cp)
 {
 
 	while (*dirs)
 		findin(*dirs++, cp);
 }
 
-findin(dir, cp)
-	char *dir, *cp;
+void
+findin(char *dir, char *cp)
 {
 	DIR *dirp;
 	struct dirent *dp;
@@ -324,10 +330,10 @@ findin(dir, cp)
 	closedir(dirp);
 }
 
-itsit(cp, dp)
-	register char *cp, *dp;
+int
+itsit(char *cp, char *dp)
 {
-	register int i = strlen(dp);
+	int i = strlen(dp);
 
 	if (dp[0] == 's' && dp[1] == '.' && itsit(cp, dp+2))
 		return (1);

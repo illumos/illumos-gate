@@ -44,7 +44,7 @@ struct	stat	stbuf;
 int	status;
 #ifdef S5EMUL
 int dmsize[12]={31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-#endif S5EMUL
+#endif /* S5EMUL */
 
 static char usage[] =
 #ifdef S5EMUL
@@ -60,7 +60,7 @@ char	*prog;
 
 #ifdef S5EMUL
 char	*cbp;
-#endif S5EMUL
+#endif /* S5EMUL */
 time_t	time();
 off_t	lseek();
 time_t	timelocal(), timegm();
@@ -93,8 +93,8 @@ gtime()
 
 gpair()
 {
-	register int c, d;
-	register char *cp;
+	int c, d;
+	char *cp;
 
 	cp = cbp;
 	if (*cp == 0)
@@ -111,15 +111,14 @@ gpair()
 }
 #endif /*S5EMUL*/
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
-	register c;
+	int c;
 #ifdef S5EMUL
 	int days_in_month;
 	struct tm *tp;
-#endif S5EMUL
+#endif /* S5EMUL */
 
 	int errflg=0, optc;
 	extern char *optarg;
@@ -191,8 +190,7 @@ main(argc, argv)
 		if (touch(argv[c]) < 0)
 			status++;
 	}
-	exit(status);
-	/* NOTREACHED */
+	return (status);
 }
 
 int
@@ -200,7 +198,7 @@ touch(filename)
 	char *filename;
 {
 	struct timeval times[2];
-	register int fd;
+	int fd;
 
 	if (stat(filename, &stbuf)) {
 		/*
@@ -273,7 +271,7 @@ touch(filename)
 int
 oldtouch(filename, statp)
 	char *filename;
-	register struct stat *statp;
+	struct stat *statp;
 {
 	int rwstatus;
 
@@ -340,14 +338,14 @@ error:
 isnumber(s)
 	char *s;
 {
-	register c;
+	char c;
 
 	while (c = *s++)
 		if (!isdigit(c))
 			return (0);
 	return (1);
 }
-#endif S5EMUL
+#endif /* S5EMUL */
 
 /*
  * nanoseconds are rounded off to microseconds by flooring.

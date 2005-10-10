@@ -52,11 +52,20 @@ static struct termiox termiox;
 static struct winsize winsize, owinsize;
 static int term;
 
+void prmodes(int);
+void pramodes(int);
+void prachars(void);
+void pcol(int, int);
+void pit(unsigned char, char *, char *);
+void delay(int, char *s);
+void prspeed(char *, int);
+void prencode(void);
+
 #define ioctl_desc	1
 #define output		stderr
 
-main(argc, argv)
-char	*argv[];
+int
+main(int argc, char *argv[])
 {
 
 	int i;
@@ -163,13 +172,14 @@ char	*argv[];
 		perror(STTY);
 		exit(2);
 	}
-	exit(0);	/*NOTREACHED*/
+	return (0);	/*NOTREACHED*/
 }
 
-prmodes(moremodes)			/* print modes, no options, argc is 1 */
-int moremodes;
+void
+prmodes(int moremodes)
+/* print modes, no options, argc is 1 */
 {
-	register m;
+	int m;
 
 	if (!(term & ASYNC)) {
 		m = stio.imode;
@@ -422,10 +432,11 @@ int moremodes;
 		prachars();
 }
 
-pramodes(tabform)			/* print all modes, -a option */
-int tabform;
+void
+pramodes(int tabform)
+/* print all modes, -a option */
 {
-	register m;
+	int m;
 
 	m = cb.c_cflag;
 	if(term & ASYNC) {
@@ -593,7 +604,8 @@ int tabform;
 		prachars();
 }
 
-prachars()
+void
+prachars(void)
 {
 	if ((cb.c_lflag&ICANON)==0)
 		(void) fprintf(output,"min %d, time %d\n", cb.c_cc[VMIN],
@@ -624,8 +636,8 @@ eol2  swtch\
 	}
 }
 
-pcol(ch1, ch2)
-	int ch1, ch2;
+void
+pcol(int ch1, int ch2)
 {
 	int nout = 0;
 
@@ -663,10 +675,9 @@ pcol(ch1, ch2)
 	}
 }
 
-
-pit(what, itsname, sep)		/*print function for prmodes() and pramodes() */
-	unsigned char what;
-	char *itsname, *sep;
+void
+pit(unsigned char what, char *itsname, char *sep)
+/* print function for prmodes() and pramodes() */
 {
 
 	pitt++;
@@ -690,8 +701,8 @@ pit(what, itsname, sep)		/*print function for prmodes() and pramodes() */
 	(void) fprintf(output,"%c%s", what, sep);
 }
 
-delay(m, s)
-char *s;
+void
+delay(int m, char *s)
 {
 	if(m)
 		(void) fprintf(output,"%s%d ", s, m);
@@ -702,20 +713,23 @@ long	speed[] = {
 	57600,76800,115200,153600,230400,307200,460800
 };
 
-prspeed(c, s)
-char *c;
-int s;
+void
+prspeed(char *c, int s)
 {
 
 	(void) fprintf(output,"%s%d baud; ", c, speed[s]);
 }
 
-					/* print current settings for use with  */
-prencode()				/* another stty cmd, used for -g option */
+/*
+ * print current settings for use with
+ * another stty cmd, used for -g option
+ */
+void
+prencode(void)
 {
 	int i, last;
 
-	/* Since the -g option is mostly used for redirecting to a file *
+	/* Since the -g option is mostly used for redirecting to a file */
 	/* We must print to stdout here, not stderr */
 
 	(void) printf("%x:%x:%x:%x:",cb.c_iflag,cb.c_oflag,cb.c_cflag,cb.c_lflag);

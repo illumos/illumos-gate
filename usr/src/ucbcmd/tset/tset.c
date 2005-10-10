@@ -1,3 +1,8 @@
+/*
+ * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -8,12 +13,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983 - 1999 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 **  TSET -- set terminal modes
@@ -320,10 +320,10 @@
 #define	OLDDIALUP	"sd"
 #define	PLUGBOARD	"plugboard"
 #define	OLDPLUGBOARD	"sp"
-/***
+/*
 #define	ARPANET		"arpanet"
 #define	OLDARPANET	"sa"
-/***/
+*/
 
 #define	DEFTYPE		"unknown"
 
@@ -437,19 +437,27 @@ struct termios	modes;
 struct termios	oldmodes;
 int		istermios;
 
+void reportek(char *, char, char, char);
+void setdelay(char *, struct delay [], tcflag_t, tcflag_t *);
+void prs(char *);
+void prc(char);
+void flush(void);
+void cat(char *);
+void bmove(char *, char *, int);
+void makealias(char *);
+void wrtermcap(char *);
+void fatal (char *, char *);
 char reset();			/* Routine for checking&resetting chars */
-int prc();
 
-main(argc, argv)
-int	argc;
-char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	char		buf[CAPBUFSIZ];
 	char		termbuf[32];
 	auto char	*bufp;
-	register char	*p;
+	char		*p;
 	char		*command;
-	register int	i;
+	int		i;
 	int		Break;
 	int		Not;
 	char		*nextarg();
@@ -1097,7 +1105,7 @@ ask:
 	reportek("Kill", curkill, oldkill, CKILL);
 	reportek("Interrupt", curintr, oldintr, CINTR);
 
-	exit(0);
+	return (0);
 }
 
 /*
@@ -1105,7 +1113,8 @@ ask:
  * st (set one tab) and ch (horizontal cursor addressing) capabilities.
  * This is done before if and is, so they can patch in case we blow this.
  */
-settabs()
+int
+settabs(void)
 {
 	char caps[100];
 	char *capsp = caps;
@@ -1145,9 +1154,9 @@ settabs()
 			tputs(set_tab, 0, prc);
 		}
 		prc('\r');
-		return 1;
+		return (1);
 	}
-	return 0;
+	return (0);
 }
 
 void setmode(flag)
@@ -1160,7 +1169,7 @@ int	flag;
 {
 	struct termio *ttymode;
 	struct termios *ttymodes;
-	register int i;
+	int i;
 
 	ttymode = (struct termio *)0;
 	ttymodes = (struct termios *)0;
@@ -1207,15 +1216,12 @@ int	flag;
 		exit(1);
 }
 
-reportek(name, new, old, def)
-char	*name;
-char	old;
-char	new;
-char	def;
+void
+reportek(char *name, char new, char old, char def)
 {
-	register char	o;
-	register char	n;
-	register char	*p;
+	char	o;
+	char	n;
+	char	*p;
 	char		buf[32];
 	char		*bufp;
 	extern char *tgetstr();
@@ -1253,15 +1259,11 @@ char	def;
 
 
 
-
-setdelay(cap, dtab, bits, flags)
-char		*cap;
-struct delay	dtab[];
-int		bits;
-short		*flags;
+void
+setdelay(char *cap, struct delay dtab[], tcflag_t bits, tcflag_t *flags)
 {
-	register int	i;
-	register struct delay	*p;
+	int		i;
+	struct delay	*p;
 	extern short	ospeed;
 
 	/* see if this capability exists at all */
@@ -1286,12 +1288,11 @@ short		*flags;
 	}
 
 	/* use last entry if none will do */
-	*flags |= (--p)->d_bits;
+	*flags |= (tcflag_t)((--p)->d_bits);
 }
 
-
-prs(s)
-char	*s;
+void
+prs(char *s)
 {
 	while (*s != '\0')
 		prc(*s++);
@@ -1301,27 +1302,27 @@ char	*s;
 char	OutBuf[256];
 int	OutPtr;
 
-prc(c)
-char	c;
+void
+prc(char c)
 {
 	OutBuf[OutPtr++] = c;
 	if (OutPtr >= sizeof OutBuf)
 		flush();
 }
 
-flush()
+void
+flush(void)
 {
 	if (OutPtr > 0)
 		(void) write(2, OutBuf, OutPtr);
 	OutPtr = 0;
 }
 
-
-cat(file)
-char	*file;
+void
+cat(char *file)
 {
-	register int	fd;
-	register int	i;
+	int	fd;
+	int	i;
 	char		buf[BUFSIZ];
 
 	fd = open(file, 0);
@@ -1341,14 +1342,11 @@ char	*file;
 }
 
 
-
-bmove(from, to, length)
-char	*from;
-char	*to;
-int	length;
+void
+bmove(char *from, char *to, int length)
 {
-	register char	*p, *q;
-	register int	i;
+	char	*p, *q;
+	int	i;
 
 	i = length;
 	p = from;
@@ -1359,14 +1357,11 @@ int	length;
 }
 
 
-
-bequal(a, b, len)	/* must be same thru len chars */
-char	*a;
-char	*b;
-int	len;
+int
+bequal(char *a, char *b, int len)	/* must be same thru len chars */
 {
-	register char	*p, *q;
-	register int	i;
+	char	*p, *q;
+	int	i;
 
 	i = len;
 	p = a;
@@ -1379,11 +1374,10 @@ int	len;
 	return ((*p == *q) && i >= 0);
 }
 
-sequal(a, b)	/* must be same thru NULL */
-char	*a;
-char	*b;
+int
+sequal(char *a, char *b)	/* must be same thru NULL */
 {
-	register char *p = a, *q = b;
+	char *p = a, *q = b;
 
 	while (*p && *q && (*p == *q))
 	{
@@ -1392,12 +1386,12 @@ char	*b;
 	return (*p == *q);
 }
 
-makealias(buf)
-char	*buf;
+void
+makealias(char *buf)
 {
-	register int i;
-	register char *a;
-	register char *b;
+	int i;
+	char *a;
+	char *b;
 
 	Alias[0] = a = Aliasbuf;
 	b = buf;
@@ -1418,8 +1412,8 @@ char	*buf;
 # endif
 }
 
-isalias(ident)	/* is ident same as one of the aliases? */
-char	*ident;
+int
+isalias(char *ident)	/* is ident same as one of the aliases? */
 {
 	char **a = Alias;
 
@@ -1440,8 +1434,8 @@ char	*ident;
 char delcap[128][2];
 int ncap = 0;
 
-wrtermcap(bp)
-char *bp;
+void
+wrtermcap(char *bp)
 {
 	char buf[CAPBUFSIZ];
 	char *p = buf;
@@ -1523,10 +1517,10 @@ char *bp;
 	(void) write (STDOUT, buf, p-buf);
 }
 
-cancelled(cap)
-char	*cap;
+int
+cancelled(char *cap)
 {
-	register int i;
+	int i;
 
 	for (i = 0; i < ncap; i++)
 	{
@@ -1565,9 +1559,8 @@ char	*str;
 	return (ptr);
 }
 
-
-baudrate(p)
-char	*p;
+int
+baudrate(char *p)
 {
 	char buf[8];
 	int i = 0;
@@ -1663,9 +1656,8 @@ char	*argv[];
 	return (*argv);
 }
 
-fatal (mesg, obj)
-char	*mesg;
-char	*obj;
+void
+fatal (char *mesg, char *obj)
 {
 	prs (mesg);
 	prs (obj);

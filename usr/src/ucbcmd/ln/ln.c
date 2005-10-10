@@ -1,6 +1,10 @@
+/*
+ * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,12 +12,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ln
@@ -23,17 +22,19 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <unistd.h>
 
 struct	stat stb;
 int	fflag;		/* force flag set? */
 int	sflag;
-extern	int errno;
 
-main(argc, argv)
-	int argc;
-	register char **argv;
+int linkit(char *, char *);
+void Perror(char *);
+
+int
+main(int argc, char **argv)
 {
-	register int i, r;
+	int i, r;
 
 	argc--, argv++;
 again:
@@ -47,7 +48,7 @@ again:
 		argv++;
 		argc--;
 	}
-	if (argc == 0) 
+	if (argc == 0)
 		goto usage;
 	else if (argc == 1) {
 		argv[argc] = ".";
@@ -56,11 +57,11 @@ again:
 	if (argc > 2) {
 		if (stat(argv[argc-1], &stb) < 0)
 			goto usage;
-		if ((stb.st_mode&S_IFMT) != S_IFDIR) 
+		if ((stb.st_mode&S_IFMT) != S_IFDIR)
 			goto usage;
 	}
 	r = 0;
-	for(i = 0; i < argc-1; i++)
+	for (i = 0; i < argc-1; i++)
 		r |= linkit(argv[i], argv[argc-1]);
 	exit(r);
 usage:
@@ -68,13 +69,11 @@ usage:
 	    "Usage: ln [-f] [-s] f1\n\
        ln [-f] [-s] f1 f2\n\
        ln [-f] [-s] f1 ... fn d1\n");
-	exit(1);
+	return (1);
 }
 
-int	link(), symlink();
-
-linkit(from, to)
-	char *from, *to;
+int
+linkit(char *from, char *to)
 {
 	char destname[MAXPATHLEN + 1];
 	char *tail;
@@ -82,8 +81,8 @@ linkit(from, to)
 	char *strrchr();
 
 	/* is target a directory? */
-	if (sflag == 0 && fflag == 0 && stat(from, &stb) >= 0
-	    && (stb.st_mode&S_IFMT) == S_IFDIR) {
+	if (sflag == 0 && fflag == 0 && stat(from, &stb) >= 0 &&
+	    (stb.st_mode&S_IFMT) == S_IFDIR) {
 		printf("%s is a directory\n", from);
 		return (1);
 	}
@@ -93,7 +92,7 @@ linkit(from, to)
 			tail = from;
 		else
 			tail++;
-		if (strlen(to) + strlen(tail) >= sizeof destname - 1) {
+		if (strlen(to) + strlen(tail) >= sizeof (destname) - 1) {
 			(void) fprintf(stderr, "ln: %s/%s: Name too long\n",
 			    to, tail);
 			return (1);
@@ -113,10 +112,9 @@ linkit(from, to)
 	return (0);
 }
 
-Perror(s)
-	char *s;
+void
+Perror(char *s)
 {
-
 	(void) fprintf(stderr, "ln: ");
 	perror(s);
 }

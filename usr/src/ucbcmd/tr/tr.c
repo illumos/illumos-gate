@@ -51,12 +51,12 @@ char	squeez[256];
 char	vect[256];
 struct string { int last, max; char *p; } string1, string2;
 
-main(argc,argv)
-char **argv;
+int
+main(int argc, char **argv)
 {
-	register i;
+	int i;
 	int j;
-	register c, d;
+	int c, d;
 	char *compl;
 	int lastd;
 
@@ -127,12 +127,11 @@ char **argv;
 					exit(1);
 			}
 	}
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
-next(s)
-struct string *s;
+int
+next(struct string *s)
 {
 
 again:
@@ -157,10 +156,10 @@ again:
 	return(s->last = nextc(s));
 }
 
-nextc(s)
-struct string *s;
+int
+nextc(struct string *s)
 {
-	register c, i, n;
+	int c, i, n;
 
 	c = *s->p++;
 	if(c=='\\') {

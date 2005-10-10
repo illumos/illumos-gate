@@ -60,12 +60,15 @@ int	status;
 int	fflag;
 int	rflag;
 
-main(argc, argv)
-	char *argv[];
+void fatal(int, char *, char *);
+
+int
+main(int argc, char *argv[])
 {
-	register int c;
+	int c;
 	gid_t gid;
-	register char *cp, *group;
+	char *cp, *group;
+	char optchar[2];
 	struct group *grp;
 	extern char *strchr();
 
@@ -84,7 +87,9 @@ main(argc, argv)
 			break;
 
 		default:
-			fatal(255, "unknown option: %c", *cp);
+			optchar[0] = *cp;
+			optchar[1] = '\0';
+			fatal(255, "unknown option: %s", optchar);
 		}
 		argv++, argc--;
 	}
@@ -144,13 +149,13 @@ main(argc, argv)
 			continue;
 		}
 	}
-	exit(status);
+	return (status);
 }
 
-isnumber(s)
-	char *s;
+int
+isnumber(char *s)
 {
-	register c;
+	int c;
 
 	while (c = *s++)
 		if (!isdigit(c))
@@ -158,13 +163,11 @@ isnumber(s)
 	return (1);
 }
 
-chownr(dir, uid, gid)
-	char *dir;
-	uid_t uid;
-	gid_t gid;
+int
+chownr(char *dir, uid_t uid, gid_t gid)
 {
-	register DIR *dirp;
-	register struct dirent *dp;
+	DIR *dirp;
+	struct dirent *dp;
 	struct stat st;
 	char savedir[1024];
 	int ecode;
@@ -210,8 +213,8 @@ chownr(dir, uid, gid)
 	return (ecode);
 }
 
-error(fmt, a)
-	char *fmt, *a;
+int
+error(char *fmt, char *a)
 {
 
 	if (!fflag) {
@@ -222,9 +225,8 @@ error(fmt, a)
 	return (!fflag);
 }
 
-fatal(status, fmt, a)
-	int status;
-	char *fmt, *a;
+void
+fatal(int status, char *fmt, char *a)
 {
 
 	fflag = 0;
@@ -232,8 +234,8 @@ fatal(status, fmt, a)
 	exit(status);
 }
 
-Perror(s)
-	char *s;
+int
+Perror(char *s)
 {
 
 	if (!fflag) {

@@ -65,9 +65,8 @@ extern int errno;
 int copy();
 void usage();
 
-main(argc, argv)
-	int	argc;
-	char	**argv;
+int
+main(int argc, char **argv)
 {
 	extern char	*optarg;
 	extern int	optind;
@@ -182,8 +181,7 @@ main(argc, argv)
         rc = 0;
         for (i = 0; i < argc-1; i++)
                 rc |= install(argv[i], argv[argc-1]);
-        exit(rc);
-	/* NOTREACHED */
+        return (rc);
 }
 
 int
@@ -302,9 +300,9 @@ copy_done:
  */
 int
 atoo(str)
-        register char   *str;
+        char   *str;
 {        
-        register int    val;
+        int    val;
  
         for (val = 0; isdigit(*str); ++str)
                 val = val * 8 + *str - '0';

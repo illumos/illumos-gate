@@ -41,6 +41,7 @@
 static char	*s_arg;			/* s_arg: ptr to mode to be set */
 static int	match;
 static int gct(), eq(), encode();
+static int eqarg(char *, int);
 
 /* set terminal modes for supplied options */
 char *
@@ -55,7 +56,7 @@ struct	termios	*cb;
 struct	termiox	*termiox;
 struct	winsize	*winsize;
 {
-	register i;
+	int i;
 	extern	const struct	speeds	speeds[];
 	extern	const struct	mds	lmodes[];
 	extern	const struct	mds	nlmodes[];
@@ -276,7 +277,7 @@ struct	winsize	*winsize;
 static int eq(string)
 char *string;
 {
-	register i;
+	int i;
 
 	if(!s_arg)
 		return(0);
@@ -292,9 +293,7 @@ loop:
 
 /* Checks for options that require an argument */
 static int
-eqarg(string, argc)
-char *string;
-int argc;
+eqarg(char *string, int argc)
 {
 	int status;
 
@@ -311,10 +310,10 @@ int argc;
 /* get pseudo control characters from terminal */
 /* and convert to internal representation      */
 static int gct(cp, term)
-register char *cp;
+char *cp;
 int term;
 {
-	register c;
+	int c;
 
 	c = *cp++;
 	if (c == '^') {
