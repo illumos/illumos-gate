@@ -19,8 +19,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 1999 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -123,6 +123,16 @@ f none usr/share/lib/keytables/type_6/uk 444 root bin
 f none usr/share/lib/keytables/type_6/korea  444 root bin
 f none usr/share/lib/keytables/type_6/us 444 root bin
 f none usr/share/lib/keytables/type_6/reset 444 root bin
+f none usr/share/lib/keytables/type_6/slovakia 444 root bin
+f none usr/share/lib/keytables/type_6/slovenia 444 root bin
+f none usr/share/lib/keytables/type_6/serbiaandmontenegro 444 root bin
+f none usr/share/lib/keytables/type_6/iceland 444 root bin
+f none usr/share/lib/keytables/type_6/croatia 444 root bin
+f none usr/share/lib/keytables/type_6/bulgaria 444 root bin
+f none usr/share/lib/keytables/type_6/belarus 444 root bin
+f none usr/share/lib/keytables/type_6/maltaus 444 root bin
+f none usr/share/lib/keytables/type_6/maltauk 444 root bin
+f none usr/share/lib/keytables/type_6/albania 444 root bin
 
 l none usr/share/lib/keytables/type_6/layout_00=../../../../../usr/share/lib/keytables/type_6/us
 l none usr/share/lib/keytables/type_6/layout_06=../../../../../usr/share/lib/keytables/type_6/denmark
@@ -142,3 +152,13 @@ l none usr/share/lib/keytables/type_6/layout_1c=../../../../../usr/share/lib/key
 l none usr/share/lib/keytables/type_6/layout_1e=../../../../../usr/share/lib/keytables/type_6/taiwan
 l none usr/share/lib/keytables/type_6/layout_20=../../../../../usr/share/lib/keytables/type_6/uk
 l none usr/share/lib/keytables/type_6/layout_21=../../../../../usr/share/lib/keytables/type_6/us
+l none usr/share/lib/keytables/type_6/layout_18=../../../../../usr/share/lib/keytables/type_6/slovakia
+l none usr/share/lib/keytables/type_6/layout_100=../../../../../usr/share/lib/keytables/type_6/slovenia
+l none usr/share/lib/keytables/type_6/layout_101=../../../../../usr/share/lib/keytables/type_6/serbiaandmontenegro 
+l none usr/share/lib/keytables/type_6/layout_102=../../../../../usr/share/lib/keytables/type_6/iceland 
+l none usr/share/lib/keytables/type_6/layout_103=../../../../../usr/share/lib/keytables/type_6/croatia
+l none usr/share/lib/keytables/type_6/layout_104=../../../../../usr/share/lib/keytables/type_6/bulgaria
+l none usr/share/lib/keytables/type_6/layout_105=../../../../../usr/share/lib/keytables/type_6/belarus
+l none usr/share/lib/keytables/type_6/layout_106=../../../../../usr/share/lib/keytables/type_6/maltaus
+l none usr/share/lib/keytables/type_6/layout_107=../../../../../usr/share/lib/keytables/type_6/maltauk
+l none usr/share/lib/keytables/type_6/layout_108=../../../../../usr/share/lib/keytables/type_6/albania

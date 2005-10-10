@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms. 
@@ -67,6 +67,16 @@ case "$KBD_TYPE" in
 	"US-English" )		LAYOUT=33 ;;
 	"US-English(Microsoft-Natural)" ) LAYOUT=33 ;;
 	"US-English(104-Key)" ) LAYOUT=33 ;;
+	"Slovenian" )		LAYOUT=256 ;;
+	"Slovakian" )		LAYOUT=24 ;;
+	"Serbia-And-Montenegro")	LAYOUT=257 ;;
+	"Icelandic" )		LAYOUT=258 ;;
+	"Croatian" )		LAYOUT=259 ;;
+	"Bulgarian" )		LAYOUT=260 ;;
+	"Belarusian" )		LAYOUT=261 ;;
+	"Malta_US" )		LAYOUT=262 ;;
+	"Malta_UK" )		LAYOUT=263 ;;
+	"Albanian" )		LAYOUT=264 ;;
 	*)			LAYOUT= ;;
 	esac
 	;;

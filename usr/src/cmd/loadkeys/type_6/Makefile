@@ -20,18 +20,21 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #
-# Copyright (c) 1999 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/loadkeys/type_6/Makefile
 
 KEYTABLES = \
-	us denmark finnish france germany italy japan korea \
-	netherlands norway portugal reset spain sweden \
-        swiss_french swiss_german taiwan uk
+        us denmark finnish france germany italy japan korea \
+        netherlands norway portugal reset spain sweden \
+        swiss_french swiss_german taiwan uk \
+        slovakia slovenia serbiaandmontenegro \
+        iceland croatia bulgaria belarus maltaus \
+        maltauk albania
 
 include ../../Makefile.cmd
 
@@ -42,9 +45,11 @@ ROOTKEYTABLES= $(KEYTABLES:%=$(ROOTKEYDIR)/%)
 # there is an install target for each ROOT layout link
 #
 LAYOUTS= \
-	layout_00 layout_06 layout_07 layout_08 layout_09 layout_0e \
+        layout_00 layout_06 layout_07 layout_08 layout_09 layout_0e \
         layout_0f layout_10 layout_12 layout_13 layout_16 layout_19 \
-        layout_1a layout_1b layout_1c layout_1e layout_20 layout_21
+        layout_1a layout_1b layout_1c layout_1e layout_20 layout_21 \
+        layout_100 layout_18 layout_101 layout_102 layout_103 layout_104 \
+        layout_105 layout_106 layout_107 layout_108
 
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
@@ -123,5 +128,35 @@ $(ROOTKEYDIR)/layout_20: $(ROOTKEYDIR)/uk
 
 $(ROOTKEYDIR)/layout_21: $(ROOTKEYDIR)/us
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/us $@
+
+$(ROOTKEYDIR)/layout_18: $(ROOTKEYDIR)/slovakia
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/slovakia $@
+
+$(ROOTKEYDIR)/layout_100: $(ROOTKEYDIR)/slovenia
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/slovenia $@
+
+$(ROOTKEYDIR)/layout_101: $(ROOTKEYDIR)/serbiaandmontenegro
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/serbiaandmontenegro $@
+
+$(ROOTKEYDIR)/layout_102: $(ROOTKEYDIR)/iceland
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/iceland $@
+
+$(ROOTKEYDIR)/layout_103: $(ROOTKEYDIR)/croatia
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/croatia  $@
+
+$(ROOTKEYDIR)/layout_104: $(ROOTKEYDIR)/bulgaria
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/bulgaria  $@
+
+$(ROOTKEYDIR)/layout_105: $(ROOTKEYDIR)/belarus
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/belarus  $@
+
+$(ROOTKEYDIR)/layout_106: $(ROOTKEYDIR)/maltaus
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/maltaus  $@
+
+$(ROOTKEYDIR)/layout_107: $(ROOTKEYDIR)/maltauk
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/maltauk  $@
+
+$(ROOTKEYDIR)/layout_108: $(ROOTKEYDIR)/albania
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/albania  $@ 
 
 include ../../Makefile.targ
