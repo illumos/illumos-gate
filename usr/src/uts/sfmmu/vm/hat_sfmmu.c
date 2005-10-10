@@ -359,7 +359,7 @@ static void	sfmmu_mod_tsb(sfmmu_t *, caddr_t, tte_t *, int);
 static void	sfmmu_copy_tsb(struct tsb_info *, struct tsb_info *);
 static tsb_replace_rc_t sfmmu_replace_tsb(sfmmu_t *, struct tsb_info *, uint_t,
     hatlock_t *, uint_t);
-static void	sfmmu_size_tsb(sfmmu_t *, int, uint64_t, uint64_t);
+static void	sfmmu_size_tsb(sfmmu_t *, int, uint64_t, uint64_t, int);
 
 static void	sfmmu_cache_flush(pfn_t, int);
 void		sfmmu_cache_flushcolor(int, pfn_t);
@@ -550,8 +550,13 @@ static int tsb_alloc_count = 0;
 /* if set to 1, will remap valid TTEs when growing TSB. */
 int tsb_remap_ttes = 1;
 
-/* if we have more than this many mappings, allocate a second TSB. */
-int tsb_sectsb_threshold = 1;
+/*
+ * If we have more than this many mappings, allocate a second TSB.
+ * This default is chosen because the I/D fully associative TLBs are
+ * assumed to have at least 8 available entries. Platforms with a
+ * larger fully-associative TLB could probably override the default.
+ */
+int tsb_sectsb_threshold = 8;
 
 /*
  * kstat data
@@ -3334,11 +3339,14 @@ readtte:
 /*
  * Register a callback class.  Each subsystem should do this once and
  * cache the id_t returned for use in setting up and tearing down callbacks.
- * There is no facility for removing callback IDs once they are created,
- * so this should only be called from modules which cannot be unloaded.
+ *
+ * There is no facility for removing callback IDs once they are created;
+ * the "key" should be unique for each module, so in case a module is unloaded
+ * and subsequently re-loaded, we can recycle the module's previous entry.
  */
 id_t
-hat_register_callback(int (*prehandler)(caddr_t, uint_t, uint_t, void *),
+hat_register_callback(int key,
+	int (*prehandler)(caddr_t, uint_t, uint_t, void *),
 	int (*posthandler)(caddr_t, uint_t, uint_t, void *, pfn_t),
 	int (*errhandler)(caddr_t, uint_t, uint_t, void *),
 	int capture_cpus)
@@ -3346,25 +3354,25 @@ hat_register_callback(int (*prehandler)(caddr_t, uint_t, uint_t, void *),
 	id_t id;
 
 	/*
-	 * If this callback has already been registered just return the
-	 * ID for it.
+	 * Search the table for a pre-existing callback associated with
+	 * the identifier "key".  If one exists, we re-use that entry in
+	 * the table for this instance, otherwise we assign the next
+	 * available table slot.
 	 */
 	for (id = 0; id < sfmmu_max_cb_id; id++) {
-		if (sfmmu_cb_table[id].prehandler == prehandler &&
-		    sfmmu_cb_table[id].posthandler == posthandler &&
-		    sfmmu_cb_table[id].errhandler == errhandler &&
-		    sfmmu_cb_table[id].capture_cpus == capture_cpus) {
-			return (id);
-		}
+		if (sfmmu_cb_table[id].key == key)
+			break;
 	}
 
-	id = sfmmu_cb_nextid++;
+	if (id == sfmmu_max_cb_id) {
+		id = sfmmu_cb_nextid++;
+		if (id >= sfmmu_max_cb_id)
+			panic("hat_register_callback: out of callback IDs");
+	}
 
 	ASSERT(prehandler != NULL || posthandler != NULL);
 
-	if (id >= sfmmu_max_cb_id)
-		panic("hat_register_callback: out of callback IDs");
-
+	sfmmu_cb_table[id].key = key;
 	sfmmu_cb_table[id].prehandler = prehandler;
 	sfmmu_cb_table[id].posthandler = posthandler;
 	sfmmu_cb_table[id].errhandler = errhandler;
@@ -9050,6 +9058,7 @@ sfmmu_check_page_sizes(sfmmu_t *sfmmup, int growing)
 	uint64_t ttecnt[MMU_PAGE_SIZES];
 	uint64_t tte8k_cnt, tte4m_cnt;
 	uint8_t i;
+	int sectsb_thresh;
 
 	/*
 	 * Kernel threads, processes with small address spaces not using
@@ -9094,10 +9103,16 @@ sfmmu_check_page_sizes(sfmmu_t *sfmmup, int growing)
 	 * Also double the size of the second TSB to minimize
 	 * extra conflict misses due to competition between 4M text pages
 	 * and data pages.
+	 *
+	 * We need to adjust the second TSB allocation threshold by the
+	 * inflation factor, since there is no point in creating a second
+	 * TSB when we know all the mappings can fit in the I/D TLBs.
 	 */
+	sectsb_thresh = tsb_sectsb_threshold;
 	if (sfmmup->sfmmu_flags & HAT_4MTEXT_FLAG) {
 		tte8k_cnt <<= 1;
 		tte4m_cnt <<= 1;
+		sectsb_thresh <<= 1;
 	}
 
 	/*
@@ -9105,15 +9120,15 @@ sfmmu_check_page_sizes(sfmmu_t *sfmmup, int growing)
 	 * grow or shrink it.  If the process is small, our work is
 	 * finished at this point.
 	 */
-	if (tte8k_cnt <= tsb_rss_factor && tte4m_cnt <= tsb_sectsb_threshold) {
+	if (tte8k_cnt <= tsb_rss_factor && tte4m_cnt <= sectsb_thresh) {
 		return;
 	}
-	sfmmu_size_tsb(sfmmup, growing, tte8k_cnt, tte4m_cnt);
+	sfmmu_size_tsb(sfmmup, growing, tte8k_cnt, tte4m_cnt, sectsb_thresh);
 }
 
 static void
 sfmmu_size_tsb(sfmmu_t *sfmmup, int growing, uint64_t tte8k_cnt,
-	uint64_t tte4m_cnt)
+	uint64_t tte4m_cnt, int sectsb_thresh)
 {
 	int tsb_bits;
 	uint_t tsb_szc;
@@ -9156,7 +9171,7 @@ sfmmu_size_tsb(sfmmu_t *sfmmup, int growing, uint64_t tte8k_cnt,
 	 * after it's freed). Note: second tsb is required for 32M/256M
 	 * page sizes.
 	 */
-	if (tte4m_cnt > tsb_sectsb_threshold) {
+	if (tte4m_cnt > sectsb_thresh) {
 		/*
 		 * If we're growing, select the size based on RSS.  If we're
 		 * shrinking, leave some room so we don't have to turn
@@ -11808,8 +11823,8 @@ sfmmu_init_tsbs(void)
 			kpmtsbmp->flags |= KPMTSBM_TSBPHYS_FLAG;
 	}
 
-	sfmmu_tsb_cb_id = hat_register_callback(sfmmu_tsb_pre_relocator,
-	    sfmmu_tsb_post_relocator, NULL, 0);
+	sfmmu_tsb_cb_id = hat_register_callback('T'<<16 | 'S' << 8 | 'B',
+	    sfmmu_tsb_pre_relocator, sfmmu_tsb_post_relocator, NULL, 0);
 }
 
 /* Avoid using sfmmu_tsbinfo_alloc() to avoid kmem_alloc - no real reason */

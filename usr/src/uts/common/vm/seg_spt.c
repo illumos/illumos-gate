@@ -109,6 +109,7 @@ struct seg_ops segspt_ops = {
 	SEGSPT_BADOP(int),		/* setpgsz */
 	SEGSPT_BADOP(int),		/* getmemid */
 	segspt_getpolicy,		/* getpolicy */
+	SEGSPT_BADOP(int),		/* capable */
 };
 
 static int segspt_shmdup(struct seg *seg, struct seg *newseg);
@@ -142,6 +143,7 @@ static int segspt_shmpagelock(struct seg *, caddr_t, size_t,
 static int segspt_shmsetpgsz(struct seg *, caddr_t, size_t, uint_t);
 static int segspt_shmgetmemid(struct seg *, caddr_t, memid_t *);
 static lgrp_mem_policy_info_t *segspt_shmgetpolicy(struct seg *, caddr_t);
+static int segspt_shmcapable(struct seg *, segcapability_t);
 
 struct seg_ops segspt_shmops = {
 	segspt_shmdup,
@@ -166,6 +168,7 @@ struct seg_ops segspt_shmops = {
 	segspt_shmsetpgsz,
 	segspt_shmgetmemid,
 	segspt_shmgetpolicy,
+	segspt_shmcapable,
 };
 
 static void segspt_purge(struct seg *seg);
@@ -2698,4 +2701,11 @@ segspt_shmgetpolicy(struct seg *seg, caddr_t addr)
 	policy_info = lgrp_shm_policy_get(amp, anon_index, NULL, 0);
 
 	return (policy_info);
+}
+
+/*ARGSUSED*/
+static int
+segspt_shmcapable(struct seg *seg, segcapability_t capability)
+{
+	return (0);
 }

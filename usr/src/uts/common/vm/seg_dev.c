@@ -184,6 +184,7 @@ static int	segdev_pagelock(struct seg *, caddr_t, size_t,
 static int	segdev_setpagesize(struct seg *, caddr_t, size_t, uint_t);
 static int	segdev_getmemid(struct seg *, caddr_t, memid_t *);
 static lgrp_mem_policy_info_t	*segdev_getpolicy(struct seg *, caddr_t);
+static int	segdev_capable(struct seg *, segcapability_t);
 
 /*
  * XXX	this struct is used by rootnex_map_fault to identify
@@ -213,6 +214,7 @@ struct seg_ops segdev_ops = {
 	segdev_setpagesize,
 	segdev_getmemid,
 	segdev_getpolicy,
+	segdev_capable,
 };
 
 /*
@@ -4015,6 +4017,13 @@ static lgrp_mem_policy_info_t *
 segdev_getpolicy(struct seg *seg, caddr_t addr)
 {
 	return (NULL);
+}
+
+/*ARGSUSED*/
+static int
+segdev_capable(struct seg *seg, segcapability_t capability)
+{
+	return (0);
 }
 
 /*

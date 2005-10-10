@@ -728,6 +728,14 @@ segkmem_getpolicy(struct seg *seg, caddr_t addr)
 	return (NULL);
 }
 
+/*ARGSUSED*/
+static int
+segkmem_capable(struct seg *seg, segcapability_t capability)
+{
+	if (capability == S_CAPABILITY_NOMINFLT)
+		return (1);
+	return (0);
+}
 
 static struct seg_ops segkmem_ops = {
 	SEGKMEM_BADOP(int),		/* dup */
@@ -752,6 +760,7 @@ static struct seg_ops segkmem_ops = {
 	SEGKMEM_BADOP(int),		/* setpgsz */
 	segkmem_getmemid,
 	segkmem_getpolicy,		/* getpolicy */
+	segkmem_capable,		/* capable */
 };
 
 int

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,7 @@ static struct	segkp_data *segkp_find(struct seg *seg, caddr_t vaddr);
 static int	segkp_getmemid(struct seg *seg, caddr_t addr, memid_t *memidp);
 static lgrp_mem_policy_info_t	*segkp_getpolicy(struct seg *seg,
     caddr_t addr);
+static int	segkp_capable(struct seg *seg, segcapability_t capability);
 
 /*
  * Lock used to protect the hash table(s) and caches.
@@ -170,6 +171,7 @@ static struct	seg_ops segkp_ops = {
 	SEGKP_BADOP(int),		/* setpgsz */
 	segkp_getmemid,			/* getmemid */
 	segkp_getpolicy,		/* getpolicy */
+	segkp_capable,			/* capable */
 };
 
 
@@ -1396,6 +1398,13 @@ static lgrp_mem_policy_info_t	*
 segkp_getpolicy(struct seg *seg, caddr_t addr)
 {
 	return (NULL);
+}
+
+/*ARGSUSED*/
+static int
+segkp_capable(struct seg *seg, segcapability_t capability)
+{
+	return (0);
 }
 
 #include <sys/mem_config.h>

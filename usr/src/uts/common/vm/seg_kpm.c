@@ -60,6 +60,7 @@
 #include <sys/cpuvar.h>
 #include <sys/bitmap.h>
 #include <sys/atomic.h>
+#include <sys/lgrp.h>
 
 #include <vm/seg_kmem.h>
 #include <vm/seg_kpm.h>
@@ -106,6 +107,7 @@ faultcode_t segkpm_fault(struct hat *hat, struct seg *seg, caddr_t addr,
 static void	segkpm_dump(struct seg *);
 static void	segkpm_badop(void);
 static int	segkpm_notsup(void);
+static int	segkpm_capable(struct seg *, segcapability_t);
 
 #define	SEGKPM_BADOP(t)	(t(*)())segkpm_badop
 #define	SEGKPM_NOTSUP	(int(*)())segkpm_notsup
@@ -132,6 +134,8 @@ static struct seg_ops segkpm_ops = {
 	SEGKPM_NOTSUP,		/* pagelock */
 	SEGKPM_BADOP(int),	/* setpgsz */
 	SEGKPM_BADOP(int),	/* getmemid */
+	SEGKPM_BADOP(lgrp_mem_policy_info_t *),	/* getpolicy */
+	segkpm_capable,		/* capable */
 };
 
 /*
@@ -321,3 +325,13 @@ segkpm_notsup()
 static void
 segkpm_dump(struct seg *seg)
 {}
+
+/*
+ * We claim to have no special capabilities.
+ */
+/*ARGSUSED*/
+static int
+segkpm_capable(struct seg *seg, segcapability_t capability)
+{
+	return (0);
+}

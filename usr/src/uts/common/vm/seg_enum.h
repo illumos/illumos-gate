@@ -78,6 +78,13 @@ enum seg_rw {
 	S_READ_NOCOW		/* read access, don't do a copy on write */
 };
 
+/*
+ * Capabilities for capability segment op.
+ */
+typedef enum {
+	S_CAPABILITY_NOMINFLT	/* supports non-faulting page renaming */
+} segcapability_t;
+
 #ifdef	__cplusplus
 }
 #endif

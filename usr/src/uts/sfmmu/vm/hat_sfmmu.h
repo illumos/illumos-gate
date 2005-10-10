@@ -474,6 +474,7 @@ struct ctx_trace {
  * Kernel page relocation stuff.
  */
 struct sfmmu_callback {
+	int key;
 	int (*prehandler)(caddr_t, uint_t, uint_t, void *);
 	int (*posthandler)(caddr_t, uint_t, uint_t, void *, pfn_t);
 	int (*errhandler)(caddr_t, uint_t, uint_t, void *);

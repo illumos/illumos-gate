@@ -506,7 +506,7 @@ void	hat_getkpfnum_badcall(void *caller);
  */
 extern int	hat_add_callback(id_t, caddr_t, uint_t, uint_t, void *,
 	pfn_t *);
-extern id_t	hat_register_callback(
+extern id_t	hat_register_callback(int,
 	int (*prehandler)(caddr_t, uint_t, uint_t, void *),
 	int (*posthandler)(caddr_t, uint_t, uint_t, void *, pfn_t),
 	int (*errhandler)(caddr_t, uint_t, uint_t, void *), int);

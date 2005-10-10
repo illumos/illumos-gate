@@ -255,12 +255,21 @@ mmio(struct uio *uio, enum uio_rw rw, pfn_t pfn, off_t pageoff, int allowio)
 
 #ifdef	__sparc
 
-#define	IS_KPM_VA(va)							\
-	(kpm_enable && (va) >= segkpm->s_base &&			\
-	(va) < (segkpm->s_base + segkpm->s_size))
-#define	IS_KP_VA(va)							\
-	((va) >= segkp->s_base && (va) < segkp->s_base + segkp->s_size)
-#define	NEED_LOCK_KVADDR(va)	(!IS_KPM_VA(va) && !IS_KP_VA(va))
+static int
+mmpagelock(struct as *as, caddr_t va)
+{
+	struct seg *seg;
+	int i;
+
+	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
+	seg = as_segat(as, va);
+	i = (seg != NULL)? SEGOP_CAPABLE(seg, S_CAPABILITY_NOMINFLT) : 0;
+	AS_LOCK_EXIT(as, &as->a_lock);
+
+	return (i);
+}
+
+#define	NEED_LOCK_KVADDR(kva)	mmpagelock(&kas, kva)
 
 #else	/* __i386, __amd64 */
 

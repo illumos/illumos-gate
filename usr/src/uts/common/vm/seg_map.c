@@ -94,6 +94,7 @@ static void	segmap_badop(void);
 static int	segmap_getmemid(struct seg *seg, caddr_t addr, memid_t *memidp);
 static lgrp_mem_policy_info_t	*segmap_getpolicy(struct seg *seg,
     caddr_t addr);
+static int	segmap_capable(struct seg *seg, segcapability_t capability);
 
 /* segkpm support */
 static caddr_t	segmap_pagecreate_kpm(struct seg *, vnode_t *, u_offset_t,
@@ -125,6 +126,7 @@ static struct seg_ops segmap_ops = {
 	SEGMAP_BADOP(int),	/* setpgsz */
 	segmap_getmemid,	/* getmemid */
 	segmap_getpolicy,	/* getpolicy */
+	segmap_capable,		/* capable */
 };
 
 /*
@@ -2193,6 +2195,13 @@ static lgrp_mem_policy_info_t *
 segmap_getpolicy(struct seg *seg, caddr_t addr)
 {
 	return (NULL);
+}
+
+/*ARGSUSED*/
+static int
+segmap_capable(struct seg *seg, segcapability_t capability)
+{
+	return (0);
 }
 
 

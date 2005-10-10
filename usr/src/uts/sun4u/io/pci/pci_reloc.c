@@ -426,9 +426,11 @@ pci_reloc_init(void)
 {
 	mutex_init(&pci_reloc_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&pci_reloc_cv, NULL, CV_DEFAULT, NULL);
-	pci_dvma_cbid = hat_register_callback(pci_common_prerelocator,
-		pci_dvma_postrelocator, pci_dma_relocerr, 1);
-	pci_fast_dvma_cbid = hat_register_callback(pci_common_prerelocator,
+	pci_dvma_cbid = hat_register_callback('D'<<24 | 'V'<<16 | 'M'<<8 | 'A',
+		pci_common_prerelocator, pci_dvma_postrelocator,
+		pci_dma_relocerr, 1);
+	pci_fast_dvma_cbid = hat_register_callback(
+		'F'<<24 | 'D'<<16 | 'M'<<8 | 'A', pci_common_prerelocator,
 		pci_fdvma_postrelocator, pci_dma_relocerr, 1);
 }
 

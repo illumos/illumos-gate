@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,6 +133,7 @@ struct	seg_ops {
 	int	(*setpagesize)(struct seg *, caddr_t, size_t, uint_t);
 	int	(*getmemid)(struct seg *, caddr_t, memid_t *);
 	struct lgrp_mem_policy_info	*(*getpolicy)(struct seg *, caddr_t);
+	int	(*capable)(struct seg *, segcapability_t);
 };
 
 #ifdef _KERNEL
@@ -212,6 +213,7 @@ extern	segadvstat_t  segadvstat;
 		(*(s)->s_ops->setpagesize)((s), (a), (l), (szc))
 #define	SEGOP_GETMEMID(s, a, mp)    (*(s)->s_ops->getmemid)((s), (a), (mp))
 #define	SEGOP_GETPOLICY(s, a)	    (*(s)->s_ops->getpolicy)((s), (a))
+#define	SEGOP_CAPABLE(s, c)	    (*(s)->s_ops->capable)((s), (c))
 
 #define	seg_page(seg, addr) \
 	(((uintptr_t)((addr) - (seg)->s_base)) >> PAGESHIFT)
