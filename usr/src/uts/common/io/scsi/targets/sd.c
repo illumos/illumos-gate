@@ -162,6 +162,8 @@ static	char *sd_config_list		= "sd-config-list";
 
 #define	sd_tr				ssd_tr
 #define	sd_reset_throttle_timeout	ssd_reset_throttle_timeout
+#define	sd_qfull_throttle_timeout	ssd_qfull_throttle_timeout
+#define	sd_qfull_throttle_enable	ssd_qfull_throttle_enable
 #define	sd_check_media_time		ssd_check_media_time
 #define	sd_wait_cmds_complete		ssd_wait_cmds_complete
 #define	sd_label_mutex			ssd_label_mutex
@@ -198,6 +200,7 @@ static	char *sd_config_list		= "sd-config-list";
 #define	sd_force_pm_supported		ssd_force_pm_supported
 
 #define	sd_dtype_optical_bind		ssd_dtype_optical_bind
+
 #endif
 
 
@@ -213,6 +216,7 @@ int sd_report_pfa			= 1;
 int sd_max_throttle			= SD_MAX_THROTTLE;
 int sd_min_throttle			= SD_MIN_THROTTLE;
 int sd_rot_delay			= 4; /* Default 4ms Rotation delay */
+int sd_qfull_throttle_enable		= TRUE;
 
 int sd_retry_on_reservation_conflict	= 1;
 int sd_reinstate_resv_delay		= SD_REINSTATE_RESV_DELAY;
@@ -241,9 +245,10 @@ static struct sd_resv_reclaim_request	sd_tr = { NULL, NULL, NULL, 0, 0, 0 };
 
 /*
  * Timer value used to reset the throttle after it has been reduced
- * (typically in response to TRAN_BUSY)
+ * (typically in response to TRAN_BUSY or STATUS_QFULL)
  */
 static int sd_reset_throttle_timeout	= SD_RESET_THROTTLE_TIMEOUT;
+static int sd_qfull_throttle_timeout	= SD_QFULL_THROTTLE_TIMEOUT;
 
 /*
  * Interval value associated with the media change scsi watch.
@@ -15056,7 +15061,8 @@ sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
 			retry_delay = SD_BSY_TIMEOUT;
 			statp = kstat_waitq_enter;
 			SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
-			    "sd_retry_command: immed. retry hit throttle!\n");
+			    "sd_retry_command: immed. retry hit "
+			    "throttle!\n");
 		} else {
 			/*
 			 * We're clear to proceed with the immediate retry.
@@ -15711,8 +15717,9 @@ sd_reduce_throttle(struct sd_lun *un, int throttle_type)
 			}
 
 			if (un->un_ncmds_in_transport > 0) {
-				un->un_throttle = un->un_ncmds_in_transport;
+			    un->un_throttle = un->un_ncmds_in_transport;
 			}
+
 		} else {
 			if (un->un_ncmds_in_transport == 0) {
 				un->un_throttle = 1;
@@ -15725,7 +15732,7 @@ sd_reduce_throttle(struct sd_lun *un, int throttle_type)
 	/* Reschedule the timeout if none is currently active */
 	if (un->un_reset_throttle_timeid == NULL) {
 		un->un_reset_throttle_timeid = timeout(sd_restore_throttle,
-		    un, sd_reset_throttle_timeout);
+		    un, SD_THROTTLE_RESET_INTERVAL);
 		SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
 		    "sd_reduce_throttle: timeout scheduled!\n");
 	}
@@ -15768,10 +15775,32 @@ sd_restore_throttle(void *arg)
 		 * value that un_throttle was when we got a TRAN_BUSY back
 		 * from scsi_transport(). We want to revert back to this
 		 * value.
+		 *
+		 * In the QFULL case, the throttle limit will incrementally
+		 * increase until it reaches max throttle.
 		 */
 		if (un->un_busy_throttle > 0) {
 			un->un_throttle = un->un_busy_throttle;
 			un->un_busy_throttle = 0;
+		} else {
+			/*
+			 * increase throttle by 10% open gate slowly, schedule
+			 * another restore if saved throttle has not been
+			 * reached
+			 */
+			short throttle;
+			if (sd_qfull_throttle_enable) {
+				throttle = un->un_throttle +
+				    max((un->un_throttle / 10), 1);
+				un->un_throttle =
+				    (throttle < un->un_saved_throttle) ?
+				    throttle : un->un_saved_throttle;
+				if (un->un_throttle < un->un_saved_throttle) {
+				    un->un_reset_throttle_timeid =
+					timeout(sd_restore_throttle,
+					un, SD_QFULL_THROTTLE_RESET_INTERVAL);
+				}
+			}
 		}
 
 		/*

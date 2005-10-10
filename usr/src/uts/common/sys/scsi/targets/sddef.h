@@ -1287,14 +1287,22 @@ if (((pktp)->pkt_reason == CMD_RESET) ||				\
 /*
  * Delay (in seconds) before restoring the "throttle limit" back
  * to its maximum value.
+ * 60 seconds is what we will wait for to reset the
+ * throttle back to it SD_MAX_THROTTLE for TRAN_BUSY.
+ * 10 seconds for STATUS_QFULL because QFULL will incrementally
+ * increase the throttle limit until it reaches max value.
  */
 #define	SD_RESET_THROTTLE_TIMEOUT	60
+#define	SD_QFULL_THROTTLE_TIMEOUT	10
 
 #define	SD_THROTTLE_TRAN_BUSY		0
 #define	SD_THROTTLE_QFULL		1
 
 #define	SD_THROTTLE_RESET_INTERVAL	\
 	(sd_reset_throttle_timeout * drv_usectohz(1000000))
+
+#define	SD_QFULL_THROTTLE_RESET_INTERVAL	\
+	(sd_qfull_throttle_timeout * drv_usectohz(1000000))
 
 
 /*
