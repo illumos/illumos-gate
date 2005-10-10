@@ -281,7 +281,7 @@ use File::Spec;
 
 $main::SIG{__WARN__}=\&CGI::Carp::warn;
 
-$CGI::Carp::VERSION    = '1.27';
+$CGI::Carp::VERSION    = '1.29';
 $CGI::Carp::CUSTOM_MSG = undef;
 
 
@@ -371,7 +371,7 @@ sub _warn {
 # eval.  These evals don't count when looking at the stack backtrace.
 sub _longmess {
     my $message = Carp::longmess();
-    $message =~ s,eval[^\n]+(ModPerl|Apache)/Registry\w*\.pm.*,,s
+    $message =~ s,eval[^\n]+(ModPerl|Apache)/(?:Registry|Dispatch)\w*\.pm.*,,s
         if exists $ENV{MOD_PERL};
     return $message;
 }
@@ -381,10 +381,11 @@ sub ineval {
 }
 
 sub die {
-  my ($arg) = @_;
-  realdie @_ if ineval;
+  my ($arg,@rest) = @_;
+  realdie ($arg,@rest) if ineval();
+
   if (!ref($arg)) {
-    $arg = join("", @_);
+    $arg = join("", ($arg,@rest));
     my($file,$line,$id) = id(1);
     $arg .= " at $file line $line." unless $arg=~/\n$/;
     &fatalsToBrowser($arg) if $WRAP;
@@ -443,8 +444,6 @@ END
   ;
   my $mod_perl = exists $ENV{MOD_PERL};
 
-  warningsToBrowser(1);    # emit warnings before dying
-
   if ($CUSTOM_MSG) {
     if (ref($CUSTOM_MSG) eq 'CODE') {
       print STDOUT "Content-type: text/html\n\n" 
@@ -466,17 +465,20 @@ END
   ;
 
   if ($mod_perl) {
-    require mod_perl;
-    if ($mod_perl::VERSION >= 1.99) {
+    my $r;
+    if ($ENV{MOD_PERL_API_VERSION}) {
       $mod_perl = 2;
-      require Apache::RequestRec;
-      require Apache::RequestIO;
-      require Apache::RequestUtil;
+      require Apache2::RequestRec;
+      require Apache2::RequestIO;
+      require Apache2::RequestUtil;
       require APR::Pool;
       require ModPerl::Util;
-      require Apache::Response;
+      require Apache2::Response;
+      $r = Apache2::RequestUtil->request;
     }
-    my $r = Apache->request;
+    else {
+      $r = Apache->request;
+    }
     # If bytes have already been sent, then
     # we print the message out directly.
     # Otherwise we make a custom error
@@ -501,6 +503,8 @@ END
         print STDOUT $mess;
     }
   }
+
+  warningsToBrowser(1);    # emit warnings before dying
 }
 
 # Cut and paste from CGI.pm so that we don't have the overhead of
