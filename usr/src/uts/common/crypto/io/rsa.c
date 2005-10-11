@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 #include <sys/strsun.h>
 #include <sys/md5.h>
 #include <sys/sha1.h>
+#include <sys/sha2.h>
 #include <sys/random.h>
 #include "rsa_impl.h"
 
@@ -66,7 +67,10 @@ typedef enum rsa_mech_type {
 	RSA_PKCS_MECH_INFO_TYPE,	/* SUN_CKM_RSA_PKCS */
 	RSA_X_509_MECH_INFO_TYPE,	/* SUN_CKM_RSA_X_509 */
 	MD5_RSA_PKCS_MECH_INFO_TYPE,	/* SUN_MD5_RSA_PKCS */
-	SHA1_RSA_PKCS_MECH_INFO_TYPE	/* SUN_SHA1_RSA_PKCS */
+	SHA1_RSA_PKCS_MECH_INFO_TYPE,	/* SUN_SHA1_RSA_PKCS */
+	SHA256_RSA_PKCS_MECH_INFO_TYPE,	/* SUN_SHA256_RSA_PKCS */
+	SHA384_RSA_PKCS_MECH_INFO_TYPE,	/* SUN_SHA384_RSA_PKCS */
+	SHA512_RSA_PKCS_MECH_INFO_TYPE	/* SUN_SHA512_RSA_PKCS */
 } rsa_mech_type_t;
 
 /*
@@ -79,7 +83,7 @@ typedef struct rsa_ctx {
 } rsa_ctx_t;
 
 /*
- * Context for MD5_RSA_PKCS and SHA1_RSA_PKCS mechanisms.
+ * Context for MD5_RSA_PKCS and SHA*_RSA_PKCS mechanisms.
  */
 typedef struct digest_rsa_ctx {
 	rsa_mech_type_t	mech_type;
@@ -88,11 +92,13 @@ typedef struct digest_rsa_ctx {
 	union {
 		MD5_CTX md5ctx;
 		SHA1_CTX sha1ctx;
+		SHA2_CTX sha2ctx;
 	} dctx_u;
 } digest_rsa_ctx_t;
 
 #define	md5_ctx		dctx_u.md5ctx
 #define	sha1_ctx	dctx_u.sha1ctx
+#define	sha2_ctx	dctx_u.sha2ctx
 
 /*
  * Mechanism info structure passed to KCF during registration.
@@ -128,14 +134,36 @@ static crypto_mech_info_t rsa_mech_info_tab[] = {
 	{SUN_CKM_SHA1_RSA_PKCS, SHA1_RSA_PKCS_MECH_INFO_TYPE,
 	    CRYPTO_FG_SIGN | CRYPTO_FG_SIGN_ATOMIC |
 	    CRYPTO_FG_VERIFY | CRYPTO_FG_VERIFY_ATOMIC,
+	    RSA_MIN_KEY_LEN, RSA_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BITS},
+
+	/* SHA256_RSA_PKCS */
+	{SUN_CKM_SHA256_RSA_PKCS, SHA256_RSA_PKCS_MECH_INFO_TYPE,
+	    CRYPTO_FG_SIGN | CRYPTO_FG_SIGN_ATOMIC |
+	    CRYPTO_FG_VERIFY | CRYPTO_FG_VERIFY_ATOMIC,
+	    RSA_MIN_KEY_LEN, RSA_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BITS},
+
+	/* SHA384_RSA_PKCS */
+	{SUN_CKM_SHA384_RSA_PKCS, SHA384_RSA_PKCS_MECH_INFO_TYPE,
+	    CRYPTO_FG_SIGN | CRYPTO_FG_SIGN_ATOMIC |
+	    CRYPTO_FG_VERIFY | CRYPTO_FG_VERIFY_ATOMIC,
+	    RSA_MIN_KEY_LEN, RSA_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BITS},
+
+	/* SHA512_RSA_PKCS */
+	{SUN_CKM_SHA512_RSA_PKCS, SHA512_RSA_PKCS_MECH_INFO_TYPE,
+	    CRYPTO_FG_SIGN | CRYPTO_FG_SIGN_ATOMIC |
+	    CRYPTO_FG_VERIFY | CRYPTO_FG_VERIFY_ATOMIC,
 	    RSA_MIN_KEY_LEN, RSA_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BITS}
+
 };
 
 #define	RSA_VALID_MECH(mech)					\
 	(((mech)->cm_type == RSA_PKCS_MECH_INFO_TYPE ||		\
 	(mech)->cm_type == RSA_X_509_MECH_INFO_TYPE ||		\
 	(mech)->cm_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||	\
-	(mech)->cm_type == SHA1_RSA_PKCS_MECH_INFO_TYPE) ? 1 : 0)
+	(mech)->cm_type == SHA1_RSA_PKCS_MECH_INFO_TYPE ||	\
+	(mech)->cm_type == SHA256_RSA_PKCS_MECH_INFO_TYPE ||	\
+	(mech)->cm_type == SHA384_RSA_PKCS_MECH_INFO_TYPE ||	\
+	(mech)->cm_type == SHA512_RSA_PKCS_MECH_INFO_TYPE) ? 1 : 0)
 
 /* operations are in-place if the output buffer is NULL */
 #define	RSA_ARG_INPLACE(input, output)				\
@@ -488,7 +516,8 @@ typedef enum cmd_type {
 	COPY_TO_DATA,
 	COMPARE_TO_DATA,
 	MD5_DIGEST_DATA,
-	SHA1_DIGEST_DATA
+	SHA1_DIGEST_DATA,
+	SHA2_DIGEST_DATA
 } cmd_type_t;
 
 /*
@@ -552,6 +581,9 @@ process_uio_data(crypto_data_t *data, uchar_t *buf, int len,
 			break;
 		case SHA1_DIGEST_DATA:
 			SHA1Update(digest_ctx, datap, cur_len);
+			break;
+		case SHA2_DIGEST_DATA:
+			SHA2Update(digest_ctx, datap, cur_len);
 			break;
 		}
 
@@ -631,6 +663,9 @@ process_mblk_data(crypto_data_t *data, uchar_t *buf, int len,
 			break;
 		case SHA1_DIGEST_DATA:
 			SHA1Update(digest_ctx, datap, cur_len);
+			break;
+		case SHA2_DIGEST_DATA:
+			SHA2Update(digest_ctx, datap, cur_len);
 			break;
 		}
 
@@ -1283,6 +1318,9 @@ rsa_sign_verify_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	switch (mechanism->cm_type) {
 	case MD5_RSA_PKCS_MECH_INFO_TYPE:
 	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
 		dctxp = kmem_zalloc(sizeof (digest_rsa_ctx_t), kmflag);
 		ctxp = (rsa_ctx_t *)dctxp;
 		break;
@@ -1299,6 +1337,9 @@ rsa_sign_verify_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 		switch (mechanism->cm_type) {
 		case MD5_RSA_PKCS_MECH_INFO_TYPE:
 		case SHA1_RSA_PKCS_MECH_INFO_TYPE:
+		case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+		case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+		case SHA512_RSA_PKCS_MECH_INFO_TYPE:
 			kmem_free(dctxp, sizeof (digest_rsa_ctx_t));
 			break;
 		default:
@@ -1315,6 +1356,18 @@ rsa_sign_verify_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 
 	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
 		SHA1Init(&(dctxp->sha1_ctx));
+		break;
+
+	case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+		SHA2Init(SHA256, &(dctxp->sha2_ctx));
+		break;
+
+	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+		SHA2Init(SHA384, &(dctxp->sha2_ctx));
+		break;
+
+	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
+		SHA2Init(SHA512, &(dctxp->sha2_ctx));
 		break;
 	}
 
@@ -1339,6 +1392,7 @@ rsa_sign_verify_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 #define	DO_SHA1		0x08
 #define	DO_SIGN		0x10
 #define	DO_VERIFY	0x20
+#define	DO_SHA2		0x40
 
 static int
 digest_data(crypto_data_t *data, void *dctx, uchar_t *digest,
@@ -1346,9 +1400,8 @@ digest_data(crypto_data_t *data, void *dctx, uchar_t *digest,
 {
 	int rv, dlen;
 	uchar_t *dptr;
-	cmd_type_t cmd;
 
-	ASSERT(flag & DO_MD5 || flag & DO_SHA1);
+	ASSERT(flag & DO_MD5 || flag & DO_SHA1 || flag & DO_SHA2);
 	if (data == NULL) {
 		ASSERT((flag & DO_UPDATE) == 0);
 		goto dofinal;
@@ -1356,45 +1409,72 @@ digest_data(crypto_data_t *data, void *dctx, uchar_t *digest,
 
 	dlen = data->cd_length;
 
-	switch (data->cd_format) {
-	case CRYPTO_DATA_RAW:
-		dptr = (uchar_t *)(data->cd_raw.iov_base +
-		    data->cd_offset);
+	if (flag & DO_UPDATE) {
 
-		if (flag & DO_MD5) {
-			if (flag & DO_UPDATE)
+		switch (data->cd_format) {
+		case CRYPTO_DATA_RAW:
+			dptr = (uchar_t *)(data->cd_raw.iov_base +
+			    data->cd_offset);
+
+			if (flag & DO_MD5)
 				MD5Update(dctx, dptr, dlen);
-		} else {
-			if (flag & DO_UPDATE)
+
+			else if (flag & DO_SHA1)
 				SHA1Update(dctx, dptr, dlen);
-		}
+
+			else
+				SHA2Update(dctx, dptr, dlen);
+
 		break;
 
-	case CRYPTO_DATA_UIO:
-		cmd = ((flag & DO_MD5) ? MD5_DIGEST_DATA : SHA1_DIGEST_DATA);
-		if (flag & DO_UPDATE) {
-			rv = process_uio_data(data, NULL, dlen, cmd, dctx);
-			if (rv != CRYPTO_SUCCESS)
-				return (rv);
-		}
-		break;
+		case CRYPTO_DATA_UIO:
+			if (flag & DO_MD5)
+				rv = process_uio_data(data, NULL, dlen,
+				    MD5_DIGEST_DATA, dctx);
 
-	case CRYPTO_DATA_MBLK:
-		cmd = ((flag & DO_MD5) ? MD5_DIGEST_DATA : SHA1_DIGEST_DATA);
-		if (flag & DO_UPDATE) {
-			rv = process_mblk_data(data, NULL, dlen, cmd, dctx);
+			else if (flag & DO_SHA1)
+				rv = process_uio_data(data, NULL, dlen,
+				    SHA1_DIGEST_DATA, dctx);
+
+			else
+				rv = process_uio_data(data, NULL, dlen,
+				    SHA2_DIGEST_DATA, dctx);
+
 			if (rv != CRYPTO_SUCCESS)
 				return (rv);
+
+			break;
+
+		case CRYPTO_DATA_MBLK:
+			if (flag & DO_MD5)
+				rv = process_mblk_data(data, NULL, dlen,
+				    MD5_DIGEST_DATA, dctx);
+
+			else if (flag & DO_SHA1)
+				rv = process_mblk_data(data, NULL, dlen,
+				    SHA1_DIGEST_DATA, dctx);
+
+			else
+				rv = process_mblk_data(data, NULL, dlen,
+				    SHA2_DIGEST_DATA, dctx);
+
+			if (rv != CRYPTO_SUCCESS)
+				return (rv);
+
+			break;
 		}
-		break;
 	}
 
 dofinal:
 	if (flag & DO_FINAL) {
 		if (flag & DO_MD5)
 			MD5Final(digest, dctx);
-		else
+
+		else if (flag & DO_SHA1)
 			SHA1Final(digest, dctx);
+
+		else
+			SHA2Final(digest, dctx);
 	}
 
 	return (CRYPTO_SUCCESS);
@@ -1408,10 +1488,9 @@ rsa_digest_svrfy_common(digest_rsa_ctx_t *ctxp, crypto_data_t *data,
 
 /* EXPORT DELETE START */
 
-	int dlen;
-	uchar_t digest[SHA1_DIGEST_SIZE];
+	uchar_t digest[SHA512_DIGEST_LENGTH];
 	/* The der_data size is enough for MD5 also */
-	uchar_t der_data[SHA1_DIGEST_SIZE + SHA1_DER_PREFIX_Len];
+	uchar_t der_data[SHA512_DIGEST_LENGTH + SHA2_DER_PREFIX_Len];
 	ulong_t der_data_len;
 	crypto_data_t der_cd;
 	rsa_mech_type_t mech_type;
@@ -1420,8 +1499,8 @@ rsa_digest_svrfy_common(digest_rsa_ctx_t *ctxp, crypto_data_t *data,
 	ASSERT(data != NULL || (flag & DO_FINAL));
 
 	mech_type = ctxp->mech_type;
-	if (!(mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||
-	    mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE))
+	if (mech_type == RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == RSA_X_509_MECH_INFO_TYPE)
 		return (CRYPTO_MECHANISM_INVALID);
 
 	/*
@@ -1444,17 +1523,21 @@ rsa_digest_svrfy_common(digest_rsa_ctx_t *ctxp, crypto_data_t *data,
 		}
 	}
 
-	dlen = ((mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE) ?
-	    MD5_DIGEST_SIZE : SHA1_DIGEST_SIZE);
-
 	if (mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE)
 		rv = digest_data(data, &(ctxp->md5_ctx),
 		    digest, flag | DO_MD5);
-	else
+
+	else if (mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE)
 		rv = digest_data(data, &(ctxp->sha1_ctx),
 		    digest, flag | DO_SHA1);
+
+	else
+		rv = digest_data(data, &(ctxp->sha2_ctx),
+		    digest, flag | DO_SHA2);
+
 	if (rv != CRYPTO_SUCCESS)
 		return (rv);
+
 
 	/*
 	 * Prepare the DER encoding of the DigestInfo value as follows:
@@ -1463,14 +1546,40 @@ rsa_digest_svrfy_common(digest_rsa_ctx_t *ctxp, crypto_data_t *data,
 	 *
 	 * See rsa_impl.c for more details.
 	 */
-	if (mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE) {
+	switch (mech_type) {
+	case MD5_RSA_PKCS_MECH_INFO_TYPE:
 		bcopy(MD5_DER_PREFIX, der_data, MD5_DER_PREFIX_Len);
-		bcopy(digest, der_data + MD5_DER_PREFIX_Len, dlen);
-		der_data_len = MD5_DER_PREFIX_Len + dlen;
-	} else {
+		bcopy(digest, der_data + MD5_DER_PREFIX_Len, MD5_DIGEST_SIZE);
+		der_data_len = MD5_DER_PREFIX_Len + MD5_DIGEST_SIZE;
+		break;
+
+	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
 		bcopy(SHA1_DER_PREFIX, der_data, SHA1_DER_PREFIX_Len);
-		bcopy(digest, der_data + SHA1_DER_PREFIX_Len, dlen);
-		der_data_len = SHA1_DER_PREFIX_Len + dlen;
+		bcopy(digest, der_data + SHA1_DER_PREFIX_Len,
+		    SHA1_DIGEST_SIZE);
+		der_data_len = SHA1_DER_PREFIX_Len + SHA1_DIGEST_SIZE;
+		break;
+
+	case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+		bcopy(SHA256_DER_PREFIX, der_data, SHA2_DER_PREFIX_Len);
+		bcopy(digest, der_data + SHA2_DER_PREFIX_Len,
+		    SHA256_DIGEST_LENGTH);
+		der_data_len = SHA2_DER_PREFIX_Len + SHA256_DIGEST_LENGTH;
+		break;
+
+	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+		bcopy(SHA384_DER_PREFIX, der_data, SHA2_DER_PREFIX_Len);
+		bcopy(digest, der_data + SHA2_DER_PREFIX_Len,
+		    SHA384_DIGEST_LENGTH);
+		der_data_len = SHA2_DER_PREFIX_Len + SHA384_DIGEST_LENGTH;
+		break;
+
+	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
+		bcopy(SHA512_DER_PREFIX, der_data, SHA2_DER_PREFIX_Len);
+		bcopy(digest, der_data + SHA2_DER_PREFIX_Len,
+		    SHA512_DIGEST_LENGTH);
+		der_data_len = SHA2_DER_PREFIX_Len + SHA512_DIGEST_LENGTH;
+		break;
 	}
 
 	INIT_RAW_CRYPTO_DATA(der_cd, der_data, der_data_len, der_data_len);
@@ -1535,6 +1644,9 @@ rsa_sign_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 	case RSA_PKCS_MECH_INFO_TYPE:
 	case MD5_RSA_PKCS_MECH_INFO_TYPE:
 	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
 		/*
 		 * Add PKCS padding to the input data to format a block
 		 * type "01" encryption block.
@@ -1583,6 +1695,9 @@ rsa_sign(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	switch (ctxp->mech_type) {
 	case MD5_RSA_PKCS_MECH_INFO_TYPE:
 	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
 		rv = rsa_digest_svrfy_common((digest_rsa_ctx_t *)ctxp, data,
 		    signature, KM_SLEEP, DO_SIGN | DO_UPDATE | DO_FINAL);
 		break;
@@ -1610,16 +1725,22 @@ rsa_sign_update(crypto_ctx_t *ctx, crypto_data_t *data, crypto_req_handle_t req)
 	ctxp = ctx->cc_provider_private;
 	mech_type = ctxp->mech_type;
 
-	if (!(mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||
-	    mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE))
+	if (mech_type == RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == RSA_X_509_MECH_INFO_TYPE)
 		return (CRYPTO_MECHANISM_INVALID);
 
 	if (mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE)
 		rv = digest_data(data, &(ctxp->md5_ctx),
 		    NULL, DO_MD5 | DO_UPDATE);
-	else
+
+	else if (mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE)
 		rv = digest_data(data, &(ctxp->sha1_ctx),
 		    NULL, DO_SHA1 | DO_UPDATE);
+
+	else
+		rv = digest_data(data, &(ctxp->sha2_ctx),
+		    NULL, DO_SHA2 | DO_UPDATE);
+
 	return (rv);
 }
 
@@ -1654,23 +1775,38 @@ rsa_sign_atomic(crypto_provider_handle_t provider,
 	if ((rv = check_mech_and_key(mechanism, key)) != CRYPTO_SUCCESS)
 		return (rv);
 
-	switch (mechanism->cm_type) {
-	case MD5_RSA_PKCS_MECH_INFO_TYPE:
-	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
-		dctx.mech_type = mechanism->cm_type;
-		dctx.key = key;
-		if (mechanism->cm_type == MD5_RSA_PKCS_MECH_INFO_TYPE)
-			MD5Init(&(dctx.md5_ctx));
-		else
-			SHA1Init(&(dctx.sha1_ctx));
-		rv = rsa_digest_svrfy_common(&dctx, data,
-		    signature, crypto_kmflag(req),
-		    DO_SIGN | DO_UPDATE | DO_FINAL);
-		break;
-	default:
+	if (mechanism->cm_type == RSA_PKCS_MECH_INFO_TYPE ||
+	    mechanism->cm_type == RSA_X_509_MECH_INFO_TYPE)
 		rv = rsa_sign_common(mechanism->cm_type, key, data,
 		    signature, crypto_kmflag(req));
-		break;
+
+	else {
+		dctx.mech_type = mechanism->cm_type;
+		dctx.key = key;
+		switch (mechanism->cm_type) {
+		case MD5_RSA_PKCS_MECH_INFO_TYPE:
+			MD5Init(&(dctx.md5_ctx));
+			break;
+
+		case SHA1_RSA_PKCS_MECH_INFO_TYPE:
+			SHA1Init(&(dctx.sha1_ctx));
+			break;
+
+		case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+			SHA2Init(SHA256, &(dctx.sha2_ctx));
+			break;
+
+		case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+			SHA2Init(SHA384, &(dctx.sha2_ctx));
+			break;
+
+		case SHA512_RSA_PKCS_MECH_INFO_TYPE:
+			SHA2Init(SHA512, &(dctx.sha2_ctx));
+			break;
+		}
+
+		rv = rsa_digest_svrfy_common(&dctx, data, signature,
+		    crypto_kmflag(req), DO_SIGN | DO_UPDATE | DO_FINAL);
 	}
 
 	return (rv);
@@ -1706,10 +1842,12 @@ rsa_verify_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 	if (rv != CRYPTO_SUCCESS)
 		return (rv);
 
-	switch (mech_type) {
-	case RSA_PKCS_MECH_INFO_TYPE:
-	case MD5_RSA_PKCS_MECH_INFO_TYPE:
-	case SHA1_RSA_PKCS_MECH_INFO_TYPE: {
+	if (mech_type == RSA_X_509_MECH_INFO_TYPE) {
+		if (compare_data(data, (plain_data + modulus_len
+		    - data->cd_length)) != 0)
+			rv = CRYPTO_SIGNATURE_INVALID;
+
+	} else {
 		int data_len = modulus_len;
 
 		/*
@@ -1719,27 +1857,14 @@ rsa_verify_common(rsa_mech_type_t mech_type, crypto_key_t *key,
 		 */
 		rv = soft_verify_rsa_pkcs_decode(plain_data, &data_len);
 		if (rv != CRYPTO_SUCCESS)
-			break;
+			return (rv);
 
-		if (data_len != data->cd_length) {
-			rv = CRYPTO_SIGNATURE_LEN_RANGE;
-			break;
-		}
+		if (data_len != data->cd_length)
+			return (CRYPTO_SIGNATURE_LEN_RANGE);
 
 		if (compare_data(data, (plain_data + modulus_len
 		    - data_len)) != 0)
 			rv = CRYPTO_SIGNATURE_INVALID;
-		break;
-	}
-
-	case RSA_X_509_MECH_INFO_TYPE:
-		if (compare_data(data, (plain_data + modulus_len
-		    - data->cd_length)) != 0)
-			rv = CRYPTO_SIGNATURE_INVALID;
-		break;
-
-	default:
-		break;
 	}
 
 /* EXPORT DELETE END */
@@ -1762,6 +1887,9 @@ rsa_verify(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	switch (ctxp->mech_type) {
 	case MD5_RSA_PKCS_MECH_INFO_TYPE:
 	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
 		rv = rsa_digest_svrfy_common((digest_rsa_ctx_t *)ctxp, data,
 		    signature, KM_SLEEP, DO_VERIFY | DO_UPDATE | DO_FINAL);
 		break;
@@ -1784,22 +1912,33 @@ rsa_verify_update(crypto_ctx_t *ctx, crypto_data_t *data,
 {
 	int rv;
 	digest_rsa_ctx_t *ctxp;
-	rsa_mech_type_t mech_type;
 
 	ASSERT(ctx->cc_provider_private != NULL);
 	ctxp = ctx->cc_provider_private;
-	mech_type = ctxp->mech_type;
 
-	if (!(mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||
-	    mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE))
-		return (CRYPTO_MECHANISM_INVALID);
+	switch (ctxp->mech_type) {
 
-	if (mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE)
+	case MD5_RSA_PKCS_MECH_INFO_TYPE:
 		rv = digest_data(data, &(ctxp->md5_ctx),
 		    NULL, DO_MD5 | DO_UPDATE);
-	else
+		break;
+
+	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
 		rv = digest_data(data, &(ctxp->sha1_ctx),
 		    NULL, DO_SHA1 | DO_UPDATE);
+		break;
+
+	case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
+		rv = digest_data(data, &(ctxp->sha2_ctx),
+		    NULL, DO_SHA2 | DO_UPDATE);
+		break;
+
+	default:
+		return (CRYPTO_MECHANISM_INVALID);
+	}
+
 	return (rv);
 }
 
@@ -1836,23 +1975,40 @@ rsa_verify_atomic(crypto_provider_handle_t provider,
 	if ((rv = check_mech_and_key(mechanism, key)) != CRYPTO_SUCCESS)
 		return (rv);
 
-	switch (mechanism->cm_type) {
-	case MD5_RSA_PKCS_MECH_INFO_TYPE:
-	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
+	if (mechanism->cm_type == RSA_PKCS_MECH_INFO_TYPE ||
+	    mechanism->cm_type == RSA_X_509_MECH_INFO_TYPE)
+		rv = rsa_verify_common(mechanism->cm_type, key, data,
+		    signature, crypto_kmflag(req));
+
+	else {
 		dctx.mech_type = mechanism->cm_type;
 		dctx.key = key;
-		if (mechanism->cm_type == MD5_RSA_PKCS_MECH_INFO_TYPE)
+
+		switch (mechanism->cm_type) {
+		case MD5_RSA_PKCS_MECH_INFO_TYPE:
 			MD5Init(&(dctx.md5_ctx));
-		else
+			break;
+
+		case SHA1_RSA_PKCS_MECH_INFO_TYPE:
 			SHA1Init(&(dctx.sha1_ctx));
+			break;
+
+		case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+			SHA2Init(SHA256, &(dctx.sha2_ctx));
+			break;
+
+		case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+			SHA2Init(SHA384, &(dctx.sha2_ctx));
+			break;
+
+		case SHA512_RSA_PKCS_MECH_INFO_TYPE:
+			SHA2Init(SHA512, &(dctx.sha2_ctx));
+			break;
+		}
+
 		rv = rsa_digest_svrfy_common(&dctx, data,
 		    signature, crypto_kmflag(req),
 		    DO_VERIFY | DO_UPDATE | DO_FINAL);
-		break;
-	default:
-		rv = rsa_verify_common(mechanism->cm_type, key, data,
-		    signature, crypto_kmflag(req));
-		break;
 	}
 
 	return (rv);

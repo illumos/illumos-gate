@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@ extern "C" {
 #include <sys/types.h>
 #include <security/pkcs11t.h>
 #include <aes_impl.h>
+#include <blowfish_impl.h>
 #include <des_impl.h>
 #include <bignum.h>
 #include "softObject.h"
@@ -62,6 +63,15 @@ typedef struct soft_aes_ctx {
 	size_t remain_len;			/* for use by update */
 	void *aes_cbc;			/* to be used by CBC mode */
 } soft_aes_ctx_t;
+
+typedef struct soft_blowfish_ctx {
+	void *key_sched;		/* pointer to key schedule */
+	size_t keysched_len;		/* Length of the key schedule */
+	uint8_t ivec[BLOWFISH_BLOCK_LEN];	/* initialization vector */
+	uint8_t data[BLOWFISH_BLOCK_LEN];	/* for use by update */
+	size_t remain_len;			/* for use by update */
+	void *blowfish_cbc;			/* to be used by CBC mode */
+} soft_blowfish_ctx_t;
 
 /*
  * Function Prototypes.
@@ -106,6 +116,17 @@ CK_RV soft_aes_encrypt_common(soft_session_t *, CK_BYTE_PTR, CK_ULONG,
 	CK_BYTE_PTR, CK_ULONG_PTR, boolean_t);
 
 CK_RV soft_aes_decrypt_common(soft_session_t *, CK_BYTE_PTR, CK_ULONG,
+	CK_BYTE_PTR, CK_ULONG_PTR, boolean_t);
+
+void *blowfish_cbc_ctx_init(void *, size_t, uint8_t *);
+
+CK_RV soft_blowfish_crypt_init_common(soft_session_t *, CK_MECHANISM_PTR,
+	soft_object_t *, boolean_t);
+
+CK_RV soft_blowfish_encrypt_common(soft_session_t *, CK_BYTE_PTR, CK_ULONG,
+	CK_BYTE_PTR, CK_ULONG_PTR, boolean_t);
+
+CK_RV soft_blowfish_decrypt_common(soft_session_t *, CK_BYTE_PTR, CK_ULONG,
 	CK_BYTE_PTR, CK_ULONG_PTR, boolean_t);
 
 CK_RV convert_rv(BIG_ERR_CODE);

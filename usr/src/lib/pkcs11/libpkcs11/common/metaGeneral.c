@@ -39,7 +39,7 @@
 extern meta_session_t *meta_sessionlist_head;
 
 struct CK_FUNCTION_LIST metaslot_functionList = {
-	{ 2, 11 },	/* version */
+	{ 2, 20 },	/* version */
 	meta_Initialize,
 	meta_Finalize,
 	meta_GetInfo,

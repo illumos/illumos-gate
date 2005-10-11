@@ -65,7 +65,6 @@
 #include <stdlib.h>
 #include <errno.h>
 
-
 #endif	/* !_KERNEL */
 
 static void Encode(uint8_t *, uint32_t *, size_t);
@@ -153,15 +152,6 @@ typedef enum sha2_mech_type {
 
 #ifdef _KERNEL
 
-#define	SHA2_HMAC_MIN_KEY_LEN	8	/* SHA2-HMAC min key length in bits */
-#define	SHA2_HMAC_MAX_KEY_LEN	INT_MAX /* SHA2-HMAC max key length in bits */
-
-#define	SHA256_DIGEST_LENGTH	32	/* SHA256 digest length in bytes */
-#define	SHA384_DIGEST_LENGTH	48	/* SHA384 digest length in bytes */
-#define	SHA512_DIGEST_LENGTH	64	/* SHA512 digest length in bytes */
-
-#define	SHA256_HMAC_BLOCK_SIZE	64	/* SHA256-HMAC block size */
-#define	SHA512_HMAC_BLOCK_SIZE	128	/* SHA512-HMAC block size */
 
 /*
  * Context for SHA2 mechanism.
@@ -462,6 +452,58 @@ SHA256Transform(SHA2_CTX *ctx, const uint8_t *blk)
 		blk = (uint8_t *)ctx->buf_un.buf32;
 	}
 
+#if	defined(__sparc)
+	/*LINTED*/
+	w0 =  LOAD_BIG_32(blk + 4 * 0);
+	SHA256ROUND(a, b, c, d, e, f, g, h, 0, w0);
+	/*LINTED*/
+	w1 =  LOAD_BIG_32(blk + 4 * 1);
+	SHA256ROUND(h, a, b, c, d, e, f, g, 1, w1);
+	/*LINTED*/
+	w2 =  LOAD_BIG_32(blk + 4 * 2);
+	SHA256ROUND(g, h, a, b, c, d, e, f, 2, w2);
+	/*LINTED*/
+	w3 =  LOAD_BIG_32(blk + 4 * 3);
+	SHA256ROUND(f, g, h, a, b, c, d, e, 3, w3);
+	/*LINTED*/
+	w4 =  LOAD_BIG_32(blk + 4 * 4);
+	SHA256ROUND(e, f, g, h, a, b, c, d, 4, w4);
+	/*LINTED*/
+	w5 =  LOAD_BIG_32(blk + 4 * 5);
+	SHA256ROUND(d, e, f, g, h, a, b, c, 5, w5);
+	/*LINTED*/
+	w6 =  LOAD_BIG_32(blk + 4 * 6);
+	SHA256ROUND(c, d, e, f, g, h, a, b, 6, w6);
+	/*LINTED*/
+	w7 =  LOAD_BIG_32(blk + 4 * 7);
+	SHA256ROUND(b, c, d, e, f, g, h, a, 7, w7);
+	/*LINTED*/
+	w8 =  LOAD_BIG_32(blk + 4 * 8);
+	SHA256ROUND(a, b, c, d, e, f, g, h, 8, w8);
+	/*LINTED*/
+	w9 =  LOAD_BIG_32(blk + 4 * 9);
+	SHA256ROUND(h, a, b, c, d, e, f, g, 9, w9);
+	/*LINTED*/
+	w10 =  LOAD_BIG_32(blk + 4 * 10);
+	SHA256ROUND(g, h, a, b, c, d, e, f, 10, w10);
+	/*LINTED*/
+	w11 =  LOAD_BIG_32(blk + 4 * 11);
+	SHA256ROUND(f, g, h, a, b, c, d, e, 11, w11);
+	/*LINTED*/
+	w12 =  LOAD_BIG_32(blk + 4 * 12);
+	SHA256ROUND(e, f, g, h, a, b, c, d, 12, w12);
+	/*LINTED*/
+	w13 =  LOAD_BIG_32(blk + 4 * 13);
+	SHA256ROUND(d, e, f, g, h, a, b, c, 13, w13);
+	/*LINTED*/
+	w14 =  LOAD_BIG_32(blk + 4 * 14);
+	SHA256ROUND(c, d, e, f, g, h, a, b, 14, w14);
+	/*LINTED*/
+	w15 =  LOAD_BIG_32(blk + 4 * 15);
+	SHA256ROUND(b, c, d, e, f, g, h, a, 15, w15);
+
+#else
+
 	w0 =  LOAD_BIG_32(blk + 4 * 0);
 	SHA256ROUND(a, b, c, d, e, f, g, h, 0, w0);
 	w1 =  LOAD_BIG_32(blk + 4 * 1);
@@ -494,6 +536,8 @@ SHA256Transform(SHA2_CTX *ctx, const uint8_t *blk)
 	SHA256ROUND(c, d, e, f, g, h, a, b, 14, w14);
 	w15 =  LOAD_BIG_32(blk + 4 * 15);
 	SHA256ROUND(b, c, d, e, f, g, h, a, 15, w15);
+
+#endif
 
 	w0 = SIGMA1_256(w14) + w9 + SIGMA0_256(w1) + w0;
 	SHA256ROUND(a, b, c, d, e, f, g, h, 16, w0);
@@ -662,6 +706,58 @@ SHA512Transform(SHA2_CTX *ctx, const uint8_t *blk)
 		blk = (uint8_t *)ctx->buf_un.buf64;
 	}
 
+#if	defined(__sparc)
+	/*LINTED*/
+	w0 =  LOAD_BIG_64(blk + 8 * 0);
+	SHA512ROUND(a, b, c, d, e, f, g, h, 0, w0);
+	/*LINTED*/
+	w1 =  LOAD_BIG_64(blk + 8 * 1);
+	SHA512ROUND(h, a, b, c, d, e, f, g, 1, w1);
+	/*LINTED*/
+	w2 =  LOAD_BIG_64(blk + 8 * 2);
+	SHA512ROUND(g, h, a, b, c, d, e, f, 2, w2);
+	/*LINTED*/
+	w3 =  LOAD_BIG_64(blk + 8 * 3);
+	SHA512ROUND(f, g, h, a, b, c, d, e, 3, w3);
+	/*LINTED*/
+	w4 =  LOAD_BIG_64(blk + 8 * 4);
+	SHA512ROUND(e, f, g, h, a, b, c, d, 4, w4);
+	/*LINTED*/
+	w5 =  LOAD_BIG_64(blk + 8 * 5);
+	SHA512ROUND(d, e, f, g, h, a, b, c, 5, w5);
+	/*LINTED*/
+	w6 =  LOAD_BIG_64(blk + 8 * 6);
+	SHA512ROUND(c, d, e, f, g, h, a, b, 6, w6);
+	/*LINTED*/
+	w7 =  LOAD_BIG_64(blk + 8 * 7);
+	SHA512ROUND(b, c, d, e, f, g, h, a, 7, w7);
+	/*LINTED*/
+	w8 =  LOAD_BIG_64(blk + 8 * 8);
+	SHA512ROUND(a, b, c, d, e, f, g, h, 8, w8);
+	/*LINTED*/
+	w9 =  LOAD_BIG_64(blk + 8 * 9);
+	SHA512ROUND(h, a, b, c, d, e, f, g, 9, w9);
+	/*LINTED*/
+	w10 =  LOAD_BIG_64(blk + 8 * 10);
+	SHA512ROUND(g, h, a, b, c, d, e, f, 10, w10);
+	/*LINTED*/
+	w11 =  LOAD_BIG_64(blk + 8 * 11);
+	SHA512ROUND(f, g, h, a, b, c, d, e, 11, w11);
+	/*LINTED*/
+	w12 =  LOAD_BIG_64(blk + 8 * 12);
+	SHA512ROUND(e, f, g, h, a, b, c, d, 12, w12);
+	/*LINTED*/
+	w13 =  LOAD_BIG_64(blk + 8 * 13);
+	SHA512ROUND(d, e, f, g, h, a, b, c, 13, w13);
+	/*LINTED*/
+	w14 =  LOAD_BIG_64(blk + 8 * 14);
+	SHA512ROUND(c, d, e, f, g, h, a, b, 14, w14);
+	/*LINTED*/
+	w15 =  LOAD_BIG_64(blk + 8 * 15);
+	SHA512ROUND(b, c, d, e, f, g, h, a, 15, w15);
+
+#else
+
 	w0 =  LOAD_BIG_64(blk + 8 * 0);
 	SHA512ROUND(a, b, c, d, e, f, g, h, 0, w0);
 	w1 =  LOAD_BIG_64(blk + 8 * 1);
@@ -694,6 +790,8 @@ SHA512Transform(SHA2_CTX *ctx, const uint8_t *blk)
 	SHA512ROUND(c, d, e, f, g, h, a, b, 14, w14);
 	w15 =  LOAD_BIG_64(blk + 8 * 15);
 	SHA512ROUND(b, c, d, e, f, g, h, a, 15, w15);
+
+#endif
 
 	w0 = SIGMA1(w14) + w9 + SIGMA0(w1) + w0;
 	SHA512ROUND(a, b, c, d, e, f, g, h, 16, w0);
@@ -1300,7 +1398,6 @@ sha2_digest(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *digest,
 
 	if (ret != CRYPTO_SUCCESS) {
 		/* the update failed, free context and bail */
-		bzero(&PROV_SHA2_CTX(ctx)->sc_sha2_ctx, sizeof (SHA2_CTX));
 		kmem_free(ctx->cc_provider_private, sizeof (sha2_ctx_t));
 		ctx->cc_provider_private = NULL;
 		digest->cd_length = 0;
@@ -1330,16 +1427,10 @@ sha2_digest(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *digest,
 
 	/* all done, free context and return */
 
-	if (ret == CRYPTO_SUCCESS) {
+	if (ret == CRYPTO_SUCCESS)
 		digest->cd_length = sha_digest_len;
-	} else {
-		/*
-		 * Only bzero context on failure, since SHA2Final()
-		 * does it for us.
-		 */
-		bzero(&PROV_SHA2_CTX(ctx)->sc_sha2_ctx, sizeof (SHA2_CTX));
+	else
 		digest->cd_length = 0;
-	}
 
 	kmem_free(ctx->cc_provider_private, sizeof (sha2_ctx_t));
 	ctx->cc_provider_private = NULL;
@@ -1435,16 +1526,10 @@ sha2_digest_final(crypto_ctx_t *ctx, crypto_data_t *digest,
 
 	/* all done, free context and return */
 
-	if (ret == CRYPTO_SUCCESS) {
+	if (ret == CRYPTO_SUCCESS)
 		digest->cd_length = sha_digest_len;
-	} else {
-		/*
-		 * Only bzero context this on failure, since SHA2Final()
-		 * does it for us.
-		 */
-		bzero(&PROV_SHA2_CTX(ctx)->sc_sha2_ctx, sizeof (SHA2_CTX));
+	else
 		digest->cd_length = 0;
-	}
 
 	kmem_free(ctx->cc_provider_private, sizeof (sha2_ctx_t));
 	ctx->cc_provider_private = NULL;
@@ -1490,10 +1575,8 @@ sha2_digest_atomic(crypto_provider_handle_t provider,
 
 	if (ret != CRYPTO_SUCCESS) {
 		/* the update failed, bail */
-		bzero(&sha2_ctx, sizeof (SHA2_CTX));
 		digest->cd_length = 0;
 		return (ret);
-
 	}
 
 	if (mechanism->cm_type <= SHA256_HMAC_GEN_MECH_INFO_TYPE)
@@ -1522,16 +1605,10 @@ sha2_digest_atomic(crypto_provider_handle_t provider,
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
-	if (ret == CRYPTO_SUCCESS) {
+	if (ret == CRYPTO_SUCCESS)
 		digest->cd_length = sha_digest_len;
-	} else {
-		/*
-		 * Only bzero context on failure, since SHA2Final()
-		 * does it for us.
-		 */
-		bzero(&sha2_ctx, sizeof (SHA2_CTX));
+	else
 		digest->cd_length = 0;
-	}
 
 	return (ret);
 }
@@ -1810,20 +1887,12 @@ sha2_mac_final(crypto_ctx_t *ctx, crypto_data_t *mac, crypto_req_handle_t req)
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
-	if (ret == CRYPTO_SUCCESS) {
+	if (ret == CRYPTO_SUCCESS)
 		mac->cd_length = digest_len;
-	} else {
-		/*
-		 * Only bzero outer context on failure, since SHA2Final()
-		 * does it for us.
-		 * We don't have to bzero the inner context since we
-		 * always invoke a SHA2Final() on it.
-		 */
-		bzero(&PROV_SHA2_HMAC_CTX(ctx)->hc_ocontext,
-		    sizeof (SHA2_CTX));
+	else
 		mac->cd_length = 0;
-	}
 
+	bzero(&PROV_SHA2_HMAC_CTX(ctx)->hc_ocontext, sizeof (sha2_hmac_ctx_t));
 	kmem_free(ctx->cc_provider_private, sizeof (sha2_hmac_ctx_t));
 	ctx->cc_provider_private = NULL;
 
@@ -1983,18 +2052,8 @@ sha2_mac_atomic(crypto_provider_handle_t provider,
 
 	if (ret == CRYPTO_SUCCESS) {
 		mac->cd_length = digest_len;
-	} else {
-		/*
-		 * Only bzero outer context on failure, since SHA2Final()
-		 * does it for us.
-		 * We don't have to bzero the inner context since we
-		 * always invoke a SHA2Final() on it.
-		 */
-		bzero(&sha2_hmac_ctx.hc_ocontext, sizeof (SHA2_CTX));
-		mac->cd_length = 0;
+		return (CRYPTO_SUCCESS);
 	}
-
-	return (ret);
 bail:
 	bzero(&sha2_hmac_ctx, sizeof (sha2_hmac_ctx_t));
 	mac->cd_length = 0;

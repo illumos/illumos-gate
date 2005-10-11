@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <security/cryptoki.h>
 #include <arcfour.h>
 #include <aes_impl.h>
+#include <blowfish_impl.h>
 #include <bignum.h>
 #include <des_impl.h>
 #include <rsa_impl.h>
@@ -39,6 +40,7 @@
 #include "softSession.h"
 #include "softKeystore.h"
 #include "softKeystoreUtil.h"
+#include "softCrypt.h"
 
 
 /*
@@ -2653,6 +2655,19 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 #endif /* CRYPTO_UNLIMITED */
 			break;
 
+		case CKK_BLOWFISH:
+			if (!isValue) {
+				rv = CKR_TEMPLATE_INCOMPLETE;
+				goto fail_cleanup;
+			}
+			if ((sck->sk_value_len < BLOWFISH_MINBYTES) ||
+			    (sck->sk_value_len > BLOWFISH_MAXBYTES)) {
+				rv = CKR_ATTRIBUTE_VALUE_INVALID;
+				goto fail_cleanup;
+			}
+
+			break;
+
 		case CKK_DES:
 			if (!isValue) {
 				rv = CKR_TEMPLATE_INCOMPLETE;
@@ -2762,6 +2777,19 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 			break;
 
+		case CKK_BLOWFISH:
+			if (!isValueLen) {
+				rv = CKR_TEMPLATE_INCONSISTENT;
+				goto fail_cleanup;
+			}
+			if ((sck->sk_value_len < BLOWFISH_MINBYTES) ||
+			    (sck->sk_value_len > BLOWFISH_MAXBYTES)) {
+				rv = CKR_ATTRIBUTE_VALUE_INVALID;
+				goto fail_cleanup;
+			}
+
+			break;
+
 		case CKK_DES:
 		case CKK_DES2:
 		case CKK_DES3:
@@ -2838,6 +2866,17 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 			}
 			break;
 
+		case CKK_BLOWFISH:
+			if (isValueLen &&
+			    ((sck->sk_value_len < BLOWFISH_MINBYTES) ||
+				(sck->sk_value_len > BLOWFISH_MAXBYTES))) {
+					rv = CKR_ATTRIBUTE_VALUE_INVALID;
+					goto fail_cleanup;
+				}
+
+
+			break;
+
 		case CKK_DES:
 		case CKK_DES2:
 		case CKK_DES3:
@@ -2901,6 +2940,17 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 			break;
 
+		case CKK_BLOWFISH:
+			if (isValueLen &&
+			    ((sck->sk_value_len < BLOWFISH_MINBYTES) ||
+				(sck->sk_value_len > BLOWFISH_MAXBYTES))) {
+					rv = CKR_ATTRIBUTE_VALUE_INVALID;
+					goto fail_cleanup;
+				}
+
+
+			break;
+
 		case CKK_DES:
 		case CKK_DES2:
 		case CKK_DES3:
@@ -2933,6 +2983,7 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 		case CKK_RC4:
 		case CKK_GENERIC_SECRET:
 		case CKK_AES:
+		case CKK_BLOWFISH:
 			/*
 			 * No need to check key length value here, it will be
 			 * validated later in soft_key_derive_check_length().
@@ -4194,6 +4245,7 @@ soft_get_secret_key_attribute(soft_object_t *object_p,
 		case CKK_DES3:
 		case CKK_CDMF:
 		case CKK_AES:
+		case CKK_BLOWFISH:
 			if (template->type == CKA_VALUE_LEN) {
 				return (get_ulong_attr_from_object(
 				    OBJ_SEC_VALUE_LEN(object_p),
@@ -4397,7 +4449,7 @@ soft_get_certificate_attribute(soft_object_t *object_p,
 		case CKA_AC_ISSUER:
 		case CKA_ATTR_TYPES:
 			return (get_extra_attr_from_object(object_p,
-				template));
+			    template));
 			break;
 		default:
 			return (soft_get_common_attrs(object_p, template,
@@ -4886,7 +4938,8 @@ soft_set_secret_key_attribute(soft_object_t *object_p,
 	case CKA_VALUE_LEN:
 		if ((keytype == CKK_RC4) ||
 		    (keytype == CKK_GENERIC_SECRET) ||
-		    (keytype == CKK_AES))
+		    (keytype == CKK_AES) ||
+		    (keytype == CKK_BLOWFISH))
 			return (CKR_ATTRIBUTE_READ_ONLY);
 		break;
 

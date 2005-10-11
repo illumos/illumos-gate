@@ -959,7 +959,7 @@ AESPROV_OBJS +=	aes.o aes_cbc_crypt.o aes_impl.o
 
 ARCFOURPROV_OBJS += arcfour.o arcfour_crypt.o
 
-BLOWFISHPROV_OBJS += blowfish.o blowfish_impl.o 
+BLOWFISHPROV_OBJS += blowfish.o blowfish_impl.o blowfish_cbc_crypt.o
 
 COMMON_RSAPROV_OBJS += rsa.o bignumimpl.o rsa_impl.o
 

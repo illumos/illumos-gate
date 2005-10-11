@@ -41,6 +41,7 @@
 #include <sys/strsun.h>
 #include <sys/note.h>
 #include <blowfish_impl.h>
+#include <blowfish_cbc_crypt.h>
 
 extern struct mod_ops mod_cryptoops;
 
@@ -62,54 +63,10 @@ static struct modlinkage modlinkage = {
  * CSPI information (entry points, provider info, etc.)
  */
 typedef enum blowfish_mech_type {
-	BF_ECB_MECH_INFO_TYPE,		/* SUN_CKM_BF_ECB */
-	BF_CBC_MECH_INFO_TYPE		/* SUN_CKM_BF_CBC */
+	BLOWFISH_ECB_MECH_INFO_TYPE,		/* SUN_CKM_BLOWFISH_ECB */
+	BLOWFISH_CBC_MECH_INFO_TYPE		/* SUN_CKM_BLOWFISH_CBC */
 } blowfish_mech_type_t;
 
-/*
- * bc_keysched:		Pointer to key schedule.
- *
- * bc_keysched_len:	Length of the key schedule.
- *
- * bc_remainder:	This is for residual data, i.e. data that can't
- *			be processed because there are too few bytes.
- *			Must wait until more data arrives.
- *
- * bc_remainder_len:	Number of bytes in bc_remainder.
- *
- * bc_iv:		Scratch buffer that sometimes contains the IV.
- *
- * bc_lastblock:	Scratch buffer.
- *
- * bc_lastp:		Pointer to previous block of ciphertext.
- *
- * bc_copy_to:		Pointer to where encrypted residual data needs
- *			to be copied.
- *
- * bc_flags:		BLOWFISH_PROVIDER_OWNS_KEY_SCHEDULE
- *			When a context is freed, it is necessary
- *			to know whether the key schedule was allocated
- *			by the caller, or by blowfish_common_init().
- *			If allocated by the latter, then it needs to be freed.
- *
- *			BLOWFISH_CBC_MODE
- *			If flag is not set, the mode is BLOWFISH_ECB_MODE.
- *
- */
-typedef struct blowfish_ctx {
-	void *bc_keysched;
-	size_t bc_keysched_len;
-	uint64_t bc_iv;
-	uint64_t bc_lastblock;
-	uint64_t bc_remainder;
-	size_t bc_remainder_len;
-	uint8_t *bc_lastp;
-	uint8_t *bc_copy_to;
-	uint32_t bc_flags;
-} blowfish_ctx_t;
-
-#define	BLOWFISH_PROVIDER_OWNS_KEY_SCHEDULE	0x00000001
-#define	BLOWFISH_CBC_MODE			0x00000002
 
 #define	BLOWFISH_COPY_BLOCK(src, dst) \
 	(dst)[0] = (src)[0]; \
@@ -137,20 +94,20 @@ typedef struct blowfish_ctx {
 
 static crypto_mech_info_t blowfish_mech_info_tab[] = {
 	/* BLOWFISH_ECB */
-	{SUN_CKM_BF_ECB, BF_ECB_MECH_INFO_TYPE,
+	{SUN_CKM_BLOWFISH_ECB, BLOWFISH_ECB_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
 	    BLOWFISH_MINBITS, BLOWFISH_MAXBITS, CRYPTO_KEYSIZE_UNIT_IN_BITS},
 	/* BLOWFISH_CBC */
-	{SUN_CKM_BF_CBC, BF_CBC_MECH_INFO_TYPE,
+	{SUN_CKM_BLOWFISH_CBC, BLOWFISH_CBC_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
 	    BLOWFISH_MINBITS, BLOWFISH_MAXBITS, CRYPTO_KEYSIZE_UNIT_IN_BITS}
 };
 
 #define	BLOWFISH_VALID_MECH(mech)				\
-	(((mech)->cm_type == BF_ECB_MECH_INFO_TYPE ||		\
-	(mech)->cm_type == BF_CBC_MECH_INFO_TYPE) ? 1 : 0)
+	(((mech)->cm_type == BLOWFISH_ECB_MECH_INFO_TYPE ||		\
+	(mech)->cm_type == BLOWFISH_CBC_MECH_INFO_TYPE) ? 1 : 0)
 
 /* operations are in-place if the output buffer is NULL */
 #define	BLOWFISH_ARG_INPLACE(input, output)			\
@@ -239,10 +196,6 @@ static crypto_provider_info_t blowfish_prov_info = {
 	blowfish_mech_info_tab
 };
 
-static int blowfish_encrypt_contiguous_blocks(blowfish_ctx_t *, char *, size_t,
-    crypto_data_t *);
-static int blowfish_decrypt_contiguous_blocks(blowfish_ctx_t *, char *, size_t,
-    crypto_data_t *);
 
 static crypto_kcf_provider_handle_t blowfish_prov_handle = NULL;
 
@@ -1060,461 +1013,6 @@ blowfish_free_context(crypto_ctx_t *ctx)
 	return (CRYPTO_SUCCESS);
 }
 
-/*
- * Initialize by setting iov_or_mp to point to the current iovec or mp,
- * and by setting current_offset to an offset within the current iovec or mp .
- */
-static void
-blowfish_init_ptrs(crypto_data_t *out, void **iov_or_mp,
-    offset_t *current_offset)
-{
-	offset_t offset;
-
-	switch (out->cd_format) {
-	case CRYPTO_DATA_RAW:
-		*current_offset = out->cd_offset;
-		break;
-
-	case CRYPTO_DATA_UIO: {
-		uio_t *uiop = out->cd_uio;
-		uint_t vec_idx;
-
-		offset = out->cd_offset;
-		for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
-		    offset >= uiop->uio_iov[vec_idx].iov_len;
-		    offset -= uiop->uio_iov[vec_idx++].iov_len);
-
-		*current_offset = offset;
-		*iov_or_mp = (void *)(uintptr_t)vec_idx;
-		break;
-	}
-
-	case CRYPTO_DATA_MBLK: {
-		mblk_t *mp;
-
-		offset = out->cd_offset;
-		for (mp = out->cd_mp; mp != NULL && offset >= MBLKL(mp);
-			offset -= MBLKL(mp), mp = mp->b_cont);
-
-		*current_offset = offset;
-		*iov_or_mp = mp;
-		break;
-
-	}
-	} /* end switch */
-}
-
-/*
- * Get pointers for where in the output to copy a block of encrypted or
- * decrypted data.  The iov_or_mp argument stores a pointer to the current
- * iovec or mp, and offset stores an offset into the current iovec or mp.
- */
-static void
-blowfish_get_ptrs(crypto_data_t *out, void **iov_or_mp,
-    offset_t *current_offset, uint8_t **out_data_1, size_t *out_data_1_len,
-    uint8_t **out_data_2)
-{
-	offset_t offset;
-
-	switch (out->cd_format) {
-	case CRYPTO_DATA_RAW: {
-		iovec_t *iov;
-
-		offset = *current_offset;
-		iov = &out->cd_raw;
-		if ((offset + BLOWFISH_BLOCK_LEN) <= iov->iov_len) {
-			/* one BLOWFISH block fits */
-			*out_data_1 = (uint8_t *)iov->iov_base + offset;
-			*out_data_1_len = BLOWFISH_BLOCK_LEN;
-			*out_data_2 = NULL;
-			*current_offset = offset + BLOWFISH_BLOCK_LEN;
-		}
-		break;
-	}
-
-	case CRYPTO_DATA_UIO: {
-		uio_t *uio = out->cd_uio;
-		iovec_t *iov;
-		offset_t offset;
-		uint_t vec_idx;
-		uint8_t *p;
-
-		offset = *current_offset;
-		vec_idx = (uint_t)(uintptr_t)(*iov_or_mp);
-		iov = &uio->uio_iov[vec_idx];
-		p = (uint8_t *)iov->iov_base + offset;
-		*out_data_1 = p;
-
-		if (offset + BLOWFISH_BLOCK_LEN <= iov->iov_len) {
-			/* can fit one BLOWFISH block into this iov */
-			*out_data_1_len = BLOWFISH_BLOCK_LEN;
-			*out_data_2 = NULL;
-			*current_offset = offset + BLOWFISH_BLOCK_LEN;
-		} else {
-			/* one BLOWFISH block spans two iovecs */
-			*out_data_1_len = iov->iov_len - offset;
-			if (vec_idx == uio->uio_iovcnt)
-				return;
-			vec_idx++;
-			iov = &uio->uio_iov[vec_idx];
-			*out_data_2 = (uint8_t *)iov->iov_base;
-			*current_offset = BLOWFISH_BLOCK_LEN - *out_data_1_len;
-		}
-		*iov_or_mp = (void *)(uintptr_t)vec_idx;
-		break;
-	}
-
-	case CRYPTO_DATA_MBLK: {
-		mblk_t *mp;
-		uint8_t *p;
-
-		offset = *current_offset;
-		mp = (mblk_t *)*iov_or_mp;
-		p = mp->b_rptr + offset;
-		*out_data_1 = p;
-		if ((p + BLOWFISH_BLOCK_LEN) <= mp->b_wptr) {
-			/* can fit one BLOWFISH block into this mblk */
-			*out_data_1_len = BLOWFISH_BLOCK_LEN;
-			*out_data_2 = NULL;
-			*current_offset = offset + BLOWFISH_BLOCK_LEN;
-		} else {
-			/* one BLOWFISH block spans two mblks */
-			*out_data_1_len = mp->b_wptr - p;
-			if ((mp = mp->b_cont) == NULL)
-				return;
-			*out_data_2 = mp->b_rptr;
-			*current_offset = BLOWFISH_BLOCK_LEN - *out_data_1_len;
-		}
-		*iov_or_mp = mp;
-		break;
-	}
-	} /* end switch */
-}
-
-/*
- * Encrypt multiple blocks of data.
- */
-static int
-blowfish_encrypt_contiguous_blocks(blowfish_ctx_t *ctx, char *data,
-    size_t length, crypto_data_t *out)
-{
-/* EXPORT DELETE START */
-	size_t remainder = length;
-	size_t need;
-	uint8_t *datap = (uint8_t *)data;
-	uint8_t *blockp;
-	uint8_t *lastp;
-	uint32_t tmp[2];
-	void *iov_or_mp;
-	offset_t offset;
-	uint8_t *out_data_1;
-	uint8_t *out_data_2;
-	size_t out_data_1_len;
-
-	if (length + ctx->bc_remainder_len < BLOWFISH_BLOCK_LEN) {
-		/* accumulate bytes here and return */
-		bcopy(datap,
-		    (uint8_t *)&ctx->bc_remainder + ctx->bc_remainder_len,
-		    length);
-		ctx->bc_remainder_len += length;
-		ctx->bc_copy_to = datap;
-		return (0);
-	}
-
-	lastp = (uint8_t *)&ctx->bc_iv;
-	if (out != NULL)
-		blowfish_init_ptrs(out, &iov_or_mp, &offset);
-
-	do {
-		/* Unprocessed data from last call. */
-		if (ctx->bc_remainder_len > 0) {
-			need = BLOWFISH_BLOCK_LEN - ctx->bc_remainder_len;
-
-			if (need > remainder)
-				return (1);
-
-			bcopy(datap, &((uint8_t *)&ctx->bc_remainder)
-			    [ctx->bc_remainder_len], need);
-
-			blockp = (uint8_t *)&ctx->bc_remainder;
-		} else {
-			blockp = datap;
-		}
-
-		/* don't write on the plaintext */
-		if (out != NULL) {
-			if (IS_P2ALIGNED(blockp, sizeof (uint32_t))) {
-				/* LINTED: pointer alignment */
-				tmp[0] = *(uint32_t *)blockp;
-				/* LINTED: pointer alignment */
-				tmp[1] = *(uint32_t *)&blockp[4];
-			} else {
-#ifdef _BIG_ENDIAN
-				tmp[0] = (((uint32_t)blockp[0] << 24) |
-				    ((uint32_t)blockp[1] << 16) |
-				    ((uint32_t)blockp[2] << 8) |
-				    (uint32_t)blockp[3]);
-
-				tmp[1] = (((uint32_t)blockp[4] << 24) |
-				    ((uint32_t)blockp[5] << 16) |
-				    ((uint32_t)blockp[6] << 8) |
-				    (uint32_t)blockp[7]);
-#else
-				tmp[0] = (((uint32_t)blockp[7] << 24) |
-				    ((uint32_t)blockp[6] << 16) |
-				    ((uint32_t)blockp[5] << 8) |
-				    (uint32_t)blockp[4]);
-
-				tmp[1] = (((uint32_t)blockp[3] << 24) |
-				    ((uint32_t)blockp[2] << 16) |
-				    ((uint32_t)blockp[1] << 8) |
-				    (uint32_t)blockp[0]);
-#endif /* _BIG_ENDIAN */
-			}
-			blockp = (uint8_t *)tmp;
-		}
-
-		if (ctx->bc_flags & BLOWFISH_CBC_MODE) {
-			/*
-			 * XOR the previous cipher block or IV with the
-			 * current clear block. Check for alignment.
-			 */
-			if (IS_P2ALIGNED(blockp, sizeof (uint32_t)) &&
-			    IS_P2ALIGNED(lastp, sizeof (uint32_t))) {
-				/* LINTED: pointer alignment */
-				*(uint32_t *)&blockp[0] ^=
-				/* LINTED: pointer alignment */
-				    *(uint32_t *)&lastp[0];
-				/* LINTED: pointer alignment */
-				*(uint32_t *)&blockp[4] ^=
-				/* LINTED: pointer alignment */
-				    *(uint32_t *)&lastp[4];
-			} else {
-				BLOWFISH_XOR_BLOCK(lastp, blockp);
-			}
-		}
-
-		if (out == NULL) {
-			blowfish_encrypt_block(ctx->bc_keysched, blockp,
-			    blockp);
-
-			ctx->bc_lastp = blockp;
-			lastp = blockp;
-
-			if (ctx->bc_remainder_len > 0) {
-				bcopy(blockp, ctx->bc_copy_to,
-				    ctx->bc_remainder_len);
-				bcopy(blockp + ctx->bc_remainder_len, datap,
-				    need);
-			}
-		} else {
-			blowfish_encrypt_block(ctx->bc_keysched, blockp, lastp);
-			blowfish_get_ptrs(out, &iov_or_mp, &offset, &out_data_1,
-			    &out_data_1_len, &out_data_2);
-
-			/* copy block to where it belongs */
-			bcopy(lastp, out_data_1, out_data_1_len);
-			if (out_data_2 != NULL) {
-				bcopy(lastp + out_data_1_len, out_data_2,
-				    BLOWFISH_BLOCK_LEN - out_data_1_len);
-			}
-
-			/* update offset */
-			out->cd_offset += BLOWFISH_BLOCK_LEN;
-		}
-
-		/* Update pointer to next block of data to be processed. */
-		if (ctx->bc_remainder_len != 0) {
-			datap += need;
-			ctx->bc_remainder_len = 0;
-		} else {
-			datap += BLOWFISH_BLOCK_LEN;
-		}
-
-		remainder = (size_t)&data[length] - (size_t)datap;
-
-		/* Incomplete last block. */
-		if (remainder > 0 && remainder < BLOWFISH_BLOCK_LEN) {
-			bcopy(datap, &ctx->bc_remainder, remainder);
-			ctx->bc_remainder_len = remainder;
-			ctx->bc_copy_to = datap;
-			goto out;
-		}
-		ctx->bc_copy_to = NULL;
-
-	} while (remainder > 0);
-
-out:
-	if (ctx->bc_lastp != NULL) {
-		if (IS_P2ALIGNED(ctx->bc_lastp, sizeof (uint32_t))) {
-			uint8_t *iv8 = (uint8_t *)&ctx->bc_iv;
-			uint8_t *last8 = (uint8_t *)ctx->bc_lastp;
-
-			/* LINTED: pointer alignment */
-			*(uint32_t *)iv8 = *(uint32_t *)last8;
-			/* LINTED: pointer alignment */
-			*(uint32_t *)&iv8[4] = *(uint32_t *)&last8[4];
-		} else {
-			uint8_t *iv8 = (uint8_t *)&ctx->bc_iv;
-			uint8_t *last8 = ctx->bc_lastp;
-
-			BLOWFISH_COPY_BLOCK(last8, iv8);
-		}
-		ctx->bc_lastp = (uint8_t *)&ctx->bc_iv;
-	}
-/* EXPORT DELETE END */
-
-	return (0);
-}
-
-#define	OTHER(a, ctx) \
-	(((a) == &(ctx)->bc_lastblock) ? &(ctx)->bc_iv : &(ctx)->bc_lastblock)
-
-static int
-blowfish_decrypt_contiguous_blocks(blowfish_ctx_t *ctx, char *data,
-    size_t length, crypto_data_t *out)
-{
-/* EXPORT DELETE START */
-	size_t remainder = length;
-	size_t need;
-	uint8_t *datap = (uint8_t *)data;
-	uint8_t *blockp;
-	uint8_t *lastp;
-	uint32_t tmp[2];
-	void *iov_or_mp;
-	offset_t offset;
-	uint8_t *out_data_1;
-	uint8_t *out_data_2;
-	size_t out_data_1_len;
-
-	if (length + ctx->bc_remainder_len < BLOWFISH_BLOCK_LEN) {
-		/* accumulate bytes here and return */
-		bcopy(datap,
-		    (uint8_t *)&ctx->bc_remainder + ctx->bc_remainder_len,
-		    length);
-		ctx->bc_remainder_len += length;
-		ctx->bc_copy_to = datap;
-		return (0);
-	}
-
-	lastp = ctx->bc_lastp;
-	if (out != NULL)
-		blowfish_init_ptrs(out, &iov_or_mp, &offset);
-
-	do {
-		/* Unprocessed data from last call. */
-		if (ctx->bc_remainder_len > 0) {
-			need = BLOWFISH_BLOCK_LEN - ctx->bc_remainder_len;
-
-			if (need > remainder)
-				return (1);
-
-			bcopy(datap, &((uint8_t *)&ctx->bc_remainder)
-			    [ctx->bc_remainder_len], need);
-
-			blockp = (uint8_t *)&ctx->bc_remainder;
-		} else {
-			blockp = datap;
-		}
-
-		if (ctx->bc_flags & BLOWFISH_CBC_MODE) {
-
-			/* Save current ciphertext block */
-			if (IS_P2ALIGNED(blockp, sizeof (uint32_t))) {
-				uint32_t *tmp32;
-
-				/* LINTED: pointer alignment */
-				tmp32 = (uint32_t *)OTHER((uint64_t *)lastp,
-				    ctx);
-
-				/* LINTED: pointer alignment */
-				*tmp32++ = *(uint32_t *)blockp;
-				/* LINTED: pointer alignment */
-				*tmp32++ = *(uint32_t *)&blockp[4];
-			} else {
-				uint8_t *tmp8;
-				tmp8 = (uint8_t *)OTHER((uint64_t *)lastp, ctx);
-
-				BLOWFISH_COPY_BLOCK(blockp, tmp8);
-			}
-		}
-
-		if (out != NULL) {
-			blowfish_decrypt_block(ctx->bc_keysched, blockp,
-			    (uint8_t *)tmp);
-			blockp = (uint8_t *)tmp;
-		} else {
-			blowfish_decrypt_block(ctx->bc_keysched, blockp,
-			    blockp);
-		}
-
-		if (ctx->bc_flags & BLOWFISH_CBC_MODE) {
-			/*
-			 * XOR the previous cipher block or IV with the
-			 * currently decrypted block.  Check for alignment.
-			 */
-			if (IS_P2ALIGNED(blockp, sizeof (uint32_t)) &&
-			    IS_P2ALIGNED(lastp, sizeof (uint32_t))) {
-				/* LINTED: pointer alignment */
-				*(uint32_t *)blockp ^= *(uint32_t *)lastp;
-				/* LINTED: pointer alignment */
-				*(uint32_t *)&blockp[4] ^=
-				/* LINTED: pointer alignment */
-				    *(uint32_t *)&lastp[4];
-			} else {
-				BLOWFISH_XOR_BLOCK(lastp, blockp);
-			}
-
-			/* LINTED: pointer alignment */
-			lastp = (uint8_t *)OTHER((uint64_t *)lastp, ctx);
-		}
-
-		if (out != NULL) {
-			blowfish_get_ptrs(out, &iov_or_mp, &offset, &out_data_1,
-			    &out_data_1_len, &out_data_2);
-			/* copy temporary block to where it belongs */
-			bcopy(&tmp, out_data_1, out_data_1_len);
-			if (out_data_2 != NULL) {
-				bcopy((uint8_t *)&tmp + out_data_1_len,
-				    out_data_2,
-				    BLOWFISH_BLOCK_LEN - out_data_1_len);
-			}
-
-			/* update offset */
-			out->cd_offset += BLOWFISH_BLOCK_LEN;
-		} else if (ctx->bc_remainder_len > 0) {
-			/* copy temporary block to where it belongs */
-			bcopy(blockp, ctx->bc_copy_to, ctx->bc_remainder_len);
-			bcopy(blockp + ctx->bc_remainder_len, datap, need);
-		}
-
-		/* Update pointer to next block of data to be processed. */
-		if (ctx->bc_remainder_len != 0) {
-			datap += need;
-			ctx->bc_remainder_len = 0;
-		} else {
-			datap += BLOWFISH_BLOCK_LEN;
-		}
-
-		remainder = (size_t)&data[length] - (size_t)datap;
-
-		/* Incomplete last block. */
-		if (remainder > 0 && remainder < BLOWFISH_BLOCK_LEN) {
-			bcopy(datap, (uchar_t *)&ctx->bc_remainder, remainder);
-			ctx->bc_remainder_len = remainder;
-			ctx->bc_lastp = lastp;
-			ctx->bc_copy_to = datap;
-			return (0);
-		}
-		ctx->bc_copy_to = NULL;
-
-	} while (remainder > 0);
-
-	ctx->bc_lastp = lastp;
-/* EXPORT DELETE END */
-	return (0);
-}
-
 /* ARGSUSED */
 static int
 blowfish_common_init_ctx(blowfish_ctx_t *blowfish_ctx,
@@ -1544,7 +1042,7 @@ blowfish_common_init_ctx(blowfish_ctx_t *blowfish_ctx,
 		keysched = template;
 	}
 
-	if (mechanism->cm_type == BF_CBC_MECH_INFO_TYPE) {
+	if (mechanism->cm_type == BLOWFISH_CBC_MECH_INFO_TYPE) {
 		/*
 		 * Copy IV into BLOWFISH context.
 		 *

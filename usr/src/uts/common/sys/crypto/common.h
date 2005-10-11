@@ -87,8 +87,8 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_DES3_CBC		"CKM_DES3_CBC"
 #define	SUN_CKM_DES_ECB			"CKM_DES_ECB"
 #define	SUN_CKM_DES3_ECB		"CKM_DES3_ECB"
-#define	SUN_CKM_BF_CBC			"CKM_BF_CBC"
-#define	SUN_CKM_BF_ECB			"CKM_BF_ECB"
+#define	SUN_CKM_BLOWFISH_CBC		"CKM_BLOWFISH_CBC"
+#define	SUN_CKM_BLOWFISH_ECB		"CKM_BLOWFISH_ECB"
 #define	SUN_CKM_AES_CBC			"CKM_AES_CBC"
 #define	SUN_CKM_AES_ECB			"CKM_AES_ECB"
 #define	SUN_CKM_RC4			"CKM_RC4"
@@ -96,6 +96,9 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_RSA_X_509		"CKM_RSA_X_509"
 #define	SUN_CKM_MD5_RSA_PKCS		"CKM_MD5_RSA_PKCS"
 #define	SUN_CKM_SHA1_RSA_PKCS		"CKM_SHA1_RSA_PKCS"
+#define	SUN_CKM_SHA256_RSA_PKCS		"CKM_SHA256_RSA_PKCS"
+#define	SUN_CKM_SHA384_RSA_PKCS		"CKM_SHA384_RSA_PKCS"
+#define	SUN_CKM_SHA512_RSA_PKCS		"CKM_SHA512_RSA_PKCS"
 
 
 /* Data arguments of cryptographic operations */

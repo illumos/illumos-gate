@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <security/cryptoki.h>
 #include <aes_impl.h>
+#include <blowfish_impl.h>
 #include <des_impl.h>
 #include <arcfour.h>
 #include "softGlobal.h"
@@ -177,6 +178,10 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		key_type = CKK_AES;
 		break;
 
+	case CKM_BLOWFISH_KEY_GEN:
+		key_type = CKK_BLOWFISH;
+		break;
+
 	case CKM_RC4_KEY_GEN:
 		key_type = CKK_RC4;
 		break;
@@ -284,6 +289,7 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	/* FALLTHRU */
 
 	case CKM_AES_KEY_GEN:
+	case CKM_BLOWFISH_KEY_GEN:
 	case CKM_PBE_SHA1_RC4_128:
 	case CKM_RC4_KEY_GEN:
 		keylen = OBJ_SEC_VALUE_LEN(secret_key);
@@ -526,6 +532,7 @@ soft_key_derive_check_length(soft_object_t *secret_key, CK_ULONG max_keylen)
 		break;
 	case CKK_RC4:
 	case CKK_AES:
+	case CKK_BLOWFISH:
 		if ((OBJ_SEC_VALUE_LEN(secret_key) == 0) ||
 			(OBJ_SEC_VALUE_LEN(secret_key) > max_keylen)) {
 			/* RC4 and AES has variable key length */
@@ -824,8 +831,8 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	CK_BYTE *public_value;
 	CK_ULONG public_value_len;
 	CK_MECHANISM digest_mech;
-	CK_BYTE hash[SHA1_HASH_SIZE];  /* space enough for SHA1 and MD5 */
-	CK_ULONG hash_len = SHA1_HASH_SIZE;
+	CK_BYTE hash[SHA512_DIGEST_LENGTH]; /* space enough for all mechs */
+	CK_ULONG hash_len = SHA512_DIGEST_LENGTH;
 	CK_ULONG secret_key_len;
 	CK_ULONG hash_size;
 
@@ -876,6 +883,23 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_MD5_KEY_DERIVATION:
 		hash_size = MD5_HASH_SIZE;
 		digest_mech.mechanism = CKM_MD5;
+		goto common;
+
+	case CKM_SHA256_KEY_DERIVATION:
+		hash_size = SHA256_DIGEST_LENGTH;
+		digest_mech.mechanism = CKM_SHA256;
+		goto common;
+
+	case CKM_SHA384_KEY_DERIVATION:
+		hash_size = SHA384_DIGEST_LENGTH;
+		digest_mech.mechanism = CKM_SHA384;
+		goto common;
+
+	case CKM_SHA512_KEY_DERIVATION:
+		hash_size = SHA512_DIGEST_LENGTH;
+		digest_mech.mechanism = CKM_SHA512;
+		goto common;
+
 common:
 		/*
 		 * Create a new object for secret key. The key type is optional
@@ -1360,6 +1384,7 @@ soft_wrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_DES_CBC:
 	case CKM_DES3_CBC:
 	case CKM_AES_CBC:
+	case CKM_BLOWFISH_CBC:
 		/*
 		 * Unpadded secret key mechs and private key mechs are only
 		 * defined for wrapping secret keys.  See PKCS#11 refs above.
@@ -1405,6 +1430,7 @@ soft_wrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_DES_CBC:
 	case CKM_DES3_CBC:
 	case CKM_AES_CBC:
+	case CKM_BLOWFISH_CBC:
 		/* Find the block size of the wrapping key. */
 		if (wrappingKey_p->class == CKO_SECRET_KEY) {
 			switch (wrappingKey_p->key_type) {
@@ -1415,6 +1441,9 @@ soft_wrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 				break;
 			case CKK_AES:
 				wkey_blksz = AES_BLOCK_LEN;
+				break;
+			case CKK_BLOWFISH:
+				wkey_blksz = BLOWFISH_BLOCK_LEN;
 				break;
 			default:
 				break;
@@ -1506,6 +1535,7 @@ soft_unwrap_secret_len_check(CK_KEY_TYPE keytype, CK_MECHANISM_TYPE mechtype,
 	case CKM_DES_CBC:
 	case CKM_DES3_CBC:
 	case CKM_AES_CBC:
+	case CKM_BLOWFISH_CBC:
 		/*
 		 * CKA_VALUE_LEN must be specified
 		 * if keytype is CKK_RC4, CKK_AES and CKK_GENERIC_SECRET
@@ -1521,6 +1551,7 @@ soft_unwrap_secret_len_check(CK_KEY_TYPE keytype, CK_MECHANISM_TYPE mechtype,
 		case CKK_GENERIC_SECRET:
 		case CKK_RC4:
 		case CKK_AES:
+		case CKK_BLOWFISH:
 			if (!isValueLen)
 				return (CKR_TEMPLATE_INCOMPLETE);
 			break;
@@ -1581,6 +1612,7 @@ soft_unwrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_DES_CBC:
 	case CKM_DES3_CBC:
 	case CKM_AES_CBC:
+	case CKM_BLOWFISH_CBC:
 		if (new_obj_class != CKO_SECRET_KEY)
 			return (CKR_MECHANISM_INVALID);
 		break;
@@ -1689,6 +1721,7 @@ soft_unwrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		case CKK_GENERIC_SECRET:
 		case CKK_RC4:
 		case CKK_AES:
+		case CKK_BLOWFISH:
 			break;
 		default:
 			rv = CKR_WRAPPED_KEY_INVALID;

@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,16 +39,22 @@ do
 		if [ $? != 0 ]; then
 			rsa=`egrep '^rsa' $src`
 		fi
+		egrep '^sha2' $dest > /dev/null 2>&1
+		if [ $? != 0 ]; then
+			sha2=`egrep '^sha2' $src`
+		fi
 		egrep '^swrand' $dest > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			swrand=`egrep '^swrand' $src`
 		fi
 		export rsa
 		export rc4
+		export sha2
 		export swrand
 		nawk '/^# End SUNWcsr/ { \
 			if (ENVIRON["rc4"] != "") {print ENVIRON["rc4"]} \
 			if (ENVIRON["rsa"] != "") {print ENVIRON["rsa"]} \
+			if (ENVIRON["sha2"] != "") {print ENVIRON["sha2"]} \
 			if (ENVIRON["swrand"] != "") {print ENVIRON["swrand"]} \
 		     } \
 		     { print } \

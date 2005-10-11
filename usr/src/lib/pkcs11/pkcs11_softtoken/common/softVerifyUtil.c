@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,12 @@ soft_verify_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_MD5_HMAC:
 	case CKM_SHA_1_HMAC_GENERAL:
 	case CKM_SHA_1_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
 
 		return (soft_hmac_sign_verify_init_common(session_p,
 		    pMechanism, key_p, B_FALSE));
@@ -73,6 +79,9 @@ soft_verify_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_RSA_PKCS:
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS:
+	case CKM_SHA384_RSA_PKCS:
+	case CKM_SHA512_RSA_PKCS:
 
 		return (soft_rsa_sign_verify_init_common(session_p, pMechanism,
 		    key_p, B_FALSE));
@@ -128,9 +137,15 @@ soft_verify(soft_session_t *session_p, CK_BYTE_PTR pData,
 	case CKM_MD5_HMAC:
 	case CKM_SHA_1_HMAC_GENERAL:
 	case CKM_SHA_1_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
 	{
 		CK_ULONG len;
-		CK_BYTE hmac[SHA1_HASH_SIZE]; /* use the maximum size */
+		CK_BYTE hmac[SHA512_DIGEST_LENGTH]; /* use the maximum size */
 		soft_hmac_ctx_t *hmac_ctx;
 
 		hmac_ctx = (soft_hmac_ctx_t *)session_p->verify.context;
@@ -185,6 +200,9 @@ soft_verify(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS:
+	case CKM_SHA384_RSA_PKCS:
+	case CKM_SHA512_RSA_PKCS:
 
 		return (soft_rsa_digest_verify_common(session_p, pData,
 		    ulDataLen, pSignature, ulSignatureLen, mechanism, B_FALSE));
@@ -232,6 +250,12 @@ soft_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 	case CKM_MD5_HMAC:
 	case CKM_SHA_1_HMAC_GENERAL:
 	case CKM_SHA_1_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
 
 		return (soft_hmac_sign_verify_update(session_p, pPart,
 		    ulPartLen, B_FALSE));
@@ -244,6 +268,9 @@ soft_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS:
+	case CKM_SHA384_RSA_PKCS:
+	case CKM_SHA512_RSA_PKCS:
 		/*
 		 * The MD5/SHA1 digest value is accumulated in the context
 		 * of the multiple-part digesting operation. In the final
@@ -290,9 +317,15 @@ soft_verify_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 	case CKM_MD5_HMAC:
 	case CKM_SHA_1_HMAC_GENERAL:
 	case CKM_SHA_1_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
 	{
 		CK_ULONG len;
-		CK_BYTE hmac[SHA1_HASH_SIZE];
+		CK_BYTE hmac[SHA512_DIGEST_LENGTH];
 		soft_hmac_ctx_t *hmac_ctx;
 
 		hmac_ctx = (soft_hmac_ctx_t *)session_p->verify.context;
@@ -341,6 +374,9 @@ soft_verify_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 	}
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS:
+	case CKM_SHA384_RSA_PKCS:
+	case CKM_SHA512_RSA_PKCS:
 
 		return (soft_rsa_digest_verify_common(session_p, NULL, 0,
 		    pSignature, ulSignatureLen, mechanism, B_TRUE));

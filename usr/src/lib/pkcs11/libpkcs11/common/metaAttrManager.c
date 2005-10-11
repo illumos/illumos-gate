@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -320,6 +320,7 @@ get_master_template_by_type(CK_OBJECT_CLASS class, CK_ULONG subtype,
 		    case CKK_RC4:
 		    case CKK_RC5:
 		    case CKK_AES:
+		    case CKK_BLOWFISH:
 		    case CKK_CAST:
 		    case CKK_CAST3:
 		    case CKK_CAST128:

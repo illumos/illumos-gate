@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,11 +42,14 @@
 #endif
 
 /*
- * DER encoding T of the DigestInfo values for MD5 and SHA1
+ * DER encoding T of the DigestInfo values for MD5, SHA1, and SHA2
  * from PKCS#1 v2.1: RSA Cryptography Standard Section 9.2 Note 1
  *
  * MD5:     (0x)30 20 30 0c 06 08 2a 86 48 86 f7 0d 02 05 05 00 04 10 || H
  * SHA-1:   (0x)30 21 30 09 06 05 2b 0e 03 02 1a 05 00 04 14 || H
+ * SHA-256: (0x)30 31 30 0d 06 09 60 86 48 01 65 03 04 02 01 05 00 04 20 || H.
+ * SHA-384: (0x)30 41 30 0d 06 09 60 86 48 01 65 03 04 02 02 05 00 04 30 || H.
+ * SHA-512: (0x)30 51 30 0d 06 09 60 86 48 01 65 03 04 02 03 05 00 04 40 || H.
  *
  * Where H is the digested output from MD5 or SHA1. We define the constant
  * byte array (the prefix) here and use it rather than doing the DER
@@ -58,6 +61,18 @@ const CK_BYTE MD5_DER_PREFIX[MD5_DER_PREFIX_Len] = {0x30, 0x20, 0x30, 0x0c,
 
 const CK_BYTE SHA1_DER_PREFIX[SHA1_DER_PREFIX_Len] = {0x30, 0x21, 0x30,
     0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03, 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14};
+
+const CK_BYTE SHA256_DER_PREFIX[SHA2_DER_PREFIX_Len] = {0x30, 0x31, 0x30, 0x0d,
+    0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05,
+    0x00, 0x04, 0x20};
+
+const CK_BYTE SHA384_DER_PREFIX[SHA2_DER_PREFIX_Len] = {0x30, 0x41, 0x30, 0x0d,
+    0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05,
+    0x00, 0x04, 0x30};
+
+const CK_BYTE SHA512_DER_PREFIX[SHA2_DER_PREFIX_Len] = {0x30, 0x51, 0x30, 0x0d,
+    0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05,
+    0x00, 0x04, 0x40};
 
 BIG_ERR_CODE
 RSA_key_init(RSAkey *key, int psize, int qsize)

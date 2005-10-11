@@ -62,22 +62,27 @@ LCL_OBJECTS = \
 	softKeystore.o		\
 	softKeystoreUtil.o	\
 	softSSL.o		\
-	softASN1.o
+	softASN1.o		\
+	softBlowfishCrypt.o
 
 ASFLAGS = $(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS)
 
 AES_COBJECTS = aes_cbc_crypt.o  aes_impl.o
+BLOWFISH_COBJECTS = blowfish_cbc_crypt.o blowfish_impl.o
 ARCFOUR_COBJECTS = arcfour_crypt.o
 DES_COBJECTS = des_cbc_crypt.o des_impl.o des_ks.o
 RSA_COBJECTS = rsa_impl.o
 SHA1_COBJECTS = sha1.o
+SHA2_COBJECTS = sha2.o
 BIGNUM_COBJECTS = bignumimpl.o
 
 AES_OBJECTS = $(AES_COBJECTS) $(AES_PSR_OBJECTS)
+BLOWFISH_OBJECTS = $(BLOWFISH_COBJECTS) $(BLOWFISH_PSR_OBJECTS)
 ARCFOUR_OBJECTS = $(ARCFOUR_COBJECTS) $(ARCFOUR_PSR_OBJECTS)
 DES_OBJECTS = $(DES_COBJECTS) $(DES_PSR_OBJECTS)
 RSA_OBJECTS = $(RSA_COBJECTS) $(RSA_PSR_OBJECTS)
 SHA1_OBJECTS = $(SHA1_COBJECTS) $(SHA1_PSR_OBJECTS)
+SHA2_OBJECTS = $(SHA2_COBJECTS) $(SHA2_PSR_OBJECTS)
 BIGNUM_OBJECTS = $(BIGNUM_COBJECTS) $(BIGNUM_PSR_OBJECTS)
 
 BER_OBJECTS = bprint.o decode.o encode.o io.o
@@ -108,18 +113,22 @@ BER_OBJECTS = bprint.o decode.o encode.o io.o
 OBJECTS = \
 	$(LCL_OBJECTS)		\
 	$(AES_OBJECTS)		\
+	$(BLOWFISH_OBJECTS)	\
 	$(ARCFOUR_OBJECTS)	\
 	$(DES_OBJECTS)		\
 	$(RSA_OBJECTS)		\
 	$(SHA1_OBJECTS)		\
+	$(SHA2_OBJECTS)		\
 	$(BIGNUM_OBJECTS)	\
 	$(BER_OBJECTS)
 
 AESDIR=		$(SRC)/common/crypto/aes
+BLOWFISHDIR=	$(SRC)/common/crypto/blowfish
 ARCFOURDIR=	$(SRC)/common/crypto/arcfour
 DESDIR=		$(SRC)/common/crypto/des
 RSADIR=		$(SRC)/common/crypto/rsa
 SHA1DIR=	$(SRC)/common/crypto/sha1
+SHA2DIR=	$(SRC)/common/crypto/sha2
 BIGNUMDIR=	$(SRC)/common/bignum
 BERDIR=		../../../libldap5/sources/ldap/ber
 
@@ -133,10 +142,12 @@ SRCDIR= $(SRC)/lib/pkcs11/pkcs11_softtoken/common
 SRCS =	\
 	$(LCL_OBJECTS:%.o=$(SRCDIR)/%.c) \
 	$(AES_COBJECTS:%.o=$(AESDIR)/%.c) \
+	$(BLOWFISH_COBJECTS:%.o=$(BLOWFISHDIR)/%.c) \
 	$(ARCFOUR_COBJECTS:%.o=$(ARCFOURDIR)/%.c) \
 	$(DES_COBJECTS:%.o=$(DESDIR)/%.c) \
 	$(RSA_COBJECTS:%.o=$(RSADIR)/%.c) \
 	$(SHA1_COBJECTS:%.o=$(SHA1DIR)/%.c) \
+	$(SHA2_COBJECTS:%.o=$(SHA2DIR)/%.c) \
 	$(BIGNUM_COBJECTS:%.o=$(BIGNUMDIR)/%.c) \
 	$(BIGNUM_PSR_SRCS)
 
@@ -147,8 +158,8 @@ MAPDIR  = ../spec/$(TRANSMACH)
 SPECMAPFILE = $(MAPDIR)/mapfile
 
 CFLAGS 	+=      $(CCVERBOSE)
-CPPFLAGS += -I$(AESDIR) -I$(ARCFOURDIR) -I$(DESDIR) -I$(RSADIR) \
-	    -I$(SRCDIR) -I$(BIGNUMDIR) -D_POSIX_PTHREAD_SEMANTICS
+CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR) \
+	    -I$(RSADIR) -I$(SRCDIR) -I$(BIGNUMDIR) -D_POSIX_PTHREAD_SEMANTICS
 
 LINTFLAGS64 += -errchk=longptr64
 
@@ -165,6 +176,10 @@ pics/%.o:	$(AESDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
+pics/%.o:	$(BLOWFISHDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
 pics/%.o:	$(ARCFOURDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
@@ -178,6 +193,10 @@ pics/%.o:	$(RSADIR)/%.c
 	$(POST_PROCESS_O)
 
 pics/%.o:	$(SHA1DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(SHA2DIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 

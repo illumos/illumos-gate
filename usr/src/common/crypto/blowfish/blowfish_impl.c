@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,9 +41,15 @@
 #include "blowfish_impl.h"
 
 #ifdef _KERNEL
+
 #define	BLOWFISH_ASSERT(x)	ASSERT(x)
+
 #else /* !_KERNEL */
+
+#include <strings.h>
+#include <stdlib.h>
 #define	BLOWFISH_ASSERT(x)
+
 #endif /* _KERNEL */
 
 /* EXPORT DELETE START */
@@ -377,6 +383,7 @@ blowfish_encrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
 	uint32_t *b32;
 
 	if (IS_P2ALIGNED(block, sizeof (uint32_t))) {
+		/* LINTED:  pointer alignment */
 		b32 = (uint32_t *)block;
 		left = b32[0];
 		right = b32[1];
@@ -422,6 +429,7 @@ blowfish_encrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
 
 #ifdef _BIG_ENDIAN
 	if (IS_P2ALIGNED(out_block, sizeof (uint32_t))) {
+		/* LINTED:  pointer alignment */
 		b32 = (uint32_t *)out_block;
 		b32[0] = left;
 		b32[1] = right;
@@ -431,12 +439,10 @@ blowfish_encrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
 	out_block[0] = left >> 24;
 	out_block[1] = left >> 16;
 	out_block[2] = left >> 8;
-	/* LINTED: narrowing conversion */
 	out_block[3] = left;
 	out_block[4] = right >> 24;
 	out_block[5] = right >> 16;
 	out_block[6] = right >> 8;
-	/* LINTED: narrowing conversion */
 	out_block[7] = right;
 #ifdef _BIG_ENDIAN
 	}
@@ -463,6 +469,7 @@ blowfish_decrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
 	uint32_t *b32;
 
 	if (IS_P2ALIGNED(block, sizeof (uint32_t))) {
+		/* LINTED:  pointer alignment */
 		b32 = (uint32_t *)block;
 		left = b32[0];
 		right = b32[1];
@@ -508,6 +515,7 @@ blowfish_decrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
 
 #ifdef _BIG_ENDIAN
 	if (IS_P2ALIGNED(out_block, sizeof (uint32_t))) {
+		/* LINTED:  pointer alignment */
 		b32 = (uint32_t *)out_block;
 		b32[0] = left;
 		b32[1] = right;
@@ -517,12 +525,10 @@ blowfish_decrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
 	out_block[0] = left >> 24;
 	out_block[1] = left >> 16;
 	out_block[2] = left >> 8;
-	/* LINTED: narrowing conversion */
 	out_block[3] = left;
 	out_block[4] = right >> 24;
 	out_block[5] = right >> 16;
 	out_block[6] = right >> 8;
-	/* LINTED: narrowing conversion */
 	out_block[7] = right;
 #ifdef _BIG_ENDIAN
 	}
@@ -660,13 +666,18 @@ blowfish_init_keysched(uint8_t *key, uint_t bits, void *keysched)
 /*
  * Allocate key schedule for Blowfish.
  */
+/* ARGSUSED */
 void *
 blowfish_alloc_keysched(size_t *size, int kmflag)
 {
 /* EXPORT DELETE START */
 	keysched_t *keysched;
 
+#ifdef _KERNEL
 	keysched = (keysched_t *)kmem_alloc(sizeof (keysched_t), kmflag);
+#else
+	keysched = (keysched_t *)malloc(sizeof (keysched_t));
+#endif /* _KERNEL */
 	if (keysched != NULL) {
 		*size = sizeof (keysched_t);
 		return (keysched);

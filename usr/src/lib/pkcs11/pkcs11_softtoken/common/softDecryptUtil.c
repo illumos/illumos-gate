@@ -34,6 +34,7 @@
 #include <security/cryptoki.h>
 #include <des_cbc_crypt.h>
 #include <aes_cbc_crypt.h>
+#include <blowfish_cbc_crypt.h>
 #include <arcfour.h>
 #include "softSession.h"
 #include "softObject.h"
@@ -227,6 +228,51 @@ cbc_common:
 		return (rv);
 	}
 
+	case CKM_BLOWFISH_CBC:
+	{
+		soft_blowfish_ctx_t *soft_blowfish_ctx;
+
+		if (key_p->key_type != CKK_BLOWFISH)
+			return (CKR_KEY_TYPE_INCONSISTENT);
+
+		if ((pMechanism->pParameter == NULL) ||
+		    (pMechanism->ulParameterLen != BLOWFISH_BLOCK_LEN))
+			return (CKR_MECHANISM_PARAM_INVALID);
+
+		rv = soft_blowfish_crypt_init_common(session_p, pMechanism,
+		    key_p, B_FALSE);
+
+		if (rv != CKR_OK)
+			return (rv);
+
+		(void) pthread_mutex_lock(&session_p->session_mutex);
+
+		soft_blowfish_ctx =
+		    (soft_blowfish_ctx_t *)session_p->decrypt.context;
+
+		/* Save Initialization Vector in the context. */
+		(void) memcpy(soft_blowfish_ctx->ivec, pMechanism->pParameter,
+		    BLOWFISH_BLOCK_LEN);
+
+		/* Allocate a context for CBC */
+		soft_blowfish_ctx->blowfish_cbc =
+		    (void *)blowfish_cbc_ctx_init(soft_blowfish_ctx->key_sched,
+			soft_blowfish_ctx->keysched_len,
+			soft_blowfish_ctx->ivec);
+
+		if (soft_blowfish_ctx->blowfish_cbc == NULL) {
+			bzero(soft_blowfish_ctx->key_sched,
+			    soft_blowfish_ctx->keysched_len);
+			free(soft_blowfish_ctx->key_sched);
+			free(session_p->decrypt.context = NULL);
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			return (CKR_HOST_MEMORY);
+		}
+
+		(void) pthread_mutex_unlock(&session_p->session_mutex);
+		return (rv);
+	}
+
 	case CKM_RC4:
 
 		if (key_p->key_type != CKK_RC4) {
@@ -296,6 +342,11 @@ soft_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 	case CKM_AES_CBC_PAD:
 
 		return (soft_aes_decrypt_common(session_p, pEncrypted,
+		    ulEncryptedLen, pData, pulDataLen, Update));
+
+	case CKM_BLOWFISH_CBC:
+
+		return (soft_blowfish_decrypt_common(session_p, pEncrypted,
 		    ulEncryptedLen, pData, pulDataLen, Update));
 
 	case CKM_RC4:
@@ -391,6 +442,7 @@ soft_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedPart,
 	case CKM_AES_ECB:
 	case CKM_AES_CBC:
 	case CKM_AES_CBC_PAD:
+	case CKM_BLOWFISH_CBC:
 
 		return (soft_decrypt_common(session_p, pEncryptedPart,
 		    ulEncryptedPartLen, pPart, pulPartLen, B_TRUE));
@@ -655,6 +707,29 @@ soft_decrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastPart,
 		free(soft_aes_ctx->aes_cbc);
 		bzero(soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len);
 		free(soft_aes_ctx->key_sched);
+
+		break;
+	}
+
+	case CKM_BLOWFISH_CBC:
+	{
+		soft_blowfish_ctx_t *soft_blowfish_ctx;
+
+		soft_blowfish_ctx =
+		    (soft_blowfish_ctx_t *)session_p->decrypt.context;
+
+		*pulLastPartLen = 0;
+		if (soft_blowfish_ctx->remain_len != 0)
+			rv = CKR_ENCRYPTED_DATA_LEN_RANGE;
+		else {
+			if (pLastPart == NULL)
+				goto clean2;
+		}
+
+		free(soft_blowfish_ctx->blowfish_cbc);
+		bzero(soft_blowfish_ctx->key_sched,
+		    soft_blowfish_ctx->keysched_len);
+		free(soft_blowfish_ctx->key_sched);
 
 		break;
 	}

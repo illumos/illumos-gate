@@ -179,11 +179,11 @@ kcf_init_mech_tabs()
 	    CRYPTO_MAX_MECH_NAME);
 	kcf_cipher_mechs_tab[3].me_threshold = kcf_des3_threshold;
 
-	(void) strncpy(kcf_cipher_mechs_tab[4].me_name, SUN_CKM_BF_CBC,
+	(void) strncpy(kcf_cipher_mechs_tab[4].me_name, SUN_CKM_BLOWFISH_CBC,
 	    CRYPTO_MAX_MECH_NAME);
 	kcf_cipher_mechs_tab[4].me_threshold = kcf_bf_threshold;
 
-	(void) strncpy(kcf_cipher_mechs_tab[5].me_name, SUN_CKM_BF_ECB,
+	(void) strncpy(kcf_cipher_mechs_tab[5].me_name, SUN_CKM_BLOWFISH_ECB,
 	    CRYPTO_MAX_MECH_NAME);
 	kcf_cipher_mechs_tab[5].me_threshold = kcf_bf_threshold;
 

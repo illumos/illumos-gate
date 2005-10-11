@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,12 @@ soft_sign_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_MD5_HMAC:
 	case CKM_SHA_1_HMAC_GENERAL:
 	case CKM_SHA_1_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
 
 		return (soft_hmac_sign_verify_init_common(session_p,
 		    pMechanism, key_p, B_TRUE));
@@ -72,6 +78,9 @@ soft_sign_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_RSA_PKCS:
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS:
+	case CKM_SHA384_RSA_PKCS:
+	case CKM_SHA512_RSA_PKCS:
 
 		return (soft_rsa_sign_verify_init_common(session_p, pMechanism,
 		    key_p, B_TRUE));
@@ -127,8 +136,14 @@ soft_sign(soft_session_t *session_p, CK_BYTE_PTR pData,
 	case CKM_MD5_HMAC:
 	case CKM_SHA_1_HMAC_GENERAL:
 	case CKM_SHA_1_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
 	{
-		CK_BYTE hmac[SHA1_HASH_SIZE]; /* use the maximum size */
+		CK_BYTE hmac[SHA512_DIGEST_LENGTH]; /* use the maximum size */
 
 		if (pSignature != NULL) {
 			/* Pass local buffer to avoid overflow. */
@@ -175,6 +190,9 @@ soft_sign(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS:
+	case CKM_SHA384_RSA_PKCS:
+	case CKM_SHA512_RSA_PKCS:
 
 		return (soft_rsa_digest_sign_common(session_p, pData, ulDataLen,
 		    pSignature, pulSignatureLen, mechanism, B_FALSE));
@@ -222,6 +240,12 @@ soft_sign_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 	case CKM_MD5_HMAC:
 	case CKM_SHA_1_HMAC_GENERAL:
 	case CKM_SHA_1_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
 
 		return (soft_hmac_sign_verify_update(session_p, pPart,
 		    ulPartLen, B_TRUE));
@@ -234,6 +258,9 @@ soft_sign_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS:
+	case CKM_SHA384_RSA_PKCS:
+	case CKM_SHA512_RSA_PKCS:
 		/*
 		 * The MD5/SHA1 digest value is accumulated in the context
 		 * of the multiple-part digesting operation. In the final
@@ -280,8 +307,14 @@ soft_sign_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 	case CKM_MD5_HMAC:
 	case CKM_SHA_1_HMAC_GENERAL:
 	case CKM_SHA_1_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
 	{
-		CK_BYTE hmac[SHA1_HASH_SIZE]; /* use the maximum size */
+		CK_BYTE hmac[SHA512_DIGEST_LENGTH]; /* use the maximum size */
 
 		if (pSignature != NULL) {
 			/* Pass local buffer to avoid overflow */
@@ -320,6 +353,9 @@ soft_sign_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 	}
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS:
+	case CKM_SHA384_RSA_PKCS:
+	case CKM_SHA512_RSA_PKCS:
 
 		return (soft_rsa_digest_sign_common(session_p, NULL, 0,
 		    pSignature, pulSignatureLen, mechanism, B_TRUE));
@@ -398,6 +434,9 @@ soft_sign_verify_cleanup(soft_session_t *session_p, boolean_t sign,
 
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS:
+	case CKM_SHA384_RSA_PKCS:
+	case CKM_SHA512_RSA_PKCS:
 	case CKM_DSA_SHA1:
 		if (session_p->digest.context != NULL) {
 			free(session_p->digest.context);
@@ -417,6 +456,12 @@ soft_sign_verify_cleanup(soft_session_t *session_p, boolean_t sign,
 	case CKM_MD5_HMAC:
 	case CKM_SHA_1_HMAC_GENERAL:
 	case CKM_SHA_1_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
 		if (active_op->context != NULL)
 			bzero(active_op->context, sizeof (soft_hmac_ctx_t));
 		break;

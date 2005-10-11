@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,7 @@
 /*
  * Get the key type for the given mechanism
  *
- * All mechanisms in PKCS #11 v2.11 are listed here.
+ * All mechanisms in PKCS #11 v2.20 are listed here.
  */
 CK_RV
 pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
@@ -48,6 +48,12 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_MD2_RSA_PKCS:
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS:
+	case CKM_SHA384_RSA_PKCS:
+	case CKM_SHA512_RSA_PKCS:
+	case CKM_SHA256_RSA_PKCS_PSS:
+	case CKM_SHA384_RSA_PKCS_PSS:
+	case CKM_SHA512_RSA_PKCS_PSS:
 	case CKM_RIPEMD128_RSA_PKCS:
 	case CKM_RIPEMD160_RSA_PKCS:
 	case CKM_RSA_PKCS_OAEP:
@@ -104,6 +110,15 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_SHA_1:
 	case CKM_SHA_1_HMAC:
 	case CKM_SHA_1_HMAC_GENERAL:
+	case CKM_SHA256:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA384:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA512:
+	case CKM_SHA512_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
 	case CKM_GENERIC_SECRET_KEY_GEN:
 	case CKM_FASTHASH:
 	case CKM_PKCS5_PBKD2:
@@ -118,6 +133,13 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_TLS_MASTER_KEY_DERIVE:
 	case CKM_TLS_KEY_AND_MAC_DERIVE:
 	case CKM_TLS_MASTER_KEY_DERIVE_DH:
+	case CKM_TLS_PRF:
+	case CKM_WTLS_PRE_MASTER_KEY_GEN:
+	case CKM_WTLS_MASTER_KEY_DERIVE:
+	case CKM_WTLS_MASTER_KEY_DERIVE_DH_ECC:
+	case CKM_WTLS_PRF:
+	case CKM_WTLS_SERVER_KEY_AND_MAC_DERIVE:
+	case CKM_WTLS_CLIENT_KEY_AND_MAC_DERIVE:
 	case CKM_CONCATENATE_BASE_AND_KEY:
 	case CKM_CONCATENATE_BASE_AND_DATA:
 	case CKM_CONCATENATE_DATA_AND_BASE:
@@ -130,6 +152,9 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_RIPEMD160_HMAC:
 	case CKM_RIPEMD160_HMAC_GENERAL:
 	case CKM_SHA1_KEY_DERIVATION:
+	case CKM_SHA256_KEY_DERIVATION:
+	case CKM_SHA384_KEY_DERIVATION:
+	case CKM_SHA512_KEY_DERIVATION:
 	case CKM_MD5_KEY_DERIVATION:
 	case CKM_MD2_KEY_DERIVATION:
 	/* not sure the following 2 should be CKK_DES or not */
@@ -164,6 +189,12 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_DES_CBC_PAD:
 	case CKM_PBE_MD2_DES_CBC:
 	case CKM_PBE_MD5_DES_CBC:
+	case CKM_DES_OFB64:
+	case CKM_DES_OFB8:
+	case CKM_DES_CFB64:
+	case CKM_DES_CFB8:
+	case CKM_DES_ECB_ENCRYPT_DATA:
+	case CKM_DES_CBC_ENCRYPT_DATA:
 		*ktype = CKK_DES;
 		break;
 
@@ -179,6 +210,8 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_DES3_MAC_GENERAL:
 	case CKM_DES3_CBC_PAD:
 	case CKM_PBE_SHA1_DES3_EDE_CBC:
+	case CKM_DES3_ECB_ENCRYPT_DATA:
+	case CKM_DES3_CBC_ENCRYPT_DATA:
 		*ktype = CKK_DES3;
 		break;
 
@@ -279,7 +312,19 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_AES_MAC:
 	case CKM_AES_MAC_GENERAL:
 	case CKM_AES_CBC_PAD:
+	case CKM_AES_ECB_ENCRYPT_DATA:
+	case CKM_AES_CBC_ENCRYPT_DATA:
 		*ktype = CKK_AES;
+		break;
+
+	case CKM_BLOWFISH_KEY_GEN:
+	case CKM_BLOWFISH_CBC:
+		*ktype = CKK_BLOWFISH;
+		break;
+
+	case CKM_TWOFISH_KEY_GEN:
+	case CKM_TWOFISH_CBC:
+		*ktype = CKK_TWOFISH;
 		break;
 
 	default:

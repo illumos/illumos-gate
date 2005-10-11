@@ -87,7 +87,7 @@
  */
 
 /* Keystore description file pre-defined values */
-#define	KS_PKCS11_VER		"2.11"
+#define	KS_PKCS11_VER		"2.20"
 #define	KS_PKCS11_OFFSET	0
 #define	KS_PKCS11_VER_SIZE	32
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 #include <string.h>
 #include <security/cryptoki.h>
 #include <aes_impl.h>
+#include <blowfish_impl.h>
 #include <arcfour.h>
 #include <des_impl.h>
 #include "kernelGlobal.h"
@@ -1917,6 +1918,17 @@ kernel_build_secret_key_object(CK_ATTRIBUTE_PTR template,
 		}
 		break;
 
+	case CKK_BLOWFISH:
+		if (!isValue) {
+			rv = CKR_TEMPLATE_INCOMPLETE;
+			goto fail_cleanup;
+		}
+		if (sck->sk_value_len < BLOWFISH_MINBYTES) {
+			rv = CKR_ATTRIBUTE_VALUE_INVALID;
+			goto fail_cleanup;
+		}
+		break;
+
 	case CKK_DES:
 		if (!isValue) {
 			rv = CKR_TEMPLATE_INCOMPLETE;
@@ -2602,6 +2614,7 @@ kernel_get_secret_key_attribute(kernel_object_t *object_p,
 		case CKK_DES3:
 		case CKK_CDMF:
 		case CKK_AES:
+		case CKK_BLOWFISH:
 			/*
 			 * Copy secret key object attributes to template.
 			 */
@@ -3016,7 +3029,8 @@ kernel_set_secret_key_attribute(kernel_object_t *object_p,
 	case CKA_VALUE_LEN:
 		if ((keytype == CKK_RC4) ||
 		    (keytype == CKK_GENERIC_SECRET) ||
-		    (keytype == CKK_AES))
+		    (keytype == CKK_AES) ||
+		    (keytype == CKK_BLOWFISH))
 			return (CKR_ATTRIBUTE_READ_ONLY);
 		break;
 

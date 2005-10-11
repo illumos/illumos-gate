@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,9 +67,13 @@ extern "C" {
 
 #define	MD5_DER_PREFIX_Len	18
 #define	SHA1_DER_PREFIX_Len	15
+#define	SHA2_DER_PREFIX_Len	19
 
 extern const CK_BYTE MD5_DER_PREFIX[MD5_DER_PREFIX_Len];
 extern const CK_BYTE SHA1_DER_PREFIX[SHA1_DER_PREFIX_Len];
+extern const CK_BYTE SHA256_DER_PREFIX[SHA2_DER_PREFIX_Len];
+extern const CK_BYTE SHA384_DER_PREFIX[SHA2_DER_PREFIX_Len];
+extern const CK_BYTE SHA512_DER_PREFIX[SHA2_DER_PREFIX_Len];
 
 typedef struct {
 	int 	size;		/* key size in bits */

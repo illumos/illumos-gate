@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #include <pthread.h>
 #include <sys/md5.h>
 #include <sys/sha1.h>
+#include <sys/sha2.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -83,68 +84,97 @@ soft_hmac_sign_verify_init_common(soft_session_t *session_p,
 	}
 
 	switch (pMechanism->mechanism) {
+	case CKM_MD5_HMAC:
+		hmac_ctx->hmac_len = MD5_HASH_SIZE;
+		break;
 
-	case CKM_SSL3_MD5_MAC:
-	case CKM_SSL3_SHA1_MAC:
+	case CKM_SHA_1_HMAC:
+		hmac_ctx->hmac_len = SHA1_HASH_SIZE;
+		break;
+
+	case CKM_SHA256_HMAC:
+		hmac_ctx->hmac_len = SHA256_DIGEST_LENGTH;
+		break;
+
+	case CKM_SHA384_HMAC:
+		hmac_ctx->hmac_len = SHA384_DIGEST_LENGTH;
+		break;
+
+	case CKM_SHA512_HMAC:
+		hmac_ctx->hmac_len = SHA512_DIGEST_LENGTH;
+		break;
+
 	case CKM_MD5_HMAC_GENERAL:
-	case CKM_SHA_1_HMAC_GENERAL:
+	case CKM_SSL3_MD5_MAC:
+		if ((pMechanism->ulParameterLen !=
+		    sizeof (CK_MAC_GENERAL_PARAMS)) &&
+		    (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
+			MD5_HASH_SIZE)) {
+				free(hmac_ctx);
+				return (CKR_MECHANISM_PARAM_INVALID);
+			}
+		hmac_ctx->hmac_len = *((CK_MAC_GENERAL_PARAMS_PTR)
+		    pMechanism->pParameter);
+		break;
 
-		if (pMechanism->ulParameterLen !=
-		    sizeof (CK_MAC_GENERAL_PARAMS)) {
+	case CKM_SSL3_SHA1_MAC:
+	case CKM_SHA_1_HMAC_GENERAL:
+		if ((pMechanism->ulParameterLen !=
+		    sizeof (CK_MAC_GENERAL_PARAMS)) &&
+		    (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
+			SHA1_HASH_SIZE)) {
+			free(hmac_ctx);
+			return (CKR_MECHANISM_PARAM_INVALID);
+		}
+		hmac_ctx->hmac_len = *((CK_MAC_GENERAL_PARAMS_PTR)
+		    pMechanism->pParameter);
+		break;
+
+	case CKM_SHA256_HMAC_GENERAL:
+		if ((pMechanism->ulParameterLen !=
+		    sizeof (CK_MAC_GENERAL_PARAMS)) &&
+		    (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
+			SHA256_DIGEST_LENGTH)) {
+			free(hmac_ctx);
+			return (CKR_MECHANISM_PARAM_INVALID);
+		}
+		hmac_ctx->hmac_len = *((CK_MAC_GENERAL_PARAMS_PTR)
+		    pMechanism->pParameter);
+		break;
+
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA512_HMAC_GENERAL:
+		if ((pMechanism->ulParameterLen !=
+		    sizeof (CK_MAC_GENERAL_PARAMS)) &&
+		    (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
+			SHA512_DIGEST_LENGTH)) {
 			free(hmac_ctx);
 			return (CKR_MECHANISM_PARAM_INVALID);
 		}
 
-		if (pMechanism->mechanism == CKM_MD5_HMAC_GENERAL ||
-		    pMechanism->mechanism == CKM_SSL3_MD5_MAC) {
-			if (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
-			    MD5_HASH_SIZE) {
-				free(hmac_ctx);
-				return (CKR_MECHANISM_PARAM_INVALID);
-			}
-		} else {
-			if (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
-			    SHA1_HASH_SIZE) {
-				free(hmac_ctx);
-				return (CKR_MECHANISM_PARAM_INVALID);
-			}
-		}
-
 		hmac_ctx->hmac_len = *((CK_MAC_GENERAL_PARAMS_PTR)
 		    pMechanism->pParameter);
-
-		/*FALLTHRU*/
-	case CKM_MD5_HMAC:
-	case CKM_SHA_1_HMAC:
-
-		if (pMechanism->mechanism == CKM_MD5_HMAC) {
-			hmac_ctx->hmac_len = MD5_HASH_SIZE;
-		} else if (pMechanism->mechanism == CKM_SHA_1_HMAC) {
-			hmac_ctx->hmac_len = SHA1_HASH_SIZE;
-		}
-
-		/* Initialize a MAC context. */
-		rv = mac_init_ctx(session_p, key_p, hmac_ctx,
-		    pMechanism->mechanism);
-		if (rv != CKR_OK)
-			return (rv);
-
-		(void) pthread_mutex_lock(&session_p->session_mutex);
-
-		if (sign_op) {
-			session_p->sign.mech.mechanism =
-			    pMechanism->mechanism;
-			session_p->sign.context = hmac_ctx;
-		} else {
-			session_p->verify.mech.mechanism =
-			    pMechanism->mechanism;
-			session_p->verify.context = hmac_ctx;
-		}
-
-		(void) pthread_mutex_unlock(&session_p->session_mutex);
-
 		break;
+
 	}
+
+
+	/* Initialize a MAC context. */
+	rv = mac_init_ctx(session_p, key_p, hmac_ctx, pMechanism->mechanism);
+	if (rv != CKR_OK)
+		return (rv);
+
+	(void) pthread_mutex_lock(&session_p->session_mutex);
+
+	if (sign_op) {
+		session_p->sign.mech.mechanism = pMechanism->mechanism;
+		session_p->sign.context = hmac_ctx;
+	} else {
+		session_p->verify.mech.mechanism = pMechanism->mechanism;
+		session_p->verify.context = hmac_ctx;
+	}
+
+	(void) pthread_mutex_unlock(&session_p->session_mutex);
 
 	return (CKR_OK);
 }
@@ -293,6 +323,129 @@ mac_init_ctx(soft_session_t *session_p, soft_object_t *key,
 
 		break;
 	}
+	case CKM_SHA256_HMAC:
+	case CKM_SHA256_HMAC_GENERAL:
+	{
+		uint64_t sha_ipad[SHA256_HMAC_INTS_PER_BLOCK];
+		uint64_t sha_opad[SHA256_HMAC_INTS_PER_BLOCK];
+		CK_MECHANISM digest_mech;
+		CK_ULONG hash_len = SHA256_DIGEST_LENGTH;
+
+		bzero(sha_ipad, SHA256_HMAC_BLOCK_SIZE);
+		bzero(sha_opad, SHA256_HMAC_BLOCK_SIZE);
+
+		if (OBJ_SEC(key)->sk_value_len > SHA256_HMAC_BLOCK_SIZE) {
+			/*
+			 * Hash the key when it is longer than 64 bytes.
+			 */
+			digest_mech.mechanism = CKM_SHA256;
+			digest_mech.pParameter = NULL_PTR;
+			digest_mech.ulParameterLen = 0;
+			rv = soft_digest_init_internal(session_p, &digest_mech);
+			if (rv != CKR_OK)
+				return (rv);
+			rv = soft_digest(session_p, OBJ_SEC(key)->sk_value,
+			    OBJ_SEC(key)->sk_value_len, (CK_BYTE_PTR)sha_ipad,
+			    &hash_len);
+			session_p->digest.flags = 0;
+			if (rv != CKR_OK)
+				return (rv);
+			(void) memcpy(sha_opad, sha_ipad, hash_len);
+		} else {
+			(void) memcpy(sha_ipad, OBJ_SEC(key)->sk_value,
+			    OBJ_SEC(key)->sk_value_len);
+			(void) memcpy(sha_opad, OBJ_SEC(key)->sk_value,
+			    OBJ_SEC(key)->sk_value_len);
+		}
+
+		sha2_hmac_ctx_init(CKM_TO_SHA2(mech), &ctx->hc_ctx_u.sha2_ctx,
+		    sha_ipad, sha_opad, SHA256_HMAC_INTS_PER_BLOCK,
+		    SHA256_HMAC_BLOCK_SIZE);
+
+		break;
+	}
+	case CKM_SHA384_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	{
+		uint64_t sha_ipad[SHA512_HMAC_INTS_PER_BLOCK];
+		uint64_t sha_opad[SHA512_HMAC_INTS_PER_BLOCK];
+		CK_MECHANISM digest_mech;
+		CK_ULONG hash_len = SHA384_DIGEST_LENGTH;
+
+		bzero(sha_ipad, SHA512_HMAC_BLOCK_SIZE);
+		bzero(sha_opad, SHA512_HMAC_BLOCK_SIZE);
+
+		if (OBJ_SEC(key)->sk_value_len > SHA512_HMAC_BLOCK_SIZE) {
+			/*
+			 * Hash the key when it is longer than 64 bytes.
+			 */
+			digest_mech.mechanism = CKM_SHA384;
+			digest_mech.pParameter = NULL_PTR;
+			digest_mech.ulParameterLen = 0;
+			rv = soft_digest_init_internal(session_p, &digest_mech);
+			if (rv != CKR_OK)
+				return (rv);
+			rv = soft_digest(session_p, OBJ_SEC(key)->sk_value,
+			    OBJ_SEC(key)->sk_value_len, (CK_BYTE_PTR)sha_ipad,
+			    &hash_len);
+			session_p->digest.flags = 0;
+			if (rv != CKR_OK)
+				return (rv);
+			(void) memcpy(sha_opad, sha_ipad, hash_len);
+		} else {
+			(void) memcpy(sha_ipad, OBJ_SEC(key)->sk_value,
+			    OBJ_SEC(key)->sk_value_len);
+			(void) memcpy(sha_opad, OBJ_SEC(key)->sk_value,
+			    OBJ_SEC(key)->sk_value_len);
+		}
+
+		sha2_hmac_ctx_init(CKM_TO_SHA2(mech), &ctx->hc_ctx_u.sha2_ctx,
+		    sha_ipad, sha_opad, SHA512_HMAC_INTS_PER_BLOCK,
+		    SHA512_HMAC_BLOCK_SIZE);
+
+		break;
+	}
+	case CKM_SHA512_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	{
+		uint64_t sha_ipad[SHA512_HMAC_INTS_PER_BLOCK];
+		uint64_t sha_opad[SHA512_HMAC_INTS_PER_BLOCK];
+		CK_MECHANISM digest_mech;
+		CK_ULONG hash_len = SHA512_DIGEST_LENGTH;
+
+		bzero(sha_ipad, SHA512_HMAC_BLOCK_SIZE);
+		bzero(sha_opad, SHA512_HMAC_BLOCK_SIZE);
+
+		if (OBJ_SEC(key)->sk_value_len > SHA512_HMAC_BLOCK_SIZE) {
+			/*
+			 * Hash the key when it is longer than 64 bytes.
+			 */
+			digest_mech.mechanism = CKM_SHA512;
+			digest_mech.pParameter = NULL_PTR;
+			digest_mech.ulParameterLen = 0;
+			rv = soft_digest_init_internal(session_p, &digest_mech);
+			if (rv != CKR_OK)
+				return (rv);
+			rv = soft_digest(session_p, OBJ_SEC(key)->sk_value,
+			    OBJ_SEC(key)->sk_value_len, (CK_BYTE_PTR)sha_ipad,
+			    &hash_len);
+			session_p->digest.flags = 0;
+			if (rv != CKR_OK)
+				return (rv);
+			(void) memcpy(sha_opad, sha_ipad, hash_len);
+		} else {
+			(void) memcpy(sha_ipad, OBJ_SEC(key)->sk_value,
+			    OBJ_SEC(key)->sk_value_len);
+			(void) memcpy(sha_opad, OBJ_SEC(key)->sk_value,
+			    OBJ_SEC(key)->sk_value_len);
+		}
+
+		sha2_hmac_ctx_init(CKM_TO_SHA2(mech), &ctx->hc_ctx_u.sha2_ctx,
+		    sha_ipad, sha_opad, SHA512_HMAC_INTS_PER_BLOCK,
+		    SHA512_HMAC_BLOCK_SIZE);
+
+		break;
+	}
 	}
 	return (rv);
 }
@@ -352,8 +505,6 @@ soft_hmac_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			    pData, datalen);
 		}
 		SOFT_MAC_FINAL(MD5, &(hmac_ctx->hc_ctx_u.md5_ctx), pSigned);
-		*pulSignedLen = hmac_ctx->hmac_len;
-
 		break;
 
 	case CKM_SSL3_SHA1_MAC:
@@ -366,10 +517,45 @@ soft_hmac_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			    pData, datalen);
 		}
 		SOFT_MAC_FINAL(SHA1, &(hmac_ctx->hc_ctx_u.sha1_ctx), pSigned);
-		*pulSignedLen = hmac_ctx->hmac_len;
-
 		break;
-	}
+
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+		if (pData != NULL)
+			/* Called by soft_sign() or soft_verify(). */
+			SHA2Update(&(hmac_ctx->hc_ctx_u.sha2_ctx.hc_icontext),
+			    pData, datalen);
+
+		SOFT_MAC_FINAL_2(SHA256, &(hmac_ctx->hc_ctx_u.sha2_ctx),
+		    pSigned);
+		break;
+
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+		if (pData != NULL)
+			/* Called by soft_sign() or soft_verify(). */
+			SHA2Update(&(hmac_ctx->hc_ctx_u.sha2_ctx.hc_icontext),
+			    pData, datalen);
+
+		SOFT_MAC_FINAL_2(SHA384, &(hmac_ctx->hc_ctx_u.sha2_ctx),
+		    pSigned);
+		hmac_ctx->hmac_len = SHA384_DIGEST_LENGTH;
+		break;
+
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
+
+		if (pData != NULL)
+			/* Called by soft_sign() or soft_verify(). */
+			SHA2Update(&(hmac_ctx->hc_ctx_u.sha2_ctx.hc_icontext),
+			    pData, datalen);
+
+		SOFT_MAC_FINAL_2(SHA512, &(hmac_ctx->hc_ctx_u.sha2_ctx),
+		    pSigned);
+	};
+
+	*pulSignedLen = hmac_ctx->hmac_len;
+
 
 clean_exit:
 
@@ -434,6 +620,18 @@ soft_hmac_sign_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 		    partlen);
 
 		break;
+
+	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA256_HMAC:
+	case CKM_SHA384_HMAC_GENERAL:
+	case CKM_SHA384_HMAC:
+	case CKM_SHA512_HMAC_GENERAL:
+	case CKM_SHA512_HMAC:
+
+		SOFT_MAC_UPDATE(SHA2, &(hmac_ctx->hc_ctx_u.sha2_ctx), pPart,
+		    partlen);
+		break;
+
 	}
 	return (CKR_OK);
 }
@@ -465,4 +663,27 @@ sha1_hmac_ctx_init(sha1_hc_ctx_t *sha1_hmac_ctx, uint32_t *ipad, uint32_t *opad)
 	}
 	SOFT_MAC_INIT_CTX(SHA1, sha1_hmac_ctx, (const uchar_t *)ipad,
 	    (const uchar_t *)opad, SHA1_HMAC_BLOCK_SIZE);
+}
+
+
+void
+sha2_hmac_ctx_init(uint_t mech, sha2_hc_ctx_t *ctx, uint64_t *ipad,
+    uint64_t *opad, uint_t blocks_per_int64, uint_t block_size)
+{
+	int i;
+
+	/* XOR key with ipad (0x36) and opad (0x5c) */
+	for (i = 0; i < blocks_per_int64; i ++) {
+		ipad[i] ^= 0x3636363636363636;
+		opad[i] ^= 0x5c5c5c5c5c5c5c5c;
+	}
+
+	/* perform SHA2 on ipad */
+	SHA2Init(mech, &ctx->hc_icontext);
+	SHA2Update(&ctx->hc_icontext, (uint8_t *)ipad, block_size);
+
+	/* perform SHA2 on opad */
+	SHA2Init(mech, &ctx->hc_ocontext);
+	SHA2Update(&ctx->hc_ocontext, (uint8_t *)opad, block_size);
+
 }

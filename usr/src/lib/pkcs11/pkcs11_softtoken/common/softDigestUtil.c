@@ -31,6 +31,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <sys/sha1.h>
+#include <sys/sha2.h>
 #include <sys/types.h>
 #include <security/cryptoki.h>
 #include "softGlobal.h"
@@ -97,6 +98,43 @@ soft_digest_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism)
 
 		break;
 
+	case CKM_SHA256:
+	case CKM_SHA384:
+	case CKM_SHA512:
+
+		(void) pthread_mutex_lock(&session_p->session_mutex);
+
+		session_p->digest.context = malloc(sizeof (SHA2_CTX));
+
+		if (session_p->digest.context == NULL) {
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			return (CKR_HOST_MEMORY);
+		}
+
+		switch (pMechanism->mechanism) {
+		case CKM_SHA256:
+			session_p->digest.mech.mechanism = CKM_SHA256;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			SHA2Init(SHA256,
+			    (SHA2_CTX *)session_p->digest.context);
+			break;
+
+		case CKM_SHA384:
+			session_p->digest.mech.mechanism = CKM_SHA384;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			SHA2Init(SHA384,
+			    (SHA2_CTX *)session_p->digest.context);
+			break;
+
+		case CKM_SHA512:
+			session_p->digest.mech.mechanism = CKM_SHA512;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			SHA2Init(SHA512,
+			    (SHA2_CTX *)session_p->digest.context);
+			break;
+		}
+		break;
+
 	default:
 		return (CKR_MECHANISM_INVALID);
 	}
@@ -145,6 +183,18 @@ soft_digest_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 	case CKM_SHA_1:
 		digestLen = 20;
+		break;
+
+	case CKM_SHA256:
+		digestLen = 32;
+		break;
+
+	case CKM_SHA384:
+		digestLen = 48;
+		break;
+
+	case CKM_SHA512:
+		digestLen = 64;
 		break;
 
 	default:
@@ -224,6 +274,29 @@ soft_digest_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			    (SHA1_CTX *)session_p->digest.context);
 			len = sizeof (SHA1_CTX);
 		}
+		break;
+	case CKM_SHA256:
+	case CKM_SHA384:
+	case CKM_SHA512:
+		if (pData != NULL) {
+			/*
+			 * this is called by soft_digest()
+			 */
+
+			SHA2Update((SHA2_CTX *)session_p->digest.context,
+			    pData, ulDataLen);
+
+			SHA2Final(pDigest,
+			    (SHA2_CTX *)session_p->digest.context);
+		} else {
+			/*
+			 * this is called by soft_digest_final()
+			 */
+			SHA2Final(pDigest,
+			    (SHA2_CTX *)session_p->digest.context);
+			len = sizeof (SHA2_CTX);
+		}
+
 		break;
 	}
 
@@ -311,6 +384,13 @@ soft_digest_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 		SHA1Update((SHA1_CTX *)session_p->digest.context,
 		    pPart, ulPartLen);
 #endif	/* __sparcv9 */
+		break;
+
+	case CKM_SHA256:
+	case CKM_SHA384:
+	case CKM_SHA512:
+		SHA2Update((SHA2_CTX *)session_p->digest.context,
+		    pPart, ulPartLen);
 		break;
 
 	default:

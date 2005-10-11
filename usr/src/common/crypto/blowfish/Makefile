@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,17 +35,22 @@ FRC:
 
 # EXPORT DELETE START
 EXPORT_SRC:
-	$(RM) Makefile+ blowfish_impl.c+ blowfish_impl.h+
+	$(RM) Makefile+ blowfish_impl.c+ blowfish_impl.h+ \
+		blowfish_cbc_crypt.c+
 	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
 		< blowfish_impl.c > blowfish_impl.c+
 	$(MV) blowfish_impl.c+ blowfish_impl.c
 	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
 		< blowfish_impl.h > blowfish_impl.h+
 	$(MV) blowfish_impl.h+ blowfish_impl.h
+	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
+		< blowfish_cbc_crypt.c > blowfish_cbc_crypt.c+
+	$(MV) blowfish_cbc_crypt.c+ blowfish_cbc_crypt.c
 	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
 		< Makefile > Makefile+
 	$(RM) Makefile
 	$(MV) Makefile+ Makefile 
-	$(CHMOD) 444 Makefile blowfish_impl.c blowfish_impl.h
+	$(CHMOD) 444 Makefile blowfish_impl.c blowfish_impl.h \
+		blowfish_cbc_crypt.c
 
 # EXPORT DELETE END

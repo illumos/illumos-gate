@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@ extern "C" {
 
 #include <sys/md5.h>
 #include <sys/sha1.h>
+#include <sys/sha2.h>
 #include <security/pkcs11t.h>
 #include "softSession.h"
 #include "softObject.h"
@@ -45,6 +46,10 @@ extern "C" {
 #define	MD5_HMAC_INTS_PER_BLOCK (MD5_HMAC_BLOCK_SIZE/sizeof (uint32_t))
 #define	SHA1_HMAC_BLOCK_SIZE	64	/* SHA1-HMAC block size */
 #define	SHA1_HMAC_INTS_PER_BLOCK	(SHA1_HMAC_BLOCK_SIZE/sizeof (uint32_t))
+#define	SHA256_HMAC_INTS_PER_BLOCK	\
+	(SHA256_HMAC_BLOCK_SIZE/sizeof (uint64_t))
+#define	SHA512_HMAC_INTS_PER_BLOCK	\
+	(SHA512_HMAC_BLOCK_SIZE/sizeof (uint64_t))
 
 
 #define	MD5_SSL_PAD_SIZE	48	/* MD5 SSL pad length in bytes */
@@ -71,6 +76,11 @@ typedef struct sha1_hc_ctx {
 	SHA1_CTX	hc_ocontext;    /* outer SHA1 context */
 } sha1_hc_ctx_t;
 
+typedef struct sha2_hc_ctx {
+	SHA2_CTX	hc_icontext;    /* inner SHA2 context */
+	SHA2_CTX	hc_ocontext;    /* outer SHA2 context */
+} sha2_hc_ctx_t;
+
 /*
  * Generic Context struct for HMAC.
  */
@@ -79,11 +89,12 @@ typedef struct soft_hmac_ctx {
 	union {
 		md5_hc_ctx_t	md5_ctx;
 		sha1_hc_ctx_t	sha1_ctx;
+		sha2_hc_ctx_t	sha2_ctx;
 	} hc_ctx_u;
 } soft_hmac_ctx_t;
 
 
-/* Generic MAC envelop macros. Substitute HASH with MD5 or SHA1 */
+/* Generic MAC envelop macros. Substitute HASH with MD5, SHA1, & SHA2 mechs */
 
 #define	SOFT_MAC_INIT_CTX(HASH, mac_ctx, ipad, opad, len)		\
 	/* Perform HASH on ipad */					\
@@ -96,11 +107,18 @@ typedef struct soft_hmac_ctx {
 #define	SOFT_MAC_UPDATE(HASH, mac_ctx, pPart, PartLen)			\
 	HASH##Update(&((mac_ctx)->hc_icontext), pPart, PartLen);
 
-
 #define	SOFT_MAC_FINAL(HASH, mac_ctx, mac)				\
 	HASH##Final((mac), &((mac_ctx)->hc_icontext));			\
 	HASH##Update(&((mac_ctx)->hc_ocontext), (mac), HASH##_HASH_SIZE);\
 	HASH##Final((mac), &((mac_ctx)->hc_ocontext));
+
+#define	SOFT_MAC_FINAL_2(HASH, mac_ctx, mac)				\
+	SHA2Final((mac), &((mac_ctx)->hc_icontext));			\
+	SHA2Update(&((mac_ctx)->hc_ocontext), (mac), HASH##_DIGEST_LENGTH); \
+	SHA2Final((mac), &((mac_ctx)->hc_ocontext));
+
+#define	CKM_TO_SHA2(ckm_value)	\
+	(ckm_value % 0x10) + (((ckm_value - 0x250) / 0x10) * 3)
 
 /*
  * Function Prototypes.
@@ -120,6 +138,9 @@ CK_RV soft_hmac_sign_verify_update(soft_session_t *, CK_BYTE_PTR,
 void md5_hmac_ctx_init(md5_hc_ctx_t *, uint32_t *, uint32_t *);
 
 void sha1_hmac_ctx_init(sha1_hc_ctx_t *, uint32_t *, uint32_t *);
+
+void sha2_hmac_ctx_init(uint_t mech, sha2_hc_ctx_t *, uint64_t *, uint64_t *,
+    uint_t, uint_t);
 
 #ifdef	__cplusplus
 }

@@ -41,7 +41,7 @@
 #pragma fini(softtoken_fini)
 
 static struct CK_FUNCTION_LIST functionList = {
-	{ 2, 11 },	/* version */
+	{ 2, 20 },	/* version */
 	C_Initialize,
 	C_Finalize,
 	C_GetInfo,

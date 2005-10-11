@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,7 +98,7 @@ struct mech_alias {
 	boolean_t available;
 };
 
-#define	MECH_ALIASES_COUNT 5
+#define	MECH_ALIASES_COUNT 11
 
 static struct mech_alias mech_aliases[] = {
 	{ CKM_SHA_1, "sha1", ULONG_MAX, 0L, 8, B_FALSE },
@@ -106,6 +106,12 @@ static struct mech_alias mech_aliases[] = {
 	{ CKM_DES_MAC, "des_mac", ULONG_MAX, 0L, 8, B_FALSE },
 	{ CKM_SHA_1_HMAC, "sha1_hmac", ULONG_MAX, 0L, 8, B_FALSE },
 	{ CKM_MD5_HMAC, "md5_hmac", ULONG_MAX, 0L, 8, B_FALSE },
+	{ CKM_SHA256, "sha256", ULONG_MAX, 0L, 8, B_FALSE },
+	{ CKM_SHA384, "sha384", ULONG_MAX, 0L, 8, B_FALSE },
+	{ CKM_SHA512, "sha512", ULONG_MAX, 0L, 8, B_FALSE },
+	{ CKM_SHA256_HMAC, "sha256_hmac", ULONG_MAX, 0L, 8, B_FALSE },
+	{ CKM_SHA384_HMAC, "sha384_hmac", ULONG_MAX, 0L, 8, B_FALSE },
+	{ CKM_SHA512_HMAC, "sha512_hmac", ULONG_MAX, 0L, 8, B_FALSE }
 };
 
 static CK_BBOOL true = TRUE;

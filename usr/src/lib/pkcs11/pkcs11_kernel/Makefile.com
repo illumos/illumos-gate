@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,12 +51,13 @@ OBJECTS= \
 	kernelAttributeUtil.o
 
 AESDIR=		$(SRC)/common/crypto/aes
+BLOWFISHDIR=	$(SRC)/common/crypto/blowfish
 ARCFOURDIR=	$(SRC)/common/crypto/arcfour
 DESDIR=		$(SRC)/common/crypto/des
 
 lint \
 pics/kernelAttributeUtil.o := \
-	CPPFLAGS += -I$(AESDIR) -I$(ARCFOURDIR) -I$(DESDIR)
+	CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR)
 
 include $(SRC)/lib/Makefile.lib
 
