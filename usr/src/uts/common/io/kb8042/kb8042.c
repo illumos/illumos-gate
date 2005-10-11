@@ -454,6 +454,8 @@ kb8042_close(queue_t *qp, int flag, cred_t *credp)
 
 	kb8042 = (struct kb8042 *)qp->q_ptr;
 
+	(void) kbtrans_streams_fini(kb8042->hw_kbtrans);
+
 	kb8042->w_qp = (queue_t *)NULL;
 	qprocsoff(qp);
 
