@@ -29416,6 +29416,13 @@ sd_failfast_flushq(struct sd_lun *un)
 		}
 
 		un->un_failfast_tailp = un->un_waitq_tailp;
+
+		/* update kstat for each bp moved out of the waitq */
+		for (bp = un->un_waitq_headp; bp != NULL; bp = bp->av_forw) {
+			SD_UPDATE_KSTATS(un, kstat_waitq_exit, bp);
+		}
+
+		/* empty the waitq */
 		un->un_waitq_headp = un->un_waitq_tailp = NULL;
 
 	} else {
@@ -29468,6 +29475,12 @@ sd_failfast_flushq(struct sd_lun *un)
 				prev_waitq_bp->av_forw = next_waitq_bp;
 			}
 			bp->av_forw = NULL;
+
+			/*
+			 * update kstat since the bp is moved out of
+			 * the waitq
+			 */
+			SD_UPDATE_KSTATS(un, kstat_waitq_exit, bp);
 
 			/*
 			 * Now put the bp onto the failfast queue.
