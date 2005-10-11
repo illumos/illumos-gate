@@ -140,29 +140,21 @@ REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,ae
 
 /*
  * Populate PCI slots
- *
- * FIXIT: Verify pci slot pathnames
- *
- * Slot 0 = /pci@1e,600000/pci@0/pci@a/pci@0,2
- * Slot 1 = /pci@1e,600000/pci@0/pci@2/pci@0/pci@8
- * Slot 2 = /pci@1e,600000/pci@0/pci@1
- * Slot 3 = /pci@1e,600000/pci@0/pci@0
- * Slot 4 = /pci@1f,700000
  */
 name:/frutree/chassis/MB/system-board/pci-slot?Label=PCI4
 REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pci@1f,700000/picl?DeviceID=0
 
 name:/frutree/chassis/MB/system-board/pci-slot?Label=PCI3
-REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@0/picl?DeviceID=0
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@8/picl?DeviceID=0
 
 name:/frutree/chassis/MB/system-board/pci-slot?Label=PCI2
-REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@1/picl?DeviceID=0
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@3/picl?DeviceID=0
 
 name:/frutree/chassis/MB/system-board/pci-slot?Label=PCI1
-REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@2/pci@0/pci@8/picl?DeviceID=0
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@9/pci@0,2/picl?DeviceID=1
 
 name:/frutree/chassis/MB/system-board/pci-slot?Label=PCI0
-REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@a/pci@0,2/picl?DeviceID=0
+REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@9/pci@0,2/picl?DeviceID=2
 
 /*
  * SEEPROM source for the motherboard
@@ -257,22 +249,20 @@ REFPROP _fru_parent /frutree/chassis/MB/system-board
 
 /*
  * _fru_parent PCI devices
- * 
- * FIXIT: verify pci slot addresses
  */
-_class:/PLATFORM_CLASS/pci?UnitAddress=1f,700000/picl?DeviceID=0
+_class:/PLATFORM_CLASS/pci@1f,700000/picl?DeviceID=0
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCI4/pci-card
 
-_class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci?UnitAddress=0/picl?DeviceID=0
+_class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@8/picl?DeviceID=0
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCI3/pci-card
 
-_class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci?UnitAddress=1/picl?DeviceID=0
+_class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@3/picl?DeviceID=0
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCI2/pci-card
 
-_class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@2/pci@0/pci?UnitAddress=8/picl?DeviceID=0
+_class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@9/pci@0,2/picl?DeviceID=1
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCI1/pci-card
 
-_class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@0/pci?UnitAddress=0,2/picl?DeviceID=0
+_class:/PLATFORM_CLASS/pci@1e,600000/pci@0/pci@9/pci@0,2/picl?DeviceID=2
 REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCI0/pci-card
 
 /*
@@ -388,54 +378,65 @@ ENDTABLE
 
 /*
  * Hard disk link between fru and device tree
- *
- * FIXIT: update pathnames when LSI1064 changes from being a plugin card
- * to onboard eventually. Currently, the path is that of sas at PCI-X slot 0
  */
 name:/frutree/chassis/SAS-BP/HDD0/disk
-TABLE Devices
-ROW
-PROP Class string r 0 "block"
-REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@0,0
-ENDROW
-ENDTABLE
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@0,0
-REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD0/disk
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@0,0/hard-disk0
-REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD0/disk
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "block"
+	REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0
+	ENDROW
+	ENDTABLE
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD0/disk
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0/hard-disk0
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD0/disk
 
 name:/frutree/chassis/SAS-BP/HDD1/disk
-TABLE Devices
-ROW
-PROP Class string r 0 "block"
-REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@1,0
-ENDROW
-ENDTABLE
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@1,0
-REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD1/disk
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@1,0/hard-disk1
-REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD1/disk
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "block"
+	REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0
+	ENDROW
+	ENDTABLE
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD1/disk
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0/hard-disk1
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD1/disk
 
 name:/frutree/chassis/SAS-BP/HDD2/disk
-TABLE Devices
-ROW
-PROP Class string r 0 "block"
-REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@2,0
-ENDROW
-ENDTABLE
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@2,0
-REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD2/disk
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@2,0/hard-disk2
-REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD2/disk
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "block"
+	REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0
+	ENDROW
+	ENDTABLE
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD2/disk
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0/hard-disk2
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD2/disk
 
 name:/frutree/chassis/SAS-BP/HDD3/disk
-TABLE Devices
-ROW
-PROP Class string r 0 "block"
-REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@3,0
-ENDROW
-ENDTABLE
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@3,0
-REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD3/disk
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@3,0/hard-disk3
-REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD3/disk
+	TABLE Devices
+	ROW
+	PROP Class string r 0 "block"
+	REFPROP _block_ name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0
+	ENDROW
+	ENDTABLE
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD3/disk
+
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0/hard-disk3
+	REFPROP _fru_parent name:/frutree/chassis/SAS-BP/HDD3/disk
+
+name:/frutree/chassis/FIOB/system-board/RM0/cdrom
+	TABLE Device
+	ROW
+	PROP Class string r 0 "cdrom"
+	REFPROP _cdrom_ name:/platform/pci@1e,600000/pci@0/pci@1/pci@0/ide@1f/sd@0,0
+	ENDROW
+	ENDTABLE
+name:/platform/pci@1e,600000/pci@0/pci@1/pci@0/ide@1f/sd@0,0
+	REFPROP _fru_parent name:/frutree/chassis/FIOB/system-board/RM0/cdrom

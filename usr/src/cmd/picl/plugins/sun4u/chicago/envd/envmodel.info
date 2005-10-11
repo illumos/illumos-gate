@@ -144,19 +144,19 @@ name:/platform/ebus@1f,464000/env-monitor@3,0/ENV_SYSTEM_FAN4
 /*
  * Internal hard disks
  */
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@0,0/ENV_DISK0
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0/ENV_DISK0
     PROP Label string r 0 "hard-disk0"
     PROP ID int r 4 DISK0_ID
 
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@1,0/ENV_DISK1
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0/ENV_DISK1
     PROP Label string r 0 "hard-disk1"
     PROP ID int r 4 DISK1_ID
 
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@2,0/ENV_DISK2
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0/ENV_DISK2
     PROP Label string r 0 "hard-disk2"
     PROP ID int r 4 DISK2_ID
 
-name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@3,0/ENV_DISK3
+name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0/ENV_DISK3
     PROP Label string r 0 "hard-disk3"
     PROP ID int r 4 DISK3_ID
 

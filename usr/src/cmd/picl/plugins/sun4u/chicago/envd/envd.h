@@ -145,43 +145,43 @@ extern "C" {
 #define	COLLECTION_DATA_SIZE		6
 
 #define	DISK0_PHYSPATH	\
-	"/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@0,0"
+	"/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0"
 
 #define	DISK1_PHYSPATH	\
-	"/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@1,0"
+	"/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0"
 
 #define	DISK2_PHYSPATH  \
-	"/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@2,0"
+	"/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0"
 
 #define	DISK3_PHYSPATH  \
-	"/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@3,0"
+	"/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0"
 
 #define	ENV_DISK0_DEVFS	\
-"/devices/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@0,0:a,raw"
+"/devices/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0:a,raw"
 
 #define	ENV_DISK1_DEVFS	\
-"/devices/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@1,0:a,raw"
+"/devices/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0:a,raw"
 
 #define	ENV_DISK2_DEVFS \
-"/devices/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@2,0:a,raw"
+"/devices/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0:a,raw"
 
 #define	ENV_DISK3_DEVFS \
-"/devices/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@3,0:a,raw"
+"/devices/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0:a,raw"
 
 #define	DISK0_NODE_PATH	\
-"name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@0,0"
+"name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0"
 
 #define	DISK1_NODE_PATH	\
-"name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@1,0"
+"name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0"
 
 #define	DISK2_NODE_PATH \
-"name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@2,0"
+"name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0"
 
 #define	DISK3_NODE_PATH \
-"name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@3,0"
+"name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0"
 
 #define	SCSI_CONTROLLER_NODE_PATH	\
-	"name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1"
+	"name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1"
 
 /* CPU Path Names */
 #define	CPU0_PATH		"_class:/jbus/cpu?ID=0"

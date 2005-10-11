@@ -83,6 +83,10 @@ NODE frutree picl
 	    NODE system-board fru
 		 PROP FRUDataAvailable void r
 		 REFPROP _seeprom_source /platform/ebus@1f,464000/i2c@3,80/front-io-fru-prom@0,a4
+		NODE RM0 location
+		    PROP SlotType string r 0 "cdrom-slot"
+		    PROP Label string r 0 "RM0"
+		ENDNODE
 	    ENDNODE
 	ENDNODE
 
@@ -157,33 +161,24 @@ ENDNODE
 
 /*
  * Add disk fru nodes for disks which are present.
- *
- * FIXIT: Rev R0B2 of the MB has LSI1064 onboard with the path
- * 		/platform/pci@1e,600000/pci@0/pci@9/pci@0/LSILogic,sas@1
- * Change the paths below appropriately when this is confirmed
  */
 name:/frutree/chassis/SAS-BP/HDD0
-REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@0,0
+REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@0,0
 
 name:/frutree/chassis/SAS-BP/HDD1
-REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@1,0
+REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@1,0
 
 name:/frutree/chassis/SAS-BP/HDD2
-REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@2,0
+REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@2,0
 
 name:/frutree/chassis/SAS-BP/HDD3
-REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@a/pci@0/LSILogic,sas@1/sd@3,0
+REFNODE disk fru WITH name:/platform/pci@1e,600000/pci@0/pci@9/pci@0/scsi@1/sd@3,0
 
 /*
- * FIXIT: Latest DVDROM path via 1575 on R0B2 is
- *
- *   name:/frutree/chassis/FIOB
- *   REFNODE cdrom fru WITH name:/platform/pci@1e,600000/pci@0/pci@1/pci@0/ide@1f/sd@0,0
- *
- * Enable it when this is confirmed (also assumes that dvdrom drive is removable separately
- * from the front panel interface board).
- *
+ * Removable Media on front-io board
  */
+name:/frutree/chassis/FIOB/system-board/RM0
+REFNODE cdrom fru WITH name:/platform/pci@1e,600000/pci@0/pci@1/pci@0/ide@1f/sd@0,0
 
 #include "system-board.info"
 
