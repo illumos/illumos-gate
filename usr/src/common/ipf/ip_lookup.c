@@ -68,7 +68,6 @@ static const char rcsid[] = "@(#)$Id: ip_lookup.c,v 2.21 2003/06/28 17:01:57 dar
 #endif
 
 #ifdef	IPFILTER_LOOKUP
-static ip_pool_stat_t ippoolstate;
 # ifdef USE_MUTEXES
 ipfrwlock_t	ip_poolrw;
 # endif
@@ -88,7 +87,6 @@ int ip_lookup_init()
 		return -1;
 
 	RWLOCK_INIT(&ip_poolrw, "ip pool rwlock");
-	bzero((char *)&ippoolstate, sizeof(ippoolstate));
 
 	ip_lookup_inited = 1;
 
@@ -131,16 +129,12 @@ int mode;
 	case SIOCLOOKUPADDNODE :
 		WRITE_ENTER(&ip_poolrw);
 		err = iplookup_addnode(data);
-		if (err == 0)
-			ippoolstate.ipls_nodes++;
 		RWLOCK_EXIT(&ip_poolrw);
 		break;
 
 	case SIOCLOOKUPDELNODE :
 		WRITE_ENTER(&ip_poolrw);
 		err = iplookup_delnode(data);
-		if (err == 0)
-			ippoolstate.ipls_nodes--;
 		RWLOCK_EXIT(&ip_poolrw);
 		break;
 
@@ -335,8 +329,6 @@ caddr_t data;
 			err = EEXIST;
 		else
 			err = ip_pool_create(&op);
-		if (err == 0)
-			ippoolstate.ipls_pools++;
 		break;
 # endif
 

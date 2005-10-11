@@ -227,6 +227,7 @@ ip_pool_t *ipo;
 /* ------------------------------------------------------------------------ */
 int ip_pool_init()
 {
+	bzero((char *)&ipoolstat, sizeof(ipoolstat));
 
 #if !defined(_KERNEL) || (BSD < 199306)
 	rn_init();
@@ -451,6 +452,8 @@ int info;
 		ipo->ipo_list->ipn_pnext = &x->ipn_next;
 	ipo->ipo_list = x;
 
+	ipoolstat.ipls_nodes++;
+
 	return 0;
 }
 
@@ -516,7 +519,9 @@ iplookupop_t *op;
 		ip_pool_list[unit]->ipo_pnext = &h->ipo_next;
 	h->ipo_pnext = &ip_pool_list[unit];
 	ip_pool_list[unit] = h;
+
 	ipoolstat.ipls_pools++;
+
 	return 0;
 }
 
@@ -554,6 +559,9 @@ ip_pool_node_t *ipe;
 	ipo->ipo_head->rnh_deladdr(&n->ipn_addr, &n->ipn_mask,
 				   ipo->ipo_head);
 	KFREE(n);
+
+	ipoolstat.ipls_nodes--;	
+
 	return 0;
 }
 
@@ -614,6 +622,8 @@ ip_pool_t *ipo;
 		if (n->ipn_next)
 			n->ipn_next->ipn_pnext = n->ipn_pnext;
 		KFREE(n);
+
+		ipoolstat.ipls_nodes--;
 	}
 
 	ipo->ipo_list = NULL;
@@ -622,6 +632,8 @@ ip_pool_t *ipo;
 	*ipo->ipo_pnext = ipo->ipo_next;
 	rn_freehead(ipo->ipo_head);
 	KFREE(ipo);
+
+	ipoolstat.ipls_pools--;
 }
 
 

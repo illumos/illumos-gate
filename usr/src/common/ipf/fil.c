@@ -477,7 +477,7 @@ fr_info_t *fin;
 			break;
 
 		case IPPROTO_FRAGMENT :
-			p = frpr_fragment6(fin);
+ 			p = frpr_fragment6(fin);
 			if (fin->fin_off != 0)	/* Not the first frag */
 				go = 0;
 			break;
@@ -774,6 +774,8 @@ fr_info_t *fin;
 	fr_checkv6sum(fin);
 
 	frpr_short6(fin, sizeof(struct udphdr));
+	if (frpr_pullup(fin, sizeof(struct udphdr)) == -1)
+		return;
 
 	fin->fin_flen -= fin->fin_dlen - sizeof(struct udphdr);
 
@@ -796,6 +798,8 @@ fr_info_t *fin;
 	fr_checkv6sum(fin);
 
 	frpr_short6(fin, sizeof(struct tcphdr));
+	if (frpr_pullup(fin, sizeof(struct tcphdr)) == -1)
+		return;
 
 	fin->fin_flen -= fin->fin_dlen - sizeof(struct tcphdr);
 
@@ -823,7 +827,8 @@ int plen;
 		if (fin->fin_dp != NULL)
 			plen += (char *)fin->fin_dp -
 				((char *)fin->fin_ip + fin->fin_hlen);
-		plen += fin->fin_hlen;
+		plen += ((char *)fin->fin_ip - MTOD(fin->fin_m, char *)) +
+		    fin->fin_hlen;
 		if (M_LEN(fin->fin_m) < plen) {
 			if (fr_pullup(fin->fin_m, fin, plen) == NULL)
 				return -1;
@@ -1351,7 +1356,7 @@ fr_info_t *fin;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_makefrip                                                 */
-/* Returns:     void                                                        */
+/* Returns:     int - 1 == hdr checking error, 0 == OK                      */
 /* Parameters:  hlen(I) - length of IP packet header                        */
 /*              ip(I)   - pointer to the IP header                          */
 /*              fin(IO)  - pointer to packet information                    */
