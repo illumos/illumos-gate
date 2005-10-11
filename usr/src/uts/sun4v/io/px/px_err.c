@@ -157,7 +157,7 @@ px_err_common_intr(px_fault_t *fault_p, px_rc_err_t *epkt)
 	mutex_exit(&cb_p->xbc_fm_mutex);
 
 	if ((err & (PX_FATAL_GOS | PX_FATAL_SW)) || (ret == DDI_FM_FATAL))
-		fm_panic("Fatal System Bus Error has occurred\n");
+		PX_FM_PANIC("Fatal System Bus Error has occurred\n");
 
 	return (DDI_INTR_CLAIMED);
 }

@@ -1273,6 +1273,16 @@ px_lib_map_vconfig(dev_info_t *dip,
 }
 
 void
+px_lib_map_attr_check(ddi_map_req_t *mp)
+{
+	ddi_acc_hdl_t *hp = mp->map_handlep;
+
+	/* fire does not accept byte masks from PIO store merge */
+	if (hp->ah_acc.devacc_attr_dataorder == DDI_STORECACHING_OK_ACC)
+		hp->ah_acc.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+}
+
+void
 px_lib_clr_errs(px_t *px_p)
 {
 	px_pec_t	*pec_p = px_p->px_pec_p;
@@ -1308,7 +1318,7 @@ px_lib_clr_errs(px_t *px_p)
 	 * therefore it does not cause panic.
 	 */
 	if ((err & (PX_FATAL_GOS | PX_FATAL_SW)) || (ret == DDI_FM_FATAL))
-		fm_panic("Fatal System Port Error has occurred\n");
+		PX_FM_PANIC("Fatal System Port Error has occurred\n");
 }
 
 #ifdef  DEBUG

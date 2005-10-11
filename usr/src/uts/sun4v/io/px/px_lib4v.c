@@ -1347,6 +1347,12 @@ px_lib_map_vconfig(dev_info_t *dip,
 	return (DDI_SUCCESS);
 }
 
+/*ARGSUSED*/
+void
+px_lib_map_attr_check(ddi_map_req_t *mp)
+{
+}
+
 /*
  * px_lib_log_safeacc_err:
  * Imitate a cpu/mem trap call when a peek/poke fails.

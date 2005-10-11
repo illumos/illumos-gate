@@ -710,6 +710,7 @@ px_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	p_mapreq = *mp;		/* dup the whole structure */
 	p_mapreq.map_type = DDI_MT_REGSPEC;
 	p_mapreq.map_obj.rp = &p_regspec;
+	px_lib_map_attr_check(&p_mapreq);
 	rval = ddi_map(dip, &p_mapreq, 0, 0, addrp);
 
 	if (rval == DDI_SUCCESS) {

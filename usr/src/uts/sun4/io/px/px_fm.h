@@ -95,6 +95,8 @@ extern uint_t px_err_fabric_intr(px_t *px_p, msgcode_t msg_code,
  * Common error handling functions
  */
 extern void px_err_safeacc_check(px_t *px_p, ddi_fm_error_t *derr);
+#define	PX_FM_PANIC	\
+	if (!panicstr)	fm_panic
 
 #ifdef	__cplusplus
 }

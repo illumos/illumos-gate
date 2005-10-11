@@ -529,7 +529,7 @@ px_err_cb_intr(caddr_t arg)
 	 * HW initiated reset, therefore no furthur handling is required.
 	 */
 	if (fatal || err & (PX_FATAL_GOS | PX_FATAL_SW))
-		fm_panic("Fatal System Bus Error has occurred\n");
+		PX_FM_PANIC("Fatal System Bus Error has occurred\n");
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -580,7 +580,7 @@ px_err_dmc_pec_intr(caddr_t arg)
 	 * therefore it does not cause panic.
 	 */
 	if ((err & (PX_FATAL_GOS | PX_FATAL_SW)) || (ret == DDI_FM_FATAL))
-		fm_panic("Fatal System Port Error has occurred\n");
+		PX_FM_PANIC("Fatal System Port Error has occurred\n");
 
 	return (DDI_INTR_CLAIMED);
 }

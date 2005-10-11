@@ -62,6 +62,7 @@ extern int px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl);
 extern int px_lib_dev_fini(dev_info_t *dip);
 extern int px_lib_map_vconfig(dev_info_t *dip, ddi_map_req_t *mp,
     pci_config_offset_t off, pci_regspec_t *rp, caddr_t *addrp);
+extern void px_lib_map_attr_check(ddi_map_req_t *mp);
 extern int px_lib_intr_devino_to_sysino(dev_info_t *dip, devino_t devino,
     sysino_t *sysino);
 extern int px_lib_intr_getvalid(dev_info_t *dip, sysino_t sysino,

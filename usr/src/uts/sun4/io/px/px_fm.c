@@ -800,7 +800,7 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code,
 	 */
 	if ((err & (PX_FATAL_GOS | PX_FATAL_SW)) ||
 	    (ret == DDI_FM_FATAL) || (fab_err == DDI_FM_FATAL))
-		fm_panic("Fatal PCIe Fabric Error has occurred\n");
+		PX_FM_PANIC("Fatal PCIe Fabric Error has occurred\n");
 
 	return (DDI_INTR_CLAIMED);
 }
