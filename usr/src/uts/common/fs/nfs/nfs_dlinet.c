@@ -57,9 +57,6 @@
 #include <net/if.h>
 #include <net/route.h>
 
-#include <inet/common.h>
-#include <inet/ip.h>
-
 #include <netinet/in.h>
 #include <netinet/arp.h>
 #include <netinet/dhcp.h>
@@ -189,8 +186,7 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-static in_addr_t	get_approxnetmask(in_addr_t, in_addr_t);
-static int		set_ifnetmask(TIUSER *, in_addr_t);
+
 static enum clnt_stat	pmap_rmt_call(struct knetconfig *, struct netbuf *,
 			    bool_t, rpcprog_t, rpcvers_t, rpcproc_t, xdrproc_t,
 			    caddr_t, xdrproc_t, caddr_t, struct timeval,
@@ -631,9 +627,6 @@ ping_prog(struct netbuf *call_addr, uint_t prog, uint_t vers, int proto,
 }
 
 static struct netbuf bootparam_addr;
-static bool_t router_exists = B_FALSE;
-static in_addr_t client_ip;
-static in_addr_t client_netmask;
 
 /*
  * Returns after filling in the following global variables:
@@ -644,22 +637,20 @@ static in_addr_t client_netmask;
 static int
 whoami(void)
 {
-	TIUSER			*tiptr;
-	struct	netbuf 		sa;
-	struct	netbuf 		req;
-	struct	bp_whoami_arg 	arg;
-	struct	bp_whoami_res 	res;
-	struct	timeval 	tv;
-	enum	clnt_stat 	stat;
-	int			rc;
-	size_t			namelen;
-	int			printed_waiting_msg;
-	in_addr_t		boot_serv;
+	TIUSER *tiptr;
+	struct netbuf sa;
+	struct netbuf req;
+	struct bp_whoami_arg arg;
+	struct bp_whoami_res res;
+	struct timeval tv;
+	enum clnt_stat stat;
+	int rc;
+	size_t namelen;
+	int printed_waiting_msg;
 
-	if ((rc = t_kopen(NULL, dl_udp_netconf.knc_rdev, FREAD|FWRITE,
-	    &tiptr, CRED())) != 0) {
+	if ((rc = t_kopen((file_t *)NULL, dl_udp_netconf.knc_rdev,
+	    FREAD|FWRITE, &tiptr, CRED())) != 0) {
 		nfs_perror(rc, "whoami: t_kopen udp failed: %m.\n");
-		return (rc);
 	}
 
 	/*
@@ -690,10 +681,7 @@ whoami(void)
 		(void) t_kclose(tiptr, 0);
 		return (rc);
 	}
-	/*
-	 * store client's IP address
-	 */
-	client_ip = ((struct sockaddr_in *)req.buf)->sin_addr.s_addr;
+
 	/*
 	 * Set up the arguments expected by bootparamd.
 	 */
@@ -757,11 +745,7 @@ whoami(void)
 		    stat, clnt_sperrno(stat));
 		goto done;
 	}
-	/*
-	 * store the boot server IP address
-	 */
-	boot_serv = ((struct sockaddr_in *)
-	    bootparam_addr.buf)->sin_addr.s_addr;
+
 	namelen = strlen(res.client_name);
 	if (namelen > sizeof (utsname.nodename)) {
 		printf("whoami: hostname too long");
@@ -793,35 +777,23 @@ whoami(void)
 	if (res.router_address.address_type == IP_ADDR_TYPE) {
 		struct rtentry		rtentry;
 		struct sockaddr_in	*sin;
-		in_addr_t		ipaddr;
+		struct in_addr		ipaddr;
 
 		bcopy(&res.router_address.bp_address.ip_addr, &ipaddr,
-		    sizeof (ipaddr));
+		    sizeof (struct in_addr));
 
-		if (ipaddr != (uint32_t)0) {
-			/*
-			 * get the netmask for given combination of
-			 * router and local ip for a given network.
-			 * This is done because at this point client
-			 * has no idea of the netmask in the case of
-			 * a subnetted or supernetted network.
-			 */
-			client_netmask = get_approxnetmask(ipaddr, client_ip);
-			if ((rc = set_ifnetmask(tiptr, client_netmask)) != 0) {
-				nfs_perror(rc, "whoami: failed to set netmask: "
-				    "%m.\n");
-				goto done;
-			}
-			router_exists = B_TRUE;
-
+		if (ipaddr.s_addr != (uint32_t)0) {
 			sin = (struct sockaddr_in *)&rtentry.rt_dst;
 			bzero(sin, sizeof (*sin));
 			sin->sin_family = AF_INET;
+
 			sin = (struct sockaddr_in *)&rtentry.rt_gateway;
 			bzero(sin, sizeof (*sin));
 			sin->sin_family = AF_INET;
-			sin->sin_addr.s_addr = ipaddr;
+			sin->sin_addr.s_addr = ipaddr.s_addr;
+
 			rtentry.rt_flags = RTF_GATEWAY | RTF_UP;
+
 			if (rc = rtioctl(tiptr, SIOCADDRT, &rtentry)) {
 				nfs_perror(rc,
 				    "whoami: couldn't add route: %m.\n");
@@ -832,79 +804,12 @@ whoami(void)
 		printf("whoami: unknown gateway addr family %d\n",
 		    res.router_address.address_type);
 	}
-	if (!router_exists) {
-		/*
-		 * router's IP address was not obtained in
-		 * WHOAMI RPC request or we could not set
-		 * interface netmask by now. Use the client's
-		 * and boot server's IP addresses to get the
-		 * netmask which will work for this supernet
-		 * or subnet.
-		 */
-		client_netmask = get_approxnetmask(boot_serv, client_ip);
-		if ((rc = set_ifnetmask(tiptr, client_netmask)) != 0) {
-			nfs_perror(rc, "whoami: failed to set netmask: %m.\n");
-		}
-	}
-
 done:
 	kmem_free(res.client_name, MAX_MACHINE_NAME + 1);
 	kmem_free(res.domain_name, MAX_MACHINE_NAME + 1);
 	free_netbuf(&sa);
 	(void) t_kclose(tiptr, 0);
 	return (rc);
-}
-
-/*
- * set netmask for the interface.
- */
-static int
-set_ifnetmask(TIUSER *tptr, in_addr_t netmask)
-{
-	struct sockaddr_in	sin;
-	struct netbuf		sbuf;
-	TIUSER			*tiptr = tptr;
-	int			rc;
-
-	if (tptr == NULL) {
-		if ((rc = t_kopen(NULL, dl_udp_netconf.knc_rdev,
-		    FREAD|FWRITE, &tiptr, CRED())) != 0) {
-			nfs_perror(rc, "set_ifnetmask: "
-			    "t_kopen udp failed: %m.\n");
-			return (rc);
-		}
-	}
-	sin.sin_addr.s_addr = netmask;
-	sin.sin_family = AF_INET;
-	sbuf.buf = (caddr_t)&sin;
-	sbuf.maxlen = sbuf.len = sizeof (sin);
-	if ((rc = ifioctl(tiptr, SIOCSIFNETMASK, &sbuf)) != 0) {
-		nfs_perror(rc, "set_ifnetmask: cannot set interface "
-		    "netmask: %m.\n");
-	}
-	if (tptr == NULL) {
-		(void) t_kclose(tiptr, 0);
-	}
-	return (rc);
-}
-
-/*
- * guess an approximate netmask for the combination of two IP addresses
- * within the net.
- */
-static in_addr_t
-get_approxnetmask(in_addr_t ip1, in_addr_t ip2)
-{
-	int		bit;
-	in_addr_t	netmask = 0;
-
-	for (bit = IP_ABITS - 1; bit != 0; bit--) {
-		if ((ip1 >> bit) != (ip2 >> bit)) {
-			break;
-		}
-		netmask |= (1 << bit);
-	}
-	return (netmask);
 }
 
 /*
@@ -924,10 +829,9 @@ getfile(char *fileid,
 	enum clnt_stat stat;
 	int root = FALSE;
 	static int using_cache = FALSE;
-	in_addr_t ipaddr;
+	struct in_addr ipaddr;
 	int timeo = DEFAULT_TIMEO;
 	int retries = DEFAULT_RETRIES;
-	int rc;
 
 	if (dldebug)
 		printf("getfile: entered\n");
@@ -1029,26 +933,12 @@ getfile(char *fileid,
 		    AF_INET;
 		bcopy(&res.server_address.bp_address.ip_addr,
 		    &ipaddr, sizeof (ipaddr));
-		if (ipaddr == 0)
+		if (ipaddr.s_addr == 0)
 			return (EINVAL);
 
 		((struct sockaddr_in *)server_address->buf)->sin_addr.s_addr =
-		    ipaddr;
+		    ipaddr.s_addr;
 		server_address->len = sizeof (struct sockaddr_in);
-		/*
-		 * If the router does not exist and root server doesn't
-		 * logically fall in the client's subnet, get the netmask
-		 * from the combination of client & root server IP's.
-		 */
-		if (!router_exists && ((client_ip & client_netmask) !=
-		    (ipaddr & client_netmask))) {
-			client_netmask = get_approxnetmask(ipaddr, client_ip);
-			if ((rc = set_ifnetmask(NULL, client_netmask)) != 0) {
-				nfs_perror(rc, "getfile: failed to set "
-				    "netmask: %m.\n");
-				return (rc);
-			}
-		}
 		break;
 
 	default:
