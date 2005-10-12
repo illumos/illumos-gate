@@ -4486,7 +4486,7 @@ rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 		 */
 		if (*lenp == NULL) {
 			dma->dp_current_cookie = 0;
-			hp->dmai_cookie = dma->dp_cookies;
+			hp->dmai_cookie = window->wd_first_cookie;
 
 		/*
 		 * go to the next cookie in the window then see if we done with
