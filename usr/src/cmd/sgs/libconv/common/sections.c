@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -95,7 +96,7 @@ conv_sectyp_str(ushort_t mach, uint_t sec)
 		MSG_SHF_TLS_SIZE + \
 		MSG_SHF_EXCLUDE_SIZE + \
 		MSG_SHF_ORDERED_SIZE + \
-		MSG_SHF_AMD64_LARGE + \
+		MSG_SHF_AMD64_LARGE_SIZE + \
 		MSG_GBL_CSQBRKT_SIZE
 
 const char *

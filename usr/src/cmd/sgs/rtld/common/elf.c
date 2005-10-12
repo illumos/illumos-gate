@@ -19,16 +19,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
- *
  *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * Object file dependent support for ELF objects.
@@ -1346,8 +1345,6 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 	int		any;
 	Dyninfo		*dip = &DYNINFO(ilmp)[ndx];
 	Lm_list		*lml = LIST(ilmp);
-	Lm_cntl		*lmc = 0;
-	Aliste		lmco;
 
 	/*
 	 * Indicate that the filter has been used.  If a binding already exists
@@ -1443,6 +1440,9 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 		 * objects.
 		 */
 		if ((pnp->p_info == 0) && (pnp->p_orig & PN_TKN_HWCAP)) {
+			Lm_cntl	*lmc;
+			Aliste	lmco;
+
 			if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
 				if ((lmc = alist_append(&(lml->lm_lists), 0,
 				    sizeof (Lm_cntl), AL_CNT_LMLISTS)) == 0)
@@ -1456,6 +1456,16 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 
 			pnp = hwcap_filtees(pnpp, lmco, dip, ilmp, filtees,
 			    mode, (FLG_RT_HANDLE | FLG_RT_HWCAP));
+
+			/*
+			 * Now that any hardware capability objects have been
+			 * processed, remove any link-map control list.
+			 */
+			if (lmc) {
+				if (pnp->p_len == 0)
+					(void) lm_salvage(lml, 0, lmco);
+				remove_cntl(lml, lmco);
+			}
 		}
 
 		if (pnp->p_len == 0)
@@ -1512,6 +1522,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 
 			} else {
 				Rej_desc	rej = { 0 };
+				Lm_cntl		*lmc;
+				Aliste		lmco;
 
 				/*
 				 * Establish a new link-map control list from
@@ -1588,6 +1600,16 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				if (nlmp && ghp && (CNTL(nlmp) <= CNTL(ilmp)) &&
 				    (hdl_add(ghp, ilmp, GPD_FILTER) == 0))
 					nlmp = 0;
+
+				/*
+				 * Now that this object has been processed,
+				 * remove any link-map control list.
+				 */
+				if (lmc) {
+					if (nlmp == 0)
+						(void) lm_salvage(lml, 0, lmco);
+					remove_cntl(lml, lmco);
+				}
 			}
 
 			/*
@@ -1603,11 +1625,6 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				if (ghp)
 					(void) dlclose_core(ghp, ilmp);
 
-				if (lmc) {
-					(void) lm_salvage(lml, 0, lmco);
-					remove_cntl(lml, lmco);
-					lmc = 0;
-				}
 				pnp->p_len = 0;
 				continue;
 			}
@@ -1674,9 +1691,6 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				pnp->p_info = 0;
 			}
 			if (sym) {
-				if (lmc)
-					remove_cntl(lml, lmco);
-
 				*binfo |= DBG_BINFO_FILTEE;
 				return (sym);
 			}
@@ -1689,9 +1703,6 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 		if (FLAGS1(ghp->gh_owner) & FL1_RT_ENDFILTE)
 			break;
 	}
-
-	if (lmc)
-		remove_cntl(lml, lmco);
 
 	/*
 	 * If we're just here to trigger filtee loading then we're done.

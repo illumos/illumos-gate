@@ -1529,11 +1529,17 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc * fdesc)
 	if ((FLAGS(nlmp) & FLG_RT_OBJECT) == 0) {
 		/*
 		 * Update the objects full path information if necessary.
+		 * Note, with pathname expansion in effect, the fd_pname will
+		 * be used as PATHNAME().  This allocated string will be freed
+		 * should this object be deleted.  However, without pathname
+		 * expansion, the fd_name should be freed now, as it is no
+		 * longer referenced.
 		 */
-		if (FLAGS1(nlmp) & FL1_RT_RELATIVE) {
+		if (FLAGS1(nlmp) & FL1_RT_RELATIVE)
 			(void) fullpath(nlmp, fdesc->fd_pname);
-			fdesc->fd_pname = 0;
-		}
+		else if (fdesc->fd_pname != fdesc->fd_nname)
+			free((void *)fdesc->fd_pname);
+		fdesc->fd_pname = 0;
 
 		if ((NAME(nlmp)[0] == '/') && (fpavl_insert(lml, nlmp,
 		    NAME(nlmp), fdesc->fd_avlwhere) == 0)) {

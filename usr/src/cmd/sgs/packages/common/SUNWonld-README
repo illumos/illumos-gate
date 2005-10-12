@@ -1529,3 +1529,6 @@ All the above change is incorporated in the following patches:
 --------------------------------------------------------------------------------
 6309061 link_audit should use __asm__ with gcc
 6310736 gcc and sgs/libld don't get along on SPARC
+6329796 Memory leak with iconv_open/iconv_close with patch 109147-33
+6332983 s9 linker patches 112963-24/113986-20 causing cluster machines not
+	to boot

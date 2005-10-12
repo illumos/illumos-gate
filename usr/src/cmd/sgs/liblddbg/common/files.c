@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -645,6 +646,11 @@ Dbg_file_cntl(Lm_list *lml, Aliste flmco, Aliste tlmco)
 	for (ALIST_TRAVERSE(lml->lm_lists, off, lmc)) {
 		Rt_map	*lmp;
 
+		if (lmc->lc_head == 0) {
+			dbg_print(MSG_ORIG(MSG_CNTL_ENTRY), EC_XWORD(off),
+			    MSG_ORIG(MSG_STR_EMPTY));
+			continue;
+		}
 		for (lmp = lmc->lc_head; lmp; lmp = (Rt_map *)NEXT(lmp))
 			dbg_print(MSG_ORIG(MSG_CNTL_ENTRY), EC_XWORD(off),
 			    NAME(lmp));
