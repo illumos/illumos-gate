@@ -490,7 +490,16 @@ void (*clnt_stop_idle)(queue_t *wq);
  */
 #define	REFRESHES	2	/* authentication refreshes */
 
-static int clnt_cots_do_bindresvport = 0; /* bind to a non-reserved port */
+/*
+ * The following is used to determine the global default behavior for
+ * COTS when binding to a local port.
+ *
+ * If the value is set to 1 the default will be to select a reserved
+ * (aka privileged) port, if the value is zero the default will be to
+ * use non-reserved ports.  Users of kRPC may override this by using
+ * CLNT_CONTROL() and CLSET_BINDRESVPORT.
+ */
+static int clnt_cots_do_bindresvport = 1;
 
 static zone_key_t zone_cots_key;
 

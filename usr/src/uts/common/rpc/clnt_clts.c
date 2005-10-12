@@ -254,7 +254,17 @@ static uint_t clts_rcstat_ndata =
 #define	SNDTRIES	4
 #define	REFRESHES	2	/* authentication refreshes */
 
-static int clnt_clts_do_bindresvport = 0; /* bind to a non-reserved port */
+/*
+ * The following is used to determine the global default behavior for
+ * CLTS when binding to a local port.
+ *
+ * If the value is set to 1 the default will be to select a reserved
+ * (aka privileged) port, if the value is zero the default will be to
+ * use non-reserved ports.  Users of kRPC may override this by using
+ * CLNT_CONTROL() and CLSET_BINDRESVPORT.
+ */
+static int clnt_clts_do_bindresvport = 1;
+
 #define	BINDRESVPORT_RETRIES 5
 
 void
