@@ -120,7 +120,7 @@ case "$1" in
 		[ -n "$pid" ] && kill -TERM $pid 2>/dev/null
 		/usr/sbin/pfild >/dev/null
 		if load_ippool && load_ipf && load_ipnat ; then
-			ipmon -Ds
+			/usr/sbin/ipmon -Ds
 		else
 			exit $SMF_EXIT_ERR_CONFIG
 		fi
@@ -151,7 +151,7 @@ case "$1" in
 		load_ipf
 		load_ipnat
 		if [ -f $PIDFILE -a -n "$pid" ] ; then
-			ipmon -Ds
+			/usr/sbin/ipmon -Ds
 		fi
 		;;
 

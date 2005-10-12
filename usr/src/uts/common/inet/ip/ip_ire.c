@@ -6594,7 +6594,7 @@ mblk_t *
 ip_nexthop_route(const struct sockaddr *target, char *ifname)
 {
 	struct nce_s *nce;
-	ire_t *dir, *gw;
+	ire_t *dir;
 	ill_t *ill;
 	mblk_t *mp;
 
@@ -6602,22 +6602,20 @@ ip_nexthop_route(const struct sockaddr *target, char *ifname)
 	if (ifname == NULL || target == NULL)
 		return (NULL);
 
-	gw = NULL;
-
 	/* Find the route entry, if it exists. */
 	switch (target->sa_family) {
 	case AF_INET:
 		dir = ire_route_lookup(
 		    ((struct sockaddr_in *)target)->sin_addr.s_addr,
 		    0xffffffff,
-		    0, 0, NULL, &gw, ALL_ZONES,
+		    0, 0, NULL, NULL, ALL_ZONES,
 		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
 		break;
 	case AF_INET6:
 		dir = ire_route_lookup_v6(
 		    &((struct sockaddr_in6 *)target)->sin6_addr,
 		    NULL,
-		    0, 0, NULL, &gw, ALL_ZONES,
+		    0, 0, NULL, NULL, ALL_ZONES,
 		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
 		if ((dir != NULL) && (dir->ire_nce == NULL)) {
 			ire_refrele(dir);
@@ -6690,7 +6688,7 @@ ip_nexthop(const struct sockaddr *target, const char *ifname)
 	struct nce_s *nce;
 	ill_walk_context_t ctx;
 	t_uscalar_t sap;
-	ire_t *dir, *gw;
+	ire_t *dir;
 	ill_t *ill;
 	mblk_t *mp;
 
@@ -6735,21 +6733,20 @@ ip_nexthop(const struct sockaddr *target, const char *ifname)
 	mutex_exit(&ill->ill_lock);
 	rw_exit(&ill_g_lock);
 
-	gw = NULL;
 	/* Find the resolver entry, if it exists. */
 	switch (target->sa_family) {
 	case AF_INET:
 		dir = ire_route_lookup(
 			((struct sockaddr_in *)target)->sin_addr.s_addr,
 			0xffffffff,
-			0, 0, ill->ill_ipif, &gw, ALL_ZONES,
+			0, 0, ill->ill_ipif, NULL, ALL_ZONES,
 			MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|
 			MATCH_IRE_RECURSIVE|MATCH_IRE_IPIF);
 		break;
 	case AF_INET6:
 		dir = ire_route_lookup_v6(
 			&((struct sockaddr_in6 *)target)->sin6_addr, NULL,
-			0, 0, ill->ill_ipif, &gw, ALL_ZONES,
+			0, 0, ill->ill_ipif, NULL, ALL_ZONES,
 			MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|
 			MATCH_IRE_RECURSIVE|MATCH_IRE_IPIF);
 		if ((dir != NULL) && (dir->ire_nce == NULL)) {

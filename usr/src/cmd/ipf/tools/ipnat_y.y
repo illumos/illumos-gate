@@ -7,8 +7,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef  __FreeBSD__
 # ifndef __FreeBSD_cc_version
@@ -435,7 +434,7 @@ nummask:
 
 portstuff:
 	compare YY_NUMBER		{ $$.pc = $1; $$.p1 = $2; }
-	| YY_NUMBER range YY_NUMBER	{ $$.pc = $2; $$.p1 = $1; $$.p1 = $3; }
+	| YY_NUMBER range YY_NUMBER	{ $$.pc = $2; $$.p1 = $1; $$.p2 = $3; }
 	;
 
 mapoptions:

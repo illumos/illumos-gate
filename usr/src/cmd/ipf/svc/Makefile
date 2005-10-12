@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -14,6 +14,8 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 $(ROOTMANIFEST)		:= FILEMODE= 444
 
 include $(SRC)/cmd/Makefile.targ
+
+all: $(OBJS)
 
 $(ROOTMANIFESTDIR)/%: %
 		$(INS.file)

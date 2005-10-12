@@ -587,7 +587,7 @@ fr_info_t *fin;
 frdest_t *fdp;
 {
 #ifndef IRE_ILL_CN
-	ire_t *ir, *dir, *gw;
+	ire_t *ir, *dir;
 	struct in_addr dst;
 	ill_t *ifp;
 	u_char *s;
@@ -672,16 +672,15 @@ frdest_t *fdp;
 		dst.s_addr = fin->fin_fi.fi_daddr;
 
 #if SOLARIS2 >= 6
-	gw = NULL;
 	if (fin->fin_v == 4) {
 		dir = ire_route_lookup(dst.s_addr, 0xffffffff, 0, 0, NULL,
-					&gw, NULL, MATCH_IRE_DSTONLY|
+					NULL, NULL, MATCH_IRE_DSTONLY|
 					MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
 	}
 #ifdef	USE_INET6
 	else if (fin->fin_v == 6) {
 		dir = ire_route_lookup_v6(&ip6->ip6_dst, NULL, 0, 0,
-					NULL, &gw, NULL, MATCH_IRE_DSTONLY|
+					NULL, NULL, NULL, MATCH_IRE_DSTONLY|
 					MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
 	}
 #endif
@@ -943,11 +942,11 @@ fr_info_t *fin;
 		return 0;
 
 #else
-	ire_t *ir, *dir, *gw;
+	ire_t *ir, *dir;
 
 #if SOLARIS2 >= 6
 	dir = ire_route_lookup(fin->fin_saddr, 0xffffffff, 0, 0, NULL,
-			       &gw, NULL, MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|
+			       NULL, NULL, MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|
 			       MATCH_IRE_RECURSIVE);
 #else
 	dir = ire_lookup(fin->fin_saddr);

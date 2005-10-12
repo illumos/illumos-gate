@@ -770,13 +770,12 @@ int mode;
 			READ_ENTER(&ipf_nat);
 		}
 		error = fr_inobj(data, &nl, IPFOBJ_NATLOOKUP);
-		if (error)
-			break;
-
-		if (nat_lookupredir(&nl)) {
-			error = fr_outobj(data, &nl, IPFOBJ_NATLOOKUP);
-		} else
-			error = ESRCH;
+		if (error == 0) {
+			if (nat_lookupredir(&nl)) {
+				error = fr_outobj(data, &nl, IPFOBJ_NATLOOKUP);
+			} else
+				error = ESRCH;
+		}
 		if (getlock) {
 			RWLOCK_EXIT(&ipf_nat);
 		}
