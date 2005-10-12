@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,9 +93,13 @@ C_CloseSession(CK_SESSION_HANDLE hSession)
 
 	(void) pthread_mutex_lock(&session_p->session_mutex);
 	/*
-	 * Se SESSION_IS_CLOSING flag so any access to this
+	 * Set SESSION_IS_CLOSING flag so any access to this
 	 * session will be rejected.
 	 */
+	if (session_p->ses_close_sync & SESSION_IS_CLOSING) {
+		SES_REFRELE(session_p, lock_held);
+		return (CKR_SESSION_CLOSED);
+	}
 	session_p->ses_close_sync |= SESSION_IS_CLOSING;
 
 	/*

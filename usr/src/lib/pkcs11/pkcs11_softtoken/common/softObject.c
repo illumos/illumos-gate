@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -270,6 +270,11 @@ C_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)
 		 * object will be rejected.
 		 */
 		(void) pthread_mutex_lock(&object_p->object_mutex);
+		if (object_p->obj_delete_sync & OBJECT_IS_DELETING) {
+			(void) pthread_mutex_unlock(&object_p->object_mutex);
+			SES_REFRELE(session_p, lock_held);
+			return (CKR_OBJECT_HANDLE_INVALID);
+		}
 		object_p->obj_delete_sync |= OBJECT_IS_DELETING;
 		(void) pthread_mutex_unlock(&object_p->object_mutex);
 		SES_REFRELE(session_p, lock_held);
@@ -298,6 +303,11 @@ C_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)
 	 * object will be rejected.
 	 */
 	(void) pthread_mutex_lock(&object_p->object_mutex);
+	if (object_p->obj_delete_sync & OBJECT_IS_DELETING) {
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
+		SES_REFRELE(session_p, lock_held);
+		return (CKR_OBJECT_HANDLE_INVALID);
+	}
 	object_p->obj_delete_sync |= OBJECT_IS_DELETING;
 	(void) pthread_mutex_unlock(&object_p->object_mutex);
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -839,11 +839,12 @@ soft_ssl_key_and_mac_derive(soft_session_t *sp, CK_MECHANISM_PTR mech,
 			    random_data->pClientRandom, ClientRandomLen,
 			    random_data->pServerRandom, ServerRandomLen,
 			    export_keys, B_TRUE);
-			    new_tmpl[4].pValue = export_keys;
+			new_tmpl[4].pValue = export_keys;
+			new_tmpl[4].ulValueLen = MD5_HASH_SIZE;
 		} else {
 			new_tmpl[4].pValue = kb;
+			new_tmpl[4].ulValueLen = secret_key_bytes;
 		}
-		new_tmpl[4].ulValueLen = secret_key_bytes;
 
 		if (ulAttributeCount > 0)
 			bcopy(pTemplate, &new_tmpl[5],
