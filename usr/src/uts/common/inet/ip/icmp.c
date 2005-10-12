@@ -1694,12 +1694,6 @@ icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 				pkti->ipi6_addr = ipv6_all_zeros;
 			return (sizeof (struct in6_pktinfo));
 		}
-		case IPV6_HOPLIMIT:
-			if (ipp->ipp_fields & IPPF_HOPLIMIT)
-				*i1 = ipp->ipp_hoplimit;
-			else
-				*i1 = -1; /* Not set */
-			break;
 		case IPV6_NEXTHOP: {
 			sin6_t *sin6 = (sin6_t *)ptr;
 
@@ -2130,15 +2124,15 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			}
 			if (!checkonly) {
 				if (*i1 == -1) {
-					icmp->icmp_ttl = ipp->ipp_hoplimit =
+					icmp->icmp_ttl = ipp->ipp_unicast_hops =
 					    icmp_ipv6_hoplimit;
-					ipp->ipp_fields &= ~IPPF_HOPLIMIT;
+					ipp->ipp_fields &= ~IPPF_UNICAST_HOPS;
 					/* Pass modified value to IP. */
 					*i1 = ipp->ipp_hoplimit;
 				} else {
-					icmp->icmp_ttl = ipp->ipp_hoplimit =
+					icmp->icmp_ttl = ipp->ipp_unicast_hops =
 					    (uint8_t)*i1;
-					ipp->ipp_fields |= IPPF_HOPLIMIT;
+					ipp->ipp_fields |= IPPF_UNICAST_HOPS;
 				}
 				/* Rebuild the header template */
 				error = icmp_build_hdrs(q, icmp);
@@ -2157,22 +2151,16 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (!checkonly) {
 				if (*i1 == -1) {
 					icmp->icmp_multicast_ttl =
-					    ipp->ipp_multi_hoplimit =
+					    ipp->ipp_multicast_hops =
 					    IP_DEFAULT_MULTICAST_TTL;
-					ipp->ipp_fields &= ~IPPF_MULTI_HOPLIMIT;
+					ipp->ipp_fields &= ~IPPF_MULTICAST_HOPS;
 					/* Pass modified value to IP. */
-					*i1 = ipp->ipp_multi_hoplimit;
+					*i1 = icmp->icmp_multicast_ttl;
 				} else {
 					icmp->icmp_multicast_ttl =
-					    ipp->ipp_multi_hoplimit =
+					    ipp->ipp_multicast_hops =
 					    (uint8_t)*i1;
-					ipp->ipp_fields |= IPPF_MULTI_HOPLIMIT;
-				}
-				/* Rebuild the header template */
-				error = icmp_build_hdrs(q, icmp);
-				if (error != 0) {
-					*outlenp = 0;
-					return (error);
+					ipp->ipp_fields |= IPPF_MULTICAST_HOPS;
 				}
 			}
 			break;
@@ -2322,6 +2310,9 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			}
 			break;
 		case IPV6_HOPLIMIT:
+			/* This option can only be used as ancillary data. */
+			if (sticky)
+				return (EINVAL);
 			if (inlen != 0 && inlen != sizeof (int))
 				return (EINVAL);
 			if (checkonly)
@@ -2338,11 +2329,6 @@ icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				else
 					ipp->ipp_hoplimit = *i1;
 				ipp->ipp_fields |= IPPF_HOPLIMIT;
-			}
-			if (sticky) {
-				error = icmp_build_hdrs(q, icmp);
-				if (error != 0)
-					return (error);
 			}
 			break;
 		case IPV6_TCLASS:
@@ -2726,15 +2712,6 @@ icmp_build_hdrs(queue_t *q, icmp_t *icmp)
 
 	if (!(ipp->ipp_fields & IPPF_ADDR))
 		ip6h->ip6_src = icmp->icmp_v6src;
-
-	/*
-	 * If IPV6_HOPLIMIT was set in ipp, use that value.
-	 * For sticky options, if it does not exist use
-	 * the value in the icmp structure.
-	 * All this as per RFC 2922.
-	 */
-	if (!(ipp->ipp_fields & IPPF_HOPLIMIT))
-		ip6h->ip6_hops = icmp->icmp_ttl;
 
 	/* Try to get everything in a single mblk */
 	if (hdrs_len > icmp->icmp_max_hdr_len) {
@@ -4247,13 +4224,21 @@ icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
 		}
 	}
 
-	if (!(ignore & IPPF_HOPLIMIT)) {
-		if (ipp->ipp_fields & IPPF_HOPLIMIT) {
-			option_exists |= IPPF_HOPLIMIT;
-		} else if (icmp->icmp_sticky_ipp.ipp_fields & IPPF_HOPLIMIT) {
-			option_exists |= IPPF_HOPLIMIT;
-			is_sticky |= IPPF_HOPLIMIT;
-		}
+	if (!(ignore & IPPF_HOPLIMIT) && (ipp->ipp_fields & IPPF_HOPLIMIT))
+		option_exists |= IPPF_HOPLIMIT;
+	/* IPV6_HOPLIMIT can never be sticky */
+	ASSERT(!(icmp->icmp_sticky_ipp.ipp_fields & IPPF_HOPLIMIT));
+
+	if (!(ignore & IPPF_UNICAST_HOPS) &&
+	    (icmp->icmp_sticky_ipp.ipp_fields & IPPF_UNICAST_HOPS)) {
+		option_exists |= IPPF_UNICAST_HOPS;
+		is_sticky |= IPPF_UNICAST_HOPS;
+	}
+
+	if (!(ignore & IPPF_MULTICAST_HOPS) &&
+	    (icmp->icmp_sticky_ipp.ipp_fields & IPPF_MULTICAST_HOPS)) {
+		option_exists |= IPPF_MULTICAST_HOPS;
+		is_sticky |= IPPF_MULTICAST_HOPS;
 	}
 
 	if (icmp->icmp_sticky_ipp.ipp_fields & IPPF_NO_CKSUM) {
@@ -4373,15 +4358,19 @@ no_options:
 	ip6h->ip6_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
 	bzero(&ip6h->ip6_src, sizeof (ip6h->ip6_src));
 
+	/* Set the hoplimit of the outgoing packet. */
 	if (option_exists & IPPF_HOPLIMIT) {
-		tipp = ANCIL_OR_STICKY_PTR(IPPF_HOPLIMIT);
-		ip6h->ip6_hops = tipp->ipp_hoplimit;
-	} else if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) &&
-	    (icmp->icmp_sticky_ipp.ipp_fields & IPPF_MULTI_HOPLIMIT)) {
-		ip6h->ip6_hops = icmp->icmp_multicast_ttl;
+		/* IPV6_HOPLIMIT ancillary data overrides all other settings. */
+		ip6h->ip6_hops = ipp->ipp_hoplimit;
 		ip6i->ip6i_flags |= IP6I_HOPLIMIT;
+	} else if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
+		ip6h->ip6_hops = icmp->icmp_multicast_ttl;
+		if (option_exists & IPPF_MULTICAST_HOPS)
+			ip6i->ip6i_flags |= IP6I_HOPLIMIT;
 	} else {
 		ip6h->ip6_hops = icmp->icmp_ttl;
+		if (option_exists & IPPF_UNICAST_HOPS)
+			ip6i->ip6i_flags |= IP6I_HOPLIMIT;
 	}
 
 	if (option_exists & IPPF_ADDR) {

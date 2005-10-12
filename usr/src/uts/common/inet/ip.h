@@ -2393,8 +2393,9 @@ struct ip6_pkt_s {
 	uint_t		ipp_sticky_ignored;	/* sticky fields to ignore */
 	uint_t		ipp_ifindex;		/* pktinfo ifindex */
 	in6_addr_t	ipp_addr;		/* pktinfo src/dst addr */
-	uint_t		ipp_hoplimit;
-	uint_t		ipp_multi_hoplimit;
+	uint_t		ipp_unicast_hops;	/* IPV6_UNICAST_HOPS */
+	uint_t		ipp_multicast_hops;	/* IPV6_MULTICAST_HOPS */
+	uint_t		ipp_hoplimit;		/* IPV6_HOPLIMIT */
 	uint_t		ipp_hopoptslen;
 	uint_t		ipp_rtdstoptslen;
 	uint_t		ipp_rthdrlen;
@@ -2448,13 +2449,14 @@ typedef struct in_pktinfo {
 
 #define	IPPF_TCLASS	0x1000
 #define	IPPF_DONTFRAG	0x2000
-#define	IPPF_USE_MIN_MTU	0x4000
-#define	IPPF_MULTI_HOPLIMIT	0x8000
+#define	IPPF_USE_MIN_MTU	0x04000
+#define	IPPF_MULTICAST_HOPS	0x08000
+#define	IPPF_UNICAST_HOPS	0x10000
 
 #define	IPPF_HAS_IP6I \
 	(IPPF_IFINDEX|IPPF_ADDR|IPPF_NEXTHOP|IPPF_SCOPE_ID| \
 	IPPF_NO_CKSUM|IPPF_RAW_CKSUM|IPPF_HOPLIMIT|IPPF_DONTFRAG| \
-	IPPF_USE_MIN_MTU|IPPF_MULTI_HOPLIMIT)
+	IPPF_USE_MIN_MTU|IPPF_MULTICAST_HOPS|IPPF_UNICAST_HOPS)
 
 #define	TCP_PORTS_OFFSET	0
 #define	UDP_PORTS_OFFSET	0

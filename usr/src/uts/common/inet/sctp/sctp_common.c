@@ -422,6 +422,12 @@ sctp_set_iplen(sctp_t *sctp, mblk_t *mp)
 		iph->ipha_length = htons(sum);
 	} else {
 		ip6h = (ip6_t *)mp->b_rptr;
+		/*
+		 * If an ip6i_t is present, the real IPv6 header
+		 * immediately follows.
+		 */
+		if (ip6h->ip6_nxt == IPPROTO_RAW)
+			ip6h = (ip6_t *)&ip6h[1];
 		ip6h->ip6_plen = htons(sum - ((char *)&sctp->sctp_ip6h[1] -
 		    sctp->sctp_iphc6));
 	}
@@ -904,14 +910,12 @@ sctp_build_hdrs(sctp_t *sctp)
 	ip6_pkt_t	*ipp = &sctp->sctp_sticky_ipp;
 	in6_addr_t	src;
 	in6_addr_t	dst;
-	uint8_t		hoplimit;
 	/*
 	 * save the existing sctp header and source/dest IP addresses
 	 */
 	bcopy(sctp->sctp_sctph6, buf, sizeof (sctp_hdr_t));
 	src = sctp->sctp_ip6h->ip6_src;
 	dst = sctp->sctp_ip6h->ip6_dst;
-	hoplimit = sctp->sctp_ip6h->ip6_hops;
 	hdrs_len = ip_total_hdrs_len_v6(ipp) + SCTP_MAX_HDR_LENGTH;
 	ASSERT(hdrs_len != 0);
 	if (hdrs_len > sctp->sctp_iphc6_len) {
@@ -948,20 +952,11 @@ sctp_build_hdrs(sctp_t *sctp)
 	sctp->sctp_ip6h->ip6_src = src;
 	sctp->sctp_ip6h->ip6_dst = dst;
 	/*
-	 * If IPV6_HOPLIMIT was set in ipp, use that value.
-	 * For sticky options, if it does not exist use
-	 * the default/saved value (which was set in ip_build_hdrs_v6())
-	 * All this as per RFC 2922.
+	 * If the hoplimit was not set by ip_build_hdrs_v6(), we need to
+	 * set it to the default value for SCTP.
 	 */
-	if (!(ipp->ipp_fields & IPPF_HOPLIMIT))
-		sctp->sctp_ip6h->ip6_hops = hoplimit;
-	/*
-	 * Set the IPv6 header payload length.
-	 * If there's an ip6i_t included, don't count it in the length.
-	 */
-	sctp->sctp_ip6h->ip6_plen = sctp->sctp_hdr6_len - IPV6_HDR_LEN;
-	if (ipp->ipp_fields & IPPF_HAS_IP6I)
-		sctp->sctp_ip6h->ip6_plen -= sizeof (ip6i_t);
+	if (!(ipp->ipp_fields & IPPF_UNICAST_HOPS))
+		sctp->sctp_ip6h->ip6_hops = sctp_ipv6_hoplimit;
 	/*
 	 * If we're setting extension headers after a connection
 	 * has been established, and if we have a routing header

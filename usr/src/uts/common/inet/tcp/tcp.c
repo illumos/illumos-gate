@@ -10220,12 +10220,6 @@ tcp_opt_get(queue_t *q, int level, int	name, uchar_t *ptr)
 				pkti->ipi6_addr = ipv6_all_zeros;
 			return (sizeof (struct in6_pktinfo));
 		}
-		case IPV6_HOPLIMIT:
-			if (ipp->ipp_fields & IPPF_HOPLIMIT)
-				*i1 = ipp->ipp_hoplimit;
-			else
-				*i1 = -1; /* Not set */
-			break;	/* goto sizeof (int) option return */
 		case IPV6_TCLASS:
 			if (ipp->ipp_fields & IPPF_TCLASS)
 				*i1 = ipp->ipp_tclass;
@@ -10722,16 +10716,20 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (!checkonly) {
 				if (*i1 == -1) {
 					tcp->tcp_ip6h->ip6_hops =
-					    ipp->ipp_hoplimit =
+					    ipp->ipp_unicast_hops =
 					    (uint8_t)tcp_ipv6_hoplimit;
-					ipp->ipp_fields &= ~IPPF_HOPLIMIT;
+					ipp->ipp_fields &= ~IPPF_UNICAST_HOPS;
 					/* Pass modified value to IP. */
 					*i1 = tcp->tcp_ip6h->ip6_hops;
 				} else {
 					tcp->tcp_ip6h->ip6_hops =
-					    ipp->ipp_hoplimit = (uint8_t)*i1;
-					ipp->ipp_fields |= IPPF_HOPLIMIT;
+					    ipp->ipp_unicast_hops =
+					    (uint8_t)*i1;
+					ipp->ipp_fields |= IPPF_UNICAST_HOPS;
 				}
+				reterr = tcp_build_hdrs(q, tcp);
+				if (reterr != 0)
+					return (reterr);
 			}
 			break;
 		case IPV6_BOUND_IF:
@@ -10872,33 +10870,6 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 					ipp->ipp_fields |= IPPF_ADDR;
 				else
 					ipp->ipp_fields &= ~IPPF_ADDR;
-			}
-			reterr = tcp_build_hdrs(q, tcp);
-			if (reterr != 0)
-				return (reterr);
-			break;
-		case IPV6_HOPLIMIT:
-			if (inlen != 0 && inlen != sizeof (int))
-				return (EINVAL);
-			if (checkonly)
-				break;
-
-			if (inlen == 0) {
-				ipp->ipp_fields &= ~IPPF_HOPLIMIT;
-				tcp->tcp_ip6_hops =
-				    (uint8_t)tcp_ipv6_hoplimit;
-			} else {
-				if (*i1 > 255 || *i1 < -1)
-					return (EINVAL);
-				if (*i1 == -1) {
-					ipp->ipp_hoplimit = tcp_ipv6_hoplimit;
-					*i1 = tcp_ipv6_hoplimit;
-				} else {
-					ipp->ipp_hoplimit = *i1;
-				}
-				ipp->ipp_fields |= IPPF_HOPLIMIT;
-				tcp->tcp_ip6_hops =
-				    ipp->ipp_hoplimit;
 			}
 			reterr = tcp_build_hdrs(q, tcp);
 			if (reterr != 0)
@@ -11175,7 +11146,6 @@ tcp_build_hdrs(queue_t *q, tcp_t *tcp)
 	char	buf[TCP_MAX_HDR_LENGTH];
 	ip6_pkt_t *ipp = &tcp->tcp_sticky_ipp;
 	in6_addr_t src, dst;
-	uint8_t hops;
 
 	/*
 	 * save the existing tcp header and source/dest IP addresses
@@ -11183,7 +11153,6 @@ tcp_build_hdrs(queue_t *q, tcp_t *tcp)
 	bcopy(tcp->tcp_tcph, buf, tcp->tcp_tcp_hdr_len);
 	src = tcp->tcp_ip6h->ip6_src;
 	dst = tcp->tcp_ip6h->ip6_dst;
-	hops = tcp->tcp_ip6h->ip6_hops;
 	hdrs_len = ip_total_hdrs_len_v6(ipp) + TCP_MAX_HDR_LENGTH;
 	ASSERT(hdrs_len != 0);
 	if (hdrs_len > tcp->tcp_iphc_len) {
@@ -11230,19 +11199,12 @@ tcp_build_hdrs(queue_t *q, tcp_t *tcp)
 	tcp->tcp_ip6h->ip6_dst = dst;
 
 	/*
-	 * If the hop limit was not set by ip_build_hdrs_v6(), restore
-	 * the saved value.
+	 * If the hop limit was not set by ip_build_hdrs_v6(), set it to
+	 * the default value for TCP.
 	 */
-	if (!(ipp->ipp_fields & IPPF_HOPLIMIT))
-		tcp->tcp_ip6h->ip6_hops = hops;
+	if (!(ipp->ipp_fields & IPPF_UNICAST_HOPS))
+		tcp->tcp_ip6h->ip6_hops = tcp_ipv6_hoplimit;
 
-	/*
-	 * Set the IPv6 header payload length.
-	 * If there's an ip6i_t included, don't count it in the length.
-	 */
-	tcp->tcp_ip6h->ip6_plen = tcp->tcp_hdr_len - IPV6_HDR_LEN;
-	if (ipp->ipp_fields & IPPF_HAS_IP6I)
-		tcp->tcp_ip6h->ip6_plen -= sizeof (ip6i_t);
 	/*
 	 * If we're setting extension headers after a connection
 	 * has been established, and if we have a routing header

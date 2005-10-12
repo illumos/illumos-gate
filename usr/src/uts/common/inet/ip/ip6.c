@@ -10263,12 +10263,14 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 
 	/*
 	 * If the sender didn't supply the hop limit and there is a default
-	 * hop limit associated with the output interface, we use that.
-	 * Interface specific hop limits as set via the SIOCSLIFLNKINFO
-	 * ioctl.
+	 * unicast hop limit associated with the output interface, we use
+	 * that if the packet is unicast.  Interface specific unicast hop
+	 * limits as set via the SIOCSLIFLNKINFO ioctl.
 	 */
-	if (!(flags & IP6I_HOPLIMIT) && ill->ill_max_hops != 0)
+	if (ill->ill_max_hops != 0 && !(flags & IP6I_HOPLIMIT) &&
+	    !(IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst))) {
 		ip6h->ip6_hops = ill->ill_max_hops;
+	}
 
 	if (ire->ire_type == IRE_LOCAL && ire->ire_zoneid != zoneid) {
 		/*
@@ -11724,8 +11726,8 @@ ip_build_hdrs_v6(uchar_t *ext_hdrs, uint_t ext_hdrs_len,
 			    &ipp->ipp_addr));
 			ip6i->ip6i_flags |= IP6I_VERIFY_SRC;
 		}
-		if (ipp->ipp_fields & IPPF_HOPLIMIT) {
-			ip6i->ip6i_hops = ip6h->ip6_hops = ipp->ipp_hoplimit;
+		if (ipp->ipp_fields & IPPF_UNICAST_HOPS) {
+			ip6h->ip6_hops = ipp->ipp_unicast_hops;
 			/*
 			 * We need to set this flag so that IP doesn't
 			 * rewrite the IPv6 header's hoplimit with the

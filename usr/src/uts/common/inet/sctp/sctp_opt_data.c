@@ -1122,12 +1122,6 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			*optlen = sizeof (struct in6_pktinfo);
 			break;
 		}
-		case IPV6_HOPLIMIT:
-			if (ipp->ipp_fields & IPPF_HOPLIMIT)
-				*i1 = ipp->ipp_hoplimit;
-			else
-				*i1 = -1; /* Not set */
-			break;	/* goto sizeof (int) option return */
 		case IPV6_NEXTHOP: {
 			sin6_t *sin6;
 
@@ -1515,10 +1509,14 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				retval = EINVAL;
 				break;
 			}
-			if (*i1 == -1)
-				sctp->sctp_ip6h->ip6_hops = sctp_ipv6_hoplimit;
-			else
-				sctp->sctp_ip6h->ip6_hops = (uint8_t)*i1;
+			if (*i1 == -1) {
+				ipp->ipp_unicast_hops = sctp_ipv6_hoplimit;
+				ipp->ipp_fields &= ~IPPF_UNICAST_HOPS;
+			} else {
+				ipp->ipp_unicast_hops = (uint8_t)*i1;
+				ipp->ipp_fields |= IPPF_UNICAST_HOPS;
+			}
+			retval = sctp_build_hdrs(sctp);
 			break;
 		case IPV6_UNSPEC_SRC:
 			if (inlen < sizeof (int32_t)) {
@@ -1632,26 +1630,6 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 					ipp->ipp_fields |= IPPF_ADDR;
 				else
 					ipp->ipp_fields &= ~IPPF_ADDR;
-			}
-			retval = sctp_build_hdrs(sctp);
-			break;
-		case IPV6_HOPLIMIT:
-			if (inlen != 0 && inlen != sizeof (int)) {
-				retval = EINVAL;
-				break;
-			}
-			if (inlen == 0) {
-				ipp->ipp_fields &= ~IPPF_HOPLIMIT;
-			} else {
-				if (*i1 > 255 || *i1 < -1) {
-					retval = EINVAL;
-					break;
-				}
-				if (*i1 == -1)
-					ipp->ipp_hoplimit = sctp_ipv6_hoplimit;
-				else
-					ipp->ipp_hoplimit = *i1;
-				ipp->ipp_fields |= IPPF_HOPLIMIT;
 			}
 			retval = sctp_build_hdrs(sctp);
 			break;
