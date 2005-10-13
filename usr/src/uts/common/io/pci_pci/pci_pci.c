@@ -509,7 +509,7 @@ ppb_initchild(dev_info_t *child)
 		 * Try to merge the properties from this prototype
 		 * node into real h/w nodes.
 		 */
-		if (ndi_merge_node(child, ppb_name_child) != DDI_SUCCESS) {
+		if (ndi_merge_node(child, ppb_name_child) == DDI_SUCCESS) {
 			/*
 			 * Merged ok - return failure to remove the node.
 			 */
