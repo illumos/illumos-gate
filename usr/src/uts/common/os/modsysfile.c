@@ -183,6 +183,7 @@ kobj_file_err(int type,  struct _buf *file, char *fmt, ...)
 
 #ifdef DEBUG
 char *tokennames[] = {
+	"UNEXPECTED",
 	"EQUALS",
 	"AMPERSAND",
 	"BIT_OR",
@@ -208,10 +209,10 @@ kobj_lex(struct _buf *file, char *val, size_t size)
 	char	*cp;
 	int	ch, oval, badquote;
 	size_t	remain;
-	token_t token;
+	token_t token = UNEXPECTED;
 
 	if (size < 2)
-		return (-1);
+		return (token);	/* this token is UNEXPECTED */
 
 	cp = val;
 	while ((ch = kobj_getc(file)) == ' ' || ch == '\t')
@@ -253,8 +254,8 @@ kobj_lex(struct _buf *file, char *val, size_t size)
 		while ((ch = kobj_getc(file)) == ' ' ||
 		    ch == '\t' || ch == '\f') {
 			if (--remain == 0) {
-				*cp = '\0';
-				return (-1);
+				token = UNEXPECTED;
+				goto out;
 			}
 			*cp++ = (char)ch;
 		}
@@ -284,8 +285,8 @@ kobj_lex(struct _buf *file, char *val, size_t size)
 
 			case '\\':
 				if (--remain == 0) {
-					*cp = '\0';
-					return (-1);
+					token = UNEXPECTED;
+					goto out;
 				}
 				ch = (char)kobj_getc(file);
 				if (!isdigit(ch)) {
@@ -310,8 +311,8 @@ kobj_lex(struct _buf *file, char *val, size_t size)
 				break;
 			default:
 				if (--remain == 0) {
-					*cp = '\0';
-					return (-1);
+					token = UNEXPECTED;
+					goto out;
 				}
 				*cp++ = (char)ch;
 				break;
@@ -331,8 +332,8 @@ kobj_lex(struct _buf *file, char *val, size_t size)
 		 */
 		if (ch == '-') {
 			if (--remain == 0) {
-				*cp = '\0';
-				return (-1);
+				token = UNEXPECTED;
+				goto out;
 			}
 			*cp++ = (char)(ch = kobj_getc(file));
 			if (iswhite(ch) || (ch == '\n')) {
@@ -344,8 +345,8 @@ kobj_lex(struct _buf *file, char *val, size_t size)
 			}
 		} else if (isunary(ch)) {
 			if (--remain == 0) {
-				*cp = '\0';
-				return (-1);
+				token = UNEXPECTED;
+				goto out;
 			}
 			*cp++ = (char)(ch = kobj_getc(file));
 		}
@@ -355,15 +356,15 @@ kobj_lex(struct _buf *file, char *val, size_t size)
 			if (ch == '0') {
 				if ((ch = kobj_getc(file)) == 'x') {
 					if (--remain == 0) {
-						*cp = '\0';
-						return (-1);
+						token = UNEXPECTED;
+						goto out;
 					}
 					*cp++ = (char)ch;
 					ch = kobj_getc(file);
 					while (isxdigit(ch)) {
 						if (--remain == 0) {
-							*cp = '\0';
-							return (-1);
+							token = UNEXPECTED;
+							goto out;
 						}
 						*cp++ = (char)ch;
 						ch = kobj_getc(file);
@@ -378,8 +379,8 @@ kobj_lex(struct _buf *file, char *val, size_t size)
 digit:
 				while (isdigit(ch)) {
 					if (--remain == 0) {
-						*cp = '\0';
-						return (-1);
+						token = UNEXPECTED;
+						goto out;
 					}
 					*cp++ = (char)ch;
 					ch = kobj_getc(file);
@@ -403,8 +404,8 @@ digit:
 				if (ch == '\\')
 					ch = kobj_getc(file);
 				if (--remain == 0) {
-					*cp = '\0';
-					return (-1);
+					token = UNEXPECTED;
+					goto out;
 				}
 				*cp++ = (char)ch;
 				ch = kobj_getc(file);
@@ -412,16 +413,21 @@ digit:
 			(void) kobj_ungetc(file);
 			token = NAME;
 		} else {
-			return (-1);
+			token = UNEXPECTED;
 		}
 		break;
 	}
-
+out:
 	*cp = '\0';
 
 #ifdef DEBUG
-	parse_debug(NULL, "kobj_lex: token %s value '%s'\n", tokennames[token],
-	    val);
+	/*
+	 * The UNEXPECTED token is the first element of the tokennames array,
+	 * but its token value is -1.  Adjust the value by adding one to it
+	 * to change it to an index of the array.
+	 */
+	parse_debug(NULL, "kobj_lex: token %s value '%s'\n",
+	    tokennames[token+1], val);
 #endif
 	return (token);
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,7 @@ extern "C" {
 #define	isnamechar(ch)	(isalphanum(ch) || (ch) == '_' || (ch) == '-')
 
 typedef enum {
+	UNEXPECTED = -1,
 	EQUALS,
 	AMPERSAND,
 	BIT_OR,
