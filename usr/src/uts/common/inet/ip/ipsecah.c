@@ -840,7 +840,7 @@ inbound_task(void *arg)
 static int
 ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 {
-	isaf_t *primary, *secondary, *inbound;
+	isaf_t *primary, *secondary, *inbound, *outbound;
 	sadb_sa_t *assoc = (sadb_sa_t *)ksi->ks_in_extv[SADB_EXT_SA];
 	sadb_address_t *dstext =
 	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
@@ -876,6 +876,7 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 	}
 
 	inbound = INBOUND_BUCKET(sp, assoc->sadb_sa_spi);
+	outbound = &sp->sdb_of[outhash];
 
 	switch (ksi->ks_in_dsttype) {
 	case KS_IN_ADDR_MBCAST:
@@ -883,7 +884,7 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 		/* FALLTHRU */
 	case KS_IN_ADDR_ME:
 		primary = inbound;
-		secondary = &sp->sdb_of[outhash];
+		secondary = outbound;
 		/*
 		 * If the source address is either one of mine, or unspecified
 		 * (which is best summed up by saying "not 'not mine'"),
@@ -897,7 +898,7 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi)
 		is_inbound = B_TRUE;
 		break;
 	case KS_IN_ADDR_NOTME:
-		primary = &sp->sdb_of[outhash];
+		primary = outbound;
 		secondary = inbound;
 		/*
 		 * If the source address literally not mine (either

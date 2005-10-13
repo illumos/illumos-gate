@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,6 +90,8 @@ struct ip_dropstats {
 	kstat_named_t ipds_spd_nomem;
 	kstat_named_t ipds_spd_ah_badid;
 	kstat_named_t ipds_spd_esp_badid;
+	kstat_named_t ipds_spd_ah_innermismatch;
+	kstat_named_t ipds_spd_esp_innermismatch;
 
 	/* ESP-specific drop statistics. */
 	kstat_named_t ipds_esp_nomem;
@@ -152,6 +154,10 @@ struct ip_dropstats {
 #define	ipdrops_spd_nomem		ip_drop_types->ipds_spd_nomem
 #define	ipdrops_spd_ah_badid		ip_drop_types->ipds_spd_ah_badid
 #define	ipdrops_spd_esp_badid		ip_drop_types->ipds_spd_esp_badid
+#define	ipdrops_spd_ah_innermismatch	\
+				ip_drop_types->ipds_spd_ah_innermismatch
+#define	ipdrops_spd_esp_innermismatch	\
+				ip_drop_types->ipds_spd_esp_innermismatch
 
 /* ESP-specific drop statistics. */
 #define	ipdrops_esp_nomem		ip_drop_types->ipds_esp_nomem

@@ -2068,6 +2068,7 @@ sadb_srcaddrfix(keysock_in_t *ksi)
 	struct sockaddr_in *src;
 	struct sockaddr_in6 *dst;
 	sadb_address_t *srcext, *dstext;
+	uint16_t sport;
 
 	if (ksi->ks_in_srctype != KS_IN_ADDR_UNSPEC ||
 	    ksi->ks_in_dsttype == KS_IN_ADDR_NOTTHERE)
@@ -2086,9 +2087,14 @@ sadb_srcaddrfix(keysock_in_t *ksi)
 	    src->sin_family == AF_INET)
 		return;
 
-	/* Convert "src" to AF_INET INADDR_ANY. */
+	/*
+	 * Convert "src" to AF_INET INADDR_ANY.  We rely on sin_port being
+	 * in the same place for sockaddr_in and sockaddr_in6.
+	 */
+	sport = src->sin_port;
 	bzero(src, sizeof (*src));
 	src->sin_family = AF_INET;
+	src->sin_port = sport;
 }
 
 /*
@@ -2145,9 +2151,11 @@ sadb_purge_cb(isaf_t *head, ipsa_t *entry, void *cookie)
 	    (ps->dst != NULL &&
 		!IPSA_ARE_ADDR_EQUAL(entry->ipsa_dstaddr, ps->dst, ps->af)) ||
 	    (ps->didstr != NULL &&
+		(entry->ipsa_dst_cid != NULL) &&
 		!(ps->didtype == entry->ipsa_dst_cid->ipsid_type &&
 		    strcmp(ps->didstr, entry->ipsa_dst_cid->ipsid_cid) == 0)) ||
 	    (ps->sidstr != NULL &&
+		(entry->ipsa_src_cid != NULL) &&
 		!(ps->sidtype == entry->ipsa_src_cid->ipsid_type &&
 		    strcmp(ps->sidstr, entry->ipsa_src_cid->ipsid_cid) == 0)) ||
 	    (ps->kmproto <= SADB_X_KMP_MAX && ps->kmproto != entry->ipsa_kmp)) {
@@ -2418,13 +2426,10 @@ sadb_set_unique(ipsa_t *sa, uint8_t proto,
 	uint16_t srcport = src->sin_port;
 	uint16_t dstport = dst->sin_port;
 
-	if (proto != IPPROTO_TCP && proto != IPPROTO_UDP) {
-		srcport = dstport = 0;
-	}
-
 	sa->ipsa_unique_id = SA_UNIQUE_ID(srcport, dstport, proto);
 	sa->ipsa_unique_mask = SA_UNIQUE_MASK(srcport, dstport, proto);
-	sa->ipsa_flags |= IPSA_F_UNIQUE;
+	if (sa->ipsa_unique_mask != 0)
+		sa->ipsa_flags |= IPSA_F_UNIQUE;
 }
 
 
@@ -2685,8 +2690,7 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	(void) drv_getparm(TIME, &newbie->ipsa_addtime);
 
 	/* Set unique value */
-	if (dstext->sadb_address_proto != 0)
-		sadb_set_unique(newbie, dstext->sadb_address_proto, src, dst);
+	sadb_set_unique(newbie, dstext->sadb_address_proto, src, dst);
 
 	if (kmcext != NULL) {
 		newbie->ipsa_kmp = kmcext->sadb_x_kmc_proto;
@@ -3833,9 +3837,8 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 	}
 
 	if (outbound_target != NULL) {
-		if (dstext->sadb_address_proto != 0)
-			sadb_set_unique(outbound_target,
-			    dstext->sadb_address_proto, src, dst);
+		sadb_set_unique(outbound_target, dstext->sadb_address_proto,
+		    src, dst);
 		sadb_update_lifetimes(outbound_target, hard, soft);
 		if (kmp != 0)
 			outbound_target->ipsa_kmp = kmp;
@@ -3844,9 +3847,8 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 	}
 
 	if (inbound_target != NULL) {
-		if (dstext->sadb_address_proto != 0)
-			sadb_set_unique(inbound_target,
-			    dstext->sadb_address_proto, src, dst);
+		sadb_set_unique(inbound_target, dstext->sadb_address_proto,
+		    src, dst);
 		sadb_update_lifetimes(inbound_target, hard, soft);
 		if (kmp != 0)
 			inbound_target->ipsa_kmp = kmp;

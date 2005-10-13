@@ -498,6 +498,9 @@ ipsec_getassocbyspi(isaf_t *bucket, uint32_t spi, uint32_t *src, uint32_t *dst,
 		 * There is a weakness here in that a packet with all-zeroes
 		 * for an address will match regardless of the source address
 		 * stored in the packet.
+		 *
+		 * Note that port-level packet selectors, if present,
+		 * are checked in ipsec_check_ipsecin_unique().
 		 */
 		if (IPSA_ARE_ADDR_EQUAL(src, retval->ipsa_srcaddr, af) ||
 		    IPSA_IS_ADDR_UNSPEC(retval->ipsa_srcaddr, af) ||

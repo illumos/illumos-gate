@@ -31,10 +31,6 @@
  *
  * This module maintains the SPD and provides routines used by ip and ip6
  * to apply IPsec policy to inbound and outbound datagrams.
- *
- * XXX TODO LIST
- * Inbound policy:
- * Put policy failure logging back in here (as policy action flag bit)
  */
 
 #include <sys/types.h>
@@ -157,6 +153,9 @@ ipsec_alginfo_t *ipsec_alglists[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];
 uint8_t ipsec_sortlist[IPSEC_NALGTYPES][IPSEC_MAX_ALGS];
 ipsec_algs_exec_mode_t ipsec_algs_exec_mode[IPSEC_NALGTYPES];
 static crypto_notify_handle_t prov_update_handle = NULL;
+
+int ipsec_hdr_pullup_needed = 0;
+int ipsec_weird_null_inbound_policy = 0;
 
 #define	ALGBITS_ROUND_DOWN(x, align)	(((x)/(align))*(align))
 #define	ALGBITS_ROUND_UP(x, align)	ALGBITS_ROUND_DOWN((x)+(align)-1, align)
@@ -1301,6 +1300,58 @@ ipsec_check_loopback_policy(queue_t *q, mblk_t *first_mp,
 	return (first_mp);
 }
 
+/*
+ * Check that packet's inbound ports & proto match the selectors
+ * expected by the SAs it traversed on the way in.
+ */
+static boolean_t
+ipsec_check_ipsecin_unique(ipsec_in_t *ii, mblk_t *mp,
+    ipha_t *ipha, ip6_t *ip6h,
+    const char **reason, kstat_named_t **counter)
+{
+	uint64_t pkt_unique, ah_mask, esp_mask;
+	ipsa_t *ah_assoc = ii->ipsec_in_ah_sa;
+	ipsa_t *esp_assoc = ii->ipsec_in_esp_sa;
+	ipsec_selector_t sel;
+
+	ASSERT((ah_assoc != NULL) || (esp_assoc != NULL));
+
+	ah_mask = (ah_assoc != NULL) ? ah_assoc->ipsa_unique_mask : 0;
+	esp_mask = (esp_assoc != NULL) ? esp_assoc->ipsa_unique_mask : 0;
+
+	if ((ah_mask == 0) && (esp_mask == 0))
+		return (B_TRUE);
+
+	if (!ipsec_init_inbound_sel(&sel, mp, ipha, ip6h)) {
+		/*
+		 * Technically not a policy mismatch, but it is
+		 * an internal failure.
+		 */
+		*reason = "ipsec_init_inbound_sel";
+		*counter = &ipdrops_spd_nomem;
+		return (B_FALSE);
+	}
+
+	pkt_unique = SA_UNIQUE_ID(sel.ips_remote_port, sel.ips_local_port,
+	    sel.ips_protocol);
+
+	if (ah_mask != 0) {
+		if (ah_assoc->ipsa_unique_id != (pkt_unique & ah_mask)) {
+			*reason = "AH inner header mismatch";
+			*counter = &ipdrops_spd_ah_innermismatch;
+			return (B_FALSE);
+		}
+	}
+	if (esp_mask != 0) {
+		if (esp_assoc->ipsa_unique_id != (pkt_unique & esp_mask)) {
+			*reason = "ESP inner header mismatch";
+			*counter = &ipdrops_spd_esp_innermismatch;
+			return (B_FALSE);
+		}
+	}
+	return (B_TRUE);
+}
+
 static boolean_t
 ipsec_check_ipsecin_action(ipsec_in_t *ii, mblk_t *mp, ipsec_action_t *ap,
     ipha_t *ipha, ip6_t *ip6h, const char **reason, kstat_named_t **counter)
@@ -1502,6 +1553,9 @@ ipsec_check_ipsecin_latch(ipsec_in_t *ii, mblk_t *mp, ipsec_latch_t *ipl,
 		return (B_FALSE);
 	}
 
+	if (!ipsec_check_ipsecin_unique(ii, mp, ipha, ip6h, reason, counter))
+		return (B_FALSE);
+
 	return (ipsec_check_ipsecin_action(ii, mp, ipl->ipl_in_action,
 	    ipha, ip6h, reason, counter));
 }
@@ -1552,6 +1606,10 @@ ipsec_check_ipsecin_policy(queue_t *q, mblk_t *first_mp, ipsec_policy_t *ipsp,
 		counter = &ipdrops_spd_ahesp_diffid;
 		goto drop;
 	}
+
+	if (!ipsec_check_ipsecin_unique(ii, data_mp, ipha, ip6h,
+	    &reason, &counter))
+		goto drop;
 
 	/*
 	 * Ok, now loop through the possible actions and see if any
@@ -2085,7 +2143,7 @@ ipsec_latch_inbound(ipsec_latch_t *ipl, ipsec_in_t *ii)
  * inbound datagram; called from IP in numerous places.
  *
  * Note that this is not a chokepoint for inbound policy checks;
- * see also ipsec_check_ipsecin_latch()
+ * see also ipsec_check_ipsecin_latch() and ipsec_check_global_policy()
  */
 mblk_t *
 ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
@@ -2176,14 +2234,16 @@ ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
 
 	if (ipl == NULL) {
 		/*
-		 * We don't have policies cached in the conn's
+		 * We don't have policies cached in the conn
 		 * for this stream. So, look at the global
 		 * policy. It will check against conn or global
 		 * depending on whichever is stronger.
 		 */
 		return (ipsec_check_global_policy(first_mp, connp,
 		    ipha, ip6h, mctl_present));
-	} else if (ipl->ipl_in_action != NULL) {
+	}
+
+	if (ipl->ipl_in_action != NULL) {
 		/* Policy is cached & latched; fast(er) path */
 		const char *reason;
 		kstat_named_t *counter;
@@ -2200,8 +2260,10 @@ ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
 		    &spd_dropper);
 		BUMP_MIB(&ip_mib, ipsecInFailed);
 		return (NULL);
-	} else if (ipl->ipl_in_policy == NULL)
+	} else if (ipl->ipl_in_policy == NULL) {
+		ipsec_weird_null_inbound_policy++;
 		return (first_mp);
+	}
 
 	IPPOL_REFHOLD(ipl->ipl_in_policy);
 	first_mp = ipsec_check_ipsecin_policy(CONNP_TO_WQ(connp), first_mp,
@@ -2284,6 +2346,7 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp,
 		 * apart from IP or options?  If so, perhaps we should revisit
 		 * the spare_mp strategy.
 		 */
+		ipsec_hdr_pullup_needed++;
 		if (spare_mp == NULL &&
 		    (spare_mp = msgpullup(mp, -1)) == NULL) {
 			return (B_FALSE);

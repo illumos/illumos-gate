@@ -2140,16 +2140,6 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 	 * First, fill in port numbers and protocol in extensions.
 	 */
 
-	if ((proto == 0) && ((srcport != 0) || (dstport != 0))) {
-		warnx(gettext("WARNING: ports without proto is nonsensical."));
-		/*
-		 * Don't worry about it, it just may make the SA not match
-		 * any outbound traffic, or it perhaps could be perverted
-		 * by the kernel to cover both TCP and UDP traffic on the
-		 * same port (e.g. DNS).
-		 */
-	}
-
 	if (src != NULL) {
 		src->sadb_address_proto = proto;
 		sin6 = (struct sockaddr_in6 *)(src + 1);
@@ -3345,6 +3335,13 @@ dodelget(int cmd, int satype, char *argv[])
 
 	thiscmd = (cmd == CMD_GET) ? "get" : "delete";
 
+#define	ALLOC_ADDR_EXT(ext, exttype)			\
+	(ext) = (struct sadb_address *)nextext;		\
+	nextext = (uint64_t *)((ext) + 1);		\
+	nextext += SADB_8TO64(roundup(sa_len, 8));	\
+	(ext)->sadb_address_exttype = exttype;		\
+	(ext)->sadb_address_len = nextext - ((uint64_t *)ext);
+
 	/* Assume last element in argv is set to NULL. */
 	do {
 		token = parseextval(*argv, &next);
@@ -3412,11 +3409,9 @@ dodelget(int cmd, int satype, char *argv[])
 			argv++;
 
 			unspec_src = B_FALSE;
-			src = (struct sadb_address *)nextext;
-			nextext = (uint64_t *)(src + 1);
-			nextext += SADB_8TO64(roundup(sa_len, 8));
-			src->sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
-			src->sadb_address_len = nextext - ((uint64_t *)src);
+
+			ALLOC_ADDR_EXT(src, SADB_EXT_ADDRESS_SRC);
+
 			if (srchp == &dummy.he) {
 				/*
 				 * Single address with -n flag.
@@ -3440,11 +3435,8 @@ dodelget(int cmd, int satype, char *argv[])
 			    (token == TOK_SRCADDR6));
 			argv++;
 
-			dst = (struct sadb_address *)nextext;
-			nextext = (uint64_t *)(dst + 1);
-			nextext += SADB_8TO64(roundup(sa_len, 8));
-			dst->sadb_address_exttype = SADB_EXT_ADDRESS_DST;
-			dst->sadb_address_len = nextext - ((uint64_t *)dst);
+			ALLOC_ADDR_EXT(dst, SADB_EXT_ADDRESS_DST);
+
 			if (dsthp == &dummy.he) {
 				/*
 				 * Single address with -n flag.
@@ -3464,6 +3456,20 @@ dodelget(int cmd, int satype, char *argv[])
 			break;
 		}
 	} while (token != TOK_EOF);
+
+	if ((srcport != 0) && (src == NULL)) {
+		ALLOC_ADDR_EXT(src, SADB_EXT_ADDRESS_SRC);
+		sin6 = (struct sockaddr_in6 *)(src + 1);
+		bzero(sin6, sizeof (*sin6));
+		sin6->sin6_family = AF_INET6;
+	}
+
+	if ((dstport != 0) && (dst == NULL)) {
+		ALLOC_ADDR_EXT(dst, SADB_EXT_ADDRESS_DST);
+		sin6 = (struct sockaddr_in6 *)(dst + 1);
+		bzero(sin6, sizeof (*sin6));
+		sin6->sin6_family = AF_INET6;
+	}
 
 	/* So I have enough of the message to send it down! */
 	msg->sadb_msg_len = nextext - get_buffer;

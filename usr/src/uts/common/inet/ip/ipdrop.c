@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,6 +110,10 @@ ip_drop_init(void)
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ipdrops_spd_esp_badid, "spd_esp_badid",
 	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ipdrops_spd_ah_innermismatch,
+	    "spd_ah_innermismatch", KSTAT_DATA_UINT64);
+	kstat_named_init(&ipdrops_spd_esp_innermismatch,
+	    "spd_esp_innermismatch", KSTAT_DATA_UINT64);
 
 	/* ESP-specific drop statistics. */
 
