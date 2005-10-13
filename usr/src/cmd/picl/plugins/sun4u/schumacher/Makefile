@@ -19,37 +19,33 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libc_psr/spec/sun4u-us3/Makefile.links
-
-include $(SRC)/Makefile.psm
-
-MODULE = abi
-
 #
-# links in /usr/platform
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-LINKED_PLATFORMS	= SUNW,Sun-Blade-1000
-LINKED_PLATFORMS	+= SUNW,Sun-Blade-1500
-LINKED_PLATFORMS	+= SUNW,Sun-Blade-2500
-LINKED_PLATFORMS	+= SUNW,A70
-LINKED_PLATFORMS	+= SUNW,Sun-Fire
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V240
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V250
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V440
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-280R
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-15000
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-880
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-480R
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V890
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V490
-LINKED_PLATFORMS	+= SUNW,Netra-T12
-LINKED_PLATFORMS	+= SUNW,Netra-T4
-LINKED_PLATFORMS	+= SUNW,Netra-CP3010
+# cmd/picl/plugins/sun4u/schumacher/Makefile
+#
 
-include $(SRC)/lib/libc_psr/spec/Makefile.com
+SUBDIRS=	frudata frutree
+
+MSGSUBDIRS=
+
+all :=		TARGET= all
+install :=	TARGET= install
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+lint :=		TARGET= lint
+_msg :=		TARGET= _msg
+
+.KEEP_STATE:
+
+all install clean clobber lint : $(SUBDIRS)
+
+_msg:	$(MSGSUBDIRS)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

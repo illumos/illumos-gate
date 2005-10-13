@@ -75,6 +75,7 @@ d none usr/platform/SUNW,UltraSPARC-IIi-Netract 755 root sys
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 755 root sys
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 755 root sys
 d none usr/platform/SUNW,Netra-CP2300 755 root sys
+d none usr/platform/SUNW,Netra-CP3010 755 root sys
 #
 # create other sun4u platform/lib directories
 #
@@ -105,3 +106,4 @@ d none usr/platform/SUNW,UltraSPARC-IIi-Netract/lib 755 root bin
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib 755 root bin
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP2300/lib 755 root bin
+d none usr/platform/SUNW,Netra-CP3010/lib 755 root bin

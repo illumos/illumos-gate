@@ -54,6 +54,14 @@ f none platform/SUNW,Netra-CP2300/kernel/misc/sparcv9/platmod 755 root sys
 d none platform/SUNW,Netra-CP2300/kernel/tod 755 root sys
 d none platform/SUNW,Netra-CP2300/kernel/tod/sparcv9 755 root sys
 f none platform/SUNW,Netra-CP2300/kernel/tod/sparcv9/todds1307 0755 root sys
+d none platform/SUNW,Netra-CP3010 755 root sys
+d none platform/SUNW,Netra-CP3010/kernel 755 root sys
+d none platform/SUNW,Netra-CP3010/kernel/misc 755 root sys
+d none platform/SUNW,Netra-CP3010/kernel/misc/sparcv9 755 root sys
+f none platform/SUNW,Netra-CP3010/kernel/misc/sparcv9/platmod 755 root sys
+d none platform/SUNW,Netra-CP3010/kernel/crypto 755 root sys
+d none platform/SUNW,Netra-CP3010/kernel/crypto/sparcv9 755 root sys
+s none platform/SUNW,Netra-CP3010/kernel/crypto/sparcv9/aes=../../../../sun4u-us3/kernel/crypto/sparcv9/aes
 d none platform/SUNW,Netra-T12 755 root sys
 d none platform/SUNW,Netra-T12/kernel 755 root sys
 s none platform/SUNW,Netra-T12/kernel/cpu=../../SUNW,Sun-Fire/kernel/cpu

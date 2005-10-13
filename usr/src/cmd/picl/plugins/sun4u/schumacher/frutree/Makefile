@@ -25,30 +25,49 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/picl/plugins/sun4u/Makefile
+# lib/picl/plugins/sun4u/schumacher/frutree/Makefile
 #
+include	$(SRC)/Makefile.psm
 
-SUBDIRS= lib .WAIT envmon .WAIT \
-	frudata grover excalibur psvc littleneck daktari \
-	cherrystone lw8 lw2plus taco enchilada chicago blade mpxu ents \
-	chalupa silverstone sebring snowbird schumacher .WAIT
+# include library definitions
+include $(SRC)/lib/Makefile.lib
 
-MSGSUBDIRS=	lib frudata grover excalibur psvc littleneck daktari \
-	cherrystone lw8 lw2plus taco enchilada chicago blade envmon mpxu ents \
-	silverstone sebring snowbird schumacher
+ROOT_PLATFORM = $(USR_PLAT_DIR)/SUNW,Netra-CP3010
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
+include	$(SRC)/cmd/picl/plugins/Makefile.com
+
+ROOTLIBDIR	= $(ROOT_PLAT_PLUGINDIR)
+ROOTLIBDIR	:= OWNER = root
+ROOTLIBDIR	:= GROUP = sys
+
+CONF=           piclfrutree.conf
+ROOTCONF=       $(CONF:%=$(ROOTLIBDIR)/%)
+$(ROOTCONF)	:= FILEMODE = 0644
+INFOS=          piclfrutree.info system-board.info
 
 .KEEP_STATE:
 
-all install clean clobber lint : $(SUBDIRS)
+SUBDIRS=
 
-_msg:	$(MSGSUBDIRS)
+all	:=	TARGET= all
+install :=	TARGET= install
+clean	:=	TARGET= clean
+clobber	:=	TARGET= clobber
+lint	:=	TARGET= lint
+
+all:	$(CONF) 
+
+install:	$(ROOTLIBDIR) $(ROOTCONF)
+	
+$(CONF): $(INFOS)
+	$(RM) $@
+	$(CPP) piclfrutree.info > $@
+
+# include library targets
+include $(SRC)/lib/Makefile.targ
+include	$(SRC)/cmd/picl/plugins/Makefile.targ
+
+lint:
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

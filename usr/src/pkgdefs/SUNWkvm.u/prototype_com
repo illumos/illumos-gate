@@ -78,6 +78,7 @@ d none usr/platform/SUNW,UltraSPARC-IIi-Netract 755 root sys
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 755 root sys
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 755 root sys
 d none usr/platform/SUNW,Netra-CP2300 755 root sys
+d none usr/platform/SUNW,Netra-CP3010 755 root sys
 #
 # create sun4u/sbin and links to it from each sun4u platform
 #
@@ -118,6 +119,10 @@ d none usr/platform/SUNW,Netra-CP2300/sbin 755 root bin
 s none usr/platform/SUNW,Netra-CP2300/sbin/eeprom=../../sun4u/sbin/eeprom
 s none usr/platform/SUNW,Netra-CP2300/sbin/prtdiag=../../sun4u/sbin/prtdiag
 s none usr/platform/SUNW,Netra-CP2300/sbin/trapstat=../../sun4u/sbin/trapstat
+d none usr/platform/SUNW,Netra-CP3010/sbin 755 root bin
+s none usr/platform/SUNW,Netra-CP3010/sbin/eeprom=../../sun4u/sbin/eeprom
+s none usr/platform/SUNW,Netra-CP3010/sbin/prtdiag=../../sun4u/sbin/prtdiag
+s none usr/platform/SUNW,Netra-CP3010/sbin/trapstat=../../sun4u/sbin/trapstat
 #
 f none usr/platform/sun4u/sbin/eeprom 2555 root sys
 f none usr/platform/sun4u/sbin/trapstat 555 root bin
@@ -128,6 +133,7 @@ f none usr/platform/sun4u/sbin/trapstat 555 root bin
 f none usr/platform/sun4u/sbin/prtdiag 2755 root sys
 f none usr/platform/sun4u/lib/libprtdiag.so.1 755 root bin
 s none usr/platform/sun4u/lib/libprtdiag.so=./libprtdiag.so.1
+f none usr/platform/SUNW,Netra-CP3010/lib/libprtdiag_psr.so.1 644 root bin
 f none usr/platform/SUNW,Ultra-2/lib/libprtdiag_psr.so.1 644 root bin
 s none usr/platform/sun4u/lib/libprtdiag_psr.so.1=../../SUNW,Ultra-2/lib/libprtdiag_psr.so.1
 f none usr/platform/SUNW,Ultra-250/lib/libprtdiag_psr.so.1 644 root bin
@@ -175,6 +181,7 @@ d none usr/platform/SUNW,UltraSPARC-IIi-Netract/lib 755 root bin
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib 755 root bin
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP2300/lib 755 root bin
+d none usr/platform/SUNW,Netra-CP3010/lib 755 root bin
 #
 # create sun4u/lib/cfgadm and links to it for each sun4u platform
 #
@@ -206,6 +213,7 @@ s none usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/cfgadm=../../sun4u/lib/cfgad
 s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/cfgadm=../../sun4u/lib/cfgadm
 s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/cfgadm=../../sun4u/lib/cfgadm
 s none usr/platform/SUNW,Netra-CP2300/lib/cfgadm=../../sun4u/lib/cfgadm
+s none usr/platform/SUNW,Netra-CP3010/lib/cfgadm=../../sun4u/lib/cfgadm
 #
 f none usr/platform/sun4u/lib/cfgadm/sysctrl.so.1 755 root bin
 s none usr/platform/sun4u/lib/cfgadm/sysctrl.so=./sysctrl.so.1
@@ -244,6 +252,7 @@ s none usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,Netra-CP2300/lib/fs=../../sun4u/lib/fs
+s none usr/platform/SUNW,Netra-CP3010/lib/fs=../../sun4u/lib/fs
 #
 d none usr/platform/sun4u/lib/fs/ufs 755 root bin
 f none usr/platform/sun4u/lib/fs/ufs/bootblk 444 root sys

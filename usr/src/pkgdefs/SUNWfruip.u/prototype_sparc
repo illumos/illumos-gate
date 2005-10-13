@@ -138,7 +138,13 @@ f none usr/platform/SUNW,Netra-CP2300/lib/libfruaccess.so.1 755 root sys
 s none usr/platform/SUNW,Netra-CP2300/lib/libfruaccess.so=libfruaccess.so.1
 d none usr/platform/SUNW,Netra-CP2300/sbin 755 root bin
 s none usr/platform/SUNW,Netra-CP2300/sbin/fruadm=../../sun4u/sbin/fruadm
-
+d none usr/platform/SUNW,Netra-CP3010 755 root sys
+d none usr/platform/SUNW,Netra-CP3010/lib 755 root bin
+d none usr/platform/SUNW,Netra-CP3010/lib/picl 755 root sys
+d none usr/platform/SUNW,Netra-CP3010/lib/picl/plugins 755 root sys
+f none usr/platform/SUNW,Netra-CP3010/lib/picl/plugins/libpiclfrudata.conf 644 root sys
+d none usr/platform/SUNW,Netra-CP3010/sbin 755 root bin
+s none usr/platform/SUNW,Netra-CP3010/sbin/fruadm=../../sun4u/sbin/fruadm
 d none usr/platform/sun4u 755 root sys
 d none usr/platform/sun4u/lib 755 root bin
 f none usr/platform/sun4u/lib/fru_container.conf 644 root sys

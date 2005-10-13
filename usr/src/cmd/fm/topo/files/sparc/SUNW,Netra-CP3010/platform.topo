@@ -19,37 +19,24 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libc_psr/spec/sun4u-us3/Makefile.links
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-include $(SRC)/Makefile.psm
-
-MODULE = abi
-
-#
-# links in /usr/platform
-#
-LINKED_PLATFORMS	= SUNW,Sun-Blade-1000
-LINKED_PLATFORMS	+= SUNW,Sun-Blade-1500
-LINKED_PLATFORMS	+= SUNW,Sun-Blade-2500
-LINKED_PLATFORMS	+= SUNW,A70
-LINKED_PLATFORMS	+= SUNW,Sun-Fire
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V240
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V250
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V440
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-280R
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-15000
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-880
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-480R
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V890
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V490
-LINKED_PLATFORMS	+= SUNW,Netra-T12
-LINKED_PLATFORMS	+= SUNW,Netra-T4
-LINKED_PLATFORMS	+= SUNW,Netra-CP3010
-
-include $(SRC)/lib/libc_psr/spec/Makefile.com
+/motherboard0/cpumodule0/cpu[0]
+	PLAT-FRU=hc:///component=CPU0
+/motherboard0/cpu[1]
+	PLAT-FRU=hc:///component=CPU1
+/motherboard0/hostbridge0
+	DEV=/pci@1c
+/motherboard0/hostbridge0/pcibus[0]
+	DEV=/pci@1c,600000
+/motherboard0/hostbridge0/pcibus[1]
+	DEV=/pci@1d,700000
+/motherboard0/hostbridge1
+	DEV=/pci@1e
+/motherboard0/hostbridge1/pcibus[0]
+	DEV=/pci@1e,600000
+/motherboard0/hostbridge1/pcibus[1]
+	DEV=/pci@1f,700000

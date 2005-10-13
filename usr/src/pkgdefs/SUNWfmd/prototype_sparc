@@ -57,6 +57,8 @@ d none usr/lib/fm/topo/SUNW,Sun-Blade-1500 755 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Blade-1500/platform.topo 444 root bin
 d none usr/lib/fm/topo/SUNW,Sun-Blade-2500 755 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Blade-2500/platform.topo 444 root bin
+d none usr/lib/fm/topo/SUNW,Netra-CP3010 755 root bin
+f none usr/lib/fm/topo/SUNW,Netra-CP3010/platform.topo 444 root bin
 d none usr/lib/fm/topo/SUNW,Sun-Fire-15000 755 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Fire-15000/platform.topo 444 root bin
 d none usr/lib/fm/topo/SUNW,Sun-Fire-480R 755 root bin

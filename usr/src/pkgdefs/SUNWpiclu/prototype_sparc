@@ -253,6 +253,11 @@ s none usr/platform/SUNW,Netra-CP2300/lib/picl/plugins/libpiclwd.so=libpiclwd.so
 f none usr/platform/SUNW,Netra-CP2300/lib/picl/plugins/envmond.conf 644 root sys
 f none usr/platform/SUNW,Netra-CP2300/lib/picl/plugins/SUNW,Netra-CP2300.conf 644 root sys
 f none usr/platform/SUNW,Netra-CP2300/lib/picl/plugins/SUNW,Netra-CP2300.RTM.conf 644 root sys
+d none usr/platform/SUNW,Netra-CP3010 755 root sys
+d none usr/platform/SUNW,Netra-CP3010/lib 755 root bin 
+d none usr/platform/SUNW,Netra-CP3010/lib/picl 755 root sys
+d none usr/platform/SUNW,Netra-CP3010/lib/picl/plugins 755 root sys
+f none usr/platform/SUNW,Netra-CP3010/lib/picl/plugins/piclfrutree.conf 644 root sys
 d none usr/platform/SUNW,Sun-Fire-V240/lib/picl 755 root sys
 d none usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins 755 root sys
 f none usr/platform/SUNW,Sun-Fire-V240/lib/picl/plugins/picldevtree.conf 644 root sys

@@ -20,36 +20,56 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libc_psr/spec/sun4u-us3/Makefile.links
-
-include $(SRC)/Makefile.psm
-
-MODULE = abi
-
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# links in /usr/platform
+# lib/picl/plugins/sun4u/schumacher/frudata/Makefile
 #
-LINKED_PLATFORMS	= SUNW,Sun-Blade-1000
-LINKED_PLATFORMS	+= SUNW,Sun-Blade-1500
-LINKED_PLATFORMS	+= SUNW,Sun-Blade-2500
-LINKED_PLATFORMS	+= SUNW,A70
-LINKED_PLATFORMS	+= SUNW,Sun-Fire
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V240
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V250
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V440
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-280R
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-15000
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-880
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-480R
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V890
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V490
-LINKED_PLATFORMS	+= SUNW,Netra-T12
-LINKED_PLATFORMS	+= SUNW,Netra-T4
-LINKED_PLATFORMS	+= SUNW,Netra-CP3010
+include	$(SRC)/Makefile.psm
 
-include $(SRC)/lib/libc_psr/spec/Makefile.com
+# include library definitions
+include $(SRC)/lib/Makefile.lib
+
+ROOT_PLATFORM = $(USR_PLAT_DIR)/SUNW,Netra-CP3010
+
+include	$(SRC)/cmd/picl/plugins/Makefile.com
+
+ROOTLIBDIR	= $(ROOT_PLAT_PLUGINDIR)
+ROOTLIBDIR	:= OWNER = root
+ROOTLIBDIR	:= GROUP = sys
+
+CONF=           libpiclfrudata.conf
+ROOTCONF=       $(CONF:%=$(ROOTLIBDIR)/%)
+$(ROOTCONF)	:= FILEMODE = 0644
+
+ROOTLINTDIR =   $(ROOTLIBDIR)
+
+.KEEP_STATE:
+
+SUBDIRS=
+
+all	:=	TARGET= all
+install :=	TARGET= install
+clean	:=	TARGET= clean
+clobber	:=	TARGET= clobber
+lint	:=	TARGET= lint
+
+all: $(CONF)
+
+install:	$(ROOTLIBDIR) $(ROOTCONF)
+
+# include library targets
+include $(SRC)/lib/Makefile.targ
+include	$(SRC)/cmd/picl/plugins/Makefile.targ
+
+$(ROOTLINTDIR)/%: ../%
+	$(INS.file)
+
+lint:
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
