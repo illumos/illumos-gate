@@ -1398,7 +1398,8 @@ ppm_svc_resume_ctlop(dev_info_t *dip, power_req_t *reqp)
 	powered = 0;
 	domp = ppmd->domp;
 	mutex_enter(&domp->lock);
-	if ((domp->model == PPMD_FET) || PPMD_IS_PCI(domp->model)) {
+	if ((domp->model == PPMD_FET) || PPMD_IS_PCI(domp->model) ||
+	    (domp->model == PPMD_PCIE)) {
 		for (ppmd = domp->devlist; ppmd; ppmd = ppmd->next) {
 			if (ppmd->dip == dip && ppmd->level)
 				powered++;
@@ -1443,9 +1444,8 @@ ppm_bringup_domains()
 
 	PPMD(D_CPR, ("%s[%d]: enter\n", str, ++ppmbringup))
 	for (domp = ppm_domain_p; domp; domp = domp->next) {
-
-		if ((!PPMD_IS_PCI(domp->model) && (domp->model != PPMD_FET)) ||
-		    (domp->devlist == NULL))
+		if ((!PPMD_IS_PCI(domp->model) && (domp->model != PPMD_FET) &&
+		    (domp->model != PPMD_PCIE)) || (domp->devlist == NULL))
 			continue;
 
 		mutex_enter(&domp->lock);
@@ -1453,15 +1453,23 @@ ppm_bringup_domains()
 			mutex_exit(&domp->lock);
 			continue;
 		}
-
-		if (domp->model == PPMD_FET)
-			ret = ppm_fetset(domp,  PPMD_ON);
-		else		/* PPMD_PCI or PPMD_PCI_PROP */
+		switch (domp->model) {
+		case PPMD_FET:
+			ret = ppm_fetset(domp, PPMD_ON);
+			break;
+		case PPMD_PCI:
+		case PPMD_PCI_PROP:
 			ret = ppm_switch_clock(domp, PPMD_ON);
-
+			break;
+		case PPMD_PCIE:
+			ret = ppm_pcie_pwr(domp, PPMD_ON);
+			break;
+		default:
+			break;
+		}
 		mutex_exit(&domp->lock);
 	}
-	PPMD(D_CPR, ("%s[%d]: exit\n", str, ppmbringup))
+	PPMD(D_CPR, ("%s[%d]: exit, ret=%d\n", str, ppmbringup, ret))
 
 	return (ret);
 }
@@ -1481,9 +1489,8 @@ ppm_sync_bookkeeping()
 
 	PPMD(D_CPR, ("%s[%d]: enter\n", str, ++ppmsyncbp))
 	for (domp = ppm_domain_p; domp; domp = domp->next) {
-
-		if ((!PPMD_IS_PCI(domp->model) && (domp->model != PPMD_FET)) ||
-		    (domp->devlist == NULL))
+		if ((!PPMD_IS_PCI(domp->model) && (domp->model != PPMD_FET) &&
+		    (domp->model != PPMD_PCIE)) || (domp->devlist == NULL))
 			continue;
 
 		mutex_enter(&domp->lock);
@@ -1491,23 +1498,23 @@ ppm_sync_bookkeeping()
 			mutex_exit(&domp->lock);
 			continue;
 		}
-
-		/*
-		 * skip NULL .devlist slot, for some may host pci device
-		 * that can not tolerate clock off or not even participate
-		 * in PM.
-		 */
-		if (domp->devlist == NULL)
-			continue;
-
-		if (domp->model == PPMD_FET)
+		switch (domp->model) {
+		case PPMD_FET:
 			ret = ppm_fetset(domp, PPMD_OFF);
-		else		/* PPMD_PCI or PPMD_PCI_PROP */
+			break;
+		case PPMD_PCI:
+		case PPMD_PCI_PROP:
 			ret = ppm_switch_clock(domp, PPMD_OFF);
-
+			break;
+		case PPMD_PCIE:
+			ret = ppm_pcie_pwr(domp, PPMD_OFF);
+			break;
+		default:
+			break;
+		}
 		mutex_exit(&domp->lock);
 	}
-	PPMD(D_CPR, ("%s[%d]: exit\n", str, ppmsyncbp))
+	PPMD(D_CPR, ("%s[%d]: exit, ret=%d\n", str, ppmsyncbp, ret))
 
 	return (ret);
 }
@@ -2568,7 +2575,7 @@ ppm_pcie_pwr(ppm_domain_t *domp, int onoff)
 				PPMD(D_GPIO, ("%s: waiting %lu micro "
 				    "seconds after change\n",
 				    domp->name, delay))
-				    drv_usecwait(delay);
+				drv_usecwait(delay);
 			}
 		}
 		break;
@@ -2738,7 +2745,7 @@ ppm_power_up_domain(dev_info_t *dip)
 				PPMD(D_FET, ("%s: turned on fet for %s@%s\n",
 				    str, PM_NAME(dip), PM_ADDR(dip)))
 			} else {
-				PPMD(D_FET, ("%s: couldn't turned on fet "
+				PPMD(D_FET, ("%s: couldn't turn on fet "
 				    "for %s@%s\n", str, PM_NAME(dip),
 				    PM_ADDR(dip)))
 			}
@@ -2754,7 +2761,22 @@ ppm_power_up_domain(dev_info_t *dip)
 				    "%s@%s\n", str, PM_NAME(dip),
 				    PM_ADDR(dip)))
 			} else {
-				PPMD(D_PCI, ("%s: couldn't turned on clock "
+				PPMD(D_PCI, ("%s: couldn't turn on clock "
+				    "for %s@%s\n", str, PM_NAME(dip),
+				    PM_ADDR(dip)))
+			}
+		}
+		break;
+
+	case PPMD_PCIE:
+		if (domp->status == PPMD_OFF) {
+			if ((ret = ppm_pcie_pwr(domp, PPMD_ON)) ==
+			    DDI_SUCCESS) {
+				PPMD(D_PCI, ("%s: turned on link for "
+				    "%s@%s\n", str, PM_NAME(dip),
+				    PM_ADDR(dip)))
+			} else {
+				PPMD(D_PCI, ("%s: couldn't turn on link "
 				    "for %s@%s\n", str, PM_NAME(dip),
 				    PM_ADDR(dip)))
 			}
@@ -2814,6 +2836,22 @@ ppm_power_down_domain(dev_info_t *dip)
 				    str, PM_NAME(dip), PM_ADDR(dip)))
 			} else {
 				PPMD(D_PCI, ("%s: couldn't turn off clock "
+				    "for %s@%s\n", str, PM_NAME(dip),
+				    PM_ADDR(dip)))
+			}
+		}
+		break;
+
+	case PPMD_PCIE:
+		if ((domp->pwr_cnt == 0) &&
+		    (ppm_cpr_window_flag == B_FALSE) &&
+		    ppm_none_else_holds_power(domp)) {
+			if ((ret = ppm_pcie_pwr(domp, PPMD_OFF)) ==
+			    DDI_SUCCESS) {
+				PPMD(D_PCI, ("%s: turned off link for %s@%s\n",
+				    str, PM_NAME(dip), PM_ADDR(dip)))
+			} else {
+				PPMD(D_PCI, ("%s: couldn't turn off link "
 				    "for %s@%s\n", str, PM_NAME(dip),
 				    PM_ADDR(dip)))
 			}
