@@ -57,13 +57,10 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-#ifdef SOLARIS_OPENSSL
-#include <dlfcn.h>
-#endif /* SOLARIS_OPENSSL */
 
 /* S/MIME utility function */
 
@@ -73,6 +70,10 @@
 #include <openssl/crypto.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
+
+#ifdef SOLARIS_OPENSSL
+extern int SUNWcry_installed;
+#endif
 
 #undef PROG
 #define PROG smime_main
@@ -155,8 +156,7 @@ int MAIN(int argc, char **argv)
 #ifdef SOLARIS_OPENSSL
 		else if (strcmp(*argv,"-aes192") == 0)
 			{
-			cipher = dlsym(RTLD_DEFAULT, "EVP_aes_192_cbc");
-			if (cipher == NULL)
+			if (!SUNWcry_installed)
 				{
 				BIO_printf(bio_err,"SUNWcry not installed.\n");
 				goto end;
@@ -164,8 +164,7 @@ int MAIN(int argc, char **argv)
 			}
 		else if (strcmp(*argv,"-aes256") == 0)
 			{
-			cipher = dlsym(RTLD_DEFAULT, "EVP_aes_256_cbc");
-			if (cipher == NULL)
+			if (!SUNWcry_installed)
 				{
 				BIO_printf(bio_err,"SUNWcry not installed.\n");
 				goto end;
@@ -176,7 +175,7 @@ int MAIN(int argc, char **argv)
 				cipher = EVP_aes_192_cbc();
 		else if (!strcmp(*args,"-aes256"))
 				cipher = EVP_aes_256_cbc();
-#endif /* SOLARIS_OPENSSL */
+#endif
 #endif
 		else if (!strcmp (*args, "-text")) 
 				flags |= PKCS7_TEXT;

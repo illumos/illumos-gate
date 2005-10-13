@@ -59,14 +59,10 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-#ifdef SOLARIS_OPENSSL
-#include <dlfcn.h>
-#endif /* SOLARIS_OPENSSL */
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,6 +74,10 @@
 #include <openssl/pkcs12.h>
 
 #define PROG pkcs12_main
+
+#ifdef SOLARIS_OPENSSL
+extern int SUNWcry_installed;
+#endif
 
 const EVP_CIPHER *enc;
 
@@ -171,8 +171,7 @@ int MAIN(int argc, char **argv)
 #ifdef SOLARIS_OPENSSL
 		else if (!strcmp(*argv,"-aes192"))
 			{
-			enc=dlsym(RTLD_DEFAULT, "EVP_aes_192_cbc");
-			if (enc == NULL)
+			if (!SUNWcry_installed)
 				{
 				BIO_printf(bio_err,"SUNWcry not installed.\n");
 				goto end;
@@ -180,8 +179,7 @@ int MAIN(int argc, char **argv)
 			}
 		else if (!strcmp(*argv,"-aes256"))
 			{
-			enc=dlsym(RTLD_DEFAULT, "EVP_aes_256_cbc");
-			if (enc == NULL)
+			if (!SUNWcry_installed)
 				{
 				BIO_printf(bio_err,"SUNWcry not installed.\n");
 				goto end;
@@ -190,7 +188,7 @@ int MAIN(int argc, char **argv)
 #else
 		else if (!strcmp(*args,"-aes192")) enc=EVP_aes_192_cbc();
 		else if (!strcmp(*args,"-aes256")) enc=EVP_aes_256_cbc();
-#endif /* SOLARIS_OPENSSL */
+#endif
 #endif
 		else if (!strcmp (*args, "-noiter")) iter = 1;
 		else if (!strcmp (*args, "-maciter"))

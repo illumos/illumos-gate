@@ -57,13 +57,10 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-#ifdef SOLARIS_OPENSSL
-#include <dlfcn.h>
-#endif /* SOLARIS_OPENSSL */
 
 #ifndef OPENSSL_NO_DSA
 #include <stdio.h>
@@ -81,6 +78,10 @@
 #define DEFBITS	512
 #undef PROG
 #define PROG gendsa_main
+
+#ifdef SOLARIS_OPENSSL
+extern int SUNWcry_installed;
+#endif
 
 int MAIN(int, char **);
 
@@ -154,8 +155,7 @@ int MAIN(int argc, char **argv)
 #ifdef SOLARIS_OPENSSL
 		else if (strcmp(*argv,"-aes192") == 0)
 			{
-			enc=dlsym(RTLD_DEFAULT, "EVP_aes_192_cbc");
-			if (enc == NULL)
+			if (!SUNWcry_installed)
 				{
 				BIO_printf(bio_err,"SUNWcry not installed.\n");
 				goto bad;
@@ -163,8 +163,7 @@ int MAIN(int argc, char **argv)
 			}
 		else if (strcmp(*argv,"-aes256") == 0)
 			{
-			enc=dlsym(RTLD_DEFAULT, "EVP_aes_256_cbc");
-			if (enc == NULL)
+			if (!SUNWcry_installed)
 				{
 				BIO_printf(bio_err,"SUNWcry not installed.\n");
 				goto bad;
@@ -175,7 +174,7 @@ int MAIN(int argc, char **argv)
 			enc=EVP_aes_192_cbc();
 		else if (strcmp(*argv,"-aes256") == 0)
 			enc=EVP_aes_256_cbc();
-#endif /* SOLARIS_OPENSSL */
+#endif
 #endif
 		else if (**argv != '-' && dsaparams == NULL)
 			{

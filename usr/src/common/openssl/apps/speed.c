@@ -58,7 +58,7 @@
 /*
  * The portions of this code that are #ifdef SOLARIS_OPENSSL are
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -97,7 +97,7 @@
 #include OPENSSL_UNISTD
 #endif
 #ifdef SOLARIS_OPENSSL
-extern int SUNWcry_installed(void);
+extern int SUNWcry_installed;
 #endif
 
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(OPENSSL_SYS_MACOSX)
@@ -697,7 +697,7 @@ int MAIN(int argc, char **argv)
 			if (strcmp(*argv,"aes-128-cbc") == 0) doit[D_CBC_128_AES]=1;
 #ifdef SOLARIS_OPENSSL
 		else	if (strcmp(*argv,"aes-192-cbc") == 0)
-				if (!SUNWcry_installed())
+				if (!SUNWcry_installed)
 					{
 					BIO_printf(bio_err,
 					  "aes-192-cbc not available."
@@ -707,7 +707,7 @@ int MAIN(int argc, char **argv)
 				else
 					doit[D_CBC_192_AES]=1;
 		else	if (strcmp(*argv,"aes-256-cbc") == 0)
-				if (!SUNWcry_installed())
+				if (!SUNWcry_installed)
 					{
 					BIO_printf(bio_err,
 					  "aes-256-cbc not available."
@@ -788,8 +788,8 @@ int MAIN(int argc, char **argv)
 			{
 			doit[D_CBC_128_AES]=1;
 #ifdef SOLARIS_OPENSSL
-			doit[D_CBC_192_AES]= SUNWcry_installed();
-			doit[D_CBC_256_AES]= SUNWcry_installed();
+			doit[D_CBC_192_AES]= SUNWcry_installed;
+			doit[D_CBC_256_AES]= SUNWcry_installed;
 #else
 			doit[D_CBC_192_AES]=1;
 			doit[D_CBC_256_AES]=1;
@@ -868,7 +868,7 @@ int MAIN(int argc, char **argv)
 #endif
 #ifndef OPENSSL_NO_AES
 #ifdef SOLARIS_OPENSSL
-			if (SUNWcry_installed())
+			if (SUNWcry_installed)
 				BIO_printf(bio_err,
 				  "aes-128-cbc aes-192-cbc aes-256-cbc ");
 			else
@@ -1310,7 +1310,11 @@ int MAIN(int argc, char **argv)
 			print_result(D_CBC_128_AES,j,count,d);
 			}
 		}
+#ifdef SOLARIS_OPENSSL
+	if (doit[D_CBC_192_AES] && SUNWcry_installed)
+#else
 	if (doit[D_CBC_192_AES])
+#endif
 		{
 		for (j=0; j<SIZE_NUM; j++)
 			{
@@ -1324,7 +1328,11 @@ int MAIN(int argc, char **argv)
 			print_result(D_CBC_192_AES,j,count,d);
 			}
 		}
+#ifdef SOLARIS_OPENSSL
+	if (doit[D_CBC_256_AES] && SUNWcry_installed)
+#else
 	if (doit[D_CBC_256_AES])
+#endif
 		{
 		for (j=0; j<SIZE_NUM; j++)
 			{
@@ -1724,6 +1732,9 @@ show_res:
 	for (k=0; k<ALGOR_NUM; k++)
 		{
 		if (!doit[k]) continue;
+#ifdef SOLARIS_OPENSSL
+		if ((k == D_CBC_192_AES || k == D_CBC_256_AES) && !SUNWcry_installed) continue;
+#endif
 		if(mr)
 			fprintf(stdout,"+F:%d:%s",k,names[k]);
 		else

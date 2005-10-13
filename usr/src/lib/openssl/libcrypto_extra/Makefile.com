@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,12 +30,14 @@
 LIBRARY= libcrypto_extra.a
 
 OBJECTS=\
+	sunw.o                                                              \
+	\
 	aes/aes_cbc.o    aes/aes_cfb.o    aes/aes_core.o   aes/aes_ctr.o    \
 	aes/aes_ecb.o    aes/aes_misc.o   aes/aes_ofb.o                     \
 	\
 	bf/bf_skey.o     bf/bf_ecb.o      bf/bf_cfb64.o    bf/bf_ofb64.o    \
 	\
-	evp/e_aes.o      evp/e_bf.o       evp/e_rc4.o      evp/c_allc.o \
+	evp/e_aes.o      evp/e_bf.o       evp/e_rc4.o      evp/c_allc.o     \
 	\
 	rc4/rc4_enc.o    rc4/rc4_skey.o                                     \
 	\
