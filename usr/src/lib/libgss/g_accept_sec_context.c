@@ -304,8 +304,9 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 
 				*d_cred = (gss_cred_id_t)d_u_cred;
 			}
-			if (ret_flags != NULL)
-				*ret_flags = flags;
+		}
+		if (ret_flags != NULL) {
+			*ret_flags = flags;
 		}
 
 		if (src_name == NULL && tmp_src_name != NULL)
