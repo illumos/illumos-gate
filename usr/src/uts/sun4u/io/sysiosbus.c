@@ -218,8 +218,8 @@ sbus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result);
 
 static int
-sbus_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, ddi_ispec_t *ispecp,
-    int32_t ign);
+sbus_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, uint32_t *intr,
+    uint32_t *pil, int32_t ign);
 
 static int
 sbus_attach(dev_info_t *devi, ddi_attach_cmd_t cmd);
@@ -1491,8 +1491,7 @@ sbus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		}
 
 		for (i = 0, n = i_ddi_get_nintrs(rdip); i < n; i++) {
-			ddi_ispec_t *ispecp;
-			uint32_t sbuslevel, pri;
+			uint32_t sbuslevel, inum, pri;
 
 			if (i != 0) {
 				f_len += snprintf(msgbuf + len,
@@ -1500,15 +1499,11 @@ sbus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 				len = strlen(msgbuf);
 			}
 
-			i_ddi_alloc_ispec(rdip, i,
-			    (ddi_intrspec_t *)&ispecp);
+			sbuslevel = inum = i_ddi_get_inum(rdip, i);
+			pri = i_ddi_get_intr_pri(rdip, i);
 
-			sbuslevel = *ispecp->is_intr;
-
-			(void) sbus_xlate_intrs(dip, rdip, ispecp,
-			    softsp->intr_mapping_ign);
-
-			pri = ispecp->is_pil;
+			(void) sbus_xlate_intrs(dip, rdip, &inum,
+			    &pri, softsp->intr_mapping_ign);
 
 			if (sbuslevel > MAX_SBUS_LEVEL)
 				f_len += snprintf(msgbuf + len,
@@ -1523,8 +1518,6 @@ sbus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			f_len += snprintf(msgbuf + len, REPORTDEV_BUFSIZE - len,
 			    "sparc9 ipl %d", pri);
 			len = strlen(msgbuf);
-
-			i_ddi_free_ispec((ddi_intrspec_t)ispecp);
 		}
 #ifdef DEBUG
 	if (f_len + 1 >= REPORTDEV_BUFSIZE) {
@@ -1689,7 +1682,6 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 {
 	struct sbus_soft_state *softsp = (struct sbus_soft_state *)
 	    ddi_get_soft_state(sbusp, ddi_get_instance(dip));
-	ddi_ispec_t *ip = (ddi_ispec_t *)hdlp->ih_private;
 	volatile uint64_t *mondo_vec_reg;
 	volatile uint64_t tmp_mondo_vec;
 	volatile uint64_t *intr_state_reg;
@@ -1713,19 +1705,19 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	}
 
 	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr: sbus interrupt %d "
-	    "for device %s%d\n", hdlp->ih_vector, ddi_get_name(rdip),
+	    "for device %s%d\n", hdlp->ih_vector, ddi_driver_name(rdip),
 	    ddi_get_instance(rdip)));
 
 	/* Xlate the interrupt */
-	if (sbus_xlate_intrs(dip, rdip, ip,
-	    softsp->intr_mapping_ign) == DDI_FAILURE) {
+	if (sbus_xlate_intrs(dip, rdip, (uint32_t *)&hdlp->ih_vector,
+	    &hdlp->ih_pri, softsp->intr_mapping_ign) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "Can't xlate SBUS devices %s interrupt.\n",
-		    ddi_get_name(rdip));
+		    ddi_driver_name(rdip));
 		return (DDI_FAILURE);
 	}
 
 	/* get the ino number */
-	ino = (*ip->is_intr) & SBUS_MAX_INO;
+	ino = hdlp->ih_vector & SBUS_MAX_INO;
 	mondo_vec_reg = (softsp->intr_mapping_reg +
 	    ino_table[ino]->mapping_reg);
 
@@ -1752,7 +1744,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	intr_handler->inum = hdlp->ih_inum;
 
 	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr: xlated interrupt 0x%x "
-	    "intr_handler 0x%x\n", *ip->is_intr, intr_handler));
+	    "intr_handler 0x%x\n", hdlp->ih_vector, intr_handler));
 
 	/*
 	 * Grab this lock here. So it will protect the poll list.
@@ -1797,8 +1789,6 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		    "clear reg: 0x%x\n", ino, sbus_arg->clear_reg));
 		sbus_arg->softsp = softsp;
 		sbus_arg->handler_list = intr_handler;
-
-		hdlp->ih_vector = *ip->is_intr;
 
 		/*
 		 * No handler added yet in the interrupt vector
@@ -1934,7 +1924,6 @@ sbus_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 #endif /* !lint */
 	struct sbus_soft_state *softsp = (struct sbus_soft_state *)
 	    ddi_get_soft_state(sbusp, ddi_get_instance(dip));
-	ddi_ispec_t *ip = (ddi_ispec_t *)hdlp->ih_private;
 	int start_bit, ino, slot;
 	struct sbus_wrapper_arg *sbus_arg;
 
@@ -1942,14 +1931,14 @@ sbus_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	mutex_enter(&softsp->intr_poll_list_lock);
 
 	/* Xlate the interrupt */
-	if (sbus_xlate_intrs(dip, rdip, ip,
-	    softsp->intr_mapping_ign) == DDI_FAILURE) {
+	if (sbus_xlate_intrs(dip, rdip, (uint32_t *)&hdlp->ih_vector,
+	    &hdlp->ih_pri, softsp->intr_mapping_ign) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "Can't xlate SBUS devices %s interrupt.\n",
-		    ddi_get_name(rdip));
+		    ddi_driver_name(rdip));
 		goto done;
 	}
 
-	ino = ((int32_t)*ip->is_intr) & SBUS_MAX_INO;
+	ino = ((int32_t)hdlp->ih_vector) & SBUS_MAX_INO;
 
 	mondo_vec_reg = (softsp->intr_mapping_reg +
 	    ino_table[ino]->mapping_reg);
@@ -1987,17 +1976,15 @@ sbus_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 
 	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Rem intr: Softsp 0x%x, Mondo 0x%x, "
 	    "ino 0x%x, sbus_arg 0x%x intr cntr %d\n", softsp,
-	    *ip->is_intr, ino, sbus_arg, softsp->intr_hndlr_cnt[slot]));
+	    hdlp->ih_vector, ino, sbus_arg, softsp->intr_hndlr_cnt[slot]));
 
 	ASSERT(sbus_arg != NULL);
 	ASSERT(sbus_arg->handler_list != NULL);
 	sbus_free_handler(rdip, hdlp->ih_inum, sbus_arg);
 
 	/* If we still have a list, we're done. */
-	if (sbus_arg->handler_list == NULL) {
-		hdlp->ih_vector = *ip->is_intr;
+	if (sbus_arg->handler_list == NULL)
 		i_ddi_rem_ivintr(hdlp);
-	}
 
 	/*
 	 * If other devices are still installed for this slot, we need to
@@ -2039,10 +2026,10 @@ done:
  * Translate the sbus levels or mondos into sysiointrspecs.
  */
 static int
-sbus_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, ddi_ispec_t *ispecp,
-    int32_t ign)
+sbus_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, uint32_t *intr,
+    uint32_t *pil, int32_t ign)
 {
-	uint32_t ino, slot, level = *ispecp->is_intr;
+	uint32_t ino, slot, level = *intr;
 	int ret = DDI_SUCCESS;
 
 	/*
@@ -2059,14 +2046,14 @@ sbus_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, ddi_ispec_t *ispecp,
 		/* Construct ino from slot and interrupts */
 		if ((slot = find_sbus_slot(dip, rdip)) == -1) {
 			cmn_err(CE_WARN, "Can't determine sbus slot "
-			    "of %s device\n", ddi_get_name(rdip));
+			    "of %s device\n", ddi_driver_name(rdip));
 			ret = DDI_FAILURE;
 			goto done;
 		}
 
 		if (slot >= MAX_SBUS_SLOT_ADDR) {
 			cmn_err(CE_WARN, "Invalid sbus slot 0x%x"
-			    "in %s device\n", slot, ddi_get_name(rdip));
+			    "in %s device\n", slot, ddi_driver_name(rdip));
 			ret = DDI_FAILURE;
 			goto done;
 		}
@@ -2088,29 +2075,28 @@ sbus_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, ddi_ispec_t *ispecp,
 		goto done;
 	}
 
-	if (ispecp->is_pil == 0) {
+	if (*pil == 0) {
 #define	SOC_PRIORITY 5
 		/* The sunfire i/o board has a soc in the printer slot */
 		if ((ino_table[ino]->clear_reg == PP_CLEAR) &&
 		    ((strcmp(ddi_get_name(rdip), "soc") == 0) ||
 			(strcmp(ddi_get_name(rdip), "SUNW,soc") == 0))) {
-			ispecp->is_pil = SOC_PRIORITY;
+			*pil = SOC_PRIORITY;
 		} else {
 			/* Figure out the pil associated with this interrupt */
-			ispecp->is_pil = interrupt_priorities[ino];
+			*pil = interrupt_priorities[ino];
 		}
 	}
 
 	/* Or in the upa_id into the interrupt group number field */
-	*ispecp->is_intr = (uint32_t)(ino | ign);
+	*intr = (uint32_t)(ino | ign);
 
 	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Xlate intr: Interrupt info for "
 	    "device %s Mondo: 0x%x, ino: 0x%x, Pil: 0x%x, sbus level: 0x%x\n",
-	    ddi_get_name(rdip), *ispecp->is_intr, ino, ispecp->is_pil, level));
+	    ddi_driver_name(rdip), *intr, ino, *pil, level));
 
 done:
 	return (ret);
-
 }
 
 /* new intr_ops structure */
@@ -2120,13 +2106,12 @@ sbus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 {
 	struct sbus_soft_state *softsp = (struct sbus_soft_state *)
 	    ddi_get_soft_state(sbusp, ddi_get_instance(dip));
-	ddi_ispec_t		*ip = (ddi_ispec_t *)hdlp->ih_private;
 	int			ret = DDI_SUCCESS;
 
 
 	switch (intr_op) {
 	case DDI_INTROP_GETCAP:
-		*(int *)result = 0;
+		*(int *)result = DDI_INTR_FLAG_LEVEL;
 		break;
 	case DDI_INTROP_ALLOC:
 		*(int *)result = hdlp->ih_scratch1;
@@ -2134,23 +2119,21 @@ sbus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_FREE:
 		break;
 	case DDI_INTROP_GETPRI:
-		if (ip->is_pil == 0) {
+		if (hdlp->ih_vector == 0) {
 			/* Xlate the interrupt */
 			(void) sbus_xlate_intrs(dip, rdip,
-			    ip, softsp->intr_mapping_ign);
+			    (uint32_t *)&hdlp->ih_vector, &hdlp->ih_pri,
+			    softsp->intr_mapping_ign);
 		}
 
-		*(int *)result = ip->is_pil;
+		*(int *)result = hdlp->ih_pri;
 		break;
 	case DDI_INTROP_SETPRI:
-		ip->is_pil = (*(int *)result);
 		break;
 	case DDI_INTROP_ADDISR:
-		hdlp->ih_vector = *ip->is_intr;
 		ret = sbus_add_intr_impl(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_REMISR:
-		hdlp->ih_vector = *ip->is_intr;
 		sbus_remove_intr_impl(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_ENABLE:
@@ -2619,17 +2602,16 @@ sbus_update_intr_state(dev_info_t *dip, dev_info_t *rdip,
 	int ino;
 	struct sbus_wrapper_arg *sbus_arg;
 	struct sbus_intr_handler *intr_handler;
-	ddi_ispec_t *ip = (ddi_ispec_t *)hdlp->ih_private;
 
 	/* Xlate the interrupt */
-	if (sbus_xlate_intrs(dip, rdip, ip,
-	    softsp->intr_mapping_ign) == DDI_FAILURE) {
+	if (sbus_xlate_intrs(dip, rdip, (uint32_t *)&hdlp->ih_vector,
+	    &hdlp->ih_pri, softsp->intr_mapping_ign) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "sbus_update_intr_state() can't xlate SBUS "
-		    "devices %s interrupt.", ddi_get_name(rdip));
+		    "devices %s interrupt.", ddi_driver_name(rdip));
 		return (DDI_FAILURE);
 	}
 
-	ino = ((int32_t)*ip->is_intr) & SBUS_MAX_INO;
+	ino = ((int32_t)hdlp->ih_vector) & SBUS_MAX_INO;
 	sbus_arg = softsp->intr_list[ino];
 
 	ASSERT(sbus_arg != NULL);

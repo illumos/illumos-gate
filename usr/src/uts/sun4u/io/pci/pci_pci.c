@@ -630,11 +630,10 @@ static int
 ppb_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	ddi_ispec_t		*ip = (ddi_ispec_t *)hdlp->ih_private;
-	dev_info_t		*cdip = rdip;
-	pci_regspec_t		*pci_rp;
-	int			reglen, len;
-	uint32_t		d, intr;
+	dev_info_t	*cdip = rdip;
+	pci_regspec_t	*pci_rp;
+	int		reglen, len;
+	uint32_t	d, intr;
 
 	if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
 		goto done;
@@ -659,13 +658,13 @@ ppb_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	    "reg", (caddr_t)&pci_rp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
-	intr = *ip->is_intr;
+	intr = hdlp->ih_vector;
 
 	/* Spin the interrupt */
 	d = PCI_REG_DEV_G(pci_rp[0].pci_phys_hi);
 
 	if ((intr >= PCI_INTA) && (intr <= PCI_INTD))
-		*ip->is_intr = ((intr - 1 + (d % 4)) % 4 + 1);
+		hdlp->ih_vector = ((intr - 1 + (d % 4)) % 4 + 1);
 	else
 		cmn_err(CE_WARN, "%s%d: %s: PCI intr=%x out of range",
 		    ddi_driver_name(rdip), ddi_get_instance(rdip),

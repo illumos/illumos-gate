@@ -68,7 +68,7 @@ int
 rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp);
 
-void
+int
 rootnex_get_intr_pri(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp);
 
@@ -82,10 +82,6 @@ int
 rootnex_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
 {
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
-
-	hdlp->ih_vector = *ip->is_intr;
-
 	return (i_ddi_add_ivintr(hdlp));
 }
 
@@ -97,9 +93,6 @@ int
 rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
 {
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
-
-	hdlp->ih_vector = *ip->is_intr;
 	i_ddi_rem_ivintr(hdlp);
 
 	return (DDI_SUCCESS);
@@ -109,10 +102,11 @@ rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
  * rootnex_get_intr_pri:
  */
 /*ARGSUSED*/
-void
+int
 rootnex_get_intr_pri(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
 {
+	return (hdlp->ih_pri);
 }
 
 int

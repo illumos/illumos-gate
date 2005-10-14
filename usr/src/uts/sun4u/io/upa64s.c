@@ -574,13 +574,13 @@ upa64s_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 #define	UPA_BASE_INO	0x2a
 
 static int
-upa64s_xlate_intr(dev_info_t *rdip, int32_t safariport, ddi_ispec_t *ispecp)
+upa64s_xlate_intr(dev_info_t *rdip, int32_t safariport, uint32_t *intr)
 {
 	uint32_t ino = UPA_BASE_INO;
 	int32_t portid;
 
 	/* Clear the ffb's interrupts property, it's meaningless */
-	*ispecp->is_intr = 0;
+	*intr = 0;
 
 	if ((portid = ddi_getprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 	    "upa-portid", -1)) == -1)
@@ -588,11 +588,11 @@ upa64s_xlate_intr(dev_info_t *rdip, int32_t safariport, ddi_ispec_t *ispecp)
 
 	ino += portid;
 
-	*ispecp->is_intr = UPA64S_MAKE_MONDO(safariport, ino);
+	*intr = UPA64S_MAKE_MONDO(safariport, ino);
 
 	DBG5(D_A_ISPEC, rdip, "upa64s_xlate_intr: rdip=%s%d: upa portid %d "
 	    "ino=%x mondo 0x%x\n", ddi_get_name(rdip), ddi_get_instance(rdip),
-	    portid, ino, *ispecp->is_intr);
+	    portid, ino, *intr);
 
 	return (portid);
 }
@@ -610,18 +610,18 @@ upa64s_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	uint_t (*int_handler)(caddr_t, caddr_t) = hdlp->ih_cb_func;
 	caddr_t int_handler_arg1 = hdlp->ih_cb_arg1;
 #endif /* DEBUG */
-	ddi_ispec_t *ip = (ddi_ispec_t *)hdlp->ih_private;
 	uint_t cpu_id;
 	volatile uint64_t imr_data;
 
-	upaport = upa64s_xlate_intr(rdip, upa64s_p->safari_id, ip);
+	upaport = upa64s_xlate_intr(rdip, upa64s_p->safari_id,
+	    (uint32_t *)&hdlp->ih_vector);
 
-	if (*ip->is_intr == 0)
+	if (hdlp->ih_vector == 0)
 		return (DDI_FAILURE);
 
 	DBG3(D_A_ISPEC, dip,
 	    "rdip=%s%d - IDDI_INTR_TYPE_NORMAL, mondo=%x\n",
-	    ddi_get_name(rdip), ddi_get_instance(rdip), *ip->is_intr);
+	    ddi_driver_name(rdip), ddi_get_instance(rdip), hdlp->ih_vector);
 
 	/*
 	 * Make sure an interrupt handler isn't already installed.
@@ -637,7 +637,6 @@ upa64s_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	DBG2(D_A_ISPEC, dip, "i_ddi_add_ivintr: hdlr=%p arg=%p\n",
 	    int_handler, int_handler_arg1);
 #endif
-	hdlp->ih_vector = *ip->is_intr;
 	if (i_ddi_add_ivintr(hdlp) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -657,7 +656,7 @@ upa64s_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	imr_data = ddi_get64(upa64s_p->imr_ah[upaport], upa64s_p->imr[upaport]);
 	upa64s_p->ino_state[upaport] = INO_INUSE;
 
-	DBG(D_A_ISPEC, dip, "add_intrspec success!\n");
+	DBG(D_A_ISPEC, dip, "add_intr success!\n");
 	return (DDI_SUCCESS);
 }
 
@@ -671,7 +670,6 @@ upa64s_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 {
 	upa64s_devstate_t *upa64s_p =
 	    get_upa64s_soft_state(ddi_get_instance(dip));
-	ddi_ispec_t *ip = (ddi_ispec_t *)hdlp->ih_private;
 	int upaport;
 #ifndef lint
 	volatile uint64_t tmp;
@@ -680,21 +678,21 @@ upa64s_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	/*
 	 * Make sure the mondo is valid.
 	 */
-	upaport = upa64s_xlate_intr(rdip, upa64s_p->safari_id, ip);
+	upaport = upa64s_xlate_intr(rdip, upa64s_p->safari_id,
+	    (uint32_t *)&hdlp->ih_vector);
 
-	if (*ip->is_intr == 0)
+	if (hdlp->ih_vector == 0)
 		return (DDI_FAILURE);
 
 	DBG3(D_R_ISPEC, dip,
 	    "rdip=%s%d - IDDI_INTR_TYPE_NORMAL, mondo=%x\n",
-	    ddi_get_name(rdip), ddi_get_instance(rdip), *ip->is_intr);
+	    ddi_driver_name(rdip), ddi_get_instance(rdip), hdlp->ih_vector);
 
 	if (upa64s_p->ino_state[upaport] != INO_INUSE) {
 		return (DDI_FAILURE);
 	}
 
 	/* Call up to our parent to handle the removal */
-	hdlp->ih_vector = *ip->is_intr;
 	i_ddi_rem_ivintr(hdlp);
 
 	ddi_put64(upa64s_p->imr_ah[upaport], upa64s_p->imr[upaport], 0);
@@ -713,12 +711,11 @@ static int
 upa64_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
-	int		ret = DDI_SUCCESS;
+	int	ret = DDI_SUCCESS;
 
 	switch (intr_op) {
 	case DDI_INTROP_GETCAP:
-		*(int *)result = 0;
+		*(int *)result = DDI_INTR_FLAG_EDGE;
 		break;
 	case DDI_INTROP_ALLOC:
 		*(int *)result = hdlp->ih_scratch1;
@@ -732,19 +729,14 @@ upa64_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		 * had their PILs set to 5.  Only do it if the PIL is not
 		 * being preset.
 		 */
-		*(int *)result = ip->is_pil ? ip->is_pil : 5;
+		*(int *)result = hdlp->ih_pri ? hdlp->ih_pri : 5;
 		break;
 	case DDI_INTROP_SETPRI:
-		ip->is_pil = (*(int *)result);
 		break;
 	case DDI_INTROP_ADDISR:
-		hdlp->ih_vector = *ip->is_intr;
-
 		ret = upa64s_add_intr_impl(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_REMISR:
-		hdlp->ih_vector = *ip->is_intr;
-
 		ret = upa64s_remove_intr_impl(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_ENABLE:
@@ -786,10 +778,8 @@ extern void prom_printf(const char *, ...);
  *	DDI_CTLOPS_INITCHILD	see init_child() for details
  *	DDI_CTLOPS_UNINITCHILD
  *	DDI_CTLOPS_REPORTDEV	see report_dev() for details
- *	DDI_CTLOPS_XLATE_INTRS	nothing to do
  *	DDI_CTLOPS_REGSIZE
  *	DDI_CTLOPS_NREGS
- *	DDI_CTLOPS_NINTRS
  *
  * All others passed to parent.
  */
@@ -821,9 +811,6 @@ upa64s_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		    ddi_get_name(rdip), ddi_get_instance(rdip));
 		return (report_dev(rdip));
 
-	case DDI_CTLOPS_XLATE_INTRS:
-		return (DDI_FAILURE);
-
 	case DDI_CTLOPS_REGSIZE:
 		DBG2(D_CTLOPS, dip, "DDI_CTLOPS_REGSIZE: rdip=%s%d\n",
 		    ddi_get_name(rdip), ddi_get_instance(rdip));
@@ -835,9 +822,6 @@ upa64s_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		    ddi_get_name(rdip), ddi_get_instance(rdip));
 		*((uint_t *)result) = get_nreg_set(rdip);
 		return (DDI_SUCCESS);
-
-	case DDI_CTLOPS_NINTRS:
-		return (DDI_FAILURE);
 	}
 
 	/*

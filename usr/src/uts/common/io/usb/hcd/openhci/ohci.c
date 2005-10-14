@@ -1257,7 +1257,7 @@ ohci_register_intrs_and_init_mutex(ohci_state_t	*ohcip)
 
 	/* Initialize the mutex */
 	mutex_init(&ohcip->ohci_int_mutex, NULL, MUTEX_DRIVER,
-	    (void *)(uintptr_t)ohcip->ohci_intr_pri);
+	    DDI_INTR_PRI(ohcip->ohci_intr_pri));
 
 	if (ddi_intr_add_handler(ohcip->ohci_htable[0],
 	    (ddi_intr_handler_t *)ohci_intr, (caddr_t)ohcip, NULL)) {

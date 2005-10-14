@@ -267,12 +267,9 @@ nx1394_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op, void *arg,
 	case DDI_CTLOPS_REPORTINT:
 	case DDI_CTLOPS_REGSIZE:
 	case DDI_CTLOPS_NREGS:
-	case DDI_CTLOPS_NINTRS:
 	case DDI_CTLOPS_SIDDEV:
 	case DDI_CTLOPS_SLAVEONLY:
 	case DDI_CTLOPS_AFFINITY:
-	case DDI_CTLOPS_INTR_HILEVEL:
-	case DDI_CTLOPS_XLATE_INTRS:
 	case DDI_CTLOPS_POKE:
 	case DDI_CTLOPS_PEEK: {
 		cmn_err(CE_CONT, "!%s(%d): invalid op (%d) from %s(%d)",

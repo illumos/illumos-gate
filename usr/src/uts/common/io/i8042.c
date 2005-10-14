@@ -865,17 +865,9 @@ i8042_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		*(int *)result = DDI_INTR_TYPE_FIXED;
 		break;
 	case DDI_INTROP_GETCAP:
-#if defined(__sparc)
-		/*
-		 * For sparc, there is concern to pass to its parent,
-		 * so just hard code it to 0
-		 */
-		*(int *)result = 0;
-#else
 		if (i_ddi_intr_ops(dip, rdip, intr_op, hdlp, result)
 		    == DDI_FAILURE)
 			*(int *)result = 0;
-#endif /* defined(__sparc) */
 		break;
 	case DDI_INTROP_NINTRS:
 		*(int *)result = 1;

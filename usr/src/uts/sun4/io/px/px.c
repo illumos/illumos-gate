@@ -528,11 +528,11 @@ px_pwr_setup(dev_info_t *dip)
 	pwr_p->pwr_func_lvl = PM_LEVEL_D0;
 
 	mutex_init(&px_p->px_l23ready_lock, NULL, MUTEX_DRIVER,
-	    (void *)(uintptr_t)px_pwr_pil);
+	    DDI_INTR_PRI(px_pwr_pil));
 	cv_init(&px_p->px_l23ready_cv, NULL, CV_DRIVER, NULL);
 
 	mutex_init(&px_p->px_lup_lock, NULL, MUTEX_DRIVER,
-	    (void *)PX_ERR_PIL);
+	    DDI_INTR_PRI(PX_ERR_PIL));
 	cv_init(&px_p->px_lup_cv, NULL, CV_DRIVER, NULL);
 
 	if (ddi_get_soft_iblock_cookie(dip, DDI_SOFTINT_HIGH,
@@ -540,8 +540,10 @@ px_pwr_setup(dev_info_t *dip)
 		DBG(DBG_PWR, dip, "px_pwr_setup: couldn't get iblock cookie\n");
 		goto pwr_setup_err1;
 	}
+
 	mutex_init(&px_p->px_lupsoft_lock, NULL, MUTEX_DRIVER,
 	    (void *)iblk_cookie);
+
 	if (ddi_add_softintr(dip, DDI_SOFTINT_HIGH, &px_p->px_lupsoft_id,
 	    NULL, NULL, px_lup_softintr, (caddr_t)px_p) != DDI_SUCCESS) {
 		DBG(DBG_PWR, dip, "px_pwr_setup: couldn't add soft intr \n");
@@ -1149,11 +1151,9 @@ px_dma_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
  *	DDI_CTLOPS_INITCHILD	see init_child() for details
  *	DDI_CTLOPS_UNINITCHILD
  *	DDI_CTLOPS_REPORTDEV	see report_dev() for details
- *	DDI_CTLOPS_XLATE_INTRS	nothing to do
  *	DDI_CTLOPS_IOMIN	cache line size if streaming otherwise 1
  *	DDI_CTLOPS_REGSIZE
  *	DDI_CTLOPS_NREGS
- *	DDI_CTLOPS_NINTRS
  *	DDI_CTLOPS_DVMAPAGESIZE
  *	DDI_CTLOPS_POKE
  *	DDI_CTLOPS_PEEK

@@ -775,7 +775,6 @@ ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
 	ddi_intr_handle_impl_t *hdlp, uint_t new_intr_state)
 {
 	ib_t		*ib_p = pci_p->pci_ib_p;
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
 	ib_ino_info_t	*ino_p;
 	ib_mondo_t	mondo;
 	ih_t		*ih_p;
@@ -784,7 +783,7 @@ ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
 	if ((mondo = pci_xlate_intr(pci_p->pci_dip, rdip, pci_p->pci_ib_p,
-	    IB_MONDO_TO_INO(*ip->is_intr))) == 0) {
+	    IB_MONDO_TO_INO(hdlp->ih_vector))) == 0) {
 		mutex_exit(&ib_p->ib_ino_lst_mutex);
 		return (ret);
 	}

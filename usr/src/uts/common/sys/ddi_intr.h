@@ -91,6 +91,12 @@ extern "C" {
 #define	DDI_INTR_FLAG_MSI64	0x0200	/* (R0) MSI/X supports 64 bit addr */
 
 /*
+ * Macro to be used while passing interrupt priority
+ * for lock initialization.
+ */
+#define	DDI_INTR_PRI(pri)	(void *)((uintptr_t)(pri))
+
+/*
  * Typedef for interrupt handles
  */
 typedef struct __ddi_intr_handle *ddi_intr_handle_t;
@@ -205,6 +211,9 @@ int	ddi_intr_set_softint_pri(ddi_softint_handle_t h, uint_t soft_pri);
 
 /*
  * Old DDI interrupt interfaces.
+ *
+ * The following DDI interrupt interfaces are obsolete.
+ * Use the above new DDI interrupt interfaces instead.
  */
 
 /*

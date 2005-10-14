@@ -86,16 +86,19 @@ typedef struct px_msi_address_ranges {
 	uint32_t	msi_addr64_len;
 } px_msi_address_ranges_t;
 
+#define	PX_MSI_WIDTH			16
+#define	PX_MSIX_WIDTH			32
+
 /*
  * Default MSI configurations
  */
 #define	PX_DEFAULT_MSI_CNT		256
 #define	PX_DEFAULT_MSI_1ST_MSINUM	0
 #define	PX_DEFAULT_MSI_DATA_MASK	0xff
-#define	PX_DEFAULT_MSI_DATA_WIDTH	16
+#define	PX_DEFAULT_MSI_DATA_WIDTH	PX_MSIX_WIDTH
 
-#define	PX_MSI_WIDTH			16
-#define	PX_MSIX_WIDTH			32
+#define	PX_MSI_4GIG_LIMIT		0xFFFFFFFFUL
+#define	PX_MSI_ADDR_LEN			0x10000	/* 64K bytes */
 
 extern	int	px_msi_attach(px_t *px_p);
 extern	void	px_msi_detach(px_t *px_p);

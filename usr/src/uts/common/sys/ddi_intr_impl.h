@@ -76,7 +76,7 @@ typedef struct ddi_intr_handle_impl {
 	dev_info_t		*ih_dip;	/* dip associated with handle */
 	uint16_t		ih_type;	/* interrupt type being used */
 	ushort_t		ih_inum;	/* interrupt number */
-	ushort_t		ih_vector;	/* vector number */
+	uint32_t		ih_vector;	/* vector number */
 	uint16_t		ih_ver;		/* Version */
 	uint_t			ih_state;	/* interrupt handle state */
 	uint_t			ih_cap;		/* interrupt capabilities */
@@ -114,6 +114,9 @@ typedef struct ddi_intr_handle_impl {
 
 #define	DDI_INTR_IS_MSI_OR_MSIX(type) \
 	((type) == DDI_INTR_TYPE_MSI || (type) == DDI_INTR_TYPE_MSIX)
+
+#define	DDI_INTR_SUP_TYPES	DDI_INTR_TYPE_FIXED|DDI_INTR_TYPE_MSI|\
+				DDI_INTR_TYPE_MSIX
 
 /*
  * One such data structure is allocated per ddi_soft_intr_handle
@@ -190,8 +193,6 @@ typedef struct devinfo_intr {
 	(DEVI(dip)->devi_ops->devo_bus_ops->busops_rev >= BUSO_REV_9) && \
 	(DEVI(dip)->devi_ops->devo_bus_ops->bus_intr_op))
 
-int	i_ddi_handle_intr_ops(dev_info_t *dip, dev_info_t *rdip,
-	    ddi_intr_op_t op, ddi_intr_handle_impl_t *hdlp, void *result);
 int	i_ddi_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t op,
 	    ddi_intr_handle_impl_t *hdlp, void *result);
 
@@ -212,17 +213,15 @@ void	i_ddi_intr_set_supported_nintrs(dev_info_t *dip, int nintrs);
 uint_t	i_ddi_intr_get_current_nintrs(dev_info_t *dip);
 void	i_ddi_intr_set_current_nintrs(dev_info_t *dip, int nintrs);
 
+ddi_intr_handle_t *i_ddi_get_intr_handle(dev_info_t *dip, int inum);
 void	i_ddi_set_intr_handle(dev_info_t *dip, int inum,
 	    ddi_intr_handle_t *hdlp);
-ddi_intr_handle_t *i_ddi_get_intr_handle(dev_info_t *dip, int inum);
 
 ddi_intr_msix_t	*i_ddi_get_msix(dev_info_t *dip);
 void	i_ddi_set_msix(dev_info_t *dip, ddi_intr_msix_t *msix_p);
 
 int32_t i_ddi_get_intr_weight(dev_info_t *);
 int32_t i_ddi_set_intr_weight(dev_info_t *, int32_t);
-
-int	i_ddi_get_nintrs(dev_info_t *dip);
 
 #define	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, func, arg1, arg2) \
 	hdlp->ih_cb_func = func; \
@@ -252,15 +251,6 @@ struct intrspec {
 };
 
 #ifdef _KERNEL
-/*
- * This structure is allocated by i_ddi_add_softintr and its address is used
- * as a cookie passed back to the caller to be used later by
- * i_ddi_remove_softintr
- */
-struct soft_intrspec {
-	struct dev_info *si_devi;	/* records dev_info of caller */
-	struct intrspec si_intrspec;	/* and the intrspec */
-};
 
 /*
  * NOTE:

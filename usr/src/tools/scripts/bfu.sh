@@ -5284,6 +5284,11 @@ mondo_loop() {
 	# Remove CPCv1 API header per PSARC/2004/648
 	rm -f $usr/include/sys/cpc_event.h
 
+	# Remove headers per PSARC/2005/561
+	rm -f $usr/include/sys/nexusintr.h
+	rm -f $usr/platform/sun4u/include/sys/nexusintr_impl.h
+	rm -f $usr/platform/sun4v/include/sys/nexusintr_impl.h
+
 	# Remove usr/lib/mail which has moved to etc/mail/cf, but first,
 	# attempt to migrate any user-added files, which primarily live
 	# under usr/lib/mail/cf .  Blow away the seven files which we

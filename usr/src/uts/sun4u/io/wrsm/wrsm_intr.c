@@ -44,7 +44,6 @@
 #include <sys/param.h>
 #include <sys/sysconf.h>
 #include <sys/machsystm.h>
-#include <sys/nexusintr_impl.h>
 #include <sys/errno.h>
 #include <sys/ivintr.h>
 #include <sys/promif.h>

@@ -404,7 +404,7 @@ ohci_polled_init(
 	 * uint64_t typecast to make sure amd64 can compile
 	 */
 	mutex_init(&ohci_polledp->ohci_polled_input_pipe_handle->p_mutex,
-	    NULL, MUTEX_DRIVER, (void *)(uintptr_t)ohcip->ohci_intr_pri);
+	    NULL, MUTEX_DRIVER, DDI_INTR_PRI(ohcip->ohci_intr_pri));
 
 	/* Create a new ohci pipe private structure */
 	pp = (ohci_pipe_private_t *)

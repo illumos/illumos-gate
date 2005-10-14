@@ -285,8 +285,6 @@ static int rootnex_dma_init();
 static void rootnex_add_props(dev_info_t *);
 static int rootnex_ctl_reportdev(dev_info_t *dip);
 static struct intrspec *rootnex_get_ispec(dev_info_t *rdip, int inum);
-static int rootnex_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, int *in,
-    struct ddi_parent_private_data *pdptr);
 static int rootnex_ctlops_poke(peekpoke_ctlops_t *in_args);
 static int rootnex_ctlops_peek(peekpoke_ctlops_t *in_args, void *result);
 static int rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp);
@@ -507,13 +505,13 @@ rootnex_add_props(dev_info_t *dip)
  * rootnex_ctlops()
  *
  */
+/*ARGSUSED*/
 static int
 rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
     void *arg, void *result)
 {
 	int n, *ptr;
 	struct ddi_parent_private_data *pdp;
-
 
 	switch (ctlop) {
 	case DDI_CTLOPS_DMAPMAPC:
@@ -572,7 +570,6 @@ rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 
 	case DDI_CTLOPS_REGSIZE:
 	case DDI_CTLOPS_NREGS:
-	case DDI_CTLOPS_NINTRS:
 		break;
 
 	case DDI_CTLOPS_SIDDEV:
@@ -582,26 +579,15 @@ rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 			return (DDI_SUCCESS);
 		return (DDI_FAILURE);
 
-	case DDI_CTLOPS_INTR_HILEVEL:
-		/*
-		 * Indicate whether the interrupt specified is to be handled
-		 * above lock level.  In other words, above the level that
-		 * cv_signal and default type mutexes can be used.
-		 */
-		*(int *)result =
-		    (INT_IPL(((struct intrspec *)arg)->intrspec_pri)
-		    > LOCK_LEVEL);
-		return (DDI_SUCCESS);
-
-	case DDI_CTLOPS_XLATE_INTRS:
-		return (rootnex_xlate_intrs(dip, rdip, arg, result));
-
 	case DDI_CTLOPS_POWER:
 		return ((*pm_platform_power)((power_req_t *)arg));
 
+	case DDI_CTLOPS_RESERVED0: /* Was DDI_CTLOPS_NINTRS, obsolete */
 	case DDI_CTLOPS_RESERVED1: /* Was DDI_CTLOPS_POKE_INIT, obsolete */
 	case DDI_CTLOPS_RESERVED2: /* Was DDI_CTLOPS_POKE_FLUSH, obsolete */
 	case DDI_CTLOPS_RESERVED3: /* Was DDI_CTLOPS_POKE_FINI, obsolete */
+	case DDI_CTLOPS_RESERVED4: /* Was DDI_CTLOPS_INTR_HILEVEL, obsolete */
+	case DDI_CTLOPS_RESERVED5: /* Was DDI_CTLOPS_XLATE_INTRS, obsolete */
 		if (!rootnex_state->r_reserved_msg_printed) {
 			rootnex_state->r_reserved_msg_printed = B_TRUE;
 			cmn_err(CE_WARN, "Failing ddi_ctlops call(s) for "
@@ -621,9 +607,6 @@ rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 	if (ctlop == DDI_CTLOPS_NREGS) {
 		ptr = (int *)result;
 		*ptr = pdp->par_nreg;
-	} else if (ctlop == DDI_CTLOPS_NINTRS) {
-		ptr = (int *)result;
-		*ptr = pdp->par_nintr;
 	} else {
 		off_t *size = (off_t *)result;
 
@@ -1589,149 +1572,6 @@ rootnex_get_ispec(dev_info_t *rdip, int inum)
 
 	/* Get the interrupt structure pointer and return that */
 	return ((struct intrspec *)&pdp->par_intr[inum]);
-}
-
-
-/*
- * rootnex_xlate_intrs()
- *     For the x86 rootnexus, we're prepared to claim that the interrupt string
- *     is in the form of a list of <ipl,vec> specifications.
- */
-static int
-rootnex_xlate_intrs(dev_info_t *dip, dev_info_t *rdip, int *in,
-    struct ddi_parent_private_data *pdptr)
-{
-	size_t size;
-	int n;
-	struct intrspec *new;
-	caddr_t got_prop;
-	int *inpri;
-	int got_len;
-
-	static char bad_intr_fmt[] =
-	    "rootnex: bad interrupt spec from %s%d - ipl %d, irq %d\n";
-
-#ifdef	lint
-	dip = dip;
-#endif
-	/*
-	 * determine if the driver is expecting the new style "interrupts"
-	 * property which just contains the IRQ, or the old style which
-	 * contains pairs of <IPL,IRQ>.  if it is the new style, we always
-	 * assign IPL 5 unless an "interrupt-priorities" property exists.
-	 * in that case, the "interrupt-priorities" property contains the
-	 * IPL values that match, one for one, the IRQ values in the
-	 * "interrupts" property.
-	 */
-	inpri = NULL;
-	if ((ddi_getprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-	    "ignore-hardware-nodes", -1) != -1) ||
-	    ignore_hardware_nodes) {
-		/* the old style "interrupts" property... */
-
-		/*
-		 * The list consists of <ipl,vec> elements
-		 */
-		if ((n = (*in++ >> 1)) < 1)
-			return (DDI_FAILURE);
-
-		pdptr->par_nintr = n;
-		size = n * sizeof (struct intrspec);
-		new = pdptr->par_intr = kmem_zalloc(size, KM_SLEEP);
-
-		while (n--) {
-			int level = *in++;
-			int vec = *in++;
-
-			if (level < 1 || level > MAXIPL ||
-			    vec < VEC_MIN || vec > VEC_MAX) {
-				cmn_err(CE_CONT, bad_intr_fmt,
-				    DEVI(rdip)->devi_name,
-				    DEVI(rdip)->devi_instance, level, vec);
-				goto broken;
-			}
-			new->intrspec_pri = level;
-			if (vec != 2)
-				new->intrspec_vec = vec;
-			else
-				/*
-				 * irq 2 on the PC bus is tied to irq 9
-				 * on ISA, EISA and MicroChannel
-				 */
-				new->intrspec_vec = 9;
-			new++;
-		}
-
-		return (DDI_SUCCESS);
-	} else {
-		/* the new style "interrupts" property... */
-
-		/*
-		 * The list consists of <vec> elements
-		 */
-		if ((n = (*in++)) < 1)
-			return (DDI_FAILURE);
-
-		pdptr->par_nintr = n;
-		size = n * sizeof (struct intrspec);
-		new = pdptr->par_intr = kmem_zalloc(size, KM_SLEEP);
-
-		/* XXX check for "interrupt-priorities" property... */
-		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-		    "interrupt-priorities", (caddr_t)&got_prop, &got_len)
-		    == DDI_PROP_SUCCESS) {
-			if (n != (got_len / sizeof (int))) {
-				cmn_err(CE_CONT,
-				    "rootnex: bad interrupt-priorities length"
-				    " from %s%d: expected %d, got %d\n",
-				    DEVI(rdip)->devi_name,
-				    DEVI(rdip)->devi_instance, n,
-				    (int)(got_len / sizeof (int)));
-				goto broken;
-			}
-			inpri = (int *)got_prop;
-		}
-
-		while (n--) {
-			int level;
-			int vec = *in++;
-
-			if (inpri == NULL)
-				level = 5;
-			else
-				level = *inpri++;
-
-			if (level < 1 || level > MAXIPL ||
-			    vec < VEC_MIN || vec > VEC_MAX) {
-				cmn_err(CE_CONT, bad_intr_fmt,
-				    DEVI(rdip)->devi_name,
-				    DEVI(rdip)->devi_instance, level, vec);
-				goto broken;
-			}
-			new->intrspec_pri = level;
-			if (vec != 2)
-				new->intrspec_vec = vec;
-			else
-				/*
-				 * irq 2 on the PC bus is tied to irq 9
-				 * on ISA, EISA and MicroChannel
-				 */
-				new->intrspec_vec = 9;
-			new++;
-		}
-
-		if (inpri != NULL)
-			kmem_free(got_prop, got_len);
-		return (DDI_SUCCESS);
-	}
-
-broken:
-	kmem_free(pdptr->par_intr, size);
-	pdptr->par_intr = NULL;
-	pdptr->par_nintr = 0;
-	if (inpri != NULL)
-		kmem_free(got_prop, got_len);
-	return (DDI_FAILURE);
 }
 
 

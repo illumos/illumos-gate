@@ -329,7 +329,6 @@ CHKHDRS=			\
 	ndi_impldefs.h		\
 	netconfig.h		\
 	nexusdefs.h		\
-	nexusintr.h		\
 	note.h			\
 	nvpair.h                \
 	nvpair_impl.h           \

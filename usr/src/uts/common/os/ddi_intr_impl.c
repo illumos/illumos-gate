@@ -67,6 +67,12 @@ i_ddi_intr_devi_fini(dev_info_t *dip)
 {
 	devinfo_intr_t	*intr_p = DEVI(dip)->devi_intr_p;
 
+	DDI_INTR_APIDBG((CE_CONT, "i_ddi_intr_devi_fini: dip %p\n",
+	    (void *)dip));
+
+	if (DEVI(dip)->devi_intr_p == NULL)
+		return;
+
 	/*
 	 * devi_intr_handle_p will only be used for devices
 	 * which are using the legacy DDI Interrupt interfaces.
@@ -79,6 +85,7 @@ i_ddi_intr_devi_fini(dev_info_t *dip)
 			    sizeof (ddi_intr_handle_t));
 		}
 	}
+
 	kmem_free(DEVI(dip)->devi_intr_p, sizeof (devinfo_intr_t));
 	DEVI(dip)->devi_intr_p = NULL;
 }
@@ -96,7 +103,7 @@ i_ddi_intr_get_supported_types(dev_info_t *dip)
 	bzero(&hdl, sizeof (ddi_intr_handle_impl_t));
 	hdl.ih_dip = dip;
 
-	ret = i_ddi_handle_intr_ops(dip, dip, DDI_INTROP_SUPPORTED_TYPES, &hdl,
+	ret = i_ddi_intr_ops(dip, dip, DDI_INTROP_SUPPORTED_TYPES, &hdl,
 	    (void *)&intr_types);
 
 	return ((ret == DDI_SUCCESS) ? intr_types : 0);
@@ -129,7 +136,7 @@ i_ddi_intr_get_supported_nintrs(dev_info_t *dip, int intr_type)
 	hdl.ih_dip = dip;
 	hdl.ih_type = intr_type;
 
-	ret = i_ddi_handle_intr_ops(dip, dip, DDI_INTROP_NINTRS, &hdl,
+	ret = i_ddi_intr_ops(dip, dip, DDI_INTROP_NINTRS, &hdl,
 	    (void *)&nintrs);
 
 	return ((ret == DDI_SUCCESS) ? nintrs : 0);
@@ -241,7 +248,7 @@ i_ddi_set_intr_handle(dev_info_t *dip, int inum,
 	if ((inum < 0) || (inum >= intr_p->devi_intr_sup_nintrs))
 		return;
 
-	if (intr_p->devi_intr_handle_p == NULL) {
+	if (intr_hdlp && (intr_p->devi_intr_handle_p == NULL)) {
 		/* nintrs could be zero; so check for it first */
 		if (intr_p->devi_intr_sup_nintrs)
 			intr_p->devi_intr_handle_p = kmem_zalloc(
@@ -249,7 +256,8 @@ i_ddi_set_intr_handle(dev_info_t *dip, int inum,
 			    intr_p->devi_intr_sup_nintrs, KM_SLEEP);
 	}
 
-	intr_p->devi_intr_handle_p[inum] = intr_hdlp;
+	if (intr_p->devi_intr_handle_p)
+		intr_p->devi_intr_handle_p[inum] = intr_hdlp;
 }
 
 /*
@@ -307,8 +315,8 @@ i_ddi_get_intrspec(dev_info_t *dip, dev_info_t *rdip, uint_t inumber)
 
 	cmn_err(CE_WARN, "Failed to process interrupt "
 	    "for %s%d due to down-rev nexus driver %s%d",
-	    ddi_get_name(rdip), ddi_get_instance(rdip),
-	    ddi_get_name(pdip), ddi_get_instance(pdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip),
+	    ddi_driver_name(pdip), ddi_get_instance(pdip));
 
 	return (NULL);
 }
@@ -325,8 +333,8 @@ i_ddi_add_intrspec(dev_info_t *dip, dev_info_t *rdip, ddi_intrspec_t intrspec,
 
 	cmn_err(CE_WARN, "Failed to process interrupt "
 	    "for %s%d due to down-rev nexus driver %s%d",
-	    ddi_get_name(rdip), ddi_get_instance(rdip),
-	    ddi_get_name(pdip), ddi_get_instance(pdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip),
+	    ddi_driver_name(pdip), ddi_get_instance(pdip));
 
 	return (DDI_ENOTSUP);
 }
@@ -340,8 +348,8 @@ i_ddi_remove_intrspec(dev_info_t *dip, dev_info_t *rdip,
 
 	cmn_err(CE_WARN, "Failed to process interrupt "
 	    "for %s%d due to down-rev nexus driver %s%d",
-	    ddi_get_name(rdip), ddi_get_instance(rdip),
-	    ddi_get_name(pdip), ddi_get_instance(pdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip),
+	    ddi_driver_name(pdip), ddi_get_instance(pdip));
 }
 
 /* ARGSUSED */
@@ -353,8 +361,8 @@ i_ddi_intr_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_ctlop_t op,
 
 	cmn_err(CE_WARN, "Failed to process interrupt "
 	    "for %s%d due to down-rev nexus driver %s%d",
-	    ddi_get_name(rdip), ddi_get_instance(rdip),
-	    ddi_get_name(pdip), ddi_get_instance(pdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip),
+	    ddi_driver_name(pdip), ddi_get_instance(pdip));
 
 	return (DDI_ENOTSUP);
 }

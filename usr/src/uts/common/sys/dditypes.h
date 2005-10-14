@@ -102,6 +102,9 @@ typedef struct {
  */
 
 /*
+ * Both ddi_iblock_cookie_t and ddi_idevice_cookie_t are
+ * obsolete data structures.
+ *
  * lock initialization type
  */
 typedef struct __ddi_iblock_cookie *ddi_iblock_cookie_t;
@@ -126,6 +129,8 @@ typedef struct __ddi_regspec *ddi_regspec_t;
 typedef struct __ddi_intrspec *ddi_intrspec_t;
 
 /*
+ * ddi_softintr_t is an obsolete data structure.
+ *
  * soft interrupt id
  */
 typedef struct __ddi_softintr *ddi_softintr_t;

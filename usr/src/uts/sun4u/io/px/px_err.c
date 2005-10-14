@@ -639,11 +639,12 @@ px_err_reg_disable(px_t *px_p, px_err_id_t id)
 {
 	px_err_reg_desc_t	*reg_desc = &px_err_reg_tbl[id];
 	caddr_t			csr_base;
+	pxu_t			*pxu_p = (pxu_t *)px_p->px_plat_p;
 
 	if (id == PX_ERR_JBC)
-		csr_base = (caddr_t)(uintptr_t)px_p->px_inos[PX_INTR_XBC];
+		csr_base = (caddr_t)(uintptr_t)pxu_p->px_address[PX_REG_XBC];
 	else
-		csr_base = (caddr_t)(uintptr_t)px_p->px_inos[PX_INTR_PEC];
+		csr_base = (caddr_t)(uintptr_t)pxu_p->px_address[PX_REG_CSR];
 
 	reg_desc->enabled = B_FALSE;
 

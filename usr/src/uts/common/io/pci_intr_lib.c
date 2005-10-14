@@ -947,11 +947,13 @@ pci_intx_get_cap(dev_info_t *dip, int *flagsp)
 	DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_cap: "
 	    "command register is now 0x%x\n", cmdreg));
 
+	*flagsp = DDI_INTR_FLAG_LEVEL;
+
 	if (cmdreg & PCI_COMM_INTX_DISABLE) {
 		DDI_INTR_NEXDBG((CE_CONT, "pci_intx_get_cap: "
 		    "masking supported\n"));
-		*flagsp = (DDI_INTR_FLAG_MASKABLE |
-		    DDI_INTR_FLAG_PENDING | DDI_INTR_FLAG_LEVEL);
+		*flagsp |= (DDI_INTR_FLAG_MASKABLE |
+		    DDI_INTR_FLAG_PENDING);
 	}
 
 	/* Restore the device back to the original state and return */

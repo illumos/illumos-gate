@@ -36,7 +36,6 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/ddi_subrdefs.h>
-#include <sys/nexusintr_impl.h>
 #include <sys/promif.h>
 #include <sys/machsystm.h>
 #include <sys/ddi_intr_impl.h>
@@ -344,15 +343,12 @@ vnex_ctl(dev_info_t *dip, dev_info_t *rdip,
 		kmem_free((caddr_t)vnex_regspec, reglen);
 		return (DDI_SUCCESS);
 	}
-	case DDI_CTLOPS_NINTRS:
 	case DDI_CTLOPS_SIDDEV:
 	case DDI_CTLOPS_SLAVEONLY:
 	case DDI_CTLOPS_AFFINITY:
 	case DDI_CTLOPS_IOMIN:
 	case DDI_CTLOPS_POKE:
 	case DDI_CTLOPS_PEEK:
-	case DDI_CTLOPS_INTR_HILEVEL:
-	case DDI_CTLOPS_XLATE_INTRS:
 		cmn_err(CE_CONT, "%s%d: invalid op (%d) from %s%d\n",
 			ddi_get_name(dip), ddi_get_instance(dip),
 			ctlop, ddi_get_name(rdip), ddi_get_instance(rdip));
@@ -514,39 +510,33 @@ static int
 vnex_intr_ops(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_op_t intr_op, ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	ddi_ispec_t *ispecp = (ddi_ispec_t *)hdlp->ih_private;
-	int ret = DDI_SUCCESS;
+	int	ret = DDI_SUCCESS;
 
 	switch (intr_op) {
 		case DDI_INTROP_GETCAP:
-			*(int *)result = 0;
+			*(int *)result = DDI_INTR_FLAG_LEVEL;
 			break;
 		case DDI_INTROP_ALLOC:
 			*(int *)result = hdlp->ih_scratch1;
 			break;
 		case DDI_INTROP_GETPRI:
-			*(int *)result = ispecp->is_pil ?
-			    ispecp->is_pil : vnex_get_pil(rdip);
+			*(int *)result = hdlp->ih_pri ?
+			    hdlp->ih_pri : vnex_get_pil(rdip);
 			break;
 		case DDI_INTROP_FREE:
 			break;
 		case DDI_INTROP_SETPRI:
-			ispecp->is_pil = (*(int *)result);
 			break;
 		case DDI_INTROP_ADDISR:
-			hdlp->ih_vector = *ispecp->is_intr;
 			ret = vnex_add_intr(dip, rdip, hdlp);
 			break;
 		case DDI_INTROP_REMISR:
-			hdlp->ih_vector = *ispecp->is_intr;
 			ret = vnex_remove_intr(rdip, hdlp);
 			break;
 		case DDI_INTROP_ENABLE:
-			hdlp->ih_vector = *ispecp->is_intr;
 			ret = vnex_enable_intr(rdip, hdlp);
 			break;
 		case DDI_INTROP_DISABLE:
-			hdlp->ih_vector = *ispecp->is_intr;
 			ret = vnex_disable_intr(rdip, hdlp);
 			break;
 		case DDI_INTROP_NINTRS:

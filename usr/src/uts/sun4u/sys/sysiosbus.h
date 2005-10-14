@@ -374,7 +374,6 @@ struct sysio_parent_private_data {
 	int par_nreg;			/* number of regs */
 	struct regspec *par_reg;	/* array of regs */
 	int par_nintr;			/* number of interrupts */
-	struct sysiointrspec *par_intr;	/* array of possible interrupts */
 	int par_nrng;			/* number of ranges */
 	struct rangespec *par_rng;	/* array of ranges */
 	uint_t slot;			/* Slot number, on this sbus */

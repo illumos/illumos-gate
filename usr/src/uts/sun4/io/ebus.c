@@ -764,11 +764,10 @@ ebus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 #ifdef DEBUG
 	ebus_devstate_t *ebus_p = get_ebus_soft_state(ddi_get_instance(dip));
 #endif
-	ddi_ispec_t		*ip = (ddi_ispec_t *)hdlp->ih_private;
-	int32_t			i, max_children, max_device_types, len;
-	char			*name_p, *device_type_p;
+	int32_t		i, max_children, max_device_types, len;
+	char		*name_p, *device_type_p;
 
-	DBG1(D_INTR, ebus_p, "ip 0x%p\n", ip);
+	DBG1(D_INTR, ebus_p, "ebus_p 0x%p\n", ebus_p);
 
 	/*
 	 * NOTE: These ops below will never be supported in this nexus
@@ -776,7 +775,7 @@ ebus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	 */
 	switch (intr_op) {
 	case DDI_INTROP_GETCAP:
-		*(int *)result = 0;
+		*(int *)result = DDI_INTR_FLAG_LEVEL;
 		return (DDI_SUCCESS);
 	case DDI_INTROP_SETCAP:
 	case DDI_INTROP_SETMASK:
@@ -787,7 +786,7 @@ ebus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		break;
 	}
 
-	if ((intr_op == DDI_INTROP_SUPPORTED_TYPES) || ip->is_pil)
+	if ((intr_op == DDI_INTROP_SUPPORTED_TYPES) || hdlp->ih_pri)
 		goto done;
 
 	/*
@@ -806,7 +805,7 @@ ebus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			    ebus_name_to_pil[i].string,
 			    ebus_name_to_pil[i].pil);
 
-			ip->is_pil = ebus_name_to_pil[i].pil;
+			hdlp->ih_pri = ebus_name_to_pil[i].pil;
 			goto done;
 		}
 	}
@@ -824,7 +823,7 @@ ebus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 				    "PIL %d\n", ebus_device_type_to_pil[i].
 				    string, ebus_device_type_to_pil[i].pil);
 
-				ip->is_pil = ebus_device_type_to_pil[i].pil;
+				hdlp->ih_pri = ebus_device_type_to_pil[i].pil;
 				break;
 			}
 		}
@@ -836,12 +835,13 @@ ebus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	 * If we get here, we need to set a default value
 	 * for the PIL.
 	 */
-	if (ip->is_pil == 0) {
-		ip->is_pil = 1;
+	if (hdlp->ih_pri == 0) {
+		hdlp->ih_pri = 1;
 
 		cmn_err(CE_WARN, "%s%d assigning default interrupt level %d "
-		    "for device %s%d", ddi_get_name(dip), ddi_get_instance(dip),
-		    ip->is_pil, ddi_get_name(rdip), ddi_get_instance(rdip));
+		    "for device %s%d", ddi_driver_name(dip),
+		    ddi_get_instance(dip), hdlp->ih_pri, ddi_driver_name(rdip),
+		    ddi_get_instance(rdip));
 	}
 
 done:

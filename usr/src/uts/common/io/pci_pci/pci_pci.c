@@ -378,16 +378,6 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		ppb_removechild((dev_info_t *)arg);
 		return (DDI_SUCCESS);
 
-	case DDI_CTLOPS_NINTRS:
-		if (ddi_get_parent_data(rdip))
-			*(int *)result = 1;
-		else
-			*(int *)result = 0;
-		return (DDI_SUCCESS);
-
-	case DDI_CTLOPS_XLATE_INTRS:
-		return (DDI_SUCCESS);
-
 	case DDI_CTLOPS_SIDDEV:
 		return (DDI_SUCCESS);
 

@@ -73,7 +73,6 @@
 #include <pcmcia/sys/cs_priv.h>
 
 #ifdef sparc
-#include <sys/nexusintr_impl.h>
 #include <sys/ddi_subrdefs.h>
 #endif
 
@@ -673,15 +672,6 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		/* in general this is true. */
 		return (DDI_SUCCESS);
 
-	case DDI_CTLOPS_NINTRS:
-		ppd = (struct pcmcia_parent_private *)
-			ddi_get_parent_data(rdip);
-		if (ppd != NULL && ppd->ppd_intr)
-			*((uint32_t *)result) = 1;
-		else
-			*((uint32_t *)result) = 0;
-		return (DDI_SUCCESS);	/* if a memory card */
-
 	case DDI_CTLOPS_NREGS:
 		ppd = (struct pcmcia_parent_private *)
 			ddi_get_parent_data(rdip);
@@ -698,11 +688,6 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			*((off_t *)result) =  sizeof (struct pcm_regs);
 		else
 			*((off_t *)result) = 0;
-		return (DDI_SUCCESS);
-
-	case DDI_CTLOPS_INTR_HILEVEL:
-		/* Should probably allow low level when they are possible */
-		*((uint32_t *)result) = 1;
 		return (DDI_SUCCESS);
 
 	case DDI_CTLOPS_POWER:
@@ -764,7 +749,6 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		return (DDI_FAILURE);
 		/* These CTLOPS will need to be implemented for new form */
 		/* let CardServices know about this */
-	case DDI_CTLOPS_XLATE_INTRS:
 
 	default:
 		/* if we don't understand, pass up the tree */
@@ -4798,8 +4782,6 @@ pcmcia_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	clear_irq_handler_t handler;
 	struct intrspec *pispec;
 	int socket;
-	ddi_ispec_t		*ip = (ddi_ispec_t *)hdlp->ih_private;
-
 
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug) {
@@ -4825,8 +4807,7 @@ pcmcia_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 
 	/* first handle the multifunction case since it is simple */
 	mutex_enter(&sockp->ls_ilock);
-	if (sockp->ls_inthandlers != NULL &&
-	    (struct intrspec *)ip != &sockp->ls_intrspec) {
+	if (sockp->ls_inthandlers != NULL) {
 		/* we must be MFC */
 		inthandler_t *intr;
 		int remhandler = 0;
@@ -4870,16 +4851,12 @@ pcmcia_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 			mutex_exit(&sockp->ls_ilock);
 			return;
 		}
-		/* need to remove the real handler in MFC case */
-		hdlp->ih_private = (ddi_intrspec_t)&sockp->ls_intrspec;
 
 		/* need to get the dip that was used to add the handler */
 		rdip = sockp->ls_mfintr_dip;
 	}
-	mutex_exit(&sockp->ls_ilock);
 
-	if ((struct intrspec *)ip == &sockp->ls_intrspec)
-		pispec = (struct intrspec *)ip;
+	mutex_exit(&sockp->ls_ilock);
 
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug) {
@@ -4902,8 +4879,7 @@ int
 pcmcia_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
-	int		ret = DDI_SUCCESS;
+	int	ret = DDI_SUCCESS;
 
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug) {
@@ -4914,7 +4890,7 @@ pcmcia_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 	switch (intr_op) {
 	case DDI_INTROP_GETCAP:
-		*(int *)result = 0;
+		*(int *)result = DDI_INTR_FLAG_LEVEL;
 		break;
 	case DDI_INTROP_SETCAP:
 		ret = DDI_ENOTSUP;
@@ -4931,16 +4907,11 @@ pcmcia_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		pcmcia_remove_intr_impl(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_SETPRI:
-		ip->is_pil = (*(int *)result);
 		break;
 	case DDI_INTROP_ADDISR:
-		hdlp->ih_vector = *ip->is_intr;
-
 		ret = pcmcia_add_intr_impl(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_REMISR:
-		hdlp->ih_vector = *ip->is_intr;
-
 		pcmcia_remove_intr_impl(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_ENABLE:
@@ -5422,7 +5393,7 @@ pcmcia_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		*(int *)result = DDI_INTR_TYPE_FIXED;
 		break;
 	case DDI_INTROP_GETCAP:
-		*(int *)result = 0;
+		*(int *)result = DDI_INTR_FLAG_LEVEL;
 		break;
 	case DDI_INTROP_NINTRS:
 	case DDI_INTROP_NAVAIL:

@@ -858,7 +858,6 @@ f none usr/include/sys/mutex.h 644 root bin
 f none usr/include/sys/nbmlock.h 644 root bin
 f none usr/include/sys/netconfig.h 644 root bin
 f none usr/include/sys/nexusdefs.h 644 root bin
-f none usr/include/sys/nexusintr.h 644 root bin
 f none usr/include/sys/ndifm.h 644 root bin
 f none usr/include/sys/ndi_impldefs.h 644 root bin
 f none usr/include/sys/note.h 644 root bin

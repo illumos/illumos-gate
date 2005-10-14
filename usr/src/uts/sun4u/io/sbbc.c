@@ -39,7 +39,6 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_subrdefs.h>
 #include <sys/pci.h>
-#include <sys/nexusintr_impl.h>
 #include <sys/pci/pci_nexus.h>
 #include <sys/autoconf.h>
 #include <sys/cmn_err.h>
@@ -617,12 +616,11 @@ static int
 sbbc_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
-	int		ret = DDI_SUCCESS;
+	int	ret = DDI_SUCCESS;
 
 	switch (intr_op) {
 	case DDI_INTROP_GETCAP:
-		*(int *)result = 0;
+		*(int *)result = DDI_INTR_FLAG_LEVEL;
 		break;
 	case DDI_INTROP_ALLOC:
 		*(int *)result = hdlp->ih_scratch1;
@@ -630,16 +628,17 @@ sbbc_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_FREE:
 		break;
 	case DDI_INTROP_GETPRI:
-		if (ip->is_pil == 0) {
-			ip->is_pil = 0x1;
+		if (hdlp->ih_pri == 0) {
+			hdlp->ih_pri = 0x1;
 
 			cmn_err(CE_WARN, "%s%d assigning default interrupt "
-			    "level %d for device %s%d", ddi_get_name(dip),
-			    ddi_get_instance(dip), ip->is_pil,
-			    ddi_get_name(rdip), ddi_get_instance(rdip));
+			    "level %d for device %s%d", ddi_driver_name(dip),
+			    ddi_get_instance(dip), hdlp->ih_pri,
+			    ddi_driver_name(rdip), ddi_get_instance(rdip));
 		}
 
-		*(int *)result = ip->is_pil;
+		*(int *)result = hdlp->ih_pri;
+
 		break;
 	case DDI_INTROP_ADDISR:
 		ret = sbbc_add_intr_impl(dip, rdip, intr_op, hdlp, result);

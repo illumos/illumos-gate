@@ -316,7 +316,7 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Initialize the mutex */
 	mutex_init(&uhcip->uhci_int_mutex, NULL, MUTEX_DRIVER,
-	    (void *)(uintptr_t)intr_pri);
+	    DDI_INTR_PRI(intr_pri));
 
 	/* Create prototype condition variable */
 	cv_init(&uhcip->uhci_cv_SOF, NULL, CV_DRIVER, NULL);

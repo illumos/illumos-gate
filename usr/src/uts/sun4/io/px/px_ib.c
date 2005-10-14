@@ -135,6 +135,7 @@ px_ib_intr_enable(px_t *px_p, cpuid_t cpu_id, devino_t ino)
 	}
 
 	PX_INTR_ENABLE(px_p->px_dip, sysino, cpu_id);
+	px_lib_intr_setstate(px_p->px_dip, sysino, INTR_IDLE_STATE);
 
 	mutex_exit(&ib_p->ib_intr_lock);
 }

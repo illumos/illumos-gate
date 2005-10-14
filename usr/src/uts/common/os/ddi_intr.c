@@ -73,7 +73,7 @@ ddi_intr_get_supported_types(dev_info_t *dip, int *typesp)
 	bzero(&hdl, sizeof (ddi_intr_handle_impl_t));
 	hdl.ih_dip = dip;
 
-	ret = i_ddi_handle_intr_ops(dip, dip, DDI_INTROP_SUPPORTED_TYPES, &hdl,
+	ret = i_ddi_intr_ops(dip, dip, DDI_INTROP_SUPPORTED_TYPES, &hdl,
 	    (void *)typesp);
 
 	if (ret != DDI_SUCCESS)
@@ -98,14 +98,18 @@ ddi_intr_get_nintrs(dev_info_t *dip, int type, int *nintrsp)
 	int			ret;
 	ddi_intr_handle_impl_t	hdl;
 
-	if (dip == NULL)
-		return (DDI_EINVAL);
+	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_nintrs: dip %p, type: %d\n",
+	    (void *)dip, type));
 
-	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_nintrs: dip %p\n",
-	    (void *)dip));
-
-	if (!(i_ddi_intr_get_supported_types(dip) & type))
+	if ((dip == NULL) || (type & ~(DDI_INTR_SUP_TYPES))) {
+		*nintrsp = 0;
 		return (DDI_EINVAL);
+	}
+
+	if (!(i_ddi_intr_get_supported_types(dip) & type)) {
+		*nintrsp = 0;
+		return (DDI_EINVAL);
+	}
 
 	if (*nintrsp = i_ddi_intr_get_supported_nintrs(dip, type))
 		return (DDI_SUCCESS);
@@ -114,7 +118,7 @@ ddi_intr_get_nintrs(dev_info_t *dip, int type, int *nintrsp)
 	hdl.ih_dip = dip;
 	hdl.ih_type = type;
 
-	ret = i_ddi_handle_intr_ops(dip, dip, DDI_INTROP_NINTRS, &hdl,
+	ret = i_ddi_intr_ops(dip, dip, DDI_INTROP_NINTRS, &hdl,
 	    (void *)nintrsp);
 
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_nintrs:: nintrs %x\n",
@@ -139,14 +143,18 @@ ddi_intr_get_navail(dev_info_t *dip, int type, int *navailp)
 	int			ret;
 	ddi_intr_handle_impl_t	hdl;
 
-	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_navail: dip %p\n",
-	    (void *)dip));
+	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_navail: dip %p, type: %d\n",
+	    (void *)dip, type));
 
-	if (dip == NULL)
+	if ((dip == NULL) || (type & ~(DDI_INTR_SUP_TYPES))) {
+		*navailp = 0;
 		return (DDI_EINVAL);
+	}
 
-	if (!(i_ddi_intr_get_supported_types(dip) & type))
+	if (!(i_ddi_intr_get_supported_types(dip) & type)) {
+		*navailp = 0;
 		return (DDI_EINVAL);
+	}
 
 	/*
 	 * In future, this interface implementation will change
@@ -156,8 +164,8 @@ ddi_intr_get_navail(dev_info_t *dip, int type, int *navailp)
 	hdl.ih_dip = dip;
 	hdl.ih_type = type;
 
-	ret = i_ddi_handle_intr_ops(dip, dip,
-	    DDI_INTROP_NAVAIL, &hdl, (void *)navailp);
+	ret = i_ddi_intr_ops(dip, dip, DDI_INTROP_NAVAIL, &hdl,
+	    (void *)navailp);
 
 	return (ret == DDI_SUCCESS ? DDI_SUCCESS : DDI_INTR_NOTFOUND);
 }
@@ -273,14 +281,14 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	tmp_hdl.ih_scratch2 = behavior;
 	tmp_hdl.ih_dip = dip;
 
-	if (i_ddi_handle_intr_ops(dip, dip, DDI_INTROP_ALLOC,
+	if (i_ddi_intr_ops(dip, dip, DDI_INTROP_ALLOC,
 	    &tmp_hdl, (void *)actualp) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: allocation "
 		    "failed\n"));
 		return (*actualp ? DDI_EAGAIN : DDI_INTR_NOTFOUND);
 	}
 
-	if ((ret = i_ddi_handle_intr_ops(dip, dip, DDI_INTROP_GETPRI,
+	if ((ret = i_ddi_intr_ops(dip, dip, DDI_INTROP_GETPRI,
 	    &tmp_hdl, (void *)&pri)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: get priority "
 		    "failed\n"));
@@ -289,7 +297,7 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: getting capability\n"));
 
-	if ((ret = i_ddi_handle_intr_ops(dip, dip, DDI_INTROP_GETCAP,
+	if ((ret = i_ddi_intr_ops(dip, dip, DDI_INTROP_GETCAP,
 	    &tmp_hdl, (void *)&cap)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: get capability "
 		    "failed\n"));
@@ -344,21 +352,21 @@ ddi_intr_free(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_FREE, hdlp, NULL);
 
 	rw_exit(&hdlp->ih_rwlock);
 	if (ret == DDI_SUCCESS) {
-		if ((i_ddi_intr_get_current_nintrs(hdlp->ih_dip) - 1) == 0)
-			/* Reset current interrupt type and count used */
-			i_ddi_intr_set_current_type(hdlp->ih_dip, 0);
-
 		i_ddi_intr_set_current_nintrs(hdlp->ih_dip,
 		    i_ddi_intr_get_current_nintrs(hdlp->ih_dip) - 1);
 
-		if (hdlp->ih_type & DDI_INTR_TYPE_FIXED)
-			i_ddi_set_intr_handle(hdlp->ih_dip,
-			    hdlp->ih_inum, NULL);
+		if (i_ddi_intr_get_current_nintrs(hdlp->ih_dip) == 0) {
+			i_ddi_intr_devi_fini(hdlp->ih_dip);
+		} else {
+			if (hdlp->ih_type & DDI_INTR_TYPE_FIXED)
+				i_ddi_set_intr_handle(hdlp->ih_dip,
+				    hdlp->ih_inum, NULL);
+		}
 
 		rw_destroy(&hdlp->ih_rwlock);
 		kmem_free(hdlp, sizeof (ddi_intr_handle_impl_t));
@@ -426,7 +434,7 @@ ddi_intr_get_cap(ddi_intr_handle_t h, int *flagsp)
 		return (DDI_SUCCESS);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_GETCAP, hdlp, (void *)flagsp);
 
 	if (ret == DDI_SUCCESS) {
@@ -475,7 +483,7 @@ ddi_intr_set_cap(ddi_intr_handle_t h, int flags)
 		return (DDI_ENOTSUP);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_SETCAP, hdlp, &flags);
 
 	rw_exit(&hdlp->ih_rwlock);
@@ -519,7 +527,7 @@ ddi_intr_get_pri(ddi_intr_handle_t h, uint_t *prip)
 		return (DDI_SUCCESS);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_GETPRI, hdlp, (void *)prip);
 
 	if (ret == DDI_SUCCESS)
@@ -559,7 +567,7 @@ ddi_intr_set_pri(ddi_intr_handle_t h, uint_t pri)
 		return (DDI_SUCCESS);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_SETPRI, hdlp, &pri);
 
 	if (ret == DDI_SUCCESS)
@@ -595,7 +603,7 @@ ddi_intr_add_handler(ddi_intr_handle_t h, ddi_intr_handler_t inthandler,
 	hdlp->ih_cb_arg1 = arg1;
 	hdlp->ih_cb_arg2 = arg2;
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_ADDISR, hdlp, NULL);
 
 	if (ret != DDI_SUCCESS) {
@@ -632,7 +640,7 @@ ddi_intr_dup_handler(ddi_intr_handle_t org, int vector, ddi_intr_handle_t *dup)
 		return (DDI_EINVAL);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_DUPVEC, hdlp, (void *)&vector);
 
 	if (ret == DDI_SUCCESS) {
@@ -679,7 +687,7 @@ ddi_intr_remove_handler(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_REMISR, hdlp, NULL);
 
 	if (ret == DDI_SUCCESS) {
@@ -716,7 +724,7 @@ ddi_intr_enable(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_ENABLE, hdlp, NULL);
 
 	if (ret == DDI_SUCCESS)
@@ -746,7 +754,7 @@ ddi_intr_disable(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_DISABLE, hdlp, NULL);
 
 	if (ret == DDI_SUCCESS)
@@ -785,7 +793,7 @@ ddi_intr_block_enable(ddi_intr_handle_t *h_array, int count)
 	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
 	hdlp->ih_scratch1 = count;
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_BLOCKENABLE, hdlp, NULL);
 
 	rw_exit(&hdlp->ih_rwlock);
@@ -830,7 +838,7 @@ ddi_intr_block_disable(ddi_intr_handle_t *h_array, int count)
 	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
 	hdlp->ih_scratch1 = count;
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_BLOCKDISABLE, hdlp, NULL);
 
 	rw_exit(&hdlp->ih_rwlock);
@@ -868,7 +876,7 @@ ddi_intr_set_mask(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 	}
 
-	ret =  i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret =  i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_SETMASK, hdlp, NULL);
 
 	rw_exit(&hdlp->ih_rwlock);
@@ -893,7 +901,7 @@ ddi_intr_clr_mask(ddi_intr_handle_t h)
 		return (DDI_EINVAL);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_CLRMASK, hdlp, NULL);
 
 	rw_exit(&hdlp->ih_rwlock);
@@ -921,7 +929,7 @@ ddi_intr_get_pending(ddi_intr_handle_t h, int *pendingp)
 		return (DDI_EINVAL);
 	}
 
-	ret = i_ddi_handle_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_GETPENDING, hdlp, (void *)pendingp);
 
 	rw_exit(&hdlp->ih_rwlock);
@@ -1093,6 +1101,9 @@ ddi_intr_set_softint_pri(ddi_softint_handle_t h, uint_t soft_pri)
 
 /*
  * Old DDI interrupt framework
+ *
+ * The following DDI interrupt interfaces are obsolete.
+ * Use the above new DDI interrupt interfaces instead.
  */
 
 int
@@ -1264,9 +1275,6 @@ ddi_add_intr(dev_info_t *dip, uint_t inumber,
 		idevice_cookiep->idev_priority = pri;
 	}
 
-	/* this line may be removed in near future */
-	i_ddi_set_intr_handle(dip, inumber, hdl_p);
-
 	return (DDI_SUCCESS);
 }
 
@@ -1320,9 +1328,6 @@ ddi_remove_intr(dev_info_t *dip, uint_t inum, ddi_iblock_cookie_t iblock_cookie)
 	}
 
 	kmem_free(hdl_p, sizeof (ddi_intr_handle_t));
-
-	/* this line may be removed in near future */
-	i_ddi_set_intr_handle(dip, inum, NULL);
 }
 
 /* ARGSUSED */

@@ -104,7 +104,6 @@ struct px_ib_ino_info {
 
 #define	PX_INTR_ENABLE(dip, sysino, cpuid) \
 	(void) px_lib_intr_settarget(dip, sysino, cpuid); \
-	(void) px_lib_intr_setstate(dip, sysino, INTR_IDLE_STATE); \
 	(void) px_lib_intr_setvalid(dip, sysino, INTR_VALID);
 
 #define	PX_INTR_DISABLE(dip, sysino) \

@@ -62,7 +62,7 @@ int
 rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp);
 
-void
+int
 rootnex_get_intr_pri(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp);
 
@@ -76,7 +76,6 @@ int
 rootnex_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
 {
-	ddi_ispec_t		*ip = (ddi_ispec_t *)hdlp->ih_private;
 	volatile uint64_t	*intr_mapping_reg;
 	volatile uint64_t	mondo_vector;
 	int32_t			r_upaid = -1;
@@ -90,15 +89,14 @@ rootnex_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		    "upa-interrupt-slave", 0) != 0) {
 
 			/* Give slave devices pri of 5. e.g. fb's */
-			ip->is_pil = 5;
-			hdlp->ih_pri = ip->is_pil;
+			hdlp->ih_pri = 5;
 		}
 
 		/*
 		 * Translate the interrupt property by stuffing in the
 		 * portid for those devices which have a upa-portid.
 		 */
-		*ip->is_intr |= (UPAID_TO_IGN(upa_portid) << 6);
+		hdlp->ih_vector |= (UPAID_TO_IGN(upa_portid) << 6);
 	}
 
 	/*
@@ -122,7 +120,6 @@ rootnex_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 			return (DDI_FAILURE);
 	}
 
-	hdlp->ih_vector = *ip->is_intr;
 	if ((ret = i_ddi_add_ivintr(hdlp)) != DDI_SUCCESS)
 		return (ret);
 
@@ -139,7 +136,7 @@ rootnex_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		 * running under load.
 		 */
 		mondo_vector = cpu0.cpu_id << IMR_TID_SHIFT;
-		mondo_vector |= (IMR_VALID | (uint64_t)*ip->is_intr);
+		mondo_vector |= (IMR_VALID | (uint64_t)hdlp->ih_vector);
 
 		/* Set the mapping register */
 		*intr_mapping_reg = mondo_vector;
@@ -159,7 +156,6 @@ int
 rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
 {
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
 	int32_t		upa_portid;
 	int		len;
 
@@ -169,7 +165,7 @@ rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		 * Translate the interrupt property by stuffing in the
 		 * portid for those devices which have a upa-portid.
 		 */
-		*ip->is_intr |= (UPAID_TO_IGN(upa_portid) << 6);
+		hdlp->ih_vector |= (UPAID_TO_IGN(upa_portid) << 6);
 	}
 
 	/*
@@ -203,7 +199,6 @@ rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		}
 	}
 
-	hdlp->ih_vector = *ip->is_intr;
 	i_ddi_rem_ivintr(hdlp);
 
 	return (DDI_SUCCESS);
@@ -213,11 +208,11 @@ rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
  * rootnex_get_intr_pri:
  */
 /*ARGSUSED*/
-void
+int
 rootnex_get_intr_pri(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
 {
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
+	int	pri = hdlp->ih_pri;
 
 	if (ddi_prop_get_int(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 	    "upa-portid", -1) != -1) {
@@ -225,9 +220,11 @@ rootnex_get_intr_pri(dev_info_t *dip, dev_info_t *rdip,
 		    "upa-interrupt-slave", 0) != 0) {
 
 			/* Give slave devices pri of 5. e.g. fb's */
-			ip->is_pil = 5;
+			pri = 5;
 		}
 	}
+
+	return (pri);
 }
 
 int

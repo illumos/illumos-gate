@@ -330,14 +330,11 @@ i2o_bus_ctl(dev_info_t *dip, dev_info_t *rdip,
 	 * These functions shouldn't be called by the OSMs. Return error.
 	 */
 	case DDI_CTLOPS_DMAPMAPC:
-	case DDI_CTLOPS_INTR_HILEVEL:
-	case DDI_CTLOPS_XLATE_INTRS:
 	case DDI_CTLOPS_SIDDEV:
 	case DDI_CTLOPS_SLAVEONLY:
 	case DDI_CTLOPS_AFFINITY:
 	case DDI_CTLOPS_REGSIZE:
 	case DDI_CTLOPS_NREGS:
-	case DDI_CTLOPS_NINTRS:
 	case DDI_CTLOPS_POKE:
 	case DDI_CTLOPS_PEEK:
 		return (DDI_FAILURE);

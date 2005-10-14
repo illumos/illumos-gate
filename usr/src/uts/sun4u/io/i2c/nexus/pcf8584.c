@@ -583,8 +583,6 @@ pcf8584_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op,
 	case DDI_CTLOPS_PTOB:
 	case DDI_CTLOPS_BTOP:
 	case DDI_CTLOPS_BTOPR:
-	case DDI_CTLOPS_INTR_HILEVEL:
-	case DDI_CTLOPS_XLATE_INTRS:
 	case DDI_CTLOPS_DVMAPAGESIZE:
 
 		return (DDI_FAILURE);

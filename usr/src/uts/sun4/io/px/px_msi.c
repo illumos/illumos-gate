@@ -408,10 +408,10 @@ px_msi_get_props(px_t *px_p)
 	 * Reserve PCI MEM 32 resources to perform 32 bit MSI transactions.
 	 */
 	bzero((caddr_t)&request, sizeof (ndi_ra_request_t));
-	request.ra_flags = (NDI_RA_ALLOC_BOUNDED | NDI_RA_ALLOC_PARTIAL_OK);
+	request.ra_flags = NDI_RA_ALLOC_BOUNDED;
 	request.ra_boundbase = 0;
-	request.ra_boundlen = 0xFFFFFFFFUL;
-	request.ra_len = 0x10000; /* 64K bytes */
+	request.ra_boundlen = PX_MSI_4GIG_LIMIT;
+	request.ra_len = PX_MSI_ADDR_LEN;
 	request.ra_align_mask = 0;
 
 	if (ndi_ra_alloc(dip, &request, &mem_answer, &mem_alen,
@@ -430,12 +430,18 @@ px_msi_get_props(px_t *px_p)
 
 	/*
 	 * Reserve PCI MEM 64 resources to perform 64 bit MSI transactions.
+	 *
+	 * NOTE:
+	 *
+	 * Currently OBP do not export any "available" property or range in
+	 * the MEM64 space. Hence ndi_ra_alloc() request will return failure.
+	 * So, for time being ignore this failure.
 	 */
 	bzero((caddr_t)&request, sizeof (ndi_ra_request_t));
-	request.ra_flags = (NDI_RA_ALLOC_BOUNDED | NDI_RA_ALLOC_PARTIAL_OK);
-	request.ra_boundbase = 0;
-	request.ra_boundlen = 0xFFFFFFFFFFFFFFFFUL;
-	request.ra_len = 0x10000; /* 64K bytes */
+	request.ra_flags = NDI_RA_ALLOC_BOUNDED;
+	request.ra_boundbase = PX_MSI_4GIG_LIMIT + 1;
+	request.ra_boundlen = PX_MSI_4GIG_LIMIT;
+	request.ra_len = PX_MSI_ADDR_LEN;
 	request.ra_align_mask = 0;
 
 	if (ndi_ra_alloc(dip, &request, &mem_answer, &mem_alen,
@@ -443,7 +449,7 @@ px_msi_get_props(px_t *px_p)
 		DBG(DBG_MSIQ, dip, "px_msi_getprops: Failed to allocate "
 		    "64KB mem\n");
 
-		return (DDI_FAILURE);
+		return (DDI_SUCCESS);
 	}
 
 	msi_state_p->msi_addr64 = mem_answer;

@@ -416,7 +416,7 @@ ehci_polled_init(
 	 * uint64_t typecast to make sure amd64 can compile
 	 */
 	mutex_init(&ehci_polledp->ehci_polled_input_pipe_handle->p_mutex,
-	    NULL, MUTEX_DRIVER, (void *)(uintptr_t)ehcip->ehci_intr_pri);
+	    NULL, MUTEX_DRIVER, DDI_INTR_PRI(ehcip->ehci_intr_pri));
 
 	/*
 	 * Create a new ehci pipe private structure

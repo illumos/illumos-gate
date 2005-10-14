@@ -1978,8 +1978,6 @@ pci_thermal_rem_intr(dev_info_t *rdip, uint_t inum)
 {
 	pci_t		*pci_p;
 	dev_info_t	*pdip;
-	ddi_intrspec_t	ispec;
-	ddi_ispec_t	*ip;
 	uint32_t	dev_mondo, pci_mondo;
 	int 		instance;
 
@@ -1997,10 +1995,8 @@ pci_thermal_rem_intr(dev_info_t *rdip, uint_t inum)
 	pci_p = get_pci_soft_state(instance);
 
 	/* Calculate the requesting device's mondo */
-	i_ddi_alloc_ispec(rdip, inum, &ispec);
-	ip = (ddi_ispec_t *)ispec;
 	dev_mondo = pci_xlate_intr(pci_p->pci_dip, rdip, pci_p->pci_ib_p,
-	    IB_MONDO_TO_INO(*ip->is_intr));
+	    IB_MONDO_TO_INO(i_ddi_get_inum(rdip, inum)));
 
 	/* get pci's thermal mondo */
 	pci_mondo = ((pci_p->pci_cb_p->cb_ign << PCI_INO_BITS) |
@@ -2013,6 +2009,4 @@ pci_thermal_rem_intr(dev_info_t *rdip, uint_t inum)
 		    ddi_get_instance(rdip));
 		rem_ivintr(pci_mondo, NULL);
 	}
-
-	i_ddi_free_ispec(ispec);
 }

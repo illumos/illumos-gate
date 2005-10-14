@@ -58,7 +58,6 @@ SUN4_HDRS=			\
 	memnode.h		\
 	memtestio.h		\
 	nexusdebug.h		\
-	nexusintr_impl.h	\
 	prom_debug.h		\
 	scb.h			\
 	sun4asi.h		\

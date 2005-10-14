@@ -221,7 +221,6 @@ f none usr/platform/sun4u/include/sys/memlist_plat.h 644 root bin
 f none usr/platform/sun4u/include/sys/memnode.h 644 root bin
 f none usr/platform/sun4u/include/sys/mmu.h 644 root bin
 f none usr/platform/sun4u/include/sys/nexusdebug.h 644 root bin
-f none usr/platform/sun4u/include/sys/nexusintr_impl.h 644 root bin
 f none usr/platform/sun4u/include/sys/prom_debug.h 644 root bin
 f none usr/platform/sun4u/include/sys/sbd_ioctl.h 644 root bin
 f none usr/platform/sun4u/include/sys/prom_plat.h 644 root bin
@@ -287,7 +286,6 @@ f none usr/platform/sun4v/include/sys/memlist_plat.h 644 root bin
 f none usr/platform/sun4v/include/sys/mmu.h 644 root bin
 f none usr/platform/sun4v/include/sys/memnode.h 644 root bin
 f none usr/platform/sun4v/include/sys/nexusdebug.h 644 root bin
-f none usr/platform/sun4v/include/sys/nexusintr_impl.h 644 root bin
 f none usr/platform/sun4v/include/sys/niagaraasi.h 644 root bin
 f none usr/platform/sun4v/include/sys/niagararegs.h 644 root bin
 f none usr/platform/sun4v/include/sys/prom_debug.h 644 root bin

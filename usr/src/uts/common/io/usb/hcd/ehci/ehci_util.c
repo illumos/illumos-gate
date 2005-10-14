@@ -715,7 +715,7 @@ ehci_register_intrs_and_init_mutex(ehci_state_t	*ehcip)
 
 	/* Initialize the mutex */
 	mutex_init(&ehcip->ehci_int_mutex, NULL, MUTEX_DRIVER,
-	    (void *)(uintptr_t)ehcip->ehci_intr_pri);
+	    DDI_INTR_PRI(ehcip->ehci_intr_pri));
 
 	if (ddi_intr_add_handler(ehcip->ehci_htable[0],
 	    (ddi_intr_handler_t *)ehci_intr, (caddr_t)ehcip, NULL) !=

@@ -1240,11 +1240,9 @@ get_reg_set_size(dev_info_t *child, int rnumber)
  *	DDI_CTLOPS_INITCHILD	see init_child() for details
  *	DDI_CTLOPS_UNINITCHILD
  *	DDI_CTLOPS_REPORTDEV	see report_dev() for details
- *	DDI_CTLOPS_XLATE_INTRS	nothing to do
  *	DDI_CTLOPS_IOMIN	cache line size if streaming otherwise 1
  *	DDI_CTLOPS_REGSIZE
  *	DDI_CTLOPS_NREGS
- *	DDI_CTLOPS_NINTRS
  *	DDI_CTLOPS_DVMAPAGESIZE
  *	DDI_CTLOPS_POKE
  *	DDI_CTLOPS_PEEK
@@ -1333,7 +1331,6 @@ pci_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 {
 	pci_t		*pci_p = get_pci_soft_state(
 			ddi_get_instance(dip));
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
 	int		ret = DDI_SUCCESS;
 
 	switch (intr_op) {
@@ -1350,20 +1347,15 @@ pci_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_FREE:
 		break;
 	case DDI_INTROP_GETPRI:
-		*(int *)result = ip->is_pil ?
-		    ip->is_pil : pci_class_to_pil(rdip);
+		*(int *)result = hdlp->ih_pri ?
+		    hdlp->ih_pri : pci_class_to_pil(rdip);
 		break;
 	case DDI_INTROP_SETPRI:
-		ip->is_pil = (*(int *)result);
 		break;
 	case DDI_INTROP_ADDISR:
-		hdlp->ih_vector = *ip->is_intr;
-
 		ret = pci_add_intr(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_REMISR:
-		hdlp->ih_vector = *ip->is_intr;
-
 		ret = pci_remove_intr(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_ENABLE:

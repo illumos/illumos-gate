@@ -2062,7 +2062,7 @@ char *db_ctlop_name[] = {
 	"DDI_CTLOPS_REPORTINT",
 	"DDI_CTLOPS_REGSIZE",
 	"DDI_CTLOPS_NREGS",
-	"DDI_CTLOPS_NINTRS",
+	"DDI_CTLOPS_RESERVED0",
 	"DDI_CTLOPS_SIDDEV",
 	"DDI_CTLOPS_SLAVEONLY",
 	"DDI_CTLOPS_AFFINITY",
@@ -2073,8 +2073,8 @@ char *db_ctlop_name[] = {
 	"DDI_CTLOPS_RESERVED1",
 	"DDI_CTLOPS_RESERVED2",
 	"DDI_CTLOPS_RESERVED3",
-	"DDI_CTLOPS_INTR_HILEVEL",
-	"DDI_CTLOPS_XLATE_INTRS",
+	"DDI_CTLOPS_RESERVED4",
+	"DDI_CTLOPS_RESERVED5",
 	"DDI_CTLOPS_DVMAPAGESIZE",
 	"DDI_CTLOPS_POWER",
 	"DDI_CTLOPS_ATTACH",
@@ -2143,7 +2143,6 @@ static int
 db_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
 	dev_info_t	*cdip = rdip;
 	pci_regspec_t	*pci_rp;
 	int		reglen, len;
@@ -2175,20 +2174,20 @@ db_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	    "reg", (caddr_t)&pci_rp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
-	intr = *ip->is_intr;
+	intr = hdlp->ih_vector;
 
 	/* Spin the interrupt */
 	d = PCI_REG_DEV_G(pci_rp[0].pci_phys_hi);
 
 	if ((intr >= PCI_INTA) && (intr <= PCI_INTD))
-		*ip->is_intr = ((intr - 1 + (d % 4)) % 4 + 1);
+		hdlp->ih_vector = ((intr - 1 + (d % 4)) % 4 + 1);
 	else
 		cmn_err(CE_WARN, "%s#%d: %s: PCI intr=%x out of range",
 		    ddi_driver_name(rdip), ddi_get_instance(rdip),
 		    ddi_driver_name(dip), intr);
 
 	DB_DEBUG3(DB_INTR_OPS, dip, "intr=%d, d=%d, is_intr=%d\n",
-	    intr, d, *ip->is_intr);
+	    intr, d, hdlp->ih_vector);
 
 	kmem_free(pci_rp, reglen);
 

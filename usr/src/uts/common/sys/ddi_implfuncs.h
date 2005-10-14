@@ -67,12 +67,6 @@ ddi_regspec_t
 i_ddi_get_regspec(dev_info_t *dip, dev_info_t *rdip, uint_t rnumber,
 	off_t offset, off_t len);
 
-void
-i_ddi_set_parent_private(dev_info_t *dip, caddr_t data);
-
-caddr_t
-i_ddi_get_parent_private(dev_info_t *dip);
-
 /*
  * Implementation specific memory allocation and de-allocation routines.
  */

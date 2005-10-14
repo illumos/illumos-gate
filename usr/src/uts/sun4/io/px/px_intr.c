@@ -116,7 +116,7 @@ warn:
 extern uint64_t intr_get_time(void);
 
 /*
- * px_intx_intr (legacy or intx interrupt handler)
+ * px_intx_intr (INTx or legacy interrupt handler)
  *
  * This routine is used as wrapper around interrupt handlers installed by child
  * device drivers.  This routine invokes the driver interrupt handlers and
@@ -206,7 +206,7 @@ px_intx_intr(caddr_t arg)
 }
 
 /*
- * px_msiq_intr (MSI/MSIX/MSG interrupt handler)
+ * px_msiq_intr (MSI/X or PCIe MSG interrupt handler)
  *
  * This routine is used as wrapper around interrupt handlers installed by child
  * device drivers.  This routine invokes the driver interrupt handlers and
@@ -530,9 +530,8 @@ int
 px_intx_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	px_t		*px_p = DIP_TO_STATE(dip);
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
-	int		ret = DDI_SUCCESS;
+	px_t	*px_p = DIP_TO_STATE(dip);
+	int	ret = DDI_SUCCESS;
 
 	DBG(DBG_INTROPS, dip, "px_intx_ops: dip=%x rdip=%x intr_op=%x "
 	    "handle=%p\n", dip, rdip, intr_op, hdlp);
@@ -551,29 +550,24 @@ px_intx_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_FREE:
 		break;
 	case DDI_INTROP_GETPRI:
-		*(int *)result = ip->is_pil ?
-		    ip->is_pil : px_class_to_pil(rdip);
+		*(int *)result = hdlp->ih_pri ?
+		    hdlp->ih_pri : px_class_to_pil(rdip);
 		break;
 	case DDI_INTROP_SETPRI:
-		ip->is_pil = (*(int *)result);
 		break;
 	case DDI_INTROP_ADDISR:
-		hdlp->ih_vector = *ip->is_intr;
-
 		ret = px_add_intx_intr(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_REMISR:
-		hdlp->ih_vector = *ip->is_intr;
-
 		ret = px_rem_intx_intr(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_ENABLE:
 		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
-		    *ip->is_intr, PX_INTR_STATE_ENABLE);
+		    hdlp->ih_vector, PX_INTR_STATE_ENABLE);
 		break;
 	case DDI_INTROP_DISABLE:
 		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
-		    *ip->is_intr, PX_INTR_STATE_DISABLE);
+		    hdlp->ih_vector, PX_INTR_STATE_DISABLE);
 		break;
 	case DDI_INTROP_SETMASK:
 		ret = pci_intx_set_mask(rdip);
@@ -881,6 +875,12 @@ px_create_intr_kstats(px_ih_t *ih_p)
 	}
 }
 
+/*
+ * px_add_intx_intr:
+ *
+ * This function is called to register INTx and legacy hardware
+ * interrupt pins interrupts.
+ */
 int
 px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
@@ -987,6 +987,12 @@ fail1:
 	return (ret);
 }
 
+/*
+ * px_rem_intx_intr:
+ *
+ * This function is called to unregister INTx and legacy hardware
+ * interrupt pins interrupts.
+ */
 int
 px_rem_intx_intr(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
@@ -1031,12 +1037,7 @@ px_rem_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 		kmem_free(ino_p, sizeof (px_ib_ino_info_t));
 	} else {
 		/* Re-enable interrupt only if mapping regsiter still shared */
-		if ((ret = px_lib_intr_settarget(px_p->px_dip,
-			    ino_p->ino_sysino, curr_cpu)) != DDI_SUCCESS)
-			goto fail;
-
-		ret = px_lib_intr_setvalid(px_p->px_dip, ino_p->ino_sysino,
-		    INTR_VALID);
+		PX_INTR_ENABLE(px_p->px_dip, ino_p->ino_sysino, curr_cpu);
 	}
 
 fail:
@@ -1044,6 +1045,11 @@ fail:
 	return (ret);
 }
 
+/*
+ * px_add_msiq_intr:
+ *
+ * This function is called to register MSI/Xs and PCIe message interrupts.
+ */
 int
 px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp, msiq_rec_type_t rec_type,
@@ -1162,6 +1168,11 @@ fail1:
 	return (ret);
 }
 
+/*
+ * px_rem_msiq_intr:
+ *
+ * This function is called to unregister MSI/Xs and PCIe message interrupts.
+ */
 int
 px_rem_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp, msiq_rec_type_t rec_type,
@@ -1211,12 +1222,7 @@ px_rem_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 		kmem_free(ino_p, sizeof (px_ib_ino_info_t));
 	} else {
 		/* Re-enable interrupt only if mapping regsiter still shared */
-		if ((ret = px_lib_intr_settarget(px_p->px_dip,
-		    ino_p->ino_sysino, curr_cpu)) != DDI_SUCCESS)
-			goto fail;
-
-		ret = px_lib_intr_setvalid(px_p->px_dip, ino_p->ino_sysino,
-		    INTR_VALID);
+		PX_INTR_ENABLE(px_p->px_dip, ino_p->ino_sysino, curr_cpu);
 	}
 
 fail:

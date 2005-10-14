@@ -337,9 +337,6 @@ i_ddi_free_node(dev_info_t *dip)
 	ASSERT(devi->devi_node_state == DS_PROTO);
 	ASSERT(devi->devi_child == NULL);
 
-	if (devi->devi_intr_p)
-		i_ddi_intr_devi_fini((dev_info_t *)devi);
-
 	/* free devi_addr_buf allocated by ddi_set_name_addr() */
 	if (devi->devi_addr_buf)
 		kmem_free(devi->devi_addr_buf, 2 * MAXNAMELEN);

@@ -88,7 +88,7 @@ int rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp);
 #pragma weak rootnex_remove_intr_impl
 
-void rootnex_get_intr_pri(dev_info_t *dip, dev_info_t *rdip,
+int rootnex_get_intr_pri(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp);
 #pragma weak rootnex_get_intr_pri
 
@@ -645,8 +645,7 @@ static int
 rootnex_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	ddi_ispec_t	*ip = (ddi_ispec_t *)hdlp->ih_private;
-	int		ret = DDI_SUCCESS;
+	int	ret = DDI_SUCCESS;
 
 	DPRINTF(ROOTNEX_INTR_DEBUG, ("rootnex_intr_ops: rdip=%s%d "
 	    "intr_op 0x%x hdlp 0x%p\n", ddi_driver_name(rdip),
@@ -654,7 +653,7 @@ rootnex_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 	switch (intr_op) {
 	case DDI_INTROP_GETCAP:
-		*(int *)result = 0;
+		*(int *)result = DDI_INTR_FLAG_LEVEL;
 		break;
 	case DDI_INTROP_SETCAP:
 		ret = DDI_ENOTSUP;
@@ -665,11 +664,9 @@ rootnex_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_FREE:
 		break;
 	case DDI_INTROP_GETPRI:
-		rootnex_get_intr_pri(dip, rdip, hdlp);
-		*(int *)result = ip->is_pil;
+		*(int *)result = rootnex_get_intr_pri(dip, rdip, hdlp);
 		break;
 	case DDI_INTROP_SETPRI:
-		ip->is_pil = (*(int *)result);
 		break;
 	case DDI_INTROP_ADDISR:
 		ret = rootnex_add_intr_impl(dip, rdip, hdlp);
@@ -911,9 +908,12 @@ rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		return ((*pm_platform_power)((power_req_t *)arg));
 	}
 
+	case DDI_CTLOPS_RESERVED0: /* Was DDI_CTLOPS_NINTRS, obsolete */
 	case DDI_CTLOPS_RESERVED1: /* Was DDI_CTLOPS_POKE_INIT, obsolete */
 	case DDI_CTLOPS_RESERVED2: /* Was DDI_CTLOPS_POKE_FLUSH, obsolete */
 	case DDI_CTLOPS_RESERVED3: /* Was DDI_CTLOPS_POKE_FINI, obsolete */
+	case DDI_CTLOPS_RESERVED4: /* Was DDI_CTLOPS_INTR_HILEVEL, obsolete */
+	case DDI_CTLOPS_RESERVED5: /* Was DDI_CTLOPS_XLATE_INTRS, obsolete */
 		if (!reserved_msg_printed) {
 			reserved_msg_printed = B_TRUE;
 			cmn_err(CE_WARN, "Failing ddi_ctlops call(s) for "
@@ -939,8 +939,6 @@ rootnex_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	if (ctlop == DDI_CTLOPS_NREGS) {
 		ptr = (int *)result;
 		*ptr = pdp->par_nreg;
-	} else if (ctlop == DDI_CTLOPS_NINTRS) {
-		return (DDI_FAILURE);
 	} else {	/* ctlop == DDI_CTLOPS_REGSIZE */
 		off_t *size = (off_t *)result;
 

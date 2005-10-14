@@ -389,6 +389,149 @@ struct prop_ispec {
 };
 
 /*
+ * For the x86, we're prepared to claim that the interrupt string
+ * is in the form of a list of <ipl,vec> specifications.
+ */
+
+#define	VEC_MIN	1
+#define	VEC_MAX	255
+
+static int
+impl_xlate_intrs(dev_info_t *child, int *in,
+    struct ddi_parent_private_data *pdptr)
+{
+	size_t size;
+	int n;
+	struct intrspec *new;
+	caddr_t got_prop;
+	int *inpri;
+	int got_len;
+	extern int ignore_hardware_nodes;	/* force flag from ddi_impl.c */
+
+	static char bad_intr_fmt[] =
+	    "bad interrupt spec from %s%d - ipl %d, irq %d\n";
+
+	/*
+	 * determine if the driver is expecting the new style "interrupts"
+	 * property which just contains the IRQ, or the old style which
+	 * contains pairs of <IPL,IRQ>.  if it is the new style, we always
+	 * assign IPL 5 unless an "interrupt-priorities" property exists.
+	 * in that case, the "interrupt-priorities" property contains the
+	 * IPL values that match, one for one, the IRQ values in the
+	 * "interrupts" property.
+	 */
+	inpri = NULL;
+	if ((ddi_getprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
+	    "ignore-hardware-nodes", -1) != -1) || ignore_hardware_nodes) {
+		/* the old style "interrupts" property... */
+
+		/*
+		 * The list consists of <ipl,vec> elements
+		 */
+		if ((n = (*in++ >> 1)) < 1)
+			return (DDI_FAILURE);
+
+		pdptr->par_nintr = n;
+		size = n * sizeof (struct intrspec);
+		new = pdptr->par_intr = kmem_zalloc(size, KM_SLEEP);
+
+		while (n--) {
+			int level = *in++;
+			int vec = *in++;
+
+			if (level < 1 || level > MAXIPL ||
+			    vec < VEC_MIN || vec > VEC_MAX) {
+				cmn_err(CE_CONT, bad_intr_fmt,
+				    DEVI(child)->devi_name,
+				    DEVI(child)->devi_instance, level, vec);
+				goto broken;
+			}
+			new->intrspec_pri = level;
+			if (vec != 2)
+				new->intrspec_vec = vec;
+			else
+				/*
+				 * irq 2 on the PC bus is tied to irq 9
+				 * on ISA, EISA and MicroChannel
+				 */
+				new->intrspec_vec = 9;
+			new++;
+		}
+
+		return (DDI_SUCCESS);
+	} else {
+		/* the new style "interrupts" property... */
+
+		/*
+		 * The list consists of <vec> elements
+		 */
+		if ((n = (*in++)) < 1)
+			return (DDI_FAILURE);
+
+		pdptr->par_nintr = n;
+		size = n * sizeof (struct intrspec);
+		new = pdptr->par_intr = kmem_zalloc(size, KM_SLEEP);
+
+		/* XXX check for "interrupt-priorities" property... */
+		if (ddi_getlongprop(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
+		    "interrupt-priorities", (caddr_t)&got_prop, &got_len)
+		    == DDI_PROP_SUCCESS) {
+			if (n != (got_len / sizeof (int))) {
+				cmn_err(CE_CONT,
+				    "bad interrupt-priorities length"
+				    " from %s%d: expected %d, got %d\n",
+				    DEVI(child)->devi_name,
+				    DEVI(child)->devi_instance, n,
+				    (int)(got_len / sizeof (int)));
+				goto broken;
+			}
+			inpri = (int *)got_prop;
+		}
+
+		while (n--) {
+			int level;
+			int vec = *in++;
+
+			if (inpri == NULL)
+				level = 5;
+			else
+				level = *inpri++;
+
+			if (level < 1 || level > MAXIPL ||
+			    vec < VEC_MIN || vec > VEC_MAX) {
+				cmn_err(CE_CONT, bad_intr_fmt,
+				    DEVI(child)->devi_name,
+				    DEVI(child)->devi_instance, level, vec);
+				goto broken;
+			}
+			new->intrspec_pri = level;
+			if (vec != 2)
+				new->intrspec_vec = vec;
+			else
+				/*
+				 * irq 2 on the PC bus is tied to irq 9
+				 * on ISA, EISA and MicroChannel
+				 */
+				new->intrspec_vec = 9;
+			new++;
+		}
+
+		if (inpri != NULL)
+			kmem_free(got_prop, got_len);
+		return (DDI_SUCCESS);
+	}
+
+broken:
+	kmem_free(pdptr->par_intr, size);
+	pdptr->par_intr = NULL;
+	pdptr->par_nintr = 0;
+	if (inpri != NULL)
+		kmem_free(got_prop, got_len);
+
+	return (DDI_FAILURE);
+}
+
+/*
  * Create a ddi_parent_private_data structure from the ddi properties of
  * the dev_info node.
  *
@@ -517,8 +660,7 @@ make_ddi_ppd(dev_info_t *child, struct ddi_parent_private_data **ppd)
 		*out = n / sizeof (int);
 		bcopy(irupts_prop, out + 1, (size_t)n);
 		ddi_prop_free((void *)irupts_prop);
-		if (ddi_ctlops(child, child, DDI_CTLOPS_XLATE_INTRS,
-		    out, pdptr) != DDI_SUCCESS) {
+		if (impl_xlate_intrs(child, out, pdptr) != DDI_SUCCESS) {
 			cmn_err(CE_CONT,
 			    "Unable to translate 'interrupts' for %s%d\n",
 			    DEVI(child)->devi_binding_name,
@@ -659,16 +801,6 @@ static struct impl_bus_promops *impl_busp;
 /*
  * New DDI interrupt framework
  */
-
-/*
- * i_ddi_handle_intr_ops:
- */
-int
-i_ddi_handle_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t op,
-    ddi_intr_handle_impl_t *hdlp, void * result)
-{
-	return (i_ddi_intr_ops(dip, rdip, op, hdlp, result));
-}
 
 /*
  * i_ddi_intr_ops:

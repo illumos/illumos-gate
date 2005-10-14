@@ -55,7 +55,7 @@
 #include <sys/ddi_isa.h>
 
 dev_info_t *get_intr_parent(dev_info_t *, dev_info_t *,
-    ddi_ispec_t *, ddi_ispec_t **);
+    ddi_intr_handle_impl_t *);
 #pragma weak get_intr_parent
 
 int process_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
@@ -394,97 +394,249 @@ cells_1275_cmp(prop_1275_cell_t *cell1, prop_1275_cell_t *cell2, int32_t len)
 }
 
 /*
- * Wrapper functions used by New DDI interrupt framework.
+ * get_intr_parent() is a generic routine that process a 1275 interrupt
+ * map (imap) property.  This function returns a dev_info_t structure
+ * which claims ownership of the interrupt domain.
+ * It also returns the new interrupt translation within this new domain.
+ * If an interrupt-parent or interrupt-map property are not found,
+ * then we fallback to using the device tree's parent.
+ *
+ * imap entry format:
+ * <reg>,<interrupt>,<phandle>,<translated interrupt>
+ * reg - The register specification in the interrupts domain
+ * interrupt - The interrupt specification
+ * phandle - PROM handle of the device that owns the xlated interrupt domain
+ * translated interrupt - interrupt specifier in the parents domain
+ * note: <reg>,<interrupt> - The reg and interrupt can be combined to create
+ *	a unique entry called a unit interrupt specifier.
+ *
+ * Here's the processing steps:
+ * step1 - If the interrupt-parent property exists, create the ispec and
+ *	return the dip of the interrupt parent.
+ * step2 - Extract the interrupt-map property and the interrupt-map-mask
+ *	If these don't exist, just return the device tree parent.
+ * step3 - build up the unit interrupt specifier to match against the
+ *	interrupt map property
+ * step4 - Scan the interrupt-map property until a match is found
+ * step4a - Extract the interrupt parent
+ * step4b - Compare the unit interrupt specifier
  */
-
-/*
- * i_ddi_handle_intr_ops:
- */
-int
-i_ddi_handle_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t op,
-    ddi_intr_handle_impl_t *hdlp, void *result)
+dev_info_t *
+get_intr_parent(dev_info_t *pdip, dev_info_t *dip, ddi_intr_handle_impl_t *hdlp)
 {
-	ddi_intrspec_t		ispec;
-	int			ret;
+	prop_1275_cell_t *imap, *imap_mask, *scan, *reg_p, *match_req;
+	int32_t imap_sz, imap_cells, imap_scan_cells, imap_mask_sz,
+	    addr_cells, intr_cells, reg_len, i, j;
+	int32_t match_found = 0;
+	dev_info_t *intr_parent_dip = NULL;
+	uint32_t *intr = &hdlp->ih_vector;
+	uint32_t nodeid;
+#ifdef DEBUG
+	static int debug = 0;
+#endif
 
-	if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
-		return (i_ddi_intr_ops(dip, rdip, op, hdlp, result));
-
-	i_ddi_alloc_ispec(dip, hdlp->ih_inum, &ispec);
-	if ((ddi_ispec_t *)ispec == NULL)
-		return (DDI_FAILURE);
-
-	hdlp->ih_private = (void *)ispec;
-	ret = i_ddi_intr_ops(dip, rdip, op, hdlp, result);
-	hdlp->ih_private = NULL;
-
-	i_ddi_free_ispec(ispec);
-	return (ret);
-}
-
-/*
- * i_ddi_intr_ops:
- */
-int
-i_ddi_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t op,
-    ddi_intr_handle_impl_t *hdlp, void *result)
-{
-	ddi_ispec_t	*sav_ip, *ip = NULL;
-	dev_info_t	*pdip = ddi_get_parent(dip);
-	int		ret = DDI_FAILURE;
-
-	if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
-		return (process_intr_ops(pdip, rdip, op, hdlp, result));
-
-	switch (op) {
-	case DDI_INTROP_ADDISR:
-	case DDI_INTROP_REMISR:
-	case DDI_INTROP_ENABLE:
-	case DDI_INTROP_DISABLE:
-	case DDI_INTROP_BLOCKENABLE:
-	case DDI_INTROP_BLOCKDISABLE:
-		/* Save the ispec */
-		sav_ip = (ddi_ispec_t *)hdlp->ih_private;
+	/*
+	 * step1
+	 * If we have an interrupt-parent property, this property represents
+	 * the nodeid of our interrupt parent.
+	 */
+	if ((nodeid = ddi_getprop(DDI_DEV_T_ANY, dip, 0,
+	    "interrupt-parent", -1)) != -1) {
+		intr_parent_dip = e_ddi_nodeid_to_dip(nodeid);
+		ASSERT(intr_parent_dip);
 
 		/*
-		 * If we have an ispec struct, try and determine our
-		 * parent and possibly an interrupt translation.
-		 * intr parent dip returned held
+		 * Attach the interrupt parent.
+		 *
+		 * N.B. e_ddi_nodeid_to_dip() isn't safe under DR.
+		 *	Also, interrupt parent isn't held. This needs
+		 *	to be revisited if DR-capable platforms implement
+		 *	interrupt redirection.
 		 */
-		if ((pdip = get_intr_parent(pdip, dip, sav_ip, &ip)) != NULL) {
-			/* Insert the interrupt info structure */
-			hdlp->ih_private = (void *)ip;
-		} else
-			goto done;
-	}
-
-	ret = process_intr_ops(pdip, rdip, op, hdlp, result);
-
-done:
-	switch (op) {
-	case DDI_INTROP_ADDISR:
-	case DDI_INTROP_REMISR:
-	case DDI_INTROP_ENABLE:
-	case DDI_INTROP_DISABLE:
-	case DDI_INTROP_BLOCKENABLE:
-	case DDI_INTROP_BLOCKDISABLE:
-		/* Release hold acquired in get_intr_parent() */
-		if (pdip)
-			ndi_rele_devi(pdip);
-
-		if (ip) {
-			/* Set the PIL according to what the parent did */
-			sav_ip->is_pil = ip->is_pil;
-
-			/* Free the stacked ispec structure */
-			i_ddi_free_ispec((ddi_intrspec_t)ip);
+		if (i_ddi_attach_node_hierarchy(intr_parent_dip)
+		    != DDI_SUCCESS) {
+			ndi_rele_devi(intr_parent_dip);
+			return (NULL);
 		}
 
-		/* Restore the interrupt info */
-		hdlp->ih_private = (void *)sav_ip;
+		return (intr_parent_dip);
 	}
 
-	return (ret);
+	/*
+	 * step2
+	 * Get interrupt map structure from PROM property
+	 */
+	if (ddi_getlongprop(DDI_DEV_T_ANY, pdip, DDI_PROP_DONTPASS,
+	    "interrupt-map", (caddr_t)&imap, &imap_sz)
+	    != DDI_PROP_SUCCESS) {
+		/*
+		 * If we don't have an imap property, default to using the
+		 * device tree.
+		 */
+
+		ndi_hold_devi(pdip);
+		return (pdip);
+	}
+
+	/* Get the interrupt mask property */
+	if (ddi_getlongprop(DDI_DEV_T_ANY, pdip, DDI_PROP_DONTPASS,
+	    "interrupt-map-mask", (caddr_t)&imap_mask, &imap_mask_sz)
+	    != DDI_PROP_SUCCESS) {
+		/*
+		 * If we don't find this property, we have to fail the request
+		 * because the 1275 imap property wasn't defined correctly.
+		 */
+		ASSERT(intr_parent_dip == NULL);
+		goto exit2;
+	}
+
+	/* Get the address cell size */
+	addr_cells = ddi_getprop(DDI_DEV_T_ANY, pdip, 0,
+	    "#address-cells", 2);
+
+	/* Get the interrupts cell size */
+	intr_cells = ddi_getprop(DDI_DEV_T_ANY, pdip, 0,
+	    "#interrupt-cells", 1);
+
+	/*
+	 * step3
+	 * Now lets build up the unit interrupt specifier e.g. reg,intr
+	 * and apply the imap mask.  match_req will hold this when we're
+	 * through.
+	 */
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
+	    (caddr_t)&reg_p, &reg_len) != DDI_SUCCESS) {
+		ASSERT(intr_parent_dip == NULL);
+		goto exit3;
+	}
+
+	match_req = kmem_alloc(CELLS_1275_TO_BYTES(addr_cells) +
+	    CELLS_1275_TO_BYTES(intr_cells), KM_SLEEP);
+
+	for (i = 0; i < addr_cells; i++)
+		match_req[i] = (reg_p[i] & imap_mask[i]);
+
+	for (j = 0; j < intr_cells; i++, j++)
+		match_req[i] = (intr[j] & imap_mask[i]);
+
+	/* Calculate the imap size in cells */
+	imap_cells = BYTES_TO_1275_CELLS(imap_sz);
+
+#ifdef DEBUG
+	if (debug)
+		prom_printf("reg cell size 0x%x, intr cell size 0x%x, "
+		    "match_request 0x%p, imap 0x%p\n", addr_cells, intr_cells,
+		    match_req, imap);
+#endif
+
+	/*
+	 * Scan the imap property looking for a match of the interrupt unit
+	 * specifier.  This loop is rather complex since the data within the
+	 * imap property may vary in size.
+	 */
+	for (scan = imap, imap_scan_cells = i = 0;
+	    imap_scan_cells < imap_cells; scan += i, imap_scan_cells += i) {
+		int new_intr_cells;
+
+		/* Set the index to the nodeid field */
+		i = addr_cells + intr_cells;
+
+		/*
+		 * step4a
+		 * Translate the nodeid field to a dip
+		 */
+		ASSERT(intr_parent_dip == NULL);
+		intr_parent_dip = e_ddi_nodeid_to_dip((uint_t)scan[i++]);
+
+		ASSERT(intr_parent_dip != 0);
+#ifdef DEBUG
+		if (debug)
+			prom_printf("scan 0x%p\n", scan);
+#endif
+		/*
+		 * The tmp_dip describes the new domain, get it's interrupt
+		 * cell size
+		 */
+		new_intr_cells = ddi_getprop(DDI_DEV_T_ANY, intr_parent_dip, 0,
+		    "#interrupts-cells", 1);
+
+		/*
+		 * step4b
+		 * See if we have a match on the interrupt unit specifier
+		 */
+		if (cells_1275_cmp(match_req, scan, addr_cells + intr_cells)
+		    == 0) {
+			uint32_t *intr;
+
+			match_found = 1;
+
+			/*
+			 * If we have an imap parent whose not in our device
+			 * tree path, we need to hold and install that driver.
+			 */
+			if (i_ddi_attach_node_hierarchy(intr_parent_dip)
+			    != DDI_SUCCESS) {
+				ndi_rele_devi(intr_parent_dip);
+				intr_parent_dip = (dev_info_t *)NULL;
+				goto exit4;
+			}
+
+			/*
+			 * We need to handcraft an ispec along with a bus
+			 * interrupt value, so we can dup it into our
+			 * standard ispec structure.
+			 */
+			/* Extract the translated interrupt information */
+			intr = kmem_alloc(
+			    CELLS_1275_TO_BYTES(new_intr_cells), KM_SLEEP);
+
+			for (j = 0; j < new_intr_cells; j++, i++)
+				intr[j] = scan[i];
+
+			cells_1275_copy(intr, &hdlp->ih_vector, new_intr_cells);
+
+			kmem_free(intr, CELLS_1275_TO_BYTES(new_intr_cells));
+
+#ifdef DEBUG
+			if (debug)
+				prom_printf("dip 0x%p\n", intr_parent_dip);
+#endif
+			break;
+		} else {
+#ifdef DEBUG
+			if (debug)
+				prom_printf("dip 0x%p\n", intr_parent_dip);
+#endif
+			ndi_rele_devi(intr_parent_dip);
+			intr_parent_dip = NULL;
+			i += new_intr_cells;
+		}
+	}
+
+	/*
+	 * If we haven't found our interrupt parent at this point, fallback
+	 * to using the device tree.
+	 */
+	if (!match_found) {
+		ndi_hold_devi(pdip);
+		ASSERT(intr_parent_dip == NULL);
+		intr_parent_dip = pdip;
+	}
+
+	ASSERT(intr_parent_dip != NULL);
+
+exit4:
+	kmem_free(reg_p, reg_len);
+	kmem_free(match_req, CELLS_1275_TO_BYTES(addr_cells) +
+	    CELLS_1275_TO_BYTES(intr_cells));
+
+exit3:
+	kmem_free(imap_mask, imap_mask_sz);
+
+exit2:
+	kmem_free(imap, imap_sz);
+
+	return (intr_parent_dip);
 }
 
 /*
@@ -507,6 +659,115 @@ process_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t op,
 		    ddi_get_name(rdip), ddi_get_instance(rdip),
 		    ddi_get_name(pdip), ddi_get_instance(pdip));
 	}
+
+	return (ret);
+}
+
+/*ARGSUSED*/
+uint_t
+softlevel1(caddr_t arg)
+{
+	softint();
+	return (1);
+}
+
+/*
+ * indirection table, to save us some large switch statements
+ * NOTE: This must agree with "INTLEVEL_foo" constants in
+ *	<sys/avintr.h>
+ */
+struct autovec *const vectorlist[] = { 0 };
+
+/*
+ * This value is exported here for the functions in avintr.c
+ */
+const uint_t maxautovec = (sizeof (vectorlist) / sizeof (vectorlist[0]));
+
+/*
+ * Check for machine specific interrupt levels which cannot be reassigned by
+ * settrap(), sun4u version.
+ *
+ * sun4u does not support V8 SPARC "fast trap" handlers.
+ */
+/*ARGSUSED*/
+int
+exclude_settrap(int lvl)
+{
+	return (1);
+}
+
+/*
+ * Check for machine specific interrupt levels which cannot have interrupt
+ * handlers added. We allow levels 1 through 15; level 0 is nonsense.
+ */
+/*ARGSUSED*/
+int
+exclude_level(int lvl)
+{
+	return ((lvl < 1) || (lvl > 15));
+}
+
+/*
+ * Wrapper functions used by New DDI interrupt framework.
+ */
+
+/*
+ * i_ddi_intr_ops:
+ */
+int
+i_ddi_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t op,
+    ddi_intr_handle_impl_t *hdlp, void *result)
+{
+	dev_info_t	*pdip = ddi_get_parent(dip);
+	int		ret = DDI_FAILURE;
+
+	/*
+	 * The following check is required to address
+	 * one of the test case of ADDI test suite.
+	 */
+	if (pdip == NULL)
+		return (DDI_FAILURE);
+
+	if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
+		return (process_intr_ops(pdip, rdip, op, hdlp, result));
+
+	if (hdlp->ih_vector == 0)
+		hdlp->ih_vector = i_ddi_get_inum(rdip, hdlp->ih_inum);
+
+	if (hdlp->ih_pri == 0)
+		hdlp->ih_pri = i_ddi_get_intr_pri(rdip, hdlp->ih_inum);
+
+	switch (op) {
+	case DDI_INTROP_ADDISR:
+	case DDI_INTROP_REMISR:
+	case DDI_INTROP_ENABLE:
+	case DDI_INTROP_DISABLE:
+	case DDI_INTROP_BLOCKENABLE:
+	case DDI_INTROP_BLOCKDISABLE:
+		/*
+		 * Try and determine our parent and possibly an interrupt
+		 * translation. intr parent dip returned held
+		 */
+		if ((pdip = get_intr_parent(pdip, dip, hdlp)) == NULL)
+			goto done;
+	}
+
+	ret = process_intr_ops(pdip, rdip, op, hdlp, result);
+
+done:
+	switch (op) {
+	case DDI_INTROP_ADDISR:
+	case DDI_INTROP_REMISR:
+	case DDI_INTROP_ENABLE:
+	case DDI_INTROP_DISABLE:
+	case DDI_INTROP_BLOCKENABLE:
+	case DDI_INTROP_BLOCKDISABLE:
+		/* Release hold acquired in get_intr_parent() */
+		if (pdip)
+			ndi_rele_devi(pdip);
+	}
+
+	hdlp->ih_vector = 0;
 
 	return (ret);
 }
@@ -548,6 +809,98 @@ i_ddi_rem_ivintr(ddi_intr_handle_impl_t *hdlp)
 }
 
 /*
+ * i_ddi_get_inum - Get the interrupt number property from the
+ * specified device. Note that this function is called only for
+ * the FIXED interrupt type.
+ */
+uint32_t
+i_ddi_get_inum(dev_info_t *dip, uint_t inumber)
+{
+	int32_t			intrlen, intr_cells, max_intrs;
+	prop_1275_cell_t	*ip, intr_sz;
+	uint32_t		intr = 0;
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS |
+	    DDI_PROP_CANSLEEP,
+	    "interrupts", (caddr_t)&ip, &intrlen) == DDI_SUCCESS) {
+
+		intr_cells = ddi_getprop(DDI_DEV_T_ANY, dip, 0,
+		    "#interrupt-cells", 1);
+
+		/* adjust for number of bytes */
+		intr_sz = CELLS_1275_TO_BYTES(intr_cells);
+
+		/* Calculate the number of interrupts */
+		max_intrs = intrlen / intr_sz;
+
+		if (inumber < max_intrs) {
+			prop_1275_cell_t *intrp = ip;
+
+			/* Index into interrupt property */
+			intrp += (inumber * intr_cells);
+
+			cells_1275_copy(intrp, &intr, intr_cells);
+		}
+
+		kmem_free(ip, intrlen);
+	}
+
+	return (intr);
+}
+
+/*
+ * i_ddi_get_intr_pri - Get the interrupt-priorities property from
+ * the specified device. Note that this function is called only for
+ * the FIXED interrupt type.
+ */
+uint32_t
+i_ddi_get_intr_pri(dev_info_t *dip, uint_t inumber)
+{
+	uint32_t	*intr_prio_p;
+	uint32_t	pri = 0;
+	int32_t		i;
+
+	/*
+	 * Use the "interrupt-priorities" property to determine the
+	 * the pil/ipl for the interrupt handler.
+	 */
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "interrupt-priorities", (caddr_t)&intr_prio_p,
+	    &i) == DDI_SUCCESS) {
+		if (inumber < (i / sizeof (int32_t)))
+			pri = intr_prio_p[inumber];
+		kmem_free(intr_prio_p, i);
+	}
+
+	return (pri);
+}
+
+int
+i_ddi_get_nintrs(dev_info_t *dip)
+{
+	int32_t intrlen;
+	prop_1275_cell_t intr_sz;
+	prop_1275_cell_t *ip;
+	int32_t ret = 0;
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS |
+	    DDI_PROP_CANSLEEP,
+	    "interrupts", (caddr_t)&ip, &intrlen) == DDI_SUCCESS) {
+
+		intr_sz = ddi_getprop(DDI_DEV_T_ANY, dip, 0,
+		    "#interrupt-cells", 1);
+		/* adjust for number of bytes */
+		intr_sz = CELLS_1275_TO_BYTES(intr_sz);
+
+		ret = intrlen / intr_sz;
+
+		kmem_free(ip, intrlen);
+	}
+
+	return (ret);
+}
+
+/*
  * i_ddi_add_softint - allocate and add a soft interrupt to the system
  */
 int
@@ -574,8 +927,10 @@ i_ddi_remove_softint(ddi_softint_hdl_impl_t *hdlp)
 
 	/* disable */
 	ASSERT(hdlp->ih_private != NULL);
+
 	/* use uintptr_t to suppress the gcc warning */
 	intr_id = (uint_t)(uintptr_t)hdlp->ih_private;
+
 	rem_softintr(intr_id);
 	hdlp->ih_private = NULL;
 }
@@ -615,96 +970,6 @@ i_ddi_set_softint_pri(ddi_softint_hdl_impl_t *hdlp, uint_t old_pri)
 	ret = update_softint_pri(intr_id, hdlp->ih_pri);
 
 	return (ret);
-}
-
-/*
- * Support routine for allocating and initializing an interrupt specification.
- * The bus interrupt value will be allocated at the end of this structure, so
- * the corresponding routine i_ddi_free_ispec() should be used to free the
- * interrupt specification.
- */
-void
-i_ddi_alloc_ispec(dev_info_t *dip, uint_t inumber, ddi_intrspec_t *intrspecp)
-{
-	int32_t intrlen, intr_cells, max_intrs;
-	prop_1275_cell_t *ip;
-	prop_1275_cell_t intr_sz;
-	ddi_ispec_t **ispecp = (ddi_ispec_t **)intrspecp;
-
-	*ispecp = NULL;
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS |
-	    DDI_PROP_CANSLEEP,
-	    "interrupts", (caddr_t)&ip, &intrlen) == DDI_SUCCESS) {
-
-		intr_cells = ddi_getprop(DDI_DEV_T_ANY, dip, 0,
-		    "#interrupt-cells", 1);
-
-		/* adjust for number of bytes */
-		intr_sz = CELLS_1275_TO_BYTES(intr_cells);
-
-		/* Calculate the number of interrupts */
-		max_intrs = intrlen / intr_sz;
-
-		if (inumber < max_intrs) {
-			prop_1275_cell_t *intrp = ip;
-
-			*ispecp = kmem_zalloc(
-			    (sizeof (ddi_ispec_t) + intr_sz), KM_SLEEP);
-
-			(*ispecp)->is_intr =
-			    (uint32_t *)(*ispecp + 1);
-
-			/* Index into interrupt property */
-			intrp += (inumber * intr_cells);
-
-			cells_1275_copy(intrp,
-			    (*ispecp)->is_intr, intr_cells);
-
-			(*ispecp)->is_intr_sz = intr_sz;
-
-			(*ispecp)->is_pil = i_ddi_get_intr_pri(dip, inumber);
-		}
-
-		kmem_free(ip, intrlen);
-	}
-}
-
-/*
- * Analog routine to i_ddi_alloc_ispec() used to free the interrupt
- * specification and the associated bus interrupt value.
- */
-void
-i_ddi_free_ispec(ddi_intrspec_t intrspecp)
-{
-	ddi_ispec_t *ispecp = (ddi_ispec_t *)intrspecp;
-
-	kmem_free(ispecp, sizeof (ddi_ispec_t) + (ispecp->is_intr_sz));
-}
-
-/*
- * i_ddi_get_intr_pri - Get the interrupt-priorities property from
- * the specified device.
- */
-uint32_t
-i_ddi_get_intr_pri(dev_info_t *dip, uint_t inumber)
-{
-	uint32_t *intr_prio_p;
-	uint32_t pri = 0;
-	int32_t i;
-
-	/*
-	 * Use the "interrupt-priorities" property to determine the
-	 * the pil/ipl for the interrupt handler.
-	 */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "interrupt-priorities", (caddr_t)&intr_prio_p,
-	    &i) == DDI_SUCCESS) {
-		if (inumber < (i / sizeof (int32_t)))
-			pri = intr_prio_p[inumber];
-		kmem_free(intr_prio_p, i);
-	}
-
-	return (pri);
 }
 
 /*
@@ -1366,379 +1631,6 @@ impl_fix_props(dev_info_t *dip, dev_info_t *ch_dip, char *name, int len,
 	/*
 	 * There are no adjustments needed in this implementation.
 	 */
-}
-
-/*
- * SECTION: DDI Interrupt
- */
-
-/*
- * get_intr_parent() is a generic routine that process a 1275 interrupt
- * map (imap) property.  This function returns a dev_info_t structure
- * which claims ownership of the interrupt domain.
- * It also returns the new interrupt translation within this new domain.
- * If an interrupt-parent or interrupt-map property are not found,
- * then we fallback to using the device tree's parent.
- *
- * imap entry format:
- * <reg>,<interrupt>,<phandle>,<translated interrupt>
- * reg - The register specification in the interrupts domain
- * interrupt - The interrupt specification
- * phandle - PROM handle of the device that owns the xlated interrupt domain
- * translated interrupt - interrupt specifier in the parents domain
- * note: <reg>,<interrupt> - The reg and interrupt can be combined to create
- *	a unique entry called a unit interrupt specifier.
- *
- * Here's the processing steps:
- * step1 - If the interrupt-parent property exists, create the ispec and
- *	return the dip of the interrupt parent.
- * step2 - Extract the interrupt-map property and the interrupt-map-mask
- *	If these don't exist, just return the device tree parent.
- * step3 - build up the unit interrupt specifier to match against the
- *	interrupt map property
- * step4 - Scan the interrupt-map property until a match is found
- * step4a - Extract the interrupt parent
- * step4b - Compare the unit interrupt specifier
- */
-dev_info_t *
-get_intr_parent(dev_info_t *pdip, dev_info_t *dip,
-    ddi_ispec_t *child_ispecp, ddi_ispec_t **new_ispecp)
-{
-	prop_1275_cell_t *imap, *imap_mask, *scan, *reg_p, *match_req;
-	int32_t imap_sz, imap_cells, imap_scan_cells, imap_mask_sz,
-	    addr_cells, intr_cells, reg_len, i, j;
-	int32_t match_found = 0;
-	dev_info_t *intr_parent_dip = NULL;
-	ddi_ispec_t *ispecp;
-	uint32_t *intr = child_ispecp->is_intr;
-	uint32_t nodeid;
-	static ddi_ispec_t *dup_ispec(ddi_ispec_t *ispecp);
-#ifdef DEBUG
-	static int debug = 0;
-#endif
-
-	*new_ispecp = (ddi_ispec_t *)NULL;
-
-	/*
-	 * step1
-	 * If we have an interrupt-parent property, this property represents
-	 * the nodeid of our interrupt parent.
-	 */
-	if ((nodeid = ddi_getprop(DDI_DEV_T_ANY, dip, 0,
-	    "interrupt-parent", -1)) != -1) {
-		intr_parent_dip = e_ddi_nodeid_to_dip(nodeid);
-		ASSERT(intr_parent_dip);
-		/*
-		 * Attach the interrupt parent.
-		 *
-		 * N.B. e_ddi_nodeid_to_dip() isn't safe under DR.
-		 *	Also, interrupt parent isn't held. This needs
-		 *	to be revisited if DR-capable platforms implement
-		 *	interrupt redirection.
-		 */
-		if (i_ddi_attach_node_hierarchy(intr_parent_dip)
-		    != DDI_SUCCESS) {
-			ndi_rele_devi(intr_parent_dip);
-			return (NULL);
-		}
-
-		/* Create a new interrupt info struct and initialize it. */
-		ispecp = dup_ispec(child_ispecp);
-
-		*new_ispecp = ispecp;
-		return (intr_parent_dip);
-	}
-
-	/*
-	 * step2
-	 * Get interrupt map structure from PROM property
-	 */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, pdip, DDI_PROP_DONTPASS,
-	    "interrupt-map", (caddr_t)&imap, &imap_sz)
-	    != DDI_PROP_SUCCESS) {
-		/*
-		 * If we don't have an imap property, default to using the
-		 * device tree.
-		 */
-		/* Create a new interrupt info struct and initialize it. */
-		ispecp = dup_ispec(child_ispecp);
-
-		*new_ispecp = ispecp;
-		ndi_hold_devi(pdip);
-		return (pdip);
-	}
-
-	/* Get the interrupt mask property */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, pdip, DDI_PROP_DONTPASS,
-	    "interrupt-map-mask", (caddr_t)&imap_mask, &imap_mask_sz)
-	    != DDI_PROP_SUCCESS) {
-		/*
-		 * If we don't find this property, we have to fail the request
-		 * because the 1275 imap property wasn't defined correctly.
-		 */
-		ASSERT(intr_parent_dip == NULL);
-		goto exit2;
-	}
-
-	/* Get the address cell size */
-	addr_cells = ddi_getprop(DDI_DEV_T_ANY, pdip, 0,
-	    "#address-cells", 2);
-
-	/* Get the interrupts cell size */
-	intr_cells = ddi_getprop(DDI_DEV_T_ANY, pdip, 0,
-	    "#interrupt-cells", 1);
-
-	/*
-	 * step3
-	 * Now lets build up the unit interrupt specifier e.g. reg,intr
-	 * and apply the imap mask.  match_req will hold this when we're
-	 * through.
-	 */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
-	    (caddr_t)&reg_p, &reg_len) != DDI_SUCCESS) {
-		ASSERT(intr_parent_dip == NULL);
-		goto exit3;
-	}
-
-	match_req = kmem_alloc(CELLS_1275_TO_BYTES(addr_cells) +
-	    CELLS_1275_TO_BYTES(intr_cells), KM_SLEEP);
-
-	for (i = 0; i < addr_cells; i++)
-		match_req[i] = (reg_p[i] & imap_mask[i]);
-
-	for (j = 0; j < intr_cells; i++, j++)
-		match_req[i] = (intr[j] & imap_mask[i]);
-
-	/* Calculate the imap size in cells */
-	imap_cells = BYTES_TO_1275_CELLS(imap_sz);
-
-#ifdef DEBUG
-	if (debug)
-		prom_printf("reg cell size 0x%x, intr cell size 0x%x, "
-		    "match_request 0x%p, imap 0x%p\n", addr_cells, intr_cells,
-		    match_req, imap);
-#endif
-
-	/*
-	 * Scan the imap property looking for a match of the interrupt unit
-	 * specifier.  This loop is rather complex since the data within the
-	 * imap property may vary in size.
-	 */
-	for (scan = imap, imap_scan_cells = i = 0;
-	    imap_scan_cells < imap_cells; scan += i, imap_scan_cells += i) {
-		int new_intr_cells;
-
-		/* Set the index to the nodeid field */
-		i = addr_cells + intr_cells;
-
-		/*
-		 * step4a
-		 * Translate the nodeid field to a dip
-		 */
-		ASSERT(intr_parent_dip == NULL);
-		intr_parent_dip = e_ddi_nodeid_to_dip((uint_t)scan[i++]);
-
-		ASSERT(intr_parent_dip != 0);
-#ifdef DEBUG
-		if (debug)
-			prom_printf("scan 0x%p\n", scan);
-#endif
-		/*
-		 * The tmp_dip describes the new domain, get it's interrupt
-		 * cell size
-		 */
-		new_intr_cells = ddi_getprop(DDI_DEV_T_ANY, intr_parent_dip, 0,
-		    "#interrupts-cells", 1);
-
-		/*
-		 * step4b
-		 * See if we have a match on the interrupt unit specifier
-		 */
-		if (cells_1275_cmp(match_req, scan, addr_cells + intr_cells)
-		    == 0) {
-			ddi_ispec_t ispec;
-			uint32_t *intr;
-
-			/*
-			 * Copy The childs ispec info excluding the interrupt
-			 */
-			ispec = *child_ispecp;
-
-			match_found = 1;
-
-			/*
-			 * If we have an imap parent whose not in our device
-			 * tree path, we need to hold and install that driver.
-			 */
-			if (i_ddi_attach_node_hierarchy(intr_parent_dip)
-			    != DDI_SUCCESS) {
-				ndi_rele_devi(intr_parent_dip);
-				intr_parent_dip = (dev_info_t *)NULL;
-				goto exit4;
-			}
-
-			/*
-			 * We need to handcraft an ispec along with a bus
-			 * interrupt value, so we can dup it into our
-			 * standard ispec structure.
-			 */
-			/* Extract the translated interrupt information */
-			intr = kmem_alloc(
-			    CELLS_1275_TO_BYTES(new_intr_cells), KM_SLEEP);
-
-			for (j = 0; j < new_intr_cells; j++, i++)
-				intr[j] = scan[i];
-
-			ispec.is_intr_sz =
-			    CELLS_1275_TO_BYTES(new_intr_cells);
-			ispec.is_intr = intr;
-
-			ispecp = dup_ispec(&ispec);
-
-			kmem_free(intr, CELLS_1275_TO_BYTES(new_intr_cells));
-
-#ifdef DEBUG
-			if (debug)
-				prom_printf("dip 0x%p, intr info 0x%p\n",
-				    intr_parent_dip, ispecp);
-#endif
-
-			break;
-		} else {
-#ifdef DEBUG
-			if (debug)
-				prom_printf("dip 0x%p\n", intr_parent_dip);
-#endif
-			ndi_rele_devi(intr_parent_dip);
-			intr_parent_dip = NULL;
-			i += new_intr_cells;
-		}
-	}
-
-	/*
-	 * If we haven't found our interrupt parent at this point, fallback
-	 * to using the device tree.
-	 */
-	if (!match_found) {
-		/* Create a new interrupt info struct and initialize it. */
-		ispecp = dup_ispec(child_ispecp);
-
-		ndi_hold_devi(pdip);
-		ASSERT(intr_parent_dip == NULL);
-		intr_parent_dip = pdip;
-	}
-
-	ASSERT(ispecp != NULL);
-	ASSERT(intr_parent_dip != NULL);
-	*new_ispecp = ispecp;
-
-exit4:
-	kmem_free(reg_p, reg_len);
-	kmem_free(match_req, CELLS_1275_TO_BYTES(addr_cells) +
-	    CELLS_1275_TO_BYTES(intr_cells));
-
-exit3:
-	kmem_free(imap_mask, imap_mask_sz);
-
-exit2:
-	kmem_free(imap, imap_sz);
-
-	return (intr_parent_dip);
-}
-
-/*
- * Support routine for duplicating and initializing an interrupt specification.
- * The bus interrupt value will be allocated at the end of this structure, so
- * the corresponding routine i_ddi_free_ispec() should be used to free the
- * interrupt specification.
- */
-static ddi_ispec_t *
-dup_ispec(ddi_ispec_t *ispecp)
-{
-	ddi_ispec_t *new_ispecp;
-
-	new_ispecp = kmem_alloc(sizeof (ddi_ispec_t) + ispecp->is_intr_sz,
-	    KM_SLEEP);
-
-	/* Copy the contents of the ispec */
-	*new_ispecp = *ispecp;
-
-	/* Reset the intr pointer to the one just created */
-	new_ispecp->is_intr = (uint32_t *)(new_ispecp + 1);
-
-	cells_1275_copy(ispecp->is_intr, new_ispecp->is_intr,
-	    BYTES_TO_1275_CELLS(ispecp->is_intr_sz));
-
-	return (new_ispecp);
-}
-
-int
-i_ddi_get_nintrs(dev_info_t *dip)
-{
-	int32_t intrlen;
-	prop_1275_cell_t intr_sz;
-	prop_1275_cell_t *ip;
-	int32_t ret = 0;
-
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS |
-	    DDI_PROP_CANSLEEP,
-	    "interrupts", (caddr_t)&ip, &intrlen) == DDI_SUCCESS) {
-
-		intr_sz = ddi_getprop(DDI_DEV_T_ANY, dip, 0,
-		    "#interrupt-cells", 1);
-		/* adjust for number of bytes */
-		intr_sz = CELLS_1275_TO_BYTES(intr_sz);
-
-		ret = intrlen / intr_sz;
-
-		kmem_free(ip, intrlen);
-	}
-
-	return (ret);
-}
-
-/*ARGSUSED*/
-uint_t
-softlevel1(caddr_t arg)
-{
-	softint();
-	return (1);
-}
-
-/*
- * indirection table, to save us some large switch statements
- * NOTE: This must agree with "INTLEVEL_foo" constants in
- *	<sys/avintr.h>
- */
-struct autovec *const vectorlist[] = { 0 };
-
-/*
- * This value is exported here for the functions in avintr.c
- */
-const uint_t maxautovec = (sizeof (vectorlist) / sizeof (vectorlist[0]));
-
-/*
- * Check for machine specific interrupt levels which cannot be reassigned by
- * settrap(), sun4u version.
- *
- * sun4u does not support V8 SPARC "fast trap" handlers.
- */
-/*ARGSUSED*/
-int
-exclude_settrap(int lvl)
-{
-	return (1);
-}
-
-/*
- * Check for machine specific interrupt levels which cannot have interrupt
- * handlers added. We allow levels 1 through 15; level 0 is nonsense.
- */
-/*ARGSUSED*/
-int
-exclude_level(int lvl)
-{
-	return ((lvl < 1) || (lvl > 15));
 }
 
 /*

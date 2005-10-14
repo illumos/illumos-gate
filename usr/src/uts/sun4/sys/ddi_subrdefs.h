@@ -35,7 +35,6 @@
 
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/nexusintr_impl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -43,11 +42,9 @@ extern "C" {
 
 #ifdef	_KERNEL
 
+uint32_t i_ddi_get_inum(dev_info_t *dip, uint_t inumber);
 uint32_t i_ddi_get_intr_pri(dev_info_t *dip, uint_t inumber);
-
-void	i_ddi_alloc_ispec(dev_info_t *dip, uint_t inumber,
-	    ddi_intrspec_t *ispecp);
-void	i_ddi_free_ispec(ddi_intrspec_t ispecp);
+int	 i_ddi_get_nintrs(dev_info_t *dip);
 
 int	i_ddi_add_ivintr(ddi_intr_handle_impl_t *hdlp);
 void	i_ddi_rem_ivintr(ddi_intr_handle_impl_t *hdlp);

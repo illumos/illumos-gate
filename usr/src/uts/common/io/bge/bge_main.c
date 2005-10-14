@@ -940,7 +940,7 @@ bge_init_buff_ring(bge_t *bgep, uint64_t ring)
 	brp->cons_index_p = &bsp->buff_cons_index[buff_cons_xref[ring]];
 	brp->chip_mbx_reg = mailbox_regs[ring];
 	mutex_init(brp->rf_lock, NULL, MUTEX_DRIVER,
-	    (void *)(uintptr_t)bgep->intr_pri);
+	    DDI_INTR_PRI(bgep->intr_pri));
 
 	/*
 	 * Allocate the array of s/w Receive Buffer Descriptors
@@ -1019,7 +1019,7 @@ bge_init_recv_ring(bge_t *bgep, uint64_t ring)
 	rrp->prod_index_p = RECV_INDEX_P(bsp, ring);
 	rrp->chip_mbx_reg = RECV_RING_CONS_INDEX_REG(ring);
 	mutex_init(rrp->rx_lock, NULL, MUTEX_DRIVER,
-	    (void *)(uintptr_t)bgep->intr_pri);
+	    DDI_INTR_PRI(bgep->intr_pri));
 }
 
 
@@ -1086,7 +1086,7 @@ bge_init_send_ring(bge_t *bgep, uint64_t ring)
 	rw_init(srp->tx_lock, NULL, RW_DRIVER,
 	    (void *)(uintptr_t)bgep->intr_pri);
 	mutex_init(srp->tc_lock, NULL, MUTEX_DRIVER,
-	    (void *)(uintptr_t)bgep->intr_pri);
+	    DDI_INTR_PRI(bgep->intr_pri));
 
 	/*
 	 * Allocate the array of s/w Send Buffer Descriptors
@@ -1145,9 +1145,9 @@ bge_init_rings(bge_t *bgep)
 	BGE_TRACE(("bge_init_rings($%p)", (void *)bgep));
 
 	mutex_init(bgep->genlock, NULL, MUTEX_DRIVER,
-	    (void *)(uintptr_t)bgep->intr_pri);
+	    DDI_INTR_PRI(bgep->intr_pri));
 	rw_init(bgep->errlock, NULL, RW_DRIVER,
-	    (void *)(uintptr_t)bgep->intr_pri);
+	    DDI_INTR_PRI(bgep->intr_pri));
 
 	/*
 	 * Perform one-off initialisation of each ring ...
