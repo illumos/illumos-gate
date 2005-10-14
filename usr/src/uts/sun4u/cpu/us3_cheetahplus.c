@@ -1239,10 +1239,11 @@ cpu_scrub_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
 	for (i = 0; i < 2; i++) {
 		if (core_cpus[i] == NULL) {
 			/*
-			 * This should only happen if one of the two cores is
-			 * blacklisted, which should only happen when we're
-			 * doing hardware bringup or debugging.  Give up and
-			 * return quietly.
+			 * This may happen during DR - one core is offlined
+			 * and completely unconfigured before the second
+			 * core is offlined.  Give up and return quietly,
+			 * since the second core should quickly be removed
+			 * anyways.
 			 */
 			return (0);
 		}
@@ -1324,7 +1325,7 @@ cpu_get_sibling_core(cpu_t *cpup)
 {
 	cpu_t *nextp;
 
-	if (!cmp_cpu_is_cmp(cpup->cpu_id))
+	if ((cpup == NULL) || (!cmp_cpu_is_cmp(cpup->cpu_id)))
 		return (NULL);
 
 	nextp = cpup->cpu_next_chip;
