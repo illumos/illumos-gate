@@ -113,9 +113,10 @@ Alias for checkin command.
 Alias for checkout command.
 
 .TP
-.B codereview [codereview options]
+.B codereview [-N] [codereview options]
 generate environmentally friendly codereview diffs
-for all active files.
+for all active files.  -N indicates that delta
+comments shouldn't be included in the output.
 
 .TP
 .B comchk
@@ -257,8 +258,9 @@ preceded by its directory.
 Alias for get command.
 
 .TP
-.B fullreview [codereview options]
+.B fullreview [-N] [codereview options]
 generate full codereview diffs for all active files.
+-N indicates that delta comments shouldn't be included in the output.
 
 .TP
 .B get [-k][-r #][-p] [file ...]

@@ -27,7 +27,7 @@
 .I cstyle
 \- check for some common stylistic errors in C source files
 .SH SYNOPSIS
-\fBcstyle [-chpvCP] [file...]\fP
+\fBcstyle [-chpvCP] [-o constructs] [file...]\fP
 .LP
 .SH DESCRIPTION
 .IX "OS-Net build tools" "cstyle" "" "\fBcstyle\fP"
@@ -79,6 +79,19 @@ Check for use of non-POSIX types.  Historically, types like "u_int" and
 "u_long" were used, but they are now deprecated in favor of the POSIX
 types uint_t, ulong_t, etc.  This detects any use of the deprecated
 types.  Used as part of the putback checks.
+.LP
+.TP 4
+.B \-o \fIconstructs\fP
+Allow a comma-seperated list of additional constructs.  Available
+constructs include:
+.LP
+.TP 10
+.B doxygen
+Allow doxygen-style block comments (\fT/**\fP and \fT/*!\fP)
+.LP
+.TP 10
+.B splint
+Allow splint-style lint comments (\fT/*@...@*/\fP)
 .LP
 .SH NOTES
 .LP

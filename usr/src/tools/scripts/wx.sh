@@ -929,12 +929,15 @@ Usage:  $ME command [-D] [args]
                         preferred way of reviewing code.
                         Will skip files listed in wx/webrev.NOT
 
-        $ME codereview [codereview options]
+        $ME codereview [-N] [codereview options]
                         generate environmentally friendly codereview diffs
-                        for all active files.
+                        for all active files.  -N indicates that delta
+                        comments should not be included.
 
-        $ME fullreview [codereview options]
+        $ME fullreview [-N] [codereview options]
                         generate full codereview diffs for all active files.
+                        -N indicates that delta comments should not be
+                        included.
 
 ======================== Backup and Restore Commands ======================
         $ME backup [-i|-n|-z|-b|-t]
@@ -4026,9 +4029,15 @@ but there is no SCCS/p.$file
 
 wx_fullreview() {
 	if wx_pnt_filepath; then
-		codereview $args $parentfilepath $workspace/$filepath
+		:
 	else
-		codereview $args /dev/null $workspace/$filepath
+		parentfilepath=/dev/null
+	fi
+	if $show_comments && wx_show_comment > $wxdir/comment; then
+		comm=-y"`cat $wxdir/comment`"
+		codereview "$comm" $args $parentfilepath $workspace/$filepath
+	else
+		codereview $args $parentfilepath $workspace/$filepath
 	fi
 }
 
@@ -4580,6 +4589,9 @@ multi_delta_list=
 # Used to bringover any files just before exit of wx
 bofilelist=
 
+# should codereviews include delta comments?
+show_comments=true
+
 # Determines if active list should be sorted by default
 # If sort_active contains true then we sort the active list on updates.
 if [[ -r $wxdir/sort_active && "$(cat $wxdir/sort_active)" == "true" ]]; then
@@ -4693,6 +4705,11 @@ while [ $# -gt 0 ]; do
                         else
                                 silent=-s
                         fi;;
+		-N)	if [[ "$command" == @(codereview|fullreview) ]]; then
+				show_comments=false
+			else
+				args="$args $1"
+			fi ;;
 		-*) 	args="$args $1";;
 		*)  	if [[ -z "$file_list" ]]; then
 				file_list="$1"

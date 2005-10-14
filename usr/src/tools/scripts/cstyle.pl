@@ -57,18 +57,22 @@ use Getopt::Std;
 use strict;
 
 my $usage =
-"usage: cstyle [-c] [-h] [-p] [-v] [-C] [-P] file ...
+"usage: cstyle [-chpvCP] [-o constructs] file ...
 	-c	check continuation indentation inside functions
 	-h	perform heuristic checks that are sometimes wrong
 	-p	perform some of the more picky checks
 	-v	verbose
 	-C	don't check anything in header block comments
 	-P	check for use of non-POSIX types
+	-o constructs
+		allow a comma-seperated list of optional constructs:
+		    doxygen	allow doxygen-style block comments (/** /*!)
+		    splint	allow splint-style lint comments (/*@ ... @*/)
 ";
 
 my %opts;
 
-if (!getopts("chpvCP", \%opts)) {
+if (!getopts("cho:pvCP", \%opts)) {
 	print $usage;
 	exit 1;
 }
@@ -80,14 +84,39 @@ my $verbose = $opts{'v'};
 my $ignore_hdr_comment = $opts{'C'};
 my $check_posix_types = $opts{'P'};
 
+my $doxygen_comments = 0;
+my $splint_comments = 0;
+
+if (defined($opts{'o'})) {
+	for my $x (split /,/, $opts{'o'}) {
+		if ($x eq "doxygen") {
+			$doxygen_comments = 1;
+		} elsif ($x eq "splint") {
+			$splint_comments = 1;
+		} else {
+			print "cstyle: unrecognized construct \"$x\"\n";
+			print $usage;
+			exit 1;
+		}
+	}
+}
+
 my ($filename, $line, $prev);		# shared globals
 
 my $fmt;
+my $hdr_comment_start;
 
 if ($verbose) {
 	$fmt = "%s: %d: %s\n%s\n";
 } else {
 	$fmt = "%s: %d: %s\n";
+}
+
+if ($doxygen_comments) {
+	# doxygen comments look like "/*!" or "/**"; allow them.
+	$hdr_comment_start = qr/^\s*\/\*[\!\*]?$/;
+} else {
+	$hdr_comment_start = qr/^\s*\/\*$/;
 }
 
 # Note, following must be in single quotes so that \s and \w work right.
@@ -107,31 +136,39 @@ my %old2posix = (
 	'quad' => 'quad_t'
 );
 
-my $warlock_comment = "(
-VARIABLES PROTECTED BY|
-MEMBERS PROTECTED BY|
-ALL MEMBERS PROTECTED BY|
-READ-ONLY VARIABLES:|
-READ-ONLY MEMBERS:|
-VARIABLES READABLE WITHOUT LOCK:|
-MEMBERS READABLE WITHOUT LOCK:|
-LOCKS COVERED BY|
-LOCK UNNEEDED BECAUSE|
-LOCK NEEDED:|
-LOCK HELD ON ENTRY:|
-READ LOCK HELD ON ENTRY:|
-WRITE LOCK HELD ON ENTRY:|
-LOCK ACQUIRED AS SIDE EFFECT:|
-READ LOCK ACQUIRED AS SIDE EFFECT:|
-WRITE LOCK ACQUIRED AS SIDE EFFECT:|
-LOCK RELEASED AS SIDE EFFECT:|
-LOCK UPGRADED AS SIDE EFFECT:|
-LOCK DOWNGRADED AS SIDE EFFECT:|
-FUNCTIONS CALLED THROUGH POINTER|
-FUNCTIONS CALLED THROUGH MEMBER|
-LOCK ORDER:
-)";
-$warlock_comment =~ tr/\n//d;
+my $lint_re = qr/\/\*(?:
+	ARGSUSED[0-9]*|NOTREACHED|LINTLIBRARY|VARARGS[0-9]*|
+	CONSTCOND|CONSTANTCOND|CONSTANTCONDITION|EMPTY|
+	FALLTHRU|FALLTHROUGH|LINTED.*?|PRINTFLIKE[0-9]*|
+	PROTOLIB[0-9]*|SCANFLIKE[0-9]*|CSTYLED.*?
+    )\*\//x;
+
+my $splint_re = qr/\/\*@.*?@\*\//x;
+
+my $warlock_re = qr/\/\*\s*(?:
+	VARIABLES\ PROTECTED\ BY|
+	MEMBERS\ PROTECTED\ BY|
+	ALL\ MEMBERS\ PROTECTED\ BY|
+	READ-ONLY\ VARIABLES:|
+	READ-ONLY\ MEMBERS:|
+	VARIABLES\ READABLE\ WITHOUT\ LOCK:|
+	MEMBERS\ READABLE\ WITHOUT\ LOCK:|
+	LOCKS\ COVERED\ BY|
+	LOCK\ UNNEEDED\ BECAUSE|
+	LOCK\ NEEDED:|
+	LOCK\ HELD\ ON\ ENTRY:|
+	READ\ LOCK\ HELD\ ON\ ENTRY:|
+	WRITE\ LOCK\ HELD\ ON\ ENTRY:|
+	LOCK\ ACQUIRED\ AS\ SIDE\ EFFECT:|
+	READ\ LOCK\ ACQUIRED\ AS\ SIDE\ EFFECT:|
+	WRITE\ LOCK\ ACQUIRED\ AS\ SIDE\ EFFECT:|
+	LOCK\ RELEASED\ AS\ SIDE\ EFFECT:|
+	LOCK\ UPGRADED\ AS\ SIDE\ EFFECT:|
+	LOCK\ DOWNGRADED\ AS\ SIDE\ EFFECT:|
+	FUNCTIONS\ CALLED\ THROUGH\ POINTER|
+	FUNCTIONS\ CALLED\ THROUGH\ MEMBER|
+	LOCK\ ORDER:
+    )/x;
 
 if ($#ARGV >= 0) {
 	foreach my $arg (@ARGV) {
@@ -358,13 +395,13 @@ line: while (<$filehandle>) {
 		$comment_done = 0;
 	}
 	# does this looks like the start of a block comment?
-	if (/^\s*\/\*$/) {
-		if (!/^\t*\/\*$/) {
+	if (/$hdr_comment_start/) {
+		if (!/^\t*\/\*/) {
 			err("block comment not indented by tabs");
 		}
 		$in_comment = 1;
-		s/\/\*//;
-		$comment_prefix = $_;
+		/^(\s*)\//;
+		$comment_prefix = $1;
 		if ($comment_prefix eq "") {
 			$in_header_comment = 1;
 		}
@@ -404,12 +441,12 @@ line: while (<$filehandle>) {
 	if (/^\t+ [^ \t\*]/ || /^\t+  \S/ || /^\t+   \S/) {
 		err("continuation line not indented by 4 spaces");
 	}
-	if (/\/\*\s*$warlock_comment/o && !/\*\//) {
+	if (/$warlock_re/ && !/\*\//) {
 		$in_warlock_comment = 1;
 		$prev = $line;
 		next line;
 	}
-	if (/^\s*\/\*./ && !/^\s*\/\*.*\*\//) {
+	if (/^\s*\/\*./ && !/^\s*\/\*.*\*\// && !/$hdr_comment_start/) {
 		err("improper first line of block comment");
 	}
 
@@ -419,17 +456,11 @@ line: while (<$filehandle>) {
 	}
 
 	if ((/[^(]\/\*\S/ || /^\/\*\S/) &&
-	    !(/\/\*(ARGSUSED[0-9]*|NOTREACHED|LINTLIBRARY|VARARGS[0-9]*)\*\// ||
-	    /\/\*(CONSTCOND|CONSTANTCOND|CONSTANTCONDITION|EMPTY)\*\// ||
-	    /\/\*(FALLTHRU|FALLTHROUGH|LINTED.*|PRINTFLIKE[0-9]*)\*\// ||
-	    /\/\*(PROTOLIB[0-9]*|SCANFLIKE[0-9]*|CSTYLED.*)\*\//)) {
+	    !(/$lint_re/ || ($splint_comments && /$splint_re/))) {
 		err("missing blank after open comment");
 	}
 	if (/\S\*\/[^)]|\S\*\/$/ &&
-	    !(/\/\*(ARGSUSED[0-9]*|NOTREACHED|LINTLIBRARY|VARARGS[0-9]*)\*\// ||
-	    /\/\*(CONSTCOND|CONSTANTCOND|CONSTANTCONDITION|EMPTY)\*\// ||
-	    /\/\*(FALLTHRU|FALLTHROUGH|LINTED.*|PRINTFLIKE[0-9]*)\*\// ||
-	    /\/\*(PROTOLIB[0-9]*|SCANFLIKE[0-9]*|CSTYLED.*)\*\//)) {
+	    !(/$lint_re/ || ($splint_comments && /$splint_re/))) {
 		err("missing blank before close comment");
 	}
 	if (/\/\/\S/) {		# C++ comments
@@ -601,8 +632,10 @@ line: while (<$filehandle>) {
 	}
 	if ($picky) {
 		# try to detect spaces after casts, but allow (e.g.)
-		# "sizeof (int) + 1" and "void (*funcptr)(int) = foo;"
-		if (/\($typename( \*+)?\)\s/o &&
+		# "sizeof (int) + 1", "void (*funcptr)(int) = foo;", and
+		# "int foo(int) __NORETURN;"
+		if ((/^\($typename( \*+)?\)\s/o ||
+		    /\W\($typename( \*+)?\)\s/o) &&
 		    !/sizeof\s*\($typename( \*)?\)\s/o &&
 		    !/\($typename( \*+)?\)\s+=[^=]/o) {
 			err("space after cast");

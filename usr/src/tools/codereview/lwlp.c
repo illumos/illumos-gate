@@ -71,7 +71,7 @@ static char sccsid[] = "%Z%%M%	%I%	%E% SMI";
 #define	USAGE2	"[-l<lines>|-w<columns>] [-c<count>] [-t<tabs>]"
 #define	USAGE3	"[-hstring] [-Bstring] [-Istring] [-Xstring] [-Gstring]"
 #define	USAGE4	"[-Pfile] [file ...]"
-#define	USAGE6	"[-hstring] [-e] oldfile newfile"
+#define	USAGE6	"[-hstring] [-e] [-y comment] oldfile newfile"
 
 #include <stdio.h>
 #include <string.h>
@@ -198,6 +198,7 @@ static char	bufout[BUFOUT];		/* output buffer */
 static long	*page_map;		/* offset of first byte of each page */
 
 static char	*username, *hostname, *currentdate;
+static char	*comment;
 
 static void	preamble(void);
 static void	postamble(void);
@@ -301,7 +302,7 @@ main(int argc, char **argv)
 	}
 
 	while ((ch = getopt(argc, argv,
-			"1248B:c:deG:h:I:l:Ln:P:prt:vw:X:")) != -1) {
+			"1248B:c:deG:h:I:l:Ln:P:prt:vw:X:y:")) != -1) {
 		switch (ch) {
 		case '1':
 			layoutp = &layout1;
@@ -411,6 +412,9 @@ main(int argc, char **argv)
 			bitclength = strlen(optarg);
 			bitcstring = malloc((size_t)(bitclength + 1));
 			(void) strcpy(bitcstring, optarg);
+			break;
+		case 'y':
+			comment = optarg;
 			break;
 		default:
 			(void) fprintf(stderr,
@@ -703,6 +707,34 @@ printbanner(char *filename, FILE *outfile)
 		proc(buffer, outfile);
 		nlines++;
 	} while (strlen(filename) != 0);
+
+	if (comment != NULL && comment[0] != 0) {
+		const char *cur = comment;
+		const char *endl;
+		int len;
+
+		while (*cur != 0) {
+			current.row -= point_size;
+			(void) fprintf(outfile, "%d %.2f %s\n", start_x,
+			    current.row, MOVETO);
+
+			endl = strchr(cur, '\n');
+			if (endl == NULL)
+				endl = cur + strlen(cur);
+
+			/* truncate to columns */
+			len = endl - cur;
+			if (len > columns)
+				len = columns;
+			(void) sprintf(buffer, "%.*s", len, cur);
+			proc(buffer, outfile);
+			nlines++;
+
+			if (*endl == 0)
+				break;
+			cur = endl + 1;
+		}
+	}
 
 	current.row -= point_size;
 	(void) fprintf(outfile, "%d %.2f %s\n", start_x, current.row, MOVETO);
