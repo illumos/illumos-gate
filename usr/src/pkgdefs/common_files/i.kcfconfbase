@@ -31,6 +31,7 @@ do
 	if [ ! -f $dest ] ; then
 		cp $src $dest
 	else
+
 		egrep '^arcfour' $dest > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			rc4=`egrep '^arcfour' $src` 
@@ -60,6 +61,11 @@ do
 		     { print } \
 		' $dest > $dest.$$
 		mv $dest.$$ $dest
+
+		sed -e 's/CKM_BF_/CKM_BLOWFISH_/g' $dest > $dest.$$
+		mv $dest.$$ $dest
+
+
 	fi
 
 done
