@@ -87,7 +87,7 @@ ufs_dir(char *dirname)
 int
 ufs_read(char *buf, int len)
 {
-  	int off, size, ret = 0;
+  	int off, size, ret = 0, ok;
 	grub_daddr32_t lblk, dblk;
 
   	while (len) {
@@ -100,7 +100,10 @@ ufs_read(char *buf, int len)
 		if (size > len)
 		  	size = len;
 
-		if (!devread(fsbtodb(SUPERBLOCK, dblk), off, size, buf))
+		disk_read_func = disk_read_hook;
+		ok = devread(fsbtodb(SUPERBLOCK, dblk), off, size, buf);
+		disk_read_func = 0;
+		if (!ok)
 		  	return 0;
 		buf += size;
 		len -= size;

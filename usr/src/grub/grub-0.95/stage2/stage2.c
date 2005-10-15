@@ -889,7 +889,7 @@ cmain (void)
 	  
 	  /* Get a saved default entry if possible.  */
 	  saved_entryno = 0;
-	  grub_strncat (default_file, config_file, DEFAULT_FILE_BUFLEN);
+	  grub_strcpy (default_file, config_file);
 	  for (i = grub_strlen(default_file); i >= 0; i--)
 	    if (default_file[i] == '/')
 	      {
