@@ -525,6 +525,8 @@ typedef struct tcp_s {
 	 * with the rest which require such condition.
 	 */
 	boolean_t	tcp_issocket;	/* this is a socket tcp */
+
+	uint32_t	tcp_squeue_bytes;
 } tcp_t;
 
 extern void 	tcp_free(tcp_t *tcp);
