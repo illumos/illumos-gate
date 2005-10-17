@@ -318,7 +318,8 @@ next_signature:
 		/*
 		 * Failsafe
 		 */
-		if (SUA_rem < SUF_MIN_LEN || SUF_LEN(sig_string) <= 0) {
+		if (SUA_rem < SUF_MIN_LEN ||
+		    sig_string == NULL || SUF_LEN(sig_string) <= 0) {
 			return (END_OF_SUA);
 		}
 
