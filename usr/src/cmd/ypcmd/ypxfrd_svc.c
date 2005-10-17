@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -158,6 +158,7 @@ ypxfrd_1(struct svc_req *rqstp, register SVCXPRT *transp)
 	_rpcsvcstate = _SERVED;
 }
 
+int
 main()
 {
 	pid_t pid;

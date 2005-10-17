@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +35,8 @@ static void usage( void )
 	exit(LDAP_PARAM_ERROR );
 }
 
-int main( argc, argv )
-int		argc;
-char	**argv;
+int 
+main(int argc, char **argv )
 {
 	char *myname, *entrydn, *rdn, buf[ 4096 ];
 	int rc, havedn, deref, optind;
@@ -53,7 +52,10 @@ char	**argv;
 
 	contoper =  remove_oldrdn = 0;
 
-	myname = (myname = strrchr(argv[0], '/')) == NULL ? argv[0] : ++myname;
+	if ((myname = strrchr(argv[0], '/')) == NULL)
+		myname = argv[0];
+	else
+		++myname;
 
 	optind = ldaptool_process_args( argc, argv, "cr", 0, options_callback);
 	
@@ -224,7 +226,7 @@ domodrdn( LDAP *ld, char *dn, char *rdn, char *newsuperior, int remove_oldrdn )
 
 	if ( ldaptool_verbose )
 		printf( gettext("new RDN: %1$s (%2$skeep existing values)\n"),
-						rdn, remove ? "do not " : "" );
+						rdn, remove_oldrdn ? "do not " : "" );
  
 	printf( gettext("%1$srenaming entry %2$s\n"), 
 			ldaptool_not ? "!" : "", dn );

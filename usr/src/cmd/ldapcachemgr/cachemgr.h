@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,7 @@ extern int get_clearance(int callnumber);
 extern int release_clearance(int callnumber);
 #ifdef SLP
 extern void discover();
-#endif SLP
+#endif /* SLP */
 extern void getldap_serverInfo_refresh(void);
 extern void getldap_getserver(ldap_return_t *out, ldap_call_t *in);
 extern void getldap_get_cacheData(ldap_return_t *out, ldap_call_t *in);

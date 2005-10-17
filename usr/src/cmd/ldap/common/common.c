@@ -1,11 +1,11 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/* 
+/*
  * The contents of this file are subject to the Netscape Public
  * License Version 1.1 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of
@@ -138,7 +138,7 @@ ldaptool_common_usage( int two_hosts )
     fprintf( stderr, gettext("    -W\t\tSSL key password\n") );
 #ifndef SOLARIS_LDAP_CMD
     fprintf( stderr, gettext("    -3\t\tcheck hostnames in SSL certificates\n") );
-#endif	/SOLARIS_LDAP_CMD */
+#endif	/* SOLARIS_LDAP_CMD */
 
 #ifdef LDAP_TOOL_PKCS11
     fprintf( stderr, gettext("    -Q [token][:certificate name]\tPKCS 11\n") );

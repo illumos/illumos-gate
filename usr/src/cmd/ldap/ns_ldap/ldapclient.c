@@ -331,10 +331,8 @@ static int do_service(const char *fmri, boolean_t waitflag, int dowhat,
 static useconds_t get_timeout_value(int dowhat, const char *fmri,
 		useconds_t default_val);
 
-void
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char **argv)
 {
 	char *ret_locale, *ret_textdomain;
 	int retcode;

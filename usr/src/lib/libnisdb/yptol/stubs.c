@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,7 @@ int
 lock_core(int hashval)
 {
 	disaster();
+	return (0);
 }
 
 #pragma weak unlock_core
@@ -78,6 +79,7 @@ int
 unlock_core(int hashval)
 {
 	disaster();
+	return (0);
 }
 
 #pragma weak lock_map
@@ -101,6 +103,7 @@ bool
 init_lock_map()
 {
 	disaster();
+	return (FALSE);
 }
 
 #pragma weak hash
@@ -108,6 +111,7 @@ int
 hash(char *s)
 {
 	disaster();
+	return (0);
 }
 
 #pragma weak rename_map
@@ -115,6 +119,7 @@ bool
 rename_map(char *from, char *to, bool_t secure_map)
 {
 	disaster();
+	return (FALSE);
 }
 
 #pragma weak delete_map
@@ -122,6 +127,7 @@ bool
 delete_map(char *name)
 {
 	disaster();
+	return (FALSE);
 }
 
 #pragma weak single
@@ -136,6 +142,7 @@ bool_t
 validloginshell(char *sh, char *arg, int priv)
 {
 	disaster();
+	return (0);
 }
 
 #pragma weak validstr

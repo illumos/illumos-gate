@@ -22,7 +22,7 @@
 /*
  *	db_dictionary_c.x
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
  
@@ -50,8 +50,8 @@
 %#include "db_vers.h"
 %#include "db_dictlog.h"
 %#include "ldap_xdr.h"
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 struct db_table_desc {
   string table_name<NIS_MAXNAMELEN>;
@@ -61,7 +61,7 @@ struct db_table_desc {
   nullptr database;   /* for XDR, keep database from descriptor */
 #else
   db *database;        /* for program use in c++ code */
-#endif USINGC
+#endif /* USINGC */
   db_table_desc *next;
 };
 typedef struct db_table_desc * db_table_desc_p;
@@ -71,7 +71,7 @@ typedef struct db_table_desc * db_table_desc_p;
 #ifndef USINGC
 typedef u_int db_dict_version;
 %bool_t xdr_db_dict_version();
-#endif USINGC
+#endif /* USINGC */
 
 typedef char * db_table_namep;
 typedef db_table_namep db_table_names<>;
@@ -94,7 +94,8 @@ struct db_dict_desc {
 %};
 %typedef struct db_dict_desc db_dict_desc;
 %bool_t xdr_db_dict_desc();
-#endif USINGC
+#endif /* USINGC */
+
 #endif
 
 typedef struct db_dict_desc * db_dict_desc_p;
@@ -106,7 +107,7 @@ struct __nisdb_dictionary_defer_struct {
 typedef struct __nisdb_dictionary_defer_struct	__nisdb_dictionary_defer_t;
 #ifdef	USINGC
 %bool_t xdr___nisdb_dictionary_defer_t();
-#endif	USINGC
+#endif	/* USINGC */
 #endif
 
 #ifndef USINGC
@@ -284,10 +285,10 @@ typedef struct __nisdb_dictionary_defer_struct	__nisdb_dictionary_defer_t;
 %extern "C" bool_t xdr_db_table_names(XDR *, db_table_names *); 
 %#endif
 
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_DICTIONARY_H
-#endif RPC_HDR
+%#endif /* _DB_DICTIONARY_H */
+#endif /* RPC_HDR */
 

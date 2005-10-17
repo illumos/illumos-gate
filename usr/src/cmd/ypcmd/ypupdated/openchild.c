@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -64,6 +64,7 @@ extern unsigned int strlen();
 /*
  * returns pid, or -1 for failure
  */
+int
 _openchild(command, fto, ffrom)
 	char *command;
 	FILE **fto;

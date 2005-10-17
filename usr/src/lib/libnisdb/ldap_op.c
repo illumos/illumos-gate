@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,10 @@
 #ifndef LDAPS_PORT
 #define	LDAPS_PORT	636
 #endif
+
+static int setupConList(char *serverList, char *who,
+			char *cred, auth_method_t method);
+
 
 /*
  * Build one of our internal LDAP search structures, containing copies of

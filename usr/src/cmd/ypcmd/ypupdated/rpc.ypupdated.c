@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,10 +57,14 @@ char UPDATEFILE[] = "updaters";
 
 void ypupdate_prog();
 void detachfromtty();
+
+static int addr2netname(char *, SVCXPRT *);
+
 int insecure;
 extern SVCXPRT *svctcp_create(int, uint_t, uint_t);
 extern SVCXPRT *svcudp_create();
 
+int
 main(argc, argv)
 	int argc;
 	char *argv[];
@@ -147,6 +151,7 @@ main(argc, argv)
 	svc_run();
 	abort();
 	/* NOTREACHED */
+	return (1);
 }
 
 /*
@@ -268,6 +273,7 @@ ypupdate_prog(rqstp, transp)
  * and update it if so. Returns the NIS status, which is zero
  * if there is no access violation.
  */
+int
 update(requester, mapname, op, keylen, key, datalen, data)
 	char *requester;
 	char *mapname;

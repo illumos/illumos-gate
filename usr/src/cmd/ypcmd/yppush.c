@@ -171,7 +171,7 @@ static struct state_duple state_duples[] = {
 /*
  * Status_duple table.  No messages should require any args.
  */
-static struct status_duple {
+struct status_duple {
 	long status;
 	char *status_msg;
 };
@@ -203,7 +203,7 @@ static struct status_duple status_duples[] = {
 /*
  * rpcerr_duple table
  */
-static struct rpcerr_duple {
+struct rpcerr_duple {
 	enum clnt_stat rpc_stat;
 	char *rpc_msg;
 };
@@ -652,6 +652,7 @@ generate_callback(unsigned long *program)
  */
 
 
+int
 add_to_active()
 {
 	struct server  *ps;
@@ -664,6 +665,7 @@ add_to_active()
 	return (1);
 }
 
+int
 delete_active(in)
 	struct server  *in;
 {

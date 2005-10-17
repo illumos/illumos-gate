@@ -393,9 +393,13 @@ mydbm_topkey(DBM *db, datum okey)
 	register char	*buf;
 	int		n;
 	register short	*sp;
-	register	t;
+	register short 	t;
 	datum		item;
-	register	m;
+#if defined(_XPG4_2)
+	register size_t	m;
+#else
+	register long	m;
+#endif
 	register char	*p1, *p2;
 
 	buf = db->dbm_pagbuf;

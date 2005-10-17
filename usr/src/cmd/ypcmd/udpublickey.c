@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 
 extern char *malloc();
 
+int
 main(argc, argv)
 	int argc;
 	char *argv[];
@@ -171,11 +172,12 @@ main(argc, argv)
 		dup(0); dup(0);
 		execl("/bin/sh", "sh", "-c", argv[2], NULL);
 	}
-	exit(err);
+	return (err);
 	/* NOTREACHED */
 }
 
 
+int
 match(line, name)
 	char *line;
 	char *name;

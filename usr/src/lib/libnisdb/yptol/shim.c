@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,8 +63,8 @@ USE_DBM
 /*
  * Globals
  */
-extern bool_t yptol_mode = FALSE;	/* Set if in N2L mode */
-extern bool_t ypxfrd_flag = FALSE;	/* Set if called from ypxfrd */
+bool_t yptol_mode = FALSE;	/* Set if in N2L mode */
+bool_t ypxfrd_flag = FALSE;	/* Set if called from ypxfrd */
 pid_t parent_pid;			/* ID of calling parent process */
 
 

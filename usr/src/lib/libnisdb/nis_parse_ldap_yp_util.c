@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,12 +44,16 @@ extern __nis_mapping_rule_t **dup_mapping_rules(
 extern __nis_mapping_rule_t *dup_mapping_rule(
 	__nis_mapping_rule_t *in);
 
-int	merge_table_mapping(__nis_table_mapping_t *in,
+static int	merge_table_mapping(__nis_table_mapping_t *in,
 	__nis_table_mapping_t *out);
 __nis_table_mapping_t *new_merged_mapping(const char *,
 	__nis_table_mapping_t *intbl);
-int append_mapping_rule(__nis_mapping_rule_t *src_rule,
+static int append_mapping_rule(__nis_mapping_rule_t *src_rule,
 	__nis_table_mapping_t *tbl, int flag);
+
+
+static int copy_object_dn(__nis_object_dn_t	*in,
+		__nis_object_dn_t	*newdn);
 
 /*
  * FUNCTION:	initialize_table_mapping

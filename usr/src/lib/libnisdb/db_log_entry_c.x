@@ -22,8 +22,8 @@
 /*
  *	db_log_entry_c.x
  *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +35,7 @@
 %
 %/* A log entry that describes an action to be performed and its parameters. */
 %
-#endif RPC_HDR
+#endif /* RPC_HDR */
 
 #if RPC_HDR || RPC_XDR
 #ifdef USINGC
@@ -46,8 +46,8 @@
 %#include "db_vers.h"
 %#include "db_query.h"
 %#include "db_entry.h"
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #if RPC_HDR || RPC_XDR
 #ifdef USINGC
@@ -60,8 +60,8 @@ struct db_log_entry {
   vers bversion;                    /* sanity check */
 };
 typedef  struct db_log_entry* db_log_entry_p;
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -113,13 +113,13 @@ typedef  struct db_log_entry* db_log_entry_p;
 %extern bool_t xdr_db_log_entry(XDR*, db_log_entry*);
 %#endif
 %typedef class db_log_entry * db_log_entry_p;
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 struct db_log_list {
   db_log_entry_p list<>;
 };
   
 #if RPC_HDR
-%#endif _DB_LOG_ENTRY_H  
-#endif RPC_HDR
+%#endif /* _DB_LOG_ENTRY_H */
+#endif /* RPC_HDR */

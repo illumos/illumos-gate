@@ -20,10 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-							    
+
+
 /*
  * mkmap - program to convert the mail.aliases map into an
  * inverse map of <user@host> back to <preferred-alias>
@@ -62,7 +63,7 @@ int NoOutput = 0;	/* no output, just do the check */
 int Simple = 0;		/* Do not do the user name preference step */
 int NameMode = 0;	/* Try to capitalize as names */
 
-DBM *Indbm=NULL, *Scandbm=NULL, *Outdbm=NULL;
+DBM *Indbm = NULL, *Scandbm = NULL, *Outdbm = NULL;
 
 int
 IsMailingList(char *s)
@@ -127,8 +128,8 @@ void
 CopyName(char *dst, char *src, int len)
 {
 	/*
-	* copy a string, but ignore white space
-	*/
+	 * copy a string, but ignore white space
+	 */
 	while (*src && len--) {
 		if (isspace(*src))
 			src++;
@@ -248,7 +249,7 @@ DoName(char *cp)
 void
 UpperCase(char *cp)
 {
-	register ch = cp[0];
+	int ch = cp[0];
 
 	if (isupper(ch))
 		ch = tolower(ch);

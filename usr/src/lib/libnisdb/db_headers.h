@@ -22,8 +22,8 @@
 /*
  *	db_headers.h
  *
- *	Copyright (c) 1988-2001 by Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -214,4 +214,4 @@ enum db_action {DB_LOOKUP, DB_REMOVE, DB_ADD, DB_FIRST, DB_NEXT, DB_ALL,
 			DB_ADD_NOSYNC, DB_REMOVE_NOSYNC };
 typedef enum db_action db_action;
 
-#endif _DB_HEADERS_H
+#endif /* _DB_HEADERS_H */

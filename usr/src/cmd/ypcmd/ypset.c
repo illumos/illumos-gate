@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,7 +102,7 @@ extern unsigned int strlen();
  * have been passed from the command line, and uses defaults for the rest.
  */
 
-void
+int
 main(argc, argv)
 	int argc;
 	char **argv;
@@ -116,20 +116,20 @@ main(argc, argv)
 			domain = default_domain_name;
 		} else {
 			(void) fprintf(stderr,
-	err_cant_get_kname,
-	err_bad_domainname);
+				err_cant_get_kname,
+				err_bad_domainname);
 			exit(1);
 		}
 
-		if ((int) strlen(domain) == 0) {
+		if ((int)strlen(domain) == 0) {
 			(void) fprintf(stderr,
-	err_null_kname,
-	err_bad_domainname);
+				err_null_kname,
+				err_bad_domainname);
 			exit(1);
 		}
 	}
 	send_message();
-	exit(0);
+	return (0);
 }
 
 /*
@@ -161,7 +161,7 @@ get_command_line_args(argc, argv)
 						*argv) != 0) {
 						host = *argv;
 
-						if ((int) strlen(host) > 256) {
+						if ((int)strlen(host) > 256) {
 							(void) fprintf(stderr,
 	err_bad_args,
 	err_bad_hostname);
@@ -223,7 +223,7 @@ get_command_line_args(argc, argv)
 
 		server_to_use = *argv;
 
-		if ((int) strlen(server_to_use) > 256) {
+		if ((int)strlen(server_to_use) > 256) {
 			(void) fprintf(stderr, err_bad_args,
 			    err_bad_server);
 			exit(1);
@@ -263,7 +263,7 @@ send_message()
 
 	/* get nconf, netbuf structures */
 	nconf = getnetconfigent(server->cl_netid);
-	clnt_control(server, CLGET_SVC_ADDR, (char *) &nbuf);
+	clnt_control(server, CLGET_SVC_ADDR, (char *)&nbuf);
 
 	/*
 	 * Open a path to host

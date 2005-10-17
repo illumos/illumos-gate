@@ -20,12 +20,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (C) 1990-2000, Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SMI4.1 1.5 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SMI4.1 1.5 */
 
 /*
  * Network name to unix credential database generator.
@@ -110,6 +110,22 @@ static char WHITE[] = "\t ";
 static char COLON[] = ":";
 static char COMMA[] = ",";
 
+void domapfile(char *, FILE *);
+void dogrpfile(char *, FILE *);
+void dopwdfile(char *, FILE *);
+void dohostfile(char *, FILE *);
+static int Atoi(char *);
+void check_getname(char **, char *, char *, char *, char *);
+void multdef(char *);
+static int wasprinted(char *);
+void storegid(int, char *);
+void printgroups(char *, int);
+int parseargs(int, char *[]);
+void put_s(char *);
+void put_d(int);
+
+
+int
 main(argc, argv)
 	int argc;
 	char *argv[];
@@ -137,13 +153,14 @@ main(argc, argv)
 	dopwdfile(pwdfile, pf);
 	dohostfile(hostfile, hf);
 
-	exit(0);
+	return (0);
 	/* NOTREACHED */
 }
 
 /*
  * Parse the network id mapping file
  */
+void
 domapfile(mapfile, mf)
 	char *mapfile;
 	FILE *mf;
@@ -190,6 +207,7 @@ domapfile(mapfile, mf)
 /*
  * Parse the groups file
  */
+void
 dogrpfile(grpfile, gf)
 	char *grpfile;
 	FILE *gf;
@@ -220,6 +238,7 @@ dogrpfile(grpfile, gf)
 /*
  * Parse the password file
  */
+void
 dopwdfile(pwdfile, pf)
 	char *pwdfile;
 	FILE *pf;
@@ -260,6 +279,7 @@ dopwdfile(pwdfile, pf)
 /*
  * Parse the hosts file
  */
+void
 dohostfile(hostfile, hf)
 	char *hostfile;
 	FILE *hf;
@@ -305,6 +325,7 @@ openfile(fname)
 /*
  * Print syntax error message, then exit
  */
+void
 syntaxerror()
 {
 	(void) fprintf(stderr, "%s: syntax error in file \"%s\", line %d\n",
@@ -332,6 +353,7 @@ Atoi(str)
 /*
  * Attempt to get a token from a file, print a message and exit upon failure
  */
+void
 check_getname(lp, name, skip, term, com)
 	char **lp;
 	char *name;
@@ -347,6 +369,7 @@ check_getname(lp, name, skip, term, com)
 /*
  * Something was defined more than once
  */
+void
 multdef(name)
 	char *name;
 {
@@ -357,7 +380,7 @@ multdef(name)
 	}
 }
 
-static
+static int
 hash(str, size)
 	unsigned char *str;
 	int size;
@@ -383,7 +406,7 @@ hash(str, size)
  * Check if an item has been printed
  * If not, store the item into the printed item table
  */
-static
+static int
 wasprinted(name)
 	char *name;
 {
@@ -407,6 +430,7 @@ wasprinted(name)
 /*
  * Add gid to the list of a user's groups
  */
+void
 storegid(gid, user)
 	int gid;
 	char *user;
@@ -444,6 +468,7 @@ storegid(gid, user)
 /*
  * print out a user's groups
  */
+void
 printgroups(user, gid)
 	char *user;
 	int gid;
@@ -471,6 +496,7 @@ printgroups(user, gid)
 /*
  * Parse command line arguments
  */
+int
 parseargs(argc, argv)
 	int argc;
 	char *argv[];
@@ -523,6 +549,7 @@ parseargs(argc, argv)
 /*
  * Print a string, quickly
  */
+void
 put_s(s)
 	char *s;
 {
@@ -532,6 +559,7 @@ put_s(s)
 /*
  * Print an integer, quickly
  */
+void
 put_d(d)
 	int d;
 {

@@ -251,7 +251,7 @@ server_destroy(void *arg)
 	(void) mutex_unlock(&create_lock);
 }
 
-void
+int
 main(int argc, char ** argv)
 {
 	int			did;

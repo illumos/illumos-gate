@@ -22,8 +22,8 @@
 /*
  *	db_dictlog_c.x
  *
- *	Copyright (c) 1988-2000 by Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * 	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * 	Use is subject to license terms.
  */
 
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +35,7 @@
 %
 %/* A log entry that describes an action to be performed and its parameters. */
 %
-#endif RPC_HDR
+#endif /* RPC_HDR */
 
 #if RPC_HDR || RPC_XDR
 #ifdef USINGC
@@ -43,9 +43,9 @@
 #else
 %#include "db_vers.h"
 %#include "db_pickle.h"
-#endif USINGC
+#endif /* USINGC */
 %#include <rpcsvc/nis.h>
-#endif RPC_HDR
+#endif /* RPC_HDR */
 %
 %#include "nisdb_rw.h"
 %
@@ -63,14 +63,14 @@ struct db_dictlog_entry {
   vers bversion;                    /* sanity check;should be same as aversion*/
 };
 typedef  struct db_dictlog_entry* db_dictlog_entry_p;
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifdef USINGC
 #if RPC_HDR
 %bool_t xdr_table_obj();
 #endif
-#endif USINGC
+#endif /* USINGC */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -122,8 +122,8 @@ typedef  struct db_dictlog_entry* db_dictlog_entry_p;
 %extern bool_t xdr_db_dictlog_entry(XDR*, db_dictlog_entry*);
 %#endif
 %typedef class db_dictlog_entry * db_dictlog_entry_p;
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 struct db_dictlog_list {
   db_dictlog_entry_p list<>;
@@ -187,9 +187,9 @@ struct db_dictlog_list {
 %  }
 %
 %};
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_DICTLOG_H
-#endif RPC_HDR
+%#endif /* _DB_DICTLOG_H */
+#endif /* RPC_HDR */

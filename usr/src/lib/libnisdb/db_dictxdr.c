@@ -22,8 +22,8 @@
 /*
  *	db_dictxdr.c
  *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +33,7 @@
 
 extern vers db_update_version;
 
-extern make_zero(vers*);
+extern void make_zero(vers*);
 
 /* Special xdr_db_dict_desc that understands optional version number at end. */
 bool_t
@@ -43,8 +43,8 @@ xdr_db_dict_desc(XDR *xdrs, db_dict_desc *objp)
 	if (!xdr_db_dict_version(xdrs, &objp->impl_vers))
 		return (FALSE);
 	if (!xdr_array(xdrs, (char **)&objp->tables.tables_val,
-		(u_int *) &objp->tables.tables_len, ~0,
-		sizeof (db_table_desc_p), (xdrproc_t) xdr_db_table_desc_p))
+		(uint_t *)&objp->tables.tables_len, ~0,
+		sizeof (db_table_desc_p), (xdrproc_t)xdr_db_table_desc_p))
 		return (FALSE);
 	if (!xdr_int(xdrs, &objp->count))
 		return (FALSE);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,7 @@
 #define	YPPASSWDD_STR "check_restricted_shell_name=1"
 
 /* The guts are in there */
-extern changepasswd(SVCXPRT *);
+extern void changepasswd(SVCXPRT *);
 
 static void	boilerplate(struct svc_req *rqstp, SVCXPRT *transp);
 static void	unlimit(int lim);

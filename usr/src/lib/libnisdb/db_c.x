@@ -22,7 +22,7 @@
 /*
  *	db_c.x
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,8 +43,8 @@
 %#include "db_vers.h"
 %#include "db_entry.h"
 %#include "db_scheme.h"
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #if RPC_HDR || RPC_XDR 
 #ifdef USINGC
@@ -58,8 +58,8 @@ struct db {
   bool changed;
   __nisdb_rwlock_t db_rwlock;
 };
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR 
@@ -221,9 +221,9 @@ struct db {
 %};
 %
 %typedef class db * dbp;
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #if RPC_HDR
-%#endif _DB_DB_H
-#endif RPC_HDR
+%#endif /* _DB_DB_H */
+#endif /* RPC_HDR */

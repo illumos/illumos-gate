@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3682,7 +3682,7 @@ dumptable(char *service)
 	}
 }
 
-void
+int
 main(int argc, char **argv)
 {
 	char	*password;

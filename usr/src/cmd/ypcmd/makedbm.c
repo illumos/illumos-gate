@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,6 +106,7 @@ _close(int filedes) {
 	return ((*fptr)(filedes));
 }
 
+int
 main(argc, argv)
 	int argc;
 	char **argv;

@@ -22,7 +22,7 @@
 /*
  *	db_index_c.x
  *
- *  Copyright 1988-2002 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -47,8 +47,8 @@
 %#include "db_index_entry.h"
 %#include "db_table.h"
 %#include "db_scheme.h"
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 %
 %#include "nisdb_rw.h"
 %
@@ -61,8 +61,8 @@ struct db_index {
   __nisdb_rwlock_t index_rwlock;
 };
 typedef struct db_index * db_index_p;
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -159,9 +159,9 @@ typedef struct db_index * db_index_p;
 %extern bool_t xdr_db_index(XDR *, db_index *);
 %#endif
 %typedef class db_index * db_index_p;
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_INDEX_H
-#endif RPC_HDR
+%#endif /* _DB_INDEX_H */
+#endif /* RPC_HDR */

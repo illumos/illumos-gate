@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,15 +61,11 @@ __nis_ldap_search_t	*createLdapRequest(__nis_table_mapping_t *t,
 				__nis_rule_value_t *rv, char **dn,
 				int fromLDAP, int *res,
 				__nis_object_dn_t *objectDN);
-LDAP			*ldapInit(char *server, int port, bool_t use_ssl);
-int			ldapBind(LDAP **ld, char *who, char *cred,
-				auth_method_t method, struct timeval timeout);
 int			ldapDestroy(void);
 int			string2method(char *method);
 int			ldapConnect(void);
 __nis_rule_value_t	*ldapSearch(__nis_ldap_search_t *ls, int *numValues,
 				__nis_rule_value_t *rvIn, int *ldapStat);
-void			freeLdapMod(LDAPMod **mods);
 LDAPMod			**search2LdapMod(__nis_rule_value_t *rv, int add,
 				int oc);
 int			ldapModify(char *dn, __nis_rule_value_t *rv,

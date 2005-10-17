@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,7 +228,7 @@ extern int errno;
  * This is the mainline for the ypxfr process.
  */
 
-void
+int
 main(argc, argv)
 	int argc;
 	char **argv;
@@ -320,6 +320,7 @@ main(argc, argv)
 	}
 
 	xfr_exit(YPPUSH_SUCC);
+	return (0);
 	/* NOTREACHED */
 }
 
@@ -560,6 +561,7 @@ find_map_master()
 }
 
 #ifdef TREEPUSH
+int
 chk_treepush(name)
 char *name;
 {
@@ -1368,6 +1370,7 @@ new_mapfiles(pname)
 	}
 }
 
+int
 count_callback(status)
 	int status;
 {
@@ -1391,6 +1394,7 @@ count_callback(status)
  * make sure that the dbm file was built correctly.
  * Returns TRUE if everything is OK, FALSE if they mismatch.
  */
+int
 count_mismatch(pname, oldcount)
 	char *pname;
 	int oldcount;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -288,7 +288,7 @@ getldap_cache_op(cache_op_t op, cache_type_t type,
 	unsigned long		hash;
 	static rwlock_t 	cache_lock = DEFAULTRWLOCK;
 	int 			i;
-	static			entry_num = 0;
+	static int		entry_num = 0;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_cache_op()...\n");

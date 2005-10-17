@@ -22,8 +22,8 @@
 /*
  *	db_table_c.x
  *
- *	Copyright (c) 1988-2001 Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,8 +38,8 @@
 #else
 %#include "db_query.h"
 %#include "db_scheme.h"
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 %
 %#include "nisdb_ldap.h"
 %#include "nisdb_rw.h"
@@ -67,8 +67,8 @@ struct db_free_list {
   __nisdb_rwlock_t free_list_rwlock;
 };
 typedef struct db_free_list * db_free_list_p;
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -123,8 +123,8 @@ typedef struct db_free_list * db_free_list_p;
 %	return (RULOCK(free_list));
 %  }
 %};
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR || RPC_XDR
 #ifdef USINGC
@@ -141,8 +141,8 @@ struct db_table
 };
 typedef struct db_table * db_table_p;
 
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -298,9 +298,9 @@ typedef struct db_table * db_table_p;
 %extern bool_t xdr_db_table(XDR*, db_table*);
 %#endif
 %typedef class db_table * db_table_p;
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_TABLE_H
-#endif RPC_HDR
+%#endif /* _DB_TABLE_H */
+#endif /* RPC_HDR */

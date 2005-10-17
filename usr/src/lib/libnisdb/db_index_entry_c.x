@@ -22,8 +22,8 @@
 /*
  *	db_index_entry_c.x
  *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,8 +56,8 @@
 #else
 %#include "db_item.h"
 %#include "db_table.h"   /* contains definition of entryp */
-#endif USIGNC
-#endif RPC_HDR
+#endif /* USIGNC */
+#endif /* RPC_HDR */
 
 
 #if RPC_HDR || RPC_XDR
@@ -74,8 +74,8 @@ struct db_index_entry {
 #endif
 };
 typedef struct db_index_entry * db_index_entry_p;
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -171,9 +171,9 @@ typedef struct db_index_entry * db_index_entry_p;
 %  void print_results();
 %};
 %typedef class db_index_entry * db_index_entry_p;
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_INDEX_ENTRY_H
-#endif RPC_HDR
+%#endif /* _DB_INDEX_ENTRY_H */
+#endif /* RPC_HDR */

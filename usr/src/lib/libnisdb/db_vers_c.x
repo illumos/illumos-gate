@@ -22,8 +22,8 @@
 /*
  *	db_vers_c.x
  *
- *	Copyright (c) 1988-2000 by Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,7 @@
 #if RPC_HDR
 %#ifndef _DB_VERS_H
 %#define _DB_VERS_H
-#endif RPC_HDR
+#endif /* RPC_HDR */
 
 %/* 'vers' is the version identifier.  */
 
@@ -47,8 +47,8 @@ struct vers {
 	u_int time_usec;
 	__nisdb_rwlock_t vers_rwlock;
 };
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -117,9 +117,9 @@ struct vers {
 %	return (RULOCK(vers));
 %  }
 %};
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif VERS_H
-#endif RPC_HDR
+%#endif /* VERS_H */
+#endif /* RPC_HDR */

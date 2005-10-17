@@ -20,12 +20,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (C) 1986,1987,1988,1989,1990 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-							    
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SMI4.1 1.3 */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SMI4.1 1.3 */
 
 #include <stdio.h>
 #include <string.h>
@@ -85,6 +85,7 @@ getline(line, maxlinelen, f, lcount, com)
  *	  0: partial entry parsed, ran out of space in name
  *  -1: no more entries in line
  */
+int
 getname(name, namelen, ignore, sep, linep, com)
 	char *name;
 	int namelen;

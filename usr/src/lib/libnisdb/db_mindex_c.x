@@ -22,8 +22,8 @@
 /*
  *	db_mindex_c.x
  *
- *	Copyright (c) 1988-2001 by Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,11 +46,11 @@
 %#include "db_index.h"
 %#include "db_scheme.h"
 %#include "db_query.h"
-#endif USINGC
+#endif /* USINGC */
 %#include "ldap_parse.h"
 %#include "nisdb_rw.h"
 %#include "ldap_xdr.h"
-#endif RPC_HDR
+#endif /* RPC_HDR */
 
 #if RPC_HDR
 %struct db_next_index_desc {
@@ -60,10 +60,10 @@
 #ifndef USINGC  
 %  db_next_index_desc( entryp loc, struct db_next_index_desc *n )
 %    { location = loc; next = n; }
-#endif USINGC
+#endif /* USINGC */
 
 %};
-#endif RPC_HDR
+#endif /* RPC_HDR */
 
 
 #if RPC_HDR || RPC_XDR
@@ -93,8 +93,8 @@ struct xdr_nis_object_s {
 typedef struct xdr_nis_object_s	xdr_nis_object_t;
 
 %extern bool_t	xdr_nis_object();
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -373,9 +373,9 @@ typedef struct xdr_nis_object_s	xdr_nis_object_t;
 %extern bool_t xdr_db_mindex(XDR*, db_mindex*);
 %#endif
 %typedef class db_mindex * db_mindex_p;
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_MINDEX_H
-#endif RPC_HDR
+%#endif /* _DB_MINDEX_H */
+#endif /* RPC_HDR */

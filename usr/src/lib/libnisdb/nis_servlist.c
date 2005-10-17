@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -69,7 +69,7 @@ extern char	*nis_data(char *s);
 /*
  * This is a link list of all the directories served by this server.
  */
-static struct nis_dir_list {
+struct nis_dir_list {
 	char	*name;
 	struct nis_dir_list *next;
 };
@@ -126,6 +126,7 @@ static int init_dir_list(const char *filename)
 /*
  * nis_server_control() controls various aspects of server administration.
  */
+int
 nis_server_control(infotype, op, argp)
 	enum NIS_SERVER_INFO	infotype;
 	enum NIS_SERVER_OP	op;

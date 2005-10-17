@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +99,7 @@ extern int strcmp();
  * This is the mainline for the yppoll process.
  */
 
-void
+int
 main(argc, argv)
 	int argc;
 	char **argv;
@@ -116,8 +116,7 @@ main(argc, argv)
 	}
 
 	getmapparms();
-	exit(status);
-	/* NOTREACHED */
+	return (status);
 }
 
 /*
@@ -252,8 +251,8 @@ getmapparms()
 	struct ypresp_order oresp;
 	struct ypreq_nokey req;
 	struct ypresp_master mresp;
-	struct ypresp_master *mresults = (struct ypresp_master *) NULL;
-	struct ypresp_order *oresults = (struct ypresp_order *) NULL;
+	struct ypresp_master *mresults = (struct ypresp_master *)NULL;
+	struct ypresp_order *oresults = (struct ypresp_order *)NULL;
 
 	struct timeval timeout;
 	enum clnt_stat s;
@@ -273,8 +272,8 @@ getmapparms()
 	mresp.master = NULL;
 
 	if (clnt_call(map_clnt, YPPROC_MASTER,  (xdrproc_t)xdr_ypreq_nokey,
-		    (caddr_t) &req, (xdrproc_t)xdr_ypresp_master,
-		    (caddr_t) &mresp, timeout) == RPC_SUCCESS) {
+		    (caddr_t)&req, (xdrproc_t)xdr_ypresp_master,
+		    (caddr_t)&mresp, timeout) == RPC_SUCCESS) {
 		mresults = &mresp;
 		s = (enum clnt_stat) clnt_call(map_clnt, YPPROC_ORDER,
 		    (xdrproc_t)xdr_ypreq_nokey, (char *)&req,

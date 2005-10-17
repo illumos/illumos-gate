@@ -22,8 +22,8 @@
 /*
  *	db_item_c.x
  *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,15 +35,15 @@
 #if RPC_HDR
 %#ifndef _DB_ITEM_H
 %#define _DB_ITEM_H
-#endif RPC_HDR
+#endif /* RPC_HDR */
 
 #if RPC_HDR || RPC_XDR
 #ifdef USINGC
 struct item{
   char itemvalue<>;
 };
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -81,9 +81,9 @@ struct item{
 %/* Return hash value.  'casein' TRUE means case insensitive test. */
 %  unsigned int get_hashval( bool_t casein = FALSE );
 %};
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_ITEM_H
-#endif RPC_HDR
+%#endif /* _DB_ITEM_H */
+#endif /* RPC_HDR */

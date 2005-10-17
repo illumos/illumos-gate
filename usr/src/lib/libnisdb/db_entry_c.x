@@ -22,8 +22,8 @@
 /*
  *	db_entry_c.x
  *
- *	Copyright (c) 1988-2001 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,7 @@
 %#define _DB_NIS_H
 
 %#include <rpcsvc/nis.h>
-#endif RPC_HDR
+#endif /* RPC_HDR */
 
 #ifdef USINGC
 enum db_status {DB_SUCCESS, DB_NOTFOUND, DB_NOTUNIQUE,
@@ -48,7 +48,7 @@ enum db_status {DB_SUCCESS, DB_NOTFOUND, DB_NOTUNIQUE,
 enum db_action {DB_LOOKUP, DB_REMOVE, DB_ADD, DB_FIRST, DB_NEXT,
 			DB_ALL, DB_RESET_NEXT, DB_ADD_NOLOG,
 			DB_ADD_NOSYNC, DB_REMOVE_NOSYNC };
-#endif USINGC
+#endif /* USINGC */
 
 /* Make alias to NIS definition */
 
@@ -104,9 +104,9 @@ struct db_request {
 %extern char copy_entry();
 %extern void free_entry();
 %extern void new_entry();
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_NIS_H
-#endif RPC_HDR
+%#endif /* _DB_NIS_H */
+#endif /* RPC_HDR */

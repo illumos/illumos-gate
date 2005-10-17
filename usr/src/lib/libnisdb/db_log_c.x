@@ -22,7 +22,7 @@
 /*
  *	db_log_c.x
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,8 +37,8 @@
 #else
 %#include "db_pickle.h"
 %#include "db_log_entry.h"
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 %
 %#include "nisdb_rw.h"
 %
@@ -124,9 +124,9 @@
 %	return (RULOCK(log));
 %  }
 %};
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_LOG_H
-#endif RPC_HDR
+%#endif /* _DB_LOG_H */
+#endif /* RPC_HDR */

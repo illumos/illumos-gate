@@ -22,8 +22,8 @@
 /*
  *	db_query_c.x
  *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,8 +45,8 @@
 %#include "db_item.h"
 %#include "db_entry.h"
 %#include "db_scheme.h"
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 %/* A component of a query */
 struct db_qcomp {
@@ -59,8 +59,8 @@ struct db_qcomp {
 struct db_query {
   db_qcomp components<>;
 };
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -104,9 +104,9 @@ struct db_query {
 %  void print();
 %};
 %typedef class db_query * db_query_p;
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_QUERY_H
-#endif RPC_HDR
+%#endif /* _DB_QUERY_H */
+#endif /* RPC_HDR */

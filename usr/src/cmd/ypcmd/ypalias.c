@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,6 +120,7 @@ static char usage[] =
 	ypalias -d domainname\n\
 	ypalias mapname\n";
 
+int
 main(argc, argv)
 char **argv;
 {

@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +63,7 @@ static bool match_one();
 static void print_one();
 extern void maketable();
 extern int getmapname();
-extern int yp_match_rsvdport ();
+extern int yp_match_rsvdport();
 
 static int translate = TRUE;
 static int dodump = FALSE;
@@ -95,6 +95,7 @@ static char err_bad_domainname[] = "domainname";
 /*
  * This is the main line for the ypmatch process.
  */
+int
 main(argc, argv)
 	char **argv;
 {
@@ -158,7 +159,7 @@ get_command_line_args(argc, argv)
 				argc--;
 				domain = *argv;
 
-				if ((int) strlen(domain) > YPMAXDOMAIN) {
+				if ((int)strlen(domain) > YPMAXDOMAIN) {
 					(void) fprintf(stderr, err_bad_args,
 					    err_bad_domainname);
 					exit(1);
@@ -189,7 +190,7 @@ get_command_line_args(argc, argv)
 		nkeys = argc -1;
 		map = argv[argc -1];
 
-		if ((int) strlen(map) > YPMAXMAP) {
+		if ((int)strlen(map) > YPMAXMAP) {
 			(void) fprintf(stderr, err_bad_args, err_bad_mapname);
 			exit(1);
 		}
@@ -210,7 +211,7 @@ getdomain()
 		exit(1);
 	}
 
-	if ((int) strlen(domain) == 0) {
+	if ((int)strlen(domain) == 0) {
 		(void) fprintf(stderr, err_null_kname, err_bad_domainname);
 		exit(1);
 	}
@@ -261,11 +262,12 @@ match_one(key, val, len)
 
 	*val = NULL;
 	*len = 0;
-	err = yp_match_rsvdport(domain, map, key, (int) strlen(key), val, len);
+	err = yp_match_rsvdport(domain, map, key, (int)strlen(key), val, len);
 
 
 	if (err == YPERR_KEY) {
-		err = yp_match_rsvdport(domain, map, key, ((int) strlen(key) + 1),
+		err = yp_match_rsvdport(domain, map, key,
+					((int)strlen(key) + 1),
 		    val, len);
 	}
 

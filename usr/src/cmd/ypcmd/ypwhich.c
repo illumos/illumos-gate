@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,8 +124,8 @@ static void dump_response();
 static void dump_ypmaps();
 static void dumpmaps();
 
-static bool xdr_yp_inaddr ();
-static bool xdr_old_ypbind_resp ();
+static bool xdr_yp_inaddr();
+static bool xdr_old_ypbind_resp();
 static bool xdr_old_yp_binding();
 static int old_call_binder();
 static void print_server();
@@ -147,6 +147,7 @@ struct old_ypbind_resp {
 /*
  * This is the main line for the ypwhich process.
  */
+int
 main(argc, argv)
 char **argv;
 {
@@ -350,7 +351,7 @@ get_server_name()
 {
 	char *notbound = "Domain %s not bound on %s.\n";
 
-	if (vers >= 3){
+	if (vers >= 3) {
 		if (!call_binder(vers))
 			(void) fprintf(stderr, notbound, domain, host);
 	} else {
@@ -412,7 +413,7 @@ clnt_create error");
 	ypbd.ypbind_vers = vers;
 	response = ypbindproc_domain_3(&ypbd, client);
 
-	if (response == NULL){
+	if (response == NULL) {
 		(void) sprintf(errstring,
 		    "ypwhich: can't call ypbind on %s", host);
 		(void) clnt_perror(client, errstring);
@@ -454,7 +455,7 @@ clnt_create error");
 						XDR_DECODE);
 					if (af == AF_INET6) {
 						xdr_opaque(&xdrs,
-							(caddr_t)svcaddr->buf, 
+							(caddr_t)svcaddr->buf,
 							IPV6_ADDR_LEN);
 						sa6 = (struct sockaddr_in6 *)
 							xbuf;
@@ -533,7 +534,7 @@ static bool xdr_old_ypbind_resp(xdrs, ps)
 	struct old_ypbind_resp *ps;
 
 {
-	if (!xdr_enum(xdrs, (enum_t*)&ps->ypbind_status)) {
+	if (!xdr_enum(xdrs, (enum_t *)&ps->ypbind_status)) {
 		return (FALSE);
 	}
 	switch (ps->ypbind_status) {
@@ -613,7 +614,7 @@ static void print_server(server)
 	struct hostent *hp;
 
 	strcpy(buf, inet_ntoa(*server));
-	hp = gethostbyaddr((char*)&server->s_addr,
+	hp = gethostbyaddr((char *)&server->s_addr,
 			sizeof (struct in_addr), AF_INET);
 
 	printf("%s\n", hp ? hp->h_name : buf);
@@ -648,7 +649,7 @@ ypbind_resp * which;
 				(void) fprintf(stderr,
 		"ypwhich: id %s device %s flag %x protofmly %s proto %s\n",
 		nc->nc_netid, nc->nc_device,
-		(int) nc->nc_flag, nc->nc_protofmly,
+		(int)nc->nc_flag, nc->nc_protofmly,
 		nc->nc_proto);
 			}
 			if (ua == NULL)
@@ -735,11 +736,11 @@ struct dom_binding *binding;
 	struct ypmaplist *pmpl;
 	struct ypresp_maplist maplist;
 
-	maplist.list = (struct ypmaplist *) NULL;
+	maplist.list = (struct ypmaplist *)NULL;
 
 	rpc_stat = clnt_call(binding->dom_client, YPPROC_MAPLIST,
-	    (xdrproc_t) xdr_ypdomain_wrap_string, (caddr_t) &domain,
-	    (xdrproc_t) xdr_ypresp_maplist, (caddr_t) &maplist,
+	    (xdrproc_t)xdr_ypdomain_wrap_string, (caddr_t)&domain,
+	    (xdrproc_t)xdr_ypresp_maplist, (caddr_t)&maplist,
 	    timeout);
 
 	if (rpc_stat != RPC_SUCCESS) {

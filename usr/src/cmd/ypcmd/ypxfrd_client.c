@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1986-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,7 +50,7 @@ static	DBM	*db;
 extern bool secure_map;
 
 /* delete the dbm file with name file */
-static
+static int
 dbm_deletefile(file)
 char *file;
 {
@@ -173,6 +173,7 @@ xdr_dirs(xdrs, objp)
  * we may not use this optional protocol
  */
 
+int
 xdr_myfyl(xdrs, objp)
 	XDR *xdrs;
 	int *objp;
@@ -192,6 +193,7 @@ xdr_myfyl(xdrs, objp)
 	return (TRUE);
 }
 
+int
 ypxfrd_getdbm(tempmap, master, domain, map)
 	char *tempmap;
 	char *master;
@@ -275,7 +277,7 @@ ypxfrd_getdbm(tempmap, master, domain, map)
 
 	rmap.map = map;
 	rmap.domain = domain;
-	memset((char *) &res, 0, sizeof (res));
+	memset((char *)&res, 0, sizeof (res));
 	db = dbm_open(tempmap, O_RDWR + O_CREAT + O_TRUNC, 0777);
 	if (db == NULL) {
 		logprintf("dbm_open failed %s\n", tempmap);

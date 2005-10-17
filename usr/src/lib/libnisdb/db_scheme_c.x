@@ -22,8 +22,8 @@
 /*
  *	db_scheme_c.x
  *
- *	Copyright (c) 1988-2000 by Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 %#pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,11 +38,11 @@
 #else
 %#include "db_item.h"
 %#include "db_entry.h"
-#endif USINGC
+#endif /* USINGC */
 
 const DB_KEY_CASE = TA_CASE;
 
-#endif RPC_HDR
+#endif /* RPC_HDR */
 %
 %#include "nisdb_rw.h"
 %
@@ -81,8 +81,8 @@ struct db_scheme {
 };
 
 typedef struct db_scheme  * db_scheme_p;
-#endif USINGC
-#endif RPC_HDR
+#endif /* USINGC */
+#endif /* RPC_HDR */
 
 #ifndef USINGC
 #ifdef RPC_HDR
@@ -156,10 +156,10 @@ typedef struct db_scheme  * db_scheme_p;
 %};
 
 %typedef class db_scheme * db_scheme_p;
-#endif RPC_HDR
-#endif USINGC
+#endif /* RPC_HDR */
+#endif /* USINGC */
 
 #if RPC_HDR
-%#endif _DB_SCHEMA_H
+%#endif /* _DB_SCHEMA_H */
 
-#endif RPC_HDR
+#endif /* RPC_HDR */

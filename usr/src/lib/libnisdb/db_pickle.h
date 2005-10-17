@@ -22,8 +22,8 @@
 /*
  *	db_pickle.h
  *
- *	Copyright (c) 1988-2000 by Sun Microsystems, Inc.
- *	All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,10 +34,10 @@
 #include "nisdb_rw.h"
 
 /*
-	'pickle' is the package for storing data structures into files.
-	'pickle_file' is the base class.  Classes that inherit this base
-	class need to instantiate the virtual function 'dump'.
-*/
+ * 'pickle' is the package for storing data structures into files.
+ * 'pickle_file' is the base class.  Classes that inherit this base
+ * class need to instantiate the virtual function 'dump'.
+ */
 
 enum pickle_mode {
 	PICKLE_READ, PICKLE_WRITE, PICKLE_APPEND
@@ -52,12 +52,12 @@ class pickle_file {
 	FILE *file;		/* file handle */
 	pickle_mode mode;
 	XDR xdr;
-	char* filename;
+	char *filename;
 	STRUCTRWLOCK(pickle);
     public:
 
 	/* Constructor.  Creates pickle_file with given name and mode. */
-	pickle_file(char*, pickle_mode);
+	pickle_file(char *, pickle_mode);
 
 	~pickle_file()  { delete filename; DESTROYRW(pickle); }
 
@@ -71,11 +71,11 @@ class pickle_file {
 	int close();
 
 	/*
-	dump or load data structure to/from 'filename' using function 'f'.
-	dump/load is determined by 'mode' with which pickle_file was created.
-	Returns 0 if successful; 1 if file cannot be opened in mode
-	specified; -1 if transfer failed do to encoding/decoding errors.
-	*/
+	 * dump or load data structure to/from 'filename' using function 'f'.
+	 * dump/load is determined by 'mode' with which pickle_file was created.
+	 * Returns 0 if successful; 1 if file cannot be opened in mode
+	 * specified; -1 if transfer failed do to encoding/decoding errors.
+	 */
 	int transfer(pptr, bool_t (*f) (XDR*, pptr));
 
 	/* Exclusive access */
@@ -87,4 +87,4 @@ class pickle_file {
 		return (WULOCK(pickle));
 	}
 };
-#endif PICKLE_H
+#endif /* PICKLE_H */

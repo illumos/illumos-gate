@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,10 +101,8 @@ static void getdomain();
  * have been passed from the command line, and uses defaults for the rest.
  */
 
-main (argc, argv)
-	int argc;
-	char **argv;
-
+int
+main(int argc, char ** argv)
 {
 	int err;
 	int fail = 0;
@@ -127,14 +125,14 @@ main (argc, argv)
 	}
 
 	cbinfo.foreach = callback;
-	cbinfo.data = (char *) &fail;
+	cbinfo.data = (char *)&fail;
 	err = __yp_all_rsvdport(domain, map, &cbinfo);
 
 	if (err == YPERR_VERS) {
 		one_by_one_all(domain, map);
 	} else if (err) {
 		fail = TRUE;
-		fprintf (stderr, "%s\n", yperr_string(err));
+		fprintf(stderr, "%s\n", yperr_string(err));
 	}
 
 	exit(fail);
@@ -201,7 +199,7 @@ get_command_line_args(argc, argv)
 			(void) fprintf(stderr, err_usage);
 			exit(1);
 		}
-		if ((int) strlen(map) > YPMAXMAP) {
+		if ((int)strlen(map) > YPMAXMAP) {
 			(void) fprintf(stderr, err_bad_args, err_bad_mapname);
 			exit(1);
 		}
@@ -317,7 +315,7 @@ getdomain()
 		exit(1);
 	}
 
-	if ((int) strlen(domain) == 0) {
+	if ((int)strlen(domain) == 0) {
 		(void) fprintf(stderr, err_null_kname, err_bad_domainname);
 		exit(1);
 	}
