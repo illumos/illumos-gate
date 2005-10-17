@@ -430,7 +430,7 @@ __s_api_cvtEntry(LDAP	*ld,
 		return (NS_LDAP_MEMORY);
 	}
 
-	if (schema_mapping_existed)
+	if (schema_mapping_existed && ((flags & NS_LDAP_NOT_CVT_DN) == 0))
 		ap[0]->attrvalue[0] = _cvtDN(service, dn);
 	else
 		ap[0]->attrvalue[0] = strdup(dn);
@@ -3076,9 +3076,13 @@ __ns_ldap_uid2dn(const char *uid,
 		(void) snprintf(userdata, len, UIDFILTER_SSD, uid);
 	}
 
+	/*
+	 * we want to retrieve the DN as it appears in LDAP
+	 * hence the use of NS_LDAP_NOT_CVT_DN in flags
+	 */
 	rc = __ns_ldap_list("passwd", filter,
 				__s_api_merge_SSD_filter,
-				NULL, cred, 0,
+				NULL, cred, NS_LDAP_NOT_CVT_DN,
 				&result, errorp, NULL,
 				userdata);
 	free(filter);
@@ -3150,9 +3154,13 @@ __ns_ldap_host2dn(const char *host,
 	}
 	(void) snprintf(userdata, len, HOSTFILTER_SSD, host);
 
+	/*
+	 * we want to retrieve the DN as it appears in LDAP
+	 * hence the use of NS_LDAP_NOT_CVT_DN in flags
+	 */
 	rc = __ns_ldap_list("hosts", filter,
 				__s_api_merge_SSD_filter,
-				NULL, cred, 0, &result,
+				NULL, cred, NS_LDAP_NOT_CVT_DN, &result,
 				errorp, NULL,
 				userdata);
 	free(filter);

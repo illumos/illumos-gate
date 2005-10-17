@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,14 @@ typedef enum ScopeType {
 
 #define	NS_LDAP_PAGE_CTRL	  0x1000
 #define	NS_LDAP_NO_PAGE_CTRL	  0x0000
+
+/*
+ * NS_LDAP_NOT_CVT_DN is needed when attribute mapping is used
+ * to retrieve the DN in LDAP and DN is not to be converted when
+ * being passed back to the application. See __ns_ldap_uid2dn()
+ * and __ns_ldap_host2dn() for such usage.
+ */
+#define	NS_LDAP_NOT_CVT_DN	0x2000
 
 /*
  * Authentication Information
