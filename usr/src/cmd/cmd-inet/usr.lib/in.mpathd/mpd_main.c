@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -431,7 +431,7 @@ initifs()
 		 * comment at the beginning of probe.c
 		 */
 		if (pi->pi_flags & IFF_INACTIVE) {
-			if (!pi->pi_empty)
+			if (!pi->pi_empty && (pi->pi_flags & IFF_STANDBY))
 				(void) try_failover(pi, FAILOVER_TO_NONSTANDBY);
 		} else {
 			struct phyint_instance *pii;
@@ -1415,10 +1415,8 @@ process_rtm_ifinfo(if_msghdr_t *ifm, int type)
 	 */
 	if ((old_flags ^ pii->pii_flags) & IFF_INACTIVE) {
 		if (pii->pii_flags & IFF_INACTIVE) {
-			assert(pii->pii_flags & IFF_STANDBY);
-			if (!pi->pi_empty) {
+			if (!pi->pi_empty && (pi->pi_flags & IFF_STANDBY))
 				(void) try_failover(pi, FAILOVER_TO_NONSTANDBY);
-			}
 		} else {
 			if (pi->pi_state == PI_RUNNING && !pi->pi_full) {
 				pi->pi_empty = 0;
@@ -2306,6 +2304,12 @@ main(int argc, char *argv[])
 	timer_init();
 
 	initifs();
+
+	/* Inform kernel whether failback is enabled or disabled */
+	if (ioctl(ifsock_v4, SIOCSIPMPFAILBACK, (int *)&failback_enabled) < 0) {
+		logperror("main: ioctl (SIOCSIPMPFAILBACK)");
+		exit(1);
+	}
 
 	/*
 	 * If we're operating in "adopt" mode and no interfaces need to be

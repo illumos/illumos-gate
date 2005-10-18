@@ -1362,7 +1362,9 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* 180 */ { SIOCGIPMSFILTER, sizeof (struct ip_msfilter), IPI_GET_CMD,
 			MISC_CMD, ip_sioctl_msfilter, NULL },
 	/* 181 */ { SIOCSIPMSFILTER, sizeof (struct ip_msfilter), IPI_WR,
-			MISC_CMD, ip_sioctl_msfilter, NULL }
+			MISC_CMD, ip_sioctl_msfilter, NULL },
+	/* 182 */ { SIOCSIPMPFAILBACK, sizeof (int), IPI_PRIV, MISC_CMD,
+			ip_sioctl_set_ipmpfailback, NULL }
 };
 
 int ip_ndx_ioctl_count = sizeof (ip_ndx_ioctl_table) / sizeof (ip_ioctl_cmd_t);

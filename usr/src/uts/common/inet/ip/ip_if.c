@@ -551,6 +551,14 @@ uint_t	ill_no_arena = 12;
 #pragma align CACHE_ALIGN_SIZE(phyint_g_list)
 static phyint_list_t phyint_g_list;	/* start of phyint list */
 
+/*
+ * Reflects value of FAILBACK variable in IPMP config file
+ * /etc/default/mpathd. Default value is B_TRUE.
+ * Set to B_FALSE if user disabled failback by configuring "FAILBACK=no"
+ * in.mpathd uses SIOCSIPMPFAILBACK ioctl to pass this information to kernel.
+ */
+static boolean_t ipmp_enable_failback = B_TRUE;
+
 static uint_t
 ipif_rand(void)
 {
@@ -8290,6 +8298,16 @@ lif_copydone:
 	return (0);
 }
 
+/* ARGSUSED */
+int
+ip_sioctl_set_ipmpfailback(ipif_t *dummy_ipif, sin_t *dummy_sin,
+    queue_t *q, mblk_t *mp, ip_ioctl_cmd_t *ipip, void *ifreq)
+{
+	/* Existence of b_cont->b_cont checked in ip_wput_nondata */
+	ipmp_enable_failback = *(int *)mp->b_cont->b_cont->b_rptr;
+	return (0);
+}
+
 static void
 ip_sioctl_ip6addrpolicy(queue_t *q, mblk_t *mp)
 {
@@ -10741,9 +10759,11 @@ ip_sioctl_get_dstaddr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
  * IPv4 or IPv6 interface of the "phyi" that does not belong in here, we
  * will consider it to be ACTIVE (clear IFF_INACTIVE) i.e the interface
  * will be used for outbound packets.
+ *
+ * Caller needs to verify the validity of setting IFF_INACTIVE.
  */
 static void
-phyint_standby_inactive(phyint_t *phyi)
+phyint_inactive(phyint_t *phyi)
 {
 	ill_t *ill_v4;
 	ill_t *ill_v6;
@@ -10821,6 +10841,45 @@ ip_redo_nomination(phyint_t *phyi)
 		if (ill_v4->ill_group->illgrp_ill_count > 1)
 			ill_nominate_bcast_rcv(ill_v4->ill_group);
 	}
+}
+
+/*
+ * Heuristic to check if ill is INACTIVE.
+ * Checks if ill has an ipif with an usable ip address.
+ *
+ * Return values:
+ *	B_TRUE	- ill is INACTIVE; has no usable ipif
+ *	B_FALSE - ill is not INACTIVE; ill has at least one usable ipif
+ */
+static boolean_t
+ill_is_inactive(ill_t *ill)
+{
+	ipif_t *ipif;
+
+	/* Check whether it is in an IPMP group */
+	if (ill->ill_phyint->phyint_groupname == NULL)
+		return (B_FALSE);
+
+	if (ill->ill_ipif_up_count == 0)
+		return (B_TRUE);
+
+	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+		uint64_t flags = ipif->ipif_flags;
+
+		/*
+		 * This ipif is usable if it is IPIF_UP and not a
+		 * dedicated test address.  A dedicated test address
+		 * is marked IPIF_NOFAILOVER *and* IPIF_DEPRECATED
+		 * (note in particular that V6 test addresses are
+		 * link-local data addresses and thus are marked
+		 * IPIF_NOFAILOVER but not IPIF_DEPRECATED).
+		 */
+		if ((flags & IPIF_UP) &&
+		    ((flags & (IPIF_DEPRECATED|IPIF_NOFAILOVER)) !=
+		    (IPIF_DEPRECATED|IPIF_NOFAILOVER)))
+			return (B_FALSE);
+	}
+	return (B_TRUE);
 }
 
 /*
@@ -10978,21 +11037,48 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		/*
 		 * First set the INACTIVE flag if needed. Then delete the ires.
 		 * ire_add will atomically prevent creating new IRE_CACHEs
-		 * unless hidden flag is set
+		 * unless hidden flag is set.
+		 * PHYI_FAILED and PHYI_INACTIVE are exclusive
 		 */
+		if ((turn_on & PHYI_FAILED) &&
+		    ((intf_flags & PHYI_STANDBY) || !ipmp_enable_failback)) {
+			/* Reset PHYI_INACTIVE when PHYI_FAILED is being set */
+			phyi->phyint_flags &= ~PHYI_INACTIVE;
+		}
+		if ((turn_off & PHYI_FAILED) &&
+		    ((intf_flags & PHYI_STANDBY) ||
+		    (!ipmp_enable_failback && ill_is_inactive(ill)))) {
+			phyint_inactive(phyi);
+		}
+
 		if (turn_on & PHYI_STANDBY) {
 			/*
-			 * We set INACTIVE only when STANDBY is set.
+			 * We implicitly set INACTIVE only when STANDBY is set.
+			 * INACTIVE is also set on non-STANDBY phyint when user
+			 * disables FAILBACK using configuration file.
+			 * Do not allow STANDBY to be set on such INACTIVE
+			 * phyint
 			 */
-			ASSERT(!(phyi->phyint_flags & PHYI_INACTIVE));
-			phyint_standby_inactive(phyi);
+			if (phyi->phyint_flags & PHYI_INACTIVE)
+				return (EINVAL);
+			if (!(phyi->phyint_flags & PHYI_FAILED))
+				phyint_inactive(phyi);
 		}
 		if (turn_off & PHYI_STANDBY) {
-			/*
-			 * PHYI_INACTIVE makes sense only when PHYI_STANDBY is
-			 * set.
-			 */
-			phyi->phyint_flags &= ~PHYI_INACTIVE;
+			if (ipmp_enable_failback) {
+				/*
+				 * Reset PHYI_INACTIVE.
+				 */
+				phyi->phyint_flags &= ~PHYI_INACTIVE;
+			} else if (ill_is_inactive(ill) &&
+			    !(phyi->phyint_flags & PHYI_FAILED)) {
+				/*
+				 * Need to set INACTIVE, when user sets
+				 * STANDBY on a non-STANDBY phyint and
+				 * later resets STANDBY
+				 */
+				phyint_inactive(phyi);
+			}
 		}
 		/*
 		 * We should always send up a message so that the
@@ -13310,13 +13396,11 @@ ill_up_ipifs(ill_t *ill, queue_t *q, mblk_t *mp)
 			if (ill_v6 == NULL) {
 				if (from_ill->ill_phyint->phyint_flags &
 				    PHYI_STANDBY) {
-					phyint_standby_inactive
-					    (from_ill->ill_phyint);
+					phyint_inactive(from_ill->ill_phyint);
 				}
 				if (ill_v4->ill_phyint->phyint_flags &
 				    PHYI_STANDBY) {
-					phyint_standby_inactive
-						(ill_v4->ill_phyint);
+					phyint_inactive(ill_v4->ill_phyint);
 				}
 			}
 			ill_v4->ill_move_peer = NULL;
@@ -13358,10 +13442,10 @@ ill_up_ipifs(ill_t *ill, queue_t *q, mblk_t *mp)
 			from_ill->ill_state_flags &= ~ILL_CHANGING;
 			mutex_exit(&from_ill->ill_lock);
 			if (from_ill->ill_phyint->phyint_flags & PHYI_STANDBY) {
-				phyint_standby_inactive(from_ill->ill_phyint);
+				phyint_inactive(from_ill->ill_phyint);
 			}
 			if (ill_v6->ill_phyint->phyint_flags & PHYI_STANDBY) {
-				phyint_standby_inactive(ill_v6->ill_phyint);
+				phyint_inactive(ill_v6->ill_phyint);
 			}
 			ill_v6->ill_move_peer = NULL;
 		}
@@ -14511,7 +14595,7 @@ ill_nominate_mcast_rcv(ill_group_t *illgrp)
 {
 	ilm_t *ilm;
 	ill_t *ill;
-	ill_t *fallback_stand_ill = NULL;
+	ill_t *fallback_inactive_ill = NULL;
 	ill_t *fallback_failed_ill = NULL;
 	int ret = 0;
 
@@ -14525,11 +14609,11 @@ ill_nominate_mcast_rcv(ill_group_t *illgrp)
 	}
 
 	/*
-	 * Choose a good ill. Fallback to standby or failed if
+	 * Choose a good ill. Fallback to inactive or failed if
 	 * none available. We need to fallback to FAILED in the
 	 * case where we have 2 interfaces in a group - where
 	 * one of them is failed and another is a good one and
-	 * the good one (not marked standby) is leaving the group.
+	 * the good one (not marked inactive) is leaving the group.
 	 */
 	ret = 0;
 	for (ill = illgrp->illgrp_ill; ill != NULL;
@@ -14543,7 +14627,7 @@ ill_nominate_mcast_rcv(ill_group_t *illgrp)
 			continue;
 		}
 		if (ill->ill_phyint->phyint_flags & PHYI_INACTIVE) {
-			fallback_stand_ill = ill;
+			fallback_inactive_ill = ill;
 			continue;
 		}
 		for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
@@ -14567,7 +14651,7 @@ ill_nominate_mcast_rcv(ill_group_t *illgrp)
 		 */
 		return (ret);
 	}
-	if ((ill = fallback_stand_ill) != NULL) {
+	if ((ill = fallback_inactive_ill) != NULL) {
 		for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
 			if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
 				ret = ip_join_allmulti(ill->ill_ipif);
@@ -16835,8 +16919,6 @@ ip_sioctl_move(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	}
 
 err_ret:
-	if (err == 0)
-		goto no_err;
 	/*
 	 * EINPROGRESS means we are waiting for the ipif's that need to be
 	 * moved to become quiescent.
@@ -16876,30 +16958,32 @@ err_ret:
 		ill_to_v4->ill_move_peer = NULL;
 		ill_to_v4->ill_state_flags &= ~ILL_CHANGING;
 	}
+
 	/*
-	 * Check for setting INACTIVE, if STANDBY is set. Do this always
-	 * to maintain proper state i.e even in the case of errors.
-	 * As phyint_standby_inactive looks at both v4 and v6 interfaces,
+	 * Check for setting INACTIVE, if STANDBY is set and FAILED is not set.
+	 * Do this always to maintain proper state i.e even in case of errors.
+	 * As phyint_inactive looks at both v4 and v6 interfaces,
 	 * we need not call on both v4 and v6 interfaces.
 	 */
 	if (ill_from_v4 != NULL) {
-		if (ill_from_v4->ill_phyint->phyint_flags & PHYI_STANDBY) {
-			phyint_standby_inactive(ill_from_v4->ill_phyint);
+		if ((ill_from_v4->ill_phyint->phyint_flags &
+		    (PHYI_STANDBY | PHYI_FAILED)) == PHYI_STANDBY) {
+			phyint_inactive(ill_from_v4->ill_phyint);
 		}
 	} else if (ill_from_v6 != NULL) {
-		if (ill_from_v6->ill_phyint->phyint_flags & PHYI_STANDBY) {
-			phyint_standby_inactive(ill_from_v6->ill_phyint);
+		if ((ill_from_v6->ill_phyint->phyint_flags &
+		    (PHYI_STANDBY | PHYI_FAILED)) == PHYI_STANDBY) {
+			phyint_inactive(ill_from_v6->ill_phyint);
 		}
 	}
 
 	if (ill_to_v4 != NULL) {
-		if (ill_to_v4->ill_phyint->phyint_flags & PHYI_STANDBY) {
-			phyint_standby_inactive(ill_to_v4->ill_phyint);
+		if (ill_to_v4->ill_phyint->phyint_flags & PHYI_INACTIVE) {
+			ill_to_v4->ill_phyint->phyint_flags &= ~PHYI_INACTIVE;
 		}
-
 	} else if (ill_to_v6 != NULL) {
-		if (ill_to_v6->ill_phyint->phyint_flags & PHYI_STANDBY) {
-			phyint_standby_inactive(ill_to_v6->ill_phyint);
+		if (ill_to_v6->ill_phyint->phyint_flags & PHYI_INACTIVE) {
+			ill_to_v6->ill_phyint->phyint_flags &= ~PHYI_INACTIVE;
 		}
 	}
 
@@ -22718,47 +22802,6 @@ ipif_lookup_zoneid_group(ill_t *ill, zoneid_t zoneid, int flags, ipif_t **ipifp)
 }
 
 /*
- * Heuristic to check if ill has hit the FAILBACK=no case,
- * i.e. failover has occured from ill and later interface has recovered,
- * but user has configured FAILBACK=no.
- * Checks if ill has an usable ipif.
- *
- * Return values:
- *	B_FALSE - ill has no usable ipif, hit FAILBACK=no case
- *	B_TRUE	- ill has at least one usable ipif, FAILBACK=no case not hit
- */
-static boolean_t
-ill_has_usable_ipif(ill_t *ill)
-{
-	ipif_t *ipif;
-
-	/* Check whether it is in an IPMP group */
-	if (ill->ill_phyint->phyint_groupname == NULL)
-		return (B_TRUE);
-
-	if (ill->ill_ipif_up_count == 0)
-		return (B_FALSE);
-
-	for (ipif = ill->ill_ipif; ipif; ipif = ipif->ipif_next) {
-		uint64_t flags = ipif->ipif_flags;
-
-		/*
-		 * This ipif is usable if it is IPIF_UP and not a
-		 * dedicated test address.  A dedicated test address
-		 * is marked IPIF_NOFAILOVER *and* IPIF_DEPRECATED
-		 * (note in particular that V6 test addresses are
-		 * link-local data addresses and thus are marked
-		 * IPIF_NOFAILOVER but not IPIF_DEPRECATED).
-		 */
-		if ((flags & IPIF_UP) &&
-		    ((flags & (IPIF_DEPRECATED|IPIF_NOFAILOVER)) !=
-		    (IPIF_DEPRECATED|IPIF_NOFAILOVER)))
-			return (B_TRUE);
-	}
-	return (B_FALSE);
-}
-
-/*
  * Check if this ill is only being used to send ICMP probes for IPMP
  */
 boolean_t
@@ -22766,12 +22809,9 @@ ill_is_probeonly(ill_t *ill)
 {
 	/*
 	 * Check if the interface is FAILED, or INACTIVE
-	 * or has hit the FAILBACK=no case.
 	 */
-	if ((ill->ill_phyint->phyint_flags & (PHYI_FAILED|PHYI_INACTIVE)) ||
-	    ill_has_usable_ipif(ill) == B_FALSE) {
+	if (ill->ill_phyint->phyint_flags & (PHYI_FAILED|PHYI_INACTIVE))
 		return (B_TRUE);
-	}
 
 	return (B_FALSE);
 }

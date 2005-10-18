@@ -140,8 +140,11 @@ static void		reset_snxt_basetimes(void);
  *	target list. So the phyints are in the PI_NOTARGETS state.
  *
  * I -	value of (pi_flags & IFF_INACTIVE)
- *	IFF_INACTIVE: No failovers have been done to the standby, from
- *		other phyints. This phyint is an inactive standby.
+ *	IFF_INACTIVE: No failovers have been done to this phyint, from
+ *		other phyints. This phyint is inactive. Phyint can be a Standby.
+ *		When failback has been disabled (FAILOVER=no configured),
+ *		phyint can also be a non-STANDBY. In this case IFF_INACTIVE
+ *		is set when phyint subsequently recovers after a failure.
  *
  * pi_empty
  *	This phyint has failed over successfully to another phyint, and
@@ -206,16 +209,20 @@ static void		reset_snxt_basetimes(void);
  *	detection		: set IFF_FAILED on this phyint
  *				: failover from this phyint to another
  *
- *	NIC failure		(PI_RUNNING, I == 1) -> (PI_FAILED, I == 1)
+ *	NIC failure		(PI_RUNNING, I == 1) -> (PI_FAILED, I == 0)
  *	detection		: set IFF_FAILED on this phyint
  *
- *	NIC repair 		(PI_FAILED, I == 0)  ->	(PI_RUNNING, I == 0)
- *	detection		: to.pi_empty = 0
- *				: failback to this phyint if enabled
+ *	NIC repair 		(PI_FAILED, I == 0, FAILBACK=yes)
+ *	detection				     -> (PI_RUNNING, I == 0)
+ *				: to.pi_empty = 0
  *				: clear IFF_FAILED on this phyint
+ *				: failback to this phyint if enabled
  *
- *	NIC repair 		(PI_FAILED, I == 1)  ->	(PI_RUNNING, I == 1)
- *	detection		: clear IFF_FAILED on this phyint
+ *	NIC repair 		(PI_FAILED, I == 0, FAILBACK=no)
+ *	detection				     ->	(PI_RUNNING, I == 1)
+ *				: to.pi_empty = 0
+ *				: clear IFF_FAILED on this phyint
+ *				: if failback is disabled set I == 1
  *
  *	Group failure		(perform on all phyints in the group)
  *	detection 		PI_RUNNING		PI_FAILED
@@ -233,9 +240,9 @@ static void		reset_snxt_basetimes(void);
  * ---------------------------------------------------------------------------
  *	Event		State			Action:
  * ---------------------------------------------------------------------------
- *	Turn on I 	pi_empty == 0 		: failover from standby
+ *	Turn on I 	pi_empty == 0, STANDBY 	: failover from standby
  *
- *	Turn off I 	PI_RUNNING,		: pi_empty = 0
+ *	Turn off I 	PI_RUNNING, STANDBY	: pi_empty = 0
  *			pi_full == 0		: failback to this if enabled
  * ---------------------------------------------------------------------------
  *
@@ -248,7 +255,7 @@ static void		reset_snxt_basetimes(void);
  * Invariants
  *
  * pg_groupfailed = 0  &&
- *   1. (I == 1, pi_empty == 0)		 ==> initiate failover from standby
+ *   1. (I == 1, pi_empty == 0)		   ==> initiate failover from standby
  *   2. (I == 0, PI_FAILED, pi_empty == 0) ==> initiate failover from phyint
  *   3. (I == 0, PI_RUNNING, pi_full == 0) ==> initiate failback to phyint
  *
@@ -1404,7 +1411,7 @@ phyint_check_for_repair(struct phyint *pi)
 			return;
 		}
 
-		if (pi->pi_flags & IFF_INACTIVE) {
+		if (pi->pi_flags & IFF_STANDBY) {
 			(void) change_lif_flags(pi, IFF_FAILED, _B_FALSE);
 		} else {
 			if (try_failback(pi, _B_FALSE) != IPMP_FAILURE) {
@@ -1478,7 +1485,7 @@ phyint_inst_check_for_failure(struct phyint_instance *pii)
 			 * and gone to PI_NOTARGETS state.
 			 */
 			if (pi2->pi_state == PI_RUNNING)
-				phyint_chstate(pi, PI_FAILED);
+				phyint_chstate(pi2, PI_FAILED);
 
 			pi2->pi_empty = 0;
 			pi2->pi_full = 0;
@@ -2783,7 +2790,7 @@ get_failover_dst(struct phyint *pi, int failover_type)
 			continue;
 		}
 
-		if ((pi2->pi_flags & IFF_INACTIVE) &&
+		if ((pi2->pi_flags & (IFF_STANDBY | IFF_INACTIVE)) &&
 		    (failover_type != FAILOVER_TO_NONSTANDBY)) {
 			return (pi2);
 		} else {

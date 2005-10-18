@@ -146,7 +146,9 @@ struct ifnet {
 
 #define	IFF_FAILED	0x0010000000	/* NIC has failed */
 #define	IFF_STANDBY	0x0020000000	/* Standby NIC to be used on failures */
-#define	IFF_INACTIVE	0x0040000000	/* Standby active or not ? */
+#define	IFF_INACTIVE	0x0040000000	/* NIC active or not ? */
+					/* Used for Standby NIC or */
+					/* when FAILBACK is disabled by user */
 #define	IFF_OFFLINE	0x0080000000	/* NIC has been offlined */
 
 /*

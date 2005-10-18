@@ -311,6 +311,12 @@ extern "C" {
 #define	SIOCGIPMSFILTER	_IOWR('i', 180, 0)
 #define	SIOCSIPMSFILTER	_IOW('i', 181, 0)
 
+/*
+ * IOCTL for implementing "disable FAILBACK" IPMP configuration.
+ */
+#define	SIOCSIPMPFAILBACK	_IOW('i', 182, int)	/* enable/disable */
+							/* FAILBACK */
+
 #ifdef	__cplusplus
 }
 #endif
