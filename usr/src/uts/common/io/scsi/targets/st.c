@@ -199,8 +199,6 @@ static int st_report_soft_errors_on_close = 1;
 extern const int st_ndrivetypes;	/* defined in st_conf.c */
 extern const struct st_drivetype st_drivetypes[];
 
-static kmutex_t st_attach_mutex;
-
 #ifdef STDEBUG
 static int st_soft_error_report_debug = 0;
 static int st_debug = 0;
@@ -507,9 +505,7 @@ _init(void)
 		return (e);
 	}
 
-	mutex_init(&st_attach_mutex, NULL, MUTEX_DRIVER, NULL);
 	if ((e = mod_install(&modlinkage)) != 0) {
-		mutex_destroy(&st_attach_mutex);
 		ddi_soft_state_fini(&st_state);
 	}
 
@@ -525,7 +521,6 @@ _fini(void)
 		return (e);
 	}
 
-	mutex_destroy(&st_attach_mutex);
 	ddi_soft_state_fini(&st_state);
 
 	return (e);
