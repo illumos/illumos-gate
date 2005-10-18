@@ -296,8 +296,8 @@ typedef struct ipsa_s {
 #define	INBOUND_HASH(sadb, spi) ((spi) % ((sadb)->sdb_hashsize))
 #define	OUTBOUND_HASH_V4(sadb, v4addr) ((v4addr) % ((sadb)->sdb_hashsize))
 #define	OUTBOUND_HASH_V6(sadb, v6addr) OUTBOUND_HASH_V4((sadb), \
-	(*(uint32_t *)&(v6addr)) ^ (*((uint32_t *)&(v6addr)) + 1) ^ \
-	(*((uint32_t *)&(v6addr)) + 2) ^ (*((uint32_t *)&(v6addr)) + 3))
+	(*(uint32_t *)&(v6addr)) ^ (*(((uint32_t *)&(v6addr)) + 1)) ^ \
+	(*(((uint32_t *)&(v6addr)) + 2)) ^ (*(((uint32_t *)&(v6addr)) + 3)))
 
 /*
  * Syntactic sugar to find the appropriate hash bucket directly.
