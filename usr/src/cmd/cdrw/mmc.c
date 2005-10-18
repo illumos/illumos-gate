@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,6 +242,7 @@ read_disc_info(int fd, uchar_t *di)
 	return (1);
 }
 
+/* Get information about the Logical Unit's capabilities */
 int
 get_configuration(int fd, uint16_t feature, int bufsize, uchar_t *buf)
 {
@@ -250,16 +251,24 @@ get_configuration(int fd, uint16_t feature, int bufsize, uchar_t *buf)
 	scmd = get_uscsi_cmd();
 	scmd->uscsi_flags = USCSI_READ|USCSI_SILENT;
 	scmd->uscsi_timeout = DEFAULT_SCSI_TIMEOUT;
+
+	/* Set OPERATION CODE in CDB */
 	scmd->uscsi_cdb[0] = GET_CONFIG_CMD;
-	if (feature == 0)
-		scmd->uscsi_cdb[1] = 0x2;
-	else
-		scmd->uscsi_cdb[1] = 0x1;
+
+	/*
+	 * Set RT field in CDB, currently need at most one
+	 * Feature Descriptor
+	 */
 	scmd->uscsi_cdb[1] = 0x2;
+
+	/* Set Starting Feature Number in CDB */
 	scmd->uscsi_cdb[2] = (feature >> 8) & 0xff;
 	scmd->uscsi_cdb[3] = feature & 0xff;
+
+	/* Set Allocation Length in CDB */
 	scmd->uscsi_cdb[7] = (bufsize >> 8) & 0xff;
 	scmd->uscsi_cdb[8] = bufsize & 0xff;
+
 	scmd->uscsi_cdblen = 10;
 	scmd->uscsi_bufaddr = (char *)buf;
 	scmd->uscsi_buflen = bufsize;
