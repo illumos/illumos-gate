@@ -78,7 +78,7 @@ cpu_halt(void)
 {
 	cpu_t *cpup = CPU;
 	processorid_t cpun = cpup->cpu_id;
-	cpupart_t *cp;
+	cpupart_t *cp = cpup->cpu_part;
 	int hset_update = 1;
 	uint_t s;
 
@@ -91,38 +91,68 @@ cpu_halt(void)
 	 */
 	if (CPU->cpu_flags & CPU_OFFLINE || ncpus == 1)
 		hset_update = 0;
-	/*
-	 * We're on our way to being halted.
-	 * Disable interrupts now, so that we'll awaken immediately
-	 * after halting if someone tries to poke us between now and
-	 * the time we actually halt.
-	 */
-	s = disable_vec_intr();
 
 	/*
 	 * Add ourselves to the partition's halted CPUs bitmask
 	 * and set our HALTED flag, if necessary.
 	 *
-	 * Note that the memory barrier after updating the HALTED flag
-	 * is needed to ensure that the HALTED flag has reached global
-	 * visibility before scanning the run queue for the last time
-	 * (via disp_anywork) and halting ourself.
+	 * When a thread becomes runnable, it is placed on the queue
+	 * and then the halted cpuset is checked to determine who
+	 * (if anyone) should be awoken. We therefore need to first
+	 * add ourselves to the halted cpuset, and then check if there
+	 * is any work available.
 	 */
 	if (hset_update) {
 		cpup->cpu_disp_flags |= CPU_DISP_HALTED;
 		membar_producer();
-		cp = cpup->cpu_part;
 		CPUSET_ATOMIC_ADD(cp->cp_haltset, cpun);
 	}
 
 	/*
 	 * Check to make sure there's really nothing to do.
-	 * If work becomes available *after* we do this check
-	 * and it's determined that the work should be ours,
-	 * we won't miss it since we'll be notified with a "poke"
-	 * ...which will pop us right back out of the halted state.
+	 * Work destined for this CPU may become available after
+	 * this check. We'll be notified through the clearing of our
+	 * bit in the halted CPU bitmask, and a poke.
 	 */
 	if (disp_anywork()) {
+		if (hset_update) {
+			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
+			CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
+		}
+		return;
+	}
+
+	/*
+	 * We're on our way to being halted.
+	 *
+	 * Disable interrupts now, so that we'll awaken immediately
+	 * after halting if someone tries to poke us between now and
+	 * the time we actually halt.
+	 *
+	 * We check for the presence of our bit after disabling interrupts.
+	 * If it's cleared, we'll return. If the bit is cleared after
+	 * we check then the poke will pop us out of the halted state.
+	 *
+	 * The ordering of the poke and the clearing of the bit by cpu_wakeup
+	 * is important.
+	 * cpu_wakeup() must clear, then poke.
+	 * cpu_halt() must disable interrupts, then check for the bit.
+	 */
+	s = disable_vec_intr();
+
+	if (hset_update && !CPU_IN_SET(cp->cp_haltset, cpun)) {
+		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
+		enable_vec_intr(s);
+		return;
+	}
+
+	/*
+	 * The check for anything locally runnable is here for performance
+	 * and isn't needed for correctness. disp_nrunnable ought to be
+	 * in our cache still, so it's inexpensive to check, and if there
+	 * is anything runnable we won't have to wait for the poke.
+	 */
+	if (cpup->cpu_disp->disp_nrunnable != 0) {
 		if (hset_update) {
 			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
 			CPUSET_ATOMIC_DEL(cp->cp_haltset, cpun);
