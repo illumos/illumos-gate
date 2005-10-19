@@ -310,6 +310,9 @@ REFPROP _fru_parent /frutree/chassis/MB/system-board
 name:/platform/ebus@1f,464000/env-monitor@3,0/Front_panel
 REFPROP _fru_parent /frutree/chassis/FIOB/system-board
 
+name:/platform/ebus@1f,464000/env-monitor@3,0/PSU
+REFPROP _fru_parent /frutree/chassis/MB/system-board
+
 /*
  * Environmental device associated with motherboard
  */
@@ -334,6 +337,10 @@ ENDROW
 ROW
 PROP Class string r 0 "temperature-sensor"
 REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/LSI1064
+ENDROW
+ROW
+PROP Class string r 0 "temperature-sensor"
+REFPROP _temperature-sensor_ name:/platform/ebus@1f,464000/env-monitor@3,0/PSU
 ENDROW
 ENDTABLE
 

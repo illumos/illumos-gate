@@ -61,6 +61,7 @@ VERBOSE 1
 #define	SENSOR_FIRE		FireASIC
 #define	SENSOR_LSI1064		LSI1064
 #define	SENSOR_FRONT_PANEL	Front_panel
+#define	SENSOR_PSU		PSU
 
 #define	CPU0_SENSOR_ID		0
 #define	CPU1_SENSOR_ID		1
@@ -70,6 +71,7 @@ VERBOSE 1
 #define	FIRE_SENSOR_ID		5
 #define	LSI1064_SENSOR_ID	6
 #define	FRONT_PANEL_SENSOR_ID	7
+#define	PSU_SENSOR_ID		8
 
 /* 
  * Hard disk sensor names and ids
@@ -119,6 +121,10 @@ name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_LSI1064
 name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_FRONT_PANEL
     PROP Label string r 0 "front_panel-sensor"
     PROP ID int r 4 FRONT_PANEL_SENSOR_ID
+
+name:/platform/ebus@1f,464000/env-monitor@3,0/SENSOR_PSU
+    PROP Label string r 0 "psu-sensor"
+    PROP ID int r 4 PSU_SENSOR_ID
 
 
 name:/platform/ebus@1f,464000/env-monitor@3,0/ENV_SYSTEM_FAN0

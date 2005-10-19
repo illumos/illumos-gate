@@ -97,6 +97,8 @@ static sensor_node_t sensor_nodes[] = {
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_LSI1064,
 	NULL, NULL, NULL, NULL},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_FRONT_PANEL,
+	NULL, NULL, NULL, NULL},
+	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_PSU,
 	NULL, NULL, NULL, NULL}
 };
 #define	N_SENSOR_NODES	(sizeof (sensor_nodes)/sizeof (sensor_nodes[0]))

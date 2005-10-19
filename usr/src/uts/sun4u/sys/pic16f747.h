@@ -53,6 +53,7 @@ extern "C" {
 #define	RF_FAN2_PERIOD	0x02
 #define	RF_FAN3_PERIOD	0x03
 #define	RF_FAN4_PERIOD	0x04
+#define	RF_FAN5_PERIOD	0x05	/* unused */
 #define	RF_LOCAL_TEMP	0x06
 #define	RF_REMOTE1_TEMP	0x07
 #define	RF_REMOTE2_TEMP	0x08
@@ -64,15 +65,9 @@ extern "C" {
 #define	RF_FAN_STATUS	0x0E
 #define	RF_VCORE0	0x0F
 #define	RF_VCORE1	0x10
-
-/*
- * Bitmasks for RF_STATUS register
- */
-#define	ST_FFAULT		0x01	/* fan failure has occurred */
-#define	ST_ENV_BUSY		0x02	/* environmental bus is busy */
-#define	ST_STALE_ADT_DATA	0x04	/* ADT7462 data currently invalid */
-#define	ST_STALE_LM_DATA	0x08	/* LM95221 data currently invalid */
-#define	ST_FW_VERSION		0xF0	/* firmware version number */
+#define	RF_VMEM0	0x11
+#define	RF_VMEM1	0x12
+#define	RF_PSU_TEMP	0x13
 
 /*
  * Bitmasks for RF_COMMAND values
@@ -80,10 +75,29 @@ extern "C" {
 #define	CMD_TO_ESTAR		0x01
 #define	CMD_PIC_RESET		0x80
 
+/*
+ * Bitmasks for RF_STATUS values
+ */
+#define	ST_FFAULT		0x01	/* fan failure has occurred */
+#define	ST_ENV_BUSY		0x02	/* environmental bus is busy */
+#define	ST_ENV_STALE		0x04	/* ADT7462/LM95221 data invalid */
+#define	ST_TPM_GOOD		0x08	/* TPM self test passed */
+#define	ST_FW_VERSION		0xF0	/* firmware version number */
+
+/*
+ * Fan fault bits in RF_FAN_STATUS
+ */
+#define	F0_FLT_BIT		0
+#define	F1_FLT_BIT		1
+#define	F2_FLT_BIT		2
+#define	F3_FLT_BIT		3
+#define	F4_FLT_BIT		4
+#define	F5_FLT_BIT		5	/* unused */
+#define	PSUF_FLT_BIT		6
+
 /* Number of fans/sensors */
-#define	MAX_PIC_NODES		16
 #define	N_FANS			5
-#define	N_SENSORS		8
+#define	N_SENSORS		9
 #define	N_PIC_NODES		(N_FANS+N_SENSORS+1)
 
 /*
@@ -97,7 +111,7 @@ typedef struct minor_node_info {
 } minor_node_info;
 
 /*
- * PIC device minor numbers are constructed as <inst_9-12>:<unit_0-8>
+ * PIC device minor numbers are constructed as <inst_8-11>:<unit_0-7>
  */
 #define	PIC_INST_TO_MINOR(x)	(((x) << 8) & 0x0F00)
 #define	PIC_UNIT_TO_MINOR(x)	((x) & 0xFF)

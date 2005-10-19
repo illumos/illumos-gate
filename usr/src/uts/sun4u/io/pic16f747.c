@@ -90,11 +90,11 @@ static struct dev_ops pic_dev_ops = {
  */
 static struct minor_node_info pic_nodes[N_PIC_NODES] = {
 	{NULL, 0, 0},				/* Reserved */
-	{"fan_0", RF_FAN0_PERIOD, 0},		/* System Fan 0 */
-	{"fan_1", RF_FAN1_PERIOD, 1},		/* System Fan 1 */
-	{"fan_2", RF_FAN2_PERIOD, 2},		/* System Fan 2 */
-	{"fan_3", RF_FAN3_PERIOD, 3},		/* System Fan 3 */
-	{"fan_4", RF_FAN4_PERIOD, 4},		/* System Fan 4 in P0.1 */
+	{"fan_0", RF_FAN0_PERIOD, F0_FLT_BIT},	/* System Fan 0 */
+	{"fan_1", RF_FAN1_PERIOD, F1_FLT_BIT},	/* System Fan 1 */
+	{"fan_2", RF_FAN2_PERIOD, F2_FLT_BIT},	/* System Fan 2 */
+	{"fan_3", RF_FAN3_PERIOD, F3_FLT_BIT},	/* System Fan 3 */
+	{"fan_4", RF_FAN4_PERIOD, F4_FLT_BIT},	/* System Fan 4 */
 	{"adt7462", RF_LOCAL_TEMP, 0},		/* ADT7462 Local Temperature */
 	{"cpu_0", RF_REMOTE1_TEMP, 0},		/* CPU 0 temp */
 	{"cpu_1", RF_REMOTE2_TEMP, 0},		/* CPU 1 temp */
@@ -102,7 +102,8 @@ static struct minor_node_info pic_nodes[N_PIC_NODES] = {
 	{"lm95221", RF_LM95221_TEMP, 0},	/* LM95221 Local Temperature */
 	{"fire", RF_FIRE_TEMP, 0},		/* FIRE Temp */
 	{"lsi1064", RF_LSI1064_TEMP, 0},	/* LSI1064 Temp */
-	{"front_panel", RF_FRONT_TEMP, 0}	/* Front Panel Temperature */
+	{"front_panel", RF_FRONT_TEMP, 0},	/* Front Panel Temperature */
+	{"psu", RF_PSU_TEMP, PSUF_FLT_BIT}	/* PSU Temp (and ffault) */
 };
 
 /*

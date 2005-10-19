@@ -39,7 +39,7 @@ extern "C" {
 /*
  * Chicago Platform Details
  */
-#define	MAX_SENSORS		8
+#define	MAX_SENSORS		9
 #define	MAX_FANS		6
 
 /*
@@ -71,6 +71,7 @@ extern "C" {
 #define	SENSOR_FIRE		"FireASIC"
 #define	SENSOR_LSI1064		"LSI1064"
 #define	SENSOR_FRONT_PANEL	"Front_panel"
+#define	SENSOR_PSU		"PSU"
 
 #define	CPU0_SENSOR_ID		0
 #define	CPU1_SENSOR_ID		1
@@ -80,6 +81,7 @@ extern "C" {
 #define	FIRE_SENSOR_ID		5
 #define	LSI1064_SENSOR_ID	6
 #define	FRONT_PANEL_SENSOR_ID	7
+#define	PSU_SENSOR_ID		8
 
 /*
  * Hard disk sensor names and ids
@@ -231,6 +233,8 @@ extern "C" {
 	"/devices/ebus@1f,464000/env-monitor@3,0:lsi1064"
 #define	SENSOR_FRONT_PANEL_DEVFS	\
 	"/devices/ebus@1f,464000/env-monitor@3,0:front_panel"
+#define	SENSOR_PSU_DEVFS	\
+	"/devices/ebus@1f,464000/env-monitor@3,0:psu"
 
 /*
  * Temperature type
@@ -426,6 +430,13 @@ typedef struct {
 #define	FRONT_PANEL_LOW_SHUTDOWN	0
 #define	FRONT_PANEL_LOW_POWER_OFF	0
 
+#define	PSU_HIGH_POWER_OFF		95
+#define	PSU_HIGH_SHUTDOWN		85
+#define	PSU_HIGH_WARNING		75
+#define	PSU_LOW_WARNING			5
+#define	PSU_LOW_SHUTDOWN		0
+#define	PSU_LOW_POWER_OFF		0
+
 /*
  * Temperature sensor related data structure
  */
@@ -480,7 +491,7 @@ typedef int fanspeed_t;
 
 typedef struct env_fan {
 	char		*name;			/* fan name */
-	char		*devfs_path;	/* fan device devfs path */
+	char		*devfs_path;		/* fan device devfs path */
 	uchar_t		id;
 	fanspeed_t	speed_min;		/* minimum speed */
 	fanspeed_t	speed_max;		/* maximum speed */

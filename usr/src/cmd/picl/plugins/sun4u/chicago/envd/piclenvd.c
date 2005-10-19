@@ -86,6 +86,12 @@ extern int env_picl_setup_tuneables(void);
 
 static boolean_t has_fan_failed(env_fan_t *fanp);
 
+/*
+ * PSU fan fault handling
+ */
+static boolean_t has_psufan_failed(void);
+static int psufan_last_status = FAN_OK;
+
 #pragma init(piclenvd_register)
 
 /*
@@ -152,6 +158,10 @@ static es_sensor_blk_t sensor_default_ctl[MAX_SENSORS] = {
 	    FRONT_PANEL_HIGH_POWER_OFF, FRONT_PANEL_HIGH_SHUTDOWN,
 	    FRONT_PANEL_HIGH_WARNING, FRONT_PANEL_LOW_WARNING,
 	    FRONT_PANEL_LOW_SHUTDOWN, FRONT_PANEL_LOW_POWER_OFF
+	},
+	{
+	    PSU_HIGH_POWER_OFF, PSU_HIGH_SHUTDOWN, PSU_HIGH_WARNING,
+	    PSU_LOW_WARNING, PSU_LOW_SHUTDOWN, PSU_LOW_POWER_OFF
 	}
 };
 
@@ -261,6 +271,9 @@ static env_sensor_t envd_sensor_front_panel = {
 	SENSOR_FRONT_PANEL, SENSOR_FRONT_PANEL_DEVFS, FRONT_PANEL_SENSOR_ID,
 	-1, NULL,
 };
+static env_sensor_t envd_sensor_psu = {
+	SENSOR_PSU, SENSOR_PSU_DEVFS, PSU_SENSOR_ID, -1, NULL,
+};
 
 /*
  * The vendor-id and device-id are the properties associated with
@@ -306,7 +319,7 @@ static env_disk_t *envd_disks[] = {
 /*
  * NULL terminated array of temperature sensors
  */
-#define	N_ENVD_SENSORS	8
+#define	N_ENVD_SENSORS	9
 static env_sensor_t *envd_sensors[] = {
 	&envd_sensor_cpu0,
 	&envd_sensor_cpu1,
@@ -316,6 +329,7 @@ static env_sensor_t *envd_sensors[] = {
 	&envd_sensor_fire,
 	&envd_sensor_lsi1064,
 	&envd_sensor_front_panel,
+	&envd_sensor_psu,
 	NULL
 };
 
@@ -1728,10 +1742,7 @@ fan_thr(void *args)
 		for (i = 0; (fanp = envd_fans[i]) != NULL; i++) {
 			if (fanp->present == B_FALSE)
 				continue;
-			/*
-			 * We initiate shutdown if fan status indicates
-			 * failure. Also, don't warn repeatedly.
-			 */
+
 			if (has_fan_failed(fanp) == B_TRUE) {
 				if (fanp->last_status == FAN_FAILED)
 					continue;
@@ -1748,6 +1759,23 @@ fan_thr(void *args)
 				    ENV_FAN_OK_MSG, fanp->name);
 				envd_log(LOG_ALERT, msgbuf);
 			}
+		}
+
+		if (has_psufan_failed() == B_TRUE) {
+			if (psufan_last_status == FAN_FAILED)
+				continue;
+			psufan_last_status = FAN_FAILED;
+			(void) snprintf(msgbuf, sizeof (msgbuf),
+				ENV_FAN_FAILURE_WARNING_MSG, SENSOR_PSU,
+				fan_rpm_string, fan_status_string);
+			envd_log(LOG_ALERT, msgbuf);
+		} else {
+			if (psufan_last_status == FAN_OK)
+				continue;
+			psufan_last_status = FAN_OK;
+			(void) snprintf(msgbuf, sizeof (msgbuf),
+				ENV_FAN_OK_MSG, SENSOR_PSU);
+			envd_log(LOG_ALERT, msgbuf);
 		}
 	}
 
@@ -2071,6 +2099,57 @@ has_fan_failed(env_fan_t *fanp)
 			(void) snprintf(fan_rpm_string, sizeof (fan_rpm_string),
 			    "%d", fan_speed);
 		}
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+boolean_t
+has_psufan_failed(void)
+{
+	uchar_t		status;
+	int		ret, ntries;
+
+	if (envd_sensor_psu.fd == -1)
+		return (B_FALSE);
+
+	/*
+	 * For psu, only fan fault is visible, no fan speed
+	 */
+	(void) strncpy(fan_rpm_string, NOT_AVAILABLE, sizeof (fan_rpm_string));
+
+	/*
+	 * Read RF_FAN_STATUS bit of the fan fault register, retry if
+	 * the PIC is busy, with a 1 second delay to allow it to update.
+	 */
+	for (ntries = 0; ntries < MAX_RETRIES_FOR_FAN_FAULT; ntries++) {
+		ret = ioctl(envd_sensor_psu.fd, PIC_GET_FAN_STATUS, &status);
+		if ((ret == 0) && ((status & 0x1) == 0))
+			break;
+		(void) sleep(1);
+	}
+
+	if (ntries > 0) {
+		if (env_debug) {
+			envd_log(LOG_ERR,
+			    "%d retries attempted in reading fan status.\n",
+			    ntries);
+		}
+	}
+
+	if (ntries == MAX_RETRIES_FOR_FAN_FAULT) {
+		(void) strncpy(fan_status_string, NOT_AVAILABLE,
+		    sizeof (fan_status_string));
+		return (B_TRUE);
+	}
+
+	if (env_debug)
+		envd_log(LOG_ERR, "fan status = 0x%x\n", status);
+
+	if (status & 0x1) {
+		(void) snprintf(fan_status_string, sizeof (fan_status_string),
+		    "0x%x", status);
 		return (B_TRUE);
 	}
 
