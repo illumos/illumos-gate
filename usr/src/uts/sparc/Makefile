@@ -88,6 +88,7 @@ $(SVVS) $(XMODS):	FRC
 	fi
 
 install_h check:	FRC
+	@cd asm; pwd; $(MAKE) $(TARGET)
 	@cd sys; pwd; $(MAKE) $(TARGET)
 	@cd v7/sys; pwd; $(MAKE) $(TARGET)
 	@cd v9/sys; pwd; $(MAKE) $(TARGET)

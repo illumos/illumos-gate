@@ -35,13 +35,13 @@ zulu_hat
 	zulu_tsb_size	ZULU_HAT_TSB_SZ
 	zulu_ctx	ZULU_HAT_CTX
 
+#ifdef ZULUVM_STATS
 zuluvm_miss_t
 	idata		ZULUVM_IDATA
 	arg		ZULUVM_ARG
 	mmu_pa		ZULUVM_PAMMU
 	state		ZULUVM_STATE
 	intr_num	ZULUVM_INTRNUM
-#ifdef ZULUVM_STATS
 	cancel		ZULUVM_ST_TLBCANCEL
 	tlb_miss	ZULUVM_ST_MISS
 	pagefault	ZULUVM_ST_PGFAULT
@@ -55,9 +55,20 @@ zuluvm_miss_t
 	dtlb2miss	ZULUVM_ST_DTLB2MISS
 	demap_page	ZULUVM_ST_DEMAP_PAGE
 	demap_ctx	ZULUVM_ST_DEMAP_CTX
-#endif
 	pfnbuf		ZULUVM_PFNBUF
 	pfncnt		ZULUVM_PFNCNT
+
+#else
+
+zuluvm_miss_t
+	idata		ZULUVM_IDATA
+	arg		ZULUVM_ARG
+	mmu_pa		ZULUVM_PAMMU
+	state		ZULUVM_STATE
+	intr_num	ZULUVM_INTRNUM
+	pfnbuf		ZULUVM_PFNBUF
+	pfncnt		ZULUVM_PFNCNT
+#endif
 
 \#define ZULUVM_OFFSET(a) (ZULUVM_IDATA + ((a) * ZULUVM_IDATA_INCR))
 \#define ZULUVM_ASM_TLB_TTE	ZULUVM_OFFSET(ZULUVM_TLB_TTE_IDX)

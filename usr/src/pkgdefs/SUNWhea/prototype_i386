@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -49,7 +48,6 @@
 #
 # SUNWhea
 #
-d none usr/include/asm 755 root bin
 f none usr/include/asm/atomic.h 644 root bin
 f none usr/include/asm/bitmap.h 644 root bin
 f none usr/include/asm/byteorder.h 644 root bin
@@ -58,8 +56,6 @@ f none usr/include/asm/cpu.h 644 root bin
 f none usr/include/asm/cpuvar.h 644 root bin
 f none usr/include/asm/htable.h 644 root bin
 f none usr/include/asm/mmu.h 644 root bin
-f none usr/include/asm/sunddi.h 644 root bin
-f none usr/include/asm/thread.h 644 root bin
 d none usr/include/amd64 755 root bin
 d none usr/include/amd64/sys 755 root bin
 f none usr/include/amd64/sys/privregs.h 644 root bin
