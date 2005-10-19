@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1990-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -331,7 +331,7 @@ get_aout_head(struct vnode **vpp, struct exdata *edp, long *execsz, int *isdyn)
 	edp->ux_doffset = getdfile(&filhdr);
 	edp->ux_txtorg = gettmem(&filhdr);
 	edp->ux_datorg = getdmem(&filhdr);
-	edp->ux_entloc = (caddr_t)filhdr.a_entry;
+	edp->ux_entloc = (caddr_t)(uintptr_t)filhdr.a_entry;
 	edp->vp = vp;
 	*isdyn = filhdr.a_dynamic;
 

@@ -128,7 +128,7 @@ ucbsigvechandler(int sig, siginfo_t *sip, ucontext_t *ucp)
 		 * on sparc machines.  (5.x does not increment the PC.)
 		 */
 		ucp->uc_mcontext.gregs[REG_PC] =
-			ucp->uc_mcontext.gregs[REG_nPC];
+		    ucp->uc_mcontext.gregs[REG_nPC];
 		ucp->uc_mcontext.gregs[REG_nPC] += 4;
 	}
 	sc.sc_sp = ucp->uc_mcontext.gregs[REG_SP];
@@ -154,7 +154,7 @@ ucbsigvechandler(int sig, siginfo_t *sip, ucontext_t *ucp)
 	 * ucontext_t isn't available to sigcleanup.
 	 */
 	sc.sc_wbcnt = (int)(sizeof (*ucp));
-	sc.sc_spbuf[0] = (char *)sig;
+	sc.sc_spbuf[0] = (char *)(uintptr_t)sig;
 	sc.sc_spbuf[1] = (char *)ucp;
 #ifdef NEVER
 	/*
@@ -347,7 +347,7 @@ __sigcleanup(struct sigcontext *scp)
 	 * such as the original "out" registers when the signal occurred.
 	 */
 	if (scp->sc_wbcnt == sizeof (*ucp)) {
-		sig = (int)scp->sc_spbuf[0];
+		sig = (int)(uintptr_t)scp->sc_spbuf[0];
 		ucp = (ucontext_t *)scp->sc_spbuf[1];
 	} else {
 		/*
@@ -510,7 +510,7 @@ ucbsigvec(int sig, struct sigvec *nvec, struct sigvec *ovec)
 		if (oact.sa_handler == SIG_DFL || oact.sa_handler == SIG_IGN)
 			ovec->sv_handler =
 			    (void (*) (int, int, struct sigcontext *, char *))
-				oact.sa_handler;
+			    oact.sa_handler;
 		else
 			ovec->sv_handler = ohandler;
 		ovec->sv_mask = set2mask(&oact.sa_mask);
@@ -574,7 +574,7 @@ ucbsignal(int s, void (*a)(int)))(int)
 	if (nsv.sv_mask != osv.sv_mask || nsv.sv_flags != osv.sv_flags) {
 		mask[s] = nsv.sv_mask = osv.sv_mask;
 		flags[s] = nsv.sv_flags =
-			osv.sv_flags & ~(SV_RESETHAND|SV_INTERRUPT);
+		    osv.sv_flags & ~(SV_RESETHAND|SV_INTERRUPT);
 		if (ucbsigvec(s, &nsv, (struct sigvec *)0) < 0)
 			return (SIG_ERR);
 	}

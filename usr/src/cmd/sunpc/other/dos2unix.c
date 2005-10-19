@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,10 +98,8 @@ static int	tmpfd = -1;
 * ENTRY POINTS
  ******************************************************************************/
 
-
-void	main(argc, argv)
-int	argc;
-char	**argv;
+int
+main(int argc, char **argv)
 {
    FILE *in_stream = NULL;
    FILE *out_stream = NULL;
@@ -473,7 +471,7 @@ char	**argv;
 		fclose(in_stream);
 		unlink(out_file_name);
 	}
-	exit(0);
+	return (0);
 }
 
 void	error(format, args)
