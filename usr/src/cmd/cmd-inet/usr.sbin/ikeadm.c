@@ -972,6 +972,7 @@ parse_ps(int argc, char **argv, ike_ps_t **presharedpp, int *len)
 	struct hostent	*loche = NULL, *remhe = NULL;
 	ike_ps_t	*psp = NULL;
 	sadb_ident_t	*sidp;
+	boolean_t	whacked = B_FALSE;
 
 	if ((argv[c] == NULL) || (argv[c][0] != '{'))
 		return (-1);
@@ -981,8 +982,19 @@ parse_ps(int argc, char **argv, ike_ps_t **presharedpp, int *len)
 	} else {
 		c++;
 	}
+	if ((argv[argc - 1][strlen(argv[argc - 1]) - 1] == '}') &&
+	    (argv[argc - 1][0] != '}')) {
+		/*
+		 * whack '}' without a space before it or parsers break.
+		 * Remember this trailing character for later
+		 */
+		argv[argc - 1][strlen(argv[argc - 1]) - 1] = '\0';
+		whacked = B_TRUE;
+	}
 
 	while ((c < argc) && (argv[c] != NULL) && (argv[c][0] != '}')) {
+		if ((argv[c + 1] == NULL) || (argv[c + 1][0] == '}'))
+			goto bail;
 		if (parse_psfldid(argv[c++], &fldid) < 0)
 			goto bail;
 		switch (fldid) {
@@ -1013,6 +1025,15 @@ parse_ps(int argc, char **argv, ike_ps_t **presharedpp, int *len)
 			break;
 		}
 	}
+
+	/* Make sure the line was terminated with '}' */
+	if (argv[c] == NULL) {
+		if (!whacked)
+			goto bail;
+	} else if (argv[c][0] != '}') {
+		goto bail;
+	}
+
 	/*
 	 * make sure we got all the required fields.  If no idtype, assume
 	 * ip addr; if that translation fails, we'll catch the error then.
@@ -1169,6 +1190,8 @@ errstr(int err)
 		return (gettext("Not allowed at current privilege level"));
 	case IKE_ERR_SYS_ERR:
 		return (gettext("System error"));
+	case IKE_ERR_DUP_IGNORED:
+		return (gettext("One or more duplicate entries ignored"));
 	default:
 		(void) snprintf(rtn, MAXLINESIZE,
 		    gettext("<unknown error %d>"), err);
@@ -1952,7 +1975,10 @@ ikeadm_err_msg(ike_err_t *err, char *fmt, ...)
 	va_end(ap);
 	if ((err != NULL) && (err->ike_err == IKE_ERR_SYS_ERR)) {
 		message("%s: %s", mbuf, (err->ike_err_unix == 0) ?
-		    gettext("<unknown error>") : strerror(err->ike_err_unix));
+		    gettext("<unknown error>") :
+		    ((err->ike_err_unix == EEXIST) ?
+		    gettext("Duplicate entry") :
+		    strerror(err->ike_err_unix)));
 	} else {
 		message("%s: %s", mbuf, (err == NULL) ?
 		    gettext("<unknown error>") : errstr(err->ike_err));

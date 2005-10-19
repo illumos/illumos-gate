@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -373,6 +373,7 @@ typedef struct {
 #define	IKE_ERR_REQ_INVALID	8	/* badly formatted request */
 #define	IKE_ERR_NO_PRIV		9	/* privilege level not high enough */
 #define	IKE_ERR_SYS_ERR		10	/* syserr occurred while processing */
+#define	IKE_ERR_DUP_IGNORED	11	/* attempt to add a duplicate entry */
 
 
 /*
