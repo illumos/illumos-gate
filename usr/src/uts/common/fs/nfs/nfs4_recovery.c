@@ -1310,7 +1310,7 @@ nfs4_recov_thread(recov_info_t *recovp)
 			 * user process exits).
 			 */
 			if (!(mi->mi_recovflags & MI4R_LOST_STATE)) {
-				recov_done(mi, recovp);
+				done = 1;
 				mutex_exit(&mi->mi_lock);
 				break;
 			}
@@ -1493,7 +1493,6 @@ nfs4_recov_thread(recov_info_t *recovp)
 			list_move_tail(&local_lost_state, &mi->mi_lost_state);
 
 			done = 1;
-			recov_done(mi, recovp);
 			mutex_exit(&mi->mi_lock);
 			/*
 			 * Now officially free the "moved"
@@ -1524,10 +1523,6 @@ nfs4_recov_thread(recov_info_t *recovp)
 
 	} while (!done);
 
-	mutex_enter(&mi->mi_lock);
-	mi->mi_in_recovery--;
-	cv_broadcast(&mi->mi_cv_in_recov);
-	mutex_exit(&mi->mi_lock);
 
 	if (sp != NULL)
 		nfs4_server_rele(sp);
@@ -1537,6 +1532,10 @@ nfs4_recov_thread(recov_info_t *recovp)
 	 */
 	nfs4_dlistclean();
 
+	mutex_enter(&mi->mi_lock);
+	recov_done(mi, recovp);
+	mi->mi_in_recovery--;
+
 	/*
 	 * Free up resources that were allocated for us.
 	 */
@@ -1545,6 +1544,9 @@ nfs4_recov_thread(recov_info_t *recovp)
 	if (recovp->rc_vp2 != NULL)
 		VN_RELE(recovp->rc_vp2);
 	VFS_RELE(mi->mi_vfsp);
+	cv_broadcast(&mi->mi_cv_in_recov);
+	mutex_exit(&mi->mi_lock);
+
 	kmem_free(recovp, sizeof (recov_info_t));
 	mutex_enter(&cpr_lock);
 	CALLB_CPR_EXIT(&cpr_info);

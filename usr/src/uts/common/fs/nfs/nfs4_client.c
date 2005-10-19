@@ -2978,6 +2978,15 @@ nfs_free_mi4(mntinfo4_t *mi)
 
 	mutex_exit(&mi->mi_async_lock);
 
+	/*
+	 * Make sure recovery thread is really done.
+	 */
+	mutex_enter(&mi->mi_lock);
+	while (mi->mi_in_recovery > 0) {
+		cv_wait(&mi->mi_cv_in_recov, &mi->mi_lock);
+	}
+	mutex_exit(&mi->mi_lock);
+
 	mutex_enter(&mi->mi_msg_list_lock);
 	while (msgp = list_head(&mi->mi_msg_list)) {
 		list_remove(&mi->mi_msg_list, msgp);
