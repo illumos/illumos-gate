@@ -260,6 +260,12 @@ struct vhci_pkt {
 	int				vpkt_tgt_init_scblen;
 	int				vpkt_tgt_init_pkt_flags;
 	struct buf			*vpkt_tgt_init_bp;
+
+	/*
+	 * Pointer to original struct vhci_pkt for cmd send by ssd.
+	 * Saved when the command is being retried internally.
+	 */
+	struct vhci_pkt			*vpkt_org_vpkt;
 };
 
 typedef struct scsi_vhci_lun {
