@@ -1232,11 +1232,11 @@ XGE_HAL_OBJS =  xgehal-channel.o xgehal-fifo.o xgehal-ring.o  xgehal-config.o \
 #
 #	Chelsio N110 10G NIC driver module
 #
-CH_OBJS = ch.o sge.o pe.o glue.o
+CH_OBJS = ch.o glue.o pe.o sge.o
 
-CH_COM_OBJS =	ch_subr.o tp.o ch_mac.o ulp.o vsc7321.o mc3.o xpak.o pm3393.o \
-		ixf1010.o espi.o idt75.o mc4.o mv88e1xxx.o cspi.o mv88x201x.o \
-		my3126.o cynse70xxx.o
+CH_COM_OBJS =	ch_mac.o ch_subr.o cspi.o espi.o ixf1010.o mc3.o mc4.o mc5.o \
+		mv88e1xxx.o mv88x201x.o my3126.o pm3393.o tp.o ulp.o \
+		vsc7321.o xpak.o
 
 #
 #	PCI strings file 

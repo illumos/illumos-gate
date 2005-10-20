@@ -108,3 +108,4 @@ check_add_drv()
 }
 
 check_add_drv -i '"pci1425,7"' -b "$BASEDIR" chxge
+check_add_drv -i '"pci1425,a"' -b "$BASEDIR" chxge
