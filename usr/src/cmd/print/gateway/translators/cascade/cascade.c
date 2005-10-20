@@ -28,6 +28,7 @@
 
 /*LINTLIBRARY*/
 
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -168,7 +169,10 @@ cascade_submit_job(const char *printer, const char *host, char *cf,
 		    char **df_list)
 {
 	FILE *fp;
-	char *s, *newcf;
+	char *s, *newcf, *user = NULL;
+	int i;
+	uid_t userid = -1;
+	struct passwd *p = NULL;
 
 	syslog(LOG_DEBUG, "cascade_submit_job(%s, %s, 0x%x, 0x%x)",
 		(printer ? printer : "NULL"), (host ? host : "NULL"), cf,
@@ -190,7 +194,33 @@ cascade_submit_job(const char *printer, const char *host, char *cf,
 			strcat(newcf, s);
 			strcat(newcf, "\n");
 		}
+		if (s[0] == CF_USER)    /* RFC-1179 User */
+			user = ++s;
 	}
+
+	/*
+	 * When printd comes to print the request, it will have the submitting
+	 * user's privileges so, having extracted the username from the BSD
+	 * control file, check the user is known to locally active passwd
+	 * databases and change ownership of the datafiles to the job owner.
+	 */
+	if ((user != NULL) && (p = getpwnam(user)) != NULL) {
+		syslog(LOG_DEBUG, "cascade_submit_job: user = %s\n", user);
+		userid = p->pw_uid;
+		syslog(LOG_DEBUG, "cascade_submit_job: userid = %d\n", userid);
+	}
+
+	if (userid > 0)
+		for (i = 0; df_list[i] != NULL; i++) {
+			syslog(LOG_DEBUG, "cascade_submit_job: dffile = %s\n",
+			    df_list[i]);
+			if ((chown(df_list[i], userid, -1)) < 0)
+				syslog(LOG_DEBUG,
+				    "cascade_submit_job: chown failed");
+			else
+				syslog(LOG_DEBUG,
+				    "cascade_submit_job: chown succeeded");
+		}
 
 	/* write the control file */
 	df_list[0][0] = 'c';
