@@ -13349,10 +13349,22 @@ sd_initpkt_for_uscsi(struct buf *bp, struct scsi_pkt **pktpp)
 	SD_TRACE(SD_LOG_IO_CORE, un,
 	    "sd_initpkt_for_uscsi: entry: buf:0x%p\n", bp);
 
-	/* Allocate the scsi_pkt for the command. */
+	/*
+	 * Allocate the scsi_pkt for the command.
+	 * Note: If PKT_DMA_PARTIAL flag is set, scsi_vhci binds a path
+	 *	 during scsi_init_pkt time and will continue to use the
+	 *	 same path as long as the same scsi_pkt is used without
+	 *	 intervening scsi_dma_free(). Since uscsi command does
+	 *	 not call scsi_dmafree() before retry failed command, it
+	 *	 is necessary to make sure PKT_DMA_PARTIAL flag is NOT
+	 *	 set such that scsi_vhci can use other available path for
+	 *	 retry. Besides, ucsci command does not allow DMA breakup,
+	 *	 so there is no need to set PKT_DMA_PARTIAL flag.
+	 */
 	pktp = scsi_init_pkt(SD_ADDRESS(un), NULL,
 	    ((bp->b_bcount != 0) ? bp : NULL), uscmd->uscsi_cdblen,
-	    sizeof (struct scsi_arq_status), 0, un->un_pkt_flags,
+	    sizeof (struct scsi_arq_status), 0,
+	    (un->un_pkt_flags & ~PKT_DMA_PARTIAL),
 	    sdrunout, (caddr_t)un);
 
 	if (pktp == NULL) {
