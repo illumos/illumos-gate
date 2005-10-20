@@ -718,8 +718,6 @@ post_syscall(long rval1, long rval2)
 		repost = 1;
 	}
 
-	t->t_sysnum = 0;	/* no longer in a system call */
-
 sig_check:
 	/*
 	 * Reset flag for next time.
@@ -847,6 +845,8 @@ sig_check:
 		prdostep();
 		repost = 1;
 	}
+
+	t->t_sysnum = 0;	/* no longer in a system call */
 
 	/*
 	 * In case the args were copied to the lwp, reset the
