@@ -1472,7 +1472,7 @@ devfs_reset_perm(uint_t flags)
  */
 
 static int
-devfs_remdrv_rmdir(vnode_t *dirvp, const char *dir, vnode_t *rootvp)
+devfs_remdrv_rmdir(vnode_t *dirvp, const char *dir, vnode_t *rvp)
 {
 	int error;
 	vnode_t *vp;
@@ -1537,10 +1537,10 @@ devfs_remdrv_rmdir(vnode_t *dirvp, const char *dir, vnode_t *rootvp)
 				vp->v_type == VCHR || vp->v_type == VBLK);
 
 			if (vp->v_type == VDIR) {
-				error = devfs_remdrv_rmdir(vp, nm, rootvp);
+				error = devfs_remdrv_rmdir(vp, nm, rvp);
 				if (error == 0) {
 					error = VOP_RMDIR(dirvp,
-					    (char *)nm, rootvp, kcred);
+					    (char *)nm, rvp, kcred);
 					dsysdebug(error,
 					    ("rem_drv %s/%s rmdir (%d)\n",
 					    dir, nm, error));
@@ -1583,18 +1583,19 @@ devfs_remdrv_cleanup(const char *dir, const char *nodename)
 	int nodenamelen = strlen(nodename);
 	char *nm;
 	struct pathname pn;
+	vnode_t *rvp;		/* root node of the underlying attribute fs */
 
 	dcmn_err5(("devfs_remdrv_cleanup: %s %s\n", dir, nodename));
 
 	if (error = pn_get((char *)dir, UIO_SYSSPACE, &pn))
 		return (0);
 
-	rootvp = dvroot->dv_attrvp;
-	ASSERT(rootvp != NULL);
-	VN_HOLD(rootvp);
+	rvp = dvroot->dv_attrvp;
+	ASSERT(rvp != NULL);
+	VN_HOLD(rvp);
 
 	pn_skipslash(&pn);
-	dirvp = rootvp;
+	dirvp = rvp;
 	VN_HOLD(dirvp);
 
 	nm = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -1603,13 +1604,13 @@ devfs_remdrv_cleanup(const char *dir, const char *nodename)
 		ASSERT(dirvp->v_type == VDIR);
 		(void) pn_getcomponent(&pn, nm);
 		ASSERT((strcmp(nm, ".") != 0) && (strcmp(nm, "..") != 0));
-		error = VOP_LOOKUP(dirvp, nm, &vp, NULL, 0, rootvp, kcred);
+		error = VOP_LOOKUP(dirvp, nm, &vp, NULL, 0, rvp, kcred);
 		if (error) {
 			dcmn_err5(("remdrv_cleanup %s lookup error %d\n",
 			    nm, error));
 			VN_RELE(dirvp);
-			if (dirvp != rootvp)
-				VN_RELE(rootvp);
+			if (dirvp != rvp)
+				VN_RELE(rvp);
 			pn_free(&pn);
 			kmem_free(nm, MAXNAMELEN);
 			return (0);
@@ -1620,8 +1621,8 @@ devfs_remdrv_cleanup(const char *dir, const char *nodename)
 	}
 
 	ASSERT(dirvp->v_type == VDIR);
-	if (dirvp != rootvp)
-		VN_RELE(rootvp);
+	if (dirvp != rvp)
+		VN_RELE(rvp);
 	pn_free(&pn);
 	kmem_free(nm, MAXNAMELEN);
 
@@ -1677,10 +1678,10 @@ devfs_remdrv_cleanup(const char *dir, const char *nodename)
 				vp->v_type == VCHR || vp->v_type == VBLK);
 
 			if (vp->v_type == VDIR) {
-				error = devfs_remdrv_rmdir(vp, nm, rootvp);
+				error = devfs_remdrv_rmdir(vp, nm, rvp);
 				if (error == 0) {
 					error = VOP_RMDIR(dirvp,
-					    (char *)nm, rootvp, kcred);
+					    (char *)nm, rvp, kcred);
 					dsysdebug(error,
 					    ("rem_drv %s/%s rmdir (%d)\n",
 					    dir, nm, error));
