@@ -248,7 +248,7 @@ char  *
 initstate(unsigned seed, char *arg_state, int n)
 {
 	struct _randomjunk *rp = _randomjunk();
-	 char		*ostate;
+	char		*ostate;
 
 	if (rp == 0)
 		return (0);
