@@ -1688,6 +1688,7 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 	int	i;
 	ulong_t an_idx = 0;
 	int	err = 0;
+	int	dyn_ism_unmap = hat_supported(HAT_DYNAMIC_ISM_UNMAP, (void *)0);
 
 #ifdef lint
 	hat = hat;
@@ -1804,16 +1805,24 @@ segspt_dismfault(struct hat *hat, struct seg *seg, caddr_t addr,
 			/*
 			 * And now drop the SE_SHARED lock(s).
 			 */
-			for (i = 0; i < npages; i++)
-				page_unlock(ppa[i]);
+			if (dyn_ism_unmap) {
+				for (i = 0; i < npages; i++) {
+					page_unlock(ppa[i]);
+				}
+			}
 		}
 
-		if (!hat_supported(HAT_DYNAMIC_ISM_UNMAP, (void *)0)) {
+		if (!dyn_ism_unmap) {
 			if (hat_share(seg->s_as->a_hat, shm_addr,
 			    curspt->a_hat, segspt_addr, ptob(npages),
 			    seg->s_szc) != 0) {
 				panic("hat_share err in DISM fault");
 				/* NOTREACHED */
+			}
+			if (type == F_INVAL) {
+				for (i = 0; i < npages; i++) {
+					page_unlock(ppa[i]);
+				}
 			}
 		}
 		AS_LOCK_EXIT(sptseg->s_as, &sptseg->s_as->a_lock);
@@ -2120,6 +2129,7 @@ segspt_shmdup(struct seg *seg, struct seg *newseg)
 	struct shm_data 	*shmd_new;
 	struct seg		*spt_seg = shmd->shm_sptseg;
 	struct spt_data		*sptd = spt_seg->s_data;
+	int			error = 0;
 
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
 
@@ -2139,9 +2149,21 @@ segspt_shmdup(struct seg *seg, struct seg *newseg)
 	if (sptd->spt_flags & SHM_PAGEABLE) {
 		shmd_new->shm_vpage = kmem_zalloc(btopr(amp->size), KM_SLEEP);
 		shmd_new->shm_lckpgs = 0;
+		if (hat_supported(HAT_DYNAMIC_ISM_UNMAP, (void *)0)) {
+			if ((error = hat_share(newseg->s_as->a_hat,
+			    newseg->s_base, shmd->shm_sptas->a_hat, SEGSPTADDR,
+			    seg->s_size, seg->s_szc)) != 0) {
+				kmem_free(shmd_new->shm_vpage,
+				btopr(amp->size));
+			}
+		}
+		return (error);
+	} else {
+		return (hat_share(newseg->s_as->a_hat, newseg->s_base,
+		    shmd->shm_sptas->a_hat, SEGSPTADDR, seg->s_size,
+		    seg->s_szc));
+
 	}
-	return (hat_share(newseg->s_as->a_hat, newseg->s_base,
-	    shmd->shm_sptas->a_hat, SEGSPTADDR, seg->s_size, seg->s_szc));
 }
 
 /*ARGSUSED*/
